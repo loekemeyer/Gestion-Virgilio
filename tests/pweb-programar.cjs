@@ -3,6 +3,8 @@
    Verifica que:
    (a) el barrio se derive de la sucursal de entrega (guión común y raya larga) y que
        "Retira" se reconozca aunque venga escrito de varias formas,
+   (a2) el número visible sea "LK ####" y salga de la RPC de numeración, no del id
+       del pedido —un pedido partido consume varios números correlativos—,
    (b) la zona se sugiera con el MISMO diccionario que usa la PPP (no un criterio nuevo),
    (c) el guardado mande SOLO las filas que la persona editó. La zona sugerida viene
        preseleccionada en el <select>, así que sin este filtro se guardaba sola en
@@ -54,6 +56,10 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
           fecha_recep: "2026-09-03", hora_recep: "15:46:51", direccion: "Juncal 2869 - Martinez",
           v: "21", lineas: 1, cajas: 1, enviado_a_compras: false, items: [{ art: "027", cajas: 1 }] }
       ]);
+      if (u.includes("ppp_web_np_asignar"))     return json([
+        { r_order_id: 1342, r_np_idx: 1, r_np: 1343 },
+        { r_order_id: 1341, r_np_idx: 1, r_np: 1344 }
+      ]);
       if (u.includes("Volumen_Articulos"))       return json([{ codigo: "027", m3: 0.1 }]);
       if (u.includes("PPP_Web_Programacion"))    return json([]);   // sin nada programado todavía
       return json([]);
@@ -63,14 +69,14 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
 
     const btn = document.getElementById("pwebGuardar");
     const arrancaDeshabilitado = btn.disabled;
-    const zonaSugerida = document.getElementById("pwZ_900134201").value;
+    const zonaSugerida = document.getElementById("pwZ_1342_1").value;
     // Martinez ya está en el diccionario de fábrica: la sugerencia sale igual.
-    const zonaSinDicc  = document.getElementById("pwZ_900134101").value;
+    const zonaSinDicc  = document.getElementById("pwZ_1341_1").value;
 
     // Se programa UNA sola: la otra no se toca.
-    document.getElementById("pwT_900134201").value = "D52B";
-    document.getElementById("pwF_900134201").value = "2026-09-05";
-    pwebMarcarSucio("900134201");
+    document.getElementById("pwT_1342_1").value = "D52B";
+    document.getElementById("pwF_1342_1").value = "2026-09-05";
+    pwebMarcarSucio("1342|1");
     const habilitaAlTocar = !btn.disabled;
     await pwebGuardar();
 
@@ -79,13 +85,16 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
       arrancaDeshabilitado, habilitaAlTocar, zonaSugerida, zonaSinDicc,
       posteos: posts.length,
       soloLaTocada: (post.body || []).length === 1,
-      np: ((post.body || [])[0] || {}).np_prov,
+      etiqueta: (document.querySelector(".pweb-np") || {}).textContent,
+      orderGuardado: ((post.body || [])[0] || {}).order_id,
+      npIdxGuardado: ((post.body || [])[0] || {}).np_idx,
+      npGuardado: ((post.body || [])[0] || {}).np,
       tanda: ((post.body || [])[0] || {}).tanda,
       zona: ((post.body || [])[0] || {}).zona,
       fecha: ((post.body || [])[0] || {}).fecha_entrega,
       barrioGuardado: ((post.body || [])[0] || {}).barrio,
       m3Guardado: ((post.body || [])[0] || {}).m3,
-      upsert: String(post.url || "").includes("on_conflict=empresa,np_prov"),
+      upsert: String(post.url || "").includes("on_conflict=empresa,order_id,np_idx"),
       noTocaPppProd: !posts.some(x => String(x.url).includes("PPP_Programacion_Diaria")),
       status: document.getElementById("pwebStatus").textContent
     };
@@ -98,8 +107,8 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
         return { ok: false, status: 403, text: async () => "permission denied" };
       return { ok: true, status: 200, json: async () => ([]), text: async () => "[]" };
     };
-    document.getElementById("pwT_900134101").value = "D53B";
-    pwebMarcarSucio("900134101");
+    document.getElementById("pwT_1341_1").value = "D53B";
+    pwebMarcarSucio("1341|1");
     await pwebGuardar();
     return document.getElementById("pwebStatus").textContent;
   });
@@ -109,7 +118,8 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
     && barrios.suelta === "Calle 44 Nro 1647" && barrios.vacio === "";
   const ok = okBarrios && r.arrancaDeshabilitado && r.habilitaAlTocar
     && r.zonaSugerida === "Zona 3 - CABA Oeste" && r.zonaSinDicc === "Zona 6 - GBA Norte"
-    && r.posteos === 1 && r.soloLaTocada && r.np === "900134201" && r.tanda === "D52B"
+    && r.posteos === 1 && r.soloLaTocada && r.tanda === "D52B"
+    && r.etiqueta === "LK 1343" && r.orderGuardado === 1342 && r.npIdxGuardado === 1 && r.npGuardado === 1343
     && r.zona === "Zona 3 - CABA Oeste" && r.fecha === "2026-09-05"
     && r.barrioGuardado === "Mataderos" && r.m3Guardado === 0.2
     && r.upsert && r.noTocaPppProd && r.status.indexOf("✓") === 0

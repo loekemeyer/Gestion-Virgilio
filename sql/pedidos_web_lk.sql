@@ -53,17 +53,22 @@
 --   `items_string` viene ordenado por código y ya perdió el orden del carrito.
 --
 -- ----------------------------------------------------------------------------
--- LA NORMA DEL EXCEL QUE **NO** SE COPIA: la numeración
+-- ACÁ NO SE NUMERA NADA
 -- ----------------------------------------------------------------------------
---   El `N° Pedido` del Excel (`globalN`) es un contador de la tanda: numera
---   primero todos los pedidos de >= 18 líneas y después los chicos. O sea que EL
---   MISMO PEDIDO SACA UN NÚMERO DISTINTO según con qué otros pedidos salga en el
---   mail. No es identidad y no sirve como clave.
---   Por eso acá va una NP propia y estable: 9 dígitos,
---   `<empresa><order_id 6><parte 2>`, con el primer dígito marcando la empresa
---   igual que ISIS (9 = Loekemeyer, 4 = Chef). Pedido 1342 parte 1 → 900134201.
---   Se renombra a la NP real de ISIS cuando ISIS la asigna (el `np_map` del plan,
---   todavía sin construir).
+--   La identidad de una NP es **(order_id, np_idx)**: el pedido y su parte. Nada
+--   más. El número visible ("LK 1343") lo reparte GESTIÓN con su propio contador
+--   —`ppp_web_np_asignar`, en `sql/ppp_web_programacion.sql`— y se guarda al lado
+--   como etiqueta.
+--
+--   Antes esta vista devolvía un `np_prov` de 9 dígitos que armaba el número acá.
+--   Se sacó el 2026-09-03: tener dos numeraciones compitiendo es pedir que se
+--   usen mal, y el dueño pidió que el número sea corto (4 dígitos con prefijo de
+--   empresa), cosa que una fórmula sobre el order_id no puede dar.
+--
+--   Lo que sigue valiendo es por qué NO se copia el `N° Pedido` del Excel: ese
+--   (`globalN`) es un contador de la tanda —numera primero los pedidos de >= 18
+--   líneas y después los chicos—, así que el mismo pedido saca distinto número
+--   según con qué otros salga en el mail. No es identidad ni sirve como clave.
 --
 -- EL m³ NO SALE DE ACÁ: LK no tiene el volumen por caja. Vive en
 --   `Volumen_Articulos` de Virgilio y lo resuelve Gestión contra su propia base.
@@ -130,7 +135,9 @@ where o.sheets_payload is not null
 --    líneas por separado ni volver a ordenarlas.
 --    `enviado_a_compras` en false = el pedido todavía no salió por mail, o sea
 --    que ISIS ni se enteró. Ese es el caso que la idea 3717 viene a resolver.
-create or replace view public.v_pedidos_web_np
+-- Ojo al reemplazarla: Postgres no deja SACAR columnas con `create or replace`.
+-- Si cambia la lista de columnas hay que `drop view` y volver a crearla.
+create view public.v_pedidos_web_np
 with (security_invoker = true) as
 with cap as (
   select 'lk'::text as empresa, 18 as cap_lineas
@@ -146,9 +153,6 @@ select
   p.empresa,
   p.order_id,
   p.np_idx,
-  case p.empresa when 'lk' then '9' when 'chef' then '4' else '0' end
-    || lpad(p.order_id::text, 6, '0')
-    || lpad(p.np_idx::text,   2, '0')                as np_prov,
   min(p.cod_cliente)                                 as cod,
   min(p.razon_social)                                as razon_social,
   min(p.fecha_pedido)                                as fecha_recep,
@@ -181,7 +185,7 @@ grant select on public.v_pedidos_web_np to authenticated;
 --
 --   -- Lo que todavía no salió por mail. Sin esto, estos pedidos no existen para
 --   -- nadie hasta el día siguiente:
---   select np_prov, cod, razon_social, fecha_recep, hora_recep, direccion,
+--   select order_id, np_idx, cod, razon_social, fecha_recep, hora_recep, direccion,
 --          lineas, cajas
 --     from public.v_pedidos_web_np
 --    where not enviado_a_compras

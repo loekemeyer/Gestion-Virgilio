@@ -8338,9 +8338,8 @@ lee **la misma tabla donde caen los pedidos de la página**, en vivo.
 - **La norma del Excel que NO se copia**: su `N° Pedido` (`globalN`) es un contador
   de la tanda —numera primero los pedidos de ≥18 líneas y después los chicos—, así
   que el mismo pedido saca distinto número según con qué otros salga en el mail.
-  No es identidad. Por eso se usa **NP provisoria**: 9 dígitos,
-  `<empresa><order_id 6><parte 2>`, primer dígito = empresa igual que ISIS
-  (9 = Loekemeyer, 4 = Chef). Pedido 1342 parte 1 → `900134201`.
+  No es identidad y no sirve como clave. La identidad de una NP es
+  **(order_id, np_idx)**; el número visible se reparte aparte (ver abajo).
 
 - **El m³ no sale de LK** (no tiene volumen por caja): lo resuelve Gestión contra
   su propia `Volumen_Articulos`, como `Σ cajas × m3`.
@@ -8391,7 +8390,26 @@ lee **la misma tabla donde caen los pedidos de la página**, en vivo.
   entrega, y se guardan en **`PPP_Web_Programacion`** de esta base
   (`sql/ppp_web_programacion.sql`). Es lo único del circuito que no sale de LK:
   no es un dato del pedido, es una decisión del depósito.
-  - Clave `np_prov` (la NP provisoria, estable). **No** el N° Pedido del Excel.
+  - Clave **(order_id, np_idx)**, la identidad real — no el número visible, que es
+    una etiqueta guardada al lado. Así la programación no depende de cómo se numere.
+  - **El número de NP: `LK 1343`** (v12.62) — prefijo de empresa (`LK` / `CH`) y
+    cuatro dígitos, parecido al id de pedido de la página. Lo reparte
+    `ppp_web_np_asignar` y vive en `PPP_Web_NP`.
+    ⚠ **No es el id del pedido**, aunque arranque pegado a él (seed 1343 = el id
+    más alto al crearlo + 1). Es un **contador propio**, como las NP de ISIS: cada
+    NP consume un número. Tiene que serlo porque un pedido se parte en varias NP
+    —31% de los casos— y si el pedido 1342 diera LK 1342/1343/1344, el pedido 1343
+    de mañana chocaría con el LK 1343 ya usado. A partir del primer pedido partido
+    las dos secuencias se despegan.
+    La RPC es **idempotente** (una NP numerada conserva su número siempre) y toma
+    un `pg_advisory_xact_lock` por empresa: sin eso, dos pantallas abiertas leen el
+    mismo `max(np)` y sacan el mismo número.
+    ⚠ **Techo de 4 dígitos**: a ~273 NP/mes, de 1343 a 9999 hay unos **31 meses**.
+    Ahí hay que reiniciar el contador o pasar a 5 dígitos.
+    La v12.61 usaba una NP de 9 dígitos derivada del `order_id` y calculada en la
+    vista de LK; se eliminó — dos numeraciones compitiendo es pedir que se usen mal.
+    Ojo: Postgres **no deja sacar columnas con `create or replace view`**, hubo que
+    `drop view` y recrearla.
   - **Tabla aparte de `PPP_Programacion_Diaria` a propósito**: esa es la de
     Producción y escribir ahí mezclaría dos circuitos. Conviven sin tocarse.
   - Escritura con la **misma reja** que la PPP: los tres mails de supervisor, por

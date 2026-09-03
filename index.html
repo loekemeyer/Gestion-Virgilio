@@ -6626,7 +6626,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v12.61";
+const APP_VERSION = "v12.62";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -25222,7 +25222,7 @@ async function pwebCargar() {
     const tok = await pwebLkToken();
     const soloPend = !!(document.getElementById("pwebSoloPend") || {}).checked;
     let url = PWEB_LK_URL + "/rest/v1/v_pedidos_web_np"
-            + "?select=np_prov,order_id,np_idx,cod,razon_social,fecha_recep,hora_recep,direccion,v,lineas,cajas,items,enviado_a_compras"
+            + "?select=order_id,np_idx,cod,razon_social,fecha_recep,hora_recep,direccion,v,lineas,cajas,items,enviado_a_compras"
             + "&order=order_id.asc,np_idx.asc&limit=2000";
     if (soloPend) url += "&enviado_a_compras=eq.false";
     const r = await fetch(url, { headers: { apikey: PWEB_LK_ANON, Authorization: "Bearer " + tok } });
@@ -25234,6 +25234,7 @@ async function pwebCargar() {
     nps.forEach(function (n) { (n.items || []).forEach(function (i) { cods[i.art] = 1; }); });
     const vol = await pwebVolumenes(Object.keys(cods));
     await pwebCargarProg();
+    await pwebNumerar(nps);
 
     let m3Tot = 0, cajasTot = 0, sinM3 = {}, npsParciales = 0;
     nps.forEach(function (n) {
@@ -25280,12 +25281,12 @@ async function pwebCargar() {
           + '<th>Tanda</th><th>Zona</th><th>Fecha entrega</th>'
           + '</tr></thead><tbody>';
     nps.forEach(function (n) {
-      const g = _pwebProg[n.np_prov] || {};
+      const id = pwebClave(n);
+      const g = _pwebProg[id] || {};
       const zonaSug = g.zona || pwebZonaSugerida(n.direccion);
-      const id = n.np_prov;
       h += '<tr class="' + (g.tanda ? "pweb-programada" : "") + '" title="'
          + (n.items || []).map(function (i) { return i.art + " x" + i.cajas; }).join(", ") + '">'
-         + '<td class="pweb-np">' + n.np_prov + '</td>'
+         + '<td class="pweb-np">' + pwebEtiqueta(n) + '</td>'
          + '<td>' + (n.cod || "") + '</td>'
          + '<td>' + (n.razon_social || '<i>(sin razón social)</i>') + '</td>'
          + '<td>' + (n.direccion || "") + '</td>'
@@ -25295,16 +25296,16 @@ async function pwebCargar() {
          + '<td class="pweb-num' + (n._m3Parcial ? ' pweb-parcial' : '') + '" title="'
          + (n._m3Parcial ? 'Incompleto: hay artículos sin m³ medido' : '') + '">'
          + (n._m3Parcial ? '~' : '') + n._m3.toFixed(3) + '</td>'
-         + '<td><input class="pweb-in pweb-in-tanda" id="pwT_' + id + '" value="'
+         + '<td><input class="pweb-in pweb-in-tanda" id="pwT_' + id.replace("|","_") + '" value="'
              + escapeHtml(g.tanda || "") + '" placeholder="—" oninput="pwebMarcarSucio(\'' + id + '\')"></td>'
-         + '<td><select class="pweb-in pweb-in-zona" id="pwZ_' + id + '" onchange="pwebMarcarSucio(\'' + id + '\')">'
+         + '<td><select class="pweb-in pweb-in-zona" id="pwZ_' + id.replace("|","_") + '" onchange="pwebMarcarSucio(\'' + id + '\')">'
              + '<option value="">—</option>'
              + PPP_ZONAS.map(function (z) {
                  return '<option value="' + escapeHtml(z) + '"' + (z === zonaSug ? " selected" : "") + '>'
                       + escapeHtml(PPP_ZONA_SHORT[z] || z) + '</option>';
                }).join("")
              + '</select></td>'
-         + '<td><input type="date" class="pweb-in pweb-in-fecha" id="pwF_' + id + '" value="'
+         + '<td><input type="date" class="pweb-in pweb-in-fecha" id="pwF_' + id.replace("|","_") + '" value="'
              + (g.fecha_entrega || "") + '" onchange="pwebMarcarSucio(\'' + id + '\')"></td>'
          + '</tr>';
     });
@@ -25328,21 +25329,24 @@ async function pwebCargar() {
    —los tres mails de supervisor, chequeados por RLS del lado del servidor—, así
    que un operario no puede tocar esto ni con la consola abierta.
 
-   La clave es `np_prov`, que es estable (sale del order_id y del número de parte)
-   y no del contador de la tanda del Excel, que cambia según con qué otros pedidos
-   salga en el mail. */
-let _pwebProg = {};    // np_prov -> { tanda, zona, fecha_entrega }
+   La clave es (order_id, np_idx): la identidad real del pedido y su parte. El
+   número visible ("LK 1343") es una ETIQUETA que se guarda al lado, no la clave —
+   así la programación no depende de cómo se numere.
+   Tampoco se usa el N° Pedido del Excel del mail: ese es un contador de la tanda
+   y el mismo pedido saca distinto número según con qué otros salga. */
+let _pwebProg = {};    // "order_id|np_idx" -> { tanda, zona, fecha_entrega }
+let _pwebNum  = {};    // "order_id|np_idx" -> número de NP (el de 4 dígitos)
 let _pwebNps  = [];    // lo último que se renderizó
 let _pwebSucio = false;
-let _pwebEditadas = {};   // np_prov -> 1, las que tocó la persona en esta pantalla
+let _pwebEditadas = {};   // "order_id|np_idx" -> 1, las que tocó la persona
 
 /* Se anota QUÉ NP tocó la persona, no solo que algo cambió.
    Sin esto, la zona sugerida —que viene preseleccionada en el <select>— se
    guardaba sola en TODAS las filas visibles apenas alguien apretaba Guardar,
    aunque no las hubiera mirado. Una sugerencia no es una decisión: se persiste
    la fila cuando alguien la editó, y no antes. */
-function pwebMarcarSucio(np) {
-  if (np) _pwebEditadas[np] = 1;
+function pwebMarcarSucio(k) {
+  if (k) _pwebEditadas[k] = 1;
   _pwebSucio = true;
   const b = document.getElementById("pwebGuardar");
   if (b) { b.disabled = false; b.classList.add("pweb-btn-sucio"); }
@@ -25352,6 +25356,43 @@ function pwebLimpio() {
   _pwebEditadas = {};
   const b = document.getElementById("pwebGuardar");
   if (b) { b.disabled = true; b.classList.remove("pweb-btn-sucio"); }
+}
+
+/* ===== El número de nota de pedido =====================================
+   Formato: "LK 1343" — prefijo de empresa y CUATRO dígitos. Lo pidió el dueño
+   así, y el número se parece al id de la página a propósito.
+
+   ⚠ NO es el id del pedido, aunque arranque pegado a él. Es un CONTADOR PROPIO
+   de Gestión, igual que las NP de ISIS: cada NP consume un número. Tiene que ser
+   así porque un pedido se parte en varias NP —31% de los casos— y si el pedido
+   1342 se partiera en LK 1342/1343/1344, mañana el pedido 1343 querría el mismo
+   LK 1343 y chocarían. Con contador propio no se repite nunca.
+   Los números los reparte la RPC `ppp_web_np_asignar` del lado del servidor, con
+   un lock por empresa: dos pantallas abiertas a la vez no pueden sacar el mismo.
+   Es idempotente — una NP ya numerada conserva su número para siempre.
+
+   La IDENTIDAD interna sigue siendo (order_id, np_idx), no el número: así el
+   número es una etiqueta y no algo de lo que dependa la programación guardada. */
+function pwebClave(n)   { return n.order_id + "|" + n.np_idx; }
+function pwebPrefijo(e) { return (e === "chef") ? "CH" : "LK"; }
+function pwebEtiqueta(n) {
+  const num = _pwebNum[pwebClave(n)];
+  return num ? (pwebPrefijo(n.empresa) + " " + num) : "…";
+}
+
+/* Pide (y si hace falta asigna) los números de las NP que se están mostrando. */
+async function pwebNumerar(nps) {
+  _pwebNum = {};
+  if (!nps.length) return;
+  const h = await facAuthWriteHeaders();
+  if (!h) return;                         // sin sesión no se numera; la etiqueta queda en "…"
+  const pares = nps.map(function (n) { return { order_id: n.order_id, np_idx: n.np_idx }; });
+  const r = await fetch(SUPABASE_URL + "/rest/v1/rpc/ppp_web_np_asignar", {
+    method: "POST", headers: h,
+    body: JSON.stringify({ p_empresa: "lk", p_pares: pares })
+  });
+  if (!r.ok) return;
+  (await r.json()).forEach(function (x) { _pwebNum[x.r_order_id + "|" + x.r_np_idx] = x.r_np; });
 }
 
 /* El barrio de un pedido web sale de la sucursal de entrega, que viene como
@@ -25380,10 +25421,10 @@ function pwebZonaSugerida(suc) {
 async function pwebCargarProg() {
   _pwebProg = {};
   try {
-    const url = SUPABASE_URL + '/rest/v1/PPP_Web_Programacion?select=np_prov,tanda,zona,fecha_entrega&empresa=eq.lk&limit=5000';
+    const url = SUPABASE_URL + '/rest/v1/PPP_Web_Programacion?select=order_id,np_idx,tanda,zona,fecha_entrega&empresa=eq.lk&limit=5000';
     const r = await fetch(url, { headers: { apikey: SUPABASE_KEY } });
     if (!r.ok) return;
-    (await r.json()).forEach(function (x) { _pwebProg[x.np_prov] = x; });
+    (await r.json()).forEach(function (x) { _pwebProg[x.order_id + "|" + x.np_idx] = x; });
   } catch (_e) {}
 }
 
@@ -25391,17 +25432,20 @@ async function pwebGuardar() {
   const st = document.getElementById("pwebStatus");
   const filas = [];
   _pwebNps.forEach(function (n) {
-    const t = (document.getElementById("pwT_" + n.np_prov) || {}).value || "";
-    const z = (document.getElementById("pwZ_" + n.np_prov) || {}).value || "";
-    const f = (document.getElementById("pwF_" + n.np_prov) || {}).value || "";
-    const g = _pwebProg[n.np_prov] || {};
+    const k  = pwebClave(n);
+    const dk = k.replace("|", "_");
+    const t = (document.getElementById("pwT_" + dk) || {}).value || "";
+    const z = (document.getElementById("pwZ_" + dk) || {}).value || "";
+    const f = (document.getElementById("pwF_" + dk) || {}).value || "";
+    const g = _pwebProg[k] || {};
     // Dos filtros, y los dos hacen falta. Editada: que la zona sugerida no se
     // guarde sola en filas que nadie miró. Distinta: que un guardado no pise
     // filas sin cambios y les corra el actualizado_at sin motivo.
-    if (!_pwebEditadas[n.np_prov]) return;
+    if (!_pwebEditadas[k]) return;
     if (t === (g.tanda || "") && z === (g.zona || "") && f === (g.fecha_entrega || "")) return;
     filas.push({
-      empresa: "lk", np_prov: n.np_prov, order_id: n.order_id, np_idx: n.np_idx,
+      empresa: "lk", order_id: n.order_id, np_idx: n.np_idx,
+      np: _pwebNum[k] || null,          // el número es etiqueta, no la clave
       cod_cliente: n.cod, razon_social: n.razon_social, direccion: n.direccion,
       barrio: pwebBarrioDe(n.direccion),
       tanda: t || null, zona: z || null, fecha_entrega: f || null,
@@ -25414,7 +25458,7 @@ async function pwebGuardar() {
   try {
     const h = await facAuthWriteHeaders({ Prefer: "resolution=merge-duplicates,return=minimal" });
     if (!h) { if (st) st.textContent = "⚠ " + authNoSesionMsg("Iniciá sesión para programar."); return; }
-    const r = await fetch(SUPABASE_URL + "/rest/v1/PPP_Web_Programacion?on_conflict=empresa,np_prov", {
+    const r = await fetch(SUPABASE_URL + "/rest/v1/PPP_Web_Programacion?on_conflict=empresa,order_id,np_idx", {
       method: "POST", headers: h, body: JSON.stringify(filas)
     });
     if (!r.ok) {
@@ -25425,7 +25469,8 @@ async function pwebGuardar() {
       throw new Error("HTTP " + r.status + ": " + txt);
     }
     filas.forEach(function (f) {
-      _pwebProg[f.np_prov] = { np_prov: f.np_prov, tanda: f.tanda, zona: f.zona, fecha_entrega: f.fecha_entrega };
+      _pwebProg[f.order_id + "|" + f.np_idx] =
+        { order_id: f.order_id, np_idx: f.np_idx, tanda: f.tanda, zona: f.zona, fecha_entrega: f.fecha_entrega };
     });
     pwebLimpio();
     await pwebCargar();                       // primero refrescar…

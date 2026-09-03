@@ -1,41 +1,148 @@
 -- ============================================================================
--- PPP_Web_Programacion · la decisión del depósito sobre un pedido web
--- Idea 3717 · corre en VIRGILIO (hrxfctzncixxqmpfhskv)
+-- PPP Web · numeración de NP y programación · Idea 3717
+-- Corre en VIRGILIO (hrxfctzncixxqmpfhskv)
 -- ============================================================================
--- QUÉ GUARDA: tanda, zona y fecha de entrega de cada NP que salió de un pedido
---   web. Es lo ÚNICO del circuito que no puede venir de LK: no es un dato del
---   pedido, es una decisión de acá. Todo lo demás (cliente, ítems, corte en NP)
---   se lee en vivo de LK y no se copia.
+-- Dos cosas que solo existen de este lado:
+--   1) el NÚMERO de nota de pedido que se ve en pantalla,
+--   2) la DECISIÓN del depósito sobre cada NP (tanda, zona, fecha de entrega).
+-- Todo lo demás —cliente, ítems, corte en NP— se lee en vivo de LK y no se copia.
 --
--- ⚠ TABLA NUEVA Y APARTE, NO `PPP_Programacion_Diaria`. Esa es la que están
+-- ----------------------------------------------------------------------------
+-- 1 · EL NÚMERO: "LK 1343" · prefijo de empresa + CUATRO dígitos
+-- ----------------------------------------------------------------------------
+-- Formato pedido por el dueño (2026-09-03): `LK` o `CH`, un espacio, y cuatro
+-- dígitos, parecido al id de pedido de la página.
+--
+-- ⚠ **NO ES EL ID DEL PEDIDO**, aunque arranque pegado a él. Es un CONTADOR
+--   PROPIO, igual que las NP de ISIS: cada NP consume un número. Tiene que ser
+--   así porque un pedido se parte en varias NP —31% de los casos, medido— y si
+--   el pedido 1342 se partiera en LK 1342/1343/1344, mañana el pedido 1343
+--   querría el mismo LK 1343 y chocarían. Con contador propio no se repite nunca.
+--   La contra es que a partir del primer pedido partido el número deja de
+--   coincidir con el id de la página: son dos secuencias distintas.
+--
+-- ⚠ TECHO DE 4 DÍGITOS. Al ritmo medido —188 pedidos/mes × 1,45 NP por pedido =
+--   ~273 NP/mes— desde 1343 hasta 9999 hay unos **31 meses**. Cuando se acerque
+--   hay que decidir: reiniciar el contador (y convivir con números repetidos de
+--   años distintos, como hace ISIS) o pasar a 5 dígitos.
+--
+-- La identidad interna de una NP NO es el número: es **(order_id, np_idx)**. El
+-- número es una etiqueta que se guarda al lado, así la programación no depende
+-- de cómo se numere.
+-- ----------------------------------------------------------------------------
+
+create table if not exists public."PPP_Web_NP" (
+  empresa   text    not null,
+  np        integer not null,
+  order_id  bigint  not null,
+  np_idx    integer not null,
+  creado_at timestamptz not null default now(),
+  primary key (empresa, np),
+  unique (empresa, order_id, np_idx)
+);
+
+-- Desde dónde arranca cada empresa. LK arranca en 1343 = el id de pedido más
+-- alto al momento de crearlo (1342) + 1, para que los primeros números se
+-- parezcan a los de la página.
+create table if not exists public."PPP_Web_NP_Seed" (
+  empresa text primary key,
+  desde   integer not null
+);
+insert into public."PPP_Web_NP_Seed" (empresa, desde)
+values ('lk', 1343), ('chef', 1)
+on conflict (empresa) do nothing;
+
+alter table public."PPP_Web_NP"      enable row level security;
+alter table public."PPP_Web_NP_Seed" enable row level security;
+
+drop policy if exists ppp_web_np_select on public."PPP_Web_NP";
+create policy ppp_web_np_select on public."PPP_Web_NP"
+  for select to anon, authenticated using (true);
+drop policy if exists ppp_web_np_seed_select on public."PPP_Web_NP_Seed";
+create policy ppp_web_np_seed_select on public."PPP_Web_NP_Seed"
+  for select to anon, authenticated using (true);
+
+grant select on public."PPP_Web_NP"      to anon, authenticated;
+grant select on public."PPP_Web_NP_Seed" to anon, authenticated;
+
+-- Reparte números a las NP que todavía no tienen. Es IDEMPOTENTE: una NP ya
+-- numerada conserva su número para siempre, así que la pantalla la puede llamar
+-- en cada carga sin consumir numeración.
+create or replace function public.ppp_web_np_asignar(p_empresa text, p_pares jsonb)
+returns table (r_order_id bigint, r_np_idx integer, r_np integer)
+language plpgsql
+security definer
+set search_path to 'public'
+as $function$
+declare
+  v_next integer;
+begin
+  if auth.uid() is null then
+    raise exception 'Se necesita sesión para asignar números de NP.';
+  end if;
+
+  -- Sin este lock, dos pantallas abiertas a la vez leen el mismo max(np) y sacan
+  -- el mismo número. Es por empresa y se libera solo al cerrar la transacción.
+  perform pg_advisory_xact_lock(hashtext('ppp_web_np:' || p_empresa));
+
+  select greatest(
+           coalesce((select max(n.np) from public."PPP_Web_NP" n where n.empresa = p_empresa), 0) + 1,
+           coalesce((select s.desde from public."PPP_Web_NP_Seed" s where s.empresa = p_empresa), 1)
+         )
+    into v_next;
+
+  with pedir as (
+    select (x->>'order_id')::bigint as oid, (x->>'np_idx')::int as idx
+    from jsonb_array_elements(p_pares) x
+  ),
+  nuevos as (
+    select p.oid, p.idx,
+           row_number() over (order by p.oid, p.idx) - 1 as offset_rn
+    from pedir p
+    where not exists (
+      select 1 from public."PPP_Web_NP" n
+       where n.empresa = p_empresa and n.order_id = p.oid and n.np_idx = p.idx)
+  )
+  insert into public."PPP_Web_NP" (empresa, np, order_id, np_idx)
+  select p_empresa, v_next + nu.offset_rn::int, nu.oid, nu.idx
+  from nuevos nu
+  on conflict (empresa, order_id, np_idx) do nothing;
+
+  return query
+    with pedir as (
+      select (x->>'order_id')::bigint as oid, (x->>'np_idx')::int as idx
+      from jsonb_array_elements(p_pares) x
+    )
+    select n.order_id, n.np_idx, n.np
+      from public."PPP_Web_NP" n
+      join pedir p on p.oid = n.order_id and p.idx = n.np_idx
+     where n.empresa = p_empresa;
+end
+$function$;
+
+revoke all on function public.ppp_web_np_asignar(text, jsonb) from public, anon;
+grant execute on function public.ppp_web_np_asignar(text, jsonb) to authenticated;
+
+
+-- ----------------------------------------------------------------------------
+-- 2 · LA PROGRAMACIÓN: tanda, zona, fecha de entrega
+-- ----------------------------------------------------------------------------
+-- ⚠ TABLA APARTE DE `PPP_Programacion_Diaria`, NO la misma. Esa es la que están
 --   usando los operarios de Producción —misma base, 61 tandas vivas, entregas
 --   hasta octubre— y escribir ahí mezclaría dos circuitos que todavía no están
---   unificados. Cuando el flujo nuevo reemplace al viejo habrá que decidir si se
---   fusionan; hasta entonces conviven sin tocarse.
+--   unificados. Conviven sin tocarse.
 --
--- CLAVE: `np_prov`, la NP provisoria de 9 dígitos que arma `v_pedidos_web_np`
---   en LK (`<empresa><order_id 6><parte 2>`). Es estable porque sale del pedido
---   y del número de parte. **No usar el N° Pedido del Excel del mail**: ese es un
---   contador de la tanda y el mismo pedido saca distinto número según con qué
---   otros salga.
---
--- ESCRITURA: misma reja que `PPP_Programacion_Diaria` — los tres mails de
---   supervisor, chequeados por RLS del lado del servidor. Un operario no puede
---   escribir acá ni con la consola abierta. Si mañana hay otro supervisor, se
---   agrega en las DOS policies (esta y la de la PPP), que hoy están duplicadas a
---   mano.
---
--- `m3` y `m3_parcial` se guardan como FOTO del momento en que se programó, no
---   como cálculo vivo: la tanda se armó con ese número y el volumen de un
---   artículo puede cambiar después. `m3_parcial = true` significa que a esa NP le
---   faltaban artículos sin medir, o sea que el m³ guardado es un PISO.
--- ============================================================================
+-- `m3` y `m3_parcial` se guardan como FOTO del momento de programar, no como
+--   cálculo vivo: la tanda se armó con ese número y el volumen de un artículo
+--   puede cambiar después. `m3_parcial = true` = a esa NP le faltaban artículos
+--   sin medir, o sea que el m³ guardado es un PISO.
+-- ----------------------------------------------------------------------------
 
 create table if not exists public."PPP_Web_Programacion" (
-  empresa        text not null default 'lk',
-  np_prov        text not null,
-  order_id       bigint,
-  np_idx         integer,
+  empresa        text    not null default 'lk',
+  order_id       bigint  not null,
+  np_idx         integer not null,
+  np             integer,              -- etiqueta visible, no la clave
   cod_cliente    text,
   razon_social   text,
   direccion      text,
@@ -52,14 +159,18 @@ create table if not exists public."PPP_Web_Programacion" (
   creado_por     text,
   creado_at      timestamptz not null default now(),
   actualizado_at timestamptz not null default now(),
-  primary key (empresa, np_prov)
+  primary key (empresa, order_id, np_idx)
 );
 
 create index if not exists ppp_web_prog_tanda_idx   on public."PPP_Web_Programacion" (empresa, tanda);
 create index if not exists ppp_web_prog_entrega_idx on public."PPP_Web_Programacion" (fecha_entrega);
+create index if not exists ppp_web_prog_np_idx      on public."PPP_Web_Programacion" (empresa, np);
 
 alter table public."PPP_Web_Programacion" enable row level security;
 
+-- Misma reja que `PPP_Programacion_Diaria`: los tres mails de supervisor,
+-- chequeados por RLS del lado del servidor. Las dos listas están duplicadas a
+-- mano — al sumar un supervisor hay que tocar las DOS policies.
 drop policy if exists ppp_web_prog_select on public."PPP_Web_Programacion";
 create policy ppp_web_prog_select on public."PPP_Web_Programacion"
   for select to anon, authenticated using (true);
@@ -74,8 +185,8 @@ grant select on public."PPP_Web_Programacion" to anon, authenticated;
 grant insert, update, delete on public."PPP_Web_Programacion" to authenticated;
 
 -- Auditoría del lado del servidor: el front no decide quién firmó ni cuándo.
--- `creado_at` se preserva en el UPDATE para que un reprogramado no borre cuándo
--- se programó por primera vez.
+-- `creado_at` se preserva en el UPDATE para que reprogramar no borre cuándo se
+-- programó por primera vez.
 create or replace function public.ppp_web_prog_touch()
 returns trigger language plpgsql as $$
 begin
@@ -92,17 +203,27 @@ create trigger trg_ppp_web_prog_touch
   before insert or update on public."PPP_Web_Programacion"
   for each row execute function public.ppp_web_prog_touch();
 
+
 -- ----------------------------------------------------------------------------
 -- Controles
 -- ----------------------------------------------------------------------------
+--   -- Numeración entregada, y cuánto queda antes del techo de 4 dígitos:
+--   select empresa, min(np) as desde, max(np) as hasta, count(*) as np,
+--          9999 - max(np) as quedan
+--     from public."PPP_Web_NP" group by empresa;
+--
 --   -- Lo programado, por tanda:
 --   select tanda, count(*) as np, sum(cajas) as cajas, round(sum(m3),3) as m3,
 --          bool_or(m3_parcial) as algun_m3_incompleto, min(fecha_entrega) as entrega
 --     from public."PPP_Web_Programacion" where empresa='lk' and tanda is not null
 --    group by tanda order by tanda;
 --
---   -- Que no se haya escrito en la PPP de Producción (tiene que dar 161 o más,
---   -- nunca menos, y ninguna fila con np de 9 dígitos):
+--   -- Que un pedido partido tenga números correlativos:
+--   select order_id, np_idx, np from public."PPP_Web_NP"
+--    where empresa='lk' and order_id in (select order_id from public."PPP_Web_NP"
+--                                         group by order_id having count(*) > 1)
+--    order by order_id, np_idx;
+--
+--   -- Que no se haya escrito en la PPP de Producción (161 o más, nunca menos):
 --   select count(*) from public."PPP_Programacion_Diaria";
---   select count(*) from public."PPP_Programacion_Diaria" where length(np) = 9;
 -- ----------------------------------------------------------------------------

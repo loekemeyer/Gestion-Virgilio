@@ -32,6 +32,7 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
           items: [{ art: "027", cajas: 2 }, { art: "505", cajas: 5 }, { art: "ZZZ", cajas: 3 }] }
       ]);
       // ZZZ tiene FILA pero sin valor: no tiene que sumar 0 en silencio, tiene que avisar.
+      if (u.includes("ppp_web_np_asignar"))    return json([{ r_order_id: 1342, r_np_idx: 1, r_np: 1343 }]);
       if (u.includes("Volumen_Articulos"))     return json([{ codigo: "027", m3: 0.1 }, { codigo: "505", m3: 0.02 }, { codigo: "ZZZ", m3: null }]);
       return json([]);
     };
@@ -47,7 +48,7 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
       avisaSinM3:      res.includes("ZZZ"),
       marcaParcial:    html.includes("~0.300"),  // la NP queda marcada como incompleta
       totalEsPiso:     res.includes("≥0.300"),   // el total se muestra como mínimo, no como valor
-      muestraNp:       html.includes("900134201"),
+      muestraNp:       html.includes("LK 1343"),   // etiqueta corta, no la NP larga de antes
       status:          document.getElementById("pwebStatus").textContent
     };
   });
