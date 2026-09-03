@@ -6627,7 +6627,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v12.63";
+const APP_VERSION = "v12.64";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -7438,6 +7438,12 @@ function equivResolve(cod) { const e = equivLookup(cod); return e ? e.real : Str
    9 / empieza con 4" y "> 90000" son la misma regla. Devuelve "" si no hay número
    → sin empresa no se toca nada. ===== */
 function empresaDeNp(np) {
+  // v12.64 — Las NP de la PPP Web vienen etiquetadas ("LK 1343" / "CH 87") y su
+  // número es de 4 dígitos, así que la regla de abajo las leería como Chef y el
+  // picking mandaría a buscar un pedido de Loekemeyer al sector de Chef. Cuando
+  // la etiqueta dice la empresa, manda la etiqueta.
+  const pref = /^\s*(LK|CH)\b/i.exec(String(np == null ? "" : np));
+  if (pref) return pref[1].toUpperCase();
   const n = parseInt(String(np == null ? "" : np).replace(/\D/g, ""), 10);
   if (isNaN(n)) return "";
   return n > 90000 ? "LK" : "CH";
@@ -7909,6 +7915,7 @@ async function fetchPickingBase() {
 async function fetchPickingBaseFromSupabase() {
   const rows = await supaFetchAll(SUPABASE_PPP_BASE_ENDPOINT, "select=pedido,articulo,cajas");
   const map = new Map();
+  await mergePickingBasePppWeb(map);      // v12.64 — los artículos de los pedidos web
   for (let i = 0; i < rows.length; i++) {
     const ped = pickNormNp(rows[i].pedido);
     if (!ped) continue;
@@ -25375,10 +25382,9 @@ function pwebLimpio() {
    La IDENTIDAD interna sigue siendo (order_id, np_idx), no el número: así el
    número es una etiqueta y no algo de lo que dependa la programación guardada. */
 function pwebClave(n)   { return n.order_id + "|" + n.np_idx; }
-function pwebPrefijo(e) { return (e === "chef") ? "CH" : "LK"; }
 function pwebEtiqueta(n) {
   const num = _pwebNum[pwebClave(n)];
-  return num ? (pwebPrefijo(n.empresa) + " " + num) : "…";
+  return num ? pwebNpLabel(n.empresa, num) : "…";
 }
 
 /* Pide (y si hace falta asigna) los números de las NP que se están mostrando. */
@@ -25577,6 +25583,32 @@ async function pwebGuardar() {
       if (r.status === 401 || r.status === 403) throw new Error("Tu usuario no tiene permiso para programar (solo supervisores).");
       throw new Error("HTTP " + r.status + ": " + txt);
     }
+    // Foto de los artículos: sin esto la tanda llega al celular vacía. Solo de las
+    // que quedaron CON tanda — una NP sin tanda no se pickea, y guardar sus líneas
+    // sería dejar basura que después nadie limpia.
+    const conTanda = _pwebNps.filter(function (n) {
+      return filas.some(function (f) { return f.order_id === n.order_id && f.np_idx === n.np_idx && f.tanda; });
+    });
+    if (conTanda.length) {
+      const lineas = [];
+      conTanda.forEach(function (n) {
+        const etq = pwebNpLabel(n.empresa, _pwebNum[pwebClave(n)]);
+        // Se suma por código: el carrito puede repetir un artículo y el picking
+        // cuenta cajas por código, no renglones.
+        const porArt = {};
+        (n.items || []).forEach(function (i) { porArt[i.art] = (porArt[i.art] || 0) + (Number(i.cajas) || 0); });
+        Object.keys(porArt).forEach(function (a) {
+          lineas.push({ empresa: n.empresa || "lk", order_id: n.order_id, np_idx: n.np_idx,
+                        np_label: etq, articulo: a, cajas: porArt[a] });
+        });
+      });
+      const rb = await fetch(SUPABASE_URL + "/rest/v1/PPP_Web_Base?on_conflict=empresa,order_id,np_idx,articulo", {
+        method: "POST", headers: h, body: JSON.stringify(lineas)
+      });
+      if (!rb.ok) throw new Error("Se guardó la programación pero NO los artículos (HTTP "
+        + rb.status + "): el operario vería la tanda vacía.");
+    }
+
     filas.forEach(function (f) {
       _pwebProg[f.order_id + "|" + f.np_idx] =
         { order_id: f.order_id, np_idx: f.np_idx, tanda: f.tanda, zona: f.zona, fecha_entrega: f.fecha_entrega };
@@ -31124,6 +31156,7 @@ function targetDeliveryDates(sheetMap, futureCount) {
 /* PPP "Programacion Diaria" desde Supabase (aplica los side-effects de m³ persistido). v5.34. */
 async function fetchMonitorSheet() {
   const acc = await fetchMonitorFromSupabase();
+  await mergeMonitorPppWeb(acc);          // v12.64 — las tandas programadas desde la PPP Web
   // Persistimos cada tanda con m³ > 0 para que sobreviva cuando salga de la PPP
   // "Programacion Diaria" (mañana ya no estará pero la recordamos).
   for (const [k, v] of acc) { if (v && v.m3 > 0) rememberTandaM3(k, v.m3); }
@@ -31170,6 +31203,77 @@ async function fetchMonitorFromSupabase() {
     });
   }
   return acc;
+}
+
+/* ===== v12.64 · Las tandas de la PPP Web llegan al operario ================
+   Un pedido programado en la PPP Web tiene que aparecer en el celular igual que
+   uno de ISIS. Se suma al MISMO mapa de tandas, así todo lo que viene después
+   —picking, armado, carga, monitor— funciona sin enterarse de dónde salió.
+
+   La NP viaja ETIQUETADA ("LK 1343"), no como número pelado, y eso no es
+   cosmético: `empresaDeNp` resuelve la empresa por el número (>90000 = LK) y una
+   NP web de 4 dígitos caería en Chef, mandando a buscar un pedido de Loekemeyer
+   al sector equivocado. Con la etiqueta, la empresa la dice el prefijo.
+
+   Es ADITIVO: si esto falla o no devuelve nada, el picking de siempre queda
+   exactamente igual. Por eso va en su propia función y con try/catch. */
+async function mergeMonitorPppWeb(acc) {
+  try {
+    const url = SUPABASE_URL + "/rest/v1/PPP_Web_Programacion"
+      + "?select=empresa,np,tanda,zona,fecha_entrega,cod_cliente,razon_social,direccion,barrio,m3"
+      + "&tanda=not.is.null&limit=5000";
+    const r = await fetch(url, { headers: { apikey: SUPABASE_KEY } });
+    if (!r.ok) return;
+    const rows = await r.json();
+    for (const x of rows) {
+      const tanda = String(x.tanda || "").trim();
+      if (!tanda || !x.np) continue;
+      const np    = pwebNpLabel(x.empresa, x.np);
+      const fe    = String(x.fecha_entrega || "").trim();
+      const feRaw = monitorRawFecha(fe);
+      const mapKey = tanda.toUpperCase();
+      if (!acc.has(mapKey)) acc.set(mapKey, {
+        tanda: tanda, _key: mapKey, m3: 0,
+        fechaEntrega: monitorFmtFecha(fe), fechaEntregaRaw: feRaw,
+        opIsSi: false, pedidos: []
+      });
+      const entry = acc.get(mapKey);
+      const m3 = Number(x.m3) || 0;
+      entry.m3 += m3;
+      entry.pedidos.push({
+        np: np, m3: m3, razonSocial: String(x.razon_social || "").trim(),
+        cod:       String(x.cod_cliente || "").trim(),
+        direccion: String(x.direccion   || "").trim(),
+        barrio:    String(x.barrio      || "").trim(),
+        zona:      String(x.zona        || "").trim()
+      });
+    }
+  } catch (_e) { /* si falla, el picking de ISIS sigue igual */ }
+}
+
+/* Los artículos de esos pedidos. Salen de `PPP_Web_Base`, que es una FOTO tomada
+   al programar, no una lectura en vivo de LK — y acá la copia sí corresponde:
+   el operario pickea lo que se programó, y el pedido no puede cambiarle abajo de
+   la mano mientras lo levanta. Es lo mismo que hace `PPP_Base_Pedidos` con ISIS.
+   (Además el operario no tiene, ni tiene por qué tener, sesión contra LK.) */
+async function mergePickingBasePppWeb(map) {
+  try {
+    const url = SUPABASE_URL + "/rest/v1/PPP_Web_Base?select=np_label,articulo,cajas&limit=20000";
+    const r = await fetch(url, { headers: { apikey: SUPABASE_KEY } });
+    if (!r.ok) return;
+    for (const x of await r.json()) {
+      const np  = pickNormNp(x.np_label);
+      const art = String(x.articulo == null ? "" : x.articulo).trim();
+      if (!np || !art) continue;
+      if (!map.has(np)) map.set(np, []);
+      map.get(np).push({ art: art, cajas: Number(x.cajas) || 0 });
+    }
+  } catch (_e) { /* ídem */ }
+}
+
+/* La etiqueta que ve el operario y que viaja como "NP" por todo el circuito. */
+function pwebNpLabel(empresa, np) {
+  return ((empresa === "chef") ? "CH" : "LK") + " " + np;
 }
 
 /* (v5.34) fetchMonitorFromSheets eliminado: la PPP se lee de Supabase

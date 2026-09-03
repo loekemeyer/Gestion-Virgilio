@@ -229,3 +229,6 @@ PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node te
 
 echo "== pweb-tandas (idea 3717: armar tandas en la PPP Web — mismo criterio que la PPP, no pisa lo manual) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/pweb-tandas.cjs
+
+echo "== pweb-picking (idea 3717: la tanda programada en la PPP Web llega al operario) =="
+PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/pweb-picking.cjs

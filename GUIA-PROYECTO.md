@@ -8439,7 +8439,23 @@ lee **la misma tabla donde caen los pedidos de la página**, en vivo.
       nombres y dos tandas distintas con el mismo código serían un lío en el
       depósito.
     - Una NP sin zona **no se mete en cualquier tanda**: queda sin tanda y se avisa.
-  - Regresión: `tests/pweb-programar.cjs` y `tests/pweb-tandas.cjs`.
+  - **Llega al operario (v12.64)**: la tanda programada en la PPP Web entra al
+    **mismo mapa** que las de ISIS (`mergeMonitorPppWeb` sobre `fetchMonitorSheet`),
+    y sus artículos al mismo mapa de picking (`mergePickingBasePppWeb` sobre
+    `fetchPickingBaseFromSupabase`). Todo lo que viene después —picking, armado,
+    carga, monitor— funciona sin enterarse de dónde salió el pedido. Una tanda
+    puede mezclar NP de ISIS y web.
+    - Es **aditivo y con `try/catch`**: si falla, el picking de siempre queda igual.
+    - Los artículos salen de **`PPP_Web_Base`**, una **foto tomada al programar**.
+      Acá la copia sí corresponde: el operario pickea lo que se programó, y además
+      no tiene sesión contra LK. Es lo mismo que hace `PPP_Base_Pedidos` con ISIS.
+    - ⚠ **La NP viaja etiquetada (`LK 1343`), y no es cosmético.** `empresaDeNp`
+      resolvía la empresa por el número (**>90000 = LK, si no CH**), así que una NP
+      web de 4 dígitos caía en **Chef** y el operario iría a buscar un pedido de
+      Loekemeyer al sector equivocado. Ahora, si la NP trae prefijo `LK`/`CH`,
+      manda el prefijo; las NP de ISIS (solo dígitos) siguen igual.
+  - Regresión: `tests/pweb-programar.cjs`, `tests/pweb-tandas.cjs` y
+    `tests/pweb-picking.cjs`.
 
 **Pendiente MEDIA**: `prodLoad/prodCompute` — RPC parametrizado por rango de fechas,
 cálculo de productividad con m³ y factores. Complejidad alta, dejado para después.

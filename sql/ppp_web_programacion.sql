@@ -227,3 +227,56 @@ create trigger trg_ppp_web_prog_touch
 --   -- Que no se haya escrito en la PPP de Producción (161 o más, nunca menos):
 --   select count(*) from public."PPP_Programacion_Diaria";
 -- ----------------------------------------------------------------------------
+
+
+-- ============================================================================
+-- 3 · PPP_Web_Base · los artículos que ve el operario
+-- ============================================================================
+-- FOTO de las líneas de cada NP, tomada AL PROGRAMAR. Acá la copia sí
+-- corresponde, y por dos motivos:
+--   · el operario pickea lo que se programó — el pedido no puede cambiarle abajo
+--     de la mano mientras lo levanta;
+--   · el operario no tiene, ni tiene por qué tener, sesión contra el proyecto LK.
+-- Es lo mismo que hace `PPP_Base_Pedidos` con los pedidos de ISIS.
+--
+-- `np_label` es la etiqueta ("LK 1343"), que es la que viaja como NP por todo el
+-- circuito de picking. **No es cosmética**: `empresaDeNp` del front resuelve la
+-- empresa por el número (>90000 = LK) y una NP web de 4 dígitos caería en Chef,
+-- mandando a buscar un pedido de Loekemeyer al sector equivocado. Con la etiqueta
+-- la empresa la dice el prefijo.
+-- ============================================================================
+
+create table if not exists public."PPP_Web_Base" (
+  empresa   text    not null default 'lk',
+  order_id  bigint  not null,
+  np_idx    integer not null,
+  np_label  text    not null,
+  articulo  text    not null,
+  cajas     numeric not null default 0,
+  creado_at timestamptz not null default now(),
+  primary key (empresa, order_id, np_idx, articulo)
+);
+create index if not exists ppp_web_base_np_idx on public."PPP_Web_Base" (np_label);
+
+alter table public."PPP_Web_Base" enable row level security;
+
+drop policy if exists ppp_web_base_select on public."PPP_Web_Base";
+create policy ppp_web_base_select on public."PPP_Web_Base"
+  for select to anon, authenticated using (true);
+
+drop policy if exists ppp_web_base_write_sup on public."PPP_Web_Base";
+create policy ppp_web_base_write_sup on public."PPP_Web_Base"
+  for all to authenticated
+  using      ((auth.jwt() ->> 'email') = any (array['loekemeyer.n8n@gmail.com','loekemeyer.logistica@gmail.com','comexloekemeyer@gmail.com']))
+  with check ((auth.jwt() ->> 'email') = any (array['loekemeyer.n8n@gmail.com','loekemeyer.logistica@gmail.com','comexloekemeyer@gmail.com']));
+
+grant select on public."PPP_Web_Base" to anon, authenticated;
+grant insert, update, delete on public."PPP_Web_Base" to authenticated;
+
+--   -- Que ninguna tanda web haya quedado sin artículos (llegaría vacía al celular):
+--   select p.tanda, p.np, count(b.articulo) as lineas
+--     from public."PPP_Web_Programacion" p
+--     left join public."PPP_Web_Base" b
+--       on b.empresa = p.empresa and b.order_id = p.order_id and b.np_idx = p.np_idx
+--    where p.tanda is not null
+--    group by p.tanda, p.np having count(b.articulo) = 0;
