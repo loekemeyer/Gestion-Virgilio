@@ -113,6 +113,24 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
     out.f5_nombre = nombre;
     out.xml = blob ? await blob.text() : "";
 
+    // F9: .xlsx real (ZIP con XMLs), para que el archivo se pueda abrir en el celular.
+    // El .xls XML 2003 es el único probado con ISIS; el .xlsx está para probarlo.
+    blob = null; nombre = "";
+    URL.createObjectURL = function (x) { blob = x; return "blob:test"; };
+    facXlsDescargarXlsx();
+    URL.createObjectURL = origCreate;
+    out.f9_nombre = nombre;
+    if (blob) {
+      const u = new Uint8Array(await blob.arrayBuffer());
+      out.f9_esZip = u[0] === 0x50 && u[1] === 0x4B && u[2] === 0x03 && u[3] === 0x04;   // "PK\x03\x04"
+      out.f9_bytes = u.length;
+      let txt = ""; for (let i = 0; i < u.length; i++) txt += String.fromCharCode(u[i]);
+      out.f9_partes = ["[Content_Types].xml", "_rels/.rels", "xl/workbook.xml",
+                       "xl/_rels/workbook.xml.rels", "xl/worksheets/sheet1.xml",
+                       "xl/worksheets/sheet2.xml"].filter(function (n) { return txt.indexOf(n) >= 0; }).length;
+      out.f9_codTexto = txt.indexOf("<t xml:space=\"preserve\">029</t>") >= 0;   // 029 va como texto, no número
+    }
+
     // F8: el CSV alternativo (mismo contenido, para mirarlo desde el celular)
     blob = null; nombre = "";
     URL.createObjectURL = function (x) { blob = x; return "blob:test"; };
@@ -165,9 +183,15 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
   ck(r.f8_bom === true, "F8: al CSV le falta el BOM (Excel/Numbers rompen los acentos)");
   ck((r.csv || "").split("\r\n").length >= 40, "F8: el CSV tiene " + (r.csv || "").split("\r\n").length + " líneas (esperaba 39 + encabezado)");
   ck((r.csv || "").indexOf(";") > 0, "F8: el CSV no usa punto y coma");
+  // F9: .xlsx real
+  ck(/\.xlsx$/.test(r.f9_nombre || ""), "F9: el xlsx se llama '" + r.f9_nombre + "'");
+  ck(r.f9_esZip === true, "F9: el .xlsx no arranca con la firma de un ZIP");
+  ck(r.f9_partes === 6, "F9: el .xlsx tiene " + r.f9_partes + " de las 6 partes obligatorias");
+  ck(r.f9_codTexto === true, "F9: en el .xlsx el código 029 no quedó como texto (Excel lo mostraría como 29)");
+  ck((r.f9_bytes || 0) > 1000, "F9: el .xlsx pesa " + r.f9_bytes + " bytes");
   ck(errs.length === 0, "errores de página: " + errs.join(" | "));
 
   await b.close();
   if (fails.length) { console.error("fac-excel-isis: FALLÓ\n - " + fails.join("\n - ")); process.exit(1); }
-  console.log("fac-excel-isis: OK (selección en la lista, dedup, split 18/15, orden por código, XML 2003, previa + CSV)");
+  console.log("fac-excel-isis: OK (selección en la lista, dedup, split 18/15, orden por código, XML 2003, previa, CSV y xlsx real)");
 })();
