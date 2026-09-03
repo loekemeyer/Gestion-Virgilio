@@ -1785,6 +1785,13 @@ button.pk-anular small{ display:block; font-size:12px; font-weight:700; opacity:
 .pweb-num{ text-align:right; font-variant-numeric:tabular-nums; white-space:nowrap; }
 .pweb-parcial{ color:#fbbf24; }
 .pweb-card-parcial b{ color:#fbbf24; }
+.pweb-in{ background:#0b1220; color:#e2e8f0; border:1px solid #1e293b; border-radius:6px;
+  padding:4px 6px; font-size:13px; font-family:inherit; }
+.pweb-in-tanda{ width:74px; text-transform:uppercase; }
+.pweb-in-zona{ max-width:130px; }
+.pweb-in-fecha{ width:140px; }
+.pweb-programada td{ background:#0d1b14; }
+.pweb-btn-sucio{ border-color:#f59e0b !important; color:#fbbf24 !important; }
 /* v8.68 — grilla de botones del hub Configuración (2 columnas, angosto y centrado).
    Selector con doble clase (.sup-actions.cfg-actions) para ganarle en especificidad a
    .sup-actions.sup-secondary (que fuerza 7/3 columnas). */
@@ -3934,6 +3941,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
       <div class="ppp-btnrow">
         <button class="ppp-imp-toggle" onclick="pwebCargar()">↻ Actualizar</button>
         <label class="pweb-chk"><input type="checkbox" id="pwebSoloPend" checked onchange="pwebCargar()"> Solo los que todavía no salieron por mail</label>
+        <button class="ppp-imp-toggle" id="pwebGuardar" onclick="pwebGuardar()" disabled>💾 Guardar programación</button>
       </div>
       <div id="pwebResumen" class="pweb-resumen"></div>
       <div id="pwebTabla" class="ppp-preview"></div>
@@ -6618,7 +6626,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v12.60";
+const APP_VERSION = "v12.61";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -25225,6 +25233,7 @@ async function pwebCargar() {
     const cods = {};
     nps.forEach(function (n) { (n.items || []).forEach(function (i) { cods[i.art] = 1; }); });
     const vol = await pwebVolumenes(Object.keys(cods));
+    await pwebCargarProg();
 
     let m3Tot = 0, cajasTot = 0, sinM3 = {}, npsParciales = 0;
     nps.forEach(function (n) {
@@ -25267,10 +25276,15 @@ async function pwebCargar() {
 
     let h = '<table class="pweb-table"><thead><tr>'
           + '<th>NP</th><th>Cliente</th><th>Razón social</th><th>Entrega</th>'
-          + '<th>Recibido</th><th>Líneas</th><th>Cajas</th><th>m³</th><th>Vend</th>'
+          + '<th>Recibido</th><th>Líneas</th><th>Cajas</th><th>m³</th>'
+          + '<th>Tanda</th><th>Zona</th><th>Fecha entrega</th>'
           + '</tr></thead><tbody>';
     nps.forEach(function (n) {
-      h += '<tr title="' + (n.items || []).map(function (i) { return i.art + " x" + i.cajas; }).join(", ") + '">'
+      const g = _pwebProg[n.np_prov] || {};
+      const zonaSug = g.zona || pwebZonaSugerida(n.direccion);
+      const id = n.np_prov;
+      h += '<tr class="' + (g.tanda ? "pweb-programada" : "") + '" title="'
+         + (n.items || []).map(function (i) { return i.art + " x" + i.cajas; }).join(", ") + '">'
          + '<td class="pweb-np">' + n.np_prov + '</td>'
          + '<td>' + (n.cod || "") + '</td>'
          + '<td>' + (n.razon_social || '<i>(sin razón social)</i>') + '</td>'
@@ -25281,12 +25295,141 @@ async function pwebCargar() {
          + '<td class="pweb-num' + (n._m3Parcial ? ' pweb-parcial' : '') + '" title="'
          + (n._m3Parcial ? 'Incompleto: hay artículos sin m³ medido' : '') + '">'
          + (n._m3Parcial ? '~' : '') + n._m3.toFixed(3) + '</td>'
-         + '<td>' + (n.v || "") + '</td>'
+         + '<td><input class="pweb-in pweb-in-tanda" id="pwT_' + id + '" value="'
+             + escapeHtml(g.tanda || "") + '" placeholder="—" oninput="pwebMarcarSucio(\'' + id + '\')"></td>'
+         + '<td><select class="pweb-in pweb-in-zona" id="pwZ_' + id + '" onchange="pwebMarcarSucio(\'' + id + '\')">'
+             + '<option value="">—</option>'
+             + PPP_ZONAS.map(function (z) {
+                 return '<option value="' + escapeHtml(z) + '"' + (z === zonaSug ? " selected" : "") + '>'
+                      + escapeHtml(PPP_ZONA_SHORT[z] || z) + '</option>';
+               }).join("")
+             + '</select></td>'
+         + '<td><input type="date" class="pweb-in pweb-in-fecha" id="pwF_' + id + '" value="'
+             + (g.fecha_entrega || "") + '" onchange="pwebMarcarSucio(\'' + id + '\')"></td>'
          + '</tr>';
     });
     h += '</tbody></table>';
     if (tb) tb.innerHTML = h;
+    _pwebNps = nps;
+    pwebLimpio();
     if (st) st.textContent = "";
+  } catch (e) {
+    if (st) st.textContent = "⚠ " + (e && e.message ? e.message : e);
+  }
+}
+
+/* ===== Programación: tanda / zona / fecha de entrega =====================
+   Es lo ÚNICO que no puede salir de LK: no es un dato del pedido, es una
+   decisión del depósito. Vive en `PPP_Web_Programacion` de ESTA base.
+
+   ⚠ Tabla NUEVA y aparte a propósito. `PPP_Programacion_Diaria` es la que están
+   usando los operarios de Producción (misma base, 61 tandas vivas): escribir ahí
+   mezclaría dos circuitos. La reja de escritura es la MISMA que la de esa tabla
+   —los tres mails de supervisor, chequeados por RLS del lado del servidor—, así
+   que un operario no puede tocar esto ni con la consola abierta.
+
+   La clave es `np_prov`, que es estable (sale del order_id y del número de parte)
+   y no del contador de la tanda del Excel, que cambia según con qué otros pedidos
+   salga en el mail. */
+let _pwebProg = {};    // np_prov -> { tanda, zona, fecha_entrega }
+let _pwebNps  = [];    // lo último que se renderizó
+let _pwebSucio = false;
+let _pwebEditadas = {};   // np_prov -> 1, las que tocó la persona en esta pantalla
+
+/* Se anota QUÉ NP tocó la persona, no solo que algo cambió.
+   Sin esto, la zona sugerida —que viene preseleccionada en el <select>— se
+   guardaba sola en TODAS las filas visibles apenas alguien apretaba Guardar,
+   aunque no las hubiera mirado. Una sugerencia no es una decisión: se persiste
+   la fila cuando alguien la editó, y no antes. */
+function pwebMarcarSucio(np) {
+  if (np) _pwebEditadas[np] = 1;
+  _pwebSucio = true;
+  const b = document.getElementById("pwebGuardar");
+  if (b) { b.disabled = false; b.classList.add("pweb-btn-sucio"); }
+}
+function pwebLimpio() {
+  _pwebSucio = false;
+  _pwebEditadas = {};
+  const b = document.getElementById("pwebGuardar");
+  if (b) { b.disabled = true; b.classList.remove("pweb-btn-sucio"); }
+}
+
+/* El barrio de un pedido web sale de la sucursal de entrega, que viene como
+   "Bragado 5742 - Mataderos". Se corta por el ÚLTIMO separador (guión común o
+   raya larga: los dos aparecen en el padrón). 444 de las 472 sucursales tienen
+   separador; el resto son direcciones sueltas y retiros. */
+function pwebBarrioDe(suc) {
+  const t = String(suc || "").trim();
+  if (!t) return "";
+  if (/retir/i.test(t)) return "Retira";
+  const partes = t.split(/\s[-—–]\s|—/);
+  return (partes.length > 1 ? partes[partes.length - 1] : t).trim();
+}
+
+/* La zona NO se inventa acá: se resuelve con el MISMO diccionario compartido que
+   usa la PPP (Zonas_Barrios + overrides), así una zona corregida en un lado vale
+   en el otro. Si el barrio no está en el diccionario devuelve vacío y lo elige
+   la persona. */
+function pwebZonaSugerida(suc) {
+  const b = pwebBarrioDe(suc);
+  if (!b) return "";
+  if (b === "Retira") return "Retira";
+  return pppZonaDeBarrio(b) || "";
+}
+
+async function pwebCargarProg() {
+  _pwebProg = {};
+  try {
+    const url = SUPABASE_URL + '/rest/v1/PPP_Web_Programacion?select=np_prov,tanda,zona,fecha_entrega&empresa=eq.lk&limit=5000';
+    const r = await fetch(url, { headers: { apikey: SUPABASE_KEY } });
+    if (!r.ok) return;
+    (await r.json()).forEach(function (x) { _pwebProg[x.np_prov] = x; });
+  } catch (_e) {}
+}
+
+async function pwebGuardar() {
+  const st = document.getElementById("pwebStatus");
+  const filas = [];
+  _pwebNps.forEach(function (n) {
+    const t = (document.getElementById("pwT_" + n.np_prov) || {}).value || "";
+    const z = (document.getElementById("pwZ_" + n.np_prov) || {}).value || "";
+    const f = (document.getElementById("pwF_" + n.np_prov) || {}).value || "";
+    const g = _pwebProg[n.np_prov] || {};
+    // Dos filtros, y los dos hacen falta. Editada: que la zona sugerida no se
+    // guarde sola en filas que nadie miró. Distinta: que un guardado no pise
+    // filas sin cambios y les corra el actualizado_at sin motivo.
+    if (!_pwebEditadas[n.np_prov]) return;
+    if (t === (g.tanda || "") && z === (g.zona || "") && f === (g.fecha_entrega || "")) return;
+    filas.push({
+      empresa: "lk", np_prov: n.np_prov, order_id: n.order_id, np_idx: n.np_idx,
+      cod_cliente: n.cod, razon_social: n.razon_social, direccion: n.direccion,
+      barrio: pwebBarrioDe(n.direccion),
+      tanda: t || null, zona: z || null, fecha_entrega: f || null,
+      m3: Number(n._m3.toFixed(3)), m3_parcial: !!n._m3Parcial,
+      lineas: n.lineas, cajas: n.cajas
+    });
+  });
+  if (!filas.length) { if (st) st.textContent = "No hay cambios para guardar."; return; }
+  if (st) st.textContent = "Guardando " + filas.length + "…";
+  try {
+    const h = await facAuthWriteHeaders({ Prefer: "resolution=merge-duplicates,return=minimal" });
+    if (!h) { if (st) st.textContent = "⚠ " + authNoSesionMsg("Iniciá sesión para programar."); return; }
+    const r = await fetch(SUPABASE_URL + "/rest/v1/PPP_Web_Programacion?on_conflict=empresa,np_prov", {
+      method: "POST", headers: h, body: JSON.stringify(filas)
+    });
+    if (!r.ok) {
+      const txt = (await r.text()).slice(0, 300);
+      // La RLS solo deja escribir a los tres mails de supervisor: si el que está
+      // logueado no es uno, PostgREST devuelve 401/403 y hay que decirlo claro.
+      if (r.status === 401 || r.status === 403) throw new Error("Tu usuario no tiene permiso para programar (solo supervisores).");
+      throw new Error("HTTP " + r.status + ": " + txt);
+    }
+    filas.forEach(function (f) {
+      _pwebProg[f.np_prov] = { np_prov: f.np_prov, tanda: f.tanda, zona: f.zona, fecha_entrega: f.fecha_entrega };
+    });
+    pwebLimpio();
+    await pwebCargar();                       // primero refrescar…
+    if (st) st.textContent = "✓ Guardado (" + filas.length + ").";   // …y recién ahí el cartel, que si no lo borra el refresco
   } catch (e) {
     if (st) st.textContent = "⚠ " + (e && e.message ? e.message : e);
   }

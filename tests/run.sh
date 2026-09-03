@@ -223,3 +223,6 @@ PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node te
 
 echo "== pweb-ppp-web (idea 3717: PPP Web — lee LK en vivo, m³ local, no toca la PPP de Producción) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/pweb-ppp-web.cjs
+
+echo "== pweb-programar (idea 3717: programar desde la PPP Web — tanda/zona/fecha, solo lo editado) =="
+PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/pweb-programar.cjs

@@ -8387,8 +8387,28 @@ lee **la misma tabla donde caen los pedidos de la página**, en vivo.
   61 tandas, entregas hasta el 28/10. La PPP Web es una vista aparte que no
   escribe nada. Vaciar esa tabla para "empezar limpio" rompería Producción.
 
-- **Falta**: persistir la asignación de tanda, zona y fecha de entrega. Hoy la
-  pantalla muestra las NP pero todavía no se pueden bajar a picking.
+- **Programar (v12.61)**: cada fila de la PPP Web tiene tanda, zona y fecha de
+  entrega, y se guardan en **`PPP_Web_Programacion`** de esta base
+  (`sql/ppp_web_programacion.sql`). Es lo único del circuito que no sale de LK:
+  no es un dato del pedido, es una decisión del depósito.
+  - Clave `np_prov` (la NP provisoria, estable). **No** el N° Pedido del Excel.
+  - **Tabla aparte de `PPP_Programacion_Diaria` a propósito**: esa es la de
+    Producción y escribir ahí mezclaría dos circuitos. Conviven sin tocarse.
+  - Escritura con la **misma reja** que la PPP: los tres mails de supervisor, por
+    RLS del lado del servidor. Las dos listas están duplicadas a mano — al sumar
+    un supervisor hay que tocar las dos policies.
+  - La **zona se sugiere** con el mismo diccionario compartido que usa la PPP
+    (`Zonas_Barrios` + overrides, vía `pppZonaDeBarrio`), así una zona corregida
+    en un lado vale en el otro. El barrio sale de la sucursal de entrega cortando
+    por el último separador ("Bragado 5742 - Mataderos" → Mataderos); "Retira" en
+    cualquier grafía se reconoce como tal. 444 de 472 sucursales traen separador.
+  - ⚠ **La sugerencia no es una decisión**: solo se guardan las filas que la
+    persona editó. Sin ese filtro la zona sugerida —que viene preseleccionada en
+    el `<select>`— se guardaba sola en todas las filas visibles al apretar
+    Guardar, aunque nadie las hubiera mirado.
+  - `m3` y `m3_parcial` se guardan como **foto** del momento de programar: la
+    tanda se armó con ese número. `m3_parcial` marca que ese m³ es un piso.
+  - Regresión: `tests/pweb-programar.cjs`.
 
 **Pendiente MEDIA**: `prodLoad/prodCompute` — RPC parametrizado por rango de fechas,
 cálculo de productividad con m³ y factores. Complejidad alta, dejado para después.
