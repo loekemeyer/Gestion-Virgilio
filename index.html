@@ -3497,6 +3497,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
     <button onclick="openRuteo()" style="width:100%;margin-top:8px;padding:13px;border:none;border-radius:10px;background:#0f766e;color:#fff;font-size:15px;font-weight:800;cursor:pointer">🗺️ Armar ruta de reparto de mañana</button>
     <button onclick="openZonasMapa()" title="Geocodifica todas las direcciones (OpenStreetMap) y las muestra en un mapa por zona, para parametrizar bien las zonas" style="width:100%;margin-top:6px;padding:11px;border:1px solid #0f766e;border-radius:10px;background:#ecfeff;color:#0f766e;font-size:14px;font-weight:800;cursor:pointer">📍 Mapa de zonas (geocodificar)</button>
     <div id="facTickedList" class="fac-ticked-list" style="display:none"></div>
+    <button id="facBtnXlsIsis" onclick="facXlsIsisOpen()" title="PRUEBA: arma el mismo Excel que hoy sale por mail a las 12:30, pero con las cajas ENTREGADAS, para confirmar que ISIS lo importa. No se importa en produccion." style="flex:0 0 100%;width:100%;margin-top:6px;padding:10px;border:1px solid #fcd34d;border-radius:10px;background:#fffbeb;color:#78350f;font-size:13px;font-weight:800;cursor:pointer">⬇ Excel para ISIS <span style="font-weight:600;opacity:.85">(prueba de formato)</span></button>
     <button onclick="facNCOpen()" title="Anular una factura ya emitida con una Nota de Crédito" style="flex:0 0 100%;width:100%;margin-top:4px;padding:9px;border:1px solid #fecaca;border-radius:10px;background:#fff;color:#b91c1c;font-size:13px;font-weight:800;cursor:pointer">🧾 Anular factura (Nota de Crédito)</button>
   </div>
   <div class="fac-toast" id="facToast"></div>
@@ -6557,7 +6558,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v12.50";
+const APP_VERSION = "v12.51";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -32879,6 +32880,401 @@ async function facMaybePrintFacturado(np, tanda){
     if (!ok) return;
   }
   await facPrintFacturado(np, tanda);
+}
+
+/* ============================================================================
+   PASO 0 de la idea 3717 — "Excel para ISIS (prueba)"
+   ----------------------------------------------------------------------------
+   QUÉ ES: arma, desde las NP que YA se facturaron, el MISMO archivo Excel que
+   hoy sale por mail a las 12:30 (Edge Function `procesar-pedidos-db` del
+   proyecto LK), pero con las cajas ENTREGADAS en vez de las pedidas.
+
+   PARA QUÉ: probar que ISIS importa ese formato armado desde Virgilio. Es el
+   único paso autorizado de la idea 3717 (ver docs/PLAN-PEDIDO-DIRECTO-3717.md,
+   §11). NO cambia nada del circuito actual.
+
+   ⚠ EL ARCHIVO NO SE IMPORTA EN PRODUCCIÓN. Las NP que lleva ya están en ISIS
+   y ya se facturaron; si se importara, ISIS numeraría NP nuevas para pedidos
+   que ya existen. Por eso el archivo se llama PRUEBA_NO_IMPORTAR_*, la hoja
+   "Resumen" abre con la advertencia y el botón sólo lo ve un supervisor.
+
+   SIN BACKEND: no crea funciones, tablas ni columnas en Supabase. Lee con la
+   anon key las mismas tablas que ya lee la app. Cuando el formato se valide,
+   §4.6 del plan mueve la consulta a una RPC.
+
+   REGLAS (verificadas contra datos reales el 2026-09-03):
+   - Tope de líneas por NP: 18 en Loekemeyer (NP 9xxxx) y 15 en CHEF (NP 4xxxx).
+   - La partición es por orden ASCENDENTE de código de artículo.
+   - Una misma línea puede estar cargada dos veces en Entregas_Virgilio (28 NP
+     de 748 en 60 días, por re-armado): se toma la última y se topea contra lo
+     pedido, para no facturar el doble.
+   ========================================================================== */
+
+let _facXls = null;
+
+/* Mismo padCodArt que la Edge Function: 3 dígitos + letras, sin uppercase.
+   Antes saca el sufijo de empresa (" LK" / " CH") que usa el stock de Virgilio. */
+function _facXlsPadCod(cod) {
+  const s = String(cod == null ? "" : cod).trim().replace(/\s+(LK|CH)$/i, "");
+  const d = (s.match(/\d+/) || [""])[0];
+  const l = (s.match(/[a-zA-Z]+/) || [""])[0];
+  return (d ? d.padStart(3, "0") : "") + l;
+}
+
+/* Empresa por el PRIMER dígito de la NP (9 = Loekemeyer, 4 = Chef).
+   Sirve para el tope de líneas, que es distinto en cada una. */
+function _facXlsEmpresa(np) {
+  const d = String(np == null ? "" : np).replace(/\D/g, "");
+  return d.charAt(0) === "4" ? "chef" : "lk";
+}
+function _facXlsTope(np) { return _facXlsEmpresa(np) === "chef" ? 15 : 18; }
+
+function _facXlsFechaAR(d) {
+  try { return new Date(d).toLocaleDateString("en-CA", { timeZone: "America/Argentina/Buenos_Aires" }); }
+  catch (_e) { return ""; }
+}
+function _facXlsDDMMYYYY(iso) {
+  const m = String(iso || "").match(/^(\d{4})-(\d{2})-(\d{2})/);
+  return m ? (m[3] + "/" + m[2] + "/" + m[1]) : "";
+}
+
+/* Abre el módulo. Sólo supervisor. */
+async function facXlsIsisOpen() {
+  if (!requireSupervisor()) return;
+  const hoy = _facXlsFechaAR(new Date());
+  _facXls = { desde: hoy, hasta: hoy, rows: [], nps: [], sel: {}, cargando: true, error: "" };
+  _facXlsShell();
+  await facXlsIsisCargar();
+}
+
+function facXlsIsisClose() {
+  _facXls = null;
+  const el = document.getElementById("facXlsOverlay");
+  if (el) el.remove();
+}
+
+function _facXlsShell() {
+  let ov = document.getElementById("facXlsOverlay");
+  if (!ov) {
+    ov = document.createElement("div");
+    ov.id = "facXlsOverlay";
+    ov.style.cssText = "position:fixed;inset:0;z-index:100000;background:rgba(15,23,42,.55);display:flex;align-items:flex-start;justify-content:center;padding:16px;overflow:auto;";
+    ov.innerHTML =
+      '<div style="background:#fff;border-radius:14px;max-width:min(1100px,97vw);width:100%;margin:auto;box-shadow:0 10px 40px rgba(0,0,0,.3);overflow:hidden">' +
+        '<div style="background:#78350f;color:#fff;padding:14px 18px;display:flex;align-items:center;gap:12px">' +
+          '<b style="font-size:17px;flex:1">Excel para ISIS — PRUEBA de formato</b>' +
+          '<button onclick="facXlsIsisClose()" style="background:#fff;color:#78350f;border:none;border-radius:8px;padding:7px 14px;font-weight:800;cursor:pointer">Cerrar</button>' +
+        '</div>' +
+        '<div id="facXlsBody" style="padding:16px 18px;font-size:14px"></div>' +
+      '</div>';
+    document.body.appendChild(ov);
+  }
+  _facXlsRender();
+}
+
+async function facXlsIsisCargar() {
+  if (!_facXls) return;
+  _facXls.cargando = true; _facXls.error = ""; _facXlsRender();
+  try {
+    const H = { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY };
+    const d0 = _facXls.desde + "T00:00:00-03:00";
+    const d1 = _facXls.hasta + "T23:59:59-03:00";
+
+    // 1) NP facturadas en el rango
+    const rNp = await fetch(SUPABASE_FACTURACION_NP_ENDPOINT +
+      "?select=np,tanda,m3,razon_social,cod_cliente,fecha_salida,facturado_at" +
+      "&facturado_at=gte." + encodeURIComponent(d0) +
+      "&facturado_at=lte." + encodeURIComponent(d1) +
+      "&order=np.asc&limit=2000", { headers: H, cache: "no-store" });
+    if (!rNp.ok) throw new Error("Facturacion_NP HTTP " + rNp.status);
+    let nps = await rNp.json();
+    nps = (nps || []).filter(function (x) { return /^\d{4,7}$/.test(String(x.np)); }); // fuera la basura del simulador
+    if (!nps.length) { _facXls.nps = []; _facXls.rows = []; _facXls.cargando = false; _facXlsRender(); return; }
+
+    const lista = nps.map(function (x) { return String(x.np); });
+    const inList = "(" + lista.join(",") + ")";
+
+    // 2) Líneas armadas, 3) fecha del pedido, 4) uxb, 5) vendedor, 6) sucursal
+    const [ent, base, uxb, vend, match] = await Promise.all([
+      fetch(SUPABASE_URL + "/rest/v1/Entregas_Virgilio?select=id,np,cod_art,cajas_pedidas,cajas_entregadas&np=in." + inList + "&order=id.asc&limit=20000", { headers: H, cache: "no-store" }).then(function (r) { return r.ok ? r.json() : []; }),
+      fetch(SUPABASE_URL + "/rest/v1/PPP_Base_Pedidos?select=pedido,fecha&pedido=in." + inList + "&limit=20000", { headers: H, cache: "no-store" }).then(function (r) { return r.ok ? r.json() : []; }),
+      supaFetchAllSafe(SUPABASE_URL + "/rest/v1/vista_uxb_articulo", "select=cod,uxb").catch(function () { return []; }),
+      supaFetchAllSafe(SUPABASE_URL + "/rest/v1/clientes_vendedor", "select=cod_cliente,vend").catch(function () { return []; }),
+      supaFetchAllSafe(SUPABASE_URL + "/rest/v1/lk_pedidos_match", "select=cod_cliente,empresa,fecha_pedido,sucursal_entrega,items_string,ambiguo,orden_en_dia").catch(function () { return []; })
+    ]);
+
+    // Índices
+    const uxbBy = {}; (uxb || []).forEach(function (x) { const k = String(x.cod || "").replace(/^0+/, ""); if (k) uxbBy[k] = Number(x.uxb) || null; });
+    const vendBy = {}; (vend || []).forEach(function (x) { vendBy[String(x.cod_cliente)] = String(x.vend || ""); });
+    const fechaBy = {}; (base || []).forEach(function (x) {
+      const f = String(x.fecha || "").slice(0, 10);
+      const k = String(x.pedido);
+      if (f && (!fechaBy[k] || f < fechaBy[k])) fechaBy[k] = f;
+    });
+
+    // Líneas por NP, dedup por (np, cod_art) quedándose con la ÚLTIMA cargada
+    const porNp = {};
+    (ent || []).forEach(function (e) {
+      const np = String(e.np), cod = String(e.cod_art || "");
+      if (!np || !cod) return;
+      if (!porNp[np]) porNp[np] = {};
+      const k = cod;
+      const prev = porNp[np][k];
+      const ce = Number(e.cajas_entregadas) || 0, cp = Number(e.cajas_pedidas) || 0;
+      if (!prev || Number(e.id) > Number(prev.id)) {
+        porNp[np][k] = { id: e.id, cod: cod, ent: ce, ped: cp, n: (prev ? prev.n + 1 : 1), sum: (prev ? prev.sum + ce : ce) };
+      } else {
+        prev.n += 1; prev.sum += ce;
+      }
+    });
+
+    // Sucursal: pedido web del mismo cliente y empresa, dentro de [fecha-3, fecha].
+    // Desempate por INCLUSIÓN de los ítems de la NP en el pedido (un pedido grande
+    // se parte en varias NP, así que la igualdad exacta nunca daría).
+    function sucursalDe(np, cod, fecha, itemsNp) {
+      const emp = _facXlsEmpresa(np);
+      const cands = (match || []).filter(function (m) {
+        if (String(m.cod_cliente) !== String(cod) || String(m.empresa) !== emp) return false;
+        const f = String(m.fecha_pedido || "").slice(0, 10);
+        if (!f || !fecha) return false;
+        const d = (new Date(fecha + "T00:00:00Z") - new Date(f + "T00:00:00Z")) / 86400000;
+        return d >= 0 && d <= 3;
+      });
+      if (!cands.length) return { suc: "", dudosa: false, nCand: 0 };
+      let best = null;
+      cands.forEach(function (m) {
+        const inc = itemsNp.length && itemsNp.every(function (it) { return String(m.items_string || "").indexOf(it) >= 0; });
+        const score = inc ? 1 : 0;
+        if (!best || score > best.score || (score === best.score && Number(m.orden_en_dia || 0) < Number(best.m.orden_en_dia || 0))) best = { m: m, score: score };
+      });
+      return {
+        suc: String(best.m.sucursal_entrega || ""),
+        dudosa: !!best.m.ambiguo || cands.length > 1 || best.score === 0,
+        nCand: cands.length
+      };
+    }
+
+    // Armado por NP
+    const out = [];
+    nps.forEach(function (n) {
+      const np = String(n.np);
+      const cod = String(n.cod_cliente || "");
+      const fecha = fechaBy[np] || _facXlsFechaAR(n.fecha_salida) || "";
+      const mapa = porNp[np] || {};
+      let lineas = Object.keys(mapa).map(function (k) { return mapa[k]; })
+        .filter(function (x) { return x.ent > 0; })
+        .map(function (x) {
+          const art = _facXlsPadCod(x.cod);
+          const cajas = Math.min(x.ent, x.ped > 0 ? x.ped : x.ent);
+          const u = uxbBy[art.replace(/^0+/, "")] || uxbBy[art.replace(/^0+/, "").replace(/[a-zA-Z]+$/, "")] || null;
+          return { art: art, cajas: cajas, uxb: u, reArmada: x.n > 1, excede: x.sum > x.ped && x.ped > 0 };
+        })
+        .sort(function (a, b) { return a.art < b.art ? -1 : a.art > b.art ? 1 : 0; });   // ORDEN POR CÓDIGO
+      const itemsNp = lineas.map(function (l) { return l.art.replace(/^0+/, "") + "x"; });
+      const s = sucursalDe(np, cod, fecha, itemsNp);
+      out.push({
+        np: np, cod: cod, rs: String(n.razon_social || ""), tanda: String(n.tanda || ""),
+        fecha: fecha, fechaTxt: _facXlsDDMMYYYY(fecha),
+        vend: vendBy[cod] || "", suc: s.suc, sucDudosa: s.dudosa,
+        empresa: _facXlsEmpresa(np), tope: _facXlsTope(np),
+        lineas: lineas,
+        cajas: lineas.reduce(function (a, l) { return a + l.cajas; }, 0),
+        reArmada: lineas.some(function (l) { return l.reArmada; }),
+        excede: lineas.some(function (l) { return l.excede; }),
+        sinUxb: lineas.some(function (l) { return !l.uxb; }),
+        sinVend: !(vendBy[cod] || ""),
+        tramos: Math.max(1, Math.ceil(lineas.length / _facXlsTope(np)))
+      });
+    });
+
+    _facXls.rows = out.filter(function (r) { return r.lineas.length > 0; });
+    _facXls.sel = {};
+    _facXls.rows.forEach(function (r) { _facXls.sel[r.np] = !r.excede; });  // lo que excede lo pedido arranca destildado
+    _facXls.cargando = false;
+    _facXlsRender();
+  } catch (e) {
+    _facXls.error = (e && e.message) ? e.message : String(e);
+    _facXls.cargando = false;
+    _facXlsRender();
+  }
+}
+
+function facXlsIsisFecha(cual, val) {
+  if (!_facXls) return;
+  if (cual === "desde") _facXls.desde = val; else _facXls.hasta = val;
+  if (_facXls.desde > _facXls.hasta) { if (cual === "desde") _facXls.hasta = val; else _facXls.desde = val; }
+  facXlsIsisCargar();
+}
+function facXlsIsisTick(np) {
+  if (!_facXls) return;
+  _facXls.sel[np] = !_facXls.sel[np];
+  _facXlsRender();
+}
+function facXlsIsisTodos(v) {
+  if (!_facXls) return;
+  _facXls.rows.forEach(function (r) { _facXls.sel[r.np] = !!v; });
+  _facXlsRender();
+}
+
+function _facXlsRender() {
+  const body = document.getElementById("facXlsBody");
+  if (!body || !_facXls) return;
+  const esc = function (s) { return String(s == null ? "" : s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;"); };
+  let h = "";
+  h += '<div style="background:#fef3c7;border:1px solid #f59e0b;border-radius:10px;padding:11px 13px;margin-bottom:12px;line-height:1.45">' +
+       '<b>Esto es una prueba de formato, no se importa en ISIS.</b><br>' +
+       'Las NP de abajo <b>ya están en ISIS y ya se facturaron</b>. El archivo sirve para confirmar que ISIS acepta un pedido armado desde Virgilio, con las cajas <b>entregadas</b> en vez de las pedidas. Si se importara de verdad, ISIS crearía NP nuevas para pedidos que ya existen.' +
+       '</div>';
+  h += '<div style="display:flex;gap:10px;align-items:end;flex-wrap:wrap;margin-bottom:12px">' +
+       '<label style="font-weight:700">Facturadas desde<br><input type="date" value="' + esc(_facXls.desde) + '" onchange="facXlsIsisFecha(\'desde\', this.value)" style="padding:7px;border:1px solid #cbd5e1;border-radius:8px;font-size:14px"></label>' +
+       '<label style="font-weight:700">hasta<br><input type="date" value="' + esc(_facXls.hasta) + '" onchange="facXlsIsisFecha(\'hasta\', this.value)" style="padding:7px;border:1px solid #cbd5e1;border-radius:8px;font-size:14px"></label>' +
+       '<button onclick="facXlsIsisTodos(true)" style="padding:8px 12px;border:1px solid #cbd5e1;border-radius:8px;background:#fff;cursor:pointer;font-weight:700">Marcar todas</button>' +
+       '<button onclick="facXlsIsisTodos(false)" style="padding:8px 12px;border:1px solid #cbd5e1;border-radius:8px;background:#fff;cursor:pointer;font-weight:700">Desmarcar</button>' +
+       '</div>';
+
+  if (_facXls.cargando) { body.innerHTML = h + '<div style="padding:24px;text-align:center;color:#64748b">Cargando…</div>'; return; }
+  if (_facXls.error)    { body.innerHTML = h + '<div style="padding:16px;color:#b91c1c"><b>Error:</b> ' + esc(_facXls.error) + '</div>'; return; }
+  if (!_facXls.rows.length) { body.innerHTML = h + '<div style="padding:24px;text-align:center;color:#64748b">No hay NP facturadas en ese rango.</div>'; return; }
+
+  let selN = 0, selL = 0, selT = 0;
+  _facXls.rows.forEach(function (r) { if (_facXls.sel[r.np]) { selN++; selL += r.lineas.length; selT += r.tramos; } });
+
+  h += '<div style="max-height:52vh;overflow:auto;border:1px solid #e2e8f0;border-radius:10px">';
+  h += '<table style="width:100%;border-collapse:collapse;font-size:13px">' +
+       '<thead><tr style="background:#f1f5f9;position:sticky;top:0">' +
+       '<th style="padding:7px 6px"></th><th style="padding:7px 6px;text-align:left">NP</th><th style="padding:7px 6px;text-align:left">Cód</th>' +
+       '<th style="padding:7px 6px;text-align:left">Razón social</th><th style="padding:7px 6px">Líneas</th><th style="padding:7px 6px">Cajas</th>' +
+       '<th style="padding:7px 6px">NP en ISIS</th><th style="padding:7px 6px;text-align:left">Avisos</th></tr></thead><tbody>';
+  _facXls.rows.forEach(function (r) {
+    const npAttr = esc(r.np);   // precalculado: nada de llamar funciones dentro de un atributo on*
+    const av = [];
+    if (r.excede)     av.push('<span style="color:#b91c1c;font-weight:800">entregado &gt; pedido</span>');
+    if (r.reArmada)   av.push('<span style="color:#b45309">re-armada</span>');
+    if (!r.suc)       av.push('<span style="color:#b45309">sin sucursal</span>');
+    else if (r.sucDudosa) av.push('<span style="color:#b45309">sucursal dudosa</span>');
+    if (r.sinVend)    av.push('<span style="color:#64748b">sin vendedor</span>');
+    if (r.sinUxb)     av.push('<span style="color:#64748b">sin unidades por caja</span>');
+    if (r.empresa === "chef") av.push('<span style="color:#7c3aed;font-weight:700">Chef (corta de a 15)</span>');
+    h += '<tr style="border-top:1px solid #e2e8f0' + (r.excede ? ';background:#fef2f2' : '') + '">' +
+         '<td style="padding:6px"><input type="checkbox" ' + (_facXls.sel[r.np] ? "checked" : "") + ' onchange="facXlsIsisTick(\'' + npAttr + '\')" style="width:17px;height:17px"></td>' +
+         '<td style="padding:6px;font-weight:800">' + esc(r.np) + '</td>' +
+         '<td style="padding:6px">' + esc(r.cod) + '</td>' +
+         '<td style="padding:6px">' + esc(r.rs) + '</td>' +
+         '<td style="padding:6px;text-align:center">' + r.lineas.length + '</td>' +
+         '<td style="padding:6px;text-align:center">' + (Math.round(r.cajas * 100) / 100) + '</td>' +
+         '<td style="padding:6px;text-align:center' + (r.tramos > 1 ? ';font-weight:800;color:#7c3aed' : '') + '">' + r.tramos + '</td>' +
+         '<td style="padding:6px">' + av.join(" · ") + '</td>' +
+         '</tr>';
+  });
+  h += "</tbody></table></div>";
+  h += '<div style="margin-top:12px;display:flex;gap:12px;align-items:center;flex-wrap:wrap">' +
+       '<button onclick="facXlsIsisGenerar()" ' + (selN ? "" : "disabled") + ' style="padding:12px 18px;border:none;border-radius:10px;background:' + (selN ? "#78350f" : "#cbd5e1") + ';color:#fff;font-size:15px;font-weight:800;cursor:' + (selN ? "pointer" : "not-allowed") + '">⬇ Generar Excel (' + selN + ' NP · ' + selL + ' líneas · ' + selT + ' pedidos en ISIS)</button>' +
+       '<span style="color:#64748b">El archivo se baja como <b>PRUEBA_NO_IMPORTAR_…</b></span>' +
+       '</div>';
+  body.innerHTML = h;
+}
+
+/* Port literal de generateExcel() de la Edge Function procesar-pedidos-db:
+   XML Spreadsheet 2003, hoja 1 sin encabezado con las 12 columnas en orden,
+   hoja 2 "Resumen". Mismos estilos y misma regla de tipo de celda. */
+function _facXlsXml(items, dateLabel, npsReales) {
+  const esc = function (s) { return String(s == null ? "" : s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;"); };
+  const isNum = function (v) {
+    const t = String(v == null ? "" : v).trim();
+    if (t === "") return false;
+    if (t.length > 1 && t.charAt(0) === "0" && t.slice(0, 2) !== "0.") return false;
+    return /^-?\d+(\.\d+)?$/.test(t);
+  };
+  const cell = function (v, style) {
+    const sa = style ? ' ss:StyleID="' + style + '"' : "";
+    if ((v === "" || v == null) && v !== 0) return style ? "<Cell" + sa + "/>" : "<Cell/>";
+    const t = isNum(v) ? "Number" : "String";
+    return "<Cell" + sa + '><Data ss:Type="' + t + '">' + esc(v) + "</Data></Cell>";
+  };
+  const cols = ["fecha", "N_Pedido", "cliente", "vend", "articulo", "cajas", "uni", "sucursal", "leyenda2", "condPago", "pctDto", "numOC"];
+  const filas = items.map(function (it) { return "<Row>" + cols.map(function (c) { return cell(it[c]); }).join("") + "</Row>"; }).join("\n");
+
+  const grupos = {};
+  items.forEach(function (it) {
+    const k = it.cliente + "|" + it.N_Pedido;
+    if (!grupos[k]) grupos[k] = { cliente: it.cliente, nPedido: it.N_Pedido, count: 0 };
+    grupos[k].count++;
+  });
+  const desglose = Object.keys(grupos).map(function (k) { return grupos[k]; }).sort(function (a, b) { return a.nPedido - b.nPedido; });
+  const pedidosOrig = Object.keys(items.reduce(function (a, i) { a[i.cliente + "|" + i.sucursal] = 1; return a; }, {})).length;
+
+  const resumen = [
+    '<Row><Cell ss:MergeAcross="2" ss:StyleID="Desglose"><Data ss:Type="String">PRUEBA DE FORMATO — NO IMPORTAR</Data></Cell></Row>',
+    '<Row><Cell ss:MergeAcross="2"><Data ss:Type="String">Estas NP ya estan numeradas y facturadas en ISIS: ' + esc(npsReales.join(", ")) + '</Data></Cell></Row>',
+    "<Row/>",
+    "<Row>" + cell("Pedidos", "Header") + cell("NP", "Header") + "</Row>",
+    "<Row>" + cell(String(pedidosOrig), "Data") + cell(String(desglose.length), "Data") + "</Row>",
+    "<Row/>",
+    '<Row><Cell ss:MergeAcross="2" ss:StyleID="Desglose"><Data ss:Type="String">Desglose</Data></Cell></Row>',
+    "<Row>" + cell("Cod Clte", "Header") + cell("Num Ped", "Header") + cell("Cant Items", "Header") + "</Row>"
+  ].concat(desglose.map(function (d) {
+    return "<Row>" + cell(d.cliente, "Data") + cell(String(d.nPedido), "Data") + cell(String(d.count), "Data") + "</Row>";
+  })).join("\n");
+
+  return '<?xml version="1.0"?>\n<?mso-application progid="Excel.Sheet"?>\n' +
+    '<Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet"\n' +
+    '          xmlns:o="urn:schemas-microsoft-com:office:office"\n' +
+    '          xmlns:x="urn:schemas-microsoft-com:office:excel"\n' +
+    '          xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet">\n' +
+    "  <Styles>\n" +
+    '    <Style ss:ID="Default" ss:Name="Normal"><Alignment ss:Vertical="Bottom"/></Style>\n' +
+    '    <Style ss:ID="Header"><Alignment ss:Horizontal="Center" ss:Vertical="Center" ss:WrapText="1"/><Font ss:Size="16" ss:Bold="1"/><Borders><Border ss:Position="Bottom" ss:LineStyle="Continuous" ss:Weight="1"/><Border ss:Position="Top" ss:LineStyle="Continuous" ss:Weight="1"/><Border ss:Position="Left" ss:LineStyle="Continuous" ss:Weight="1"/><Border ss:Position="Right" ss:LineStyle="Continuous" ss:Weight="1"/></Borders></Style>\n' +
+    '    <Style ss:ID="Data"><Alignment ss:Horizontal="Center" ss:Vertical="Center"/><Font ss:Size="14"/><Borders><Border ss:Position="Bottom" ss:LineStyle="Continuous" ss:Weight="1"/><Border ss:Position="Top" ss:LineStyle="Continuous" ss:Weight="1"/><Border ss:Position="Left" ss:LineStyle="Continuous" ss:Weight="1"/><Border ss:Position="Right" ss:LineStyle="Continuous" ss:Weight="1"/></Borders></Style>\n' +
+    '    <Style ss:ID="Desglose"><Alignment ss:Horizontal="Center" ss:Vertical="Center"/><Font ss:Size="20" ss:Bold="1"/><Borders><Border ss:Position="Bottom" ss:LineStyle="Continuous" ss:Weight="1"/><Border ss:Position="Top" ss:LineStyle="Continuous" ss:Weight="1"/><Border ss:Position="Left" ss:LineStyle="Continuous" ss:Weight="1"/><Border ss:Position="Right" ss:LineStyle="Continuous" ss:Weight="1"/></Borders></Style>\n' +
+    "  </Styles>\n" +
+    '  <Worksheet ss:Name="' + esc(dateLabel) + '"><Table>\n' + filas + "\n  </Table></Worksheet>\n" +
+    '  <Worksheet ss:Name="Resumen"><Table>\n' +
+    '      <Column ss:Width="67.5"/><Column ss:Width="51"/><Column ss:Width="63"/>\n' + resumen + "\n  </Table></Worksheet>\n" +
+    "</Workbook>";
+}
+
+function facXlsIsisGenerar() {
+  if (!_facXls) return;
+  const sel = _facXls.rows.filter(function (r) { return _facXls.sel[r.np]; });
+  if (!sel.length) return;
+
+  // Un N_Pedido por TRAMO: cada NP se corta de a 18 líneas (Loekemeyer) o 15 (Chef),
+  // en orden de código, igual que hace ISIS al importar.
+  const items = [];
+  let n = 0;
+  sel.forEach(function (r) {
+    for (let i = 0; i < r.lineas.length; i += r.tope) {
+      n++;
+      r.lineas.slice(i, i + r.tope).forEach(function (l) {
+        items.push({
+          fecha: r.fechaTxt,
+          N_Pedido: n,
+          cliente: r.cod,
+          vend: r.vend,
+          articulo: l.art,
+          cajas: String(l.cajas),
+          uni: l.uxb ? String(l.cajas * l.uxb) : "",
+          sucursal: r.suc,
+          leyenda2: "",          // deuda / límite de crédito / plazo viven sólo en LK
+          condPago: "",          // el código de condición no está espejado en Virgilio
+          pctDto: "2% Descuento Web",
+          numOC: ""
+        });
+      });
+    }
+  });
+
+  const hoy = _facXlsFechaAR(new Date());
+  const dd = _facXlsDDMMYYYY(hoy).replace(/\//g, "-").slice(0, 5) + "-" + hoy.slice(2, 4);
+  let hhmm = "";
+  try { hhmm = new Date().toLocaleTimeString("es-AR", { timeZone: "America/Argentina/Buenos_Aires", hour: "2-digit", minute: "2-digit", hour12: false }).replace(":", ""); } catch (_e) { hhmm = "0000"; }
+  const xml = _facXlsXml(items, dd + " 9Hs", sel.map(function (r) { return r.np; }));
+  const blob = new Blob([xml], { type: "application/vnd.ms-excel" });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = "PRUEBA_NO_IMPORTAR_" + dd + "_" + hhmm + ".xls";
+  document.body.appendChild(a); a.click();
+  setTimeout(function () { URL.revokeObjectURL(a.href); a.remove(); }, 1500);
 }
 
 function facTodayKey(){
