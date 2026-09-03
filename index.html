@@ -3482,6 +3482,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
       <button id="facBtnRevertir" class="fac-btn-revertir" disabled onclick="facRevertir()" title="Borra todos los ticks pendientes de cierre">↺ Revertir</button>
       <span class="fac-chip"><span class="fac-dot" id="facDot"></span><span id="facStatusTxt">Cargando…</span></span>
     </div>
+    <button id="facBtnXlsIsis" onclick="facXlsIsisOpen()" title="PRUEBA: arma el mismo Excel que hoy sale por mail a las 12:30, pero con las cajas ENTREGADAS, para confirmar que ISIS lo importa. No se importa en produccion." style="margin-right:8px;padding:9px 13px;border:1px solid #fcd34d;border-radius:10px;background:#fffbeb;color:#78350f;font-size:13px;font-weight:800;cursor:pointer">⬇ Excel ISIS <span style="font-weight:600;opacity:.85">(prueba)</span></button>
     <button class="fac-close-btn" onclick="closeFacturacion()">Cerrar</button>
   </div>
   <div id="facContainer">
@@ -3497,7 +3498,6 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
     <button onclick="openRuteo()" style="width:100%;margin-top:8px;padding:13px;border:none;border-radius:10px;background:#0f766e;color:#fff;font-size:15px;font-weight:800;cursor:pointer">🗺️ Armar ruta de reparto de mañana</button>
     <button onclick="openZonasMapa()" title="Geocodifica todas las direcciones (OpenStreetMap) y las muestra en un mapa por zona, para parametrizar bien las zonas" style="width:100%;margin-top:6px;padding:11px;border:1px solid #0f766e;border-radius:10px;background:#ecfeff;color:#0f766e;font-size:14px;font-weight:800;cursor:pointer">📍 Mapa de zonas (geocodificar)</button>
     <div id="facTickedList" class="fac-ticked-list" style="display:none"></div>
-    <button id="facBtnXlsIsis" onclick="facXlsIsisOpen()" title="PRUEBA: arma el mismo Excel que hoy sale por mail a las 12:30, pero con las cajas ENTREGADAS, para confirmar que ISIS lo importa. No se importa en produccion." style="flex:0 0 100%;width:100%;margin-top:6px;padding:10px;border:1px solid #fcd34d;border-radius:10px;background:#fffbeb;color:#78350f;font-size:13px;font-weight:800;cursor:pointer">⬇ Excel para ISIS <span style="font-weight:600;opacity:.85">(prueba de formato)</span></button>
     <button onclick="facNCOpen()" title="Anular una factura ya emitida con una Nota de Crédito" style="flex:0 0 100%;width:100%;margin-top:4px;padding:9px;border:1px solid #fecaca;border-radius:10px;background:#fff;color:#b91c1c;font-size:13px;font-weight:800;cursor:pointer">🧾 Anular factura (Nota de Crédito)</button>
   </div>
   <div class="fac-toast" id="facToast"></div>
@@ -6558,7 +6558,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v12.51";
+const APP_VERSION = "v12.52";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
