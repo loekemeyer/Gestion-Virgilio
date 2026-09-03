@@ -232,3 +232,6 @@ PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node te
 
 echo "== pweb-picking (idea 3717: la tanda programada en la PPP Web llega al operario) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/pweb-picking.cjs
+
+echo "== pweb-chef (idea 3717: Chef en la PPP Web — RPC aparte, el FDW no se paga desde LK) =="
+PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/pweb-chef.cjs

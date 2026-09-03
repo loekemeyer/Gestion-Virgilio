@@ -8367,9 +8367,20 @@ lee **la misma tabla donde caen los pedidos de la página**, en vivo.
   **441Z**, **442E**, **444E** y **446E** (Bowl Ac. Inox. Base Silicona 16/20/24).
   Midiendo esos 7 el módulo queda sin agujeros.
 
-- **Alcance**: hoy solo Loekemeyer. Chef espera el mismo
-  `grant select on public.orders to loke_reader` que ya debe
-  `sync_pedidos_match_virgilio`; el tope de 15 ya está contemplado.
+- **Chef (v12.66)**: habilitado el 2026-09-03. Del lado de Chef se corrió
+  `grant usage on schema public` + `grant select on public.orders` a `loke_reader`.
+  Se elige con el selector de empresa de la pantalla.
+  - ⚠ Va por **RPC aparte** (`get_pedidos_web_np_chef`), **no** unida a
+    `v_pedidos_web_np`: leer `chef_orders` por el FDW cuesta **3.338 ms** y si
+    estuvieran juntas cada carga pagaría esos 3,3 s aunque nadie mire Chef.
+  - ⚠ Va **`SECURITY DEFINER`** (el user mapping del FDW es de `postgres`, leyendo
+    como el invocante el foreign scan falla), así que el chequeo contra `admins`
+    está **dentro** de la función y se le revocó el EXECUTE a `anon`.
+  - Tope **15** líneas; razón social de `chef_padron` (las numeraciones de cliente
+    son independientes entre empresas); `enviado_a_compras` vuelve **NULL** porque
+    `chef_orders` no espeja esa columna.
+  - Estado: 116 pedidos, **59 con payload** — los otros 57 no tienen ítems y no
+    aparecen. Corte verificado: el pedido 213 (17 líneas) sale **15 + 2**.
 
 - **La pantalla**: botón **🧾 PPP Web** en el panel supervisor (v12.59, m³ endurecido en v12.60). Lee
   `v_pedidos_web_np` de LK en vivo, resuelve el m³ contra `Volumen_Articulos` de

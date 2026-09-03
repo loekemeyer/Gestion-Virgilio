@@ -241,3 +241,40 @@ grant select on public.v_pedidos_web_np to authenticated;
 -- 441Z, 442E, 444E, 446E. Para listarlos de nuevo:
 --   select codigo, m3 from "Volumen_Articulos" where m3 is null or m3 <= 0;
 -- ============================================================================
+
+
+-- ============================================================================
+-- ANEXO · CHEF  ·  get_pedidos_web_np_chef(p_dias)
+-- ============================================================================
+-- Chef vive en OTRO proyecto Supabase (nkhzocgdpwtgrmwleihr, otra organización) y
+-- se lee por el FDW `chef_db` con el rol remoto `loke_reader`. Habilitado el
+-- 2026-09-03 con, del lado de Chef:
+--     grant usage on schema public to loke_reader;
+--     grant select on public.orders  to loke_reader;
+--
+-- ⚠ VA EN UNA RPC APARTE, **NO** UNIDA A `v_pedidos_web_np`. Medido: leer
+--   `chef_orders` por el FDW cuesta **3.338 ms**. Si Chef estuviera en la misma
+--   vista, CADA carga de la pantalla pagaría esos 3,3 s aunque nadie mire Chef.
+--   Es exactamente la lección que ya había dejado el padrón de Chef.
+--
+-- ⚠ VA `SECURITY DEFINER`, no `security_invoker` como las de Loekemeyer, y no es
+--   un descuido: el user mapping del FDW es para `postgres`, así que leyendo como
+--   el invocante el foreign scan falla. Al correr como el dueño saltea RLS, por
+--   eso el chequeo contra `admins` está DENTRO de la función y se le revocó el
+--   EXECUTE a `anon`.
+--
+-- Diferencias con Loekemeyer, todas reales:
+--   · tope de **15 líneas** por NP (18 en LK);
+--   · la razón social sale de `chef_padron` (copia local), no de `customers`:
+--     las numeraciones de cliente son independientes entre las dos empresas;
+--   · `chef_orders` **no espeja `enviado_a_compras_at`**, así que
+--     `enviado_a_compras` vuelve NULL — de Chef no se sabe si ya salió por mail.
+--
+-- Estado al 2026-09-03: 116 pedidos, **59 con `sheets_payload`**. Los otros 57 no
+-- se pueden partir en NP (no hay ítems) y no aparecen. Verificado el corte: el
+-- pedido 213 (17 líneas) sale 15 + 2.
+--
+--   -- Control (como admin):
+--   select order_id, np_idx, cod, razon_social, lineas, cajas
+--     from public.get_pedidos_web_np_chef(30) order by order_id desc, np_idx;
+-- ============================================================================
