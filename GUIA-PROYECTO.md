@@ -8298,52 +8298,61 @@ Tercer lote. Objetos creados, **aún no conectados al front**:
   excluye controlados (CRN) y sin salida (FSS), ordena vencidos primero. Columnas:
   np, tanda, lios, cod_cliente, rs, vencido, first_load, last_ccn.
 
-### Pedidos web de LK dentro de Virgilio (idea 3717 · Paso 1)
+### Pedidos web de LK dentro de Virgilio (idea 3717)
 
-Desde 2026-09-03 los pedidos de la página LK llegan a Virgilio **sin pasar por
-ISIS ni por el mail de las 12:30**. Es el primer paso del flujo nuevo: la
-programación deja de salir del espejo de la PPP y pasa a salir del pedido web.
+Desde 2026-09-03 la programación puede salir del **pedido web**, sin esperar al
+mail de las 12:30 ni a que alguien lo cargue a ISIS. Un pedido que entró a las
+16:03 está disponible al instante, en vez de al día siguiente.
 
-- **`Pedidos_Web`** — TABLA. Espejo de los pedidos web de LK, **una fila por
-  línea**, con `linea_rn` = la posición del ítem dentro de `sheets_payload.items`
-  (o sea, el orden del carrito). Ese orden es lo que la regla de corte necesita
-  y es exactamente lo que `lk_pedidos_match` NO tiene, porque su `items_string`
-  viene ordenado por código.
-  ⚠ **Es un espejo puro: se borra y se reescribe entero cada 15 minutos.** No
-  agregarle columnas de trabajo (tanda, zona, operario, estado) — se perderían
-  en la próxima corrida. Eso va en la tabla de programación, que todavía no existe.
+**No hay copia en Virgilio.** Se probó primero con una tabla espejo (`Pedidos_Web`)
+alimentada por un cron cada 15 min, y se descartó por decisión del dueño: es otra
+copia de un dato que ya existe, con su propia forma de desincronizarse. Gestión
+lee **la misma tabla donde caen los pedidos de la página**, en vivo.
 
-- **`v_pedidos_web_np`** — VIEW. Las NP que Virgilio programaría, ya cortadas.
-  Regla: bloques de **18 líneas contiguas en el orden del carrito** (15 en Chef),
-  vía `ceil(linea_rn / 18)`. **No es una suposición**: está leída de
+- **Dónde vive**: entero en el proyecto **LK** (`kwkclwhmoygunqmlegrg`), en
+  `sql/pedidos_web_lk.sql`. Dos vistas: `v_pedidos_web` (el pedido abierto en
+  líneas, en el orden del carrito) y **`v_pedidos_web_np`** (las NP ya cortadas,
+  con los ítems en `jsonb` ordenados). Esta última es la que consume Gestión.
+
+- **Cómo llega Gestión**: con el cliente Supabase de LK y la sesión de admin que
+  ya da el bridge del Panel Web LK (`lkTryBridge`, v12.35, loguea como
+  `loekemeyer.n8n@gmail.com`, que está en `public.admins`). Sin credenciales ni
+  permisos nuevos.
+
+- **Seguridad**: las dos vistas van con `security_invoker = true`, así la RLS de
+  `orders` es la que decide. Sin eso correrían como `postgres` y cualquier cliente
+  logueado del portal vería los pedidos de todos. Verificado: admin del bridge
+  1.463 NP · otro authenticated 0 · anon permission denied. **Al tocar esas vistas
+  hay que repetir las tres pruebas.**
+
+- **Regla de corte**: bloques de **18 líneas contiguas en el orden del carrito**
+  (Loekemeyer) y **15** (Chef), vía `ceil(linea_rn / tope)`. Está leída de
   `processOrders` de la Edge Function `procesar-pedidos-db` de LK, que es la que
-  arma el Excel del mail. **Nunca ordenar por código de artículo acá** —
-  reordenar es el bug clásico de este módulo.
-  La **NP provisoria** son 9 dígitos, `<empresa><order_id 6><parte 2>`, con el
-  primer dígito marcando empresa igual que ISIS (9 = Loekemeyer, 4 = Chef): el
-  pedido 1342 parte 1 → `900134201`. Se renombra a la NP real cuando ISIS la
-  asigna.
-  El **m³ no viene de LK**: sale de `Volumen_Articulos` de Virgilio × cajas. El
-  join es LEFT a propósito, y `arts_sin_m3` cuenta el faltante para que se vea
-  en pantalla en vez de desaparecer una línea.
+  arma el Excel del mail. El tope de Chef está **medido**, no recordado: por
+  líneas por NP en `PPP_Base_Pedidos`, Chef amontona 25 NP en 15 y cae a 0 en 16;
+  LK amontona 253 en 18 y cae a 2 en 19.
+  **Nunca ordenar por código de artículo acá** — reordenar es el bug clásico del
+  módulo, y es por lo que `lk_pedidos_match` NO sirve para esto (su `items_string`
+  viene ordenado por código y ya perdió el carrito).
 
-- **Cómo llega**: LK **empuja** por el FDW `virgilio_db` con el rol
-  `lk_ppp_reader`, igual que `lk_pedidos_match`. En LK: vista `v_pedidos_web`
-  (revocada de anon/authenticated), función `sync_pedidos_web_virgilio()` y cron
-  `sync-pedidos-web-virgilio` cada 15 min, ventana móvil de 30 días con
-  delete+insert. Virgilio nunca toca el FDW.
-  Apagar sin borrar nada: `select cron.unschedule('sync-pedidos-web-virgilio');`
+- **La norma del Excel que NO se copia**: su `N° Pedido` (`globalN`) es un contador
+  de la tanda —numera primero los pedidos de ≥18 líneas y después los chicos—, así
+  que el mismo pedido saca distinto número según con qué otros salga en el mail.
+  No es identidad. Por eso se usa **NP provisoria**: 9 dígitos,
+  `<empresa><order_id 6><parte 2>`, primer dígito = empresa igual que ISIS
+  (9 = Loekemeyer, 4 = Chef). Pedido 1342 parte 1 → `900134201`.
 
-- **Alcance**: solo `empresa = 'lk'`. Chef espera el mismo
-  `grant select on public.orders to loke_reader` que ya tiene pendiente
-  `sync_pedidos_match_virgilio`.
+- **El m³ no sale de LK** (no tiene volumen por caja): lo resuelve Gestión contra
+  su propia `Volumen_Articulos`. De los 230 artículos que alguna vez se pidieron
+  por web, **los 230 tienen m³**. Del catálogo entero faltan 3, nunca pedidos por
+  web todavía: **442E, 444E y 446E** (Bowl Ac. Inox. Base Silicona 16/20/24 cm).
 
-- **Verificado el 2026-09-03**: 215 pedidos / 4.372 líneas, idéntico a LK; 350 NP
-  generadas, 0 con artículos sin m³, 0 pasadas de 18 líneas. El corte reproduce
-  el del Excel (pedido 1338, 44 ítems → 18/18/8). Quedan 6 NP sin razón social,
-  de los códigos 4284 y 4301, que no tienen ficha en `customers` de LK.
+- **Alcance**: hoy solo Loekemeyer. Chef espera el mismo
+  `grant select on public.orders to loke_reader` que ya debe
+  `sync_pedidos_match_virgilio`; el tope de 15 ya está contemplado.
 
-- SQL completo, con verificación y vuelta atrás: `sql/pedidos_web_ingesta.sql`.
+- **Falta**: la pantalla de programación en Gestión (asignar tanda, zona y fecha
+  de entrega). Sin eso los pedidos se ven pero no se pueden bajar a picking.
 
 **Pendiente MEDIA**: `prodLoad/prodCompute` — RPC parametrizado por rango de fechas,
 cálculo de productividad con m³ y factores. Complejidad alta, dejado para después.
