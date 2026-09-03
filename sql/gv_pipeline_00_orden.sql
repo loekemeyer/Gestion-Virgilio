@@ -1,0 +1,32 @@
+-- ============================================================================
+-- GESTIÓN VIRGILIO — Pipeline de pedidos web (estructura "desenchufada")
+-- ============================================================================
+-- Objetivo: que Gestión Virgilio lea los pedidos de las páginas de venta
+-- (Loekemeyer 'lk' + Chef 'ch') de forma directa y simétrica, los parta,
+-- les asigne una NP interna, calcule el m³ y arme una tanda — ESCRIBIENDO EN
+-- UN ESQUEMA AISLADO (`pipeline`), sin tocar las tablas PPP de producción.
+--
+-- Las únicas conexiones a producción son de SOLO LECTURA (FDW a los feeds).
+-- El día que se quiera "enchufar", se cambia el destino de escritura de
+-- `pipeline.*` a `public.PPP_*`.
+--
+-- PROYECTOS (3 Supabase distintos):
+--   - Virgilio : hrxfctzncixxqmpfhskv  (org azosplccoimzkdtbvzfi)  → destino
+--   - LK web   : kwkclwhmoygunqmlegrg  (org azosplccoimzkdtbvzfi)  → fuente
+--   - Chef     : nkhzocgdpwtgrmwleihr  (org eczogcnncryxuaipplqx)  → fuente
+--
+-- ORDEN DE EJECUCIÓN:
+--   10  gv_pipeline_10_feed_ch.sql        → correr en el proyecto CHEF
+--   11  gv_pipeline_11_feed_lk.sql        → correr en el proyecto LK
+--   20  gv_pipeline_20_fdw_virgilio.sql   → correr en el proyecto VIRGILIO
+--   30  gv_pipeline_30_schema.sql         → correr en el proyecto VIRGILIO
+--   40  gv_pipeline_40_aplicar_pedido.sql → correr en el proyecto VIRGILIO
+--
+-- SEGURIDAD:
+--   - Rol lector `virgilio_reader` en LK y Chef: read-only, SOLO ve la
+--     vista-contrato `v_virgilio_pedidos_feed`, ninguna tabla cruda.
+--   - Los passwords van como PLACEHOLDER en este repo. Los reales viven solo
+--     en la base (rol + user mapping). Rotar = ALTER ROLE + ALTER USER MAPPING.
+--   - Todo el esquema `pipeline` tiene REVOKE para anon/authenticated y vive
+--     fuera de los schemas expuestos por PostgREST → la anon key no lo ve.
+-- ============================================================================
