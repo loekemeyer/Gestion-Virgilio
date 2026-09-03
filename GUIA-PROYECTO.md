@@ -8426,7 +8426,20 @@ lee **la misma tabla donde caen los pedidos de la página**, en vivo.
     Guardar, aunque nadie las hubiera mirado.
   - `m3` y `m3_parcial` se guardan como **foto** del momento de programar: la
     tanda se armó con ese número. `m3_parcial` marca que ese m³ es un piso.
-  - Regresión: `tests/pweb-programar.cjs`.
+  - **🪄 Armar tandas (v12.63)**: botón que arma el reparto solo. **No es un
+    algoritmo nuevo** — reusa el de la PPP (`_pppBalancearZona`, `pppEsSuper`, el
+    generador de códigos): súper una tanda por cliente, el resto por zona → cliente
+    empacado en **0,60–1,00 m³** (objetivo `tandaCap`, 0,80 por defecto), sin
+    mezclar zonas nunca.
+    - **Llena los campos pero NO guarda**: el reparto se revisa antes de existir.
+      Por eso es "casi" automático.
+    - **No pisa una tanda escrita a mano.**
+    - Los códigos (`LETRA<NN><LETRA>`) siguen desde la última letra usada en **las
+      dos tablas**, la de la PPP Web y la de Producción: comparten espacio de
+      nombres y dos tandas distintas con el mismo código serían un lío en el
+      depósito.
+    - Una NP sin zona **no se mete en cualquier tanda**: queda sin tanda y se avisa.
+  - Regresión: `tests/pweb-programar.cjs` y `tests/pweb-tandas.cjs`.
 
 **Pendiente MEDIA**: `prodLoad/prodCompute` — RPC parametrizado por rango de fechas,
 cálculo de productividad con m³ y factores. Complejidad alta, dejado para después.

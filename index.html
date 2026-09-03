@@ -3941,6 +3941,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
       <div class="ppp-btnrow">
         <button class="ppp-imp-toggle" onclick="pwebCargar()">↻ Actualizar</button>
         <label class="pweb-chk"><input type="checkbox" id="pwebSoloPend" checked onchange="pwebCargar()"> Solo los que todavía no salieron por mail</label>
+        <button class="ppp-imp-toggle" onclick="pwebSugerirTandas()" title="Arma las tandas con el mismo criterio que la PPP: súper una por cliente, el resto por zona empacando en 0,60–1,00 m³. Llena los campos pero NO guarda.">🪄 Armar tandas</button>
         <button class="ppp-imp-toggle" id="pwebGuardar" onclick="pwebGuardar()" disabled>💾 Guardar programación</button>
       </div>
       <div id="pwebResumen" class="pweb-resumen"></div>
@@ -6626,7 +6627,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v12.62";
+const APP_VERSION = "v12.63";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -25426,6 +25427,114 @@ async function pwebCargarProg() {
     if (!r.ok) return;
     (await r.json()).forEach(function (x) { _pwebProg[x.order_id + "|" + x.np_idx] = x; });
   } catch (_e) {}
+}
+
+/* ===== Armar las tandas casi solo ======================================
+   NO es un algoritmo nuevo: es EL MISMO que ya usa la PPP (`pppSugerirTandas`),
+   apuntado a los pedidos web. Súper → una tanda por cliente; el resto agrupado
+   por zona y después por cliente, empacado en tandas de 0,60–1,00 m³ con el
+   objetivo que diga la config (`tandaCap`, 0,80 por defecto). Nunca mezcla zonas.
+   Reusa `_pppBalancearZona`, `pppEsSuper` y el generador de códigos, así las dos
+   pantallas arman las tandas igual y no hay dos criterios dando vueltas.
+
+   ⚠ NO GUARDA: llena los campos de tanda y deja el botón Guardar en amarillo.
+   Es "casi automático" a propósito — el reparto se revisa antes de que exista.
+
+   Los códigos siguen desde la última letra usada en LAS DOS tablas, la de la PPP
+   Web y la de Producción: comparten el espacio de nombres de tandas y dos tandas
+   distintas con el mismo código serían un lío en el depósito. */
+async function pwebSugerirTandas() {
+  const st = document.getElementById("pwebStatus");
+  if (!_pwebNps.length) { if (st) st.textContent = "No hay pedidos para armar tandas."; return; }
+
+  const cfg = pppGetCfg();
+  const T_MIN = 0.60, T_MAX = 1.00;
+  let T_IDEAL = cfg.tandaCap > 0 ? cfg.tandaCap : 0.80;
+  if (T_IDEAL < T_MIN) T_IDEAL = T_MIN;
+  if (T_IDEAL > T_MAX) T_IDEAL = T_MAX;
+
+  // Última letra global usada, mirando los dos circuitos.
+  let maxGlobalIdx = -1;
+  const re = /^([A-Z]+)(\d+)([A-Z]+)$/;
+  const mirarTandas = function (rows, campo) {
+    (rows || []).forEach(function (r) {
+      const m = re.exec(String(r[campo] || "").toUpperCase());
+      if (m) { const gi = _pppLetterIdx(m[1]); if (gi > maxGlobalIdx) maxGlobalIdx = gi; }
+    });
+  };
+  try {
+    const [a, b] = await Promise.all([
+      fetch(SUPABASE_URL + "/rest/v1/PPP_Web_Programacion?select=tanda&tanda=not.is.null&limit=5000", { headers: { apikey: SUPABASE_KEY } }),
+      fetch(SUPABASE_URL + "/rest/v1/PPP_Programacion_Diaria?select=tanda&limit=20000", { headers: { apikey: SUPABASE_KEY } })
+    ]);
+    if (a.ok) mirarTandas(await a.json(), "tanda");
+    if (b.ok) mirarTandas(await b.json(), "tanda");
+  } catch (_e) {}
+  let globalLetterIdx = maxGlobalIdx + 1, zoneNum = 0, tandaLetterIdx = 0;
+  const nextZone = function () { zoneNum++; tandaLetterIdx = 0; };
+  const nextTanda = function () {
+    const code = _pppLetter(globalLetterIdx) + String(zoneNum).padStart(2, "0") + _pppLetter(tandaLetterIdx);
+    tandaLetterIdx++;
+    if (tandaLetterIdx >= 26) { tandaLetterIdx = 0; zoneNum++; if (zoneNum > 99) { zoneNum = 1; globalLetterIdx++; } }
+    return code;
+  };
+
+  // Solo las que todavía no tienen tanda escrita en pantalla: una tanda ya puesta
+  // a mano no se pisa.
+  const pend = _pwebNps.filter(function (n) {
+    const el = document.getElementById("pwT_" + pwebClave(n).replace("|", "_"));
+    return el && !String(el.value || "").trim();
+  });
+  if (!pend.length) { if (st) st.textContent = "Todas las NP visibles ya tienen tanda."; return; }
+
+  // Adaptador: `pppEsSuper` y el balanceador esperan la forma de la PPP vieja.
+  const adap = pend.map(function (n) {
+    return { _n: n, cod: n.cod, razon_social: n.razon_social,
+             localidad: pwebBarrioDe(n.direccion), tipo: "", m3: n._m3 || 0 };
+  });
+
+  const asignar = function (items, code) {
+    items.forEach(function (a) {
+      const el = document.getElementById("pwT_" + pwebClave(a._n).replace("|", "_"));
+      if (el) { el.value = code; pwebMarcarSucio(pwebClave(a._n)); }
+    });
+  };
+  let nT = 0;
+
+  // 1) Súper: una tanda por cliente, sin empacar.
+  const sup = adap.filter(pppEsSuper), bySup = {}, supOrd = [];
+  sup.forEach(function (a) { const k = String(a.razon_social || a.cod); if (!(k in bySup)) supOrd.push(k); (bySup[k] = bySup[k] || []).push(a); });
+  if (sup.length) nextZone();
+  supOrd.forEach(function (k) { asignar(bySup[k], nextTanda()); nT++; });
+
+  // 2) El resto CON zona: por zona → cliente, balanceado. Sin mezclar zonas.
+  const resto = adap.filter(function (a) { return !pppEsSuper(a) && pppZonaDeBarrio(a.localidad); });
+  const byZ = {};
+  resto.forEach(function (a) { const z = pppZonaDeBarrio(a.localidad); (byZ[z] = byZ[z] || []).push(a); });
+  const zorder = Object.keys(byZ).sort(function (x, y) {
+    const ix = PPP_ZONAS.indexOf(x), iy = PPP_ZONAS.indexOf(y);
+    return (ix < 0 ? 99 : ix) - (iy < 0 ? 99 : iy);
+  });
+  let nPend = 0;
+  zorder.forEach(function (z) {
+    nextZone();
+    const byC = {}, cord = [];
+    byZ[z].forEach(function (a) { const k = String(a.cod || a.razon_social); if (!(k in byC)) cord.push(k); (byC[k] = byC[k] || []).push(a); });
+    const clientes = cord.map(function (k) {
+      return { m3: byC[k].reduce(function (t, a) { return t + (a.m3 || 0); }, 0), pedidos: byC[k] };
+    });
+    const bal = _pppBalancearZona(clientes, T_MIN, T_IDEAL, T_MAX);
+    bal.tandas.forEach(function (t) { asignar(t, nextTanda()); nT++; });
+    nPend += bal.pend.length;
+  });
+
+  const sinZona = adap.filter(function (a) { return !pppEsSuper(a) && !pppZonaDeBarrio(a.localidad); }).length;
+  if (st) {
+    st.textContent = "🪄 " + nT + " tandas armadas"
+      + (nPend ? " · " + nPend + " NP no llegan a " + T_MIN.toFixed(2) + " m³ sin mezclar zona" : "")
+      + (sinZona ? " · " + sinZona + " sin zona (elegila a mano)" : "")
+      + ". Revisá y guardá.";
+  }
 }
 
 async function pwebGuardar() {
