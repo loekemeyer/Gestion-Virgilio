@@ -1791,6 +1791,9 @@ button.pk-anular small{ display:block; font-size:12px; font-weight:700; opacity:
 .pweb-in-zona{ max-width:130px; }
 .pweb-in-fecha{ width:140px; }
 .pweb-programada td{ background:#0d1b14; }
+.pweb-yaisis td{ background:#1c1608; }
+.pweb-isis{ font-size:10px; font-weight:700; color:#0b1220; background:#fbbf24;
+  border-radius:4px; padding:1px 4px; vertical-align:middle; }
 .pweb-btn-sucio{ border-color:#f59e0b !important; color:#fbbf24 !important; }
 /* v8.68 — grilla de botones del hub Configuración (2 columnas, angosto y centrado).
    Selector con doble clase (.sup-actions.cfg-actions) para ganarle en especificidad a
@@ -3940,7 +3943,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
     <div class="planim-body">
       <div class="ppp-btnrow">
         <button class="ppp-imp-toggle" onclick="pwebCargar()">↻ Actualizar</button>
-        <label class="pweb-chk"><input type="checkbox" id="pwebSoloPend" checked onchange="pwebCargar()"> Solo los que todavía no salieron por mail</label>
+        <label class="pweb-chk"><input type="checkbox" id="pwebSoloPend" checked onchange="pwebCargar()"> Solo los que faltan programar</label>
         <button class="ppp-imp-toggle" onclick="pwebSugerirTandas()" title="Arma las tandas con el mismo criterio que la PPP: súper una por cliente, el resto por zona empacando en 0,60–1,00 m³. Llena los campos pero NO guarda.">🪄 Armar tandas</button>
         <button class="ppp-imp-toggle" id="pwebGuardar" onclick="pwebGuardar()" disabled>💾 Guardar programación</button>
       </div>
@@ -6627,7 +6630,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v12.64";
+const APP_VERSION = "v12.65";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -25228,20 +25231,33 @@ async function pwebCargar() {
   if (res) res.innerHTML = "";
   try {
     const tok = await pwebLkToken();
-    const soloPend = !!(document.getElementById("pwebSoloPend") || {}).checked;
-    let url = PWEB_LK_URL + "/rest/v1/v_pedidos_web_np"
-            + "?select=order_id,np_idx,cod,razon_social,fecha_recep,hora_recep,direccion,v,lineas,cajas,items,enviado_a_compras"
-            + "&order=order_id.asc,np_idx.asc&limit=2000";
-    if (soloPend) url += "&enviado_a_compras=eq.false";
+    // v12.65 — La pantalla ya NO filtra por "salió el mail". Ese criterio servía
+    // para mostrar el agujero (un pedido de las 16:03 no existía hasta el mediodía
+    // siguiente), pero como filtro de trabajo estaba mal: al día siguiente el
+    // pedido se sellaba y DESAPARECÍA de la pantalla aunque nadie lo hubiera
+    // programado. Ahora entra todo lo que llega a la página, y el que falta
+    // programar es el que se muestra por defecto.
+    const desde = new Date(Date.now() - PWEB_VENTANA_DIAS * 86400000).toISOString().slice(0, 10);
+    const url = PWEB_LK_URL + "/rest/v1/v_pedidos_web_np"
+            + "?select=empresa,order_id,np_idx,cod,razon_social,fecha_recep,hora_recep,direccion,v,lineas,cajas,items,enviado_a_compras"
+            + "&fecha_recep=gte." + desde
+            + "&order=order_id.asc,np_idx.asc&limit=5000";
     const r = await fetch(url, { headers: { apikey: PWEB_LK_ANON, Authorization: "Bearer " + tok } });
     if (!r.ok) throw new Error("LK respondió " + r.status + ": " + (await r.text()).slice(0, 200));
-    const nps = await r.json();
+    let nps = await r.json();
 
     // m³: se resuelve acá, con los códigos que realmente aparecen.
     const cods = {};
     nps.forEach(function (n) { (n.items || []).forEach(function (i) { cods[i.art] = 1; }); });
     const vol = await pwebVolumenes(Object.keys(cods));
     await pwebCargarProg();
+    const soloPend = !!(document.getElementById("pwebSoloPend") || {}).checked;
+    if (soloPend) {
+      nps = nps.filter(function (n) {
+        const g = _pwebProg[pwebClave(n)];
+        return !(g && g.tanda);
+      });
+    }
     await pwebNumerar(nps);
 
     let m3Tot = 0, cajasTot = 0, sinM3 = {}, npsParciales = 0;
@@ -25292,9 +25308,13 @@ async function pwebCargar() {
       const id = pwebClave(n);
       const g = _pwebProg[id] || {};
       const zonaSug = g.zona || pwebZonaSugerida(n.direccion);
-      h += '<tr class="' + (g.tanda ? "pweb-programada" : "") + '" title="'
+      const yaIsis = !!n.enviado_a_compras && !g.tanda;
+      h += '<tr class="' + (g.tanda ? "pweb-programada" : (yaIsis ? "pweb-yaisis" : "")) + '" title="'
+         + (yaIsis ? "⚠ Ya salió por mail: puede estar programado en ISIS. Programarlo acá lo haría pickear dos veces.\n" : "")
          + (n.items || []).map(function (i) { return i.art + " x" + i.cajas; }).join(", ") + '">'
-         + '<td class="pweb-np">' + pwebEtiqueta(n) + '</td>'
+         + '<td class="pweb-np">' + pwebEtiqueta(n)
+             + (yaIsis ? ' <span class="pweb-isis" title="Ya salió por mail: revisá que no esté ya programado en ISIS">ISIS</span>' : '')
+             + '</td>'
          + '<td>' + (n.cod || "") + '</td>'
          + '<td>' + (n.razon_social || '<i>(sin razón social)</i>') + '</td>'
          + '<td>' + (n.direccion || "") + '</td>'
@@ -25346,6 +25366,9 @@ let _pwebProg = {};    // "order_id|np_idx" -> { tanda, zona, fecha_entrega }
 let _pwebNum  = {};    // "order_id|np_idx" -> número de NP (el de 4 dígitos)
 let _pwebNps  = [];    // lo último que se renderizó
 let _pwebSucio = false;
+/* Ventana de la pantalla. No se trae el histórico entero (1.463 NP y creciendo):
+   lo que tiene más de un mes sin programar no se programa, se investiga. */
+const PWEB_VENTANA_DIAS = 30;
 let _pwebEditadas = {};   // "order_id|np_idx" -> 1, las que tocó la persona
 
 /* Se anota QUÉ NP tocó la persona, no solo que algo cambió.

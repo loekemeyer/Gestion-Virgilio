@@ -8373,9 +8373,15 @@ lee **la misma tabla donde caen los pedidos de la página**, en vivo.
 
 - **La pantalla**: botón **🧾 PPP Web** en el panel supervisor (v12.59, m³ endurecido en v12.60). Lee
   `v_pedidos_web_np` de LK en vivo, resuelve el m³ contra `Volumen_Articulos` de
-  esta base y muestra las NP a programar. Por defecto filtra
-  `enviado_a_compras = false`, o sea **solo lo que todavía no salió por mail** —
-  que es lo que hoy no se puede trabajar hasta el día siguiente.
+  esta base y muestra las NP a programar. Trae una **ventana de 30 días**
+  (`PWEB_VENTANA_DIAS`) y por defecto muestra **solo lo que falta programar**.
+  ⚠ **Ya no filtra por "salió el mail"** (v12.65). Ese criterio servía para mostrar
+  el agujero —un pedido de las 16:03 no existía para nadie hasta el mediodía
+  siguiente—, pero como filtro de trabajo estaba mal: al día siguiente el pedido se
+  sellaba y **desaparecía de la pantalla aunque nadie lo hubiera programado**.
+  Lo que ya salió por mail se muestra con una chapita **ISIS** en ámbar: durante la
+  transición puede estar programado en el circuito viejo, y programarlo también acá
+  lo haría **pickear dos veces**.
   La sesión de LK sale del **mismo bridge** que abre el Panel Web LK
   (`admin-login-otp` acción `bridge`), cacheada en memoria una hora.
   Regresión: `tests/pweb-ppp-web.cjs`.
