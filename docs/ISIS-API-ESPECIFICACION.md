@@ -58,15 +58,6 @@ O sea: para ISIS el pedido es el mismo tipo de documento de siempre, con los mis
 campos. Cambia **cuándo** llega, **por dónde** llega, y que las cantidades ya vienen
 firmes.
 
-### Las tres reglas que salen de ahí
-
-1. **El pedido va sin número de nota de pedido.** La NP la asigna ISIS al darlo de alta,
-   igual que hoy cuando se carga a mano. No mandamos NP nuestra dentro del pedido.
-2. **Cada línea trae un código y una cantidad: los realmente preparados.** No hay
-   "pedido vs. entregado". Si el depósito preparó menos, o preparó un artículo
-   equivalente, el pedido ya sale corregido. Lo que ISIS recibe es lo que se factura.
-3. **No necesitamos nada de vuelta.** Ni la NP, ni el comprobante, ni un acuse (§5).
-
 ---
 
 ## 1. Infraestructura — no hace falta Windows Server, IIS, IP pública ni abrir puertos
