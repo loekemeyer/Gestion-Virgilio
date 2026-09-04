@@ -347,13 +347,24 @@ sobre las funciones extraídas del `script.js` real.
 
 ### Lo que queda de 4990
 
-1. **El front de Chef.** El repo `loekemeyer/paginach` y su proyecto Supabase
-   (`nkhzocgdpwtgrmwleihr`) son de **otra organización y no hay acceso desde acá**. Si su
-   portal es gemelo del de LK —lo es en `orders`/`sheets_payload`— tiene la misma
-   `edit_order_fast` y el mismo agujero. **Hay que hacerlo allá.**
+1. **El front de Chef — y NO es el mismo caso que LK.** Se revisó el repo
+   `loekemeyer/paginach` (HEAD `67870b9`, v2.0.28): **Chef no tiene el módulo "Editar
+   pedidos"**. Cero apariciones de `editOrder`, `editingOrderId` o `edit_order_fast`; el
+   historial del cliente sólo ofrece **"Descargar Pedido"** y **"Repetir Pedido"**.
+   O sea que el agujero que se tapó en LK **no existe en Chef**: ahí el cliente no puede
+   tocar un pedido ya mandado. Lo que falta no es corregir un módulo, es **construirlo**,
+   y eso incluye la RPC del lado Chef.
+   ⚠ Su proyecto Supabase (`nkhzocgdpwtgrmwleihr`) es de **otra organización**: no
+   aparece en `list_projects` desde esta sesión, así que la RPC hay que hacerla allá.
 2. **Mostrar el estado del pedido** (programado / en picking / armado / facturado) en la
    página. Es el espejo Virgilio → LK por FDW, todavía sin construir. Es también la idea
    **8743**, que además pide bloquear la edición cuando está facturado.
+   💡 **Ya existe dónde aterrizarlo, en las dos páginas:** la tabla `order_tracking`
+   (`np_number`, `status`, `fecha_entrega`) y su **stepper de 3 pasos** —
+   *Recibido → Programado → Entregado* — dibujado en el historial del cliente
+   (`script.js` de LK y de Chef). No hace falta inventar tabla ni UI: el espejo puede
+   alimentar eso, y a lo sumo agregarle los pasos que hoy no tiene (en picking, en
+   armado, facturado).
 3. **Aflojar la ventana** a "hasta que se factura", el día que Gestión tome control.
 
 ---

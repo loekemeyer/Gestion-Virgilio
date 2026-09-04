@@ -749,10 +749,18 @@ apareo por etiqueta del §3.g, medido ahí).
    `edit_order_fast` del **proyecto LK** (no en éste): para cada producto que el pedido
    ya tenía, lo que llega tiene que traer al menos las mismas cajas. Detalle, pruebas y
    rollback en `docs/PENDIENTES-PIPELINE-GESTION.md` §4990.
-   ⚠ **Chef sigue abierto** — otro proyecto y otra organización, sin acceso desde acá.
+   ⚠ **Chef NO es el mismo caso.** Revisado el repo `paginach` (HEAD `67870b9`): **no
+   tiene el módulo "Editar pedidos"** — 0 apariciones de `editOrder` / `edit_order_fast`,
+   y el historial sólo ofrece "Descargar" y "Repetir". El agujero que se tapó en LK no
+   existe ahí; lo que falta es **construir** el módulo, RPC incluida, y su proyecto
+   (`nkhzocgdpwtgrmwleihr`) es de otra organización, sin acceso desde acá.
    ⚠ **Mostrar el estado sigue abierto**: la página habla con LK y `gv_ppp_web_estado`
    vive acá. Decisión del dueño: espejo **Virgilio → LK por FDW**, el mismo patrón que
    `lk_pedidos_match` pero al revés. Sin construir.
+   💡 Pero **el aterrizaje ya existe en las dos páginas**: la tabla `order_tracking`
+   (`np_number`, `status`, `fecha_entrega`) con un stepper de 3 pasos
+   *Recibido → Programado → Entregado* ya dibujado en el historial del cliente. El
+   espejo puede alimentar eso en vez de inventar tabla y UI nuevas.
 2. **Que la facturación de NP web escriba en `Facturacion_NP` con la etiqueta** (`LK 00001`).
    Pendiente #4.
 3. ~~**El picking todavía no ordena por `prioridad`.**~~ **HECHO — v12.85, ver abajo.**
