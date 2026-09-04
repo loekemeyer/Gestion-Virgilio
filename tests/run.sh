@@ -242,3 +242,6 @@ PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node te
 
 echo "== pweb-barrio-zona (v12.72: barrio por el último guión + los web fuera del panel del Excel) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/pweb-barrio-zona.cjs
+
+echo "== apr-programar (v12.80: solapa A Programar, armado manual de tandas) =="
+PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/apr-programar.cjs

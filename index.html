@@ -691,6 +691,76 @@ button {
 .monitor-table td.center, .monitor-table th.center{ text-align: center; }
 .monitor-table td.num, .monitor-table th.num{ text-align: right; font-variant-numeric: tabular-nums; }
 .monitor-tanda{ font-weight: bold; color: #1e6bd6; }
+/* ═══ A Programar · armado manual de tandas (v12.80) ═══════════════════════ */
+.apr-bar{ display:flex; align-items:center; gap:10px; margin:6px 2px 10px; flex-wrap:wrap; }
+.apr-emp{ display:inline-flex; border:1px solid #cbd5e1; border-radius:8px; overflow:hidden; }
+.apr-empb{ border:0; background:#fff; padding:6px 12px; font-size:13px; font-weight:700; color:#475569; cursor:pointer; }
+.apr-empb.on{ background:#1e6bd6; color:#fff; }
+.apr-reload{ border:1px solid #cbd5e1; background:#fff; border-radius:8px; padding:5px 10px; cursor:pointer; font-size:14px; }
+.apr-load{ font-size:12.5px; color:#64748b; }
+.apr-err{ background:#fee2e2; border-left:5px solid #b91c1c; color:#7f1d1d; padding:8px 10px; border-radius:6px; margin:6px 2px; font-weight:600; }
+.apr-msg{ background:#ecfdf5; border-left:5px solid #059669; color:#065f46; padding:8px 10px; border-radius:6px; margin:6px 2px; font-weight:600; }
+
+.apr-wrap{ display:grid; grid-template-columns: 1fr 1fr 320px; gap:12px; align-items:start; }
+.apr-col{ background:#f8fafc; border:1px solid #e2e8f0; border-radius:10px; padding:10px; min-width:0; }
+.apr-col-t{ font-size:14px; font-weight:800; color:#0f172a; margin-bottom:8px; }
+.apr-q{ width:100%; box-sizing:border-box; padding:7px 10px; border:1px solid #cbd5e1; border-radius:8px; font-size:13px; margin-bottom:8px; }
+.apr-scroll{ max-height:62vh; overflow-y:auto; display:flex; flex-direction:column; gap:7px; }
+.apr-vacio{ color:#94a3b8; font-size:13px; padding:14px 4px; text-align:center; }
+
+/* Tarjeta de PEDIDO (lo que se arrastra) */
+.apr-card{ background:#fff; border:1px solid #dbe3ec; border-left:4px solid #1e6bd6; border-radius:8px; padding:7px 9px; cursor:grab; }
+.apr-card:active{ cursor:grabbing; }
+.apr-card-h{ display:flex; justify-content:space-between; align-items:center; gap:6px; cursor:pointer; }
+.apr-card-cli{ font-weight:800; font-size:13px; color:#0f172a; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.apr-card-chev{ color:#94a3b8; font-size:12px; }
+.apr-card-d{ display:flex; flex-wrap:wrap; gap:5px; margin-top:5px; }
+.apr-chip{ font-size:11.5px; background:#f1f5f9; color:#475569; border-radius:999px; padding:2px 8px; font-weight:600; }
+.apr-chip-z{ background:#e0edff; color:#1e40af; }
+.apr-chip-m3{ background:#fef3c7; color:#92400e; }
+.apr-chip-np{ background:#ede9fe; color:#5b21b6; }
+.apr-card-body{ margin-top:7px; border-top:1px dashed #e2e8f0; padding-top:6px; }
+.apr-kv{ font-size:12px; color:#475569; margin-bottom:3px; }
+.apr-bloque{ font-size:11.5px; font-weight:700; color:#0f172a; margin-top:6px; }
+.apr-arts{ display:flex; flex-wrap:wrap; gap:4px; margin-top:3px; }
+.apr-art{ font-size:11px; background:#f8fafc; border:1px solid #e2e8f0; border-radius:5px; padding:1px 5px; color:#334155; }
+
+/* Caja de TANDA (zona de soltar) */
+.apr-nueva{ width:100%; border:2px dashed #94a3b8; background:#fff; color:#334155; border-radius:9px; padding:9px; font-size:13.5px; font-weight:800; cursor:pointer; margin-bottom:9px; }
+.apr-nueva:hover{ border-color:#1e6bd6; color:#1e6bd6; }
+.apr-tanda{ background:#fff; border:2px solid #cbd5e1; border-radius:9px; padding:8px; }
+.apr-tanda-h{ display:flex; align-items:center; gap:7px; cursor:grab; }
+.apr-tanda-cod{ font-size:15px; font-weight:900; color:#0f172a; letter-spacing:.5px; }
+.apr-badge{ background:#b91c1c; color:#fff; font-size:11.5px; font-weight:800; border-radius:999px; padding:2px 8px; cursor:help; }
+.apr-tanda-x{ margin-left:auto; border:0; background:transparent; color:#94a3b8; font-size:15px; cursor:pointer; }
+.apr-tanda-x:hover{ color:#b91c1c; }
+.apr-tanda-m3{ font-size:12.5px; color:#475569; margin:4px 0 6px; }
+.apr-avisos{ margin-bottom:6px; }
+.apr-aviso{ font-size:11.5px; background:#fef2f2; color:#7f1d1d; border-left:3px solid #b91c1c; border-radius:4px; padding:4px 7px; margin-bottom:3px; line-height:1.3; }
+.apr-titem{ display:flex; align-items:center; gap:6px; border-top:1px solid #f1f5f9; padding:5px 0; }
+.apr-titem-cli{ font-size:12.5px; font-weight:700; color:#0f172a; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; flex:1 1 auto; }
+.apr-titem-d{ font-size:11.5px; color:#64748b; white-space:nowrap; }
+.apr-titem-x{ border:0; background:transparent; color:#94a3b8; cursor:pointer; font-size:14px; }
+.apr-titem-x:hover{ color:#1e6bd6; }
+.apr-tanda-vacia{ font-size:12px; color:#94a3b8; text-align:center; padding:12px 0; border:1px dashed #e2e8f0; border-radius:6px; }
+
+/* Calendario */
+.apr-cal-nav{ display:flex; align-items:center; justify-content:space-between; margin-bottom:7px; font-weight:800; font-size:13.5px; color:#0f172a; }
+.apr-cal-nav button{ border:1px solid #cbd5e1; background:#fff; border-radius:6px; padding:2px 9px; cursor:pointer; }
+.apr-cal-dow{ display:grid; grid-template-columns:repeat(7,1fr); gap:3px; font-size:11px; color:#64748b; text-align:center; font-weight:700; margin-bottom:3px; }
+.apr-cal-grid{ display:grid; grid-template-columns:repeat(7,1fr); gap:3px; }
+.apr-dia{ aspect-ratio:1/1; border:1px solid #e2e8f0; border-radius:50%; background:#fff; display:flex; flex-direction:column; align-items:center; justify-content:center; font-size:12px; color:#334155; }
+.apr-dia-off{ border:0; background:transparent; }
+.apr-dia-nohabil{ background:#f1f5f9; color:#94a3b8; }
+.apr-dia-hoy{ box-shadow:0 0 0 2px #1e6bd6 inset; font-weight:800; }
+.apr-dia-con{ background:#dcfce7; border-color:#86efac; }
+.apr-dia-lleno{ background:#fee2e2; border-color:#fca5a5; }
+.apr-dia-n{ line-height:1; }
+.apr-dia-m3{ font-size:9.5px; color:#166534; font-weight:700; }
+.apr-cal-pie{ font-size:11px; color:#64748b; margin-top:8px; line-height:1.35; }
+
+@media (max-width: 1100px){ .apr-wrap{ grid-template-columns:1fr; } .apr-scroll{ max-height:44vh; } }
+
 /* Cartel de AGREGADO: el cliente sumó algo a un pedido que ya estaba en la mesa.
    Tiene que gritar — si nadie lo ve, el camión sale sin eso. */
 .pweb-agregado-aviso{
@@ -6626,7 +6696,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v12.79";
+const APP_VERSION = "v12.80";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -28685,8 +28755,34 @@ function pppGoToRow(np) {
   el.classList.add("ppp-row-flash");
   setTimeout(function () { try { el.classList.remove("ppp-row-flash"); } catch (_e) {} }, 1800);
 }
+/* La barra de solapas. Se extrajo para que "A Programar" pueda dibujarse SIN
+   depender de los datos de ISIS: ese módulo ahora trabaja sobre los pedidos web
+   y tiene que abrir aunque no se haya importado ninguna PPP. `null` = todavía no
+   se sabe el número. */
+function pppTabsHtml(cProg, cPlan, cViaje, cEnt) {
+  const n = function (v) { return (v == null ? "…" : v); };
+  const b = function (id, txt) {
+    return '<button class="ppp-tab ' + (_pppTab === id ? "on" : "") +
+           '" onclick="pppTab(\'' + id + '\')">' + txt + '</button>';
+  };
+  return '<div class="ppp-tabs">' +
+    b("prog",    "📥 A Programar (" + n(cProg) + ")") +
+    b("plan",    "🗓️ Programación (" + n(cPlan) + ")") +
+    b("enviaje", "🚚 En Salida (" + n(cViaje) + ")") +
+    b("resumen", "🚚 Resumen") +
+    b("ent",     "✅ Pedidos Entregados (" + n(cEnt) + ")") +
+    b("ocup",    "📦 Ocupación") +
+  '</div>';
+}
+
 function pppRenderProg() {
   const box = document.getElementById("pppPreview"); if (!box) return;
+  // ⚠ "A Programar" se intercepta ACÁ ARRIBA, antes de todo lo de ISIS. El módulo
+  //   nuevo (tres columnas, arrastrar y soltar) trabaja sobre los pedidos WEB de
+  //   LK y Chef, así que no puede depender de que se haya importado una PPP —
+  //   más abajo hay un `if (!all.length) return` que lo dejaría afuera para
+  //   siempre. Ver docs/SUPABASE-GESTION-VIRGILIO.md §3.j.
+  if (_pppTab === "prog") { aprRender(); return; }
   // v8.61 — cargar (una vez) los entregados para el aviso "salió en fecha ≠ a la PPP".
   if (_pppDelivered == null) { try { pppRefreshDelivered(); } catch (_e) {} }
   // Semáforo de góndola: en las solapas con íconos, dispará (o refrescá) la carga
@@ -28730,15 +28826,9 @@ function pppRenderProg() {
   }
   // v9.72 — split de facturados en "En viaje" (sin confirmar entrega) y "Entregados" (confirmados)
   const _pppSplit = (_pppDelivered != null && _pppMetaEntSet != null) ? _pppSplitDelivered() : null;
-  let html =
-    '<div class="ppp-tabs">' +
-      '<button class="ppp-tab ' + (_pppTab === "prog" ? "on" : "") + '" onclick="pppTab(\'prog\')">📥 A Programar (' + aProgramar.length + ')</button>' +
-      '<button class="ppp-tab ' + (_pppTab === "plan" ? "on" : "") + '" onclick="pppTab(\'plan\')">🗓️ Programación (' + programados.length + ')</button>' +
-      '<button class="ppp-tab ' + (_pppTab === "enviaje" ? "on" : "") + '" onclick="pppTab(\'enviaje\')">🚚 En Salida (' + (_pppSplit ? _pppSplit.enViaje.length : "…") + ')</button>' +
-      '<button class="ppp-tab ' + (_pppTab === "resumen" ? "on" : "") + '" onclick="pppTab(\'resumen\')">🚚 Resumen</button>' +
-      '<button class="ppp-tab ' + (_pppTab === "ent" ? "on" : "") + '" onclick="pppTab(\'ent\')">✅ Pedidos Entregados (' + (_pppSplit ? _pppSplit.entregados.length : (_pppDelivered ? _pppDelivered.length : entreg.length)) + ')</button>' +
-      '<button class="ppp-tab ' + (_pppTab === "ocup" ? "on" : "") + '" onclick="pppTab(\'ocup\')">📦 Ocupación</button>' +
-    '</div>';
+  let html = pppTabsHtml(aProgramar.length, programados.length,
+    (_pppSplit ? _pppSplit.enViaje.length : null),
+    (_pppSplit ? _pppSplit.entregados.length : (_pppDelivered ? _pppDelivered.length : entreg.length)));
   html += '<div class="ppp-search"><input id="pppSearchInp" type="search" autocomplete="off" placeholder="🔎 Buscar: NP, cliente, cód, tanda, localidad, zona, fecha…" value="' + escapeHtml(_pppSearch) + '" oninput="pppSetSearch(this.value)">' + (_pppSearch ? '<button class="ppp-search-clr" onclick="pppSetSearch(\'\')" title="Limpiar búsqueda">✕</button><span class="ppp-search-n">' + (programados.length + aProgramar.length + entreg.length) + ' coincidencia(s)</span>' : '') + '</div>';
   // v8.61 — aviso: pedidos que SALIERON en fecha ≠ a la programada en la PPP (para corregir la carga
   // de raíz). Reusa _pppDelivered.discrep (carga camión ≠ fecha PPP). No bloquea, es informativo.
@@ -31244,6 +31334,422 @@ function pwebNpLabel(empresa, np) {
   const n = String(np);
   return ((empresa === "chef") ? "CH" : "LK") + " " + (n.length >= 5 ? n : n.padStart(5, "0"));
 }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   A PROGRAMAR · armado manual de tandas (v12.80)
+   ═══════════════════════════════════════════════════════════════════════════
+   Tres columnas: los PEDIDOS pendientes a la izquierda, las tandas que se están
+   armando en el medio, el calendario a la derecha. Se arrastra un pedido a una
+   tanda, y después la tanda a un día.
+
+   ⚠ La unidad que se arrastra es el PEDIDO, no la NP. Un pedido grande se parte
+     en bloques de 18 líneas (LK) o 15 (Chef) —eso lo hace la vista de LK, río
+     arriba— pero los bloques NO se pueden separar en tandas distintas. Por eso
+     la tarjeta es un pedido y al soltarlo viajan todos sus bloques juntos.
+
+   ⚠ El número de NP NO se pide acá. Se asigna al PROGRAMAR la tanda, que es
+     cuando el pedido se vuelve real para el depósito. Por eso este módulo no
+     llama a `pwebNumerar()`: ésa es la función que numeraba todo con sólo abrir
+     una pantalla, y está apagada a propósito.
+
+   Toda la lógica de negocio vive en Supabase (§3.j del registro). Acá no se
+   decide nada: se dibuja lo que el backend dice, incluidos los avisos del badge.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+let _apr = {
+  emp: "lk", cargando: false, err: "", listo: false,
+  pedidos: [],      // los que quedan A PROGRAMAR (columna izquierda)
+  pedidosTodos: [], // todos los del período, para poder mandar los artículos al programar
+  tandas: [],       // gv_ppp_web_tandas_abiertas
+  items: {},        // codigo -> [items del borrador]
+  cal: [],          // gv_ppp_web_calendario
+  mes: null,        // Date del día 1 del mes que se muestra
+  q: "", exp: {}, drag: null, dragTanda: null, msg: ""
+};
+
+function aprMesActual() {
+  if (!_apr.mes) { const h = new Date(); _apr.mes = new Date(h.getFullYear(), h.getMonth(), 1); }
+  return _apr.mes;
+}
+function aprMesMover(d) {
+  const m = aprMesActual();
+  _apr.mes = new Date(m.getFullYear(), m.getMonth() + d, 1);
+  aprCargarCalendario().then(aprRender);
+}
+function aprISO(d) {
+  return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
+}
+function aprNum(v, dec) { const n = Number(v) || 0; return n.toFixed(dec == null ? 3 : dec).replace(".", ","); }
+
+/* El mensaje de error que devuelve PostgREST viene en JSON; lo que le sirve al
+   supervisor es el `message`, no el volcado entero. */
+function aprMsgErr(txt) {
+  try { const j = JSON.parse(txt); return j.message || j.hint || txt; } catch (_e) { return txt; }
+}
+
+async function aprRpc(fn, body) {
+  const h = await facAuthWriteHeaders();
+  if (!h) throw new Error("Necesitás iniciar sesión de supervisor para tocar las tandas.");
+  const r = await fetch(SUPABASE_URL + "/rest/v1/rpc/" + fn, {
+    method: "POST", headers: h, body: JSON.stringify(body || {})
+  });
+  if (!r.ok) throw new Error(aprMsgErr(await r.text()));
+  const t = await r.text();
+  return t ? JSON.parse(t) : null;
+}
+
+async function aprGet(path) {
+  const r = await fetch(SUPABASE_URL + "/rest/v1/" + path, { headers: { apikey: SUPABASE_KEY }, cache: "no-store" });
+  if (!r.ok) throw new Error("Supabase respondió " + r.status);
+  return await r.json();
+}
+
+/* Los pedidos pendientes. Salen de LK/Chef en vivo y se AGRUPAN por pedido:
+   la vista devuelve un renglón por bloque y acá se junta en una tarjeta sola. */
+async function aprTraerPedidos() {
+  const emp = _apr.emp;
+  const tok = await pwebLkToken();
+  let nps;
+  if (emp === "chef") {
+    const rc = await fetch(PWEB_LK_URL + "/rest/v1/rpc/get_pedidos_web_np_chef", {
+      method: "POST",
+      headers: { apikey: PWEB_LK_ANON, Authorization: "Bearer " + tok, "Content-Type": "application/json" },
+      body: JSON.stringify({ p_dias: PWEB_VENTANA_DIAS })
+    });
+    if (!rc.ok) throw new Error("Chef respondió " + rc.status);
+    nps = await rc.json();
+  } else {
+    const desde = new Date(Date.now() - PWEB_VENTANA_DIAS * 86400000).toISOString().slice(0, 10);
+    const r = await fetch(PWEB_LK_URL + "/rest/v1/v_pedidos_web_np"
+      + "?select=empresa,order_id,np_idx,cod,razon_social,fecha_recep,direccion,lineas,cajas,items,m3,m3_parcial,localidad,zona_expreso,nombre_expreso,direccion_expreso"
+      + "&fecha_recep=gte." + desde + "&order=order_id.asc,np_idx.asc&limit=5000",
+      { headers: { apikey: PWEB_LK_ANON, Authorization: "Bearer " + tok } });
+    if (!r.ok) throw new Error("LK respondió " + r.status);
+    nps = await r.json();
+  }
+
+  // Agrupar por pedido. `np_total` = cuántos bloques tiene: se cuenta acá porque
+  // la vista de LK lo calcula pero no lo devuelve (sí lo devuelven nuestras RPC
+  // `gv_pedidos_web_np_*`, que usa el job automático).
+  const by = new Map();
+  for (const n of nps) {
+    const k = String(n.order_id);
+    if (!by.has(k)) by.set(k, {
+      order_id: n.order_id, empresa: n.empresa || emp,
+      cod: n.cod || "", razon_social: n.razon_social || "",
+      fecha_recep: n.fecha_recep || "", zona: pwebZonaSugerida(n),
+      localidad: pwebLocalidad(n), direccion: pwebDireccion(n),
+      m3: 0, m3_parcial: false, lineas: 0, cajas: 0, bloques: []
+    });
+    const p = by.get(k);
+    p.m3 += Number(n.m3) || 0;
+    p.lineas += Number(n.lineas) || 0;
+    p.cajas += Number(n.cajas) || 0;
+    if (n.m3_parcial) p.m3_parcial = true;
+    p.bloques.push({
+      np_idx: n.np_idx, m3: Number(n.m3) || 0, lineas: Number(n.lineas) || 0,
+      cajas: Number(n.cajas) || 0, m3_parcial: !!n.m3_parcial, items: n.items || []
+    });
+  }
+  const out = [];
+  for (const p of by.values()) {
+    p.bloques.sort(function (a, b) { return a.np_idx - b.np_idx; });
+    p.np_total = p.bloques.length;
+    p.m3 = Number(p.m3.toFixed(3));
+    out.push(p);
+  }
+  out.sort(function (a, b) {
+    return String(a.fecha_recep).localeCompare(String(b.fecha_recep)) || (a.order_id - b.order_id);
+  });
+  return out;
+}
+
+async function aprCargarCalendario() {
+  const m = aprMesActual();
+  const desde = aprISO(new Date(m.getFullYear(), m.getMonth(), 1));
+  const hasta = aprISO(new Date(m.getFullYear(), m.getMonth() + 1, 0));
+  try { _apr.cal = await aprRpc("gv_ppp_web_calendario", { p_desde: desde, p_hasta: hasta }) || []; }
+  catch (_e) { _apr.cal = []; }
+}
+
+async function aprCargar() {
+  if (_apr.cargando) return;
+  _apr.cargando = true; _apr.err = ""; aprRender();
+  try {
+    const emp = _apr.emp;
+    const [peds, prog, items, tandas] = await Promise.all([
+      aprTraerPedidos(),
+      aprGet('PPP_Web_Programacion?select=order_id&empresa=eq.' + emp + '&tanda=not.is.null&limit=20000'),
+      aprGet('PPP_Web_Tanda_Items?select=*&empresa=eq.' + emp + '&limit=20000'),
+      aprGet('gv_ppp_web_tandas_abiertas?select=*&empresa=eq.' + emp + '&order=codigo.asc')
+    ]);
+    await aprCargarCalendario();
+
+    // Un pedido ya programado, o que ya está en un borrador, no vuelve a la izquierda.
+    const fuera = new Set();
+    for (const x of prog)  fuera.add(String(x.order_id));
+    for (const x of items) fuera.add(String(x.order_id));
+    // `pedidosTodos` guarda TODOS, incluidos los que ya están en un borrador: al
+    // programar hacen falta sus artículos, y ésos ya no están en la lista de la
+    // izquierda.
+    _apr.pedidosTodos = peds;
+    _apr.pedidos = peds.filter(function (p) { return !fuera.has(String(p.order_id)); });
+
+    _apr.tandas = tandas;
+    _apr.items = {};
+    for (const it of items) { (_apr.items[it.codigo] = _apr.items[it.codigo] || []).push(it); }
+    _apr.listo = true;
+  } catch (e) {
+    _apr.err = e && e.message ? e.message : String(e);
+  }
+  _apr.cargando = false;
+  aprRender();
+}
+
+/* ── Acciones ──────────────────────────────────────────────────────────── */
+async function aprNuevaTanda() {
+  try { await aprRpc("gv_ppp_web_tanda_nueva", { p_empresa: _apr.emp, p_por: aprQuien() }); _apr.msg = ""; }
+  catch (e) { _apr.msg = e.message; }
+  await aprCargar();
+}
+
+function aprQuien() {
+  try { return (window.sbAuth && window.sbAuth.email) ? window.sbAuth.email : ""; } catch (_e) { return ""; }
+}
+
+/* Suelta un pedido ENTERO en una tanda: viajan todos sus bloques en una sola
+   llamada, porque no se pueden separar. */
+async function aprSoltarPedido(codigo) {
+  const p = _apr.drag; _apr.drag = null;
+  if (!p) return;
+  const filas = p.bloques.map(function (b) {
+    return {
+      order_id: p.order_id, np_idx: b.np_idx, np_total: p.np_total,
+      cod: p.cod, razon_social: p.razon_social, zona: p.zona,
+      m3: String(b.m3), m3_parcial: b.m3_parcial,
+      lineas: String(b.lineas), cajas: String(b.cajas),
+      fecha_recep: p.fecha_recep
+    };
+  });
+  try {
+    await aprRpc("gv_ppp_web_tanda_agregar",
+      { p_empresa: _apr.emp, p_codigo: codigo, p_np: filas, p_por: aprQuien() });
+    _apr.msg = "";
+  } catch (e) { _apr.msg = e.message; }
+  await aprCargar();
+}
+
+async function aprSacarPedido(codigo, orderId) {
+  const its = (_apr.items[codigo] || []).filter(function (x) { return String(x.order_id) === String(orderId); });
+  try {
+    for (const it of its) {
+      await aprRpc("gv_ppp_web_tanda_sacar",
+        { p_empresa: _apr.emp, p_codigo: codigo, p_order_id: it.order_id, p_np_idx: it.np_idx });
+    }
+    _apr.msg = "";
+  } catch (e) { _apr.msg = e.message; }
+  await aprCargar();
+}
+
+async function aprDescartarTanda(codigo) {
+  if (!confirm("¿Descartar la tanda " + codigo + "? Los pedidos vuelven a la lista de la izquierda.")) return;
+  try { await aprRpc("gv_ppp_web_tanda_descartar", { p_empresa: _apr.emp, p_codigo: codigo }); _apr.msg = ""; }
+  catch (e) { _apr.msg = e.message; }
+  await aprCargar();
+}
+
+/* Soltar la tanda en un día = programarla. Los artículos van desde acá: viven en
+   LK y Virgilio no los puede consultar. Sin ellos el operario abre la tanda y no
+   ve un solo renglón. */
+async function aprProgramar(codigo, fecha) {
+  _apr.dragTanda = null;
+  const its = _apr.items[codigo] || [];
+  if (!its.length) { _apr.msg = "La tanda " + codigo + " está vacía."; aprRender(); return; }
+  const porPed = new Map();
+  for (const p of _apr.pedidosTodos || []) porPed.set(String(p.order_id), p);
+  const items = [];
+  for (const it of its) {
+    const p = porPed.get(String(it.order_id));
+    const b = p ? (p.bloques || []).find(function (x) { return x.np_idx === it.np_idx; }) : null;
+    items.push({ order_id: it.order_id, np_idx: it.np_idx, items: (b && b.items) || [] });
+  }
+  const t = _apr.tandas.find(function (x) { return x.codigo === codigo; });
+  if (t && t.n_avisos > 0 &&
+      !confirm("La tanda " + codigo + " tiene " + t.n_avisos + " aviso(s):\n\n· " +
+               (t.avisos || []).join("\n· ") + "\n\n¿Programarla igual para el " + fecha + "?")) return;
+  try {
+    const r = await aprRpc("gv_ppp_web_tanda_programar",
+      { p_empresa: _apr.emp, p_codigo: codigo, p_fecha: fecha, p_items: items, p_por: aprQuien() });
+    const x = (r && r[0]) || {};
+    _apr.msg = "✅ " + codigo + " programada para el " + fecha + ": " +
+               (x.np_programadas || 0) + " NP · " + aprNum(x.m3) + " m³." +
+               (x.aviso_dia ? "  ⚠ " + x.aviso_dia : "");
+  } catch (e) { _apr.msg = "⚠ " + e.message; }
+  await aprCargar();
+}
+
+function aprSetEmpresa(e) { _apr.emp = (e === "chef" ? "chef" : "lk"); _apr.listo = false; aprCargar(); }
+function aprBuscar(v) { _apr.q = String(v || "").toLowerCase(); aprRender(); }
+function aprToggle(id) { _apr.exp[id] = !_apr.exp[id]; aprRender(); }
+
+/* ── Arrastre ──────────────────────────────────────────────────────────── */
+function aprDragPedido(orderId) {
+  _apr.drag = _apr.pedidos.find(function (p) { return String(p.order_id) === String(orderId); }) || null;
+}
+function aprDragTandaIni(codigo) { _apr.dragTanda = codigo; }
+function aprOver(ev) { ev.preventDefault(); ev.dataTransfer.dropEffect = "move"; }
+function aprDropTanda(ev, codigo) { ev.preventDefault(); ev.stopPropagation(); aprSoltarPedido(codigo); }
+function aprDropDia(ev, fecha) {
+  ev.preventDefault();
+  if (_apr.dragTanda) aprProgramar(_apr.dragTanda, fecha);
+}
+
+/* ── Dibujo ────────────────────────────────────────────────────────────── */
+function aprRender() {
+  const box = document.getElementById("pppPreview"); if (!box) return;
+  if (!_apr.listo && !_apr.cargando && !_apr.err) { aprCargar(); }
+
+  let h = pppTabsHtml(_apr.listo ? _apr.pedidos.length : null, null, null, null);
+
+  h += '<div class="apr-bar">' +
+       '<span class="apr-emp">' +
+         '<button class="apr-empb ' + (_apr.emp === "lk" ? "on" : "") + '" onclick="aprSetEmpresa(\'lk\')">Loekemeyer</button>' +
+         '<button class="apr-empb ' + (_apr.emp === "chef" ? "on" : "") + '" onclick="aprSetEmpresa(\'chef\')">Chef</button>' +
+       '</span>' +
+       '<button class="apr-reload" onclick="aprCargar()" title="Volver a leer">🔄</button>' +
+       (_apr.cargando ? '<span class="apr-load">Cargando…</span>' : '') +
+       '</div>';
+
+  if (_apr.err) h += '<div class="apr-err">⚠ ' + escapeHtml(_apr.err) + '</div>';
+  if (_apr.msg) h += '<div class="apr-msg">' + escapeHtml(_apr.msg) + '</div>';
+
+  h += '<div class="apr-wrap">' + aprColPedidos() + aprColTandas() + aprColCal() + '</div>';
+  _renderKeepFocus(box, h);
+}
+
+function aprColPedidos() {
+  const q = _apr.q;
+  let lista = _apr.pedidos;
+  if (q) lista = lista.filter(function (p) {
+    return (p.razon_social + " " + p.cod + " " + p.zona + " " + p.localidad + " " + p.order_id).toLowerCase().indexOf(q) >= 0;
+  });
+  let h = '<div class="apr-col apr-col-nps">' +
+    '<div class="apr-col-t">📋 Pedidos a programar <b>(' + lista.length + ')</b></div>' +
+    '<input class="apr-q" type="search" placeholder="🔎 cliente, zona, localidad…" value="' + escapeHtml(_apr.q) + '" oninput="aprBuscar(this.value)">' +
+    '<div class="apr-scroll">';
+  if (!lista.length) {
+    h += '<div class="apr-vacio">' + (_apr.listo ? "No queda nada por programar." : "Cargando pedidos…") + '</div>';
+  }
+  for (const p of lista) {
+    const id = "p" + p.order_id, ab = !!_apr.exp[id];
+    h += '<div class="apr-card" draggable="true" ondragstart="aprDragPedido(' + p.order_id + ')">' +
+      '<div class="apr-card-h" onclick="aprToggle(\'' + id + '\')">' +
+        '<span class="apr-card-cli">' + escapeHtml(p.razon_social || p.cod || ("#" + p.order_id)) + '</span>' +
+        '<span class="apr-card-chev">' + (ab ? "▾" : "▸") + '</span>' +
+      '</div>' +
+      '<div class="apr-card-d">' +
+        '<span class="apr-chip apr-chip-z">' + escapeHtml(p.zona || "sin zona") + '</span>' +
+        '<span class="apr-chip">' + escapeHtml(p.fecha_recep || "—") + '</span>' +
+        '<span class="apr-chip apr-chip-m3">' + aprNum(p.m3) + ' m³' + (p.m3_parcial ? "*" : "") + '</span>' +
+        (p.np_total > 1 ? '<span class="apr-chip apr-chip-np">sale en ' + p.np_total + ' NP</span>' : '') +
+      '</div>';
+    if (ab) {
+      h += '<div class="apr-card-body">' +
+        '<div class="apr-kv"><b>Pedido</b> #' + p.order_id + ' · <b>Cód</b> ' + escapeHtml(p.cod || "—") + '</div>' +
+        '<div class="apr-kv"><b>Entrega</b> ' + escapeHtml(p.direccion || p.localidad || "—") + '</div>' +
+        '<div class="apr-kv"><b>' + p.lineas + '</b> líneas · <b>' + aprNum(p.cajas, 0) + '</b> cajas</div>';
+      for (const b of p.bloques) {
+        h += '<div class="apr-bloque">Bloque ' + b.np_idx + '/' + p.np_total + ' · ' + b.lineas + ' líneas · ' + aprNum(b.m3) + ' m³</div>' +
+             '<div class="apr-arts">' + (b.items || []).map(function (it) {
+               return '<span class="apr-art">' + escapeHtml(String(it.art || "")) + ' <b>×' + aprNum(it.cajas, 0) + '</b></span>';
+             }).join("") + '</div>';
+      }
+      h += '</div>';
+    }
+    h += '</div>';
+  }
+  return h + '</div></div>';
+}
+
+function aprColTandas() {
+  let h = '<div class="apr-col apr-col-tandas">' +
+    '<div class="apr-col-t">📦 Tandas en armado <b>(' + _apr.tandas.length + ')</b></div>' +
+    '<button class="apr-nueva" onclick="aprNuevaTanda()">＋ Nueva tanda vacía</button>' +
+    '<div class="apr-scroll">';
+  if (!_apr.tandas.length) h += '<div class="apr-vacio">Tocá <b>＋</b> y arrastrá pedidos acá.</div>';
+  for (const t of _apr.tandas) {
+    const its = _apr.items[t.codigo] || [];
+    // Un pedido puede tener varios bloques adentro: se muestra UNA fila por pedido.
+    const byPed = new Map();
+    for (const it of its) {
+      const k = String(it.order_id);
+      if (!byPed.has(k)) byPed.set(k, { order_id: it.order_id, rs: it.razon_social, cod: it.cod_cliente, zona: it.zona, m3: 0, n: 0, total: it.np_total || 1 });
+      const e = byPed.get(k); e.m3 += Number(it.m3) || 0; e.n++;
+    }
+    h += '<div class="apr-tanda" ondragover="aprOver(event)" ondrop="aprDropTanda(event,\'' + t.codigo + '\')">' +
+      '<div class="apr-tanda-h" draggable="true" ondragstart="aprDragTandaIni(\'' + t.codigo + '\')" title="Arrastrá la tanda a un día del calendario para programarla">' +
+        '<span class="apr-tanda-cod">' + escapeHtml(t.codigo) + '</span>' +
+        (t.n_avisos > 0 ? '<span class="apr-badge" title="' + escapeHtml((t.avisos || []).join(" · ")) + '">⚠ ' + t.n_avisos + '</span>' : '') +
+        '<button class="apr-tanda-x" onclick="aprDescartarTanda(\'' + t.codigo + '\')" title="Descartar">✕</button>' +
+      '</div>' +
+      '<div class="apr-tanda-m3"><b>' + aprNum(t.m3) + ' m³</b> · ' + byPed.size + ' pedido(s) · ' + t.n_np + ' NP</div>';
+    if (t.n_avisos > 0) {
+      h += '<div class="apr-avisos">' + (t.avisos || []).map(function (a) {
+        return '<div class="apr-aviso">⚠ ' + escapeHtml(a) + '</div>';
+      }).join("") + '</div>';
+    }
+    for (const e of byPed.values()) {
+      h += '<div class="apr-titem">' +
+        '<span class="apr-titem-cli">' + escapeHtml(e.rs || e.cod || ("#" + e.order_id)) + '</span>' +
+        '<span class="apr-titem-d">' + escapeHtml(e.zona || "sin zona") + ' · ' + aprNum(e.m3) + ' m³' +
+          (e.total > 1 ? ' · ' + e.n + '/' + e.total + ' bloques' : '') + '</span>' +
+        '<button class="apr-titem-x" onclick="aprSacarPedido(\'' + t.codigo + '\',' + e.order_id + ')" title="Sacar de la tanda">↩</button>' +
+      '</div>';
+    }
+    if (!byPed.size) h += '<div class="apr-tanda-vacia">Arrastrá un pedido acá</div>';
+    h += '</div>';
+  }
+  return h + '</div></div>';
+}
+
+function aprColCal() {
+  const m = aprMesActual();
+  const MES = ["Enero","Febrero","Marzo","Abril","Mayo","Junio","Julio","Agosto","Septiembre","Octubre","Noviembre","Diciembre"];
+  const byD = {}; for (const d of _apr.cal) byD[d.dia] = d;
+  const primero = new Date(m.getFullYear(), m.getMonth(), 1);
+  const dias = new Date(m.getFullYear(), m.getMonth() + 1, 0).getDate();
+  const hoy = aprISO(new Date());
+
+  let h = '<div class="apr-col apr-col-cal">' +
+    '<div class="apr-col-t">🗓️ Calendario</div>' +
+    '<div class="apr-cal-nav">' +
+      '<button onclick="aprMesMover(-1)">◀</button>' +
+      '<span>' + MES[m.getMonth()] + ' ' + m.getFullYear() + '</span>' +
+      '<button onclick="aprMesMover(1)">▶</button>' +
+    '</div>' +
+    '<div class="apr-cal-dow">' + ["Do","Lu","Ma","Mi","Ju","Vi","Sá"].map(function (d) { return '<span>' + d + '</span>'; }).join("") + '</div>' +
+    '<div class="apr-cal-grid">';
+  for (let i = 0; i < primero.getDay(); i++) h += '<div class="apr-dia apr-dia-off"></div>';
+  for (let d = 1; d <= dias; d++) {
+    const iso = aprISO(new Date(m.getFullYear(), m.getMonth(), d));
+    const info = byD[iso] || {};
+    const cls = ["apr-dia"];
+    if (info.habil === false) cls.push("apr-dia-nohabil");
+    if (info.pasado) cls.push("apr-dia-lleno");
+    if (iso === hoy) cls.push("apr-dia-hoy");
+    if (Number(info.tandas) > 0) cls.push("apr-dia-con");
+    h += '<div class="' + cls.join(" ") + '" ondragover="aprOver(event)" ondrop="aprDropDia(event,\'' + iso + '\')"' +
+         ' title="' + escapeHtml(iso + (info.habil === false ? " · no hábil" : "") +
+           (Number(info.tandas) > 0 ? " · " + info.tandas + " tanda(s) · " + aprNum(info.m3) + " m³" : "") ) + '">' +
+      '<span class="apr-dia-n">' + d + '</span>' +
+      (Number(info.tandas) > 0 ? '<span class="apr-dia-m3">' + aprNum(info.m3, 1) + '</span>' : '') +
+    '</div>';
+  }
+  h += '</div><div class="apr-cal-pie">Arrastrá una tanda a un día para programarla. ' +
+       'Los días grises no son hábiles; los rojos pasan el cupo.</div>';
+  return h + '</div>';
+}
+
 
 /* (v5.34) fetchMonitorFromSheets eliminado: la PPP se lee de Supabase
    (fetchMonitorFromSupabase). */

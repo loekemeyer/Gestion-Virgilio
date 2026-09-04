@@ -938,13 +938,34 @@ El camino feliz se probó prendiendo y apagando la numeración **dentro de una s
 transacción**, para no dejar el interruptor abierto ni un segundo. Todo borrado después:
 las 5 tablas en 0 y `PPP_Programacion_Diaria` en 182.
 
+### El front — v12.80
+
+Ya está. Tres columnas, arrastrar y soltar, el "+" y el badge.
+
+- **Se intercepta arriba de todo** en `pppRenderProg`: el módulo trabaja sobre pedidos web
+  y no puede depender de que se haya importado una PPP de ISIS — más abajo hay un
+  `if (!all.length) return` que lo dejaría afuera para siempre. Por eso la barra de solapas
+  se extrajo a `pppTabsHtml()`.
+- **La izquierda lista pedidos**, no NP: se agrupan por `order_id` en el front y `np_total`
+  se cuenta ahí mismo (la vista de LK no lo devuelve; sí lo hacen nuestras RPC, que usa el
+  job). La tarjeta dice *"sale en 3 NP"* y se expande a los bloques y sus artículos.
+- **No llama a `pwebNumerar()`.** Ésa es la que numeraba todo con sólo abrir una pantalla
+  y está apagada a propósito; acá el número se asigna al programar.
+- **Al soltar un pedido viajan todos sus bloques** en una sola llamada.
+- Selector **Loekemeyer / Chef**: una tanda pertenece a una empresa.
+- Antes de programar una tanda con avisos, pide confirmación mostrándolos.
+
+Regresión: `tests/apr-programar.cjs` (19 chequeos, carga el `index.html` real). Cubre el
+badge, el pedido a medias, los tres estados del calendario, y que un pedido sin razón
+social ni m³ no rompa el dibujo. Verde junto con `smoke`, `ppp-errores`, `pweb-barrio-zona`
+y `checkhtml`.
+
 ### Lo que falta
 
-1. **El front**: las tres columnas, el arrastre, el "+" y el badge. Esto es sólo la lógica
-   de atrás, que es lo que se pidió primero.
-2. La lista de la izquierda la arma el front (las NP viven en LK/Chef); de acá sólo
-   necesita saber cuáles están tomadas.
-3. Programar no funciona hasta que se prenda la numeración. A propósito.
+1. **Programar no funciona hasta que se prenda la numeración.** A propósito: corta con el
+   mensaje correcto. Es lo único que separa a este módulo de estar operativo.
+2. La lista de la izquierda sale en vivo de LK/Chef con el bridge del supervisor; sin
+   sesión no carga.
 
 ---
 
