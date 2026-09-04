@@ -119,8 +119,9 @@ returns int language sql stable as $$
   ) t;
 $$;
 
--- El cuerpo de `ppp_web_armar_tandas` está aplicado en la base (migración
--- `ppp_web_armar_tandas`). Notas de implementación que importan al tocarlo:
+-- ⚠ Este cuerpo se volcó del vivo el 2026-09-04: el archivo sólo decía "está
+--   aplicado en la base", así que el repo no lo tenía y no había forma de
+--   revisarlo sin abrir Supabase. Notas de implementación que importan al tocarlo:
 --
 --   · Los clientes se recorren de MAYOR a MENOR m³ (first-fit decreasing):
 --     empaqueta mejor que tomarlos en el orden que vengan.
@@ -131,6 +132,104 @@ $$;
 --     MISMA transacción reventaban con "relation _sin_tanda already exists".
 --   · Va SECURITY INVOKER: la RLS de `PPP_Web_Programacion` (los tres mails de
 --     supervisor) decide quién puede escribir.
+
+create or replace function public.ppp_web_armar_tandas(
+  p_empresa text, p_fecha date default current_date, p_filas jsonb default '[]'::jsonb)
+returns table (r_tanda text, r_zona text, r_np_count int, r_m3 numeric, r_clientes int)
+language plpgsql
+as $function$
+declare
+  v_tope   numeric := coalesce((select valor from public."PPP_Web_Config" where clave='tanda_m3_max_mezcla'), 1.00);
+  v_dias   int     := coalesce((select valor from public."PPP_Web_Config" where clave='dias_hasta_entrega'), 0)::int;
+  v_saltar boolean := coalesce((select valor from public."PPP_Web_Config" where clave='saltar_fin_de_semana'), 1) <> 0;
+  v_letra  int     := public.ppp_web_proxima_letra();
+  v_fecha  date;
+  v_zona   text;
+  v_zn     int := 0;
+  v_ti     int;
+  v_code   text;
+  v_acum   numeric;
+  r_cli    record;
+begin
+  v_fecha := p_fecha + v_dias;
+  if v_saltar then
+    while extract(dow from v_fecha) in (0, 6) loop v_fecha := v_fecha + 1; end loop;
+  end if;
+
+  drop table if exists _sin_tanda;
+  drop table if exists _asig;
+
+  create temp table _sin_tanda on commit drop as
+  select (x->>'order_id')::bigint as order_id,
+         (x->>'np_idx')::int      as np_idx,
+         nullif(x->>'np','')::int as np,
+         coalesce(nullif(x->>'zona',''), '(sin zona)') as zona,
+         coalesce(nullif(x->>'cod',''), nullif(x->>'razon_social',''), '?') as cliente,
+         nullif(x->>'razon_social','') as razon_social,
+         nullif(x->>'direccion','')    as direccion,
+         nullif(x->>'barrio','')       as barrio,
+         coalesce(nullif(x->>'m3','')::numeric, 0)    as m3,
+         coalesce((x->>'m3_parcial')::boolean, false) as m3_parcial,
+         nullif(x->>'lineas','')::int                 as lineas,
+         nullif(x->>'cajas','')::numeric              as cajas
+    from jsonb_array_elements(p_filas) x
+   where not exists (
+           select 1 from public."PPP_Web_Programacion" g
+            where g.empresa = p_empresa
+              and g.order_id = (x->>'order_id')::bigint
+              and g.np_idx   = (x->>'np_idx')::int
+              and coalesce(nullif(trim(g.tanda),''), '') <> '');
+
+  -- Sin zona no se programa: falta el barrio y la elige una persona.
+  delete from _sin_tanda where zona = '(sin zona)';
+
+  create temp table _asig (order_id bigint, np_idx int, tanda text) on commit drop;
+
+  for v_zona in select distinct zona from _sin_tanda order by 1 loop
+    v_zn := v_zn + 1; v_ti := 0; v_acum := 0; v_code := null;
+    for r_cli in
+      select cliente, sum(m3) as m3_cli from _sin_tanda where zona = v_zona
+       group by cliente order by sum(m3) desc, cliente
+    loop
+      -- Súper va siempre solo; un cliente que solo ya pasa el tope también.
+      if v_zona = 'Super' or r_cli.m3_cli >= v_tope or v_code is null
+         or (v_acum + r_cli.m3_cli) > v_tope then
+        v_code := public.ppp_web_letra(v_letra) || lpad(v_zn::text, 2, '0')
+                  || public.ppp_web_letra(v_ti);
+        v_ti := v_ti + 1; v_acum := 0;
+      end if;
+      insert into _asig (order_id, np_idx, tanda)
+      select s.order_id, s.np_idx, v_code
+        from _sin_tanda s where s.zona = v_zona and s.cliente = r_cli.cliente;
+      v_acum := v_acum + r_cli.m3_cli;
+      if v_zona = 'Super' or r_cli.m3_cli >= v_tope then v_code := null; v_acum := 0; end if;
+    end loop;
+  end loop;
+
+  insert into public."PPP_Web_Programacion"
+    (empresa, order_id, np_idx, np, cod_cliente, razon_social, direccion, barrio,
+     tanda, zona, fecha_entrega, m3, m3_parcial, lineas, cajas)
+  select p_empresa, s.order_id, s.np_idx, s.np,
+         s.cliente, s.razon_social, s.direccion, s.barrio,
+         a.tanda, s.zona, v_fecha, s.m3, s.m3_parcial, s.lineas, s.cajas
+    from _sin_tanda s join _asig a on a.order_id = s.order_id and a.np_idx = s.np_idx
+  on conflict (empresa, order_id, np_idx) do update
+     set tanda = excluded.tanda, zona = excluded.zona,
+         fecha_entrega = excluded.fecha_entrega,
+         m3 = excluded.m3, m3_parcial = excluded.m3_parcial,
+         lineas = excluded.lineas, cajas = excluded.cajas;
+
+  return query
+    select a.tanda, min(s.zona), count(*)::int, round(sum(s.m3), 3), count(distinct s.cliente)::int
+      from _asig a join _sin_tanda s on s.order_id = a.order_id and s.np_idx = a.np_idx
+     group by a.tanda order by a.tanda;
+end
+$function$;
+
+-- ⚠ NO escribe `PPP_Web_Base` (la foto de artículos del picking). El front la
+--   escribe aparte en `pwebGuardarProg`, y el armado automático la escribe en
+--   `gv-ppp-web-tandas-diarias`. Sin ella la tanda queda programada y el operario
+--   la abre VACÍA.
 --
 -- ── Controles ─────────────────────────────────────────────────────────────
 --   -- Cómo quedaron las tandas del día:

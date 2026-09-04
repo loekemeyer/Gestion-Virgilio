@@ -271,6 +271,77 @@ Detalle en el anexo técnico de `docs/ISIS-API-ESPECIFICACION.md`.
 
 ---
 
+## 3.c Armado automático de tandas — 2026-09-04
+
+`ppp_web_armar_tandas` existía y estaba probada desde antes, pero **no la llamaba
+nadie**: 0 referencias en `index.html`, 0 crons. Por eso `PPP_Web_Programacion` tenía
+**0 filas con 350 NP ya numeradas** — la cadena se cortaba justo ahí y todo lo de abajo
+(picking, armado, facturación, ISIS) estaba en cero por arrastre.
+
+Pedido del dueño: *"para el comienzo de cada día (lunes a viernes no feriado) tiene que
+elegir las tandas a armar a ese día"*.
+
+### Lo que se creó (todo NUEVO y con prefijo)
+
+| objeto | qué es |
+|---|---|
+| `gv_es_dia_habil(date)` | lunes a viernes y no feriado. Lee `planify.feriados` (35 filas, hasta 2027, cron diario ajeno). `SECURITY DEFINER` porque `planify` no está abierto; devuelve un booleano y nada más |
+| `gv_ppp_web_barrio_de(text)` | corte del barrio por el último guión. Espejo backend de `pwebBarrioDe()` |
+| `gv_ppp_web_zona(ze, loc, dir)` | la cascada `zona_expreso → localidad → dirección` + diccionario. Espejo de `pwebZonaSugerida()` |
+| `gv_ppp_web_zona_lote(jsonb)` | la misma cuenta para N filas en una llamada |
+| `GV_Tandas_Auto_Log` | bitácora de cada corrida, incluidas las que no hacen nada. RLS: lectura sólo para los tres mails de supervisor |
+| `PPP_Web_Config.ventana_dias` | fila nueva (`insert … do nothing`), 30 días |
+| Edge Fn `gv-ppp-web-tandas-diarias` | el disparador. `verify_jwt = true` |
+| cron `gv-ppp-web-tandas-diarias` | `1 3 * * 1-5` = 00:01 de Argentina. jobid 71 |
+
+### Que no jode a Producción
+
+Grep obligatorio contra `loekemeyer/produccion-virgilio` (HEAD `a7b3368`) **antes** de
+tocar nada: `ppp_web_armar_tandas` 0 · `PPP_Web_Programacion` 0 · `PPP_Web_Config` 0 ·
+`ppp_web_proxima_letra` 0 · `gv_zona_de_barrio` 0. De lo compartido sólo se **lee**
+(`Zonas_Barrios` 18 hits, `planify.feriados` 1). Ni un `create or replace` sobre nada
+ajeno, ni un trigger sobre tabla compartida, ni un INSERT contra
+`PPP_Programacion_Diaria`.
+
+**`ppp_web_armar_tandas` no se modificó**, aunque es nuestra y el grep da 0: se pensó
+agregarle el salto de feriados a la fecha de entrega y no hace falta (el job sólo corre
+en día hábil y `dias_hasta_entrega = 0`). Un `create or replace` que no hace falta es
+riesgo gratis.
+
+### Dos cosas que aparecieron al construirlo
+
+1. **`ppp_web_armar_tandas` no escribe `PPP_Web_Base`**, que es la foto de artículos que
+   después pickea el operario. El front las escribe juntas en `pwebGuardarProg`; el job
+   automático la habría dejado afuera y **el operario habría abierto la tanda vacía** —
+   el propio front tiene ese error escrito a mano. La escribe ahora la Edge Function.
+2. **El barrio se cortaba mal en dos bordes.** La primera versión de
+   `gv_ppp_web_barrio_de` usaba `rpos > 1` y no replicaba al front cuando el guión está
+   al principio o al final de la cadena. Corregido y probado contra 13 casos.
+
+### Medido, no supuesto
+
+- **Zona:** 340 de 355 NP reales de LK de 30 días (**95,8%**). Las 15 restantes son del
+  interior sin `zona_expreso` en el padrón (Santa Cruz, Aguilares, Concepción del
+  Uruguay, Río Cuarto) más una fila basura. Es el padrón de LK, no el diccionario.
+- **Armado:** 32 NP reales (pedidos 1312-1344) por toda la cadena, en transacción
+  revertida. 31 programadas en 13 tandas. Súper solo (4,560 m³), un cliente que pasa el
+  tope no se parte (1,375 m³ en 2 NP juntas), 4 clientes chicos en una tanda (0,643 m³),
+  Retira junta 2 clientes, ninguna tanda mezcla zonas, la que no tenía zona quedó afuera.
+- Después de la prueba: `PPP_Web_Programacion` de vuelta en 0, `PPP_Programacion_Diaria`
+  en 182 y sin una sola NP web.
+
+### ⚠ Falta un secreto para que arranque
+
+`GV_LK_SERVICE_KEY` = service_role del proyecto **LK** (`kwkclwhmoygunqmlegrg`), en Edge
+Functions → Secrets del proyecto Virgilio. Hace falta porque `v_pedidos_web_np` y
+`get_pedidos_web_np_chef` piden `authenticated` — con la anon key dan 401, y así tiene
+que seguir: traen razón social, dirección y detalle de pedidos. Hasta que se cargue, el
+cron corre y deja una fila `estado='error'` con ese motivo en `GV_Tandas_Auto_Log`.
+
+Detalle completo en `sql/gv_tandas_diarias.sql`.
+
+---
+
 ## 4. Incidente de seguridad — 2026-09-04 (cerrado)
 
 `public.vista_pedidos_web_feed` tenía `select` para `anon`. Los esquemas `fuentes` y
