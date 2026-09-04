@@ -235,3 +235,6 @@ PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node te
 
 echo "== pweb-chef (idea 3717: Chef en la PPP Web — RPC aparte, el FDW no se paga desde LK) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/pweb-chef.cjs
+
+echo "== pweb-excel-isis (idea 3717: el Excel para ISIS también arma las NP de la PPP Web) =="
+PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/pweb-excel-isis.cjs

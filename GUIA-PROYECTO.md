@@ -8471,8 +8471,17 @@ lee **la misma tabla donde caen los pedidos de la página**, en vivo.
       web de 4 dígitos caía en **Chef** y el operario iría a buscar un pedido de
       Loekemeyer al sector equivocado. Ahora, si la NP trae prefijo `LK`/`CH`,
       manda el prefijo; las NP de ISIS (solo dígitos) siguen igual.
-  - Regresión: `tests/pweb-programar.cjs`, `tests/pweb-tandas.cjs` y
-    `tests/pweb-picking.cjs`.
+  - **El Excel para ISIS también las arma (v12.67)** — es el último paso: se
+    pickea el pedido web y después hay que importarlo a ISIS para facturar.
+    `_facXlsArmar` tenía dos agujeros para las NP web, los dos silenciosos:
+    - las NP van ahora **entrecomilladas** en el `in.()`. `"LK 1343"` tiene un
+      espacio y sin comillas PostgREST no lo resuelve: esas filas se caían del
+      archivo sin ningún error;
+    - la **fecha** de una NP de ISIS sale de `PPP_Base_Pedidos`, donde una NP web
+      no está. Se guarda `PPP_Web_Programacion.fecha_recep` al programar y el Excel
+      la lee de ahí. Antes salía con la fecha vacía.
+  - Regresión: `tests/pweb-programar.cjs`, `tests/pweb-tandas.cjs`,
+    `tests/pweb-picking.cjs` y `tests/pweb-excel-isis.cjs`.
 
 **Pendiente MEDIA**: `prodLoad/prodCompute` — RPC parametrizado por rango de fechas,
 cálculo de productividad con m³ y factores. Complejidad alta, dejado para después.

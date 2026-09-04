@@ -280,3 +280,8 @@ grant insert, update, delete on public."PPP_Web_Base" to authenticated;
 --       on b.empresa = p.empresa and b.order_id = p.order_id and b.np_idx = p.np_idx
 --    where p.tanda is not null
 --    group by p.tanda, p.np having count(b.articulo) = 0;
+
+-- v12.67 · `fecha_recep`: la fecha en que el pedido entró por la página.
+-- La necesita el Excel para ISIS. Para una NP de ISIS esa fecha sale de
+-- `PPP_Base_Pedidos`, donde una NP web no está, así que se guarda al programar.
+alter table public."PPP_Web_Programacion" add column if not exists fecha_recep date;
