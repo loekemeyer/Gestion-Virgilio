@@ -381,17 +381,21 @@ Objetos creados en LK: `gv_pedidos_web_np_lk(date)`, `gv_cods_chef_de_lk(text[])
 
 ### Cómo se carga la credencial (sólo panel, sin terminal)
 
-**1.** LK → **Project Settings** → **API Keys** → *Create new secret key*. LK está
-en el sistema nuevo de llaves (tiene `sb_publishable_…`), así que ahí se crean
-llaves `sb_secret_…`. **Si al crearla deja elegir el rol de Postgres, elegir
-`gv_reader`** — eso da la llave acotada sin tocar nada más.
+**1.** LK → **Project Settings** → **API Keys** → *Create new secret key*:
+nombre `gv_tandas_virgilio`. **El diálogo NO deja elegir rol de Postgres**
+(verificado el 2026-09-04): toda secret key bypasea la RLS. Aun así se prefiere
+sobre la `service_role` legacy, que tiene el mismo poder pero **no se puede
+revocar sola**: para invalidarla hay que rotar el JWT Secret del proyecto, y eso
+tumba la anon key y todas las sesiones abiertas del sitio de LK. La
+`sb_secret_…` se borra sola y no rompe nada más.
 
 **2.** Virgilio → **Edge Functions** → **Secrets** → *Add new secret*:
 `GV_LK_SERVICE_KEY` = la llave del paso 1.
 
-Si el panel **no** deja elegir el rol, sirve igual la service key de LK como
-paso intermedio: la Edge Function acepta las dos sin recompilar, porque todo va
-por RPC. Se acota después sin tocar código, sólo cambiando el valor del secreto.
+La Edge Function acepta los dos formatos sin recompilar: `authLk()` detecta si
+es `sb_secret_…` (va en el header `apikey`) o un JWT (va en `Authorization`, con
+la anon key en `apikey`). Pasar al token acotado de `gv_reader` más adelante es
+cambiar el valor del secreto, sin tocar código.
 
 > Alternativa sin panel, por si alguna vez hace falta: `tools/gv-token-lk.js`
 > firma el token de `gv_reader` con el JWT Secret de LK, que entra por variable

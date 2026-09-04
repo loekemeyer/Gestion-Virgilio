@@ -44,15 +44,24 @@ const VIRGILIO_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 // tiene que seguir.
 //
 // `GV_LK_SERVICE_KEY` acepta CUALQUIERA de las dos credenciales, sin recompilar:
-//   · el token del rol `gv_reader` (recomendado) — solo puede ejecutar las tres
-//     funciones `gv_*` de abajo y no lee NI UNA tabla; o
-//   · la service key de LK, que abre todo.
+//   · una secret key `sb_secret_...` del panel de LK — se crea en dos clicks
+//     pero BYPASEA la RLS, asi que abre todo LK. Se prefiere sobre la
+//     `service_role` legacy porque se revoca sola: borrar esa llave no toca
+//     nada mas, mientras que revocar la legacy obliga a rotar el JWT Secret,
+//     que invalida la anon key y todas las sesiones abiertas del sitio; o
+//   · el token del rol `gv_reader` — solo puede ejecutar las tres funciones
+//     `gv_*` de abajo y no lee NI UNA tabla, pero hay que firmarlo aparte
+//     (`tools/gv-token-lk.js`).
 // Por eso todo va por RPC y no por lectura directa de vistas: `gv_reader` no
-// tiene SELECT sobre nada, a proposito.
+// tiene SELECT sobre nada, a proposito. Cambiar de una credencial a la otra es
+// cambiar el valor del secreto, sin tocar codigo.
 //
-// El header `apikey` va SIEMPRE con la anon key de LK (es publica, esta en el
-// front) porque el gateway la exige; quien decide los permisos es el JWT del
-// Authorization.
+// Las dos credenciales viajan distinto y por eso `authLk()` decide sola:
+//   · `sb_secret_...` (llave del sistema nuevo) va en los DOS headers, apikey y
+//     Authorization. Es lo que espera el gateway para ese formato.
+//   · un JWT (`ey...`, como el de `gv_reader`) va en Authorization, y el apikey
+//     lleva la anon key de LK, que es publica y ya esta en el front. Ahi quien
+//     decide los permisos es el rol del JWT.
 const LK_URL = Deno.env.get("GV_LK_URL") ?? "https://kwkclwhmoygunqmlegrg.supabase.co";
 const LK_KEY = Deno.env.get("GV_LK_SERVICE_KEY") ?? "";
 const LK_ANON = Deno.env.get("GV_LK_ANON") ??
@@ -86,12 +95,20 @@ async function vgRpc<T>(fn: string, body: unknown): Promise<T> {
   return await r.json() as T;
 }
 
+function authLk(): { apikey: string; Authorization: string } {
+  // Una llave del sistema nuevo no es un JWT: el gateway la quiere en apikey.
+  const esLlaveNueva = LK_KEY.startsWith("sb_secret_") || LK_KEY.startsWith("sb_publishable_");
+  return {
+    apikey: esLlaveNueva ? LK_KEY : LK_ANON,
+    Authorization: "Bearer " + LK_KEY,
+  };
+}
+
 async function lk(path: string, init: RequestInit = {}): Promise<Response> {
   return await fetch(LK_URL + path, {
     ...init,
     headers: {
-      apikey: LK_ANON,
-      Authorization: "Bearer " + LK_KEY,
+      ...authLk(),
       "Content-Type": "application/json",
       ...(init.headers ?? {}),
     },
@@ -308,7 +325,7 @@ Deno.serve(async (req: Request) => {
       return Response.json({ ok: true, fecha, salteada: true, motivo });
     }
 
-    if (!LK_KEY) throw new Error("Falta el secreto GV_LK_SERVICE_KEY (token de gv_reader, o service_role de LK).");
+    if (!LK_KEY) throw new Error("Falta el secreto GV_LK_SERVICE_KEY (secret key de LK, o token de gv_reader).");
 
     const rCfg = await vg("/rest/v1/PPP_Web_Config?select=valor&clave=eq.ventana_dias");
     const cfg = rCfg.ok ? await rCfg.json() as { valor: number }[] : [];
