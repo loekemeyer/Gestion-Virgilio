@@ -14,6 +14,28 @@
 >
 > Última actualización: 2026-09-04 · Versión app al documentar: **v12.77**
 >
+> Nota **backend, sin bump de app** — **Las tres sublistas del módulo Facturación: la vista
+> que las corta.** El circuito que pidió el dueño es: pedido armado → *pendiente de facturar*
+> → se tilda y se manda a ISIS → *esperando confirmación* → aparece la factura → *facturado*.
+> `vista_facturacion_estado` (`sql/facturacion_estado.sql`) resuelve el corte **2↔3**, que es
+> el nuevo; la lista 1 la sigue armando el front, que es el único que sabe si una NP está
+> armada (`facEstaArmada`, cruza `Entregas_Virgilio` con fallback de eventos TAL/TAP).
+> **Se acepta la confirmación por dos caminos**, porque son independientes y ninguno alcanza
+> solo: **(a)** el acuse de ISIS por la API de salida (`isis_export_pedidos`, `sql/isis_api.sql`)
+> con `resultado='ok'` + nro de comprobante + CAE; **(b)** el parseo de comprobantes
+> (`vista_cruce_facturacion` contra `isis_lk`/`isis_ch.documentos`, por cliente + fecha ±3 d +
+> cajas). La columna `via` dice por cuál entró — sirve para saber si la API está andando.
+> **Medido el 2026-09-04** sobre las 1.181 NP tildadas: 735 facturadas (todas por parseo, **0
+> por acuse** — ISIS todavía no usa la API) y 446 esperando. Por antigüedad: última semana
+> 102/29, 8-30 días 298/57, junio a hace 30 días 335/306, anterior a junio 0/54 (el parseo
+> arranca en junio). O sea: para lo reciente el corte sirve, pero hacia atrás hay cola muerta
+> → **la sublista 2 conviene mostrarla con ventana de fecha**, o se vuelve un cementerio.
+> ⚠ Falso negativo conocido (ya documentado en `sql/cruce_facturacion.sql`): una factura que
+> consolida varias NP del mismo cliente y día tiene las cajas sumadas y no matchea 1:1; esa NP
+> queda esperando sin estar mal. Por eso la vista expone `candidatos_cercanos`.
+> ⚠ Las NP web todavía **no llegan** a `Facturacion_NP` (esa tabla tiene NP de ISIS, de 44361
+> para arriba). Cuando la facturación de NP web se conecte entran solas.
+>
 > Nota **v12.77** — **Se puede agregar artículos a un pedido y el sistema reacomoda solo.**
 > Regla fijada por el dueño: un pedido web se edita **en cualquier momento hasta que se
 > factura** —a programar, programado, en picking, en armado, armado esperando factura—, y el
