@@ -1,90 +1,128 @@
 -- ============================================================================
--- m³ por artículo con la "L" final resuelta · v12.75
+-- m³ por artículo con la "L" final resuelta · v12.75, regla revisada 2026-09-04
 -- Corre en VIRGILIO (hrxfctzncixxqmpfhskv)
 -- ============================================================================
--- QUÉ ARREGLA
+-- LA REGLA: UN CÓDIGO CON "L" ES EL MISMO ARTÍCULO QUE SU BASE
 -- ----------------------------------------------------------------------------
--- Un código terminado en "L" (438EL, 097L) es un artículo de LOEKEMEYER que
--- VENDE Chef: el pedido entra como NP de Chef pero la mercadería sale de la
--- góndola de Loeke. El picking y el armado ya lo resuelven desde v12.37/v12.39
--- (`pkStripL` / `pkEmpresaArt` / `pkResolveArt` en index.html), pero el **m³ no**:
--- `pwebVolumenes()` buscaba `Volumen_Articulos` por el código crudo y listo.
+-- `438EL` es el `438E` de Loekemeyer vendido por Chef. Es la MISMA caja: sale de
+-- la misma góndola y ocupa el mismo lugar en el camión. Entonces su m³ **es el del
+-- base, siempre** — no "si el base tiene", no "cuando falta el propio": siempre.
+-- Decisión del dueño (2026-09-04): *"usá los valores del código pelado para todos
+-- los códigos L"*.
 --
--- Medido el 2026-09-04 sobre los pedidos web: Chef trae **12 códigos con L** y
--- **9 no tienen fila de m³ con valor**. Esas NP salían con el m³ de menos —
--- marcadas `m3_parcial`, pero de menos igual, y el m³ es lo que decide la tanda.
--- Pelando la L resuelven 8 de los 9; `727EL` no tiene medida ni crudo ni pelado
--- y sigue sin m³, que es lo correcto (mejor sin dato que un 0 silencioso).
+-- ⚠ La primera versión de esta vista hacía lo contrario (el crudo mandaba y el base
+--   sólo llenaba huecos) porque no estaba claro cuál medida era la buena. Lo está:
+--   los datos muestran que las filas L son las malas.
 --
 -- ----------------------------------------------------------------------------
--- LA REGLA: EL CRUDO MANDA, EL PELADO ES FALLBACK
+-- POR QUÉ LA FILA "L" ES EL DATO MALO
 -- ----------------------------------------------------------------------------
--- ⚠ Tres códigos con L **tienen fila propia** (`438EL`, `439EL`, `809EL`) y en dos
---   NO coincide con la del base: `439EL` mide 0,0561 y `439E` 0,0185 — el triple.
---   Alguna de las dos está mal, pero eso es un dato a revisar, no algo que esta
---   vista pueda decidir. Por eso el pelado **nunca pisa** una medida propia: sólo
---   entra donde no hay ninguna. Así esto no cambia ni un m³ de los que hoy salen.
+-- `Volumen_Articulos` tiene 156 códigos con L medidos. **Los 156 tienen su base
+-- medido también**, y 102 ya coinciden exactamente. Los 54 que no, no se desvían
+-- un poco: se desvían como se desvía un error de tipeo.
 --
--- Por qué una VISTA y no pelar la L en el front: la conversión es lógica de
--- negocio y va en el backend (protocolo del CLAUDE.md). El front sólo cambia de
--- endpoint — no pela nada. Y por qué no un trigger que reescriba el código: el
--- dueño lo prohibió expresamente (regla dura, §4.3 de docs/HANDOFF-PIPELINE-VENTAS.md).
--- Se resuelve en LECTURA, el código del pedido queda crudo.
+--   523L 0,0510 vs 523 0,0051   ← ×10 justo
+--   531L 0,0240 vs 531 0,0024   ← ×10 justo
+--   560L 0,0512 vs 560 0,0051   ← ×10 justo
+--   521L 0,0024 vs 521 0,0240   ← ÷10 justo
+--   366EL 0,0016 vs 366E 0,0160 ← ÷10 justo
+--   539EL 0,0630 vs 539E 0,0029 · 404EL 0,0645 vs 404E 0,0065 · 580EL 0,0240 vs 580E 0,0033
+--
+-- Seis casos de coma corrida diez lugares y dos al revés. No son artículos que
+-- midan distinto: son cargas mal tipeadas en la fila del código con L. El base es
+-- el que alguien midió de verdad.
+--
+-- **No se borran ni se corrigen esas filas** — modificar datos va con permiso
+-- explícito, y además no hace falta: la vista las ignora. Si algún día se quieren
+-- limpiar, la lista sale de la consulta del final.
+--
+-- ----------------------------------------------------------------------------
+-- QUÉ CAMBIA EN LA PRÁCTICA
+-- ----------------------------------------------------------------------------
+-- Sobre los pedidos web de Chef (los únicos que traen códigos con L) hay 12 de
+-- estos códigos, y el cambio mueve **dos** m³ en todo el histórico:
+--   439EL  0,0561 → 0,0185 · 8 cajas  → −0,30 m³
+--   438EL  0,0093 → 0,0185 · 16 cajas → +0,15 m³
+-- Los otros 10 ya venían del base (9 no tenían medida propia y `809EL` coincidía).
+-- El resto del catálogo no se toca: verificado, 0 códigos sin L cambiaron de valor.
+--
+-- ----------------------------------------------------------------------------
+-- POR QUÉ UNA VISTA
+-- ----------------------------------------------------------------------------
+-- La conversión es lógica de negocio y va en el backend (protocolo del CLAUDE.md).
+-- El front sólo cambia de endpoint: `pwebVolumenes()` lee esta vista y no pela
+-- nada. Y no se reescribe el código del pedido en el back — regla dura del dueño,
+-- §4.3 de docs/HANDOFF-PIPELINE-VENTAS.md: la equivalencia se resuelve en LECTURA,
+-- el pedido conserva `438EL`.
 --
 -- `security_invoker = true`: la RLS de `Volumen_Articulos` es la que decide, no el
--- dueño de la vista. Sin eso la vista correría como `postgres` y saltearía la RLS.
--- La policy `vol_art_select_anon` es `using (true)` para anon/authenticated, así
--- que la app la lee igual que antes.
+-- dueño de la vista. Sin eso correría como `postgres` y saltearía la RLS — que es
+-- exactamente el agujero que tenía `vista_pedidos_web_feed`.
 --
--- Verificado: 1.480 filas (934 propias + 546 peladas), 0 códigos duplicados, y
--- las 934 propias devuelven exactamente el mismo m³ que la tabla cruda.
+-- Verificado: 1.480 filas (778 propias + 702 por base), 0 códigos duplicados,
+-- 0 códigos con L que no sigan a su base, 0 códigos sin L movidos.
 -- ============================================================================
 
 create or replace view public.vista_volumen_articulo_resuelto
 with (security_invoker = true) as
-  -- 1) Lo medido, tal cual. `Volumen_Articulos` tiene 2.547 filas pero sólo 934
-  --    con valor: una fila sin m³ es un código dado de alta sin medir, y no debe
-  --    llegar como 0 (sumaría de menos sin que nadie se entere).
-  select upper(trim(v.codigo)) as codigo, v.m3, 'propio'::text as origen
+with med as (
+  -- `Volumen_Articulos` tiene 2.547 filas pero sólo 934 con valor: una fila sin m³
+  -- es un código dado de alta sin medir, y no debe llegar como 0 (sumaría de menos
+  -- sin que nadie se entere, que es peor que no mostrarlo).
+  select upper(trim(v.codigo)) as codigo, v.m3
     from public."Volumen_Articulos" v
    where v.m3 > 0
-  union all
-  -- 2) La variante con "L" de cada código medido, SÓLO si no tiene medida propia.
-  --    El `~ '[0-9E]$'` es el mismo recorte que `pkStripL`: la L pega a dígito o a
-  --    "E" (505L, 438EL), nunca a un sufijo de empresa (" LK" / " CH" terminan en
-  --    K/H, así que no entran).
-  select upper(trim(v.codigo)) || 'L', v.m3, 'pelado'::text
-    from public."Volumen_Articulos" v
-   where v.m3 > 0
-     and upper(trim(v.codigo)) ~ '[0-9E]$'
-     and not exists (
-           select 1 from public."Volumen_Articulos" w
-            where upper(trim(w.codigo)) = upper(trim(v.codigo)) || 'L'
-              and w.m3 > 0);
+)
+-- 1) Códigos sin "L": tal cual.
+select m.codigo, m.m3, 'propio'::text as origen
+  from med m
+ where m.codigo !~ '[0-9E]L$'
+union all
+-- 2) Códigos con "L" que tienen fila propia: manda el base. La medida propia queda
+--    sólo por si el base no está medido (hoy no pasa nunca: los 156 tienen base).
+select m.codigo,
+       coalesce(b.m3, m.m3),
+       case when b.m3 is not null then 'base' else 'propio' end
+  from med m
+  left join med b on b.codigo = regexp_replace(m.codigo, '([0-9E])L$', '\1')
+ where m.codigo ~ '[0-9E]L$'
+union all
+-- 3) La variante con "L" de cada base medido que NO tiene fila propia — así un
+--    `097L` que nunca se dio de alta igual resuelve.
+--    El `[0-9E]$` es el mismo recorte que `pkStripL`: la L pega a dígito o a "E"
+--    (505L, 438EL), nunca a un sufijo de empresa (" LK" / " CH" terminan en K/H).
+select b.codigo || 'L', b.m3, 'base'::text
+  from med b
+ where b.codigo ~ '[0-9E]$'
+   and not exists (select 1 from med w where w.codigo = b.codigo || 'L');
 
 grant select on public.vista_volumen_articulo_resuelto to anon, authenticated;
 
 -- ----------------------------------------------------------------------------
 -- Verificación
 -- ----------------------------------------------------------------------------
--- -- Ningún código duplicado (si da > 0, el `not exists` de arriba está mal):
+-- -- Ningún código duplicado (si da > 0, el `not exists` del brazo 3 está mal):
 -- select codigo, count(*) from public.vista_volumen_articulo_resuelto
 --  group by 1 having count(*) > 1;
 --
--- -- Los códigos con L de los pedidos de Chef, y de dónde sacan el m³:
--- with it as (
---   select distinct upper(trim(x->>'cod_art')) cod
---     from public.vista_pedidos_web_feed f, lateral jsonb_array_elements(f.items) x
---    where f.empresa = 'ch' and upper(trim(x->>'cod_art')) ~ 'L$')
--- select it.cod, r.m3, r.origen
---   from it left join public.vista_volumen_articulo_resuelto r on r.codigo = it.cod
---  order by 1;
+-- -- Ningún código con L puede diferir de su base (tiene que dar 0):
+-- select count(*) from public.vista_volumen_articulo_resuelto r
+--   join public.vista_volumen_articulo_resuelto b
+--     on b.codigo = regexp_replace(r.codigo, '([0-9E])L$', '\1')
+--  where r.codigo ~ '[0-9E]L$' and r.m3 is distinct from b.m3;
 --
--- -- Que no se haya movido ningún m³ existente (tiene que dar 0 filas):
--- select v.codigo, v.m3, r.m3
---   from public."Volumen_Articulos" v
+-- -- Ningún código SIN L cambió respecto de la tabla cruda (tiene que dar 0):
+-- select count(*) from public."Volumen_Articulos" v
 --   join public.vista_volumen_articulo_resuelto r on r.codigo = upper(trim(v.codigo))
---  where v.m3 > 0 and r.m3 is distinct from v.m3;
+--  where v.m3 > 0 and upper(trim(v.codigo)) !~ '[0-9E]L$' and r.m3 is distinct from v.m3;
+--
+-- -- Las 54 filas L cuya medida propia contradice al base (candidatas a limpiar):
+-- with med as (select upper(trim(codigo)) codigo, m3 from public."Volumen_Articulos" where m3 > 0)
+-- select m.codigo, m.m3 as m3_fila_L, b.codigo as base, b.m3 as m3_base,
+--        round(m.m3 / b.m3, 2) as veces
+--   from med m join med b on b.codigo = regexp_replace(m.codigo, '([0-9E])L$', '\1')
+--  where m.codigo ~ '[0-9E]L$' and m.m3 <> b.m3
+--  order by abs(ln(m.m3 / b.m3)) desc;
 
 -- ----------------------------------------------------------------------------
 -- PENDIENTE: el resto de los caminos de m³ (`loadVolumenes`, el panel de datos

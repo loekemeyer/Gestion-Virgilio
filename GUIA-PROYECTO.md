@@ -22,14 +22,21 @@
 > de menos, y el m³ es lo que decide la tanda. Pelando la L resuelven 8 (`727EL` no tiene
 > medida en ningún lado y sigue sin m³, que es lo correcto).
 > **Va en el backend**, como manda el protocolo: vista **`vista_volumen_articulo_resuelto`**
-> (`sql/volumen_articulo_resuelto.sql`, `security_invoker = true`), que emite el código medido
-> y además su variante con L **sólo cuando esa variante no tiene medida propia**. El front sólo
-> cambia de endpoint; no pela nada, y el código del pedido sigue crudo (regla dura del dueño:
-> no reescribir el código en el back).
-> ⚠ **El crudo manda siempre.** `438EL`, `439EL` y `809EL` tienen fila propia, y en dos no
-> coincide con la del base: **`439EL` mide 0,0561 y `439E` 0,0185 — el triple**. Alguna de las
-> dos está mal; es un dato a revisar, no algo que la vista decida. Verificado: 1.480 filas
-> (934 propias + 546 peladas), 0 duplicados, y **0 m³ existentes se movieron**.
+> (`sql/volumen_articulo_resuelto.sql`, `security_invoker = true`). El front sólo cambia de
+> endpoint; no pela nada, y el código del pedido sigue crudo (regla dura del dueño: no
+> reescribir el código en el back).
+> **La regla es: el base manda SIEMPRE.** Un código con L es el mismo artículo que su base
+> —la misma caja, la misma góndola, el mismo lugar en el camión—, así que su m³ es el del
+> base, tenga o no medida propia. Decisión del dueño el 2026-09-04.
+> **Y los datos le dan la razón:** de los 156 códigos con L medidos, los 156 tienen base
+> medido y 102 ya coincidían. De los 54 que no, ocho son la coma corrida diez lugares —
+> `523L` 0,0510 vs `523` 0,0051 · `531L` 0,0240 vs `531` 0,0024 · `560L` 0,0512 vs `560`
+> 0,0051 · `521L` 0,0024 vs `521` 0,0240 · `366EL` 0,0016 vs `366E` 0,0160—: no son artículos
+> que midan distinto, son cargas mal tipeadas en la fila del L. Esas filas **no se borran**
+> (modificar datos va con permiso); la vista simplemente las ignora.
+> En los pedidos web el cambio mueve **dos** m³ en todo el histórico: `439EL` 0,0561→0,0185
+> (−0,30 m³) y `438EL` 0,0093→0,0185 (+0,15 m³). Verificado: 1.480 filas (778 propias + 702
+> por base), 0 duplicados, 0 códigos con L que no sigan al base, **0 códigos sin L movidos**.
 >
 > Nota **2026-09-02** — **Legajo 277: 185 reportes atascados ("sin enviar") — NO era señal, era un timeout de 8 s en un trigger, y la cadena de stock EN VIVO documentada.**
 > **Síntoma:** el legajo 277 mostraba "185 reportes sin enviar" y la app trabada. Diagnóstico

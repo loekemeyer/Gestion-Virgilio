@@ -151,16 +151,18 @@ pedido → customer_delivery_addresses.zona_expreso   (= el BARRIO que carga el 
    ✅ **Resuelto en `main` para picking/armado/stock** (v12.37/v12.39): `pkStripL`,
    `pkEmpresaArt` y `pkResolveArt` en `index.html`.
    ✅ **Y en el m³ desde v12.75**, en el backend: la vista
-   `public.vista_volumen_articulo_resuelto` (`sql/volumen_articulo_resuelto.sql`) emite cada
-   código medido y su variante con L, **sólo cuando esa variante no tiene medida propia**;
-   `pwebVolumenes()` la lee en lugar de la tabla cruda. Antes de esto, de los 12 códigos con
-   L que traen los pedidos de Chef, 9 no tenían m³ y esas NP salían de menos. Resuelven 8
-   (`097L`, `702EL`, `706L`, `798EL`, `824L`, `836L`, `840L`, `847L`); `727EL` no tiene
-   medida en ningún lado y sigue sin m³, que es lo correcto.
-   ⚠ **Queda un dato a revisar:** `438EL`, `439EL` y `809EL` tienen fila propia, y en dos no
-   coincide con la del base — `439EL` mide 0,0561 y `439E` 0,0185, el triple. La vista no lo
-   decide: el crudo manda siempre y el pelado sólo llena huecos. Habría que medir cuál está
-   bien.
+   `public.vista_volumen_articulo_resuelto` (`sql/volumen_articulo_resuelto.sql`), que lee
+   `pwebVolumenes()` en lugar de la tabla cruda.
+   **Regla (dueño, 2026-09-04): el base manda SIEMPRE.** Un código con L es el mismo
+   artículo que su base, así que su m³ es el del base, tenga o no medida propia. De los 12
+   códigos con L que traen los pedidos de Chef, 9 no tenían medida y ahora resuelven 8
+   (`727EL` no tiene m³ ni en el base y sigue sin m³, que es lo correcto); de los 3 que sí
+   tenían, `439EL` y `438EL` pasan a la del base.
+   **Los datos respaldan la regla:** de los 156 códigos con L medidos, los 156 tienen base
+   medido y 102 ya coincidían; de los 54 restantes, ocho son la coma corrida diez lugares
+   (`523L`, `531L`, `560L`, `521L`, `366EL`…). Son cargas mal tipeadas en la fila del L, no
+   artículos que midan distinto. Esas filas **no se tocaron** — la vista las ignora; la
+   consulta para listarlas, si algún día se limpian, está al final del `.sql`.
 4. **Tanda:** agrupar **(empresa, zona, día)**. Tope **1 m³** para juntar pedidos chicos
    distintos. Un pedido con varias NPs → **todas sus NPs en la MISMA tanda** (mismo día),
    aunque supere 1 m³. Un pedido nunca se parte entre tandas.
