@@ -6794,7 +6794,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v12.85";
+const APP_VERSION = "v12.86";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -8275,7 +8275,10 @@ const PICK_UBIC_DUAL = {
    por NP y cada uno trae su propio sector de la planimetría, así que este bloque
    queda inerte para esos códigos (no matchea el código con sufijo). Sigue vivo
    para cualquier código dual que todavía no tenga el stock separado. */
-function pkNpEsLoeke(np) { const n = parseInt(String(np == null ? "" : np).replace(/\D/g, ""), 10); return !isNaN(n) && n > 90000; }
+// v12.86 — pasa por empresaDeNp, que entiende la etiqueta de las NP web ("LK 01344"):
+// con la regla numérica sola, una NP web de Loekemeyer (dígitos 01344) caía en Chef.
+// Para las NP de ISIS la respuesta es la de siempre (>90000 = LK).
+function pkNpEsLoeke(np) { return empresaDeNp(np) === "LK"; }
 /* Dado el código dual (ya resuelto por equivalencia) y las NPs de la tanda, suma cuántas
    cajas pidió cada origen. Devuelve {loeke, chef}. */
 function pkDualBreakdown(resolvedCode, nps, pickBase) {
@@ -23032,6 +23035,13 @@ async function stockSalidaFacturadoNP(np, tanda, legajo) {
     const n = String(np == null ? "" : np).trim().replace(/\.0+$/, "");
     if (!t || !n) return;
     const refNp = t + "|" + n;
+    // v12.86 — Si la NP es web ("LK 01344"), decir la empresa EXPLÍCITA. El trigger
+    // zz_normalizar_empresa la respeta cuando viene LK/CH; si no viene, la deriva de
+    // los DÍGITOS del NP embebido en el ref, y "01344" le parece de Chef
+    // (empresa_de_np('01344') = 'CH', medido 2026-09-04). Solo pesa en códigos duales
+    // (los demás quedan 'Mixto' igual), pero ahí pesa: el stock de Loekemeyer se
+    // descontaría del de Chef. Las NP de ISIS siguen sin mandarla, como siempre.
+    const empWeb = /^(LK|CH)\s/i.test(n) ? (empresaDeNp(n) || null) : null;
     const H = { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY };
     const chk = await fetch(SUPABASE_STOCK_ENDPOINT + "?tipo=eq.facturado&ref=eq." + encodeURIComponent(refNp) + "&select=id&limit=1", { headers: H, cache: "no-store" });
     if (chk.ok) { const ex = await chk.json(); if (ex && ex.length) return; }   // esta NP ya drenó
@@ -23045,7 +23055,11 @@ async function stockSalidaFacturadoNP(np, tanda, legajo) {
       if (!slot) return;
       const disp = Math.round(slot.sum * 1000) / 1000;
       const bajar = Math.min(comp[c], disp);
-      if (bajar > 0) { rows.push({ cod_art: slot.key, descripcion: slot.desc || null, deposito: "a_facturar", delta: -bajar, tipo: "facturado", ref: refNp, ubicacion: n, legajo: String(legajo || "") }); slot.sum -= bajar; }
+      if (bajar > 0) {
+        const row = { cod_art: slot.key, descripcion: slot.desc || null, deposito: "a_facturar", delta: -bajar, tipo: "facturado", ref: refNp, ubicacion: n, legajo: String(legajo || "") };
+        if (empWeb) row.empresa = empWeb;   // solo las web; las de ISIS no cambian
+        rows.push(row); slot.sum -= bajar;
+      }
     });
     if (rows.length) await stockMove(rows);
   } catch (_e) {}
@@ -34312,11 +34326,12 @@ function _facXlsPadCod(cod) {
   return (d ? d.padStart(3, "0") : "") + l;
 }
 
-/* Empresa por el PRIMER dígito de la NP (9 = Loekemeyer, 4 = Chef).
-   Sirve para el tope de líneas, que es distinto en cada una. */
+/* Empresa de la NP (9xxxx = Loekemeyer, 4xxxx = Chef; las web por su etiqueta "LK"/"CH").
+   Sirve para el tope de líneas, que es distinto en cada una.
+   v12.86 — antes miraba el primer dígito: una NP web de Chef ("CH 00007" → dígitos
+   00007) caía en "lk" y el Excel le daba 18 líneas en vez de 15. */
 function _facXlsEmpresa(np) {
-  const d = String(np == null ? "" : np).replace(/\D/g, "");
-  return d.charAt(0) === "4" ? "chef" : "lk";
+  return empresaDeNp(np) === "CH" ? "chef" : "lk";
 }
 function _facXlsTope(np) { return _facXlsEmpresa(np) === "chef" ? 15 : 18; }
 
@@ -35129,7 +35144,11 @@ async function facFetchArmadosEventos(){
       if (!t) return;
       // La NP es siempre el primer campo antes de "|" en TAL y TAP.
       const np = String(t.split("|", 1)[0] || "").trim().replace(/\.0+$/, "");
-      if (np && /^\d+$/.test(np)) s.add(np);
+      // v12.86 — también las NP web, que van etiquetadas ("LK 01344" / "CH 00007").
+      // Con el filtro numérico solo, el TAP de una NP web no contaba como "armada" y
+      // la NP no aparecía NUNCA en Facturación: el circuito web moría justo acá, en
+      // silencio. Lo demás (códigos de tanda, basura) se sigue descartando como antes.
+      if (np && (/^\d+$/.test(np) || /^(LK|CH)\s\d+$/i.test(np))) s.add(np);
     });
     _facArmEv = s; _facArmEvTs = now;
   } catch (_e) { /* sin red: queda el último cache */ }

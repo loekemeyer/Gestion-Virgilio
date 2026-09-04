@@ -761,8 +761,20 @@ apareo por etiqueta del §3.g, medido ahí).
    (`np_number`, `status`, `fecha_entrega`) con un stepper de 3 pasos
    *Recibido → Programado → Entregado* ya dibujado en el historial del cliente. El
    espejo puede alimentar eso en vez de inventar tabla y UI nuevas.
-2. **Que la facturación de NP web escriba en `Facturacion_NP` con la etiqueta** (`LK 00001`).
-   Pendiente #4.
+2. ~~**Que la facturación de NP web escriba en `Facturacion_NP` con la etiqueta**~~ **HECHO —
+   v12.86.** Ya lo hacía: el tilde toma `np` del mapa de tandas, que para las web es la
+   etiqueta. Lo que faltaba era que la NP **apareciera**: `facFetchArmadosEventos`
+   descartaba toda NP no numérica (`/^\d+$/`), así que el TAP de una `LK 01344` no
+   contaba como armada y `facRender` no la dibujaba. Arreglado, más `pkNpEsLoeke` y
+   `_facXlsEmpresa` (miraban dígitos: la web de Chef caía en LK), y
+   `stockSalidaFacturadoNP` ahora manda `empresa` explícita para las web — porque el
+   trigger `zz_normalizar_empresa`, sin ella, deriva de los dígitos del NP en el `ref`
+   y `empresa_de_np('01344')` = **`CH`** (medido). Las de ISIS no cambian.
+   ⚠ **Queda un hueco del lado servidor, a propósito sin tocar:** el `picking` y el
+   `separado` de stock los escribe el backend (trigger de `Entregas_Virgilio` + cron), y
+   ahí la empresa sale de `empresa_de_np`, que no entiende la etiqueta. Sólo pesa en
+   los 4 códigos duales (`437E/438E/439E/809E`). Arreglarlo es un `create or replace`
+   de una función de Producción → decisión del dueño. Test: `tests/pweb-facturacion.cjs`.
 3. ~~**El picking todavía no ordena por `prioridad`.**~~ **HECHO — v12.85, ver abajo.**
 4. Nada de esto corrió con datos reales, porque la numeración está apagada.
 

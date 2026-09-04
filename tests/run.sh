@@ -251,3 +251,6 @@ PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node te
 
 echo "== pk-prioridad-agregado (idea 4990 / v12.85: la tanda con un agregado urgente va arriba de la lista del operario) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/pk-prioridad-agregado.cjs
+
+echo "== pweb-facturacion (v12.86: la NP web llega a Facturación y se factura con su etiqueta) =="
+PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/pweb-facturacion.cjs
