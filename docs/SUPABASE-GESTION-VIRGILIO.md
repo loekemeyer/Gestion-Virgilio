@@ -379,17 +379,25 @@ Objetos creados en LK: `gv_pedidos_web_np_lk(date)`, `gv_cods_chef_de_lk(text[])
 `gv_clientes_lk_ch` (vista, 357 pares por CUIT), rol `gv_reader` + grant a
 `authenticator`. Más `gv_pedidos_web_np_chef(integer)`, que ya existía.
 
-### Cómo se emite el token
+### Cómo se carga la credencial (sólo panel, sin terminal)
 
-`tools/gv-token-lk.js`, sin dependencias. El JWT Secret de LK entra por variable
-de entorno y no se guarda en ningún lado:
+**1.** LK → **Project Settings** → **API Keys** → *Create new secret key*. LK está
+en el sistema nuevo de llaves (tiene `sb_publishable_…`), así que ahí se crean
+llaves `sb_secret_…`. **Si al crearla deja elegir el rol de Postgres, elegir
+`gv_reader`** — eso da la llave acotada sin tocar nada más.
 
-```bash
-LK_JWT_SECRET='<JWT Secret de LK>' node tools/gv-token-lk.js
-```
+**2.** Virgilio → **Edge Functions** → **Secrets** → *Add new secret*:
+`GV_LK_SERVICE_KEY` = la llave del paso 1.
 
-El token sale con `role: gv_reader` y 5 años de vigencia, y se pega en Virgilio →
-Edge Functions → Secrets como `GV_LK_SERVICE_KEY`.
+Si el panel **no** deja elegir el rol, sirve igual la service key de LK como
+paso intermedio: la Edge Function acepta las dos sin recompilar, porque todo va
+por RPC. Se acota después sin tocar código, sólo cambiando el valor del secreto.
+
+> Alternativa sin panel, por si alguna vez hace falta: `tools/gv-token-lk.js`
+> firma el token de `gv_reader` con el JWT Secret de LK, que entra por variable
+> de entorno y no se guarda en ningún lado. No se puede hacer desde el SQL Editor
+> porque Supabase ya **no** expone `app.settings.jwt_secret` a Postgres en este
+> proyecto (verificado el 2026-09-04; `pgcrypto` sí está, `pgjwt` no).
 
 La Edge Function acepta **cualquiera de las dos** credenciales sin recompilar (el
 token de `gv_reader` o la service key de LK), porque todo va por RPC. El header
