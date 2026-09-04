@@ -8182,6 +8182,16 @@ Además del log de eventos, el stock físico y las compras viven en tablas propi
   (87 filas): lo llena solo el trigger `trg_ppp_autozona` y a mano la RPC
   `zona_barrio_set`. No confundir con `pipeline.barrio_zona` (ver abajo).
 
+🔒 **Incidente de seguridad 2026-09-04 (cerrado).** La vista `public.vista_pedidos_web_feed`
+—del build paralelo, que no lee nadie— tenía `select` para `anon`. Los esquemas `fuentes` y
+`pipeline` sí estaban revocados, pero **la vista no lleva `security_invoker`**, así que corría
+como `postgres` y salteaba ese candado: con la anon key (que es pública, va embebida en la app)
+se leían los **1.358 pedidos web de LK y Chef** enteros — razón social, código de cliente,
+sucursal de entrega, ítems y condición de pago. Se revocó (migración
+`revoke_anon_vista_pedidos_web_feed`) y se verificó que `anon` ya recibe *permission denied*.
+**Lección:** una vista en `public` sobre datos con RLS o sobre foreign tables necesita
+`security_invoker = true`; el revoke del esquema de abajo NO la cubre.
+
 ⚠ **Objetos vivos pero SIN USO — esquemas `pipeline` y `fuentes`.** Son de un segundo
 build del pipeline de pedidos web, hecho en paralelo en la rama
 `claude/pipeline-estructura-supabase-1haka4` mientras `main` construía el que sí corre.
