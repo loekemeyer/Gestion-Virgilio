@@ -3,6 +3,26 @@
 > Documento de traspaso para retomar el trabajo en otra sesión. Estado al 2026-09-04.
 > **Leé esto entero antes de tocar nada.** Hay reglas de negocio y decisiones abiertas.
 
+## ⚠ ESTADO DE RAMAS — LEER PRIMERO
+
+- **Esta rama:** `claude/pipeline-estructura-supabase-1haka4` (donde vive este handoff y mi
+  build). Está basada en un **`main` VIEJO** (`afd7ebd`).
+- **`main` YA TIENE el pipeline 3717 completo y MÁS AVANZADO que el mío** (llegó a **v12.74**).
+  Mientras yo lo reconstruía en esta rama, otro trabajo en paralelo lo construyó de punta a
+  punta en `main`. **`main` es la fuente de verdad, no esta rama.**
+- Commits clave que están en `main` y NO en esta rama:
+  `Idea 3717 de punta a punta` · `v12.59 PPP Web` · `v12.60 m³ validado` ·
+  `v12.62 NP "LK 1343" (prefijo empresa + 4 dígitos)` · `v12.66 Chef entra a la PPP Web` ·
+  `v12.69 los pedidos se ven EN la PPP` · `v12.71 end-to-end datos reales` ·
+  `v12.72 barrio por último guión (295 NP sin zona)` · `v12.73 localidad del padrón` ·
+  `v12.74 zona interior = la del expreso`.
+- **NO mergear esta rama a `main`:** chocaría dos implementaciones distintas (mi NP de 9
+  dígitos vs la real "LK 1343"; mi esquema `pipeline` aislado vs el productivo). Mi código
+  es **redundante y quedó atrás**.
+- **Para la otra sesión:** arrancá de `main` (v12.74). Este handoff sirve como **mapa de
+  decisiones y reglas de negocio** (§4) y de la lógica de resolución de zona (§2), que se
+  descubrieron acá y muchas ya están resueltas en `main`. Compará antes de reimplementar.
+
 ## 0. Objetivo
 
 Gestión Virgilio (este repo, `loekemeyer/gestion-virgilio`) va a **reemplazar por completo**
