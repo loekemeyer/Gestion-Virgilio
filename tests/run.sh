@@ -221,20 +221,15 @@ echo "== TODO OK =="
 echo "== fac-excel-isis (Paso 0 idea 3717: Excel de prueba para ISIS — dedup, split 18/15, orden por código) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/fac-excel-isis.cjs
 
-echo "== pweb-ppp-web (idea 3717: PPP Web — lee LK en vivo, m³ local, no toca la PPP de Producción) =="
-PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/pweb-ppp-web.cjs
 
-echo "== pweb-programar (idea 3717: programar desde la PPP Web — tanda/zona/fecha, solo lo editado) =="
-PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/pweb-programar.cjs
 
-echo "== pweb-tandas (idea 3717: armar tandas en la PPP Web — mismo criterio que la PPP, no pisa lo manual) =="
-PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/pweb-tandas.cjs
+
+echo "== pweb-en-ppp (idea 3717: los pedidos de la página entran a la PPP común) =="
+PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/pweb-en-ppp.cjs
 
 echo "== pweb-picking (idea 3717: la tanda programada en la PPP Web llega al operario) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/pweb-picking.cjs
 
-echo "== pweb-chef (idea 3717: Chef en la PPP Web — RPC aparte, el FDW no se paga desde LK) =="
-PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/pweb-chef.cjs
 
 echo "== pweb-excel-isis (idea 3717: el Excel para ISIS también arma las NP de la PPP Web) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/pweb-excel-isis.cjs

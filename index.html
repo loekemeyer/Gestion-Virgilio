@@ -3787,7 +3787,6 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
       <button class="sup-action-btn" onclick="showFaltAvisar()" style="position:relative;"><span class="sup-ico">📦➕</span><span>Completar Pedido</span><span id="cpBadge" class="dp-badge" style="display:none;" title="Pedidos con faltante que tiene stock para completarse"></span></button>
       <button class="sup-action-btn" onclick="openStockAdmin()" style="position:relative;"><span class="sup-ico">📦</span><span>Stock y Compras</span><span id="stkBadge" class="dp-badge" style="display:none;" title="Códigos con stock negativo"></span><span id="stkOkBadge" style="display:none;position:absolute;top:2px;right:2px;min-width:18px;height:18px;padding:0 5px;border-radius:999px;background:#16a34a;color:#fff;font-size:10px;font-weight:800;line-height:18px;text-align:center;pointer-events:none;">✓</span></button>
       <button class="sup-action-btn" onclick="openPanelWebLK()"><span class="sup-ico">🌐</span><span>Panel Web LK</span></button>
-      <button class="sup-action-btn" onclick="openPppWeb()"><span class="sup-ico">🧾</span><span>PPP Web</span></button>
       <button class="sup-action-btn" onclick="openRemitosAdmin()" style="position:relative;"><span class="sup-ico">🚚</span><span>Recepción Remitos (RR)</span><span id="rrBadge" class="dp-badge" style="display:none;" title="Remitos cargados al camión sin controlar todavía"></span><span id="rrAlertBadge" style="display:none;position:absolute;top:2px;left:2px;min-width:26px;height:26px;line-height:26px;padding:0 5px;border-radius:13px;background:#dc2626;color:#fff;font-size:15px;font-weight:800;text-align:center;box-shadow:0 1px 4px rgba(0,0,0,.35);" title="Hay remitos VENCIDOS (cargados hace +30 h sin controlar)">⚠️</span></button>
     </div>
     <div class="sup-sec-label">Reportes y configuración</div>
@@ -3932,32 +3931,6 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
     </div>
   </div>
 
-  <!-- PPP Web (idea 3717): la programación calculada EN VIVO sobre los pedidos que
-       llegan a la página LK. No hay tabla propia ni copia: se lee la vista
-       v_pedidos_web_np del proyecto LK y el m³ sale de Volumen_Articulos de acá. -->
-  <div id="pppWebOverlay" class="recp-admin-overlay">
-    <div class="recp-admin-bar">
-      <span class="recp-admin-title">🧾 PPP Web — a programar</span>
-      <button class="recp-admin-close" onclick="closePppWeb()">Cerrar</button>
-    </div>
-    <div class="planim-body">
-      <div class="ppp-btnrow">
-        <select class="pweb-in" id="pwebEmpresa" onchange="pwebCargar()" title="Chef vive en otro proyecto y se lee por FDW: tarda unos segundos.">
-          <option value="lk" selected>Loekemeyer</option>
-          <option value="chef">Chef</option>
-        </select>
-        <button class="ppp-imp-toggle" onclick="pwebCargar()">↻ Actualizar</button>
-        <label class="pweb-chk"><input type="checkbox" id="pwebSoloPend" checked onchange="pwebCargar()"> Solo los que faltan programar</label>
-        <button class="ppp-imp-toggle" onclick="pwebSugerirTandas()" title="Arma las tandas con el mismo criterio que la PPP: súper una por cliente, el resto por zona empacando en 0,60–1,00 m³. Llena los campos pero NO guarda.">🪄 Armar tandas</button>
-        <button class="ppp-imp-toggle" id="pwebGuardar" onclick="pwebGuardar()" disabled>💾 Guardar programación</button>
-      </div>
-      <div id="pwebResumen" class="pweb-resumen"></div>
-      <div id="pwebTabla" class="ppp-preview"></div>
-      <div id="pwebStatus" class="planim-status"></div>
-    </div>
-  </div>
-
-  <!-- Sugerencia de tandas (solo lectura, imprimible) para cargar a mano en el Excel. -->
   <div id="pppSugOverlay" class="recp-admin-overlay">
     <div class="recp-admin-bar">
       <span class="recp-admin-title">🪄 Sugerencia de tandas</span>
@@ -6634,7 +6607,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v12.68";
+const APP_VERSION = "v12.69";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -25215,206 +25188,76 @@ async function pwebVolumenes(cods) {
   return out;
 }
 
-function openPppWeb() {
-  if (!requireSupervisor()) return;
-  const ov = document.getElementById("pppWebOverlay");
-  if (ov) ov.classList.add("show");
-  pwebCargar();
-}
-function closePppWeb() {
-  const ov = document.getElementById("pppWebOverlay");
-  if (ov) ov.classList.remove("show");
-}
+/* Trae los pedidos de la página ya cortados en NP, numerados y con m³, y los
+   devuelve con la MISMA forma que las filas de la PPP (ver `_pppRowFromSupa`).
+   No dibuja nada: los consume `pppLoadProgFromSupabase`, que los concatena al
+   resto. Por eso se ven idénticos a los de ISIS — es la misma tabla, la misma
+   pantalla y las mismas solapas.
 
-async function pwebCargar() {
-  const st  = document.getElementById("pwebStatus");
-  const tb  = document.getElementById("pwebTabla");
-  const res = document.getElementById("pwebResumen");
-  if (st) st.textContent = "Buscando pedidos en la página…";
-  if (tb) tb.innerHTML = "";
-  if (res) res.innerHTML = "";
-  try {
-    const tok = await pwebLkToken();
-    // v12.65 — La pantalla ya NO filtra por "salió el mail". Ese criterio servía
-    // para mostrar el agujero (un pedido de las 16:03 no existía hasta el mediodía
-    // siguiente), pero como filtro de trabajo estaba mal: al día siguiente el
-    // pedido se sellaba y DESAPARECÍA de la pantalla aunque nadie lo hubiera
-    // programado. Ahora entra todo lo que llega a la página, y el que falta
-    // programar es el que se muestra por defecto.
-    const emp = pwebEmpresaSel();
-    let nps;
-    if (emp === "chef") {
-      // Chef vive en OTRO proyecto y se lee por el FDW `chef_db`, que cuesta
-      // ~3,3 s. Por eso va por RPC aparte y NO unido a la vista de Loekemeyer:
-      // si estuvieran juntas, cada carga de la pantalla pagaría ese costo aunque
-      // nadie mire Chef. Es la misma lección que dejó el padrón de Chef.
-      // La RPC es SECURITY DEFINER (el user mapping del FDW es de `postgres`) y
-      // lleva el chequeo de admin adentro.
-      const rc = await fetch(PWEB_LK_URL + "/rest/v1/rpc/get_pedidos_web_np_chef", {
-        method: "POST",
-        headers: { apikey: PWEB_LK_ANON, Authorization: "Bearer " + tok, "Content-Type": "application/json" },
-        body: JSON.stringify({ p_dias: PWEB_VENTANA_DIAS })
-      });
-      if (!rc.ok) throw new Error("Chef respondió " + rc.status + ": " + (await rc.text()).slice(0, 200));
-      nps = await rc.json();
-      nps.sort(function (a, b) { return (a.order_id - b.order_id) || (a.np_idx - b.np_idx); });
-    } else {
-      const desde = new Date(Date.now() - PWEB_VENTANA_DIAS * 86400000).toISOString().slice(0, 10);
-      const url = PWEB_LK_URL + "/rest/v1/v_pedidos_web_np"
-              + "?select=empresa,order_id,np_idx,cod,razon_social,fecha_recep,hora_recep,direccion,v,lineas,cajas,items,enviado_a_compras"
-              + "&fecha_recep=gte." + desde
-              + "&order=order_id.asc,np_idx.asc&limit=5000";
-      const r = await fetch(url, { headers: { apikey: PWEB_LK_ANON, Authorization: "Bearer " + tok } });
-      if (!r.ok) throw new Error("LK respondió " + r.status + ": " + (await r.text()).slice(0, 200));
-      nps = await r.json();
-    }
-
-    // m³: se resuelve acá, con los códigos que realmente aparecen.
-    const cods = {};
-    nps.forEach(function (n) { (n.items || []).forEach(function (i) { cods[i.art] = 1; }); });
-    const vol = await pwebVolumenes(Object.keys(cods));
-    await pwebCargarProg();
-    const soloPend = !!(document.getElementById("pwebSoloPend") || {}).checked;
-    if (soloPend) {
-      nps = nps.filter(function (n) {
-        const g = _pwebProg[pwebClave(n)];
-        return !(g && g.tanda);
-      });
-    }
-    await pwebNumerar(nps);
-
-    let m3Tot = 0, cajasTot = 0, sinM3 = {}, npsParciales = 0;
-    nps.forEach(function (n) {
-      let m3 = 0, falta = false;
-      (n.items || []).forEach(function (i) {
-        const v = vol[i.art];
-        if (v === undefined) { sinM3[i.art] = 1; falta = true; return; }
-        m3 += (Number(i.cajas) || 0) * v;
-      });
-      n._m3 = m3;
-      n._m3Parcial = falta;      // el número existe pero le faltan artículos: se marca
-      if (falta) npsParciales++;
-      m3Tot += m3;
-      cajasTot += Number(n.cajas) || 0;
+   Antes esto tenía pantalla propia con su tabla. Se sacó: el supervisor no tiene
+   por qué aprender dos vistas de lo mismo. */
+async function pppTraerPedidosWeb(empresa) {
+  const emp = (empresa === "chef") ? "chef" : "lk";
+  const tok = await pwebLkToken();
+  let nps;
+  if (emp === "chef") {
+    // Chef vive en otro proyecto y se lee por FDW (~3,3 s), así que va por RPC
+    // aparte: unida a la vista de Loekemeyer, cada carga pagaría ese costo.
+    const rc = await fetch(PWEB_LK_URL + "/rest/v1/rpc/get_pedidos_web_np_chef", {
+      method: "POST",
+      headers: { apikey: PWEB_LK_ANON, Authorization: "Bearer " + tok, "Content-Type": "application/json" },
+      body: JSON.stringify({ p_dias: PWEB_VENTANA_DIAS })
     });
-
-    if (!nps.length) {
-      if (res) res.innerHTML = '<div class="pweb-vacio">No hay pedidos web pendientes de programar.</div>';
-      if (st) st.textContent = "";
-      return;
-    }
-
-    const pedidos = {}; nps.forEach(function (n) { pedidos[n.order_id] = 1; });
-    const faltan = Object.keys(sinM3);
-    if (res) {
-      res.innerHTML =
-        '<div class="pweb-cards">'
-        + '<div class="pweb-card"><b>' + Object.keys(pedidos).length + '</b><span>pedidos</span></div>'
-        + '<div class="pweb-card"><b>' + nps.length + '</b><span>NP</span></div>'
-        + '<div class="pweb-card"><b>' + cajasTot + '</b><span>cajas</span></div>'
-        + '<div class="pweb-card' + (npsParciales ? ' pweb-card-parcial' : '') + '"><b>'
-        + (npsParciales ? '≥' : '') + m3Tot.toFixed(3) + '</b><span>m³</span></div>'
-        + '</div>'
-        + (faltan.length
-            ? '<div class="pweb-warn">⚠ Sin m³ medido: ' + faltan.join(", ")
-              + ' — ' + npsParciales + (npsParciales === 1 ? ' NP queda' : ' NP quedan')
-              + ' con el m³ INCOMPLETO (marcadas con ~).</div>'
-            : '');
-    }
-
-    let h = '<table class="pweb-table"><thead><tr>'
-          + '<th>NP</th><th>Cliente</th><th>Razón social</th><th>Entrega</th>'
-          + '<th>Recibido</th><th>Líneas</th><th>Cajas</th><th>m³</th>'
-          + '<th>Tanda</th><th>Zona</th><th>Fecha entrega</th>'
-          + '</tr></thead><tbody>';
-    nps.forEach(function (n) {
-      const id = pwebClave(n);
-      const g = _pwebProg[id] || {};
-      const zonaSug = g.zona || pwebZonaSugerida(n.direccion);
-      const yaIsis = !!n.enviado_a_compras && !g.tanda;
-      h += '<tr class="' + (g.tanda ? "pweb-programada" : (yaIsis ? "pweb-yaisis" : "")) + '" title="'
-         + (yaIsis ? "⚠ Ya salió por mail: puede estar programado en ISIS. Programarlo acá lo haría pickear dos veces.\n" : "")
-         + (n.items || []).map(function (i) { return i.art + " x" + i.cajas; }).join(", ") + '">'
-         + '<td class="pweb-np">' + pwebEtiqueta(n)
-             + (yaIsis ? ' <span class="pweb-isis" title="Ya salió por mail: revisá que no esté ya programado en ISIS">ISIS</span>' : '')
-             + '</td>'
-         + '<td>' + (n.cod || "") + '</td>'
-         + '<td>' + (n.razon_social || '<i>(sin razón social)</i>') + '</td>'
-         + '<td>' + (n.direccion || "") + '</td>'
-         + '<td>' + (n.fecha_recep || "") + " " + (n.hora_recep || "").slice(0, 5) + '</td>'
-         + '<td class="pweb-num">' + n.lineas + '</td>'
-         + '<td class="pweb-num">' + n.cajas + '</td>'
-         + '<td class="pweb-num' + (n._m3Parcial ? ' pweb-parcial' : '') + '" title="'
-         + (n._m3Parcial ? 'Incompleto: hay artículos sin m³ medido' : '') + '">'
-         + (n._m3Parcial ? '~' : '') + n._m3.toFixed(3) + '</td>'
-         + '<td><input class="pweb-in pweb-in-tanda" id="pwT_' + id.replace("|","_") + '" value="'
-             + escapeHtml(g.tanda || "") + '" placeholder="—" oninput="pwebMarcarSucio(\'' + id + '\')"></td>'
-         + '<td><select class="pweb-in pweb-in-zona" id="pwZ_' + id.replace("|","_") + '" onchange="pwebMarcarSucio(\'' + id + '\')">'
-             + '<option value="">—</option>'
-             + PPP_ZONAS.map(function (z) {
-                 return '<option value="' + escapeHtml(z) + '"' + (z === zonaSug ? " selected" : "") + '>'
-                      + escapeHtml(PPP_ZONA_SHORT[z] || z) + '</option>';
-               }).join("")
-             + '</select></td>'
-         + '<td><input type="date" class="pweb-in pweb-in-fecha" id="pwF_' + id.replace("|","_") + '" value="'
-             + (g.fecha_entrega || "") + '" onchange="pwebMarcarSucio(\'' + id + '\')"></td>'
-         + '</tr>';
-    });
-    h += '</tbody></table>';
-    if (tb) tb.innerHTML = h;
-    _pwebNps = nps;
-    pwebLimpio();
-    if (st) st.textContent = "";
-  } catch (e) {
-    if (st) st.textContent = "⚠ " + (e && e.message ? e.message : e);
+    if (!rc.ok) throw new Error("Chef respondió " + rc.status);
+    nps = await rc.json();
+  } else {
+    const desde = new Date(Date.now() - PWEB_VENTANA_DIAS * 86400000).toISOString().slice(0, 10);
+    const r = await fetch(PWEB_LK_URL + "/rest/v1/v_pedidos_web_np"
+      + "?select=empresa,order_id,np_idx,cod,razon_social,fecha_recep,hora_recep,direccion,v,lineas,cajas,items,enviado_a_compras"
+      + "&fecha_recep=gte." + desde + "&order=order_id.asc,np_idx.asc&limit=5000",
+      { headers: { apikey: PWEB_LK_ANON, Authorization: "Bearer " + tok } });
+    if (!r.ok) throw new Error("LK respondió " + r.status);
+    nps = await r.json();
   }
+  if (!nps.length) return [];
+
+  const cods = {};
+  nps.forEach(function (n) { (n.items || []).forEach(function (i) { cods[i.art] = 1; }); });
+  const vol = await pwebVolumenes(Object.keys(cods));
+  await pwebCargarProg(emp);
+  await pwebNumerar(nps, emp);
+
+  return nps.map(function (n) {
+    const k = pwebClave(n), g = _pwebProg[k] || {}, num = _pwebNum[k];
+    let m3 = 0, parcial = false;
+    (n.items || []).forEach(function (i) {
+      const v = vol[i.art];
+      if (v === undefined) { parcial = true; return; }   // fila sin m³ medido: no suma 0 en silencio
+      m3 += (Number(i.cajas) || 0) * v;
+    });
+    const tanda = g.tanda || "";
+    return {
+      np: num ? pwebNpLabel(n.empresa || emp, num) : ("? " + n.order_id + "-" + n.np_idx),
+      tanda: tanda || "—", tipo: "", fecha: n.fecha_recep || "",
+      cod: n.cod || "", razon_social: n.razon_social || "",
+      m3: Number(m3.toFixed(3)),
+      localidad: pwebBarrioDe(n.direccion),
+      fecha_entrega: g.fecha_entrega || "",
+      zona: g.zona || pwebZonaSugerida(n.direccion),
+      programmed: !!tanda,
+      // Lo necesario para guardar después, sin volver a pedirle nada a LK.
+      _web: true, _wEmp: n.empresa || emp, _wOrder: n.order_id, _wIdx: n.np_idx,
+      _wNum: num || null, _wItems: n.items || [], _wLineas: n.lineas, _wCajas: n.cajas,
+      _wM3Parcial: parcial, _wDir: n.direccion || "", _wIsis: !!n.enviado_a_compras
+    };
+  });
 }
 
-/* ===== Programación: tanda / zona / fecha de entrega =====================
-   Es lo ÚNICO que no puede salir de LK: no es un dato del pedido, es una
-   decisión del depósito. Vive en `PPP_Web_Programacion` de ESTA base.
-
-   ⚠ Tabla NUEVA y aparte a propósito. `PPP_Programacion_Diaria` es la que están
-   usando los operarios de Producción (misma base, 61 tandas vivas): escribir ahí
-   mezclaría dos circuitos. La reja de escritura es la MISMA que la de esa tabla
-   —los tres mails de supervisor, chequeados por RLS del lado del servidor—, así
-   que un operario no puede tocar esto ni con la consola abierta.
-
-   La clave es (order_id, np_idx): la identidad real del pedido y su parte. El
-   número visible ("LK 1343") es una ETIQUETA que se guarda al lado, no la clave —
-   así la programación no depende de cómo se numere.
-   Tampoco se usa el N° Pedido del Excel del mail: ese es un contador de la tanda
-   y el mismo pedido saca distinto número según con qué otros salga. */
 let _pwebProg = {};    // "order_id|np_idx" -> { tanda, zona, fecha_entrega }
 let _pwebNum  = {};    // "order_id|np_idx" -> número de NP (el de 4 dígitos)
-let _pwebNps  = [];    // lo último que se renderizó
-let _pwebSucio = false;
-/* Ventana de la pantalla. No se trae el histórico entero (1.463 NP y creciendo):
+/* Ventana que se trae. El histórico entero (1.463 NP y creciendo) no sirve acá:
    lo que tiene más de un mes sin programar no se programa, se investiga. */
 const PWEB_VENTANA_DIAS = 30;
-function pwebEmpresaSel() {
-  const el = document.getElementById("pwebEmpresa");
-  return (el && el.value === "chef") ? "chef" : "lk";
-}
-let _pwebEditadas = {};   // "order_id|np_idx" -> 1, las que tocó la persona
-
-/* Se anota QUÉ NP tocó la persona, no solo que algo cambió.
-   Sin esto, la zona sugerida —que viene preseleccionada en el <select>— se
-   guardaba sola en TODAS las filas visibles apenas alguien apretaba Guardar,
-   aunque no las hubiera mirado. Una sugerencia no es una decisión: se persiste
-   la fila cuando alguien la editó, y no antes. */
-function pwebMarcarSucio(k) {
-  if (k) _pwebEditadas[k] = 1;
-  _pwebSucio = true;
-  const b = document.getElementById("pwebGuardar");
-  if (b) { b.disabled = false; b.classList.add("pweb-btn-sucio"); }
-}
-function pwebLimpio() {
-  _pwebSucio = false;
-  _pwebEditadas = {};
-  const b = document.getElementById("pwebGuardar");
-  if (b) { b.disabled = true; b.classList.remove("pweb-btn-sucio"); }
-}
 
 /* ===== El número de nota de pedido =====================================
    Formato: "LK 1343" — prefijo de empresa y CUATRO dígitos. Lo pidió el dueño
@@ -25432,13 +25275,9 @@ function pwebLimpio() {
    La IDENTIDAD interna sigue siendo (order_id, np_idx), no el número: así el
    número es una etiqueta y no algo de lo que dependa la programación guardada. */
 function pwebClave(n)   { return n.order_id + "|" + n.np_idx; }
-function pwebEtiqueta(n) {
-  const num = _pwebNum[pwebClave(n)];
-  return num ? pwebNpLabel(n.empresa, num) : "…";
-}
 
 /* Pide (y si hace falta asigna) los números de las NP que se están mostrando. */
-async function pwebNumerar(nps) {
+async function pwebNumerar(nps, empresa) {
   _pwebNum = {};
   if (!nps.length) return;
   const h = await facAuthWriteHeaders();
@@ -25446,7 +25285,7 @@ async function pwebNumerar(nps) {
   const pares = nps.map(function (n) { return { order_id: n.order_id, np_idx: n.np_idx }; });
   const r = await fetch(SUPABASE_URL + "/rest/v1/rpc/ppp_web_np_asignar", {
     method: "POST", headers: h,
-    body: JSON.stringify({ p_empresa: pwebEmpresaSel(), p_pares: pares })
+    body: JSON.stringify({ p_empresa: (empresa || "lk"), p_pares: pares })
   });
   if (!r.ok) return;
   (await r.json()).forEach(function (x) { _pwebNum[x.r_order_id + "|" + x.r_np_idx] = x.r_np; });
@@ -25475,215 +25314,80 @@ function pwebZonaSugerida(suc) {
   return pppZonaDeBarrio(b) || "";
 }
 
-async function pwebCargarProg() {
+async function pwebCargarProg(empresa) {
   _pwebProg = {};
   try {
     const url = SUPABASE_URL + '/rest/v1/PPP_Web_Programacion?select=order_id,np_idx,tanda,zona,fecha_entrega&empresa=eq.'
-              + pwebEmpresaSel() + '&limit=5000';
+              + (empresa || "lk") + '&limit=5000';
     const r = await fetch(url, { headers: { apikey: SUPABASE_KEY } });
     if (!r.ok) return;
     (await r.json()).forEach(function (x) { _pwebProg[x.order_id + "|" + x.np_idx] = x; });
   } catch (_e) {}
 }
 
-/* ===== Armar las tandas casi solo ======================================
-   NO es un algoritmo nuevo: es EL MISMO que ya usa la PPP (`pppSugerirTandas`),
-   apuntado a los pedidos web. Súper → una tanda por cliente; el resto agrupado
-   por zona y después por cliente, empacado en tandas de 0,60–1,00 m³ con el
-   objetivo que diga la config (`tandaCap`, 0,80 por defecto). Nunca mezcla zonas.
-   Reusa `_pppBalancearZona`, `pppEsSuper` y el generador de códigos, así las dos
-   pantallas arman las tandas igual y no hay dos criterios dando vueltas.
+/* Persiste lo que se programó de los pedidos web: la cabecera en
+   `PPP_Web_Programacion` y la FOTO de sus artículos en `PPP_Web_Base`, que es lo
+   que después ve el operario en el celular.
 
-   ⚠ NO GUARDA: llena los campos de tanda y deja el botón Guardar en amarillo.
-   Es "casi automático" a propósito — el reparto se revisa antes de que exista.
+   Sin la foto la tanda le llega VACÍA, así que si esa segunda escritura falla se
+   avisa fuerte en vez de dar el guardado por bueno.
 
-   Los códigos siguen desde la última letra usada en LAS DOS tablas, la de la PPP
-   Web y la de Producción: comparten el espacio de nombres de tandas y dos tandas
-   distintas con el mismo código serían un lío en el depósito. */
-async function pwebSugerirTandas() {
-  const st = document.getElementById("pwebStatus");
-  if (!_pwebNps.length) { if (st) st.textContent = "No hay pedidos para armar tandas."; return; }
+   Lo llama `pppConfirmarProgramar` junto con lo de siempre: para el supervisor es
+   el mismo botón de siempre, no hay un paso extra por ser web. */
+async function pppGuardarWeb(filas) {
+  const web = (filas || []).filter(function (p) { return p._web && p.tanda && p.tanda !== "—"; });
+  if (!web.length) return 0;
 
-  const cfg = pppGetCfg();
-  const T_MIN = 0.60, T_MAX = 1.00;
-  let T_IDEAL = cfg.tandaCap > 0 ? cfg.tandaCap : 0.80;
-  if (T_IDEAL < T_MIN) T_IDEAL = T_MIN;
-  if (T_IDEAL > T_MAX) T_IDEAL = T_MAX;
+  // Sin número no se guarda: si la numeración falló, la NP quedaría con np null y
+  // un rótulo roto, y el operario tendría una tanda que no se puede pickear.
+  const sinNum = web.filter(function (p) { return !p._wNum; });
+  if (sinNum.length) throw new Error(sinNum.length + " NP web sin número asignado. Recargá la PPP y reintentá.");
 
-  // Última letra global usada, mirando los dos circuitos.
-  let maxGlobalIdx = -1;
-  const re = /^([A-Z]+)(\d+)([A-Z]+)$/;
-  const mirarTandas = function (rows, campo) {
-    (rows || []).forEach(function (r) {
-      const m = re.exec(String(r[campo] || "").toUpperCase());
-      if (m) { const gi = _pppLetterIdx(m[1]); if (gi > maxGlobalIdx) maxGlobalIdx = gi; }
-    });
-  };
-  try {
-    const [a, b] = await Promise.all([
-      fetch(SUPABASE_URL + "/rest/v1/PPP_Web_Programacion?select=tanda&tanda=not.is.null&limit=5000", { headers: { apikey: SUPABASE_KEY } }),
-      fetch(SUPABASE_URL + "/rest/v1/PPP_Programacion_Diaria?select=tanda&limit=20000", { headers: { apikey: SUPABASE_KEY } })
-    ]);
-    if (a.ok) mirarTandas(await a.json(), "tanda");
-    if (b.ok) mirarTandas(await b.json(), "tanda");
-  } catch (_e) {}
-  let globalLetterIdx = maxGlobalIdx + 1, zoneNum = 0, tandaLetterIdx = 0;
-  const nextZone = function () { zoneNum++; tandaLetterIdx = 0; };
-  const nextTanda = function () {
-    const code = _pppLetter(globalLetterIdx) + String(zoneNum).padStart(2, "0") + _pppLetter(tandaLetterIdx);
-    tandaLetterIdx++;
-    if (tandaLetterIdx >= 26) { tandaLetterIdx = 0; zoneNum++; if (zoneNum > 99) { zoneNum = 1; globalLetterIdx++; } }
-    return code;
-  };
+  const h = await facAuthWriteHeaders({ Prefer: "resolution=merge-duplicates,return=minimal" });
+  if (!h) throw new Error(authNoSesionMsg("Iniciá sesión para programar."));
 
-  // Solo las que todavía no tienen tanda escrita en pantalla: una tanda ya puesta
-  // a mano no se pisa.
-  const pend = _pwebNps.filter(function (n) {
-    const el = document.getElementById("pwT_" + pwebClave(n).replace("|", "_"));
-    return el && !String(el.value || "").trim();
+  const cab = web.map(function (p) {
+    return {
+      empresa: p._wEmp, order_id: p._wOrder, np_idx: p._wIdx, np: p._wNum,
+      cod_cliente: p.cod, razon_social: p.razon_social, direccion: p._wDir,
+      barrio: p.localidad, fecha_recep: p.fecha || null,
+      tanda: p.tanda, zona: p.zona || null, fecha_entrega: p.fecha_entrega || null,
+      m3: p.m3, m3_parcial: !!p._wM3Parcial, lineas: p._wLineas, cajas: p._wCajas
+    };
   });
-  if (!pend.length) { if (st) st.textContent = "Todas las NP visibles ya tienen tanda."; return; }
-
-  // Adaptador: `pppEsSuper` y el balanceador esperan la forma de la PPP vieja.
-  const adap = pend.map(function (n) {
-    return { _n: n, cod: n.cod, razon_social: n.razon_social,
-             localidad: pwebBarrioDe(n.direccion), tipo: "", m3: n._m3 || 0 };
-  });
-
-  const asignar = function (items, code) {
-    items.forEach(function (a) {
-      const el = document.getElementById("pwT_" + pwebClave(a._n).replace("|", "_"));
-      if (el) { el.value = code; pwebMarcarSucio(pwebClave(a._n)); }
-    });
-  };
-  let nT = 0;
-
-  // 1) Súper: una tanda por cliente, sin empacar.
-  const sup = adap.filter(pppEsSuper), bySup = {}, supOrd = [];
-  sup.forEach(function (a) { const k = String(a.razon_social || a.cod); if (!(k in bySup)) supOrd.push(k); (bySup[k] = bySup[k] || []).push(a); });
-  if (sup.length) nextZone();
-  supOrd.forEach(function (k) { asignar(bySup[k], nextTanda()); nT++; });
-
-  // 2) El resto CON zona: por zona → cliente, balanceado. Sin mezclar zonas.
-  const resto = adap.filter(function (a) { return !pppEsSuper(a) && pppZonaDeBarrio(a.localidad); });
-  const byZ = {};
-  resto.forEach(function (a) { const z = pppZonaDeBarrio(a.localidad); (byZ[z] = byZ[z] || []).push(a); });
-  const zorder = Object.keys(byZ).sort(function (x, y) {
-    const ix = PPP_ZONAS.indexOf(x), iy = PPP_ZONAS.indexOf(y);
-    return (ix < 0 ? 99 : ix) - (iy < 0 ? 99 : iy);
-  });
-  let nPend = 0;
-  zorder.forEach(function (z) {
-    nextZone();
-    const byC = {}, cord = [];
-    byZ[z].forEach(function (a) { const k = String(a.cod || a.razon_social); if (!(k in byC)) cord.push(k); (byC[k] = byC[k] || []).push(a); });
-    const clientes = cord.map(function (k) {
-      return { m3: byC[k].reduce(function (t, a) { return t + (a.m3 || 0); }, 0), pedidos: byC[k] };
-    });
-    const bal = _pppBalancearZona(clientes, T_MIN, T_IDEAL, T_MAX);
-    bal.tandas.forEach(function (t) { asignar(t, nextTanda()); nT++; });
-    nPend += bal.pend.length;
-  });
-
-  const sinZona = adap.filter(function (a) { return !pppEsSuper(a) && !pppZonaDeBarrio(a.localidad); }).length;
-  if (st) {
-    st.textContent = "🪄 " + nT + " tandas armadas"
-      + (nPend ? " · " + nPend + " NP no llegan a " + T_MIN.toFixed(2) + " m³ sin mezclar zona" : "")
-      + (sinZona ? " · " + sinZona + " sin zona (elegila a mano)" : "")
-      + ". Revisá y guardá.";
+  const rp = await fetch(SUPABASE_URL + "/rest/v1/PPP_Web_Programacion?on_conflict=empresa,order_id,np_idx",
+    { method: "POST", headers: h, body: JSON.stringify(cab) });
+  if (!rp.ok) {
+    // La RLS solo deja escribir a los tres mails de supervisor.
+    if (rp.status === 401 || rp.status === 403) throw new Error("Tu usuario no tiene permiso para programar (solo supervisores).");
+    throw new Error("HTTP " + rp.status + ": " + (await rp.text()).slice(0, 200));
   }
+
+  const lineas = [];
+  web.forEach(function (p) {
+    // Se suma por código: el carrito puede repetir un artículo y el picking cuenta
+    // cajas por código, no renglones.
+    const porArt = {};
+    (p._wItems || []).forEach(function (i) { porArt[i.art] = (porArt[i.art] || 0) + (Number(i.cajas) || 0); });
+    // Ordenado a propósito: las claves de un objeto JS salen con las numéricas
+    // primero ("505" antes que "027"), así que sin esto el orden de las líneas
+    // cambia según los códigos. Al picking le da igual —suma por código— pero
+    // para leer la tabla y comparar dos guardados conviene que sea estable.
+    Object.keys(porArt).sort().forEach(function (a) {
+      lineas.push({ empresa: p._wEmp, order_id: p._wOrder, np_idx: p._wIdx,
+                    np_label: p.np, articulo: a, cajas: porArt[a] });
+    });
+  });
+  if (lineas.length) {
+    const rb = await fetch(SUPABASE_URL + "/rest/v1/PPP_Web_Base?on_conflict=empresa,order_id,np_idx,articulo",
+      { method: "POST", headers: h, body: JSON.stringify(lineas) });
+    if (!rb.ok) throw new Error("Se guardó la programación pero NO los artículos (HTTP " + rb.status
+      + "): el operario vería la tanda vacía.");
+  }
+  return web.length;
 }
 
-async function pwebGuardar() {
-  const st = document.getElementById("pwebStatus");
-  const filas = [];
-  _pwebNps.forEach(function (n) {
-    const k  = pwebClave(n);
-    const dk = k.replace("|", "_");
-    const t = (document.getElementById("pwT_" + dk) || {}).value || "";
-    const z = (document.getElementById("pwZ_" + dk) || {}).value || "";
-    const f = (document.getElementById("pwF_" + dk) || {}).value || "";
-    const g = _pwebProg[k] || {};
-    // Dos filtros, y los dos hacen falta. Editada: que la zona sugerida no se
-    // guarde sola en filas que nadie miró. Distinta: que un guardado no pise
-    // filas sin cambios y les corra el actualizado_at sin motivo.
-    if (!_pwebEditadas[k]) return;
-    if (t === (g.tanda || "") && z === (g.zona || "") && f === (g.fecha_entrega || "")) return;
-    filas.push({
-      empresa: n.empresa || pwebEmpresaSel(), order_id: n.order_id, np_idx: n.np_idx,
-      np: _pwebNum[k] || null,          // el número es etiqueta, no la clave
-      cod_cliente: n.cod, razon_social: n.razon_social, direccion: n.direccion,
-      barrio: pwebBarrioDe(n.direccion),
-      fecha_recep: n.fecha_recep || null,   // la necesita el Excel para ISIS
-      tanda: t || null, zona: z || null, fecha_entrega: f || null,
-      m3: Number(n._m3.toFixed(3)), m3_parcial: !!n._m3Parcial,
-      lineas: n.lineas, cajas: n.cajas
-    });
-  });
-  if (!filas.length) { if (st) st.textContent = "No hay cambios para guardar."; return; }
 
-  // Guard: sin número no se guarda. `pwebNumerar` puede haber fallado (RPC caída,
-  // sesión vencida) y en ese caso la etiqueta queda en "…" — pero el guardado
-  // seguía igual y escribía np: null y un np_label "LK undefined" en la foto de
-  // artículos, o sea una tanda que le llega ROTA al operario. Mejor no guardar.
-  const sinNumero = filas.filter(function (f) { return !f.np; });
-  if (sinNumero.length) {
-    if (st) st.textContent = "⚠ " + sinNumero.length + " NP todavía no tienen número asignado. "
-      + "Tocá ↻ Actualizar y volvé a intentar.";
-    return;
-  }
-
-  if (st) st.textContent = "Guardando " + filas.length + "…";
-  try {
-    const h = await facAuthWriteHeaders({ Prefer: "resolution=merge-duplicates,return=minimal" });
-    if (!h) { if (st) st.textContent = "⚠ " + authNoSesionMsg("Iniciá sesión para programar."); return; }
-    const r = await fetch(SUPABASE_URL + "/rest/v1/PPP_Web_Programacion?on_conflict=empresa,order_id,np_idx", {
-      method: "POST", headers: h, body: JSON.stringify(filas)
-    });
-    if (!r.ok) {
-      const txt = (await r.text()).slice(0, 300);
-      // La RLS solo deja escribir a los tres mails de supervisor: si el que está
-      // logueado no es uno, PostgREST devuelve 401/403 y hay que decirlo claro.
-      if (r.status === 401 || r.status === 403) throw new Error("Tu usuario no tiene permiso para programar (solo supervisores).");
-      throw new Error("HTTP " + r.status + ": " + txt);
-    }
-    // Foto de los artículos: sin esto la tanda llega al celular vacía. Solo de las
-    // que quedaron CON tanda — una NP sin tanda no se pickea, y guardar sus líneas
-    // sería dejar basura que después nadie limpia.
-    const conTanda = _pwebNps.filter(function (n) {
-      return filas.some(function (f) { return f.order_id === n.order_id && f.np_idx === n.np_idx && f.tanda; });
-    });
-    if (conTanda.length) {
-      const lineas = [];
-      conTanda.forEach(function (n) {
-        const etq = pwebNpLabel(n.empresa, _pwebNum[pwebClave(n)]);
-        // Se suma por código: el carrito puede repetir un artículo y el picking
-        // cuenta cajas por código, no renglones.
-        const porArt = {};
-        (n.items || []).forEach(function (i) { porArt[i.art] = (porArt[i.art] || 0) + (Number(i.cajas) || 0); });
-        Object.keys(porArt).forEach(function (a) {
-          lineas.push({ empresa: n.empresa || "lk", order_id: n.order_id, np_idx: n.np_idx,
-                        np_label: etq, articulo: a, cajas: porArt[a] });
-        });
-      });
-      const rb = await fetch(SUPABASE_URL + "/rest/v1/PPP_Web_Base?on_conflict=empresa,order_id,np_idx,articulo", {
-        method: "POST", headers: h, body: JSON.stringify(lineas)
-      });
-      if (!rb.ok) throw new Error("Se guardó la programación pero NO los artículos (HTTP "
-        + rb.status + "): el operario vería la tanda vacía.");
-    }
-
-    filas.forEach(function (f) {
-      _pwebProg[f.order_id + "|" + f.np_idx] =
-        { order_id: f.order_id, np_idx: f.np_idx, tanda: f.tanda, zona: f.zona, fecha_entrega: f.fecha_entrega };
-    });
-    pwebLimpio();
-    await pwebCargar();                       // primero refrescar…
-    if (st) st.textContent = "✓ Guardado (" + filas.length + ").";   // …y recién ahí el cartel, que si no lo borra el refresco
-  } catch (e) {
-    if (st) st.textContent = "⚠ " + (e && e.message ? e.message : e);
-  }
-}
 /* ===== Importador PPP (Fase 1). Lee el .xls en el navegador (SheetJS lazy desde
    CDN — el sandbox no puede vendorearlo, pero el navegador del supervisor sí lo
    baja), mapea columnas IGUAL que el Apps Script, muestra preview y al confirmar
@@ -26182,13 +25886,20 @@ async function pppLoadProgFromSupabase() {
   for (const r of rows) { const np = _pppS(r.np); if (!np || (np in nps)) continue; nps[np] = 1; supa.push(_pppRowFromSupa(r)); }
   _pppSupaNps = nps;
   const extra = PPP_READONLY ? [] : pppLoadPedidosStore().filter(function (p) { return !(String(p.np) in nps); });   // importados que aún no están en Supabase (solo modo editable)
-  _pppParsed.prog = supa.concat(extra);
+  // Los pedidos de la página entran a la MISMA lista que los de ISIS: misma tabla,
+  // mismas solapas, mismo aspecto. Si LK no contesta, la PPP de siempre sigue igual.
+  let web = [];
+  try { web = await pppTraerPedidosWeb("lk"); }
+  catch (e) { pppSetStatus("⚠ No pude traer los pedidos de la página (" + ((e && e.message) || e) + "). Muestro solo lo de ISIS.", false); }
+  _pppParsed.prog = supa.concat(extra, web);
   const prog = supa.filter(function (p) { return p.programmed; }).length;
   pppRenderProg();
   if (typeof pppRefreshArmado === "function") pppRefreshArmado();
   if (typeof pppRefreshEntregado === "function") pppRefreshEntregado();
   if (typeof pppRefreshControlado === "function") pppRefreshControlado();
-  pppSetStatus("🟢 Programación de Supabase: " + supa.length + " pedidos (" + prog + " programados)" + (extra.length ? " + " + extra.length + " locales sin sincronizar" : "") + ".", true);
+  pppSetStatus("🟢 Programación de Supabase: " + supa.length + " pedidos (" + prog + " programados)"
+    + (extra.length ? " + " + extra.length + " locales sin sincronizar" : "")
+    + (web.length ? " + " + web.length + " de la página web" : "") + ".", true);
 }
 /* ===== Detección de SÚPER (van solos: un camión por súper). Tres señales (lo pedido):
    (1) lista de clientes súper (editable, sembrada con los 4 actuales),
@@ -26932,7 +26643,12 @@ function pppSugerirTandas() {
   if (!_pppEntregados) _pppEntregados = new Set();
   const ed = pppLoadEdits();
   const tandaDe = function (p) { const e = ed[String(p.np)]; const t = (e && e.tanda != null) ? e.tanda : (p.tanda || ""); return (t && t !== "—") ? t : ""; };
-  const pend = (_pppParsed.prog || []).filter(function (p) { return !_pppEntregados.has(String(p.np)) && !tandaDe(p); });
+  // ⚠ En solo-lectura sólo se arman tandas de los pedidos WEB. Las NP de ISIS ya
+  // vienen programadas de allá: asignarles tanda acá sería inventar programación
+  // sobre pedidos que no manejamos.
+  const pend = (_pppParsed.prog || []).filter(function (p) {
+    return !_pppEntregados.has(String(p.np)) && !tandaDe(p) && (!PPP_READONLY || p._web);
+  });
   if (!pend.length) { pppSetStatus("No hay pedidos sin tanda para sugerir.", false); return; }
 
   let globalLetterIdx = 0, zoneNum = 0, tandaLetterIdx = 0;
@@ -27140,7 +26856,10 @@ function pppOkSuper(np) {
 function pppConfirmarProgramar() {
   const ed = pppLoadEdits(), set = pppLoadEntregados();
   const tandaDe = function (p) { const e = ed[String(p.np)]; const t = (e && e.tanda != null) ? e.tanda : (p.tanda || ""); return (t && t !== "—") ? t.toUpperCase() : ""; };
-  const pend = (_pppParsed.prog || []).filter(function (p) { return !set.has(String(p.np)) && !(ed[String(p.np)] && ed[String(p.np)].programmed); });
+  const pend = (_pppParsed.prog || []).filter(function (p) {
+    return !set.has(String(p.np)) && !(ed[String(p.np)] && ed[String(p.np)].programmed)
+        && (!PPP_READONLY || p._web);   // en solo-lectura se programan sólo los web
+  });
   const conTanda = pend.filter(function (p) { return !pppEsSuper(p) && tandaDe(p); });
   const supers = pend.filter(pppEsSuper);
   if (!conTanda.length && !supers.length) { pppSetStatus("No hay tandas para programar. Armá las tandas primero (🪄 Sugerir tandas).", false); return; }
@@ -27152,6 +26871,20 @@ function pppConfirmarProgramar() {
   for (const p of supers) { const e = ed[String(p.np)]; const f = String(((e && e.fecha_entrega != null) ? e.fecha_entrega : p.fecha_entrega) || "").trim(); if (f) { const k = String(p.np); ed[k] = ed[k] || {}; ed[k].programmed = true; ed[k].fecha_entrega = f; nSup++; } else supSinFecha++; }
   pppSaveEdits(); _pppTab = "plan"; pppRenderProg();
   pppSetStatus("✅ Programado: " + tlist.length + " tanda(s)" + (nSup ? " + " + nSup + " súper" : "") + (supSinFecha ? " · ⚠ " + supSinFecha + " súper sin fecha" : "") + ".", true);
+
+  // Los pedidos de la página se guardan en Supabase, no en el localStorage de la
+  // PPP: son los únicos que este circuito maneja de punta a punta, y el operario
+  // tiene que verlos desde su celular. Va después de pintar para que la pantalla
+  // responda ya; si falla, se avisa sin deshacer lo mostrado.
+  const _web = pend.filter(function (p) { return p._web; })
+                   .map(function (p) { const o = Object.assign({}, p); o.tanda = tandaDe(p) || p.tanda; return o; });
+  if (_web.length) {
+    pppGuardarWeb(_web).then(function (n) {
+      if (n) pppSetStatus("✅ Programado · " + n + " pedido(s) de la página guardados y visibles para el operario.", true);
+    }).catch(function (e) {
+      pppSetStatus("⚠ Las tandas se ven acá pero NO se guardaron los pedidos de la página: " + ((e && e.message) || e), false);
+    });
+  }
 }
 /* ===== Zona automática desde el Barrio de entrega =====
    Fuente de verdad: tabla Zonas_Barrios en Supabase (auto-learn via trigger
@@ -28966,7 +28699,11 @@ function pppRenderProg() {
   }
   // ===== Tab "A Programar" → (en modo editable) armar tandas y confirmar; en SOLO-LECTURA sólo lista =====
   const cfg = pppGetCfg();
-  if (!PPP_READONLY) {
+  // La PPP de ISIS es de solo lectura (refleja lo ya cargado allá), pero los pedidos
+  // de la página SÍ se programan acá: son nuestros. Por eso la barra aparece también
+  // en modo lectura cuando hay filas web sin tanda — y sus acciones tocan SOLO esas.
+  const _hayWeb = aProgramar.some(function (p) { return p._web; });
+  if (!PPP_READONLY || _hayWeb) {
     html += '<div class="ppp-toolbar">' +
       '<button class="ppp-sug-btn" onclick="pppSugerirTandas()">🪄 Sugerir tandas</button>' +
       '<button class="ppp-confirm-btn" onclick="pppConfirmarProgramar()">✅ Confirmar todas</button>' +

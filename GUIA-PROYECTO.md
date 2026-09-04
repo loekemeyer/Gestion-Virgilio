@@ -8382,20 +8382,24 @@ lee **la misma tabla donde caen los pedidos de la página**, en vivo.
   - Estado: 116 pedidos, **59 con payload** — los otros 57 no tienen ítems y no
     aparecen. Corte verificado: el pedido 213 (17 líneas) sale **15 + 2**.
 
-- **La pantalla**: botón **🧾 PPP Web** en el panel supervisor (v12.59, m³ endurecido en v12.60). Lee
-  `v_pedidos_web_np` de LK en vivo, resuelve el m³ contra `Volumen_Articulos` de
-  esta base y muestra las NP a programar. Trae una **ventana de 30 días**
-  (`PWEB_VENTANA_DIAS`) y por defecto muestra **solo lo que falta programar**.
-  ⚠ **Ya no filtra por "salió el mail"** (v12.65). Ese criterio servía para mostrar
-  el agujero —un pedido de las 16:03 no existía para nadie hasta el mediodía
-  siguiente—, pero como filtro de trabajo estaba mal: al día siguiente el pedido se
-  sellaba y **desaparecía de la pantalla aunque nadie lo hubiera programado**.
-  Lo que ya salió por mail se muestra con una chapita **ISIS** en ámbar: durante la
-  transición puede estar programado en el circuito viejo, y programarlo también acá
-  lo haría **pickear dos veces**.
-  La sesión de LK sale del **mismo bridge** que abre el Panel Web LK
-  (`admin-login-otp` acción `bridge`), cacheada en memoria una hora.
-  Regresión: `tests/pweb-ppp-web.cjs`.
+- **Dónde se ven (v12.69)**: **en la PPP de siempre**, no en una pantalla aparte.
+  `pppLoadProgFromSupabase` concatena las filas web a `_pppParsed.prog`, con la
+  misma forma que `_pppRowFromSupa`, así que caen en 📥 A Programar junto a las de
+  ISIS y comparten tabla, solapas, colores, buscador y bloques por tanda. Se ven
+  idénticas porque **son la misma pantalla**.
+  Hubo una pantalla propia (v12.61–v12.68, botón "🧾 PPP Web") y se eliminó: el
+  supervisor no tiene por qué aprender dos vistas de lo mismo.
+  - Las trae `pppTraerPedidosWeb(empresa)`. Si LK no contesta, se avisa y la PPP
+    sigue mostrando lo de ISIS.
+  - **Armar y confirmar tocan SOLO las filas web** mientras `PPP_READONLY` esté en
+    `true`: las NP de ISIS ya vienen programadas de allá y asignarles tanda acá
+    sería inventar programación sobre pedidos que este circuito no maneja.
+  - La barra de 🪄 Sugerir tandas / ✅ Confirmar aparece en modo lectura **sólo si
+    hay pedidos web sin tanda**.
+  - Al confirmar, `pppGuardarWeb` persiste la cabecera en `PPP_Web_Programacion` y
+    la foto de artículos en `PPP_Web_Base`. Para el supervisor es el mismo botón
+    de siempre.
+  - Regresión: `tests/pweb-en-ppp.cjs`.
 
 - ⚠ **`PPP_Programacion_Diaria` NO se toca.** Gestión y Producción comparten el
   MISMO proyecto Supabase (`hrxfctzncixxqmpfhskv`, los dos `supabase-config.js`
@@ -8484,8 +8488,8 @@ lee **la misma tabla donde caen los pedidos de la página**, en vivo.
     - la **fecha** de una NP de ISIS sale de `PPP_Base_Pedidos`, donde una NP web
       no está. Se guarda `PPP_Web_Programacion.fecha_recep` al programar y el Excel
       la lee de ahí. Antes salía con la fecha vacía.
-  - Regresión: `tests/pweb-programar.cjs`, `tests/pweb-tandas.cjs`,
-    `tests/pweb-picking.cjs` y `tests/pweb-excel-isis.cjs`.
+  - Regresión: `tests/pweb-en-ppp.cjs`, `tests/pweb-picking.cjs` y
+    `tests/pweb-excel-isis.cjs`.
 
 **Pendiente MEDIA**: `prodLoad/prodCompute` — RPC parametrizado por rango de fechas,
 cálculo de productividad con m³ y factores. Complejidad alta, dejado para después.
