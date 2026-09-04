@@ -1,6 +1,15 @@
 /* Regresión v6.12 — (A) Picking: ubicación por ORIGEN (Loeke NP>90000 vs Chef) para
    809E/437E/438E. (B) MG guarda el borrador en CADA cambio (se puede "Seguir Guardar a
-   góndola" aunque no toquen "Cerrar"). Sale 1 si falla. */
+   góndola" aunque no toquen "Cerrar"). Sale 1 si falla.
+
+   ⚠ La planimetría se FIJA acá (window.GONDOLA), no se toma la de producción.
+   Antes el test la dejaba libre y pasaba o fallaba según qué hubiera en Supabase en
+   ese momento: en una máquina sin red a la base quedaba vacía y corría el camino
+   viejo (la tabla PICK_UBIC_DUAL), y en CI se cargaba la real y corría el camino
+   nuevo (stock partido por empresa, claves "438E LK"/"438E CH"). El test esperaba
+   el viejo, así que fallaba SOLO en CI — y no por un bug, sino porque estaba mirando
+   datos vivos. Ahora se prueban los DOS caminos, cada uno con su planimetría puesta
+   a mano, y el resultado no depende de cómo esté hoy el depósito. */
 const path = require("path");
 let chromium;
 try { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
@@ -14,6 +23,12 @@ catch (_e) {
   const p = await b.newPage();
   const errs = [];
   p.on("pageerror", (e) => errs.push(e.message));
+  // La planimetría remota se dispara sola al cargar la página (loadPlanimetriaRemote()
+  // corre en el nivel de módulo), así que stubbear la función desde el test llega
+  // TARDE: el fetch ya salió y su respuesta pisa window.GONDOLA cuando vuelve.
+  // Se corta el pedido acá, antes de abrir la página. Sin esto el test vuelve a
+  // depender de la red y de cómo esté hoy la planimetría de producción.
+  await p.route("**/rest/v1/Planimetria**", function (route) { return route.abort(); });
   await p.goto("file://" + path.join(root, "index.html"), { waitUntil: "domcontentloaded" });
 
   const r = await p.evaluate(async () => {
@@ -41,7 +56,12 @@ catch (_e) {
       return acc;
     }
 
-    // ===== (A) Tanda LOEKE (NP>90000) =====
+    // La carga remota de planimetría puede resolver en cualquier momento y pisar la
+    // que fija el test. Se la desactiva de entrada.
+    window.loadPlanimetriaRemote = async function () {};
+
+    // ===== (A) Camino FALLBACK: sin planimetría por empresa, manda PICK_UBIC_DUAL =====
+    window.GONDOLA = {};
     localStorage.clear();
     window.fetchMonitorSheet = async function () { return mapOf({ "L01": { pedidos: [{ np: "98500" }] } }); };
     window.fetchPickingBase = async function () { return mapOf({ "98500": [{ art: "809E", cajas: 3 }, { art: "437E", cajas: 2 }, { art: "438E", cajas: 4 }] }); };
@@ -49,7 +69,8 @@ catch (_e) {
     await new Promise(function (res) { setTimeout(res, 60); });
     out.loeke = await walk();
 
-    // ===== (B) Tanda CHEF (NP<=90000) =====
+    // ===== (A2) Mismo camino, tanda de CHEF (NP<=90000) =====
+    window.GONDOLA = {};
     localStorage.clear();
     window.fetchMonitorSheet = async function () { return mapOf({ "C01": { pedidos: [{ np: "44500" }] } }); };
     window.fetchPickingBase = async function () { return mapOf({ "44500": [{ art: "809E", cajas: 3 }, { art: "437E", cajas: 2 }, { art: "438E", cajas: 4 }] }); };
@@ -57,7 +78,21 @@ catch (_e) {
     await new Promise(function (res) { setTimeout(res, 60); });
     out.chef = await walk();
 
+    // ===== (B) Camino NUEVO: la planimetría trae el código partido por empresa.
+    // Ahí NO manda PICK_UBIC_DUAL: cada renglón sale con el sector de su empresa.
+    window.GONDOLA = {
+      "809E LK": ["J13", 1], "437E LK": ["F09", 2], "438E LK": ["F13", 3],
+      "809E CH": ["M13", 4], "437E CH": ["L07", 5], "438E CH": ["L05", 6]
+    };
+    localStorage.clear();
+    window.fetchMonitorSheet = async function () { return mapOf({ "L02": { pedidos: [{ np: "98500" }] } }); };
+    window.fetchPickingBase = async function () { return mapOf({ "98500": [{ art: "809E", cajas: 3 }, { art: "437E", cajas: 2 }, { art: "438E", cajas: 4 }] }); };
+    await showPickingList("L02", "57");
+    await new Promise(function (res) { setTimeout(res, 60); });
+    out.porEmpresa = await walk();
+
     // ===== (C) MG auto-guarda el borrador sin "Cerrar" =====
+    window.GONDOLA = {};
     localStorage.clear();
     window.loadArtNombres = async function () { return {}; };
     window.stockFetchSaldos = async function () { return { "502": { cod: "502", desc: "X", a_guardar: 10, terminado: 0 } }; };
@@ -83,19 +118,27 @@ catch (_e) {
     return out;
   });
 
-  const L = r.loeke || {}, C = r.chef || {};
+  const L = r.loeke || {}, C = r.chef || {}, E = r.porEmpresa || {};
   const okLoeke = L["809E"] && L["809E"].sector === "J13" && /LOEKE/.test(L["809E"].orig || "") &&
                   L["437E"] && L["437E"].sector === "F9" && /F9 a F12/.test(L["437E"].orig || "") &&
                   L["438E"] && L["438E"].sector === "F13";
   const okChef  = C["809E"] && C["809E"].sector === "M13" && /CHEF/.test(C["809E"].orig || "") &&
                   C["437E"] && C["437E"].sector === "L7" &&
                   C["438E"] && C["438E"].sector === "L5" && /L5 y L6/.test(C["438E"].orig || "");
+  // Camino nuevo: el renglón viene partido por empresa y el sector sale de la
+  // planimetría, no de PICK_UBIC_DUAL. Sin nota de origen: ya lo dice la clave.
+  const okEmpresa = E["809E LK"] && E["809E LK"].sector === "J13" &&
+                    E["437E LK"] && E["437E LK"].sector === "F09" &&
+                    E["438E LK"] && E["438E LK"].sector === "F13" &&
+                    !E["809E"] && !E["437E"];
   const okMg = r.draftAntes === false && r.draftDespues === true && r.draftOp === "MG" && r.draftCargar === 5;
-  const pass = okLoeke && okChef && okMg && errs.length === 0;
+  const pass = okLoeke && okChef && okEmpresa && okMg && errs.length === 0;
 
   console.log("dual-ubic-mg-draft:", JSON.stringify(r));
   console.log("  pageerrors:", errs.length ? errs.join("|") : "none");
-  console.log("  A loeke:", okLoeke ? "✓" : "✗", "· A chef:", okChef ? "✓" : "✗", "· B mg-draft:", okMg ? "✓" : "✗", "·", pass ? "OK" : "FAIL");
+  console.log("  A loeke:", okLoeke ? "✓" : "✗", "· A chef:", okChef ? "✓" : "✗",
+              "· B por-empresa:", okEmpresa ? "✓" : "✗", "· C mg-draft:", okMg ? "✓" : "✗",
+              "·", pass ? "OK" : "FAIL");
   await b.close();
   process.exit(pass ? 0 : 1);
 })();
