@@ -29,11 +29,14 @@
 --     u/caja y los dos 0,0023. Era el único código con L que quedaba sin m³.
 --     ⚠ Reemplazar cuando se mida de verdad.
 --
--- `GV_Zonas_Barrios` — 1 fila:
---   · `v.devoto` → Zona 2 - CABA Centro. Las tres grafías del mismo barrio
---     (`devoto`, `villa devoto`, `v.devoto`) se cargaron en el mismo momento y
---     v.devoto quedó en Oeste mientras las otras dos decían Centro. El dueño
---     confirmó Centro. Producción sigue viendo Oeste.
+-- `GV_Zonas_Barrios` — **hoy VACÍA**, y está bien que lo esté.
+--   Su único caso iba a ser `v.devoto`, pero el dueño decidió que **Devoto es Centro
+--   para las DOS apps**: no era un criterio distinto de Gestión, era una
+--   inconsistencia de la tabla compartida (las tres grafías —`devoto`,
+--   `villa devoto`, `v.devoto`— se cargaron en el mismo momento y sólo la tercera
+--   quedó en Oeste). Se corrigió en `Zonas_Barrios` y se borró el override.
+--   La tabla queda como MECANISMO, para el día que Gestión sí necesite una zona
+--   distinta de la que ve Producción.
 --
 -- ── CÓMO SE CONSUMEN ──────────────────────────────────────────────────────
 --   m³   → `vista_volumen_articulo_resuelto` (abajo): compartida + override.
@@ -41,7 +44,7 @@
 --
 -- ── VERIFICADO ────────────────────────────────────────────────────────────
 --   Gestión ve 439EL = 0,0185   ·  Producción ve 0,0561   (el original)
---   Gestión ve Devoto = Centro  ·  Producción ve Oeste    (el original)
+--   Devoto = Centro en las DOS (decisión del dueño, no un override)
 --   Vista: 1.482 filas, 0 duplicados, 0 códigos con L que no sigan a su base.
 --   LK lee las 1.482 por el FDW y el pipeline da 355 NP con 0 m³ incompleto.
 -- ══════════════════════════════════════════════════════════════════════════

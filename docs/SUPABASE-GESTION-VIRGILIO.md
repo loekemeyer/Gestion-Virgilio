@@ -96,7 +96,7 @@ violaron la regla.
 | `ppp_web_armar_tandas()` | Arma las tandas solo | `sql/ppp_web_tandas.sql` |
 | `ppp_web_letra()` · `ppp_web_letra_idx()` · `ppp_web_proxima_letra()` | Código de tanda | idem |
 | `GV_Volumen_Articulos` | **Override de m³ de Gestión.** Pisa a `Volumen_Articulos` sólo para nosotros | `sql/gv_overrides.sql` |
-| `GV_Zonas_Barrios` | **Override de zona de Gestión.** Pisa a `Zonas_Barrios` sólo para nosotros | idem |
+| `GV_Zonas_Barrios` | **Override de zona de Gestión** (hoy vacía: el único caso se resolvió corrigiendo la compartida). Queda como mecanismo | idem |
 | `gv_zona_de_barrio()` | Resuelve zona: override primero, después la compartida | idem |
 | `vista_volumen_articulo_resuelto` | m³ con la "L" resuelta desde el artículo base, superponiendo el override | `sql/volumen_articulo_resuelto.sql` |
 | `vista_facturacion_estado` | Corte "esperando confirmación" / "facturado" | `sql/facturacion_estado.sql` |
@@ -147,10 +147,11 @@ estaba; Gestión tiene su fuente canónica.
 |---|---|---|
 | A | `UPDATE` de 54 filas de `Volumen_Articulos` | Revertido. `GV_Volumen_Articulos` (157 filas: 156 códigos con "L" con el m³ de su base + `727E` estimado) y `vista_volumen_articulo_resuelto` superpone override sobre compartida. |
 | A' | `UPDATE` de `727E` (0 → 0,0023) — **se me había pasado**, es el mismo caso | Revertido a 0. El 0,0023 vive en el override, marcado como estimado por similitud y no medido. |
-| B | `UPDATE` de `v.devoto` en `Zonas_Barrios` | Revertido a `Zona 3 - CABA Oeste`. `GV_Zonas_Barrios` tiene `v.devoto → Zona 2` y `gv_zona_de_barrio()` resuelve override primero. |
+| B | `UPDATE` de `v.devoto` en `Zonas_Barrios` | **Resuelto de otra forma, por decisión del dueño: Devoto es Centro para las DOS apps.** No es un override — es corregir una inconsistencia de la tabla compartida, donde las 3 grafías (`devoto`, `villa devoto`, `v.devoto`) se cargaron juntas y sólo la tercera quedó en Oeste. Ahora las tres dicen `Zona 2 - CABA Centro`. El override se borró: ya no hace falta. 0 NP afectadas. |
 
-**Verificado, las dos apps ven cosas distintas a propósito:** Gestión ve `439EL` = 0,0185
-y Devoto = Centro; Producción ve 0,0561 y Oeste — sus valores originales. La vista sigue
+**Verificado:** en el m³ las dos apps ven cosas distintas a propósito — Gestión ve
+`439EL` = 0,0185 y Producción su valor original 0,0561. En la zona **ven lo mismo**,
+porque el dueño decidió que Devoto es Centro para las dos. La vista sigue
 con 1.482 filas, 0 duplicados y 0 códigos con L que no sigan a su base, y LK las lee por
 el FDW: 355 NP con 0 m³ incompleto.
 
