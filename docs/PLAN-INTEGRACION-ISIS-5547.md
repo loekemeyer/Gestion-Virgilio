@@ -3,12 +3,48 @@
 **Ticket ISIS:** 1159666  
 **Reunión:** agosto 2026 con Horacio Barbieri (Sistemas ISIS)  
 **Plazo:** 3 semanas desde 16/8/2026  
-**Estado:** pendiente — nada ejecutado  
+**Estado:** **P1/P2 CONSTRUIDOS (2026-09-04)** — falta que ISIS consuma la API. P3/P4/P5 pendientes.  
 **Artefacto de análisis:** https://claude.ai/code/artifact/3d7b6485-b065-4e3f-9388-eebdf49317a2
 
 > **Contexto clave:** el informe de agosto 2026 SUPERSEDE el approach anterior
 > (API `/api/ISISPedido` + Balcony). Todo pasa ahora por **JSON file exchange**.
 > `docs/integracion-isis.md` hay que actualizarlo.
+
+---
+
+## ✅ 2026-09-04 — Lo construido (respuesta al Punto 18 del informe)
+
+ISIS pidió (Punto 18): infraestructura, URL, token, endpoint del pedido y estructura
+JSON. Se resolvió por la **Alternativa B** (ISIS consulta una API nuestra), no por
+intercambio de archivos: es request **saliente** desde su LAN, así que **no hace falta
+Windows Server, IIS, IP pública ni abrir puertos** en el depósito.
+
+**Documento para mandarle a ISIS: [`ISIS-API-ESPECIFICACION.md`](ISIS-API-ESPECIFICACION.md).**
+
+| Pieza del plan | Estado |
+|---|---|
+| 1 · JSON del pedido | ✅ `isis_pedido_json(np)` — arma cabecera + items + faltantes |
+| 2 · `vista_falta_global` | ❌ **No se hizo, y no hace falta**: se factura por pedido (decisión 25/08), y lo que se manda es lo **realmente armado** (`Entregas_Virgilio`), no una proyección de stock |
+| 3 · Disparador | ✅ Uno solo: el **tick de Facturación** (`Facturacion_NP`) → trigger `trg_isis_encolar_facturado`. Cubre el caso completo y el parcial: siempre se manda lo armado |
+| 4 · Botón UI | ❌ No hizo falta: el botón que ya existe (tildar en Facturación) **es** el disparador |
+| 5 · Tabla staging | ✅ `isis_export_pedidos`, con los campos de trazabilidad del riesgo #5 (`procesado_en`, `resultado`, `nro_comprobante`, `cae`, `error_detalle`) y PK por NP = control de duplicados |
+| 6 · Agente local | ❌ Descartado: era el plan B por si ISIS prefería leer disco. Con la API no hace falta |
+| 7 · Auditoría LK/Chef | ✅ Resuelto por diseño: `empresa` sale de `empresa_de_np(np)` y viaja en el JSON y en el filtro `?empresa=` |
+| 8 · Docs | ✅ Este archivo + `integracion-isis.md` + `GUIA-PROYECTO.md` |
+
+**Riesgos del plan, resueltos:**
+
+- **#2 (código equivocado):** el JSON manda `articulo` = el código **realmente
+  preparado** (sale de `Entregas_Virgilio`) y `articulo_pedido` = el que traía el
+  pedido. Documentado como regla de lectura en la especificación.
+- **#5 (trazabilidad):** el acuse (`POST /pedidos/{np}/acuse`) graba resultado,
+  comprobante y CAE. Un segundo acuse OK sobre la misma NP no pisa nada y devuelve
+  `duplicado: true`.
+- **#6 (empresa):** el campo va en el JSON (`"empresa": "LK"|"CH"`).
+- **#7 (`falta_global`):** no existe más en el JSON — se sacó justamente para que ISIS
+  no bloquee facturas por un faltante global.
+- **#4 (cutover del CAE):** ⚠ **SIGUE ABIERTO.** Hay que apagar la emisión propia
+  (PV 11, `arca-wsfe`) el mismo día que ISIS empiece a facturar.
 
 ---
 
