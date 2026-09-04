@@ -94,9 +94,15 @@ async function traerLk(desde: string): Promise<Fila[]> {
 }
 
 /** Chef vive en otro proyecto y se lee por FDW desde LK (~3,3 s), por eso va por
- *  RPC aparte: unirlo a la vista de LK haría pagar ese costo en cada lectura. */
+ *  RPC aparte: unirlo a la vista de LK haría pagar ese costo en cada lectura.
+ *
+ *  ⚠ Va contra `gv_pedidos_web_np_chef`, NO contra `get_pedidos_web_np_chef` que
+ *  usa el front. El original chequea `auth.uid()` contra `public.admins`, y acá
+ *  corremos con la service key: `auth.uid()` es NULL, así que ese chequeo siempre
+ *  falla. El gemelo `gv_` no tiene ese chequeo — su gate es el GRANT, que sólo
+ *  alcanza a `service_role`. */
 async function traerChef(dias: number): Promise<Fila[]> {
-  const r = await lk("/rest/v1/rpc/get_pedidos_web_np_chef",
+  const r = await lk("/rest/v1/rpc/gv_pedidos_web_np_chef",
     { method: "POST", body: JSON.stringify({ p_dias: dias }) });
   if (!r.ok) throw new Error(`Chef RPC: HTTP ${r.status} ${(await r.text()).slice(0, 300)}`);
   return await r.json();

@@ -159,6 +159,75 @@ grant execute on function public.gv_ppp_web_zona(text, text, text) to anon, auth
 grant execute on function public.gv_ppp_web_zona_lote(jsonb)       to authenticated, service_role;
 
 
+-- ── 2.d Agrupación de zonas ───────────────────────────────────────────────
+-- Regla del dueño 2026-09-04: *"por zona: 2 y 3 pueden juntarse. 6 con 7. Todas
+-- las demás por separado"*. Devuelve la CLAVE con la que se agrupa al armar: dos
+-- zonas con la misma clave pueden compartir tanda.
+create or replace function public.gv_ppp_web_grupo_zona(p_zona text)
+returns text
+language sql
+immutable
+as $function$
+  select case
+           when coalesce(btrim(p_zona),'') = '' then null
+           when (regexp_match(p_zona, '^Zona\s*([0-9]+)'))[1] in ('2','3') then 'Zonas 2+3'
+           when (regexp_match(p_zona, '^Zona\s*([0-9]+)'))[1] in ('6','7') then 'Zonas 6+7'
+           else btrim(p_zona)
+         end;
+$function$;
+
+comment on function public.gv_ppp_web_grupo_zona(text) is
+  'Clave de agrupación de zonas para armar tandas: 2+3 juntas, 6+7 juntas, el resto sola.';
+revoke all on function public.gv_ppp_web_grupo_zona(text) from public;
+grant execute on function public.gv_ppp_web_grupo_zona(text) to anon, authenticated, service_role;
+
+
+-- ── 2.e Clientes con regla propia ─────────────────────────────────────────
+-- Tabla, no lista hardcodeada: el dueño va a agregar y sacar clientes de acá sin
+-- que haya que tocar una función.
+--   'solo'        → siempre tanda propia, no se junta con nadie
+--   'prioritario' → no puede esperar en la cola; se programa dentro de la semana
+create table if not exists public."GV_Clientes_Reglas" (
+  cod_cliente text not null,
+  empresa     text not null default 'lk',
+  regla       text not null,
+  nombre      text,
+  nota        text,
+  creado_en   timestamptz not null default now(),
+  primary key (cod_cliente, empresa, regla),
+  constraint gv_clientes_reglas_regla_chk   check (regla in ('solo','prioritario')),
+  constraint gv_clientes_reglas_empresa_chk check (empresa in ('lk','chef'))
+);
+
+alter table public."GV_Clientes_Reglas" enable row level security;
+revoke all on public."GV_Clientes_Reglas" from anon, authenticated;
+drop policy if exists gv_clientes_reglas_select on public."GV_Clientes_Reglas";
+create policy gv_clientes_reglas_select on public."GV_Clientes_Reglas"
+  for select to authenticated using (true);
+drop policy if exists gv_clientes_reglas_write on public."GV_Clientes_Reglas";
+create policy gv_clientes_reglas_write on public."GV_Clientes_Reglas"
+  for all to authenticated
+  using      ((auth.jwt() ->> 'email') = any (array['loekemeyer.n8n@gmail.com','loekemeyer.logistica@gmail.com','comexloekemeyer@gmail.com']))
+  with check ((auth.jwt() ->> 'email') = any (array['loekemeyer.n8n@gmail.com','loekemeyer.logistica@gmail.com','comexloekemeyer@gmail.com']));
+grant select on public."GV_Clientes_Reglas" to authenticated;
+grant insert, update, delete on public."GV_Clientes_Reglas" to authenticated;
+
+-- Códigos VERIFICADOS contra `public.customers` de LK el 2026-09-04, no tipeados
+-- de memoria: el dueño los nombró como "extralim", "dist gm", "osa" y "horcada".
+insert into public."GV_Clientes_Reglas" (cod_cliente, empresa, regla, nombre, nota) values
+  ('4114','lk','solo',        'Extralimp S.A.',                'Regla del dueño 2026-09-04: va solo.'),
+  ('4080','lk','solo',        'Distribuidora GM S.R.L.',       'Regla del dueño 2026-09-04: va solo.'),
+  ('2533','lk','prioritario', 'Osa Distribuidora SRLChemelo',  'Regla del dueño 2026-09-04: se programa sí o sí dentro de la semana.'),
+  ('85',  'lk','prioritario', 'Horcada Marcelo Horcada Gustav','Regla del dueño 2026-09-04: se programa sí o sí dentro de la semana.')
+on conflict do nothing;
+
+-- ⚠ FALTA UNO. El dueño nombró "torres filigas" y **no existe en ningún padrón**:
+--   ni en `customers` de LK ni en `chef_padron`. Los candidatos son
+--   `Torres Y Liva S.A Cif` (LK 288 / CH 271) y `Torres Juan Luis` (LK 2266).
+--   No se cargó ninguno: meter el cliente equivocado en una regla de prioridad es
+--   peor que no tener la regla.
+
+
 -- ── 3 · Bitácora de las corridas ──────────────────────────────────────────
 -- Un job que corre solo a las 00:01 y no deja rastro es un job que nadie puede
 -- auditar. Acá queda qué hizo cada corrida, incluidas las que NO hicieron nada

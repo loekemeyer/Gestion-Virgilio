@@ -49,6 +49,25 @@
 -- lo ya programado. Reacomodar lo que YA tiene tanda es tarea de
 -- `ppp_web_resync` (ver sql/ppp_web_programacion.sql §3).
 --
+-- ══════════════════════════════════════════════════════════════════════════
+-- v2 · REGLAS QUE AGREGÓ EL DUEÑO EL 2026-09-04
+-- ══════════════════════════════════════════════════════════════════════════
+--   · **Tope 0,80 m³** (era 1,00). Sale de `PPP_Web_Config`, no está hardcodeado.
+--   · **Zonas 2+3 pueden juntarse, y 6+7. Todas las demás por separado.**
+--     Lo resuelve `gv_ppp_web_grupo_zona`, y el bucle recorre GRUPOS, no zonas.
+--   · **Retira: cada cliente en su tanda.** Antes se juntaban como una zona más.
+--     ⚠ El dueño dijo *"solo se juntan si retiran el mismo día"* — ese día NO
+--     existe en ningún lado del pedido web (ver el PENDIENTE de abajo), así que
+--     por ahora se aplica la mitad segura de la regla: separados.
+--   · **Súper: una tanda por cliente.** Sin cambio, ya era así.
+--   · **Clientes que van solos siempre:** `GV_Clientes_Reglas` con `regla='solo'`.
+--     Hoy Extralimp (4114) y Distribuidora GM (4080), códigos verificados contra
+--     el padrón de LK. Es una tabla, se edita sin tocar código.
+--   · **+0,80 m³ es su propia tanda.** Ya lo hacía; ahora con el tope nuevo.
+--   · **LK y CH no se mezclan.** Sale gratis: la función se llama por empresa y
+--     `ppp_web_proxima_letra` avanza entre llamadas, así que ni el código de
+--     tanda se repite entre las dos.
+--
 -- ── PROBADO (transacciones revertidas, producción verificada intacta) ──────
 --   cliente de 5 m³ en Zona 1        → tanda propia, no se parte          ✔
 --   3 clientes de 0,30/0,25/0,30     → una sola tanda (0,85 < tope)       ✔
@@ -59,6 +78,17 @@
 --   misma entrada dos veces          → la segunda no toca nada            ✔
 --   armado un domingo                → entrega corrida al lunes           ✔
 --   códigos                          → arrancan en E (Producción va por D)✔
+--
+--   v2, 2026-09-04, 14 casos armados a propósito:
+--   Retira A y Retira B              → una tanda cada uno                 ✔
+--   Súper Uno y Súper Dos            → una tanda cada uno                 ✔
+--   Extralimp + otro de Zona 5       → tandas distintas, aunque sumaban
+--                                      0,10 y entraban holgados           ✔
+--   Distribuidora GM en Zonas 2+3    → tanda propia, con lugar al lado    ✔
+--   Chico Z2 + Chico Z3              → JUNTOS (0,60 < 0,80)               ✔
+--   Chico Z6 + Chico Z7              → JUNTOS                             ✔
+--   Chico Z1 y Chico Z4              → separados, no se agrupan           ✔
+--   Grande Z1 de 0,85                → tanda propia (pasa el tope)        ✔
 -- ══════════════════════════════════════════════════════════════════════════
 
 create table if not exists public."PPP_Web_Config" (
@@ -69,8 +99,8 @@ create table if not exists public."PPP_Web_Config" (
 );
 
 insert into public."PPP_Web_Config" (clave, valor, descripcion) values
-  ('tanda_m3_max_mezcla', 1.00,
-   'Tope de m³ para JUNTAR clientes distintos. No parte a un cliente: si uno solo pide más, se va solo con todo lo suyo.'),
+  ('tanda_m3_max_mezcla', 0.80,
+   'Tope de m³ para JUNTAR clientes distintos (dueño, 2026-09-04). No parte a un cliente: si uno solo pide más, se va solo con todo lo suyo.'),
   ('tanda_m3_min', 0.60,
    'm³ deseable mínimo. NO bloquea: 33 de 56 tandas históricas salieron por debajo.'),
   ('dias_hasta_entrega', 0,
@@ -139,12 +169,12 @@ returns table (r_tanda text, r_zona text, r_np_count int, r_m3 numeric, r_client
 language plpgsql
 as $function$
 declare
-  v_tope   numeric := coalesce((select valor from public."PPP_Web_Config" where clave='tanda_m3_max_mezcla'), 1.00);
+  v_tope   numeric := coalesce((select valor from public."PPP_Web_Config" where clave='tanda_m3_max_mezcla'), 0.80);
   v_dias   int     := coalesce((select valor from public."PPP_Web_Config" where clave='dias_hasta_entrega'), 0)::int;
   v_saltar boolean := coalesce((select valor from public."PPP_Web_Config" where clave='saltar_fin_de_semana'), 1) <> 0;
   v_letra  int     := public.ppp_web_proxima_letra();
   v_fecha  date;
-  v_zona   text;
+  v_grupo  text;
   v_zn     int := 0;
   v_ti     int;
   v_code   text;
@@ -164,6 +194,7 @@ begin
          (x->>'np_idx')::int      as np_idx,
          nullif(x->>'np','')::int as np,
          coalesce(nullif(x->>'zona',''), '(sin zona)') as zona,
+         public.gv_ppp_web_grupo_zona(coalesce(nullif(x->>'zona',''), '(sin zona)')) as grupo,
          coalesce(nullif(x->>'cod',''), nullif(x->>'razon_social',''), '?') as cliente,
          nullif(x->>'razon_social','') as razon_social,
          nullif(x->>'direccion','')    as direccion,
@@ -171,7 +202,10 @@ begin
          coalesce(nullif(x->>'m3','')::numeric, 0)    as m3,
          coalesce((x->>'m3_parcial')::boolean, false) as m3_parcial,
          nullif(x->>'lineas','')::int                 as lineas,
-         nullif(x->>'cajas','')::numeric              as cajas
+         nullif(x->>'cajas','')::numeric              as cajas,
+         exists (select 1 from public."GV_Clientes_Reglas" g
+                  where g.regla = 'solo' and g.empresa = p_empresa
+                    and g.cod_cliente = nullif(x->>'cod','')) as va_solo
     from jsonb_array_elements(p_filas) x
    where not exists (
            select 1 from public."PPP_Web_Programacion" g
@@ -185,24 +219,32 @@ begin
 
   create temp table _asig (order_id bigint, np_idx int, tanda text) on commit drop;
 
-  for v_zona in select distinct zona from _sin_tanda order by 1 loop
+  -- Se recorre por GRUPO de zona, no por zona: asi 2 y 3 caen en el mismo bucle
+  -- y pueden compartir tanda, y el resto no.
+  for v_grupo in select distinct grupo from _sin_tanda order by 1 loop
     v_zn := v_zn + 1; v_ti := 0; v_acum := 0; v_code := null;
     for r_cli in
-      select cliente, sum(m3) as m3_cli from _sin_tanda where zona = v_zona
+      select cliente, sum(m3) as m3_cli, bool_or(va_solo) as solo
+        from _sin_tanda where grupo = v_grupo
        group by cliente order by sum(m3) desc, cliente
     loop
-      -- Súper va siempre solo; un cliente que solo ya pasa el tope también.
-      if v_zona = 'Super' or r_cli.m3_cli >= v_tope or v_code is null
-         or (v_acum + r_cli.m3_cli) > v_tope then
+      -- Abre tanda nueva si: el cliente va solo por regla propia, si es Super o
+      -- Retira (uno por cliente), si el cliente solo ya pasa el tope, o si
+      -- sumarlo lo pasaria.
+      if v_grupo in ('Super','Retira') or r_cli.solo or r_cli.m3_cli >= v_tope
+         or v_code is null or (v_acum + r_cli.m3_cli) > v_tope then
         v_code := public.ppp_web_letra(v_letra) || lpad(v_zn::text, 2, '0')
                   || public.ppp_web_letra(v_ti);
         v_ti := v_ti + 1; v_acum := 0;
       end if;
       insert into _asig (order_id, np_idx, tanda)
       select s.order_id, s.np_idx, v_code
-        from _sin_tanda s where s.zona = v_zona and s.cliente = r_cli.cliente;
+        from _sin_tanda s where s.grupo = v_grupo and s.cliente = r_cli.cliente;
       v_acum := v_acum + r_cli.m3_cli;
-      if v_zona = 'Super' or r_cli.m3_cli >= v_tope then v_code := null; v_acum := 0; end if;
+      -- Cierra la tanda para que nadie mas se le sume.
+      if v_grupo in ('Super','Retira') or r_cli.solo or r_cli.m3_cli >= v_tope then
+        v_code := null; v_acum := 0;
+      end if;
     end loop;
   end loop;
 
@@ -220,7 +262,7 @@ begin
          lineas = excluded.lineas, cajas = excluded.cajas;
 
   return query
-    select a.tanda, min(s.zona), count(*)::int, round(sum(s.m3), 3), count(distinct s.cliente)::int
+    select a.tanda, min(s.grupo), count(*)::int, round(sum(s.m3), 3), count(distinct s.cliente)::int
       from _asig a join _sin_tanda s on s.order_id = a.order_id and s.np_idx = a.np_idx
      group by a.tanda order by a.tanda;
 end
