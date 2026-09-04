@@ -69,6 +69,15 @@ button {
 }
 .auth-logout-row { text-align: center; margin-top: 18px; }
 .auth-logout-row .auth-logout-btn { display: inline-block; }
+/* Marca de la app: cartel grande para identificar de un vistazo en qué pantalla
+   estamos (selector de planta y panel de Administración). */
+.app-brand {
+  text-align: center; margin: 12px 0 6px;
+  font-size: clamp(28px, 6vw, 56px); font-weight: 900; line-height: 1.05;
+  letter-spacing: .05em; text-transform: uppercase; color: #0f172a;
+}
+.app-brand .app-brand-hi { color: #dc2626; }
+.app-brand + .sup-title { margin-top: 14px; }
 /* Panel de Administración (supervisor): título + botones grandes centrados. */
 .sup-title { text-align: center; font-size: 32px; margin: 5vh 0 0; }
 .sup-actions {
@@ -3778,6 +3787,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
 
   <!-- SUPERVISOR (solo n8n / logistica): botones grandes centrados. -->
   <div id="supervisorPanel" class="hidden">
+    <div class="app-brand">Gestion <span class="app-brand-hi">Virgilio</span></div>
     <h1 class="sup-title">Administración</h1>
     <!-- GRANDES: uso diario (orden definido por el usuario). "Stock y Compras" = Stocks + OC en un solo botón. -->
     <div class="sup-actions sup-primary">
@@ -3852,6 +3862,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
     #plantSelector .auth-logout-row { margin-top:24px; }
   </style>
   <div id="plantSelector" class="hidden">
+    <div class="app-brand">Gestion <span class="app-brand-hi">Virgilio</span></div>
     <h1 class="ps-title">¿Dónde vas a trabajar hoy?</h1>
     <div class="plant-cards">
       <button class="plant-card plant-vir" onclick="chooseVirgilio()">
@@ -6607,7 +6618,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v12.75";
+const APP_VERSION = "v12.76";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco

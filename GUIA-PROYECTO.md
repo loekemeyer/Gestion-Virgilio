@@ -12,7 +12,14 @@
 > única**; no se replica. Ante la duda entre parche rápido y fix de raíz → **fix
 > de raíz**.
 >
-> Última actualización: 2026-09-04 · Versión app al documentar: **v12.75**
+> Última actualización: 2026-09-04 · Versión app al documentar: **v12.76**
+>
+> Nota **v12.76** — **Cartel "GESTION VIRGILIO" en las dos pantallas de entrada.**
+> Cosmético, sólo front. El selector de planta (`#plantSelector`) y el panel de
+> Administración (`#supervisorPanel`) llevan arriba un `<div class="app-brand">` grande
+> (`GESTION VIRGILIO`, con "VIRGILIO" en rojo `#dc2626`) para identificar la app de un
+> vistazo en capturas y en el monitor. La clase `.app-brand` vive en el CSS inline de
+> `index.html`, junto a `.sup-title`. No toca lógica ni datos.
 >
 > Nota **backend, sin bump de app** — **El corte de un pedido web en NP se balancea por m³.**
 > Antes se cortaba en bloques del tope contiguos en el orden del carrito
