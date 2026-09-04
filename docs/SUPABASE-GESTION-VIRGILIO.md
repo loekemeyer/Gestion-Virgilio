@@ -745,10 +745,33 @@ apareo por etiqueta del §3.g, medido ahí).
    y bloquear cuando `puede_agregar` es false. Es la idea **8743**.
 2. **Que la facturación de NP web escriba en `Facturacion_NP` con la etiqueta** (`LK 00001`).
    Pendiente #4.
-3. **El picking todavía no ordena por `prioridad`.** La columna se llena y el cartel se ve,
-   pero la lista del operario sigue en su orden de siempre. Falta engancharlo donde se arma
-   esa lista.
+3. ~~**El picking todavía no ordena por `prioridad`.**~~ **HECHO — v12.85, ver abajo.**
 4. Nada de esto corrió con datos reales, porque la numeración está apagada.
+
+### El picking ya ordena por `prioridad` — v12.85 (idea 4990, punto 2)
+
+La columna se llenaba desde v12.79 y el cartel rojo se veía, pero **la lista de tandas del
+celular seguía ordenada por fecha de entrega y después alfabético**. Una tanda con un
+agregado urgente para el jueves quedaba debajo de todas las del martes y el miércoles: en
+la práctica, invisible — lo contrario de *"ARMENLO YA"*.
+
+| dónde | qué cambió |
+|---|---|
+| `mergeMonitorPppWeb` | la tanda hereda la prioridad **más alta** de sus NP (una sola NP en 100 sube la tanda entera) |
+| `getPppTandasForOperator` | arrastra `prioridad` y `agregados` hasta la lista (antes tiraba todo menos código y fecha) |
+| `populateTandasList` | las de `prioridad > 0` salen del agrupado por fecha y se dibujan en un bloque rojo **arriba de todo**, con a qué pedido se agregó cada una |
+
+**Se saltea el orden por fecha a propósito**, no queda primera dentro de su día: el día de
+esa tanda puede estar tres grupos más abajo. Es lo que pidió el dueño —*"ponerlo primero en
+la lista de prioridades para ser pickeado y armado […] ARMENLO YA"*—.
+
+**Es aditivo:** las tandas de ISIS no tienen la columna, quedan en `prioridad = 0` y en el
+orden de siempre. Sin ninguna fila priorizada la lista se dibuja **exactamente** como antes,
+sin bloque rojo. Regresión: `tests/pk-prioridad-agregado.cjs` (14 chequeos, carga el
+`index.html` real; incluye el caso "sin prioridad no cambia nada").
+
+⚠ Sigue sin correr con datos reales: `PPP_Web_Programacion` está vacía y la numeración
+apagada.
 
 ---
 

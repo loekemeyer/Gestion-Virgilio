@@ -86,10 +86,19 @@ backend, no por la buena voluntad del front:
 1. **El front de las páginas** (`PaginaLK` + Chef): botón de agregar, mostrar el estado del
    pedido, y bloquear cuando `puede_agregar` es false. Es la idea **8743**, que además
    pide mostrar *por qué* está bloqueado.
-2. **El picking todavía no ordena por `prioridad`.** La columna se llena y el cartel se ve,
-   pero la lista del operario sigue en su orden de siempre. **Esto sí es de este repo** y
-   es lo más barato de la lista: falta engancharlo donde se arma esa lista.
+2. ~~**El picking todavía no ordena por `prioridad`.**~~ ✅ **HECHO — v12.85.** La tanda
+   hereda la prioridad más alta de sus NP y las urgentes se dibujan en un bloque rojo
+   **arriba de todo**, salteándose el orden por fecha (el día de esa tanda puede estar
+   tres grupos más abajo). Aditivo: las de ISIS quedan igual que siempre. Regresión:
+   `tests/pk-prioridad-agregado.cjs`.
 3. Nada de esto corrió con datos reales (interruptor).
+
+**⚠ Lo que falta acá es sólo el front de las páginas, y arrastra una decisión de fondo:**
+el módulo *"Editar pedidos"* **ya existe** en `pagina-LK-copia` (`editOrder()` +
+RPC `edit_order_fast`), pero hace lo contrario de lo que pide la nota: **borra y reinserta
+los ítems**, así que el cliente puede sacar y bajar cantidades. Y su ventana es *hasta las
+12:30 / hasta `enviado_a_compras_at`*, no *hasta que se factura*. Ver el bloque de
+decisiones abiertas al final de este archivo.
 
 ### [ ] 9357 — Fecha de entrega de Supers: tiene que viajar con el pedido
 
@@ -259,6 +268,49 @@ Se cruza con la idea **3402** (*picking: ver el stock de góndola en pantalla y 
 cruzar cada artículo antes de sacar la mercadería*).
 
 **Preguntarle al dueño qué es antes de construir nada.**
+
+---
+
+## 4990 — lo que se encontró al abrir la página LK (2026-09-04)
+
+Repo `loekemeyer/pagina-LK-copia` (clonado en `/home/user/pagina-lk-copia`, HEAD `4421dc8`).
+⚠ `loekemeyer/PaginaLK` —el que nombra el `CLAUDE.md`— está **archivado**; el vivo es éste.
+
+**El módulo "Editar pedidos" YA EXISTE.** No hay que construirlo, hay que corregirlo:
+
+| pieza | dónde | qué hace hoy |
+|---|---|---|
+| `editOrder(orderId)` | `script.js:2181` | carga los ítems del pedido **al carrito** |
+| `isOrderEditable(order)` | `script.js:2166` | UI: editable si `enviado_a_compras_at` es null **y** antes del corte de las 12:30 |
+| RPC `edit_order_fast` | `sql/order_items_source.sql:105` | el candado real: rechaza si `enviado_a_compras_at is not null` |
+| `mode: "edit"` | `script.js:7622` | viaja en el `sheets_payload` |
+
+**Los dos choques con lo que pide la nota:**
+
+1. **Hoy el cliente puede SACAR.** `edit_order_fast` hace `delete from order_items where
+   order_id = …` y reinserta lo que llegue: si el carrito viene con menos, el pedido se
+   achica; si viene vacío, queda vacío. La nota dice *"sólo agregar (hace difícil que
+   saquen o cancelen)"*, y nuestra vista ya lo declara (`puede_quitar` **siempre false**).
+2. **La ventana no es la misma.** La página corta en *12:30 / enviado a compras*;
+   `gv_ppp_web_estado` dice *hasta que se factura*. Aflojarla hoy tocaría la operación
+   actual, porque mientras Gestión no tome control el pedido sigue saliendo a ISIS por el
+   mail de las 12:30 y `enviado_a_compras_at` es el candado que lo sostiene.
+
+**Y un tercer problema, de plomería:** `gv_ppp_web_estado` vive en el proyecto **Virgilio**
+(`hrxfctzncixxqmpfhskv`) y la página habla con el de **LK** (`kwkclwhmoygunqmlegrg`), que
+son dos proyectos separados a propósito. Para que la página muestre el estado hace falta un
+camino Virgilio → LK. Hoy existe el inverso: **LK empuja a Virgilio** por el FDW
+`virgilio_db` / rol `lk_ppp_reader` sobre la tabla espejo `lk_pedidos_match`
+(`sql/pedidos_match_virgilio.sql`). El mismo patrón, invertido, es la opción obvia.
+
+### Decisiones abiertas (bloquean el resto de 4990)
+
+1. **El candado de "sólo agregar": ¿backend o front?** El protocolo dice backend, o sea
+   `edit_order_fast` — pero es una función en producción que usan clientes reales ahora
+   mismo.
+2. **¿Se afloja la ventana ya, o recién el día que Gestión tome control?**
+3. **¿Cómo llega el estado a la página?** Espejo Virgilio → LK (mismo patrón que
+   `lk_pedidos_match`, invertido) o algo más.
 
 ---
 

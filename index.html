@@ -362,6 +362,16 @@ button {
   color: #fff;
   transform: scale(0.96);
 }
+/* v12.85 — el bloque de tandas URGENTES (el cliente agregó algo a un pedido que
+   ya estaba en la mesa). Va arriba de todo y en rojo: si el operario lo lee como
+   una tanda más, el camión sale sin el agregado. Mismo rojo que el cartel del
+   monitor (.pweb-agregado-aviso) para que sea obvio que hablan de lo mismo. */
+.tandas-day-group.urgente{ border-color:#b91c1c; background:#fff1f1; }
+.tandas-day-header.urgente{ color:#b91c1c; }
+.tandas-urgente-linea{ display:flex; align-items:center; gap:8px; margin-bottom:6px; flex-wrap:wrap; }
+.tandas-urgente-txt{ font-size:13px; font-weight:700; color:#7f1d1d; line-height:1.3; }
+.tanda-chip.urgente{ background:#b91c1c; border-color:#7f1d1d; color:#fff; }
+.tanda-chip.urgente:active{ background:#7f1d1d; color:#fff; }
 .tandas-list-empty,
 .tandas-list-label{
   font-size: 14px;
@@ -5941,7 +5951,12 @@ async function getPppTandasForOperator() {
         tanda: v.tanda,
         opIsSi: !!v.opIsSi,
         fechaRaw: v.fechaEntregaRaw,
-        fechaDisplay: v.fechaEntrega
+        fechaDisplay: v.fechaEntrega,
+        // v12.85 — lo que hace que una tanda se saltee la fila. Sale de
+        // PPP_Web_Programacion.prioridad; las tandas de ISIS no la tienen y quedan
+        // en 0, o sea exactamente donde estaban.
+        prioridad: Number(v.prioridad) || 0,
+        agregados: (v.agregados || []).slice()
       });
     }
     _pppOperatorCache = items;
@@ -6101,9 +6116,22 @@ async function populateTandasList(filterMode) {
     container.innerHTML = `<div class="tandas-list-empty">${msg}</div>`;
     return;
   }
+  // v12.85 — LAS URGENTES VAN ARRIBA DE TODO, antes de cualquier fecha.
+  // Una tanda con `prioridad > 0` es una a la que el cliente le agregó algo cuando
+  // ya estaba en la mesa (`ppp_web_resync` le pone 100). El pedido del dueño fue
+  // "ponerlo primero en la lista de prioridades para ser pickeado y armado […]
+  // ARMENLO YA", así que se saltea el orden por fecha: no alcanza con ser la
+  // primera de su día, porque su día puede estar tres grupos más abajo.
+  // Salen del agrupado por fecha para no aparecer dos veces.
+  const urgentes = filtered
+    .filter(it => Number(it.prioridad) > 0)
+    .sort((a, b) => (Number(b.prioridad) || 0) - (Number(a.prioridad) || 0) ||
+                    a.tanda.localeCompare(b.tanda));
+  const urgentSet = new Set(urgentes.map(it => it.tanda));
   // Agrupar por fecha de entrega
   const byDate = new Map();
   for (const it of filtered) {
+    if (urgentSet.has(it.tanda)) continue;
     if (!byDate.has(it.fechaRaw)) byDate.set(it.fechaRaw, { fechaDisplay: it.fechaDisplay, codes: new Set() });
     byDate.get(it.fechaRaw).codes.add(it.tanda);
   }
@@ -6128,7 +6156,22 @@ async function populateTandasList(filterMode) {
   const moreBtnHtml = hidden > 0
     ? `<button class="tandas-more-btn" type="button" onclick="expandTandasList()">Ver más (+${hidden} ${hidden === 1 ? "día" : "días"})</button>`
     : "";
-  container.innerHTML = `<div class="tandas-day-grid">${groupsHtml}</div>${moreBtnHtml}`;
+  // El bloque urgente NO entra en el "Ver más": si está, se ve siempre.
+  const urgentHtml = urgentes.length ? `
+    <div class="tandas-day-group urgente">
+      <div class="tandas-day-header urgente">⚠ ARMENLO YA — el cliente agregó</div>
+      ${urgentes.map(it => {
+        const ag = (it.agregados || []).map(a =>
+          escapeHtml(a.np || "(sin numerar)") + " es un agregado al pedido " +
+          escapeHtml(a.aNp || "?") + (a.rs ? " · " + escapeHtml(a.rs) : "")
+        ).join("<br>");
+        return `<div class="tandas-urgente-linea">
+          <button class="tanda-chip urgente" type="button" data-code="${escapeHtml(it.tanda)}" onclick="textInput.value=this.dataset.code;textInput.focus()">${escapeHtml(it.tanda)}</button>
+          <span class="tandas-urgente-txt">${ag || "Entrega " + escapeHtml(it.fechaDisplay || "")}</span>
+        </div>`;
+      }).join("")}
+    </div>` : "";
+  container.innerHTML = `<div class="tandas-day-grid">${urgentHtml}${groupsHtml}</div>${moreBtnHtml}`;
 }
 
 function expandTandasList() {
@@ -6751,7 +6794,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v12.84";
+const APP_VERSION = "v12.85";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -31387,6 +31430,11 @@ async function mergeMonitorPppWeb(acc) {
       if (!entry.agregados) entry.agregados = [];   // tanda que ya existía por ISIS
       const m3 = Number(x.m3) || 0;
       entry.m3 += m3;
+      // v12.85 — la PRIORIDAD de la tanda es la MÁS ALTA de sus NP. `ppp_web_resync`
+      // le pone 100 a un agregado que cayó sobre una tanda ya en marcha; con eso la
+      // tanda entera sube en la lista del operario. Se acumula acá, sobre el mismo
+      // recorrido, para no volver a barrer los pedidos después.
+      entry.prioridad = Math.max(Number(entry.prioridad) || 0, Number(x.prioridad) || 0);
       entry.pedidos.push({
         np: np, m3: m3, razonSocial: String(x.razon_social || "").trim(),
         cod:       String(x.cod_cliente || "").trim(),
