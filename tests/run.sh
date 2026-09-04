@@ -245,3 +245,6 @@ PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node te
 
 echo "== apr-programar (v12.80: solapa A Programar, armado manual de tandas) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/apr-programar.cjs
+
+echo "== pweb-lk-token (v12.82: el token de LK se pide UNA sola vez aunque lo pidan varios) =="
+PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/pweb-lk-token.cjs

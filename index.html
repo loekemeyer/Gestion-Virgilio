@@ -6696,7 +6696,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v12.81";
+const APP_VERSION = "v12.82";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -25229,32 +25229,56 @@ let _pwebTok = null, _pwebTokExp = 0;
 
 /* Canjea el JWT de Virgilio por uno de LK. Se cachea en memoria: el token dura
    una hora y pedirlo en cada carga sería un viaje de más por nada. */
+/* ⚠⚠ UNA SOLA LLAMADA A LA VEZ (single flight). No es una optimización: es lo que
+   hace que esto funcione.
+
+   El puente `bridge` de `admin-login-otp` le SETEA al usuario de LK una password
+   temporal nueva en cada llamada, y después se entra con ésa. Si dos partes de la
+   app piden el token al mismo tiempo —pasa al abrir la PPP: el cargador de
+   siempre (`pppTraerPedidosWeb`) y la solapa A Programar (`aprTraerPedidos`)— la
+   segunda le PISA la password a la primera, y la primera cae con
+   "Login LK falló (HTTP 400)". Es una carrera, así que gana una y falla la otra
+   sin patrón: por eso parecía intermitente.
+
+   Con `_pwebTokProm` la primera llamada abre el puente y las demás esperan ESA
+   misma promesa. La promesa se limpia al terminar (bien o mal) para poder
+   reintentar. */
+let _pwebTokProm = null;
 async function pwebLkToken() {
   if (_pwebTok && Date.now() < _pwebTokExp - 60000) return _pwebTok;
-  let vjwt = null;
-  try { if (window.sbAuth) vjwt = await window.sbAuth.getAccessToken(); } catch (_e) {}
-  if (!vjwt) throw new Error(authNoSesionMsg("Iniciá sesión para ver la PPP Web."));
-  const br = await fetch(PWEB_LK_URL + "/functions/v1/admin-login-otp", {
-    method: "POST",
-    headers: { apikey: PWEB_LK_ANON, "Content-Type": "application/json" },
-    body: JSON.stringify({ action: "bridge", vjwt: vjwt })
-  });
-  let bd = {}; try { bd = await br.json(); } catch (_e) {}
-  if (!br.ok || !bd.tmp_password) {
-    throw new Error("No se pudo entrar a LK (" + (bd.detail || bd.error || ("HTTP " + br.status)) + ").");
-  }
-  const lr = await fetch(PWEB_LK_URL + "/auth/v1/token?grant_type=password", {
-    method: "POST",
-    headers: { apikey: PWEB_LK_ANON, "Content-Type": "application/json" },
-    body: JSON.stringify({ email: bd.email, password: bd.tmp_password })
-  });
-  let ld = {}; try { ld = await lr.json(); } catch (_e) {}
-  if (!lr.ok || !ld.access_token) {
-    throw new Error("Login LK falló (" + (ld.error_description || ("HTTP " + lr.status)) + ").");
-  }
-  _pwebTok = ld.access_token;
-  _pwebTokExp = Date.now() + ((ld.expires_in || 3600) * 1000);
-  return _pwebTok;
+  if (_pwebTokProm) return await _pwebTokProm;
+  _pwebTokProm = (async function () {
+    let vjwt = null;
+    try { if (window.sbAuth) vjwt = await window.sbAuth.getAccessToken(); } catch (_e) {}
+    if (!vjwt) throw new Error(authNoSesionMsg("Iniciá sesión para ver la PPP Web."));
+    const br = await fetch(PWEB_LK_URL + "/functions/v1/admin-login-otp", {
+      method: "POST",
+      headers: { apikey: PWEB_LK_ANON, "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "bridge", vjwt: vjwt })
+    });
+    let bd = {}; try { bd = await br.json(); } catch (_e) {}
+    if (!br.ok || !bd.tmp_password) {
+      throw new Error("No se pudo entrar a LK (" + (bd.detail || bd.error || bd.msg || ("HTTP " + br.status)) + ").");
+    }
+    const lr = await fetch(PWEB_LK_URL + "/auth/v1/token?grant_type=password", {
+      method: "POST",
+      headers: { apikey: PWEB_LK_ANON, "Content-Type": "application/json" },
+      body: JSON.stringify({ email: bd.email, password: bd.tmp_password })
+    });
+    let ld = {}; try { ld = await lr.json(); } catch (_e) {}
+    if (!lr.ok || !ld.access_token) {
+      // GoTrue nuevo contesta {code, error_code, msg} y el viejo
+      // {error, error_description}: sin mirar los dos quedaba sólo "HTTP 400" y
+      // no se podía diagnosticar nada.
+      throw new Error("Login LK falló (" +
+        (ld.error_description || ld.msg || ld.error_code || ld.error || ("HTTP " + lr.status)) + ").");
+    }
+    _pwebTok = ld.access_token;
+    _pwebTokExp = Date.now() + ((ld.expires_in || 3600) * 1000);
+    return _pwebTok;
+  })();
+  try { return await _pwebTokProm; }
+  finally { _pwebTokProm = null; }
 }
 
 /* m³ por artículo, de ESTA base. Se piden solo los códigos que aparecen en los
@@ -25321,6 +25345,44 @@ async function pwebResync(nps, empresa) {
 
    Antes esto tenía pantalla propia con su tabla. Se sacó: el supervisor no tiene
    por qué aprender dos vistas de lo mismo. */
+/* Los pedidos WEB YA PROGRAMADOS, para que aparezcan en Programación, En Salida,
+   Resumen, Entregados y Ocupación igual que los de ISIS.
+
+   Sale de `PPP_Web_Programacion` —esta base— y NO de LK: una vez programado, el
+   pedido está descrito entero acá (cliente, zona, tanda, fecha, m³). Ir a LK para
+   esto obligaba a tener sesión de supervisor sólo para MIRAR la PPP.
+
+   Los PENDIENTES no salen por acá: ésos son de la solapa A Programar, que es la
+   única que necesita LK porque todavía no existen de este lado. */
+async function pppTraerWebProgramados() {
+  const rows = await supaFetchAll(SUPABASE_URL + "/rest/v1/PPP_Web_Programacion",
+    "select=empresa,order_id,np_idx,np,cod_cliente,razon_social,direccion,barrio,zona," +
+    "tanda,fecha_entrega,fecha_recep,m3,m3_parcial,lineas,cajas&tanda=not.is.null");
+  return (rows || []).map(function (r) {
+    return {
+      // Sin número todavía (la numeración arranca al programar) no se inventa una
+      // etiqueta: se muestra de dónde salió.
+      np: (r.np == null) ? ("? " + r.order_id + "-" + r.np_idx) : pwebNpLabel(r.empresa, r.np),
+      tanda: r.tanda || "—", tipo: "", fecha: r.fecha_recep || "",
+      cod: r.cod_cliente || "", razon_social: r.razon_social || "",
+      m3: Number(r.m3) || 0,
+      localidad: r.barrio || "",
+      fecha_entrega: r.fecha_entrega || "",
+      zona: r.zona || "",
+      programmed: true,
+      _web: true, _wEmp: r.empresa, _wOrder: r.order_id, _wIdx: r.np_idx,
+      _wNum: r.np, _wItems: [], _wLineas: r.lineas, _wCajas: r.cajas,
+      _wM3Parcial: !!r.m3_parcial, _wDir: r.direccion || "", _wIsis: false
+    };
+  });
+}
+
+/* ⚠ QUEDA SIN USO DESDE v12.82. Traía los pedidos web EN VIVO de LK (pendientes y
+   programados) para la tabla vieja de "A Programar". Esa tabla la reemplazó el
+   módulo nuevo (`aprRender`), que habla con LK por su cuenta. Se deja porque
+   `pwebNumerar`/`pwebResync`/`pwebCargarProg` documentan el orden correcto de esa
+   secuencia; si se borra, borrar también `pwebGuardarProg`, que es el guardado
+   viejo de la misma pantalla. */
 async function pppTraerPedidosWeb(empresa) {
   const emp = (empresa === "chef") ? "chef" : "lk";
   const tok = await pwebLkToken();
@@ -26049,10 +26111,24 @@ async function pppLoadProgFromSupabase() {
   _pppSupaNps = nps;
   const extra = PPP_READONLY ? [] : pppLoadPedidosStore().filter(function (p) { return !(String(p.np) in nps); });   // importados que aún no están en Supabase (solo modo editable)
   // Los pedidos de la página entran a la MISMA lista que los de ISIS: misma tabla,
-  // mismas solapas, mismo aspecto. Si LK no contesta, la PPP de siempre sigue igual.
+  // mismas solapas, mismo aspecto. Si esto falla, la PPP de siempre sigue igual.
+  //
+  // ⚠ v12.82 — ACÁ YA NO SE LLAMA A LK. Antes esto hacía `pppTraerPedidosWeb`, que
+  //   abre el puente de sesión contra LK, numera y hace resync, en CADA apertura
+  //   de la PPP. Tres motivos para sacarlo:
+  //     1. Los pedidos PENDIENTES ahora los maneja la solapa A Programar, que es
+  //        la única que necesita LK. Acá sólo hace falta lo YA PROGRAMADO, y eso
+  //        está entero en `PPP_Web_Programacion`, en esta misma base.
+  //     2. Dos consumidores del puente al mismo tiempo se pisaban la password
+  //        temporal: uno entraba y el otro moría con "Login LK falló (HTTP 400)".
+  //        El single flight de `pwebLkToken` lo cubre, pero no tener la carrera
+  //        es mejor que resolverla.
+  //     3. `pwebNumerar` está apagado a propósito (la numeración arranca el día
+  //        que Gestión tome control), así que abrir la PPP disparaba una llamada
+  //        que sólo podía fallar.
   let web = [];
-  try { web = await pppTraerPedidosWeb("lk"); }
-  catch (e) { pppSetStatus("⚠ No pude traer los pedidos de la página (" + ((e && e.message) || e) + "). Muestro solo lo de ISIS.", false); }
+  try { web = await pppTraerWebProgramados(); }
+  catch (e) { pppSetStatus("⚠ No pude traer los pedidos web programados (" + ((e && e.message) || e) + "). Muestro solo lo de ISIS.", false); }
   _pppParsed.prog = supa.concat(extra, web);
   const prog = supa.filter(function (p) { return p.programmed; }).length;
   pppRenderProg();
