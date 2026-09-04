@@ -691,12 +691,19 @@ button {
 .monitor-table td.center, .monitor-table th.center{ text-align: center; }
 .monitor-table td.num, .monitor-table th.num{ text-align: right; font-variant-numeric: tabular-nums; }
 .monitor-tanda{ font-weight: bold; color: #1e6bd6; }
-/* ═══ A Programar · armado manual de tandas (v12.80) ═══════════════════════ */
+/* ═══ A Programar · armado manual de tandas ══════════════════════════════════
+   ⚠ La app tiene un `button { width:100%; margin-top:14px; padding:16px }` GLOBAL
+   (línea ~25). Sin pisarlo, el botón "↩" de sacar un pedido medía 293px y
+   aplastaba el nombre del cliente a 107px: se leía "Messina Herma…" con 380px
+   libres al lado. Se resetea para todo el módulo y después cada botón pone lo
+   suyo. */
+.apr-wrap button, .apr-bar button{ width:auto; margin-top:0; padding:0; }
+
 .apr-bar{ display:flex; align-items:center; gap:10px; margin:6px 2px 10px; flex-wrap:wrap; }
 .apr-emp{ display:inline-flex; border:1px solid #cbd5e1; border-radius:8px; overflow:hidden; }
-.apr-empb{ border:0; background:#fff; padding:6px 12px; font-size:13px; font-weight:700; color:#475569; cursor:pointer; }
+.apr-empb{ border:0; background:#fff; padding:6px 12px !important; font-size:13px; font-weight:700; color:#475569; cursor:pointer; }
 .apr-empb.on{ background:#1e6bd6; color:#fff; }
-.apr-reload{ border:1px solid #cbd5e1; background:#fff; border-radius:8px; padding:5px 10px; cursor:pointer; font-size:14px; }
+.apr-reload{ border:1px solid #cbd5e1; background:#fff; border-radius:8px; padding:5px 10px !important; cursor:pointer; font-size:14px; }
 .apr-load{ font-size:12.5px; color:#64748b; }
 .apr-err{ background:#fee2e2; border-left:5px solid #b91c1c; color:#7f1d1d; padding:8px 10px; border-radius:6px; margin:6px 2px; font-weight:600; }
 .apr-msg{ background:#ecfdf5; border-left:5px solid #059669; color:#065f46; padding:8px 10px; border-radius:6px; margin:6px 2px; font-weight:600; }
@@ -712,7 +719,7 @@ button {
 .apr-card{ background:#fff; border:1px solid #dbe3ec; border-left:4px solid #1e6bd6; border-radius:8px; padding:7px 9px; cursor:grab; }
 .apr-card:active{ cursor:grabbing; }
 .apr-card-h{ display:flex; justify-content:space-between; align-items:center; gap:6px; cursor:pointer; }
-.apr-card-cli{ font-weight:800; font-size:13px; color:#0f172a; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.apr-card-cli{ font-weight:800; font-size:13px; color:#0f172a; line-height:1.25; overflow-wrap:anywhere; }
 .apr-card-chev{ color:#94a3b8; font-size:12px; }
 .apr-card-d{ display:flex; flex-wrap:wrap; gap:5px; margin-top:5px; }
 .apr-chip{ font-size:11.5px; background:#f1f5f9; color:#475569; border-radius:999px; padding:2px 8px; font-weight:600; }
@@ -726,42 +733,88 @@ button {
 .apr-art{ font-size:11px; background:#f8fafc; border:1px solid #e2e8f0; border-radius:5px; padding:1px 5px; color:#334155; }
 
 /* Caja de TANDA (zona de soltar) */
-.apr-nueva{ width:100%; border:2px dashed #94a3b8; background:#fff; color:#334155; border-radius:9px; padding:9px; font-size:13.5px; font-weight:800; cursor:pointer; margin-bottom:9px; }
+.apr-nueva{ width:100% !important; border:2px dashed #94a3b8; background:#fff; color:#334155; border-radius:9px; padding:10px !important; font-size:13.5px; font-weight:800; cursor:pointer; margin-bottom:9px; }
 .apr-nueva:hover{ border-color:#1e6bd6; color:#1e6bd6; }
 .apr-tanda{ background:#fff; border:2px solid #cbd5e1; border-radius:9px; padding:8px; }
 .apr-tanda-h{ display:flex; align-items:center; gap:7px; cursor:grab; }
 .apr-tanda-cod{ font-size:15px; font-weight:900; color:#0f172a; letter-spacing:.5px;
   white-space:nowrap; flex:0 0 auto; }   /* sin esto "GV-01A" se partía en dos renglones */
-.apr-badge{ background:#b91c1c; color:#fff; font-size:11.5px; font-weight:800; border-radius:999px; padding:2px 8px; cursor:help; }
-.apr-tanda-x{ margin-left:auto; border:0; background:transparent; color:#94a3b8; font-size:15px; cursor:pointer; }
+.apr-badge{ background:#b91c1c; color:#fff; font-size:11.5px; font-weight:800; border-radius:999px;
+  padding:2px 9px; cursor:help; white-space:nowrap; flex:0 0 auto; line-height:1.5; }
+.apr-tanda-x{ margin-left:auto; border:0; background:transparent; color:#94a3b8; font-size:15px;
+  cursor:pointer; padding:0 4px !important; flex:0 0 auto; }
 .apr-tanda-x:hover{ color:#b91c1c; }
 .apr-tanda-m3{ font-size:12.5px; color:#475569; margin:4px 0 6px; }
 .apr-avisos{ margin-bottom:6px; }
 .apr-aviso{ font-size:11.5px; background:#fef2f2; color:#7f1d1d; border-left:3px solid #b91c1c; border-radius:4px; padding:4px 7px; margin-bottom:3px; line-height:1.3; }
 .apr-titem{ display:flex; align-items:flex-start; gap:6px; border-top:1px solid #f1f5f9; padding:6px 0; }
 .apr-titem-txt{ flex:1 1 auto; min-width:0; }
-.apr-titem-cli{ font-size:12.5px; font-weight:700; color:#0f172a; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.apr-titem-cli{ font-size:12.5px; font-weight:700; color:#0f172a; line-height:1.25;
+  overflow-wrap:anywhere; }
 .apr-titem-d{ font-size:11.5px; color:#64748b; margin-top:1px; }
-.apr-titem-x{ border:0; background:transparent; color:#94a3b8; cursor:pointer; font-size:14px; }
+.apr-titem-x{ border:0; background:transparent; color:#94a3b8; cursor:pointer; font-size:14px;
+  padding:0 4px !important; flex:0 0 auto; }
 .apr-titem-x:hover{ color:#1e6bd6; }
 .apr-tanda-vacia{ font-size:12px; color:#94a3b8; text-align:center; padding:12px 0; border:1px dashed #e2e8f0; border-radius:6px; }
 
-/* Calendario */
-.apr-cal-nav{ display:flex; align-items:center; justify-content:space-between; margin-bottom:7px; font-weight:800; font-size:13.5px; color:#0f172a; }
-.apr-cal-nav button{ border:1px solid #cbd5e1; background:#fff; border-radius:6px; padding:2px 9px; cursor:pointer; }
-.apr-cal-dow{ display:grid; grid-template-columns:repeat(7,1fr); gap:3px; font-size:11px; color:#64748b; text-align:center; font-weight:700; margin-bottom:3px; }
-.apr-cal-grid{ display:grid; grid-template-columns:repeat(7,1fr); gap:3px; }
-.apr-dia{ aspect-ratio:1/1; border:1px solid #e2e8f0; border-radius:50%; background:#fff; display:flex; flex-direction:column; align-items:center; justify-content:center; font-size:12px; color:#334155; }
-.apr-dia-off{ border:0; background:transparent; }
-.apr-dia-nohabil{ background:#f1f5f9; color:#94a3b8; }
-.apr-dia-hoy{ box-shadow:0 0 0 2px #1e6bd6 inset; font-weight:800; }
-.apr-dia-con{ background:#dcfce7; border-color:#86efac; }
-.apr-dia-lleno{ background:#fee2e2; border-color:#fca5a5; }
-.apr-dia-n{ line-height:1; }
-.apr-dia-m3{ font-size:9.5px; color:#166534; font-weight:700; }
-.apr-cal-pie{ font-size:11px; color:#64748b; margin-top:8px; line-height:1.35; }
+/* Lista de días (reemplazó a la grilla de mes: siempre se programa para adelante) */
+.apr-dias-ayuda{ font-size:11.5px; color:#64748b; margin:-3px 0 8px; line-height:1.35; }
+.apr-dias{ gap:5px; }
+.apr-dia{ display:flex; align-items:center; gap:10px; background:#fff; border:1px solid #e2e8f0;
+  border-left:4px solid #cbd5e1; border-radius:8px; padding:7px 9px;
+  transition:transform .12s ease, box-shadow .12s ease, border-color .12s ease; }
+.apr-dia-fecha{ display:flex; flex-direction:column; min-width:86px; }
+.apr-dia-dow{ font-size:11px; color:#64748b; font-weight:700; text-transform:uppercase; letter-spacing:.3px; }
+.apr-dia-num{ font-size:14.5px; font-weight:800; color:#0f172a; }
+.apr-dia-cuerpo{ flex:1 1 auto; min-width:0; }
+.apr-dia-barra{ height:6px; background:#eef2f7; border-radius:999px; overflow:hidden; margin-bottom:4px; }
+.apr-dia-barra > i{ display:block; height:100%; background:linear-gradient(90deg,#4ade80,#16a34a);
+  border-radius:999px; transition:width .35s cubic-bezier(.4,0,.2,1); }
+.apr-dia-txt{ font-size:11.5px; color:#475569; }
+.apr-dia-cerr{ color:#b91c1c; font-weight:700; }
+.apr-dia-hoy{ border-left-color:#1e6bd6; }
+.apr-dia-hoy .apr-dia-num{ color:#1e6bd6; }
+.apr-dia-con{ border-left-color:#16a34a; }
+/* Día que NO recibe: no hábil o ya completo. Gris y sin manito. */
+.apr-dia-cerrado{ background:#f1f5f9; border-left-color:#cbd5e1; opacity:.62; }
+.apr-dia-cerrado .apr-dia-num, .apr-dia-cerrado .apr-dia-dow{ color:#94a3b8; }
+.apr-dia-lleno .apr-dia-barra > i{ background:linear-gradient(90deg,#fca5a5,#b91c1c); }
+.apr-mas{ width:100% !important; margin-top:8px; border:1px solid #cbd5e1; background:#fff; color:#475569;
+  border-radius:8px; padding:8px !important; font-size:12.5px; font-weight:700; cursor:pointer; }
+.apr-mas:hover{ border-color:#1e6bd6; color:#1e6bd6; }
+
+/* ── Arrastrar y soltar ──────────────────────────────────────────────────
+   Mientras dura el gesto, el <body> lleva apr-dnd-ped o apr-dnd-tanda: con eso
+   se ilumina SÓLO lo que puede recibir y se apaga el resto, así no hay que
+   adivinar dónde soltar. */
+.apr-card, .apr-tanda{ transition:transform .12s ease, box-shadow .12s ease,
+  border-color .12s ease, opacity .12s ease; }
+.apr-card:hover{ box-shadow:0 2px 8px rgba(15,23,42,.10); transform:translateY(-1px); }
+.apr-arrastrando{ opacity:.35; transform:scale(.97) rotate(-.6deg); }
+
+body.apr-dnd-ped .apr-tanda{ border-color:#93c5fd; border-style:dashed;
+  box-shadow:0 0 0 3px rgba(30,107,214,.08); }
+body.apr-dnd-ped .apr-col-nps{ opacity:.55; }
+body.apr-dnd-tanda .apr-dia:not(.apr-dia-cerrado){ border-color:#93c5fd;
+  box-shadow:0 0 0 3px rgba(30,107,214,.08); }
+body.apr-dnd-tanda .apr-col-nps, body.apr-dnd-tanda .apr-dia-cerrado{ opacity:.4; }
+
+.apr-tanda.apr-drop-on{ border-color:#1e6bd6; border-style:solid; background:#f0f7ff;
+  transform:scale(1.02); box-shadow:0 6px 18px rgba(30,107,214,.20); }
+.apr-dia.apr-drop-on{ border-color:#1e6bd6; background:#f0f7ff;
+  transform:translateX(4px); box-shadow:0 4px 14px rgba(30,107,214,.18); }
+.apr-tanda.apr-drop-on .apr-tanda-vacia{ border-color:#1e6bd6; color:#1e6bd6; }
+
+@keyframes aprPulso{ 0%{ box-shadow:0 0 0 0 rgba(22,163,74,.45); } 100%{ box-shadow:0 0 0 14px rgba(22,163,74,0); } }
+.apr-pulso{ animation:aprPulso .5s ease-out; }
+@keyframes aprEntra{ from{ opacity:0; transform:translateY(-4px); } to{ opacity:1; transform:none; } }
+.apr-titem{ animation:aprEntra .18s ease-out; }
+.apr-msg, .apr-err{ animation:aprEntra .2s ease-out; }
 
 @media (max-width: 1100px){ .apr-wrap{ grid-template-columns:1fr; } .apr-scroll{ max-height:44vh; } }
+/* En pantallas chicas el arrastre HTML5 no existe: se avisa en vez de dejar una
+   pantalla que no responde. */
+@media (hover:none){ .apr-dias-ayuda::after{ content:" En celular el arrastre no funciona: usá la compu."; color:#b45309; font-weight:700; } }
 
 /* Cartel de AGREGADO: el cliente sumó algo a un pedido que ya estaba en la mesa.
    Tiene que gritar — si nadie lo ve, el camión sale sin eso. */
@@ -6698,7 +6751,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v12.83";
+const APP_VERSION = "v12.84";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -31440,20 +31493,15 @@ let _apr = {
   pedidosTodos: [], // todos los del período, para poder mandar los artículos al programar
   tandas: [],       // gv_ppp_web_tandas_abiertas
   items: {},        // codigo -> [items del borrador]
-  cal: [],          // gv_ppp_web_calendario
-  mes: null,        // Date del día 1 del mes que se muestra
-  q: "", exp: {}, drag: null, dragTanda: null, msg: "", msgErr: false
+  cal: [],          // gv_ppp_web_calendario, de HOY para adelante
+  horizonte: 21,    // cuántos días muestra la lista
+  q: "", exp: {}, drag: null, dragTanda: null, msg: "", msgErr: false,
+  ocupado: false    // hay una acción en vuelo: no dejar arrastrar encima
 };
 
-function aprMesActual() {
-  if (!_apr.mes) { const h = new Date(); _apr.mes = new Date(h.getFullYear(), h.getMonth(), 1); }
-  return _apr.mes;
-}
-function aprMesMover(d) {
-  const m = aprMesActual();
-  _apr.mes = new Date(m.getFullYear(), m.getMonth() + d, 1);
-  aprCargarCalendario().then(aprRender);
-}
+/* Siempre se programa PARA ADELANTE: la lista arranca hoy y no muestra días
+   pasados. No hay a dónde navegar hacia atrás. */
+function aprMasDias() { _apr.horizonte += 21; aprCargarCalendario().then(aprRender); }
 function aprISO(d) {
   return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
 }
@@ -31543,10 +31591,10 @@ async function aprTraerPedidos() {
 }
 
 async function aprCargarCalendario() {
-  const m = aprMesActual();
-  const desde = aprISO(new Date(m.getFullYear(), m.getMonth(), 1));
-  const hasta = aprISO(new Date(m.getFullYear(), m.getMonth() + 1, 0));
-  try { _apr.cal = await aprRpc("gv_ppp_web_calendario", { p_desde: desde, p_hasta: hasta }) || []; }
+  const hoy = new Date();
+  const fin = new Date(hoy.getFullYear(), hoy.getMonth(), hoy.getDate() + _apr.horizonte);
+  try { _apr.cal = await aprRpc("gv_ppp_web_calendario",
+          { p_desde: aprISO(hoy), p_hasta: aprISO(fin) }) || []; }
   catch (_e) { _apr.cal = []; }
 }
 
@@ -31605,8 +31653,8 @@ async function aprQuien() {
 
 /* Suelta un pedido ENTERO en una tanda: viajan todos sus bloques en una sola
    llamada, porque no se pueden separar. */
-async function aprSoltarPedido(codigo) {
-  const p = _apr.drag; _apr.drag = null;
+async function aprSoltarPedido(codigo, ped) {
+  const p = ped || _apr.drag; _apr.drag = null;
   if (!p) return;
   const filas = p.bloques.map(function (b) {
     return {
@@ -31617,11 +31665,13 @@ async function aprSoltarPedido(codigo) {
       fecha_recep: p.fecha_recep
     };
   });
+  _apr.ocupado = true;
   try {
     await aprRpc("gv_ppp_web_tanda_agregar",
       { p_empresa: _apr.emp, p_codigo: codigo, p_np: filas, p_por: await aprQuien() });
     _apr.msg = ""; _apr.msgErr = false;
   } catch (e) { _apr.msg = e.message; _apr.msgErr = true; }
+  _apr.ocupado = false;
   await aprCargar();
 }
 
@@ -31663,6 +31713,7 @@ async function aprProgramar(codigo, fecha) {
   if (t && t.n_avisos > 0 &&
       !confirm("La tanda " + codigo + " tiene " + t.n_avisos + " aviso(s):\n\n· " +
                (t.avisos || []).join("\n· ") + "\n\n¿Programarla igual para el " + fecha + "?")) return;
+  _apr.ocupado = true;
   try {
     const r = await aprRpc("gv_ppp_web_tanda_programar",
       { p_empresa: _apr.emp, p_codigo: codigo, p_fecha: fecha, p_items: items, p_por: await aprQuien() });
@@ -31672,6 +31723,7 @@ async function aprProgramar(codigo, fecha) {
                (x.aviso_dia ? "  ⚠ " + x.aviso_dia : "");
     _apr.msgErr = false;
   } catch (e) { _apr.msg = "⚠ " + e.message; _apr.msgErr = true; }
+  _apr.ocupado = false;
   await aprCargar();
 }
 
@@ -31679,16 +31731,68 @@ function aprSetEmpresa(e) { _apr.emp = (e === "chef" ? "chef" : "lk"); _apr.list
 function aprBuscar(v) { _apr.q = String(v || "").toLowerCase(); aprRender(); }
 function aprToggle(id) { _apr.exp[id] = !_apr.exp[id]; aprRender(); }
 
-/* ── Arrastre ──────────────────────────────────────────────────────────── */
-function aprDragPedido(orderId) {
-  _apr.drag = _apr.pedidos.find(function (p) { return String(p.order_id) === String(orderId); }) || null;
+/* ── Arrastre ───────────────────────────────────────────────────────────────
+   El arrastre no toca el estado ni re-dibuja: prende y apaga clases sobre el DOM
+   que ya está. Volver a renderizar en cada `dragover` haría desaparecer el
+   elemento que el navegador está arrastrando y el gesto se corta solo.
+
+   `document.body` lleva `apr-dnd-ped` o `apr-dnd-tanda` mientras dura el gesto:
+   con eso el CSS ilumina SÓLO los destinos que sirven —las tandas cuando se
+   arrastra un pedido, los días cuando se arrastra una tanda— y apaga el resto. */
+function aprDndIni(tipo) {
+  document.body.classList.add(tipo === "tanda" ? "apr-dnd-tanda" : "apr-dnd-ped");
 }
-function aprDragTandaIni(codigo) { _apr.dragTanda = codigo; }
-function aprOver(ev) { ev.preventDefault(); ev.dataTransfer.dropEffect = "move"; }
-function aprDropTanda(ev, codigo) { ev.preventDefault(); ev.stopPropagation(); aprSoltarPedido(codigo); }
-function aprDropDia(ev, fecha) {
+function aprDndFin() {
+  document.body.classList.remove("apr-dnd-ped", "apr-dnd-tanda");
+  document.querySelectorAll(".apr-drop-on").forEach(function (e) { e.classList.remove("apr-drop-on"); });
+  document.querySelectorAll(".apr-arrastrando").forEach(function (e) { e.classList.remove("apr-arrastrando"); });
+  _apr.drag = null; _apr.dragTanda = null;
+}
+function aprDragPedido(ev, orderId) {
+  if (_apr.ocupado) { ev.preventDefault(); return; }
+  _apr.drag = _apr.pedidos.find(function (p) { return String(p.order_id) === String(orderId); }) || null;
+  _apr.dragTanda = null;
+  try { ev.dataTransfer.effectAllowed = "move"; ev.dataTransfer.setData("text/plain", String(orderId)); } catch (_e) {}
+  ev.currentTarget.classList.add("apr-arrastrando");
+  aprDndIni("pedido");
+}
+function aprDragTandaIni(ev, codigo) {
+  if (_apr.ocupado) { ev.preventDefault(); return; }
+  _apr.dragTanda = codigo; _apr.drag = null;
+  try { ev.dataTransfer.effectAllowed = "move"; ev.dataTransfer.setData("text/plain", codigo); } catch (_e) {}
+  const caja = ev.currentTarget.closest(".apr-tanda");
+  if (caja) caja.classList.add("apr-arrastrando");
+  aprDndIni("tanda");
+}
+/* `dragenter`/`dragleave` se disparan también al pasar por los hijos, así que se
+   cuenta la profundidad: si no, entrar a un texto de adentro apagaba el resaltado. */
+function aprOver(ev, tipo) {
+  if (tipo === "dia" && !_apr.dragTanda) return;      // un pedido no va a un día
+  if (tipo === "tanda" && !_apr.drag) return;         // una tanda no va a otra tanda
   ev.preventDefault();
-  if (_apr.dragTanda) aprProgramar(_apr.dragTanda, fecha);
+  try { ev.dataTransfer.dropEffect = "move"; } catch (_e) {}
+  const t = ev.currentTarget;
+  t._aprDepth = (t._aprDepth || 0);
+  if (!t.classList.contains("apr-drop-on")) t.classList.add("apr-drop-on");
+}
+function aprSale(ev) {
+  const t = ev.currentTarget;
+  if (!t.contains(ev.relatedTarget)) t.classList.remove("apr-drop-on");
+}
+function aprDropTanda(ev, codigo) {
+  ev.preventDefault(); ev.stopPropagation();
+  ev.currentTarget.classList.remove("apr-drop-on");
+  ev.currentTarget.classList.add("apr-pulso");
+  const ped = _apr.drag;
+  aprDndFin();
+  if (ped) aprSoltarPedido(codigo, ped);
+}
+function aprDropDia(ev, fecha) {
+  ev.preventDefault(); ev.stopPropagation();
+  ev.currentTarget.classList.remove("apr-drop-on");
+  const cod = _apr.dragTanda;
+  aprDndFin();
+  if (cod) aprProgramar(cod, fecha);
 }
 
 /* ── Dibujo ────────────────────────────────────────────────────────────── */
@@ -31710,8 +31814,17 @@ function aprRender() {
   if (_apr.err) h += '<div class="apr-err">⚠ ' + escapeHtml(_apr.err) + '</div>';
   if (_apr.msg) h += '<div class="' + (_apr.msgErr ? "apr-err" : "apr-msg") + '">' + escapeHtml(_apr.msg) + '</div>';
 
-  h += '<div class="apr-wrap">' + aprColPedidos() + aprColTandas() + aprColCal() + '</div>';
+  h += '<div class="apr-wrap">' + aprColPedidos() + aprColTandas() + aprColDias() + '</div>';
+
+  // Cada acción re-dibuja las tres columnas. Sin esto, sacar un pedido de una
+  // tanda te mandaba al principio de una lista de 218 y había que volver a
+  // buscar dónde estabas.
+  const scrolls = [];
+  box.querySelectorAll(".apr-scroll").forEach(function (e) { scrolls.push(e.scrollTop); });
   _renderKeepFocus(box, h);
+  box.querySelectorAll(".apr-scroll").forEach(function (e, i) {
+    if (scrolls[i]) e.scrollTop = scrolls[i];
+  });
 }
 
 function aprColPedidos() {
@@ -31729,7 +31842,8 @@ function aprColPedidos() {
   }
   for (const p of lista) {
     const id = "p" + p.order_id, ab = !!_apr.exp[id];
-    h += '<div class="apr-card" draggable="true" ondragstart="aprDragPedido(' + p.order_id + ')">' +
+    h += '<div class="apr-card" draggable="true" ondragstart="aprDragPedido(event,' + p.order_id + ')"' +
+      ' ondragend="aprDndFin()">' +
       '<div class="apr-card-h" onclick="aprToggle(\'' + id + '\')">' +
         '<span class="apr-card-cli">' + escapeHtml(p.razon_social || p.cod || ("#" + p.order_id)) + '</span>' +
         '<span class="apr-card-chev">' + (ab ? "▾" : "▸") + '</span>' +
@@ -31737,7 +31851,9 @@ function aprColPedidos() {
       '<div class="apr-card-d">' +
         '<span class="apr-chip apr-chip-z">' + escapeHtml(p.zona || "sin zona") + '</span>' +
         '<span class="apr-chip">' + escapeHtml(p.fecha_recep || "—") + '</span>' +
-        '<span class="apr-chip apr-chip-m3">' + aprNum(p.m3) + ' m³' + (p.m3_parcial ? "*" : "") + '</span>' +
+        '<span class="apr-chip apr-chip-m3"' +
+          (p.m3_parcial ? ' title="Hay artículos sin medir: el m³ es un PISO, puede ser más"' : '') +
+          '>' + aprNum(p.m3) + ' m³' + (p.m3_parcial ? " *" : "") + '</span>' +
         (p.np_total > 1 ? '<span class="apr-chip apr-chip-np">sale en ' + p.np_total + ' NP</span>' : '') +
       '</div>';
     if (ab) {
@@ -31773,8 +31889,10 @@ function aprColTandas() {
       if (!byPed.has(k)) byPed.set(k, { order_id: it.order_id, rs: it.razon_social, cod: it.cod_cliente, zona: it.zona, m3: 0, n: 0, total: it.np_total || 1 });
       const e = byPed.get(k); e.m3 += Number(it.m3) || 0; e.n++;
     }
-    h += '<div class="apr-tanda" ondragover="aprOver(event)" ondrop="aprDropTanda(event,\'' + t.codigo + '\')">' +
-      '<div class="apr-tanda-h" draggable="true" ondragstart="aprDragTandaIni(\'' + t.codigo + '\')" title="Arrastrá la tanda a un día del calendario para programarla">' +
+    h += '<div class="apr-tanda" ondragover="aprOver(event,\'tanda\')" ondragleave="aprSale(event)"' +
+      ' ondrop="aprDropTanda(event,\'' + t.codigo + '\')">' +
+      '<div class="apr-tanda-h" draggable="true" ondragstart="aprDragTandaIni(event,\'' + t.codigo + '\')"' +
+      ' ondragend="aprDndFin()" title="Arrastrá la tanda a un día para programarla">' +
         '<span class="apr-tanda-cod">' + escapeHtml(t.codigo) + '</span>' +
         (t.n_avisos > 0 ? '<span class="apr-badge" title="' + escapeHtml((t.avisos || []).join(" · ")) + '">⚠ ' + t.n_avisos + '</span>' : '') +
         '<button class="apr-tanda-x" onclick="aprDescartarTanda(\'' + t.codigo + '\')" title="Descartar">✕</button>' +
@@ -31801,41 +31919,63 @@ function aprColTandas() {
   return h + '</div></div>';
 }
 
-function aprColCal() {
-  const m = aprMesActual();
-  const MES = ["Enero","Febrero","Marzo","Abril","Mayo","Junio","Julio","Agosto","Septiembre","Octubre","Noviembre","Diciembre"];
-  const byD = {}; for (const d of _apr.cal) byD[d.dia] = d;
-  const primero = new Date(m.getFullYear(), m.getMonth(), 1);
-  const dias = new Date(m.getFullYear(), m.getMonth() + 1, 0).getDate();
-  const hoy = aprISO(new Date());
+function aprColDias() {
+  const DOW = ["Domingo","Lunes","Martes","Miércoles","Jueves","Viernes","Sábado"];
+  const MES = ["ene","feb","mar","abr","may","jun","jul","ago","sep","oct","nov","dic"];
+  const hoyISO = aprISO(new Date());
 
-  let h = '<div class="apr-col apr-col-cal">' +
-    '<div class="apr-col-t">🗓️ Calendario</div>' +
-    '<div class="apr-cal-nav">' +
-      '<button onclick="aprMesMover(-1)">◀</button>' +
-      '<span>' + MES[m.getMonth()] + ' ' + m.getFullYear() + '</span>' +
-      '<button onclick="aprMesMover(1)">▶</button>' +
-    '</div>' +
-    '<div class="apr-cal-dow">' + ["Do","Lu","Ma","Mi","Ju","Vi","Sá"].map(function (d) { return '<span>' + d + '</span>'; }).join("") + '</div>' +
-    '<div class="apr-cal-grid">';
-  for (let i = 0; i < primero.getDay(); i++) h += '<div class="apr-dia apr-dia-off"></div>';
-  for (let d = 1; d <= dias; d++) {
-    const iso = aprISO(new Date(m.getFullYear(), m.getMonth(), d));
-    const info = byD[iso] || {};
+  let h = '<div class="apr-col apr-col-dias">' +
+    '<div class="apr-col-t">🗓️ Programar para…</div>' +
+    '<div class="apr-dias-ayuda">Arrastrá una tanda a un día. Los días completos o no hábiles no reciben.</div>' +
+    '<div class="apr-scroll apr-dias">';
+
+  if (!_apr.cal.length) h += '<div class="apr-vacio">Cargando días…</div>';
+
+  for (const d of _apr.cal) {
+    const iso   = String(d.dia).slice(0, 10);
+    const p     = iso.split("-");
+    const fecha = new Date(Number(p[0]), Number(p[1]) - 1, Number(p[2]));
+    const m3    = Number(d.m3) || 0;
+    const cupo  = Number(d.cupo) || 0;
+    const lleno = cupo > 0 && m3 >= cupo;             // se alcanzó el límite del día
+    const pct   = cupo > 0 ? Math.min(100, Math.round((m3 / cupo) * 100)) : 0;
+    // Un día no recibe si no es hábil o si ya está lleno. El pasado no se dibuja:
+    // la lista arranca hoy, siempre se programa para adelante.
+    const cerrado = (d.habil === false) || lleno;
     const cls = ["apr-dia"];
-    if (info.habil === false) cls.push("apr-dia-nohabil");
-    if (info.pasado) cls.push("apr-dia-lleno");
-    if (iso === hoy) cls.push("apr-dia-hoy");
-    if (Number(info.tandas) > 0) cls.push("apr-dia-con");
-    h += '<div class="' + cls.join(" ") + '" ondragover="aprOver(event)" ondrop="aprDropDia(event,\'' + iso + '\')"' +
-         ' title="' + escapeHtml(iso + (info.habil === false ? " · no hábil" : "") +
-           (Number(info.tandas) > 0 ? " · " + info.tandas + " tanda(s) · " + aprNum(info.m3) + " m³" : "") ) + '">' +
-      '<span class="apr-dia-n">' + d + '</span>' +
-      (Number(info.tandas) > 0 ? '<span class="apr-dia-m3">' + aprNum(info.m3, 1) + '</span>' : '') +
+    if (cerrado)        cls.push("apr-dia-cerrado");
+    if (lleno)          cls.push("apr-dia-lleno");
+    if (d.habil === false) cls.push("apr-dia-nohabil");
+    if (iso === hoyISO) cls.push("apr-dia-hoy");
+    if (Number(d.tandas) > 0) cls.push("apr-dia-con");
+
+    const motivo = (d.habil === false) ? "No es día hábil"
+                 : lleno ? "Completo: " + aprNum(m3, 2) + " de " + aprNum(cupo, 2) + " m³"
+                 : "Quedan " + aprNum(d.resta, 2) + " m³";
+
+    h += '<div class="' + cls.join(" ") + '"' +
+         (cerrado ? '' :
+           ' ondragover="aprOver(event,\'dia\')" ondragleave="aprSale(event)"' +
+           ' ondrop="aprDropDia(event,\'' + iso + '\')"') +
+         ' title="' + escapeHtml(motivo) + '">' +
+      '<div class="apr-dia-fecha">' +
+        '<span class="apr-dia-dow">' + DOW[fecha.getDay()] + (iso === hoyISO ? " · hoy" : "") + '</span>' +
+        '<span class="apr-dia-num">' + fecha.getDate() + ' ' + MES[fecha.getMonth()] + '</span>' +
+      '</div>' +
+      '<div class="apr-dia-cuerpo">' +
+        '<div class="apr-dia-barra"><i style="width:' + pct + '%"></i></div>' +
+        '<div class="apr-dia-txt">' +
+          (d.habil === false
+            ? '<span class="apr-dia-cerr">No hábil</span>'
+            : '<b>' + aprNum(m3, 2) + '</b> / ' + aprNum(cupo, 2) + ' m³' +
+              (Number(d.tandas) > 0 ? ' · ' + d.tandas + ' tanda(s)' : '') +
+              (lleno ? ' <span class="apr-dia-cerr">completo</span>' : '')) +
+        '</div>' +
+      '</div>' +
     '</div>';
   }
-  h += '</div><div class="apr-cal-pie">Arrastrá una tanda a un día para programarla. ' +
-       'Los días grises no son hábiles; los rojos pasan el cupo.</div>';
+  h += '</div>';
+  if (_apr.cal.length) h += '<button class="apr-mas" onclick="aprMasDias()">Ver más días</button>';
   return h + '</div>';
 }
 

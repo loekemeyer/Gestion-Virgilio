@@ -955,10 +955,32 @@ Ya está. Tres columnas, arrastrar y soltar, el "+" y el badge.
 - Selector **Loekemeyer / Chef**: una tanda pertenece a una empresa.
 - Antes de programar una tanda con avisos, pide confirmación mostrándolos.
 
-Regresión: `tests/apr-programar.cjs` (19 chequeos, carga el `index.html` real). Cubre el
-badge, el pedido a medias, los tres estados del calendario, y que un pedido sin razón
-social ni m³ no rompa el dibujo. Verde junto con `smoke`, `ppp-errores`, `pweb-barrio-zona`
-y `checkhtml`.
+**v12.84 — el calendario pasó a ser una LISTA de días.** Pedido del dueño. Arranca **hoy**
+y va para adelante (no hay navegación hacia atrás: siempre se programa a futuro), con
+"Ver más días" para estirar el horizonte. Cada día muestra los m³ ya programados contra el
+cupo, con barra de progreso y cuántas tandas tiene. **Un día que llegó al límite, o que no
+es hábil, se pinta gris y NO acepta que le suelten una tanda** — no ofrece algo que el
+backend después va a rechazar.
+
+También v12.84: el arrastre da feedback. Mientras dura el gesto el `<body>` lleva una
+clase y el CSS **ilumina sólo los destinos que sirven** (las tandas cuando se arrastra un
+pedido, los días cuando se arrastra una tanda) y apaga el resto; la tarjeta que se arrastra
+se atenúa, el destino bajo el cursor se resalta, y al soltar hay un pulso. El arrastre **no
+re-dibuja**: prende y apaga clases sobre el DOM que ya está, porque re-renderizar en
+`dragover` le saca al navegador el elemento que está arrastrando y corta el gesto. Además
+se conserva el scroll al re-dibujar: sacar un pedido ya no te manda al principio de una
+lista de 218.
+
+⚠ **La app tiene un `button { width:100% }` global.** Sin pisarlo, el "↩" de sacar un
+pedido medía **293px** y aplastaba el nombre del cliente a 107px ("Messina Herma…" con
+380px libres al lado). Se resetea para todo el módulo. El test lo **mide**, no lo mira:
+en el HTML eso no se ve.
+
+Regresión: `tests/apr-programar.cjs` (26 chequeos, carga el `index.html` real). Cubre el
+badge, el pedido a medias, la lista de días (que el cerrado no acepte drop y el abierto
+sí), el error en rojo, los anchos reales, y que un pedido sin razón social ni m³ no rompa
+el dibujo. Más `tests/pweb-lk-token.cjs`. Verdes junto con `smoke`, `ppp-errores`,
+`pweb-barrio-zona`, `pweb-en-ppp`, `ppp-chk-gondola` y `checkhtml`.
 
 ### Lo que falta
 

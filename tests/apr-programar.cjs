@@ -10,7 +10,8 @@
      · el badge del código de tanda con la CANTIDAD de avisos (no bloquean,
        marcan);
      · una tanda que se llevó sólo algunos bloques de un pedido lo dice;
-     · el calendario distingue día no hábil / con tandas / pasado de cupo;
+     · la lista de días muestra cuánto hay programado, marca el día COMPLETO y
+       el no hábil, y ésos no aceptan que les suelten nada;
      · nada de esto se cae con un pedido sin razón social ni con m³ en 0.
 
    La lógica de negocio NO se prueba acá: vive en Supabase (§3.j del registro) y
@@ -52,13 +53,12 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
       { codigo:"GV-01A", order_id:9,    np_idx:1, razon_social:"Distri zona 6",         cod_cliente:"C6A", zona:"Zona 6", m3:0.9,   np_total:1 }
     ] };
     _apr.cal = [
-      { dia:"2026-09-09", habil:true,  m3:0.5, tandas:1, np:2, resta:4.5, pasado:false },
-      { dia:"2026-09-05", habil:false, m3:0,   tandas:0, np:0, resta:5,   pasado:false },
-      { dia:"2026-09-10", habil:true,  m3:6.2, tandas:3, np:9, resta:0,   pasado:true  }
+      { dia:"2026-09-09", habil:true,  m3:0.5, tandas:1, np:2, cupo:5, resta:4.5, pasado:false },
+      { dia:"2026-09-12", habil:false, m3:0,   tandas:0, np:0, cupo:5, resta:5,   pasado:false },
+      { dia:"2026-09-10", habil:true,  m3:5.2, tandas:3, np:9, cupo:5, resta:0,   pasado:false }
     ];
-    _apr.mes = new Date(2026, 8, 1);
 
-    const izq = aprColPedidos(), med = aprColTandas(), der = aprColCal();
+    const izq = aprColPedidos(), med = aprColTandas(), der = aprColDias();
     _apr.exp["p1117"] = true;
     const izqAbierta = aprColPedidos();
 
@@ -71,7 +71,26 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
     const conOk = document.getElementById("pppPreview").innerHTML;
     _apr.msg = "";
 
-    return { izq, med, der, izqAbierta, conError, conOk };
+    // ⚠ La app tiene un `button { width:100% }` GLOBAL. Sin pisarlo, el "↩" de
+    //   sacar un pedido medía 293px y aplastaba el nombre del cliente a 107px:
+    //   se leía "Messina Herma…" con 380px libres al lado. Se mide de verdad,
+    //   porque en el HTML no se ve.
+    aprRender();
+    document.getElementById("pppOverlay").classList.add("show");
+    const anchoDe = function (sel) {
+      const e = document.querySelector(sel);
+      return e ? Math.round(e.getBoundingClientRect().width) : -1;
+    };
+    const anchos = {
+      titem: anchoDe(".apr-titem"),
+      txt:   anchoDe(".apr-titem-txt"),
+      x:     anchoDe(".apr-titem-x"),
+      nueva: anchoDe(".apr-nueva"),
+      altoNueva: (function () { const e = document.querySelector(".apr-nueva");
+        return e ? Math.round(e.getBoundingClientRect().height) : -1; })()
+    };
+
+    return { izq, med, der, izqAbierta, conError, conOk, anchos };
   });
 
   const fallos = [];
@@ -89,17 +108,38 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
   chk(r.med.includes("Riesgo Marcelo Fabian"),  "el nombre del cliente entra entero en la tanda");
   chk(r.med.includes("apr-titem-txt"),          "el item va en dos renglones (el nombre no compite con el detalle)");
   chk(r.med.includes("Arrastrá un pedido acá"),"la tanda vacía lo dice");
-  chk(r.der.includes("Septiembre 2026"),       "el mes del calendario");
-  chk(r.der.includes("apr-dia-nohabil"),       "pinta el día no hábil");
-  chk(r.der.includes("apr-dia-lleno"),         "pinta el día pasado de cupo");
-  chk(r.der.includes("apr-dia-con"),           "pinta el día con tandas");
+  chk(r.der.includes("Miércoles") && r.der.includes("9 sep"), "la lista dice el día con nombre y fecha");
+  chk(r.der.includes("0,50</b> / 5,00 m³"),    "muestra los m³ programados contra el cupo");
+  chk((r.der.match(/apr-dia-cerrado/g) || []).length === 2, "el no hábil y el completo quedan cerrados");
+  chk(r.der.includes("apr-dia-lleno") && r.der.includes("completo"), "marca el día que llegó al límite");
+  chk(r.der.includes("apr-dia-con"),           "marca el día que ya tiene tandas");
   chk(r.izqAbierta.includes("Bloque 1/3"),     "expandida muestra los bloques");
   chk(r.izqAbierta.includes("027"),            "expandida muestra los artículos");
   chk(!/undefined/.test(todo),                 "sin 'undefined' en pantalla");
   chk(!/NaN/.test(todo),                       "sin 'NaN' en pantalla");
   chk(!/on\w+="[^"]*undefined/.test(todo),     "sin handlers rotos");
+  // Un día cerrado que igual acepte el drop es peor que no marcarlo: promete algo
+  // que el backend después rechaza.
+  // Sobre el TAG de apertura de cada día. Se ancla a que la clase EMPIECE con
+  // "apr-dia" seguido de espacio o comilla: partir por 'apr-dia' a secas cortaba
+  // también en apr-dia-fecha/apr-dia-cuerpo, y filtrar por nombre se comía los
+  // cerrados (el "cerr" del filtro matcheaba "cerrado").
+  const tags = r.der.match(/<div class="apr-dia[ "][^>]*>/g) || [];
+  const cerrados = tags.filter(function (t) { return /apr-dia-cerrado/.test(t); });
+  const abiertos = tags.filter(function (t) { return !/apr-dia-cerrado/.test(t); });
+  chk(tags.length === 3, "se dibujan los 3 días (se contaron " + tags.length + ")");
+  chk(cerrados.length === 2 && cerrados.every(function (t) { return t.indexOf("ondrop") < 0; }),
+      "un día cerrado NO acepta que le suelten una tanda");
+  chk(abiertos.length === 1 && abiertos.every(function (t) { return t.indexOf("aprDropDia") >= 0; }),
+      "un día abierto sí la acepta");
+  chk(r.der.includes("aprMasDias"),            "se pueden pedir más días");
+  chk(!/◀|▶/.test(r.der),                      "no hay navegación hacia atrás: se programa para adelante");
   chk(/class="apr-err"[^>]*>[^<]*APAGADA/.test(r.conError), "un error se pinta de ROJO, no de verde");
   chk(/class="apr-msg"[^>]*>[^<]*programada/.test(r.conOk),  "un mensaje bueno se pinta de verde");
+  const a = r.anchos;
+  chk(a.x > 0 && a.x < 40, "el botón ↩ es chico (" + a.x + "px) — el button{width:100%} global no se le cuela");
+  chk(a.txt > a.titem * 0.8, "el nombre del cliente se queda con el ancho (" + a.txt + " de " + a.titem + "px)");
+  chk(a.altoNueva > 28, "el botón de nueva tanda conserva su padding (alto " + a.altoNueva + "px)");
   chk(errs.length === 0, "sin errores de página" + (errs.length ? ": " + errs[0] : ""));
 
   await b.close();
