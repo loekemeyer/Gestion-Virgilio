@@ -13,7 +13,7 @@
 //   1. ¿es día hábil en Argentina? → si no, loguea 'salteada' y corta
 //   2. lee LK (`gv_pedidos_web_np_lk`) y Chef (`gv_pedidos_web_np_chef`), que
 //      devuelven EXACTAMENTE las mismas columnas
-//   3. `ppp_web_np_asignar`     — numera lo que no tiene número
+//   3. `gv_ppp_web_np_asignar`  — numera lo que no tiene número
 //   4. `ppp_web_resync`         — pone al día lo YA programado que cambió
 //   5. `gv_ppp_web_zona_lote`   — resuelve la zona de cada NP
 //   6. `ppp_web_armar_tandas`   — arma las tandas del día, hasta el cupo de m³
@@ -204,9 +204,16 @@ async function procesarEmpresa(
   }
 
   // ── 1. numerar ──────────────────────────────────────────────────────────
+  // Va por `gv_ppp_web_np_asignar` y NO por `ppp_web_np_asignar`, que es la
+  // puerta del front y arranca con `if auth.uid() is null then raise`. Acá no
+  // hay nadie logueado: `vg()` entra con la service key y `auth.uid()` da NULL,
+  // así que la original tira "Se necesita sesión" y el job muere sin numerar
+  // nada (pasó de verdad el 2026-09-04, log id 2). La lógica de numeración es
+  // LA MISMA —la original delega en esta— sólo cambia el candado: GRANT a
+  // `service_role` en vez de sesión.
   const pares = filas.map((n) => ({ order_id: n.order_id, np_idx: n.np_idx }));
   const nums = await vgRpc<{ r_order_id: number; r_np_idx: number; r_np: number }[]>(
-    "ppp_web_np_asignar", { p_empresa: emp, p_pares: pares });
+    "gv_ppp_web_np_asignar", { p_empresa: emp, p_pares: pares });
   const numDe = new Map<string, number>();
   for (const x of nums) numDe.set(`${x.r_order_id}|${x.r_np_idx}`, x.r_np);
 
@@ -298,13 +305,25 @@ async function procesarEmpresa(
 Deno.serve(async (req: Request) => {
   const t0 = Date.now();
   const url = new URL(req.url);
-  // `?forzar=1` corre aunque sea sábado o feriado. Para probar a mano.
-  const forzar = url.searchParams.get("forzar") === "1";
-  // `?dry=1` hace todo menos escribir: no numera, no resync, no arma. Sólo mide.
-  const dry = url.searchParams.get("dry") === "1";
-  // `?esperar=1` devuelve el resultado en vez de contestar al toque (ver abajo).
-  const esperar = url.searchParams.get("esperar") === "1";
-  const fecha = url.searchParams.get("fecha") ?? hoyArgentina();
+
+  // Los flags valen tanto en la query (`?dry=1`) como en el body
+  // (`{"dry":true}`). Antes eran SÓLO query, y mandar `{"dry":true}` en el body
+  // no daba error: se ignoraba en silencio y la corrida salía POR EL CAMINO
+  // REAL creyendo uno que era una prueba (pasó el 2026-09-04). Un flag de
+  // seguridad que se ignora sin avisar es peor que no tenerlo.
+  let cuerpo: Record<string, unknown> = {};
+  try { cuerpo = await req.json() as Record<string, unknown>; } catch (_e) { /* body vacío: el cron manda {} */ }
+  const flag = (k: string) =>
+    url.searchParams.get(k) === "1" || cuerpo[k] === true || cuerpo[k] === "1";
+
+  // `forzar` corre aunque sea sábado o feriado. Para probar a mano.
+  const forzar = flag("forzar");
+  // `dry` hace todo menos escribir: no numera, no resync, no arma. Sólo mide.
+  const dry = flag("dry");
+  // `esperar` devuelve el resultado en vez de contestar al toque (ver abajo).
+  const esperar = flag("esperar");
+  const fecha = url.searchParams.get("fecha") ??
+    (typeof cuerpo.fecha === "string" ? cuerpo.fecha : null) ?? hoyArgentina();
 
   const log = async (estado: string, motivo: string | null, extra: Record<string, unknown>) => {
     try {

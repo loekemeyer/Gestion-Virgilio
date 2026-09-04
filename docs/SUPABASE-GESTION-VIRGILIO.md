@@ -486,6 +486,79 @@ Medido el 2026-09-04, no supuesto:
 
 ---
 
+## 3.f El job no podía numerar las NP — 2026-09-04
+
+Salió de **correr el disparador de verdad**, no de leer el código:
+
+```
+GV_Tandas_Auto_Log id 2 · estado 'error'
+lk:   ppp_web_np_asignar: HTTP 400 "Se necesita sesión para asignar números de NP."
+chef: ppp_web_np_asignar: HTTP 400 (idem)
+```
+
+`ppp_web_np_asignar` arranca con `if auth.uid() is null then raise`. Ese candado está
+bien para el **front** (un supervisor logueado), pero el job entra con la service key y
+ahí `auth.uid()` es NULL — **y el cron usa exactamente esa credencial** (jobid 71 va con
+la `SUPABASE_SERVICE_ROLE_KEY`). O sea: habría fallado todas las noches, sin numerar una
+sola NP y por lo tanto sin armar una sola tanda. Mismo bicho que ya nos había comido con
+la RPC de Chef.
+
+Chequeadas las otras cuatro funciones de la cadena (`ppp_web_resync`,
+`ppp_web_armar_tandas`, `ppp_web_proxima_letra`, `gv_ppp_web_zona_lote`): ninguna tiene
+el gate. Era una sola.
+
+### El arreglo
+
+| objeto | qué |
+|---|---|
+| `gv_ppp_web_np_asignar(text,jsonb)` | **nuevo**. Tiene la lógica. El candado es el GRANT, no la sesión — que además es lo auditable |
+| `ppp_web_np_asignar(text,jsonb)` | queda como la **puerta del front**: mismo gate de sesión de siempre, pero **delega**. Así la numeración vive en un solo lugar y no puede driftear |
+| Edge Fn v8 | llama a `gv_ppp_web_np_asignar` |
+
+El front no cambia en nada. Grep previo contra Producción: `ppp_web_np_asignar` **0
+referencias**, es nuestra.
+
+| rol | `gv_ppp_web_np_asignar` | `ppp_web_np_asignar` |
+|---|---|---|
+| `anon` | ❌ | ❌ |
+| `authenticated` | ❌ | ✅ (el front, con sesión) |
+| `service_role` | ✅ (el job) | ✅ |
+
+### La lógica de numeración, medida
+
+- Un número por `(empresa, order_id, np_idx)` — un pedido web se puede partir en varias NP.
+- Correlativo **por empresa** desde `PPP_Web_NP_Seed`: LK `1343` (donde quedó la
+  numeración a mano), Chef `1`.
+- Idempotente (`on conflict do nothing`) y serializado con advisory lock por empresa.
+- La NP viaja etiquetada `LK 1343`: `empresaDeNp` resuelve la empresa por el número
+  (>90000 = LK) y una NP web de 4 dígitos caería en Chef.
+
+Medido el 2026-09-04: LK **357 asignadas, 1343→1699, 0 duplicados, 0 huecos**; Chef 0.
+Sin choque con Producción (sus NP numéricas arrancan en 44361; en el rango 1..2000 hay 0).
+Llamada como el job (`set local role service_role`, `auth.uid()` NULL) sobre pares que ya
+tenían número: devolvió `1343,1344,1345` y **no escribió una fila**.
+
+### ⚠ Un flag de seguridad que se ignoraba en silencio
+
+La prueba se lanzó con `{"dry":true}` en el **body**, pero la Edge Function leía los flags
+**sólo del query string** (`?dry=1`). No dio error: los ignoró y corrió por el camino
+**real** creyendo uno que era una prueba. No llegó a escribir nada porque murió en la
+numeración, pero el próximo caso podía no tener esa suerte.
+
+Arreglado en v8: `flag()` mira query **y** body. Verificado sin escribir nada — se mandó
+`{"dry":true,"fecha":"2026-09-06"}` (sábado): contestó por el camino síncrono
+(`salteada`, no `encolada`) y `GV_Tandas_Auto_Log` quedó en 2 filas, porque el log de
+'salteada' está detrás de `if (!dry)`.
+
+### Estado después de esto
+
+`PPP_Web_Programacion` sigue en **0** y `PPP_Programacion_Diaria` en **182**: nada corrió
+todavía de punta a punta. Falta la primera corrida real, que necesita el OK del dueño.
+
+Detalle y SQL en `sql/gv_tandas_diarias.sql`.
+
+---
+
 ## 4. Incidente de seguridad — 2026-09-04 (cerrado)
 
 `public.vista_pedidos_web_feed` tenía `select` para `anon`. Los esquemas `fuentes` y

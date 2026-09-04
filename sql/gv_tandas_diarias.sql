@@ -438,6 +438,131 @@ on conflict (clave) do nothing;
 -- front las lee con la anon key. No es una superficie nueva.
 --
 -- ══════════════════════════════════════════════════════════════════════════
+-- EL JOB NO PODÍA NUMERAR: `auth.uid()` con service_role es NULL (2026-09-04)
+-- ══════════════════════════════════════════════════════════════════════════
+-- Se descubrió corriendo el disparador de verdad, no leyendo el código:
+--
+--   GV_Tandas_Auto_Log id 2 · estado 'error'
+--   lk:   ppp_web_np_asignar: HTTP 400 "Se necesita sesión para asignar
+--         números de NP."
+--   chef: ppp_web_np_asignar: HTTP 400 (idem)
+--
+-- `ppp_web_np_asignar` arranca con `if auth.uid() is null then raise`. Ese
+-- candado tiene sentido para el FRONT (un supervisor logueado), pero el job
+-- entra con la service key y ahí `auth.uid()` es NULL — igual que el cron, que
+-- usa la misma credencial. O sea: **habría fallado todas las noches**, sin
+-- numerar ni una NP y por lo tanto sin armar ni una tanda. Es el mismo bicho que
+-- ya nos había comido con la RPC de Chef.
+--
+-- Chequeadas las otras cuatro funciones de la cadena: `ppp_web_resync`,
+-- `ppp_web_armar_tandas`, `ppp_web_proxima_letra` y `gv_ppp_web_zona_lote` no
+-- tienen el gate. Era una sola.
+--
+-- ARREGLO: el candado pasa a ser el GRANT, que además es lo auditable.
+-- `gv_ppp_web_np_asignar` tiene la lógica y **la original delega en ella**, así
+-- que la numeración vive en UN solo lugar y no puede driftear. El front no
+-- cambia en nada: sigue entrando por `ppp_web_np_asignar` y sigue exigiendo
+-- sesión.
+
+create or replace function public.gv_ppp_web_np_asignar(p_empresa text, p_pares jsonb)
+returns table(r_order_id bigint, r_np_idx integer, r_np integer)
+language plpgsql security definer set search_path to 'public'
+as $function$
+declare
+  v_next integer;
+begin
+  -- Serializa por empresa: el job y una pantalla abierta no pueden sacar el
+  -- mismo numero. Se libera sola al terminar la transaccion.
+  perform pg_advisory_xact_lock(hashtext('ppp_web_np:' || p_empresa));
+
+  select greatest(
+           coalesce((select max(n.np) from public."PPP_Web_NP" n where n.empresa = p_empresa), 0) + 1,
+           coalesce((select s.desde from public."PPP_Web_NP_Seed" s where s.empresa = p_empresa), 1)
+         )
+    into v_next;
+
+  with pedir as (
+    select (x->>'order_id')::bigint as oid, (x->>'np_idx')::int as idx
+    from jsonb_array_elements(p_pares) x
+  ),
+  nuevos as (
+    select p.oid, p.idx,
+           row_number() over (order by p.oid, p.idx) - 1 as offset_rn
+    from pedir p
+    where not exists (
+      select 1 from public."PPP_Web_NP" n
+       where n.empresa = p_empresa and n.order_id = p.oid and n.np_idx = p.idx)
+  )
+  insert into public."PPP_Web_NP" (empresa, np, order_id, np_idx)
+  select p_empresa, v_next + nu.offset_rn::int, nu.oid, nu.idx
+  from nuevos nu
+  on conflict (empresa, order_id, np_idx) do nothing;
+
+  return query
+    with pedir as (
+      select (x->>'order_id')::bigint as oid, (x->>'np_idx')::int as idx
+      from jsonb_array_elements(p_pares) x
+    )
+    select n.order_id, n.np_idx, n.np
+      from public."PPP_Web_NP" n
+      join pedir p on p.oid = n.order_id and p.idx = n.np_idx
+     where n.empresa = p_empresa;
+end
+$function$;
+
+-- El candado. `anon` no la alcanza ni con la key publica; `authenticated`
+-- tampoco: el front entra por la de abajo, que le pide sesion.
+revoke all on function public.gv_ppp_web_np_asignar(text, jsonb) from public, anon, authenticated;
+grant execute on function public.gv_ppp_web_np_asignar(text, jsonb) to service_role;
+
+-- La puerta del FRONT: mismo gate de sesion de siempre, pero delega.
+create or replace function public.ppp_web_np_asignar(p_empresa text, p_pares jsonb)
+returns table(r_order_id bigint, r_np_idx integer, r_np integer)
+language plpgsql security definer set search_path to 'public'
+as $function$
+begin
+  if auth.uid() is null then
+    raise exception 'Se necesita sesión para asignar números de NP.';
+  end if;
+  return query select * from public.gv_ppp_web_np_asignar(p_empresa, p_pares);
+end
+$function$;
+
+-- ── La lógica de numeración, para que no haya que leerla del cuerpo ────────
+--   · un número por (empresa, order_id, np_idx) — un pedido web se puede
+--     partir en varias NP, y cada parte lleva la suya
+--   · correlativo POR EMPRESA desde el seed de `PPP_Web_NP_Seed`:
+--     LK 1343 (donde quedó la numeración a mano), Chef 1
+--   · idempotente: pedir dos veces el mismo par devuelve el mismo número y no
+--     inserta nada (`on conflict do nothing`)
+--   · serializado con advisory lock por empresa: el job y dos pantallas
+--     abiertas no pueden sacar el mismo número
+--   · la NP viaja ETIQUETADA ("LK 1343"), no pelada: `empresaDeNp` resuelve la
+--     empresa por el número (>90000 = LK) y una NP web de 4 dígitos caería en
+--     Chef, mandando a buscar un pedido de Loekemeyer al sector equivocado
+--
+-- Medido el 2026-09-04, no supuesto:
+--   · LK: 357 asignadas, 1343 → 1699, **0 duplicados y 0 huecos**
+--   · Chef: 0 asignadas todavía
+--   · sin choque con Producción: sus NP numéricas arrancan en 44361 y en el
+--     rango 1..2000 hay 0
+--   · llamada como el job (`set local role service_role`, `auth.uid()` NULL)
+--     sobre pares que ya tenían número → devolvió 1343,1344,1345 y no escribió
+--     una fila
+--   · matriz de permisos:
+--       anon           gv_ NO · original NO
+--       authenticated  gv_ NO · original SÍ   (el front, con sesión)
+--       service_role   gv_ SÍ · original SÍ   (el job)
+--
+-- ── Y un bicho del disparador que salió del mismo error ───────────────────
+-- La prueba se lanzó con `{"dry":true}` en el BODY, pero la función leía los
+-- flags SÓLO del query string. No dio error: los ignoró en silencio y corrió
+-- por el camino REAL creyendo uno que era una prueba. No llegó a escribir nada
+-- (murió en la numeración), pero el próximo caso podía no tener esa suerte.
+-- Ahora `flag()` mira query Y body. Un flag de seguridad que se ignora sin
+-- avisar es peor que no tenerlo.
+
+-- ══════════════════════════════════════════════════════════════════════════
 -- CONTROLES
 -- ══════════════════════════════════════════════════════════════════════════
 --   -- Las corridas de la última semana:
