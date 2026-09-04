@@ -1012,6 +1012,12 @@ cubre**.
 
 ## 5. Pendientes
 
+> 📌 La lista **de negocio** de lo que falta para cerrar el pipeline —la nota que dejó el
+> dueño el 2026-09-04, cruzada con el estado real de cada pieza— está en
+> **`docs/PENDIENTES-PIPELINE-GESTION.md`** (códigos 4990 · 9357 · 8808 · 9871 · 1439 ·
+> 8033 · 1946). Lo de acá abajo son los pendientes **técnicos** de Supabase, y varios
+> están referenciados desde ahí.
+
 1. **Stock de los pedidos web.** `trg_normalizar_empresa_stock` (trigger de
    `Movimientos_Stock`, tabla compartida) completa la empresa de un movimiento con
    `empresa_de_np`, que no entiende las NP web. Hay que definir cómo entra el stock de un

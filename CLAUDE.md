@@ -91,6 +91,11 @@ el impacto medido (la consulta que lo prueba, no "no debería afectar") y el rol
 Ese archivo —no la memoria— es lo que dice en qué estado está el pipeline al abrir
 una sesión nueva. **Leerlo antes de tocar Supabase.**
 
+📌 **Y qué FALTA para cerrar el pipeline está en `docs/PENDIENTES-PIPELINE-GESTION.md`**
+(nota del dueño del 2026-09-04, cruzada con el estado real del repo). Se avanzó hasta la
+**programación de pedidos**; de ahí para abajo —picking, armado, facturación, envío a ISIS
+y cruce de factura— está abierto. **Leerlo al abrir una sesión nueva sobre el pipeline.**
+
 ## ⚠⚠⚠ CUANDO GESTIÓN TOMA CONTROL Y SE VUELVE LA VERSIÓN QUE USAMOS, SEGUIR CON LA NUMERACIÓN QUE DEJÓ VIRGILIO
 
 Mientras convivan las dos apps, **Gestión no numera NP y sus tandas son de prueba**.
