@@ -1044,6 +1044,42 @@ el dibujo. Más `tests/pweb-lk-token.cjs`. Verdes junto con `smoke`, `ppp-errore
 
 ---
 
+## 3.k Controlado → Pedidos Entregados, también para las NP web — 2026-09-04
+
+Regla del dueño: *"si el pedido ya fue controlado, automáticamente tendría que ir a Pedidos
+Entregados. No tiene que haber más complejidad que eso."*
+
+**Ya pasaba para las NP de ISIS.** Un pedido está *confirmado* si tiene `CRN` (Control
+Remitos, texto `NP|TANDA`, mirado 60 días para atrás) **o** figura en `PPP_Entregados_Meta`
+(el espejo del Sheet de ISIS, la fuente durable). `_pppConfirmadas()` junta las dos y parte
+`vista_ppp_pedidos_entregados` en *entregados* / *en viaje*.
+
+**Lo que fallaba para las web:** `PPP_Entregados_Meta` se **trunca cada 30 min** con lo que
+baja del Sheet (`sync_ppp_entregados_meta`, truncate + insert). Una NP web no existe ahí ni
+va a existir → a los 60 días del CRN dejaba de estar confirmada y pasaba a *en viaje* para
+siempre.
+
+**La solución, la más chica:** no hace falta tabla nueva. El CRN de una NP web **ya se
+emite con la etiqueta** (`"LK 01344|GV-02A"`, `crSendDetail`) y `Registros_Produccion_Virgilio`
+conserva todo (CRN desde el 2026-06-24, 821 filas, sin poda).
+
+| objeto | qué |
+|---|---|
+| vista **`gv_ppp_web_entregados`** | los CRN cuyo NP es una etiqueta (`~* '^\s*(LK\|CH)\s+\d+'`, sin legajos de prueba), cruzados con `PPP_Web_Programacion` → `empresa, np, np_label, tanda, cod_cliente, razon_social, m3, fecha_entrega, controlado_at, n_crn`. `security_invoker = true`. `sql/gv_ppp_web_entregados.sql` |
+| front v12.87 | `pppRefreshMetaEntSet` y `pppRefreshEntregadosFull` la suman a lo de ISIS, en `try/catch`: si falla, ISIS queda igual |
+
+`vista_ppp_pedidos_entregados` **ya traía las web**: sale de `Facturacion_NP` + `Facturacion_Cierres`
+con joins por texto, sin ningún cast numérico. No se tocó.
+
+**Medido:** grep en Producción = 0 usos · vista creada con `security_invoker=true` · **0 filas
+hoy** (no hay NP web con CRN: numeración apagada) · `Registros` intacto (29.228 filas) · `anon`
+sólo `SELECT`. Regresión: `tests/pweb-entregados.cjs` (13 chequeos, incluido "si la vista
+falla, ISIS sigue igual").
+
+**Rollback:** `drop view public.gv_ppp_web_entregados;` y sacar las dos lecturas del front.
+
+---
+
 ## 4. Incidente de seguridad — 2026-09-04 (cerrado)
 
 `public.vista_pedidos_web_feed` tenía `select` para `anon`. Los esquemas `fuentes` y

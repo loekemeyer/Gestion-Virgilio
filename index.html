@@ -6794,7 +6794,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v12.86";
+const APP_VERSION = "v12.87";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -26439,6 +26439,15 @@ async function pppRefreshMetaEntSet() {
     const rows = await supaFetchAllSafe(SUPABASE_URL + "/rest/v1/PPP_Entregados_Meta", "select=np");
     const s = new Set();
     (rows || []).forEach(function (r) { const np = String(r.np == null ? "" : r.np).trim().replace(/\.0+$/, ""); if (np) s.add(np); });
+    // v12.87 — las NP WEB confirmadas. PPP_Entregados_Meta es el espejo del Sheet de ISIS
+    // y se TRUNCA cada 30 min: una NP web no existe ahí ni va a existir, y a los 60 días
+    // del CRN pasaría a "en viaje" para siempre. Para ellas la fuente durable es el CRN
+    // que ya emite Control Remitos (texto "LK 01344|TANDA"), leído por la vista
+    // gv_ppp_web_entregados. Aditivo: si falla, queda lo de ISIS exactamente igual.
+    try {
+      const web = await supaFetchAllSafe(SUPABASE_URL + "/rest/v1/gv_ppp_web_entregados", "select=np_label");
+      (web || []).forEach(function (r) { const np = String(r.np_label == null ? "" : r.np_label).trim(); if (np) s.add(np); });
+    } catch (_e) {}
     _pppMetaEntSet = s;
     if (typeof pppRenderProg === "function") pppRenderProg();
   } catch (_e) { if (!_pppMetaEntSet) _pppMetaEntSet = new Set(); }
@@ -26510,6 +26519,24 @@ async function pppRefreshEntregadosFull() {
         frep: fe, fkey: _pppYmdKey(fe)
       });
     }
+    // v12.87 — sumar las NP web confirmadas, con la misma forma de fila (ver
+    // pppRefreshMetaEntSet para el porqué). Si falla, el histórico de ISIS queda igual.
+    try {
+      const web = await supaFetchAllSafe(SUPABASE_URL + "/rest/v1/gv_ppp_web_entregados", "select=np_label,cod_cliente,razon_social,tanda,m3,fecha_entrega&order=fecha_entrega.desc");
+      for (let i = 0; i < (web || []).length; i++) {
+        const w = web[i];
+        const np = String(w.np_label == null ? "" : w.np_label).trim(); if (!np) continue;
+        const fe = String(w.fecha_entrega == null ? "" : w.fecha_entrega).slice(0, 10);
+        list.push({
+          np: np,
+          cod: String(w.cod_cliente == null ? "" : w.cod_cliente).trim(),
+          rs: String(w.razon_social == null ? "" : w.razon_social).trim(),
+          tanda: (String(w.tanda == null ? "" : w.tanda).trim().toUpperCase() || "—"),
+          m3: (w.m3 == null || w.m3 === "") ? null : Number(w.m3),
+          frep: fe, fkey: _pppYmdKey(fe)
+        });
+      }
+    } catch (_e) {}
     _pppDeliveredFull = list;
     if (_pppTab === "ent" && _pppEntMode === "excel") pppRenderProg();
   } catch (_e) { if (!_pppDeliveredFull) _pppDeliveredFull = []; }
