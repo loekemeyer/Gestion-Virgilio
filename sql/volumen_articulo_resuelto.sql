@@ -32,13 +32,14 @@
 -- midan distinto: son cargas mal tipeadas en la fila del código con L. El base es
 -- el que alguien midió de verdad.
 --
--- ✅ **LIMPIADAS el 2026-09-04**, por pedido del dueño. Las 54 filas se alinearon al
--- valor de su base (`update ... set m3 = m3_del_base`). No se borraron: el código
--- sigue existiendo en el catálogo, con el número bueno.
--- **Esto no cambió ningún m³ que la app calcule** —la vista ya usaba el base—; lo que
--- arregla es la TABLA CRUDA, para el que la consulte directo sin pasar por la vista.
--- Valores viejos guardados en `sql/backups/backup_volumen_articulos_codigos_L_20260904.sql`.
--- Verificado después: 0 discrepancias entre una fila con L y su base.
+-- ⚠⚠ OJO CON LA HISTORIA DE ESTE ARCHIVO. El 2026-09-04 se "limpiaron" esas 54 filas
+-- con un `update` sobre `Volumen_Articulos` — que es una tabla COMPARTIDA con Producción
+-- Virgilio, la app que los operarios usan hoy. Ese update **se revirtió el mismo día**:
+-- viola la regla de que sobre una tabla compartida se agrega y no se modifica.
+--
+-- El criterio de Gestión vive ahora en **`GV_Volumen_Articulos`** (`sql/gv_overrides.sql`)
+-- y esta vista lo superpone. Gestión ve el m³ del base; Producción sigue viendo su fila
+-- original. **No volver a tocar `Volumen_Articulos`.**
 --
 -- ----------------------------------------------------------------------------
 -- QUÉ CAMBIA EN LA PRÁCTICA
@@ -69,13 +70,25 @@
 
 create or replace view public.vista_volumen_articulo_resuelto
 with (security_invoker = true) as
-with med as (
+with base as (
   -- `Volumen_Articulos` tiene 2.547 filas pero sólo 934 con valor: una fila sin m³
   -- es un código dado de alta sin medir, y no debe llegar como 0 (sumaría de menos
   -- sin que nadie se entere, que es peor que no mostrarlo).
   select upper(trim(v.codigo)) as codigo, v.m3
     from public."Volumen_Articulos" v
    where v.m3 > 0
+),
+ovr as (
+  -- El criterio propio de Gestión. Ver sql/gv_overrides.sql.
+  select upper(trim(g.codigo)) as codigo, g.m3
+    from public."GV_Volumen_Articulos" g
+   where g.m3 > 0
+),
+med as (
+  -- El override manda; si no hay, la compartida.
+  select coalesce(o.codigo, b.codigo) as codigo,
+         coalesce(o.m3, b.m3)         as m3
+    from base b full join ovr o on o.codigo = b.codigo
 )
 -- 1) Códigos sin "L": tal cual.
 select m.codigo, m.m3, 'propio'::text as origen

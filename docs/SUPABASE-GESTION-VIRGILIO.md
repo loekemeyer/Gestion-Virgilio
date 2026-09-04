@@ -60,7 +60,7 @@ grep -rn "NOMBRE_DEL_OBJETO" --include=*.js --include=*.html --include=*.sql \
   /home/user/loekemeyer/produccion-virgilio
 ```
 
-Cuesta cinco segundos y el 2026-09-04 habría evitado los tres cambios de §3 que
+Cuesta cinco segundos y el 2026-09-04 habría evitado los cuatro cambios de §3 que
 violaron la regla.
 
 ### Reglas que no están en la frase del dueño pero hacen falta
@@ -95,7 +95,10 @@ violaron la regla.
 | `ppp_web_resync()` | Reacomoda la programación cuando el pedido cambia | idem §3 |
 | `ppp_web_armar_tandas()` | Arma las tandas solo | `sql/ppp_web_tandas.sql` |
 | `ppp_web_letra()` · `ppp_web_letra_idx()` · `ppp_web_proxima_letra()` | Código de tanda | idem |
-| `vista_volumen_articulo_resuelto` | m³ con la "L" resuelta desde el artículo base | `sql/volumen_articulo_resuelto.sql` |
+| `GV_Volumen_Articulos` | **Override de m³ de Gestión.** Pisa a `Volumen_Articulos` sólo para nosotros | `sql/gv_overrides.sql` |
+| `GV_Zonas_Barrios` | **Override de zona de Gestión.** Pisa a `Zonas_Barrios` sólo para nosotros | idem |
+| `gv_zona_de_barrio()` | Resuelve zona: override primero, después la compartida | idem |
+| `vista_volumen_articulo_resuelto` | m³ con la "L" resuelta desde el artículo base, superponiendo el override | `sql/volumen_articulo_resuelto.sql` |
 | `vista_facturacion_estado` | Corte "esperando confirmación" / "facturado" | `sql/facturacion_estado.sql` |
 
 En el proyecto **LK** (`kwkclwhmoygunqmlegrg`), que Producción **no** usa para esto:
@@ -134,23 +137,53 @@ Todo lo de este día está en `main`, commits `1d55e01` … `c9973e2`.
 | 7 | Drop de los esquemas `pipeline` y `fuentes`, servers FDW `lk_feed`/`chef_feed`, y en LK el rol `virgilio_reader` + su vista | 0 referencias en Producción (los hits de "pipeline."/"fuentes." son comentarios y la palabra española) |
 | 8 | En LK: split balanceado por m³ y columnas `m3`/`m3_parcial` en `v_pedidos_web_np` y en la RPC de Chef | 0 referencias en Producción |
 
-#### ⚠ Violan la regla — se hicieron ANTES de fijarla, hay que corregirlos
+#### ✅ CORREGIDOS el mismo día — violaban la regla, se hicieron antes de fijarla
+
+Los updates sobre tablas compartidas se **revirtieron** y el criterio de Gestión pasó a
+tablas de override propias (`sql/gv_overrides.sql`). Producción quedó exactamente como
+estaba; Gestión tiene su fuente canónica.
+
+| # | Qué era | Cómo quedó |
+|---|---|---|
+| A | `UPDATE` de 54 filas de `Volumen_Articulos` | Revertido. `GV_Volumen_Articulos` (157 filas: 156 códigos con "L" con el m³ de su base + `727E` estimado) y `vista_volumen_articulo_resuelto` superpone override sobre compartida. |
+| A' | `UPDATE` de `727E` (0 → 0,0023) — **se me había pasado**, es el mismo caso | Revertido a 0. El 0,0023 vive en el override, marcado como estimado por similitud y no medido. |
+| B | `UPDATE` de `v.devoto` en `Zonas_Barrios` | Revertido a `Zona 3 - CABA Oeste`. `GV_Zonas_Barrios` tiene `v.devoto → Zona 2` y `gv_zona_de_barrio()` resuelve override primero. |
+
+**Verificado, las dos apps ven cosas distintas a propósito:** Gestión ve `439EL` = 0,0185
+y Devoto = Centro; Producción ve 0,0561 y Oeste — sus valores originales. La vista sigue
+con 1.482 filas, 0 duplicados y 0 códigos con L que no sigan a su base, y LK las lee por
+el FDW: 355 NP con 0 m³ incompleto.
+
+Las **28 filas agregadas a `Zonas_Barrios`** se mantienen: son un `insert`, que la regla
+permite, y su impacto medido es cero (las 4 NP que tocan ya traían `Super` del Excel).
+
+#### ⚠ Pendiente de decisión
 
 | # | Cambio | Por qué viola | Impacto medido | Rollback |
 |---|---|---|---|---|
-| A | `Volumen_Articulos`: **UPDATE de 54 filas** (códigos con "L" alineados a su base) | Es un update sobre tabla compartida, no un insert | **2 líneas de 9.667** en `PPP_Base_Pedidos` (NP 44600 `439EL` y 44601 `438EL`), **ambas entregadas el 03/09 y ya facturadas**. El m³ que la PPP muestra sale de la columna guardada, no de esta tabla | `sql/backups/backup_volumen_articulos_codigos_L_20260904.sql` |
-| B | `Zonas_Barrios`: **UPDATE de `v.devoto`** (Zona 3 → Zona 2) | idem | **0 NP** con ese barrio en la PPP | `update … set zona='Zona 3 - CABA Oeste' where barrio_norm='v.devoto'` |
-| C | `empresa_de_np()`: **create or replace** de una función compartida | Producción la usa (9 referencias) | **0 NP** de Producción cambian de empresa — verificado comparando la regla vieja contra la nueva sobre toda la tabla | `sql/empresa_de_np.sql` tiene las dos versiones |
+| C | `empresa_de_np()`: **create or replace** de una función compartida | Producción la usa (9 referencias) | **0 filas** cambian de clasificación: 0 de 51.395 en `Movimientos_Stock` y 0 de 1.181 en `Facturacion_NP` tienen prefijo web | `sql/empresa_de_np.sql` tiene las dos versiones |
 
-**Corrección propuesta** (pendiente de tu OK):
+**Por qué C no se corrigió igual que A y B.** Sus tres consumidores son
+`isis_encolar_facturado` (24 líneas), `trg_normalizar_empresa_stock` (48) e
+`isis_pedido_json` (101). Copiar las funciones es trivial — el problema es que **dos de
+las tres son TRIGGERS sobre tablas compartidas**: `Facturacion_NP` y `Movimientos_Stock`.
+Y la regla prohíbe poner un trigger en una tabla compartida, porque corre para Producción
+también y no hay forma de acotarlo.
 
-- **A y B** → revertir los updates y mover el criterio de Gestión a tablas de override
-  `GV_Volumen_Articulos` y `GV_Zonas_Barrios`. `vista_volumen_articulo_resuelto` pasa a
-  leer `Volumen_Articulos` + override; se crea `gv_zona_de_barrio()` que hace lo mismo
-  con las zonas. Producción queda exactamente como estaba.
-- **C** → decidir: dejarla como excepción auditada (0 impacto, y el arreglo es
-  necesario para que la exportación a ISIS no mande una NP web de Loekemeyer como Chef),
-  o crear `gv_empresa_de_np()` y revertir la compartida.
+Así que "duplicar C" de verdad significa que Gestión tenga su propia `GV_Facturacion_NP`
+con su trigger y su cola de exportación, y su propio camino de normalización de stock: el
+circuito de facturación y el de stock enteros.
+
+Opciones sobre la mesa (pendiente de decisión):
+
+1. **Dejar C como excepción auditada.** Costo hoy: 0. Está medido que no cambia ninguna
+   fila existente, y el arreglo es lo que evita que una NP web de Loekemeyer se exporte a
+   ISIS como Chef.
+2. **Revertir la compartida y crear `gv_empresa_de_np()`.** Costo hoy: ~10 minutos, y
+   cumple la regla al pie. Hoy no la usaría nadie, porque ninguna NP web llega todavía a
+   `Facturacion_NP`. El problema real se resuelve más adelante, cuando Gestión tenga su
+   propia `GV_Facturacion_NP` —que la va a necesitar igual para las tres sublistas y el
+   botón "Enviar a ISIS"— y esa use `gv_empresa_de_np`.
 
 #### Cambios de datos en el proyecto **LK** (padrón de clientes)
 
@@ -181,7 +214,7 @@ cubre**.
 
 ## 5. Pendientes
 
-1. Corregir A, B y C de §3 (arriba).
+1. Decidir C de §3: excepción auditada, o `gv_empresa_de_np()` y revertir la compartida.
 2. Disparador de las 00:01 para `ppp_web_armar_tandas`: la función recibe las NP vivas
    por parámetro porque viven en LK y Virgilio no tiene FDW contra LK. Hace falta una
    Edge Function que lea LK y la llame, agendada por cron con prefijo `gv_`.
