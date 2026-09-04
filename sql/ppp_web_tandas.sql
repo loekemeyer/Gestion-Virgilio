@@ -9,6 +9,29 @@
 --   estructura de reemplazo, montada aparte, para el día que se haga el cambio.
 --
 -- ══════════════════════════════════════════════════════════════════════════
+-- ⚠⚠⚠  CUANDO GESTIÓN TOMA CONTROL Y SE VUELVE LA VERSIÓN QUE USAMOS,
+--       SEGUIR CON LA NUMERACIÓN QUE DEJÓ VIRGILIO
+-- ══════════════════════════════════════════════════════════════════════════
+-- Se hace con UNA línea, vaciando el parámetro:
+--
+--   update public."PPP_Web_Config" set valor_texto = '' where clave = 'tanda_prefijo';
+--
+-- Con el prefijo vacío la función vuelve sola a la codificación histórica
+-- LETRA+NN+LETRA (D19J) y `ppp_web_proxima_letra()` retoma desde la última letra
+-- que dejó Producción, mirando LAS DOS tablas. No hay nada más que tocar.
+--
+-- MIENTRAS TANTO (hoy, mientras conviven las dos apps): las tandas que arma
+-- Gestión son DE PRUEBA y llevan prefijo propio **`GV-`** → `GV-01A`, `GV-02B`.
+-- No se pueden confundir con las de Producción (D19J y compañía) ni colisionar
+-- con ellas: el prefijo rompe el patrón `^[A-Z]+[0-9]+[A-Z]+$`, así que además
+-- no ensucian el contador de letras de `ppp_web_proxima_letra()`.
+--
+-- Probado el 2026-09-04 en transacción revertida, los dos modos:
+--   con prefijo  → GV-01A · GV-02A · GV-03A   (0 matchean el patrón de ISIS)
+--   sin prefijo  → E01A · E02A · E03A         (sigue después de la D de Virgilio)
+-- ══════════════════════════════════════════════════════════════════════════
+
+-- ══════════════════════════════════════════════════════════════════════════
 -- LA REGLA SALIÓ DE LAS TANDAS REALES, NO DE UNA SUPOSICIÓN
 -- ══════════════════════════════════════════════════════════════════════════
 -- Ingeniería inversa sobre `PPP_Programacion_Diaria`, 120 días, 61 tandas:
@@ -138,6 +161,15 @@ insert into public."PPP_Web_Config" (clave, valor, descripcion) values
    'Cuántos m³ se arman por día en total (las dos empresas juntas). El dueño dijo 4 a 5; se tomó 5. Lo que no entra espera al día siguiente: esa cola es la demora.')
 on conflict (clave) do nothing;
 
+-- `valor` es numeric; el prefijo es texto. La tabla es NUESTRA, así que agregar
+-- una columna está permitido: nullable y sin default que reescriba nada.
+alter table public."PPP_Web_Config" add column if not exists valor_texto text;
+
+insert into public."PPP_Web_Config" (clave, valor, valor_texto, descripcion) values
+  ('tanda_prefijo', null, 'GV-',
+   'Prefijo de los códigos de tanda de Gestión MIENTRAS CONVIVE con Producción: son tandas de prueba y no se pueden confundir con las de ISIS. ⚠ CUANDO GESTIÓN TOME CONTROL Y SEA LA VERSIÓN QUE USAMOS, VACIAR ESTE CAMPO ('''') PARA SEGUIR CON LA NUMERACIÓN QUE DEJÓ VIRGILIO (LETRA+NN+LETRA, D19J).')
+on conflict (clave) do nothing;
+
 alter table public."PPP_Web_Config" enable row level security;
 drop policy if exists ppp_web_config_select on public."PPP_Web_Config";
 create policy ppp_web_config_select on public."PPP_Web_Config"
@@ -205,6 +237,8 @@ declare
   v_cupo   numeric := coalesce((select valor from public."PPP_Web_Config" where clave='m3_max_dia'), 5.00);
   v_dias   int     := coalesce((select valor from public."PPP_Web_Config" where clave='dias_hasta_entrega'), 0)::int;
   v_saltar boolean := coalesce((select valor from public."PPP_Web_Config" where clave='saltar_fin_de_semana'), 1) <> 0;
+  -- Vacio = codificacion historica de Virgilio. VER LA NOTA DEL ENCABEZADO.
+  v_pref   text    := coalesce((select valor_texto from public."PPP_Web_Config" where clave='tanda_prefijo'), '');
   v_letra  int     := public.ppp_web_proxima_letra();
   v_fecha  date;
   v_usado  numeric;
@@ -308,8 +342,11 @@ begin
       -- el mismo dia.
       if v_grupo = 'Super' or r_cli.solo or r_cli.m3_cli >= v_tope
          or v_code is null or (v_acum + r_cli.m3_cli) > v_tope then
-        v_code := public.ppp_web_letra(v_letra) || lpad(v_zn::text, 2, '0')
-                  || public.ppp_web_letra(v_ti);
+        -- Con prefijo: GV-01A (prueba). Sin prefijo: E01A (codificacion Virgilio).
+        -- ⚠ VER LA NOTA DEL ENCABEZADO ANTES DE TOCAR ESTO.
+        v_code := case when v_pref <> '' then v_pref
+                       else public.ppp_web_letra(v_letra) end
+                  || lpad(v_zn::text, 2, '0') || public.ppp_web_letra(v_ti);
         v_ti := v_ti + 1; v_acum := 0;
       end if;
       insert into _asig (order_id, np_idx, tanda)

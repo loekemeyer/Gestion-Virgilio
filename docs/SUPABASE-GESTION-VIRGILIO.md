@@ -292,7 +292,7 @@ elegir las tandas a armar a ese día"*.
 | `GV_Tandas_Auto_Log` | bitácora de cada corrida, incluidas las que no hacen nada. RLS: lectura sólo para los tres mails de supervisor |
 | `PPP_Web_Config.ventana_dias` | fila nueva (`insert … do nothing`), 30 días |
 | Edge Fn `gv-ppp-web-tandas-diarias` | el disparador. `verify_jwt = true` |
-| cron `gv-ppp-web-tandas-diarias` | `1 3 * * 1-5` = 00:01 de Argentina. jobid 71 |
+| cron `gv-ppp-web-tandas-diarias` | `1 3 * * 1-5` = 00:01 de Argentina. jobid 71. **Apagado el mismo día — ver §3.e** |
 
 ### Que no jode a Producción
 
@@ -414,6 +414,75 @@ quien decide permisos es el JWT del `Authorization`.
 -- en LK. Corta el acceso al instante, sin tocar nada mas.
 revoke gv_reader from authenticator;
 ```
+
+---
+
+## 3.e Numeración propia de las tandas + cron apagado — 2026-09-04
+
+### ⚠⚠⚠ CUANDO GESTIÓN TOMA CONTROL Y SE VUELVE LA VERSIÓN QUE USAMOS, SEGUIR CON LA NUMERACIÓN QUE DEJÓ VIRGILIO
+
+**Es una sola línea, el día del cambio:**
+
+```sql
+-- en VIRGILIO (hrxfctzncixxqmpfhskv)
+update public."PPP_Web_Config" set valor_texto = '' where clave = 'tanda_prefijo';
+```
+
+Con el prefijo vacío `ppp_web_armar_tandas` vuelve sola a la codificación histórica
+`LETRA + NN + LETRA` (`D19J`) y `ppp_web_proxima_letra()` **retoma desde la última letra
+que dejó Producción**, porque mira las dos tablas (`PPP_Programacion_Diaria` y
+`PPP_Web_Programacion`). No hay nada más que tocar: ni código, ni deploy, ni migración.
+
+**Mientras tanto (hoy, mientras conviven las dos apps):** las tandas que arma Gestión son
+**de prueba** y llevan prefijo propio **`GV-`** → `GV-01A`, `GV-02B`. No se confunden con
+las de Producción ni le pisan el contador: el prefijo rompe el patrón
+`^[A-Z]+[0-9]+[A-Z]+$` que usa `ppp_web_proxima_letra()` para leer la letra, así que las
+de prueba quedan fuera de esa cuenta.
+
+Lo que se agregó, todo por la regla del §1 (agregar, no modificar):
+
+| objeto | qué |
+|---|---|
+| `PPP_Web_Config.valor_texto` | columna **nueva** (`add column if not exists`), nullable, sin default, sin backfill. La tabla es nuestra, igual se respetó la regla |
+| `PPP_Web_Config` fila `tanda_prefijo` | `insert … do nothing`, valor `GV-` |
+| `ppp_web_armar_tandas` v4 | lee ese parámetro y arma el código con o sin prefijo. Función nuestra, 0 referencias en Producción (grep verificado) |
+
+Probado el 2026-09-04 en transacción revertida, los dos modos:
+
+| modo | códigos | chequeo |
+|---|---|---|
+| HOY (prueba) | `GV-01A · GV-02A · GV-03A` | ninguno matchea `^[A-Z]+[0-9]+[A-Z]+$` |
+| FUTURO (Virgilio) | `E01A · E02A · E03A` | todos matchean; sigue después de la `D` de Producción |
+
+Config intacta después del rollback (`tanda_prefijo` = `GV-`).
+
+### El cron quedó APAGADO a pedido del dueño
+
+```sql
+select cron.alter_job(71, active := false);   -- para prenderlo: active := true
+```
+
+`jobid 71`, definición **conservada** (no se borró), 0 corridas ejecutadas. Se apaga
+porque hasta que Gestión reemplace a Producción las tandas que arma son de prueba y no
+tiene sentido que se generen solas todas las madrugadas.
+
+### Auditoría de independencia (lo que pidió el dueño: "chequeá eso")
+
+Medido el 2026-09-04, no supuesto:
+
+- **26 objetos nuestros → 0 referencias** en el repo de Producción (grep sobre `.js`,
+  `.html`, `.sql` de `loekemeyer/produccion-virgilio`).
+- **0 triggers nuestros** sobre tablas compartidas.
+- **1 solo cron** nuestro, con prefijo, y apagado.
+- `PPP_Programacion_Diaria` intacta: **182 filas, 0 NP web**.
+- La PPP del front de Producción lee `PPP_Programacion_Diaria`; la de Gestión lee
+  `PPP_Web_Programacion`. Son tablas distintas: cada app ve su propia programación y por
+  eso las tandas de prueba de Gestión **no aparecen** en la pantalla de los operarios.
+- Exposición a `anon`: `PPP_Programacion_Diaria`, `PPP_Base_Pedidos`, `Entregas_Virgilio`
+  y `Facturacion_NP` ya tenían `SELECT / true` para `anon` desde antes — igual que las
+  nuestras. Se deja como está (decisión del dueño). ⚠ Al pasar: `Facturacion_NP` además
+  tiene `INSERT`/`UPDATE`/`DELETE` para `anon` con `true`. No es nuestro y no se tocó,
+  pero queda anotado.
 
 ---
 

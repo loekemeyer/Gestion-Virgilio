@@ -91,6 +91,25 @@ el impacto medido (la consulta que lo prueba, no "no debería afectar") y el rol
 Ese archivo —no la memoria— es lo que dice en qué estado está el pipeline al abrir
 una sesión nueva. **Leerlo antes de tocar Supabase.**
 
+## ⚠⚠⚠ CUANDO GESTIÓN TOMA CONTROL Y SE VUELVE LA VERSIÓN QUE USAMOS, SEGUIR CON LA NUMERACIÓN QUE DEJÓ VIRGILIO
+
+Las tandas de Gestión son **de prueba** mientras convivan las dos apps, y por eso llevan
+prefijo propio **`GV-`** (`GV-01A`, `GV-02B`) — no se confunden con las de Producción
+(`D19J`) ni le pisan el contador de letras.
+
+**El día que Gestión reemplace a Producción, se vacía el prefijo y listo:**
+
+```sql
+-- en VIRGILIO (hrxfctzncixxqmpfhskv)
+update public."PPP_Web_Config" set valor_texto = '' where clave = 'tanda_prefijo';
+```
+
+`ppp_web_armar_tandas` vuelve sola a la codificación histórica `LETRA+NN+LETRA` y
+`ppp_web_proxima_letra()` **retoma desde la última letra que dejó Virgilio** (mira las dos
+tablas). No hay que tocar código ni redeployar nada.
+
+Detalle y pruebas: `docs/SUPABASE-GESTION-VIRGILIO.md` §3.e y `sql/ppp_web_tandas.sql`.
+
 ## ⚠ PROTOCOLO OBLIGATORIO: Backups antes de tocar datos en Supabase
 
 **SIEMPRE que edites/alters/truncates/deletes en tablas de Supabase:**
