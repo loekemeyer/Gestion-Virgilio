@@ -752,6 +752,66 @@ apareo por etiqueta del §3.g, medido ahí).
 
 ---
 
+## 3.i Sólo zona 1 y zona 2 se programan solas — 2026-09-04
+
+Regla del dueño: *"para el armado de tandas y programación, que sólo los pedidos de zona 1
+y zona 2 sean automáticamente programados, el resto tienen que ser programados
+manualmente"*.
+
+| objeto | qué |
+|---|---|
+| `PPP_Web_Config.zonas_automaticas` | fila nueva (`insert … do nothing`), `valor_texto = '1,2'` |
+| `gv_ppp_web_zona_automatica(text)` | el helper, separado para poder probarlo suelto y para que el front pueda pintar distinto lo que va a mano |
+| `ppp_web_armar_tandas` | un `delete` más sobre la tabla temporal, antes de repartir tandas |
+
+Va por config y no hardcodeado: sumar una zona es un `update`, sin tocar código ni
+redeployar.
+
+```sql
+update public."PPP_Web_Config" set valor_texto = '1,2,3' where clave = 'zonas_automaticas';
+```
+
+**Lo que queda afuera no se pierde ni se marca:** simplemente no recibe tanda, o sea ni
+siquiera entra a `PPP_Web_Programacion`. Es exactamente como ya se ve un pedido pendiente
+en la pantalla de la PPP Web. Y cada corrida los vuelve a mirar, así que el día que se
+agregue la zona entran solos.
+
+### Probado
+
+El helper, contra los valores de zona que existen de verdad:
+
+| entra solo | va a mano |
+|---|---|
+| `Zona 1` · `Zona 2` · `Zona1` (sin espacio) | `Zona 3` · `Zona 6` · `Zona 7` · **`Zona 10`** · `Retira` · `Super` · `Expo` · `(sin zona)` · `''` · `null` |
+
+⚠ `Zona 10` da **no**, no se confunde con la 1: el capture group toma `'10'` entero.
+
+El armado completo, con 8 pedidos de todas las zonas (filas de mentira, borradas después —
+`PPP_Web_Programacion` volvió a 0 y Producción quedó en 182):
+
+| | |
+|---|---|
+| Zona 1, 2 clientes | → `GV-01A` (0,550 m³) |
+| Zona 2, 1 cliente | → `GV-02A` (0,400 m³) |
+| Zona 3 · 6 · 10 · Retira · Súper | → **sin fila en `PPP_Web_Programacion`** |
+
+Los 5 que van a mano no quedaron a medias ni con una tanda vacía: no existen en la
+programación. Y las zonas 1 y 2 fueron a tandas **separadas**, que es la regla de siempre
+(sólo se juntan los pares definidos: 2+3 y 6+7).
+
+⚠ Detalle cosmético: la zona 2 se agrupa como `'Zonas 2+3'` y esa regla no cambió, así que
+con la 3 fuera del automático ese grupo queda con zona 2 sola y el resumen igual dice
+"Zonas 2+3". Es sólo la etiqueta del resumen; la columna `zona` de cada NP guarda la zona
+real.
+
+### ⚠ Falta definir: cómo se programan a mano
+
+Hoy la pantalla de la PPP Web ya los muestra sin tanda y un supervisor los puede programar
+ahí, pero **no hay nada que los destaque** como "estos van a mano" — se mezclan con los que
+todavía no llegaron a su turno. Lo dijo el dueño: *"ahora vemos bien cómo"*.
+
+---
+
 ## 4. Incidente de seguridad — 2026-09-04 (cerrado)
 
 `public.vista_pedidos_web_feed` tenía `select` para `anon`. Los esquemas `fuentes` y

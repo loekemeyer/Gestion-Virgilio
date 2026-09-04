@@ -293,6 +293,22 @@ begin
   -- Sin zona no se programa: falta el barrio y la elige una persona.
   delete from _sin_tanda where zona = '(sin zona)';
 
+  -- ⚠ SOLO SE PROGRAMAN SOLAS LAS ZONAS DE `zonas_automaticas` (hoy: 1 y 2).
+  --   Regla del dueño (2026-09-04): el resto —zonas 3+, Retira, Súper, Expo— lo
+  --   programa una persona a mano. No se pierden ni se marcan: quedan SIN tanda,
+  --   que es exactamente como llegan a la pantalla de la PPP Web para que alguien
+  --   las agarre. Cada corrida las vuelve a mirar, así que el día que se agregue
+  --   una zona a la lista entran solas sin tocar código:
+  --
+  --     update public."PPP_Web_Config" set valor_texto = '1,2,3'
+  --      where clave = 'zonas_automaticas';
+  --
+  --   ⚠ Ojo con el nombre del grupo: la zona 2 se agrupa como 'Zonas 2+3' (esa
+  --     regla no cambió). Con la 3 fuera del automático ese grupo queda con zona 2
+  --     sola y el resumen igual dice 'Zonas 2+3'. Es sólo la etiqueta del resumen:
+  --     la columna `zona` de cada NP guarda la zona REAL.
+  delete from _sin_tanda where not public.gv_ppp_web_zona_automatica(zona);
+
   -- ── Cuanto queda de cupo para esa fecha ────────────────────────────────
   -- Cuenta las DOS empresas: el cupo es del deposito, no de una razon social.
   select coalesce(sum(m3), 0) into v_usado

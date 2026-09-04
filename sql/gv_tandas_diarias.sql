@@ -677,3 +677,62 @@ grant execute on function public.gv_ppp_web_np_label(text, integer) to anon, aut
 --   como una zona más. **Expo no tiene evidencia histórica** (0 tandas en 120
 --   días) y hoy se trata como una zona más. Sin definir.
 -- ══════════════════════════════════════════════════════════════════════════
+
+
+-- ══════════════════════════════════════════════════════════════════════════
+-- SOLO ZONA 1 Y ZONA 2 SE PROGRAMAN SOLAS · 2026-09-04
+-- ══════════════════════════════════════════════════════════════════════════
+-- Regla del dueño: *"para el armado de tandas y programación, que sólo los
+-- pedidos de zona 1 y zona 2 sean automáticamente programados, el resto tienen
+-- que ser programados manualmente"*.
+--
+-- Va por config y no hardcodeado, para que sumar una zona sea un UPDATE:
+--
+--   update public."PPP_Web_Config" set valor_texto = '1,2,3'
+--    where clave = 'zonas_automaticas';
+--
+-- Lo que queda afuera NO se pierde ni se marca de ninguna forma: simplemente no
+-- recibe tanda, o sea ni siquiera entra a `PPP_Web_Programacion`. Así es como ya
+-- se ve un pedido pendiente en la pantalla de la PPP Web, y cada corrida los
+-- vuelve a mirar — el día que se agregue la zona a la lista entran solos.
+
+insert into public."PPP_Web_Config" (clave, valor, valor_texto, descripcion)
+values ('zonas_automaticas', null, '1,2',
+        'Numeros de zona que el armado automatico programa SOLO. El resto (zonas 3+, Retira, Super, Expo, y cualquier cosa sin zona) queda SIN tanda, esperando que una persona la programe a mano. Vacio = ninguna zona automatica. Regla del dueno, 2026-09-04.')
+on conflict (clave) do nothing;
+
+-- Separado de `ppp_web_armar_tandas` para poder probarlo suelto y para que el
+-- front pueda pintar distinto lo que va a mano.
+create or replace function public.gv_ppp_web_zona_automatica(p_zona text)
+returns boolean language sql stable as $function$
+  select coalesce(
+    (regexp_match(coalesce(p_zona,''), '^\s*Zona\s*([0-9]+)'))[1] = any (
+      select btrim(z) from unnest(string_to_array(
+        coalesce((select valor_texto from public."PPP_Web_Config" where clave='zonas_automaticas'), ''),
+        ',')) z
+      where btrim(z) <> ''
+    ), false);
+$function$;
+
+grant execute on function public.gv_ppp_web_zona_automatica(text) to anon, authenticated, service_role;
+
+-- ── Probado el 2026-09-04 ──────────────────────────────────────────────────
+-- El helper, contra los valores de zona que existen de verdad:
+--   Zona 1 → sí · Zona 2 → sí · Zona1 (sin espacio) → sí
+--   Zona 3 · Zona 6 · Zona 7 · Zona 10 · Retira · Super · Expo · (sin zona)
+--   · '' · null → NO
+--   ⚠ `Zona 10` da NO, no se confunde con la 1: el capture group toma '10'.
+--
+-- El armado entero, con 8 pedidos de todas las zonas (filas de mentira, borradas
+-- después; `PPP_Web_Programacion` volvió a 0 y Producción quedó en 182):
+--   Zona 1  ×2 clientes → GV-01A  (0,550 m³)   ← programados
+--   Zona 2  ×1 cliente  → GV-02A  (0,400 m³)   ← programado
+--   Zona 3 · Zona 6 · Zona 10 · Retira · Super → SIN fila en PPP_Web_Programacion
+--
+-- Es decir: los 5 que van a mano no quedaron a medias ni con tanda vacía, no
+-- existen en la programación. Y las zonas 1 y 2 fueron a tandas SEPARADAS, que es
+-- la regla de siempre (sólo se juntan los pares definidos: 2+3 y 6+7).
+--
+-- ⚠ PENDIENTE, hablado: cómo se programan a mano. Hoy la pantalla de la PPP Web
+--   ya los muestra sin tanda y un supervisor puede programarlos ahí, pero no hay
+--   nada que los DESTAQUE como "estos van a mano". Falta definirlo.
