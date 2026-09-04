@@ -12,7 +12,11 @@
        una sugerencia pasaba a ser una decisión sin que nadie la tomara,
    (d) escriba en PPP_Web_Programacion y NUNCA en PPP_Programacion_Diaria, que es la
        tabla viva de Producción,
-   (e) un 403 de la RLS se explique como falta de permiso y no como error crudo. */
+   (e) un 403 de la RLS se explique como falta de permiso y no como error crudo,
+   (f) NO se guarde si la NP todavía no tiene número: si la numeración falló, la
+       etiqueta queda en "…" y guardar igual escribía np: null y un np_label
+       "LK undefined" en la foto de artículos — una tanda que le llega rota al
+       operario. */
 const path = require("path");
 let chromium;
 try { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
@@ -100,15 +104,60 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
     };
   });
 
-  // (e) 403 de la RLS -> mensaje entendible
+  // (f) sin número asignado no se guarda. Se recarga la pantalla primero: después
+  // del guardado anterior la 1342 quedó con tanda y sale del listado.
+  const sinNum = await p.evaluate(async () => {
+    const posts = [];
+    const json = (o) => ({ ok: true, status: 200, json: async () => o, text: async () => JSON.stringify(o) });
+    window.fetch = async (url, opt) => {
+      const u = String(url);
+      if (opt && opt.method === "POST" && u.includes("PPP_Web_")) { posts.push(u); return json([]); }
+      if (u.includes("admin-login-otp"))  return json({ email: "a@b.c", tmp_password: "x" });
+      if (u.includes("/auth/v1/token"))   return json({ access_token: "lk", expires_in: 3600 });
+      if (u.includes("v_pedidos_web_np")) return json([
+        { empresa: "lk", order_id: 1342, np_idx: 1, cod: "4109", razon_social: "Di Leo",
+          fecha_recep: "2026-09-03", hora_recep: "16:03:54", direccion: "Bragado 5742 - Mataderos",
+          v: "21", lineas: 1, cajas: 2, enviado_a_compras: false, items: [{ art: "027", cajas: 2 }] }
+      ]);
+      if (u.includes("ppp_web_np_asignar")) return { ok: false, status: 500, json: async () => ({}), text: async () => "boom" };
+      if (u.includes("Volumen_Articulos"))  return json([{ codigo: "027", m3: 0.1 }]);
+      return json([]);
+    };
+    await pwebCargar();                          // la numeración falla -> etiqueta "…"
+    const etiqueta = (document.querySelector(".pweb-np") || {}).textContent;
+    document.getElementById("pwT_1342_1").value = "D99Z";
+    pwebMarcarSucio("1342|1");
+    await pwebGuardar();
+    return { etiqueta: etiqueta, posteos: posts.length,
+             status: document.getElementById("pwebStatus").textContent };
+  });
+
+  // (e) 403 de la RLS -> mensaje entendible. Primero se recarga con la numeración
+  // andando (si no, lo frena el guard de (f)) y recién después se cambia el stub
+  // por uno que rechaza el POST.
   const permiso = await p.evaluate(async () => {
+    const json = (o) => ({ ok: true, status: 200, json: async () => o, text: async () => JSON.stringify(o) });
+    window.fetch = async (url) => {
+      const u = String(url);
+      if (u.includes("admin-login-otp"))  return json({ email: "a@b.c", tmp_password: "x" });
+      if (u.includes("/auth/v1/token"))   return json({ access_token: "lk", expires_in: 3600 });
+      if (u.includes("v_pedidos_web_np")) return json([
+        { empresa: "lk", order_id: 1342, np_idx: 1, cod: "4109", razon_social: "Di Leo",
+          fecha_recep: "2026-09-03", hora_recep: "16:03:54", direccion: "Bragado 5742 - Mataderos",
+          v: "21", lineas: 1, cajas: 2, enviado_a_compras: false, items: [{ art: "027", cajas: 2 }] }
+      ]);
+      if (u.includes("ppp_web_np_asignar")) return json([{ r_order_id: 1342, r_np_idx: 1, r_np: 1343 }]);
+      if (u.includes("Volumen_Articulos"))  return json([{ codigo: "027", m3: 0.1 }]);
+      return json([]);
+    };
+    await pwebCargar();
     window.fetch = async (url, opt) => {
       if (opt && opt.method === "POST" && String(url).includes("PPP_Web_Programacion"))
         return { ok: false, status: 403, text: async () => "permission denied" };
       return { ok: true, status: 200, json: async () => ([]), text: async () => "[]" };
     };
-    document.getElementById("pwT_1341_1").value = "D53B";
-    pwebMarcarSucio("1341|1");
+    document.getElementById("pwT_1342_1").value = "D53B";
+    pwebMarcarSucio("1342|1");
     await pwebGuardar();
     return document.getElementById("pwebStatus").textContent;
   });
@@ -123,9 +172,10 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
     && r.zona === "Zona 3 - CABA Oeste" && r.fecha === "2026-09-05"
     && r.barrioGuardado === "Mataderos" && r.m3Guardado === 0.2
     && r.upsert && r.noTocaPppProd && r.status.indexOf("✓") === 0
-    && /permiso/i.test(permiso);
+    && /permiso/i.test(permiso)
+    && sinNum.posteos === 0 && /número/i.test(sinNum.status);
 
-  console.log("pweb-programar:", JSON.stringify({ barrios, ...r, permiso }),
+  console.log("pweb-programar:", JSON.stringify({ barrios, ...r, sinNum, permiso }),
     "· pageerrors:", errs.length ? errs.join("|") : "none", "·", (ok && !errs.length) ? "✓ OK" : "✗ FAIL");
   await b.close();
   process.exit((ok && !errs.length) ? 0 : 1);

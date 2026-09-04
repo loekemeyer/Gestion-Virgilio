@@ -6634,7 +6634,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v12.67";
+const APP_VERSION = "v12.68";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -25621,6 +25621,18 @@ async function pwebGuardar() {
     });
   });
   if (!filas.length) { if (st) st.textContent = "No hay cambios para guardar."; return; }
+
+  // Guard: sin número no se guarda. `pwebNumerar` puede haber fallado (RPC caída,
+  // sesión vencida) y en ese caso la etiqueta queda en "…" — pero el guardado
+  // seguía igual y escribía np: null y un np_label "LK undefined" en la foto de
+  // artículos, o sea una tanda que le llega ROTA al operario. Mejor no guardar.
+  const sinNumero = filas.filter(function (f) { return !f.np; });
+  if (sinNumero.length) {
+    if (st) st.textContent = "⚠ " + sinNumero.length + " NP todavía no tienen número asignado. "
+      + "Tocá ↻ Actualizar y volvé a intentar.";
+    return;
+  }
+
   if (st) st.textContent = "Guardando " + filas.length + "…";
   try {
     const h = await facAuthWriteHeaders({ Prefer: "resolution=merge-duplicates,return=minimal" });

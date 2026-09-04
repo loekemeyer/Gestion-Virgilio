@@ -8437,6 +8437,10 @@ lee **la misma tabla donde caen los pedidos de la página**, en vivo.
     en un lado vale en el otro. El barrio sale de la sucursal de entrega cortando
     por el último separador ("Bragado 5742 - Mataderos" → Mataderos); "Retira" en
     cualquier grafía se reconoce como tal. 444 de 472 sucursales traen separador.
+  - ⚠ **Sin número no se guarda** (v12.68). Si `ppp_web_np_asignar` falla (RPC
+    caída, sesión vencida) la etiqueta queda en `…`, pero el guardado seguía igual
+    y escribía `np: null` y un `np_label` `"LK undefined"` en la foto de artículos
+    — una tanda que le llega **rota** al operario. Ahora corta y pide refrescar.
   - ⚠ **La sugerencia no es una decisión**: solo se guardan las filas que la
     persona editó. Sin ese filtro la zona sugerida —que viene preseleccionada en
     el `<select>`— se guardaba sola en todas las filas visibles al apretar
