@@ -342,6 +342,69 @@ Detalle completo en `sql/gv_tandas_diarias.sql`.
 
 ---
 
+## 3.d La credencial contra LK — 2026-09-04
+
+El armado automático corre en Virgilio y los pedidos viven en **otro proyecto**
+(LK, `kwkclwhmoygunqmlegrg`). La `SUPABASE_SERVICE_ROLE_KEY` que la Edge Function
+ya tiene abre Virgilio y nada más. Y el camino del front no sirve: entra a LK
+canjeando el JWT de la sesión del supervisor por el bridge de `admin-login-otp`
+(`pwebLkToken`), y a las 00:01 no hay nadie logueado.
+
+⚠ **Sí, esto lo habíamos cerrado el mismo día.** El rol `virgilio_reader` de LK
+se borró junto con su vista `v_virgilio_pedidos_feed` y el FDW. Los motivos eran
+buenos (su password había quedado expuesta en un chat, la vista no tenía el corte
+en NP ni el m³, y el FDW se midió más lento: 3,16 s contra 2,90 s), pero **era el
+único camino de credencial server-side contra LK** y eso no quedó anotado. Lo que
+sigue lo reconstruye, apuntando a las vistas correctas.
+
+### El rol `gv_reader` (en LK)
+
+Sólo puede **ejecutar tres funciones**. No tiene `SELECT` sobre ninguna tabla ni
+vista. Van por función y no por grant sobre las vistas a propósito:
+`v_pedidos_web_np` y `gv_clientes_lk_ch` son `security_invoker`, así que un rol
+nuevo chocaría contra la RLS de las tablas de abajo y no vería nada; envueltas en
+`SECURITY DEFINER` el permiso pasa a ser el GRANT, que es lo auditable.
+
+| | `gv_reader` | anon key (pública, está en el front) | service key |
+|---|---|---|---|
+| tablas/vistas que lee | **0** | 192 | todo |
+| funciones `SECURITY DEFINER` que alcanza y anon no | **3** (las nuestras) | — | todas |
+| superusuario / bypassrls | no | no | sí |
+| login con password | no | no | — |
+
+Medido el 2026-09-04, no supuesto. El resto de funciones que alcanza son las que
+`anon` ya alcanza con la key pública: no agrega superficie.
+
+Objetos creados en LK: `gv_pedidos_web_np_lk(date)`, `gv_cods_chef_de_lk(text[])`,
+`gv_clientes_lk_ch` (vista, 357 pares por CUIT), rol `gv_reader` + grant a
+`authenticator`. Más `gv_pedidos_web_np_chef(integer)`, que ya existía.
+
+### Cómo se emite el token
+
+`tools/gv-token-lk.js`, sin dependencias. El JWT Secret de LK entra por variable
+de entorno y no se guarda en ningún lado:
+
+```bash
+LK_JWT_SECRET='<JWT Secret de LK>' node tools/gv-token-lk.js
+```
+
+El token sale con `role: gv_reader` y 5 años de vigencia, y se pega en Virgilio →
+Edge Functions → Secrets como `GV_LK_SERVICE_KEY`.
+
+La Edge Function acepta **cualquiera de las dos** credenciales sin recompilar (el
+token de `gv_reader` o la service key de LK), porque todo va por RPC. El header
+`apikey` va siempre con la anon key de LK, que es pública y ya está en el front;
+quien decide permisos es el JWT del `Authorization`.
+
+### Para revocarlo
+
+```sql
+-- en LK. Corta el acceso al instante, sin tocar nada mas.
+revoke gv_reader from authenticator;
+```
+
+---
+
 ## 4. Incidente de seguridad — 2026-09-04 (cerrado)
 
 `public.vista_pedidos_web_feed` tenía `select` para `anon`. Los esquemas `fuentes` y

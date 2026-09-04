@@ -11,7 +11,7 @@
 //
 // Hace, en orden:
 //   1. ¿es día hábil en Argentina? → si no, loguea 'salteada' y corta
-//   2. lee LK (`v_pedidos_web_np`) y Chef (RPC `get_pedidos_web_np_chef`)
+//   2. lee LK (`gv_pedidos_web_np_lk`) y Chef (`gv_pedidos_web_np_chef`)
 //   3. `ppp_web_np_asignar`     — numera lo que no tiene número
 //   4. `ppp_web_resync`         — pone al día lo YA programado que cambió
 //   5. `gv_ppp_web_zona_lote`   — resuelve la zona de cada NP
@@ -39,11 +39,24 @@ import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 const VIRGILIO_URL = Deno.env.get("SUPABASE_URL")!;
 const VIRGILIO_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
-// Proyecto de LK. `v_pedidos_web_np` y la RPC de Chef piden `authenticated`
-// (traen razón social, dirección y detalle de pedidos), así que la anon key da
-// 401 — y así tiene que seguir. La service key va como secreto del proyecto.
+// Proyecto de LK. Los datos que necesita el armado no son publicos (razon
+// social, direccion, detalle de pedidos), asi que la anon key no alcanza y asi
+// tiene que seguir.
+//
+// `GV_LK_SERVICE_KEY` acepta CUALQUIERA de las dos credenciales, sin recompilar:
+//   · el token del rol `gv_reader` (recomendado) — solo puede ejecutar las tres
+//     funciones `gv_*` de abajo y no lee NI UNA tabla; o
+//   · la service key de LK, que abre todo.
+// Por eso todo va por RPC y no por lectura directa de vistas: `gv_reader` no
+// tiene SELECT sobre nada, a proposito.
+//
+// El header `apikey` va SIEMPRE con la anon key de LK (es publica, esta en el
+// front) porque el gateway la exige; quien decide los permisos es el JWT del
+// Authorization.
 const LK_URL = Deno.env.get("GV_LK_URL") ?? "https://kwkclwhmoygunqmlegrg.supabase.co";
 const LK_KEY = Deno.env.get("GV_LK_SERVICE_KEY") ?? "";
+const LK_ANON = Deno.env.get("GV_LK_ANON") ??
+  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imt3a2Nsd2htb3lndW5xbWxlZ3JnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njk1MjA2NzUsImV4cCI6MjA4NTA5NjY3NX0.soqPY5hfA3RkAJ9jmIms8UtEGUc4WpZztpEbmDijOgU";
 
 const TZ = "America/Argentina/Buenos_Aires";
 
@@ -77,7 +90,7 @@ async function lk(path: string, init: RequestInit = {}): Promise<Response> {
   return await fetch(LK_URL + path, {
     ...init,
     headers: {
-      apikey: LK_KEY,
+      apikey: LK_ANON,
       Authorization: "Bearer " + LK_KEY,
       "Content-Type": "application/json",
       ...(init.headers ?? {}),
@@ -87,14 +100,14 @@ async function lk(path: string, init: RequestInit = {}): Promise<Response> {
 
 type Fila = Record<string, unknown>;
 
-/** Las columnas que pide `v_pedidos_web_np`. Mismas que usa el front. */
-const COLS = "empresa,order_id,np_idx,cod,razon_social,fecha_recep,hora_recep,direccion,v," +
-  "lineas,cajas,items,enviado_a_compras,localidad,zona_expreso,nombre_expreso,direccion_expreso,m3,m3_parcial";
-
+/** Los pedidos de Loekemeyer. Va por RPC y no leyendo `v_pedidos_web_np`
+ *  directo: la vista es `security_invoker`, asi que un rol acotado chocaria con
+ *  la RLS de las tablas de abajo y no veria nada. Envuelta en una funcion
+ *  SECURITY DEFINER el permiso pasa a ser el GRANT, que es lo que se audita. */
 async function traerLk(desde: string): Promise<Fila[]> {
-  const r = await lk(`/rest/v1/v_pedidos_web_np?select=${COLS}` +
-    `&fecha_recep=gte.${desde}&order=order_id.asc,np_idx.asc&limit=5000`);
-  if (!r.ok) throw new Error(`LK v_pedidos_web_np: HTTP ${r.status} ${(await r.text()).slice(0, 300)}`);
+  const r = await lk("/rest/v1/rpc/gv_pedidos_web_np_lk",
+    { method: "POST", body: JSON.stringify({ p_desde: desde }) });
+  if (!r.ok) throw new Error(`LK gv_pedidos_web_np_lk: HTTP ${r.status} ${(await r.text()).slice(0, 300)}`);
   return await r.json();
 }
 
@@ -105,7 +118,7 @@ async function traerLk(desde: string): Promise<Fila[]> {
  *  usa el front. El original chequea `auth.uid()` contra `public.admins`, y acá
  *  corremos con la service key: `auth.uid()` es NULL, así que ese chequeo siempre
  *  falla. El gemelo `gv_` no tiene ese chequeo — su gate es el GRANT, que sólo
- *  alcanza a `service_role`. */
+ *  alcanza a `service_role` y a `gv_reader`. */
 async function traerChef(dias: number): Promise<Fila[]> {
   const r = await lk("/rest/v1/rpc/gv_pedidos_web_np_chef",
     { method: "POST", body: JSON.stringify({ p_dias: dias }) });
@@ -151,14 +164,11 @@ async function resolverZonas(entradas: { ze: string; loc: string; dir: string }[
  *  distinto la misma razón social ("Torres Y Liva S.A Cif" contra "Torres Y Liva"). */
 async function codsChefDe(codsLk: string[]): Promise<string[]> {
   if (!codsLk.length) return [];
+  const r = await lk("/rest/v1/rpc/gv_cods_chef_de_lk",
+    { method: "POST", body: JSON.stringify({ p_cods_lk: codsLk }) });
+  if (!r.ok) return [];                   // sin mapeo se sigue igual, no se rompe el armado
   const out = new Set<string>();
-  // De a tandas de 100 para no armar una URL infinita.
-  for (let i = 0; i < codsLk.length; i += 100) {
-    const lote = codsLk.slice(i, i + 100).map((c) => `"${c}"`).join(",");
-    const r = await lk(`/rest/v1/gv_clientes_lk_ch?select=cod_ch&cod_lk=in.(${lote})`);
-    if (!r.ok) return [];                 // sin mapeo se sigue igual, no se rompe el armado
-    for (const x of await r.json() as { cod_ch: string }[]) out.add(String(x.cod_ch));
-  }
+  for (const x of await r.json() as { cod_ch: string }[]) out.add(String(x.cod_ch));
   return [...out];
 }
 
@@ -298,7 +308,7 @@ Deno.serve(async (req: Request) => {
       return Response.json({ ok: true, fecha, salteada: true, motivo });
     }
 
-    if (!LK_KEY) throw new Error("Falta el secreto GV_LK_SERVICE_KEY (service_role de LK).");
+    if (!LK_KEY) throw new Error("Falta el secreto GV_LK_SERVICE_KEY (token de gv_reader, o service_role de LK).");
 
     const rCfg = await vg("/rest/v1/PPP_Web_Config?select=valor&clave=eq.ventana_dias");
     const cfg = rCfg.ok ? await rCfg.json() as { valor: number }[] : [];
