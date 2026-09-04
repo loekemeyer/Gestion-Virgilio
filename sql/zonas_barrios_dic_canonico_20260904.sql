@@ -1,0 +1,92 @@
+-- ============================================================================
+-- Zonas_Barrios · barrios que faltan, según la lista canónica del dueño
+-- Corre en VIRGILIO (hrxfctzncixxqmpfhskv) · 2026-09-04
+-- ============================================================================
+-- ⚠⚠ **NO EJECUTADO.** Esto TOCA DATOS de producción y el CLAUDE.md manda pedir
+--    permiso explícito antes. Está acá para que el dueño lo lea, decida y recién
+--    ahí se corra. Correr el BACKUP primero, siempre.
+--
+-- ----------------------------------------------------------------------------
+-- QUÉ PROBLEMA RESUELVE
+-- ----------------------------------------------------------------------------
+-- v12.72-v12.74 arreglaron de dónde SALE el barrio de un pedido web: sale de
+-- `customer_delivery_addresses.zona_expreso` (el barrio del punto de entrega,
+-- que para el interior es el depósito del expreso en CABA). Eso ya está en main.
+--
+-- Lo que quedó pendiente es el OTRO lado del cruce: el diccionario barrio→zona.
+-- v12.74 lo dijo textual: «los 7 que faltan son grafías […] que se aprenden
+-- eligiendo la zona una vez en la PPP. No se tocó el diccionario.»
+--
+-- Medido el 2026-09-04 contra `public.vista_pedidos_web_feed` (1.358 pedidos):
+-- hay **22 barrios de entrega reales, con 51 pedidos**, que NO están en
+-- `public."Zonas_Barrios"` (87 filas) pero SÍ resuelven en la lista canónica que
+-- pasó el dueño (`pipeline.barrio_zona`, 113 filas). Cada uno de esos pedidos
+-- entra a la PPP sin zona y hay que asignarle el barrio a mano.
+--
+--   tortuguitas 8 · villa general mitre 5 · florencio varela 5 · valentin alsina 4
+--   microcentro 3 · laferrere 3 · lanus este 2 · jose c. paz 2 · villa riachuelo 2
+--   villa lynch 2 · san antonio de padua 2 · villa del parque 2 · garin 2
+--   palomar 1 · monserrat 1 · puerto madero 1 · gonzalez catan 1 · p. patricios 1
+--   villa adelina 1 · san isidro 1 · lanus oeste 1 · liniers 1
+--
+-- («santa fe», 1 pedido, tampoco resuelve: no está en ninguno de los dos. Es
+--  interior sin barrio de expreso cargado — se arregla en el padrón de LK, no acá.)
+--
+-- ----------------------------------------------------------------------------
+-- LO QUE HAY QUE DECIDIR ANTES DE CORRER
+-- ----------------------------------------------------------------------------
+-- 1) `tortuguitas → Super` y `campo de mayo → Super`: la lista canónica los manda
+--    a Super, no a una zona de reparto. Son los dos de mayor volumen del lote.
+--    ¿Va así? Si van a Super, esos 8 pedidos salen del reparto normal.
+-- 2) `mataderos (8:30 a 14)`: el horario viene pegado al barrio. Entra tal cual
+--    porque así llega desde la página; si se prefiere, se limpia en el padrón.
+-- 3) Los 6 alias de grafía (`p. patricios`, `jose c. paz`, `lanus este/oeste`,
+--    `v. maipu - san martin`, `micro centro`) son duplicados de un barrio que ya
+--    existe. Entran igual: el cruce es por texto normalizado, no por geografía.
+--
+-- ----------------------------------------------------------------------------
+-- LO QUE **NO** SE TOCA (3 conflictos — la lista canónica está peor que la base)
+-- ----------------------------------------------------------------------------
+--   barrio        Zonas_Barrios (hoy)      lista canónica        veredicto
+--   burzaco       Zona 4 - GBA Sur         Zona 2 - CABA Centro  la lista está MAL
+--   villa bosch   Zona 6 - GBA Norte       Zona 5 - GBA Oeste    dudoso, no tocar
+--   v.devoto      Zona 3 - CABA Oeste      Zona 2 - CABA Centro  §6.1 del HANDOFF,
+--                                                                sin resolver
+-- Por eso este script es INSERT-only con `on conflict do nothing`: agrega lo que
+-- falta y no pisa nada de lo que ya está decidido en producción.
+-- ============================================================================
+
+-- ----------------------------------------------------------------------------
+-- PASO 1 · BACKUP (correr esto PRIMERO y guardar el resultado)
+-- ----------------------------------------------------------------------------
+-- select 'insert into public."Zonas_Barrios" (barrio_norm, zona) values ('
+--        || quote_literal(barrio_norm) || ',' || quote_literal(zona) || ');'
+--   from public."Zonas_Barrios" order by barrio_norm;
+
+-- ----------------------------------------------------------------------------
+-- PASO 2 · EL ALTA (22 barrios con pedidos reales + los que faltan de la lista)
+-- ----------------------------------------------------------------------------
+-- insert into public."Zonas_Barrios" (barrio_norm, zona)
+-- select b.barrio_norm, b.zona
+--   from pipeline.barrio_zona b
+--  where not exists (
+--          select 1 from public."Zonas_Barrios" z
+--           where public._norm_barrio(z.barrio_norm) = b.barrio_norm)
+-- on conflict (barrio_norm) do nothing;
+
+-- ----------------------------------------------------------------------------
+-- PASO 3 · VERIFICAR (tiene que dar 0 filas: ya no queda barrio real sin zona)
+-- ----------------------------------------------------------------------------
+-- with f as (
+--   select public._norm_barrio(barrio) b, count(*) n
+--     from public.vista_pedidos_web_feed
+--    where coalesce(trim(barrio),'') <> '' group by 1)
+-- select f.b, f.n from f
+--  where not exists (select 1 from public."Zonas_Barrios" z
+--                     where public._norm_barrio(z.barrio_norm) = f.b)
+--  order by f.n desc;
+
+-- ----------------------------------------------------------------------------
+-- ROLLBACK · si algo sale mal, borra SOLO lo que agregó este script
+-- ----------------------------------------------------------------------------
+-- delete from public."Zonas_Barrios" where creado::date = current_date;

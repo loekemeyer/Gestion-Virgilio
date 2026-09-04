@@ -8161,7 +8161,20 @@ Además del log de eventos, el stock físico y las compras viven en tablas propi
   aprobación → bajado); `Racks_Planimetria` guarda el layout.
 - **`Envasar_Ubicaciones`** — dónde está lo del depósito `para_envasar` (aparte de la
   planimetría de góndola).
-- **`Zonas_Barrios`** — mapa barrio → zona para la PPP.
+- **`Zonas_Barrios`** — mapa barrio → zona para la PPP. **Es el diccionario productivo**
+  (87 filas): lo llena solo el trigger `trg_ppp_autozona` y a mano la RPC
+  `zona_barrio_set`. No confundir con `pipeline.barrio_zona` (ver abajo).
+
+⚠ **Objetos vivos pero SIN USO — esquemas `pipeline` y `fuentes`.** Son de un segundo
+build del pipeline de pedidos web, hecho en paralelo en la rama
+`claude/pipeline-estructura-supabase-1haka4` mientras `main` construía el que sí corre.
+Nadie los lee: el pipeline productivo entra a LK por el bridge de admin, no por FDW.
+Quedan **desenchufados** y documentados en `sql/gv_pipeline_*.sql` +
+`docs/HANDOFF-PIPELINE-VENTAS.md` para que no haya objetos productivos sin SQL en el
+repo. Incluye los servers FDW `lk_feed`/`chef_feed`, la vista
+`public.vista_pedidos_web_feed`, el rol `virgilio_reader` en LK y en Chef, y
+`pipeline.barrio_zona` (la lista canónica de 113 barrios del dueño, que **no** es la
+que usa la app). Dar de baja o no está abierto — ver §6.11 del handoff.
 
 RLS `anon` (hardening 2026-07): lectura + escritura **acotada por tabla** — insert
 siempre; update sólo donde la app lo usa; **sin delete** salvo `Envasar_Ubicaciones`.
@@ -8459,6 +8472,14 @@ lee **la misma tabla donde caen los pedidos de la página**, en vivo.
       (`Esteban Echeverría` con acento, `Laferrere`, `Tortuguitas`, `Microcentro`,
       `Lanus Oeste`, `Villa General Mitre`, `Villa Riachuelo`) que se aprenden
       eligiendo la zona una vez en la PPP (`zona_barrio_set`), como siempre.
+    - **Medido sobre el histórico completo** (1.358 pedidos, 2026-09-04): son **22
+      barrios de entrega con 51 pedidos** los que no están en `Zonas_Barrios`
+      (`tortuguitas` 8, `villa general mitre` 5, `florencio varela` 5,
+      `valentin alsina` 4, `microcentro` 3, `laferrere` 3, y 16 más de 1-2). Los 22
+      resuelven en la lista canónica de 113 barrios que pasó el dueño. El alta está
+      escrita y **sin ejecutar** en `sql/zonas_barrios_dic_canonico_20260904.sql`
+      (INSERT-only: la lista canónica tiene `burzaco` mal y `v.devoto`/`villa bosch`
+      en discusión, y no hay que pisar lo que ya decidió producción).
     - Con `v12.61–v12.72` el barrio se sacaba **partiendo el string de la
       dirección**: era una invención y fallaba en la mitad de los casos.
   - ⚠ **Los pedidos web NO entran al panel de "revisar/corregir en el Excel"**

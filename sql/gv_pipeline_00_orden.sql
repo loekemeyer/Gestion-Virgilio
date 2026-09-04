@@ -1,0 +1,62 @@
+-- ============================================================================
+-- GESTIÓN VIRGILIO — Pipeline de pedidos web (estructura "desenchufada")
+-- ============================================================================
+-- ⚠⚠ ESTO **NO ES** EL PIPELINE PRODUCTIVO. LEER ANTES DE TOCAR.
+--
+--   El pipeline que corre de verdad es el de la PPP Web (idea 3717, v12.59-v12.74):
+--       sql/pedidos_web_lk.sql        → las NP se calculan EN VIVO en el proyecto LK
+--       sql/ppp_web_programacion.sql  → la numeración "LK 1343" y la programación
+--   Ese lee LK por el bridge de admin, sin FDW y sin copiar nada.
+--
+--   Lo de acá es un SEGUNDO build, hecho en paralelo en la rama
+--   `claude/pipeline-estructura-supabase-1haka4` mientras main construía el otro.
+--   Quedó ATRÁS y es REDUNDANTE — pero sus objetos **están vivos** en Supabase
+--   (esquema `pipeline`, esquema `fuentes`, servers FDW `lk_feed` y `chef_feed`,
+--   vista `public.vista_pedidos_web_feed`, rol `virgilio_reader` en LK y en Chef).
+--   Se documenta acá para que no queden objetos productivos sin SQL en el repo.
+--
+--   Lo que SÍ sirve de este build (y por eso se conserva):
+--     · la vista-contrato con la columna `barrio` (= `zona_expreso`, el barrio del
+--       punto de entrega) — el mismo dato que v12.74 usa en el front;
+--     · `pipeline.barrio_zona`, la lista canónica de 113 barrios que pasó el dueño
+--       (ver sql/gv_pipeline_35_barrio_zona.sql y el merge propuesto en
+--        sql/zonas_barrios_dic_canonico_20260904.sql);
+--     · el mapa de reglas de negocio de docs/HANDOFF-PIPELINE-VENTAS.md.
+--
+--   NADA de acá escribe en `public.PPP_*`. Es seguro dejarlo quieto. Si se decide
+--   dar de baja, hay que dropear los objetos vivos a mano (con backup y permiso).
+-- ----------------------------------------------------------------------------
+-- Objetivo: que Gestión Virgilio lea los pedidos de las páginas de venta
+-- (Loekemeyer 'lk' + Chef 'ch') de forma directa y simétrica, los parta,
+-- les asigne una NP interna, calcule el m³ y arme una tanda — ESCRIBIENDO EN
+-- UN ESQUEMA AISLADO (`pipeline`), sin tocar las tablas PPP de producción.
+--
+-- Las únicas conexiones a producción son de SOLO LECTURA (FDW a los feeds).
+-- El día que se quiera "enchufar", se cambia el destino de escritura de
+-- `pipeline.*` a `public.PPP_*`.
+--
+-- PROYECTOS (3 Supabase distintos):
+--   - Virgilio : hrxfctzncixxqmpfhskv  (org azosplccoimzkdtbvzfi)  → destino
+--   - LK web   : kwkclwhmoygunqmlegrg  (org azosplccoimzkdtbvzfi)  → fuente
+--   - Chef     : nkhzocgdpwtgrmwleihr  (org eczogcnncryxuaipplqx)  → fuente
+--
+-- ORDEN DE EJECUCIÓN:
+--   10  gv_pipeline_10_feed_ch.sql        → correr en el proyecto CHEF
+--   11  gv_pipeline_11_feed_lk.sql        → correr en el proyecto LK
+--   20  gv_pipeline_20_fdw_virgilio.sql   → correr en el proyecto VIRGILIO
+--   30  gv_pipeline_30_schema.sql         → correr en el proyecto VIRGILIO
+--   35  gv_pipeline_35_barrio_zona.sql    → correr en el proyecto VIRGILIO
+--   40  gv_pipeline_40_aplicar_pedido.sql → correr en el proyecto VIRGILIO
+--
+--   50  gv_pipeline_50_zonas_sucursales.sql → NO ESTÁ EN EL REPO (.gitignore):
+--       lleva direcciones de clientes y este repo es público. Además quedó
+--       incompleto (el volcado del Sheet se cortó en "Lanus", 406 filas).
+--
+-- SEGURIDAD:
+--   - Rol lector `virgilio_reader` en LK y Chef: read-only, SOLO ve la
+--     vista-contrato `v_virgilio_pedidos_feed`, ninguna tabla cruda.
+--   - Los passwords van como PLACEHOLDER en este repo. Los reales viven solo
+--     en la base (rol + user mapping). Rotar = ALTER ROLE + ALTER USER MAPPING.
+--   - Todo el esquema `pipeline` tiene REVOKE para anon/authenticated y vive
+--     fuera de los schemas expuestos por PostgREST → la anon key no lo ve.
+-- ============================================================================

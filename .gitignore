@@ -8,3 +8,6 @@ app-release-signing.keystore
 android-twa/
 node_modules/
 .claude/caveman-enabled
+
+# Datos de clientes (direcciones de entrega) — NO subir a repo público
+sql/gv_pipeline_50_zonas_sucursales.sql
