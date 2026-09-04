@@ -12,6 +12,15 @@
 > (idea 5547). Lo de abajo queda como **histórico**: explica por qué se descartaron el
 > Comprobante Manual y el Modelo B, y sigue valiendo lo de conectividad on-premise.
 >
+> ✅ **2026-09-04 — CONSTRUIDO. El circuito de facturación (P1/P2) ya está andando.**
+> Se resolvió por la **Alternativa B del §11**: ISIS consulta una API nuestra
+> (Edge Function `isis-api` en Supabase) en vez de intercambiar archivos JSON o de
+> que nosotros llamemos al ISIS on-premise. Eso deja sin efecto el requisito de
+> Windows Server / IIS / IP pública / puertos del §18: la request es **saliente**
+> desde la red de ISIS.
+> **Lo que se le manda a ISIS (URL, token, endpoints, estructura JSON) está en
+> [`ISIS-API-ESPECIFICACION.md`](ISIS-API-ESPECIFICACION.md).**
+>
 > Efecto lateral bueno: al facturar ISIS un pedido normal (y no un pedido tipo Balcony),
 > se cae el bloqueante de **contado vs cuenta corriente** que figura más abajo —
 > confirmar igual con el proveedor.
