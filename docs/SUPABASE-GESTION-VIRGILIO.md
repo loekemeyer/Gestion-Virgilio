@@ -235,22 +235,28 @@ nuevo, `gv_*`.
 
 ### El contrato con ISIS quedó escrito — 2026-09-04
 
-`docs/ISIS-API-ESPECIFICACION.md` pasó a **v2.0** con este formato. La v1.0 decía lo
-contrario (ISIS bajaba "pedidos terminados" identificados por su NP, con `cajas_pedidas`
-vs `cajas` y `articulo` vs `articulo_pedido`) y quedó sin efecto. Lo que se conservó de la
-v1.0 es el **transporte**, que ya estaba acordado con Sistemas ISIS: ISIS consulta una API
-nuestra (Alternativa B del §11 de su informe), que es la que evita montar Windows Server /
-IIS / IP pública del lado del depósito. Cambió *qué* viaja, no *cómo*.
+`docs/ISIS-API-ESPECIFICACION.md` pasó a **v2.0**. La v1.0 decía lo contrario (ISIS bajaba
+"pedidos terminados" identificados por su NP, con `cajas_pedidas` vs `cajas` y `articulo`
+vs `articulo_pedido`) y quedó sin efecto. Lo único que se conservó es el **transporte**,
+que ya estaba acordado con Sistemas ISIS y es lo que ellos pidieron: ISIS consulta una API
+nuestra (Alternativa B del §11 de su informe), que evita montar Windows Server / IIS / IP
+pública del lado del depósito. Cambió *qué* viaja, no *cómo*.
 
-Lo que agrega la v2.0:
+Los tres puntos del contrato:
 
-- El pedido se identifica por una **referencia nuestra** (`LK 1344`) en la URL y en el
-  acuse. Es la clave de la integración, **no viaja dentro del pedido** y no es una NP.
-- El cuerpo es `{referencia, empresa, …, pedido:{…formato de la página…}, control:{…}}`.
-  `pedido` **no lleva NP** y cada línea trae un solo `cod_art` y una sola cantidad `cajas`:
-  lo armado.
-- **El acuse devuelve la NP que asignó ISIS** (campo `np`, obligatorio cuando
-  `resultado="ok"`). Eso cierra el punto **P3** del informe, que estaba abierto.
+- **El pedido no lleva NP.** El cuerpo es
+  `{referencia, empresa, …, pedido:{…}, control:{…}}`, donde `referencia` (`LK 1344`) es la
+  clave de la integración —va en la URL y en el listado, **no dentro del pedido**— y no es
+  una NP. Cada línea trae un solo `cod_art` y una sola cantidad `cajas`: lo armado.
+- **El formato es el del mail de las 12:30, no un canal existente.** Hoy los pedidos web
+  llegan a ISIS por un mail que alguien **carga a mano**; no hay entrada automática. Lo que
+  se repite es el formato y los campos. Lo que cambia: cuándo se manda (al cerrarse el
+  armado, no a las 12:30), por dónde llega (esta API, no un mail) y que las cantidades ya
+  vienen firmes.
+- **No vuelve nada de ISIS.** Sin acuse, sin NP, sin comprobante, sin CAE. El vínculo
+  factura ↔ pedido lo resuelve nuestro parseo (`vista_cruce_facturacion`), que hoy explica
+  **735 de 735** NP facturadas con 0 acuses. Eso deja el punto **P3** del informe sin
+  objeto. Del lado de ISIS quedan **dos GET de lectura** y nada más.
 
 Artefactos: `docs/API-Virgilio-ISIS-v2.0.pdf` (lo que se le manda a Horacio) y su fuente
 `docs/API-Virgilio-ISIS-v2.0.fuente.html` — se regenera con
@@ -259,9 +265,9 @@ WhatsApp con el token) está publicado como artifact y también se actualizó.
 
 ⚠ **El código desplegado sigue en la v1.0.** El contrato va adelante; falta reescribir
 `isis_pedido_json`, traer los campos comerciales del `sheets_payload` de LK, cambiar la
-clave de `isis_export_pedidos` de NP a referencia (+ columna para la NP que devuelve ISIS)
-y reemplazar el disparador `Facturacion_NP` por el cierre del armado. Detalle en el anexo
-técnico de `docs/ISIS-API-ESPECIFICACION.md`.
+clave de `isis_export_pedidos` de NP a referencia, **sacar las rutas de acuse y la RPC
+`isis_api_acuse`**, y reemplazar el disparador `Facturacion_NP` por el cierre del armado.
+Detalle en el anexo técnico de `docs/ISIS-API-ESPECIFICACION.md`.
 
 ---
 
