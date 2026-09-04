@@ -14,6 +14,35 @@
 >
 > Última actualización: 2026-09-04 · Versión app al documentar: **v12.77**
 >
+> Nota **backend, sin bump de app** — **Armado AUTOMÁTICO de tandas de la PPP Web
+> (`ppp_web_armar_tandas`).** ⚠ **No toca Producción Virgilio**: escribe sólo en
+> `PPP_Web_Programacion`; `PPP_Programacion_Diaria` se lee en un único lugar
+> (`ppp_web_proxima_letra`, para no repetir un código de tanda) y no tiene ni un INSERT ni un
+> UPDATE en todo el módulo.
+> **La regla salió de ingeniería inversa sobre 61 tandas reales de 120 días, no de una
+> suposición:** una tanda = una sola fecha (0 de 61 tienen más); no se mezclan zonas (sólo 3
+> de 56, 5%); Súper es una tanda por cliente (las 3 históricas tienen 1 cliente y 1 NP);
+> **el tope de m³ es para juntar clientes distintos, NO para partir a uno** — las 6 tandas de
+> más de 2 m³ son todas de un solo cliente y el máximo real es 9,25 m³, contra el T_MAX de
+> 1,00 que usa el sugeridor del front; el mínimo no retiene nada (33 de 56 salieron bajo 0,60);
+> Retira se junta como una zona más (2 tandas, 1,5 clientes); **Expo no tiene evidencia**
+> (0 tandas) y se trata como una zona más.
+> **La fecha no se pudo deducir y se dice por qué:** entre el último pedido de una tanda y su
+> entrega hay mediana 11 días, mínimo 2 y máximo 96, y 56 de 61 pasan la semana — eso lo carga
+> una persona. Tampoco hay calendario zona→día (Zona 1 reparte miércoles, jueves y viernes;
+> Zona 5 lunes, martes, jueves y viernes). Lo único sólido: **nunca se entrega fin de semana**
+> (0 casos). Así que se aplica el criterio del dueño —la tanda se arma para el día y se cierra
+> al final del día— con `fecha_entrega = día de armado + dias_hasta_entrega` (config, arranca
+> en 0) y corrimiento al lunes si cae finde.
+> **Es idempotente y sólo toca lo que no tiene tanda**, así que se puede correr todas las veces
+> que haga falta: la tanda del día queda **abierta** y los pedidos que entran se le suman sin
+> mover lo ya programado. Reacomodar lo que ya tiene tanda es de `ppp_web_resync`.
+> Todo configurable en la tabla nueva **`PPP_Web_Config`** (tope de mezcla, mínimo, días hasta
+> entrega, saltar fin de semana). Detalle y pruebas en `sql/ppp_web_tandas.sql`.
+> ⚠ **Falta el disparador de las 00:01**: la función recibe las NP vivas por parámetro porque
+> viven en LK y Virgilio no tiene FDW contra LK. Para que corra sola hace falta una Edge
+> Function que lea LK y la llame, agendada por cron.
+>
 > Nota **backend, sin bump de app** — **`empresa_de_np` era ciega a las NP web: toda NP de
 > Gestión salía como Chef.** La regla vieja sacaba los dígitos y miraba si pasaban de 90.000
 > —sirve para las NP de ISIS (9xxxx Loekemeyer / 4xxxx Chef)— pero las NP web son `LK 1343` /
