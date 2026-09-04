@@ -158,33 +158,24 @@ el FDW: 355 NP con 0 m³ incompleto.
 Las **28 filas agregadas a `Zonas_Barrios`** se mantienen: son un `insert`, que la regla
 permite, y su impacto medido es cero (las 4 NP que tocan ya traían `Super` del Excel).
 
-#### ⚠ Pendiente de decisión
+#### ✅ C — revertido, y el pipeline nuevo no lo necesita
 
 | # | Cambio | Por qué viola | Impacto medido | Rollback |
 |---|---|---|---|---|
 | C | `empresa_de_np()`: **create or replace** de una función compartida | Producción la usa (9 referencias) | **0 filas** cambian de clasificación: 0 de 51.395 en `Movimientos_Stock` y 0 de 1.181 en `Facturacion_NP` tienen prefijo web | `sql/empresa_de_np.sql` tiene las dos versiones |
 
-**Por qué C no se corrigió igual que A y B.** Sus tres consumidores son
-`isis_encolar_facturado` (24 líneas), `trg_normalizar_empresa_stock` (48) e
-`isis_pedido_json` (101). Copiar las funciones es trivial — el problema es que **dos de
-las tres son TRIGGERS sobre tablas compartidas**: `Facturacion_NP` y `Movimientos_Stock`.
-Y la regla prohíbe poner un trigger en una tabla compartida, porque corre para Producción
-también y no hay forma de acotarlo.
+**Resuelto: se revirtió `empresa_de_np` a la regla original de Producción, y NO se creó
+`gv_empresa_de_np` porque no tendría uso.**
 
-Así que "duplicar C" de verdad significa que Gestión tenga su propia `GV_Facturacion_NP`
-con su trigger y su cola de exportación, y su propio camino de normalización de stock: el
-circuito de facturación y el de stock enteros.
+El dueño lo señaló y tiene razón: la función existe para **adivinar** la empresa de una NP
+de ISIS, que no la lleva escrita (9xxxx Loekemeyer / 4xxxx Chef). **Las NP que genera
+Gestión ya dicen la empresa en el prefijo** (`LK 1343` / `CH 7`), así que no hay nada que
+deducir — cuando Gestión exporte a ISIS, manda la empresa que ya tiene.
 
-Opciones sobre la mesa (pendiente de decisión):
-
-1. **Dejar C como excepción auditada.** Costo hoy: 0. Está medido que no cambia ninguna
-   fila existente, y el arreglo es lo que evita que una NP web de Loekemeyer se exporte a
-   ISIS como Chef.
-2. **Revertir la compartida y crear `gv_empresa_de_np()`.** Costo hoy: ~10 minutos, y
-   cumple la regla al pie. Hoy no la usaría nadie, porque ninguna NP web llega todavía a
-   `Facturacion_NP`. El problema real se resuelve más adelante, cuando Gestión tenga su
-   propia `GV_Facturacion_NP` —que la va a necesitar igual para las tres sublistas y el
-   botón "Enviar a ISIS"— y esa use `gv_empresa_de_np`.
+Queda una sola punta suelta, a resolver aparte: `trg_normalizar_empresa_stock`, el trigger
+de `Movimientos_Stock`, sí la usa para completar la empresa de un movimiento a partir de la
+NP referenciada. Se enchufa cuando el stock de los pedidos web entre al circuito. Hoy: 0 de
+51.395 filas de `Movimientos_Stock` tienen una NP con prefijo web.
 
 #### Cambios de datos en el proyecto **LK** (padrón de clientes)
 
@@ -215,7 +206,17 @@ cubre**.
 
 ## 5. Pendientes
 
-1. Decidir C de §3: excepción auditada, o `gv_empresa_de_np()` y revertir la compartida.
+1. **Stock de los pedidos web.** `trg_normalizar_empresa_stock` (trigger de
+   `Movimientos_Stock`, tabla compartida) completa la empresa de un movimiento con
+   `empresa_de_np`, que no entiende las NP web. Hay que definir cómo entra el stock de un
+   pedido web sin poner un trigger en una tabla compartida.
+2. ⚠ **La exportación a ISIS de Gestión es un objeto NUEVO, no `isis_pedido_json`.** Esa
+   función arma un informe del pedido TERMINADO (cajas pedidas vs entregadas vs faltantes,
+   leído de `Facturacion_NP` + `Entregas_Virgilio` + `PPP_Base_Pedidos`) para que ISIS
+   facture lo que realmente salió. Además hace `np::bigint` sacando los no-dígitos, así que
+   una NP `LK 1343` viajaría como `1343`, sin prefijo. Al construir la de Gestión hay que
+   decidir explícitamente si se manda **lo pedido** (formato de las páginas, más simple) o
+   **lo entregado** (lo que hace hoy, y lo que evita facturar de más cuando hubo faltante).
 2. Disparador de las 00:01 para `ppp_web_armar_tandas`: la función recibe las NP vivas
    por parámetro porque viven en LK y Virgilio no tiene FDW contra LK. Hace falta una
    Edge Function que lea LK y la llame, agendada por cron con prefijo `gv_`.

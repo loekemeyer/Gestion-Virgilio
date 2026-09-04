@@ -18,42 +18,38 @@
 -- `vista_faltante_demanda`, `vista_faltante_real`, `vista_nc_loeke_chef`).
 
 -- ────────────────────────────────────────────────────────────────────────────
--- ⚠ REVISADA 2026-09-04 — la regla vieja era CIEGA a las NP que genera Gestión.
+-- ⚠ ESTA FUNCIÓN ES DE PRODUCCIÓN VIRGILIO. GESTIÓN NO LA USA NI LA TOCA.
 --
--- Sacaba los dígitos y miraba si pasaban de 90.000. Eso sirve para las NP de ISIS
--- (9xxxx Loekemeyer / 4xxxx Chef), pero las NP web son **"LK 1343" / "CH 7"**:
--- 1343 no llega a 90.000, así que `empresa_de_np('LK 1343')` devolvía **'CH'**.
+-- El 2026-09-04 se la modificó para que entendiera las NP web ("LK 1343" daba
+-- 'CH', porque 1343 no llega a 90.000) y **el mismo día se revirtió**: es un
+-- `create or replace` sobre una función compartida, que la regla prohíbe
+-- (docs/SUPABASE-GESTION-VIRGILIO.md §1).
 --
--- No era teórico. La usan `isis_encolar_facturado` (la empresa con la que el pedido
--- sale al ERP), `isis_pedido_json` y `trg_normalizar_empresa_stock`. La primera NP
--- web que se facturara se habría exportado a ISIS como Chef, fuera cual fuera.
+-- Y sobre todo: **el pipeline nuevo no la necesita.** Existe para adivinar la
+-- empresa de una NP de ISIS, que no la lleva escrita (9xxxx Loekemeyer / 4xxxx
+-- Chef). Las NP que genera Gestión **ya dicen la empresa en el prefijo**, así que
+-- no hay nada que deducir: cuando Gestión exporte a ISIS, manda la empresa que ya
+-- tiene. Tampoco se creó una `gv_empresa_de_np()`, porque no tendría uso.
 --
--- El arreglo es ADITIVO: si la NP arranca con el prefijo de empresa, ese prefijo
--- manda; para todo lo demás queda exactamente la regla de antes. Verificado sobre
--- `PPP_Programacion_Diaria`: **0 NP cambian de empresa**. Ningún índice depende de
--- la función (chequeado), así que el `create or replace` es seguro.
+-- Lo único que quedó pendiente de esto es el lado de STOCK: el trigger
+-- `trg_normalizar_empresa_stock` de `Movimientos_Stock` sí la usa para completar
+-- la empresa de un movimiento a partir de la NP referenciada. Se resuelve aparte
+-- cuando el stock de los pedidos web se enchufe (hoy: 0 de 51.395 filas de
+-- `Movimientos_Stock` tienen una NP con prefijo web).
 -- ────────────────────────────────────────────────────────────────────────────
--- (El archivo traía todavía la primera versión, por prefijo `^9`/`^4`; la base venía
---  usando desde hace tiempo la variante por valor numérico. Se sincroniza acá.)
 create or replace function public.empresa_de_np(p_np text)
 returns text
 language sql
 immutable
 as $function$
-  select case
-    -- NP de Gestión Virgilio: "LK 1343" / "CH 7". El prefijo ES la empresa.
-    when upper(trim(coalesce(p_np,''))) ~ '^(LK|CH)[ -]' then upper(left(trim(p_np), 2))
-    -- NP de ISIS: se decide por el número (9xxxx Loekemeyer / 4xxxx Chef).
-    when regexp_replace(coalesce(p_np,''), '\D', '', 'g') = '' then null
-    when (regexp_replace(p_np, '\D', '', 'g'))::bigint > 90000 then 'LK'
-    else 'CH'
-  end;
+  select case when regexp_replace(coalesce(p_np,''),'\D','','g')='' then null
+              when (regexp_replace(p_np,'\D','','g'))::bigint > 90000 then 'LK'
+              else 'CH' end;
 $function$;
 
--- Control:
---   select public.empresa_de_np('LK 1343'), public.empresa_de_np('CH 7'),
---          public.empresa_de_np('98213'),   public.empresa_de_np('44361');
---   -- → LK · CH · LK · CH
+-- Control (la regla de ISIS, que es la que vale acá):
+--   select public.empresa_de_np('98213'), public.empresa_de_np('44361');
+--   -- → LK · CH
 grant execute on function public.empresa_de_np(text) to anon, authenticated;
 
 create table if not exists public."Codigos_Duales" (
