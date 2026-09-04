@@ -8436,25 +8436,31 @@ lee **la misma tabla donde caen los pedidos de la página**, en vivo.
   - Escritura con la **misma reja** que la PPP: los tres mails de supervisor, por
     RLS del lado del servidor. Las dos listas están duplicadas a mano — al sumar
     un supervisor hay que tocar las dos policies.
-  - **La localidad sale del PADRÓN, no de parsear la dirección** (v12.73).
-    `customer_delivery_addresses.localidad` es una columna propia de LK, y
-    `sheets_payload.sucursal_entrega` es el **`label`** de esa tabla — por ahí se
-    cruzan. Es el mismo criterio que la PPP de Producción, donde el barrio viene en
-    su columna (`PPP_Programacion_Diaria.barrio`) y la dirección es sólo el
-    fallback: `localidad: (barrio || direccion)`.
-    Medido: **164 de las 180 sucursales** pedidas en 30 días resuelven por el
-    padrón, y **312 de 350 NP** traen localidad. De las que no: 10 son "Retira"
-    (no tiene dirección) y el resto etiquetas sueltas.
-    ⚠ La v12.61–v12.72 lo sacaba **partiendo el string de la dirección**. Era una
-    invención y fallaba en la mitad de los casos. El parseo queda sólo como
-    **último recurso** — para Retira, etiquetas sueltas y **Chef**, cuya RPC
-    todavía no devuelve la columna.
-  - La **zona se sugiere** con el mismo diccionario compartido que usa la PPP
-    (`Zonas_Barrios` + overrides, vía `pppZonaDeBarrio`), así una zona corregida en
-    un lado vale en el otro. Si la localidad no está en el diccionario, queda vacía
-    y la elige la persona: las del **interior** (Córdoba, Rosario, Bahía Blanca,
-    Mendoza…) **no tienen zona a propósito** — el esquema es de CABA/GBA y esas van
-    por expreso.
+  - **El barrio es el del punto adonde va el camión, y sale del padrón** (v12.74).
+    Para un cliente del **interior** ese punto no es su ciudad: es el depósito de su
+    **expreso**, en CABA. Córdoba → Azul, Ferre 1455, **Pompeya**. Mendoza →
+    Rodriguez, Erezcano 3880, **Soldati**. Tucumán → Lezana, **Parque Patricios**.
+    Por eso la PPP de Producción sólo tiene barrios de CABA/GBA: los pedidos del
+    interior entran con el barrio del expreso. **Tratar "Córdoba" como una localidad
+    sin zona fue un error de concepto** (v12.72/73), corregido acá.
+    - Columna que manda: **`customer_delivery_addresses.zona_expreso`** — es
+      exactamente ese barrio, y está cargado también en muchos clientes de GBA cuyo
+      punto de entrega difiere de su localidad (149 casos). Orden:
+      `zona_expreso` → `localidad` → parsear la dirección (último recurso: Retira,
+      etiquetas sueltas y **Chef**, cuya RPC todavía no trae estas columnas).
+    - `sheets_payload.sucursal_entrega` es el **`label`** de esa tabla; por ahí se
+      cruzan. Las vistas de LK devuelven `localidad, provincia, zona_expreso,
+      nombre_expreso, direccion_expreso`.
+    - La dirección que ve el supervisor, si hay expreso, es **adonde va el camión**:
+      `Exp. Azul — Ferre 1455, Pompeya (Rancagua 4650- Cordoba)`.
+    - Medido en 30 días: **324 de 350 NP** traen `zona_expreso` (204 van por
+      expreso), 11 más sólo `localidad`. De los **57 barrios de entrega distintos,
+      50 resuelven zona** en `Zonas_Barrios`; los 7 restantes son grafías
+      (`Esteban Echeverría` con acento, `Laferrere`, `Tortuguitas`, `Microcentro`,
+      `Lanus Oeste`, `Villa General Mitre`, `Villa Riachuelo`) que se aprenden
+      eligiendo la zona una vez en la PPP (`zona_barrio_set`), como siempre.
+    - Con `v12.61–v12.72` el barrio se sacaba **partiendo el string de la
+      dirección**: era una invención y fallaba en la mitad de los casos.
   - ⚠ **Los pedidos web NO entran al panel de "revisar/corregir en el Excel"**
     (v12.72). No salen de ningún Excel, y con 295 avisos el panel dejaba de servir
     para lo suyo, que es detectar errores de carga de la PPP de ISIS.

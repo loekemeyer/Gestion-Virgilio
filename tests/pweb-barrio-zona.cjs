@@ -48,18 +48,25 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
       retira:        pwebBarrioDe("Retira en depósito"),
       vacio:         pwebBarrioDe("")
     };
-    // La localidad del padrón MANDA sobre lo que diga la dirección.
+    // Orden: zona_expreso (adonde va el camión) → localidad → parseo.
+    // Un cliente de Córdoba entrega en el depósito de su expreso, en Pompeya:
+    // la zona es la de Pompeya, no "sin zona".
     const padron = {
+      expresoManda: pwebLocalidad({ zona_expreso: "Pompeya", localidad: "Cordoba", direccion: "Rancagua 4650- Cordoba" }),
+      dirExpreso:   pwebDireccion({ nombre_expreso: "Azul", direccion_expreso: "Ferre 1455, Pompeya", direccion: "Rancagua 4650- Cordoba" }),
+      dirSinExp:    pwebDireccion({ direccion: "Bragado 5742 - Mataderos" }),
       // el padrón dice Colegiales aunque la dirección diga otra cosa
       mandaPadron:  pwebLocalidad({ localidad: "Colegiales", direccion: "Av Falsa 1 - Mataderos" }),
       // sin padrón, se cae al parseo
       fallback:     pwebLocalidad({ localidad: "",           direccion: "Federico Lacroze 1737-Palermo" }),
       fallbackNull: pwebLocalidad({ direccion: "Cochabamba 2579- Constitucion" })
     };
+    window._pppZonaSupa.pompeya = "Zona 1 - CABA Sur";
     const zonas = {
+      interiorPorExpreso: pwebZonaSugerida({ zona_expreso: "Pompeya", localidad: "Cordoba" }),
       dePadron:    pwebZonaSugerida({ localidad: "Quilmes", direccion: "Av Falsa 1 - Mataderos" }),
       deFallback:  pwebZonaSugerida({ direccion: "Federico Lacroze 1737-Palermo" }),
-      interior:    pwebZonaSugerida({ localidad: "Cordoba" }),   // interior: sin zona, y está bien
+      interiorSinExpreso: pwebZonaSugerida({ localidad: "Cordoba" }),   // sin expreso cargado: no hay zona que inventar
       retira:      pwebZonaSugerida({ direccion: "Virgilio 2788 - Retira" })
     };
     // El panel de errores del Excel no tiene que ver los pedidos web.
@@ -75,10 +82,14 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
     && c.espacioAmbos === "Mataderos" && c.sinEspacioNum === "Tortuguita"
     && c.dosGuiones === "G. de Laferrere" && c.barras === "Flores"
     && c.sinGuion === "Rio Cuarto" && c.retira === "Retira" && c.vacio === ""
+    && r.padron.expresoManda === "Pompeya"
+    && r.padron.dirExpreso === "Exp. Azul — Ferre 1455, Pompeya (Rancagua 4650- Cordoba)"
+    && r.padron.dirSinExp === "Bragado 5742 - Mataderos"
+    && z.interiorPorExpreso === "Zona 1 - CABA Sur"
     && r.padron.mandaPadron === "Colegiales" && r.padron.fallback === "Palermo"
     && r.padron.fallbackNull === "Constitucion"
     && z.dePadron === "Zona 4 - GBA Sur"        // gana el padrón (Quilmes), no la dirección (Mataderos)
-    && z.deFallback === "Zona 2 - CABA Centro" && z.interior === "" && z.retira === "Retira"
+    && z.deFallback === "Zona 2 - CABA Centro" && z.interiorSinExpreso === "" && z.retira === "Retira"
     && r.sinZonaEnPanel.length === 1 && r.sinZonaEnPanel[0] === "98500";
 
   console.log("pweb-barrio-zona:", JSON.stringify(r), "· pageerrors:", errs.length ? errs.join("|") : "none", "·", (ok && !errs.length) ? "✓ OK" : "✗ FAIL");

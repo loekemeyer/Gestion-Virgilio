@@ -6607,7 +6607,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v12.73";
+const APP_VERSION = "v12.74";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -25213,7 +25213,7 @@ async function pppTraerPedidosWeb(empresa) {
   } else {
     const desde = new Date(Date.now() - PWEB_VENTANA_DIAS * 86400000).toISOString().slice(0, 10);
     const r = await fetch(PWEB_LK_URL + "/rest/v1/v_pedidos_web_np"
-      + "?select=empresa,order_id,np_idx,cod,razon_social,fecha_recep,hora_recep,direccion,v,lineas,cajas,items,enviado_a_compras,localidad"
+      + "?select=empresa,order_id,np_idx,cod,razon_social,fecha_recep,hora_recep,direccion,v,lineas,cajas,items,enviado_a_compras,localidad,zona_expreso,nombre_expreso,direccion_expreso"
       + "&fecha_recep=gte." + desde + "&order=order_id.asc,np_idx.asc&limit=5000",
       { headers: { apikey: PWEB_LK_ANON, Authorization: "Bearer " + tok } });
     if (!r.ok) throw new Error("LK respondió " + r.status);
@@ -25248,7 +25248,7 @@ async function pppTraerPedidosWeb(empresa) {
       // Lo necesario para guardar después, sin volver a pedirle nada a LK.
       _web: true, _wEmp: n.empresa || emp, _wOrder: n.order_id, _wIdx: n.np_idx,
       _wNum: num || null, _wItems: n.items || [], _wLineas: n.lineas, _wCajas: n.cajas,
-      _wM3Parcial: parcial, _wDir: n.direccion || "", _wIsis: !!n.enviado_a_compras
+      _wM3Parcial: parcial, _wDir: pwebDireccion(n), _wIsis: !!n.enviado_a_compras
     };
   });
 }
@@ -25310,23 +25310,35 @@ function pwebBarrioDe(suc) {
   return (i > 0 ? t.slice(i + 1) : t).trim();
 }
 
-/* La localidad de un pedido web sale del PADRÓN DE DIRECCIONES de LK
-   (`customer_delivery_addresses.localidad`), que es una columna propia — no se
-   deduce del texto de la dirección.
+/* El BARRIO de un pedido web es el del punto adonde va el camión, y sale del
+   padrón de direcciones de LK (`customer_delivery_addresses`), no del texto.
 
-   Es el mismo criterio que la PPP de Producción, donde el barrio viene en su
-   columna (`PPP_Programacion_Diaria.barrio`) y la dirección es sólo el fallback:
-   `localidad: (barrio || direccion)`.
+   Para un cliente del INTERIOR ese punto no es su ciudad: es el depósito de su
+   EXPRESO, que está en CABA. Córdoba → Azul, Ferre 1455, Pompeya. Mendoza →
+   Rodriguez, Erezcano 3880, Soldati. Por eso la PPP de Producción sólo tiene
+   barrios de CABA/GBA: los pedidos del interior entran con el barrio del expreso.
+   Tratar "Córdoba" como una localidad sin zona era un error de concepto mío.
 
-   Antes esto se sacaba partiendo el string de la sucursal, que era una invención
-   mía y fallaba en la mitad de los casos. Medido sobre las 180 sucursales pedidas
-   en 30 días: **164 resuelven por el padrón**; de las 16 que no, 10 son "Retira"
-   —que no tiene dirección— y el resto son etiquetas sueltas. El parseo queda como
-   ÚLTIMO RECURSO, para esas y para Chef, cuya RPC todavía no devuelve la columna. */
+   `zona_expreso` es exactamente ese barrio, y está cargado también en muchos
+   clientes de GBA cuyo punto de entrega difiere de su localidad (149 casos).
+   Orden: zona_expreso → localidad → parsear la dirección (último recurso, para
+   Retira, etiquetas sueltas y Chef, cuya RPC todavía no trae estas columnas).
+   Medido en 30 días: 165 de 180 sucursales traen zona_expreso, 11 más localidad. */
 function pwebLocalidad(n) {
+  const ze = String((n && n.zona_expreso) || "").trim();
+  if (ze) return ze;
   const l = String((n && n.localidad) || "").trim();
   if (l) return l;
   return pwebBarrioDe(n && n.direccion);
+}
+
+/* Lo que ve el supervisor como dirección: si hay expreso, ADONDE VA EL CAMIÓN
+   (el depósito del expreso), con la sucursal del cliente como aclaración. */
+function pwebDireccion(n) {
+  const exp = String((n && n.nombre_expreso) || "").trim();
+  const dexp = String((n && n.direccion_expreso) || "").trim();
+  if (exp || dexp) return "Exp. " + (exp || "") + (dexp ? " — " + dexp : "") + " (" + String((n && n.direccion) || "").trim() + ")";
+  return String((n && n.direccion) || "").trim();
 }
 
 /* La zona NO se inventa acá: se resuelve con el MISMO diccionario compartido que
