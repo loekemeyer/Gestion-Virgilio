@@ -23,12 +23,15 @@ catch (_e) {
   const p = await b.newPage();
   const errs = [];
   p.on("pageerror", (e) => errs.push(e.message));
-  // La planimetría remota se dispara sola al cargar la página (loadPlanimetriaRemote()
-  // corre en el nivel de módulo), así que stubbear la función desde el test llega
-  // TARDE: el fetch ya salió y su respuesta pisa window.GONDOLA cuando vuelve.
-  // Se corta el pedido acá, antes de abrir la página. Sin esto el test vuelve a
-  // depender de la red y de cómo esté hoy la planimetría de producción.
-  await p.route("**/rest/v1/Planimetria**", function (route) { return route.abort(); });
+  // El test corre SIN RED a Supabase. Al cargar, index.html dispara varias cargas
+  // solas (planimetría, equivalencias, …) y sus respuestas pisan lo que el test
+  // fija: no alcanza con stubbear las funciones desde adentro, porque para cuando
+  // el test corre los pedidos ya salieron y vuelven después.
+  // Ese era el bug: el resultado dependía de qué datos hubiera en producción y de
+  // cuánto tardaran en llegar. En una máquina sin acceso a la base pasaba, y en CI
+  // —donde sí llegan— fallaba. Cortando todo en la puerta, el test mide la LÓGICA
+  // y no el estado del depósito de hoy.
+  await p.route("**/rest/v1/**", function (route) { return route.abort(); });
   await p.goto("file://" + path.join(root, "index.html"), { waitUntil: "domcontentloaded" });
 
   const r = await p.evaluate(async () => {
