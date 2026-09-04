@@ -812,6 +812,142 @@ todavía no llegaron a su turno. Lo dijo el dueño: *"ahora vemos bien cómo"*.
 
 ---
 
+## 3.j Solapa "A Programar": armado manual de tandas — 2026-09-04
+
+Rediseño de la solapa **A Programar** de la PPP (las 6 solapas ya existían). El dueño
+pasó el boceto del front y pidió que el backend se definiera acá.
+
+```
+┌─ NPs ──────┐   ┌─ Tanda ────┐   ┌─ Calendario ──────────┐
+│ tarjeta ▾  │   │  F57A  ⚠2  │   │  ◀  Sep 2026  ▶       │
+│ tarjeta ▾  │ → │            │ → │  Do Lu Ma Mi Ju Vi Sá │
+│ tarjeta ▾  │   │  m³: 0,55  │   │   ○  ○  ○  ○  ○  ○  ○ │
+└────────────┘   └────────────┘   └───────────────────────┘
+```
+
+Decisiones del dueño: trabaja sobre las **NP web de LK y Chef**; **varias tandas en
+paralelo** con un botón "+"; y las reglas de negocio **no bloquean** — ponen un **badge**
+al lado del código de la tanda.
+
+### El problema de fondo
+
+Hoy una tanda **sólo existe** cuando ya está escrita en `PPP_Web_Programacion` con su
+código. Ese front necesita una tanda que exista **mientras se arma**: sin fecha y sin que
+la vea nadie del depósito. Ese estado no existía.
+
+⚠ **Por qué tablas propias y no `fecha_entrega = null`:** `mergeMonitorPppWeb` lee
+`PPP_Web_Programacion` filtrando **sólo** `tanda=not.is.null`. Un borrador guardado ahí
+caería en el celular del operario apenas se arrastra la primera NP.
+
+| objeto | qué |
+|---|---|
+| `PPP_Web_Tandas` | cabecera: `codigo`, `estado` (borrador/programada/descartada), `fecha_entrega`, quién y cuándo |
+| `PPP_Web_Tanda_Items` | qué NP tiene adentro + foto de `np · np_total · zona · cliente · m³ · fecha_recep` |
+| `gv_ppp_web_tandas_abiertas` | la vista que dibuja las cajas del medio, con `n_avisos` para el badge |
+| `gv_ppp_web_tanda_avisos` | los 6 avisos |
+| `gv_ppp_web_pedido_bloques` | dónde está cada bloque de un pedido |
+| `gv_ppp_web_tanda_nueva/_agregar/_sacar/_descartar/_programar` | las acciones |
+| `gv_ppp_web_calendario` | lo que va adentro de cada circulito |
+| `gv_ppp_web_codigo_tomado` · `gv_ppp_web_tanda_codigo_nuevo` | los códigos |
+
+⚠ Una NP **no puede estar en dos tandas**: unique sobre `(empresa, order_id, np_idx)`. Dos
+supervisores armando al mismo tiempo no se pisan el mismo pedido.
+
+### La unidad de arrastre es el PEDIDO, no la NP
+
+La columna izquierda lista **pedidos** (un `order_id` por tarjeta). Se arrastra el pedido
+entero, la NP se numera al programar, y el corte en bloques ya viene hecho de arriba.
+
+Queda escrito porque en el camino se discutió al revés y la conclusión del dueño es la que
+vale: *"si me arrastro el pedido entero de un cliente a la tanda, ahí se le asigna nota de
+pedido y ahí se parte; de todas formas un pedido de un mismo cliente no se puede partir en
+diferentes tandas"*.
+
+**El corte en 18/15 ya existía**, río arriba, en la vista `v_pedidos_web_np` de LK: 18
+líneas para LK, 15 para Chef, `n_tramos = ceil(líneas/cap)`, repartidas en **serpentina**
+(ordenadas por m³, yendo y viniendo) para que los bloques queden parejos en volumen. **No
+se tocó**: es de LK.
+
+**Lo que sí faltaba:** la vista calculaba `n_tramos` y **no lo devolvía**. Sin ese dato la
+tarjeta del pedido no puede decir *"esto va a salir en 3 NP"*, que es información que el
+supervisor necesita para decidir. Ahora `gv_pedidos_web_np_lk` y `gv_pedidos_web_np_chef`
+devuelven `np_total` (agregar una columna al `RETURNS TABLE` obliga a DROP + CREATE; son
+nuestras y el cron está apagado), viaja hasta `PPP_Web_Tanda_Items` y
+`PPP_Web_Programacion`, y `_agregar` acepta el pedido entero como array.
+
+Cuánto pesa, medido sobre 30 días reales:
+
+| | NP de pedidos partidos | pedidos partidos | máx bloques |
+|---|---|---|---|
+| LK | **242 de 364 (66%)** | 99 de 221 | 6 |
+| Chef | **23 de 38 (60%)** | 11 | — |
+
+El pedido partido es la norma, no la excepción.
+
+**El aviso `pedido_partido` queda como red de seguridad.** Con la unidad de arrastre en el
+pedido no debería poder pasar; salta si una tanda igual termina con menos bloques de los
+que tiene el pedido, y dice dónde están los otros (`gv_ppp_web_pedido_bloques`). Cuesta
+nada y cubre el día que el front mande un pedido a medias, o que aparezca un bloque nuevo
+después (ver los agregados, §3.h).
+
+### Los 6 avisos (badge, no bloqueo)
+
+`pedido_partido` · `zonas_mezcladas` · `sin_zona` · `cliente_va_solo` · `super_mezclado` ·
+`pasa_tope_mezcla`.
+
+La mezcla de **empresas** no está en la lista a propósito: `empresa` es parte de la clave
+de la tanda, así que LK y CH no se pueden mezclar ni queriendo. Esa regla la garantiza la
+estructura, no un chequeo.
+
+### ⚠⚠ La NP se numera al PROGRAMAR, y recién ahí
+
+Salió de la prueba: `PPP_Web_Base.np_label` es `NOT NULL` y la etiqueta se arma con el
+número, así que **sin numerar el operario no puede ni abrir la tanda**.
+
+Y es el momento correcto: una NP se numera cuando la tanda se programa, que es cuando el
+pedido se vuelve real para el depósito — no al abrir una pantalla, que es lo que hacía
+`pwebNumerar()` y por lo que aparecieron 357 NP de prueba (§3.f).
+
+Como llama a `gv_ppp_web_np_asignar`, hereda su interruptor: **hoy, con la numeración
+apagada, programar corta** con el mensaje correcto. O sea este módulo no se puede usar de
+verdad hasta que se prenda la numeración. Es una decisión, no un bug.
+
+### ⚠ Bug que esto destapó y arregla
+
+`ppp_web_proxima_letra()` sólo miraba las dos tablas de programación. Un código reservado
+en un borrador era **invisible**, así que el job automático podía emitir **el mismo
+código**. Ahora mira los borradores, y las dos vías consultan `gv_ppp_web_codigo_tomado`
+antes de emitir.
+
+### Probado de punta a punta
+
+| paso | resultado |
+|---|---|
+| "+" dos veces | `GV-01A` y `GV-01B` en paralelo |
+| 2 NP del mismo cliente, zona 3 | 0,500 m³ · **0 avisos** |
+| + 1 NP de otro cliente, zona 6 | 1,400 m³ · **2 avisos** (mezcla zonas + pasa el tope) |
+| la misma NP a la otra tanda | *"Esa NP ya está en otra tanda en armado"* |
+| la red: sólo el bloque 1 del pedido real 1117 (3 bloques) | *"entran 1 de 3 bloques. Los otros siguen sin programar"* |
+| el bloque 2 en la otra tanda | **las dos** se marcan y se nombran entre sí |
+| **el pedido 1117 entero de una** (el uso normal) | 3 NP · 0,367 m³ · **0 avisos** |
+| programar `GV-01A` al 09/09 | 2 NP · 0,500 m³ · 3 líneas. NP `LK 00001`/`LK 00002`. El art 027 venía 8 + 2 → quedó en **10 cajas** |
+| calendario del 09/09 | 1 tanda · 2 NP · 0,500 m³ · restan 4,500 |
+| con la numeración apagada | corta con el mensaje de la numeración |
+
+El camino feliz se probó prendiendo y apagando la numeración **dentro de una sola
+transacción**, para no dejar el interruptor abierto ni un segundo. Todo borrado después:
+las 5 tablas en 0 y `PPP_Programacion_Diaria` en 182.
+
+### Lo que falta
+
+1. **El front**: las tres columnas, el arrastre, el "+" y el badge. Esto es sólo la lógica
+   de atrás, que es lo que se pidió primero.
+2. La lista de la izquierda la arma el front (las NP viven en LK/Chef); de acá sólo
+   necesita saber cuáles están tomadas.
+3. Programar no funciona hasta que se prenda la numeración. A propósito.
+
+---
+
 ## 4. Incidente de seguridad — 2026-09-04 (cerrado)
 
 `public.vista_pedidos_web_feed` tenía `select` para `anon`. Los esquemas `fuentes` y
