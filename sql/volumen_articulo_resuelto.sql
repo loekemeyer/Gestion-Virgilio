@@ -32,9 +32,13 @@
 -- midan distinto: son cargas mal tipeadas en la fila del código con L. El base es
 -- el que alguien midió de verdad.
 --
--- **No se borran ni se corrigen esas filas** — modificar datos va con permiso
--- explícito, y además no hace falta: la vista las ignora. Si algún día se quieren
--- limpiar, la lista sale de la consulta del final.
+-- ✅ **LIMPIADAS el 2026-09-04**, por pedido del dueño. Las 54 filas se alinearon al
+-- valor de su base (`update ... set m3 = m3_del_base`). No se borraron: el código
+-- sigue existiendo en el catálogo, con el número bueno.
+-- **Esto no cambió ningún m³ que la app calcule** —la vista ya usaba el base—; lo que
+-- arregla es la TABLA CRUDA, para el que la consulte directo sin pasar por la vista.
+-- Valores viejos guardados en `sql/backups/backup_volumen_articulos_codigos_L_20260904.sql`.
+-- Verificado después: 0 discrepancias entre una fila con L y su base.
 --
 -- ----------------------------------------------------------------------------
 -- QUÉ CAMBIA EN LA PRÁCTICA
@@ -116,7 +120,7 @@ grant select on public.vista_volumen_articulo_resuelto to anon, authenticated;
 --   join public.vista_volumen_articulo_resuelto r on r.codigo = upper(trim(v.codigo))
 --  where v.m3 > 0 and upper(trim(v.codigo)) !~ '[0-9E]L$' and r.m3 is distinct from v.m3;
 --
--- -- Las 54 filas L cuya medida propia contradice al base (candidatas a limpiar):
+-- -- Filas L cuya medida propia contradiga al base (tiene que dar 0 desde la limpieza):
 -- with med as (select upper(trim(codigo)) codigo, m3 from public."Volumen_Articulos" where m3 > 0)
 -- select m.codigo, m.m3 as m3_fila_L, b.codigo as base, b.m3 as m3_base,
 --        round(m.m3 / b.m3, 2) as veces

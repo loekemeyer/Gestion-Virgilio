@@ -60,8 +60,11 @@
 > medido y 102 ya coincidían. De los 54 que no, ocho son la coma corrida diez lugares —
 > `523L` 0,0510 vs `523` 0,0051 · `531L` 0,0240 vs `531` 0,0024 · `560L` 0,0512 vs `560`
 > 0,0051 · `521L` 0,0024 vs `521` 0,0240 · `366EL` 0,0016 vs `366E` 0,0160—: no son artículos
-> que midan distinto, son cargas mal tipeadas en la fila del L. Esas filas **no se borran**
-> (modificar datos va con permiso); la vista simplemente las ignora.
+> que midan distinto, son cargas mal tipeadas en la fila del L.
+> ✅ **Las 54 filas se limpiaron el 2026-09-04** (pedido del dueño): se alinearon al valor de
+> su base, no se borraron. No cambió ningún m³ que la app calcule —la vista ya usaba el
+> base—; arregla la tabla cruda para el que la consulte directo. Backup de los valores
+> viejos en `sql/backups/backup_volumen_articulos_codigos_L_20260904.sql`.
 > En los pedidos web el cambio mueve **dos** m³ en todo el histórico: `439EL` 0,0561→0,0185
 > (−0,30 m³) y `438EL` 0,0093→0,0185 (+0,15 m³). Verificado: 1.480 filas (778 propias + 702
 > por base), 0 duplicados, 0 códigos con L que no sigan al base, **0 códigos sin L movidos**.
