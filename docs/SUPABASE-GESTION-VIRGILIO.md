@@ -185,6 +185,56 @@ NP referenciada. Se enchufa cuando el stock de los pedidos web entre al circuito
 
 ---
 
+## 3.b La salida a ISIS — el formato, que ya estaba decidido
+
+**ISIS es un facturador glorificado.** Gestión arma el pedido —lo parte en NP, lo programa,
+lo pickea, lo arma— y **recién después** se lo manda. Lo que viaja es el pedido **ya armado
+y listo para facturar**.
+
+Pero por cómo funciona ISIS, **tiene que entrar como si fuera un pedido nuevo, con el mismo
+formato que exportan las páginas hoy**. No es un informe de pedido terminado: es un pedido.
+
+### Lo que mandan las páginas hoy (`orders.sheets_payload`, real, 2026-09-04)
+
+```json
+{ "mode": "new", "source": "Web", "order_number": "1344",
+  "cod_cliente": "288", "sucursal_entrega": "Rivadavia 3663- Mar Del Plata",
+  "vend": "7", "condicion_pago": "Pago Contado: 25% Dto", "condicion_pago_code": 8,
+  "payment_term": 2, "observaciones": "", "is_promo": false, "extra_discount": 0,
+  "order_total": 2532920.54, "credit_limit": 90000000, "deuda": 24921781.21,
+  "cliente_nuevo": "", "lc": "OK", "d": "X", "pp": "2",
+  "items": [ { "cod_art": "321", "cajas": 6, "uxb": 12, "cod_original": null } ] }
+```
+
+**No hay NP en ningún lado.** `order_number` es el id del pedido de la página, no una NP.
+La NP la pone ISIS al facturar — ese es todo su trabajo en el régimen nuevo.
+
+### Entonces, la exportación de Gestión
+
+| eje | qué va |
+|---|---|
+| **Formato** | el de arriba, tal cual. Lo que ISIS ya sabe recibir. |
+| **Contenido** | las **cajas ARMADAS**, no las pedidas. El pedido ya pasó por picking y armado; si salió corto, viaja lo que salió. |
+| **NP** | **ninguna.** Ni la nuestra ni un placeholder. |
+
+⚠ **`isis_pedido_json` NO sirve para esto y no hay que reusarla.** Esa función arma un
+*informe* del pedido terminado (np, tanda, m³, cajas pedidas vs entregadas vs faltantes,
+control de neto) con una forma completamente distinta, y además hace `np::bigint` sacando
+los no-dígitos — una NP `LK 1343` viajaría como `1343`. La salida de Gestión es un objeto
+nuevo, `gv_*`.
+
+### Lo que queda por resolver al construirla
+
+1. **Una NP nuestra = un pedido para ISIS.** Un pedido web partido en 3 NP entra a ISIS
+   como 3 pedidos, porque la NP es la unidad que se pickea, se arma y se factura. Confirmar.
+2. **Qué va en `order_number`.** El de la página es el id del pedido; con NP partidas hay
+   varias por id. Hay que definir qué mandar para que ISIS no las confunda.
+3. **Los campos de contexto comercial** (`deuda`, `credit_limit`, `lc`, `order_total`,
+   `extra_discount`): la página los calcula al momento de la venta. Hay que ver cuáles
+   ISIS realmente usa y cuáles se pueden mandar vacíos.
+
+---
+
 ## 4. Incidente de seguridad — 2026-09-04 (cerrado)
 
 `public.vista_pedidos_web_feed` tenía `select` para `anon`. Los esquemas `fuentes` y
