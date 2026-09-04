@@ -6607,7 +6607,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v12.69";
+const APP_VERSION = "v12.70";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -28887,7 +28887,22 @@ async function pppFetchDetalle(np) {
     var items = await r.json();
     // v8.85 — traer uni_x_caja de OC_Maximos para cada artículo → mostrar unidades.
     try {
-      var cods = items.map(function(i){ return _ocgNorm(i.articulo); }).filter(Boolean);
+      // ⚠ Al servidor se le mandan los códigos COMO VIENEN, no normalizados.
+      // `_ocgNorm` le saca los ceros de adelante ("031" → "31") y OC_Maximos los
+      // guarda CON el cero, así que el in.() no encontraba nada y la columna
+      // Unidades salía "—". Afecta a los 20 códigos activos que empiezan con cero
+      // (026, 027, 031, 034, 035E, 043, 052…): 031 tiene uni_x_caja 24 y no se veía.
+      // Se mandan las dos formas —cruda y normalizada— porque no hay garantía de
+      // que la tabla use siempre la misma; el cruce posterior sí normaliza los dos
+      // lados, así que da igual cuál de las dos vuelva.
+      var _set = {};
+      items.forEach(function (i) {
+        var raw = String(i.articulo == null ? "" : i.articulo).toUpperCase().trim();
+        if (raw) _set[raw] = 1;
+        var nrm = _ocgNorm(i.articulo);
+        if (nrm) _set[nrm] = 1;
+      });
+      var cods = Object.keys(_set);
       if (cods.length) {
         var uniUrl = SUPABASE_URL + "/rest/v1/OC_Maximos?cod=in.(" + cods.map(encodeURIComponent).join(",") + ")&select=cod,uni_x_caja&activo=eq.true";
         var ru = await fetch(uniUrl, { headers: H, cache: "no-store" });

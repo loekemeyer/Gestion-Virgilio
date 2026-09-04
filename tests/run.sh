@@ -233,3 +233,6 @@ PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node te
 
 echo "== pweb-excel-isis (idea 3717: el Excel para ISIS también arma las NP de la PPP Web) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/pweb-excel-isis.cjs
+
+echo "== ppp-uni-cero (v12.70: Unidades del detalle de tanda para códigos con cero adelante) =="
+PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/ppp-uni-cero.cjs

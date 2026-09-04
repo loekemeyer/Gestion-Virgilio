@@ -8643,6 +8643,27 @@ lo excluye de horas/productividad (guard `opcion==="LT"` en
 
 ---
 
+### ⚠ Códigos con cero adelante: normalizar ANTES de consultar rompe el filtro
+
+`_ocgNorm` le saca los ceros de la izquierda a un código (`031` → `31`). Sirve para
+CRUZAR dos listas en memoria, pero **no para armar un filtro contra la base**: las
+tablas guardan el código con el cero.
+
+Pasó en `pppFetchDetalle` (arreglado en v12.70): mandaba
+`OC_Maximos?cod=in.(31,102E,…)` y la fila `031` no volvía nunca, así que la columna
+**Unidades** del detalle de la tanda salía `—`. No daba error: mostraba un guión.
+Afecta a los **20 códigos activos que empiezan con cero** — 026, 027, 031, 034,
+035E, 043, 052, 053, 054, 055, 056E, 057, 058, 059, 066, 067, 070, 071, 097, 099 —
+y el 031 tiene `uni_x_caja` 24.
+
+**Regla**: al servidor se le manda el código **como viene** (o las dos formas);
+normalizar es para el cruce posterior, donde se normalizan los dos lados.
+Los otros consumidores de UxB (`_ocgFetchUxb`, `_facXlsArmar`) no tenían el
+problema porque traen la tabla entera y normalizan de los dos lados.
+Regresión: `tests/ppp-uni-cero.cjs`.
+
+---
+
 ## 8. Cómo se calculan horas / jornada
 
 En `showDayBreakdown` (monitor, por operario por día):
