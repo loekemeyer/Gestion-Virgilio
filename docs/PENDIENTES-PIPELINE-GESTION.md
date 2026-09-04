@@ -17,6 +17,52 @@
 
 ---
 
+## ⚠⚠ LEER PRIMERO — el modelo, en palabras del dueño (2026-09-04, a la tarde)
+
+Después de ver cómo se estaba encarando lo que sigue, el dueño frenó y lo dijo así:
+
+> *"El programa en síntesis, en normas generales, tenía que andar **igual que Producción
+> Virgilio**, solamente que el **ingreso de pedidos**, en lugar de nutrirse del espejo —que
+> es el otro programa—, tenía que surgir **directamente de los pedidos que llegan a la
+> página de LK copia**. Dentro de la PPP, si el pedido ya fue **controlado**, automáticamente
+> tendría que ir a **Pedidos Entregados**. No tiene que haber más complejidad que eso."*
+
+Eso reduce todo a **tres reglas**, y cualquier cosa que no encaje en una de ellas **no se
+construye** salvo que el dueño la pida de nuevo:
+
+| # | regla | estado |
+|---|---|---|
+| 1 | Los pedidos entran **desde la página LK** (no desde el espejo de ISIS) | ✅ hecho hasta la programación (v12.64→v12.85). Gate: numeración apagada, a propósito |
+| 2 | De ahí en adelante, **igual que Producción**: picking, armado, carga, control, facturación | ✅ es el mismo código. Faltan **tres enganches chicos** (abajo) |
+| 3 | **Controlado → Pedidos Entregados**, solo | ✅ ya pasa hoy vía `CRN`. Falta un lugar **durable** para las NP web (abajo) |
+
+### Lo que de verdad queda, bajo ese modelo
+
+| qué | por qué falta | tamaño |
+|---|---|---|
+| **NP web en Facturación** | el módulo lee `vista_facturacion_estado` (tablas de ISIS). Hay que sumarle las NP web en el front, igual que `mergeMonitorPppWeb` hace con el monitor, y que el tilde escriba en `Facturacion_NP` con la etiqueta `LK 00001` | chico |
+| **Entregados durable para NP web** | `PPP_Entregados_Meta` se **trunca cada 30 min** con el Sheet de ISIS (`sync_ppp_entregados_meta`, truncate+insert), así que ahí no se puede anotar nada nuestro. Tabla propia `PPP_Web_Entregados` + que `pppRefreshMetaEntSet` la lea también. El `CRN` ya llega con la etiqueta | chico |
+| **Stock — sólo verificar** | medido el 2026-09-04: el trigger `zz_normalizar_empresa` **respeta la empresa que manda el front** (sólo deriva del NP si llega `NULL`/`Mixto` y el código es dual), y el front ya la manda —`empresaDeNp("LK 00001") = "LK"`, sufijo ` LK`/` CH` en `cod_art` para duales—. El único hueco es el fallback del backend: `empresa_de_np('LK 00001')` devuelve **`CH`** (mira sólo dígitos). Es función de Producción: no se toca. Alcanza con un test que fije que el front siempre manda el sufijo en duales | test |
+| **Fecha de entrega Supers** (9357) | la cañería de LK (Krikos) está escrita y sin mergear; la columna en `lk_pedidos_match` ya está. En Gestión sólo falta **mostrarla en la tarjeta** de "A Programar" | chico, espera a LK |
+| **Prender la numeración** | dos líneas, las decide el dueño | — |
+
+### Lo que queda APARCADO (no entra en las tres reglas)
+
+- **Espejo Virgilio → LK para mostrar el estado en la página** (8743). La página ya tiene
+  `order_tracking` y un stepper de 3 pasos; si algún día se quiere, es ahí. **No ahora.**
+- **API ISIS v2.0** (`gv_*` nuevo, referencia sin NP, disparo al cerrar armado). El "envío a
+  ISIS" que hace falta para *andar igual que Producción* es el **Excel para ISIS**, que ya
+  arma las NP web (`tests/pweb-excel-isis.cjs`). El contrato v2.0 queda escrito para cuando
+  se retome, pero **no se construye ahora.**
+- **Módulo "Editar pedidos" en Chef.** No existe allá y su Supabase no es accesible desde
+  acá. Cuando se quiera, es construirlo, no corregirlo.
+
+Lo de abajo es el detalle punto por punto tal como se relevó **antes** de esta aclaración.
+Sigue siendo cierto como estado del repo, pero **el orden y el alcance los manda esta
+sección**.
+
+---
+
 ## Transcripción de la nota (textual)
 
 ```
