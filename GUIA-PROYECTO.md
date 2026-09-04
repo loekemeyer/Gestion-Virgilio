@@ -8656,8 +8656,26 @@ Afecta a los **20 códigos activos que empiezan con cero** — 026, 027, 031, 03
 035E, 043, 052, 053, 054, 055, 056E, 057, 058, 059, 066, 067, 070, 071, 097, 099 —
 y el 031 tiene `uni_x_caja` 24.
 
+**La causa de fondo: las tablas NO usan todas la misma convención.** Medido
+2026-09-04:
+
+| Guardan `031` (con cero) | Guardan `31` (sin cero) |
+|---|---|
+| `OC_Maximos` (22) · `vista_saldos_stock` (22) · `Volumen_Articulos` (46) · `PPP_Base_Pedidos` (574) | `vista_uxb_articulo` · `vista_recepcion_mensual` · `vista_venta_mensual` |
+
+Los valores coinciden (`OC_Maximos.031` y `vista_uxb_articulo.31` dan los dos 24),
+pero el código con el que hay que preguntar **no**.
+
 **Regla**: al servidor se le manda el código **como viene** (o las dos formas);
 normalizar es para el cruce posterior, donde se normalizan los dos lados.
+
+**Barrido hecho el 2026-09-04**: se revisaron los 29 filtros `in.(…)` y `eq.` sobre
+códigos. `pppFetchDetalle` era el único roto. Los demás están bien y por dos vías:
+o traen la tabla entera y normalizan de los dos lados (`_ocgFetchUxb`, `artNombre`,
+`artUxb`, `_facXlsArmar`), o mandan el código crudo (`pkFetchExcedente`,
+`_pkConteoSistema`, `_stkGondolaSaldoVivo`, el badge de correcciones). Dos ya
+mandaban **las dos formas** a propósito (`_stkNpDeCodigo`, y el `or=` de la línea
+del stock por código).
 Los otros consumidores de UxB (`_ocgFetchUxb`, `_facXlsArmar`) no tenían el
 problema porque traen la tabla entera y normalizan de los dos lados.
 Regresión: `tests/ppp-uni-cero.cjs`.
