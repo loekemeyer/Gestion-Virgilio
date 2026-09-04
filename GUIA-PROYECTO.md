@@ -14,6 +14,27 @@
 >
 > Última actualización: 2026-09-04 · Versión app al documentar: **v12.77**
 >
+> Nota **backend, sin bump de app** — **`empresa_de_np` era ciega a las NP web: toda NP de
+> Gestión salía como Chef.** La regla vieja sacaba los dígitos y miraba si pasaban de 90.000
+> —sirve para las NP de ISIS (9xxxx Loekemeyer / 4xxxx Chef)— pero las NP web son `LK 1343` /
+> `CH 7`, y 1343 no llega a 90.000: caía en el `else` y devolvía **CH**.
+> No era teórico. La usan `isis_encolar_facturado` (la empresa con la que el pedido sale al
+> ERP), `isis_pedido_json` y `trg_normalizar_empresa_stock`: **la primera NP web que se
+> facturara se habría exportado a ISIS como Chef**, fuera de la empresa que fuera.
+> El arreglo es aditivo — si la NP arranca con el prefijo, ese prefijo manda; el resto queda
+> igual. Verificado: **0 NP de `PPP_Programacion_Diaria` cambian de empresa**, y ningún índice
+> depende de la función. `sql/empresa_de_np.sql` (que además estaba desfasado de la base: traía
+> todavía la primera versión por prefijo `^9`/`^4`).
+>
+> **Por qué las NP web no llegaban a Facturación** (pregunta del dueño): resulta que **nada las
+> bloquea**. Las tres columnas `np` involucradas —`Entregas_Virgilio`, `Facturacion_NP`,
+> `PPP_Programacion_Diaria`— son `text`, así que "LK 1343" entra; el monitor ya mezcla las
+> tandas web (`mergeMonitorPppWeb`, v12.64); y el trigger `validar_np_armada` sólo exige que la
+> NP tenga ítems en `Entregas_Virgilio`, sin pedir nada de la PPP de ISIS. **No llegó ninguna
+> porque todavía no se programó ni un pedido web en una tanda real** (`PPP_Web_Programacion`
+> está en 0). El circuito está tendido y sin estrenar; lo único roto de verdad era
+> `empresa_de_np`, ya arreglado.
+>
 > Nota **backend, sin bump de app** — **Las tres sublistas del módulo Facturación: la vista
 > que las corta.** El circuito que pidió el dueño es: pedido armado → *pendiente de facturar*
 > → se tilda y se manda a ISIS → *esperando confirmación* → aparece la factura → *facturado*.

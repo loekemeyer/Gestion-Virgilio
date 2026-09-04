@@ -17,18 +17,43 @@
 -- `EMPRESA_SPLIT_CODS`) y 4 en la base (función `cob_empresa_np`, vistas
 -- `vista_faltante_demanda`, `vista_faltante_real`, `vista_nc_loeke_chef`).
 
+-- ────────────────────────────────────────────────────────────────────────────
+-- ⚠ REVISADA 2026-09-04 — la regla vieja era CIEGA a las NP que genera Gestión.
+--
+-- Sacaba los dígitos y miraba si pasaban de 90.000. Eso sirve para las NP de ISIS
+-- (9xxxx Loekemeyer / 4xxxx Chef), pero las NP web son **"LK 1343" / "CH 7"**:
+-- 1343 no llega a 90.000, así que `empresa_de_np('LK 1343')` devolvía **'CH'**.
+--
+-- No era teórico. La usan `isis_encolar_facturado` (la empresa con la que el pedido
+-- sale al ERP), `isis_pedido_json` y `trg_normalizar_empresa_stock`. La primera NP
+-- web que se facturara se habría exportado a ISIS como Chef, fuera cual fuera.
+--
+-- El arreglo es ADITIVO: si la NP arranca con el prefijo de empresa, ese prefijo
+-- manda; para todo lo demás queda exactamente la regla de antes. Verificado sobre
+-- `PPP_Programacion_Diaria`: **0 NP cambian de empresa**. Ningún índice depende de
+-- la función (chequeado), así que el `create or replace` es seguro.
+-- ────────────────────────────────────────────────────────────────────────────
+-- (El archivo traía todavía la primera versión, por prefijo `^9`/`^4`; la base venía
+--  usando desde hace tiempo la variante por valor numérico. Se sincroniza acá.)
 create or replace function public.empresa_de_np(p_np text)
 returns text
 language sql
 immutable
-set search_path = public
-as $$
+as $function$
   select case
-    when regexp_replace(trim(coalesce(p_np,'')), '\.0+$', '') ~ '^9' then 'LK'
-    when regexp_replace(trim(coalesce(p_np,'')), '\.0+$', '') ~ '^4' then 'CH'
-    else null
+    -- NP de Gestión Virgilio: "LK 1343" / "CH 7". El prefijo ES la empresa.
+    when upper(trim(coalesce(p_np,''))) ~ '^(LK|CH)[ -]' then upper(left(trim(p_np), 2))
+    -- NP de ISIS: se decide por el número (9xxxx Loekemeyer / 4xxxx Chef).
+    when regexp_replace(coalesce(p_np,''), '\D', '', 'g') = '' then null
+    when (regexp_replace(p_np, '\D', '', 'g'))::bigint > 90000 then 'LK'
+    else 'CH'
   end;
-$$;
+$function$;
+
+-- Control:
+--   select public.empresa_de_np('LK 1343'), public.empresa_de_np('CH 7'),
+--          public.empresa_de_np('98213'),   public.empresa_de_np('44361');
+--   -- → LK · CH · LK · CH
 grant execute on function public.empresa_de_np(text) to anon, authenticated;
 
 create table if not exists public."Codigos_Duales" (
