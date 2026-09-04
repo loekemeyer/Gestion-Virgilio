@@ -743,6 +743,16 @@ apareo por etiqueta del §3.g, medido ahí).
 
 1. **El front de las páginas** (`PaginaLK` y el de Chef): dejar agregar, mostrar el estado
    y bloquear cuando `puede_agregar` es false. Es la idea **8743**.
+   → **LK hecho el 2026-09-04** (repo `pagina-LK-copia` v2.3.300): el módulo ya existía
+   pero **borraba y reinsertaba** los ítems, o sea que `puede_quitar = false` era una
+   declaración que nadie hacía cumplir. Ahora el candado vive en la RPC
+   `edit_order_fast` del **proyecto LK** (no en éste): para cada producto que el pedido
+   ya tenía, lo que llega tiene que traer al menos las mismas cajas. Detalle, pruebas y
+   rollback en `docs/PENDIENTES-PIPELINE-GESTION.md` §4990.
+   ⚠ **Chef sigue abierto** — otro proyecto y otra organización, sin acceso desde acá.
+   ⚠ **Mostrar el estado sigue abierto**: la página habla con LK y `gv_ppp_web_estado`
+   vive acá. Decisión del dueño: espejo **Virgilio → LK por FDW**, el mismo patrón que
+   `lk_pedidos_match` pero al revés. Sin construir.
 2. **Que la facturación de NP web escriba en `Facturacion_NP` con la etiqueta** (`LK 00001`).
    Pendiente #4.
 3. ~~**El picking todavía no ordena por `prioridad`.**~~ **HECHO — v12.85, ver abajo.**

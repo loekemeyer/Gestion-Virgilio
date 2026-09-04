@@ -303,14 +303,58 @@ camino Virgilio → LK. Hoy existe el inverso: **LK empuja a Virgilio** por el F
 `virgilio_db` / rol `lk_ppp_reader` sobre la tabla espejo `lk_pedidos_match`
 (`sql/pedidos_match_virgilio.sql`). El mismo patrón, invertido, es la opción obvia.
 
-### Decisiones abiertas (bloquean el resto de 4990)
+### Las tres decisiones — resueltas por el dueño el 2026-09-04
 
-1. **El candado de "sólo agregar": ¿backend o front?** El protocolo dice backend, o sea
-   `edit_order_fast` — pero es una función en producción que usan clientes reales ahora
-   mismo.
-2. **¿Se afloja la ventana ya, o recién el día que Gestión tome control?**
-3. **¿Cómo llega el estado a la página?** Espejo Virgilio → LK (mismo patrón que
-   `lk_pedidos_match`, invertido) o algo más.
+| | decisión |
+|---|---|
+| El candado de "sólo agregar" | **backend**, en `edit_order_fast`. El front lo duplica como UX |
+| La ventana de edición | **no se toca**: sigue el corte de las 12:30 hasta que Gestión tome control |
+| Cómo llega el estado a la página | **espejo Virgilio → LK por FDW**, el mismo patrón que `lk_pedidos_match` pero al revés |
+
+### ✅ Hecho el mismo día — el candado (repo `pagina-LK-copia`, v2.3.300)
+
+**La regla:** para cada producto que el pedido **ya tenía**, lo que llega tiene que traer
+al menos las mismas cajas. Subir cantidad y sumar productos nuevos sigue libre. No se
+puede bajar, sacar, ni mandar el pedido vacío.
+
+- **`edit_order_fast`** (proyecto LK, ya aplicada): el chequeo va después de las
+  validaciones de siempre y **antes del `delete`**, que es lo que hace irreversible el
+  achique. Fuente y motivos en `sql/edit_order_solo_agregar.sql`; rollback textual en
+  `sql/backups/edit_order_fast_20260904_pre_solo_agregar.sql` (sacado con
+  `pg_get_functiondef`, no escrito a mano).
+- **Se suma por producto**, no se compara fila contra fila: hay **18 grupos reales** con
+  el mismo producto repetido en dos filas del mismo pedido. Fila a fila daban falso
+  positivo.
+- **Los admins quedan exceptuados.** Es la salida de emergencia para cuando el cliente
+  llama y pide sacar algo; sin eso no habría forma de hacerlo desde ningún lado.
+- **El front** (`script.js`) guarda el piso de cada línea al abrir el pedido, apaga el `−`
+  al llegar al piso, saca la `✕` y explica por qué. El piso sobrevive al F5.
+
+**Dos bugs que aparecieron al construirlo, y que rompían igual:**
+
+1. `editOrder` pedía **sólo `product_id`**, así que las líneas **Loke** no entraban al
+   carrito y al confirmar se **borraban en silencio**. Con el candado puesto eso deja de
+   ser pérdida de datos y pasa a ser peor: un pedido con artículos Loke quedaría
+   **imposible de editar para siempre**, porque la RPC lo rechazaría siempre.
+2. El mismo producto en dos filas hacía que el carrito mostrara la línea repetida y que el
+   piso de cada una se comparara contra el total → el `−` trabado de entrada.
+
+**Probado:** los 6 escenarios de la RPC contra un pedido **real de 42 ítems**, dentro de
+una transacción revertida — idéntico permite · sacar / bajar / vaciar rechazan · subir y
+agregar permite · admin puede sacar. Verificado después que el pedido quedó intacto (42
+ítems, 65 cajas, su forma de pago). El front, con `tests/solo-agregar.cjs`: 23 chequeos
+sobre las funciones extraídas del `script.js` real.
+
+### Lo que queda de 4990
+
+1. **El front de Chef.** El repo `loekemeyer/paginach` y su proyecto Supabase
+   (`nkhzocgdpwtgrmwleihr`) son de **otra organización y no hay acceso desde acá**. Si su
+   portal es gemelo del de LK —lo es en `orders`/`sheets_payload`— tiene la misma
+   `edit_order_fast` y el mismo agujero. **Hay que hacerlo allá.**
+2. **Mostrar el estado del pedido** (programado / en picking / armado / facturado) en la
+   página. Es el espejo Virgilio → LK por FDW, todavía sin construir. Es también la idea
+   **8743**, que además pide bloquear la edición cuando está facturado.
+3. **Aflojar la ventana** a "hasta que se factura", el día que Gestión tome control.
 
 ---
 
