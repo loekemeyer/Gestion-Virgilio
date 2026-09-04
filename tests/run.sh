@@ -239,3 +239,6 @@ PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node te
 
 echo "== pweb-e2e (idea 3717: circuito completo con datos REALES — pedido → tanda → operario → Excel ISIS) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/pweb-e2e.cjs
+
+echo "== pweb-barrio-zona (v12.72: barrio por el último guión + los web fuera del panel del Excel) =="
+PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/pweb-barrio-zona.cjs

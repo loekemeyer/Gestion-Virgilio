@@ -8439,8 +8439,19 @@ lee **la misma tabla donde caen los pedidos de la página**, en vivo.
   - La **zona se sugiere** con el mismo diccionario compartido que usa la PPP
     (`Zonas_Barrios` + overrides, vía `pppZonaDeBarrio`), así una zona corregida
     en un lado vale en el otro. El barrio sale de la sucursal de entrega cortando
-    por el último separador ("Bragado 5742 - Mataderos" → Mataderos); "Retira" en
-    cualquier grafía se reconoce como tal. 444 de 472 sucursales traen separador.
+    por el **último guión, con o sin espacios** (v12.72); "Retira" en cualquier
+    grafía se reconoce como tal.
+    ⚠ Antes se exigía espacio a los dos lados y **el padrón real no lo respeta**:
+    `1737-Palermo`, `2579- Constitucion`, `Krausse5108-Tortuguita` quedaban sin
+    cortar, la dirección entera pasaba por barrio y la zona no resolvía nunca —
+    295 NP salían "sin zona". Medido sobre las 171 sucursales distintas: de 163
+    "barrios" basura a **123 reales, 37 con zona** en el diccionario.
+    Los otros 86 son del **interior** (Córdoba, Rosario, Bahía Blanca, Mendoza…) y
+    **no tienen zona a propósito**: el esquema de zonas es de CABA/GBA. Esos se
+    resuelven a mano o por expreso, no hay nada que arreglar ahí.
+  - ⚠ **Los pedidos web NO entran al panel de "revisar/corregir en el Excel"**
+    (v12.72). No salen de ningún Excel, y con 295 avisos el panel dejaba de servir
+    para lo suyo, que es detectar errores de carga de la PPP de ISIS.
   - ⚠ **Sin número no se guarda** (v12.68). Si `ppp_web_np_asignar` falla (RPC
     caída, sesión vencida) la etiqueta queda en `…`, pero el guardado seguía igual
     y escribía `np: null` y un `np_label` `"LK undefined"` en la foto de artículos

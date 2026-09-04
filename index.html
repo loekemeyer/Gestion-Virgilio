@@ -6607,7 +6607,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v12.71";
+const APP_VERSION = "v12.72";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -25299,8 +25299,15 @@ function pwebBarrioDe(suc) {
   const t = String(suc || "").trim();
   if (!t) return "";
   if (/retir/i.test(t)) return "Retira";
-  const partes = t.split(/\s[-—–]\s|—/);
-  return (partes.length > 1 ? partes[partes.length - 1] : t).trim();
+  // Se corta por el ÚLTIMO guión, con o sin espacios alrededor. Antes se exigía
+  // espacio a los dos lados y el padrón real no lo respeta: "1737-Palermo",
+  // "2579- Constitucion", "Krausse5108-Tortuguita" quedaban sin cortar y la
+  // dirección entera se tomaba como barrio, así que la zona nunca resolvía.
+  // Medido sobre las 171 sucursales distintas: pasa de 163 "barrios" (basura) a
+  // 123 reales, 37 de los cuales están en el diccionario de zonas. El resto son
+  // del interior (Córdoba, Rosario, Bahía Blanca) y NO tienen zona a propósito.
+  const i = Math.max(t.lastIndexOf("-"), t.lastIndexOf("—"), t.lastIndexOf("–"));
+  return (i > 0 ? t.slice(i + 1) : t).trim();
 }
 
 /* La zona NO se inventa acá: se resuelve con el MISMO diccionario compartido que
@@ -28540,6 +28547,12 @@ function _pppEsCiudadela(barrio) {
 function _pppComputeErrors(peds, entSet) {
   const sacar = [], sinZona = [], zonaDif = [];
   for (const p of peds) {
+    // Los pedidos de la página NO salen de ningún Excel: este panel dice "revisar/
+    // corregir en el Excel" y para ellos no hay Excel que corregir. Sin este filtro
+    // inundaban el panel —295 de 300 avisos eran web— y lo volvían inservible para
+    // lo que es: detectar errores de carga de la PPP de ISIS. Su zona se elige en
+    // la propia fila, y las del interior directamente no tienen zona.
+    if (p._web) { p._err = []; continue; }
     p._err = [];
     if (p.programmed && entSet && entSet.has(String(p.np))) { p._err.push("sacar"); sacar.push(p); }
     const zCol = _pppS(p.zona);
