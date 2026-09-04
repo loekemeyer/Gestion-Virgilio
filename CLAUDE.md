@@ -49,6 +49,48 @@ Ejemplo concreto: la conversión MC↔Uni de insumos (v11.77) vive en el trigger
 `normalizar_unidad_insumo` de `Movimientos_Stock`. El front también convierte
 como optimización, pero el trigger es el que manda.
 
+## ⚠⚠ PROTOCOLO OBLIGATORIO: la base es COMPARTIDA con Producción Virgilio
+
+**Gestión Virgilio y Producción Virgilio usan el MISMO proyecto Supabase
+(`hrxfctzncixxqmpfhskv`) y la MISMA anon key.** Producción Virgilio (repo
+`loekemeyer/Produccion-Virgilio`) es la app que los operarios **están usando en
+este momento**. Cualquier cosa que se toque en `public.*` —una fila, una columna,
+una función, un trigger, un cron, un grant— la ve esa app al instante.
+
+**Regla del dueño (2026-09-04): sobre una tabla compartida se AGREGA, nunca se
+MODIFICA lo que ya está.** Cuando no alcance con agregar, se crea una tabla nueva
+que sea la **fuente canónica para Gestión**, y Producción sigue leyendo la suya.
+
+| Querés… | |
+|---|---|
+| Agregar **filas** a una tabla compartida | ✅ `insert … on conflict do nothing`. Nunca `do update`. |
+| Agregar una **columna** | ✅ nullable, sin `default` que reescriba, sin backfill, con prefijo `gv_`. |
+| `update` / `delete` / `truncate` de filas existentes | ❌ → tabla `GV_*` de override + vista que la superpone |
+| Cambiar o borrar una columna existente | ❌ → override |
+| Objeto **nuevo** (tabla, vista, función) | ✅ con prefijo `PPP_Web_*`, `GV_*`, `gv_*`, `ppp_web_*` |
+| `create or replace` de una función/vista que Producción usa | ❌ → crear `gv_<nombre>` nueva |
+| Trigger sobre una tabla compartida | ❌ **nunca**: corre para Producción también |
+| Dropear algo que no creamos nosotros | ❌ |
+
+**Antes de tocar CUALQUIER objeto de `public.*`, grepear el repo de Producción**
+(clonado en `/home/user/loekemeyer/produccion-virgilio`; si no está, traerlo con
+`add_repo` + `git clone`):
+
+```bash
+grep -rn "NOMBRE_DEL_OBJETO" --include=*.js --include=*.html --include=*.sql \
+  /home/user/loekemeyer/produccion-virgilio
+```
+
+Además: **toda vista nueva va con `security_invoker = true`** (sin eso corre como
+`postgres` y saltea la RLS — el 2026-09-04 eso costó una filtración real), **RLS
+prendida por defecto** en cada tabla nueva, y los **crons/Edge Functions llevan
+prefijo** porque son globales al proyecto.
+
+📒 **Todo cambio se anota en `docs/SUPABASE-GESTION-VIRGILIO.md` el mismo día**, con
+el impacto medido (la consulta que lo prueba, no "no debería afectar") y el rollback.
+Ese archivo —no la memoria— es lo que dice en qué estado está el pipeline al abrir
+una sesión nueva. **Leerlo antes de tocar Supabase.**
+
 ## ⚠ PROTOCOLO OBLIGATORIO: Backups antes de tocar datos en Supabase
 
 **SIEMPRE que edites/alters/truncates/deletes en tablas de Supabase:**
