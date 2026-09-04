@@ -2,9 +2,15 @@
 -- Zonas_Barrios · barrios que faltan, según la lista canónica del dueño
 -- Corre en VIRGILIO (hrxfctzncixxqmpfhskv) · 2026-09-04
 -- ============================================================================
--- ⚠⚠ **NO EJECUTADO.** Esto TOCA DATOS de producción y el CLAUDE.md manda pedir
---    permiso explícito antes. Está acá para que el dueño lo lea, decida y recién
---    ahí se corra. Correr el BACKUP primero, siempre.
+-- ✅ **EJECUTADO el 2026-09-04**, con permiso explícito del dueño ("implementá lo de
+--    las localidades"). Entraron **28 barrios**; `Zonas_Barrios` pasó de 87 a 115 filas.
+--    Backup previo: `sql/backups/backup_zonas_barrios_20260904.sql` (las 87 originales).
+--    Rollback de SOLO el alta: `delete from public."Zonas_Barrios" where creado::date = '2026-09-04';`
+--
+--    RESULTADO medido sobre los 1.358 pedidos del feed:
+--      antes:   1.295 con zona · 51 con barrio pero sin zona · 12 sin barrio
+--      después: **1.346 con zona (99,1%)** · 1 con barrio sin zona · 11 sin barrio
+--    Los 12 que quedan NO son un problema de diccionario — ver el bloque final.
 --
 -- ----------------------------------------------------------------------------
 -- QUÉ PROBLEMA RESUELVE
@@ -57,14 +63,14 @@
 -- ============================================================================
 
 -- ----------------------------------------------------------------------------
--- PASO 1 · BACKUP (correr esto PRIMERO y guardar el resultado)
+-- PASO 1 · BACKUP (se corrió; el resultado está en sql/backups/)
 -- ----------------------------------------------------------------------------
 -- select 'insert into public."Zonas_Barrios" (barrio_norm, zona) values ('
 --        || quote_literal(barrio_norm) || ',' || quote_literal(zona) || ');'
 --   from public."Zonas_Barrios" order by barrio_norm;
 
 -- ----------------------------------------------------------------------------
--- PASO 2 · EL ALTA (22 barrios con pedidos reales + los que faltan de la lista)
+-- PASO 2 · EL ALTA (se corrió: 28 filas — los 22 con pedidos reales + 6 sin uso aún)
 -- ----------------------------------------------------------------------------
 -- insert into public."Zonas_Barrios" (barrio_norm, zona)
 -- select b.barrio_norm, b.zona
@@ -75,7 +81,7 @@
 -- on conflict (barrio_norm) do nothing;
 
 -- ----------------------------------------------------------------------------
--- PASO 3 · VERIFICAR (tiene que dar 0 filas: ya no queda barrio real sin zona)
+-- PASO 3 · VERIFICAR (dio 1 fila: 'santa fe', que no es un barrio — ver abajo)
 -- ----------------------------------------------------------------------------
 -- with f as (
 --   select public._norm_barrio(barrio) b, count(*) n
@@ -90,3 +96,25 @@
 -- ROLLBACK · si algo sale mal, borra SOLO lo que agregó este script
 -- ----------------------------------------------------------------------------
 -- delete from public."Zonas_Barrios" where creado::date = current_date;
+
+-- ============================================================================
+-- LO QUE QUEDÓ AFUERA — 12 pedidos, y NO se arreglan con el diccionario
+-- ============================================================================
+-- No es que falte el barrio en la lista: es que a esos clientes **no se les cargó
+-- `zona_expreso` en el padrón de LK**, así que el pedido no trae punto de entrega.
+-- Se arregla en el padrón (cargándoles el barrio del expreso), no acá.
+--
+--   interior sin expreso asignado (8): Río Cuarto · Concepción del Uruguay ·
+--     Aguilares · Santa Cruz · Rafaela · Junín · La Plata · 'Santa Fe' (que además
+--     es una provincia, no un barrio — por eso aparece como "barrio sin zona")
+--   CABA/GBA sin expreso cargado (4): Tigre · Adrogué · Berisso · "Caba"
+--     (estos cuatro sí resolverían solos si alguien les carga el punto de entrega;
+--      mientras tanto el front igual los intenta por `localidad` y por la dirección)
+--
+-- Consulta para volver a listarlos:
+--   select empresa, order_id, cod_cliente, cliente_nombre, sucursal_entrega, barrio
+--     from public.vista_pedidos_web_feed
+--    where coalesce(trim(barrio),'') = ''
+--       or public._norm_barrio(barrio) = 'santa fe'
+--    order by empresa, order_id;
+-- ============================================================================

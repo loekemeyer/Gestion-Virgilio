@@ -8489,14 +8489,22 @@ lee **la misma tabla donde caen los pedidos de la página**, en vivo.
       (`Esteban Echeverría` con acento, `Laferrere`, `Tortuguitas`, `Microcentro`,
       `Lanus Oeste`, `Villa General Mitre`, `Villa Riachuelo`) que se aprenden
       eligiendo la zona una vez en la PPP (`zona_barrio_set`), como siempre.
-    - **Medido sobre el histórico completo** (1.358 pedidos, 2026-09-04): son **22
-      barrios de entrega con 51 pedidos** los que no están en `Zonas_Barrios`
-      (`tortuguitas` 8, `villa general mitre` 5, `florencio varela` 5,
-      `valentin alsina` 4, `microcentro` 3, `laferrere` 3, y 16 más de 1-2). Los 22
-      resuelven en la lista canónica de 113 barrios que pasó el dueño. El alta está
-      escrita y **sin ejecutar** en `sql/zonas_barrios_dic_canonico_20260904.sql`
-      (INSERT-only: la lista canónica tiene `burzaco` mal y `v.devoto`/`villa bosch`
-      en discusión, y no hay que pisar lo que ya decidió producción).
+    - ✅ **El diccionario se completó el 2026-09-04.** Faltaban 22 barrios de entrega
+      con 51 pedidos (`tortuguitas` 8, `villa general mitre` 5, `florencio varela` 5,
+      `valentin alsina` 4, `microcentro` 3, `laferrere` 3, y 16 más de 1-2), que sí
+      estaban en la lista canónica de 113 que pasó el dueño. Entraron **28 filas**
+      (los 22 más 6 que todavía no tuvieron pedido) y `Zonas_Barrios` pasó de **87 a
+      115**. Script y medición en `sql/zonas_barrios_dic_canonico_20260904.sql`;
+      backup previo en `sql/backups/backup_zonas_barrios_20260904.sql`.
+    - Fue **INSERT-only a propósito**: en 3 barrios la lista canónica está peor que la
+      base y no se pisó nada — `burzaco` (la lista lo manda a CABA Centro y es GBA
+      Sur), `villa bosch` y `v.devoto`.
+    - **Cobertura resultante: 1.346 de 1.358 pedidos (99,1%)**. Los 12 que quedan **no
+      son un problema de diccionario**: son clientes a los que no se les cargó
+      `zona_expreso` en el padrón de LK, así que el pedido no trae punto de entrega
+      (8 del interior sin expreso asignado; 4 de CABA/GBA —Tigre, Adrogué, Berisso,
+      "Caba"— que resolverían solos si alguien les carga el barrio del expreso). Se
+      arregla en el padrón, no en la tabla de zonas.
     - Con `v12.61–v12.72` el barrio se sacaba **partiendo el string de la
       dirección**: era una invención y fallaba en la mitad de los casos.
   - ⚠ **Los pedidos web NO entran al panel de "revisar/corregir en el Excel"**

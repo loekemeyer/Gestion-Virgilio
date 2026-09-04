@@ -91,17 +91,19 @@ pedido → customer_delivery_addresses.zona_expreso   (= el BARRIO que carga el 
 > contra **`public."Zonas_Barrios"`** (87 filas, auto-aprendizaje por `trg_ppp_autozona`,
 > alta manual por la RPC `zona_barrio_set`) — **no** contra `pipeline.barrio_zona`.
 >
-> **Lo único que falta del cruce es el diccionario.** Medido el 2026-09-04 sobre los 1.358
-> pedidos de `vista_pedidos_web_feed`: **22 barrios de entrega reales, 51 pedidos**, no
-> están en `Zonas_Barrios` pero sí resuelven en la lista canónica de 113
-> (`tortuguitas` 8, `villa general mitre` 5, `florencio varela` 5, `valentin alsina` 4,
-> `microcentro` 3, `laferrere` 3, y 16 más con 1-2 cada uno). Esos pedidos entran a la PPP
-> sin zona y hay que asignarles el barrio a mano, una vez cada uno.
+> ✅ **El diccionario se completó el 2026-09-04.** Faltaban 22 barrios de entrega reales
+> con 51 pedidos, que sí estaban en la lista canónica de 113. Entraron **28 filas** y
+> `Zonas_Barrios` pasó de **87 a 115**. Script, medición y lo que quedó afuera:
+> `sql/zonas_barrios_dic_canonico_20260904.sql`; backup previo en
+> `sql/backups/backup_zonas_barrios_20260904.sql`.
 >
-> El alta está escrita y **sin ejecutar** en `sql/zonas_barrios_dic_canonico_20260904.sql`
-> (tocar datos necesita permiso explícito). Ojo con 3 conflictos donde **la lista canónica
-> está peor que la base y NO hay que pisar**: `burzaco` (la lista dice CABA Centro y es GBA
-> Sur), `villa bosch` y `v.devoto` (§6.1). Por eso el script es INSERT-only.
+> INSERT-only a propósito: en 3 barrios la lista canónica está **peor** que la base y no se
+> pisó nada — `burzaco` (la lista dice CABA Centro y es GBA Sur), `villa bosch` y `v.devoto`
+> (§6.1, sigue abierto).
+>
+> **Cobertura: 1.346 de 1.358 pedidos (99,1%).** Los 12 restantes no son un problema de
+> diccionario: son clientes sin `zona_expreso` cargado en el padrón de LK, así que el pedido
+> no trae punto de entrega. Se arregla en el padrón.
 
 ## 3. Lo construido (en vivo, funcionando)
 
@@ -215,8 +217,11 @@ calendario día→zona fue un invento (§6.7). No se dropeó: es cambio de datos
     `pipeline.calendario_zona` (invento, §4.7) seguro; y decidir si se conservan el esquema
     `pipeline`, `fuentes` y los servers FDW `lk_feed`/`chef_feed` o se dropean. Hoy no los
     lee nadie: el pipeline productivo entra a LK por el bridge de admin, no por FDW.
-12. 🆕 **Alta de los 22 barrios que faltan en `Zonas_Barrios`** (§2) —
-    `sql/zonas_barrios_dic_canonico_20260904.sql`, escrito y **sin ejecutar**.
+12. ~~**Alta de los 22 barrios que faltan en `Zonas_Barrios`.**~~ ✅ Corrido el 2026-09-04
+    (28 filas, 87 → 115). Ver §2.
+13. 🆕 **Cargar `zona_expreso` en el padrón de LK** a los 12 clientes que no lo tienen —
+    es lo único que queda entre el 99,1% y el 100%. Cuatro de ellos (Tigre, Adrogué,
+    Berisso, "Caba") resuelven solos apenas se les cargue el barrio del punto de entrega.
 
 ## 7. Cómo continuar
 
