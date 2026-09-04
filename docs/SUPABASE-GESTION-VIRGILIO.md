@@ -582,16 +582,31 @@ update public."PPP_Web_Config" set valor_texto = '' where clave = 'tanda_prefijo
 update public."PPP_Web_Config" set valor       = 1  where clave = 'numeracion_activa';
 ```
 
-Y antes de la segunda, decidir de qué número arranca:
+### De qué número arranca: 00001, las dos empresas
 
-```sql
-select * from public."PPP_Web_NP_Seed";                        -- hoy: lk 1343, chef 1
-update public."PPP_Web_NP_Seed" set desde = <N> where empresa = 'lk';
-```
+Decidido por el dueño el mismo día. `PPP_Web_NP_Seed` quedó en **lk 1 · chef 1**, así que
+el primer pedido que numere Gestión va a ser **`LK 00001`** / **`CH 00001`**. El `1343`
+que tenía LK era arbitrario (se había elegido para parecerse al número de pedido de la
+página) y se descartó. Sin choque con Producción: sus NP son de 5 dígitos desde 44361.
 
-El `1343` de hoy es **arbitrario** — se eligió para que se pareciera al número de pedido
-de la página. No es el contador de Producción: las NP de ISIS son de 5 dígitos y arrancan
-en 44361, así que no hay choque posible con ninguno.
+### La etiqueta: `LK 00001` — prefijo + espacio + 5 dígitos
+
+Fuente de verdad en el backend, **`gv_ppp_web_np_label(empresa, np)`**. El front
+(`pwebNpLabel`) y la Edge Function (`npLabel`) la duplican **sólo como optimización de
+UX**; si cambia el formato, se cambia primero en Supabase. Verificado que las tres dan lo
+mismo en 6 casos.
+
+El prefijo no es cosmético: `empresaDeNp` resuelve la empresa por el número (>90000 = LK)
+y una NP web de pocos dígitos caería en Chef, mandando a buscar un pedido de Loekemeyer al
+sector equivocado.
+
+⚠ **`lpad` trunca.** `lpad('100000',5,'0')` devuelve `'10000'` — que es la etiqueta de la
+NP 10000. Sin guarda, las NP 10000, 100000 y 100001 compartirían etiqueta, y como la
+etiqueta *es* la NP que viaja por picking, armado y facturación (`PPP_Web_Base` está
+indexada por `np_label`), el operario abriría una tanda con los artículos de tres pedidos
+mezclados, en silencio. Con la guarda, pasado 99999 la etiqueta crece (`LK 100000`).
+A 4.300 NP al año son unos 23 años; no es un incendio, es una mina enterrada, y la guarda
+sale gratis.
 
 ### Estado después de esto
 

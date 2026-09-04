@@ -6618,7 +6618,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v12.77";
+const APP_VERSION = "v12.78";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -31183,9 +31183,22 @@ async function mergePickingBasePppWeb(map) {
   } catch (_e) { /* ídem */ }
 }
 
-/* La etiqueta que ve el operario y que viaja como "NP" por todo el circuito. */
+/* La etiqueta que ve el operario y que viaja como "NP" por todo el circuito:
+   "LK 00001" / "CH 00001". Prefijo de empresa + espacio + 5 dígitos.
+
+   ⚠ ESTO ES UNA COPIA. La fuente de verdad es `gv_ppp_web_np_label(empresa, np)`
+   en Supabase; acá se duplica sólo para no esperar al servidor al pintar la
+   pantalla. Si se cambia el formato, se cambia PRIMERO en el backend.
+
+   El prefijo no es cosmético: `empresaDeNp` resuelve la empresa por el número
+   (>90000 = LK) y una NP web de pocos dígitos caería en Chef, mandando a buscar
+   un pedido de Loekemeyer al sector equivocado. Con el prefijo manda la etiqueta.
+
+   Los ceros se rellenan hasta 5; pasado 99999 la etiqueta crece ("LK 100000") en
+   vez de recortarse, que repetiría un número ya usado. */
 function pwebNpLabel(empresa, np) {
-  return ((empresa === "chef") ? "CH" : "LK") + " " + np;
+  const n = String(np);
+  return ((empresa === "chef") ? "CH" : "LK") + " " + (n.length >= 5 ? n : n.padStart(5, "0"));
 }
 
 /* (v5.34) fetchMonitorFromSheets eliminado: la PPP se lee de Supabase

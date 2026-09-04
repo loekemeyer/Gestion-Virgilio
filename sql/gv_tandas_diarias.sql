@@ -566,14 +566,15 @@ $function$;
 --   update public."PPP_Web_Config" set valor_texto = '' where clave = 'tanda_prefijo';
 --   update public."PPP_Web_Config" set valor       = 1  where clave = 'numeracion_activa';
 --
--- Y antes de la segunda, decidir de qué número arranca:
+-- De qué número arranca ya está decidido (dueño, 2026-09-04): **de 00001, las
+-- dos empresas**. `PPP_Web_NP_Seed` = lk 1 · chef 1, así que el primer pedido
+-- que numere Gestión va a ser `LK 00001` / `CH 00001`.
 --
---   select * from public."PPP_Web_NP_Seed";          -- hoy: lk 1343, chef 1
---   update public."PPP_Web_NP_Seed" set desde = <N> where empresa = 'lk';
+--   select * from public."PPP_Web_NP_Seed";   -- lk 1 · chef 1
 --
--- El 1343 de hoy es arbitrario (se eligió para que se pareciera al número de
--- pedido de la página). No es el contador de Producción: las NP de ISIS son de
--- 5 dígitos y arrancan en 44361, así que no hay choque posible con ninguno.
+-- El 1343 que tenía LK antes era arbitrario (se había elegido para que se
+-- pareciera al número de pedido de la página) y se descartó. No hay choque
+-- posible con Producción: sus NP son de 5 dígitos y arrancan en 44361.
 --
 -- Probado el 2026-09-04, las dos puertas:
 --   gv_ppp_web_np_asignar (job)   → cortó por el interruptor
@@ -582,6 +583,32 @@ $function$;
 --                                   no queda tapado por el gate de sesión
 --   PPP_Web_NP quedó en 0 filas · PPP_Programacion_Diaria intacta en 182
 --
+-- ══════════════════════════════════════════════════════════════════════════
+-- La ETIQUETA de la NP · fuente de verdad
+-- ══════════════════════════════════════════════════════════════════════════
+-- "LK 00001" / "CH 00001": prefijo de empresa + espacio + 5 digitos.
+-- El front (`pwebNpLabel`) y la Edge Function (`npLabel`) la duplican SOLO como
+-- optimizacion de UX. Si cambia el formato, se cambia PRIMERO aca.
+create or replace function public.gv_ppp_web_np_label(p_empresa text, p_np integer)
+returns text language sql immutable as $function$
+  select case when lower(coalesce(p_empresa,'')) in ('chef','ch') then 'CH' else 'LK' end
+      || ' '
+      -- ⚠ lpad TRUNCA si el texto ya es mas largo que el ancho:
+      --   lpad('100000',5,'0') = '10000', que es la etiqueta de la NP 10000.
+      --   Tres pedidos distintos compartirian NP y el operario abriria una
+      --   tanda con los articulos mezclados, en silencio. Con la guarda, pasado
+      --   99999 la etiqueta simplemente crece: LK 100000.
+      || case when length(p_np::text) >= 5 then p_np::text
+              else lpad(p_np::text, 5, '0') end;
+$function$;
+
+grant execute on function public.gv_ppp_web_np_label(text, integer) to anon, authenticated, service_role;
+
+-- Probado el 2026-09-04, las tres implementaciones dan lo mismo en los 6 casos
+-- (backend, front y Edge Function), incluido el borde que truncaba:
+--   lk/1 → LK 00001 · chef/1 → CH 00001 · lk/357 → LK 00357
+--   chef/87 → CH 00087 · lk/99999 → LK 99999 · lk/100000 → LK 100000
+
 -- ── La lógica de numeración, para que no haya que leerla del cuerpo ────────
 --   · un número por (empresa, order_id, np_idx) — un pedido web se puede
 --     partir en varias NP, y cada parte lleva la suya

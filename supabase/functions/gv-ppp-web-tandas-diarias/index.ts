@@ -190,10 +190,18 @@ async function codsChefDe(codsLk: string[]): Promise<string[]> {
   return [...out];
 }
 
-/** La etiqueta que ve el operario: "LK 1343". */
+/** La etiqueta que ve el operario: "LK 00001" / "CH 00001".
+ *
+ *  ⚠ ES UNA COPIA. La fuente de verdad es `gv_ppp_web_np_label(empresa, np)` en
+ *  Supabase; acá se duplica para no pagar un round trip por cada línea de la
+ *  foto de artículos. Si cambia el formato, se cambia PRIMERO en el backend.
+ *
+ *  Pasado 99999 la etiqueta crece ("LK 100000") en vez de recortarse: recortar
+ *  repetiría un número ya usado. */
 function npLabel(empresa: string, num: number): string {
-  return (String(empresa).toLowerCase() === "chef" || String(empresa).toUpperCase() === "CH" ? "CH" : "LK") +
-    " " + num;
+  const emp = String(empresa).toLowerCase() === "chef" || String(empresa).toUpperCase() === "CH" ? "CH" : "LK";
+  const n = String(num);
+  return emp + " " + (n.length >= 5 ? n : n.padStart(5, "0"));
 }
 
 async function procesarEmpresa(
@@ -211,6 +219,10 @@ async function procesarEmpresa(
   // nada (pasó de verdad el 2026-09-04, log id 2). La lógica de numeración es
   // LA MISMA —la original delega en esta— sólo cambia el candado: GRANT a
   // `service_role` en vez de sesión.
+  //
+  // ⚠ Hasta que Gestión reemplace a Producción esto CORTA a propósito:
+  //   `PPP_Web_Config.numeracion_activa = 0`. Hoy la NP la manda ISIS a la hoja
+  //   de cálculos y la usa Producción; Gestión numera recién el día del cambio.
   const pares = filas.map((n) => ({ order_id: n.order_id, np_idx: n.np_idx }));
   const nums = await vgRpc<{ r_order_id: number; r_np_idx: number; r_np: number }[]>(
     "gv_ppp_web_np_asignar", { p_empresa: emp, p_pares: pares });

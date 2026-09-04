@@ -112,9 +112,11 @@ update public."PPP_Web_Config" set valor_texto = '' where clave = 'tanda_prefijo
 update public."PPP_Web_Config" set valor       = 1  where clave = 'numeracion_activa';
 ```
 
-Antes de la segunda, decidir de qué número arranca la NP
-(`PPP_Web_NP_Seed`: hoy lk 1343, chef 1 — el 1343 es arbitrario, **no** es el contador de
-Producción, que son 5 dígitos desde 44361).
+La NP arranca en **00001 para las dos empresas** (`PPP_Web_NP_Seed`: lk 1 · chef 1), o sea
+el primer pedido de Gestión va a ser **`LK 00001`** / **`CH 00001`**. Sin choque con
+Producción, cuyas NP son de 5 dígitos desde 44361. La etiqueta la arma
+**`gv_ppp_web_np_label(empresa, np)`** en el backend — prefijo + espacio + 5 dígitos; el
+front y la Edge Function la duplican sólo como optimización de UX.
 
 Con el prefijo vacío, `ppp_web_armar_tandas` vuelve sola a la codificación histórica
 `LETRA+NN+LETRA` y `ppp_web_proxima_letra()` **retoma desde la última letra que dejó
