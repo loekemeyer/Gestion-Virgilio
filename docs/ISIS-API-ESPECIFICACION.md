@@ -351,20 +351,22 @@ pide el §18 del informe.
 
 ---
 
-## 9. Lo que queda pendiente, aparte de esto
-
-Ninguno de estos puntos bloquea lo de arriba:
-
-1. **P4 — Recepción de mercadería (remitos de compra).** Requiere definir el mapeo de
-   códigos de proveedor y de artículo entre los dos sistemas.
-2. **Cutover de la emisión.** Hoy Producción Virgilio emite Factura A por punto de venta
-   11. Cuando ISIS empiece a facturar estos pedidos, hay que **apagar la emisión propia
-   el mismo día** para no pedir dos CAE por la misma venta. Definir fecha y si el PV 11
-   queda de respaldo.
-
----
-
 ## Anexo técnico (interno, no se envía a ISIS)
+
+### Dos temas que NO van en el documento que se manda
+
+Estaban como "puntos abiertos" y se sacaron: el documento es la API de pedidos y nada
+más. Abrir otros frentes ahí sólo desvía la respuesta. Quedan anotados acá.
+
+1. **P4 — Recepción de mercadería (remitos de compra).** Es otro tema del mismo ticket,
+   sin relación con esta API. Requiere definir el mapeo de códigos de proveedor y de
+   artículo entre los dos sistemas.
+2. **Cutover de la emisión.** Hoy Producción Virgilio emite Factura A por punto de venta
+   11. Cuando ISIS empiece a facturar estos pedidos hay que **apagar la emisión propia el
+   mismo día**, para no pedir dos CAE por la misma venta. Definir fecha y si el PV 11 queda
+   de respaldo. Se plantea al coordinar la prueba conjunta, no antes.
+
+### Objetos
 
 - Edge Function: `supabase/functions/isis-api/index.ts` (proyecto `hrxfctzncixxqmpfhskv`,
   `verify_jwt = off` — la función valida su propio token).
