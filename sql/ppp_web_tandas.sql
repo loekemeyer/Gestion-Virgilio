@@ -50,15 +50,32 @@
 -- `ppp_web_resync` (ver sql/ppp_web_programacion.sql §3).
 --
 -- ══════════════════════════════════════════════════════════════════════════
--- v2 · REGLAS QUE AGREGÓ EL DUEÑO EL 2026-09-04
+-- v2/v3 · REGLAS QUE AGREGÓ EL DUEÑO EL 2026-09-04
 -- ══════════════════════════════════════════════════════════════════════════
 --   · **Tope 0,80 m³** (era 1,00). Sale de `PPP_Web_Config`, no está hardcodeado.
 --   · **Zonas 2+3 pueden juntarse, y 6+7. Todas las demás por separado.**
 --     Lo resuelve `gv_ppp_web_grupo_zona`, y el bucle recorre GRUPOS, no zonas.
---   · **Retira: cada cliente en su tanda.** Antes se juntaban como una zona más.
---     ⚠ El dueño dijo *"solo se juntan si retiran el mismo día"* — ese día NO
---     existe en ningún lado del pedido web (ver el PENDIENTE de abajo), así que
---     por ahora se aplica la mitad segura de la regla: separados.
+--   · **Retira: se juntan, y es su propio grupo** (no se mezcla con reparto).
+--     ⚠ Acá me equivoqué primero. Leí *"los retira separados, sólo se juntan si
+--     retiran el mismo día"* como que hacía falta un dato de "día de retiro" que
+--     no existe, y los separé a todos. El dueño lo aclaró: **la tanda es la que
+--     DEFINE el día**. Juntar dos Retira en una tanda es exactamente lo que hace
+--     que retiren el mismo día. No falta ningún dato: se juntan como cualquier
+--     grupo, bajo el tope.
+--   · **Cupo diario de 4 a 5 m³** (`m3_max_dia`, se tomó 5). El depósito no arma
+--     todo lo pendiente: arma hasta ahí y el resto espera. **Esa cola es la
+--     demora de 7 a 15 días** que hoy es la real — no hay que programarla aparte.
+--   · **Orden de la cola:** primero los clientes `prioritario`, después por
+--     ANTIGÜEDAD del pedido. Antes se tomaba por m³ descendente: empaquetaba
+--     mejor pero dejaba a los pedidos chicos esperando para siempre.
+--   · **Clientes que no pueden esperar:** `GV_Clientes_Reglas` con
+--     `regla='prioritario'`. Hoy Osa (2533), Horcada (85) y Torres y Liva
+--     (LK 288 / CH 271). Entran aunque el cupo esté lleno.
+--   · **Misma razón social pidiendo LK y CH → el mismo día.** LK se arma primero
+--     y los clientes que entraron se mapean a sus códigos de Chef por CUIT
+--     (vista `gv_clientes_lk_ch` en LK, 357 pares); esos entran forzados en la
+--     corrida de Chef. Por CUIT y no por nombre: los padrones escriben distinto
+--     la misma razón social.
 --   · **Súper: una tanda por cliente.** Sin cambio, ya era así.
 --   · **Clientes que van solos siempre:** `GV_Clientes_Reglas` con `regla='solo'`.
 --     Hoy Extralimp (4114) y Distribuidora GM (4080), códigos verificados contra
@@ -80,7 +97,6 @@
 --   códigos                          → arrancan en E (Producción va por D)✔
 --
 --   v2, 2026-09-04, 14 casos armados a propósito:
---   Retira A y Retira B              → una tanda cada uno                 ✔
 --   Súper Uno y Súper Dos            → una tanda cada uno                 ✔
 --   Extralimp + otro de Zona 5       → tandas distintas, aunque sumaban
 --                                      0,10 y entraban holgados           ✔
@@ -89,6 +105,17 @@
 --   Chico Z6 + Chico Z7              → JUNTOS                             ✔
 --   Chico Z1 y Chico Z4              → separados, no se agrupan           ✔
 --   Grande Z1 de 0,85                → tanda propia (pasa el tope)        ✔
+--
+--   v3, 2026-09-04, 14 NP reales de LK con fechas de recepción reales y el
+--   cupo de 5 m³ puesto:
+--   se armaron 4,628 m³ en 7 tandas    → NO se pasó del cupo               ✔
+--   Coto (4,56) y Messina (1,21)       → quedaron EN COLA por ser los más
+--                                        nuevos                            ✔
+--   Osa y Torres y Liva                → entraron igual siendo los MÁS
+--                                        nuevos, por prioritarios          ✔
+--   Merajver + Garbarino (Retira)      → JUNTOS, o sea retiran el mismo día ✔
+--   Dapelo (Z2) + Guini (Z3)           → JUNTOS                            ✔
+--   Linea Ge 1,375 y Torres 0,985      → tanda propia cada uno             ✔
 -- ══════════════════════════════════════════════════════════════════════════
 
 create table if not exists public."PPP_Web_Config" (
@@ -106,7 +133,9 @@ insert into public."PPP_Web_Config" (clave, valor, descripcion) values
   ('dias_hasta_entrega', 0,
    'Días desde que se arma la tanda hasta la entrega. 0 = mismo día. Sin evidencia histórica; es el parámetro a mover.'),
   ('saltar_fin_de_semana', 1,
-   '1 = si cae sábado o domingo, corre al lunes. 0 entregas de fin de semana en 120 días.')
+   '1 = si cae sábado o domingo, corre al lunes. 0 entregas de fin de semana en 120 días.'),
+  ('m3_max_dia', 5.00,
+   'Cuántos m³ se arman por día en total (las dos empresas juntas). El dueño dijo 4 a 5; se tomó 5. Lo que no entra espera al día siguiente: esa cola es la demora.')
 on conflict (clave) do nothing;
 
 alter table public."PPP_Web_Config" enable row level security;
@@ -164,16 +193,23 @@ $$;
 --     supervisor) decide quién puede escribir.
 
 create or replace function public.ppp_web_armar_tandas(
-  p_empresa text, p_fecha date default current_date, p_filas jsonb default '[]'::jsonb)
+  p_empresa text,
+  p_fecha date default current_date,
+  p_filas jsonb default '[]'::jsonb,
+  p_forzar_cods text[] default '{}')
 returns table (r_tanda text, r_zona text, r_np_count int, r_m3 numeric, r_clientes int)
 language plpgsql
 as $function$
 declare
   v_tope   numeric := coalesce((select valor from public."PPP_Web_Config" where clave='tanda_m3_max_mezcla'), 0.80);
+  v_cupo   numeric := coalesce((select valor from public."PPP_Web_Config" where clave='m3_max_dia'), 5.00);
   v_dias   int     := coalesce((select valor from public."PPP_Web_Config" where clave='dias_hasta_entrega'), 0)::int;
   v_saltar boolean := coalesce((select valor from public."PPP_Web_Config" where clave='saltar_fin_de_semana'), 1) <> 0;
   v_letra  int     := public.ppp_web_proxima_letra();
   v_fecha  date;
+  v_usado  numeric;
+  v_resta  numeric;
+  v_acumsel numeric := 0;
   v_grupo  text;
   v_zn     int := 0;
   v_ti     int;
@@ -187,6 +223,7 @@ begin
   end if;
 
   drop table if exists _sin_tanda;
+  drop table if exists _sel;
   drop table if exists _asig;
 
   create temp table _sin_tanda on commit drop as
@@ -199,13 +236,18 @@ begin
          nullif(x->>'razon_social','') as razon_social,
          nullif(x->>'direccion','')    as direccion,
          nullif(x->>'barrio','')       as barrio,
+         coalesce(nullif(x->>'fecha_recep','')::date, current_date) as fecha_recep,
          coalesce(nullif(x->>'m3','')::numeric, 0)    as m3,
          coalesce((x->>'m3_parcial')::boolean, false) as m3_parcial,
          nullif(x->>'lineas','')::int                 as lineas,
          nullif(x->>'cajas','')::numeric              as cajas,
          exists (select 1 from public."GV_Clientes_Reglas" g
                   where g.regla = 'solo' and g.empresa = p_empresa
-                    and g.cod_cliente = nullif(x->>'cod','')) as va_solo
+                    and g.cod_cliente = nullif(x->>'cod','')) as va_solo,
+         (exists (select 1 from public."GV_Clientes_Reglas" g
+                   where g.regla = 'prioritario' and g.empresa = p_empresa
+                     and g.cod_cliente = nullif(x->>'cod',''))
+          or coalesce(nullif(x->>'cod','') = any(p_forzar_cods), false)) as prioritario
     from jsonb_array_elements(p_filas) x
    where not exists (
            select 1 from public."PPP_Web_Programacion" g
@@ -217,10 +259,42 @@ begin
   -- Sin zona no se programa: falta el barrio y la elige una persona.
   delete from _sin_tanda where zona = '(sin zona)';
 
+  -- ── Cuanto queda de cupo para esa fecha ────────────────────────────────
+  -- Cuenta las DOS empresas: el cupo es del deposito, no de una razon social.
+  select coalesce(sum(m3), 0) into v_usado
+    from public."PPP_Web_Programacion"
+   where fecha_entrega = v_fecha and coalesce(nullif(trim(tanda),''),'') <> '';
+  v_resta := greatest(v_cupo - v_usado, 0);
+
+  -- ── Seleccion: quien entra hoy ─────────────────────────────────────────
+  -- La unidad es el CLIENTE (no la NP): un cliente entra entero o no entra.
+  -- Orden: prioritarios primero, despues el pedido mas viejo.
+  create temp table _sel (cliente text primary key) on commit drop;
+  for r_cli in
+    select cliente, sum(m3) as m3_cli, bool_or(prioritario) as prio,
+           min(fecha_recep) as desde
+      from _sin_tanda
+     group by cliente
+     order by bool_or(prioritario) desc, min(fecha_recep), sum(m3) desc, cliente
+  loop
+    -- El prioritario entra siempre. El resto, mientras quede cupo. Y el primero
+    -- entra aunque el solo se pase: un cliente no se parte ni se posterga
+    -- eternamente por ser mas grande que el cupo de un dia.
+    if r_cli.prio
+       or v_acumsel = 0 and v_resta > 0
+       or v_acumsel + r_cli.m3_cli <= v_resta then
+      insert into _sel (cliente) values (r_cli.cliente) on conflict do nothing;
+      v_acumsel := v_acumsel + r_cli.m3_cli;
+    end if;
+  end loop;
+
+  delete from _sin_tanda s where not exists (select 1 from _sel where cliente = s.cliente);
+
+  -- ── Armado de tandas con lo seleccionado ───────────────────────────────
   create temp table _asig (order_id bigint, np_idx int, tanda text) on commit drop;
 
   -- Se recorre por GRUPO de zona, no por zona: asi 2 y 3 caen en el mismo bucle
-  -- y pueden compartir tanda, y el resto no.
+  -- y pueden compartir tanda, y el resto no. Retira es su propio grupo.
   for v_grupo in select distinct grupo from _sin_tanda order by 1 loop
     v_zn := v_zn + 1; v_ti := 0; v_acum := 0; v_code := null;
     for r_cli in
@@ -228,10 +302,11 @@ begin
         from _sin_tanda where grupo = v_grupo
        group by cliente order by sum(m3) desc, cliente
     loop
-      -- Abre tanda nueva si: el cliente va solo por regla propia, si es Super o
-      -- Retira (uno por cliente), si el cliente solo ya pasa el tope, o si
-      -- sumarlo lo pasaria.
-      if v_grupo in ('Super','Retira') or r_cli.solo or r_cli.m3_cli >= v_tope
+      -- Abre tanda nueva si: el cliente va solo por regla propia, si es Super
+      -- (uno por cliente), si el cliente solo ya pasa el tope, o si sumarlo lo
+      -- pasaria. Retira NO abre siempre: juntarlos es lo que hace que retiren
+      -- el mismo dia.
+      if v_grupo = 'Super' or r_cli.solo or r_cli.m3_cli >= v_tope
          or v_code is null or (v_acum + r_cli.m3_cli) > v_tope then
         v_code := public.ppp_web_letra(v_letra) || lpad(v_zn::text, 2, '0')
                   || public.ppp_web_letra(v_ti);
@@ -241,8 +316,7 @@ begin
       select s.order_id, s.np_idx, v_code
         from _sin_tanda s where s.grupo = v_grupo and s.cliente = r_cli.cliente;
       v_acum := v_acum + r_cli.m3_cli;
-      -- Cierra la tanda para que nadie mas se le sume.
-      if v_grupo in ('Super','Retira') or r_cli.solo or r_cli.m3_cli >= v_tope then
+      if v_grupo = 'Super' or r_cli.solo or r_cli.m3_cli >= v_tope then
         v_code := null; v_acum := 0;
       end if;
     end loop;
@@ -267,6 +341,11 @@ begin
      group by a.tanda order by a.tanda;
 end
 $function$;
+
+-- ⚠ La v3 agrego `p_forzar_cods` CON DEFAULT, asi que quedaron dos sobrecargas y
+--   la llamada de 3 argumentos se volvio ambigua ("could not choose a best
+--   candidate function"). Eso rompia la Edge Function. Hay que borrar la vieja:
+--     drop function if exists public.ppp_web_armar_tandas(text, date, jsonb);
 
 -- ⚠ NO escribe `PPP_Web_Base` (la foto de artículos del picking). El front la
 --   escribe aparte en `pwebGuardarProg`, y el armado automático la escribe en

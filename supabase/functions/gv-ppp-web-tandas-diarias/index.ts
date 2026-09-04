@@ -15,9 +15,14 @@
 //   3. `ppp_web_np_asignar`     — numera lo que no tiene número
 //   4. `ppp_web_resync`         — pone al día lo YA programado que cambió
 //   5. `gv_ppp_web_zona_lote`   — resuelve la zona de cada NP
-//   6. `ppp_web_armar_tandas`   — arma las tandas con lo que quedó sin tanda
+//   6. `ppp_web_armar_tandas`   — arma las tandas del día, hasta el cupo de m³
 //   7. `PPP_Web_Base`           — la foto de artículos, o el picking sale vacío
 //   8. `GV_Tandas_Auto_Log`     — deja constancia, incluso de no haber hecho nada
+//
+// LK va PRIMERO y Chef después, no en paralelo: si un cliente de LK entró hoy y
+// el mismo (por CUIT) también tiene pedido en Chef, el de Chef entra forzado ese
+// mismo día. Es la regla del dueño *"clientes que son de la misma razón social y
+// piden LK y CH hay que mandarlos el mismo día"*.
 //
 // ⚠⚠ NO TOCA PRODUCCIÓN VIRGILIO. Escribe en `PPP_Web_Programacion`,
 //    `PPP_Web_Base` y `GV_Tandas_Auto_Log`, todas nuestras. De lo compartido
@@ -140,14 +145,35 @@ async function resolverZonas(entradas: { ze: string; loc: string; dir: string }[
   return out;
 }
 
+/** Los códigos de Chef que corresponden a estos códigos de LK, por CUIT.
+ *  `gv_clientes_lk_ch` es una vista de LK que aparea los dos padrones (357
+ *  clientes al 2026-09-04). Por CUIT y no por nombre: los padrones escriben
+ *  distinto la misma razón social ("Torres Y Liva S.A Cif" contra "Torres Y Liva"). */
+async function codsChefDe(codsLk: string[]): Promise<string[]> {
+  if (!codsLk.length) return [];
+  const out = new Set<string>();
+  // De a tandas de 100 para no armar una URL infinita.
+  for (let i = 0; i < codsLk.length; i += 100) {
+    const lote = codsLk.slice(i, i + 100).map((c) => `"${c}"`).join(",");
+    const r = await lk(`/rest/v1/gv_clientes_lk_ch?select=cod_ch&cod_lk=in.(${lote})`);
+    if (!r.ok) return [];                 // sin mapeo se sigue igual, no se rompe el armado
+    for (const x of await r.json() as { cod_ch: string }[]) out.add(String(x.cod_ch));
+  }
+  return [...out];
+}
+
 /** La etiqueta que ve el operario: "LK 1343". */
 function npLabel(empresa: string, num: number): string {
   return (String(empresa).toLowerCase() === "chef" || String(empresa).toUpperCase() === "CH" ? "CH" : "LK") +
     " " + num;
 }
 
-async function procesarEmpresa(emp: "lk" | "chef", filas: Fila[], fecha: string) {
-  if (!filas.length) return { np_leidas: 0, np_programadas: 0, tandas: [] as unknown[] };
+async function procesarEmpresa(
+  emp: "lk" | "chef", filas: Fila[], fecha: string, forzarCods: string[] = [],
+) {
+  if (!filas.length) {
+    return { np_leidas: 0, np_programadas: 0, tandas: [] as unknown[], codsHoy: [] as string[] };
+  }
 
   // ── 1. numerar ──────────────────────────────────────────────────────────
   const pares = filas.map((n) => ({ order_id: n.order_id, np_idx: n.np_idx }));
@@ -180,10 +206,13 @@ async function procesarEmpresa(emp: "lk" | "chef", filas: Fila[], fecha: string)
     zona: zonas[i] || "",
     cod: n.cod ?? null, razon_social: n.razon_social ?? null,
     direccion: direccionDe(n) || null, barrio: barrioCrudo(n).barrio || null,
+    // La antigüedad es con lo que se ordena la cola cuando no entra todo.
+    fecha_recep: n.fecha_recep ?? null,
     m3: n.m3, m3_parcial: !!n.m3_parcial, lineas: n.lineas, cajas: n.cajas,
   }));
   const tandas = await vgRpc<{ r_tanda: string; r_zona: string; r_np_count: number; r_m3: number; r_clientes: number }[]>(
-    "ppp_web_armar_tandas", { p_empresa: emp, p_fecha: fecha, p_filas: filasTanda });
+    "ppp_web_armar_tandas",
+    { p_empresa: emp, p_fecha: fecha, p_filas: filasTanda, p_forzar_cods: forzarCods });
 
   // ── 5. la foto de artículos ─────────────────────────────────────────────
   // Sin esto el operario abre la tanda y no ve un solo artículo. El front las
@@ -227,7 +256,15 @@ async function procesarEmpresa(emp: "lk" | "chef", filas: Fila[], fecha: string)
     }
   }
 
-  return { np_leidas: filas.length, np_programadas: programadas.size, tandas };
+  // Los clientes que entraron HOY, para encadenar Chef con LK.
+  const rHoy = await vg(`/rest/v1/PPP_Web_Programacion?select=cod_cliente` +
+    `&empresa=eq.${emp}&fecha_entrega=eq.${fecha}&tanda=not.is.null&limit=20000`);
+  const codsHoy = rHoy.ok
+    ? [...new Set((await rHoy.json() as { cod_cliente: string }[])
+        .map((x) => String(x.cod_cliente)).filter(Boolean))]
+    : [];
+
+  return { np_leidas: filas.length, np_programadas: programadas.size, tandas, codsHoy };
 }
 
 Deno.serve(async (req: Request) => {
@@ -289,23 +326,33 @@ Deno.serve(async (req: Request) => {
     }
 
     // Las dos empresas por separado: si Chef falla, LK igual queda armado.
+    // LK va primero porque de ahí salen los clientes a forzar en Chef.
     const out: Record<string, unknown> = {};
     let leidas = 0, programadas = 0, nTandas = 0;
     const errores: string[] = [];
+    let forzarChef: string[] = [];
 
-    for (const emp of ["lk", "chef"] as const) {
-      try {
-        const filas = emp === "lk" ? await traerLk(desde) : await traerChef(ventana);
-        const r = await procesarEmpresa(emp, filas, fecha);
-        leidas += r.np_leidas;
-        programadas += r.np_programadas;
-        nTandas += r.tandas.length;
-        out[emp] = { np_leidas: r.np_leidas, tandas_nuevas: r.tandas };
-      } catch (e) {
-        const msg = `${emp}: ${e instanceof Error ? e.message : String(e)}`;
-        errores.push(msg);
-        out[emp] = { error: msg };
-      }
+    try {
+      const filas = await traerLk(desde);
+      const r = await procesarEmpresa("lk", filas, fecha);
+      leidas += r.np_leidas; programadas += r.np_programadas; nTandas += r.tandas.length;
+      out.lk = { np_leidas: r.np_leidas, tandas_nuevas: r.tandas };
+      // Misma razón social pidiendo a las dos empresas → el mismo día.
+      forzarChef = await codsChefDe(r.codsHoy);
+      if (forzarChef.length) out.forzados_en_chef = forzarChef;
+    } catch (e) {
+      const msg = `lk: ${e instanceof Error ? e.message : String(e)}`;
+      errores.push(msg); out.lk = { error: msg };
+    }
+
+    try {
+      const filas = await traerChef(ventana);
+      const r = await procesarEmpresa("chef", filas, fecha, forzarChef);
+      leidas += r.np_leidas; programadas += r.np_programadas; nTandas += r.tandas.length;
+      out.chef = { np_leidas: r.np_leidas, tandas_nuevas: r.tandas };
+    } catch (e) {
+      const msg = `chef: ${e instanceof Error ? e.message : String(e)}`;
+      errores.push(msg); out.chef = { error: msg };
     }
 
     const estado = errores.length === 2 ? "error" : "ok";
