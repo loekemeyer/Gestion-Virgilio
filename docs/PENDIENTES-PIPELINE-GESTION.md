@@ -158,12 +158,16 @@ O sea: la cañería está escrita pero **todavía no corre**. Falta cargar
 
 **Lo que hay que hacer del lado Virgilio, en orden:**
 
-1. **Agregar `fecha_entrega date`** —y opcionalmente `fecha_entrega_txt text` para
-   conservar la hora— a `public.lk_pedidos_match`. El DDL canónico vive en
-   `sql/lk_pedidos_match.sql` **del repo `Produccion-Virgilio`**, que no está adjunto en
-   esta sesión: si se agrega la columna sin tocar ese archivo, el repo queda mintiendo.
-   ⚠ La columna **no lleva prefijo `gv_`**: no es de Gestión. `lk_pedidos_match` es la
-   tabla espejo que **LK** escribe y **Producción** lee; Gestión acá no es dueña de nada.
+1. ~~**Agregar `fecha_entrega date`** y `fecha_entrega_txt text` a
+   `public.lk_pedidos_match`.~~ ✅ **HECHO el 2026-09-04.** DDL en
+   `sql/lk_pedidos_match.sql` del repo `Produccion-Virgilio` (commit `e15b682`) y aplicado
+   en Supabase — base y repo dicen lo mismo.
+   ⚠ **Sin prefijo `gv_`, a propósito:** no es de Gestión. `lk_pedidos_match` es la tabla
+   espejo que **LK** escribe y **Producción** lee.
+   **Verificado después:** las dos nullable, sin default, sin backfill · 1.085 filas
+   intactas, 0 con fecha · `vista_np_sucursal` en 149 · `PPP_Programacion_Diaria` en 182 ·
+   los dos consumidores piden columnas por nombre · `lk_ppp_reader` ya tenía `UPDATE`
+   sobre la tabla **y sobre las columnas nuevas**, no hizo falta grant.
 2. **Del lado LK** (después de la columna): `v_pedidos_match` expone
    `sheets_payload->>'fecha_entrega'` y `sync_pedidos_match_virgilio()` la copia por el
    FDW `virgilio_db`. El rol `lk_ppp_reader` ya tiene INSERT/UPDATE/DELETE sobre esa tabla,
