@@ -61,7 +61,17 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
     const izq = aprColPedidos(), med = aprColTandas(), der = aprColCal();
     _apr.exp["p1117"] = true;
     const izqAbierta = aprColPedidos();
-    return { izq, med, der, izqAbierta };
+
+    // Un ERROR no puede pintarse de verde como si todo hubiera salido bien.
+    _apr.msg = "Numeración de NP APAGADA."; _apr.msgErr = true;
+    aprRender();
+    const conError = document.getElementById("pppPreview").innerHTML;
+    _apr.msg = "✅ GV-01A programada."; _apr.msgErr = false;
+    aprRender();
+    const conOk = document.getElementById("pppPreview").innerHTML;
+    _apr.msg = "";
+
+    return { izq, med, der, izqAbierta, conError, conOk };
   });
 
   const fallos = [];
@@ -76,6 +86,8 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
   chk(r.med.includes("GV-01A") && r.med.includes("GV-01B"), "las dos tandas abiertas");
   chk(r.med.includes('class="apr-badge"') && r.med.includes("⚠ 2"), "el badge con la cantidad de avisos");
   chk(r.med.includes("2/3 bloques"),           "marca el pedido que entró a medias");
+  chk(r.med.includes("Riesgo Marcelo Fabian"),  "el nombre del cliente entra entero en la tanda");
+  chk(r.med.includes("apr-titem-txt"),          "el item va en dos renglones (el nombre no compite con el detalle)");
   chk(r.med.includes("Arrastrá un pedido acá"),"la tanda vacía lo dice");
   chk(r.der.includes("Septiembre 2026"),       "el mes del calendario");
   chk(r.der.includes("apr-dia-nohabil"),       "pinta el día no hábil");
@@ -86,6 +98,8 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
   chk(!/undefined/.test(todo),                 "sin 'undefined' en pantalla");
   chk(!/NaN/.test(todo),                       "sin 'NaN' en pantalla");
   chk(!/on\w+="[^"]*undefined/.test(todo),     "sin handlers rotos");
+  chk(/class="apr-err"[^>]*>[^<]*APAGADA/.test(r.conError), "un error se pinta de ROJO, no de verde");
+  chk(/class="apr-msg"[^>]*>[^<]*programada/.test(r.conOk),  "un mensaje bueno se pinta de verde");
   chk(errs.length === 0, "sin errores de página" + (errs.length ? ": " + errs[0] : ""));
 
   await b.close();

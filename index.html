@@ -730,16 +730,18 @@ button {
 .apr-nueva:hover{ border-color:#1e6bd6; color:#1e6bd6; }
 .apr-tanda{ background:#fff; border:2px solid #cbd5e1; border-radius:9px; padding:8px; }
 .apr-tanda-h{ display:flex; align-items:center; gap:7px; cursor:grab; }
-.apr-tanda-cod{ font-size:15px; font-weight:900; color:#0f172a; letter-spacing:.5px; }
+.apr-tanda-cod{ font-size:15px; font-weight:900; color:#0f172a; letter-spacing:.5px;
+  white-space:nowrap; flex:0 0 auto; }   /* sin esto "GV-01A" se partía en dos renglones */
 .apr-badge{ background:#b91c1c; color:#fff; font-size:11.5px; font-weight:800; border-radius:999px; padding:2px 8px; cursor:help; }
 .apr-tanda-x{ margin-left:auto; border:0; background:transparent; color:#94a3b8; font-size:15px; cursor:pointer; }
 .apr-tanda-x:hover{ color:#b91c1c; }
 .apr-tanda-m3{ font-size:12.5px; color:#475569; margin:4px 0 6px; }
 .apr-avisos{ margin-bottom:6px; }
 .apr-aviso{ font-size:11.5px; background:#fef2f2; color:#7f1d1d; border-left:3px solid #b91c1c; border-radius:4px; padding:4px 7px; margin-bottom:3px; line-height:1.3; }
-.apr-titem{ display:flex; align-items:center; gap:6px; border-top:1px solid #f1f5f9; padding:5px 0; }
-.apr-titem-cli{ font-size:12.5px; font-weight:700; color:#0f172a; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; flex:1 1 auto; }
-.apr-titem-d{ font-size:11.5px; color:#64748b; white-space:nowrap; }
+.apr-titem{ display:flex; align-items:flex-start; gap:6px; border-top:1px solid #f1f5f9; padding:6px 0; }
+.apr-titem-txt{ flex:1 1 auto; min-width:0; }
+.apr-titem-cli{ font-size:12.5px; font-weight:700; color:#0f172a; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.apr-titem-d{ font-size:11.5px; color:#64748b; margin-top:1px; }
 .apr-titem-x{ border:0; background:transparent; color:#94a3b8; cursor:pointer; font-size:14px; }
 .apr-titem-x:hover{ color:#1e6bd6; }
 .apr-tanda-vacia{ font-size:12px; color:#94a3b8; text-align:center; padding:12px 0; border:1px dashed #e2e8f0; border-radius:6px; }
@@ -6696,7 +6698,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v12.82";
+const APP_VERSION = "v12.83";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -28902,7 +28904,7 @@ function pppRenderProg() {
   }
   // v9.72 — split de facturados en "En viaje" (sin confirmar entrega) y "Entregados" (confirmados)
   const _pppSplit = (_pppDelivered != null && _pppMetaEntSet != null) ? _pppSplitDelivered() : null;
-  let html = pppTabsHtml(aProgramar.length, programados.length,
+  let html = pppTabsHtml((_apr && _apr.listo) ? _apr.pedidos.length : null, programados.length,
     (_pppSplit ? _pppSplit.enViaje.length : null),
     (_pppSplit ? _pppSplit.entregados.length : (_pppDelivered ? _pppDelivered.length : entreg.length)));
   html += '<div class="ppp-search"><input id="pppSearchInp" type="search" autocomplete="off" placeholder="🔎 Buscar: NP, cliente, cód, tanda, localidad, zona, fecha…" value="' + escapeHtml(_pppSearch) + '" oninput="pppSetSearch(this.value)">' + (_pppSearch ? '<button class="ppp-search-clr" onclick="pppSetSearch(\'\')" title="Limpiar búsqueda">✕</button><span class="ppp-search-n">' + (programados.length + aProgramar.length + entreg.length) + ' coincidencia(s)</span>' : '') + '</div>';
@@ -31440,7 +31442,7 @@ let _apr = {
   items: {},        // codigo -> [items del borrador]
   cal: [],          // gv_ppp_web_calendario
   mes: null,        // Date del día 1 del mes que se muestra
-  q: "", exp: {}, drag: null, dragTanda: null, msg: ""
+  q: "", exp: {}, drag: null, dragTanda: null, msg: "", msgErr: false
 };
 
 function aprMesActual() {
@@ -31584,8 +31586,8 @@ async function aprCargar() {
 
 /* ── Acciones ──────────────────────────────────────────────────────────── */
 async function aprNuevaTanda() {
-  try { await aprRpc("gv_ppp_web_tanda_nueva", { p_empresa: _apr.emp, p_por: await aprQuien() }); _apr.msg = ""; }
-  catch (e) { _apr.msg = e.message; }
+  try { await aprRpc("gv_ppp_web_tanda_nueva", { p_empresa: _apr.emp, p_por: await aprQuien() }); _apr.msg = ""; _apr.msgErr = false; }
+  catch (e) { _apr.msg = e.message; _apr.msgErr = true; }
   await aprCargar();
 }
 
@@ -31618,8 +31620,8 @@ async function aprSoltarPedido(codigo) {
   try {
     await aprRpc("gv_ppp_web_tanda_agregar",
       { p_empresa: _apr.emp, p_codigo: codigo, p_np: filas, p_por: await aprQuien() });
-    _apr.msg = "";
-  } catch (e) { _apr.msg = e.message; }
+    _apr.msg = ""; _apr.msgErr = false;
+  } catch (e) { _apr.msg = e.message; _apr.msgErr = true; }
   await aprCargar();
 }
 
@@ -31630,15 +31632,15 @@ async function aprSacarPedido(codigo, orderId) {
       await aprRpc("gv_ppp_web_tanda_sacar",
         { p_empresa: _apr.emp, p_codigo: codigo, p_order_id: it.order_id, p_np_idx: it.np_idx });
     }
-    _apr.msg = "";
-  } catch (e) { _apr.msg = e.message; }
+    _apr.msg = ""; _apr.msgErr = false;
+  } catch (e) { _apr.msg = e.message; _apr.msgErr = true; }
   await aprCargar();
 }
 
 async function aprDescartarTanda(codigo) {
   if (!confirm("¿Descartar la tanda " + codigo + "? Los pedidos vuelven a la lista de la izquierda.")) return;
-  try { await aprRpc("gv_ppp_web_tanda_descartar", { p_empresa: _apr.emp, p_codigo: codigo }); _apr.msg = ""; }
-  catch (e) { _apr.msg = e.message; }
+  try { await aprRpc("gv_ppp_web_tanda_descartar", { p_empresa: _apr.emp, p_codigo: codigo }); _apr.msg = ""; _apr.msgErr = false; }
+  catch (e) { _apr.msg = e.message; _apr.msgErr = true; }
   await aprCargar();
 }
 
@@ -31648,7 +31650,7 @@ async function aprDescartarTanda(codigo) {
 async function aprProgramar(codigo, fecha) {
   _apr.dragTanda = null;
   const its = _apr.items[codigo] || [];
-  if (!its.length) { _apr.msg = "La tanda " + codigo + " está vacía."; aprRender(); return; }
+  if (!its.length) { _apr.msg = "La tanda " + codigo + " está vacía."; _apr.msgErr = true; aprRender(); return; }
   const porPed = new Map();
   for (const p of _apr.pedidosTodos || []) porPed.set(String(p.order_id), p);
   const items = [];
@@ -31668,7 +31670,8 @@ async function aprProgramar(codigo, fecha) {
     _apr.msg = "✅ " + codigo + " programada para el " + fecha + ": " +
                (x.np_programadas || 0) + " NP · " + aprNum(x.m3) + " m³." +
                (x.aviso_dia ? "  ⚠ " + x.aviso_dia : "");
-  } catch (e) { _apr.msg = "⚠ " + e.message; }
+    _apr.msgErr = false;
+  } catch (e) { _apr.msg = "⚠ " + e.message; _apr.msgErr = true; }
   await aprCargar();
 }
 
@@ -31705,7 +31708,7 @@ function aprRender() {
        '</div>';
 
   if (_apr.err) h += '<div class="apr-err">⚠ ' + escapeHtml(_apr.err) + '</div>';
-  if (_apr.msg) h += '<div class="apr-msg">' + escapeHtml(_apr.msg) + '</div>';
+  if (_apr.msg) h += '<div class="' + (_apr.msgErr ? "apr-err" : "apr-msg") + '">' + escapeHtml(_apr.msg) + '</div>';
 
   h += '<div class="apr-wrap">' + aprColPedidos() + aprColTandas() + aprColCal() + '</div>';
   _renderKeepFocus(box, h);
@@ -31784,9 +31787,11 @@ function aprColTandas() {
     }
     for (const e of byPed.values()) {
       h += '<div class="apr-titem">' +
-        '<span class="apr-titem-cli">' + escapeHtml(e.rs || e.cod || ("#" + e.order_id)) + '</span>' +
-        '<span class="apr-titem-d">' + escapeHtml(e.zona || "sin zona") + ' · ' + aprNum(e.m3) + ' m³' +
-          (e.total > 1 ? ' · ' + e.n + '/' + e.total + ' bloques' : '') + '</span>' +
+        '<div class="apr-titem-txt">' +
+          '<div class="apr-titem-cli">' + escapeHtml(e.rs || e.cod || ("#" + e.order_id)) + '</div>' +
+          '<div class="apr-titem-d">' + escapeHtml(e.zona || "sin zona") + ' · ' + aprNum(e.m3) + ' m³' +
+            (e.total > 1 ? ' · ' + e.n + '/' + e.total + ' bloques' : '') + '</div>' +
+        '</div>' +
         '<button class="apr-titem-x" onclick="aprSacarPedido(\'' + t.codigo + '\',' + e.order_id + ')" title="Sacar de la tanda">↩</button>' +
       '</div>';
     }
