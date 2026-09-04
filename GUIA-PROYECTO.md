@@ -12,9 +12,9 @@
 > única**; no se replica. Ante la duda entre parche rápido y fix de raíz → **fix
 > de raíz**.
 >
-> Última actualización: 2026-09-04 · Versión app al documentar: **v12.76**
+> Última actualización: 2026-09-04 · Versión app al documentar: **v12.77**
 >
-> Nota **v12.76** — **Se puede agregar artículos a un pedido y el sistema reacomoda solo.**
+> Nota **v12.77** — **Se puede agregar artículos a un pedido y el sistema reacomoda solo.**
 > Regla fijada por el dueño: un pedido web se edita **en cualquier momento hasta que se
 > factura** —a programar, programado, en picking, en armado, armado esperando factura—, y el
 > sistema **reestructura automáticamente**, sin preguntar. Los agregados se hacen por las
@@ -41,6 +41,41 @@
 > milésimo (0,336 y 1,184).
 > Probados los cuatro casos en transacciones revertidas: crece → 2 actualizadas + 1 agregada a
 > la tanda · se repite → 0 filas · se achica → 2 actualizadas + 1 borrada · facturada → 0 filas.
+>
+> Nota **v12.76** — **Cartel "GESTION VIRGILIO" en las dos pantallas de entrada.**
+> Cosmético, sólo front. El selector de planta (`#plantSelector`) y el panel de
+> Administración (`#supervisorPanel`) llevan arriba un `<div class="app-brand">` grande
+> (`GESTION VIRGILIO`, con "VIRGILIO" en rojo `#dc2626`) para identificar la app de un
+> vistazo en capturas y en el monitor. La clase `.app-brand` vive en el CSS inline de
+> `index.html`, junto a `.sup-title`. No toca lógica ni datos.
+>
+> Nota **backend, sin bump de app** — **API de salida a ISIS: los pedidos terminados
+> se exportan solos al ERP.** Responde el Punto 18 del informe del ticket 1159666
+> (ISIS pidió infraestructura, URL, token, endpoint y estructura JSON). Se hizo por la
+> **Alternativa B del §11** del informe: **ISIS consulta una API nuestra**
+> (Edge Function `isis-api`, `verify_jwt=off`, token propio en el header `X-API-Key`),
+> en vez de que nosotros llamemos al ISIS on-premise. Como la request es **saliente**
+> desde la red de ISIS, **no hace falta Windows Server, IIS, IP pública ni abrir
+> puertos** en el depósito — que era todo lo que el §18 nos pedía confirmar.
+> **Disparador: el tick de Facturación de siempre.** Cuando la operadora tilda una NP
+> (`Facturacion_NP`), el trigger `trg_isis_encolar_facturado` la encola en
+> `isis_export_pedidos` como `pendiente`; destildarla la pasa a `anulado`. No hay
+> botón nuevo ni pantalla nueva. **Lo que viaja es lo ARMADO, no lo pedido:** el JSON
+> sale de `Entregas_Virgilio` (`cajas` = `cajas_entregadas`), así que el pedido con
+> faltantes se factura parcial y **el `articulo` es el código realmente preparado**
+> (437E), no el del pedido (029) — eso cierra de raíz el riesgo de la alerta de
+> equivalencias de v5.10, que hoy se avisa por Telegram porque se factura a mano.
+> Endpoints: `GET /pedidos` (listado por estado), `GET /pedidos/{np}` (el JSON
+> completo; lo pasa a `entregado`), `POST /pedidos/{np}/acuse` (ISIS devuelve
+> `resultado`/`nro_comprobante`/`cae`, idempotente: un segundo acuse OK no pisa nada y
+> contesta `duplicado:true`). Trazabilidad completa en `isis_export_pedidos` +
+> `isis_api_log`. La cola arrancó **vacía a propósito**: las NP facturadas antes de
+> encender esto no se le mandan a ISIS. ⚠ **Pendiente antes de encender del lado de
+> ISIS: el cutover del CAE** — hoy la app emite Factura A por PV 11 (`arca-wsfe`); el
+> día que ISIS facture estos pedidos hay que **apagar la emisión propia** o se piden
+> dos CAE por la misma venta. DDL `sql/isis_api.sql`, función
+> `supabase/functions/isis-api/index.ts`, especificación para el proveedor
+> `docs/ISIS-API-ESPECIFICACION.md`.
 >
 > Nota **backend, sin bump de app** — **El corte de un pedido web en NP se balancea por m³.**
 > Antes se cortaba en bloques del tope contiguos en el orden del carrito
@@ -8163,6 +8198,27 @@ por `agente-local/nc_ingest.py` (parsea PDFs de Notas de Crédito/Débito) a dos
   `confirmado_at`, `confirmado_por`.
 - **`Comprobantes_NC_Items`** — líneas. Cols: `id`, `nc_id` (→ `Comprobantes_NC.id`),
   `cod_raw`, `cod_art`, `descripcion`, `cajas`, `unidades`, `importe`.
+
+**Subsistema API ISIS (salida de pedidos terminados al ERP, 2026-09-04):** DDL en
+`sql/isis_api.sql`, Edge Function en `supabase/functions/isis-api/`, especificación
+para el proveedor en `docs/ISIS-API-ESPECIFICACION.md`. Tres tablas, las tres con
+**RLS activa y sin policies** (la anon key no las ve) y con las RPC restringidas a
+`service_role`:
+- **`isis_export_pedidos`** — la cola. PK `np` (una fila por NP = control de
+  duplicados). Cols: `np`, `empresa` (`LK`/`CH`), `estado`
+  (`pendiente`→`entregado`→`procesado`|`error`; además `anulado` e `historico`),
+  `terminado_en`, `entregado_en`, `entregas`, `procesado_en`, `resultado`,
+  `nro_comprobante`, `cae`, `error_detalle`, `anulado_en`, `payload` (snapshot del
+  JSON entregado).
+- **`isis_api_tokens`** — `nombre`, `token_hash` (**sólo el SHA-256**, el token en
+  claro no se guarda), `activo`, `ultimo_uso`, `usos`.
+- **`isis_api_log`** — traza de cada request (método, ruta, np, status, ms, ip).
+
+Se llena **desde el tick de Facturación**: `trg_isis_encolar_facturado` (AFTER INSERT
+en `Facturacion_NP`) encola la NP como `pendiente`; `trg_isis_anular_facturado`
+(AFTER DELETE) la marca `anulado` si se destilda. Los dos triggers tienen el cuerpo
+dentro de `BEGIN…EXCEPTION WHEN OTHERS` → **si la integración falla, el tick de
+facturación sigue funcionando igual**.
 
 ### Esquemas `isis_lk` / `isis_ch` — facturación real del ISIS (sin documentar hasta v12.25)
 

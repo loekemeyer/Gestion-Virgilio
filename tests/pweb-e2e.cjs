@@ -39,7 +39,7 @@ const VOL = [["027",0.0051],["031",0.0035],["220",0.0111],["224",0.0051],["280",
   ["521",0.024],["529E",0.0023],["530",0.0024],["544",0.0134],["574E",0.003],["580",0.0024],["586",0.0035],
   ["587",0.0051],["598E",0.0033],["599E",0.0024],["811E",0.008],["816E",0.003],["984E",0.0072]]
   .map(([codigo,m3])=>({codigo,m3}));
-// v12.76 — el m³ ya viene calculado del backend (v_pedidos_web_np lo expone), así que
+// v12.77 — el m³ ya viene calculado del backend (v_pedidos_web_np lo expone), así que
 // el mock tiene que traerlo igual que la vista real. Se computa acá desde los mismos
 // m³ de Volumen_Articulos, para que los totales esperados no cambien.
 const _VOLMAP = Object.fromEntries(VOL.map(v => [v.codigo, v.m3]));
@@ -79,7 +79,7 @@ const ZONAS = { mataderos:"Zona 3 - CABA Oeste", martinez:"Zona 6 - GBA Norte", 
       // v12.75 — el m³ sale de la VISTA que resuelve la "L" final, no de la tabla
       // cruda. Si alguien vuelve a apuntar a `Volumen_Articulos`, este mock no
       // matchea, el m³ da 0 y el test cae: es el guardarraíl del cambio.
-      // v12.76 — el m³ ya no se pide acá: viene en la fila de la NP. Si alguien
+      // v12.77 — el m³ ya no se pide acá: viene en la fila de la NP. Si alguien
       // vuelve a sumarlo en el front, estos mocks devuelven vacío y el test cae.
       if (u.includes("vista_volumen_articulo_resuelto")) { volUrl.push(u); return json([]); }
       if (u.includes("Volumen_Articulos"))    return json([]);
@@ -178,8 +178,8 @@ const ZONAS = { mataderos:"Zona 3 - CABA Oeste", martinez:"Zona 6 - GBA Norte", 
     r.operVeTanda && r.operNp === "LK 1344" && r.operEmpresa === "LK" &&
     r.artsOper === "031:10,280:10,315:10,502:15,505:150,506:20,521:3,530:4,574E:25,580:15,586:50,598E:25,599E:3,811E:3,816E:15" &&
     r.xlsFilas === 1 && /03\/09\/2026/.test(String(r.xlsFecha)) && r.xlsLineas === 15 &&
-    r.volPideVista === false &&                              // v12.76: el m³ ya no se pide, viene en la fila
-    r.resyncLlamado === 1 && r.resyncEmpresa === "lk" &&      // v12.76: se reacomoda la programación
+    r.volPideVista === false &&                              // v12.77: el m³ ya no se pide, viene en la fila
+    r.resyncLlamado === 1 && r.resyncEmpresa === "lk" &&      // v12.77: se reacomoda la programación
     r.resyncFilas === 3 && r.resyncTraeM3 === true;
 
   console.log("pweb-e2e:", JSON.stringify(r, null, 0));
