@@ -285,3 +285,65 @@ grant insert, update, delete on public."PPP_Web_Base" to authenticated;
 -- La necesita el Excel para ISIS. Para una NP de ISIS esa fecha sale de
 -- `PPP_Base_Pedidos`, donde una NP web no está, así que se guarda al programar.
 alter table public."PPP_Web_Programacion" add column if not exists fecha_recep date;
+
+
+-- ============================================================================
+-- 3 · EL PEDIDO CAMBIÓ  ·  ppp_web_resync(empresa, filas)
+-- ============================================================================
+-- Un pedido web se puede editar en la página **en cualquier momento hasta que se
+-- factura** (regla del dueño, 2026-09-04): a programar, programado, en picking, en
+-- armado, armado esperando factura. Una vez facturado, no.
+--
+-- Cuando le agregan o le sacan artículos:
+--   · el CORTE en NP se recalcula solo — vive en la vista `v_pedidos_web_np` de LK,
+--     que se evalúa en cada consulta. No hay nada que disparar;
+--   · la PROGRAMACIÓN no, porque es una FOTO guardada en `PPP_Web_Programacion`.
+--     El m³ guardado deja de ser el que se usó para armar la tanda, y si el pedido
+--     creció puede aparecer una NP nueva que no está en ninguna.
+--
+-- `ppp_web_resync` cierra ese hueco. Recibe las NP vivas (las que devolvió LK) y:
+--   · ACTUALIZA la foto de las que ya estaban (m³, m³ parcial, líneas, cajas, y de
+--     paso cliente/dirección/barrio por si cambió la sucursal);
+--   · AGREGA la NP nueva **a la misma tanda que sus hermanas** — §4.4 del handoff:
+--     un pedido nunca se parte entre tandas;
+--   · BORRA la NP que sobra si el pedido se achicó y ahora entra en menos partes.
+--
+-- Lo que NO hace, a propósito: **no toca la tanda, la zona ni la fecha** que eligió
+-- una persona. Reacomoda el contenido, no la decisión.
+--
+-- ⚠ Sólo toca pedidos YA PROGRAMADOS. Uno sin programar no necesita nada: su corte
+--   se calcula vivo cada vez que se abre la PPP.
+--
+-- ⚠ NO toca una NP facturada. Hoy ese chequeo es INERTE: las NP web todavía no
+--   llegan a `Facturacion_NP` (esa tabla tiene NP de ISIS, de 44361 para arriba; las
+--   web van de 1343 a 9999, así que tampoco hay colisión de números). **Cuando se
+--   construya la facturación de NP web hay que asegurarse de que escriba ahí**, o
+--   cambiar el chequeo — si no, se podría reacomodar algo ya facturado.
+--
+-- Es IDEMPOTENTE: correrla dos veces con lo mismo devuelve 0 filas la segunda. Por
+-- eso el front la llama en CADA carga de la PPP sin condicionarla a nada.
+--
+-- Va SECURITY INVOKER (el default) a propósito: la RLS de `PPP_Web_Programacion`
+-- —los tres mails de supervisor— es la que decide si el que llama puede escribir.
+-- Y todo en UN solo statement, sin tablas temporales, así no queda estado colgado
+-- si dos llamadas caen en la misma transacción.
+--
+-- El ORDEN en el front importa y está comentado en `pppTraerPedidosWeb`:
+--   numerar → resync → leer programación.
+-- Numerar primero porque una NP recién nacida necesita su número para entrar a la
+-- tanda; leer la programación al final para que se vea ya reacomodada.
+--
+-- ----------------------------------------------------------------------------
+-- Probado el 2026-09-04, los cuatro casos, en transacciones que se revirtieron:
+--   pedido crece de 2 a 3 NP  → 2 actualizadas + 1 agregada_a_tanda (heredó Z9A)
+--   se vuelve a correr igual  → 0 filas (idempotente)
+--   pedido se achica a 2 NP   → 2 actualizadas + 1 borrada
+--   la NP está en Facturacion_NP → 0 filas, no se toca nada
+-- ----------------------------------------------------------------------------
+--
+--   -- Control: NP programadas cuya foto no coincide con lo vivo. Ojo, hay que
+--   -- traer lo vivo de LK (Virgilio no tiene FDW contra LK), así que esto se mira
+--   -- desde el front o pegándole a la vista de LK con la sesión de admin.
+--   select empresa, order_id, np_idx, np, tanda, m3, lineas, cajas, actualizado_at
+--     from public."PPP_Web_Programacion" order by actualizado_at desc limit 20;
+-- ============================================================================

@@ -176,9 +176,17 @@ pedido → customer_delivery_addresses.zona_expreso   (= el BARRIO que carga el 
 4. **Tanda:** agrupar **(empresa, zona, día)**. Tope **1 m³** para juntar pedidos chicos
    distintos. Un pedido con varias NPs → **todas sus NPs en la MISMA tanda** (mismo día),
    aunque supere 1 m³. Un pedido nunca se parte entre tandas.
-5. **Editar pedido:** si agregan ítems a un pedido y supera un límite → **recomputar**
-   (re-partir + re-empaquetar). aplicar_pedido ya es idempotente. **Falta la ventana de
-   edición** (¿hasta cuándo? antes de tener tanda / antes del picking).
+5. **Editar pedido:** si agregan ítems a un pedido → **recomputar** (re-partir + re-empaquetar).
+   ✅ **HECHO el 2026-09-04.** Ventana definida por el dueño: se puede editar **en cualquier
+   momento hasta que se factura** — a programar, programado, en picking, en armado, armado
+   esperando factura. Una vez facturado, no. Y **reestructura automáticamente**, sin preguntar.
+   Los agregados se hacen **por las páginas** (LK/Chef); una UI propia en Gestión queda para
+   más adelante (módulo, front y conexión sin definir).
+   Cómo funciona: el corte en NP se recalcula solo (vive en una vista de LK); la programación
+   es una foto y la pone al día `public.ppp_web_resync` — actualiza el m³, mete la NP nueva en
+   la MISMA tanda que sus hermanas (§4.4) y borra la que sobra si el pedido se achicó. No
+   toca la tanda, la zona ni la fecha que eligió una persona. Detalle en
+   `sql/ppp_web_programacion.sql` §3.
 6. **Canales:** reparto local (zonas 1-7) por tanda de zona; **Retira** (zona 'Retira'),
    **Super** y **Expo** (interior) tienen lógica propia. **PENDIENTE definir cómo se programan.**
 7. **NO hay calendario día→zona** en la realidad (verificado: 0 menciones de días). El día de

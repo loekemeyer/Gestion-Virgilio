@@ -12,7 +12,35 @@
 > única**; no se replica. Ante la duda entre parche rápido y fix de raíz → **fix
 > de raíz**.
 >
-> Última actualización: 2026-09-04 · Versión app al documentar: **v12.75**
+> Última actualización: 2026-09-04 · Versión app al documentar: **v12.76**
+>
+> Nota **v12.76** — **Se puede agregar artículos a un pedido y el sistema reacomoda solo.**
+> Regla fijada por el dueño: un pedido web se edita **en cualquier momento hasta que se
+> factura** —a programar, programado, en picking, en armado, armado esperando factura—, y el
+> sistema **reestructura automáticamente**, sin preguntar. Los agregados se hacen por las
+> páginas; una UI propia en Gestión queda para más adelante.
+> **El corte en NP ya se recalculaba solo** (vive en la vista `v_pedidos_web_np` de LK, que se
+> evalúa en cada consulta). Lo que se quedaba viejo era la PROGRAMACIÓN, que es una foto en
+> `PPP_Web_Programacion`: el m³ dejaba de ser el que se usó para armar la tanda, y si el
+> pedido crecía aparecía una NP nueva sin tanda.
+> Lo cierra la RPC **`ppp_web_resync`** (`sql/ppp_web_programacion.sql` §3): actualiza la foto,
+> mete la NP nueva **en la misma tanda que sus hermanas** (§4.4 del handoff — un pedido no se
+> parte entre tandas) y borra la que sobra si el pedido se achicó. **No toca la tanda, la zona
+> ni la fecha** que eligió una persona: reacomoda el contenido, no la decisión. Tampoco toca
+> una NP facturada.
+> Es idempotente, así que el front la llama en **cada carga** de la PPP sin condicionarla. El
+> orden importa: **numerar → resync → leer programación** (numerar primero porque una NP recién
+> nacida necesita su número para entrar a la tanda).
+> ⚠ El chequeo de "facturada" hoy es **inerte**: las NP web todavía no llegan a
+> `Facturacion_NP`. Cuando se construya la facturación de NP web hay que asegurarse de que
+> escriba ahí, o cambiar el chequeo.
+> **De paso se sacó el cálculo de m³ duplicado del front:** `v_pedidos_web_np` y la RPC de Chef
+> ahora devuelven `m3` y `m3_parcial`, y `pwebVolumenes()` se eliminó. Era la misma cuenta
+> hecha dos veces, y la del backend es la que además balancea el corte, así que si diferían
+> ganaba una distinta según quién mirara. Verificado: el m³ de los tests no se movió ni un
+> milésimo (0,336 y 1,184).
+> Probados los cuatro casos en transacciones revertidas: crece → 2 actualizadas + 1 agregada a
+> la tanda · se repite → 0 filas · se achica → 2 actualizadas + 1 borrada · facturada → 0 filas.
 >
 > Nota **backend, sin bump de app** — **El corte de un pedido web en NP se balancea por m³.**
 > Antes se cortaba en bloques del tope contiguos en el orden del carrito

@@ -39,6 +39,20 @@ const VOL = [["027",0.0051],["031",0.0035],["220",0.0111],["224",0.0051],["280",
   ["521",0.024],["529E",0.0023],["530",0.0024],["544",0.0134],["574E",0.003],["580",0.0024],["586",0.0035],
   ["587",0.0051],["598E",0.0033],["599E",0.0024],["811E",0.008],["816E",0.003],["984E",0.0072]]
   .map(([codigo,m3])=>({codigo,m3}));
+// v12.76 — el m³ ya viene calculado del backend (v_pedidos_web_np lo expone), así que
+// el mock tiene que traerlo igual que la vista real. Se computa acá desde los mismos
+// m³ de Volumen_Articulos, para que los totales esperados no cambien.
+const _VOLMAP = Object.fromEntries(VOL.map(v => [v.codigo, v.m3]));
+NPS.forEach(n => {
+  let m3 = 0, parcial = false;
+  (n.items || []).forEach(i => {
+    const v = _VOLMAP[i.art];
+    if (v === undefined) { parcial = true; return; }
+    m3 += (Number(i.cajas) || 0) * v;
+  });
+  n.m3 = Number(m3.toFixed(3));
+  n.m3_parcial = parcial;
+});
 // zonas reales de Zonas_Barrios
 const ZONAS = { mataderos:"Zona 3 - CABA Oeste", martinez:"Zona 6 - GBA Norte", retira:"Retira" };
 
@@ -51,7 +65,7 @@ const ZONAS = { mataderos:"Zona 3 - CABA Oeste", martinez:"Zona 6 - GBA Norte", 
   await p.goto("file://" + path.join(__dirname, "..", "index.html"), { waitUntil: "domcontentloaded" });
 
   const r = await p.evaluate(async ({ NPS, VOL, ZONAS }) => {
-    const posts = [], volUrl = [];
+    const posts = [], volUrl = [], resync = [];
     window.sbAuth = { getAccessToken: async () => "tok" };
     window._pppZonaSupa = ZONAS;
     const json = (o) => ({ ok: true, status: 200, json: async () => o, text: async () => JSON.stringify(o) });
@@ -65,8 +79,13 @@ const ZONAS = { mataderos:"Zona 3 - CABA Oeste", martinez:"Zona 6 - GBA Norte", 
       // v12.75 — el m³ sale de la VISTA que resuelve la "L" final, no de la tabla
       // cruda. Si alguien vuelve a apuntar a `Volumen_Articulos`, este mock no
       // matchea, el m³ da 0 y el test cae: es el guardarraíl del cambio.
-      if (u.includes("vista_volumen_articulo_resuelto")) { volUrl.push(u); return json(VOL); }
+      // v12.76 — el m³ ya no se pide acá: viene en la fila de la NP. Si alguien
+      // vuelve a sumarlo en el front, estos mocks devuelven vacío y el test cae.
+      if (u.includes("vista_volumen_articulo_resuelto")) { volUrl.push(u); return json([]); }
       if (u.includes("Volumen_Articulos"))    return json([]);
+      // El resync: el pedido cambió → el backend reacomoda. Acá sólo se verifica
+      // que se llame, con las filas vivas y antes de leer la programación.
+      if (u.includes("rpc/ppp_web_resync")) { resync.push(JSON.parse(opt.body)); return json([]); }
       if (u.includes("PPP_Web_Programacion")) return json([]);
       if (u.includes("PPP_Programacion_Diaria")) return json([]);
       return json([]);
@@ -139,7 +158,11 @@ const ZONAS = { mataderos:"Zona 3 - CABA Oeste", martinez:"Zona 6 - GBA Norte", 
       xlsFilas: xls.length,
       xlsFecha: xls[0] ? xls[0].fechaTxt : null,
       xlsLineas: xls[0] ? xls[0].lineas.length : 0,
-      volPideVista: volUrl.length > 0
+      volPideVista: volUrl.length > 0,
+      resyncLlamado: resync.length,
+      resyncEmpresa: resync[0] ? resync[0].p_empresa : null,
+      resyncFilas: resync[0] ? resync[0].p_filas.length : 0,
+      resyncTraeM3: !!(resync[0] && resync[0].p_filas[0] && resync[0].p_filas[0].m3 != null)
     };
   }, { NPS, VOL, ZONAS });
 
@@ -155,7 +178,9 @@ const ZONAS = { mataderos:"Zona 3 - CABA Oeste", martinez:"Zona 6 - GBA Norte", 
     r.operVeTanda && r.operNp === "LK 1344" && r.operEmpresa === "LK" &&
     r.artsOper === "031:10,280:10,315:10,502:15,505:150,506:20,521:3,530:4,574E:25,580:15,586:50,598E:25,599E:3,811E:3,816E:15" &&
     r.xlsFilas === 1 && /03\/09\/2026/.test(String(r.xlsFecha)) && r.xlsLineas === 15 &&
-    r.volPideVista === true;                                 // v12.75: el m³ se pide a la vista, no a la tabla
+    r.volPideVista === false &&                              // v12.76: el m³ ya no se pide, viene en la fila
+    r.resyncLlamado === 1 && r.resyncEmpresa === "lk" &&      // v12.76: se reacomoda la programación
+    r.resyncFilas === 3 && r.resyncTraeM3 === true;
 
   console.log("pweb-e2e:", JSON.stringify(r, null, 0));
   console.log("  pageerrors:", errs.length ? errs.join("|") : "none", "·", (ok && !errs.length) ? "✓ OK" : "✗ FAIL");

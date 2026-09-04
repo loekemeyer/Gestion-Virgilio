@@ -29,7 +29,10 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
       { empresa: "lk", order_id: 1342, np_idx: 1, cod: "4109", razon_social: "Di Leo",
         fecha_recep: "2026-09-03", hora_recep: "16:03:54", direccion: "Bragado 5742 - Mataderos",
         v: "21", lineas: 3, cajas: 10, enviado_a_compras: false,
-        items: [{ art: "027", cajas: 2 }, { art: "505", cajas: 5 }, { art: "ZZZ", cajas: 3 }] }
+        items: [{ art: "027", cajas: 2 }, { art: "505", cajas: 5 }, { art: "ZZZ", cajas: 3 }],
+        // v12.76 — el m³ viene calculado del backend. 027×2 (0,1) + 505×5 (0,02) = 0,3;
+        // ZZZ tiene fila pero sin valor, así que la vista lo marca parcial.
+        m3: 0.3, m3_parcial: true }
     ];
     window.fetch = async (url, opt) => {
       const u = String(url); urls.push(u);
@@ -38,8 +41,9 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
       if (u.includes("/auth/v1/token"))     return json({ access_token: "lk", expires_in: 3600 });
       if (u.includes("v_pedidos_web_np"))   return json(NPS);
       if (u.includes("ppp_web_np_asignar")) return json([{ r_order_id: 1342, r_np_idx: 1, r_np: 1343 }]);
-      // ZZZ tiene fila pero sin valor: cuenta como NO medido.
-      if (u.includes("vista_volumen_articulo_resuelto")) return json([{ codigo: "027", m3: 0.1 }, { codigo: "505", m3: 0.02 }, { codigo: "ZZZ", m3: null }]);
+      // v12.76 — el m³ ya no se pide desde el front: viene en la fila de la NP.
+      if (u.includes("vista_volumen_articulo_resuelto")) return json([]);
+      if (u.includes("rpc/ppp_web_resync")) return json([]);
       if (u.includes("PPP_Web_Programacion")) return json([]);
       return json([]);
     };
@@ -85,10 +89,12 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
       if (u.includes("get_pedidos_web_np_chef")) return json([
         { empresa: "chef", order_id: 213, np_idx: 2, cod: "2393", razon_social: "Addoumie",
           fecha_recep: "2026-09-02", hora_recep: "10:25", direccion: "San Luis 1524 - Rosario Norte",
-          enviado_a_compras: null, lineas: 2, cajas: 2, items: [{ art: "052", cajas: 1 }] }
+          enviado_a_compras: null, lineas: 2, cajas: 2, items: [{ art: "052", cajas: 1 }],
+          m3: 0.01, m3_parcial: false }
       ]);
       if (u.includes("ppp_web_np_asignar")) return json([{ r_order_id: 213, r_np_idx: 2, r_np: 7 }]);
-      if (u.includes("vista_volumen_articulo_resuelto")) return json([{ codigo: "052", m3: 0.01 }]);
+      if (u.includes("vista_volumen_articulo_resuelto")) return json([]);
+      if (u.includes("rpc/ppp_web_resync")) return json([]);
       return json([]);
     };
     const filas = await pppTraerPedidosWeb("chef");
