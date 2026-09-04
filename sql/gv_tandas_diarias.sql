@@ -312,6 +312,13 @@ on conflict (clave) do nothing;
 --
 -- Para probar a mano: `?forzar=1` corre aunque sea sábado o feriado, `?dry=1`
 -- lee y resuelve zonas sin escribir nada, y `?fecha=YYYY-MM-DD` fija el día.
+
+-- ⚠⚠ EL CRON ESTÁ APAGADO (`active = false`), por decisión del dueño el
+--    2026-09-04. Existe con toda su definición y 0 corridas; no dispara.
+--    Se apagó, no se borró, para no perder la definición.
+--    Prender:  select cron.alter_job((select jobid from cron.job
+--                where jobname='gv-ppp-web-tandas-diarias'), active := true);
+--    Apagar:   lo mismo con active := false.
 --
 -- ⚠ SECRETO QUE HAY QUE CARGAR A MANO (sin esto la función no arranca):
 --   `GV_LK_SERVICE_KEY` = service_role key del proyecto **LK**
@@ -398,6 +405,37 @@ on conflict (clave) do nothing;
 -- ⚠ NO es lo mismo que `PPP_Web_Programacion.fecha_entrega`: esa la DEFINE la
 --   tanda (el día en que se arma). Ésta viene pactada de antemano y de afuera.
 --   Por eso el nombre distinto.
+--
+-- ══════════════════════════════════════════════════════════════════════════
+-- AUDITORÍA DE INDEPENDENCIA CONTRA PRODUCCIÓN (2026-09-04)
+-- ══════════════════════════════════════════════════════════════════════════
+-- El dueño pidió confirmar que las dos apps siguen sin pisarse. Medido:
+--
+--   26 objetos nuevos o tocados hoy, grep en su repo (HEAD a7b3368) ... 0 refs
+--   triggers nuestros sobre tablas que usa Producción ................. 0
+--   `create or replace` sobre algo suyo ............................... 0
+--   crons nuevos ...................................................... 1, con prefijo
+--   `PPP_Programacion_Diaria` ......................................... 182 filas, intacta
+--   NP web coladas en la PPP de ISIS .................................. 0
+--
+-- ── El código de tanda NO los cruza ───────────────────────────────────────
+-- Producción está en la letra D (61 tandas, entregas del 02/09 al 28/10) y los
+-- códigos no los genera la base: los escribe una persona en el Google Sheet y
+-- los trae `sync_ppp_pull_server_side.sql`. Gestión tomaría E.
+--
+-- Si algún día los códigos coincidieran, **Producción no se entera**: su código
+-- no conoce `PPP_Web_Programacion` (0 referencias). El único afectado sería el
+-- monitor de GESTIÓN, que a propósito muestra las dos PPP en una sola pantalla
+-- (v12.69) agrupando por código de tanda. Es un problema interno nuestro y sólo
+-- durante la transición: cuando Gestión reemplace a Producción va a haber una
+-- sola fuente y va a seguir la codificación histórica.
+--
+-- ── La exposición a `anon` es la que ya tiene Producción ──────────────────
+-- `PPP_Web_Programacion` es legible por `anon` con `using (true)`. Se planteó
+-- cerrarlo y el dueño resolvió dejarlo, porque **es exactamente lo que ya hace
+-- Producción**: `PPP_Programacion_Diaria`, `PPP_Base_Pedidos`, `Entregas_Virgilio`
+-- y `Facturacion_NP` tienen la misma policy `SELECT / true` para `anon`, y el
+-- front las lee con la anon key. No es una superficie nueva.
 --
 -- ══════════════════════════════════════════════════════════════════════════
 -- CONTROLES
