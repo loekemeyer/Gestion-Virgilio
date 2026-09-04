@@ -618,6 +618,54 @@ Detalle y SQL en `sql/gv_tandas_diarias.sql`.
 
 ---
 
+## 3.g El freno de "facturado = congelado" no frenaba nada — 2026-09-04
+
+`ppp_web_resync` vuelve a mirar el pedido y actualiza la foto (m³, líneas, cajas) cuando
+el cliente lo edita en la página después de que lo programamos. No toca la tanda, la zona
+ni la fecha: eso lo decidió una persona. Y **no debe tocar un pedido ya facturado**.
+
+Ese último freno estaba roto:
+
+```sql
+join public."Facturacion_NP" f on f.np::text = g2.np::text   -- ❌
+```
+
+| lado | qué tiene |
+|---|---|
+| `PPP_Web_Programacion.np` | **integer** → `1`, `2`, `3` |
+| `Facturacion_NP.np` | **text** → `'97500'`, `'44537'` |
+| la NP web cuando llegue ahí | **`'LK 00001'`** — la etiqueta, que es lo que viaja por el circuito |
+
+Comparaba `'1'` contra `'LK 00001'`: **no coincidía nunca**. No era inerte por falta de
+datos —así lo decía el comentario del repo, y estaba mal— sino **por construcción**: el
+día que se conectara la facturación de NP web habría seguido sin frenar.
+
+Y el bug espejo: `g2.np::text` de la NP 44537 da `'44537'`, que **es una NP real de
+Producción**. Medido: las **1.187 filas** de `Facturacion_NP` son dígitos pelados, o sea
+las 1.187 eran falsos positivos posibles. Al llegar nuestro contador ahí, el freno se
+dispararía al revés y saltearía un pedido nuestro creyéndolo facturado.
+
+**Arreglado apareando por la etiqueta**, que lleva prefijo y por eso no se puede confundir
+con una NP de ISIS:
+
+```sql
+join public."Facturacion_NP" f on f.np = public.gv_ppp_web_np_label(p_empresa, g2.np)
+```
+
+Verificado **sin tocar `Facturacion_NP`** (es compartida, sólo se lee): 0 de sus 1.187
+filas tienen prefijo `LK `/`CH ` → el choque es imposible por construcción; y
+`gv_ppp_web_np_label('lk', 44537)` ≠ `'44537'`. `ppp_web_resync` es nuestra (0 referencias
+en Producción).
+
+⚠ **Queda enganchado con el pendiente #4:** cuando se construya la facturación de NP web,
+tiene que escribir en `Facturacion_NP` con la **etiqueta** (`LK 00001`), no con el número
+pelado. Si escribe el número pelado, el freno vuelve a no frenar.
+
+⚠ **Y del lado del cliente el hueco sigue abierto:** la página lo deja editar un pedido ya
+facturado y el cambio se pierde en silencio, sin avisarle. Anotado como idea **8743**.
+
+---
+
 ## 4. Incidente de seguridad — 2026-09-04 (cerrado)
 
 `public.vista_pedidos_web_feed` tenía `select` para `anon`. Los esquemas `fuentes` y

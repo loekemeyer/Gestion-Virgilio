@@ -314,11 +314,39 @@ alter table public."PPP_Web_Programacion" add column if not exists fecha_recep d
 -- ⚠ Sólo toca pedidos YA PROGRAMADOS. Uno sin programar no necesita nada: su corte
 --   se calcula vivo cada vez que se abre la PPP.
 --
--- ⚠ NO toca una NP facturada. Hoy ese chequeo es INERTE: las NP web todavía no
---   llegan a `Facturacion_NP` (esa tabla tiene NP de ISIS, de 44361 para arriba; las
---   web van de 1343 a 9999, así que tampoco hay colisión de números). **Cuando se
---   construya la facturación de NP web hay que asegurarse de que escriba ahí**, o
---   cambiar el chequeo — si no, se podría reacomodar algo ya facturado.
+-- ⚠ NO toca una NP facturada — y ese chequeo estuvo ROTO hasta el 2026-09-04.
+--
+--   Lo que decía antes este comentario era que el chequeo era "inerte porque las NP
+--   web todavía no llegan a `Facturacion_NP`, y además van de 1343 a 9999 así que no
+--   hay colisión de números". Las dos mitades estaban mal:
+--
+--   · El apareo era `f.np::text = g2.np::text`. `PPP_Web_Programacion.np` es un
+--     INTEGER (1, 2, 3) y `Facturacion_NP.np` es TEXT con la NP tal como viaja por
+--     el circuito ("LK 00001"). O sea comparaba '1' contra 'LK 00001': **no coincidía
+--     nunca**. No era inerte por falta de datos, era inerte por construcción — el día
+--     que se conectara la facturación de NP web habría seguido sin frenar nada.
+--   · Y el argumento del rango era el revés del peligro: `g2.np::text` de la NP 44537
+--     da '44537', que ES una NP real de Producción. Medido: las 1.187 filas de
+--     `Facturacion_NP` son dígitos pelados, así que las 1.187 eran falsos positivos
+--     posibles. El día que nuestro contador llegara ahí, el freno se dispararía al
+--     revés y saltearía un pedido nuestro creyéndolo facturado.
+--
+--   Arreglado apareando por la ETIQUETA, que lleva prefijo y por eso no se puede
+--   confundir con una NP de ISIS:
+--
+--     join public."Facturacion_NP" f
+--       on f.np = public.gv_ppp_web_np_label(p_empresa, g2.np)
+--
+--   Verificado sin tocar `Facturacion_NP` (es compartida, sólo se lee): 0 de sus
+--   1.187 filas tienen prefijo `LK `/`CH `, así que el choque ahora es imposible por
+--   construcción, y `gv_ppp_web_np_label('lk', 44537)` <> '44537'.
+--
+--   ⚠ Sigue faltando lo otro: **la facturación de NP web tiene que escribir en
+--   `Facturacion_NP` con la etiqueta** (`LK 00001`), no con el número pelado. Es el
+--   pendiente #4 de `docs/SUPABASE-GESTION-VIRGILIO.md`.
+--
+--   Y del lado del CLIENTE el hueco sigue abierto: la página lo deja editar igual y
+--   el cambio se pierde en silencio. Anotado como idea **8743**.
 --
 -- Es IDEMPOTENTE: correrla dos veces con lo mismo devuelve 0 filas la segunda. Por
 -- eso el front la llama en CADA carga de la PPP sin condicionarla a nada.
