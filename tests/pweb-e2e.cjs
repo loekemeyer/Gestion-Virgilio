@@ -51,7 +51,7 @@ const ZONAS = { mataderos:"Zona 3 - CABA Oeste", martinez:"Zona 6 - GBA Norte", 
   await p.goto("file://" + path.join(__dirname, "..", "index.html"), { waitUntil: "domcontentloaded" });
 
   const r = await p.evaluate(async ({ NPS, VOL, ZONAS }) => {
-    const posts = [];
+    const posts = [], volUrl = [];
     window.sbAuth = { getAccessToken: async () => "tok" };
     window._pppZonaSupa = ZONAS;
     const json = (o) => ({ ok: true, status: 200, json: async () => o, text: async () => JSON.stringify(o) });
@@ -62,7 +62,11 @@ const ZONAS = { mataderos:"Zona 3 - CABA Oeste", martinez:"Zona 6 - GBA Norte", 
       if (u.includes("/auth/v1/token"))       return json({ access_token:"lk", expires_in:3600 });
       if (u.includes("v_pedidos_web_np"))     return json(NPS);
       if (u.includes("ppp_web_np_asignar"))   return json(NPS.map((n,i)=>({ r_order_id:n.order_id, r_np_idx:n.np_idx, r_np:1343+i })));
-      if (u.includes("Volumen_Articulos"))    return json(VOL);
+      // v12.75 — el m³ sale de la VISTA que resuelve la "L" final, no de la tabla
+      // cruda. Si alguien vuelve a apuntar a `Volumen_Articulos`, este mock no
+      // matchea, el m³ da 0 y el test cae: es el guardarraíl del cambio.
+      if (u.includes("vista_volumen_articulo_resuelto")) { volUrl.push(u); return json(VOL); }
+      if (u.includes("Volumen_Articulos"))    return json([]);
       if (u.includes("PPP_Web_Programacion")) return json([]);
       if (u.includes("PPP_Programacion_Diaria")) return json([]);
       return json([]);
@@ -134,7 +138,8 @@ const ZONAS = { mataderos:"Zona 3 - CABA Oeste", martinez:"Zona 6 - GBA Norte", 
       artsOper: artsOper,
       xlsFilas: xls.length,
       xlsFecha: xls[0] ? xls[0].fechaTxt : null,
-      xlsLineas: xls[0] ? xls[0].lineas.length : 0
+      xlsLineas: xls[0] ? xls[0].lineas.length : 0,
+      volPideVista: volUrl.length > 0
     };
   }, { NPS, VOL, ZONAS });
 
@@ -149,7 +154,8 @@ const ZONAS = { mataderos:"Zona 3 - CABA Oeste", martinez:"Zona 6 - GBA Norte", 
     r.lineasBase === 15 &&
     r.operVeTanda && r.operNp === "LK 1344" && r.operEmpresa === "LK" &&
     r.artsOper === "031:10,280:10,315:10,502:15,505:150,506:20,521:3,530:4,574E:25,580:15,586:50,598E:25,599E:3,811E:3,816E:15" &&
-    r.xlsFilas === 1 && /03\/09\/2026/.test(String(r.xlsFecha)) && r.xlsLineas === 15;
+    r.xlsFilas === 1 && /03\/09\/2026/.test(String(r.xlsFecha)) && r.xlsLineas === 15 &&
+    r.volPideVista === true;                                 // v12.75: el m³ se pide a la vista, no a la tabla
 
   console.log("pweb-e2e:", JSON.stringify(r, null, 0));
   console.log("  pageerrors:", errs.length ? errs.join("|") : "none", "·", (ok && !errs.length) ? "✓ OK" : "✗ FAIL");

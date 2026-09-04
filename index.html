@@ -6607,7 +6607,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v12.74";
+const APP_VERSION = "v12.75";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -25172,11 +25172,18 @@ async function pwebLkToken() {
    entra al mapa el que tiene un valor POSITIVO — si no, un artículo sin medir
    sumaría 0 y el m³ del pedido saldría de menos sin que nadie se entere, que es
    peor que no mostrarlo. Del catálogo de la web hoy son 7: 071, 241, 242, 441Z,
-   442E, 444E y 446E. */
+   442E, 444E y 446E.
+
+   v12.75 — se lee la VISTA `vista_volumen_articulo_resuelto`, no la tabla cruda:
+   un código con "L" final (438EL = artículo Loeke que vende Chef) usa el m³ del
+   artículo base cuando no tiene medida propia. La resolución vive en el backend
+   (`sql/volumen_articulo_resuelto.sql`); acá no se pela nada. La vista ya filtra
+   m³ > 0, pero el chequeo de abajo se conserva igual — es la garantía de este
+   lado y no depende de cómo esté definida la vista. */
 async function pwebVolumenes(cods) {
   const out = {};
   if (!cods.length) return out;
-  const url = SUPABASE_URL + "/rest/v1/Volumen_Articulos?select=codigo,m3&codigo=in.("
+  const url = SUPABASE_URL + "/rest/v1/vista_volumen_articulo_resuelto?select=codigo,m3&codigo=in.("
             + cods.map(encodeURIComponent).join(",") + ")&limit=5000";
   const r = await fetch(url, { headers: { apikey: SUPABASE_KEY } });
   if (!r.ok) return out;

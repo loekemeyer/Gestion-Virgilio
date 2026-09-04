@@ -39,7 +39,7 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
       if (u.includes("v_pedidos_web_np"))   return json(NPS);
       if (u.includes("ppp_web_np_asignar")) return json([{ r_order_id: 1342, r_np_idx: 1, r_np: 1343 }]);
       // ZZZ tiene fila pero sin valor: cuenta como NO medido.
-      if (u.includes("Volumen_Articulos"))  return json([{ codigo: "027", m3: 0.1 }, { codigo: "505", m3: 0.02 }, { codigo: "ZZZ", m3: null }]);
+      if (u.includes("vista_volumen_articulo_resuelto")) return json([{ codigo: "027", m3: 0.1 }, { codigo: "505", m3: 0.02 }, { codigo: "ZZZ", m3: null }]);
       if (u.includes("PPP_Web_Programacion")) return json([]);
       return json([]);
     };
@@ -88,7 +88,7 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
           enviado_a_compras: null, lineas: 2, cajas: 2, items: [{ art: "052", cajas: 1 }] }
       ]);
       if (u.includes("ppp_web_np_asignar")) return json([{ r_order_id: 213, r_np_idx: 2, r_np: 7 }]);
-      if (u.includes("Volumen_Articulos"))  return json([{ codigo: "052", m3: 0.01 }]);
+      if (u.includes("vista_volumen_articulo_resuelto")) return json([{ codigo: "052", m3: 0.01 }]);
       return json([]);
     };
     const filas = await pppTraerPedidosWeb("chef");

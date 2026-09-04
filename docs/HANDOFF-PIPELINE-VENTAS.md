@@ -148,15 +148,17 @@ pedido → customer_delivery_addresses.zona_expreso   (= el BARRIO que carga el 
    reescribir el código en el back** (regla dura del usuario).
    ✅ **Resuelto en `main` para picking/armado/stock** (v12.37/v12.39): `pkStripL`,
    `pkEmpresaArt` y `pkResolveArt` en `index.html`.
-   ⚠ **Falta en el m³ de la PPP Web.** `pwebVolumenes()` busca `Volumen_Articulos` por el
-   código **crudo** y no prueba el pelado. Medido el 2026-09-04 sobre el feed: los pedidos
-   de Chef traen **12 códigos con L**, y **9 no tienen fila de m³ con valor** → esas NP
-   salen con el m³ de menos y nadie se entera. Pelando la L, 8 de los 9 resuelven
-   (`097L→097`, `702EL→702E`, `706L→706`, `798EL→798E`, `824L`, `836L`, `840L`, `847L`);
-   sólo `727EL` no tiene m³ ni pelado ni crudo.
-   ⚠ Ojo al implementarlo: `438EL`, `439EL` y `809EL` **sí tienen fila propia**, y en dos
-   casos no coincide con la del base (`439EL` = 0,0561 vs `439E` = 0,0185, 3×). Por eso la
-   regla segura es **crudo primero, pelado sólo como fallback** — nunca pisar el crudo.
+   ✅ **Y en el m³ desde v12.75**, en el backend: la vista
+   `public.vista_volumen_articulo_resuelto` (`sql/volumen_articulo_resuelto.sql`) emite cada
+   código medido y su variante con L, **sólo cuando esa variante no tiene medida propia**;
+   `pwebVolumenes()` la lee en lugar de la tabla cruda. Antes de esto, de los 12 códigos con
+   L que traen los pedidos de Chef, 9 no tenían m³ y esas NP salían de menos. Resuelven 8
+   (`097L`, `702EL`, `706L`, `798EL`, `824L`, `836L`, `840L`, `847L`); `727EL` no tiene
+   medida en ningún lado y sigue sin m³, que es lo correcto.
+   ⚠ **Queda un dato a revisar:** `438EL`, `439EL` y `809EL` tienen fila propia, y en dos no
+   coincide con la del base — `439EL` mide 0,0561 y `439E` 0,0185, el triple. La vista no lo
+   decide: el crudo manda siempre y el pelado sólo llena huecos. Habría que medir cuál está
+   bien.
 4. **Tanda:** agrupar **(empresa, zona, día)**. Tope **1 m³** para juntar pedidos chicos
    distintos. Un pedido con varias NPs → **todas sus NPs en la MISMA tanda** (mismo día),
    aunque supere 1 m³. Un pedido nunca se parte entre tandas.
@@ -196,8 +198,8 @@ calendario día→zona fue un invento (§6.7). No se dropeó: es cambio de datos
    (En `main` la tanda hoy la arma el supervisor desde la PPP Web, con el sugeridor de
    `pppSugerirTandas`; automatizarlo del todo sigue abierto.)
 6. **`aplicar_pedido` v2:** split balanceado por m³ + equivalencia códigos L + escribir zona.
-   Aplicado a `main`, lo que queda vivo de esto es: **(a)** el split balanceado (§4.1) y
-   **(b)** el fallback de la L en el m³ (§4.3). La zona ya la escribe (v12.74).
+   Aplicado a `main`, lo único que queda vivo de esto es **el split balanceado (§4.1)**. La
+   zona ya la escribe (v12.74) y el fallback de la L en el m³ se hizo en v12.75 (§4.3).
 7. **Rotar los passwords** de `virgilio_reader` (LK y CH). Quedaron expuestos en el chat de
    la sesión de origen (NO se copian acá: este repo es PÚBLICO). Rol read-only sobre una
    vista, riesgo bajo, pero rotar antes de producción (ALTER ROLE en la fuente + ALTER USER

@@ -12,7 +12,24 @@
 > única**; no se replica. Ante la duda entre parche rápido y fix de raíz → **fix
 > de raíz**.
 >
-> Última actualización: 2026-09-02 · Versión app al documentar: **v12.48**
+> Última actualización: 2026-09-04 · Versión app al documentar: **v12.75**
+>
+> Nota **v12.75** — **El m³ de un código con "L" sale del artículo base (backend).**
+> Un código terminado en L (`438EL`, `097L`) es un artículo de Loekemeyer que vende Chef.
+> El picking y el armado ya lo resolvían desde v12.37/v12.39 (`pkStripL`), pero el **m³ no**:
+> `pwebVolumenes()` buscaba `Volumen_Articulos` por el código crudo. Medido sobre los pedidos
+> web: Chef trae **12 códigos con L y 9 sin fila de m³ con valor** → esas NP salían con el m³
+> de menos, y el m³ es lo que decide la tanda. Pelando la L resuelven 8 (`727EL` no tiene
+> medida en ningún lado y sigue sin m³, que es lo correcto).
+> **Va en el backend**, como manda el protocolo: vista **`vista_volumen_articulo_resuelto`**
+> (`sql/volumen_articulo_resuelto.sql`, `security_invoker = true`), que emite el código medido
+> y además su variante con L **sólo cuando esa variante no tiene medida propia**. El front sólo
+> cambia de endpoint; no pela nada, y el código del pedido sigue crudo (regla dura del dueño:
+> no reescribir el código en el back).
+> ⚠ **El crudo manda siempre.** `438EL`, `439EL` y `809EL` tienen fila propia, y en dos no
+> coincide con la del base: **`439EL` mide 0,0561 y `439E` 0,0185 — el triple**. Alguna de las
+> dos está mal; es un dato a revisar, no algo que la vista decida. Verificado: 1.480 filas
+> (934 propias + 546 peladas), 0 duplicados, y **0 m³ existentes se movieron**.
 >
 > Nota **2026-09-02** — **Legajo 277: 185 reportes atascados ("sin enviar") — NO era señal, era un timeout de 8 s en un trigger, y la cadena de stock EN VIVO documentada.**
 > **Síntoma:** el legajo 277 mostraba "185 reportes sin enviar" y la app trabada. Diagnóstico
