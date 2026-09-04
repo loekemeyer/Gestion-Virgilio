@@ -6696,7 +6696,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v12.80";
+const APP_VERSION = "v12.81";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -31508,13 +31508,21 @@ async function aprCargar() {
 
 /* ── Acciones ──────────────────────────────────────────────────────────── */
 async function aprNuevaTanda() {
-  try { await aprRpc("gv_ppp_web_tanda_nueva", { p_empresa: _apr.emp, p_por: aprQuien() }); _apr.msg = ""; }
+  try { await aprRpc("gv_ppp_web_tanda_nueva", { p_empresa: _apr.emp, p_por: await aprQuien() }); _apr.msg = ""; }
   catch (e) { _apr.msg = e.message; }
   await aprCargar();
 }
 
-function aprQuien() {
-  try { return (window.sbAuth && window.sbAuth.email) ? window.sbAuth.email : ""; } catch (_e) { return ""; }
+/* Quién armó la tanda. `window.sbAuth` no expone el mail —sólo da el token—, así
+   que sale del propio JWT. Si no se puede, va `null` y no una cadena vacía: una
+   columna vacía miente menos que un "" que parece un nombre en blanco. */
+async function aprQuien() {
+  try {
+    const t = window.sbAuth && (await window.sbAuth.getAccessToken());
+    if (!t) return null;
+    const p = JSON.parse(atob(t.split(".")[1].replace(/-/g, "+").replace(/_/g, "/")));
+    return p.email || (p.user_metadata && p.user_metadata.email) || null;
+  } catch (_e) { return null; }
 }
 
 /* Suelta un pedido ENTERO en una tanda: viajan todos sus bloques en una sola
@@ -31533,7 +31541,7 @@ async function aprSoltarPedido(codigo) {
   });
   try {
     await aprRpc("gv_ppp_web_tanda_agregar",
-      { p_empresa: _apr.emp, p_codigo: codigo, p_np: filas, p_por: aprQuien() });
+      { p_empresa: _apr.emp, p_codigo: codigo, p_np: filas, p_por: await aprQuien() });
     _apr.msg = "";
   } catch (e) { _apr.msg = e.message; }
   await aprCargar();
@@ -31579,7 +31587,7 @@ async function aprProgramar(codigo, fecha) {
                (t.avisos || []).join("\n· ") + "\n\n¿Programarla igual para el " + fecha + "?")) return;
   try {
     const r = await aprRpc("gv_ppp_web_tanda_programar",
-      { p_empresa: _apr.emp, p_codigo: codigo, p_fecha: fecha, p_items: items, p_por: aprQuien() });
+      { p_empresa: _apr.emp, p_codigo: codigo, p_fecha: fecha, p_items: items, p_por: await aprQuien() });
     const x = (r && r[0]) || {};
     _apr.msg = "✅ " + codigo + " programada para el " + fecha + ": " +
                (x.np_programadas || 0) + " NP · " + aprNum(x.m3) + " m³." +

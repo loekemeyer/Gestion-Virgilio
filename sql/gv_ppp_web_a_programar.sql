@@ -244,3 +244,43 @@ $function$;
 --   no las puede consultar. El front ya las trae; de acá sólo necesita saber
 --   cuáles están tomadas (`PPP_Web_Tanda_Items` + `PPP_Web_Programacion`).
 -- · Numeración apagada ⇒ programar no funciona todavía. A propósito.
+
+
+-- ══════════════════════════════════════════════════════════════════════════
+-- BUG EN PRODUCCION: 401 al abrir la solapa (2026-09-04, v12.81)
+-- ══════════════════════════════════════════════════════════════════════════
+-- El dueno abrio el modulo y le dio:
+--
+--   ⚠ Supabase respondio 401
+--   {"code":"42501","message":"permission denied for table GV_Clientes_Reglas"}
+--
+-- CAUSA. `gv_ppp_web_tandas_abiertas` es `security_invoker = true` (obligatorio,
+-- ver el §1 del CLAUDE.md), asi que sus lecturas corren con los permisos de quien
+-- llama — el front lee con la anon key. La vista invoca
+-- `gv_ppp_web_tanda_avisos`, que consulta `GV_Clientes_Reglas` (que clientes van
+-- solos), y esa tabla esta CERRADA a `anon` a proposito.
+--
+-- ⚠⚠ POR QUE NO LO AGARRO LA PRUEBA: cuando probe la vista como `anon`, NO HABIA
+--    NINGUNA TANDA. Con 0 filas la subconsulta correlacionada de los avisos nunca
+--    se ejecuta, asi que dio "ok (0 filas)" y parecio sana. El permiso recien se
+--    toca cuando hay al menos una tanda que evaluar — o sea reventaba en el
+--    primer clic de "+ Nueva tanda".
+--
+--    LECCION, que vale para cualquier vista de este repo: **probar una vista
+--    vacia no prueba nada sobre sus permisos.** Hay que probarla CON datos, y con
+--    el rol real que la va a leer.
+--
+-- ARREGLO. `gv_ppp_web_tanda_avisos` pasa a SECURITY DEFINER con search_path
+-- fijo: el candado es el GRANT, que es lo auditable — mismo patron que
+-- `gv_pedidos_web_np_*` y `gv_ppp_web_np_asignar`. No amplia lo que se ve: los
+-- nombres de cliente que devuelve el aviso ya estan en `PPP_Web_Tanda_Items`,
+-- que `anon` lee.
+--
+-- Verificado con la URL EXACTA que manda el front y con tandas creadas:
+--   antes  → 401  permission denied for table GV_Clientes_Reglas
+--   despues→ 200  [{"codigo":"GV-01A",...},{"codigo":"GV-01B",...}]
+--
+-- ── CONTROL, para que no vuelva ────────────────────────────────────────────
+--   -- Tiene que devolver filas SIN error. Correr con AL MENOS UNA tanda abierta.
+--   set local role anon;
+--   select codigo, n_avisos from public.gv_ppp_web_tandas_abiertas;
