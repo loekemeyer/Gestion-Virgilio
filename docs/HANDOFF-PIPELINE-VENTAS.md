@@ -14,22 +14,23 @@ Hubo **dos builds del mismo pipeline al mismo tiempo**, sin saber uno del otro:
 | Dónde escribe | `public.PPP_Web_NP` + `public.PPP_*` | esquema aislado `pipeline` |
 | N° de NP | `LK 1343` (prefijo + 4 dígitos) | 9 dígitos internos |
 | SQL en el repo | `sql/pedidos_web_lk.sql`, `sql/ppp_web_programacion.sql` | `sql/gv_pipeline_*.sql` |
-| Estado | **fuente de verdad, v12.74** | redundante, quedó atrás |
+| Estado | **fuente de verdad** | 🗑 **dropeado el 2026-09-04** |
 
 **`main` es la fuente de verdad.** El build de la rama **NO se mergeó como código** —
-habría chocado dos implementaciones distintas. Lo que sí se trajo a `main` es:
+habría chocado dos implementaciones distintas— y el 2026-09-04 se **dio de baja entero**:
+no lo leía nadie, se midió que su camino no era mejor (leer Chef por el FDW de Virgilio
+costaba 3,16 s contra 2,90 s por la RPC de LK: el costo es el salto a Chef, no el rodeo),
+y encima su vista `vista_pedidos_web_feed` había quedado abierta a `anon`.
 
-1. **este documento** (el mapa de reglas de negocio §4 y de decisiones abiertas §6);
-2. **los `sql/gv_pipeline_*.sql`**, porque sus objetos **están vivos en Supabase**
-   (esquema `pipeline`, esquema `fuentes`, servers FDW `lk_feed`/`chef_feed`, vista
-   `public.vista_pedidos_web_feed`, rol `virgilio_reader` en LK y en Chef) y estaban
-   quedando sin SQL en el repo. Se reconciliaron con la base viva: se les agregó la
-   columna `barrio` que faltaba (§5) y el archivo `35` del diccionario;
-3. **el diccionario canónico de 113 barrios** → `sql/gv_pipeline_35_barrio_zona.sql`,
-   y el merge propuesto contra el productivo en
-   `sql/zonas_barrios_dic_canonico_20260904.sql` (**sin ejecutar**, ver §2).
+De ese build sobreviven **dos cosas**:
 
-Nada de eso escribe en `public.PPP_*`. Es seguro dejarlo quieto.
+1. **este documento**, que es lo que más valía: el mapa de reglas de negocio (§4) y de
+   decisiones abiertas (§6). Casi todas ya se cerraron sobre el pipeline productivo;
+2. **el diccionario canónico de 113 barrios**, volcado a `public."Zonas_Barrios"` el
+   2026-09-04 (§2) y con su SQL en `sql/gv_pipeline_35_barrio_zona.sql`.
+
+Los demás `sql/gv_pipeline_*.sql` quedan como **registro histórico de objetos que ya no
+existen**. No correrlos.
 
 ### Lo que ya está resuelto en `main` (no reimplementar)
 
@@ -88,8 +89,8 @@ pedido → customer_delivery_addresses.zona_expreso   (= el BARRIO que carga el 
 > **Estado en `main` (2026-09-04).** La cadena de arriba **ya está andando**: v12.73 sacó
 > la localidad del padrón y v12.74 hizo mandar a `zona_expreso` sobre la localidad y sobre
 > el parseo de la dirección. El front resuelve `zona_expreso → localidad → parsear` y cruza
-> contra **`public."Zonas_Barrios"`** (87 filas, auto-aprendizaje por `trg_ppp_autozona`,
-> alta manual por la RPC `zona_barrio_set`) — **no** contra `pipeline.barrio_zona`.
+> contra **`public."Zonas_Barrios"`** (auto-aprendizaje por `trg_ppp_autozona`, alta manual
+> por la RPC `zona_barrio_set`) — nunca contra `pipeline.barrio_zona`, que ya no existe.
 >
 > ✅ **El diccionario se completó el 2026-09-04.** Faltaban 22 barrios de entrega reales
 > con 51 pedidos, que sí estaban en la lista canónica de 113. Entraron **28 filas** y
@@ -98,16 +99,20 @@ pedido → customer_delivery_addresses.zona_expreso   (= el BARRIO que carga el 
 > `sql/backups/backup_zonas_barrios_20260904.sql`.
 >
 > INSERT-only a propósito: en 3 barrios la lista canónica está **peor** que la base y no se
-> pisó nada — `burzaco` (la lista dice CABA Centro y es GBA Sur), `villa bosch` y `v.devoto`
-> (§6.1, sigue abierto).
+> pisó nada — `burzaco` (la lista dice CABA Centro y es GBA Sur) y `villa bosch`.
+> (`v.devoto` se resolvió aparte el mismo día: va a **Centro**, ver §6.1.)
 >
 > **Cobertura: 1.346 de 1.358 pedidos (99,1%).** Los 12 restantes no son un problema de
 > diccionario: son clientes sin `zona_expreso` cargado en el padrón de LK, así que el pedido
 > no trae punto de entrega. Se arregla en el padrón.
 
-## 3. Lo construido (en vivo, funcionando)
+## 3. Lo que se construyó en la rama  🗑 *(ya no existe — dropeado el 2026-09-04)*
 
-### En LK y en CH (fuentes)
+> Se deja el inventario porque explica de dónde salió el diccionario de barrios y qué se
+> probó. **Ninguno de estos objetos vive hoy.** Lo único que sigue en pie es el diccionario,
+> ya volcado a `public."Zonas_Barrios"`.
+
+### En LK y en CH (fuentes) — borrado en LK; en CHEF **falta borrarlo** (§6.7)
 - Vista-contrato **`public.v_virgilio_pedidos_feed`** (mismas columnas en las dos):
   `empresa, order_id, cod_cliente, cliente_nombre, created_at, fecha, hora, status,
   sucursal_entrega, condicion_pago, items(jsonb en orden), barrio`.
@@ -135,12 +140,17 @@ pedido → customer_delivery_addresses.zona_expreso   (= el BARRIO que carga el 
 ## 4. Reglas de negocio fijadas por el usuario
 
 1. **Partición:** tope de líneas **18 LK / 15 CH**. En el régimen nuevo el Excel lo genera
-   Virgilio → el orden es libre. Regla nueva pedida: dividir en **mín. `ceil(líneas/tope)`
+   Virgilio → el orden es libre. Regla pedida: dividir en **mín. `ceil(líneas/tope)`
    tramos y balancear por m³** (ej. 20 líneas LK → 2×10, no 18+2).
-   ⚠ **SIGUE PENDIENTE en `main`.** Hoy `sql/pedidos_web_lk.sql` corta con
-   `ceil(linea_rn / cap)`: bloques contiguos del tope, en el orden del carrito
-   (reproduce exacto lo que hace la Edge Function del Excel). O sea 20 líneas LK
-   salen **18 + 2**, no 10 + 10. Cambiarlo rompe la paridad con ISIS a propósito.
+   ✅ **HECHO el 2026-09-04**, en LK (`v_pedidos_web_np`) y en la RPC de Chef. Reparte en
+   serpentina sobre las líneas ordenadas por m³; dentro de cada NP se restituye el orden
+   del carrito. El m³ se lee de Virgilio por el FDW, sin copiar la tabla.
+   La paridad con ISIS se rompe **a propósito y sin costo**: el pedido web no entra a ISIS
+   hasta que ya está armado y listo, así que no hay nada del otro lado con lo que coincidir.
+   Verificado: **0 pedidos cambian de cantidad de NP** y **0 tramos pasan el tope**, así que
+   los números ya repartidos en `PPP_Web_NP` siguen valiendo.
+   Ejemplo real, pedido 684: `0,146/0,182/0,166/0,276/0,019` → `0,171/0,161/0,157/0,152/0,147`.
+   Detalle en `sql/pedidos_web_lk.sql`, sección "LA REGLA DE CORTE".
 2. **NP interna:** `<E> + order_id(6) + parte(2)`; E = `9` lk / `4` ch (empresa por 1er dígito).
    ⚠ **SUPERADO.** `main` usa **`LK 1343` / `CH 1343`** — prefijo de empresa + 4 dígitos, de
    un contador propio (`ppp_web_np_asignar`). La identidad interna es `(order_id, np_idx)`.
@@ -193,21 +203,25 @@ calendario día→zona fue un invento (§6.7). No se dropeó: es cambio de datos
 
 ## 6. Pendientes / decisiones abiertas
 
-1. **Villa Devoto (180 pedidos):** mapeado a `Zona 2 - CABA Centro` (según la lista canónica
-   `V.Devoto→Zona 2`), pero geográficamente es Oeste (Zona 3). **Confirmar con el usuario.**
+1. ~~**Villa Devoto:** ¿Centro o Oeste?~~ ✅ Resuelto por el dueño el 2026-09-04: **Centro**.
+   Había una inconsistencia en la propia tabla —`devoto` y `villa devoto` decían Zona 2 pero
+   `v.devoto` decía Zona 3, las tres cargadas en el mismo momento—. Se alineó `v.devoto` a
+   `Zona 2 - CABA Centro`; ahora las tres grafías coinciden.
 2. **Ventana de edición** de pedidos (item adds) — ver §4.5.
 3. **Retira / Super / Expo** — cómo se programan (§4.6).
 4. **Día de la tanda** — cómo se asigna sin fecha pactada ni calendario (§4.7).
 5. **Construir `ppp_programar`** (agrupar zona-día + tope 1 m³) — próximo paso grande.
    (En `main` la tanda hoy la arma el supervisor desde la PPP Web, con el sugeridor de
    `pppSugerirTandas`; automatizarlo del todo sigue abierto.)
-6. **`aplicar_pedido` v2:** split balanceado por m³ + equivalencia códigos L + escribir zona.
-   Aplicado a `main`, lo único que queda vivo de esto es **el split balanceado (§4.1)**. La
-   zona ya la escribe (v12.74) y el fallback de la L en el m³ se hizo en v12.75 (§4.3).
-7. **Rotar los passwords** de `virgilio_reader` (LK y CH). Quedaron expuestos en el chat de
-   la sesión de origen (NO se copian acá: este repo es PÚBLICO). Rol read-only sobre una
-   vista, riesgo bajo, pero rotar antes de producción (ALTER ROLE en la fuente + ALTER USER
-   MAPPING en Virgilio). El valor vigente vive solo en el `user mapping` del FDW de Virgilio.
+6. ~~**`aplicar_pedido` v2:** split balanceado + equivalencia códigos L + escribir zona.~~
+   ✅ Las tres, sobre el pipeline productivo de `main`: zona en v12.74, m³ de los códigos
+   con L en v12.75, split balanceado por m³ el 2026-09-04.
+7. **Rotar los passwords** de `virgilio_reader`. ✅ En LK se resolvió mejor: el rol se
+   **borró** junto con su vista `v_virgilio_pedidos_feed` (2026-09-04), porque Virgilio ya
+   no tiene FDW contra LK.
+   ⚠ **Falta en CHEF** (`nkhzocgdpwtgrmwleihr`, otra organización, sin acceso desde acá):
+   borrar el rol `virgilio_reader` y su vista `v_virgilio_pedidos_feed`. Su password quedó
+   expuesta en el chat de la sesión de origen.
 8. **ZonasSucursales completa** (opcional): el volcado del Sheet se cortó en "Lanus"; el
    fallback por `zona_expreso` lo hace casi innecesario.
 9. ~~**Commit al repo:** definir rama.~~ ✅ Resuelto: este documento y los `gv_pipeline_*.sql`
@@ -215,10 +229,13 @@ calendario día→zona fue un invento (§6.7). No se dropeó: es cambio de datos
 10. **Puente pipeline→producción:** ya no hace falta — `main` escribe directo en
     `public.PPP_Web_NP` y la PPP Web se ve en la app. El esquema `pipeline` quedó
     **desenchufado y sin uso**.
-11. 🆕 **Dar de baja lo que quedó huérfano en Supabase** (pide permiso, es cambio de datos):
-    `pipeline.calendario_zona` (invento, §4.7) seguro; y decidir si se conservan el esquema
-    `pipeline`, `fuentes` y los servers FDW `lk_feed`/`chef_feed` o se dropean. Hoy no los
-    lee nadie: el pipeline productivo entra a LK por el bridge de admin, no por FDW.
+11. ~~**Dar de baja lo que quedó huérfano en Supabase.**~~ ✅ Dropeado el 2026-09-04:
+    esquemas `pipeline` y `fuentes`, servers `lk_feed`/`chef_feed`, vista
+    `vista_pedidos_web_feed`, y en LK el rol `virgilio_reader`. Se midió antes que el
+    camino por FDW **no era mejor** (3,16 s contra 2,90 s por la RPC de LK: el costo es el
+    salto a Chef, no el rodeo). Producción verificada intacta. Se perdió
+    `pipeline.zonas_sucursales` (406 filas, import parcial de un Sheet que sigue existiendo
+    y cuyo dato reemplazó `zona_expreso` del padrón). Falta sólo el lado de Chef (§6.7).
 12. ~~**Alta de los 22 barrios que faltan en `Zonas_Barrios`.**~~ ✅ Corrido el 2026-09-04
     (28 filas, 87 → 115). Ver §2.
 13. 🆕 **Cargar `zona_expreso` en el padrón de LK** a los 12 clientes que no lo tienen —

@@ -14,6 +14,34 @@
 >
 > Última actualización: 2026-09-04 · Versión app al documentar: **v12.75**
 >
+> Nota **backend, sin bump de app** — **El corte de un pedido web en NP se balancea por m³.**
+> Antes se cortaba en bloques del tope contiguos en el orden del carrito
+> (`ceil(linea_rn/tope)`, que es lo que hace la Edge Function del Excel): un pedido de 20
+> líneas salía **18 + 2** y la segunda NP era un viaje por dos renglones. En m³ era peor —
+> el pedido 684 salía `0,146 / 0,182 / 0,166 / 0,276 / **0,019**`.
+> Ahora se parte en el **mínimo de tramos que respeta el tope** —`ceil(lineas/tope)`, el
+> mismo número que antes— y las líneas se reparten parejas en m³. El 684 sale
+> `0,171 / 0,161 / 0,157 / 0,152 / 0,147`.
+> **Se puede reordenar porque el Excel para ISIS lo genera Virgilio**: el pedido web no
+> entra a ISIS hasta que ya está armado y listo, así que no hay nada del otro lado con lo
+> que coincidir línea por línea.
+> **Cómo reparte:** serpentina sobre las líneas ordenadas de mayor a menor m³
+> (1,2,…,N,N,…,2,1,…). Determinístico, SQL puro, sin loops. Deja los tramos parejos en m³ y
+> en líneas (difieren en 1 como mucho) y nunca pasan el tope porque `ceil(lineas/N) ≤ tope`.
+> Dentro de cada NP se restituye el **orden del carrito**.
+> ⚠ **Lo que no cambia, y es lo que lo hace seguro:** la CANTIDAD de NP por pedido es
+> idéntica. Verificado sobre los 1.019 pedidos de LK y los de Chef: **0 pedidos cambian de
+> cantidad de NP** y **0 tramos pasan el tope**. Como la identidad de una NP es
+> `(order_id, np_idx)`, los números ya repartidos en `PPP_Web_NP` siguen valiendo.
+> **El m³ sale de Virgilio, no se copia:** LK lo lee por el FDW `virgilio_db` que ya tenía,
+> contra `vista_volumen_articulo_resuelto`. En la vista de LK va envuelto en la función
+> `virgilio_volumen_map()` (`security definer`) porque el user mapping del FDW es para
+> `postgres` y la vista corre con `security_invoker`; la RPC de Chef lo lee directo porque
+> ya es `security definer`. ⚠ El `MATERIALIZED` del CTE no es decorativo: sin él el planner
+> ejecuta el salto FDW **una vez por pedido** (1.019, medido). Costo final: 1,17 s → 2,07 s.
+> Las tres pruebas de seguridad de la vista siguen dando bien (admin 1.463 NP · otro
+> authenticated 0 · anon *permission denied*). Detalle en `sql/pedidos_web_lk.sql`.
+>
 > Nota **v12.75** — **El m³ de un código con "L" sale del artículo base (backend).**
 > Un código terminado en L (`438EL`, `097L`) es un artículo de Loekemeyer que vende Chef.
 > El picking y el armado ya lo resolvían desde v12.37/v12.39 (`pkStripL`), pero el **m³ no**:
@@ -8199,16 +8227,23 @@ sucursal de entrega, ítems y condición de pago. Se revocó (migración
 **Lección:** una vista en `public` sobre datos con RLS o sobre foreign tables necesita
 `security_invoker = true`; el revoke del esquema de abajo NO la cubre.
 
-⚠ **Objetos vivos pero SIN USO — esquemas `pipeline` y `fuentes`.** Son de un segundo
+🗑 **Dados de baja el 2026-09-04 — esquemas `pipeline` y `fuentes`.** Eran de un segundo
 build del pipeline de pedidos web, hecho en paralelo en la rama
 `claude/pipeline-estructura-supabase-1haka4` mientras `main` construía el que sí corre.
-Nadie los lee: el pipeline productivo entra a LK por el bridge de admin, no por FDW.
-Quedan **desenchufados** y documentados en `sql/gv_pipeline_*.sql` +
-`docs/HANDOFF-PIPELINE-VENTAS.md` para que no haya objetos productivos sin SQL en el
-repo. Incluye los servers FDW `lk_feed`/`chef_feed`, la vista
-`public.vista_pedidos_web_feed`, el rol `virgilio_reader` en LK y en Chef, y
-`pipeline.barrio_zona` (la lista canónica de 113 barrios del dueño, que **no** es la
-que usa la app). Dar de baja o no está abierto — ver §6.11 del handoff.
+No los leía nadie (el pipeline productivo entra a LK por el bridge de admin, no por FDW)
+y se midió que ese camino **no era más rápido**: 2,90 s por LK contra 3,16 s por ahí — el
+costo es el salto a Chef, no el rodeo. Encima ya habían costado una filtración.
+Se dropearon: esquemas `pipeline` y `fuentes`, servers FDW `lk_feed`/`chef_feed`, vista
+`public.vista_pedidos_web_feed`, y en LK el rol `virgilio_reader` con su vista
+`v_virgilio_pedidos_feed`. Producción verificada intacta antes y después.
+⚠ **Queda pendiente del lado de Chef** (`nkhzocgdpwtgrmwleihr`, otra organización, sin
+acceso desde acá): borrar el rol `virgilio_reader` y su vista `v_virgilio_pedidos_feed`.
+Su password quedó expuesta en el chat de la sesión que la creó.
+Lo que valía la pena se conservó: el diccionario de 113 barrios está volcado en
+`Zonas_Barrios` y su SQL en `sql/gv_pipeline_35_barrio_zona.sql`; los demás
+`sql/gv_pipeline_*.sql` quedan como registro histórico de algo que ya no existe.
+Se perdió `pipeline.zonas_sucursales` (406 filas): era un import parcial —cortado en
+"Lanus"— de un Sheet que sigue existiendo, y su dato lo reemplazó `zona_expreso` del padrón.
 
 RLS `anon` (hardening 2026-07): lectura + escritura **acotada por tabla** — insert
 siempre; update sólo donde la app lo usa; **sin delete** salvo `Envasar_Ubicaciones`.

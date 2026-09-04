@@ -1,7 +1,24 @@
 -- ============================================================================
 -- GESTIÓN VIRGILIO — Pipeline de pedidos web (estructura "desenchufada")
 -- ============================================================================
--- ⚠⚠ ESTO **NO ES** EL PIPELINE PRODUCTIVO. LEER ANTES DE TOCAR.
+-- 🗑🗑 ESTOS OBJETOS YA NO EXISTEN. Se dropearon el 2026-09-04. Este archivo queda
+--    como REGISTRO HISTÓRICO: sirve para entender de dónde salió el diccionario de
+--    barrios y qué se probó, no para volver a correrlo.
+--
+--    Se dieron de baja porque no los leía nadie y porque se midió que este camino no
+--    era mejor: leer Chef por el FDW de Virgilio costaba 3,16 s contra 2,90 s por la
+--    RPC de LK que ya estaba en producción — el costo es el salto a Chef, no el rodeo.
+--    Además la vista `vista_pedidos_web_feed` había quedado abierta a `anon` y filtró
+--    los 1.358 pedidos web de las dos empresas hasta que se cerró ese mismo día.
+--
+--    Lo único que valía la pena se conservó: el diccionario de 113 barrios está
+--    volcado en `public."Zonas_Barrios"` y su SQL en gv_pipeline_35_barrio_zona.sql.
+--
+--    ⚠ Pendiente del lado de CHEF (otra organización, sin acceso desde acá): borrar
+--      el rol `virgilio_reader` y la vista `v_virgilio_pedidos_feed`.
+--
+-- ----------------------------------------------------------------------------
+-- ⚠⚠ ESTO **NO ERA** EL PIPELINE PRODUCTIVO.
 --
 --   El pipeline que corre de verdad es el de la PPP Web (idea 3717, v12.59-v12.74):
 --       sql/pedidos_web_lk.sql        → las NP se calculan EN VIVO en el proyecto LK

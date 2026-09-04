@@ -33,9 +33,45 @@
 --   Sale de `processOrders` de `procesar-pedidos-db`, que es la que arma el Excel
 --   del mail. Agrupa por (N° Pedido, Sucursal, Cliente) — y un pedido web tiene un
 --   solo cliente y una sola sucursal, así que el grupo es el pedido entero.
---   Los de >= tope se cortan en bloques del tope, CONTIGUOS EN EL ORDEN DEL
---   CARRITO; los de < tope son una sola NP. `ceil(linea_rn / tope)` reproduce los
---   dos casos, incluido el borde de exactamente 18.
+--
+--   ⚠ **CAMBIÓ el 2026-09-04 (§4.1 del handoff): ahora se BALANCEA POR m³.**
+--   El corte viejo hacía bloques del tope contiguos en el orden del carrito
+--   (`ceil(linea_rn / tope)`), que es lo que hace la Edge Function del Excel. Eso
+--   dejaba colgados: un pedido de 20 líneas salía 18 + 2, y la segunda NP era un
+--   viaje por dos renglones. Peor todavía en m³ — el pedido 684 salía
+--   0,146 / 0,182 / 0,166 / 0,276 / **0,019**.
+--
+--   La regla nueva, pedida por el dueño: partir en el MÍNIMO de tramos que respeta
+--   el tope —`ceil(lineas / tope)`, el mismo número que antes— y repartir las
+--   líneas entre esos tramos de forma pareja en m³. El mismo 684 sale ahora
+--   0,171 / 0,161 / 0,157 / 0,152 / 0,147.
+--
+--   Se puede reordenar porque en el régimen nuevo **el Excel para ISIS lo genera
+--   Virgilio**: el pedido web no entra a ISIS hasta que ya está armado y listo, así
+--   que no hay nada del otro lado con lo que haya que coincidir línea por línea.
+--   (Sigue valiendo el ⚠ de más abajo: NO ordenar por código de artículo. Acá se
+--   ordena por m³ para repartir, y dentro de cada NP se restituye el orden del
+--   carrito.)
+--
+--   CÓMO REPARTE — serpentina sobre las líneas ordenadas de mayor a menor m³:
+--   1, 2, …, N, N, …, 2, 1, 1, 2, … Las líneas grandes se alternan entre tramos y
+--   las chicas compensan. Es determinístico y sale en SQL puro (nada de loops).
+--   Deja los tramos parejos en m³ y, de paso, parejos en cantidad de líneas:
+--   difieren en 1 como mucho, y no pasan el tope nunca porque
+--   `ceil(lineas / N) <= tope` por construcción.
+--
+--   ⚠ LO QUE **NO** CAMBIA — y es lo que hace seguro el cambio: la CANTIDAD de NP
+--   por pedido es idéntica a la del corte viejo, porque N es el mismo. Verificado
+--   sobre los 1.019 pedidos: **0 pedidos cambian de cantidad de NP** y **0 tramos
+--   pasan el tope**. Como la identidad de una NP es (order_id, np_idx), los números
+--   ya repartidos en `PPP_Web_NP` siguen valiendo; lo único que cambia es qué
+--   líneas caen en cada uno.
+--
+--   EL m³ SALE DE VIRGILIO, NO SE COPIA. Se lee por el FDW `virgilio_db` que LK ya
+--   tenía, contra la vista `public.vista_volumen_articulo_resuelto` —que además ya
+--   resuelve el m³ de un código con "L" desde su artículo base, lo cual importa
+--   justamente acá, porque los códigos con L son de Chef—. Una línea sin medida
+--   pesa 0 y sólo cuenta por cantidad: no se inventa volumen.
 --
 --   TOPE: **18 en Loekemeyer, 15 en Chef.** Medido, no recordado: un tope deja una
 --   pila de NP justo en el valor del tope. Sobre `PPP_Base_Pedidos` de Virgilio,
@@ -137,17 +173,77 @@ where o.sheets_payload is not null
 --    que ISIS ni se enteró. Ese es el caso que la idea 3717 viene a resolver.
 -- Ojo al reemplazarla: Postgres no deja SACAR columnas con `create or replace`.
 -- Si cambia la lista de columnas hay que `drop view` y volver a crearla.
+-- 2.b) El m³ de Virgilio, envuelto. El user mapping del FDW `virgilio_db` es para
+--      `postgres`, y la vista de abajo corre con security_invoker; un foreign scan
+--      directo adentro fallaría con "permission denied for schema virgilio" al
+--      correr como el invocante (mismo caso que la RPC de Chef). Esto NO amplía el
+--      acceso a nada: devuelve sólo (código, m³) del catálogo, que no es dato de
+--      nadie. Quién ve qué PEDIDO lo sigue decidiendo la RLS de `orders`, afuera.
+create or replace function public.virgilio_volumen_map()
+returns table (codigo text, m3 numeric)
+language sql
+security definer
+stable
+set search_path to 'public', 'virgilio'
+as $$
+  select v.codigo, v.m3 from virgilio.volumen_articulo v where v.m3 > 0;
+$$;
+
+revoke all on function public.virgilio_volumen_map() from public;
+grant execute on function public.virgilio_volumen_map() to authenticated, service_role;
+
+-- La foreign table, si no existiera todavía:
+--   create foreign table virgilio.volumen_articulo (codigo text, m3 numeric, origen text)
+--     server virgilio_db options (schema_name 'public', table_name 'vista_volumen_articulo_resuelto');
+-- Y del lado de VIRGILIO, para que el lector del FDW la pueda leer:
+--   grant select on public."Volumen_Articulos"             to lk_ppp_reader;
+--   grant select on public.vista_volumen_articulo_resuelto to lk_ppp_reader;
+--   create policy vol_art_select_lk_reader on public."Volumen_Articulos"
+--     for select to lk_ppp_reader using (true);
+
 create view public.v_pedidos_web_np
 with (security_invoker = true) as
-with cap as (
+with vol as materialized (
+  -- ⚠ EL `MATERIALIZED` NO ES DECORATIVO. Sin él el planner mete la función adentro
+  --   del nested loop y ejecuta el salto FDW a Virgilio UNA VEZ POR PEDIDO: medido,
+  --   1.019 veces. Materializado se trae las 1.482 filas una sola vez.
+  select codigo, m3 from public.virgilio_volumen_map()
+),
+cap as (
   select 'lk'::text as empresa, 18 as cap_lineas
   union all
   select 'chef',                15
 ),
-part as (
-  select i.*, ceil(i.linea_rn::numeric / c.cap_lineas)::int as np_idx
+lin as (
+  -- m³ de la línea = cajas × m³/caja. Sin medida pesa 0 y sólo cuenta por cantidad.
+  select i.*, c.cap_lineas,
+         coalesce(i.cajas, 0) * coalesce(v.m3, 0) as linea_m3
   from public.v_pedidos_web i
   join cap c on c.empresa = i.empresa
+  left join vol v on v.codigo = upper(btrim(i.art))
+),
+tramos as (
+  -- El MÍNIMO de tramos que respeta el tope. Mismo número que daba el corte viejo,
+  -- así que ningún pedido gana ni pierde NP (ver "LA REGLA DE CORTE" arriba).
+  select l.*,
+         ceil(count(*) over (partition by l.empresa, l.order_id)::numeric
+              / l.cap_lineas::numeric)::int as n_tramos
+  from lin l
+),
+orden as (
+  select t.*,
+         row_number() over (partition by t.empresa, t.order_id
+                            order by t.linea_m3 desc, t.linea_rn) as rk
+  from tramos t
+),
+part as (
+  -- Serpentina: 1,2,…,N,N,…,2,1,1,2,…
+  select o.*,
+         (case when ((o.rk - 1) % (2 * o.n_tramos)) < o.n_tramos
+               then ((o.rk - 1) % (2 * o.n_tramos)) + 1
+               else 2 * o.n_tramos - ((o.rk - 1) % (2 * o.n_tramos))
+          end)::int as np_idx
+  from orden o
 )
 select
   p.empresa,
@@ -164,9 +260,16 @@ select
   bool_and(p.enviado_a_compras_at is not null)       as enviado_a_compras,
   count(*)                                           as lineas,
   sum(p.cajas)                                       as cajas,
+  -- Dentro de la NP se restituye el ORDEN DEL CARRITO, no el del balanceo.
   jsonb_agg(jsonb_build_object('art', p.art, 'cajas', p.cajas, 'uxb', p.uxb, 'uni', p.uni)
             order by p.linea_rn)                     as items,
-  string_agg(p.art, ',' order by p.linea_rn)         as arts
+  string_agg(p.art, ',' order by p.linea_rn)         as arts,
+  -- v12.73/v12.74: el punto de entrega sale del padrón, no de parsear la dirección.
+  min(p.localidad)                                   as localidad,
+  min(p.provincia)                                   as provincia,
+  min(p.zona_expreso)                                as zona_expreso,
+  min(p.nombre_expreso)                              as nombre_expreso,
+  min(p.direccion_expreso)                           as direccion_expreso
 from part p
 group by p.empresa, p.order_id, p.np_idx;
 
@@ -271,8 +374,17 @@ grant select on public.v_pedidos_web_np to authenticated;
 --     `enviado_a_compras` vuelve NULL — de Chef no se sabe si ya salió por mail.
 --
 -- Estado al 2026-09-03: 116 pedidos, **59 con `sheets_payload`**. Los otros 57 no
--- se pueden partir en NP (no hay ítems) y no aparecen. Verificado el corte: el
--- pedido 213 (17 líneas) sale 15 + 2.
+-- se pueden partir en NP (no hay ítems) y no aparecen.
+--
+-- ⚠ 2026-09-04: la RPC usa **el mismo corte balanceado por m³** que la vista de
+--   Loekemeyer (ver "LA REGLA DE CORTE" arriba) — mismo `ceil(lineas/15)` de tramos,
+--   misma serpentina sobre las líneas ordenadas por m³, mismo orden del carrito
+--   restituido dentro de cada NP. Acá el m³ se lee de `virgilio.volumen_articulo`
+--   directo (sin la función envoltorio: la RPC ya es SECURITY DEFINER, corre como
+--   `postgres` y el foreign scan le funciona). Que la vista de Virgilio resuelva la
+--   "L" desde el artículo base importa sobre todo acá: los códigos con L son de Chef.
+--   Verificado: 84 NP antes y 84 después, máximo 15 líneas, 0 pedidos cambian de
+--   cantidad de NP, y **0 líneas sin m³**.
 --
 --   -- Control (como admin):
 --   select order_id, np_idx, cod, razon_social, lineas, cajas
