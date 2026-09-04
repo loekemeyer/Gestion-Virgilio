@@ -94,8 +94,7 @@ pasamos a ISIS:</p>
   <li><b>Queda cerrado</b>, y ahí se publica en esta API con los códigos y las cantidades
       <b>definitivos</b>.</li>
   <li><b>ISIS lo da de alta y lo factura.</b></li>
-  <li><b>Nosotros vinculamos la factura con el pedido</b>, de nuestro lado. ISIS no tiene
-      que avisarnos nada.</li>
+  <li><b>Nosotros vinculamos la factura con el pedido</b>, de nuestro lado.</li>
 </ol>
 
 <p>Lo que ISIS recibe, entonces, no es un pedido a medio armar ni un informe de
@@ -112,9 +111,7 @@ facturar.</p>
   <tr><td><b>Cantidades y códigos</b></td><td>los pedidos</td><td>los <b>realmente preparados</b></td></tr>
 </table>
 
-<p>O sea: para ISIS el pedido es el mismo tipo de documento de siempre, con los mismos
-campos. Cambia <b>cuándo</b> llega, <b>por dónde</b> llega, y que las cantidades ya vienen
-firmes.</p>
+<p>O sea: para ISIS el pedido es el mismo tipo de documento de siempre.</p>
 
 <h2 class="brk">1. Infraestructura: no hace falta Windows Server, IIS, IP pública ni abrir puertos</h2>
 
@@ -158,9 +155,9 @@ permiten headers arbitrarios.</p>
 <ul>
   <li>El token se entrega <b>por canal aparte</b> (no va en este documento).</li>
   <li>Es un token de producción, de un solo consumidor (Sistemas ISIS).</li>
-  <li>Se puede revocar y reemplazar en cualquier momento sin tocar el servicio.</li>
-  <li>Del lado de Virgilio se guarda <b>sólo el hash SHA-256</b>: si se pierde, no se
-      recupera — se emite uno nuevo.</li>
+  <li>Se revoca y se reemplaza en cualquier momento sin tocar el servicio. Del lado de
+      Virgilio se guarda <b>sólo el hash SHA-256</b>, así que un token perdido no se
+      recupera: se emite otro.</li>
 </ul>
 <p>Sin token o con token inválido, cualquier endpoint responde <b>401</b>.</p>
 
@@ -222,8 +219,6 @@ facturadas sin que ISIS haga nada.</p>
 </div>
 <p>Eso deja sin objeto el punto <b>P3</b> del informe (“cómo devuelve ISIS el número de NP
 cuando el pedido nace del otro lado”): no hace falta resolverlo, ni ahora ni después.</p>
-<p>Del lado de ISIS el trabajo es <b>sólo consumir los dos GET de la §4</b>.</p>
-
 <h2 class="brk">6. Estructura del pedido</h2>
 <p>Los mismos campos que hoy viajan en el mail de las 12:30, dentro de un sobre con la
 referencia y la empresa. <b>El pedido en sí (<code>pedido</code>) no lleva NP.</b></p>
@@ -292,16 +287,10 @@ referencia y la empresa. <b>El pedido en sí (<code>pedido</code>) no lleva NP.<
 sólo para cotejar contra lo que emite ISIS. <code>m3</code> son los metros cúbicos, para
 logística.</p>
 
-<div class="warn">
-  <p style="margin-bottom:1.6mm"><b>Dos reglas importantes de lectura</b></p>
-  <ol style="margin-bottom:0">
-    <li><b>El pedido no trae NP y no hay que buscarle una.</b> Se da de alta como se da de
-        alta hoy el pedido del mail: la NP la pone ISIS.</li>
-    <li><b><code>cajas</code> y <code>cod_art</code> son lo preparado, y es lo único que
-        viaja.</b> No hay campos de “pedido original”: si se preparó menos o se preparó un
-        equivalente, la corrección ya vino hecha. No hay nada que conciliar del lado de ISIS.</li>
-  </ol>
-</div>
+<div class="warn"><b>Lo que no está, no falta.</b> No hay NP —se da de alta como se da
+de alta hoy el pedido del mail— y no hay campos de “pedido original”: si se preparó menos
+o se preparó un equivalente, la corrección ya vino hecha. No hay nada que conciliar del
+lado de ISIS.</div>
 
 <p>Si algún campo que ISIS necesita no está en la lista de arriba, lo agregamos —
 avisando cuál, sale en el día.</p>
@@ -321,7 +310,7 @@ avisando cuál, sale en el día.</p>
                   +-------------+</div>
 <ul>
   <li><b>pendiente</b> — listo para que ISIS lo baje.</li>
-  <li><b>entregado</b> — ISIS ya lo bajó. Ahí termina: no hace falta confirmar nada.</li>
+  <li><b>entregado</b> — ISIS ya lo bajó.</li>
   <li><b>anulado</b> — el pedido se dio de baja en Virgilio. Si eso pasa <b>después</b> de
       que ISIS lo bajó, aparece con <code>"anulado": true</code> y se lista con
       <code>GET /pedidos?estado=anulado</code>. <b>Conviene consultar ese listado en cada

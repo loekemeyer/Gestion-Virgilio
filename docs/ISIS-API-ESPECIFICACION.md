@@ -38,8 +38,7 @@ a ISIS:
 5. **Queda cerrado**, y ahí se publica en esta API con los códigos y las cantidades
    **definitivos**.
 6. **ISIS lo da de alta y lo factura.**
-7. **Nosotros vinculamos la factura con el pedido**, de nuestro lado. ISIS no tiene que
-   avisarnos nada.
+7. **Nosotros vinculamos la factura con el pedido**, de nuestro lado.
 
 Lo que ISIS recibe, entonces, no es un pedido a medio armar ni un informe de producción:
 es un **pedido**, con lo que realmente salió del depósito, listo para facturar.
@@ -54,9 +53,7 @@ es un **pedido**, con lo que realmente salió del depósito, listo para facturar
 | **Formato y campos** | los de hoy | **los mismos** |
 | **Cantidades y códigos** | los pedidos | los **realmente preparados** |
 
-O sea: para ISIS el pedido es el mismo tipo de documento de siempre, con los mismos
-campos. Cambia **cuándo** llega, **por dónde** llega, y que las cantidades ya vienen
-firmes.
+O sea: para ISIS el pedido es el mismo tipo de documento de siempre.
 
 ---
 
@@ -121,9 +118,9 @@ headers arbitrarios.
 
 - El token se entrega **por canal aparte** (no va en este documento).
 - Es un token de producción, de un solo consumidor (Sistemas ISIS).
-- Se puede revocar y reemplazar en cualquier momento sin tocar el servicio.
-- Del lado de Virgilio se guarda **sólo el hash SHA-256** del token: si se pierde,
-  no se recupera — se emite uno nuevo.
+- Se revoca y se reemplaza en cualquier momento sin tocar el servicio. Del lado de
+  Virgilio se guarda **sólo el hash SHA-256**, así que un token perdido no se recupera:
+  se emite otro.
 
 Sin token o con token inválido, cualquier endpoint responde **401**.
 
@@ -214,8 +211,6 @@ está andando y hoy resuelve la totalidad de las NP facturadas sin que ISIS haga
 Eso deja sin objeto el punto **P3** del informe ("cómo devuelve ISIS el número de NP
 cuando el pedido nace del otro lado"): no hace falta resolverlo, ni ahora ni después.
 
-Del lado de ISIS el trabajo es **sólo consumir los dos GET de la §4**.
-
 ---
 
 ## 6. Estructura del pedido
@@ -293,13 +288,9 @@ referencia y la empresa. **El pedido en sí (`pedido`) no lleva NP.**
 neto que calcula Virgilio con su lista de precios; sirve sólo para cotejar contra lo que
 emite ISIS. `m3` son los metros cúbicos, para logística.
 
-### Dos reglas importantes de lectura
-
-1. **El pedido no trae NP y no hay que buscarle una.** Se da de alta como se da de alta
-   hoy el pedido del mail: la NP la pone ISIS.
-2. **`cajas` y `cod_art` son lo preparado, y es lo único que viaja.** No hay campos de
-   "pedido original": si se preparó menos o se preparó un equivalente, la corrección ya
-   vino hecha. No hay nada que conciliar del lado de ISIS.
+> **Lo que no está, no falta.** No hay NP —se da de alta como se da de alta hoy el
+> pedido del mail— y no hay campos de "pedido original": si se preparó menos o se preparó
+> un equivalente, la corrección ya vino hecha. No hay nada que conciliar del lado de ISIS.
 
 Si algún campo que ISIS necesita no está en la lista de arriba, lo agregamos — avisando
 cuál, sale en el día.
@@ -324,7 +315,7 @@ cuál, sale en el día.
 ```
 
 - **`pendiente`** — listo para que ISIS lo baje.
-- **`entregado`** — ISIS ya lo bajó. Ahí termina: no hace falta confirmar nada.
+- **`entregado`** — ISIS ya lo bajó.
 - **`anulado`** — el pedido se dio de baja en Virgilio. Si eso pasa **después** de que
   ISIS lo bajó, aparece con `"anulado": true` y se puede listar con
   `GET /pedidos?estado=anulado`. **Conviene consultar ese listado en cada ciclo de
