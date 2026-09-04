@@ -233,6 +233,36 @@ nuevo, `gv_*`.
    `extra_discount`): la página los calcula al momento de la venta. Hay que ver cuáles
    ISIS realmente usa y cuáles se pueden mandar vacíos.
 
+### El contrato con ISIS quedó escrito — 2026-09-04
+
+`docs/ISIS-API-ESPECIFICACION.md` pasó a **v2.0** con este formato. La v1.0 decía lo
+contrario (ISIS bajaba "pedidos terminados" identificados por su NP, con `cajas_pedidas`
+vs `cajas` y `articulo` vs `articulo_pedido`) y quedó sin efecto. Lo que se conservó de la
+v1.0 es el **transporte**, que ya estaba acordado con Sistemas ISIS: ISIS consulta una API
+nuestra (Alternativa B del §11 de su informe), que es la que evita montar Windows Server /
+IIS / IP pública del lado del depósito. Cambió *qué* viaja, no *cómo*.
+
+Lo que agrega la v2.0:
+
+- El pedido se identifica por una **referencia nuestra** (`LK 1344`) en la URL y en el
+  acuse. Es la clave de la integración, **no viaja dentro del pedido** y no es una NP.
+- El cuerpo es `{referencia, empresa, …, pedido:{…formato de la página…}, control:{…}}`.
+  `pedido` **no lleva NP** y cada línea trae un solo `cod_art` y una sola cantidad `cajas`:
+  lo armado.
+- **El acuse devuelve la NP que asignó ISIS** (campo `np`, obligatorio cuando
+  `resultado="ok"`). Eso cierra el punto **P3** del informe, que estaba abierto.
+
+Artefactos: `docs/API-Virgilio-ISIS-v2.0.pdf` (lo que se le manda a Horacio) y su fuente
+`docs/API-Virgilio-ISIS-v2.0.fuente.html` — se regenera con
+`chromium --headless --print-to-pdf --no-pdf-header-footer`. El kit de envío (mail + PDF +
+WhatsApp con el token) está publicado como artifact y también se actualizó.
+
+⚠ **El código desplegado sigue en la v1.0.** El contrato va adelante; falta reescribir
+`isis_pedido_json`, traer los campos comerciales del `sheets_payload` de LK, cambiar la
+clave de `isis_export_pedidos` de NP a referencia (+ columna para la NP que devuelve ISIS)
+y reemplazar el disparador `Facturacion_NP` por el cierre del armado. Detalle en el anexo
+técnico de `docs/ISIS-API-ESPECIFICACION.md`.
+
 ---
 
 ## 4. Incidente de seguridad — 2026-09-04 (cerrado)

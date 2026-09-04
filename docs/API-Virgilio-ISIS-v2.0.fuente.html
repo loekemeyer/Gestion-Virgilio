@@ -1,0 +1,359 @@
+<!doctype html>
+<html lang="es"><head><meta charset="utf-8">
+<title>API Producción Virgilio → ISIS · v2.0</title>
+<style>
+  @page { size: A4; margin: 17mm 16mm 15mm; }
+  * { box-sizing: border-box; }
+  body {
+    font: 10pt/1.45 "DejaVu Sans", "Liberation Sans", Arial, sans-serif;
+    color: #16232a; margin: 0;
+  }
+  h1 { font-size: 19pt; margin: 0 0 2mm; letter-spacing: -.01em; line-height: 1.15; }
+  h2 {
+    font-size: 12.5pt; margin: 8mm 0 2.5mm; padding-bottom: 1.4mm;
+    border-bottom: 1.4pt solid #0d5a61; color: #0d5a61;
+    page-break-after: avoid;
+  }
+  h3 { font-size: 10.5pt; margin: 5mm 0 1.6mm; color: #10222a; page-break-after: avoid; }
+  p { margin: 0 0 2.4mm; }
+  ul, ol { margin: 0 0 2.6mm; padding-left: 5mm; }
+  li { margin-bottom: .9mm; }
+  .meta {
+    font-size: 8.6pt; color: #4a6470; border-bottom: .6pt solid #d2dcdb;
+    padding-bottom: 3mm; margin-bottom: 5mm;
+  }
+  .meta b { color: #16232a; }
+  code { font-family: "DejaVu Sans Mono", "Liberation Mono", monospace; font-size: 8.8pt; }
+  pre {
+    font-family: "DejaVu Sans Mono", "Liberation Mono", monospace; font-size: 8pt;
+    line-height: 1.42; background: #f3f7f6; border: .6pt solid #dbe6e4;
+    border-radius: 2mm; padding: 2.6mm 3mm; margin: 0 0 3mm;
+    white-space: pre-wrap; word-break: break-word; page-break-inside: avoid;
+  }
+  table { border-collapse: collapse; width: 100%; margin: 0 0 3.4mm; font-size: 8.8pt; page-break-inside: avoid; }
+  th, td { border: .6pt solid #cfdcda; padding: 1.5mm 2mm; text-align: left; vertical-align: top; }
+  th { background: #eaf1f0; font-weight: 600; }
+  td code, th code { font-size: 8.2pt; }
+  .call {
+    background: #f6faf9; border-left: 2.6pt solid #0d5a61; padding: 2.6mm 3.4mm;
+    margin: 0 0 3.4mm; page-break-inside: avoid;
+  }
+  .warn {
+    background: #fdf6e6; border-left: 2.6pt solid #c99a2e; padding: 2.6mm 3.4mm;
+    margin: 0 0 3.4mm; page-break-inside: avoid;
+  }
+  .lead { font-size: 10.4pt; }
+  .flow {
+    font-family: "DejaVu Sans Mono", monospace; font-size: 7.4pt; line-height: 1.35;
+    white-space: pre; background: #f3f7f6; border: .6pt solid #dbe6e4; border-radius: 2mm;
+    padding: 3mm; margin: 0 0 3.4mm; page-break-inside: avoid;
+  }
+  .brk { page-break-before: always; }
+  footer.f {
+    margin-top: 8mm; padding-top: 2.6mm; border-top: .6pt solid #d2dcdb;
+    font-size: 8pt; color: #7f959d;
+  }
+</style></head><body>
+
+<h1>API Producción Virgilio → ISIS<br>Pedidos armados</h1>
+<div class="meta">
+  <b>Cliente:</b> Loekemeyer Hnos. SRL &nbsp;·&nbsp; <b>Ticket ISIS:</b> 1159666<br>
+  <b>Documento:</b> respuesta al Punto 18 (“Próximos pasos Cliente”) del informe consolidado<br>
+  <b>Versión de la API:</b> 2.0 &nbsp;·&nbsp; <b>Fecha:</b> 04/09/2026
+</div>
+
+<p class="lead">Este documento contiene todo lo que pide el Punto 18 <b>menos el token</b>,
+que se envía por canal aparte (ver §3).</p>
+
+<h2>0. El circuito: ISIS recibe el pedido ya armado, como si fuera un pedido nuevo</h2>
+
+<p>El pedido se construye <b>entero</b> del lado de Virgilio: se toma, se planifica, se arma
+en el depósito (picking y control) y recién cuando está terminado se lo pasamos a ISIS. Lo
+que ISIS recibe no es un pedido a medio armar: son los códigos y las cantidades
+<b>definitivos</b>, listos para facturar.</p>
+
+<p>Para ISIS eso <b>no es un tipo de documento nuevo</b>. Entra por donde entran hoy los
+pedidos que exportan las páginas web de Loekemeyer y de Chef, con la misma estructura y los
+mismos campos. No hace falta desarrollar un consumidor especial ni un formato nuevo.</p>
+
+<div class="call">
+  <p style="margin-bottom:1.6mm"><b>Las tres reglas que gobiernan todo el resto del documento:</b></p>
+  <ol style="margin-bottom:0">
+    <li><b>El pedido va sin número de nota de pedido.</b> La NP la asigna ISIS al darlo de
+        alta, igual que con un pedido web. No mandamos NP nuestra dentro del pedido.</li>
+    <li><b>Cada línea trae un código y una cantidad: los realmente preparados.</b> No hay
+        “pedido vs. entregado”. Si el depósito preparó menos, o preparó un artículo
+        equivalente, el pedido ya sale corregido. Lo que ISIS recibe es lo que se factura.</li>
+    <li><b>Lo único que necesitamos de vuelta es la NP que ISIS le asignó</b> (§4.3).
+        Con eso se cierra el circuito y el pedido armado queda enlazado con su factura.</li>
+  </ol>
+</div>
+
+<p>El <b>transporte</b> es el que ya veníamos conversando: ISIS consulta una API nuestra
+(la Alternativa B del §11 del informe), porque es la que evita montar infraestructura del
+lado del depósito.</p>
+
+<h2>1. Infraestructura: no hace falta Windows Server, IIS, IP pública ni abrir puertos</h2>
+
+<p>El Punto 18 pide confirmar la infraestructura para “operar mediante API” y consultar la
+configuración de Windows Server / IIS / IP pública / puertos. Eso corresponde al escenario
+en el que <b>nosotros llamamos a la API del ISIS on-premise</b> (mensaje de Horacio Barbieri
+del 25/08). Se resuelve por el otro camino, el que plantea el §11 del propio informe y que
+ya está construido y andando:</p>
+
+<div class="call"><b>ISIS consulta una API nuestra.</b> El servicio corre en la nube, con
+HTTPS y certificado válido. ISIS hace requests <b>salientes</b> desde su red, con la
+frecuencia que quiera.</div>
+
+<table>
+  <tr><th style="width:52%">Requisito del Punto 18</th><th>Estado</th></tr>
+  <tr><td>Windows Server</td><td><b>No se necesita.</b> El servicio es cloud.</td></tr>
+  <tr><td>IIS</td><td><b>No se necesita.</b></td></tr>
+  <tr><td>IP pública fija del depósito</td><td><b>No se necesita.</b></td></tr>
+  <tr><td>Abrir puertos / firewall expuesto</td><td><b>No se necesita.</b> No se expone nada de la red del depósito.</td></tr>
+  <tr><td>Disponibilidad 24/7</td><td>La da la plataforma cloud, no un servidor del depósito.</td></tr>
+</table>
+
+<p>Del lado de ISIS sólo hace falta <b>salida HTTPS (puerto 443)</b> hacia el dominio del
+servicio.</p>
+
+<h2>2. URL del servicio</h2>
+<pre>https://hrxfctzncixxqmpfhskv.supabase.co/functions/v1/isis-api</pre>
+<p>De acá en más, <code>{BASE}</code> = esa URL. Todos los endpoints aceptan además el
+prefijo opcional <code>/v1</code> (<code>{BASE}/v1/pedidos</code> es lo mismo que
+<code>{BASE}/pedidos</code>).</p>
+<p>Healthcheck para probar conectividad y token:</p>
+<pre>curl -H "X-API-Key: &lt;TOKEN&gt;" {BASE}/ping
+
+{ "ok": true, "servicio": "Producción Virgilio — API pedidos armados",
+  "version": "2.0", "cliente": "Sistemas ISIS - producción",
+  "hora": "2026-09-04T14:07:21.137Z" }</pre>
+
+<h2>3. Credenciales</h2>
+<p>Autenticación por <b>token fijo</b> en el header <code>X-API-Key: &lt;TOKEN&gt;</code>.
+También se acepta <code>Authorization: Bearer &lt;TOKEN&gt;</code> para clientes que no
+permiten headers arbitrarios.</p>
+<ul>
+  <li>El token se entrega <b>por canal aparte</b> (no va en este documento).</li>
+  <li>Es un token de producción, de un solo consumidor (Sistemas ISIS).</li>
+  <li>Se puede revocar y reemplazar en cualquier momento sin tocar el servicio.</li>
+  <li>Del lado de Virgilio se guarda <b>sólo el hash SHA-256</b>: si se pierde, no se
+      recupera — se emite uno nuevo.</li>
+</ul>
+<p>Sin token o con token inválido, cualquier endpoint responde <b>401</b>.</p>
+
+<h2 class="brk">4. Endpoints</h2>
+
+<p>Los pedidos se identifican con una <b>referencia nuestra</b> (<code>referencia</code>),
+del estilo <code>LK 1344</code> o <code>CH 812</code>. Es sólo la clave para bajar y acusar
+un pedido: <b>no es una NP de ISIS ni pretende serlo</b>, y no viaja dentro del cuerpo del
+pedido. La NP la pone ISIS.</p>
+
+<h3>4.1 &nbsp;GET {BASE}/pedidos — listado de pedidos armados</h3>
+<p>Devuelve las <b>cabeceras</b> de los pedidos en un estado dado. Es el endpoint de
+polling: ISIS lo llama cada N minutos y se lleva los que están en <code>pendiente</code>.</p>
+<table>
+  <tr><th>Parámetro</th><th>Default</th><th>Valores</th></tr>
+  <tr><td><code>estado</code></td><td><code>pendiente</code></td><td><code>pendiente</code>, <code>entregado</code>, <code>procesado</code>, <code>error</code>, <code>anulado</code></td></tr>
+  <tr><td><code>empresa</code></td><td>(todas)</td><td><code>LK</code> (Loekemeyer) o <code>CH</code> (Chef)</td></tr>
+  <tr><td><code>desde</code></td><td>(sin filtro)</td><td>fecha/hora ISO-8601; devuelve lo terminado desde ese momento</td></tr>
+  <tr><td><code>limit</code></td><td><code>100</code></td><td>1 a 500</td></tr>
+</table>
+<pre>curl -H "X-API-Key: &lt;TOKEN&gt;" "{BASE}/pedidos?estado=pendiente&amp;limit=50"
+
+{ "ok": true, "estado": "pendiente", "total": 1,
+  "pedidos": [
+    { "referencia": "LK 1344", "empresa": "LK", "estado": "pendiente",
+      "cod_cliente": "288", "razon_social": "MEGA BAZAR S.A.",
+      "fecha_entrega": "2026-09-04",
+      "terminado_en": "2026-09-03T16:35:20-03:00",
+      "items": 14, "cajas": 25 }
+  ] }</pre>
+
+<h3>4.2 &nbsp;GET {BASE}/pedidos/{referencia} — el pedido completo</h3>
+<p>Devuelve el pedido en el formato de la §5, listo para darlo de alta. <b>Al responder, el
+pedido pasa de <code>pendiente</code> a <code>entregado</code></b> (queda registrado que ISIS
+lo bajó). Para consultarlo sin cambiar el estado: <code>?marcar=false</code>.</p>
+<pre>curl -H "X-API-Key: &lt;TOKEN&gt;" "{BASE}/pedidos/LK%201344"</pre>
+
+<h3>4.3 &nbsp;POST {BASE}/pedidos/{referencia}/acuse — confirmación de ISIS</h3>
+<p>ISIS avisa qué hizo con el pedido. Es lo que cierra el circuito, lo que <b>evita darlo de
+alta dos veces</b>, y lo que nos devuelve el número de NP.</p>
+<pre>curl -X POST "{BASE}/pedidos/LK%201344/acuse" \
+     -H "X-API-Key: &lt;TOKEN&gt;" -H "Content-Type: application/json" \
+     -d '{"resultado":"ok","np":"98213",
+          "nro_comprobante":"0004-00012345","cae":"75123456789012"}'</pre>
+<table>
+  <tr><th>Campo</th><th>Tipo</th><th>Oblig.</th><th>Descripción</th></tr>
+  <tr><td><code>resultado</code></td><td><code>"ok"</code> | <code>"error"</code></td><td>sí</td><td>Si el pedido se dio de alta / facturó, o si falló</td></tr>
+  <tr><td><code>np</code></td><td>string | entero</td><td><b>sí si <code>ok</code></b></td><td><b>Número de nota de pedido que ISIS le asignó</b></td></tr>
+  <tr><td><code>nro_comprobante</code></td><td>string</td><td>no</td><td>Nº de comprobante emitido (ej. <code>0004-00012345</code>)</td></tr>
+  <tr><td><code>cae</code></td><td>string</td><td>no</td><td>CAE de AFIP</td></tr>
+  <tr><td><code>error_detalle</code></td><td>string</td><td>no</td><td>Motivo, cuando <code>resultado = "error"</code></td></tr>
+</table>
+<pre>{ "referencia": "LK 1344", "np": "98213", "ok": true,
+  "estado": "procesado", "duplicado": false }</pre>
+<p>Si esa referencia <b>ya tenía un acuse OK</b>, no se pisa nada y se devuelve la NP y el
+comprobante ya registrados (<code>"duplicado": true</code>). El acuse es idempotente:
+reintentarlo es seguro. Variante con la referencia en el cuerpo, para clientes que no arman
+URLs dinámicas: <code>POST {BASE}/acuse</code> con
+<code>{"referencia":"LK 1344","resultado":"ok","np":"98213", …}</code>.</p>
+
+<h3>4.4 &nbsp;Errores</h3>
+<pre>{ "ok": false, "codigo": "token_invalido", "error": "Token inválido o dado de baja." }</pre>
+<table>
+  <tr><th>HTTP</th><th>codigo</th><th>Cuándo</th></tr>
+  <tr><td>401</td><td><code>sin_token</code> / <code>token_invalido</code></td><td>Falta el header o el token no sirve</td></tr>
+  <tr><td>400</td><td><code>referencia_invalida</code>, <code>estado_invalido</code>, <code>resultado_invalido</code>, <code>json_invalido</code>, <code>falta_np</code></td><td>Parámetros mal</td></tr>
+  <tr><td>404</td><td><code>no_encontrado</code></td><td>La referencia no está publicada</td></tr>
+  <tr><td>404</td><td><code>ruta_desconocida</code></td><td>URL mal escrita</td></tr>
+  <tr><td>500/503</td><td><code>error_interno</code> / <code>backend</code></td><td>Error del servicio — reintentar</td></tr>
+</table>
+
+<h2 class="brk">5. Estructura del pedido</h2>
+<p>Es la misma estructura con la que entran hoy los pedidos de las páginas web, más un sobre
+con la referencia y la empresa. <b>El pedido en sí (<code>pedido</code>) no lleva NP.</b></p>
+<pre>{
+  "referencia": "LK 1344",
+  "empresa": "LK",
+  "estado_integracion": "entregado",
+  "terminado_en": "2026-09-03T16:35:20-03:00",
+  "fecha_entrega": "2026-09-04",
+  "pedido": {
+    "source": "Virgilio",
+    "cod_cliente": "288",
+    "sucursal_entrega": "Rivadavia 3663 - Mar Del Plata",
+    "vend": "7",
+    "condicion_pago": "Pago Contado: 25% Dto",
+    "condicion_pago_code": 8,
+    "payment_term": 2,
+    "observaciones": "",
+    "items": [
+      { "cod_art": "321", "cajas": 6, "uxb": 12 }
+    ]
+  },
+  "control": {
+    "items": 14, "cajas": 25, "m3": 0.142,
+    "neto_estimado": 775560.24, "moneda": "ARS",
+    "nota": "Informativo, sólo para control. El importe a facturar lo
+             determina ISIS con su lista de precios."
+  }
+}</pre>
+
+<h3>Sobre (uso de la integración, no del pedido)</h3>
+<table>
+  <tr><th style="width:26%">Campo</th><th style="width:20%">Tipo</th><th>Descripción</th></tr>
+  <tr><td><code>referencia</code></td><td>string</td><td>Clave del pedido en esta API (<code>LK 1344</code>). Se usa en la URL y en el acuse. <b>No es una NP.</b></td></tr>
+  <tr><td><code>empresa</code></td><td><code>"LK"</code> | <code>"CH"</code></td><td>Razón social del pedido — las dos que contempla el §14 del informe.</td></tr>
+  <tr><td><code>estado_integracion</code></td><td>string</td><td><code>pendiente</code>, <code>entregado</code>, <code>procesado</code>, <code>error</code>, <code>anulado</code>.</td></tr>
+  <tr><td><code>terminado_en</code></td><td>ISO-8601 <code>-03:00</code></td><td>Momento en que el pedido quedó armado y cerrado.</td></tr>
+  <tr><td><code>fecha_entrega</code></td><td><code>YYYY-MM-DD</code></td><td>Fecha de salida prevista del camión.</td></tr>
+  <tr><td><code>anulado</code></td><td>booleano</td><td>Aparece <b>sólo</b> si el pedido se dio de baja después de publicarse (§6).</td></tr>
+</table>
+
+<h3>pedido — el pedido propiamente dicho, en formato de pedido web</h3>
+<table>
+  <tr><th style="width:26%">Campo</th><th style="width:20%">Tipo</th><th>Descripción</th></tr>
+  <tr><td><code>source</code></td><td>string</td><td>Origen del pedido. Siempre <code>"Virgilio"</code>.</td></tr>
+  <tr><td><code>cod_cliente</code></td><td>string</td><td>Código de cliente en ISIS.</td></tr>
+  <tr><td><code>sucursal_entrega</code></td><td>string</td><td>Domicilio de entrega elegido.</td></tr>
+  <tr><td><code>vend</code></td><td>string</td><td>Código de vendedor.</td></tr>
+  <tr><td><code>condicion_pago</code></td><td>string</td><td>Condición de pago, en texto, tal como la muestran las páginas.</td></tr>
+  <tr><td><code>condicion_pago_code</code></td><td>entero</td><td>Código de la condición de pago.</td></tr>
+  <tr><td><code>payment_term</code></td><td>entero</td><td>Plazo de pago.</td></tr>
+  <tr><td><code>observaciones</code></td><td>string</td><td>Observaciones del pedido (puede ir vacío).</td></tr>
+  <tr><td><code>items[]</code></td><td>array</td><td>Las líneas. Ver abajo.</td></tr>
+</table>
+
+<h3>pedido.items[]</h3>
+<table>
+  <tr><th style="width:26%">Campo</th><th style="width:20%">Tipo</th><th>Descripción</th></tr>
+  <tr><td><code>cod_art</code></td><td>string</td><td>Código de artículo <b>realmente preparado</b>. Es el que se factura.</td></tr>
+  <tr><td><code>cajas</code></td><td>entero</td><td>Cajas <b>realmente preparadas</b>. Es lo que se factura.</td></tr>
+  <tr><td><code>uxb</code></td><td>entero</td><td>Unidades por caja del artículo.</td></tr>
+</table>
+
+<p><code>control</code> es <b>informativo</b> y no forma parte del pedido.
+<code>neto_estimado</code> es el neto que calcula Virgilio con su lista de precios; sirve
+sólo para cotejar contra lo que emite ISIS. <code>m3</code> son los metros cúbicos, para
+logística.</p>
+
+<div class="warn">
+  <p style="margin-bottom:1.6mm"><b>Tres reglas importantes de lectura</b></p>
+  <ol style="margin-bottom:0">
+    <li><b>El pedido no trae NP y no hay que buscarle una.</b> Se da de alta como un pedido
+        nuevo y la NP la asigna ISIS. Esa NP vuelve por el acuse (§4.3).</li>
+    <li><b><code>cajas</code> y <code>cod_art</code> son lo preparado, y es lo único que
+        viaja.</b> No hay campos de “pedido original”: si se preparó menos o se preparó un
+        equivalente, la corrección ya vino hecha. No hay nada que conciliar del lado de ISIS.</li>
+    <li><b>Un pedido aparece en la API recién cuando está armado y cerrado.</b> No hay
+        pedidos a medio armar en esta API.</li>
+  </ol>
+</div>
+
+<h2>6. Ciclo de vida de un pedido</h2>
+<div class="flow">        el pedido queda armado y cerrado en Virgilio
+                 |
+                 v
+          +-------------+  GET /pedidos/{ref}   +------------+
+          |  pendiente  | --------------------> | entregado  |
+          +-------------+                       +------------+
+                 |                                     |
+                 | se da de baja en Virgilio           | POST .../acuse  (trae la NP)
+                 v                                     v
+          +-------------+                     +-------------------+
+          |   anulado   |                     | procesado | error |
+          +-------------+                     +-------------------+</div>
+<ul>
+  <li><b>pendiente</b> — listo para que ISIS lo baje.</li>
+  <li><b>entregado</b> — ISIS ya lo bajó, todavía sin acusar.</li>
+  <li><b>procesado</b> — ISIS lo dio de alta y facturó; quedó registrada la NP asignada.</li>
+  <li><b>error</b> — ISIS no pudo procesarlo; queda registrado el motivo.</li>
+  <li><b>anulado</b> — el pedido se dio de baja en Virgilio. Si eso pasa <b>después</b> de
+      que ISIS lo bajó, conserva su estado pero aparece con <code>"anulado": true</code> y se
+      lista con <code>GET /pedidos?estado=anulado</code>. <b>Conviene consultar ese listado en
+      cada ciclo de polling</b>, para no facturar algo dado de baja.</li>
+</ul>
+
+<h3>Polling sugerido</h3>
+<ol>
+  <li><code>GET /pedidos?estado=pendiente</code> cada 5 a 15 minutos.</li>
+  <li>Por cada referencia: <code>GET /pedidos/{referencia}</code>, dar de alta el pedido y facturarlo.</li>
+  <li><code>POST /pedidos/{referencia}/acuse</code> con el resultado y <b>con la NP asignada</b> (siempre, también en error).</li>
+  <li><code>GET /pedidos?estado=anulado</code> para detectar bajas.</li>
+</ol>
+<p>Reintentos: todos los endpoints son seguros de reintentar. El acuse no duplica.</p>
+
+<h2>7. Trazabilidad</h2>
+<p>Del lado de Virgilio queda registrado, por referencia: cuándo se terminó de armar, cuándo
+lo bajó ISIS y cuántas veces, el JSON exacto que se entregó, y el acuse (NP asignada,
+resultado, número de comprobante, CAE o error). Además se loguea cada request de la API
+(método, ruta, referencia, código HTTP, tiempo de respuesta). Es lo que pide el §18 del
+informe.</p>
+
+<h2>8. Lo que falta confirmar del lado de ISIS</h2>
+<ol>
+  <li><b>La estructura exacta de un pedido web.</b> Como el pedido tiene que entrar igual que
+      uno de las páginas, necesitamos que ISIS confirme el formato que recibe hoy: qué campos
+      son obligatorios, cuáles opcionales, y el dominio de la condición de pago. El de la §5
+      es el que tenemos relevado; si falta algo, lo agregamos.</li>
+  <li><b>Un pedido de Virgilio, ¿es un pedido de ISIS?</b> Si un pedido armado se factura
+      siempre en un solo comprobante, la referencia mapea 1 a 1 contra la NP. Si ISIS puede
+      partirlo, el acuse tiene que poder traer más de una NP.</li>
+  <li><b>P4 — Recepción de mercadería (remitos de compra).</b> Requiere definir el mapeo de
+      códigos de proveedor y de artículo entre los dos sistemas.</li>
+  <li><b>Cutover de la emisión.</b> Hoy Producción Virgilio emite Factura A por punto de venta
+      11. Cuando ISIS empiece a facturar estos pedidos hay que <b>apagar la emisión propia el
+      mismo día</b>, para no pedir dos CAE por la misma venta. Definir fecha y si el PV 11
+      queda de respaldo.</li>
+</ol>
+
+<div class="call"><b>P3 queda resuelto.</b> El informe lo dejaba abierto (“cómo devuelve ISIS
+el número de NP cuando el pedido nace del otro lado”). Con este esquema no necesita
+desarrollo aparte: la NP viaja en el campo <code>np</code> del acuse.</div>
+
+<footer class="f">
+  Loekemeyer Hnos. SRL · Producción Virgilio · API v2.0 · Ticket ISIS 1159666 · 04/09/2026
+</footer>
+
+</body></html>
