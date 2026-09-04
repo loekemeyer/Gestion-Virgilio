@@ -8436,19 +8436,25 @@ lee **la misma tabla donde caen los pedidos de la página**, en vivo.
   - Escritura con la **misma reja** que la PPP: los tres mails de supervisor, por
     RLS del lado del servidor. Las dos listas están duplicadas a mano — al sumar
     un supervisor hay que tocar las dos policies.
+  - **La localidad sale del PADRÓN, no de parsear la dirección** (v12.73).
+    `customer_delivery_addresses.localidad` es una columna propia de LK, y
+    `sheets_payload.sucursal_entrega` es el **`label`** de esa tabla — por ahí se
+    cruzan. Es el mismo criterio que la PPP de Producción, donde el barrio viene en
+    su columna (`PPP_Programacion_Diaria.barrio`) y la dirección es sólo el
+    fallback: `localidad: (barrio || direccion)`.
+    Medido: **164 de las 180 sucursales** pedidas en 30 días resuelven por el
+    padrón, y **312 de 350 NP** traen localidad. De las que no: 10 son "Retira"
+    (no tiene dirección) y el resto etiquetas sueltas.
+    ⚠ La v12.61–v12.72 lo sacaba **partiendo el string de la dirección**. Era una
+    invención y fallaba en la mitad de los casos. El parseo queda sólo como
+    **último recurso** — para Retira, etiquetas sueltas y **Chef**, cuya RPC
+    todavía no devuelve la columna.
   - La **zona se sugiere** con el mismo diccionario compartido que usa la PPP
-    (`Zonas_Barrios` + overrides, vía `pppZonaDeBarrio`), así una zona corregida
-    en un lado vale en el otro. El barrio sale de la sucursal de entrega cortando
-    por el **último guión, con o sin espacios** (v12.72); "Retira" en cualquier
-    grafía se reconoce como tal.
-    ⚠ Antes se exigía espacio a los dos lados y **el padrón real no lo respeta**:
-    `1737-Palermo`, `2579- Constitucion`, `Krausse5108-Tortuguita` quedaban sin
-    cortar, la dirección entera pasaba por barrio y la zona no resolvía nunca —
-    295 NP salían "sin zona". Medido sobre las 171 sucursales distintas: de 163
-    "barrios" basura a **123 reales, 37 con zona** en el diccionario.
-    Los otros 86 son del **interior** (Córdoba, Rosario, Bahía Blanca, Mendoza…) y
-    **no tienen zona a propósito**: el esquema de zonas es de CABA/GBA. Esos se
-    resuelven a mano o por expreso, no hay nada que arreglar ahí.
+    (`Zonas_Barrios` + overrides, vía `pppZonaDeBarrio`), así una zona corregida en
+    un lado vale en el otro. Si la localidad no está en el diccionario, queda vacía
+    y la elige la persona: las del **interior** (Córdoba, Rosario, Bahía Blanca,
+    Mendoza…) **no tienen zona a propósito** — el esquema es de CABA/GBA y esas van
+    por expreso.
   - ⚠ **Los pedidos web NO entran al panel de "revisar/corregir en el Excel"**
     (v12.72). No salen de ningún Excel, y con 295 avisos el panel dejaba de servir
     para lo suyo, que es detectar errores de carga de la PPP de ISIS.

@@ -16,21 +16,21 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
 // ---- datos REALES (v_pedidos_web_np de LK, 03/09) ----
 const NPS = [
   { empresa:"lk", order_id:1342, np_idx:1, cod:"4109", razon_social:"Di Leo Rossi Echarri Pedro SH",
-    fecha_recep:"2026-09-03", hora_recep:"16:03:54", direccion:"Bragado 5742 - Mataderos", v:"21",
+    fecha_recep:"2026-09-03", hora_recep:"16:03:54", direccion:"Bragado 5742 - Mataderos", localidad:"Mataderos", v:"21",
     lineas:15, cajas:84, enviado_a_compras:false, items:[
     {art:"027",cajas:1,uxb:24},{art:"220",cajas:2,uxb:12},{art:"224",cajas:1,uxb:12},{art:"438E",cajas:1,uxb:24},
     {art:"501",cajas:15,uxb:6},{art:"505",cajas:25,uxb:12},{art:"506",cajas:5,uxb:12},{art:"513",cajas:6,uxb:12},
     {art:"521",cajas:2,uxb:12},{art:"529E",cajas:12,uxb:12},{art:"544",cajas:1,uxb:12},{art:"586",cajas:5,uxb:12},
     {art:"587",cajas:2,uxb:12},{art:"811E",cajas:1,uxb:12},{art:"816E",cajas:5,uxb:12}] },
   { empresa:"lk", order_id:1341, np_idx:1, cod:"4188", razon_social:"Orfali Alfredo Luciano",
-    fecha_recep:"2026-09-03", hora_recep:"15:46:51", direccion:"Juncal 2869 - Martinez", v:"7",
+    fecha_recep:"2026-09-03", hora_recep:"15:46:51", direccion:"Juncal 2869 - Martinez", localidad:"Martinez", v:"7",
     lineas:15, cajas:358, enviado_a_compras:false, items:[
     {art:"031",cajas:10,uxb:24},{art:"280",cajas:10,uxb:12},{art:"315",cajas:10,uxb:12},{art:"502",cajas:15,uxb:12},
     {art:"505",cajas:150,uxb:12},{art:"506",cajas:20,uxb:12},{art:"521",cajas:3,uxb:12},{art:"530",cajas:4,uxb:12},
     {art:"574E",cajas:25,uxb:12},{art:"580",cajas:15,uxb:12},{art:"586",cajas:50,uxb:12},{art:"598E",cajas:25,uxb:12},
     {art:"599E",cajas:3,uxb:12},{art:"811E",cajas:3,uxb:12},{art:"816E",cajas:15,uxb:12}] },
   { empresa:"lk", order_id:1340, np_idx:1, cod:"4210", razon_social:"Garbarino Franco Tomas",
-    fecha_recep:"2026-09-03", hora_recep:"15:11:17", direccion:"Retira", v:"21",
+    fecha_recep:"2026-09-03", hora_recep:"15:11:17", direccion:"Retira", localidad:null, v:"21",
     lineas:2, cajas:5, enviado_a_compras:false, items:[{art:"404E",cajas:4,uxb:4},{art:"984E",cajas:1,uxb:12}] }
 ];
 // m³ reales de Volumen_Articulos

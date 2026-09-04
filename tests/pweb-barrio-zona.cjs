@@ -1,5 +1,13 @@
-/* Regresión (v12.72): el barrio de un pedido web sale de la sucursal de entrega
-   cortando por el ÚLTIMO guión, con o sin espacios alrededor.
+/* Regresión (v12.72/73): de dónde sale la LOCALIDAD de un pedido web.
+
+   Sale del PADRÓN de LK (`customer_delivery_addresses.localidad`), que es una
+   columna propia — mismo criterio que la PPP de Producción, donde el barrio viene
+   en su columna y la dirección es sólo el fallback. Partir el string de la
+   dirección era una invención, y queda como ÚLTIMO RECURSO (Retira, etiquetas
+   sueltas y Chef, cuya RPC todavía no trae la columna).
+
+   El fallback igual tiene que cortar bien: por el ÚLTIMO guión, con o sin
+   espacios alrededor.
 
    Antes se exigía espacio a los dos lados y el padrón real no lo respeta:
    "1737-Palermo", "2579- Constitucion", "Krausse5108-Tortuguita" quedaban sin
@@ -40,19 +48,26 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
       retira:        pwebBarrioDe("Retira en depósito"),
       vacio:         pwebBarrioDe("")
     };
+    // La localidad del padrón MANDA sobre lo que diga la dirección.
+    const padron = {
+      // el padrón dice Colegiales aunque la dirección diga otra cosa
+      mandaPadron:  pwebLocalidad({ localidad: "Colegiales", direccion: "Av Falsa 1 - Mataderos" }),
+      // sin padrón, se cae al parseo
+      fallback:     pwebLocalidad({ localidad: "",           direccion: "Federico Lacroze 1737-Palermo" }),
+      fallbackNull: pwebLocalidad({ direccion: "Cochabamba 2579- Constitucion" })
+    };
     const zonas = {
-      palermo:     pwebZonaSugerida("Federico Lacroze 1737-Palermo"),
-      constitucion:pwebZonaSugerida("Cochabamba 2579- Constitucion"),
-      quilmes:     pwebZonaSugerida("Madres Pza Mayo 949- Quilmes"),
-      interior:    pwebZonaSugerida("Rancagua 4650- Cordoba"),   // interior: sin zona, y está bien
-      retira:      pwebZonaSugerida("Virgilio 2788 - Retira")
+      dePadron:    pwebZonaSugerida({ localidad: "Quilmes", direccion: "Av Falsa 1 - Mataderos" }),
+      deFallback:  pwebZonaSugerida({ direccion: "Federico Lacroze 1737-Palermo" }),
+      interior:    pwebZonaSugerida({ localidad: "Cordoba" }),   // interior: sin zona, y está bien
+      retira:      pwebZonaSugerida({ direccion: "Virgilio 2788 - Retira" })
     };
     // El panel de errores del Excel no tiene que ver los pedidos web.
     const info = _pppComputeErrors([
       { np: "LK 1343", _web: true,  localidad: "Cordoba", zona: "", programmed: false },
       { np: "98500",   _web: false, localidad: "Pueblo Ignoto", zona: "", programmed: false }
     ], new Set());
-    return { casos, zonas, sinZonaEnPanel: (info.sinZona || []).map(x => x.np) };
+    return { casos, padron, zonas, sinZonaEnPanel: (info.sinZona || []).map(x => x.np) };
   });
 
   const c = r.casos, z = r.zonas;
@@ -60,8 +75,10 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
     && c.espacioAmbos === "Mataderos" && c.sinEspacioNum === "Tortuguita"
     && c.dosGuiones === "G. de Laferrere" && c.barras === "Flores"
     && c.sinGuion === "Rio Cuarto" && c.retira === "Retira" && c.vacio === ""
-    && z.palermo === "Zona 2 - CABA Centro" && z.constitucion === "Zona 1 - CABA Sur"
-    && z.quilmes === "Zona 4 - GBA Sur" && z.interior === "" && z.retira === "Retira"
+    && r.padron.mandaPadron === "Colegiales" && r.padron.fallback === "Palermo"
+    && r.padron.fallbackNull === "Constitucion"
+    && z.dePadron === "Zona 4 - GBA Sur"        // gana el padrón (Quilmes), no la dirección (Mataderos)
+    && z.deFallback === "Zona 2 - CABA Centro" && z.interior === "" && z.retira === "Retira"
     && r.sinZonaEnPanel.length === 1 && r.sinZonaEnPanel[0] === "98500";
 
   console.log("pweb-barrio-zona:", JSON.stringify(r), "· pageerrors:", errs.length ? errs.join("|") : "none", "·", (ok && !errs.length) ? "✓ OK" : "✗ FAIL");

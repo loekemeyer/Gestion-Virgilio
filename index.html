@@ -6607,7 +6607,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v12.72";
+const APP_VERSION = "v12.73";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -25213,7 +25213,7 @@ async function pppTraerPedidosWeb(empresa) {
   } else {
     const desde = new Date(Date.now() - PWEB_VENTANA_DIAS * 86400000).toISOString().slice(0, 10);
     const r = await fetch(PWEB_LK_URL + "/rest/v1/v_pedidos_web_np"
-      + "?select=empresa,order_id,np_idx,cod,razon_social,fecha_recep,hora_recep,direccion,v,lineas,cajas,items,enviado_a_compras"
+      + "?select=empresa,order_id,np_idx,cod,razon_social,fecha_recep,hora_recep,direccion,v,lineas,cajas,items,enviado_a_compras,localidad"
       + "&fecha_recep=gte." + desde + "&order=order_id.asc,np_idx.asc&limit=5000",
       { headers: { apikey: PWEB_LK_ANON, Authorization: "Bearer " + tok } });
     if (!r.ok) throw new Error("LK respondió " + r.status);
@@ -25241,9 +25241,9 @@ async function pppTraerPedidosWeb(empresa) {
       tanda: tanda || "—", tipo: "", fecha: n.fecha_recep || "",
       cod: n.cod || "", razon_social: n.razon_social || "",
       m3: Number(m3.toFixed(3)),
-      localidad: pwebBarrioDe(n.direccion),
+      localidad: pwebLocalidad(n),
       fecha_entrega: g.fecha_entrega || "",
-      zona: g.zona || pwebZonaSugerida(n.direccion),
+      zona: g.zona || pwebZonaSugerida(n),
       programmed: !!tanda,
       // Lo necesario para guardar después, sin volver a pedirle nada a LK.
       _web: true, _wEmp: n.empresa || emp, _wOrder: n.order_id, _wIdx: n.np_idx,
@@ -25310,14 +25310,33 @@ function pwebBarrioDe(suc) {
   return (i > 0 ? t.slice(i + 1) : t).trim();
 }
 
+/* La localidad de un pedido web sale del PADRÓN DE DIRECCIONES de LK
+   (`customer_delivery_addresses.localidad`), que es una columna propia — no se
+   deduce del texto de la dirección.
+
+   Es el mismo criterio que la PPP de Producción, donde el barrio viene en su
+   columna (`PPP_Programacion_Diaria.barrio`) y la dirección es sólo el fallback:
+   `localidad: (barrio || direccion)`.
+
+   Antes esto se sacaba partiendo el string de la sucursal, que era una invención
+   mía y fallaba en la mitad de los casos. Medido sobre las 180 sucursales pedidas
+   en 30 días: **164 resuelven por el padrón**; de las 16 que no, 10 son "Retira"
+   —que no tiene dirección— y el resto son etiquetas sueltas. El parseo queda como
+   ÚLTIMO RECURSO, para esas y para Chef, cuya RPC todavía no devuelve la columna. */
+function pwebLocalidad(n) {
+  const l = String((n && n.localidad) || "").trim();
+  if (l) return l;
+  return pwebBarrioDe(n && n.direccion);
+}
+
 /* La zona NO se inventa acá: se resuelve con el MISMO diccionario compartido que
    usa la PPP (Zonas_Barrios + overrides), así una zona corregida en un lado vale
-   en el otro. Si el barrio no está en el diccionario devuelve vacío y lo elige
-   la persona. */
-function pwebZonaSugerida(suc) {
-  const b = pwebBarrioDe(suc);
+   en el otro. Si la localidad no está en el diccionario devuelve vacío y la elige
+   la persona — las del interior directamente no tienen zona. */
+function pwebZonaSugerida(n) {
+  const b = (typeof n === "string") ? pwebBarrioDe(n) : pwebLocalidad(n);
   if (!b) return "";
-  if (b === "Retira") return "Retira";
+  if (/retir/i.test(b)) return "Retira";
   return pppZonaDeBarrio(b) || "";
 }
 
