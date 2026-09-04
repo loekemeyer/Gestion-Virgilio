@@ -126,6 +126,56 @@ donde hay que mostrar la fecha ya es la pantalla manual.
    es la comprometida. Es un aviso más de los de `gv_ppp_web_tanda_avisos`, no un bloqueo.
 4. **Cross-repo:** los puntos 1 y 2 son de `PaginaLK` / Chef. El 3 es de este repo.
 
+### ⚡ Los puntos 1 y 2 ya están resueltos — la integración Krikos (2026-09-04)
+
+El *"bot la parsea tal vez"* de la nota **existe y ya está construido**, en la rama
+`claude/krikos-lk-integration-064xyz` del repo `pagina-LK-copia` (pusheada, **sin
+mergear**). Commits `a3f65d7` · `fdc204d` · `4bd08b2`.
+
+| pieza (proyecto **LK**) | qué hace |
+|---|---|
+| Edge Fn `krikos-ingest` + cron `krikos-ingest-10min` | lee `ventas@loekemeyer.com` por IMAP, engancha los mails de `noreply@planexware.com` *"Notificación de recepción de Orden de Compra"*, baja el PDF del link firmado y lo deja en el bucket `krikos-oc` |
+| tabla `krikos_oc_inbox` | por OC: cadena, GLN, sucursal, dirección, nro_documento, `fecha_emision`, **`fecha_entrega`** (texto `dd/mm/yyyy`, a veces con hora), `fecha_cancelacion`, link, estado (pendiente/cargado/descartado/error), `order_id` cuando se cargó |
+| panel admin → PDF Krikos → **Bandeja Krikos** | abre la OC en una card; al subir el pedido marca la fila como cargada con su `order_id` |
+| `orders.sheets_payload.fecha_entrega` | **acá viaja la fecha**, más `fecha_entrega_origen` (`"Krikos"` \| `"PDF"`) |
+
+Antes sólo se parseaba `due_date`, que es el **vencimiento de cobro**, no la entrega.
+Archivos: `sql/krikos_oc_inbox.sql`, `supabase/functions/krikos-ingest/index.ts`,
+`admin-supercot.js` (Bandeja Krikos + `deliveryDate`), sección "Integración Krikos" del
+`CLAUDE.md` de LK.
+
+**Estado medido el 2026-09-04 (no supuesto):**
+
+| | |
+|---|---|
+| `krikos_oc_inbox` en LK | ✅ existe, 24 columnas |
+| `sync_pedidos_match_virgilio()` en LK | ✅ existe |
+| pedidos con `sheets_payload.fecha_entrega` | **0 de 1.025** con payload |
+| `lk_pedidos_match.fecha_entrega` en Virgilio | ❌ **no existe** (14 columnas, sin ella) |
+
+O sea: la cañería está escrita pero **todavía no corre**. Falta cargar
+`KRIKOS_IMAP_PASS` en el Vault de LK y **mergear la rama a main**.
+
+**Lo que hay que hacer del lado Virgilio, en orden:**
+
+1. **Agregar `fecha_entrega date`** —y opcionalmente `fecha_entrega_txt text` para
+   conservar la hora— a `public.lk_pedidos_match`. El DDL canónico vive en
+   `sql/lk_pedidos_match.sql` **del repo `Produccion-Virgilio`**, que no está adjunto en
+   esta sesión: si se agrega la columna sin tocar ese archivo, el repo queda mintiendo.
+   ⚠ La columna **no lleva prefijo `gv_`**: no es de Gestión. `lk_pedidos_match` es la
+   tabla espejo que **LK** escribe y **Producción** lee; Gestión acá no es dueña de nada.
+2. **Del lado LK** (después de la columna): `v_pedidos_match` expone
+   `sheets_payload->>'fecha_entrega'` y `sync_pedidos_match_virgilio()` la copia por el
+   FDW `virgilio_db`. El rol `lk_ppp_reader` ya tiene INSERT/UPDATE/DELETE sobre esa tabla,
+   así que no hace falta ningún grant nuevo.
+3. **Consumirla** en la PPP / planificación de entregas de Producción.
+4. **Y recién ahí, en Gestión:** el punto 3 de arriba — mostrarla en la tarjeta de "A
+   Programar", ordenar por ella y avisar si la tanda se programa para otra fecha.
+
+⚠ **El orden importa:** agregar la columna hoy no rompe nada (nullable, sin default, sin
+backfill → Producción no la ve), pero tampoco sirve hasta que la rama de LK esté mergeada
+y el Vault cargado. Hoy viajarían 0 fechas.
+
 ---
 
 ## Gestión Virgilio

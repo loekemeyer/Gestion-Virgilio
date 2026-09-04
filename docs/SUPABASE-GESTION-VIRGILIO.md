@@ -1051,6 +1051,36 @@ cubre**.
 
 ---
 
+## 4.b Integración Krikos — contexto que llega de LK, 2026-09-04
+
+Nota de la sesión de LK, anotada acá porque **toca este proyecto Supabase** y porque es
+justo el pendiente **9357** (la fecha de entrega de los súperes).
+
+Del lado LK está construido —rama `claude/krikos-lk-integration-064xyz` de
+`pagina-LK-copia`, pusheada y **sin mergear**— un ingest por IMAP que lee las
+notificaciones de OC de Planexware, baja el PDF y guarda la **fecha de entrega** en
+`krikos_oc_inbox`; de ahí viaja en `orders.sheets_payload.fecha_entrega` (+
+`fecha_entrega_origen`). Antes sólo se parseaba `due_date`, que es vencimiento de cobro.
+
+**Lo que se pide de este lado:** agregar `fecha_entrega date` (y opcional
+`fecha_entrega_txt text`) a **`public.lk_pedidos_match`**, para que
+`sync_pedidos_match_virgilio()` la copie por el FDW `virgilio_db`. El rol `lk_ppp_reader`
+ya tiene escritura sobre esa tabla: no hace falta ningún grant.
+
+**Medido, no supuesto (2026-09-04):** `krikos_oc_inbox` existe en LK (24 col) ·
+`sync_pedidos_match_virgilio()` existe · **0 de 1.025** pedidos con payload tienen
+`fecha_entrega` (la rama no está mergeada) · `lk_pedidos_match` **no tiene** la columna.
+
+⚠ **Dos cosas antes de ejecutarlo.** (a) El DDL canónico de `lk_pedidos_match` vive en
+`sql/lk_pedidos_match.sql` del repo **`Produccion-Virgilio`**, que no está adjunto en la
+sesión de Gestión: agregar la columna sin tocar ese archivo deja el repo desactualizado.
+(b) La columna **no lleva prefijo `gv_`** — no es de Gestión: esa tabla la escribe LK y la
+lee Producción.
+
+Detalle completo, con los pasos en orden, en `docs/PENDIENTES-PIPELINE-GESTION.md` §9357.
+
+---
+
 ## 5. Pendientes
 
 > 📌 La lista **de negocio** de lo que falta para cerrar el pipeline —la nota que dejó el
