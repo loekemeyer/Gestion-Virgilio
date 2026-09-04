@@ -93,22 +93,35 @@ una sesión nueva. **Leerlo antes de tocar Supabase.**
 
 ## ⚠⚠⚠ CUANDO GESTIÓN TOMA CONTROL Y SE VUELVE LA VERSIÓN QUE USAMOS, SEGUIR CON LA NUMERACIÓN QUE DEJÓ VIRGILIO
 
-Las tandas de Gestión son **de prueba** mientras convivan las dos apps, y por eso llevan
-prefijo propio **`GV-`** (`GV-01A`, `GV-02B`) — no se confunden con las de Producción
-(`D19J`) ni le pisan el contador de letras.
+Mientras convivan las dos apps, **Gestión no numera NP y sus tandas son de prueba**.
 
-**El día que Gestión reemplace a Producción, se vacía el prefijo y listo:**
+- **NP** → hoy la manda **ISIS** a la hoja de cálculos y la usa Producción. Gestión tiene
+  la numeración **apagada** (`PPP_Web_Config.numeracion_activa = 0`) y `PPP_Web_NP` vacía.
+  Regla del dueño: *"cuando Gestión tome control, va a asignarle la numeración nuestra a
+  los pedidos que estén pendientes y a los que vayan cayendo. Recién ahí que empiece"*.
+  ⚠ El interruptor existe porque la pantalla de la PPP Web **numera sola todo lo que
+  muestra apenas se abre** (`pwebNumerar()`): borrar sin apagar no sirve, vuelven.
+- **Tandas** → llevan prefijo propio **`GV-`** (`GV-01A`, `GV-02B`), así no se confunden
+  con las de Producción (`D19J`) ni le pisan el contador de letras.
+
+**El día del cambio son DOS líneas, y listo:**
 
 ```sql
 -- en VIRGILIO (hrxfctzncixxqmpfhskv)
 update public."PPP_Web_Config" set valor_texto = '' where clave = 'tanda_prefijo';
+update public."PPP_Web_Config" set valor       = 1  where clave = 'numeracion_activa';
 ```
 
-`ppp_web_armar_tandas` vuelve sola a la codificación histórica `LETRA+NN+LETRA` y
-`ppp_web_proxima_letra()` **retoma desde la última letra que dejó Virgilio** (mira las dos
-tablas). No hay que tocar código ni redeployar nada.
+Antes de la segunda, decidir de qué número arranca la NP
+(`PPP_Web_NP_Seed`: hoy lk 1343, chef 1 — el 1343 es arbitrario, **no** es el contador de
+Producción, que son 5 dígitos desde 44361).
 
-Detalle y pruebas: `docs/SUPABASE-GESTION-VIRGILIO.md` §3.e y `sql/ppp_web_tandas.sql`.
+Con el prefijo vacío, `ppp_web_armar_tandas` vuelve sola a la codificación histórica
+`LETRA+NN+LETRA` y `ppp_web_proxima_letra()` **retoma desde la última letra que dejó
+Virgilio** (mira las dos tablas). No hay que tocar código ni redeployar nada.
+
+Detalle y pruebas: `docs/SUPABASE-GESTION-VIRGILIO.md` §3.e y §3.f, `sql/ppp_web_tandas.sql`
+y `sql/gv_tandas_diarias.sql`.
 
 ## ⚠ PROTOCOLO OBLIGATORIO: Backups antes de tocar datos en Supabase
 

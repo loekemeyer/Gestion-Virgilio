@@ -464,6 +464,12 @@ on conflict (clave) do nothing;
 -- cambia en nada: sigue entrando por `ppp_web_np_asignar` y sigue exigiendo
 -- sesión.
 
+-- El interruptor: hoy la NP la manda ISIS y Gestion NO numera nada.
+insert into public."PPP_Web_Config" (clave, valor, descripcion)
+values ('numeracion_activa', 0,
+        '0 = Gestion NO asigna numeros de NP. Hoy la NP la manda ISIS a la hoja de calculos y la usa Produccion. Se prende (=1) el dia que Gestion tome control: ahi numera los pedidos pendientes y los que vayan cayendo.')
+on conflict (clave) do nothing;
+
 create or replace function public.gv_ppp_web_np_asignar(p_empresa text, p_pares jsonb)
 returns table(r_order_id bigint, r_np_idx integer, r_np integer)
 language plpgsql security definer set search_path to 'public'
@@ -471,6 +477,14 @@ as $function$
 declare
   v_next integer;
 begin
+  -- ⚠ Hasta que Gestion reemplace a Produccion, la NP la manda ISIS y Gestion
+  --   no numera NADA. Sin este candado la pantalla de la PPP Web numeraba sola
+  --   todo lo que mostraba con solo abrirla: asi aparecieron 357 NP de prueba
+  --   los dias 3 y 4 de septiembre de 2026.
+  if coalesce((select valor from public."PPP_Web_Config" where clave = 'numeracion_activa'), 0) <> 1 then
+    raise exception 'Numeración de NP APAGADA (PPP_Web_Config.numeracion_activa = 0). Se prende el día que Gestión tome control de Producción.';
+  end if;
+
   -- Serializa por empresa: el job y una pantalla abierta no pueden sacar el
   -- mismo numero. Se libera sola al terminar la transaccion.
   perform pg_advisory_xact_lock(hashtext('ppp_web_np:' || p_empresa));
@@ -528,6 +542,46 @@ begin
 end
 $function$;
 
+-- ══════════════════════════════════════════════════════════════════════════
+-- ⚠⚠⚠  LA NUMERACIÓN ARRANCA EL DÍA QUE GESTIÓN TOME CONTROL, NO ANTES
+-- ══════════════════════════════════════════════════════════════════════════
+-- Regla del dueño (2026-09-04): *"actualmente Producción Virgilio usa las NP
+-- que manda ISIS a la hoja de cálculos. Cuando Gestión Virgilio tome control,
+-- va a asignarle la numeración nuestra a los pedidos que estén pendientes y a
+-- los que vayan cayendo. Recién ahí que empiece"*.
+--
+-- Por eso `numeracion_activa = 0` y las DOS puertas cortan.
+--
+-- POR QUÉ HACÍA FALTA UN INTERRUPTOR Y NO ALCANZABA CON BORRAR: la pantalla de
+-- la PPP Web llama a `pwebNumerar()` al abrirse y numera TODO lo que muestra,
+-- sola, sin que nadie apriete nada. Así aparecieron 357 NP de LK (1343..1699)
+-- los días 3 y 4 de septiembre, sólo por abrir la pantalla mientras
+-- trabajábamos. Borrarlas sin apagar el grifo las traía de vuelta a la próxima.
+-- Verificado que no eran pedidos de Producción: 0 en `PPP_Programacion_Diaria`,
+-- 0 en `Facturacion_NP`, 0 en `Registros_Produccion_Virgilio`. Backup en
+-- `sql/backups/backup_PPP_Web_NP_20260904.sql` y tabla vaciada (0 filas).
+--
+-- EL DÍA DEL CAMBIO son DOS líneas, no una:
+--
+--   update public."PPP_Web_Config" set valor_texto = '' where clave = 'tanda_prefijo';
+--   update public."PPP_Web_Config" set valor       = 1  where clave = 'numeracion_activa';
+--
+-- Y antes de la segunda, decidir de qué número arranca:
+--
+--   select * from public."PPP_Web_NP_Seed";          -- hoy: lk 1343, chef 1
+--   update public."PPP_Web_NP_Seed" set desde = <N> where empresa = 'lk';
+--
+-- El 1343 de hoy es arbitrario (se eligió para que se pareciera al número de
+-- pedido de la página). No es el contador de Producción: las NP de ISIS son de
+-- 5 dígitos y arrancan en 44361, así que no hay choque posible con ninguno.
+--
+-- Probado el 2026-09-04, las dos puertas:
+--   gv_ppp_web_np_asignar (job)   → cortó por el interruptor
+--   ppp_web_np_asignar (front)    → cortó por el interruptor TAMBIÉN con sesión
+--                                   viva (`set local request.jwt.claims`), o sea
+--                                   no queda tapado por el gate de sesión
+--   PPP_Web_NP quedó en 0 filas · PPP_Programacion_Diaria intacta en 182
+--
 -- ── La lógica de numeración, para que no haya que leerla del cuerpo ────────
 --   · un número por (empresa, order_id, np_idx) — un pedido web se puede
 --     partir en varias NP, y cada parte lleva la suya
@@ -541,7 +595,9 @@ $function$;
 --     empresa por el número (>90000 = LK) y una NP web de 4 dígitos caería en
 --     Chef, mandando a buscar un pedido de Loekemeyer al sector equivocado
 --
--- Medido el 2026-09-04, no supuesto:
+-- Medido el 2026-09-04, no supuesto (con la numeración todavía prendida, antes
+-- de apagarla y vaciar la tabla — o sea: la lógica quedó probada, lo que no
+-- corre hoy es el permiso para usarla):
 --   · LK: 357 asignadas, 1343 → 1699, **0 duplicados y 0 huecos**
 --   · Chef: 0 asignadas todavía
 --   · sin choque con Producción: sus NP numéricas arrancan en 44361 y en el

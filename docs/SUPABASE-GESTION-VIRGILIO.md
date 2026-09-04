@@ -550,10 +550,54 @@ Arreglado en v8: `flag()` mira query **y** body. Verificado sin escribir nada �
 (`salteada`, no `encolada`) y `GV_Tandas_Auto_Log` quedó en 2 filas, porque el log de
 'salteada' está detrás de `if (!dry)`.
 
+### ⚠⚠⚠ Y después: la numeración se APAGÓ. Arranca el día del cambio, no antes
+
+Regla del dueño, el mismo día: *"actualmente Producción Virgilio usa las NP que manda
+ISIS a la hoja de cálculos. Cuando Gestión Virgilio tome control, va a asignarle la
+numeración nuestra a los pedidos que estén pendientes y a los que vayan cayendo. Recién
+ahí que empiece"*.
+
+Había 357 NP de LK (1343→1699). **No eran pedidos de Producción**: 0 en
+`PPP_Programacion_Diaria`, 0 en `Facturacion_NP`, 0 en `Registros_Produccion_Virgilio`.
+Se habían creado los días **3 y 4 de septiembre**, en estas sesiones, porque la pantalla
+de la PPP Web llama a `pwebNumerar()` al abrirse y **numera todo lo que muestra, sola**.
+
+Por eso no alcanzaba con borrarlas: volvían la próxima vez que alguien abriera la
+pantalla. Va con interruptor:
+
+| objeto | qué |
+|---|---|
+| `PPP_Web_Config.numeracion_activa` | fila nueva (`insert … do nothing`), valor **0** |
+| gate en `gv_ppp_web_np_asignar` | corta con un mensaje explícito. Como la del front **delega** en ésta, el interruptor apaga las dos de una sola vez |
+| `PPP_Web_NP` | **vaciada** (357 → 0). Backup: `sql/backups/backup_PPP_Web_NP_20260904.sql` |
+
+Probado, las dos puertas: la del job cortó por el interruptor, y la del front cortó por
+el interruptor **también con sesión viva** (`set local request.jwt.claims`) — o sea el
+candado nuevo no queda tapado por el viejo gate de sesión.
+
+**El día del cambio son DOS líneas, no una** (la otra es la de las tandas, §3.e):
+
+```sql
+update public."PPP_Web_Config" set valor_texto = '' where clave = 'tanda_prefijo';
+update public."PPP_Web_Config" set valor       = 1  where clave = 'numeracion_activa';
+```
+
+Y antes de la segunda, decidir de qué número arranca:
+
+```sql
+select * from public."PPP_Web_NP_Seed";                        -- hoy: lk 1343, chef 1
+update public."PPP_Web_NP_Seed" set desde = <N> where empresa = 'lk';
+```
+
+El `1343` de hoy es **arbitrario** — se eligió para que se pareciera al número de pedido
+de la página. No es el contador de Producción: las NP de ISIS son de 5 dígitos y arrancan
+en 44361, así que no hay choque posible con ninguno.
+
 ### Estado después de esto
 
-`PPP_Web_Programacion` sigue en **0** y `PPP_Programacion_Diaria` en **182**: nada corrió
-todavía de punta a punta. Falta la primera corrida real, que necesita el OK del dueño.
+`PPP_Web_NP` **0** · `PPP_Web_Programacion` **0** · `PPP_Web_Base` **0** ·
+`PPP_Programacion_Diaria` **182** (Producción intacta). Nada corrió de punta a punta, y
+ahora tampoco puede hasta que se prenda la numeración.
 
 Detalle y SQL en `sql/gv_tandas_diarias.sql`.
 
