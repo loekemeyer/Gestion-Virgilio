@@ -347,6 +347,59 @@ on conflict (clave) do nothing;
 -- `PPP_Programacion_Diaria` sigue en 182 y no tiene ni una NP web.
 --
 -- ══════════════════════════════════════════════════════════════════════════
+-- LO QUE SALIÓ MAL EN LA PRIMERA CORRIDA REAL (2026-09-04)
+-- ══════════════════════════════════════════════════════════════════════════
+-- Tres cosas, las tres encontradas por la prueba y no por leer el código:
+--
+-- 1. **Chef llegaba sin zona: 31 de 38 NP.** No era el diccionario. La RPC de
+--    Chef no devolvía `zona_expreso` ni `localidad`, así que la zona caía al
+--    parseo de la dirección, que para Chef casi nunca resuelve.
+--    ⚠ Esto **ya estaba escrito** en `docs/HANDOFF-PIPELINE-VENTAS.md` desde el
+--    principio ("el fallback existe para Retira, etiquetas sueltas y Chef, cuya
+--    RPC todavía no trae estas columnas") y no se tomó como pendiente. Era, de
+--    hecho, la tarea con la que arrancó la sesión: arreglar la localidad.
+--    Arreglado en `gv_pedidos_web_np_chef`, cruzando `chef_customers` +
+--    `chef_customer_delivery_addresses` con el MISMO criterio que usa
+--    `v_pedidos_web` para LK. Medido: 38 de 38 con zona.
+--
+-- 2. **Ese arreglo hizo timeout (57014).** Las tablas de Chef son foreign
+--    tables: con el lateral adentro del foreign scan hacía un round trip por
+--    fila. Se traen con `as materialized` — son chicas (762 / 710 / 762 y 26
+--    pedidos en 30 días). Es el mismo truco que ya usaba `v_pedidos_web_np`.
+--
+-- 3. **`pg_net` corta a los 5 segundos** y la corrida real pasa de eso. Se le
+--    pasó `timeout_milliseconds := 120000` y lo ignoró igual. Si el cron
+--    esperara, registraría un timeout todos los días y el trabajo podría quedar
+--    cortado a la mitad, con escrituras parciales. Por eso la Edge Function
+--    ahora **contesta al instante y sigue trabajando con `EdgeRuntime.waitUntil`**;
+--    el resultado se mira en `GV_Tandas_Auto_Log`. Con `?dry=1` o `?esperar=1`
+--    sí espera, que es como se prueba a mano.
+--    Verificado end-to-end con `?fecha=<un domingo>`: HTTP 200 inmediato
+--    (`{"ok":true,"encolada":true}`), el log quedó escrito con estado
+--    'salteada' en 148 ms, y 0 tandas creadas.
+--
+-- ══════════════════════════════════════════════════════════════════════════
+-- UN SOLO CONTRATO PARA LAS DOS PÁGINAS
+-- ══════════════════════════════════════════════════════════════════════════
+-- `gv_pedidos_web_np_lk` y `gv_pedidos_web_np_chef` devuelven **las mismas 24
+-- columnas, mismo nombre, mismo tipo y mismo orden** (verificado columna por
+-- columna). Antes no: al wrapper de LK le faltaban `condicion_pago_code`,
+-- `numero_oc`, `provincia` y `arts`.
+--
+-- De esos, sólo `condicion_pago_code` viaja de verdad a ISIS — está en el
+-- `sheets_payload` de los 220 de 220 pedidos de LK de 30 días. **`numero_oc` NO**:
+-- está vacío en el 100% de LK y no es parte del formato de ISIS; se devuelve sólo
+-- para que las dos funciones tengan las mismas columnas.
+--
+-- `fecha_entrega_pactada` (nueva): el **turno del súper**, para cuando las páginas
+-- lo manden. Hoy sale NULL en las dos (0 de 399 pedidos), pero se lee del
+-- `sheets_payload`, así que el día que agreguen el campo empieza a llegar solo,
+-- sin tocar el backend.
+-- ⚠ NO es lo mismo que `PPP_Web_Programacion.fecha_entrega`: esa la DEFINE la
+--   tanda (el día en que se arma). Ésta viene pactada de antemano y de afuera.
+--   Por eso el nombre distinto.
+--
+-- ══════════════════════════════════════════════════════════════════════════
 -- CONTROLES
 -- ══════════════════════════════════════════════════════════════════════════
 --   -- Las corridas de la última semana:

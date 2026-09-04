@@ -11,7 +11,8 @@
 //
 // Hace, en orden:
 //   1. ¿es día hábil en Argentina? → si no, loguea 'salteada' y corta
-//   2. lee LK (`gv_pedidos_web_np_lk`) y Chef (`gv_pedidos_web_np_chef`)
+//   2. lee LK (`gv_pedidos_web_np_lk`) y Chef (`gv_pedidos_web_np_chef`), que
+//      devuelven EXACTAMENTE las mismas columnas
 //   3. `ppp_web_np_asignar`     — numera lo que no tiene número
 //   4. `ppp_web_resync`         — pone al día lo YA programado que cambió
 //   5. `gv_ppp_web_zona_lote`   — resuelve la zona de cada NP
@@ -128,14 +129,14 @@ async function traerLk(desde: string): Promise<Fila[]> {
   return await r.json();
 }
 
-/** Chef vive en otro proyecto y se lee por FDW desde LK (~3,3 s), por eso va por
- *  RPC aparte: unirlo a la vista de LK haría pagar ese costo en cada lectura.
+/** Chef vive en otro proyecto y se lee por FDW desde LK, por eso va por RPC
+ *  aparte: unirlo a la vista de LK haria pagar ese costo en cada lectura.
  *
  *  ⚠ Va contra `gv_pedidos_web_np_chef`, NO contra `get_pedidos_web_np_chef` que
- *  usa el front. El original chequea `auth.uid()` contra `public.admins`, y acá
- *  corremos con la service key: `auth.uid()` es NULL, así que ese chequeo siempre
- *  falla. El gemelo `gv_` no tiene ese chequeo — su gate es el GRANT, que sólo
- *  alcanza a `service_role` y a `gv_reader`. */
+ *  usa el front. Dos motivos: la original chequea `auth.uid()` contra
+ *  `public.admins` —con la service key eso es NULL y siempre falla— y ademas NO
+ *  devuelve el punto de entrega, sin el cual la zona de Chef no resuelve (31 de
+ *  38 sin zona antes de arreglarlo, 0 despues). */
 async function traerChef(dias: number): Promise<Fila[]> {
   const r = await lk("/rest/v1/rpc/gv_pedidos_web_np_chef",
     { method: "POST", body: JSON.stringify({ p_dias: dias }) });
@@ -301,6 +302,8 @@ Deno.serve(async (req: Request) => {
   const forzar = url.searchParams.get("forzar") === "1";
   // `?dry=1` hace todo menos escribir: no numera, no resync, no arma. Sólo mide.
   const dry = url.searchParams.get("dry") === "1";
+  // `?esperar=1` devuelve el resultado en vez de contestar al toque (ver abajo).
+  const esperar = url.searchParams.get("esperar") === "1";
   const fecha = url.searchParams.get("fecha") ?? hoyArgentina();
 
   const log = async (estado: string, motivo: string | null, extra: Record<string, unknown>) => {
@@ -316,81 +319,104 @@ Deno.serve(async (req: Request) => {
     } catch (_e) { /* el log no puede tumbar la corrida */ }
   };
 
-  try {
-    // ── día hábil ─────────────────────────────────────────────────────────
-    const habil = await vgRpc<boolean>("gv_es_dia_habil", { p_fecha: fecha });
-    if (!habil && !forzar) {
-      const motivo = "No es día hábil (fin de semana o feriado)";
-      if (!dry) await log("salteada", motivo, {});
-      return Response.json({ ok: true, fecha, salteada: true, motivo });
-    }
-
-    if (!LK_KEY) throw new Error("Falta el secreto GV_LK_SERVICE_KEY (secret key de LK, o token de gv_reader).");
-
-    const rCfg = await vg("/rest/v1/PPP_Web_Config?select=valor&clave=eq.ventana_dias");
-    const cfg = rCfg.ok ? await rCfg.json() as { valor: number }[] : [];
-    const ventana = Number(cfg[0]?.valor) || 30;
-    const desde = new Date(Date.now() - ventana * 86400000).toISOString().slice(0, 10);
-
-    // Modo prueba: lee las dos fuentes y resuelve zonas, sin escribir nada.
-    if (dry) {
-      const out: Record<string, unknown> = {};
-      for (const emp of ["lk", "chef"] as const) {
-        try {
-          const filas = emp === "lk" ? await traerLk(desde) : await traerChef(ventana);
-          const zonas = await resolverZonas(filas.map((n) => {
-            const b = barrioCrudo(n);
-            return b.usaDireccion ? { ze: "", loc: "", dir: b.barrio } : { ze: b.barrio, loc: "", dir: "" };
-          }));
-          const porZona: Record<string, number> = {};
-          zonas.forEach((z) => { const k = z || "(sin zona)"; porZona[k] = (porZona[k] ?? 0) + 1; });
-          out[emp] = { np_leidas: filas.length, por_zona: porZona };
-        } catch (e) {
-          out[emp] = { error: e instanceof Error ? e.message : String(e) };
-        }
+  const trabajo = async (): Promise<{ status: number; body: Record<string, unknown> }> => {
+    try {
+      // ── día hábil ─────────────────────────────────────────────────────
+      const habil = await vgRpc<boolean>("gv_es_dia_habil", { p_fecha: fecha });
+      if (!habil && !forzar) {
+        const motivo = "No es día hábil (fin de semana o feriado)";
+        if (!dry) await log("salteada", motivo, {});
+        return { status: 200, body: { ok: true, fecha, salteada: true, motivo } };
       }
-      return Response.json({ ok: true, dry: true, fecha, ventana, detalle: out });
-    }
 
-    // Las dos empresas por separado: si Chef falla, LK igual queda armado.
-    // LK va primero porque de ahí salen los clientes a forzar en Chef.
-    const out: Record<string, unknown> = {};
-    let leidas = 0, programadas = 0, nTandas = 0;
-    const errores: string[] = [];
-    let forzarChef: string[] = [];
+      if (!LK_KEY) throw new Error("Falta el secreto GV_LK_SERVICE_KEY (secret key de LK, o token de gv_reader).");
 
-    try {
-      const filas = await traerLk(desde);
-      const r = await procesarEmpresa("lk", filas, fecha);
-      leidas += r.np_leidas; programadas += r.np_programadas; nTandas += r.tandas.length;
-      out.lk = { np_leidas: r.np_leidas, tandas_nuevas: r.tandas };
-      // Misma razón social pidiendo a las dos empresas → el mismo día.
-      forzarChef = await codsChefDe(r.codsHoy);
-      if (forzarChef.length) out.forzados_en_chef = forzarChef;
+      const rCfg = await vg("/rest/v1/PPP_Web_Config?select=valor&clave=eq.ventana_dias");
+      const cfg = rCfg.ok ? await rCfg.json() as { valor: number }[] : [];
+      const ventana = Number(cfg[0]?.valor) || 30;
+      const desde = new Date(Date.now() - ventana * 86400000).toISOString().slice(0, 10);
+
+      // Modo prueba: lee las dos fuentes y resuelve zonas, sin escribir nada.
+      if (dry) {
+        const out: Record<string, unknown> = {};
+        for (const emp of ["lk", "chef"] as const) {
+          try {
+            const filas = emp === "lk" ? await traerLk(desde) : await traerChef(ventana);
+            const zonas = await resolverZonas(filas.map((n) => {
+              const b = barrioCrudo(n);
+              return b.usaDireccion ? { ze: "", loc: "", dir: b.barrio } : { ze: b.barrio, loc: "", dir: "" };
+            }));
+            const porZona: Record<string, number> = {};
+            zonas.forEach((z) => { const k = z || "(sin zona)"; porZona[k] = (porZona[k] ?? 0) + 1; });
+            out[emp] = {
+              np_leidas: filas.length,
+              con_fecha_pactada: filas.filter((n) => n.fecha_entrega_pactada).length,
+              por_zona: porZona,
+            };
+          } catch (e) {
+            out[emp] = { error: e instanceof Error ? e.message : String(e) };
+          }
+        }
+        return { status: 200, body: { ok: true, dry: true, fecha, ventana, detalle: out } };
+      }
+
+      // Las dos empresas por separado: si Chef falla, LK igual queda armado.
+      // LK va primero porque de ahí salen los clientes a forzar en Chef.
+      const out: Record<string, unknown> = {};
+      let leidas = 0, programadas = 0, nTandas = 0;
+      const errores: string[] = [];
+      let forzarChef: string[] = [];
+
+      try {
+        const filas = await traerLk(desde);
+        const r = await procesarEmpresa("lk", filas, fecha);
+        leidas += r.np_leidas; programadas += r.np_programadas; nTandas += r.tandas.length;
+        out.lk = { np_leidas: r.np_leidas, tandas_nuevas: r.tandas };
+        // Misma razón social pidiendo a las dos empresas → el mismo día.
+        forzarChef = await codsChefDe(r.codsHoy);
+        if (forzarChef.length) out.forzados_en_chef = forzarChef;
+      } catch (e) {
+        const msg = `lk: ${e instanceof Error ? e.message : String(e)}`;
+        errores.push(msg); out.lk = { error: msg };
+      }
+
+      try {
+        const filas = await traerChef(ventana);
+        const r = await procesarEmpresa("chef", filas, fecha, forzarChef);
+        leidas += r.np_leidas; programadas += r.np_programadas; nTandas += r.tandas.length;
+        out.chef = { np_leidas: r.np_leidas, tandas_nuevas: r.tandas };
+      } catch (e) {
+        const msg = `chef: ${e instanceof Error ? e.message : String(e)}`;
+        errores.push(msg); out.chef = { error: msg };
+      }
+
+      const estado = errores.length === 2 ? "error" : "ok";
+      await log(estado, errores.length ? errores.join(" | ") : null, {
+        np_leidas: leidas, np_programadas: programadas, tandas: nTandas, detalle: out,
+      });
+      return {
+        status: estado === "ok" ? 200 : 500,
+        body: { ok: estado === "ok", fecha, tandas: nTandas, detalle: out },
+      };
     } catch (e) {
-      const msg = `lk: ${e instanceof Error ? e.message : String(e)}`;
-      errores.push(msg); out.lk = { error: msg };
+      const msg = e instanceof Error ? e.message : String(e);
+      await log("error", msg, {});
+      return { status: 500, body: { ok: false, fecha, error: msg } };
     }
+  };
 
-    try {
-      const filas = await traerChef(ventana);
-      const r = await procesarEmpresa("chef", filas, fecha, forzarChef);
-      leidas += r.np_leidas; programadas += r.np_programadas; nTandas += r.tandas.length;
-      out.chef = { np_leidas: r.np_leidas, tandas_nuevas: r.tandas };
-    } catch (e) {
-      const msg = `chef: ${e instanceof Error ? e.message : String(e)}`;
-      errores.push(msg); out.chef = { error: msg };
-    }
-
-    const estado = errores.length === 2 ? "error" : "ok";
-    await log(estado, errores.length ? errores.join(" | ") : null, {
-      np_leidas: leidas, np_programadas: programadas, tandas: nTandas, detalle: out,
-    });
-    return Response.json({ ok: estado === "ok", fecha, tandas: nTandas, detalle: out },
-      { status: estado === "ok" ? 200 : 500 });
-  } catch (e) {
-    const msg = e instanceof Error ? e.message : String(e);
-    await log("error", msg, {});
-    return Response.json({ ok: false, fecha, error: msg }, { status: 500 });
+  // ⚠ El cron NO espera el resultado, y no es un detalle: `pg_net` corta a los
+  //   5 segundos (probado el 2026-09-04 — le pasamos timeout_milliseconds y lo
+  //   ignoró igual), y la corrida real pasa de eso porque leer Chef va por FDW.
+  //   Si esperáramos, el cron registraría un timeout en cada corrida y encima el
+  //   trabajo podría quedar cortado a la mitad, con escrituras parciales.
+  //   Entonces: se contesta al instante y el trabajo sigue con `waitUntil`. El
+  //   resultado se mira en `GV_Tandas_Auto_Log`, que para eso está.
+  //   Con `?dry=1` o `?esperar=1` sí se espera, que es como se prueba a mano.
+  if (dry || esperar) {
+    const r = await trabajo();
+    return Response.json(r.body, { status: r.status });
   }
+  EdgeRuntime.waitUntil(trabajo());
+  return Response.json({ ok: true, encolada: true, fecha });
 });
