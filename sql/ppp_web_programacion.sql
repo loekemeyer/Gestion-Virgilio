@@ -8,23 +8,35 @@
 -- Todo lo demás —cliente, ítems, corte en NP— se lee en vivo de LK y no se copia.
 --
 -- ----------------------------------------------------------------------------
--- 1 · EL NÚMERO: "LK 1343" · prefijo de empresa + CUATRO dígitos
+-- 1 · EL NÚMERO: "LK 00001" · prefijo de empresa + espacio + CINCO dígitos
 -- ----------------------------------------------------------------------------
--- Formato pedido por el dueño (2026-09-03): `LK` o `CH`, un espacio, y cuatro
--- dígitos, parecido al id de pedido de la página.
+-- ⚠ ACTUALIZADO EL 2026-09-04. Antes acá decía "LK 1343 · cuatro dígitos,
+--   parecido al id de pedido de la página". Cambiaron las dos cosas:
 --
--- ⚠ **NO ES EL ID DEL PEDIDO**, aunque arranque pegado a él. Es un CONTADOR
---   PROPIO, igual que las NP de ISIS: cada NP consume un número. Tiene que ser
---   así porque un pedido se parte en varias NP —31% de los casos, medido— y si
---   el pedido 1342 se partiera en LK 1342/1343/1344, mañana el pedido 1343
---   querría el mismo LK 1343 y chocarían. Con contador propio no se repite nunca.
---   La contra es que a partir del primer pedido partido el número deja de
---   coincidir con el id de la página: son dos secuencias distintas.
+--   · **Arranca en 00001 para las dos empresas** (`PPP_Web_NP_Seed`: lk 1, chef 1).
+--     El 1343 se había elegido para que se pareciera al id de pedido de la página
+--     y se descartó. Sin choque con Producción: sus NP son de 5 dígitos desde
+--     44361, y la nuestra lleva prefijo.
+--   · **La etiqueta la arma el BACKEND**: `gv_ppp_web_np_label(empresa, np)` es la
+--     fuente de verdad; el front (`pwebNpLabel`) y la Edge Function (`npLabel`) la
+--     duplican sólo como optimización de UX.
 --
--- ⚠ TECHO DE 4 DÍGITOS. Al ritmo medido —188 pedidos/mes × 1,45 NP por pedido =
---   ~273 NP/mes— desde 1343 hasta 9999 hay unos **31 meses**. Cuando se acerque
---   hay que decidir: reiniciar el contador (y convivir con números repetidos de
---   años distintos, como hace ISIS) o pasar a 5 dígitos.
+-- ⚠ **NO ES EL ID DEL PEDIDO.** Es un CONTADOR PROPIO, igual que las NP de ISIS:
+--   cada NP consume un número. Tiene que ser así porque un pedido se parte en
+--   varias NP —31% de los casos, medido— y dos pedidos distintos querrían el mismo
+--   número. Con contador propio no se repite nunca.
+--
+-- ⚠ Pasado 99999 la etiqueta CRECE ("LK 100000"), no se recorta. `lpad` trunca
+--   —`lpad('100000',5,'0')` da `'10000'`, que es la etiqueta de la NP 10000— y como
+--   la etiqueta ES la NP que viaja por picking, armado y facturación, tres pedidos
+--   distintos quedarían con el mismo número y el operario armaría una tanda con
+--   todo mezclado, en silencio. Por eso la guarda. A ~4.300 NP/año son unos 23
+--   años; la guarda sale gratis igual.
+--
+-- ⚠ HOY LA NUMERACIÓN ESTÁ APAGADA (`PPP_Web_Config.numeracion_activa = 0`).
+--   Mientras convivan las dos apps la NP la manda ISIS a la hoja de cálculos y la
+--   usa Producción. Gestión numera recién el día que tome control. Ver §3.f de
+--   `docs/SUPABASE-GESTION-VIRGILIO.md`.
 --
 -- La identidad interna de una NP NO es el número: es **(order_id, np_idx)**. El
 -- número es una etiqueta que se guarda al lado, así la programación no depende
@@ -41,16 +53,18 @@ create table if not exists public."PPP_Web_NP" (
   unique (empresa, order_id, np_idx)
 );
 
--- Desde dónde arranca cada empresa. LK arranca en 1343 = el id de pedido más
--- alto al momento de crearlo (1342) + 1, para que los primeros números se
--- parezcan a los de la página.
+-- Desde dónde arranca cada empresa. Decisión del dueño (2026-09-04): **00001 las
+-- dos**, o sea el primer pedido que numere Gestión va a ser `LK 00001` / `CH 00001`.
 create table if not exists public."PPP_Web_NP_Seed" (
   empresa text primary key,
   desde   integer not null
 );
 insert into public."PPP_Web_NP_Seed" (empresa, desde)
-values ('lk', 1343), ('chef', 1)
+values ('lk', 1), ('chef', 1)
 on conflict (empresa) do nothing;
+-- El `do nothing` no pisa una fila que ya exista, así que en la base viva se
+-- bajó a mano el 2026-09-04:
+--   update public."PPP_Web_NP_Seed" set desde = 1 where empresa in ('lk','chef');
 
 alter table public."PPP_Web_NP"      enable row level security;
 alter table public."PPP_Web_NP_Seed" enable row level security;
@@ -374,4 +388,87 @@ alter table public."PPP_Web_Programacion" add column if not exists fecha_recep d
 --   -- desde el front o pegándole a la vista de LK con la sesión de admin.
 --   select empresa, order_id, np_idx, np, tanda, m3, lineas, cajas, actualizado_at
 --     from public."PPP_Web_Programacion" order by actualizado_at desc limit 20;
+-- ============================================================================
+
+
+-- ============================================================================
+-- 5 · AGREGADOS AL PEDIDO  ·  la cañería, 2026-09-04
+-- ============================================================================
+-- Pedido del dueño: en loekemeyer.com y chefsrl.com el cliente va a poder
+-- MODIFICAR un pedido ya mandado — **sólo AGREGAR productos, nunca sacar**. El
+-- front de esas páginas se hace después; esto es la cañería del lado nuestro.
+--
+-- La regla, textual: *"máxima flexibilidad para el cliente es el objetivo. Si el
+-- pedido del cliente ya se encuentra en picking, armado o está armado pendiente
+-- de facturar y el cliente agrega algo, el sistema debería reconocerlo y ponerlo
+-- primero en la lista de prioridades para ser pickeado y armado, con una alerta
+-- en el monitor 'ESTO ES UN AGREGADO AL PEDIDO XXX Y SALEN JUNTOS, ARMENLO YA'.
+-- Sería una NP aparte obviamente."*
+--
+-- ── Columnas nuevas en `PPP_Web_Programacion` (tabla NUESTRA, estaba en 0 filas)
+alter table public."PPP_Web_Programacion"
+  add column if not exists es_agregado   boolean  not null default false,
+  add column if not exists agregado_a_np integer,
+  add column if not exists agregado_en   timestamptz,
+  add column if not exists prioridad     smallint not null default 0;
+--   es_agregado    el cliente lo sumó con la tanda ya en la mesa
+--   agregado_a_np  la NP del pedido original — es el "XXX" del cartel
+--   prioridad      mayor = se pickea y se arma antes. 0 normal, 100 agregado
+--
+-- ── `gv_ppp_web_estado`: en qué punto del circuito está cada NP web
+-- El estado NO es una columna que haya que mantener: sale de los eventos que los
+-- operarios YA emiten (`EP`/`TP`/`AP`/`TAP` por tanda) más `Facturacion_NP` por
+-- NP. Así no hace falta ningún trigger sobre una tabla compartida, que además
+-- está prohibido. Va con `security_invoker = true` (obligatorio).
+--
+--   estado: sin_programar · programado · en_picking · pickeado · en_armado ·
+--           armado (pendiente de facturar) · facturado
+--   puede_agregar          true hasta que se factura  → máxima flexibilidad
+--   puede_quitar           SIEMPRE false              → la página sólo suma
+--   agregado_seria_urgente true si la tanda ya arrancó → el agregado va urgente
+--
+-- ⚠ `agregado_seria_urgente` mira CUALQUIER evento y no sólo el `EP`: hay tandas
+--   reales con `AP` y `TAP` y sin `EP` registrado (C33C). Atándolo al EP, un
+--   agregado sobre una tanda que ya se está armando no se marcaba urgente.
+--
+-- ── `ppp_web_resync` clasifica el agregado
+-- La NP nueva entra a la MISMA tanda que sus hermanas (tienen que SALIR JUNTOS).
+-- Si esa tanda ya está en marcha, además se marca `es_agregado`, se guarda a qué
+-- NP se le agregó y se le pone `prioridad = 100`. Devuelve la acción
+-- `agregado_urgente` en vez de `agregada_a_tanda` para que se vea en el log.
+--
+-- ⚠ Y NO BORRA si la tanda ya está en marcha. La página sólo deja agregar, así
+--   que un pedido que se achica ahí es una edición desde otro lado; borrar una NP
+--   que el operario ya tiene pickeada en la mesa desincroniza el sistema con la
+--   realidad física, en silencio.
+--
+-- ── Probado el 2026-09-04 contra TANDAS REALES de Producción
+-- Se metieron filas de mentira en `PPP_Web_Programacion` (nuestra, estaba vacía)
+-- apuntando a tandas reales, así el estado sale de eventos reales. No se tocó
+-- NINGUNA tabla compartida. Borradas después; verificado: 0 filas, Producción en
+-- 182 y ni un evento inventado.
+--
+--   vista de estado
+--     GV-99Z (sin eventos)  → programado   · urgente=false
+--     C62A   (EP)           → en_picking   · urgente=true
+--     C34B   (EP+TP)        → pickeado     · urgente=true
+--     C33C   (AP+TAP)       → armado       · urgente=true
+--   resync
+--     A) agrega, tanda en marcha    → 'agregado_urgente'   (es_agregado, prio 100,
+--                                      agregado_a_np=2 → cartel "LK 00002")
+--     B) agrega, tanda sin empezar  → 'agregada_a_tanda'   (normal, prio 0)
+--     C) achica, tanda en marcha    → NO borra nada
+--     D) achica, tanda sin empezar  → 'borrada'
+--
+-- El branch `facturado` de la vista NO se pudo probar con datos: haría falta una
+-- fila en `Facturacion_NP`, que es compartida y no se toca. Queda verificado por
+-- construcción (mismo apareo por etiqueta del §3, medido ahí).
+--
+-- ── Lo que FALTA para que esto sirva de verdad
+--   1. El front de las páginas (repos `PaginaLK` y el de Chef): dejar agregar,
+--      mostrar el estado y bloquear cuando `puede_agregar` es false. Idea 8743.
+--   2. Que la facturación de NP web escriba en `Facturacion_NP` con la ETIQUETA.
+--   3. El picking NO ordena por `prioridad` todavía: la columna se llena y el
+--      cartel se ve, pero la lista sigue en su orden de siempre. Falta engancharlo
+--      donde se arma la lista de tandas del operario.
 -- ============================================================================

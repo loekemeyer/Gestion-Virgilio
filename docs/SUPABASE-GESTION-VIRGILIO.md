@@ -666,6 +666,92 @@ facturado y el cambio se pierde en silencio, sin avisarle. Anotado como idea **8
 
 ---
 
+## 3.h La cañería de los AGREGADOS al pedido — 2026-09-04
+
+Pedido del dueño: en **loekemeyer.com** y **chefsrl.com** el cliente va a poder modificar
+un pedido ya mandado — **sólo agregar productos, nunca sacar**. El front de esas páginas se
+hace después; esto es la cañería del lado nuestro.
+
+> *"Máxima flexibilidad para el cliente es el objetivo. Si el pedido del cliente ya se
+> encuentra en picking, armado o está armado pendiente de facturar y el cliente agrega
+> algo, el sistema debería reconocerlo y ponerlo primero en la lista de prioridades para
+> ser pickeado y armado, con una alerta en el monitor: ESTO ES UN AGREGADO AL PEDIDO XXX Y
+> SALEN JUNTOS, ARMENLO YA. Sería una NP aparte obviamente."*
+
+### Lo que se construyó
+
+| objeto | qué |
+|---|---|
+| `PPP_Web_Programacion` + 4 columnas | `es_agregado`, `agregado_a_np` (el "XXX" del cartel), `agregado_en`, `prioridad`. Tabla nuestra, estaba en 0 filas |
+| vista **`gv_ppp_web_estado`** | en qué punto del circuito está cada NP web. `security_invoker = true` |
+| `ppp_web_resync` | clasifica el agregado y lo prioriza |
+| front v12.79 | el cartel rojo en el monitor **y en cada paso del picking** |
+
+**El estado no es una columna que haya que mantener**: sale de los eventos que los
+operarios ya emiten (`EP`/`TP`/`AP`/`TAP`, por tanda) más `Facturacion_NP` (por NP). Así no
+hace falta ningún trigger sobre tabla compartida, que además está prohibido.
+
+```
+sin_programar → programado → en_picking → pickeado → en_armado → armado → facturado
+```
+
+Y tres columnas que son las que va a leer la página del cliente:
+
+| | |
+|---|---|
+| `puede_agregar` | true **hasta que se factura** → máxima flexibilidad |
+| `puede_quitar` | **siempre false** → la página sólo suma |
+| `agregado_seria_urgente` | true si la tanda ya arrancó → el agregado va urgente |
+
+⚠ `agregado_seria_urgente` mira **cualquier** evento, no sólo el `EP`: hay tandas reales
+con `AP` y `TAP` y **sin `EP` registrado** (`C33C`). Atándolo al EP, un agregado sobre una
+tanda que ya se está armando no se marcaba urgente. Salió de la prueba, no de leer.
+
+### Cómo se comporta resync ahora
+
+La NP nueva entra a la **misma tanda** que sus hermanas — tienen que **salir juntos**. Si
+esa tanda ya está en marcha, además se marca `es_agregado`, se guarda a qué NP se le
+agregó y se le pone `prioridad = 100`.
+
+⚠ **Y ya no borra si la tanda está en marcha.** La página sólo deja agregar, así que un
+pedido que se achica ahí es una edición desde otro lado; borrar una NP que el operario ya
+tiene pickeada en la mesa desincroniza el sistema con la realidad física, en silencio.
+
+### Probado contra tandas REALES de Producción
+
+Se metieron filas de mentira en `PPP_Web_Programacion` (nuestra, estaba vacía) apuntando a
+tandas reales, así el estado sale de eventos reales. **No se tocó ninguna tabla
+compartida.** Borradas después; verificado: 0 filas, Producción en 182, ni un evento
+inventado.
+
+| caso | resultado |
+|---|---|
+| `GV-99Z` sin eventos | `programado` · urgente **false** |
+| `C62A` (EP) | `en_picking` · urgente **true** |
+| `C34B` (EP+TP) | `pickeado` · urgente **true** |
+| `C33C` (AP+TAP) | `armado` · urgente **true** |
+| agrega, tanda en marcha | **`agregado_urgente`** — prio 100, `agregado_a_np=2` → cartel "LK 00002" |
+| agrega, tanda sin empezar | `agregada_a_tanda` — normal, prio 0 |
+| achica, tanda en marcha | **no borra nada** |
+| achica, tanda sin empezar | `borrada` |
+
+El branch `facturado` de la vista **no se pudo probar con datos**: haría falta una fila en
+`Facturacion_NP`, que es compartida y no se toca. Queda verificado por construcción (mismo
+apareo por etiqueta del §3.g, medido ahí).
+
+### Lo que FALTA para que esto sirva de verdad
+
+1. **El front de las páginas** (`PaginaLK` y el de Chef): dejar agregar, mostrar el estado
+   y bloquear cuando `puede_agregar` es false. Es la idea **8743**.
+2. **Que la facturación de NP web escriba en `Facturacion_NP` con la etiqueta** (`LK 00001`).
+   Pendiente #4.
+3. **El picking todavía no ordena por `prioridad`.** La columna se llena y el cartel se ve,
+   pero la lista del operario sigue en su orden de siempre. Falta engancharlo donde se arma
+   esa lista.
+4. Nada de esto corrió con datos reales, porque la numeración está apagada.
+
+---
+
 ## 4. Incidente de seguridad — 2026-09-04 (cerrado)
 
 `public.vista_pedidos_web_feed` tenía `select` para `anon`. Los esquemas `fuentes` y
