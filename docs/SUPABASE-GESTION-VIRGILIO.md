@@ -1080,6 +1080,81 @@ falla, ISIS sigue igual").
 
 ---
 
+## 3.l Pendiente = NO enviado a compras, y el checklist del día del cambio — 2026-09-04
+
+Pedido del dueño: *"fijate la lógica de lo que había antes de lo de la numeración, a ver si
+ya la dejamos andando todo entero"*. Se revisó pieza por pieza, **midiendo**, y apareció una
+cosa que había que arreglar antes de prender nada.
+
+### Lo que se verificó
+
+| pieza | estado medido |
+|---|---|
+| `numeracion_activa` | `0` · `tanda_prefijo` = `GV-` · `zonas_automaticas` = `1,2` · seed lk 1 / chef 1 |
+| `PPP_Web_NP` / `_Programacion` / `_Base` | 0 / 0 / 0 |
+| `PPP_Web_Tandas` | **3 borradores de prueba** (`GV-01A/B/C`, 17:22, 7 bloques de pedidos reales) — hay que descartarlos antes del cambio: un pedido no puede estar en dos tandas y esos quedarían **trabados** |
+| cron `gv-ppp-web-tandas-diarias` (jobid 71) | apagado, definición intacta |
+| `pwebNumerar()` (la que numeraba todo al abrir una pantalla) | **inalcanzable**: su único caller (`pppTraerPedidosWeb`) no lo llama nadie desde v12.82 |
+| credencial `GV_LK_SERVICE_KEY` | ✅ **cargada** — corrida en seco por el camino del cron (`net.http_post` con la service key de `app_secrets`, `?dry=1&fecha=2026-09-07`, `timeout_milliseconds := 90000`): leyó LK y Chef (FDW) y resolvió zonas sin escribir nada |
+
+### ⚠ Lo que estaba mal: el job iba a programar 30 días de pedidos ya entregados
+
+La corrida en seco leyó **365 NP de LK y 39 de Chef** en 30 días. Pero en LK, de los
+**213 pedidos** de esos 30 días, **208 ya habían salido a ISIS** por el mail de las 12:30
+(`enviado_a_compras_at`) y Producción ya los había entregado. **Ni el job ni "A Programar"
+filtraban por eso.** Prendido tal cual, el lunes 00:01 programaba ~226 NP de zona 1 y 2 que
+ISIS ya había despachado.
+
+La regla, en palabras del dueño (§3.f): *"va a asignarle la numeración nuestra a los pedidos
+que estén **pendientes** y a los que vayan cayendo"*. Pendiente = todavía no se fue a ISIS.
+
+| objeto | qué |
+|---|---|
+| `gv_pedidos_web_np_lk` (**LK**) | `and not coalesce(p.enviado_a_compras, false)` |
+| foreign table `chef_orders` (**LK**) | `+ enviado_a_compras_at timestamptz` (aditivo). Chef la tiene: verificado con `IMPORT FOREIGN SCHEMA` a un schema temporal, borrado después |
+| `gv_pedidos_web_np_chef` (**LK**) | `and o.enviado_a_compras_at is null`; `enviado_a_compras` pasa de `null` a `false` |
+| front v12.88 `aprTraerPedidos` | pide la columna y filtra `!enviado_a_compras` — duplicado como UX, la regla vive en las RPC |
+
+Las dos funciones **no estaban en ningún repo** (creadas directo en la base). Desde hoy:
+`sql/gv_pedidos_web_np_feeds.sql` (vigente) y
+`sql/backups/gv_pedidos_web_np_feeds_20260904_pre_filtro_enviado.sql` (rollback textual).
+
+**Medido después:** LK **365 → 10 NP (5 pedidos)** · Chef **39 → 1**. Segunda corrida en seco
+por el camino real: `lk: 10 (Zona 1: 8, Zona 2: 1, Zona 5: 1) · chef: 1 (Zona 6)`. Regresión:
+`tests/pweb-pendiente.cjs`.
+
+### El interruptor de verdad está en LK, no en Virgilio
+
+Mientras corra el cron de LK **`procesar-pedidos-web`** (`30 15 * * *` UTC = 12:30 ART,
+`enviar_pedidos_main()` → `postear_envio_pedidos`) más su `retry-procesar-pedidos`, cada
+pedido web sigue yéndose a ISIS al mediodía. Con el filtro de arriba las dos apps **no se
+pisan** (Gestión ve sólo lo que ISIS todavía no vio), pero un pedido que Gestión numeró a la
+mañana se lo lleva ISIS a las 12:30 y lo entregan dos veces. **Prender la numeración y
+apagar ese cron van juntos.** Chef tiene el suyo en su propio proyecto (sin acceso desde acá).
+
+### Checklist del día del cambio — en este orden
+
+0. **Los operarios pasan a la app de Gestión.** Producción no muestra tandas web.
+1. **LK** — apagar el mail de las 12:30 (dueño):
+   ```sql
+   select cron.alter_job(jobid, active := false) from cron.job where jobname in ('procesar-pedidos-web','retry-procesar-pedidos');
+   ```
+   Y lo mismo del lado Chef, en su proyecto.
+2. **Virgilio** — descartar los 3 borradores de prueba (`GV-01A/B/C`): `gv_ppp_web_tanda_descartar` por cada uno, o `delete` en `PPP_Web_Tanda_Items` + `PPP_Web_Tandas` (tablas nuestras).
+3. **Virgilio** — las dos líneas de siempre + el cron:
+   ```sql
+   update public."PPP_Web_Config" set valor       = 1  where clave = 'numeracion_activa';
+   update public."PPP_Web_Config" set valor_texto = '' where clave = 'tanda_prefijo';   -- o dejar 'GV-' si se quiere seguir distinguiendo
+   select cron.alter_job(71, active := true);
+   ```
+4. **Verificar:** el primer pedido programado numera `LK 00001` / `CH 00001`; el lunes 00:01 el job arma tandas de zona 1 y 2 (hoy: 9 NP); zona 5 y Chef zona 6 van a mano por "A Programar".
+
+**Rollback** (todo reversible el mismo día): `numeracion_activa = 0`, cron 71 `active := false`,
+`tanda_prefijo = 'GV-'`, backup + borrado de `PPP_Web_NP` / `PPP_Web_Programacion` /
+`PPP_Web_Base` de ese día, y volver a prender el cron de LK.
+
+---
+
 ## 4. Incidente de seguridad — 2026-09-04 (cerrado)
 
 `public.vista_pedidos_web_feed` tenía `select` para `anon`. Los esquemas `fuentes` y

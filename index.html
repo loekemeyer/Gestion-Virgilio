@@ -6794,7 +6794,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v12.87";
+const APP_VERSION = "v12.88";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -31636,12 +31636,19 @@ async function aprTraerPedidos() {
   } else {
     const desde = new Date(Date.now() - PWEB_VENTANA_DIAS * 86400000).toISOString().slice(0, 10);
     const r = await fetch(PWEB_LK_URL + "/rest/v1/v_pedidos_web_np"
-      + "?select=empresa,order_id,np_idx,cod,razon_social,fecha_recep,direccion,lineas,cajas,items,m3,m3_parcial,localidad,zona_expreso,nombre_expreso,direccion_expreso"
+      + "?select=empresa,order_id,np_idx,cod,razon_social,fecha_recep,direccion,lineas,cajas,items,m3,m3_parcial,localidad,zona_expreso,nombre_expreso,direccion_expreso,enviado_a_compras"
       + "&fecha_recep=gte." + desde + "&order=order_id.asc,np_idx.asc&limit=5000",
       { headers: { apikey: PWEB_LK_ANON, Authorization: "Bearer " + tok } });
     if (!r.ok) throw new Error("LK respondió " + r.status);
     nps = await r.json();
   }
+
+  // v12.88 — PENDIENTE = NO ENVIADO A COMPRAS. Un pedido que ya salió a ISIS por el
+  // mail de las 12:30 lo entrega Producción; acá no tiene que aparecer. La regla vive
+  // en el backend (gv_pedidos_web_np_lk / _chef, que usa el job automático); acá se
+  // duplica porque esta pantalla lee la vista cruda de LK. Medido el 2026-09-04: sin
+  // el filtro eran 365 NP en 30 días, de las cuales 355 ya entregadas por ISIS.
+  nps = (nps || []).filter(function (n) { return !n.enviado_a_compras; });
 
   // Agrupar por pedido. `np_total` = cuántos bloques tiene: se cuenta acá porque
   // la vista de LK lo calcula pero no lo devuelve (sí lo devuelven nuestras RPC

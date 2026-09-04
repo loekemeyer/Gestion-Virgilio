@@ -257,3 +257,6 @@ PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node te
 
 echo "== pweb-entregados (v12.87: la NP web controlada cuenta como entregada, y sigue contando con el tiempo) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/pweb-entregados.cjs
+
+echo "== pweb-pendiente (v12.88: A Programar sólo muestra pedidos NO enviados a compras) =="
+PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/pweb-pendiente.cjs
