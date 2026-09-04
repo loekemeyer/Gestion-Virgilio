@@ -8298,6 +8298,195 @@ Tercer lote. Objetos creados, **aún no conectados al front**:
   excluye controlados (CRN) y sin salida (FSS), ordena vencidos primero. Columnas:
   np, tanda, lios, cod_cliente, rs, vencido, first_load, last_ccn.
 
+### Pedidos web de LK dentro de Virgilio (idea 3717)
+
+Desde 2026-09-03 la programación puede salir del **pedido web**, sin esperar al
+mail de las 12:30 ni a que alguien lo cargue a ISIS. Un pedido que entró a las
+16:03 está disponible al instante, en vez de al día siguiente.
+
+**No hay copia en Virgilio.** Se probó primero con una tabla espejo (`Pedidos_Web`)
+alimentada por un cron cada 15 min, y se descartó por decisión del dueño: es otra
+copia de un dato que ya existe, con su propia forma de desincronizarse. Gestión
+lee **la misma tabla donde caen los pedidos de la página**, en vivo.
+
+- **Dónde vive**: entero en el proyecto **LK** (`kwkclwhmoygunqmlegrg`), en
+  `sql/pedidos_web_lk.sql`. Dos vistas: `v_pedidos_web` (el pedido abierto en
+  líneas, en el orden del carrito) y **`v_pedidos_web_np`** (las NP ya cortadas,
+  con los ítems en `jsonb` ordenados). Esta última es la que consume Gestión.
+
+- **Cómo llega Gestión**: con el cliente Supabase de LK y la sesión de admin que
+  ya da el bridge del Panel Web LK (`lkTryBridge`, v12.35, loguea como
+  `loekemeyer.n8n@gmail.com`, que está en `public.admins`). Sin credenciales ni
+  permisos nuevos.
+
+- **Seguridad**: las dos vistas van con `security_invoker = true`, así la RLS de
+  `orders` es la que decide. Sin eso correrían como `postgres` y cualquier cliente
+  logueado del portal vería los pedidos de todos. Verificado: admin del bridge
+  1.463 NP · otro authenticated 0 · anon permission denied. **Al tocar esas vistas
+  hay que repetir las tres pruebas.**
+
+- **Regla de corte**: bloques de **18 líneas contiguas en el orden del carrito**
+  (Loekemeyer) y **15** (Chef), vía `ceil(linea_rn / tope)`. Está leída de
+  `processOrders` de la Edge Function `procesar-pedidos-db` de LK, que es la que
+  arma el Excel del mail. El tope de Chef está **medido**, no recordado: por
+  líneas por NP en `PPP_Base_Pedidos`, Chef amontona 25 NP en 15 y cae a 0 en 16;
+  LK amontona 253 en 18 y cae a 2 en 19.
+  **Nunca ordenar por código de artículo acá** — reordenar es el bug clásico del
+  módulo, y es por lo que `lk_pedidos_match` NO sirve para esto (su `items_string`
+  viene ordenado por código y ya perdió el carrito).
+
+- **La norma del Excel que NO se copia**: su `N° Pedido` (`globalN`) es un contador
+  de la tanda —numera primero los pedidos de ≥18 líneas y después los chicos—, así
+  que el mismo pedido saca distinto número según con qué otros salga en el mail.
+  No es identidad y no sirve como clave. La identidad de una NP es
+  **(order_id, np_idx)**; el número visible se reparte aparte (ver abajo).
+
+- **El m³ no sale de LK** (no tiene volumen por caja): lo resuelve Gestión contra
+  su propia `Volumen_Articulos`, como `Σ cajas × m3`.
+
+  **Está validado contra las NP reales**, no supuesto. Sobre 158 NP con m³ oficial
+  en `PPP_Programacion_Diaria`: total calculado **51,00 m³ contra 51,13 reales
+  (0,26% de diferencia)**, error mediano por NP de **0,8 litros**, p95 de 9,4 y
+  máximo de 124. 151 de 158 quedan por debajo de los 10 litros. Contra la otra
+  fuente, independiente —`PPP_Entregados_Meta`, que viene de la columna `Mt3` del
+  Sheet, 637 NP— el total da **1,75% abajo** y la mediana por NP 0,9985.
+  Los pocos desvíos porcentuales grandes son NP diminutas donde el propio dato
+  oficial está redondeado a 3 decimales (una NP de 0,002 m³ se va 20% con medio
+  milésimo de redondeo). Para repetir la medición, la consulta está en
+  `sql/pedidos_web_lk.sql`.
+
+  ⚠ **Tener la fila en `Volumen_Articulos` NO es tener el dato.** La tabla tiene
+  **2.547 filas pero 1.613 con m³ nulo o cero** — códigos dados de alta sin medir.
+  Por eso el módulo solo toma valores POSITIVOS: una fila vacía se trata como
+  faltante. Si no, un artículo sin medir sumaría 0 y el pedido saldría con m³ de
+  menos sin que nadie se entere. Las NP a las que les falta algún artículo se
+  muestran con `~` y el total con `≥`, porque son un piso y no un valor.
+
+  Del catálogo de la web hoy hay **7 sin m³ útil**: **071** (Bowl Multi Uso 330ml,
+  el único que ya se pidió por web — 6 veces, última el 11/07), **241**, **242**,
+  **441Z**, **442E**, **444E** y **446E** (Bowl Ac. Inox. Base Silicona 16/20/24).
+  Midiendo esos 7 el módulo queda sin agujeros.
+
+- **Chef (v12.66)**: habilitado el 2026-09-03. Del lado de Chef se corrió
+  `grant usage on schema public` + `grant select on public.orders` a `loke_reader`.
+  Se elige con el selector de empresa de la pantalla.
+  - ⚠ Va por **RPC aparte** (`get_pedidos_web_np_chef`), **no** unida a
+    `v_pedidos_web_np`: leer `chef_orders` por el FDW cuesta **3.338 ms** y si
+    estuvieran juntas cada carga pagaría esos 3,3 s aunque nadie mire Chef.
+  - ⚠ Va **`SECURITY DEFINER`** (el user mapping del FDW es de `postgres`, leyendo
+    como el invocante el foreign scan falla), así que el chequeo contra `admins`
+    está **dentro** de la función y se le revocó el EXECUTE a `anon`.
+  - Tope **15** líneas; razón social de `chef_padron` (las numeraciones de cliente
+    son independientes entre empresas); `enviado_a_compras` vuelve **NULL** porque
+    `chef_orders` no espeja esa columna.
+  - Estado: 116 pedidos, **59 con payload** — los otros 57 no tienen ítems y no
+    aparecen. Corte verificado: el pedido 213 (17 líneas) sale **15 + 2**.
+
+- **La pantalla**: botón **🧾 PPP Web** en el panel supervisor (v12.59, m³ endurecido en v12.60). Lee
+  `v_pedidos_web_np` de LK en vivo, resuelve el m³ contra `Volumen_Articulos` de
+  esta base y muestra las NP a programar. Trae una **ventana de 30 días**
+  (`PWEB_VENTANA_DIAS`) y por defecto muestra **solo lo que falta programar**.
+  ⚠ **Ya no filtra por "salió el mail"** (v12.65). Ese criterio servía para mostrar
+  el agujero —un pedido de las 16:03 no existía para nadie hasta el mediodía
+  siguiente—, pero como filtro de trabajo estaba mal: al día siguiente el pedido se
+  sellaba y **desaparecía de la pantalla aunque nadie lo hubiera programado**.
+  Lo que ya salió por mail se muestra con una chapita **ISIS** en ámbar: durante la
+  transición puede estar programado en el circuito viejo, y programarlo también acá
+  lo haría **pickear dos veces**.
+  La sesión de LK sale del **mismo bridge** que abre el Panel Web LK
+  (`admin-login-otp` acción `bridge`), cacheada en memoria una hora.
+  Regresión: `tests/pweb-ppp-web.cjs`.
+
+- ⚠ **`PPP_Programacion_Diaria` NO se toca.** Gestión y Producción comparten el
+  MISMO proyecto Supabase (`hrxfctzncixxqmpfhskv`, los dos `supabase-config.js`
+  apuntan ahí), así que esa tabla es la que están usando los operarios: 161 filas,
+  61 tandas, entregas hasta el 28/10. La PPP Web es una vista aparte que no
+  escribe nada. Vaciar esa tabla para "empezar limpio" rompería Producción.
+
+- **Programar (v12.61)**: cada fila de la PPP Web tiene tanda, zona y fecha de
+  entrega, y se guardan en **`PPP_Web_Programacion`** de esta base
+  (`sql/ppp_web_programacion.sql`). Es lo único del circuito que no sale de LK:
+  no es un dato del pedido, es una decisión del depósito.
+  - Clave **(order_id, np_idx)**, la identidad real — no el número visible, que es
+    una etiqueta guardada al lado. Así la programación no depende de cómo se numere.
+  - **El número de NP: `LK 1343`** (v12.62) — prefijo de empresa (`LK` / `CH`) y
+    cuatro dígitos, parecido al id de pedido de la página. Lo reparte
+    `ppp_web_np_asignar` y vive en `PPP_Web_NP`.
+    ⚠ **No es el id del pedido**, aunque arranque pegado a él (seed 1343 = el id
+    más alto al crearlo + 1). Es un **contador propio**, como las NP de ISIS: cada
+    NP consume un número. Tiene que serlo porque un pedido se parte en varias NP
+    —31% de los casos— y si el pedido 1342 diera LK 1342/1343/1344, el pedido 1343
+    de mañana chocaría con el LK 1343 ya usado. A partir del primer pedido partido
+    las dos secuencias se despegan.
+    La RPC es **idempotente** (una NP numerada conserva su número siempre) y toma
+    un `pg_advisory_xact_lock` por empresa: sin eso, dos pantallas abiertas leen el
+    mismo `max(np)` y sacan el mismo número.
+    ⚠ **Techo de 4 dígitos**: a ~273 NP/mes, de 1343 a 9999 hay unos **31 meses**.
+    Ahí hay que reiniciar el contador o pasar a 5 dígitos.
+    La v12.61 usaba una NP de 9 dígitos derivada del `order_id` y calculada en la
+    vista de LK; se eliminó — dos numeraciones compitiendo es pedir que se usen mal.
+    Ojo: Postgres **no deja sacar columnas con `create or replace view`**, hubo que
+    `drop view` y recrearla.
+  - **Tabla aparte de `PPP_Programacion_Diaria` a propósito**: esa es la de
+    Producción y escribir ahí mezclaría dos circuitos. Conviven sin tocarse.
+  - Escritura con la **misma reja** que la PPP: los tres mails de supervisor, por
+    RLS del lado del servidor. Las dos listas están duplicadas a mano — al sumar
+    un supervisor hay que tocar las dos policies.
+  - La **zona se sugiere** con el mismo diccionario compartido que usa la PPP
+    (`Zonas_Barrios` + overrides, vía `pppZonaDeBarrio`), así una zona corregida
+    en un lado vale en el otro. El barrio sale de la sucursal de entrega cortando
+    por el último separador ("Bragado 5742 - Mataderos" → Mataderos); "Retira" en
+    cualquier grafía se reconoce como tal. 444 de 472 sucursales traen separador.
+  - ⚠ **Sin número no se guarda** (v12.68). Si `ppp_web_np_asignar` falla (RPC
+    caída, sesión vencida) la etiqueta queda en `…`, pero el guardado seguía igual
+    y escribía `np: null` y un `np_label` `"LK undefined"` en la foto de artículos
+    — una tanda que le llega **rota** al operario. Ahora corta y pide refrescar.
+  - ⚠ **La sugerencia no es una decisión**: solo se guardan las filas que la
+    persona editó. Sin ese filtro la zona sugerida —que viene preseleccionada en
+    el `<select>`— se guardaba sola en todas las filas visibles al apretar
+    Guardar, aunque nadie las hubiera mirado.
+  - `m3` y `m3_parcial` se guardan como **foto** del momento de programar: la
+    tanda se armó con ese número. `m3_parcial` marca que ese m³ es un piso.
+  - **🪄 Armar tandas (v12.63)**: botón que arma el reparto solo. **No es un
+    algoritmo nuevo** — reusa el de la PPP (`_pppBalancearZona`, `pppEsSuper`, el
+    generador de códigos): súper una tanda por cliente, el resto por zona → cliente
+    empacado en **0,60–1,00 m³** (objetivo `tandaCap`, 0,80 por defecto), sin
+    mezclar zonas nunca.
+    - **Llena los campos pero NO guarda**: el reparto se revisa antes de existir.
+      Por eso es "casi" automático.
+    - **No pisa una tanda escrita a mano.**
+    - Los códigos (`LETRA<NN><LETRA>`) siguen desde la última letra usada en **las
+      dos tablas**, la de la PPP Web y la de Producción: comparten espacio de
+      nombres y dos tandas distintas con el mismo código serían un lío en el
+      depósito.
+    - Una NP sin zona **no se mete en cualquier tanda**: queda sin tanda y se avisa.
+  - **Llega al operario (v12.64)**: la tanda programada en la PPP Web entra al
+    **mismo mapa** que las de ISIS (`mergeMonitorPppWeb` sobre `fetchMonitorSheet`),
+    y sus artículos al mismo mapa de picking (`mergePickingBasePppWeb` sobre
+    `fetchPickingBaseFromSupabase`). Todo lo que viene después —picking, armado,
+    carga, monitor— funciona sin enterarse de dónde salió el pedido. Una tanda
+    puede mezclar NP de ISIS y web.
+    - Es **aditivo y con `try/catch`**: si falla, el picking de siempre queda igual.
+    - Los artículos salen de **`PPP_Web_Base`**, una **foto tomada al programar**.
+      Acá la copia sí corresponde: el operario pickea lo que se programó, y además
+      no tiene sesión contra LK. Es lo mismo que hace `PPP_Base_Pedidos` con ISIS.
+    - ⚠ **La NP viaja etiquetada (`LK 1343`), y no es cosmético.** `empresaDeNp`
+      resolvía la empresa por el número (**>90000 = LK, si no CH**), así que una NP
+      web de 4 dígitos caía en **Chef** y el operario iría a buscar un pedido de
+      Loekemeyer al sector equivocado. Ahora, si la NP trae prefijo `LK`/`CH`,
+      manda el prefijo; las NP de ISIS (solo dígitos) siguen igual.
+  - **El Excel para ISIS también las arma (v12.67)** — es el último paso: se
+    pickea el pedido web y después hay que importarlo a ISIS para facturar.
+    `_facXlsArmar` tenía dos agujeros para las NP web, los dos silenciosos:
+    - las NP van ahora **entrecomilladas** en el `in.()`. `"LK 1343"` tiene un
+      espacio y sin comillas PostgREST no lo resuelve: esas filas se caían del
+      archivo sin ningún error;
+    - la **fecha** de una NP de ISIS sale de `PPP_Base_Pedidos`, donde una NP web
+      no está. Se guarda `PPP_Web_Programacion.fecha_recep` al programar y el Excel
+      la lee de ahí. Antes salía con la fecha vacía.
+  - Regresión: `tests/pweb-programar.cjs`, `tests/pweb-tandas.cjs`,
+    `tests/pweb-picking.cjs` y `tests/pweb-excel-isis.cjs`.
+
 **Pendiente MEDIA**: `prodLoad/prodCompute` — RPC parametrizado por rango de fechas,
 cálculo de productividad con m³ y factores. Complejidad alta, dejado para después.
 
