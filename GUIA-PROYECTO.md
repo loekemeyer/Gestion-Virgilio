@@ -8488,8 +8488,22 @@ lee **la misma tabla donde caen los pedidos de la página**, en vivo.
     - la **fecha** de una NP de ISIS sale de `PPP_Base_Pedidos`, donde una NP web
       no está. Se guarda `PPP_Web_Programacion.fecha_recep` al programar y el Excel
       la lee de ahí. Antes salía con la fecha vacía.
-  - Regresión: `tests/pweb-en-ppp.cjs`, `tests/pweb-picking.cjs` y
-    `tests/pweb-excel-isis.cjs`.
+  - ⚠ **La fecha de entrega sale de los edits, no de la fila** (v12.71). La escribe
+    `_pppScheduleTandas` al confirmar; leyendo la fila original se guardaba `null` y
+    la NP quedaba en Supabase **sin día de entrega** aunque en pantalla se viera
+    agendada.
+  - ⚠ **Con pocos pedidos web el armado automático casi no programa nada.** La regla
+    de la PPP pide **0,60 m³ mínimos por tanda y no mezclar zonas**. Medido con los
+    3 pedidos reales del 03/09: sólo 1 llegó al mínimo (1,184 m³, Zona 6); los de
+    0,336 (Zona 3) y 0,033 (Retira) quedaron sin tanda. **No es un fallo**: es la
+    regla, y en la PPP de ISIS no se nota porque hay muchos pedidos por zona. Con el
+    circuito nuevo, hasta que haya volumen, la mayoría habrá que agruparla a mano o
+    bajar el mínimo.
+  - Regresión: `tests/pweb-en-ppp.cjs`, `tests/pweb-picking.cjs`,
+    `tests/pweb-excel-isis.cjs` y **`tests/pweb-e2e.cjs`** — este último corre el
+    circuito entero (pedido → NP → número → m³ → PPP → tanda → lo que se guarda →
+    lo que ve el operario → Excel para ISIS) con **datos reales** de producción
+    congelados como fixture.
 
 **Pendiente MEDIA**: `prodLoad/prodCompute` — RPC parametrizado por rango de fechas,
 cálculo de productividad con m³ y factores. Complejidad alta, dejado para después.

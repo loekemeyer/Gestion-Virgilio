@@ -6607,7 +6607,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v12.70";
+const APP_VERSION = "v12.71";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -26876,8 +26876,18 @@ function pppConfirmarProgramar() {
   // PPP: son los únicos que este circuito maneja de punta a punta, y el operario
   // tiene que verlos desde su celular. Va después de pintar para que la pantalla
   // responda ya; si falla, se avisa sin deshacer lo mostrado.
-  const _web = pend.filter(function (p) { return p._web; })
-                   .map(function (p) { const o = Object.assign({}, p); o.tanda = tandaDe(p) || p.tanda; return o; });
+  // La tanda y la FECHA DE ENTREGA salen de los edits, no de la fila original: los
+  // acaba de escribir _pppScheduleTandas ahí. Leyendo la fila se guardaba la fecha
+  // en null y la NP quedaba en Supabase sin día de entrega, aunque en pantalla se
+  // viera agendada.
+  const _ed2 = pppLoadEdits();
+  const _web = pend.filter(function (p) { return p._web; }).map(function (p) {
+    const e = _ed2[String(p.np)] || {};
+    const o = Object.assign({}, p);
+    o.tanda = tandaDe(p) || p.tanda;
+    o.fecha_entrega = (e.fecha_entrega != null && e.fecha_entrega !== "") ? e.fecha_entrega : (p.fecha_entrega || "");
+    return o;
+  });
   if (_web.length) {
     pppGuardarWeb(_web).then(function (n) {
       if (n) pppSetStatus("✅ Programado · " + n + " pedido(s) de la página guardados y visibles para el operario.", true);
