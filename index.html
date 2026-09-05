@@ -2339,6 +2339,10 @@ tr.ppp-err-zona > td{ background:#fffbeb !important; }
 .pn-alert .n{ font-size:21px; font-weight:900; color:#b91c1c; background:#fee2e2; border-radius:9px; padding:2px 10px; }
 .pn-alert b{ color:#7f1d1d; } .pn-alert .s{ color:#991b1b; font-size:12.5px; }
 .pn-alert .btn{ margin-left:auto; background:#b91c1c; color:#fff; font-weight:800; padding:7px 13px; border-radius:9px; font-size:13px; white-space:nowrap; }
+.pn-alert.warn{ background:#fff7ed; border-color:#fdba74; }
+.pn-alert.warn:hover{ background:#ffedd5; }
+.pn-alert.warn .n{ color:#c2410c; background:#ffedd5; } .pn-alert.warn b{ color:#7c2d12; } .pn-alert.warn .s{ color:#9a3412; } .pn-alert.warn .btn{ background:#c2410c; }
+@media (max-width:640px){ .pn-alert{ flex-wrap:wrap; } .pn-alert .btn{ margin-left:0; width:100%; text-align:center; } .pn-kpi .v{ font-size:21px; } }
 .pn-days{ display:grid; grid-template-columns:repeat(3,1fr); gap:12px; }
 .pn-day{ background:#fff; border:1.5px solid #dbe3ee; border-radius:16px; padding:13px 15px 11px; display:flex; flex-direction:column; min-height:240px; box-shadow:0 1px 3px rgba(15,23,42,.05); cursor:pointer; }
 .pn-day:hover{ border-color:#93c5fd; box-shadow:0 6px 18px rgba(30,107,214,.12); }
@@ -6945,7 +6949,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v13.04";
+const APP_VERSION = "v13.05";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -29416,9 +29420,12 @@ function _pppPlanGridHtml(programados) {
     '<div class="pn-kpi"><div class="ico">🚚</div><div><div class="l">Camiones</div><div class="v">' + camiones + '</div><div class="s">uno por zona y día</div></div></div>' +
     '<div class="pn-kpi"><div class="ico">🧊</div><div><div class="l">Volumen</div><div class="v">' + _pppFmtM3(totM3) + ' m³</div><div class="s">a entregar</div></div></div>' +
     '<div class="pn-kpi g"><div class="ico">💰</div><div><div class="l">Valor</div><div class="v">' + (_pppValor ? _pppFmtPesos(totVal) : '…') + '</div><div class="s">estimado a lista' + (totSinVal ? ' · ' + totSinVal + ' sin valuar' : '') + '</div></div></div>' +
-    '<div class="pn-kpi' + ((nVenc || sinCtrl) ? ' r' : ' ok') + '"><div class="ico">' + ((nVenc || sinCtrl) ? '⏰' : '✅') + '</div><div><div class="l">Atención</div><div class="v">' + (nVenc + sinCtrl) + '</div><div class="s">' + nVenc + ' vencida' + (nVenc === 1 ? '' : 's') + ' · ' + sinCtrl + ' sin controlar</div></div></div>' +
+    '<div class="pn-kpi' + (nVenc ? ' r' : ' ok') + '"><div class="ico">' + (nVenc ? '⏰' : '✅') + '</div><div><div class="l">Atrasados</div><div class="v">' + nVenc + '</div><div class="s">' + (nVenc ? 'fecha pasada, no salieron' : 'todo al día') + '</div></div></div>' +
     '</div>';
-  if (nVenc) h += '<div class="pn-alert" onclick="pppPlanAbrir(\'venc\')"><span class="n">' + nVenc + '</span><div><b>Pedido' + (nVenc === 1 ? '' : 's') + ' con fecha vencida todavía en programación</b><div class="s">Entrega pasada y sin cargar ni controlar' + (sinCtrl ? ' · además ' + sinCtrl + ' cargado(s) SIN CONTROLAR en En Salida' : '') + '</div></div><span class="btn">Ver ' + (nVenc === 1 ? 'el' : 'los ' + nVenc) + ' →</span></div>';
+  // v13.05 — dos carteles separados (dueño: "es confuso el cartel"): atrasados por un lado,
+  // cargados sin controlar por otro (esos ya no están acá: viven en En Salida).
+  if (nVenc) h += '<div class="pn-alert" onclick="pppPlanAbrir(\'venc\')"><span class="n">' + nVenc + '</span><div><b>' + (nVenc === 1 ? 'Pedido atrasado' : 'Pedidos atrasados') + '</b><div class="s">La fecha de entrega ya pasó y todavía no ' + (nVenc === 1 ? 'salió' : 'salieron') + '. Tocá para ' + (nVenc === 1 ? 'verlo y reprogramarlo' : 'verlos y reprogramarlos') + '.</div></div><span class="btn">Ver →</span></div>';
+  if (sinCtrl) h += '<div class="pn-alert warn" onclick="pppTab(\'enviaje\')"><span class="n">' + sinCtrl + '</span><div><b>' + (sinCtrl === 1 ? 'Pedido cargado al camión sin controlar el remito' : 'Pedidos cargados al camión sin controlar el remito') + '</b><div class="s">Ya ' + (sinCtrl === 1 ? 'salió' : 'salieron') + ' y pasó el plazo de control. ' + (sinCtrl === 1 ? 'Está' : 'Están') + ' en En Salida.</div></div><span class="btn">Ir a En Salida →</span></div>';
   h += '<div class="pn-days">';
   for (const d of dias) {
     const dd = g.byDay.get(d.key);
@@ -29457,8 +29464,8 @@ function _pppPlanDiaHtml(programados, key) {
   const ped = esVenc ? g.venc : ((g.byDay.get(key) || {}).ped || []);
   const hoy = _pppHoyKey();
   const dt = esVenc ? null : _pppKeyDate(key);
-  const titulo = esVenc ? "Vencidas — entrega pasada, todavía en programación" : (dt.getDate() + " de " + _PN_MESL[dt.getMonth()]);
-  const sub = esVenc ? (ped.length + " pedido" + (ped.length === 1 ? "" : "s") + " para revisar") : (_PN_DOW[dt.getDay()] + (key === hoy ? " · hoy" : ""));
+  const titulo = esVenc ? "Atrasados — la fecha de entrega ya pasó" : (dt.getDate() + " de " + _PN_MESL[dt.getMonth()]);
+  const sub = esVenc ? (ped.length + " pedido" + (ped.length === 1 ? "" : "s") + " que no " + (ped.length === 1 ? "salió" : "salieron") + " · reprogramar o cargar") : (_PN_DOW[dt.getDay()] + (key === hoy ? " · hoy" : ""));
   const cams = _pppCamiones(ped), est = _pppPlanEstDia(ped), val = _pppPlanValor(ped);
   const nCam = cams.filter(function (c) { return c.ruta !== "ret" && c.ruta !== "sup"; }).length;
   let h = '<div class="pn-topbar"><button class="pn-back" onclick="pppPlanVolver()">← Volver a los 6 días</button><button class="pn-lnk" onclick="pppPlanClasica(true)">Vista clásica</button></div>';
@@ -29466,7 +29473,7 @@ function _pppPlanDiaHtml(programados, key) {
     '<div class="kp"><div class="k"><i>📦</i><div><div class="l">Pedidos</div><div class="v">' + ped.length + '</div></div></div><div class="k"><i>🚚</i><div><div class="l">Camiones</div><div class="v">' + nCam + '</div></div></div><div class="k"><i>🧊</i><div><div class="l">Volumen</div><div class="v">' + _pppFmtM3(_pppM3Sum(ped)) + ' m³</div></div></div><div class="k"><i>💰</i><div><div class="l">Valor estimado</div><div class="v g">' + (_pppValor ? _pppFmtPesos(val.valor) : '…') + '</div></div></div></div>' +
     '<div class="barw">' + _pppPlanBarraHtml(est, ped.length) + '</div></div>';
   if (!ped.length) return h + '<div class="planim-empty">Nada programado para este día.</div>';
-  if (esVenc) h += '<div class="pn-note">⏰ Estos pedidos tienen fecha de entrega pasada y siguen en Programación (no se cargaron al camión ni se controló el remito). Reprogramalos desde ✏️ Editar o, si ya salieron, cargá el CCN / controlá el remito.</div>';
+  if (esVenc) h += '<div class="pn-note">⏰ La fecha de entrega de estos pedidos ya pasó y no se cargaron al camión. Ponéles una fecha nueva con ✏️ Editar (abajo, en la tanda). Si en realidad ya salieron, hay que cargar el camión (CCN) y controlar el remito.</div>';
   const dk = esVenc ? "venc" : key;
   for (const c of cams) {
     const oc = (c.ruta === "ret" || c.ruta === "sup") ? null : _pppOrdenCarga(c);

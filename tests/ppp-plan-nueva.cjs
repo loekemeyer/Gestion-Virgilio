@@ -57,10 +57,10 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
     _pppTab = "plan"; _pppPlanDay = null; _pppPlanClasica = false; pppRenderProg();
     let html = document.getElementById("pppPreview").innerHTML;
     const kpi = (l) => { const m = new RegExp('<div class="l">' + l + '</div><div class="v">([^<]*)</div>').exec(html); return m ? m[1] : null; };
-    out.kpiPed = kpi("Pedidos"); out.kpiCam = kpi("Camiones"); out.kpiVol = kpi("Volumen"); out.kpiVal = kpi("Valor"); out.kpiAt = kpi("Atención");
+    out.kpiPed = kpi("Pedidos"); out.kpiCam = kpi("Camiones"); out.kpiVol = kpi("Volumen"); out.kpiVal = kpi("Valor"); out.kpiAt = kpi("Atrasados");
     out.dias = (html.match(/class="pn-day(?: |")/g) || []).length;
     out.vacios = (html.match(/pn-day empty/g) || []).length;
-    out.alerta = /pn-alert/.test(html) && /Ver los 2/.test(html);
+    out.alerta = /pn-alert/.test(html) && /Pedidos atrasados/.test(html) && !/pn-alert warn/.test(html);
     out.hoyBadge = /class="hoy">HOY/.test(html) === (hab[0].getTime() === _pppKeyDate(_pppHoyKey()).getTime());
     out.dia1 = /Camión 1 · Zona 1 - CABA Sur/.test(html) && /Camión 2 · Zona 6 - GBA Norte/.test(html) && /\$ 6\.000\.000/.test(html);   // 3,7+0,8+0,9+0,6 m³ × 1 M
     out.retira = /Retira en fábrica/.test(html);
@@ -82,7 +82,7 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
     // vencidas
     pppPlanAbrir("venc");
     html = document.getElementById("pppPreview").innerHTML;
-    out.venc = /Vencidas/.test(html) && /Vencida Uno/.test(html) && /Vencida Dos/.test(html) && !/Astorga/.test(html);
+    out.venc = /Atrasados/.test(html) && /Vencida Uno/.test(html) && /Vencida Dos/.test(html) && !/Astorga/.test(html);
     // vista clásica y vuelta
     pppPlanClasica(true);
     html = document.getElementById("pppPreview").innerHTML;
@@ -101,9 +101,9 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
     ["KPI camiones 5 (uno por zona y día; Retira no cuenta)", r.kpiCam === "5"],
     ["KPI volumen 20,4 m³",                                   r.kpiVol === "20,4 m³"],
     ["KPI valor $ 20.400.000",                                r.kpiVal === "$ 20.400.000"],
-    ["KPI atención 2 (vencidas)",                             r.kpiAt === "2"],
+    ["KPI atrasados 2",                                       r.kpiAt === "2"],
     ["6 tarjetas de día, 2 vacías",                           r.dias === 6 && r.vacios === 2],
-    ["banda roja de vencidas con 'Ver los 2'",                r.alerta === true],
+    ["cartel rojo de atrasados (sin el naranja: no hay sin controlar)", r.alerta === true],
     ["HOY sólo si hoy es hábil",                              r.hoyBadge === true],
     ["día 1: dos camiones por zona con $",                    r.dia1 === true],
     ["día 2: Retira en fábrica aparte",                       r.retira === true],
@@ -117,7 +117,7 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
     ["2º en picking → falta armar",                           r.faltaArmar === true],
     ["camión de 1 pedido: 1º se carga primero",               r.sinOrdenNorte === true],
     ["las tandas del día siguen abajo con sus bloques",       r.bloques === true],
-    ["vista de vencidas",                                     r.venc === true],
+    ["vista de atrasados",                                    r.venc === true],
     ["vista clásica y vuelta al tablero",                     r.clasica === true && r.vuelve === true],
     ["día 2: Retira sin orden de carga ni camión",            r.dia2 === true],
     ["sin errores de página",                                 errs.length === 0]

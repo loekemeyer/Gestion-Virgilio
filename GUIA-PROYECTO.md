@@ -12,7 +12,7 @@
 > única**; no se replica. Ante la duda entre parche rápido y fix de raíz → **fix
 > de raíz**.
 >
-> Última actualización: 2026-09-05 (sábado, noche) · Versión app al documentar: **v13.04**
+> Última actualización: 2026-09-05 (sábado, noche) · Versión app al documentar: **v13.05**
 >
 > ⚠ **Regla desde el 2026-09-05 (dueño: "empezá a bumpear las modificaciones así voy chequeando"):
 > TODO cambio —front o backend— lleva bump de `APP_VERSION`/`SW_VERSION`, aunque no toque
@@ -23,6 +23,15 @@
 > tandas con prefijo `GV-`. Sólo del lado Virgilio: el mail de las 12:30 de LK sigue andando y
 > Producción no se tocó (medido: ninguna función `ppp_web_*`/`gv_ppp_web_*` escribe en tabla
 > compartida). Primera corrida real: lunes 2026-09-07 00:01. Cómo apagar, en `CLAUDE.md`.
+>
+> Nota **v13.05** — **Tablero: carteles separados** (dueño, desde el celular: *"es confuso el cartel"*).
+> Antes un solo cartel rojo mezclaba "vencidas" con "cargados sin controlar" y el KPI sumaba las dos
+> cosas (40 = 38 + 2). Ahora: KPI **Atrasados** (sólo los de fecha pasada que no salieron); cartel
+> **rojo** "Pedidos atrasados — la fecha de entrega ya pasó y todavía no salieron. Tocá para verlos y
+> reprogramarlos" → abre la vista "Atrasados" (antes "Vencidas"); cartel **naranja** aparte, sólo si
+> hay, "Pedidos cargados al camión sin controlar el remito — ya salieron y pasó el plazo de control.
+> Están en En Salida" → abre En Salida. En celular los carteles envuelven y el botón va abajo a lo
+> ancho. Test `ppp-plan-nueva` ajustado.
 >
 > Nota **v13.04** (backend + bump) — **Armado intradía de zona 1 y 2** (idea **7317**, dueño:
 > *"los pedidos de zona 1 y 2 deben programarse inmediatamente, apenas llegan, porque a esa zona voy
