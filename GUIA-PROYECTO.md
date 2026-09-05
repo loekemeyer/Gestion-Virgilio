@@ -12,7 +12,22 @@
 > única**; no se replica. Ante la duda entre parche rápido y fix de raíz → **fix
 > de raíz**.
 >
-> Última actualización: 2026-09-05 (sábado, noche) · Versión app al documentar: **v13.10**
+> Última actualización: 2026-09-05 (sábado, noche) · Versión app al documentar: **v13.11**
+>
+> Nota **v13.11** (front) — **La PPP tardaba 15 s en mostrar "A Programar" en el celular.** Medido en
+> los logs de Supabase (20:04 del 05/09): al abrir la PPP salían **~80 requests en 2 s** (base de
+> picking entera paginada, `vista_saldos_stock` ×4 de 2,5 s cada una, `gv_ppp_entregados_meta` ×3,
+> Entregados, meta, alertas…); dos vistas murieron por `statement_timeout` (3 s de anon:
+> `gv_ppp_entregados` y `vista_ppp_pedidos_entregados`, que solas tardan 0,00 s) y había un 400 fijo
+> (`pppCountTable` pedía `select=id` a una vista sin `id`). La cadena que la solapa necesita
+> (puente a LK 1,6 s + login 0,4 s + vista 1,6 s, en serie) esperaba en la cola de red del celular.
+> Arreglos: (1) `supaFetchAll` con **single flight** (consultas idénticas en vuelo comparten un
+> fetch, cada uno recibe su copia); (2) `openPPP` carga **primero lo que se ve** — si está "A
+> Programar" el puente a LK arranca ya; la Programación base después; lo pesado (semáforo de
+> góndola, Entregados, meta, alertas) recién cuando llegó lo de arriba (o a los 6 s); se sacaron
+> 4 refrescos que estaban repetidos; (3) el **token de LK en `sessionStorage`** (dura 1 h: recargar
+> no vuelve a pasar por la Edge Function); (4) el calendario de "A Programar" en paralelo, no en
+> serie; (5) `pppCountTable` con `select=np`. Sin cambio de backend.
 >
 > Nota **v13.10** (backend + front) — **Cruce de factura para NP web** (idea **8033**). Las vistas del
 > cruce (de Producción) deciden la empresa por "¿empieza con 9?", así que una `LK 1350` caía como

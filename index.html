@@ -6958,7 +6958,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v13.10";
+const APP_VERSION = "v13.11";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -8218,7 +8218,24 @@ function pickNormNp(v) {
    corta a max-rows, ~1000). Usa Content-Range (Prefer: count=exact) para saber
    el total — necesario porque "PPP Excel Base Datos Pedidos" tiene ~20k filas.
    Lee con la key pública (anon). v2.80. */
-async function supaFetchAll(endpoint, query) {
+/* v13.11 — SINGLE FLIGHT. Al abrir la PPP salían ~80 requests en 2 s y varias eran la
+   MISMA consulta pedida por tres módulos a la vez (vista_saldos_stock ×4 de 2,5 s cada
+   una, gv_ppp_entregados_meta ×3, Entregas_Virgilio paginada ×2…). En la base eso se
+   apilaba: dos vistas se murieron por statement_timeout (3 s de anon) y en el celular
+   la cola de red demoraba 15 s lo que importaba. Ahora una consulta idéntica en vuelo
+   se comparte: todos esperan el mismo fetch y cada uno recibe su propia copia de la
+   lista (por si alguno la ordena o la recorta in place). */
+const _supaInflight = new Map();
+function supaFetchAll(endpoint, query) {
+  const key = endpoint + "?" + query;
+  let p = _supaInflight.get(key);
+  if (!p) {
+    p = _supaFetchAllRaw(endpoint, query).finally(function () { _supaInflight.delete(key); });
+    _supaInflight.set(key, p);
+  }
+  return p.then(function (rows) { return rows.slice(); });
+}
+async function _supaFetchAllRaw(endpoint, query) {
   const out = [];
   let from = 0, total = Infinity;
   while (from < total) {
@@ -25509,19 +25526,31 @@ function openPPP() {
   pppSeedIfNeeded();        // 1ª vez: precarga el estado actual de la PPP (migrado del Excel)
   if (!_pppParsed.prog || !_pppParsed.prog.length) { const st = pppLoadPedidosStore(); if (st.length) _pppParsed.prog = st; }
   pppShowBaseInfo();
+  // v13.11 — PRIMERO LO QUE SE VE, DESPUÉS EL RESTO. Antes esto disparaba ~80 requests
+  // en 2 s (base de picking entera paginada, saldos ×4, entregados, meta, alertas…) y la
+  // solapa abierta esperaba en la cola de red del celular: 15 s hasta ver algo. Ahora:
+  //   1. si está "A Programar", el puente a LK arranca YA (es la cadena más larga:
+  //      Edge Function + login + vista, ~3,5 s en serie);
+  //   2. la Programación de Supabase (la lista base y los badges) — al terminar llama
+  //      sola a Armado/Entregado/Controlado/En Salida (ya lo hacía: acá estaban repetidos);
+  //   3. lo pesado que ninguna solapa muestra al abrir (semáforo de góndola = base de
+  //      picking + saldos + PKC, Entregados, meta, alertas) va DESPUÉS de que llegó lo de
+  //      arriba. Las solapas siguen refrescando lo suyo al tocarlas (pppTab).
+  if (_pppTab === "apr" && typeof pwebLkToken === "function") { try { pwebLkToken().catch(function () {}); } catch (_e) {} }
   pppRenderProg();
-  pppChkAutoLoad(true);        // arranca el semáforo de góndola (carga compartida: base + saldos + picking pendiente)
-  pppLoadProgFromSupabase();   // BASE = Supabase (Programación Diaria): reemplaza la lista local + deja _pppSupaNps para el dedupe de imports
-  pppRefreshArmado();
-  pppRefreshEntregado();
-  pppRefreshControlado();   // controlados (CRN) + chequeo de carga sin controlar vencida (alarma + Telegram)
-  pppRefreshEnSalida();     // v13.02: cargados al camión sin CRN → salen de Programación, van a En Salida
-  pppRefreshDelivered();    // v6.97: lista durable de Pedidos Entregados (badge correcto al abrir)
-  pppRefreshMetaEntSet();   // v9.72: set de entregadas (hoja) para separar "En viaje" de "Entregados"
+  const _despues = function () {
+    try { pppChkAutoLoad(true); } catch (_e) {}      // semáforo de góndola (base + saldos + picking pendiente)
+    try { pppRefreshDelivered(); } catch (_e) {}     // v6.97: lista durable de Pedidos Entregados (badge)
+    try { pppRefreshMetaEntSet(); } catch (_e) {}    // v9.72: set de entregadas (hoja) para "En viaje"/"Entregados"
+    try { pppRefreshAlertasWeb(); } catch (_e) {}    // v8.82: alertas de pedidos web anómalos
+  };
+  let _ya = false;
+  const _unaVez = function () { if (_ya) return; _ya = true; _despues(); };
+  Promise.resolve().then(pppLoadProgFromSupabase).catch(function () {}).then(_unaVez);   // BASE = Supabase (Programación Diaria) + Armado/Entregado/Controlado/En Salida
+  setTimeout(_unaVez, 6000);    // si la base tarda, lo demás no espera para siempre
   pppAutoRenderStatus();    // auto-carga (File System Access): estado + arranque del chequeo
   pppAutoStart();
   pppRenderPdfDirStatus();  // estado de la carpeta de PDF (ISIS) para imprimir pedidos
-  pppRefreshAlertasWeb();   // v8.82: alertas de pedidos web anómalos
 }
 function pppToggleImport() { const m = document.getElementById("pppImportMenu"); if (!m) return; m.classList.toggle("hidden"); if (!m.classList.contains("hidden")) { pppShowBaseInfo(); pppAutoRenderStatus(); } }
 function pppCloseImport() { const m = document.getElementById("pppImportMenu"); if (m) m.classList.add("hidden"); }
@@ -25557,6 +25586,13 @@ const PWEB_LK_URL  = "https://kwkclwhmoygunqmlegrg.supabase.co";
 const PWEB_LK_ANON = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imt3a2Nsd2htb3lndW5xbWxlZ3JnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njk1MjA2NzUsImV4cCI6MjA4NTA5NjY3NX0.soqPY5hfA3RkAJ9jmIms8UtEGUc4WpZztpEbmDijOgU";
 
 let _pwebTok = null, _pwebTokExp = 0;
+// v13.11 — el token de LK dura 1 h: guardado en sessionStorage se ahorra el puente
+// (Edge Function 1,6 s + login 0,4 s, medido) en cada recarga dentro de esa hora.
+const PWEB_TOK_SS_KEY = "gv_lk_tok_v1";
+try {
+  const _s = JSON.parse(sessionStorage.getItem(PWEB_TOK_SS_KEY) || "null");
+  if (_s && _s.tok && _s.exp && Date.now() < _s.exp - 60000) { _pwebTok = _s.tok; _pwebTokExp = _s.exp; }
+} catch (_e) {}
 
 /* Canjea el JWT de Virgilio por uno de LK. Se cachea en memoria: el token dura
    una hora y pedirlo en cada carga sería un viaje de más por nada. */
@@ -25606,6 +25642,7 @@ async function pwebLkToken() {
     }
     _pwebTok = ld.access_token;
     _pwebTokExp = Date.now() + ((ld.expires_in || 3600) * 1000);
+    try { sessionStorage.setItem(PWEB_TOK_SS_KEY, JSON.stringify({ tok: _pwebTok, exp: _pwebTokExp })); } catch (_e) {}
     return _pwebTok;
   })();
   try { return await _pwebTokProm; }
@@ -29834,7 +29871,9 @@ async function pppSubir(tipo) {
    count=exact). Sirve para CORROBORAR que un import realmente entró a la PPP. */
 async function pppCountTable(endpoint) {
   try {
-    const r = await fetch(endpoint + "?select=id&limit=1", { headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY, Prefer: "count=exact" }, cache: "no-store" });
+    // v13.11: `select=np` y no `id` — las vistas gv_ del espejo (gv_ppp_entregados_meta) no
+    // tienen `id` y esto devolvía 400 en cada apertura. Las tres tablas/vistas tienen `np`.
+    const r = await fetch(endpoint + "?select=np&limit=1", { headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY, Prefer: "count=exact" }, cache: "no-store" });
     if (!r.ok) return null;
     const m = /\/(\d+)\s*$/.exec(r.headers.get("content-range") || "");
     return m ? parseInt(m[1], 10) : null;
@@ -32313,9 +32352,9 @@ async function aprCargar() {
       aprTraerPedidos(),
       aprGet('PPP_Web_Programacion?select=order_id&empresa=eq.' + emp + '&tanda=not.is.null&limit=20000'),
       aprGet('PPP_Web_Tanda_Items?select=*&empresa=eq.' + emp + '&limit=20000'),
-      aprGet('gv_ppp_web_tandas_abiertas?select=*&empresa=eq.' + emp + '&order=codigo.asc')
+      aprGet('gv_ppp_web_tandas_abiertas?select=*&empresa=eq.' + emp + '&order=codigo.asc'),
+      aprCargarCalendario()   // v13.11: en paralelo (estaba en serie, una vuelta de red más)
     ]);
-    await aprCargarCalendario();
 
     // Un pedido ya programado, o que ya está en un borrador, no vuelve a la izquierda.
     const fuera = new Set();
