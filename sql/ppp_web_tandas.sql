@@ -246,6 +246,7 @@ create or replace function public.ppp_web_armar_tandas(
   p_forzar_cods text[] default '{}')
 returns table (r_tanda text, r_zona text, r_np_count int, r_m3 numeric, r_clientes int)
 language plpgsql
+set search_path = public, pg_temp   -- v13.08: advisor function_search_path_mutable
 as $function$
 declare
   v_tope   numeric := coalesce((select valor from public."PPP_Web_Config" where clave='tanda_m3_max_mezcla'), 0.80);

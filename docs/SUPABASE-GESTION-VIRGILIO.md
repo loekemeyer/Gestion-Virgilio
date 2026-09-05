@@ -1417,9 +1417,11 @@ Decisiones (AskUserQuestion): **sectores + vecinos en tablas, backend**; **Boedo
 - `zonas_automaticas` = `'1,2,3'` (antes `'1,2'`): la zona 3 entra al job de las 00:01 y al intradía.
 
 **Impacto medido.** Simulación con 14 filas sintéticas (`gv_ppp_web_armar_simular`, fecha 07/09):
-Núñez → E01D y Villa Lugano → E01B (**nunca juntos**); Barracas + Constitución + Lugano → E01B;
-Pompeya + Mataderos → E01C; Boedo + Flores + barrio desconocido → E01A; Once + Núñez + Belgrano →
-E01D (0,80 justo); Avellaneda (zona 4), Retira y Súper quedan sin tanda (no automáticos). Los 109
+Núñez → E01D y Villa Lugano → E01A (**nunca juntos**); Barracas + Constitución + Lugano → E01A
+(0,75); Pompeya + Mataderos → E01B (0,65); Boedo + Flores + barrio desconocido → E01C (0,75: el
+desconocido cae en la regla vieja "mismo grupo Zonas 2+3" y va al final, `collate "C"`); Once +
+Núñez + Belgrano → E01D (0,80 justo); Avellaneda (zona 4), Retira y Súper quedan sin tanda (no
+automáticos). Los 109
 barrios de zona 1–7 tienen sector (0 sin). `gv_ppp_web_pueden_compartir`: Núñez–Lugano false,
 Barracas–Constitución true, Boedo–Pompeya true, Once–Pompeya false, Flores–Mataderos true,
 Barracas–Avellaneda true, desconocido(z2)–Once true, desconocido(z2)–Barracas false, Retira–Barracas
@@ -1435,6 +1437,15 @@ Zona 2"); sin tanda → "Sin tanda · Zona 4"; Retira y Súper aparte. Test `ppp
 **Rollback.** `update public."PPP_Web_Config" set valor = 0 where clave = 'sectores_activos';`
 (vuelve el bucle viejo sin redeploy) y `set valor_texto = '1,2' where clave = 'zonas_automaticas'`.
 Para sacar todo, el bloque final de `sql/gv_sectores.sql`.
+
+**Advisors (v13.08).** Security advisor tras la migración: sobre lo nuevo sólo (a)
+`auth_allow_anonymous_sign_ins` en las 4 tablas — es el patrón de todas las `PPP_Web_*`/`GV_*`
+(la app entra con la anon key; escribe sólo el supervisor por mail) y (b)
+`function_search_path_mutable` en las 6 funciones nuevas y en `ppp_web_armar_tandas` → migración
+`gv_sectores_search_path_v1308`: `set search_path = public, pg_temp` en las 7 (todas califican
+`public.`; `pg_temp` por las tablas temporales del armado). Simulación re-corrida después: mismo
+resultado. Sin filas de la simulación en `PPP_Web_Programacion` (0), una sola sobrecarga de
+`ppp_web_armar_tandas`.
 
 ### 3.x ✅ Armado intradía de zona 1 y 2 al llegar a 0,80 m³ (idea 7317) — 2026-09-05 sábado (v13.04)
 

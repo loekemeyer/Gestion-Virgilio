@@ -12,7 +12,10 @@
 > única**; no se replica. Ante la duda entre parche rápido y fix de raíz → **fix
 > de raíz**.
 >
-> Última actualización: 2026-09-05 (sábado, noche) · Versión app al documentar: **v13.07**
+> Última actualización: 2026-09-05 (sábado, noche) · Versión app al documentar: **v13.08**
+>
+> Nota **v13.08** (backend, sólo bump) — `search_path = public, pg_temp` fijo en las 6 funciones nuevas
+> de v13.07 y en `ppp_web_armar_tandas` (advisor `function_search_path_mutable`). Sin cambio de lógica.
 >
 > ⚠ **Regla desde el 2026-09-05 (dueño: "empezá a bumpear las modificaciones así voy chequeando"):
 > TODO cambio —front o backend— lleva bump de `APP_VERSION`/`SW_VERSION`, aunque no toque

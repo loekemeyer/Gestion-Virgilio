@@ -205,6 +205,7 @@ create or replace function public.gv_ppp_web_barrio_norm(p_barrio text, p_direcc
 returns text
 language sql
 stable
+set search_path = public, pg_temp
 as $function$
   with c as (
     select 1 as ord, public._norm_barrio(p_barrio) as b
@@ -225,6 +226,7 @@ create or replace function public.gv_ppp_web_sector(p_zona text, p_barrio text, 
 returns text
 language sql
 stable
+set search_path = public, pg_temp
 as $function$
   select coalesce(
     case when coalesce(p_zona, '') ~ '^\s*Zona\s*[0-9]' then
@@ -241,6 +243,7 @@ create or replace function public.gv_ppp_web_camion(p_zona text, p_sector text)
 returns text
 language sql
 stable
+set search_path = public, pg_temp
 as $function$
   select coalesce(
     (select g.camion from public."GV_Sectores" g where g.sector = p_sector),
@@ -259,6 +262,7 @@ create or replace function public.gv_ppp_web_compat(
 returns boolean
 language plpgsql
 stable
+set search_path = public, pg_temp
 as $function$
 declare
   v_on  boolean := coalesce((select valor from public."PPP_Web_Config" where clave = 'sectores_activos'), 1) <> 0;
@@ -296,6 +300,7 @@ create or replace function public.gv_ppp_web_pueden_compartir(
 returns boolean
 language sql
 stable
+set search_path = public, pg_temp
 as $function$
   select public.gv_ppp_web_compat(
     p_zona_a, public.gv_ppp_web_sector(p_zona_a, p_barrio_a, p_dir_a), public.gv_ppp_web_barrio_norm(p_barrio_a, p_dir_a),
@@ -324,6 +329,7 @@ create or replace function public.gv_ppp_web_armar_simular(
   p_forzar_cods text[] default '{}')
 returns jsonb
 language plpgsql
+set search_path = public, pg_temp
 as $function$
 declare
   v_out jsonb := '{}'::jsonb;
