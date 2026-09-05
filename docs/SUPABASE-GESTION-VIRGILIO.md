@@ -1380,6 +1380,25 @@ es de Chef y pisa al LK 217): cuando Gestión alimente el tracking, escribir el 
 una función `gv_*` y pedir columna `empresa` en PaginaLK. Y el Excel ISIS de Facturación manda
 `N_Pedido` contador (no el id), como el mail: ISIS numera 98xxx por su cuenta.
 
+### 3.t ✅ El estado del pedido en la página LK (idea 8743) — 2026-09-05 sábado
+
+Dueño: *"cuando un pedido queda facturado debería mostrarlo en la página y decir que ya no
+se puede modificar"*.
+
+| objeto | proyecto | qué |
+|---|---|---|
+| **`gv_pedido_web_estado_pagina`** (vista, `security_invoker`) | Virgilio | un estado por `(empresa, order_id)`: el del bloque **menos** avanzado — `sin_programar / programado / en_picking / pickeado / en_armado / armado / facturado / entregado` — con `fecha_entrega`, `tanda`, `facturado`, `entregado`, `entregado_at` (CRN). Sale de `gv_ppp_web_estado` + CRN. `sql/gv_pedido_web_estado_pagina.sql` |
+| rol `lk_ppp_reader` (el del FDW de LK) | Virgilio | + `select` sobre `PPP_Web_Programacion` (policy `ppp_web_prog_lk_reader_sel`), `gv_ppp_web_estado` y la vista nueva; + `execute` sobre `gv_ppp_web_np_label`. Todo aditivo |
+| foreign table `virgilio.gv_pedido_web_estado_pagina` | LK | `import foreign schema … limit to` |
+| RPC `gv_estado_mis_pedidos(p_ids)` | LK | `security definer`, sólo `authenticated`; devuelve el estado de los pedidos del usuario (dueño / link / admin, como `orders_select_own`). `sql/gv_estado_mis_pedidos.sql` del repo LK |
+| `edit_order_fast` | LK | + candado: facturado o entregado en Gestión → `Pedido ya facturado: no se puede modificar` (backup en el repo LK) |
+| front LK | LK | "Mis pedidos" lee la RPC; stepper de **4** pasos (Recibido · Programado/En preparación · Facturado · Entregado); facturado/entregado esconde Editar y lo dice. `isOrderEditable` pierde el corte de las 12:30 (mail apagado). Test `tests/estado-gestion.cjs` (16) |
+
+Producción no cambia. Chef queda afuera (sin acceso a su proyecto; su página no edita).
+**Rollback:** `drop view gv_pedido_web_estado_pagina` + revocar los grants a `lk_ppp_reader`;
+en LK `drop function gv_estado_mis_pedidos`, `drop foreign table`, y `edit_order_fast` de
+`sql/edit_order_solo_agregar.sql`; front LK commit anterior.
+
 ### 3.s ✅ Tandas sin prefijo `GV-` — 2026-09-05 sábado (config, sin bump)
 
 Dueño: *"sacá el prefijo GV- de las tandas"*. `update "PPP_Web_Config" set valor_texto = ''
