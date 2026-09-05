@@ -272,3 +272,6 @@ PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node te
 
 echo "== mejoras-v1297 (4210 doble tap RC · 8818 horas por tanda · 2359 badge HOY) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/mejoras-v1297.cjs
+
+echo "== mejoras-v1298 (9017 saldos para_envasar/racks_ch · 6124 TAP doble · 5070 barra de avance del monitor) =="
+PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/mejoras-v1298.cjs

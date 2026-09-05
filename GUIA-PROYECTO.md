@@ -12,13 +12,28 @@
 > única**; no se replica. Ante la duda entre parche rápido y fix de raíz → **fix
 > de raíz**.
 >
-> Última actualización: 2026-09-05 (sábado, tarde) · Versión app al documentar: **v12.97**
+> Última actualización: 2026-09-05 (sábado, tarde) · Versión app al documentar: **v12.98**
 >
 > ⚠⚠ **Estado del pipeline web desde el 2026-09-04 a la noche: la NUMERACIÓN ESTÁ PRENDIDA**
 > (`PPP_Web_Config.numeracion_activa = 1`), el cron de tandas (jobid 71, 00:01 hábiles) activo,
 > tandas con prefijo `GV-`. Sólo del lado Virgilio: el mail de las 12:30 de LK sigue andando y
 > Producción no se tocó (medido: ninguna función `ppp_web_*`/`gv_ppp_web_*` escribe en tabla
 > compartida). Primera corrida real: lunes 2026-09-07 00:01. Cómo apagar, en `CLAUDE.md`.
+>
+> Nota **v12.98** — **Tres mejoras más del backlog de agentes** (sólo front, sin tocar Supabase).
+> **(9017)** `stockFetchSaldos()` ahora expone `para_envasar` y `racks_ch` (la vista
+> `vista_saldos_stock` ya los traía desde la idea 7263 pero la función los tiraba): "Bajar de racks",
+> MG guardado, catálogo de Insumos, salida Cervantes y CP dejan de ver 0 donde hay stock real.
+> **(6124)** TAP doble: al terminar el armado por el asistente «Completar», el botón "Tenés un Armado
+> pendiente" quedaba en pantalla con un closure viejo y un segundo toque mandaba OTRO TAP con
+> `ts_inicio=null`, volvía a pedir ubicaciones (AUB) y a mover stock. Ahora `compTerminar()` anota
+> la tanda en `_tapCerradoSesion` y redibuja la sugerencia; `send()` frena cualquier TAP de una tanda
+> ya cerrada en la sesión con un aviso ("ya quedó terminado"). **(5070)** Monitor: barra de avance
+> grande debajo de los conteos del header (`#monitorProgress`, `.mon-prog`): tandas de la ventana
+> con picking Y armado terminados sobre las programadas para esa ventana, con color semáforo (rojo
+> <40 %, ámbar <80 %, verde) y tamaño mayor en modo TV. Test `tests/mejoras-v1298.cjs` (15 chequeos).
+> La idea **7779** (contador visible de "reportes sin enviar") ya estaba resuelta desde v5.20
+> (`#pendingIndicator` fijo en todas las pantallas + `⏳ N` en el badge de versión): se marcó hecha.
 >
 > Nota **v12.97** — **Tres mejoras chicas del backlog de agentes** (`agente_propuestas`, sin tocar
 > Supabase). **(4210)** Reasignar cajas: `rcConfirm()` con doble tap pasaba las cajas dos veces (doble

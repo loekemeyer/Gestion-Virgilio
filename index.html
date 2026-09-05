@@ -682,6 +682,23 @@ button {
   #monitorModal.tv.show ~ #qrFichadaBox #qrCanvas{ width: clamp(40px, 4.5vh, 56px); height: clamp(40px, 4.5vh, 56px); }
 }
 .monitor-meta{ font-size: 11px; color: #666; margin-top: 2px; }
+/* v12.98 (idea 5070) — barra de avance del día en el header del monitor. */
+.mon-prog{ display:flex; align-items:center; gap:8px; margin-top:4px; max-width:520px; }
+.mon-prog.vacia{ display:none; }
+.mon-prog-track{ flex:1; height:10px; border-radius:999px; background:#e5e7eb; overflow:hidden; }
+.mon-prog-bar{ height:100%; border-radius:999px; background:#dc2626; transition:width .4s ease; }
+.mon-prog.mid .mon-prog-bar{ background:#d97706; }
+.mon-prog.ok  .mon-prog-bar{ background:#16a34a; }
+.mon-prog-txt{ font-size:12px; font-weight:800; color:#374151; white-space:nowrap; font-variant-numeric:tabular-nums; }
+.mon-prog.low .mon-prog-txt{ color:#b91c1c; }
+.mon-prog.mid .mon-prog-txt{ color:#b45309; }
+.mon-prog.ok  .mon-prog-txt{ color:#15803d; }
+#monitorModal.tv .mon-prog{ max-width:none; margin-top:6px; gap:12px; }
+#monitorModal.tv .mon-prog-track{ height:clamp(12px, 1.8vh, 22px); background:#1f2937; }
+#monitorModal.tv .mon-prog-txt{ font-size:clamp(14px, 2.2vh, 26px); color:#f8fafc; }
+#monitorModal.tv .mon-prog.low .mon-prog-txt{ color:#fca5a5; }
+#monitorModal.tv .mon-prog.mid .mon-prog-txt{ color:#fcd34d; }
+#monitorModal.tv .mon-prog.ok  .mon-prog-txt{ color:#86efac; }
 .monitor-table{
   width: 100%;
   border-collapse: collapse;
@@ -6812,7 +6829,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v12.97";
+const APP_VERSION = "v12.98";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -7265,6 +7282,15 @@ async function send() {
   // confirma contra el server (`_compTandaYaArmada` = ¿tiene Entregas?). Si NO hay registros,
   // avisamos y abrimos el asistente en vez de emitir un TAP hueco. El legajo de PRUEBA no crea
   // Entregas (v7.69) → no aplica. Falla ABIERTO (sin red / error no bloquea).
+  // v12.98 (idea 6124): si el TAP de esta tanda YA salió en esta sesión (por el asistente
+  // «Completar» o por este mismo botón), no se manda otro: el segundo iba con ts_inicio=null,
+  // volvía a pedir ubicaciones (AUB) y a mover stock. Verificado en datos reales.
+  if (opcion === "TAP" && texto && typeof _tapCerradoSesion !== "undefined"
+      && _tapCerradoSesion.has(String(texto).trim().toUpperCase())) {
+    try { alert("✓ El armado de " + texto + " ya quedó terminado (TAP registrado). No hace falta volver a tocar."); } catch (_e) {}
+    try { renderPendingSuggestion(); } catch (_e) {}
+    return;
+  }
   if (opcion === "TAP" && texto && !(typeof esOperadorPrueba === "function" && esOperadorPrueba())
       && !(typeof _armadoRegistrado !== "undefined" && _armadoRegistrado.has(texto))) {
     let _tieneReg = null;
@@ -10206,6 +10232,12 @@ async function _compTandaYaArmada(tanda) {
 // v7.74 — tandas cuyo armado se COMPLETÓ en el asistente (con Entregas grabadas) en esta sesión.
 // Fast-path para el gate del TAP en send(): evita el race de leer las Entregas recién posteadas.
 const _armadoRegistrado = new Set();
+// v12.98 (idea 6124) — tandas cuyo TAP YA se emitió en esta sesión (desde compTerminar o send).
+// El botón "Tenés un Armado pendiente" quedaba en el DOM con un closure viejo después de
+// terminar por el asistente; un segundo toque mandaba OTRO TAP con ts_inicio=null y volvía a
+// mover stock / pedir ubicaciones. send() lo frena con este Set y compTerminar redibuja la
+// sugerencia para que el botón desaparezca.
+const _tapCerradoSesion = new Set();
 async function compTerminar() {
   if (!_comp) return;
   // Paso 1 — faltantes: no se puede faltar MÁS de lo que dio el picking
@@ -10287,6 +10319,8 @@ async function compTerminar() {
     // Actualizar estado: marcar armado como inactivo.
     st.armado = { active: false, value: "", ts_inicio: null };
     setLegajoState(legajo, st);
+    try { _tapCerradoSesion.add(String(tanda).trim().toUpperCase()); } catch (_e) {}   // v12.98 (idea 6124)
+    try { renderPendingSuggestion(); } catch (_e) {}   // v12.98: saca el botón "Tenés un Armado pendiente" viejo
 
     // Agregar a historial local.
     pushHistoryForLegajo(legajo, {
@@ -10565,7 +10599,10 @@ async function stockFetchSaldos() {
   const m = {};
   rows.forEach(function (x) {
     const k = String(x.cod_art);
-    m[k] = { cod: k, desc: x.descripcion || "", terminado: Number(x.terminado) || 0, excedente: Number(x.excedente) || 0, separar_pedidos: Number(x.separar_pedidos) || 0, a_facturar: Number(x.a_facturar) || 0, a_guardar: Number(x.a_guardar) || 0, racks: Number(x.racks) || 0, insumos: Number(x.insumos) || 0 };
+    // v12.98 (idea 9017): para_envasar y racks_ch ya venían en la vista (idea 7263) pero acá se
+    // perdían → "Bajar de racks", MG guardado, catálogo de Insumos y CP los veían en 0 aunque
+    // hubiera stock real (712E racks_ch=444, 584E para_envasar=424).
+    m[k] = { cod: k, desc: x.descripcion || "", terminado: Number(x.terminado) || 0, excedente: Number(x.excedente) || 0, separar_pedidos: Number(x.separar_pedidos) || 0, a_facturar: Number(x.a_facturar) || 0, a_guardar: Number(x.a_guardar) || 0, racks: Number(x.racks) || 0, insumos: Number(x.insumos) || 0, para_envasar: Number(x.para_envasar) || 0, racks_ch: Number(x.racks_ch) || 0 };
   });
   return m;
 }
@@ -32833,6 +32870,7 @@ function renderMonitor(sheetMap, statusMap, alertasOffSheet, targetDates, emplea
   // muestran todas; las terminadas van al cuadro "Tandas a FC".
   const MAX_PLANNED_NO_ACT = 6;
   let plannedShown = 0;
+  let fcEnVentana = 0;   // v12.98: tandas de la ventana con picking Y armado terminados
 
   for (const t of tandas) {
     const ev = t.ev;
@@ -32861,6 +32899,7 @@ function renderMonitor(sheetMap, statusMap, alertasOffSheet, targetDates, emplea
     const bothDone = (ev.picking === "done" && ev.separado === "done");
     if (bothDone) {   // v10.28
       tandasFC.push(t);
+      fcEnVentana++;  // v12.98 (idea 5070): para la barra de avance del header
       continue;       // las terminadas no van a la tabla principal
     }
     // Tabla principal: TODAS las tandas con actividad actual (picking o
@@ -33251,6 +33290,28 @@ function renderMonitor(sheetMap, statusMap, alertasOffSheet, targetDates, emplea
   // barra meta). Acá solo dejamos los conteos.
   document.getElementById("monitorMeta").textContent =
     `${totalProgramadas} programadas (total) · ${tandas.length} entrega ${targetLabel} · ${countCurso} en curso · ${tandasFC.length} a FC`;
+  // v12.98 (idea 5070) — barra de avance grande al lado de los conteos: desde la TV de la pared
+  // el texto chico no se lee. % = tandas de la ventana con picking Y armado terminados sobre las
+  // programadas para esa ventana; color semáforo (rojo <40, ámbar <80, verde).
+  try {
+    const _metaEl = document.getElementById("monitorMeta");
+    let _prog = document.getElementById("monitorProgress");
+    if (!_prog && _metaEl && _metaEl.parentNode) {
+      _prog = document.createElement("div");
+      _prog.id = "monitorProgress";
+      _prog.className = "mon-prog";
+      _metaEl.parentNode.insertBefore(_prog, _metaEl.nextSibling);
+    }
+    if (_prog) {
+      const _tot = tandas.length, _done = fcEnVentana;
+      const _pct = _tot ? Math.round(_done * 100 / _tot) : 0;
+      const _cls = _pct >= 80 ? "ok" : _pct >= 40 ? "mid" : "low";
+      _prog.className = "mon-prog " + _cls + (_tot ? "" : " vacia");
+      _prog.title = `${_done} de ${_tot} tandas terminadas (picking + armado) · entrega ${targetLabel}`;
+      _prog.innerHTML = `<div class="mon-prog-track"><div class="mon-prog-bar" style="width:${_pct}%"></div></div>` +
+        `<span class="mon-prog-txt">${_done}/${_tot} · ${_pct}%</span>`;
+    }
+  } catch (_e) {}
   const _vpEl = document.getElementById("monitorVpInfo");
   if (_vpEl && _mm && _mm.dataset.vpSize) {
     _vpEl.textContent = `${_mm.dataset.vpSize} (${_mm.dataset.vp || "?"})`;
