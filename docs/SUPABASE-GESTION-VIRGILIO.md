@@ -1177,6 +1177,14 @@ Con eso, decisión del dueño: **sólo Virgilio, LK intacto, prefijo `GV-`**.
 | prueba de numeración en transacción revertida | `gv_ppp_web_np_asignar('lk', …)` asignó **`LK 00001` y `LK 00002`** y no dejó nada | `PPP_Web_NP` = 0 · seeds lk 1 / chef 1 |
 | Producción | — | `PPP_Programacion_Diaria` = 182, intacta |
 
+**¿Falta cargar algo en Gestión de lo que ya tiene Producción? No.** Se pidió y se midió
+antes de tocar: la PPP de Gestión baja **la misma** `PPP_Programacion_Diaria`
+(`pppLoadProgFromSupabase`), así que los 182 NP de Producción ya se ven en Gestión. De esos,
+158 NP son 93 pedidos web que ISIS ya numeró (9xxxx): 33 facturados, 53 con tanda, 7 sin
+tanda. Cargarlos como `LK 000xx` los duplicaría en la misma pantalla. Sí hay un **limbo** de
+**5 pedidos** (3 del 03/09 + 2 del 04/09) que se fueron a ISIS y que Producción todavía no
+tiene en su PPP: los trae ISIS el lunes, como siempre. Decisión del dueño: **no cargar nada**.
+
 **Qué pasa a partir de acá.** El lunes 00:01 el job programa las NP web **pendientes** de
 zona 1 y 2 (hoy 9 de LK) con tandas `GV-…` y las numera desde `LK 00001`; el resto (zona 5,
 Chef zona 6) espera en "A Programar". Como el mail de las 12:30 sigue andando, **lo que
