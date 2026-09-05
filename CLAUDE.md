@@ -106,8 +106,10 @@ duales, módulo Chef, tracking a la página). **Leerlo al abrir una sesión nuev
 hasta el sábado 05/09, cuando el dueño lo hizo sacar (`tanda_prefijo = ''` → `E01A`).** Decisión del dueño: prender **sólo Virgilio**, sin tocar LK — el mail de
 las 12:30 (`procesar-pedidos-web`) siguió andando hasta el **sábado 2026-09-05 a las 13:50 ART,
 cuando el dueño lo hizo apagar** (crons 7 y 10 de LK en `active=false`, v12.94). Último envío a
-ISIS: sábado 12:30, pedidos 1340..1349 → esos son de Producción. **Desde el 1350 todo pedido de la
-página entra sólo por Gestión.** El cron de Chef vive en su proyecto (nkhzocgdpwtgrmwleihr, sin
+ISIS: sábado 12:30, pedidos 1340..1349. **⚠ Cambio del sábado a la noche (v13.15): el dueño dijo
+"el lunes van a empezar a usar GV, no más PV" → el mail del sábado se IGNORA y GV programa también
+los 1340..1349** (`PPP_Web_Config.excluir_enviados_a_isis = 0`; no cargar ese mail en ISIS, quedarían
+dobles). **Desde el lunes 2026-09-07 los operarios usan Gestión.** El cron de Chef vive en su proyecto (nkhzocgdpwtgrmwleihr, sin
 acceso desde acá): lo apaga el dueño desde el Dashboard; hasta entonces lo que Chef mande por
 mail sigue siendo de Producción (regla `enviado_a_isis`).
 Detalle, medición y rollback en `docs/SUPABASE-GESTION-VIRGILIO.md` §3.l y §3.p.
@@ -131,9 +133,10 @@ Detalle, medición y rollback en `docs/SUPABASE-GESTION-VIRGILIO.md` §3.l y §3
   `gv_ppp_web_armar_simular(...)`.
   Regla del dueño: *"cuando Gestión tome control, va a asignarle la numeración
   nuestra a los pedidos que estén pendientes y a los que vayan cayendo"*. **Pendiente =
-  pedido de la página que NO salió a ISIS por el mail (`enviado_a_compras`), con fecha ≥
-  `gestion_desde` (2026-09-03, piso), y que Producción/ISIS no tenga** (v12.94; el mail se
-  apagó el sábado 05/09). La regla vive en UNA RPC de Virgilio, `gv_pedidos_web_excluidos`, que
+  pedido de la página con fecha ≥ `gestion_desde` (2026-09-03, piso) que Producción/ISIS no
+  tenga** (v13.15). Con `excluir_enviados_a_isis = 1` además se excluye lo que salió por el mail
+  (`enviado_a_compras`; era la regla de convivencia, v12.94); desde el sábado 05/09 a la noche
+  está en 0 porque el lunes nadie usa Producción. La regla vive en UNA RPC de Virgilio, `gv_pedidos_web_excluidos`, que
   llaman el job y "A Programar"; los feeds de LK son crudos. Motivos: `enviado_a_isis`,
   `anterior_al_cambio`, `en_produccion`. **Bloques**: de a 18 (LK) / 15 (Chef) SEGUIDOS en el
   orden del carrito, igual que ISIS (v12.94; antes serpentina por m³).

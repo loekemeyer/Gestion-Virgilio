@@ -12,7 +12,18 @@
 > única**; no se replica. Ante la duda entre parche rápido y fix de raíz → **fix
 > de raíz**.
 >
-> Última actualización: 2026-09-05 (sábado, noche) · Versión app al documentar: **v13.14**
+> Última actualización: 2026-09-05 (sábado, noche) · Versión app al documentar: **v13.15**
+>
+> ⚠⚠ **Desde el lunes 2026-09-07 los operarios usan GESTIÓN, no Producción** (dueño, sábado a la
+> noche: *"el lunes van a empezar a usar GV, no más PV"*). Las tandas web viven en
+> `PPP_Web_Programacion` y Producción no las ve. URL: la de GitHub Pages de este repo.
+>
+> Nota **v13.15** (backend, sólo bump) — **El mail del sábado ya no excluye.** Con nadie en
+> Producción, los pedidos 1340…1349 (mail del sábado 12:30) quedaban huérfanos. Interruptor
+> `PPP_Web_Config.excluir_enviados_a_isis = 0`: `gv_pedidos_web_excluidos` ya no excluye por
+> `enviado_a_compras`; GV los programa desde la página. Simulado el lunes con los 12 pedidos reales:
+> 6 tandas (E01A…E01F, 3,718 m³) + 3 a mano (Retira, Martínez, Padua). §3.ab de la doc de Supabase.
+> ⚠ No cargar el mail del sábado en ISIS (quedarían dobles).
 >
 > Nota **v13.14** (front) — Franja de tanda (v13.01) en celular: nombre arriba, clientes/NP en la
 > 2ª línea, fecha en la 3ª y m³/acciones en la 4ª. Antes la fecha "Vencida" tapaba el código.

@@ -125,18 +125,33 @@ Gestión tiene que dar es la cañería, y en el punto 1 ya está dada.
 
 ## Estado al cierre del sábado 2026-09-05 (noche) — lo que va a pasar el lunes
 
-**Lo que el job de las 00:01 va a armar** (simulado con los pedidos reales de LK y
-`gv_ppp_web_armar_simular`, sin escribir): pendientes desde `gestion_desde` = 1340…1351; los
-1340…1349 salieron a ISIS por el mail del sábado 12:30 (`enviado_a_compras`) → son de Producción.
-Quedan **1350 Distribuidora Cuyana** (4 bloques, 0,938 m³, expreso en Soldati) y **1351 Astorga**
-(Pompeya, 0,191 m³), los dos Zona 1:
+**⚠⚠ Desde el lunes 2026-09-07 todos los operarios usan GESTIÓN, no Producción** (dueño, sábado
+a la noche). Por eso el mail del sábado 12:30 (pedidos 1340…1349) **se ignora** y GV los programa
+desde la página (`excluir_enviados_a_isis = 0`, v13.15, §3.ab). **No cargar ese mail en ISIS.**
 
-| tanda | pedido | barrio | m³ | por qué |
-|---|---|---|---|---|
-| **E01A** | LK 1350 / 1350-2 / 1350-3 / 1350-4 | Soldati | 0,938 | un cliente > 0,80 → tanda propia |
-| **E01B** | LK 1351 | Pompeya | 0,191 | no entra en E01A (tope) |
+**Lo que el job de las 00:01 va a armar** (simulado con los 12 pedidos reales de LK y
+`gv_ppp_web_armar_simular`, sin escribir; 3,718 m³, cupo 5):
 
+| tanda | pedidos | barrio | m³ |
+|---|---|---|---|
+| **E01A** | 1344 Torres y Liva (2 bloques) | Barracas | 0,985 (sola, > tope) |
+| **E01B** | 1345 Emilio Martinez + 1347 Guerreiro | Barracas | 0,483 |
+| **E01C** | 1350 Distribuidora Cuyana (4 bloques) | Soldati | 0,938 (sola) |
+| **E01D** | 1348 A L S.A + 1351 Astorga | Soldati + Pompeya | 0,577 |
+| **E01E** | 1342 Di Leo (Mataderos) + 1346 BP Import (Villa Devoto) | zona 3 + 2 (vecinos) | 0,468 |
+| **E01F** | 1343 Chen Li Yu (3 bloques) | Belgrano | 0,267 |
+
+A mano en "A Programar": **1340** (Retira), **1341** (Martínez, zona 6), **1349** (Padua, zona 5).
 `gv_pedidos_web_excluidos` no excluye ninguno. Chef: 0 pendientes en el dry run del sábado.
+
+**Checklist del cambio a GV (lunes a la mañana):**
+1. Operarios y monitor TV entran a la URL de Gestión (GitHub Pages de este repo), no a la de
+   Producción ni a la app de Play Store (la TWA apunta a Producción hasta que se re-apunte).
+2. Antes de cambiar, abrir Producción una vez con señal para que vacíe su cola offline
+   (eventos sin mandar quedan en el IndexedDB de ESA app).
+3. Supervisores: mismo login (mismo proyecto Supabase).
+4. Lo de Producción que sigue corriendo (crons, Apps Script del espejo) no molesta: escribe en
+   tablas que GV lee con la canilla cerrada.
 
 **Auditoría de casts** (¿una NP `LK 1350` rompe algo de Producción el lunes?): se buscó en TODAS
 las funciones y vistas de `public` un cast a entero sobre NP/pedido/`texto`. El pipeline de stock

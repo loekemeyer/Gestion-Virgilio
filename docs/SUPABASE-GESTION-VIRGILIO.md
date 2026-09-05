@@ -1384,6 +1384,40 @@ es de Chef y pisa al LK 217): cuando Gestión alimente el tracking, escribir el 
 una función `gv_*` y pedir columna `empresa` en PaginaLK. Y el Excel ISIS de Facturación manda
 `N_Pedido` contador (no el id), como el mail: ISIS numera 98xxx por su cuenta.
 
+### 3.ab ✅ "El lunes todos en GV": el mail del sábado ya no excluye (v13.15) — 2026-09-05 sábado (noche)
+
+**Qué dijo el dueño.** *"El lunes van a empezar a usar GV, no más PV."* Con nadie en Producción,
+los pedidos **1340…1349** (salieron a ISIS por el mail del sábado 12:30, el último) quedaban
+**huérfanos**: la regla de pendientes los excluía (`enviado_a_isis` = "son de Producción") y nadie
+los iba a programar. Decisión (AskUserQuestion): **el mail del sábado se ignora y GV los programa
+desde la página**, como cualquier otro; se facturan después con el Excel ISIS como todo lo web.
+
+**Qué se hizo** (migración `gv_pedidos_web_excluidos_sin_enviado_a_isis_v1315`,
+`sql/gv_pedidos_web_excluidos.sql`): fila nueva `PPP_Web_Config.excluir_enviados_a_isis = 0` y
+`gv_pedidos_web_excluidos` la lee: el motivo `enviado_a_isis` sólo aplica con `= 1`. Los otros dos
+motivos (`anterior_al_cambio`, `en_produccion`) siguen igual. La Edge Function y "A Programar" no
+cambian (llaman la misma RPC).
+
+**Impacto medido** (simulación con los 12 pedidos reales de LK, `gv_ppp_web_armar_simular`, sin
+escribir): 0 excluidos. El lunes 00:01 el job arma **6 tandas, 3,718 m³** (cupo 5):
+
+| tanda | pedidos | barrio | m³ |
+|---|---|---|---|
+| E01A | 1344 Torres y Liva (2 bloques) | Barracas | 0,985 (sola, > tope) |
+| E01B | 1345 Emilio Martinez + 1347 Guerreiro | Barracas | 0,483 |
+| E01C | 1350 Distribuidora Cuyana (4 bloques) | Soldati | 0,938 (sola) |
+| E01D | 1348 A L S.A + 1351 Astorga | Soldati + Pompeya | 0,577 |
+| E01E | 1342 Di Leo (Mataderos) + 1346 BP Import (Villa Devoto) | zona 3 + zona 2 (C–E vecinos) | 0,468 |
+| E01F | 1343 Chen Li Yu (3 bloques) | Belgrano | 0,267 |
+
+A mano en "A Programar": **1340** (Retira), **1341** (Martínez, zona 6), **1349** (Padua, zona 5).
+Producción: nada cambia (función `gv_`, tabla nuestra).
+
+**⚠ Para el dueño:** si alguien carga igual el mail del sábado en ISIS, esos 10 pedidos van a
+existir dos veces (ISIS y GV). No cargarlo.
+
+**Rollback.** `update public."PPP_Web_Config" set valor = 1 where clave = 'excluir_enviados_a_isis';`
+
 ### 3.aa ✅ Cruce de factura que entiende las NP web (idea 8033) — 2026-09-05 sábado (v13.10)
 
 **El agujero.** `vista_facturacion_neto_items` y `vista_cruce_facturacion` (objetos de **Producción**,
