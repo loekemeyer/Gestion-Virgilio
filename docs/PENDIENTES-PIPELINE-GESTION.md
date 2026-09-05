@@ -173,7 +173,9 @@ decisiones abiertas al final de este archivo.
   cabecera y reescribe `sheets_payload.items`. Las policies de `order_items` (sacar el delete
   al cliente) quedan comentadas: `rollbackOrder()` las necesita. Test headless
   `paginach/tests/editar-pedido.cjs` (18 chequeos, RPC espejada en memoria).
-  ⚠ Chef se hospeda en IIS (`web.config`): el push a `main` no publica solo, hay que subirlo.
+  ⚠ LK y Chef viven en GitHub **y** en un hosting privado (dueño, 2026-09-05): el push a `main`
+  no publica solo, los archivos se suben al hosting aparte. Cómo saber si está al día: el pie
+  de página (`chefsrl.com/mayorista` → v2.0.31; LK → v2.3.301). Los datos van a Supabase igual.
 - **Queda**: el estado de Gestión en "Mis pedidos" de Chef (como LK v2.3.301) → FDW Chef →
   Virgilio, también SQL del dueño en Chef.
 
