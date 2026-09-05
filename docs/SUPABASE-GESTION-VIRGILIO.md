@@ -1384,6 +1384,41 @@ es de Chef y pisa al LK 217): cuando Gestión alimente el tracking, escribir el 
 una función `gv_*` y pedir columna `empresa` en PaginaLK. Y el Excel ISIS de Facturación manda
 `N_Pedido` contador (no el id), como el mail: ISIS numera 98xxx por su cuenta.
 
+### 3.z ✅ Rol `ch_ppp_reader`: Chef lee su estado en Gestión por FDW (ideas 8743 + 4990) — 2026-09-05 sábado (v13.09)
+
+**Qué.** La página de Chef (`paginach`) va a mostrar en "Mis pedidos" el estado real del pedido
+en Gestión (programado / en preparación / facturado / entregado) y a bloquear la edición cuando
+está facturado, igual que LK desde la v2.3.301. LK lo hace con `postgres_fdw` contra Virgilio con
+el rol `lk_ppp_reader`; para Chef se creó el rol gemelo **`ch_ppp_reader`** (migración
+`ch_ppp_reader_rol_lectura_para_chef_v1309`): `login`, `connection limit 5`, sin `bypassrls`, sin
+escritura, `usage` en `public` y **SELECT** en las mismas 13 tablas/vistas que `lk_ppp_reader`
+menos las de LK (`lk_pedidos_match`, `proyeccion_madre`, `whatsapp_clientes`):
+`Facturacion_NP`, `GV_Volumen_Articulos`, `PPP_Base_Pedidos`, `PPP_Entregados_Meta`,
+`PPP_Programacion_Diaria`, `PPP_Web_Programacion`, `Registros_Produccion_Virgilio`,
+`Volumen_Articulos`, `gv_pedido_web_estado_pagina`, `gv_ppp_web_estado`, `ppp_etapa_tanda`,
+`vista_ppp_pedidos_entregados`, `vista_volumen_articulo_resuelto`. La contraseña se generó al azar
+y **no se imprimió**: el dueño la reemplaza con `alter role ch_ppp_reader password '…'` y usa la
+misma en el user mapping del lado Chef (`paginach/sql/gv_estado_mis_pedidos_chef.sql`, que además
+crea la RPC `gv_estado_mis_pedidos` y suma el candado "facturado" a `edit_order_fast`).
+
+Además, como las 8 tablas base tienen RLS, el grant solo no alcanza: `lk_ppp_reader` tiene una
+policy de SELECT por tabla (`lk_ppp_reader_sel`), así que se creó la gemela **`ch_ppp_reader_sel`**
+(`for select to ch_ppp_reader using (true)`) en `Facturacion_NP`, `GV_Volumen_Articulos`,
+`PPP_Base_Pedidos`, `PPP_Entregados_Meta`, `PPP_Programacion_Diaria`, `PPP_Web_Programacion`,
+`Registros_Produccion_Virgilio` y `Volumen_Articulos` (migración `ch_ppp_reader_policies_select_v1309`).
+`ppp_etapa_tanda` no tiene RLS. Es AGREGAR una policy para un rol nuevo: las de anon/authenticated
+(Producción) no se tocan — mismo precedente que `lk_ppp_reader`.
+
+**Impacto medido.** Nada cambia para Producción ni para la app (rol nuevo + policies sólo para él).
+Hoy la vista está vacía de verdad: `PPP_Web_Programacion` tiene 0 filas (la primera corrida real es
+el lunes 07/09 00:01), así que `gv_pedido_web_estado_pagina` da 0 y el FDW de LK también da 0 —
+coherente, no es RLS. No se pudo hacer `set role ch_ppp_reader` desde el MCP (no es miembro); la
+prueba real es del lado Chef, después del lunes:
+`select * from virgilio.gv_pedido_web_estado_pagina where empresa = 'chef' limit 5;`
+
+**Rollback.** `drop owned by ch_ppp_reader; drop role ch_ppp_reader;` (borra también sus policies;
+y en Chef el bloque de rollback del SQL).
+
 ### 3.y ✅ Tandas por cercanía real: sectores + vecinos, zona 3 automática (idea 7317) — 2026-09-05 sábado (v13.07)
 
 **Qué pidió el dueño.** *"Zonas pueden ir agrupadas también zona 1 y 2. Hay más zonas juntas… pero

@@ -12,7 +12,13 @@
 > única**; no se replica. Ante la duda entre parche rápido y fix de raíz → **fix
 > de raíz**.
 >
-> Última actualización: 2026-09-05 (sábado, noche) · Versión app al documentar: **v13.08**
+> Última actualización: 2026-09-05 (sábado, noche) · Versión app al documentar: **v13.09**
+>
+> Nota **v13.09** (backend, sólo bump) — Rol de sólo lectura **`ch_ppp_reader`** en Virgilio para que
+> la página de Chef (`paginach` v2.0.31) lea por FDW `gv_pedido_web_estado_pagina` y muestre en
+> "Mis pedidos" el estado real de Gestión + bloquee la edición cuando está facturado (ideas 8743 y
+> 4990; espejo de LK v2.3.301). Contraseña la pone el dueño (`alter role … password`); SQL del lado
+> Chef en `paginach/sql/gv_estado_mis_pedidos_chef.sql`. §3.z de la doc de Supabase.
 >
 > Nota **v13.08** (backend, sólo bump) — `search_path = public, pg_temp` fijo en las 6 funciones nuevas
 > de v13.07 y en `ppp_web_armar_tandas` (advisor `function_search_path_mutable`). Sin cambio de lógica.
