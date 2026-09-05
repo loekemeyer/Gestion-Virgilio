@@ -12,13 +12,27 @@
 > única**; no se replica. Ante la duda entre parche rápido y fix de raíz → **fix
 > de raíz**.
 >
-> Última actualización: 2026-09-05 (sábado, tarde) · Versión app al documentar: **v12.94**
+> Última actualización: 2026-09-05 (sábado, tarde) · Versión app al documentar: **v12.95**
 >
 > ⚠⚠ **Estado del pipeline web desde el 2026-09-04 a la noche: la NUMERACIÓN ESTÁ PRENDIDA**
 > (`PPP_Web_Config.numeracion_activa = 1`), el cron de tandas (jobid 71, 00:01 hábiles) activo,
 > tandas con prefijo `GV-`. Sólo del lado Virgilio: el mail de las 12:30 de LK sigue andando y
 > Producción no se tocó (medido: ninguna función `ppp_web_*`/`gv_ppp_web_*` escribe en tabla
 > compartida). Primera corrida real: lunes 2026-09-07 00:01. Cómo apagar, en `CLAUDE.md`.
+>
+> Nota **v12.95** — **Control de remito = pedido entregado, solo.** Dueño: *"cuando ya el pedido se
+> controla el remito, tiene que pasar directamente a Pedidos Entregados, sin que nadie toque nada. Hoy
+> en Producción requiere corregir el Excel para que se corrija el espejo (la PPP). En Gestión tiene que
+> ser automático."* Fuente durable en el backend: vista **`gv_ppp_entregados`** (`sql/gv_ppp_entregados.sql`,
+> `security_invoker`, sólo `select`) = toda NP con un evento `CRN` (Control Remitos), de ISIS o web, con
+> tanda, cliente, m³, fecha programada, fecha de carga (`CCN`), cajas (`Entregas_Virgilio`), primer
+> control y si está facturada; sólo NP que Gestión conoce (`PPP_Web_Programacion` / vistas `gv_ppp_*`).
+> Front: `pppRefreshControlado` y `pppRefreshMetaEntSet` leen la vista (los 60 días de CRN quedan de
+> fallback), `pppRefreshDelivered` suma a "Pedidos Entregados" las NP de la vista que no están
+> facturadas con cierre, y en Programación (modo sólo lectura) la NP controlada **se esconde** en vez de
+> quedar con el badge «🚮 SACAR» hasta que la operadora la borre del Excel. Superconjunto de
+> `gv_ppp_web_entregados` (v12.87), que queda. Medido al crear: 376 NP con CRN resueltas, 32 todavía en
+> la programación de ISIS (desde hoy Gestión no las muestra ahí). Test `tests/ppp-crn-auto.cjs` (9).
 >
 > Nota **v12.94** — **CORTE REAL: el mail de las 12:30 de LK está APAGADO (sábado 05/09, 13:50 ART) y los
 > bloques web son los de ISIS.** Un cruce de sólo lectura sobre `pagina-lk-copia`, `paginach`, la base de LK

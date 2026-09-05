@@ -1380,6 +1380,25 @@ es de Chef y pisa al LK 217): cuando Gestión alimente el tracking, escribir el 
 una función `gv_*` y pedir columna `empresa` en PaginaLK. Y el Excel ISIS de Facturación manda
 `N_Pedido` contador (no el id), como el mail: ISIS numera 98xxx por su cuenta.
 
+### 3.r ✅ Control de remito = entregado, solo — 2026-09-05 sábado (v12.95)
+
+Dueño: *"cuando ya el pedido se controla el remito, tiene que pasar directamente a Pedidos
+Entregados, sin que nadie toque nada. En Producción requiere corregir el Excel; en Gestión
+automático."* Eligió **backend**.
+
+| objeto | qué |
+|---|---|
+| **`gv_ppp_entregados`** (vista, `security_invoker`, sólo `select` anon/authenticated) | toda NP con evento `CRN` (`Registros_Produccion_Virgilio`, sin legajos de prueba): `np` (etiqueta para las web), `empresa`, `es_web`, `tanda`, `cod_cliente`, `razon_social`, `m3`, `fecha_entrega`, `fecha_carga` (último `CCN`), `controlado_at` (primer CRN), `n_crn`, cajas de `Entregas_Virgilio`, `facturada`. Datos de `PPP_Web_Programacion` (web) o `gv_ppp_programacion_diaria` → `Facturacion_NP` → `gv_ppp_entregados_meta` (ISIS, en ese orden). Sólo NP que Gestión conoce. `sql/gv_ppp_entregados.sql` |
+| front v12.95 | Programación (sólo lectura) esconde las controladas en vez del badge «🚮 SACAR»; Pedidos Entregados suma las de la vista aunque no estén facturadas/cerradas; el set de controladas viene de la vista (60 días de CRN sólo como fallback) |
+
+Nada escribe. Producción no cambia: sigue con su Excel.
+
+**Medido:** 821 CRN históricos → **376** NP resueltas (0 web todavía), **32** todavía en la
+programación de ISIS (desde hoy no se ven en Programación de Gestión), 0 sin facturar; 445 CRN
+de NP que ya no están en ninguna tabla (más viejas que el espejo) quedan afuera, como corresponde.
+
+**Rollback:** `drop view public.gv_ppp_entregados;` + front v12.94.
+
 ### 3.q 🔍 Control "ningún pedido muerto en el medio" — 2026-09-05 sábado (sólo lectura)
 
 Pedido del dueño: los últimos 50 clientes que pidieron por cada página, y ver si están en la PPP

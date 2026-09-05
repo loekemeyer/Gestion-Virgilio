@@ -42,13 +42,16 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
     }
     window.fetch = function (url) {
       url = String(url);
-      if (url.indexOf("gv_ppp_web_entregados") >= 0) {
-        if (webFalla) return J([], false);
-        return J([{ np_label: "LK 1344", cod_cliente: "4188", razon_social: "Orfali", tanda: "GV-02A", m3: 1.184, fecha_entrega: "2026-09-11" }]);
-      }
+      // ⚠ "ppp_entregados_meta" ANTES que "gv_ppp_entregados": el nombre de la vista de
+      //   CRN es prefijo del de la meta.
       if (url.indexOf("ppp_entregados_meta") >= 0) return J([
         { np: "98574", cod: "2533", rs: "Osa Distribuidora", tanda: "C03B", m3: 0.5, fecha_entrega: "2026-09-10" }
       ]);
+      // v12.95 — gv_ppp_entregados reemplaza a gv_ppp_web_entregados (toda NP con CRN, ISIS o web)
+      if (url.indexOf("gv_ppp_entregados") >= 0) {
+        if (webFalla) return J([], false);
+        return J([{ np: "LK 1344", cod_cliente: "4188", razon_social: "Orfali", tanda: "GV-02A", m3: 1.184, fecha_entrega: "2026-09-11", fecha_carga: null, controlado_at: "2026-09-11T14:00:00Z", cajas_entregadas: 1, cajas_falto: 0 }]);
+      }
       if (url.indexOf("vista_ppp_pedidos_entregados") >= 0) return J([
         { np: "98574",    tanda: "C03B",   cod_cliente: "2533", razon_social: "Osa Distribuidora", m3: 0.5,   fecha_salida: "2026-09-10", facturado_at: "2026-09-10T12:00:00Z", cajas_pedidas: 5, cajas_entregadas: 5, cajas_falto: 0 },
         { np: "LK 1344", tanda: "GV-02A", cod_cliente: "4188", razon_social: "Orfali",            m3: 1.184, fecha_salida: "2026-09-11", facturado_at: "2026-09-11T12:00:00Z", cajas_pedidas: 1, cajas_entregadas: 1, cajas_falto: 0 },

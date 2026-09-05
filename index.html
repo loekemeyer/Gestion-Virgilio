@@ -6805,7 +6805,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v12.94";
+const APP_VERSION = "v12.95";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -26398,13 +26398,23 @@ async function pppRefreshEntregado() {
 let _pppControladoCR = null;
 async function pppRefreshControlado() {
   try {
-    const since = new Date(Date.now() - 60 * 24 * 60 * 60 * 1000).toISOString();
-    const url = SUPABASE_TABLE_ENDPOINT + "?opcion=eq.CRN&ts_cliente=gte." + encodeURIComponent(since) + "&select=texto&limit=20000";
-    const r = await fetch(url, { headers: { "apikey": SUPABASE_KEY, "Authorization": "Bearer " + SUPABASE_KEY } });
-    if (!r.ok) throw new Error("HTTP " + r.status);
-    const data = await r.json();
+    // v12.95 — Regla del dueño: "cuando se controla el remito, el pedido pasa directo a
+    // Pedidos Entregados, sin que nadie toque nada". La fuente durable es la vista
+    // gv_ppp_entregados (toda NP con CRN, de ISIS o web, sin ventana de 60 días ni
+    // localStorage). Si la vista no responde, se cae a leer los CRN de 60 días como antes.
     const set = new Set();
-    for (const ev of data) { const t = String(ev.texto || "").split("|")[0].trim().replace(/\.0+$/, ""); if (t) set.add(t); }
+    let rows = null;
+    try { rows = await supaFetchAll(SUPABASE_URL + "/rest/v1/gv_ppp_entregados", "select=np"); } catch (_e) { rows = null; }
+    if (Array.isArray(rows)) {
+      for (const x of rows) { const t = String(x.np == null ? "" : x.np).trim().replace(/\.0+$/, ""); if (t) set.add(t); }
+    } else {
+      const since = new Date(Date.now() - 60 * 24 * 60 * 60 * 1000).toISOString();
+      const url = SUPABASE_TABLE_ENDPOINT + "?opcion=eq.CRN&ts_cliente=gte." + encodeURIComponent(since) + "&select=texto&limit=20000";
+      const r = await fetch(url, { headers: { "apikey": SUPABASE_KEY, "Authorization": "Bearer " + SUPABASE_KEY } });
+      if (!r.ok) throw new Error("HTTP " + r.status);
+      const data = await r.json();
+      for (const ev of data) { const t = String(ev.texto || "").split("|")[0].trim().replace(/\.0+$/, ""); if (t) set.add(t); }
+    }
     _pppControladoCR = set;
     const ent = pppLoadEntregados(); let changed = false;
     for (const np of set) { if (!ent.has(np)) { ent.add(np); changed = true; } }
@@ -26455,9 +26465,11 @@ async function pppRefreshMetaEntSet() {
     // del CRN pasaría a "en viaje" para siempre. Para ellas la fuente durable es el CRN
     // que ya emite Control Remitos (texto "LK 01344|TANDA"), leído por la vista
     // gv_ppp_web_entregados. Aditivo: si falla, queda lo de ISIS exactamente igual.
+    // v12.95 — gv_ppp_entregados: TODA NP con control de remito (ISIS o web). Es la
+    // regla del dueño: CRN = entregada, sin esperar al Excel ni a la facturación.
     try {
-      const web = await supaFetchAllSafe(SUPABASE_URL + "/rest/v1/gv_ppp_web_entregados", "select=np_label");
-      (web || []).forEach(function (r) { const np = String(r.np_label == null ? "" : r.np_label).trim(); if (np) s.add(np); });
+      const crn = await supaFetchAllSafe(SUPABASE_URL + "/rest/v1/gv_ppp_entregados", "select=np");
+      (crn || []).forEach(function (r) { const np = String(r.np == null ? "" : r.np).trim().replace(/\.0+$/, ""); if (np) s.add(np); });
     } catch (_e) {}
     _pppMetaEntSet = s;
     if (typeof pppRenderProg === "function") pppRenderProg();
@@ -26508,6 +26520,31 @@ async function pppRefreshDelivered() {
         pppDate: fp, discrep: !!(fc && fp && fc !== fp)   // PPP mal cargada (carga ≠ PPP)
       });
     }
+    // v12.95 — Regla del dueño: el control de remito (CRN) ES la entrega. Se suman las NP
+    // de gv_ppp_entregados que no vinieron de la vista de facturados (todavía no
+    // facturadas o sin cierre): entran igual a "Pedidos Entregados", sin que nadie
+    // toque el Excel ni facture.
+    try {
+      const ya = new Set(list.map(function (p) { return _pppNpNorm(p.np); }));
+      const crn = await supaFetchAllSafe(SUPABASE_URL + "/rest/v1/gv_ppp_entregados",
+        "select=np,tanda,cod_cliente,razon_social,m3,fecha_entrega,fecha_carga,controlado_at,cajas_entregadas,cajas_falto&order=controlado_at.desc");
+      for (const g of (crn || [])) {
+        const np = String(g.np == null ? "" : g.np).trim();
+        if (!np || ya.has(_pppNpNorm(np))) continue;
+        const fc = String(g.fecha_carga || "").slice(0, 10);
+        const fp = String(g.fecha_entrega || "").slice(0, 10);
+        const frep = fc || fp || String(g.controlado_at || "").slice(0, 10);
+        list.push({
+          np: np, tanda: (String(g.tanda == null ? "" : g.tanda).trim().toUpperCase() || "—"),
+          cod: String(g.cod_cliente == null ? "" : g.cod_cliente).trim(),
+          rs: String(g.razon_social == null ? "" : g.razon_social).trim(),
+          m3: (g.m3 == null || g.m3 === "") ? null : Number(g.m3),
+          cajE: Number(g.cajas_entregadas) || 0, cajF: Number(g.cajas_falto) || 0,
+          frep: frep, fkey: _pppYmdKey(frep),
+          pppDate: fp, discrep: !!(fc && fp && fc !== fp), _crn: true
+        });
+      }
+    } catch (_e) {}
     _pppDelivered = list;
     pppRenderProg();   // v8.61 — re-render siempre: el aviso de discrepancia PPP vs salida se ve en cualquier tab
   } catch (_e) { if (!_pppDelivered) _pppDelivered = []; }
@@ -26530,14 +26567,16 @@ async function pppRefreshEntregadosFull() {
         frep: fe, fkey: _pppYmdKey(fe)
       });
     }
-    // v12.87 — sumar las NP web confirmadas, con la misma forma de fila (ver
-    // pppRefreshMetaEntSet para el porqué). Si falla, el histórico de ISIS queda igual.
+    // v12.87 / v12.95 — sumar las NP con control de remito (gv_ppp_entregados: ISIS y web)
+    // que la hoja del Excel todavía no tiene, con la misma forma de fila. Si falla, el
+    // histórico de ISIS queda igual.
     try {
-      const web = await supaFetchAllSafe(SUPABASE_URL + "/rest/v1/gv_ppp_web_entregados", "select=np_label,cod_cliente,razon_social,tanda,m3,fecha_entrega&order=fecha_entrega.desc");
+      const ya = new Set(list.map(function (p) { return _pppNpNorm(p.np); }));
+      const web = await supaFetchAllSafe(SUPABASE_URL + "/rest/v1/gv_ppp_entregados", "select=np,cod_cliente,razon_social,tanda,m3,fecha_entrega,fecha_carga&order=controlado_at.desc");
       for (let i = 0; i < (web || []).length; i++) {
         const w = web[i];
-        const np = String(w.np_label == null ? "" : w.np_label).trim(); if (!np) continue;
-        const fe = String(w.fecha_entrega == null ? "" : w.fecha_entrega).slice(0, 10);
+        const np = String(w.np == null ? "" : w.np).trim(); if (!np || ya.has(_pppNpNorm(np))) continue;
+        const fe = String(w.fecha_carga || w.fecha_entrega || "").slice(0, 10);
         list.push({
           np: np,
           cod: String(w.cod_cliente == null ? "" : w.cod_cliente).trim(),
@@ -29033,11 +29072,16 @@ function pppRenderProg() {
   const ent = pppLoadEntregados();
   let programados, aProgramar, entreg, _errInfo = null;
   if (PPP_READONLY) {
-    _errInfo    = _pppComputeErrors(all, ent);                           // anota p._err + arma el panel
+    // v12.95 — Regla del dueño: controlado el remito, el pedido SALE de Programación solo.
+    // Antes (como en Producción) la fila quedaba con "🚮 SACAR" hasta que la operadora lo
+    // borraba del Excel de ISIS. En Gestión no hay Excel que corregir: se esconde y pasa a
+    // Pedidos Entregados. Los errores (zona) se calculan sobre lo que sigue en programación.
+    const notEnt = all.filter(function (p) { return !ent.has(String(p.np)); });
+    _errInfo    = _pppComputeErrors(notEnt, ent);                        // anota p._err + arma el panel
     try { _pppEmitError(_errInfo); } catch (_e) {}                       // v4.05: aviso Telegram si hay errores PPP
     entreg      = all.filter(function (p) { return ent.has(String(p.np)); });
-    programados = all.filter(function (p) { return p.programmed; });     // incluye los entregados (se marcan 🚮 SACAR in situ)
-    aProgramar  = all.filter(function (p) { return !p.programmed; });
+    programados = notEnt.filter(function (p) { return p.programmed; });
+    aProgramar  = notEnt.filter(function (p) { return !p.programmed; });
   } else {
     const notEnt = all.filter(function (p) { return !ent.has(String(p.np)); });
     entreg      = all.filter(function (p) { return ent.has(String(p.np)); });

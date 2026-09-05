@@ -266,3 +266,6 @@ PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node te
 
 echo "== pweb-np-es-pedido (v12.92: la NP web es el número de pedido de la página, con bloque) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/pweb-np-es-pedido.cjs
+
+echo "== ppp-crn-auto (v12.95: control de remito = entregado, solo; sin Excel) =="
+PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/ppp-crn-auto.cjs
