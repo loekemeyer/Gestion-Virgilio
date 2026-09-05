@@ -1380,6 +1380,31 @@ es de Chef y pisa al LK 217): cuando Gestión alimente el tracking, escribir el 
 una función `gv_*` y pedir columna `empresa` en PaginaLK. Y el Excel ISIS de Facturación manda
 `N_Pedido` contador (no el id), como el mail: ISIS numera 98xxx por su cuenta.
 
+### 3.q 🔍 Control "ningún pedido muerto en el medio" — 2026-09-05 sábado (sólo lectura)
+
+Pedido del dueño: los últimos 50 clientes que pidieron por cada página, y ver si están en la PPP
+de Gestión. Se tomó el último pedido de cada uno de los 50 clientes más recientes (LK 50 · Chef 49,
+desde 26/08 y 01/07) y se lo buscó en las cuatro tablas que Gestión lee (programación,
+facturación, entregados, entregas, por `cod` + fecha de `PPP_Base_Pedidos`) y en la RPC de
+pendientes.
+
+| veredicto | LK | Chef |
+|---|---|---|
+| En Producción (NP de ISIS, programada/facturada/entregada) | 39 | 44 |
+| Enviado a ISIS el jue/vie/sáb, Producción todavía no lo cargó (⏳ normal: entra el lunes) | 10 (1340..1349) | 2 (216, 217) |
+| Pendiente en Gestión ("A Programar") | 1 (1350) | 0 |
+| Con fecha corrida (ISIS lo cargó con otra fecha), igual en Producción | 0 | 1 (164) |
+| Cargado por ISIS **como pedido de la otra empresa** | — | 1: Chef 208 (P & M Bazar, 24/08) está como **LK 98544/98545, cod 4044**, facturado 02/09 |
+| **⚠ MUERTO** | 0 | **1: Chef 200 — El Martillo Srl (cod Chef 2643 / LK 3831, CUIT 30714523585), 13/08, 33 líneas, salió por mail 13/08 15:30 UTC y no está en ninguna tabla de Producción, ni por cod, ni por nombre, ni por artículos (mejor candidato coincide 7 de 20), ni facturado en `isis_ch`/`isis_lk.documentos` desde el 10/08** |
+
+Receta (dos consultas, `sql/` no hace falta): en LK, `distinct on (cod)` sobre `v_pedidos_web_np`
+(np_idx = 1) y `gv_pedidos_web_np_chef(90)` ordenado por `order_id desc`; en Virgilio, cruzar
+`(empresa, order_id, cod, fecha, enviado)` contra `gv_ppp_programacion_diaria ∪ Facturacion_NP ∪
+gv_ppp_entregados_meta ∪ Entregas_Virgilio` por `cod` + fecha de `gv_ppp_base_pedidos` (±3 días
+para "corrida") y contra `gv_pedidos_web_excluidos`. Regla: enviado y sin NP con fecha ≥ 03/09 =
+⏳; enviado y sin NP más viejo = muerto; no enviado y excluido = muerto; no enviado y no excluido =
+Gestión. **Repetir el lunes a la tarde: los 12 ⏳ tienen que haber pasado a Producción.**
+
 ---
 
 ## 4. Incidente de seguridad — 2026-09-04 (cerrado)
