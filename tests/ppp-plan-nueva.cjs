@@ -77,7 +77,9 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
     out.cargarAhora = /CARGAR AHORA/.test(fila("98702")) && /class="n go">1º/.test(fila("98702"));
     out.esperaTurno = /4º/.test(fila("98701")) && /espera su turno/.test(fila("98701"));
     out.faltaArmar = /2º/.test(fila("98703")) && /falta armar/.test(fila("98703")) && /En picking/.test(fila("98703"));
-    out.sinOrdenNorte = /Camión 2 · Zona 6 - GBA Norte/.test(html) && /1º<\/span><span class="t">se carga primero/.test(html);
+    // v13.13: con 1 pedido (o sin ubicaciones) no hay orden de carga ni "se carga primero"
+    const _norte = html.slice(html.indexOf("Camión 2 · Zona 6 - GBA Norte"));
+    out.sinOrdenNorte = /Camión 2 · Zona 6 - GBA Norte/.test(html) && !/Orden de carga/.test(_norte) && !/se carga primero/.test(_norte);
     out.bloques = /Tanda E01A/.test(html) && /Tanda E01B/.test(html) && /Tanda E02A/.test(html) && /ppp-tanda-h/.test(html);
     // vencidas
     pppPlanAbrir("venc");
@@ -125,7 +127,7 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
     ["1º armado → CARGAR AHORA",                              r.cargarAhora === true],
     ["4º armado → espera su turno",                           r.esperaTurno === true],
     ["2º en picking → falta armar",                           r.faltaArmar === true],
-    ["camión de 1 pedido: 1º se carga primero",               r.sinOrdenNorte === true],
+    ["camión de 1 pedido: sin orden de carga (v13.13)",       r.sinOrdenNorte === true],
     ["las tandas del día siguen abajo con sus bloques",       r.bloques === true],
     ["vista de atrasados",                                    r.venc === true],
     ["vista clásica y vuelta al tablero",                     r.clasica === true && r.vuelve === true],

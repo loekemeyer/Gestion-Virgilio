@@ -2433,7 +2433,14 @@ tr.ppp-err-zona > td{ background:#fffbeb !important; }
 .pn-carga .t{ font-size:11px; font-weight:800; color:#475569; line-height:1.2; } .pn-carga .t.go{ color:#15803d; }
 .pn-sec2{ font-size:11px; font-weight:800; letter-spacing:.7px; text-transform:uppercase; color:#64748b; margin:16px 0 8px; }
 @media (max-width:1100px){ .pn-kpis{ grid-template-columns:repeat(3,minmax(0,1fr)); } .pn-days{ grid-template-columns:repeat(2,1fr); } .pn-dayhead{ grid-template-columns:1fr; } .pn-thead{ display:none; } .pn-ped{ grid-template-columns:70px minmax(0,1fr) auto; } .pn-ped .loc, .pn-ped .m{ display:none; } }
-@media (max-width:640px){ .pn-kpis{ grid-template-columns:repeat(2,1fr); } .pn-days{ grid-template-columns:1fr; } .pn-camion .ch{ grid-template-columns:36px 1fr; } }
+@media (max-width:640px){ .pn-kpis{ grid-template-columns:repeat(2,1fr); } .pn-days{ grid-template-columns:1fr; }
+  /* v13.13: cabecera del camión en celular — título arriba; chips, m³ y $ en la línea de abajo (antes los chips se salían por la izquierda) */
+  .pn-camion .ch{ display:flex; flex-wrap:wrap; gap:6px 10px; padding:9px 12px; }
+  .pn-camion .ch > div:nth-child(2){ flex:1 1 60%; min-width:0; }
+  .pn-camion .ch .t1{ font-size:15px; } .pn-camion .ch .t2{ white-space:normal; }
+  .pn-camion .ch .st{ flex:1 1 100%; order:3; justify-content:flex-start; }
+  .pn-camion .ch .m3{ order:4; font-size:15px; } .pn-camion .ch .p{ order:5; font-size:15px; margin-left:auto; }
+}
 .ppp-edit-panel{ display:none; }
 .ppp-tanda.ppp-open.ppp-edit-mode .ppp-edit-panel{ display:flex; flex-wrap:wrap; gap:10px 16px; align-items:center; padding:10px 14px; background:#fffbeb; border-bottom:1px solid #fde68a; }
 .ppp-ep-l{ font-size:13px; font-weight:700; color:#92400e; display:inline-flex; align-items:center; gap:8px; }
@@ -6958,7 +6965,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v13.12";
+const APP_VERSION = "v13.13";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -29435,7 +29442,9 @@ function _pppCamiones(ped) {
   const arr = [...by.values()].sort(function (a, b) {
     return (ord[a.ruta] - ord[b.ruta]) || ((a.tn == null ? 1e9 : a.tn) - (b.tn == null ? 1e9 : b.tn)) || a.zona.localeCompare(b.zona);
   });
-  let n = 0; for (const c of arr) { if (c.ruta === "ret" || c.ruta === "sup") continue; c.num = ++n; }
+  // v13.13: Camión 1, 2, 3… en el orden de la vista (dueño: "Camión 46" con el n° de la tanda
+  // no se entendía). El código de la tanda sigue en el subtítulo. Sin tanda no numera.
+  let n = 0; for (const c of arr) { if (c.ruta === "ret" || c.ruta === "sup" || c.tn == null) continue; c.num = ++n; }
   return arr;
 }
 /* Orden de carga LIFO de un camión: recorrido geográfico (PPP_Geo + _rtOptimize) y se numera al
@@ -29467,7 +29476,7 @@ function _pppPlanEstDia(ped) { const est = { armado: 0, curso: 0, sin: 0 }; for 
 function _pppPlanValor(ped) { let v = 0, sin = 0; for (const p of ped) { const x = _pppValorPed(p); if (x == null) sin++; else v += x; } return { valor: v, sin: sin }; }
 function _pppCamionIco(c) { return c.ruta === "ret" ? "🏭" : (c.ruta === "sup" ? "🛒" : "🚚"); }
 /* v13.07: el número del camión ES el de la tanda (E02A → Camión 2), como en el cuadro "Total por día". */
-function _pppCamionNombre(c) { return c.ruta === "ret" ? "Retira en fábrica" : (c.ruta === "sup" ? "Súper" : ((c.tn != null ? "Camión " + c.tn : "Sin tanda") + " · " + c.zona)); }
+function _pppCamionNombre(c) { return c.ruta === "ret" ? "Retira en fábrica" : (c.ruta === "sup" ? "Súper" : ((c.tn != null ? "Camión " + c.num : "Sin tanda") + " · " + c.zona)); }
 /* ---- GRILLA: KPI + banda de vencidas + 6 días + otras fechas ---- */
 function _pppPlanGridHtml(programados) {
   const g = _pppPlanAgrupar(programados);
@@ -29543,7 +29552,10 @@ function _pppPlanDiaHtml(programados, key) {
   if (esVenc) h += '<div class="pn-note">⏰ La fecha de entrega de estos pedidos ya pasó y no se cargaron al camión. Ponéles una fecha nueva con ✏️ Editar (abajo, en la tanda). Si en realidad ya salieron, hay que cargar el camión (CCN) y controlar el remito.</div>';
   const dk = esVenc ? "venc" : key;
   for (const c of cams) {
-    const oc = (c.ruta === "ret" || c.ruta === "sup") ? null : _pppOrdenCarga(c);
+    // v13.13: el orden de carga sólo si hay recorrido de verdad — al menos 2 paradas con
+    // ubicación. Con 1 pedido, o sin ubicaciones ("1º Soldati ? → 2º Soldati ?"), no dice nada.
+    let oc = (c.ruta === "ret" || c.ruta === "sup") ? null : _pppOrdenCarga(c);
+    if (oc && (oc.paradas.length - oc.sinUbic) < 2) oc = null;
     const chips = (c.est.armado ? '<span class="pn-chip mid">' + c.est.armado + ' armado' + (c.est.armado === 1 ? '' : 's') + '</span>' : '') + (c.est.curso ? '<span class="pn-chip wait">' + c.est.curso + ' en curso</span>' : '') + (c.est.sin ? '<span class="pn-chip">' + c.est.sin + ' sin empezar</span>' : '');
     h += '<div class="pn-camion"><div class="ch ' + c.ruta + '"><div class="ico">' + _pppCamionIco(c) + '</div><div><div class="t1">' + escapeHtml(_pppCamionNombre(c)) + '</div><div class="t2">' + (c.tandas.length ? 'Tanda' + (c.tandas.length === 1 ? '' : 's') + ' ' + escapeHtml(c.tandas.join(" · ")) : 'Sin tanda') + ' · ' + c.ped.length + ' pedido' + (c.ped.length === 1 ? '' : 's') + '</div></div><div class="st">' + chips + '</div><div class="m3">' + _pppFmtM3(c.m3) + ' m³</div><div class="p">' + (_pppValor ? _pppFmtPesos(c.valor) : '…') + (c.sinValor ? '<small title="Pedidos sin valuar (sin líneas o sin precio de lista)"> · ' + c.sinValor + ' s/valor</small>' : '') + '</div></div>';
     if (oc && oc.paradas.length > 1) {

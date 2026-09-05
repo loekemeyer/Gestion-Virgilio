@@ -12,7 +12,14 @@
 > única**; no se replica. Ante la duda entre parche rápido y fix de raíz → **fix
 > de raíz**.
 >
-> Última actualización: 2026-09-05 (sábado, noche) · Versión app al documentar: **v13.12**
+> Última actualización: 2026-09-05 (sábado, noche) · Versión app al documentar: **v13.13**
+>
+> Nota **v13.13** (front) — Vista de un día / Atrasados en celular (dueño: *"se ve feo y no se
+> entiende"*): (1) los camiones se numeran **1, 2, 3… en el orden de la vista** — "Camión 46" con el
+> n° de la tanda (D46E) no se entendía; el código de la tanda sigue en el subtítulo; (2) el **orden de
+> carga sólo aparece con recorrido de verdad** (≥ 2 paradas con ubicación) — con 1 pedido o sin
+> ubicaciones salía "1º Soldati ? → 2º Soldati ?"; (3) la cabecera del camión en celular va en dos
+> líneas (título; chips + m³ + $) — antes los chips se salían por la izquierda. Test ajustado.
 >
 > Nota **v13.12** (front) — Programación sin los dos carteles de arriba (dueño, desde el celular:
 > *"sacá esas 2 alertas de ahí"*): el amarillo "N pedidos salieron en una fecha distinta a la
