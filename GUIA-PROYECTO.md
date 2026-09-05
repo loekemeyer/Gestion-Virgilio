@@ -12,7 +12,52 @@
 > única**; no se replica. Ante la duda entre parche rápido y fix de raíz → **fix
 > de raíz**.
 >
-> Última actualización: 2026-09-04 · Versión app al documentar: **v12.77**
+> Última actualización: 2026-09-04 (noche) · Versión app al documentar: **v12.88**
+>
+> ⚠⚠ **Estado del pipeline web desde el 2026-09-04 a la noche: la NUMERACIÓN ESTÁ PRENDIDA**
+> (`PPP_Web_Config.numeracion_activa = 1`), el cron de tandas (jobid 71, 00:01 hábiles) activo,
+> tandas con prefijo `GV-`. Sólo del lado Virgilio: el mail de las 12:30 de LK sigue andando y
+> Producción no se tocó (medido: ninguna función `ppp_web_*`/`gv_ppp_web_*` escribe en tabla
+> compartida). Primera corrida real: lunes 2026-09-07 00:01. Cómo apagar, en `CLAUDE.md`.
+>
+> Nota **v12.88** — **"A Programar" y el job sólo ven pedidos PENDIENTES = no enviados a compras.**
+> Regla del dueño: *"a los pedidos que estén pendientes y a los que vayan cayendo"*. Un pedido
+> que ya salió a ISIS por el mail de las 12:30 (`enviado_a_compras_at`) lo entrega Producción.
+> Sin el filtro, la corrida en seco del job leía **365 NP** de LK en 30 días, y **208 de esos 213
+> pedidos ya estaban entregados**: el lunes habría programado ~226 NP de zona 1 y 2 de nuevo.
+> La regla vive en las RPC de LK `gv_pedidos_web_np_lk` / `_chef` (`sql/gv_pedidos_web_np_feeds.sql`
+> — antes no estaban en ningún repo) y se duplica en `aprTraerPedidos`. Al foreign table
+> `chef_orders` se le sumó `enviado_a_compras_at` (Chef la tiene). Medido: LK 365 → **10 NP**,
+> Chef 39 → **1**. Test `tests/pweb-pendiente.cjs`.
+>
+> Nota **v12.87** — **Una NP web CONTROLADA cuenta como ENTREGADA, y sigue contando con el tiempo.**
+> Regla del dueño: *"si el pedido ya fue controlado, automáticamente tendría que ir a Pedidos
+> Entregados"*. Para las NP de ISIS ya pasaba (CRN de 60 días ∪ `PPP_Entregados_Meta`); para las
+> web fallaba la mitad durable, porque `PPP_Entregados_Meta` **se trunca cada 30 min** con el
+> Sheet de ISIS. Sin tabla nueva: vista **`gv_ppp_web_entregados`** (los CRN cuya NP es una
+> etiqueta —el CRN ya viaja como `"LK 01344|GV-02A"`— cruzados con `PPP_Web_Programacion`),
+> `security_invoker`, sumada a las dos lecturas del front (`pppRefreshMetaEntSet` y el histórico
+> completo). `vista_ppp_pedidos_entregados` ya traía las web (sale de `Facturacion_NP`, sin cast
+> numérico). Test `tests/pweb-entregados.cjs`.
+>
+> Nota **v12.86** — **La NP web llega a Facturación y se factura con su etiqueta.** La lista ya
+> salía de `fetchMonitorSheet()` (trae las tandas web) y el tilde ya escribía la etiqueta en
+> `Facturacion_NP`. Lo que mataba el circuito era **un solo filtro**: `facFetchArmadosEventos`
+> descartaba toda NP no numérica, así que el TAP de una `LK 01344` no contaba como armada y la
+> fila no se dibujaba. Más tres lugares que miraban dígitos: `pkNpEsLoeke`, `_facXlsEmpresa`
+> (la web de Chef caía en LK: 18 líneas en vez de 15) y `stockSalidaFacturadoNP`, que ahora
+> manda `empresa` explícita para las web porque el trigger `zz_normalizar_empresa`, sin ella,
+> deriva de los dígitos y `empresa_de_np('01344')` = `CH`. ⚠ Queda un hueco **del lado
+> servidor**: el `picking`/`separado` de stock los escribe el backend con `empresa_de_np`, que
+> no entiende la etiqueta; pesa sólo en los 4 duales (`437E/438E/439E/809E`) y arreglarlo es
+> tocar una función de Producción → decisión del dueño. Test `tests/pweb-facturacion.cjs`.
+>
+> Nota **v12.85** — **La tanda con un agregado urgente va ARRIBA de la lista del operario.**
+> `PPP_Web_Programacion.prioridad` se llenaba desde v12.79 y el cartel rojo se veía, pero la lista
+> de tandas del celular seguía por fecha y después alfabético. Ahora la tanda hereda la prioridad
+> más alta de sus NP y las de `prioridad > 0` van en un bloque rojo *"⚠ ARMENLO YA — el cliente
+> agregó"* antes de cualquier fecha, diciendo a qué pedido se agregó cada una. Aditivo: sin
+> prioridad la lista se dibuja exactamente como antes. Test `tests/pk-prioridad-agregado.cjs`.
 >
 > Nota **backend, sin bump de app** — **Armado AUTOMÁTICO de tandas de la PPP Web
 > (`ppp_web_armar_tandas`).** ⚠ **No toca Producción Virgilio**: escribe sólo en

@@ -13,7 +13,11 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
   p.on("pageerror", (e) => errs.push(e.message));
   await p.goto("file://" + path.join(__dirname, "..", "index.html"), { waitUntil: "domcontentloaded" });
   const r = await p.evaluate(() => {
-    const now = Date.now(), iso = (m) => new Date(now - m * 60000).toISOString(), tk = isoToDayKey(now);
+    // `now` fijo al MEDIODÍA de hoy (hora Argentina), no Date.now(): los eventos van a
+    // -120' y -300', y si el test corre entre las 0:00 y las 5:00 caen en AYER, se
+    // filtran por "sólo hoy" y la lista sale vacía. Falló así el 2026-09-05 a la 1:10.
+    const now = new Date(isoToDayKey(Date.now()) + "T15:00:00Z").getTime();   // 15:00 UTC = 12:00 ART
+    const iso = (m) => new Date(now - m * 60000).toISOString(), tk = isoToDayKey(now);
     const fj = new Set(["52"]);
     const evs = [
       { legajo: "50", opcion: "EP", ts_cliente: iso(120) },   // silencio 120' → SÍ

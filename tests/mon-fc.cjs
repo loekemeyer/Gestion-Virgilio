@@ -1,7 +1,9 @@
 const path=require("path");let chromium;
 try{({chromium}=require("/opt/node22/lib/node_modules/playwright"));}catch(e){({chromium}=require("playwright"));}
 (async()=>{
-  const root="/home/user/Produccion-Virgilio";
+  // Antes apuntaba a /home/user/Produccion-Virgilio, una ruta de otro clon: el test
+  // moría con ERR_FILE_NOT_FOUND desde que este repo se llama Gestion-Virgilio.
+  const root = require("path").join(__dirname, "..");
   const b=await chromium.launch();const p=await b.newPage({viewport:{width:1600,height:900}});
   const errs=[];p.on("pageerror",e=>errs.push(e.message));
   await p.goto("file://"+path.join(root,"index.html"),{waitUntil:"domcontentloaded"});
