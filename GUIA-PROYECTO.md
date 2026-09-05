@@ -12,7 +12,10 @@
 > única**; no se replica. Ante la duda entre parche rápido y fix de raíz → **fix
 > de raíz**.
 >
-> Última actualización: 2026-09-05 (sábado, noche) · Versión app al documentar: **v13.13**
+> Última actualización: 2026-09-05 (sábado, noche) · Versión app al documentar: **v13.14**
+>
+> Nota **v13.14** (front) — Franja de tanda (v13.01) en celular: nombre arriba, clientes/NP en la
+> 2ª línea, fecha en la 3ª y m³/acciones en la 4ª. Antes la fecha "Vencida" tapaba el código.
 >
 > Nota **v13.13** (front) — Vista de un día / Atrasados en celular (dueño: *"se ve feo y no se
 > entiende"*): (1) los camiones se numeran **1, 2, 3… en el orden de la vista** — "Camión 46" con el

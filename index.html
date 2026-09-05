@@ -2434,6 +2434,12 @@ tr.ppp-err-zona > td{ background:#fffbeb !important; }
 .pn-sec2{ font-size:11px; font-weight:800; letter-spacing:.7px; text-transform:uppercase; color:#64748b; margin:16px 0 8px; }
 @media (max-width:1100px){ .pn-kpis{ grid-template-columns:repeat(3,minmax(0,1fr)); } .pn-days{ grid-template-columns:repeat(2,1fr); } .pn-dayhead{ grid-template-columns:1fr; } .pn-thead{ display:none; } .pn-ped{ grid-template-columns:70px minmax(0,1fr) auto; } .pn-ped .loc, .pn-ped .m{ display:none; } }
 @media (max-width:640px){ .pn-kpis{ grid-template-columns:repeat(2,1fr); } .pn-days{ grid-template-columns:1fr; }
+  /* v13.14: franja de tanda en celular — nombre arriba, clientes/NP en la 2ª línea, fecha + m³ en la 3ª (antes la fecha tapaba el código) */
+  .ppp-tanda-h{ grid-template-columns:14px minmax(0,1fr) auto; gap:4px 8px; }
+  .ppp-tanda-h .ppp-tanda-name{ min-width:0; }
+  .ppp-tanda-h .ppp-tanda-sum{ grid-column:2 / -1; }
+  .ppp-tanda-h .ppp-tanda-fe{ grid-column:2 / -1; justify-self:start; }
+  .ppp-tanda-h .ppp-tanda-meta{ grid-column:2 / -1; justify-self:start; }
   /* v13.13: cabecera del camión en celular — título arriba; chips, m³ y $ en la línea de abajo (antes los chips se salían por la izquierda) */
   .pn-camion .ch{ display:flex; flex-wrap:wrap; gap:6px 10px; padding:9px 12px; }
   .pn-camion .ch > div:nth-child(2){ flex:1 1 60%; min-width:0; }
@@ -6965,7 +6971,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v13.13";
+const APP_VERSION = "v13.14";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
