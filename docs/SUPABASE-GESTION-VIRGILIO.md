@@ -1380,7 +1380,7 @@ es de Chef y pisa al LK 217): cuando Gestión alimente el tracking, escribir el 
 una función `gv_*` y pedir columna `empresa` en PaginaLK. Y el Excel ISIS de Facturación manda
 `N_Pedido` contador (no el id), como el mail: ISIS numera 98xxx por su cuenta.
 
-### 3.x ✅ Armado intradía de zona 1 y 2 al llegar a 0,80 m³ (idea 7317) — 2026-09-05 sábado (backend, sin bump)
+### 3.x ✅ Armado intradía de zona 1 y 2 al llegar a 0,80 m³ (idea 7317) — 2026-09-05 sábado (v13.04)
 
 **Qué pidió el dueño.** *"Los pedidos que se entregan en zona 1 y 2 deben programarse
 inmediatamente, apenas llegan, porque a esa zona voy todos los días."* Aclarado: *"cuando se llega

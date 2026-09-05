@@ -424,3 +424,6 @@ que en el momento pida verlo.
   Todo va a `main` directo. Si la plataforma crea una rama automáticamente,
   mergear a `main` de inmediato y trabajar desde ahí.
 - Estilo de commits: `vX.YZ: descripción` cuando hay bump de versión.
+- **Desde el 2026-09-05: TODO cambio lleva bump** de `APP_VERSION` (index.html) y `SW_VERSION`
+  (sw.js), también los de backend/Supabase/Edge Functions. Pedido del dueño: *"empezá a bumpear
+  las modificaciones así voy chequeando"* — mira el badge de versión para saber qué llegó.

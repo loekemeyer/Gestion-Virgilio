@@ -12,7 +12,11 @@
 > única**; no se replica. Ante la duda entre parche rápido y fix de raíz → **fix
 > de raíz**.
 >
-> Última actualización: 2026-09-05 (sábado, noche) · Versión app al documentar: **v13.03**
+> Última actualización: 2026-09-05 (sábado, noche) · Versión app al documentar: **v13.04**
+>
+> ⚠ **Regla desde el 2026-09-05 (dueño: "empezá a bumpear las modificaciones así voy chequeando"):
+> TODO cambio —front o backend— lleva bump de `APP_VERSION`/`SW_VERSION`, aunque no toque
+> `index.html` más que por el número.** Así el dueño ve en el badge de la app que llegó algo nuevo.
 >
 > ⚠⚠ **Estado del pipeline web desde el 2026-09-04 a la noche: la NUMERACIÓN ESTÁ PRENDIDA**
 > (`PPP_Web_Config.numeracion_activa = 1`), el cron de tandas (jobid 71, 00:01 hábiles) activo,
@@ -20,7 +24,7 @@
 > Producción no se tocó (medido: ninguna función `ppp_web_*`/`gv_ppp_web_*` escribe en tabla
 > compartida). Primera corrida real: lunes 2026-09-07 00:01. Cómo apagar, en `CLAUDE.md`.
 >
-> Nota **backend 2026-09-05 (sin bump) — Armado intradía de zona 1 y 2** (idea **7317**, dueño:
+> Nota **v13.04** (backend + bump) — **Armado intradía de zona 1 y 2** (idea **7317**, dueño:
 > *"los pedidos de zona 1 y 2 deben programarse inmediatamente, apenas llegan, porque a esa zona voy
 > todos los días… cuando se llega a 0,80 m³, para el próximo día que se pueda entregar según PPP;
 > excepciones son las de súper"*). Cron nuevo **jobid 73** `gv-ppp-web-tandas-intradia` (cada 15
