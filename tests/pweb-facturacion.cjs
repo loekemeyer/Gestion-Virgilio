@@ -1,16 +1,16 @@
 /* Regresión (v12.86): una NP web llega a Facturación y se factura con su etiqueta.
 
    El agujero que tapa: `facFetchArmadosEventos` descartaba cualquier NP que no fuera
-   numérica (/^\d+$/), así que el TAP de una NP web ("LK 01344") nunca contaba como
+   numérica (/^\d+$/), así que el TAP de una NP web ("LK 1344") nunca contaba como
    "armada", `facEstaArmada` daba false y la fila no se dibujaba. El circuito web
    moría en Facturación, en silencio.
 
    Verifica que:
-   (a) con un TAP de "LK 01344" en los eventos, facEstaArmada("LK 01344") sea true, y
+   (a) con un TAP de "LK 1344" en los eventos, facEstaArmada("LK 1344") sea true, y
        que un texto de tanda suelto ("C03B") se siga descartando como antes,
    (b) facTick() dibuje la fila de la NP web al lado de la de ISIS,
-   (c) el tilde escriba en Facturacion_NP con np = "LK 01344" (la etiqueta, no un número),
-   (d) el drenaje de stock de esa NP mande empresa = "LK" explícita (ref "GV-02A|LK 01344"
+   (c) el tilde escriba en Facturacion_NP con np = "LK 1344" (la etiqueta, no un número),
+   (d) el drenaje de stock de esa NP mande empresa = "LK" explícita (ref "GV-02A|LK 1344"
        tiene dígitos 01344 y el trigger, sin la empresa, la leería como Chef),
    (e) el drenaje de una NP de ISIS NO mande empresa (no cambia nada de lo de siempre),
    (f) pkNpEsLoeke y _facXlsEmpresa entiendan la etiqueta y sigan iguales para ISIS. */
@@ -56,13 +56,13 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
       if (url.indexOf("vista_tanda_status") >= 0) return J([{ tanda: "GV-02A" }, { tanda: "C03B" }]);
       // eventos de armado: uno web, uno ISIS, y un texto de tanda suelto (basura de siempre)
       if (url.indexOf("opcion=in.(TAL,TAP)") >= 0) return J([
-        { opcion: "TAP", texto: "LK 01344|55|GV-02A|A=586X1|NADA" },
+        { opcion: "TAP", texto: "LK 1344|55|GV-02A|A=586X1|NADA" },
         { opcion: "TAL", texto: "98574|3|C03B|A=100X2|LIO" },
         { opcion: "TAP", texto: "C03B" }
       ]);
       // composición TAL de cada NP (para el drenaje de a_facturar)
       if (url.indexOf("opcion=eq.TAL") >= 0) {
-        if (url.indexOf("LK%2001344") >= 0 || url.indexOf("LK 01344") >= 0) return J([{ texto: "LK 01344|0|GV-02A|A=586X1|NADA", ts_cliente: "2026-09-11T12:00:00Z" }]);
+        if (url.indexOf("LK%201344") >= 0 || url.indexOf("LK 1344") >= 0) return J([{ texto: "LK 1344|0|GV-02A|A=586X1|NADA", ts_cliente: "2026-09-11T12:00:00Z" }]);
         if (url.indexOf("98574") >= 0) return J([{ texto: "98574|0|C03B|A=100X2|LIO", ts_cliente: "2026-09-11T12:00:00Z" }]);
         return J([]);
       }
@@ -81,24 +81,24 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
 
     // (a) el fallback de "está armada" acepta la etiqueta
     await facFetchArmadosEventos();
-    out.armadaWeb   = facEstaArmada("LK 01344");
+    out.armadaWeb   = facEstaArmada("LK 1344");
     out.armadaIsis  = facEstaArmada("98574");
     out.basuraFuera = !facEstaArmada("C03B");
 
     // (b) la fila aparece
     await facTick();
     const html = (document.getElementById("facContainer") || {}).innerHTML || "";
-    out.filaWeb  = html.indexOf('data-fac-np="LK 01344"') >= 0;
+    out.filaWeb  = html.indexOf('data-fac-np="LK 1344"') >= 0;
     out.filaIsis = html.indexOf('data-fac-np="98574"') >= 0;
     out.tandasFC = (_facLastTandas || []).map(t => t.tanda).sort().join(",");
 
     // (c)+(d) tilde de la web
     const btn = document.createElement("button");
-    btn.dataset.args = JSON.stringify({ np: "LK 01344", tanda: "GV-02A", m3: 1.184, rs: "Orfali", cod: "4188", feRaw: "2026-09-11" });
+    btn.dataset.args = JSON.stringify({ np: "LK 1344", tanda: "GV-02A", m3: 1.184, rs: "Orfali", cod: "4188", feRaw: "2026-09-11" });
     await window.facTickNP(btn);
     out.postNp    = posts.length ? posts[0].np : null;
     out.postTanda = posts.length ? posts[0].tanda : null;
-    const drenWeb = stockRows.filter(x => x.ref === "GV-02A|LK 01344");
+    const drenWeb = stockRows.filter(x => x.ref === "GV-02A|LK 1344");
     out.drenWebN       = drenWeb.length;
     out.drenWebEmpresa = drenWeb.length ? drenWeb[0].empresa : null;
     out.drenWebDelta   = drenWeb.length ? drenWeb[0].delta : null;
@@ -112,11 +112,11 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
     out.drenIsisSinEmpresa = drenIsis.length ? !("empresa" in drenIsis[0]) : null;
 
     // (f) las dos funciones auxiliares
-    out.loekeWeb  = pkNpEsLoeke("LK 01344");
-    out.loekeChW  = pkNpEsLoeke("CH 00007");
+    out.loekeWeb  = pkNpEsLoeke("LK 1344");
+    out.loekeChW  = pkNpEsLoeke("CH 0007");
     out.loekeIsis = pkNpEsLoeke("98574") && !pkNpEsLoeke("44603");
-    out.xlsWebCh  = _facXlsEmpresa("CH 00007");
-    out.xlsWebLk  = _facXlsEmpresa("LK 01344");
+    out.xlsWebCh  = _facXlsEmpresa("CH 0007");
+    out.xlsWebLk  = _facXlsEmpresa("LK 1344");
     out.xlsIsis   = _facXlsEmpresa("44603") + "/" + _facXlsEmpresa("98574");
     return out;
   });
@@ -128,7 +128,7 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
     ["la fila de la NP web se dibuja en Facturación",           r.filaWeb === true],
     ["al lado de la de ISIS",                                   r.filaIsis === true],
     ["las dos tandas quedan como FC",                           r.tandasFC === "C03B,GV-02A"],
-    ["el tilde escribe la etiqueta, no un número",              r.postNp === "LK 01344"],
+    ["el tilde escribe la etiqueta, no un número",              r.postNp === "LK 1344"],
     ["con su tanda",                                            r.postTanda === "GV-02A"],
     ["el drenaje de la NP web genera movimiento",               r.drenWebN === 1],
     ["y manda empresa = LK explícita",                          r.drenWebEmpresa === "LK"],

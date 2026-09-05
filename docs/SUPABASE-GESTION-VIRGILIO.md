@@ -1294,6 +1294,19 @@ update public."PPP_Web_Config" set valor = null where clave like 'espejo_np_cort
 Rollback total: `drop view` de las tres vistas, `drop function` de las dos, borrar las dos
 filas de config, front v12.89 (vuelve a las tablas) y la RPC de `sql/gv_pedidos_web_excluidos.sql`.
 
+### 3.n ✅ Etiqueta de NP web a 4 dígitos — 2026-09-05 (v12.91)
+
+Dueño: *"que tengan 4 dígitos los de página"*. `gv_ppp_web_np_label` pasa de `lpad 5` a
+`lpad 4`: **`LK 0001` / `CH 0001`** (pasado 9999 crece, `LK 10000`, no se recorta). Se cambió
+**antes de numerar el primero**: `PPP_Web_NP` 0 filas, `PPP_Web_Base` 0, `PPP_Web_Programacion`
+0, 0 eventos con etiqueta en `Registros_Produccion_Virgilio`, ningún índice sobre la función.
+`create or replace` de una función nuestra (`gv_`); la usan `ppp_web_resync`,
+`gv_ppp_web_tanda_programar` y las vistas `gv_ppp_web_entregados` / `gv_ppp_web_estado`, que
+la toman en vivo. Copias de UX: `pwebNpLabel` (front v12.91) y `npLabel` (Edge Fn **v11**).
+Fuente en `sql/gv_tandas_diarias.sql`. Probado: `lk/1 → LK 0001 · chef/1 → CH 0001 ·
+lk/357 → LK 0357 · lk/12345 → LK 12345`. Rollback: volver a `5` en los tres lugares (sólo
+mientras no haya nada numerado; después habría que reetiquetar).
+
 ---
 
 ## 4. Incidente de seguridad — 2026-09-04 (cerrado)

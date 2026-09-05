@@ -6802,7 +6802,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v12.90";
+const APP_VERSION = "v12.91";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -31546,7 +31546,7 @@ async function mergePickingBasePppWeb(map) {
 }
 
 /* La etiqueta que ve el operario y que viaja como "NP" por todo el circuito:
-   "LK 00001" / "CH 00001". Prefijo de empresa + espacio + 5 dígitos.
+   "LK 0001" / "CH 0001". Prefijo de empresa + espacio + 4 dígitos (dueño, 2026-09-05; antes 5).
 
    ⚠ ESTO ES UNA COPIA. La fuente de verdad es `gv_ppp_web_np_label(empresa, np)`
    en Supabase; acá se duplica sólo para no esperar al servidor al pintar la
@@ -31556,11 +31556,11 @@ async function mergePickingBasePppWeb(map) {
    (>90000 = LK) y una NP web de pocos dígitos caería en Chef, mandando a buscar
    un pedido de Loekemeyer al sector equivocado. Con el prefijo manda la etiqueta.
 
-   Los ceros se rellenan hasta 5; pasado 99999 la etiqueta crece ("LK 100000") en
+   Los ceros se rellenan hasta 4; pasado 9999 la etiqueta crece ("LK 10000") en
    vez de recortarse, que repetiría un número ya usado. */
 function pwebNpLabel(empresa, np) {
   const n = String(np);
-  return ((empresa === "chef") ? "CH" : "LK") + " " + (n.length >= 5 ? n : n.padStart(5, "0"));
+  return ((empresa === "chef") ? "CH" : "LK") + " " + (n.length >= 4 ? n : n.padStart(4, "0"));
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════

@@ -586,28 +586,28 @@ $function$;
 -- ══════════════════════════════════════════════════════════════════════════
 -- La ETIQUETA de la NP · fuente de verdad
 -- ══════════════════════════════════════════════════════════════════════════
--- "LK 00001" / "CH 00001": prefijo de empresa + espacio + 5 digitos.
+-- "LK 0001" / "CH 0001": prefijo de empresa + espacio + CUATRO digitos.
+-- (2026-09-05, dueño: "que tengan 4 digitos los de pagina". Hasta ese dia eran 5;
+--  se cambio antes de numerar el primero: PPP_Web_NP tenia 0 filas.)
 -- El front (`pwebNpLabel`) y la Edge Function (`npLabel`) la duplican SOLO como
 -- optimizacion de UX. Si cambia el formato, se cambia PRIMERO aca.
 create or replace function public.gv_ppp_web_np_label(p_empresa text, p_np integer)
 returns text language sql immutable as $function$
   select case when lower(coalesce(p_empresa,'')) in ('chef','ch') then 'CH' else 'LK' end
       || ' '
-      -- ⚠ lpad TRUNCA si el texto ya es mas largo que el ancho:
-      --   lpad('100000',5,'0') = '10000', que es la etiqueta de la NP 10000.
-      --   Tres pedidos distintos compartirian NP y el operario abriria una
-      --   tanda con los articulos mezclados, en silencio. Con la guarda, pasado
-      --   99999 la etiqueta simplemente crece: LK 100000.
-      || case when length(p_np::text) >= 5 then p_np::text
-              else lpad(p_np::text, 5, '0') end;
+      -- 2026-09-05 (dueño): CUATRO digitos, no cinco. "LK 0001".
+      -- lpad TRUNCA si el texto ya es mas largo que el ancho: lpad('12345',4,'0')
+      -- devuelve '1234'. Con la guarda, pasado 9999 la etiqueta simplemente
+      -- crece (LK 10000) en vez de repetir un numero que ya existe.
+      || case when length(p_np::text) >= 4 then p_np::text
+              else lpad(p_np::text, 4, '0') end;
 $function$;
 
 grant execute on function public.gv_ppp_web_np_label(text, integer) to anon, authenticated, service_role;
 
--- Probado el 2026-09-04, las tres implementaciones dan lo mismo en los 6 casos
+-- Probado el 2026-09-05, las tres implementaciones dan lo mismo
 -- (backend, front y Edge Function), incluido el borde que truncaba:
---   lk/1 → LK 00001 · chef/1 → CH 00001 · lk/357 → LK 00357
---   chef/87 → CH 00087 · lk/99999 → LK 99999 · lk/100000 → LK 100000
+--   lk/1 → LK 0001 · chef/1 → CH 0001 · lk/357 → LK 0357 · lk/12345 → LK 12345
 
 -- ── La lógica de numeración, para que no haya que leerla del cuerpo ────────
 --   · un número por (empresa, order_id, np_idx) — un pedido web se puede

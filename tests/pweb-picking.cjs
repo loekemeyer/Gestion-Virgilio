@@ -4,7 +4,7 @@
        de ISIS sigan intactas (es aditivo: si esto falla, el picking de siempre no
        se entera),
    (b) los artículos salgan de PPP_Web_Base (la foto tomada al programar),
-   (c) la EMPRESA se resuelva por la etiqueta "LK 01343" y no por el número: la
+   (c) la EMPRESA se resuelva por la etiqueta "LK 1343" y no por el número: la
        regla vieja es >90000 = LK, así que una NP web de 4 dígitos caería en Chef y
        el operario iría a buscar un pedido de Loekemeyer al sector equivocado,
    (d) una tanda que mezcla una NP de ISIS y una web quede con las dos. */
@@ -21,7 +21,7 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
 
   // (c) la trampa de la empresa, aislada
   const emp = await p.evaluate(() => ({
-    webLk:    empresaDeNp("LK 01343"),
+    webLk:    empresaDeNp("LK 1343"),
     webCh:    empresaDeNp("CH 87"),
     isisLk:   empresaDeNp("98574"),
     isisCh:   empresaDeNp("44603"),
@@ -43,9 +43,9 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
           direccion: "Juncal 2869", barrio: "Martinez", m3: 1.184 }
       ]);
       if (u.includes("PPP_Web_Base")) return json([
-        { np_label: "LK 01343", articulo: "027", cajas: 2 },
-        { np_label: "LK 01343", articulo: "505", cajas: 5 },
-        { np_label: "LK 01344", articulo: "586", cajas: 1 }
+        { np_label: "LK 1343", articulo: "027", cajas: 2 },
+        { np_label: "LK 1343", articulo: "505", cajas: 5 },
+        { np_label: "LK 1344", articulo: "586", cajas: 1 }
       ]);
       return json([]);
     };
@@ -62,13 +62,13 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
     const mixta = acc.get("MIXTA");
     return {
       isisIntacta:   !!acc.get("C03B") && acc.get("C03B").pedidos[0].np === "98574",
-      webAparece:    !!d01a && d01a.pedidos[0].np === "LK 01343",
+      webAparece:    !!d01a && d01a.pedidos[0].np === "LK 1343",
       m3Web:         d01a ? Number(d01a.m3.toFixed(3)) : null,
       mixtaTieneLasDos: !!mixta && mixta.pedidos.length === 2
                         && mixta.pedidos.some(x => x.np === "98999")
-                        && mixta.pedidos.some(x => x.np === "LK 01344"),
-      arts1343:      (base.get("LK 01343") || []).map(x => x.art + ":" + x.cajas).join(","),
-      arts1344:      (base.get("LK 01344") || []).map(x => x.art + ":" + x.cajas).join(",")
+                        && mixta.pedidos.some(x => x.np === "LK 1344"),
+      arts1343:      (base.get("LK 1343") || []).map(x => x.art + ":" + x.cajas).join(","),
+      arts1344:      (base.get("LK 1344") || []).map(x => x.art + ":" + x.cajas).join(",")
     };
   });
 

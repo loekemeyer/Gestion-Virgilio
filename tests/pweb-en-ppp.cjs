@@ -2,7 +2,7 @@
    No hay pantalla aparte: se ven igual que los de ISIS porque son la misma tabla.
    Verifica que:
    (a) pppTraerPedidosWeb devuelva filas con la MISMA forma que las de la PPP
-       (np rotulada "LK 01343" — prefijo + 5 dígitos desde v12.78 —, m³ propio,
+       (np rotulada "LK 1343" — prefijo + 5 dígitos desde v12.78 —, m³ propio,
        barrio y zona resueltos, programmed),
    (b) el m³ NO sume 0 en silencio cuando un artículo no está medido,
    (c) Chef vaya por su RPC (FDW ~3,3 s) y Loekemeyer NO la toque,
@@ -117,12 +117,12 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
     } catch (e) { return e.message; }
   });
 
-  const ok = r.filas === 1 && r.np === "LK 01343" && r.localidad === "Mataderos" && r.formaPpp
+  const ok = r.filas === 1 && r.np === "LK 1343" && r.localidad === "Mataderos" && r.formaPpp
     && r.m3 === 0.3 && r.parcial === true && r.programmed === false && r.lkNoTocaChef
     && r.guardadas === 1 && r.cabNp === 1343 && r.cabTanda === "D01A" && r.cabM3Parcial === true
-    && r.arts === "027:2,505:5,ZZZ:3" && r.artsNpLabel === "LK 01343"
+    && r.arts === "027:2,505:5,ZZZ:3" && r.artsNpLabel === "LK 1343"
     && /número/i.test(r.sinNum)
-    && chef.np === "CH 00007" && chef.usaRpc && chef.noUsaVistaLk
+    && chef.np === "CH 0007" && chef.usaRpc && chef.noUsaVistaLk
     && /permiso/i.test(permiso);
   console.log("pweb-en-ppp:", JSON.stringify({ ...r, chef, permiso }),
     "· pageerrors:", errs.length ? errs.join("|") : "none", "·", (ok && !errs.length) ? "✓ OK" : "✗ FAIL");

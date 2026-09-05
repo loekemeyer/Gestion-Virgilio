@@ -44,14 +44,14 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
       url = String(url);
       if (url.indexOf("gv_ppp_web_entregados") >= 0) {
         if (webFalla) return J([], false);
-        return J([{ np_label: "LK 01344", cod_cliente: "4188", razon_social: "Orfali", tanda: "GV-02A", m3: 1.184, fecha_entrega: "2026-09-11" }]);
+        return J([{ np_label: "LK 1344", cod_cliente: "4188", razon_social: "Orfali", tanda: "GV-02A", m3: 1.184, fecha_entrega: "2026-09-11" }]);
       }
       if (url.indexOf("ppp_entregados_meta") >= 0) return J([
         { np: "98574", cod: "2533", rs: "Osa Distribuidora", tanda: "C03B", m3: 0.5, fecha_entrega: "2026-09-10" }
       ]);
       if (url.indexOf("vista_ppp_pedidos_entregados") >= 0) return J([
         { np: "98574",    tanda: "C03B",   cod_cliente: "2533", razon_social: "Osa Distribuidora", m3: 0.5,   fecha_salida: "2026-09-10", facturado_at: "2026-09-10T12:00:00Z", cajas_pedidas: 5, cajas_entregadas: 5, cajas_falto: 0 },
-        { np: "LK 01344", tanda: "GV-02A", cod_cliente: "4188", razon_social: "Orfali",            m3: 1.184, fecha_salida: "2026-09-11", facturado_at: "2026-09-11T12:00:00Z", cajas_pedidas: 1, cajas_entregadas: 1, cajas_falto: 0 },
+        { np: "LK 1344", tanda: "GV-02A", cod_cliente: "4188", razon_social: "Orfali",            m3: 1.184, fecha_salida: "2026-09-11", facturado_at: "2026-09-11T12:00:00Z", cajas_pedidas: 1, cajas_entregadas: 1, cajas_falto: 0 },
         { np: "98575",    tanda: "C03B",   cod_cliente: "2540", razon_social: "Otro",              m3: 0.3,   fecha_salida: "2026-09-10", facturado_at: "2026-09-10T12:00:00Z", cajas_pedidas: 2, cajas_entregadas: 2, cajas_falto: 0 }
       ]);
       return J([]);
@@ -60,7 +60,7 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
     // (a) el set de confirmadas
     await pppRefreshMetaEntSet();
     out.confIsis = _pppMetaEntSet.has("98574");
-    out.confWeb  = _pppMetaEntSet.has("LK 01344");
+    out.confWeb  = _pppMetaEntSet.has("LK 1344");
     out.confNo   = !_pppMetaEntSet.has("98575");
 
     // (b) entregados vs en viaje
@@ -71,7 +71,7 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
 
     // (c) el histórico completo
     await pppRefreshEntregadosFull();
-    const w = (_pppDeliveredFull || []).find(x => x.np === "LK 01344");
+    const w = (_pppDeliveredFull || []).find(x => x.np === "LK 1344");
     out.histWeb  = w ? { cod: w.cod, rs: w.rs, tanda: w.tanda, m3: w.m3, frep: w.frep, fkey: w.fkey } : null;
     out.histIsis = !!(_pppDeliveredFull || []).find(x => x.np === "98574");
 
@@ -79,10 +79,10 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
     webFalla = true;
     await pppRefreshMetaEntSet();
     out.fallaIsisSigue = _pppMetaEntSet.has("98574");
-    out.fallaWebFuera  = !_pppMetaEntSet.has("LK 01344");
+    out.fallaWebFuera  = !_pppMetaEntSet.has("LK 1344");
     await pppRefreshEntregadosFull();
     out.fallaHistIsis  = !!(_pppDeliveredFull || []).find(x => x.np === "98574");
-    out.fallaHistWeb   = !(_pppDeliveredFull || []).find(x => x.np === "LK 01344");
+    out.fallaHistWeb   = !(_pppDeliveredFull || []).find(x => x.np === "LK 1344");
     return out;
   });
 
@@ -90,7 +90,7 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
     ["confirmadas: la NP de ISIS sigue viniendo de la hoja",    r.confIsis === true],
     ["confirmadas: la NP web viene de gv_ppp_web_entregados",   r.confWeb === true],
     ["confirmadas: la que no se controló no está",              r.confNo === true],
-    ["entregados = ISIS confirmada + web controlada",           r.entregados === "98574,LK 01344"],
+    ["entregados = ISIS confirmada + web controlada",           r.entregados === "98574,LK 1344"],
     ["en viaje = la que nadie confirmó",                        r.enViaje === "98575"],
     ["histórico: la fila web trae cliente",                     r.histWeb && r.histWeb.cod === "4188" && r.histWeb.rs === "Orfali"],
     ["histórico: tanda, m³ y fecha con la misma forma",         r.histWeb && r.histWeb.tanda === "GV-02A" && r.histWeb.m3 === 1.184 && r.histWeb.frep === "2026-09-11" && r.histWeb.fkey === "20260911"],

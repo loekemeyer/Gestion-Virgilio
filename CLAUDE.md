@@ -105,7 +105,7 @@ las 12:30 (`procesar-pedidos-web`) **sigue andando**, así que Producción sigue
 por ISIS lo que ya venía y lo que caiga; lo que falte se le suma a Producción después.
 Detalle, medición y rollback en `docs/SUPABASE-GESTION-VIRGILIO.md` §3.l.
 
-- **NP** → Gestión numera desde **`LK 00001` / `CH 00001`** (`PPP_Web_NP_Seed` lk 1 · chef 1)
+- **NP** → Gestión numera desde **`LK 0001` / `CH 0001`** (4 dígitos desde v12.91; `PPP_Web_NP_Seed` lk 1 · chef 1)
   al **programar** una tanda (job de las 00:01 para zona 1 y 2; "A Programar" a mano para el
   resto). Regla del dueño: *"cuando Gestión tome control, va a asignarle la numeración
   nuestra a los pedidos que estén pendientes y a los que vayan cayendo"*. **Pendiente =
@@ -141,9 +141,10 @@ update public."PPP_Web_Config" set valor_texto = '' where clave = 'tanda_prefijo
 ```
 
 La NP arranca en **00001 para las dos empresas** (`PPP_Web_NP_Seed`: lk 1 · chef 1), o sea
-el primer pedido de Gestión va a ser **`LK 00001`** / **`CH 00001`**. Sin choque con
+el primer pedido de Gestión va a ser **`LK 0001`** / **`CH 0001`**. Sin choque con
 Producción, cuyas NP son de 5 dígitos desde 44361. La etiqueta la arma
-**`gv_ppp_web_np_label(empresa, np)`** en el backend — prefijo + espacio + 5 dígitos; el
+**`gv_ppp_web_np_label(empresa, np)`** en el backend — prefijo + espacio + **4 dígitos**
+(dueño, 2026-09-05; hasta v12.90 eran 5, se cambió antes de numerar el primero); el
 front y la Edge Function la duplican sólo como optimización de UX.
 
 Con el prefijo vacío, `ppp_web_armar_tandas` vuelve sola a la codificación histórica

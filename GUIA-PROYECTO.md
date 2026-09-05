@@ -12,13 +12,20 @@
 > única**; no se replica. Ante la duda entre parche rápido y fix de raíz → **fix
 > de raíz**.
 >
-> Última actualización: 2026-09-05 (madrugada) · Versión app al documentar: **v12.90**
+> Última actualización: 2026-09-05 (madrugada) · Versión app al documentar: **v12.91**
 >
 > ⚠⚠ **Estado del pipeline web desde el 2026-09-04 a la noche: la NUMERACIÓN ESTÁ PRENDIDA**
 > (`PPP_Web_Config.numeracion_activa = 1`), el cron de tandas (jobid 71, 00:01 hábiles) activo,
 > tandas con prefijo `GV-`. Sólo del lado Virgilio: el mail de las 12:30 de LK sigue andando y
 > Producción no se tocó (medido: ninguna función `ppp_web_*`/`gv_ppp_web_*` escribe en tabla
 > compartida). Primera corrida real: lunes 2026-09-07 00:01. Cómo apagar, en `CLAUDE.md`.
+>
+> Nota **v12.91** — **La etiqueta de las NP web pasa a 4 dígitos: `LK 0001` / `CH 0001`.** Dueño:
+> *"que tengan 4 dígitos los de página"*. Antes eran 5 (`LK 00001`). Se cambió antes de numerar el
+> primero (`PPP_Web_NP` tenía 0 filas, ningún evento con etiqueta). Fuente de verdad
+> `gv_ppp_web_np_label` (`sql/gv_tandas_diarias.sql`); las copias de UX `pwebNpLabel` (front) y
+> `npLabel` (Edge Fn v11) siguen. Pasado 9999 la etiqueta crece (`LK 10000`), no se recorta. Las NP
+> de ISIS siguen siendo de 5 dígitos (`98694`); el prefijo es lo que distingue. Tests ajustados.
 >
 > Nota **v12.90** — **La canilla del espejo de ISIS está CERRADA para Gestión.** Dueño: *"una vez
 > que ya esté todo en Gestión Virgilio, cerrá la canilla para que no lleguen más desde el espejo del

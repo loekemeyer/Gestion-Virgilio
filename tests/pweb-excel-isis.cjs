@@ -1,7 +1,7 @@
 /* Regresión (idea 3717): el Excel para ISIS también sirve para las NP de la PPP Web.
    Es el último paso del circuito: se pickea el pedido web y después hay que
    importarlo a ISIS para facturar. Verifica que:
-   (a) las NP vayan ENTRECOMILLADAS en el in.() — "LK 01343" tiene un espacio y sin
+   (a) las NP vayan ENTRECOMILLADAS en el in.() — "LK 1343" tiene un espacio y sin
        comillas PostgREST no lo resuelve: esas filas se caían del archivo EN SILENCIO,
    (b) la fecha de una NP web salga de PPP_Web_Programacion.fecha_recep, porque
        PPP_Base_Pedidos (de donde sale la de ISIS) no tiene las NP web,
@@ -24,7 +24,7 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
     window.fetch = async (url) => {
       const u = String(url); urls.push(u);
       if (u.includes("Entregas_Virgilio")) return json([
-        { id: 1, np: "LK 01343", cod_art: "027", cajas_pedidas: 2, cajas_entregadas: 2 },
+        { id: 1, np: "LK 1343", cod_art: "027", cajas_pedidas: 2, cajas_entregadas: 2 },
         { id: 2, np: "98574",   cod_art: "505", cajas_pedidas: 1, cajas_entregadas: 1 }
       ]);
       if (u.includes("ppp_base_pedidos"))       return json([{ pedido: "98574", fecha: "2026-08-30" }]);
@@ -35,17 +35,17 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
       return json([]);
     };
     window._facLastTandas = [{ pedidos: [
-      { np: "LK 01343", cod: "4109", razonSocial: "Di Leo" },
+      { np: "LK 1343", cod: "4109", razonSocial: "Di Leo" },
       { np: "98574",   cod: "1792", razonSocial: "Otro" }
     ] }];
-    const filas = await _facXlsArmar(["LK 01343", "98574"]);
+    const filas = await _facXlsArmar(["LK 1343", "98574"]);
     const inUrl = urls.find(u => u.includes("Entregas_Virgilio")) || "";
     const byNp = {}; filas.forEach(f => { byNp[f.np] = f; });
     return {
-      npEntrecomillada: inUrl.includes('%22LK%201343%22') || inUrl.includes('"LK 01343"'),
+      npEntrecomillada: inUrl.includes('%22LK%201343%22') || inUrl.includes('"LK 1343"'),
       pidioWebProg:     urls.some(u => u.includes("PPP_Web_Programacion")),
       filas:            filas.length,
-      fechaWeb:         byNp["LK 01343"] ? byNp["LK 01343"].fechaTxt : null,
+      fechaWeb:         byNp["LK 1343"] ? byNp["LK 1343"].fechaTxt : null,
       fechaIsis:        byNp["98574"]   ? byNp["98574"].fechaTxt   : null
     };
   });

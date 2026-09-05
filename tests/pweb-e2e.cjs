@@ -126,19 +126,19 @@ const ZONAS = { mataderos:"Zona 3 - CABA Oeste", martinez:"Zona 6 - GBA Norte", 
     // de 0,60 m³ de su zona y quedan sin programar — es la regla, no un fallo.
     const t = cab.find(c => c.order_id === 1341) || {};
     const tandaObj = t.tanda ? mapa.get(String(t.tanda).toUpperCase()) : null;
-    const artsOper = (pick.get("LK 01344") || []).map(x => x.art + ":" + x.cajas).join(",");
+    const artsOper = (pick.get("LK 1344") || []).map(x => x.art + ":" + x.cajas).join(",");
 
     // ---- 5) el Excel para ISIS ----
     window.fetch = async (url) => {
       const u = String(url);
       if (u.includes("Entregas_Virgilio")) return json(
-        (base.filter(x => x.np_label === "LK 01344")).map((x,i) => ({ id:i+1, np:"LK 01344", cod_art:x.articulo, cajas_pedidas:x.cajas, cajas_entregadas:x.cajas })));
+        (base.filter(x => x.np_label === "LK 1344")).map((x,i) => ({ id:i+1, np:"LK 1344", cod_art:x.articulo, cajas_pedidas:x.cajas, cajas_entregadas:x.cajas })));
       if (u.includes("PPP_Web_Programacion")) return json([{ np:1344, empresa:"lk", fecha_recep:"2026-09-03" }]);
       if (u.includes("vista_uxb_articulo"))   return json([{cod:"31",uxb:24},{cod:"505",uxb:12}]);
       return json([]);
     };
-    window._facLastTandas = [{ pedidos:[{ np:"LK 01344", cod:"4188", razonSocial:"Orfali" }] }];
-    const xls = await _facXlsArmar(["LK 01344"]);
+    window._facLastTandas = [{ pedidos:[{ np:"LK 1344", cod:"4188", razonSocial:"Orfali" }] }];
+    const xls = await _facXlsArmar(["LK 1344"]);
 
     return {
       filas: filas.length,
@@ -168,14 +168,14 @@ const ZONAS = { mataderos:"Zona 3 - CABA Oeste", martinez:"Zona 6 - GBA Norte", 
 
   const ok =
     r.filas === 3 &&
-    r.np === "LK 01343 · LK 01344 · LK 01345" &&
+    r.np === "LK 1343 · LK 1344 · LK 1345" &&
     r.m3_1342 === 0.336 &&                                   // calculado a mano sobre los m³ reales
     r.zonas === "Zona 3 - CABA Oeste · Zona 6 - GBA Norte · Retira" &&
     r.sinTanda === 2 &&                                      // 0,336 y 0,033 m³ no llegan al mínimo de 0,60
     r.guardadas === 1 && r.cabNp === 1344 && r.cabM3 === 1.184 &&
     r.cabZona === "Zona 6 - GBA Norte" && r.cabFechaEnt === true &&
     r.lineasBase === 15 &&
-    r.operVeTanda && r.operNp === "LK 01344" && r.operEmpresa === "LK" &&
+    r.operVeTanda && r.operNp === "LK 1344" && r.operEmpresa === "LK" &&
     r.artsOper === "031:10,280:10,315:10,502:15,505:150,506:20,521:3,530:4,574E:25,580:15,586:50,598E:25,599E:3,811E:3,816E:15" &&
     r.xlsFilas === 1 && /03\/09\/2026/.test(String(r.xlsFecha)) && r.xlsLineas === 15 &&
     r.volPideVista === false &&                              // v12.77: el m³ ya no se pide, viene en la fila

@@ -220,18 +220,18 @@ async function codsChefDe(codsLk: string[]): Promise<string[]> {
   return [...out];
 }
 
-/** La etiqueta que ve el operario: "LK 00001" / "CH 00001".
+/** La etiqueta que ve el operario: "LK 0001" / "CH 0001" (4 dígitos; dueño, 2026-09-05).
  *
  *  ⚠ ES UNA COPIA. La fuente de verdad es `gv_ppp_web_np_label(empresa, np)` en
  *  Supabase; acá se duplica para no pagar un round trip por cada línea de la
  *  foto de artículos. Si cambia el formato, se cambia PRIMERO en el backend.
  *
- *  Pasado 99999 la etiqueta crece ("LK 100000") en vez de recortarse: recortar
+ *  Pasado 9999 la etiqueta crece ("LK 10000") en vez de recortarse: recortar
  *  repetiría un número ya usado. */
 function npLabel(empresa: string, num: number): string {
   const emp = String(empresa).toLowerCase() === "chef" || String(empresa).toUpperCase() === "CH" ? "CH" : "LK";
   const n = String(num);
-  return emp + " " + (n.length >= 5 ? n : n.padStart(5, "0"));
+  return emp + " " + (n.length >= 4 ? n : n.padStart(4, "0"));
 }
 
 async function procesarEmpresa(

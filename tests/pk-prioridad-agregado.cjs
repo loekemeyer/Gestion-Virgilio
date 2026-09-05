@@ -95,7 +95,7 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
     out.gvAntesQueIsis = html.indexOf('data-code="GV-02A"') < html.indexOf('data-code="C03B"');
     // (e) dice a qué pedido se agregó
     out.diceAQuePedido = html.indexOf("es un agregado al pedido") >= 0 &&
-                         html.indexOf("LK 00002") >= 0 && html.indexOf("LK 00001") >= 0;
+                         html.indexOf("LK 0002") >= 0 && html.indexOf("LK 0001") >= 0;
 
     // (f) sin prioridad → lista de siempre, sin bloque rojo.
     // `_pppOperatorCache` es un `let` de módulo (no vive en window) y tiene TTL, así
