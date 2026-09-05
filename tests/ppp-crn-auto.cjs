@@ -50,7 +50,7 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
     await pppRefreshControlado();
     await pppRefreshMetaEntSet();
     await pppRefreshDelivered();
-    _pppTab = "plan"; pppRenderProg();
+    _pppPlanClasica = true; _pppTab = "plan"; pppRenderProg();
     let html = document.body.innerHTML;
     out.plan98001 = html.indexOf('id="ppprow_98001"') >= 0;
     out.plan98002 = html.indexOf('id="ppprow_98002"') >= 0;

@@ -276,6 +276,9 @@ PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node te
 echo "== mejoras-v1298 (9017 saldos para_envasar/racks_ch · 6124 TAP doble · 5070 barra de avance del monitor) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/mejoras-v1298.cjs
 
+echo "== ppp-plan-nueva (v13.03: tablero de 6 días + orden de carga LIFO) =="
+PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/ppp-plan-nueva.cjs
+
 echo "== ppp-en-salida (v13.02: cargado al camión = En Salida, fuera de Programación) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/ppp-en-salida.cjs
 

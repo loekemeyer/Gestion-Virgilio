@@ -49,7 +49,7 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
     _pppEntregadoCC = new Set(["98002"]); _pppLoadMs = new Map([["98002", Date.now() - 48 * 3600000]]);
     window.crVencido = (ms) => ms > 0 && (Date.now() - ms) > 30 * 3600000;
 
-    _pppTab = "plan"; pppRenderProg();
+    _pppPlanClasica = true; _pppTab = "plan"; pppRenderProg();
     let html = document.body.innerHTML;
     out.plan98001 = html.indexOf('id="ppprow_98001"') >= 0;
     out.plan98002 = html.indexOf('id="ppprow_98002"') >= 0;
@@ -69,7 +69,7 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
     // vista vacía → En Salida vacía, aunque haya facturados sin confirmar
     salida = []; await pppRefreshEnSalida();
     out.vaciaSinCargados = _pppSplitDelivered().enViaje.length === 0;
-    _pppTab = "plan"; pppRenderProg();
+    _pppPlanClasica = true; _pppTab = "plan"; pppRenderProg();
     out.vuelve98002 = document.body.innerHTML.indexOf('id="ppprow_98002"') >= 0;
     return out;
   });

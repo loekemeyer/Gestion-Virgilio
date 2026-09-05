@@ -12,13 +12,36 @@
 > única**; no se replica. Ante la duda entre parche rápido y fix de raíz → **fix
 > de raíz**.
 >
-> Última actualización: 2026-09-05 (sábado, noche) · Versión app al documentar: **v13.02**
+> Última actualización: 2026-09-05 (sábado, noche) · Versión app al documentar: **v13.03**
 >
 > ⚠⚠ **Estado del pipeline web desde el 2026-09-04 a la noche: la NUMERACIÓN ESTÁ PRENDIDA**
 > (`PPP_Web_Config.numeracion_activa = 1`), el cron de tandas (jobid 71, 00:01 hábiles) activo,
 > tandas con prefijo `GV-`. Sólo del lado Virgilio: el mail de las 12:30 de LK sigue andando y
 > Producción no se tocó (medido: ninguna función `ppp_web_*`/`gv_ppp_web_*` escribe en tabla
 > compartida). Primera corrida real: lunes 2026-09-07 00:01. Cómo apagar, en `CLAUDE.md`.
+>
+> Nota **v13.03** — **Programación nueva: tablero de 6 días hábiles** (mockup v2 aprobado por el dueño:
+> *"que la hoja Programación entren 6 días… en 6 botones grandes que digan el resumen: 1 camión, 6 m³,
+> Zona 1, $5.000.000… si entro, ahí veo con otra visual qué tiene dentro"*). Decisiones: **$** = vista
+> backend `gv_ppp_np_valor` (v13.02); **camión = ZONA por día** (Retira y Súper aparte, no cuentan como
+> camión); **6 días = próximos 6 hábiles** desde hoy, sin sáb/dom (sin feriados). Código: bloque
+> `_pppPlan*` antes de `pppTabsHtml` (`_pppDiasHabiles`, `_pppPlanAgrupar`, `_pppCamiones`,
+> `_pppOrdenCarga`, `_pppPlanGridHtml`, `_pppPlanDiaHtml`, `_pppTandaBlocksHtml`), CSS `pn-*`.
+> **Grilla**: 5 KPI (pedidos, camiones, m³, $ estimado a lista, atención = vencidas + cargados sin
+> controlar), banda roja de **vencidas** (fecha < hoy y todavía en Programación → abre la vista
+> "Vencidas"), 6 tarjetas de día (mini-KPI, camiones con zona/tandas/m³/$, "+N más", barra armados /
+> en curso / sin empezar, aviso si una zona pasa el `m³/día` configurado), chips "Más adelante" para
+> fechas fuera de los 6 días. **Adentro del día**: cabecera con los 4 números y la barra; un bloque por
+> camión (zona) con chips de estado, m³ y $; **orden de carga LIFO** (idea **5920**): recorrido de
+> entrega con `_rtOptimize` sobre `PPP_Geo` (sin geocodificar acá; lo sin ubicación va último en el
+> reparto = primero a cargar, marcado "?") y se numera al revés — 1º = último en entregarse; por
+> pedido: tanda, cliente/NP, localidad, m³, $, dos pasitos Picking·Armado con el estado
+> (`_pppEstadoPed`: armado / armando / picking / pickeando / sin) y la columna **Carga**: 1º armado →
+> **CARGAR AHORA** (verde); 1º sin armar → "se carga primero · falta armar"; otros armados → "espera su
+> turno"; resto "falta armar". Abajo del día siguen **las tandas de siempre** (bloques v13.01 con tabla,
+> ✓ Controlar, ✏️ Editar, 🖨️, semáforo). Botón **"Vista clásica"** vuelve a la lista por fecha/tanda
+> (`_pppPlanClasica`). `pppRefreshArmado` ahora guarda también `_pppPickDone/_pppPickStarted`; las
+> filas de la PPP guardan `direccion`/`barrio` (para PPP_Geo). Test `tests/ppp-plan-nueva.cjs` (24).
 >
 > Nota **v13.02** — **Cargado al camión = En Salida, fuera de Programación** (idea **4459**, dueño:
 > *"si hay pedidos que ya se cargaron a un camión, tienen que salir de la Programación y pasar a En

@@ -2318,6 +2318,109 @@ tr.ppp-err-zona > td{ background:#fffbeb !important; }
 .ppp-ok-btn:hover{ background:#dcfce7; }
 .ppp-pencil-btn{ padding:3px 9px; font-size:12px; font-weight:700; border:1px solid #fde68a; border-radius:7px; background:#fffbeb; color:#92400e; cursor:pointer; }   /* v13.01: franja clara */
 .ppp-pencil-btn:hover{ background:#fef3c7; }
+/* ===== v13.03 — Programación nueva (tablero de 6 días) · prefijo pn- ===== */
+.pn-wrap{ color:#0f172a; }
+.pn-head{ display:flex; align-items:flex-end; justify-content:space-between; gap:12px; margin:2px 0 12px; }
+.pn-h1{ font-size:24px; font-weight:900; letter-spacing:-.3px; }
+.pn-h2{ color:#64748b; font-size:13px; font-weight:600; margin-top:2px; }
+.pn-lnk{ width:auto; background:#fff; border:1px solid #dbe3ee; color:#1e3a8a; font-weight:800; font-size:12px; padding:6px 11px; border-radius:8px; cursor:pointer; }
+.pn-lnk:hover{ background:#f1f5f9; }
+.pn-kpis{ display:grid; grid-template-columns:repeat(5,1fr); gap:10px; margin-bottom:10px; }
+.pn-kpi{ background:#fff; border:1px solid #dbe3ee; border-radius:14px; padding:12px 14px; display:grid; grid-template-columns:44px 1fr; gap:10px; align-items:center; }
+.pn-kpi .ico{ width:44px; height:44px; border-radius:12px; background:#e8f0fd; display:grid; place-items:center; font-size:21px; }
+.pn-kpi .l{ font-size:11px; font-weight:800; letter-spacing:.7px; text-transform:uppercase; color:#64748b; }
+.pn-kpi .v{ font-size:23px; font-weight:900; line-height:1.1; white-space:nowrap; }
+.pn-kpi .s{ font-size:12px; color:#64748b; font-weight:600; }
+.pn-kpi.g .v{ color:#15803d; } .pn-kpi.g .ico{ background:#e6f7ec; }
+.pn-kpi.r{ border-color:#fca5a5; background:#fff5f5; } .pn-kpi.r .v{ color:#b91c1c; } .pn-kpi.r .ico{ background:#fee2e2; }
+.pn-kpi.ok .v{ color:#15803d; }
+.pn-alert{ background:#fff1f2; border:1.5px solid #fca5a5; border-radius:12px; padding:9px 13px; margin-bottom:12px; display:flex; align-items:center; gap:12px; font-size:13.5px; cursor:pointer; }
+.pn-alert:hover{ background:#ffe4e6; }
+.pn-alert .n{ font-size:21px; font-weight:900; color:#b91c1c; background:#fee2e2; border-radius:9px; padding:2px 10px; }
+.pn-alert b{ color:#7f1d1d; } .pn-alert .s{ color:#991b1b; font-size:12.5px; }
+.pn-alert .btn{ margin-left:auto; background:#b91c1c; color:#fff; font-weight:800; padding:7px 13px; border-radius:9px; font-size:13px; white-space:nowrap; }
+.pn-days{ display:grid; grid-template-columns:repeat(3,1fr); gap:12px; }
+.pn-day{ background:#fff; border:1.5px solid #dbe3ee; border-radius:16px; padding:13px 15px 11px; display:flex; flex-direction:column; min-height:240px; box-shadow:0 1px 3px rgba(15,23,42,.05); cursor:pointer; }
+.pn-day:hover{ border-color:#93c5fd; box-shadow:0 6px 18px rgba(30,107,214,.12); }
+.pn-day.today{ border:2px solid #1e6bd6; }
+.pn-day.empty{ border-style:dashed; background:#f8fafc; cursor:default; }
+.pn-day .dh{ display:flex; align-items:baseline; gap:7px; }
+.pn-day .dow{ font-size:17px; font-weight:900; } .pn-day .dnum{ font-size:24px; font-weight:900; line-height:1; } .pn-day .dmon{ font-size:14px; font-weight:700; color:#64748b; }
+.pn-day .hoy{ margin-left:auto; background:#1e6bd6; color:#fff; font-size:11px; font-weight:900; padding:3px 9px; border-radius:999px; letter-spacing:.5px; }
+.pn-mini{ display:grid; grid-template-columns:repeat(4,1fr); margin:9px 0; border:1px solid #e8edf5; border-radius:10px; overflow:hidden; }
+.pn-mini > div{ padding:6px 6px; border-right:1px solid #e8edf5; display:flex; align-items:center; gap:5px; min-width:0; }
+.pn-mini > div:last-child{ border-right:0; }
+.pn-mini i{ font-style:normal; font-size:15px; } .pn-mini b{ font-size:15px; font-weight:900; line-height:1; white-space:nowrap; }
+.pn-mini small{ display:block; font-size:10px; color:#64748b; font-weight:700; } .pn-mini .g b{ color:#15803d; }
+.pn-sec{ font-size:10.5px; font-weight:800; letter-spacing:.7px; text-transform:uppercase; color:#64748b; display:flex; justify-content:space-between; margin-bottom:5px; }
+.pn-sec a{ color:#1e6bd6; text-transform:none; letter-spacing:0; font-size:12px; }
+.pn-trk{ display:grid; grid-template-columns:28px 1fr auto auto; gap:8px; align-items:center; background:#f8fafc; border:1px solid #e8edf5; border-radius:9px; padding:5px 9px; margin-bottom:4px; font-size:13px; }
+.pn-trk .ico, .pn-camion .ico{ width:28px; height:28px; border-radius:7px; color:#fff; display:grid; place-items:center; font-size:14px; background:#1e6bd6; }
+.pn-trk .ico.n{ background:#0d9488; } .pn-trk .ico.ret{ background:#64748b; } .pn-trk .ico.sup{ background:#b45309; }
+.pn-trk .z{ font-weight:800; } .pn-trk .sub{ font-size:11px; color:#64748b; font-weight:600; }
+.pn-trk .m3{ font-weight:800; color:#1e40af; white-space:nowrap; } .pn-trk .p{ font-weight:900; color:#15803d; white-space:nowrap; min-width:90px; text-align:right; }
+.pn-more{ font-size:12px; font-weight:700; color:#1e6bd6; margin:2px 0 6px; }
+.pn-state{ margin-top:auto; }
+.pn-bar{ display:flex; height:9px; border-radius:999px; overflow:hidden; background:#e2e8f0; }
+.pn-bar i{ display:block; height:100%; } .pn-bar .arm{ background:#1e6bd6; } .pn-bar .cur{ background:#f59e0b; } .pn-bar .sin{ background:#cbd5e1; }
+.pn-leg{ display:flex; gap:11px; flex-wrap:wrap; margin-top:5px; font-size:11.5px; font-weight:700; color:#475569; }
+.pn-leg b{ display:inline-block; width:9px; height:9px; border-radius:3px; margin-right:4px; vertical-align:middle; }
+.pn-leg b.arm{ background:#1e6bd6; } .pn-leg b.cur{ background:#f59e0b; } .pn-leg b.sin{ background:#cbd5e1; }
+.pn-warn{ display:inline-block; font-size:11.5px; font-weight:800; color:#b91c1c; background:#fee2e2; padding:3px 9px; border-radius:999px; margin-top:7px; }
+.pn-day .emptytxt{ margin:auto; text-align:center; color:#94a3b8; font-weight:700; font-size:14px; } .pn-day .emptytxt small{ display:block; font-size:12px; font-weight:600; }
+.pn-otras{ margin-top:12px; display:flex; align-items:center; gap:8px; flex-wrap:wrap; font-size:12.5px; }
+.pn-otras .t{ font-weight:800; color:#64748b; }
+.pn-chip{ width:auto; display:inline-block; padding:4px 10px; border-radius:999px; font-size:12px; font-weight:800; background:#f1f5f9; color:#334155; border:1px solid #e2e8f0; cursor:pointer; }
+.pn-chip.mid{ background:#dbeafe; color:#1e40af; border-color:#bfdbfe; } .pn-chip.wait{ background:#fef3c7; color:#92400e; border-color:#fde68a; }
+/* adentro del día */
+.pn-topbar{ display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; }
+.pn-back{ width:auto; display:inline-flex; align-items:center; gap:8px; background:#fff; border:1px solid #dbe3ee; border-radius:9px; padding:7px 13px; font-weight:800; color:#1e3a8a; font-size:13px; cursor:pointer; }
+.pn-dayhead{ background:#fff; border:2px solid #1e6bd6; border-radius:16px; padding:12px 16px; display:grid; grid-template-columns:auto 1fr auto; gap:18px; align-items:center; margin-bottom:12px; }
+.pn-dayhead.venc{ border-color:#dc2626; background:#fff7f7; }
+.pn-dayhead .d1{ font-size:11px; font-weight:800; letter-spacing:.7px; text-transform:uppercase; color:#64748b; }
+.pn-dayhead .d2{ font-size:25px; font-weight:900; line-height:1.05; }
+.pn-dayhead .kp{ display:flex; gap:8px; flex-wrap:wrap; }
+.pn-dayhead .k{ display:flex; align-items:center; gap:8px; background:#f8fafc; border:1px solid #e8edf5; border-radius:10px; padding:7px 11px; }
+.pn-dayhead .k i{ font-style:normal; font-size:17px; }
+.pn-dayhead .k .l{ font-size:10px; font-weight:800; letter-spacing:.6px; text-transform:uppercase; color:#64748b; }
+.pn-dayhead .k .v{ font-size:18px; font-weight:900; line-height:1.1; white-space:nowrap; } .pn-dayhead .k .v.g{ color:#15803d; }
+.pn-dayhead .barw{ width:260px; }
+.pn-note{ background:#fff7ed; border:1px solid #fed7aa; color:#9a3412; border-radius:10px; padding:8px 12px; font-size:12.5px; margin-bottom:10px; }
+.pn-camion{ background:#fff; border:1px solid #dbe3ee; border-radius:14px; margin-bottom:12px; overflow:hidden; }
+.pn-camion .ch{ display:grid; grid-template-columns:36px 1fr auto auto auto; gap:12px; align-items:center; padding:9px 14px; border-left:7px solid #1e6bd6; background:#f8fbff; }
+.pn-camion .ch.n{ border-left-color:#0d9488; background:#f3fbfa; } .pn-camion .ch.n .ico{ background:#0d9488; }
+.pn-camion .ch.ret{ border-left-color:#64748b; background:#f8fafc; } .pn-camion .ch.ret .ico{ background:#64748b; }
+.pn-camion .ch.sup{ border-left-color:#b45309; background:#fffbeb; } .pn-camion .ch.sup .ico{ background:#b45309; }
+.pn-camion .ch .ico{ width:34px; height:34px; border-radius:9px; font-size:18px; }
+.pn-camion .t1{ font-size:16px; font-weight:900; } .pn-camion .t2{ font-size:12px; color:#64748b; font-weight:600; }
+.pn-camion .st{ display:flex; gap:5px; flex-wrap:wrap; justify-content:flex-end; }
+.pn-camion .ch .m3{ font-size:17px; font-weight:900; color:#1e40af; white-space:nowrap; } .pn-camion .ch .p{ font-size:17px; font-weight:900; color:#15803d; white-space:nowrap; } .pn-camion .ch .p small{ font-size:11px; color:#64748b; font-weight:700; }
+.pn-orden{ display:flex; align-items:center; gap:10px; flex-wrap:wrap; padding:7px 14px 7px 20px; background:#f0fdf4; border-top:1px solid #bbf7d0; border-bottom:1px solid #bbf7d0; font-size:12.5px; }
+.pn-orden b{ color:#166534; white-space:nowrap; }
+.pn-orden .r{ display:flex; gap:5px; align-items:center; flex-wrap:wrap; font-weight:800; }
+.pn-orden .r span{ background:#fff; border:1px solid #bbf7d0; border-radius:999px; padding:2px 9px; font-size:12px; white-space:nowrap; }
+.pn-orden .r span.go{ background:#15803d; color:#fff; border-color:#15803d; }
+.pn-orden .r em{ font-style:normal; color:#b45309; font-weight:900; }
+.pn-orden .hint{ margin-left:auto; color:#166534; font-weight:700; font-size:11.5px; }
+.pn-thead, .pn-ped{ display:grid; grid-template-columns:82px minmax(0,1fr) 110px 60px 105px 175px 150px; gap:10px; align-items:center; padding:7px 14px 7px 20px; border-top:1px solid #eef2f7; }
+.pn-thead{ font-size:10px; font-weight:800; letter-spacing:.6px; text-transform:uppercase; color:#64748b; background:#fafcff; }
+.pn-thead .num, .pn-ped .m, .pn-ped .pp{ text-align:right; }
+.pn-ped{ font-size:13.5px; } .pn-ped.err{ background:#fff1f2; }
+.pn-ped .tanda{ font-family:Consolas,Menlo,monospace; font-weight:800; background:#1e6bd6; color:#fff; padding:3px 8px; border-radius:7px; justify-self:start; font-size:12px; }
+.pn-ped .tanda.n{ background:#0d9488; } .pn-ped .tanda.ret{ background:#64748b; } .pn-ped .tanda.sup{ background:#b45309; }
+.pn-ped .rs{ font-weight:800; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; } .pn-ped .np{ color:#64748b; font-family:Consolas,Menlo,monospace; font-weight:700; font-size:12px; }
+.pn-ped .loc{ color:#475569; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.pn-ped .m{ font-weight:800; color:#1e40af; } .pn-ped .pp{ font-weight:800; color:#15803d; white-space:nowrap; } .pn-ped .pp small{ color:#94a3b8; font-weight:700; }
+.pn-steps{ display:flex; gap:3px; } .pn-steps span{ width:34px; height:7px; border-radius:999px; background:#e2e8f0; }
+.pn-steps span.on{ background:#f59e0b; } .pn-steps span.done{ background:#1e6bd6; }
+.pn-ped .stl{ font-size:11.5px; font-weight:800; color:#475569; margin-top:3px; } .pn-ped .stl.arm{ color:#1e40af; } .pn-ped .stl.cur{ color:#b45309; }
+.pn-carga{ display:flex; align-items:center; gap:7px; }
+.pn-carga .n{ width:32px; height:32px; border-radius:50%; display:grid; place-items:center; font-weight:900; font-size:13.5px; background:#e2e8f0; color:#64748b; flex:0 0 auto; }
+.pn-carga .n.go{ background:#15803d; color:#fff; box-shadow:0 0 0 3px #bbf7d0; } .pn-carga .n.ok{ background:#dbeafe; color:#1e40af; } .pn-carga .n.first{ background:#fef3c7; color:#92400e; }
+.pn-carga .t{ font-size:11px; font-weight:800; color:#475569; line-height:1.2; } .pn-carga .t.go{ color:#15803d; }
+.pn-sec2{ font-size:11px; font-weight:800; letter-spacing:.7px; text-transform:uppercase; color:#64748b; margin:16px 0 8px; }
+@media (max-width:1100px){ .pn-kpis{ grid-template-columns:repeat(3,1fr); } .pn-days{ grid-template-columns:repeat(2,1fr); } .pn-dayhead{ grid-template-columns:1fr; } .pn-thead{ display:none; } .pn-ped{ grid-template-columns:70px minmax(0,1fr) auto; } .pn-ped .loc, .pn-ped .m{ display:none; } }
+@media (max-width:640px){ .pn-kpis{ grid-template-columns:repeat(2,1fr); } .pn-days{ grid-template-columns:1fr; } .pn-camion .ch{ grid-template-columns:36px 1fr; } }
 .ppp-edit-panel{ display:none; }
 .ppp-tanda.ppp-open.ppp-edit-mode .ppp-edit-panel{ display:flex; flex-wrap:wrap; gap:10px 16px; align-items:center; padding:10px 14px; background:#fffbeb; border-bottom:1px solid #fde68a; }
 .ppp-ep-l{ font-size:13px; font-weight:700; color:#92400e; display:inline-flex; align-items:center; gap:8px; }
@@ -6842,7 +6945,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v13.02";
+const APP_VERSION = "v13.03";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -26314,6 +26417,7 @@ function _pppRowFromSupa(r) {
     fecha: _pppSupaFecha(r.fecha_recep), cod: _pppS(r.cod), razon_social: _pppS(r.razon_social),
     m3: (r.m3 == null || r.m3 === "" ? null : Number(r.m3)),
     localidad: (_pppS(r.barrio) || _pppS(r.direccion)), fecha_entrega: fe, zona: _pppS(r.zona),
+    direccion: _pppS(r.direccion), barrio: _pppS(r.barrio),   // v13.03: para ubicar el pedido (PPP_Geo) en el orden de carga
     programmed: ((!!tanda && tanda !== "—") || !!fe), _supa: true
   };
 }
@@ -26431,7 +26535,7 @@ function _pppSearchStr(p) { return [p.np, p.cod, p.razon_social, p.tanda, p.loca
 function pppSetSearch(v) { _pppSearch = String(v == null ? "" : v).trim(); pppRenderProg(); }
 function pppLoadEntregados() { if (_pppEntregados) return _pppEntregados; let a = []; try { a = JSON.parse(localStorage.getItem(PPP_ENT_KEY) || "[]"); } catch (_e) {} _pppEntregados = new Set(Array.isArray(a) ? a.map(String) : []); return _pppEntregados; }
 function pppSaveEntregados() { try { localStorage.setItem(PPP_ENT_KEY, JSON.stringify(Array.from(pppLoadEntregados()))); } catch (_e) {} }
-function pppTab(t) { _pppTab = t; pppRenderProg(); if (t === "plan" || t === "ent" || t === "resumen") { pppRefreshArmado(); pppRefreshEntregado(); pppRefreshControlado(); } if (t === "plan" || t === "ent" || t === "enviaje" || t === "resumen") pppRefreshEnSalida(); if (t === "ent" || t === "enviaje") { pppRefreshDelivered(); pppRefreshMetaEntSet(); } if (t === "ocup") pppRefreshOcupacion(); }
+function pppTab(t) { _pppTab = t; pppRenderProg(); if (t === "plan" || t === "ent" || t === "resumen") { pppRefreshArmado(); pppRefreshEntregado(); pppRefreshControlado(); } if (t === "plan" || t === "ent" || t === "enviaje" || t === "resumen") pppRefreshEnSalida(); if (t === "plan") { pppRefreshValor(); pppRefreshGeo(); } if (t === "ent" || t === "enviaje") { pppRefreshDelivered(); pppRefreshMetaEntSet(); } if (t === "ocup") pppRefreshOcupacion(); }
 /* "Controlado" (manual, lo marca la operadora) → recién ahí el pedido pasa a Pedidos
    Entregados. _pppEntregados = NPs controlados (persistido en vir_ppp_entregados). */
 function pppControlar(np) { pppLoadEntregados().add(String(np)); pppSaveEntregados(); pppRenderProg(); }
@@ -26451,9 +26555,11 @@ async function pppRefreshArmado() {
     const s = await getActivityStatus();
     _pppArmadoDone = (s && s.armadoDone) || new Set();
     _pppArmadoStarted = (s && s.armadoStarted) || new Set();
+    _pppPickDone = (s && s.pickingDone) || new Set();        // v13.03: estado de picking para la Programación nueva
+    _pppPickStarted = (s && s.pickingStarted) || new Set();
     pppRenderProg();
   }
-  catch (_e) { if (!_pppArmadoDone) _pppArmadoDone = new Set(); if (!_pppArmadoStarted) _pppArmadoStarted = new Set(); }
+  catch (_e) { if (!_pppArmadoDone) _pppArmadoDone = new Set(); if (!_pppArmadoStarted) _pppArmadoStarted = new Set(); if (!_pppPickDone) _pppPickDone = new Set(); if (!_pppPickStarted) _pppPickStarted = new Set(); }
 }
 let _pppEntregadoCC = null;
 let _pppLoadMs = null;   // NP -> ms de la PRIMERA carga (CCN), para el plazo de control
@@ -29157,6 +29263,265 @@ function pppGoToRow(np) {
    depender de los datos de ISIS: ese módulo ahora trabaja sobre los pedidos web
    y tiene que abrir aunque no se haya importado ninguna PPP. `null` = todavía no
    se sabe el número. */
+/* =====================================================================================
+   v13.03 — PROGRAMACIÓN NUEVA: 6 DÍAS HÁBILES COMO TABLERO (mockup v2, 2026-09-05)
+   Pedido del dueño: "que la hoja Programación entren 6 días de programación; si entro, ahí
+   veo con otra visual qué tiene dentro; en 6 botones grandes que digan el resumen: 1 camión
+   6 m³ Zona 1 $5.000.000". Decisiones (AskUserQuestion): $ = vista backend gv_ppp_np_valor
+   (valor a lista), camión = ZONA por día, 6 días = próximos 6 hábiles (sin sáb/dom).
+   Idea 5920: orden de carga LIFO por camión — se carga primero el último que se entrega
+   (recorrido = _rtOptimize sobre PPP_Geo; sin geocodificar acá: lo que no tiene ubicación va
+   último en el reparto, o sea primero a cargar, marcado "sin ubicación").
+   Las tandas de cada día siguen adentro con los bloques de siempre (acciones, tabla, control).
+   ===================================================================================== */
+let _pppPlanDay = null;        // null = grilla de 6 días · "YYYYMMDD" = adentro de un día · "venc" = vencidas
+let _pppPlanClasica = false;   // true = lista clásica por fecha/tanda (v13.01)
+let _pppValor = null;          // Map np(norm) → { valor, sinPrecio }  (gv_ppp_np_valor)
+let _pppGeo = null;            // cache PPP_Geo (dir_key → {lat,lng}) para el orden de carga
+let _pppPickDone = null, _pppPickStarted = null;   // tandas (UPPER) con TP / con EP
+async function pppRefreshValor() {
+  try {
+    const rows = await supaFetchAllSafe(SUPABASE_URL + "/rest/v1/gv_ppp_np_valor", "select=np,valor_lista,lineas_sin_precio");
+    const m = new Map();
+    (rows || []).forEach(function (r) { const np = _pppNpNorm(r.np); if (np) m.set(np, { valor: Number(r.valor_lista) || 0, sinPrecio: Number(r.lineas_sin_precio) || 0 }); });
+    _pppValor = m;
+    if (typeof pppRenderProg === "function") pppRenderProg();
+  } catch (_e) { if (!_pppValor) _pppValor = new Map(); }
+}
+async function pppRefreshGeo() {
+  if (_pppGeo) return;
+  try { _pppGeo = await _rtCacheAll(); } catch (_e) { _pppGeo = {}; }
+  if (typeof pppRenderProg === "function") pppRenderProg();
+}
+function pppPlanAbrir(k) { _pppPlanDay = k || null; pppRenderProg(); try { const el = document.getElementById("pppPreview"); if (el) el.scrollIntoView({ block: "start" }); } catch (_e) {} }
+function pppPlanVolver() { _pppPlanDay = null; pppRenderProg(); }
+function pppPlanClasica(v) { _pppPlanClasica = !!v; pppRenderProg(); }
+function _pppFmtPesos(n) { n = Math.round(Number(n) || 0); const s = String(Math.abs(n)).replace(/\B(?=(\d{3})+(?!\d))/g, "."); return (n < 0 ? "-$ " : "$ ") + s; }
+function _pppFmtPesosCorto(n) { n = Number(n) || 0; if (Math.abs(n) >= 1e6) return "$" + (n / 1e6).toFixed(1).replace(".", ",") + " M"; if (Math.abs(n) >= 1e3) return "$" + Math.round(n / 1e3) + " mil"; return _pppFmtPesos(n); }
+function _pppFmtM3(n) { return (Number(n) || 0).toFixed(1).replace(".", ","); }
+const _PN_DOW = ["Domingo", "Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado"];
+const _PN_MES = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"];
+const _PN_MESL = ["enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"];
+function _pppHoyKey() { return String(getTodayKey() || "").replace(/-/g, ""); }
+function _pppKeyDate(k) { return new Date(+k.slice(0, 4), +k.slice(4, 6) - 1, +k.slice(6, 8)); }
+function _pppDateKey(d) { return d.getFullYear() + String(d.getMonth() + 1).padStart(2, "0") + String(d.getDate()).padStart(2, "0"); }
+/* Próximos N días hábiles desde hoy (hoy incluido si es hábil). */
+function _pppDiasHabiles(n) {
+  const out = []; const d = _pppKeyDate(_pppHoyKey());
+  let guard = 0;
+  while (out.length < n && guard++ < 40) {
+    const dow = d.getDay();
+    if (dow !== 0 && dow !== 6) out.push({ key: _pppDateKey(d), date: new Date(d.getTime()), dow: _PN_DOW[dow], dnum: d.getDate(), mon: _PN_MES[d.getMonth()] });
+    d.setDate(d.getDate() + 1);
+  }
+  return out;
+}
+function _pppZonaPed(p) {
+  if (pppEsSuper(p)) return "Súper";
+  const z = String(p.zona || "").trim() || pppZonaDeBarrio(p.localidad || p.barrio || "");
+  return z || "Sin zona";
+}
+function _pppRutaZona(z) {
+  if (z === "Retira") return "ret";
+  if (z === "Súper") return "sup";
+  for (const R of RT_RUTAS) if (R.zonas.indexOf(z) >= 0) return R.nombre === "Norte" ? "n" : "so";
+  return "";
+}
+function _pppValorPed(p) { const v = _pppValor && _pppValor.get(_pppNpNorm(p.np)); return v ? v.valor : null; }
+/* Estado de un pedido por su tanda: "armado" (TAP) · "armando" (AP) · "picking" (TP hecho, sin AP) ·
+   "pickeando" (EP) · "sin" (nada). */
+function _pppEstadoPed(p) {
+  const t = String(p.tanda || "").trim().toUpperCase();
+  if (!t || t === "—") return "sin";
+  if (_pppArmadoDone && _pppArmadoDone.has(t)) return "armado";
+  if (_pppArmadoStarted && _pppArmadoStarted.has(t)) return "armando";
+  if (_pppPickDone && _pppPickDone.has(t)) return "picking";
+  if (_pppPickStarted && _pppPickStarted.has(t)) return "pickeando";
+  return "sin";
+}
+const _PN_EST = { armado: { txt: "Armado ✓", cls: "arm" }, armando: { txt: "Armando", cls: "cur" }, picking: { txt: "Picking ✓ · falta armar", cls: "cur" }, pickeando: { txt: "En picking", cls: "cur" }, sin: { txt: "Sin empezar", cls: "sin" } };
+function _pppPlanAgrupar(programados) {
+  const hoy = _pppHoyKey();
+  const byDay = new Map(); const venc = [];
+  for (const p of programados) {
+    const k = _pppFechaKey(p.fecha_entrega || "");
+    if (k < hoy) { venc.push(p); continue; }
+    if (!byDay.has(k)) byDay.set(k, { key: k, fecha: p.fecha_entrega || "—", ped: [] });
+    byDay.get(k).ped.push(p);
+  }
+  return { byDay: byDay, venc: venc };
+}
+/* Camiones de un día = un camión por ZONA (decisión del dueño). Retira y Súper van aparte. */
+function _pppCamiones(ped) {
+  const by = new Map();
+  for (const p of ped) {
+    const z = _pppZonaPed(p);
+    if (!by.has(z)) by.set(z, { zona: z, ruta: _pppRutaZona(z), ped: [], tandas: [], m3: 0, valor: 0, sinValor: 0, est: { armado: 0, curso: 0, sin: 0 } });
+    const c = by.get(z);
+    c.ped.push(p); c.m3 += Number(p.m3) || 0;
+    const v = _pppValorPed(p); if (v == null) c.sinValor++; else c.valor += v;
+    const t = String(p.tanda || "").trim().toUpperCase(); if (t && t !== "—" && c.tandas.indexOf(t) < 0) c.tandas.push(t);
+    const e = _pppEstadoPed(p); c.est[e === "armado" ? "armado" : (e === "sin" ? "sin" : "curso")]++;
+  }
+  const ord = { so: 1, n: 2, "": 3, sup: 4, ret: 5 };
+  const arr = [...by.values()].sort(function (a, b) { return (ord[a.ruta] - ord[b.ruta]) || a.zona.localeCompare(b.zona); });
+  let n = 0; for (const c of arr) { if (c.ruta === "ret" || c.ruta === "sup") continue; c.num = ++n; }
+  return arr;
+}
+/* Orden de carga LIFO de un camión: recorrido geográfico (PPP_Geo + _rtOptimize) y se numera al
+   revés: el último en entregarse se carga primero (idea 5920). Sin ubicación → al final del
+   reparto (= primero a cargar). Devuelve { paradas:[p...] (orden de entrega), sinUbic:n }. */
+function _pppOrdenCarga(cam) {
+  const geo = _pppGeo || {};
+  const depot = geo[RT_DEPOT_KEY] || { lat: -34.6037, lng: -58.4 };
+  const stops = [], sin = [];
+  for (const p of cam.ped) {
+    const c = geo[_rtDirKey(p.direccion, p.localidad || p.barrio)];
+    if (c && isFinite(c.lat) && isFinite(c.lng)) stops.push({ lat: c.lat, lng: c.lng, p: p }); else sin.push(p);
+  }
+  const ordered = stops.length ? _rtOptimize(depot, stops).map(function (s) { return s.p; }) : [];
+  const paradas = ordered.concat(sin);
+  const n = paradas.length;
+  paradas.forEach(function (p, i) { p._parada = i + 1; p._carga = n - i; p._sinUbic = sin.indexOf(p) >= 0; });
+  return { paradas: paradas, sinUbic: sin.length };
+}
+function _pppPlanBarraHtml(est, tot) {
+  if (!tot) return "";
+  const w = function (n) { return Math.round(100 * n / tot); };
+  return '<div class="pn-bar"><i class="arm" style="width:' + w(est.armado) + '%"></i><i class="cur" style="width:' + w(est.curso) + '%"></i><i class="sin" style="width:' + w(est.sin) + '%"></i></div>' +
+    '<div class="pn-leg">' + (est.armado ? '<span><b class="arm"></b>' + est.armado + ' armado' + (est.armado === 1 ? '' : 's') + '</span>' : '') +
+    (est.curso ? '<span><b class="cur"></b>' + est.curso + ' en curso</span>' : '') +
+    (est.sin ? '<span><b class="sin"></b>' + est.sin + ' sin empezar</span>' : '') + '</div>';
+}
+function _pppPlanEstDia(ped) { const est = { armado: 0, curso: 0, sin: 0 }; for (const p of ped) { const e = _pppEstadoPed(p); est[e === "armado" ? "armado" : (e === "sin" ? "sin" : "curso")]++; } return est; }
+function _pppPlanValor(ped) { let v = 0, sin = 0; for (const p of ped) { const x = _pppValorPed(p); if (x == null) sin++; else v += x; } return { valor: v, sin: sin }; }
+function _pppCamionIco(c) { return c.ruta === "ret" ? "🏭" : (c.ruta === "sup" ? "🛒" : "🚚"); }
+function _pppCamionNombre(c) { return c.ruta === "ret" ? "Retira en fábrica" : (c.ruta === "sup" ? "Súper" : ("Camión " + c.num + " · " + c.zona)); }
+/* ---- GRILLA: KPI + banda de vencidas + 6 días + otras fechas ---- */
+function _pppPlanGridHtml(programados) {
+  const g = _pppPlanAgrupar(programados);
+  const dias = _pppDiasHabiles(6);
+  const enGrilla = new Set(dias.map(function (d) { return d.key; }));
+  const hoy = _pppHoyKey();
+  const cap = pppGetCfg().dayCap > 0 ? pppGetCfg().dayCap : 6;
+  let tot = 0, totM3 = 0, totVal = 0, totSinVal = 0, camiones = 0;
+  for (const d of dias) { const dd = g.byDay.get(d.key); if (!dd) continue; tot += dd.ped.length; totM3 += _pppM3Sum(dd.ped); const v = _pppPlanValor(dd.ped); totVal += v.valor; totSinVal += v.sin; camiones += _pppCamiones(dd.ped).filter(function (c) { return c.ruta !== "ret" && c.ruta !== "sup"; }).length; }
+  let sinCtrl = 0;
+  if (_pppEnSalida) _pppEnSalida.forEach(function (r, np) { try { if (_pppCargaVencida({ np: np })) sinCtrl++; } catch (_e) {} });
+  const nVenc = g.venc.length;
+  let h = '<div class="pn-head"><div><div class="pn-h1">Programación de entregas</div><div class="pn-h2">Próximos 6 días hábiles · tocá un día para ver sus camiones y pedidos</div></div>' +
+    '<div class="pn-tools"><button class="pn-lnk" onclick="pppPlanClasica(true)" title="Lista por fecha y tanda (como antes)">Vista clásica</button></div></div>';
+  h += '<div class="pn-kpis">' +
+    '<div class="pn-kpi"><div class="ico">📦</div><div><div class="l">Pedidos</div><div class="v">' + tot + '</div><div class="s">próximos 6 días</div></div></div>' +
+    '<div class="pn-kpi"><div class="ico">🚚</div><div><div class="l">Camiones</div><div class="v">' + camiones + '</div><div class="s">uno por zona y día</div></div></div>' +
+    '<div class="pn-kpi"><div class="ico">🧊</div><div><div class="l">Volumen</div><div class="v">' + _pppFmtM3(totM3) + ' m³</div><div class="s">a entregar</div></div></div>' +
+    '<div class="pn-kpi g"><div class="ico">💰</div><div><div class="l">Valor</div><div class="v">' + (_pppValor ? _pppFmtPesos(totVal) : '…') + '</div><div class="s">estimado a lista' + (totSinVal ? ' · ' + totSinVal + ' sin valuar' : '') + '</div></div></div>' +
+    '<div class="pn-kpi' + ((nVenc || sinCtrl) ? ' r' : ' ok') + '"><div class="ico">' + ((nVenc || sinCtrl) ? '⏰' : '✅') + '</div><div><div class="l">Atención</div><div class="v">' + (nVenc + sinCtrl) + '</div><div class="s">' + nVenc + ' vencida' + (nVenc === 1 ? '' : 's') + ' · ' + sinCtrl + ' sin controlar</div></div></div>' +
+    '</div>';
+  if (nVenc) h += '<div class="pn-alert" onclick="pppPlanAbrir(\'venc\')"><span class="n">' + nVenc + '</span><div><b>Pedido' + (nVenc === 1 ? '' : 's') + ' con fecha vencida todavía en programación</b><div class="s">Entrega pasada y sin cargar ni controlar' + (sinCtrl ? ' · además ' + sinCtrl + ' cargado(s) SIN CONTROLAR en En Salida' : '') + '</div></div><span class="btn">Ver ' + (nVenc === 1 ? 'el' : 'los ' + nVenc) + ' →</span></div>';
+  h += '<div class="pn-days">';
+  for (const d of dias) {
+    const dd = g.byDay.get(d.key);
+    const esHoy = d.key === hoy;
+    if (!dd) {
+      h += '<div class="pn-day empty' + (esHoy ? ' today' : '') + '"><div class="dh"><span class="dow">' + d.dow + '</span><span class="dnum">' + d.dnum + '</span><span class="dmon">' + d.mon + '</span>' + (esHoy ? '<span class="hoy">HOY</span>' : '') + '</div><div class="emptytxt">Sin pedidos todavía<small>Programalos desde “A Programar”</small></div></div>';
+      continue;
+    }
+    const cams = _pppCamiones(dd.ped), est = _pppPlanEstDia(dd.ped), val = _pppPlanValor(dd.ped);
+    const nCam = cams.filter(function (c) { return c.ruta !== "ret" && c.ruta !== "sup"; }).length;
+    const camsShow = cams.slice(0, 3);
+    let over = "";
+    for (const c of cams) if (c.ruta !== "ret" && c.ruta !== "sup" && c.m3 > cap) { over += '<span class="pn-warn">⚠ ' + escapeHtml(c.zona) + ' al ' + Math.round(100 * c.m3 / cap) + ' % (' + _pppFmtM3(c.m3) + ' / ' + _pppFmtM3(cap) + ' m³)</span>'; }
+    h += '<div class="pn-day' + (esHoy ? ' today' : '') + '" onclick="pppPlanAbrir(\'' + d.key + '\')">' +
+      '<div class="dh"><span class="dow">' + d.dow + '</span><span class="dnum">' + d.dnum + '</span><span class="dmon">' + d.mon + '</span>' + (esHoy ? '<span class="hoy">HOY</span>' : '') + '</div>' +
+      '<div class="pn-mini"><div><i>📦</i><span><b>' + dd.ped.length + '</b><small>pedido' + (dd.ped.length === 1 ? '' : 's') + '</small></span></div><div><i>🚚</i><span><b>' + nCam + '</b><small>' + (nCam === 1 ? 'camión' : 'camiones') + '</small></span></div><div><i>🧊</i><span><b>' + _pppFmtM3(_pppM3Sum(dd.ped)) + '</b><small>m³</small></span></div><div class="g"><i>💰</i><span><b>' + (_pppValor ? _pppFmtPesosCorto(val.valor) : '…') + '</b><small>estimado</small></span></div></div>' +
+      '<div class="pn-sec"><span>Camiones programados</span><a>Ver todos →</a></div>';
+    for (const c of camsShow) {
+      h += '<div class="pn-trk"><div class="ico ' + c.ruta + '">' + _pppCamionIco(c) + '</div><div><div class="z">' + escapeHtml(_pppCamionNombre(c)) + '</div><div class="sub">' + escapeHtml(c.tandas.join(" · ") || "sin tanda") + ' · ' + c.ped.length + ' pedido' + (c.ped.length === 1 ? '' : 's') + '</div></div><div class="m3">' + _pppFmtM3(c.m3) + ' m³</div><div class="p">' + (_pppValor ? _pppFmtPesos(c.valor) : '…') + '</div></div>';
+    }
+    if (cams.length > camsShow.length) h += '<div class="pn-more">+ ' + (cams.length - camsShow.length) + ' más</div>';
+    h += '<div class="pn-state">' + _pppPlanBarraHtml(est, dd.ped.length) + over + '</div></div>';
+  }
+  h += '</div>';
+  const otras = [...g.byDay.keys()].filter(function (k) { return !enGrilla.has(k); }).sort();
+  if (otras.length) {
+    h += '<div class="pn-otras"><span class="t">Más adelante:</span>' + otras.map(function (k) { const dd = g.byDay.get(k), dt = _pppKeyDate(k); return '<button class="pn-chip" onclick="pppPlanAbrir(\'' + k + '\')">' + _PN_DOW[dt.getDay()].slice(0, 3) + ' ' + dt.getDate() + '/' + (dt.getMonth() + 1) + ' · ' + dd.ped.length + ' ped · ' + _pppFmtM3(_pppM3Sum(dd.ped)) + ' m³</button>'; }).join("") + '</div>';
+  }
+  return h;
+}
+/* ---- ADENTRO DE UN DÍA (o de las vencidas): cabecera + un bloque por camión con sus pedidos,
+   el orden de carga y, abajo, las tandas de siempre (acciones/tabla/control). ---- */
+function _pppPlanDiaHtml(programados, key) {
+  const g = _pppPlanAgrupar(programados);
+  const esVenc = key === "venc";
+  const ped = esVenc ? g.venc : ((g.byDay.get(key) || {}).ped || []);
+  const hoy = _pppHoyKey();
+  const dt = esVenc ? null : _pppKeyDate(key);
+  const titulo = esVenc ? "Vencidas — entrega pasada, todavía en programación" : (dt.getDate() + " de " + _PN_MESL[dt.getMonth()]);
+  const sub = esVenc ? (ped.length + " pedido" + (ped.length === 1 ? "" : "s") + " para revisar") : (_PN_DOW[dt.getDay()] + (key === hoy ? " · hoy" : ""));
+  const cams = _pppCamiones(ped), est = _pppPlanEstDia(ped), val = _pppPlanValor(ped);
+  const nCam = cams.filter(function (c) { return c.ruta !== "ret" && c.ruta !== "sup"; }).length;
+  let h = '<div class="pn-topbar"><button class="pn-back" onclick="pppPlanVolver()">← Volver a los 6 días</button><button class="pn-lnk" onclick="pppPlanClasica(true)">Vista clásica</button></div>';
+  h += '<div class="pn-dayhead' + (esVenc ? ' venc' : '') + '"><div><div class="d1">' + escapeHtml(sub) + '</div><div class="d2">' + escapeHtml(titulo) + '</div></div>' +
+    '<div class="kp"><div class="k"><i>📦</i><div><div class="l">Pedidos</div><div class="v">' + ped.length + '</div></div></div><div class="k"><i>🚚</i><div><div class="l">Camiones</div><div class="v">' + nCam + '</div></div></div><div class="k"><i>🧊</i><div><div class="l">Volumen</div><div class="v">' + _pppFmtM3(_pppM3Sum(ped)) + ' m³</div></div></div><div class="k"><i>💰</i><div><div class="l">Valor estimado</div><div class="v g">' + (_pppValor ? _pppFmtPesos(val.valor) : '…') + '</div></div></div></div>' +
+    '<div class="barw">' + _pppPlanBarraHtml(est, ped.length) + '</div></div>';
+  if (!ped.length) return h + '<div class="planim-empty">Nada programado para este día.</div>';
+  if (esVenc) h += '<div class="pn-note">⏰ Estos pedidos tienen fecha de entrega pasada y siguen en Programación (no se cargaron al camión ni se controló el remito). Reprogramalos desde ✏️ Editar o, si ya salieron, cargá el CCN / controlá el remito.</div>';
+  const dk = esVenc ? "venc" : key;
+  for (const c of cams) {
+    const oc = (c.ruta === "ret" || c.ruta === "sup") ? null : _pppOrdenCarga(c);
+    const chips = (c.est.armado ? '<span class="pn-chip mid">' + c.est.armado + ' armado' + (c.est.armado === 1 ? '' : 's') + '</span>' : '') + (c.est.curso ? '<span class="pn-chip wait">' + c.est.curso + ' en curso</span>' : '') + (c.est.sin ? '<span class="pn-chip">' + c.est.sin + ' sin empezar</span>' : '');
+    h += '<div class="pn-camion"><div class="ch ' + c.ruta + '"><div class="ico">' + _pppCamionIco(c) + '</div><div><div class="t1">' + escapeHtml(_pppCamionNombre(c)) + '</div><div class="t2">' + (c.tandas.length ? 'Tanda' + (c.tandas.length === 1 ? '' : 's') + ' ' + escapeHtml(c.tandas.join(" · ")) : 'Sin tanda') + ' · ' + c.ped.length + ' pedido' + (c.ped.length === 1 ? '' : 's') + '</div></div><div class="st">' + chips + '</div><div class="m3">' + _pppFmtM3(c.m3) + ' m³</div><div class="p">' + (_pppValor ? _pppFmtPesos(c.valor) : '…') + (c.sinValor ? '<small title="Pedidos sin valuar (sin líneas o sin precio de lista)"> · ' + c.sinValor + ' s/valor</small>' : '') + '</div></div>';
+    if (oc && oc.paradas.length > 1) {
+      const rec = oc.paradas.map(function (p) { return escapeHtml(p.localidad || p.barrio || p.razon_social || p.np); });
+      const carga = oc.paradas.slice().reverse();
+      h += '<div class="pn-orden"><b>🔁 Orden de carga</b><div class="r">' + carga.map(function (p, i) { return '<span class="' + (i === 0 ? 'go' : '') + '">' + (i + 1) + 'º ' + escapeHtml(p.localidad || p.barrio || p.razon_social || p.np) + (p._sinUbic ? ' <em title="Sin ubicación en PPP_Geo: va último en el reparto">?</em>' : '') + '</span>'; }).join(' → ') + '</div><div class="hint">Se carga primero el último que se entrega · Recorrido: ' + rec.join(' → ') + (oc.sinUbic ? ' · ' + oc.sinUbic + ' sin ubicación' : '') + '</div></div>';
+    }
+    const rows = oc ? oc.paradas.slice().sort(function (a, b) { return a._carga - b._carga; }) : c.ped.slice();
+    const primero = rows.length ? rows[0] : null;
+    h += '<div class="pn-thead"><span>Tanda</span><span>Cliente · N° pedido</span><span>Localidad</span><span class="num">m³</span><span class="num">Valor</span><span>Picking · Armado</span><span>' + (oc ? 'Carga' : '') + '</span></div>';
+    for (const p of rows) {
+      const e = _pppEstadoPed(p), E = _PN_EST[e];
+      const pick = (e === "armado" || e === "armando" || e === "picking") ? "done" : (e === "pickeando" ? "on" : "");
+      const arm = e === "armado" ? "done" : (e === "armando" ? "on" : "");
+      const v = _pppValorPed(p);
+      const np = (typeof pwebNpLabel === "function" && p._web) ? p.np : p.np;
+      let carga = "";
+      if (oc) {
+        const esPrimero = primero && p === primero;
+        const n = p._carga;
+        if (esPrimero && e === "armado") carga = '<div class="pn-carga"><span class="n go">' + n + 'º</span><span class="t go">CARGAR AHORA<br>armado ✓</span></div>';
+        else if (esPrimero) carga = '<div class="pn-carga"><span class="n first">' + n + 'º</span><span class="t">se carga primero<br>' + (e === "armado" ? "" : "falta armar") + '</span></div>';
+        else if (e === "armado") carga = '<div class="pn-carga"><span class="n ok">' + n + 'º</span><span class="t">armado ✓<br>espera su turno</span></div>';
+        else carga = '<div class="pn-carga"><span class="n">' + n + 'º</span><span class="t">falta armar</span></div>';
+      }
+      h += '<div class="pn-ped' + (p._err && p._err.length ? ' err' : '') + '"><span class="tanda ' + c.ruta + '">' + escapeHtml(String(p.tanda || "—").toUpperCase()) + '</span>' +
+        '<div><div class="rs">' + (p._err && p._err.length ? '⚠️ ' : '') + escapeHtml(p.razon_social || p.cod || "—") + '</div><div class="np">' + escapeHtml(String(np)) + (p.cod ? ' · cód ' + escapeHtml(String(p.cod)) : '') + '</div></div>' +
+        '<div class="loc">' + escapeHtml(p.localidad || p.barrio || "—") + '</div>' +
+        '<div class="m">' + _pppFmtM3(p.m3) + '</div>' +
+        '<div class="pp">' + (v == null ? '<small>s/valor</small>' : _pppFmtPesos(v)) + '</div>' +
+        '<div><div class="pn-steps"><span class="' + pick + '"></span><span class="' + arm + '"></span></div><div class="stl ' + E.cls + '">' + E.txt + '</div></div>' +
+        carga + '</div>';
+    }
+    h += '</div>';
+  }
+  // Las tandas del día, con todas las acciones de siempre (tabla, ✓ Controlar, ✏️ Editar, 🖨️, semáforo).
+  h += '<div class="pn-sec2">Tandas del día — acciones, tabla y control</div>' + _pppTandaBlocksHtml(dk, ped);
+  return h;
+}
+/* Bloques de tanda (v13.01) de una lista de pedidos: lo comparten la vista clásica y el día. */
+function _pppTandaBlocksHtml(dk, ped) {
+  let html = "";
+  const byT = {}, ordt = []; for (const p of ped) { const t = _pppTieneTanda(p) ? p.tanda.toUpperCase() : "—"; if (!(t in byT)) ordt.push(t); (byT[t] = byT[t] || []).push(p); }
+  ordt.sort(function (a, b) { return _pppCamKey(byT[a]) - _pppCamKey(byT[b]) || (a < b ? -1 : a > b ? 1 : 0); });   // agrupa por camión (color), luego por tanda
+  for (const t of ordt) {
+    const es = pppEsSuper(byT[t][0]);
+    const pencil = (t !== "—" && !PPP_READONLY) ? ' <button class="ppp-pencil-btn" onclick="event.stopPropagation();pppSetMode(\'__BLOCKID__\',\'edit\')" title="Editar: fecha / mover / devolver">✏️ Editar</button>' : '';   // editar corrige (Excel) → oculto en solo-lectura
+    const entBtn = (t !== "—" && !PPP_READONLY) ? ' <button class="ppp-tanda-ent" onclick="event.stopPropagation();pppSetMode(\'__BLOCKID__\',\'ctrl\')" title="Marcar entregas (local)">✓ Controlar</button>' : '';   // en solo-lectura el control es POR NP (tilde en cada fila)
+    html += _pppBlock("plan_" + dk + "_" + t, (es ? "🛒 " : "") + (t === "—" ? "Sin tanda" : "Tanda " + escapeHtml(t)), es ? "ppp-tanda-super" : "", byT[t].length + " ped · " + _pppM3Sum(byT[t]).toFixed(2) + " m³", byT[t], pencil + entBtn, (t !== "—" ? t : null));
+  }
+  return html;
+}
 function pppTabsHtml(cProg, cPlan, cViaje, cEnt) {
   const n = function (v) { return (v == null ? "…" : v); };
   const b = function (id, txt) {
@@ -29285,20 +29650,20 @@ function pppRenderProg() {
     // PROGRAMACIÓN — pedidos programados, agrupados por Fecha de Entrega → por tanda.
     // (La columna "Listo FC" se actualiza sola: pppRefreshArmado se llama al entrar al tab.)
     if (!programados.length) { html += '<div class="planim-empty">Todavía no hay nada programado. Andá a <b>📥 A Programar</b>, armá las tandas y tocá <b>✅ Confirmar y programar</b>.</div>'; _renderKeepFocus(box, html); return; }
-    html += '<div class="ppp-res-leg">🎨 Color por camión: <span class="rtleg rt-so">Sur/Centro/Oeste</span> <span class="rtleg rt-n">Norte</span> <span class="rtleg rt-ret">Retira</span> <span class="rtleg rt-sup">Súper</span>. Tocá una tanda para abrirla.</div>';
+    // v13.03 — tablero de 6 días hábiles (grilla → día). La lista clásica queda detrás de "Vista clásica".
+    if (!_pppPlanClasica) {
+      if (_pppValor == null) { try { pppRefreshValor(); } catch (_e) {} }
+      if (_pppGeo == null) { try { pppRefreshGeo(); } catch (_e) {} }
+      html += '<div class="pn-wrap">' + (_pppPlanDay ? _pppPlanDiaHtml(programados, _pppPlanDay) : _pppPlanGridHtml(programados)) + '</div>';
+      _renderKeepFocus(box, html); return;
+    }
+    html += '<div class="ppp-res-leg">🎨 Color por camión: <span class="rtleg rt-so">Sur/Centro/Oeste</span> <span class="rtleg rt-n">Norte</span> <span class="rtleg rt-ret">Retira</span> <span class="rtleg rt-sup">Súper</span>. Tocá una tanda para abrirla. <button class="pn-lnk" onclick="pppPlanClasica(false)">↩ Tablero de 6 días</button></div>';
     const DOW = ["Dom", "Lun", "Mar", "Mié", "Jue", "Vie", "Sáb"];
     const byD = {}; for (const p of programados) { const k = _pppFechaKey(p.fecha_entrega || ""); if (!byD[k]) byD[k] = { fecha: p.fecha_entrega || "—", ped: [] }; byD[k].ped.push(p); }
     for (const dk of Object.keys(byD).sort()) {
       const d = byD[dk], dt = _pppFechaDate(d.fecha), dia = dt ? DOW[dt.getDay()] : "";
       html += '<div class="ppp-sec-t ppp-sec-done">🗓️ ' + (dia ? dia + " " : "") + escapeHtml(d.fecha) + ' · ' + d.ped.length + ' ped · ' + _pppM3Sum(d.ped).toFixed(2) + ' m³</div>';
-      const byT = {}, ordt = []; for (const p of d.ped) { const t = _pppTieneTanda(p) ? p.tanda.toUpperCase() : "—"; if (!(t in byT)) ordt.push(t); (byT[t] = byT[t] || []).push(p); }
-      ordt.sort(function (a, b) { return _pppCamKey(byT[a]) - _pppCamKey(byT[b]) || (a < b ? -1 : a > b ? 1 : 0); });   // agrupa por camión (color), luego por tanda
-      for (const t of ordt) {
-        const es = pppEsSuper(byT[t][0]);
-        const pencil = (t !== "—" && !PPP_READONLY) ? ' <button class="ppp-pencil-btn" onclick="event.stopPropagation();pppSetMode(\'__BLOCKID__\',\'edit\')" title="Editar: fecha / mover / devolver">✏️ Editar</button>' : '';   // editar corrige (Excel) → oculto en solo-lectura
-        const entBtn = (t !== "—" && !PPP_READONLY) ? ' <button class="ppp-tanda-ent" onclick="event.stopPropagation();pppSetMode(\'__BLOCKID__\',\'ctrl\')" title="Marcar entregas (local)">✓ Controlar</button>' : '';   // en solo-lectura el control es POR NP (tilde en cada fila)
-        html += _pppBlock("plan_" + dk + "_" + t, (es ? "🛒 " : "") + (t === "—" ? "Sin tanda" : "Tanda " + escapeHtml(t)), es ? "ppp-tanda-super" : "", byT[t].length + " ped · " + _pppM3Sum(byT[t]).toFixed(2) + " m³", byT[t], pencil + entBtn, (t !== "—" ? t : null));
-      }
+      html += _pppTandaBlocksHtml(dk, d.ped);
     }
     _renderKeepFocus(box, html); return;
   }
