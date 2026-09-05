@@ -123,6 +123,37 @@ Para probar mientras tanto se prende y se apaga **dentro de una sola transacció
 Estos dos puntos se implementan en `PaginaLK` y en el repo de Chef, **no acá**. Lo que
 Gestión tiene que dar es la cañería, y en el punto 1 ya está dada.
 
+## Estado al cierre del sábado 2026-09-05 (noche) — lo que va a pasar el lunes
+
+**Lo que el job de las 00:01 va a armar** (simulado con los pedidos reales de LK y
+`gv_ppp_web_armar_simular`, sin escribir): pendientes desde `gestion_desde` = 1340…1351; los
+1340…1349 salieron a ISIS por el mail del sábado 12:30 (`enviado_a_compras`) → son de Producción.
+Quedan **1350 Distribuidora Cuyana** (4 bloques, 0,938 m³, expreso en Soldati) y **1351 Astorga**
+(Pompeya, 0,191 m³), los dos Zona 1:
+
+| tanda | pedido | barrio | m³ | por qué |
+|---|---|---|---|---|
+| **E01A** | LK 1350 / 1350-2 / 1350-3 / 1350-4 | Soldati | 0,938 | un cliente > 0,80 → tanda propia |
+| **E01B** | LK 1351 | Pompeya | 0,191 | no entra en E01A (tope) |
+
+`gv_pedidos_web_excluidos` no excluye ninguno. Chef: 0 pendientes en el dry run del sábado.
+
+**Auditoría de casts** (¿una NP `LK 1350` rompe algo de Producción el lunes?): se buscó en TODAS
+las funciones y vistas de `public` un cast a entero sobre NP/pedido/`texto`. El pipeline de stock
+(`reconciliar_pipeline_stock_etapa1`, cron 68 cada 10 min) usa tanda (campo 1), artículo (campo 2)
+y pickeado (campo 4, sólo dígitos) del PKC — **no castea el pedido**. `vista_np_faltantes_secuencia`
+filtra `~ '^\d+$'` antes del `::bigint`. `vista_control_remitos` castea sólo `lios` del TAL. Los
+únicos casts sobre NP son `isis_api_pendientes` / `isis_pedido_json` (v1.0 del contrato ISIS, ya
+anotado en **1439**: dan 1350 para `LK 1350`, no rompen) y nuestras `ppp_web_*`. **Conclusión: nada
+de Producción se cae por una NP web.** Queda `empresa_de_np` (duales, §3.aa).
+
+**⚠ Lo que tiene que pasar del lado del dueño para que el lunes funcione:**
+1. **Los operarios entran a Gestión, no a Producción.** Las tandas web (E01A, E01B) viven en
+   `PPP_Web_Programacion` y Producción no las ve: si el operario abre la app vieja, no las va a
+   encontrar. Es el ítem "operarios a Gestión" de `CLAUDE.md`.
+2. Cron de Chef (12:30) apagado desde el Dashboard de Chef, cuando quiera que Chef entre por Gestión.
+3. Revisar los 38 atrasados de ISIS (reprogramar o cargar) — el recordatorio de las 08:30 los lista.
+
 ### [ ] 4990 — Módulo "Editar pedidos": el cliente agrega al pedido ya mandado
 
 Textual: *"Módulo Editar pedidos (clientes pueden agregar cosas al pedido) recomiendo que
