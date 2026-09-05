@@ -119,6 +119,10 @@ Detalle, medición y rollback en `docs/SUPABASE-GESTION-VIRGILIO.md` §3.l y §3
   ni momento de numerar: "A Programar" ya muestra la NP apenas llega. (`PPP_Web_NP_Seed` y el
   contador de `gv_ppp_web_np_asignar` quedaron sin uso; `sql/gv_np_es_pedido.sql`.) Se
   programa por el job de las 00:01 para zona 1 y 2 y a mano en "A Programar" para el resto.
+  **Desde el 2026-09-05 además hay armado INTRADÍA** (idea 7317, cron jobid 73 cada 15 min
+  lun–vie 07:00–18:45 ART, Edge Function v14 con `{"intradia": true}`): cuando lo pendiente de
+  zona 1 y 2 suma ≥ 0,80 m³ se arma ya, para hoy si es antes de las 12:00 y hay cupo, si no
+  para el próximo hábil con cupo (`gv_ppp_web_proximo_dia_entrega`). §3.x de la doc de Supabase.
   Regla del dueño: *"cuando Gestión tome control, va a asignarle la numeración
   nuestra a los pedidos que estén pendientes y a los que vayan cayendo"*. **Pendiente =
   pedido de la página que NO salió a ISIS por el mail (`enviado_a_compras`), con fecha ≥

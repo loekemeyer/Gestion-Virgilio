@@ -236,6 +236,49 @@ function npLabel(empresa: string, num: number, idx = 1): string {
   return emp + " " + (n.length >= 4 ? n : n.padStart(4, "0")) + (idx > 1 ? "-" + idx : "");
 }
 
+/** Umbral del armado intradía (idea 7317): `intradia_umbral_m3`, si no el tope de
+ *  mezcla `tanda_m3_max_mezcla`, si no 0,80. */
+async function umbralIntradia(): Promise<number> {
+  const r = await vg("/rest/v1/PPP_Web_Config?select=clave,valor&clave=in.(intradia_umbral_m3,tanda_m3_max_mezcla)");
+  const rows = r.ok ? await r.json() as { clave: string; valor: number | null }[] : [];
+  const de = (k: string) => { const x = rows.find((y) => y.clave === k); return x && x.valor != null ? Number(x.valor) : NaN; };
+  const u = de("intradia_umbral_m3");
+  if (!isNaN(u) && u > 0) return u;
+  const t = de("tanda_m3_max_mezcla");
+  return (!isNaN(t) && t > 0) ? t : 0.8;
+}
+
+/** Lo PENDIENTE del armado automático: filas de la empresa que todavía no tienen tanda
+ *  y cuya zona es automática (`gv_ppp_web_zona_automatica`: hoy 1 y 2; Súper, Retira y
+ *  el resto nunca). Es lo que se compara contra el umbral intradía. Sólo lee. */
+async function pendienteAutomatico(emp: "lk" | "chef", filas: Fila[]): Promise<{ m3: number; np: number; zonas: Record<string, number> }> {
+  if (!filas.length) return { m3: 0, np: 0, zonas: {} };
+  const rProg = await vg(`/rest/v1/PPP_Web_Programacion?select=order_id,np_idx` +
+    `&empresa=eq.${emp}&tanda=not.is.null&limit=20000`);
+  const progRows = rProg.ok ? await rProg.json() as { order_id: number; np_idx: number }[] : [];
+  const conTanda = new Set(progRows.map((x) => `${x.order_id}|${x.np_idx}`));
+  const pend = filas.filter((n) => !conTanda.has(`${n.order_id}|${n.np_idx}`));
+  if (!pend.length) return { m3: 0, np: 0, zonas: {} };
+  const zonas = await resolverZonas(pend.map((n) => {
+    const b = barrioCrudo(n);
+    return b.usaDireccion ? { ze: "", loc: "", dir: b.barrio } : { ze: b.barrio, loc: "", dir: "" };
+  }));
+  const auto = new Map<string, boolean>();
+  for (const z of new Set(zonas.filter(Boolean))) {
+    try { auto.set(z, await vgRpc<boolean>("gv_ppp_web_zona_automatica", { p_zona: z })); }
+    catch (_e) { auto.set(z, false); }
+  }
+  let m3 = 0, np = 0;
+  const porZona: Record<string, number> = {};
+  pend.forEach((n, i) => {
+    const z = zonas[i] || "";
+    if (!auto.get(z)) return;
+    m3 += Number(n.m3) || 0; np++;
+    porZona[z] = (porZona[z] ?? 0) + (Number(n.m3) || 0);
+  });
+  return { m3: Math.round(m3 * 1000) / 1000, np, zonas: porZona };
+}
+
 async function procesarEmpresa(
   emp: "lk" | "chef", filas: Fila[], fecha: string, forzarCods: string[] = [],
 ) {
@@ -366,8 +409,15 @@ Deno.serve(async (req: Request) => {
   const dry = flag("dry");
   // `esperar` devuelve el resultado en vez de contestar al toque (ver abajo).
   const esperar = flag("esperar");
-  const fecha = url.searchParams.get("fecha") ??
-    (typeof cuerpo.fecha === "string" ? cuerpo.fecha : null) ?? hoyArgentina();
+  // `intradia` (idea 7317, 2026-09-05): corrida DURANTE el día, cada 15 min. Sólo arma si
+  // lo pendiente sin tanda de las zonas automáticas (1 y 2; Súper nunca) suma
+  // ≥ `intradia_umbral_m3` (0,80), y lo arma para la fecha que elige
+  // `gv_ppp_web_proximo_dia_entrega` (hoy si es antes de las 12:00 y hay cupo; si no,
+  // el próximo hábil con cupo). Lo que no llega al umbral lo arma igual el job de las 00:01.
+  const intradia = flag("intradia");
+  const fechaExplicita = url.searchParams.get("fecha") ??
+    (typeof cuerpo.fecha === "string" ? cuerpo.fecha : null);
+  let fecha = fechaExplicita ?? hoyArgentina();
 
   const log = async (estado: string, motivo: string | null, extra: Record<string, unknown>) => {
     try {
@@ -384,6 +434,10 @@ Deno.serve(async (req: Request) => {
 
   const trabajo = async (): Promise<{ status: number; body: Record<string, unknown> }> => {
     try {
+      // ── intradía: la fecha la elige el backend ────────────────────────
+      if (intradia && !fechaExplicita) {
+        fecha = await vgRpc<string>("gv_ppp_web_proximo_dia_entrega", {});
+      }
       // ── día hábil ─────────────────────────────────────────────────────
       const habil = await vgRpc<boolean>("gv_es_dia_habil", { p_fecha: fecha });
       if (!habil && !forzar) {
@@ -402,6 +456,7 @@ Deno.serve(async (req: Request) => {
       // Modo prueba: lee las dos fuentes y resuelve zonas, sin escribir nada.
       if (dry) {
         const out: Record<string, unknown> = {};
+        let m3Auto = 0, npAuto = 0;
         for (const emp of ["lk", "chef"] as const) {
           try {
             const crudas = emp === "lk" ? await traerLk(desde) : await traerChef(ventana);
@@ -412,17 +467,21 @@ Deno.serve(async (req: Request) => {
             }));
             const porZona: Record<string, number> = {};
             zonas.forEach((z) => { const k = z || "(sin zona)"; porZona[k] = (porZona[k] ?? 0) + 1; });
+            const pend = await pendienteAutomatico(emp, filas);
+            m3Auto += pend.m3; npAuto += pend.np;
             out[emp] = {
               np_crudas: crudas.length, pedidos_crudos, excluidos,
               np_leidas: filas.length,
               con_fecha_pactada: filas.filter((n) => n.fecha_entrega_pactada).length,
               por_zona: porZona,
+              pendiente_automatico: pend,
             };
           } catch (e) {
             out[emp] = { error: e instanceof Error ? e.message : String(e) };
           }
         }
-        return { status: 200, body: { ok: true, dry: true, fecha, ventana, detalle: out } };
+        const umbral = await umbralIntradia();
+        return { status: 200, body: { ok: true, dry: true, intradia, fecha, ventana, umbral_m3: umbral, m3_pendiente_automatico: m3Auto, np_pendiente_automatico: npAuto, armaria: m3Auto >= umbral, detalle: out } };
       }
 
       // Las dos empresas por separado: si Chef falla, LK igual queda armado.
@@ -432,8 +491,36 @@ Deno.serve(async (req: Request) => {
       const errores: string[] = [];
       let forzarChef: string[] = [];
 
+      // ── intradía: ¿se llegó al umbral? ─────────────────────────────────
+      // Se leen las dos fuentes UNA vez (se reutilizan abajo) y se suma lo pendiente
+      // sin tanda de las zonas automáticas. Por debajo del umbral no se escribe nada
+      // salvo el log; a las 00:01 el job normal arma lo que quedó chico.
+      let filasLk: Fila[] | null = null, filasChef: Fila[] | null = null;
+      let exLk: Record<string, number> = {}, exChef: Record<string, number> = {};
+      if (intradia) {
+        const umbral = await umbralIntradia();
+        let m3Auto = 0, npAuto = 0;
+        const det: Record<string, unknown> = {};
+        try {
+          const s = await soloPendientes("lk", await traerLk(desde)); filasLk = s.filas; exLk = s.excluidos;
+          const p = await pendienteAutomatico("lk", filasLk); m3Auto += p.m3; npAuto += p.np; det.lk = p;
+        } catch (e) { det.lk = { error: e instanceof Error ? e.message : String(e) }; }
+        try {
+          const s = await soloPendientes("chef", await traerChef(ventana)); filasChef = s.filas; exChef = s.excluidos;
+          const p = await pendienteAutomatico("chef", filasChef); m3Auto += p.m3; npAuto += p.np; det.chef = p;
+        } catch (e) { det.chef = { error: e instanceof Error ? e.message : String(e) }; }
+        if (m3Auto < umbral) {
+          const motivo = `intradía: pendiente automático ${m3Auto.toFixed(3)} m³ (${npAuto} NP) < umbral ${umbral} m³`;
+          await log("intradia_sin_umbral", motivo, { np_leidas: (filasLk?.length ?? 0) + (filasChef?.length ?? 0), detalle: { m3_pendiente_automatico: m3Auto, np_pendiente_automatico: npAuto, umbral_m3: umbral, ...det } });
+          return { status: 200, body: { ok: true, intradia: true, fecha, armo: false, motivo, m3_pendiente_automatico: m3Auto, umbral_m3: umbral } };
+        }
+        out.intradia = { m3_pendiente_automatico: m3Auto, np_pendiente_automatico: npAuto, umbral_m3: umbral, ...det };
+      }
+
       try {
-        const { filas, excluidos } = await soloPendientes("lk", await traerLk(desde));
+        const { filas, excluidos } = filasLk
+          ? { filas: filasLk, excluidos: exLk }
+          : await soloPendientes("lk", await traerLk(desde));
         const r = await procesarEmpresa("lk", filas, fecha);
         leidas += r.np_leidas; programadas += r.np_programadas; nTandas += r.tandas.length;
         out.lk = { np_leidas: r.np_leidas, excluidos, tandas_nuevas: r.tandas };
@@ -446,7 +533,9 @@ Deno.serve(async (req: Request) => {
       }
 
       try {
-        const { filas, excluidos } = await soloPendientes("chef", await traerChef(ventana));
+        const { filas, excluidos } = filasChef
+          ? { filas: filasChef, excluidos: exChef }
+          : await soloPendientes("chef", await traerChef(ventana));
         const r = await procesarEmpresa("chef", filas, fecha, forzarChef);
         leidas += r.np_leidas; programadas += r.np_programadas; nTandas += r.tandas.length;
         out.chef = { np_leidas: r.np_leidas, excluidos, tandas_nuevas: r.tandas };
@@ -455,13 +544,13 @@ Deno.serve(async (req: Request) => {
         errores.push(msg); out.chef = { error: msg };
       }
 
-      const estado = errores.length === 2 ? "error" : "ok";
+      const estado = errores.length === 2 ? "error" : (intradia ? "intradia_ok" : "ok");
       await log(estado, errores.length ? errores.join(" | ") : null, {
         np_leidas: leidas, np_programadas: programadas, tandas: nTandas, detalle: out,
       });
       return {
-        status: estado === "ok" ? 200 : 500,
-        body: { ok: estado === "ok", fecha, tandas: nTandas, detalle: out },
+        status: estado === "error" ? 500 : 200,
+        body: { ok: estado !== "error", intradia, fecha, tandas: nTandas, detalle: out },
       };
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);

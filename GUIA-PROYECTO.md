@@ -20,6 +20,18 @@
 > Producción no se tocó (medido: ninguna función `ppp_web_*`/`gv_ppp_web_*` escribe en tabla
 > compartida). Primera corrida real: lunes 2026-09-07 00:01. Cómo apagar, en `CLAUDE.md`.
 >
+> Nota **backend 2026-09-05 (sin bump) — Armado intradía de zona 1 y 2** (idea **7317**, dueño:
+> *"los pedidos de zona 1 y 2 deben programarse inmediatamente, apenas llegan, porque a esa zona voy
+> todos los días… cuando se llega a 0,80 m³, para el próximo día que se pueda entregar según PPP;
+> excepciones son las de súper"*). Cron nuevo **jobid 73** `gv-ppp-web-tandas-intradia` (cada 15
+> min, lun–vie 07:00–18:45 ART) llama a la Edge Function `gv-ppp-web-tandas-diarias` **v14** con
+> `{"intradia": true}`: suma lo pendiente sin tanda de las zonas automáticas (`zonas_automaticas`,
+> hoy 1 y 2; Súper nunca) y si llega a `intradia_umbral_m3` (0,80) arma ya, para la fecha que elige
+> `gv_ppp_web_proximo_dia_entrega()` (hoy si es antes de `intradia_corte_hora` = 12:00 y hay cupo;
+> si no, el próximo hábil con cupo). Por debajo del umbral sólo loguea (`intradia_sin_umbral` en
+> `GV_Tandas_Auto_Log`); el job de las 00:01 (jobid 71) sigue igual y arma lo que quedó chico.
+> Detalle y medición §3.x de `docs/SUPABASE-GESTION-VIRGILIO.md`, SQL en `sql/gv_ppp_web_intradia.sql`.
+>
 > Nota **v13.03** — **Programación nueva: tablero de 6 días hábiles** (mockup v2 aprobado por el dueño:
 > *"que la hoja Programación entren 6 días… en 6 botones grandes que digan el resumen: 1 camión, 6 m³,
 > Zona 1, $5.000.000… si entro, ahí veo con otra visual qué tiene dentro"*). Decisiones: **$** = vista

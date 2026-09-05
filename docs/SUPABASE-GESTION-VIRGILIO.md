@@ -1380,6 +1380,44 @@ es de Chef y pisa al LK 217): cuando Gestión alimente el tracking, escribir el 
 una función `gv_*` y pedir columna `empresa` en PaginaLK. Y el Excel ISIS de Facturación manda
 `N_Pedido` contador (no el id), como el mail: ISIS numera 98xxx por su cuenta.
 
+### 3.x ✅ Armado intradía de zona 1 y 2 al llegar a 0,80 m³ (idea 7317) — 2026-09-05 sábado (backend, sin bump)
+
+**Qué pidió el dueño.** *"Los pedidos que se entregan en zona 1 y 2 deben programarse
+inmediatamente, apenas llegan, porque a esa zona voy todos los días."* Aclarado: *"cuando se llega
+a 0,80 para zona 1 y 2, para el próximo día que se pueda entregar según PPP; excepciones son las de
+súper"*; lo que no llega a 0,80 lo arma igual el job de las 00:01; "hoy" cuenta si es antes de las
+12:00 y hay cupo. Decisión: backend.
+
+**Qué había.** El armado (`ppp_web_armar_tandas`) ya era idempotente, ya se limitaba a
+`zonas_automaticas = '1,2'` y Súper nunca es automático. Lo único que lo frenaba era el cron 71:
+una corrida por día, 00:01.
+
+**Qué se hizo** (`sql/gv_ppp_web_intradia.sql`, migración `gv_ppp_web_intradia`, Edge Function
+`gv-ppp-web-tandas-diarias` **v14**):
+- `PPP_Web_Config`: filas nuevas `intradia_umbral_m3 = 0.80` y `intradia_corte_hora = '12:00'`
+  (`insert … on conflict do nothing`).
+- Función nueva `gv_ppp_web_proximo_dia_entrega(p_ahora)`: hoy si es antes del corte, hábil y con
+  m³ programados < `m3_max_dia`; si no, el primer hábil siguiente con cupo. Probado: sáb 05/09 →
+  lun 07; lun 10:00 → lun; lun 12:00 → mar; vie 13:00 → lun 14.
+- Edge Function, flag `intradia` (query `?intradia=1` o body `{"intradia": true}`): la fecha la
+  elige la función de arriba; lee LK y Chef UNA vez, suma lo pendiente **sin tanda** de las zonas
+  automáticas (`pendienteAutomatico`: `gv_ppp_web_zona_automatica` por zona) y si es
+  `< intradia_umbral_m3` sólo loguea `intradia_sin_umbral` (nada se escribe); si llega, corre el
+  armado normal (mismo `procesarEmpresa`) y loguea `intradia_ok`. Sin el flag la función es
+  idéntica a v13 (el job de las 00:01 no cambia). `?dry=1&intradia=1` devuelve `armaria`,
+  `m3_pendiente_automatico` y el detalle por empresa.
+- Cron NUEVO **jobid 73** `gv-ppp-web-tandas-intradia`: `*/15 10-21 * * 1-5` UTC = cada 15 min,
+  lun–vie 07:00–18:45 ART, body `{"intradia": true}`.
+
+**Impacto medido.** Dry run sáb 05/09 18:31 ART: fecha elegida 2026-09-07, pendiente automático
+**1,129 m³ / 5 NP** (LK, todas Zona 1), Chef 0 → `armaria: true`. O sea el lunes a las 07:00 el
+intradía arma lo mismo que el job de las 00:01 ya habrá armado (idempotente: no duplica). Producción
+no se toca (escribe sólo en `PPP_Web_Programacion`, `PPP_Web_Base`, `GV_Tandas_Auto_Log`).
+
+**Rollback.** `select cron.unschedule('gv-ppp-web-tandas-intradia');` (la función v14 sin el flag
+es v13). Y `drop function public.gv_ppp_web_proximo_dia_entrega(timestamptz); delete from
+public."PPP_Web_Config" where clave in ('intradia_umbral_m3','intradia_corte_hora');`
+
 ### 3.w ✅ Cargado al camión = En Salida (idea 4459) + valor a lista por NP — 2026-09-05 sábado (v13.02)
 
 **Qué pidió el dueño.** *"Si hay pedidos que ya se cargaron a un camión, tienen que salir de la
