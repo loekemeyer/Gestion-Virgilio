@@ -20,6 +20,11 @@
 > Producción no se tocó (medido: ninguna función `ppp_web_*`/`gv_ppp_web_*` escribe en tabla
 > compartida). Primera corrida real: lunes 2026-09-07 00:01. Cómo apagar, en `CLAUDE.md`.
 >
+> Nota **backend, sin bump (2026-09-05, sábado)** — **Tandas sin prefijo `GV-`.** Dueño: *"sacá el
+> prefijo GV- de las tandas"*. `PPP_Web_Config.tanda_prefijo = ''` → `ppp_web_armar_tandas` vuelve a la
+> codificación histórica `LETRA+NN+LETRA` y `ppp_web_proxima_letra()` retoma desde la última letra de
+> Producción (D71A): la primera tanda de Gestión es **`E01A`**. No había tandas web previas. Detalle §3.s.
+>
 > Nota **v12.95** — **Control de remito = pedido entregado, solo.** Dueño: *"cuando ya el pedido se
 > controla el remito, tiene que pasar directamente a Pedidos Entregados, sin que nadie toque nada. Hoy
 > en Producción requiere corregir el Excel para que se corrija el espejo (la PPP). En Gestión tiene que

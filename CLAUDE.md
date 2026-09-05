@@ -99,8 +99,8 @@ y cruce de factura— está abierto. **Leerlo al abrir una sesión nueva sobre e
 ## ⚠⚠⚠ CUANDO GESTIÓN TOMA CONTROL Y SE VUELVE LA VERSIÓN QUE USAMOS, SEGUIR CON LA NUMERACIÓN QUE DEJÓ VIRGILIO
 
 **Estado desde el 2026-09-04 (viernes, a la noche): la numeración está PRENDIDA
-(`numeracion_activa = 1`), el cron de tandas (jobid 71) activo, y las tandas siguen con
-prefijo `GV-`.** Decisión del dueño: prender **sólo Virgilio**, sin tocar LK — el mail de
+(`numeracion_activa = 1`), el cron de tandas (jobid 71) activo, y las tandas con prefijo `GV-`
+hasta el sábado 05/09, cuando el dueño lo hizo sacar (`tanda_prefijo = ''` → `E01A`).** Decisión del dueño: prender **sólo Virgilio**, sin tocar LK — el mail de
 las 12:30 (`procesar-pedidos-web`) siguió andando hasta el **sábado 2026-09-05 a las 13:50 ART,
 cuando el dueño lo hizo apagar** (crons 7 y 10 de LK en `active=false`, v12.94). Último envío a
 ISIS: sábado 12:30, pedidos 1340..1349 → esos son de Producción. **Desde el 1350 todo pedido de la
@@ -125,8 +125,10 @@ Detalle, medición y rollback en `docs/SUPABASE-GESTION-VIRGILIO.md` §3.l y §3
   `anterior_al_cambio`, `en_produccion`. **Bloques**: de a 18 (LK) / 15 (Chef) SEGUIDOS en el
   orden del carrito, igual que ISIS (v12.94; antes serpentina por m³).
   `pwebNumerar()` —la que numeraba todo al abrir una pantalla— quedó inalcanzable desde v12.82.
-- **Tandas** → siguen con prefijo **`GV-`** (`GV-01A`) mientras convivan las dos apps: cero
-  chance de pisarse con una tanda de Producción en el registro de eventos compartido.
+- **Tandas** → **codificación histórica `LETRA+NN+LETRA`** desde el sábado 2026-09-05 (dueño:
+  *"sacá el prefijo GV-"*; `tanda_prefijo = ''`). `ppp_web_proxima_letra()` retoma desde la
+  última letra de Producción (D71A) → la primera tanda de Gestión es **`E01A`**. Hasta ese día
+  el prefijo era `GV-` para no pisarse con Producción; para volver: `valor_texto = 'GV-'`.
 - **Canilla del espejo de ISIS: CERRADA para Gestión desde el 2026-09-05** (v12.90). Gestión
   no lee más `PPP_Programacion_Diaria` / `PPP_Base_Pedidos` / `PPP_Entregados_Meta` directo:
   lee las vistas **`gv_ppp_programacion_diaria` / `gv_ppp_base_pedidos` / `gv_ppp_entregados_meta`**
@@ -144,11 +146,12 @@ update public."PPP_Web_Config" set valor = 0 where clave = 'numeracion_activa';
 select cron.alter_job(71, active := false);
 ```
 
-**Cuando Producción deje de armar tandas, una línea más y las tandas siguen la codificación
-histórica** (`ppp_web_proxima_letra()` retoma desde la última letra que dejó Producción):
+**Hecho el sábado 2026-09-05: las tandas siguen la codificación histórica** (`tanda_prefijo = ''`;
+`ppp_web_proxima_letra()` retomó desde la última letra que dejó Producción, D71A → `E01A`).
+Para volver al prefijo de convivencia:
 
 ```sql
-update public."PPP_Web_Config" set valor_texto = '' where clave = 'tanda_prefijo';
+update public."PPP_Web_Config" set valor_texto = 'GV-' where clave = 'tanda_prefijo';
 ```
 
 **La NP web es el número de pedido de la página** (v12.92): `LK 1350`, `LK 1350-2` (bloque 2),

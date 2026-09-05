@@ -1380,6 +1380,14 @@ es de Chef y pisa al LK 217): cuando Gestión alimente el tracking, escribir el 
 una función `gv_*` y pedir columna `empresa` en PaginaLK. Y el Excel ISIS de Facturación manda
 `N_Pedido` contador (no el id), como el mail: ISIS numera 98xxx por su cuenta.
 
+### 3.s ✅ Tandas sin prefijo `GV-` — 2026-09-05 sábado (config, sin bump)
+
+Dueño: *"sacá el prefijo GV- de las tandas"*. `update "PPP_Web_Config" set valor_texto = ''
+where clave = 'tanda_prefijo'`. Medido antes: `PPP_Web_Tandas` 0, `PPP_Web_Programacion` con
+tanda 0 (nada que renombrar). Después: `ppp_web_proxima_letra()` = 4 (A=0 → **E**), última
+de Producción `D71A` → la primera tanda de Gestión será **`E01A`**, codificación histórica
+`LETRA+NN+LETRA`. Producción no cambia. Rollback: `valor_texto = 'GV-'`.
+
 ### 3.r ✅ Control de remito = entregado, solo — 2026-09-05 sábado (v12.95)
 
 Dueño: *"cuando ya el pedido se controla el remito, tiene que pasar directamente a Pedidos
