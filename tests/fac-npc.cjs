@@ -57,8 +57,8 @@ catch (_e) {
           { np: "97958", cod_cliente: "2533", tanda: "C75B", fecha_salida: "2026-07-15", cod_art: "100", cajas_pedidas: 2, cajas_falto: 0 }
         ]);
       }
-      if (url.indexOf("PPP_Entregados_Meta") >= 0) return J([]);
-      if (url.indexOf("PPP_Programacion_Diaria") >= 0) {
+      if (url.indexOf("ppp_entregados_meta") >= 0) return J([]);
+      if (url.indexOf("ppp_programacion_diaria") >= 0) {
         return J([
           { np: "97957", cod: "2533", razon_social: "Osa Distribuidora", fecha_entrega: "2026-07-15 00:00:00", tanda: "C75B" },
           { np: "97958", cod: "2533", razon_social: "Osa Distribuidora", fecha_entrega: "2026-07-15 00:00:00", tanda: "C75B" }

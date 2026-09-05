@@ -76,7 +76,7 @@ const PEND = { "840": 8 };
       return [];
     };
     window.fetch = function (url) {
-      const rows = /PPP_Base_Pedidos/.test(String(url)) ? fx.LINEAS.slice() : [];
+      const rows = /ppp_base_pedidos/.test(String(url)) ? fx.LINEAS.slice() : [];
       return Promise.resolve({ ok: true, json: function () { return Promise.resolve(rows); } });
     };
     window.loadArtNombres = async function () { return {}; };

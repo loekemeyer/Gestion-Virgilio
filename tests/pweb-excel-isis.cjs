@@ -27,7 +27,7 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
         { id: 1, np: "LK 01343", cod_art: "027", cajas_pedidas: 2, cajas_entregadas: 2 },
         { id: 2, np: "98574",   cod_art: "505", cajas_pedidas: 1, cajas_entregadas: 1 }
       ]);
-      if (u.includes("PPP_Base_Pedidos"))       return json([{ pedido: "98574", fecha: "2026-08-30" }]);
+      if (u.includes("ppp_base_pedidos"))       return json([{ pedido: "98574", fecha: "2026-08-30" }]);
       if (u.includes("PPP_Web_Programacion"))   return json([{ np: 1343, empresa: "lk", fecha_recep: "2026-09-03" }]);
       if (u.includes("vista_uxb_articulo"))     return json([{ cod: "027", uxb: 24 }, { cod: "505", uxb: 12 }]);
       if (u.includes("clientes_vendedor"))      return json([{ cod_cliente: "4109", vend: "21" }]);

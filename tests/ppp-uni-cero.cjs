@@ -26,7 +26,7 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
     const json = (o) => ({ ok: true, status: 200, json: async () => o });
     window.fetch = async (url) => {
       const u = String(url);
-      if (u.includes("PPP_Base_Pedidos")) return json([
+      if (u.includes("ppp_base_pedidos")) return json([
         { articulo: "031", cajas: 60 },   // con cero: el que fallaba
         { articulo: "502", cajas: 40 }    // sin cero: el que siempre anduvo
       ]);

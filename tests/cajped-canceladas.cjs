@@ -25,7 +25,7 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
     window.getEmpleadosNombres = async function () { return new Map(); };
     window.fetch = function (url) {
       url = String(url);
-      if (url.indexOf("PPP_Base_Pedidos") >= 0) return J([
+      if (url.indexOf("ppp_base_pedidos") >= 0) return J([
         { pedido: "44458", cajas: 18, cliente: "Dorinka S.R.L" },   // CANCELADA
         { pedido: "44593", cajas: 6,  cliente: "Aguilar Maria Co" },// sin programar (fallback de RS)
         { pedido: "44600", cajas: 16, cliente: "Dorinka S.R.L" },   // programada
@@ -33,8 +33,8 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
       ]);
       if (url.indexOf("NP_Canceladas") >= 0) return J([{ np: "44458" }]);
       if (url.indexOf("Facturacion_NP") >= 0) return J([{ np: "44700" }]);
-      if (url.indexOf("PPP_Entregados_Meta") >= 0) return J([]);
-      if (url.indexOf("PPP_Programacion_Diaria") >= 0) return J([
+      if (url.indexOf("ppp_entregados_meta") >= 0) return J([]);
+      if (url.indexOf("ppp_programacion_diaria") >= 0) return J([
         { np: "44600", tanda: "D58A", razon_social: "Dorinka S.R.L", fecha_entrega: "2026-09-03" }
       ]);
       return J([]);
@@ -65,7 +65,7 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
     // caso borde: si TODAS las NP están canceladas/facturadas, el pop-up lo dice y no rompe
     window.fetch = function (url) {
       url = String(url);
-      if (url.indexOf("PPP_Base_Pedidos") >= 0) return J([{ pedido: "44458", cajas: 18, cliente: "Dorinka S.R.L" }]);
+      if (url.indexOf("ppp_base_pedidos") >= 0) return J([{ pedido: "44458", cajas: 18, cliente: "Dorinka S.R.L" }]);
       if (url.indexOf("NP_Canceladas") >= 0) return J([{ np: "44458" }]);
       return J([]);
     };

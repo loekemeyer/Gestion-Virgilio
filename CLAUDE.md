@@ -116,6 +116,14 @@ Detalle, medición y rollback en `docs/SUPABASE-GESTION-VIRGILIO.md` §3.l.
   `pwebNumerar()` —la que numeraba todo al abrir una pantalla— quedó inalcanzable desde v12.82.
 - **Tandas** → siguen con prefijo **`GV-`** (`GV-01A`) mientras convivan las dos apps: cero
   chance de pisarse con una tanda de Producción en el registro de eventos compartido.
+- **Canilla del espejo de ISIS: CERRADA para Gestión desde el 2026-09-05** (v12.90). Gestión
+  no lee más `PPP_Programacion_Diaria` / `PPP_Base_Pedidos` / `PPP_Entregados_Meta` directo:
+  lee las vistas **`gv_ppp_programacion_diaria` / `gv_ppp_base_pedidos` / `gv_ppp_entregados_meta`**
+  (`sql/gv_espejo_corte.sql`), que sólo devuelven NP ≤ `PPP_Web_Config.espejo_np_corte_lk`
+  (98694) / `_chef` (44619). Lo que ISIS numere después lo ve Producción y no Gestión; ese
+  pedido entra a Gestión desde la página. El Apps Script y Producción no se tocaron.
+  **Abrir la canilla:** `update public."PPP_Web_Config" set valor = null where clave like 'espejo_np_corte_%';`
+  Detalle §3.m de `docs/SUPABASE-GESTION-VIRGILIO.md`.
 
 **Para apagarlo (mismo día, todo reversible):**
 

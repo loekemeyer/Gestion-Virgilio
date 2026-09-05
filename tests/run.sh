@@ -258,5 +258,8 @@ PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node te
 echo "== pweb-entregados (v12.87: la NP web controlada cuenta como entregada, y sigue contando con el tiempo) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/pweb-entregados.cjs
 
-echo "== pweb-pendiente (v12.88: A Programar sólo muestra pedidos NO enviados a compras) =="
+echo "== pweb-pendiente (v12.89: A Programar sólo muestra pedidos pendientes según gv_pedidos_web_excluidos) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/pweb-pendiente.cjs
+
+echo "== gv-espejo-corte (v12.90: Gestión lee las vistas gv_ppp_* y no las tablas crudas del espejo de ISIS) =="
+PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/gv-espejo-corte.cjs

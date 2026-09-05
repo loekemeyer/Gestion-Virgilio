@@ -87,7 +87,7 @@ const ZONAS = { mataderos:"Zona 3 - CABA Oeste", martinez:"Zona 6 - GBA Norte", 
       // que se llame, con las filas vivas y antes de leer la programación.
       if (u.includes("rpc/ppp_web_resync")) { resync.push(JSON.parse(opt.body)); return json([]); }
       if (u.includes("PPP_Web_Programacion")) return json([]);
-      if (u.includes("PPP_Programacion_Diaria")) return json([]);
+      if (u.includes("ppp_programacion_diaria")) return json([]);
       return json([]);
     };
 

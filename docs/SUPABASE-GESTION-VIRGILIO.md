@@ -1237,6 +1237,63 @@ los del limbo, la RPC los va a marcar `en_produccion` sola y dejan de aparecer.
 `gestion_desde`; redeployar la Edge Fn v9 (no llama a la RPC); front v12.88. Los feeds de LK
 tal como estaban antes de todo el día: `sql/backups/gv_pedidos_web_np_feeds_20260904_pre_filtro_enviado.sql`.
 
+### 3.m ✅ La canilla del espejo de ISIS, cerrada para Gestión — 2026-09-05 (v12.90)
+
+Pedido del dueño: *"una vez que ya esté todo en Gestión Virgilio, cerrá la canilla para que
+no lleguen más desde el espejo del Excel"*. Eligió **cerrarla ya, con corte por NP, en el
+backend**.
+
+**Qué es la canilla.** El Apps Script de Google (`handleCargaPPPSync_` en "Carga PPP.gs",
+fuera del repo; el espejo es `apps-script/sync-ppp-supabase.gs`) pisa `PPP_Programacion_Diaria`
+y `PPP_Base_Pedidos` con la **service key** cada vez que ISIS actualiza el Sheet
+(`DELETE ?id=gte.0` + INSERT; 114 k inserts acumulados en Prog, 4,5 M en Base), y el cron
+`sync-ppp-entregados-meta` (jobid 27) baja "Pedidos Entregados" a `PPP_Entregados_Meta`. El
+pull server-side de `sql/sync_ppp_pull_server_side.sql` **nunca se desplegó** (0 funciones
+en la base). **Producción lee esas mismas tres tablas** y sigue viva, así que no se toca ni
+Google ni las tablas: se cierra **en lo que Gestión lee**.
+
+**Cómo.** ISIS numera en orden (LK `9xxxx`, Chef `4xxxx`). Se anotó la última NP que había y
+Gestión pasa a leer tres vistas que sólo devuelven `np <= corte`:
+
+| objeto | qué |
+|---|---|
+| `PPP_Web_Config` | + `espejo_np_corte_lk = 98694`, `espejo_np_corte_chef = 44619` (el máximo del espejo al cerrar). **`null` = canilla abierta** (passthrough). Backup previo: `sql/backups/backup_PPP_Web_Config_20260905_pre_espejo_corte.sql` |
+| `gv_espejo_corte()` | el corte vigente, una vez por consulta |
+| `gv_espejo_np_pasa(np, lk, chef)` | `immutable`: NP numérica de ISIS por encima del corte de su empresa → `false`; etiquetas web, vacíos y cualquier otra cosa → `true` |
+| **`gv_ppp_programacion_diaria`**, **`gv_ppp_base_pedidos`**, **`gv_ppp_entregados_meta`** | vistas `security_invoker`, `select` para anon/authenticated y **nada más** (son "simple views" y Postgres las dejaría escribibles), `cross join gv_espejo_corte()` + `where gv_espejo_np_pasa(...)` |
+| front v12.90 | los tres endpoints constantes y las 13 URLs literales pasan a las vistas: **0 lecturas REST de las tablas crudas** en `index.html`. Queda `pppSubir` (importar un Excel a mano, supervisor, con confirm), que escribe a las tablas reales: es lo de siempre, no se tocó |
+| `gv_pedidos_web_excluidos` | `en_produccion` sólo cuenta NP que pasan la canilla. Sin esto, un pedido nuevo de la página que ISIS cargue mañana quedaba **invisible** en Gestión: excluido de A Programar por estar en Producción, y ausente de la PPP por ser posterior al corte |
+| tests | `tests/gv-espejo-corte.cjs` (8 chequeos: 0 lecturas crudas, endpoints, PPP / base de picking / entregados cargan de las vistas). Nueve tests viejos ajustaron el stub de URL (case) |
+
+Todo en `sql/gv_espejo_corte.sql`. Nada escribe; Producción no cambia.
+
+**Medido al cerrar** (corte = máximo → las vistas devuelven exactamente lo que había):
+
+| | tabla | vista |
+|---|---|---|
+| Programación | 182 | 182 |
+| Base | 9.667 | 9.667 |
+| Entregados_Meta | 2.783 | 2.783 |
+
+Simulación en transacción revertida: con corte LK `98600` la vista de programación baja a
+**94** (= filas reales `<= 98600`, máx. `98600`); la NP `98694` (cod 1964, 02/09) es
+`en_produccion` con el corte en `98694`, **no excluida** con el corte en `98693`, y vuelve a
+`en_produccion` con la canilla abierta (`null`). La corrida en seco del job da lo mismo que
+en §3.l (LK 10 pedidos / Chef 2): hoy el corte no cambia nada, sólo frena lo que venga.
+
+**Qué pasa a partir de acá.** Cada NP que ISIS numere de ahora en más (LK > 98694, Chef >
+44619) la ve Producción y **no** Gestión; ese pedido entra a Gestión desde la página. Las 182
+abiertas siguen vivas en las dos apps y se purgan solas cuando Producción las saca del Excel.
+⚠ Mientras siga el mail de las 12:30 en LK, un pedido nuevo va a existir en las dos apps
+(ISIS en Producción, web en Gestión): es lo que el dueño aceptó en §3.l.
+
+**Rollback (abrir la canilla, un update):**
+```sql
+update public."PPP_Web_Config" set valor = null where clave like 'espejo_np_corte_%';
+```
+Rollback total: `drop view` de las tres vistas, `drop function` de las dos, borrar las dos
+filas de config, front v12.89 (vuelve a las tablas) y la RPC de `sql/gv_pedidos_web_excluidos.sql`.
+
 ---
 
 ## 4. Incidente de seguridad — 2026-09-04 (cerrado)

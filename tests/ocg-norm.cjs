@@ -62,9 +62,9 @@ catch (_e) {
   await p.goto("file://" + path.join(root, "index.html"), { waitUntil: "domcontentloaded" });
   const r2 = await p.evaluate(async () => {
     supaFetchAll = async (url, q) => {
-      if (String(url).indexOf("PPP_Programacion_Diaria") >= 0)
+      if (String(url).indexOf("ppp_programacion_diaria") >= 0)
         return [{ np: "9001", tanda: "C10A" }, { np: "9002", tanda: "C10B" }, { np: "9003", tanda: "C10C" }];
-      if (String(url).indexOf("PPP_Base_Pedidos") >= 0) return [];
+      if (String(url).indexOf("ppp_base_pedidos") >= 0) return [];
       if (String(q || "").indexOf("opcion=eq.TP") >= 0) return [{ texto: "c10b" }];   // C10B ya pickeada
       return [];
     };

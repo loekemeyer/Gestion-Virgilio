@@ -46,7 +46,7 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
         if (webFalla) return J([], false);
         return J([{ np_label: "LK 01344", cod_cliente: "4188", razon_social: "Orfali", tanda: "GV-02A", m3: 1.184, fecha_entrega: "2026-09-11" }]);
       }
-      if (url.indexOf("PPP_Entregados_Meta") >= 0) return J([
+      if (url.indexOf("ppp_entregados_meta") >= 0) return J([
         { np: "98574", cod: "2533", rs: "Osa Distribuidora", tanda: "C03B", m3: 0.5, fecha_entrega: "2026-09-10" }
       ]);
       if (url.indexOf("vista_ppp_pedidos_entregados") >= 0) return J([

@@ -12,13 +12,28 @@
 > única**; no se replica. Ante la duda entre parche rápido y fix de raíz → **fix
 > de raíz**.
 >
-> Última actualización: 2026-09-05 (madrugada) · Versión app al documentar: **v12.89**
+> Última actualización: 2026-09-05 (madrugada) · Versión app al documentar: **v12.90**
 >
 > ⚠⚠ **Estado del pipeline web desde el 2026-09-04 a la noche: la NUMERACIÓN ESTÁ PRENDIDA**
 > (`PPP_Web_Config.numeracion_activa = 1`), el cron de tandas (jobid 71, 00:01 hábiles) activo,
 > tandas con prefijo `GV-`. Sólo del lado Virgilio: el mail de las 12:30 de LK sigue andando y
 > Producción no se tocó (medido: ninguna función `ppp_web_*`/`gv_ppp_web_*` escribe en tabla
 > compartida). Primera corrida real: lunes 2026-09-07 00:01. Cómo apagar, en `CLAUDE.md`.
+>
+> Nota **v12.90** — **La canilla del espejo de ISIS está CERRADA para Gestión.** Dueño: *"una vez
+> que ya esté todo en Gestión Virgilio, cerrá la canilla para que no lleguen más desde el espejo del
+> Excel"*. La canilla es el Apps Script de Google que pisa `PPP_Programacion_Diaria` / `PPP_Base_Pedidos`
+> (y el cron que baja `PPP_Entregados_Meta`); Producción lee esas mismas tablas, así que no se tocan.
+> Gestión pasa a leer las vistas **`gv_ppp_programacion_diaria` / `gv_ppp_base_pedidos` /
+> `gv_ppp_entregados_meta`** (`sql/gv_espejo_corte.sql`, `security_invoker`, sólo `select`), que
+> devuelven únicamente NP ≤ `PPP_Web_Config.espejo_np_corte_lk` (98694) / `_chef` (44619) — la última
+> NP de ISIS que había al cerrar. ISIS numera en orden: lo que cargue después lo ve Producción y no
+> Gestión; ese pedido entra a Gestión desde la página. `gv_pedidos_web_excluidos` respeta el corte (una
+> NP posterior no cuenta como "en Producción"; si no, el pedido desaparecía de las dos pantallas). Los
+> tres endpoints constantes y las 13 URLs literales de `index.html` apuntan a las vistas: **0 lecturas
+> REST de las tablas crudas**; sólo queda `pppSubir` (importar Excel a mano) escribiendo a las tablas.
+> `null` en las dos config = canilla abierta (passthrough). Medido: 182 / 9.667 / 2.783 en tabla y en
+> vista. Test `tests/gv-espejo-corte.cjs`.
 >
 > Nota **v12.89** — **PENDIENTE = pedido de la página con fecha ≥ `gestion_desde` (2026-09-03) que
 > Producción/ISIS no tenga.** Reemplaza la regla de v12.88 (que dejaba afuera el *limbo*: enviado a

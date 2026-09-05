@@ -53,7 +53,7 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
     window.fetch = function (url) {
       url = String(url);
       if (url.indexOf("Entregas_Virgilio") >= 0) return J(ent);
-      if (url.indexOf("PPP_Base_Pedidos") >= 0) return J([
+      if (url.indexOf("ppp_base_pedidos") >= 0) return J([
         { pedido: "98001", fecha: "2026-08-25" }, { pedido: "98002", fecha: "2026-08-26" }, { pedido: "44001", fecha: "2026-08-27" }
       ]);
       if (url.indexOf("vista_uxb_articulo") >= 0) return J([{ cod: "501", uxb: 12 }, { cod: "56E", uxb: 6 }]);
