@@ -92,9 +92,12 @@ Ese archivo —no la memoria— es lo que dice en qué estado está el pipeline 
 una sesión nueva. **Leerlo antes de tocar Supabase.**
 
 📌 **Y qué FALTA para cerrar el pipeline está en `docs/PENDIENTES-PIPELINE-GESTION.md`**
-(nota del dueño del 2026-09-04, cruzada con el estado real del repo). Se avanzó hasta la
-**programación de pedidos**; de ahí para abajo —picking, armado, facturación, envío a ISIS
-y cruce de factura— está abierto. **Leerlo al abrir una sesión nueva sobre el pipeline.**
+(nota del dueño del 2026-09-04, cruzada con el estado real del repo). Al sábado 2026-09-05 el
+pipeline está **cerrado de punta a punta**: pedido de la página → NP = nº de pedido → A
+Programar / job 00:01 → picking, armado, carga (mismo código que Producción) → Facturación
+(NP web: bajar el Excel ISIS = facturada) → control de remito = entregado, solo. Lo que
+queda es del dueño (cron de Chef, El Martillo, operarios a Gestión) o estacionado (Krikos,
+duales, módulo Chef, tracking a la página). **Leerlo al abrir una sesión nueva sobre el pipeline.**
 
 ## ⚠⚠⚠ CUANDO GESTIÓN TOMA CONTROL Y SE VUELVE LA VERSIÓN QUE USAMOS, SEGUIR CON LA NUMERACIÓN QUE DEJÓ VIRGILIO
 

@@ -12,13 +12,20 @@
 > única**; no se replica. Ante la duda entre parche rápido y fix de raíz → **fix
 > de raíz**.
 >
-> Última actualización: 2026-09-05 (sábado, tarde) · Versión app al documentar: **v12.95**
+> Última actualización: 2026-09-05 (sábado, tarde) · Versión app al documentar: **v12.96**
 >
 > ⚠⚠ **Estado del pipeline web desde el 2026-09-04 a la noche: la NUMERACIÓN ESTÁ PRENDIDA**
 > (`PPP_Web_Config.numeracion_activa = 1`), el cron de tandas (jobid 71, 00:01 hábiles) activo,
 > tandas con prefijo `GV-`. Sólo del lado Virgilio: el mail de las 12:30 de LK sigue andando y
 > Producción no se tocó (medido: ninguna función `ppp_web_*`/`gv_ppp_web_*` escribe en tabla
 > compartida). Primera corrida real: lunes 2026-09-07 00:01. Cómo apagar, en `CLAUDE.md`.
+>
+> Nota **v12.96** — **El Excel ISIS de Facturación deja de decir "prueba".** Desde v12.93 bajarlo es la
+> facturación de las NP web, pero el archivo seguía llamándose `PRUEBA_NO_IMPORTAR_*` y la hoja Resumen
+> decía "PRUEBA DE FORMATO — NO IMPORTAR / estas NP ya están numeradas en ISIS" (era del paso 0 de la
+> idea 3717, cuando se probaba el formato con NP de ISIS). Ahora: `PEDIDOS_WEB_ISIS_<fecha>.xlsx` (y
+> `.xls`) y la leyenda "PEDIDOS WEB DE GESTION VIRGILIO — IMPORTAR EN ISIS · NP de Gestión (todavía no
+> existen en ISIS; ISIS les asigna su número al importar)". Test `tests/fac-excel-isis.cjs` ajustado.
 >
 > Nota **backend, sin bump (2026-09-05, sábado)** — **Tandas sin prefijo `GV-`.** Dueño: *"sacá el
 > prefijo GV- de las tandas"*. `PPP_Web_Config.tanda_prefijo = ''` → `ppp_web_armar_tandas` vuelve a la

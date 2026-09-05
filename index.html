@@ -6805,7 +6805,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v12.95";
+const APP_VERSION = "v12.96";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -34408,7 +34408,7 @@ async function facMaybePrintFacturado(np, tanda){
    §11). NO cambia nada del circuito actual.
 
    ⚠ EL ARCHIVO NO SE IMPORTA EN PRODUCCIÓN. Las NP que lleva ya están numeradas
-   en ISIS; si se importara, ISIS crearía NP nuevas para pedidos que ya existen. Por eso el archivo se llama PRUEBA_NO_IMPORTAR_*, la hoja
+   en ISIS. ⚠ v12.93/v12.96: eso cambió — al Excel van SÓLO las NP web (no existen en ISIS), bajarlo ES su facturación y el archivo se llama PEDIDOS_WEB_ISIS_*; la hoja
    "Resumen" abre con la advertencia y el botón sólo lo ve un supervisor.
 
    SIN BACKEND: no crea funciones, tablas ni columnas en Supabase. Lee con la
@@ -34572,8 +34572,8 @@ function _facXlsDescargarXlsx(filas) {
   items.forEach(function (it) { const k = it.cliente + "|" + it.N_Pedido; if (!grupos[k]) grupos[k] = { c: it.cliente, n: it.N_Pedido, q: 0 }; grupos[k].q++; });
   const desg = Object.keys(grupos).map(function (k) { return grupos[k]; }).sort(function (a, b) { return a.n - b.n; });
   const resumen = [
-    ["PRUEBA DE FORMATO — NO IMPORTAR"],
-    ["Estas NP ya estan numeradas en ISIS: " + filas.map(function (r) { return r.np; }).join(", ")],
+    ["PEDIDOS WEB DE GESTION VIRGILIO — IMPORTAR EN ISIS"],
+    ["NP de Gestion (todavia no existen en ISIS; ISIS les asigna su numero al importar): " + filas.map(function (r) { return r.np; }).join(", ")],
     [],
     ["Pedidos", "NP"],
     [String(Object.keys(items.reduce(function (a, i) { a[i.cliente + "|" + i.sucursal] = 1; return a; }, {})).length), String(desg.length)],
@@ -34587,7 +34587,7 @@ function _facXlsDescargarXlsx(filas) {
   const blob = _facXlsxBlob([{ nombre: dd + " 9Hs", filas: filasHoja }, { nombre: "Resumen", filas: resumen }]);
   const a = document.createElement("a");
   a.href = URL.createObjectURL(blob);
-  a.download = "PRUEBA_NO_IMPORTAR_" + dd + ".xlsx";
+  a.download = "PEDIDOS_WEB_ISIS_" + dd + ".xlsx";
   document.body.appendChild(a); a.click();
   setTimeout(function () { URL.revokeObjectURL(a.href); a.remove(); }, 1500);
 }
@@ -34622,8 +34622,8 @@ function _facXlsXml(items, dateLabel, npsReales) {
   const pedidosOrig = Object.keys(items.reduce(function (a, i) { a[i.cliente + "|" + i.sucursal] = 1; return a; }, {})).length;
 
   const resumen = [
-    '<Row><Cell ss:MergeAcross="2" ss:StyleID="Desglose"><Data ss:Type="String">PRUEBA DE FORMATO — NO IMPORTAR</Data></Cell></Row>',
-    '<Row><Cell ss:MergeAcross="2"><Data ss:Type="String">Estas NP ya estan numeradas y facturadas en ISIS: ' + esc(npsReales.join(", ")) + '</Data></Cell></Row>',
+    '<Row><Cell ss:MergeAcross="2" ss:StyleID="Desglose"><Data ss:Type="String">PEDIDOS WEB DE GESTION VIRGILIO — IMPORTAR EN ISIS</Data></Cell></Row>',
+    '<Row><Cell ss:MergeAcross="2"><Data ss:Type="String">NP de Gestion (todavia no existen en ISIS; ISIS les asigna su numero al importar): ' + esc(npsReales.join(", ")) + '</Data></Cell></Row>',
     "<Row/>",
     "<Row>" + cell("Pedidos", "Header") + cell("NP", "Header") + "</Row>",
     "<Row>" + cell(String(pedidosOrig), "Data") + cell(String(desglose.length), "Data") + "</Row>",
@@ -34905,7 +34905,7 @@ function _facXlsDescargar(filas) {
   const blob = new Blob([xml], { type: "application/vnd.ms-excel" });
   const a = document.createElement("a");
   a.href = URL.createObjectURL(blob);
-  a.download = "PRUEBA_NO_IMPORTAR_" + dd + "_" + hhmm + ".xls";
+  a.download = "PEDIDOS_WEB_ISIS_" + dd + "_" + hhmm + ".xls";
   document.body.appendChild(a); a.click();
   setTimeout(function () { URL.revokeObjectURL(a.href); a.remove(); }, 1500);
 }

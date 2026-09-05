@@ -32,9 +32,9 @@ construye** salvo que el dueño la pida de nuevo:
 
 | # | regla | estado |
 |---|---|---|
-| 1 | Los pedidos entran **desde la página LK** (no desde el espejo de ISIS) | ✅ hecho hasta la programación (v12.64→v12.85). Gate: numeración apagada, a propósito |
-| 2 | De ahí en adelante, **igual que Producción**: picking, armado, carga, control, facturación | ✅ es el mismo código. Faltan **tres enganches chicos** (abajo) |
-| 3 | **Controlado → Pedidos Entregados**, solo | ✅ ya pasa hoy vía `CRN`. Falta un lugar **durable** para las NP web (abajo) |
+| 1 | Los pedidos entran **desde la página LK** (no desde el espejo de ISIS) | ✅ **cerrado el sábado 05/09**: NP = nº de pedido de la página (v12.92), numeración prendida, mail de las 12:30 de LK apagado (v12.94), canilla del espejo cerrada (v12.90). Falta que el dueño apague el cron de Chef |
+| 2 | De ahí en adelante, **igual que Producción**: picking, armado, carga, control, facturación | ✅ mismo código + Facturación: NP de ISIS se tilda, NP web se factura bajando el Excel ISIS (v12.93, archivo `PEDIDOS_WEB_ISIS_*`) |
+| 3 | **Controlado → Pedidos Entregados**, solo | ✅ **v12.95**: vista `gv_ppp_entregados` (toda NP con CRN); Programación la esconde, Entregados la muestra, sin Excel |
 
 ### Lo que de verdad queda, bajo ese modelo
 

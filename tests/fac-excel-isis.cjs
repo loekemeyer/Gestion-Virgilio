@@ -14,7 +14,7 @@
        su contenido.
    F4) FORMATO XML Spreadsheet 2003 fiel: 12 columnas en orden, "029" como String
        (empieza con cero), celda vacía <Cell/>, hoja "Resumen" con la advertencia.
-   F5) El archivo se llama PRUEBA_NO_IMPORTAR_* (esas NP ya están numeradas en ISIS).
+   F5) El archivo se llama PEDIDOS_WEB_ISIS_* (v12.96: desde v12.93 bajarlo ES la facturación de las NP web).
    F6) La selección vive fuera del botón: se marca en la lista y sobrevive al refresh.
    F9) El botón baja un .xlsx real (ZIP con XMLs), que se abre en el celular. El .xls
        XML 2003 sigue disponible por la constante FAC_XLS_FORMATO: es el único probado
@@ -146,14 +146,14 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
   ck(xml.indexOf('<?mso-application progid="Excel.Sheet"?>') >= 0, "F4: falta la cabecera mso-application");
   ck(xml.indexOf('<Data ss:Type="String">029</Data>') >= 0, "F4: el código 029 no salió como String");
   ck(xml.indexOf('ss:Name="Resumen"') >= 0, "F4: falta la hoja Resumen");
-  ck(xml.indexOf("PRUEBA DE FORMATO — NO IMPORTAR") >= 0, "F4: la hoja Resumen no lleva la advertencia");
+  ck(xml.indexOf("PEDIDOS WEB DE GESTION VIRGILIO — IMPORTAR EN ISIS") >= 0, "F4: la hoja Resumen no lleva la leyenda de importar");
   ck(xml.indexOf("2% Descuento Web") >= 0, "F4: falta la columna pctDto");
   ck(xml.indexOf("<Cell/>") >= 0, "F4: las celdas vacías no salieron como <Cell/>");
   // 20 (98001) + 3 (98002) + 16 (44001) = 39 filas de datos
   ck((xml.match(/<Row>/g) || []).length >= 39, "F4: filas insuficientes (" + (xml.match(/<Row>/g) || []).length + ")");
   // 2 pedidos por la de LK + 1 por la mixta + 2 por Chef = 5
   ck((xml.match(/<Data ss:Type="Number">5<\/Data>/g) || []).length >= 1, "F4: no se llegó al pedido nº 5 (el split no generó los 5 tramos)");
-  ck(/^PRUEBA_NO_IMPORTAR_/.test(r.f5_nombre || ""), "F5: el archivo se llama '" + r.f5_nombre + "' (esperaba PRUEBA_NO_IMPORTAR_*)");
+  ck(/^PEDIDOS_WEB_ISIS_/.test(r.f5_nombre || ""), "F5: el archivo se llama '" + r.f5_nombre + "' (esperaba PEDIDOS_WEB_ISIS_*)");
   // F9: .xlsx real
   ck(/\.xlsx$/.test(r.f9_nombre || ""), "F9: el xlsx se llama '" + r.f9_nombre + "'");
   ck(r.f9_esZip === true, "F9: el .xlsx no arranca con la firma de un ZIP");
