@@ -1384,6 +1384,40 @@ es de Chef y pisa al LK 217): cuando Gestión alimente el tracking, escribir el 
 una función `gv_*` y pedir columna `empresa` en PaginaLK. Y el Excel ISIS de Facturación manda
 `N_Pedido` contador (no el id), como el mail: ISIS numera 98xxx por su cuenta.
 
+### 3.aa ✅ Cruce de factura que entiende las NP web (idea 8033) — 2026-09-05 sábado (v13.10)
+
+**El agujero.** `vista_facturacion_neto_items` y `vista_cruce_facturacion` (objetos de **Producción**,
+`sql/cruce_facturacion.sql` de ese repo) resuelven la empresa con `np ~ '^9' → lk, si no chef`. Una NP
+web de LK es `LK 1350`: no empieza con 9 → Chef → busca la factura en `isis_ch.documentos` y el
+descuento en `clientes_dto` de chef → **nunca cruza**. Lo mismo `empresa_de_np('LK 1350')` = `CH`
+(mira sólo los dígitos). Las de Chef (`CH 0217`) caían bien de casualidad.
+
+**Qué se hizo** (`sql/gv_cruce_facturacion.sql`, migración `gv_cruce_facturacion_np_web_v1310`). Sin
+tocar nada de Producción: `gv_empresa_de_np_texto(np)` (`LK …` → lk, `CH …` → chef, 9xxxx → lk, resto
+→ chef) + copias **`gv_vista_facturacion_neto_items`**, **`gv_vista_facturacion_neto`**,
+**`gv_vista_cruce_facturacion`** (`security_invoker`, sin grant a anon/authenticated, como la original)
+y las RPC **`gv_cruce_facturacion_resumen`** / **`gv_cruce_facturacion_totales`** (SECURITY DEFINER,
+execute anon/authenticated). El front (pestaña "Facturación vs ISIS") llama a `gv_cruce_facturacion_resumen`.
+
+**Impacto medido.** Últimos 60 días: Producción 789 filas, gv 789 filas, **789 idénticas** (estado,
+empresa y diff), 0 sólo en una. O sea, para las NP numéricas es lo mismo; la diferencia aparece recién
+con la primera NP web facturada. `gv_empresa_de_np_texto`: `LK 1350` → lk, `CH 0217` → chef, `98702`
+→ lk, `44620` → chef. Hoy no hay NP web en `Facturacion_NP` ni en `Entregas_Virgilio` (0 filas no
+numéricas). Tests `fac-excel-isis`, `fac-npc`, `pweb-facturacion` OK.
+
+**Queda (Producción, decisión del dueño).** `empresa_de_np` es de Producción y la usa el trigger
+`zz_normalizar_empresa` de `Movimientos_Stock` para los 4 códigos duales: con una NP web sigue dando
+`CH`. Arreglo propuesto, reversible, compatible con lo numérico:
+```sql
+create or replace function public.empresa_de_np(p_np text) returns text language sql immutable as $$
+  select case when p_np ~* '^\s*LK' then 'LK' when p_np ~* '^\s*CH' then 'CH'
+              when regexp_replace(coalesce(p_np,''),'\D','','g') = '' then null
+              when (regexp_replace(p_np,'\D','','g'))::bigint > 90000 then 'LK' else 'CH' end $$;
+```
+No se aplica sin permiso explícito: es `create or replace` de una función que corre para Producción.
+
+**Rollback.** El bloque de rollback del SQL; el front vuelve a `cruce_facturacion_resumen`.
+
 ### 3.z ✅ Rol `ch_ppp_reader`: Chef lee su estado en Gestión por FDW (ideas 8743 + 4990) — 2026-09-05 sábado (v13.09)
 
 **Qué.** La página de Chef (`paginach`) va a mostrar en "Mis pedidos" el estado real del pedido

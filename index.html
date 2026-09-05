@@ -6958,7 +6958,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v13.09";
+const APP_VERSION = "v13.10";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -38392,7 +38392,7 @@ async function cruceRefresh(reset) {
   if (reset !== false) { _cruceState.offset = 0; _cruceState.rows = []; }
   var cont = document.getElementById("cruceTabla");
   if (cont && !_cruceState.rows.length) cont.innerHTML = '<div style="padding:20px;color:#64748b;">Cargando…</div>';
-  var r = await sb.rpc("cruce_facturacion_resumen", {
+  var r = await sb.rpc("gv_cruce_facturacion_resumen", {   // v13.10: copia gv_ que entiende las NP web (idea 8033, sql/gv_cruce_facturacion.sql)
     p_empresa: _cruceState.empresa || null,
     p_estado: _cruceState.estado || null,
     p_q: _cruceState.q || null,

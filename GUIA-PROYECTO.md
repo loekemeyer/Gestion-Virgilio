@@ -12,7 +12,15 @@
 > única**; no se replica. Ante la duda entre parche rápido y fix de raíz → **fix
 > de raíz**.
 >
-> Última actualización: 2026-09-05 (sábado, noche) · Versión app al documentar: **v13.09**
+> Última actualización: 2026-09-05 (sábado, noche) · Versión app al documentar: **v13.10**
+>
+> Nota **v13.10** (backend + front) — **Cruce de factura para NP web** (idea **8033**). Las vistas del
+> cruce (de Producción) deciden la empresa por "¿empieza con 9?", así que una `LK 1350` caía como
+> Chef y nunca cruzaba. Copias `gv_vista_facturacion_neto_items` / `gv_vista_facturacion_neto` /
+> `gv_vista_cruce_facturacion` + RPC `gv_cruce_facturacion_resumen` con `gv_empresa_de_np_texto`
+> (etiqueta → empresa). Medido: 789 de 789 filas idénticas a Producción para lo numérico. La
+> pestaña "Facturación vs ISIS" usa la RPC gv_. Queda `empresa_de_np` (trigger de stock, duales):
+> propuesta en §3.aa, decisión del dueño. `sql/gv_cruce_facturacion.sql`.
 >
 > Nota **v13.09** (backend, sólo bump) — Rol de sólo lectura **`ch_ppp_reader`** en Virgilio para que
 > la página de Chef (`paginach` v2.0.31) lea por FDW `gv_pedido_web_estado_pagina` y muestre en
