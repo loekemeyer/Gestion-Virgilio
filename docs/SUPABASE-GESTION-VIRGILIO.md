@@ -1307,6 +1307,35 @@ Fuente en `sql/gv_tandas_diarias.sql`. Probado: `lk/1 → LK 0001 · chef/1 → 
 lk/357 → LK 0357 · lk/12345 → LK 12345`. Rollback: volver a `5` en los tres lugares (sólo
 mientras no haya nada numerado; después habría que reetiquetar).
 
+### 3.o ✅ La NP web es el número de pedido de la página — 2026-09-05 (v12.92)
+
+Dueño: *"tiene que ser automático: ya cuando llegan a página LK y a Gestión Virgilio, ya
+vienen con numeración. En página LK ya tienen numeración. En Gestión, con la lógica de los
+18 ítems para LK y 15 para CH"*. Se descarta el contador propio ("desde 0001", §3.f) sin
+haber numerado nada.
+
+| objeto | qué |
+|---|---|
+| `PPP_Web_NP` | PK `(empresa, np)` → **`(empresa, order_id, np_idx)`** (+ índice `(empresa, np)`). `np` = `order_id`: dos bloques del mismo pedido comparten número |
+| `gv_ppp_web_np_label(empresa, np, np_idx default 1)` | **nueva firma**: `LK 1350` · `LK 1350-2` · `CH 0217`; pasado 9999 crece. La de dos parámetros se **dropeó** (ambigüedad con el default) |
+| `gv_ppp_web_np_asignar` | ya no cuenta: registra `np = order_id` por bloque, idempotente. Conserva firma, candado `numeracion_activa` y grants (sólo `service_role`; el front sigue entrando por `ppp_web_np_asignar`) |
+| `gv_ppp_web_estado`, `gv_ppp_web_entregados` | recreadas (dependían de la función): etiqueta con bloque. `security_invoker`, sólo `select` |
+| `ppp_web_resync`, `gv_ppp_web_tanda_programar` | pasan `np_idx` a la etiqueta; el bloque agregado hereda `order_id` si no está en `PPP_Web_NP` |
+| `PPP_Web_NP_Seed` | queda sin uso. No se borra |
+| front v12.92 | `pwebNpLabel(emp, np, np_idx)`; PPP y monitor etiquetan con bloque; **A Programar muestra la NP apenas llega** (tarjeta y bloques); Facturación acepta `LK 1350-2` |
+| Edge Fn | **v12**: `npLabel(emp, num, idx)` en la foto de artículos |
+
+Todo en `sql/gv_np_es_pedido.sql`. Producción no cambia (objetos `PPP_Web_*` / `gv_*`).
+Backup previo: `sql/backups/gv_np_es_pedido_20260905_pre.sql`.
+
+**Medido:** antes, `PPP_Web_NP` / `_Programacion` / `_Base` en 0 y 0 eventos con etiqueta.
+Después, `gv_ppp_web_np_label('lk',1350) = LK 1350 · ('lk',1350,2) = LK 1350-2 · ('chef',217) =
+CH 0217 · ('lk',12345) = LK 12345`; PK y `security_invoker` verificados. Página hoy: LK va por el
+pedido **1349**, Chef por el **217**. Test `tests/pweb-np-es-pedido.cjs`.
+
+**Rollback:** el backup (volver a la etiqueta de dos parámetros, el contador y las vistas) +
+PK original de `PPP_Web_NP`; front v12.91; Edge Fn v11. Sólo mientras no haya nada numerado.
+
 ---
 
 ## 4. Incidente de seguridad — 2026-09-04 (cerrado)

@@ -6802,7 +6802,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v12.91";
+const APP_VERSION = "v12.92";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -25480,9 +25480,9 @@ async function pppTraerWebProgramados() {
     "tanda,fecha_entrega,fecha_recep,m3,m3_parcial,lineas,cajas&tanda=not.is.null");
   return (rows || []).map(function (r) {
     return {
-      // Sin número todavía (la numeración arranca al programar) no se inventa una
-      // etiqueta: se muestra de dónde salió.
-      np: (r.np == null) ? ("? " + r.order_id + "-" + r.np_idx) : pwebNpLabel(r.empresa, r.np),
+      // v12.92 — la NP es el número de pedido de la página: si `np` viniera vacío se
+      // arma igual desde order_id (es el mismo número). El bloque va en la etiqueta.
+      np: pwebNpLabel(r.empresa, (r.np == null) ? r.order_id : r.np, r.np_idx),
       tanda: r.tanda || "—", tipo: "", fecha: r.fecha_recep || "",
       cod: r.cod_cliente || "", razon_social: r.razon_social || "",
       m3: Number(r.m3) || 0,
@@ -25543,7 +25543,7 @@ async function pppTraerPedidosWeb(empresa) {
     const m3 = Number(n.m3) || 0, parcial = !!n.m3_parcial;
     const tanda = g.tanda || "";
     return {
-      np: num ? pwebNpLabel(n.empresa || emp, num) : ("? " + n.order_id + "-" + n.np_idx),
+      np: pwebNpLabel(n.empresa || emp, num || n.order_id, n.np_idx),
       tanda: tanda || "—", tipo: "", fecha: n.fecha_recep || "",
       cod: n.cod || "", razon_social: n.razon_social || "",
       m3: Number(m3.toFixed(3)),
@@ -31457,7 +31457,7 @@ async function fetchMonitorFromSupabase() {
 async function mergeMonitorPppWeb(acc) {
   try {
     const url = SUPABASE_URL + "/rest/v1/PPP_Web_Programacion"
-      + "?select=empresa,np,tanda,zona,fecha_entrega,cod_cliente,razon_social,direccion,barrio,m3"
+      + "?select=empresa,np,np_idx,tanda,zona,fecha_entrega,cod_cliente,razon_social,direccion,barrio,m3"
       + ",es_agregado,agregado_a_np,prioridad"
       + "&tanda=not.is.null&limit=5000";
     const r = await fetch(url, { headers: { apikey: SUPABASE_KEY } });
@@ -31466,7 +31466,7 @@ async function mergeMonitorPppWeb(acc) {
     for (const x of rows) {
       const tanda = String(x.tanda || "").trim();
       if (!tanda || !x.np) continue;
-      const np    = pwebNpLabel(x.empresa, x.np);
+      const np    = pwebNpLabel(x.empresa, x.np, x.np_idx);
       const fe    = String(x.fecha_entrega || "").trim();
       const feRaw = monitorRawFecha(fe);
       const mapKey = tanda.toUpperCase();
@@ -31558,9 +31558,12 @@ async function mergePickingBasePppWeb(map) {
 
    Los ceros se rellenan hasta 4; pasado 9999 la etiqueta crece ("LK 10000") en
    vez de recortarse, que repetiría un número ya usado. */
-function pwebNpLabel(empresa, np) {
-  const n = String(np);
-  return ((empresa === "chef") ? "CH" : "LK") + " " + (n.length >= 4 ? n : n.padStart(4, "0"));
+function pwebNpLabel(empresa, np, npIdx) {
+  // v12.92 — `np` ES el número de pedido de la página (dueño, 2026-09-05: "ya vienen
+  // con numeración"). El bloque 1 lleva el número pelado; los demás, sufijo "-N":
+  // "LK 1350", "LK 1350-2", "CH 0217". Espejo exacto de gv_ppp_web_np_label(e, np, idx).
+  const n = String(np), i = Number(npIdx) || 1;
+  return ((empresa === "chef") ? "CH" : "LK") + " " + (n.length >= 4 ? n : n.padStart(4, "0")) + (i > 1 ? "-" + i : "");
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
@@ -31974,11 +31977,12 @@ function aprColPedidos() {
       '</div>';
     if (ab) {
       h += '<div class="apr-card-body">' +
-        '<div class="apr-kv"><b>Pedido</b> #' + p.order_id + ' · <b>Cód</b> ' + escapeHtml(p.cod || "—") + '</div>' +
+        // v12.92 — la NP es el número de pedido de la página: ya viene numerado.
+        '<div class="apr-kv"><b>NP</b> ' + escapeHtml(pwebNpLabel(p.empresa || _apr.emp, p.order_id, 1)) + ' · <b>Cód</b> ' + escapeHtml(p.cod || "—") + '</div>' +
         '<div class="apr-kv"><b>Entrega</b> ' + escapeHtml(p.direccion || p.localidad || "—") + '</div>' +
         '<div class="apr-kv"><b>' + p.lineas + '</b> líneas · <b>' + aprNum(p.cajas, 0) + '</b> cajas</div>';
       for (const b of p.bloques) {
-        h += '<div class="apr-bloque">Bloque ' + b.np_idx + '/' + p.np_total + ' · ' + b.lineas + ' líneas · ' + aprNum(b.m3) + ' m³</div>' +
+        h += '<div class="apr-bloque"><b>' + escapeHtml(pwebNpLabel(p.empresa || _apr.emp, p.order_id, b.np_idx)) + '</b> · bloque ' + b.np_idx + '/' + p.np_total + ' · ' + b.lineas + ' líneas · ' + aprNum(b.m3) + ' m³</div>' +
              '<div class="apr-arts">' + (b.items || []).map(function (it) {
                return '<span class="apr-art">' + escapeHtml(String(it.art || "")) + ' <b>×' + aprNum(it.cajas, 0) + '</b></span>';
              }).join("") + '</div>';
@@ -32022,7 +32026,7 @@ function aprColTandas() {
     for (const e of byPed.values()) {
       h += '<div class="apr-titem">' +
         '<div class="apr-titem-txt">' +
-          '<div class="apr-titem-cli">' + escapeHtml(e.rs || e.cod || ("#" + e.order_id)) + '</div>' +
+          '<div class="apr-titem-cli">' + escapeHtml(pwebNpLabel(_apr.emp, e.order_id, 1)) + ' · ' + escapeHtml(e.rs || e.cod || "") + '</div>' +
           '<div class="apr-titem-d">' + escapeHtml(e.zona || "sin zona") + ' · ' + aprNum(e.m3) + ' m³' +
             (e.total > 1 ? ' · ' + e.n + '/' + e.total + ' bloques' : '') + '</div>' +
         '</div>' +
@@ -34708,7 +34712,7 @@ async function _facXlsArmar(nps) {
     // La fecha de una NP de ISIS sale de PPP_Base_Pedidos; una NP web NO está ahí,
     // así que su fecha de recepción se guarda al programar y se lee de acá. Sin
     // esto el Excel salía con la fecha vacía para todo lo que viene de la página.
-    fetch(SUPABASE_URL + "/rest/v1/PPP_Web_Programacion?select=np,empresa,fecha_recep&fecha_recep=not.is.null&limit=5000", { headers: H, cache: "no-store" }).then(function (r) { return r.ok ? r.json() : []; }).catch(function () { return []; })
+    fetch(SUPABASE_URL + "/rest/v1/PPP_Web_Programacion?select=np,np_idx,empresa,fecha_recep&fecha_recep=not.is.null&limit=5000", { headers: H, cache: "no-store" }).then(function (r) { return r.ok ? r.json() : []; }).catch(function () { return []; })
   ]);
 
   const uxbBy = {}; (uxb || []).forEach(function (x) { const k = String(x.cod || "").replace(/^0+/, ""); if (k) uxbBy[k] = Number(x.uxb) || null; });
@@ -34719,7 +34723,7 @@ async function _facXlsArmar(nps) {
   });
   (web || []).forEach(function (x) {
     const f = String(x.fecha_recep || "").slice(0, 10);
-    if (f && x.np) fechaBy[pwebNpLabel(x.empresa, x.np)] = f;
+    if (f && x.np) fechaBy[pwebNpLabel(x.empresa, x.np, x.np_idx)] = f;
   });
 
   // Cabecera (cod cliente, razón social) desde la lista que ya está en pantalla
@@ -35202,7 +35206,8 @@ async function facFetchArmadosEventos(){
       // Con el filtro numérico solo, el TAP de una NP web no contaba como "armada" y
       // la NP no aparecía NUNCA en Facturación: el circuito web moría justo acá, en
       // silencio. Lo demás (códigos de tanda, basura) se sigue descartando como antes.
-      if (np && (/^\d+$/.test(np) || /^(LK|CH)\s\d+$/i.test(np))) s.add(np);
+      // v12.92 — la etiqueta web puede llevar bloque: "LK 1350-2".
+      if (np && (/^\d+$/.test(np) || /^(LK|CH)\s\d+(-\d+)?$/i.test(np))) s.add(np);
     });
     _facArmEv = s; _facArmEvTs = now;
   } catch (_e) { /* sin red: queda el último cache */ }

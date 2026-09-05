@@ -122,7 +122,7 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
     && r.guardadas === 1 && r.cabNp === 1343 && r.cabTanda === "D01A" && r.cabM3Parcial === true
     && r.arts === "027:2,505:5,ZZZ:3" && r.artsNpLabel === "LK 1343"
     && /número/i.test(r.sinNum)
-    && chef.np === "CH 0007" && chef.usaRpc && chef.noUsaVistaLk
+    && chef.np === "CH 0007-2" && chef.usaRpc && chef.noUsaVistaLk
     && /permiso/i.test(permiso);
   console.log("pweb-en-ppp:", JSON.stringify({ ...r, chef, permiso }),
     "· pageerrors:", errs.length ? errs.join("|") : "none", "·", (ok && !errs.length) ? "✓ OK" : "✗ FAIL");

@@ -113,7 +113,7 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
   chk((r.der.match(/apr-dia-cerrado/g) || []).length === 2, "el no hábil y el completo quedan cerrados");
   chk(r.der.includes("apr-dia-lleno") && r.der.includes("completo"), "marca el día que llegó al límite");
   chk(r.der.includes("apr-dia-con"),           "marca el día que ya tiene tandas");
-  chk(r.izqAbierta.includes("Bloque 1/3"),     "expandida muestra los bloques");
+  chk(r.izqAbierta.includes("bloque 1/3"),     "expandida muestra los bloques (v12.92: \"LK 1201 · bloque 1/3\")");
   chk(r.izqAbierta.includes("027"),            "expandida muestra los artículos");
   chk(!/undefined/.test(todo),                 "sin 'undefined' en pantalla");
   chk(!/NaN/.test(todo),                       "sin 'NaN' en pantalla");

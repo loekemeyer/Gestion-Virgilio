@@ -415,6 +415,11 @@ alter table public."PPP_Web_Programacion"
 --   agregado_a_np  la NP del pedido original — es el "XXX" del cartel
 --   prioridad      mayor = se pickea y se arma antes. 0 normal, 100 agregado
 --
+-- ⚠ 2026-09-05 (v12.92): la definición VIGENTE de `gv_ppp_web_estado` está en
+-- sql/gv_np_es_pedido.sql (§4): `np_label` se arma con el bloque
+-- (gv_ppp_web_np_label(g.empresa, g.np, g.np_idx)). Además `PPP_Web_NP` cambió de PK a
+-- (empresa, order_id, np_idx): la NP es el número de pedido y dos bloques la comparten.
+-- `PPP_Web_NP_Seed` y `ppp_web_np_asignar` (contador) quedaron sin uso real.
 -- ── `gv_ppp_web_estado`: en qué punto del circuito está cada NP web
 -- El estado NO es una columna que haya que mantener: sale de los eventos que los
 -- operarios YA emiten (`EP`/`TP`/`AP`/`TAP` por tanda) más `Facturacion_NP` por

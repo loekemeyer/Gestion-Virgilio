@@ -105,9 +105,14 @@ las 12:30 (`procesar-pedidos-web`) **sigue andando**, así que Producción sigue
 por ISIS lo que ya venía y lo que caiga; lo que falte se le suma a Producción después.
 Detalle, medición y rollback en `docs/SUPABASE-GESTION-VIRGILIO.md` §3.l.
 
-- **NP** → Gestión numera desde **`LK 0001` / `CH 0001`** (4 dígitos desde v12.91; `PPP_Web_NP_Seed` lk 1 · chef 1)
-  al **programar** una tanda (job de las 00:01 para zona 1 y 2; "A Programar" a mano para el
-  resto). Regla del dueño: *"cuando Gestión tome control, va a asignarle la numeración
+- **NP** → **la NP web ES el número de pedido de la página** (v12.92, dueño: *"ya cuando
+  llegan a página LK y a Gestión, ya vienen con numeración"*): pedido 1350 de LK = **`LK 1350`**,
+  pedido 217 de Chef = **`CH 0217`** (4 dígitos). Los bloques de 18 líneas (LK) / 15 (Chef)
+  siguen: el bloque 1 lleva el número pelado y los demás sufijo, `LK 1350-2`. No hay contador
+  ni momento de numerar: "A Programar" ya muestra la NP apenas llega. (`PPP_Web_NP_Seed` y el
+  contador de `gv_ppp_web_np_asignar` quedaron sin uso; `sql/gv_np_es_pedido.sql`.) Se
+  programa por el job de las 00:01 para zona 1 y 2 y a mano en "A Programar" para el resto.
+  Regla del dueño: *"cuando Gestión tome control, va a asignarle la numeración
   nuestra a los pedidos que estén pendientes y a los que vayan cayendo"*. **Pendiente =
   pedido de la página con fecha ≥ `gestion_desde` (2026-09-03) que Producción/ISIS no
   tenga** (v12.89). La regla vive en UNA RPC de Virgilio, `gv_pedidos_web_excluidos`, que
@@ -140,12 +145,13 @@ histórica** (`ppp_web_proxima_letra()` retoma desde la última letra que dejó 
 update public."PPP_Web_Config" set valor_texto = '' where clave = 'tanda_prefijo';
 ```
 
-La NP arranca en **00001 para las dos empresas** (`PPP_Web_NP_Seed`: lk 1 · chef 1), o sea
-el primer pedido de Gestión va a ser **`LK 0001`** / **`CH 0001`**. Sin choque con
-Producción, cuyas NP son de 5 dígitos desde 44361. La etiqueta la arma
-**`gv_ppp_web_np_label(empresa, np)`** en el backend — prefijo + espacio + **4 dígitos**
-(dueño, 2026-09-05; hasta v12.90 eran 5, se cambió antes de numerar el primero); el
-front y la Edge Function la duplican sólo como optimización de UX.
+**La NP web es el número de pedido de la página** (v12.92): `LK 1350`, `LK 1350-2` (bloque 2),
+`CH 0217`. Sin choque con Producción, cuyas NP son de 5 dígitos desde 44361 y sin prefijo. La
+etiqueta la arma **`gv_ppp_web_np_label(empresa, np, np_idx)`** en el backend — prefijo +
+espacio + 4 dígitos + `-bloque` si el bloque es > 1; el front (`pwebNpLabel`) y la Edge
+Function (`npLabel`) la duplican sólo como optimización de UX. Historia del 2026-09-05: se
+pasó de 5 a 4 dígitos (v12.91) y de contador propio a número de pedido (v12.92), las dos
+veces antes de numerar el primero.
 
 Con el prefijo vacío, `ppp_web_armar_tandas` vuelve sola a la codificación histórica
 `LETRA+NN+LETRA` y `ppp_web_proxima_letra()` **retoma desde la última letra que dejó

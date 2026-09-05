@@ -16,7 +16,7 @@
 //   2b. `gv_pedidos_web_excluidos` — saca lo que NO es de Gestión: lo anterior a
 //      `gestion_desde` y lo que Producción/ISIS ya conoce (regla del dueño,
 //      2026-09-04). Si esta llamada falla, no se programa nada: falla cerrado.
-//   3. `gv_ppp_web_np_asignar`  — numera lo que no tiene número
+//   3. `gv_ppp_web_np_asignar`  — registra la NP de cada bloque (= nº de pedido de la página)
 //   4. `ppp_web_resync`         — pone al día lo YA programado que cambió
 //   5. `gv_ppp_web_zona_lote`   — resuelve la zona de cada NP
 //   6. `ppp_web_armar_tandas`   — arma las tandas del día, hasta el cupo de m³
@@ -220,7 +220,8 @@ async function codsChefDe(codsLk: string[]): Promise<string[]> {
   return [...out];
 }
 
-/** La etiqueta que ve el operario: "LK 0001" / "CH 0001" (4 dígitos; dueño, 2026-09-05).
+/** La etiqueta que ve el operario: "LK 1350" / "LK 1350-2" (bloque 2) / "CH 0217".
+ *  El número ES el número de pedido de la página (dueño, 2026-09-05); 4 dígitos.
  *
  *  ⚠ ES UNA COPIA. La fuente de verdad es `gv_ppp_web_np_label(empresa, np)` en
  *  Supabase; acá se duplica para no pagar un round trip por cada línea de la
@@ -228,10 +229,10 @@ async function codsChefDe(codsLk: string[]): Promise<string[]> {
  *
  *  Pasado 9999 la etiqueta crece ("LK 10000") en vez de recortarse: recortar
  *  repetiría un número ya usado. */
-function npLabel(empresa: string, num: number): string {
+function npLabel(empresa: string, num: number, idx = 1): string {
   const emp = String(empresa).toLowerCase() === "chef" || String(empresa).toUpperCase() === "CH" ? "CH" : "LK";
   const n = String(num);
-  return emp + " " + (n.length >= 4 ? n : n.padStart(4, "0"));
+  return emp + " " + (n.length >= 4 ? n : n.padStart(4, "0")) + (idx > 1 ? "-" + idx : "");
 }
 
 async function procesarEmpresa(
@@ -317,7 +318,7 @@ async function procesarEmpresa(
     for (const a of Object.keys(porArt).sort()) {
       lineas.push({
         empresa: emp, order_id: n.order_id, np_idx: n.np_idx,
-        np_label: npLabel(emp, num), articulo: a, cajas: porArt[a],
+        np_label: npLabel(emp, num, Number(n.np_idx) || 1), articulo: a, cajas: porArt[a],
       });
     }
   }

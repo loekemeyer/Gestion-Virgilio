@@ -12,7 +12,7 @@
 > única**; no se replica. Ante la duda entre parche rápido y fix de raíz → **fix
 > de raíz**.
 >
-> Última actualización: 2026-09-05 (madrugada) · Versión app al documentar: **v12.91**
+> Última actualización: 2026-09-05 (madrugada) · Versión app al documentar: **v12.92**
 >
 > ⚠⚠ **Estado del pipeline web desde el 2026-09-04 a la noche: la NUMERACIÓN ESTÁ PRENDIDA**
 > (`PPP_Web_Config.numeracion_activa = 1`), el cron de tandas (jobid 71, 00:01 hábiles) activo,
@@ -20,7 +20,22 @@
 > Producción no se tocó (medido: ninguna función `ppp_web_*`/`gv_ppp_web_*` escribe en tabla
 > compartida). Primera corrida real: lunes 2026-09-07 00:01. Cómo apagar, en `CLAUDE.md`.
 >
-> Nota **v12.91** — **La etiqueta de las NP web pasa a 4 dígitos: `LK 0001` / `CH 0001`.** Dueño:
+> Nota **v12.92** — **La NP web ES el número de pedido de la página.** Dueño: *"tiene que ser
+> automático: ya cuando llegan a página LK y a Gestión Virgilio, ya vienen con numeración. En
+> página LK ya tienen numeración. En Gestión, con la lógica de los 18 ítems para LK y 15 para CH"*.
+> Se fue el contador propio (`PPP_Web_NP_Seed`, "desde 0001"): la NP de un pedido es su `order_id`
+> en la página, 4 dígitos, y el bloque va como sufijo — **`LK 1350`**, **`LK 1350-2`**, **`CH 0217`**.
+> No hay momento de numerar: "A Programar" muestra la NP apenas llega (`pwebNpLabel(emp, order_id,
+> np_idx)`), y `gv_ppp_web_np_asignar` sólo registra `np = order_id` en `PPP_Web_NP` (PK ahora
+> `(empresa, order_id, np_idx)`: dos bloques comparten número). `gv_ppp_web_np_label(empresa, np,
+> np_idx default 1)` reemplaza a la de dos parámetros (dropeada; vistas `gv_ppp_web_estado` /
+> `gv_ppp_web_entregados` recreadas con el bloque; `ppp_web_resync` y `gv_ppp_web_tanda_programar`
+> pasan `np_idx`). Front: `pwebNpLabel` con bloque, Facturación acepta `LK 1350-2`, A Programar
+> muestra la NP en la tarjeta y en cada bloque. Edge Fn v12 (`npLabel` con bloque). Todo en
+> `sql/gv_np_es_pedido.sql`; backup en `sql/backups/gv_np_es_pedido_20260905_pre.sql`. Hecho con 0
+> filas numeradas. Test `tests/pweb-np-es-pedido.cjs` (14 chequeos).
+>
+> Nota **v12.91** (superada por v12.92) — **La etiqueta de las NP web pasa a 4 dígitos: `LK 0001` / `CH 0001`.** Dueño:
 > *"que tengan 4 dígitos los de página"*. Antes eran 5 (`LK 00001`). Se cambió antes de numerar el
 > primero (`PPP_Web_NP` tenía 0 filas, ningún evento con etiqueta). Fuente de verdad
 > `gv_ppp_web_np_label` (`sql/gv_tandas_diarias.sql`); las copias de UX `pwebNpLabel` (front) y

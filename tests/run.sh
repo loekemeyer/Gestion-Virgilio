@@ -263,3 +263,6 @@ PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node te
 
 echo "== gv-espejo-corte (v12.90: Gestión lee las vistas gv_ppp_* y no las tablas crudas del espejo de ISIS) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/gv-espejo-corte.cjs
+
+echo "== pweb-np-es-pedido (v12.92: la NP web es el número de pedido de la página, con bloque) =="
+PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/pweb-np-es-pedido.cjs

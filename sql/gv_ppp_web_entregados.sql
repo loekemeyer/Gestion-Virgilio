@@ -38,34 +38,9 @@
 -- ROLLBACK: drop view public.gv_ppp_web_entregados;
 -- =============================================================================
 
-create or replace view public.gv_ppp_web_entregados
-with (security_invoker = true) as
-with crn as (
-  select upper(btrim(split_part(r.texto, '|', 1))) as np_label,
-         min(r.ts_cliente)                          as controlado_at,
-         count(*)                                   as n_crn
-  from public."Registros_Produccion_Virgilio" r
-  where r.opcion = 'CRN'
-    and r.texto ~* '^\s*(LK|CH)\s+\d+'
-    and not public.es_legajo_test(r.legajo)
-  group by 1
-)
-select p.empresa,
-       p.np,
-       c.np_label,
-       p.tanda,
-       p.cod_cliente,
-       p.razon_social,
-       p.m3,
-       p.fecha_entrega,
-       c.controlado_at,
-       c.n_crn
-from crn c
-join public."PPP_Web_Programacion" p
-  on public.gv_ppp_web_np_label(p.empresa, p.np) = c.np_label;
-
--- Los privilegios por defecto del proyecto le dan TODO a anon sobre cada objeto nuevo
--- (medido: anon_insert = true recién creada). La vista no es actualizable —CTE con
--- GROUP BY— así que un INSERT fallaría igual, pero que el grant diga la verdad.
-grant select on public.gv_ppp_web_entregados to anon, authenticated;
-revoke insert, update, delete, truncate, references, trigger on public.gv_ppp_web_entregados from anon, authenticated;
+-- ⚠ 2026-09-05 (v12.92): la DEFINICIÓN VIGENTE está en sql/gv_np_es_pedido.sql (§4).
+-- Cambió una sola cosa: la etiqueta se arma con el bloque,
+-- gv_ppp_web_np_label(p.empresa, p.np, p.np_idx), porque la NP web pasó a ser el
+-- número de pedido de la página y dos bloques comparten número ("LK 1350", "LK 1350-2").
+-- El resto (CRN con etiqueta ⋈ PPP_Web_Programacion, security_invoker, sólo select) es
+-- exactamente lo de arriba. No ejecutar este archivo: correría con la firma vieja.

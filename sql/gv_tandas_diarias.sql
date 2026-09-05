@@ -470,59 +470,11 @@ values ('numeracion_activa', 0,
         '0 = Gestion NO asigna numeros de NP. Hoy la NP la manda ISIS a la hoja de calculos y la usa Produccion. Se prende (=1) el dia que Gestion tome control: ahi numera los pedidos pendientes y los que vayan cayendo.')
 on conflict (clave) do nothing;
 
-create or replace function public.gv_ppp_web_np_asignar(p_empresa text, p_pares jsonb)
-returns table(r_order_id bigint, r_np_idx integer, r_np integer)
-language plpgsql security definer set search_path to 'public'
-as $function$
-declare
-  v_next integer;
-begin
-  -- ⚠ Hasta que Gestion reemplace a Produccion, la NP la manda ISIS y Gestion
-  --   no numera NADA. Sin este candado la pantalla de la PPP Web numeraba sola
-  --   todo lo que mostraba con solo abrirla: asi aparecieron 357 NP de prueba
-  --   los dias 3 y 4 de septiembre de 2026.
-  if coalesce((select valor from public."PPP_Web_Config" where clave = 'numeracion_activa'), 0) <> 1 then
-    raise exception 'Numeración de NP APAGADA (PPP_Web_Config.numeracion_activa = 0). Se prende el día que Gestión tome control de Producción.';
-  end if;
-
-  -- Serializa por empresa: el job y una pantalla abierta no pueden sacar el
-  -- mismo numero. Se libera sola al terminar la transaccion.
-  perform pg_advisory_xact_lock(hashtext('ppp_web_np:' || p_empresa));
-
-  select greatest(
-           coalesce((select max(n.np) from public."PPP_Web_NP" n where n.empresa = p_empresa), 0) + 1,
-           coalesce((select s.desde from public."PPP_Web_NP_Seed" s where s.empresa = p_empresa), 1)
-         )
-    into v_next;
-
-  with pedir as (
-    select (x->>'order_id')::bigint as oid, (x->>'np_idx')::int as idx
-    from jsonb_array_elements(p_pares) x
-  ),
-  nuevos as (
-    select p.oid, p.idx,
-           row_number() over (order by p.oid, p.idx) - 1 as offset_rn
-    from pedir p
-    where not exists (
-      select 1 from public."PPP_Web_NP" n
-       where n.empresa = p_empresa and n.order_id = p.oid and n.np_idx = p.idx)
-  )
-  insert into public."PPP_Web_NP" (empresa, np, order_id, np_idx)
-  select p_empresa, v_next + nu.offset_rn::int, nu.oid, nu.idx
-  from nuevos nu
-  on conflict (empresa, order_id, np_idx) do nothing;
-
-  return query
-    with pedir as (
-      select (x->>'order_id')::bigint as oid, (x->>'np_idx')::int as idx
-      from jsonb_array_elements(p_pares) x
-    )
-    select n.order_id, n.np_idx, n.np
-      from public."PPP_Web_NP" n
-      join pedir p on p.oid = n.order_id and p.idx = n.np_idx
-     where n.empresa = p_empresa;
-end
-$function$;
+-- ⚠ 2026-09-05 (v12.92): `gv_ppp_web_np_asignar` YA NO CUENTA. La NP web es el número
+-- de pedido de la página (np = order_id, bloque en np_idx) y la definición vigente está
+-- en sql/gv_np_es_pedido.sql (§3). El contador con PPP_Web_NP_Seed y el advisory lock
+-- que estaban acá quedaron en sql/backups/gv_np_es_pedido_20260905_pre.sql. Se conserva
+-- la firma, el candado `numeracion_activa` y los grants de abajo.
 
 -- El candado. `anon` no la alcanza ni con la key publica; `authenticated`
 -- tampoco: el front entra por la de abajo, que le pide sesion.
@@ -586,28 +538,13 @@ $function$;
 -- ══════════════════════════════════════════════════════════════════════════
 -- La ETIQUETA de la NP · fuente de verdad
 -- ══════════════════════════════════════════════════════════════════════════
--- "LK 0001" / "CH 0001": prefijo de empresa + espacio + CUATRO digitos.
--- (2026-09-05, dueño: "que tengan 4 digitos los de pagina". Hasta ese dia eran 5;
---  se cambio antes de numerar el primero: PPP_Web_NP tenia 0 filas.)
+-- ⚠ 2026-09-05 (v12.92): la etiqueta pasó a `gv_ppp_web_np_label(empresa, np, np_idx)`
+-- y vive en sql/gv_np_es_pedido.sql (§2). `np` ES el número de pedido de la página,
+-- 4 dígitos, y el bloque va como sufijo: "LK 1350" · "LK 1350-2" · "CH 0217".
+-- La de dos parámetros se DROPEÓ (con la de tres con default sería ambigua).
 -- El front (`pwebNpLabel`) y la Edge Function (`npLabel`) la duplican SOLO como
--- optimizacion de UX. Si cambia el formato, se cambia PRIMERO aca.
-create or replace function public.gv_ppp_web_np_label(p_empresa text, p_np integer)
-returns text language sql immutable as $function$
-  select case when lower(coalesce(p_empresa,'')) in ('chef','ch') then 'CH' else 'LK' end
-      || ' '
-      -- 2026-09-05 (dueño): CUATRO digitos, no cinco. "LK 0001".
-      -- lpad TRUNCA si el texto ya es mas largo que el ancho: lpad('12345',4,'0')
-      -- devuelve '1234'. Con la guarda, pasado 9999 la etiqueta simplemente
-      -- crece (LK 10000) en vez de repetir un numero que ya existe.
-      || case when length(p_np::text) >= 4 then p_np::text
-              else lpad(p_np::text, 4, '0') end;
-$function$;
-
-grant execute on function public.gv_ppp_web_np_label(text, integer) to anon, authenticated, service_role;
-
--- Probado el 2026-09-05, las tres implementaciones dan lo mismo
--- (backend, front y Edge Function), incluido el borde que truncaba:
---   lk/1 → LK 0001 · chef/1 → CH 0001 · lk/357 → LK 0357 · lk/12345 → LK 12345
+-- optimizacion de UX. Si cambia el formato, se cambia PRIMERO en el backend.
+-- Probado: lk/1350 → LK 1350 · lk/1350/2 → LK 1350-2 · chef/217 → CH 0217 · lk/12345 → LK 12345
 
 -- ── La lógica de numeración, para que no haya que leerla del cuerpo ────────
 --   · un número por (empresa, order_id, np_idx) — un pedido web se puede
