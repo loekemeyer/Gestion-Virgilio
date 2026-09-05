@@ -6958,7 +6958,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v13.06";
+const APP_VERSION = "v13.07";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -29364,20 +29364,40 @@ function _pppPlanAgrupar(programados) {
   }
   return { byDay: byDay, venc: venc };
 }
-/* Camiones de un día = un camión por ZONA (decisión del dueño). Retira y Súper van aparte. */
+/* Camiones de un día. v13.07 (idea 7317): un camión = un NÚMERO de tanda (E01A + E01B = camión 01,
+   igual que el cuadro "Total por día" y que Producción). Antes era un camión por zona, pero con los
+   sectores del backend (GV_Sectores) una tanda puede mezclar zonas vecinas (Barracas con Constitución,
+   zona 1 + zona 2), así que la etiqueta lista las zonas que lleva: "Camión 1 · Zona 1 + Zona 2".
+   Los pedidos sin tanda se agrupan por zona como antes. Retira y Súper van aparte, siempre. */
+function _pppTandaNum(t) { const m = /^[A-Z]+(\d+)[A-Z]+$/.exec(String(t || "").trim().toUpperCase()); return m ? parseInt(m[1], 10) : null; }
+function _pppZonaCorta(z) { const m = /^Zona\s*(\d+)/i.exec(String(z || "")); return m ? "Zona " + m[1] : String(z || ""); }
 function _pppCamiones(ped) {
   const by = new Map();
   for (const p of ped) {
     const z = _pppZonaPed(p);
-    if (!by.has(z)) by.set(z, { zona: z, ruta: _pppRutaZona(z), ped: [], tandas: [], m3: 0, valor: 0, sinValor: 0, est: { armado: 0, curso: 0, sin: 0 } });
-    const c = by.get(z);
+    const ruta = _pppRutaZona(z);
+    const tn = (ruta === "ret" || ruta === "sup") ? null : _pppTandaNum(p.tanda);
+    const key = ruta === "ret" ? "ret" : (ruta === "sup" ? "sup" : (tn != null ? "n" + tn : "z" + z));
+    if (!by.has(key)) by.set(key, { key: key, tn: tn, zona: z, zonas: [], ruta: ruta, ped: [], tandas: [], m3: 0, valor: 0, sinValor: 0, est: { armado: 0, curso: 0, sin: 0 } });
+    const c = by.get(key);
+    if (c.zonas.indexOf(z) < 0) c.zonas.push(z);
     c.ped.push(p); c.m3 += Number(p.m3) || 0;
     const v = _pppValorPed(p); if (v == null) c.sinValor++; else c.valor += v;
     const t = String(p.tanda || "").trim().toUpperCase(); if (t && t !== "—" && c.tandas.indexOf(t) < 0) c.tandas.push(t);
     const e = _pppEstadoPed(p); c.est[e === "armado" ? "armado" : (e === "sin" ? "sin" : "curso")]++;
   }
+  for (const c of by.values()) {
+    if (c.ruta === "ret" || c.ruta === "sup" || c.zonas.length < 2) continue;
+    c.zonas.sort(); c.zona = c.zonas.map(_pppZonaCorta).join(" + ");
+    // color: la ruta más frecuente entre sus zonas (Sur/Oeste vs Norte); vacío si no se sabe
+    const cnt = {}; for (const z of c.zonas) { const r = _pppRutaZona(z); cnt[r] = (cnt[r] || 0) + 1; }
+    let best = c.ruta, bn = -1; for (const k in cnt) if (k && cnt[k] > bn) { bn = cnt[k]; best = k; }
+    c.ruta = best;
+  }
   const ord = { so: 1, n: 2, "": 3, sup: 4, ret: 5 };
-  const arr = [...by.values()].sort(function (a, b) { return (ord[a.ruta] - ord[b.ruta]) || a.zona.localeCompare(b.zona); });
+  const arr = [...by.values()].sort(function (a, b) {
+    return (ord[a.ruta] - ord[b.ruta]) || ((a.tn == null ? 1e9 : a.tn) - (b.tn == null ? 1e9 : b.tn)) || a.zona.localeCompare(b.zona);
+  });
   let n = 0; for (const c of arr) { if (c.ruta === "ret" || c.ruta === "sup") continue; c.num = ++n; }
   return arr;
 }
@@ -29409,7 +29429,8 @@ function _pppPlanBarraHtml(est, tot) {
 function _pppPlanEstDia(ped) { const est = { armado: 0, curso: 0, sin: 0 }; for (const p of ped) { const e = _pppEstadoPed(p); est[e === "armado" ? "armado" : (e === "sin" ? "sin" : "curso")]++; } return est; }
 function _pppPlanValor(ped) { let v = 0, sin = 0; for (const p of ped) { const x = _pppValorPed(p); if (x == null) sin++; else v += x; } return { valor: v, sin: sin }; }
 function _pppCamionIco(c) { return c.ruta === "ret" ? "🏭" : (c.ruta === "sup" ? "🛒" : "🚚"); }
-function _pppCamionNombre(c) { return c.ruta === "ret" ? "Retira en fábrica" : (c.ruta === "sup" ? "Súper" : ("Camión " + c.num + " · " + c.zona)); }
+/* v13.07: el número del camión ES el de la tanda (E02A → Camión 2), como en el cuadro "Total por día". */
+function _pppCamionNombre(c) { return c.ruta === "ret" ? "Retira en fábrica" : (c.ruta === "sup" ? "Súper" : ((c.tn != null ? "Camión " + c.tn : "Sin tanda") + " · " + c.zona)); }
 /* ---- GRILLA: KPI + banda de vencidas + 6 días + otras fechas ---- */
 function _pppPlanGridHtml(programados) {
   const g = _pppPlanAgrupar(programados);
@@ -29426,7 +29447,7 @@ function _pppPlanGridHtml(programados) {
     '<div class="pn-tools"><button class="pn-lnk" onclick="pppPlanClasica(true)" title="Lista por fecha y tanda (como antes)">Vista clásica</button></div></div>';
   h += '<div class="pn-kpis">' +
     '<div class="pn-kpi"><div class="ico">📦</div><div><div class="l">Pedidos</div><div class="v">' + tot + '</div><div class="s">próximos 6 días</div></div></div>' +
-    '<div class="pn-kpi"><div class="ico">🚚</div><div><div class="l">Camiones</div><div class="v">' + camiones + '</div><div class="s">uno por zona y día</div></div></div>' +
+    '<div class="pn-kpi"><div class="ico">🚚</div><div><div class="l">Camiones</div><div class="v">' + camiones + '</div><div class="s">por n° de tanda y día</div></div></div>' +
     '<div class="pn-kpi"><div class="ico">🧊</div><div><div class="l">Volumen</div><div class="v">' + _pppFmtM3(totM3) + ' m³</div><div class="s">a entregar</div></div></div>' +
     '<div class="pn-kpi g"><div class="ico">💰</div><div><div class="l">Valor</div><div class="v">' + (_pppValor ? _pppFmtPesos(totVal) : '…') + '</div><div class="s">estimado a lista' + (totSinVal ? ' · ' + totSinVal + ' sin valuar' : '') + '</div></div></div>' +
     '<div class="pn-kpi' + (nVenc ? ' r' : ' ok') + '"><div class="ico">' + (nVenc ? '⏰' : '✅') + '</div><div><div class="l">Atrasados</div><div class="v">' + nVenc + '</div><div class="s">' + (nVenc ? 'fecha pasada, no salieron' : 'todo al día') + '</div></div></div>' +

@@ -223,6 +223,21 @@ $$;
 --     MISMA transacción reventaban con "relation _sin_tanda already exists".
 --   · Va SECURITY INVOKER: la RLS de `PPP_Web_Programacion` (los tres mails de
 --     supervisor) decide quién puede escribir.
+--
+-- v4 (2026-09-05, v13.07, idea 7317) — TANDAS POR CERCANÍA REAL. Con
+--   `PPP_Web_Config.sectores_activos = 1` (default) el armado deja de ir por grupo
+--   de zona y va por SECTOR + VECINOS (`GV_Sectores`, `GV_Barrios_Sector`,
+--   `GV_Sectores_Vecinos`, `GV_Barrios_Pares`; ver sql/gv_sectores.sql):
+--   · Se recorren los clientes por camión → sector → m³ desc y cada uno entra en la
+--     primera tanda abierta que (a) no pase el tope y (b) sea compatible con TODAS
+--     sus paradas (`gv_ppp_web_compat`). Si ninguna, abre tanda nueva.
+--   · Zona 1 y 2 pueden compartir (Barracas con Constitución), pero Núñez con
+--     Lugano no: los sectores H y B no son vecinos y además está el par prohibido.
+--   · El NÚMERO de la tanda (E01A → 01) es por camión (Capital / GBA Sur / GBA
+--     Oeste / GBA Norte / Retira / Super), no por zona. La letra final va por tanda.
+--   · Con `sectores_activos = 0` corre el bucle viejo, línea por línea.
+--   · Probar sin escribir: `select gv_ppp_web_armar_simular('lk', current_date, '[…]')`.
+--   Backup del cuerpo anterior: sql/backups/ppp_web_armar_tandas_20260905_pre_sectores.sql
 
 create or replace function public.ppp_web_armar_tandas(
   p_empresa text,
@@ -240,6 +255,8 @@ declare
   -- Vacio = codificacion historica de Virgilio. VER LA NOTA DEL ENCABEZADO.
   v_pref   text    := coalesce((select valor_texto from public."PPP_Web_Config" where clave='tanda_prefijo'), '');
   v_letra  int     := public.ppp_web_proxima_letra();
+  -- v4: 1 = sectores + vecinos (gv_sectores.sql); 0 = bucle viejo por grupo de zona.
+  v_sect   boolean := coalesce((select valor from public."PPP_Web_Config" where clave='sectores_activos'), 1) <> 0;
   v_fecha  date;
   v_usado  numeric;
   v_resta  numeric;
@@ -249,6 +266,7 @@ declare
   v_ti     int;
   v_code   text;
   v_acum   numeric;
+  v_cierra boolean;
   r_cli    record;
 begin
   v_fecha := p_fecha + v_dias;
@@ -259,6 +277,9 @@ begin
   drop table if exists _sin_tanda;
   drop table if exists _sel;
   drop table if exists _asig;
+  drop table if exists _open;
+  drop table if exists _open_stops;
+  drop table if exists _cam;
 
   create temp table _sin_tanda on commit drop as
   select (x->>'order_id')::bigint as order_id,
@@ -266,6 +287,10 @@ begin
          nullif(x->>'np','')::int as np,
          coalesce(nullif(x->>'zona',''), '(sin zona)') as zona,
          public.gv_ppp_web_grupo_zona(coalesce(nullif(x->>'zona',''), '(sin zona)')) as grupo,
+         -- v4: sector chico y barrio normalizado (sólo se usan con sectores_activos = 1)
+         public.gv_ppp_web_sector(coalesce(nullif(x->>'zona',''), '(sin zona)'),
+                                  nullif(x->>'barrio',''), nullif(x->>'direccion','')) as sector,
+         public.gv_ppp_web_barrio_norm(nullif(x->>'barrio',''), nullif(x->>'direccion','')) as bnorm,
          coalesce(nullif(x->>'cod',''), nullif(x->>'razon_social',''), '?') as cliente,
          nullif(x->>'razon_social','') as razon_social,
          nullif(x->>'direccion','')    as direccion,
@@ -293,8 +318,9 @@ begin
   -- Sin zona no se programa: falta el barrio y la elige una persona.
   delete from _sin_tanda where zona = '(sin zona)';
 
-  -- ⚠ SOLO SE PROGRAMAN SOLAS LAS ZONAS DE `zonas_automaticas` (hoy: 1 y 2).
-  --   Regla del dueño (2026-09-04): el resto —zonas 3+, Retira, Súper, Expo— lo
+  -- ⚠ SOLO SE PROGRAMAN SOLAS LAS ZONAS DE `zonas_automaticas` (hoy: 1, 2 y 3; la 3
+  --   entró el 2026-09-05 con la v13.07).
+  --   Regla del dueño (2026-09-04): el resto —zonas 4+, Retira, Súper, Expo— lo
   --   programa una persona a mano. No se pierden ni se marcan: quedan SIN tanda,
   --   que es exactamente como llegan a la pantalla de la PPP Web para que alguien
   --   las agarre. Cada corrida las vuelve a mirar, así que el día que se agregue
@@ -343,6 +369,75 @@ begin
   -- ── Armado de tandas con lo seleccionado ───────────────────────────────
   create temp table _asig (order_id bigint, np_idx int, tanda text) on commit drop;
 
+  if v_sect then
+    -- ── v4: por SECTOR + VECINOS (sql/gv_sectores.sql) ─────────────────────
+    -- Una tanda es una clique: el cliente entra sólo si TODAS sus paradas son
+    -- compatibles con TODAS las que ya tiene la tanda (`gv_ppp_web_compat`).
+    alter table _sin_tanda add column camion text;
+    update _sin_tanda set camion = public.gv_ppp_web_camion(zona, sector);
+    create temp table _open (code text primary key, camion text, m3 numeric, cerrada boolean, seq int) on commit drop;
+    create temp table _open_stops (code text, zona text, sector text, bnorm text) on commit drop;
+    create temp table _cam (camion text primary key, zn int, ti int) on commit drop;
+
+    for r_cli in
+      select cliente, sum(m3) as m3_cli, bool_or(va_solo) as solo,
+             bool_or(grupo = 'Super') as es_super,
+             min(camion) as camion, min(sector) as sector
+        from _sin_tanda
+       group by cliente
+       -- barrido geográfico: camión, sector (A→P = sur→norte), grande→chico.
+       -- collate "C": los pseudo-sectores '~…' (barrio desconocido) van al FINAL y
+       -- rellenan lo que quede; con la collation del cluster '~' se ordenaba primero.
+       order by min(camion) collate "C", min(sector) collate "C", sum(m3) desc, cliente
+    loop
+      v_code := null;
+      -- Súper (una por cliente), `solo` por regla propia, o el cliente solo pasa el
+      -- tope: tanda propia y cerrada. Retira NO: juntarlos es lo que hace que
+      -- retiren el mismo día.
+      v_cierra := r_cli.es_super or r_cli.solo or r_cli.m3_cli >= v_tope;
+      if not v_cierra then
+        select o.code into v_code
+          from _open o
+         where not o.cerrada
+           and o.m3 + r_cli.m3_cli <= v_tope
+           and not exists (
+                 select 1
+                   from _open_stops st
+                   join _sin_tanda s on s.cliente = r_cli.cliente
+                  where st.code = o.code
+                    and not public.gv_ppp_web_compat(st.zona, st.sector, st.bnorm,
+                                                     s.zona, s.sector, s.bnorm))
+         -- primero la tanda que ya tiene una parada del mismo sector, después la
+         -- más llena (empaqueta mejor), después la más vieja
+         order by (exists (select 1 from _open_stops st
+                            where st.code = o.code and st.sector = r_cli.sector)) desc,
+                  o.m3 desc, o.seq
+         limit 1;
+      end if;
+      if v_code is null then
+        -- tanda nueva: el número es del camión (01 = el primero que aparece),
+        -- la letra final corre por tanda dentro del camión.
+        insert into _cam (camion, zn, ti)
+        values (r_cli.camion, (select coalesce(max(zn), 0) + 1 from _cam), 0)
+        on conflict (camion) do nothing;
+        select c.zn, c.ti into v_zn, v_ti from _cam c where c.camion = r_cli.camion;
+        -- Con prefijo: GV-01A (prueba). Sin prefijo: E01A (codificacion Virgilio).
+        -- ⚠ VER LA NOTA DEL ENCABEZADO ANTES DE TOCAR ESTO.
+        v_code := case when v_pref <> '' then v_pref
+                       else public.ppp_web_letra(v_letra) end
+                  || lpad(v_zn::text, 2, '0') || public.ppp_web_letra(v_ti);
+        update _cam set ti = ti + 1 where camion = r_cli.camion;
+        insert into _open (code, camion, m3, cerrada, seq)
+        values (v_code, r_cli.camion, 0, v_cierra, (select count(*) from _open));
+      end if;
+      insert into _asig (order_id, np_idx, tanda)
+      select s.order_id, s.np_idx, v_code from _sin_tanda s where s.cliente = r_cli.cliente;
+      insert into _open_stops (code, zona, sector, bnorm)
+      select v_code, s.zona, s.sector, s.bnorm from _sin_tanda s where s.cliente = r_cli.cliente;
+      update _open set m3 = m3 + r_cli.m3_cli where code = v_code;
+    end loop;
+  else
+  -- ── bucle viejo (sectores_activos = 0): por GRUPO de zona ────────────────
   -- Se recorre por GRUPO de zona, no por zona: asi 2 y 3 caen en el mismo bucle
   -- y pueden compartir tanda, y el resto no. Retira es su propio grupo.
   for v_grupo in select distinct grupo from _sin_tanda order by 1 loop
@@ -374,6 +469,7 @@ begin
       end if;
     end loop;
   end loop;
+  end if;
 
   insert into public."PPP_Web_Programacion"
     (empresa, order_id, np_idx, np, cod_cliente, razon_social, direccion, barrio,
@@ -388,8 +484,12 @@ begin
          m3 = excluded.m3, m3_parcial = excluded.m3_parcial,
          lineas = excluded.lineas, cajas = excluded.cajas;
 
+  -- r_zona: con sectores, las zonas reales que lleva la tanda ('Zona 1 - CABA Sur +
+  -- Zona 2 - CABA Centro'); con el bucle viejo, el grupo (como siempre).
   return query
-    select a.tanda, min(s.grupo), count(*)::int, round(sum(s.m3), 3), count(distinct s.cliente)::int
+    select a.tanda,
+           case when v_sect then string_agg(distinct s.zona, ' + ' order by s.zona) else min(s.grupo) end,
+           count(*)::int, round(sum(s.m3), 3), count(distinct s.cliente)::int
       from _asig a join _sin_tanda s on s.order_id = a.order_id and s.np_idx = a.np_idx
      group by a.tanda order by a.tanda;
 end

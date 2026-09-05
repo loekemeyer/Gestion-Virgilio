@@ -93,12 +93,22 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
     pppPlanAbrir(_pppDateKey(hab[1]));
     html = document.getElementById("pppPreview").innerHTML;
     out.dia2 = /class="l">Camiones<\/div><div class="v">1</.test(html) && /Retira en fábrica/.test(html) && !/Orden de carga/.test(html);
+    // v13.07 (idea 7317): camión = número de tanda; una tanda que mezcla zonas vecinas se etiqueta "Zona 1 + Zona 2".
+    const cams = _pppCamiones([
+      { np: "1", tanda: "E01A", m3: 0.3, zona: "Zona 1 - CABA Sur", barrio: "Barracas" },
+      { np: "2", tanda: "E01A", m3: 0.2, zona: "Zona 2 - CABA Centro", barrio: "Constitucion" },
+      { np: "3", tanda: "E01B", m3: 0.4, zona: "Zona 3 - CABA Oeste", barrio: "Flores" },
+      { np: "4", tanda: "E02A", m3: 0.5, zona: "Zona 6 - GBA Norte", barrio: "Munro" },
+      { np: "5", tanda: "", m3: 0.1, zona: "Zona 4 - GBA Sur", barrio: "Lanús" },
+      { np: "6", tanda: "E01C", m3: 0.1, zona: "Retira", barrio: "Retira" }
+    ]);
+    out.porTanda = cams.map((c) => _pppCamionNombre(c) + "|" + c.tandas.join("+") + "|" + c.ped.length).join(" ; ");
     return out;
   });
 
   const checks = [
     ["KPI pedidos 9 (6 días, sin vencidas ni más adelante)",  r.kpiPed === "9"],
-    ["KPI camiones 5 (uno por zona y día; Retira no cuenta)", r.kpiCam === "5"],
+    ["KPI camiones 5 (por n° de tanda y día; Retira no cuenta)", r.kpiCam === "5"],
     ["KPI volumen 20,4 m³",                                   r.kpiVol === "20,4 m³"],
     ["KPI valor $ 20.400.000",                                r.kpiVal === "$ 20.400.000"],
     ["KPI atrasados 2",                                       r.kpiAt === "2"],
@@ -120,6 +130,8 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
     ["vista de atrasados",                                    r.venc === true],
     ["vista clásica y vuelta al tablero",                     r.clasica === true && r.vuelve === true],
     ["día 2: Retira sin orden de carga ni camión",            r.dia2 === true],
+    ["v13.07: camión = n° de tanda, zonas mezcladas 'Zona 1 + Zona 2 + Zona 3', sin tanda por zona, Retira aparte",
+      r.porTanda === "Camión 1 · Zona 1 + Zona 2 + Zona 3|E01A+E01B|3 ; Sin tanda · Zona 4 - GBA Sur||1 ; Camión 2 · Zona 6 - GBA Norte|E02A|1 ; Retira en fábrica|E01C|1"],
     ["sin errores de página",                                 errs.length === 0]
   ];
   let bad = 0;

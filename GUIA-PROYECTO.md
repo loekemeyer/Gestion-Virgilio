@@ -12,7 +12,7 @@
 > única**; no se replica. Ante la duda entre parche rápido y fix de raíz → **fix
 > de raíz**.
 >
-> Última actualización: 2026-09-05 (sábado, noche) · Versión app al documentar: **v13.06**
+> Última actualización: 2026-09-05 (sábado, noche) · Versión app al documentar: **v13.07**
 >
 > ⚠ **Regla desde el 2026-09-05 (dueño: "empezá a bumpear las modificaciones así voy chequeando"):
 > TODO cambio —front o backend— lleva bump de `APP_VERSION`/`SW_VERSION`, aunque no toque
@@ -23,6 +23,23 @@
 > tandas con prefijo `GV-`. Sólo del lado Virgilio: el mail de las 12:30 de LK sigue andando y
 > Producción no se tocó (medido: ninguna función `ppp_web_*`/`gv_ppp_web_*` escribe en tabla
 > compartida). Primera corrida real: lunes 2026-09-07 00:01. Cómo apagar, en `CLAUDE.md`.
+>
+> Nota **v13.07** (backend + front) — **Tandas por cercanía real: sectores + vecinos** (idea **7317**,
+> dueño: *"zonas pueden ir agrupadas también zona 1 y 2… pero Núñez con Villa Lugano no debe ir
+> junto"*). Backend (`sql/gv_sectores.sql`): tablas `GV_Sectores` (14 sectores A…P con su camión
+> Capital / GBA Sur / GBA Oeste / GBA Norte), `GV_Barrios_Sector` (los 109 barrios de zona 1–7),
+> `GV_Sectores_Vecinos` (27 pares que pueden compartir tanda) y `GV_Barrios_Pares` (excepciones:
+> Núñez/Belgrano/Colegiales nunca con Lugano/Soldati/Pompeya; Boedo sí con Pompeya). Decisiones del
+> dueño: Boedo con Once/Almagro (Centro); Capital Sur puede compartir con Avellaneda/Lanús; **zona 3
+> automática** (`zonas_automaticas = '1,2,3'`). `ppp_web_armar_tandas` v4: cada cliente entra en la
+> primera tanda abierta que no pase 0,80 m³ y sea compatible con TODAS sus paradas
+> (`gv_ppp_web_compat`: par explícito → mismo sector → barrio desconocido cae en la regla vieja →
+> vecinos); el número de la tanda es por camión (E01A = Capital), la letra por tanda. Interruptor
+> `PPP_Web_Config.sectores_activos` (0 = bucle viejo por grupo de zona). Simulador sin escribir:
+> `gv_ppp_web_armar_simular(...)`. Front: en el tablero un camión = un **número de tanda** (E01A +
+> E01B = Camión 1) y si mezcla zonas la etiqueta las lista ("Camión 1 · Zona 1 + Zona 2"); sin tanda
+> → "Sin tanda · Zona 4". §3.y de la doc de Supabase; análisis previo en
+> `docs/ANALISIS-TANDAS-CERCANIA-20260905.md`.
 >
 > Nota **v13.06** — **Tablero en celular**: los KPI ya no se desbordan (grilla `minmax(0,1fr)`, valor
 > con `overflow-wrap`, tarjeta Atrasados a lo ancho, tipografía un punto menor ≤ 640 px). Visto en el

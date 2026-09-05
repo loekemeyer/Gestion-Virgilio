@@ -118,11 +118,17 @@ Detalle, medición y rollback en `docs/SUPABASE-GESTION-VIRGILIO.md` §3.l y §3
   siguen: el bloque 1 lleva el número pelado y los demás sufijo, `LK 1350-2`. No hay contador
   ni momento de numerar: "A Programar" ya muestra la NP apenas llega. (`PPP_Web_NP_Seed` y el
   contador de `gv_ppp_web_np_asignar` quedaron sin uso; `sql/gv_np_es_pedido.sql`.) Se
-  programa por el job de las 00:01 para zona 1 y 2 y a mano en "A Programar" para el resto.
+  programa por el job de las 00:01 para zona 1, 2 y 3 (`zonas_automaticas = '1,2,3'` desde v13.07)
+  y a mano en "A Programar" para el resto.
   **Desde el 2026-09-05 además hay armado INTRADÍA** (idea 7317, cron jobid 73 cada 15 min
   lun–vie 07:00–18:45 ART, Edge Function v14 con `{"intradia": true}`): cuando lo pendiente de
-  zona 1 y 2 suma ≥ 0,80 m³ se arma ya, para hoy si es antes de las 12:00 y hay cupo, si no
+  las zonas automáticas suma ≥ 0,80 m³ se arma ya, para hoy si es antes de las 12:00 y hay cupo, si no
   para el próximo hábil con cupo (`gv_ppp_web_proximo_dia_entrega`). §3.x de la doc de Supabase.
+  **Y las tandas se arman por CERCANÍA REAL** (v13.07, §3.y): sectores + vecinos en `GV_Sectores`,
+  `GV_Barrios_Sector`, `GV_Sectores_Vecinos`, `GV_Barrios_Pares` (`sql/gv_sectores.sql`); Núñez
+  nunca con Lugano, Barracas sí con Constitución o Avellaneda. Interruptor
+  `PPP_Web_Config.sectores_activos` (0 = regla vieja por grupo de zona). Probar sin escribir:
+  `gv_ppp_web_armar_simular(...)`.
   Regla del dueño: *"cuando Gestión tome control, va a asignarle la numeración
   nuestra a los pedidos que estén pendientes y a los que vayan cayendo"*. **Pendiente =
   pedido de la página que NO salió a ISIS por el mail (`enviado_a_compras`), con fecha ≥

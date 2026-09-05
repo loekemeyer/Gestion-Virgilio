@@ -807,6 +807,10 @@ apagada.
 
 ## 3.i Sólo zona 1 y zona 2 se programan solas — 2026-09-04
 
+> **Actualización 2026-09-05 (v13.07, §3.y):** `zonas_automaticas = '1,2,3'` — la zona 3 también
+> se programa sola (dueño: *"sí, 1, 2 y 3 automáticas"*). Y las tandas ya no se arman por grupo de
+> zona sino por sector + vecinos (`GV_Sectores*`), con interruptor `sectores_activos`.
+
 Regla del dueño: *"para el armado de tandas y programación, que sólo los pedidos de zona 1
 y zona 2 sean automáticamente programados, el resto tienen que ser programados
 manualmente"*.
@@ -1379,6 +1383,58 @@ Quedaron anotados, sin tocar: `order_tracking` de LK cruza por id pelado y mezcl
 es de Chef y pisa al LK 217): cuando Gestión alimente el tracking, escribir el id pelado por
 una función `gv_*` y pedir columna `empresa` en PaginaLK. Y el Excel ISIS de Facturación manda
 `N_Pedido` contador (no el id), como el mail: ISIS numera 98xxx por su cuenta.
+
+### 3.y ✅ Tandas por cercanía real: sectores + vecinos, zona 3 automática (idea 7317) — 2026-09-05 sábado (v13.07)
+
+**Qué pidió el dueño.** *"Zonas pueden ir agrupadas también zona 1 y 2. Hay más zonas juntas… pero
+hay cosas que no son parejas: Núñez con Villa Lugano estaría dentro de 1 y 2 y no debe ir junto."*
+Análisis previo con 10 agentes sobre 2.454 NP con tanda (ene–sep): `docs/ANALISIS-TANDAS-CERCANIA-20260905.md`.
+Decisiones (AskUserQuestion): **sectores + vecinos en tablas, backend**; **Boedo con Once/Almagro**
+(Centro); **Capital Sur puede compartir con Avellaneda/Lanús/V. Alsina**; **zona 3 automática**.
+
+**Qué se hizo** (`sql/gv_sectores.sql` + `sql/ppp_web_tandas.sql`, migraciones
+`gv_sectores_tandas_por_cercania_v1307` y `ppp_web_armar_tandas_v4_sectores_v1307`):
+- Tablas nuevas (RLS: todos leen, escriben los tres mails de supervisor; grants como `PPP_Web_Base`):
+  **`GV_Sectores`** (14 sectores A…P, sin I/O; `camion` = Capital / GBA Sur / GBA Oeste / GBA Norte),
+  **`GV_Barrios_Sector`** (109 barrios = TODOS los `Zonas_Barrios` de zona 1–7, clave `_norm_barrio`),
+  **`GV_Sectores_Vecinos`** (27 pares que pueden compartir tanda), **`GV_Barrios_Pares`** (23
+  excepciones: 18 NO Núñez/Belgrano/Colegiales × Lugano/Soldati/Pompeya; 5 SÍ Boedo × Pompeya/P. Patricios).
+- Funciones nuevas: `gv_ppp_web_barrio_norm(barrio, direccion)` (prueba el texto crudo, el barrio
+  parseado de ese texto y el de la dirección — la Edge Function manda la dirección entera como
+  barrio cuando no hay otra cosa), `gv_ppp_web_sector(zona, barrio, direccion)` (`'~<grupo>'` si no
+  hay sector: Retira, Súper, barrio desconocido), `gv_ppp_web_camion(zona, sector)`,
+  **`gv_ppp_web_compat(...)`** (el núcleo: interruptor → par explícito → mismo sector → pseudo-sector
+  cae en la regla vieja de grupo → vecinos), `gv_ppp_web_pueden_compartir(...)` (cómoda) y
+  **`gv_ppp_web_armar_simular(empresa, fecha, filas, forzar)`**: corre el armado y lo deshace
+  (excepción propia `GVS01`), devuelve `{tandas, detalle}` — para probar sin escribir.
+- **`ppp_web_armar_tandas` v4**: con `PPP_Web_Config.sectores_activos = 1` (fila nueva) recorre los
+  clientes por camión → sector → m³ y los mete en la primera tanda abierta que no pase el tope y sea
+  compatible con TODAS sus paradas (clique); si no hay, abre tanda nueva. El NÚMERO de la tanda es
+  por camión (E01A = Capital), la letra por tanda. Súper, `solo` y ≥ tope siguen solos. Con `= 0`
+  corre el bucle viejo línea por línea. `r_zona` pasa a listar las zonas reales de la tanda.
+  Backup del cuerpo anterior: `sql/backups/ppp_web_armar_tandas_20260905_pre_sectores.sql`
+  (md5 `3b7ae2a5…`).
+- `zonas_automaticas` = `'1,2,3'` (antes `'1,2'`): la zona 3 entra al job de las 00:01 y al intradía.
+
+**Impacto medido.** Simulación con 14 filas sintéticas (`gv_ppp_web_armar_simular`, fecha 07/09):
+Núñez → E01D y Villa Lugano → E01B (**nunca juntos**); Barracas + Constitución + Lugano → E01B;
+Pompeya + Mataderos → E01C; Boedo + Flores + barrio desconocido → E01A; Once + Núñez + Belgrano →
+E01D (0,80 justo); Avellaneda (zona 4), Retira y Súper quedan sin tanda (no automáticos). Los 109
+barrios de zona 1–7 tienen sector (0 sin). `gv_ppp_web_pueden_compartir`: Núñez–Lugano false,
+Barracas–Constitución true, Boedo–Pompeya true, Once–Pompeya false, Flores–Mataderos true,
+Barracas–Avellaneda true, desconocido(z2)–Once true, desconocido(z2)–Barracas false, Retira–Barracas
+false. Producción: cero referencias a `ppp_web_armar_tandas`/`GV_Sectores*`/`sectores_activos` en su
+repo (grep del 05/09); nada de lo nuevo escribe en tabla compartida. Nada se escribió en
+`PPP_Web_Programacion` (la simulación deshace). Primera corrida real: lunes 07/09 00:01 (cron 71) y
+07:00 (cron 73).
+
+**Front (v13.07).** Tablero: un camión = un NÚMERO de tanda (E01A + E01B = Camión 1, como el cuadro
+"Total por día"); si la tanda mezcla zonas vecinas la etiqueta las lista ("Camión 1 · Zona 1 +
+Zona 2"); sin tanda → "Sin tanda · Zona 4"; Retira y Súper aparte. Test `ppp-plan-nueva` +1 chequeo.
+
+**Rollback.** `update public."PPP_Web_Config" set valor = 0 where clave = 'sectores_activos';`
+(vuelve el bucle viejo sin redeploy) y `set valor_texto = '1,2' where clave = 'zonas_automaticas'`.
+Para sacar todo, el bloque final de `sql/gv_sectores.sql`.
 
 ### 3.x ✅ Armado intradía de zona 1 y 2 al llegar a 0,80 m³ (idea 7317) — 2026-09-05 sábado (v13.04)
 
