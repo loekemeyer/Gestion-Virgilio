@@ -12,13 +12,23 @@
 > única**; no se replica. Ante la duda entre parche rápido y fix de raíz → **fix
 > de raíz**.
 >
-> Última actualización: 2026-09-05 (sábado, tarde) · Versión app al documentar: **v12.96**
+> Última actualización: 2026-09-05 (sábado, tarde) · Versión app al documentar: **v12.97**
 >
 > ⚠⚠ **Estado del pipeline web desde el 2026-09-04 a la noche: la NUMERACIÓN ESTÁ PRENDIDA**
 > (`PPP_Web_Config.numeracion_activa = 1`), el cron de tandas (jobid 71, 00:01 hábiles) activo,
 > tandas con prefijo `GV-`. Sólo del lado Virgilio: el mail de las 12:30 de LK sigue andando y
 > Producción no se tocó (medido: ninguna función `ppp_web_*`/`gv_ppp_web_*` escribe en tabla
 > compartida). Primera corrida real: lunes 2026-09-07 00:01. Cómo apagar, en `CLAUDE.md`.
+>
+> Nota **v12.97** — **Tres mejoras chicas del backlog de agentes** (`agente_propuestas`, sin tocar
+> Supabase). **(4210)** Reasignar cajas: `rcConfirm()` con doble tap pasaba las cajas dos veces (doble
+> `stockMove` + doble RPC `reasignar_cajas`); ahora un candado `_rc._busy` frena el segundo toque
+> (`_rcConfirmInner()` es el cuerpo original). **(8818)** Premios/monitor: `fetchMonitorDayStats`
+> sumaba las horas de CADA TP/TAP/CC aunque el m³ de la tanda se contara una vez → dos cierres de la
+> misma tanda daban el doble de horas y la mitad de m³/h; ahora el tiempo se acredita **una vez por
+> tanda** (el popup de detalle sigue listando todos los cierres). **(2359)** Lista de tandas del
+> operario: el grupo de HOY va con borde ámbar y badge `HOY` (`.tandas-day-group.hoy`,
+> `.tandas-hoy-badge`). Test `tests/mejoras-v1297.cjs` (10 chequeos).
 >
 > Nota **v12.96** — **El Excel ISIS de Facturación deja de decir "prueba".** Desde v12.93 bajarlo es la
 > facturación de las NP web, pero el archivo seguía llamándose `PRUEBA_NO_IMPORTAR_*` y la hoja Resumen

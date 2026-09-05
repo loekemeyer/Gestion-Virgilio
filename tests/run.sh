@@ -269,3 +269,6 @@ PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node te
 
 echo "== ppp-crn-auto (v12.95: control de remito = entregado, solo; sin Excel) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/ppp-crn-auto.cjs
+
+echo "== mejoras-v1297 (4210 doble tap RC · 8818 horas por tanda · 2359 badge HOY) =="
+PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/mejoras-v1297.cjs

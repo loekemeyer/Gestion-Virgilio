@@ -368,6 +368,10 @@ button {
    monitor (.pweb-agregado-aviso) para que sea obvio que hablan de lo mismo. */
 .tandas-day-group.urgente{ border-color:#b91c1c; background:#fff1f1; }
 .tandas-day-header.urgente{ color:#b91c1c; }
+/* v12.97 (idea 2359) — el día de HOY resaltado en la lista de tandas */
+.tandas-day-group.hoy{ border-color:#b45309; background:#fffbeb; }
+.tandas-day-header.hoy{ color:#b45309; }
+.tandas-hoy-badge{ display:inline-block; margin-left:6px; padding:1px 7px; border-radius:999px; background:#b45309; color:#fff; font-size:11px; font-weight:800; letter-spacing:.3px; vertical-align:middle; }
 .tandas-urgente-linea{ display:flex; align-items:center; gap:8px; margin-bottom:6px; flex-wrap:wrap; }
 .tandas-urgente-txt{ font-size:13px; font-weight:700; color:#7f1d1d; line-height:1.3; }
 .tanda-chip.urgente{ background:#b91c1c; border-color:#7f1d1d; color:#fff; }
@@ -6156,9 +6160,12 @@ async function populateTandasList(filterMode) {
     ? grouped
     : grouped.slice(0, TANDAS_LIST_VISIBLE_DAYS);
   const hidden = grouped.length - visible.length;
+  // v12.97 (idea 2359) — el grupo de HOY se resalta: desde el celular todos los días se
+  // veían iguales y el operario tenía que leer la fecha para saber cuál tocaba.
+  const _hoyKey = getTodayKey();
   const groupsHtml = visible.map(g => `
-    <div class="tandas-day-group">
-      <div class="tandas-day-header">${escapeHtml(g.fechaDisplay)}</div>
+    <div class="tandas-day-group${g.fechaRaw === _hoyKey ? " hoy" : ""}">
+      <div class="tandas-day-header${g.fechaRaw === _hoyKey ? " hoy" : ""}">${escapeHtml(g.fechaDisplay)}${g.fechaRaw === _hoyKey ? ' <span class="tandas-hoy-badge">HOY</span>' : ""}</div>
       <div class="tandas-chips">
         ${g.codes.map(c => `<button class="tanda-chip" type="button" data-code="${escapeHtml(c)}" onclick="textInput.value=this.dataset.code;textInput.focus()">${escapeHtml(c)}</button>`).join("")}
       </div>
@@ -6805,7 +6812,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v12.96";
+const APP_VERSION = "v12.97";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -22708,7 +22715,17 @@ function rcPickDonor(i) { if (!_rc) return; _rc.donorSel = i; const d = (_rc.don
 function _rcMaxQ() { const donor = (_rc.donorSel != null) ? (_rc.donors || [])[_rc.donorSel] : null; const maxFalt = Math.max(1, Math.round(Number(_rc.sel.cajas_falto) || 1)); return donor ? Math.max(1, Math.min(maxFalt, donor.disp)) : maxFalt; }
 function rcQty(dd) { if (!_rc) return; const mx = _rcMaxQ(); _rc.qty = Math.max(1, Math.min(mx, _rc.qty + dd)); rcRender(); }
 function rcQtySet(v) { if (!_rc) return; const mx = _rcMaxQ(); let n = Math.max(1, parseInt(v, 10) || 1); if (n > mx) n = mx; _rc.qty = n; rcRender(); }
+/* v12.97 (idea 4210) — Candado anti doble-tap. rcConfirm hace cuatro awaits (RPC
+   reasignar_cajas, stockMove, líos, evento RC) sin deshabilitar el botón: dos toques
+   seguidos pasaban las cajas DOS veces (doble stock y doble lío). Un flag en _rc
+   frena el segundo toque hasta que termina el primero. */
 async function rcConfirm() {
+  if (!_rc || _rc._busy) return;
+  _rc._busy = true;
+  try { await _rcConfirmInner(); }
+  finally { if (_rc) _rc._busy = false; }
+}
+async function _rcConfirmInner() {
   if (!_rc || !_rc.sel || _rc.donorSel == null) return;
   const t = _rc.sel, d = (_rc.donors || [])[_rc.donorSel], qty = _rc.qty, leg = _rc.legajo;
   if (!d || qty <= 0) return;
@@ -24756,9 +24773,12 @@ async function fetchMonitorDayStats(dayKey, sheetMapArg) {
       const dur = computeClosureDur(leg, new Date(ev.ts_inicio).getTime(), new Date(ev.ts_cliente).getTime(), _br);
       const durOK = dur > 0 && dur < 24 * 3600 * 1000;
       const detail = { tanda, m3: tandaM3(tanda), ts_inicio: ev.ts_inicio, ts_cliente: ev.ts_cliente, durMs: dur, breakdown: _br };
-      if (ev.opcion === "TP"  && durOK) { p.pickedTandas.add(tanda); p.pickedDetail.push(detail); p.pickMs += dur; }
-      if (ev.opcion === "TAP" && durOK) { p.armedTandas.add(tanda);  p.armedDetail.push(detail);  p.armMs  += dur; }
-      if (ev.opcion === "CC"  && durOK) { p.ccTandas.add(tanda);     p.ccDetail.push(detail);     p.ccMs   += dur; }
+      // v12.97 (idea 8818) — el TIEMPO se acredita UNA vez por tanda, igual que el m³:
+      // si una tanda tiene dos TP/TAP (se cerró dos veces por error), antes el m³ se
+      // contaba una vez pero las horas dos → el m³/h de Premios salía a la mitad.
+      if (ev.opcion === "TP"  && durOK) { if (!p.pickedTandas.has(tanda)) p.pickMs += dur; p.pickedTandas.add(tanda); p.pickedDetail.push(detail); }
+      if (ev.opcion === "TAP" && durOK) { if (!p.armedTandas.has(tanda))  p.armMs  += dur; p.armedTandas.add(tanda);  p.armedDetail.push(detail);  }
+      if (ev.opcion === "CC"  && durOK) { if (!p.ccTandas.has(tanda))     p.ccMs   += dur; p.ccTandas.add(tanda);     p.ccDetail.push(detail);     }
     }
     if (ev.opcion === "PC" && ev.ts_inicio) {
       const dur = new Date(ev.ts_cliente) - new Date(ev.ts_inicio);
