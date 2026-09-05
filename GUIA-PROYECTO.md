@@ -12,7 +12,12 @@
 > única**; no se replica. Ante la duda entre parche rápido y fix de raíz → **fix
 > de raíz**.
 >
-> Última actualización: 2026-09-05 (sábado, noche) · Versión app al documentar: **v13.11**
+> Última actualización: 2026-09-05 (sábado, noche) · Versión app al documentar: **v13.12**
+>
+> Nota **v13.12** (front) — Programación sin los dos carteles de arriba (dueño, desde el celular:
+> *"sacá esas 2 alertas de ahí"*): el amarillo "N pedidos salieron en una fecha distinta a la
+> programada" (v8.61; la marca sigue por pedido en Pedidos Entregados) y el verde "✓ Sin errores
+> detectados". El panel de errores sigue apareciendo sólo cuando hay algo que corregir.
 >
 > Nota **v13.11** (front) — **La PPP tardaba 15 s en mostrar "A Programar" en el celular.** Medido en
 > los logs de Supabase (20:04 del 05/09): al abrir la PPP salían **~80 requests en 2 s** (base de

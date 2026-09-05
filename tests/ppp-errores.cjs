@@ -63,7 +63,7 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
     // ---- sin nada raro → panel limpio ----
     res = _pppComputeErrors([P({ np: "98016", tanda: "T4", localidad: "Flores", zona: "Zona 1 - CABA Sur" })], new Set());
     out.limpio = res.sacar.length + res.sinZona.length + res.zonaDif.length + res.tandasMal.length === 0 &&
-      /Sin errores/.test(pppErroresHtml(res));
+      pppErroresHtml(res) === "";   // v13.12: sin errores no se dibuja nada (dueño: "sacá esas 2 alertas")
 
     return out;
   });
