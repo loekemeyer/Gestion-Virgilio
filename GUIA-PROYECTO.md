@@ -12,13 +12,29 @@
 > única**; no se replica. Ante la duda entre parche rápido y fix de raíz → **fix
 > de raíz**.
 >
-> Última actualización: 2026-09-05 (sábado, noche) · Versión app al documentar: **v13.01**
+> Última actualización: 2026-09-05 (sábado, noche) · Versión app al documentar: **v13.02**
 >
 > ⚠⚠ **Estado del pipeline web desde el 2026-09-04 a la noche: la NUMERACIÓN ESTÁ PRENDIDA**
 > (`PPP_Web_Config.numeracion_activa = 1`), el cron de tandas (jobid 71, 00:01 hábiles) activo,
 > tandas con prefijo `GV-`. Sólo del lado Virgilio: el mail de las 12:30 de LK sigue andando y
 > Producción no se tocó (medido: ninguna función `ppp_web_*`/`gv_ppp_web_*` escribe en tabla
 > compartida). Primera corrida real: lunes 2026-09-07 00:01. Cómo apagar, en `CLAUDE.md`.
+>
+> Nota **v13.02** — **Cargado al camión = En Salida, fuera de Programación** (idea **4459**, dueño:
+> *"si hay pedidos que ya se cargaron a un camión, tienen que salir de la Programación y pasar a En
+> Salida, y no verse más en Programación"*; decisión: backend). Vista NUEVA **`gv_ppp_en_salida`**
+> (`sql/gv_ppp_en_salida.sql`): toda NP con evento **CCN** (carga camión por NP, legajo real), **sin
+> CRN** y sin un **FSS** posterior a la última carga, con tanda/cliente/m³/zona/fecha de carga/facturada.
+> Front: `pppRefreshEnSalida()` → `_pppEnSalida`; **Programación** esconde esas NP (junto con las
+> controladas, v12.95); **En Salida** pasa a ser exactamente esa lista (antes era "facturado sin
+> confirmar", que mezclaba lo facturado que todavía no salió: eso ahora sigue en Programación hasta
+> que se cargue); con el CRN la NP pasa sola a **Pedidos Entregados**. La pastilla **🚨 SIN CONTROLAR**
+> (cargado y vencido el plazo) se muestra en En Salida, que es donde ahora está la fila. Medido al
+> crearla: 23 NP cargadas sin CRN (14 estaban en Programación). Además vista **`gv_ppp_np_valor`**
+> (`sql/gv_ppp_np_valor.sql`): valor a lista por NP (ISIS y web, Σ cajas × uxb × precio, sin
+> descuentos) para el resumen "$" de la Programación nueva (todavía sin front). Tests
+> `tests/ppp-en-salida.cjs` (13) y `pweb-entregados` ajustado. Detalle §3.w de
+> `docs/SUPABASE-GESTION-VIRGILIO.md`.
 >
 > Nota **v13.01** — **La PPP (solapa Programación) se ve distinta** (dueño, con foto del monitor: *"se ve
 > feo"*). Antes cada tanda era una barra entera con degradé saturado del color del camión, y las

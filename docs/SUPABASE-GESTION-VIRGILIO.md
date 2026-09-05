@@ -1380,6 +1380,29 @@ es de Chef y pisa al LK 217): cuando Gestión alimente el tracking, escribir el 
 una función `gv_*` y pedir columna `empresa` en PaginaLK. Y el Excel ISIS de Facturación manda
 `N_Pedido` contador (no el id), como el mail: ISIS numera 98xxx por su cuenta.
 
+### 3.w ✅ Cargado al camión = En Salida (idea 4459) + valor a lista por NP — 2026-09-05 sábado (v13.02)
+
+**Qué pidió el dueño.** *"Si hay pedidos que ya se cargaron a un camión, tienen que salir de la
+Programación y pasar a En Salida, y no verse más en Programación."* Decisión (AskUserQuestion):
+backend, y también el **$ por pedido** del resumen por día de la Programación nueva en backend.
+
+**Vistas nuevas** (sólo lectura, `security_invoker`, grant select a anon/authenticated):
+- **`gv_ppp_en_salida`** (`sql/gv_ppp_en_salida.sql`, migraciones `gv_ppp_en_salida` y
+  `gv_ppp_en_salida_fss`): NP con CCN de legajo real, sin CRN, sin FSS posterior a la última
+  carga; enriquecida como `gv_ppp_entregados` (web por `PPP_Web_Programacion`, ISIS por las vistas
+  gv_ con canilla + `Facturacion_NP` + meta). Columnas: np, empresa, es_web, tanda, cod_cliente,
+  razon_social, m3, fecha_entrega, zona, barrio, direccion, fecha_carga, cargado_at, n_ccn, facturada.
+- **`gv_ppp_np_valor`** (`sql/gv_ppp_np_valor.sql`): valor_lista por NP = Σ cajas × uxb × precio_unit
+  (ISIS: `gv_ppp_base_pedidos` × `precios_venta`/`precios_venta_chef` según prefijo 4xxxx=Chef; web:
+  `PPP_Web_Base` × precios por empresa), más lineas y lineas_sin_precio. Sin descuentos.
+
+**Impacto medido** (como `anon`): `gv_ppp_en_salida` 23 NP (todas facturadas, cargas del 14/08 al
+04/09; 14 todavía en `gv_ppp_programacion_diaria` → esas dejan de verse en Programación y pasan a
+En Salida). `gv_ppp_np_valor` 822 NP (181 de las 182 programadas), 46 con alguna línea sin precio,
+total programado ≈ $334 M. Producción no lee ninguna de las dos. Sin escritura, sin trigger.
+
+**Rollback.** `drop view public.gv_ppp_en_salida; drop view public.gv_ppp_np_valor;` y front v13.01.
+
 ### 3.v ✅ Alerta `picking_sin_terminar` (idea 1471) — 2026-09-05 sábado (v13.00)
 
 **Qué.** Espejo de `armado_sin_terminar` para el picking: EP abierto > 24 h sin TP (últimos 7 días,

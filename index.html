@@ -6842,7 +6842,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v13.01";
+const APP_VERSION = "v13.02";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -25399,6 +25399,7 @@ function openPPP() {
   pppRefreshArmado();
   pppRefreshEntregado();
   pppRefreshControlado();   // controlados (CRN) + chequeo de carga sin controlar vencida (alarma + Telegram)
+  pppRefreshEnSalida();     // v13.02: cargados al camión sin CRN → salen de Programación, van a En Salida
   pppRefreshDelivered();    // v6.97: lista durable de Pedidos Entregados (badge correcto al abrir)
   pppRefreshMetaEntSet();   // v9.72: set de entregadas (hoja) para separar "En viaje" de "Entregados"
   pppAutoRenderStatus();    // auto-carga (File System Access): estado + arranque del chequeo
@@ -25932,7 +25933,7 @@ function pppImportarCompleta(rows, fname) {
   let nProg = 0;
   for (const np in r.edits) { ed[np] = Object.assign(ed[np] || {}, r.edits[np]); if (r.edits[np].programmed) nProg++; }
   pppSaveEdits();
-  _pppTab = "plan"; pppRenderProg(); pppRefreshArmado(); pppRefreshEntregado(); pppRefreshControlado();
+  _pppTab = "plan"; pppRenderProg(); pppRefreshArmado(); pppRefreshEntregado(); pppRefreshControlado(); pppRefreshEnSalida();
   pppSetStatus("✓ PPP completa cargada (" + fname + "): " + res.total + " pedidos · " + nProg + " ya programados (migración del Excel actual). SOLO LOCAL.", true);
 }
 async function pppHandleFile(tipo, f, buf, quiet) {     // de click, drag-drop o auto-carga
@@ -26349,6 +26350,7 @@ async function pppLoadProgFromSupabase() {
   if (typeof pppRefreshArmado === "function") pppRefreshArmado();
   if (typeof pppRefreshEntregado === "function") pppRefreshEntregado();
   if (typeof pppRefreshControlado === "function") pppRefreshControlado();
+  if (typeof pppRefreshEnSalida === "function") pppRefreshEnSalida();
   pppSetStatus("🟢 Programación de Supabase: " + supa.length + " pedidos (" + prog + " programados)"
     + (extra.length ? " + " + extra.length + " locales sin sincronizar" : "")
     + (web.length ? " + " + web.length + " de la página web" : "") + ".", true);
@@ -26429,7 +26431,7 @@ function _pppSearchStr(p) { return [p.np, p.cod, p.razon_social, p.tanda, p.loca
 function pppSetSearch(v) { _pppSearch = String(v == null ? "" : v).trim(); pppRenderProg(); }
 function pppLoadEntregados() { if (_pppEntregados) return _pppEntregados; let a = []; try { a = JSON.parse(localStorage.getItem(PPP_ENT_KEY) || "[]"); } catch (_e) {} _pppEntregados = new Set(Array.isArray(a) ? a.map(String) : []); return _pppEntregados; }
 function pppSaveEntregados() { try { localStorage.setItem(PPP_ENT_KEY, JSON.stringify(Array.from(pppLoadEntregados()))); } catch (_e) {} }
-function pppTab(t) { _pppTab = t; pppRenderProg(); if (t === "plan" || t === "ent" || t === "resumen") { pppRefreshArmado(); pppRefreshEntregado(); pppRefreshControlado(); } if (t === "ent" || t === "enviaje") { pppRefreshDelivered(); pppRefreshMetaEntSet(); } if (t === "ocup") pppRefreshOcupacion(); }
+function pppTab(t) { _pppTab = t; pppRenderProg(); if (t === "plan" || t === "ent" || t === "resumen") { pppRefreshArmado(); pppRefreshEntregado(); pppRefreshControlado(); } if (t === "plan" || t === "ent" || t === "enviaje" || t === "resumen") pppRefreshEnSalida(); if (t === "ent" || t === "enviaje") { pppRefreshDelivered(); pppRefreshMetaEntSet(); } if (t === "ocup") pppRefreshOcupacion(); }
 /* "Controlado" (manual, lo marca la operadora) → recién ahí el pedido pasa a Pedidos
    Entregados. _pppEntregados = NPs controlados (persistido en vir_ppp_entregados). */
 function pppControlar(np) { pppLoadEntregados().add(String(np)); pppSaveEntregados(); pppRenderProg(); }
@@ -26455,6 +26457,22 @@ async function pppRefreshArmado() {
 }
 let _pppEntregadoCC = null;
 let _pppLoadMs = null;   // NP -> ms de la PRIMERA carga (CCN), para el plazo de control
+/* v13.02 (idea 4459) — Regla del dueño: "si hay pedidos que ya se cargaron a un camión, tienen
+   que salir de la Programación y pasar a En Salida, y no verse más en Programación". La fuente
+   durable es la vista gv_ppp_en_salida (sql/gv_ppp_en_salida.sql): toda NP con CCN, sin CRN y
+   sin un FSS posterior. Programación la esconde; En Salida la lista; con el CRN pasa sola a
+   Pedidos Entregados (gv_ppp_entregados, v12.95). */
+let _pppEnSalida = null;   // Map np(normalizada) → fila de gv_ppp_en_salida
+async function pppRefreshEnSalida() {
+  try {
+    const rows = await supaFetchAllSafe(SUPABASE_URL + "/rest/v1/gv_ppp_en_salida",
+      "select=np,empresa,es_web,tanda,cod_cliente,razon_social,m3,fecha_entrega,zona,barrio,fecha_carga,cargado_at,facturada&order=cargado_at.desc");
+    const m = new Map();
+    (rows || []).forEach(function (r) { const np = _pppNpNorm(r.np); if (np) m.set(np, r); });
+    _pppEnSalida = m;
+    if (typeof pppRenderProg === "function") pppRenderProg();
+  } catch (_e) { if (!_pppEnSalida) _pppEnSalida = new Map(); }
+}
 async function pppRefreshEntregado() {
   try {
     const since = new Date(Date.now() - 60 * 24 * 60 * 60 * 1000).toISOString();
@@ -26575,17 +26593,39 @@ function _pppConfirmadas() {
 }
 function _pppSplitDelivered() {
   const conf = _pppConfirmadas();
-  const enViaje = [], entregados = [];
-  (_pppDelivered || []).forEach(function (p) { (conf.has(_pppNpNorm(p.np)) ? entregados : enViaje).push(p); });
+  const entregados = [];
+  const facturados = new Map();   // np → fila de la vista de facturados (trae cajas)
+  (_pppDelivered || []).forEach(function (p) { const k = _pppNpNorm(p.np); if (conf.has(k)) entregados.push(p); else facturados.set(k, p); });
+  // v13.02 (idea 4459) — EN SALIDA = lo CARGADO AL CAMIÓN sin control de remito (gv_ppp_en_salida).
+  // Antes era "facturado sin confirmar", que mezclaba lo facturado que todavía no salió (eso
+  // sigue en Programación hasta que se cargue). Si la NP también está en la vista de facturados
+  // se usa esa fila (tiene cajas); si no, se arma desde la vista.
+  const enViaje = [];
+  if (_pppEnSalida) {
+    _pppEnSalida.forEach(function (r, np) {
+      if (conf.has(np)) return;
+      const f = facturados.get(np);
+      if (f) { f._cargado = true; enViaje.push(f); return; }
+      const fc = String(r.fecha_carga || "").slice(0, 10), fp = String(r.fecha_entrega || "").slice(0, 10);
+      const frep = fc || fp;
+      enViaje.push({
+        np: String(r.np == null ? "" : r.np).trim(), tanda: (String(r.tanda == null ? "" : r.tanda).trim().toUpperCase() || "—"),
+        cod: String(r.cod_cliente == null ? "" : r.cod_cliente).trim(), rs: String(r.razon_social == null ? "" : r.razon_social).trim(),
+        m3: (r.m3 == null || r.m3 === "") ? null : Number(r.m3), cajE: 0, cajF: 0,
+        frep: frep, fkey: _pppYmdKey(frep), pppDate: fp, discrep: !!(fc && fp && fc !== fp), _cargado: true
+      });
+    });
+  }
   return { enViaje: enViaje, entregados: entregados };
 }
 function _pppEnViajeHtml() {
-  if (_pppDelivered == null || _pppMetaEntSet == null) return '<div class="planim-empty">Cargando pedidos en salida…</div>';
+  if (_pppDelivered == null || _pppMetaEntSet == null || _pppEnSalida == null) return '<div class="planim-empty">Cargando pedidos en salida…</div>';
   const list = _pppEntFilter(_pppSplitDelivered().enViaje);
-  if (!list.length) return '<div class="ppp-ent-note">' + (_pppSearch ? "Sin coincidencias." : "No hay pedidos en salida (todos los facturados están confirmados como entregados).") + '</div>';
-  let totM3 = 0; for (const p of list) totM3 += (p.m3 || 0);
+  if (!list.length) return '<div class="ppp-ent-note">' + (_pppSearch ? "Sin coincidencias." : "No hay pedidos en salida: nada cargado al camión sin controlar.") + '</div>';
+  let totM3 = 0, nVenc = 0; for (const p of list) { totM3 += (p.m3 || 0); if (_pppCargaVencida(p)) nVenc++; }
   const r = _pppEntGroupedHtml(list, true, 0);
-  return '<div class="ppp-ent-note">🚚 Pedidos <b>en salida</b> — ya se <b>facturaron</b> (salieron de la programación) pero <b>todavía no se confirmó la entrega</b> (sin control de remito ni en la hoja de entregados). Incluye lo facturado sin cargar y lo cargado sin controlar. <b>' + list.length + '</b> pedido(s) · <b>' + totM3.toFixed(2) + '</b> m³.</div>' + r.html;
+  return '<div class="ppp-ent-note">🚚 Pedidos <b>en salida</b> — ya se <b>cargaron al camión</b> (salieron de Programación) y <b>todavía no se controló el remito</b>. Con el control pasan solos a Pedidos Entregados. <b>' + list.length + '</b> pedido(s) · <b>' + totM3.toFixed(2) + '</b> m³.' +
+    (nVenc ? ' <span style="color:#b91c1c;font-weight:800;">· 🚨 ' + nVenc + ' cargado(s) SIN CONTROLAR pasado el plazo</span>' : '') + '</div>' + r.html;
 }
 function _pppYmdKey(s) { const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(s || "")); return m ? (m[1] + m[2] + m[3]) : ""; }
 async function pppRefreshDelivered() {
@@ -26718,7 +26758,9 @@ function _pppEntGroupedHtml(list, showCajas, cap) {
         const cajas = (showCajas && p.cajE) ? (' · ' + p.cajE + ' cj' + (p.cajF ? ' <span style="color:#dc2626">(faltó ' + p.cajF + ')</span>' : '')) : '';
         // v8.33 — si carga camión ≠ PPP, marcar (la PPP se cargó con otra fecha)
         const disc = (p.discrep && p.pppDate) ? ' <span style="color:#b45309;font-weight:700;" title="Salió (carga camión) en otra fecha que la de la PPP — revisar la PPP">⚠ PPP decía ' + p.pppDate.slice(8, 10) + '/' + p.pppDate.slice(5, 7) + '</span>' : '';
-        html += '<div class="ppp-ent-row"><b>' + escapeHtml(p.np) + '</b> ' + escapeHtml((p.rs || p.cod || "").slice(0, 32)) + (p.m3 != null ? ' <span class="ppp-ent-m3">' + p.m3.toFixed(3) + ' m³</span>' : '') + cajas + disc + '</div>';
+        // v13.02 — en En Salida, lo cargado y sin controlar pasado el plazo lleva la pastilla roja (antes iba en Programación).
+        const venc = (p._cargado && _pppCargaVencida(p)) ? ' <span class="ppp-cargvenc-badge">🚨 SIN CONTROLAR</span>' : '';
+        html += '<div class="ppp-ent-row"><b>' + escapeHtml(p.np) + '</b> ' + escapeHtml((p.rs || p.cod || "").slice(0, 32)) + (p.m3 != null ? ' <span class="ppp-ent-m3">' + p.m3.toFixed(3) + ' m³</span>' : '') + cajas + disc + venc + '</div>';
       }
       html += '</div>';
     }
@@ -29161,20 +29203,24 @@ function pppRenderProg() {
   for (const p of (_pppParsed.prog || [])) { const k = String(p.np).trim(); if (!k || _vistos[k]) continue; _vistos[k] = 1; all.push(merge(p)); }
   if (!all.length) { _renderKeepFocus(box, '<div class="planim-empty">Importá el <b>Formato PPP</b> — los pedidos del día se suman a los que ya estaban y caen en <b>A Programar</b>.</div>'); return; }
   const ent = pppLoadEntregados();
+  // v13.02 (idea 4459) — lo CARGADO AL CAMIÓN (gv_ppp_en_salida) también sale de Programación:
+  // va a En Salida hasta el control de remito. Misma idea que el CRN de v12.95.
+  const _sal = _pppEnSalida || new Map();
+  const _fuera = function (p) { return ent.has(String(p.np)) || _sal.has(_pppNpNorm(p.np)); };
   let programados, aProgramar, entreg, _errInfo = null;
   if (PPP_READONLY) {
     // v12.95 — Regla del dueño: controlado el remito, el pedido SALE de Programación solo.
     // Antes (como en Producción) la fila quedaba con "🚮 SACAR" hasta que la operadora lo
     // borraba del Excel de ISIS. En Gestión no hay Excel que corregir: se esconde y pasa a
     // Pedidos Entregados. Los errores (zona) se calculan sobre lo que sigue en programación.
-    const notEnt = all.filter(function (p) { return !ent.has(String(p.np)); });
+    const notEnt = all.filter(function (p) { return !_fuera(p); });
     _errInfo    = _pppComputeErrors(notEnt, ent);                        // anota p._err + arma el panel
     try { _pppEmitError(_errInfo); } catch (_e) {}                       // v4.05: aviso Telegram si hay errores PPP
     entreg      = all.filter(function (p) { return ent.has(String(p.np)); });
     programados = notEnt.filter(function (p) { return p.programmed; });
     aProgramar  = notEnt.filter(function (p) { return !p.programmed; });
   } else {
-    const notEnt = all.filter(function (p) { return !ent.has(String(p.np)); });
+    const notEnt = all.filter(function (p) { return !_fuera(p); });
     entreg      = all.filter(function (p) { return ent.has(String(p.np)); });
     programados = notEnt.filter(function (p) { return p.programmed; });
     aProgramar  = notEnt.filter(function (p) { return !p.programmed; });
@@ -29186,7 +29232,7 @@ function pppRenderProg() {
     programados = programados.filter(mt); aProgramar = aProgramar.filter(mt); entreg = entreg.filter(mt);
   }
   // v9.72 — split de facturados en "En viaje" (sin confirmar entrega) y "Entregados" (confirmados)
-  const _pppSplit = (_pppDelivered != null && _pppMetaEntSet != null) ? _pppSplitDelivered() : null;
+  const _pppSplit = (_pppDelivered != null && _pppMetaEntSet != null && _pppEnSalida != null) ? _pppSplitDelivered() : null;
   let html = pppTabsHtml((_apr && _apr.listo) ? _apr.pedidos.length : null, programados.length,
     (_pppSplit ? _pppSplit.enViaje.length : null),
     (_pppSplit ? _pppSplit.entregados.length : (_pppDelivered ? _pppDelivered.length : entreg.length)));

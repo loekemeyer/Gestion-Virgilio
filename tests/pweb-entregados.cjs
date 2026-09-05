@@ -47,6 +47,10 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
       if (url.indexOf("ppp_entregados_meta") >= 0) return J([
         { np: "98574", cod: "2533", rs: "Osa Distribuidora", tanda: "C03B", m3: 0.5, fecha_entrega: "2026-09-10" }
       ]);
+      // v13.02 — En Salida = lo CARGADO al camión sin CRN (gv_ppp_en_salida): la 98575 está cargada.
+      if (url.indexOf("gv_ppp_en_salida") >= 0) return J([
+        { np: "98575", empresa: "lk", es_web: false, tanda: "C03B", cod_cliente: "2540", razon_social: "Otro", m3: 0.3, fecha_entrega: "2026-09-10", fecha_carga: "2026-09-10", cargado_at: "2026-09-10T13:00:00Z", facturada: true }
+      ]);
       // v12.95 — gv_ppp_entregados reemplaza a gv_ppp_web_entregados (toda NP con CRN, ISIS o web)
       if (url.indexOf("gv_ppp_entregados") >= 0) {
         if (webFalla) return J([], false);
@@ -68,6 +72,7 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
 
     // (b) entregados vs en viaje
     await pppRefreshDelivered();
+    await pppRefreshEnSalida();
     const sp = _pppSplitDelivered();
     out.entregados = sp.entregados.map(x => x.np).sort().join(",");
     out.enViaje    = sp.enViaje.map(x => x.np).sort().join(",");
@@ -94,7 +99,7 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
     ["confirmadas: la NP web viene de gv_ppp_web_entregados",   r.confWeb === true],
     ["confirmadas: la que no se controló no está",              r.confNo === true],
     ["entregados = ISIS confirmada + web controlada",           r.entregados === "98574,LK 1344"],
-    ["en viaje = la que nadie confirmó",                        r.enViaje === "98575"],
+    ["en salida = la cargada que nadie confirmó (v13.02)",      r.enViaje === "98575"],
     ["histórico: la fila web trae cliente",                     r.histWeb && r.histWeb.cod === "4188" && r.histWeb.rs === "Orfali"],
     ["histórico: tanda, m³ y fecha con la misma forma",         r.histWeb && r.histWeb.tanda === "GV-02A" && r.histWeb.m3 === 1.184 && r.histWeb.frep === "2026-09-11" && r.histWeb.fkey === "20260911"],
     ["histórico: la de ISIS sigue",                             r.histIsis === true],
