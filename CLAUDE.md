@@ -110,8 +110,9 @@ ISIS: sábado 12:30, pedidos 1340..1349. **⚠ Cambio del sábado a la noche (v1
 "el lunes van a empezar a usar GV, no más PV" → el mail del sábado se IGNORA y GV programa también
 los 1340..1349** (`PPP_Web_Config.excluir_enviados_a_isis = 0`; no cargar ese mail en ISIS, quedarían
 dobles). **Desde el lunes 2026-09-07 los operarios usan Gestión.** El cron de Chef vive en su proyecto (nkhzocgdpwtgrmwleihr, sin
-acceso desde acá): lo apaga el dueño desde el Dashboard; hasta entonces lo que Chef mande por
-mail sigue siendo de Producción (regla `enviado_a_isis`).
+acceso desde acá): lo apaga el dueño desde el Dashboard. **⚠ Con el interruptor en 0 también los
+pedidos de Chef que salgan por su mail los programa GV: ese mail hay que IGNORARLO (no cargarlo en
+ISIS) hasta apagar el cron, si no quedan dobles.** Apagarlo es urgente desde el lunes.
 Detalle, medición y rollback en `docs/SUPABASE-GESTION-VIRGILIO.md` §3.l y §3.p.
 
 - **NP** → **la NP web ES el número de pedido de la página** (v12.92, dueño: *"ya cuando

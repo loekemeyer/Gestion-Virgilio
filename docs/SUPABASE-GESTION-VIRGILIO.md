@@ -1414,7 +1414,11 @@ A mano en "A Programar": **1340** (Retira), **1341** (Martínez, zona 6), **1349
 Producción: nada cambia (función `gv_`, tabla nuestra).
 
 **⚠ Para el dueño:** si alguien carga igual el mail del sábado en ISIS, esos 10 pedidos van a
-existir dos veces (ISIS y GV). No cargarlo.
+existir dos veces (ISIS y GV). No cargarlo. **Y lo mismo con Chef:** el interruptor es uno solo
+para las dos empresas, así que lo que el cron de Chef siga mandando por mail (12:30, hasta que se
+apague en su Dashboard) también lo programa GV → ese mail se ignora. Apagar el cron de Chef pasa a
+ser urgente. Si se quisiera volver a la regla vieja sólo para Chef, habría que desdoblar el
+interruptor por empresa (no está hecho).
 
 **Rollback.** `update public."PPP_Web_Config" set valor = 1 where clave = 'excluir_enviados_a_isis';`
 
