@@ -92,12 +92,32 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
     out.filaIsis = html.indexOf('data-fac-np="98574"') >= 0;
     out.tandasFC = (_facLastTandas || []).map(t => t.tanda).sort().join(",");
 
-    // (c)+(d) tilde de la web
+    // v12.93 — regla del dueño: la NP web NO se tilda (se factura bajando el Excel ISIS)
+    // y la de ISIS NO va al Excel (se tilda). La fila lo refleja:
+    const filaWeb = html.slice(html.indexOf('data-fac-np="LK 1344"'), html.indexOf('</tr>', html.indexOf('data-fac-np="LK 1344"')));
+    out.webSinTilde   = filaWeb.length > 0 && filaWeb.indexOf("fac-btn-tick") < 0 && filaWeb.indexOf("fac-tick-web") >= 0;
+    out.webConCasilla = /class="fac-xls-chk" data-np="LK 1344"/.test(filaWeb);
+    const filaIsis = html.slice(html.indexOf('data-fac-np="98574"'), html.indexOf('</tr>', html.indexOf('data-fac-np="98574"')));
+    out.isisConTilde  = filaIsis.indexOf("fac-btn-tick") >= 0;
+    out.isisSinCasilla = filaIsis.indexOf("fac-xls-chk") < 0;
+
+    // (c) el tilde sobre una NP web se niega: no escribe nada
     const btn = document.createElement("button");
     btn.dataset.args = JSON.stringify({ np: "LK 1344", tanda: "GV-02A", m3: 1.184, rs: "Orfali", cod: "4188", feRaw: "2026-09-11" });
     await window.facTickNP(btn);
+    out.tildeWebNoEscribe = posts.length === 0;
+
+    // (d) bajar el Excel con la NP web marcada = facturada (Facturacion_NP + drenaje)
+    window.requireSupervisor = () => true;
+    window._facXlsArmar = async (nps) => nps.map(np => ({ np: np, cod_art: "586", cajas: 1 }));
+    window._facXlsDescargarXlsx = () => {};
+    window._facXlsDescargar = () => {};
+    _facXlsSel = new Set(["LK 1344", "98574"]);   // la de ISIS se tiene que caer sola
+    await facXlsBajar();
+    out.isisSacadaDelExcel = !_facXlsSel.has("98574");
     out.postNp    = posts.length ? posts[0].np : null;
     out.postTanda = posts.length ? posts[0].tanda : null;
+    out.postsN    = posts.length;
     const drenWeb = stockRows.filter(x => x.ref === "GV-02A|LK 1344");
     out.drenWebN       = drenWeb.length;
     out.drenWebEmpresa = drenWeb.length ? drenWeb[0].empresa : null;
@@ -128,8 +148,15 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
     ["la fila de la NP web se dibuja en Facturación",           r.filaWeb === true],
     ["al lado de la de ISIS",                                   r.filaIsis === true],
     ["las dos tandas quedan como FC",                           r.tandasFC === "C03B,GV-02A"],
-    ["el tilde escribe la etiqueta, no un número",              r.postNp === "LK 1344"],
+    ["la fila web NO tiene tilde",                              r.webSinTilde === true],
+    ["y SÍ tiene la casilla del Excel",                         r.webConCasilla === true],
+    ["la fila de ISIS SÍ tiene tilde",                          r.isisConTilde === true],
+    ["y NO tiene casilla del Excel",                            r.isisSinCasilla === true],
+    ["tildar una NP web no escribe nada",                       r.tildeWebNoEscribe === true],
+    ["al bajar el Excel, la de ISIS marcada se cae sola",       r.isisSacadaDelExcel === true],
+    ["bajar el Excel escribe la etiqueta, no un número",        r.postNp === "LK 1344"],
     ["con su tanda",                                            r.postTanda === "GV-02A"],
+    ["y una sola NP (la de ISIS no)",                           r.postsN === 1],
     ["el drenaje de la NP web genera movimiento",               r.drenWebN === 1],
     ["y manda empresa = LK explícita",                          r.drenWebEmpresa === "LK"],
     ["por la cantidad armada (1 caja)",                         r.drenWebDelta === -1],

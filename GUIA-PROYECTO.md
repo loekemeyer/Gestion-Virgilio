@@ -12,13 +12,26 @@
 > única**; no se replica. Ante la duda entre parche rápido y fix de raíz → **fix
 > de raíz**.
 >
-> Última actualización: 2026-09-05 (madrugada) · Versión app al documentar: **v12.92**
+> Última actualización: 2026-09-05 (madrugada) · Versión app al documentar: **v12.93**
 >
 > ⚠⚠ **Estado del pipeline web desde el 2026-09-04 a la noche: la NUMERACIÓN ESTÁ PRENDIDA**
 > (`PPP_Web_Config.numeracion_activa = 1`), el cron de tandas (jobid 71, 00:01 hábiles) activo,
 > tandas con prefijo `GV-`. Sólo del lado Virgilio: el mail de las 12:30 de LK sigue andando y
 > Producción no se tocó (medido: ninguna función `ppp_web_*`/`gv_ppp_web_*` escribe en tabla
 > compartida). Primera corrida real: lunes 2026-09-07 00:01. Cómo apagar, en `CLAUDE.md`.
+>
+> Nota **v12.93** — **Facturación: la NP de ISIS se TILDA, la NP web se FACTURA BAJANDO EL EXCEL. Ni una
+> al revés.** Dueño (2026-09-05): *"los del módulo anterior (98xxx / 44xxx) sean los únicos que se
+> pueden cliquear en Facturación, y los de la nueva numeración sean los que se descargan en el Excel;
+> no puede hacerse el caso opuesto en ninguno de los dos"*. En la lista: fila de ISIS → botón ✓ y sin
+> casilla; fila web (`LK 1350`) → casilla del Excel y, en vez del ✓, la marca «⬇ Excel». `facTickNP`
+> se niega sobre una NP web (`facNpEsWeb`), `facXlsBajar` saca de la selección cualquier NP de ISIS.
+> **Bajar el Excel ES la facturación de las NP web** (elegido por el dueño): cada NP que va en el
+> archivo queda marcada igual que con el tilde — `Facturacion_NP` + drenaje de stock — vía el núcleo
+> nuevo `facMarcarFacturada(args, headers)`, que ahora también usa el tilde. La sesión se pide ANTES
+> de bajar (sin sesión no se baja: un archivo sin marcar se bajaría dos veces). El botón deja de decir
+> «(prueba)»: «⬇ Excel ISIS (NP web)». Sólo front: `Facturacion_NP` es tabla compartida con Producción
+> y no admite trigger. Test `tests/pweb-facturacion.cjs` (27 chequeos).
 >
 > Nota **v12.92** — **La NP web ES el número de pedido de la página.** Dueño: *"tiene que ser
 > automático: ya cuando llegan a página LK y a Gestión Virgilio, ya vienen con numeración. En
