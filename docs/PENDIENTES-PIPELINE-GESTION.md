@@ -156,6 +156,24 @@ los ítems**, así que el cliente puede sacar y bajar cantidades. Y su ventana e
 12:30 / hasta `enviado_a_compras_at`*, no *hasta que se factura*. Ver el bloque de
 decisiones abiertas al final de este archivo.
 
+**Actualización 2026-09-05 (sábado, noche).**
+- **LK**: candado "sólo agregar" en la RPC `edit_order_fast` (v2.3.300) + facturado/entregado
+  en Gestión bloquea la edición (v2.3.301, idea 8743).
+- **Chef** (`paginach` v2.0.29): el módulo **no existía** (sólo Descargar y Repetir) y se
+  construyó. Chef es distinto: no tiene RPC de pedidos, inserta directo en `orders` /
+  `order_items` desde el navegador. La edición hace lo mismo: **inserta sólo el delta** en
+  `order_items`, actualiza `orders` (subtotal/total con los descuentos del pedido) y
+  **reescribe `sheets_payload.items`** — ⚠ es lo que leen Gestión (`gv_pedidos_web_np_chef`,
+  en LK, vía la foreign table `chef_orders`) y el mail de las 12:30 de Chef; `order_items` no
+  lo lee nadie río abajo. Ventana: `enviado_a_compras_at is null` (el cron de Chef sigue
+  prendido). Candado de UI + chequeo en el front; el **candado server** está escrito en
+  `paginach/sql/edit_order_fast_chef.sql` (RPC + policies opcionales) y **lo corre el dueño**
+  en el SQL editor del proyecto Chef (`nkhzocgdpwtgrmwleihr`, sin acceso desde acá); después
+  el front pasa a llamar la RPC. Test headless `paginach/tests/editar-pedido.cjs` (17 chequeos).
+  ⚠ Chef se hospeda en IIS (`web.config`): el push a `main` no publica solo, hay que subirlo.
+- **Queda**: el estado de Gestión en "Mis pedidos" de Chef (como LK v2.3.301) → FDW Chef →
+  Virgilio, también SQL del dueño en Chef.
+
 ### [ ] 9357 — Fecha de entrega de Supers: tiene que viajar con el pedido
 
 Textual: *"Fecha de entrega Supers (tiene que viajar a Supa junto con el pedido; bot la
