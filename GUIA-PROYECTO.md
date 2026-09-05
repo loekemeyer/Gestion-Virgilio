@@ -12,13 +12,29 @@
 > única**; no se replica. Ante la duda entre parche rápido y fix de raíz → **fix
 > de raíz**.
 >
-> Última actualización: 2026-09-05 (madrugada) · Versión app al documentar: **v12.93**
+> Última actualización: 2026-09-05 (sábado, tarde) · Versión app al documentar: **v12.94**
 >
 > ⚠⚠ **Estado del pipeline web desde el 2026-09-04 a la noche: la NUMERACIÓN ESTÁ PRENDIDA**
 > (`PPP_Web_Config.numeracion_activa = 1`), el cron de tandas (jobid 71, 00:01 hábiles) activo,
 > tandas con prefijo `GV-`. Sólo del lado Virgilio: el mail de las 12:30 de LK sigue andando y
 > Producción no se tocó (medido: ninguna función `ppp_web_*`/`gv_ppp_web_*` escribe en tabla
 > compartida). Primera corrida real: lunes 2026-09-07 00:01. Cómo apagar, en `CLAUDE.md`.
+>
+> Nota **v12.94** — **CORTE REAL: el mail de las 12:30 de LK está APAGADO (sábado 05/09, 13:50 ART) y los
+> bloques web son los de ISIS.** Un cruce de sólo lectura sobre `pagina-lk-copia`, `paginach`, la base de LK
+> y Gestión confirmó que el número coincide (`LK 1350` = "Pedido N° 1350" = `orders.id`; `CH 0217` =
+> `chef_orders.id`) pero los bloques no: ISIS/el mail cortan de a 18/15 **seguidos** en el orden del carrito
+> (LK ya guarda los ítems por código ascendente) y Gestión repartía por serpentina de m³ (1345: mail 18+4,
+> Gestión 11+11). Dueño: **igual que ISIS** → `v_pedidos_web_np` y `gv_pedidos_web_np_chef` (LK) parten por
+> `linea_rn` en cortes de 18/15; medido 1345 → 18+4 con las mismas 18 primeras líneas, Chef 205 → 15+12.
+> Y el riesgo alto: el mail seguía prendido y ese sábado a las 12:30 mandó a ISIS los pedidos 1340..1349
+> que Gestión iba a programar el lunes → doble armado. Dueño: **apagar el mail** → crons 7 y 10 de LK en
+> `active=false`; Chef lo apaga el dueño en su proyecto. La regla de pendiente suma **`enviado_a_isis`**
+> como primer motivo (`gv_pedidos_web_excluidos`): lo que ya salió por mail es de Producción; lo que no
+> (el 1350 del sábado 12:49 y todo lo que venga) es de Gestión. `gestion_desde` queda en 03/09 como piso —
+> moverlo al lunes, como se dijo, dejaba huérfanos los pedidos del fin de semana que ya no salen por mail.
+> Edge Fn v13 y `aprTraerPedidos` pasan `enviado_a_compras` a la RPC. Detalle §3.p de
+> `docs/SUPABASE-GESTION-VIRGILIO.md`. Test `tests/pweb-pendiente.cjs`.
 >
 > Nota **v12.93** — **Facturación: la NP de ISIS se TILDA, la NP web se FACTURA BAJANDO EL EXCEL. Ni una
 > al revés.** Dueño (2026-09-05): *"los del módulo anterior (98xxx / 44xxx) sean los únicos que se

@@ -143,15 +143,13 @@ begin
       from con_m3 c
   ),
   orden as (
-    select t.*, row_number() over (partition by t.l_order_id
-                                   order by t.linea_m3 desc, t.linea_rn) as rk from tramos t
+    -- 2026-09-05 (dueño, v12.94): bloques SEGUIDOS de a 15 en el orden del carrito,
+    -- igual que el mail de Chef / ISIS (44592 = primeras 15 líneas del pedido 205,
+    -- 44593 las 12 restantes). Antes: serpentina balanceada por m³.
+    select t.*, row_number() over (partition by t.l_order_id order by t.linea_rn) as rk from tramos t
   ),
   part as (
-    select o.*,
-           (case when ((o.rk - 1) % (2 * o.n_tramos)) < o.n_tramos
-                 then ((o.rk - 1) % (2 * o.n_tramos)) + 1
-                 else 2 * o.n_tramos - ((o.rk - 1) % (2 * o.n_tramos))
-            end)::int as l_np_idx
+    select o.*, ceil(o.rk::numeric / 15)::int as l_np_idx
       from orden o
   )
   select

@@ -1336,6 +1336,50 @@ pedido **1349**, Chef por el **217**. Test `tests/pweb-np-es-pedido.cjs`.
 **Rollback:** el backup (volver a la etiqueta de dos parámetros, el contador y las vistas) +
 PK original de `PPP_Web_NP`; front v12.91; Edge Fn v11. Sólo mientras no haya nada numerado.
 
+### 3.p ✅ Corte real: mail de las 12:30 de LK APAGADO, bloques como ISIS — 2026-09-05 sábado 13:50 ART (v12.94)
+
+Un cruce de sólo lectura sobre los repos `pagina-lk-copia`, `paginach`, la base de LK y
+Gestión (17 agentes, 4 desvíos verificados por tres escépticos cada uno) confirmó:
+**el número coincide** (`LK 1350` = "Pedido N° 1350" de la página = `orders.id`; `CH 0217` =
+`chef_orders.id` 217), **los bloques no** (ISIS/el mail cortan de a 18/15 SEGUIDOS en el orden
+del carrito, que en LK ya viene por código ascendente; Gestión repartía por serpentina de m³:
+misma cantidad, otras líneas — pedido 1345: mail 18+4, Gestión 11+11), y **el riesgo alto**: el
+mail seguía prendido, ese mismo sábado a las 12:30 mandó a ISIS los pedidos 1340..1349, y
+Gestión los tenía como pendientes para el lunes → doble armado.
+
+Decisiones del dueño: **bloques igual que ISIS** y **corte al lunes + apagar el mail**.
+
+| objeto | proyecto | qué |
+|---|---|---|
+| cron 7 `procesar-pedidos-web` (`30 15 * * *`) y cron 10 `retry-procesar-pedidos` (`2-59/6 15,16 * * *`) | **LK** | `cron.alter_job(…, active := false)` a las 13:50 ART del sábado. Último envío: sábado 12:30, pedidos 1340..1349. **Chef tiene su propio cron en su proyecto (nkhzocgdpwtgrmwleihr): lo apaga el dueño desde el Dashboard.** |
+| `v_pedidos_web_np` | LK | bloques seguidos: `rk = row_number() over (partition by empresa, order_id order by linea_rn)`, `np_idx = ceil(rk / cap_lineas)`. Únicos consumidores: `gv_pedidos_web_np_lk` / `_chef` (medido con `pg_depend` + `pg_proc`). `sql/pedidos_web_lk.sql` |
+| `gv_pedidos_web_np_chef` | LK | idem, de a 15 por `linea_rn`. `sql/gv_pedidos_web_np_feeds.sql` |
+| `gv_pedidos_web_excluidos` | Virgilio | **vuelve `enviado_a_compras` como primer motivo (`enviado_a_isis`)**: lo que ya salió por mail es de Producción. `gestion_desde` se queda en 2026-09-03 como piso. `sql/gv_pedidos_web_excluidos.sql` |
+| Edge Fn v13 · front v12.94 | Virgilio | pasan `enviado_a_compras` en `p_pedidos` (`soloPendientes`, `aprTraerPedidos`) |
+
+**Por qué no se movió `gestion_desde` al lunes** (lo que el dueño eligió literalmente): con el
+mail apagado el sábado a la tarde, el pedido 1350 (sábado 12:49) y los del domingo no salen por
+mail nunca; excluidos por fecha, no los tomaría nadie. Con `enviado_a_compras` el corte es
+exacto —el último mail— y no hay ni dobles ni huérfanos. Es lo que el dueño pidió ("cero
+dobles"), implementado por la bandera y no por la fecha.
+
+**Medido:** `v_pedidos_web_np` 1345 → `1: 18 líneas (315…551)` + `2: 4 líneas`, y las 18 son
+exactamente las primeras 18 de `v_pedidos_web` por `linea_rn`; en 60 días los bloques no
+finales tienen siempre 18. Chef 205 → `1: 15` + `2: 12`, primeras 15 en orden de carrito.
+RPC: `1349 (enviado) → enviado_a_isis`, `1350 (no enviado, 05/09) → pendiente`, `1300 (20/08)
+→ anterior_al_cambio`. Corrida en seco del job (Edge Fn v13, `?dry=1&fecha=2026-09-07`):
+LK 213 pedidos → `enviado_a_isis` 212 · pendiente **1 pedido (el 1350, 4 NP, Zona 1)**; Chef 26 →
+`enviado_a_isis` 26 · pendiente **0**. El lunes 00:01 arranca con lo que caiga desde el sábado 12:30.
+
+**Rollback:** LK `select cron.alter_job(7, active := true); select cron.alter_job(10, active := true);`;
+la vista y la función con serpentina están en git (commit 0469989, `sql/pedidos_web_lk.sql` y
+`sql/gv_pedidos_web_np_feeds.sql`); la RPC v12.89 en el commit 473cf7f; Edge Fn v12; front v12.93.
+
+Quedaron anotados, sin tocar: `order_tracking` de LK cruza por id pelado y mezcla LK/Chef (id 217
+es de Chef y pisa al LK 217): cuando Gestión alimente el tracking, escribir el id pelado por
+una función `gv_*` y pedir columna `empresa` en PaginaLK. Y el Excel ISIS de Facturación manda
+`N_Pedido` contador (no el id), como el mail: ISIS numera 98xxx por su cuenta.
+
 ---
 
 ## 4. Incidente de seguridad — 2026-09-04 (cerrado)

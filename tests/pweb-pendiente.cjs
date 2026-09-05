@@ -48,7 +48,7 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
         { empresa: "lk", order_id: 1348, np_idx: 1, cod: "4109", razon_social: "Di Leo", fecha_recep: "2026-09-04", direccion: "Bragado 5742 - Mataderos", lineas: 18, cajas: 20, items: [], m3: 0.5,  m3_parcial: false, localidad: "", zona_expreso: "Zona 1" },
         { empresa: "lk", order_id: 1348, np_idx: 2, cod: "4109", razon_social: "Di Leo", fecha_recep: "2026-09-04", direccion: "Bragado 5742 - Mataderos", lineas: 4,  cajas: 5,  items: [], m3: 0.1,  m3_parcial: false, localidad: "", zona_expreso: "Zona 1" },
         { empresa: "lk", order_id: 1300, np_idx: 1, cod: "4188", razon_social: "Orfali", fecha_recep: "2026-08-20", direccion: "Juncal 2869 - Martinez",  lineas: 3,  cajas: 3,  items: [], m3: 0.2,  m3_parcial: false, localidad: "", zona_expreso: "Zona 6" },
-        { empresa: "lk", order_id: 1310, np_idx: 1, cod: "2533", razon_social: "Osa",    fecha_recep: "2026-09-03", direccion: "Rivadavia 100 - Caballito", lineas: 2, cajas: 2,  items: [], m3: 0.05, m3_parcial: false, localidad: "", zona_expreso: "Zona 2" },
+        { empresa: "lk", order_id: 1310, np_idx: 1, cod: "2533", razon_social: "Osa",    fecha_recep: "2026-09-03", direccion: "Rivadavia 100 - Caballito", lineas: 2, cajas: 2,  items: [], m3: 0.05, m3_parcial: false, localidad: "", zona_expreso: "Zona 2", enviado_a_compras: true },
         { empresa: "lk", order_id: 1350, np_idx: 1, cod: "1651", razon_social: "Inc SA", fecha_recep: "2026-09-04", direccion: "Corrientes 500 - Centro", lineas: 2, cajas: 2,  items: [], m3: 0.05, m3_parcial: false, localidad: "", zona_expreso: "Zona 2" }
       ]);
       return json([]);
@@ -60,7 +60,10 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
     const pp = (body.p_pedidos || []);
     out.unoPorPedido = pp.length === 4 && new Set(pp.map(x => x.order_id)).size === 4;
     const p1348 = pp.find(x => x.order_id === 1348) || {};
-    out.campos = p1348.empresa === "lk" && p1348.cod === "4109" && p1348.fecha_recep === "2026-09-04";
+    // v12.94 — viaja también enviado_a_compras (lo que salió a ISIS por el mail es de Producción)
+    const p1310 = pp.find(x => x.order_id === 1310) || {};
+    out.campos = p1348.empresa === "lk" && p1348.cod === "4109" && p1348.fecha_recep === "2026-09-04"
+      && p1348.enviado_a_compras === false && p1310.enviado_a_compras === true;
     out.ids = peds.map(x => x.order_id).sort().join(",");
     const g = peds.find(x => x.order_id === 1348);
     out.bloques1348 = g ? g.bloques.length : null;
@@ -78,7 +81,7 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
   const checks = [
     ["la pantalla llama a la RPC una vez",                     r.rpcLlamadas === 1],
     ["con un registro por PEDIDO (4), no por bloque (5)",      r.unoPorPedido === true],
-    ["y con empresa, cod y fecha_recep",                       r.campos === true],
+    ["y con empresa, cod, fecha_recep y enviado_a_compras",    r.campos === true],
     ["los excluidos (1300 y 1310) no aparecen",                r.ids === "1348,1350"],
     ["el pedido partido conserva sus 2 bloques",               r.bloques1348 === 2],
     ["y np_total = 2",                                         r.npTotal1348 === 2],

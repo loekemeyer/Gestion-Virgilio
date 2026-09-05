@@ -6805,7 +6805,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v12.93";
+const APP_VERSION = "v12.94";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -31670,7 +31670,8 @@ async function aprTraerPedidos() {
   for (const n of nps) { const k = String(n.order_id); if (!_porPedido.has(k)) _porPedido.set(k, n); }
   if (_porPedido.size) {
     const ex = await aprRpc("gv_pedidos_web_excluidos", { p_pedidos: [..._porPedido.values()].map(function (n) {
-      return { empresa: emp, order_id: n.order_id, cod: n.cod || "", fecha_recep: n.fecha_recep || null };
+      // v12.94 — `enviado_a_compras`: lo que ya salió a ISIS por el mail es de Producción.
+      return { empresa: emp, order_id: n.order_id, cod: n.cod || "", fecha_recep: n.fecha_recep || null, enviado_a_compras: !!n.enviado_a_compras };
     }) }) || [];
     const fuera = new Set(ex.map(function (x) { return String(x.order_id); }));
     nps = nps.filter(function (n) { return !fuera.has(String(n.order_id)); });

@@ -101,9 +101,13 @@ y cruce de factura— está abierto. **Leerlo al abrir una sesión nueva sobre e
 **Estado desde el 2026-09-04 (viernes, a la noche): la numeración está PRENDIDA
 (`numeracion_activa = 1`), el cron de tandas (jobid 71) activo, y las tandas siguen con
 prefijo `GV-`.** Decisión del dueño: prender **sólo Virgilio**, sin tocar LK — el mail de
-las 12:30 (`procesar-pedidos-web`) **sigue andando**, así que Producción sigue recibiendo
-por ISIS lo que ya venía y lo que caiga; lo que falte se le suma a Producción después.
-Detalle, medición y rollback en `docs/SUPABASE-GESTION-VIRGILIO.md` §3.l.
+las 12:30 (`procesar-pedidos-web`) siguió andando hasta el **sábado 2026-09-05 a las 13:50 ART,
+cuando el dueño lo hizo apagar** (crons 7 y 10 de LK en `active=false`, v12.94). Último envío a
+ISIS: sábado 12:30, pedidos 1340..1349 → esos son de Producción. **Desde el 1350 todo pedido de la
+página entra sólo por Gestión.** El cron de Chef vive en su proyecto (nkhzocgdpwtgrmwleihr, sin
+acceso desde acá): lo apaga el dueño desde el Dashboard; hasta entonces lo que Chef mande por
+mail sigue siendo de Producción (regla `enviado_a_isis`).
+Detalle, medición y rollback en `docs/SUPABASE-GESTION-VIRGILIO.md` §3.l y §3.p.
 
 - **NP** → **la NP web ES el número de pedido de la página** (v12.92, dueño: *"ya cuando
   llegan a página LK y a Gestión, ya vienen con numeración"*): pedido 1350 de LK = **`LK 1350`**,
@@ -114,10 +118,12 @@ Detalle, medición y rollback en `docs/SUPABASE-GESTION-VIRGILIO.md` §3.l.
   programa por el job de las 00:01 para zona 1 y 2 y a mano en "A Programar" para el resto.
   Regla del dueño: *"cuando Gestión tome control, va a asignarle la numeración
   nuestra a los pedidos que estén pendientes y a los que vayan cayendo"*. **Pendiente =
-  pedido de la página con fecha ≥ `gestion_desde` (2026-09-03) que Producción/ISIS no
-  tenga** (v12.89). La regla vive en UNA RPC de Virgilio, `gv_pedidos_web_excluidos`, que
-  llaman el job y "A Programar"; los feeds de LK son crudos. Un pedido que ISIS ya cargó en
-  Producción no entra a Gestión; el que salió a ISIS pero Producción todavía no tiene, sí.
+  pedido de la página que NO salió a ISIS por el mail (`enviado_a_compras`), con fecha ≥
+  `gestion_desde` (2026-09-03, piso), y que Producción/ISIS no tenga** (v12.94; el mail se
+  apagó el sábado 05/09). La regla vive en UNA RPC de Virgilio, `gv_pedidos_web_excluidos`, que
+  llaman el job y "A Programar"; los feeds de LK son crudos. Motivos: `enviado_a_isis`,
+  `anterior_al_cambio`, `en_produccion`. **Bloques**: de a 18 (LK) / 15 (Chef) SEGUIDOS en el
+  orden del carrito, igual que ISIS (v12.94; antes serpentina por m³).
   `pwebNumerar()` —la que numeraba todo al abrir una pantalla— quedó inalcanzable desde v12.82.
 - **Tandas** → siguen con prefijo **`GV-`** (`GV-01A`) mientras convivan las dos apps: cero
   chance de pisarse con una tanda de Producción en el registro de eventos compartido.

@@ -231,18 +231,19 @@ tramos as (
   from lin l
 ),
 orden as (
+  -- 2026-09-05 (dueño, v12.94): los bloques van SEGUIDOS en el orden del carrito
+  -- (linea_rn), igual que el mail de las 12:30 / ISIS: de a 18 (LK) o 15 (Chef).
+  -- Antes era una serpentina balanceada por m³ (rk por linea_m3 desc + ida y vuelta)
+  -- que daba la MISMA cantidad de bloques pero con otras líneas adentro: "LK 1345-2"
+  -- no era el segundo pedido que ISIS tenía de 1345 (mail 18+4, Gestión 11+11).
+  -- Como la página LK guarda los ítems ordenados por código (script.js, sort antes
+  -- de grabar), "seguidos" = por código ascendente, exactamente lo que ve ISIS.
   select t.*,
-         row_number() over (partition by t.empresa, t.order_id
-                            order by t.linea_m3 desc, t.linea_rn) as rk
+         row_number() over (partition by t.empresa, t.order_id order by t.linea_rn) as rk
   from tramos t
 ),
 part as (
-  -- Serpentina: 1,2,…,N,N,…,2,1,1,2,…
-  select o.*,
-         (case when ((o.rk - 1) % (2 * o.n_tramos)) < o.n_tramos
-               then ((o.rk - 1) % (2 * o.n_tramos)) + 1
-               else 2 * o.n_tramos - ((o.rk - 1) % (2 * o.n_tramos))
-          end)::int as np_idx
+  select o.*, ceil(o.rk::numeric / o.cap_lineas::numeric)::int as np_idx
   from orden o
 )
 select

@@ -162,6 +162,7 @@ async function soloPendientes(
   if (!porPedido.size) return { filas, excluidos: {}, pedidos_crudos: 0 };
   const p_pedidos = [...porPedido.values()].map((n) => ({
     empresa: emp, order_id: n.order_id, cod: n.cod ?? "", fecha_recep: n.fecha_recep ?? null,
+    enviado_a_compras: !!n.enviado_a_compras,
   }));
   const ex = await vgRpc<{ empresa: string; order_id: number; motivo: string }[]>(
     "gv_pedidos_web_excluidos", { p_pedidos });
