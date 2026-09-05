@@ -108,10 +108,12 @@ Detalle, medición y rollback en `docs/SUPABASE-GESTION-VIRGILIO.md` §3.l.
 - **NP** → Gestión numera desde **`LK 00001` / `CH 00001`** (`PPP_Web_NP_Seed` lk 1 · chef 1)
   al **programar** una tanda (job de las 00:01 para zona 1 y 2; "A Programar" a mano para el
   resto). Regla del dueño: *"cuando Gestión tome control, va a asignarle la numeración
-  nuestra a los pedidos que estén pendientes y a los que vayan cayendo"*. **Pendiente = no
-  enviado a compras** (v12.88): un pedido que ya salió a ISIS por el mail de las 12:30 no
-  entra a Gestión. `pwebNumerar()` —la que numeraba todo al abrir una pantalla— quedó
-  inalcanzable desde v12.82.
+  nuestra a los pedidos que estén pendientes y a los que vayan cayendo"*. **Pendiente =
+  pedido de la página con fecha ≥ `gestion_desde` (2026-09-03) que Producción/ISIS no
+  tenga** (v12.89). La regla vive en UNA RPC de Virgilio, `gv_pedidos_web_excluidos`, que
+  llaman el job y "A Programar"; los feeds de LK son crudos. Un pedido que ISIS ya cargó en
+  Producción no entra a Gestión; el que salió a ISIS pero Producción todavía no tiene, sí.
+  `pwebNumerar()` —la que numeraba todo al abrir una pantalla— quedó inalcanzable desde v12.82.
 - **Tandas** → siguen con prefijo **`GV-`** (`GV-01A`) mientras convivan las dos apps: cero
   chance de pisarse con una tanda de Producción en el registro de eventos compartido.
 

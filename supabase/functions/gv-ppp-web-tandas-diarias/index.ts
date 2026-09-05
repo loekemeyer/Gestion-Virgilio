@@ -12,7 +12,10 @@
 // Hace, en orden:
 //   1. ¿es día hábil en Argentina? → si no, loguea 'salteada' y corta
 //   2. lee LK (`gv_pedidos_web_np_lk`) y Chef (`gv_pedidos_web_np_chef`), que
-//      devuelven EXACTAMENTE las mismas columnas
+//      devuelven EXACTAMENTE las mismas columnas — CRUDAS, sin filtrar
+//   2b. `gv_pedidos_web_excluidos` — saca lo que NO es de Gestión: lo anterior a
+//      `gestion_desde` y lo que Producción/ISIS ya conoce (regla del dueño,
+//      2026-09-04). Si esta llamada falla, no se programa nada: falla cerrado.
 //   3. `gv_ppp_web_np_asignar`  — numera lo que no tiene número
 //   4. `ppp_web_resync`         — pone al día lo YA programado que cambió
 //   5. `gv_ppp_web_zona_lote`   — resuelve la zona de cada NP
@@ -142,6 +145,33 @@ async function traerChef(dias: number): Promise<Fila[]> {
     { method: "POST", body: JSON.stringify({ p_dias: dias }) });
   if (!r.ok) throw new Error(`Chef RPC: HTTP ${r.status} ${(await r.text()).slice(0, 300)}`);
   return await r.json();
+}
+
+/** PENDIENTE PARA GESTIÓN = pedido de la página con fecha >= gestion_desde que
+ *  Producción/ISIS no conozca. La regla vive en Virgilio (`gv_pedidos_web_excluidos`,
+ *  sql/gv_pedidos_web_excluidos.sql); acá sólo se le pasa (empresa, order_id, cod,
+ *  fecha_recep) de cada pedido y se sacan los que devuelve, con el motivo contado
+ *  para el log. Los feeds de LK son CRUDOS a propósito: si esta llamada falla, la
+ *  empresa entera falla y no se programa nada — antes que duplicar un pedido que
+ *  Producción ya tiene, no tomar ninguno (2026-09-04, regla del dueño). */
+async function soloPendientes(
+  emp: "lk" | "chef", filas: Fila[],
+): Promise<{ filas: Fila[]; excluidos: Record<string, number>; pedidos_crudos: number }> {
+  const porPedido = new Map<string, Fila>();
+  for (const n of filas) { const k = String(n.order_id); if (!porPedido.has(k)) porPedido.set(k, n); }
+  if (!porPedido.size) return { filas, excluidos: {}, pedidos_crudos: 0 };
+  const p_pedidos = [...porPedido.values()].map((n) => ({
+    empresa: emp, order_id: n.order_id, cod: n.cod ?? "", fecha_recep: n.fecha_recep ?? null,
+  }));
+  const ex = await vgRpc<{ empresa: string; order_id: number; motivo: string }[]>(
+    "gv_pedidos_web_excluidos", { p_pedidos });
+  const fuera = new Set(ex.map((x) => String(x.order_id)));
+  const excluidos: Record<string, number> = {};
+  for (const x of ex) excluidos[x.motivo] = (excluidos[x.motivo] ?? 0) + 1;
+  return {
+    filas: filas.filter((n) => !fuera.has(String(n.order_id))),
+    excluidos, pedidos_crudos: porPedido.size,
+  };
 }
 
 /** Espejo de `pwebDireccion()`: si hay expreso, adónde va el camión de verdad. */
@@ -372,7 +402,8 @@ Deno.serve(async (req: Request) => {
         const out: Record<string, unknown> = {};
         for (const emp of ["lk", "chef"] as const) {
           try {
-            const filas = emp === "lk" ? await traerLk(desde) : await traerChef(ventana);
+            const crudas = emp === "lk" ? await traerLk(desde) : await traerChef(ventana);
+            const { filas, excluidos, pedidos_crudos } = await soloPendientes(emp, crudas);
             const zonas = await resolverZonas(filas.map((n) => {
               const b = barrioCrudo(n);
               return b.usaDireccion ? { ze: "", loc: "", dir: b.barrio } : { ze: b.barrio, loc: "", dir: "" };
@@ -380,6 +411,7 @@ Deno.serve(async (req: Request) => {
             const porZona: Record<string, number> = {};
             zonas.forEach((z) => { const k = z || "(sin zona)"; porZona[k] = (porZona[k] ?? 0) + 1; });
             out[emp] = {
+              np_crudas: crudas.length, pedidos_crudos, excluidos,
               np_leidas: filas.length,
               con_fecha_pactada: filas.filter((n) => n.fecha_entrega_pactada).length,
               por_zona: porZona,
@@ -399,10 +431,10 @@ Deno.serve(async (req: Request) => {
       let forzarChef: string[] = [];
 
       try {
-        const filas = await traerLk(desde);
+        const { filas, excluidos } = await soloPendientes("lk", await traerLk(desde));
         const r = await procesarEmpresa("lk", filas, fecha);
         leidas += r.np_leidas; programadas += r.np_programadas; nTandas += r.tandas.length;
-        out.lk = { np_leidas: r.np_leidas, tandas_nuevas: r.tandas };
+        out.lk = { np_leidas: r.np_leidas, excluidos, tandas_nuevas: r.tandas };
         // Misma razón social pidiendo a las dos empresas → el mismo día.
         forzarChef = await codsChefDe(r.codsHoy);
         if (forzarChef.length) out.forzados_en_chef = forzarChef;
@@ -412,10 +444,10 @@ Deno.serve(async (req: Request) => {
       }
 
       try {
-        const filas = await traerChef(ventana);
+        const { filas, excluidos } = await soloPendientes("chef", await traerChef(ventana));
         const r = await procesarEmpresa("chef", filas, fecha, forzarChef);
         leidas += r.np_leidas; programadas += r.np_programadas; nTandas += r.tandas.length;
-        out.chef = { np_leidas: r.np_leidas, tandas_nuevas: r.tandas };
+        out.chef = { np_leidas: r.np_leidas, excluidos, tandas_nuevas: r.tandas };
       } catch (e) {
         const msg = `chef: ${e instanceof Error ? e.message : String(e)}`;
         errores.push(msg); out.chef = { error: msg };

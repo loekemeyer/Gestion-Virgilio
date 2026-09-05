@@ -12,7 +12,7 @@
 > única**; no se replica. Ante la duda entre parche rápido y fix de raíz → **fix
 > de raíz**.
 >
-> Última actualización: 2026-09-04 (noche) · Versión app al documentar: **v12.88**
+> Última actualización: 2026-09-05 (madrugada) · Versión app al documentar: **v12.89**
 >
 > ⚠⚠ **Estado del pipeline web desde el 2026-09-04 a la noche: la NUMERACIÓN ESTÁ PRENDIDA**
 > (`PPP_Web_Config.numeracion_activa = 1`), el cron de tandas (jobid 71, 00:01 hábiles) activo,
@@ -20,7 +20,18 @@
 > Producción no se tocó (medido: ninguna función `ppp_web_*`/`gv_ppp_web_*` escribe en tabla
 > compartida). Primera corrida real: lunes 2026-09-07 00:01. Cómo apagar, en `CLAUDE.md`.
 >
-> Nota **v12.88** — **"A Programar" y el job sólo ven pedidos PENDIENTES = no enviados a compras.**
+> Nota **v12.89** — **PENDIENTE = pedido de la página con fecha ≥ `gestion_desde` (2026-09-03) que
+> Producción/ISIS no tenga.** Reemplaza la regla de v12.88 (que dejaba afuera el *limbo*: enviado a
+> ISIS pero que Producción todavía no tiene, y eso es de Gestión). Dueño: *"no tiene que leer más de
+> ahora en más, salvo los pedidos que estén en la página LK que falten en programación diaria / A
+> Programar"*. Vive en UNA RPC de Virgilio, **`gv_pedidos_web_excluidos(p_pedidos)`**
+> (`sql/gv_pedidos_web_excluidos.sql`): devuelve los excluidos con motivo (`anterior_al_cambio`,
+> `en_produccion` = hay NP de ISIS de ese cliente con esa fecha en programación/facturación/
+> entregados/entregas). La llaman el job (Edge Fn v10, `soloPendientes`) y `aprTraerPedidos`;
+> los feeds de LK volvieron a ser crudos. Falla cerrado. Medido: LK 212 pedidos → **10** pendientes
+> (18 NP), Chef 26 → **2** (3 NP). Test `tests/pweb-pendiente.cjs`.
+>
+> Nota **v12.88** (superada por v12.89) — **"A Programar" y el job sólo ven pedidos PENDIENTES = no enviados a compras.**
 > Regla del dueño: *"a los pedidos que estén pendientes y a los que vayan cayendo"*. Un pedido
 > que ya salió a ISIS por el mail de las 12:30 (`enviado_a_compras_at`) lo entrega Producción.
 > Sin el filtro, la corrida en seco del job leía **365 NP** de LK en 30 días, y **208 de esos 213

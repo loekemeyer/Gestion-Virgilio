@@ -1108,6 +1108,12 @@ ISIS ya había despachado.
 La regla, en palabras del dueño (§3.f): *"va a asignarle la numeración nuestra a los pedidos
 que estén **pendientes** y a los que vayan cayendo"*. Pendiente = todavía no se fue a ISIS.
 
+> ⚠ **Esta definición duró unas horas.** A la noche el dueño la corrigió (*"salvo los pedidos
+> que estén en la página LK que falten en programación diaria / A Programar"*) y la regla pasó
+> a ser **desde el día del cambio, lo que Producción no tenga** — ver **"La regla definitiva"**
+> más abajo (v12.89). Las tres filas de LK de la tabla que sigue **se revirtieron** esa misma
+> noche; se dejan como historia.
+
 | objeto | qué |
 |---|---|
 | `gv_pedidos_web_np_lk` (**LK**) | `and not coalesce(p.enviado_a_compras, false)` |
@@ -1191,6 +1197,45 @@ Chef zona 6) espera en "A Programar". Como el mail de las 12:30 sigue andando, *
 Gestión programe a la mañana también se lo lleva ISIS al mediodía**: mientras convivan,
 esos pedidos van a existir en las dos apps. Lo aceptó el dueño; se resuelve el día que se
 apague ese cron en LK (paso 1 del checklist).
+
+### ✅ La regla definitiva de "pendiente" — 2026-09-04, más tarde esa noche (v12.89)
+
+Después de prender, el dueño precisó: *"[Gestión] no tiene que leer más de ahora en más,
+salvo los pedidos que estén en la página LK que falten en programación diaria / A
+Programar"*. El filtro "no enviado a compras" (v12.88) **no cumplía eso**: dejaba afuera el
+**limbo** —pedidos que ya salieron a ISIS por el mail de las 12:30 pero que Producción
+todavía no tiene— y el dueño quiere que eso sea de Gestión.
+
+Se midieron tres formas y eligió **"desde el día del cambio, lo que Producción no tenga"**:
+"lo que Producción no tenga" a secas marcaba 19 pedidos de LK, 9 de ellos de hace tres
+semanas que Producción sí entregó pero con otro código (clientes nuevos que ISIS dio de alta
+con `cod` 4284…4312, un `cod` "1" placeholder, fechas corridas un día por la carga en ISIS).
+Con fecha de corte quedan **10** (los 5 sin enviar + los 5 en limbo). Chef: **2**.
+
+| objeto | proyecto | qué |
+|---|---|---|
+| `PPP_Web_Config` | Virgilio | + fila `gestion_desde = '2026-09-03'` (`valor_texto`) |
+| **`gv_pedidos_web_excluidos(p_pedidos jsonb)`** | Virgilio | **nueva**, `security invoker`, sólo lectura. Recibe `(empresa, order_id, cod, fecha_recep)` por pedido y devuelve los **excluidos** con motivo: `anterior_al_cambio` (`fecha_recep < gestion_desde`) y `en_produccion` (hay una NP de ISIS de ese `cod` con esa fecha de pedido en `PPP_Programacion_Diaria` ∪ `Facturacion_NP` ∪ `PPP_Entregados_Meta` ∪ `Entregas_Virgilio`, fecha por `PPP_Base_Pedidos`; `9xxxx` = LK, `4xxxx` = Chef). **Falla cerrado**: sin config, excluye todo. `sql/gv_pedidos_web_excluidos.sql` |
+| `gv_pedidos_web_np_lk` / `_chef` | LK | **vuelven a ser feeds crudos**: se sacó el `and not enviado…`. Chef ahora devuelve `enviado_a_compras` real (informativo). `sql/gv_pedidos_web_np_feeds.sql` reescrito |
+| Edge Fn `gv-ppp-web-tandas-diarias` | Virgilio | **v10**: `soloPendientes(emp, filas)` llama a la RPC después de cada feed, en el camino real y en el `dry`; el log guarda `excluidos: {motivo: n}`. Si la RPC falla, esa empresa falla y no se programa nada |
+| front v12.89 `aprTraerPedidos` | — | llama a la misma RPC (un registro por pedido) y saca lo que devuelve; si falla, la pantalla falla en vez de mostrar todo. `tests/pweb-pendiente.cjs` (9 chequeos) |
+
+Nada de esto escribe: la RPC sólo lee tablas que `anon` ya leía. Producción no cambia.
+
+**Medido después** (corrida en seco por el camino del cron, `?dry=1&fecha=2026-09-07`):
+
+| | crudo | `anterior_al_cambio` | `en_produccion` | **pendiente** |
+|---|---|---|---|---|
+| LK | 352 NP · 212 pedidos | 202 | 193 | **18 NP** (Zona 1: 10 · Zona 2: 4 · Zona 3: 1 · Zona 5: 1 · Zona 6: 1 · Retira: 1) |
+| Chef | 38 NP · 26 pedidos | 23 | 21 | **3 NP** (Zona 1: 2 · Zona 6: 1) |
+
+(Los motivos se solapan: un pedido viejo que Producción tiene cuenta en los dos.) El lunes
+00:01 el job arma zona 1 y 2: **14 NP de LK + 2 de Chef**. Cuando ISIS le traiga a Producción
+los del limbo, la RPC los va a marcar `en_produccion` sola y dejan de aparecer.
+
+**Rollback:** `drop function public.gv_pedidos_web_excluidos(jsonb)` + borrar la fila
+`gestion_desde`; redeployar la Edge Fn v9 (no llama a la RPC); front v12.88. Los feeds de LK
+tal como estaban antes de todo el día: `sql/backups/gv_pedidos_web_np_feeds_20260904_pre_filtro_enviado.sql`.
 
 ---
 

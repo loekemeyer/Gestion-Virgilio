@@ -6794,7 +6794,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v12.88";
+const APP_VERSION = "v12.89";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -31643,12 +31643,24 @@ async function aprTraerPedidos() {
     nps = await r.json();
   }
 
-  // v12.88 — PENDIENTE = NO ENVIADO A COMPRAS. Un pedido que ya salió a ISIS por el
-  // mail de las 12:30 lo entrega Producción; acá no tiene que aparecer. La regla vive
-  // en el backend (gv_pedidos_web_np_lk / _chef, que usa el job automático); acá se
-  // duplica porque esta pantalla lee la vista cruda de LK. Medido el 2026-09-04: sin
-  // el filtro eran 365 NP en 30 días, de las cuales 355 ya entregadas por ISIS.
-  nps = (nps || []).filter(function (n) { return !n.enviado_a_compras; });
+  // v12.89 — PENDIENTE PARA GESTIÓN = pedido de la página con fecha >= gestion_desde
+  // que Producción/ISIS no conozca. La regla vive en Virgilio, en UNA sola RPC
+  // (`gv_pedidos_web_excluidos`) que también usa el job de las 00:01: acá se le pasa
+  // (empresa, order_id, cod, fecha_recep) de cada pedido y se sacan los que devuelve.
+  // Reemplaza al filtro "no enviado a compras" de v12.88, que dejaba afuera los
+  // pedidos que ya se fueron a ISIS pero que Producción todavía no tiene — y esos,
+  // dijo el dueño, son de Gestión. Si la RPC falla, la pantalla falla: antes que
+  // mostrar un pedido que Producción ya tiene, no mostrar ninguno.
+  nps = nps || [];
+  const _porPedido = new Map();
+  for (const n of nps) { const k = String(n.order_id); if (!_porPedido.has(k)) _porPedido.set(k, n); }
+  if (_porPedido.size) {
+    const ex = await aprRpc("gv_pedidos_web_excluidos", { p_pedidos: [..._porPedido.values()].map(function (n) {
+      return { empresa: emp, order_id: n.order_id, cod: n.cod || "", fecha_recep: n.fecha_recep || null };
+    }) }) || [];
+    const fuera = new Set(ex.map(function (x) { return String(x.order_id); }));
+    nps = nps.filter(function (n) { return !fuera.has(String(n.order_id)); });
+  }
 
   // Agrupar por pedido. `np_total` = cuántos bloques tiene: se cuenta acá porque
   // la vista de LK lo calcula pero no lo devuelve (sí lo devuelven nuestras RPC
