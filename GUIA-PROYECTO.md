@@ -12,13 +12,24 @@
 > única**; no se replica. Ante la duda entre parche rápido y fix de raíz → **fix
 > de raíz**.
 >
-> Última actualización: 2026-09-05 (sábado, tarde) · Versión app al documentar: **v12.98**
+> Última actualización: 2026-09-05 (sábado, tarde) · Versión app al documentar: **v12.99**
 >
 > ⚠⚠ **Estado del pipeline web desde el 2026-09-04 a la noche: la NUMERACIÓN ESTÁ PRENDIDA**
 > (`PPP_Web_Config.numeracion_activa = 1`), el cron de tandas (jobid 71, 00:01 hábiles) activo,
 > tandas con prefijo `GV-`. Sólo del lado Virgilio: el mail de las 12:30 de LK sigue andando y
 > Producción no se tocó (medido: ninguna función `ppp_web_*`/`gv_ppp_web_*` escribe en tabla
 > compartida). Primera corrida real: lunes 2026-09-07 00:01. Cómo apagar, en `CLAUDE.md`.
+>
+> Nota **v12.99** — **Otras tres del backlog** (sólo front). **(7953)** `send()`: cerrar un
+> TP/TAP abierto hace más de 8 h, o un toggle (CR/CC/RT/MG/…) abierto hace más de 3 h, pide
+> confirmación ("está abierto hace X h — ¿seguro que lo cerrás AHORA?"); Cancelar no manda nada.
+> Mismos umbrales que Inconsistencias (`INC_DUR_CORE_MAX_MIN` / `INC_DUR_TOGGLE_MAX_MIN`, §12.A).
+> Ataca en el origen los TP de 65 h / TAP de 121 h que antes sólo se veían después. Falla abierto.
+> **(1257)** `computeInconsistencias`: el hueco de inactividad (>90 min) sólo lo mueven EP/TP/AP/TAP y
+> los toggles; los eventos de detalle (PKC/TAL/CCN/CRN/CCR/AUB/PUB/PSP…) —siempre sin `ts_inicio`—
+> subían el contador `inProgress` sin que nada lo bajara y el hueco no volvía a dispararse en todo el
+> día. **(6092)** Stock: "Cajas Pedidas" en 0 muestra `—` (igual que Capacidad Góndola), no una celda
+> vacía. Test `tests/mejoras-v1299.cjs` (9 chequeos).
 >
 > Nota **v12.98** — **Tres mejoras más del backlog de agentes** (sólo front, sin tocar Supabase).
 > **(9017)** `stockFetchSaldos()` ahora expone `para_envasar` y `racks_ch` (la vista

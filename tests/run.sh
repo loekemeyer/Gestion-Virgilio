@@ -275,3 +275,6 @@ PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node te
 
 echo "== mejoras-v1298 (9017 saldos para_envasar/racks_ch · 6124 TAP doble · 5070 barra de avance del monitor) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/mejoras-v1298.cjs
+
+echo "== mejoras-v1299 (7953 confirmar cierre absurdo · 1257 hueco vs eventos de detalle · 6092 Cajas Pedidas 0 = —) =="
+PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/mejoras-v1299.cjs
