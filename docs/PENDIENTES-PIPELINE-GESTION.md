@@ -166,10 +166,13 @@ decisiones abiertas al final de este archivo.
   **reescribe `sheets_payload.items`** — ⚠ es lo que leen Gestión (`gv_pedidos_web_np_chef`,
   en LK, vía la foreign table `chef_orders`) y el mail de las 12:30 de Chef; `order_items` no
   lo lee nadie río abajo. Ventana: `enviado_a_compras_at is null` (el cron de Chef sigue
-  prendido). Candado de UI + chequeo en el front; el **candado server** está escrito en
-  `paginach/sql/edit_order_fast_chef.sql` (RPC + policies opcionales) y **lo corre el dueño**
-  en el SQL editor del proyecto Chef (`nkhzocgdpwtgrmwleihr`, sin acceso desde acá); después
-  el front pasa a llamar la RPC. Test headless `paginach/tests/editar-pedido.cjs` (17 chequeos).
+  prendido). **Candado server desde la v2.0.30** (misma noche): el dueño corrió
+  `paginach/sql/edit_order_fast_chef.sql` en el proyecto Chef (`nkhzocgdpwtgrmwleihr`, sin
+  acceso desde acá) y el front llama a la RPC `edit_order_fast` con el carrito completo; la RPC
+  valida dueño, ventana y "sólo agregar" (admins exceptuados), inserta el delta, actualiza la
+  cabecera y reescribe `sheets_payload.items`. Las policies de `order_items` (sacar el delete
+  al cliente) quedan comentadas: `rollbackOrder()` las necesita. Test headless
+  `paginach/tests/editar-pedido.cjs` (18 chequeos, RPC espejada en memoria).
   ⚠ Chef se hospeda en IIS (`web.config`): el push a `main` no publica solo, hay que subirlo.
 - **Queda**: el estado de Gestión en "Mis pedidos" de Chef (como LK v2.3.301) → FDW Chef →
   Virgilio, también SQL del dueño en Chef.
