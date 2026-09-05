@@ -2325,7 +2325,7 @@ tr.ppp-err-zona > td{ background:#fffbeb !important; }
 .pn-h2{ color:#64748b; font-size:13px; font-weight:600; margin-top:2px; }
 .pn-lnk{ width:auto; background:#fff; border:1px solid #dbe3ee; color:#1e3a8a; font-weight:800; font-size:12px; padding:6px 11px; border-radius:8px; cursor:pointer; }
 .pn-lnk:hover{ background:#f1f5f9; }
-.pn-kpis{ display:grid; grid-template-columns:repeat(5,1fr); gap:10px; margin-bottom:10px; }
+.pn-kpis{ display:grid; grid-template-columns:repeat(5,minmax(0,1fr)); gap:10px; margin-bottom:10px; }
 .pn-kpi{ background:#fff; border:1px solid #dbe3ee; border-radius:14px; padding:12px 14px; display:grid; grid-template-columns:44px 1fr; gap:10px; align-items:center; }
 .pn-kpi .ico{ width:44px; height:44px; border-radius:12px; background:#e8f0fd; display:grid; place-items:center; font-size:21px; }
 .pn-kpi .l{ font-size:11px; font-weight:800; letter-spacing:.7px; text-transform:uppercase; color:#64748b; }
@@ -2342,7 +2342,16 @@ tr.ppp-err-zona > td{ background:#fffbeb !important; }
 .pn-alert.warn{ background:#fff7ed; border-color:#fdba74; }
 .pn-alert.warn:hover{ background:#ffedd5; }
 .pn-alert.warn .n{ color:#c2410c; background:#ffedd5; } .pn-alert.warn b{ color:#7c2d12; } .pn-alert.warn .s{ color:#9a3412; } .pn-alert.warn .btn{ background:#c2410c; }
-@media (max-width:640px){ .pn-alert{ flex-wrap:wrap; } .pn-alert .btn{ margin-left:0; width:100%; text-align:center; } .pn-kpi .v{ font-size:21px; } }
+@media (max-width:640px){
+  .pn-alert{ flex-wrap:wrap; } .pn-alert .btn{ margin-left:0; width:100%; text-align:center; }
+  .pn-kpis{ grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px; }
+  .pn-kpi{ min-width:0; padding:10px 11px; grid-template-columns:36px minmax(0,1fr); gap:8px; }
+  .pn-kpi .ico{ width:36px; height:36px; font-size:18px; border-radius:10px; }
+  .pn-kpi .v{ font-size:19px; white-space:normal; overflow-wrap:anywhere; }
+  .pn-kpi .s{ font-size:11px; }
+  .pn-kpi:nth-child(5){ grid-column:1 / -1; }
+  .pn-h1{ font-size:21px; }
+}
 .pn-days{ display:grid; grid-template-columns:repeat(3,1fr); gap:12px; }
 .pn-day{ background:#fff; border:1.5px solid #dbe3ee; border-radius:16px; padding:13px 15px 11px; display:flex; flex-direction:column; min-height:240px; box-shadow:0 1px 3px rgba(15,23,42,.05); cursor:pointer; }
 .pn-day:hover{ border-color:#93c5fd; box-shadow:0 6px 18px rgba(30,107,214,.12); }
@@ -2423,7 +2432,7 @@ tr.ppp-err-zona > td{ background:#fffbeb !important; }
 .pn-carga .n.go{ background:#15803d; color:#fff; box-shadow:0 0 0 3px #bbf7d0; } .pn-carga .n.ok{ background:#dbeafe; color:#1e40af; } .pn-carga .n.first{ background:#fef3c7; color:#92400e; }
 .pn-carga .t{ font-size:11px; font-weight:800; color:#475569; line-height:1.2; } .pn-carga .t.go{ color:#15803d; }
 .pn-sec2{ font-size:11px; font-weight:800; letter-spacing:.7px; text-transform:uppercase; color:#64748b; margin:16px 0 8px; }
-@media (max-width:1100px){ .pn-kpis{ grid-template-columns:repeat(3,1fr); } .pn-days{ grid-template-columns:repeat(2,1fr); } .pn-dayhead{ grid-template-columns:1fr; } .pn-thead{ display:none; } .pn-ped{ grid-template-columns:70px minmax(0,1fr) auto; } .pn-ped .loc, .pn-ped .m{ display:none; } }
+@media (max-width:1100px){ .pn-kpis{ grid-template-columns:repeat(3,minmax(0,1fr)); } .pn-days{ grid-template-columns:repeat(2,1fr); } .pn-dayhead{ grid-template-columns:1fr; } .pn-thead{ display:none; } .pn-ped{ grid-template-columns:70px minmax(0,1fr) auto; } .pn-ped .loc, .pn-ped .m{ display:none; } }
 @media (max-width:640px){ .pn-kpis{ grid-template-columns:repeat(2,1fr); } .pn-days{ grid-template-columns:1fr; } .pn-camion .ch{ grid-template-columns:36px 1fr; } }
 .ppp-edit-panel{ display:none; }
 .ppp-tanda.ppp-open.ppp-edit-mode .ppp-edit-panel{ display:flex; flex-wrap:wrap; gap:10px 16px; align-items:center; padding:10px 14px; background:#fffbeb; border-bottom:1px solid #fde68a; }
@@ -6949,7 +6958,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v13.05";
+const APP_VERSION = "v13.06";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco

@@ -12,7 +12,7 @@
 > única**; no se replica. Ante la duda entre parche rápido y fix de raíz → **fix
 > de raíz**.
 >
-> Última actualización: 2026-09-05 (sábado, noche) · Versión app al documentar: **v13.05**
+> Última actualización: 2026-09-05 (sábado, noche) · Versión app al documentar: **v13.06**
 >
 > ⚠ **Regla desde el 2026-09-05 (dueño: "empezá a bumpear las modificaciones así voy chequeando"):
 > TODO cambio —front o backend— lleva bump de `APP_VERSION`/`SW_VERSION`, aunque no toque
@@ -23,6 +23,10 @@
 > tandas con prefijo `GV-`. Sólo del lado Virgilio: el mail de las 12:30 de LK sigue andando y
 > Producción no se tocó (medido: ninguna función `ppp_web_*`/`gv_ppp_web_*` escribe en tabla
 > compartida). Primera corrida real: lunes 2026-09-07 00:01. Cómo apagar, en `CLAUDE.md`.
+>
+> Nota **v13.06** — **Tablero en celular**: los KPI ya no se desbordan (grilla `minmax(0,1fr)`, valor
+> con `overflow-wrap`, tarjeta Atrasados a lo ancho, tipografía un punto menor ≤ 640 px). Visto en el
+> render de 400 px: "$ 28.560.00" cortado y la columna derecha fuera del borde.
 >
 > Nota **v13.05** — **Tablero: carteles separados** (dueño, desde el celular: *"es confuso el cartel"*).
 > Antes un solo cartel rojo mezclaba "vencidas" con "cargados sin controlar" y el KPI sumaba las dos
