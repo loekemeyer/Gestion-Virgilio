@@ -1153,6 +1153,37 @@ apagar ese cron van juntos.** Chef tiene el suyo en su propio proyecto (sin acce
 `tanda_prefijo = 'GV-'`, backup + borrado de `PPP_Web_NP` / `PPP_Web_Programacion` /
 `PPP_Web_Base` de ese día, y volver a prender el cron de LK.
 
+### ✅ Lo que se PRENDIÓ — 2026-09-04, viernes a la noche
+
+El dueño frenó el checklist con una condición: **que los cambios toquen sólo Gestión
+Virgilio, no Producción**. Los que ya llegaron a Producción por ISIS se quedan ahí; lo que
+falte se le suma después. Se midió primero qué escribe cada pieza:
+
+- Las **25 funciones** `ppp_web_*` / `gv_ppp_web_*`: **ninguna escribe** en una tabla
+  compartida. Tres sólo leen (`ppp_web_proxima_letra` y `gv_ppp_web_codigo_tomado` →
+  `PPP_Programacion_Diaria`; `ppp_web_resync` → `Facturacion_NP`, `Registros`).
+- La Edge Function escribe únicamente `PPP_Web_Programacion`, `PPP_Web_Base`,
+  `GV_Tandas_Auto_Log` y `PPP_Web_Config`.
+
+Con eso, decisión del dueño: **sólo Virgilio, LK intacto, prefijo `GV-`**.
+
+| paso | hecho | medido después |
+|---|---|---|
+| borrar los 3 borradores de prueba | ✅ `PPP_Web_Tandas` / `_Items` (backup restore-ready en `sql/backups/backup_PPP_Web_Tandas_borradores_20260904.sql`) | 0 / 0 |
+| `numeracion_activa = 1` | ✅ | `1` |
+| cron 71 `active := true` | ✅ | `active=true · 1 3 * * 1-5` |
+| `tanda_prefijo` | **se deja `GV-`** (convivencia) | `GV-` |
+| mail de las 12:30 en LK | **NO se tocó** (decisión del dueño) | `procesar-pedidos-web` activo |
+| prueba de numeración en transacción revertida | `gv_ppp_web_np_asignar('lk', …)` asignó **`LK 00001` y `LK 00002`** y no dejó nada | `PPP_Web_NP` = 0 · seeds lk 1 / chef 1 |
+| Producción | — | `PPP_Programacion_Diaria` = 182, intacta |
+
+**Qué pasa a partir de acá.** El lunes 00:01 el job programa las NP web **pendientes** de
+zona 1 y 2 (hoy 9 de LK) con tandas `GV-…` y las numera desde `LK 00001`; el resto (zona 5,
+Chef zona 6) espera en "A Programar". Como el mail de las 12:30 sigue andando, **lo que
+Gestión programe a la mañana también se lo lleva ISIS al mediodía**: mientras convivan,
+esos pedidos van a existir en las dos apps. Lo aceptó el dueño; se resuelve el día que se
+apague ese cron en LK (paso 1 del checklist).
+
 ---
 
 ## 4. Incidente de seguridad — 2026-09-04 (cerrado)

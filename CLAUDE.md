@@ -98,23 +98,36 @@ y cruce de factura— está abierto. **Leerlo al abrir una sesión nueva sobre e
 
 ## ⚠⚠⚠ CUANDO GESTIÓN TOMA CONTROL Y SE VUELVE LA VERSIÓN QUE USAMOS, SEGUIR CON LA NUMERACIÓN QUE DEJÓ VIRGILIO
 
-Mientras convivan las dos apps, **Gestión no numera NP y sus tandas son de prueba**.
+**Estado desde el 2026-09-04 (viernes, a la noche): la numeración está PRENDIDA
+(`numeracion_activa = 1`), el cron de tandas (jobid 71) activo, y las tandas siguen con
+prefijo `GV-`.** Decisión del dueño: prender **sólo Virgilio**, sin tocar LK — el mail de
+las 12:30 (`procesar-pedidos-web`) **sigue andando**, así que Producción sigue recibiendo
+por ISIS lo que ya venía y lo que caiga; lo que falte se le suma a Producción después.
+Detalle, medición y rollback en `docs/SUPABASE-GESTION-VIRGILIO.md` §3.l.
 
-- **NP** → hoy la manda **ISIS** a la hoja de cálculos y la usa Producción. Gestión tiene
-  la numeración **apagada** (`PPP_Web_Config.numeracion_activa = 0`) y `PPP_Web_NP` vacía.
-  Regla del dueño: *"cuando Gestión tome control, va a asignarle la numeración nuestra a
-  los pedidos que estén pendientes y a los que vayan cayendo. Recién ahí que empiece"*.
-  ⚠ El interruptor existe porque la pantalla de la PPP Web **numera sola todo lo que
-  muestra apenas se abre** (`pwebNumerar()`): borrar sin apagar no sirve, vuelven.
-- **Tandas** → llevan prefijo propio **`GV-`** (`GV-01A`, `GV-02B`), así no se confunden
-  con las de Producción (`D19J`) ni le pisan el contador de letras.
+- **NP** → Gestión numera desde **`LK 00001` / `CH 00001`** (`PPP_Web_NP_Seed` lk 1 · chef 1)
+  al **programar** una tanda (job de las 00:01 para zona 1 y 2; "A Programar" a mano para el
+  resto). Regla del dueño: *"cuando Gestión tome control, va a asignarle la numeración
+  nuestra a los pedidos que estén pendientes y a los que vayan cayendo"*. **Pendiente = no
+  enviado a compras** (v12.88): un pedido que ya salió a ISIS por el mail de las 12:30 no
+  entra a Gestión. `pwebNumerar()` —la que numeraba todo al abrir una pantalla— quedó
+  inalcanzable desde v12.82.
+- **Tandas** → siguen con prefijo **`GV-`** (`GV-01A`) mientras convivan las dos apps: cero
+  chance de pisarse con una tanda de Producción en el registro de eventos compartido.
 
-**El día del cambio son DOS líneas, y listo:**
+**Para apagarlo (mismo día, todo reversible):**
 
 ```sql
 -- en VIRGILIO (hrxfctzncixxqmpfhskv)
+update public."PPP_Web_Config" set valor = 0 where clave = 'numeracion_activa';
+select cron.alter_job(71, active := false);
+```
+
+**Cuando Producción deje de armar tandas, una línea más y las tandas siguen la codificación
+histórica** (`ppp_web_proxima_letra()` retoma desde la última letra que dejó Producción):
+
+```sql
 update public."PPP_Web_Config" set valor_texto = '' where clave = 'tanda_prefijo';
-update public."PPP_Web_Config" set valor       = 1  where clave = 'numeracion_activa';
 ```
 
 La NP arranca en **00001 para las dos empresas** (`PPP_Web_NP_Seed`: lk 1 · chef 1), o sea
