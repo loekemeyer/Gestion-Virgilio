@@ -12,13 +12,52 @@
 > única**; no se replica. Ante la duda entre parche rápido y fix de raíz → **fix
 > de raíz**.
 >
-> Última actualización: 2026-09-05 (sábado, tarde) · Versión app al documentar: **v12.99**
+> Última actualización: 2026-09-05 (sábado, noche) · Versión app al documentar: **v13.01**
 >
 > ⚠⚠ **Estado del pipeline web desde el 2026-09-04 a la noche: la NUMERACIÓN ESTÁ PRENDIDA**
 > (`PPP_Web_Config.numeracion_activa = 1`), el cron de tandas (jobid 71, 00:01 hábiles) activo,
 > tandas con prefijo `GV-`. Sólo del lado Virgilio: el mail de las 12:30 de LK sigue andando y
 > Producción no se tocó (medido: ninguna función `ppp_web_*`/`gv_ppp_web_*` escribe en tabla
 > compartida). Primera corrida real: lunes 2026-09-07 00:01. Cómo apagar, en `CLAUDE.md`.
+>
+> Nota **v13.01** — **La PPP (solapa Programación) se ve distinta** (dueño, con foto del monitor: *"se ve
+> feo"*). Antes cada tanda era una barra entera con degradé saturado del color del camión, y las
+> vencidas una barra roja de punta a punta que temblaba (`pppShake`). Ahora la franja de cada tanda es
+> una **tarjeta blanca con texto oscuro**: el color del camión va en la **cinta izquierda** y en el
+> **chip del código de tanda** (la leyenda "Color por camión" sigue valiendo); razón social en negrita,
+> NP en gris monoespaciado, fecha de entrega como pastilla gris. **Vencida** = cinta roja + fondo
+> rosado tenue + pastilla roja "⏰ 03/09/2026 · Vencida" (sin animación). **🚨 SIN CONTROLAR** = borde
+> rojo + pastilla roja que titila (sigue "molesta", pero no pinta la fila). Tanda con error = cinta
+> roja + ⚠️. Cabecera de día neutra (gris, cinta oscura) en vez de verde. Los botones de la franja
+> (🖨️, ✓ Controlar, ✏️ Editar, ✓ OK, semáforo) pasaron a versión clara. Sólo CSS + el texto de la
+> pastilla (`_pppBlock`); nada de lógica. Sin cambios en A Programar / Entregados.
+>
+> Nota **v13.00** — **Backlog de agentes con Supabase, cerrado lo que se podía sin tocar lo compartido**
+> (pedido del dueño: *"dale curso a los que puedas sin romper ni Gestión ni Prod"*). Detalle y medición
+> en `docs/SUPABASE-GESTION-VIRGILIO.md` §3.u y §3.v.
+> **(1471)** Alerta **`picking_sin_terminar`** (EP abierto > 24 h sin TP), espejo de
+> `armado_sin_terminar`: función NUEVA `gv_reporte_agentes_picking_sin_terminar()` + cron propio
+> jobid 72 (`2 11,15,19 * * *` UTC, 2 min después del job 14 porque `generar_reporte_agentes` borra
+> la tabla al arrancar). No se tocó `generar_reporte_agentes()` (la usa Producción). Gestión la
+> muestra en 🤖 Agentes (CATS + briefing "Hoy"); Producción no la conoce en su panel, y el resumen
+> Telegram de las 22:00 la nombra por su clave. `sql/gv_reporte_agentes_picking_sin_terminar.sql`.
+> **(6309)** Las 4 tablas de la idea ya estaban con RLS; había **11 más** sin RLS, todas de Gestión
+> (backups 09-02/09-04, `snap_costo_nombres_0903`, `codigos_duales`, `cobranzas_escalones`,
+> `deudores_condiciones`, `wa_grupo_listo`, `wa_np_snapshot`). Ahora **0 tablas de `public.*` sin
+> RLS**: backups sin policy (la anon key ya no las ve), tablas vivas con policy `gv_select_all` de
+> sólo lectura (lo que leía la anon key sigue leyendo; medido). Grants sin tocar.
+> **(8609 / 9137)** Decisión documentada: **el legajo `0` en `Movimientos_Stock` es el actor
+> SISTEMA/ADMIN** (1370 `inicial`, 684 `ajuste`, conteos, `baja_racks`, `cp`…), NO basura — jamás
+> excluirlo de `vista_saldos_stock` ni de `stockComputeSaldos`. El legajo `1` tiene 7 ajustes
+> (neto +1, ago-2026). La regla "legajos 0 y 1 son test" vale para `Registros_Produccion_Virgilio`,
+> no para el stock. 9137 descartada, 8609 hecha.
+> **(7746)** 566E hoy: góndola 26, racks 0 — se resolvió operando; el aviso "hay stock en racks"
+> ya existe (RAG, `tests/pk-racks-aguardar.cjs`). **(9200)** El mecanismo de identidad sintética
+> `código·detalle` para insumos nuevos ya no existe: desde v11.x el sistema numera `TMP-NNNN`
+> (`nuevo_insumo_tmp`) y el admin los identifica en "Pendientes de identificar". Quedan 2 identidades
+> viejas con saldo (`ALAMBRE LARGO·11` = 340, `FLEJES CHEF·1.00 X 121` = 61) que se unifican desde
+> ese mismo panel cuando el dueño quiera. **Quedan pendientes (tocan stock real, decide el dueño):**
+> 6676 (TAP huérfano C54B, 13 cajas, jul-2026) y 3425 (superávit sistémico de picking, +435 cajas).
 >
 > Nota **v12.99** — **Otras tres del backlog** (sólo front). **(7953)** `send()`: cerrar un
 > TP/TAP abierto hace más de 8 h, o un toggle (CR/CC/RT/MG/…) abierto hace más de 3 h, pide

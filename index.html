@@ -2146,39 +2146,51 @@ button.pk-anular small{ display:block; font-size:12px; font-weight:700; opacity:
 .ppp-alert-dismiss:hover{ background:#15803d; }
 .ppp-alert-dismiss.danger{ background:#fff; color:#dc2626; border:1px solid #fca5a5; }
 .ppp-alert-dismiss.danger:hover{ background:#fef2f2; }
-.ppp-tanda{ background:#fff; border:1px solid #e2e8f0; border-radius:10px; margin-bottom:5px; overflow:hidden; }
-.ppp-tanda.ppp-tanda-none{ border:1px solid #fcd34d; }
-.ppp-tanda.ppp-tanda-none .ppp-tanda-h{ background:linear-gradient(90deg,#d97706,#b45309); }
-.ppp-tanda-h{ display:grid; grid-template-columns:18px minmax(0,200px) minmax(0,1fr) minmax(110px,max-content) auto; align-items:center; gap:0 14px; padding:6px 14px; background:linear-gradient(90deg,#1e6bd6,#1e3a8a); color:#fff; cursor:pointer; }
-.ppp-tanda-h:hover{ filter:brightness(1.06); }
-.ppp-tanda-h.rt-so{ background:linear-gradient(90deg,#1e6bd6,#1e3a8a); }
-.ppp-tanda-h.rt-n{ background:linear-gradient(90deg,#0d9488,#115e59); }
-.ppp-tanda-h.rt-c{ background:linear-gradient(90deg,#7c3aed,#5b21b6); }
-.ppp-tanda-h.rt-ret{ background:linear-gradient(90deg,#64748b,#334155); }
+/* v13.01 — franja de tanda CLARA (pedido del dueño: "se ve feo"). Antes cada tanda era una barra
+   con degradé saturado del color del camión y las vencidas una barra roja entera que temblaba.
+   Ahora: tarjeta blanca, texto oscuro, el color del camión va en la CINTA izquierda y en el chip
+   del código de tanda; vencida / sin controlar / error se marcan con cinta roja + pastilla, sin
+   pintar toda la fila ni animar. */
+.ppp-tanda{ background:#fff; border:1px solid #e2e8f0; border-radius:10px; margin-bottom:6px; overflow:hidden; box-shadow:0 1px 2px rgba(15,23,42,.04); }
+.ppp-tanda.ppp-tanda-none{ border-color:#fcd34d; }
+.ppp-tanda.ppp-tanda-none .ppp-tanda-h{ border-left-color:#f59e0b; background:#fffbeb; }
+.ppp-tanda.ppp-tanda-none .ppp-tanda-name{ background:#f59e0b; }
+.ppp-tanda-h{ display:grid; grid-template-columns:14px minmax(0,190px) minmax(0,1fr) minmax(110px,max-content) auto; align-items:center; gap:0 12px; padding:7px 12px 7px 10px; background:#fff; color:#0f172a; cursor:pointer; border-left:5px solid #1e6bd6; }
+.ppp-tanda-h:hover{ background:#f8fafc; }
+.ppp-tanda-h.rt-so{ border-left-color:#1e6bd6; }
+.ppp-tanda-h.rt-n{ border-left-color:#0d9488; }
+.ppp-tanda-h.rt-c{ border-left-color:#7c3aed; }
+.ppp-tanda-h.rt-ret{ border-left-color:#64748b; }
+.ppp-tanda-h.rt-so .ppp-tanda-name{ background:#1e6bd6; }
+.ppp-tanda-h.rt-n .ppp-tanda-name{ background:#0d9488; }
+.ppp-tanda-h.rt-c .ppp-tanda-name{ background:#7c3aed; }
+.ppp-tanda-h.rt-ret .ppp-tanda-name{ background:#64748b; }
 .rtleg{ display:inline-block; padding:2px 9px; border-radius:999px; color:#fff; font-weight:700; font-size:11px; margin:0 2px; }
 .rtleg.rt-so{ background:#1e6bd6; } .rtleg.rt-n{ background:#0d9488; } .rtleg.rt-c{ background:#7c3aed; } .rtleg.rt-ret{ background:#64748b; } .rtleg.rt-sup{ background:#b45309; }
-.ppp-tanda.ppp-vencida{ border:2px solid #dc2626; }
-.ppp-tanda.ppp-vencida .ppp-tanda-h{ background:linear-gradient(90deg,#dc2626,#7f1d1d); animation:pppShake 2.2s ease-in-out infinite; }
-.ppp-fe-venc{ background:rgba(0,0,0,.32); color:#fff; font-weight:800; }
+.ppp-tanda.ppp-vencida{ border-color:#fca5a5; }
+.ppp-tanda.ppp-vencida .ppp-tanda-h{ border-left-color:#dc2626; background:#fff7f7; }
+.ppp-tanda.ppp-vencida .ppp-tanda-h:hover{ background:#fef2f2; }
+.ppp-fe-venc{ background:#dc2626 !important; color:#fff !important; font-weight:800; }
 @keyframes pppShake{ 0%,80%,100%{ transform:translateX(0); } 82%{ transform:translateX(-5px); } 84%{ transform:translateX(5px); } 86%{ transform:translateX(-5px); } 88%{ transform:translateX(5px); } 90%{ transform:translateX(-3px); } 92%{ transform:translateX(3px); } 94%{ transform:translateX(0); } }
-/* CARGA VENCIDA (cargado al camión, sin controlar, pasado el plazo) — rojo grande y molesto. */
-.ppp-tanda.ppp-cargvenc{ border:3px solid #dc2626; box-shadow:0 0 0 2px #fecaca, 0 6px 18px rgba(220,38,38,.35); }
-.ppp-tanda.ppp-cargvenc .ppp-tanda-h{ background:linear-gradient(90deg,#dc2626,#991b1b); animation:pppShake 1.3s ease-in-out infinite; }
-.ppp-tanda.ppp-tanda-err .ppp-tanda-h{ background:linear-gradient(90deg,#dc2626,#991b1b); box-shadow:inset 5px 0 0 #fca5a5; }   /* tanda con errores → roja + ⚠️ en el nombre */
-.ppp-cargvenc-badge{ display:inline-block; background:#fff; color:#b91c1c; font-weight:900; font-size:11px; letter-spacing:.4px; padding:2px 8px; border-radius:6px; animation:pppBlink 1s steps(1) infinite; }
+/* CARGA VENCIDA (cargado al camión, sin controlar, pasado el plazo): borde rojo + pastilla que
+   titila. v13.01: ya no pinta la franja entera ni tiembla — la pastilla sola se ve de lejos. */
+.ppp-tanda.ppp-cargvenc{ border:2px solid #dc2626; }
+.ppp-tanda.ppp-cargvenc .ppp-tanda-h{ border-left-color:#dc2626; background:#fef2f2; }
+.ppp-tanda.ppp-tanda-err .ppp-tanda-h{ border-left-color:#dc2626; background:#fff1f2; }   /* tanda con errores → cinta roja + ⚠️ en el nombre */
+.ppp-cargvenc-badge{ display:inline-block; background:#dc2626; color:#fff; font-weight:900; font-size:11px; letter-spacing:.4px; padding:2px 8px; border-radius:6px; animation:pppBlink 1s steps(1) infinite; }
 .ppp-cargvenc-row > td{ background:#fef2f2 !important; }
 .ppp-cargvenc-row .ppp-cli{ color:#b91c1c; font-weight:800; }
 .ppp-fc.cargvenc{ color:#fff; background:#dc2626; border-radius:999px; padding:2px 8px; font-weight:900; white-space:nowrap; animation:pppBlink 1s steps(1) infinite; }
 @keyframes pppBlink{ 0%,100%{ opacity:1; } 50%{ opacity:.5; } }
-.ppp-tanda-name{ font-size:15px; font-weight:800; font-family:Consolas,Menlo,monospace; letter-spacing:.5px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; min-width:0; }
-.ppp-tanda-meta{ font-size:12px; opacity:.95; white-space:nowrap; display:inline-flex; align-items:center; gap:10px; justify-self:end; }
-.ppp-caret{ font-size:12px; opacity:.85; transition:transform .15s; display:inline-block; }
-.ppp-tanda.ppp-open .ppp-caret{ transform:rotate(90deg); }
-.ppp-tanda-sum{ display:block; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; min-width:0; font-size:12px; opacity:.96; }
-.ppp-sum-np{ font-family:Consolas,Menlo,monospace; font-weight:700; }
-.ppp-sum-raz{ font-weight:600; }
+.ppp-tanda-name{ display:inline-block; justify-self:start; max-width:100%; font-size:13.5px; font-weight:800; font-family:Consolas,Menlo,monospace; letter-spacing:.5px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; min-width:0; background:#1e6bd6; color:#fff; padding:3px 10px; border-radius:7px; }
+.ppp-tanda-meta{ font-size:12px; color:#475569; white-space:nowrap; display:inline-flex; align-items:center; gap:8px; justify-self:end; }
+.ppp-caret{ font-size:12px; color:#94a3b8; transition:transform .15s; display:inline-block; }
+.ppp-tanda.ppp-open .ppp-caret{ transform:rotate(90deg); color:#334155; }
+.ppp-tanda-sum{ display:block; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; min-width:0; font-size:13px; color:#0f172a; }
+.ppp-sum-np{ font-family:Consolas,Menlo,monospace; font-weight:700; color:#64748b; margin-left:4px; }
+.ppp-sum-raz{ font-weight:700; }
 .ppp-tanda-fe{ white-space:nowrap; }
-.ppp-sum-fe{ background:rgba(255,255,255,.20); padding:2px 9px; border-radius:999px; font-weight:700; font-size:12px; }
+.ppp-sum-fe{ background:#f1f5f9; color:#334155; padding:2px 9px; border-radius:999px; font-weight:700; font-size:12px; border:1px solid #e2e8f0; }
 .ppp-tanda .ppp-tablewrap{ display:none; }
 .ppp-tanda.ppp-open .ppp-tablewrap{ display:block; }
 .ppp-tablewrap{ overflow-x:auto; }
@@ -2220,7 +2232,7 @@ button.pk-anular small{ display:block; font-size:12px; font-weight:700; opacity:
 .ppp-chk-ico.warn{ background:#f59e0b; color:#fff; } .ppp-chk-ico.warn:hover{ background:#d97706; }
 .ppp-chk-ico.bad{ background:#dc2626; color:#fff; } .ppp-chk-ico.bad:hover{ background:#b91c1c; }
 .ppp-chk-ico.wait{ background:#e2e8f0; color:#64748b; } .ppp-chk-ico.wait:hover{ background:#cbd5e1; }
-.ppp-chk-ico.big.wait{ background:rgba(255,255,255,.28); color:#fff; } .ppp-chk-ico.big.wait:hover{ background:rgba(255,255,255,.42); }
+.ppp-chk-ico.big.wait{ background:#e2e8f0; color:#64748b; } .ppp-chk-ico.big.wait:hover{ background:#cbd5e1; }   /* v13.01: la franja ahora es clara */
 .ppp-pdf-toggle{ margin-left:8px; border-color:#2563eb; color:#1d4ed8; } .ppp-pdf-toggle:hover{ background:#eff6ff; }
 .ppp-pdfdir-status{ font-size:12px; color:#475569; margin-left:8px; }
 .ppp-edit{ width:100%; min-width:62px; box-sizing:border-box; padding:5px 7px; font-size:13px; border:1px solid #cbd5e1; border-radius:6px; background:#fffbeb; color:#0f172a; }
@@ -2236,9 +2248,10 @@ button.pk-anular small{ display:block; font-size:12px; font-weight:700; opacity:
 .ppp-sec-t{ font-size:13px; font-weight:800; margin:11px 0 5px; padding:5px 12px; border-radius:8px; }
 .ppp-sec-t.ppp-sec-super{ background:#fef3c7; color:#92400e; border:1px solid #fcd34d; }
 .ppp-sec-t.ppp-sec-prog{ background:#dbeafe; color:#1e40af; border:1px solid #bfdbfe; }
-.ppp-sec-t.ppp-sec-done{ background:#dcfce7; color:#166534; border:1px solid #bbf7d0; }
+.ppp-sec-t.ppp-sec-done{ background:#f8fafc; color:#0f172a; border:1px solid #e2e8f0; border-left:5px solid #334155; margin-top:16px; font-size:13.5px; }   /* v13.01: cabecera de día neutra, no verde */
 .ppp-tanda.ppp-tanda-super{ border:1px solid #fcd34d; }
-.ppp-tanda.ppp-tanda-super .ppp-tanda-h{ background:linear-gradient(90deg,#d97706,#92400e); }
+.ppp-tanda.ppp-tanda-super .ppp-tanda-h{ border-left-color:#b45309; background:#fffbeb; }
+.ppp-tanda.ppp-tanda-super .ppp-tanda-name{ background:#b45309; }
 .ppp-toolbar{ display:flex; align-items:center; gap:10px; flex-wrap:wrap; background:#fff; border:1px solid #e2e8f0; border-radius:10px; padding:10px 12px; margin:6px 0 4px; }
 .ppp-sug-btn{ padding:9px 16px; font-size:14px; font-weight:800; border:none; border-radius:10px; background:#7c3aed; color:#fff; cursor:pointer; }
 .ppp-sug-btn:hover{ background:#6d28d9; }
@@ -2297,14 +2310,14 @@ tr.ppp-err-zona > td{ background:#fffbeb !important; }
 .ppp-aptap{ display:inline-flex; gap:4px; margin-left:8px; vertical-align:middle; }
 .ppp-apt{ font-size:10px; font-weight:800; padding:2px 6px; border-radius:999px; background:#e2e8f0; color:#94a3b8; white-space:nowrap; letter-spacing:.02em; }
 .ppp-apt.on{ background:#dcfce7; color:#166534; }
-.ppp-tanda-print{ margin-left:6px; padding:3px 9px; font-size:13px; border:none; border-radius:7px; background:rgba(255,255,255,.22); color:#fff; cursor:pointer; }
-.ppp-tanda-print:hover{ background:rgba(255,255,255,.38); }
-.ppp-tanda-ent{ margin-left:8px; padding:3px 10px; font-size:11px; font-weight:800; border:none; border-radius:7px; background:rgba(255,255,255,.22); color:#fff; cursor:pointer; }
-.ppp-tanda-ent:hover{ background:rgba(255,255,255,.35); }
-.ppp-ok-btn{ margin-left:8px; padding:3px 12px; font-size:12px; font-weight:800; border:none; border-radius:7px; background:#fff; color:#166534; cursor:pointer; }
+.ppp-tanda-print{ margin-left:2px; padding:3px 9px; font-size:13px; border:1px solid #e2e8f0; border-radius:7px; background:#f8fafc; color:#334155; cursor:pointer; }
+.ppp-tanda-print:hover{ background:#e2e8f0; }
+.ppp-tanda-ent{ margin-left:4px; padding:3px 10px; font-size:11px; font-weight:800; border:1px solid #bbf7d0; border-radius:7px; background:#f0fdf4; color:#166534; cursor:pointer; }
+.ppp-tanda-ent:hover{ background:#dcfce7; }
+.ppp-ok-btn{ margin-left:8px; padding:3px 12px; font-size:12px; font-weight:800; border:1px solid #bbf7d0; border-radius:7px; background:#f0fdf4; color:#166534; cursor:pointer; }
 .ppp-ok-btn:hover{ background:#dcfce7; }
-.ppp-pencil-btn{ padding:3px 9px; font-size:13px; border:none; border-radius:7px; background:rgba(255,255,255,.22); color:#fff; cursor:pointer; }
-.ppp-pencil-btn:hover{ background:rgba(255,255,255,.42); }
+.ppp-pencil-btn{ padding:3px 9px; font-size:12px; font-weight:700; border:1px solid #fde68a; border-radius:7px; background:#fffbeb; color:#92400e; cursor:pointer; }   /* v13.01: franja clara */
+.ppp-pencil-btn:hover{ background:#fef3c7; }
 .ppp-edit-panel{ display:none; }
 .ppp-tanda.ppp-open.ppp-edit-mode .ppp-edit-panel{ display:flex; flex-wrap:wrap; gap:10px 16px; align-items:center; padding:10px 14px; background:#fffbeb; border-bottom:1px solid #fde68a; }
 .ppp-ep-l{ font-size:13px; font-weight:700; color:#92400e; display:inline-flex; align-items:center; gap:8px; }
@@ -6829,7 +6842,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v12.99";
+const APP_VERSION = "v13.01";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -12856,7 +12869,7 @@ let _agt = null;
 async function openAgentesAdmin() {
   if (!document.getElementById("agtCss")) {
     const s = document.createElement("style"); s.id = "agtCss";
-    s.textContent = "#agentesAdminOverlay{display:none;position:fixed;inset:0;z-index:1280;background:rgba(2,6,23,.74);overflow:auto;padding:14px;}#agentesAdminOverlay.show{display:block;}.agt-card{background:#f8fafc;max-width:860px;margin:0 auto;border-radius:16px;overflow:hidden;box-shadow:0 24px 70px rgba(0,0,0,.5);}.agt-head{display:flex;align-items:center;justify-content:space-between;padding:13px 16px;background:linear-gradient(90deg,#0f766e,#0b3b36);color:#fff;}.agt-title{font-size:19px;font-weight:800;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}.agt-close{background:#dc2626;color:#fff;border:none;border-radius:8px;padding:6px 14px;font-weight:800;cursor:pointer;width:auto;flex-shrink:0;margin-left:10px;}.agt-body{padding:14px 16px;}.agt-loading,.agt-empty{padding:24px;text-align:center;color:#64748b;}.agt-cod{font-family:Consolas,Menlo,monospace;font-weight:800;color:#1e6bd6;}.stk-rep-head{display:flex;justify-content:space-between;align-items:baseline;gap:10px;margin-bottom:12px;flex-wrap:wrap;}.stk-rep-head b{font-size:16px;}.stk-rep-gen{font-size:12px;color:#64748b;}.stk-rep-ok{padding:30px;text-align:center;color:#15803d;font-weight:800;font-size:18px;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:12px;}.stk-rep-ok small{display:block;color:#64748b;font-weight:600;font-size:13px;margin-top:6px;}.stk-rep-cat{border:1px solid #e2e8f0;border-radius:12px;padding:11px 13px;margin-bottom:11px;}.stk-rep-cat.stock_negativo{background:#fef2f2;border-color:#fecaca;}.stk-rep-cat.error_app{background:#fff7ed;border-color:#fed7aa;}.stk-rep-cat.outbox{background:#fffbeb;border-color:#fde68a;}.stk-rep-cat-h{font-weight:800;font-size:14.5px;color:#0f172a;display:flex;align-items:center;gap:8px;}.stk-rep-n{background:#0f172a;color:#fff;border-radius:999px;font-size:12px;padding:1px 9px;font-weight:800;}.stk-rep-hint{font-size:12px;color:#64748b;margin:3px 0 8px;}.stk-rep-row{display:flex;justify-content:space-between;gap:12px;padding:6px 0;border-top:1px solid rgba(0,0,0,.06);font-size:13.5px;flex-wrap:wrap;}.stk-rep-t{font-weight:700;color:#0f172a;}.stk-rep-d{color:#475569;font-size:12.5px;text-align:right;}.agt-estab{padding:10px 13px;border-radius:10px;font-weight:800;font-size:13.5px;margin-bottom:12px;}.agt-estab.ok{background:#f0fdf4;border:1px solid #bbf7d0;color:#15803d;}.agt-estab.no{background:#fffbeb;border:1px solid #fde68a;color:#b45309;}.agt-brief{background:#eef2ff;border:1px solid #c7d2fe;border-radius:10px;padding:11px 13px;margin-bottom:12px;}.agt-brief-h{font-weight:800;font-size:14px;color:#3730a3;}.agt-brief-ul{margin:7px 0 0;padding-left:20px;font-size:13px;color:#1e293b;}.agt-brief-ul li{margin:3px 0;}.agt-brief-ok{font-size:13px;color:#15803d;font-weight:700;margin-top:5px;}.stk-rep-cat.error_envio{background:#fef2f2;border-color:#fecaca;}.stk-rep-cat.faltante{background:#eff6ff;border-color:#bfdbfe;}.stk-rep-cat.oc_baja{background:#fffbeb;border-color:#fde68a;}.stk-rep-cat.falta_facturacion{background:#fef2f2;border-color:#fecaca;}.stk-rep-cat.carga_sin_control{background:#fef2f2;border-color:#fecaca;}.stk-rep-cat.picking_sin_stock{background:#fef2f2;border-color:#fecaca;}.stk-rep-cat.mg_fuera_lista{background:#fff7ed;border-color:#fed7aa;}.stk-rep-cat.sin_planimetria{background:#eff6ff;border-color:#bfdbfe;}.stk-rep-cat.excedente{background:#fffbeb;border-color:#fde68a;}.stk-rep-cat.ppp_error{background:#fffbeb;border-color:#fde68a;}.stk-rep-cat.mg_pendiente{background:#fffbeb;border-color:#fde68a;}.stk-rep-cat.armado_sin_terminar{background:#fffbeb;border-color:#fde68a;}.stk-rep-cat.pipeline_atascado{background:#fffbeb;border-color:#fde68a;}.stk-rep-cat.excedente_estancado{background:#eff6ff;border-color:#bfdbfe;}.stk-rep-cat.recepcion_absurda{background:#fef2f2;border-color:#fecaca;}.stk-rep-cat.faltante_articulo{background:#eff6ff;border-color:#bfdbfe;}";
+    s.textContent = "#agentesAdminOverlay{display:none;position:fixed;inset:0;z-index:1280;background:rgba(2,6,23,.74);overflow:auto;padding:14px;}#agentesAdminOverlay.show{display:block;}.agt-card{background:#f8fafc;max-width:860px;margin:0 auto;border-radius:16px;overflow:hidden;box-shadow:0 24px 70px rgba(0,0,0,.5);}.agt-head{display:flex;align-items:center;justify-content:space-between;padding:13px 16px;background:linear-gradient(90deg,#0f766e,#0b3b36);color:#fff;}.agt-title{font-size:19px;font-weight:800;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}.agt-close{background:#dc2626;color:#fff;border:none;border-radius:8px;padding:6px 14px;font-weight:800;cursor:pointer;width:auto;flex-shrink:0;margin-left:10px;}.agt-body{padding:14px 16px;}.agt-loading,.agt-empty{padding:24px;text-align:center;color:#64748b;}.agt-cod{font-family:Consolas,Menlo,monospace;font-weight:800;color:#1e6bd6;}.stk-rep-head{display:flex;justify-content:space-between;align-items:baseline;gap:10px;margin-bottom:12px;flex-wrap:wrap;}.stk-rep-head b{font-size:16px;}.stk-rep-gen{font-size:12px;color:#64748b;}.stk-rep-ok{padding:30px;text-align:center;color:#15803d;font-weight:800;font-size:18px;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:12px;}.stk-rep-ok small{display:block;color:#64748b;font-weight:600;font-size:13px;margin-top:6px;}.stk-rep-cat{border:1px solid #e2e8f0;border-radius:12px;padding:11px 13px;margin-bottom:11px;}.stk-rep-cat.stock_negativo{background:#fef2f2;border-color:#fecaca;}.stk-rep-cat.error_app{background:#fff7ed;border-color:#fed7aa;}.stk-rep-cat.outbox{background:#fffbeb;border-color:#fde68a;}.stk-rep-cat-h{font-weight:800;font-size:14.5px;color:#0f172a;display:flex;align-items:center;gap:8px;}.stk-rep-n{background:#0f172a;color:#fff;border-radius:999px;font-size:12px;padding:1px 9px;font-weight:800;}.stk-rep-hint{font-size:12px;color:#64748b;margin:3px 0 8px;}.stk-rep-row{display:flex;justify-content:space-between;gap:12px;padding:6px 0;border-top:1px solid rgba(0,0,0,.06);font-size:13.5px;flex-wrap:wrap;}.stk-rep-t{font-weight:700;color:#0f172a;}.stk-rep-d{color:#475569;font-size:12.5px;text-align:right;}.agt-estab{padding:10px 13px;border-radius:10px;font-weight:800;font-size:13.5px;margin-bottom:12px;}.agt-estab.ok{background:#f0fdf4;border:1px solid #bbf7d0;color:#15803d;}.agt-estab.no{background:#fffbeb;border:1px solid #fde68a;color:#b45309;}.agt-brief{background:#eef2ff;border:1px solid #c7d2fe;border-radius:10px;padding:11px 13px;margin-bottom:12px;}.agt-brief-h{font-weight:800;font-size:14px;color:#3730a3;}.agt-brief-ul{margin:7px 0 0;padding-left:20px;font-size:13px;color:#1e293b;}.agt-brief-ul li{margin:3px 0;}.agt-brief-ok{font-size:13px;color:#15803d;font-weight:700;margin-top:5px;}.stk-rep-cat.error_envio{background:#fef2f2;border-color:#fecaca;}.stk-rep-cat.faltante{background:#eff6ff;border-color:#bfdbfe;}.stk-rep-cat.oc_baja{background:#fffbeb;border-color:#fde68a;}.stk-rep-cat.falta_facturacion{background:#fef2f2;border-color:#fecaca;}.stk-rep-cat.carga_sin_control{background:#fef2f2;border-color:#fecaca;}.stk-rep-cat.picking_sin_stock{background:#fef2f2;border-color:#fecaca;}.stk-rep-cat.mg_fuera_lista{background:#fff7ed;border-color:#fed7aa;}.stk-rep-cat.sin_planimetria{background:#eff6ff;border-color:#bfdbfe;}.stk-rep-cat.excedente{background:#fffbeb;border-color:#fde68a;}.stk-rep-cat.ppp_error{background:#fffbeb;border-color:#fde68a;}.stk-rep-cat.mg_pendiente{background:#fffbeb;border-color:#fde68a;}.stk-rep-cat.armado_sin_terminar{background:#fffbeb;border-color:#fde68a;}.stk-rep-cat.picking_sin_terminar{background:#fffbeb;border-color:#fde68a;}.stk-rep-cat.pipeline_atascado{background:#fffbeb;border-color:#fde68a;}.stk-rep-cat.excedente_estancado{background:#eff6ff;border-color:#bfdbfe;}.stk-rep-cat.recepcion_absurda{background:#fef2f2;border-color:#fecaca;}.stk-rep-cat.faltante_articulo{background:#eff6ff;border-color:#bfdbfe;}";
     document.head.appendChild(s);
   }
   let ov = document.getElementById("agentesAdminOverlay");
@@ -12903,6 +12916,7 @@ function agtRender() {
     { key: "excedente", icon: "📦", titulo: "Guardado a excedente (góndola llena)", hint: "Cajas que no entraron en góndola. Fijate si hay que bajarlas o reubicar." },
     { key: "mg_pendiente", icon: "⏳", titulo: "Mercadería recibida sin guardar", hint: "Llegó a 'a guardar' y nadie la subió a góndola hace +8 h. Bloquea stock disponible." },
     { key: "armado_sin_terminar", icon: "🧩", titulo: "Armado empezado sin terminar", hint: "Tandas con armado abierto hace +24 h sin cerrar (TAP). ¿Se olvidaron de cerrar?" },
+    { key: "picking_sin_terminar", icon: "🧺", titulo: "Picking empezado sin terminar", hint: "Tandas con picking abierto hace +24 h sin cerrar (TP). ¿Se olvidaron de cerrar? Deja la tanda reservada para otros y ensucia los tiempos. (v13.00, idea 1471)" },
     { key: "pipeline_atascado", icon: "🚧", titulo: "Pipeline atascado (+2 días hábiles)", hint: "Cajas pickeadas / a facturar sin que NADIE las trabaje hace +2 días hábiles (sáb/dom no cuentan). Mide por última actividad, no por la caja más vieja." },
     { key: "excedente_estancado", icon: "🧊", titulo: "Excedente estancado (+5 días)", hint: "Excedente que nadie baja a góndola — stock 'escondido' arriba." },
     { key: "oc_baja", icon: "📉", titulo: "OCs con entrega baja (<50%)", hint: "Proveedores que entregaron menos de la mitad de lo pedido." },
@@ -12920,6 +12934,7 @@ function agtRender() {
   if (_cnt("carga_sin_control")) _todo.push("🚨 Controlar remitos de " + _cnt("carga_sin_control") + " NP");
   if (_cnt("mg_pendiente")) _todo.push("⏳ Guardar a góndola " + _cnt("mg_pendiente") + " artículo(s)");
   if (_cnt("armado_sin_terminar")) _todo.push("🧩 Cerrar " + _cnt("armado_sin_terminar") + " armado(s) abierto(s)");
+  if (_cnt("picking_sin_terminar")) _todo.push("🧺 Cerrar " + _cnt("picking_sin_terminar") + " picking(s) abierto(s)");
   if (_nudge || _todo.length) {
     h += '<div class="agt-brief"><div class="agt-brief-h">📅 Hoy' + (_nudge ? ' — ' + _nudge : '') + '</div>' +
          (_todo.length ? '<ul class="agt-brief-ul"><li>' + _todo.join('</li><li>') + '</li></ul>' : '<div class="agt-brief-ok">Sin pendientes urgentes del día 👍</div>') + '</div>';
@@ -28423,7 +28438,7 @@ function _pppBlock(key, name, cls, meta, pedidos, headerExtra, editTanda) {
   const chkTit = editTanda ? ("Tanda " + String(editTanda).toUpperCase()) : (razStr || (pedidos.length + " pedidos"));
   const tandaChkBtn = _pppChkIcon(pedidos.map(function (p) { return String(p.np); }), chkTit, editTanda || "", true);
   const sum = cargBadge + (razStr ? '<span class="ppp-sum-raz">' + escapeHtml(razStr) + '</span> ' : '') + '<span class="ppp-sum-np">' + escapeHtml(npStr) + '</span>';
-  const feHtml = fes.length ? '<span class="ppp-sum-fe' + (venc ? ' ppp-fe-venc' : '') + '">' + (venc ? '⏰ ' : '📅 ') + escapeHtml(fes.join(" / ")) + (venc ? ' ¡VENCIDA!' : '') + '</span>' : '';
+  const feHtml = fes.length ? '<span class="ppp-sum-fe' + (venc ? ' ppp-fe-venc' : '') + '">' + (venc ? '⏰ ' : '📅 ') + escapeHtml(fes.join(" / ")) + (venc ? ' · Vencida' : '') + '</span>' : '';
   const hx = (headerExtra || "").replace(/__BLOCKID__/g, id);
   let h = '<div class="ppp-tanda ' + cls + open + modeCls + (venc ? ' ppp-vencida' : '') + (cargVenc ? ' ppp-cargvenc' : '') + (hasErr ? ' ppp-tanda-err' : '') + '" id="' + id + '">' +
     '<div class="ppp-tanda-h' + rcls + '" onclick="pppToggleBlock(\'' + id + '\')">' +

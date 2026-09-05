@@ -1380,6 +1380,54 @@ es de Chef y pisa al LK 217): cuando Gestión alimente el tracking, escribir el 
 una función `gv_*` y pedir columna `empresa` en PaginaLK. Y el Excel ISIS de Facturación manda
 `N_Pedido` contador (no el id), como el mail: ISIS numera 98xxx por su cuenta.
 
+### 3.v ✅ Alerta `picking_sin_terminar` (idea 1471) — 2026-09-05 sábado (v13.00)
+
+**Qué.** Espejo de `armado_sin_terminar` para el picking: EP abierto > 24 h sin TP (últimos 7 días,
+sin legajos 0/1), severidad `media`, hasta 20 filas.
+
+**Cómo, sin tocar lo compartido.** `generar_reporte_agentes()` la usa Producción (cron jobid 14,
+`0 11,15,19 * * *` UTC) y **borra `reporte_agentes` entera al arrancar**, así que no se la editó:
+función NUEVA `public.gv_reporte_agentes_picking_sin_terminar()` (SECURITY DEFINER, sin execute
+para anon/authenticated; sólo borra su propia categoría y agrega filas) + cron NUEVO **jobid 72**
+`gv-reporte-agentes-picking-sin-terminar`, `2 11,15,19 * * *` UTC (2 min después del 14). SQL en
+`sql/gv_reporte_agentes_picking_sin_terminar.sql`.
+
+**Impacto medido.** Corrida a mano el 05/09 → 0 filas (no hay pickings abiertos > 24 h). Producción:
+su panel Agentes itera una lista fija de categorías y no conoce esta clave → no la muestra; el
+resumen Telegram de las 22:00 (`reporte_agentes_resumen_telegram`) cae en el `else` y la nombra
+por su clave como "media". Gestión la renderiza en 🤖 Agentes y la suma al briefing "Hoy".
+
+**Rollback.** `select cron.unschedule('gv-reporte-agentes-picking-sin-terminar');`
+`drop function public.gv_reporte_agentes_picking_sin_terminar();`
+`delete from public.reporte_agentes where categoria = 'picking_sin_terminar';`
+
+### 3.u ✅ RLS en las 11 tablas que no la tenían (idea 6309) — 2026-09-05 sábado (v13.00)
+
+**Qué había.** Las 4 tablas de la idea (`alertas_recepcion_log`, `*_backup_20260807`) ya estaban con
+RLS. Pero `pg_class.relrowsecurity = false` daba **11 tablas más**, todas de Gestión (creadas
+02/09–04/09): `Partes_Plasticas_bkp_codisis_20260904`, `Partes_Plasticas_bkp_proveedor_20260904`,
+`clientes_dto_backup_20260902`, `cobranzas_super_cadena_backup_20260902`,
+`precios_super_lk_backup_20260902`, `snap_costo_nombres_0903` (backups/snapshots, con grant ALL a
+anon y sin ninguna referencia en código), y las vivas `codigos_duales`, `cobranzas_escalones`,
+`deudores_condiciones`, `wa_grupo_listo`, `wa_np_snapshot`.
+
+**Qué se hizo** (migración `gv_rls_tablas_sin_rls_20260905`). RLS prendida en las 11. Backups: sin
+policy → la anon key ya no las ve. Vivas: policy `gv_select_all` (`for select to anon, authenticated
+using (true)`) → lo que se leía se sigue leyendo; escrituras sólo por funciones SECURITY DEFINER
+(`wa_*`, triggers), que no pasan por RLS. **Grants sin tocar.** Las vistas que las usan
+(`vista_saldos_stock` → `codigos_duales`; `vista_np_factura` → `wa_np_snapshot`;
+`vista_deudores_documentos` → `cobranzas_escalones`, `deudores_condiciones`) corren como owner (no
+tienen `security_invoker`), así que la RLS de la base no las afecta.
+
+**Impacto medido** (`set local role anon`): `vista_saldos_stock` 483 filas, `vista_np_factura` 92,
+`codigos_duales` 4, `cobranzas_escalones` 6, `wa_np_snapshot` 254, `wa_grupo_listo` 62 (igual que
+antes); los backups devuelven 0. `vista_deudores_documentos` da "permission denied" para anon **y
+para authenticated, igual que antes de la migración** (nunca tuvo grant; se lee por RPC/service_role).
+Después: **0 tablas de `public.*` sin RLS.**
+
+**Rollback.** `sql/backups/backup_rls_tablas_sin_rls_20260905_pre.sql` (11 `disable row level
+security` + 5 `drop policy`).
+
 ### 3.t ✅ El estado del pedido en la página LK (idea 8743) — 2026-09-05 sábado
 
 Dueño: *"cuando un pedido queda facturado debería mostrarlo en la página y decir que ya no
