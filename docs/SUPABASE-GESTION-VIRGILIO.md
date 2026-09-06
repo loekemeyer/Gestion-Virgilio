@@ -1384,6 +1384,36 @@ es de Chef y pisa al LK 217): cuando Gestión alimente el tracking, escribir el 
 una función `gv_*` y pedir columna `empresa` en PaginaLK. Y el Excel ISIS de Facturación manda
 `N_Pedido` contador (no el id), como el mail: ISIS numera 98xxx por su cuenta.
 
+### 3.ah ✅ Cupo por dotación: pickers × 3 m³, contando ISIS + web (idea 6220, v13.23) — 2026-09-05 sábado (noche)
+
+Dueño: *"depende cuánta gente trabaje"* → *"por los mensajes de prod ya lo tenés"* (la dotación sale de
+`Registros_Produccion_Virgilio`) y *"lo que esté, esté"* (lo de ISIS cuenta). Del análisis de 3 agentes
+(90 días): 1 picker ≈ 3,9 m³/día, 2 ≈ 6,2 → **K = 3 m³ por picker**; correlación gente-total ↔ m³ nula
+(r 0,19), manda el picking; armado 0,55 m³/h-hombre es el cuello (no se tapó todavía).
+- `gv_ppp_web_pickers_tipicos()` = mediana de legajos distintos con EP/TP/PKC (≠ 0/1) por día, últimos
+  `cupo_dias_muestra` (10) días con actividad. Hoy: **2**.
+- `gv_ppp_web_cupo(fecha)` = pickers × `cupo_m3_por_picker` (3) si `cupo_por_dotacion = 1`, si no
+  `m3_max_dia` (5). Hoy: **6 m³**.
+- `gv_ppp_web_m3_isis(fecha)` = ISIS del día (canilla cerrada). **usado = web + ISIS.**
+- Aplicado en `gv_ppp_web_proximo_dia_entrega` (job + intradía), `gv_ppp_web_calendario` (drop + create:
+  `m3` = web + ISIS, `cupo` por día, nueva `m3_web`), y por parche `replace()` sobre `pg_get_functiondef`
+  en `ppp_web_armar_tandas` v4 y `gv_ppp_web_tanda_programar` (aborta si no encuentra el punto).
+Medido: calendario 07..14 → 08: 13,45/6 resta 0 · 09: 10,77/6 resta 0 · 10: 5,76/6 resta 0,24 ·
+**11: 3,14/6 resta 2,86** · 14: 1,51/6 resta 4,49. `proximo_dia_entrega('lun 07 00:01')` = 11. Los 3,72 m³
+web pendientes se reparten vie 11 / lun 14. SQL: `sql/gv_ppp_web_cupo_dotacion.sql`. Rollback:
+`cupo_por_dotacion = 0` (vuelve 5 fijo; ISIS sigue contando).
+
+### 3.ag ✅ Lunes 07/09 no hábil (Día del Metalúrgico): `GV_Dias_No_Habiles` (v13.23) — 2026-09-05 sábado (noche)
+
+Dueño: *"el lunes no es feriado pero es el Día del Metalúrgico, no van a ir a trabajar; por eso no hay
+pedidos en la PPP para el lunes"*. Tabla nueva **`GV_Dias_No_Habiles`** (fecha, motivo; RLS: todos leen,
+supervisores/service escriben) con el 2026-09-07, y `gv_es_dia_habil()` (nuestra) la mira además de
+`planify.feriados`. No se tocó `planify.feriados`: la pisa el sync `planify_sync-feriados` (cron 33) y la
+usan `planify_is_dia_laboral` y `notificar_pasaje_papeles_48h`. Medido: `gv_es_dia_habil('2026-09-07')`
+= false; `dia_minimo('lun 07 00:01')` sigue siendo vie 11 (el lunes es la base, no cuenta). El job y el
+intradía del lunes corren igual (miran la fecha objetivo). Recordatorios de esta sesión movidos al
+martes 08 (08:30 y 15:00). SQL: `sql/gv_dias_no_habiles.sql`.
+
 ### 3.af ✅ Anticipación mínima: Gestión programa a partir de hoy + 4 hábiles (v13.22) — 2026-09-05 sábado (noche)
 
 Dueño: *"el lunes los operarios no van a tener que aplicar nada de la PPP para ese mismo día, salvo el

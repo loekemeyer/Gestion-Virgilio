@@ -1,3 +1,4 @@
+-- ⚠ v13.22: v_desde ahora es gv_ppp_web_dia_minimo(p_ahora) (anticipación mínima), ver sql/gv_ppp_web_anticipacion.sql; el cuerpo de abajo es el de v13.21.
 -- gv_ppp_web_dia_salida(p_filas, p_ahora) · "qué día va a poder salir" cada pedido de "A Programar".
 -- v13.21 (2026-09-06 noche) · dueño: "en A Programar debe aparecer para qué día va a poder salir el
 -- pedido, no la primera (fecha de recepción, sin sentido)". Migración `gv_ppp_web_dia_salida_v1321`.

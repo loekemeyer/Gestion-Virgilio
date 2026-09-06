@@ -12,11 +12,19 @@
 > única**; no se replica. Ante la duda entre parche rápido y fix de raíz → **fix
 > de raíz**.
 >
-> Última actualización: 2026-09-05 (sábado, noche) · Versión app al documentar: **v13.22**
+> Última actualización: 2026-09-05 (sábado, noche) · Versión app al documentar: **v13.23**
 >
 > ⚠⚠ **Desde el lunes 2026-09-07 los operarios usan GESTIÓN, no Producción** (dueño, sábado a la
 > noche: *"el lunes van a empezar a usar GV, no más PV"*). Las tandas web viven en
 > `PPP_Web_Programacion` y Producción no las ve. URL: la de GitHub Pages de este repo.
+>
+> Nota **v13.23** (backend) — (1) **Cupo por dotación** (idea 6220, dueño: *"depende cuánta gente
+> trabaje… por los mensajes de prod ya lo tenés… lo que esté, esté"*): `gv_ppp_web_cupo(fecha)` =
+> pickers típicos (mediana de legajos con EP/TP/PKC en los últimos 10 días con actividad) × 3 m³; el
+> usado suma web + ISIS. Hoy 2 × 3 = 6 m³. Lo usan el job, el intradía, el calendario, el armado y la
+> programación manual. Interruptores `cupo_por_dotacion`, `cupo_m3_por_picker`, `cupo_dias_muestra`.
+> (2) **Lunes 07/09 no hábil** (Día del Metalúrgico): tabla `GV_Dias_No_Habiles` + `gv_es_dia_habil()`.
+> §3.ag y §3.ah; `sql/gv_ppp_web_cupo_dotacion.sql`, `sql/gv_dias_no_habiles.sql`.
 >
 > Nota **v13.22** (backend + front) — **Anticipación mínima: Gestión programa a partir de hoy + 4
 > días hábiles** (dueño: *"lo que haga Gestión va recién de acá a cuatro, cinco días; el lunes los

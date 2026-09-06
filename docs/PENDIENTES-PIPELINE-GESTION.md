@@ -134,6 +134,10 @@ desde la página (`excluir_enviados_a_isis = 0`, v13.15, §3.ab). **No cargar es
 días"*). El job del lunes 07 a las 00:01 arma estas mismas tandas pero con **fecha de entrega viernes
 11**, no lunes 7 (`gv_ppp_web_dia_minimo`, cron 71 con `{"fecha": …}`, §3.af). Martes 8 y miércoles 9
 son "Muy pronto" en A Programar. Para volver a "hoy": `dias_anticipacion_min = 0`.
+**v13.23:** el **lunes 07 es Día del Metalúrgico, no hábil** (`GV_Dias_No_Habiles`, §3.ag): nadie trabaja,
+el primer día real con Gestión es el **martes 08** (recordatorios 08:30 y 15:00 movidos al martes). Y el
+**cupo ya no es 5 fijo: pickers típicos × 3 m³ = 6, contando ISIS + web** (§3.ah): vie 11 tiene 3,14 de
+ISIS → quedan 2,86 para web; lo que no entra va al lun 14 (4,49 libres).
 
 **Lo que el job de las 00:01 va a armar** (simulado el sábado con los 12 pedidos reales de LK y
 `gv_ppp_web_armar_simular`, sin escribir; 3,718 m³, cupo 5; la composición no cambia con la anticipación,

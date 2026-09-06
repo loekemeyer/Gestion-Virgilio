@@ -113,7 +113,9 @@ dobles). **Desde el lunes 2026-09-07 los operarios usan Gestión.** **⚠ v13.22
 MÍNIMA de 4 días hábiles** (`PPP_Web_Config.dias_anticipacion_min`, `gv_ppp_web_dia_minimo()`): el lunes
 los operarios sólo arman lo que ISIS dejó (mar 8 / mié 9 / jue 10); lo que Gestión programe cae recién el
 **viernes 11** en adelante (job 00:01 vía cron 71 con `{"fecha": …}`, intradía, "A Programar"). Poner en 0
-para volver a hoy/mañana. §3.af. El cron de Chef vive en su proyecto (nkhzocgdpwtgrmwleihr, sin
+para volver a hoy/mañana. §3.af. **El lunes 07/09 es Día del Metalúrgico: no hábil** (`GV_Dias_No_Habiles`,
+§3.ag); primer día real con Gestión = martes 08. **Cupo diario = pickers típicos × 3 m³ (hoy 6), contando
+ISIS + web** (`gv_ppp_web_cupo`, idea 6220, v13.23, §3.ah; `cupo_por_dotacion = 0` → 5 fijo). El cron de Chef vive en su proyecto (nkhzocgdpwtgrmwleihr, sin
 acceso desde acá): lo apaga el dueño desde el Dashboard. **⚠ Con el interruptor en 0 también los
 pedidos de Chef que salgan por su mail los programa GV: ese mail hay que IGNORARLO (no cargarlo en
 ISIS) hasta apagar el cron, si no quedan dobles.** Apagarlo es urgente desde el lunes.

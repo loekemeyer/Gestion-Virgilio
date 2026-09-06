@@ -1,3 +1,4 @@
+-- ⚠ v13.23: la versión vigente devuelve además muy_pronto, dia_minimo y m3_web, con m3 = web + ISIS y cupo = gv_ppp_web_cupo(dia). Ver sql/gv_ppp_web_anticipacion.sql y sql/gv_ppp_web_cupo_dotacion.sql; el cuerpo de abajo es el de v13.18.
 -- gv_ppp_web_calendario(p_desde, p_hasta) · los "circulitos" del calendario de "A Programar".
 -- v13.18 (2026-09-06 noche) · dueño: "acá sigue figurando cero pero sí hay en la PPP".
 -- Hasta v13.17 sólo sumaba PPP_Web_Programacion (tandas web). Ahora devuelve además lo que ISIS

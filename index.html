@@ -6985,7 +6985,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v13.22";
+const APP_VERSION = "v13.23";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -32805,7 +32805,7 @@ function aprColDias() {
         '</div>' +
         // v13.18 (dueño: "acá sigue figurando cero pero sí hay en la PPP"): lo que ISIS ya tiene ese día.
         (d.habil !== false && Number(d.m3_isis) > 0
-          ? '<div class="apr-dia-isis" title="Programado por ISIS para ese día (lo que se ve en la solapa Programación). No cuenta para el cupo web.">📋 ISIS: <b>' + aprNum(Number(d.m3_isis), 2) + ' m³</b> · ' + (Number(d.tandas_isis) || 0) + ' tanda(s) · ' + (Number(d.np_isis) || 0) + ' NP</div>'
+          ? '<div class="apr-dia-isis" title="Programado por ISIS para ese día (lo que se ve en la solapa Programación). Desde v13.23 cuenta para el cupo del día (pickers × 3 m³).">📋 ISIS: <b>' + aprNum(Number(d.m3_isis), 2) + ' m³</b> · ' + (Number(d.tandas_isis) || 0) + ' tanda(s) · ' + (Number(d.np_isis) || 0) + ' NP</div>'
           : '') +
       '</div>' +
     '</div>';
