@@ -11,7 +11,7 @@
 | día | qué pasa |
 |---|---|
 | **lun 7** | Día del Metalúrgico. No se trabaja (`GV_Dias_No_Habiles`). A las 00:01 el job arma lo web pendiente **para el viernes 11**. |
-| **mar 8** | Primer día real con Gestión. Se arma lo que ISIS dejó: 13,45 m³, 7 tandas (D59A, D60A–F, D61A). Nada web. |
+| **mar 8** | Primer día real con Gestión. **v13.60 (dom 6 a la noche): el lunes 7 es feriado y nada estaba armado, así que la semana se corrió UN día hábil (salvo súper).** Sale el martes sólo lo ya armado: **D59A Coto y D61A Carrefour** (8,87 m³). Ese día se pickea y arma lo del **mié 9: D60A–F (9 NP, 4,58 m³, GBA Sur/Oeste) + D62A Patagonia** (pickeada el 3/9, falta armar). Después: jue 10 = D66A–F (7,78) · vie 11 = D67A–K (5,76) + E07A Chango Mas · lun 14 = D68A–G + E01A–F (6,58, primer día con web) · mar 15 = D69A–E + E03A–B. Matiz D71A sigue el mié 16. |
 | **mié 9** | ISIS: 10,77 m³ (D62A, D66A–F). |
 | **jue 10** | ISIS: 5,76 m³ (D67A–K). |
 | **vie 11** | ISIS: 3,14 m³ (D68A–F) + **las primeras tandas web, ya programadas el sábado**: E01A (1344), E01B (1345+1347), E01C (1348+1351), E01D (1342+1346), E01E (1343), E02A (Chef 216) y E04A (1349 Bazar Mónica) = 3,43 m³ + **E07A 44619 Chango Mas (4,31, ISIS sin tanda → override)**. |

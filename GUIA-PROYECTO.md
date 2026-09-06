@@ -12,12 +12,27 @@
 > única**; no se replica. Ante la duda entre parche rápido y fix de raíz → **fix
 > de raíz**.
 >
-> Última actualización: 2026-09-06 (domingo) · Versión app al documentar: **v13.58**
+> Última actualización: 2026-09-06 (domingo) · Versión app al documentar: **v13.60**
 >
 > ⚠⚠ **Desde el lunes 2026-09-07 los operarios usan GESTIÓN, no Producción** (dueño, sábado a la
 > noche: *"el lunes van a empezar a usar GV, no más PV"*). Las tandas web viven en
 > `PPP_Web_Programacion` y Producción no las ve. URL: la de GitHub Pages de este repo.
 >
+> Nota **v13.60** (backend + datos) — **un camión por día y zona, y la semana corrida un día hábil**
+> (dueño: *"el viernes 11 hay cinco camiones, no puede ser… no tiene sentido que se parta así"* y *"si lo del
+> 8 no fue ni empezado, pasemos los del 8 al 9 y así vamos avanzando"*). (1) `ppp_web_armar_tandas` v6
+> (`sql/gv_ppp_web_camion_del_dia.sql`): antes de numerar mira los camiones que ya van ese día (web + ISIS,
+> sin súper/retira) y su etiqueta (`gv_ppp_web_camion`: Capital · GBA Sur · GBA Oeste · GBA Norte); una tanda
+> nueva para esa etiqueta entra al camión existente con la letra siguiente (E01F, D68G), y sólo abre camión
+> nuevo si no hay ninguno. Todo código pasa por `gv_ppp_web_codigo_tomado` (ahora mira también
+> `GV_PPP_Prog_Override`, donde vive E07A; ídem `gv_ppp_web_letra_y_camion`). (2) Datos: lun 7 feriado y nada
+> armado → todo un día hábil adelante salvo súper: D60A–F 8→9, D66 9→10, D67 10→11, D68 11→14, D69 14→15
+> (81 NP vía override, nota `v13.60 …`), web E01A–E/E02A/E04A 11→14 y E03A/E05A/E06A/E08A 14→15; quedan
+> Coto D59A y Carrefour D61A (8, armadas), Patagonia D62A (9), Chango Mas E07A (11), Matiz D71A (16).
+> Consolidación: E02A→E01F, E04A→D68G, E05A→D69D, E06A→D69E, E08A→E03B. Resultado: 2 camiones por día
+> (8: D59+D61 · 9: D60+D62 · 10: D66 · 11: D67+E07 · 14: D68+E01 · 15: D69+E03). Backup:
+> `sql/backups/reprogramacion_20260906_pre_v1360.sql`. Detalle §3.at de la doc de Supabase (las migraciones se llaman `…_v1359` porque chocó con la v13.59 del otro chat, que apagó los crons 71 y 73).
+
 > Nota **v13.58** (front) — **A Programar sin selector Loekemeyer/Chef: LK y Chef juntos, sin filtros**
 > (dueño: *"sacá el botón Loeke/Chef; tienen que aparecer todos los pedidos a programar ahí sin filtros"*).
 > `aprTraerTodos()` lee las dos empresas en paralelo (LK por la vista `v_pedidos_web_np`, Chef por la RPC

@@ -1487,6 +1487,57 @@ vie 11 = 10,88 m³ (7,45 ISIS + 3,43 web: pasado a propósito, el súper va en c
 589 cajas. Producción sigue viendo la fila cruda (tanda vacía). **Rollback:** `delete from "GV_PPP_Prog_Override"
 where np = '44619'` (la vista queda; sin filas es passthrough).
 
+### 3.at ✅ Un camión por día y zona + semana corrida un día hábil (v13.60) — 2026-09-06 domingo (22:30)
+
+> Nombrada v13.60 porque la v13.59 la tomó el otro chat (§3.as: crons 71 y 73 apagados). Las migraciones quedaron
+> con sufijo `_v1359` (ya aplicadas, no se renombran). Con los crons apagados, la regla de camión rige para el
+> armado manual/simulado y para cuando se vuelvan a prender.
+
+**Pedido del dueño:** *"el viernes 11 hay cinco camiones, no puede ser. El 14 veo cuatro. No tiene sentido que se
+parta así los días de programación"* y *"si todos los del 8 todavía no fueron ni empezados a armar, pasemos los
+del 8 al 9 y así vamos avanzando"*. Confirmó por pregunta: sólo D60 del martes (Coto y Carrefour ya armadas), todo
+un día hábil salvo súper, los súper quedan.
+
+**Causa de los camiones de más:** `ppp_web_armar_tandas` numeraba cada corrida con un camión NUEVO
+(`_cam` arrancaba en `v_zn0 + 1`), así que el intradía abría E02, E04, E05, E06, E08 para pedidos de 0,1–0,5 m³
+que tenían camión ese día. Camión = LETRA+NN (tablero `_pppTandaNum`, Producción, cuadro "Total por día").
+
+**Cambio (migración `gv_ppp_web_camion_del_dia_v1359`, repo `sql/gv_ppp_web_camion_del_dia.sql`):**
+- `ppp_web_armar_tandas` v6: con `sectores_activos = 1` y sin prefijo, antes del bucle carga en `_cam` los
+  camiones que ya van a `v_fecha` (web `PPP_Web_Programacion` + ISIS `gv_ppp_programacion_diaria`, sin
+  `tipo = KRIKOS` ni zona súper/retira/expo), con su letra (`base`), número y la próxima letra de tanda libre
+  (`max(ti)+1`), agrupados por etiqueta `gv_ppp_web_camion(zona, sector)`; si una etiqueta tiene más de un
+  camión, gana el que más paradas lleva. Una tanda nueva para esa etiqueta sale como `base||NN||letra`
+  (E01F, D68G). Camión nuevo sólo si no hay: `greatest(max NN de la letra vigente en _cam, v_zn0) + 1`.
+  Cada código pasa por `gv_ppp_web_codigo_tomado` en un loop (nunca repite).
+- `gv_ppp_web_codigo_tomado` y `gv_ppp_web_letra_y_camion` miran también `GV_PPP_Prog_Override.tanda`
+  (E07A vive sólo ahí; sin esto el próximo camión nuevo podía salir E07 otra vez).
+- Bucle viejo por grupo (`sectores_activos = 0`) sin cambios.
+- `gv_ppp_web_dia_camion` (migración `gv_ppp_web_dia_camion_sin_super_v1359`): un súper `tipo = KRIKOS` con zona
+  numérica (E07A Chango Mas quedó como "Zona 5") ya no cuenta como camión a esa zona — la simulación mandaba un
+  pedido de Morón al vie 11 como E08A por culpa de eso.
+
+**Datos (backup restore-ready `sql/backups/reprogramacion_20260906_pre_v1360.sql`, 11 filas de override + 26 NP
+web):** override `fecha_entrega` para 81 NP de ISIS (D60→09-09, D66→09-10, D67→09-11, D68→09-14, D69→09-15,
+nota `v13.60 …`); `PPP_Web_Programacion.fecha_entrega` 19 NP 11→14 y 7 NP 14→15; renombres E02A→E01F,
+E04A→D68G, E05A→D69D, E06A→D69E, E08A→E03B (ninguna tenía evento ni fila en `PPP_Web_Tandas`/`Tanda_Items`).
+Súper sin tocar: D59A, D61A (mar 8, armadas), D62A (mié 9), E07A (vie 11). Matiz D71A (mié 16) sin tocar.
+
+**Medición (misma consulta antes/después, camiones = `left(tanda,3)` por día, web + ISIS):**
+
+| día | antes | después |
+|---|---|---|
+| mar 8 | D59 D60 D61 (3) · 13,45 | D59 D61 (2) · 8,87 |
+| mié 9 | D62 D66 (2) · 10,77 | D60 D62 (2) · 7,57 |
+| jue 10 | D67 (1) · 5,76 | D66 (1) · 7,78 |
+| vie 11 | D68 E01 E02 E04 E07 (5) · 10,88 | D67 E07 (2) · 10,07 |
+| lun 14 | D69 E03 E05 E06 E08 (5) · 3,77 | D68 E01 (2) · 6,58 |
+| mar 15 | — | D69 E03 (2) · 4,01 |
+
+**Rollback:** ejecutar el backup (deja fechas y códigos como estaban; las 81 filas nuevas del override se borran
+con `delete from public."GV_PPP_Prog_Override" where nota like 'v13.60%'`) y reaplicar
+`sql/gv_ppp_web_armar_pendientes.sql` §3 y §4 (funciones v5).
+
 ### 3.ar ✅ Sólo Recepción de Remitos (CRN) = entregado; vuelve atrás v13.27 (v13.57) — 2026-09-06 domingo (20:30)
 
 Dueño: *"Todos los de recepción de remitos deberían estar en 'En salida'"*. El modelo de siempre (GUIA v3.69):
