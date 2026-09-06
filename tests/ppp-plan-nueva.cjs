@@ -113,7 +113,8 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
       { np: "4", tanda: "E02A", m3: 0.5, zona: "Zona 6 - GBA Norte", barrio: "Munro" },
       { np: "5", tanda: "", m3: 0.1, zona: "Zona 4 - GBA Sur", barrio: "Lanús" },
       { np: "6", tanda: "E01C", m3: 0.1, zona: "Retira", barrio: "Retira" },
-      { np: "7", tanda: "F01A", m3: 0.2, zona: "Zona 1 - CABA Sur", barrio: "Boedo" }   // v13.16: Chef, misma NN que LK → otro camión
+      { np: "7", tanda: "F01A", m3: 0.2, zona: "Zona 1 - CABA Sur", barrio: "Boedo" },   // v13.16: Chef, misma NN que LK → otro camión
+      { np: "8", tanda: "D59A", m3: 8.9, zona: "", tipo: "KRIKOS", barrio: "" }          // v13.19: Súper = otro camión, se numera
     ]);
     out.porTanda = cams.map((c) => _pppCamionNombre(c) + "|" + c.tandas.join("+") + "|" + c.ped.length).join(" ; ");
     return out;
@@ -147,7 +148,7 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
     ["v13.17: vuelta a la hoja 1",                            r.hoja1Vuelve === true],
     ["día 2: Retira sin orden de carga ni camión",            r.dia2 === true],
     ["v13.07: camión = n° de tanda, zonas mezcladas 'Zona 1 + Zona 2 + Zona 3', sin tanda por zona, Retira aparte",
-      r.porTanda === "Camión 1 · Zona 1 + Zona 2 + Zona 3|E01A+E01B|3 ; Camión 2 · Zona 1 - CABA Sur|F01A|1 ; Sin tanda · Zona 4 - GBA Sur||1 ; Camión 3 · Zona 6 - GBA Norte|E02A|1 ; Retira en fábrica|E01C|1"],
+      r.porTanda === "Camión 1 · Zona 1 + Zona 2 + Zona 3|E01A+E01B|3 ; Camión 2 · Zona 1 - CABA Sur|F01A|1 ; Sin tanda · Zona 4 - GBA Sur||1 ; Camión 3 · Zona 6 - GBA Norte|E02A|1 ; Camión 4 · Súper|D59A|1 ; Retira en fábrica|E01C|1"],
     ["sin errores de página",                                 errs.length === 0]
   ];
   let bad = 0;

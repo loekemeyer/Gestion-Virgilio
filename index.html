@@ -6979,7 +6979,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v13.18";
+const APP_VERSION = "v13.19";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -29470,7 +29470,8 @@ function _pppCamiones(ped) {
   });
   // v13.13: Camión 1, 2, 3… en el orden de la vista (dueño: "Camión 46" con el n° de la tanda
   // no se entendía). El código de la tanda sigue en el subtítulo. Sin tanda no numera.
-  let n = 0; for (const c of arr) { if (c.ruta === "ret" || c.ruta === "sup" || c.tn == null) continue; c.num = ++n; }
+  // v13.19 (dueño): "si hay Súper, el Súper va sí o sí en otro camión" → cuenta y se numera como camión.
+  let n = 0; for (const c of arr) { if (c.ruta === "ret" || (c.ruta !== "sup" && c.tn == null)) continue; c.num = ++n; }
   return arr;
 }
 /* Orden de carga LIFO de un camión: recorrido geográfico (PPP_Geo + _rtOptimize) y se numera al
@@ -29502,7 +29503,7 @@ function _pppPlanEstDia(ped) { const est = { armado: 0, curso: 0, sin: 0 }; for 
 function _pppPlanValor(ped) { let v = 0, sin = 0; for (const p of ped) { const x = _pppValorPed(p); if (x == null) sin++; else v += x; } return { valor: v, sin: sin }; }
 function _pppCamionIco(c) { return c.ruta === "ret" ? "🏭" : (c.ruta === "sup" ? "🛒" : "🚚"); }
 /* v13.07: el número del camión ES el de la tanda (E02A → Camión 2), como en el cuadro "Total por día". */
-function _pppCamionNombre(c) { return c.ruta === "ret" ? "Retira en fábrica" : (c.ruta === "sup" ? "Súper" : ((c.tn != null ? "Camión " + c.num : "Sin tanda") + " · " + c.zona)); }
+function _pppCamionNombre(c) { return c.ruta === "ret" ? "Retira en fábrica" : (c.ruta === "sup" ? "Camión " + c.num + " · Súper" : ((c.tn != null ? "Camión " + c.num : "Sin tanda") + " · " + c.zona)); }
 /* ---- GRILLA: KPI + banda de vencidas + 6 días + otras fechas ---- */
 function _pppPlanGridHtml(programados) {
   const g = _pppPlanAgrupar(programados);
@@ -29514,7 +29515,7 @@ function _pppPlanGridHtml(programados) {
   const rangoTxt = dias.length ? (dias[0].dnum + ' ' + dias[0].mon + ' → ' + dias[dias.length - 1].dnum + ' ' + dias[dias.length - 1].mon) : '';
   const cap = pppGetCfg().dayCap > 0 ? pppGetCfg().dayCap : 6;
   let tot = 0, totM3 = 0, totVal = 0, totSinVal = 0, camiones = 0;
-  for (const d of dias) { const dd = g.byDay.get(d.key); if (!dd) continue; tot += dd.ped.length; totM3 += _pppM3Sum(dd.ped); const v = _pppPlanValor(dd.ped); totVal += v.valor; totSinVal += v.sin; camiones += _pppCamiones(dd.ped).filter(function (c) { return c.ruta !== "ret" && c.ruta !== "sup"; }).length; }
+  for (const d of dias) { const dd = g.byDay.get(d.key); if (!dd) continue; tot += dd.ped.length; totM3 += _pppM3Sum(dd.ped); const v = _pppPlanValor(dd.ped); totVal += v.valor; totSinVal += v.sin; camiones += _pppCamiones(dd.ped).filter(function (c) { return c.ruta !== "ret"; }).length; }
   let sinCtrl = 0;
   if (_pppEnSalida) _pppEnSalida.forEach(function (r, np) { try { if (_pppCargaVencida({ np: np })) sinCtrl++; } catch (_e) {} });
   const nVenc = g.venc.length;
@@ -29540,7 +29541,7 @@ function _pppPlanGridHtml(programados) {
       continue;
     }
     const cams = _pppCamiones(dd.ped), est = _pppPlanEstDia(dd.ped), val = _pppPlanValor(dd.ped);
-    const nCam = cams.filter(function (c) { return c.ruta !== "ret" && c.ruta !== "sup"; }).length;
+    const nCam = cams.filter(function (c) { return c.ruta !== "ret"; }).length;
     const camsShow = cams.slice(0, 3);
     let over = "";
     for (const c of cams) if (c.ruta !== "ret" && c.ruta !== "sup" && c.m3 > cap) { over += '<span class="pn-warn">⚠ ' + escapeHtml(c.zona) + ' al ' + Math.round(100 * c.m3 / cap) + ' % (' + _pppFmtM3(c.m3) + ' / ' + _pppFmtM3(cap) + ' m³)</span>'; }
@@ -29579,7 +29580,7 @@ function _pppPlanDiaHtml(programados, key) {
   const titulo = esVenc ? "Atrasados — la fecha de entrega ya pasó" : (dt.getDate() + " de " + _PN_MESL[dt.getMonth()]);
   const sub = esVenc ? (ped.length + " pedido" + (ped.length === 1 ? "" : "s") + " que no " + (ped.length === 1 ? "salió" : "salieron") + " · reprogramar o cargar") : (_PN_DOW[dt.getDay()] + (key === hoy ? " · hoy" : ""));
   const cams = _pppCamiones(ped), est = _pppPlanEstDia(ped), val = _pppPlanValor(ped);
-  const nCam = cams.filter(function (c) { return c.ruta !== "ret" && c.ruta !== "sup"; }).length;
+  const nCam = cams.filter(function (c) { return c.ruta !== "ret"; }).length;
   let h = '<div class="pn-topbar"><button class="pn-back" onclick="pppPlanVolver()">← Volver a los 6 días</button><button class="pn-lnk" onclick="pppPlanClasica(true)">Vista clásica</button></div>';
   h += '<div class="pn-dayhead' + (esVenc ? ' venc' : '') + '"><div><div class="d1">' + escapeHtml(sub) + '</div><div class="d2">' + escapeHtml(titulo) + '</div></div>' +
     '<div class="kp"><div class="k"><i>📦</i><div><div class="l">Pedidos</div><div class="v">' + ped.length + '</div></div></div><div class="k"><i>🚚</i><div><div class="l">Camiones</div><div class="v">' + nCam + '</div></div></div><div class="k"><i>🧊</i><div><div class="l">Volumen</div><div class="v">' + _pppFmtM3(_pppM3Sum(ped)) + ' m³</div></div></div><div class="k"><i>💰</i><div><div class="l">Valor estimado</div><div class="v g">' + (_pppValor ? _pppFmtPesos(val.valor) : '…') + '</div></div></div></div>' +

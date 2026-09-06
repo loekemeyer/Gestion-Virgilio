@@ -12,11 +12,15 @@
 > única**; no se replica. Ante la duda entre parche rápido y fix de raíz → **fix
 > de raíz**.
 >
-> Última actualización: 2026-09-06 (domingo, noche) · Versión app al documentar: **v13.18**
+> Última actualización: 2026-09-06 (domingo, noche) · Versión app al documentar: **v13.19**
 >
 > ⚠⚠ **Desde el lunes 2026-09-07 los operarios usan GESTIÓN, no Producción** (dueño, sábado a la
 > noche: *"el lunes van a empezar a usar GV, no más PV"*). Las tandas web viven en
 > `PPP_Web_Programacion` y Producción no las ve. URL: la de GitHub Pages de este repo.
+>
+> Nota **v13.19** (front) — Tablero: **el Súper cuenta como camión** (dueño: *"si hay Súper, el
+> Súper va sí o sí en otro camión (2 camiones)"*). Se numera en el orden de la vista ("Camión 2 ·
+> Súper") y entra en el KPI de camiones del día y de la grilla. Retira en fábrica sigue sin contar.
 >
 > Nota **v13.18** (backend + front) — El calendario de "A Programar" mostraba `0,00 / 5,00 m³` en días
 > que ISIS ya tiene cargados (martes 8: 13,45 m³). `gv_ppp_web_calendario` devuelve ahora `m3_isis`,
