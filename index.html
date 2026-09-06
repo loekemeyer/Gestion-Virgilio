@@ -825,6 +825,7 @@ button {
 .apr-dia-txt{ font-size:11.5px; color:#475569; }
 .apr-dia-isis{ margin-top:3px; font-size:11px; color:#7c3aed; } /* v13.18: lo que ISIS ya tiene ese día */
 .apr-dia-isis b{ font-weight:800; }
+.apr-cupo-lleno{ margin:6px 0 8px; padding:8px 12px; border-radius:10px; background:#fff7ed; color:#9a3412; border:1px solid #fed7aa; font-size:12.5px; } /* idea 2510 */
 .apr-dia-pronto .apr-dia-cerr-pronto{ color:#64748b; } /* v13.22: antes de la anticipación mínima */
 .apr-dia-cerr{ color:#b91c1c; font-weight:700; }
 .apr-dia-hoy{ border-left-color:#1e6bd6; }
@@ -32859,6 +32860,22 @@ function aprColTandas() {
   return h + '</div></div>';
 }
 
+/* idea 2510 — si el cupo está lleno varios días hábiles seguidos (desde el primer día permitido), avisar
+   arriba del calendario en vez de que el supervisor lo descubra renglón por renglón. Sólo lee _apr.cal. */
+function aprCupoLlenoHtml() {
+  const cal = (_apr.cal || []).slice().sort(function (a, b) { return String(a.dia).localeCompare(String(b.dia)); });
+  let n = 0, desde = null, libre = null;
+  for (const d of cal) {
+    if (d.habil === false || d.muy_pronto === true) continue;
+    const m3 = Number(d.m3) || 0, cupo = Number(d.cupo) || 0;
+    if (cupo > 0 && m3 >= cupo) { n++; if (!desde) desde = d; }
+    else { libre = d; break; }
+  }
+  if (n < 2) return "";
+  const f = function (x) { const q = String(x.dia).slice(0, 10).split("-"); return q[2] + "/" + q[1]; };
+  return '<div class="apr-cupo-lleno">🟧 <b>' + n + ' días hábiles seguidos con cupo lleno</b> desde el ' + escapeHtml(f(desde)) +
+    (libre ? ' · lo nuevo cae el <b>' + escapeHtml(f(libre)) + '</b>' : ' · sin día libre a la vista: tocá "Ver más días"') + '</div>';
+}
 function aprColDias() {
   const DOW = ["Domingo","Lunes","Martes","Miércoles","Jueves","Viernes","Sábado"];
   const MES = ["ene","feb","mar","abr","may","jun","jul","ago","sep","oct","nov","dic"];
@@ -32867,6 +32884,7 @@ function aprColDias() {
   let h = '<div class="apr-col apr-col-dias">' +
     '<div class="apr-col-t">🗓️ Programar para…</div>' +
     '<div class="apr-dias-ayuda">Arrastrá una tanda a un día. Los días completos, no hábiles o muy próximos no reciben.</div>' +
+    aprCupoLlenoHtml() +   // idea 2510
     '<div class="apr-scroll apr-dias">';
 
   if (!_apr.cal.length) h += '<div class="apr-vacio">Cargando días…</div>';
