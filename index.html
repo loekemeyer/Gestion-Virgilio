@@ -755,6 +755,10 @@ button {
 .apr-card-d{ display:flex; flex-wrap:wrap; gap:5px; margin-top:5px; }
 .apr-chip{ font-size:11.5px; background:#f1f5f9; color:#475569; border-radius:999px; padding:2px 8px; font-weight:600; }
 .apr-chip-z{ background:#e0edff; color:#1e40af; }
+/* idea 2048: última corrida del armado automático */
+.apr-log{ margin:0 0 8px; padding:7px 12px; border-radius:10px; font-size:12.5px; font-weight:700; background:#dcfce7; color:#166534; border:1px solid #bbf7d0; }
+.apr-log.gris{ background:#f1f5f9; color:#475569; border-color:#e2e8f0; }
+.apr-log.err{ background:#fee2e2; color:#991b1b; border-color:#fecaca; }
 /* v13.21: qué día sale el pedido */
 .apr-chip-sal{ background:#dcfce7; color:#166534; font-weight:800; }
 .apr-chip-sal.hoy{ background:#166534; color:#fff; }
@@ -32292,6 +32296,7 @@ let _apr = {
   items: {},        // codigo -> [items del borrador]
   cal: [],          // gv_ppp_web_calendario, de HOY para adelante
   salida: {},       // v13.21: order_id → { dia, motivo, detalle } (gv_ppp_web_dia_salida)
+  log: null,        // idea 2048: última fila de GV_Tandas_Auto_Log (¿corrió el armado automático?)
   horizonte: 21,    // cuántos días muestra la lista
   q: "", exp: {}, drag: null, dragTanda: null, msg: "", msgErr: false,
   ocupado: false    // hay una acción en vuelo: no dejar arrastrar encima
@@ -32445,6 +32450,35 @@ function aprSalidaChip(p) {
   return '<span class="apr-chip apr-chip-sal no" title="' + escapeHtml(recep + s.detalle) + '">' + lab + '</span>';
 }
 
+/* idea 2048 — "¿corrió el armado automático?" El job estuvo roto semanas sin que nadie lo viera
+   (v13.25). Se lee la última corrida de GV_Tandas_Auto_Log (RLS: sesión de supervisor) y se muestra
+   arriba de A Programar. Nunca tumba la carga: si falla, no se muestra nada. */
+async function aprCargarLog() {
+  try {
+    const h = await facAuthWriteHeaders();
+    if (!h) { _apr.log = null; return; }
+    const r = await fetch(SUPABASE_URL + "/rest/v1/GV_Tandas_Auto_Log?select=id,corrida_en,fecha_objetivo,estado,motivo,tandas,np_programadas,np_leidas&order=id.desc&limit=1", { headers: h, cache: "no-store" });
+    const rows = r.ok ? await r.json() : [];
+    _apr.log = rows && rows[0] ? rows[0] : null;
+  } catch (_e) { _apr.log = null; }
+}
+function aprLogHtml() {
+  const l = _apr.log; if (!l) return "";
+  const dt = l.corrida_en ? new Date(l.corrida_en) : null;
+  const DOW = ["dom", "lun", "mar", "mié", "jue", "vie", "sáb"];
+  const cuando = dt ? DOW[dt.getDay()] + " " + dt.getDate() + "/" + (dt.getMonth() + 1) + " " + String(dt.getHours()).padStart(2, "0") + ":" + String(dt.getMinutes()).padStart(2, "0") : "—";
+  const horas = dt ? (Date.now() - dt.getTime()) / 36e5 : 0;
+  const fo = l.fecha_objetivo ? (function () { const q = String(l.fecha_objetivo).slice(0, 10).split("-"); return q[2] + "/" + q[1]; })() : "";
+  const est = String(l.estado || "");
+  let cls = "ok", txt;
+  if (est === "ok" || est === "intradia_ok") txt = "🤖 Último armado automático: " + cuando + " · " + (l.tandas || 0) + " tanda" + (l.tandas === 1 ? "" : "s") + (fo ? " para el " + fo : "") + " · " + (l.np_programadas || 0) + " NP programadas";
+  else if (est === "intradia_sin_umbral") { cls = "gris"; txt = "🤖 Armado automático: " + cuando + " · nada pendiente para armar"; }
+  else if (est === "salteada") { cls = "gris"; txt = "🤖 Armado automático: " + cuando + " · salteado (" + (l.motivo || "no hábil") + ")"; }
+  else { cls = "err"; txt = "⚠ El armado automático FALLÓ " + cuando + ": " + (l.motivo || est) + " — avisá para que lo revisen"; }
+  if (cls !== "err" && horas > 30) { cls = "err"; txt = "⚠ El armado automático no corre desde " + cuando + " (" + Math.round(horas) + " h) — avisá para que lo revisen"; }
+  return '<div class="apr-log ' + cls + '" title="' + escapeHtml("Corre a las 00:01 (lun–vie) y cada 15 min de 07:00 a 18:45. Fuente: GV_Tandas_Auto_Log.") + '">' + escapeHtml(txt) + '</div>';
+}
+
 async function aprCargar() {
   if (_apr.cargando) return;
   _apr.cargando = true; _apr.err = ""; aprRender();
@@ -32455,7 +32489,8 @@ async function aprCargar() {
       aprGet('PPP_Web_Programacion?select=order_id&empresa=eq.' + emp + '&tanda=not.is.null&limit=20000'),
       aprGet('PPP_Web_Tanda_Items?select=*&empresa=eq.' + emp + '&limit=20000'),
       aprGet('gv_ppp_web_tandas_abiertas?select=*&empresa=eq.' + emp + '&order=codigo.asc'),
-      aprCargarCalendario()   // v13.11: en paralelo (estaba en serie, una vuelta de red más)
+      aprCargarCalendario(),  // v13.11: en paralelo (estaba en serie, una vuelta de red más)
+      aprCargarLog()          // idea 2048: ¿corrió el armado automático?
     ]);
 
     // Un pedido ya programado, o que ya está en un borrador, no vuelve a la izquierda.
@@ -32663,6 +32698,7 @@ function aprRender() {
 
   if (_apr.err) h += '<div class="apr-err">⚠ ' + escapeHtml(_apr.err) + '</div>';
   if (_apr.msg) h += '<div class="' + (_apr.msgErr ? "apr-err" : "apr-msg") + '">' + escapeHtml(_apr.msg) + '</div>';
+  h += aprLogHtml();   // idea 2048
 
   h += '<div class="apr-wrap">' + aprColPedidos() + aprColTandas() + aprColDias() + '</div>';
 
