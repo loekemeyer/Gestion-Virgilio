@@ -155,6 +155,25 @@ sólo la fecha):
 A mano en "A Programar": **1340** (Retira), **1341** (Martínez, zona 6), **1349** (Padua, zona 5).
 `gv_pedidos_web_excluidos` no excluye ninguno. Chef: 0 pendientes en el dry run del sábado.
 
+**Ideas de la noche del sábado (3 agentes, "aprovechá la noche para pensar mejoras"; dueño dormido, nada
+tocó `main`).** Listas en su rama, se activan por número (":" o "hacé el NNNN"):
+
+| código | rama | qué |
+|---|---|---|
+| **7828** | `idea/7828` | Monitor de pared: camión por letra+número (E60A y D60A ya no se suman en "Total por día") |
+| **2048** | `idea/2048` | A Programar muestra la última corrida del armado automático (ok / falló / no corre hace N h) |
+| **4528** | `idea/4528` | "Programadas sin artículos" mira también las tandas web (vistas `gv_np_prog_sin_base`, ya en la base) |
+| **7999** | `idea/7999` | Pulido visual: m³ con coma en En Salida/Entregados, solapas y días vacíos compactos en celular, "lleno" en ámbar, etc. |
+| **5162** | `idea/5162` | Interruptores del pipeline web visibles en ⚙️ Configuración (sólo lectura) |
+| **2510** | `idea/2510` | Aviso arriba del calendario cuando el cupo está lleno varios días seguidos |
+
+Pendientes (decisión del dueño): **7394** marca única web/ISIS en las 3 vistas · **3254** botonera de
+Facturación con 4 estilos · **6900** tipografía única del código de tanda · **3007** estado repetido 3
+veces en el día abierto · **2485** `ppp_web_resync` congela todo el pedido si un bloque se facturó ·
+**6908** `proximo_dia_entrega` se rinde a los 40 días · **6194** alerta de NP web cargada después en ISIS.
+Además, en `main`: los `.sql` llevan al pie los parches vigentes de la base (antes el repo no reproducía
+el estado real: hallazgo del agente de lógica).
+
 **Checklist del cambio a GV (lunes a la mañana):**
 1. Operarios y monitor TV entran a la URL de Gestión (GitHub Pages de este repo), no a la de
    Producción ni a la app de Play Store (la TWA apunta a Producción hasta que se re-apunte).
