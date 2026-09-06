@@ -2382,11 +2382,16 @@ tr.ppp-err-zona > td{ background:#fffbeb !important; }
 .pn-h2{ color:#64748b; font-size:13px; font-weight:600; margin-top:2px; }
 .pn-lnk{ width:auto; background:#fff; border:1px solid #dbe3ee; color:#1e3a8a; font-weight:800; font-size:12px; padding:6px 11px; border-radius:8px; cursor:pointer; }
 .pn-lnk:hover{ background:#f1f5f9; }
-.pn-kpis{ display:grid; grid-template-columns:repeat(5,minmax(0,1fr)); gap:10px; margin-bottom:10px; }
-.pn-kpi{ background:#fff; border:1px solid #dbe3ee; border-radius:14px; padding:12px 14px; display:grid; grid-template-columns:44px 1fr; gap:10px; align-items:center; }
+/* v13.56 (dueño: "el de arriba de todo también está feo"): son 4 tarjetas desde v13.33 (Atrasados se fue a
+   Resumen) pero la grilla seguía en 5 columnas → quedaba un hueco a la derecha y el $ se cortaba. Ahora 4
+   columnas, el número achica solo con el ancho (clamp) y el importe largo pasa al corto ($232,0 M) por debajo
+   de 1300 px, no sólo en celular. */
+.pn-kpis{ display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:10px; margin-bottom:10px; }
+.pn-kpi{ background:#fff; border:1px solid #dbe3ee; border-radius:14px; padding:12px 14px; display:grid; grid-template-columns:44px minmax(0,1fr); gap:10px; align-items:center; min-width:0; }
 .pn-kpi .ico{ width:44px; height:44px; border-radius:12px; background:#e8f0fd; display:grid; place-items:center; font-size:21px; }
 .pn-kpi .l{ font-size:11px; font-weight:800; letter-spacing:.7px; text-transform:uppercase; color:#64748b; }
-.pn-kpi .v{ font-size:23px; font-weight:900; line-height:1.1; white-space:nowrap; }
+.pn-kpi .v{ font-size:clamp(18px, 1.55vw, 23px); font-weight:900; line-height:1.1; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.pn-kpi .s{ white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 .pn-kpi .s{ font-size:12px; color:#64748b; font-weight:600; }
 .pn-kpi.g .v{ color:#15803d; } .pn-kpi.g .ico{ background:#e6f7ec; }
 .pn-kpi.r{ border-color:#fca5a5; background:#fff5f5; } .pn-kpi.r .v{ color:#b91c1c; } .pn-kpi.r .ico{ background:#fee2e2; }
@@ -2455,6 +2460,9 @@ tr.ppp-err-zona > td{ background:#fffbeb !important; }
 .pn-kpi.click{ cursor:pointer; }
 .pn-kpi.click:hover{ box-shadow:0 0 0 2px #fca5a5 inset; }
 .pn-kpi .v .short{ display:none; }
+/* v13.56: el importe largo ($ 232.001.930) pasa al corto ($232,0 M) por debajo de 1300 px, no sólo en celular.
+   Va DESPUÉS de la regla de arriba: misma especificidad, gana la última. */
+@media (max-width:1300px){ .pn-kpi .v .full{ display:none; } .pn-kpi .v .short{ display:inline; } }
 .pn-flags{ margin:10px 0 2px; }
 .pn-flag{ width:auto; display:inline-block; padding:6px 12px; border-radius:999px; font-size:13px; font-weight:700; background:#fff7ed; color:#9a3412; border:1px solid #fed7aa; cursor:pointer; text-align:left; }
 @media (max-width:640px){
@@ -2509,7 +2517,7 @@ tr.ppp-err-zona > td{ background:#fffbeb !important; }
 .pn-carga .n.go{ background:#15803d; color:#fff; box-shadow:0 0 0 3px #bbf7d0; } .pn-carga .n.ok{ background:#dbeafe; color:#1e40af; } .pn-carga .n.first{ background:#fef3c7; color:#92400e; }
 .pn-carga .t{ font-size:11px; font-weight:800; color:#475569; line-height:1.2; } .pn-carga .t.go{ color:#15803d; }
 .pn-sec2{ font-size:11px; font-weight:800; letter-spacing:.7px; text-transform:uppercase; color:#64748b; margin:16px 0 8px; }
-@media (max-width:1100px){ .pn-kpis{ grid-template-columns:repeat(3,minmax(0,1fr)); } .pn-days{ grid-template-columns:repeat(2,1fr); } .pn-dayhead{ grid-template-columns:1fr; } .pn-thead{ display:none; } .pn-ped{ grid-template-columns:70px minmax(0,1fr) auto; } .pn-ped .loc, .pn-ped .m{ display:none; } }
+@media (max-width:1100px){ .pn-kpis{ grid-template-columns:repeat(2,minmax(0,1fr)); } .pn-days{ grid-template-columns:repeat(2,1fr); }   /* v13.56: 4 tarjetas → 2×2, no 3+1 */ .pn-dayhead{ grid-template-columns:1fr; } .pn-thead{ display:none; } .pn-ped{ grid-template-columns:70px minmax(0,1fr) auto; } .pn-ped .loc, .pn-ped .m{ display:none; } }
 @media (max-width:640px){ .pn-days{ grid-template-columns:1fr; }   /* .pn-kpis vive en el @media de arriba (v13.06, minmax(0,1fr)) */
   /* v13.14: franja de tanda en celular — nombre arriba, clientes/NP en la 2ª línea, fecha + m³ en la 3ª (antes la fecha tapaba el código) */
   .ppp-tanda-h{ grid-template-columns:14px minmax(0,1fr) auto; gap:4px 8px; }
@@ -7065,7 +7073,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v13.55";
+const APP_VERSION = "v13.56";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco

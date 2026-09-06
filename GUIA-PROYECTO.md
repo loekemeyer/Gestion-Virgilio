@@ -12,11 +12,16 @@
 > única**; no se replica. Ante la duda entre parche rápido y fix de raíz → **fix
 > de raíz**.
 >
-> Última actualización: 2026-09-06 (domingo) · Versión app al documentar: **v13.55**
+> Última actualización: 2026-09-06 (domingo) · Versión app al documentar: **v13.56**
 >
 > ⚠⚠ **Desde el lunes 2026-09-07 los operarios usan GESTIÓN, no Producción** (dueño, sábado a la
 > noche: *"el lunes van a empezar a usar GV, no más PV"*). Las tandas web viven en
 > `PPP_Web_Programacion` y Producción no las ve. URL: la de GitHub Pages de este repo.
+>
+> Nota **v13.56** (front) — fila de KPIs del tablero (dueño: *"el de arriba de todo también está feo"*): son
+> 4 tarjetas desde v13.33 pero la grilla seguía en 5 columnas (hueco a la derecha, $ cortado). Ahora 4 columnas
+> (`repeat(4, minmax(0,1fr))`), el número achica con el ancho (`clamp(18px, 1.55vw, 23px)`), el importe largo
+> pasa al corto ($232,0 M) por debajo de 1300 px y a ≤ 1100 px la fila es 2×2 (antes 3+1).
 >
 > Nota **v13.55** (front) — tablero de Programación: **el box de plata ya no se corta** (dueño: *"los boxes de
 > plata siempre quedan por fuera"*). La mini-fila de cada día (`.pn-mini`) era 4 × 1fr y el importe en nowrap
