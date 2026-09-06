@@ -12,11 +12,17 @@
 > única**; no se replica. Ante la duda entre parche rápido y fix de raíz → **fix
 > de raíz**.
 >
-> Última actualización: 2026-09-06 (domingo) · Versión app al documentar: **v13.56**
+> Última actualización: 2026-09-06 (domingo) · Versión app al documentar: **v13.57**
 >
 > ⚠⚠ **Desde el lunes 2026-09-07 los operarios usan GESTIÓN, no Producción** (dueño, sábado a la
 > noche: *"el lunes van a empezar a usar GV, no más PV"*). Las tandas web viven en
 > `PPP_Web_Programacion` y Producción no las ve. URL: la de GitHub Pages de este repo.
+>
+> Nota **v13.57** (backend + front) — **sólo `CRN` (Recepción Remitos) es entregado; `CCR` NO** (dueño: *"todos
+> los de recepción de remitos deberían estar en 'En salida'"*). Deshace v13.27: `CCR` es el Control de Remitos
+> ANTES de cargar (botón CR), no la vuelta del remito. Vistas `gv_ppp_en_salida` / `gv_ppp_entregados` y el
+> fallback del front vuelven a `CRN`. En Salida 0 → 13 (lo cargado el viernes 4/9), entregados 824 → 376,
+> vencidos en Resumen 20 → 51. §3.ar de la doc de Supabase.
 >
 > Nota **v13.56** (front) — fila de KPIs del tablero (dueño: *"el de arriba de todo también está feo"*): son
 > 4 tarjetas desde v13.33 pero la grilla seguía en 5 columnas (hueco a la derecha, $ cortado). Ahora 4 columnas
@@ -224,7 +230,7 @@
 > ⚙️ Configuración (sólo lectura, `PWEB_CFG_ITEMS`) · **2510** aviso arriba del calendario cuando el cupo
 > está lleno varios días hábiles seguidos (`aprCupoLlenoHtml`).
 >
-> Nota **v13.27** (backend + front) — **CCR también es "controlado"** (dueño: *"¿los 38 atrasados no
+> Nota **v13.27** (backend + front) — ⚠ **DESHECHA en v13.57** (CCR no es entregado). **CCR también es "controlado"** (dueño: *"¿los 38 atrasados no
 > deberían estar en En Salida? Si ya fueron controlados, van directo a Entregados"*). Hasta ahora sólo
 > `CRN` (Recepción Remitos) contaba; el `CCR` (Control Remitos, botón CR del operario) no. Ahora las vistas
 > `gv_ppp_entregados` y `gv_ppp_en_salida` toman `CRN` o `CCR`; el fallback del front también. Efecto

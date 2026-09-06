@@ -1399,6 +1399,20 @@ vie 11 = 10,88 m³ (7,45 ISIS + 3,43 web: pasado a propósito, el súper va en c
 589 cajas. Producción sigue viendo la fila cruda (tanda vacía). **Rollback:** `delete from "GV_PPP_Prog_Override"
 where np = '44619'` (la vista queda; sin filas es passthrough).
 
+### 3.ar ✅ Sólo Recepción de Remitos (CRN) = entregado; vuelve atrás v13.27 (v13.57) — 2026-09-06 domingo (20:30)
+
+Dueño: *"Todos los de recepción de remitos deberían estar en 'En salida'"*. El modelo de siempre (GUIA v3.69):
+**CR = Control Remitos (`CCR`) es el control del remito ANTES de cargar**, **CC = carga (`CCN`)**, **RR =
+Recepción Remitos (`CRN`) = el remito volvió firmado = entregado**. En v13.27 (§3.aj) había hecho contar `CCR`
+como controlado y con eso En Salida quedó en 0 y 448 NP pasaron a "entregados" sin que el remito hubiera
+vuelto. Migración `gv_ppp_en_salida_solo_crn_v1357`: `gv_ppp_en_salida` y `gv_ppp_entregados` vuelven a
+`opcion = 'CRN'` (parche `replace()` sobre `pg_get_viewdef`, `security_invoker = true` conservado); el
+fallback del front (`pppRefreshControlado`) también (`opcion=eq.CRN`).
+**Medido:** En Salida **0 → 13** (los cargados el viernes 4/9 por legajo 8: D55D ×4, D56B ×5, D56E ×2, D54B
+98551, D53F 98602 — los mismos 13 del agente `carga_sin_control`); entregados 824 → 376; vencidos en Resumen
+20 → 51 (13 en salida + el resto con CCR/CCN sin CRN, o sin nada). Rollback: volver a `ANY(ARRAY['CRN','CCR'])`
+(§3.aj).
+
 ### 3.aq ✅ Canilla ABIERTA + dobles del mail del sábado ocultos (v13.51) — 2026-09-06 domingo (17:30)
 
 El dueño mandó el Excel PPP vigente (`AAA_PPP_Vigente.xlsm`). Cruzado contra Supabase:

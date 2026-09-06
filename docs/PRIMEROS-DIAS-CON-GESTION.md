@@ -60,7 +60,7 @@ web llegue al depósito. Cupo diario = pickers típicos × 3 m³ (hoy 2 → 6), 
 | **Programación** | Tablero de 6 días (botón "Ver hoja 2 →"), camiones numerados por día, Súper aparte. Tocar un día → camiones, orden de carga, pedidos y estado (sin empezar / en curso / armado). Cuenta **sólo lo que tiene fecha por delante**. | Los de fecha vencida no están acá (v13.33): son un dato de gerencia y se miran desde **Resumen**. |
 | **Resumen** | Cuadro de m³ por día y zona (el "Resumen Prog" de siempre). Arriba, la línea **"⏰ N pedido(s) con fecha de entrega vencida… Ver la lista →"**. | Es la vista de gerencia: ahí se decide qué se hace con los vencidos (reprogramar, cargar o sacar de ISIS). |
 | **Facturación** | NP de ISIS: tilde ✓ como siempre. **NP web (`LK 1350`): tildar y bajar el Excel ISIS = facturada**; ese Excel se carga en ISIS. | El cruce de factura ya entiende las NP web. |
-| **En Salida** | Lo cargado al camión que todavía no se controló. | Si pasa el plazo sin control, alerta naranja. |
+| **En Salida** | Lo cargado al camión (CC) cuyo remito todavía no volvió por **Recepción Remitos (RR)**. El Control de Remitos (CR) de antes de cargar NO lo saca de acá (v13.57). | Si pasa el plazo sin RR, alerta naranja. Hoy: 13 del viernes 4/9. |
 | **Entregados** | Lo controlado (CRN). | — |
 
 **Lo automático (no hay que hacer nada, pero conviene saber que existe):**
