@@ -65,7 +65,7 @@ que sea la **fuente canónica para Gestión**, y Producción sigue leyendo la su
 |---|---|
 | Agregar **filas** a una tabla compartida | ✅ `insert … on conflict do nothing`. Nunca `do update`. |
 | Agregar una **columna** | ✅ nullable, sin `default` que reescriba, sin backfill, con prefijo `gv_`. |
-| `update` / `delete` / `truncate` de filas existentes | ❌ → tabla `GV_*` de override + vista que la superpone |
+| `update` / `delete` / `truncate` de filas existentes | ❌ → tabla `GV_*` de override + vista que la superpone (ej. `GV_PPP_Prog_Override` → `gv_ppp_programacion_diaria`, v13.50) |
 | Cambiar o borrar una columna existente | ❌ → override |
 | Objeto **nuevo** (tabla, vista, función) | ✅ con prefijo `PPP_Web_*`, `GV_*`, `gv_*`, `ppp_web_*` |
 | `create or replace` de una función/vista que Producción usa | ❌ → crear `gv_<nombre>` nueva |

@@ -14,7 +14,7 @@
 | **mar 8** | Primer día real con Gestión. Se arma lo que ISIS dejó: 13,45 m³, 7 tandas (D59A, D60A–F, D61A). Nada web. |
 | **mié 9** | ISIS: 10,77 m³ (D62A, D66A–F). |
 | **jue 10** | ISIS: 5,76 m³ (D67A–K). |
-| **vie 11** | ISIS: 3,14 m³ (D68A–F) + **las primeras tandas web, ya programadas el sábado**: E01A (1344), E01B (1345+1347), E01C (1348+1351), E01D (1342+1346), E01E (1343), E02A (Chef 216) y E04A (1349 Bazar Mónica) = 3,43 m³. |
+| **vie 11** | ISIS: 3,14 m³ (D68A–F) + **las primeras tandas web, ya programadas el sábado**: E01A (1344), E01B (1345+1347), E01C (1348+1351), E01D (1342+1346), E01E (1343), E02A (Chef 216) y E04A (1349 Bazar Mónica) = 3,43 m³ + **E07A 44619 Chango Mas (4,31, ISIS sin tanda → override)**. |
 | **lun 14** | ISIS: 1,51 (D69A–C) + E03A (1350 Cuyana, 0,94), E05A (1341 Orfali, 1,18), E06A (CH 0217 Gifel) = 3,77 m³. |
 
 Los 4 días de colchón (`dias_anticipacion_min = 4`) están para esto: ver qué falta antes de que una tanda
@@ -107,9 +107,8 @@ web llegue al depósito. Cupo diario = pickers típicos × 3 m³ (hoy 2 → 6), 
   del viernes, con OK explícito antes de escribir.
 - [ ] **Armadas sin tildar en Facturación**: 98510, 98541, 98542, 98543 (D57B), 98647 Coto (D59A), 98619
   Carrefour (D61A). Faltante sólo en 98542 Pro Tatiana (566E 3/5, 583E 4/10, 231/232/233 1/1).
-- [ ] **44619 Chango Mas (Dorinka, 4,31 m³, vie 11) está en ISIS SIN TANDA** (tipo KRIKOS, "OC 9400146407").
-  Gestión no lo cuenta en el cupo del viernes mientras no tenga tanda: el viernes hoy suma 3,14 ISIS + 3,33
-  web = 6,47; con esto serían 10,8 m³. Ponerle tanda en ISIS (sale en camión propio, súper) o moverlo.
+- [x] ~~44619 Chango Mas sin tanda en ISIS~~ — **v13.50: programado como E07A (vie 11)** vía `GV_PPP_Prog_Override`
+  (ISIS/Producción siguen viéndolo sin tanda; Gestión lo ve en E07A). El viernes queda en 10,9 m³ (súper en camión propio).
 - [ ] **Stock para las tandas web del viernes** (según `vista_stock_vs_pedidos`, cortado al domingo): sin
   stock hoy 323E (E01A Torres y Liva pide 20), 438E, 232, 233, 951E, 957E, 970E, 971E, 727E (F01A pide 3);
   justo 508 (16 en stock, 18 pedidas en total). Hay 4 días para producir; si no, salen con faltante como

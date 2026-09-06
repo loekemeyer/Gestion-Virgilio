@@ -12,11 +12,16 @@
 > única**; no se replica. Ante la duda entre parche rápido y fix de raíz → **fix
 > de raíz**.
 >
-> Última actualización: 2026-09-06 (domingo) · Versión app al documentar: **v13.49**
+> Última actualización: 2026-09-06 (domingo) · Versión app al documentar: **v13.50**
 >
 > ⚠⚠ **Desde el lunes 2026-09-07 los operarios usan GESTIÓN, no Producción** (dueño, sábado a la
 > noche: *"el lunes van a empezar a usar GV, no más PV"*). Las tandas web viven en
 > `PPP_Web_Programacion` y Producción no las ve. URL: la de GitHub Pages de este repo.
+>
+> Nota **v13.50** (backend) — dueño: *"Chango Mas, programalo"*. La 44619 (súper, 4,31 m³, vie 11) estaba en ISIS
+> sin tanda. Nueva tabla de override **`GV_PPP_Prog_Override`** (np → tanda / fecha) que la vista
+> `gv_ppp_programacion_diaria` superpone: Gestión ve **E07A**, Producción sigue viendo la fila cruda. Es el
+> patrón para cambiar algo de una NP de ISIS sin tocar la tabla compartida. `sql/gv_ppp_prog_override.sql`, §3.ap.
 >
 > Nota **v13.49** (backend) — dueño: *"las letras no se cambian por día. E tiene que llegar hasta E99 para pasar
 > después a F"*. Las tandas F01A–F05A del domingo se renombraron E02A–E06A (el F01A de Chef venía de la regla

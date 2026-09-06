@@ -1384,6 +1384,21 @@ es de Chef y pisa al LK 217): cuando Gestión alimente el tracking, escribir el 
 una función `gv_*` y pedir columna `empresa` en PaginaLK. Y el Excel ISIS de Facturación manda
 `N_Pedido` contador (no el id), como el mail: ISIS numera 98xxx por su cuenta.
 
+### 3.ap ✅ Override de Gestión sobre una NP de ISIS: 44619 Chango Mas → E07A (v13.50) — 2026-09-06 domingo (16:45)
+
+Dueño: *"Chango Mas, programalo"*. La 44619 (Dorinka / Chango Mas, súper, 4,31 m³, vie 11) estaba en
+`PPP_Programacion_Diaria` con `tanda = ''`: ISIS la dejó sin tanda, el tablero no la mostraba en ningún camión
+y el cupo no la contaba. La tabla es COMPARTIDA con Producción (no se modifica), así que se aplicó el patrón
+de CLAUDE.md: **tabla `GV_PPP_Prog_Override`** (np pk, tanda, fecha_entrega, nota) + la vista que Gestión ya
+lee, **`gv_ppp_programacion_diaria`**, la superpone (`coalesce(override.tanda, p.tanda)`, ídem fecha; mismas
+columnas y tipos, `security_invoker`). `gv_ppp_web_letra_y_camion()` también cuenta los códigos del override.
+RLS: select anon/authenticated; escribe sólo postgres/service_role por SQL. `sql/gv_ppp_prog_override.sql`.
+
+**Medido:** la vista devuelve 44619 → E07A vie 11 · `letra_y_camion` = (4, 7) → próxima E08A · calendario
+vie 11 = 10,88 m³ (7,45 ISIS + 3,43 web: pasado a propósito, el súper va en camión propio) · base 12 líneas /
+589 cajas. Producción sigue viendo la fila cruda (tanda vacía). **Rollback:** `delete from "GV_PPP_Prog_Override"
+where np = '44619'` (la vista queda; sin filas es passthrough).
+
 ### 3.ao ✅ "Mandá directo a Programación si ya está. No más en A Programar" (v13.47) — 2026-09-06 domingo (tarde)
 
 Dueño, viendo A Programar con 4 pedidos que decían *"🤖 se arma solo → lun 14/9"* y *"🚚 hay camión el
