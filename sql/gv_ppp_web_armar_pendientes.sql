@@ -497,3 +497,41 @@ select cron.alter_job(73, schedule := '*/15 9-23 * * *');
 alter table public."GV_Tandas_Auto_Log" drop constraint gv_tandas_auto_log_estado_chk;
 alter table public."GV_Tandas_Auto_Log" add constraint gv_tandas_auto_log_estado_chk
   check (estado = any (array['ok','salteada','error','intradia_ok','intradia_sin_umbral']));
+
+-- ═══ v13.49 (domingo 16:35) · dueño: "las letras no se cambian por día. E tiene que llegar hasta E99 para
+-- pasar después a F" ════════════════════════════════════════════════════════════════════════════════════
+-- El F01A de Chef (00:20, regla vieja) había abierto la letra F y la cuenta nueva siguió en F02A…F05A.
+-- Renombradas en PPP_Web_Programacion (9 filas; sin eventos, items ni ISIS que las nombren):
+--   update public."PPP_Web_Programacion" set tanda = case tanda when 'F01A' then 'E02A' when 'F02A' then 'E03A'
+--     when 'F03A' then 'E04A' when 'F04A' then 'E05A' when 'F05A' then 'E06A' end
+--    where tanda in ('F01A','F02A','F03A','F04A','F05A');
+-- gv_ppp_web_letra_y_camion() = (4, 6) → la próxima es E07A. Rollback: el case inverso.
+-- Y "Nueva tanda vacía" (gv_ppp_web_tanda_codigo_nuevo) también tomaba letra nueva → migración
+-- gv_ppp_web_tanda_codigo_nuevo_misma_letra_v1349: letra vigente + próximo camión libre.
+create or replace function public.gv_ppp_web_tanda_codigo_nuevo()
+returns text
+language plpgsql
+set search_path to 'public', 'pg_temp'
+as $function$
+declare
+  v_pref  text := coalesce((select valor_texto from public."PPP_Web_Config" where clave='tanda_prefijo'), '');
+  v_letra int;
+  v_nn    int;
+  v_base  text;
+  v_ti    int;
+  v_code  text;
+begin
+  select lc.letra, lc.camion into v_letra, v_nn from public.gv_ppp_web_letra_y_camion() lc;
+  if v_pref <> '' then v_base := v_pref; v_nn := 1;
+  else v_base := public.ppp_web_letra(v_letra); v_nn := v_nn + 1; end if;
+  while v_nn <= 99 loop
+    v_ti := 0;
+    while v_ti < 26 loop
+      v_code := v_base || lpad(v_nn::text, 2, '0') || public.ppp_web_letra(v_ti);
+      if not public.gv_ppp_web_codigo_tomado(v_code) then return v_code; end if;
+      v_ti := v_ti + 1;
+    end loop;
+    v_nn := v_nn + 1;
+  end loop;
+  return public.ppp_web_letra(v_letra + 1) || '01A';
+end $function$;

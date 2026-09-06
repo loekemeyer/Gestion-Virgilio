@@ -1427,8 +1427,8 @@ vie 11 F03A (camión D68E/F a la zona 5; el viernes ya está en 6,47/6, entra co
 (Retira) queda en A Programar. Chef 217 Gifel (zona 6, 0,136) → lun 14. `gv_ppp_web_letra_y_camion()` =
 (5, 1) = F01.
 **Corrida real: la hizo sola el cron 73 a las 16:15:00** (recién ampliado a domingos, con la Edge Fn v15
-deployada 16:12): `PPP_Web_Programacion` +7 filas a las 16:15:11 — **F03A** 1349 Bazar Mónica vie 11 ·
-**F02A** 1350 Cuyana (4 NP) lun 14 · **F04A** 1341 Orfali lun 14 · **F05A** CH 0217 Gifel lun 14 — todas con
+deployada 16:12): `PPP_Web_Programacion` +7 filas a las 16:15:11 — F03A 1349 Bazar Mónica vie 11 ·
+F02A 1350 Cuyana (4 NP) lun 14 · F04A 1341 Orfali lun 14 · F05A CH 0217 Gifel lun 14 — todas con
 la foto en `PPP_Web_Base` (16 + 60 + 15 + 1 líneas). Calendario: vie 11 = 6,57 m³ (3,14 ISIS + 3,43 web,
 pasado por el forzado de zona 5, a propósito), lun 14 = 3,77 (1,51 + 2,26). En A Programar queda sólo 1340
 Garbarino (Retira).
@@ -1437,6 +1437,14 @@ Edge Fn escribe `estado = 'intradia_ok' / 'intradia_sin_umbral'` y el check de l
 ok/salteada/error → 400 en el insert (visto en edge_logs; el `try/catch` del log lo tapaba). Nunca había
 corrido un intradía real (cron lun–vie, creado el sábado). Migración `gv_tandas_auto_log_estados_intradia_v1347b`
 amplía el check. El cartel verde de A Programar ("Último armado automático") lee ese log.
+**v13.49 (16:35, dueño: *"las letras no se cambian por día. E tiene que llegar hasta E99 para pasar después
+a F"*):** la regla nueva ya seguía la cuenta, pero el F01A de Chef (creado a las 00:20 con la regla vieja)
+había abierto la letra F y todo siguió en F. **Renombradas en `PPP_Web_Programacion` (9 filas, sin eventos ni
+items ni ISIS que las nombren): F01A → E02A (Chef 216, vie 11), F02A → E03A (Cuyana), F03A → E04A (Bazar
+Mónica, vie 11), F04A → E05A (Orfali), F05A → E06A (Gifel).** `gv_ppp_web_letra_y_camion()` = (4, 6) → la
+próxima es **E07A**. Y `gv_ppp_web_tanda_codigo_nuevo()` ("Nueva tanda vacía") también tomaba letra nueva:
+migración `gv_ppp_web_tanda_codigo_nuevo_misma_letra_v1349`, ahora sigue la misma cuenta (próximo camión
+de la letra vigente). Rollback del rename: el `update … case` inverso.
 
 **Rollback:** al final de `sql/gv_ppp_web_armar_pendientes.sql` (cron 73 a `*/15 10-21 * * 1-5`, drop de las
 funciones nuevas, restaurar la de 4 args desde el backup, redeployar la Edge Function v14).

@@ -14,8 +14,8 @@
 | **mar 8** | Primer día real con Gestión. Se arma lo que ISIS dejó: 13,45 m³, 7 tandas (D59A, D60A–F, D61A). Nada web. |
 | **mié 9** | ISIS: 10,77 m³ (D62A, D66A–F). |
 | **jue 10** | ISIS: 5,76 m³ (D67A–K). |
-| **vie 11** | ISIS: 3,14 m³ (D68A–F) + **las primeras tandas web, ya programadas el sábado**: E01A (1344), E01B (1345+1347), E01C (1348+1351), E01D (1342+1346), E01E (1343) y F01A (Chef 216) = 3,33 m³. |
-| **lun 14** | ISIS: 1,51 (D69A–C) + lo que no entró el viernes (1350 Cuyana, 0,94) y lo que llegue. |
+| **vie 11** | ISIS: 3,14 m³ (D68A–F) + **las primeras tandas web, ya programadas el sábado**: E01A (1344), E01B (1345+1347), E01C (1348+1351), E01D (1342+1346), E01E (1343), E02A (Chef 216) y E04A (1349 Bazar Mónica) = 3,43 m³. |
+| **lun 14** | ISIS: 1,51 (D69A–C) + E03A (1350 Cuyana, 0,94), E05A (1341 Orfali, 1,18), E06A (CH 0217 Gifel) = 3,77 m³. |
 
 Los 4 días de colchón (`dias_anticipacion_min = 4`) están para esto: ver qué falta antes de que una tanda
 web llegue al depósito. Cupo diario = pickers típicos × 3 m³ (hoy 2 → 6), contando ISIS + web.
@@ -79,7 +79,7 @@ web llegue al depósito. Cupo diario = pickers típicos × 3 m³ (hoy 2 → 6), 
 - **No cargar en ISIS el mail del sábado 12:30** (pedidos LK 1340…1349): Gestión los programa.
   Quedarían dobles.
 - **No cargar en ISIS los mails de Chef del viernes (216) ni del sábado (217)**: Gestión los toma de la
-  página (216 ya es F01A). El cron de Chef quedó apagado el domingo; no salen más.
+  página (216 ya es E02A). El cron de Chef quedó apagado el domingo; no salen más.
 - No usar Producción para programar ni facturar: lo web no está ahí.
 
 **Interruptores (los toco yo, con pedido del dueño; viven en `PPP_Web_Config`):**
@@ -115,8 +115,8 @@ web llegue al depósito. Cupo diario = pickers típicos × 3 m³ (hoy 2 → 6), 
   justo 508 (16 en stock, 18 pedidas en total). Hay 4 días para producir; si no, salen con faltante como
   cualquier tanda.
 - [x] ~~Pedidos web que NO se arman solos~~ — **v13.47 (domingo a la tarde)**: el automático los programa
-  solo si tienen día: LK 1349 Bazar Mónica → vie 11 (camión zona 5), LK 1350 Cuyana → lun 14, LK 1341 Orfali
-  y CH 0217 Gifel → lun 14 (camión zona 6, D69C). Queda a mano sólo **LK 1340 Garbarino (Retira, 0,03)**.
+  solo si tienen día: LK 1349 Bazar Mónica → vie 11 E04A (camión zona 5), LK 1350 Cuyana → lun 14 E03A, LK 1341
+  Orfali E05A y CH 0217 Gifel E06A → lun 14 (camión zona 6, D69C). Las tandas siguen la letra E (E07A la próxima). Queda a mano sólo **LK 1340 Garbarino (Retira, 0,03)**.
   Chef 215 Dorinka quedó excluido porque ya es el 44619 de ISIS.
 - [ ] Chef: password de `ch_ppp_reader` + correr `paginach/sql/gv_estado_mis_pedidos_chef.sql` (para que el cliente vea el estado).
 - [ ] Decisiones abiertas: orden de carga por cod cliente (1/2/3); zonas manuales ¿se suman solas a un camión

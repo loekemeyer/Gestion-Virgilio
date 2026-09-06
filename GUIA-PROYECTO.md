@@ -12,11 +12,16 @@
 > única**; no se replica. Ante la duda entre parche rápido y fix de raíz → **fix
 > de raíz**.
 >
-> Última actualización: 2026-09-06 (domingo) · Versión app al documentar: **v13.48**
+> Última actualización: 2026-09-06 (domingo) · Versión app al documentar: **v13.49**
 >
 > ⚠⚠ **Desde el lunes 2026-09-07 los operarios usan GESTIÓN, no Producción** (dueño, sábado a la
 > noche: *"el lunes van a empezar a usar GV, no más PV"*). Las tandas web viven en
 > `PPP_Web_Programacion` y Producción no las ve. URL: la de GitHub Pages de este repo.
+>
+> Nota **v13.49** (backend) — dueño: *"las letras no se cambian por día. E tiene que llegar hasta E99 para pasar
+> después a F"*. Las tandas F01A–F05A del domingo se renombraron E02A–E06A (el F01A de Chef venía de la regla
+> vieja y había abierto la F); la próxima es E07A. "Nueva tanda vacía" (`gv_ppp_web_tanda_codigo_nuevo`) sigue
+> la misma cuenta. §3.ao de la doc de Supabase.
 >
 > Nota **v13.47** (backend + Edge Function + front) — **"Mandá directo a Programación si ya está. No más
 > en A Programar"** (dueño, domingo a la tarde). Todo pedido web con día previsible se programa en la
@@ -27,7 +32,7 @@
 > sin zona y sin camión previsto. Nueva `gv_ppp_web_armar_pendientes(...)` (+ `_simular`) que llama a
 > `ppp_web_armar_tandas` por fecha (ahora 5 args: `p_incluir_manuales`). **Las tandas se numeran como
 > Producción**: `gv_ppp_web_letra_y_camion()` → E01A, E02A, E03A… (una letra nueva sólo en el camión 99),
-> no una letra por corrida. Chips de A Programar: "🤖 se arma solo → lun 14/9 · en minutos", "🚚 va al camión
+> no una letra por corrida (→ v13.49: y se renombró lo que había salido en F). Chips de A Programar: "🤖 se arma solo → lun 14/9 · en minutos", "🚚 va al camión
 > del vie 11/9 · en minutos". `docs/SUPABASE-GESTION-VIRGILIO.md` §3.ao, `sql/gv_ppp_web_armar_pendientes.sql`.
 >
 > Nota **v13.46** (front) — **Vencidos en dos grupos: los que NO salieron van en alerta** (dueño:
