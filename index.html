@@ -2417,14 +2417,19 @@ tr.ppp-err-zona > td{ background:#fffbeb !important; }
 .pn-day .dh{ display:flex; align-items:baseline; gap:7px; }
 .pn-day .dow{ font-size:17px; font-weight:900; } .pn-day .dnum{ font-size:24px; font-weight:900; line-height:1; } .pn-day .dmon{ font-size:14px; font-weight:700; color:#64748b; }
 .pn-day .hoy{ margin-left:auto; background:#1e6bd6; color:#fff; font-size:11px; font-weight:900; padding:3px 9px; border-radius:999px; letter-spacing:.5px; }
-.pn-mini{ display:grid; grid-template-columns:repeat(4,1fr); margin:9px 0; border:1px solid #e8edf5; border-radius:10px; overflow:hidden; }
+/* v13.55 (dueño: "los boxes de plata siempre quedan por fuera"): la 4ª celda (💰 $61,0 M) se dimensiona
+   por su contenido (max-content) y las otras tres se reparten el resto; antes eran 4 × 1fr y el importe,
+   que va en nowrap, quedaba cortado por el overflow:hidden del borde redondeado. */
+.pn-mini{ display:grid; grid-template-columns:repeat(3,minmax(0,1fr)) max-content; margin:9px 0; border:1px solid #e8edf5; border-radius:10px; overflow:hidden; }
 .pn-mini > div{ padding:6px 6px; border-right:1px solid #e8edf5; display:flex; align-items:center; gap:5px; min-width:0; }
-.pn-mini > div:last-child{ border-right:0; }
-.pn-mini i{ font-style:normal; font-size:15px; } .pn-mini b{ font-size:15px; font-weight:900; line-height:1; white-space:nowrap; }
+.pn-mini > div:last-child{ border-right:0; padding-right:9px; }
+.pn-mini i{ font-style:normal; font-size:15px; flex:0 0 auto; } .pn-mini b{ font-size:15px; font-weight:900; line-height:1; white-space:nowrap; }
 .pn-mini small{ display:block; font-size:10px; color:#64748b; font-weight:700; } .pn-mini .g b{ color:#15803d; }
+@media (max-width:1400px){ .pn-mini i{ display:none; } .pn-mini b{ font-size:14px; } }   /* en pantallas justas el ícono sobra */
 .pn-sec{ font-size:10.5px; font-weight:800; letter-spacing:.7px; text-transform:uppercase; color:#64748b; display:flex; justify-content:space-between; margin-bottom:5px; }
 .pn-sec a{ color:#1e6bd6; text-transform:none; letter-spacing:0; font-size:12px; }
-.pn-trk{ display:grid; grid-template-columns:28px 1fr auto auto; gap:8px; align-items:center; background:#f8fafc; border:1px solid #e8edf5; border-radius:9px; padding:5px 9px; margin-bottom:4px; font-size:13px; }
+.pn-trk{ display:grid; grid-template-columns:28px minmax(0,1fr) auto auto; gap:8px; align-items:center; background:#f8fafc; border:1px solid #e8edf5; border-radius:9px; padding:5px 9px; margin-bottom:4px; font-size:13px; min-width:0; }   /* v13.55: el nombre cede, el $ nunca se corta */
+.pn-trk > div:nth-child(2){ min-width:0; overflow-wrap:anywhere; }
 .pn-trk .ico, .pn-camion .ico{ width:28px; height:28px; border-radius:7px; color:#fff; display:grid; place-items:center; font-size:14px; background:#1e6bd6; }
 .pn-trk .ico.n{ background:#0d9488; } .pn-trk .ico.ret{ background:#64748b; } .pn-trk .ico.sup{ background:#b45309; }
 .pn-trk .z{ font-weight:800; } .pn-trk .sub{ font-size:11px; color:#64748b; font-weight:600; }
@@ -7060,7 +7065,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v13.54";
+const APP_VERSION = "v13.55";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco

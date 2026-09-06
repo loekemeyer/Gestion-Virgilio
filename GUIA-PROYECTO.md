@@ -12,11 +12,17 @@
 > única**; no se replica. Ante la duda entre parche rápido y fix de raíz → **fix
 > de raíz**.
 >
-> Última actualización: 2026-09-06 (domingo) · Versión app al documentar: **v13.54**
+> Última actualización: 2026-09-06 (domingo) · Versión app al documentar: **v13.55**
 >
 > ⚠⚠ **Desde el lunes 2026-09-07 los operarios usan GESTIÓN, no Producción** (dueño, sábado a la
 > noche: *"el lunes van a empezar a usar GV, no más PV"*). Las tandas web viven en
 > `PPP_Web_Programacion` y Producción no las ve. URL: la de GitHub Pages de este repo.
+>
+> Nota **v13.55** (front) — tablero de Programación: **el box de plata ya no se corta** (dueño: *"los boxes de
+> plata siempre quedan por fuera"*). La mini-fila de cada día (`.pn-mini`) era 4 × 1fr y el importe en nowrap
+> quedaba tapado por el `overflow:hidden`; ahora la 4ª celda es `max-content` y las otras tres se reparten el
+> resto; en pantallas ≤ 1400 px se esconden los íconos de la mini-fila. En las filas de camión (`.pn-trk`) el
+> nombre cede (`minmax(0,1fr)`) y el $ nunca se corta.
 >
 > Nota **v13.54** (front) — **"Programar para…" (A Programar) rediseñado** (dueño: *"la visual está fea"*):
 > columna de 370 px (era 320), tarjeta en dos bloques — fecha grande a la izquierda (día de la semana, número
