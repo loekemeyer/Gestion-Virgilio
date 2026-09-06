@@ -113,7 +113,7 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
   chk(r.med.includes("Riesgo Marcelo Fabian"),  "el nombre del cliente entra entero en la tanda");
   chk(r.med.includes("apr-titem-txt"),          "el item va en dos renglones (el nombre no compite con el detalle)");
   chk(r.med.includes("Arrastrá un pedido acá"),"la tanda vacía lo dice");
-  chk(r.der.includes("Miércoles") && r.der.includes("9 sep"), "la lista dice el día con nombre y fecha");
+  chk(r.der.includes("Miércoles") && /9<small>sep<\/small>/.test(r.der), "la lista dice el día con nombre y fecha (v13.54: número grande + mes chico)");
   chk(r.der.includes("0,50</b> / 5,00 m³"),    "muestra los m³ programados contra el cupo");
   chk((r.der.match(/apr-dia-cerrado/g) || []).length === 3, "el no hábil, el completo y el muy pronto quedan cerrados");
   chk(/apr-dia-pronto/.test(r.der) && /Muy pronto · desde el 11\/09/.test(r.der), "v13.22: el día antes de la anticipación mínima dice 'Muy pronto · desde el 11/09'");

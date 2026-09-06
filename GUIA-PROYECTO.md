@@ -12,11 +12,17 @@
 > única**; no se replica. Ante la duda entre parche rápido y fix de raíz → **fix
 > de raíz**.
 >
-> Última actualización: 2026-09-06 (domingo) · Versión app al documentar: **v13.53**
+> Última actualización: 2026-09-06 (domingo) · Versión app al documentar: **v13.54**
 >
 > ⚠⚠ **Desde el lunes 2026-09-07 los operarios usan GESTIÓN, no Producción** (dueño, sábado a la
 > noche: *"el lunes van a empezar a usar GV, no más PV"*). Las tandas web viven en
 > `PPP_Web_Programacion` y Producción no las ve. URL: la de GitHub Pages de este repo.
+>
+> Nota **v13.54** (front) — **"Programar para…" (A Programar) rediseñado** (dueño: *"la visual está fea"*):
+> columna de 370 px (era 320), tarjeta en dos bloques — fecha grande a la izquierda (día de la semana, número
+> grande, mes chico) y a la derecha m³/cupo en negrita + chip de estado (hoy · quedan N m³ · completo · muy
+> pronto · no hábil) + barra + renglón chico con tandas/m³ web y lo de ISIS. Antes todo iba en un renglón de
+> 11 px que se partía en tres. Mismas clases y textos (los tests de v13.18/22/24 siguen).
 >
 > Nota **v13.53** (front) — **BUG: las tandas web no se veían en el tablero de Programación.** Desde v12.82
 > `pppTraerWebProgramados` devuelve `fecha_entrega` ISO ("2026-09-11") y `_pppFechaKey`/`_pppFechaDate` sólo
