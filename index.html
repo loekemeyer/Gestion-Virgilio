@@ -7030,7 +7030,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v13.39";
+const APP_VERSION = "v13.40";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -29450,6 +29450,7 @@ let _pppPlanClasica = false;   // true = lista clásica por fecha/tanda (v13.01)
 let _pppPlanHoja = 0;          // v13.17: hoja de la grilla (0 = próximos 6 hábiles, 1 = los 6 siguientes…)
 let _pppValor = null;          // Map np(norm) → { valor, sinPrecio }  (gv_ppp_np_valor)
 let _pppGeo = null;            // cache PPP_Geo (dir_key → {lat,lng}) para el orden de carga
+let _pppGeoCod = null;         // v13.40: cache GV_Geo_Cliente ("cod dir_key" y "cod" → {lat,lng})
 let _pppNoHabiles = null;      // v13.25: Set "YYYYMMDD" de GV_Dias_No_Habiles (feriados de la empresa: 07/09 Día del Metalúrgico)
 async function pppRefreshNoHabiles() {
   if (_pppNoHabiles) return;
@@ -29474,6 +29475,21 @@ async function pppRefreshValor() {
 async function pppRefreshGeo() {
   if (_pppGeo) return;
   try { _pppGeo = await _rtCacheAll(); } catch (_e) { _pppGeo = {}; }
+  // v13.40: además de PPP_Geo (por dirección), la ubicación POR CÓD DE CLIENTE. Es el paracaídas
+  // contra el cambio de tipeo en ISIS: si un día escribe "Rivadavia 18059" y otro "Av Rivadavia
+  // 18059", la clave por dirección es nueva y el pedido quedaba sin ubicación; por cód sigue ahí.
+  try {
+    const r = await fetch(SUPABASE_URL + "/rest/v1/GV_Geo_Cliente?select=cod,dir_key,lat,lng,usos,actualizado_at&limit=20000", { headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY }, cache: "no-store" });
+    const rows = r.ok ? await r.json() : [];
+    _pppGeoCod = {};
+    for (const x of rows) {
+      const cod = String(x.cod || "").trim(); if (!cod) continue;
+      const c = { lat: +x.lat, lng: +x.lng, usos: Number(x.usos) || 0, ts: x.actualizado_at || "" };
+      if (x.dir_key) _pppGeoCod[cod + " " + x.dir_key] = c;   // dirección exacta de ese cliente
+      const prev = _pppGeoCod[cod];                                 // y la "mejor" del cliente
+      if (!prev || c.usos > prev.usos || (c.usos === prev.usos && c.ts > prev.ts)) _pppGeoCod[cod] = c;
+    }
+  } catch (_e) { _pppGeoCod = _pppGeoCod || {}; }
   if (typeof pppRenderProg === "function") pppRenderProg();
 }
 function pppPlanAbrir(k) { _pppPlanDay = k || null; pppRenderProg(); try { const el = document.getElementById("pppPreview"); if (el) el.scrollIntoView({ block: "start" }); } catch (_e) {} }
@@ -29591,13 +29607,25 @@ function _pppCamiones(ped) {
 /* Orden de carga LIFO de un camión: recorrido geográfico (PPP_Geo + _rtOptimize) y se numera al
    revés: el último en entregarse se carga primero (idea 5920). Sin ubicación → al final del
    reparto (= primero a cargar). Devuelve { paradas:[p...] (orden de entrega), sinUbic:n }. */
+/* v13.40 — la ubicación de un pedido, en el orden en que conviene creerle:
+   1. `GV_Geo_Cliente` con la dirección exacta de ese cliente (cód + dirección) — lo más preciso;
+   2. `PPP_Geo` por dirección (la de siempre, compartida con Producción);
+   3. cualquier ubicación de ese cód — el paracaídas: si ISIS le cambió el tipeo a la dirección,
+      la clave 2 falla y sin esto el pedido caía a "sin ubicación". */
+function _pppGeoDe(p) {
+  const cod = String((p && p.cod) || "").trim();
+  const dk = _rtDirKey(p.direccion, p.localidad || p.barrio);
+  const gc = _pppGeoCod || {}, geo = _pppGeo || {};
+  const cand = (cod && gc[cod + " " + dk]) || geo[dk] || (cod && gc[cod]) || null;
+  return (cand && isFinite(cand.lat) && isFinite(cand.lng)) ? cand : null;
+}
 function _pppOrdenCarga(cam) {
   const geo = _pppGeo || {};
   const depot = geo[RT_DEPOT_KEY] || { lat: -34.6037, lng: -58.4 };
   const stops = [], sin = [];
   for (const p of cam.ped) {
-    const c = geo[_rtDirKey(p.direccion, p.localidad || p.barrio)];
-    if (c && isFinite(c.lat) && isFinite(c.lng)) stops.push({ lat: c.lat, lng: c.lng, p: p }); else sin.push(p);
+    const c = _pppGeoDe(p);
+    if (c) stops.push({ lat: c.lat, lng: c.lng, p: p }); else sin.push(p);
   }
   const ordered = stops.length ? _rtOptimize(depot, stops).map(function (s) { return s.p; }) : [];
   const paradas = ordered.concat(sin);

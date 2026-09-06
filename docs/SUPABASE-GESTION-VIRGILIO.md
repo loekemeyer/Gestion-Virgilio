@@ -1384,6 +1384,46 @@ es de Chef y pisa al LK 217): cuando Gestión alimente el tracking, escribir el 
 una función `gv_*` y pedir columna `empresa` en PaginaLK. Y el Excel ISIS de Facturación manda
 `N_Pedido` contador (no el id), como el mail: ISIS numera 98xxx por su cuenta.
 
+### 3.an ✅ Las ubicaciones se llenan solas y se guardan por cód de cliente (v13.40) — 2026-09-06 domingo
+
+Dueño: *"todo tenés que tener todas las ubicaciones"*, y antes *"dale, 1 y 2"* a las dos cosas que le
+propuse. Estado al abrir: **43 de 54 direcciones programadas sin ubicar**; `PPP_Geo` con 118 filas y
+la última geocodificación del **21/08**, porque sólo corría cuando un supervisor abría 📍 Mapa de
+zonas y tocaba el botón. Sin ubicación, el orden de carga manda ese pedido al final del reparto.
+
+**Lo nuevo** (`sql/gv_geo_cliente.sql`, migraciones `gv_geo_cliente_y_faltantes_v1340`,
+`gv_geo_cliente_clave_cod_mas_dir_v1340b`, `gv_dir_geo_query_espacios_y_retira_v1340c`):
+
+| objeto | qué es |
+|---|---|
+| `gv_dir_geo_query(dir)` | la dirección lista para preguntar: saca `"Exp. Arnes — "` y el `"(domicilio final)"` de los pedidos por expreso, colapsa los espacios de más que escribe ISIS (`"Jufre   339"`) y devuelve `null` si la dirección dice "Retira" |
+| `gv_dir_key(dir, barrio)` | la MISMA clave que arma el front (`_rtDirKey`) |
+| `GV_Geo_Cliente` | **fuente canónica de Gestión**. Clave `(cod, dir_key)` — no sólo el cód, porque hay clientes con varias direcciones (1792 Dapelo entrega en Villa Crespo, Almagro y Colegiales). RLS: lectura anon/authenticated, escritura authenticated. `manual = true` la congela: el cron no la pisa |
+| `gv_geo_de_cliente(cod)` | la ubicación "mejor" de un cliente (más usada, y a igualdad la última) |
+| `gv_geo_faltantes` | vista `security_invoker`: lo programado (ISIS + web, desde 7 días atrás) sin ubicación ni por (cód, dirección) ni por dirección |
+| `GV_Geo_Log` | una fila por corrida: `ok` / `sin_faltantes` / `error`, cuántas pidió, ubicó y fallaron |
+| Edge Function `gv-geocodificar` | lee `gv_geo_faltantes`, pregunta a Nominatim **1 por segundo**, escribe `GV_Geo_Cliente` y **agrega** a `PPP_Geo`. Tope de 40 por corrida (~45 s); lo que sobra queda para la siguiente |
+| cron **jobid 75** | `20 */6 * * *` — cada 6 horas |
+
+**⚠ `PPP_Geo` es compartida con Producción** (la usa su `index.html`): la Edge Function sólo le
+**agrega** filas (`Prefer: resolution=ignore-duplicates`). Medido: 118 → 120 filas en la primera
+corrida, ninguna fila existente modificada.
+
+**Cascada de intentos** (la primera versión dejaba 19 de 64 sin ubicar, todas "sin resultado"):
+1. dirección + barrio + Buenos Aires; 2. lo mismo con el barrio corregido (`"P.Patricios"` →
+`"Parque Patricios"`, `"Soldati"` → `"Villa Soldati"`, `"Tortuguita"` → `"Tortuguitas"`);
+3. dirección + Argentina, **sin** Buenos Aires ni viewbox — un pedido de Chef entrega en Río Cuarto
+(Córdoba) y el `", Buenos Aires"` lo mandaba a ningún lado; 4. búsqueda estructurada `street`/`city`.
+Cada intento cuesta 1 s y sólo se hace si el anterior falló.
+
+**En el front** (v13.40): `pppRefreshGeo` carga también `GV_Geo_Cliente`, y `_pppGeoDe(p)` decide la
+ubicación en este orden: (1) `(cód, dirección)` exacta, (2) `PPP_Geo` por dirección, (3) **cualquier**
+ubicación de ese cód — el paracaídas: si ISIS le cambia el tipeo a la dirección, antes el pedido caía
+a "sin ubicación". Test: `tests/geo-por-cod.cjs`.
+
+**Rollback**: `select cron.unschedule(75);` y los `drop` que están al pie de `sql/gv_geo_cliente.sql`.
+`PPP_Geo` queda como está — sólo se le agregaron filas.
+
 ### 3.am ✅ El calendario tardaba 1,4 s: el cupo se calculaba 21 veces (v13.34) — 2026-09-06 domingo
 
 Dueño: *"tarda 5 seg en cargarse los datos, ¿por qué?"*. Midiendo con `explain analyze`, el grueso

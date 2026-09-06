@@ -12,11 +12,21 @@
 > única**; no se replica. Ante la duda entre parche rápido y fix de raíz → **fix
 > de raíz**.
 >
-> Última actualización: 2026-09-06 (domingo) · Versión app al documentar: **v13.39**
+> Última actualización: 2026-09-06 (domingo) · Versión app al documentar: **v13.40**
 >
 > ⚠⚠ **Desde el lunes 2026-09-07 los operarios usan GESTIÓN, no Producción** (dueño, sábado a la
 > noche: *"el lunes van a empezar a usar GV, no más PV"*). Las tandas web viven en
 > `PPP_Web_Programacion` y Producción no las ve. URL: la de GitHub Pages de este repo.
+>
+> Nota **v13.40** (backend + front) — **Las ubicaciones se llenan solas y se guardan por cód de
+> cliente** (dueño: *"todo tenés que tener todas las ubicaciones"* → *"dale, 1 y 2"*). Nuevo:
+> **`GV_Geo_Cliente`** (clave `(cod, dir_key)`, porque hay clientes con varias direcciones de
+> entrega), la vista **`gv_geo_faltantes`**, la Edge Function **`gv-geocodificar`** y el **cron 75**
+> cada 6 h. El front lee la ubicación en orden: dirección exacta del cliente → `PPP_Geo` por
+> dirección → **cualquier** ubicación de ese cód (el paracaídas: si ISIS cambia el tipeo, antes el
+> pedido caía a "sin ubicación"). `PPP_Geo` es compartida con Producción: sólo se le **agregan**
+> filas. Detalle, cascada de intentos y rollback en §3.an de `docs/SUPABASE-GESTION-VIRGILIO.md`;
+> SQL en `sql/gv_geo_cliente.sql`; test `tests/geo-por-cod.cjs`.
 >
 > Nota **v13.39** (front) — **Los dos súper que faltaban**: **2686 (Dorinka S.R.L) → Chango Mas** y
 > **4263 (Matiz SA) → Gigot**. Con esto la tabla de abreviaturas está completa: los 6 súper de la PPP

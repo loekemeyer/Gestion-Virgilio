@@ -1,0 +1,174 @@
+// ══════════════════════════════════════════════════════════════════════════
+// gv-geocodificar — ubica en el mapa las direcciones programadas que faltan
+// Proyecto VIRGILIO (hrxfctzncixxqmpfhskv) · verify_jwt = true
+// ══════════════════════════════════════════════════════════════════════════
+// Lo que pidió el dueño (2026-09-06): *"todo tenés que tener todas las
+// ubicaciones"*. Hasta hoy la única forma de geocodificar era que un supervisor
+// abriera 📍 Mapa de zonas y tocara "Geocodificar faltantes": la última corrida
+// era del 21/08 y quedaban 43 de 54 direcciones sin ubicar. Sin ubicación, el
+// orden de carga del camión manda ese pedido al final y el reparto se arma mal.
+//
+// Hace, en orden:
+//   1. lee `gv_geo_faltantes` (ISIS + web, sin las que ya están por (cód,dir)
+//      ni por dirección; Retira no cuenta)
+//   2. por cada una le pregunta a Nominatim/OpenStreetMap, UNA POR SEGUNDO —
+//      es el límite de la política de uso gratuita y no se negocia
+//   3. escribe la ubicación en `GV_Geo_Cliente` (cód + dirección: nuestra) y
+//      AGREGA la fila a `PPP_Geo` si no está
+//   4. deja constancia en `GV_Geo_Log`, incluso cuando no hubo nada que hacer
+//
+// ⚠⚠ `PPP_Geo` es COMPARTIDA con Producción Virgilio (la usa su index.html).
+//    Acá sólo se le AGREGAN filas (`Prefer: resolution=ignore-duplicates`):
+//    ni un update ni un delete sobre lo que ya existe.
+//
+// Es idempotente: lo que ya tiene ubicación no vuelve a pedirse, así que
+// correrla dos veces seguidas no gasta ni una llamada de más.
+//
+// El tope de `MAX_POR_CORRIDA` existe para no pasarse del tiempo de ejecución de
+// la Edge Function: con 1 llamada por segundo, 40 son ~45 s. Lo que sobra queda
+// para la corrida siguiente del cron (cada 6 h), y el propio log lo dice.
+// ══════════════════════════════════════════════════════════════════════════
+
+import "jsr:@supabase/functions-js/edge-runtime.d.ts";
+
+const URL_ = Deno.env.get("SUPABASE_URL")!;
+const KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+
+const MAX_POR_CORRIDA = 40;
+const ESPERA_MS = 1100;          // 1 por segundo + margen (política de Nominatim)
+// Nominatim EXIGE un User-Agent que identifique a la aplicación. Sin esto
+// devuelve 403 y la función parece "no encontrar nada".
+const UA = "GestionVirgilio/1.0 (deposito Loekemeyer; contacto por el repo loekemeyer/Gestion-Virgilio)";
+
+type Falt = {
+  fuente: string; cod: string; razon_social: string | null;
+  direccion: string; barrio: string | null; zona: string | null;
+  dir_key: string; dir_query: string;
+};
+
+const H = { apikey: KEY, Authorization: "Bearer " + KEY, "Content-Type": "application/json" };
+
+async function rest(path: string, init?: RequestInit) {
+  const r = await fetch(URL_ + "/rest/v1/" + path, { ...init, headers: { ...H, ...((init?.headers as object) || {}) } });
+  if (!r.ok) throw new Error(path.split("?")[0] + " → HTTP " + r.status + " " + (await r.text()).slice(0, 300));
+  const t = await r.text();
+  return t ? JSON.parse(t) : null;
+}
+
+type Coord = { lat: number; lng: number; comp: unknown };
+
+/* ISIS escribe los barrios abreviados o mal, y con eso Nominatim no encuentra nada.
+   Sólo los que aparecieron de verdad en la programación; el resto va tal cual. */
+const BARRIOS: Record<string, string> = {
+  "p.patricios": "Parque Patricios", "p. patricios": "Parque Patricios",
+  "soldati": "Villa Soldati", "tortuguita": "Tortuguitas", "moron": "Morón",
+  "lujan": "Luján", "g. de laferrere": "Gregorio de Laferrere", "pompeya": "Nueva Pompeya",
+};
+function barrioOk(b: string | null) {
+  const k = String(b || "").trim().toLowerCase();
+  return BARRIOS[k] || String(b || "").trim();
+}
+
+async function nominatim(qs: string) {
+  const r = await fetch("https://nominatim.openstreetmap.org/search?" + qs,
+    { headers: { Accept: "application/json", "User-Agent": UA } });
+  if (!r.ok) return { c: null as null | Coord, err: "HTTP " + r.status };
+  const j = await r.json();
+  if (!j || !j.length || !j[0].lat) return { c: null, err: "sin resultado" };
+  const lat = +j[0].lat, lng = +j[0].lon;
+  if (!isFinite(lat) || !isFinite(lng)) return { c: null, err: "coordenada inválida" };
+  return { c: { lat, lng, comp: j[0].address || null }, err: "" };
+}
+
+/* Nominatim con addressdetails (para guardar partido/barrio oficiales) y viewbox sesgado al AMBA,
+   sin forzarlo: un cliente de Luján o de Campo de Mayo también tiene que caer bien.
+   Va en cascada, porque con UNA sola forma de preguntar quedaban 19 de 64 sin ubicar:
+     1. dirección + barrio + Buenos Aires   (lo normal)
+     2. lo mismo con el barrio corregido    ("P.Patricios" → "Parque Patricios")
+     3. dirección + Argentina, sin Buenos Aires ni viewbox — un pedido de Chef entrega en
+        Río Cuarto (Córdoba) y el ", Buenos Aires" lo mandaba a ningún lado
+     4. búsqueda estructurada street/city, que tolera mejor una calle mal escrita
+   Cada intento cuesta 1 segundo (política de Nominatim), y sólo se hacen si el anterior falló. */
+async function geocodificar(dir: string, barrio: string | null) {
+  const AMBA = "&viewbox=-58.80,-34.40,-58.05,-34.85";
+  const base = "format=jsonv2&addressdetails=1&limit=1&countrycodes=ar";
+  const bOk = barrioOk(barrio);
+  const intentos: string[] = [
+    base + AMBA + "&q=" + encodeURIComponent(dir + (barrio ? ", " + barrio : "") + ", Buenos Aires, Argentina"),
+  ];
+  if (bOk && bOk !== String(barrio || "").trim()) {
+    intentos.push(base + AMBA + "&q=" + encodeURIComponent(dir + ", " + bOk + ", Buenos Aires, Argentina"));
+  }
+  intentos.push(base + "&q=" + encodeURIComponent(dir + (bOk ? ", " + bOk : "") + ", Argentina"));
+  intentos.push(base + AMBA + "&street=" + encodeURIComponent(dir) + (bOk ? "&city=" + encodeURIComponent(bOk) : "") + "&country=Argentina");
+
+  let err = "sin resultado";
+  for (let i = 0; i < intentos.length; i++) {
+    if (i) await new Promise((r) => setTimeout(r, ESPERA_MS));
+    const res = await nominatim(intentos[i]);
+    if (res.c) return { c: res.c, err: "", intento: i + 1 };
+    err = res.err;
+  }
+  return { c: null as null | Coord, err, intento: intentos.length };
+}
+
+async function log(estado: string, pedidas: number, ubicadas: number, fallaron: number, motivo: string, detalle: unknown) {
+  try {
+    await rest('GV_Geo_Log', {
+      method: "POST", headers: { Prefer: "return=minimal" },
+      body: JSON.stringify({ estado, pedidas, ubicadas, fallaron, motivo: motivo || null, detalle }),
+    });
+  } catch (_e) { /* el log no puede tumbar la corrida */ }
+}
+
+Deno.serve(async (req) => {
+  const t0 = Date.now();
+  try {
+    const body = await req.json().catch(() => ({}));
+    const tope = Math.min(Math.max(Number(body?.max) || MAX_POR_CORRIDA, 1), 200);
+
+    const falt: Falt[] = await rest("gv_geo_faltantes?select=*&limit=500");
+    if (!falt.length) {
+      await log("sin_faltantes", 0, 0, 0, "", null);
+      return Response.json({ ok: true, estado: "sin_faltantes", faltaban: 0 });
+    }
+
+    const lote = falt.slice(0, tope);
+    let ubicadas = 0; const errores: { cod: string; dir: string; err: string }[] = [];
+
+    for (let i = 0; i < lote.length; i++) {
+      const f = lote[i];
+      const { c, err } = await geocodificar(f.dir_query, f.barrio);
+      if (c) {
+        // Nuestra tabla: la fuente canónica de Gestión.
+        await rest('GV_Geo_Cliente?on_conflict=cod,dir_key', {
+          method: "POST", headers: { Prefer: "resolution=merge-duplicates,return=minimal" },
+          body: JSON.stringify({
+            cod: f.cod || "", dir_key: f.dir_key, razon_social: f.razon_social,
+            direccion: f.direccion, barrio: f.barrio, lat: c.lat, lng: c.lng, comp: c.comp,
+            fuente: "nominatim", actualizado_at: new Date().toISOString(),
+          }),
+        }).catch((e) => errores.push({ cod: f.cod, dir: f.direccion, err: "GV_Geo_Cliente: " + e.message }));
+        // Compartida con Producción: SÓLO agregar. Si la clave ya está, no se toca.
+        await rest("PPP_Geo", {
+          method: "POST", headers: { Prefer: "resolution=ignore-duplicates,return=minimal" },
+          body: JSON.stringify({ dir_key: f.dir_key, direccion: f.direccion, barrio: f.barrio, lat: c.lat, lng: c.lng, comp: c.comp }),
+        }).catch((e) => errores.push({ cod: f.cod, dir: f.direccion, err: "PPP_Geo: " + e.message }));
+        ubicadas++;
+      } else {
+        errores.push({ cod: f.cod, dir: f.dir_query, err });
+      }
+      if (i < lote.length - 1) await new Promise((r) => setTimeout(r, ESPERA_MS));
+    }
+
+    const quedan = falt.length - ubicadas;
+    await log("ok", lote.length, ubicadas, errores.length,
+      quedan > 0 ? quedan + " sin ubicar todavía" : "",
+      errores.length ? { errores: errores.slice(0, 40) } : null);
+    return Response.json({ ok: true, estado: "ok", faltaban: falt.length, pedidas: lote.length, ubicadas, fallaron: errores.length, quedan, errores: errores.slice(0, 40), ms: Date.now() - t0 });
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    await log("error", 0, 0, 0, msg, null);
+    return Response.json({ ok: false, error: msg }, { status: 500 });
+  }
+});

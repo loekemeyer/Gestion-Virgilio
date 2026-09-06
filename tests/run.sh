@@ -287,3 +287,6 @@ PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node te
 
 echo "== zg-geo-web-expreso (v13.38: el mapa de zonas ubica también lo web y limpia las direcciones de expreso) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/zg-geo-web-expreso.cjs
+
+echo "== geo-por-cod (v13.40: la ubicación por cód de cliente salva el cambio de tipeo en ISIS) =="
+PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/geo-por-cod.cjs
