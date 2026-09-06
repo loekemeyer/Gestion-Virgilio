@@ -1399,6 +1399,31 @@ vie 11 = 10,88 m³ (7,45 ISIS + 3,43 web: pasado a propósito, el súper va en c
 589 cajas. Producción sigue viendo la fila cruda (tanda vacía). **Rollback:** `delete from "GV_PPP_Prog_Override"
 where np = '44619'` (la vista queda; sin filas es passthrough).
 
+### 3.aq ✅ Canilla ABIERTA + dobles del mail del sábado ocultos (v13.51) — 2026-09-06 domingo (17:30)
+
+El dueño mandó el Excel PPP vigente (`AAA_PPP_Vigente.xlsm`). Cruzado contra Supabase:
+- **Facturación**: las 59 `Fecha Fc` del Excel (02/09, 03/09, 04/09) coinciden una por una con los tics de
+  `Facturacion_NP` (mismo día). Las 6 FC del jueves 04/09 en ISIS (400035804–809: 98484 Vargas, 98461 Sun
+  Yung Hung, 98464/98465 MRG, 98646 Zhu Leo, 98513 Fang Chiao Wen) están tildadas el jueves 16:01–16:12 (+44594).
+  En el Excel 5 de esas 6 todavía no tienen `Fecha Fc` (la app va adelante). **Ninguna `Fecha Fc` ni tic del
+  viernes 05/09**: el viernes no se facturó nada. "11:00HS" / "12:00hs" en `Fecha Fc` de 98685 y 98647 son
+  horarios de entrega mal puestos, no facturas.
+- **NP por encima del corte de la canilla (98694 / 44619)**: 98696–98703 y 44620/44621 = **el mail del sábado
+  12:30 cargado en ISIS** (1343 Chen Li Yu ×3, 1344 Torres y Liva ×2, 1340 Garbarino, 1341 Orfali, 1342 Di Leo;
+  Chef 216 Elbantonio ×2) — sin tanda ni fecha; dobles de E01E/E01A/E05A/E01D/E02A y de Garbarino (a mano). Y
+  **98704 Salvetti Angel Hernan, D60G, mar 8** = pedido nuevo de ISIS que Gestión NO veía por la canilla.
+
+**Hecho (migración `gv_ppp_prog_override_oculto_canilla_abierta_v1351`, `sql/gv_ppp_prog_override.sql`):**
+canilla **abierta** (`espejo_np_corte_lk/_chef = null`; Gestión ve todo lo que ISIS numere) + columna
+`oculto` en `GV_PPP_Prog_Override`, filtrada en las tres vistas del espejo y en `gv_pedidos_web_excluidos`
+(una NP oculta no cuenta como "en producción"). 10 filas ocultas (las de arriba). Medido: corte (null, null),
+10 ocultas, `gv_pedidos_web_excluidos` para 1340/1343/216 → nada (siguen siendo de Gestión), 215 →
+en_produccion (44619, correcto). El espejo de Supabase todavía no tiene las 98696+ (la hoja de Google va
+atrás del Excel): cuando lleguen quedan ocultas solas y Salvetti aparece en D60G.
+**Pendiente del dueño**: qué hacer en ISIS con las 10 NP dobles (anular) y que la operadora no cargue
+1345–1349. Rollback: `update "GV_PPP_Prog_Override" set oculto = false where oculto` y volver el corte a
+98704/44621.
+
 ### 3.ao ✅ "Mandá directo a Programación si ya está. No más en A Programar" (v13.47) — 2026-09-06 domingo (tarde)
 
 Dueño, viendo A Programar con 4 pedidos que decían *"🤖 se arma solo → lun 14/9"* y *"🚚 hay camión el

@@ -85,3 +85,23 @@ end $$;
 insert into public."GV_PPP_Prog_Override" (np, tanda, fecha_entrega, nota)
 values ('44619', 'E07A', null, 'v13.50 2026-09-06 · dueño: "Chango Mas, programalo". ISIS lo dejó sin tanda para el vie 11 (Dorinka / Chango Mas, súper, 4,31 m³, OC 9400146407).')
 on conflict (np) do nothing;
+
+-- ═══ v13.51 (mismo domingo, 17:30) · migración gv_ppp_prog_override_oculto_canilla_abierta_v1351 ═══════
+-- El Excel PPP vigente (AAA_PPP_Vigente.xlsm, lo mandó el dueño) trae NP por ENCIMA del corte de la canilla:
+--   · 98696–98703 (LK 1343 Chen Li Yu ×3, 1344 Torres y Liva ×2, 1340 Garbarino, 1341 Orfali, 1342 Di Leo)
+--     y 44620/44621 (Chef 216 Elbantonio) = el mail del sábado 12:30 CARGADO en ISIS pese al pedido de no
+--     hacerlo → dobles de E01E / E01A / (Garbarino a mano) / E05A / E01D / E02A.
+--   · 98704 Salvetti Angel Hernan, D60G, mar 8 = pedido NUEVO de ISIS (cotizador) que Gestión no veía.
+-- Decisión: CANILLA ABIERTA (espejo_np_corte_lk/_chef = null: Gestión ve todo lo que ISIS numere, como
+-- Producción) + los dobles OCULTOS fila por fila (columna `oculto` del override), en las tres vistas del
+-- espejo (gv_ppp_programacion_diaria, gv_ppp_base_pedidos, gv_ppp_entregados_meta) y en
+-- gv_pedidos_web_excluidos (una NP oculta no cuenta como "en producción": 1340/1343/216 siguen siendo de
+-- Gestión). Medido: corte (null, null) · 10 ocultas · el espejo de Supabase todavía no tiene las 98696+
+-- (la hoja de Google va atrás del Excel), cuando lleguen quedan ocultas solas.
+-- Receta para otro doble: insert into "GV_PPP_Prog_Override" (np, oculto, nota) values ('98xxx', true, '…')
+--   on conflict (np) do update set oculto = true, nota = excluded.nota;
+-- Rollback: update "GV_PPP_Prog_Override" set oculto = false where oculto;  y para cerrar la canilla otra vez:
+--   update "PPP_Web_Config" set valor = 98704 where clave = 'espejo_np_corte_lk'; … 44621 … '_chef'.
+alter table public."GV_PPP_Prog_Override" add column if not exists oculto boolean not null default false;
+-- (vistas + gv_pedidos_web_excluidos: ver la migración; mismo cuerpo que arriba más
+--  `and not coalesce(o.oculto,false)` / `and not exists (select 1 from "GV_PPP_Prog_Override" o where o.oculto and o.np = …)`)

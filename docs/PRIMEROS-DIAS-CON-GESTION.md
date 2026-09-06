@@ -77,7 +77,8 @@ web llegue al depósito. Cupo diario = pickers típicos × 3 m³ (hoy 2 → 6), 
 **Lo que NO hay que hacer (esta semana):**
 
 - **No cargar en ISIS el mail del sábado 12:30** (pedidos LK 1340…1349): Gestión los programa.
-  Quedarían dobles.
+  Quedarían dobles. **⚠ Se cargó igual (visto el domingo en el Excel: 98696–98703 = 1340–1344, y 44620/21 =
+  Chef 216).** Gestión los oculta (v13.51); falta anularlos en ISIS y no cargar 1345–1349.
 - **No cargar en ISIS los mails de Chef del viernes (216) ni del sábado (217)**: Gestión los toma de la
   página (216 ya es E02A). El cron de Chef quedó apagado el domingo; no salen más.
 - No usar Producción para programar ni facturar: lo web no está ahí.
@@ -98,7 +99,7 @@ web llegue al depósito. Cupo diario = pickers típicos × 3 m³ (hoy 2 → 6), 
 - [x] ~~Cargar el mail en `Empleados` de 122 y 504~~ — no hace falta: entran con el número de legajo.
 - [ ] Que cada uno abra Producción una vez con señal antes de cambiar (cola offline).
 - [x] Apagar el cron de Chef de las 12:30 — hecho el domingo 06/09 (jobs 1 y 2 en `active=false`).
-- [ ] No cargar el mail del sábado en ISIS.
+- [ ] ~~No cargar el mail del sábado en ISIS~~ → ya se cargó (1340–1344 y Chef 216): **anular en ISIS 98696–98703 y 44620/44621**, y no cargar 1345–1349.
 - [ ] Explicarle a la operadora el paso nuevo de Facturación: **NP web → tildar → bajar Excel ISIS**.
 - [ ] Los 20 atrasados (v13.46): 12 facturadas y armadas → marcar Controlado; 4 de D57B (98510, 98541,
   98542, 98543) armadas sin facturar → decidir; 4 sin armar (D57C 98553/98554, D57D 98528/98600) → reprogramar.

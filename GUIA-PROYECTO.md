@@ -12,11 +12,18 @@
 > única**; no se replica. Ante la duda entre parche rápido y fix de raíz → **fix
 > de raíz**.
 >
-> Última actualización: 2026-09-06 (domingo) · Versión app al documentar: **v13.50**
+> Última actualización: 2026-09-06 (domingo) · Versión app al documentar: **v13.51**
 >
 > ⚠⚠ **Desde el lunes 2026-09-07 los operarios usan GESTIÓN, no Producción** (dueño, sábado a la
 > noche: *"el lunes van a empezar a usar GV, no más PV"*). Las tandas web viven en
 > `PPP_Web_Programacion` y Producción no las ve. URL: la de GitHub Pages de este repo.
+>
+> Nota **v13.51** (backend) — **canilla del espejo ABIERTA** (`espejo_np_corte_*` = null) y **NP de ISIS ocultas
+> por fila** (`GV_PPP_Prog_Override.oculto`, filtrado en `gv_ppp_programacion_diaria` / `gv_ppp_base_pedidos` /
+> `gv_ppp_entregados_meta` / `gv_pedidos_web_excluidos`). Motivo: el Excel PPP del domingo mostró que el mail del
+> sábado se cargó igual en ISIS (98696–98703, 44620/21 = dobles de E01A/E01D/E01E/E02A/E05A) y que ISIS sigue
+> numerando pedidos propios (98704 Salvetti D60G mar 8) que Gestión no veía. Ocultas las 10 dobles; Gestión ve
+> lo demás. §3.aq de la doc de Supabase.
 >
 > Nota **v13.50** (backend) — dueño: *"Chango Mas, programalo"*. La 44619 (súper, 4,31 m³, vie 11) estaba en ISIS
 > sin tanda. Nueva tabla de override **`GV_PPP_Prog_Override`** (np → tanda / fecha) que la vista

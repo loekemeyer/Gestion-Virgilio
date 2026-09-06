@@ -158,14 +158,17 @@ Detalle, medición y rollback en `docs/SUPABASE-GESTION-VIRGILIO.md` §3.l y §3
   *"sacá el prefijo GV-"*; `tanda_prefijo = ''`). `ppp_web_proxima_letra()` retoma desde la
   última letra de Producción (D71A) → la primera tanda de Gestión es **`E01A`**. Hasta ese día
   el prefijo era `GV-` para no pisarse con Producción; para volver: `valor_texto = 'GV-'`.
-- **Canilla del espejo de ISIS: CERRADA para Gestión desde el 2026-09-05** (v12.90). Gestión
-  no lee más `PPP_Programacion_Diaria` / `PPP_Base_Pedidos` / `PPP_Entregados_Meta` directo:
-  lee las vistas **`gv_ppp_programacion_diaria` / `gv_ppp_base_pedidos` / `gv_ppp_entregados_meta`**
-  (`sql/gv_espejo_corte.sql`), que sólo devuelven NP ≤ `PPP_Web_Config.espejo_np_corte_lk`
-  (98694) / `_chef` (44619). Lo que ISIS numere después lo ve Producción y no Gestión; ese
-  pedido entra a Gestión desde la página. El Apps Script y Producción no se tocaron.
-  **Abrir la canilla:** `update public."PPP_Web_Config" set valor = null where clave like 'espejo_np_corte_%';`
-  Detalle §3.m de `docs/SUPABASE-GESTION-VIRGILIO.md`.
+- **Canilla del espejo de ISIS: ABIERTA de nuevo desde el domingo 2026-09-06 (v13.51).** Gestión lee las
+  vistas **`gv_ppp_programacion_diaria` / `gv_ppp_base_pedidos` / `gv_ppp_entregados_meta`**
+  (`sql/gv_espejo_corte.sql`), que con `PPP_Web_Config.espejo_np_corte_lk/_chef = null` devuelven todo lo
+  que ISIS numere (ISIS sigue cargando pedidos propios, ej. 98704 Salvetti D60G). Lo que NO debe verse
+  (una NP de ISIS que duplica un pedido web ya programado por Gestión) se oculta **fila por fila** con
+  `GV_PPP_Prog_Override.oculto = true` (`sql/gv_ppp_prog_override.sql`); las tres vistas y
+  `gv_pedidos_web_excluidos` la saltean. Al 06/09 hay 10 ocultas: 98696–98703 y 44620/44621, el mail del
+  sábado que se cargó en ISIS igual. La misma tabla sirve para **pisar tanda/fecha** de una NP de ISIS sin
+  tocar la tabla compartida (44619 Chango Mas → E07A, v13.50). Estuvo cerrada del 05/09 al 06/09 (v12.90,
+  corte 98694/44619); para cerrarla otra vez: `update public."PPP_Web_Config" set valor = 98704 where clave =
+  'espejo_np_corte_lk'` (y 44621 en `_chef`). Detalle §3.m, §3.ap y §3.aq de `docs/SUPABASE-GESTION-VIRGILIO.md`.
 
 **Para apagarlo (mismo día, todo reversible):**
 
