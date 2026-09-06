@@ -12,11 +12,17 @@
 > única**; no se replica. Ante la duda entre parche rápido y fix de raíz → **fix
 > de raíz**.
 >
-> Última actualización: 2026-09-06 (domingo) · Versión app al documentar: **v13.41**
+> Última actualización: 2026-09-06 (domingo) · Versión app al documentar: **v13.42**
 >
 > ⚠⚠ **Desde el lunes 2026-09-07 los operarios usan GESTIÓN, no Producción** (dueño, sábado a la
 > noche: *"el lunes van a empezar a usar GV, no más PV"*). Las tandas web viven en
 > `PPP_Web_Programacion` y Producción no las ve. URL: la de GitHub Pages de este repo.
+>
+> Nota **v13.42** (backend) — **Si el mapa no tiene la altura, ubica la calle** (dueño mostró en
+> Google Maps que "Trole 163" existe; OpenStreetMap no tiene esa altura cargada). Quinto intento de la
+> cascada de `gv-geocodificar`: la calle sin el número, sólo si hay barrio. Queda marcado en
+> **`GV_Geo_Cliente.precision = 'calle'`** (vs `exacta`), y el log dice cuántas fueron "por la calle".
+> Una calle de dos cuadras ordena el reparto igual de bien; lo que importa es que se pueda revisar.
 >
 > Nota **v13.41** (backend) — **Correcciones de dirección para geocodificar, sin tocar ISIS** (dueño:
 > *"sí, dale. Ambas"*). Las 16 que quedaban sin ubicar eran todas cómo las escribe ISIS

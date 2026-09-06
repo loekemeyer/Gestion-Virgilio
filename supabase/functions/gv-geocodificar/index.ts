@@ -72,7 +72,24 @@ function barrioOk(b: string | null) {
   return BARRIOS[k] || String(b || "").trim();
 }
 
-async function nominatim(qs: string) {
+/* Sin acentos, minúsculas, un espacio: para comparar "Morón" con "moron" o "Luján" con "lujan". */
+function plano(s: unknown) {
+  return String(s ?? "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/\s+/g, " ").trim();
+}
+/* v13.42 — ¿el resultado cae en el barrio/partido que se pidió? Se mira en los componentes
+   oficiales que devuelve Nominatim (suburb, city, town, county, state_district…): alguno tiene que
+   contener el barrio pedido, o al revés ("Villa Soldati" ⊃ "Soldati"). Sin esto, "J. M. Pérez,
+   Luján" devolvió una calle de Ezeiza a 50 km — un pedido ubicado MAL es peor que sin ubicar. */
+function enElBarrio(comp: unknown, barrio: string) {
+  const b = plano(barrio); if (b.length < 4 || !comp || typeof comp !== "object") return false;
+  for (const v of Object.values(comp as Record<string, unknown>)) {
+    const t = plano(v); if (t.length < 4) continue;
+    if (t.includes(b) || b.includes(t)) return true;
+  }
+  return false;
+}
+
+async function nominatim(qs: string, barrioExigido?: string) {
   const r = await fetch("https://nominatim.openstreetmap.org/search?" + qs,
     { headers: { Accept: "application/json", "User-Agent": UA } });
   if (!r.ok) return { c: null as null | Coord, err: "HTTP " + r.status };
@@ -80,6 +97,7 @@ async function nominatim(qs: string) {
   if (!j || !j.length || !j[0].lat) return { c: null, err: "sin resultado" };
   const lat = +j[0].lat, lng = +j[0].lon;
   if (!isFinite(lat) || !isFinite(lng)) return { c: null, err: "coordenada inválida" };
+  if (barrioExigido && !enElBarrio(j[0].address, barrioExigido)) return { c: null, err: "cayó fuera de " + barrioExigido };
   return { c: { lat, lng, comp: j[0].address || null }, err: "" };
 }
 
@@ -91,28 +109,41 @@ async function nominatim(qs: string) {
      3. dirección + Argentina, sin Buenos Aires ni viewbox — un pedido de Chef entrega en
         Río Cuarto (Córdoba) y el ", Buenos Aires" lo mandaba a ningún lado
      4. búsqueda estructurada street/city, que tolera mejor una calle mal escrita
+     5. (v13.42) la CALLE sin el número, sólo si tiene barrio — "Trole 163" existe (el dueño lo
+        mostró en Google Maps) pero OpenStreetMap no tiene esa altura cargada. Una calle de dos
+        cuadras ordena el reparto igual de bien; queda marcada `precision = 'calle'` para
+        poder revisarla. Sin barrio no se intenta: "Rivadavia" solo es cualquier lado.
    Cada intento cuesta 1 segundo (política de Nominatim), y sólo se hacen si el anterior falló. */
 async function geocodificar(dir: string, barrio: string | null) {
   const AMBA = "&viewbox=-58.80,-34.40,-58.05,-34.85";
   const base = "format=jsonv2&addressdetails=1&limit=1&countrycodes=ar";
   const bOk = barrioOk(barrio);
-  const intentos: string[] = [
-    base + AMBA + "&q=" + encodeURIComponent(dir + (barrio ? ", " + barrio : "") + ", Buenos Aires, Argentina"),
+  // `exigir`: los intentos 3, 4 y 5 preguntan con menos contexto (sin "Buenos Aires", o sólo la
+  // calle), así que el resultado tiene que caer en el barrio pedido o se descarta (enElBarrio).
+  // Los dos primeros ya llevan barrio + "Buenos Aires" y son los que ubicaron bien 47 de 47.
+  const intentos: { qs: string; precision: string; exigir: boolean }[] = [
+    { qs: base + AMBA + "&q=" + encodeURIComponent(dir + (barrio ? ", " + barrio : "") + ", Buenos Aires, Argentina"), precision: "exacta", exigir: false },
   ];
   if (bOk && bOk !== String(barrio || "").trim()) {
-    intentos.push(base + AMBA + "&q=" + encodeURIComponent(dir + ", " + bOk + ", Buenos Aires, Argentina"));
+    intentos.push({ qs: base + AMBA + "&q=" + encodeURIComponent(dir + ", " + bOk + ", Buenos Aires, Argentina"), precision: "exacta", exigir: false });
   }
-  intentos.push(base + "&q=" + encodeURIComponent(dir + (bOk ? ", " + bOk : "") + ", Argentina"));
-  intentos.push(base + AMBA + "&street=" + encodeURIComponent(dir) + (bOk ? "&city=" + encodeURIComponent(bOk) : "") + "&country=Argentina");
+  intentos.push({ qs: base + "&q=" + encodeURIComponent(dir + (bOk ? ", " + bOk : "") + ", Argentina"), precision: "exacta", exigir: !!bOk });
+  intentos.push({ qs: base + AMBA + "&street=" + encodeURIComponent(dir) + (bOk ? "&city=" + encodeURIComponent(bOk) : "") + "&country=Argentina", precision: "exacta", exigir: !!bOk });
+  // 5 · la calle sola. Se saca el número del final ("Trole 163" → "Trole", "Av. La Salle 1923" →
+  //     "Av. La Salle"); si la dirección no termina en número, no hay nada que sacar y no se intenta.
+  const calle = dir.replace(/\s+\d[\d\/\-\s]*[a-zA-Z]?\s*$/, "").trim();
+  if (bOk && calle && calle !== dir) {
+    intentos.push({ qs: base + AMBA + "&street=" + encodeURIComponent(calle) + "&city=" + encodeURIComponent(bOk) + "&country=Argentina", precision: "calle", exigir: true });
+  }
 
   let err = "sin resultado";
   for (let i = 0; i < intentos.length; i++) {
     if (i) await new Promise((r) => setTimeout(r, ESPERA_MS));
-    const res = await nominatim(intentos[i]);
-    if (res.c) return { c: res.c, err: "", intento: i + 1 };
+    const res = await nominatim(intentos[i].qs, intentos[i].exigir ? bOk : undefined);
+    if (res.c) return { c: res.c, err: "", intento: i + 1, precision: intentos[i].precision };
     err = res.err;
   }
-  return { c: null as null | Coord, err, intento: intentos.length };
+  return { c: null as null | Coord, err, intento: intentos.length, precision: "" };
 }
 
 async function log(estado: string, pedidas: number, ubicadas: number, fallaron: number, motivo: string, detalle: unknown) {
@@ -137,19 +168,21 @@ Deno.serve(async (req) => {
     }
 
     const lote = falt.slice(0, tope);
-    let ubicadas = 0; const errores: { cod: string; dir: string; err: string }[] = [];
+    let ubicadas = 0, aproximadas = 0; const errores: { cod: string; dir: string; err: string }[] = [];
+    const porCalle: { cod: string; dir: string }[] = [];
 
     for (let i = 0; i < lote.length; i++) {
       const f = lote[i];
-      const { c, err } = await geocodificar(f.dir_query, f.barrio_geo || f.barrio);
+      const { c, err, precision } = await geocodificar(f.dir_query, f.barrio_geo || f.barrio);
       if (c) {
+        if (precision === "calle") { aproximadas++; porCalle.push({ cod: f.cod, dir: f.direccion }); }
         // Nuestra tabla: la fuente canónica de Gestión.
         await rest('GV_Geo_Cliente?on_conflict=cod,dir_key', {
           method: "POST", headers: { Prefer: "resolution=merge-duplicates,return=minimal" },
           body: JSON.stringify({
             cod: f.cod || "", dir_key: f.dir_key, razon_social: f.razon_social,
             direccion: f.direccion, barrio: f.barrio, lat: c.lat, lng: c.lng, comp: c.comp,
-            fuente: "nominatim", actualizado_at: new Date().toISOString(),
+            fuente: "nominatim", precision: precision || "exacta", actualizado_at: new Date().toISOString(),
           }),
         }).catch((e) => errores.push({ cod: f.cod, dir: f.direccion, err: "GV_Geo_Cliente: " + e.message }));
         // Compartida con Producción: SÓLO agregar. Si la clave ya está, no se toca.
@@ -165,10 +198,10 @@ Deno.serve(async (req) => {
     }
 
     const quedan = falt.length - ubicadas;
-    await log("ok", lote.length, ubicadas, errores.length,
-      quedan > 0 ? quedan + " sin ubicar todavía" : "",
-      errores.length ? { errores: errores.slice(0, 40) } : null);
-    return Response.json({ ok: true, estado: "ok", faltaban: falt.length, pedidas: lote.length, ubicadas, fallaron: errores.length, quedan, errores: errores.slice(0, 40), ms: Date.now() - t0 });
+    const motivo = [quedan > 0 ? quedan + " sin ubicar todavía" : "", aproximadas ? aproximadas + " por la calle (sin altura en OSM)" : ""].filter(Boolean).join(" · ");
+    await log("ok", lote.length, ubicadas, errores.length, motivo,
+      (errores.length || porCalle.length) ? { errores: errores.slice(0, 40), por_calle: porCalle.slice(0, 40) } : null);
+    return Response.json({ ok: true, estado: "ok", faltaban: falt.length, pedidas: lote.length, ubicadas, aproximadas, fallaron: errores.length, quedan, errores: errores.slice(0, 40), por_calle: porCalle, ms: Date.now() - t0 });
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     await log("error", 0, 0, 0, msg, null);

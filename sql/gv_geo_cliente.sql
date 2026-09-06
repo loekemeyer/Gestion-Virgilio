@@ -160,3 +160,13 @@ grant usage, select on sequence public."GV_Geo_Log_id_seq" to authenticated;
 --   drop function public.gv_dir_geo_query(text);
 --   drop function public.gv_dir_key(text, text);
 --   (PPP_Geo queda como está: sólo se le agregaron filas, ninguna se modificó.)
+
+-- ── v13.42 — precisión de la ubicación ──────────────────────────────────────
+-- "Trole 163" existe (el dueño lo mostró en Google Maps) pero OpenStreetMap no
+-- tiene esa altura. Cuando pasa eso, la Edge Function ubica la CALLE (último
+-- intento de la cascada) y lo deja marcado, porque una calle de dos cuadras
+-- ordena el reparto igual de bien pero hay que poder revisarlo.
+alter table public."GV_Geo_Cliente" add column if not exists precision text not null default 'exacta';
+comment on column public."GV_Geo_Cliente".precision is
+  'exacta = número de puerta encontrado · calle = sólo la calle (OSM no tiene la altura); aproximado, revisar si el reparto lo pide · manual = puesta a mano';
+-- Ver las aproximadas:  select cod, razon_social, direccion, barrio from public."GV_Geo_Cliente" where precision = 'calle';

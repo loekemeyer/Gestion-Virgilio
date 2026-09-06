@@ -1414,6 +1414,26 @@ Camino del Buen Ayre"* (sin altura), 888 Pezzali *"La Salle 2174"* y 1821 Sendra
 
 Para agregar una corrección nueva, la receta está al pie de `sql/gv_geo_correccion.sql`.
 
+**v13.42 — quinto intento: la calle sola.** El dueño mostró en Google Maps que *"Trole 163"* existe
+(Parque Patricios, C1437DKC); es OpenStreetMap el que no tiene esa altura. Cuando los cuatro intentos
+fallan y la dirección termina en número, se pregunta por la **calle sin el número** con el barrio
+(`street=Trole&city=Parque Patricios`), y si sale queda con **`GV_Geo_Cliente.precision = 'calle'`**
+(migración `gv_geo_cliente_precision_v1342`; valores `exacta` / `calle` / `manual`). El log lo cuenta
+aparte (*"N por la calle (sin altura en OSM)"*, detalle `por_calle`). Sin barrio no se intenta: una
+calle sola sin barrio es cualquier lado. Auditarlas:
+`select cod, razon_social, direccion, barrio from public."GV_Geo_Cliente" where precision = 'calle';`
+
+**⚠ Y la verificación de barrio que hizo falta el mismo día.** La primera corrida con el quinto
+intento ubicó *"J. M. Pérez, Luján"* en **"José María Pérez de Urdininea", Ezeiza — a 50 km**. El
+`viewbox` de Nominatim es un sesgo, no un límite. Un pedido ubicado **mal** es peor que sin ubicar
+(el camión lo ordena en un lugar que no es), así que: (1) borré esa fila de `GV_Geo_Cliente` y la de
+`PPP_Geo` — las dos eran **mías, de un minuto antes**, no datos de Producción; (2) los intentos 3, 4
+y 5 (los que preguntan con menos contexto) ahora **exigen que el resultado caiga en el barrio pedido**
+(`enElBarrio`: algún componente oficial de la respuesta —suburb, city, town, county…— tiene que
+contener el barrio, sin acentos, o al revés: *"Villa Soldati"* ⊃ *"Soldati"*). Si no, se descarta con
+motivo *"cayó fuera de …"*. Los intentos 1 y 2 llevan barrio + "Buenos Aires" y ubicaron bien 47 de
+47, así que quedan como estaban.
+
 ### 3.an ✅ Las ubicaciones se llenan solas y se guardan por cód de cliente (v13.40) — 2026-09-06 domingo
 
 Dueño: *"todo tenés que tener todas las ubicaciones"*, y antes *"dale, 1 y 2"* a las dos cosas que le
