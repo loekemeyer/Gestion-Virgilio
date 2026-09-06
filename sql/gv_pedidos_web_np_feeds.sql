@@ -65,6 +65,11 @@ AS $function$
    order by p.order_id, p.np_idx;
 $function$;
 
+-- ⚠ v13.43 (2026-09-06): la versión VIGENTE de gv_pedidos_web_np_chef está en
+--   sql/gv_pedidos_web_np_chef_v1343.sql — devuelve `direccion_expreso` desde
+--   chef_customer_delivery_addresses.direccion_entrega (antes: null::text, y Gestión
+--   geocodificaba la sucursal del cliente en Río Cuarto). La de acá abajo queda como
+--   historia de la v12.94.
 CREATE OR REPLACE FUNCTION public.gv_pedidos_web_np_chef(p_dias integer DEFAULT 30)
  RETURNS TABLE(empresa text, order_id bigint, np_idx integer, cod text, razon_social text, fecha_recep date, hora_recep text, direccion text, v text, condicion_pago_code text, numero_oc text, enviado_a_compras boolean, lineas bigint, cajas numeric, items jsonb, arts text, localidad text, provincia text, zona_expreso text, nombre_expreso text, direccion_expreso text, m3 numeric, m3_parcial boolean, fecha_entrega_pactada date, np_total integer)
  LANGUAGE plpgsql

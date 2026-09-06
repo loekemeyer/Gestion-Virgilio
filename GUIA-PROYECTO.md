@@ -12,11 +12,22 @@
 > única**; no se replica. Ante la duda entre parche rápido y fix de raíz → **fix
 > de raíz**.
 >
-> Última actualización: 2026-09-06 (domingo) · Versión app al documentar: **v13.42**
+> Última actualización: 2026-09-06 (domingo) · Versión app al documentar: **v13.43**
 >
 > ⚠⚠ **Desde el lunes 2026-09-07 los operarios usan GESTIÓN, no Producción** (dueño, sábado a la
 > noche: *"el lunes van a empezar a usar GV, no más PV"*). Las tandas web viven en
 > `PPP_Web_Programacion` y Producción no las ve. URL: la de GitHub Pages de este repo.
+>
+> Nota **v13.43** (backend, LK + Virgilio) — **Los pedidos de Chef se ubican en NUESTRA entrega, no en la
+> sucursal del cliente** (dueño: *"los de Chef probablemente estés poniendo la dirección de su sucursal
+> en lugar de la dirección de entrega nuestra"*). El feed `gv_pedidos_web_np_chef` (proyecto LK)
+> devolvía `direccion` = sucursal del cliente ("I. Catolica 6- Rio Cuarto") y `direccion_expreso` =
+> `null`, siempre. Chef sí tiene el dato: `chef_customer_delivery_addresses.direccion_entrega`
+> ("Pergamino 3751" = el expreso en Soldati). Ahora: con intermediario (expreso o cliente de otra
+> provincia) `direccion_expreso` = esa entrega, igual que LK; entrega local → `direccion` = la
+> dirección limpia. Verificado sobre 60 días: 74 filas, 0 sin dirección, 44 con expreso. Además el
+> chequeo de distancia del geocodificador va en **todos** los intentos: una dirección lejos del barrio
+> nunca es punto de entrega. SQL: `sql/gv_pedidos_web_np_chef_v1343.sql`; §3.añ.
 >
 > Nota **v13.42** (backend) — **Si el mapa no tiene la altura, ubica la calle** (dueño mostró en
 > Google Maps que "Trole 163" existe; OpenStreetMap no tiene esa altura cargada). Quinto intento de la

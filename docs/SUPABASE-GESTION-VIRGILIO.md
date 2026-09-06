@@ -1443,6 +1443,24 @@ Villa Crespo, Chilavert en Lugano, Otto Krause en Tortuguitas, O'Higgins en Pila
 *"Trole 163"* no está en OSM ni como "Trole" ni como "Pasaje Trole": para ésa hace falta la
 coordenada a mano (`precision = 'manual'`), que se le pidió al dueño desde Google Maps.
 
+**v13.43 — Chef: la dirección de entrega, no la sucursal del cliente.** Dueño: *"los de Chef
+probablemente estés poniendo la dirección de su sucursal en lugar de la dirección de entrega
+nuestra"*. Exacto: `gv_pedidos_web_np_chef` (proyecto **LK**, `kwkclwhmoygunqmlegrg`) devolvía
+`direccion` = `sheets_payload.sucursal_entrega` (*"I. Catolica 6- Rio Cuarto"*) y `direccion_expreso`
+= `null::text`, siempre — así que la Edge Function no armaba el *"Exp. — …"* y Gestión geocodificaba
+Río Cuarto. Chef **sí** guarda adónde va nuestro camión: `chef_customer_delivery_addresses.
+direccion_entrega` (*"Pergamino 3751"* para Elbantonio = el expreso en Soldati; *"Hilarion De La
+Quintana 2150"* para Gifel = entrega local en San Martín). Migración
+`gv_pedidos_web_np_chef_direccion_entrega_v1343` (LK), SQL en `sql/gv_pedidos_web_np_chef_v1343.sql`:
+con **intermediario** (hay `nombre_expreso`, o la provincia no es Buenos Aires/CABA) `direccion` =
+sucursal del cliente y `direccion_expreso` = `direccion_entrega` — la Edge Function arma
+*"Exp. — Pergamino 3751 (I. Catolica 6- Rio Cuarto)"* y `gv_dir_geo_query` se queda con *"Pergamino
+3751"*; **entrega local** → `direccion` = `direccion_entrega` (la limpia) y `direccion_expreso` = null.
+Verificado sobre 60 días: 74 filas, 0 sin dirección, 44 con expreso. Para el pedido 216 ya programado
+(dirección vieja en `PPP_Web_Programacion`) se cargó una corrección → *"Pergamino 3751", Villa
+Soldati*. Y el chequeo de distancia del geocodificador pasa a **todos** los intentos: una dirección
+lejos del barrio nunca es punto de entrega, no importa cómo se preguntó.
+
 ### 3.an ✅ Las ubicaciones se llenan solas y se guardan por cód de cliente (v13.40) — 2026-09-06 domingo
 
 Dueño: *"todo tenés que tener todas las ubicaciones"*, y antes *"dale, 1 y 2"* a las dos cosas que le

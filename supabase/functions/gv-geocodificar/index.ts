@@ -138,14 +138,15 @@ async function geocodificar(dir: string, barrio: string | null) {
   const AMBA = "&viewbox=-58.80,-34.40,-58.05,-34.85";
   const base = "format=jsonv2&addressdetails=1&limit=1&countrycodes=ar";
   const bOk = barrioOk(barrio);
-  // `exigir`: los intentos 3, 4 y 5 preguntan con menos contexto (sin "Buenos Aires", o sólo la
-  // calle), así que el resultado tiene que caer en el barrio pedido o se descarta (enElBarrio).
-  // Los dos primeros ya llevan barrio + "Buenos Aires" y son los que ubicaron bien 47 de 47.
+  // `exigir`: el resultado tiene que caer a ≤ RADIO_KM del barrio pedido o se descarta. Va en TODOS
+  // los intentos (v13.43): el dueño aclaró que una dirección de otra provincia nunca es punto de
+  // entrega —se entrega al expreso en Buenos Aires—, así que un resultado lejos del barrio es
+  // siempre un error, no importa cómo se preguntó. Sin barrio no hay contra qué verificar.
   const intentos: { qs: string; precision: string; exigir: boolean }[] = [
-    { qs: base + AMBA + "&q=" + encodeURIComponent(dir + (barrio ? ", " + barrio : "") + ", Buenos Aires, Argentina"), precision: "exacta", exigir: false },
+    { qs: base + AMBA + "&q=" + encodeURIComponent(dir + (barrio ? ", " + barrio : "") + ", Buenos Aires, Argentina"), precision: "exacta", exigir: !!bOk },
   ];
   if (bOk && bOk !== String(barrio || "").trim()) {
-    intentos.push({ qs: base + AMBA + "&q=" + encodeURIComponent(dir + ", " + bOk + ", Buenos Aires, Argentina"), precision: "exacta", exigir: false });
+    intentos.push({ qs: base + AMBA + "&q=" + encodeURIComponent(dir + ", " + bOk + ", Buenos Aires, Argentina"), precision: "exacta", exigir: true });
   }
   intentos.push({ qs: base + "&q=" + encodeURIComponent(dir + (bOk ? ", " + bOk : "") + ", Argentina"), precision: "exacta", exigir: !!bOk });
   intentos.push({ qs: base + AMBA + "&street=" + encodeURIComponent(dir) + (bOk ? "&city=" + encodeURIComponent(bOk) : "") + "&country=Argentina", precision: "exacta", exigir: !!bOk });
