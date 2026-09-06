@@ -7039,7 +7039,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v13.47";
+const APP_VERSION = "v13.48";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -32690,7 +32690,7 @@ function aprLogHtml() {
   const dow = new Date().getDay();
   // fin de semana no corre: no asustar
   if (cls !== "err" && horas > 30 && dow !== 0 && dow !== 6) { cls = "err"; txt = "⚠ El armado automático no corre desde " + cuando + " (" + Math.round(horas) + " h) — avisá para que lo revisen"; }
-  return '<div class="apr-log ' + cls + '" title="' + escapeHtml("Corre a las 00:01 (lun–vie) y cada 15 min de 07:00 a 18:45. Fuente: GV_Tandas_Auto_Log.") + '">' + escapeHtml(txt) + '</div>';
+  return '<div class="apr-log ' + cls + '" title="' + escapeHtml("Corre a las 00:01 (lun–vie) y cada 15 min de 06:00 a 20:45, todos los días. Fuente: GV_Tandas_Auto_Log.") + '">' + escapeHtml(txt) + '</div>';
 }
 
 async function aprCargar() {
