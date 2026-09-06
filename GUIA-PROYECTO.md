@@ -12,11 +12,17 @@
 > única**; no se replica. Ante la duda entre parche rápido y fix de raíz → **fix
 > de raíz**.
 >
-> Última actualización: 2026-09-06 (domingo) · Versión app al documentar: **v13.52**
+> Última actualización: 2026-09-06 (domingo) · Versión app al documentar: **v13.53**
 >
 > ⚠⚠ **Desde el lunes 2026-09-07 los operarios usan GESTIÓN, no Producción** (dueño, sábado a la
 > noche: *"el lunes van a empezar a usar GV, no más PV"*). Las tandas web viven en
 > `PPP_Web_Programacion` y Producción no las ve. URL: la de GitHub Pages de este repo.
+>
+> Nota **v13.53** (front) — **BUG: las tandas web no se veían en el tablero de Programación.** Desde v12.82
+> `pppTraerWebProgramados` devuelve `fecha_entrega` ISO ("2026-09-11") y `_pppFechaKey`/`_pppFechaDate` sólo
+> entendían "dd/mm/aaaa" → clave "99999999" = "después de estos 6 días": el viernes 11 mostraba 7,5 m³ (ISIS +
+> Chango Mas) sin E01A…E07A, y el KPI decía "28 después". Ahora las dos funciones aceptan los dos formatos.
+> Test: `tests/ppp-plan-nueva.cjs` (tanda web E09A con fecha ISO cae en su día).
 >
 > Nota **v13.51** (backend) — **canilla del espejo ABIERTA** (`espejo_np_corte_*` = null) y **NP de ISIS ocultas
 > por fila** (`GV_PPP_Prog_Override.oculto`, filtrado en `gv_ppp_programacion_diaria` / `gv_ppp_base_pedidos` /

@@ -41,6 +41,12 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
     window.fetch = (url) => {
       const u = String(url);
       if (u.indexOf("gv_ppp_programacion_diaria") >= 0) return J(rows);
+      // v13.53: una tanda WEB viene con fecha_entrega ISO ("2026-09-11") desde PPP_Web_Programacion y tiene
+      // que caer en su día del tablero (antes caía en "después" y no se veía en ningún día).
+      if (u.indexOf("PPP_Web_Programacion") >= 0) return J([
+        { empresa: "lk", order_id: 1360, np_idx: 1, np: 1360, cod_cliente: "4321", razon_social: "Web Nueva SRL", direccion: "Pergamino 3751", barrio: "Soldati",
+          zona: "Zona 1 - CABA Sur", tanda: "E09A", fecha_entrega: iso(hab[2]), fecha_recep: "2026-09-05", m3: 0.3, m3_parcial: false, lineas: 3, cajas: 5 }
+      ]);
       if (u.indexOf("gv_ppp_np_valor") >= 0) return J(rows.map((x) => ({ np: x.np, valor_lista: Math.round(x.m3 * 1000000), lineas_sin_precio: 0 })));
       if (u.indexOf("PPP_Geo") >= 0) return J([
         { dir_key: "__deposito_virgilio_2788__", lat: -34.65, lng: -58.5 },
@@ -107,12 +113,12 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
     pppPlanHoja(1);
     html = document.getElementById("pppPreview").innerHTML;
     out.hoja2 = (html.match(/class="pn-day(?: |")/g) || []).length === 6 && (html.match(/pn-day empty/g) || []).length === 5 &&
-      /Hoja 2 · /.test(html) && /← Hoja 1/.test(html) && /Ver hoja 3 →/.test(html) && !/Más adelante:/.test(html) && kpi("Pedidos") === "10" && /1 en la hoja 2 · 9 después/.test(html);
+      /Hoja 2 · /.test(html) && /← Hoja 1/.test(html) && /Ver hoja 3 →/.test(html) && !/Más adelante:/.test(html) && kpi("Pedidos") === "11" && /1 en la hoja 2 · 10 después/.test(html);
     pppPlanHoja(0);
     html = document.getElementById("pppPreview").innerHTML;
-    out.hoja1Vuelve = /Próximos 6 días hábiles/.test(html) && /Más adelante:/.test(html) && kpi("Pedidos") === "10";
+    out.hoja1Vuelve = /Próximos 6 días hábiles/.test(html) && /Más adelante:/.test(html) && kpi("Pedidos") === "11";
     // v13.33: los atrasados se miran desde Resumen
-    out.tabPlanN = />🗓️ Programación \(10\)</.test(html);
+    out.tabPlanN = />🗓️ Programación \(11\)</.test(html);
     _pppTab = "resumen"; pppRenderProg();
     html = document.getElementById("pppPreview").innerHTML;
     out.resumenVenc = /ppp-res-note rep">⏰ <b>2<\/b> pedido\(s\) con fecha de entrega vencida: <b>2 sin salir → hay que reprogramar<\/b>\. /.test(html) && /pppTab\('plan'\);pppPlanAbrir\('venc'\)/.test(html);
@@ -121,6 +127,11 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
     pppPlanAbrir(_pppDateKey(hab[1]));
     html = document.getElementById("pppPreview").innerHTML;
     out.dia2 = /class="l">Camiones<\/div><div class="v">1</.test(html) && /Retira en fábrica/.test(html) && !/Orden de carga/.test(html);
+    // v13.53: la tanda web (fecha ISO) está en el día 3 con su etiqueta LK 1360
+    pppPlanVolver(); pppPlanAbrir(_pppDateKey(hab[2]));
+    html = document.getElementById("pppPreview").innerHTML;
+    out.webDia3 = /Tanda E09A/.test(html) && /LK 1360/.test(html) && /Web Nueva SRL/.test(html);
+    pppPlanVolver();
     // v13.07 (idea 7317): camión = número de tanda; una tanda que mezcla zonas vecinas se etiqueta "Zona 1 + Zona 2".
     const cams = _pppCamiones([
       { np: "1", tanda: "E01A", m3: 0.3, zona: "Zona 1 - CABA Sur", barrio: "Barracas" },
@@ -139,12 +150,13 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
   });
 
   const checks = [
-    ["v13.33: KPI pedidos 10 = programados sin los vencidos, igual que la solapa", r.kpiPed === "10" && r.kpiPedSub === "9 en estos 6 días · 1 después" && r.tabPlanN === true],
-    ["KPI camiones 5 (por n° de tanda y día; Retira no cuenta)", r.kpiCam === "5"],
-    ["KPI volumen 20,4 m³",                                   r.kpiVol === "20,4 m³"],
+    ["v13.33/v13.53: KPI pedidos 11 (10 ISIS + 1 web) = programados sin los vencidos, igual que la solapa", r.kpiPed === "11" && r.kpiPedSub === "10 en estos 6 días · 1 después" && r.tabPlanN === true],
+    ["KPI camiones 6 (por n° de tanda y día; Retira no cuenta; +1 web)", r.kpiCam === "6"],
+    ["KPI volumen 20,7 m³ (20,4 ISIS + 0,3 web)",             r.kpiVol === "20,7 m³"],
     ["KPI valor $ 20.400.000 (corto: $20,4 M en celular)",  r.kpiVal === "$ 20.400.000|$20,4 M"],
     ["v13.33: Atrasados fuera de Programación, en Resumen con acceso a la lista", r.kpiAt === null && r.resumenVenc === true],
-    ["6 tarjetas de día, 2 vacías",                           r.dias === 6 && r.vacios === 2],
+    ["6 tarjetas de día, 1 vacía (v13.53: la web llena el día 3)", r.dias === 6 && r.vacios === 1],
+    ["v13.53: la tanda web con fecha ISO se ve en su día (Tanda E09A · LK 1360)", r.webDia3 === true],
     ["v13.33: sin carteles ni tarjeta de Atrasados en Programación", r.alerta === true],
     ["HOY sólo si hoy es hábil",                              r.hoyBadge === true],
     ["día 1: dos camiones por zona con $",                    r.dia1 === true],

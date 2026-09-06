@@ -7039,7 +7039,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v13.52";
+const APP_VERSION = "v13.53";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -27839,8 +27839,12 @@ function pppZonaCell(p) {
 /* Encabezado y fila <tr> reusados por todas las secciones de la PPP. */
 const PPP_THEAD = '<thead><tr><th>Tanda</th><th>Cód Cli</th><th>N° Pedido</th><th>Fecha</th><th>Razón Social</th><th class="num">m³</th><th>Localidad</th><th>Fecha Entrega</th><th>Zona</th><th>Listo FC</th><th>Entregado</th><th></th></tr></thead>';
 function _pppTieneTanda(p) { const t = (p.tanda || "").trim(); return !!t && t !== "—"; }
-function _pppFechaKey(s) { const m = /^(\d{1,2})\/(\d{1,2})\/(\d{2,4})/.exec(String(s || "")); if (!m) return "99999999"; let y = m[3]; if (y.length === 2) y = "20" + y; return y + String(m[2]).padStart(2, "0") + String(m[1]).padStart(2, "0"); }
-function _pppFechaDate(s) { const m = /^(\d{1,2})\/(\d{1,2})\/(\d{2,4})/.exec(String(s || "")); if (!m) return null; let y = +m[3]; if (y < 100) y += 2000; const d = new Date(y, +m[2] - 1, +m[1]); return isNaN(d.getTime()) ? null : d; }
+/* v13.53 — aceptan "dd/mm/aaaa" (ISIS, pasado por _pppSupaFecha) Y "aaaa-mm-dd[ ...]" (las tandas web
+   vienen crudas de PPP_Web_Programacion desde v12.82). Sin esto una NP web caía en la clave "99999999"
+   = "después de estos 6 días" y el tablero de Programación no la mostraba en ningún día (dueño,
+   domingo 06/09: "no puede ser eso" — el viernes 11 mostraba 7,5 m³ sin E01A…E07A). */
+function _pppFechaKey(s) { s = String(s || ""); let m = /^(\d{4})-(\d{2})-(\d{2})/.exec(s); if (m) return m[1] + m[2] + m[3]; m = /^(\d{1,2})\/(\d{1,2})\/(\d{2,4})/.exec(s); if (!m) return "99999999"; let y = m[3]; if (y.length === 2) y = "20" + y; return y + String(m[2]).padStart(2, "0") + String(m[1]).padStart(2, "0"); }
+function _pppFechaDate(s) { s = String(s || ""); let m = /^(\d{4})-(\d{2})-(\d{2})/.exec(s); if (m) { const d = new Date(+m[1], +m[2] - 1, +m[3]); return isNaN(d.getTime()) ? null : d; } m = /^(\d{1,2})\/(\d{1,2})\/(\d{2,4})/.exec(s); if (!m) return null; let y = +m[3]; if (y < 100) y += 2000; const d = new Date(y, +m[2] - 1, +m[1]); return isNaN(d.getTime()) ? null : d; }
 function _pppM3Sum(arr) { return arr.reduce(function (s, p) { return s + (Number(p.m3) || 0); }, 0); }
 /* Texto plano → argumento seguro para meterlo entre comillas simples DENTRO de un
    atributo onclick: primero se escapa para JS (\ y ') y recién después para HTML. El
