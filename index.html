@@ -6979,7 +6979,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v13.19";
+const APP_VERSION = "v13.20";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -29445,8 +29445,9 @@ function _pppCamiones(ped) {
   for (const p of ped) {
     const z = _pppZonaPed(p);
     const ruta = _pppRutaZona(z);
-    const tn = (ruta === "ret" || ruta === "sup") ? null : _pppTandaNum(p.tanda);
-    const key = ruta === "ret" ? "ret" : (ruta === "sup" ? "sup" : (tn != null ? "n" + tn : "z" + z));
+    const tn = ruta === "ret" ? null : _pppTandaNum(p.tanda);
+    // v13.20 (dueño): "2 súper diferentes, 2 camiones diferentes" → un súper por n° de tanda.
+    const key = ruta === "ret" ? "ret" : (ruta === "sup" ? (tn != null ? "s" + tn : "sup") : (tn != null ? "n" + tn : "z" + z));
     if (!by.has(key)) by.set(key, { key: key, tn: tn, zona: z, zonas: [], ruta: ruta, ped: [], tandas: [], m3: 0, valor: 0, sinValor: 0, est: { armado: 0, curso: 0, sin: 0 } });
     const c = by.get(key);
     if (c.zonas.indexOf(z) < 0) c.zonas.push(z);

@@ -12,11 +12,15 @@
 > única**; no se replica. Ante la duda entre parche rápido y fix de raíz → **fix
 > de raíz**.
 >
-> Última actualización: 2026-09-06 (domingo, noche) · Versión app al documentar: **v13.19**
+> Última actualización: 2026-09-06 (domingo, noche) · Versión app al documentar: **v13.20**
 >
 > ⚠⚠ **Desde el lunes 2026-09-07 los operarios usan GESTIÓN, no Producción** (dueño, sábado a la
 > noche: *"el lunes van a empezar a usar GV, no más PV"*). Las tandas web viven en
 > `PPP_Web_Programacion` y Producción no las ve. URL: la de GitHub Pages de este repo.
+>
+> Nota **v13.20** (front) — Tablero: **un camión por cada Súper con distinto n° de tanda** (dueño:
+> *"2 súper diferentes, 2 camiones diferentes"*): D59A y D61A el mismo día son "Camión 2 · Súper" y
+> "Camión 3 · Súper", no un bloque "Súper" único. Sin n° de tanda se agrupan como antes.
 >
 > Nota **v13.19** (front) — Tablero: **el Súper cuenta como camión** (dueño: *"si hay Súper, el
 > Súper va sí o sí en otro camión (2 camiones)"*). Se numera en el orden de la vista ("Camión 2 ·
