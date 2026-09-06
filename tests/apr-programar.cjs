@@ -127,6 +127,7 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
   chk((r.der.match(/apr-dia-isis/g) || []).length === 1, "v13.18: sólo el día con ISIS lleva la línea");
   // v13.21: el chip dice qué día sale, no cuándo llegó (eso queda en el title)
   chk(/apr-chip-sal man" title="Llegó el 2026-08-20\. Ya hay camión a la zona 3: D60A">🚚 hay camión el mar 8\/9 · programalo</.test(r.izq), "v13.32: chip .hay camión el mar 8/9 · programalo. con el motivo en el title");
+  chk(/apr-porque">Ninguno tiene tanda todavía · <b>1<\/b> de zona manual: los programás vos</.test(r.izq), "v13.34: la línea dice por qué siguen en la lista");
   chk(!/<span class="apr-chip">2026-08-20<\/span>/.test(r.izq), "v13.21: la fecha de recepción ya no es un chip");
   chk(/apr-chip-sal esp"[^>]*>🚚 …</.test(r.izq), "v13.21: sin respuesta todavía → '🚚 …'");
   chk(r.izqAbierta.includes("bloque 1/3"),     "expandida muestra los bloques (v12.92: \"LK 1201 · bloque 1/3\")");

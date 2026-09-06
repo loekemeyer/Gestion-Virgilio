@@ -742,6 +742,9 @@ button {
 .apr-wrap{ display:grid; grid-template-columns: 1fr 1fr 320px; gap:12px; align-items:start; }
 .apr-col{ background:#f8fafc; border:1px solid #e2e8f0; border-radius:10px; padding:10px; min-width:0; }
 .apr-col-t{ font-size:14px; font-weight:800; color:#0f172a; margin-bottom:8px; }
+/* v13.34: por qué cada grupo sigue en la lista (el cartel verde dice "N programadas" y confunde) */
+.apr-porque{ font-size:11.5px; line-height:1.45; color:#475569; background:#f1f5f9; border:1px solid #e2e8f0; border-radius:8px; padding:6px 8px; margin:-2px 0 8px; }
+.apr-porque b{ color:#0f172a; }
 .apr-q{ width:100%; box-sizing:border-box; padding:7px 10px; border:1px solid #cbd5e1; border-radius:8px; font-size:13px; margin-bottom:8px; }
 .apr-scroll{ max-height:62vh; overflow-y:auto; display:flex; flex-direction:column; gap:7px; }
 .apr-vacio{ color:#94a3b8; font-size:13px; padding:14px 4px; text-align:center; }
@@ -7027,7 +7030,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v13.33";
+const APP_VERSION = "v13.34";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -25606,7 +25609,10 @@ function openPPP() {
   //   3. lo pesado que ninguna solapa muestra al abrir (semáforo de góndola = base de
   //      picking + saldos + PKC, Entregados, meta, alertas) va DESPUÉS de que llegó lo de
   //      arriba. Las solapas siguen refrescando lo suyo al tocarlas (pppTab).
-  if (_pppTab === "apr" && typeof pwebLkToken === "function") { try { pwebLkToken().catch(function () {}); } catch (_e) {} }
+  // v13.34 — decía `_pppTab === "apr"` y la solapa se llama "prog": el precalentamiento del
+  // puente a LK NUNCA corría, así que la cadena larga (Edge Function + login) arrancaba recién
+  // dentro de aprCargar. Por eso "A Programar" tardaba ~5 s en mostrar algo.
+  if (_pppTab === "prog" && typeof pwebLkToken === "function") { try { pwebLkToken().catch(function () {}); } catch (_e) {} }
   pppRenderProg();
   const _despues = function () {
     try { pppChkAutoLoad(true); } catch (_e) {}      // semáforo de góndola (base + saldos + picking pendiente)
@@ -32548,7 +32554,9 @@ function aprLogHtml() {
   const fo = l.fecha_objetivo ? (function () { const q = String(l.fecha_objetivo).slice(0, 10).split("-"); return q[2] + "/" + q[1]; })() : "";
   const est = String(l.estado || "");
   let cls = "ok", txt;
-  if (est === "ok" || est === "intradia_ok") txt = "🤖 Último armado automático: " + cuando + " · " + (l.tandas || 0) + " tanda" + (l.tandas === 1 ? "" : "s") + (fo ? " para el " + fo : "") + " · " + (l.np_programadas || 0) + " NP programadas";
+  // v13.34: "18 NP programadas" con 4 pedidos abajo se leía como que ésos también estaban
+  // programados. Se aclara que lo de esa corrida ya no está en la lista.
+  if (est === "ok" || est === "intradia_ok") txt = "🤖 Último armado automático: " + cuando + " · " + (l.tandas || 0) + " tanda" + (l.tandas === 1 ? "" : "s") + (fo ? " para el " + fo : "") + " · " + (l.np_programadas || 0) + " NP programadas (ya salieron de esta lista)";
   else if (est === "intradia_sin_umbral") { cls = "gris"; txt = "🤖 Armado automático: " + cuando + " · nada pendiente para armar"; }
   else if (est === "salteada") { cls = "gris"; txt = "🤖 Armado automático: " + cuando + " · salteado (" + (l.motivo || "no hábil") + ")"; }
   else { cls = "err"; txt = "⚠ El armado automático FALLÓ " + cuando + ": " + (l.motivo || est) + " — avisá para que lo revisen"; }
@@ -32581,7 +32589,6 @@ async function aprCargar() {
     // izquierda.
     _apr.pedidosTodos = peds;
     _apr.pedidos = peds.filter(function (p) { return !fuera.has(String(p.order_id)); });
-    await aprCargarSalida();   // v13.21: qué día sale cada uno (backend)
 
     _apr.tandas = tandas;
     _apr.items = {};
@@ -32594,6 +32601,10 @@ async function aprCargar() {
   // v13.16: sólo redibujar si el supervisor sigue en "A Programar" (la carga tarda ~3 s;
   // si cambió de solapa mientras tanto, pisaba la pantalla con esta).
   if (_pppTab === "prog") aprRender();
+  // v13.34 — el día de salida (gv_ppp_web_dia_salida) es UNA vuelta de red más y sólo llena
+  // los chips. Antes se esperaba antes de dibujar nada; ahora la lista se ve primero y los
+  // chips ("🚚 …") se completan cuando llega.
+  if (!_apr.err) aprCargarSalida().then(function () { if (_pppTab === "prog") aprRender(); });
 }
 
 /* ── Acciones ──────────────────────────────────────────────────────────── */
@@ -32792,6 +32803,27 @@ function aprRender() {
   });
 }
 
+/* v13.34 (dueño: "siguen figurando ahí pedidos que según eso ya fueron programados") — el cartel
+   verde dice "18 NP programadas" y abajo quedan pedidos: parece que sobran. No sobran: NINGUNO de
+   esta lista tiene tanda. Esta línea dice por qué cada grupo sigue acá, para no tener que abrir
+   tarjeta por tarjeta. Los motivos salen de gv_ppp_web_dia_salida (backend). */
+function aprPorQueHtml(lista) {
+  if (!_apr.listo || !lista.length) return "";
+  const s = _apr.salida || {};
+  let auto = 0, manual = 0, mano = 0;
+  for (const p of lista) {
+    const m = (s[p.order_id] || {}).motivo || "";
+    if (m === "job" || m === "intradia") auto++;
+    else if (m === "camion" || m === "sin_camion") manual++;
+    else if (m === "retira" || m === "super" || m === "sin_zona") mano++;
+  }
+  if (!auto && !manual && !mano) return "";
+  const partes = [];
+  if (auto)   partes.push('<b>' + auto + '</b> los arma solo el automático (esperan día con cupo)');
+  if (manual) partes.push('<b>' + manual + '</b> de zona manual: los programás vos');
+  if (mano)   partes.push('<b>' + mano + '</b> retira o súper: siempre a mano');
+  return '<div class="apr-porque">Ninguno tiene tanda todavía · ' + partes.join(' · ') + '</div>';
+}
 function aprColPedidos() {
   const q = _apr.q;
   let lista = _apr.pedidos;
@@ -32800,6 +32832,7 @@ function aprColPedidos() {
   });
   let h = '<div class="apr-col apr-col-nps">' +
     '<div class="apr-col-t">📋 Pedidos a programar <b>(' + lista.length + ')</b></div>' +
+    aprPorQueHtml(lista) +
     '<input class="apr-q" type="search" placeholder="🔎 cliente, zona, localidad…" value="' + escapeHtml(_apr.q) + '" oninput="aprBuscar(this.value)">' +
     '<div class="apr-scroll">';
   if (!lista.length) {

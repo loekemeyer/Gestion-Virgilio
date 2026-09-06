@@ -1384,6 +1384,34 @@ es de Chef y pisa al LK 217): cuando Gestión alimente el tracking, escribir el 
 una función `gv_*` y pedir columna `empresa` en PaginaLK. Y el Excel ISIS de Facturación manda
 `N_Pedido` contador (no el id), como el mail: ISIS numera 98xxx por su cuenta.
 
+### 3.am ✅ El calendario tardaba 1,4 s: el cupo se calculaba 21 veces (v13.34) — 2026-09-06 domingo
+
+Dueño: *"tarda 5 seg en cargarse los datos, ¿por qué?"*. Midiendo con `explain analyze`, el grueso
+estaba en **`gv_ppp_web_calendario(hoy, hoy+20)` = 1.357 ms**. No era ninguna tabla grande: llamaba a
+`gv_ppp_web_cupo(dia)` **una vez por día** (21 llamadas) y cada llamada evaluaba
+`gv_ppp_web_pickers_tipicos()` **dos veces** (una en la condición del `case`, otra en el resultado) →
+42 escaneos de 60 días de `Registros_Produccion_Virgilio`.
+
+Arreglo, sin duplicar la regla: la fórmula del cupo pasa a vivir en **`gv_ppp_web_cupo_dias(desde,
+hasta)`** (nueva, `security definer`, grants a `authenticated`/`service_role`), que resuelve pickers y
+config **una sola vez** para todo el rango y aplica la fórmula por día; **`gv_ppp_web_cupo(fecha)`**
+queda como envoltorio de un día, así el job, el intradía, `gv_ppp_web_dia_salida` y
+`gv_ppp_web_proximo_dia_entrega` siguen llamando lo mismo. Los CTE van `materialized` a propósito: sin
+eso Postgres inlinea la subconsulta y vuelve a contar los pickers por fila, que es el bug.
+
+**Medido**: calendario 1.357 ms → **22,8 ms** (60×); `gv_ppp_web_dia_salida` (4 pedidos) 99 ms → 60 ms.
+**Impacto verificado**: foto de `gv_ppp_web_calendario(hoy, hoy+40)` antes del cambio en una tabla
+temporal y `except` en los dos sentidos después → **0 y 0** sobre 41 filas; tabla temporal borrada.
+Producción no usa ninguna de las tres funciones (grep en el repo: 0 hits).
+SQL: `sql/gv_ppp_web_cupo_dias.sql`. Migración `gv_ppp_web_cupo_dias_calendario_rapido_v1334`.
+**Rollback**: reaplicar `sql/gv_ppp_web_cupo_dotacion.sql` + `sql/gv_ppp_web_calendario.sql` y
+`drop function public.gv_ppp_web_cupo_dias(date, date);`.
+
+Del lado del front, en la misma versión: (a) `openPPP()` preguntaba por `_pppTab === "apr"` y la solapa
+se llama **`"prog"`**, así que el precalentamiento del puente a LK (Edge Function + login, la cadena
+más larga) **nunca corría** — arrancaba recién dentro de `aprCargar`; (b) `aprCargar` esperaba a
+`gv_ppp_web_dia_salida` antes de dibujar nada: ahora dibuja la lista y completa los chips cuando llega.
+
 ### 3.al ✅ Cron de Chef apagado (v13.31) — 2026-09-06 domingo
 
 Dueño: *"llegó el mail automático de Chef"* → *"mandame SQL para que frene el mandado de mails"*. En el

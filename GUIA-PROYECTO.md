@@ -12,11 +12,22 @@
 > única**; no se replica. Ante la duda entre parche rápido y fix de raíz → **fix
 > de raíz**.
 >
-> Última actualización: 2026-09-06 (domingo) · Versión app al documentar: **v13.33**
+> Última actualización: 2026-09-06 (domingo) · Versión app al documentar: **v13.34**
 >
 > ⚠⚠ **Desde el lunes 2026-09-07 los operarios usan GESTIÓN, no Producción** (dueño, sábado a la
 > noche: *"el lunes van a empezar a usar GV, no más PV"*). Las tandas web viven en
 > `PPP_Web_Programacion` y Producción no las ve. URL: la de GitHub Pages de este repo.
+>
+> Nota **v13.34** (backend + front) — **"A Programar" abría en ~5 s** (dueño: *"tarda 5 seg en
+> cargarse los datos, ¿por qué?"*). Tres causas, las tres arregladas: (1) `gv_ppp_web_calendario`
+> pedía el cupo **día por día** y cada pedido contaba los pickers **dos veces** → 1.357 ms; ahora la
+> fórmula vive en `gv_ppp_web_cupo_dias(desde, hasta)` y sale en **22,8 ms** (mismas filas, verificado
+> con `except`); (2) `openPPP()` preguntaba por la solapa `"apr"` y se llama `"prog"`, así que el
+> precalentamiento del puente a LK **nunca corría**; (3) `aprCargar` esperaba el día de salida antes de
+> dibujar — ahora dibuja la lista y completa los chips después. Y para la confusión de *"siguen
+> figurando pedidos que ya fueron programados"*: el cartel verde aclara **"(ya salieron de esta lista)"**
+> y arriba de la lista hay una línea que dice **por qué** sigue cada grupo ("Ninguno tiene tanda todavía
+> · N los arma solo el automático · N de zona manual: los programás vos · N retira o súper"). §3.am.
 >
 > Nota **v13.33** (front) — **Los atrasados salen de "Programación"** (dueño: *"los 48 atrasados no
 > deben aparecer en Programación… es solamente un dato para que lo revise alguien de gerencia"*). Se
