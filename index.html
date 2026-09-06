@@ -755,6 +755,12 @@ button {
 .apr-card-d{ display:flex; flex-wrap:wrap; gap:5px; margin-top:5px; }
 .apr-chip{ font-size:11.5px; background:#f1f5f9; color:#475569; border-radius:999px; padding:2px 8px; font-weight:600; }
 .apr-chip-z{ background:#e0edff; color:#1e40af; }
+/* idea 5162: interruptores del pipeline web en Configuración */
+.pweb-cfg-tbl{ width:100%; border-collapse:collapse; font-size:13px; }
+.pweb-cfg-tbl td{ padding:5px 8px; border-bottom:1px solid #e2e8f0; vertical-align:top; }
+.pweb-cfg-tbl td.k{ font-family:ui-monospace,Menlo,monospace; font-size:11px; color:#94a3b8; text-align:right; white-space:nowrap; }
+.pweb-cfg-nota{ margin-top:6px; font-size:11.5px; color:#64748b; }
+@media (max-width:640px){ .pweb-cfg-tbl td.k{ display:none; } }
 /* v13.21: qué día sale el pedido */
 .apr-chip-sal{ background:#dcfce7; color:#166534; font-weight:800; }
 .apr-chip-sal.hoy{ background:#166534; color:#fff; }
@@ -4322,6 +4328,11 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
         <button class="sup-action-btn" onclick="cfgGo(openPppSupers)" title="Agregar/quitar clientes súper (salen en camión propio)"><span class="sup-ico">🛒</span><span>Clientes súper</span></button>
         <button class="sup-action-btn" onclick="cfgGo(pppConnectPdfDir)" title="Conectar las carpetas con los PDF de ISIS (ej. X:\PDF_ISIS y X:\PDF_ISISCHEF). Una por vez. Necesita Chrome/Edge en PC."><span class="sup-ico">🖨️</span><span>Carpeta(s) PDF de ISIS</span></button>
         <button class="sup-action-btn" onclick="cfgGo(openZonasMapa)" title="Geocodifica las direcciones y las muestra en un mapa por zona, marcando desajustes"><span class="sup-ico">📍</span><span>Mapa de zonas</span></button>
+      </div>
+      <!-- idea 5162: los interruptores del pipeline web, visibles (sólo lectura; se cambian por SQL a pedido del dueño) -->
+      <div class="sup-cfg" id="pwebCfgRow" style="max-width:none;margin:16px auto 0;">
+        <div class="sup-cfg-top"><span class="sup-cfg-t">🗓️ Pipeline web (PPP_Web_Config)</span></div>
+        <div class="sup-cfg-hint" id="pwebCfgBody">Cargando…</div>
       </div>
       <div class="sup-cfg" id="ssgSwitchRow" style="max-width:none;margin:16px auto 0;">
         <div class="sup-cfg-top">
@@ -30185,6 +30196,33 @@ function openConfiguracion() {
   const ov = document.getElementById("configOverlay");
   if (ov) ov.classList.add("show");
   try { loadSsgSwitch(); } catch (_e) {}
+  try { loadPwebCfg(); } catch (_e) {}   // idea 5162
+}
+/* idea 5162 — los interruptores del pipeline web, visibles en Configuración. Sólo lectura: cambiarlos
+   es una decisión del dueño y se hace por SQL (PPP_Web_Config), acá se ve qué quedó prendido. */
+const PWEB_CFG_ITEMS = [
+  ["dias_anticipacion_min",  "Anticipación mínima",       function (v) { return v == null ? "—" : (Number(v) === 0 ? "0 · hoy / mañana" : Number(v) + " días hábiles"); }],
+  ["cupo_por_dotacion",      "Cupo por dotación",         function (v) { return Number(v) === 1 ? "sí · pickers típicos × m³ por picker" : "no · fijo m3_max_dia"; }],
+  ["cupo_m3_por_picker",     "m³ por picker y día",       function (v) { return v == null ? "—" : String(Number(v)).replace(".", ",") + " m³"; }],
+  ["m3_max_dia",             "Cupo fijo (si no hay dotación)", function (v) { return v == null ? "—" : String(Number(v)).replace(".", ",") + " m³"; }],
+  ["zonas_automaticas",      "Zonas que se arman solas",  function (v, t) { return t || "—"; }],
+  ["intradia_umbral_m3",     "Umbral intradía",           function (v) { return v == null ? "—" : (Number(v) <= 0.001 ? "apenas hay algo pendiente" : String(Number(v)).replace(".", ",") + " m³"); }],
+  ["intradia_corte_hora",    "Corte para armar 'hoy'",    function (v, t) { return t || "12:00"; }],
+  ["sectores_activos",       "Tandas por cercanía (sectores)", function (v) { return Number(v) === 1 ? "sí" : "no · regla por grupo de zona"; }],
+  ["numeracion_activa",      "Numeración de NP web",      function (v) { return Number(v) === 1 ? "prendida" : "APAGADA"; }],
+  ["excluir_enviados_a_isis","Excluir lo enviado a ISIS por mail", function (v) { return Number(v) === 1 ? "sí" : "no"; }]
+];
+async function loadPwebCfg() {
+  const box = document.getElementById("pwebCfgBody"); if (!box) return;
+  try {
+    const r = await fetch(SUPABASE_URL + "/rest/v1/PPP_Web_Config?select=clave,valor,valor_texto&limit=200", { headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY }, cache: "no-store" });
+    if (!r.ok) throw new Error("HTTP " + r.status);
+    const by = {}; (await r.json()).forEach(function (x) { by[x.clave] = x; });
+    box.innerHTML = '<table class="pweb-cfg-tbl">' + PWEB_CFG_ITEMS.map(function (it) {
+      const x = by[it[0]]; const val = x ? it[2](x.valor, x.valor_texto) : "—";
+      return '<tr><td>' + escapeHtml(it[1]) + '</td><td><b>' + escapeHtml(val) + '</b></td><td class="k">' + escapeHtml(it[0]) + '</td></tr>';
+    }).join("") + '</table><div class="pweb-cfg-nota">Se cambian por SQL (tabla PPP_Web_Config), a pedido del dueño. Detalle en docs/SUPABASE-GESTION-VIRGILIO.md.</div>';
+  } catch (e) { box.textContent = "No se pudo leer la configuración (" + (e && e.message ? e.message : e) + ")."; }
 }
 function closeConfiguracion() {
   const ov = document.getElementById("configOverlay");
