@@ -12,11 +12,20 @@
 > única**; no se replica. Ante la duda entre parche rápido y fix de raíz → **fix
 > de raíz**.
 >
-> Última actualización: 2026-09-06 (domingo) · Versión app al documentar: **v13.36**
+> Última actualización: 2026-09-06 (domingo) · Versión app al documentar: **v13.37**
 >
 > ⚠⚠ **Desde el lunes 2026-09-07 los operarios usan GESTIÓN, no Producción** (dueño, sábado a la
 > noche: *"el lunes van a empezar a usar GV, no más PV"*). Las tandas web viven en
 > `PPP_Web_Programacion` y Producción no las ve. URL: la de GitHub Pages de este repo.
+>
+> Nota **v13.37** (front) — **Abreviaturas de los súper** (dueño). Por código: **801 → Coto**,
+> **1651 (Inc Sociedad Anonima) → Carrefour**, **771 (S.A.Imp Y Exp De La Patagonia) → La Anónima**,
+> **2444 (CENCOSUD S.A.) → Jumbo**. Viven en `PPP_SUPER_ALIAS` (index.html), no sólo en el seed: la
+> lista de clientes súper se guarda en el `localStorage` de cada dispositivo, así que hay una
+> migración (`_pppSupersMigrar`) que pisa el nombre guardado **sólo si es el viejo**
+> (`PPP_SUPER_LEGACY`) — si el supervisor le puso otro a mano, se respeta — y agrega los códigos que
+> falten. Las filas viejas de ISIS sin cód se reconocen por la razón social larga. **Sin abreviatura
+> todavía: 2686 Dorinka S.R.L y 4263 Matiz SA** (esperando al dueño).
 >
 > Nota **v13.36** (front) — **El orden de carga va por CÓD de cliente** (dueño: *"esto ya te pedí que
 > pongas el cód cliente, no la localidad"*). Los chips decían `1º Rafael Calzada`, `5º Avellaneda`,
