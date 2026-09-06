@@ -1431,8 +1431,9 @@ intento ubicó *"J. M. Pérez, Luján"* en **"José María Pérez de Urdininea",
 y 5 (los que preguntan con menos contexto) ahora **exigen que el resultado caiga cerca del barrio
 pedido**. La primera verificación fue por nombre (¿algún componente de la respuesta dice "Luján"?) y
 **también falló**: en Laferrere hay un barrio *"Villa Luján"* y con eso pasó. La que quedó es
-**geográfica**: se ubica el barrio pedido una vez por corrida (`centroBarrio`, con cache y con
-", Buenos Aires" para que "Luján" no sea Luján de Cuyo) y el resultado tiene que estar a **≤ 20 km**
+**geográfica**: se ubica el barrio pedido una vez por corrida (`centroBarrio`, con cache, por
+búsqueda **estructurada** `city=` + `state=Buenos Aires` — la búsqueda libre "Luján, Buenos Aires"
+devolvía algo a 24 km de la ciudad: un río o un barrio que se llama así) y el resultado tiene que estar a **≤ 20 km**
 de ese centro (`RADIO_KM`; un partido grande del GBA cabe). Si el barrio no se puede ubicar, no hay
 contra qué verificar y el intento se descarta: **falla cerrado**. Motivo en el log: *"cayó a N km de
 …"*. Los intentos 1 y 2 llevan barrio + "Buenos Aires" y ubicaron bien 47 de 47, así que quedan como

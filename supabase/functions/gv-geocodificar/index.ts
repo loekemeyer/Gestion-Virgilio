@@ -94,8 +94,11 @@ async function centroBarrio(barrio: string) {
   const k = plano(barrio);
   if (_centros.has(k)) return _centros.get(k)!;
   await new Promise((r) => setTimeout(r, ESPERA_MS));   // es una llamada más a Nominatim: 1 por segundo
-  // con "Buenos Aires" y el sesgo al AMBA: "Luján, Argentina" a secas puede ser Luján de Cuyo (Mendoza)
-  const res = await nominatim("format=jsonv2&limit=1&countrycodes=ar&viewbox=-58.80,-34.40,-58.05,-34.85&q=" + encodeURIComponent(barrio + ", Buenos Aires, Argentina"));
+  // Búsqueda ESTRUCTURADA (city + state), no libre: "Luján, Argentina" a secas puede ser Luján de
+  // Cuyo (Mendoza), un río o un barrio que se llame así. Con city= sólo devuelve la localidad.
+  // Un barrio de CABA (Flores, Parque Patricios) también sale por city=: Nominatim lo resuelve
+  // como suburb de Buenos Aires.
+  const res = await nominatim("format=jsonv2&limit=1&countrycodes=ar&viewbox=-58.80,-34.40,-58.05,-34.85&city=" + encodeURIComponent(barrio) + "&state=" + encodeURIComponent("Buenos Aires") + "&country=Argentina");
   const c = res.c ? { lat: res.c.lat, lng: res.c.lng } : null;
   _centros.set(k, c);
   return c;
