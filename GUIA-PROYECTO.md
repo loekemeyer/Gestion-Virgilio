@@ -12,11 +12,26 @@
 > única**; no se replica. Ante la duda entre parche rápido y fix de raíz → **fix
 > de raíz**.
 >
-> Última actualización: 2026-09-06 (domingo) · Versión app al documentar: **v13.37**
+> Última actualización: 2026-09-06 (domingo) · Versión app al documentar: **v13.38**
 >
 > ⚠⚠ **Desde el lunes 2026-09-07 los operarios usan GESTIÓN, no Producción** (dueño, sábado a la
 > noche: *"el lunes van a empezar a usar GV, no más PV"*). Las tandas web viven en
 > `PPP_Web_Programacion` y Producción no las ve. URL: la de GitHub Pages de este repo.
+>
+> Nota **v13.38** (front) — **El Mapa de zonas ubica también lo web y entiende las direcciones de
+> expreso** (dueño: *"todo tenés que tener todas las ubicaciones"*). Estado al 06/09: de **54
+> direcciones programadas, 43 sin ubicación**; `PPP_Geo` tiene 118 filas, todas de Nominatim, la
+> última del **21/08** — el geocodificador sólo corre cuando alguien abre 📍 Mapa de zonas y toca
+> "Geocodificar faltantes". Dos causas arregladas: (1) `_zgFetchAddrs` leía **sólo**
+> `gv_ppp_programacion_diaria`, así que las direcciones de los pedidos de la página no se
+> geocodificaban nunca — ahora lee ISIS **y** `PPP_Web_Programacion`; (2) las direcciones de expreso
+> (`"Exp. Arnes — AUSTRALIA 2959, Barracas (Rivadavia 3663- Mar Del Plata)"`) no las encontraba: el
+> nombre del expreso adelante y el domicilio final del cliente entre paréntesis (otra provincia)
+> ensuciaban la consulta. `_zgDirQuery()` las limpia **sólo para preguntar**; la clave de `PPP_Geo`
+> sigue siendo la dirección original, así que el orden de carga la encuentra igual.
+> Test: `tests/zg-geo-web-expreso.cjs`. **Pendiente de decisión del dueño**: que esto corra solo
+> (Edge Function + cron) y que la ubicación se guarde por **cód de cliente** y no por texto de
+> dirección — hoy un tipeo distinto en ISIS crea una clave nueva y la ubicación se "pierde".
 >
 > Nota **v13.37** (front) — **Abreviaturas de los súper** (dueño). Por código: **801 → Coto**,
 > **1651 (Inc Sociedad Anonima) → Carrefour**, **771 (S.A.Imp Y Exp De La Patagonia) → La Anónima**,

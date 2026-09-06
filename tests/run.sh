@@ -284,3 +284,6 @@ PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node te
 
 echo "== mejoras-v1299 (7953 confirmar cierre absurdo · 1257 hueco vs eventos de detalle · 6092 Cajas Pedidas 0 = —) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/mejoras-v1299.cjs
+
+echo "== zg-geo-web-expreso (v13.38: el mapa de zonas ubica también lo web y limpia las direcciones de expreso) =="
+PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/zg-geo-web-expreso.cjs
