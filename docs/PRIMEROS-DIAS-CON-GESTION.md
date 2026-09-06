@@ -55,9 +55,10 @@ web llegue al depósito. Cupo diario = pickers típicos × 3 m³ (hoy 2 → 6), 
 
 | solapa | qué hace | qué mirar |
 |---|---|---|
-| **A Programar** | Pedidos de la página (LK y Chef) que todavía no tienen tanda. Cada tarjeta dice **"🚚 sale vie 11/9"** (o "retira", "súper: a mano", "sin camión previsto"). | Zonas 1/2/3 se arman solas (00:01 y cada 15 min si juntan 0,80 m³). Zonas 4/5/6, Súper y Retira **a mano**: "+ Nueva tanda vacía", arrastrar pedidos, arrastrar la tanda a un día. **El arrastre sólo funciona en la compu.** |
+| **A Programar** | Pedidos de la página (LK y Chef) que **todavía no tienen tanda**: nada de acá está programado. Cada tarjeta dice qué va a pasar: **"🤖 se arma solo → vie 11/9"** (zona automática) o **"🚚 hay camión el vie 11/9 · programalo"** (zona manual), y si no, "retira", "súper: a mano", "sin camión previsto". | Zonas 1/2/3 se arman solas (00:01 y cada 15 min si juntan 0,80 m³). Zonas 4/5/6, Súper y Retira **a mano**: "+ Nueva tanda vacía", arrastrar pedidos, arrastrar la tanda a un día. **El arrastre sólo funciona en la compu.** |
 | calendario (misma solapa) | Un renglón por día: `m³ usados / cupo`, línea "📋 ISIS: …", **"Muy pronto"** en los días antes del mínimo, "No hábil". | Días completos, no hábiles o muy pronto no reciben. |
-| **Programación** | Tablero de 6 días (botón "Ver hoja 2 →"), camiones numerados por día, Súper aparte. Tocar un día → camiones, orden de carga, pedidos y estado (sin empezar / en curso / armado). | KPI **Atrasados**: hoy 38 de ISIS con fecha vencida. Hay que decidir qué se hace con ellos (reprogramar o cargar). |
+| **Programación** | Tablero de 6 días (botón "Ver hoja 2 →"), camiones numerados por día, Súper aparte. Tocar un día → camiones, orden de carga, pedidos y estado (sin empezar / en curso / armado). Cuenta **sólo lo que tiene fecha por delante**. | Los de fecha vencida no están acá (v13.33): son un dato de gerencia y se miran desde **Resumen**. |
+| **Resumen** | Cuadro de m³ por día y zona (el "Resumen Prog" de siempre). Arriba, la línea **"⏰ N pedido(s) con fecha de entrega vencida… Ver la lista →"**. | Es la vista de gerencia: ahí se decide qué se hace con los vencidos (reprogramar, cargar o sacar de ISIS). |
 | **Facturación** | NP de ISIS: tilde ✓ como siempre. **NP web (`LK 1350`): tildar y bajar el Excel ISIS = facturada**; ese Excel se carga en ISIS. | El cruce de factura ya entiende las NP web. |
 | **En Salida** | Lo cargado al camión que todavía no se controló. | Si pasa el plazo sin control, alerta naranja. |
 | **Entregados** | Lo controlado (CRN). | — |

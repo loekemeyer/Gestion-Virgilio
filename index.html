@@ -773,7 +773,7 @@ button {
 @media (max-width:640px){ .pweb-cfg-tbl td.k{ display:none; } }
 /* v13.21: qué día sale el pedido */
 .apr-chip-sal{ background:#dcfce7; color:#166534; font-weight:800; }
-.apr-chip-sal.hoy{ background:#166534; color:#fff; }
+.apr-chip-sal.man{ background:#e0edff; color:#1e40af; } /* v13.32: zona manual con camión: lo programa el supervisor */
 .apr-chip-sal.no{ background:#fef3c7; color:#92400e; }
 .apr-chip-sal.esp{ background:#f1f5f9; color:#94a3b8; }
 .apr-chip-m3{ background:#f1f5f9; color:#334155; } /* idea 7999: es un dato, no una alerta */
@@ -7027,7 +7027,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v13.31";
+const APP_VERSION = "v13.33";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -28819,6 +28819,11 @@ function pppResumenHtml(prog) {
   const _esRetira = function (p) { const z = String(p.zona || "").trim() || pppZonaDeBarrio(p.localidad || ""); return String(z).toLowerCase() === "retira"; };
   const sinF = prog.filter(function (p) { return !(p.fecha_entrega || "").trim() && !_esRetira(p); }).length;
   let head = '';
+  // v13.33 (dueño: "los atrasados son un dato para que lo revise alguien de gerencia"): salieron de la
+  // solapa Programación y viven acá, en Resumen, que es la solapa de mirar el conjunto.
+  const _nVenc = _pppPlanAgrupar(prog).venc.length;
+  if (_nVenc) head += '<div class="ppp-res-note">⏰ <b>' + _nVenc + '</b> pedido(s) con fecha de entrega vencida que nunca se cargaron al camión. ' +
+    '<button class="pn-lnk" onclick="pppTab(\'plan\');pppPlanAbrir(\'venc\')">Ver la lista →</button></div>';
   if (sinF) head += '<div class="ppp-res-note">⏳ ' + sinF + ' pedido(s) sin Fecha de Entrega — no entran al resumen. <span style="opacity:.7">(Retira no cuenta)</span></div>';
   if (!conF.length) return head + '<div class="planim-empty">Sin pedidos con Fecha de Entrega todavía.</div>';
   const CAP = pppGetCfg().dayCap > 0 ? pppGetCfg().dayCap : 6;
@@ -29585,18 +29590,22 @@ function _pppPlanGridHtml(programados) {
   const nVenc = g.venc.length;
   let h = '<div class="pn-head"><div><div class="pn-h1">Programación de entregas</div><div class="pn-h2">' + (hoja ? 'Hoja ' + (hoja + 1) + ' · ' + escapeHtml(rangoTxt) : 'Próximos 6 días hábiles') + ' · tocá un día para ver sus camiones y pedidos</div></div>' +
     '<div class="pn-tools"><button class="pn-lnk" onclick="pppPlanClasica(true)" title="Lista por fecha y tanda (como antes)">Vista clásica</button></div></div>';
+  // v13.33 (dueño: "los 48 atrasados no deben aparecer en Programación… es un dato para que lo revise
+  // alguien de gerencia"): esta solapa es la de programar, así que cuenta SÓLO lo que todavía tiene
+  // fecha por delante. Los vencidos se miran desde Resumen.
+  const nProg = Math.max(0, programados.length - nVenc);
   h += '<div class="pn-kpis">' +
-    '<div class="pn-kpi"><div class="ico">📦</div><div><div class="l">Pedidos</div><div class="v">' + programados.length + '</div><div class="s">' + tot + ' en ' + (hoja ? 'la hoja ' + (hoja + 1) : 'estos 6 días') + ' · ' + nVenc + ' atrasados · ' + Math.max(0, programados.length - tot - nVenc) + ' después</div></div></div>' +
+    '<div class="pn-kpi"><div class="ico">📦</div><div><div class="l">Pedidos</div><div class="v">' + nProg + '</div><div class="s">' + tot + ' en ' + (hoja ? 'la hoja ' + (hoja + 1) : 'estos 6 días') + ' · ' + Math.max(0, nProg - tot) + ' después</div></div></div>' +
     '<div class="pn-kpi"><div class="ico">🚚</div><div><div class="l">Camiones</div><div class="v">' + camiones + '</div><div class="s">por n° de tanda y día</div></div></div>' +
     '<div class="pn-kpi"><div class="ico">🧊</div><div><div class="l">Volumen</div><div class="v">' + _pppFmtM3(totM3) + ' m³</div><div class="s">a entregar</div></div></div>' +
     '<div class="pn-kpi g"><div class="ico">💰</div><div><div class="l">Valor</div><div class="v">' + (_pppValor ? '<span class="full">' + _pppFmtPesos(totVal) + '</span><span class="short">' + _pppFmtPesosCorto(totVal) + '</span>' : '…') + '</div><div class="s">estimado a lista' + (totSinVal ? ' · ' + totSinVal + ' sin valuar' : '') + '</div></div></div>' +
-    // v13.25 (dueño: "el cartel de los 38 no entiendo ni qué significa"): la tarjeta ES el acceso; sin cartel duplicado.
-    '<div class="pn-kpi' + (nVenc ? ' r click' : ' ok') + '"' + (nVenc ? ' onclick="pppPlanAbrir(\'venc\')" title="Pedidos de ISIS con fecha de entrega vencida que nunca se cargaron al camión. Tocá para verlos."' : '') + '><div class="ico">' + (nVenc ? '⏰' : '✅') + '</div><div><div class="l">Atrasados</div><div class="v">' + nVenc + '</div><div class="s">' + (nVenc ? 'fecha vencida sin cargar · <u>ver</u>' : 'todo al día') + '</div></div></div>' +
     '</div>';
   // v13.05 — dos carteles separados (dueño: "es confuso el cartel"): atrasados por un lado,
   // cargados sin controlar por otro (esos ya no están acá: viven en En Salida).
   // v13.25: sin carteles grandes (dueño: "no entiendo ni qué significa"). Atrasados vive en su tarjeta;
   // lo cargado sin controlar es de En Salida y acá sólo se avisa en una línea.
+  // v13.33: la tarjeta de Atrasados también se fue de acá — es un dato de gerencia, no de quien programa.
+  // Vive en la solapa Resumen, que es la de mirar el conjunto.
   if (sinCtrl) h += '<div class="pn-flags"><button class="pn-flag" onclick="pppTab(\'enviaje\')" title="Se cargaron al camión y nadie marcó el remito como controlado dentro del plazo. Están en En Salida.">🚚 ' + sinCtrl + ' cargado' + (sinCtrl === 1 ? '' : 's') + ' al camión sin controlar el remito → En Salida</button></div>';
   h += '<div class="pn-days">';
   for (const d of dias) {
@@ -29788,7 +29797,10 @@ function pppRenderProg() {
   }
   // v9.72 — split de facturados en "En viaje" (sin confirmar entrega) y "Entregados" (confirmados)
   const _pppSplit = (_pppDelivered != null && _pppMetaEntSet != null && _pppEnSalida != null) ? _pppSplitDelivered() : null;
-  let html = pppTabsHtml((_apr && _apr.listo) ? _apr.pedidos.length : null, programados.length,
+  // v13.33: la solapa Programación cuenta lo que se programa (fecha por delante). Los de fecha
+  // vencida sin cargar son un dato de gerencia y se miran desde Resumen.
+  const _nPlanTab = programados.length - _pppPlanAgrupar(programados).venc.length;
+  let html = pppTabsHtml((_apr && _apr.listo) ? _apr.pedidos.length : null, Math.max(0, _nPlanTab),
     (_pppSplit ? _pppSplit.enViaje.length : null),
     (_pppSplit ? _pppSplit.entregados.length : (_pppDelivered ? _pppDelivered.length : entreg.length)));
   html += '<div class="ppp-search"><input id="pppSearchInp" type="search" autocomplete="off" placeholder="🔎 Buscar: NP, cliente, cód, tanda, localidad, zona, fecha…" value="' + escapeHtml(_pppSearch) + '" oninput="pppSetSearch(this.value)">' + (_pppSearch ? '<button class="ppp-search-clr" onclick="pppSetSearch(\'\')" title="Limpiar búsqueda">✕</button><span class="ppp-search-n">' + (programados.length + aProgramar.length + entreg.length) + ' coincidencia(s)</span>' : '') + '</div>';
@@ -32504,8 +32516,12 @@ function aprSalidaChip(p) {
   if (s.dia) {
     const d = new Date(+s.dia.slice(0, 4), +s.dia.slice(5, 7) - 1, +s.dia.slice(8, 10));
     const DOW = ["dom", "lun", "mar", "mié", "jue", "vie", "sáb"];
-    const txt = "🚚 sale " + DOW[d.getDay()] + " " + d.getDate() + "/" + (d.getMonth() + 1);
-    return '<span class="apr-chip apr-chip-sal' + (s.motivo === "intradia" ? " hoy" : "") + '" title="' + escapeHtml(recep + s.detalle) + '">' + txt + '</span>';
+    // v13.32 (dueño: "¿por qué aparece mezclado lo programado con lo que no?"): nada de esta lista está
+    // programado; el chip dice qué va a pasar. Automático = se arma solo; manual = hay camión, programalo.
+    const f = DOW[d.getDay()] + " " + d.getDate() + "/" + (d.getMonth() + 1);
+    const auto = s.motivo === "intradia" || s.motivo === "job";
+    const txt = auto ? "🤖 se arma solo → " + f : "🚚 hay camión el " + f + " · programalo";
+    return '<span class="apr-chip apr-chip-sal' + (auto ? "" : " man") + '" title="' + escapeHtml(recep + s.detalle) + '">' + txt + '</span>';
   }
   const lab = s.motivo === "retira" ? "🏭 retira" : (s.motivo === "super" ? "🛒 súper: a mano" : (s.motivo === "sin_zona" ? "❓ sin zona" : "⏳ sin camión previsto"));
   return '<span class="apr-chip apr-chip-sal no" title="' + escapeHtml(recep + s.detalle) + '">' + lab + '</span>';

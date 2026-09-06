@@ -58,12 +58,12 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
     let html = document.getElementById("pppPreview").innerHTML;
     const kpi = (l) => { const m = new RegExp('<div class="l">' + l + '</div><div class="v">([^<]*)</div>').exec(html); return m ? m[1] : null; };
     out.kpiPed = kpi("Pedidos"); out.kpiCam = kpi("Camiones"); out.kpiVol = kpi("Volumen"); out.kpiVal = (function () { const m = /<div class="l">Valor<\/div><div class="v"><span class="full">([^<]*)<\/span><span class="short">([^<]*)<\/span>/.exec(html); return m ? m[1] + "|" + m[2] : null; })();   // v13.25: largo + corto (celular)
-    out.kpiAt = kpi("Atrasados");
+    out.kpiAt = kpi("Atrasados");   // v13.33: ya no existe en Programación → null
     out.kpiPedSub = (function () { const m = /<div class="l">Pedidos<\/div><div class="v">[^<]*<\/div><div class="s">([^<]*)<\/div>/.exec(html); return m ? m[1] : null; })();
     out.dias = (html.match(/class="pn-day(?: |")/g) || []).length;
     out.vacios = (html.match(/pn-day empty/g) || []).length;
-    // v13.25: sin carteles; la tarjeta Atrasados es tocable (abre 'venc') y no hay línea de "sin controlar"
-    out.alerta = !/pn-alert/.test(html) && /pn-kpi r click" onclick="pppPlanAbrir\('venc'\)"/.test(html) && !/pn-flags/.test(html);
+    // v13.33: ni carteles ni tarjeta de Atrasados en Programación (dueño: "es un dato de gerencia")
+    out.alerta = !/pn-alert/.test(html) && !/pppPlanAbrir\('venc'\)/.test(html) && !/Atrasados/.test(html) && !/pn-flags/.test(html);
     out.hoyBadge = /class="hoy">HOY/.test(html) === (hab[0].getTime() === _pppKeyDate(_pppHoyKey()).getTime());
     out.dia1 = /Camión 1 · Zona 1 - CABA Sur/.test(html) && /Camión 2 · Zona 6 - GBA Norte/.test(html) && /\$ 6\.000\.000/.test(html);   // 3,7+0,8+0,9+0,6 m³ × 1 M
     out.retira = /Retira en fábrica/.test(html);
@@ -100,10 +100,16 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
     pppPlanHoja(1);
     html = document.getElementById("pppPreview").innerHTML;
     out.hoja2 = (html.match(/class="pn-day(?: |")/g) || []).length === 6 && (html.match(/pn-day empty/g) || []).length === 5 &&
-      /Hoja 2 · /.test(html) && /← Hoja 1/.test(html) && /Ver hoja 3 →/.test(html) && !/Más adelante:/.test(html) && kpi("Pedidos") === "12" && /1 en la hoja 2 · 2 atrasados · 9 después/.test(html);
+      /Hoja 2 · /.test(html) && /← Hoja 1/.test(html) && /Ver hoja 3 →/.test(html) && !/Más adelante:/.test(html) && kpi("Pedidos") === "10" && /1 en la hoja 2 · 9 después/.test(html);
     pppPlanHoja(0);
     html = document.getElementById("pppPreview").innerHTML;
-    out.hoja1Vuelve = /Próximos 6 días hábiles/.test(html) && /Más adelante:/.test(html) && kpi("Pedidos") === "12";
+    out.hoja1Vuelve = /Próximos 6 días hábiles/.test(html) && /Más adelante:/.test(html) && kpi("Pedidos") === "10";
+    // v13.33: los atrasados se miran desde Resumen
+    out.tabPlanN = />🗓️ Programación \(10\)</.test(html);
+    _pppTab = "resumen"; pppRenderProg();
+    html = document.getElementById("pppPreview").innerHTML;
+    out.resumenVenc = /⏰ <b>2<\/b> pedido\(s\) con fecha de entrega vencida/.test(html) && /pppTab\('plan'\);pppPlanAbrir\('venc'\)/.test(html);
+    _pppTab = "plan"; pppRenderProg();
     // día 2: Retira no cuenta como camión ni tiene orden de carga
     pppPlanAbrir(_pppDateKey(hab[1]));
     html = document.getElementById("pppPreview").innerHTML;
@@ -125,13 +131,13 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
   });
 
   const checks = [
-    ["KPI pedidos 12 = todos los programados, igual que la solapa (v13.26)", r.kpiPed === "12" && r.kpiPedSub === "9 en estos 6 días · 2 atrasados · 1 después"],
+    ["v13.33: KPI pedidos 10 = programados sin los vencidos, igual que la solapa", r.kpiPed === "10" && r.kpiPedSub === "9 en estos 6 días · 1 después" && r.tabPlanN === true],
     ["KPI camiones 5 (por n° de tanda y día; Retira no cuenta)", r.kpiCam === "5"],
     ["KPI volumen 20,4 m³",                                   r.kpiVol === "20,4 m³"],
     ["KPI valor $ 20.400.000 (corto: $20,4 M en celular)",  r.kpiVal === "$ 20.400.000|$20,4 M"],
-    ["KPI atrasados 2",                                       r.kpiAt === "2"],
+    ["v13.33: Atrasados fuera de Programación, en Resumen con acceso a la lista", r.kpiAt === null && r.resumenVenc === true],
     ["6 tarjetas de día, 2 vacías",                           r.dias === 6 && r.vacios === 2],
-    ["v13.25: sin carteles; tarjeta Atrasados tocable, sin línea de 'sin controlar'", r.alerta === true],
+    ["v13.33: sin carteles ni tarjeta de Atrasados en Programación", r.alerta === true],
     ["HOY sólo si hoy es hábil",                              r.hoyBadge === true],
     ["día 1: dos camiones por zona con $",                    r.dia1 === true],
     ["día 2: Retira en fábrica aparte",                       r.retira === true],

@@ -12,11 +12,25 @@
 > única**; no se replica. Ante la duda entre parche rápido y fix de raíz → **fix
 > de raíz**.
 >
-> Última actualización: 2026-09-05 (sábado, noche) · Versión app al documentar: **v13.31**
+> Última actualización: 2026-09-06 (domingo) · Versión app al documentar: **v13.33**
 >
 > ⚠⚠ **Desde el lunes 2026-09-07 los operarios usan GESTIÓN, no Producción** (dueño, sábado a la
 > noche: *"el lunes van a empezar a usar GV, no más PV"*). Las tandas web viven en
 > `PPP_Web_Programacion` y Producción no las ve. URL: la de GitHub Pages de este repo.
+>
+> Nota **v13.33** (front) — **Los atrasados salen de "Programación"** (dueño: *"los 48 atrasados no
+> deben aparecer en Programación… es solamente un dato para que lo revise alguien de gerencia"*). Se
+> fue la tarjeta ⏰ Atrasados y la mención en el subtítulo de Pedidos; la solapa cuenta ahora **sólo lo
+> que tiene fecha por delante** (contador de la solapa incluido), así el número de arriba y el de la
+> tarjeta son el mismo. La lista sigue existiendo: en **Resumen** hay una línea *"N pedido(s) con fecha
+> de entrega vencida… Ver la lista →"* que abre la misma vista de siempre (`pppPlanAbrir('venc')`).
+> `tests/ppp-plan-nueva.cjs` chequea las dos cosas.
+>
+> Nota **v13.32** (front) — **Los chips de "A Programar" ya no dicen "sale el …"** (dueño: *"¿por qué
+> aparece mezclado lo que ya está programado con lo que no?"*). Nada de esa solapa está programado; el
+> chip decía la fecha y se leía como si lo estuviera. Ahora dice qué va a pasar: **🤖 se arma solo →
+> vie 11/9** (zonas automáticas, lo toma el job o el intradía) o **🚚 hay camión el vie 11/9 ·
+> programalo** (zonas manuales: hay a dónde sumarlo, pero lo tiene que hacer el supervisor).
 >
 > Nota **v13.31** (docs, sólo bump) — **Cron de Chef apagado** (domingo 06/09, jobs 1 y 2 del proyecto
 > Chef en `active=false`, por SQL del dueño). Ya no sale el mail de las 12:30 de Chef; los del vie (216)

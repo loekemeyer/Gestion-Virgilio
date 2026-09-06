@@ -37,7 +37,7 @@ catch (_e) {
         let data = [];
         if (u.indexOf("vista_np_sin_programar") >= 0) data = [{ np: "98111", fecha: "2026-08-20", cliente: "X", cajas: 3, lineas: 1 }];
         else if (u.indexOf("vista_np_faltantes_secuencia") >= 0) data = [{ np_faltante: "98120", anterior: "98119", siguiente: "98121" }];
-        else if (u.indexOf("vista_np_prog_sin_base") >= 0) data = progSinBase;
+        else if (u.indexOf("np_prog_sin_base") >= 0) data = progSinBase;   // v13.28: el front lee gv_np_prog_sin_base (web + ISIS)
         return { ok: true, status: 200, json: async () => data };
       };
     };
