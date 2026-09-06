@@ -1384,6 +1384,21 @@ es de Chef y pisa al LK 217): cuando Gestión alimente el tracking, escribir el 
 una función `gv_*` y pedir columna `empresa` en PaginaLK. Y el Excel ISIS de Facturación manda
 `N_Pedido` contador (no el id), como el mail: ISIS numera 98xxx por su cuenta.
 
+### 3.aj ✅ CCR cuenta como controlado = entregado (v13.27) — 2026-09-05 sábado (noche)
+
+Dueño, mirando los 38 atrasados: *"¿no deberían estar en En Salida? Si ya fueron controlados, van
+directo a Entregados"*. Cruce de los 76 NP con fecha vencida del espejo: la mayoría tiene **CCR** (Control
+Remitos, botón CR) del 03/04-09 y muchos también CCN, pero no **CRN** (Recepción Remitos), que era lo
+único que las vistas tomaban como "controlado". Cambio (migración
+`gv_ppp_entregados_ccr_cuenta_como_controlado_v1327`, parche `replace()` sobre `pg_get_viewdef`,
+`security_invoker = true` conservado): en `gv_ppp_entregados` y `gv_ppp_en_salida` el CTE `crn` toma
+`opcion in ('CRN','CCR')`. El fallback del front (`pppRefreshControlado`) también.
+Medido: atrasados **38 → 20**, En Salida **13 → 0**, entregados 824. Los 20 que quedan (98665, 98502,
+98569, 44594, 98461, 98464, 98465, 98480, 98481, 98484, 98510, 98518, 98528, 98541, 98542, 98543, 98553,
+98554, 98600, 98646) no tienen CCN, CRN ni CCR: nadie los cargó ni controló en la app (4 ni siquiera
+armados: D57C, D57D). Son los que la operadora tiene que revisar. Rollback: volver el `ANY(ARRAY['CRN','CCR'])`
+a `= 'CRN'` en las dos vistas.
+
 ### 3.ai ✅ El job real fallaba (pg_safeupdate) + intradía sin umbral + primera corrida (v13.25) — 2026-09-05 sábado (noche)
 
 Dueño: *"si ya programaste, directo que salgan de A Programar"*. Se puso `intradia_umbral_m3 = 0,001` (el

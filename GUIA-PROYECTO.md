@@ -12,11 +12,19 @@
 > única**; no se replica. Ante la duda entre parche rápido y fix de raíz → **fix
 > de raíz**.
 >
-> Última actualización: 2026-09-05 (sábado, noche) · Versión app al documentar: **v13.26**
+> Última actualización: 2026-09-05 (sábado, noche) · Versión app al documentar: **v13.27**
 >
 > ⚠⚠ **Desde el lunes 2026-09-07 los operarios usan GESTIÓN, no Producción** (dueño, sábado a la
 > noche: *"el lunes van a empezar a usar GV, no más PV"*). Las tandas web viven en
 > `PPP_Web_Programacion` y Producción no las ve. URL: la de GitHub Pages de este repo.
+>
+> Nota **v13.27** (backend + front) — **CCR también es "controlado"** (dueño: *"¿los 38 atrasados no
+> deberían estar en En Salida? Si ya fueron controlados, van directo a Entregados"*). Hasta ahora sólo
+> `CRN` (Recepción Remitos) contaba; el `CCR` (Control Remitos, botón CR del operario) no. Ahora las vistas
+> `gv_ppp_entregados` y `gv_ppp_en_salida` toman `CRN` o `CCR`; el fallback del front también. Efecto
+> medido: atrasados **38 → 20** (los 20 que quedan no tienen ningún evento de carga ni control), En Salida
+> **13 → 0**. Ojo: la nota de §4 sobre `CCR` ("NO alimenta RR") sigue valiendo para Recepción Remitos;
+> lo que cambia es que para la PPP de Gestión CCR = entregado. §3.aj de la doc de Supabase.
 >
 > Nota **v13.26** (front) — La tarjeta **Pedidos** del tablero muestra el **mismo total que la solapa
 > Programación** (126) y abajo el desglose: "85 en estos 6 días · 38 atrasados · 3 después" (dueño:
