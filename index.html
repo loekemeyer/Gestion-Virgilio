@@ -6997,7 +6997,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v13.25";
+const APP_VERSION = "v13.26";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -29552,7 +29552,7 @@ function _pppPlanGridHtml(programados) {
   let h = '<div class="pn-head"><div><div class="pn-h1">Programación de entregas</div><div class="pn-h2">' + (hoja ? 'Hoja ' + (hoja + 1) + ' · ' + escapeHtml(rangoTxt) : 'Próximos 6 días hábiles') + ' · tocá un día para ver sus camiones y pedidos</div></div>' +
     '<div class="pn-tools"><button class="pn-lnk" onclick="pppPlanClasica(true)" title="Lista por fecha y tanda (como antes)">Vista clásica</button></div></div>';
   h += '<div class="pn-kpis">' +
-    '<div class="pn-kpi"><div class="ico">📦</div><div><div class="l">Pedidos</div><div class="v">' + tot + '</div><div class="s">' + (hoja ? 'hoja ' + (hoja + 1) : 'estos 6 días') + ' · de ' + programados.length + ' programados (' + nVenc + ' atrasados, ' + Math.max(0, programados.length - tot - nVenc) + ' en otras fechas)</div></div></div>' +
+    '<div class="pn-kpi"><div class="ico">📦</div><div><div class="l">Pedidos</div><div class="v">' + programados.length + '</div><div class="s">' + tot + ' en ' + (hoja ? 'la hoja ' + (hoja + 1) : 'estos 6 días') + ' · ' + nVenc + ' atrasados · ' + Math.max(0, programados.length - tot - nVenc) + ' después</div></div></div>' +
     '<div class="pn-kpi"><div class="ico">🚚</div><div><div class="l">Camiones</div><div class="v">' + camiones + '</div><div class="s">por n° de tanda y día</div></div></div>' +
     '<div class="pn-kpi"><div class="ico">🧊</div><div><div class="l">Volumen</div><div class="v">' + _pppFmtM3(totM3) + ' m³</div><div class="s">a entregar</div></div></div>' +
     '<div class="pn-kpi g"><div class="ico">💰</div><div><div class="l">Valor</div><div class="v">' + (_pppValor ? '<span class="full">' + _pppFmtPesos(totVal) + '</span><span class="short">' + _pppFmtPesosCorto(totVal) + '</span>' : '…') + '</div><div class="s">estimado a lista' + (totSinVal ? ' · ' + totSinVal + ' sin valuar' : '') + '</div></div></div>' +

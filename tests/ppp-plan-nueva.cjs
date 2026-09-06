@@ -59,6 +59,7 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
     const kpi = (l) => { const m = new RegExp('<div class="l">' + l + '</div><div class="v">([^<]*)</div>').exec(html); return m ? m[1] : null; };
     out.kpiPed = kpi("Pedidos"); out.kpiCam = kpi("Camiones"); out.kpiVol = kpi("Volumen"); out.kpiVal = (function () { const m = /<div class="l">Valor<\/div><div class="v"><span class="full">([^<]*)<\/span><span class="short">([^<]*)<\/span>/.exec(html); return m ? m[1] + "|" + m[2] : null; })();   // v13.25: largo + corto (celular)
     out.kpiAt = kpi("Atrasados");
+    out.kpiPedSub = (function () { const m = /<div class="l">Pedidos<\/div><div class="v">[^<]*<\/div><div class="s">([^<]*)<\/div>/.exec(html); return m ? m[1] : null; })();
     out.dias = (html.match(/class="pn-day(?: |")/g) || []).length;
     out.vacios = (html.match(/pn-day empty/g) || []).length;
     // v13.25: sin carteles; la tarjeta Atrasados es tocable (abre 'venc') y no hay línea de "sin controlar"
@@ -99,10 +100,10 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
     pppPlanHoja(1);
     html = document.getElementById("pppPreview").innerHTML;
     out.hoja2 = (html.match(/class="pn-day(?: |")/g) || []).length === 6 && (html.match(/pn-day empty/g) || []).length === 5 &&
-      /Hoja 2 · /.test(html) && /← Hoja 1/.test(html) && /Ver hoja 3 →/.test(html) && !/Más adelante:/.test(html) && kpi("Pedidos") === "1";
+      /Hoja 2 · /.test(html) && /← Hoja 1/.test(html) && /Ver hoja 3 →/.test(html) && !/Más adelante:/.test(html) && kpi("Pedidos") === "12" && /1 en la hoja 2 · 2 atrasados · 9 después/.test(html);
     pppPlanHoja(0);
     html = document.getElementById("pppPreview").innerHTML;
-    out.hoja1Vuelve = /Próximos 6 días hábiles/.test(html) && /Más adelante:/.test(html) && kpi("Pedidos") === "9";
+    out.hoja1Vuelve = /Próximos 6 días hábiles/.test(html) && /Más adelante:/.test(html) && kpi("Pedidos") === "12";
     // día 2: Retira no cuenta como camión ni tiene orden de carga
     pppPlanAbrir(_pppDateKey(hab[1]));
     html = document.getElementById("pppPreview").innerHTML;
@@ -124,7 +125,7 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
   });
 
   const checks = [
-    ["KPI pedidos 9 (6 días, sin vencidas ni más adelante)",  r.kpiPed === "9"],
+    ["KPI pedidos 12 = todos los programados, igual que la solapa (v13.26)", r.kpiPed === "12" && r.kpiPedSub === "9 en estos 6 días · 2 atrasados · 1 después"],
     ["KPI camiones 5 (por n° de tanda y día; Retira no cuenta)", r.kpiCam === "5"],
     ["KPI volumen 20,4 m³",                                   r.kpiVol === "20,4 m³"],
     ["KPI valor $ 20.400.000 (corto: $20,4 M en celular)",  r.kpiVal === "$ 20.400.000|$20,4 M"],

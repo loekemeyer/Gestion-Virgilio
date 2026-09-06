@@ -12,11 +12,15 @@
 > única**; no se replica. Ante la duda entre parche rápido y fix de raíz → **fix
 > de raíz**.
 >
-> Última actualización: 2026-09-05 (sábado, noche) · Versión app al documentar: **v13.25**
+> Última actualización: 2026-09-05 (sábado, noche) · Versión app al documentar: **v13.26**
 >
 > ⚠⚠ **Desde el lunes 2026-09-07 los operarios usan GESTIÓN, no Producción** (dueño, sábado a la
 > noche: *"el lunes van a empezar a usar GV, no más PV"*). Las tandas web viven en
 > `PPP_Web_Programacion` y Producción no las ve. URL: la de GitHub Pages de este repo.
+>
+> Nota **v13.26** (front) — La tarjeta **Pedidos** del tablero muestra el **mismo total que la solapa
+> Programación** (126) y abajo el desglose: "85 en estos 6 días · 38 atrasados · 3 después" (dueño:
+> *"85 vs 126 + 12 no me convence"*). Los 12 de A Programar siguen aparte: no están programados.
 >
 > Nota **v13.25** (backend + front) — (1) **Bug real en el job**: `ppp_web_armar_tandas` v4 tenía
 > `update _sin_tanda set camion = …` sin `where`; con `pg_safeupdate` (activo para lo que entra por
