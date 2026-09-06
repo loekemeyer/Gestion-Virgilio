@@ -12,11 +12,20 @@
 > única**; no se replica. Ante la duda entre parche rápido y fix de raíz → **fix
 > de raíz**.
 >
-> Última actualización: 2026-09-06 (domingo) · Versión app al documentar: **v13.45**
+> Última actualización: 2026-09-06 (domingo) · Versión app al documentar: **v13.46**
 >
 > ⚠⚠ **Desde el lunes 2026-09-07 los operarios usan GESTIÓN, no Producción** (dueño, sábado a la
 > noche: *"el lunes van a empezar a usar GV, no más PV"*). Las tandas web viven en
 > `PPP_Web_Programacion` y Producción no las ve. URL: la de GitHub Pages de este repo.
+>
+> Nota **v13.46** (front) — **Vencidos en dos grupos: los que NO salieron van en alerta** (dueño:
+> *"marcalas como alerta pero hay que reprogramarlas"*). De los 20 atrasados, 16 tienen la tanda armada
+> (salieron; sólo falta marcar el remito) y 4 tienen la tanda sin armar (nunca subieron a un camión:
+> D57C y D57D del jueves 4/9). En **Resumen** la línea ahora dice *"N sin salir → hay que reprogramar ·
+> M con la tanda armada y el remito sin marcar"* (roja si hay alguno sin salir), y adentro de la lista
+> de atrasados hay un bloque rojo con esos pedidos (NP · cliente · tanda · fecha) y la columna **"Qué
+> hacer"** por fila: *"⚠ NO SALIÓ · reprogramar"* o *"salió · marcar remito"*. Sin orden de carga en
+> esa vista. El criterio es el estado de armado que ya calcula el front (`_pppEstadoPed`).
 >
 > Nota **v13.45** (backend) — **Cierre de ubicaciones: 63 de 63 que importan.** El dueño mandó los pines
 > de Google Maps de las tres calles que OpenStreetMap no tiene (Trole 163, J. M. Pérez 977 en Luján,

@@ -90,7 +90,11 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
     // vencidas
     pppPlanAbrir("venc");
     html = document.getElementById("pppPreview").innerHTML;
-    out.venc = /Atrasados/.test(html) && /Vencida Uno/.test(html) && /Vencida Dos/.test(html) && !/Astorga/.test(html);
+    // v13.46: las dos vencidas del fixture (D50E, D46E) nunca se armaron → alerta "NO salieron, reprogramar";
+    // sin orden de carga en esta vista; la columna dice qué hacer.
+    out.venc = /Atrasados/.test(html) && /Vencida Uno/.test(html) && /Vencida Dos/.test(html) && !/Astorga/.test(html) &&
+      /pn-reprog/.test(html) && /⚠ 2 pedidos NO salieron — hay que reprogramarlos/.test(html) && (html.match(/NO SALIÓ/g) || []).length === 2 &&
+      !/Orden de carga/.test(html) && /<span>Qué hacer<\/span>/.test(html) && /<b>0<\/b> pedidos salieron con la tanda armada/.test(html);
     // vista clásica y vuelta
     pppPlanClasica(true);
     html = document.getElementById("pppPreview").innerHTML;
@@ -111,7 +115,7 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
     out.tabPlanN = />🗓️ Programación \(10\)</.test(html);
     _pppTab = "resumen"; pppRenderProg();
     html = document.getElementById("pppPreview").innerHTML;
-    out.resumenVenc = /⏰ <b>2<\/b> pedido\(s\) con fecha de entrega vencida/.test(html) && /pppTab\('plan'\);pppPlanAbrir\('venc'\)/.test(html);
+    out.resumenVenc = /ppp-res-note rep">⏰ <b>2<\/b> pedido\(s\) con fecha de entrega vencida: <b>2 sin salir → hay que reprogramar<\/b>\. /.test(html) && /pppTab\('plan'\);pppPlanAbrir\('venc'\)/.test(html);
     _pppTab = "plan"; pppRenderProg();
     // día 2: Retira no cuenta como camión ni tiene orden de carga
     pppPlanAbrir(_pppDateKey(hab[1]));

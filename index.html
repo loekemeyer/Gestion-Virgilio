@@ -745,6 +745,15 @@ button {
 /* v13.34: por qué cada grupo sigue en la lista (el cartel verde dice "N programadas" y confunde) */
 .apr-porque{ font-size:11.5px; line-height:1.45; color:#475569; background:#f1f5f9; border:1px solid #e2e8f0; border-radius:8px; padding:6px 8px; margin:-2px 0 8px; }
 .apr-porque b{ color:#0f172a; }
+/* v13.46: vencidos que NO salieron (tanda sin armar) → alerta roja, hay que reprogramar */
+.pn-reprog{ background:#fef2f2; border:1px solid #fca5a5; border-radius:12px; padding:10px 12px; margin:10px 0; color:#991b1b; font-size:13px; }
+.pn-reprog b{ color:#b91c1c; }
+.pn-reprog .l{ display:flex; flex-wrap:wrap; gap:6px; margin:8px 0 6px; }
+.pn-reprog .l span{ background:#fff; border:1px solid #fecaca; border-radius:8px; padding:4px 8px; font-weight:700; color:#7f1d1d; font-size:12.5px; }
+.pn-reprog .l span small{ font-weight:600; color:#b91c1c; opacity:.85; }
+.pn-reprog .h{ font-size:12px; color:#7f1d1d; opacity:.9; }
+.pn-carga .t.rep{ color:#b91c1c; font-weight:800; }
+.ppp-res-note.rep{ background:#fef2f2; border-color:#fca5a5; color:#991b1b; }
 .apr-q{ width:100%; box-sizing:border-box; padding:7px 10px; border:1px solid #cbd5e1; border-radius:8px; font-size:13px; margin-bottom:8px; }
 .apr-scroll{ max-height:62vh; overflow-y:auto; display:flex; flex-direction:column; gap:7px; }
 .apr-vacio{ color:#94a3b8; font-size:13px; padding:14px 4px; text-align:center; }
@@ -7030,7 +7039,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v13.45";
+const APP_VERSION = "v13.46";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -28847,8 +28856,16 @@ function pppResumenHtml(prog) {
   // v13.33 (dueño: "los atrasados son un dato para que lo revise alguien de gerencia"): salieron de la
   // solapa Programación y viven acá, en Resumen, que es la solapa de mirar el conjunto.
   const _nVenc = _pppPlanAgrupar(prog).venc.length;
-  if (_nVenc) head += '<div class="ppp-res-note">⏰ <b>' + _nVenc + '</b> pedido(s) con fecha de entrega vencida que nunca se cargaron al camión. ' +
-    '<button class="pn-lnk" onclick="pppTab(\'plan\');pppPlanAbrir(\'venc\')">Ver la lista →</button></div>';
+  if (_nVenc) {
+    // v13.46 (dueño): los que NO salieron (tanda sin armar) van como alerta — hay que reprogramarlos;
+    // los que salieron con la tanda armada sólo tienen el remito sin marcar.
+    const _venc = _pppPlanAgrupar(prog).venc;
+    const _rep = _venc.filter(function (p) { return _pppEstadoPed(p) !== "armado"; }).length;
+    head += '<div class="ppp-res-note' + (_rep ? ' rep' : '') + '">⏰ <b>' + _nVenc + '</b> pedido(s) con fecha de entrega vencida: ' +
+      (_rep ? '<b>' + _rep + ' sin salir → hay que reprogramar</b>' + (_nVenc - _rep ? ' · ' : '') : '') +
+      (_nVenc - _rep ? (_nVenc - _rep) + ' con la tanda armada y el remito sin marcar' : '') + '. ' +
+      '<button class="pn-lnk" onclick="pppTab(\'plan\');pppPlanAbrir(\'venc\')">Ver la lista →</button></div>';
+  }
   if (sinF) head += '<div class="ppp-res-note">⏳ ' + sinF + ' pedido(s) sin Fecha de Entrega — no entran al resumen. <span style="opacity:.7">(Retira no cuenta)</span></div>';
   if (!conF.length) return head + '<div class="planim-empty">Sin pedidos con Fecha de Entrega todavía.</div>';
   const CAP = pppGetCfg().dayCap > 0 ? pppGetCfg().dayCap : 6;
@@ -29753,13 +29770,27 @@ function _pppPlanDiaHtml(programados, key) {
     '<div class="kp"><div class="k"><i>📦</i><div><div class="l">Pedidos</div><div class="v">' + ped.length + '</div></div></div><div class="k"><i>🚚</i><div><div class="l">Camiones</div><div class="v">' + nCam + '</div></div></div><div class="k"><i>🧊</i><div><div class="l">Volumen</div><div class="v">' + _pppFmtM3(_pppM3Sum(ped)) + ' m³</div></div></div><div class="k"><i>💰</i><div><div class="l">Valor estimado</div><div class="v g">' + (_pppValor ? _pppFmtPesos(val.valor) : '…') + '</div></div></div></div>' +
     '<div class="barw">' + _pppPlanBarraHtml(est, ped.length) + '</div></div>';
   if (!ped.length) return h + '<div class="planim-empty">Nada programado para este día.</div>';
-  if (esVenc) h += '<div class="pn-note"><b>¿Qué es esto?</b> Pedidos que ISIS programó con una fecha de entrega que <b>ya pasó</b> y que <b>nunca se cargaron al camión</b> (no hay carga ni control de remito). Siguen contando como pendientes.<br>' +
-    '<b>Qué hacer con cada uno:</b> (1) si va a salir, ponele fecha nueva con ✏️ Editar en su tanda, abajo; (2) si ya salió y nadie lo marcó, cargar el camión (CC) y controlar el remito; (3) si se anuló, sacarlo de ISIS.</div>';
+  if (esVenc) {
+    // v13.46 (dueño: "marcalas como alerta pero hay que reprogramarlas"): entre los vencidos hay dos
+    // casos distintos y hay que verlos distinto. La tanda ARMADA seguro salió y nadie marcó el remito
+    // (se arregla marcando Controlado); la tanda que NO se armó no salió: el cliente espera desde la
+    // fecha vencida y hay que reprogramarla. Ésas van en alerta roja, arriba de todo.
+    const reprog = ped.filter(function (p) { return _pppEstadoPed(p) !== "armado"; });
+    const sinRem = ped.length - reprog.length;
+    if (reprog.length) {
+      h += '<div class="pn-reprog"><b>⚠ ' + reprog.length + ' pedido' + (reprog.length === 1 ? '' : 's') + ' NO ' + (reprog.length === 1 ? 'salió' : 'salieron') + ' — hay que reprogramar' + (reprog.length === 1 ? 'lo' : 'los') + '</b>' +
+        '<div class="l">' + reprog.map(function (p) { return '<span>' + escapeHtml(String(p.np)) + ' · ' + escapeHtml(p.razon_social || p.cod || "—") + ' <small>' + escapeHtml(String(p.tanda || "—").toUpperCase()) + ' · ' + escapeHtml(p.fecha_entrega || "") + '</small></span>'; }).join('') + '</div>' +
+        '<div class="h">La tanda nunca se armó, así que el pedido no subió a ningún camión. Ponele fecha nueva (✏️ Editar en su tanda, abajo) o sacalo de ISIS.</div></div>';
+    }
+    h += '<div class="pn-note"><b>' + sinRem + '</b> ' + (sinRem === 1 ? 'pedido salió' : 'pedidos salieron') + ' con la tanda armada y nadie marcó el remito: en <b>Recepción Remitos → Controlado</b> pasan a entregados y desaparecen de acá.</div>';
+  }
   const dk = esVenc ? "venc" : key;
   for (const c of cams) {
     // v13.13: el orden de carga sólo si hay recorrido de verdad — al menos 2 paradas con
     // ubicación. Con 1 pedido, o sin ubicaciones ("1º Soldati ? → 2º Soldati ?"), no dice nada.
-    let oc = (c.ruta === "ret" || c.ruta === "sup") ? null : _pppOrdenCarga(c);
+    // v13.46: en la vista de vencidos no hay orden de carga (no hay camión que armar); la última
+    // columna dice qué hacer con cada uno.
+    let oc = (esVenc || c.ruta === "ret" || c.ruta === "sup") ? null : _pppOrdenCarga(c);
     if (oc && (oc.paradas.length - oc.sinUbic) < 2) oc = null;
     const chips = (c.est.armado ? '<span class="pn-chip mid">' + c.est.armado + ' armado' + (c.est.armado === 1 ? '' : 's') + '</span>' : '') + (c.est.curso ? '<span class="pn-chip wait">' + c.est.curso + ' en curso</span>' : '') + (c.est.sin ? '<span class="pn-chip">' + c.est.sin + ' sin empezar</span>' : '');
     h += '<div class="pn-camion"><div class="ch ' + c.ruta + '"><div class="ico">' + _pppCamionIco(c) + '</div><div><div class="t1">' + escapeHtml(_pppCamionNombre(c)) + '</div><div class="t2">' + (c.tandas.length ? 'Tanda' + (c.tandas.length === 1 ? '' : 's') + ' ' + escapeHtml(c.tandas.join(" · ")) : 'Sin tanda') + ' · ' + c.ped.length + ' pedido' + (c.ped.length === 1 ? '' : 's') + '</div></div><div class="st" title="' + escapeHtml(chips.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim()) + '"></div><div class="m3">' + _pppFmtM3(c.m3) + ' m³</div><div class="p">' + (_pppValor ? _pppFmtPesos(c.valor) : '…') + (c.sinValor ? '<small title="Pedidos sin valuar (sin líneas o sin precio de lista)"> · ' + c.sinValor + ' s/valor</small>' : '') + '</div></div>';
@@ -29775,7 +29806,7 @@ function _pppPlanDiaHtml(programados, key) {
     }
     const rows = oc ? oc.paradas.slice().sort(function (a, b) { return a._carga - b._carga; }) : c.ped.slice();
     const primero = rows.length ? rows[0] : null;
-    h += '<div class="pn-thead"><span>Tanda</span><span>Cliente · N° pedido</span><span>Localidad</span><span class="num">m³</span><span class="num">Valor</span><span>Picking · Armado</span><span>' + (oc ? 'Carga' : '') + '</span></div>';
+    h += '<div class="pn-thead"><span>Tanda</span><span>Cliente · N° pedido</span><span>Localidad</span><span class="num">m³</span><span class="num">Valor</span><span>Picking · Armado</span><span>' + (esVenc ? 'Qué hacer' : (oc ? 'Carga' : '')) + '</span></div>';
     for (const p of rows) {
       const e = _pppEstadoPed(p), E = _PN_EST[e];
       const pick = (e === "armado" || e === "armando" || e === "picking") ? "done" : (e === "pickeando" ? "on" : "");
@@ -29783,7 +29814,11 @@ function _pppPlanDiaHtml(programados, key) {
       const v = _pppValorPed(p);
       const np = p.np;   // la etiqueta web ya viene formateada de la vista (LK 1350)
       let carga = "";
-      if (oc) {
+      if (esVenc) {
+        carga = e === "armado"
+          ? '<div class="pn-carga"><span class="t">salió · <b>marcar remito</b></span></div>'
+          : '<div class="pn-carga"><span class="t rep">⚠ NO SALIÓ<br>reprogramar</span></div>';
+      } else if (oc) {
         const esPrimero = primero && p === primero;
         const n = p._carga;
         if (esPrimero && e === "armado") carga = '<div class="pn-carga"><span class="n go">' + n + 'º</span><span class="t go">CARGAR AHORA<br>armado ✓</span></div>';
