@@ -12,11 +12,22 @@
 > única**; no se replica. Ante la duda entre parche rápido y fix de raíz → **fix
 > de raíz**.
 >
-> Última actualización: 2026-09-05 (sábado, noche) · Versión app al documentar: **v13.27**
+> Última actualización: 2026-09-05 (sábado, noche) · Versión app al documentar: **v13.28**
 >
 > ⚠⚠ **Desde el lunes 2026-09-07 los operarios usan GESTIÓN, no Producción** (dueño, sábado a la
 > noche: *"el lunes van a empezar a usar GV, no más PV"*). Las tandas web viven en
 > `PPP_Web_Programacion` y Producción no las ve. URL: la de GitHub Pages de este repo.
+>
+> Nota **v13.28** (front + backend) — **Seis ideas de la noche mergeadas** (dueño: *"arrancá a hacerlas"*):
+> **7828** el monitor de pared agrupa camiones por letra+número (`tandaCamion` = `E60`, `D60`; antes E60A y
+> D60A se sumaban) · **2048** A Programar muestra la última corrida del armado automático (lee
+> `GV_Tandas_Auto_Log` con la sesión: ok / nada pendiente / falló / no corre hace N h, sin asustar en fin de
+> semana) · **4528** "Programadas sin artículos" mira también las tandas web (vistas `gv_np_prog_sin_base` +
+> `gv_ppp_web_prog_sin_base`, `sql/gv_np_prog_sin_base.sql`) · **7999** pulido visual (m³ con coma en En
+> Salida/Entregados, solapas y días vacíos compactos en celular, "completo" en ámbar, chip m³ neutro, sin
+> "Excel" en Entregados, placeholder del check visible) · **5162** interruptores del pipeline web visibles en
+> ⚙️ Configuración (sólo lectura, `PWEB_CFG_ITEMS`) · **2510** aviso arriba del calendario cuando el cupo
+> está lleno varios días hábiles seguidos (`aprCupoLlenoHtml`).
 >
 > Nota **v13.27** (backend + front) — **CCR también es "controlado"** (dueño: *"¿los 38 atrasados no
 > deberían estar en En Salida? Si ya fueron controlados, van directo a Entregados"*). Hasta ahora sólo
