@@ -62,6 +62,8 @@ with prog as (
     from prog p
    where public.gv_dir_geo_query(p.direccion) is not null
      and lower(coalesce(p.zona, '')) not like '%retira%'
+     -- v13.45 (dueño: "es súper y va separado"): camión propio, una parada, sin orden de carga
+     and lower(btrim(coalesce(p.zona, ''))) not in ('super', 'súper')
    order by public.gv_dir_key(p.direccion, p.barrio), p.fecha_entrega
 )
 select u.fuente, u.cod, u.razon_social, u.direccion, u.barrio, u.zona, u.dir_key,
@@ -105,3 +107,24 @@ on conflict (dir_key) do nothing;
 --
 -- ROLLBACK: drop table public."GV_Geo_Correccion" cascade;  y volver a crear la
 -- vista con la versión de sql/gv_geo_cliente.sql.
+
+-- ── Correcciones cargadas después, el mismo 2026-09-06 ───────────────────────
+insert into public."GV_Geo_Correccion" (dir_key, cod, direccion_mal, direccion_ok, barrio_ok, nota) values
+ (public.gv_dir_key('I. Catolica 6- Rio Cuarto','Soldati'), '2466', 'I. Catolica 6- Rio Cuarto', 'Pergamino 3751', 'Villa Soldati',
+  'Chef: la sucursal del cliente está en Río Cuarto; nuestra entrega es el expreso (chef_customer_delivery_addresses.direccion_entrega). Desde v13.43 el feed ya lo manda.'),
+ (public.gv_dir_key('Av. La Salle 1923','Flores'), '1821', 'Av. La Salle 1923', 'Avenida San Juan Bautista de La Salle 1923', 'Parque Avellaneda',
+  'Dueño 2026-09-06: es Av. San Juan Bautista de la Salle (C1407, esq. Av. Olivera = Parque Avellaneda, no Flores como dice ISIS)')
+on conflict (dir_key) do nothing;
+-- (la de "Trole 163" → "Pasaje Trole" se borró: quedó como ubicación MANUAL en GV_Geo_Cliente)
+
+-- ── Ubicaciones MANUALES (pin del dueño en Google Maps, 2026-09-06) ──────────
+-- Las tres calles existen en Google pero no en OpenStreetMap. Van con precision='manual'
+-- y manual=true; el cron nunca las pisa porque gv_geo_faltantes las excluye por (cod, dir_key).
+--   732  Bertola Enrique       Trole 163, Parque Patricios        -34.64181, -58.41944
+--   888  Distribuidora Pezzali La Salle 2174 (ISIS: Flores)       -34.65450, -58.47567  (cae en Mataderos)
+--   4114 Extralimp             J. M. Pérez 977, Luján             -34.56350, -59.13658
+-- Cómo cargar una nueva:
+--   insert into public."GV_Geo_Cliente" (cod, dir_key, razon_social, direccion, barrio, lat, lng, fuente, manual, precision)
+--   values ('<cod>', public.gv_dir_key('<direccion tal cual ISIS>','<barrio tal cual ISIS>'), '<cliente>', '<direccion>', '<barrio>', <lat>, <lng>, 'google_maps_dueño', true, 'manual')
+--   on conflict (cod, dir_key) do update set lat = excluded.lat, lng = excluded.lng, manual = true, precision = 'manual', actualizado_at = now();
+--   y la misma fila a PPP_Geo con `on conflict (dir_key) do nothing` (compartida con Producción: sólo agregar).

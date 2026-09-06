@@ -1472,6 +1472,18 @@ reales, para no tocarlos): dirección *"Exp. — Pergamino 3751 (I. Catolica 6- 
 Soldati; la clave nueva la geocodifica el cron (la limpia → *"Pergamino 3751"*, Villa Soldati). Espejo
 en `sql/gv_np_es_pedido.sql` (condición) y nota en `sql/gv_v1330_resync_bloque_dobles.sql`.
 
+**v13.45 — cierre.** El dueño mandó desde Google Maps (pin → Compartir, en grados) las tres calles que
+OSM no tiene: **732 Trole 163** (-34.64181, -58.41944), **4114 J. M. Pérez 977, Luján** (-34.56350,
+-59.13658) y **888 La Salle 2174** (-34.65450, -58.47567 — cae en Mataderos, ISIS dice Flores). Van en
+`GV_Geo_Cliente` con `precision = 'manual'`, `manual = true`, `fuente = 'google_maps_dueño'`, y la misma
+fila **agregada** a `PPP_Geo`; el cron nunca las pisa porque `gv_geo_faltantes` las excluye por
+`(cod, dir_key)`. **1821 Sendra** se resolvió por corrección con el nombre completo (*Avenida San Juan
+Bautista de La Salle 1923*, barrio **Parque Avellaneda** — con "Flores" OSM no la daba: el buscador se
+queda dentro del barrio pedido). **771 La Anónima** queda sin ubicar a propósito (*"es súper y va
+separado"*): camión propio, una parada, el front saltea el orden de carga para `ruta = "sup"`. Por eso
+**Súper sale de `gv_geo_faltantes`** (migración `gv_geo_faltantes_sin_super_v1345`), igual que Retira:
+`gv_geo_faltantes` = **0**. Receta para cargar una manual al pie de `sql/gv_geo_correccion.sql`.
+
 ### 3.an ✅ Las ubicaciones se llenan solas y se guardan por cód de cliente (v13.40) — 2026-09-06 domingo
 
 Dueño: *"todo tenés que tener todas las ubicaciones"*, y antes *"dale, 1 y 2"* a las dos cosas que le

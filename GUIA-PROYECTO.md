@@ -12,11 +12,19 @@
 > única**; no se replica. Ante la duda entre parche rápido y fix de raíz → **fix
 > de raíz**.
 >
-> Última actualización: 2026-09-06 (domingo) · Versión app al documentar: **v13.44**
+> Última actualización: 2026-09-06 (domingo) · Versión app al documentar: **v13.45**
 >
 > ⚠⚠ **Desde el lunes 2026-09-07 los operarios usan GESTIÓN, no Producción** (dueño, sábado a la
 > noche: *"el lunes van a empezar a usar GV, no más PV"*). Las tandas web viven en
 > `PPP_Web_Programacion` y Producción no las ve. URL: la de GitHub Pages de este repo.
+>
+> Nota **v13.45** (backend) — **Cierre de ubicaciones: 63 de 63 que importan.** El dueño mandó los pines
+> de Google Maps de las tres calles que OpenStreetMap no tiene (Trole 163, J. M. Pérez 977 en Luján,
+> La Salle 2174) — cargadas a mano (`precision = 'manual'`, el cron no las pisa) — y el nombre completo
+> de la de Sendra (*Av. San Juan Bautista de la Salle*, Parque Avellaneda), que se resolvió por
+> corrección. La única que queda, La Anónima *"Km 10 Camino del Buen Ayre"*, el dueño la dejó afuera:
+> *"es súper y va separado"* — camión propio, una parada, sin orden de carga. Por eso **Súper sale de
+> `gv_geo_faltantes`**, igual que Retira. Receta de carga manual al pie de `sql/gv_geo_correccion.sql`.
 >
 > Nota **v13.44** (backend) — **`ppp_web_resync` también actualiza la dirección.** Sólo refrescaba una
 > fila ya programada si cambiaba el m³, las líneas, las cajas o `m3_parcial`; un cambio de dirección
