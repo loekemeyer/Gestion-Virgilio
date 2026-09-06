@@ -1384,6 +1384,36 @@ es de Chef y pisa al LK 217): cuando Gestión alimente el tracking, escribir el 
 una función `gv_*` y pedir columna `empresa` en PaginaLK. Y el Excel ISIS de Facturación manda
 `N_Pedido` contador (no el id), como el mail: ISIS numera 98xxx por su cuenta.
 
+### 3.añ ✅ Correcciones de dirección para geocodificar, sin tocar ISIS (v13.41) — 2026-09-06 domingo
+
+Dueño: *"sí, dale. Ambas"* — que se corrija en ISIS **y** que Gestión tenga su propia corrección para
+no depender de eso. De las 64 direcciones programadas quedaron 16 sin ubicar y **todas** eran cómo las
+escribe ISIS: `PEGAMINO 3751` (Pergamino), `Chilavet M Cnel.` (Coronel Martiniano Chilavert),
+`Ohiggins` (O'Higgins), `Pacifico Rodrigrez` (Pacífico Rodríguez), `B DE ASTRADA` (Berón de Astrada),
+`AV. INT. RAVANAL` (Rabanal)… El geocodificador no adivina, y no debe: una dirección inventada manda el
+camión a otro lado. Por eso la corrección es un **dato cargado y revisable**, no una heurística.
+
+**`GV_Geo_Correccion`** (`sql/gv_geo_correccion.sql`, migración `gv_geo_correccion_v1341b`): por
+`dir_key` de la dirección **mal escrita**, cuál es la buena (`direccion_ok`) y, si hace falta, el
+barrio (`barrio_ok`). `gv_geo_faltantes` la aplica y entrega `dir_query` y `barrio_geo` ya corregidos,
+más `corregida` para poder auditarlo; la Edge Function no sabe nada de correcciones.
+
+⚠ **Se usa SÓLO para preguntarle al geocodificador.** La dirección que ve el operario, la que se
+imprime en la etiqueta y la que viaja a ISIS siguen siendo las de ISIS: ni una fila de
+`PPP_Programacion_Diaria` se toca.
+
+Cargadas las **11 aprobadas por el dueño** (10 de la lista + `CHUTRO 2735` del cód 1562, el mismo caso
+que 2336). Resultado: **de 16 sin ubicar quedaron 6**, y las 11 correcciones ubicaron. La de Carrefour
+necesitó una vuelta más: `Otto Krause 5108, Tortuguitas` no aparece, pero sí con el **partido**
+(`Malvinas Argentinas`) — vale como regla para el GBA cuando la localidad chica no la conoce el mapa.
+Las 6 que siguen son direcciones que nadie sabe
+resolver todavía y están esperando al dueño: 732 Bertola *"Trole 163"*, 771 La Anónima *"Km 10, Au
+Camino del Buen Ayre"* (sin altura), 888 Pezzali *"La Salle 2174"* y 1821 Sendra *"Av. La Salle 1923"*
+(los dos en Flores), 4114 Extralimp *"J. M. Pérez 977"* (Luján) y 2466 Elbantonio *"I. Catolica 6"*
+(Río Cuarto, Córdoba — es de Chef).
+
+Para agregar una corrección nueva, la receta está al pie de `sql/gv_geo_correccion.sql`.
+
 ### 3.an ✅ Las ubicaciones se llenan solas y se guardan por cód de cliente (v13.40) — 2026-09-06 domingo
 
 Dueño: *"todo tenés que tener todas las ubicaciones"*, y antes *"dale, 1 y 2"* a las dos cosas que le

@@ -43,7 +43,10 @@ const UA = "GestionVirgilio/1.0 (deposito Loekemeyer; contacto por el repo loeke
 type Falt = {
   fuente: string; cod: string; razon_social: string | null;
   direccion: string; barrio: string | null; zona: string | null;
-  dir_key: string; dir_query: string;
+  dir_key: string;
+  // v13.41: `dir_query` y `barrio_geo` vienen YA corregidos por `GV_Geo_Correccion` (la vista los
+  // resuelve). Acá no se sabe nada de correcciones: se pregunta lo que la vista entrega.
+  dir_query: string; barrio_geo: string | null; corregida?: boolean;
 };
 
 const H = { apikey: KEY, Authorization: "Bearer " + KEY, "Content-Type": "application/json" };
@@ -138,7 +141,7 @@ Deno.serve(async (req) => {
 
     for (let i = 0; i < lote.length; i++) {
       const f = lote[i];
-      const { c, err } = await geocodificar(f.dir_query, f.barrio);
+      const { c, err } = await geocodificar(f.dir_query, f.barrio_geo || f.barrio);
       if (c) {
         // Nuestra tabla: la fuente canónica de Gestión.
         await rest('GV_Geo_Cliente?on_conflict=cod,dir_key', {

@@ -12,11 +12,20 @@
 > única**; no se replica. Ante la duda entre parche rápido y fix de raíz → **fix
 > de raíz**.
 >
-> Última actualización: 2026-09-06 (domingo) · Versión app al documentar: **v13.40**
+> Última actualización: 2026-09-06 (domingo) · Versión app al documentar: **v13.41**
 >
 > ⚠⚠ **Desde el lunes 2026-09-07 los operarios usan GESTIÓN, no Producción** (dueño, sábado a la
 > noche: *"el lunes van a empezar a usar GV, no más PV"*). Las tandas web viven en
 > `PPP_Web_Programacion` y Producción no las ve. URL: la de GitHub Pages de este repo.
+>
+> Nota **v13.41** (backend) — **Correcciones de dirección para geocodificar, sin tocar ISIS** (dueño:
+> *"sí, dale. Ambas"*). Las 16 que quedaban sin ubicar eran todas cómo las escribe ISIS
+> (`PEGAMINO`→Pergamino, `Chilavet M Cnel.`→Chilavert, `Ohiggins`→O'Higgins, `B DE ASTRADA`→Berón de
+> Astrada…). Nueva tabla **`GV_Geo_Correccion`**: por la dirección mal escrita, cuál es la buena.
+> **Sólo se usa para preguntarle al mapa** — lo que ve el operario, lo que se imprime y lo que va a
+> ISIS no cambia. Cargadas las 11 aprobadas → **de 16 quedaron 6**, todas esperando al dueño (732
+> "Trole 163", 771 "Km 10 Camino del Buen Ayre", 888 y 1821 "La Salle" en Flores, 4114 "J. M. Pérez"
+> en Luján, 2466 "I. Catolica 6" en Río Cuarto). §3.añ; SQL `sql/gv_geo_correccion.sql`.
 >
 > Nota **v13.40** (backend + front) — **Las ubicaciones se llenan solas y se guardan por cód de
 > cliente** (dueño: *"todo tenés que tener todas las ubicaciones"* → *"dale, 1 y 2"*). Nuevo:
