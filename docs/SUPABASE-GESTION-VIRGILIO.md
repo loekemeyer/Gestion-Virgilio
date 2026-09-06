@@ -1428,11 +1428,19 @@ intento ubicó *"J. M. Pérez, Luján"* en **"José María Pérez de Urdininea",
 `viewbox` de Nominatim es un sesgo, no un límite. Un pedido ubicado **mal** es peor que sin ubicar
 (el camión lo ordena en un lugar que no es), así que: (1) borré esa fila de `GV_Geo_Cliente` y la de
 `PPP_Geo` — las dos eran **mías, de un minuto antes**, no datos de Producción; (2) los intentos 3, 4
-y 5 (los que preguntan con menos contexto) ahora **exigen que el resultado caiga en el barrio pedido**
-(`enElBarrio`: algún componente oficial de la respuesta —suburb, city, town, county…— tiene que
-contener el barrio, sin acentos, o al revés: *"Villa Soldati"* ⊃ *"Soldati"*). Si no, se descarta con
-motivo *"cayó fuera de …"*. Los intentos 1 y 2 llevan barrio + "Buenos Aires" y ubicaron bien 47 de
-47, así que quedan como estaban.
+y 5 (los que preguntan con menos contexto) ahora **exigen que el resultado caiga cerca del barrio
+pedido**. La primera verificación fue por nombre (¿algún componente de la respuesta dice "Luján"?) y
+**también falló**: en Laferrere hay un barrio *"Villa Luján"* y con eso pasó. La que quedó es
+**geográfica**: se ubica el barrio pedido una vez por corrida (`centroBarrio`, con cache y con
+", Buenos Aires" para que "Luján" no sea Luján de Cuyo) y el resultado tiene que estar a **≤ 20 km**
+de ese centro (`RADIO_KM`; un partido grande del GBA cabe). Si el barrio no se puede ubicar, no hay
+contra qué verificar y el intento se descarta: **falla cerrado**. Motivo en el log: *"cayó a N km de
+…"*. Los intentos 1 y 2 llevan barrio + "Buenos Aires" y ubicaron bien 47 de 47, así que quedan como
+estaban. Las 10 correcciones del dueño cayeron todas donde deben (verificado una por una: Jufré en
+Villa Crespo, Chilavert en Lugano, Otto Krause en Tortuguitas, O'Higgins en Pilar…).
+
+*"Trole 163"* no está en OSM ni como "Trole" ni como "Pasaje Trole": para ésa hace falta la
+coordenada a mano (`precision = 'manual'`), que se le pidió al dueño desde Google Maps.
 
 ### 3.an ✅ Las ubicaciones se llenan solas y se guardan por cód de cliente (v13.40) — 2026-09-06 domingo
 

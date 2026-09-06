@@ -76,17 +76,29 @@ function barrioOk(b: string | null) {
 function plano(s: unknown) {
   return String(s ?? "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/\s+/g, " ").trim();
 }
-/* v13.42 — ¿el resultado cae en el barrio/partido que se pidió? Se mira en los componentes
-   oficiales que devuelve Nominatim (suburb, city, town, county, state_district…): alguno tiene que
-   contener el barrio pedido, o al revés ("Villa Soldati" ⊃ "Soldati"). Sin esto, "J. M. Pérez,
-   Luján" devolvió una calle de Ezeiza a 50 km — un pedido ubicado MAL es peor que sin ubicar. */
-function enElBarrio(comp: unknown, barrio: string) {
-  const b = plano(barrio); if (b.length < 4 || !comp || typeof comp !== "object") return false;
-  for (const v of Object.values(comp as Record<string, unknown>)) {
-    const t = plano(v); if (t.length < 4) continue;
-    if (t.includes(b) || b.includes(t)) return true;
-  }
-  return false;
+/* v13.42 — ¿el resultado cae DONDE se pidió? Sin esto, "J. M. Pérez, Luján" devolvió una calle
+   de Laferrere a 45 km, y un pedido ubicado MAL es peor que sin ubicar. La primera versión
+   comparaba nombres (¿algún componente de la respuesta dice "Luján"?) y también falló: en
+   Laferrere hay un barrio "Villa Luján". Así que ahora es GEOGRÁFICO: se ubica el barrio pedido
+   una vez por corrida (cache) y el resultado tiene que estar a menos de RADIO_KM de ese centro.
+   Si el barrio no se puede ubicar, no hay contra qué verificar y el intento se descarta:
+   falla cerrado. */
+const RADIO_KM = 20;   // un partido grande del GBA (Luján, Pilar, La Matanza) cabe en 20 km de radio
+const _centros = new Map<string, { lat: number; lng: number } | null>();
+function kmEntre(a: { lat: number; lng: number }, b: { lat: number; lng: number }) {
+  const R = 6371, dLat = (b.lat - a.lat) * Math.PI / 180, dLng = (b.lng - a.lng) * Math.PI / 180;
+  const s = Math.sin(dLat / 2) ** 2 + Math.cos(a.lat * Math.PI / 180) * Math.cos(b.lat * Math.PI / 180) * Math.sin(dLng / 2) ** 2;
+  return 2 * R * Math.asin(Math.min(1, Math.sqrt(s)));
+}
+async function centroBarrio(barrio: string) {
+  const k = plano(barrio);
+  if (_centros.has(k)) return _centros.get(k)!;
+  await new Promise((r) => setTimeout(r, ESPERA_MS));   // es una llamada más a Nominatim: 1 por segundo
+  // con "Buenos Aires" y el sesgo al AMBA: "Luján, Argentina" a secas puede ser Luján de Cuyo (Mendoza)
+  const res = await nominatim("format=jsonv2&limit=1&countrycodes=ar&viewbox=-58.80,-34.40,-58.05,-34.85&q=" + encodeURIComponent(barrio + ", Buenos Aires, Argentina"));
+  const c = res.c ? { lat: res.c.lat, lng: res.c.lng } : null;
+  _centros.set(k, c);
+  return c;
 }
 
 async function nominatim(qs: string, barrioExigido?: string) {
@@ -97,7 +109,12 @@ async function nominatim(qs: string, barrioExigido?: string) {
   if (!j || !j.length || !j[0].lat) return { c: null, err: "sin resultado" };
   const lat = +j[0].lat, lng = +j[0].lon;
   if (!isFinite(lat) || !isFinite(lng)) return { c: null, err: "coordenada inválida" };
-  if (barrioExigido && !enElBarrio(j[0].address, barrioExigido)) return { c: null, err: "cayó fuera de " + barrioExigido };
+  if (barrioExigido) {
+    const centro = await centroBarrio(barrioExigido);
+    if (!centro) return { c: null, err: "no se pudo ubicar el barrio " + barrioExigido + " para verificar" };
+    const km = kmEntre(centro, { lat, lng });
+    if (km > RADIO_KM) return { c: null, err: "cayó a " + Math.round(km) + " km de " + barrioExigido };
+  }
   return { c: { lat, lng, comp: j[0].address || null }, err: "" };
 }
 
