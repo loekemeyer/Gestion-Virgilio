@@ -90,7 +90,17 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
     html = document.getElementById("pppPreview").innerHTML;
     out.clasica = /ppp-sec-done/.test(html) && /Tablero de 6 días/.test(html) && !/pn-days/.test(html);
     pppPlanClasica(false); pppPlanVolver();
-    out.vuelve = /pn-days/.test(document.getElementById("pppPreview").innerHTML);
+    html = document.getElementById("pppPreview").innerHTML;
+    out.vuelve = /pn-days/.test(html);
+    // v13.17: "Ver hoja 2 →" pagina de a 6 hábiles; "Más Adelante SRL" (hábil 11) cae en la hoja 2 y deja de ser chip
+    out.hoja1Btn = /Ver hoja 2 →/.test(html) && !/← Hoja/.test(html);
+    pppPlanHoja(1);
+    html = document.getElementById("pppPreview").innerHTML;
+    out.hoja2 = (html.match(/class="pn-day(?: |")/g) || []).length === 6 && (html.match(/pn-day empty/g) || []).length === 5 &&
+      /Hoja 2 · /.test(html) && /← Hoja 1/.test(html) && /Ver hoja 3 →/.test(html) && !/Más adelante:/.test(html) && kpi("Pedidos") === "1";
+    pppPlanHoja(0);
+    html = document.getElementById("pppPreview").innerHTML;
+    out.hoja1Vuelve = /Próximos 6 días hábiles/.test(html) && /Más adelante:/.test(html) && kpi("Pedidos") === "9";
     // día 2: Retira no cuenta como camión ni tiene orden de carga
     pppPlanAbrir(_pppDateKey(hab[1]));
     html = document.getElementById("pppPreview").innerHTML;
@@ -132,6 +142,9 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
     ["las tandas del día siguen abajo con sus bloques",       r.bloques === true],
     ["vista de atrasados",                                    r.venc === true],
     ["vista clásica y vuelta al tablero",                     r.clasica === true && r.vuelve === true],
+    ["v13.17: hoja 1 con 'Ver hoja 2 →' y sin '← Hoja'",      r.hoja1Btn === true],
+    ["v13.17: hoja 2 = 6 hábiles siguientes, sin 'Más adelante', KPI 1", r.hoja2 === true],
+    ["v13.17: vuelta a la hoja 1",                            r.hoja1Vuelve === true],
     ["día 2: Retira sin orden de carga ni camión",            r.dia2 === true],
     ["v13.07: camión = n° de tanda, zonas mezcladas 'Zona 1 + Zona 2 + Zona 3', sin tanda por zona, Retira aparte",
       r.porTanda === "Camión 1 · Zona 1 + Zona 2 + Zona 3|E01A+E01B|3 ; Camión 2 · Zona 1 - CABA Sur|F01A|1 ; Sin tanda · Zona 4 - GBA Sur||1 ; Camión 3 · Zona 6 - GBA Norte|E02A|1 ; Retira en fábrica|E01C|1"],

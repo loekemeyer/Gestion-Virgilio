@@ -12,11 +12,17 @@
 > única**; no se replica. Ante la duda entre parche rápido y fix de raíz → **fix
 > de raíz**.
 >
-> Última actualización: 2026-09-05 (sábado, noche) · Versión app al documentar: **v13.16**
+> Última actualización: 2026-09-05 (sábado, noche) · Versión app al documentar: **v13.17**
 >
 > ⚠⚠ **Desde el lunes 2026-09-07 los operarios usan GESTIÓN, no Producción** (dueño, sábado a la
 > noche: *"el lunes van a empezar a usar GV, no más PV"*). Las tandas web viven en
 > `PPP_Web_Programacion` y Producción no las ve. URL: la de GitHub Pages de este repo.
+>
+> Nota **v13.17** (front) — **"Ver hoja 2 →"** en el tablero de Programación (dueño: *"acá poneme
+> un Ver Hoja 2"*). La grilla pagina de a 6 días hábiles: hoja 1 = próximos 6, hoja 2 = los 6
+> siguientes, etc. (`_pppPlanHoja`, `pppPlanHoja(n)`, `_pppDiasHabiles(n, skip)`). Los KPI y
+> "Más adelante" son de la hoja que se mira; las fechas de hojas anteriores no se listan como chip.
+> Botones abajo de la grilla: "← Hoja N" y "Ver hoja N+1 →" con el rango de fechas.
 >
 > Nota **v13.16** (backend + front) — **Revisión con 5 agentes** (revisor-logica, auditor-supabase,
 > guardian-stock, auditor-consistencia, revisor-render). Backend: (1) gate de supervisor

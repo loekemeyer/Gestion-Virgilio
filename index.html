@@ -2383,6 +2383,11 @@ tr.ppp-err-zona > td{ background:#fffbeb !important; }
 .pn-otras{ margin-top:12px; display:flex; align-items:center; gap:8px; flex-wrap:wrap; font-size:12.5px; }
 .pn-otras .t{ font-weight:800; color:#64748b; }
 .pn-chip{ width:auto; display:inline-block; padding:4px 10px; border-radius:999px; font-size:12px; font-weight:800; background:#f1f5f9; color:#334155; border:1px solid #e2e8f0; cursor:pointer; }
+/* v13.17: paginado de la grilla ("Ver hoja 2 →" / "← Hoja 1") */
+.pn-hojas{ margin-top:14px; display:flex; justify-content:space-between; align-items:center; gap:10px; }
+.pn-hoja{ width:auto; display:inline-flex; flex-direction:column; align-items:center; gap:2px; padding:10px 18px; border-radius:12px; font-size:14px; font-weight:800; background:#fff; color:#1d4ed8; border:1.5px solid #bfdbfe; cursor:pointer; min-height:44px; }
+.pn-hoja small{ font-size:11px; font-weight:600; color:#64748b; }
+.pn-hoja:hover{ background:#eff6ff; }
 .pn-chip.mid{ background:#dbeafe; color:#1e40af; border-color:#bfdbfe; } .pn-chip.wait{ background:#fef3c7; color:#92400e; border-color:#fde68a; }
 /* adentro del día */
 .pn-topbar{ display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; }
@@ -6972,7 +6977,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v13.16";
+const APP_VERSION = "v13.17";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -29340,6 +29345,7 @@ function pppGoToRow(np) {
    ===================================================================================== */
 let _pppPlanDay = null;        // null = grilla de 6 días · "YYYYMMDD" = adentro de un día · "venc" = vencidas
 let _pppPlanClasica = false;   // true = lista clásica por fecha/tanda (v13.01)
+let _pppPlanHoja = 0;          // v13.17: hoja de la grilla (0 = próximos 6 hábiles, 1 = los 6 siguientes…)
 let _pppValor = null;          // Map np(norm) → { valor, sinPrecio }  (gv_ppp_np_valor)
 let _pppGeo = null;            // cache PPP_Geo (dir_key → {lat,lng}) para el orden de carga
 let _pppPickDone = null, _pppPickStarted = null;   // tandas (UPPER) con TP / con EP
@@ -29359,6 +29365,8 @@ async function pppRefreshGeo() {
 }
 function pppPlanAbrir(k) { _pppPlanDay = k || null; pppRenderProg(); try { const el = document.getElementById("pppPreview"); if (el) el.scrollIntoView({ block: "start" }); } catch (_e) {} }
 function pppPlanVolver() { _pppPlanDay = null; pppRenderProg(); }
+/* v13.17: "Ver hoja 2" (dueño): la grilla pagina de a 6 días hábiles. */
+function pppPlanHoja(n) { _pppPlanHoja = Math.max(0, Number(n) || 0); _pppPlanDay = null; pppRenderProg(); try { const el = document.getElementById("pppPreview"); if (el) el.scrollIntoView({ block: "start" }); } catch (_e) {} }
 function pppPlanClasica(v) { _pppPlanClasica = !!v; pppRenderProg(); }
 function _pppFmtPesos(n) { n = Math.round(Number(n) || 0); const s = String(Math.abs(n)).replace(/\B(?=(\d{3})+(?!\d))/g, "."); return (n < 0 ? "-$ " : "$ ") + s; }
 function _pppFmtPesosCorto(n) { n = Number(n) || 0; if (Math.abs(n) >= 1e6) return "$" + (n / 1e6).toFixed(1).replace(".", ",") + " M"; if (Math.abs(n) >= 1e3) return "$" + Math.round(n / 1e3) + " mil"; return _pppFmtPesos(n); }
@@ -29370,13 +29378,17 @@ const _PN_MESL = ["enero", "febrero", "marzo", "abril", "mayo", "junio", "julio"
 function _pppHoyKey() { return String(getTodayKey() || "").replace(/-/g, ""); }
 function _pppKeyDate(k) { return new Date(+k.slice(0, 4), +k.slice(4, 6) - 1, +k.slice(6, 8)); }
 function _pppDateKey(d) { return d.getFullYear() + String(d.getMonth() + 1).padStart(2, "0") + String(d.getDate()).padStart(2, "0"); }
-/* Próximos N días hábiles desde hoy (hoy incluido si es hábil). */
-function _pppDiasHabiles(n) {
+/* Próximos N días hábiles desde hoy (hoy incluido si es hábil). v13.17: `skip` saltea los primeros
+   (hoja 2 = skip 6). */
+function _pppDiasHabiles(n, skip) {
   const out = []; const d = _pppKeyDate(_pppHoyKey());
-  let guard = 0;
-  while (out.length < n && guard++ < 40) {
+  let guard = 0, salt = Math.max(0, Number(skip) || 0);
+  while (out.length < n && guard++ < 40 + salt * 2) {
     const dow = d.getDay();
-    if (dow !== 0 && dow !== 6) out.push({ key: _pppDateKey(d), date: new Date(d.getTime()), dow: _PN_DOW[dow], dnum: d.getDate(), mon: _PN_MES[d.getMonth()] });
+    if (dow !== 0 && dow !== 6) {
+      if (salt > 0) salt--;
+      else out.push({ key: _pppDateKey(d), date: new Date(d.getTime()), dow: _PN_DOW[dow], dnum: d.getDate(), mon: _PN_MES[d.getMonth()] });
+    }
     d.setDate(d.getDate() + 1);
   }
   return out;
@@ -29492,19 +29504,22 @@ function _pppCamionNombre(c) { return c.ruta === "ret" ? "Retira en fábrica" : 
 /* ---- GRILLA: KPI + banda de vencidas + 6 días + otras fechas ---- */
 function _pppPlanGridHtml(programados) {
   const g = _pppPlanAgrupar(programados);
-  const dias = _pppDiasHabiles(6);
+  const hoja = _pppPlanHoja || 0;
+  const dias = _pppDiasHabiles(6, hoja * 6);
   const enGrilla = new Set(dias.map(function (d) { return d.key; }));
+  const enHojasAnt = new Set(_pppDiasHabiles(hoja * 6).map(function (d) { return d.key; }));
   const hoy = _pppHoyKey();
+  const rangoTxt = dias.length ? (dias[0].dnum + ' ' + dias[0].mon + ' → ' + dias[dias.length - 1].dnum + ' ' + dias[dias.length - 1].mon) : '';
   const cap = pppGetCfg().dayCap > 0 ? pppGetCfg().dayCap : 6;
   let tot = 0, totM3 = 0, totVal = 0, totSinVal = 0, camiones = 0;
   for (const d of dias) { const dd = g.byDay.get(d.key); if (!dd) continue; tot += dd.ped.length; totM3 += _pppM3Sum(dd.ped); const v = _pppPlanValor(dd.ped); totVal += v.valor; totSinVal += v.sin; camiones += _pppCamiones(dd.ped).filter(function (c) { return c.ruta !== "ret" && c.ruta !== "sup"; }).length; }
   let sinCtrl = 0;
   if (_pppEnSalida) _pppEnSalida.forEach(function (r, np) { try { if (_pppCargaVencida({ np: np })) sinCtrl++; } catch (_e) {} });
   const nVenc = g.venc.length;
-  let h = '<div class="pn-head"><div><div class="pn-h1">Programación de entregas</div><div class="pn-h2">Próximos 6 días hábiles · tocá un día para ver sus camiones y pedidos</div></div>' +
+  let h = '<div class="pn-head"><div><div class="pn-h1">Programación de entregas</div><div class="pn-h2">' + (hoja ? 'Hoja ' + (hoja + 1) + ' · ' + escapeHtml(rangoTxt) : 'Próximos 6 días hábiles') + ' · tocá un día para ver sus camiones y pedidos</div></div>' +
     '<div class="pn-tools"><button class="pn-lnk" onclick="pppPlanClasica(true)" title="Lista por fecha y tanda (como antes)">Vista clásica</button></div></div>';
   h += '<div class="pn-kpis">' +
-    '<div class="pn-kpi"><div class="ico">📦</div><div><div class="l">Pedidos</div><div class="v">' + tot + '</div><div class="s">próximos 6 días</div></div></div>' +
+    '<div class="pn-kpi"><div class="ico">📦</div><div><div class="l">Pedidos</div><div class="v">' + tot + '</div><div class="s">' + (hoja ? 'hoja ' + (hoja + 1) : 'próximos 6 días') + '</div></div></div>' +
     '<div class="pn-kpi"><div class="ico">🚚</div><div><div class="l">Camiones</div><div class="v">' + camiones + '</div><div class="s">por n° de tanda y día</div></div></div>' +
     '<div class="pn-kpi"><div class="ico">🧊</div><div><div class="l">Volumen</div><div class="v">' + _pppFmtM3(totM3) + ' m³</div><div class="s">a entregar</div></div></div>' +
     '<div class="pn-kpi g"><div class="ico">💰</div><div><div class="l">Valor</div><div class="v">' + (_pppValor ? _pppFmtPesos(totVal) : '…') + '</div><div class="s">estimado a lista' + (totSinVal ? ' · ' + totSinVal + ' sin valuar' : '') + '</div></div></div>' +
@@ -29538,10 +29553,17 @@ function _pppPlanGridHtml(programados) {
     h += '<div class="pn-state">' + _pppPlanBarraHtml(est, dd.ped.length) + over + '</div></div>';
   }
   h += '</div>';
-  const otras = [...g.byDay.keys()].filter(function (k) { return !enGrilla.has(k); }).sort();
+  // v13.17: las fechas de hojas anteriores no se listan (ya se vieron en su hoja)
+  const otras = [...g.byDay.keys()].filter(function (k) { return !enGrilla.has(k) && !enHojasAnt.has(k); }).sort();
   if (otras.length) {
     h += '<div class="pn-otras"><span class="t">Más adelante:</span>' + otras.map(function (k) { const dd = g.byDay.get(k), dt = _pppKeyDate(k); return '<button class="pn-chip" onclick="pppPlanAbrir(\'' + k + '\')">' + _PN_DOW[dt.getDay()].slice(0, 3) + ' ' + dt.getDate() + '/' + (dt.getMonth() + 1) + ' · ' + dd.ped.length + ' ped · ' + _pppFmtM3(_pppM3Sum(dd.ped)) + ' m³</button>'; }).join("") + '</div>';
   }
+  // v13.17: "Ver hoja 2" (dueño) — los 6 hábiles siguientes; y volver.
+  const sig = _pppDiasHabiles(6, (hoja + 1) * 6);
+  const sigTxt = sig.length ? sig[0].dnum + ' ' + sig[0].mon + ' → ' + sig[sig.length - 1].dnum + ' ' + sig[sig.length - 1].mon : '';
+  h += '<div class="pn-hojas">' +
+    (hoja ? '<button class="pn-hoja" onclick="pppPlanHoja(' + (hoja - 1) + ')">← Hoja ' + hoja + '</button>' : '<span></span>') +
+    '<button class="pn-hoja" onclick="pppPlanHoja(' + (hoja + 1) + ')">Ver hoja ' + (hoja + 2) + ' →<small>' + escapeHtml(sigTxt) + '</small></button></div>';
   return h;
 }
 /* ---- ADENTRO DE UN DÍA (o de las vencidas): cabecera + un bloque por camión con sus pedidos,
