@@ -67,7 +67,8 @@ web llegue al depósito. Cupo diario = pickers típicos × 3 m³ (hoy 2 → 6), 
 
 - **00:01 lun–vie**: job de tandas (cron 71) → arma zonas 1/2/3 pendientes para el próximo día con cupo
   desde hoy + 4 hábiles. Deja constancia en `GV_Tandas_Auto_Log`.
-- **Cada 15 min 07:00–18:45**: intradía (cron 73), mismo criterio, sólo si lo pendiente suma ≥ 0,80 m³.
+- **Cada 15 min 07:00–18:45**: intradía (cron 73), mismo criterio, **apenas hay algo pendiente** (umbral
+  0,001 m³ desde el sábado 05/09; dueño: *"si ya programaste, directo que salgan de A Programar"*).
 - **Cada 10 min**: stock (cron 68 de Producción + cron 74 para tandas web).
 - **Telegram**: alertas de picking sin stock, carga sin control, errores de PPP, etc., igual que antes.
 
@@ -86,7 +87,7 @@ web llegue al depósito. Cupo diario = pickers típicos × 3 m³ (hoy 2 → 6), 
 | `dias_anticipacion_min` | 4 | colchón de días hábiles; 0 = programar para hoy/mañana |
 | `cupo_por_dotacion` / `cupo_m3_por_picker` | 1 / 3 | cupo = pickers típicos × 3 m³; 0 = fijo `m3_max_dia` (5) |
 | `zonas_automaticas` | 1,2,3 | qué zonas se arman solas |
-| `intradia_umbral_m3` / `intradia_corte_hora` | 0,80 / 12:00 | cuándo arma el intradía |
+| `intradia_umbral_m3` / `intradia_corte_hora` | 0,001 / 12:00 | cuándo arma el intradía (0,001 = apenas hay algo; 0,80 = esperar a juntar) |
 | `sectores_activos` | 1 | tandas por cercanía real (sectores + vecinos) |
 
 ## Lo que hace falta ANTES del martes (dueño)
@@ -97,9 +98,28 @@ web llegue al depósito. Cupo diario = pickers típicos × 3 m³ (hoy 2 → 6), 
 - [x] Apagar el cron de Chef de las 12:30 — hecho el domingo 06/09 (jobs 1 y 2 en `active=false`).
 - [ ] No cargar el mail del sábado en ISIS.
 - [ ] Explicarle a la operadora el paso nuevo de Facturación: **NP web → tildar → bajar Excel ISIS**.
-- [ ] Decidir los 38 atrasados de ISIS (reprogramar en ISIS o cargar).
+- [ ] Los 20 atrasados (v13.46): 12 facturadas y armadas → marcar Controlado; 4 de D57B (98510, 98541,
+  98542, 98543) armadas sin facturar → decidir; 4 sin armar (D57C 98553/98554, D57D 98528/98600) → reprogramar.
+- [ ] **Viernes 05/09 no llegó ningún evento de Producción** (ni picking, ni armado, ni tics de facturación;
+  el jueves sí, hasta 17:12). Mirar en ISIS qué se facturó el viernes y pasármelo: lo cargo por SQL con fecha
+  del viernes, con OK explícito antes de escribir.
+- [ ] **Armadas sin tildar en Facturación**: 98510, 98541, 98542, 98543 (D57B), 98647 Coto (D59A), 98619
+  Carrefour (D61A). Faltante sólo en 98542 Pro Tatiana (566E 3/5, 583E 4/10, 231/232/233 1/1).
+- [ ] **44619 Chango Mas (Dorinka, 4,31 m³, vie 11) está en ISIS SIN TANDA** (tipo KRIKOS, "OC 9400146407").
+  Gestión no lo cuenta en el cupo del viernes mientras no tenga tanda: el viernes hoy suma 3,14 ISIS + 3,33
+  web = 6,47; con esto serían 10,8 m³. Ponerle tanda en ISIS (sale en camión propio, súper) o moverlo.
+- [ ] **Stock para las tandas web del viernes** (según `vista_stock_vs_pedidos`, cortado al domingo): sin
+  stock hoy 323E (E01A Torres y Liva pide 20), 438E, 232, 233, 951E, 957E, 970E, 971E, 727E (F01A pide 3);
+  justo 508 (16 en stock, 18 pedidas en total). Hay 4 días para producir; si no, salen con faltante como
+  cualquier tanda.
+- [ ] **Pedidos web que NO se arman solos** (zonas 4/5/6, Súper, Retira; hoy en "A Programar"): LK 1340
+  Garbarino (Retira, 0,03), LK 1341 Orfali (Martínez, zona 6, 1,18), LK 1349 Bazar Mónica (Padua, zona 5,
+  0,11), CH 0217 Gifel (San Martín, zona 6, 0,14). Se programan a mano arrastrándolos a un camión del día.
+  LK 1350 Cuyana (zona 1, 0,94) se arma sola cuando haya cupo (lunes 14). Chef 215 Dorinka quedó excluido
+  porque ya es el 44619 de ISIS.
 - [ ] Chef: password de `ch_ppp_reader` + correr `paginach/sql/gv_estado_mis_pedidos_chef.sql` (para que el cliente vea el estado).
-- [ ] Decisiones abiertas: orden de carga por cod cliente (1/2/3); carteles del tablero.
+- [ ] Decisiones abiertas: orden de carga por cod cliente (1/2/3); zonas manuales ¿se suman solas a un camión
+  existente del día?
 
 ## Lo que voy a mirar yo
 
