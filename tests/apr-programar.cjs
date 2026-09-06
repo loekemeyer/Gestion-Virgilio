@@ -31,6 +31,7 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
   const r = await p.evaluate(async () => {
     _apr.listo = true;
     _apr.emp = "lk";
+    _apr.vista = "tarjetas";   // v13.61: este test cubre la vista de tarjetas; la planilla tiene el suyo (apr-planilla.cjs)
     _apr.pedidos = [
       { order_id: 1117, cod: "R01", razon_social: "Riesgo Marcelo Fabian", zona: "Zona 3",
         fecha_recep: "2026-08-20", localidad: "Mataderos", direccion: "Bragado 5742 - Mataderos",
@@ -104,9 +105,6 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
       titem: anchoDe(".apr-titem"),
       txt:   anchoDe(".apr-titem-txt"),
       x:     anchoDe(".apr-titem-x"),
-      nueva: anchoDe(".apr-nueva"),
-      altoNueva: (function () { const e = document.querySelector(".apr-nueva");
-        return e ? Math.round(e.getBoundingClientRect().height) : -1; })()
     };
 
     return { izq, med, der, izqAbierta, conError, conOk, anchos, mezcla, barra: document.querySelector(".apr-bar").innerHTML };
@@ -172,12 +170,11 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
   const a = r.anchos;
   chk(a.x > 0 && a.x < 40, "el botón ↩ es chico (" + a.x + "px) — el button{width:100%} global no se le cuela");
   chk(a.txt > a.titem * 0.8, "el nombre del cliente se queda con el ancho (" + a.txt + " de " + a.titem + "px)");
-  chk(a.altoNueva > 28, "el botón de nueva tanda conserva su padding (alto " + a.altoNueva + "px)");
   // v13.58 (dueño: "sacá el botón Loeke/Chef; tienen que aparecer todos los pedidos a programar ahí sin filtros")
   chk(!/Loekemeyer|aprSetEmpresa/.test(r.barra), "v13.58: la barra ya no tiene el selector Loekemeyer/Chef");
   chk(/apr-tanda-emp lk">LK</.test(r.med) && /apr-tanda-emp ch">Chef</.test(r.med), "v13.58: cada tanda dice de qué empresa es");
   chk(r.med.includes("CH 0009") && r.med.includes("GV-02A"), "v13.58: la tanda de Chef etiqueta su NP como CH 0009");
-  chk(/aprNuevaTanda\('lk'\)/.test(r.med) && /aprNuevaTanda\('chef'\)/.test(r.med), "v13.58: nueva tanda LK y nueva tanda Chef");
+  chk(!/aprNuevaTanda/.test(r.med), "v13.61: ya no hay botón de tanda vacía (ninguna tanda sin fecha)");
   chk(r.mezcla.err === true && /tanda de Chef/.test(r.mezcla.msg) && /LK 1117/.test(r.mezcla.msg) && r.mezcla.rpcLlamada === false,
       "v13.58: un pedido de LK soltado en una tanda de Chef avisa y no llama a la RPC");
   chk(errs.length === 0, "sin errores de página" + (errs.length ? ": " + errs[0] : ""));

@@ -12,12 +12,31 @@
 > única**; no se replica. Ante la duda entre parche rápido y fix de raíz → **fix
 > de raíz**.
 >
-> Última actualización: 2026-09-06 (domingo) · Versión app al documentar: **v13.60**
+> Última actualización: 2026-09-06 (domingo) · Versión app al documentar: **v13.61**
 >
 > ⚠⚠ **Desde el lunes 2026-09-07 los operarios usan GESTIÓN, no Producción** (dueño, sábado a la
 > noche: *"el lunes van a empezar a usar GV, no más PV"*). Las tandas web viven en
 > `PPP_Web_Programacion` y Producción no las ve. URL: la de GitHub Pages de este repo.
 >
+> Nota **v13.61** (front) — **A Programar en PLANILLA (formato de la hoja de ISIS), tanda siempre con fecha, y
+> la PPP entera en UNA pantalla** (dueño: *"simulame un formato más similar al de PPP"*, *"no quiero tener que
+> poner el nombre de tanda yo"*, *"no puede haber tanda armada sin fecha"*, *"no quiero barras de scroll en ninguna
+> parte de la PPP; achicalo lo que tengas que achicar"*). (1) `aprPlanillaHtml()` es la vista por defecto de A
+> Programar (`_apr.vista`, `localStorage gv_apr_vista`; "🗂 Ver tarjetas" vuelve a las tres columnas): una fila por
+> NP con las columnas de ISIS (Tipo WEB/RET/SUP/EXP · N° NP · F. Recep · Cod · Razón Social · m³ · Dirección ·
+> Barrio · Programar para · Zona · Observaciones = chip de salida), y abajo "Programación próximos días" (sólo
+> lectura: m³/cupo, quedan, camiones web por LETRA+NN, ISIS). (2) **Se tilda y se toca "Generar tanda … para el
+> [día]"**, o se elige el día en la fila: `aprGenerarTanda(fecha, keys)` hace `gv_ppp_web_tanda_nueva` (código
+> automático) → `gv_ppp_web_tanda_agregar` por pedido → `gv_ppp_web_tanda_programar` con los artículos; si algo
+> falla después de crearla, `gv_ppp_web_tanda_descartar`: **ninguna tanda queda sin fecha**. Los días ofrecidos
+> son los hábiles abiertos del calendario (`gv_ppp_web_calendario`, sin "muy pronto"). Los botones "＋ Nueva tanda
+> vacía" desaparecieron también de las tarjetas. (3) `pppFitPantalla()`: el cuerpo del overlay de la PPP
+> (`.planim-body`) no scrollea (`overflow:hidden`, ancho completo en vez de 1240 px) y después de cada render de
+> `#pppPreview` (`_renderKeepFocus`) se le aplica `zoom` hasta que entre entero, ancho y alto (piso 0,35);
+> también en `resize`. `.apr-scroll` y `.ppp-tablewrap` ya no scrollean. Tests: `tests/apr-planilla.cjs` (nuevo:
+> filas por NP, tipos, días ofrecidos, orden de RPC, descarte si falla, sin fecha no arma, nada scrollea) y
+> `tests/apr-programar.cjs` (tarjetas). Sin cambios en Supabase.
+
 > Nota **v13.60** (backend + datos) — **un camión por día y zona, y la semana corrida un día hábil**
 > (dueño: *"el viernes 11 hay cinco camiones, no puede ser… no tiene sentido que se parta así"* y *"si lo del
 > 8 no fue ni empezado, pasemos los del 8 al 9 y así vamos avanzando"*). (1) `ppp_web_armar_tandas` v6
