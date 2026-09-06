@@ -1,0 +1,13 @@
+-- v13.30 (2026-09-06 madrugada) · migración gv_resync_por_bloque_prox_dia_120_dobles_v1330 · ideas 2485, 6908, 6194.
+-- 2485 · ppp_web_resync congela por BLOQUE facturado (antes: un bloque facturado congelaba todo el pedido).
+--        Parche con replace() sobre pg_get_functiondef: (a) el CTE `pedidos` deja de excluir el order_id;
+--        (b) CTE nuevo `facturadas (order_id, np_idx)` = bloques con Facturacion_NP; (c) `borradas` y
+--        `actualizadas` saltean esos bloques. Medido: 3 menciones de `facturadas` en la función viva;
+--        resync('lk','[]') = 0 filas.
+-- 6908 · gv_ppp_web_proximo_dia_entrega busca hasta 120 días (antes 40). Es STABLE: no escribe log; el
+--        aviso lo da el calendario (idea 2510).
+-- 6194 · vista gv_np_web_dobles: NP web ya programada por Gestión cuyo cliente + fecha_recep también está
+--        en ISIS (misma regla que en_produccion de gv_pedidos_web_excluidos). Hoy 0 filas. Se chequea en
+--        el control de pedidos muertos (martes 15:00) — sumar a Telegram si el dueño quiere.
+-- Cuerpos: ver la migración en supabase_migrations.schema_migrations (name = gv_resync_por_bloque_prox_dia_120_dobles_v1330).
+-- Rollback 2485: volver a poner el `and not exists (… Facturacion_NP …)` en `pedidos` (cuerpo original en sql/gv_np_es_pedido.sql).

@@ -167,7 +167,7 @@ tocó `main`).** Listas en su rama, se activan por número (":" o "hacé el NNNN
 | **5162** | `idea/5162` | Interruptores del pipeline web visibles en ⚙️ Configuración (sólo lectura) |
 | **2510** | `idea/2510` | Aviso arriba del calendario cuando el cupo está lleno varios días seguidos |
 
-Pendientes (decisión del dueño): **7394** marca única web/ISIS en las 3 vistas · **3254** botonera de
+**Domingo a la madrugada, "arrancá a hacerlas": las 6 mergeadas (v13.28) y las 7 pendientes también hechas (v13.29 front, v13.30 backend).** Eran: **7394** marca única web/ISIS en las 3 vistas · **3254** botonera de
 Facturación con 4 estilos · **6900** tipografía única del código de tanda · **3007** estado repetido 3
 veces en el día abierto · **2485** `ppp_web_resync` congela todo el pedido si un bloque se facturó ·
 **6908** `proximo_dia_entrega` se rinde a los 40 días · **6194** alerta de NP web cargada después en ISIS.

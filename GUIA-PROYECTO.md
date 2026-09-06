@@ -12,11 +12,17 @@
 > única**; no se replica. Ante la duda entre parche rápido y fix de raíz → **fix
 > de raíz**.
 >
-> Última actualización: 2026-09-05 (sábado, noche) · Versión app al documentar: **v13.29**
+> Última actualización: 2026-09-05 (sábado, noche) · Versión app al documentar: **v13.30**
 >
 > ⚠⚠ **Desde el lunes 2026-09-07 los operarios usan GESTIÓN, no Producción** (dueño, sábado a la
 > noche: *"el lunes van a empezar a usar GV, no más PV"*). Las tandas web viven en
 > `PPP_Web_Programacion` y Producción no las ve. URL: la de GitHub Pages de este repo.
+>
+> Nota **v13.30** (backend, sólo bump) — Últimas tres ideas de la noche: **2485** `ppp_web_resync`
+> congela por bloque facturado, no todo el pedido (un cambio del cliente al bloque 2 llega aunque el
+> bloque 1 ya se facturó) · **6908** `gv_ppp_web_proximo_dia_entrega` busca cupo hasta 120 días (antes
+> 40) · **6194** vista `gv_np_web_dobles`: NP web programada que también apareció en ISIS (cliente +
+> fecha de recepción). `sql/gv_v1330_resync_bloque_dobles.sql`, §3.ak.
 >
 > Nota **v13.29** (front) — Cuatro ideas visuales más: **7394** marca **WEB / ISIS** al lado de la NP en el
 > tablero, En Salida/Entregados y Facturación (`_npSrcChip`, `.np-src`) · **6900** el código de tanda en

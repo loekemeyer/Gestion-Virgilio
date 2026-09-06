@@ -1384,6 +1384,20 @@ es de Chef y pisa al LK 217): cuando Gestión alimente el tracking, escribir el 
 una función `gv_*` y pedir columna `empresa` en PaginaLK. Y el Excel ISIS de Facturación manda
 `N_Pedido` contador (no el id), como el mail: ISIS numera 98xxx por su cuenta.
 
+### 3.ak ✅ Noche de mejoras: 13 ideas de 3 agentes, todas hechas (v13.28–v13.30) — 2026-09-06 madrugada
+
+Dueño: *"lanzá agentes que piensen mejoras… aprovechá la noche"* y a la mañana *"arrancá a hacerlas"*.
+Front (v13.28/v13.29): 7828, 2048, 4528, 7999, 5162, 2510, 7394, 3254, 6900, 3007 (ver notas de la GUIA).
+Backend (v13.30, migración `gv_resync_por_bloque_prox_dia_120_dobles_v1330`):
+- **2485** `ppp_web_resync`: CTE `facturadas (order_id, np_idx)`; `pedidos` ya no excluye el order_id
+  con un bloque facturado; `borradas` y `actualizadas` saltean los bloques facturados. NP facturada =
+  congelada, por NP. Medido: 3 menciones en la función viva; `resync('lk','[]')` = 0 filas.
+- **6908** `gv_ppp_web_proximo_dia_entrega`: hasta 120 días. `('lun 07 00:01')` = lun 14 (vie 11 lleno).
+- **6194** vista `gv_np_web_dobles` (security_invoker, authenticated/service_role): 0 filas hoy.
+- **4528** (v13.28) vistas `gv_ppp_web_prog_sin_base` + `gv_np_prog_sin_base` (`sql/gv_np_prog_sin_base.sql`).
+Además los `.sql` del repo llevan al pie los parches vigentes (hallazgo del agente de lógica: el repo no
+reproducía la base). Rollback por idea en `sql/gv_v1330_resync_bloque_dobles.sql`.
+
 ### 3.aj ✅ CCR cuenta como controlado = entregado (v13.27) — 2026-09-05 sábado (noche)
 
 Dueño, mirando los 38 atrasados: *"¿no deberían estar en En Salida? Si ya fueron controlados, van
