@@ -103,9 +103,10 @@ web llegue al depósito. Cupo diario = pickers típicos × 3 m³ (hoy 2 → 6), 
 - [ ] Explicarle a la operadora el paso nuevo de Facturación: **NP web → tildar → bajar Excel ISIS**.
 - [ ] Los 20 atrasados (v13.46): 12 facturadas y armadas → marcar Controlado; 4 de D57B (98510, 98541,
   98542, 98543) armadas sin facturar → decidir; 4 sin armar (D57C 98553/98554, D57D 98528/98600) → reprogramar.
-- [ ] **Viernes 05/09 no llegó ningún evento de Producción** (ni picking, ni armado, ni tics de facturación;
-  el jueves sí, hasta 17:12). Mirar en ISIS qué se facturó el viernes y pasármelo: lo cargo por SQL con fecha
-  del viernes, con OK explícito antes de escribir.
+- [x] ~~Viernes sin eventos de Producción~~ — **falsa alarma mía (06/09): el 4/9 era VIERNES, no jueves.**
+  El viernes 4/9 llegó todo (46 eventos de operarios, 581 movimientos de stock, 6 tics de facturación); el
+  día sin actividad era el sábado 5/9. No hay nada que reconstruir. Runbook por si pasa de verdad:
+  `docs/RUNBOOK-EVENTOS-PERDIDOS.md`.
 - [ ] **Armadas sin tildar en Facturación**: 98510, 98541, 98542, 98543 (D57B), 98647 Coto (D59A), 98619
   Carrefour (D61A). Faltante sólo en 98542 Pro Tatiana (566E 3/5, 583E 4/10, 231/232/233 1/1).
 - [x] ~~44619 Chango Mas sin tanda en ISIS~~ — **v13.50: programado como E07A (vie 11)** vía `GV_PPP_Prog_Override`

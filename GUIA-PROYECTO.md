@@ -50,7 +50,7 @@
 > Nota **v13.46** (front) — **Vencidos en dos grupos: los que NO salieron van en alerta** (dueño:
 > *"marcalas como alerta pero hay que reprogramarlas"*). De los 20 atrasados, 16 tienen la tanda armada
 > (salieron; sólo falta marcar el remito) y 4 tienen la tanda sin armar (nunca subieron a un camión:
-> D57C y D57D del jueves 4/9). En **Resumen** la línea ahora dice *"N sin salir → hay que reprogramar ·
+> D57C y D57D del viernes 4/9). En **Resumen** la línea ahora dice *"N sin salir → hay que reprogramar ·
 > M con la tanda armada y el remito sin marcar"* (roja si hay alguno sin salir), y adentro de la lista
 > de atrasados hay un bloque rojo con esos pedidos (NP · cliente · tanda · fecha) y la columna **"Qué
 > hacer"** por fila: *"⚠ NO SALIÓ · reprogramar"* o *"salió · marcar remito"*. Sin orden de carga en

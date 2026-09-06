@@ -1403,11 +1403,17 @@ where np = '44619'` (la vista queda; sin filas es passthrough).
 
 El dueño mandó el Excel PPP vigente (`AAA_PPP_Vigente.xlsm`). Cruzado contra Supabase:
 - **Facturación**: las 59 `Fecha Fc` del Excel (02/09, 03/09, 04/09) coinciden una por una con los tics de
-  `Facturacion_NP` (mismo día). Las 6 FC del jueves 04/09 en ISIS (400035804–809: 98484 Vargas, 98461 Sun
-  Yung Hung, 98464/98465 MRG, 98646 Zhu Leo, 98513 Fang Chiao Wen) están tildadas el jueves 16:01–16:12 (+44594).
-  En el Excel 5 de esas 6 todavía no tienen `Fecha Fc` (la app va adelante). **Ninguna `Fecha Fc` ni tic del
-  viernes 05/09**: el viernes no se facturó nada. "11:00HS" / "12:00hs" en `Fecha Fc` de 98685 y 98647 son
-  horarios de entrega mal puestos, no facturas.
+  `Facturacion_NP` (mismo día). Las 6 FC del viernes 04/09 en ISIS (400035804–809: 98484 Vargas, 98461 Sun
+  Yung Hung, 98464/98465 MRG, 98646 Zhu Leo, 98513 Fang Chiao Wen) están tildadas el viernes 16:01–16:12 (+44594).
+  En el Excel 5 de esas 6 todavía no tienen `Fecha Fc` (la app va adelante). Ninguna `Fecha Fc` ni tic del
+  sábado 05/09 (normal). "11:00HS" / "12:00hs" en `Fecha Fc` de 98685 y 98647 son horarios de entrega mal
+  puestos, no facturas.
+  **⚠ Falsa alarma del domingo 06/09, mía:** durante todo el día etiqueté el 4/9 como "jueves" y el 5/9 como
+  "viernes" y le dije al dueño que "el viernes no llegó ningún evento de Producción". El 4/9 era **viernes**
+  (46 eventos de operarios, 581 movimientos, 6 tics) y el 5/9 **sábado**. No se perdió nada; §3.ai y las
+  notas de v13.46 sobre "el viernes" se refieren en realidad al jueves 3/9 y viernes 4/9. La FC PYME
+  500000906 (Carrefour, 03/09) es la 98115 de julio, no la 98619. Runbook para cuando pase de verdad:
+  `docs/RUNBOOK-EVENTOS-PERDIDOS.md`.
 - **NP por encima del corte de la canilla (98694 / 44619)**: 98696–98703 y 44620/44621 = **el mail del sábado
   12:30 cargado en ISIS** (1343 Chen Li Yu ×3, 1344 Torres y Liva ×2, 1340 Garbarino, 1341 Orfali, 1342 Di Leo;
   Chef 216 Elbantonio ×2) — sin tanda ni fecha; dobles de E01E/E01A/E05A/E01D/E02A y de Garbarino (a mano). Y
