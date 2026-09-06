@@ -12,11 +12,18 @@
 > única**; no se replica. Ante la duda entre parche rápido y fix de raíz → **fix
 > de raíz**.
 >
-> Última actualización: 2026-09-05 (sábado, noche) · Versión app al documentar: **v13.28**
+> Última actualización: 2026-09-05 (sábado, noche) · Versión app al documentar: **v13.29**
 >
 > ⚠⚠ **Desde el lunes 2026-09-07 los operarios usan GESTIÓN, no Producción** (dueño, sábado a la
 > noche: *"el lunes van a empezar a usar GV, no más PV"*). Las tandas web viven en
 > `PPP_Web_Programacion` y Producción no las ve. URL: la de GitHub Pages de este repo.
+>
+> Nota **v13.29** (front) — Cuatro ideas visuales más: **7394** marca **WEB / ISIS** al lado de la NP en el
+> tablero, En Salida/Entregados y Facturación (`_npSrcChip`, `.np-src`) · **6900** el código de tanda en
+> En Salida/Entregados con la misma píldora mono azul que el tablero (`.ppp-ent-t-h`) · **3007** el día
+> abierto ya no repite las píldoras de estado en cada camión (quedan la barra de arriba y el estado por
+> fila; el detalle va en el `title`) · **3254** los botones de cierre de Facturación con una sola familia
+> (`.fac-cierre-sec`, `.danger` sólo para Anular).
 >
 > Nota **v13.28** (front + backend) — **Seis ideas de la noche mergeadas** (dueño: *"arrancá a hacerlas"*):
 > **7828** el monitor de pared agrupa camiones por letra+número (`tandaCamion` = `E60`, `D60`; antes E60A y

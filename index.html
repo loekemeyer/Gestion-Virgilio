@@ -2104,7 +2104,7 @@ button.pk-anular small{ display:block; font-size:12px; font-weight:700; opacity:
 .ppp-ent-day-h{ background:#f1f5f9; padding:7px 12px; font-weight:bold; color:#0f172a; font-size:13px; display:flex; justify-content:space-between; gap:10px; }
 .ppp-ent-day-h .m3{ color:#1e6bd6; white-space:nowrap; }
 .ppp-ent-t{ padding:6px 12px; border-top:1px solid #eef2f7; }
-.ppp-ent-t-h{ font-weight:bold; color:#1e40af; font-size:12px; margin-bottom:3px; }
+.ppp-ent-t-h{ display:inline-block; font-family:Consolas,Menlo,monospace; font-weight:800; background:#1e6bd6; color:#fff; padding:3px 8px; border-radius:7px; font-size:12px; margin-bottom:4px; } /* idea 6900: igual que .pn-ped .tanda */
 .ppp-ent-np{ display:inline-block; font-size:12px; color:#334155; margin:1px 10px 1px 0; }
 .ppp-ent-np b{ color:#0f172a; }
 .ppp-ent-modes{ display:flex; gap:8px; margin:0 0 10px; flex-wrap:wrap; }
@@ -3369,6 +3369,14 @@ table.fac-np-tbl td{ padding: 3px 8px; vertical-align: middle; overflow: hidden;
 table.fac-np-tbl td.num{ text-align: right; font-variant-numeric: tabular-nums; }
 table.fac-np-tbl td.center{ text-align: center; }
 .fac-np-cell{ font-family: monospace; font-weight: bold; color: #1e6bd6; font-size: 13px; }
+/* idea 7394: marca de origen del pedido, igual en todas las pantallas */
+.np-src{ display:inline-block; margin-left:5px; padding:0 5px; border-radius:4px; font-family:system-ui,sans-serif; font-size:9.5px; font-weight:800; letter-spacing:.06em; vertical-align:middle; line-height:15px; }
+.np-src.web{ background:#dbeafe; color:#1e40af; }
+.np-src.isis{ background:#e2e8f0; color:#475569; }
+/* idea 3254: botonera de cierre con una sola familia (la primaria es .fac-btn-cierre) */
+.fac-cierre-sec{ width:100%; margin-top:6px; padding:11px; border:1.5px solid #cbd5e1; border-radius:10px; background:#fff; color:#0f172a; font-size:14px; font-weight:800; cursor:pointer; }
+.fac-cierre-sec:hover{ background:#f8fafc; }
+.fac-cierre-sec.danger{ color:#b91c1c; border-color:#fecaca; }
 .fac-cod-cell{ font-family: monospace; color: #475569; font-size: 12px; }
 /* .fac-dir-cell removido en v8.81 (columna Dirección eliminada de Facturación) */
 /* Razón Social: el nombre trunca en su renglón, pero los avisos (⚠ FALTA / 🧾
@@ -3904,10 +3912,10 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
       Genera PDF de reparto para mañana con todos los NPs facturados hoy. Los NPs sin tickear quedan pendientes para mañana.
     </div>
     <button class="fac-btn-cierre" id="facBtnCierre" disabled onclick="generateFacturacionPDF()">Terminé — Generar PDF</button>
-    <button onclick="openRuteo()" style="width:100%;margin-top:8px;padding:13px;border:none;border-radius:10px;background:#0f766e;color:#fff;font-size:15px;font-weight:800;cursor:pointer">🗺️ Armar ruta de reparto de mañana</button>
-    <button onclick="openZonasMapa()" title="Geocodifica todas las direcciones (OpenStreetMap) y las muestra en un mapa por zona, para parametrizar bien las zonas" style="width:100%;margin-top:6px;padding:11px;border:1px solid #0f766e;border-radius:10px;background:#ecfeff;color:#0f766e;font-size:14px;font-weight:800;cursor:pointer">📍 Mapa de zonas (geocodificar)</button>
+    <button onclick="openRuteo()" class="fac-cierre-sec">🗺️ Armar ruta de reparto de mañana</button>
+    <button onclick="openZonasMapa()" title="Geocodifica todas las direcciones (OpenStreetMap) y las muestra en un mapa por zona, para parametrizar bien las zonas" class="fac-cierre-sec">📍 Mapa de zonas (geocodificar)</button>
     <div id="facTickedList" class="fac-ticked-list" style="display:none"></div>
-    <button onclick="facNCOpen()" title="Anular una factura ya emitida con una Nota de Crédito" style="flex:0 0 100%;width:100%;margin-top:4px;padding:9px;border:1px solid #fecaca;border-radius:10px;background:#fff;color:#b91c1c;font-size:13px;font-weight:800;cursor:pointer">🧾 Anular factura (Nota de Crédito)</button>
+    <button onclick="facNCOpen()" title="Anular una factura ya emitida con una Nota de Crédito" class="fac-cierre-sec danger">🧾 Anular factura (Nota de Crédito)</button>
   </div>
   <div class="fac-toast" id="facToast"></div>
 </div>
@@ -7019,7 +7027,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v13.28";
+const APP_VERSION = "v13.29";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -26979,7 +26987,7 @@ function _pppEntGroupedHtml(list, showCajas, cap) {
         const disc = (p.discrep && p.pppDate) ? ' <span style="color:#b45309;font-weight:700;" title="Salió (carga camión) en otra fecha que la de la PPP — revisar la PPP">⚠ PPP decía ' + p.pppDate.slice(8, 10) + '/' + p.pppDate.slice(5, 7) + '</span>' : '';
         // v13.02 — en En Salida, lo cargado y sin controlar pasado el plazo lleva la pastilla roja (antes iba en Programación).
         const venc = (p._cargado && _pppCargaVencida(p)) ? ' <span class="ppp-cargvenc-badge">🚨 SIN CONTROLAR</span>' : '';
-        html += '<div class="ppp-ent-row"><b>' + escapeHtml(p.np) + '</b> ' + escapeHtml((p.rs || p.cod || "").slice(0, 32)) + (p.m3 != null ? ' <span class="ppp-ent-m3">' + p.m3.toFixed(3).replace('.', ',') + ' m³</span>' : '') + cajas + disc + venc + '</div>';
+        html += '<div class="ppp-ent-row"><b>' + escapeHtml(p.np) + '</b>' + _npSrcChip(p.np) + ' ' + escapeHtml((p.rs || p.cod || "").slice(0, 32)) + (p.m3 != null ? ' <span class="ppp-ent-m3">' + p.m3.toFixed(3).replace('.', ',') + ' m³</span>' : '') + cajas + disc + venc + '</div>';
       }
       html += '</div>';
     }
@@ -29426,6 +29434,8 @@ function pppPlanClasica(v) { _pppPlanClasica = !!v; pppRenderProg(); }
 function _pppFmtPesos(n) { n = Math.round(Number(n) || 0); const s = String(Math.abs(n)).replace(/\B(?=(\d{3})+(?!\d))/g, "."); return (n < 0 ? "-$ " : "$ ") + s; }
 function _pppFmtPesosCorto(n) { n = Number(n) || 0; if (Math.abs(n) >= 1e6) return "$" + (n / 1e6).toFixed(1).replace(".", ",") + " M"; if (Math.abs(n) >= 1e3) return "$" + Math.round(n / 1e3) + " mil"; return _pppFmtPesos(n); }
 // v13.16: 1 decimal, salvo volúmenes chicos (0,04 mostraba "0,0" como si el pedido no tuviera nada)
+/* idea 7394 (v13.29): la misma marca "WEB" / "ISIS" en tablero, En Salida/Entregados y Facturación */
+function _npSrcChip(np) { return /^(LK|CH)\s/i.test(String(np || "").trim()) ? '<span class="np-src web" title="Pedido de la página (web): se factura bajando el Excel ISIS">WEB</span>' : '<span class="np-src isis" title="Pedido cargado en ISIS: se factura con el tilde">ISIS</span>'; }
 function _pppFmtM3(n) { n = Number(n) || 0; return (n && Math.abs(n) < 0.1 ? n.toFixed(2) : n.toFixed(1)).replace(".", ","); }
 const _PN_DOW = ["Domingo", "Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado"];
 const _PN_MES = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"];
@@ -29651,7 +29661,7 @@ function _pppPlanDiaHtml(programados, key) {
     let oc = (c.ruta === "ret" || c.ruta === "sup") ? null : _pppOrdenCarga(c);
     if (oc && (oc.paradas.length - oc.sinUbic) < 2) oc = null;
     const chips = (c.est.armado ? '<span class="pn-chip mid">' + c.est.armado + ' armado' + (c.est.armado === 1 ? '' : 's') + '</span>' : '') + (c.est.curso ? '<span class="pn-chip wait">' + c.est.curso + ' en curso</span>' : '') + (c.est.sin ? '<span class="pn-chip">' + c.est.sin + ' sin empezar</span>' : '');
-    h += '<div class="pn-camion"><div class="ch ' + c.ruta + '"><div class="ico">' + _pppCamionIco(c) + '</div><div><div class="t1">' + escapeHtml(_pppCamionNombre(c)) + '</div><div class="t2">' + (c.tandas.length ? 'Tanda' + (c.tandas.length === 1 ? '' : 's') + ' ' + escapeHtml(c.tandas.join(" · ")) : 'Sin tanda') + ' · ' + c.ped.length + ' pedido' + (c.ped.length === 1 ? '' : 's') + '</div></div><div class="st">' + chips + '</div><div class="m3">' + _pppFmtM3(c.m3) + ' m³</div><div class="p">' + (_pppValor ? _pppFmtPesos(c.valor) : '…') + (c.sinValor ? '<small title="Pedidos sin valuar (sin líneas o sin precio de lista)"> · ' + c.sinValor + ' s/valor</small>' : '') + '</div></div>';
+    h += '<div class="pn-camion"><div class="ch ' + c.ruta + '"><div class="ico">' + _pppCamionIco(c) + '</div><div><div class="t1">' + escapeHtml(_pppCamionNombre(c)) + '</div><div class="t2">' + (c.tandas.length ? 'Tanda' + (c.tandas.length === 1 ? '' : 's') + ' ' + escapeHtml(c.tandas.join(" · ")) : 'Sin tanda') + ' · ' + c.ped.length + ' pedido' + (c.ped.length === 1 ? '' : 's') + '</div></div><div class="st" title="' + escapeHtml(chips.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim()) + '"></div><div class="m3">' + _pppFmtM3(c.m3) + ' m³</div><div class="p">' + (_pppValor ? _pppFmtPesos(c.valor) : '…') + (c.sinValor ? '<small title="Pedidos sin valuar (sin líneas o sin precio de lista)"> · ' + c.sinValor + ' s/valor</small>' : '') + '</div></div>';
     if (oc && oc.paradas.length > 1) {
       const rec = oc.paradas.map(function (p) { return escapeHtml(p.localidad || p.barrio || p.razon_social || p.np); });
       const carga = oc.paradas.slice().reverse();
@@ -29676,7 +29686,7 @@ function _pppPlanDiaHtml(programados, key) {
         else carga = '<div class="pn-carga"><span class="n">' + n + 'º</span><span class="t">falta armar</span></div>';
       }
       h += '<div class="pn-ped' + (p._err && p._err.length ? ' err' : '') + '"><span class="tanda ' + c.ruta + '">' + escapeHtml(String(p.tanda || "—").toUpperCase()) + '</span>' +
-        '<div><div class="rs">' + (p._err && p._err.length ? '⚠️ ' : '') + escapeHtml(p.razon_social || p.cod || "—") + '</div><div class="np">' + escapeHtml(String(np)) + (p.cod ? ' · cód ' + escapeHtml(String(p.cod)) : '') + '</div></div>' +
+        '<div><div class="rs">' + (p._err && p._err.length ? '⚠️ ' : '') + escapeHtml(p.razon_social || p.cod || "—") + '</div><div class="np">' + escapeHtml(String(np)) + (p.cod ? ' · cód ' + escapeHtml(String(p.cod)) : '') + _npSrcChip(np) + '</div></div>' +
         '<div class="loc">' + escapeHtml(p.localidad || p.barrio || "—") + '</div>' +
         '<div class="m">' + _pppFmtM3(p.m3) + '</div>' +
         '<div class="pp">' + (v == null ? '<small>s/valor</small>' : _pppFmtPesos(v)) + '</div>' +
@@ -36779,7 +36789,7 @@ function facRender(tandas){
         <td class="center fac-xls-cell">${facNpEsWeb(f.np)
           ? `<input type="checkbox" class="fac-xls-chk" data-np="${escapeHtml(f.np)}"${_facXlsSel.has(String(f.np)) ? ' checked' : ''} onchange="facXlsToggle(this.getAttribute('data-np'))" title="NP de la página: marcá y bajá el Excel ISIS para facturarla">`
           : `<span class="fac-xls-no" title="NP de ISIS: se factura con el tilde ✓, no va al Excel">—</span>`}</td>
-        <td class="fac-np-cell" title="${escapeHtml(_npTip)}">${escapeHtml(f.np)}</td>
+        <td class="fac-np-cell" title="${escapeHtml(_npTip)}">${escapeHtml(f.np)}${_npSrcChip(f.np)}</td>
         <td class="fac-cod-cell">${escapeHtml(f.cod)}</td>
         <td class="fac-rs-cell"><span class="fac-rs-name">${escapeHtml(f.rs)}</span>${_ft ? facTareaBadge(f.np) : ''}</td>
         <td class="fac-falta-col">${facFaltAgregDist(f.np)}</td>
