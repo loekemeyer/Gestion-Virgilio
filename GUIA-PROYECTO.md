@@ -12,11 +12,23 @@
 > única**; no se replica. Ante la duda entre parche rápido y fix de raíz → **fix
 > de raíz**.
 >
-> Última actualización: 2026-09-06 (domingo) · Versión app al documentar: **v13.46**
+> Última actualización: 2026-09-06 (domingo) · Versión app al documentar: **v13.47**
 >
 > ⚠⚠ **Desde el lunes 2026-09-07 los operarios usan GESTIÓN, no Producción** (dueño, sábado a la
 > noche: *"el lunes van a empezar a usar GV, no más PV"*). Las tandas web viven en
 > `PPP_Web_Programacion` y Producción no las ve. URL: la de GitHub Pages de este repo.
+>
+> Nota **v13.47** (backend + Edge Function + front) — **"Mandá directo a Programación si ya está. No más
+> en A Programar"** (dueño, domingo a la tarde). Todo pedido web con día previsible se programa en la
+> misma corrida del automático (job 00:01 e intradía cada 15 min, ahora **todos los días 06:00–20:45**):
+> zonas automáticas (1/2/3) en **cascada** de días con cupo (lo que no entra el primer día va al siguiente
+> con cupo, hasta 8 días por corrida); zonas manuales (4/5/6/7) **al día en que ya hay camión a la zona**
+> (tanda web o de ISIS, desde el día mínimo), como prioritarios. En "A Programar" quedan sólo Retira, Súper,
+> sin zona y sin camión previsto. Nueva `gv_ppp_web_armar_pendientes(...)` (+ `_simular`) que llama a
+> `ppp_web_armar_tandas` por fecha (ahora 5 args: `p_incluir_manuales`). **Las tandas se numeran como
+> Producción**: `gv_ppp_web_letra_y_camion()` → E01A, E02A, E03A… (una letra nueva sólo en el camión 99),
+> no una letra por corrida. Chips de A Programar: "🤖 se arma solo → lun 14/9 · en minutos", "🚚 va al camión
+> del vie 11/9 · en minutos". `docs/SUPABASE-GESTION-VIRGILIO.md` §3.ao, `sql/gv_ppp_web_armar_pendientes.sql`.
 >
 > Nota **v13.46** (front) — **Vencidos en dos grupos: los que NO salieron van en alerta** (dueño:
 > *"marcalas como alerta pero hay que reprogramarlas"*). De los 20 atrasados, 16 tienen la tanda armada

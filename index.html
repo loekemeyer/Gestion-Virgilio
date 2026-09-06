@@ -7039,7 +7039,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v13.46";
+const APP_VERSION = "v13.47";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -32649,11 +32649,12 @@ function aprSalidaChip(p) {
     const d = new Date(+s.dia.slice(0, 4), +s.dia.slice(5, 7) - 1, +s.dia.slice(8, 10));
     const DOW = ["dom", "lun", "mar", "mié", "jue", "vie", "sáb"];
     // v13.32 (dueño: "¿por qué aparece mezclado lo programado con lo que no?"): nada de esta lista está
-    // programado; el chip dice qué va a pasar. Automático = se arma solo; manual = hay camión, programalo.
+    // programado; el chip dice qué va a pasar. v13.47 (dueño: "mandá directo a Programación si ya
+    // está, no más en A Programar"): todo lo que tiene día lo programa el automático en la próxima
+    // corrida (cada 15 min), también las zonas manuales con camión. El chip ya no pide "programalo".
     const f = DOW[d.getDay()] + " " + d.getDate() + "/" + (d.getMonth() + 1);
-    const auto = s.motivo === "intradia" || s.motivo === "job";
-    const txt = auto ? "🤖 se arma solo → " + f : "🚚 hay camión el " + f + " · programalo";
-    return '<span class="apr-chip apr-chip-sal' + (auto ? "" : " man") + '" title="' + escapeHtml(recep + s.detalle) + '">' + txt + '</span>';
+    const txt = s.motivo === "camion" ? "🚚 va al camión del " + f + " · en minutos" : "🤖 se arma solo → " + f + " · en minutos";
+    return '<span class="apr-chip apr-chip-sal" title="' + escapeHtml(recep + s.detalle + " Lo programa el automático en la próxima corrida (cada 15 min).") + '">' + txt + '</span>';
   }
   const lab = s.motivo === "retira" ? "🏭 retira" : (s.motivo === "super" ? "🛒 súper: a mano" : (s.motivo === "sin_zona" ? "❓ sin zona" : "⏳ sin camión previsto"));
   return '<span class="apr-chip apr-chip-sal no" title="' + escapeHtml(recep + s.detalle) + '">' + lab + '</span>';
@@ -32936,17 +32937,18 @@ function aprRender() {
 function aprPorQueHtml(lista) {
   if (!_apr.listo || !lista.length) return "";
   const s = _apr.salida || {};
+  // v13.47: zona manual CON camión también la programa el automático (al día del camión).
   let auto = 0, manual = 0, mano = 0;
   for (const p of lista) {
     const m = (s[p.order_id] || {}).motivo || "";
-    if (m === "job" || m === "intradia") auto++;
-    else if (m === "camion" || m === "sin_camion") manual++;
+    if (m === "job" || m === "intradia" || m === "camion") auto++;
+    else if (m === "sin_camion") manual++;
     else if (m === "retira" || m === "super" || m === "sin_zona") mano++;
   }
   if (!auto && !manual && !mano) return "";
   const partes = [];
-  if (auto)   partes.push('<b>' + auto + '</b> los arma solo el automático (esperan día con cupo)');
-  if (manual) partes.push('<b>' + manual + '</b> de zona manual: los programás vos');
+  if (auto)   partes.push('<b>' + auto + '</b> los programa solo el automático en minutos');
+  if (manual) partes.push('<b>' + manual + '</b> sin camión previsto a la zona: los programás vos');
   if (mano)   partes.push('<b>' + mano + '</b> retira o súper: siempre a mano');
   return '<div class="apr-porque">Ninguno tiene tanda todavía · ' + partes.join(' · ') + '</div>';
 }

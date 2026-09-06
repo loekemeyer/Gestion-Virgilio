@@ -5,9 +5,10 @@
 // Lo que pidió el dueño: *"para el comienzo de cada día (lunes a viernes no
 // feriado) tiene que elegir las tandas a armar a ese día"*.
 //
-// La lógica de armado NO está acá: vive en `ppp_web_armar_tandas` (Postgres),
-// probada contra 120 días de tandas reales. Esta función es el DISPARADOR y el
-// puente hacia LK/Chef, que es lo único que la base no puede hacer sola.
+// La lógica de armado NO está acá: vive en `gv_ppp_web_armar_pendientes` →
+// `ppp_web_armar_tandas` (Postgres), probada contra 120 días de tandas reales. Esta
+// función es el DISPARADOR y el puente hacia LK/Chef, que es lo único que la base no
+// puede hacer sola.
 //
 // Hace, en orden:
 //   1. ¿es día hábil en Argentina? → si no, loguea 'salteada' y corta
@@ -19,7 +20,9 @@
 //   3. `gv_ppp_web_np_asignar`  — registra la NP de cada bloque (= nº de pedido de la página)
 //   4. `ppp_web_resync`         — pone al día lo YA programado que cambió
 //   5. `gv_ppp_web_zona_lote`   — resuelve la zona de cada NP
-//   6. `ppp_web_armar_tandas`   — arma las tandas del día, hasta el cupo de m³
+//   6. `gv_ppp_web_armar_pendientes` — arma las tandas (v13.47: TODO lo que tiene día
+//      previsible: zonas automáticas en cascada de días con cupo, zonas manuales al día
+//      en que ya hay camión; por dentro llama a `ppp_web_armar_tandas` por fecha)
 //   7. `PPP_Web_Base`           — la foto de artículos, o el picking sale vacío
 //   8. `GV_Tandas_Auto_Log`     — deja constancia, incluso de no haber hecho nada
 //
@@ -207,18 +210,24 @@ async function resolverZonas(entradas: { ze: string; loc: string; dir: string }[
   return out;
 }
 
-/** Los códigos de Chef que corresponden a estos códigos de LK, por CUIT.
- *  `gv_clientes_lk_ch` es una vista de LK que aparea los dos padrones (357
- *  clientes al 2026-09-04). Por CUIT y no por nombre: los padrones escriben
- *  distinto la misma razón social ("Torres Y Liva S.A Cif" contra "Torres Y Liva"). */
-async function codsChefDe(codsLk: string[]): Promise<string[]> {
+/** Los códigos de Chef que corresponden a estos códigos de LK, por CUIT, CON el día en
+ *  que entró cada LK (v13.47: una corrida arma varios días, así que "el mismo día" es el
+ *  día de ESE cliente, no el de la corrida). `gv_clientes_lk_ch` es una vista de LK que
+ *  aparea los dos padrones (357 clientes al 2026-09-04). Por CUIT y no por nombre: los
+ *  padrones escriben distinto la misma razón social ("Torres Y Liva S.A Cif" contra
+ *  "Torres Y Liva"). */
+async function forzarChefDe(codFecha: Record<string, string>): Promise<{ cod: string; fecha: string }[]> {
+  const codsLk = Object.keys(codFecha);
   if (!codsLk.length) return [];
   const r = await lk("/rest/v1/rpc/gv_cods_chef_de_lk",
     { method: "POST", body: JSON.stringify({ p_cods_lk: codsLk }) });
   if (!r.ok) return [];                   // sin mapeo se sigue igual, no se rompe el armado
-  const out = new Set<string>();
-  for (const x of await r.json() as { cod_ch: string }[]) out.add(String(x.cod_ch));
-  return [...out];
+  const out = new Map<string, string>();
+  for (const x of await r.json() as { cod_lk: string; cod_ch: string }[]) {
+    const f = codFecha[String(x.cod_lk)];
+    if (f && !out.has(String(x.cod_ch))) out.set(String(x.cod_ch), f);
+  }
+  return [...out].map(([cod, fecha]) => ({ cod, fecha }));
 }
 
 /** La etiqueta que ve el operario: "LK 1350" / "LK 1350-2" (bloque 2) / "CH 0217".
@@ -249,41 +258,58 @@ async function umbralIntradia(): Promise<number> {
 }
 
 /** Lo PENDIENTE del armado automático: filas de la empresa que todavía no tienen tanda
- *  y cuya zona es automática (`gv_ppp_web_zona_automatica`: hoy 1 y 2; Súper, Retira y
- *  el resto nunca). Es lo que se compara contra el umbral intradía. Sólo lee. */
-async function pendienteAutomatico(emp: "lk" | "chef", filas: Fila[]): Promise<{ m3: number; np: number; zonas: Record<string, number> }> {
-  if (!filas.length) return { m3: 0, np: 0, zonas: {} };
+ *  y cuya zona es automática (`gv_ppp_web_zona_automatica`: 1, 2 y 3; Súper, Retira y
+ *  el resto nunca). Es lo que se compara contra el umbral intradía. Sólo lee.
+ *  v13.47: además cuenta las de zona MANUAL que ya tienen camión a la zona
+ *  (`gv_ppp_web_dia_camion`): ésas se arman siempre, sin umbral. */
+async function pendienteAutomatico(emp: "lk" | "chef", filas: Fila[]): Promise<{ m3: number; np: number; zonas: Record<string, number>; np_manual_camion: number; m3_manual_camion: number }> {
+  const nada = { m3: 0, np: 0, zonas: {}, np_manual_camion: 0, m3_manual_camion: 0 };
+  if (!filas.length) return nada;
   const rProg = await vg(`/rest/v1/PPP_Web_Programacion?select=order_id,np_idx` +
     `&empresa=eq.${emp}&tanda=not.is.null&limit=20000`);
   const progRows = rProg.ok ? await rProg.json() as { order_id: number; np_idx: number }[] : [];
   const conTanda = new Set(progRows.map((x) => `${x.order_id}|${x.np_idx}`));
   const pend = filas.filter((n) => !conTanda.has(`${n.order_id}|${n.np_idx}`));
-  if (!pend.length) return { m3: 0, np: 0, zonas: {} };
+  if (!pend.length) return nada;
   const zonas = await resolverZonas(pend.map((n) => {
     const b = barrioCrudo(n);
     return b.usaDireccion ? { ze: "", loc: "", dir: b.barrio } : { ze: b.barrio, loc: "", dir: "" };
   }));
   const auto = new Map<string, boolean>();
+  const camion = new Map<string, string | null>();
+  let diaMin: string | null = null;
   for (const z of new Set(zonas.filter(Boolean))) {
     try { auto.set(z, await vgRpc<boolean>("gv_ppp_web_zona_automatica", { p_zona: z })); }
     catch (_e) { auto.set(z, false); }
+    if (!auto.get(z) && /^\s*Zona\s*\d+/.test(z)) {
+      try {
+        diaMin = diaMin ?? await vgRpc<string>("gv_ppp_web_dia_minimo", {});
+        camion.set(z, await vgRpc<string | null>("gv_ppp_web_dia_camion", { p_zona: z, p_desde: diaMin }));
+      } catch (_e) { camion.set(z, null); }
+    }
   }
-  let m3 = 0, np = 0;
+  let m3 = 0, np = 0, npMan = 0, m3Man = 0;
   const porZona: Record<string, number> = {};
   pend.forEach((n, i) => {
     const z = zonas[i] || "";
-    if (!auto.get(z)) return;
-    m3 += Number(n.m3) || 0; np++;
-    porZona[z] = (porZona[z] ?? 0) + (Number(n.m3) || 0);
+    if (auto.get(z)) {
+      m3 += Number(n.m3) || 0; np++;
+      porZona[z] = (porZona[z] ?? 0) + (Number(n.m3) || 0);
+    } else if (camion.get(z)) {
+      npMan++; m3Man += Number(n.m3) || 0;
+    }
   });
-  return { m3: Math.round(m3 * 1000) / 1000, np, zonas: porZona };
+  return { m3: Math.round(m3 * 1000) / 1000, np, zonas: porZona,
+    np_manual_camion: npMan, m3_manual_camion: Math.round(m3Man * 1000) / 1000 };
 }
 
+type TandaNueva = { r_fecha: string; r_tanda: string; r_zona: string; r_np_count: number; r_m3: number; r_clientes: number; r_cods: string[] | null };
+
 async function procesarEmpresa(
-  emp: "lk" | "chef", filas: Fila[], fecha: string, forzarCods: string[] = [],
+  emp: "lk" | "chef", filas: Fila[], fecha: string, forzar: { cod: string; fecha: string }[] = [],
 ) {
   if (!filas.length) {
-    return { np_leidas: 0, np_programadas: 0, tandas: [] as unknown[], codsHoy: [] as string[] };
+    return { np_leidas: 0, np_programadas: 0, tandas: [] as TandaNueva[], codFecha: {} as Record<string, string> };
   }
 
   // ── 1. numerar ──────────────────────────────────────────────────────────
@@ -322,6 +348,11 @@ async function procesarEmpresa(
   }));
 
   // ── 4. armar las tandas ─────────────────────────────────────────────────
+  // v13.47 (dueño: "mandá directo a Programación si ya está; no más en A Programar"):
+  // `gv_ppp_web_armar_pendientes` en vez de `ppp_web_armar_tandas` a secas. Programa TODO
+  // lo que tiene día previsible en esta misma corrida: zonas automáticas en cascada (primer
+  // día con cupo desde `fecha`, lo que no entra al siguiente con cupo…), y zonas manuales
+  // al día en que ya hay camión a esa zona. Retira, Súper y sin zona siguen a mano.
   const filasTanda = filas.map((n, i) => ({
     order_id: n.order_id, np_idx: n.np_idx,
     np: numDe.get(`${n.order_id}|${n.np_idx}`) ?? null,
@@ -332,9 +363,12 @@ async function procesarEmpresa(
     fecha_recep: n.fecha_recep ?? null,
     m3: n.m3, m3_parcial: !!n.m3_parcial, lineas: n.lineas, cajas: n.cajas,
   }));
-  const tandas = await vgRpc<{ r_tanda: string; r_zona: string; r_np_count: number; r_m3: number; r_clientes: number }[]>(
-    "ppp_web_armar_tandas",
-    { p_empresa: emp, p_fecha: fecha, p_filas: filasTanda, p_forzar_cods: forzarCods });
+  const tandas = await vgRpc<TandaNueva[]>(
+    "gv_ppp_web_armar_pendientes",
+    { p_empresa: emp, p_fecha: fecha, p_filas: filasTanda, p_forzar: forzar });
+  // cliente → día en que entró (para encadenar Chef al mismo día que LK)
+  const codFecha: Record<string, string> = {};
+  for (const t of tandas) for (const c of (t.r_cods ?? [])) if (c && !codFecha[c]) codFecha[c] = String(t.r_fecha).slice(0, 10);
 
   // ── 5. la foto de artículos ─────────────────────────────────────────────
   // Sin esto el operario abre la tanda y no ve un solo artículo. El front las
@@ -378,15 +412,7 @@ async function procesarEmpresa(
     }
   }
 
-  // Los clientes que entraron HOY, para encadenar Chef con LK.
-  const rHoy = await vg(`/rest/v1/PPP_Web_Programacion?select=cod_cliente` +
-    `&empresa=eq.${emp}&fecha_entrega=eq.${fecha}&tanda=not.is.null&limit=20000`);
-  const codsHoy = rHoy.ok
-    ? [...new Set((await rHoy.json() as { cod_cliente: string }[])
-        .map((x) => String(x.cod_cliente)).filter(Boolean))]
-    : [];
-
-  return { np_leidas: filas.length, np_programadas: programadas.size, tandas, codsHoy };
+  return { np_leidas: filas.length, np_programadas: programadas.size, tandas, codFecha };
 }
 
 Deno.serve(async (req: Request) => {
@@ -410,10 +436,11 @@ Deno.serve(async (req: Request) => {
   // `esperar` devuelve el resultado en vez de contestar al toque (ver abajo).
   const esperar = flag("esperar");
   // `intradia` (idea 7317, 2026-09-05): corrida DURANTE el día, cada 15 min. Sólo arma si
-  // lo pendiente sin tanda de las zonas automáticas (1 y 2; Súper nunca) suma
-  // ≥ `intradia_umbral_m3` (0,80), y lo arma para la fecha que elige
-  // `gv_ppp_web_proximo_dia_entrega` (hoy si es antes de las 12:00 y hay cupo; si no,
-  // el próximo hábil con cupo). Lo que no llega al umbral lo arma igual el job de las 00:01.
+  // lo pendiente sin tanda de las zonas automáticas suma ≥ `intradia_umbral_m3` (0,001
+  // desde el 05/09: apenas hay algo) o hay algo de zona manual con camión a la zona
+  // (v13.47), y arranca en la fecha que elige `gv_ppp_web_proximo_dia_entrega` (el primer
+  // día hábil con cupo desde el día mínimo); lo que no entra sigue al próximo día con cupo.
+  // Lo que no llega al umbral lo arma igual el job de las 00:01.
   const intradia = flag("intradia");
   const fechaExplicita = url.searchParams.get("fecha") ??
     (typeof cuerpo.fecha === "string" ? cuerpo.fecha : null);
@@ -489,7 +516,7 @@ Deno.serve(async (req: Request) => {
       const out: Record<string, unknown> = {};
       let leidas = 0, programadas = 0, nTandas = 0;
       const errores: string[] = [];
-      let forzarChef: string[] = [];
+      let forzarChef: { cod: string; fecha: string }[] = [];
 
       // ── intradía: ¿se llegó al umbral? ─────────────────────────────────
       // Se leen las dos fuentes UNA vez (se reutilizan abajo) y se suma lo pendiente
@@ -509,8 +536,11 @@ Deno.serve(async (req: Request) => {
           const s = await soloPendientes("chef", await traerChef(ventana)); filasChef = s.filas; exChef = s.excluidos;
           const p = await pendienteAutomatico("chef", filasChef); m3Auto += p.m3; npAuto += p.np; det.chef = p;
         } catch (e) { det.chef = { error: e instanceof Error ? e.message : String(e) }; }
-        if (m3Auto < umbral) {
-          const motivo = `intradía: pendiente automático ${m3Auto.toFixed(3)} m³ (${npAuto} NP) < umbral ${umbral} m³`;
+        // v13.47: lo de zona manual con camión a la zona se arma siempre, sin umbral
+        const npManual = ((det.lk as { np_manual_camion?: number })?.np_manual_camion ?? 0) +
+                         ((det.chef as { np_manual_camion?: number })?.np_manual_camion ?? 0);
+        if (m3Auto < umbral && npManual === 0) {
+          const motivo = `intradía: pendiente automático ${m3Auto.toFixed(3)} m³ (${npAuto} NP) < umbral ${umbral} m³ y nada de zona manual con camión`;
           await log("intradia_sin_umbral", motivo, { np_leidas: (filasLk?.length ?? 0) + (filasChef?.length ?? 0), detalle: { m3_pendiente_automatico: m3Auto, np_pendiente_automatico: npAuto, umbral_m3: umbral, ...det } });
           return { status: 200, body: { ok: true, intradia: true, fecha, armo: false, motivo, m3_pendiente_automatico: m3Auto, umbral_m3: umbral } };
         }
@@ -524,8 +554,8 @@ Deno.serve(async (req: Request) => {
         const r = await procesarEmpresa("lk", filas, fecha);
         leidas += r.np_leidas; programadas += r.np_programadas; nTandas += r.tandas.length;
         out.lk = { np_leidas: r.np_leidas, excluidos, tandas_nuevas: r.tandas };
-        // Misma razón social pidiendo a las dos empresas → el mismo día.
-        forzarChef = await codsChefDe(r.codsHoy);
+        // Misma razón social pidiendo a las dos empresas → el mismo día (el de ese cliente).
+        forzarChef = await forzarChefDe(r.codFecha);
         if (forzarChef.length) out.forzados_en_chef = forzarChef;
       } catch (e) {
         const msg = `lk: ${e instanceof Error ? e.message : String(e)}`;

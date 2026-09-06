@@ -55,7 +55,7 @@ web llegue al depósito. Cupo diario = pickers típicos × 3 m³ (hoy 2 → 6), 
 
 | solapa | qué hace | qué mirar |
 |---|---|---|
-| **A Programar** | Pedidos de la página (LK y Chef) que **todavía no tienen tanda**: nada de acá está programado. Cada tarjeta dice qué va a pasar: **"🤖 se arma solo → vie 11/9"** (zona automática) o **"🚚 hay camión el vie 11/9 · programalo"** (zona manual), y si no, "retira", "súper: a mano", "sin camión previsto". | Zonas 1/2/3 se arman solas (00:01 y cada 15 min si juntan 0,80 m³). Zonas 4/5/6, Súper y Retira **a mano**: "+ Nueva tanda vacía", arrastrar pedidos, arrastrar la tanda a un día. **El arrastre sólo funciona en la compu.** |
+| **A Programar** | Pedidos de la página (LK y Chef) que **todavía no tienen tanda**: nada de acá está programado. Cada tarjeta dice qué va a pasar: **"🤖 se arma solo → vie 11/9 · en minutos"** (zona automática) o **"🚚 va al camión del vie 11/9 · en minutos"** (zona manual con camión a la zona), y si no, "retira", "súper: a mano", "sin camión previsto". | **v13.47:** todo lo que tiene día lo programa el automático en la próxima corrida (cada 15 min, todos los días 06:00–20:45): zonas 1/2/3 al primer día con cupo (y lo que no entra, al siguiente), zonas 4/5/6 al día en que ya hay camión a la zona. Acá queda sólo **Retira, Súper, sin zona o sin camión previsto**: "+ Nueva tanda vacía", arrastrar pedidos, arrastrar la tanda a un día. **El arrastre sólo funciona en la compu.** |
 | calendario (misma solapa) | Un renglón por día: `m³ usados / cupo`, línea "📋 ISIS: …", **"Muy pronto"** en los días antes del mínimo, "No hábil". | Días completos, no hábiles o muy pronto no reciben. |
 | **Programación** | Tablero de 6 días (botón "Ver hoja 2 →"), camiones numerados por día, Súper aparte. Tocar un día → camiones, orden de carga, pedidos y estado (sin empezar / en curso / armado). Cuenta **sólo lo que tiene fecha por delante**. | Los de fecha vencida no están acá (v13.33): son un dato de gerencia y se miran desde **Resumen**. |
 | **Resumen** | Cuadro de m³ por día y zona (el "Resumen Prog" de siempre). Arriba, la línea **"⏰ N pedido(s) con fecha de entrega vencida… Ver la lista →"**. | Es la vista de gerencia: ahí se decide qué se hace con los vencidos (reprogramar, cargar o sacar de ISIS). |
@@ -65,10 +65,12 @@ web llegue al depósito. Cupo diario = pickers típicos × 3 m³ (hoy 2 → 6), 
 
 **Lo automático (no hay que hacer nada, pero conviene saber que existe):**
 
-- **00:01 lun–vie**: job de tandas (cron 71) → arma zonas 1/2/3 pendientes para el próximo día con cupo
-  desde hoy + 4 hábiles. Deja constancia en `GV_Tandas_Auto_Log`.
-- **Cada 15 min 07:00–18:45**: intradía (cron 73), mismo criterio, **apenas hay algo pendiente** (umbral
-  0,001 m³ desde el sábado 05/09; dueño: *"si ya programaste, directo que salgan de A Programar"*).
+- **00:01 lun–vie**: job de tandas (cron 71) → arma zonas 1/2/3 pendientes desde el próximo día con cupo
+  (hoy + 4 hábiles), en cascada si no entra todo, y zonas 4/5/6 al día en que hay camión a la zona (v13.47).
+  Deja constancia en `GV_Tandas_Auto_Log`.
+- **Cada 15 min, todos los días 06:00–20:45**: intradía (cron 73), mismo criterio, **apenas hay algo
+  pendiente** (umbral 0,001 m³ desde el sábado 05/09; dueño: *"si ya programaste, directo que salgan de A
+  Programar"*; v13.47: *"mandá directo a Programación si ya está"*).
 - **Cada 10 min**: stock (cron 68 de Producción + cron 74 para tandas web).
 - **Telegram**: alertas de picking sin stock, carga sin control, errores de PPP, etc., igual que antes.
 
@@ -112,11 +114,10 @@ web llegue al depósito. Cupo diario = pickers típicos × 3 m³ (hoy 2 → 6), 
   stock hoy 323E (E01A Torres y Liva pide 20), 438E, 232, 233, 951E, 957E, 970E, 971E, 727E (F01A pide 3);
   justo 508 (16 en stock, 18 pedidas en total). Hay 4 días para producir; si no, salen con faltante como
   cualquier tanda.
-- [ ] **Pedidos web que NO se arman solos** (zonas 4/5/6, Súper, Retira; hoy en "A Programar"): LK 1340
-  Garbarino (Retira, 0,03), LK 1341 Orfali (Martínez, zona 6, 1,18), LK 1349 Bazar Mónica (Padua, zona 5,
-  0,11), CH 0217 Gifel (San Martín, zona 6, 0,14). Se programan a mano arrastrándolos a un camión del día.
-  LK 1350 Cuyana (zona 1, 0,94) se arma sola cuando haya cupo (lunes 14). Chef 215 Dorinka quedó excluido
-  porque ya es el 44619 de ISIS.
+- [x] ~~Pedidos web que NO se arman solos~~ — **v13.47 (domingo a la tarde)**: el automático los programa
+  solo si tienen día: LK 1349 Bazar Mónica → vie 11 (camión zona 5), LK 1350 Cuyana → lun 14, LK 1341 Orfali
+  y CH 0217 Gifel → lun 14 (camión zona 6, D69C). Queda a mano sólo **LK 1340 Garbarino (Retira, 0,03)**.
+  Chef 215 Dorinka quedó excluido porque ya es el 44619 de ISIS.
 - [ ] Chef: password de `ch_ppp_reader` + correr `paginach/sql/gv_estado_mis_pedidos_chef.sql` (para que el cliente vea el estado).
 - [ ] Decisiones abiertas: orden de carga por cod cliente (1/2/3); zonas manuales ¿se suman solas a un camión
   existente del día?

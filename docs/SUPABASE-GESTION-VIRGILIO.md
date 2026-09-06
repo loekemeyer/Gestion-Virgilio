@@ -1384,6 +1384,52 @@ es de Chef y pisa al LK 217): cuando Gestión alimente el tracking, escribir el 
 una función `gv_*` y pedir columna `empresa` en PaginaLK. Y el Excel ISIS de Facturación manda
 `N_Pedido` contador (no el id), como el mail: ISIS numera 98xxx por su cuenta.
 
+### 3.ao ✅ "Mandá directo a Programación si ya está. No más en A Programar" (v13.47) — 2026-09-06 domingo (tarde)
+
+Dueño, viendo A Programar con 4 pedidos que decían *"🤖 se arma solo → lun 14/9"* y *"🚚 hay camión el
+lun 14/9 · programalo"*: *"Mandá directo a Programación si ya está. No más en A Programar."*
+
+**Antes:** el job (00:01) y el intradía armaban UNA fecha por corrida (`ppp_web_armar_tandas(p_fecha)`):
+lo que no entraba por cupo quedaba en A Programar con pronóstico hasta la corrida que cayera en ese día
+(Cuyana 1350 esperaba al lunes 07 para el lunes 14). Y las zonas manuales (4/5/6/7) nunca se armaban
+solas aunque hubiera camión a la zona ese día: esperaban a una persona.
+
+**Ahora (migración `gv_ppp_web_armar_pendientes_v1347`, `sql/gv_ppp_web_armar_pendientes.sql`):** en cada
+corrida se programa TODO lo que tiene día previsible.
+- `gv_ppp_web_armar_pendientes(p_empresa, p_fecha, p_filas, p_forzar jsonb)` — la cascada. (a) forzados con
+  fecha (`[{cod, fecha}]`: Chef al día en que entró la misma razón social por LK); (b) zonas automáticas:
+  `gv_ppp_web_proximo_dia_con_cupo(desde)` → `ppp_web_armar_tandas` → lo que quedó, al siguiente día con
+  cupo, hasta 8 días por corrida; (c) zonas manuales "Zona N": `gv_ppp_web_dia_camion(zona, dia_minimo)` =
+  primer día ≥ día mínimo con una tanda (web o ISIS) de esa zona → `ppp_web_armar_tandas(…, p_incluir_manuales
+  = true)` con esos clientes como prioritarios (el camión ya va: no esperan cupo). Retira, Súper y sin zona
+  siguen a mano. Devuelve `(r_fecha, r_tanda, r_zona, r_np_count, r_m3, r_clientes, r_cods)`.
+  `gv_ppp_web_armar_pendientes_simular(...)` = lo mismo sin escribir.
+- `ppp_web_armar_tandas` pasa a 5 args (`p_incluir_manuales boolean default false`; la de 4 se dropeó,
+  backup en `sql/backups/ppp_web_armar_tandas_20260906_pre_v1347.sql`). **Numeración como Producción**:
+  `gv_ppp_web_letra_y_camion()` da la letra vigente y el último nº de camión, y la función sigue esa cuenta
+  (E01A → E02A → …, pasa de letra en el camión 99) en vez de tomar una letra nueva por llamada (antes cada
+  corrida quemaba una letra; con varias fechas por corrida se acababa el abecedario en un mes). Como el
+  domingo ya existía F01A (Chef, letra nueva de la regla vieja), las próximas salen **F02A, F03A…**
+- `gv_ppp_web_proximo_dia_entrega(ahora)` = `gv_ppp_web_proximo_dia_con_cupo(gv_ppp_web_dia_minimo(ahora))`
+  (misma regla, una sola implementación).
+- Edge Function `gv-ppp-web-tandas-diarias` **v15**: llama a `gv_ppp_web_armar_pendientes`; encadena Chef
+  con `forzarChefDe(codFecha)` (cod_ch → la fecha en que entró el cod_lk, no la de la corrida); el intradía
+  arma también si hay algo de zona manual con camión aunque el pendiente automático no llegue al umbral.
+- **Cron 73 (intradía) corre TODOS los días 06:00–20:45 ART** (`*/15 9-23 * * *`; antes lun–vie
+  07:00–18:45): el dueño programa un domingo a la tarde y quiere ver los pedidos irse de A Programar. La
+  fecha objetivo la elige el backend (siempre hábil).
+- Front: chips de A Programar *"🤖 se arma solo → lun 14/9 · en minutos"* / *"🚚 va al camión del vie 11/9
+  · en minutos"*; la línea de motivos dice *"N los programa solo el automático en minutos"*.
+
+**Medido (simulador, domingo 16:10, antes de la corrida real):** LK 1349 Bazar Mónica (zona 5, 0,105) →
+vie 11 F03A (camión D68E/F a la zona 5; el viernes ya está en 6,47/6, entra como prioritario); 1350 Cuyana
+(zona 1, 0,938) → lun 14 F02A; 1341 Orfali (zona 6, 1,184) → lun 14 F04A (D69C a la zona 6); 1340 Garbarino
+(Retira) queda en A Programar. Chef 217 Gifel (zona 6, 0,136) → lun 14. `gv_ppp_web_letra_y_camion()` =
+(5, 1) = F01. Corrida real: ver el log id siguiente en `GV_Tandas_Auto_Log`.
+
+**Rollback:** al final de `sql/gv_ppp_web_armar_pendientes.sql` (cron 73 a `*/15 10-21 * * 1-5`, drop de las
+funciones nuevas, restaurar la de 4 args desde el backup, redeployar la Edge Function v14).
+
 ### 3.añ ✅ Correcciones de dirección para geocodificar, sin tocar ISIS (v13.41) — 2026-09-06 domingo
 
 Dueño: *"sí, dale. Ambas"* — que se corrija en ISIS **y** que Gestión tenga su propia corrección para

@@ -134,6 +134,11 @@ Detalle, medición y rollback en `docs/SUPABASE-GESTION-VIRGILIO.md` §3.l y §3
   lun–vie 07:00–18:45 ART, Edge Function v14 con `{"intradia": true}`): cuando lo pendiente de
   las zonas automáticas suma ≥ 0,80 m³ se arma ya, para hoy si es antes de las 12:00 y hay cupo, si no
   para el próximo hábil con cupo (`gv_ppp_web_proximo_dia_entrega`). §3.x de la doc de Supabase.
+  **v13.47 (domingo 06/09, dueño: *"mandá directo a Programación si ya está, no más en A Programar"*):
+  cada corrida programa TODO lo que tiene día previsible** — zonas automáticas en cascada de días con
+  cupo, zonas manuales (4/5/6/7) al día en que ya hay camión a la zona (`gv_ppp_web_armar_pendientes`,
+  §3.ao); el intradía corre todos los días 06:00–20:45 y el umbral está en 0,001. En A Programar quedan
+  sólo Retira, Súper, sin zona y sin camión previsto. Tandas numeradas como Producción (E01A, E02A…).
   **Y las tandas se arman por CERCANÍA REAL** (v13.07, §3.y): sectores + vecinos en `GV_Sectores`,
   `GV_Barrios_Sector`, `GV_Sectores_Vecinos`, `GV_Barrios_Pares` (`sql/gv_sectores.sql`); Núñez
   nunca con Lugano, Barracas sí con Constitución o Avellaneda. Interruptor
