@@ -1384,6 +1384,26 @@ es de Chef y pisa al LK 217): cuando Gestión alimente el tracking, escribir el 
 una función `gv_*` y pedir columna `empresa` en PaginaLK. Y el Excel ISIS de Facturación manda
 `N_Pedido` contador (no el id), como el mail: ISIS numera 98xxx por su cuenta.
 
+### 3.ad ✅ El calendario de "A Programar" muestra lo que ISIS ya tiene (v13.18) — 2026-09-06 domingo (noche)
+
+Dueño (captura del martes 8 con `0,00 / 5,00 m³`): *"acá sigue figurando cero pero sí hay en la PPP"*.
+`gv_ppp_web_calendario` sólo sumaba `PPP_Web_Programacion`; el martes ya tiene **13,45 m³ / 7 tandas
+/ 11 NP** de ISIS (D59A, D60A–F, D61A). Ahora la RPC devuelve 3 columnas más — `m3_isis`,
+`tandas_isis`, `np_isis` — leídas de `gv_ppp_programacion_diaria` (la vista con la canilla cerrada,
+lo mismo que ve la solapa Programación). Drop + create porque cambia el tipo de retorno; grants como
+estaban (execute anon/authenticated/service_role; sólo lee y la vista lleva `security_invoker`).
+`fecha_entrega` del espejo es texto y puede venir `""` → se filtra por forma `^\d{4}-\d{2}-\d{2}`
+antes de castear (la primera versión rompió con `invalid input syntax for type date: ""`).
+El front (`aprRender`) agrega la línea violeta "📋 ISIS: 13,45 m³ · 7 tanda(s) · 11 NP" abajo de la
+barra. **El cupo (`cupo`/`resta`/`pasado`) y el "completo" siguen siendo sobre lo web**: sumar ISIS
+al cupo de 5 m³ cerraría todos los días (ISIS solo ya pasa los 5) y el job del lunes no tendría dónde
+armar. Qué cupo corresponde lo decide el dueño con el análisis de dotación (idea **6220**: *"depende
+cuánta gente trabaje"*; agentes corriendo sobre `Registros_Produccion_Virgilio`). Mismo pendiente
+para `gv_ppp_web_proximo_dia_entrega`, `gv_ppp_web_tanda_programar` y `ppp_web_armar_tandas`.
+Medido: `gv_ppp_web_calendario('2026-09-07','2026-09-11')` → 08: 13,451 / 7 / 11 · 09: 10,768 / 7 / 20
+· 10: 5,762 / 11 / 35 · 11: 3,138 / 6 / 13; `m3` web 0 en todos. SQL: `sql/gv_ppp_web_calendario.sql`.
+Migraciones `gv_ppp_web_calendario_con_isis_v1318` y `…_fix_fecha_v1318`.
+
 ### 3.ac ✅ Revisión con 5 agentes: gate de supervisor, drenaje web del stock, revokes (v13.16) — 2026-09-05 sábado (noche)
 
 Pedido del dueño: *"Lanzá agentes de revisión del programa en sonnet 5"*. Corrieron `revisor-logica`,

@@ -12,11 +12,17 @@
 > única**; no se replica. Ante la duda entre parche rápido y fix de raíz → **fix
 > de raíz**.
 >
-> Última actualización: 2026-09-05 (sábado, noche) · Versión app al documentar: **v13.17**
+> Última actualización: 2026-09-06 (domingo, noche) · Versión app al documentar: **v13.18**
 >
 > ⚠⚠ **Desde el lunes 2026-09-07 los operarios usan GESTIÓN, no Producción** (dueño, sábado a la
 > noche: *"el lunes van a empezar a usar GV, no más PV"*). Las tandas web viven en
 > `PPP_Web_Programacion` y Producción no las ve. URL: la de GitHub Pages de este repo.
+>
+> Nota **v13.18** (backend + front) — El calendario de "A Programar" mostraba `0,00 / 5,00 m³` en días
+> que ISIS ya tiene cargados (martes 8: 13,45 m³). `gv_ppp_web_calendario` devuelve ahora `m3_isis`,
+> `tandas_isis`, `np_isis` (de `gv_ppp_programacion_diaria`) y el front lo muestra en una línea aparte
+> "📋 ISIS: 13,45 m³ · 7 tanda(s) · 11 NP". El cupo de 5 m³ sigue siendo sólo web hasta que se defina
+> la regla por dotación (idea 6220). §3.ad de la doc de Supabase; `sql/gv_ppp_web_calendario.sql`.
 >
 > Nota **v13.17** (front) — **"Ver hoja 2 →"** en el tablero de Programación (dueño: *"acá poneme
 > un Ver Hoja 2"*). La grilla pagina de a 6 días hábiles: hoja 1 = próximos 6, hoja 2 = los 6

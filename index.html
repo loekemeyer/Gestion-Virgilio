@@ -802,6 +802,8 @@ button {
 .apr-dia-barra > i{ display:block; height:100%; background:linear-gradient(90deg,#4ade80,#16a34a);
   border-radius:999px; transition:width .35s cubic-bezier(.4,0,.2,1); }
 .apr-dia-txt{ font-size:11.5px; color:#475569; }
+.apr-dia-isis{ margin-top:3px; font-size:11px; color:#7c3aed; } /* v13.18: lo que ISIS ya tiene ese día */
+.apr-dia-isis b{ font-weight:800; }
 .apr-dia-cerr{ color:#b91c1c; font-weight:700; }
 .apr-dia-hoy{ border-left-color:#1e6bd6; }
 .apr-dia-hoy .apr-dia-num{ color:#1e6bd6; }
@@ -6977,7 +6979,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v13.17";
+const APP_VERSION = "v13.18";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -32753,6 +32755,10 @@ function aprColDias() {
               (Number(d.tandas) > 0 ? ' · ' + d.tandas + ' tanda(s)' : '') +
               (lleno ? ' <span class="apr-dia-cerr">completo</span>' : '')) +
         '</div>' +
+        // v13.18 (dueño: "acá sigue figurando cero pero sí hay en la PPP"): lo que ISIS ya tiene ese día.
+        (d.habil !== false && Number(d.m3_isis) > 0
+          ? '<div class="apr-dia-isis" title="Programado por ISIS para ese día (lo que se ve en la solapa Programación). No cuenta para el cupo web.">📋 ISIS: <b>' + aprNum(Number(d.m3_isis), 2) + ' m³</b> · ' + (Number(d.tandas_isis) || 0) + ' tanda(s) · ' + (Number(d.np_isis) || 0) + ' NP</div>'
+          : '') +
       '</div>' +
     '</div>';
   }

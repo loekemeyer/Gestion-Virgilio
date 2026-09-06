@@ -53,7 +53,7 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
       { codigo:"GV-01A", order_id:9,    np_idx:1, razon_social:"Distri zona 6",         cod_cliente:"C6A", zona:"Zona 6", m3:0.9,   np_total:1 }
     ] };
     _apr.cal = [
-      { dia:"2026-09-09", habil:true,  m3:0.5, tandas:1, np:2, cupo:5, resta:4.5, pasado:false },
+      { dia:"2026-09-09", habil:true,  m3:0.5, tandas:1, np:2, cupo:5, resta:4.5, pasado:false, m3_isis:13.451, tandas_isis:7, np_isis:11 },   // v13.18: ISIS ya tiene 13,45 m³ ese día; no cierra el cupo web
       { dia:"2026-09-12", habil:false, m3:0,   tandas:0, np:0, cupo:5, resta:5,   pasado:false },
       { dia:"2026-09-10", habil:true,  m3:5.2, tandas:3, np:9, cupo:5, resta:0,   pasado:false }
     ];
@@ -113,6 +113,9 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
   chk((r.der.match(/apr-dia-cerrado/g) || []).length === 2, "el no hábil y el completo quedan cerrados");
   chk(r.der.includes("apr-dia-lleno") && r.der.includes("completo"), "marca el día que llegó al límite");
   chk(r.der.includes("apr-dia-con"),           "marca el día que ya tiene tandas");
+  // v13.18: lo de ISIS se muestra aparte y no cierra el día (el cupo sigue siendo web)
+  chk(/apr-dia-isis[^<]*📋 ISIS: <b>13,45 m³<\/b> · 7 tanda\(s\) · 11 NP/.test(r.der), "v13.18: línea 'ISIS: 13,45 m³ · 7 tanda(s) · 11 NP' en el día");
+  chk((r.der.match(/apr-dia-isis/g) || []).length === 1, "v13.18: sólo el día con ISIS lleva la línea");
   chk(r.izqAbierta.includes("bloque 1/3"),     "expandida muestra los bloques (v12.92: \"LK 1201 · bloque 1/3\")");
   chk(r.izqAbierta.includes("027"),            "expandida muestra los artículos");
   chk(!/undefined/.test(todo),                 "sin 'undefined' en pantalla");
