@@ -7030,7 +7030,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v13.38";
+const APP_VERSION = "v13.39";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -26590,7 +26590,7 @@ async function pppLoadProgFromSupabase() {
    (2) Tipo = KRIKOS si el Excel lo trae,
    (3) Zona = "Super" según la tabla de barrios (Esteban Echeverria, Campo de Mayo…). ===== */
 const PPP_SUPER_KEY = "vir_ppp_supers";
-const PPP_SUPER_SEED = [{ cod: "801", nombre: "Coto" }, { cod: "1651", nombre: "Carrefour" }, { cod: "771", nombre: "La Anónima" }, { cod: "2444", nombre: "Jumbo" }, { cod: "2686", nombre: "Dorinka S.R.L" }, { cod: "4263", nombre: "Matiz SA" }];
+const PPP_SUPER_SEED = [{ cod: "801", nombre: "Coto" }, { cod: "1651", nombre: "Carrefour" }, { cod: "771", nombre: "La Anónima" }, { cod: "2444", nombre: "Jumbo" }, { cod: "2686", nombre: "Chango Mas" }, { cod: "4263", nombre: "Gigot" }];
 /* v13.37 (dueño: "abreviemos los nombres de los supermercados") — la razón social no se lee de un
    vistazo en un cartel de camión: "Inc Sociedad Anonima" es Carrefour y "S.A.Imp Y Exp De La
    Patagonia" es La Anónima. La abreviatura va por CÓDIGO y acá en el código, no sólo en el seed,
@@ -26599,8 +26599,8 @@ const PPP_SUPER_SEED = [{ cod: "801", nombre: "Coto" }, { cod: "1651", nombre: "
    nombre viejo de cada uno: sólo se pisa si el nombre guardado es ése — si el supervisor le puso
    otro a mano, se respeta. */
 let _pppSupers = null;
-const PPP_SUPER_ALIAS = { "801": "Coto", "1651": "Carrefour", "771": "La Anónima", "2444": "Jumbo" };
-const PPP_SUPER_LEGACY = { "801": "Coto C.I.C.S.A.", "1651": "Inc Sociedad Anonima", "771": "S.A.Imp Y Exp De La Patagonia", "2444": "CENCOSUD S.A." };
+const PPP_SUPER_ALIAS = { "801": "Coto", "1651": "Carrefour", "771": "La Anónima", "2444": "Jumbo", "2686": "Chango Mas", "4263": "Gigot" };
+const PPP_SUPER_LEGACY = { "801": "Coto C.I.C.S.A.", "1651": "Inc Sociedad Anonima", "771": "S.A.Imp Y Exp De La Patagonia", "2444": "CENCOSUD S.A.", "2686": "Dorinka S.R.L", "4263": "Matiz SA" };
 function _pppSupersMigrar(arr) {
   let cambio = false;
   for (const cod in PPP_SUPER_ALIAS) {

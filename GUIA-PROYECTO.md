@@ -12,11 +12,15 @@
 > única**; no se replica. Ante la duda entre parche rápido y fix de raíz → **fix
 > de raíz**.
 >
-> Última actualización: 2026-09-06 (domingo) · Versión app al documentar: **v13.38**
+> Última actualización: 2026-09-06 (domingo) · Versión app al documentar: **v13.39**
 >
 > ⚠⚠ **Desde el lunes 2026-09-07 los operarios usan GESTIÓN, no Producción** (dueño, sábado a la
 > noche: *"el lunes van a empezar a usar GV, no más PV"*). Las tandas web viven en
 > `PPP_Web_Programacion` y Producción no las ve. URL: la de GitHub Pages de este repo.
+>
+> Nota **v13.39** (front) — **Los dos súper que faltaban**: **2686 (Dorinka S.R.L) → Chango Mas** y
+> **4263 (Matiz SA) → Gigot**. Con esto la tabla de abreviaturas está completa: los 6 súper de la PPP
+> (801 Coto, 1651 Carrefour, 771 La Anónima, 2444 Jumbo, 2686 Chango Mas, 4263 Gigot).
 >
 > Nota **v13.38** (front) — **El Mapa de zonas ubica también lo web y entiende las direcciones de
 > expreso** (dueño: *"todo tenés que tener todas las ubicaciones"*). Estado al 06/09: de **54
