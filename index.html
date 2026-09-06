@@ -809,6 +809,7 @@ button {
 .apr-dia-txt{ font-size:11.5px; color:#475569; }
 .apr-dia-isis{ margin-top:3px; font-size:11px; color:#7c3aed; } /* v13.18: lo que ISIS ya tiene ese día */
 .apr-dia-isis b{ font-weight:800; }
+.apr-dia-pronto .apr-dia-cerr-pronto{ color:#64748b; } /* v13.22: antes de la anticipación mínima */
 .apr-dia-cerr{ color:#b91c1c; font-weight:700; }
 .apr-dia-hoy{ border-left-color:#1e6bd6; }
 .apr-dia-hoy .apr-dia-num{ color:#1e6bd6; }
@@ -6984,7 +6985,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v13.21";
+const APP_VERSION = "v13.22";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -32749,7 +32750,7 @@ function aprColDias() {
 
   let h = '<div class="apr-col apr-col-dias">' +
     '<div class="apr-col-t">🗓️ Programar para…</div>' +
-    '<div class="apr-dias-ayuda">Arrastrá una tanda a un día. Los días completos o no hábiles no reciben.</div>' +
+    '<div class="apr-dias-ayuda">Arrastrá una tanda a un día. Los días completos, no hábiles o muy próximos no reciben.</div>' +
     '<div class="apr-scroll apr-dias">';
 
   if (!_apr.cal.length) h += '<div class="apr-vacio">Cargando días…</div>';
@@ -32764,15 +32765,21 @@ function aprColDias() {
     const pct   = cupo > 0 ? Math.min(100, Math.round((m3 / cupo) * 100)) : 0;
     // Un día no recibe si no es hábil o si ya está lleno. El pasado no se dibuja:
     // la lista arranca hoy, siempre se programa para adelante.
-    const cerrado = (d.habil === false) || lleno;
+    // v13.22: anticipación mínima (dueño: "lo de Gestión va recién de acá a 4-5 días") — el backend
+    // marca `muy_pronto` y además rechaza programar ahí (gv_ppp_web_tanda_programar).
+    const pronto = d.muy_pronto === true && d.habil !== false;
+    const minTxt = d.dia_minimo ? (function () { const q = String(d.dia_minimo).slice(0, 10).split("-"); return q[2] + "/" + q[1]; })() : "";
+    const cerrado = (d.habil === false) || lleno || pronto;
     const cls = ["apr-dia"];
     if (cerrado)        cls.push("apr-dia-cerrado");
     if (lleno)          cls.push("apr-dia-lleno");
+    if (pronto)         cls.push("apr-dia-pronto");
     if (d.habil === false) cls.push("apr-dia-nohabil");
     if (iso === hoyISO) cls.push("apr-dia-hoy");
     if (Number(d.tandas) > 0) cls.push("apr-dia-con");
 
     const motivo = (d.habil === false) ? "No es día hábil"
+                 : pronto ? "Muy pronto: Gestión programa desde el " + minTxt
                  : lleno ? "Completo: " + aprNum(m3, 2) + " de " + aprNum(cupo, 2) + " m³"
                  : "Quedan " + aprNum(d.resta, 2) + " m³";
 
@@ -32790,6 +32797,8 @@ function aprColDias() {
         '<div class="apr-dia-txt">' +
           (d.habil === false
             ? '<span class="apr-dia-cerr">No hábil</span>'
+            : pronto
+            ? '<span class="apr-dia-cerr apr-dia-cerr-pronto">Muy pronto · desde el ' + escapeHtml(minTxt) + '</span>'
             : '<b>' + aprNum(m3, 2) + '</b> / ' + aprNum(cupo, 2) + ' m³' +
               (Number(d.tandas) > 0 ? ' · ' + d.tandas + ' tanda(s)' : '') +
               (lleno ? ' <span class="apr-dia-cerr">completo</span>' : '')) +

@@ -129,8 +129,15 @@ Gestión tiene que dar es la cañería, y en el punto 1 ya está dada.
 a la noche). Por eso el mail del sábado 12:30 (pedidos 1340…1349) **se ignora** y GV los programa
 desde la página (`excluir_enviados_a_isis = 0`, v13.15, §3.ab). **No cargar ese mail en ISIS.**
 
-**Lo que el job de las 00:01 va a armar** (simulado con los 12 pedidos reales de LK y
-`gv_ppp_web_armar_simular`, sin escribir; 3,718 m³, cupo 5):
+**⚠ v13.22 (sábado a la noche, después de esta simulación): ANTICIPACIÓN MÍNIMA de 4 días hábiles**
+(dueño: *"el lunes los operarios sólo arman lo que ISIS dejó; lo de Gestión va recién de acá a 4–5
+días"*). El job del lunes 07 a las 00:01 arma estas mismas tandas pero con **fecha de entrega viernes
+11**, no lunes 7 (`gv_ppp_web_dia_minimo`, cron 71 con `{"fecha": …}`, §3.af). Martes 8 y miércoles 9
+son "Muy pronto" en A Programar. Para volver a "hoy": `dias_anticipacion_min = 0`.
+
+**Lo que el job de las 00:01 va a armar** (simulado el sábado con los 12 pedidos reales de LK y
+`gv_ppp_web_armar_simular`, sin escribir; 3,718 m³, cupo 5; la composición no cambia con la anticipación,
+sólo la fecha):
 
 | tanda | pedidos | barrio | m³ |
 |---|---|---|---|

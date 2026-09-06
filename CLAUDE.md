@@ -109,7 +109,11 @@ cuando el dueño lo hizo apagar** (crons 7 y 10 de LK en `active=false`, v12.94)
 ISIS: sábado 12:30, pedidos 1340..1349. **⚠ Cambio del sábado a la noche (v13.15): el dueño dijo
 "el lunes van a empezar a usar GV, no más PV" → el mail del sábado se IGNORA y GV programa también
 los 1340..1349** (`PPP_Web_Config.excluir_enviados_a_isis = 0`; no cargar ese mail en ISIS, quedarían
-dobles). **Desde el lunes 2026-09-07 los operarios usan Gestión.** El cron de Chef vive en su proyecto (nkhzocgdpwtgrmwleihr, sin
+dobles). **Desde el lunes 2026-09-07 los operarios usan Gestión.** **⚠ v13.22 (sábado a la noche): ANTICIPACIÓN
+MÍNIMA de 4 días hábiles** (`PPP_Web_Config.dias_anticipacion_min`, `gv_ppp_web_dia_minimo()`): el lunes
+los operarios sólo arman lo que ISIS dejó (mar 8 / mié 9 / jue 10); lo que Gestión programe cae recién el
+**viernes 11** en adelante (job 00:01 vía cron 71 con `{"fecha": …}`, intradía, "A Programar"). Poner en 0
+para volver a hoy/mañana. §3.af. El cron de Chef vive en su proyecto (nkhzocgdpwtgrmwleihr, sin
 acceso desde acá): lo apaga el dueño desde el Dashboard. **⚠ Con el interruptor en 0 también los
 pedidos de Chef que salgan por su mail los programa GV: ese mail hay que IGNORARLO (no cargarlo en
 ISIS) hasta apagar el cron, si no quedan dobles.** Apagarlo es urgente desde el lunes.

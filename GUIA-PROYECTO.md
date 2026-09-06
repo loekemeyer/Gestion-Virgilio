@@ -12,11 +12,19 @@
 > única**; no se replica. Ante la duda entre parche rápido y fix de raíz → **fix
 > de raíz**.
 >
-> Última actualización: 2026-09-06 (domingo, noche) · Versión app al documentar: **v13.21**
+> Última actualización: 2026-09-05 (sábado, noche) · Versión app al documentar: **v13.22**
 >
 > ⚠⚠ **Desde el lunes 2026-09-07 los operarios usan GESTIÓN, no Producción** (dueño, sábado a la
 > noche: *"el lunes van a empezar a usar GV, no más PV"*). Las tandas web viven en
 > `PPP_Web_Programacion` y Producción no las ve. URL: la de GitHub Pages de este repo.
+>
+> Nota **v13.22** (backend + front) — **Anticipación mínima: Gestión programa a partir de hoy + 4
+> días hábiles** (dueño: *"lo que haga Gestión va recién de acá a cuatro, cinco días; el lunes los
+> operarios sólo arman lo que ISIS dejó"*). `PPP_Web_Config.dias_anticipacion_min = 4` (0 = como antes)
+> y `gv_ppp_web_dia_minimo()` la aplican el job de las 00:01 (cron 71 ahora manda la fecha que elige
+> el backend; antes la Edge Function usaba HOY), el intradía, "qué día sale", el calendario ("Muy
+> pronto · desde el 11/09", no recibe arrastres) y `gv_ppp_web_tanda_programar` (rechaza). El lunes 07
+> el job arma lo pendiente para el **viernes 11**. §3.af de la doc de Supabase; `sql/gv_ppp_web_anticipacion.sql`.
 >
 > Nota **v13.21** (backend + front) — **"A Programar" dice qué día sale cada pedido** (dueño: la fecha
 > de recepción "no tiene sentido"). RPC `gv_ppp_web_dia_salida([{zona,m3}])`: zona automática → el

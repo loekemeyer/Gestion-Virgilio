@@ -55,7 +55,9 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
     _apr.cal = [
       { dia:"2026-09-09", habil:true,  m3:0.5, tandas:1, np:2, cupo:5, resta:4.5, pasado:false, m3_isis:13.451, tandas_isis:7, np_isis:11 },   // v13.18: ISIS ya tiene 13,45 m³ ese día; no cierra el cupo web
       { dia:"2026-09-12", habil:false, m3:0,   tandas:0, np:0, cupo:5, resta:5,   pasado:false },
-      { dia:"2026-09-10", habil:true,  m3:5.2, tandas:3, np:9, cupo:5, resta:0,   pasado:false }
+      { dia:"2026-09-10", habil:true,  m3:5.2, tandas:3, np:9, cupo:5, resta:0,   pasado:false },
+      // v13.22: antes de la anticipación mínima → "Muy pronto", cerrado aunque tenga cupo
+      { dia:"2026-09-08", habil:true,  m3:0,   tandas:0, np:0, cupo:5, resta:5,   pasado:false, muy_pronto:true, dia_minimo:"2026-09-11" }
     ];
 
     // v13.21: qué día sale (viene del backend, gv_ppp_web_dia_salida); el 1200 todavía no tiene respuesta
@@ -112,7 +114,8 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
   chk(r.med.includes("Arrastrá un pedido acá"),"la tanda vacía lo dice");
   chk(r.der.includes("Miércoles") && r.der.includes("9 sep"), "la lista dice el día con nombre y fecha");
   chk(r.der.includes("0,50</b> / 5,00 m³"),    "muestra los m³ programados contra el cupo");
-  chk((r.der.match(/apr-dia-cerrado/g) || []).length === 2, "el no hábil y el completo quedan cerrados");
+  chk((r.der.match(/apr-dia-cerrado/g) || []).length === 3, "el no hábil, el completo y el muy pronto quedan cerrados");
+  chk(/apr-dia-pronto/.test(r.der) && /Muy pronto · desde el 11\/09/.test(r.der), "v13.22: el día antes de la anticipación mínima dice 'Muy pronto · desde el 11/09'");
   chk(r.der.includes("apr-dia-lleno") && r.der.includes("completo"), "marca el día que llegó al límite");
   chk(r.der.includes("apr-dia-con"),           "marca el día que ya tiene tandas");
   // v13.18: lo de ISIS se muestra aparte y no cierra el día (el cupo sigue siendo web)
@@ -136,8 +139,8 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
   const tags = r.der.match(/<div class="apr-dia[ "][^>]*>/g) || [];
   const cerrados = tags.filter(function (t) { return /apr-dia-cerrado/.test(t); });
   const abiertos = tags.filter(function (t) { return !/apr-dia-cerrado/.test(t); });
-  chk(tags.length === 3, "se dibujan los 3 días (se contaron " + tags.length + ")");
-  chk(cerrados.length === 2 && cerrados.every(function (t) { return t.indexOf("ondrop") < 0; }),
+  chk(tags.length === 4, "se dibujan los 4 días (se contaron " + tags.length + ")");
+  chk(cerrados.length === 3 && cerrados.every(function (t) { return t.indexOf("ondrop") < 0; }),
       "un día cerrado NO acepta que le suelten una tanda");
   chk(abiertos.length === 1 && abiertos.every(function (t) { return t.indexOf("aprDropDia") >= 0; }),
       "un día abierto sí la acepta");

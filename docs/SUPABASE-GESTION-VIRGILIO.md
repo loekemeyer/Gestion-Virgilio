@@ -1384,7 +1384,35 @@ es de Chef y pisa al LK 217): cuando Gestión alimente el tracking, escribir el 
 una función `gv_*` y pedir columna `empresa` en PaginaLK. Y el Excel ISIS de Facturación manda
 `N_Pedido` contador (no el id), como el mail: ISIS numera 98xxx por su cuenta.
 
-### 3.ae ✅ "A Programar" dice qué día va a salir cada pedido (v13.21) — 2026-09-06 domingo (noche)
+### 3.af ✅ Anticipación mínima: Gestión programa a partir de hoy + 4 hábiles (v13.22) — 2026-09-05 sábado (noche)
+
+Dueño: *"el lunes los operarios no van a tener que aplicar nada de la PPP para ese mismo día, salvo el
+armado. Lo que haga Gestión va recién de acá a cuatro, cinco días en adelante."* Revisado el circuito:
+**el job de las 00:01 programaba para HOY** (`hoyArgentina()` en la Edge Function cuando no le pasan
+fecha) y el intradía para hoy/mañana (`gv_ppp_web_proximo_dia_entrega`). El lunes 07 a las 00:01 hubiera
+armado E01A…E01F para el mismo lunes.
+
+Nuevo interruptor **`PPP_Web_Config.dias_anticipacion_min = 4`** (0 = como antes) y una función que lo
+aplica en todos lados, `gv_ppp_web_dia_minimo(ahora)` = hoy (mañana si pasó el corte) + N hábiles:
+- `gv_ppp_web_proximo_dia_entrega` arranca en el día mínimo y de ahí busca cupo (job e intradía).
+- **Cron 71** (`cron.alter_job`, es nuestro) manda `{"fecha": gv_ppp_web_proximo_dia_entrega()}` a la
+  Edge Function en vez de `{}`: sin redeploy, la función v14 ya acepta `fecha` en el body.
+- `gv_ppp_web_dia_salida`: zonas manuales sólo camiones ≥ día mínimo (§3.ae).
+- `gv_ppp_web_calendario`: columnas `muy_pronto`, `dia_minimo` (drop + create otra vez); el front cierra
+  esos días ("Muy pronto · desde el 11/09") y no acepta arrastres.
+- `gv_ppp_web_tanda_programar`: `raise 'El 08/09 es muy pronto: Gestión programa desde el 11/09.'` si
+  `p_fecha < gv_ppp_web_dia_minimo()`. Insertado con `replace()` sobre `pg_get_functiondef` (la migración
+  aborta si no encuentra el punto); no se retipeó la función.
+Medido (sábado 22:30): `dia_minimo(now())` = jue 10 · `dia_minimo('lun 07 00:01')` = **vie 11** ·
+`('lun 07 13:00')` = lun 14 · `proximo_dia_entrega('lun 07 00:01')` = vie 11 · calendario 07/08/09
+`muy_pronto = true` · `dia_salida` lunes 09:00: zona 1 → 11, zona 4 → 11, zona 6 → 14 · cron 71 con el
+body nuevo · `gv_ppp_web_tanda_programar` contiene `gv_ppp_web_dia_minimo`.
+**Consecuencia para el lunes:** el job arma lo pendiente (1340…1351) para el **viernes 11**; el martes 8 y
+miércoles 9 se arman con lo que ISIS dejó. SQL: `sql/gv_ppp_web_anticipacion.sql`.
+Rollback: `update "PPP_Web_Config" set valor = 0 where clave = 'dias_anticipacion_min'` (todo vuelve a
+hoy/mañana) y, si se quiere, el cron con `body := '{}'`.
+
+### 3.ae ✅ "A Programar" dice qué día va a salir cada pedido (v13.21) — 2026-09-05 sábado (noche)
 
 Dueño: *"en A Programar debe aparecer para qué día va a poder salir el pedido, no la primera (sin
 sentido)"* — el chip mostraba la fecha de recepción. Nueva RPC **`gv_ppp_web_dia_salida(p_filas jsonb,
@@ -1403,7 +1431,7 @@ Front: `aprCargarSalida()` la llama al cargar la lista; `aprSalidaChip()` dibuja
 (verde; fondo verde oscuro si es hoy), "🏭 retira", "🛒 súper: a mano", "⏳ sin camión previsto",
 "❓ sin zona"; la fecha de recepción queda en el `title`. Rollback: `drop function` (el front muestra "🚚 …").
 
-### 3.ad ✅ El calendario de "A Programar" muestra lo que ISIS ya tiene (v13.18) — 2026-09-06 domingo (noche)
+### 3.ad ✅ El calendario de "A Programar" muestra lo que ISIS ya tiene (v13.18) — 2026-09-05 sábado (noche)
 
 Dueño (captura del martes 8 con `0,00 / 5,00 m³`): *"acá sigue figurando cero pero sí hay en la PPP"*.
 `gv_ppp_web_calendario` sólo sumaba `PPP_Web_Programacion`; el martes ya tiene **13,45 m³ / 7 tandas
