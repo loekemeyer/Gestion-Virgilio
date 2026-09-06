@@ -115,10 +115,11 @@ los operarios sólo arman lo que ISIS dejó (mar 8 / mié 9 / jue 10); lo que Ge
 **viernes 11** en adelante (job 00:01 vía cron 71 con `{"fecha": …}`, intradía, "A Programar"). Poner en 0
 para volver a hoy/mañana. §3.af. **El lunes 07/09 es Día del Metalúrgico: no hábil** (`GV_Dias_No_Habiles`,
 §3.ag); primer día real con Gestión = martes 08. **Cupo diario = pickers típicos × 3 m³ (hoy 6), contando
-ISIS + web** (`gv_ppp_web_cupo`, idea 6220, v13.23, §3.ah; `cupo_por_dotacion = 0` → 5 fijo). El cron de Chef vive en su proyecto (nkhzocgdpwtgrmwleihr, sin
-acceso desde acá): lo apaga el dueño desde el Dashboard. **⚠ Con el interruptor en 0 también los
-pedidos de Chef que salgan por su mail los programa GV: ese mail hay que IGNORARLO (no cargarlo en
-ISIS) hasta apagar el cron, si no quedan dobles.** Apagarlo es urgente desde el lunes.
+ISIS + web** (`gv_ppp_web_cupo`, idea 6220, v13.23, §3.ah; `cupo_por_dotacion = 0` → 5 fijo). **El cron de Chef quedó APAGADO el domingo 2026-09-06** (proyecto nkhzocgdpwtgrmwleihr, jobs 1
+`procesar-pedidos-web` y 2 `retry-procesar-pedidos` en `active=false`, lo corrió el dueño; v13.31).
+Último mail de Chef: sábado 05/09 12:30, pedido 217; el del viernes llevó el 216. **Ninguno de los dos
+se carga en ISIS: 216 ya es F01A (vie 11) y 217 lo programa GV.** Para volver a prenderlo:
+`cron.alter_job(1, active := true)` y `(2, …)` en Chef.
 Detalle, medición y rollback en `docs/SUPABASE-GESTION-VIRGILIO.md` §3.l y §3.p.
 
 - **NP** → **la NP web ES el número de pedido de la página** (v12.92, dueño: *"ya cuando

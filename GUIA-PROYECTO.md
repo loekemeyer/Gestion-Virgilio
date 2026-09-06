@@ -12,11 +12,15 @@
 > única**; no se replica. Ante la duda entre parche rápido y fix de raíz → **fix
 > de raíz**.
 >
-> Última actualización: 2026-09-05 (sábado, noche) · Versión app al documentar: **v13.30**
+> Última actualización: 2026-09-05 (sábado, noche) · Versión app al documentar: **v13.31**
 >
 > ⚠⚠ **Desde el lunes 2026-09-07 los operarios usan GESTIÓN, no Producción** (dueño, sábado a la
 > noche: *"el lunes van a empezar a usar GV, no más PV"*). Las tandas web viven en
 > `PPP_Web_Programacion` y Producción no las ve. URL: la de GitHub Pages de este repo.
+>
+> Nota **v13.31** (docs, sólo bump) — **Cron de Chef apagado** (domingo 06/09, jobs 1 y 2 del proyecto
+> Chef en `active=false`, por SQL del dueño). Ya no sale el mail de las 12:30 de Chef; los del vie (216)
+> y sáb (217) no se cargan en ISIS. §3.al.
 >
 > Nota **v13.30** (backend, sólo bump) — Últimas tres ideas de la noche: **2485** `ppp_web_resync`
 > congela por bloque facturado, no todo el pedido (un cambio del cliente al bloque 2 llega aunque el

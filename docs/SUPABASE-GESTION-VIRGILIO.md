@@ -1384,6 +1384,18 @@ es de Chef y pisa al LK 217): cuando Gestión alimente el tracking, escribir el 
 una función `gv_*` y pedir columna `empresa` en PaginaLK. Y el Excel ISIS de Facturación manda
 `N_Pedido` contador (no el id), como el mail: ISIS numera 98xxx por su cuenta.
 
+### 3.al ✅ Cron de Chef apagado (v13.31) — 2026-09-06 domingo
+
+Dueño: *"llegó el mail automático de Chef"* → *"mandame SQL para que frene el mandado de mails"*. En el
+proyecto Chef (`nkhzocgdpwtgrmwleihr`, sin acceso desde acá) había dos crons, calcados de LK: **jobid 1
+`procesar-pedidos-web`** (`30 15 * * *` = 12:30 ART, `enviar_pedidos_main()`) y **jobid 2
+`retry-procesar-pedidos`** (`2-59/6 15,16 * * *`, `retry_procesar_pedidos()`). El dueño corrió
+`cron.alter_job(1, active := false)` y `(2, …)`; verificado `active = false` en los dos.
+Mails que alcanzaron a salir: viernes 04/09 (pedido 216 Elbantonio, cod 2466) y sábado 05/09 (217).
+Cruce en Virgilio: cod 2466 sin filas en `PPP_Programacion_Diaria` ni `Facturacion_NP` desde el 1/9 →
+no se cargó en ISIS, no hay doble. 216 ya está programado por Gestión (F01A, vie 11); 217 pendiente en
+A Programar (lun 14). Rollback: `cron.alter_job(1, active := true)` y `(2, …)` en Chef.
+
 ### 3.ak ✅ Noche de mejoras: 13 ideas de 3 agentes, todas hechas (v13.28–v13.30) — 2026-09-06 madrugada
 
 Dueño: *"lanzá agentes que piensen mejoras… aprovechá la noche"* y a la mañana *"arrancá a hacerlas"*.

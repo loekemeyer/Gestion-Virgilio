@@ -74,8 +74,8 @@ web llegue al depósito. Cupo diario = pickers típicos × 3 m³ (hoy 2 → 6), 
 
 - **No cargar en ISIS el mail del sábado 12:30** (pedidos LK 1340…1349): Gestión los programa.
   Quedarían dobles.
-- **Ignorar el mail de Chef de las 12:30** hasta que se apague su cron (Dashboard de Chef, proyecto
-  `nkhzocgdpwtgrmwleihr`). Gestión ya toma los pedidos de Chef de la página.
+- **No cargar en ISIS los mails de Chef del viernes (216) ni del sábado (217)**: Gestión los toma de la
+  página (216 ya es F01A). El cron de Chef quedó apagado el domingo; no salen más.
 - No usar Producción para programar ni facturar: lo web no está ahí.
 
 **Interruptores (los toco yo, con pedido del dueño; viven en `PPP_Web_Config`):**
@@ -93,7 +93,7 @@ web llegue al depósito. Cupo diario = pickers típicos × 3 m³ (hoy 2 → 6), 
 - [ ] Pasar la URL de Gestión a los operarios y al monitor de pared (`?monitor=tv&key=…` la primera vez).
 - [ ] Cargar el mail en `Empleados` de los que faltan (al menos **122** y **504**; activos).
 - [ ] Que cada uno abra Producción una vez con señal antes de cambiar (cola offline).
-- [ ] Apagar el cron de Chef de las 12:30 (Dashboard de Chef).
+- [x] Apagar el cron de Chef de las 12:30 — hecho el domingo 06/09 (jobs 1 y 2 en `active=false`).
 - [ ] No cargar el mail del sábado en ISIS.
 - [ ] Explicarle a la operadora el paso nuevo de Facturación: **NP web → tildar → bajar Excel ISIS**.
 - [ ] Decidir los 38 atrasados de ISIS (reprogramar en ISIS o cargar).

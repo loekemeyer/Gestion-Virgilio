@@ -200,7 +200,7 @@ de Producción se cae por una NP web.** Queda `empresa_de_np` (duales, §3.aa).
 1. **Los operarios entran a Gestión, no a Producción.** Las tandas web (E01A, E01B) viven en
    `PPP_Web_Programacion` y Producción no las ve: si el operario abre la app vieja, no las va a
    encontrar. Es el ítem "operarios a Gestión" de `CLAUDE.md`.
-2. Cron de Chef (12:30) apagado desde el Dashboard de Chef, cuando quiera que Chef entre por Gestión.
+2. ~~Cron de Chef (12:30) apagado desde el Dashboard de Chef~~ ✅ **apagado el domingo 06/09** (jobs 1 y 2 de Chef en `active=false`, lo corrió el dueño por SQL; v13.31). Los mails del vie (216) y sáb (217) NO se cargan en ISIS: 216 = F01A vie 11, 217 lo programa GV.
 3. Revisar los 38 atrasados de ISIS (reprogramar o cargar) — el recordatorio de las 08:30 los lista.
 
 ### [ ] 4990 — Módulo "Editar pedidos": el cliente agrega al pedido ya mandado
