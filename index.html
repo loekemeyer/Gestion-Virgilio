@@ -14763,7 +14763,7 @@ async function stkOpenNpFaltan() {
       // v12.05 — el tercer caso: NP programada pero SIN artículos en la base de pedidos.
       // Es el que ninguna de las dos secciones de arriba puede ver (una arranca de la base,
       // la otra busca números que no existen en ningún lado). Lo cazaba solo el Telegram.
-      fetch(SUPABASE_URL + "/rest/v1/vista_np_prog_sin_base?select=np,tanda,cliente,fecha_entrega,m3&order=fecha_entrega&limit=1000", { headers: H, cache: "no-store" }).then(function (r) { return r.ok ? r.json() : []; }).catch(function () { return []; })
+      fetch(SUPABASE_URL + "/rest/v1/gv_np_prog_sin_base?select=np,tanda,cliente,fecha_entrega,m3&order=fecha_entrega&limit=1000", { headers: H, cache: "no-store" }).then(function (r) { return r.ok ? r.json() : []; }).catch(function () { return []; })
     ]);
     rows = _out[0]; gaps = _out[1]; sinBase = _out[2];
   } catch (_e) {}
@@ -14773,7 +14773,8 @@ async function stkOpenNpFaltan() {
 }
 /* v12.05 — sección "Programadas sin artículos en la base": la NP está en Programación
    Diaria pero PPP_Base_Pedidos no tiene ni una línea suya, así que el picking no se puede
-   armar. Lee vista_np_prog_sin_base (misma vista que usa la alerta de Telegram). */
+   armar. Lee gv_np_prog_sin_base = vista_np_prog_sin_base (ISIS, la misma que usa la alerta de Telegram)
+   + gv_ppp_web_prog_sin_base (tandas web sin líneas en PPP_Web_Base; idea 4528). */
 function _stkNpSinBaseHtml() {
   var sb = (_stkPop && _stkPop.sinBase) || [];
   if (!sb.length) return "";
@@ -30656,7 +30657,7 @@ async function npFaltanLoadBadge() {
       fetch(SUPABASE_URL + "/rest/v1/vista_np_sin_programar?select=np&limit=5000", { headers: H, cache: "no-store" }).then(function (r) { return r.ok ? r.json() : []; }).catch(function () { return []; }),
       fetch(SUPABASE_URL + "/rest/v1/vista_np_faltantes_secuencia?select=np_faltante&limit=5000", { headers: H, cache: "no-store" }).then(function (r) { return r.ok ? r.json() : []; }).catch(function () { return []; }),
       // v12.05 — tercera pata: programadas sin artículos en la base.
-      fetch(SUPABASE_URL + "/rest/v1/vista_np_prog_sin_base?select=np&limit=5000", { headers: H, cache: "no-store" }).then(function (r) { return r.ok ? r.json() : []; }).catch(function () { return []; })
+      fetch(SUPABASE_URL + "/rest/v1/gv_np_prog_sin_base?select=np&limit=5000", { headers: H, cache: "no-store" }).then(function (r) { return r.ok ? r.json() : []; }).catch(function () { return []; })
     ]);
     supSetBadge("npFaltanBadge", ((_o[0] || []).length + (_o[1] || []).length + (_o[2] || []).length));
   } catch (_e) {}
