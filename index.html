@@ -2259,7 +2259,6 @@ button.pk-anular small{ display:block; font-size:12px; font-weight:700; opacity:
 .ppp-confirm-btn:hover{ background:#15803d; }
 /* Sugerencia: agregar un pedido de A Programar a una tanda YA en Programación (mismo cliente). */
 .ppp-errpanel{ background:#fff7ed; border:1.5px solid #fdba74; border-radius:10px; padding:10px 12px; margin:8px 0 6px; }
-.ppp-errpanel.ok{ background:#f0fdf4; border-color:#bbf7d0; color:#166534; font-weight:600; }
 .ppp-errpanel-h{ font-weight:800; color:#9a3412; margin-bottom:6px; }
 .ppp-ei{ font-size:13px; line-height:1.5; padding:3px 0; border-top:1px dashed #fed7aa; word-break:break-word; }
 .ppp-ei.bad{ color:#b42318; } .ppp-ei.warn{ color:#92400e; }
@@ -2433,7 +2432,7 @@ tr.ppp-err-zona > td{ background:#fffbeb !important; }
 .pn-carga .t{ font-size:11px; font-weight:800; color:#475569; line-height:1.2; } .pn-carga .t.go{ color:#15803d; }
 .pn-sec2{ font-size:11px; font-weight:800; letter-spacing:.7px; text-transform:uppercase; color:#64748b; margin:16px 0 8px; }
 @media (max-width:1100px){ .pn-kpis{ grid-template-columns:repeat(3,minmax(0,1fr)); } .pn-days{ grid-template-columns:repeat(2,1fr); } .pn-dayhead{ grid-template-columns:1fr; } .pn-thead{ display:none; } .pn-ped{ grid-template-columns:70px minmax(0,1fr) auto; } .pn-ped .loc, .pn-ped .m{ display:none; } }
-@media (max-width:640px){ .pn-kpis{ grid-template-columns:repeat(2,1fr); } .pn-days{ grid-template-columns:1fr; }
+@media (max-width:640px){ .pn-days{ grid-template-columns:1fr; }   /* .pn-kpis vive en el @media de arriba (v13.06, minmax(0,1fr)) */
   /* v13.14: franja de tanda en celular — nombre arriba, clientes/NP en la 2ª línea, fecha + m³ en la 3ª (antes la fecha tapaba el código) */
   .ppp-tanda-h{ grid-template-columns:14px minmax(0,1fr) auto; gap:4px 8px; }
   .ppp-tanda-h .ppp-tanda-name{ min-width:0; }
@@ -2651,7 +2650,9 @@ tr.ppp-err-zona > td{ background:#fffbeb !important; }
 .fac-neto-cell .fac-neto-load{ color: #cbd5e1; font-weight: 700; }
 .fac-neto-cell .fac-neto-na{ color: #94a3b8; font-weight: 600; }
 .fac-neto-cell .fac-neto-falta{ display: block; font-size: 10px; font-weight: 700; color: #b45309; margin-top: 1px; white-space: nowrap; }
-.fac-np-tbl th .fac-th-siva{ font-size: 9px; font-weight: 700; color: #94a3b8; }
+.fac-np-tbl th .fac-th-siva{ font-size: 9px; font-weight: 700; color: #94a3b8; white-space: nowrap; }
+/* v13.16: casillas del Excel ISIS tocables desde el celular (nativas quedaban en 13px) */
+.fac-np-tbl .fac-xls-chk, .fac-np-tbl #facXlsChkAll{ width: auto; transform: scale(1.4); cursor: pointer; }
 .fac-neto-click{ cursor: pointer; }
 .fac-neto-click:hover .fac-neto-val{ text-decoration: underline; }
 /* v11.86 — Modal desglose por ítem (reusa .facfc-). */
@@ -6971,7 +6972,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v13.15";
+const APP_VERSION = "v13.16";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -29361,7 +29362,8 @@ function pppPlanVolver() { _pppPlanDay = null; pppRenderProg(); }
 function pppPlanClasica(v) { _pppPlanClasica = !!v; pppRenderProg(); }
 function _pppFmtPesos(n) { n = Math.round(Number(n) || 0); const s = String(Math.abs(n)).replace(/\B(?=(\d{3})+(?!\d))/g, "."); return (n < 0 ? "-$ " : "$ ") + s; }
 function _pppFmtPesosCorto(n) { n = Number(n) || 0; if (Math.abs(n) >= 1e6) return "$" + (n / 1e6).toFixed(1).replace(".", ",") + " M"; if (Math.abs(n) >= 1e3) return "$" + Math.round(n / 1e3) + " mil"; return _pppFmtPesos(n); }
-function _pppFmtM3(n) { return (Number(n) || 0).toFixed(1).replace(".", ","); }
+// v13.16: 1 decimal, salvo volúmenes chicos (0,04 mostraba "0,0" como si el pedido no tuviera nada)
+function _pppFmtM3(n) { n = Number(n) || 0; return (n && Math.abs(n) < 0.1 ? n.toFixed(2) : n.toFixed(1)).replace(".", ","); }
 const _PN_DOW = ["Domingo", "Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado"];
 const _PN_MES = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"];
 const _PN_MESL = ["enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"];
@@ -29419,7 +29421,10 @@ function _pppPlanAgrupar(programados) {
    sectores del backend (GV_Sectores) una tanda puede mezclar zonas vecinas (Barracas con Constitución,
    zona 1 + zona 2), así que la etiqueta lista las zonas que lleva: "Camión 1 · Zona 1 + Zona 2".
    Los pedidos sin tanda se agrupan por zona como antes. Retira y Súper van aparte, siempre. */
-function _pppTandaNum(t) { const m = /^[A-Z]+(\d+)[A-Z]+$/.exec(String(t || "").trim().toUpperCase()); return m ? parseInt(m[1], 10) : null; }
+/* v13.16: la clave del camión es LETRA+NN ("E01"), no sólo el número: LK y Chef se arman en
+   corridas distintas y las dos numeran desde 01 (E01A y F01A serían dos camiones, no uno).
+   Tolera el prefijo GV- de la convivencia (GV-01A). */
+function _pppTandaNum(t) { const m = /^([A-Z]+)-?(\d+)[A-Z]+$/.exec(String(t || "").trim().toUpperCase()); return m ? (m[1] + m[2]) : null; }
 function _pppZonaCorta(z) { const m = /^Zona\s*(\d+)/i.exec(String(z || "")); return m ? "Zona " + m[1] : String(z || ""); }
 function _pppCamiones(ped) {
   const by = new Map();
@@ -29446,7 +29451,8 @@ function _pppCamiones(ped) {
   }
   const ord = { so: 1, n: 2, "": 3, sup: 4, ret: 5 };
   const arr = [...by.values()].sort(function (a, b) {
-    return (ord[a.ruta] - ord[b.ruta]) || ((a.tn == null ? 1e9 : a.tn) - (b.tn == null ? 1e9 : b.tn)) || a.zona.localeCompare(b.zona);
+    // v13.16: sin tanda al final de su ruta (con localeCompare "~" ordenaba ANTES de las letras)
+    return (ord[a.ruta] - ord[b.ruta]) || ((a.tn == null) - (b.tn == null)) || String(a.tn || "").localeCompare(String(b.tn || "")) || a.zona.localeCompare(b.zona);
   });
   // v13.13: Camión 1, 2, 3… en el orden de la vista (dueño: "Camión 46" con el n° de la tanda
   // no se entendía). El código de la tanda sigue en el subtítulo. Sin tanda no numera.
@@ -29577,7 +29583,7 @@ function _pppPlanDiaHtml(programados, key) {
       const pick = (e === "armado" || e === "armando" || e === "picking") ? "done" : (e === "pickeando" ? "on" : "");
       const arm = e === "armado" ? "done" : (e === "armando" ? "on" : "");
       const v = _pppValorPed(p);
-      const np = (typeof pwebNpLabel === "function" && p._web) ? p.np : p.np;
+      const np = p.np;   // la etiqueta web ya viene formateada de la vista (LK 1350)
       let carga = "";
       if (oc) {
         const esPrimero = primero && p === primero;
@@ -32193,7 +32199,8 @@ function pwebNpLabel(empresa, np, npIdx) {
   // con numeración"). El bloque 1 lleva el número pelado; los demás, sufijo "-N":
   // "LK 1350", "LK 1350-2", "CH 0217". Espejo exacto de gv_ppp_web_np_label(e, np, idx).
   const n = String(np), i = Number(npIdx) || 1;
-  return ((empresa === "chef") ? "CH" : "LK") + " " + (n.length >= 4 ? n : n.padStart(4, "0")) + (i > 1 ? "-" + i : "");
+  const e = String(empresa || "").trim().toLowerCase();   // v13.16: 'chef' o 'ch', como gv_ppp_web_np_label
+  return ((e === "chef" || e === "ch") ? "CH" : "LK") + " " + (n.length >= 4 ? n : n.padStart(4, "0")) + (i > 1 ? "-" + i : "");
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
@@ -32379,7 +32386,9 @@ async function aprCargar() {
     _apr.err = e && e.message ? e.message : String(e);
   }
   _apr.cargando = false;
-  aprRender();
+  // v13.16: sólo redibujar si el supervisor sigue en "A Programar" (la carga tarda ~3 s;
+  // si cambió de solapa mientras tanto, pisaba la pantalla con esta).
+  if (_pppTab === "prog") aprRender();
 }
 
 /* ── Acciones ──────────────────────────────────────────────────────────── */

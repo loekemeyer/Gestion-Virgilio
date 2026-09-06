@@ -152,6 +152,10 @@ A mano en "A Programar": **1340** (Retira), **1341** (Martínez, zona 6), **1349
 3. Supervisores: mismo login (mismo proyecto Supabase).
 4. Lo de Producción que sigue corriendo (crons, Apps Script del espejo) no molesta: escribe en
    tablas que GV lee con la canilla cerrada.
+5. (v13.16, sábado a la noche) Programar tandas y numerar NP exige **sesión de supervisor** (gate
+   `gv_es_supervisor_o_servicio`): si el lunes "A Programar" dice *"Sólo supervisores pueden…"*, es
+   que el que programa no entró con uno de los 3 mails. El stock de una tanda web se drena solo al
+   facturar (cron **jobid 74**, cada 10 min desfasado), aunque el navegador no llegue a mandarlo.
 
 **Auditoría de casts** (¿una NP `LK 1350` rompe algo de Producción el lunes?): se buscó en TODAS
 las funciones y vistas de `public` un cast a entero sobre NP/pedido/`texto`. El pipeline de stock

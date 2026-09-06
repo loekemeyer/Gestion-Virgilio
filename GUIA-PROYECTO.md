@@ -12,11 +12,24 @@
 > única**; no se replica. Ante la duda entre parche rápido y fix de raíz → **fix
 > de raíz**.
 >
-> Última actualización: 2026-09-05 (sábado, noche) · Versión app al documentar: **v13.15**
+> Última actualización: 2026-09-05 (sábado, noche) · Versión app al documentar: **v13.16**
 >
 > ⚠⚠ **Desde el lunes 2026-09-07 los operarios usan GESTIÓN, no Producción** (dueño, sábado a la
 > noche: *"el lunes van a empezar a usar GV, no más PV"*). Las tandas web viven en
 > `PPP_Web_Programacion` y Producción no las ve. URL: la de GitHub Pages de este repo.
+>
+> Nota **v13.16** (backend + front) — **Revisión con 5 agentes** (revisor-logica, auditor-supabase,
+> guardian-stock, auditor-consistencia, revisor-render). Backend: (1) gate de supervisor
+> `gv_es_supervisor_o_servicio()` en `ppp_web_np_asignar` y `gv_ppp_web_tanda_programar` — antes
+> cualquier sesión anónima de la app podía numerar NP y programar tandas; (2) nuevo cron **jobid 74**
+> `gv_reconciliar_facturado_web()` que drena `a_facturar` al facturar una tanda **web** (el cron de
+> Producción sólo conoce tandas de ISIS); (3) `anon` sin execute en cruce de factura, simulador,
+> armado y avisos; `GV_Sectores*` sólo lectura para anon; (4) `search_path` fijo en todas las
+> `gv_*`/`ppp_web_*`. Front: `_pppTandaNum` es letra+número (E01A y F01A ya no caen en el mismo
+> camión), "Sin tanda" al final de su ruta, `aprCargar()` no pisa la solapa si el supervisor se fue
+> de "A Programar", m³ chicos con 2 decimales, casillas del Excel ISIS más grandes. §3.ac de la doc
+> de Supabase; SQL en `sql/gv_seguridad_v1316.sql` y `sql/gv_reconciliar_facturado_web.sql`.
+> Propuestas que quedaron a decisión del dueño: 7802, 4779, 2859, 5313.
 >
 > Nota **v13.15** (backend, sólo bump) — **El mail del sábado ya no excluye.** Con nadie en
 > Producción, los pedidos 1340…1349 (mail del sábado 12:30) quedaban huérfanos. Interruptor

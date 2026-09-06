@@ -1384,6 +1384,70 @@ es de Chef y pisa al LK 217): cuando Gestión alimente el tracking, escribir el 
 una función `gv_*` y pedir columna `empresa` en PaginaLK. Y el Excel ISIS de Facturación manda
 `N_Pedido` contador (no el id), como el mail: ISIS numera 98xxx por su cuenta.
 
+### 3.ac ✅ Revisión con 5 agentes: gate de supervisor, drenaje web del stock, revokes (v13.16) — 2026-09-05 sábado (noche)
+
+Pedido del dueño: *"Lanzá agentes de revisión del programa en sonnet 5"*. Corrieron `revisor-logica`,
+`auditor-supabase`, `guardian-stock`, `auditor-consistencia` y `revisor-render`. Lo que era bug real
+se arregló acá; lo que es decisión del dueño quedó en `agente_propuestas`. SQL en
+`sql/gv_seguridad_v1316.sql` y `sql/gv_reconciliar_facturado_web.sql`. Migraciones:
+`gv_seguridad_rpc_gate_supervisor_v1316`, `gv_gate_supervisor_y_facturado_web_v1316`.
+**Nada toca objetos de Producción**: todo es `gv_*` / `ppp_web_*` / `GV_*`.
+
+**A. Gate de supervisor (auditor-supabase #1).** `ppp_web_np_asignar` y `gv_ppp_web_tanda_programar`
+son SECURITY DEFINER y hasta v13.15 aceptaban **cualquier** `auth.uid()`: en `auth.users` hay 413
+sesiones anónimas (las que abre la app para los operarios), así que cualquier celular con la app
+podía numerar NP y programar tandas salteando la RLS de supervisores. Nueva
+`gv_es_supervisor_o_servicio()`: pasa `session_user` `postgres`/`supabase_admin` (SQL editor, cron),
+JWT `service_role` (Edge Function) o un JWT con uno de los 3 mails de supervisor. Las dos funciones
+la chequean al entrar y levantan `Sólo supervisores pueden …`.
+⚠ **La primera versión tenía un agujero**: usaba `current_user`, y adentro de una SECURITY DEFINER
+`current_user` es el dueño (`postgres`), así que el gate dejaba pasar a cualquiera. Lo detectó la
+prueba (`set role authenticated` + JWT de un anónimo → `ppp_web_np_asignar` PASÓ). Corregido la misma
+noche con `session_user` (migración `gv_es_supervisor_session_user_v1316`): no cambia con SET ROLE ni
+con SECURITY DEFINER; es `authenticator` para todo lo que entra por la API.
+Medido (copia del cuerpo con `session_user = 'authenticator'`, como lo ve la API): JWT anónimo de
+la app → false · anon key → false · mail de supervisor → true · service_role → true · SQL editor
+(`session_user = postgres`) → true. El job de las 00:01 (service_role) no cambia.
+
+**B. Drenaje de `a_facturar` para tandas web (guardian-stock #1).** `reconciliar_pipeline_stock()`
+(cron 68 de Producción) sólo drena tandas que existan en las tablas de ISIS: una tanda `E01A` nunca
+está ahí, y el movimiento `facturado` dependía sólo del navegador al bajar el Excel. Nueva
+`gv_reconciliar_facturado_web()` + cron **jobid 74** `gv-reconciliar-facturado-web`
+(`5-55/10 * * * *`, desfasado 5 min del 68): misma lógica, `tandanp` desde `PPP_Web_Programacion`
++ `gv_ppp_web_np_label`, drena sólo cuando todas las NP de la tanda están en `Facturacion_NP`,
+mismo índice `mov_stock_pipeline_dedup`. Medido: `select public.gv_reconciliar_facturado_web()`
+→ `ok facturado_web=0` (no hay tandas web facturadas todavía); `cron.job` jobid 74 `active = true`.
+
+**C. Revokes (auditor-supabase #2–#4).** `anon` sin `execute` en `gv_cruce_facturacion_resumen`,
+`gv_cruce_facturacion_totales` (datos de facturación), `gv_ppp_web_armar_simular`,
+`ppp_web_armar_tandas`, `gv_ppp_web_tanda_avisos`. En `GV_Sectores*` `anon` sólo lee;
+`authenticated` conserva insert/update/delete (la policy de supervisores lo necesita) pero pierde
+truncate/references/trigger. Medido: `has_function_privilege('anon', …, 'execute')` = false en las 5.
+
+**D. `search_path` fijo** en todas las `gv_*` / `ppp_web_*` que no lo tenían (advisor
+`function_search_path_mutable`). Medido: 0 funciones con `proconfig is null` con esos prefijos.
+
+**E. Front (revisor-logica, auditor-consistencia, revisor-render)**, todo en v13.16 de `index.html`:
+- `_pppTandaNum` devuelve **letra+número** (`E01`): antes sólo el número, así E01A y F01A caían en el
+  mismo "camión". El orden pone "Sin tanda" al final de su ruta (con `localeCompare`, la `~` que
+  se usaba de centinela ordenaba ANTES de las letras).
+- `aprCargar()` sólo redibuja si el supervisor sigue en "A Programar" (la carga tarda ~3 s; si
+  cambiaba de solapa, la pantalla volvía sola a A Programar).
+- `pwebNpLabel` acepta `chef`/`ch` en cualquier caja; `_pppFmtM3` muestra 2 decimales bajo 0,1 m³
+  (0,04 salía "0,0"); casillas del Excel ISIS al 140 % para tocarlas desde el celular; CSS muerto
+  (`.ppp-errpanel.ok`, `.pn-kpis` duplicado en el media query) afuera.
+
+**F. Lo que quedó como propuesta (decisión del dueño):**
+| Cód. | Qué | Por qué no se hizo solo |
+|---|---|---|
+| 7802 | `en_produccion` debería comparar cod + fecha, no sólo cod | cambia qué pedidos se consideran "ya en ISIS" |
+| 4779 | mismo cliente en dos sectores incompatibles el mismo día | regla de negocio |
+| 2859 | formato de m³ unificado en todo el tablero | estético, varios lugares |
+| 5313 | trigger sobre `Facturacion_NP` para drenar al facturar | **tabla compartida**: nunca trigger sin OK del dueño |
+
+**Rollback:** grants de vuelta (comentados al pie de `sql/gv_seguridad_v1316.sql`),
+`cron.unschedule('gv-reconciliar-facturado-web')` + `drop function gv_reconciliar_facturado_web()`.
+
 ### 3.ab ✅ "El lunes todos en GV": el mail del sábado ya no excluye (v13.15) — 2026-09-05 sábado (noche)
 
 **Qué dijo el dueño.** *"El lunes van a empezar a usar GV, no más PV."* Con nadie en Producción,
