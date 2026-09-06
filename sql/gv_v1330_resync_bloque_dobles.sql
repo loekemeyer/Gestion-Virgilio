@@ -11,3 +11,11 @@
 --        el control de pedidos muertos (martes 15:00) — sumar a Telegram si el dueño quiere.
 -- Cuerpos: ver la migración en supabase_migrations.schema_migrations (name = gv_resync_por_bloque_prox_dia_120_dobles_v1330).
 -- Rollback 2485: volver a poner el `and not exists (… Facturacion_NP …)` en `pedidos` (cuerpo original en sql/gv_np_es_pedido.sql).
+
+
+-- ── v13.44 (2026-09-06) — la dirección y el barrio también disparan la actualización ──────────
+-- Migración ppp_web_resync_actualiza_direccion_v1344. El cuerpo vigente completo es el de
+-- sql/gv_np_es_pedido.sql (con el bloque `facturadas` de acá arriba) más esta condición en
+-- `actualizadas`:
+--         or (v.direccion is not null and g.direccion is distinct from v.direccion)
+--         or (v.barrio    is not null and g.barrio    is distinct from v.barrio)

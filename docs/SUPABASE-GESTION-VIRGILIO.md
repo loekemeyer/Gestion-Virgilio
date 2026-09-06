@@ -1461,6 +1461,17 @@ Verificado sobre 60 días: 74 filas, 0 sin dirección, 44 con expreso. Para el p
 Soldati*. Y el chequeo de distancia del geocodificador pasa a **todos** los intentos: una dirección
 lejos del barrio nunca es punto de entrega, no importa cómo se preguntó.
 
+**v13.44 — `ppp_web_resync` no actualizaba la dirección.** El dueño volvió sobre lo mismo (*"nosotros
+no entregamos en Río Cuarto"*) porque en la app seguía viendo la sucursal en el 216 ya programado.
+Causa: `actualizadas` sólo disparaba si cambiaba m³ / líneas / cajas / `m3_parcial` — el SET ya traía
+`direccion` y `barrio`, pero un cambio de dirección solo no entraba. Migración
+`ppp_web_resync_actualiza_direccion_v1344`: la dirección y el barrio también disparan (sólo si el feed
+los trae; null no pisa, igual que el `coalesce`). Producción no usa `ppp_web_resync` (grep: 0 hits).
+El 216 se refrescó a mano llamando al resync con las dos filas del feed nuevo (m³, líneas y cajas
+reales, para no tocarlos): dirección *"Exp. — Pergamino 3751 (I. Catolica 6- Rio Cuarto)"*, barrio
+Soldati; la clave nueva la geocodifica el cron (la limpia → *"Pergamino 3751"*, Villa Soldati). Espejo
+en `sql/gv_np_es_pedido.sql` (condición) y nota en `sql/gv_v1330_resync_bloque_dobles.sql`.
+
 ### 3.an ✅ Las ubicaciones se llenan solas y se guardan por cód de cliente (v13.40) — 2026-09-06 domingo
 
 Dueño: *"todo tenés que tener todas las ubicaciones"*, y antes *"dale, 1 y 2"* a las dos cosas que le

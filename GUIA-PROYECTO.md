@@ -12,11 +12,18 @@
 > única**; no se replica. Ante la duda entre parche rápido y fix de raíz → **fix
 > de raíz**.
 >
-> Última actualización: 2026-09-06 (domingo) · Versión app al documentar: **v13.43**
+> Última actualización: 2026-09-06 (domingo) · Versión app al documentar: **v13.44**
 >
 > ⚠⚠ **Desde el lunes 2026-09-07 los operarios usan GESTIÓN, no Producción** (dueño, sábado a la
 > noche: *"el lunes van a empezar a usar GV, no más PV"*). Las tandas web viven en
 > `PPP_Web_Programacion` y Producción no las ve. URL: la de GitHub Pages de este repo.
+>
+> Nota **v13.44** (backend) — **`ppp_web_resync` también actualiza la dirección.** Sólo refrescaba una
+> fila ya programada si cambiaba el m³, las líneas, las cajas o `m3_parcial`; un cambio de dirección
+> o barrio solo no hacía nada (aunque el SET ya los traía). Salió a la luz con v13.43: el pedido 216 de
+> Chef, programado el viernes, se quedaba con la sucursal del cliente en Río Cuarto. Ahora la
+> dirección y el barrio disparan la actualización (null no pisa). El 216 se refrescó a mano con el
+> feed nuevo → *"Exp. — Pergamino 3751 (I. Catolica 6- Rio Cuarto)"*, Soldati. §3.añ.
 >
 > Nota **v13.43** (backend, LK + Virgilio) — **Los pedidos de Chef se ubican en NUESTRA entrega, no en la
 > sucursal del cliente** (dueño: *"los de Chef probablemente estés poniendo la dirección de su sucursal

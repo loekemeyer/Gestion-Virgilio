@@ -220,7 +220,13 @@ begin
        and (g.m3         is distinct from v.m3
          or g.lineas     is distinct from v.lineas
          or g.cajas      is distinct from v.cajas
-         or g.m3_parcial is distinct from v.m3_parcial)
+         or g.m3_parcial is distinct from v.m3_parcial
+         -- v13.44: la dirección y el barrio también disparan la actualización. Antes un cambio de
+         -- dirección solo no hacía nada, aunque el SET ya los traía: salió a la luz con Chef
+         -- (v13.43), cuando el feed empezó a mandar la entrega nuestra y el 216 ya programado se
+         -- quedaba con la sucursal del cliente en Río Cuarto. Null no pisa (igual que el coalesce).
+         or (v.direccion is not null and g.direccion is distinct from v.direccion)
+         or (v.barrio    is not null and g.barrio    is distinct from v.barrio))
     returning g.order_id, g.np_idx
   ),
   agregadas as (
