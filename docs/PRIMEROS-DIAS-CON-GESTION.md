@@ -28,10 +28,10 @@ web llegue al depósito. Cupo diario = pickers típicos × 3 m³ (hoy 2 → 6), 
    ("Agregar a inicio" en Chrome). La app de Play Store sigue apuntando a Producción: **no usarla**.
 2. **Antes de cambiar, abrir Producción una vez con señal** para que vacíe su cola offline (los eventos
    sin mandar quedan en el IndexedDB de esa app; en la nueva no están).
-3. **Entrar con Google**: el mail del operario tiene que estar cargado en `Empleados`. Hoy hay 21 de 69
-   con mail. De los que registraron eventos el último mes: 104 Jhonny Moncayo, 237 Franco Ortiz,
-   277 Jhonny Cartaya, 8 Farias Juan Hilario y 94 Isidro Tevez **sí**; **122 y 504 no tienen mail**
-   → no van a poder entrar hasta que se les cargue.
+3. **Entrar**: con Google (si el mail está en `Empleados`) **o con el número de legajo** — botón
+   "Entrar con legajo" en la pantalla inicial. Sólo pide que el legajo exista en `Empleados`; no hace
+   falta mail. La sesión por legajo dura el día. **122 Adrian Villalba y 504 Kevin Latronico entran
+   con legajo** (corrección del 06/09: antes decía que no podían entrar sin mail).
 4. **Nada que aprender en los botones**: son los mismos (EP/TP picking, AP/TAP armado, CC carga de
    camión, RR recepción de remitos, MG, RT, Terminar Día). Mismas pantallas de picking y armado.
 
@@ -92,7 +92,7 @@ web llegue al depósito. Cupo diario = pickers típicos × 3 m³ (hoy 2 → 6), 
 ## Lo que hace falta ANTES del martes (dueño)
 
 - [ ] Pasar la URL de Gestión a los operarios y al monitor de pared (`?monitor=tv&key=…` la primera vez).
-- [ ] Cargar el mail en `Empleados` de los que faltan (al menos **122** y **504**; activos).
+- [x] ~~Cargar el mail en `Empleados` de 122 y 504~~ — no hace falta: entran con el número de legajo.
 - [ ] Que cada uno abra Producción una vez con señal antes de cambiar (cola offline).
 - [x] Apagar el cron de Chef de las 12:30 — hecho el domingo 06/09 (jobs 1 y 2 en `active=false`).
 - [ ] No cargar el mail del sábado en ISIS.
