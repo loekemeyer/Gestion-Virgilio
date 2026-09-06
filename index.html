@@ -2396,6 +2396,16 @@ tr.ppp-err-zona > td{ background:#fffbeb !important; }
 .pn-hoja{ width:auto; display:inline-flex; flex-direction:column; align-items:center; gap:2px; padding:10px 18px; border-radius:12px; font-size:14px; font-weight:800; background:#fff; color:#1d4ed8; border:1.5px solid #bfdbfe; cursor:pointer; min-height:44px; }
 .pn-hoja small{ font-size:11px; font-weight:600; color:#64748b; }
 .pn-hoja:hover{ background:#eff6ff; }
+/* v13.25: sin carteles; la tarjeta Atrasados es el acceso, lo sin controlar es una línea */
+.pn-kpi.click{ cursor:pointer; }
+.pn-kpi.click:hover{ box-shadow:0 0 0 2px #fca5a5 inset; }
+.pn-kpi .v .short{ display:none; }
+.pn-flags{ margin:10px 0 2px; }
+.pn-flag{ width:auto; display:inline-block; padding:6px 12px; border-radius:999px; font-size:13px; font-weight:700; background:#fff7ed; color:#9a3412; border:1px solid #fed7aa; cursor:pointer; text-align:left; }
+@media (max-width:640px){
+  .pn-kpi .v .full{ display:none; }
+  .pn-kpi .v .short{ display:inline; }
+}
 .pn-chip.mid{ background:#dbeafe; color:#1e40af; border-color:#bfdbfe; } .pn-chip.wait{ background:#fef3c7; color:#92400e; border-color:#fde68a; }
 /* adentro del día */
 .pn-topbar{ display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; }
@@ -4243,9 +4253,11 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
     </div>
     <div class="planim-body">
       <div id="pppAlertBanner" class="ppp-alert-banner"><div id="pppAlertCards"></div></div>
-      <div class="ppp-btnrow">
+      <!-- v13.25 (dueño): Importar/Exportar Excel ya no tienen sentido en Gestión (los pedidos entran por la
+           página); Clientes súper, Carpeta(s) PDF y Mapa de zonas pasaron a ⚙️ Configuración. Los contenedores
+           quedan ocultos porque el código de importación y el estado de la carpeta PDF escriben en ellos. -->
+      <div class="ppp-btnrow hidden">
         <div class="ppp-imp-mini">
-          <button class="ppp-imp-toggle" onclick="pppToggleImport()">⬆ Importar Excel ▾</button>
           <div id="pppImportMenu" class="ppp-imp-menu hidden">
             <button class="ppp-imp-btn" onclick="pppImportar('prog');pppCloseImport()" ondragover="pppDragOver(event,this)" ondragleave="pppDragLeave(event,this)" ondrop="pppDrop(event,'prog',this);pppCloseImport()"><span>⬆</span> Importar Formato PPP</button>
             <button class="ppp-imp-btn" onclick="pppImportar('base');pppCloseImport()" ondragover="pppDragOver(event,this)" ondragleave="pppDragLeave(event,this)" ondrop="pppDrop(event,'base',this);pppCloseImport()"><span>⬆</span> Importar Base Pedidos (Picking)</button>
@@ -4254,12 +4266,8 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
             <div id="pppAutoBox" class="ppp-auto"></div>
           </div>
         </div>
-        <button class="ppp-imp-toggle" onclick="pppExportExcel()" title="Baja un Excel de 2 hojas (Programación Diaria pendiente + Pedidos Entregados), en vivo desde Supabase.">⬇ Exportar Excel</button>
-        <button class="ppp-imp-toggle ppp-sup-toggle" onclick="openPppSupers()" title="Agregar/quitar clientes súper">🛒 Clientes súper</button>
-        <button class="ppp-imp-toggle ppp-pdf-toggle" onclick="pppConnectPdfDir()" title="Conectar las carpetas con los PDF de ISIS (ej. X:\PDF_ISIS y X:\PDF_ISISCHEF). Podés agregar VARIAS: tocá una vez por carpeta. Elegí la subcarpeta, NO el disco entero (Chrome bloquea raíces de disco y carpetas del sistema). Necesita Chrome/Edge en PC.">🖨️ Carpeta(s) PDF</button>
-        <button class="ppp-imp-toggle" onclick="openZonasMapa()" title="Geocodifica las direcciones (OpenStreetMap) y las muestra en un mapa por zona, marcando desajustes. Sirve para parametrizar bien las zonas.">📍 Mapa de zonas</button>
       </div>
-      <span id="pppPdfDirStatus" class="ppp-pdfdir-status"></span>
+      <span id="pppPdfDirStatus" class="ppp-pdfdir-status hidden"></span>
       <div id="pppPreview" class="ppp-preview"></div>
       <div id="pppStatus" class="planim-status"></div>
     </div>
@@ -4310,6 +4318,10 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
         <button class="sup-action-btn" onclick="cfgGo(openMailsEditor)"><span class="sup-ico">✉️</span><span>Mails autorizados</span></button>
         <button class="sup-action-btn" onclick="cfgGo(openPlanimEditor)"><span class="sup-ico">🗺️</span><span>Editar Planimetría</span></button>
         <button class="sup-action-btn" onclick="cfgGo(openTallEditor)"><span class="sup-ico">👷</span><span>Talleristas de Recepción</span></button>
+        <!-- v13.25: venían de la barra de la PPP (dueño: "llevalo a configuración, sacalo de acá") -->
+        <button class="sup-action-btn" onclick="cfgGo(openPppSupers)" title="Agregar/quitar clientes súper (salen en camión propio)"><span class="sup-ico">🛒</span><span>Clientes súper</span></button>
+        <button class="sup-action-btn" onclick="cfgGo(pppConnectPdfDir)" title="Conectar las carpetas con los PDF de ISIS (ej. X:\PDF_ISIS y X:\PDF_ISISCHEF). Una por vez. Necesita Chrome/Edge en PC."><span class="sup-ico">🖨️</span><span>Carpeta(s) PDF de ISIS</span></button>
+        <button class="sup-action-btn" onclick="cfgGo(openZonasMapa)" title="Geocodifica las direcciones y las muestra en un mapa por zona, marcando desajustes"><span class="sup-ico">📍</span><span>Mapa de zonas</span></button>
       </div>
       <div class="sup-cfg" id="ssgSwitchRow" style="max-width:none;margin:16px auto 0;">
         <div class="sup-cfg-top">
@@ -6985,7 +6997,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v13.23";
+const APP_VERSION = "v13.25";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -29356,6 +29368,17 @@ let _pppPlanClasica = false;   // true = lista clásica por fecha/tanda (v13.01)
 let _pppPlanHoja = 0;          // v13.17: hoja de la grilla (0 = próximos 6 hábiles, 1 = los 6 siguientes…)
 let _pppValor = null;          // Map np(norm) → { valor, sinPrecio }  (gv_ppp_np_valor)
 let _pppGeo = null;            // cache PPP_Geo (dir_key → {lat,lng}) para el orden de carga
+let _pppNoHabiles = null;      // v13.25: Set "YYYYMMDD" de GV_Dias_No_Habiles (feriados de la empresa: 07/09 Día del Metalúrgico)
+async function pppRefreshNoHabiles() {
+  if (_pppNoHabiles) return;
+  _pppNoHabiles = new Set();
+  try {
+    const rows = await supaFetchAllSafe(SUPABASE_URL + "/rest/v1/GV_Dias_No_Habiles", "select=fecha");
+    const s = new Set(); (rows || []).forEach(function (r) { const k = String(r.fecha || "").slice(0, 10).replace(/-/g, ""); if (k) s.add(k); });
+    _pppNoHabiles = s;
+    if (s.size && typeof pppRenderProg === "function") pppRenderProg();
+  } catch (_e) { /* sin la lista, la grilla saltea sólo fines de semana */ }
+}
 let _pppPickDone = null, _pppPickStarted = null;   // tandas (UPPER) con TP / con EP
 async function pppRefreshValor() {
   try {
@@ -29393,7 +29416,7 @@ function _pppDiasHabiles(n, skip) {
   let guard = 0, salt = Math.max(0, Number(skip) || 0);
   while (out.length < n && guard++ < 40 + salt * 2) {
     const dow = d.getDay();
-    if (dow !== 0 && dow !== 6) {
+    if (dow !== 0 && dow !== 6 && !(_pppNoHabiles && _pppNoHabiles.has(_pppDateKey(d)))) {   // v13.25: ni feriados de la empresa
       if (salt > 0) salt--;
       else out.push({ key: _pppDateKey(d), date: new Date(d.getTime()), dow: _PN_DOW[dow], dnum: d.getDate(), mon: _PN_MES[d.getMonth()] });
     }
@@ -29529,16 +29552,18 @@ function _pppPlanGridHtml(programados) {
   let h = '<div class="pn-head"><div><div class="pn-h1">Programación de entregas</div><div class="pn-h2">' + (hoja ? 'Hoja ' + (hoja + 1) + ' · ' + escapeHtml(rangoTxt) : 'Próximos 6 días hábiles') + ' · tocá un día para ver sus camiones y pedidos</div></div>' +
     '<div class="pn-tools"><button class="pn-lnk" onclick="pppPlanClasica(true)" title="Lista por fecha y tanda (como antes)">Vista clásica</button></div></div>';
   h += '<div class="pn-kpis">' +
-    '<div class="pn-kpi"><div class="ico">📦</div><div><div class="l">Pedidos</div><div class="v">' + tot + '</div><div class="s">' + (hoja ? 'hoja ' + (hoja + 1) : 'próximos 6 días') + '</div></div></div>' +
+    '<div class="pn-kpi"><div class="ico">📦</div><div><div class="l">Pedidos</div><div class="v">' + tot + '</div><div class="s">' + (hoja ? 'hoja ' + (hoja + 1) : 'estos 6 días') + ' · de ' + programados.length + ' programados (' + nVenc + ' atrasados, ' + Math.max(0, programados.length - tot - nVenc) + ' en otras fechas)</div></div></div>' +
     '<div class="pn-kpi"><div class="ico">🚚</div><div><div class="l">Camiones</div><div class="v">' + camiones + '</div><div class="s">por n° de tanda y día</div></div></div>' +
     '<div class="pn-kpi"><div class="ico">🧊</div><div><div class="l">Volumen</div><div class="v">' + _pppFmtM3(totM3) + ' m³</div><div class="s">a entregar</div></div></div>' +
-    '<div class="pn-kpi g"><div class="ico">💰</div><div><div class="l">Valor</div><div class="v">' + (_pppValor ? _pppFmtPesos(totVal) : '…') + '</div><div class="s">estimado a lista' + (totSinVal ? ' · ' + totSinVal + ' sin valuar' : '') + '</div></div></div>' +
-    '<div class="pn-kpi' + (nVenc ? ' r' : ' ok') + '"><div class="ico">' + (nVenc ? '⏰' : '✅') + '</div><div><div class="l">Atrasados</div><div class="v">' + nVenc + '</div><div class="s">' + (nVenc ? 'fecha pasada, no salieron' : 'todo al día') + '</div></div></div>' +
+    '<div class="pn-kpi g"><div class="ico">💰</div><div><div class="l">Valor</div><div class="v">' + (_pppValor ? '<span class="full">' + _pppFmtPesos(totVal) + '</span><span class="short">' + _pppFmtPesosCorto(totVal) + '</span>' : '…') + '</div><div class="s">estimado a lista' + (totSinVal ? ' · ' + totSinVal + ' sin valuar' : '') + '</div></div></div>' +
+    // v13.25 (dueño: "el cartel de los 38 no entiendo ni qué significa"): la tarjeta ES el acceso; sin cartel duplicado.
+    '<div class="pn-kpi' + (nVenc ? ' r click' : ' ok') + '"' + (nVenc ? ' onclick="pppPlanAbrir(\'venc\')" title="Pedidos de ISIS con fecha de entrega vencida que nunca se cargaron al camión. Tocá para verlos."' : '') + '><div class="ico">' + (nVenc ? '⏰' : '✅') + '</div><div><div class="l">Atrasados</div><div class="v">' + nVenc + '</div><div class="s">' + (nVenc ? 'fecha vencida sin cargar · <u>ver</u>' : 'todo al día') + '</div></div></div>' +
     '</div>';
   // v13.05 — dos carteles separados (dueño: "es confuso el cartel"): atrasados por un lado,
   // cargados sin controlar por otro (esos ya no están acá: viven en En Salida).
-  if (nVenc) h += '<div class="pn-alert" onclick="pppPlanAbrir(\'venc\')"><span class="n">' + nVenc + '</span><div><b>' + (nVenc === 1 ? 'Pedido atrasado' : 'Pedidos atrasados') + '</b><div class="s">La fecha de entrega ya pasó y todavía no ' + (nVenc === 1 ? 'salió' : 'salieron') + '. Tocá para ' + (nVenc === 1 ? 'verlo y reprogramarlo' : 'verlos y reprogramarlos') + '.</div></div><span class="btn">Ver →</span></div>';
-  if (sinCtrl) h += '<div class="pn-alert warn" onclick="pppTab(\'enviaje\')"><span class="n">' + sinCtrl + '</span><div><b>' + (sinCtrl === 1 ? 'Pedido cargado al camión sin controlar el remito' : 'Pedidos cargados al camión sin controlar el remito') + '</b><div class="s">Ya ' + (sinCtrl === 1 ? 'salió' : 'salieron') + ' y pasó el plazo de control. ' + (sinCtrl === 1 ? 'Está' : 'Están') + ' en En Salida.</div></div><span class="btn">Ir a En Salida →</span></div>';
+  // v13.25: sin carteles grandes (dueño: "no entiendo ni qué significa"). Atrasados vive en su tarjeta;
+  // lo cargado sin controlar es de En Salida y acá sólo se avisa en una línea.
+  if (sinCtrl) h += '<div class="pn-flags"><button class="pn-flag" onclick="pppTab(\'enviaje\')" title="Se cargaron al camión y nadie marcó el remito como controlado dentro del plazo. Están en En Salida.">🚚 ' + sinCtrl + ' cargado' + (sinCtrl === 1 ? '' : 's') + ' al camión sin controlar el remito → En Salida</button></div>';
   h += '<div class="pn-days">';
   for (const d of dias) {
     const dd = g.byDay.get(d.key);
@@ -29593,7 +29618,8 @@ function _pppPlanDiaHtml(programados, key) {
     '<div class="kp"><div class="k"><i>📦</i><div><div class="l">Pedidos</div><div class="v">' + ped.length + '</div></div></div><div class="k"><i>🚚</i><div><div class="l">Camiones</div><div class="v">' + nCam + '</div></div></div><div class="k"><i>🧊</i><div><div class="l">Volumen</div><div class="v">' + _pppFmtM3(_pppM3Sum(ped)) + ' m³</div></div></div><div class="k"><i>💰</i><div><div class="l">Valor estimado</div><div class="v g">' + (_pppValor ? _pppFmtPesos(val.valor) : '…') + '</div></div></div></div>' +
     '<div class="barw">' + _pppPlanBarraHtml(est, ped.length) + '</div></div>';
   if (!ped.length) return h + '<div class="planim-empty">Nada programado para este día.</div>';
-  if (esVenc) h += '<div class="pn-note">⏰ La fecha de entrega de estos pedidos ya pasó y no se cargaron al camión. Ponéles una fecha nueva con ✏️ Editar (abajo, en la tanda). Si en realidad ya salieron, hay que cargar el camión (CCN) y controlar el remito.</div>';
+  if (esVenc) h += '<div class="pn-note"><b>¿Qué es esto?</b> Pedidos que ISIS programó con una fecha de entrega que <b>ya pasó</b> y que <b>nunca se cargaron al camión</b> (no hay carga ni control de remito). Siguen contando como pendientes.<br>' +
+    '<b>Qué hacer con cada uno:</b> (1) si va a salir, ponele fecha nueva con ✏️ Editar en su tanda, abajo; (2) si ya salió y nadie lo marcó, cargar el camión (CC) y controlar el remito; (3) si se anuló, sacarlo de ISIS.</div>';
   const dk = esVenc ? "venc" : key;
   for (const c of cams) {
     // v13.13: el orden de carga sólo si hay recorrido de verdad — al menos 2 paradas con
@@ -29771,6 +29797,7 @@ function pppRenderProg() {
     if (!_pppPlanClasica) {
       if (_pppValor == null) { try { pppRefreshValor(); } catch (_e) {} }
       if (_pppGeo == null) { try { pppRefreshGeo(); } catch (_e) {} }
+      if (_pppNoHabiles == null) { try { pppRefreshNoHabiles(); } catch (_e) {} }   // v13.25
       html += '<div class="pn-wrap">' + (_pppPlanDay ? _pppPlanDiaHtml(programados, _pppPlanDay) : _pppPlanGridHtml(programados)) + '</div>';
       _renderKeepFocus(box, html); return;
     }
@@ -32755,7 +32782,24 @@ function aprColDias() {
 
   if (!_apr.cal.length) h += '<div class="apr-vacio">Cargando días…</div>';
 
-  for (const d of _apr.cal) {
+  const _fechaDe = function (x) { const q = String(x.dia).slice(0, 10).split("-"); return new Date(Number(q[0]), Number(q[1]) - 1, Number(q[2])); };
+  const cal = _apr.cal;
+  for (let i = 0; i < cal.length; i++) {
+    const d = cal[i];
+    // v13.24 (dueño): 2 o 3 días no hábiles seguidos (sáb, dom, feriado) en UNA sola fila.
+    if (d.habil === false) {
+      let j = i; while (j + 1 < cal.length && cal[j + 1].habil === false) j++;
+      const a = _fechaDe(cal[i]), b = _fechaDe(cal[j]), n = j - i + 1;
+      const esHoyRun = cal.slice(i, j + 1).some(function (x) { return String(x.dia).slice(0, 10) === hoyISO; });
+      const dow = n > 1 ? DOW[a.getDay()] + ' a ' + DOW[b.getDay()] : DOW[a.getDay()];
+      const num = n > 1
+        ? a.getDate() + (a.getMonth() === b.getMonth() ? '' : ' ' + MES[a.getMonth()]) + ' – ' + b.getDate() + ' ' + MES[b.getMonth()]
+        : a.getDate() + ' ' + MES[a.getMonth()];
+      h += '<div class="apr-dia apr-dia-cerrado apr-dia-nohabil' + (esHoyRun ? ' apr-dia-hoy' : '') + (n > 1 ? ' apr-dia-nohabil-run' : '') + '" title="' + (n > 1 ? n + ' días no hábiles' : 'No es día hábil') + '">' +
+        '<div class="apr-dia-fecha"><span class="apr-dia-dow">' + dow + (esHoyRun ? ' · hoy' : '') + '</span><span class="apr-dia-num">' + num + '</span></div>' +
+        '<div class="apr-dia-cuerpo"><div class="apr-dia-txt"><span class="apr-dia-cerr">No hábil' + (n > 1 ? ' · ' + n + ' días' : '') + '</span></div></div></div>';
+      i = j; continue;
+    }
     const iso   = String(d.dia).slice(0, 10);
     const p     = iso.split("-");
     const fecha = new Date(Number(p[0]), Number(p[1]) - 1, Number(p[2]));

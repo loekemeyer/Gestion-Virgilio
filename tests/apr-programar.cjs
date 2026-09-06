@@ -55,6 +55,7 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
     _apr.cal = [
       { dia:"2026-09-09", habil:true,  m3:0.5, tandas:1, np:2, cupo:5, resta:4.5, pasado:false, m3_isis:13.451, tandas_isis:7, np_isis:11 },   // v13.18: ISIS ya tiene 13,45 m³ ese día; no cierra el cupo web
       { dia:"2026-09-12", habil:false, m3:0,   tandas:0, np:0, cupo:5, resta:5,   pasado:false },
+      { dia:"2026-09-13", habil:false, m3:0,   tandas:0, np:0, cupo:5, resta:5,   pasado:false },   // v13.24: sáb + dom seguidos → una sola fila
       { dia:"2026-09-10", habil:true,  m3:5.2, tandas:3, np:9, cupo:5, resta:0,   pasado:false },
       // v13.22: antes de la anticipación mínima → "Muy pronto", cerrado aunque tenga cupo
       { dia:"2026-09-08", habil:true,  m3:0,   tandas:0, np:0, cupo:5, resta:5,   pasado:false, muy_pronto:true, dia_minimo:"2026-09-11" }
@@ -116,6 +117,9 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
   chk(r.der.includes("0,50</b> / 5,00 m³"),    "muestra los m³ programados contra el cupo");
   chk((r.der.match(/apr-dia-cerrado/g) || []).length === 3, "el no hábil, el completo y el muy pronto quedan cerrados");
   chk(/apr-dia-pronto/.test(r.der) && /Muy pronto · desde el 11\/09/.test(r.der), "v13.22: el día antes de la anticipación mínima dice 'Muy pronto · desde el 11/09'");
+  // v13.24: sáb 12 + dom 13 no hábiles seguidos → una sola fila "Sábado a Domingo · 12 – 13 sep · No hábil · 2 días"
+  chk(/apr-dia-nohabil-run/.test(r.der) && /Sábado a Domingo/.test(r.der) && /12 – 13 sep/.test(r.der) && /No hábil · 2 días/.test(r.der), "v13.24: dos no hábiles seguidos en una fila");
+  chk((r.der.match(/apr-dia-nohabil/g) || []).length === 2, "v13.24: una sola fila no hábil (clase + run)");
   chk(r.der.includes("apr-dia-lleno") && r.der.includes("completo"), "marca el día que llegó al límite");
   chk(r.der.includes("apr-dia-con"),           "marca el día que ya tiene tandas");
   // v13.18: lo de ISIS se muestra aparte y no cierra el día (el cupo sigue siendo web)

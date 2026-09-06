@@ -1,3 +1,4 @@
+-- ⚠ v13.25 (2026-09-05 noche): en la base, `update _sin_tanda set camion = …` lleva `where true` (pg_safeupdate rechazaba el UPDATE sin WHERE cuando el job entra por PostgREST; el simulador desde el SQL editor no lo mostraba). Migración ppp_web_armar_tandas_safeupdate_where_true_v1325. También v13.23: v_cupo = gv_ppp_web_cupo(p_fecha) y v_usado suma gv_ppp_web_m3_isis(p_fecha).
 -- ══════════════════════════════════════════════════════════════════════════
 -- Armado AUTOMÁTICO de tandas de la PPP Web · 2026-09-04
 -- Corre en VIRGILIO (hrxfctzncixxqmpfhskv)

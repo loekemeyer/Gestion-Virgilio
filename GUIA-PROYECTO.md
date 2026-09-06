@@ -12,11 +12,33 @@
 > única**; no se replica. Ante la duda entre parche rápido y fix de raíz → **fix
 > de raíz**.
 >
-> Última actualización: 2026-09-05 (sábado, noche) · Versión app al documentar: **v13.23**
+> Última actualización: 2026-09-05 (sábado, noche) · Versión app al documentar: **v13.25**
 >
 > ⚠⚠ **Desde el lunes 2026-09-07 los operarios usan GESTIÓN, no Producción** (dueño, sábado a la
 > noche: *"el lunes van a empezar a usar GV, no más PV"*). Las tandas web viven en
 > `PPP_Web_Programacion` y Producción no las ve. URL: la de GitHub Pages de este repo.
+>
+> Nota **v13.25** (backend + front) — (1) **Bug real en el job**: `ppp_web_armar_tandas` v4 tenía
+> `update _sin_tanda set camion = …` sin `where`; con `pg_safeupdate` (activo para lo que entra por
+> PostgREST) la Edge Function fallaba con "UPDATE requires a WHERE clause" — desde v13.07 ninguna corrida
+> real hubiera armado nada; el simulador (SQL editor) no lo mostraba. Parche `where true`. (2) **Intradía sin
+> umbral** (`intradia_umbral_m3 = 0,001`; dueño: *"si ya programaste, directo que salgan de A Programar"*):
+> arma apenas hay algo pendiente. (3) **Job disparado a mano el sábado**: E01A–E01E (LK 1342…1348, 1351) y
+> F01A (Chef 216) para el **viernes 11** (3,33 m³); 1350 Cuyana queda para el lunes 14 (cupo). (4) Tablero:
+> **sin carteles** (dueño: *"el cartel de los 38 y los 2 no entiendo ni qué significa"*): la tarjeta
+> Atrasados es el acceso (tocable, tooltip), lo cargado sin controlar es una línea chica → En Salida, la vista
+> Atrasados explica qué son y qué hacer; valor corto en celular; el tablero saltea los días de
+> `GV_Dias_No_Habiles` (lunes 07). (5) **Barra de la PPP vacía**: Importar/Exportar Excel se sacaron
+> (dueño: *"ya no tienen sentido"*; los pedidos entran por la página); **Clientes súper, Carpeta(s) PDF
+> y Mapa de zonas pasaron a ⚙️ Configuración**. Los contenedores del import y del estado de la carpeta
+> quedan ocultos (`hidden`) porque el código escribe en ellos. (6) KPI Pedidos explica el total: "85 · estos
+> 6 días · de 126 programados (38 atrasados, 3 en otras fechas)" (dueño: *"¿por qué acá 85 y arriba
+> 126 + 12?"* — los 12 de A Programar todavía no están programados). §3.ai de la doc de Supabase.
+>
+> Nota **v13.24** (front) — Calendario de "A Programar": **2 o 3 días no hábiles seguidos** (sáb, dom,
+> feriado) van en **una sola fila** ("Sábado a Lunes · 5 – 7 sep · No hábil · 3 días"). Pedido del dueño
+> con la captura del sábado. Además: `docs/PRIMEROS-DIAS-CON-GESTION.md` (qué necesitan operarios y
+> administración para arrancar con Gestión el martes 08) y su página publicada.
 >
 > Nota **v13.23** (backend) — (1) **Cupo por dotación** (idea 6220, dueño: *"depende cuánta gente
 > trabaje… por los mensajes de prod ya lo tenés… lo que esté, esté"*): `gv_ppp_web_cupo(fecha)` =

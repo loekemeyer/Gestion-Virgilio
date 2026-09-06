@@ -1384,6 +1384,29 @@ es de Chef y pisa al LK 217): cuando Gestión alimente el tracking, escribir el 
 una función `gv_*` y pedir columna `empresa` en PaginaLK. Y el Excel ISIS de Facturación manda
 `N_Pedido` contador (no el id), como el mail: ISIS numera 98xxx por su cuenta.
 
+### 3.ai ✅ El job real fallaba (pg_safeupdate) + intradía sin umbral + primera corrida (v13.25) — 2026-09-05 sábado (noche)
+
+Dueño: *"si ya programaste, directo que salgan de A Programar"*. Se puso `intradia_umbral_m3 = 0,001` (el
+cron 73 arma apenas hay algo pendiente; la Edge Function trata 0 como "sin valor", por eso 0,001) y se
+disparó el job a mano (mismo `net.http_post` que el cron 71, `{"fecha": gv_ppp_web_proximo_dia_entrega()}`).
+**Falló** (`GV_Tandas_Auto_Log` id 3): `ppp_web_armar_tandas: HTTP 400 21000 "UPDATE requires a WHERE
+clause"`. Causa: `update _sin_tanda set camion = gv_ppp_web_camion(zona, sector);` sin `where` (v4,
+sectores, v13.07); `pg_safeupdate` está activo para las conexiones que entran por PostgREST (service_role
+de la Edge Function), no para el SQL editor ni el simulador → **desde v13.07 ninguna corrida real hubiera
+armado tandas** y no nos habíamos enterado porque todo se probó por SQL. Parche
+`ppp_web_armar_tandas_safeupdate_where_true_v1325` (`where true`, con chequeo de que no quede otro
+update/delete sin where; los otros `gv_*` con update/delete multilínea sí llevan where).
+Segunda corrida (log id 4): **ok**, 26 NP leídas, 18 programadas, 6 tandas para el **viernes 11**:
+E01A 1344 Torres y Liva (0,985) · E01B 1345 + 1347 (0,483) · E01C 1348 + 1351 (0,577) · E01D 1342 + 1346
+(0,468, zona 3 + 2 vecinas) · E01E 1343 (0,267) · **F01A Chef 216 Elbantonio (0,547, forzado por CUIT de
+LK 271)**. `PPP_Web_Base` 221 líneas. **1350 Cuyana (0,938) no entró** por cupo (6 − 3,14 ISIS = 2,86; LK
+armó 2,78) → la toma el intradía del lunes para el lunes 14. Excluidos: 181 en_produccion + 190
+anterior_al_cambio (LK), 20 + 22 (Chef).
+Front v13.25: sin carteles en el tablero (dueño: *"no entiendo ni qué significa"*): tarjeta Atrasados
+tocable con tooltip, línea chica para "cargados sin controlar" → En Salida, la vista Atrasados explica qué
+son y las 3 acciones; valor corto en celular; la grilla saltea `GV_Dias_No_Habiles` (lunes 07). Rollback:
+`intradia_umbral_m3 = 0.80`; el `where true` no se revierte (es correcto).
+
 ### 3.ah ✅ Cupo por dotación: pickers × 3 m³, contando ISIS + web (idea 6220, v13.23) — 2026-09-05 sábado (noche)
 
 Dueño: *"depende cuánta gente trabaje"* → *"por los mensajes de prod ya lo tenés"* (la dotación sale de
