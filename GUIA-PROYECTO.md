@@ -12,12 +12,25 @@
 > única**; no se replica. Ante la duda entre parche rápido y fix de raíz → **fix
 > de raíz**.
 >
-> Última actualización: 2026-09-06 (domingo) · Versión app al documentar: **v13.57**
+> Última actualización: 2026-09-06 (domingo) · Versión app al documentar: **v13.58**
 >
 > ⚠⚠ **Desde el lunes 2026-09-07 los operarios usan GESTIÓN, no Producción** (dueño, sábado a la
 > noche: *"el lunes van a empezar a usar GV, no más PV"*). Las tandas web viven en
 > `PPP_Web_Programacion` y Producción no las ve. URL: la de GitHub Pages de este repo.
 >
+> Nota **v13.58** (front) — **A Programar sin selector Loekemeyer/Chef: LK y Chef juntos, sin filtros**
+> (dueño: *"sacá el botón Loeke/Chef; tienen que aparecer todos los pedidos a programar ahí sin filtros"*).
+> `aprTraerTodos()` lee las dos empresas en paralelo (LK por la vista `v_pedidos_web_np`, Chef por la RPC
+> `get_pedidos_web_np_chef`) y las junta; si falla LK falla la pantalla, si falla sólo Chef se ven los de LK con un
+> aviso rojo "Chef no respondió". `PPP_Web_Programacion`, `PPP_Web_Tanda_Items` y `gv_ppp_web_tandas_abiertas` se
+> leen sin `empresa=eq.`; la clave de "ya está en una tanda / programado" pasa a ser **empresa+order_id**
+> (`aprKey`), porque el 1350 de LK no es el 1350 de Chef. Las tandas siguen siendo de **una** empresa (PK
+> `empresa+codigo`; en ISIS ninguna tanda mezcla NP 9xxxx con 4xxxx): cada tanda lleva un chip **LK / Chef**, hay
+> dos botones "＋ Nueva tanda LK" / "＋ Nueva tanda Chef", y soltar un pedido de LK en una tanda de Chef avisa y
+> no llama a la RPC. Las acciones (`gv_ppp_web_tanda_agregar/sacar/descartar/programar`) mandan la empresa del
+> pedido o de la tanda (`aprTandaEmp`), no un estado global. `aprSetEmpresa` desapareció; `_apr.emp` queda sólo
+> como default de `aprTraerPedidos(e)` para los tests. Sin cambios en Supabase. Test: `tests/apr-programar.cjs`.
+
 > Nota **v13.57** (backend + front) — **sólo `CRN` (Recepción Remitos) es entregado; `CCR` NO** (dueño: *"todos
 > los de recepción de remitos deberían estar en 'En salida'"*). Deshace v13.27: `CCR` es el Control de Remitos
 > ANTES de cargar (botón CR), no la vuelta del remito. Vistas `gv_ppp_en_salida` / `gv_ppp_entregados` y el

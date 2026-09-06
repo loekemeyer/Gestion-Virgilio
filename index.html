@@ -731,9 +731,11 @@ button {
 .apr-wrap button, .apr-bar button{ width:auto; margin-top:0; padding:0; }
 
 .apr-bar{ display:flex; align-items:center; gap:10px; margin:6px 2px 10px; flex-wrap:wrap; }
-.apr-emp{ display:inline-flex; border:1px solid #cbd5e1; border-radius:8px; overflow:hidden; }
-.apr-empb{ border:0; background:#fff; padding:6px 12px !important; font-size:13px; font-weight:700; color:#475569; cursor:pointer; }
-.apr-empb.on{ background:#1e6bd6; color:#fff; }
+.apr-bar-t{ font-size:13px; font-weight:800; color:#334155; background:#e2e8f0; border-radius:8px; padding:5px 10px; }
+.apr-nueva-row{ display:flex; gap:6px; }
+.apr-nueva-row .apr-nueva{ flex:1 1 0; min-width:0; white-space:nowrap; }
+.apr-tanda-emp{ font-size:10.5px; font-weight:800; padding:1px 6px; border-radius:999px; margin-left:6px; background:#dbeafe; color:#1e40af; }
+.apr-tanda-emp.ch{ background:#fef3c7; color:#92400e; }
 .apr-reload{ border:1px solid #cbd5e1; background:#fff; border-radius:8px; padding:5px 10px !important; cursor:pointer; font-size:14px; }
 .apr-load{ font-size:12.5px; color:#64748b; }
 .apr-err{ background:#fee2e2; border-left:5px solid #b91c1c; color:#7f1d1d; padding:8px 10px; border-radius:6px; margin:6px 2px; font-weight:600; }
@@ -7073,7 +7075,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v13.57";
+const APP_VERSION = "v13.58";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -32542,6 +32544,7 @@ let _apr = {
   cal: [],          // gv_ppp_web_calendario, de HOY para adelante
   salida: {},       // v13.21: order_id → { dia, motivo, detalle } (gv_ppp_web_dia_salida)
   log: null,        // idea 2048: última fila de GV_Tandas_Auto_Log (¿corrió el armado automático?)
+  aviso: "",        // v13.58: "Chef no respondió" (se ven sólo los de LK)
   horizonte: 21,    // cuántos días muestra la lista
   q: "", exp: {}, drag: null, dragTanda: null, msg: "", msgErr: false,
   ocupado: false    // hay una acción en vuelo: no dejar arrastrar encima
@@ -32580,8 +32583,26 @@ async function aprGet(path) {
 
 /* Los pedidos pendientes. Salen de LK/Chef en vivo y se AGRUPAN por pedido:
    la vista devuelve un renglón por bloque y acá se junta en una tarjeta sola. */
-async function aprTraerPedidos() {
-  const emp = _apr.emp;
+/* v13.58 (dueño: "sacá el botón Loeke/Chef; tienen que aparecer todos los pedidos a programar
+   ahí sin filtros") — A Programar muestra LK y Chef JUNTOS. Cada empresa se lee por su vía
+   (LK: vista; Chef: RPC con FDW, ~3 s) y se juntan acá. Si LK falla, falla la pantalla (igual
+   que antes); si falla sólo Chef, se ven los de LK y un aviso dice que Chef no respondió:
+   antes que dejar la pantalla en blanco por una empresa, mostrar la otra y avisar. */
+async function aprTraerTodos() {
+  const rs = await Promise.allSettled([aprTraerPedidos("lk"), aprTraerPedidos("chef")]);
+  if (rs[0].status === "rejected") throw rs[0].reason;
+  _apr.aviso = rs[1].status === "rejected"
+    ? "Chef no respondió (" + ((rs[1].reason && rs[1].reason.message) || rs[1].reason) + "): se ven sólo los pedidos de LK."
+    : "";
+  const out = rs[0].value.concat(rs[1].status === "fulfilled" ? rs[1].value : []);
+  out.sort(function (a, b) {
+    return String(a.fecha_recep).localeCompare(String(b.fecha_recep)) || (a.order_id - b.order_id);
+  });
+  return out;
+}
+
+async function aprTraerPedidos(e) {
+  const emp = e || _apr.emp || "lk";
   const tok = await pwebLkToken();
   let nps;
   if (emp === "chef") {
@@ -32737,25 +32758,26 @@ async function aprCargar() {
   if (_apr.cargando) return;
   _apr.cargando = true; _apr.err = ""; aprRender();
   try {
-    const emp = _apr.emp;
+    // v13.58: las dos empresas juntas, sin filtro. `order_id` se repite entre LK y Chef
+    // (1350 de LK ≠ 1350 de Chef), así que la clave de "ya está afuera" es empresa+order_id.
     const [peds, prog, items, tandas] = await Promise.all([
-      aprTraerPedidos(),
-      aprGet('PPP_Web_Programacion?select=order_id&empresa=eq.' + emp + '&tanda=not.is.null&limit=20000'),
-      aprGet('PPP_Web_Tanda_Items?select=*&empresa=eq.' + emp + '&limit=20000'),
-      aprGet('gv_ppp_web_tandas_abiertas?select=*&empresa=eq.' + emp + '&order=codigo.asc'),
+      aprTraerTodos(),
+      aprGet('PPP_Web_Programacion?select=empresa,order_id&tanda=not.is.null&limit=20000'),
+      aprGet('PPP_Web_Tanda_Items?select=*&limit=20000'),
+      aprGet('gv_ppp_web_tandas_abiertas?select=*&order=codigo.asc'),
       aprCargarCalendario(),  // v13.11: en paralelo (estaba en serie, una vuelta de red más)
       aprCargarLog()          // idea 2048: ¿corrió el armado automático?
     ]);
 
     // Un pedido ya programado, o que ya está en un borrador, no vuelve a la izquierda.
     const fuera = new Set();
-    for (const x of prog)  fuera.add(String(x.order_id));
-    for (const x of items) fuera.add(String(x.order_id));
+    for (const x of prog)  fuera.add(aprKey(x.empresa, x.order_id));
+    for (const x of items) fuera.add(aprKey(x.empresa, x.order_id));
     // `pedidosTodos` guarda TODOS, incluidos los que ya están en un borrador: al
     // programar hacen falta sus artículos, y ésos ya no están en la lista de la
     // izquierda.
     _apr.pedidosTodos = peds;
-    _apr.pedidos = peds.filter(function (p) { return !fuera.has(String(p.order_id)); });
+    _apr.pedidos = peds.filter(function (p) { return !fuera.has(aprKey(p.empresa, p.order_id)); });
 
     _apr.tandas = tandas;
     _apr.items = {};
@@ -32775,8 +32797,21 @@ async function aprCargar() {
 }
 
 /* ── Acciones ──────────────────────────────────────────────────────────── */
-async function aprNuevaTanda() {
-  try { await aprRpc("gv_ppp_web_tanda_nueva", { p_empresa: _apr.emp, p_por: await aprQuien() }); _apr.msg = ""; _apr.msgErr = false; }
+/* v13.58 — clave empresa+pedido y empresa de una tanda. Las tandas son de UNA empresa
+   (PK empresa+codigo; en ISIS ninguna tanda mezcla NP 9xxxx con 4xxxx): un pedido de
+   Chef no entra en una tanda de LK, y viceversa. */
+function aprKey(emp, orderId) { return String(emp || "lk") + ":" + String(orderId); }
+function aprEmpNombre(emp) { return emp === "chef" ? "Chef" : "LK"; }
+function aprTandaEmp(codigo) {
+  const t = (_apr.tandas || []).find(function (x) { return x.codigo === codigo; });
+  if (t && t.empresa) return t.empresa;
+  const it = (_apr.items[codigo] || [])[0];
+  return (it && it.empresa) || "lk";
+}
+
+async function aprNuevaTanda(emp) {
+  const e = emp === "chef" ? "chef" : "lk";
+  try { await aprRpc("gv_ppp_web_tanda_nueva", { p_empresa: e, p_por: await aprQuien() }); _apr.msg = ""; _apr.msgErr = false; }
   catch (e) { _apr.msg = e.message; _apr.msgErr = true; }
   await aprCargar();
 }
@@ -32798,6 +32833,12 @@ async function aprQuien() {
 async function aprSoltarPedido(codigo, ped) {
   const p = ped || _apr.drag; _apr.drag = null;
   if (!p) return;
+  const pe = p.empresa || "lk", te = aprTandaEmp(codigo);
+  if (pe !== te) {
+    _apr.msg = "⚠ " + codigo + " es una tanda de " + aprEmpNombre(te) + " y " + pwebNpLabel(pe, p.order_id, 1) +
+               " es de " + aprEmpNombre(pe) + ": armá una tanda de " + aprEmpNombre(pe) + " (＋ Nueva tanda " + aprEmpNombre(pe) + ").";
+    _apr.msgErr = true; aprRender(); return;
+  }
   const filas = p.bloques.map(function (b) {
     return {
       order_id: p.order_id, np_idx: b.np_idx, np_total: p.np_total,
@@ -32810,7 +32851,7 @@ async function aprSoltarPedido(codigo, ped) {
   _apr.ocupado = true;
   try {
     await aprRpc("gv_ppp_web_tanda_agregar",
-      { p_empresa: _apr.emp, p_codigo: codigo, p_np: filas, p_por: await aprQuien() });
+      { p_empresa: pe, p_codigo: codigo, p_np: filas, p_por: await aprQuien() });
     _apr.msg = ""; _apr.msgErr = false;
   } catch (e) { _apr.msg = e.message; _apr.msgErr = true; }
   _apr.ocupado = false;
@@ -32822,7 +32863,7 @@ async function aprSacarPedido(codigo, orderId) {
   try {
     for (const it of its) {
       await aprRpc("gv_ppp_web_tanda_sacar",
-        { p_empresa: _apr.emp, p_codigo: codigo, p_order_id: it.order_id, p_np_idx: it.np_idx });
+        { p_empresa: it.empresa || aprTandaEmp(codigo), p_codigo: codigo, p_order_id: it.order_id, p_np_idx: it.np_idx });
     }
     _apr.msg = ""; _apr.msgErr = false;
   } catch (e) { _apr.msg = e.message; _apr.msgErr = true; }
@@ -32831,7 +32872,7 @@ async function aprSacarPedido(codigo, orderId) {
 
 async function aprDescartarTanda(codigo) {
   if (!confirm("¿Descartar la tanda " + codigo + "? Los pedidos vuelven a la lista de la izquierda.")) return;
-  try { await aprRpc("gv_ppp_web_tanda_descartar", { p_empresa: _apr.emp, p_codigo: codigo }); _apr.msg = ""; _apr.msgErr = false; }
+  try { await aprRpc("gv_ppp_web_tanda_descartar", { p_empresa: aprTandaEmp(codigo), p_codigo: codigo }); _apr.msg = ""; _apr.msgErr = false; }
   catch (e) { _apr.msg = e.message; _apr.msgErr = true; }
   await aprCargar();
 }
@@ -32843,11 +32884,12 @@ async function aprProgramar(codigo, fecha) {
   _apr.dragTanda = null;
   const its = _apr.items[codigo] || [];
   if (!its.length) { _apr.msg = "La tanda " + codigo + " está vacía."; _apr.msgErr = true; aprRender(); return; }
+  const te = aprTandaEmp(codigo);
   const porPed = new Map();
-  for (const p of _apr.pedidosTodos || []) porPed.set(String(p.order_id), p);
+  for (const p of _apr.pedidosTodos || []) porPed.set(aprKey(p.empresa, p.order_id), p);
   const items = [];
   for (const it of its) {
-    const p = porPed.get(String(it.order_id));
+    const p = porPed.get(aprKey(it.empresa || te, it.order_id));
     const b = p ? (p.bloques || []).find(function (x) { return x.np_idx === it.np_idx; }) : null;
     items.push({ order_id: it.order_id, np_idx: it.np_idx, items: (b && b.items) || [] });
   }
@@ -32858,7 +32900,7 @@ async function aprProgramar(codigo, fecha) {
   _apr.ocupado = true;
   try {
     const r = await aprRpc("gv_ppp_web_tanda_programar",
-      { p_empresa: _apr.emp, p_codigo: codigo, p_fecha: fecha, p_items: items, p_por: await aprQuien() });
+      { p_empresa: te, p_codigo: codigo, p_fecha: fecha, p_items: items, p_por: await aprQuien() });
     const x = (r && r[0]) || {};
     _apr.msg = "✅ " + codigo + " programada para el " + fecha + ": " +
                (x.np_programadas || 0) + " NP · " + aprNum(x.m3) + " m³." +
@@ -32869,7 +32911,6 @@ async function aprProgramar(codigo, fecha) {
   await aprCargar();
 }
 
-function aprSetEmpresa(e) { _apr.emp = (e === "chef" ? "chef" : "lk"); _apr.listo = false; aprCargar(); }
 function aprBuscar(v) { _apr.q = String(v || "").toLowerCase(); aprRender(); }
 function aprToggle(id) { _apr.exp[id] = !_apr.exp[id]; aprRender(); }
 
@@ -32944,16 +32985,15 @@ function aprRender() {
 
   let h = pppTabsHtml(_apr.listo ? _apr.pedidos.length : null, null, null, null);
 
+  // v13.58: sin selector Loekemeyer/Chef — se ven las dos empresas juntas.
   h += '<div class="apr-bar">' +
-       '<span class="apr-emp">' +
-         '<button class="apr-empb ' + (_apr.emp === "lk" ? "on" : "") + '" onclick="aprSetEmpresa(\'lk\')">Loekemeyer</button>' +
-         '<button class="apr-empb ' + (_apr.emp === "chef" ? "on" : "") + '" onclick="aprSetEmpresa(\'chef\')">Chef</button>' +
-       '</span>' +
+       '<span class="apr-bar-t">LK + Chef</span>' +
        '<button class="apr-reload" onclick="aprCargar()" title="Volver a leer">🔄</button>' +
        (_apr.cargando ? '<span class="apr-load">Cargando…</span>' : '') +
        '</div>';
 
   if (_apr.err) h += '<div class="apr-err">⚠ ' + escapeHtml(_apr.err) + '</div>';
+  if (_apr.aviso) h += '<div class="apr-err">⚠ ' + escapeHtml(_apr.aviso) + '</div>';
   if (_apr.msg) h += '<div class="' + (_apr.msgErr ? "apr-err" : "apr-msg") + '">' + escapeHtml(_apr.msg) + '</div>';
   h += aprLogHtml();   // idea 2048
 
@@ -33045,7 +33085,10 @@ function aprColPedidos() {
 function aprColTandas() {
   let h = '<div class="apr-col apr-col-tandas">' +
     '<div class="apr-col-t">📦 Tandas en armado <b>(' + _apr.tandas.length + ')</b></div>' +
-    '<button class="apr-nueva" onclick="aprNuevaTanda()">＋ Nueva tanda vacía</button>' +
+    '<div class="apr-nueva-row">' +
+      '<button class="apr-nueva" onclick="aprNuevaTanda(\'lk\')">＋ Nueva tanda LK</button>' +
+      '<button class="apr-nueva apr-nueva-ch" onclick="aprNuevaTanda(\'chef\')">＋ Nueva tanda Chef</button>' +
+    '</div>' +
     '<div class="apr-scroll">';
   if (!_apr.tandas.length) h += '<div class="apr-vacio">Tocá <b>＋</b> y arrastrá pedidos acá.</div>';
   for (const t of _apr.tandas) {
@@ -33054,7 +33097,7 @@ function aprColTandas() {
     const byPed = new Map();
     for (const it of its) {
       const k = String(it.order_id);
-      if (!byPed.has(k)) byPed.set(k, { order_id: it.order_id, rs: it.razon_social, cod: it.cod_cliente, zona: it.zona, m3: 0, n: 0, total: it.np_total || 1 });
+      if (!byPed.has(k)) byPed.set(k, { order_id: it.order_id, empresa: it.empresa || t.empresa || "lk", rs: it.razon_social, cod: it.cod_cliente, zona: it.zona, m3: 0, n: 0, total: it.np_total || 1 });
       const e = byPed.get(k); e.m3 += Number(it.m3) || 0; e.n++;
     }
     h += '<div class="apr-tanda" ondragover="aprOver(event,\'tanda\')" ondragleave="aprSale(event)"' +
@@ -33062,6 +33105,7 @@ function aprColTandas() {
       '<div class="apr-tanda-h" draggable="true" ondragstart="aprDragTandaIni(event,\'' + t.codigo + '\')"' +
       ' ondragend="aprDndFin()" title="Arrastrá la tanda a un día para programarla">' +
         '<span class="apr-tanda-cod">' + escapeHtml(t.codigo) + '</span>' +
+        '<span class="apr-tanda-emp ' + (t.empresa === "chef" ? "ch" : "lk") + '">' + aprEmpNombre(t.empresa) + '</span>' +
         (t.n_avisos > 0 ? '<span class="apr-badge" title="' + escapeHtml((t.avisos || []).join(" · ")) + '">⚠ ' + t.n_avisos + '</span>' : '') +
         '<button class="apr-tanda-x" onclick="aprDescartarTanda(\'' + t.codigo + '\')" title="Descartar">✕</button>' +
       '</div>' +
@@ -33074,7 +33118,7 @@ function aprColTandas() {
     for (const e of byPed.values()) {
       h += '<div class="apr-titem">' +
         '<div class="apr-titem-txt">' +
-          '<div class="apr-titem-cli">' + escapeHtml(pwebNpLabel(_apr.emp, e.order_id, 1)) + ' · ' + escapeHtml(e.rs || e.cod || "") + '</div>' +
+          '<div class="apr-titem-cli">' + escapeHtml(pwebNpLabel(e.empresa, e.order_id, 1)) + ' · ' + escapeHtml(e.rs || e.cod || "") + '</div>' +
           '<div class="apr-titem-d">' + escapeHtml(e.zona || "sin zona") + ' · ' + aprNum(e.m3) + ' m³' +
             (e.total > 1 ? ' · ' + e.n + '/' + e.total + ' bloques' : '') + '</div>' +
         '</div>' +

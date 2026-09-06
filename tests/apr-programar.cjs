@@ -28,7 +28,7 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
   await p.route("**/rest/v1/**", (r) => r.abort());
   await p.goto("file://" + path.join(__dirname, "..", "index.html"), { waitUntil: "domcontentloaded" });
 
-  const r = await p.evaluate(() => {
+  const r = await p.evaluate(async () => {
     _apr.listo = true;
     _apr.emp = "lk";
     _apr.pedidos = [
@@ -45,12 +45,16 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
     _apr.tandas = [
       { codigo:"GV-01A", empresa:"lk", m3:1.4, n_np:3, n_avisos:2,
         avisos:["Mezcla 2 zonas distintas: Zonas 2+3 · Zonas 6+7","Junta 2 clientes y suma 1.400 m³"] },
-      { codigo:"GV-01B", empresa:"lk", m3:0, n_np:0, n_avisos:0, avisos:null }
+      { codigo:"GV-01B", empresa:"lk", m3:0, n_np:0, n_avisos:0, avisos:null },
+      // v13.58: LK y Chef juntos — una tanda de Chef con un pedido de Chef (order_id 9 también existe en LK)
+      { codigo:"GV-02A", empresa:"chef", m3:0.3, n_np:1, n_avisos:0, avisos:null }
     ];
     _apr.items = { "GV-01A": [
       { codigo:"GV-01A", order_id:1117, np_idx:1, razon_social:"Riesgo Marcelo Fabian", cod_cliente:"R01", zona:"Zona 3", m3:0.121, np_total:3 },
       { codigo:"GV-01A", order_id:1117, np_idx:2, razon_social:"Riesgo Marcelo Fabian", cod_cliente:"R01", zona:"Zona 3", m3:0.121, np_total:3 },
       { codigo:"GV-01A", order_id:9,    np_idx:1, razon_social:"Distri zona 6",         cod_cliente:"C6A", zona:"Zona 6", m3:0.9,   np_total:1 }
+    ], "GV-02A": [
+      { codigo:"GV-02A", empresa:"chef", order_id:9, np_idx:1, razon_social:"Chen Li Yu", cod_cliente:"310", zona:"Zona 2", m3:0.3, np_total:1 }
     ] };
     _apr.cal = [
       { dia:"2026-09-09", habil:true,  m3:0.5, tandas:1, np:2, cupo:5, resta:4.5, pasado:false, m3_isis:13.451, tandas_isis:7, np_isis:11 },   // v13.18: ISIS ya tiene 13,45 m³ ese día; no cierra el cupo web
@@ -76,6 +80,16 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
     const conOk = document.getElementById("pppPreview").innerHTML;
     _apr.msg = "";
 
+    // v13.58: un pedido de LK no entra en una tanda de Chef (sin llamar a la RPC)
+    let rpcLlamada = false;
+    const fetchOrig = window.fetch;
+    window.fetch = function (u) { if (String(u).indexOf("/rpc/") >= 0) rpcLlamada = true; return fetchOrig.apply(this, arguments); };
+    _apr.pedidos[0].empresa = "lk";
+    await aprSoltarPedido("GV-02A", _apr.pedidos[0]);
+    window.fetch = fetchOrig;
+    const mezcla = { msg: _apr.msg, err: _apr.msgErr, rpcLlamada: rpcLlamada };
+    _apr.msg = ""; _apr.msgErr = false;
+
     // ⚠ La app tiene un `button { width:100% }` GLOBAL. Sin pisarlo, el "↩" de
     //   sacar un pedido medía 293px y aplastaba el nombre del cliente a 107px:
     //   se leía "Messina Herma…" con 380px libres al lado. Se mide de verdad,
@@ -95,7 +109,7 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
         return e ? Math.round(e.getBoundingClientRect().height) : -1; })()
     };
 
-    return { izq, med, der, izqAbierta, conError, conOk, anchos };
+    return { izq, med, der, izqAbierta, conError, conOk, anchos, mezcla, barra: document.querySelector(".apr-bar").innerHTML };
   });
 
   const fallos = [];
@@ -159,6 +173,13 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
   chk(a.x > 0 && a.x < 40, "el botón ↩ es chico (" + a.x + "px) — el button{width:100%} global no se le cuela");
   chk(a.txt > a.titem * 0.8, "el nombre del cliente se queda con el ancho (" + a.txt + " de " + a.titem + "px)");
   chk(a.altoNueva > 28, "el botón de nueva tanda conserva su padding (alto " + a.altoNueva + "px)");
+  // v13.58 (dueño: "sacá el botón Loeke/Chef; tienen que aparecer todos los pedidos a programar ahí sin filtros")
+  chk(!/Loekemeyer|aprSetEmpresa/.test(r.barra), "v13.58: la barra ya no tiene el selector Loekemeyer/Chef");
+  chk(/apr-tanda-emp lk">LK</.test(r.med) && /apr-tanda-emp ch">Chef</.test(r.med), "v13.58: cada tanda dice de qué empresa es");
+  chk(r.med.includes("CH 0009") && r.med.includes("GV-02A"), "v13.58: la tanda de Chef etiqueta su NP como CH 0009");
+  chk(/aprNuevaTanda\('lk'\)/.test(r.med) && /aprNuevaTanda\('chef'\)/.test(r.med), "v13.58: nueva tanda LK y nueva tanda Chef");
+  chk(r.mezcla.err === true && /tanda de Chef/.test(r.mezcla.msg) && /LK 1117/.test(r.mezcla.msg) && r.mezcla.rpcLlamada === false,
+      "v13.58: un pedido de LK soltado en una tanda de Chef avisa y no llama a la RPC");
   chk(errs.length === 0, "sin errores de página" + (errs.length ? ": " + errs[0] : ""));
 
   await b.close();
