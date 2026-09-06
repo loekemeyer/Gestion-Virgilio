@@ -32058,8 +32058,13 @@ function monitorRawFecha(s) {
    Ej: C03A → "03", C03B → "03" (mismo camión), B58E → "58".
    Si no hay dígitos (RETIRA, LA ANONIMA), devuelve el código tal cual. */
 function tandaCamion(code) {
-  const m = String(code || "").match(/\d+/);
-  return m ? m[0] : String(code || "");
+  // idea 7828 (v13.28): letra + número, como _pppTandaNum del tablero (v13.16). Antes sólo el número:
+  // D60A (ISIS), E60A (LK web) y F60A (Chef web) del mismo día caían en el mismo "camión 60".
+  const s = String(code || "").trim().toUpperCase();
+  const m = /^([A-Z]+)-?(\d+)[A-Z]*$/.exec(s);
+  if (m) return m[1] + m[2];
+  const d = s.match(/\d+/);
+  return d ? d[0] : s;
 }
 
 /* Fechas a mostrar en el monitor:
