@@ -12,11 +12,18 @@
 > única**; no se replica. Ante la duda entre parche rápido y fix de raíz → **fix
 > de raíz**.
 >
-> Última actualización: 2026-09-06 (domingo) · Versión app al documentar: **v13.35**
+> Última actualización: 2026-09-06 (domingo) · Versión app al documentar: **v13.36**
 >
 > ⚠⚠ **Desde el lunes 2026-09-07 los operarios usan GESTIÓN, no Producción** (dueño, sábado a la
 > noche: *"el lunes van a empezar a usar GV, no más PV"*). Las tandas web viven en
 > `PPP_Web_Programacion` y Producción no las ve. URL: la de GitHub Pages de este repo.
+>
+> Nota **v13.36** (front) — **El orden de carga va por CÓD de cliente** (dueño: *"esto ya te pedí que
+> pongas el cód cliente, no la localidad"*). Los chips decían `1º Rafael Calzada`, `5º Avellaneda`,
+> `6º Avellaneda`… — el que carga el camión no busca por barrio. Ahora dicen **`1º cód 2305`**, con el
+> cliente, la localidad y la NP en el title. Y se fue la línea **"Recorrido: …"**, que repetía la misma
+> lista al revés y en localidades; queda sólo *"Se carga primero el último que se entrega"* y, si hay,
+> *"N sin ubicación"*. El `?` de los que no tienen ubicación en `PPP_Geo` sigue.
 >
 > Nota **v13.35** (front) — **El camión de súper lleva el nombre del cliente** (dueño: *"si es súper,
 > pone el nombre directamente"*). Un camión de súper es siempre de un cliente, así que "Camión 2 ·

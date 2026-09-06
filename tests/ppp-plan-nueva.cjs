@@ -75,7 +75,10 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
     html = document.getElementById("pppPreview").innerHTML;
     out.volver = /Volver a los 6 días/.test(html);
     out.head = /class="d2">\d+ de [a-z]+</.test(html) && /VALOR ESTIMADO|Valor estimado/i.test(html) && /\$ 7\.000\.000/.test(html);
-    out.orden = /1º Barracas/.test(html) && /4º Mataderos/.test(html) && /Recorrido: Mataderos → Lugano → Pompeya → Barracas/.test(html);
+    // v13.36: el chip lleva el CÓD del cliente (1008 = Astorga, Barracas; 1007 = Cuyana, Mataderos);
+    // el cliente y la localidad quedan en el title y ya no hay línea "Recorrido: …".
+    out.orden = /title="Astorga Ng S\.A\. · Barracas · NP 98702">1º cód 1008</.test(html) && /4º cód 1007</.test(html) &&
+      !/Recorrido:/.test(html) && !/1º Barracas/.test(html) && /Se carga primero el último que se entrega<\/div>/.test(html);
     const fila = (np) => { const i = html.indexOf(np + " · "); return i < 0 ? "" : html.slice(i, i + 900); };
     out.cargarAhora = /CARGAR AHORA/.test(fila("98702")) && /class="n go">1º/.test(fila("98702"));
     out.esperaTurno = /4º/.test(fila("98701")) && /espera su turno/.test(fila("98701"));
@@ -146,7 +149,7 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
     ["barra de estado del día 1",                             r.barra === true],
     ["adentro: botón volver",                                 r.volver === true],
     ["adentro: cabecera con fecha y $ del día",               r.head === true],
-    ["orden de carga = recorrido al revés (1º Barracas)",     r.orden === true],
+    ["v13.36: orden de carga por CÓD de cliente (1º cód 1008), sin línea de recorrido", r.orden === true],
     ["1º armado → CARGAR AHORA",                              r.cargarAhora === true],
     ["4º armado → espera su turno",                           r.esperaTurno === true],
     ["2º en picking → falta armar",                           r.faltaArmar === true],

@@ -7030,7 +7030,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v13.35";
+const APP_VERSION = "v13.36";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -29694,9 +29694,14 @@ function _pppPlanDiaHtml(programados, key) {
     const chips = (c.est.armado ? '<span class="pn-chip mid">' + c.est.armado + ' armado' + (c.est.armado === 1 ? '' : 's') + '</span>' : '') + (c.est.curso ? '<span class="pn-chip wait">' + c.est.curso + ' en curso</span>' : '') + (c.est.sin ? '<span class="pn-chip">' + c.est.sin + ' sin empezar</span>' : '');
     h += '<div class="pn-camion"><div class="ch ' + c.ruta + '"><div class="ico">' + _pppCamionIco(c) + '</div><div><div class="t1">' + escapeHtml(_pppCamionNombre(c)) + '</div><div class="t2">' + (c.tandas.length ? 'Tanda' + (c.tandas.length === 1 ? '' : 's') + ' ' + escapeHtml(c.tandas.join(" · ")) : 'Sin tanda') + ' · ' + c.ped.length + ' pedido' + (c.ped.length === 1 ? '' : 's') + '</div></div><div class="st" title="' + escapeHtml(chips.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim()) + '"></div><div class="m3">' + _pppFmtM3(c.m3) + ' m³</div><div class="p">' + (_pppValor ? _pppFmtPesos(c.valor) : '…') + (c.sinValor ? '<small title="Pedidos sin valuar (sin líneas o sin precio de lista)"> · ' + c.sinValor + ' s/valor</small>' : '') + '</div></div>';
     if (oc && oc.paradas.length > 1) {
-      const rec = oc.paradas.map(function (p) { return escapeHtml(p.localidad || p.barrio || p.razon_social || p.np); });
+      // v13.36 (dueño: "ya te pedí que pongas el cód cliente, no la localidad"): el que carga el
+      // camión busca por código, no por barrio. En el chip va el cód; el cliente, la localidad y la
+      // NP quedan en el title. Y se fue la línea "Recorrido: …", que repetía lo mismo al revés
+      // (y en localidades) — el orden ya está en los chips.
+      const _lbl = function (p) { const cd = String(p.cod || "").trim(); return cd ? "cód " + cd : ("NP " + (p.np || "—")); };
+      const _tt = function (p) { return [String(p.razon_social || "").trim(), String(p.localidad || p.barrio || "").trim(), p.np ? "NP " + p.np : ""].filter(Boolean).join(" · "); };
       const carga = oc.paradas.slice().reverse();
-      h += '<div class="pn-orden"><b>🔁 Orden de carga</b><div class="r">' + carga.map(function (p, i) { return '<span class="' + (i === 0 ? 'go' : '') + '">' + (i + 1) + 'º ' + escapeHtml(p.localidad || p.barrio || p.razon_social || p.np) + (p._sinUbic ? ' <em title="Sin ubicación en PPP_Geo: va último en el reparto">?</em>' : '') + '</span>'; }).join(' → ') + '</div><div class="hint">Se carga primero el último que se entrega · Recorrido: ' + rec.join(' → ') + (oc.sinUbic ? ' · ' + oc.sinUbic + ' sin ubicación' : '') + '</div></div>';
+      h += '<div class="pn-orden"><b>🔁 Orden de carga</b><div class="r">' + carga.map(function (p, i) { return '<span class="' + (i === 0 ? 'go' : '') + '" title="' + escapeHtml(_tt(p)) + '">' + (i + 1) + 'º ' + escapeHtml(_lbl(p)) + (p._sinUbic ? ' <em title="Sin ubicación en PPP_Geo: va último en el reparto">?</em>' : '') + '</span>'; }).join(' → ') + '</div><div class="hint">Se carga primero el último que se entrega' + (oc.sinUbic ? ' · ' + oc.sinUbic + ' sin ubicación' : '') + '</div></div>';
     }
     const rows = oc ? oc.paradas.slice().sort(function (a, b) { return a._carga - b._carga; }) : c.ped.slice();
     const primero = rows.length ? rows[0] : null;
