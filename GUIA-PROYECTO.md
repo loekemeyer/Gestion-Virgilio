@@ -12,11 +12,17 @@
 > única**; no se replica. Ante la duda entre parche rápido y fix de raíz → **fix
 > de raíz**.
 >
-> Última actualización: 2026-09-06 (domingo) · Versión app al documentar: **v13.34**
+> Última actualización: 2026-09-06 (domingo) · Versión app al documentar: **v13.35**
 >
 > ⚠⚠ **Desde el lunes 2026-09-07 los operarios usan GESTIÓN, no Producción** (dueño, sábado a la
 > noche: *"el lunes van a empezar a usar GV, no más PV"*). Las tandas web viven en
 > `PPP_Web_Programacion` y Producción no las ve. URL: la de GitHub Pages de este repo.
+>
+> Nota **v13.35** (front) — **El camión de súper lleva el nombre del cliente** (dueño: *"si es súper,
+> pone el nombre directamente"*). Un camión de súper es siempre de un cliente, así que "Camión 2 ·
+> Súper" no decía nada: ahora dice **"Camión 2 · Coto C.I.C.S.A."**. El nombre sale de la lista de
+> clientes súper (editable en Configuración → Clientes súper) y, si el código no está ahí, de la razón
+> social del pedido; sin ninguno de los dos vuelve a decir "Súper". El 🛒 sigue igual.
 >
 > Nota **v13.34** (backend + front) — **"A Programar" abría en ~5 s** (dueño: *"tarda 5 seg en
 > cargarse los datos, ¿por qué?"*). Tres causas, las tres arregladas: (1) `gv_ppp_web_calendario`

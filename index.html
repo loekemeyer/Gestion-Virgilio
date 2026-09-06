@@ -7030,7 +7030,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v13.34";
+const APP_VERSION = "v13.35";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -29578,7 +29578,23 @@ function _pppPlanEstDia(ped) { const est = { armado: 0, curso: 0, sin: 0 }; for 
 function _pppPlanValor(ped) { let v = 0, sin = 0; for (const p of ped) { const x = _pppValorPed(p); if (x == null) sin++; else v += x; } return { valor: v, sin: sin }; }
 function _pppCamionIco(c) { return c.ruta === "ret" ? "🏭" : (c.ruta === "sup" ? "🛒" : "🚚"); }
 /* v13.07: el número del camión ES el de la tanda (E02A → Camión 2), como en el cuadro "Total por día". */
-function _pppCamionNombre(c) { return c.ruta === "ret" ? "Retira en fábrica" : (c.ruta === "sup" ? "Camión " + c.num + " · Súper" : ((c.tn != null ? "Camión " + c.num : "Sin tanda") + " · " + c.zona)); }
+/* v13.35 (dueño: "si es súper, pone el nombre directamente"): un camión de súper es siempre de UN
+   cliente, así que "Camión 2 · Súper" no dice nada. Va el nombre: el de la lista de clientes súper
+   (que el supervisor puede editar en Configuración) y, si no está, la razón social del pedido. */
+function _pppSuperNombre(p) {
+  const cod = String((p && p.cod) || "").trim();
+  if (cod) { for (const s of pppLoadSupers()) { if (s.cod && String(s.cod) === cod && s.nombre) return String(s.nombre); } }
+  const rs = String((p && p.razon_social) || "").trim();
+  return rs || (cod ? "Cód " + cod : "");
+}
+function _pppCamionSuperTxt(c) {
+  const nn = [];
+  for (const p of (c.ped || [])) { const n = _pppSuperNombre(p); if (n && nn.indexOf(n) < 0) nn.push(n); }
+  if (!nn.length) return "Súper";
+  if (nn.length === 1) return nn[0];
+  return nn.slice(0, 2).join(" + ") + (nn.length > 2 ? " +" + (nn.length - 2) : "");
+}
+function _pppCamionNombre(c) { return c.ruta === "ret" ? "Retira en fábrica" : (c.ruta === "sup" ? "Camión " + c.num + " · " + _pppCamionSuperTxt(c) : ((c.tn != null ? "Camión " + c.num : "Sin tanda") + " · " + c.zona)); }
 /* ---- GRILLA: KPI + banda de vencidas + 6 días + otras fechas ---- */
 function _pppPlanGridHtml(programados) {
   const g = _pppPlanAgrupar(programados);
