@@ -1384,6 +1384,94 @@ es de Chef y pisa al LK 217): cuando Gestión alimente el tracking, escribir el 
 una función `gv_*` y pedir columna `empresa` en PaginaLK. Y el Excel ISIS de Facturación manda
 `N_Pedido` contador (no el id), como el mail: ISIS numera 98xxx por su cuenta.
 
+### 3.as ⏸ Automático APAGADO: la tanda tiene que ACUMULAR hasta 0,80 (v13.59) — 2026-09-06 domingo (20:40)
+
+Dueño: *"No se tiene que programar nada de manera automática, salvo que logremos que se vaya
+programando y que hasta que se llegue a 0,80 o un poquito más —no hay problema que se zarpe un
+poquito— ya se cierra la tanda y ahí sí no se agreguen nuevos pedidos a esa tanda"*.
+
+**Hecho hoy (sólo esto):**
+
+```sql
+select cron.alter_job(71, active := false);   -- job de las 00:01
+select cron.alter_job(73, active := false);   -- intradía cada 15 min
+```
+
+Para volver a prenderlos: los mismos dos con `active := true`. **No se tocó código todavía.**
+
+#### El hallazgo que lo motivó — `_open` nace vacía en cada corrida
+
+Verificado sobre la función **desplegada** (`pg_proc.prosrc`), no sobre el archivo del repo.
+En `ppp_web_armar_tandas`, `_open` —la lista de tandas que pueden recibir un cliente más— es
+una `temp table` que se crea vacía y sólo se llena dentro del mismo bucle:
+
+```
+create temp table _open (code text primary key, camion text, m3 numeric, cerrada boolean, seq int) on commit drop;
+...
+if v_code is null then ... insert into _open ... end if;
+```
+
+`PPP_Web_Programacion` se lee en dos lugares y en **ninguno** siembra `_open`: en el `where not
+exists` que saca lo ya programado, y desde `gv_ppp_web_letra_y_camion()` para seguir la
+numeración. O sea: **una tanda escrita en una corrida anterior nunca es candidata a recibir un
+pedido nuevo.** Con el intradía cada 15 min y `intradia_umbral_m3 = 0,001`, cada pedido que entra
+solo se lleva su propio camión.
+
+Medido sobre las tandas web de hoy:
+
+| corrida | tandas | clientes por tanda |
+|---|---|---|
+| 00:20 (varios pedidos juntos) | E01B, E01C, E01D | **2** |
+| 16:15 y 20:30 (de a 1 pedido) | E03A, E04A, E05A, E06A, E08A | **1** |
+
+#### Lo que NO era el problema
+
+El caso que lo destapó fue Muller y Muller (Pompeya) yéndose a tanda propia teniendo
+Distribuidora Cuyana (Soldati) el mismo día en la misma zona. **No fue la cercanía**: Pompeya y
+Soldati están los dos en el sector `B` (`GV_Barrios_Sector`), y de hecho ya comparten tanda en
+E01C. Fue la regla del dueño del 2026-09-04: Cuyana sola suma **0,938 m³ ≥ `tanda_m3_max_mezcla`
+(0,80)** → `v_cierra := ... or r_cli.m3_cli >= v_tope` → **E03A nació cerrada** y no admite a
+nadie. Eso funciona como está pedido; lo que falta es lo otro.
+
+#### El botón de "regenerar" de la pantalla REARMA TODO
+
+A las **20:40:59** el dueño lo tocó y las 26 filas de `PPP_Web_Programacion` quedaron con ese
+`actualizado_at`. No agrega: recalcula el tablero entero, **renombra tandas y mueve fechas de
+entrega** ya comunicadas. Los renombres de hoy: E02A→E01F, E04A→D68G, E05A→D69D, E06A→D69E,
+E08A→E03B.
+
+Y las fechas se corrieron del **vie 11 al lun 14 / mar 15**, con motivo: el 11 quedó en
+`gv_ppp_web_m3_isis('2026-09-11')` = **10,075 m³ contra un cupo de 6**, porque el override de
+Chango Mas (E07A, 4,31 m³, §3.ap) se cargó hoy a la tarde. La cascada de cupo hizo lo que tiene
+que hacer. **⚠ El instructivo de `docs/PRIMEROS-DIAS-CON-GESTION.md` dice E01A–E01E el viernes 11;
+hoy dicen lunes 14.** Sin resolver.
+
+#### Pedido de prueba 1352 (Muller y Muller) — sigue vivo
+
+Cargado a mano en LK para ver el circuito de punta a punta: 100 cajas de 505, 0,24 m³, entrega
+"De L Americas 4384- Parana" → expreso Fontana, Pompeya → Zona 1. Hoy es la tanda **E03B**, 15/09.
+
+Precauciones que se tomaron y conviene repetir si se hace otro:
+- `sheets_sent = true` a mano, porque el cron `retry-sheets` de LK (jobid 1, cada 5 min) levanta
+  todo lo que tenga `sheets_sent = false` y lo empuja al Google Sheet → ERP.
+- Cliente sin fila en `bot_customer_whatsapps`, si no el trigger `orders_notify_whatsapp` le manda
+  un "✅ Pedido recibido" real. Sólo 4 clientes de 1273 tienen teléfono cargado: 288, 4197, 4234, 4260.
+- `detectar_pedidos_anomalos` saltea los cod_cliente 1 y 3878 (los de prueba); 862 no está en esa
+  lista pero sacó score 0, así que no alertó.
+
+Para borrarlo: `PPP_Web_Programacion`, `PPP_Web_Base`, `PPP_Web_NP` en Virgilio; `order_items` y
+`orders` en LK. Backup de la fila de programación en
+`sql/backups/ppp_web_programacion_20260906_deshacer_tandas_sub080.sql`.
+
+#### Pendiente (decisión del dueño, ninguno hecho)
+
+1. **Acumular hasta 0,80 y ahí cerrar** — backend, en `ppp_web_armar_tandas`: sembrar `_open` con
+   las tandas ya programadas del mismo día que sigan abiertas, y marcar `cerrada` la que cruza el
+   tope. Sin timeout: dueño dijo que en zona 1 siempre se llena, y las otras zonas se programan a
+   mano por ahora.
+2. Que el botón **sólo agregue lo pendiente** en vez de rearmar todo.
+3. Qué se hace con las E01x: ¿quedan el lun 14 o se fuerzan al vie 11 aunque el día quede en ~13,5 m³?
+
 ### 3.ap ✅ Override de Gestión sobre una NP de ISIS: 44619 Chango Mas → E07A (v13.50) — 2026-09-06 domingo (16:45)
 
 Dueño: *"Chango Mas, programalo"*. La 44619 (Dorinka / Chango Mas, súper, 4,31 m³, vie 11) estaba en
