@@ -522,3 +522,25 @@ $function$;
 --   -- Producción intacta: ninguna NP web se coló en la PPP de ISIS (0):
 --   select count(*) from public."PPP_Programacion_Diaria" where np ~* '^(LK|CH) ';
 -- ══════════════════════════════════════════════════════════════════════════
+
+-- ═══════════════════════════════════════════════════════════════════════════════════════
+-- PARCHES VIGENTES EN LA BASE (aplicar DESPUÉS del cuerpo de arriba para reproducir el estado real).
+-- Migraciones: gv_ppp_web_cupo_por_dotacion_v1323 (parte 3) y ppp_web_armar_tandas_safeupdate_where_true_v1325.
+-- ═══════════════════════════════════════════════════════════════════════════════════════
+do $$
+declare d text; d2 text;
+begin
+  d := pg_get_functiondef('public.ppp_web_armar_tandas'::regproc);
+  -- v13.23: cupo por dotación e ISIS cuenta
+  d2 := replace(d, 'v_cupo   numeric := coalesce((select valor from public."PPP_Web_Config" where clave=''m3_max_dia''), 5.00);',
+                   'v_cupo   numeric := public.gv_ppp_web_cupo(p_fecha);   -- v13.23: cupo por dotación');
+  d2 := replace(d2, 'v_resta := greatest(v_cupo - v_usado, 0);',
+                    'v_usado := v_usado + public.gv_ppp_web_m3_isis(p_fecha);   -- v13.23: ISIS cuenta' || E'\n' || '  v_resta := greatest(v_cupo - v_usado, 0);');
+  -- v13.25: pg_safeupdate (el job entra por PostgREST): UPDATE sin WHERE no pasa
+  d2 := replace(d2, 'update _sin_tanda set camion = public.gv_ppp_web_camion(zona, sector);',
+                    'update _sin_tanda set camion = public.gv_ppp_web_camion(zona, sector) where true;   -- v13.25: pg_safeupdate');
+  if position('gv_ppp_web_m3_isis' in d2) = 0 or position('gv_ppp_web_cupo(' in d2) = 0 or position('where true' in d2) = 0 then
+    raise exception 'ppp_web_armar_tandas: faltó algún punto de inserción';
+  end if;
+  execute d2;
+end $$;

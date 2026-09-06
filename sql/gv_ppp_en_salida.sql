@@ -88,3 +88,19 @@ where k.np is null
 
 revoke all on public.gv_ppp_en_salida from anon, authenticated;
 grant select on public.gv_ppp_en_salida to anon, authenticated;
+
+-- ═══ PARCHE VIGENTE v13.27 (migración gv_ppp_entregados_ccr_cuenta_como_controlado_v1327): CRN o CCR = controlado ═══
+-- Dueño: "si ya fueron controlados, van directo a Entregados". En el CTE `crn` de gv_ppp_entregados y de
+-- gv_ppp_en_salida, `opcion = 'CRN'` pasa a `opcion = ANY (ARRAY['CRN','CCR'])` (mismo filtro de legajos test).
+do $$
+declare d text; d2 text;
+begin
+  d := pg_get_viewdef('public.gv_ppp_entregados'::regclass, true);
+  d2 := replace(d, 'WHERE r.opcion = ''CRN''::text AND NOT es_legajo_test(r.legajo)',
+                   'WHERE r.opcion = ANY (ARRAY[''CRN''::text, ''CCR''::text]) AND NOT es_legajo_test(r.legajo)');
+  if d2 <> d then execute 'create or replace view public.gv_ppp_entregados with (security_invoker = true) as ' || d2; end if;
+  d := pg_get_viewdef('public.gv_ppp_en_salida'::regclass, true);
+  d2 := replace(d, 'WHERE "Registros_Produccion_Virgilio".opcion = ''CRN''::text',
+                   'WHERE "Registros_Produccion_Virgilio".opcion = ANY (ARRAY[''CRN''::text, ''CCR''::text])');
+  if d2 <> d then execute 'create or replace view public.gv_ppp_en_salida with (security_invoker = true) as ' || d2; end if;
+end $$;

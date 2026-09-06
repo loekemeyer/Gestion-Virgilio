@@ -83,3 +83,17 @@ select cron.alter_job(71, command := $cmd$
                  'Authorization', 'Bearer ' || (select v from lecturacvs.app_secrets where k = 'SUPABASE_SERVICE_ROLE_KEY')),
     body    := jsonb_build_object('fecha', public.gv_ppp_web_proximo_dia_entrega()::text));
   $cmd$);
+
+-- ═══ PARCHE VIGENTE sobre gv_ppp_web_tanda_programar (migración gv_ppp_web_anticipacion_minima_v1322, parte 5) ═══
+do $$
+declare d text; d2 text;
+begin
+  d := pg_get_functiondef('public.gv_ppp_web_tanda_programar'::regproc);
+  d2 := replace(d,
+    'if p_fecha is null then raise exception ''Falta la fecha de entrega.''; end if;',
+    'if p_fecha is null then raise exception ''Falta la fecha de entrega.''; end if;' || E'\n' ||
+    '  -- v13.22: anticipación mínima (PPP_Web_Config.dias_anticipacion_min)' || E'\n' ||
+    '  if p_fecha < public.gv_ppp_web_dia_minimo() then raise exception ''El % es muy pronto: Gestión programa desde el %.'', to_char(p_fecha, ''DD/MM''), to_char(public.gv_ppp_web_dia_minimo(), ''DD/MM''); end if;');
+  if d2 = d then raise exception 'gv_ppp_web_tanda_programar: no se encontró el punto de inserción'; end if;
+  execute d2;
+end $$;

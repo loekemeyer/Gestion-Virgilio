@@ -70,3 +70,18 @@ grant execute on function public.gv_ppp_web_pickers_tipicos(), public.gv_ppp_web
 -- Consultas útiles:
 --   select public.gv_ppp_web_pickers_tipicos(), public.gv_ppp_web_cupo(current_date);
 --   select dia, m3, m3_web, m3_isis, cupo, resta, muy_pronto from public.gv_ppp_web_calendario('2026-09-07','2026-09-18');
+
+-- ═══ PARCHE VIGENTE sobre gv_ppp_web_tanda_programar (migración gv_ppp_web_cupo_por_dotacion_v1323, parte 3) ═══
+do $$
+declare d text; d2 text;
+begin
+  d := pg_get_functiondef('public.gv_ppp_web_tanda_programar'::regproc);
+  d2 := replace(d, 'v_cupo   numeric := coalesce((select valor from public."PPP_Web_Config" where clave=''m3_max_dia''), 5.00);',
+                   'v_cupo   numeric := public.gv_ppp_web_cupo(p_fecha);   -- v13.23: cupo por dotación');
+  d2 := replace(d2, '  if v_usado > v_cupo then',
+                    '  v_usado := v_usado + public.gv_ppp_web_m3_isis(p_fecha);   -- v13.23: ISIS cuenta' || E'\n' || '  if v_usado > v_cupo then');
+  if d2 = d or position('gv_ppp_web_m3_isis' in d2) = 0 or position('gv_ppp_web_cupo' in d2) = 0 then
+    raise exception 'gv_ppp_web_tanda_programar: no se encontraron los puntos de inserción';
+  end if;
+  execute d2;
+end $$;
