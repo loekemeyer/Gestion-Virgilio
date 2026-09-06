@@ -1384,6 +1384,25 @@ es de Chef y pisa al LK 217): cuando Gestión alimente el tracking, escribir el 
 una función `gv_*` y pedir columna `empresa` en PaginaLK. Y el Excel ISIS de Facturación manda
 `N_Pedido` contador (no el id), como el mail: ISIS numera 98xxx por su cuenta.
 
+### 3.ae ✅ "A Programar" dice qué día va a salir cada pedido (v13.21) — 2026-09-06 domingo (noche)
+
+Dueño: *"en A Programar debe aparecer para qué día va a poder salir el pedido, no la primera (sin
+sentido)"* — el chip mostraba la fecha de recepción. Nueva RPC **`gv_ppp_web_dia_salida(p_filas jsonb,
+p_ahora)`** (SECURITY DEFINER, `authenticated` + `service_role`, sin anon; `sql/gv_ppp_web_dia_salida.sql`),
+recibe `[{zona, m3}]` de la lista y devuelve por índice `r_dia`, `r_motivo`, `r_detalle`:
+- **Retira** → sin día (`retira`). **Súper** → sin día (`super`, camión propio).
+- **Zona automática** (`zonas_automaticas`): antes del corte y con lo pendiente ≥ umbral →
+  `gv_ppp_web_proximo_dia_entrega(ahora)` (`intradia`, puede ser hoy); si no →
+  `proximo_dia_entrega(mañana 00:01)` (`job`). Es la misma regla que ejecutan el cron 71 y el 73.
+- **Zona manual** → el primer día ≥ hoy (o ≥ mañana después del corte) con un camión a esa zona,
+  web (`PPP_Web_Programacion`) o ISIS (`gv_ppp_programacion_diaria`) (`camion`, detalle con las
+  tandas); si no hay → `sin_camion`. Sin zona → `sin_zona`.
+Medido (lunes 07/09 09:00 simulado): zona 1 → 07/09 `intradia`; zona 4 → 08/09 (D60A·B·C·F); zona 5 →
+08/09 (D60E); zona 6 → 14/09 (D69C); Retira/Súper/"" → null. A las 13:00 la zona 1 pasa a 08/09 `job`.
+Front: `aprCargarSalida()` la llama al cargar la lista; `aprSalidaChip()` dibuja "🚚 sale mar 8/9"
+(verde; fondo verde oscuro si es hoy), "🏭 retira", "🛒 súper: a mano", "⏳ sin camión previsto",
+"❓ sin zona"; la fecha de recepción queda en el `title`. Rollback: `drop function` (el front muestra "🚚 …").
+
 ### 3.ad ✅ El calendario de "A Programar" muestra lo que ISIS ya tiene (v13.18) — 2026-09-06 domingo (noche)
 
 Dueño (captura del martes 8 con `0,00 / 5,00 m³`): *"acá sigue figurando cero pero sí hay en la PPP"*.

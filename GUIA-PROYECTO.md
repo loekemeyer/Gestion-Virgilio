@@ -12,11 +12,17 @@
 > única**; no se replica. Ante la duda entre parche rápido y fix de raíz → **fix
 > de raíz**.
 >
-> Última actualización: 2026-09-06 (domingo, noche) · Versión app al documentar: **v13.20**
+> Última actualización: 2026-09-06 (domingo, noche) · Versión app al documentar: **v13.21**
 >
 > ⚠⚠ **Desde el lunes 2026-09-07 los operarios usan GESTIÓN, no Producción** (dueño, sábado a la
 > noche: *"el lunes van a empezar a usar GV, no más PV"*). Las tandas web viven en
 > `PPP_Web_Programacion` y Producción no las ve. URL: la de GitHub Pages de este repo.
+>
+> Nota **v13.21** (backend + front) — **"A Programar" dice qué día sale cada pedido** (dueño: la fecha
+> de recepción "no tiene sentido"). RPC `gv_ppp_web_dia_salida([{zona,m3}])`: zona automática → el
+> día que le daría el intradía/job (`gv_ppp_web_proximo_dia_entrega`); zona manual → el primer día con
+> camión a esa zona (web o ISIS); Retira/Súper → sin día. Chip "🚚 sale mar 8/9" (motivo en el
+> title). §3.ae de la doc de Supabase; `sql/gv_ppp_web_dia_salida.sql`.
 >
 > Nota **v13.20** (front) — Tablero: **un camión por cada Súper con distinto n° de tanda** (dueño:
 > *"2 súper diferentes, 2 camiones diferentes"*): D59A y D61A el mismo día son "Camión 2 · Súper" y

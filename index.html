@@ -755,6 +755,11 @@ button {
 .apr-card-d{ display:flex; flex-wrap:wrap; gap:5px; margin-top:5px; }
 .apr-chip{ font-size:11.5px; background:#f1f5f9; color:#475569; border-radius:999px; padding:2px 8px; font-weight:600; }
 .apr-chip-z{ background:#e0edff; color:#1e40af; }
+/* v13.21: qué día sale el pedido */
+.apr-chip-sal{ background:#dcfce7; color:#166534; font-weight:800; }
+.apr-chip-sal.hoy{ background:#166534; color:#fff; }
+.apr-chip-sal.no{ background:#fef3c7; color:#92400e; }
+.apr-chip-sal.esp{ background:#f1f5f9; color:#94a3b8; }
 .apr-chip-m3{ background:#fef3c7; color:#92400e; }
 .apr-chip-np{ background:#ede9fe; color:#5b21b6; }
 .apr-card-body{ margin-top:7px; border-top:1px dashed #e2e8f0; padding-top:6px; }
@@ -6979,7 +6984,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v13.20";
+const APP_VERSION = "v13.21";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -32257,6 +32262,7 @@ let _apr = {
   tandas: [],       // gv_ppp_web_tandas_abiertas
   items: {},        // codigo -> [items del borrador]
   cal: [],          // gv_ppp_web_calendario, de HOY para adelante
+  salida: {},       // v13.21: order_id → { dia, motivo, detalle } (gv_ppp_web_dia_salida)
   horizonte: 21,    // cuántos días muestra la lista
   q: "", exp: {}, drag: null, dragTanda: null, msg: "", msgErr: false,
   ocupado: false    // hay una acción en vuelo: no dejar arrastrar encima
@@ -32381,6 +32387,35 @@ async function aprCargarCalendario() {
   catch (_e) { _apr.cal = []; }
 }
 
+/* v13.21 — "qué día va a poder salir" cada pedido (dueño: la fecha de recepción "no tiene sentido").
+   La regla vive en el backend (gv_ppp_web_dia_salida: misma lógica que el job de las 00:01 y el
+   intradía para las zonas automáticas; próximo camión a la zona, web o ISIS, para las manuales).
+   Acá sólo se pide y se dibuja. */
+async function aprCargarSalida() {
+  const peds = _apr.pedidos || [];
+  if (!peds.length) { _apr.salida = {}; return; }
+  try {
+    const filas = peds.map(function (p) { return { zona: p.zona || "", m3: Number(p.m3) || 0 }; });
+    const rows = await aprRpc("gv_ppp_web_dia_salida", { p_filas: filas }) || [];
+    const m = {};
+    for (const r of rows) { const p = peds[r.r_idx]; if (p) m[p.order_id] = { dia: r.r_dia ? String(r.r_dia).slice(0, 10) : null, motivo: r.r_motivo || "", detalle: r.r_detalle || "" }; }
+    _apr.salida = m;
+  } catch (_e) { _apr.salida = {}; }
+}
+function aprSalidaChip(p) {
+  const s = (_apr.salida || {})[p.order_id];
+  const recep = p.fecha_recep ? "Llegó el " + p.fecha_recep + ". " : "";
+  if (!s) return '<span class="apr-chip apr-chip-sal esp" title="' + escapeHtml(recep + "Calculando el día de salida…") + '">🚚 …</span>';
+  if (s.dia) {
+    const d = new Date(+s.dia.slice(0, 4), +s.dia.slice(5, 7) - 1, +s.dia.slice(8, 10));
+    const DOW = ["dom", "lun", "mar", "mié", "jue", "vie", "sáb"];
+    const txt = "🚚 sale " + DOW[d.getDay()] + " " + d.getDate() + "/" + (d.getMonth() + 1);
+    return '<span class="apr-chip apr-chip-sal' + (s.motivo === "intradia" ? " hoy" : "") + '" title="' + escapeHtml(recep + s.detalle) + '">' + txt + '</span>';
+  }
+  const lab = s.motivo === "retira" ? "🏭 retira" : (s.motivo === "super" ? "🛒 súper: a mano" : (s.motivo === "sin_zona" ? "❓ sin zona" : "⏳ sin camión previsto"));
+  return '<span class="apr-chip apr-chip-sal no" title="' + escapeHtml(recep + s.detalle) + '">' + lab + '</span>';
+}
+
 async function aprCargar() {
   if (_apr.cargando) return;
   _apr.cargando = true; _apr.err = ""; aprRender();
@@ -32403,6 +32438,7 @@ async function aprCargar() {
     // izquierda.
     _apr.pedidosTodos = peds;
     _apr.pedidos = peds.filter(function (p) { return !fuera.has(String(p.order_id)); });
+    await aprCargarSalida();   // v13.21: qué día sale cada uno (backend)
 
     _apr.tandas = tandas;
     _apr.items = {};
@@ -32635,7 +32671,8 @@ function aprColPedidos() {
       '</div>' +
       '<div class="apr-card-d">' +
         '<span class="apr-chip apr-chip-z">' + escapeHtml(p.zona || "sin zona") + '</span>' +
-        '<span class="apr-chip">' + escapeHtml(p.fecha_recep || "—") + '</span>' +
+        // v13.21 (dueño): qué día va a poder salir, no la fecha en que llegó (queda en el title)
+        aprSalidaChip(p) +
         '<span class="apr-chip apr-chip-m3"' +
           (p.m3_parcial ? ' title="Hay artículos sin medir: el m³ es un PISO, puede ser más"' : '') +
           '>' + aprNum(p.m3) + ' m³' + (p.m3_parcial ? " *" : "") + '</span>' +
