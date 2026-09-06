@@ -759,12 +759,18 @@ button {
 .apr-log{ margin:0 0 8px; padding:7px 12px; border-radius:10px; font-size:12.5px; font-weight:700; background:#dcfce7; color:#166534; border:1px solid #bbf7d0; }
 .apr-log.gris{ background:#f1f5f9; color:#475569; border-color:#e2e8f0; }
 .apr-log.err{ background:#fee2e2; color:#991b1b; border-color:#fecaca; }
+/* idea 7999: en celular las 6 solapas ocupaban 2 filas altas y cada día vacío media pantalla */
+@media (max-width:460px){
+  .ppp-tab{ font-size:12px; padding:8px 5px; border-radius:8px; }
+  .pn-day.empty{ min-height:96px; padding:10px 13px; }
+  .pn-day.empty .emptytxt{ font-size:13px; }
+}
 /* v13.21: qué día sale el pedido */
 .apr-chip-sal{ background:#dcfce7; color:#166534; font-weight:800; }
 .apr-chip-sal.hoy{ background:#166534; color:#fff; }
 .apr-chip-sal.no{ background:#fef3c7; color:#92400e; }
 .apr-chip-sal.esp{ background:#f1f5f9; color:#94a3b8; }
-.apr-chip-m3{ background:#fef3c7; color:#92400e; }
+.apr-chip-m3{ background:#f1f5f9; color:#334155; } /* idea 7999: es un dato, no una alerta */
 .apr-chip-np{ background:#ede9fe; color:#5b21b6; }
 .apr-card-body{ margin-top:7px; border-top:1px dashed #e2e8f0; padding-top:6px; }
 .apr-kv{ font-size:12px; color:#475569; margin-bottom:3px; }
@@ -821,7 +827,7 @@ button {
 /* Día que NO recibe: no hábil o ya completo. Gris y sin manito. */
 .apr-dia-cerrado{ background:#f1f5f9; border-left-color:#cbd5e1; opacity:.62; }
 .apr-dia-cerrado .apr-dia-num, .apr-dia-cerrado .apr-dia-dow{ color:#94a3b8; }
-.apr-dia-lleno .apr-dia-barra > i{ background:linear-gradient(90deg,#fca5a5,#b91c1c); }
+.apr-dia-lleno .apr-dia-barra > i{ background:linear-gradient(90deg,#fde68a,#f59e0b); } /* idea 7999: lleno es normal, no error */
 .apr-mas{ width:100% !important; margin-top:8px; border:1px solid #cbd5e1; background:#fff; color:#475569;
   border-radius:8px; padding:8px !important; font-size:12.5px; font-weight:700; cursor:pointer; }
 .apr-mas:hover{ border-color:#1e6bd6; color:#1e6bd6; }
@@ -2189,7 +2195,7 @@ button.pk-anular small{ display:block; font-size:12px; font-weight:700; opacity:
 .ppp-tanda.ppp-cargvenc{ border:2px solid #dc2626; }
 .ppp-tanda.ppp-cargvenc .ppp-tanda-h{ border-left-color:#dc2626; background:#fef2f2; }
 .ppp-tanda.ppp-tanda-err .ppp-tanda-h{ border-left-color:#dc2626; background:#fff1f2; }   /* tanda con errores → cinta roja + ⚠️ en el nombre */
-.ppp-cargvenc-badge{ display:inline-block; background:#dc2626; color:#fff; font-weight:900; font-size:11px; letter-spacing:.4px; padding:2px 8px; border-radius:6px; animation:pppBlink 1s steps(1) infinite; }
+.ppp-cargvenc-badge{ display:inline-block; cursor:default; background:#dc2626; color:#fff; font-weight:900; font-size:11px; letter-spacing:.4px; padding:2px 8px; border-radius:6px; animation:pppBlink 1s steps(1) infinite; }
 .ppp-cargvenc-row > td{ background:#fef2f2 !important; }
 .ppp-cargvenc-row .ppp-cli{ color:#b91c1c; font-weight:800; }
 .ppp-fc.cargvenc{ color:#fff; background:#dc2626; border-radius:999px; padding:2px 8px; font-weight:900; white-space:nowrap; animation:pppBlink 1s steps(1) infinite; }
@@ -3389,7 +3395,7 @@ table.fac-np-tbl.nc-tbl th{ overflow: hidden; text-overflow: ellipsis; }
 .nc-btn:disabled{ opacity: .5; cursor: default; }
 /* v12.93 — NP web: sin tilde, se factura bajando el Excel ISIS. NP de ISIS: sin casilla. */
 .fac-tick-web{ display:inline-block; font-size:11px; font-weight:800; color:#1e40af; background:#eff6ff; border:1px solid #bfdbfe; border-radius:8px; padding:4px 7px; white-space:nowrap; }
-.fac-xls-no{ color:#cbd5e1; font-weight:800; }
+.fac-xls-no{ color:#94a3b8; font-weight:700; }
 .fac-btn-tick{
   background: #16a34a; color: #fff; border: none; border-radius: 4px;
   padding: 1px 10px; font-size: 13px; font-weight: bold; cursor: pointer;
@@ -26825,7 +26831,7 @@ function _pppEnViajeHtml() {
   if (!list.length) return '<div class="ppp-ent-note">' + (_pppSearch ? "Sin coincidencias." : "No hay pedidos en salida: nada cargado al camión sin controlar.") + '</div>';
   let totM3 = 0, nVenc = 0; for (const p of list) { totM3 += (p.m3 || 0); if (_pppCargaVencida(p)) nVenc++; }
   const r = _pppEntGroupedHtml(list, true, 0);
-  return '<div class="ppp-ent-note">🚚 Pedidos <b>en salida</b> — ya se <b>cargaron al camión</b> (salieron de Programación) y <b>todavía no se controló el remito</b>. Con el control pasan solos a Pedidos Entregados. <b>' + list.length + '</b> pedido(s) · <b>' + totM3.toFixed(2) + '</b> m³.' +
+  return '<div class="ppp-ent-note">🚚 Pedidos <b>en salida</b> — ya se <b>cargaron al camión</b> (salieron de Programación) y <b>todavía no se controló el remito</b>. Con el control pasan solos a Pedidos Entregados. <b>' + list.length + '</b> pedido(s) · <b>' + totM3.toFixed(2).replace('.', ',') + '</b> m³.' +
     (nVenc ? ' <span style="color:#b91c1c;font-weight:800;">· 🚨 ' + nVenc + ' cargado(s) SIN CONTROLAR pasado el plazo</span>' : '') + '</div>' + r.html;
 }
 function _pppYmdKey(s) { const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(s || "")); return m ? (m[1] + m[2] + m[3]) : ""; }
@@ -26928,7 +26934,7 @@ function _pppEntTabsHtml() {
   const nExc = _pppDeliveredFull ? _pppDeliveredFull.length : "2000+";
   return '<div class="ppp-ent-modes">' +
     '<button class="ppp-ent-mode' + (_pppEntMode === "app" ? " on" : "") + '" onclick="pppEntMode(\'app\')">🚚 Con detalle (' + nApp + ')</button>' +
-    '<button class="ppp-ent-mode' + (_pppEntMode === "excel" ? " on" : "") + '" onclick="pppEntMode(\'excel\')">📄 Histórico completo del Excel (' + nExc + ')</button>' +
+    '<button class="ppp-ent-mode' + (_pppEntMode === "excel" ? " on" : "") + '" onclick="pppEntMode(\'excel\')">📄 Histórico completo (ISIS, ' + nExc + ')</button>' +
     '</div>';
 }
 function _pppEntBodyHtml() { return _pppEntTabsHtml() + (_pppEntMode === "excel" ? _pppEntExcelHtml() : _pppEntAppHtml()); }
@@ -26949,7 +26955,7 @@ function _pppEntGroupedHtml(list, showCajas, cap) {
     let m3d = 0; for (const p of arr) m3d += (p.m3 || 0);
     let dh = "Sin fecha";
     if (k !== "00000000") { const dt = new Date(+k.slice(0, 4), +k.slice(4, 6) - 1, +k.slice(6, 8)); dh = DOW[dt.getDay()] + " " + (+k.slice(6, 8)) + "/" + (+k.slice(4, 6)) + "/" + k.slice(0, 4); }
-    html += '<div class="ppp-ent-day"><div class="ppp-ent-day-h"><span>🗓️ ' + dh + '</span><span class="m3">' + arr.length + ' ped · ' + m3d.toFixed(2) + ' m³</span></div>';
+    html += '<div class="ppp-ent-day"><div class="ppp-ent-day-h"><span>🗓️ ' + dh + '</span><span class="m3">' + arr.length + ' ped · ' + m3d.toFixed(2).replace('.', ',') + ' m³</span></div>';
     const byT = {}, tord = [];
     for (const p of arr) { const t = p.tanda || "—"; if (!(t in byT)) { byT[t] = []; tord.push(t); } byT[t].push(p); }
     tord.sort();
@@ -26961,7 +26967,7 @@ function _pppEntGroupedHtml(list, showCajas, cap) {
         const disc = (p.discrep && p.pppDate) ? ' <span style="color:#b45309;font-weight:700;" title="Salió (carga camión) en otra fecha que la de la PPP — revisar la PPP">⚠ PPP decía ' + p.pppDate.slice(8, 10) + '/' + p.pppDate.slice(5, 7) + '</span>' : '';
         // v13.02 — en En Salida, lo cargado y sin controlar pasado el plazo lleva la pastilla roja (antes iba en Programación).
         const venc = (p._cargado && _pppCargaVencida(p)) ? ' <span class="ppp-cargvenc-badge">🚨 SIN CONTROLAR</span>' : '';
-        html += '<div class="ppp-ent-row"><b>' + escapeHtml(p.np) + '</b> ' + escapeHtml((p.rs || p.cod || "").slice(0, 32)) + (p.m3 != null ? ' <span class="ppp-ent-m3">' + p.m3.toFixed(3) + ' m³</span>' : '') + cajas + disc + venc + '</div>';
+        html += '<div class="ppp-ent-row"><b>' + escapeHtml(p.np) + '</b> ' + escapeHtml((p.rs || p.cod || "").slice(0, 32)) + (p.m3 != null ? ' <span class="ppp-ent-m3">' + p.m3.toFixed(3).replace('.', ',') + ' m³</span>' : '') + cajas + disc + venc + '</div>';
       }
       html += '</div>';
     }
@@ -26980,7 +26986,7 @@ function _pppEntAppHtml() {
   if (!list.length) return '<div class="ppp-ent-note">' + (_pppSearch ? "Sin coincidencias." : "Todavía no hay pedidos con entrega confirmada (control de remito o hoja de entregados). Los que salieron están en «En Salida».") + '</div>';
   let totM3 = 0, nDisc = 0; for (const p of list) { totM3 += (p.m3 || 0); if (p.discrep) nDisc++; }
   const r = _pppEntGroupedHtml(list, true, 0);
-  return '<div class="ppp-ent-note">🚚 Pedidos <b>entregados</b>, con <b>fecha de salida</b> (carga camión; si no hay, la de la PPP), cliente, m³ y cajas. <b>' + list.length + '</b> pedido(s) · <b>' + totM3.toFixed(2) + '</b> m³.' +
+  return '<div class="ppp-ent-note">🚚 Pedidos <b>entregados</b>, con <b>fecha de salida</b> (carga camión; si no hay, la de la PPP), cliente, m³ y cajas. <b>' + list.length + '</b> pedido(s) · <b>' + totM3.toFixed(2).replace('.', ',') + '</b> m³.' +
     (nDisc > 0 ? ' <span style="color:#b45309;font-weight:700;">· ⚠ ' + nDisc + ' con fecha distinta a la PPP</span>' : '') + '</div>' + r.html;
 }
 function _pppEntExcelHtml() {
@@ -26990,7 +26996,7 @@ function _pppEntExcelHtml() {
   const CAP = 800;
   let totM3 = 0; for (const p of list) totM3 += (p.m3 || 0);
   const r = _pppEntGroupedHtml(list, false, CAP);
-  return '<div class="ppp-ent-note">📄 Histórico completo del Excel "PPP Pedidos Entregados" — NP, cliente, <b>fecha</b> y <b>m³</b>. <b>' + r.total + '</b> pedido(s) · <b>' + totM3.toFixed(2) + '</b> m³' + (r.capped ? ' · mostrando los ' + CAP + ' más recientes (usá el 🔎 buscador para el resto)' : '') + '.</div>' + r.html;
+  return '<div class="ppp-ent-note">📄 Histórico completo de ISIS ("PPP Pedidos Entregados") — NP, cliente, <b>fecha</b> y <b>m³</b>. <b>' + r.total + '</b> pedido(s) · <b>' + totM3.toFixed(2).replace('.', ',') + '</b> m³' + (r.capped ? ' · mostrando los ' + CAP + ' más recientes (usá el 🔎 buscador para el resto)' : '') + '.</div>' + r.html;
 }
 /* ---- Ocupación (v7.02): vista SEMANAL. Barras apiladas por DÍA (fecha de entrega),
    segmentadas por TAMAÑO de pedido. Selector: semana ACTUAL + las 7 PRÓXIMAS (0…+7) —
@@ -36716,7 +36722,7 @@ function facRender(tandas){
       <tr data-fac-np="${escapeHtml(f.np)}" class="${altFlag ? 'fac-tanda-alt' : ''}${_ft ? ' fac-en-progreso' : (_ff ? ' fac-has-falta' : '')}">
         <td class="center fac-xls-cell">${facNpEsWeb(f.np)
           ? `<input type="checkbox" class="fac-xls-chk" data-np="${escapeHtml(f.np)}"${_facXlsSel.has(String(f.np)) ? ' checked' : ''} onchange="facXlsToggle(this.getAttribute('data-np'))" title="NP de la página: marcá y bajá el Excel ISIS para facturarla">`
-          : `<span class="fac-xls-no" title="NP de ISIS: se factura con el tilde ✓, no va al Excel">·</span>`}</td>
+          : `<span class="fac-xls-no" title="NP de ISIS: se factura con el tilde ✓, no va al Excel">—</span>`}</td>
         <td class="fac-np-cell" title="${escapeHtml(_npTip)}">${escapeHtml(f.np)}</td>
         <td class="fac-cod-cell">${escapeHtml(f.cod)}</td>
         <td class="fac-rs-cell"><span class="fac-rs-name">${escapeHtml(f.rs)}</span>${_ft ? facTareaBadge(f.np) : ''}</td>
