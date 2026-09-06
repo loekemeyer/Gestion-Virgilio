@@ -1425,7 +1425,18 @@ corrida se programa TODO lo que tiene día previsible.
 vie 11 F03A (camión D68E/F a la zona 5; el viernes ya está en 6,47/6, entra como prioritario); 1350 Cuyana
 (zona 1, 0,938) → lun 14 F02A; 1341 Orfali (zona 6, 1,184) → lun 14 F04A (D69C a la zona 6); 1340 Garbarino
 (Retira) queda en A Programar. Chef 217 Gifel (zona 6, 0,136) → lun 14. `gv_ppp_web_letra_y_camion()` =
-(5, 1) = F01. Corrida real: ver el log id siguiente en `GV_Tandas_Auto_Log`.
+(5, 1) = F01.
+**Corrida real: la hizo sola el cron 73 a las 16:15:00** (recién ampliado a domingos, con la Edge Fn v15
+deployada 16:12): `PPP_Web_Programacion` +7 filas a las 16:15:11 — **F03A** 1349 Bazar Mónica vie 11 ·
+**F02A** 1350 Cuyana (4 NP) lun 14 · **F04A** 1341 Orfali lun 14 · **F05A** CH 0217 Gifel lun 14 — todas con
+la foto en `PPP_Web_Base` (16 + 60 + 15 + 1 líneas). Calendario: vie 11 = 6,57 m³ (3,14 ISIS + 3,43 web,
+pasado por el forzado de zona 5, a propósito), lun 14 = 3,77 (1,51 + 2,26). En A Programar queda sólo 1340
+Garbarino (Retira).
+**Bug encontrado de paso (v13.47b):** ninguna corrida intradía dejaba renglón en `GV_Tandas_Auto_Log`: la
+Edge Fn escribe `estado = 'intradia_ok' / 'intradia_sin_umbral'` y el check de la tabla sólo admitía
+ok/salteada/error → 400 en el insert (visto en edge_logs; el `try/catch` del log lo tapaba). Nunca había
+corrido un intradía real (cron lun–vie, creado el sábado). Migración `gv_tandas_auto_log_estados_intradia_v1347b`
+amplía el check. El cartel verde de A Programar ("Último armado automático") lee ese log.
 
 **Rollback:** al final de `sql/gv_ppp_web_armar_pendientes.sql` (cron 73 a `*/15 10-21 * * 1-5`, drop de las
 funciones nuevas, restaurar la de 4 args desde el backup, redeployar la Edge Function v14).

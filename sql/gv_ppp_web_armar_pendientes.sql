@@ -488,3 +488,12 @@ select cron.alter_job(73, schedule := '*/15 9-23 * * *');
 -- gv_ppp_web_proximo_dia_entrega: volver al cuerpo de sql/gv_ppp_web_anticipacion.sql (+ ISIS y cupo, v13.23).
 -- drop function public.gv_ppp_web_proximo_dia_con_cupo(date);
 -- Y redeployar la Edge Function v13 (llamaba a ppp_web_armar_tandas con 4 args).
+
+-- ═══ v13.47b (mismo domingo, 16:20) · migración gv_tandas_auto_log_estados_intradia_v1347b ═══════════
+-- El intradía loguea 'intradia_ok' / 'intradia_sin_umbral' desde la v13.2x, pero el check de
+-- GV_Tandas_Auto_Log sólo admitía ok/salteada/error: cada corrida intradía recibía 400 al insertar el
+-- log y quedaba SIN constancia (la corrida de las 16:15 programó F02A–F05A y no dejó renglón; se vio
+-- por edge_logs: POST /rest/v1/GV_Tandas_Auto_Log → 400). Nunca había corrido un intradía real antes.
+alter table public."GV_Tandas_Auto_Log" drop constraint gv_tandas_auto_log_estado_chk;
+alter table public."GV_Tandas_Auto_Log" add constraint gv_tandas_auto_log_estado_chk
+  check (estado = any (array['ok','salteada','error','intradia_ok','intradia_sin_umbral']));
