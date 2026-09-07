@@ -1294,8 +1294,12 @@ llama nadie más). Definición completa y comentada: `sql/gv_ppp_web_tanda_abier
 aplicó la regla. La `D66B` seguía con **0 eventos** de operario, así que el 1354 pasó de `D66G` a
 **`D66B`**. La tanda del miércoles 9 queda con las tres NP del cliente: 98650 (2,710) + 98667
 (1,331) de ISIS + `LK 0024` (0,026) de la web = **4,067 m³, un solo camión y un solo picking**.
-`D66G` queda vacía y sin uso. Rollback:
-`sql/backups/ppp_web_programacion_20260907_1354_pre_merge_d66b.sql`.
+`D66G` quedó vacía. **Ojo con el orden de los hechos:** más tarde la v14.09 de la otra sesión
+renombró las tandas para que ningún camión quedara en dos días (`D66B` → `E09A`, `D66G` → `E09B`)
+y ese renombre volvió a **separar** el 1354, que quedó solo en `E09B`. Se reaplicó la regla —la
+`E09A` sigue con 0 eventos— y hoy las tres NP están en **`E09A`**. Verificado después del cambio:
+**ningún número de camión en dos días** de hoy en adelante, así que lo de la v14.09 sigue en pie.
+Rollback: `sql/backups/ppp_web_programacion_20260907_1354_pre_merge_d66b.sql` (incluye la adenda).
 
 ### 3.ca ✅ El pedido web se engancha al camión que YA va al cliente (v13.93) — 2026-09-07
 
