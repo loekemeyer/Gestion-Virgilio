@@ -2220,6 +2220,10 @@ button.pk-anular small{ display:block; font-size:12px; font-weight:700; opacity:
 .ppp-ent-note{ font-size:12.5px; color:#475569; margin:0 0 8px; }
 /* ── En Salida v13.62: tabla propia (fecha de carga + estado por NP + RR embebido) ── */
 .ppp-es-help{ background:#eff6ff; border:1px solid #bfdbfe; color:#1e3a8a; border-radius:9px; padding:8px 11px; font-size:12.5px; line-height:1.45; margin:0 0 10px; }
+/* v13.97 — los tres pasos de la salida, con el nombre de siempre (nada de CCR/CCN/CRN). */
+.ppp-es-pasos{ display:flex; align-items:center; gap:7px; flex-wrap:wrap; margin:0 0 10px; padding:7px 11px; border-radius:9px; background:#f8fafc; border:1px solid #e2e8f0; font-size:12.5px; font-weight:700; color:#334155; }
+.ppp-es-pasos b{ color:#0f172a; }
+.ppp-es-pasos i{ font-style:normal; font-weight:600; color:#64748b; }
 .ppp-es-day{ margin:0 0 12px; border:1px solid #e2e8f0; border-radius:11px; overflow:hidden; background:#fff; box-shadow:0 1px 2px rgba(15,23,42,.05); }
 .ppp-es-day-h{ background:#f1f5f9; padding:8px 12px; font-weight:800; color:#0f172a; font-size:13px; display:flex; justify-content:space-between; gap:10px; align-items:center; }
 .ppp-es-day-h .m3{ color:#1e6bd6; white-space:nowrap; font-weight:700; }
@@ -7278,7 +7282,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v13.96";
+const APP_VERSION = "v13.97";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -27145,20 +27149,20 @@ function _pppEsRow(p) { return (p && p._es) ? p._es : {}; }
 function _pppEsChips(p) {
   const r = _pppEsRow(p), out = [];
   if (r.estado === "cargada") out.push('<span class="ppp-es-chip ok">🚚 Cargado al camión</span>');
-  else out.push('<span class="ppp-es-chip warn" title="Está facturada pero nadie registró la carga al camión (evento CCN). Se muestra igual para que se pueda cerrar desde acá.">⚠ Sin registro de carga</span>');
+  else out.push('<span class="ppp-es-chip warn" title="Está facturada pero nadie la marcó en Carga Camión. Se muestra igual para que se pueda cerrar desde acá.">⚠ Sin registro de carga</span>');
   if (r.armada) out.push('<span class="ppp-es-chip">🧰 Armada</span>');
-  else out.push('<span class="ppp-es-chip warn" title="No hay evento TAL: la NP no pasó por armado en la app.">Sin armar</span>');
+  else out.push('<span class="ppp-es-chip warn" title="La NP no pasó por armado en la app.">Sin armar</span>');
   if (r.facturada) out.push('<span class="ppp-es-chip">🧾 Facturada</span>');
   // v13.68 (dueño: "el orden real es Control Remitos → Carga Camión → Recepción Remitos; el control se puede saltear
   // si no llegan"): con control y sin carga NO es un error, es el paso 1 hecho y el 2 pendiente.
-  if (r.control_previo && r.estado !== "cargada") out.push('<span class="ppp-es-chip" title="Paso 1 de 3 hecho (Control de Remitos). Falta el paso 2: Carga al Camión (CCN). Si ya salió, el que cargó no lo marcó.">✔ controlada · falta cargar</span>');
+  if (r.control_previo && r.estado !== "cargada") out.push('<span class="ppp-es-chip" title="Paso 1 de 3 hecho: Control Remitos. Falta el paso 2: Carga Camión. Si ya salió, el que cargó no lo marcó.">✔ controlada · falta cargar</span>');
   const d = Number(r.dias_sin_controlar);
   if (d >= 2) out.push('<span class="ppp-es-chip ' + (d >= 5 ? "bad" : "warn") + '">⏱ ' + d + ' día' + (d === 1 ? "" : "s") + ' sin controlar</span>');
   return out.join(" ");
 }
 function _pppEsFechaCarga(p) {
   const r = _pppEsRow(p), fc = String(r.fecha_carga || "").slice(0, 10);
-  if (!fc) return '<span class="ppp-es-nofc" title="No hay evento CCN para esta NP">— sin carga</span>';
+  if (!fc) return '<span class="ppp-es-nofc" title="Nadie la marcó en Carga Camión">— sin carga</span>';
   const t = r.cargado_at ? new Date(r.cargado_at) : null;
   const hh = t && !isNaN(t) ? (" " + String(t.getHours()).padStart(2, "0") + ":" + String(t.getMinutes()).padStart(2, "0")) : "";
   return escapeHtml(fc.slice(8, 10) + "/" + fc.slice(5, 7)) + '<span class="ppp-es-hh">' + escapeHtml(hh) + '</span>';
@@ -27189,6 +27193,11 @@ function _pppEnViajeHtml() {
     '<b>' + list.length + '</b> pedido(s) · <b>' + totM3.toFixed(2).replace('.', ',') + '</b> m³ · ' +
     '<b>' + nCarg + '</b> cargada(s) al camión · <b>' + nSin + '</b> sin registro de carga.' +
     (nVenc ? ' <span style="color:#b91c1c;font-weight:800;">· 🚨 ' + nVenc + ' pasado el plazo</span>' : '') + '</div>';
+  // v13.97 (dueño 07/09: "yo nunca entendí CCR y CCN; para mí es control remitos, carga camión y
+  // recepción remitos, sólo esos nombres entiendo"): los códigos se fueron de toda la pantalla y
+  // acá quedan los tres pasos con el nombre que usa él, en orden.
+  html += '<div class="ppp-es-pasos"><b>1.</b> Control Remitos <i>(se puede saltear si los remitos no llegaron)</i> <b>→</b> ' +
+    '<b>2.</b> Carga Camión <b>→</b> <b>3.</b> Recepción Remitos <i>= entregado</i></div>';
   if (sup) html += '<div class="ppp-es-help">📋 <b>Recepción de Remitos</b> — tildá <b>Controlado</b> en los remitos que ya volvieron y confirmá abajo: pasan a <b>Pedidos Entregados</b>. <b>↩ s/salida</b> = el cliente no recibió y la mercadería volvió al depósito.</div>';
   for (const k of keys) {
     const arr = byDay[k];
@@ -27642,7 +27651,7 @@ function _pppApTapBadge(p) {
   const tap = !!(_pppArmadoDone && _pppArmadoDone.has(t));
   return '<span class="ppp-aptap">' +
     '<span class="ppp-apt' + (ap ? ' on' : '') + '" title="' + (ap ? 'Armado empezado (AP)' : 'Armado sin empezar') + '">AP ' + (ap ? '✓' : '·') + '</span>' +
-    '<span class="ppp-apt' + (tap ? ' on' : '') + '" title="' + (tap ? 'Armado terminado (TAP)' : 'Armado sin terminar') + '">TAP ' + (tap ? '✓' : '·') + '</span>' +
+    '<span class="ppp-apt' + (tap ? ' on' : '') + '" title="' + (tap ? 'Armado terminado' : 'Armado sin terminar') + '">TAP ' + (tap ? '✓' : '·') + '</span>' +
     '</span>';
 }
 function _pppEntregado(p) { return !!(_pppEntregadoCC && _pppEntregadoCC.has(String(p.np))); }
@@ -28252,8 +28261,8 @@ function _pppRowTrRO(p, npE) {
     '<td>' + escapeHtml(pppLocDisp(p.localidad)) + '</td>' +
     '<td>' + escapeHtml(p.fecha_entrega || "") + '</td>' +
     '<td>' + escapeHtml(p.zona || pppZonaDeBarrio(p.localidad) || "—") + '</td>' +
-    '<td>' + (_pppListoFC(p) ? '<span class="ppp-fc ok" title="Armado terminado (TAP)">✓ Listo</span>' : '<span class="ppp-fc">·</span>') + '</td>' +
-    '<td>' + (_pppEntregado(p) ? '<span class="ppp-fc ok2" title="Cargado al camión (CCN)">✓ Entregado</span>' : '<span class="ppp-fc">·</span>') + '</td>' +
+    '<td>' + (_pppListoFC(p) ? '<span class="ppp-fc ok" title="Armado terminado">✓ Listo</span>' : '<span class="ppp-fc">·</span>') + '</td>' +
+    '<td>' + (_pppEntregado(p) ? '<span class="ppp-fc ok2" title="Marcado en Carga Camión">✓ Entregado</span>' : '<span class="ppp-fc">·</span>') + '</td>' +
     '<td class="ppp-acc">' + ctrlBtn + _pppChkBtn(p, npE, false) + '<button class="ppp-row-btn ppp-print" onclick="pppPrintNp(\'' + npE + '\')" title="Imprimir el PDF del pedido (ISIS)">🖨️</button>' + _pppApTapBadge(p) + '</td></tr>';
 }
 function _pppRowTr(p) {
@@ -28274,10 +28283,10 @@ function _pppRowTr(p) {
     '</td><td>' + escapeHtml(pppLocDisp(p.localidad)) + '</td>' +
     '<td><input class="ppp-edit ppp-edit-fe" value="' + feEd + '" placeholder="dd/mm/aaaa" onchange="pppSetEdit(\'' + npE + '\',\'fecha_entrega\',this.value.trim(),false)"></td>' +
     '<td>' + pppZonaCell(p) + '</td>' +
-    '<td>' + (_pppListoFC(p) ? '<span class="ppp-fc ok" title="Armado terminado (TAP)">✓ Listo</span>' : '<span class="ppp-fc">·</span>') + '</td>' +
+    '<td>' + (_pppListoFC(p) ? '<span class="ppp-fc ok" title="Armado terminado">✓ Listo</span>' : '<span class="ppp-fc">·</span>') + '</td>' +
     '<td>' + (cargVenc
         ? '<span class="ppp-fc cargvenc" title="Cargado al camión y SIN controlar pasado el plazo (30 hs; viernes→lunes 12 hs)">🚨 SIN CONTROLAR</span>'
-        : (_pppEntregado(p) ? '<span class="ppp-fc ok2" title="Cargado al camión (CC)">✓ Entregado</span>' : '<span class="ppp-fc">·</span>')) + '</td>' +
+        : (_pppEntregado(p) ? '<span class="ppp-fc ok2" title="Marcado en Carga Camión">✓ Entregado</span>' : '<span class="ppp-fc">·</span>')) + '</td>' +
     '<td>' + _pppChkBtn(p, npE, true) + '<button class="ppp-row-btn ppp-print" onclick="pppPrintNp(\'' + npE + '\')" title="Imprimir el PDF del pedido (Pedido de Cliente, ISIS)">🖨️ Imprimir</button>' +
     '<button class="ppp-row-back ppp-edit-only" onclick="pppPedidoAProgramar(\'' + npE + '\')" title="Sacar de la tanda → A Programar">↩</button>' + btn + _pppApTapBadge(p) + '</td></tr>';
 }

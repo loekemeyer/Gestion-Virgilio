@@ -12,11 +12,26 @@
 > única**; no se replica. Ante la duda entre parche rápido y fix de raíz → **fix
 > de raíz**.
 >
-> Última actualización: 2026-09-07 (lunes) · Versión app al documentar: **v13.95**
+> Última actualización: 2026-09-07 (lunes) · Versión app al documentar: **v13.97**
 >
 > ⚠⚠ **Desde el lunes 2026-09-07 los operarios usan GESTIÓN, no Producción** (dueño, sábado a la
 > noche: *"el lunes van a empezar a usar GV, no más PV"*). Las tandas web viven en
 > `PPP_Web_Programacion` y Producción no las ve. URL: la de GitHub Pages de este repo.
+>
+> Nota **v13.97** (sólo front) — **Los códigos de evento no se muestran más: van los nombres de siempre**
+> (dueño 07/09: *"yo nunca entendí CCR y CCN; para mí es control remitos, carga camión y recepción remitos, sólo
+> esos nombres entiendo"*). Tenía razón: `CCR`/`CCN`/`CRN`/`TAP`/`TAL` son claves de
+> `Registros_Produccion_Virgilio`, no algo que tenga que leer el que mira la pantalla, y se colaban en los
+> `title` de En Salida y de la tabla de tandas (*"evento CCN"*, *"Armado terminado (TAP)"*, *"No hay evento
+> TAL"*). Se limpiaron todos.
+>
+> Además **En Salida abre con los tres pasos escritos**, en orden y con su nombre:
+> **1. Control Remitos** *(se puede saltear si los remitos no llegaron)* **→ 2. Carga Camión → 3. Recepción
+> Remitos** *(= entregado)*. `tests/ppp-sin-codigos.cjs` es el candado: barre las cinco solapas —texto y
+> `title`— y falla si algún código vuelve a la pantalla.
+>
+> **Equivalencias, para leer la tabla de eventos** (esto vive acá, no en la app): `CR`/`CCR` = Control Remitos ·
+> `CC`/`CCN` = Carga Camión · `RR`/`CRN` = Recepción Remitos · `TAP` = armado terminado · `TAL` = armado de la NP.
 >
 > Nota **v13.95** (sólo front) — **Con un acordeón abierto, la PPP scrollea en vez de achicarse**
 > (dueño 07/09, con captura del miércoles 9 desplegado: *"sólo para cuando hay algo tipo acordeón, ahí sí
