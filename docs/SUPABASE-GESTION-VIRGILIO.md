@@ -1384,6 +1384,31 @@ es de Chef y pisa al LK 217): cuando Gestión alimente el tracking, escribir el 
 una función `gv_*` y pedir columna `empresa` en PaginaLK. Y el Excel ISIS de Facturación manda
 `N_Pedido` contador (no el id), como el mail: ISIS numera 98xxx por su cuenta.
 
+### 3.bd ✅ La Anónima por LK (override por CUIT) y Cencosud en el checklist de ISIS (v13.79) — 2026-09-07 lunes (feriado)
+
+**Qué dijo el dueño.** *"La Anónima se le vende por LK, no por CH. Cencosud desde CH se le venden artículos de LK creo,
+ojo ahí, es similar a los de Tierra del Fuego."*
+
+**LK (migración `gv_isis_override_la_anonima_v1379`).** Tabla **`gv_isis_override`** (`cuit` pk, `isis_empresa`
+'lk'|'chef', `motivo`; RLS, select `authenticated`/`service_role`) con la fila `30506730038 → lk` (S.A. Imp. y Exp.
+de la Patagonia, LK 771 / Chef 1804: tiene sucursal en Ushuaia, slot 6). `v_pedidos_web` reescrita con un CTE `base`
+(mismas columnas y orden): `isis_empresa = coalesce(override, case provincia Tierra del Fuego → 'chef' else 'lk')`;
+la L y el `cod_isis` salen de `isis_empresa`, no de la provincia. Medido: 1.483 NP, 4 TdF (384, 385, 1228 — las
+mismas), pedidos de La Anónima (1293, 1077, 969) → `lk`, artículos sin L.
+
+**Virgilio (migración `gv_fac_ajustes_isis_v2_cencosud_v1379`).** Cencosud (Chef 2444) no compra por la web: sus NP
+de Chef entran por ISIS con artículos de Loeke **sin L** — 44609–44612 (03/09): 031, 501, 504, 513, 523, 546, 931E,
+951E, 953E… (`sales_lines`: 931E → LK 13 líneas / 11 clientes, Chef 3 / 1; 505 → LK 10.065, Chef 71). El stock en
+GV es correcto (código único → misma góndola; los duales 438E/439E ISIS ya los tipea con L). **`gv_fac_ajustes_isis`
+v2**: entra además toda NP de Chef (`gv_empresa_de_np_texto = 'chef'`) con artículo en `precios_venta` y no en
+`precios_venta_chef`; `articulos[].sin_l = true`, `art_ch = art_lk`. Ventana 60 días (con 90 eran 28, con NP de julio de Aimetta y South Naz —clientes de TdF— ya resueltas).
+Medido (`SET ROLE anon`): 20 NP en el panel — 15 de Cencosud 2444 (16/07–06/08) y 5 de Dorinka 2686 (06/08–02/09);
+las 44609–44612 del 03/09 entran cuando tengan armado en `Entregas_Virgilio`. Front: el
+artículo sin L se muestra solo (`505 ×2`), la ayuda aclara "Cencosud va sin L".
+
+**Rollback.** LK: `delete from gv_isis_override where cuit = '30506730038'` (o `drop table` + vista v13.77).
+Virgilio: vista v1 del bloque v13.78 de `sql/gv_fac_ajustes_isis.sql`.
+
 ### 3.bc ✅ Checklist manual de ISIS (ajuste − LK / + CH por NP con artículos L) (v13.78) — 2026-09-07 lunes (feriado)
 
 **Qué dijo el dueño.** *"Cuando se va a facturar por Chef hay que: hacer ajuste negativo de stock de LK en ISIS

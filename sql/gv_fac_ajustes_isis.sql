@@ -28,7 +28,7 @@ with ent as (
          regexp_replace(e.np, '\.0+$', '') as np, upper(btrim(e.cod_art)) as cod_art,
          coalesce(e.cajas_entregadas, 0) as cajas, e.cod_cliente, e.tanda, e.creado
     from public."Entregas_Virgilio" e
-   where e.cod_art ~* '^[0-9]+E?L$' and e.creado >= now() - interval '90 days'
+   where e.cod_art ~* '^[0-9]+E?L$' and e.creado >= now() - interval '60 days'
    order by regexp_replace(e.np, '\.0+$', ''), upper(btrim(e.cod_art)), e.id desc
 ), por_np as (
   select np, max(cod_cliente) as cod_cliente, max(tanda) as tanda, max(creado) as armada_at,
@@ -46,3 +46,10 @@ select p.np, p.cod_cliente, p.tanda, p.armada_at, p.cajas, p.articulos,
   left join public."GV_Fac_Ajustes_ISIS" a1 on a1.np = p.np and a1.paso = 'lk_neg'
   left join public."GV_Fac_Ajustes_ISIS" a2 on a2.np = p.np and a2.paso = 'ch_pos';
 grant select on public.gv_fac_ajustes_isis to anon, authenticated;
+
+-- v13.79 (2026-09-07, migración gv_fac_ajustes_isis_v2_cencosud_v1379) — dueño: "Cencosud desde CH se le venden
+-- artículos de LK, ojo ahí, es similar a los de Tierra del Fuego". Medido: NP de Chef de Cencosud (2444; 44609–44612
+-- del 03/09) con artículos de Loeke SIN L (031, 501, 504, 513, 523, 546, 931E, 951E…). v2 de la vista: además de los
+-- códigos con L (cualquier NP), entra toda NP de CHEF (gv_empresa_de_np_texto = 'chef') cuyo artículo está en la
+-- lista de LK y NO en la de Chef (precios_venta EXCEPT precios_venta_chef); ahí art_ch = art_lk y sin_l = true.
+-- v13.79b: ventana 60 días (con 90 entraban 28 NP, muchas de julio ya resueltas). Migración gv_fac_ajustes_isis_v2b_60d_v1379.

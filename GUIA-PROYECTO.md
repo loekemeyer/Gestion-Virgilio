@@ -12,11 +12,26 @@
 > única**; no se replica. Ante la duda entre parche rápido y fix de raíz → **fix
 > de raíz**.
 >
-> Última actualización: 2026-09-07 (lunes) · Versión app al documentar: **v13.78**
+> Última actualización: 2026-09-07 (lunes) · Versión app al documentar: **v13.79**
 >
 > ⚠⚠ **Desde el lunes 2026-09-07 los operarios usan GESTIÓN, no Producción** (dueño, sábado a la
 > noche: *"el lunes van a empezar a usar GV, no más PV"*). Las tandas web viven en
 > `PPP_Web_Programacion` y Producción no las ve. URL: la de GitHub Pages de este repo.
+>
+> Nota **v13.79** (backend LK + Virgilio + front) — **La Anónima por LK; Cencosud como Tierra del Fuego** (dueño 07/09:
+> *"La Anónima se le vende por LK, no por CH. Cencosud desde CH se le venden artículos de LK creo, ojo ahí, es
+> similar a los de Tierra del Fuego"*). (1) **La Anónima** (S.A. Imp. y Exp. de la Patagonia, LK 771 / Chef 1804) tiene
+> una sucursal en Ushuaia y la regla v13.77 la mandaría a ISIS Chef → tabla **`gv_isis_override`** en LK (CUIT →
+> `isis_empresa` forzada) que `v_pedidos_web` consulta antes de la regla de provincia; con `'lk'` no hay L ni código
+> Chef. Sus pedidos (1293, 1077…) siguen LK; las 4 NP de TdF siguen (384, 385, 1228). Para otra excepción: una fila
+> más en esa tabla. (2) **Cencosud** (Chef 2444): sus NP de Chef (44609–44612 del 03/09) traen artículos de Loeke
+> **sin L** (031, 501, 504, 513, 523, 546, 931E, 951E…; LK se los vende a cientos de clientes, Chef casi sólo a
+> Cencosud). El stock en GV sale bien (código único = misma góndola; los duales 438E/439E ISIS ya los tipea con L),
+> pero el checklist de ISIS (v13.78) no los veía. **`gv_fac_ajustes_isis` v2**: además de los códigos con L, entra
+> toda NP de Chef cuyo artículo está en la lista de LK y no en la de Chef (`precios_venta EXCEPT
+> precios_venta_chef`), con `sin_l = true` y `art_ch = art_lk`. Ventana 60 días. Hoy el panel muestra 20 NP:
+> 15 de Cencosud (16/07–06/08) y 5 de Dorinka (06/08–02/09); las 44609–44612 del 03/09 todavía no tienen armado en
+> `Entregas_Virgilio`, entran cuando se armen. `sql/pedidos_web_lk.sql`, `sql/gv_fac_ajustes_isis.sql`, §3.bd.
 >
 > Nota **v13.78** (backend Virgilio + front) — **Checklist manual de ISIS en Facturación** (dueño 07/09: *"cuando se
 > va a facturar por Chef hay que hacer ajuste negativo de stock de LK en ISIS LK, y ajuste positivo en CH, para que

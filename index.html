@@ -7201,7 +7201,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v13.78";
+const APP_VERSION = "v13.79";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -37420,10 +37420,11 @@ function facAjustesIsisRender() {
   if (!rows.length) { box.style.display = "none"; box.innerHTML = ""; return; }
   const fmt = function (ts) { if (!ts) return ""; const d = new Date(ts); if (isNaN(d)) return ""; const i = new Date(d.getTime() - 3 * 3600e3).toISOString(); return i.slice(8, 10) + "/" + i.slice(5, 7); };   // ART fijo UTC-3, sin depender del locale
   let h = '<h3>🧾 Ajustes manuales en ISIS · ' + rows.length + ' NP con artículos de Loeke que se facturan por Chef</h3>' +
-    '<div class="fa-ayuda">Antes de facturar en ISIS Chef: <b>ajuste NEGATIVO</b> de esas cajas en ISIS <b>LK</b> (código sin L) y <b>ajuste POSITIVO</b> en ISIS <b>CH</b> (código con L), así al facturar queda neteado. Gestión ya descuenta el stock de Loeke sola. Tildá cada paso cuando lo hagas; la NP desaparece con los dos.</div>' +
+    '<div class="fa-ayuda">Antes de facturar en ISIS Chef: <b>ajuste NEGATIVO</b> de esas cajas en ISIS <b>LK</b> (código sin L) y <b>ajuste POSITIVO</b> en ISIS <b>CH</b> (con L si ISIS lo tipea con L; Cencosud va sin L), así al facturar queda neteado. Gestión ya descuenta el stock de Loeke sola. Tildá cada paso cuando lo hagas; la NP desaparece con los dos.</div>' +
     '<table><thead><tr><th>NP</th><th>Cliente</th><th>Artículos (cajas entregadas)</th><th>ISIS LK · ajuste −</th><th>ISIS CH · ajuste +</th></tr></thead><tbody>';
   rows.forEach(function (x) {
-    const arts = (x.articulos || []).map(function (a) { return escapeHtml(String(a.art_lk)) + '→' + escapeHtml(String(a.art_ch)) + ' ×' + escapeHtml(String(a.cajas)); }).join(' · ');
+    // v13.79: Cencosud y cía. — artículo de Loeke que ISIS Chef tipea SIN L (sin_l): se muestra el código solo
+    const arts = (x.articulos || []).map(function (a) { return (String(a.art_lk) === String(a.art_ch) ? escapeHtml(String(a.art_lk)) : escapeHtml(String(a.art_lk)) + '→' + escapeHtml(String(a.art_ch))) + ' ×' + escapeHtml(String(a.cajas)); }).join(' · ');
     const np = escapeHtml(String(x.np));
     const chk = function (paso, at, por) {
       return '<label><input type="checkbox" class="fa-chk" data-np="' + np + '" data-paso="' + paso + '"' + (at ? ' checked' : '') + ' onchange="facAjustesIsisToggle(this)"> ' +

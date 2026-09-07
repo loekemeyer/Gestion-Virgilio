@@ -45,7 +45,7 @@ con L. **Nunca** recodificar 7xx→5xx ni "pasar a LK" un pedido de Chef. Inform
 como Loeke (con una L al final) y después va a ISIS de CH, no de LK"*** — un pedido de la página LK con sucursal de entrega en
 Tierra del Fuego sigue siendo NP **LK** (se pickea de la góndola Loeke), pero cada artículo lleva **L** (505L) y el Excel ISIS va
 al de **Chef** con el código de cliente de Chef del mismo CUIT (vista `v_pedidos_web` de LK: `isis_empresa`, `cod_isis`;
-`_facXlsArmar`). Los 10 clientes LK de TdF ya cruzan por CUIT. Ser cliente de las dos empresas, solo, no es problema; **el cod
+`_facXlsArmar`). Los 10 clientes LK de TdF ya cruzan por CUIT. **Excepción: La Anónima (771) se vende por LK** (`gv_isis_override` en LK, por CUIT). **Cencosud (Chef 2444) es el caso inverso: NP de Chef con artículos de Loeke sin L** → entra al checklist de ajustes ISIS (`gv_fac_ajustes_isis` v2, v13.79). Ser cliente de las dos empresas, solo, no es problema; **el cod
 cliente no significa nada, sólo el CUIT vale** (v13.76). La regla v13.75/76 ("cliente con FC en LK → no se programa",
 `cliente_fc_lk`) fue un malentendido y está **apagada** (`doble_lk_dias = 0`). §3.az, §3.ba y §3.bb.
 

@@ -413,3 +413,12 @@ grant select on public.v_pedidos_web_np to authenticated;
 -- 0 no-TdF con cod_isis distinto del cod. Rollback: volver a las definiciones de arriba (sin las dos columnas)
 -- y recrear gv_pedidos_web_np_lk sin ellas.
 -- =============================================================================
+
+-- v13.79 (2026-09-07, migración gv_isis_override_la_anonima_v1379) — dueño: "La Anónima se le vende por LK, no por
+-- CH". S.A. Imp. y Exp. de la Patagonia (LK 771 / Chef 1804, CUIT 30506730038) tiene una sucursal en Ushuaia (slot 6)
+-- y la regla de Tierra del Fuego la mandaría a ISIS Chef. Tabla nueva `gv_isis_override (cuit pk, isis_empresa
+-- 'lk'|'chef', motivo)` — RLS, select authenticated/service_role — y v_pedidos_web la consulta ANTES de la regla
+-- de provincia: `coalesce(ov.isis_empresa, case provincia TdF → 'chef' else 'lk')`. Con 'lk' no hay L ni cod Chef.
+-- La vista se reescribió con un CTE `base` (mismas columnas, mismo orden). Medido: sigue habiendo 4 NP TdF (384,
+-- 385, 1228); los pedidos de La Anónima (1293, 1077, 969…) salen 'lk' con artículos sin L. Para agregar otra
+-- excepción: insert into gv_isis_override (cuit, isis_empresa, motivo) values ('…', 'lk'|'chef', '…').
