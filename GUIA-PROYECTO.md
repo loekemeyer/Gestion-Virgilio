@@ -12,7 +12,7 @@
 > única**; no se replica. Ante la duda entre parche rápido y fix de raíz → **fix
 > de raíz**.
 >
-> Última actualización: 2026-09-07 (lunes) · Versión app al documentar: **v14.20**
+> Última actualización: 2026-09-07 (lunes) · Versión app al documentar: **v14.25**
 >
 > ⚠⚠ **Desde el lunes 2026-09-07 los operarios usan GESTIÓN, no Producción** (dueño, sábado a la
 > noche: *"el lunes van a empezar a usar GV, no más PV"*). Las tandas web viven en
@@ -40,6 +40,26 @@
 > **El caso Osa quedó resuelto a mano y no se toca**: mié 09/09, camión 09, misma dirección —
 > `E09A` = 98650 + 98667 (ISIS, 4,041 m³) · `E09B` = `LK 0024` (web, 0,026 m³). Se pickean por separado.
 > La otra sesión lo volvió a juntar (commit `7f431fb`) leyendo la regla vieja; se revirtió en la base.
+>
+> Nota **v14.25** — **La PPP en el celular: el importe se cortaba** (dueño, con captura: *"el importe
+> se ve mal y no podés scrollear hacia la derecha"*). La causa no era falta de scroll: la media query
+> de `max-width:1100px` **sí** achicaba la fila, pero adentro del overlay la pisa
+> `#pppOverlay .pn-ped`, un selector con **ID**, que gana por especificidad aunque esté fuera de la
+> media query. En un teléfono de 390 px la fila seguía con sus 7 columnas fijas (~800 px), el Valor
+> quedaba cortado contra el borde y el contenedor no scrollea (`overflow:visible`). Se agregó una
+> media query de 760 px **también prefijada con `#pppOverlay`** y ubicada después, que reacomoda la
+> fila en 3 renglones —tanda · cliente/NP · **importe** / localidad · m³ / picking · armado— sin
+> esconder ningún dato ni necesitar scroll horizontal. Verificado a 390 px con Playwright: ancho del
+> documento 390 = viewport, 0 filas cortadas, los tres importes enteros terminando en x=367.
+>
+> Nota **v14.25 (datos)** — **Se fueron los `?` del orden de carga.** El `?` marca la parada sin
+> ubicación, que por eso va al final del reparto. Eran 3 direcciones, todas por lo mismo: **ISIS las
+> guarda abreviadas o con el barrio pegado adentro de la calle**. `B DE ASTRADA 2796, Soldati` es
+> **Berón de Astrada** (y el barrio le llegaba dos veces a Nominatim); `Ayacucho 56 - San Antonio de P`
+> traía el barrio truncado dentro de la calle. Las dos se arreglaron con `GV_Geo_Correccion` — ojo:
+> **la clave se arma con la dirección COMPLETA**, con el prefijo `Exp. …` y el paréntesis, no con la
+> ya limpia. La tercera es Osa (2533), que **retira en fábrica**: su punto es literalmente nuestro
+> depósito, así que se le cargaron esas coordenadas. **`gv_geo_faltantes` quedó en 0.**
 >
 > Nota **v14.20** (backend) — **No se entrega en el interior: el padrón estaba mal leído.** Dueño:
 > *"no entrego en ninguno del interior"* · *"quién del interior tenés? está mal, no entrego en esa
