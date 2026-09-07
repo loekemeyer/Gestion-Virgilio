@@ -12,11 +12,28 @@
 > única**; no se replica. Ante la duda entre parche rápido y fix de raíz → **fix
 > de raíz**.
 >
-> Última actualización: 2026-09-07 (lunes) · Versión app al documentar: **v14.04**
+> Última actualización: 2026-09-07 (lunes) · Versión app al documentar: **v14.06**
 >
 > ⚠⚠ **Desde el lunes 2026-09-07 los operarios usan GESTIÓN, no Producción** (dueño, sábado a la
 > noche: *"el lunes van a empezar a usar GV, no más PV"*). Las tandas web viven en
 > `PPP_Web_Programacion` y Producción no las ve. URL: la de GitHub Pages de este repo.
+>
+> Nota **v14.06** (sólo front) — **Cada atrasado muestra SU fecha de entrega** (dueño 07/09, sobre los 13 que
+> no salieron: *"si no salieron, que figuren en la PPP con su fecha de entrega; mañana martes lo mira la
+> administrativa"*). En la lista de **Atrasados** conviven pedidos de días distintos —hoy hay del 02, 03 y
+> 04/09— y la fila no decía de cuándo era cada uno: el encabezado es de "Atrasados", no de un día. Ahora cada
+> fila lleva un chip **📅 dd/mm/aaaa** al lado del NP. En la vista de **un día** no se dibuja: ahí la fecha ya
+> está en el encabezado y repetirla es ruido.
+>
+> Se verificó de paso que **los atrasados SIN TANDA se ven igual** — son los 9 de Cencosud del 04/09, que
+> nunca se armaron y por eso no tienen botón de mover; la administrativa los ve con su fecha y decide.
+> `tests/ppp-atrasados.cjs` (4 chequeos nuevos, incluido uno que evita que la fecha se cuele en la vista de
+> un día).
+>
+> **Dapelo queda en 3 tandas** (dueño: *"dejalo en 3 como estaba"*). `D67E` Colegiales · `D67F` Villa Crespo ·
+> `D67G` Almagro, viernes 11, 11 NP y 1,43 m³: son **tres sucursales**, cada una con su remito, y ISIS las
+> separó por eso. No entran en la regla del agregado (regla v13.93 + v14.05 de la otra sesión), que es para un pedido
+> nuevo a la MISMA entrega.
 >
 > Nota **v14.04** (sólo front) — **"📅 Mover de día" abre un POP-UP con un botón por día y los m³ de cada
 > uno** (dueño 07/09: *"cuando toco el botón, que me abra un pop up para ponerme los botones de cada día y

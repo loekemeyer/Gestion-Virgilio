@@ -1,4 +1,4 @@
-/* v13.94 — Los atrasados se ven SIN dar vueltas.
+/* v14.06 — Los atrasados se ven SIN dar vueltas, y cada uno con SU fecha de entrega.
    Dueño 07/09: "hoy para ver los pedidos atrasados tengo que entrar a Resumen para que me aparezca
    el botón que me lleve de nuevo a Programación, una locura". La v13.33 había sacado la tarjeta de
    Atrasados de Programación ("es un dato de gerencia") pero la LISTA se quedó ahí: el cartel de
@@ -11,7 +11,10 @@
        decir "Cerrar la lista";
    (d) la lista abierta en Resumen dice "Cerrar la lista", no "Volver a los 6 días" (ahí no hay
        grilla a la que volver), y cerrándola desaparece;
-   (e) los KPI de Programación siguen contando sólo lo que tiene fecha por delante (v13.33).
+   (e) los KPI de Programación siguen contando sólo lo que tiene fecha por delante (v13.33);
+   (f) v14.06 (dueño: "si no salieron, que figuren en la PPP con su fecha de entrega; mañana lo mira la
+       administrativa"): en atrasados conviven pedidos de varios días, así que cada fila lleva su fecha —
+       y los que no tienen tanda (el caso Cencosud) se ven igual. En la vista de UN día no se repite.
    Sin red. Sale 1 si falla. */
 const path = require("path");
 const { chromium } = require("/opt/node22/lib/node_modules/playwright");
@@ -30,12 +33,15 @@ const { chromium } = require("/opt/node22/lib/node_modules/playwright");
     const hab = _pppDiasHabiles(6).map((d) => d.date);
     const iso = (dt) => dt.getFullYear() + "-" + String(dt.getMonth() + 1).padStart(2, "0") + "-" + String(dt.getDate()).padStart(2, "0");
     const ayer = new Date(hab[0].getTime()); ayer.setDate(ayer.getDate() - 3);
+    const anteayer = new Date(hab[0].getTime()); anteayer.setDate(anteayer.getDate() - 5);
     const mk = (np, tanda, cod, rs, m3, barrio, dir, dt, zona) => ({ np: np, tanda: tanda, tipo: "", fecha_recep: "2026-08-20", cod: cod, razon_social: rs, m3: m3, direccion: dir, barrio: barrio, fecha_entrega: iso(dt), zona: zona });
     // 3 vencidos: E90A armada (salió, falta remito) · E91A sin armar ×2 (no salieron) + 2 al día
     const rows = [
       mk("98801", "E90A", "1001", "Salió Uno SRL", 0.30, "Barracas", "Montes de Oca 1000", ayer, "Zona 1 - CABA Sur"),
       mk("98802", "E91A", "1002", "No Salió Uno", 0.40, "Soldati", "Alberdi 6000", ayer, "Zona 1 - CABA Sur"),
       mk("98803", "E91A", "1003", "No Salió Dos", 0.20, "Soldati", "Escalada 1200", ayer, "Zona 1 - CABA Sur"),
+      // v14.06: un vencido SIN TANDA (el caso Cencosud) y de OTRO día — tiene que verse igual, con su fecha
+      mk("98806", "", "2444", "Cencosud S.A.", 0.60, "Soldati", "Alberdi 100", anteayer, "Zona 1 - CABA Sur"),
       mk("98804", "E92A", "1004", "Al Día Uno", 1.10, "Pompeya", "Sáenz 1100", hab[0], "Zona 1 - CABA Sur"),
       mk("98805", "E92A", "1005", "Al Día Dos", 0.90, "Lugano", "Cafayate 4000", hab[0], "Zona 1 - CABA Sur")
     ];
@@ -54,7 +60,7 @@ const { chromium } = require("/opt/node22/lib/node_modules/playwright");
     _pppTab = "plan"; _pppPlanDay = null; _pppPlanClasica = false; pppRenderProg();
     let h = document.getElementById("pppPreview").innerHTML;
     out.banda = /class="pn-venc-band rep"[^>]*onclick="pppPlanAbrir\('venc'\)"/.test(h);
-    out.bandaDice = /<b>⏰ 3 atrasados<\/b>/.test(h) && /2 sin salir → reprogramar/.test(h) && /1 salieron · falta el remito/.test(h);
+    out.bandaDice = /<b>⏰ 4 atrasados<\/b>/.test(h) && /3 sin salir → reprogramar/.test(h) && /1 salieron · falta el remito/.test(h);
     out.sinTarjetaGrande = !/pn-alert/.test(h);
     out.kpiSoloFuturo = /<div class="l">Pedidos<\/div><div class="v">2<\/div>/.test(h);   // v13.33: los 3 vencidos no cuentan
 
@@ -62,13 +68,16 @@ const { chromium } = require("/opt/node22/lib/node_modules/playwright");
     pppPlanAbrir("venc");
     h = document.getElementById("pppPreview").innerHTML;
     out.listaEnPlan = /Atrasados — la fecha de entrega ya pasó/.test(h) && _pppTab === "plan";
+    out.diaSinFechaPorFila = (function () { pppPlanVolver(); pppPlanAbrir(_pppDateKey(hab[0]));
+      const hd = document.getElementById("pppPreview").innerHTML; pppPlanVolver(); pppPlanAbrir("venc");
+      return !/class="pn-fe"/.test(hd); })();
     out.volverALaGrilla = /onclick="pppPlanVolver\(\)"/.test(h);
     pppPlanVolver();
 
     // (c)+(d) el cartel de Resumen
     _pppTab = "resumen"; pppRenderProg();
     h = document.getElementById("pppPreview").innerHTML;
-    out.cartel = /3<\/b> pedido\(s\) con fecha de entrega vencida/.test(h);
+    out.cartel = /4<\/b> pedido\(s\) con fecha de entrega vencida/.test(h);
     // el cartel en sí no debe mandar a otra solapa (la barra de solapas obviamente sí la tiene)
     const _cartel = (/<div class="ppp-res-note[^"]*">[\s\S]*?<\/div>/.exec(h) || [""])[0];
     out.noSalta = _cartel.indexOf("pppTab(") < 0 && /vencida/.test(_cartel);
@@ -81,13 +90,18 @@ const { chromium } = require("/opt/node22/lib/node_modules/playwright");
     out.cerrarNoVolver = /onclick="pppVencInline\(false\)"/.test(h) && !/Volver a los 6 días/.test(h);
     out.dosCierres = (h.match(/pppVencInline\(false\)/g) || []).length;   // el del cartel y el de la barra
     out.reprog = /NO salió/.test(h) || /reprogramar/.test(h);
+    // v14.06: cada fila lleva SU fecha de entrega (en atrasados conviven varios días)
+    const _f = (dt) => String(dt.getDate()).padStart(2, "0") + "/" + String(dt.getMonth() + 1).padStart(2, "0") + "/" + dt.getFullYear();
+    out.fechas = (h.match(/class="pn-fe"/g) || []).length;
+    out.fechasDistintas = h.indexOf("📅 " + _f(ayer)) >= 0 && h.indexOf("📅 " + _f(anteayer)) >= 0;
+    out.sinTandaSeVe = /Cencosud S\.A\./.test(h) && h.indexOf("98806") >= 0;
 
     pppVencInline(false);
     h = document.getElementById("pppPreview").innerHTML;
     out.cierra = !/Atrasados — la fecha de entrega ya pasó/.test(h);
 
     // (b) sin atrasados no hay banda
-    _pppParsed.prog = _pppParsed.prog.filter((x) => x.tanda !== "E90A" && x.tanda !== "E91A");
+    _pppParsed.prog = _pppParsed.prog.filter((x) => ["E92A"].indexOf(x.tanda) >= 0);   // deja sólo los del día
     _pppTab = "plan"; _pppPlanDay = null; pppRenderProg();
     out.sinAtrasados = !/pn-venc-band/.test(document.getElementById("pppPreview").innerHTML);
     return out;
@@ -109,6 +123,10 @@ const { chromium } = require("/opt/node22/lib/node_modules/playwright");
   chk(r.cerrarNoVolver, "ahí dice Cerrar la lista, no 'Volver a los 6 días' (no hay grilla atrás)");
   chk(r.dosCierres === 2, "se cierra desde el cartel y desde la barra de la lista: " + r.dosCierres);
   chk(r.reprog, "y la lista marca los que no salieron");
+  chk(r.fechas === 4, "cada atrasado muestra SU fecha de entrega (4): " + r.fechas);
+  chk(r.fechasDistintas, "y son las de cada uno, no una sola para todos");
+  chk(r.sinTandaSeVe, "un atrasado SIN TANDA (el caso Cencosud) también se ve en la lista");
+  chk(r.diaSinFechaPorFila, "en la vista de un día NO se repite la fecha en cada fila (ya está en el encabezado)");
   chk(r.cierra, "cerrarla la saca de la pantalla");
   chk(r.sinAtrasados, "sin atrasados no se dibuja ninguna banda");
   chk(errs.length === 0, "sin errores de página" + (errs.length ? ": " + errs[0] : ""));

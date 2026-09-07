@@ -2630,6 +2630,7 @@ tr.ppp-err-zona > td{ background:#fffbeb !important; }
 .pn-orden .hint{ margin-left:auto; color:#166534; font-weight:700; font-size:11.5px; }
 /* v13.94 — banda chiquita de atrasados en la grilla de Programación (la entrada a la lista, que
    vive en esa misma solapa). No es la tarjeta grande que se sacó en la v13.33: una línea. */
+.pn-fe{ display:inline-block; margin-left:6px; padding:1px 7px; border-radius:999px; background:#fef3c7; border:1px solid #fde68a; color:#92400e; font-size:11px; font-weight:800; white-space:nowrap; }
 .pn-venc-band{ display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin:0 0 12px; padding:8px 13px; border-radius:10px; background:#f8fafc; border:1px solid #e2e8f0; font-size:12.5px; color:#475569; cursor:pointer; }
 .pn-venc-band:hover{ background:#f1f5f9; }
 .pn-venc-band.rep{ background:#fffbeb; border-color:#fde68a; color:#92400e; }
@@ -7278,7 +7279,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v14.05";
+const APP_VERSION = "v14.06";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -30623,7 +30624,11 @@ function _pppPlanDiaHtml(programados, key, opts) {
         else carga = '<div class="pn-carga"><span class="n">' + n + 'º</span><span class="t">falta armar</span></div>';
       }
       h += '<div class="pn-ped' + (p._err && p._err.length ? ' err' : '') + '"><span class="tanda ' + c.ruta + '">' + escapeHtml(String(p.tanda || "—").toUpperCase()) + '</span>' +
-        '<div><div class="rs">' + (p._err && p._err.length ? '⚠️ ' : '') + escapeHtml(p.razon_social || p.cod || "—") + '</div><div class="np">' + escapeHtml(String(np)) + (p.cod ? ' · cód ' + escapeHtml(String(p.cod)) : '') + '</div></div>' +   // v13.65: sin chip WEB/ISIS
+        // v14.06 (dueño: "si no salieron, que figuren en la PPP con su fecha de entrega; mañana lo mira la
+        // administrativa"): en ATRASADOS conviven pedidos de varios días, así que sin la fecha en la fila no
+        // se sabe de cuándo es cada uno. En la vista de un día no hace falta: el día es el del encabezado.
+        '<div><div class="rs">' + (p._err && p._err.length ? '⚠️ ' : '') + escapeHtml(p.razon_social || p.cod || "—") + '</div><div class="np">' + escapeHtml(String(np)) + (p.cod ? ' · cód ' + escapeHtml(String(p.cod)) : '') +
+          (esVenc && p.fecha_entrega ? ' <span class="pn-fe" title="Fecha de entrega que tenía">📅 ' + escapeHtml(String(p.fecha_entrega)) + '</span>' : '') + '</div></div>' +   // v13.65: sin chip WEB/ISIS
         '<div class="loc">' + escapeHtml(p.localidad || p.barrio || "—") + '</div>' +
         '<div class="m">' + _pppFmtM3(p.m3) + '</div>' +
         '<div class="pp">' + (v == null ? '<small>s/valor</small>' : _pppFmtPesos(v)) + '</div>' +
