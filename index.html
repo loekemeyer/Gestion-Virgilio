@@ -736,54 +736,30 @@ button {
 .apr-nueva-row .apr-nueva{ flex:1 1 0; min-width:0; white-space:nowrap; }
 .apr-tanda-emp{ font-size:10.5px; font-weight:800; padding:1px 6px; border-radius:999px; margin-left:6px; background:#dbeafe; color:#1e40af; }
 .apr-tanda-emp.ch{ background:#fef3c7; color:#92400e; }
-.apr-vista{ border:1px solid #cbd5e1; background:#fff; border-radius:8px; padding:5px 10px !important; cursor:pointer; font-size:12.5px; font-weight:700; color:#334155; margin-left:auto; }
-
-/* ── v13.61: A Programar en PLANILLA (formato de la hoja de ISIS) ───────────────── */
-.aprp-sec button, .aprp-sec select{ width:auto; margin-top:0; }
-.aprp-sec{ background:#fff; border:1px solid #e2e8f0; border-radius:10px; padding:6px 10px 8px; margin:0 2px 8px; width:auto; }
-.aprp-t{ font-size:12.5px; font-weight:800; margin:0 0 5px; padding:4px 10px; border-radius:8px; display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
-.aprp-t small{ font-weight:600; color:#64748b; }
-.aprp-t .r{ margin-left:auto; font-weight:600; font-size:11.5px; color:#64748b; }
-.aprp-t.pend{ background:#fef3c7; color:#92400e; border:1px solid #fcd34d; }
-.aprp-t.prog{ background:#f8fafc; color:#0f172a; border:1px solid #e2e8f0; border-left:5px solid #334155; }
-.aprp-acc{ display:flex; align-items:center; gap:10px; margin:2px 0 6px; flex-wrap:wrap; }
-.aprp-gen{ background:#1e40af; color:#fff; border:0; border-radius:8px; padding:6px 12px !important; font-weight:800; font-size:12.5px; cursor:pointer; }
-.aprp-gen:disabled{ background:#cbd5e1; color:#64748b; cursor:default; }
-.aprp-gen small{ font-weight:600; opacity:.85; }
-.aprp-hint{ font-size:11px; color:#64748b; }
-.aprp-tbl{ width:100%; border-collapse:collapse; font-size:12px; white-space:nowrap; table-layout:auto; }
-.aprp-tbl th{ text-align:left; padding:3px 6px; background:#f8fafc; color:#475569; border-bottom:1px solid #e2e8f0; font-size:10.5px; text-transform:uppercase; letter-spacing:.2px; }
-.aprp-tbl td{ padding:2px 6px; border-bottom:1px solid #f1f5f9; vertical-align:middle; color:#0f172a; }
-.aprp-tbl th.num, .aprp-tbl td.num{ text-align:right; }
-.aprp-tbl tbody tr:hover td{ background:#f8fafc; }
-.aprp-tbl tr.ini td{ border-top:2px solid #e2e8f0; }
-.aprp-tbl td.rs{ font-weight:700; max-width:190px; overflow:hidden; text-overflow:ellipsis; }
-.aprp-tbl td.dir{ max-width:190px; overflow:hidden; text-overflow:ellipsis; color:#334155; }
-.aprp-tbl td.np{ font-weight:700; }
-.aprp-tbl tr.b2 td.np{ font-weight:600; color:#475569; }
-.aprp-tbl tr.b2 td.np:before{ content:"↳ "; color:#94a3b8; }
-.aprp-tbl td.chk, .aprp-tbl th.chk{ width:20px; text-align:center; }
-.aprp-tbl input[type=checkbox]{ width:15px; height:15px; margin:0; }
-.aprp-tbl select{ font:inherit; font-size:11.5px; padding:2px 3px; border:1px solid #cbd5e1; border-radius:6px; background:#fff; color:#0f172a; min-width:150px; max-width:170px; width:auto; }
-.aprp-tbl select.vacio{ color:#64748b; border-style:dashed; background:#fafafa; }
-.aprp-tbl td.obs{ white-space:normal; max-width:250px; line-height:1.2; font-size:11.5px; }
-.aprp-tbl td.obs .apr-chip{ font-size:11px; }
-.aprp-tipo{ display:inline-block; padding:0 6px; border-radius:999px; font-size:10.5px; font-weight:800; letter-spacing:.3px; }
-.aprp-tipo.rep{ background:#dbeafe; color:#1e40af; } .aprp-tipo.ret{ background:#e2e8f0; color:#334155; }
-.aprp-tipo.sup{ background:#fef3c7; color:#92400e; } .aprp-tipo.exp{ background:#0f172a; color:#fff; }
-.aprp-z{ display:inline-block; padding:0 6px; border-radius:999px; font-size:10.5px; font-weight:700; color:#fff; background:#2563eb; }
-.aprp-z.z4{ background:#16a34a; } .aprp-z.z5{ background:#0891b2; } .aprp-z.z6{ background:#0891b2; } .aprp-z.z7{ background:#14b8a6; }
-.aprp-z.z2{ background:#7c3aed; } .aprp-z.z3{ background:#7c3aed; } .aprp-z.sup{ background:#b45309; } .aprp-z.ret{ background:#64748b; } .aprp-z.sin{ background:#94a3b8; }
-.aprp-dia td{ font-size:12px; } .aprp-dia .d{ font-weight:800; white-space:nowrap; }
-.aprp-dia .lleno{ color:#b91c1c; font-weight:700; } .aprp-dia .queda{ color:#065f46; font-weight:700; } .aprp-dia .pronto{ color:#b45309; font-weight:700; }
-.aprp-bar{ display:inline-block; width:80px; height:7px; background:#e2e8f0; border-radius:4px; vertical-align:middle; overflow:hidden; }
-.aprp-bar i{ display:block; height:100%; background:#16a34a; } .aprp-bar i.f{ background:#dc2626; }
-.aprp-tag{ display:inline-block; background:#dbeafe; color:#1e40af; font-weight:700; padding:0 5px; border-radius:5px; margin-right:3px; font-size:11px; }
-.aprp-tag.isis{ background:#f1f5f9; color:#475569; }
-.aprp-vacio{ color:#64748b; font-size:12px; padding:6px 4px; }
 
 /* ── v13.61: la PPP entra ENTERA en una pantalla (dueño: "no quiero barras de scroll en ninguna parte") ── */
-#pppOverlay .planim-body{ overflow:hidden; }
+#pppOverlay .planim-body{ overflow:hidden; padding:8px 12px; gap:6px; }
+/* v13.65 (dueño: "sin scroll pero ilegible; muchísimo espacio vacío"): menos aire vertical en la PPP, así el zoom
+   casi no tiene que achicar. Piso de zoom 0,70 en pppFitPantalla: por debajo no se lee, y ahí sí scrollea. */
+#pppOverlay .pn-kpis{ margin-bottom:6px; gap:8px; }
+#pppOverlay .pn-kpi{ padding:6px 12px; border-radius:10px; }
+#pppOverlay .pn-camion{ margin-bottom:6px; border-radius:10px; }
+#pppOverlay .pn-camion .ch{ padding:5px 12px; gap:10px; }
+#pppOverlay .pn-camion table td, #pppOverlay .pn-camion table th{ padding-top:2px; padding-bottom:2px; }
+#pppOverlay .ppp-tanda{ margin-bottom:3px; }
+#pppOverlay .ppp-tanda-h{ padding:4px 10px 4px 8px; }
+#pppOverlay .ppp-sec-t{ margin:6px 0 3px; padding:3px 10px; }
+#pppOverlay .pn-day{ padding:8px 10px 6px; min-height:0; }
+#pppOverlay .pn-days{ gap:8px; }
+#pppOverlay .pn-trk{ padding:3px 8px; margin-bottom:3px; }
+#pppOverlay .pn-mini{ margin:5px 0; }
+/* vista de día: la columna cliente no se estira a todo el ancho (dueño: "muchísimo espacio vacío de columnas al
+   pedo"); cliente + NP en UNA línea; picking·armado en una línea. */
+#pppOverlay .pn-thead, #pppOverlay .pn-ped{ grid-template-columns:82px minmax(220px,max-content) 110px 60px 105px 175px 150px; justify-content:start; padding:3px 12px 3px 16px; gap:8px; }
+#pppOverlay .pn-ped > div:nth-child(2){ white-space:nowrap; }
+#pppOverlay .pn-ped .rs, #pppOverlay .pn-ped .np{ display:inline; }
+#pppOverlay .pn-ped .np{ margin-left:8px; }
+#pppOverlay .pn-ped > div:nth-child(6){ display:flex; align-items:center; gap:6px; }
 #pppOverlay .ppp-tablewrap, #pppOverlay .ppp-ocup-chart-wrap, #pppOverlay .ppp-restbl-wrap{ overflow:visible; }
 .apr-reload{ border:1px solid #cbd5e1; background:#fff; border-radius:8px; padding:5px 10px !important; cursor:pointer; font-size:14px; }
 .apr-load{ font-size:12.5px; color:#64748b; }
@@ -2092,7 +2068,7 @@ button.pk-anular small{ display:block; font-size:12px; font-weight:700; opacity:
 .planim-body > *{ width: 100%; max-width: 560px; box-sizing: border-box; }   /* columna prolija centrada */
 /* La PPP usa TODO el ancho de la página (no el cap de 560px del editor de planimetría) → sin scroll horizontal. */
 #pppOverlay .planim-body{ align-items: center; gap: 8px; }
-#pppOverlay .planim-body > *{ max-width: none; width: 100%; }   /* v13.61: antes 1240px; la PPP usa toda la pantalla (se achica con zoom hasta entrar) */
+#pppOverlay .planim-body > *{ max-width: 1500px; width: 100%; }   /* v13.61: 1240 → v13.65: 1500 y centrado (a todo el ancho quedaban columnas vacías) */
 .planim-add-row .planim-inp{ flex: 1 1 100px; min-width: 0; }
 .planim-add-row .planim-inp-num{ flex: 0 0 84px; }
 .planim-add{ background: #fff; border: 2px solid #1e6bd6; border-radius: 10px; padding: 12px; }
@@ -4915,15 +4891,19 @@ let _pppFitPend = false;
 function pppFitPantalla() {
   const ov = document.getElementById("pppOverlay"); if (!ov || !ov.classList.contains("show")) return;
   const body = ov.querySelector(".planim-body"); if (!body) return;
-  body.style.zoom = "1";
-  let z = 1;
+  body.style.zoom = "1"; body.style.overflowY = "hidden";
+  let z = 1, entra = true;
   for (let i = 0; i < 5; i++) {
     const needH = body.scrollHeight, haveH = body.clientHeight, needW = body.scrollWidth, haveW = body.clientWidth;
     if (!needH || !haveH) return;
-    if (needH <= haveH + 1 && needW <= haveW + 1) break;
-    z = Math.max(0.35, z * Math.min(haveH / needH, haveW / needW) * 0.99);
+    entra = needH <= haveH + 1 && needW <= haveW + 1;
+    if (entra || z <= 0.7) break;
+    // v13.65: piso 0,70 — más chico que eso no se lee (dueño: "sin scroll pero ilegible")
+    z = Math.max(0.7, z * Math.min(haveH / needH, haveW / needW) * 0.99);
     body.style.zoom = String(z);
   }
+  // Si ni al 70 % entra, scrollea: ilegible es peor que una barra.
+  if (!entra) body.style.overflowY = "auto";
 }
 function pppFitProgramar() {
   if (_pppFitPend) return; _pppFitPend = true;
@@ -27108,7 +27088,7 @@ function _pppEnViajeHtml() {
       const venc = _pppCargaVencida(p);
       const cajas = (p.cajE ? ('<div class="ppp-es-cj">' + p.cajE + ' cj' + (p.cajF ? ' · <b style="color:#dc2626">faltó ' + p.cajF + '</b>' : '') + '</div>') : "");
       html += '<tr class="ppp-es-row' + (on ? " on" : "") + (venc ? " venc" : "") + '"' + (sup ? ' onclick="pppEsToggle(\'' + npc + '\')"' : '') + '>' +
-        '<td class="np"><b>' + escapeHtml(np) + '</b>' + _npSrcChip(np) + cajas + '</td>' +
+        '<td class="np"><b>' + escapeHtml(np) + '</b>' + cajas + '</td>' +   // v13.65: sin chip WEB/ISIS (dueño: da lo mismo, salvo en Facturación)
         '<td class="rs">' + escapeHtml((p.rs || p.cod || "—").slice(0, 34)) + '<div class="ppp-es-cod">' + escapeHtml(p.cod || "") + '</div></td>' +
         '<td class="td">' + escapeHtml(p.tanda || "—") + '</td>' +
         '<td class="c">' + (p.m3 != null ? p.m3.toFixed(3).replace('.', ',') : "—") + '</td>' +
@@ -27295,7 +27275,7 @@ function _pppEntGroupedHtml(list, showCajas, cap) {
         const disc = (p.discrep && p.pppDate) ? ' <span style="color:#b45309;font-weight:700;" title="Salió (carga camión) en otra fecha que la de la PPP — revisar la PPP">⚠ PPP decía ' + p.pppDate.slice(8, 10) + '/' + p.pppDate.slice(5, 7) + '</span>' : '';
         // v13.02 — en En Salida, lo cargado y sin controlar pasado el plazo lleva la pastilla roja (antes iba en Programación).
         const venc = (p._cargado && _pppCargaVencida(p)) ? ' <span class="ppp-cargvenc-badge">🚨 SIN CONTROLAR</span>' : '';
-        html += '<div class="ppp-ent-row"><b>' + escapeHtml(p.np) + '</b>' + _npSrcChip(p.np) + ' ' + escapeHtml((p.rs || p.cod || "").slice(0, 32)) + (p.m3 != null ? ' <span class="ppp-ent-m3">' + p.m3.toFixed(3).replace('.', ',') + ' m³</span>' : '') + cajas + disc + venc + '</div>';
+        html += '<div class="ppp-ent-row"><b>' + escapeHtml(p.np) + '</b>' + ' ' + escapeHtml((p.rs || p.cod || "").slice(0, 32)) + (p.m3 != null ? ' <span class="ppp-ent-m3">' + p.m3.toFixed(3).replace('.', ',') + ' m³</span>' : '') + cajas + disc + venc + '</div>';
       }
       html += '</div>';
     }
@@ -30105,7 +30085,7 @@ function _pppPlanDiaHtml(programados, key) {
         else carga = '<div class="pn-carga"><span class="n">' + n + 'º</span><span class="t">falta armar</span></div>';
       }
       h += '<div class="pn-ped' + (p._err && p._err.length ? ' err' : '') + '"><span class="tanda ' + c.ruta + '">' + escapeHtml(String(p.tanda || "—").toUpperCase()) + '</span>' +
-        '<div><div class="rs">' + (p._err && p._err.length ? '⚠️ ' : '') + escapeHtml(p.razon_social || p.cod || "—") + '</div><div class="np">' + escapeHtml(String(np)) + (p.cod ? ' · cód ' + escapeHtml(String(p.cod)) : '') + _npSrcChip(np) + '</div></div>' +
+        '<div><div class="rs">' + (p._err && p._err.length ? '⚠️ ' : '') + escapeHtml(p.razon_social || p.cod || "—") + '</div><div class="np">' + escapeHtml(String(np)) + (p.cod ? ' · cód ' + escapeHtml(String(p.cod)) : '') + '</div></div>' +   // v13.65: sin chip WEB/ISIS
         '<div class="loc">' + escapeHtml(p.localidad || p.barrio || "—") + '</div>' +
         '<div class="m">' + _pppFmtM3(p.m3) + '</div>' +
         '<div class="pp">' + (v == null ? '<small>s/valor</small>' : _pppFmtPesos(v)) + '</div>' +
@@ -32781,10 +32761,7 @@ let _apr = {
   salida: {},       // v13.21: order_id → { dia, motivo, detalle } (gv_ppp_web_dia_salida)
   log: null,        // idea 2048: última fila de GV_Tandas_Auto_Log (¿corrió el armado automático?)
   aviso: "",        // v13.58: "Chef no respondió" (se ven sólo los de LK)
-  vista: (function () { try { return localStorage.getItem("gv_apr_vista") === "tarjetas" ? "tarjetas" : "planilla"; } catch (_e) { return "planilla"; } })(),   // v13.61
-  sel: {},          // v13.61: empresa:order_id → true (tildados en la planilla)
-  prog: [],         // v13.61: filas web programadas (tanda, fecha_entrega, m3, zona) para "Programación próximos días"
-  progIsis: [],     // v13.64: ídem, lo que ISIS dejó (tanda, fecha_entrega, m3) — se muestran juntos, sin distinguir
+
   horizonte: 21,    // cuántos días muestra la lista
   q: "", exp: {}, drag: null, dragTanda: null, msg: "", msgErr: false,
   ocupado: false    // hay una acción en vuelo: no dejar arrastrar encima
@@ -33000,13 +32977,11 @@ async function aprCargar() {
   try {
     // v13.58: las dos empresas juntas, sin filtro. `order_id` se repite entre LK y Chef
     // (1350 de LK ≠ 1350 de Chef), así que la clave de "ya está afuera" es empresa+order_id.
-    const [peds, prog, items, tandas, progIsis] = await Promise.all([
+    const [peds, prog, items, tandas] = await Promise.all([
       aprTraerTodos(),
-      aprGet('PPP_Web_Programacion?select=empresa,order_id,tanda,fecha_entrega,m3,zona&tanda=not.is.null&limit=20000'),
+      aprGet('PPP_Web_Programacion?select=empresa,order_id&tanda=not.is.null&limit=20000'),
       aprGet('PPP_Web_Tanda_Items?select=*&limit=20000'),
       aprGet('gv_ppp_web_tandas_abiertas?select=*&order=codigo.asc'),
-      // v13.64: las tandas que ISIS dejó programadas, para listar los camiones del día junto con los web
-      aprGet('gv_ppp_programacion_diaria?select=tanda,fecha_entrega,m3&tanda=not.is.null&fecha_entrega=gte.' + aprISO(new Date()) + '&limit=5000').catch(function () { return []; }),
       aprCargarCalendario(),  // v13.11: en paralelo (estaba en serie, una vuelta de red más)
       aprCargarLog()          // idea 2048: ¿corrió el armado automático?
     ]);
@@ -33022,8 +32997,6 @@ async function aprCargar() {
     _apr.pedidos = peds.filter(function (p) { return !fuera.has(aprKey(p.empresa, p.order_id)); });
 
     _apr.tandas = tandas;
-    _apr.prog = prog;   // v13.61
-    _apr.progIsis = progIsis || [];   // v13.64
     _apr.items = {};
     for (const it of items) { (_apr.items[it.codigo] = _apr.items[it.codigo] || []).push(it); }
     _apr.listo = true;
@@ -33139,14 +33112,14 @@ function aprDiaCorto(iso) {
   return DOW[d.getDay()] + " " + d.getDate() + "/" + (d.getMonth() + 1);
 }
 
-/* v13.61 (dueño: "no puede haber tanda armada sin fecha" · "no quiero tener que poner el nombre de
-   tanda yo"): la planilla arma la tanda y la programa en UN paso — código automático
-   (gv_ppp_web_tanda_nueva) + pedidos (gv_ppp_web_tanda_agregar) + día (gv_ppp_web_tanda_programar).
+/* v13.61/v13.65 (dueño: "no puede haber tanda armada sin fecha" · "no quiero tener que poner el nombre
+   de tanda yo"): soltar un PEDIDO en un DÍA arma la tanda y la programa en UN paso — código automático
+   (gv_ppp_web_tanda_nueva) + pedido (gv_ppp_web_tanda_agregar) + día (gv_ppp_web_tanda_programar).
    Si algo falla después de crearla, se descarta: nunca queda una tanda sin fecha. */
 async function aprGenerarTanda(fecha, keys) {
-  const sel = keys || Object.keys(_apr.sel).filter(function (k) { return _apr.sel[k]; });
+  const sel = keys || [];
   const peds = sel.map(function (k) { return (_apr.pedidos || []).find(function (p) { return aprKey(p.empresa, p.order_id) === k; }); }).filter(Boolean);
-  if (!peds.length) { _apr.msg = "Tildá al menos un pedido."; _apr.msgErr = true; aprRender(); return; }
+  if (!peds.length) { _apr.msg = "No encontré el pedido."; _apr.msgErr = true; aprRender(); return; }
   if (!fecha) { _apr.msg = "Elegí el día de entrega: ninguna tanda queda sin fecha."; _apr.msgErr = true; aprRender(); return; }
   const emps = {}; for (const p of peds) emps[p.empresa || "lk"] = true;
   if (Object.keys(emps).length > 1) { _apr.msg = "Una tanda es de una sola empresa: tildá sólo LK o sólo Chef."; _apr.msgErr = true; aprRender(); return; }
@@ -33167,7 +33140,7 @@ async function aprGenerarTanda(fecha, keys) {
     const r = await aprRpc("gv_ppp_web_tanda_programar", { p_empresa: emp, p_codigo: codigo, p_fecha: fecha, p_items: aprItemsDe(peds), p_por: por });
     const x = (r && r[0]) || {};
     _apr.msg = "✅ " + codigo + " programada para el " + aprDiaCorto(fecha) + ": " + (x.np_programadas || 0) + " NP · " + aprNum(x.m3) + " m³." + (x.aviso_dia ? "  ⚠ " + x.aviso_dia : "");
-    _apr.msgErr = false; _apr.sel = {};
+    _apr.msgErr = false;
   } catch (e) {
     if (codigo) { try { await aprRpc("gv_ppp_web_tanda_descartar", { p_empresa: emp, p_codigo: codigo }); } catch (_e) {} }
     _apr.msg = "⚠ " + (e && e.message ? e.message : String(e)) + (codigo ? " — la tanda " + codigo + " se descartó: ninguna queda sin fecha." : "");
@@ -33175,25 +33148,6 @@ async function aprGenerarTanda(fecha, keys) {
   }
   _apr.ocupado = false;
   await aprCargar();
-}
-function aprProgramarFila(key, fecha) { if (!fecha) return Promise.resolve(); return aprGenerarTanda(fecha, [key]); }
-function aprSelToggle(key, on) { if (on) _apr.sel[key] = true; else delete _apr.sel[key]; aprRender(); }
-function aprSelTodos(on) {
-  _apr.sel = {};
-  if (on) for (const p of aprPedidosFiltrados()) _apr.sel[aprKey(p.empresa, p.order_id)] = true;
-  aprRender();
-}
-function aprSetVista(v) {
-  _apr.vista = v === "tarjetas" ? "tarjetas" : "planilla";
-  try { localStorage.setItem("gv_apr_vista", _apr.vista); } catch (_e) {}
-  aprRender();
-}
-function aprPedidosFiltrados() {
-  const q = _apr.q; let lista = _apr.pedidos || [];
-  if (q) lista = lista.filter(function (p) {
-    return (p.razon_social + " " + p.cod + " " + p.zona + " " + p.localidad + " " + p.order_id).toLowerCase().indexOf(q) >= 0;
-  });
-  return lista;
 }
 
 /* Soltar la tanda en un día = programarla. Los artículos van desde acá: viven en
@@ -33250,9 +33204,10 @@ function aprDndFin() {
   document.querySelectorAll(".apr-arrastrando").forEach(function (e) { e.classList.remove("apr-arrastrando"); });
   _apr.drag = null; _apr.dragTanda = null;
 }
-function aprDragPedido(ev, orderId) {
+function aprDragPedido(ev, key) {
   if (_apr.ocupado) { ev.preventDefault(); return; }
-  _apr.drag = _apr.pedidos.find(function (p) { return String(p.order_id) === String(orderId); }) || null;
+  // v13.65: clave empresa:order_id (desde v13.58 conviven LK y Chef y el 1350 de uno no es el del otro)
+  _apr.drag = _apr.pedidos.find(function (p) { return aprKey(p.empresa, p.order_id) === String(key); }) || null;
   _apr.dragTanda = null;
   try { ev.dataTransfer.effectAllowed = "move"; ev.dataTransfer.setData("text/plain", String(orderId)); } catch (_e) {}
   ev.currentTarget.classList.add("apr-arrastrando");
@@ -33269,7 +33224,7 @@ function aprDragTandaIni(ev, codigo) {
 /* `dragenter`/`dragleave` se disparan también al pasar por los hijos, así que se
    cuenta la profundidad: si no, entrar a un texto de adentro apagaba el resaltado. */
 function aprOver(ev, tipo) {
-  if (tipo === "dia" && !_apr.dragTanda) return;      // un pedido no va a un día
+  if (tipo === "dia" && !_apr.dragTanda && !_apr.drag) return;   // v13.65: a un día va una tanda O un pedido
   if (tipo === "tanda" && !_apr.drag) return;         // una tanda no va a otra tanda
   ev.preventDefault();
   try { ev.dataTransfer.dropEffect = "move"; } catch (_e) {}
@@ -33292,9 +33247,11 @@ function aprDropTanda(ev, codigo) {
 function aprDropDia(ev, fecha) {
   ev.preventDefault(); ev.stopPropagation();
   ev.currentTarget.classList.remove("apr-drop-on");
-  const cod = _apr.dragTanda;
+  const cod = _apr.dragTanda, ped = _apr.drag;
   aprDndFin();
   if (cod) aprProgramar(cod, fecha);
+  // v13.65: un pedido soltado en un día = tanda nueva (código automático) ya programada ese día
+  else if (ped) aprGenerarTanda(fecha, [aprKey(ped.empresa, ped.order_id)]);
 }
 
 /* ── Dibujo ────────────────────────────────────────────────────────────── */
@@ -33309,9 +33266,6 @@ function aprRender() {
        '<span class="apr-bar-t">LK + Chef</span>' +
        '<button class="apr-reload" onclick="aprCargar()" title="Volver a leer">🔄</button>' +
        (_apr.cargando ? '<span class="apr-load">Cargando…</span>' : '') +
-       // v13.61: planilla (formato ISIS) por defecto; las tarjetas quedan como vista alternativa
-       '<button class="apr-vista" onclick="aprSetVista(\'' + (_apr.vista === "planilla" ? "tarjetas" : "planilla") + '\')">' +
-         (_apr.vista === "planilla" ? "🗂 Ver tarjetas" : "📋 Ver planilla") + '</button>' +
        '</div>';
 
   if (_apr.err) h += '<div class="apr-err">⚠ ' + escapeHtml(_apr.err) + '</div>';
@@ -33319,8 +33273,8 @@ function aprRender() {
   if (_apr.msg) h += '<div class="' + (_apr.msgErr ? "apr-err" : "apr-msg") + '">' + escapeHtml(_apr.msg) + '</div>';
   h += aprLogHtml();   // idea 2048
 
-  if (_apr.vista === "planilla") h += aprPlanillaHtml();
-  else h += '<div class="apr-wrap">' + aprColPedidos() + aprColTandas() + aprColDias() + '</div>';
+  // v13.65 (dueño: "no me gusta lo que armaste; volvé al formato anterior"): las tres columnas, siempre.
+  h += '<div class="apr-wrap">' + aprColPedidos() + aprColTandas() + aprColDias() + '</div>';
 
   // Cada acción re-dibuja las tres columnas. Sin esto, sacar un pedido de una
   // tanda te mandaba al principio de una lista de 218 y había que volver a
@@ -33371,7 +33325,7 @@ function aprColPedidos() {
   }
   for (const p of lista) {
     const id = "p" + p.order_id, ab = !!_apr.exp[id];
-    h += '<div class="apr-card" draggable="true" ondragstart="aprDragPedido(event,' + p.order_id + ')"' +
+    h += '<div class="apr-card" draggable="true" ondragstart="aprDragPedido(event,\'' + aprKey(p.empresa, p.order_id) + '\')"' +
       ' ondragend="aprDndFin()">' +
       '<div class="apr-card-h" onclick="aprToggle(\'' + id + '\')">' +
         '<span class="apr-card-cli">' + escapeHtml(p.razon_social || p.cod || ("#" + p.order_id)) + '</span>' +
@@ -33408,10 +33362,12 @@ function aprColPedidos() {
 function aprColTandas() {
   let h = '<div class="apr-col apr-col-tandas">' +
     '<div class="apr-col-t">📦 Tandas en armado <b>(' + _apr.tandas.length + ')</b></div>' +
-    // v13.61 (dueño: "no puede haber tanda armada sin fecha"): ya no se crean tandas vacías; las
-    // que queden acá son viejas y hay que programarlas (arrastrar a un día) o descartarlas.
+    '<div class="apr-nueva-row">' +
+      '<button class="apr-nueva" onclick="aprNuevaTanda(\'lk\')">＋ Nueva tanda LK</button>' +
+      '<button class="apr-nueva apr-nueva-ch" onclick="aprNuevaTanda(\'chef\')">＋ Nueva tanda Chef</button>' +
+    '</div>' +
     '<div class="apr-scroll">';
-  if (!_apr.tandas.length) h += '<div class="apr-vacio">Ninguna tanda sin fecha 👌 Se programan desde la planilla.</div>';
+  if (!_apr.tandas.length) h += '<div class="apr-vacio">Tocá <b>＋</b> y arrastrá pedidos acá — o arrastrá un pedido <b>directo a un día</b>: la tanda se arma y se programa sola.</div>';
   for (const t of _apr.tandas) {
     const its = _apr.items[t.codigo] || [];
     // Un pedido puede tener varios bloques adentro: se muestra UNA fila por pedido.
@@ -33452,126 +33408,6 @@ function aprColTandas() {
   return h + '</div></div>';
 }
 
-/* ── v13.61: A Programar en PLANILLA (misma hoja que la PPP de ISIS) ─────────────────────
-   Dueño: "simulame un formato más similar al de PPP" · "no quiero tener que poner el nombre de
-   tanda yo" · "no puede haber tanda armada sin fecha" · "sin barras de scroll, todo en una pantalla".
-   Dos secciones: pedidos a programar (una fila por NP, tildar → Generar tanda con día) y la
-   programación de los próximos días (sólo lectura). Sin sección de tandas sin fecha. */
-function aprPlanTipo(p) {
-  const z = String(p.zona || ""), dir = String(p.direccion || "");
-  if (/retira/i.test(z)) return "ret";
-  if (/super|súper/i.test(z)) return "sup";
-  if (/^Exp\./i.test(dir) || /Zona\s*7|expo/i.test(z)) return "exp";
-  return "rep";   // reparto (v13.64: no dice "WEB" — de dónde vino el pedido no importa)
-}
-function aprPlanZonaChip(z) {
-  const m = /^Zona\s*([0-9]+)/i.exec(String(z || ""));
-  if (m) return '<span class="aprp-z z' + m[1] + '">' + m[1] + ' · ' + escapeHtml(String(z).replace(/^Zona\s*[0-9]+\s*-\s*/i, "")) + '</span>';
-  if (/retira/i.test(z)) return '<span class="aprp-z ret">Retira</span>';
-  if (/super|súper/i.test(z)) return '<span class="aprp-z sup">Súper</span>';
-  return '<span class="aprp-z sin">' + escapeHtml(z || "sin zona") + '</span>';
-}
-function aprDiasAbiertos() {
-  return (_apr.cal || []).filter(function (d) { return d.habil && !d.pasado && !d.muy_pronto; });
-}
-function aprDiaSugerido(p) {
-  const ab = aprDiasAbiertos();
-  const s = (_apr.salida || {})[p.order_id];
-  if (s && s.dia && ab.some(function (d) { return d.dia === s.dia; })) return s.dia;
-  const c = ab.find(function (d) { return Number(d.resta) > 0; });
-  return c ? c.dia : (ab[0] ? ab[0].dia : "");
-}
-function aprDiaOpciones(sel) {
-  return aprDiasAbiertos().map(function (d) {
-    const r = Number(d.resta) || 0;
-    return '<option value="' + d.dia + '"' + (d.dia === sel ? ' selected' : '') + '>' + aprDiaCorto(d.dia) + (r > 0 ? ' · quedan ' + aprNum(r, 2) : ' · lleno') + '</option>';
-  }).join("");
-}
-function aprPlanillaHtml() {
-  const lista = aprPedidosFiltrados();
-  const sel = Object.keys(_apr.sel).filter(function (k) { return _apr.sel[k]; });
-  const selPeds = lista.filter(function (p) { return _apr.sel[aprKey(p.empresa, p.order_id)]; });
-  let m3sel = 0, m3tot = 0, nNp = 0;
-  for (const p of selPeds) m3sel += Number(p.m3) || 0;
-  for (const p of lista) { m3tot += Number(p.m3) || 0; nNp += (p.np_total || 1); }
-  const diaGen = selPeds.length ? aprDiaSugerido(selPeds[0]) : (aprDiasAbiertos().find(function (d) { return Number(d.resta) > 0; }) || {}).dia || "";
-  const todos = lista.length > 0 && selPeds.length === lista.length;
-
-  let h = '<div class="aprp-sec">' +
-    '<div class="aprp-t pend">⏳ PEDIDOS A PROGRAMAR <small>' + nNp + ' NP · ' + lista.length + ' pedido(s) · ' + aprNum(m3tot, 2) + ' m³</small>' +
-      '<span class="r">' + aprPorQueHtml(lista).replace(/<[^>]+>/g, "") + '</span></div>' +
-    '<div class="aprp-acc">' +
-      '<button class="aprp-gen" onclick="aprGenerarTanda(document.getElementById(\'aprpDiaGen\').value)"' + (selPeds.length && !_apr.ocupado ? '' : ' disabled') + '>' +
-        '🧺 Generar tanda con ' + (selPeds.length ? 'los ' + selPeds.length + ' tildados' : 'los tildados') +
-        (selPeds.length ? ' <small>· ' + aprNum(m3sel, 2) + ' m³ · el código sale solo</small>' : '') + '</button>' +
-      '<span class="aprp-hint">para el</span> <select id="aprpDiaGen" class="aprp-dia-gen">' + aprDiaOpciones(diaGen) + '</select>' +
-      '<input class="apr-q" type="search" placeholder="🔎 cliente, zona, localidad…" value="' + escapeHtml(_apr.q) + '" oninput="aprBuscar(this.value)" style="width:auto;flex:1;min-width:160px;margin:0">' +
-      '<span class="aprp-hint">Una fila por NP; las NP de un pedido van juntas. La tanda nace con día: ninguna queda sin fecha.</span>' +
-    '</div>' +
-    '<table class="aprp-tbl"><thead><tr>' +
-      '<th class="chk"><input type="checkbox"' + (todos ? ' checked' : '') + ' onchange="aprSelTodos(this.checked)" title="Tildar todos"></th>' +
-      '<th>Tipo</th><th>N° NP</th><th>F. Recep</th><th>Cod</th><th>Razón Social</th><th class="num">m³</th><th>Dirección entrega</th><th>Barrio</th><th>Programar para</th><th>Zona</th><th>Observaciones</th>' +
-    '</tr></thead><tbody>';
-  if (!lista.length) h += '<tr><td colspan="12" class="aprp-vacio">' + (_apr.listo ? "No queda nada por programar." : "Cargando pedidos…") + '</td></tr>';
-  for (const p of lista) {
-    const key = aprKey(p.empresa, p.order_id), on = !!_apr.sel[key], tipo = aprPlanTipo(p);
-    const bloques = (p.bloques && p.bloques.length) ? p.bloques : [{ np_idx: 1, m3: p.m3 }];
-    const recep = p.fecha_recep ? String(p.fecha_recep).slice(8, 10) + "/" + String(p.fecha_recep).slice(5, 7) : "";
-    bloques.forEach(function (b, i) {
-      h += '<tr class="' + (i === 0 ? 'ini' : 'b2') + '">' +
-        '<td class="chk">' + (i === 0 ? '<input type="checkbox"' + (on ? ' checked' : '') + ' onchange="aprSelToggle(\'' + key + '\', this.checked)">' : '') + '</td>' +
-        '<td><span class="aprp-tipo ' + tipo + '">' + tipo.toUpperCase() + '</span></td>' +
-        '<td class="np">' + escapeHtml(pwebNpLabel(p.empresa, p.order_id, b.np_idx)) + '</td>' +
-        '<td>' + recep + '</td>' +
-        '<td>' + escapeHtml(p.cod || "") + '</td>' +
-        '<td class="rs" title="' + escapeHtml(p.razon_social || "") + '">' + escapeHtml(p.razon_social || ("#" + p.order_id)) + '</td>' +
-        '<td class="num">' + aprNum(b.m3, 2) + (p.m3_parcial ? '*' : '') + '</td>' +
-        '<td class="dir" title="' + escapeHtml(p.direccion || "") + '">' + escapeHtml(p.direccion || "—") + '</td>' +
-        '<td>' + escapeHtml(p.localidad || "—") + '</td>' +
-        '<td>' + (i === 0
-          ? '<select class="vacio" onchange="aprProgramarFila(\'' + key + '\', this.value)"' + (_apr.ocupado ? ' disabled' : '') + '><option value="">→ tanda nueva para…</option>' + aprDiaOpciones("") + '</select>'
-          : '<span class="aprp-hint">con el bloque 1</span>') + '</td>' +
-        '<td>' + aprPlanZonaChip(p.zona) + '</td>' +
-        '<td class="obs">' + (i === 0 ? aprSalidaChip(p) : '<span class="aprp-hint">″ mismo pedido, ' + p.np_total + ' NP</span>') + '</td>' +
-      '</tr>';
-    });
-  }
-  h += '</tbody></table></div>';
-
-  // Programación próximos días (sólo lectura): días hábiles del calendario + camiones web + ISIS
-  // v13.64 (dueño: "ISIS o web no me interesa para nada; sólo en Facturación"): un solo listado de
-  // camiones por día, web e ISIS juntos, por LETRA+NN.
-  const byDia = {};
-  for (const r of (_apr.prog || []).concat(_apr.progIsis || [])) {
-    if (!r.fecha_entrega || !r.tanda || !/^\d{4}-\d{2}-\d{2}/.test(String(r.fecha_entrega).trim())) continue;
-    const k = String(r.fecha_entrega).trim().slice(0, 10);
-    const cam = _pppTandaNum(r.tanda) || String(r.tanda).toUpperCase();
-    const d = byDia[k] = byDia[k] || {};
-    const c = d[cam] = d[cam] || { tandas: {}, m3: 0, np: 0 };
-    c.tandas[String(r.tanda).toUpperCase()] = true; c.m3 += Number(r.m3) || 0; c.np++;
-  }
-  h += '<div class="aprp-sec"><div class="aprp-t prog">📅 PROGRAMACIÓN PRÓXIMOS DÍAS <small>sólo lectura · el detalle está en la solapa Programación</small>' +
-       '<span class="r">cupo por día = pickers × 3 m³ · <a href="#" onclick="aprMasDias();return false;">ver más días</a></span></div>' +
-       '<table class="aprp-tbl aprp-dia"><thead><tr><th>Día</th><th>m³ / cupo</th><th></th><th>Quedan</th><th>Tandas · NP</th><th>Camiones</th></tr></thead><tbody>';
-  const cal = (_apr.cal || []).filter(function (d) { return d.habil && !d.pasado; });
-  if (!cal.length) h += '<tr><td colspan="6" class="aprp-vacio">Sin calendario.</td></tr>';
-  for (const d of cal) {
-    const cupo = Number(d.cupo) || 0, m3 = Number(d.m3) || 0, resta = Number(d.resta) || 0;
-    const pct = cupo > 0 ? Math.min(100, Math.round(m3 / cupo * 100)) : 0;
-    const cams = byDia[d.dia] || {};
-    const web = Object.keys(cams).sort().map(function (k) {
-      const c = cams[k]; return '<span class="aprp-tag" title="' + escapeHtml(Object.keys(c.tandas).sort().join(" · ")) + '">' + escapeHtml(k) + ' · ' + Object.keys(c.tandas).length + ' t · ' + aprNum(c.m3, 2) + '</span>';
-    }).join("");
-    const tot = (Number(d.tandas) || 0) > 0 ? '<b>' + d.tandas + '</b> t · <b>' + (d.np || 0) + '</b> NP' : '<span class="aprp-hint">—</span>';
-    h += '<tr><td class="d">' + aprDiaCorto(d.dia) + '</td><td>' + aprNum(m3, 2) + ' / ' + aprNum(cupo, 2) + '</td>' +
-         '<td><span class="aprp-bar"><i' + (resta <= 0 ? ' class="f"' : '') + ' style="width:' + pct + '%"></i></span></td>' +
-         '<td>' + (d.muy_pronto ? '<span class="pronto">muy pronto</span>' : (resta > 0 ? '<span class="queda">' + aprNum(resta, 2) + '</span>' : '<span class="lleno">lleno</span>')) + '</td>' +
-         '<td>' + tot + '</td><td>' + (web || '<span class="aprp-hint">—</span>') + '</td></tr>';
-  }
-  h += '</tbody></table></div>';
-  return h;
-}
-
 /* idea 2510 — si el cupo está lleno varios días hábiles seguidos (desde el primer día permitido), avisar
    arriba del calendario en vez de que el supervisor lo descubra renglón por renglón. Sólo lee _apr.cal. */
 function aprCupoLlenoHtml() {
@@ -33595,7 +33431,7 @@ function aprColDias() {
 
   let h = '<div class="apr-col apr-col-dias">' +
     '<div class="apr-col-t">🗓️ Programar para…</div>' +
-    '<div class="apr-dias-ayuda">Arrastrá una tanda a un día. Los días completos, no hábiles o muy próximos no reciben.</div>' +
+    '<div class="apr-dias-ayuda">Arrastrá una tanda — o un pedido suelto — a un día: el pedido arma su tanda y queda programado ahí. Los días completos, no hábiles o muy próximos no reciben.</div>' +
     aprCupoLlenoHtml() +   // idea 2510
     '<div class="apr-scroll apr-dias">';
 

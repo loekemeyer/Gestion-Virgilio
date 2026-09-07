@@ -31,7 +31,6 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
   const r = await p.evaluate(async () => {
     _apr.listo = true;
     _apr.emp = "lk";
-    _apr.vista = "tarjetas";   // v13.61: este test cubre la vista de tarjetas; la planilla tiene el suyo (apr-planilla.cjs)
     _apr.pedidos = [
       { order_id: 1117, cod: "R01", razon_social: "Riesgo Marcelo Fabian", zona: "Zona 3",
         fecha_recep: "2026-08-20", localidad: "Mataderos", direccion: "Bragado 5742 - Mataderos",
@@ -175,7 +174,9 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
   chk(!/Loekemeyer|aprSetEmpresa/.test(r.barra), "v13.58: la barra ya no tiene el selector Loekemeyer/Chef");
   chk(/apr-tanda-emp lk">LK</.test(r.med) && /apr-tanda-emp ch">Chef</.test(r.med), "v13.58: cada tanda dice de qué empresa es");
   chk(r.med.includes("CH 0009") && r.med.includes("GV-02A"), "v13.58: la tanda de Chef etiqueta su NP como CH 0009");
-  chk(!/aprNuevaTanda/.test(r.med), "v13.61: ya no hay botón de tanda vacía (ninguna tanda sin fecha)");
+  chk(/aprNuevaTanda\('lk'\)/.test(r.med) && /aprNuevaTanda\('chef'\)/.test(r.med), "v13.58/v13.65: nueva tanda LK y nueva tanda Chef (formato anterior, como pidió el dueño)");
+  chk(/aprDragPedido\(event,'lk:1117'\)/.test(r.izq), "v13.65: el arrastre lleva empresa:pedido (LK 1350 ≠ Chef 1350)");
+  chk(/o un pedido suelto/.test(r.der), "v13.65: la ayuda dice que un pedido suelto va a un día");
   chk(r.mezcla.err === true && /tanda de Chef/.test(r.mezcla.msg) && /LK 1117/.test(r.mezcla.msg) && r.mezcla.rpcLlamada === false,
       "v13.58: un pedido de LK soltado en una tanda de Chef avisa y no llama a la RPC");
   chk(errs.length === 0, "sin errores de página" + (errs.length ? ": " + errs[0] : ""));

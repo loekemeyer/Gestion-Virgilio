@@ -12,12 +12,29 @@
 > única**; no se replica. Ante la duda entre parche rápido y fix de raíz → **fix
 > de raíz**.
 >
-> Última actualización: 2026-09-06 (domingo) · Versión app al documentar: **v13.64**
+> Última actualización: 2026-09-06 (domingo) · Versión app al documentar: **v13.65**
 >
 > ⚠⚠ **Desde el lunes 2026-09-07 los operarios usan GESTIÓN, no Producción** (dueño, sábado a la
 > noche: *"el lunes van a empezar a usar GV, no más PV"*). Las tandas web viven en
 > `PPP_Web_Programacion` y Producción no las ve. URL: la de GitHub Pages de este repo.
 >
+> Nota **v13.65** (front) — **A Programar vuelve a las TRES COLUMNAS; la planilla se borró** (dueño: *"no me gusta
+> lo que armaste, no me gusta para nada; volvé al formato anterior"*). Se fue `aprPlanillaHtml` con su CSS, su test
+> y el interruptor de vista; vuelven los botones "＋ Nueva tanda LK / Chef". Quedó lo que sí sirve: (a) **soltar un
+> pedido directo en un día** arma la tanda con código automático y la programa ese día (`aprDropDia` →
+> `aprGenerarTanda(fecha, [empresa:order_id])`: `gv_ppp_web_tanda_nueva` → `_agregar` → `_programar`; si falla
+> después de crearla, `_descartar` — ninguna queda sin fecha); (b) **la PPP entera en una pantalla**
+> (`pppFitPantalla`, v13.61); (c) sin distinguir ISIS de web (v13.64: las tarjetas de día dicen "N tanda(s) · N NP"
+> contando las dos). El arrastre de pedidos lleva `empresa:order_id` (`aprDragPedido(ev, key)`): desde v13.58 el
+> 1350 de LK no es el 1350 de Chef. Test nuevo `tests/apr-fit.cjs` (reemplaza a `apr-planilla`).
+> **Y el ajuste a pantalla se corrigió** (dueño: *"sin scroll pero ilegible; muchísimo espacio vacío de columnas"*): el
+> contenido de la PPP vuelve a un ancho acotado (1500 px, centrado; a todo el ancho la columna cliente se estiraba),
+> la vista de día se compactó (grilla `.pn-ped` con `justify-content:start` y cliente `max-content`, cliente + NP en
+> UNA línea, picking·armado en una línea, menos padding en camiones, KPIs, tandas del día), y `pppFitPantalla` tiene
+> **piso 0,70**: si ni al 70 % entra, el cuerpo scrollea (ilegible es peor que una barra). A 1920×1000 con 11 pedidos y
+> 7 tandas entra al 80 %. Además el chip **WEB/ISIS** se sacó del tablero, de la tabla clásica y de Entregados
+> (`_npSrcChip` queda sólo en Facturación, regla v13.64).
+
 > Nota **v13.64** (front) — **ISIS o web: la PPP no distingue** (dueño: *"que el pedido sea de ISIS o cargado por la
 > web no me interesa para absolutamente nada; lo que me importa es para el módulo de Facturación, después de eso
 > no"*). Principio desde ahora: **fuera de Facturación, ninguna pantalla separa lo de ISIS de lo web.** Hecho en A

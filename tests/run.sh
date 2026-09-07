@@ -246,8 +246,8 @@ PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node te
 echo "== apr-programar (v12.80: solapa A Programar, armado manual de tandas) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/apr-programar.cjs
 
-echo "== apr-planilla (v13.61: A Programar en planilla, tanda con fecha, PPP en una pantalla) =="
-PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/apr-planilla.cjs
+echo "== apr-fit (v13.65: PPP entera en una pantalla + pedido soltado en un día = tanda programada) =="
+PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/apr-fit.cjs
 
 echo "== pweb-lk-token (v12.82: el token de LK se pide UNA sola vez aunque lo pidan varios) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/pweb-lk-token.cjs
