@@ -12,7 +12,7 @@
 > única**; no se replica. Ante la duda entre parche rápido y fix de raíz → **fix
 > de raíz**.
 >
-> Última actualización: 2026-09-07 (lunes) · Versión app al documentar: **v14.16**
+> Última actualización: 2026-09-07 (lunes) · Versión app al documentar: **v14.17**
 >
 > ⚠⚠ **Desde el lunes 2026-09-07 los operarios usan GESTIÓN, no Producción** (dueño, sábado a la
 > noche: *"el lunes van a empezar a usar GV, no más PV"*). Las tandas web viven en
@@ -40,6 +40,17 @@
 > **El caso Osa quedó resuelto a mano y no se toca**: mié 09/09, camión 09, misma dirección —
 > `E09A` = 98650 + 98667 (ISIS, 4,041 m³) · `E09B` = `LK 0024` (web, 0,026 m³). Se pickean por separado.
 > La otra sesión lo volvió a juntar (commit `7f431fb`) leyendo la regla vieja; se revirtió en la base.
+>
+> Nota **v14.17** — **La Bandeja Krikos ya está en el espejo del panel admin.** El `CLAUDE.md`
+> prohíbe dejar ramas dando vueltas, así que se mergeó a `main` la rama gemela de este repo
+> (`claude/krikos-tema-anterior-v0l88o`): `admin/admin-supercot.js` con la Bandeja de OC de
+> supermercados y el `?v=` de `admin/admin.html`. Se entra por **🌐 Panel Web LK → PDF Krikos →
+> Bandeja Krikos**. **Todavía no va a mostrar nada**: `krikos_oc_inbox` tiene 0 filas porque falta
+> cargar `KRIKOS_IMAP_PASS` en el Vault de LK (verificado hoy: el cron corre cada 10 min y la Edge
+> Function contesta 500 *"KRIKOS_IMAP_PASS no configurado"*). Queda sin mergear la rama del repo
+> `pagina-LK-copia`, que es la que trae la Edge Function y el `admin-supercot.js` original — o sea
+> que hasta ese merge el espejo de acá está **adelante** de la fuente: al re-sincronizar, no pisarlo
+> con la versión vieja de LK. Detalle: `docs/PENDIENTES-PIPELINE-GESTION.md`.
 >
 > Nota **v14.16** (backend) — **Ahora se ubica TODO el padrón, no sólo lo que está programado**
 > (dueño 07/09: *"tenés que tener a todo ubicado. sin falta de ninguno, inclusive aunque no hayan mandado

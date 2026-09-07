@@ -303,9 +303,10 @@ donde hay que mostrar la fecha ya es la pantalla manual.
 
 ### ⚡ Los puntos 1 y 2 ya están resueltos — la integración Krikos (2026-09-04)
 
-El *"bot la parsea tal vez"* de la nota **existe y ya está construido**, en la rama
-`claude/krikos-lk-integration-064xyz` del repo `pagina-LK-copia` (pusheada, **sin
-mergear**). Commits `a3f65d7` · `fdc204d` · `4bd08b2`.
+El *"bot la parsea tal vez"* de la nota **existe y ya está construido**. Nació en la rama
+`claude/krikos-lk-integration-064xyz` de `pagina-LK-copia` (commits `a3f65d7` · `fdc204d` ·
+`4bd08b2`) y el **2026-09-07 se trajo entera** a `claude/krikos-tema-anterior-v0l88o` del
+mismo repo — **falta mergearla a `main`, que es lo que la despliega**.
 
 | pieza (proyecto **LK**) | qué hace |
 |---|---|
@@ -319,17 +320,31 @@ Archivos: `sql/krikos_oc_inbox.sql`, `supabase/functions/krikos-ingest/index.ts`
 `admin-supercot.js` (Bandeja Krikos + `deliveryDate`), sección "Integración Krikos" del
 `CLAUDE.md` de LK.
 
-**Estado medido el 2026-09-04 (no supuesto):**
+**Estado medido el 2026-09-07 (no supuesto):**
 
 | | |
 |---|---|
-| `krikos_oc_inbox` en LK | ✅ existe, 24 columnas |
-| `sync_pedidos_match_virgilio()` en LK | ✅ existe |
-| pedidos con `sheets_payload.fecha_entrega` | **0 de 1.025** con payload |
-| `lk_pedidos_match.fecha_entrega` en Virgilio | ❌ **no existe** (14 columnas, sin ella) |
+| `krikos_oc_inbox` en LK | ✅ existe, 24 columnas · **0 filas** |
+| Edge Fn `krikos-ingest` | ✅ desplegada (v6) |
+| cron `krikos-ingest-10min` | ✅ activo, 584 corridas, 0 fallidas (el `net.http_post` siempre "succeeded": mide el encolado, no el resultado) |
+| `KRIKOS_INGEST_SECRET` en el Vault de LK | ✅ |
+| `KRIKOS_IMAP_PASS` en el Vault de LK | ❌ **falta** — es lo único que traba el ingest. Medido en `net._http_response`: la función contesta **500 `{"ok":false,"error":"KRIKOS_IMAP_PASS no configurado (ni env ni Vault)"}`** en cada corrida de los :00/:10/:20… Inocuo, pero la bandeja queda vacía |
+| bucket `krikos-oc` | ✅ existe |
+| rama de LK con la Bandeja Krikos | ✅ en `claude/krikos-tema-anterior-v0l88o`, **sin mergear a `main`** |
+| espejo `/admin/` en Gestión (este repo) | ✅ **mergeado a `main` el 2026-09-07 (v14.17)**. La Bandeja ya se ve entrando por 🌐 Panel Web LK; hasta que entre la primera OC muestra la bandeja vacía |
+| `sync_pedidos_match_virgilio()` lleva la fecha | ✅ **desde el 2026-09-07** |
+| pedidos con `sheets_payload.fecha_entrega` | **0** (nadie cargó todavía una OC por la bandeja) |
+| `lk_pedidos_match.fecha_entrega` en Virgilio | ✅ existe (04/09) y ya se llena (07/09), hoy con 0 fechas |
 
-O sea: la cañería está escrita pero **todavía no corre**. Falta cargar
-`KRIKOS_IMAP_PASS` en el Vault de LK y **mergear la rama a main**.
+O sea: la cañería está completa de punta a punta pero **todavía no corre**, y las dos cosas
+que faltan son del dueño: cargar `KRIKOS_IMAP_PASS` en el Vault de LK y **mergear la rama de
+`pagina-LK-copia` a `main`** (ese merge es el que despliega la Bandeja del lado LK).
+
+> **Actualización 2026-09-07 (v14.17):** la rama gemela de **este** repo ya se mergeó a `main`
+> —el `CLAUDE.md` prohíbe dejar ramas dando vueltas— así que el espejo `/admin/admin-supercot.js`
+> está desplegado. Queda **sólo la de `pagina-LK-copia`**, que es la que tiene la Edge Function y
+> el `admin-supercot.js` original. Ojo con el orden: mientras LK no se mergee, el espejo de acá
+> está **adelante** de la fuente. Al re-sincronizar, no pisar el espejo con la versión vieja de LK.
 
 **Lo que hay que hacer del lado Virgilio, en orden:**
 
@@ -343,17 +358,27 @@ O sea: la cañería está escrita pero **todavía no corre**. Falta cargar
    intactas, 0 con fecha · `vista_np_sucursal` en 149 · `PPP_Programacion_Diaria` en 182 ·
    los dos consumidores piden columnas por nombre · `lk_ppp_reader` ya tenía `UPDATE`
    sobre la tabla **y sobre las columnas nuevas**, no hizo falta grant.
-2. **Del lado LK** (después de la columna): `v_pedidos_match` expone
+2. ~~**Del lado LK** (después de la columna): `v_pedidos_match` expone
    `sheets_payload->>'fecha_entrega'` y `sync_pedidos_match_virgilio()` la copia por el
-   FDW `virgilio_db`. El rol `lk_ppp_reader` ya tiene INSERT/UPDATE/DELETE sobre esa tabla,
-   así que no hace falta ningún grant nuevo.
+   FDW `virgilio_db`.~~ ✅ **HECHO el 2026-09-07.** La vista devuelve `fecha_entrega_txt`
+   (texto crudo) y `fecha_entrega` (parseada: primera `dd/mm/yyyy` del texto con el separador
+   normalizado, así que "15.09.2026 08:00" también entra); Chef va `NULL` porque su portal no
+   carga OC de súper. Hubo que declarar las dos columnas en la **foreign table** de LK
+   (`virgilio.lk_pedidos_match`), que no las tenía. Sin grants nuevos: `lk_ppp_reader` ya
+   tenía INSERT/UPDATE/DELETE sobre la tabla y sobre las columnas. Verificado corriendo el
+   sync a mano: 1.030 filas lk + 62 chef, 0 con fecha (todavía no hay ninguna OC cargada).
+   `sql/pedidos_match_fecha_entrega.sql` de LK, backup y rollback en `sql/backups/`.
 3. **Consumirla** en la PPP / planificación de entregas de Producción.
 4. **Y recién ahí, en Gestión:** el punto 3 de arriba — mostrarla en la tarjeta de "A
    Programar", ordenar por ella y avisar si la tanda se programa para otra fecha.
 
-⚠ **El orden importa:** agregar la columna hoy no rompe nada (nullable, sin default, sin
-backfill → Producción no la ve), pero tampoco sirve hasta que la rama de LK esté mergeada
-y el Vault cargado. Hoy viajarían 0 fechas.
+⚠ **El orden importa:** los puntos 1 y 2 no rompen nada (columnas nullable, sin default, sin
+backfill → Producción no las ve) pero tampoco sirven hasta que la rama de LK esté mergeada y
+el Vault cargado: hoy viajan 0 fechas. **Por eso los puntos 3 y 4 se dejaron sin empezar** —
+mostrar la fecha en "A Programar" obliga a exponerla en `v_pedidos_web` → `v_pedidos_web_np`
+(la cadena de vistas que también consumen el job de las 00:01 y el intradía), y tocar eso para
+mostrar una columna que hoy sale vacía es riesgo sin ganancia. Se hace cuando entre la primera
+OC de verdad.
 
 ---
 
