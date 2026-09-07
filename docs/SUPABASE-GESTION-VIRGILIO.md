@@ -1406,6 +1406,11 @@ Medido (`SET ROLE anon`): 20 NP en el panel — 15 de Cencosud 2444 (16/07–06/
 las 44609–44612 del 03/09 entran cuando tengan armado en `Entregas_Virgilio`. Front: el
 artículo sin L se muestra solo (`505 ×2`), la ayuda aclara "Cencosud va sin L".
 
+**Datos (dueño 07/09, "tildalas todas como histórico").** Las 20 NP que mostraba el panel (15 Cencosud 16/07–06/08,
+5 Dorinka 06/08–02/09, todas facturadas en Producción) se marcaron con los dos pasos en `GV_Fac_Ajustes_ISIS`,
+`legajo = 'histórico (dueño 07/09)'` (40 filas, `on conflict do nothing`). El panel arranca vacío el martes. Para
+deshacer: `delete from "GV_Fac_Ajustes_ISIS" where legajo = 'histórico (dueño 07/09)'`.
+
 **Rollback.** LK: `delete from gv_isis_override where cuit = '30506730038'` (o `drop table` + vista v13.77).
 Virgilio: vista v1 del bloque v13.78 de `sql/gv_fac_ajustes_isis.sql`.
 
