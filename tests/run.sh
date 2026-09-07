@@ -311,3 +311,6 @@ PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node te
 
 echo "== ppp-hoja-ruta (v13.92: hoja de ruta imprimible del camión — firma por parada, observaciones; una parada = una dirección) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/ppp-hoja-ruta.cjs
+
+echo "== ppp-atrasados (v13.94: los atrasados se ven sin rebotar de solapa — banda en Programación + lista adentro de Resumen) =="
+PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/ppp-atrasados.cjs

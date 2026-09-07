@@ -12,11 +12,34 @@
 > única**; no se replica. Ante la duda entre parche rápido y fix de raíz → **fix
 > de raíz**.
 >
-> Última actualización: 2026-09-07 (lunes) · Versión app al documentar: **v13.92**
+> Última actualización: 2026-09-07 (lunes) · Versión app al documentar: **v13.94**
 >
 > ⚠⚠ **Desde el lunes 2026-09-07 los operarios usan GESTIÓN, no Producción** (dueño, sábado a la
 > noche: *"el lunes van a empezar a usar GV, no más PV"*). Las tandas web viven en
 > `PPP_Web_Programacion` y Producción no las ve. URL: la de GitHub Pages de este repo.
+>
+> Nota **v13.94** (sólo front) — **Los atrasados se ven sin rebotar de solapa** (dueño 07/09: *"hoy para ver
+> los pedidos atrasados tengo que entrar a Resumen para que me aparezca el botón que me lleve de nuevo a
+> Programación, una locura"*). Tenía razón y era mitad culpa de la v13.33: ese día sacamos la **tarjeta** de
+> Atrasados de Programación (*"es un dato de gerencia"*) pero la **lista** se quedó ahí, así que el cartel de
+> Resumen no hacía más que mandarte de vuelta. Ahora, decisión del dueño, está en **los dos lados**:
+>
+> - **Programación** vuelve a tener la entrada, pero como **una línea** (`.pn-venc-band`), no la tarjeta grande
+>   que se sacó: `⏰ 3 atrasados · 2 sin salir → reprogramar · 1 salieron · falta el remito · Ver la lista →`.
+>   Abre la lista en la misma solapa, que es donde ya vivía. Si no hay atrasados, no se dibuja nada.
+> - **Resumen** conserva su cartel, y ahora la lista **se despliega ahí abajo** (`pppVencInline`,
+>   `_pppPlanDiaHtml(prog, "venc", {inline:true})`): no llama más a `pppTab('plan')`. En esa vista la barra dice
+>   **✕ Cerrar la lista** en vez de "← Volver a los 6 días", porque en Resumen no hay grilla atrás.
+> - Los KPI de Programación siguen contando **sólo lo que tiene fecha por delante**: la v13.33 sigue en pie.
+>
+> **Qué son los atrasados, al 07/09** (51 NP · 12,26 m³, y **todos del 2 al 4 de septiembre**: es la cola de
+> Producción, ni uno lo generó Gestión):
+> · **13 NP · 6,98 m³ no salieron** → 9 de **Cencosud** (cód 2444, entrados el 03/09 para el 04/09, nunca se les
+>   armó tanda) + 4 con el picking hecho y sin armar (`D57C` ×2, `D57D` ×2);
+> · **38 NP · 5,28 m³ salieron** (la tanda se armó) y falta el remito → 14 con CCR y CCN, 8 con CCR sin CCN (la
+>   anomalía ya reportada), 16 sin ningún rastro de carga.
+> Los que ya tienen CRN no están en la lista: al controlarse el remito pasan solos a Entregados (eran 32 más).
+> `tests/ppp-atrasados.cjs` (15 chequeos).
 >
 > Nota **v13.92** (sólo front) — **La hoja de ruta pasó a ser un DOCUMENTO IMPRESO** (dueño 07/09, sobre la
 > v13.89: *"más útil quizás sería una impresión, más que Google Maps"*). Imprimir es el **botón principal** y el

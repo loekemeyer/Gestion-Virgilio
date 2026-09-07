@@ -2628,6 +2628,16 @@ tr.ppp-err-zona > td{ background:#fffbeb !important; }
 .pn-orden .r span.go{ background:#15803d; color:#fff; border-color:#15803d; }
 .pn-orden .r em{ font-style:normal; color:#b45309; font-weight:900; }
 .pn-orden .hint{ margin-left:auto; color:#166534; font-weight:700; font-size:11.5px; }
+/* v13.94 — banda chiquita de atrasados en la grilla de Programación (la entrada a la lista, que
+   vive en esa misma solapa). No es la tarjeta grande que se sacó en la v13.33: una línea. */
+.pn-venc-band{ display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin:0 0 12px; padding:8px 13px; border-radius:10px; background:#f8fafc; border:1px solid #e2e8f0; font-size:12.5px; color:#475569; cursor:pointer; }
+.pn-venc-band:hover{ background:#f1f5f9; }
+.pn-venc-band.rep{ background:#fffbeb; border-color:#fde68a; color:#92400e; }
+.pn-venc-band b{ color:#0f172a; white-space:nowrap; }
+.pn-venc-band.rep b{ color:#78350f; }
+.pn-venc-band .r{ font-weight:800; color:#b45309; }
+.pn-venc-band .go{ margin-left:auto; font-weight:800; color:#1e6bd6; white-space:nowrap; }
+.pn-wrap-inline{ margin-top:10px; }
 /* v13.89 — botón "Hoja de ruta" del camión (Maps + imprimir para el fletero). */
 .pn-hr{ display:flex; align-items:center; gap:10px; flex-wrap:wrap; padding:7px 14px 7px 20px; background:#f8fafc; border-top:1px solid #eef2f7; }
 .pn-hr-b{ display:inline-flex; align-items:center; gap:6px; background:#1a73e8; color:#fff; border:none; border-radius:9px; padding:6px 13px; font-size:12.5px; font-weight:800; cursor:pointer; width:auto; }
@@ -7260,7 +7270,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v13.93";
+const APP_VERSION = "v13.94";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -29254,7 +29264,12 @@ function pppResumenHtml(prog) {
     head += '<div class="ppp-res-note' + (_rep ? ' rep' : '') + '">⏰ <b>' + _nVenc + '</b> pedido(s) con fecha de entrega vencida: ' +
       (_rep ? '<b>' + _rep + ' sin salir → hay que reprogramar</b>' + (_nVenc - _rep ? ' · ' : '') : '') +
       (_nVenc - _rep ? (_nVenc - _rep) + ' con la tanda armada y el remito sin marcar' : '') + '. ' +
-      '<button class="pn-lnk" onclick="pppTab(\'plan\');pppPlanAbrir(\'venc\')">Ver la lista →</button></div>';
+      // v13.94 (dueño: "tengo que entrar a Resumen para que me aparezca el botón que me lleve de
+      // nuevo a Programación, una locura"): antes esto hacía pppTab('plan') + pppPlanAbrir('venc'),
+      // o sea te sacaba de la solapa. Ahora la lista se abre ACÁ, debajo del cartel.
+      '<button class="pn-lnk" onclick="pppVencInline(' + (_pppVencInline ? 'false' : 'true') + ')">' +
+      (_pppVencInline ? '✕ Cerrar la lista' : 'Ver la lista →') + '</button></div>';
+    if (_pppVencInline) head += '<div class="pn-wrap pn-wrap-inline">' + _pppPlanDiaHtml(prog, "venc", { inline: true }) + '</div>';
   }
   if (sinF) head += '<div class="ppp-res-note">⏳ ' + sinF + ' pedido(s) sin Fecha de Entrega — no entran al resumen. <span style="opacity:.7">(Retira no cuenta)</span></div>';
   if (!conF.length) return head + '<div class="planim-empty">Sin pedidos con Fecha de Entrega todavía.</div>';
@@ -29855,6 +29870,7 @@ function pppGoToRow(np) {
 let _pppPlanDay = null;        // null = grilla de 6 días · "YYYYMMDD" = adentro de un día · "venc" = vencidas
 let _pppPlanClasica = false;   // true = lista clásica por fecha/tanda (v13.01)
 let _pppPlanHoja = 0;          // v13.17: hoja de la grilla (0 = próximos 6 hábiles, 1 = los 6 siguientes…)
+let _pppVencInline = false;    // v13.94: la lista de atrasados desplegada adentro de Resumen
 let _pppValor = null;          // Map np(norm) → { valor, sinPrecio }  (gv_ppp_np_valor)
 let _pppGeo = null;            // cache PPP_Geo (dir_key → {lat,lng}) para el orden de carga
 let _pppGeoCod = null;         // v13.40: cache GV_Geo_Cliente ("cod dir_key" y "cod" → {lat,lng})
@@ -29901,6 +29917,12 @@ async function pppRefreshGeo() {
 }
 function pppPlanAbrir(k) { _pppPlanDay = k || null; pppRenderProg(); try { const el = document.getElementById("pppPreview"); if (el) el.scrollIntoView({ block: "start" }); } catch (_e) {} }
 function pppPlanVolver() { _pppPlanDay = null; pppRenderProg(); }
+/* v13.94 — la lista de atrasados abierta DENTRO de Resumen (sin saltar a Programación). */
+function pppVencInline(v) {
+  _pppVencInline = !!v;
+  pppRenderProg();
+  if (_pppVencInline) { try { const el = document.getElementById("pppPreview"); if (el) el.scrollIntoView({ block: "start" }); } catch (_e) {} }
+}
 /* v13.17: "Ver hoja 2" (dueño): la grilla pagina de a 6 días hábiles. */
 function pppPlanHoja(n) { _pppPlanHoja = Math.max(0, Number(n) || 0); _pppPlanDay = null; pppRenderProg(); try { const el = document.getElementById("pppPreview"); if (el) el.scrollIntoView({ block: "start" }); } catch (_e) {} }
 function pppPlanClasica(v) { _pppPlanClasica = !!v; pppRenderProg(); }
@@ -30267,6 +30289,20 @@ function _pppPlanGridHtml(programados) {
     '<div class="pn-kpi"><div class="ico">🧊</div><div><div class="l">Volumen</div><div class="v">' + _pppFmtM3(totM3) + ' m³</div><div class="s">a entregar</div></div></div>' +
     '<div class="pn-kpi g"><div class="ico">💰</div><div><div class="l">Valor</div><div class="v">' + (_pppValor ? '<span class="full">' + _pppFmtPesos(totVal) + '</span><span class="short">' + _pppFmtPesosCorto(totVal) + '</span>' : '…') + '</div><div class="s">estimado a lista' + (totSinVal ? ' · ' + totSinVal + ' sin valuar' : '') + '</div></div></div>' +
     '</div>';
+  // v13.94 (dueño 07/09: "para ver los pedidos atrasados tengo que entrar a Resumen para que me
+  // aparezca el botón que me lleve de nuevo a Programación, una locura"): la LISTA de atrasados vive
+  // acá, así que la entrada también. Es una línea chiquita — no vuelve la tarjeta grande que la
+  // v13.33 sacó por pedido del dueño ("es un dato de gerencia"): no ocupa lugar ni tapa la grilla,
+  // y el que programa la ve de reojo. El cartel de Resumen sigue estando, y ahí la lista abre
+  // adentro de Resumen, sin mandar a nadie a otra solapa.
+  if (nVenc) {
+    const _rep = g.venc.filter(function (p) { return _pppEstadoPed(p) !== "armado"; }).length;
+    h += '<div class="pn-venc-band' + (_rep ? ' rep' : '') + '" onclick="pppPlanAbrir(\'venc\')" title="Ver la lista de atrasados">' +
+      '<b>⏰ ' + nVenc + ' atrasado' + (nVenc === 1 ? '' : 's') + '</b>' +
+      (_rep ? '<span class="r">' + _rep + ' sin salir → reprogramar</span>' : '') +
+      ((nVenc - _rep) ? '<span>' + (nVenc - _rep) + ' salieron · falta el remito</span>' : '') +
+      '<span class="go">Ver la lista →</span></div>';
+  }
   // v13.05 — dos carteles separados (dueño: "es confuso el cartel"): atrasados por un lado,
   // cargados sin controlar por otro (esos ya no están acá: viven en En Salida).
   // v13.25: sin carteles grandes (dueño: "no entiendo ni qué significa"). Atrasados vive en su tarjeta;
@@ -30313,9 +30349,12 @@ function _pppPlanGridHtml(programados) {
 }
 /* ---- ADENTRO DE UN DÍA (o de las vencidas): cabecera + un bloque por camión con sus pedidos,
    el orden de carga y, abajo, las tandas de siempre (acciones/tabla/control). ---- */
-function _pppPlanDiaHtml(programados, key) {
+function _pppPlanDiaHtml(programados, key, opts) {
   const g = _pppPlanAgrupar(programados);
   const esVenc = key === "venc";
+  // v13.94: `inline` = la lista se está dibujando DENTRO de Resumen, no en Programación. Cambia
+  // sólo la barra de arriba: ahí no hay "los 6 días" a los que volver, hay que cerrarla y punto.
+  const inline = !!(opts && opts.inline);
   const ped = esVenc ? g.venc : ((g.byDay.get(key) || {}).ped || []);
   const hoy = _pppHoyKey();
   const dt = esVenc ? null : _pppKeyDate(key);
@@ -30323,7 +30362,9 @@ function _pppPlanDiaHtml(programados, key) {
   const sub = esVenc ? (ped.length + " pedido" + (ped.length === 1 ? "" : "s") + " que no " + (ped.length === 1 ? "salió" : "salieron") + " · reprogramar o cargar") : (_PN_DOW[dt.getDay()] + (key === hoy ? " · hoy" : ""));
   const cams = _pppCamiones(ped), est = _pppPlanEstDia(ped), val = _pppPlanValor(ped);
   const nCam = cams.filter(function (c) { return c.ruta !== "ret"; }).length;
-  let h = '<div class="pn-topbar"><button class="pn-back" onclick="pppPlanVolver()">← Volver a los 6 días</button><button class="pn-lnk" onclick="pppPlanClasica(true)">Vista clásica</button></div>';
+  let h = inline
+    ? '<div class="pn-topbar"><button class="pn-back" onclick="pppVencInline(false)">✕ Cerrar la lista</button></div>'
+    : '<div class="pn-topbar"><button class="pn-back" onclick="pppPlanVolver()">← Volver a los 6 días</button><button class="pn-lnk" onclick="pppPlanClasica(true)">Vista clásica</button></div>';
   h += '<div class="pn-dayhead' + (esVenc ? ' venc' : '') + '"><div><div class="d1">' + escapeHtml(sub) + '</div><div class="d2">' + escapeHtml(titulo) + '</div></div>' +
     '<div class="kp"><div class="k"><i>📦</i><div><div class="l">Pedidos</div><div class="v">' + ped.length + '</div></div></div><div class="k"><i>🚚</i><div><div class="l">Camiones</div><div class="v">' + nCam + '</div></div></div><div class="k"><i>🧊</i><div><div class="l">Volumen</div><div class="v">' + _pppFmtM3(_pppM3Sum(ped)) + ' m³</div></div></div><div class="k"><i>💰</i><div><div class="l">Valor estimado</div><div class="v g">' + (_pppValor ? _pppFmtPesos(val.valor) : '…') + '</div></div></div></div>' +
     '<div class="barw">' + _pppPlanBarraHtml(est, ped.length) + '</div></div>';
