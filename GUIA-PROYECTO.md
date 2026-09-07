@@ -12,11 +12,22 @@
 > única**; no se replica. Ante la duda entre parche rápido y fix de raíz → **fix
 > de raíz**.
 >
-> Última actualización: 2026-09-07 (lunes) · Versión app al documentar: **v13.87**
+> Última actualización: 2026-09-07 (lunes) · Versión app al documentar: **v13.88**
 >
 > ⚠⚠ **Desde el lunes 2026-09-07 los operarios usan GESTIÓN, no Producción** (dueño, sábado a la
 > noche: *"el lunes van a empezar a usar GV, no más PV"*). Las tandas web viven en
 > `PPP_Web_Programacion` y Producción no las ve. URL: la de GitHub Pages de este repo.
+>
+> Nota **v13.88** (sólo front) — **"Listo: no queda nada por programar"** (dueño 07/09 09:25, con captura, después
+> de programar al cliente 4210: *"tendría que ponerme un listo o algo, no continuar programando si no hay nada más
+> que programar"*). Tres arreglos en A Programar: (1) el **paso 2 quedaba en pie con "0 pedidos · 0,00 m³" y el
+> botón Programar en VERDE** — al tocarlo iba a la RPC para no armar nada; ahora el botón se deshabilita sin
+> pedidos y el paso 2 **vuelve solo al paso 1** cuando no queda ninguno tildado (es lo que pasa justo después de
+> programar, que vacía la selección); (2) con la lista vacía va un cartel verde **✅ Listo: no queda nada por
+> programar · Todo lo que entró ya tiene tanda y día. Si llega un pedido nuevo aparece acá solo**, en vez del
+> gris chiquito de antes; (3) ahí **no se dibuja la botonera** de armar tanda. Una búsqueda sin resultados sigue
+> diciendo "Ningún pedido coincide con «…»", que no es lo mismo que estar al día. `tests/apr-pasos.cjs`
+> (4 chequeos nuevos).
 >
 > Nota **v13.87** (backend Virgilio + front) — **Mover una tanda de día DESDE LA APP** (dueño 07/09, después de
 > que adelantar la tanda del 2533 al miércoles hubiera que hacerlo por SQL: *"esa solicitud la tengo que poder

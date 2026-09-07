@@ -141,6 +141,15 @@ const { chromium } = require("/opt/node22/lib/node_modules/playwright");
     _apr.paso = 2; _apr.diaSel = "2026-09-15"; calls.length = 0;
     await aprConfirmar();
     out.okk = { fns: calls.map((c) => c.fn).filter((f) => /^gv_ppp_web_tanda_/.test(f)).join(">"), fecha: (calls.find((c) => c.fn === "gv_ppp_web_tanda_programar") || { body: {} }).body.p_fecha, paso: _apr.paso, sel: aprSelKeys().length, msg: _apr.msg, err: _apr.msgErr };
+    // v13.88 (dueño: "recién programé al 4210; tendría que ponerme un listo, no seguir programando si no hay nada")
+    _apr.sel = {}; _apr.paso = 2; _apr.diaSel = "2026-09-15"; aprRender();
+    out.paso2Vacio = { paso: _apr.paso, foot: (prev.querySelector(".apr-foot-txt") || {}).textContent || "", btnOff: !!(prev.querySelector(".apr-foot-btn") || {}).disabled };
+    const antes = _apr.pedidos.slice();
+    _apr.pedidos = []; _apr.paso = 1; _apr.listo = true; aprRender();
+    out.listo = { cartel: !!prev.querySelector(".apr-listo"), txt: (prev.querySelector(".apr-listo") || {}).textContent || "", foot: !!prev.querySelector(".apr-foot") };
+    _apr.q = "zzz"; _apr.pedidos = antes; aprRender();
+    out.buscaVacia = { cartel: !!prev.querySelector(".apr-listo"), txt: (prev.querySelector(".apr-vacio") || {}).textContent || "" };
+    _apr.q = "";
     return out;
   });
   await b.close();
@@ -174,6 +183,11 @@ const { chromium } = require("/opt/node22/lib/node_modules/playwright");
   chk(!/segundo camión/.test(r.camPrimero), "el primer camión del día tampoco pregunta");
   chk(r.falla.fns === "gv_ppp_web_tanda_nueva>gv_ppp_web_tanda_agregar>gv_ppp_web_tanda_agregar>gv_ppp_web_tanda_programar>gv_ppp_web_tanda_descartar" && r.falla.paso === 2 && r.falla.err && r.falla.sel === 2, "si programar falla: descarta la tanda y se queda en el paso 2 con la selección");
   chk(r.okk.fns === "gv_ppp_web_tanda_nueva>gv_ppp_web_tanda_agregar>gv_ppp_web_tanda_agregar>gv_ppp_web_tanda_programar" && r.okk.fecha === "2026-09-15" && r.okk.paso === 1 && r.okk.sel === 0 && /✅ E09A programada para el mar 15\/9/.test(r.okk.msg) && !r.okk.err, "Programar ✓ = nueva → agregar ×2 → programar, y vuelve al paso 1 vacío");
+  // v13.88
+  chk(r.paso2Vacio.paso === 1, "el paso 2 sin pedidos tildados vuelve solo al paso 1 (quedaba con '0 pedidos' y Programar en verde)");
+  chk(r.listo.cartel && /Listo: no queda nada por programar/.test(r.listo.txt), "sin pedidos: cartel 'Listo' (" + r.listo.txt.slice(0, 40) + ")");
+  chk(!r.listo.foot, "y sin la botonera de armar tanda");
+  chk(!r.buscaVacia.cartel && /Ningún pedido coincide/.test(r.buscaVacia.txt), "una búsqueda sin resultados NO dice 'Listo' (" + r.buscaVacia.txt.slice(0, 40) + ")");
   chk(errs.length === 0, "sin errores de página" + (errs.length ? ": " + errs[0] : ""));
   if (fallos.length) { console.error("\nFALLARON " + fallos.length + ":\n· " + fallos.join("\n· ")); process.exit(1); }
   console.log("\napr-pasos OK");

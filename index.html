@@ -961,6 +961,9 @@ body.apr-dnd-tanda .apr-col-nps, body.apr-dnd-tanda .apr-dia-cerrado{ opacity:.4
 .apr-sel-res{ display:flex; flex-wrap:wrap; gap:6px; }
 .apr-sel-chip{ background:#eff6ff; border:1px solid #bfdbfe; color:#1e3a8a; border-radius:999px; padding:4px 10px; font-size:13px; font-weight:700; }
 .apr-sel-chip small{ font-weight:600; color:#3b82f6; }
+.apr-listo{ background:#dcfce7; border:1px solid #86efac; color:#14532d; border-radius:12px; padding:18px 16px; text-align:center; font-size:17px; }
+.apr-listo b{ color:#15803d; }
+.apr-listo-sub{ margin-top:6px; font-size:13.5px; color:#166534; font-weight:600; }
 .apr-dia:not(.apr-dia-cerrado){ cursor:pointer; }
 .apr-dia.apr-dia-sel{ border-color:#16a34a; border-top-color:#16a34a; background:#f0fdf4; box-shadow:0 0 0 3px rgba(22,163,74,.22); }
 .apr-dia.apr-dia-sel .apr-dia-num{ color:#15803d; }
@@ -7252,7 +7255,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v13.87";
+const APP_VERSION = "v13.88";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -32961,6 +32964,8 @@ function aprResumenSel() {
 function aprFootHtml() {
   const r = aprResumenSel();
   if (_apr.paso === 1) {
+    // v13.88: sin pedidos a programar no se muestra la botonera (ya está el cartel "Listo")
+    if (_apr.listo && !(_apr.pedidos || []).length) return "";
     return '<div class="apr-foot">' +
       '<div class="apr-foot-txt">' + (r.n ? '<b>' + r.n + '</b> pedido' + (r.n === 1 ? '' : 's') + ' · <b>' + aprNum(r.m3, 2) + '</b> m³ · ' + escapeHtml(aprEmpNombre(r.emp)) : 'Tildá los pedidos que van juntos en la tanda') + '</div>' +
       (r.n ? '<button class="apr-foot-sec" onclick="aprSelLimpiar()">Limpiar</button>' : '') +
@@ -32968,10 +32973,14 @@ function aprFootHtml() {
       '</div>';
   }
   const dia = _apr.diaSel ? aprDiaCorto(_apr.diaSel) : "";
+  // v13.88: sin pedidos seleccionados NO se programa (antes el botón quedaba verde con "0 pedidos · 0,00 m³"
+  // y al tocarlo iba a la RPC para no armar nada).
   return '<div class="apr-foot">' +
     '<button class="apr-foot-sec" onclick="aprVolver()">← Pedidos</button>' +
-    '<div class="apr-foot-txt"><b>' + r.n + '</b> pedido' + (r.n === 1 ? '' : 's') + ' · <b>' + aprNum(r.m3, 2) + '</b> m³' + (dia ? ' → <b>' + escapeHtml(dia) + '</b>' : ' · tocá un día') + '</div>' +
-    '<button class="apr-foot-btn ok" ' + (_apr.diaSel && !_apr.ocupado ? '' : 'disabled ') + 'onclick="aprConfirmar()">' + (_apr.ocupado ? 'Programando…' : 'Programar ✓') + '</button>' +
+    '<div class="apr-foot-txt">' + (r.n
+      ? '<b>' + r.n + '</b> pedido' + (r.n === 1 ? '' : 's') + ' · <b>' + aprNum(r.m3, 2) + '</b> m³' + (dia ? ' → <b>' + escapeHtml(dia) + '</b>' : ' · tocá un día')
+      : 'No hay pedidos seleccionados — volvé a <b>Pedidos</b>') + '</div>' +
+    '<button class="apr-foot-btn ok" ' + (r.n && _apr.diaSel && !_apr.ocupado ? '' : 'disabled ') + 'onclick="aprConfirmar()">' + (_apr.ocupado ? 'Programando…' : 'Programar ✓') + '</button>' +
     '</div>';
 }
 function aprPaso2Html() {
@@ -33598,6 +33607,9 @@ function aprRender() {
   // v13.81: DOS PASOS (dueño: "se ve todo muy chiquitito; armar la tanda y después elegir el día").
   //   Paso 1: pedidos (tildables) + tandas sin fecha si hay. Paso 2: los días. Botonera fija abajo.
   const conTandas = (_apr.tandas || []).length > 0;
+  // v13.88 (dueño: "recién programé al 4210; no debería seguir programando si no hay nada más"): el paso 2 sólo
+  // existe mientras haya pedidos tildados. Al programar se vacía la selección, así que vuelve solo al paso 1.
+  if (_apr.paso === 2 && !aprSelKeys().length) { _apr.paso = 1; _apr.diaSel = null; }
   if (_apr.paso === 2) h += '<div class="apr-wrap apr-2col">' + aprPaso2Html() + '</div>';
   else h += '<div class="apr-wrap' + (conTandas ? '' : ' apr-2col') + '">' + aprColPedidos() + (conTandas ? aprColTandas() : '') + '</div>';
   h += aprFootHtml();
@@ -33652,7 +33664,11 @@ function aprColPedidos() {
     '<input class="apr-q" type="search" placeholder="🔎 cliente, zona, localidad…" value="' + escapeHtml(_apr.q) + '" oninput="aprBuscar(this.value)">' +
     '<div class="apr-scroll">';
   if (!lista.length) {
-    h += '<div class="apr-vacio">' + (_apr.listo ? "No queda nada por programar." : "Cargando pedidos…") + '</div>';
+    // v13.88 (dueño: "tendría que ponerme un listo o algo"): terminado se dice fuerte, no en gris chiquito.
+    h += _apr.listo
+      ? (q ? '<div class="apr-vacio">Ningún pedido coincide con «' + escapeHtml(q) + '».</div>'
+           : '<div class="apr-listo">✅ <b>Listo: no queda nada por programar.</b><div class="apr-listo-sub">Todo lo que entró ya tiene tanda y día. Si llega un pedido nuevo aparece acá solo.</div></div>')
+      : '<div class="apr-vacio">Cargando pedidos…</div>';
   }
   for (const p of lista) {
     const id = "p" + p.order_id, ab = !!_apr.exp[id];
