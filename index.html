@@ -2645,6 +2645,11 @@ tr.ppp-err-zona > td{ background:#fffbeb !important; }
 .pn-hr-b:active{ transform:scale(.97); }
 .pn-hr-t{ font-size:11.5px; color:#64748b; font-weight:700; }
 .pn-thead, .pn-ped{ display:grid; grid-template-columns:82px minmax(0,1fr) 110px 60px 105px 175px 150px; gap:10px; align-items:center; padding:7px 14px 7px 20px; border-top:1px solid #eef2f7; }
+/* v14.10 — camión sin orden de carga (súper, retira, o menos de 2 paradas ubicadas): sin la
+   última columna, que quedaba vacía ocupando 150 px al final de cada fila. */
+.pn-thead.pn-sin-ult, .pn-ped.pn-sin-ult{ grid-template-columns:82px minmax(0,1fr) 110px 60px 105px 175px; }
+.pn-camion .t2 .pn-mas, .pn-trk .sub .pn-mas{ color:#1e6bd6; font-weight:800; }
+.pn-trk .sub{ white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 .pn-thead{ font-size:10px; font-weight:800; letter-spacing:.6px; text-transform:uppercase; color:#64748b; background:#fafcff; }
 .pn-thead .num, .pn-ped .m, .pn-ped .pp{ text-align:right; }
 .pn-ped{ font-size:13.5px; } .pn-ped.err{ background:#fff1f2; }
@@ -7282,7 +7287,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v14.09";
+const APP_VERSION = "v14.10";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -30428,6 +30433,25 @@ function _pppPlanBarraHtml(est, tot) {
 }
 function _pppPlanEstDia(ped) { const est = { armado: 0, curso: 0, sin: 0 }; for (const p of ped) { const e = _pppEstadoPed(p); est[e === "armado" ? "armado" : (e === "sin" ? "sin" : "curso")]++; } return est; }
 function _pppPlanValor(ped) { let v = 0, sin = 0; for (const p of ped) { const x = _pppValorPed(p); if (x == null) sin++; else v += x; } return { valor: v, sin: sin }; }
+/* v14.10 (mirando la pantalla real del viernes 11: un camión con 11 tandas escupía
+   "Tandas D67A · D67B · D67C · D67D · D67E · D67F · D67G · D67H · D67I · D67J · D67K" y el
+   encabezado se iba a dos renglones, tapando los m³ y el valor). Se muestran las primeras 4 y
+   "+N más"; la lista entera queda en el globito, que es donde sirve si hay que buscar una. */
+/* En la tarjeta de la grilla (6 días) el renglón es angosto: van 3 y "+N". La lista entera, en el
+   globito. Con 11 tandas el renglón se iba a dos líneas y desalineaba los m³ y el valor. */
+function _pppTandasCorto(tandas) {
+  const t = tandas || [], n = t.length;
+  if (n <= 3) return escapeHtml(t.join(" · "));
+  return '<span title="' + escapeHtml(t.join(" · ")) + '">' + escapeHtml(t.slice(0, 3).join(" · ")) +
+         ' <b class="pn-mas">+' + (n - 3) + '</b></span>';
+}
+function _pppTandasTxt(tandas) {
+  const t = tandas || [], n = t.length;
+  const cab = 'Tanda' + (n === 1 ? '' : 's') + ' ';
+  if (n <= 4) return cab + escapeHtml(t.join(" · "));
+  return '<span title="' + escapeHtml(t.join(" · ")) + '">' + cab + escapeHtml(t.slice(0, 4).join(" · ")) +
+         ' <b class="pn-mas">+' + (n - 4) + ' más</b></span>';
+}
 function _pppCamionIco(c) { return c.ruta === "ret" ? "🏭" : (c.ruta === "sup" ? "🛒" : "🚚"); }
 /* v13.07: el número del camión ES el de la tanda (E02A → Camión 2), como en el cuadro "Total por día". */
 /* v13.35 (dueño: "si es súper, pone el nombre directamente"): un camión de súper es siempre de UN
@@ -30516,7 +30540,7 @@ function _pppPlanGridHtml(programados) {
       '<div class="pn-mini"><div><i>📦</i><span><b>' + dd.ped.length + '</b><small>pedido' + (dd.ped.length === 1 ? '' : 's') + '</small></span></div><div><i>🚚</i><span><b>' + nCam + '</b><small>' + (nCam === 1 ? 'camión' : 'camiones') + '</small></span></div><div><i>🧊</i><span><b>' + _pppFmtM3(_pppM3Sum(dd.ped)) + '</b><small>m³</small></span></div><div class="g"><i>💰</i><span><b>' + (_pppValor ? _pppFmtPesosCorto(val.valor) : '…') + '</b><small>estimado</small></span></div></div>' +
       '<div class="pn-sec"><span>Camiones programados</span><a>Ver todos →</a></div>';
     for (const c of camsShow) {
-      h += '<div class="pn-trk"><div class="ico ' + c.ruta + '">' + _pppCamionIco(c) + '</div><div><div class="z">' + escapeHtml(_pppCamionNombre(c)) + '</div><div class="sub">' + escapeHtml(c.tandas.join(" · ") || "sin tanda") + ' · ' + c.ped.length + ' pedido' + (c.ped.length === 1 ? '' : 's') + '</div></div><div class="m3">' + _pppFmtM3(c.m3) + ' m³</div><div class="p">' + (_pppValor ? _pppFmtPesos(c.valor) : '…') + '</div></div>';
+      h += '<div class="pn-trk"><div class="ico ' + c.ruta + '">' + _pppCamionIco(c) + '</div><div><div class="z">' + escapeHtml(_pppCamionNombre(c)) + '</div><div class="sub">' + (c.tandas.length ? _pppTandasCorto(c.tandas) : "sin tanda") + ' · ' + c.ped.length + ' pedido' + (c.ped.length === 1 ? '' : 's') + '</div></div><div class="m3">' + _pppFmtM3(c.m3) + ' m³</div><div class="p">' + (_pppValor ? _pppFmtPesos(c.valor) : '…') + '</div></div>';
     }
     if (cams.length > camsShow.length) h += '<div class="pn-more">+ ' + (cams.length - camsShow.length) + ' más</div>';
     h += '<div class="pn-state">' + _pppPlanBarraHtml(est, dd.ped.length) + over + '</div></div>';
@@ -30580,7 +30604,7 @@ function _pppPlanDiaHtml(programados, key, opts) {
     let oc = (esVenc || c.ruta === "ret" || c.ruta === "sup") ? null : _pppOrdenCarga(c);
     if (oc && (oc.paradas.length - oc.sinUbic) < 2) oc = null;
     const chips = (c.est.armado ? '<span class="pn-chip mid">' + c.est.armado + ' armado' + (c.est.armado === 1 ? '' : 's') + '</span>' : '') + (c.est.curso ? '<span class="pn-chip wait">' + c.est.curso + ' en curso</span>' : '') + (c.est.sin ? '<span class="pn-chip">' + c.est.sin + ' sin empezar</span>' : '');
-    h += '<div class="pn-camion"><div class="ch ' + c.ruta + '"><div class="ico">' + _pppCamionIco(c) + '</div><div><div class="t1">' + escapeHtml(_pppCamionNombre(c)) + '</div><div class="t2">' + (c.tandas.length ? 'Tanda' + (c.tandas.length === 1 ? '' : 's') + ' ' + escapeHtml(c.tandas.join(" · ")) : 'Sin tanda') + ' · ' + c.ped.length + ' pedido' + (c.ped.length === 1 ? '' : 's') + '</div></div><div class="st" title="' + escapeHtml(chips.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim()) + '"></div><div class="m3">' + _pppFmtM3(c.m3) + ' m³</div><div class="p">' + (_pppValor ? _pppFmtPesos(c.valor) : '…') + (c.sinValor ? '<small title="Pedidos sin valuar (sin líneas o sin precio de lista)"> · ' + c.sinValor + ' s/valor</small>' : '') + '</div></div>';
+    h += '<div class="pn-camion"><div class="ch ' + c.ruta + '"><div class="ico">' + _pppCamionIco(c) + '</div><div><div class="t1">' + escapeHtml(_pppCamionNombre(c)) + '</div><div class="t2">' + (c.tandas.length ? _pppTandasTxt(c.tandas) : 'Sin tanda') + ' · ' + c.ped.length + ' pedido' + (c.ped.length === 1 ? '' : 's') + '</div></div><div class="st" title="' + escapeHtml(chips.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim()) + '"></div><div class="m3">' + _pppFmtM3(c.m3) + ' m³</div><div class="p">' + (_pppValor ? _pppFmtPesos(c.valor) : '…') + (c.sinValor ? '<small title="Pedidos sin valuar (sin líneas o sin precio de lista)"> · ' + c.sinValor + ' s/valor</small>' : '') + '</div></div>';
     if (oc && oc.paradas.length > 1) {
       // v13.36 (dueño: "ya te pedí que pongas el cód cliente, no la localidad"): el que carga el
       // camión busca por código, no por barrio. En el chip va el cód; el cliente, la localidad y la
@@ -30606,7 +30630,12 @@ function _pppPlanDiaHtml(programados, key, opts) {
     }
     const rows = oc ? oc.paradas.slice().sort(function (a, b) { return a._carga - b._carga; }) : c.ped.slice();
     const primero = rows.length ? rows[0] : null;
-    h += '<div class="pn-thead"><span>Tanda</span><span>Cliente · N° pedido</span><span>Localidad</span><span class="num">m³</span><span class="num">Valor</span><span>Picking · Armado</span><span>' + (esVenc ? 'Qué hacer' : (oc ? 'Carga' : '')) + '</span></div>';
+    // v14.10: si no hay última columna que mostrar (camión sin orden de carga: súper, retira o
+    // menos de 2 paradas ubicadas) la tabla NO reserva sus 150 px — antes quedaba una columna
+    // fantasma a la derecha de "Picking · Armado" en todos esos camiones.
+    const _ult = esVenc ? 'Qué hacer' : (oc ? 'Carga' : '');
+    const _sinUlt = _ult ? '' : ' pn-sin-ult';
+    h += '<div class="pn-thead' + _sinUlt + '"><span>Tanda</span><span>Cliente · N° pedido</span><span>Localidad</span><span class="num">m³</span><span class="num">Valor</span><span>Picking · Armado</span>' + (_ult ? '<span>' + _ult + '</span>' : '') + '</div>';
     for (const p of rows) {
       const e = _pppEstadoPed(p), E = _PN_EST[e];
       const pick = (e === "armado" || e === "armando" || e === "picking") ? "done" : (e === "pickeando" ? "on" : "");
@@ -30626,7 +30655,7 @@ function _pppPlanDiaHtml(programados, key, opts) {
         else if (e === "armado") carga = '<div class="pn-carga"><span class="n ok">' + n + 'º</span><span class="t">armado ✓<br>espera su turno</span></div>';
         else carga = '<div class="pn-carga"><span class="n">' + n + 'º</span><span class="t">falta armar</span></div>';
       }
-      h += '<div class="pn-ped' + (p._err && p._err.length ? ' err' : '') + '"><span class="tanda ' + c.ruta + '">' + escapeHtml(String(p.tanda || "—").toUpperCase()) + '</span>' +
+      h += '<div class="pn-ped' + _sinUlt + (p._err && p._err.length ? ' err' : '') + '"><span class="tanda ' + c.ruta + '">' + escapeHtml(String(p.tanda || "—").toUpperCase()) + '</span>' +
         // v14.06 (dueño: "si no salieron, que figuren en la PPP con su fecha de entrega; mañana lo mira la
         // administrativa"): en ATRASADOS conviven pedidos de varios días, así que sin la fecha en la fila no
         // se sabe de cuándo es cada uno. En la vista de un día no hace falta: el día es el del encabezado.

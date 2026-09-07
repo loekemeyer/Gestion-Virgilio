@@ -12,11 +12,28 @@
 > única**; no se replica. Ante la duda entre parche rápido y fix de raíz → **fix
 > de raíz**.
 >
-> Última actualización: 2026-09-07 (lunes) · Versión app al documentar: **v14.09**
+> Última actualización: 2026-09-07 (lunes) · Versión app al documentar: **v14.10**
 >
 > ⚠⚠ **Desde el lunes 2026-09-07 los operarios usan GESTIÓN, no Producción** (dueño, sábado a la
 > noche: *"el lunes van a empezar a usar GV, no más PV"*). Las tandas web viven en
 > `PPP_Web_Programacion` y Producción no las ve. URL: la de GitHub Pages de este repo.
+>
+> Nota **v14.10** (sólo front) — **Dos cosas feas de Programación, encontradas mirando la pantalla con los
+> datos reales** (dueño: *"¿ves algo feo en la programación que corregirías?"*; se renderizó la solapa headless
+> con las 169 filas de verdad, del 02 al 16/09).
+>
+> 1. **Columna muda.** La tabla de cada camión tiene 7 columnas fijas y la última es **Carga** (el orden de
+>    carga). En los camiones que NO lo tienen —súper, retira, o menos de 2 paradas ubicadas— la columna quedaba
+>    **vacía ocupando 150 px** al final de cada fila: el encabezado terminaba en "Picking · Armado" y sobraba
+>    una columna sin nada. Ahora esos camiones usan una grilla de **6 columnas** (`.pn-sin-ult`) y el resto se
+>    reparte el espacio.
+> 2. **Lista de tandas desbordada.** El viernes 11 hay un camión con **11 tandas**: el encabezado escribía
+>    `Tandas D67A · D67B · … · D67K`, se iba a dos renglones y desalineaba los m³ y el valor de esa tarjeta
+>    contra las otras cinco. Ahora van las primeras y **"+N"** —4 adentro del día (`_pppTandasTxt`), 3 en la
+>    tarjeta de la grilla (`_pppTandasCorto`), que es más angosta— y **la lista completa queda en el globito**,
+>    que es donde sirve si hay que buscar una. Un camión de una sola tanda se sigue escribiendo entero.
+>
+> `tests/ppp-prolijo.cjs` (11 chequeos).
 >
 > Nota **v14.09** (datos, sin cambios de app) — **Ningún camión repetido en dos días** (dueño 07/09, con
 > captura de la búsqueda "d66": *"ahora quedó D66B en miércoles y jueves, no puede quedar la misma tanda en

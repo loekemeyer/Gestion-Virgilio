@@ -326,3 +326,6 @@ PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node te
 
 echo "== fac-fecha-entrega (v14.08: Facturación muestra la fecha de ENTREGA de la PPP como columna) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/fac-fecha-entrega.cjs
+
+echo "== ppp-prolijo (v14.10: sin columna muda en camiones sin orden de carga; lista de tandas larga resumida) =="
+PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/ppp-prolijo.cjs
