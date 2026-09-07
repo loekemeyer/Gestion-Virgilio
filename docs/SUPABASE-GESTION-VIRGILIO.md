@@ -3330,6 +3330,19 @@ del cód 45 esa misma mañana.
 
 Después, `gv_geo_reintentar()` devolvió **70** fallidas a la cola con la consulta nueva.
 
+**Verificado después de aplicar** (dos corridas del cron, ~11 minutos):
+
+```sql
+select * from public.gv_geo_cobertura;
+--            antes                    después
+--  chef   36/43 · faltan  2       38/43 · faltan  0
+--  lk    255/446 · faltan 132    290/446 · faltan 97
+--  total 291                     328        (+37 en 11 minutos)
+```
+
+De las 13 correcciones a mano, **11 ya quedaron ubicadas** en la primera pasada; faltan
+`Calle Constitucion 2587` y `Avenida Juan B. Justo 8587`, que todavía no salieron en la cola.
+
 **Archivo:** `sql/gv_geo_normalizar_v1426.sql` (incluye el rollback en la cabecera: sacar el
 `gv_dir_geo_normalizar(...)` del `dir_query` de las dos vistas y dropear la función; no escribe
 nada, no hay datos que restaurar).
