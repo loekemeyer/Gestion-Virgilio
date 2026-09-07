@@ -16,39 +16,25 @@
 
 ---
 
-## 1. PENDIENTE (para quien esté en `ppp_web_armar_tandas`) — enganchar el pedido al camión que YA va al cliente
+## 1. HECHO — el pedido se engancha al camión que YA va al cliente (v13.93 + v14.05)
 
-**El caso, medido el 07/09.** Osa Distribuidora (cod **2533**, Villa Lugano, Zona 1) tenía
-camión el **miércoles 9/09** — tanda `D66B`, NP 98650 (2,710 m³) y 98667 (1,331 m³). Entró un
-pedido web del mismo cliente (0,026 m³) y el automático lo programó para el **martes 15/09**,
-en un camión aparte. 26 litros, seis días después, al mismo cliente y al mismo barrio.
+**El caso.** Osa Distribuidora (cod **2533**, Villa Lugano, Zona 1) tenía camión el **miércoles
+9/09** — tanda `D66B`, 4,04 m³ en dos NP. Entró un pedido web del mismo cliente (0,026 m³) y el
+automático lo programó para el **martes 15/09**, en un camión aparte.
 
-**Por qué pasó — dos causas independientes:**
+**v13.93** — bloque (a2) de `gv_ppp_web_armar_pendientes`: busca **hacia atrás** (de mañana hasta
+el día anterior al que el automático elegiría) el día en que el cliente ya tiene entrega, y pisa el
+colchón **y** el cupo. La regla adelanta el pedido, nunca lo demora.
 
-1. **El colchón lo tapaba.** Con `dias_anticipacion_min = 4`, un lunes 7 el mínimo era el 11:
-   los días 8, 9 y 10 no eran candidatos. (Ojo: la v13.84 ya habilitó "programar para antes",
-   así que esta mitad puede estar resuelta — verificar.)
-2. **El automático nunca mira si el cliente ya tiene camión ese día.** Sólo mira cupo por día y
-   cercanía entre las tandas que arma en esa misma corrida. La `D66B` es de ISIS y queda
-   íntegramente fuera de su universo.
+**v14.05** — bloque (a1), la corrección del dueño: *"sólo en caso que ya se haya pickeado (o pasos
+posteriores) [tanda nueva]; si todavía ni se pickeó, el agregado se agrega a la tanda actual del
+cliente"*. **El corte es "¿ya se tocó?" (EP/TP/AP/TAP), no "¿es de ISIS o es web?".** Función nueva
+`gv_ppp_web_tanda_abierta_cliente`. Detalle y medición: `docs/SUPABASE-GESTION-VIRGILIO.md` §3.ca y
+§3.cb; SQL en `sql/gv_ppp_web_dia_cliente.sql` y `sql/gv_ppp_web_tanda_abierta_cliente.sql`.
 
-El cupo tampoco lo hubiera dejado entrar: el 9 estaba en **7,03 m³ de ISIS contra un cupo de 6**.
-
-**Pero acá el cupo no debería mandar.** El cupo mide capacidad de *picking*; sumarle 26 litros a
-un cliente que ya tiene 4 m³ armándose para ese día es casi gratis y ahorra un camión entero.
-
-**Lo que decidió el dueño (07/09):**
-
-- **La regla pisa el colchón Y el cupo.** Fue explícito: es el único modo que resuelve el caso,
-  porque el 9 estaba a la vez dentro del colchón y pasado de cupo.
-- **Se busca HACIA ATRÁS, no hacia adelante.** Textual: *"tiene que buscar para atrás, no para
-  adelante"*. O sea: entre hoy y el día que el automático asignaría por su cuenta, tomar el día
-  en que el cliente ya tiene entrega. **La regla adelanta el pedido, nunca lo demora.**
-
-Ya existe media pieza: la v13.47 manda las zonas manuales al día en que hay camión a esa **zona**
-(`gv_ppp_web_armar_pendientes`, §3.ao). Falta la versión **por cliente** y para todas las zonas.
-
-**Va en el backend** (decidido con el dueño, dos veces, y es lo que pide el protocolo del repo).
+⚠ **Lo único que queda, y es del dueño:** el pedido **1354 de Osa** está a mano en `D66G`/09-09.
+Bajo la regla nueva le tocaría estar **dentro de `D66B`**, que sigue sin tocar. **No se movió** —
+hay que preguntarle si quiere juntarlas ahora o dejarlo así.
 
 ---
 
