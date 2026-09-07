@@ -1384,6 +1384,36 @@ es de Chef y pisa al LK 217): cuando Gestión alimente el tracking, escribir el 
 una función `gv_*` y pedir columna `empresa` en PaginaLK. Y el Excel ISIS de Facturación manda
 `N_Pedido` contador (no el id), como el mail: ISIS numera 98xxx por su cuenta.
 
+### 3.aw ✅ NP web = contador propio, un número por bloque, sin sufijo (v13.70) — 2026-09-07 lunes (feriado, 03:00)
+
+**Dueño:** *"el pedido tiene que ser único. No puede haber cuatro variantes de un pedido cuando se separa en cuatro.
+Guardá el ID del pedido de la página, pero que sea un número de pedido diferente. No 1540-1, 1540-2, 1540-3."* → *"LK y
+4 dígitos. No importa que no tenga relación con el ID de página."* Retroactivo sobre los 7 pedidos partidos (nada pickeado).
+
+**Migración `gv_np_contador_sin_sufijo_v1370`** (repo `sql/gv_np_contador_v1370.sql`):
+- `gv_ppp_web_np_label(p_empresa, p_np, p_np_idx)`: ignora `p_np_idx` → "LK 0001" / "CH 0003" (crece pasado 9999). Misma
+  firma, así que `gv_ppp_web_estado`, `gv_ppp_web_entregados`, `gv_np_web_dobles`, `gv_ppp_np_valor`, `gv_ppp_web_prog_sin_base`,
+  `gv_ppp_en_salida`, `gv_pedido_web_estado_pagina`, `gv_ppp_entregados`, `gv_ppp_web_tanda_programar`, `ppp_web_resync` y
+  `gv_reconciliar_facturado_web` siguen sin tocar.
+- `gv_ppp_web_np_asignar(p_empresa, p_pares)`: contador. `pg_advisory_xact_lock` por empresa; próximo =
+  `greatest(PPP_Web_NP_Seed.desde, max(np)+1)`; inserta sólo los pares nuevos en orden (order_id, np_idx); devuelve todos.
+  Idempotente (probado: `asignar('lk', [1351/1, 1350/4])` → 23 y 22, sin insertar).
+- Índice único `ppp_web_np_empresa_np_uk (empresa, np)`.
+
+**Datos (backup `sql/backups/np_web_20260907_pre_contador_v1370.sql`, 78 updates):** `PPP_Web_NP` 26 filas renumeradas por
+`row_number() over (partition by empresa order by order_id, np_idx)`; `PPP_Web_Programacion.np` 25 filas; `PPP_Web_Base.np_label`
+313 filas. Guardas: 0 NP web en `Facturacion_NP` y en `Entregas_Virgilio`; 0 eventos de operarios con texto `LK …`/`CH …`.
+Resultado: LK 0001 (1340) … LK 0019–0022 (1350, 4 bloques), LK 0023 (1351); CH 0001–0002 (216), CH 0003 (217).
+`gv_ppp_web_estado` y `PPP_Web_Base` coinciden (`prog_desync = 0`).
+
+**Edge Function `gv-ppp-web-tandas-diarias` v16:** `npLabel` sin sufijo (copia del backend para la foto de artículos).
+**Front:** `pwebNpLabel(e, np)` sin sufijo; `pwebPedidoLabel(e, order_id)` = "web LK 1350" para lo que no tiene NP (A
+Programar: chip en la tarjeta, "Pedido web LK 1350 · sale en 4 NP", "bloque 2/4"; tandas sin fecha; filas de la PPP con `np`
+null).
+
+**Rollback:** ejecutar el backup, `drop index ppp_web_np_empresa_np_uk`, reaplicar `sql/gv_np_es_pedido.sql` §2–3 y redeployar
+la Edge Function v15.
+
 ### 3.av ✅ La tanda ACUMULA hasta 0,80 entre corridas; crons 71/73 prendidos; 1352 borrado (v13.67) — 2026-09-07 lunes (feriado, 01:30)
 
 **Pendientes unificados del otro chat (`docs/HANDOFF-EN-SALIDA-Y-TANDAS.md`), resueltos acá:**

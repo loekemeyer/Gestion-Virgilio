@@ -17,7 +17,7 @@
 //   2b. `gv_pedidos_web_excluidos` — saca lo que NO es de Gestión: lo anterior a
 //      `gestion_desde` y lo que Producción/ISIS ya conoce (regla del dueño,
 //      2026-09-04). Si esta llamada falla, no se programa nada: falla cerrado.
-//   3. `gv_ppp_web_np_asignar`  — registra la NP de cada bloque (= nº de pedido de la página)
+//   3. `gv_ppp_web_np_asignar`  — asigna la NP de cada bloque (v13.70: contador propio, un número por bloque)
 //   4. `ppp_web_resync`         — pone al día lo YA programado que cambió
 //   5. `gv_ppp_web_zona_lote`   — resuelve la zona de cada NP
 //   6. `gv_ppp_web_armar_pendientes` — arma las tandas (v13.47: TODO lo que tiene día
@@ -230,19 +230,20 @@ async function forzarChefDe(codFecha: Record<string, string>): Promise<{ cod: st
   return [...out].map(([cod, fecha]) => ({ cod, fecha }));
 }
 
-/** La etiqueta que ve el operario: "LK 1350" / "LK 1350-2" (bloque 2) / "CH 0217".
- *  El número ES el número de pedido de la página (dueño, 2026-09-05); 4 dígitos.
+/** La etiqueta que ve el operario: "LK 0001" / "CH 0003". v13.70 (dueño, 2026-09-07): el número es
+ *  del CONTADOR propio (gv_ppp_web_np_asignar), uno por bloque, sin sufijo; 4 dígitos.
  *
- *  ⚠ ES UNA COPIA. La fuente de verdad es `gv_ppp_web_np_label(empresa, np)` en
+ *  ⚠ ES UNA COPIA (v16, v13.70: sin sufijo de bloque). La fuente de verdad es `gv_ppp_web_np_label(empresa, np)` en
  *  Supabase; acá se duplica para no pagar un round trip por cada línea de la
  *  foto de artículos. Si cambia el formato, se cambia PRIMERO en el backend.
  *
  *  Pasado 9999 la etiqueta crece ("LK 10000") en vez de recortarse: recortar
  *  repetiría un número ya usado. */
-function npLabel(empresa: string, num: number, idx = 1): string {
+function npLabel(empresa: string, num: number, _idx = 1): string {
+  // v13.70: un número por bloque (contador gv_ppp_web_np_asignar), sin sufijo "-N".
   const emp = String(empresa).toLowerCase() === "chef" || String(empresa).toUpperCase() === "CH" ? "CH" : "LK";
   const n = String(num);
-  return emp + " " + (n.length >= 4 ? n : n.padStart(4, "0")) + (idx > 1 ? "-" + idx : "");
+  return emp + " " + (n.length >= 4 ? n : n.padStart(4, "0"));
 }
 
 /** Umbral del armado intradía (idea 7317): `intradia_umbral_m3`, si no el tope de

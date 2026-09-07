@@ -173,7 +173,7 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
   // v13.58 (dueño: "sacá el botón Loeke/Chef; tienen que aparecer todos los pedidos a programar ahí sin filtros")
   chk(!/Loekemeyer|aprSetEmpresa/.test(r.barra), "v13.58: la barra ya no tiene el selector Loekemeyer/Chef");
   chk(/apr-tanda-emp lk">LK</.test(r.med) && /apr-tanda-emp ch">Chef</.test(r.med), "v13.58: cada tanda dice de qué empresa es");
-  chk(r.med.includes("CH 0009") && r.med.includes("GV-02A"), "v13.58: la tanda de Chef etiqueta su NP como CH 0009");
+  chk(r.med.includes("web CH 9") && r.med.includes("GV-02A"), "v13.58/v13.70: la tanda de Chef muestra el pedido de la página (web CH 9)");
   chk(!/aprNuevaTanda/.test(r.med) && /Tandas sin fecha/.test(r.med), "v13.69: sin botones de tanda LK/Chef; la columna lista sólo tandas viejas sin fecha");
   chk(/aprDragPedido\(event,'lk:1117'\)/.test(r.izq), "v13.65: el arrastre lleva empresa:pedido (LK 1350 ≠ Chef 1350)");
   chk(/Arrastrá el pedido directo al día/.test(r.der), "v13.69: la ayuda dice arrastrar el pedido directo al día");

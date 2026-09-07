@@ -12,12 +12,27 @@
 > única**; no se replica. Ante la duda entre parche rápido y fix de raíz → **fix
 > de raíz**.
 >
-> Última actualización: 2026-09-06 (domingo) · Versión app al documentar: **v13.69**
+> Última actualización: 2026-09-06 (domingo) · Versión app al documentar: **v13.70**
 >
 > ⚠⚠ **Desde el lunes 2026-09-07 los operarios usan GESTIÓN, no Producción** (dueño, sábado a la
 > noche: *"el lunes van a empezar a usar GV, no más PV"*). Las tandas web viven en
 > `PPP_Web_Programacion` y Producción no las ve. URL: la de GitHub Pages de este repo.
 >
+> Nota **v13.70** (backend + datos + front + Edge Function) — **NP web = CONTADOR propio, un número por bloque, sin
+> sufijo** (dueño: *"el pedido tiene que ser único; no puede haber cuatro variantes cuando se separa en cuatro; guardá el
+> ID de la página pero que sea un número de pedido diferente; LK y 4 dígitos, no importa que no tenga relación con el ID"*).
+> Deshace v12.92. `gv_ppp_web_np_asignar` vuelve a ser contador (lock por empresa, idempotente, arranca en
+> `PPP_Web_NP_Seed.desde` o `max(np)+1`); `gv_ppp_web_np_label(e, np, idx)` ignora `idx` → "LK 0001" / "CH 0003" (misma
+> firma: las 8 vistas y 3 funciones que la usan no cambian); índice único `(empresa, np)` en `PPP_Web_NP`. El `order_id`
+> de la página queda guardado en `PPP_Web_NP` / `PPP_Web_Programacion` / `PPP_Web_Base` y se muestra como **"web LK
+> 1350"** (`pwebPedidoLabel`) mientras el pedido no tiene NP (A Programar, chip nuevo en la tarjeta y en el detalle:
+> "Pedido web LK 1350 · sale en 4 NP", "bloque 2/4"). La NP se asigna al programar (Edge Function antes de armar,
+> `gv_ppp_web_tanda_programar` a mano). **Datos:** los 26 bloques existentes se renumeraron en orden → LK 0001–0023
+> (1340 Garbarino = 0001 … 1350 = 0019–0022, 1351 = 0023), CH 0001–0003 (216 = 0001/0002, 217 = 0003); etiquetas de
+> `PPP_Web_Base` acompañan; nada estaba pickeado ni facturado. Backup `sql/backups/np_web_20260907_pre_contador_v1370.sql`.
+> Edge Function v16 (`npLabel` sin sufijo). SQL `sql/gv_np_contador_v1370.sql`, §3.aw. Tests `pweb-np-es-pedido`,
+> `pweb-en-ppp`, `apr-programar`.
+
 > Nota **v13.69** (front) — **A Programar: se arrastra el pedido directo al día, sin "＋ Nueva tanda LK / Chef"**
 > (dueño: *"no quiero tener que tocar Tanda LK o CH, quiero arrastrar directo"*). Los botones se fueron; la columna
 > del medio ("Tandas sin fecha") sólo aparece si quedó alguna tanda vieja sin día (para arrastrarla a un día o

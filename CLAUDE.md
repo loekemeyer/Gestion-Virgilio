@@ -130,12 +130,12 @@ se carga en ISIS: 216 ya es E02A (vie 11) y 217 es E06A (lun 14).** Para volver 
 `cron.alter_job(1, active := true)` y `(2, …)` en Chef.
 Detalle, medición y rollback en `docs/SUPABASE-GESTION-VIRGILIO.md` §3.l y §3.p.
 
-- **NP** → **la NP web ES el número de pedido de la página** (v12.92, dueño: *"ya cuando
-  llegan a página LK y a Gestión, ya vienen con numeración"*): pedido 1350 de LK = **`LK 1350`**,
-  pedido 217 de Chef = **`CH 0217`** (4 dígitos). Los bloques de 18 líneas (LK) / 15 (Chef)
-  siguen: el bloque 1 lleva el número pelado y los demás sufijo, `LK 1350-2`. No hay contador
-  ni momento de numerar: "A Programar" ya muestra la NP apenas llega. (`PPP_Web_NP_Seed` y el
-  contador de `gv_ppp_web_np_asignar` quedaron sin uso; `sql/gv_np_es_pedido.sql`.) Se
+- **NP** → **v13.70 (2026-09-07): la NP web es un CONTADOR propio, un número por bloque, SIN sufijo** (dueño:
+  *"el pedido tiene que ser único; no 1540-1, 1540-2; guardá el ID de la página pero que sea otro número; LK y 4
+  dígitos"*): `LK 0001`, `LK 0002`… / `CH 0001`… (`gv_ppp_web_np_asignar` con lock, `PPP_Web_NP_Seed`, índice único
+  `(empresa, np)`). El pedido de la página (`order_id`) queda guardado como referencia y se muestra "web LK 1350"
+  hasta que se programa (ahí se asigna la NP). Un pedido de 4 bloques = 4 NP distintas. Deshace v12.92 (NP = nº de
+  pedido con sufijo `-2`); `sql/gv_np_contador_v1370.sql`, §3.aw. Se
   programa por el job de las 00:01 para zona 1, 2 y 3 (`zonas_automaticas = '1,2,3'` desde v13.07)
   y a mano en "A Programar" para el resto.
   **Desde el 2026-09-05 además hay armado INTRADÍA** (idea 7317, cron jobid 73 cada 15 min

@@ -794,6 +794,7 @@ button {
 .apr-card-chev{ color:#94a3b8; font-size:12px; }
 .apr-card-d{ display:flex; flex-wrap:wrap; gap:5px; margin-top:5px; }
 .apr-chip{ font-size:11.5px; background:#f1f5f9; color:#475569; border-radius:999px; padding:2px 8px; font-weight:600; }
+.apr-chip-ped{ background:#f1f5f9; color:#475569; font-family:monospace; }
 .apr-chip-z{ background:#e0edff; color:#1e40af; }
 /* idea 2048: última corrida del armado automático */
 .apr-log{ margin:0 0 8px; padding:7px 12px; border-radius:10px; font-size:12.5px; font-weight:700; background:#dcfce7; color:#166534; border:1px solid #bbf7d0; }
@@ -7172,7 +7173,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v13.69";
+const APP_VERSION = "v13.70";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -25948,7 +25949,7 @@ async function pppTraerWebProgramados() {
     return {
       // v12.92 — la NP es el número de pedido de la página: si `np` viniera vacío se
       // arma igual desde order_id (es el mismo número). El bloque va en la etiqueta.
-      np: pwebNpLabel(r.empresa, (r.np == null) ? r.order_id : r.np, r.np_idx),
+      np: (r.np == null) ? pwebPedidoLabel(r.empresa, r.order_id) : pwebNpLabel(r.empresa, r.np),   // v13.70
       tanda: r.tanda || "—", tipo: "", fecha: r.fecha_recep || "",
       cod: r.cod_cliente || "", razon_social: r.razon_social || "",
       m3: Number(r.m3) || 0,
@@ -26009,7 +26010,7 @@ async function pppTraerPedidosWeb(empresa) {
     const m3 = Number(n.m3) || 0, parcial = !!n.m3_parcial;
     const tanda = g.tanda || "";
     return {
-      np: pwebNpLabel(n.empresa || emp, num || n.order_id, n.np_idx),
+      np: num ? pwebNpLabel(n.empresa || emp, num) : pwebPedidoLabel(n.empresa || emp, n.order_id),   // v13.70
       tanda: tanda || "—", tipo: "", fecha: n.fecha_recep || "",
       cod: n.cod || "", razon_social: n.razon_social || "",
       m3: Number(m3.toFixed(3)),
@@ -32724,13 +32725,20 @@ async function mergePickingBasePppWeb(map) {
 
    Los ceros se rellenan hasta 4; pasado 9999 la etiqueta crece ("LK 10000") en
    vez de recortarse, que repetiría un número ya usado. */
-function pwebNpLabel(empresa, np, npIdx) {
-  // v12.92 — `np` ES el número de pedido de la página (dueño, 2026-09-05: "ya vienen
-  // con numeración"). El bloque 1 lleva el número pelado; los demás, sufijo "-N":
-  // "LK 1350", "LK 1350-2", "CH 0217". Espejo exacto de gv_ppp_web_np_label(e, np, idx).
-  const n = String(np), i = Number(npIdx) || 1;
+function pwebNpLabel(empresa, np, _npIdx) {
+  // v13.70 (dueño: "el pedido tiene que ser único; no 1540-1, 1540-2; LK y 4 dígitos"): `np` es
+  // el número del CONTADOR propio, uno por bloque, sin sufijo: "LK 0001", "CH 0003". Espejo de
+  // gv_ppp_web_np_label(e, np). El bloque (_npIdx) ya no forma parte de la etiqueta. El número
+  // lo da el backend (gv_ppp_web_np_asignar) al programar; hasta ahí el pedido se muestra con
+  // pwebPedidoLabel (el ID de la página, que queda guardado como referencia).
+  const n = String(np);
   const e = String(empresa || "").trim().toLowerCase();   // v13.16: 'chef' o 'ch', como gv_ppp_web_np_label
-  return ((e === "chef" || e === "ch") ? "CH" : "LK") + " " + (n.length >= 4 ? n : n.padStart(4, "0")) + (i > 1 ? "-" + i : "");
+  return ((e === "chef" || e === "ch") ? "CH" : "LK") + " " + (n.length >= 4 ? n : n.padStart(4, "0"));
+}
+/* v13.70 — referencia al pedido de la página (order_id), para lo que todavía no tiene NP. */
+function pwebPedidoLabel(empresa, orderId) {
+  const e = String(empresa || "").trim().toLowerCase();
+  return "web " + ((e === "chef" || e === "ch") ? "CH" : "LK") + " " + String(orderId);
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
@@ -33055,7 +33063,7 @@ async function aprSoltarPedido(codigo, ped) {
   if (!p) return;
   const pe = p.empresa || "lk", te = aprTandaEmp(codigo);
   if (pe !== te) {
-    _apr.msg = "⚠ " + codigo + " es una tanda de " + aprEmpNombre(te) + " y " + pwebNpLabel(pe, p.order_id, 1) +
+    _apr.msg = "⚠ " + codigo + " es una tanda de " + aprEmpNombre(te) + " y " + pwebPedidoLabel(pe, p.order_id) +
                " es de " + aprEmpNombre(pe) + ": armá una tanda de " + aprEmpNombre(pe) + " (＋ Nueva tanda " + aprEmpNombre(pe) + ").";
     _apr.msgErr = true; aprRender(); return;
   }
@@ -33128,7 +33136,7 @@ async function aprGenerarTanda(fecha, keys) {
   if (Object.keys(emps).length > 1) { _apr.msg = "Una tanda es de una sola empresa: tildá sólo LK o sólo Chef."; _apr.msgErr = true; aprRender(); return; }
   const emp = Object.keys(emps)[0];
   let m3 = 0; for (const p of peds) m3 += Number(p.m3) || 0;
-  const labels = peds.map(function (p) { return pwebNpLabel(p.empresa, p.order_id, 1) + (p.np_total > 1 ? " (" + p.np_total + " NP)" : ""); }).join(", ");
+  const labels = peds.map(function (p) { return pwebPedidoLabel(p.empresa, p.order_id) + (p.np_total > 1 ? " (" + p.np_total + " NP)" : ""); }).join(", ");
   if (!confirm("¿Armar una tanda nueva con " + labels + " · " + aprNum(m3) + " m³ para el " + aprDiaCorto(fecha) + "?\n\nEl código lo pone el sistema.")) return;
   _apr.ocupado = true; aprRender();
   let codigo = null;
@@ -33338,6 +33346,8 @@ function aprColPedidos() {
       '</div>' +
       '<div class="apr-card-d">' +
         '<span class="apr-chip apr-chip-z">' + escapeHtml(p.zona || "sin zona") + '</span>' +
+        // v13.70: el pedido de la página como referencia (la NP la da el contador al programar)
+        '<span class="apr-chip apr-chip-ped" title="Número de pedido de la página; la NP (LK 0001…) se asigna al programar">' + escapeHtml(pwebPedidoLabel(p.empresa, p.order_id)) + '</span>' +
         // v13.21 (dueño): qué día va a poder salir, no la fecha en que llegó (queda en el title)
         aprSalidaChip(p) +
         '<span class="apr-chip apr-chip-m3"' +
@@ -33348,11 +33358,12 @@ function aprColPedidos() {
     if (ab) {
       h += '<div class="apr-card-body">' +
         // v12.92 — la NP es el número de pedido de la página: ya viene numerado.
-        '<div class="apr-kv"><b>NP</b> ' + escapeHtml(pwebNpLabel(p.empresa || _apr.emp, p.order_id, 1)) + ' · <b>Cód</b> ' + escapeHtml(p.cod || "—") + '</div>' +
+        // v13.70: la NP la da el contador al programar; acá va el pedido de la página
+        '<div class="apr-kv"><b>Pedido</b> ' + escapeHtml(pwebPedidoLabel(p.empresa || _apr.emp, p.order_id)) + ' · <b>Cód</b> ' + escapeHtml(p.cod || "—") + (p.np_total > 1 ? ' · sale en <b>' + p.np_total + '</b> NP' : '') + '</div>' +
         '<div class="apr-kv"><b>Entrega</b> ' + escapeHtml(p.direccion || p.localidad || "—") + '</div>' +
         '<div class="apr-kv"><b>' + p.lineas + '</b> líneas · <b>' + aprNum(p.cajas, 0) + '</b> cajas</div>';
       for (const b of p.bloques) {
-        h += '<div class="apr-bloque"><b>' + escapeHtml(pwebNpLabel(p.empresa || _apr.emp, p.order_id, b.np_idx)) + '</b> · bloque ' + b.np_idx + '/' + p.np_total + ' · ' + b.lineas + ' líneas · ' + aprNum(b.m3) + ' m³</div>' +
+        h += '<div class="apr-bloque"><b>bloque ' + b.np_idx + '/' + p.np_total + '</b> · ' + b.lineas + ' líneas · ' + aprNum(b.m3) + ' m³</div>' +
              '<div class="apr-arts">' + (b.items || []).map(function (it) {
                return '<span class="apr-art">' + escapeHtml(String(it.art || "")) + ' <b>×' + aprNum(it.cajas, 0) + '</b></span>';
              }).join("") + '</div>';
@@ -33398,7 +33409,7 @@ function aprColTandas() {
     for (const e of byPed.values()) {
       h += '<div class="apr-titem">' +
         '<div class="apr-titem-txt">' +
-          '<div class="apr-titem-cli">' + escapeHtml(pwebNpLabel(e.empresa, e.order_id, 1)) + ' · ' + escapeHtml(e.rs || e.cod || "") + '</div>' +
+          '<div class="apr-titem-cli">' + escapeHtml(pwebPedidoLabel(e.empresa, e.order_id)) + ' · ' + escapeHtml(e.rs || e.cod || "") + '</div>' +
           '<div class="apr-titem-d">' + escapeHtml(e.zona || "sin zona") + ' · ' + aprNum(e.m3) + ' m³' +
             (e.total > 1 ? ' · ' + e.n + '/' + e.total + ' bloques' : '') + '</div>' +
         '</div>' +

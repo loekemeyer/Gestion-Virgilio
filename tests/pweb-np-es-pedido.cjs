@@ -56,9 +56,10 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
     _apr.tandas = _apr.tandas || [];
     let html = "";
     try { aprRender(); html = (document.getElementById("pppProgBody") || document.body).innerHTML; } catch (e) { out.errApr = String(e && e.message || e); }
-    out.aprMuestra1348   = html.indexOf("LK 1348") >= 0;
-    out.aprMuestra1348b2 = html.indexOf("LK 1348-2") >= 0;
-    out.aprMuestra1350   = html.indexOf("LK 1350") >= 0;
+    // v13.70: sin número todavía → se muestra el pedido de la página ("web LK 1348") y el bloque ("bloque 2/2")
+    out.aprMuestra1348   = html.indexOf("web LK 1348") >= 0;
+    out.aprMuestra1348b2 = html.indexOf("bloque 2/2") >= 0 && html.indexOf("LK 1348-2") < 0;
+    out.aprMuestra1350   = html.indexOf("web LK 1350") >= 0;
     out.aprSinNumeroRpc  = true;   // no hay RPC de numerar en el fetch stub: si se llamara, aprTraerPedidos igual no la necesita
 
     // (c) lo programado, con bloque (content-range exacto: si no, supaFetchAll pagina y duplica)
@@ -66,8 +67,8 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
     window.fetch = async (url) => {
       const u = String(url);
       if (u.indexOf("PPP_Web_Programacion") >= 0) return json3([
-        { empresa: "lk", order_id: 1348, np_idx: 1, np: 1348, cod_cliente: "4109", razon_social: "Di Leo", tanda: "GV-01A", zona: "Zona 1", fecha_entrega: "2026-09-08", m3: 0.5 },
-        { empresa: "lk", order_id: 1348, np_idx: 2, np: 1348, cod_cliente: "4109", razon_social: "Di Leo", tanda: "GV-01A", zona: "Zona 1", fecha_entrega: "2026-09-08", m3: 0.1 },
+        { empresa: "lk", order_id: 1348, np_idx: 1, np: 15, cod_cliente: "4109", razon_social: "Di Leo", tanda: "GV-01A", zona: "Zona 1", fecha_entrega: "2026-09-08", m3: 0.5 },
+        { empresa: "lk", order_id: 1348, np_idx: 2, np: 16, cod_cliente: "4109", razon_social: "Di Leo", tanda: "GV-01A", zona: "Zona 1", fecha_entrega: "2026-09-08", m3: 0.1 },
         { empresa: "chef", order_id: 217, np_idx: 1, np: null, cod_cliente: "55", razon_social: "Osa", tanda: "GV-01B", zona: "Zona 1", fecha_entrega: "2026-09-08", m3: 0.2 }
       ]);
       return json([]);
@@ -78,31 +79,31 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
     // (d) Facturación acepta el TAP con bloque
     window.fetch = async (url) => {
       const u = String(url);
-      if (u.indexOf("opcion=in.(TAL,TAP)") >= 0) return json([{ opcion: "TAP", texto: "LK 1348-2|55|GV-01A|A=586X1|NADA" }, { opcion: "TAP", texto: "LK 1350|3|GV-01A|A=1X1|NADA" }]);
+      if (u.indexOf("opcion=in.(TAL,TAP)") >= 0) return json([{ opcion: "TAP", texto: "LK 0016|55|GV-01A|A=586X1|NADA" }, { opcion: "TAP", texto: "LK 1350|3|GV-01A|A=1X1|NADA" }]);
       return json([]);
     };
     _facArmEvTs = 0;
     await facFetchArmadosEventos();
-    out.armada1348b2 = facEstaArmada("LK 1348-2");
+    out.armada1348b2 = facEstaArmada("LK 0016");
     out.armada1350   = facEstaArmada("LK 1350");
 
     // (e) la empresa sale del prefijo
-    out.emp = empresaDeNp("LK 1348-2") + "/" + empresaDeNp("CH 0217-3") + "/" + empresaDeNp("98694");
+    out.emp = empresaDeNp("LK 0016") + "/" + empresaDeNp("CH 0003") + "/" + empresaDeNp("98694");
     return out;
   });
 
   const checks = [
     ["LK 1350 (bloque 1, sin sufijo)",                         r.l1 === "LK 1350"],
-    ["LK 1350-2 (bloque 2)",                                    r.l2 === "LK 1350-2"],
+    ["v13.70: el bloque 2 NO lleva sufijo (LK 1350)",            r.l2 === "LK 1350"],
     ["CH 0217 (4 dígitos)",                                     r.l3 === "CH 0217"],
-    ["CH 0217-3",                                               r.l4 === "CH 0217-3"],
+    ["v13.70: CH 0217 también sin sufijo",                       r.l4 === "CH 0217"],
     ["pasado 9999 crece: LK 12345",                             r.l5 === "LK 12345"],
     ["acepta strings",                                          r.l6 === "LK 1350"],
-    ["A Programar muestra LK 1348 apenas llega",                r.aprMuestra1348 === true],
-    ["y el bloque 2 como LK 1348-2",                            r.aprMuestra1348b2 === true],
-    ["y LK 1350",                                               r.aprMuestra1350 === true],
-    ["la PPP etiqueta lo programado con bloque (y CH 0217)",    r.progNps === "CH 0217,LK 1348,LK 1348-2"],
-    ["Facturación toma el TAP de LK 1348-2 como armada",        r.armada1348b2 === true],
+    ["A Programar muestra el pedido de la página (web LK 1348)", r.aprMuestra1348 === true],
+    ["y el bloque 2 como 'bloque 2/2', sin LK 1348-2",           r.aprMuestra1348b2 === true],
+    ["y web LK 1350",                                            r.aprMuestra1350 === true],
+    ["la PPP etiqueta lo programado con el contador; sin número → web CH 217", r.progNps === "LK 0015,LK 0016,web CH 217"],
+    ["Facturación toma el TAP de LK 0016 como armada",           r.armada1348b2 === true],
     ["y el de LK 1350",                                         r.armada1350 === true],
     ["empresaDeNp: LK / CH / LK",                               r.emp === "LK/CH/LK"],
     ["sin errores de página",                                   errs.length === 0]

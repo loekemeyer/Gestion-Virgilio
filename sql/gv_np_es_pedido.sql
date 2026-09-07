@@ -6,6 +6,7 @@
 -- Gestión Virgilio, ya vienen con numeración. En página LK ya tienen numeración. En
 -- Gestión Virgilio, con la lógica de los 18 ítems para LK y 15 para CH".
 --
+-- ⚠ SUPERADO por v13.70 (sql/gv_np_contador_v1370.sql): volvió el contador, un número por bloque, sin sufijo.
 -- ANTES: Gestión tenía un CONTADOR propio (PPP_Web_NP_Seed, lk 1 / chef 1) y numeraba
 -- al PROGRAMAR (job de las 00:01 o "A Programar"). Un pedido esperaba sin número.
 --
