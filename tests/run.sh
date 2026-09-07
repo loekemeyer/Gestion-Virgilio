@@ -309,5 +309,5 @@ PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node te
 echo "== ppp-mover-tanda (v13.87: mover una tanda de día desde la app — RPC gv_ppp_tanda_mover, no localStorage) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/ppp-mover-tanda.cjs
 
-echo "== ppp-hoja-ruta (v13.89: hoja de ruta del camión — Maps + imprimir; una parada = una dirección, no una NP) =="
+echo "== ppp-hoja-ruta (v13.92: hoja de ruta imprimible del camión — firma por parada, observaciones; una parada = una dirección) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/ppp-hoja-ruta.cjs

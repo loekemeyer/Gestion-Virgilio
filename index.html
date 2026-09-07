@@ -7260,7 +7260,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v13.91";
+const APP_VERSION = "v13.92";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -26781,12 +26781,13 @@ function _pppRowFromSupa(r) {
     m3: (r.m3 == null || r.m3 === "" ? null : Number(r.m3)),
     localidad: (_pppS(r.barrio) || _pppS(r.direccion)), fecha_entrega: fe, zona: _pppS(r.zona),
     direccion: _pppS(r.direccion), barrio: _pppS(r.barrio),   // v13.03: para ubicar el pedido (PPP_Geo) en el orden de carga
+    observaciones: _pppS(r.observaciones),   // v13.92: va a la hoja de ruta impresa ("11:00Hs", "OC 9400146407", "PEDIDO EXPO")
     programmed: ((!!tanda && tanda !== "—") || !!fe), _supa: true
   };
 }
 async function pppLoadProgFromSupabase() {
   let rows;
-  try { rows = await supaFetchAll(SUPABASE_PPP_PROG_ENDPOINT, "select=np,tanda,tipo,fecha_recep,cod,razon_social,m3,direccion,barrio,fecha_entrega,zona"); }
+  try { rows = await supaFetchAll(SUPABASE_PPP_PROG_ENDPOINT, "select=np,tanda,tipo,fecha_recep,cod,razon_social,m3,direccion,barrio,fecha_entrega,zona,observaciones"); }
   catch (e) { pppSetStatus("⚠ No pude leer la Programación de Supabase (" + (e.message || e) + "). Muestro lo local.", false); return; }
   const supa = [], nps = {};
   for (const r of rows) { const np = _pppS(r.np); if (!np || (np in nps)) continue; nps[np] = 1; supa.push(_pppRowFromSupa(r)); }
@@ -30069,13 +30070,17 @@ function _pppHojaParadas(paradas) {
       s = {
         rs: String(p.razon_social || "").trim(), cod: String(p.cod || "").trim(),
         dir: String(p.direccion || "").trim(), loc: String(p.localidad || p.barrio || "").trim(),
-        lat: g ? g.lat : null, lng: g ? g.lng : null, nps: [], tandas: [], m3: 0
+        lat: g ? g.lat : null, lng: g ? g.lng : null, nps: [], tandas: [], obs: [], m3: 0
       };
       by.set(k, s); out.push(s);
     }
     s.nps.push(String(p.np || "—")); s.m3 += Number(p.m3) || 0;
     const t = String(p.tanda || "").trim().toUpperCase();
     if (t && t !== "—" && s.tandas.indexOf(t) < 0) s.tandas.push(t);
+    // v13.92: la observación de ISIS va a la hoja impresa — es lo que el fletero necesita saber
+    // antes de salir ("11:00Hs", "OC 9400146407", "PEDIDO EXPO", "CLIENTE NUEVO").
+    const o = String(p.observaciones || "").trim();
+    if (o && s.obs.indexOf(o) < 0) s.obs.push(o);
   }
   return out;
 }
@@ -30096,20 +30101,52 @@ function _pppHojaCss() {
     ".hr-b:active{transform:scale(.97);}" +
     ".hr-note{font-size:11.5px;color:#64748b;background:#f1f5f9;border-radius:8px;padding:8px 11px;margin-bottom:12px;}" +
     ".hr-warn{font-size:12px;color:#92400e;background:#fffbeb;border:1px solid #fde68a;border-radius:8px;padding:8px 11px;margin-bottom:12px;}" +
-    ".hr-stop{display:flex;align-items:flex-start;gap:11px;padding:9px 0;border-top:1px solid #eef2f7;}" +
-    ".hr-stop:first-child{border-top:none;}" +
-    ".hr-n{flex:0 0 auto;width:26px;height:26px;border-radius:50%;background:#0f172a;color:#fff;font-size:13px;font-weight:800;display:inline-flex;align-items:center;justify-content:center;}" +
-    ".hr-b2{min-width:0;flex:1;}" +
-    ".hr-rs{font-size:14px;font-weight:800;color:#0f172a;}" +
+    /* el documento: en pantalla se ve como la hoja que sale impresa (misma tabla) */
+    ".hr-doc{border:1px solid #dbe3ee;border-radius:10px;padding:12px 14px;}" +
+    ".hr-doc-h{display:none;}" +
+    ".hr-tbl{width:100%;border-collapse:collapse;font-size:12.5px;}" +
+    ".hr-tbl th{font-size:10px;letter-spacing:.6px;text-transform:uppercase;color:#64748b;text-align:left;padding:0 6px 6px;border-bottom:2px solid #cbd5e1;}" +
+    ".hr-tbl th.num,.hr-tbl td.num{text-align:right;}" +
+    ".hr-tbl td{padding:8px 6px;border-bottom:1px solid #eef2f7;vertical-align:top;}" +
+    ".hr-tbl tfoot td{border-bottom:none;border-top:2px solid #cbd5e1;font-weight:800;padding-top:8px;}" +
+    ".hr-tbl td.n{width:26px;font-weight:800;color:#fff;}" +
+    ".hr-tbl td.n span{display:inline-flex;align-items:center;justify-content:center;width:24px;height:24px;border-radius:50%;background:#0f172a;font-size:12.5px;}" +
+    ".hr-rs{font-size:13.5px;font-weight:800;color:#0f172a;}" +
+    ".hr-rs small{color:#64748b;font-weight:700;}" +
     ".hr-dir{font-size:12.5px;color:#334155;}" +
-    ".hr-nps{font-size:12px;color:#475569;margin-top:2px;}" +
-    ".hr-nps b{color:#1a73e8;}" +
-    ".hr-m3{flex:0 0 auto;font-size:12.5px;font-weight:800;color:#0f766e;font-variant-numeric:tabular-nums;}" +
+    ".hr-obs{font-size:12px;font-weight:800;color:#92400e;margin-top:2px;}" +
+    ".hr-npc{width:150px;font-size:11.5px;color:#475569;}" +
+    ".hr-npc b{display:block;font-size:12.5px;color:#0f172a;}" +
+    ".hr-m3c{width:56px;font-weight:800;color:#0f766e;font-variant-numeric:tabular-nums;}" +
+    ".hr-fir{width:190px;border-left:1px dashed #cbd5e1;}" +
+    ".hr-fir i{display:block;height:26px;border-bottom:1px solid #cbd5e1;}" +
     ".hr-sinu{font-size:11.5px;color:#b45309;font-weight:800;}" +
-    ".hr-firma{margin-top:16px;padding-top:10px;border-top:2px solid #0f172a;font-size:12px;color:#475569;display:none;}" +
-    "@media print{body>*{display:none !important;}body>#pppHrOverlay{display:block !important;position:static;background:#fff;padding:0;overflow:visible;}" +
-    ".hr-card{box-shadow:none;border-radius:0;max-width:none;}.hr-head{background:#fff;color:#000;border-bottom:2px solid #000;}" +
-    ".hr-close,.hr-acts,.hr-note{display:none !important;}.hr-firma{display:block;}.hr-stop{break-inside:avoid;}}";
+    ".hr-pie{display:none;font-size:11px;margin-top:10px;}" +   /* sólo al imprimir (la regla del @media lo prende) */
+    /* ---- LA IMPRESIÓN (lo que se lleva el fletero) ---- */
+    "@media print{@page{size:A4 portrait;margin:11mm 10mm;}" +
+    "body>*{display:none !important;}" +
+    "body>#pppHrOverlay{display:block !important;position:static;background:#fff;padding:0;overflow:visible;}" +
+    ".hr-card{box-shadow:none;border-radius:0;max-width:none;}" +
+    /* el aviso de "sin ubicación" es para el supervisor, no para el fletero: no se imprime
+       (en la hoja la parada igual sale marcada). */
+    ".hr-head,.hr-close,.hr-acts,.hr-note,.hr-sub,.hr-warn{display:none !important;}" +
+    ".hr-body{padding:0;}" +
+    ".hr-doc{border:none;padding:0;color:#000;}" +
+    ".hr-doc *{color:#000 !important;}" +           /* todo negro: sale por impresora láser */
+    ".hr-tbl{table-layout:fixed;}" +
+    ".hr-doc-h{display:block;border-bottom:2px solid #000;padding-bottom:6px;margin-bottom:8px;}" +
+    ".hr-doc-t{font-size:19px;font-weight:800;}" +
+    ".hr-doc-s{font-size:13px;font-weight:700;margin-top:2px;}" +
+    ".hr-doc-f{font-size:12px;margin-top:6px;}" +
+    ".hr-tbl{font-size:11.5px;}" +
+    ".hr-tbl thead{display:table-header-group;}" +          /* el encabezado se repite en cada hoja */
+    ".hr-tbl tr{break-inside:avoid;page-break-inside:avoid;}" +
+    ".hr-tbl th{color:#000;border-bottom:1.5px solid #000;}" +
+    ".hr-tbl td{border-bottom:1px solid #94a3b8;padding:9px 6px;}" +
+    ".hr-tbl td.n span{background:#fff;color:#000;border:1.5px solid #000;}" +
+    ".hr-rs,.hr-dir,.hr-npc b,.hr-m3c,.hr-obs{color:#000;}" +
+    ".hr-fir{border-left:1px solid #94a3b8;}.hr-fir i{height:30px;border-bottom:1px solid #000;}" +
+    ".hr-pie{display:block;}}";
   document.head.appendChild(s);
 }
 function pppHojaCerrar() { const o = document.getElementById("pppHrOverlay"); if (o) o.classList.remove("show"); }
@@ -30123,23 +30160,36 @@ function pppHojaHtml(H) {
   const urls = conUbic.length ? _rtMapsUrls(depot, conUbic) : [];
   let h = '<div class="hr-sub">' + escapeHtml(H.fecha || "") + ' · <b>' + paradas.length + '</b> parada' + (paradas.length === 1 ? '' : 's') +
     ' · <b>' + H.nps + '</b> NP · ' + _pppFmtM3(H.m3) + ' m³</div>';
-  h += '<div class="hr-acts">';
+  // v13.92 (dueño: "más útil quizás sería una impresión, más que Google Maps"): imprimir es el
+  // botón principal; el link de Maps queda al lado, para el que la navega desde el celular.
+  h += '<div class="hr-acts"><button class="hr-b print" onclick="pppHojaImprimir()">🖨 Imprimir la hoja</button>';
   if (urls.length === 1) h += '<a class="hr-b maps" href="' + urls[0] + '" target="_blank" rel="noopener">📍 Abrir en Google Maps</a>';
   else urls.forEach(function (u, i) { h += '<a class="hr-b maps" href="' + u + '" target="_blank" rel="noopener">📍 Maps · tramo ' + (i + 1) + '</a>'; });
-  h += '<button class="hr-b print" onclick="pppHojaImprimir()">🖨 Imprimir</button></div>';
+  h += '</div>';
   if (urls.length > 1) h += '<div class="hr-note">Google Maps abre hasta ~9 paradas por link: la ruta va en <b>' + urls.length + ' tramos</b> (cada uno arranca donde terminó el anterior).</div>';
-  h += '<div class="hr-note">En <b>orden de entrega</b>, saliendo del depósito (Virgilio 2788). Es el <b>inverso del orden de carga</b>: lo último que se entrega se carga primero. Un cliente con varias NP en la <b>misma dirección</b> es <b>una sola parada</b>.</div>';
-  if (sinUbic) h += '<div class="hr-warn">⚠ <b>' + sinUbic + ' parada(s) sin ubicación</b>: no entran al link de Maps (van marcadas abajo). Revisá la dirección en la PPP.</div>';
+  h += '<div class="hr-note">En <b>orden de entrega</b>, saliendo del depósito (Virgilio 2788). Es el <b>inverso del orden de carga</b>: lo último que se entrega se carga primero. Un cliente con varias NP en la <b>misma dirección</b> es <b>una sola parada</b>. Así se imprime.</div>';
+  if (sinUbic) h += '<div class="hr-warn">⚠ <b>' + sinUbic + ' parada(s) sin ubicación</b>: van al final de la hoja y no entran al link de Maps. Revisá la dirección en la PPP.</div>';
+  // ---- el documento (lo mismo que sale por la impresora) ----
+  h += '<div class="hr-doc"><div class="hr-doc-h"><div class="hr-doc-t">HOJA DE RUTA — ' + escapeHtml(H.nombre || "Camión") + '</div>' +
+    '<div class="hr-doc-s">Entrega ' + escapeHtml(H.fecha || "") + ' · ' + paradas.length + ' parada' + (paradas.length === 1 ? '' : 's') +
+    ' · ' + H.nps + ' NP · ' + _pppFmtM3(H.m3) + ' m³ · sale del depósito Virgilio 2788</div>' +
+    '<div class="hr-doc-f">Fletero: ______________________________  ·  Patente: ________________  ·  Salida: ______ hs</div></div>';
+  h += '<table class="hr-tbl"><colgroup><col style="width:34px"><col><col style="width:170px"><col style="width:46px"><col style="width:215px"></colgroup>' +
+    '<thead><tr><th>Nº</th><th>Cliente · dirección</th><th>Notas de pedido</th><th class="num">m³</th><th>Recibí conforme — firma y aclaración</th></tr></thead><tbody>';
   paradas.forEach(function (s, i) {
-    const nps = s.nps.length;
-    h += '<div class="hr-stop"><span class="hr-n">' + (i + 1) + '</span><div class="hr-b2">' +
-      '<div class="hr-rs">' + escapeHtml(s.rs || (s.cod ? "Cód " + s.cod : "—")) + (s.cod ? ' <small style="color:#64748b;font-weight:700">· cód ' + escapeHtml(s.cod) + '</small>' : '') + '</div>' +
+    h += '<tr><td class="n"><span>' + (i + 1) + '</span></td>' +
+      '<td><div class="hr-rs">' + escapeHtml(s.rs || (s.cod ? "Cód " + s.cod : "—")) + (s.cod ? ' <small>· cód ' + escapeHtml(s.cod) + '</small>' : '') + '</div>' +
       '<div class="hr-dir">' + escapeHtml(s.dir || "—") + (s.loc ? ', ' + escapeHtml(s.loc) : '') +
       (Number.isFinite(s.lat) ? "" : ' <span class="hr-sinu">· sin ubicación</span>') + '</div>' +
-      '<div class="hr-nps"><b>' + nps + ' NP</b>: ' + escapeHtml(s.nps.join(" · ")) + (s.tandas.length ? ' <small>· tanda ' + escapeHtml(s.tandas.join(" · ")) + '</small>' : '') + '</div>' +
-      '</div><div class="hr-m3">' + _pppFmtM3(s.m3) + ' m³</div></div>';
+      (s.obs.length ? '<div class="hr-obs">⚑ ' + escapeHtml(s.obs.join(" · ")) + '</div>' : '') + '</td>' +
+      '<td class="hr-npc"><b>' + s.nps.length + ' NP</b>' + escapeHtml(s.nps.join(" · ")) +
+      (s.tandas.length ? '<br>tanda ' + escapeHtml(s.tandas.join(" · ")) : '') + '</td>' +
+      '<td class="hr-m3c num">' + _pppFmtM3(s.m3) + '</td>' +
+      '<td class="hr-fir"><i></i></td></tr>';
   });
-  h += '<div class="hr-firma">Recibí conforme — firma y aclaración: ______________________________________  ·  Fecha: ____ / ____ / ______</div>';
+  h += '</tbody><tfoot><tr><td></td><td>Total</td><td class="hr-npc"><b>' + H.nps + ' NP</b></td>' +
+    '<td class="hr-m3c num">' + _pppFmtM3(H.m3) + '</td><td class="hr-fir"></td></tr></tfoot></table>';
+  h += '<div class="hr-pie">Lo que no se entrega vuelve al depósito y hay que avisarlo el mismo día: la NP queda como no entregada y se reprograma.</div></div>';
   return h;
 }
 function pppHojaAbrir(k) {

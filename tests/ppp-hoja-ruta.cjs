@@ -8,6 +8,10 @@
    (c) el link de Maps arranca en el depósito, va en orden de ENTREGA y no lleva las paradas sin
        ubicación (que igual se listan, marcadas);
    (d) la hoja se puede imprimir y el overlay abre con el nombre del camión.
+   v13.92 — dueño: "más útil quizás sería una impresión, más que Google Maps". La hoja pasó a ser un
+   DOCUMENTO: imprimir es el botón principal, encabezado con camión / fletero / patente / salida,
+   una fila por parada con renglón de firma, fila de Total y las observaciones de ISIS ("11:00Hs",
+   "OC 9400146407") que hasta ahora no salían de la vista de Supabase.
    Todo con lo que ya está en memoria: sin red. Sale 1 si falla. */
 const path = require("path");
 const { chromium } = require("/opt/node22/lib/node_modules/playwright");
@@ -29,13 +33,13 @@ const { chromium } = require("/opt/node22/lib/node_modules/playwright");
     G[_rtDirKey("Brasil 1200", "Constitución")] = { lat: -34.6250, lng: -58.3880 };
     _pppGeo = G; _pppGeoCod = {};
 
-    const ped = (np, cod, rs, dir, loc, m3, tanda) => ({ np: np, cod: cod, razon_social: rs, direccion: dir, localidad: loc, m3: m3, tanda: tanda, fecha_entrega: "11/09/2026" });
+    const ped = (np, cod, rs, dir, loc, m3, tanda, obs) => ({ np: np, cod: cod, razon_social: rs, direccion: dir, localidad: loc, m3: m3, tanda: tanda, fecha_entrega: "11/09/2026", observaciones: obs || "" });
     const cam = {
       key: "n01", ruta: "so", tn: "E01", num: 1, zona: "Zona 2 - CABA Centro", tandas: ["E01A"], m3: 0,
       ped: [
         // Dapelo, 4 NP en la MISMA dirección de Almagro → una sola parada
-        ped("98676", "1792", "Dapelo Claudio Marcelo", "Guardia Vieja 4200", "Almagro", 0.30, "E01A"),
-        ped("98677", "1792", "Dapelo Claudio Marcelo", "Guardia Vieja 4200", "Almagro", 0.25, "E01A"),
+        ped("98676", "1792", "Dapelo Claudio Marcelo", "Guardia Vieja 4200", "Almagro", 0.30, "E01A", "11:00Hs"),
+        ped("98677", "1792", "Dapelo Claudio Marcelo", "Guardia Vieja 4200", "Almagro", 0.25, "E01A", "OC 9400146407"),
         ped("98678", "1792", "Dapelo Claudio Marcelo", "Guardia Vieja 4200", "Almagro", 0.20, "E01A"),
         ped("98679", "1792", "Dapelo Claudio Marcelo", "Guardia Vieja 4200", "Almagro", 0.25, "E01A"),
         // el MISMO cód en otros dos barrios → dos paradas más
@@ -60,11 +64,17 @@ const { chromium } = require("/opt/node22/lib/node_modules/playwright");
     const H = { nombre: "Camión 1 · Zona 2 - CABA Centro", fecha: "11/09/2026", paradas: paradas, nps: cam.ped.length, m3: cam.m3 };
     const html = pppHojaHtml(H);
     out.html = html;
-    out.dice4NP = /<b>4 NP<\/b>: 98676 · 98677 · 98678 · 98679/.test(html);
+    out.dice4NP = /<b>4 NP<\/b>98676 · 98677 · 98678 · 98679/.test(html);
     out.maps = (html.match(/https:\/\/www\.google\.com\/maps\/dir\/[^"]+/g) || []);
     out.imprimir = /onclick="pppHojaImprimir\(\)"/.test(html);
+    out.imprimirPrimero = html.indexOf("pppHojaImprimir") < html.indexOf("google.com/maps");   // v13.92: imprimir manda
     out.avisaSinUbic = /1 parada\(s\) sin ubicación/.test(html);
     out.totalNP = /<b>8<\/b> NP/.test(html);
+    out.firmas = (html.match(/class="hr-fir"><i><\/i>/g) || []).length;   // un renglón de firma por parada
+    out.encabezado = /HOJA DE RUTA — Camión 1/.test(html) && /Fletero: _+/.test(html) && /Patente: _+/.test(html);
+    out.totalPie = /<td>Total<\/td>/.test(html) && /<td class="hr-m3c num">2,4<\/td>/.test(html);
+    // dos NP de la misma parada con observaciones distintas → van juntas, sin repetir el renglón
+    out.obs = /⚑ 11:00Hs · OC 9400146407/.test(html) && (html.match(/hr-obs/g) || []).length === 1;
 
     // el overlay abre con el nombre del camión
     _pppHoja["20260911|n01"] = H;
@@ -121,7 +131,11 @@ const { chromium } = require("/opt/node22/lib/node_modules/playwright");
   chk(/origin=-34\.628000,-58\.411000/.test(r.maps[0] || ""), "el link arranca en el depósito");
   chk(/destination=-34\.628000,-58\.411000/.test(r.maps[0] || ""), "y vuelve al depósito");
   chk(((r.maps[0] || "").match(/%7C/g) || []).length === 3, "lleva las 4 paradas ubicadas como waypoints (3 separadores)");
-  chk(r.imprimir, "tiene botón de imprimir");
+  chk(r.imprimir && r.imprimirPrimero, "el botón de imprimir va PRIMERO, antes del de Maps (dueño: la impresión es lo más útil)");
+  chk(r.encabezado, "la hoja impresa lleva encabezado con el camión y los renglones de fletero y patente");
+  chk(r.firmas === 5, "un renglón de firma por parada (5): " + r.firmas);
+  chk(r.totalPie, "y una fila de Total con las NP y los m³");
+  chk(r.obs, "las observaciones de ISIS salen en la hoja, juntas por parada (11:00Hs · OC 9400146407)");
   chk(r.hayCssPrint, "y una hoja de impresión (@media print)");
   chk(r.abre && /Camión 1/.test(r.titulo), "el overlay abre con el nombre del camión (" + r.titulo + ")");
   chk(r.cierra, "y cierra");

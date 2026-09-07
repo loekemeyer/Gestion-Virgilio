@@ -12,11 +12,34 @@
 > única**; no se replica. Ante la duda entre parche rápido y fix de raíz → **fix
 > de raíz**.
 >
-> Última actualización: 2026-09-07 (lunes) · Versión app al documentar: **v13.89**
+> Última actualización: 2026-09-07 (lunes) · Versión app al documentar: **v13.92**
 >
 > ⚠⚠ **Desde el lunes 2026-09-07 los operarios usan GESTIÓN, no Producción** (dueño, sábado a la
 > noche: *"el lunes van a empezar a usar GV, no más PV"*). Las tandas web viven en
 > `PPP_Web_Programacion` y Producción no las ve. URL: la de GitHub Pages de este repo.
+>
+> Nota **v13.92** (sólo front) — **La hoja de ruta pasó a ser un DOCUMENTO IMPRESO** (dueño 07/09, sobre la
+> v13.89: *"más útil quizás sería una impresión, más que Google Maps"*). Imprimir es el **botón principal** y el
+> link de Maps queda al lado. La hoja —lo mismo que se ve en pantalla y lo que sale por la impresora— es una
+> tabla A4 vertical:
+>
+> - **Encabezado**: `HOJA DE RUTA — Camión 1 · Zona 2 - CABA Centro`, la fecha de entrega, paradas / NP / m³, y
+>   los renglones para llenar a mano **Fletero · Patente · Salida ___ hs**.
+> - **Una fila por parada**: Nº en círculo, cliente + cód, dirección y barrio, las **NP** ("4 NP" con la lista y
+>   la tanda), los m³ y una **columna de firma — "Recibí conforme — firma y aclaración"** con renglón por parada.
+> - **Fila de Total** (NP y m³) y, al pie, sólo en el papel: *lo que no se entrega vuelve al depósito y hay que
+>   avisarlo el mismo día*.
+> - El encabezado de la tabla **se repite en cada hoja** (`display:table-header-group`) y ninguna parada se
+>   parte al medio entre páginas. Todo negro sobre blanco (`@page A4 portrait`, márgenes 11/10 mm).
+> - Lo que en pantalla es ayuda del supervisor **no se imprime**: ni el aviso de "sin ubicación", ni la nota del
+>   orden de entrega, ni los botones. En la hoja la parada sin ubicar igual sale marcada.
+>
+> Además la hoja ahora trae la **Observación de ISIS** (`gv_ppp_programacion_diaria.observaciones`), que hasta
+> acá no se leía en Gestión: es lo que el fletero necesita antes de salir — **"11:00Hs"**, **"OC 9400146407"**,
+> **"PEDIDO EXPO"**, **"CLIENTE NUEVO"**. Va con ⚑ debajo de la dirección, y si dos NP de la misma parada traen
+> observaciones distintas se muestran juntas, sin repetir el renglón. Se agregó `observaciones` al `select` de
+> `pppLoadProgFromSupabase` y a `_pppRowFromSupa` (campo nuevo, no cambia nada de lo que ya había).
+> `tests/ppp-hoja-ruta.cjs` (5 chequeos nuevos).
 >
 > Nota **v13.89** (sólo front) — **🗺️ HOJA DE RUTA del camión: Google Maps + imprimible para el fletero**
 > (dueño 07/09, con foto de la solapa Programación: *"en el módulo de orden de carga me gustaría un botoncito que
