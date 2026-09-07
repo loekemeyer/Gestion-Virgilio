@@ -293,3 +293,6 @@ PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node te
 
 echo "== geo-por-cod (v13.40: la ubicación por cód de cliente salva el cambio de tipeo en ISIS) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/geo-por-cod.cjs
+
+echo "== fac-cruce (v13.73: Cruce con ISIS desde Facturación — rango, totales, cajas ent/fact, NP web + ISIS, 📄 PDF; filtros de Deuda/Cruce globales) =="
+PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/fac-cruce.cjs

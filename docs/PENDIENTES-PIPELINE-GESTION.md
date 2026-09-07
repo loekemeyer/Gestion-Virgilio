@@ -30,7 +30,7 @@
 | 7 | Pedidos de clientes LK cargados por Chef | ✅ Decidido 07/09: es un pedido de Chef, se factura por Chef, artículo LK con "L" (505L); v13.71 valor a lista. ✅ v13.72: vendedor del padrón Chef en el Excel, Excel partido en ISIS LK / ISIS CH, doble contra ISIS LK detectado por CUIT+fecha (`en_produccion_lk`, cartel en A Programar), RPC buena de Chef en el front. Informe `docs/INFORME-PEDIDOS-LK-POR-CHEF.md`. |
 | 8 | Alerta si un día hábil no tiene eventos | ✅ v13.72: cron 76 `gv-alerta-sin-eventos` (lun–vie 10:30 ART) → Telegram. |
 | 9 | Cron de Chef (`procesar-pedidos-web`) | ✅ Dueño 07/09: sigue apagado (Gestión programa Chef). |
-| 10 | Cruce factura ISIS ↔ app como pantalla | ⏳ Pedido 07/09 ("dale"). Sin líneas de factura de ISIS en ninguna base: sólo se puede cruzar por NP / CUIT / fecha con `comprobantes_venta` (39.495 comprobantes, hasta 05/09) y `Facturacion_NP`. Definir qué mostrar. |
+| 10 | Cruce factura ISIS ↔ app como pantalla | ✅ v13.73 (dueño 07/09: *"11 porque no? … ahí algo de eso hicimos"*). Ya existía como pestaña **🔍 Facturación vs ISIS** dentro de 💰 Deuda / Cobranzas (v13.10, `gv_vista_cruce_facturacion`: NP × factura PDF de ISIS por cliente + fecha ±3 + cajas). Ahora: botón **🔍 Cruce con ISIS** en Facturación, rango de fechas, totales del rango, cajas ent/fact, 📄 abre el PDF, artículos `505L` valuados; y los filtros de las 4 pestañas (que tiraban "not defined") arreglados. Lo de GestOpClientes es la notificación por WhatsApp (`lk_factura-check`), no un cruce. |
 
 ## ⚠⚠ LEER PRIMERO — el modelo, en palabras del dueño (2026-09-04, a la tarde)
 

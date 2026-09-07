@@ -1384,6 +1384,38 @@ es de Chef y pisa al LK 217): cuando Gestión alimente el tracking, escribir el 
 una función `gv_*` y pedir columna `empresa` en PaginaLK. Y el Excel ISIS de Facturación manda
 `N_Pedido` contador (no el id), como el mail: ISIS numera 98xxx por su cuenta.
 
+### 3.ay ✅ Cruce Facturación vs ISIS: artículo `505L` valuado + pantalla desde Facturación (v13.73) — 2026-09-07 lunes (feriado)
+
+**Qué.** Pendiente 10 del dueño ("cruce factura ISIS ↔ app como pantalla"; *"11 porque no? … ahí algo de eso
+hicimos"*). El cruce ya existía (§3.aa, v13.10): `gv_vista_cruce_facturacion` compara el neto calculado con las
+cajas entregadas contra el PDF de la factura que ISIS carga en `isis_lk.documentos` / `isis_ch.documentos`
+(21.937 + 6.178 facturas de venta, todas con PDF, hasta el 04/09), buscada por cliente + fecha de salida ±3 días
++ cajas. Lo que faltaba era llegar desde Facturación y ver cajas / PDF. GestOpClientes no cruza importes: es el
+aviso por WhatsApp (`lk_factura-check`, trigger `wa_factura_notificar`) que se dispara cuando `Facturacion_NP`
+se marca facturada.
+
+**Backend (migración `gv_cruce_facturacion_articulo_L_v1373`).** `gv_vista_facturacion_neto_items` (objeto
+nuestro, `gv_`) valúa el artículo con "L" final de una NP de Chef (`505L`, `438EL`) con la lista LK por el código
+pelado (regla v13.71). Antes buscaba `505L` en `precios_venta` → `sin_precio` → neto corto → "diff" falso.
+Mismas columnas; `gv_vista_facturacion_neto` y `gv_vista_cruce_facturacion` no cambian. Sin grant nuevo (las
+RPC `gv_cruce_facturacion_resumen` / `_totales` siguen SECURITY DEFINER con execute a anon/authenticated).
+
+**Impacto medido.** Antes/después sobre toda la vista: conteo por estado **idéntico** (ok 460 · diff 157 ·
+ambiguo 124 · sin_factura 80 · sin_neto 366). Sólo cambiaron las 3 NP con artículos L (`Entregas_Virgilio`
+tiene 3 filas `438EL`/`439EL`, NP 44483, 44600, 44601): 44483 diff 1.873.710 → 365.760 (2 s/precio en vez de 3),
+44600 1.444.912 → −163.567, 44601 2.040.131 → −770.748. Nada en `public.*` de Producción tocado (grep
+`gv_vista_facturacion|gv_cruce_facturacion` en el repo de Producción: 0).
+
+**Front.** Botón **🔍 Cruce con ISIS** en la barra de Facturación (`openCobros('cruce')`, que ahora acepta
+cualquier pestaña), rango de fechas (default 30 días), totales del rango con `gv_cruce_facturacion_totales`,
+columna cajas ent / fact, "n s/precio", 📄 abre el PDF con `createSignedUrl` (bucket `isis-lk` / `isis-ch`).
+**Bug preexistente arreglado:** `_deudaState`, `_cruceState`, `_antState`, `_bancoState` eran `var` dentro del
+closure `initAuth`, así que los `oninput`/`onchange` inline de las 4 pestañas tiraban `not defined` (buscar,
+empresa, tramo, estado no hacían nada). Expuestos en `window`. Test `tests/fac-cruce.cjs`.
+
+**Rollback.** Volver a la definición anterior de `gv_vista_facturacion_neto_items` (join por `cod_canon`,
+`sql/gv_cruce_facturacion.sql` arriba del bloque v13.73).
+
 ### 3.ax ✅ Chef: vendedor propio, Excel partido, doble contra ISIS LK, RPC buena; alerta sin eventos (v13.72) — 2026-09-07 lunes (feriado, 04:30)
 
 **Decisiones del dueño (07/09, por pregunta):** vendedor del padrón Chef · dos archivos ISIS LK / ISIS CH · detectar el doble

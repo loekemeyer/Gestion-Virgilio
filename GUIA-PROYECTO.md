@@ -12,11 +12,29 @@
 > única**; no se replica. Ante la duda entre parche rápido y fix de raíz → **fix
 > de raíz**.
 >
-> Última actualización: 2026-09-06 (domingo) · Versión app al documentar: **v13.72**
+> Última actualización: 2026-09-07 (lunes) · Versión app al documentar: **v13.73**
 >
 > ⚠⚠ **Desde el lunes 2026-09-07 los operarios usan GESTIÓN, no Producción** (dueño, sábado a la
 > noche: *"el lunes van a empezar a usar GV, no más PV"*). Las tandas web viven en
 > `PPP_Web_Programacion` y Producción no las ve. URL: la de GitHub Pages de este repo.
+>
+> Nota **v13.73** (backend Virgilio + front) — **Cruce factura ISIS ↔ Gestión como pantalla** (pendiente 10,
+> dueño 07/09: *"11 porque no? Traé el repo gestopclientes, ahí algo de eso hicimos"*). El cruce **ya existía**
+> desde v13.10 como pestaña **🔍 Facturación vs ISIS** dentro de 💰 Deuda / Cobranzas (`gv_vista_cruce_facturacion`:
+> por cada NP de `Facturacion_NP`, neto calculado = cajas ENTREGADAS × lista × descuento vs la factura real de
+> ISIS —el PDF parseado en `isis_lk/isis_ch.documentos`— buscada por cliente + fecha de salida ±3 días + cajas;
+> estados ok / diff / ambiguo / sin_factura / sin_neto). Lo de GestOpClientes es otra cosa: el aviso por
+> WhatsApp cuando se factura (`lk_factura-check`), no cruza importes. Lo nuevo: (1) botón **🔍 Cruce con ISIS**
+> en la barra de Facturación → abre esa pestaña directo (`openCobros('cruce')`); (2) rango de fechas de salida
+> elegible (default 30 días) y **totales del rango** por estado vía `gv_cruce_facturacion_totales`; (3) columna
+> **cajas ent / fact** (en naranja si difieren), aviso "n s/precio", tanda, nº y fecha del comprobante y botón
+> **📄** que abre el PDF (bucket `isis-lk` / `isis-ch`, como Deudores); (4) backend: `gv_vista_facturacion_neto_items`
+> valúa el artículo `505L` de una NP de Chef con la lista LK por el código pelado (regla v13.71; antes quedaba
+> sin precio y daba "diff" falso — sólo cambiaron las 3 NP con L); (5) **bug preexistente**: los estados
+> `_deudaState` / `_cruceState` / `_antState` / `_bancoState` eran locales del closure `initAuth` y los
+> filtros inline (buscar, empresa, tramo, estado) tiraban `not defined` en las 4 pestañas → expuestos en
+> `window`. NP web e ISIS se listan juntas (LK 0004 al lado de 98702). Test `tests/fac-cruce.cjs`.
+> `sql/gv_cruce_facturacion.sql`, §3.ay de la doc de Supabase.
 >
 > Nota **v13.72** (backend LK + Virgilio + Edge Function v17 + front) — **cuatro pendientes del dueño (07/09) en uno:**
 > (a) **Vendedor de una NP de Chef en el Excel ISIS** sale del pedido de Chef (`sheets_payload.vend` vía la RPC nueva de

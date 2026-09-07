@@ -215,3 +215,16 @@ as $$
    group by estado
 $$;
 grant execute on function public.gv_cruce_facturacion_totales(date, date, text) to anon, authenticated;
+
+-- =============================================================================
+-- v13.73 (2026-09-07) — artículo con "L" al final en una NP de Chef (505L, 438EL) = artículo
+-- de LOEKEMEYER vendido por Chef (regla v13.71, dueño: "el 505 se factura como 505L"). El
+-- cruce lo valuaba buscando 505L en precios_venta → sin_precio → neto corto → "diff" falso.
+-- Migración gv_cruce_facturacion_articulo_L_v1373: `gv_vista_facturacion_neto_items` agrega
+-- en `base` `es_articulo_l` (empresa = chef y cod_canon ~ '^[0-9]+E?L$') y `cod_precio`
+-- (el código pelado) y el join a precios_venta pasa a `canon_cod(pv.cod) = b.cod_precio`;
+-- la columna `cod` conserva el crudo `505L`. Mismas columnas, las vistas de arriba no cambian.
+-- Medido: sólo cambiaron las 3 NP con L (44483 diff 1.873.710 → 365.760; 44600 → −163.567;
+-- 44601 → −770.748); conteo por estado idéntico (ok 460 / diff 157 / ambiguo 124 / sin_factura
+-- 80 / sin_neto 366). Rollback: volver a la definición de arriba (join por cod_canon).
+-- =============================================================================

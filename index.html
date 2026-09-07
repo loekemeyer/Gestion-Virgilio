@@ -3430,6 +3430,11 @@ table.facfc-tbl tr.facneto-row-falt td{ background: #fef2f2; }
   width:auto; flex:0 0 auto; margin:0; padding:8px 12px; font-size:13px; font-weight:800;
   border:1px solid #fcd34d; border-radius:8px; background:#fffbeb; color:#78350f; cursor:pointer;
 }
+/* v13.73: "Cruce con ISIS" al lado del Excel — abre la pestaña del cruce (Deuda / Cobranzas) */
+.fac-top-acts #facBtnCruce{
+  width:auto; flex:0 0 auto; margin:0; padding:8px 12px; font-size:13px; font-weight:800;
+  border:1px solid #93c5fd; border-radius:8px; background:#eff6ff; color:#1e3a8a; cursor:pointer;
+}
 .fac-top-acts .fac-close-btn{ margin:0; }
 /* Casilla "marcar para el Excel de prueba de ISIS" en cada fila de Facturación.
    Grande a propósito: se toca con el dedo desde el celular. */
@@ -4017,6 +4022,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
     </div>
     <div class="fac-top-acts">
       <button id="facBtnXlsIsis" onclick="facXlsBajar()" title="Arma el Excel para importar en ISIS con las cajas ENTREGADAS de las NP de la página que marcaste. Al bajarlo, esas NP quedan FACTURADAS (es su tilde). Las NP de ISIS no van acá: se tildan.">⬇ Excel ISIS <span style="font-weight:600;opacity:.85">(NP web)</span></button>
+      <button id="facBtnCruce" onclick="openCobros('cruce')" title="Cruza cada NP facturada (lo que Gestión calculó con las cajas entregadas y la lista) contra la factura real que cargó ISIS (el PDF): neto, cajas y diferencia. Sólo mira, no corrige nada.">🔍 Cruce con ISIS</button>
       <button class="fac-close-btn" onclick="closeFacturacion()">Cerrar</button>
     </div>
   </div>
@@ -7173,7 +7179,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v13.72";
+const APP_VERSION = "v13.73";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -39094,6 +39100,7 @@ applyAuthState();
    2019 sin descontar pagos da un número que no significa nada).
    ============================================================================ */
 var _deudaState = { rows: [], q: "", empresa: null, tramo: null, offset: 0, limit: 200, total: 0 };
+window._deudaState = _deudaState;   // v13.73: los filtros inline (oninput/onchange) viven fuera de este closure
 
 async function deudaRefresh(reset) {
   if (reset !== false) { _deudaState.offset = 0; _deudaState.rows = []; }
@@ -39278,28 +39285,60 @@ window.deudaVerDetalle = deudaVerDetalle;
    Deudores). Backend: sql/cruce_facturacion.sql. Sólo lee — no corrige nada
    solo, cada diferencia queda para que la revise una persona.
    ============================================================================ */
-var _cruceState = { rows: [], q: "", empresa: null, estado: null, offset: 0, limit: 100, total: 0 };
+var _cruceState = { rows: [], q: "", empresa: null, estado: null, offset: 0, limit: 100, total: 0, desde: null, hasta: null, tot: null };
+window._cruceState = _cruceState;   // v13.73: los filtros inline viven fuera de este closure (antes tiraban "not defined")
 var CRUCE_ESTADO_LABEL = { diff: "Diferencia", ambiguo: "Ambiguo", sin_factura: "Sin factura", sin_neto: "Sin neto calculado", ok: "OK" };
 var CRUCE_ESTADO_COLOR = { diff: "#dc2626", ambiguo: "#d97706", sin_factura: "#64748b", sin_neto: "#94a3b8", ok: "#059669" };
+/* v13.73 (pendiente 10 del dueño: "cruce factura ISIS ↔ app como pantalla"): rango de fechas
+   elegible (default últimos 30 días de salida), totales por estado del RANGO entero
+   (gv_cruce_facturacion_totales, no sólo de la página cargada), cajas entregadas vs facturadas
+   y botón 📄 que abre el PDF de la factura (mismo bucket que Deudores). */
+function _cruceISO(d) { return new Date(d.getTime() - 3 * 3600e3).toISOString().slice(0, 10); }   // ART fijo UTC-3
+function _cruceRango() {
+  var hoy = new Date();
+  if (!_cruceState.hasta) _cruceState.hasta = _cruceISO(hoy);
+  if (!_cruceState.desde) _cruceState.desde = _cruceISO(new Date(hoy.getTime() - 30 * 86400e3));
+  return { desde: _cruceState.desde, hasta: _cruceState.hasta };
+}
+function _cruceFechaAR(iso) { return iso ? String(iso).slice(8, 10) + "/" + String(iso).slice(5, 7) : "—"; }
+function _cruceNum(n) { return (n == null || isNaN(Number(n))) ? "—" : Number(n).toLocaleString("es-AR", { maximumFractionDigits: 0 }); }
 
 async function cruceRefresh(reset) {
   if (reset !== false) { _cruceState.offset = 0; _cruceState.rows = []; }
   var cont = document.getElementById("cruceTabla");
   if (cont && !_cruceState.rows.length) cont.innerHTML = '<div style="padding:20px;color:#64748b;">Cargando…</div>';
-  var r = await sb.rpc("gv_cruce_facturacion_resumen", {   // v13.10: copia gv_ que entiende las NP web (idea 8033, sql/gv_cruce_facturacion.sql)
-    p_empresa: _cruceState.empresa || null,
-    p_estado: _cruceState.estado || null,
-    p_q: _cruceState.q || null,
-    p_limit: _cruceState.limit,
-    p_offset: _cruceState.offset
-  });
+  var rg = _cruceRango();
+  var pr = [
+    sb.rpc("gv_cruce_facturacion_resumen", {   // v13.10: copia gv_ que entiende las NP web (idea 8033, sql/gv_cruce_facturacion.sql)
+      p_desde: rg.desde,
+      p_hasta: rg.hasta,
+      p_empresa: _cruceState.empresa || null,
+      p_estado: _cruceState.estado || null,
+      p_q: _cruceState.q || null,
+      p_limit: _cruceState.limit,
+      p_offset: _cruceState.offset
+    })
+  ];
+  if (!_cruceState.offset) pr.push(sb.rpc("gv_cruce_facturacion_totales", { p_desde: rg.desde, p_hasta: rg.hasta, p_empresa: _cruceState.empresa || null }));
+  var rs = await Promise.all(pr);
+  var r = rs[0];
   if (r.error) { if (cont) cont.innerHTML = '<div style="padding:20px;color:#b91c1c;">Error: ' + r.error.message + '</div>'; return; }
   var data = r.data || [];
   _cruceState.rows = _cruceState.offset ? _cruceState.rows.concat(data) : data;
   _cruceState.total = data.length ? (Number(data[0].total_count) || data.length) : 0;
+  if (rs[1] && !rs[1].error) {
+    var tot = {}; (rs[1].data || []).forEach(function (t) { tot[t.estado] = { n: Number(t.n) || 0, suma: Number(t.suma_diff) || 0 }; });
+    _cruceState.tot = tot;
+  }
   cruceRender();
 }
 window.cruceRefresh = cruceRefresh;
+
+async function cruceAbrirFactura(empresa, storagePath) {
+  if (!storagePath) return;
+  return (window.deudaAbrirFactura || deudaAbrirFactura)(empresa, storagePath);
+}
+window.cruceAbrirFactura = cruceAbrirFactura;
 
 function cruceCargarMas() {
   _cruceState.offset += _cruceState.limit;
@@ -39312,42 +39351,50 @@ function cruceRender() {
   var res  = document.getElementById("cruceResumen");
   if (!cont) return;
   var rows = _cruceState.rows;
-  var nDiff = rows.filter(function(r){ return r.estado === 'diff'; }).length;
-  var nAmbiguo = rows.filter(function(r){ return r.estado === 'ambiguo'; }).length;
-  var nSinFactura = rows.filter(function(r){ return r.estado === 'sin_factura'; }).length;
+  var tot = _cruceState.tot || {};
+  function _n(k) { return tot[k] ? tot[k].n : rows.filter(function (r) { return r.estado === k; }).length; }
+  var rg = _cruceRango();
+  var nTot = Object.keys(tot).length ? Object.keys(tot).reduce(function (a, k) { return a + tot[k].n; }, 0) : _cruceState.total;
   if (res) res.innerHTML =
-    '<b>' + _cruceState.total + '</b> NP en los últimos 30 días · ' +
-    '<span style="color:#dc2626;">' + nDiff + ' con diferencia</span> · ' +
-    '<span style="color:#d97706;">' + nAmbiguo + ' ambiguas</span> · ' +
-    '<span style="color:#64748b;">' + nSinFactura + ' sin factura encontrada</span>' +
-    '<div style="margin-top:4px;font-size:12px;color:#94a3b8;">⚠ Clientes de súper (🛒) no están bien modelados en el cálculo — su diferencia es esperada, no es necesariamente un error. Matchea por cliente+fecha±3 días+cajas; una factura que consolida varias NP puede salir "sin factura" o "diferencia" sin que haya nada mal.</div>';
+    '<b>' + nTot + '</b> NP con salida del ' + _cruceFechaAR(rg.desde) + ' al ' + _cruceFechaAR(rg.hasta) + ' · ' +
+    '<span style="color:#059669;">' + _n('ok') + ' OK</span> · ' +
+    '<span style="color:#dc2626;">' + _n('diff') + ' con diferencia' + (tot.diff ? ' (' + _fmtPlata(tot.diff.suma) + ')' : '') + '</span> · ' +
+    '<span style="color:#d97706;">' + _n('ambiguo') + ' ambiguas</span> · ' +
+    '<span style="color:#64748b;">' + _n('sin_factura') + ' sin factura encontrada</span> · ' +
+    '<span style="color:#94a3b8;">' + _n('sin_neto') + ' sin neto</span>' +
+    '<div style="margin-top:4px;font-size:12px;color:#94a3b8;">Calculado = cajas ENTREGADAS × lista × descuento del cliente (web: −2 %). Real = el PDF de la factura que cargó ISIS, buscado por cliente + fecha de salida ±3 días + cajas. ⚠ Clientes de súper (🛒) no están bien modelados en el cálculo — su diferencia es esperada. Una factura que consolida varias NP puede salir "sin factura" o "diferencia" sin que haya nada mal. Sólo mira: no corrige nada.</div>';
   if (!rows.length) { cont.innerHTML = '<div style="padding:20px;color:#64748b;text-align:center;">Sin NP en el período.</div>'; return; }
   var h = '<div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;font-size:13px;">' +
     '<thead style="background:#f1f5f9;position:sticky;top:0;"><tr>' +
       '<th style="padding:8px;text-align:left;border-bottom:1px solid #cbd5e1;">NP</th>' +
       '<th style="padding:8px;text-align:left;border-bottom:1px solid #cbd5e1;">Cliente</th>' +
-      '<th style="padding:8px;text-align:left;border-bottom:1px solid #cbd5e1;">Fecha</th>' +
-      '<th style="padding:8px;text-align:right;border-bottom:1px solid #cbd5e1;">Calculado (Virgilio)</th>' +
+      '<th style="padding:8px;text-align:left;border-bottom:1px solid #cbd5e1;">Salida</th>' +
+      '<th style="padding:8px;text-align:right;border-bottom:1px solid #cbd5e1;" title="cajas entregadas (Gestión) / cajas de la factura (ISIS)">Cajas ent / fact</th>' +
+      '<th style="padding:8px;text-align:right;border-bottom:1px solid #cbd5e1;">Calculado (Gestión)</th>' +
       '<th style="padding:8px;text-align:right;border-bottom:1px solid #cbd5e1;">Real (ISIS)</th>' +
       '<th style="padding:8px;text-align:right;border-bottom:1px solid #cbd5e1;">Diferencia</th>' +
       '<th style="padding:8px;text-align:left;border-bottom:1px solid #cbd5e1;">Estado</th>' +
-      '<th style="padding:8px;border-bottom:1px solid #cbd5e1;"></th>' +
+      '<th style="padding:8px;text-align:left;border-bottom:1px solid #cbd5e1;">Factura</th>' +
     '</tr></thead><tbody>';
   h += rows.map(function(r) {
     var col = CRUCE_ESTADO_COLOR[r.estado] || '#334155';
     var lbl = CRUCE_ESTADO_LABEL[r.estado] || r.estado;
+    var cajasMal = (r.cajas_ent != null && r.factura_cajas != null && Number(r.cajas_ent) !== Number(r.factura_cajas));
+    var sp = r.storage_path ? String(r.storage_path).replace(/\\/g, "\\\\").replace(/'/g, "\\'") : "";
     return '<tr>' +
       '<td style="padding:6px 8px;border-bottom:1px solid #e2e8f0;"><b>' + (r.np || '') + '</b></td>' +
       '<td style="padding:6px 8px;border-bottom:1px solid #e2e8f0;">' + (r.cod_cliente || '') + ' ' + (r.rs_virgilio || '—') + (r.es_super ? ' 🛒' : '') + '</td>' +
-      '<td style="padding:6px 8px;border-bottom:1px solid #e2e8f0;font-size:12px;color:#64748b;">' + (r.fecha_salida || '—') + '</td>' +
-      '<td style="padding:6px 8px;border-bottom:1px solid #e2e8f0;text-align:right;">' + (r.neto_calculado != null ? _fmtPlata(r.neto_calculado) : '—') + '</td>' +
+      '<td style="padding:6px 8px;border-bottom:1px solid #e2e8f0;font-size:12px;color:#64748b;white-space:nowrap;">' + _cruceFechaAR(r.fecha_salida) + (r.tanda ? ' <span style="color:#94a3b8;">' + r.tanda + '</span>' : '') + '</td>' +
+      '<td style="padding:6px 8px;border-bottom:1px solid #e2e8f0;text-align:right;white-space:nowrap;' + (cajasMal ? 'color:#b45309;font-weight:700;' : '') + '">' + _cruceNum(r.cajas_ent) + ' / ' + _cruceNum(r.factura_cajas) + '</td>' +
+      '<td style="padding:6px 8px;border-bottom:1px solid #e2e8f0;text-align:right;">' + (r.neto_calculado != null ? _fmtPlata(r.neto_calculado) : '—') + (r.items_sin_precio > 0 ? ' <span style="font-size:11px;color:#b45309;" title="artículos sin precio de lista: el calculado queda corto">' + r.items_sin_precio + ' s/precio</span>' : '') + '</td>' +
       '<td style="padding:6px 8px;border-bottom:1px solid #e2e8f0;text-align:right;">' + (r.factura_neto != null ? _fmtPlata(r.factura_neto) : '—') + '</td>' +
       '<td style="padding:6px 8px;border-bottom:1px solid #e2e8f0;text-align:right;font-weight:bold;color:' + (r.diff > 0 ? '#dc2626' : (r.diff < 0 ? '#b45309' : '#334155')) + '">' +
         (r.diff != null ? (_fmtPlata(r.diff) + ' (' + (r.diff_pct > 0 ? '+' : '') + r.diff_pct + '%)') : '—') +
       '</td>' +
       '<td style="padding:6px 8px;border-bottom:1px solid #e2e8f0;"><span style="color:' + col + ';font-weight:600;">' + lbl + '</span>' + (r.candidatos_cercanos > 1 ? ' (' + r.candidatos_cercanos + ' candidatos)' : '') + '</td>' +
-      '<td style="padding:6px 8px;border-bottom:1px solid #e2e8f0;text-align:center;white-space:nowrap;">' +
-        (r.comprobante_id ? '<span style="font-size:11px;color:#64748b;" title="' + (r.storage_path || '') + '">' + r.comprobante_id + '</span>' : '') +
+      '<td style="padding:6px 8px;border-bottom:1px solid #e2e8f0;white-space:nowrap;">' +
+        (r.comprobante_id ? '<span style="font-size:11px;color:#64748b;">' + r.comprobante_id + '</span>' + (r.doc_fecha ? ' <span style="font-size:11px;color:#94a3b8;">' + _cruceFechaAR(r.doc_fecha) + '</span>' : '') : '') +
+        (sp ? ' <button class="cruce-pdf" title="Ver la factura (PDF de ISIS)" onclick="cruceAbrirFactura(\'' + (r.empresa || 'lk') + '\',\'' + sp + '\')" style="width:auto;margin:0;padding:2px 8px;font-size:13px;border:1px solid #cbd5e1;border-radius:6px;background:#fff;cursor:pointer;">📄</button>' : '') +
       '</td>' +
     '</tr>';
   }).join("");
@@ -39369,6 +39416,7 @@ window.cruceRender = cruceRender;
    Backend: sql/facturable_anticipado.sql.
    ============================================================================ */
 var _antState = { rows: [], q: "", empresa: null, offset: 0, limit: 100, total: 0 };
+window._antState = _antState;   // v13.73: ídem
 
 async function anticipadoRefresh(reset) {
   if (reset !== false) { _antState.offset = 0; _antState.rows = []; }
@@ -39574,6 +39622,7 @@ async function bancoImportarArchivo(file) {
 window.bancoImportarArchivo = bancoImportarArchivo;
 
 var _bancoState = { rows: [], q: "" };
+window._bancoState = _bancoState;   // v13.73: ídem
 async function bancoRefresh() {
   var cont = document.getElementById("bancoTabla");
   if (cont) cont.innerHTML = '<div style="padding:20px;color:#64748b;">Cargando…</div>';
@@ -39686,7 +39735,8 @@ async function openCobros(tab) {
       '<button onclick="cobrosClose()" style="margin-left:auto;background:#dc2626;color:#fff;border:none;border-radius:8px;padding:7px 16px;font-weight:800;cursor:pointer;">Cerrar</button>' +
     '</div>' +
     '<div id="cobrosBody" style="flex:1;overflow:auto;padding:14px 16px;min-height:0;"></div>';
-  cobrosSetTab(tab === "cob" ? "cob" : "deuda");
+  // v13.73: se puede abrir directo en cualquier pestaña (Facturación abre "cruce")
+  cobrosSetTab(["cob", "cruce", "anticipado", "banco"].indexOf(tab) >= 0 ? tab : "deuda");
 }
 window.openCobros = openCobros;
 function cobrosSetTab(tab) {
@@ -39719,6 +39769,8 @@ function cobrosSetTab(tab) {
         '<h1 style="margin:0;font-size:20px;">🔍 Facturación vs ISIS</h1>' +
         '<div style="display:flex;gap:8px;flex-wrap:wrap;">' +
           '<input id="cruceQ" placeholder="🔎 Cliente / razón social / NP" style="padding:8px;font-size:14px;border:1px solid #cbd5e1;border-radius:6px;min-width:200px;" oninput="_cruceState.q=this.value;clearTimeout(window._cruceQT);window._cruceQT=setTimeout(function(){cruceRefresh();},400);">' +
+          '<input id="cruceDesde" type="date" title="Salida desde" value="' + _cruceRango().desde + '" style="padding:8px;font-size:14px;border:1px solid #cbd5e1;border-radius:6px;width:auto;" onchange="_cruceState.desde=this.value||null;cruceRefresh();">' +
+          '<input id="cruceHasta" type="date" title="Salida hasta" value="' + _cruceRango().hasta + '" style="padding:8px;font-size:14px;border:1px solid #cbd5e1;border-radius:6px;width:auto;" onchange="_cruceState.hasta=this.value||null;cruceRefresh();">' +
           '<select id="cruceEmp" style="padding:8px;font-size:14px;border:1px solid #cbd5e1;border-radius:6px;" onchange="_cruceState.empresa=this.value||null;cruceRefresh();">' +
             '<option value="">Todas las empresas</option><option value="lk">Loekemeyer</option><option value="chef">Chef</option>' +
           '</select>' +
