@@ -12,7 +12,7 @@
 > única**; no se replica. Ante la duda entre parche rápido y fix de raíz → **fix
 > de raíz**.
 >
-> Última actualización: 2026-09-07 (lunes) · Versión app al documentar: **v14.25**
+> Última actualización: 2026-09-07 (lunes) · Versión app al documentar: **v14.26**
 >
 > ⚠⚠ **Desde el lunes 2026-09-07 los operarios usan GESTIÓN, no Producción** (dueño, sábado a la
 > noche: *"el lunes van a empezar a usar GV, no más PV"*). Las tandas web viven en
@@ -40,6 +40,25 @@
 > **El caso Osa quedó resuelto a mano y no se toca**: mié 09/09, camión 09, misma dirección —
 > `E09A` = 98650 + 98667 (ISIS, 4,041 m³) · `E09B` = `LK 0024` (web, 0,026 m³). Se pickean por separado.
 > La otra sesión lo volvió a juntar (commit `7f431fb`) leyendo la regla vieja; se revirtió en la base.
+>
+> Nota **v14.26** (backend) — **La mitad de las direcciones no fallaban por la calle, fallaban por
+> cómo están escritas.** Con la cola destapada y el padrón acotado a los clientes habituales de
+> CABA/AMBA, el geocodificador venía resolviendo ~50%. Mirando las 29 que se habían dado por perdidas,
+> los fallos eran siempre los mismos tres patrones: el **punto pegado a la letra** (`Av.Fco.Beiro`,
+> `Int.Rabanal`), la **cola del depósito del expreso** (`Pinedo 50 Galpon 3`, `Pinedo 50 G 4 Pta 5`,
+> `Av.Pinedo 50 Galpon 3 Est.Sola` — el mismo galpón de Estación Sola aparece escrito de **nueve
+> formas distintas**) y las **abreviaturas de tratamiento** (`Int`, `Gral`, `Pte`, `Fco`, `Bme`).
+> Se agregó `gv_dir_geo_normalizar(dir)`, que limpia el texto **antes** de consultar a Nominatim, y se
+> metió en el `dir_query` de `gv_geo_faltantes` y `gv_geo_faltantes_padron`. **No toca `dir_key`**, así
+> que nada de lo ya ubicado se despega (ese fue el error del 07/09 a la mañana, que desenganchó ~300
+> filas). Cuidado clave: la "G" de galpón sólo se saca si viene **después de la altura y al final**,
+> para no comerse una inicial — `Artigas Jose G. 4927` queda entero. Medición previa: cambian 160
+> filas / 85 direcciones distintas, revisadas una por una; `gv_geo_faltantes` sigue en 0. Lo que el
+> normalizador no puede arreglar se cargó a mano en `GV_Geo_Correccion` (13 filas, cada una con el
+> motivo): `Caffarena` con dos efes, `Sta.Domingo` = **Santo** Domingo, `Juan D Peron` = la calle
+> **Perón**, `Av Jujuy` con barrio "Constitución" que caía **a 640 km** (es la Constitución del
+> interior) → barrio San Cristóbal, `A Circunvalacio 550` = Av. Circunvalación, Tapiales. Después,
+> `gv_geo_reintentar()` devolvió las 70 fallidas a la cola. Archivo: `sql/gv_geo_normalizar_v1426.sql`.
 >
 > Nota **v14.25** — **La PPP en el celular: el importe se cortaba** (dueño, con captura: *"el importe
 > se ve mal y no podés scrollear hacia la derecha"*). La causa no era falta de scroll: la media query

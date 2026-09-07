@@ -3257,6 +3257,83 @@ cobertura volvió a moverse (368 → 371 → 373).
 
 **Rollback:** en la cabecera de `sql/gv_geo_fallidas_v1419.sql`.
 
+## 3.bo ✅ Las direcciones no fallaban por la calle, fallaban por cómo están escritas (v14.26) — 2026-09-07
+
+**El síntoma.** Con la cola destapada (§3.bm) y el padrón acotado a los clientes habituales de
+CABA/AMBA (v14.21/v14.22), el geocodificador venía resolviendo alrededor de la mitad de lo que
+pedía, corrida tras corrida: `pedidas 40, ubicadas 17..22`. La cobertura subía, pero lento, y las
+mismas direcciones se iban acumulando en `GV_Geo_Fallidas`.
+
+**El diagnóstico.** Al mirar las 29 direcciones de clientes habituales que ya se habían dado por
+perdidas, no había 29 problemas distintos: había **tres patrones**.
+
+| Patrón | Ejemplos |
+|---|---|
+| Punto pegado a la letra siguiente | `Av.Fco.Beiro 5425` · `Int.Rabanal 2876` · `J.A.Roca 1814` |
+| Cola del depósito del expreso | `Pinedo 50 Galpon 3` · `Pinedo 50 G 4 Pta 5` · `Av.Pinedo 50 Galpon 3 Est.Sola` |
+| Abreviatura de tratamiento | `Int Perez Quintana` · `Gral Madariaga` · `Pte Peron` · `Bme Mitre` |
+
+El galpón del expreso en Estación Sola (Pinedo y Av. Suárez, Barracas) aparece en el padrón
+escrito de **nueve formas distintas**, y ninguna de las nueve es una dirección que Nominatim
+pueda entender.
+
+**La solución.** `gv_dir_geo_normalizar(dir)` — limpia el texto **antes** de consultar, y se metió
+en el `dir_query` de las dos vistas de faltantes (`gv_geo_faltantes` y `gv_geo_faltantes_padron`),
+después de `gv_dir_geo_query` (que saca el prefijo `Exp. … —` y el paréntesis final) y **antes** de
+`GV_Geo_Correccion`, para que una corrección a mano siempre gane.
+
+⚠ **No toca `dir_key`.** El `dir_key` se sigue armando con la dirección cruda + el barrio de
+entrega, así que nada de lo ya geocodificado se despega. Cambiar el `dir_key` fue el error del
+07/09 a la mañana: desenganchó ~300 filas ya ubicadas y hubo que copiarlas de la clave vieja a la
+nueva.
+
+Los tres cuidados que costaron una iteración cada uno:
+
+- La **"G" suelta de galpón** sólo se saca si viene *después de la altura y al final*. Sin esa
+  condición, `Artigas Jose G. 4927` quedaba en `Artigas Jose` — la "G." era una inicial y el 4927
+  la altura. Con la condición, queda entero.
+- El **punto pegado** se reemplaza en **dos pasadas**: `regexp_replace` no solapa, y `J.A.Roca`
+  necesita la segunda para llegar a `J. A. Roca`.
+- Al final se limpia la **puntuación colgada**, si no `Av. Suarez Y Pinedo - Galpon 3` terminaba
+  en `Av. Suarez Y Pinedo -`.
+
+**Medición, antes de aplicar** (se revisaron las 85 a ojo, una por una):
+
+```sql
+select distinct gv_dir_geo_query(direccion),
+       gv_dir_geo_normalizar(gv_dir_geo_query(direccion))
+  from public."GV_Clientes_Direcciones"
+ where gv_dir_geo_normalizar(gv_dir_geo_query(direccion))
+       is distinct from gv_dir_geo_query(direccion);
+-- 160 filas / 85 direcciones distintas
+select count(*) from public.gv_geo_faltantes;   -- 0 antes y 0 después (no se rompió lo programado)
+```
+
+**Lo que el normalizador no puede arreglar** se cargó a mano en `GV_Geo_Correccion` (13 filas,
+cada una con su motivo escrito):
+
+- `A.Cafarena 36` → **Caffarena** 36 (dos efes), La Boca.
+- `Sta.Domingo 3930` → **Santo** Domingo (acá `Sta.` no es Santa), Pompeya.
+- `Juan D Peron 2323` → la calle de CABA es **Perón** (ex Cangallo), Balvanera.
+- `Av Jujuy 1240` / `1481`, barrio "Constitucion" → **caía a 640 km**: es la Constitución del
+  interior. Se le puso barrio **San Cristóbal**.
+- `A Circunvalacio 550` → **Av. Circunvalación**, y el Mercado Central está en **Tapiales**.
+- `Av. Suarez Esq Pinedo,Galpon 5` → **Pinedo 50** (es el mismo hub del expreso).
+- `San Juan B De La Salle 1926`, `Av J B Justo 8587`, `Av Lacroze 2433` (= Federico Lacroze, y la
+  altura 2433 cae en **Colegiales**, no Belgrano), `Virgilio 2788, Retira, CABA`, `Arenales 2000`
+  (altura 2000 = **Recoleta**, no San Nicolás), `Constitucion 2587` (se aclara "Calle" para que no
+  lo tome como el barrio).
+
+⚠ El insert sale de un `select` contra `GV_Clientes_Direcciones`, **no** de constantes: el
+`dir_key` se arma con la dirección **completa**, y escribirlo a mano con la ya limpia fue el error
+del cód 45 esa misma mañana.
+
+Después, `gv_geo_reintentar()` devolvió **70** fallidas a la cola con la consulta nueva.
+
+**Archivo:** `sql/gv_geo_normalizar_v1426.sql` (incluye el rollback en la cabecera: sacar el
+`gv_dir_geo_normalizar(...)` del `dir_query` de las dos vistas y dropear la función; no escribe
+nada, no hay datos que restaurar).
+
 ## 3.bn ✅ No se entrega en el interior: el padrón estaba mal leído (v14.20) — 2026-09-07
 
 **La corrección del dueño, textual:** *"no entrego en ninguno del interior"* y, cuando le mostré
