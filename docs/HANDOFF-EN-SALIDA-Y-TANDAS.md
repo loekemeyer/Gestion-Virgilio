@@ -39,45 +39,37 @@ cliente queda con una sola tanda: 98650 + 98667 (ISIS) + `LK 0024` (web) = **4,0
 
 ---
 
-## 2. PENDIENTE — 20 filas de `CLIENTE SIMULACIÓN` en `Facturacion_NP`
+## 2. HECHO — las 20 filas de `CLIENTE SIMULACIÓN` están borradas
 
-`cod_cliente = 99999`, razón social `CLIENTE SIMULACIÓN`, tandas `SIM######`, **m³ = 1,000
-clavado en las 20**. Alguien probó la pantalla de Facturación el **lunes 31/08** y los tics
-quedaron: entraron de a una, con segundos de diferencia, en dos tandas (11:09–11:10 y
-11:39–11:40). Las 20 tienen `cierre_id` en null; las reales llevan cierre.
+`cod_cliente = 99999`, tandas `SIM######`, m³ = 1,000 clavado en las 20; alguien probó la
+pantalla de Facturación el lunes 31/08. Verificado antes de borrar que no eran reales (0 filas
+en las tres tablas de PPP, 0 eventos, 0 referencias en el código de las dos apps, 0 con
+`cierre_id`). **Borradas el 07/09** con el OK del dueño; hoy `select count(*) … where
+cod_cliente = '99999'` → **0**. Backup:
+`sql/backups/facturacion_np_20260907_simulacion_99999.sql`. Doc: §3.bz.
 
-**Verificado que no son reales:** 0 filas en `PPP_Programacion_Diaria`, `PPP_Base_Pedidos` y
-`PPP_Web_Programacion`; 0 eventos en `Registros_Produccion_Virgilio`; 0 coincidencias en el
-código de Gestión y de Producción (commit e15b682) — no las genera ninguna app.
-
-**Se ven desde la v13.62**, que cambió el universo de `gv_ppp_en_salida` de "tiene CCN" a
-"facturada sin CRN". Inflan el módulo: de las 54 NP que muestra, **20 son éstas**, y **20 de los
-24,65 m³ son ficticios**. El universo real es **34 NP y 4,65 m³**.
-
-**El dueño dio el OK para borrarlas** (eligió esa opción sobre filtrarlas en la vista), pero
-frenó antes de que se escribiera el backup, así que **no se borró nada**. Siguen ahí.
-
-⚠ `Facturacion_NP` es tabla **compartida** con Producción y la regla del dueño es que ahí se
-agrega y no se borra. Rehacer el backup antes (`sql/backups/`), y usar un `WHERE` real
-(`supautils` bloquea `DELETE` sin `WHERE`).
-
-```sql
-select np, tanda, m3, facturado_at from public."Facturacion_NP" where cod_cliente = '99999';
-```
+**Efecto medido en En Salida:** de 54 NP / 24,65 m³ pasó a **34 NP / 4,65 m³**, que es el
+universo real (verificado hoy contra `gv_ppp_en_salida`).
 
 ---
 
-## 3. PENDIENTE — artículo 578 y el pedido 1354 de Osa
+## 3. HECHO — artículo 578 y el pedido 1354 de Osa
 
-El pedido **1354** (cliente 2533, 5 cajas del **578 Descarozador De Aceitunas**) es **real** —
-lo confirmó el dueño. Pero el artículo está **dado de baja**: `active = false`, `list_price = 0`,
-`uxb = 1`. Última venta real: **26/11/2021**. Nunca se pidió por la web.
+El **578 Descarozador De Aceitunas** estaba dado de baja (`list_price = 0`, `uxb = 1`) y el
+pedido salía en **$0**. El dueño pasó los datos: **$1.000 por unidad, 12 por caja** (v14.03).
 
-Consecuencia: **el pedido está valorizado en $0** y así va a llegar a Facturación.
+Estado hoy: `precios_venta` de Virgilio tiene 578 con uxb 12 y precio 1.000, y
+`gv_ppp_np_valor` valúa **`LK 0024` en $60.000** (5 cajas × 12 × $1.000). Ya no vale $0.
 
-Falta que el dueño pase **precio de lista** y **unidades por caja** del 578, y decida si se
-reactiva en el catálogo (ojo: activarlo lo publica para **todos** los clientes del portal, no
-sólo para Osa). Dijo *"lo veo mañana"* (08/09).
+Sigue con `active = false` en el catálogo de LK **a propósito**: activarlo lo publicaría para
+todos los clientes del portal, no sólo para Osa.
+
+**Residuo, inofensivo:** el `sheets_payload` del pedido 1354 quedó congelado con
+`"uxb": 1` y `"order_total": 0` (se armó antes de la corrección) y ya viajó al Sheet. No llega a
+ISIS por ahí: los crons 7 y 10 de LK (el mail de las 12:30 a compras) están **apagados** desde el
+05/09 y la carga a ISIS sale del Excel que baja Gestión, que se arma de `PPP_Web_Base` — donde la
+línea es sólo `578 · 5 cajas`, sin uxb. Nada que corregir; queda anotado por si alguna vez se
+vuelve a prender ese mail.
 
 ---
 
@@ -113,26 +105,47 @@ sólo para Osa). Dijo *"lo veo mañana"* (08/09).
   a lo sumo, si molesta verlas, se les puede bajar el ruido en pantalla. El chip `CCR sin CCN`
   sigue siendo útil para detectarlas.
 
-## 4.b Dato suelto sobre el recordatorio de faltantes
+## 4.b HECHO — el recordatorio de faltantes (v14.01)
 
-`FAC_OPERADORA_EMAIL = "loekemeyer.n8n@gmail.com"` — el mismo mail con el que entra el dueño
-como supervisor. Por eso el recordatorio "⏰ Es hora de completar los faltantes" **le llega a
-él** (camino 2 de `cpRecordCheck`), no sólo a la operadora.
+`FAC_OPERADORA_EMAIL = "loekemeyer.n8n@gmail.com"` — el mismo mail con el que entra el dueño como
+supervisor. Por eso el recordatorio "⏰ Es hora de completar los faltantes" **le llega a él**
+(camino 2 de `cpRecordCheck`), no sólo a la operadora.
 
-El dueño reportó que le disparó **un lunes ~10:20**, y eso el código no lo explica: el filtro
-`if (!t.habil || t.min < CP_RECORD_MIN) return;` es lo primero que corre y el piso es 15:30.
-La función de hora se probó en V8 barriendo las 24 h y devuelve bien; el `alert` existe en un
-solo lugar. Queda sin explicar — la hipótesis viva es un `index.html` viejo cacheado en el
-navegador, o el reloj del dispositivo corrido. **No se tocó nada** (el dueño pidió sólo
-diagnosticar).
+**Los cinco defectos quedaron arreglados en la v14.01.** Test: `tests/cp-recordatorio.cjs`,
+10 chequeos, verdes. Relevamiento completo del circuito: `docs/CIRCUITO-FALTANTES.md`.
 
-Lo que sí está confirmado del recordatorio, y conviene arreglar cuando se encare:
-- **no tiene tope superior**: dispara de 15:30 a 23:59;
-- **el dedup vive en `localStorage`**, o sea una vez por dispositivo/navegador, no por persona;
-- **el mismo recordatorio está en Producción y en Gestión**, dominios distintos → avisa dos veces;
-- **no sabe de feriados** (sólo mira lunes a viernes, no `GV_Dias_No_Habiles`);
-- marca "ya avisé" **antes** de abrir el modal: si `showCPModal` falla, el error se traga y no
-  reintenta en todo el día.
+| era | ahora |
+|---|---|
+| sólo piso 15:30 → disparaba hasta las 23:59 | ventana 15:30–18:00 (`CP_RECORD_MAX`) |
+| sólo miraba lunes-a-viernes | además chequea `GV_Dias_No_Habiles` (feriados) |
+| avisaba aunque no hubiera nada que completar | primero carga los faltantes; si son 0, no molesta |
+| marcaba "ya avisé" **antes** de abrir el modal | lo marca **después**; si falla, mañana reintenta |
+| sin red igual quemaba el aviso del día | sin red no avisa ni marca |
+
+**Sin explicar (y sin consecuencia hoy):** el dueño reportó que le disparó un lunes ~10:20. El
+filtro de hora es lo primero que corre y se probó en V8 barriendo las 24 h. Hipótesis vivas: un
+`index.html` viejo cacheado, o el reloj del dispositivo corrido. Con la ventana nueva, aunque se
+repita, el impacto es menor.
+
+---
+
+## 4.c PENDIENTE — lo único que queda
+
+1. **El mismo recordatorio vive también en el repo de Producción** (commit `e15b682`, bloque
+   idéntico). Son dominios distintos con `localStorage` separados, así que quien tenga las dos
+   apps instaladas lo recibe **dos veces**. Hay que sacarlo de allá o dar de baja esa app —
+   **desde este repo no se puede pushear a Producción**.
+2. **73 filas huérfanas en `Faltantes_Tareas`** (estado `pendiente`, del 24/07 al 04/09; sólo 1 en
+   `completado`). Las creaba el circuito de coordinación en vivo, que está apagado
+   (`FALT_POPUP_ENABLED = false`, v6.15), y las cerraba el popup que ya no existe. **No las lee
+   ninguna pantalla viva**, sólo ensucian la tabla. Decidir: limpiarlas, o volver a prender el
+   popup si se lo quiere usar.
+3. **El dedup del recordatorio sigue en `localStorage`**, o sea una vez por dispositivo, no por
+   persona. Se dejó a propósito: con la ventana de 2 h 30 y el "no avisa si no hay nada", el ruido
+   desapareció. Si alguna vez molesta, la alternativa es una tabla `GV_*`.
+
+Volumen real de faltantes hoy (07/09): **5 líneas, 1 NP (98542 · Pro Tatiana Ethel · D57B),
+10 cajas**.
 
 ## 5. Correcciones a la versión anterior de este archivo
 
