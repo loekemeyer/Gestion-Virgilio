@@ -81,7 +81,7 @@ Rollback: `delete from public."GV_Cruce_Avisadas";`
 
 | # | Qué | Estado medido hoy |
 |---|---|---|
-| **C1** | Geocodificación de **todo** el padrón (v14.16 → v14.20) | **1.094 de 2.307 ubicadas** (47 %) · 158 son Retira y no necesitan · **1.055 en cola**. Mirar con `select * from public.gv_geo_cobertura;`. **Ojo con dos correcciones del mismo día**: la v14.19 destapó la cola (los fallos no se recordaban y 40 direcciones que no resolvían la bloqueaban), y la **v14.20** arregló el error de fondo — `localidad`/`provincia` del padrón son **del cliente**, no de la dirección: no se entrega en el interior, se entrega al expreso en CABA (§3.bn) |
+| **C1** | Geocodificación del padrón — **sólo clientes de CABA / Buenos Aires** | Dueño: *"donde yo no entrego, no interesa que lo ubiques"*. **Chef 303/337 (89,9 %)** · **LK 240/917 (26,2 %)** · 147 son Retira y no necesitan · **562 en cola**. Mirar con `select * from public.gv_geo_cobertura;` |
 | **C2** | Cron 75 acelerado a `*/10 * * * *` para drenar | **Hay que devolverlo a `20 */6 * * *`** cuando C1 termine. Ya hay un recordatorio puesto |
 | **C3** | Cron 79 `gv-sync-padron-direcciones`, 05:40 ART | Refresca el padrón todos los días |
 | **C4** | Crons 77 y 78 (cruce de facturación e ingesta de ISIS) | Activos y bien hechos: los dos chequean `gv_es_dia_habil` antes de avisar |
