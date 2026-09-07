@@ -12,11 +12,18 @@
 > única**; no se replica. Ante la duda entre parche rápido y fix de raíz → **fix
 > de raíz**.
 >
-> Última actualización: 2026-09-07 (lunes) · Versión app al documentar: **v14.10**
+> Última actualización: 2026-09-07 (lunes) · Versión app al documentar: **v14.11**
 >
 > ⚠⚠ **Desde el lunes 2026-09-07 los operarios usan GESTIÓN, no Producción** (dueño, sábado a la
 > noche: *"el lunes van a empezar a usar GV, no más PV"*). Las tandas web viven en
 > `PPP_Web_Programacion` y Producción no las ve. URL: la de GitHub Pages de este repo.
+>
+> Nota **v14.11** (sólo front) — **Los dos avisos de Programación, en una sola fila** (dueño 07/09, con
+> captura: *"estos dos botones que sean un poco más anchos pero que ambos vayan en una sola fila, no en 2 como
+> ahora"*). La banda de **atrasados** y el botón de **cargados sin controlar el remito** salían uno debajo del
+> otro, cada uno ocupando un renglón entero y empujando la grilla de días hacia abajo. Ahora van en un
+> contenedor `.pn-avisos` (flex, `flex:1 1 320px`), repartiéndose el ancho; el botón toma la misma forma que la
+> banda (mismo alto, mismas esquinas) para que se lean como un par. En pantalla angosta se apilan solos.
 >
 > Nota **v14.10** (sólo front) — **Dos cosas feas de Programación, encontradas mirando la pantalla con los
 > datos reales** (dueño: *"¿ves algo feo en la programación que corregirías?"*; se renderizó la solapa headless
