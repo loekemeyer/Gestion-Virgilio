@@ -937,10 +937,53 @@ body.apr-dnd-tanda .apr-col-nps, body.apr-dnd-tanda .apr-dia-cerrado{ opacity:.4
 .apr-titem{ animation:aprEntra .18s ease-out; }
 .apr-msg, .apr-err{ animation:aprEntra .2s ease-out; }
 
-@media (max-width: 1100px){ .apr-scroll{ max-height:44vh; } }
+/* v13.81 — dos pasos: tilde en la tarjeta, botonera fija abajo, resumen del paso 2, día elegido */
+.apr-card-h{ gap:8px; }
+.apr-card-chk{ display:inline-flex; align-items:center; flex:0 0 auto; cursor:pointer; }
+.apr-card-chk input{ width:22px; height:22px; margin:0; accent-color:#1e6bd6; cursor:pointer; }
+.apr-card-cli{ flex:1 1 auto; cursor:pointer; }
+.apr-card-sel{ border-color:#1e6bd6; background:#eff6ff; box-shadow:0 0 0 2px rgba(30,107,214,.15); }
+.apr-pasos{ margin-left:auto; display:inline-flex; gap:6px; font-size:12px; color:#94a3b8; }
+.apr-pasos b{ font-weight:700; padding:2px 8px; border-radius:999px; background:#f1f5f9; }
+.apr-pasos b.on{ background:#1e6bd6; color:#fff; }
+.apr-foot{ position:sticky; bottom:0; z-index:5; display:flex; align-items:center; gap:10px; margin-top:10px; padding:10px 12px;
+  background:#fff; border:1px solid #cbd5e1; border-radius:12px; box-shadow:0 -4px 16px rgba(15,23,42,.10); }
+.apr-foot-txt{ flex:1 1 auto; min-width:0; font-size:14px; color:#334155; }
+.apr-foot-btn{ width:auto !important; margin:0 !important; padding:12px 18px !important; font-size:15px; font-weight:800; border:0; border-radius:10px;
+  background:#1e6bd6; color:#fff; cursor:pointer; white-space:nowrap; flex:0 0 auto; }
+.apr-foot-btn.ok{ background:#16a34a; }
+.apr-foot-btn:disabled{ background:#cbd5e1; color:#64748b; cursor:not-allowed; }
+.apr-foot-sec{ width:auto !important; margin:0 !important; padding:10px 14px !important; font-size:14px; font-weight:700; border:1px solid #cbd5e1; border-radius:10px;
+  background:#fff; color:#334155; cursor:pointer; white-space:nowrap; flex:0 0 auto; }
+.apr-paso2 .apr-col-t{ font-size:15px; }
+.apr-sel-res{ display:flex; flex-wrap:wrap; gap:6px; }
+.apr-sel-chip{ background:#eff6ff; border:1px solid #bfdbfe; color:#1e3a8a; border-radius:999px; padding:4px 10px; font-size:13px; font-weight:700; }
+.apr-sel-chip small{ font-weight:600; color:#3b82f6; }
+.apr-dia:not(.apr-dia-cerrado){ cursor:pointer; }
+.apr-dia.apr-dia-sel{ border-color:#16a34a; border-top-color:#16a34a; background:#f0fdf4; box-shadow:0 0 0 3px rgba(22,163,74,.22); }
+.apr-dia.apr-dia-sel .apr-dia-num{ color:#15803d; }
+@media (max-width: 1100px){ .apr-scroll{ max-height:none; } }
+/* celular: todo más grande (dueño: "se ve todo muy chiquitito") */
+@media (max-width: 640px){
+  .apr-col{ padding:10px 8px; }
+  .apr-card{ padding:10px 10px; }
+  .apr-card-cli{ font-size:16px; }
+  .apr-chip{ font-size:13px; padding:4px 10px; }
+  .apr-q{ font-size:16px; padding:10px 12px; }
+  .apr-dias{ grid-template-columns:repeat(2, minmax(0, 1fr)); gap:8px; }
+  .apr-dia{ padding:10px 10px 12px; }
+  .apr-dia-num{ font-size:24px; }
+  .apr-dia-dow{ font-size:12px; }
+  .apr-dia-m3{ font-size:15px; } .apr-dia-m3 b{ font-size:17px; }
+  .apr-dia-chip{ font-size:12px; padding:3px 9px; }
+  .apr-dia-sub{ font-size:12.5px; }
+  .apr-foot{ flex-wrap:wrap; }
+  .apr-foot-txt{ flex-basis:100%; }
+  .apr-foot-btn{ flex:1 1 auto; }
+}
 /* En pantallas chicas el arrastre HTML5 no existe: se avisa en vez de dejar una
    pantalla que no responde. */
-@media (hover:none){ .apr-dias-ayuda::after{ content:" En celular el arrastre no funciona: usá la compu."; color:#b45309; font-weight:700; } }
+/* v13.81: el celular ya no necesita arrastrar (dos pasos: tildar → tocar el día) */
 
 /* Cartel de AGREGADO: el cliente sumó algo a un pedido que ya estaba en la mesa.
    Tiene que gritar — si nadie lo ve, el camión sale sin eso. */
@@ -4921,6 +4964,9 @@ let _pppFitPend = false;
 function pppFitPantalla() {
   const ov = document.getElementById("pppOverlay"); if (!ov || !ov.classList.contains("show")) return;
   const body = ov.querySelector(".planim-body"); if (!body) return;
+  // v13.81 (dueño, desde el celular: "se ve todo muy chiquitito"): el zoom para que entre todo es de
+  // MONITOR. En un celular se lee a tamaño normal y se scrollea.
+  if (window.innerWidth < 900) { body.style.zoom = "1"; body.style.overflowY = "auto"; return; }
   body.style.zoom = "1"; body.style.overflowY = "hidden";
   let z = 1, entra = true;
   for (let i = 0; i < 5; i++) {
@@ -7201,7 +7247,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v13.80";
+const APP_VERSION = "v13.81";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -32810,8 +32856,71 @@ let _apr = {
 
   horizonte: 21,    // cuántos días muestra la lista
   q: "", exp: {}, drag: null, dragTanda: null, msg: "", msgErr: false,
-  ocupado: false    // hay una acción en vuelo: no dejar arrastrar encima
+  ocupado: false,   // hay una acción en vuelo: no dejar arrastrar encima
+  // v13.81 (dueño: "se ve todo muy chiquitito; hagamos dos pasos: armar la tanda y después elegir el día"):
+  paso: 1,          // 1 = elegir pedidos · 2 = elegir día
+  sel: {},          // clave empresa:order_id → true (los pedidos tildados para la tanda)
+  diaSel: null,     // día elegido en el paso 2
+  cargandoChef: false
 };
+
+/* v13.81 — DOS PASOS. Paso 1: tildar los pedidos que van juntos (misma empresa). Paso 2: tocar el
+   día. Recién ahí se arma la tanda (código automático) y se programa, en una sola operación
+   (aprGenerarTanda): ninguna tanda queda sin fecha. Nada de arrastrar (en celular no anda). */
+function aprSelKeys() { return Object.keys(_apr.sel || {}).filter(function (k) { return _apr.sel[k]; }); }
+function aprSelPedidos() { const ks = aprSelKeys(); return (_apr.pedidos || []).filter(function (p) { return ks.indexOf(aprKey(p.empresa, p.order_id)) >= 0; }); }
+function aprSel(key) { _apr.sel = _apr.sel || {}; if (_apr.sel[key]) delete _apr.sel[key]; else _apr.sel[key] = true; aprRender(); }
+function aprSelLimpiar() { _apr.sel = {}; _apr.diaSel = null; _apr.paso = 1; aprRender(); }
+function aprPasoDia() {
+  const peds = aprSelPedidos();
+  if (!peds.length) { _apr.msg = "Tildá al menos un pedido."; _apr.msgErr = true; aprRender(); return; }
+  const emps = {}; for (const p of peds) emps[p.empresa || "lk"] = true;
+  if (Object.keys(emps).length > 1) { _apr.msg = "Una tanda es de una sola empresa: tildá sólo LK o sólo Chef."; _apr.msgErr = true; aprRender(); return; }
+  _apr.msg = ""; _apr.msgErr = false; _apr.paso = 2; _apr.diaSel = null; aprRender();
+  try { const ov = document.getElementById("pppOverlay"); const b = ov && ov.querySelector(".planim-body"); if (b) b.scrollTop = 0; } catch (_e) {}
+}
+function aprVolver() { _apr.paso = 1; _apr.diaSel = null; _apr.msg = ""; aprRender(); }
+function aprElegirDia(iso) { _apr.diaSel = (_apr.diaSel === iso) ? null : iso; aprRender(); }
+async function aprConfirmar() {
+  if (_apr.ocupado) return;
+  const keys = aprSelKeys(), fecha = _apr.diaSel;
+  if (!fecha) { _apr.msg = "Tocá el día en que sale."; _apr.msgErr = true; aprRender(); return; }
+  await aprGenerarTanda(fecha, keys);   // arma + programa; si falla, descarta (ninguna tanda sin fecha)
+  if (!_apr.msgErr) { _apr.sel = {}; _apr.diaSel = null; _apr.paso = 1; }
+  aprRender();
+}
+function aprResumenSel() {
+  const peds = aprSelPedidos();
+  let m3 = 0; for (const p of peds) m3 += Number(p.m3) || 0;
+  const emp = peds.length ? (peds[0].empresa || "lk") : "";
+  return { peds: peds, m3: m3, emp: emp, n: peds.length };
+}
+function aprFootHtml() {
+  const r = aprResumenSel();
+  if (_apr.paso === 1) {
+    return '<div class="apr-foot">' +
+      '<div class="apr-foot-txt">' + (r.n ? '<b>' + r.n + '</b> pedido' + (r.n === 1 ? '' : 's') + ' · <b>' + aprNum(r.m3, 2) + '</b> m³ · ' + escapeHtml(aprEmpNombre(r.emp)) : 'Tildá los pedidos que van juntos en la tanda') + '</div>' +
+      (r.n ? '<button class="apr-foot-sec" onclick="aprSelLimpiar()">Limpiar</button>' : '') +
+      '<button class="apr-foot-btn" ' + (r.n ? '' : 'disabled ') + 'onclick="aprPasoDia()">Armar tanda → elegir día</button>' +
+      '</div>';
+  }
+  const dia = _apr.diaSel ? aprDiaCorto(_apr.diaSel) : "";
+  return '<div class="apr-foot">' +
+    '<button class="apr-foot-sec" onclick="aprVolver()">← Pedidos</button>' +
+    '<div class="apr-foot-txt"><b>' + r.n + '</b> pedido' + (r.n === 1 ? '' : 's') + ' · <b>' + aprNum(r.m3, 2) + '</b> m³' + (dia ? ' → <b>' + escapeHtml(dia) + '</b>' : ' · tocá un día') + '</div>' +
+    '<button class="apr-foot-btn ok" ' + (_apr.diaSel && !_apr.ocupado ? '' : 'disabled ') + 'onclick="aprConfirmar()">' + (_apr.ocupado ? 'Programando…' : 'Programar ✓') + '</button>' +
+    '</div>';
+}
+function aprPaso2Html() {
+  const r = aprResumenSel();
+  let h = '<div class="apr-col apr-paso2">' +
+    '<div class="apr-col-t">🗓️ Paso 2 · ¿Para qué día sale la tanda?</div>' +
+    '<div class="apr-sel-res">' + r.peds.map(function (p) {
+      return '<span class="apr-sel-chip">' + escapeHtml(p.razon_social || p.cod || ("#" + p.order_id)) + ' <small>' + aprNum(p.m3, 2) + ' m³</small></span>';
+    }).join('') + '</div>' +
+    '</div>';
+  return h + aprColDias();
+}
 
 /* Siempre se programa PARA ADELANTE: la lista arranca hoy y no muestra días
    pasados. No hay a dónde navegar hacia atrás. */
@@ -32917,26 +33026,11 @@ async function aprTraerPedidos(e) {
     // que no van"): última FC de LK del cliente (sales_lines, lote mensual) → el backend suma isis_lk.documentos
     // (diario) y decide 'cliente_fc_lk' con la ventana PPP_Web_Config.doble_lk_dias (180). Si falla, decide sólo
     // con documentos.
-    // v13.76 (dueño: "el cod cliente no significa nada, sólo el CUIT es lo que vale"): el CUIT de cada cliente
-    // de Chef sale del padrón (gv_cuits_de_chef) y la última FC de LK se busca por CUIT (gv_cuits_con_fc_lk).
+    // v13.76: CUIT + última FC de LK (gv_cuits_de_chef / gv_cuits_con_fc_lk) para 'cliente_fc_lk'.
+    // v13.81: la regla está APAGADA (doble_lk_dias = 0, era un malentendido) y eran dos vueltas de red
+    // en serie que atrasaban la lista (dueño: "tardan mucho en aparecer pedidos"). Ya no se llaman;
+    // el backend sigue aceptando `cuit`/`fc_lk` si algún día se prende.
     const cuitDe = new Map(), fcLk = new Map();
-    if (emp === "chef") {
-      try {
-        const cods = [...new Set([..._porPedido.values()].map(function (n) { return String(n.cod || "").trim(); }).filter(Boolean))];
-        const rc = await fetch(PWEB_LK_URL + "/rest/v1/rpc/gv_cuits_de_chef", {
-          method: "POST", headers: { apikey: PWEB_LK_ANON, Authorization: "Bearer " + tok, "Content-Type": "application/json" },
-          body: JSON.stringify({ p_cods_ch: cods })
-        });
-        if (rc.ok) for (const x of (await rc.json() || [])) if (x.cuit) cuitDe.set(String(x.cod_ch), String(x.cuit));
-        if (cuitDe.size) {
-          const rf = await fetch(PWEB_LK_URL + "/rest/v1/rpc/gv_cuits_con_fc_lk", {
-            method: "POST", headers: { apikey: PWEB_LK_ANON, Authorization: "Bearer " + tok, "Content-Type": "application/json" },
-            body: JSON.stringify({ p_cuits: [...new Set(cuitDe.values())], p_dias: 400 })
-          });
-          if (rf.ok) for (const x of (await rf.json() || [])) fcLk.set(String(x.cuit), String(x.ultima_fc || ""));
-        }
-      } catch (_e) {}
-    }
     const ex = await aprRpc("gv_pedidos_web_excluidos", { p_pedidos: [..._porPedido.values()].map(function (n) {
       // v12.94 — `enviado_a_compras`: lo que ya salió a ISIS por el mail es de Producción.
       const k = String(n.cod || "").trim();
@@ -33076,8 +33170,14 @@ async function aprCargar() {
   try {
     // v13.58: las dos empresas juntas, sin filtro. `order_id` se repite entre LK y Chef
     // (1350 de LK ≠ 1350 de Chef), así que la clave de "ya está afuera" es empresa+order_id.
-    const [peds, prog, items, tandas] = await Promise.all([
-      aprTraerTodos(),
+    // v13.81 (dueño: "tardan mucho en aparecer pedidos"): carga PROGRESIVA. Chef va por FDW y tarda
+    // varios segundos; antes la lista esperaba a las dos. Ahora LK se muestra apenas llega y Chef se
+    // suma después (la barra dice "Cargando Chef…").
+    _apr.dobles = [];
+    const pChef = aprTraerPedidos("chef");
+    pChef.catch(function () {});
+    const [pedsLk, prog, items, tandas] = await Promise.all([
+      aprTraerPedidos("lk"),
       aprGet('PPP_Web_Programacion?select=empresa,order_id&tanda=not.is.null&limit=20000'),
       aprGet('PPP_Web_Tanda_Items?select=*&limit=20000'),
       aprGet('gv_ppp_web_tandas_abiertas?select=*&order=codigo.asc'),
@@ -33089,20 +33189,35 @@ async function aprCargar() {
     const fuera = new Set();
     for (const x of prog)  fuera.add(aprKey(x.empresa, x.order_id));
     for (const x of items) fuera.add(aprKey(x.empresa, x.order_id));
+    const ordenar = function (arr) { return arr.sort(function (a, b) { return String(a.fecha_recep).localeCompare(String(b.fecha_recep)) || (a.order_id - b.order_id); }); };
     // `pedidosTodos` guarda TODOS, incluidos los que ya están en un borrador: al
     // programar hacen falta sus artículos, y ésos ya no están en la lista de la
     // izquierda.
-    _apr.pedidosTodos = peds;
-    _apr.pedidos = peds.filter(function (p) { return !fuera.has(aprKey(p.empresa, p.order_id)); });
+    _apr.pedidosTodos = ordenar(pedsLk.slice());
+    _apr.pedidos = _apr.pedidosTodos.filter(function (p) { return !fuera.has(aprKey(p.empresa, p.order_id)); });
 
     _apr.tandas = tandas;
     _apr.items = {};
     for (const it of items) { (_apr.items[it.codigo] = _apr.items[it.codigo] || []).push(it); }
     _apr.listo = true;
+    _apr.cargando = false;
+    _apr.cargandoChef = true;
+    _apr.aviso = "";
+    if (_pppTab === "prog") { aprRender(); aprCargarSalida().then(function () { if (_pppTab === "prog") aprRender(); }); }
+
+    // ── Chef, cuando llegue ──
+    try {
+      const pedsChef = await pChef;
+      _apr.pedidosTodos = ordenar(_apr.pedidosTodos.concat(pedsChef));
+      _apr.pedidos = _apr.pedidosTodos.filter(function (p) { return !fuera.has(aprKey(p.empresa, p.order_id)); });
+    } catch (e) {
+      _apr.aviso = "Chef no respondió (" + ((e && e.message) || e) + "): se ven sólo los pedidos de LK.";
+    }
+    _apr.cargandoChef = false;
   } catch (e) {
     _apr.err = e && e.message ? e.message : String(e);
   }
-  _apr.cargando = false;
+  _apr.cargando = false; _apr.cargandoChef = false;
   // v13.16: sólo redibujar si el supervisor sigue en "A Programar" (la carga tarda ~3 s;
   // si cambió de solapa mientras tanto, pisaba la pantalla con esta).
   if (_pppTab === "prog") aprRender();
@@ -33364,7 +33479,8 @@ function aprRender() {
   h += '<div class="apr-bar">' +
        '<span class="apr-bar-t">LK + Chef</span>' +
        '<button class="apr-reload" onclick="aprCargar()" title="Volver a leer">🔄</button>' +
-       (_apr.cargando ? '<span class="apr-load">Cargando…</span>' : '') +
+       (_apr.cargando ? '<span class="apr-load">Cargando…</span>' : (_apr.cargandoChef ? '<span class="apr-load">LK listo · cargando Chef…</span>' : '')) +
+       '<span class="apr-pasos"><b class="' + (_apr.paso === 1 ? 'on' : '') + '">① Pedidos</b> <b class="' + (_apr.paso === 2 ? 'on' : '') + '">② Día</b></span>' +
        '</div>';
 
   if (_apr.err) h += '<div class="apr-err">⚠ ' + escapeHtml(_apr.err) + '</div>';
@@ -33391,8 +33507,12 @@ function aprRender() {
 
   // v13.65 (dueño: "no me gusta lo que armaste; volvé al formato anterior"): las tres columnas, siempre.
   // v13.69: dos columnas (pedidos | días); la de tandas sin fecha sólo si hay alguna.
+  // v13.81: DOS PASOS (dueño: "se ve todo muy chiquitito; armar la tanda y después elegir el día").
+  //   Paso 1: pedidos (tildables) + tandas sin fecha si hay. Paso 2: los días. Botonera fija abajo.
   const conTandas = (_apr.tandas || []).length > 0;
-  h += '<div class="apr-wrap' + (conTandas ? '' : ' apr-2col') + '">' + aprColPedidos() + (conTandas ? aprColTandas() : '') + aprColDias() + '</div>';
+  if (_apr.paso === 2) h += '<div class="apr-wrap apr-2col">' + aprPaso2Html() + '</div>';
+  else h += '<div class="apr-wrap' + (conTandas ? '' : ' apr-2col') + '">' + aprColPedidos() + (conTandas ? aprColTandas() : '') + '</div>';
+  h += aprFootHtml();
 
   // Cada acción re-dibuja las tres columnas. Sin esto, sacar un pedido de una
   // tanda te mandaba al principio de una lista de 218 y había que volver a
@@ -33443,11 +33563,14 @@ function aprColPedidos() {
   }
   for (const p of lista) {
     const id = "p" + p.order_id, ab = !!_apr.exp[id];
-    h += '<div class="apr-card" draggable="true" ondragstart="aprDragPedido(event,\'' + aprKey(p.empresa, p.order_id) + '\')"' +
+    const key = aprKey(p.empresa, p.order_id), on = !!(_apr.sel && _apr.sel[key]);
+    // v13.81: la tarjeta se TILDA (paso 1); el nombre abre el detalle. El arrastre queda como atajo en compu.
+    h += '<div class="apr-card' + (on ? ' apr-card-sel' : '') + '" draggable="true" ondragstart="aprDragPedido(event,\'' + key + '\')"' +
       ' ondragend="aprDndFin()">' +
-      '<div class="apr-card-h" onclick="aprToggle(\'' + id + '\')">' +
-        '<span class="apr-card-cli">' + escapeHtml(p.razon_social || p.cod || ("#" + p.order_id)) + '</span>' +
-        '<span class="apr-card-chev">' + (ab ? "▾" : "▸") + '</span>' +
+      '<div class="apr-card-h">' +
+        '<label class="apr-card-chk" onclick="event.stopPropagation()"><input type="checkbox" class="apr-sel-chk" data-key="' + escapeHtml(key) + '"' + (on ? ' checked' : '') + ' onchange="aprSel(\'' + key + '\')"></label>' +
+        '<span class="apr-card-cli" onclick="aprToggle(\'' + id + '\')">' + escapeHtml(p.razon_social || p.cod || ("#" + p.order_id)) + '</span>' +
+        '<span class="apr-card-chev" onclick="aprToggle(\'' + id + '\')">' + (ab ? "▾" : "▸") + '</span>' +
       '</div>' +
       '<div class="apr-card-d">' +
         '<span class="apr-chip apr-chip-z">' + escapeHtml(p.zona || "sin zona") + '</span>' +
@@ -33550,7 +33673,9 @@ function aprColDias() {
 
   let h = '<div class="apr-col apr-col-dias">' +
     '<div class="apr-col-t">🗓️ Programar para…</div>' +
-    '<div class="apr-dias-ayuda">Arrastrá el pedido directo al día: se arma su tanda (código automático) y queda programado ahí. Los días completos, no hábiles o muy próximos no reciben.</div>' +
+    '<div class="apr-dias-ayuda">' + (_apr.paso === 2
+      ? 'Tocá el día en que sale y después <b>Programar ✓</b>: se arma la tanda (código automático) y queda programada ahí. Los días completos, no hábiles o muy próximos no reciben.'
+      : 'Arrastrá el pedido directo al día: se arma su tanda (código automático) y queda programado ahí. Los días completos, no hábiles o muy próximos no reciben.') + '</div>' +
     aprCupoLlenoHtml() +   // idea 2510
     '<div class="apr-scroll apr-dias">';
 
@@ -33595,6 +33720,7 @@ function aprColDias() {
     if (d.habil === false) cls.push("apr-dia-nohabil");
     if (iso === hoyISO) cls.push("apr-dia-hoy");
     if (Number(d.tandas) > 0) cls.push("apr-dia-con");
+    if (!cerrado && _apr.paso === 2 && _apr.diaSel === iso) cls.push("apr-dia-sel");   // v13.81
 
     const motivo = (d.habil === false) ? "No es día hábil"
                  : pronto ? "Muy pronto: Gestión programa desde el " + minTxt
@@ -33604,7 +33730,8 @@ function aprColDias() {
     h += '<div class="' + cls.join(" ") + '"' +
          (cerrado ? '' :
            ' ondragover="aprOver(event,\'dia\')" ondragleave="aprSale(event)"' +
-           ' ondrop="aprDropDia(event,\'' + iso + '\')"') +
+           ' ondrop="aprDropDia(event,\'' + iso + '\')"' +
+           (_apr.paso === 2 ? ' onclick="aprElegirDia(\'' + iso + '\')" role="button"' : '')) +   // v13.81: tocar = elegir
          ' title="' + escapeHtml(motivo) + '">' +
       '<div class="apr-dia-fecha">' +
         '<span class="apr-dia-dow">' + DOW[fecha.getDay()] + '</span>' +

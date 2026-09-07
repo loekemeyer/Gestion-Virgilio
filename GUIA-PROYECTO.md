@@ -12,11 +12,22 @@
 > única**; no se replica. Ante la duda entre parche rápido y fix de raíz → **fix
 > de raíz**.
 >
-> Última actualización: 2026-09-07 (lunes) · Versión app al documentar: **v13.80**
+> Última actualización: 2026-09-07 (lunes) · Versión app al documentar: **v13.81**
 >
 > ⚠⚠ **Desde el lunes 2026-09-07 los operarios usan GESTIÓN, no Producción** (dueño, sábado a la
 > noche: *"el lunes van a empezar a usar GV, no más PV"*). Las tandas web viven en
 > `PPP_Web_Programacion` y Producción no las ve. URL: la de GitHub Pages de este repo.
+>
+> Nota **v13.81** (front) — **A Programar en DOS PASOS + carga progresiva** (dueño 07/09 23:56, desde el celular:
+> *"tardan mucho en aparecer pedidos"* y *"se ve todo muy chiquitito; hagamos dos pasos: mandar armar la tanda y en el
+> paso siguiente elegir para qué día"*). **Pasos:** ① tildar los pedidos que van juntos (casilla grande en cada tarjeta;
+> misma empresa) → botonera fija abajo "Armar tanda → elegir día"; ② tocar el día (las cajitas de siempre, la elegida
+> en verde) → "Programar ✓" arma la tanda (código automático) y la programa en UNA operación (`aprGenerarTanda`:
+> nueva → agregar → programar; si falla, descarta y se queda en el paso 2). Ninguna tanda queda sin fecha. El
+> arrastre en compu sigue funcionando como atajo. La barra muestra ① Pedidos / ② Día. **Celular:** sin zoom
+> (`pppFitPantalla` sólo achica en ≥ 900 px), tarjetas y días más grandes, días en 2 columnas. **Carga:** LK se muestra
+> apenas llega y Chef (FDW, segundos) se suma después ("LK listo · cargando Chef…"); se sacaron las dos llamadas en
+> serie por CUIT de v13.76 (regla apagada). Test `tests/apr-pasos.cjs`; `apr-fit` y `apr-programar` siguen.
 >
 > Nota **v13.80** (front) — **El Excel ISIS lleva el código CON la L** (dueño 07/09: *"el Excel tiene que tener el
 > cod con la L"*). Verificado: ya lo llevaba (`_facXlsPadCod` conserva las letras: `505L`, `438EL`, y el test lee el

@@ -302,3 +302,6 @@ PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node te
 
 echo "== fac-ajustes-isis (v13.78: checklist manual de ISIS — ajuste − LK / + CH por NP con artículos L; drenaje con L a la góndola Loeke) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/fac-ajustes-isis.cjs
+
+echo "== apr-pasos (v13.81: A Programar en dos pasos — tildar pedidos → tocar el día; carga progresiva LK/Chef; sin zoom en celular) =="
+PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/apr-pasos.cjs
