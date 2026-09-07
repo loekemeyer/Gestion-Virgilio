@@ -7247,7 +7247,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v13.81";
+const APP_VERSION = "v13.82";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -33011,17 +33011,10 @@ async function aprTraerPedidos(e) {
     // v13.72 (dueño: "detectarlo por CUIT y fecha"): para Chef se manda también el código LK del mismo
     // cliente (gv_cods_lk_de_chef, por CUIT), así el backend detecta un pedido Chef que compras tipeó en
     // ISIS LK. Si el mapeo falla, no se detecta el doble pero no se rompe la carga.
+    // v13.82 (dueño, sobre el cartel "ya está en ISIS LK, mismo cliente por CUIT, mismo día": "ya expliqué que eso
+    // no corresponde"): la regla quedó apagada en el backend (PPP_Web_Config.doble_lk_mismo_dia = 0) y acá ya no
+    // se pide el código LK del cliente: una vuelta de red menos. Si se prende, volver a llamar gv_cods_lk_de_chef.
     const codAlt = new Map();
-    if (emp === "chef") {
-      try {
-        const cods = [...new Set([..._porPedido.values()].map(function (n) { return String(n.cod || "").trim(); }).filter(Boolean))];
-        const rm = await fetch(PWEB_LK_URL + "/rest/v1/rpc/gv_cods_lk_de_chef", {
-          method: "POST", headers: { apikey: PWEB_LK_ANON, Authorization: "Bearer " + tok, "Content-Type": "application/json" },
-          body: JSON.stringify({ p_cods_ch: cods })
-        });
-        if (rm.ok) for (const x of (await rm.json() || [])) codAlt.set(String(x.cod_ch), String(x.cod_lk));
-      } catch (_e) {}
-    }
     // v13.75 (dueño: "los que le hacemos FC E[lectrónica] vendiéndole art. de Loeke —buscá en sales_lines— son los
     // que no van"): última FC de LK del cliente (sales_lines, lote mensual) → el backend suma isis_lk.documentos
     // (diario) y decide 'cliente_fc_lk' con la ventana PPP_Web_Config.doble_lk_dias (180). Si falla, decide sólo

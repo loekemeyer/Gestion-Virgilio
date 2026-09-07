@@ -137,3 +137,8 @@ grant execute on function public.gv_pedidos_web_excluidos(jsonb) to anon, authen
 -- v13.77 (2026-09-07): `doble_lk_dias = 0` → el motivo 'cliente_fc_lk' (v13.75/76) queda APAGADO por el dueño.
 -- "FC E" era Factura E de Tierra del Fuego (la emite Chef), no "cliente con FC en LK". La regla real vive en LK:
 -- sql/pedidos_web_lk.sql (v13.77). El código de la v4 queda por si sirve; con 0 no excluye nada.
+
+-- v13.82 (2026-09-07 23:58): v5 (migración gv_excluidos_v5_sin_doble_mismo_dia_v1382). Dueño, sobre el cartel "ya
+-- está en ISIS LK (mismo cliente por CUIT, mismo día)": "ya expliqué que eso no corresponde". 'en_produccion_lk'
+-- queda detrás de PPP_Web_Config.doble_lk_mismo_dia (0). Motivos vivos: enviado_a_isis (interruptor),
+-- anterior_al_cambio, en_produccion. Probado con SET ROLE anon: 208 (cod_alt 4044, fc_lk 01/09) → sólo anterior_al_cambio.

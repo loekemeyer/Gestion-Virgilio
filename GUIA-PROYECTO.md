@@ -12,11 +12,20 @@
 > única**; no se replica. Ante la duda entre parche rápido y fix de raíz → **fix
 > de raíz**.
 >
-> Última actualización: 2026-09-07 (lunes) · Versión app al documentar: **v13.81**
+> Última actualización: 2026-09-07 (lunes) · Versión app al documentar: **v13.82**
 >
 > ⚠⚠ **Desde el lunes 2026-09-07 los operarios usan GESTIÓN, no Producción** (dueño, sábado a la
 > noche: *"el lunes van a empezar a usar GV, no más PV"*). Las tandas web viven en
 > `PPP_Web_Programacion` y Producción no las ve. URL: la de GitHub Pages de este repo.
+>
+> Nota **v13.82** (backend Virgilio + front) — **Se apaga también el cartel "ya está en ISIS LK (mismo cliente por
+> CUIT, mismo día)"** (dueño 07/09 23:58: *"Mirá ese cartel. Ya expliqué que eso no corresponde"*). El motivo
+> `en_produccion_lk` (v13.72) queda detrás de **`PPP_Web_Config.doble_lk_mismo_dia`** (0 = apagado; v5 de
+> `gv_pedidos_web_excluidos`, migración `gv_excluidos_v5_sin_doble_mismo_dia_v1382`) y A Programar ya no pide el código
+> LK del cliente (`gv_cods_lk_de_chef`): una vuelta de red menos. Los 4 del cartel (CH 201, 202, 206, 208) siguen
+> afuera por `anterior_al_cambio` (son anteriores al 03/09). Quedan vivos: `enviado_a_isis` (interruptor),
+> `anterior_al_cambio` y `en_produccion` (misma NP de la misma empresa el mismo día). Ser cliente de las dos empresas
+> **nunca** excluye nada.
 >
 > Nota **v13.81** (front) — **A Programar en DOS PASOS + carga progresiva** (dueño 07/09 23:56, desde el celular:
 > *"tardan mucho en aparecer pedidos"* y *"se ve todo muy chiquitito; hagamos dos pasos: mandar armar la tanda y en el
