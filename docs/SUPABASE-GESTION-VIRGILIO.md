@@ -1384,6 +1384,79 @@ es de Chef y pisa al LK 217): cuando Gestión alimente el tracking, escribir el 
 una función `gv_*` y pedir columna `empresa` en PaginaLK. Y el Excel ISIS de Facturación manda
 `N_Pedido` contador (no el id), como el mail: ISIS numera 98xxx por su cuenta.
 
+### 3.au ✅ En Salida: fecha de carga, estado por NP y Recepción de Remitos embebida (v13.62) — 2026-09-07 (madrugada)
+
+Dueño: *"El módulo En Salida tiene una estética completamente fea y le faltan datos. Quiero que
+figure la fecha en la que se cargó el camión y el estado de cada nota de pedido, porque si no es
+un módulo feo e inútil. El 2 del 9 veo que hay 0,04 m³ de una nota de pedido que hasta que no esté
+confirmado tiene que quedar en salida. Lo mismo los del 3 del 9: el 98502 y el 98569 tendrían que
+estar allá para que desde ahí se pueda manejar. Deberíamos integrar toda la lógica de recepción de
+remitos para que la operadora administrativa lo labure desde el módulo de En Salida de la PPP, no
+del módulo superior — el módulo superior dejarlo funcionando como ahora."*
+
+#### 1) El universo estaba mal: exigía CCN
+
+La vista v13.02 arrancaba de los eventos **CCN** (carga al camión). Las tres NP que nombró el dueño
+están facturadas y armadas pero **nunca tuvieron CCN**, así que la vista no las podía ver: quedaban
+fuera de Programación (fecha vencida), fuera de En Salida y fuera de Entregados.
+
+| NP | cliente | tanda | m³ | entrega | eventos |
+|---|---|---|---|---|---|
+| 98665 | Merajver Marcelo Fabián | D50E | 0,042 | 02/09 | TAL (sin CCN) |
+| 98502 | Clapera Alicia Raquel | D55B | 0,011 | 03/09 | TAL, AUB (sin CCN) |
+| 98569 | Distribuidora Pezzali S.A. | D55A | 0,005 | 03/09 | TAL, FCO (sin CCN) |
+
+**Regla nueva (elegida por el dueño): entra toda NP facturada sin CRN, con CCN o sin CCN.**
+Implementada en el **backend**, `sql/gv_ppp_en_salida.sql`. `base` = CCN ∪ facturadas, o sea
+estrictamente aditivo: nada de lo que se veía puede desaparecer (medido: **0 perdidas**).
+
+**El filtro que no puede faltar**: `gv_ppp_entregados_meta` (la hoja de entregados). `Facturacion_NP`
+es el histórico completo y el CRN existe recién desde el 05/09 (§3.r), así que sin ese filtro entraban
+**356 NP** —todo lo facturado de siempre, entregado hace meses—. Excluyendo lo que la hoja ya da por
+cerrado quedan **54**. Es el mismo criterio que ya usaba el front en `_pppConfirmadas()` (CRN ∪ hoja).
+
+Medido al aplicarla: **54 filas** (antes 13) · 13 `cargada` + 41 `facturada_sin_cargar` ·
+34 armadas · 24,6 m³ · 33 de septiembre, 20 de agosto, 1 del 29/07 · **0 perdidas vs v13.02**.
+
+Columnas nuevas (al final, `create or replace view` no deja reordenar): `armada`, `armado_at`,
+`cargada`, `control_previo`, `facturada_el`, `estado`, `dias_sin_controlar`.
+Además se corrigió el FSS: si nunca hubo carga, `fss_at < ultima_carga_at` daba NULL y filtraba de
+más; ahora un FSS sin carga saca la NP siempre.
+
+**No toca Producción**: verificado contra `loekemeyer/produccion-virgilio` (commit e15b682),
+**0 referencias** a `gv_ppp_en_salida`. Sigue con `security_invoker = true`.
+
+#### 2) La pantalla: tabla propia en vez del render de Entregados
+
+`_pppEnViajeHtml` reusaba `_pppEntGroupedHtml` (una línea de texto por NP, sin fecha de carga ni
+estado) — de ahí lo de "fea e inútil". Ahora tiene tabla propia agrupada por día
+(**NP · Cliente · Tanda · m³ · Cargado · Estado**), con la fecha y hora reales del CCN, `— sin carga`
+cuando no lo hubo, y chips de estado: *Cargado al camión* / *Sin registro de carga*, *Armada* /
+*Sin armar*, *Facturada*, *CCR sin CCN*, y *N días sin controlar* (ámbar a los 2, rojo a los 5).
+
+#### 3) Recepción de Remitos embebida — SÓLO supervisores
+
+Columnas **Controlado** (tildar → confirmar → emite **CRN** por NP → pasa a Pedidos Entregados) y
+**↩** (**FSS**, el cliente no recibió y volvió al depósito). Reusa los mismos emisores del módulo de
+arriba (`crSendDetail`, `crSendSinSalida`) con legajo `"0"`, igual que `openRemitosAdmin()`, así los
+dos caminos escriben idéntico. **El módulo RR de arriba quedó intacto.** Gate: `window.__isSupervisor`;
+el operario ve los datos pero no las acciones.
+
+#### 4) Anomalía que destapó (de datos, no la arregla la vista)
+
+**8 NP tienen CCR (control de remito antes de cargar) pero no CCN (carga al camión)**: 98474, 98509,
+98585, 98586, 98587, 98588, 98589, 98590. O el operario saltea el CCN, o se está usando CCR en su
+lugar. Se muestran con el chip `CCR sin CCN`. **Queda para revisar con el dueño.**
+
+#### Verificación
+
+`tests/ppp-ensalida-estado.cjs` (nuevo, 17 chequeos, verde): fecha de carga visible, `— sin carga`,
+los cuatro chips, la NP sin CCN listada, el gate de supervisor en los dos sentidos, el botón que
+cuenta lo tildado, y que el módulo RR de arriba siga existiendo. Más `checkhtml` y `smoke` verdes
+(las 11 funciones nuevas agregadas a la lista del smoke).
+
+**ROLLBACK**: `git show HEAD~1:sql/gv_ppp_en_salida.sql` y correrlo; front a v13.61.
+
 ### 3.as ⏸ Automático APAGADO: la tanda tiene que ACUMULAR hasta 0,80 (v13.59) — 2026-09-06 domingo (20:40)
 
 Dueño: *"No se tiene que programar nada de manera automática, salvo que logremos que se vaya

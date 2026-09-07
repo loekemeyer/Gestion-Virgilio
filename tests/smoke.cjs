@@ -51,7 +51,10 @@ catch (_e) {
       "pppRefreshDelivered", "_pppEntBodyHtml", "pppTandaM3Map", "pppRefreshOcupacion", "pppOcupHtml", "pppOcupSetCap", "pppOcupDay", "pppOcupWeek",
       "_ocupWeekSvg", "_ocupWeekData", "_ocupWeekDetailHtml", "_ocupUnified", "_ocupMonday", "_ocupSizeBucket", "_ocupSortPeds",
       "pppOcupAssign", "pppOcupUnplan", "pppOcupClearPlan", "pppOcupChipSel", "pppOcupDragStart", "pppOcupDrop", "_ocupLoadPlan", "_ocupPlanCount",
-      "pppRefreshEntregadosFull", "pppEntMode", "_pppEntAppHtml", "_pppEntExcelHtml", "_pppEntTabsHtml", "_pppYmdKey", "_pppEntGroupedHtml", "_pppEntFilter"];
+      "pppRefreshEntregadosFull", "pppEntMode", "_pppEntAppHtml", "_pppEntExcelHtml", "_pppEntTabsHtml", "_pppYmdKey", "_pppEntGroupedHtml", "_pppEntFilter",
+      // v13.62 — En Salida con fecha de carga + estado por NP y Recepción de Remitos embebida
+      "_pppEnViajeHtml", "_pppEsChips", "_pppEsFechaCarga", "_pppEsRow", "_pppEsNpc", "_pppEsEsSupervisor", "_pppEsFind",
+      "pppEsToggle", "pppEsFinish", "pppEsClear", "pppEsSinSalida"];
     const missing = need.filter((n) => typeof window[n] !== "function");
     const ts = new Date().toISOString();
     const sal = stockComputeSaldos([

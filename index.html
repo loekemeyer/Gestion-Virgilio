@@ -2184,6 +2184,49 @@ button.pk-anular small{ display:block; font-size:12px; font-weight:700; opacity:
 .ppp-tab.on{ background:#1e6bd6; color:#fff; border-color:#1e6bd6; }
 /* v6.97 — Pedidos Entregados (lista durable) */
 .ppp-ent-note{ font-size:12.5px; color:#475569; margin:0 0 8px; }
+/* ── En Salida v13.62: tabla propia (fecha de carga + estado por NP + RR embebido) ── */
+.ppp-es-help{ background:#eff6ff; border:1px solid #bfdbfe; color:#1e3a8a; border-radius:9px; padding:8px 11px; font-size:12.5px; line-height:1.45; margin:0 0 10px; }
+.ppp-es-day{ margin:0 0 12px; border:1px solid #e2e8f0; border-radius:11px; overflow:hidden; background:#fff; box-shadow:0 1px 2px rgba(15,23,42,.05); }
+.ppp-es-day-h{ background:#f1f5f9; padding:8px 12px; font-weight:800; color:#0f172a; font-size:13px; display:flex; justify-content:space-between; gap:10px; align-items:center; }
+.ppp-es-day-h .m3{ color:#1e6bd6; white-space:nowrap; font-weight:700; }
+.ppp-es-wrap{ overflow-x:auto; }
+.ppp-es-table{ width:100%; border-collapse:collapse; font-size:12.5px; }
+.ppp-es-table th{ background:#f8fafc; color:#475569; font-size:11px; text-transform:uppercase; letter-spacing:.03em; font-weight:800; text-align:left; padding:7px 9px; border-bottom:1px solid #e2e8f0; white-space:nowrap; position:sticky; top:0; }
+.ppp-es-table th.c, .ppp-es-table td.c{ text-align:center; }
+.ppp-es-table td{ padding:8px 9px; border-bottom:1px solid #f1f5f9; vertical-align:top; }
+.ppp-es-table tr:last-child td{ border-bottom:0; }
+.ppp-es-row{ cursor:pointer; transition:background .12s; }
+.ppp-es-row:hover{ background:#f8fafc; }
+.ppp-es-row.on{ background:#ecfdf5; }
+.ppp-es-row.on:hover{ background:#d1fae5; }
+.ppp-es-row.venc{ box-shadow:inset 3px 0 0 #dc2626; }
+.ppp-es-table td.np{ white-space:nowrap; }
+.ppp-es-table td.np b{ font-size:13px; color:#0f172a; }
+.ppp-es-table td.rs{ min-width:150px; color:#0f172a; }
+.ppp-es-cod{ color:#94a3b8; font-size:11px; }
+.ppp-es-cj{ color:#64748b; font-size:11px; margin-top:2px; }
+.ppp-es-table td.td{ white-space:nowrap; font-weight:700; color:#334155; }
+.ppp-es-table td.fc{ white-space:nowrap; font-weight:700; color:#0f172a; }
+.ppp-es-hh{ color:#94a3b8; font-weight:500; font-size:11px; }
+.ppp-es-nofc{ color:#b45309; font-weight:700; font-size:11.5px; }
+.ppp-es-table td.est{ min-width:210px; }
+.ppp-es-chip{ display:inline-block; background:#f1f5f9; color:#334155; border:1px solid #e2e8f0; border-radius:999px; padding:1px 8px; font-size:11px; font-weight:700; margin:1px 3px 1px 0; white-space:nowrap; }
+.ppp-es-chip.ok{ background:#ecfdf5; color:#047857; border-color:#a7f3d0; }
+.ppp-es-chip.warn{ background:#fffbeb; color:#b45309; border-color:#fde68a; }
+.ppp-es-chip.bad{ background:#fef2f2; color:#b91c1c; border-color:#fecaca; }
+.ppp-es-chk{ display:inline-block; width:24px; height:24px; line-height:22px; border:2px solid #cbd5e1; border-radius:7px; color:#059669; font-weight:900; font-size:15px; background:#fff; }
+.ppp-es-row.on .ppp-es-chk{ border-color:#059669; background:#ecfdf5; }
+.ppp-es-sinsal{ border:1px solid #e2e8f0; background:#fff; color:#b45309; border-radius:7px; padding:3px 9px; font-size:13px; font-weight:800; cursor:pointer; }
+.ppp-es-sinsal:hover{ background:#fffbeb; border-color:#fde68a; }
+.ppp-es-actions{ position:sticky; bottom:0; background:#fff; border-top:1px solid #e2e8f0; padding:10px 0 4px; display:flex; gap:8px; flex-wrap:wrap; }
+.ppp-es-ok{ background:#059669; color:#fff; border:0; border-radius:9px; padding:10px 18px; font-weight:800; font-size:13.5px; cursor:pointer; width:auto; flex:0 0 auto; }
+.ppp-es-ok:disabled{ background:#cbd5e1; cursor:default; }
+.ppp-es-cancel{ background:#f1f5f9; color:#475569; border:1px solid #e2e8f0; border-radius:9px; padding:10px 14px; font-weight:700; font-size:13px; cursor:pointer; width:auto; flex:0 0 auto; }
+@media (max-width:640px){
+  .ppp-es-table{ font-size:12px; }
+  .ppp-es-table td.est{ min-width:0; }
+  .ppp-es-table th, .ppp-es-table td{ padding:6px 7px; }
+}
 .ppp-ent-day{ margin:0 0 10px; border:1px solid #e2e8f0; border-radius:10px; overflow:hidden; }
 .ppp-ent-day-h{ background:#f1f5f9; padding:7px 12px; font-weight:bold; color:#0f172a; font-size:13px; display:flex; justify-content:space-between; gap:10px; }
 .ppp-ent-day-h .m3{ color:#1e6bd6; white-space:nowrap; }
@@ -7148,7 +7191,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v13.61";
+const APP_VERSION = "v13.62";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -26835,7 +26878,7 @@ let _pppEnSalida = null;   // Map np(normalizada) → fila de gv_ppp_en_salida
 async function pppRefreshEnSalida() {
   try {
     const rows = await supaFetchAllSafe(SUPABASE_URL + "/rest/v1/gv_ppp_en_salida",
-      "select=np,empresa,es_web,tanda,cod_cliente,razon_social,m3,fecha_entrega,zona,barrio,fecha_carga,cargado_at,facturada&order=cargado_at.desc");
+      "select=np,empresa,es_web,tanda,cod_cliente,razon_social,m3,fecha_entrega,zona,barrio,fecha_carga,cargado_at,facturada,armada,armado_at,cargada,control_previo,facturada_el,estado,dias_sin_controlar&order=cargado_at.desc");
     const m = new Map();
     (rows || []).forEach(function (r) { const np = _pppNpNorm(r.np); if (np) m.set(np, r); });
     _pppEnSalida = m;
@@ -26977,10 +27020,11 @@ function _pppSplitDelivered() {
     _pppEnSalida.forEach(function (r, np) {
       if (conf.has(np)) return;
       const f = facturados.get(np);
-      if (f) { f._cargado = true; enViaje.push(f); return; }
+      if (f) { f._cargado = true; f._es = r; enViaje.push(f); return; }
       const fc = String(r.fecha_carga || "").slice(0, 10), fp = String(r.fecha_entrega || "").slice(0, 10);
       const frep = fc || fp;
       enViaje.push({
+        _es: r,
         np: String(r.np == null ? "" : r.np).trim(), tanda: (String(r.tanda == null ? "" : r.tanda).trim().toUpperCase() || "—"),
         cod: String(r.cod_cliente == null ? "" : r.cod_cliente).trim(), rs: String(r.razon_social == null ? "" : r.razon_social).trim(),
         m3: (r.m3 == null || r.m3 === "") ? null : Number(r.m3), cajE: 0, cajF: 0,
@@ -26990,15 +27034,134 @@ function _pppSplitDelivered() {
   }
   return { enViaje: enViaje, entregados: entregados };
 }
+/* ── EN SALIDA (v13.62) ──────────────────────────────────────────────────────
+   Reescrito a pedido del dueño: *"tiene una estética completamente fea y le faltan
+   datos: quiero que figure la fecha en la que se cargó el camión y el estado de cada
+   nota de pedido"*. Antes reusaba `_pppEntGroupedHtml` (el render de Entregados), que
+   es una línea de texto por NP y no tiene ni fecha de carga ni estado.
+   Ahora: tabla propia por día, con la fecha real de carga, el estado de cada NP, y —
+   SÓLO PARA SUPERVISORES — la Recepción de Remitos embebida (tildar Controlado → CRN,
+   y "↩ s/salida" → FSS). El módulo RR de arriba queda exactamente como estaba. */
+let _pppEsSel = new Set();      // NP tildadas como controladas, sin confirmar todavía
+function _pppEsEsSupervisor() { return !!window.__isSupervisor; }
+function _pppEsNpc(np) { return String(np).replace(/[^0-9A-Za-z]/g, ""); }
+function _pppEsRow(p) { return (p && p._es) ? p._es : {}; }
+/* Chips de estado. Lo que el dueño pidió ver de un vistazo por nota de pedido. */
+function _pppEsChips(p) {
+  const r = _pppEsRow(p), out = [];
+  if (r.estado === "cargada") out.push('<span class="ppp-es-chip ok">🚚 Cargado al camión</span>');
+  else out.push('<span class="ppp-es-chip warn" title="Está facturada pero nadie registró la carga al camión (evento CCN). Se muestra igual para que se pueda cerrar desde acá.">⚠ Sin registro de carga</span>');
+  if (r.armada) out.push('<span class="ppp-es-chip">🧰 Armada</span>');
+  else out.push('<span class="ppp-es-chip warn" title="No hay evento TAL: la NP no pasó por armado en la app.">Sin armar</span>');
+  if (r.facturada) out.push('<span class="ppp-es-chip">🧾 Facturada</span>');
+  if (r.control_previo && r.estado !== "cargada") out.push('<span class="ppp-es-chip" title="Tiene control de remito PREVIO a la carga (CCR) pero no tiene carga al camión (CCN).">📋 CCR sin CCN</span>');
+  const d = Number(r.dias_sin_controlar);
+  if (d >= 2) out.push('<span class="ppp-es-chip ' + (d >= 5 ? "bad" : "warn") + '">⏱ ' + d + ' día' + (d === 1 ? "" : "s") + ' sin controlar</span>');
+  return out.join(" ");
+}
+function _pppEsFechaCarga(p) {
+  const r = _pppEsRow(p), fc = String(r.fecha_carga || "").slice(0, 10);
+  if (!fc) return '<span class="ppp-es-nofc" title="No hay evento CCN para esta NP">— sin carga</span>';
+  const t = r.cargado_at ? new Date(r.cargado_at) : null;
+  const hh = t && !isNaN(t) ? (" " + String(t.getHours()).padStart(2, "0") + ":" + String(t.getMinutes()).padStart(2, "0")) : "";
+  return escapeHtml(fc.slice(8, 10) + "/" + fc.slice(5, 7)) + '<span class="ppp-es-hh">' + escapeHtml(hh) + '</span>';
+}
 function _pppEnViajeHtml() {
   if (_pppDelivered == null || _pppMetaEntSet == null || _pppEnSalida == null) return '<div class="planim-empty">Cargando pedidos en salida…</div>';
   const list = _pppEntFilter(_pppSplitDelivered().enViaje);
-  if (!list.length) return '<div class="ppp-ent-note">' + (_pppSearch ? "Sin coincidencias." : "No hay pedidos en salida: nada cargado al camión sin controlar.") + '</div>';
-  let totM3 = 0, nVenc = 0; for (const p of list) { totM3 += (p.m3 || 0); if (_pppCargaVencida(p)) nVenc++; }
-  const r = _pppEntGroupedHtml(list, true, 0);
-  return '<div class="ppp-ent-note">🚚 Pedidos <b>en salida</b> — ya se <b>cargaron al camión</b> (salieron de Programación) y <b>todavía no se controló el remito</b>. Con el control pasan solos a Pedidos Entregados. <b>' + list.length + '</b> pedido(s) · <b>' + totM3.toFixed(2).replace('.', ',') + '</b> m³.' +
-    (nVenc ? ' <span style="color:#b91c1c;font-weight:800;">· 🚨 ' + nVenc + ' cargado(s) SIN CONTROLAR pasado el plazo</span>' : '') + '</div>' + r.html;
+  if (!list.length) return '<div class="ppp-ent-note">' + (_pppSearch ? "Sin coincidencias." : "No hay pedidos en salida: nada facturado sin controlar.") + '</div>';
+  const sup = _pppEsEsSupervisor();
+  let totM3 = 0, nVenc = 0, nCarg = 0, nSin = 0;
+  for (const p of list) {
+    totM3 += (p.m3 || 0);
+    if (_pppCargaVencida(p)) nVenc++;
+    if (_pppEsRow(p).estado === "cargada") nCarg++; else nSin++;
+  }
+  // Agrupado por día: fecha de carga si la hay, si no la fecha de entrega programada.
+  const DOW = ["Dom", "Lun", "Mar", "Mié", "Jue", "Vie", "Sáb"];
+  const byDay = {}, keys = [];
+  for (const p of list) {
+    const r = _pppEsRow(p);
+    const d = String(r.fecha_carga || "").slice(0, 10) || String(r.fecha_entrega || p.pppDate || "").slice(0, 10);
+    const k = _pppYmdKey(d) || "00000000";
+    if (!byDay[k]) { byDay[k] = []; keys.push(k); }
+    byDay[k].push(p);
+  }
+  keys.sort(); keys.reverse();
+  let html = '<div class="ppp-ent-note">🚚 <b>En salida</b> — facturadas y <b>todavía sin control de remito</b>. Con el control pasan a Pedidos Entregados. ' +
+    '<b>' + list.length + '</b> pedido(s) · <b>' + totM3.toFixed(2).replace('.', ',') + '</b> m³ · ' +
+    '<b>' + nCarg + '</b> cargada(s) al camión · <b>' + nSin + '</b> sin registro de carga.' +
+    (nVenc ? ' <span style="color:#b91c1c;font-weight:800;">· 🚨 ' + nVenc + ' pasado el plazo</span>' : '') + '</div>';
+  if (sup) html += '<div class="ppp-es-help">📋 <b>Recepción de Remitos</b> — tildá <b>Controlado</b> en los remitos que ya volvieron y confirmá abajo: pasan a <b>Pedidos Entregados</b>. <b>↩ s/salida</b> = el cliente no recibió y la mercadería volvió al depósito.</div>';
+  for (const k of keys) {
+    const arr = byDay[k];
+    let m3d = 0; for (const p of arr) m3d += (p.m3 || 0);
+    let dh = "Sin fecha";
+    if (k !== "00000000") { const dt = new Date(+k.slice(0, 4), +k.slice(4, 6) - 1, +k.slice(6, 8)); dh = DOW[dt.getDay()] + " " + (+k.slice(6, 8)) + "/" + (+k.slice(4, 6)) + "/" + k.slice(0, 4); }
+    html += '<div class="ppp-es-day"><div class="ppp-es-day-h"><span>🗓️ ' + dh + '</span><span class="m3">' + arr.length + ' ped · ' + m3d.toFixed(2).replace('.', ',') + ' m³</span></div>' +
+      '<div class="ppp-es-wrap"><table class="ppp-es-table"><thead><tr>' +
+      '<th>NP</th><th>Cliente</th><th>Tanda</th><th class="c">m³</th><th class="c">Cargado</th><th>Estado</th>' +
+      (sup ? '<th class="c">Controlado</th><th class="c">Volvió</th>' : '') +
+      '</tr></thead><tbody>';
+    for (const p of arr) {
+      const np = String(p.np), npc = _pppEsNpc(np), on = _pppEsSel.has(np);
+      const venc = _pppCargaVencida(p);
+      const cajas = (p.cajE ? ('<div class="ppp-es-cj">' + p.cajE + ' cj' + (p.cajF ? ' · <b style="color:#dc2626">faltó ' + p.cajF + '</b>' : '') + '</div>') : "");
+      html += '<tr class="ppp-es-row' + (on ? " on" : "") + (venc ? " venc" : "") + '"' + (sup ? ' onclick="pppEsToggle(\'' + npc + '\')"' : '') + '>' +
+        '<td class="np"><b>' + escapeHtml(np) + '</b>' + _npSrcChip(np) + cajas + '</td>' +
+        '<td class="rs">' + escapeHtml((p.rs || p.cod || "—").slice(0, 34)) + '<div class="ppp-es-cod">' + escapeHtml(p.cod || "") + '</div></td>' +
+        '<td class="td">' + escapeHtml(p.tanda || "—") + '</td>' +
+        '<td class="c">' + (p.m3 != null ? p.m3.toFixed(3).replace('.', ',') : "—") + '</td>' +
+        '<td class="c fc">' + _pppEsFechaCarga(p) + '</td>' +
+        '<td class="est">' + _pppEsChips(p) + '</td>' +
+        (sup ? ('<td class="c"><span class="ppp-es-chk">' + (on ? "✓" : "") + '</span></td>' +
+                '<td class="c"><button class="ppp-es-sinsal" onclick="event.stopPropagation();pppEsSinSalida(\'' + npc + '\')" title="El cliente no recibió — la mercadería volvió al depósito. Queda en «FC s/Salida» (Stocks).">↩</button></td>') : "") +
+        '</tr>';
+    }
+    html += '</tbody></table></div></div>';
+  }
+  if (sup) html += '<div class="ppp-es-actions"><button class="ppp-es-ok" ' + (_pppEsSel.size ? "" : "disabled ") + 'onclick="pppEsFinish()">✓ Marcar ' + _pppEsSel.size + ' controlada(s) → Entregados</button>' +
+    (_pppEsSel.size ? '<button class="ppp-es-cancel" onclick="pppEsClear()">Limpiar selección</button>' : '') + '</div>';
+  return html;
 }
+/* Recepción de Remitos embebida — reusa los MISMOS emisores que el módulo de arriba
+   (crSendDetail → CRN, crSendSinSalida → FSS), así los dos caminos escriben igual. */
+function _pppEsFind(npc) {
+  const l = _pppSplitDelivered().enViaje;
+  return l.find(function (p) { return _pppEsNpc(p.np) === String(npc); }) || null;
+}
+function pppEsToggle(npc) {
+  if (!_pppEsEsSupervisor()) return;
+  const p = _pppEsFind(npc); if (!p) return;
+  const np = String(p.np);
+  if (_pppEsSel.has(np)) _pppEsSel.delete(np); else _pppEsSel.add(np);
+  pppRenderProg();
+}
+function pppEsClear() { _pppEsSel.clear(); pppRenderProg(); }
+function pppEsFinish() {
+  if (!_pppEsEsSupervisor() || !_pppEsSel.size) return;
+  const list = _pppSplitDelivered().enViaje.filter(function (p) { return _pppEsSel.has(String(p.np)); });
+  if (!list.length) return;
+  try { if (!confirm("¿Marcar " + list.length + " remito(s) como CONTROLADOS?\n\nPasan a Pedidos Entregados.")) return; } catch (_e) {}
+  // legajo "0" = el mismo que usa openRemitosAdmin() para el RR de arriba (admin, sin legajo propio)
+  for (const p of list) crSendDetail("0", String(p.np), String(p.tanda || ""));
+  try { const ent = pppLoadEntregados(); for (const p of list) ent.add(String(p.np)); pppSaveEntregados(); } catch (_e) {}
+  _pppEsSel.clear();
+  try { pppRefreshEnSalida(); } catch (_e) {}
+  pppRenderProg();
+  try { alert("✓ " + list.length + " remito(s) controlados → Pedidos Entregados."); } catch (_e) {}
+}
+function pppEsSinSalida(npc) {
+  if (!_pppEsEsSupervisor()) return;
+  const p = _pppEsFind(npc); if (!p) return;
+  try { if (!confirm("¿Marcar la NP " + p.np + " como FACTURADO SIN SALIDA?\n\nEl cliente no recibió la mercadería (volvió al depósito).\nSale de En Salida y queda en «FC s/Salida» (Stocks).")) return; } catch (_e) {}
+  crSendSinSalida("0", String(p.np), String(p.tanda || ""));
+  _pppEsSel.delete(String(p.np));
+  try { pppRefreshEnSalida(); } catch (_e) {}
+  pppRenderProg();
+}
+window.pppEsToggle = pppEsToggle; window.pppEsFinish = pppEsFinish;
+window.pppEsClear = pppEsClear; window.pppEsSinSalida = pppEsSinSalida;
 function _pppYmdKey(s) { const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(s || "")); return m ? (m[1] + m[2] + m[3]) : ""; }
 async function pppRefreshDelivered() {
   try {
