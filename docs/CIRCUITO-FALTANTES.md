@@ -65,7 +65,10 @@ También avisa por Telegram si se retira de góndola con saldo 0 (idea 6497).
   **`loekemeyer.n8n@gmail.com`** — que es **el mail con el que entra el dueño**. Por eso le llega
   a él.
 
-### Lo que está mal, confirmado leyendo el código
+### Lo que estaba mal — ARREGLADO en la v14.01
+
+> Los cinco puntos de abajo quedaron corregidos. Se dejan escritos porque explican por qué el
+> código es como es. Test: `tests/cp-recordatorio.cjs` (10 chequeos).
 
 1. **No tiene tope superior.** El filtro es `if (!t.habil || t.min < CP_RECORD_MIN) return;` —
    sólo piso. **Dispara de 15:30 a 23:59.**
@@ -127,15 +130,16 @@ tan poco volumen, el aviso diario a toda hora es más ruido que ayuda.
 
 ---
 
-## Si se decide arreglarlo
+## Lo que quedó pendiente
 
-Los cinco defectos del punto 4 son todos de arreglo chico y de bajo riesgo:
+**El recordatorio duplicado en Producción.** El mismo bloque vive en el repo de Producción
+Virgilio (commit `e15b682`). Son dominios distintos con `localStorage` separados, así que
+mientras los operarios tengan las dos apps instaladas el aviso llega **dos veces**. Hay que
+sacarlo de allá o dar de baja esa app — **desde este repo no se puede**.
 
-- ponerle **tope de hora** (ej. `CP_RECORD_MAX`, 15:30–18:00);
-- mover el **dedup** a algo compartido (una tabla o el propio evento `CP`) en vez de `localStorage`;
-- decidir si **Producción sigue avisando** ahora que los operarios están en Gestión;
-- consultar **`GV_Dias_No_Habiles`** para los feriados;
-- marcar "ya avisé" **después** de que el modal abra, no antes.
+**El dedup sigue en `localStorage`**, o sea una vez por dispositivo. Se dejó así a propósito:
+ahora que el aviso sólo sale cuando HAY faltantes pendientes, y con la ventana de 2 h 30, el
+ruido que provocaba desapareció. Si algún día molesta, la alternativa es una tabla `GV_*`.
 
-Y aparte, sin relación con el recordatorio: **limpiar las 73 tareas huérfanas** de
-`Faltantes_Tareas`, o reactivar el popup si se lo quiere usar de nuevo.
+**Las 73 tareas huérfanas** de `Faltantes_Tareas` siguen ahí: limpiarlas, o reactivar el popup
+(`FALT_POPUP_ENABLED`) si se lo quiere usar de nuevo.

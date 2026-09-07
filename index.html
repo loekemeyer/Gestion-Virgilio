@@ -7278,7 +7278,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v14.00";
+const APP_VERSION = "v14.01";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -22833,7 +22833,10 @@ function faltPollStart() {
    ============================================================ */
 const CP_RECORD_LEGAJOS = ["104"];           // Jhonny Moncayo (sumar acá otros legajos, ej. la operadora)
 const CP_RECORD_MIN    = 15 * 60 + 30;       // 15:30 (minutos desde 00:00, hora AR)
+const CP_RECORD_MAX    = 18 * 60;            // 18:00 — v14.01: TOPE. Antes sólo había piso y el aviso
+                                             // podía saltar hasta las 23:59. Poner 24*60 para volver a sin tope.
 let _cpRecordTimer = null;
+let _cpRecordBusy  = false;                  // v14.01: el chequeo ahora hace red (¿hay faltantes?) → no reentrar
 function _cpRecordNowAR() {
   try {
     const ymd = new Date().toLocaleDateString("en-CA", { timeZone: TZ_AR });                                  // YYYY-MM-DD
@@ -22844,35 +22847,66 @@ function _cpRecordNowAR() {
     return { ymd: ymd, min: min, habil: ["Mon", "Tue", "Wed", "Thu", "Fri"].indexOf(wd) >= 0 };
   } catch (_e) { return null; }
 }
-function cpRecordCheck() {
+/* v14.01 — arreglado a pedido del dueño ("arregla"). Qué cambió y por qué:
+     1) TOPE DE HORA. Antes el filtro era sólo un piso, así que el aviso disparaba de
+        15:30 a 23:59. Ahora la ventana es CP_RECORD_MIN..CP_RECORD_MAX (15:30–18:00).
+     2) FERIADOS. Antes miraba sólo lunes-a-viernes y no sabía de los feriados de la
+        empresa: el 07/09 (Día del Metalúrgico) era "hábil" para él. Ahora consulta
+        `GV_Dias_No_Habiles` por la misma cache que usa la PPP (_pppNoHabiles). Si la
+        lista todavía no cargó, se comporta como antes (sólo fin de semana) — sin regresión.
+     3) NO AVISA SI NO HAY NADA QUE COMPLETAR. Era el ruido más grande: avisaba todos los
+        días a las 15:30 hubiera o no faltantes. Hoy hay UNA sola NP pendiente (98542, 10
+        cajas) y el aviso salía igual, en dos apps y en cada dispositivo. El chequeo va
+        ÚLTIMO, después del dedup, para no pegarle a la base cada 25 s.
+     4) EL DEDUP SE MARCA DESPUÉS DE ABRIR EL MODAL, no antes. Antes, si showCPModal
+        fallaba, el error se tragaba en un catch vacío: el operario veía el cartel, no se
+        abría nada, y no reintentaba en todo el día.
+     ⚠ Lo que NO se puede arreglar desde acá: el MISMO recordatorio vive en el repo de
+     Producción Virgilio (commit e15b682, bloque idéntico). Son dominios distintos, con
+     localStorage separados, así que mientras los operarios tengan las dos apps el aviso
+     llega dos veces. Hay que sacarlo allá o dar de baja esa app. */
+async function cpRecordCheck() {
+  if (_cpRecordBusy) return;
   try {
     const t = _cpRecordNowAR(); if (!t || !t.ymd) return;
-    if (!t.habil || t.min < CP_RECORD_MIN) return;                 // solo días hábiles, de 15:30 en adelante
+    if (!t.habil) return;                                          // fin de semana
+    if (t.min < CP_RECORD_MIN || t.min > CP_RECORD_MAX) return;    // ventana 15:30–18:00
+    // (2) feriado de la empresa: se usa la cache de la PPP si ya está cargada.
+    try {
+      if (typeof _pppNoHabiles !== "undefined" && _pppNoHabiles &&
+          _pppNoHabiles.has(String(t.ymd).replace(/-/g, ""))) return;
+    } catch (_e) {}
     const cpOpen = (function () { const m = document.getElementById("cpModal"); return !!(m && m.classList.contains("show")); })();
     if (cpOpen) return;                                            // ya está abierto
-    // Path 1 — operario por legajo (Moncayo 104, etc.), sólo cuando está en la botonera.
+    // ¿A quién le toca? Se resuelve ANTES de tocar la red.
+    let _dest = null;   // { key, legajo }
     const _miLeg = _faltMiLegajo();
     if (CP_RECORD_LEGAJOS.indexOf(_miLeg) >= 0 && _faltActivo()) {
-      const key = "vir_cp_record_" + _miLeg + "_" + t.ymd;         // dedup: 1 vez por día por legajo
-      if (localStorage.getItem(key)) return;
-      localStorage.setItem(key, "1");
-      try { alert("⏰ Es hora de completar los faltantes."); } catch (_e) {}
-      try { showCPModal(_miLeg); } catch (_e) {}
-      return;
+      // Path 1 — operario por legajo (Moncayo 104, etc.), sólo cuando está en la botonera.
+      _dest = { key: "vir_cp_record_" + _miLeg + "_" + t.ymd, legajo: _miLeg };
+    } else {
+      // Path 2 — la OPERADORA entra al panel admin con su gmail (supervisor, sin legajo):
+      // le llega el mismo recordatorio. Abre el CP con legajo vacío (igual que su FCO).
+      const _em = (typeof window !== "undefined" && window.__authEmail) ? String(window.__authEmail).trim().toLowerCase() : "";
+      const _opEmail = (typeof FAC_OPERADORA_EMAIL !== "undefined") ? String(FAC_OPERADORA_EMAIL).trim().toLowerCase() : "";
+      if (window.__isSupervisor && _em && _opEmail && _em === _opEmail) {
+        _dest = { key: "vir_cp_record_" + _em + "_" + t.ymd, legajo: "" };
+      }
     }
-    // Path 2 — la OPERADORA entra al panel admin con su gmail (supervisor, sin legajo):
-    // le llega el mismo recordatorio. Abre el CP con legajo vacío (igual que su FCO).
-    const _em = (typeof window !== "undefined" && window.__authEmail) ? String(window.__authEmail).trim().toLowerCase() : "";
-    const _opEmail = (typeof FAC_OPERADORA_EMAIL !== "undefined") ? String(FAC_OPERADORA_EMAIL).trim().toLowerCase() : "";
-    if (window.__isSupervisor && _em && _opEmail && _em === _opEmail) {
-      const key = "vir_cp_record_" + _em + "_" + t.ymd;           // dedup: 1 vez por día por email
-      if (localStorage.getItem(key)) return;
-      localStorage.setItem(key, "1");
-      try { alert("⏰ Es hora de completar los faltantes."); } catch (_e) {}
-      try { showCPModal(""); } catch (_e) {}
-      return;
-    }
-  } catch (_e) {}
+    if (!_dest) return;                                            // no es para este usuario
+    try { if (localStorage.getItem(_dest.key)) return; } catch (_e) {}   // ya avisado hoy en este dispositivo
+    // (3) recién acá se pregunta si hay algo que completar. Va último a propósito: es la
+    //     única parte que hace red, y sólo corre en la ventana y una vez por día.
+    _cpRecordBusy = true;
+    let _hay = 0;
+    try { _hay = ((await cpLoadFaltantes()) || []).length; } catch (_e) { _hay = -1; }   // -1 = sin red: no avisar ni marcar
+    _cpRecordBusy = false;
+    if (_hay <= 0) return;                                         // nada pendiente (o falló la consulta) → no molestar
+    // (4) primero abrir, después marcar: si el modal falla, mañana se reintenta.
+    try { alert("⏰ Es hora de completar los faltantes (" + _hay + " pendiente" + (_hay === 1 ? "" : "s") + ")."); } catch (_e) {}
+    showCPModal(_dest.legajo);
+    try { localStorage.setItem(_dest.key, "1"); } catch (_e) {}
+  } catch (_e) { _cpRecordBusy = false; }
 }
 function cpRecordStart() {
   if (_cpRecordTimer) return;
