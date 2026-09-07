@@ -12,11 +12,26 @@
 > única**; no se replica. Ante la duda entre parche rápido y fix de raíz → **fix
 > de raíz**.
 >
-> Última actualización: 2026-09-07 (lunes) · Versión app al documentar: **v14.02**
+> Última actualización: 2026-09-07 (lunes) · Versión app al documentar: **v14.03**
 >
 > ⚠⚠ **Desde el lunes 2026-09-07 los operarios usan GESTIÓN, no Producción** (dueño, sábado a la
 > noche: *"el lunes van a empezar a usar GV, no más PV"*). Las tandas web viven en
 > `PPP_Web_Programacion` y Producción no las ve. URL: la de GitHub Pages de este repo.
+>
+> Nota **v14.03** (datos, sin cambios de app) — **Artículo 578: precio $1.000 y 12 por caja** (dueño 07/09:
+> *"578, 12 x caja. precio por ahora ponele $1000"*). El pedido web 1354 de Osa lleva 5 cajas del **578
+> Descarozador De Aceitunas** y llegaba a Facturación **valorizado en $0**: el artículo está de baja
+> (`active = false`, `list_price = 0`, `uxb = 1`) y no figuraba en `precios_venta`, que es de donde
+> `gv_ppp_np_valor` saca el valor.
+>
+> **No hizo falta activarlo** —y por eso no se activó—: la Edge Function `sync-precios-venta` lee `products`
+> de LK **sin filtrar por `active`**, su único filtro es `list_price > 0`. Con ponerle precio entra a la lista
+> y el artículo **sigue fuera de la web** (activarlo lo publicaba para todos los clientes del portal, que era
+> el reparo del dueño). Se corrió el sync a mano para que valiera hoy.
+>
+> Verificado: `precios_venta` 578 → **$1.000 · 12 uxb**; `gv_ppp_np_valor` de **LK 0024** → **$60.000** y
+> 0 líneas sin precio (5 cajas × 12 × $1.000). El precio es provisorio: cuando pase el real se cambia igual y
+> se vuelve a correr el sync. Backup y rollback en `sql/backups/producto_578_20260907_precio_y_uxb.sql`.
 >
 > Nota **v14.02** (backend/datos, sin cambios de app) — **Se cortó la planilla de Google de "Pedidos
 > Entregados"** (dueño 07/09: *"la planilla de Google no se tiene que usar para nada"*). Salió de que él vio
