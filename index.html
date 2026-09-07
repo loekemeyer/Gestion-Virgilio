@@ -7191,7 +7191,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v13.62";
+const APP_VERSION = "v13.63";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -33172,7 +33172,7 @@ async function aprGenerarTanda(fecha, keys) {
   _apr.ocupado = false;
   await aprCargar();
 }
-function aprProgramarFila(key, fecha) { if (!fecha) return; aprGenerarTanda(fecha, [key]); }
+function aprProgramarFila(key, fecha) { if (!fecha) return Promise.resolve(); return aprGenerarTanda(fecha, [key]); }
 function aprSelToggle(key, on) { if (on) _apr.sel[key] = true; else delete _apr.sel[key]; aprRender(); }
 function aprSelTodos(on) {
   _apr.sel = {};

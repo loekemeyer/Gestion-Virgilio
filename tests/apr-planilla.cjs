@@ -118,7 +118,7 @@ const { chromium } = require("/opt/node22/lib/node_modules/playwright");
   chk(r.ok.fecha === "2026-09-15" && r.ok.codigo === "E09A", "programa con la fecha elegida y el código que dio la base");
   chk(/"order_id":1117,"np_idx":1,"items":\[\{"art":"027"/.test(r.ok.items) && /"np_idx":2,"items":\[\{"art":"801"/.test(r.ok.items), "los artículos de los dos bloques viajan al programar");
   chk(/✅ E09A programada para el mar 15\/9: 2 NP · 0,367 m³/.test(r.ok.msg) && r.ok.err === false && r.ok.sel === 0, "mensaje verde y se destilda");
-  chk(r.falla.fns.join(">") === "gv_ppp_web_tanda_nueva>gv_ppp_web_tanda_agregar>gv_ppp_web_tanda_programar>gv_ppp_web_tanda_descartar" && /se descartó/.test(r.falla.msg) && r.falla.err === true, "si programar falla, la tanda se descarta (ninguna sin fecha)");
+  chk(r.falla.fns.join(">") === "gv_ppp_web_tanda_nueva>gv_ppp_web_tanda_agregar>gv_ppp_web_tanda_programar>gv_ppp_web_tanda_descartar" && /se descartó/.test(r.falla.msg) && r.falla.err === true, "si programar falla, la tanda se descarta (ninguna sin fecha) " + JSON.stringify(r.falla));
   chk(r.sinFecha.calls === 0 && /Elegí el día/.test(r.sinFecha.msg), "sin fecha no se arma nada");
   chk(r.fit.sh <= r.fit.ch + 1 && r.fit.sw <= r.fit.cw + 1, "la PPP entra entera en la pantalla (zoom " + r.fit.zoom + ")");
   chk(r.conScroll.length === 0, "ningún elemento del overlay scrollea (" + r.conScroll.join(",") + ")");
