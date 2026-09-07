@@ -109,3 +109,17 @@ as $function$
 $function$;
 
 grant execute on function public.gv_pedidos_web_excluidos(jsonb) to anon, authenticated;
+
+-- =============================================================================
+-- v13.75 (2026-09-07) — v3 (migración gv_excluidos_cliente_fc_lk_v1375): motivo 'cliente_fc_lk'.
+-- Dueño: "no es problema que sean clientes de Loeke y de Chef. Pero los que le hacemos FC E[lectrónica]
+-- que le vendemos art de Loeke (buscá en sales_lines) son los que no van." Un pedido web de CHEF de un
+-- cliente al que LK le facturó artículos de Loeke en los últimos `PPP_Web_Config.doble_lk_dias` (180;
+-- 0 = apagado) días NO se programa: lo tipea compras en ISIS LK. Dos fuentes:
+--   · `fc_lk` en cada pedido (última FC del cliente en sales_lines de LK, RPC LK gv_clientes_lk_con_fc,
+--     sql/gv_clientes_lk_con_fc.sql — lote mensual, saltea sales_excluded_items);
+--   · isis_lk.documentos (factura_venta del cod_alt, diario). Por eso la función pasa a SECURITY DEFINER.
+-- 'en_produccion_lk' (mismo cliente, mismo día en la PPP de ISIS) se mantiene. Probado con SET ROLE anon:
+-- 2517 (fc_lk 22/08), 2183, 1816 y 4044 (FC 02–03/09 sólo en documentos) → cliente_fc_lk; cod_alt sin FC
+-- o sin cod_alt → nada; pedido LK → nada.
+-- =============================================================================

@@ -41,6 +41,10 @@ cada artículo de Loekemeyer va con **"L" al final** (505 → 505L; 438E → 438
 stock a la góndola LK (`pkEmpresaArt`), el m³ sale de `vista_volumen_articulo_resuelto` (tiene los `NNNL`), el
 precio de la lista LK pelando la L (`gv_ppp_np_valor` v13.71), y la factura / Excel ISIS llevan el código crudo
 con L. **Nunca** recodificar 7xx→5xx ni "pasar a LK" un pedido de Chef. Informe: `docs/INFORME-PEDIDOS-LK-POR-CHEF.md`.
+**Excepción (v13.75, dueño 07/09): *"los que le hacemos FC E vendiéndole art. de Loeke son los que no van"*** — si al
+cliente LK le facturó artículos de Loeke en los últimos 180 días (`PPP_Web_Config.doble_lk_dias`; `sales_lines` de LK vía
+`gv_clientes_lk_con_fc` + `isis_lk.documentos`), su pedido web de Chef **no se programa** (motivo `cliente_fc_lk` de
+`gv_pedidos_web_excluidos` v3): lo tipea compras en ISIS LK. Ser cliente de las dos empresas, solo, no es problema. §3.az.
 
 ## ⚠ PROTOCOLO OBLIGATORIO: Backend vs Front-end — preguntar ANTES de implementar
 

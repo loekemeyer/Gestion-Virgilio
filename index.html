@@ -7187,7 +7187,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v13.74";
+const APP_VERSION = "v13.75";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -32892,16 +32892,36 @@ async function aprTraerPedidos(e) {
         if (rm.ok) for (const x of (await rm.json() || [])) codAlt.set(String(x.cod_ch), String(x.cod_lk));
       } catch (_e) {}
     }
+    // v13.75 (dueño: "los que le hacemos FC E[lectrónica] vendiéndole art. de Loeke —buscá en sales_lines— son los
+    // que no van"): última FC de LK del cliente (sales_lines, lote mensual) → el backend suma isis_lk.documentos
+    // (diario) y decide 'cliente_fc_lk' con la ventana PPP_Web_Config.doble_lk_dias (180). Si falla, decide sólo
+    // con documentos.
+    const fcLk = new Map();
+    if (emp === "chef" && codAlt.size) {
+      try {
+        const rf = await fetch(PWEB_LK_URL + "/rest/v1/rpc/gv_clientes_lk_con_fc", {
+          method: "POST", headers: { apikey: PWEB_LK_ANON, Authorization: "Bearer " + tok, "Content-Type": "application/json" },
+          body: JSON.stringify({ p_cods_lk: [...new Set(codAlt.values())], p_dias: 400 })
+        });
+        if (rf.ok) for (const x of (await rf.json() || [])) fcLk.set(String(x.cod_lk), String(x.ultima_fc || ""));
+      } catch (_e) {}
+    }
     const ex = await aprRpc("gv_pedidos_web_excluidos", { p_pedidos: [..._porPedido.values()].map(function (n) {
       // v12.94 — `enviado_a_compras`: lo que ya salió a ISIS por el mail es de Producción.
-      return { empresa: emp, order_id: n.order_id, cod: n.cod || "", cod_alt: codAlt.get(String(n.cod || "").trim()) || null,
-               fecha_recep: n.fecha_recep || null, enviado_a_compras: !!n.enviado_a_compras };
+      const alt = codAlt.get(String(n.cod || "").trim()) || null;
+      return { empresa: emp, order_id: n.order_id, cod: n.cod || "", cod_alt: alt,
+               fecha_recep: n.fecha_recep || null, enviado_a_compras: !!n.enviado_a_compras,
+               fc_lk: (alt && fcLk.get(alt)) || null };
     }) }) || [];
     const fuera = new Set(ex.map(function (x) { return String(x.order_id); }));
-    // v13.72: los dobles (tipeados en ISIS LK) se avisan arriba de A Programar
-    for (const x of ex) if (x.motivo === "en_produccion_lk") {
+    // v13.72: los dobles (tipeados en ISIS LK) se avisan arriba de A Programar; v13.75: también los clientes
+    // a los que LK les factura artículos de Loeke ('cliente_fc_lk'), que los tipea compras en ISIS LK.
+    const _yaDoble = new Set();
+    for (const x of ex) if ((x.motivo === "en_produccion_lk" || x.motivo === "cliente_fc_lk") && !_yaDoble.has(String(x.order_id))) {
+      _yaDoble.add(String(x.order_id));
       const n = _porPedido.get(String(x.order_id)) || {};
-      (_apr.dobles = _apr.dobles || []).push({ empresa: emp, order_id: x.order_id, cod: n.cod || "", rs: n.razon_social || "", cod_alt: codAlt.get(String(n.cod || "").trim()) || "" });
+      const alt = codAlt.get(String(n.cod || "").trim()) || "";
+      (_apr.dobles = _apr.dobles || []).push({ empresa: emp, order_id: x.order_id, cod: n.cod || "", rs: n.razon_social || "", cod_alt: alt, motivo: x.motivo, fc_lk: fcLk.get(alt) || "" });
     }
     nps = nps.filter(function (n) { return !fuera.has(String(n.order_id)); });
   }
@@ -33317,9 +33337,15 @@ function aprRender() {
   if (_apr.err) h += '<div class="apr-err">⚠ ' + escapeHtml(_apr.err) + '</div>';
   if (_apr.aviso) h += '<div class="apr-err">⚠ ' + escapeHtml(_apr.aviso) + '</div>';
   // v13.72: pedido de Chef que compras ya tipeó en ISIS LK (mismo CUIT, mismo día): no se programa, se avisa
-  if ((_apr.dobles || []).length) h += '<div class="apr-err">⚠ ' + _apr.dobles.length + ' pedido(s) de Chef ya está(n) en ISIS LK (mismo cliente por CUIT, mismo día) y NO se programan: ' +
-    escapeHtml(_apr.dobles.map(function (d) { return pwebPedidoLabel(d.empresa, d.order_id) + " " + (d.rs || d.cod) + (d.cod_alt ? " (LK " + d.cod_alt + ")" : ""); }).join(" · ")) +
-    '. Si el de ISIS LK está mal, anulalo ahí y recargá.</div>';
+  // v13.75 (dueño: "no es problema que sean clientes de Loeke y de Chef; los que le hacemos FC E vendiéndole art.
+  // de Loeke son los que no van"): dos carteles distintos — ya tipeado hoy en ISIS LK / cliente que factura por LK.
+  const _dobHoy = (_apr.dobles || []).filter(function (d) { return d.motivo !== "cliente_fc_lk"; });
+  const _dobFc  = (_apr.dobles || []).filter(function (d) { return d.motivo === "cliente_fc_lk"; });
+  const _dobTxt = function (d) { return pwebPedidoLabel(d.empresa, d.order_id) + " " + (d.rs || d.cod) + (d.cod_alt ? " (LK " + d.cod_alt + (d.fc_lk ? ", FC " + aprDiaCorto(d.fc_lk) : "") + ")" : ""); };
+  if (_dobHoy.length) h += '<div class="apr-err">⚠ ' + _dobHoy.length + ' pedido(s) de Chef ya está(n) en ISIS LK (mismo cliente por CUIT, mismo día) y NO se programan: ' +
+    escapeHtml(_dobHoy.map(_dobTxt).join(" · ")) + '. Si el de ISIS LK está mal, anulalo ahí y recargá.</div>';
+  if (_dobFc.length) h += '<div class="apr-err">🧾 ' + _dobFc.length + ' pedido(s) de Chef son de clientes a los que LK les factura artículos de Loeke (FC Electr. en ISIS LK en los últimos ' + (_apr.dobleDias || 180) + ' días): NO se programan, los tipea compras en ISIS LK: ' +
+    escapeHtml(_dobFc.map(_dobTxt).join(" · ")) + '.</div>';
   if (_apr.msg) h += '<div class="' + (_apr.msgErr ? "apr-err" : "apr-msg") + '">' + escapeHtml(_apr.msg) + '</div>';
   h += aprLogHtml();   // idea 2048
 

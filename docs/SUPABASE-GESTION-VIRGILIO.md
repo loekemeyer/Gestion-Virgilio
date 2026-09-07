@@ -1384,6 +1384,44 @@ es de Chef y pisa al LK 217): cuando Gestión alimente el tracking, escribir el 
 una función `gv_*` y pedir columna `empresa` en PaginaLK. Y el Excel ISIS de Facturación manda
 `N_Pedido` contador (no el id), como el mail: ISIS numera 98xxx por su cuenta.
 
+### 3.az ✅ "Los que le hacemos FC en LK no van": motivo `cliente_fc_lk` (v13.75) — 2026-09-07 lunes (feriado)
+
+**Qué dijo el dueño** (sobre el cartel de 4 dobles de v13.72): *"no es problema que sean clientes de Loeke y de
+Chef. Pero los que le hacemos FC E que le vendemos art de Loeke (buscá en sales_lines) son los que no van."*
+"FC E" = FC Electrónica (así se llama el tipo en `isis_lk.documentos`: `FC Electr. A` 20.442). Decisiones
+(AskUserQuestion): ventana **180 días**; regla en el **backend con dos fuentes**.
+
+**LK (migración `gv_clientes_lk_con_fc_v1375`).** RPC **`gv_clientes_lk_con_fc(p_cods_lk text[], p_dias int)`**
+→ `(cod_lk, ultima_fc, fcs)` desde `sales_lines` (`empresa = 'lk'`, sin `sales_excluded_items`). SECURITY
+DEFINER, execute a `authenticated`, `service_role`, `gv_reader` (como `gv_cods_lk_de_chef`); sin `anon`.
+`sales_lines` llega por **lote mensual** (`ago-26`, hasta el 31/08, importado el 02/09): las FC de esta semana
+no están ahí todavía. Probado con `SET ROLE gv_reader`: 2517 → 22/08 (3 FC), 2183 → 24/08 (4), 1816 →
+23/03, 4044 → 16/04. `sql/gv_clientes_lk_con_fc.sql`.
+
+**Virgilio (migración `gv_excluidos_cliente_fc_lk_v1375`).** (1) `PPP_Web_Config.doble_lk_dias = 180`
+(`insert … on conflict do nothing`; 0 = apagar). (2) **`gv_pedidos_web_excluidos` v3**: lee `fc_lk` de cada
+pedido y agrega el motivo **`cliente_fc_lk`** para un pedido de Chef con `cod_alt` cuando `fc_lk ≥ fecha −
+180` **o** hay `isis_lk.documentos` `factura_venta` del `cod_alt` con `fecha ≥ fecha − 180`. Pasa a
+**SECURITY DEFINER** (`search_path = public, pg_temp`) porque `anon` no tiene select en `isis_lk` (sólo
+`service_role`); los grants de execute quedaron iguales (anon, authenticated, service_role, PUBLIC). Los otros
+cuatro motivos no cambian. `sql/gv_pedidos_web_excluidos.sql`.
+
+**Impacto medido.** `SET ROLE anon` + los 4 del cartel con fecha 04/09: 201 (2517, `fc_lk` 22/08), 202
+(2183, sin `fc_lk`), 206 (1816) y 208 (4044) → `cliente_fc_lk` (los dos últimos sólo por `documentos`: FC
+02–03/09). Chef con `cod_alt` sin FC → nada; Chef sin `cod_alt` con `fc_lk` → nada; pedido LK → nada.
+Alcance: **154 de los 357** pares `gv_clientes_lk_ch` tienen FC de LK en 180 días en `sales_lines`; 489 clientes
+LK con FC en `documentos`. Nada de Producción tocado (`gv_pedidos_web_excluidos` es de Gestión; grep en el
+repo de Producción: 0).
+
+**Front / Edge.** A Programar manda `fc_lk` (llama `gv_clientes_lk_con_fc` con `p_dias = 400`, la ventana la
+decide el backend) y muestra dos carteles: ⚠ "ya está en ISIS LK (mismo día)" y 🧾 "clientes a los que LK
+les factura artículos de Loeke … los tipea compras", con código LK y fecha de la última FC. Edge Function
+**v18** hace lo mismo en `soloPendientes` (`fc_lk`); el log de la corrida cuenta `cliente_fc_lk` como motivo.
+
+**Rollback.** `update "PPP_Web_Config" set valor = 0 where clave = 'doble_lk_dias'` apaga la regla sin
+tocar código. Para volver del todo: v2 de la función (bloque v13.72 del SQL) y `drop function
+public.gv_clientes_lk_con_fc(text[], int)` en LK.
+
 ### 3.ay ✅ Cruce Facturación vs ISIS: artículo `505L` valuado + pantalla desde Facturación (v13.73) — 2026-09-07 lunes (feriado)
 
 **Qué.** Pendiente 10 del dueño ("cruce factura ISIS ↔ app como pantalla"; *"11 porque no? … ahí algo de eso

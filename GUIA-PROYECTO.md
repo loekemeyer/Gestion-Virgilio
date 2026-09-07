@@ -12,11 +12,28 @@
 > única**; no se replica. Ante la duda entre parche rápido y fix de raíz → **fix
 > de raíz**.
 >
-> Última actualización: 2026-09-07 (lunes) · Versión app al documentar: **v13.74**
+> Última actualización: 2026-09-07 (lunes) · Versión app al documentar: **v13.75**
 >
 > ⚠⚠ **Desde el lunes 2026-09-07 los operarios usan GESTIÓN, no Producción** (dueño, sábado a la
 > noche: *"el lunes van a empezar a usar GV, no más PV"*). Las tandas web viven en
 > `PPP_Web_Programacion` y Producción no las ve. URL: la de GitHub Pages de este repo.
+>
+> Nota **v13.75** (backend LK + Virgilio + Edge Function v18 + front) — **"Los que le hacemos FC en LK no van"**
+> (dueño 07/09, sobre el cartel de dobles de v13.72: *"no es problema que sean clientes de Loeke y de Chef. Pero
+> los que le hacemos FC E[lectrónica] que le vendemos art de Loeke (buscá en sales_lines) son los que no van"*).
+> Regla nueva, en el backend: un pedido web de **Chef** de un cliente al que **LK le facturó artículos de Loeke en
+> los últimos 180 días** (`PPP_Web_Config.doble_lk_dias`; 0 = apagar) **no se programa**: lo tipea compras en ISIS
+> LK. `gv_pedidos_web_excluidos` v3 devuelve el motivo **`cliente_fc_lk`** mirando dos fuentes: `fc_lk` que le
+> pasa el que llama (última FC del cliente en `sales_lines` de LK, RPC nueva **`gv_clientes_lk_con_fc`** —
+> `sales_lines` llega por lote mensual, hoy hasta el 31/08 — sin los códigos administrativos de
+> `sales_excluded_items`) y **`isis_lk.documentos`** (el PDF de cada FC, diario; por eso la función pasa a
+> SECURITY DEFINER). Ventana relativa a la fecha del pedido. `en_produccion_lk` (mismo cliente, mismo día en la
+> PPP de ISIS) sigue. A Programar muestra dos carteles distintos (⚠ ya tipeado hoy / 🧾 cliente que factura
+> por LK, con el código LK y la fecha de la última FC); la Edge Function v18 manda `fc_lk` igual. Los 4 del
+> cartel del dueño (Bazar Colucci 2517, Andre Plast 2183, Sucesión Zapata 1816, P&M Bazar 4044) caen todos:
+> 2517/2183 por `sales_lines` (agosto), 1816/4044 por `documentos` (FC del 02–03/09). Alcance: 154 de los 357
+> clientes con código en las dos empresas tienen FC de LK en 180 días. `sql/gv_pedidos_web_excluidos.sql`,
+> `sql/gv_clientes_lk_con_fc.sql`, §3.az.
 >
 > Nota **v13.74** (sólo front, CSS) — **A Programar a lo ANCHO** (dueño 07/09, con captura: *"completamente feo e
 > ilegible, hacé boxes que ocupen el ancho de la pantalla, no el alto"*). Se acabaron las columnas: pedidos,
