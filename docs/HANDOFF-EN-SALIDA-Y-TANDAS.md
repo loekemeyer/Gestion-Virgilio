@@ -104,9 +104,48 @@ sólo para Osa). Dijo *"lo veo mañana"* (08/09).
 - **El 1354 de Osa se movió a mano** de `E03A`/15-09 a **`D66G` / 09-09**, camión 66, el mismo
   día que las otras dos NP de Osa (`D66B`). Tanda propia, como lo pidió el dueño.
   Rollback: `update public."PPP_Web_Programacion" set tanda='E03A', fecha_entrega='2026-09-15' where order_id=1354;`
-- **Anomalía reportada, sin tocar**: 8 NP tienen `CCR` (control de remito antes de cargar) pero
-  no `CCN` (carga al camión): 98474, 98509, 98585–98590. Se ven con el chip `CCR sin CCN`. Es
-  cómo se está operando, no un bug de código — revisar el circuito con el dueño.
+- **`CCR sin CCN`: AUDITADO Y CERRADO — no hay nada que arreglar.** Se había reportado como
+  "el circuito se está usando mal"; **eso estaba mal dicho** y queda corregido acá.
+
+  Los números: de **866 NP con CCR, 841 también tienen CCN**. Sólo **25 (2,9%)** tienen CCR sin
+  CCN, repartidas en 8 tandas de tilde entre el 29/07 y el 04/09. O sea que el 97,1% del
+  circuito se usa bien; esto es la excepción.
+
+  Y las excepciones **se cierran solas**: de esas 25, las **17 más viejas** ya no están en En
+  Salida, y las 17 figuran en la **hoja de entregados** (`gv_ppp_entregados_meta`), ninguna con
+  CRN. Salieron, se entregaron, y el Excel de ISIS las absorbió. Las **8 que se ven hoy**
+  (98474 del 03/09, y 98509 + 98585–98590 del 04/09) son sólo la cola reciente que el Excel
+  todavía no alcanzó.
+
+  El patrón del tilde también quedó claro: las seis de la D56D las armó **Franco Ortiz (237)**
+  el 03/09 a las 14:08:49 —el mismo segundo, una tanda— y **Farias Juan Hilario (8)** les puso
+  el CCR el 04/09 a las 09:54:32, las siete dentro de una décima de segundo. Eso es el botón
+  **"✓ Controlar TODA la tanda"**, no gente controlando remito por remito.
+
+  **Conclusión: es un retraso de registro, no un circuito roto.** No hace falta cambiar nada;
+  a lo sumo, si molesta verlas, se les puede bajar el ruido en pantalla. El chip `CCR sin CCN`
+  sigue siendo útil para detectarlas.
+
+## 4.b Dato suelto sobre el recordatorio de faltantes
+
+`FAC_OPERADORA_EMAIL = "loekemeyer.n8n@gmail.com"` — el mismo mail con el que entra el dueño
+como supervisor. Por eso el recordatorio "⏰ Es hora de completar los faltantes" **le llega a
+él** (camino 2 de `cpRecordCheck`), no sólo a la operadora.
+
+El dueño reportó que le disparó **un lunes ~10:20**, y eso el código no lo explica: el filtro
+`if (!t.habil || t.min < CP_RECORD_MIN) return;` es lo primero que corre y el piso es 15:30.
+La función de hora se probó en V8 barriendo las 24 h y devuelve bien; el `alert` existe en un
+solo lugar. Queda sin explicar — la hipótesis viva es un `index.html` viejo cacheado en el
+navegador, o el reloj del dispositivo corrido. **No se tocó nada** (el dueño pidió sólo
+diagnosticar).
+
+Lo que sí está confirmado del recordatorio, y conviene arreglar cuando se encare:
+- **no tiene tope superior**: dispara de 15:30 a 23:59;
+- **el dedup vive en `localStorage`**, o sea una vez por dispositivo/navegador, no por persona;
+- **el mismo recordatorio está en Producción y en Gestión**, dominios distintos → avisa dos veces;
+- **no sabe de feriados** (sólo mira lunes a viernes, no `GV_Dias_No_Habiles`);
+- marca "ya avisé" **antes** de abrir el modal: si `showCPModal` falla, el error se traga y no
+  reintenta en todo el día.
 
 ## 5. Correcciones a la versión anterior de este archivo
 
