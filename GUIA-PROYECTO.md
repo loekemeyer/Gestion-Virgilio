@@ -12,12 +12,21 @@
 > única**; no se replica. Ante la duda entre parche rápido y fix de raíz → **fix
 > de raíz**.
 >
-> Última actualización: 2026-09-06 (domingo) · Versión app al documentar: **v13.61**
+> Última actualización: 2026-09-06 (domingo) · Versión app al documentar: **v13.64**
 >
 > ⚠⚠ **Desde el lunes 2026-09-07 los operarios usan GESTIÓN, no Producción** (dueño, sábado a la
 > noche: *"el lunes van a empezar a usar GV, no más PV"*). Las tandas web viven en
 > `PPP_Web_Programacion` y Producción no las ve. URL: la de GitHub Pages de este repo.
 >
+> Nota **v13.64** (front) — **ISIS o web: la PPP no distingue** (dueño: *"que el pedido sea de ISIS o cargado por la
+> web no me interesa para absolutamente nada; lo que me importa es para el módulo de Facturación, después de eso
+> no"*). Principio desde ahora: **fuera de Facturación, ninguna pantalla separa lo de ISIS de lo web.** Hecho en A
+> Programar: la planilla lista los **camiones del día juntos** (web `PPP_Web_Programacion` + ISIS
+> `gv_ppp_programacion_diaria`, por LETRA+NN, columna única "Camiones" y "Tandas · NP" del calendario), las tarjetas
+> de día ya no tienen el renglón "📋 ISIS: … / m³ web" (queda "N tanda(s) · N NP"), y el Tipo de la fila dice
+> **REP** (reparto) en vez de WEB. La distinción sigue existiendo por dentro (`np_web` en Facturación: bajar el
+> Excel de ISIS = facturada) y en las vistas/RPC, no en lo que se ve. Tests `apr-planilla`, `apr-programar`.
+
 > Nota **v13.61** (front) — **A Programar en PLANILLA (formato de la hoja de ISIS), tanda siempre con fecha, y
 > la PPP entera en UNA pantalla** (dueño: *"simulame un formato más similar al de PPP"*, *"no quiero tener que
 > poner el nombre de tanda yo"*, *"no puede haber tanda armada sin fecha"*, *"no quiero barras de scroll en ninguna

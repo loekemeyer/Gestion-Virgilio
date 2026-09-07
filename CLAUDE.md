@@ -25,6 +25,14 @@ inventes**.
 **Mantené `GUIA-PROYECTO.md` actualizada** cuando cambie el código o los datos
 (nuevos códigos `opcion`, tablas, flujo, versión, etc.).
 
+## ⚠ Regla del dueño (2026-09-07, v13.64): ISIS o web, da lo mismo — salvo en Facturación
+
+*"Que el pedido sea de ISIS o cargado por la web no me interesa para absolutamente nada. Lo que me importa
+es para el módulo de Facturación, después de eso no."* → **Ninguna pantalla fuera de Facturación separa,
+etiqueta ni cuenta aparte lo de ISIS y lo web** (ni "camiones web / ISIS", ni "m³ web", ni Tipo "WEB"). Por
+dentro la distinción sigue (NP web = número de pedido con prefijo, facturada = bajar el Excel de ISIS), pero
+no se muestra. Al agregar una pantalla o una columna, mostrar todo junto.
+
 ## ⚠ PROTOCOLO OBLIGATORIO: Backend vs Front-end — preguntar ANTES de implementar
 
 **Cuando alguien pide cambiar lógica** (normalización de códigos, cálculos,

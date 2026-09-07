@@ -23,6 +23,7 @@ const { chromium } = require("/opt/node22/lib/node_modules/playwright");
     ];
     _apr.salida = { 1117: { dia: "2026-09-15", motivo: "job", detalle: "Zona automática" }, 1200: { dia: null, motivo: "retira", detalle: "" } };
     _apr.tandas = []; _apr.items = {}; _apr.sel = {};
+    _apr.progIsis = [ { tanda: "D68A", fecha_entrega: "2026-09-14 00:00:00", m3: 1.2 }, { tanda: "D68B", fecha_entrega: "2026-09-14 00:00:00", m3: 0.8 }, { tanda: "D99A", fecha_entrega: "30/08/2026", m3: 5 } ];
     _apr.prog = [
       { empresa: "lk", order_id: 1344, tanda: "E01A", fecha_entrega: "2026-09-14", m3: 0.99, zona: "Zona 1 - CABA Sur" },
       { empresa: "lk", order_id: 1345, tanda: "E01B", fecha_entrega: "2026-09-14", m3: 0.48, zona: "Zona 1 - CABA Sur" },
@@ -98,7 +99,7 @@ const { chromium } = require("/opt/node22/lib/node_modules/playwright");
   chk(/aprp-tbl/.test(h) && !/apr-wrap/.test(h), "la planilla reemplaza a las tres columnas");
   chk(h.includes("LK 1117") && h.includes("LK 1117-2"), "una fila por NP: LK 1117 y LK 1117-2");
   chk((h.match(/class="b2"/g) || []).length === 1, "el bloque 2 va como fila secundaria (↳)");
-  chk(/aprp-tipo web">WEB</.test(h) && /aprp-tipo ret">RET</.test(h) && /aprp-tipo sup">SUP</.test(h), "Tipo WEB / RET / SUP");
+  chk(/aprp-tipo rep">REP</.test(h) && /aprp-tipo ret">RET</.test(h) && /aprp-tipo sup">SUP</.test(h), "Tipo REP / RET / SUP (v13.64: no dice WEB)");
   chk(h.includes("CH 0218"), "la NP de Chef se etiqueta CH 0218");
   chk(/apr-chip-sal[^>]*>🤖 se arma solo → mar 15\/9/.test(h), "Observaciones = qué va a pasar (se arma solo → mar 15/9)");
   chk(/🏭 retira/.test(h), "retira: a mano");
@@ -110,8 +111,9 @@ const { chromium } = require("/opt/node22/lib/node_modules/playwright");
   chk(opts.some((o) => /mar 15\/9 · quedan 1,99/.test(o)) && opts.some((o) => /lun 14\/9 · lleno/.test(o)), "opciones 'mar 15/9 · quedan 1,99' y 'lun 14/9 · lleno'");
   chk(/aprp-gen"[^>]*disabled/.test(h), "sin tildados el botón está apagado");
   chk(/Generar tanda con los 2 tildados/.test(r.html2) && /0,87 m³/.test(r.html2) && !/aprp-gen"[^>]*disabled/.test(r.html2), "con 2 tildados: 'Generar tanda con los 2 tildados · 0,87 m³' habilitado");
-  chk(/aprp-tag"[^>]*>E01 · 2 t · 1,47</.test(h) && /aprp-tag"[^>]*>D68 · 1 t · 0,11</.test(h), "programación: camiones web por día (E01 · 2 t · 1,47, D68 · 1 t · 0,11)");
-  chk(/6 tanda\(s\) · 13 NP · 3,14 m³/.test(h), "programación: ISIS por día");
+  chk(/aprp-tag"[^>]*>E01 · 2 t · 1,47</.test(h) && /aprp-tag"[^>]*>D68 · 3 t · 2,11</.test(h), "v13.64: camiones del día web e ISIS JUNTOS (E01 · 2 t · 1,47, D68 · 3 t · 2,11)");
+  chk(!/D99/.test(h) && !/ISIS/.test(h) && !/Gestión\)/.test(h), "v13.64: sin fila con fecha rara y sin 'ISIS' / 'Gestión' en la planilla");
+  chk(/<b>8<\/b> t · <b>20<\/b> NP/.test(h), "programación: tandas · NP del día, todo junto");
   chk(/class="queda">1,99</.test(h) && /class="lleno">lleno</.test(h) && /class="pronto">muy pronto</.test(h), "quedan / lleno / muy pronto");
   chk(r.mezcla.err === true && /una sola empresa/.test(r.mezcla.msg) && r.mezcla.calls === 0, "LK + Chef tildados juntos → aviso, sin RPC");
   chk(r.ok.fns.join(">") === "gv_ppp_web_tanda_nueva>gv_ppp_web_tanda_agregar>gv_ppp_web_tanda_programar", "generar = nueva → agregar → programar (" + r.ok.fns.join(">") + ")");

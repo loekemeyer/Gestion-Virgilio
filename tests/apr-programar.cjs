@@ -135,8 +135,9 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
   chk(r.der.includes("apr-dia-lleno") && r.der.includes("completo"), "marca el día que llegó al límite");
   chk(r.der.includes("apr-dia-con"),           "marca el día que ya tiene tandas");
   // v13.18: lo de ISIS se muestra aparte y no cierra el día (el cupo sigue siendo web)
-  chk(/apr-dia-isis[^<]*📋 ISIS: <b>13,45 m³<\/b> · 7 tanda\(s\) · 11 NP/.test(r.der), "v13.18: línea 'ISIS: 13,45 m³ · 7 tanda(s) · 11 NP' en el día");
-  chk((r.der.match(/apr-dia-isis/g) || []).length === 1, "v13.18: sólo el día con ISIS lleva la línea");
+  // v13.64 (dueño: "ISIS o web no me interesa para nada"): un solo renglón "tandas · NP", sin "ISIS" ni "web"
+  chk(!/ISIS|m³ web/.test(r.der), "v13.64: el día no distingue ISIS de web");
+  chk(/apr-dia-sub"><span><b>1<\/b> tanda\(s\) · <b>2<\/b> NP/.test(r.der), "v13.64: renglón 'tanda(s) · NP' del día");
   // v13.21: el chip dice qué día sale, no cuándo llegó (eso queda en el title)
   // v13.47 (dueño: "mandá directo a Programación si ya está"): zona manual con camión → la programa el automático
   chk(/apr-chip-sal" title="Llegó el 2026-08-20\. Ya hay camión a la zona 3: D60A Lo programa el automático[^"]*">🚚 va al camión del mar 8\/9 · en minutos</.test(r.izq), "v13.47: chip .va al camión del mar 8/9 · en minutos. con el motivo en el title");

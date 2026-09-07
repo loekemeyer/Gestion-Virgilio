@@ -769,7 +769,7 @@ button {
 .aprp-tbl td.obs{ white-space:normal; max-width:250px; line-height:1.2; font-size:11.5px; }
 .aprp-tbl td.obs .apr-chip{ font-size:11px; }
 .aprp-tipo{ display:inline-block; padding:0 6px; border-radius:999px; font-size:10.5px; font-weight:800; letter-spacing:.3px; }
-.aprp-tipo.web{ background:#dbeafe; color:#1e40af; } .aprp-tipo.ret{ background:#e2e8f0; color:#334155; }
+.aprp-tipo.rep{ background:#dbeafe; color:#1e40af; } .aprp-tipo.ret{ background:#e2e8f0; color:#334155; }
 .aprp-tipo.sup{ background:#fef3c7; color:#92400e; } .aprp-tipo.exp{ background:#0f172a; color:#fff; }
 .aprp-z{ display:inline-block; padding:0 6px; border-radius:999px; font-size:10.5px; font-weight:700; color:#fff; background:#2563eb; }
 .aprp-z.z4{ background:#16a34a; } .aprp-z.z5{ background:#0891b2; } .aprp-z.z6{ background:#0891b2; } .aprp-z.z7{ background:#14b8a6; }
@@ -7191,7 +7191,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v13.63";
+const APP_VERSION = "v13.64";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -32784,6 +32784,7 @@ let _apr = {
   vista: (function () { try { return localStorage.getItem("gv_apr_vista") === "tarjetas" ? "tarjetas" : "planilla"; } catch (_e) { return "planilla"; } })(),   // v13.61
   sel: {},          // v13.61: empresa:order_id → true (tildados en la planilla)
   prog: [],         // v13.61: filas web programadas (tanda, fecha_entrega, m3, zona) para "Programación próximos días"
+  progIsis: [],     // v13.64: ídem, lo que ISIS dejó (tanda, fecha_entrega, m3) — se muestran juntos, sin distinguir
   horizonte: 21,    // cuántos días muestra la lista
   q: "", exp: {}, drag: null, dragTanda: null, msg: "", msgErr: false,
   ocupado: false    // hay una acción en vuelo: no dejar arrastrar encima
@@ -32999,11 +33000,13 @@ async function aprCargar() {
   try {
     // v13.58: las dos empresas juntas, sin filtro. `order_id` se repite entre LK y Chef
     // (1350 de LK ≠ 1350 de Chef), así que la clave de "ya está afuera" es empresa+order_id.
-    const [peds, prog, items, tandas] = await Promise.all([
+    const [peds, prog, items, tandas, progIsis] = await Promise.all([
       aprTraerTodos(),
       aprGet('PPP_Web_Programacion?select=empresa,order_id,tanda,fecha_entrega,m3,zona&tanda=not.is.null&limit=20000'),
       aprGet('PPP_Web_Tanda_Items?select=*&limit=20000'),
       aprGet('gv_ppp_web_tandas_abiertas?select=*&order=codigo.asc'),
+      // v13.64: las tandas que ISIS dejó programadas, para listar los camiones del día junto con los web
+      aprGet('gv_ppp_programacion_diaria?select=tanda,fecha_entrega,m3&tanda=not.is.null&fecha_entrega=gte.' + aprISO(new Date()) + '&limit=5000').catch(function () { return []; }),
       aprCargarCalendario(),  // v13.11: en paralelo (estaba en serie, una vuelta de red más)
       aprCargarLog()          // idea 2048: ¿corrió el armado automático?
     ]);
@@ -33020,6 +33023,7 @@ async function aprCargar() {
 
     _apr.tandas = tandas;
     _apr.prog = prog;   // v13.61
+    _apr.progIsis = progIsis || [];   // v13.64
     _apr.items = {};
     for (const it of items) { (_apr.items[it.codigo] = _apr.items[it.codigo] || []).push(it); }
     _apr.listo = true;
@@ -33458,7 +33462,7 @@ function aprPlanTipo(p) {
   if (/retira/i.test(z)) return "ret";
   if (/super|súper/i.test(z)) return "sup";
   if (/^Exp\./i.test(dir) || /Zona\s*7|expo/i.test(z)) return "exp";
-  return "web";
+  return "rep";   // reparto (v13.64: no dice "WEB" — de dónde vino el pedido no importa)
 }
 function aprPlanZonaChip(z) {
   const m = /^Zona\s*([0-9]+)/i.exec(String(z || ""));
@@ -33535,10 +33539,12 @@ function aprPlanillaHtml() {
   h += '</tbody></table></div>';
 
   // Programación próximos días (sólo lectura): días hábiles del calendario + camiones web + ISIS
+  // v13.64 (dueño: "ISIS o web no me interesa para nada; sólo en Facturación"): un solo listado de
+  // camiones por día, web e ISIS juntos, por LETRA+NN.
   const byDia = {};
-  for (const r of (_apr.prog || [])) {
-    if (!r.fecha_entrega || !r.tanda) continue;
-    const k = String(r.fecha_entrega).slice(0, 10);
+  for (const r of (_apr.prog || []).concat(_apr.progIsis || [])) {
+    if (!r.fecha_entrega || !r.tanda || !/^\d{4}-\d{2}-\d{2}/.test(String(r.fecha_entrega).trim())) continue;
+    const k = String(r.fecha_entrega).trim().slice(0, 10);
     const cam = _pppTandaNum(r.tanda) || String(r.tanda).toUpperCase();
     const d = byDia[k] = byDia[k] || {};
     const c = d[cam] = d[cam] || { tandas: {}, m3: 0, np: 0 };
@@ -33546,7 +33552,7 @@ function aprPlanillaHtml() {
   }
   h += '<div class="aprp-sec"><div class="aprp-t prog">📅 PROGRAMACIÓN PRÓXIMOS DÍAS <small>sólo lectura · el detalle está en la solapa Programación</small>' +
        '<span class="r">cupo por día = pickers × 3 m³ · <a href="#" onclick="aprMasDias();return false;">ver más días</a></span></div>' +
-       '<table class="aprp-tbl aprp-dia"><thead><tr><th>Día</th><th>m³ / cupo</th><th></th><th>Quedan</th><th>Camiones web (Gestión)</th><th>ISIS</th></tr></thead><tbody>';
+       '<table class="aprp-tbl aprp-dia"><thead><tr><th>Día</th><th>m³ / cupo</th><th></th><th>Quedan</th><th>Tandas · NP</th><th>Camiones</th></tr></thead><tbody>';
   const cal = (_apr.cal || []).filter(function (d) { return d.habil && !d.pasado; });
   if (!cal.length) h += '<tr><td colspan="6" class="aprp-vacio">Sin calendario.</td></tr>';
   for (const d of cal) {
@@ -33556,11 +33562,11 @@ function aprPlanillaHtml() {
     const web = Object.keys(cams).sort().map(function (k) {
       const c = cams[k]; return '<span class="aprp-tag" title="' + escapeHtml(Object.keys(c.tandas).sort().join(" · ")) + '">' + escapeHtml(k) + ' · ' + Object.keys(c.tandas).length + ' t · ' + aprNum(c.m3, 2) + '</span>';
     }).join("");
-    const isis = (Number(d.tandas_isis) || 0) > 0 ? '<span class="aprp-tag isis">' + d.tandas_isis + ' tanda(s) · ' + (d.np_isis || 0) + ' NP · ' + aprNum(d.m3_isis, 2) + ' m³</span>' : '<span class="aprp-hint">—</span>';
+    const tot = (Number(d.tandas) || 0) > 0 ? '<b>' + d.tandas + '</b> t · <b>' + (d.np || 0) + '</b> NP' : '<span class="aprp-hint">—</span>';
     h += '<tr><td class="d">' + aprDiaCorto(d.dia) + '</td><td>' + aprNum(m3, 2) + ' / ' + aprNum(cupo, 2) + '</td>' +
          '<td><span class="aprp-bar"><i' + (resta <= 0 ? ' class="f"' : '') + ' style="width:' + pct + '%"></i></span></td>' +
          '<td>' + (d.muy_pronto ? '<span class="pronto">muy pronto</span>' : (resta > 0 ? '<span class="queda">' + aprNum(resta, 2) + '</span>' : '<span class="lleno">lleno</span>')) + '</td>' +
-         '<td>' + (web || '<span class="aprp-hint">—</span>') + '</td><td>' + isis + '</td></tr>';
+         '<td>' + tot + '</td><td>' + (web || '<span class="aprp-hint">—</span>') + '</td></tr>';
   }
   h += '</tbody></table></div>';
   return h;
@@ -33665,14 +33671,10 @@ function aprColDias() {
           '</span>' +
         '</div>' +
         '<div class="apr-dia-barra"><i style="width:' + pct + '%"></i></div>' +
-        // renglón 3: tandas web del día + lo que ISIS ya tiene (v13.18, dueño: "acá sigue figurando cero pero sí hay en la PPP")
-        ((Number(d.tandas) > 0 || (d.habil !== false && Number(d.m3_isis) > 0))
-          ? '<div class="apr-dia-sub">' +
-              (Number(d.tandas) > 0 ? '<span><b>' + d.tandas + '</b> tanda(s)' + (Number(d.m3_web) > 0 ? ' · ' + aprNum(Number(d.m3_web), 2) + ' m³ web' : '') + '</span>' : '') +
-              (d.habil !== false && Number(d.m3_isis) > 0
-                ? '<span class="apr-dia-isis" title="Programado por ISIS para ese día (lo que se ve en la solapa Programación). Desde v13.23 cuenta para el cupo del día (pickers × 3 m³).">📋 ISIS: <b>' + aprNum(Number(d.m3_isis), 2) + ' m³</b> · ' + (Number(d.tandas_isis) || 0) + ' tanda(s) · ' + (Number(d.np_isis) || 0) + ' NP</span>'
-                : '') +
-            '</div>'
+        // renglón 3 (v13.64, dueño: "que el pedido sea de ISIS o de la web no me interesa para nada"):
+        // tandas y NP del día, todo junto. Antes (v13.18) separaba "m³ web" de "📋 ISIS".
+        (Number(d.tandas) > 0
+          ? '<div class="apr-dia-sub"><span><b>' + d.tandas + '</b> tanda(s) · <b>' + (Number(d.np) || 0) + '</b> NP</span></div>'
           : '') +
       '</div>' +
     '</div>';
