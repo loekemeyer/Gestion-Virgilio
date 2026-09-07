@@ -3415,7 +3415,20 @@ table.facfc-tbl tr.facneto-row-falt td{ background: #fef2f2; }
   padding: 12px;
 }
 #facturacionModal.show{ display: block; }
-.fac-banner,.fac-top,.fac-cierre,.fac-empty,#facNcList{
+/* v13.78: checklist manual de ISIS (NP facturadas por Chef con artículos de Loeke, códigos con L) */
+.fac-ajustes{ background:#f5f3ff; border:2px solid #8b5cf6; color:#3b0764; padding:8px 12px; border-radius:8px; margin-bottom:10px; font-size:13px; }
+.fac-ajustes h3{ margin:0 0 4px; font-size:14px; font-weight:800; }
+.fac-ajustes .fa-ayuda{ font-size:12px; color:#5b21b6; margin-bottom:6px; }
+.fac-ajustes table{ width:100%; border-collapse:collapse; background:#fff; border-radius:6px; overflow:hidden; }
+.fac-ajustes th, .fac-ajustes td{ padding:5px 8px; border-bottom:1px solid #e9d5ff; text-align:left; vertical-align:top; font-size:12.5px; }
+.fac-ajustes th{ background:#ede9fe; font-size:11.5px; text-transform:uppercase; letter-spacing:.3px; }
+.fac-ajustes .fa-arts{ font-family:ui-monospace, Menlo, monospace; font-size:12px; color:#1e1b4b; }
+.fac-ajustes label{ display:inline-flex; align-items:center; gap:6px; white-space:nowrap; cursor:pointer; font-weight:700; }
+.fac-ajustes input[type=checkbox]{ width:20px; height:20px; margin:0; }
+.fac-ajustes .fa-hecho{ color:#15803d; font-weight:600; font-size:11.5px; }
+.fac-ajustes .fa-np{ font-weight:900; color:#0f172a; white-space:nowrap; }
+.fac-ajustes .fa-fac{ font-size:11px; color:#6b21a8; white-space:nowrap; }
+.fac-banner,.fac-top,.fac-cierre,.fac-empty,#facNcList,.fac-ajustes{
   max-width: 1400px;
   margin-left: auto;
   margin-right: auto;
@@ -4017,6 +4030,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
 </style>
 <div id="facturacionModal">
   <div class="fac-banner" id="facBanner" style="display:none"></div>
+  <div class="fac-ajustes" id="facAjustesIsis" style="display:none"></div>
   <div class="fac-top">
     <h1><img class="hdr-logo" src="icon.svg" alt="">Facturación — NPs a FC</h1>
     <div class="fac-stats">
@@ -7187,7 +7201,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v13.77";
+const APP_VERSION = "v13.78";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -23512,14 +23526,21 @@ async function stockSalidaFacturadoNP(np, tanda, legajo) {
     const net = await _stockAfacturarRestanteTanda(t);
     const netN = {}; Object.keys(net).forEach(function (k) { netN[String(k).toUpperCase().trim().replace(/^0+(?=.)/, "")] = { key: k, sum: net[k].sum, desc: net[k].desc }; });
     const rows = [];
+    const _nk = function (s) { return String(s).toUpperCase().trim().replace(/^0+(?=.)/, ""); };
     Object.keys(comp).forEach(function (c) {
-      const slot = netN[String(c).toUpperCase().trim().replace(/^0+(?=.)/, "")];
+      // v13.78 (dueño: "para vos en GV, descontá directo stock de LK"): un artículo con L (438EL, 505L) está en
+      // "a facturar" con su código de góndola Loeke (438E LK / 505), no crudo. Antes no matcheaba y quedaba
+      // colgado en a_facturar (medido: D58A|44601 drenó 097…922 pero no 438EL/439EL).
+      const esL = /[0-9E]L$/.test(String(c).toUpperCase().trim());
+      let slot = netN[_nk(c)];
+      if (!slot && esL) { try { const pel = _nk(pkStripL(c)); slot = netN[_nk(pkResolveArt(c, n))] || netN[pel + " LK"] || netN[pel]; } catch (_e) {} }
       if (!slot) return;
       const disp = Math.round(slot.sum * 1000) / 1000;
       const bajar = Math.min(comp[c], disp);
       if (bajar > 0) {
         const row = { cod_art: slot.key, descripcion: slot.desc || null, deposito: "a_facturar", delta: -bajar, tipo: "facturado", ref: refNp, ubicacion: n, legajo: String(legajo || "") };
-        if (empWeb) row.empresa = empWeb;   // solo las web; las de ISIS no cambian
+        if (esL) row.empresa = "LK";          // v13.78: la L manda al stock de Loeke, sea la NP LK o CH
+        else if (empWeb) row.empresa = empWeb;   // solo las web; las de ISIS no cambian
         rows.push(row); slot.sum -= bajar;
       }
     });
@@ -37374,8 +37395,71 @@ function facRenderTicked(){
   box.innerHTML = '<div class="fac-tk-head">✓ Ya tildados hoy · ' + nps.length + '</div><div class="fac-tk-grid">' + items + '</div>';
   box.style.display = "";
 }
+/* v13.78 — CHECKLIST MANUAL DE ISIS (dueño, 07/09): "cuando se va a facturar por Chef [artículos de Loeke, códigos
+   con L] hay que hacer ajuste NEGATIVO de stock de LK en ISIS LK y ajuste POSITIVO en ISIS CH, para que al facturar
+   quede neteado; y para vos en GV, descontá directo stock de LK". Qué NP y qué artículos lo dice el backend
+   (`gv_fac_ajustes_isis`: Entregas_Virgilio con L, últimos 90 días, cajas entregadas por artículo); las tildes se
+   guardan en `GV_Fac_Ajustes_ISIS` (np, paso, legajo) y la NP sale del panel cuando están los dos pasos. */
+let _facAjustes = { rows: [], at: 0, cargando: false };
+async function facAjustesIsisCargar(force) {
+  if (_facAjustes.cargando) return;
+  if (!force && Date.now() - _facAjustes.at < 30000) { facAjustesIsisRender(); return; }
+  _facAjustes.cargando = true;
+  try {
+    const r = await fetch(SUPABASE_URL + "/rest/v1/gv_fac_ajustes_isis?select=*&completo=eq.false&order=facturado_at.desc.nullslast,armada_at.desc&limit=200",
+      { headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY }, cache: "no-store" });
+    _facAjustes.rows = r.ok ? (await r.json() || []) : [];
+    _facAjustes.at = Date.now();
+  } catch (_e) { _facAjustes.rows = []; }
+  finally { _facAjustes.cargando = false; }
+  facAjustesIsisRender();
+}
+function facAjustesIsisRender() {
+  const box = document.getElementById("facAjustesIsis"); if (!box) return;
+  const rows = (_facAjustes.rows || []).filter(function (x) { return !x.completo; });
+  if (!rows.length) { box.style.display = "none"; box.innerHTML = ""; return; }
+  const fmt = function (ts) { if (!ts) return ""; const d = new Date(ts); if (isNaN(d)) return ""; const i = new Date(d.getTime() - 3 * 3600e3).toISOString(); return i.slice(8, 10) + "/" + i.slice(5, 7); };   // ART fijo UTC-3, sin depender del locale
+  let h = '<h3>🧾 Ajustes manuales en ISIS · ' + rows.length + ' NP con artículos de Loeke que se facturan por Chef</h3>' +
+    '<div class="fa-ayuda">Antes de facturar en ISIS Chef: <b>ajuste NEGATIVO</b> de esas cajas en ISIS <b>LK</b> (código sin L) y <b>ajuste POSITIVO</b> en ISIS <b>CH</b> (código con L), así al facturar queda neteado. Gestión ya descuenta el stock de Loeke sola. Tildá cada paso cuando lo hagas; la NP desaparece con los dos.</div>' +
+    '<table><thead><tr><th>NP</th><th>Cliente</th><th>Artículos (cajas entregadas)</th><th>ISIS LK · ajuste −</th><th>ISIS CH · ajuste +</th></tr></thead><tbody>';
+  rows.forEach(function (x) {
+    const arts = (x.articulos || []).map(function (a) { return escapeHtml(String(a.art_lk)) + '→' + escapeHtml(String(a.art_ch)) + ' ×' + escapeHtml(String(a.cajas)); }).join(' · ');
+    const np = escapeHtml(String(x.np));
+    const chk = function (paso, at, por) {
+      return '<label><input type="checkbox" class="fa-chk" data-np="' + np + '" data-paso="' + paso + '"' + (at ? ' checked' : '') + ' onchange="facAjustesIsisToggle(this)"> ' +
+        (at ? '<span class="fa-hecho">hecho ' + fmt(at) + (por ? ' · ' + escapeHtml(String(por)) : '') + '</span>' : 'pendiente') + '</label>';
+    };
+    h += '<tr><td><span class="fa-np">' + np + '</span>' + (x.tanda ? ' <span class="fa-fac">' + escapeHtml(String(x.tanda)) + '</span>' : '') +
+      (x.facturado_at ? '<div class="fa-fac">facturada ' + fmt(x.facturado_at) + '</div>' : '<div class="fa-fac">armada, sin facturar</div>') + '</td>' +
+      '<td>' + escapeHtml(String(x.cod_cliente || '')) + ' ' + escapeHtml(String(x.razon_social || '')) + '</td>' +
+      '<td class="fa-arts">' + arts + '</td>' +
+      '<td>' + chk('lk_neg', x.lk_neg_at, x.lk_neg_por) + '</td>' +
+      '<td>' + chk('ch_pos', x.ch_pos_at, x.ch_pos_por) + '</td></tr>';
+  });
+  h += '</tbody></table>';
+  box.innerHTML = h; box.style.display = "block";
+}
+async function facAjustesIsisToggle(chk) {
+  const np = chk.getAttribute("data-np"), paso = chk.getAttribute("data-paso"), on = !!chk.checked;
+  const headers = await facAuthWriteHeaders({ Prefer: "resolution=merge-duplicates,return=minimal" });
+  if (!headers) { chk.checked = !on; facShowToast(authNoSesionMsg("Iniciá sesión con Google para tildar")); return; }
+  try {
+    let r;
+    if (on) r = await fetch(SUPABASE_URL + "/rest/v1/GV_Fac_Ajustes_ISIS?on_conflict=np,paso", { method: "POST", headers, body: JSON.stringify({ np, paso, legajo: _faltMiLegajo() || null }) });
+    else r = await fetch(SUPABASE_URL + "/rest/v1/GV_Fac_Ajustes_ISIS?np=eq." + encodeURIComponent(np) + "&paso=eq." + encodeURIComponent(paso), { method: "DELETE", headers });
+    if (!r.ok) throw new Error("HTTP " + r.status);
+    const row = (_facAjustes.rows || []).find(function (x) { return String(x.np) === String(np); });
+    if (row) { row[paso + "_at"] = on ? new Date().toISOString() : null; row[paso + "_por"] = on ? (_faltMiLegajo() || null) : null; row.completo = !!(row.lk_neg_at && row.ch_pos_at); }
+    if (row && row.completo) facShowToast("NP " + np + ": ajustes ISIS completos ✓");
+    facAjustesIsisRender();
+  } catch (e) { chk.checked = !on; facShowToast("No se pudo guardar: " + e.message); }
+}
+window.facAjustesIsisToggle = facAjustesIsisToggle;
+window.facAjustesIsisCargar = facAjustesIsisCargar;
+
 function facRender(tandas){
   _facLastTandas = tandas || [];   // v5.70: el filtro "solo faltante" re-dibuja este mismo set
+  try { facAjustesIsisCargar(false); } catch (_e) {}   // v13.78: checklist manual de ISIS (no bloquea la lista)
   // Aplanamos: una fila por NP pendiente, llevando tanda + fecha salida
   // como cols (antes vivían en el header de cada grupo, ahora se repiten
   // por fila). Permite ordenar/filtrar globalmente sin agrupación visual.

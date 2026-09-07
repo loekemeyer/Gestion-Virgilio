@@ -1384,6 +1384,33 @@ es de Chef y pisa al LK 217): cuando Gestión alimente el tracking, escribir el 
 una función `gv_*` y pedir columna `empresa` en PaginaLK. Y el Excel ISIS de Facturación manda
 `N_Pedido` contador (no el id), como el mail: ISIS numera 98xxx por su cuenta.
 
+### 3.bc ✅ Checklist manual de ISIS (ajuste − LK / + CH por NP con artículos L) (v13.78) — 2026-09-07 lunes (feriado)
+
+**Qué dijo el dueño.** *"Cuando se va a facturar por Chef hay que: hacer ajuste negativo de stock de LK en ISIS
+LK, y hacer ajuste positivo en CH, para que al facturar quede neteado. Y para vos en GV, descontá directo stock de
+LK."* Es manual en ISIS; Gestión lleva el checklist.
+
+**Migración `gv_fac_ajustes_isis_v1378`** (objetos nuevos, `sql/gv_fac_ajustes_isis.sql`):
+- **`GV_Fac_Ajustes_ISIS`** (np, paso `lk_neg`|`ch_pos`, hecho_at, legajo; pk np+paso). RLS: select anon +
+  authenticated; insert/delete authenticated (el front escribe con la sesión Google, `facAuthWriteHeaders`).
+- **`gv_fac_ajustes_isis`** (security_invoker, select anon + authenticated): NP armadas con artículos `^[0-9]+E?L$` en
+  `Entregas_Virgilio` (últimos 90 días, última fila por np+cod como el Excel), `articulos` = [{art_lk, art_ch,
+  cajas}], `Facturacion_NP.facturado_at`, los dos pasos y `completo`.
+
+**Impacto medido** (`SET ROLE anon`): 3 NP hoy — 44483 (C66A, 439EL ×15, facturada 07/07), 44600 (D58A, 439EL
+×16, 02/09), 44601 (D58A, 438EL ×16, 02/09), todas de Dorinka 2686, ninguna completa. Sólo lectura de tablas
+compartidas; nada de Producción tocado.
+
+**Front (v13.78).** Panel `#facAjustesIsis` arriba de la lista de Facturación (`facAjustesIsisCargar`, cache 30 s,
+llamado desde `facRender`; `facAjustesIsisToggle` hace POST `on_conflict=np,paso` / DELETE). **Stock en GV:**
+`stockSalidaFacturadoNP` no drenaba de "a facturar" los artículos con L — el TAL dice `438EL` y la góndola
+`438E LK` (medido: D58A|44601 drenó 097…922 y no 438EL/439EL) — ahora prueba `pkResolveArt` / `pkStripL` y
+manda `empresa = LK` para la L. Es lógica del front porque los movimientos de stock los genera el front
+(`stockMove`), como todo el módulo; el trigger `zz_normalizar_empresa` de Producción respeta la empresa explícita.
+
+**Rollback.** `drop view gv_fac_ajustes_isis; drop table "GV_Fac_Ajustes_ISIS";` y el front oculta el panel si la
+vista no responde.
+
 ### 3.bb ✅ Tierra del Fuego: pedido LK con L, Excel a ISIS Chef; regla `cliente_fc_lk` apagada (v13.77) — 2026-09-07 lunes (feriado)
 
 **Qué dijo el dueño.** *"Buscá los clientes de Loeke que se entreguen en la provincia de Tierra del Fuego. Esos

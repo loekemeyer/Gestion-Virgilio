@@ -12,11 +12,27 @@
 > única**; no se replica. Ante la duda entre parche rápido y fix de raíz → **fix
 > de raíz**.
 >
-> Última actualización: 2026-09-07 (lunes) · Versión app al documentar: **v13.77**
+> Última actualización: 2026-09-07 (lunes) · Versión app al documentar: **v13.78**
 >
 > ⚠⚠ **Desde el lunes 2026-09-07 los operarios usan GESTIÓN, no Producción** (dueño, sábado a la
 > noche: *"el lunes van a empezar a usar GV, no más PV"*). Las tandas web viven en
 > `PPP_Web_Programacion` y Producción no las ve. URL: la de GitHub Pages de este repo.
+>
+> Nota **v13.78** (backend Virgilio + front) — **Checklist manual de ISIS en Facturación** (dueño 07/09: *"cuando se
+> va a facturar por Chef hay que hacer ajuste negativo de stock de LK en ISIS LK, y ajuste positivo en CH, para que
+> al facturar quede neteado. Y para vos en GV, descontá directo stock de LK"*). Aplica a toda NP con artículos de
+> Loeke que se factura por Chef, o sea códigos con **L** (pedidos de la página de Chef de clientes LK, v13.71, y
+> pedidos LK de Tierra del Fuego, v13.77). Backend: tabla **`GV_Fac_Ajustes_ISIS`** (np, paso `lk_neg` / `ch_pos`,
+> hecho_at, legajo; RLS) y vista **`gv_fac_ajustes_isis`** (por NP armada con L en `Entregas_Virgilio`, 90 días:
+> cajas entregadas por artículo, `art_lk` sin L / `art_ch` con L, facturada o no, qué paso está hecho, `completo`).
+> Front: panel violeta **🧾 Ajustes manuales en ISIS** arriba de la lista de Facturación con una fila por NP
+> pendiente (artículos `438E→438EL ×1`, dos tildes: *ISIS LK · ajuste −* / *ISIS CH · ajuste +*, quién y cuándo);
+> con los dos pasos la NP desaparece; sin pendientes el panel se oculta. Hoy aparecen 3 NP reales de Dorinka
+> (44483, 44600, 44601: 438EL/439EL, facturadas en Producción) para que se tilden. **Stock en GV**: el drenaje de
+> "a facturar" al facturar (`stockSalidaFacturadoNP`) no encontraba los artículos con L (el TAL dice `438EL`, la
+> góndola guarda `438E LK`) y los dejaba colgados — medido en D58A|44601; ahora matchea por `pkResolveArt` y
+> manda `empresa = LK` para la L, sea la NP LK o CH. Test `tests/fac-ajustes-isis.cjs`. `sql/gv_fac_ajustes_isis.sql`,
+> §3.bc.
 >
 > Nota **v13.77** (backend LK + front) — **TIERRA DEL FUEGO: "el pedido se arma como Loeke (con una L al final) y
 > después va a ISIS de CH, no de LK"** (dueño 07/09). Aclaración del dueño sobre v13.75/76: "FC E" era la **Factura E**
