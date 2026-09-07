@@ -79,19 +79,31 @@ with (security_invoker = true) as
      and lower(coalesce(d.zona_expreso,'')) not like '%retira%'
    order by d.empresa, d.cod;
 
-create or replace view public.gv_geo_cobertura
+-- La cobertura cuenta las DOS tablas. La primera versión miraba sólo `GV_Geo_Cliente` y
+-- subestimaba feo: **692 direcciones del padrón ya estaban en `PPP_Geo`** —la tabla compartida
+-- que Producción viene llenando hace años— y el geocodificador las saltea con razón, pero la
+-- vista las daba por faltantes. Al pasar el `dir_key` al barrio DE ENTREGA muchas empezaron a
+-- matchear de golpe. Se reporta también `retira`, que no necesita ubicación.
+drop view if exists public.gv_geo_cobertura;
+create view public.gv_geo_cobertura
 with (security_invoker = true) as
-  with p as (select * from public."GV_Clientes_Direcciones"),
-       u as (select distinct cod, dir_key from public."GV_Geo_Cliente" where lat is not null)
-  select case when coalesce(p.provincia,'') in ('CABA','Buenos Aires')
+  select case when coalesce(d.provincia,'') in ('CABA','Buenos Aires')
               then 'Cliente AMBA' else 'Cliente del interior (entrega al expreso)' end as ambito,
-         p.empresa,
+         d.empresa,
          count(*) as direcciones,
-         count(*) filter (where u.cod is not null) as ubicadas,
-         count(*) filter (where u.cod is null) as faltan,
-         round(100.0*count(*) filter (where u.cod is not null)/nullif(count(*),0),1) as pct
-    from p left join u on u.cod = p.cod and u.dir_key = p.dir_key
-   group by 1,2 order by 1,2;
+         count(*) filter (where u.ubicada)                     as ubicadas,
+         count(*) filter (where not u.ubicada and u.retira)     as retira,
+         count(*) filter (where not u.ubicada and not u.retira) as faltan,
+         round(100.0 * count(*) filter (where u.ubicada) / nullif(count(*), 0), 1) as pct
+    from public."GV_Clientes_Direcciones" d
+    cross join lateral (
+      select (exists (select 1 from public."GV_Geo_Cliente" g
+                       where g.cod = d.cod and g.dir_key = d.dir_key and g.lat is not null)
+           or exists (select 1 from public."PPP_Geo" p
+                       where p.dir_key = d.dir_key and p.lat is not null)) as ubicada,
+             (lower(coalesce(d.zona_expreso,'')) like '%retira%')          as retira
+    ) u
+   group by 1, 2 order by 1, 2;
 
 -- Rescate de las ya ubicadas: copiar sus coordenadas de la clave vieja a la nueva.
 insert into public."GV_Geo_Cliente"
