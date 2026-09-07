@@ -1241,6 +1241,48 @@ los del limbo, la RPC los va a marcar `en_produccion` sola y dejan de aparecer.
 `gestion_desde`; redeployar la Edge Fn v9 (no llama a la RPC); front v12.88. Los feeds de LK
 tal como estaban antes de todo el día: `sql/backups/gv_pedidos_web_np_feeds_20260904_pre_filtro_enviado.sql`.
 
+### 3.ca ✅ El pedido web se engancha al camión que YA va al cliente (v13.93) — 2026-09-07
+
+**El caso.** Osa Distribuidora (cod 2533, Villa Lugano, Zona 1) tenía camión el miércoles 9 —
+tanda `D66B`, 4,04 m³ en dos NP. Un pedido web del mismo cliente, de 0,026 m³, se programó solo
+para el martes **15**, en camión aparte: 26 litros, seis días después, mismo cliente y mismo barrio.
+
+**Dos causas, las dos de diseño.** (1) El colchón de 4 días hábiles tapaba el 9: un lunes 7 el
+mínimo era el 11. (2) El automático **nunca miraba si el cliente ya tenía camión ese día** — sólo
+cupo por día y cercanía entre las tandas de esa misma corrida, y la `D66B` es de ISIS. El cupo
+tampoco lo dejaba: el 9 estaba en 7,03 m³ contra un cupo de 6.
+
+**Las dos definiciones del dueño, textuales:** *pisa el colchón Y el cupo* (único modo que
+resuelve el caso; el cupo mide picking y sumarle 26 litros a un cliente que ya tiene 4 m³
+armándose ese día es casi gratis y ahorra un camión), y *"tiene que buscar para atrás, no para
+adelante"* — la regla **adelanta** el pedido, nunca lo demora.
+
+**Cómo quedó.** Función nueva `gv_ppp_web_dia_cliente(empresa, cod, desde, hasta)`: el día más
+temprano en que ese cliente ya tiene entrega, mirando lo web y el espejo de ISIS, sólo días con
+camión de reparto (exige `Zona N`, saltea `KRIKOS`) y separando por empresa (el cod es por
+empresa: LK 2533 ≠ Chef 2533). Se engancha en el **bloque (a2)** de
+`gv_ppp_web_armar_pendientes`, con ventana `[mañana … v_techo - 1]`, donde `v_techo` es el día
+que elegiría la cascada — por eso sólo puede adelantar.
+
+**No hizo falta código para pisar nada**: el colchón lo aplica el llamador, así que una fecha
+explícita ya lo saltea; y pasar el cod en `p_forzar_cods` lo marca `prioritario`, que es la rama
+del filtro de cupo que entra siempre. Con `p_incluir_manuales = true` vale para todas las zonas.
+La v13.47 (§3.ao) ya hacía esto pero **por zona**; ésta es **por cliente**. El (a2) va **antes**
+de la cascada (b) a propósito: lo que se programa ahí queda con tanda y (b) lo saltea solo.
+
+**Probado en transacción revertida** (3 casos):
+
+| cod | situación | resultado |
+|---|---|---|
+| 2533 Osa | camión el 09 | **D66G · 09/09** — adelantado |
+| 3872 A L S.A | entrega el 14 | **E01A · 14/09** — adelantado del 15 al 14 |
+| 4999 (inexistente) | sin entrega | **E03A · 15/09** — camino normal, sin tocar |
+
+Rollback verificado: 0 filas de prueba, `PPP_Web_Programacion` quedó en 28.
+
+**ROLLBACK**: `sql/backups/gv_ppp_web_armar_pendientes_20260907_pre_a2.sql`.
+Fuente: `sql/gv_ppp_web_dia_cliente.sql`.
+
 ### 3.bz ✅ Borradas 20 filas de `CLIENTE SIMULACIÓN` de `Facturacion_NP` — 2026-09-07
 
 Dueño: *"Elimina las 20 de cliente simulación"*, después de que se le explicara que
