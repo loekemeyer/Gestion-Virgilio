@@ -6,6 +6,13 @@
 >
 > ⚠ **Dos sesiones trabajando sobre `main` a la vez.** Esta sesión venía de la v13.65
 > y al volver main estaba en la v13.88. Antes de tocar nada: `git pull --rebase origin main`.
+>
+> **Estado al 07/09 13:20 — `main` va por `v13.92`** (commit `7361d86`). La v13.90 y la v13.91 las
+> tomó esta sesión; la v13.92 la sesión de "Pipeline Gestión Virgilio pendientes" (hoja de ruta
+> imprimible del camión). **El próximo bump arranca en `v13.93`.** Único cambio de esa sesión que
+> toca algo compartido: se agregó `observaciones` al `select` de `gv_ppp_programacion_diaria` en
+> `pppLoadProgFromSupabase` y al row de `_pppRowFromSupa` — campo nuevo, nada de lo que ya había
+> cambió. Esa sesión **no toca `ppp_web_armar_tandas`**: el punto 1 de acá es todo tuyo.
 
 ---
 
