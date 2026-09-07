@@ -12,12 +12,19 @@
 > única**; no se replica. Ante la duda entre parche rápido y fix de raíz → **fix
 > de raíz**.
 >
-> Última actualización: 2026-09-06 (domingo) · Versión app al documentar: **v13.67**
+> Última actualización: 2026-09-06 (domingo) · Versión app al documentar: **v13.68**
 >
 > ⚠⚠ **Desde el lunes 2026-09-07 los operarios usan GESTIÓN, no Producción** (dueño, sábado a la
 > noche: *"el lunes van a empezar a usar GV, no más PV"*). Las tandas web viven en
 > `PPP_Web_Programacion` y Producción no las ve. URL: la de GitHub Pages de este repo.
 >
+> Nota **v13.68** (front) — **El circuito de salida, en palabras del dueño (07/09): Control de Remitos → Carga del
+> Camión → Recepción de Remitos. El control se puede saltear si los remitos no llegan.** Códigos: CR/CCR = control
+> previo (paso 1, opcional) · CC/CCN = carga (paso 2) · RR/CRN = recepción = entregado (paso 3, v13.57). Con eso, una NP
+> con CCR y sin CCN no es una anomalía: es paso 1 hecho y paso 2 pendiente (o salió y el que cargó no lo marcó). El chip
+> de En Salida pasa de "📋 CCR sin CCN" a **"✔ controlada · falta cargar"**. Las 8 del 03–04/09 (98474, 98509,
+> 98585–98590) quedan así hasta que el dueño lo vea el martes con los operarios.
+
 > Nota **v13.67** (backend + datos) — **la tanda ACUMULA entre corridas hasta 0,80 m³** (pendiente nº 1 del otro chat,
 > `docs/HANDOFF-EN-SALIDA-Y-TANDAS.md`): `ppp_web_armar_tandas` v7 siembra `_open` con las tandas web del mismo día y
 > empresa que sigan abiertas (m³ < tope) y que nadie haya empezado a pickear; una tanda abierta recibe al pedido aunque

@@ -23,7 +23,7 @@
 |---|---|---|
 | 1 | Automático apagado: la tanda tiene que acumular hasta 0,80 | ✅ v13.67 (`ppp_web_armar_tandas` v7). Crons 71/73 prendidos. Zonas auto `1,2,3` (dueño). |
 | 2 | "Botón regenerar rearma todo" | ✅ No existe tal botón; fue la reprogramación SQL de v13.60. |
-| 3 | 8 NP con CCR sin CCN | ⏳ Operación, no código. El dueño lo mira el martes 8 (chip "CCR sin CCN" en En Salida). |
+| 3 | 8 NP con CCR sin CCN | ⏳ No es anomalía: el circuito es Control (opcional) → Carga → Recepción (dueño 07/09, v13.68). Están en paso 1, falta marcar la carga. El dueño lo ve el martes 8 (chip "✔ controlada · falta cargar"). |
 | 4 | Borrar pedido de prueba 1352 | ✅ Borrado (Virgilio + LK), backup `sql/backups/pedido_prueba_1352_20260907_pre_borrado.sql`. |
 | 5 | Instructivo desactualizado | ✅ `docs/PRIMEROS-DIAS-CON-GESTION.md` según la base (v13.60). |
 | 6 | Basura en LK `bot_customer_whatsapps` | ⏳ A pedido del dueño (proyecto LK). |

@@ -7171,7 +7171,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v13.67";
+const APP_VERSION = "v13.68";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -27034,7 +27034,9 @@ function _pppEsChips(p) {
   if (r.armada) out.push('<span class="ppp-es-chip">🧰 Armada</span>');
   else out.push('<span class="ppp-es-chip warn" title="No hay evento TAL: la NP no pasó por armado en la app.">Sin armar</span>');
   if (r.facturada) out.push('<span class="ppp-es-chip">🧾 Facturada</span>');
-  if (r.control_previo && r.estado !== "cargada") out.push('<span class="ppp-es-chip" title="Tiene control de remito PREVIO a la carga (CCR) pero no tiene carga al camión (CCN).">📋 CCR sin CCN</span>');
+  // v13.68 (dueño: "el orden real es Control Remitos → Carga Camión → Recepción Remitos; el control se puede saltear
+  // si no llegan"): con control y sin carga NO es un error, es el paso 1 hecho y el 2 pendiente.
+  if (r.control_previo && r.estado !== "cargada") out.push('<span class="ppp-es-chip" title="Paso 1 de 3 hecho (Control de Remitos). Falta el paso 2: Carga al Camión (CCN). Si ya salió, el que cargó no lo marcó.">✔ controlada · falta cargar</span>');
   const d = Number(r.dias_sin_controlar);
   if (d >= 2) out.push('<span class="ppp-es-chip ' + (d >= 5 ? "bad" : "warn") + '">⏱ ' + d + ' día' + (d === 1 ? "" : "s") + ' sin controlar</span>');
   return out.join(" ");

@@ -1400,8 +1400,9 @@ una función `gv_*` y pedir columna `empresa` en PaginaLK. Y el Excel ISIS de Fa
    `select cron.alter_job(71, active := false); select cron.alter_job(73, active := false);`
 2. **"Botón regenerar rearma todo"** — no existe tal botón (grep `regenerar|rearmar` en index.html: nada). El
    `actualizado_at = 2026-09-06 20:40:59` de las 26 filas fue la reprogramación por SQL de v13.60 (§3.at). Cerrado.
-3. **8 NP con CCR sin CCN** (98474, 98509, 98585–98590) — es operación, no código; el dueño lo mira el martes.
-   Quedan con el chip "CCR sin CCN" en En Salida.
+3. **8 NP con CCR sin CCN** (98474, 98509, 98585–98590) — dueño 07/09: *"el orden real es Control Remitos → Carga
+   Camión → Recepción Remitos; se puede saltear el control si no llegan"*. No es anomalía: paso 1 hecho (03–04/09),
+   paso 2 sin marcar. Chip v13.68 "✔ controlada · falta cargar". Lo ve el martes con los operarios.
 4. **Pedido de prueba 1352 borrado** (dueño: *"sí, borralo"*). Backup restore-ready
    `sql/backups/pedido_prueba_1352_20260907_pre_borrado.sql`. Borrado en Virgilio (`PPP_Web_Programacion`,
    `PPP_Web_Base`, `PPP_Web_NP`: 1 fila cada una) y en LK (`orders` 1352, `order_items` 18876). `lk_pedidos_match`
