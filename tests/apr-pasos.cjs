@@ -77,7 +77,31 @@ const { chromium } = require("/opt/node22/lib/node_modules/playwright");
     out.p2 = { paso: _apr.paso, dias: prev.querySelectorAll(".apr-dia").length, chips: prev.querySelectorAll(".apr-sel-chip").length, btnOff: !!prev.querySelector(".apr-foot-btn").disabled, tocable: !!prev.querySelector('.apr-dia[onclick*="aprElegirDia"]') };
     aprElegirDia("2026-09-15");
     out.p2dia = { sel: prev.querySelectorAll(".apr-dia-sel").length, btnOff: !!prev.querySelector(".apr-foot-btn").disabled, txt: prev.querySelector(".apr-foot-txt").textContent };
+    // v13.84: día completo / muy pronto y tanda chica → PREGUNTA (y se puede decir que no)
+    const preg = [];
+    window.confirm = (m) => { preg.push(String(m)); return false; };
+    _apr.cal.push({ dia: "2026-09-11", habil: true, m3: 10.07, tandas: 12, np: 36, cupo: 6, resta: 0 });
+    _apr.cal.push({ dia: "2026-09-08", habil: true, m3: 8.87, tandas: 2, np: 2, cupo: 6, resta: 0, muy_pronto: true, dia_minimo: "2026-09-11" });
+    _apr.m3Min = 0.6;
+    calls.length = 0;
+    aprElegirDia("2026-09-11"); await aprConfirmar();
+    out.pregLleno = { txt: preg[preg.length - 1] || "", rpc: calls.length };
+    aprElegirDia("2026-09-11"); aprElegirDia("2026-09-08"); await aprConfirmar();
+    out.pregPronto = { txt: preg[preg.length - 1] || "", rpc: calls.length };
+    // el día libre con 0,70 m³ (> 0,60) no pregunta nada
+    preg.length = 0; aprElegirDia("2026-09-08"); aprElegirDia("2026-09-16");
+    window.confirm = () => true;
+    calls.length = 0; await aprConfirmar();
+    out.sinPreg = { preg: preg.length, fns: calls.map((c) => c.fn).filter((f) => /^gv_ppp_web_tanda_/.test(f)).join(">") };
+    // tanda chica: un solo pedido de 0,25 m³
+    _apr.sel = {}; aprSel("lk:1401"); _apr.paso = 2; _apr.diaSel = "2026-09-16";
+    preg.length = 0; window.confirm = (m) => { preg.push(String(m)); return true; };
+    calls.length = 0; await aprConfirmar();
+    out.pregChica = { txt: preg[0] || "", programo: calls.some((c) => c.fn === "gv_ppp_web_tanda_programar") };
+    window.confirm = () => true;
+
     // falla → descarta y se queda en el paso 2
+    _apr.sel = {}; aprSel("lk:1401"); aprSel("lk:1402"); _apr.paso = 2; _apr.diaSel = "2026-09-15";
     calls.length = 0; window.__falla = true;
     await aprConfirmar();
     out.falla = { fns: calls.map((c) => c.fn).filter((f) => /^gv_ppp_web_tanda_/.test(f)).join(">"), paso: _apr.paso, err: _apr.msgErr, sel: aprSelKeys().length };
@@ -102,6 +126,10 @@ const { chromium } = require("/opt/node22/lib/node_modules/playwright");
   chk(r.mixta.paso === 1 && /una sola empresa/.test(r.mixta.msg), "LK + Chef juntos no pasan al paso 2");
   chk(r.p2.paso === 2 && r.p2.dias === 2 && r.p2.chips === 2 && r.p2.btnOff && r.p2.tocable, "paso 2: días tocables, resumen de los pedidos, Programar deshabilitado hasta tocar un día");
   chk(r.p2dia.sel === 1 && !r.p2dia.btnOff && /→ mar 15\/9/.test(r.p2dia.txt), "tocar el día lo marca y habilita Programar");
+  chk(/ya está completo/.test(r.pregLleno.txt) && r.pregLleno.rpc === 0, "un día COMPLETO pregunta y, si se dice que no, no llama a nada");
+  chk(/antes de la anticipación mínima/.test(r.pregPronto.txt) && r.pregPronto.rpc === 0, "un día MUY PRONTO pregunta (v13.84: ya no lo bloquea)");
+  chk(r.sinPreg.preg === 0 && /gv_ppp_web_tanda_programar/.test(r.sinPreg.fns), "un día libre con 0,70 m³ no pregunta nada");
+  chk(/0,25 m³, menos de los 0,60/.test(r.pregChica.txt) && r.pregChica.programo, "una tanda de menos de 0,60 m³ pregunta y, si se acepta, programa");
   chk(r.falla.fns === "gv_ppp_web_tanda_nueva>gv_ppp_web_tanda_agregar>gv_ppp_web_tanda_agregar>gv_ppp_web_tanda_programar>gv_ppp_web_tanda_descartar" && r.falla.paso === 2 && r.falla.err && r.falla.sel === 2, "si programar falla: descarta la tanda y se queda en el paso 2 con la selección");
   chk(r.okk.fns === "gv_ppp_web_tanda_nueva>gv_ppp_web_tanda_agregar>gv_ppp_web_tanda_agregar>gv_ppp_web_tanda_programar" && r.okk.fecha === "2026-09-15" && r.okk.paso === 1 && r.okk.sel === 0 && /✅ E09A programada para el mar 15\/9/.test(r.okk.msg) && !r.okk.err, "Programar ✓ = nueva → agregar ×2 → programar, y vuelve al paso 1 vacío");
   chk(errs.length === 0, "sin errores de página" + (errs.length ? ": " + errs[0] : ""));

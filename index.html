@@ -857,7 +857,6 @@ button {
 .apr-tanda-vacia{ font-size:12px; color:#94a3b8; text-align:center; padding:12px 0; border:1px dashed #e2e8f0; border-radius:6px; }
 
 /* Lista de días (reemplazó a la grilla de mes: siempre se programa para adelante) */
-.apr-dias-ayuda{ font-size:11.5px; color:#64748b; margin:-3px 0 8px; line-height:1.35; }
 /* v13.54 (dueño: "la visual está fea lo de Programar para"): tarjeta de día en dos bloques — fecha grande
    a la izquierda, a la derecha una línea m³/cupo + chip de estado, la barra y una línea chica con tandas e
    ISIS. Antes todo iba en un solo renglón de 11 px que se partía en tres. */
@@ -889,7 +888,6 @@ button {
 .apr-dia-sub b{ color:#334155; font-weight:800; }
 .apr-dia-isis{ font-size:11px; color:#7c3aed; white-space:nowrap; } /* v13.18: lo que ISIS ya tiene ese día */
 .apr-dia-isis b{ font-weight:800; }
-.apr-cupo-lleno{ margin:6px 0 8px; padding:8px 12px; border-radius:10px; background:#fff7ed; color:#9a3412; border:1px solid #fed7aa; font-size:12.5px; } /* idea 2510 */
 .apr-dia-pronto .apr-dia-cerr-pronto{ color:#64748b; } /* v13.22: antes de la anticipación mínima */
 .apr-dia-cerr{ color:#b91c1c; font-weight:700; }
 .apr-dia-chip .apr-dia-cerr, .apr-dia-chip.apr-dia-cerr{ color:inherit; font-weight:inherit; }
@@ -959,13 +957,6 @@ body.apr-dnd-tanda .apr-col-nps, body.apr-dnd-tanda .apr-dia-cerrado{ opacity:.4
 .apr-sel-res{ display:flex; flex-wrap:wrap; gap:6px; }
 .apr-sel-chip{ background:#eff6ff; border:1px solid #bfdbfe; color:#1e3a8a; border-radius:999px; padding:4px 10px; font-size:13px; font-weight:700; }
 .apr-sel-chip small{ font-weight:600; color:#3b82f6; }
-.apr-libre{ margin:0 0 8px; padding:10px 12px; border-radius:10px; background:#dcfce7; color:#14532d; border:1px solid #86efac; font-size:15px; }
-.apr-libre b{ font-size:17px; color:#15803d; }
-.apr-libre.no{ background:#fee2e2; color:#7f1d1d; border-color:#fca5a5; }
-.apr-cerrados{ display:flex; flex-wrap:wrap; align-items:center; gap:5px; margin:0 0 10px; font-size:12px; color:#64748b; }
-.apr-cerrados-t{ font-weight:800; color:#475569; margin-right:2px; }
-.apr-cerr-chip{ background:#f1f5f9; color:#64748b; border:1px solid #e2e8f0; border-radius:999px; padding:3px 9px; font-size:12px; white-space:nowrap; }
-.apr-cerr-chip.lleno{ background:#fff7ed; color:#9a3412; border-color:#fed7aa; }
 .apr-dia:not(.apr-dia-cerrado){ cursor:pointer; }
 .apr-dia.apr-dia-sel{ border-color:#16a34a; border-top-color:#16a34a; background:#f0fdf4; box-shadow:0 0 0 3px rgba(22,163,74,.22); }
 .apr-dia.apr-dia-sel .apr-dia-num{ color:#15803d; }
@@ -7257,7 +7248,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v13.83";
+const APP_VERSION = "v13.84";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -32871,7 +32862,8 @@ let _apr = {
   paso: 1,          // 1 = elegir pedidos · 2 = elegir día
   sel: {},          // clave empresa:order_id → true (los pedidos tildados para la tanda)
   diaSel: null,     // día elegido en el paso 2
-  cargandoChef: false
+  cargandoChef: false,
+  m3Min: 0.6        // v13.84: PPP_Web_Config.tanda_m3_min (se relee en cada carga)
 };
 
 /* v13.81 — DOS PASOS. Paso 1: tildar los pedidos que van juntos (misma empresa). Paso 2: tocar el
@@ -32895,7 +32887,17 @@ async function aprConfirmar() {
   if (_apr.ocupado) return;
   const keys = aprSelKeys(), fecha = _apr.diaSel;
   if (!fecha) { _apr.msg = "Tocá el día en que sale."; _apr.msgErr = true; aprRender(); return; }
-  await aprGenerarTanda(fecha, keys);   // arma + programa; si falla, descarta (ninguna tanda sin fecha)
+  const r = aprResumenSel();
+  const d = (_apr.cal || []).find(function (x) { return String(x.dia).slice(0, 10) === fecha; }) || {};
+  const avisos = [];
+  // v13.84: el día ya no bloquea, pero se pregunta
+  if (d.muy_pronto === true) avisos.push("El " + aprDiaCorto(fecha) + " está antes de la anticipación mínima (Gestión programa sola desde el " + (d.dia_minimo ? aprDiaCorto(String(d.dia_minimo).slice(0, 10)) : "día mínimo") + ").");
+  if (Number(d.cupo) > 0 && Number(d.m3) >= Number(d.cupo)) avisos.push("El " + aprDiaCorto(fecha) + " ya está completo: " + aprNum(d.m3, 2) + " de " + aprNum(d.cupo, 2) + " m³.");
+  // v13.84 (dueño: "si quiero programar menos de 0,60, que me pregunte si estoy seguro"): PPP_Web_Config.tanda_m3_min
+  const min = Number(_apr.m3Min) > 0 ? Number(_apr.m3Min) : 0.6;
+  if (r.m3 < min) avisos.push("La tanda queda en " + aprNum(r.m3, 2) + " m³, menos de los " + aprNum(min, 2) + " m³ que conviene por camión.");
+  if (avisos.length && !confirm("⚠ " + avisos.join("\n⚠ ") + "\n\n¿Programo igual " + r.n + " pedido" + (r.n === 1 ? "" : "s") + " para el " + aprDiaCorto(fecha) + "?")) return;
+  await aprGenerarTanda(fecha, keys, { sinConfirm: true });   // arma + programa; si falla, descarta (ninguna tanda sin fecha)
   if (!_apr.msgErr) { _apr.sel = {}; _apr.diaSel = null; _apr.paso = 1; }
   aprRender();
 }
@@ -33092,6 +33094,16 @@ async function aprTraerPedidos(e) {
   return out;
 }
 
+/* v13.84 — el m³ mínimo deseable de una tanda lo dice el backend (PPP_Web_Config.tanda_m3_min, 0,60): el front
+   sólo pregunta. Si no se puede leer, se usa 0,60. */
+async function aprCargarCfg() {
+  try {
+    const rows = await aprGet('PPP_Web_Config?select=clave,valor&clave=eq.tanda_m3_min');
+    const v = rows && rows[0] ? Number(rows[0].valor) : NaN;
+    _apr.m3Min = (!isNaN(v) && v > 0) ? v : 0.6;
+  } catch (_e) { _apr.m3Min = 0.6; }
+}
+
 async function aprCargarCalendario() {
   const hoy = new Date();
   const fin = new Date(hoy.getFullYear(), hoy.getMonth(), hoy.getDate() + _apr.horizonte);
@@ -33185,7 +33197,8 @@ async function aprCargar() {
       aprGet('PPP_Web_Tanda_Items?select=*&limit=20000'),
       aprGet('gv_ppp_web_tandas_abiertas?select=*&order=codigo.asc'),
       aprCargarCalendario(),  // v13.11: en paralelo (estaba en serie, una vuelta de red más)
-      aprCargarLog()          // idea 2048: ¿corrió el armado automático?
+      aprCargarLog(),         // idea 2048: ¿corrió el armado automático?
+      aprCargarCfg()          // v13.84: m³ mínimo deseable de una tanda
     ]);
 
     // Un pedido ya programado, o que ya está en un borrador, no vuelve a la izquierda.
@@ -33333,7 +33346,7 @@ function aprDiaCorto(iso) {
    de tanda yo"): soltar un PEDIDO en un DÍA arma la tanda y la programa en UN paso — código automático
    (gv_ppp_web_tanda_nueva) + pedido (gv_ppp_web_tanda_agregar) + día (gv_ppp_web_tanda_programar).
    Si algo falla después de crearla, se descarta: nunca queda una tanda sin fecha. */
-async function aprGenerarTanda(fecha, keys) {
+async function aprGenerarTanda(fecha, keys, opts) {
   const sel = keys || [];
   const peds = sel.map(function (k) { return (_apr.pedidos || []).find(function (p) { return aprKey(p.empresa, p.order_id) === k; }); }).filter(Boolean);
   if (!peds.length) { _apr.msg = "No encontré el pedido."; _apr.msgErr = true; aprRender(); return; }
@@ -33343,7 +33356,9 @@ async function aprGenerarTanda(fecha, keys) {
   const emp = Object.keys(emps)[0];
   let m3 = 0; for (const p of peds) m3 += Number(p.m3) || 0;
   const labels = peds.map(function (p) { return pwebPedidoLabel(p.empresa, p.order_id) + (p.np_total > 1 ? " (" + p.np_total + " NP)" : ""); }).join(", ");
-  if (!confirm("¿Armar una tanda nueva con " + labels + " · " + aprNum(m3) + " m³ para el " + aprDiaCorto(fecha) + "?\n\nEl código lo pone el sistema.")) return;
+  // v13.84: desde el paso 2 la confirmación ya la hizo aprConfirmar (con los avisos del día y del m³ mínimo)
+  if (!(opts && opts.sinConfirm) &&
+      !confirm("¿Armar una tanda nueva con " + labels + " · " + aprNum(m3) + " m³ para el " + aprDiaCorto(fecha) + "?\n\nEl código lo pone el sistema.")) return;
   _apr.ocupado = true; aprRender();
   let codigo = null;
   try {
@@ -33655,31 +33670,17 @@ function aprColTandas() {
 
 /* idea 2510 — si el cupo está lleno varios días hábiles seguidos (desde el primer día permitido), avisar
    arriba del calendario en vez de que el supervisor lo descubra renglón por renglón. Sólo lee _apr.cal. */
-function aprCupoLlenoHtml() {
-  const cal = (_apr.cal || []).slice().sort(function (a, b) { return String(a.dia).localeCompare(String(b.dia)); });
-  let n = 0, desde = null, libre = null;
-  for (const d of cal) {
-    if (d.habil === false || d.muy_pronto === true) continue;
-    const m3 = Number(d.m3) || 0, cupo = Number(d.cupo) || 0;
-    if (cupo > 0 && m3 >= cupo) { n++; if (!desde) desde = d; }
-    else { libre = d; break; }
-  }
-  if (n < 2) return "";
-  const f = function (x) { const q = String(x.dia).slice(0, 10).split("-"); return q[2] + "/" + q[1]; };
-  return '<div class="apr-cupo-lleno">🟧 <b>' + n + ' días hábiles seguidos con cupo lleno</b> desde el ' + escapeHtml(f(desde)) +
-    (libre ? ' · lo nuevo cae el <b>' + escapeHtml(f(libre)) + '</b>' : ' · sin día libre a la vista: tocá "Ver más días"') + '</div>';
-}
+/* v13.84: aprCupoLlenoHtml (idea 2510, cartel "N días hábiles seguidos con cupo lleno") se eliminó —
+   dueño 08/09: "sacá todos esos carteles". El estado de cada día ya está en su tarjeta. */
 function aprColDias() {
   const DOW = ["Domingo","Lunes","Martes","Miércoles","Jueves","Viernes","Sábado"];
   const MES = ["ene","feb","mar","abr","may","jun","jul","ago","sep","oct","nov","dic"];
   const hoyISO = aprISO(new Date());
 
+  // v13.84 (dueño: "sacá todos esos carteles"): sin ayuda, sin "cupo lleno", sin "primer día libre",
+  // sin la tira de "no reciben". El estado de cada día ya está en su tarjeta.
   let h = '<div class="apr-col apr-col-dias">' +
     '<div class="apr-col-t">🗓️ Programar para…</div>' +
-    '<div class="apr-dias-ayuda">' + (_apr.paso === 2
-      ? 'Tocá el día en que sale y después <b>Programar ✓</b>: se arma la tanda (código automático) y queda programada ahí. Los días completos, no hábiles o muy próximos no reciben.'
-      : 'Arrastrá el pedido directo al día: se arma su tanda (código automático) y queda programado ahí. Los días completos, no hábiles o muy próximos no reciben.') + '</div>' +
-    aprCupoLlenoHtml() +   // idea 2510
     '<div class="apr-scroll apr-dias">';
 
   if (!_apr.cal.length) h += '<div class="apr-vacio">Cargando días…</div>';
@@ -33689,15 +33690,11 @@ function aprColDias() {
   // v13.83 (dueño: "se ve feo y no se entiende que hasta el 15 ya estamos completos"): en el paso 2 los días
   // que NO reciben (muy pronto, completo) van como chips en una tira arriba, los no hábiles no se dibujan, y
   // arriba de todo dice cuál es el PRIMER DÍA LIBRE. Las tarjetas son sólo los días que reciben.
-  const compacto = _apr.paso === 2;
-  const cerr = []; let primero = null;
-  const DOWc = ["dom", "lun", "mar", "mié", "jue", "vie", "sáb"];
   for (let i = 0; i < cal.length; i++) {
     const d = cal[i];
     // v13.24 (dueño): 2 o 3 días no hábiles seguidos (sáb, dom, feriado) en UNA sola fila.
     if (d.habil === false) {
       let j = i; while (j + 1 < cal.length && cal[j + 1].habil === false) j++;
-      if (compacto) { i = j; continue; }
       const a = _fechaDe(cal[i]), b = _fechaDe(cal[j]), n = j - i + 1;
       const esHoyRun = cal.slice(i, j + 1).some(function (x) { return String(x.dia).slice(0, 10) === hoyISO; });
       const dow = n > 1 ? DOW[a.getDay()] + ' a ' + DOW[b.getDay()] : DOW[a.getDay()];
@@ -33722,7 +33719,10 @@ function aprColDias() {
     // marca `muy_pronto` y además rechaza programar ahí (gv_ppp_web_tanda_programar).
     const pronto = d.muy_pronto === true && d.habil !== false;
     const minTxt = d.dia_minimo ? (function () { const q = String(d.dia_minimo).slice(0, 10).split("-"); return q[2] + "/" + q[1]; })() : "";
-    const cerrado = (d.habil === false) || lleno || pronto;
+    // v13.84 (dueño: "dejame programar si quiero para antes"): "muy pronto" y "completo" YA NO cierran el día —
+    // se pueden elegir y el backend avisa (gv_ppp_web_tanda_programar v13.84 avisa en vez de rechazar). Sólo el
+    // día no hábil queda cerrado. `aprConfirmar` pregunta antes de mandar.
+    const cerrado = (d.habil === false);
     const cls = ["apr-dia"];
     if (cerrado)        cls.push("apr-dia-cerrado");
     if (lleno)          cls.push("apr-dia-lleno");
@@ -33736,13 +33736,6 @@ function aprColDias() {
                  : pronto ? "Muy pronto: Gestión programa desde el " + minTxt
                  : lleno ? "Completo: " + aprNum(m3, 2) + " de " + aprNum(cupo, 2) + " m³"
                  : "Quedan " + aprNum(d.resta, 2) + " m³";
-    if (compacto) {
-      if (cerrado) {
-        cerr.push('<span class="apr-cerr-chip' + (lleno ? ' lleno' : '') + '" title="' + escapeHtml(motivo) + '">' + DOWc[fecha.getDay()] + ' ' + fecha.getDate() + '/' + (fecha.getMonth() + 1) + ' · ' + (pronto ? 'muy pronto' : 'completo') + '</span>');
-        continue;
-      }
-      if (!primero) primero = { iso: iso, resta: d.resta, txt: DOWc[fecha.getDay()] + ' ' + fecha.getDate() + '/' + (fecha.getMonth() + 1) };
-    }
 
     h += '<div class="' + cls.join(" ") + '"' +
          (cerrado ? '' :
@@ -33780,13 +33773,6 @@ function aprColDias() {
   }
   h += '</div>';
   if (_apr.cal.length) h += '<button class="apr-mas" onclick="aprMasDias()">Ver más días</button>';
-  if (compacto && _apr.cal.length) {
-    let cab = primero
-      ? '<div class="apr-libre">✅ Primer día libre: <b>' + escapeHtml(primero.txt) + '</b> · quedan ' + aprNum(primero.resta, 2) + ' m³' + (cerr.length ? ' · antes no entra nada' : '') + '</div>'
-      : '<div class="apr-libre no">⛔ Ningún día libre a la vista · tocá "Ver más días"</div>';
-    if (cerr.length) cab += '<div class="apr-cerrados"><span class="apr-cerrados-t">No reciben:</span> ' + cerr.join(' ') + '</div>';
-    h = h.replace('<div class="apr-scroll apr-dias">', cab + '<div class="apr-scroll apr-dias">');
-  }
   return h + '</div>';
 }
 

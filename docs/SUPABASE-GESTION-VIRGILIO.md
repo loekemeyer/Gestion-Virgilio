@@ -1384,6 +1384,28 @@ es de Chef y pisa al LK 217): cuando Gestión alimente el tracking, escribir el 
 una función `gv_*` y pedir columna `empresa` en PaginaLK. Y el Excel ISIS de Facturación manda
 `N_Pedido` contador (no el id), como el mail: ISIS numera 98xxx por su cuenta.
 
+### 3.be ✅ La anticipación mínima avisa en vez de bloquear (v13.84) — 2026-09-08 martes
+
+**Qué dijo el dueño** (sobre el paso 2 de A Programar): *"dejame programar si quiero para antes"*.
+
+**El problema.** `gv_ppp_web_tanda_programar` cortaba con `raise exception 'El % es muy pronto…'` cuando la fecha era
+anterior a `gv_ppp_web_dia_minimo()` (anticipación mínima de 4 días hábiles, `PPP_Web_Config.dias_anticipacion_min`,
+v13.22). O sea: el supervisor no podía programar a mano para el martes aunque quisiera.
+
+**Qué se hizo** (migración `gv_ppp_web_tanda_programar_anticipacion_avisa_v1384`). Ese `raise exception` pasa a
+**aviso** (`aviso_dia`, que el front ya muestra), igual que el cupo excedido y el día no hábil, que nunca
+bloquearon. Nada más cambia en la función.
+
+**El armado automático NO se adelanta.** No usa esta validación para elegir el día: la fecha sale de
+`gv_ppp_web_dia_minimo()` (job de las 00:01) y `gv_ppp_web_proximo_dia_entrega()` (intradía), que siguen intactas.
+La anticipación mínima sigue siendo la regla para lo automático; ahora es sólo una advertencia para lo manual.
+
+**Front (v13.84).** En A Programar sólo el día **no hábil** queda cerrado; "completo" y "muy pronto" se pueden
+elegir y `aprConfirmar` pregunta antes de mandar (día antes del mínimo · día completo · tanda de menos de
+`tanda_m3_min`). Si se dice que no, no se llama a ninguna RPC.
+
+**Rollback.** Volver a la definición anterior (el `raise exception` en lugar del aviso).
+
 ### 3.bd ✅ La Anónima por LK (override por CUIT) y Cencosud en el checklist de ISIS (v13.79) — 2026-09-07 lunes (feriado)
 
 **Qué dijo el dueño.** *"La Anónima se le vende por LK, no por CH. Cencosud desde CH se le venden artículos de LK creo,

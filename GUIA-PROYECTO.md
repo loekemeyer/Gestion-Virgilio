@@ -12,11 +12,27 @@
 > única**; no se replica. Ante la duda entre parche rápido y fix de raíz → **fix
 > de raíz**.
 >
-> Última actualización: 2026-09-07 (lunes) · Versión app al documentar: **v13.83**
+> Última actualización: 2026-09-07 (lunes) · Versión app al documentar: **v13.84**
 >
 > ⚠⚠ **Desde el lunes 2026-09-07 los operarios usan GESTIÓN, no Producción** (dueño, sábado a la
 > noche: *"el lunes van a empezar a usar GV, no más PV"*). Las tandas web viven en
 > `PPP_Web_Programacion` y Producción no las ve. URL: la de GitHub Pages de este repo.
+>
+> Nota **v13.84** (backend Virgilio + front) — **Sin carteles, se puede programar para antes, y avisos al confirmar**
+> (dueño 08/09, sobre el paso 2: *"1) sacá todos esos carteles · 2) dejame programar si quiero para antes ·
+> 3) si quiero programar menos de 0.60, que me pregunte si estoy seguro"*).
+> (1) **Fuera** la ayuda de la columna de días, el cartel naranja "N días hábiles seguidos con cupo lleno"
+> (idea 2510, `aprCupoLlenoHtml` eliminada), el verde "Primer día libre" y la tira "No reciben" (v13.83). El estado
+> de cada día ya está en su tarjeta.
+> (2) **Se puede programar para antes.** `gv_ppp_web_tanda_programar` **avisaba con excepción** cuando la fecha era
+> anterior a la anticipación mínima (`dias_anticipacion_min` = 4, v13.22) → ahora **avisa y deja**
+> (migración `gv_ppp_web_tanda_programar_anticipacion_avisa_v1384`). El **armado automático no cambia**: elige la
+> fecha con `gv_ppp_web_dia_minimo()` / `gv_ppp_web_proximo_dia_entrega()`, así que sigue sin adelantarse solo. En el
+> front sólo el día **no hábil** queda cerrado; "completo" y "muy pronto" se pueden elegir.
+> (3) **Confirmación al programar** (`aprConfirmar`), con todo lo que corresponda en un solo cartel: día antes de la
+> anticipación mínima, día ya completo, y **tanda de menos de `PPP_Web_Config.tanda_m3_min` (0,60 m³)** — el valor lo
+> lee el front del backend (`aprCargarCfg`), no está hardcodeado. Si se dice que no, no se llama a ninguna RPC.
+> Tests `apr-pasos` (4 chequeos nuevos) y `apr-programar` (sólo el no hábil cierra).
 >
 > Nota **v13.83** (front) — **Paso 2 claro: "Primer día libre"** (dueño 07/09, captura del paso 2: *"se ve feo y no se
 > entiende que hasta el 15 ya estamos completos"*). En el paso 2 arriba de los días va un cartel verde **✅ Primer día

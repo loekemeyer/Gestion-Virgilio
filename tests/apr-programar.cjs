@@ -126,7 +126,9 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
   chk(r.med.includes("Arrastrá un pedido acá"),"la tanda vacía (vieja) lo dice");
   chk(r.der.includes("Miércoles") && /9<small>sep<\/small>/.test(r.der), "la lista dice el día con nombre y fecha (v13.54: número grande + mes chico)");
   chk(r.der.includes("0,50</b> / 5,00 m³"),    "muestra los m³ programados contra el cupo");
-  chk((r.der.match(/apr-dia-cerrado/g) || []).length === 3, "el no hábil, el completo y el muy pronto quedan cerrados");
+  // v13.84 (dueño: "dejame programar si quiero para antes"): "completo" y "muy pronto" SE PUEDEN elegir —
+  // el backend avisa y el front pregunta. Sólo el no hábil queda cerrado.
+  chk((r.der.match(/apr-dia-cerrado/g) || []).length === 1, "sólo el día no hábil queda cerrado");
   chk(/apr-dia-pronto/.test(r.der) && /Muy pronto · desde el 11\/09/.test(r.der), "v13.22: el día antes de la anticipación mínima dice 'Muy pronto · desde el 11/09'");
   // v13.24: sáb 12 + dom 13 no hábiles seguidos → una sola fila "Sábado a Domingo · 12 – 13 sep · No hábil · 2 días"
   chk(/apr-dia-nohabil-run/.test(r.der) && /Sábado a Domingo/.test(r.der) && /12 – 13 sep/.test(r.der) && /No hábil · 2 días/.test(r.der), "v13.24: dos no hábiles seguidos en una fila");
@@ -159,10 +161,10 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
   const cerrados = tags.filter(function (t) { return /apr-dia-cerrado/.test(t); });
   const abiertos = tags.filter(function (t) { return !/apr-dia-cerrado/.test(t); });
   chk(tags.length === 4, "se dibujan los 4 días (se contaron " + tags.length + ")");
-  chk(cerrados.length === 3 && cerrados.every(function (t) { return t.indexOf("ondrop") < 0; }),
-      "un día cerrado NO acepta que le suelten una tanda");
-  chk(abiertos.length === 1 && abiertos.every(function (t) { return t.indexOf("aprDropDia") >= 0; }),
-      "un día abierto sí la acepta");
+  chk(cerrados.length === 1 && cerrados.every(function (t) { return t.indexOf("ondrop") < 0; }),
+      "el día no hábil NO acepta que le suelten una tanda");
+  chk(abiertos.length === 3 && abiertos.every(function (t) { return t.indexOf("aprDropDia") >= 0; }),
+      "los demás sí la aceptan, completo y muy pronto incluidos (v13.84)");
   chk(r.der.includes("aprMasDias"),            "se pueden pedir más días");
   chk(!/◀|▶/.test(r.der),                      "no hay navegación hacia atrás: se programa para adelante");
   chk(/class="apr-err"[^>]*>[^<]*APAGADA/.test(r.conError), "un error se pinta de ROJO, no de verde");
@@ -176,7 +178,8 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
   chk(r.med.includes("web CH 9") && r.med.includes("GV-02A"), "v13.58/v13.70: la tanda de Chef muestra el pedido de la página (web CH 9)");
   chk(!/aprNuevaTanda/.test(r.med) && /Tandas sin fecha/.test(r.med), "v13.69: sin botones de tanda LK/Chef; la columna lista sólo tandas viejas sin fecha");
   chk(/aprDragPedido\(event,'lk:1117'\)/.test(r.izq), "v13.65: el arrastre lleva empresa:pedido (LK 1350 ≠ Chef 1350)");
-  chk(/Arrastrá el pedido directo al día/.test(r.der), "v13.69: la ayuda dice arrastrar el pedido directo al día");
+  // v13.84 (dueño: "sacá todos esos carteles"): sin ayuda, sin "cupo lleno", sin "primer día libre"
+  chk(!/apr-dias-ayuda|apr-cupo-lleno|apr-libre|apr-cerrados/.test(r.der), "v13.84: la columna de días va sin carteles");
   chk(r.mezcla.err === true && /tanda de Chef/.test(r.mezcla.msg) && /LK 1117/.test(r.mezcla.msg) && r.mezcla.rpcLlamada === false,
       "v13.58: un pedido de LK soltado en una tanda de Chef avisa y no llama a la RPC");
   chk(errs.length === 0, "sin errores de página" + (errs.length ? ": " + errs[0] : ""));
