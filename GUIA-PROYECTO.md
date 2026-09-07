@@ -12,11 +12,20 @@
 > única**; no se replica. Ante la duda entre parche rápido y fix de raíz → **fix
 > de raíz**.
 >
-> Última actualización: 2026-09-07 (lunes) · Versión app al documentar: **v13.73**
+> Última actualización: 2026-09-07 (lunes) · Versión app al documentar: **v13.74**
 >
 > ⚠⚠ **Desde el lunes 2026-09-07 los operarios usan GESTIÓN, no Producción** (dueño, sábado a la
 > noche: *"el lunes van a empezar a usar GV, no más PV"*). Las tandas web viven en
 > `PPP_Web_Programacion` y Producción no las ve. URL: la de GitHub Pages de este repo.
+>
+> Nota **v13.74** (sólo front, CSS) — **A Programar a lo ANCHO** (dueño 07/09, con captura: *"completamente feo e
+> ilegible, hacé boxes que ocupen el ancho de la pantalla, no el alto"*). Se acabaron las columnas: pedidos,
+> tandas sin fecha (si hay) y días van **apilados** a todo el ancho y adentro las tarjetas se reparten en grilla
+> horizontal (`auto-fill`: pedidos de 250 px, días de 150 px). Cada día es una cajita ancha y baja —fecha arriba,
+> m³/cupo, chip, barra, tandas·NP— con el color en el borde **superior**; antes era una columna de 420 px que se
+> iba al fondo de la pantalla. Mismo HTML y mismas clases (`aprColDias`, `apr-dia-*`), sólo CSS (`.apr-wrap`,
+> `.apr-dias`, `.apr-dia*`). Con 9 pedidos y 17 días entra todo al 100 % en 1500×900; `tests/apr-fit.cjs`
+> pasa a 80 pedidos para el caso "no entra ni al 70 %".
 >
 > Nota **v13.73** (backend Virgilio + front) — **Cruce factura ISIS ↔ Gestión como pantalla** (pendiente 10,
 > dueño 07/09: *"11 porque no? Traé el repo gestopclientes, ahí algo de eso hicimos"*). El cruce **ya existía**

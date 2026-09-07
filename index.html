@@ -766,8 +766,14 @@ button {
 .apr-err{ background:#fee2e2; border-left:5px solid #b91c1c; color:#7f1d1d; padding:8px 10px; border-radius:6px; margin:6px 2px; font-weight:600; }
 .apr-msg{ background:#ecfdf5; border-left:5px solid #059669; color:#065f46; padding:8px 10px; border-radius:6px; margin:6px 2px; font-weight:600; }
 
-.apr-wrap{ display:grid; grid-template-columns: 1fr 1fr 370px; gap:12px; align-items:start; }
-.apr-wrap.apr-2col{ grid-template-columns: 1fr 420px; }   /* v13.69: sin tandas sin fecha → pedidos | días */   /* v13.54: la columna de días era angosta (320) y todo se partía */
+/* v13.74 (dueño: "completamente feo e ilegible; hacé boxes que ocupen el ANCHO de la pantalla, no el alto"):
+   ya no hay columnas. Pedidos, tandas sin fecha (si hay) y días van APILADOS a todo el ancho, y adentro de
+   cada bloque las tarjetas se reparten en una grilla horizontal (auto-fill). Los días son cajitas anchas
+   y bajas en fila, como una tira de calendario; antes eran una columna de 420 px que se iba al fondo. */
+.apr-wrap{ display:grid; grid-template-columns: 1fr; gap:10px; align-items:start; }
+.apr-wrap.apr-2col{ grid-template-columns: 1fr; }   /* v13.69: sin tandas sin fecha → pedidos | días (v13.74: apilados) */
+.apr-col-nps .apr-scroll{ display:grid; grid-template-columns:repeat(auto-fill, minmax(250px, 1fr)); gap:7px; align-items:start; }
+.apr-col-tandas .apr-scroll{ display:grid; grid-template-columns:repeat(auto-fill, minmax(280px, 1fr)); gap:7px; align-items:start; }
 .apr-col{ background:#f8fafc; border:1px solid #e2e8f0; border-radius:10px; padding:10px; min-width:0; }
 .apr-col-t{ font-size:14px; font-weight:800; color:#0f172a; margin-bottom:8px; }
 /* v13.34: por qué cada grupo sigue en la lista (el cartel verde dice "N programadas" y confunde) */
@@ -855,17 +861,18 @@ button {
 /* v13.54 (dueño: "la visual está fea lo de Programar para"): tarjeta de día en dos bloques — fecha grande
    a la izquierda, a la derecha una línea m³/cupo + chip de estado, la barra y una línea chica con tandas e
    ISIS. Antes todo iba en un solo renglón de 11 px que se partía en tres. */
-.apr-dias{ gap:6px; }
-.apr-dia{ display:flex; align-items:stretch; gap:12px; background:#fff; border:1px solid #e2e8f0;
-  border-left:4px solid #cbd5e1; border-radius:10px; padding:8px 11px 8px 10px;
+/* v13.74: tira horizontal de días — cajitas anchas y bajas, fecha arriba, m³ + chip + barra abajo */
+.apr-dias{ display:grid; grid-template-columns:repeat(auto-fill, minmax(150px, 1fr)); gap:6px; align-items:stretch; }
+.apr-dia{ display:flex; flex-direction:column; gap:5px; background:#fff; border:1px solid #e2e8f0;
+  border-top:4px solid #cbd5e1; border-radius:10px; padding:7px 10px 8px; min-width:0;
   transition:transform .12s ease, box-shadow .12s ease, border-color .12s ease; }
-.apr-dia-fecha{ display:flex; flex-direction:column; justify-content:center; min-width:74px; flex:0 0 auto;
-  border-right:1px solid #f1f5f9; padding-right:10px; }
+.apr-dia-fecha{ display:flex; flex-direction:row; align-items:baseline; gap:6px; min-width:0; flex:0 0 auto;
+  border-bottom:1px solid #f1f5f9; padding-bottom:4px; flex-wrap:wrap; }
 .apr-dia-dow{ font-size:10.5px; color:#64748b; font-weight:800; text-transform:uppercase; letter-spacing:.4px; line-height:1.2; }
-.apr-dia-num{ font-size:21px; font-weight:900; color:#0f172a; line-height:1.15; letter-spacing:-.3px; }
+.apr-dia-num{ font-size:19px; font-weight:900; color:#0f172a; line-height:1.15; letter-spacing:-.3px; }
 .apr-dia-num small{ font-size:11.5px; font-weight:700; color:#64748b; margin-left:3px; text-transform:lowercase; }
-.apr-dia-cuerpo{ flex:1 1 auto; min-width:0; display:flex; flex-direction:column; justify-content:center; gap:4px; }
-.apr-dia-top{ display:flex; align-items:center; justify-content:space-between; gap:4px 8px; min-width:0; flex-wrap:wrap; }
+.apr-dia-cuerpo{ flex:1 1 auto; min-width:0; display:flex; flex-direction:column; justify-content:flex-start; gap:4px; }
+.apr-dia-top{ display:flex; align-items:center; justify-content:space-between; gap:3px 8px; min-width:0; flex-wrap:wrap; }
 .apr-dia-top .apr-dia-txt{ margin-left:auto; }   /* el chip va a la derecha; si no entra, baja de renglón entero */
 .apr-dia-m3{ font-size:13px; color:#334155; white-space:nowrap; }
 .apr-dia-m3 b{ font-size:14.5px; font-weight:900; color:#0f172a; }
@@ -886,15 +893,16 @@ button {
 .apr-dia-pronto .apr-dia-cerr-pronto{ color:#64748b; } /* v13.22: antes de la anticipación mínima */
 .apr-dia-cerr{ color:#b91c1c; font-weight:700; }
 .apr-dia-chip .apr-dia-cerr, .apr-dia-chip.apr-dia-cerr{ color:inherit; font-weight:inherit; }
-.apr-dia-hoy{ border-left-color:#1e6bd6; }
+.apr-dia-hoy{ border-top-color:#1e6bd6; }
 .apr-dia-hoy .apr-dia-num{ color:#1e6bd6; }
-.apr-dia-con{ border-left-color:#16a34a; }
+.apr-dia-con{ border-top-color:#16a34a; }
 /* Día que NO recibe: no hábil, muy pronto o ya completo. Gris y sin manito. */
-.apr-dia-cerrado{ background:#f8fafc; border-left-color:#cbd5e1; }
+.apr-dia-cerrado{ background:#f8fafc; border-top-color:#cbd5e1; }
 .apr-dia-cerrado .apr-dia-num, .apr-dia-cerrado .apr-dia-dow{ color:#94a3b8; }
 .apr-dia-cerrado .apr-dia-m3{ color:#94a3b8; } .apr-dia-cerrado .apr-dia-m3 b{ color:#64748b; }
-.apr-dia-nohabil{ opacity:.7; padding-top:5px; padding-bottom:5px; }
-.apr-dia-nohabil .apr-dia-num{ font-size:15px; }
+.apr-dia-nohabil{ opacity:.7; }
+.apr-dia-nohabil .apr-dia-num{ font-size:14px; }
+.apr-dia-nohabil .apr-dia-fecha{ border-bottom:none; padding-bottom:0; }
 .apr-dia-lleno .apr-dia-barra > i{ background:linear-gradient(90deg,#fde68a,#f59e0b); } /* idea 7999: lleno es normal, no error */
 .apr-dia-pronto .apr-dia-barra > i{ background:#cbd5e1; }
 .apr-mas{ width:100% !important; margin-top:8px; border:1px solid #cbd5e1; background:#fff; color:#475569;
@@ -920,7 +928,7 @@ body.apr-dnd-tanda .apr-col-nps, body.apr-dnd-tanda .apr-dia-cerrado{ opacity:.4
 .apr-tanda.apr-drop-on{ border-color:#1e6bd6; border-style:solid; background:#f0f7ff;
   transform:scale(1.02); box-shadow:0 6px 18px rgba(30,107,214,.20); }
 .apr-dia.apr-drop-on{ border-color:#1e6bd6; background:#f0f7ff;
-  transform:translateX(4px); box-shadow:0 4px 14px rgba(30,107,214,.18); }
+  transform:translateY(-3px); box-shadow:0 4px 14px rgba(30,107,214,.18); }
 .apr-tanda.apr-drop-on .apr-tanda-vacia{ border-color:#1e6bd6; color:#1e6bd6; }
 
 @keyframes aprPulso{ 0%{ box-shadow:0 0 0 0 rgba(22,163,74,.45); } 100%{ box-shadow:0 0 0 14px rgba(22,163,74,0); } }
@@ -929,7 +937,7 @@ body.apr-dnd-tanda .apr-col-nps, body.apr-dnd-tanda .apr-dia-cerrado{ opacity:.4
 .apr-titem{ animation:aprEntra .18s ease-out; }
 .apr-msg, .apr-err{ animation:aprEntra .2s ease-out; }
 
-@media (max-width: 1100px){ .apr-wrap{ grid-template-columns:1fr; } .apr-scroll{ max-height:44vh; } }
+@media (max-width: 1100px){ .apr-scroll{ max-height:44vh; } }
 /* En pantallas chicas el arrastre HTML5 no existe: se avisa en vez de dejar una
    pantalla que no responde. */
 @media (hover:none){ .apr-dias-ayuda::after{ content:" En celular el arrastre no funciona: usá la compu."; color:#b45309; font-weight:700; } }
@@ -7179,7 +7187,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v13.73";
+const APP_VERSION = "v13.74";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco

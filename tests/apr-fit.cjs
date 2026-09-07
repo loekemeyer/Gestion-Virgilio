@@ -29,8 +29,9 @@ const { chromium } = require("/opt/node22/lib/node_modules/playwright");
     out.fit = { zoom: body.style.zoom, sh: body.scrollHeight, ch: body.clientHeight, sw: body.scrollWidth, cw: body.clientWidth };
     out.conScroll = [...document.querySelectorAll("#pppOverlay *")].filter((e) => { const cs = getComputedStyle(e); return /auto|scroll/.test(cs.overflowY + cs.overflowX) && (e.scrollHeight > e.clientHeight + 1 || e.scrollWidth > e.clientWidth + 1); }).map((e) => e.className || e.id);
     out.html = document.getElementById("pppPreview").innerHTML;
-    // con 30 pedidos no entra ni al 70 %: piso de legibilidad y recién ahí scrollea
-    for (let i = 8; i < 30; i++) _apr.pedidos.push(mk(i));
+    // con 80 pedidos no entra ni al 70 %: piso de legibilidad y recién ahí scrollea
+    // (v13.74: con la grilla a lo ancho 30 entran al 76 %, así que el caso 'no entra' necesita más)
+    for (let i = 8; i < 80; i++) _apr.pedidos.push(mk(i));
     aprRender();
     await new Promise((res) => setTimeout(res, 600));
     out.fit30 = { zoom: body.style.zoom, ov: body.style.overflowY, sh: body.scrollHeight, ch: body.clientHeight };
@@ -86,7 +87,7 @@ const { chromium } = require("/opt/node22/lib/node_modules/playwright");
   chk(r.fit.sh <= r.fit.ch + 1 && r.fit.sw <= r.fit.cw + 1, "con 8 pedidos la PPP entra entera (zoom " + r.fit.zoom + ")");
   chk(Number(r.fit.zoom) >= 0.7, "y sigue legible (zoom ≥ 0,70)");
   chk(r.conScroll.length === 0, "ningún elemento del overlay scrollea (" + r.conScroll.join(",") + ")");
-  chk(Number(r.fit30.zoom) >= 0.7 && r.fit30.ov === "auto" && r.fit30.sh > r.fit30.ch, "con 30 pedidos no baja del 70 %: ahí sí scrollea (zoom " + r.fit30.zoom + ")");
+  chk(Number(r.fit30.zoom) >= 0.7 && r.fit30.ov === "auto" && r.fit30.sh > r.fit30.ch, "con 80 pedidos no baja del 70 %: ahí sí scrollea (zoom " + r.fit30.zoom + ")");
   chk(/apr-wrap apr-2col/.test(r.html) && !/apr-col-tandas/.test(r.html) && !/aprNuevaTanda/.test(r.html), "v13.69: sin tandas sin fecha → dos columnas (pedidos | días), sin botones LK/Chef");
   chk(r.drop.fns.join(">") === "gv_ppp_web_tanda_nueva>gv_ppp_web_tanda_agregar>gv_ppp_web_tanda_programar", "pedido soltado en un día = nueva → agregar → programar (" + r.drop.fns.join(">") + ")");
   chk(r.drop.fecha === "2026-09-15" && r.drop.cod === "E09A" && r.drop.emp === "lk", "con el día del drop, el código que dio la base y la empresa del pedido");
