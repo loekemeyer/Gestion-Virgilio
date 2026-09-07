@@ -12,11 +12,34 @@
 > única**; no se replica. Ante la duda entre parche rápido y fix de raíz → **fix
 > de raíz**.
 >
-> Última actualización: 2026-09-07 (lunes) · Versión app al documentar: **v14.11**
+> Última actualización: 2026-09-07 (lunes) · Versión app al documentar: **v14.12**
 >
 > ⚠⚠ **Desde el lunes 2026-09-07 los operarios usan GESTIÓN, no Producción** (dueño, sábado a la
 > noche: *"el lunes van a empezar a usar GV, no más PV"*). Las tandas web viven en
 > `PPP_Web_Programacion` y Producción no las ve. URL: la de GitHub Pages de este repo.
+>
+> ## ⚠ Regla del dueño (2026-09-07, v14.12): el agregado va en tanda nueva **sólo si mezclaría ISIS con web**
+>
+> Textual, después de dos vueltas y de que dos sesiones se pisaran el mismo pedido:
+> ***"solo va en tanda nueva si mezcla lo que es pedido isis y pedido web"***. **El corte es el ORIGEN, no
+> "¿ya se pickeó?".**
+>
+> - agregado web + tanda **WEB** del mismo cliente y día, **sin empezar** → **se junta**
+> - agregado web + tanda de **ISIS** → **siempre tanda nueva**, aunque nadie la haya tocado
+> - el guard de "sin empezar" se mantiene: sumarle algo a una tanda ya pickeada rompe el picking
+>
+> La **v14.05 lo había leído al revés** (su comentario decía *"el corte es ¿ya se tocó?, NO ¿es de ISIS o es
+> web?"*) y por eso `gv_ppp_web_tanda_abierta_cliente` tomaba como candidatas también las tandas de ISIS. El
+> arreglo de la **v14.12** es sacar esa rama del `UNION`: ahora sólo mira `PPP_Web_Programacion`.
+> `sql/gv_ppp_web_tanda_abierta_cliente_v1412.sql`, backup en `GV_Backup_Func_20260907_tanda_abierta`.
+>
+> Medido: `('lk','2533','2026-09-09')` → **E09B** (su tanda web); con la versión vieja daba **E09A**, que es la
+> de ISIS — ése era el bug. `('lk','45','2026-09-15')` → `E03A` y `('lk','3843','2026-09-14')` → `E01E` (tandas
+> web sin empezar: se juntan, correcto). Cliente sin nada ese día → `NULL` (tanda nueva).
+>
+> **El caso Osa quedó resuelto a mano y no se toca**: mié 09/09, camión 09, misma dirección —
+> `E09A` = 98650 + 98667 (ISIS, 4,041 m³) · `E09B` = `LK 0024` (web, 0,026 m³). Se pickean por separado.
+> La otra sesión lo volvió a juntar (commit `7f431fb`) leyendo la regla vieja; se revirtió en la base.
 >
 > Nota **v14.11** (sólo front) — **Los dos avisos de Programación, en una sola fila** (dueño 07/09, con
 > captura: *"estos dos botones que sean un poco más anchos pero que ambos vayan en una sola fila, no en 2 como
