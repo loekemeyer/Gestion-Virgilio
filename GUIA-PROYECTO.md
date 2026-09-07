@@ -12,13 +12,13 @@
 > única**; no se replica. Ante la duda entre parche rápido y fix de raíz → **fix
 > de raíz**.
 >
-> Última actualización: 2026-09-06 (domingo) · Versión app al documentar: **v13.65**
+> Última actualización: 2026-09-06 (domingo) · Versión app al documentar: **v13.66**
 >
 > ⚠⚠ **Desde el lunes 2026-09-07 los operarios usan GESTIÓN, no Producción** (dueño, sábado a la
 > noche: *"el lunes van a empezar a usar GV, no más PV"*). Las tandas web viven en
 > `PPP_Web_Programacion` y Producción no las ve. URL: la de GitHub Pages de este repo.
 >
-> Nota **v13.65** (front) — **A Programar vuelve a las TRES COLUMNAS; la planilla se borró** (dueño: *"no me gusta
+> Nota **v13.66** (front; el número v13.65 lo tomó el otro chat con un doc de traspaso) — **A Programar vuelve a las TRES COLUMNAS; la planilla se borró** (dueño: *"no me gusta
 > lo que armaste, no me gusta para nada; volvé al formato anterior"*). Se fue `aprPlanillaHtml` con su CSS, su test
 > y el interruptor de vista; vuelven los botones "＋ Nueva tanda LK / Chef". Quedó lo que sí sirve: (a) **soltar un
 > pedido directo en un día** arma la tanda con código automático y la programa ese día (`aprDropDia` →
