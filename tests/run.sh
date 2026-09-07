@@ -305,3 +305,6 @@ PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node te
 
 echo "== apr-pasos (v13.81: A Programar en dos pasos — tildar pedidos → tocar el día; carga progresiva LK/Chef; sin zoom en celular) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/apr-pasos.cjs
+
+echo "== ppp-mover-tanda (v13.87: mover una tanda de día desde la app — RPC gv_ppp_tanda_mover, no localStorage) =="
+PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/ppp-mover-tanda.cjs

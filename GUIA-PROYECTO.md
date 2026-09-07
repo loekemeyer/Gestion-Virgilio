@@ -12,11 +12,24 @@
 > única**; no se replica. Ante la duda entre parche rápido y fix de raíz → **fix
 > de raíz**.
 >
-> Última actualización: 2026-09-07 (lunes) · Versión app al documentar: **v13.86**
+> Última actualización: 2026-09-07 (lunes) · Versión app al documentar: **v13.87**
 >
 > ⚠⚠ **Desde el lunes 2026-09-07 los operarios usan GESTIÓN, no Producción** (dueño, sábado a la
 > noche: *"el lunes van a empezar a usar GV, no más PV"*). Las tandas web viven en
 > `PPP_Web_Programacion` y Producción no las ve. URL: la de GitHub Pages de este repo.
+>
+> Nota **v13.87** (backend Virgilio + front) — **Mover una tanda de día DESDE LA APP** (dueño 07/09, después de
+> que adelantar la tanda del 2533 al miércoles hubiera que hacerlo por SQL: *"esa solicitud la tengo que poder
+> hacer desde la app"*). El botón que había en la solapa Programación —**📅 Fecha de toda la tanda → Aplicar**—
+> guardaba en **localStorage**: el cambio se veía en ese navegador y el operario nunca se enteraba. Ahora
+> `pppTandaFecha` llama a la RPC nueva **`gv_ppp_tanda_mover(p_tanda, p_fecha, p_por)`**, que escribe donde
+> corresponde: tanda **web** → `PPP_Web_Programacion` + `PPP_Web_Tandas`; tanda de **ISIS** →
+> `GV_PPP_Prog_Override`, sin tocar la tabla compartida. **Rechaza mover una tanda ya empezada** (cualquier
+> evento de operarios con la tanda en el `texto`) — el chequeo que hoy había que hacer a mano — y devuelve los
+> avisos del día destino (cupo, no hábil); el front les suma el del **segundo camión** (v13.86) y pregunta antes,
+> aclarando que "lo ven todos". Al terminar recarga la programación de Supabase, así que no queda nada local.
+> Probado: D62A (súper, 23 eventos) rechazada, D66F ida y vuelta entre el 10 y el 11.
+> `sql/gv_ppp_tanda_mover.sql`, test `tests/ppp-mover-tanda.cjs`, §3.bi.
 >
 > Nota **v13.86** (backend Virgilio + front) — **Tanda de 0,60 a 1 m³, y aviso si se abre un segundo camión**
 > (dueño 08/09: *"mínimo 0.6, máximo 1 m3, salvo pedidos de 1 solo cliente superiores a 1m3"* y *"si se programa algo

@@ -7252,7 +7252,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v13.86";
+const APP_VERSION = "v13.87";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -28273,13 +28273,46 @@ function _pppTandaNps(tanda) {
   for (const p of (_pppParsed.prog || [])) { const e = ed[String(p.np)]; const pt = ((e && e.tanda != null ? e.tanda : p.tanda) || "").toUpperCase(); if (pt === t) out.push(String(p.np)); }
   return out;
 }
-function pppTandaFecha(id, tanda) {
+/* v13.87 (dueño: "esa solicitud la tengo que poder hacer desde la app") — mover una tanda de día DE VERDAD.
+   Antes esto guardaba en `pppLoadEdits`/`pppSaveEdits`, o sea en localStorage: el cambio se veía en ESE
+   navegador y el operario nunca se enteraba (por eso una reprogramación había que hacerla por SQL). Ahora
+   llama a `gv_ppp_tanda_mover`, que escribe donde corresponde según de dónde venga la tanda:
+     · web  → PPP_Web_Programacion + PPP_Web_Tandas
+     · ISIS → GV_PPP_Prog_Override, sin tocar la tabla que comparte Producción
+   El backend rechaza mover una tanda ya empezada y devuelve los avisos del día destino (cupo, no hábil);
+   acá se suma el del segundo camión, el mismo de A Programar. */
+async function pppTandaFecha(id, tanda) {
   const inp = document.getElementById(id + "_d"); if (!inp || !inp.value) { pppSetStatus("Elegí una fecha primero.", false); return; }
   const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(inp.value); if (!m) return;
-  const f = m[3] + "/" + m[2] + "/" + m[1];
-  const ed = pppLoadEdits();
-  for (const np of _pppTandaNps(tanda)) { (ed[np] = ed[np] || {}).fecha_entrega = f; }
-  pppSaveEdits(); pppRenderProg(); pppSetStatus("✓ Tanda " + String(tanda).toUpperCase() + ": fecha de entrega → " + f + ".", true);
+  const iso = m[1] + "-" + m[2] + "-" + m[3], f = m[3] + "/" + m[2] + "/" + m[1];
+  const t = String(tanda).toUpperCase();
+  const filas = (_pppParsed.prog || []).filter(function (p) { return String(p.tanda || "").toUpperCase() === t; });
+  const avisos = [];
+  try {
+    const cam = await aprRpc("gv_ppp_web_camion_nuevo", {
+      p_fecha: iso,
+      p_filas: filas.map(function (p) { return { zona: p.zona || "", barrio: p.barrio || p.localidad || "", direccion: p.direccion || "" }; })
+    }) || [];
+    const nuevos = cam.filter(function (c) { return !c.ya_va && !c.es_super && Number(c.camiones_dia) > 0; });
+    if (nuevos.length) avisos.push("El " + f + " ya salen " + Number(nuevos[0].camiones_dia) + " camión(es) y esto abre otro: " +
+      nuevos.map(function (c) { return c.camion; }).join(", ") + ". ¿Seguro que vas a usar un segundo camión?");
+  } catch (_e) {}
+  if (!confirm("¿Mover TODA la tanda " + t + " al " + f + "?" +
+      (filas.length ? "\n\n" + filas.length + " pedido(s)." : "") +
+      (avisos.length ? "\n\n⚠ " + avisos.join("\n⚠ ") : "") +
+      "\n\nLo ven todos, también el operario en su celular.")) return;
+  pppSetStatus("Moviendo la tanda " + t + "…", true);
+  try {
+    const r = await aprRpc("gv_ppp_tanda_mover", { p_tanda: t, p_fecha: iso, p_por: (typeof _faltMiLegajo === "function" ? _faltMiLegajo() : "") || null });
+    const x = (r && r[0]) || {};
+    pppSetStatus("✓ Tanda " + t + " movida al " + f + ": " + (x.movidas || 0) + " pedido(s) · " + (x.m3 || 0) + " m³." + (x.aviso ? "  ⚠ " + x.aviso : ""), true);
+    if (x.aviso) { try { alert("Se movió, pero ojo:\n\n" + x.aviso); } catch (_e) {} }
+    await pppLoadProgFromSupabase();
+  } catch (e) {
+    const msg = (e && e.message) ? e.message : String(e);
+    pppSetStatus("⚠ No se pudo mover: " + msg, false);
+    try { alert("No se pudo mover la tanda " + t + ":\n\n" + msg); } catch (_e) {}
+  }
 }
 function pppTandaAProgramar(tanda) {
   const t = String(tanda).toUpperCase(); if (!confirm("¿Devolver toda la tanda " + t + " a 'A Programar'? (le saca la tanda, la fecha y la programación)")) return;

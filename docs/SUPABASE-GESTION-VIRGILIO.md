@@ -1384,6 +1384,40 @@ es de Chef y pisa al LK 217): cuando Gestión alimente el tracking, escribir el 
 una función `gv_*` y pedir columna `empresa` en PaginaLK. Y el Excel ISIS de Facturación manda
 `N_Pedido` contador (no el id), como el mail: ISIS numera 98xxx por su cuenta.
 
+### 3.bi ✅ `gv_ppp_tanda_mover`: mover una tanda de día desde la app (v13.87) — 2026-09-07 lunes
+
+**Qué dijo el dueño.** Después de que la reprogramación del 2533 (§3.bh) hubiera que hacerla por SQL: *"esa
+solicitud la tengo que poder hacer desde la app"*.
+
+**El agujero.** La solapa Programación ya tenía "📅 Fecha de toda la tanda → Aplicar", pero `pppTandaFecha`
+escribía en `pppLoadEdits`/`pppSaveEdits` = **localStorage**. El cambio no salía de ese navegador: el operario
+seguía viendo la tanda el día viejo. Por eso mover una tanda de verdad era una tarea de SQL.
+
+**Migración `gv_ppp_tanda_mover_v1387`.** `gv_ppp_tanda_mover(p_tanda text, p_fecha date, p_por text)` →
+`(movidas, np_web, np_isis, m3, aviso)`. SECURITY DEFINER, execute a anon/authenticated, gate
+`gv_es_supervisor_o_servicio`.
+- **Tanda web** → `update PPP_Web_Programacion.fecha_entrega` + `PPP_Web_Tandas.fecha_entrega`.
+- **Tanda de ISIS** → `insert … on conflict (np) do update` en `GV_PPP_Prog_Override`, con nota fechada y el
+  legajo. **No toca `PPP_Programacion_Diaria`**, que es compartida. Se saltean las NP que ya resolvió la rama web.
+- **Bloquea si la tanda está empezada**: `count(*)` de `Registros_Produccion_Virgilio` con
+  `split_part(texto,'|',1) = tanda` > 0 → excepción con la cantidad de eventos. Es el chequeo que en §3.bh hubo
+  que hacer a mano.
+- Avisos del día destino (cupo por `gv_ppp_web_cupo` + `gv_ppp_web_m3_isis`, y día no hábil): se devuelven, no
+  bloquean.
+
+**Probado (`SET ROLE` no hizo falta: la lógica se probó con la función real).** D62A (súper, ya empezada) →
+*"ya está empezada (23 evento(s) de operarios): no se puede mover de día"*. `ZZZZ` → *"No encontré la tanda"*.
+D66F (NP 44605, Chef, 0,213 m³) jue 10 → vie 11 (aviso: el 11/09 queda con 10,288 m³ sobre el cupo de 6) y de
+vuelta al jue 10; verificado en `gv_ppp_programacion_diaria` en cada paso.
+
+**Front.** `pppTandaFecha` pasa a async: pregunta con la tanda, el día, cuántos pedidos y —si corresponde— el
+aviso del segundo camión (`gv_ppp_web_camion_nuevo`), aclarando que "lo ven todos, también el operario en su
+celular"; llama la RPC, muestra el aviso que vuelva y recarga con `pppLoadProgFromSupabase()`. Ya **no** escribe
+en localStorage, ni siquiera si el backend rechaza. Test `tests/ppp-mover-tanda.cjs` (12 chequeos).
+
+**Rollback.** `drop function public.gv_ppp_tanda_mover(text, date, text);` — el botón vuelve a fallar con el
+error de la RPC inexistente (y no se pierde nada: no escribía en la base antes).
+
 ### 3.bh ✅ Datos: la tanda del 2533 se adelantó al miércoles — 2026-09-07 lunes
 
 **Qué pidió el dueño.** *"La tanda del cliente 2533 adelantala para el miércoles y posterga lo del miércoles que

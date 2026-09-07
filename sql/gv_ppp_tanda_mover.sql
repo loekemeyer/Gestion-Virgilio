@@ -1,0 +1,21 @@
+-- gv_ppp_tanda_mover.sql — mover una tanda entera de día, DESDE LA APP · v13.87 (2026-09-07) · Virgilio
+-- Dueño: "esa solicitud la tengo que poder hacer desde la app" (después de que una reprogramación —adelantar la
+-- tanda del cliente 2533 al miércoles— hubo que hacerla por SQL).
+--
+-- EL PROBLEMA. La solapa Programación ya tenía "📅 Fecha de toda la tanda → Aplicar", pero `pppTandaFecha`
+-- guardaba en `pppLoadEdits`/`pppSaveEdits`, o sea en **localStorage**: el cambio se veía en ESE navegador y el
+-- operario nunca se enteraba. Para mover de verdad había que escribir en la base a mano.
+--
+-- QUÉ HACE. Según de dónde venga la tanda:
+--   · WEB  → update PPP_Web_Programacion.fecha_entrega + PPP_Web_Tandas.fecha_entrega (tablas nuestras).
+--   · ISIS → upsert en GV_PPP_Prog_Override (np, fecha_entrega, nota), SIN tocar PPP_Programacion_Diaria, que
+--            es compartida con Producción. Se saltean las NP que ya resolvió la rama web.
+-- Gate de supervisor (gv_es_supervisor_o_servicio). BLOQUEA si la tanda ya está empezada: cualquier evento de
+-- Registros_Produccion_Virgilio cuyo primer campo del `texto` sea la tanda (picking, armado…). Devuelve los
+-- avisos del día destino (cupo excedido, día no hábil) sin bloquear por ellos; el front les suma el del segundo
+-- camión (gv_ppp_web_camion_nuevo, v13.86).
+--
+-- PROBADO (2026-09-07): D62A (súper, 23 eventos) → rechaza "ya está empezada"; ZZZZ → "No encontré la tanda";
+-- D66F (NP 44605, Chef, 0,213 m³) jue 10 → vie 11 y de vuelta al 10, con el aviso de cupo en las dos.
+-- Migración gv_ppp_tanda_mover_v1387. Rollback: drop function public.gv_ppp_tanda_mover(text, date, text);
+-- (el front vuelve a quedar sin forma de mover una tanda; el editor viejo escribía sólo en localStorage).
