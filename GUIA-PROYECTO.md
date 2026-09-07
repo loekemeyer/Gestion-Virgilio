@@ -12,7 +12,7 @@
 > única**; no se replica. Ante la duda entre parche rápido y fix de raíz → **fix
 > de raíz**.
 >
-> Última actualización: 2026-09-07 (lunes) · Versión app al documentar: **v14.18**
+> Última actualización: 2026-09-07 (lunes) · Versión app al documentar: **v14.19**
 >
 > ⚠⚠ **Desde el lunes 2026-09-07 los operarios usan GESTIÓN, no Producción** (dueño, sábado a la
 > noche: *"el lunes van a empezar a usar GV, no más PV"*). Las tandas web viven en
@@ -40,6 +40,20 @@
 > **El caso Osa quedó resuelto a mano y no se toca**: mié 09/09, camión 09, misma dirección —
 > `E09A` = 98650 + 98667 (ISIS, 4,041 m³) · `E09B` = `LK 0024` (web, 0,026 m³). Se pickean por separado.
 > La otra sesión lo volvió a juntar (commit `7f431fb`) leyendo la regla vieja; se revirtió en la base.
+>
+> Nota **v14.19** (backend) — **La cola de geocodificación se tapaba.** Defecto de la v14.16,
+> encontrado el mismo día: `gv_geo_faltantes_padron` devuelve siempre el mismo orden y los fallos
+> no se guardaban en ningún lado, así que una dirección que no resuelve **volvía a salir primera
+> en cada corrida**. Con 40 seguidas que fallan, la cola queda tapada y lo que está detrás **no se
+> intenta nunca**. Medido: seis corridas con `pedidas 40, ubicadas 0, fallaron 40` y la cobertura
+> clavada en **368 de 2.307 durante 90 minutos**. No era Nominatim bloqueándonos — se probó una
+> consulta directa desde la base y contesta 200 con resultado; el problema era nuestro.
+> Ahora cada fallo se anota en `GV_Geo_Fallidas` y a los **3 intentos** la vista deja esa dirección
+> afuera; queda listada en `gv_geo_no_resueltas` con su último error, que es la lista para corregir
+> a mano en `GV_Geo_Correccion` (y `gv_geo_reintentar()` la devuelve a la cola). Tres intentos y no
+> uno porque Nominatim tiene picos y la cascada prueba varias formas de preguntar. Verificado
+> después: la cola volvió a moverse (368 → 373) y los fallos se anotan solos.
+> `sql/gv_geo_fallidas_v1419.sql`, Edge Function `gv-geocodificar` v10.
 >
 > Nota **v14.18** — **La hoja de ruta ahora dice cuánto se tarda en llegar a cada parada** (dueño
 > 07/09: *"tendríamos que agregarle el tiempo de viaje que tiene desde Virgilio hasta cada destino

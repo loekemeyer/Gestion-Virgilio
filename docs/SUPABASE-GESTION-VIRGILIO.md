@@ -3217,6 +3217,46 @@ calcular ningún tiempo de viaje depósito → destino.
 
 **Rollback:** en `sql/gv_padron_direcciones_v1416.sql`.
 
+## 3.bm ✅ La cola de geocodificación se tapaba (v14.19) — 2026-09-07
+
+**Defecto de la v14.16, encontrado el mismo día.** `gv_geo_faltantes_padron` devuelve lo que
+falta **siempre en el mismo orden** (`amba desc, empresa, cod`) y el geocodificador toma los
+primeros 40. Los fallos no se guardaban en ningún lado, así que una dirección que no resuelve
+**volvía a salir primera en la corrida siguiente**. Alcanza con 40 seguidas que fallen para que
+la cola quede tapada: el cron sigue corriendo, gasta sus 40 llamadas cada 10 minutos, y **lo que
+está detrás no se intenta nunca**.
+
+**Medido:** de 16:22 a 17:53 el log da seis corridas seguidas con `pedidas 40, ubicadas 0,
+fallaron 40` y el mismo *"1731 sin ubicar todavía"*. La cobertura se quedó clavada en **368 de
+2.307 durante 90 minutos**.
+
+**No era Nominatim.** Antes de tocar nada se probó una consulta directa desde la base
+(`net.http_get` a `/search?street=Rivadavia 5000&city=Flores`) y contestó **200 con resultado**.
+El problema era nuestro.
+
+**Lo que se agregó** (`sql/gv_geo_fallidas_v1419.sql`):
+
+| Objeto | Qué hace |
+|---|---|
+| `GV_Geo_Fallidas` (tabla, RLS on) | intentos, último error y última fecha por `(cod, dir_key)` |
+| `gv_geo_marcar_fallo(cod, dir_key, error)` | la llama la Edge Function en cada fallo; incrementa |
+| `gv_geo_reintentar(cod)` | devuelve a la cola lo dado por perdido, después de corregir a mano |
+| `gv_geo_faltantes_padron` v2 | ahora excluye lo que ya falló **3 veces** — eso destapa la cola |
+| `gv_geo_no_resueltas` (vista) | las descartadas con su último error: la lista para arreglar |
+
+**Tres intentos y no uno**: Nominatim tiene picos y la cascada del geocodificador prueba varias
+formas de preguntar, así que un fallo pasajero no puede condenar una dirección para siempre.
+
+**Cómo se destapó lo que ya estaba trabado.** Antes del redeploy se sembró `GV_Geo_Fallidas`
+desde el historial de `GV_Geo_Log` (que ya venía guardando `detalle->errores`), cruzando por
+`gv_dir_geo_query(direccion)` contra el padrón: **46 anotadas, 39 descartadas**, y la cola pasó
+de 1.727 a 1.689 al instante.
+
+**Verificado después del deploy (v10 de la función):** los fallos se anotan solos (46 → 53) y la
+cobertura volvió a moverse (368 → 371 → 373).
+
+**Rollback:** en la cabecera de `sql/gv_geo_fallidas_v1419.sql`.
+
 ## 4. Incidente de seguridad — 2026-09-04 (cerrado)
 
 `public.vista_pedidos_web_feed` tenía `select` para `anon`. Los esquemas `fuentes` y

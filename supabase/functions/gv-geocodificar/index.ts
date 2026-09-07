@@ -24,7 +24,9 @@
 //      es el límite de la política de uso gratuita y no se negocia
 //   3. escribe la ubicación en `GV_Geo_Cliente` (cód + dirección: nuestra) y
 //      AGREGA la fila a `PPP_Geo` si no está
-//   4. deja constancia en `GV_Geo_Log`, incluso cuando no hubo nada que hacer
+//   4. anota los fallos en `GV_Geo_Fallidas` (v14.19): a los 3 intentos la dirección sale de
+//      la cola, para que una que no resuelve no tape a las que vienen atrás
+//   5. deja constancia en `GV_Geo_Log`, incluso cuando no hubo nada que hacer
 //
 // ⚠⚠ `PPP_Geo` es COMPARTIDA con Producción Virgilio (la usa su index.html).
 //    Acá sólo se le AGREGAN filas (`Prefer: resolution=ignore-duplicates`):
@@ -287,6 +289,15 @@ Deno.serve(async (req) => {
         ubicadas++;
       } else {
         errores.push({ cod: f.cod, dir: f.dir_query, err });
+        // v14.19 — ANOTAR EL FALLO. Sin esto la vista devuelve siempre el mismo orden y una
+        // dirección que no resuelve vuelve a salir primera en la corrida siguiente: con 40
+        // seguidas que fallen, la cola queda tapada y lo que está detrás no se intenta NUNCA.
+        // Pasó de verdad el 07/09: seis corridas con 40/40 fallidas y la cobertura clavada.
+        // A los 3 intentos la vista la deja afuera y queda en `gv_geo_no_resueltas`.
+        await fetch(URL_ + "/rest/v1/rpc/gv_geo_marcar_fallo", {
+          method: "POST", headers: H,
+          body: JSON.stringify({ p_cod: f.cod || "", p_dir_key: f.dir_key, p_error: err }),
+        }).catch(() => { /* que no se pueda anotar no puede frenar la corrida */ });
       }
       if (i < lote.length - 1) await new Promise((r) => setTimeout(r, ESPERA_MS));
     }
