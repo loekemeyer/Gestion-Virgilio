@@ -3081,7 +3081,7 @@ cargada**, ni de los 8 pedidos observados ni de sus compañeros de camión. Eso 
 
 ---
 
-## 3.bk El reporte de la página ve el depósito de Gestión (v14.13) — 2026-09-07
+## 3.bk El reporte de la página ve el depósito de Gestión (v14.14) — 2026-09-07
 
 **El pedido.** *"Hicimos un reporte diario/semanal/mensual para la página. Quiero que incluya lo
 que pasa en Gestión Virgilio (armado de pedidos y despacho de los mismos)."* Al revisar qué había,

@@ -1,6 +1,6 @@
 -- =============================================================================
 -- gv_lk_np_feed.sql — el feed de NP que consume el reporte de la página LK
--- Proyecto Virgilio (hrxfctzncixxqmpfhskv) · 2026-09-07 · v14.13
+-- Proyecto Virgilio (hrxfctzncixxqmpfhskv) · 2026-09-07 · v14.14
 -- =============================================================================
 -- POR QUÉ.
 -- El reporte diario/semanal/mensual que sale por Telegram desde el proyecto LK

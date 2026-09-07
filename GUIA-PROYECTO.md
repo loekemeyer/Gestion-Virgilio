@@ -9497,7 +9497,7 @@ día con >1 sucursal distinta — el único caso que el string no resuelve), `or
 (desempate por hora), `synced_at`. RLS: anon/authenticated SELECT; escribe solo
 `lk_ppp_reader`. Ver `sql/lk_pedidos_match.sql`.
 
-**`gv_lk_np_feed`** (vista, v14.13, 2026-09-07) — el feed que consume el **reporte diario /
+**`gv_lk_np_feed`** (vista, v14.14, 2026-09-07) — el feed que consume el **reporte diario /
 semanal / mensual de la página LK** (funciones `rep_*` del proyecto LK, salen por Telegram).
 Una fila por NP, **ISIS y web juntas**: cliente, tanda, zona, fecha de entrega, m³, si está
 facturada y cuándo, el **neto facturado** (de `gv_vista_facturacion_neto`: cajas entregadas ×
