@@ -2975,6 +2975,52 @@ Gestión. **Repetir el lunes a la tarde: los 12 ⏳ tienen que haber pasado a Pr
 
 ---
 
+## 3.bj Se cortó la planilla de Google de "Pedidos Entregados" — 2026-09-07
+
+**Cómo salió.** El dueño miró la hoja de entregados y saltó: *"¿cómo 8/9? eso es mañana"*. Era un
+tipeo: **NP 97719** (Merajver Marcelo Fabián, cód 2193, tanda `C39A`, 0,031 m³) figuraba entregado
+el **2026-09-08**. La facturación dice `facturado_at = 2026-06-08 16:45` y `fecha_salida =
+2026-06-09`: le dieron vuelta día y mes. Lo real es el **9 de junio**.
+
+**No era sistemático — se verificó.** Cruzando las **1.072 NP** que están a la vez en
+`PPP_Entregados_Meta` y en `Facturacion_NP`: 241 con la misma fecha, **567 a −1 día**, 226 entre −2
+y −4, 17 hasta −13 (normal: la hoja lleva la entrega y la facturación el día de salida). **Una sola
+fila cae fuera de escala, +91 días: ésta.** Cero casos de día/mes invertidos en serie.
+
+**Lo importante no era el tipeo, era de dónde venía.** La tabla no se cargaba a mano: la pisaba
+entera el **cron 27 `sync-ppp-entregados-meta`** (`7,37 * * * *`), que hace `http_get` del CSV de la
+hoja *"PPP Pedidos Entregados 2026"* (gid `2146771217`), **`truncate` de `PPP_Entregados_Meta`** y la
+vuelve a llenar. Corregir la fila sin apagar el cron no servía: a los minutos volvía el 08/09.
+
+**Decisión del dueño:** ***"la planilla de Google no se tiene que usar para nada"***.
+
+**Qué se hizo, en orden** (`sql/backups/entregados_meta_20260907_corte_google_sheet.sql`):
+
+1. Backup completo a `public."GV_Backup_Entregados_Meta_20260907"` — **2.783 filas originales**,
+   con la fila mala incluida.
+2. `select cron.alter_job(27, active := false)` — **primero apagar**, si no la corrección se pierde.
+3. `update … set fecha_entrega = '2026-06-09' where np = '97719'`.
+4. Verificado: última entrega en la hoja **02/09/2026**, **0 fechas futuras**, 2.783 filas intactas.
+
+**La tabla queda CONGELADA** como foto histórica (02/01 → 02/09/2026). No se borró nada y no entra
+más nada desde la planilla.
+
+**⚠ Esto también lo toma Producción** (base compartida). En su repo leen `PPP_Entregados_Meta`:
+`vista_tanda_m3`, `vista_productividad_semanal`, `picking_sin_base_telegram` y su `index.html`. Con
+el cron apagado esas vistas dejan de incorporar entregas nuevas desde la hoja; las viejas siguen. En
+**Gestión no hace falta**: desde el 07/09 el estado "entregado" sale de **Recepción Remitos**
+(`gv_ppp_entregados`, evento `CRN`).
+
+**Efecto de rebote en el análisis del "CCR sin CCN":** con la fila mala, la hoja parecía llegar al
+08/09. Corregida, **termina el 02/09** — o sea que del **3 y 4 de septiembre no hay ninguna entrega
+cargada**, ni de los 8 pedidos observados ni de sus compañeros de camión. Eso refuerza que lo del
+3–4/09 es un corte de registro de esos dos días, no algo propio de esas 8 NP.
+
+**Rollback:** `truncate` + `insert … select * from "GV_Backup_Entregados_Meta_20260907"` +
+`cron.alter_job(27, active := true)`.
+
+---
+
 ## 4. Incidente de seguridad — 2026-09-04 (cerrado)
 
 `public.vista_pedidos_web_feed` tenía `select` para `anon`. Los esquemas `fuentes` y

@@ -12,11 +12,28 @@
 > única**; no se replica. Ante la duda entre parche rápido y fix de raíz → **fix
 > de raíz**.
 >
-> Última actualización: 2026-09-07 (lunes) · Versión app al documentar: **v14.00**
+> Última actualización: 2026-09-07 (lunes) · Versión app al documentar: **v14.02**
 >
 > ⚠⚠ **Desde el lunes 2026-09-07 los operarios usan GESTIÓN, no Producción** (dueño, sábado a la
 > noche: *"el lunes van a empezar a usar GV, no más PV"*). Las tandas web viven en
 > `PPP_Web_Programacion` y Producción no las ve. URL: la de GitHub Pages de este repo.
+>
+> Nota **v14.02** (backend/datos, sin cambios de app) — **Se cortó la planilla de Google de "Pedidos
+> Entregados"** (dueño 07/09: *"la planilla de Google no se tiene que usar para nada"*). Salió de que él vio
+> un pedido entregado el **08/09** —mañana— y preguntó *"¿cómo 8/9?"*. Era un tipeo: **NP 97719** (Merajver,
+> tanda `C39A`) se entregó el **9 de junio** y alguien invirtió día y mes. Se cruzaron las 1.072 NP que están
+> en la hoja y en la facturación: todas caen entre 0 y −13 días salvo ésta, con **+91**. Una sola, no un
+> problema de formato.
+>
+> Lo de fondo: la tabla `PPP_Entregados_Meta` **no se cargaba a mano**, la pisaba entera el cron 27
+> `sync-ppp-entregados-meta` cada 30 min, bajando el CSV de la hoja y haciendo `truncate` + `insert`.
+> Corregir la fila sin apagarlo no servía. Se apagó el cron, después se corrigió la fecha, y **la tabla queda
+> congelada** como foto histórica (2.783 filas, 02/01 → 02/09/2026; no se borró nada). Backup completo en
+> `GV_Backup_Entregados_Meta_20260907`. Detalle, impacto sobre Producción y rollback: §3.bj de
+> `docs/SUPABASE-GESTION-VIRGILIO.md` y `sql/backups/entregados_meta_20260907_corte_google_sheet.sql`.
+>
+> **En Gestión no se pierde nada**: el estado "entregado" sale de **Recepción Remitos** (`gv_ppp_entregados`,
+> evento `CRN`) desde la v13.57. La hoja sólo aportaba el histórico de antes del cambio.
 >
 > Nota **v14.00** (sólo front) — **REVERTIDA la v13.97: en la app los códigos se quedan.** El dueño dijo
 > *"yo nunca entendí CCR y CCN; para mí es control remitos, carga camión y recepción remitos, sólo esos nombres
