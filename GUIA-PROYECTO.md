@@ -12,11 +12,43 @@
 > única**; no se replica. Ante la duda entre parche rápido y fix de raíz → **fix
 > de raíz**.
 >
-> Última actualización: 2026-09-07 (lunes) · Versión app al documentar: **v13.88**
+> Última actualización: 2026-09-07 (lunes) · Versión app al documentar: **v13.89**
 >
 > ⚠⚠ **Desde el lunes 2026-09-07 los operarios usan GESTIÓN, no Producción** (dueño, sábado a la
 > noche: *"el lunes van a empezar a usar GV, no más PV"*). Las tandas web viven en
 > `PPP_Web_Programacion` y Producción no las ve. URL: la de GitHub Pages de este repo.
+>
+> Nota **v13.89** (sólo front) — **🗺️ HOJA DE RUTA del camión: Google Maps + imprimible para el fletero**
+> (dueño 07/09, con foto de la solapa Programación: *"en el módulo de orden de carga me gustaría un botoncito que
+> me abra Google Maps o algo para que me diga dónde tengo que ir a entregar cada uno, o sea poder imprimírselo al
+> fletero con todos los pedidos que tiene. Ahí, si te das cuenta, tenés muchos pedidos del mismo cliente: Dapelo
+> por ejemplo pidió cuatro notas de pedido que se separó por la cantidad de ítems que pidió. Eso podríamos, para
+> lo que es solamente el módulo del mapa, que se unifique en uno solo, que nos muestre uno dos tres cuatro, ok,
+> aclare cuatro NP o algo así, pero que no aparezca todo el tiempo que hay que ir cuatro veces al mismo lugar,
+> porque solamente se va una vez"*).
+>
+> Cada camión de la pantalla del día (Programación → entrar a un día) suma abajo del "🔁 Orden de carga" un
+> botón **🗺️ Hoja de ruta** que dice cuántas paradas y cuántas NP. Abre una hoja con:
+> **📍 Abrir en Google Maps** (arranca y termina en el depósito, Virgilio 2788, en **orden de entrega**; si son
+> más de 9 paradas va en tramos encadenados, igual que "Armar ruta de reparto") y **🖨 Imprimir**, con una hoja de
+> impresión propia (`@media print`) que deja sólo la hoja y le agrega el renglón de **"Recibí conforme — firma y
+> aclaración"** para que el fletero la lleve en la mano.
+>
+> **Una parada = una DIRECCIÓN, no una NP.** La clave es **cód + dirección normalizada** (la misma `_rtDirKey`
+> que usa `PPP_Geo`), así que las 4 NP de Dapelo en Guardia Vieja son **una parada que dice "4 NP: 98676 · 98677
+> · 98678 · 98679"** con los m³ sumados. Ojo: **no se unifica por cliente**, porque en la programación del 11/09
+> el mismo Dapelo (cód 1792) tiene pedidos en **Almagro, Colegiales y Villa Crespo** — tres viajes de verdad;
+> unificar por cód se comía dos paradas. Números reales al 07/09: jue 10 **24 NP → 14 paradas**, vie 11 **38 NP →
+> 19 paradas** (17 clientes: dos de ellos con más de una dirección).
+>
+> **La unificación es SÓLO de esta hoja**, como pidió el dueño ("para el módulo del mapa solamente"): la tira
+> "🔁 Orden de carga" y la tabla del camión siguen con **una fila por NP**, porque el que carga necesita ver cada
+> bulto. Retira no lleva hoja (no hay reparto) y las vencidas tampoco (ya salieron).
+>
+> Lo que **no tiene ubicación** (`GV_Geo_Cliente` / `PPP_Geo`) no se pierde: se lista al final marcado
+> *sin ubicación* y se avisa arriba que no entra al link de Maps. Todo se calcula con lo que ya está en memoria
+> (`_pppGeo` / `_pppGeoCod`): no pega a Supabase ni geocodifica, abre al instante y anda sin señal. Front puro,
+> cero backend nuevo. `index.html` (`_pppHojaParadas`, `pppHojaHtml`, `pppHojaAbrir`), `tests/ppp-hoja-ruta.cjs`.
 >
 > Nota **v13.88** (sólo front) — **"Listo: no queda nada por programar"** (dueño 07/09 09:25, con captura, después
 > de programar al cliente 4210: *"tendría que ponerme un listo o algo, no continuar programando si no hay nada más

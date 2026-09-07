@@ -2628,6 +2628,11 @@ tr.ppp-err-zona > td{ background:#fffbeb !important; }
 .pn-orden .r span.go{ background:#15803d; color:#fff; border-color:#15803d; }
 .pn-orden .r em{ font-style:normal; color:#b45309; font-weight:900; }
 .pn-orden .hint{ margin-left:auto; color:#166534; font-weight:700; font-size:11.5px; }
+/* v13.89 — botón "Hoja de ruta" del camión (Maps + imprimir para el fletero). */
+.pn-hr{ display:flex; align-items:center; gap:10px; flex-wrap:wrap; padding:7px 14px 7px 20px; background:#f8fafc; border-top:1px solid #eef2f7; }
+.pn-hr-b{ display:inline-flex; align-items:center; gap:6px; background:#1a73e8; color:#fff; border:none; border-radius:9px; padding:6px 13px; font-size:12.5px; font-weight:800; cursor:pointer; width:auto; }
+.pn-hr-b:active{ transform:scale(.97); }
+.pn-hr-t{ font-size:11.5px; color:#64748b; font-weight:700; }
 .pn-thead, .pn-ped{ display:grid; grid-template-columns:82px minmax(0,1fr) 110px 60px 105px 175px 150px; gap:10px; align-items:center; padding:7px 14px 7px 20px; border-top:1px solid #eef2f7; }
 .pn-thead{ font-size:10px; font-weight:800; letter-spacing:.6px; text-transform:uppercase; color:#64748b; background:#fafcff; }
 .pn-thead .num, .pn-ped .m, .pn-ped .pp{ text-align:right; }
@@ -7255,7 +7260,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v13.88";
+const APP_VERSION = "v13.89";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -30034,6 +30039,125 @@ function _pppOrdenCarga(cam) {
   paradas.forEach(function (p, i) { p._parada = i + 1; p._carga = n - i; p._sinUbic = sin.indexOf(p) >= 0; });
   return { paradas: paradas, sinUbic: sin.length };
 }
+/* =====================================================================================
+   v13.89 — HOJA DE RUTA del camión: imprimible para el fletero + Google Maps.
+   Dueño 07/09: "un botoncito que me abra Google Maps … poder imprimírselo al fletero con todos
+   los pedidos que tiene … tenés muchos pedidos del mismo cliente, Dapelo por ejemplo pidió cuatro
+   notas de pedido que se separó por la cantidad de ítems … para el módulo del mapa solamente, que
+   se unifique en uno solo, que aclare 4 NP, pero que no aparezca todo el tiempo que hay que ir
+   cuatro veces al mismo lugar, porque solamente se va una vez".
+
+   UNA PARADA = UNA DIRECCIÓN, no un cliente: la clave es cód + dirección normalizada (la misma
+   `_rtDirKey` que usa PPP_Geo). Las 4 NP de Dapelo en Almagro son UNA parada; las de Colegiales y
+   las de Villa Crespo son otras dos — el mismo cliente en tres barrios son tres viajes de verdad
+   (así está la programación del 11/09). Unificar sólo por cód se comería dos paradas reales.
+
+   La unificación es SÓLO de esta hoja: la tira "🔁 Orden de carga" y la tabla del camión siguen
+   con una fila por NP, porque el que carga necesita ver cada bulto.
+
+   Orden: el de ENTREGA (el mismo recorrido de `_pppOrdenCarga`, que es el inverso de la carga).
+   Todo se calcula con lo que ya está en memoria (`_pppGeo` / `_pppGeoCod`): no pega a Supabase ni
+   geocodifica nada, así que abre al instante y anda sin señal. */
+let _pppHoja = {};   // "diaKey|camKey" → { nombre, fecha, paradas, nps, m3 }
+function _pppHojaParadas(paradas) {
+  const out = [], by = new Map();
+  for (const p of (paradas || [])) {
+    const k = String(p.cod || "").trim() + "|" + _rtDirKey(p.direccion, p.localidad || p.barrio);
+    let s = by.get(k);
+    if (!s) {
+      const g = _pppGeoDe(p);
+      s = {
+        rs: String(p.razon_social || "").trim(), cod: String(p.cod || "").trim(),
+        dir: String(p.direccion || "").trim(), loc: String(p.localidad || p.barrio || "").trim(),
+        lat: g ? g.lat : null, lng: g ? g.lng : null, nps: [], tandas: [], m3: 0
+      };
+      by.set(k, s); out.push(s);
+    }
+    s.nps.push(String(p.np || "—")); s.m3 += Number(p.m3) || 0;
+    const t = String(p.tanda || "").trim().toUpperCase();
+    if (t && t !== "—" && s.tandas.indexOf(t) < 0) s.tandas.push(t);
+  }
+  return out;
+}
+function _pppHojaCss() {
+  if (document.getElementById("pppHrCss")) return;
+  const s = document.createElement("style"); s.id = "pppHrCss";
+  s.textContent = "#pppHrOverlay{display:none;position:fixed;inset:0;z-index:1400;background:rgba(2,6,23,.74);overflow:auto;padding:14px;}" +
+    "#pppHrOverlay.show{display:block;}" +
+    ".hr-card{background:#fff;max-width:820px;margin:0 auto;border-radius:16px;overflow:hidden;box-shadow:0 24px 70px rgba(0,0,0,.5);}" +
+    ".hr-head{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:13px 16px;background:linear-gradient(90deg,#1a73e8,#0b3b6b);color:#fff;}" +
+    ".hr-title{font-size:18px;font-weight:800;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}" +
+    ".hr-close{background:#dc2626;color:#fff;border:none;border-radius:8px;padding:6px 14px;font-weight:800;cursor:pointer;width:auto;flex-shrink:0;}" +
+    ".hr-body{padding:14px 16px;}" +
+    ".hr-sub{font-size:12.5px;color:#475569;font-weight:700;margin-bottom:10px;font-variant-numeric:tabular-nums;}" +
+    ".hr-acts{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;}" +
+    ".hr-b{display:inline-flex;align-items:center;gap:6px;border:none;border-radius:9px;padding:8px 13px;font-size:12.5px;font-weight:800;cursor:pointer;text-decoration:none;width:auto;}" +
+    ".hr-b.maps{background:#1a73e8;color:#fff;}.hr-b.print{background:#0f766e;color:#fff;}" +
+    ".hr-b:active{transform:scale(.97);}" +
+    ".hr-note{font-size:11.5px;color:#64748b;background:#f1f5f9;border-radius:8px;padding:8px 11px;margin-bottom:12px;}" +
+    ".hr-warn{font-size:12px;color:#92400e;background:#fffbeb;border:1px solid #fde68a;border-radius:8px;padding:8px 11px;margin-bottom:12px;}" +
+    ".hr-stop{display:flex;align-items:flex-start;gap:11px;padding:9px 0;border-top:1px solid #eef2f7;}" +
+    ".hr-stop:first-child{border-top:none;}" +
+    ".hr-n{flex:0 0 auto;width:26px;height:26px;border-radius:50%;background:#0f172a;color:#fff;font-size:13px;font-weight:800;display:inline-flex;align-items:center;justify-content:center;}" +
+    ".hr-b2{min-width:0;flex:1;}" +
+    ".hr-rs{font-size:14px;font-weight:800;color:#0f172a;}" +
+    ".hr-dir{font-size:12.5px;color:#334155;}" +
+    ".hr-nps{font-size:12px;color:#475569;margin-top:2px;}" +
+    ".hr-nps b{color:#1a73e8;}" +
+    ".hr-m3{flex:0 0 auto;font-size:12.5px;font-weight:800;color:#0f766e;font-variant-numeric:tabular-nums;}" +
+    ".hr-sinu{font-size:11.5px;color:#b45309;font-weight:800;}" +
+    ".hr-firma{margin-top:16px;padding-top:10px;border-top:2px solid #0f172a;font-size:12px;color:#475569;display:none;}" +
+    "@media print{body>*{display:none !important;}body>#pppHrOverlay{display:block !important;position:static;background:#fff;padding:0;overflow:visible;}" +
+    ".hr-card{box-shadow:none;border-radius:0;max-width:none;}.hr-head{background:#fff;color:#000;border-bottom:2px solid #000;}" +
+    ".hr-close,.hr-acts,.hr-note{display:none !important;}.hr-firma{display:block;}.hr-stop{break-inside:avoid;}}";
+  document.head.appendChild(s);
+}
+function pppHojaCerrar() { const o = document.getElementById("pppHrOverlay"); if (o) o.classList.remove("show"); }
+function pppHojaImprimir() { try { window.print(); } catch (_e) {} }
+function pppHojaHtml(H) {
+  const paradas = H.paradas || [];
+  const conUbic = paradas.filter(function (s) { return Number.isFinite(s.lat) && Number.isFinite(s.lng); });
+  const sinUbic = paradas.length - conUbic.length;
+  const geo = _pppGeo || {};
+  const depot = geo[RT_DEPOT_KEY] || { lat: -34.6037, lng: -58.4 };
+  const urls = conUbic.length ? _rtMapsUrls(depot, conUbic) : [];
+  let h = '<div class="hr-sub">' + escapeHtml(H.fecha || "") + ' · <b>' + paradas.length + '</b> parada' + (paradas.length === 1 ? '' : 's') +
+    ' · <b>' + H.nps + '</b> NP · ' + _pppFmtM3(H.m3) + ' m³</div>';
+  h += '<div class="hr-acts">';
+  if (urls.length === 1) h += '<a class="hr-b maps" href="' + urls[0] + '" target="_blank" rel="noopener">📍 Abrir en Google Maps</a>';
+  else urls.forEach(function (u, i) { h += '<a class="hr-b maps" href="' + u + '" target="_blank" rel="noopener">📍 Maps · tramo ' + (i + 1) + '</a>'; });
+  h += '<button class="hr-b print" onclick="pppHojaImprimir()">🖨 Imprimir</button></div>';
+  if (urls.length > 1) h += '<div class="hr-note">Google Maps abre hasta ~9 paradas por link: la ruta va en <b>' + urls.length + ' tramos</b> (cada uno arranca donde terminó el anterior).</div>';
+  h += '<div class="hr-note">En <b>orden de entrega</b>, saliendo del depósito (Virgilio 2788). Es el <b>inverso del orden de carga</b>: lo último que se entrega se carga primero. Un cliente con varias NP en la <b>misma dirección</b> es <b>una sola parada</b>.</div>';
+  if (sinUbic) h += '<div class="hr-warn">⚠ <b>' + sinUbic + ' parada(s) sin ubicación</b>: no entran al link de Maps (van marcadas abajo). Revisá la dirección en la PPP.</div>';
+  paradas.forEach(function (s, i) {
+    const nps = s.nps.length;
+    h += '<div class="hr-stop"><span class="hr-n">' + (i + 1) + '</span><div class="hr-b2">' +
+      '<div class="hr-rs">' + escapeHtml(s.rs || (s.cod ? "Cód " + s.cod : "—")) + (s.cod ? ' <small style="color:#64748b;font-weight:700">· cód ' + escapeHtml(s.cod) + '</small>' : '') + '</div>' +
+      '<div class="hr-dir">' + escapeHtml(s.dir || "—") + (s.loc ? ', ' + escapeHtml(s.loc) : '') +
+      (Number.isFinite(s.lat) ? "" : ' <span class="hr-sinu">· sin ubicación</span>') + '</div>' +
+      '<div class="hr-nps"><b>' + nps + ' NP</b>: ' + escapeHtml(s.nps.join(" · ")) + (s.tandas.length ? ' <small>· tanda ' + escapeHtml(s.tandas.join(" · ")) + '</small>' : '') + '</div>' +
+      '</div><div class="hr-m3">' + _pppFmtM3(s.m3) + ' m³</div></div>';
+  });
+  h += '<div class="hr-firma">Recibí conforme — firma y aclaración: ______________________________________  ·  Fecha: ____ / ____ / ______</div>';
+  return h;
+}
+function pppHojaAbrir(k) {
+  const H = _pppHoja[k];
+  if (!H) return;
+  _pppHojaCss();
+  let o = document.getElementById("pppHrOverlay");
+  if (!o) {
+    o = document.createElement("div"); o.id = "pppHrOverlay";
+    o.innerHTML = '<div class="hr-card"><div class="hr-head"><div class="hr-title" id="pppHrTitle"></div>' +
+      '<button class="hr-close" onclick="pppHojaCerrar()">Cerrar</button></div><div class="hr-body" id="pppHrBody"></div></div>';
+    o.addEventListener("click", function (e) { if (e.target === o) pppHojaCerrar(); });
+    document.body.appendChild(o);
+  }
+  document.getElementById("pppHrTitle").textContent = "🗺️ Hoja de ruta — " + (H.nombre || "Camión");
+  document.getElementById("pppHrBody").innerHTML = pppHojaHtml(H);
+  o.classList.add("show");
+}
 function _pppPlanBarraHtml(est, tot) {
   if (!tot) return "";
   const w = function (n) { return Math.round(100 * n / tot); };
@@ -30187,6 +30311,19 @@ function _pppPlanDiaHtml(programados, key) {
       const _tt = function (p) { return [String(p.razon_social || "").trim(), String(p.localidad || p.barrio || "").trim(), p.np ? "NP " + p.np : ""].filter(Boolean).join(" · "); };
       const carga = oc.paradas.slice().reverse();
       h += '<div class="pn-orden"><b>🔁 Orden de carga</b><div class="r">' + carga.map(function (p, i) { return '<span class="' + (i === 0 ? 'go' : '') + '" title="' + escapeHtml(_tt(p)) + '">' + (i + 1) + 'º ' + escapeHtml(_lbl(p)) + (p._sinUbic ? ' <em title="Sin ubicación en PPP_Geo: va último en el reparto">?</em>' : '') + '</span>'; }).join(' → ') + '</div><div class="hint">Se carga primero el último que se entrega' + (oc.sinUbic ? ' · ' + oc.sinUbic + ' sin ubicación' : '') + '</div></div>';
+    }
+    // v13.89 — hoja de ruta del camión (Maps + imprimir para el fletero). Una parada = una
+    // dirección, no una NP. Retira no lleva camión y las vencidas ya salieron: ahí no va.
+    if (!esVenc && c.ruta !== "ret") {
+      const ocH = oc || _pppOrdenCarga(c);
+      const hk = dk + "|" + c.key;
+      _pppHoja[hk] = {
+        nombre: _pppCamionNombre(c), fecha: (c.ped[0] && c.ped[0].fecha_entrega) || "",
+        paradas: _pppHojaParadas(ocH.paradas), nps: c.ped.length, m3: c.m3
+      };
+      const nPar = _pppHoja[hk].paradas.length;
+      h += '<div class="pn-hr"><button class="pn-hr-b" onclick="pppHojaAbrir(\'' + escapeHtml(hk) + '\')">🗺️ Hoja de ruta</button>' +
+        '<span class="pn-hr-t">' + nPar + ' parada' + (nPar === 1 ? '' : 's') + ' · ' + c.ped.length + ' NP · para el fletero: Google Maps e imprimir</span></div>';
     }
     const rows = oc ? oc.paradas.slice().sort(function (a, b) { return a._carga - b._carga; }) : c.ped.slice();
     const primero = rows.length ? rows[0] : null;
