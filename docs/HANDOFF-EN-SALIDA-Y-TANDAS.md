@@ -1,211 +1,117 @@
-# Traspaso — tandas automáticas apagadas + En Salida (2026-09-07)
+# Traspaso — pendientes de la sesión de En Salida (2026-09-07)
 
-> Escrito a pedido del dueño para derivar a otro chat. Es el estado real al momento de
-> escribirlo, verificado contra la base, no de memoria. Lo hecho está en `main` hasta la
-> **v13.62**; lo pendiente está sin empezar.
+> Reescrito el 07/09 al mediodía. La versión anterior de este archivo quedó vieja en
+> horas: decía que los crons estaban apagados y que faltaba la acumulación, y las dos
+> cosas ya están resueltas por la otra sesión.
 >
-> ⚠ **Hay más de una sesión trabajando sobre `main` en paralelo.** Durante esta sesión otra
-> pusheó v13.60, v13.61 y v13.63. Antes de tocar nada: `git pull --rebase origin main` y
-> mirar `docs/SUPABASE-GESTION-VIRGILIO.md` por si el estado cambió.
+> ⚠ **Dos sesiones trabajando sobre `main` a la vez.** Esta sesión venía de la v13.65
+> y al volver main estaba en la v13.88. Antes de tocar nada: `git pull --rebase origin main`.
 
 ---
 
-## 1. LO URGENTE — el automático de tandas está APAGADO
+## 1. PENDIENTE (para quien esté en `ppp_web_armar_tandas`) — enganchar el pedido al camión que YA va al cliente
 
-**Estado en Supabase (`hrxfctzncixxqmpfhskv`), verificado:**
+**El caso, medido el 07/09.** Osa Distribuidora (cod **2533**, Villa Lugano, Zona 1) tenía
+camión el **miércoles 9/09** — tanda `D66B`, NP 98650 (2,710 m³) y 98667 (1,331 m³). Entró un
+pedido web del mismo cliente (0,026 m³) y el automático lo programó para el **martes 15/09**,
+en un camión aparte. 26 litros, seis días después, al mismo cliente y al mismo barrio.
 
-```
-cron 71  gv-ppp-web-tandas-diarias    active = false
-cron 73  gv-ppp-web-tandas-intradia   active = false
-```
+**Por qué pasó — dos causas independientes:**
 
-Los apagó esta sesión, con permiso del dueño. **Nada se programa solo.** Los pedidos web
-se siguen viendo en "A Programar" y se pueden armar a mano.
+1. **El colchón lo tapaba.** Con `dias_anticipacion_min = 4`, un lunes 7 el mínimo era el 11:
+   los días 8, 9 y 10 no eran candidatos. (Ojo: la v13.84 ya habilitó "programar para antes",
+   así que esta mitad puede estar resuelta — verificar.)
+2. **El automático nunca mira si el cliente ya tiene camión ese día.** Sólo mira cupo por día y
+   cercanía entre las tandas que arma en esa misma corrida. La `D66B` es de ISIS y queda
+   íntegramente fuera de su universo.
 
-Para volver a prenderlos:
+El cupo tampoco lo hubiera dejado entrar: el 9 estaba en **7,03 m³ de ISIS contra un cupo de 6**.
+
+**Pero acá el cupo no debería mandar.** El cupo mide capacidad de *picking*; sumarle 26 litros a
+un cliente que ya tiene 4 m³ armándose para ese día es casi gratis y ahorra un camión entero.
+
+**Lo que decidió el dueño (07/09):**
+
+- **La regla pisa el colchón Y el cupo.** Fue explícito: es el único modo que resuelve el caso,
+  porque el 9 estaba a la vez dentro del colchón y pasado de cupo.
+- **Se busca HACIA ATRÁS, no hacia adelante.** Textual: *"tiene que buscar para atrás, no para
+  adelante"*. O sea: entre hoy y el día que el automático asignaría por su cuenta, tomar el día
+  en que el cliente ya tiene entrega. **La regla adelanta el pedido, nunca lo demora.**
+
+Ya existe media pieza: la v13.47 manda las zonas manuales al día en que hay camión a esa **zona**
+(`gv_ppp_web_armar_pendientes`, §3.ao). Falta la versión **por cliente** y para todas las zonas.
+
+**Va en el backend** (decidido con el dueño, dos veces, y es lo que pide el protocolo del repo).
+
+---
+
+## 2. PENDIENTE — 20 filas de `CLIENTE SIMULACIÓN` en `Facturacion_NP`
+
+`cod_cliente = 99999`, razón social `CLIENTE SIMULACIÓN`, tandas `SIM######`, **m³ = 1,000
+clavado en las 20**. Alguien probó la pantalla de Facturación el **lunes 31/08** y los tics
+quedaron: entraron de a una, con segundos de diferencia, en dos tandas (11:09–11:10 y
+11:39–11:40). Las 20 tienen `cierre_id` en null; las reales llevan cierre.
+
+**Verificado que no son reales:** 0 filas en `PPP_Programacion_Diaria`, `PPP_Base_Pedidos` y
+`PPP_Web_Programacion`; 0 eventos en `Registros_Produccion_Virgilio`; 0 coincidencias en el
+código de Gestión y de Producción (commit e15b682) — no las genera ninguna app.
+
+**Se ven desde la v13.62**, que cambió el universo de `gv_ppp_en_salida` de "tiene CCN" a
+"facturada sin CRN". Inflan el módulo: de las 54 NP que muestra, **20 son éstas**, y **20 de los
+24,65 m³ son ficticios**. El universo real es **34 NP y 4,65 m³**.
+
+**El dueño dio el OK para borrarlas** (eligió esa opción sobre filtrarlas en la vista), pero
+frenó antes de que se escribiera el backup, así que **no se borró nada**. Siguen ahí.
+
+⚠ `Facturacion_NP` es tabla **compartida** con Producción y la regla del dueño es que ahí se
+agrega y no se borra. Rehacer el backup antes (`sql/backups/`), y usar un `WHERE` real
+(`supautils` bloquea `DELETE` sin `WHERE`).
 
 ```sql
-select cron.alter_job(71, active := true);
-select cron.alter_job(73, active := true);
-```
-
-### Por qué se apagaron
-
-Dueño (2026-09-06): *"No se tiene que programar nada de manera automática, salvo que
-logremos que se vaya programando y que hasta que se llegue a 0,80 —o un poquito más, no hay
-problema que se zarpe un poquito— ya se cierra la tanda y ahí sí no se agreguen nuevos
-pedidos a esa tanda."*
-
-O sea: **la tanda tiene que ACUMULAR entre corridas hasta 0,80 m³, y ahí cerrarse.**
-Hoy el código hace lo contrario.
-
-### El hallazgo (verificado sobre la función DESPLEGADA, no sobre el archivo del repo)
-
-En `ppp_web_armar_tandas`, la temp table `_open` —la lista de tandas que pueden recibir un
-cliente más— **se crea vacía en cada corrida** y sólo se llena con lo que esa misma corrida
-arma:
-
-```sql
-create temp table _open (code text primary key, camion text, m3 numeric, cerrada boolean, seq int) on commit drop;
-...
-if v_code is null then ... insert into _open ... end if;
-```
-
-`PPP_Web_Programacion` se lee en dos lugares y en **ninguno** siembra `_open`: en el
-`where not exists` que saca lo ya programado, y desde `gv_ppp_web_letra_y_camion()` para
-seguir la numeración. **Una tanda escrita en una corrida anterior nunca es candidata a
-recibir un pedido nuevo.** Con el intradía cada 15 min y `intradia_umbral_m3 = 0,001`, cada
-pedido que entra solo se lleva su propio camión.
-
-Medido el 06/09:
-
-| corrida | tandas | clientes por tanda |
-|---|---|---|
-| 00:20 (varios pedidos juntos) | E01B, E01C, E01D | **2** |
-| 16:15 y 20:30 (de a 1 pedido) | E03A, E04A, E05A, E06A, E08A | **1** |
-
-⚠ **Ojo**: la v13.60 de la otra sesión (§3.at, `gv_ppp_web_camion_del_dia`) cambió el
-reuso de **camión** por día y zona. Eso es el número `NN` del código de tanda, **no** es lo
-mismo que reusar la **tanda**. Hay que releer la función antes de tocarla: puede que parte
-del problema ya esté resuelto o que el diagnóstico de arriba haya quedado viejo.
-
-### Lo que NO era el problema (para no perder tiempo)
-
-El caso que lo destapó fue Muller y Muller (Pompeya) yéndose a tanda propia teniendo a
-Distribuidora Cuyana (Soldati) el mismo día y en la misma zona. **No fue la cercanía**:
-Pompeya y Soldati están los dos en el sector `B` de `GV_Barrios_Sector`, y de hecho ya
-comparten tanda en E01C. Fue la regla del dueño del 2026-09-04:
-
-```sql
-v_cierra := r_cli.es_super or r_cli.solo or r_cli.m3_cli >= v_tope;
-```
-
-Cuyana sola suma **0,938 m³ ≥ `tanda_m3_max_mezcla` (0,80)** → **E03A nació cerrada** y no
-admite a nadie. Eso funciona como está pedido.
-
-### Lo que hay que implementar
-
-Decidido con el dueño: **va en el BACKEND**, en `ppp_web_armar_tandas`.
-
-1. Sembrar `_open` con las tandas **ya programadas del mismo día** que sigan abiertas
-   (m³ < tope) y no las haya empezado nadie.
-2. La tanda que cruza 0,80 **se cierra** y no recibe más pedidos. El pedido que la cruza
-   entra igual (el dueño dijo explícitamente que puede pasarse un poco).
-3. **Sin timeout.** El dueño: *"no va a pasar, salvo que sea zona diferente a 1, y eso se
-   programa manual por ahora."* O sea que una tanda que no se llena no es un caso a resolver.
-   ⚠ Esto sugiere que `zonas_automaticas` debería quedar en `'1'` y no en `'1,2,3'` cuando se
-   vuelva a prender — **confirmar con el dueño antes**.
-4. Ojo con las tandas que un operario ya empezó a pickear: no se les puede agregar nada.
-
-**Config relevante hoy:** `tanda_m3_max_mezcla = 0.80`, `intradia_umbral_m3 = 0.001`,
-`zonas_automaticas = '1,2,3'`, `sectores_activos = 1`.
-
-Probar sin escribir: `select * from gv_ppp_web_armar_simular('lk', current_date, '[…]'::jsonb);`
-
-### Decisión abierta que quedó sin responder
-
-**El botón de "regenerar" de la pantalla rearma TODO el tablero**, no agrega: renombra
-tandas y mueve fechas ya comunicadas al depósito. El 06/09 a las 20:40:59 lo tocó el dueño y
-las 26 filas de `PPP_Web_Programacion` quedaron con ese `actualizado_at` — E02A→E01F,
-E04A→D68G, E05A→D69D, E06A→D69E, E08A→E03B, y las fechas del vie 11 al lun 14 / mar 15.
-
-Se le ofreció al dueño cambiarlo a "que sólo agregue lo pendiente" y **no llegó a contestar**.
-
----
-
-## 2. HECHO — En Salida (v13.62, commit `eccdb52`)
-
-Ya está en `main` y funcionando. Documentado en `docs/SUPABASE-GESTION-VIRGILIO.md` **§3.au**.
-Se lista acá sólo para que no se rehaga.
-
-- `gv_ppp_en_salida` reescrita (`sql/gv_ppp_en_salida.sql`): el universo pasó de "tiene CCN"
-  a **"está facturada y no tiene CRN"**. De 13 a **54 NP**, con **0 perdidas**.
-- Entraron las tres que el dueño reclamaba: **98665** Merajver (0,042, 02/09), **98502**
-  Clapera (0,011, 03/09), **98569** Pezzali (0,005, 03/09) — todas facturadas y armadas pero
-  **sin evento CCN**.
-- Columnas nuevas: `armada`, `armado_at`, `cargada`, `control_previo`, `facturada_el`,
-  `estado`, `dias_sin_controlar`.
-- Front: tabla propia por día (NP · Cliente · Tanda · m³ · **Cargado** · **Estado**) con la
-  fecha y hora reales del CCN y chips de estado.
-- **Recepción de Remitos embebida, sólo supervisores**: tildar Controlado → CRN → Entregados,
-  y ↩ s/salida → FSS. Reusa `crSendDetail` / `crSendSinSalida` con legajo `"0"`, igual que
-  `openRemitosAdmin()`. **El módulo RR de arriba quedó intacto.**
-- Test: `tests/ppp-ensalida-estado.cjs` (17 chequeos).
-
----
-
-## 3. PENDIENTE — anomalía de datos, sin tocar
-
-**8 NP tienen `CCR` (control de remito ANTES de cargar) pero no `CCN` (carga al camión):**
-
-```
-98474, 98509, 98585, 98586, 98587, 98588, 98589, 98590
-```
-
-O el operario saltea el CCN, o se está usando el CCR en su lugar. En la pantalla se ven con
-el chip `CCR sin CCN`. **Hay que revisar el circuito con el dueño** — no es un bug de código,
-es cómo se está operando.
-
-Para verlas:
-
-```sql
-select np, tanda, razon_social, m3, fecha_entrega, estado
-  from public.gv_ppp_en_salida where control_previo and not cargada order by np;
+select np, tanda, m3, facturado_at from public."Facturacion_NP" where cod_cliente = '99999';
 ```
 
 ---
 
-## 4. PENDIENTE — borrar el pedido de prueba 1352
+## 3. PENDIENTE — artículo 578 y el pedido 1354 de Osa
 
-Se cargó a mano el 06/09 para probar el circuito de punta a punta y **el dueño todavía no
-dijo de borrarlo**. Estado hoy: **tanda E03B, entrega 2026-09-15**.
+El pedido **1354** (cliente 2533, 5 cajas del **578 Descarozador De Aceitunas**) es **real** —
+lo confirmó el dueño. Pero el artículo está **dado de baja**: `active = false`, `list_price = 0`,
+`uxb = 1`. Última venta real: **26/11/2021**. Nunca se pidió por la web.
 
-- **Muller y Muller S.R.L.** (cod 862), 100 cajas del artículo **505**, 0,24 m³, $1.206.046,80.
-- Entrega "De L Americas 4384- Parana" → expreso Fontana, Pompeya → Zona 1.
+Consecuencia: **el pedido está valorizado en $0** y así va a llegar a Facturación.
 
-**No salió a ISIS ni disparó WhatsApp**, a propósito. Para borrarlo, con backup previo:
-
-| proyecto | tabla | filtro |
-|---|---|---|
-| Virgilio `hrxfctzncixxqmpfhskv` | `PPP_Web_Programacion` | `order_id = 1352` |
-| Virgilio | `PPP_Web_Base` | `order_id = 1352` |
-| Virgilio | `PPP_Web_NP` | `order_id = 1352` |
-| LK `kwkclwhmoygunqmlegrg` | `order_items` | `order_id = 1352` |
-| LK | `orders` | `id = 1352` |
-
-`lk_pedidos_match` de Virgilio se limpia sola (el cron `sync-pedidos-match-virgilio` reescribe
-una ventana móvil de 14 días).
-
-### Si se hace otro pedido de prueba, repetir estas tres precauciones
-
-1. Insertar con **`sheets_sent = true`**. El cron `retry-sheets` de LK (jobid 1, cada 5 min)
-   levanta todo lo que tenga `sheets_sent = false` y lo empuja al Google Sheet → ERP.
-2. Elegir un cliente **sin fila en `bot_customer_whatsapps`**, si no el trigger
-   `orders_notify_whatsapp` le manda un "✅ Pedido recibido" real al cliente. Sólo 4 clientes
-   de 1273 tienen teléfono: **288, 4197, 4234, 4260**.
-3. `detectar_pedidos_anomalos` (cron cada 5 min) saltea los `cod_cliente` **1 y 3878** (los de
-   prueba). Con otro cliente hay que mirar que el score dé < 5 o salta alerta a Virgilio.
+Falta que el dueño pase **precio de lista** y **unidades por caja** del 578, y decida si se
+reactiva en el catálogo (ojo: activarlo lo publica para **todos** los clientes del portal, no
+sólo para Osa). Dijo *"lo veo mañana"* (08/09).
 
 ---
 
-## 5. PENDIENTE — las E01x se corrieron de fecha y el instructivo dice otra cosa
+## 4. HECHO — no rehacer
 
-`docs/PRIMEROS-DIAS-CON-GESTION.md` dice que **E01A–E01E entregan el viernes 11**. Después del
-rearmado del 06/09 pasaron al **lunes 14**, y la v13.60 de la otra sesión volvió a correr la
-semana un día hábil (lun 7 feriado). **Hay que revisar contra qué dice hoy la base y actualizar
-el instructivo**, que es el que se le pasó a los operarios.
+- **En Salida (v13.62)**: universo "facturada sin CRN" (de 13 a 54 NP, 0 perdidas), fecha y hora
+  reales de carga, chips de estado por NP, y Recepción de Remitos embebida sólo para
+  supervisores (CRN y FSS, reusando `crSendDetail` / `crSendSinSalida`). El módulo RR de arriba
+  quedó intacto. Doc: `docs/SUPABASE-GESTION-VIRGILIO.md` §3.au. Test:
+  `tests/ppp-ensalida-estado.cjs` (17 chequeos).
+- **El 1354 de Osa se movió a mano** de `E03A`/15-09 a **`D66G` / 09-09**, camión 66, el mismo
+  día que las otras dos NP de Osa (`D66B`). Tanda propia, como lo pidió el dueño.
+  Rollback: `update public."PPP_Web_Programacion" set tanda='E03A', fecha_entrega='2026-09-15' where order_id=1354;`
+- **Anomalía reportada, sin tocar**: 8 NP tienen `CCR` (control de remito antes de cargar) pero
+  no `CCN` (carga al camión): 98474, 98509, 98585–98590. Se ven con el chip `CCR sin CCN`. Es
+  cómo se está operando, no un bug de código — revisar el circuito con el dueño.
 
-El motivo del corrimiento original está medido: `gv_ppp_web_m3_isis('2026-09-11')` daba
-**10,075 m³ contra un cupo de 6**, porque el override de Chango Mas (E07A, 4,31 m³, §3.ap) se
-cargó ese día a la tarde. La cascada de cupo hizo lo que tiene que hacer.
+## 5. Correcciones a la versión anterior de este archivo
 
----
+Lo que decía y ya no vale:
 
-## 6. Datos sueltos que se encontraron y no se tocaron
-
-- **`bot_customer_whatsapps` tiene basura en `empresa`**: en vez de `LK`/`CH`, dos filas dicen
-  `"Urriza Mariela"` y `"Lin Xiuhui"` (la razón social metida en el campo de empresa). Y la
-  fila del 2º número de Lin Xiuhui tiene `cod_cliente` en null (el `customer_id` sí está).
-  Es del proyecto **LK** (`kwkclwhmoygunqmlegrg`).
-- **`98490` Salvetti** tiene CCN pero también un **FSS posterior** (facturado sin salida), así
-  que la vista la saca a propósito. Está bien como está — no "arreglarla".
+- ~~"Los crons 71 y 73 están apagados"~~ → **prendidos** desde la v13.67, después de que
+  `ppp_web_armar_tandas` v7 hiciera que la tanda acumule entre corridas.
+- ~~"Falta implementar que la tanda acumule hasta 0,80"~~ → **hecho** (v13.67), y el tope pasó
+  de 0,80 a **1,00** en la v13.86.
+- ~~"El pedido 1352 de Muller sigue vivo"~~ → **borrado**, en LK y en Virgilio.
+- ~~"Basura en `bot_customer_whatsapps`"~~ → la tabla se **vació** (commit 55bb0a0): las 5 filas
+  eran WhatsApp de prueba.
+- ~~"La NP web debería ser el número de pedido (v12.92)"~~ → **la v13.70 lo revirtió a propósito**:
+  la NP web es un contador propio, un número por bloque, sin sufijo (`LK 0001`…). `LK 0024` para
+  el pedido 1354 es lo correcto.
