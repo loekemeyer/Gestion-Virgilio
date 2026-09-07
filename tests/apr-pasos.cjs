@@ -62,8 +62,17 @@ const { chromium } = require("/opt/node22/lib/node_modules/playwright");
     const body = document.querySelector("#pppOverlay .planim-body");
     out.zoom = body.style.zoom; out.ov = body.style.overflowY;
 
-    // (a) paso 1
+    // (a) paso 1 — v13.85: el reloj de cuánto lleva esperando cada pedido
+    const iso = (n) => { const d = new Date(); d.setDate(d.getDate() - n); return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0"); };
+    _apr.pedidos[0].fecha_recep = iso(0);
+    _apr.pedidos[1].fecha_recep = iso(2);
+    if (_apr.pedidos[2]) _apr.pedidos[2].fecha_recep = iso(6);
     aprRender();
+    out.reloj = [...document.querySelectorAll(".apr-card .apr-chip-esp")].map((e) => e.className.replace("apr-chip apr-chip-esp", "").trim() + "|" + e.textContent.trim());
+    out.relojTitulo = (document.querySelector(".apr-col-t .apr-chip-esp") || {}).textContent || "";
+    _apr.pedidos[0].fecha_recep = iso(1); aprRender();
+    out.ayer = (document.querySelector(".apr-card .apr-chip-esp") || {}).textContent || "";
+    _apr.pedidos.forEach((x, i) => { x.fecha_recep = iso(i === 0 ? 0 : 2); }); aprRender();
     out.p1 = { chks: prev.querySelectorAll("input.apr-sel-chk").length, foot: !!prev.querySelector(".apr-foot"), btnOff: !!(prev.querySelector(".apr-foot-btn") || {}).disabled, dias: prev.querySelectorAll(".apr-dia").length };
     aprSel("lk:1401"); aprSel("lk:1402");
     out.p1sel = { txt: prev.querySelector(".apr-foot-txt").textContent, btnOff: !!prev.querySelector(".apr-foot-btn").disabled, marcadas: prev.querySelectorAll(".apr-card-sel").length };
@@ -122,6 +131,12 @@ const { chromium } = require("/opt/node22/lib/node_modules/playwright");
   chk(r.sinCuit, "sin las llamadas por CUIT de v13.76 (regla apagada)");
   chk(r.zoom === "1" && r.ov === "auto", "en celular no hay zoom y scrollea (zoom " + r.zoom + ", " + r.ov + ")");
   chk(r.p1.chks === 3 && r.p1.foot && r.p1.btnOff && r.p1.dias === 0, "paso 1: tildes, botonera deshabilitada sin selección y sin días");
+  // v13.85 (dueño: "poné un reloj que diga hace cuánto llegó un pedido")
+  chk(r.reloj[0] === "|⏱ hoy", "el pedido de hoy dice 'hoy', sin color (" + r.reloj[0] + ")");
+  chk(r.reloj[1] === "medio|⏱ hace 2 días", "a los 2 días, ámbar (" + r.reloj[1] + ")");
+  chk(r.reloj[2] === "viejo|⏱ hace 6 días", "a los 6 días, rojo (" + r.reloj[2] + ")");
+  chk(/el más viejo, hace 6 días/.test(r.relojTitulo), "el título de la columna avisa cuál es el más viejo (" + r.relojTitulo + ")");
+  chk(r.ayer === "⏱ ayer", "un pedido de ayer dice 'ayer' (" + r.ayer + ")");
   chk(/2 pedidos · 0,70 m³ · LK/.test(r.p1sel.txt) && !r.p1sel.btnOff && r.p1sel.marcadas === 2, "con 2 tildados: '2 pedidos · 0,70 m³ · LK' y botón habilitado");
   chk(r.mixta.paso === 1 && /una sola empresa/.test(r.mixta.msg), "LK + Chef juntos no pasan al paso 2");
   chk(r.p2.paso === 2 && r.p2.dias === 2 && r.p2.chips === 2 && r.p2.btnOff && r.p2.tocable, "paso 2: días tocables, resumen de los pedidos, Programar deshabilitado hasta tocar un día");

@@ -823,6 +823,10 @@ button {
 .apr-chip-sal.man{ background:#e0edff; color:#1e40af; } /* v13.32: zona manual con camión: lo programa el supervisor */
 .apr-chip-sal.no{ background:#fef3c7; color:#92400e; }
 .apr-chip-sal.esp{ background:#f1f5f9; color:#94a3b8; }
+/* v13.85: hace cuánto llegó el pedido (⏱). Gris hasta 1 día, ámbar 2-3, rojo de 4 en adelante. */
+.apr-chip-esp{ background:#f1f5f9; color:#475569; font-weight:800; }
+.apr-chip-esp.medio{ background:#fef3c7; color:#92400e; }
+.apr-chip-esp.viejo{ background:#fee2e2; color:#991b1b; }
 .apr-chip-m3{ background:#f1f5f9; color:#334155; } /* idea 7999: es un dato, no una alerta */
 .apr-chip-np{ background:#ede9fe; color:#5b21b6; }
 .apr-card-body{ margin-top:7px; border-top:1px dashed #e2e8f0; padding-top:6px; }
@@ -7248,7 +7252,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v13.84";
+const APP_VERSION = "v13.85";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -33127,6 +33131,25 @@ async function aprCargarSalida() {
     _apr.salida = m;
   } catch (_e) { _apr.salida = {}; }
 }
+/* v13.85 (dueño: "poné un reloj que diga hace cuánto llegó un pedido, para trackear cuántos días lleva sin
+   programarse"). Días de calendario desde `fecha_recep` (la fecha en que entró por la página), en hora de
+   Argentina. Se pinta según cuánto espera: hasta 1 día gris, 2-3 ámbar, 4 o más rojo — 4 es la anticipación
+   mínima (`dias_anticipacion_min`), o sea que a esa altura ya se pasó una tanda entera sin salir. */
+function aprDiasEspera(iso) {
+  const q = String(iso || "").slice(0, 10).split("-");
+  if (q.length !== 3 || !q[0]) return null;
+  const d = new Date(Number(q[0]), Number(q[1]) - 1, Number(q[2]));
+  if (isNaN(d)) return null;
+  const h = new Date(); const hoy = new Date(h.getFullYear(), h.getMonth(), h.getDate());
+  return Math.round((hoy - d) / 86400000);
+}
+function aprEsperaChip(p) {
+  const n = aprDiasEspera(p.fecha_recep);
+  if (n === null || n < 0) return "";
+  const txt = n === 0 ? "hoy" : (n === 1 ? "ayer" : "hace " + n + " días");
+  const cls = n >= 4 ? " viejo" : (n >= 2 ? " medio" : "");
+  return '<span class="apr-chip apr-chip-esp' + cls + '" title="' + escapeHtml("Llegó el " + String(p.fecha_recep || "").slice(0, 10) + ". Lleva " + n + " día" + (n === 1 ? "" : "s") + " sin programarse.") + '">⏱ ' + txt + '</span>';
+}
 function aprSalidaChip(p) {
   const s = (_apr.salida || {})[p.order_id];
   const recep = p.fecha_recep ? "Llegó el " + p.fecha_recep + ". " : "";
@@ -33571,8 +33594,13 @@ function aprColPedidos() {
   if (q) lista = lista.filter(function (p) {
     return (p.razon_social + " " + p.cod + " " + p.zona + " " + p.localidad + " " + p.order_id).toLowerCase().indexOf(q) >= 0;
   });
+  // v13.85: el más viejo, arriba de todo (la lista ya viene ordenada por fecha de recepción)
+  let viejo = null;
+  for (const p of lista) { const n = aprDiasEspera(p.fecha_recep); if (n !== null && (viejo === null || n > viejo)) viejo = n; }
   let h = '<div class="apr-col apr-col-nps">' +
-    '<div class="apr-col-t">📋 Pedidos a programar <b>(' + lista.length + ')</b></div>' +
+    '<div class="apr-col-t">📋 Pedidos a programar <b>(' + lista.length + ')</b>' +
+      (viejo !== null && viejo >= 2 ? ' <span class="apr-chip apr-chip-esp' + (viejo >= 4 ? ' viejo' : ' medio') + '" title="El pedido más viejo de la lista">⏱ el más viejo, hace ' + viejo + ' días</span>' : '') +
+    '</div>' +
     aprPorQueHtml(lista) +
     '<input class="apr-q" type="search" placeholder="🔎 cliente, zona, localidad…" value="' + escapeHtml(_apr.q) + '" oninput="aprBuscar(this.value)">' +
     '<div class="apr-scroll">';
@@ -33591,6 +33619,7 @@ function aprColPedidos() {
         '<span class="apr-card-chev" onclick="aprToggle(\'' + id + '\')">' + (ab ? "▾" : "▸") + '</span>' +
       '</div>' +
       '<div class="apr-card-d">' +
+        aprEsperaChip(p) +   // v13.85: hace cuánto llegó
         '<span class="apr-chip apr-chip-z">' + escapeHtml(p.zona || "sin zona") + '</span>' +
         // v13.70: el pedido de la página como referencia (la NP la da el contador al programar)
         '<span class="apr-chip apr-chip-ped" title="Número de pedido de la página; la NP (LK 0001…) se asigna al programar">' + escapeHtml(pwebPedidoLabel(p.empresa, p.order_id)) + '</span>' +

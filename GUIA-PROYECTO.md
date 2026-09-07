@@ -12,11 +12,19 @@
 > única**; no se replica. Ante la duda entre parche rápido y fix de raíz → **fix
 > de raíz**.
 >
-> Última actualización: 2026-09-07 (lunes) · Versión app al documentar: **v13.84**
+> Última actualización: 2026-09-07 (lunes) · Versión app al documentar: **v13.85**
 >
 > ⚠⚠ **Desde el lunes 2026-09-07 los operarios usan GESTIÓN, no Producción** (dueño, sábado a la
 > noche: *"el lunes van a empezar a usar GV, no más PV"*). Las tandas web viven en
 > `PPP_Web_Programacion` y Producción no las ve. URL: la de GitHub Pages de este repo.
+>
+> Nota **v13.85** (sólo front) — **Reloj: hace cuánto llegó cada pedido** (dueño 08/09: *"poné un reloj que diga hace
+> cuánto llegó un pedido, para trackear cuántos días lleva sin programarse"*). En cada tarjeta de A Programar, primer
+> chip: **⏱ hoy · ⏱ ayer · ⏱ hace N días**, contados desde `fecha_recep` en días de calendario (hora de Argentina).
+> Color por cuánto espera: hasta 1 día gris, **2-3 ámbar**, **4 o más rojo** — 4 es la anticipación mínima
+> (`dias_anticipacion_min`), o sea que a esa altura ya se pasó una tanda entera sin salir. El título de la columna
+> lleva el peor: "⏱ el más viejo, hace N días" (desde 2 días). En el `title` de cada chip, la fecha exacta.
+> `aprDiasEspera` / `aprEsperaChip`; test `apr-pasos` (5 chequeos nuevos).
 >
 > Nota **v13.84** (backend Virgilio + front) — **Sin carteles, se puede programar para antes, y avisos al confirmar**
 > (dueño 08/09, sobre el paso 2: *"1) sacá todos esos carteles · 2) dejame programar si quiero para antes ·
