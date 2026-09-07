@@ -12,11 +12,19 @@
 > única**; no se replica. Ante la duda entre parche rápido y fix de raíz → **fix
 > de raíz**.
 >
-> Última actualización: 2026-09-07 (lunes) · Versión app al documentar: **v13.82**
+> Última actualización: 2026-09-07 (lunes) · Versión app al documentar: **v13.83**
 >
 > ⚠⚠ **Desde el lunes 2026-09-07 los operarios usan GESTIÓN, no Producción** (dueño, sábado a la
 > noche: *"el lunes van a empezar a usar GV, no más PV"*). Las tandas web viven en
 > `PPP_Web_Programacion` y Producción no las ve. URL: la de GitHub Pages de este repo.
+>
+> Nota **v13.83** (front) — **Paso 2 claro: "Primer día libre"** (dueño 07/09, captura del paso 2: *"se ve feo y no se
+> entiende que hasta el 15 ya estamos completos"*). En el paso 2 arriba de los días va un cartel verde **✅ Primer día
+> libre: mar 15/9 · quedan 2,23 m³ · antes no entra nada** (rojo si no hay ninguno a la vista); los días que NO
+> reciben (muy pronto, completo) pasan a una tira de chips "No reciben: mar 8/9 · muy pronto · … · vie 11/9 ·
+> completo"; los fines de semana no se dibujan; las tarjetas son sólo los días que reciben. Y **A Programar ya no se
+> achica en ningún ancho** (`pppFitPantalla` sale con zoom 1 cuando `_pppTab === "prog"`): el zoom descolocaba "Ver
+> más días" y la barra de estado (las dos capturas del dueño). `tests/apr-fit.cjs` pasa a chequear que NO achica.
 >
 > Nota **v13.82** (backend Virgilio + front) — **Se apaga también el cartel "ya está en ISIS LK (mismo cliente por
 > CUIT, mismo día)"** (dueño 07/09 23:58: *"Mirá ese cartel. Ya expliqué que eso no corresponde"*). El motivo
