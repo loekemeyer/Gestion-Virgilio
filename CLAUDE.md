@@ -72,6 +72,21 @@ nombres entiendo"* → **hablarle SIEMPRE con los nombres**: `CR`/`CCR` = **Cont
 corrección fue textual: ***"en la app no tenías que cambiar nada. CR, TAP, CC, RR para operarios está ok"***.
 Los operarios los usan todos los días y son los de los botones. **No tocar los códigos en la app ni en la base.**
 
+## ⚠ Regla del dueño (2026-09-07, v14.23): el SÚPER no se junta con clientes
+
+*"Súper no se puede juntar con clientes. Ya tenías esa regla. Van separados."* → un camión que
+lleva un súper (Coto, Carrefour, Chango Más, Krikos…) **no lleva ningún cliente común**, y al
+revés. Nada de "aprovechar el viaje" porque quede cerca.
+
+**El armado automático ya la respeta** (`gv_ppp_web_camion_del_dia` sólo reusa camiones con
+`zona !~* 'super|retira|expo'`; el bloque 3b dice que un súper con zona numérica no es camión a
+esa zona). Lo que NO la respetaba era el atajo manual: un `GV_PPP_Prog_Override` metido a mano
+se saltea esa función. Pasó el 07/09 —se enganchó Luján al camión de Chango Más en Moreno
+porque quedaba a 31,5 km— y se revirtió el mismo día.
+
+**Chequeo:** `select * from public.gv_ppp_super_mezclado;` — vacía = todo bien. Mirarla después
+de tocar tandas a mano. `sql/gv_ppp_super_mezclado_v1423.sql`.
+
 ## ⚠ PROTOCOLO OBLIGATORIO: Backend vs Front-end — preguntar ANTES de implementar
 
 **Cuando alguien pide cambiar lógica** (normalización de códigos, cálculos,
