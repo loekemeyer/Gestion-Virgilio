@@ -766,7 +766,8 @@ button {
 .apr-err{ background:#fee2e2; border-left:5px solid #b91c1c; color:#7f1d1d; padding:8px 10px; border-radius:6px; margin:6px 2px; font-weight:600; }
 .apr-msg{ background:#ecfdf5; border-left:5px solid #059669; color:#065f46; padding:8px 10px; border-radius:6px; margin:6px 2px; font-weight:600; }
 
-.apr-wrap{ display:grid; grid-template-columns: 1fr 1fr 370px; gap:12px; align-items:start; }   /* v13.54: la columna de días era angosta (320) y todo se partía */
+.apr-wrap{ display:grid; grid-template-columns: 1fr 1fr 370px; gap:12px; align-items:start; }
+.apr-wrap.apr-2col{ grid-template-columns: 1fr 420px; }   /* v13.69: sin tandas sin fecha → pedidos | días */   /* v13.54: la columna de días era angosta (320) y todo se partía */
 .apr-col{ background:#f8fafc; border:1px solid #e2e8f0; border-radius:10px; padding:10px; min-width:0; }
 .apr-col-t{ font-size:14px; font-weight:800; color:#0f172a; margin-bottom:8px; }
 /* v13.34: por qué cada grupo sigue en la lista (el cartel verde dice "N programadas" y confunde) */
@@ -7171,7 +7172,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v13.68";
+const APP_VERSION = "v13.69";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -33276,7 +33277,9 @@ function aprRender() {
   h += aprLogHtml();   // idea 2048
 
   // v13.65 (dueño: "no me gusta lo que armaste; volvé al formato anterior"): las tres columnas, siempre.
-  h += '<div class="apr-wrap">' + aprColPedidos() + aprColTandas() + aprColDias() + '</div>';
+  // v13.69: dos columnas (pedidos | días); la de tandas sin fecha sólo si hay alguna.
+  const conTandas = (_apr.tandas || []).length > 0;
+  h += '<div class="apr-wrap' + (conTandas ? '' : ' apr-2col') + '">' + aprColPedidos() + (conTandas ? aprColTandas() : '') + aprColDias() + '</div>';
 
   // Cada acción re-dibuja las tres columnas. Sin esto, sacar un pedido de una
   // tanda te mandaba al principio de una lista de 218 y había que volver a
@@ -33363,13 +33366,11 @@ function aprColPedidos() {
 
 function aprColTandas() {
   let h = '<div class="apr-col apr-col-tandas">' +
-    '<div class="apr-col-t">📦 Tandas en armado <b>(' + _apr.tandas.length + ')</b></div>' +
-    '<div class="apr-nueva-row">' +
-      '<button class="apr-nueva" onclick="aprNuevaTanda(\'lk\')">＋ Nueva tanda LK</button>' +
-      '<button class="apr-nueva apr-nueva-ch" onclick="aprNuevaTanda(\'chef\')">＋ Nueva tanda Chef</button>' +
-    '</div>' +
+    // v13.69 (dueño: "no quiero tener que tocar Tanda LK o CH, quiero arrastrar directo"): sin botones de tanda
+    // vacía. La columna sólo se dibuja si quedó alguna tanda vieja sin fecha (para programarla o descartarla).
+    '<div class="apr-col-t">📦 Tandas sin fecha <b>(' + _apr.tandas.length + ')</b></div>' +
+    '<div class="apr-vacio">Viejas, sin día: arrastralas a un día o descartalas. Las nuevas se arman soltando el pedido en el día.</div>' +
     '<div class="apr-scroll">';
-  if (!_apr.tandas.length) h += '<div class="apr-vacio">Tocá <b>＋</b> y arrastrá pedidos acá — o arrastrá un pedido <b>directo a un día</b>: la tanda se arma y se programa sola.</div>';
   for (const t of _apr.tandas) {
     const its = _apr.items[t.codigo] || [];
     // Un pedido puede tener varios bloques adentro: se muestra UNA fila por pedido.
@@ -33433,7 +33434,7 @@ function aprColDias() {
 
   let h = '<div class="apr-col apr-col-dias">' +
     '<div class="apr-col-t">🗓️ Programar para…</div>' +
-    '<div class="apr-dias-ayuda">Arrastrá una tanda — o un pedido suelto — a un día: el pedido arma su tanda y queda programado ahí. Los días completos, no hábiles o muy próximos no reciben.</div>' +
+    '<div class="apr-dias-ayuda">Arrastrá el pedido directo al día: se arma su tanda (código automático) y queda programado ahí. Los días completos, no hábiles o muy próximos no reciben.</div>' +
     aprCupoLlenoHtml() +   // idea 2510
     '<div class="apr-scroll apr-dias">';
 

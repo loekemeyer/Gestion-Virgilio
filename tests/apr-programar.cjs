@@ -123,7 +123,7 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
   chk(r.med.includes("2/3 bloques"),           "marca el pedido que entró a medias");
   chk(r.med.includes("Riesgo Marcelo Fabian"),  "el nombre del cliente entra entero en la tanda");
   chk(r.med.includes("apr-titem-txt"),          "el item va en dos renglones (el nombre no compite con el detalle)");
-  chk(r.med.includes("Arrastrá un pedido acá"),"la tanda vacía lo dice");
+  chk(r.med.includes("Arrastrá un pedido acá"),"la tanda vacía (vieja) lo dice");
   chk(r.der.includes("Miércoles") && /9<small>sep<\/small>/.test(r.der), "la lista dice el día con nombre y fecha (v13.54: número grande + mes chico)");
   chk(r.der.includes("0,50</b> / 5,00 m³"),    "muestra los m³ programados contra el cupo");
   chk((r.der.match(/apr-dia-cerrado/g) || []).length === 3, "el no hábil, el completo y el muy pronto quedan cerrados");
@@ -174,9 +174,9 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
   chk(!/Loekemeyer|aprSetEmpresa/.test(r.barra), "v13.58: la barra ya no tiene el selector Loekemeyer/Chef");
   chk(/apr-tanda-emp lk">LK</.test(r.med) && /apr-tanda-emp ch">Chef</.test(r.med), "v13.58: cada tanda dice de qué empresa es");
   chk(r.med.includes("CH 0009") && r.med.includes("GV-02A"), "v13.58: la tanda de Chef etiqueta su NP como CH 0009");
-  chk(/aprNuevaTanda\('lk'\)/.test(r.med) && /aprNuevaTanda\('chef'\)/.test(r.med), "v13.58/v13.65: nueva tanda LK y nueva tanda Chef (formato anterior, como pidió el dueño)");
+  chk(!/aprNuevaTanda/.test(r.med) && /Tandas sin fecha/.test(r.med), "v13.69: sin botones de tanda LK/Chef; la columna lista sólo tandas viejas sin fecha");
   chk(/aprDragPedido\(event,'lk:1117'\)/.test(r.izq), "v13.65: el arrastre lleva empresa:pedido (LK 1350 ≠ Chef 1350)");
-  chk(/o un pedido suelto/.test(r.der), "v13.65: la ayuda dice que un pedido suelto va a un día");
+  chk(/Arrastrá el pedido directo al día/.test(r.der), "v13.69: la ayuda dice arrastrar el pedido directo al día");
   chk(r.mezcla.err === true && /tanda de Chef/.test(r.mezcla.msg) && /LK 1117/.test(r.mezcla.msg) && r.mezcla.rpcLlamada === false,
       "v13.58: un pedido de LK soltado en una tanda de Chef avisa y no llama a la RPC");
   chk(errs.length === 0, "sin errores de página" + (errs.length ? ": " + errs[0] : ""));

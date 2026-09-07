@@ -12,12 +12,18 @@
 > única**; no se replica. Ante la duda entre parche rápido y fix de raíz → **fix
 > de raíz**.
 >
-> Última actualización: 2026-09-06 (domingo) · Versión app al documentar: **v13.68**
+> Última actualización: 2026-09-06 (domingo) · Versión app al documentar: **v13.69**
 >
 > ⚠⚠ **Desde el lunes 2026-09-07 los operarios usan GESTIÓN, no Producción** (dueño, sábado a la
 > noche: *"el lunes van a empezar a usar GV, no más PV"*). Las tandas web viven en
 > `PPP_Web_Programacion` y Producción no las ve. URL: la de GitHub Pages de este repo.
 >
+> Nota **v13.69** (front) — **A Programar: se arrastra el pedido directo al día, sin "＋ Nueva tanda LK / Chef"**
+> (dueño: *"no quiero tener que tocar Tanda LK o CH, quiero arrastrar directo"*). Los botones se fueron; la columna
+> del medio ("Tandas sin fecha") sólo aparece si quedó alguna tanda vieja sin día (para arrastrarla a un día o
+> descartarla); si no, son dos columnas: pedidos | días (`.apr-wrap.apr-2col`). Soltar el pedido en el día =
+> `aprGenerarTanda` (v13.65): código automático, empresa del pedido, programada ahí. Tests `apr-programar`, `apr-fit`.
+
 > Nota **v13.68** (front) — **El circuito de salida, en palabras del dueño (07/09): Control de Remitos → Carga del
 > Camión → Recepción de Remitos. El control se puede saltear si los remitos no llegan.** Códigos: CR/CCR = control
 > previo (paso 1, opcional) · CC/CCN = carga (paso 2) · RR/CRN = recepción = entregado (paso 3, v13.57). Con eso, una NP

@@ -87,7 +87,7 @@ const { chromium } = require("/opt/node22/lib/node_modules/playwright");
   chk(Number(r.fit.zoom) >= 0.7, "y sigue legible (zoom ≥ 0,70)");
   chk(r.conScroll.length === 0, "ningún elemento del overlay scrollea (" + r.conScroll.join(",") + ")");
   chk(Number(r.fit30.zoom) >= 0.7 && r.fit30.ov === "auto" && r.fit30.sh > r.fit30.ch, "con 30 pedidos no baja del 70 %: ahí sí scrollea (zoom " + r.fit30.zoom + ")");
-  chk(/apr-wrap/.test(r.html) && /apr-col-tandas/.test(r.html) && !/aprp-/.test(r.html), "v13.65: formato de tres columnas (sin planilla)");
+  chk(/apr-wrap apr-2col/.test(r.html) && !/apr-col-tandas/.test(r.html) && !/aprNuevaTanda/.test(r.html), "v13.69: sin tandas sin fecha → dos columnas (pedidos | días), sin botones LK/Chef");
   chk(r.drop.fns.join(">") === "gv_ppp_web_tanda_nueva>gv_ppp_web_tanda_agregar>gv_ppp_web_tanda_programar", "pedido soltado en un día = nueva → agregar → programar (" + r.drop.fns.join(">") + ")");
   chk(r.drop.fecha === "2026-09-15" && r.drop.cod === "E09A" && r.drop.emp === "lk", "con el día del drop, el código que dio la base y la empresa del pedido");
   chk(/"art":"027"/.test(r.drop.items), "los artículos viajan al programar");
