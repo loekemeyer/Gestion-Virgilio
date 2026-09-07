@@ -328,7 +328,7 @@ Archivos: `sql/krikos_oc_inbox.sql`, `supabase/functions/krikos-ingest/index.ts`
 | Edge Fn `krikos-ingest` | ✅ desplegada (v6) |
 | cron `krikos-ingest-10min` | ✅ activo, 584 corridas, 0 fallidas (el `net.http_post` siempre "succeeded": mide el encolado, no el resultado) |
 | `KRIKOS_INGEST_SECRET` en el Vault de LK | ✅ |
-| `KRIKOS_IMAP_PASS` en el Vault de LK | ❌ **falta** — es lo único que traba el ingest |
+| `KRIKOS_IMAP_PASS` en el Vault de LK | ❌ **falta** — es lo único que traba el ingest. Medido en `net._http_response`: la función contesta **500 `{"ok":false,"error":"KRIKOS_IMAP_PASS no configurado (ni env ni Vault)"}`** en cada corrida de los :00/:10/:20… Inocuo, pero la bandeja queda vacía |
 | bucket `krikos-oc` | ✅ existe |
 | rama de LK con la Bandeja Krikos | ✅ en `claude/krikos-tema-anterior-v0l88o`, **sin mergear a `main`** |
 | `sync_pedidos_match_virgilio()` lleva la fecha | ✅ **desde el 2026-09-07** |
