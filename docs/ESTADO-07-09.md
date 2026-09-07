@@ -56,9 +56,22 @@ en el Vault, no en una tabla. Eso es A1 y es del dueño.
 
 ## B · Esperan un sí o un no
 
-| # | Qué | Cuándo vence |
-|---|---|---|
-| **B1** | Luján (Extralimp, 4114, NP 98651, 0,745 m³): ¿queda el mar 15 en camión propio, o se pasa al vie 11 con Dorinka (Moreno)? | Antes del mar 15 |
+*(B1 — Luján — resuelto el 07/09, ver abajo.)*
+
+### Luján: resuelto
+
+Regla del dueño: *"Luján [va en camión propio] salvo que haya algo para una zona cercana que
+vaya en un camión propio."* Lo hay: **Moreno** (Dorinka / Chango Mas, `E07A`, viernes 11), a
+**31,5 km** de Luján por el mismo Acceso Oeste — la mitad que cualquier otra parada de la semana.
+
+**Aplicado**: NP 98651 (Extralimp, 0,745 m³) pasa de `D69A` / mar 15 a **`E07B` / vie 11**, vía
+`GV_PPP_Prog_Override`. El camión 07 queda en 5,06 m³, bajo el tope. Y el D69 del mar 15 pasa de
+**55,7 km a 21,5 km** punta a punta: recorrido norte limpio.
+
+Dos cosas a mirar: se entrega **4 días antes** de lo programado, y Moreno es un **súper con
+turno** — si el camión queda esperando, Luján se retrasa. Backup en
+`GV_Backup_Override_20260907_lujan`; rollback = borrar la fila 98651 de `GV_PPP_Prog_Override`.
+
 
 ### Los $10,7 M del cruce de facturación — no eran un problema, eran tres
 
