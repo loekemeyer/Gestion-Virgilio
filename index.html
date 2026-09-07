@@ -3724,6 +3724,21 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
 .fac-tk-ico{ color:#16a34a; font-weight:900; }
 .fac-tk-tanda{ font-family:Consolas,Menlo,monospace; font-weight:700; color:#0f766e; background:#ccfbf1; border-radius:5px; padding:0 5px; font-size:11px; }
 .fac-tk-rs{ color:#475569; font-weight:600; max-width:180px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+/* v14.11 — semáforo del cruce contra ISIS dentro de "Ya tildados hoy": la operadora
+   factura en ISIS, tilda acá, y a los pocos minutos (el agente que sube los PDF corre
+   cada ~1 min) esta pastilla le dice si el importe de la FC coincide con lo calculado. */
+.fac-tk-cruce{ display:inline-flex; align-items:center; gap:4px; font-size:11.5px; font-weight:700;
+  border-radius:6px; padding:1px 6px; white-space:nowrap; }
+.fac-tk-cruce.tkc-espera{ color:#64748b; background:#f1f5f9; font-weight:600; }
+.fac-tk-cruce.tkc-ok{ color:#047857; background:#d1fae5; }
+.fac-tk-cruce.tkc-diff{ color:#b91c1c; background:#fee2e2; }
+.fac-tk-cruce.tkc-super{ color:#7c3aed; background:#ede9fe; }
+.fac-tk-cruce .tkc-delta{ font-family:Consolas,Menlo,monospace; }
+.fac-tk-recheck{ margin-left:8px; font-size:11px; font-weight:700; color:#0f766e; background:#ccfbf1;
+  border:1px solid #99f6e4; border-radius:6px; padding:1px 7px; cursor:pointer; }
+.fac-tk-recheck:hover{ background:#99f6e4; }
+#facBtnCruce .fac-cruce-badge{ margin-left:6px; background:#dc2626; color:#fff; border-radius:9px;
+  padding:0 6px; font-size:11px; font-weight:800; }
 .fac-toast{
   position: fixed; bottom: 20px; right: 20px; background: #0f172a; color: #fff;
   padding: 10px 18px; border-radius: 6px; font-size: 14px; font-weight: bold;
@@ -38122,11 +38137,122 @@ function facRenderTicked(){
     const d = info.get(String(np)) || {};
     const tn = d.tanda ? '<span class="fac-tk-tanda">' + escapeHtml(d.tanda) + '</span>' : '';
     const rs = d.rs ? '<span class="fac-tk-rs">' + escapeHtml(d.rs) + '</span>' : '';
-    return '<div class="fac-tk-item"><span class="fac-tk-ico">✓</span><b>' + escapeHtml(String(np)) + '</b>' + tn + rs + '</div>';
+    // v14.11 — la pastilla del cruce arranca en espera y la completa facTickedCruceCargar()
+    const cr = '<span class="fac-tk-cruce tkc-espera" data-tk-np="' + escapeHtml(String(np)) + '">…</span>';
+    return '<div class="fac-tk-item"><span class="fac-tk-ico">✓</span><b>' + escapeHtml(String(np)) + '</b>' + tn + rs + cr + '</div>';
   }).join("");
-  box.innerHTML = '<div class="fac-tk-head">✓ Ya tildados hoy · ' + nps.length + '</div><div class="fac-tk-grid">' + items + '</div>';
+  box.innerHTML = '<div class="fac-tk-head">✓ Ya tildados hoy · ' + nps.length +
+    '<button class="fac-tk-recheck" onclick="facTickedCruceCargar(true)" title="Volver a pedirle a ISIS el importe de estas facturas">↻ Revisar contra ISIS</button>' +
+    '</div><div class="fac-tk-grid">' + items + '</div>';
   box.style.display = "";
+  facTickedCruceCargar();   // v14.11
 }
+
+/* v14.11 — CRUCE CONTRA ISIS EN LA PANTALLA DE FACTURACIÓN (pedido del dueño 07/09:
+   "un botón que figure el importe de la FC y cruce contra lo que dijimos que teníamos
+   que facturar"). La lista de arriba son NP PENDIENTES: todavía no existe factura, así
+   que ahí no hay nada que cruzar. El cruce vive en "Ya tildados hoy", que son las que la
+   operadora acaba de facturar en ISIS — el agente que sube los PDF corre cada ~1 min, así
+   que el importe aparece a los pocos minutos y ella lo ve sin cambiar de pantalla.
+   Backend: gv_cruce_facturacion_nps (sql/gv_cruce_facturacion_asignacion.sql). SÓLO LEE. */
+let _facTkCruce = { at: 0, cargando: false };
+
+async function facTickedCruceCargar(force){
+  const box = document.getElementById("facTickedList");
+  if (!box || box.style.display === "none") return;
+  const pills = Array.from(box.querySelectorAll(".fac-tk-cruce[data-tk-np]"));
+  if (!pills.length || _facTkCruce.cargando) return;
+  if (!force && Date.now() - _facTkCruce.at < 20000) return;   // el render se dispara seguido
+  _facTkCruce.cargando = true;
+  if (force) pills.forEach(function(el){ el.className = "fac-tk-cruce tkc-espera"; el.textContent = "…"; });
+  try {
+    const nps = pills.map(function(el){ return String(el.getAttribute("data-tk-np")); });
+    const r = await sb.rpc("gv_cruce_facturacion_nps", { p_nps: nps });
+    if (r.error) throw r.error;
+    const by = new Map();
+    (r.data || []).forEach(function(x){ by.set(String(x.np), x); });
+    pills.forEach(function(el){ facTickedCrucePintar(el, by.get(String(el.getAttribute("data-tk-np")))); });
+    _facTkCruce.at = Date.now();
+  } catch (e) {
+    // La RPC pide sesión (authenticated). Sin ella dejamos la pastilla muda: preferimos
+    // no mostrar nada antes que mostrar un número que no pudimos verificar.
+    const msg = (e && e.message) ? e.message : String(e);
+    pills.forEach(function(el){
+      el.className = "fac-tk-cruce tkc-espera";
+      el.textContent = "sin cruce";
+      el.title = "No se pudo consultar el cruce contra ISIS: " + msg;
+    });
+  } finally { _facTkCruce.cargando = false; }
+}
+window.facTickedCruceCargar = facTickedCruceCargar;
+
+function facTickedCrucePintar(el, x){
+  const _p = function(v){ return _fmtPlata(Number(v) || 0); };
+  if (!x || x.estado === "sin_factura"){
+    el.className = "fac-tk-cruce tkc-espera";
+    el.textContent = "⏳ sin FC";
+    el.title = "ISIS todavía no cargó la factura de esta NP. El PDF entra a los pocos minutos de emitirla.";
+    return;
+  }
+  if (x.estado === "sin_neto"){
+    el.className = "fac-tk-cruce tkc-espera";
+    el.textContent = "sin neto";
+    el.title = "Gestión no pudo calcular el neto de esta NP: faltan precios o cajas entregadas.";
+    return;
+  }
+  const fc = _p(x.factura_neto);
+  const calc = _p(x.neto_calculado);
+  const comp = x.comprobante_id ? " · " + x.comprobante_id : "";
+  // Las cajas son la pista más útil cuando hay diferencia: casi toda la plata que no
+  // cierra viene de facturas con menos cajas que las entregadas.
+  const cajas = (x.factura_cajas != null && x.cajas_ent != null && Number(x.factura_cajas) !== Number(x.cajas_ent))
+    ? " · cajas entregadas " + Math.round(Number(x.cajas_ent)) + " vs facturadas " + Math.round(Number(x.factura_cajas))
+    : "";
+  if (x.es_super){
+    el.className = "fac-tk-cruce tkc-super";
+    el.textContent = "🛒 FC " + fc;
+    el.title = "Cliente de súper: tiene lista propia y el cálculo todavía no la modela bien, así que la diferencia es esperable. Calculado " + calc + comp + cajas;
+    return;
+  }
+  if (x.estado === "ok"){
+    el.className = "fac-tk-cruce tkc-ok";
+    el.textContent = "● FC " + fc;
+    el.title = "Coincide con lo calculado (" + calc + ")" + comp + cajas;
+    return;
+  }
+  const dl = Number(x.diff) || 0;
+  const pc = (x.diff_pct == null) ? "" : " (" + (Number(x.diff_pct) > 0 ? "+" : "") + Number(x.diff_pct) + "%)";
+  el.className = "fac-tk-cruce tkc-diff";
+  el.innerHTML = "● FC " + escapeHtml(fc) +
+    ' <span class="tkc-delta">' + escapeHtml((dl > 0 ? "+" : "") + _fmtPlata(dl) + pc) + "</span>";
+  el.title = "Calculado " + calc + " · Facturado " + fc + comp + cajas + ". El detalle está en 🔍 Cruce con ISIS.";
+}
+
+/* v14.11 — número rojo sobre el botón "Cruce con ISIS": cuántas NP quedaron con
+   diferencia en los últimos 30 días, para que se vea sin entrar a la pestaña. */
+async function facCruceBadge(){
+  const b = document.getElementById("facBtnCruce");
+  if (!b) return;
+  try {
+    const _iso = function(ms){ return new Date(ms - 3 * 3600e3).toISOString().slice(0, 10); };   // ART fijo UTC-3
+    const r = await sb.rpc("gv_cruce_facturacion_totales", {
+      p_desde: _iso(Date.now() - 30 * 86400e3), p_hasta: _iso(Date.now()), p_empresa: null
+    });
+    if (r.error) throw r.error;
+    const d = (r.data || []).find(function(t){ return t.estado === "diff"; });
+    const n = d ? (Number(d.n) || 0) : 0;
+    const prev = b.querySelector(".fac-cruce-badge");
+    if (prev) prev.remove();
+    if (n > 0){
+      const sp = document.createElement("span");
+      sp.className = "fac-cruce-badge";
+      sp.textContent = String(n);
+      sp.title = n + " NP con diferencia en los últimos 30 días (" + _fmtPlata(Number(d.suma_diff) || 0) + ")";
+      b.appendChild(sp);
+    }
+  } catch (_e) { /* el botón sigue abriendo la pestaña igual, sólo se queda sin el número */ }
+}
+window.facCruceBadge = facCruceBadge;
 /* v13.78 — CHECKLIST MANUAL DE ISIS (dueño, 07/09): "cuando se va a facturar por Chef [artículos de Loeke, códigos
    con L] hay que hacer ajuste NEGATIVO de stock de LK en ISIS LK y ajuste POSITIVO en ISIS CH, para que al facturar
    quede neteado; y para vos en GV, descontá directo stock de LK". Qué NP y qué artículos lo dice el backend
@@ -38193,6 +38319,7 @@ window.facAjustesIsisCargar = facAjustesIsisCargar;
 function facRender(tandas){
   _facLastTandas = tandas || [];   // v5.70: el filtro "solo faltante" re-dibuja este mismo set
   try { facAjustesIsisCargar(false); } catch (_e) {}   // v13.78: checklist manual de ISIS (no bloquea la lista)
+  try { facCruceBadge(); } catch (_e) {}   // v14.11: número de NP con diferencia sobre el botón del cruce
   // Aplanamos: una fila por NP pendiente, llevando tanda + fecha salida
   // como cols (antes vivían en el header de cada grupo, ahora se repiten
   // por fila). Permite ordenar/filtrar globalmente sin agrupación visual.

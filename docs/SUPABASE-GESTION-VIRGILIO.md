@@ -3251,3 +3251,86 @@ Detalle completo, con los pasos en orden, en `docs/PENDIENTES-PIPELINE-GESTION.m
    dato de en qué barrio de CABA/GBA descarga el camión de cada uno.
 7. Decidir si a futuro Gestión se muda a su propio proyecto Supabase. Da aislamiento real,
    pero obliga a resolver stock, planimetría y padrón, que hoy son compartidos.
+
+---
+
+## §3.bc — v14.13 (2026-09-07): el cruce Facturación ↔ ISIS asigna cada factura a UNA sola NP
+
+**Qué estaba mal.** `gv_vista_cruce_facturacion` elegía, para cada NP, la factura de ISIS
+más parecida en cajas. Nada impedía que dos NP del mismo cliente y el mismo día eligieran
+**la misma factura**; cuando pasaba, las dos quedaban en estado `ambiguo` y no se cruzaban.
+Medido el 07/09 sobre los últimos 30 días: **52 NP en `ambiguo`, las 52 con más de una
+candidata** — o sea, el 100% de ese estado era este problema, no un dato dudoso.
+
+**Qué se hizo.** `gv_cruce_fc_asignacion()` (plpgsql, nueva) recorre todos los pares
+(NP, factura) elegibles ordenados por diferencia de cajas y después por diferencia de fecha,
+y toma el par si ni la NP ni la factura fueron ya tomadas. Greedy, determinístico (desempata
+por `np` y `doc_id`). La vista se apoya en eso. **La elegibilidad no cambió**: mismo cliente
+(`canon_cod`), misma empresa, factura dentro de ±3 días de la fecha de salida y diferencia
+de cajas dentro del 15% de lo entregado con piso de 1 caja.
+
+El estado `ambiguo` **desaparece**. Una NP que se quedó sin factura porque otra se la llevó
+cae en `sin_factura`, que es la verdad. `candidatos_cercanos` se conserva y ahora significa
+"cuántas facturas eran elegibles para esta NP" — es la pista para revisarla a mano.
+
+**Columnas: las mismas 22, en el mismo orden.** Por eso NO se tocaron
+`gv_cruce_facturacion_resumen` ni `_totales` (hacen `select v.*`) ni la pantalla del cruce.
+Hubo que castear `factura_total` / `factura_neto` / `factura_cajas` a `numeric` pelado: la
+vista vieja los devolvía así (por el `CASE ... ELSE NULL::numeric`) y `create or replace view`
+no deja cambiar el tipo de una columna.
+
+**Medición (últimos 30 días, antes → después):**
+
+| Estado | Antes | Después |
+|---|---:|---:|
+| ok | 221 | **257** |
+| diff | 69 | **85** |
+| ambiguo | 52 | **0** |
+| sin factura | 60 | 60 |
+| **total** | 402 | 402 |
+
+Los 52 `ambiguo` se repartieron en 36 `ok` y 16 `diff`. `sin_factura` **no creció**: ninguna
+NP perdió su factura contra otra. Invariante verificado: `0` facturas asignadas a dos NP, y
+la vista devuelve 1.167 filas para 1.167 NP de `Facturacion_NP` (no multiplica).
+
+**Costo:** `gv_cruce_facturacion_resumen` pasó a **1.215 ms** (la función es `volatile`, así
+que la vista se calcula entera). Contra el `statement_timeout` de ~8 s, sobra. La pantalla
+hace dos RPC en paralelo.
+
+**Lo que el cruce dice hoy, y es el hallazgo que importa.** De las 85 con diferencia, las que
+tienen **las mismas cajas** en la factura y en lo entregado suman apenas −$441.900 con un
+promedio de **+0,5%** (ruido en los dos sentidos). Las que tienen **cajas distintas** se
+llevan **−$3,88 M**. O sea: el problema no es de precios, es que **ISIS facturó menos cajas
+de las que Gestión dice que se entregaron**. Hay que decidir si se facturó de menos o si
+`cajas_ent` está inflada. Excepción aparte: Dorinka (chef 2686) NP 44601 y 44602 tienen cajas
+idénticas y **−9,00% exacto** las dos — eso es un descuento, no ruido: tenemos `dto_vol = 0.165`
+y la factura salió como si fuera ~0,235. Son $1,33 M entre las dos.
+
+**Objetos nuevos**
+
+- `gv_cruce_fc_asignacion()` — la asignación. `EXECUTE` revocado a `public`/`anon`/`authenticated`.
+- `gv_cruce_facturacion_nps(text[])` — cruce acotado a una lista de NP, para el bloque
+  "Ya tildados hoy" de la pantalla Facturación. `authenticated` (la operadora entra con Google);
+  revocado a `anon`.
+- `GV_Cruce_Avisadas(np, avisado_at, diff, estado)` — qué NP ya salieron por Telegram. RLS
+  prendida, sin policies (la escribe sólo la función, que es SECURITY DEFINER).
+- `gv_alerta_cruce_facturacion_telegram()` — digest diario. Sólo días hábiles
+  (`gv_es_dia_habil`), excluye súper (su diferencia es esperable), ventana de 45 días, top 15
+  por monto y "y N más". **Cada NP se avisa una sola vez.**
+- **Cron 77 `gv-alerta-cruce-facturacion`**, `30 21 * * 1-5` (18:30 ART, después de la ventana
+  en que entran los PDF, que es 14–17 h).
+
+⚠ **La primera corrida arrastra el backlog: 145 NP y −$10.675.643** (45 días, sin súper), 42 de
+ellas por cajas. Para arrancar limpio y que sólo avise lo nuevo:
+`insert into public."GV_Cruce_Avisadas"(np, diff, estado) select np, diff, 'diff' from public.gv_vista_cruce_facturacion where estado='diff' and fecha_salida >= current_date - 45 and not es_super on conflict do nothing;`
+
+**Rollback:** `sql/backups/gv_cruce_facturacion_20260907_pre_asignacion.sql` restaura la vista y
+las dos RPC. Para la alerta: `select cron.unschedule('gv-alerta-cruce-facturacion');`
+
+**Front (v14.13).** En "✓ Ya tildados hoy" cada NP lleva una pastilla con el importe de la
+factura y el delta: 🟢 coincide · 🔴 diferencia (con el % y las cajas en el tooltip) · ⏳ sin FC
+todavía · 🛒 súper. Se llena con `gv_cruce_facturacion_nps` y hay un botón "↻ Revisar contra
+ISIS". **La lista de arriba son NP pendientes: todavía no tienen factura, ahí no hay nada que
+cruzar** — por eso el cruce vive en las tildadas, que son las que la operadora acaba de
+facturar (el agente que sube los PDF corre cada ~1 min). Además el botón "🔍 Cruce con ISIS"
+lleva un número rojo con las NP en diferencia de los últimos 30 días.
