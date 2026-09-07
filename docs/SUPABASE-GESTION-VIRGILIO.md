@@ -1241,6 +1241,44 @@ los del limbo, la RPC los va a marcar `en_produccion` sola y dejan de aparecer.
 `gestion_desde`; redeployar la Edge Fn v9 (no llama a la RPC); front v12.88. Los feeds de LK
 tal como estaban antes de todo el día: `sql/backups/gv_pedidos_web_np_feeds_20260904_pre_filtro_enviado.sql`.
 
+### 3.bz ✅ Borradas 20 filas de `CLIENTE SIMULACIÓN` de `Facturacion_NP` — 2026-09-07
+
+Dueño: *"Elimina las 20 de cliente simulación"*, después de que se le explicara que
+`Facturacion_NP` es tabla compartida con Producción y de ofrecerle la alternativa de sólo
+filtrarlas en la vista.
+
+**Qué eran.** `cod_cliente = 99999`, razón social `CLIENTE SIMULACIÓN`, tandas `SIM######`,
+**m³ = 1,000 clavado en las 20**. Alguien probó la pantalla de Facturación el **lunes 31/08**
+y los tics quedaron: entraron **de a una, con segundos de diferencia**, en dos tandas
+(11:09–11:10, 8 filas; 11:39–11:40, 12 filas) — una persona tildando NP a mano, no un insert
+masivo. Las 20 con `cierre_id` en NULL; las reales llevan cierre.
+
+**Verificado que no eran reales** (no supuesto): 0 filas en `PPP_Programacion_Diaria`,
+`PPP_Base_Pedidos` y `PPP_Web_Programacion`; 0 eventos en `Registros_Produccion_Virgilio`
+(ni EP/TP/AP/TAP/CCN/CRN); 0 coincidencias en el código de Gestión **y de Producción**
+(commit e15b682) — no las genera ninguna app; 0 con cierre.
+
+**Por qué se vieron recién ahora.** La v13.62 (§3.au) cambió el universo de
+`gv_ppp_en_salida` de "tiene CCN" a "facturada sin CRN". Estas 20 cumplían, y aparecían como
+un renglón "Lun 31/8/2026 · 20 ped · 20,00 m³" — 20 m³ de ficción.
+
+**Impacto medido:**
+
+| | antes | después |
+|---|---|---|
+| `Facturacion_NP` | 1.187 | **1.167** |
+| `gv_ppp_en_salida` — NP | 54 | **34** |
+| `gv_ppp_en_salida` — m³ | 24,646 | **4,646** |
+| filas de simulación visibles | 20 | **0** |
+
+Controles después del borrado: `gv_ppp_entregados` 376, `gv_ppp_programacion_diaria` 182,
+`gv_ppp_web_estado` 28 — sin cambios; 0 filas con `cod_cliente='99999'`, tanda `SIM%` o NP `9990%`.
+
+Sentencia: `delete from public."Facturacion_NP" where cod_cliente = '99999';` (con `WHERE`
+real: `supautils` bloquea `DELETE` sin `WHERE` para roles no superusuario).
+
+**ROLLBACK**: `sql/backups/facturacion_np_20260907_simulacion_99999.sql` (los 20 INSERT).
+
 ### 3.m ✅ La canilla del espejo de ISIS, cerrada para Gestión — 2026-09-05 (v12.90)
 
 Pedido del dueño: *"una vez que ya esté todo en Gestión Virgilio, cerrá la canilla para que
