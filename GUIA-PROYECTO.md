@@ -12,11 +12,33 @@
 > única**; no se replica. Ante la duda entre parche rápido y fix de raíz → **fix
 > de raíz**.
 >
-> Última actualización: 2026-09-07 (lunes) · Versión app al documentar: **v14.08**
+> Última actualización: 2026-09-07 (lunes) · Versión app al documentar: **v14.09**
 >
 > ⚠⚠ **Desde el lunes 2026-09-07 los operarios usan GESTIÓN, no Producción** (dueño, sábado a la
 > noche: *"el lunes van a empezar a usar GV, no más PV"*). Las tandas web viven en
 > `PPP_Web_Programacion` y Producción no las ve. URL: la de GitHub Pages de este repo.
+>
+> Nota **v14.09** (datos, sin cambios de app) — **Ningún camión repetido en dos días** (dueño 07/09, con
+> captura de la búsqueda "d66": *"ahora quedó D66B en miércoles y jueves, no puede quedar la misma tanda en
+> dos días. corregí. porque cuando hagan el picking, tienen que pickear lo correcto"*).
+>
+> **La tanda estaba en un solo día; lo partido era el CAMIÓN.** La app agrupa por el NÚMERO de tanda
+> (`_pppTandaNum`: D66B → camión 66), así que el mié 09 había un "camión 66" (D66B, Osa) y el jue 10 otro
+> (D66A · D66C · D66D · D66E · D66F): dos camiones distintos con el mismo número. Buscando aparecía lo mismo
+> con el **camión 60** (D60A/B/C/F el jue 10 y D60E el vie 11), que nadie había mirado. Las dos roturas las
+> causaron reprogramaciones que pidió el dueño: *"la tanda del 2533 adelantala para el miércoles"* (sáb 06) y
+> *"pasala al viernes 11"* (dom 07).
+>
+> **Arreglo:** renombrar la tanda que quedó sola, con `GV_PPP_Prog_Override.tanda` — que es para esto y ya se
+> había usado (44619 Chango Mas → E07A, v13.50); **no se toca `PPP_Programacion_Diaria`, que es de Producción**.
+> `D66B → E09A` · `D66G → E09B` (el agregado de Osa) · `D60E → E10A`. Los códigos `D` son de ISIS y llegan a
+> D71; los `E` son de Gestión y llegaban a E08, así que E09 y E10 estaban libres en las cuatro tablas donde
+> vive una tanda. El miércoles Osa queda con camión propio y **el 66 vuelve a estar entero el jueves**.
+>
+> Seguro para el picking: ninguna de las renombradas tenía **un solo evento de operarios**, y desde el lunes
+> se pickea desde Gestión, no desde el papel de ISIS. Verificación final, de hoy en adelante y contando ISIS +
+> web: **ningún número de camión en dos días**. Backups y rollback en
+> `sql/backups/tandas_20260907_ningun_camion_en_dos_dias.sql`.
 >
 > Nota **v14.08** (sólo front) — **Facturación muestra la fecha de ENTREGA de la PPP** (dueño 07/09, con
 > captura de "Facturación — NPs a FC": *"acá pone la fecha de la PPP también"* · *"de entrega"*). El dato ya
