@@ -1413,6 +1413,11 @@ Alcance: **154 de los 357** pares `gv_clientes_lk_ch` tienen FC de LK en 180 dí
 LK con FC en `documentos`. Nada de Producción tocado (`gv_pedidos_web_excluidos` es de Gestión; grep en el
 repo de Producción: 0).
 
+**Corrida en seco de la Edge Function v18** (pg_net, `{"dry":true,"forzar":true}`, req 16047, 200 OK): Chef 24
+pedidos crudos → excluidos `cliente_fc_lk` 5, `en_produccion_lk` 4, `en_produccion` 19, `anterior_al_cambio` 21
+(un pedido puede traer varios motivos); quedan 3 NP (215 Dorinka, 216 Elbantonio, 217 Gifel, sin código LK).
+LK: 196 crudos → 23 NP, sin cambios.
+
 **Front / Edge.** A Programar manda `fc_lk` (llama `gv_clientes_lk_con_fc` con `p_dias = 400`, la ventana la
 decide el backend) y muestra dos carteles: ⚠ "ya está en ISIS LK (mismo día)" y 🧾 "clientes a los que LK
 les factura artículos de Loeke … los tipea compras", con código LK y fecha de la última FC. Edge Function
