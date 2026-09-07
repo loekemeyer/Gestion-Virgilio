@@ -7278,7 +7278,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v13.95";
+const APP_VERSION = "v13.96";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -29174,6 +29174,15 @@ function _pppBlock(key, name, cls, meta, pedidos, headerExtra, editTanda) {
         '<button class="ppp-ep-btn ppp-ep-back" onclick="pppTandaAProgramar(\'' + te + '\')">↩ Toda la tanda a A Programar</button>' +
         '<span class="ppp-ep-hint">Para <b>mover</b> un pedido a otra tanda: cambiá su <b>Tanda</b> en la fila. Para <b>sacarlo</b>: ↩ en su fila.</span>' +
         '</div>';
+    } else if (window.__isSupervisor) {
+      // v13.96 — en solo-lectura se ofrece SÓLO mover la tanda de día. Va porque `pppTandaFecha`
+      // llama a la RPC `gv_ppp_tanda_mover`, que escribe en la base y lo ve todo el mundo.
+      // NO se ofrece "↩ a A Programar": ésa sigue guardando en localStorage, o sea que el
+      // cambio se vería en ese navegador y nadie más — que es el bug que motivó la v13.87.
+      h += '<div class="ppp-edit-panel">' +
+        '<span class="ppp-ep-l">📅 Mover toda la tanda al día <input type="date" min="2025-01-01" class="ppp-ep-date" id="' + id + '_d"> <button class="ppp-ep-btn" onclick="pppTandaFecha(\'' + id + '\',\'' + te + '\')">Aplicar</button></span>' +
+        '<span class="ppp-ep-hint">Se guarda en el servidor: <b>lo ven todos</b>, también el operario en su celular. Una tanda ya empezada no se puede mover.</span>' +
+        '</div>';
     }
   }
   h += '<div class="ppp-tablewrap"><table class="ppp-tbl">' + PPP_THEAD + '<tbody>';
@@ -30468,7 +30477,16 @@ function _pppTandaBlocksHtml(dk, ped) {
   ordt.sort(function (a, b) { return _pppCamKey(byT[a]) - _pppCamKey(byT[b]) || (a < b ? -1 : a > b ? 1 : 0); });   // agrupa por camión (color), luego por tanda
   for (const t of ordt) {
     const es = pppEsSuper(byT[t][0]);
-    const pencil = (t !== "—" && !PPP_READONLY) ? ' <button class="ppp-pencil-btn" onclick="event.stopPropagation();pppSetMode(\'__BLOCKID__\',\'edit\')" title="Editar: fecha / mover / devolver">✏️ Editar</button>' : '';   // editar corrige (Excel) → oculto en solo-lectura
+    // v13.96 — el ✏️ completo sigue oculto en solo-lectura (esas correcciones se hacen en el Excel),
+    // pero MOVER LA TANDA DE DÍA sí se ofrece: desde la v13.87 escribe en el backend
+    // (gv_ppp_tanda_mover), lo ve el operario, y tiene su propio gate de supervisor.
+    // Sin esto el botón existía pero no se dibujaba nunca, y reprogramar había que hacerlo por SQL.
+    const pencil = (t === "—") ? ''
+      : (!PPP_READONLY
+          ? ' <button class="ppp-pencil-btn" onclick="event.stopPropagation();pppSetMode(\'__BLOCKID__\',\'edit\')" title="Editar: fecha / mover / devolver">✏️ Editar</button>'
+          : (window.__isSupervisor
+              ? ' <button class="ppp-pencil-btn" onclick="event.stopPropagation();pppSetMode(\'__BLOCKID__\',\'edit\')" title="Mover toda la tanda a otro día (lo ven todos, también el operario)">📅 Mover de día</button>'
+              : ''));
     const entBtn = (t !== "—" && !PPP_READONLY) ? ' <button class="ppp-tanda-ent" onclick="event.stopPropagation();pppSetMode(\'__BLOCKID__\',\'ctrl\')" title="Marcar entregas (local)">✓ Controlar</button>' : '';   // en solo-lectura el control es POR NP (tilde en cada fila)
     html += _pppBlock("plan_" + dk + "_" + t, (es ? "🛒 " : "") + (t === "—" ? "Sin tanda" : "Tanda " + escapeHtml(t)), es ? "ppp-tanda-super" : "", byT[t].length + " ped · " + _pppM3Sum(byT[t]).toFixed(2) + " m³", byT[t], pencil + entBtn, (t !== "—" ? t : null));
   }
