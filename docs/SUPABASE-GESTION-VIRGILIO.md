@@ -1384,6 +1384,24 @@ es de Chef y pisa al LK 217): cuando Gestión alimente el tracking, escribir el 
 una función `gv_*` y pedir columna `empresa` en PaginaLK. Y el Excel ISIS de Facturación manda
 `N_Pedido` contador (no el id), como el mail: ISIS numera 98xxx por su cuenta.
 
+### 3.bg ✅ `bot_customer_whatsapps` de LK vaciada: eran todos números de prueba — 2026-09-07 lunes
+
+**Qué dijo el dueño.** Sobre el pendiente 6 (basura en la columna `empresa`): *"fueron wpp de prueba"*, *"209 y 217
+también son de prueba"*, *"borralos"*.
+
+**Qué había.** Las 5 filas de `public.bot_customer_whatsapps` (proyecto **LK**, `kwkclwhmoygunqmlegrg`), de mayo y
+junio: 209 Pro Tatiana (4234), 217 Torres Y Liva (288), 218 Urriza Mariela (4197, con "Urriza Mariela" en la
+columna `empresa`), 220 Lin Xiuhui (4260, ídem), 222 el 2º número de Lin Xiuhui (`cod_cliente` null). Ninguna era
+de un cliente real.
+
+**Por qué se borró y no se corrigió.** El trigger `orders_notify_whatsapp` de LK le manda un WhatsApp al cliente
+cuando carga un pedido, usando esta tabla: con esas filas, un pedido real de cualquiera de esos 4 clientes le
+habría mandado el aviso a un número de prueba.
+
+**Hecho.** `delete … where id in (209, 217, 218, 220, 222)` → 5 filas, tabla en **0**. Backup completo (los 5
+inserts, con `customer_id`, fechas y flags) en `sql/backups/bot_customer_whatsapps_20260907_pre_borrado.sql`; para
+restaurar, ejecutarlo en LK y después poner al día la secuencia de `id` (la consulta está en el archivo).
+
 ### 3.bf ✅ Tanda hasta 1 m³ y aviso de segundo camión (v13.86) — 2026-09-08 martes
 
 **Qué dijo el dueño.** *"Mínimo 0.6, máximo 1 m3, salvo pedidos de 1 solo cliente superiores a 1m3."* Y: *"si se
