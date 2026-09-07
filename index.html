@@ -4990,6 +4990,14 @@ function pppFitPantalla() {
   // v13.83: A Programar tampoco se achica en el monitor (dueño: "se ve feo"; el zoom descolocaba "Ver más días"
   // y la barra de estado). Es una lista de pedidos + días: se scrollea.
   if (typeof _pppTab !== "undefined" && _pppTab === "prog") { body.style.zoom = "1"; body.style.overflowY = "auto"; return; }
+  // v13.95 (dueño 07/09, con captura del día 9 abierto: "sólo para cuando hay algo tipo acordeón,
+  // ahí sí dejame el scroll, porque si no no puedo ver estas cosas"): con una tanda desplegada, el
+  // zoom achicaba todo Y encima cortaba abajo justo la tabla que se acababa de abrir. Si hay algún
+  // bloque abierto —o hay una búsqueda, que abre sola las tandas que coinciden— se ve a tamaño
+  // normal y se scrollea. Cerrando el acordeón vuelve a entrar entero en la pantalla, como siempre.
+  if ((typeof _pppOpen !== "undefined" && _pppOpen && _pppOpen.size) || (typeof _pppSearch !== "undefined" && _pppSearch)) {
+    body.style.zoom = "1"; body.style.overflowY = "auto"; return;
+  }
   body.style.zoom = "1"; body.style.overflowY = "hidden";
   let z = 1, entra = true;
   for (let i = 0; i < 5; i++) {
@@ -7270,7 +7278,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v13.94";
+const APP_VERSION = "v13.95";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -28276,14 +28284,15 @@ function _pppRowTr(p) {
 let _pppOpen = new Set();   // ids de bloques abiertos (por clave estable → persiste entre renders)
 let _pppMode = {};          // id -> "ctrl" | "edit" (modos separados; persisten entre renders)
 function _pppKid(k) { return "pppb_" + String(k).replace(/[^A-Za-z0-9]/g, "_"); }
-function pppToggleBlock(id) { const el = document.getElementById(id); if (!el) return; el.classList.toggle("ppp-open"); if (el.classList.contains("ppp-open")) _pppOpen.add(id); else { _pppOpen.delete(id); delete _pppMode[id]; el.classList.remove("ppp-ctrl-mode", "ppp-edit-mode"); } }
+function pppToggleBlock(id) { const el = document.getElementById(id); if (!el) return; el.classList.toggle("ppp-open"); if (el.classList.contains("ppp-open")) _pppOpen.add(id); else { _pppOpen.delete(id); delete _pppMode[id]; el.classList.remove("ppp-ctrl-mode", "ppp-edit-mode"); } try { pppFitProgramar(); } catch (_e) {} }
 /* DOS modos separados por tanda: ✓ Controlar (tildar lo entregado) y ✏️ Editar (corregir
    fecha / mover / devolver). Tocar el mismo botón cierra; uno excluye al otro. ===== */
 function pppSetMode(id, mode) {
   const el = document.getElementById(id);
-  if (_pppMode[id] === mode) { delete _pppMode[id]; _pppOpen.delete(id); if (el) el.classList.remove("ppp-ctrl-mode", "ppp-edit-mode", "ppp-open"); return; }
+  if (_pppMode[id] === mode) { delete _pppMode[id]; _pppOpen.delete(id); if (el) el.classList.remove("ppp-ctrl-mode", "ppp-edit-mode", "ppp-open"); try { pppFitProgramar(); } catch (_e) {} return; }
   _pppMode[id] = mode; _pppOpen.add(id);
   if (el) { el.classList.remove("ppp-ctrl-mode", "ppp-edit-mode"); el.classList.add(mode === "edit" ? "ppp-edit-mode" : "ppp-ctrl-mode", "ppp-open"); }
+  try { pppFitProgramar(); } catch (_e) {}
 }
 /* ===== Editar tanda (✏️): cambiar la fecha de toda la tanda, mover pedidos a otra tanda
    (cambiando su Tanda en la fila) y devolver pedidos a "A Programar". ===== */

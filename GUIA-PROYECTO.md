@@ -12,11 +12,21 @@
 > única**; no se replica. Ante la duda entre parche rápido y fix de raíz → **fix
 > de raíz**.
 >
-> Última actualización: 2026-09-07 (lunes) · Versión app al documentar: **v13.94**
+> Última actualización: 2026-09-07 (lunes) · Versión app al documentar: **v13.95**
 >
 > ⚠⚠ **Desde el lunes 2026-09-07 los operarios usan GESTIÓN, no Producción** (dueño, sábado a la
 > noche: *"el lunes van a empezar a usar GV, no más PV"*). Las tandas web viven en
 > `PPP_Web_Programacion` y Producción no las ve. URL: la de GitHub Pages de este repo.
+>
+> Nota **v13.95** (sólo front) — **Con un acordeón abierto, la PPP scrollea en vez de achicarse**
+> (dueño 07/09, con captura del miércoles 9 desplegado: *"sólo para cuando hay algo tipo acordeón, ahí sí
+> dejame el scroll, porque si no no puedo ver estas cosas"*). El zoom de `pppFitPantalla` —la v13.69, *"que la
+> PPP entre entera en una pantalla"*— achicaba todo Y encima cortaba abajo justo la tabla que se acababa de
+> abrir. Ahora, si hay **algún bloque abierto** (`_pppOpen`) o **una búsqueda** (que abre sola las tandas que
+> coinciden), la vista queda a **tamaño normal con scroll**; al cerrar el acordeón vuelve a entrar entera, sin
+> barra. `pppToggleBlock` y `pppSetMode` re-disparan `pppFitProgramar`, así que el cambio se ve al toque.
+> Lo de antes sigue igual: celular (v13.81) y A Programar (v13.83) nunca se achican.
+> `tests/ppp-fit-acordeon.cjs` (8 chequeos).
 >
 > Nota **v13.94** (sólo front) — **Los atrasados se ven sin rebotar de solapa** (dueño 07/09: *"hoy para ver
 > los pedidos atrasados tengo que entrar a Resumen para que me aparezca el botón que me lleve de nuevo a
