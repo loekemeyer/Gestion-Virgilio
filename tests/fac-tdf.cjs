@@ -33,6 +33,7 @@ const { chromium } = require("/opt/node22/lib/node_modules/playwright");
       ]);
       if (url.indexOf("v_pedidos_web_np") >= 0 && url.indexOf("isis_empresa=eq.chef") >= 0) return J(window.__sinLk ? [] : [{ order_id: 1400, cod_isis: "2600" }]);
       if (url.indexOf("clientes_vendedor") >= 0) return J([{ cod_cliente: "1941", vend: "7" }]);
+      if (url.indexOf("vista_uxb_articulo") >= 0) return J([{ cod: "505", uxb: 12 }, { cod: "438E", uxb: 6 }, { cod: "438", uxb: 99 }]);
       return J([]);
     };
     window.supaFetchAllSafe = async function (ep) { const r = await window.fetch(ep); return r.json(); };
@@ -45,6 +46,14 @@ const { chromium } = require("/opt/node22/lib/node_modules/playwright");
     const by = {}; filas.forEach(function (x) { by[x.np] = x; });
     out.tdf = by["LK 0030"] ? { cod: by["LK 0030"].cod, codLk: by["LK 0030"].codLk, isisEmp: by["LK 0030"].isisEmp, tope: by["LK 0030"].tope, tdf: by["LK 0030"].tdf, vend: by["LK 0030"].vend, arts: by["LK 0030"].lineas.map(function (l) { return l.art; }) } : null;
     out.lk = by["LK 0031"] ? { cod: by["LK 0031"].cod, isisEmp: by["LK 0031"].isisEmp, tope: by["LK 0031"].tope, tdf: by["LK 0031"].tdf } : null;
+    out.uxb = by["LK 0030"] ? by["LK 0030"].lineas.map(function (l) { return l.art + "=" + l.uxb; }).join(",") : "";
+    // el archivo real (.xls XML 2003) lleva el código CON la L
+    let blobXml = null; const oc = URL.createObjectURL; URL.createObjectURL = function (x) { blobXml = x; return "blob:t"; };
+    const oa = document.body.appendChild.bind(document.body);
+    document.body.appendChild = function (el) { if (el && el.tagName === "A" && el.download) el.click = function () {}; return oa(el); };
+    _facXlsDescargar(filas.filter(function (r) { return r.np === "LK 0030"; }), "CH");
+    URL.createObjectURL = oc;
+    out.xml = blobXml ? await blobXml.text() : "";
     out.pidioLk = urls.some(function (u) { return u.indexOf("v_pedidos_web_np") >= 0 && u.indexOf("order_id=in.(") >= 0 && u.indexOf("1400") >= 0; });
     // sin respuesta de LK → todo LK, como antes
     window.__sinLk = true;
@@ -78,6 +87,8 @@ const { chromium } = require("/opt/node22/lib/node_modules/playwright");
   }
   if (!r.lk || r.lk.cod !== "111" || r.lk.isisEmp !== "LK" || r.lk.tope !== 18 || r.lk.tdf) fails.push("una NP LK común cambió: " + JSON.stringify(r.lk));
   if (!r.pidioLk) fails.push("no consultó a LK por isis_empresa=chef con los order_id");
+  if (r.uxb !== "438EL=6,505L=12") fails.push("la UxB del artículo con L tiene que ser la del código pelado (438EL → 438E): " + r.uxb);
+  if (!/>505L</.test(r.xml) || !/>438EL</.test(r.xml) || />505</.test(r.xml)) fails.push("el archivo tiene que llevar el código CON la L (505L, 438EL)");
   if (!r.sinLk || r.sinLk.cod !== "1941" || r.sinLk.isisEmp !== "LK" || r.sinLk.tope !== 18) fails.push("sin respuesta de LK tendría que seguir como LK: " + JSON.stringify(r.sinLk));
   if (!(r.nombres.some((n) => /_LK_/.test(n)) && r.nombres.some((n) => /_CH_/.test(n)))) fails.push("esperaba un archivo LK y uno CH: " + r.nombres.join(", "));
   if (!(r.alerts || []).some((a) => /Tierra del Fuego/.test(a) && /1941 → Chef 2600/.test(a))) fails.push("falta el aviso de Tierra del Fuego: " + JSON.stringify(r.alerts));

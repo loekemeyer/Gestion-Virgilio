@@ -12,11 +12,16 @@
 > única**; no se replica. Ante la duda entre parche rápido y fix de raíz → **fix
 > de raíz**.
 >
-> Última actualización: 2026-09-07 (lunes) · Versión app al documentar: **v13.79**
+> Última actualización: 2026-09-07 (lunes) · Versión app al documentar: **v13.80**
 >
 > ⚠⚠ **Desde el lunes 2026-09-07 los operarios usan GESTIÓN, no Producción** (dueño, sábado a la
 > noche: *"el lunes van a empezar a usar GV, no más PV"*). Las tandas web viven en
 > `PPP_Web_Programacion` y Producción no las ve. URL: la de GitHub Pages de este repo.
+>
+> Nota **v13.80** (front) — **El Excel ISIS lleva el código CON la L** (dueño 07/09: *"el Excel tiene que tener el
+> cod con la L"*). Verificado: ya lo llevaba (`_facXlsPadCod` conserva las letras: `505L`, `438EL`, y el test lee el
+> archivo real). Lo que estaba mal era la **UxB** de un código con L: pelaba todas las letras (`438EL` → `438`) y podía
+> tomar la de otro artículo; ahora pela sólo la L (`438EL` → `438E`). `tests/fac-tdf.cjs` chequea el archivo y la UxB.
 >
 > Nota **v13.79** (backend LK + Virgilio + front) — **La Anónima por LK; Cencosud como Tierra del Fuego** (dueño 07/09:
 > *"La Anónima se le vende por LK, no por CH. Cencosud desde CH se le venden artículos de LK creo, ojo ahí, es
