@@ -12,11 +12,25 @@
 > única**; no se replica. Ante la duda entre parche rápido y fix de raíz → **fix
 > de raíz**.
 >
-> Última actualización: 2026-09-07 (lunes) · Versión app al documentar: **v13.85**
+> Última actualización: 2026-09-07 (lunes) · Versión app al documentar: **v13.86**
 >
 > ⚠⚠ **Desde el lunes 2026-09-07 los operarios usan GESTIÓN, no Producción** (dueño, sábado a la
 > noche: *"el lunes van a empezar a usar GV, no más PV"*). Las tandas web viven en
 > `PPP_Web_Programacion` y Producción no las ve. URL: la de GitHub Pages de este repo.
+>
+> Nota **v13.86** (backend Virgilio + front) — **Tanda de 0,60 a 1 m³, y aviso si se abre un segundo camión**
+> (dueño 08/09: *"mínimo 0.6, máximo 1 m3, salvo pedidos de 1 solo cliente superiores a 1m3"* y *"si se programa algo
+> para un segundo camión para un mismo día —salvo que sea súper— debe pedirle confirmación"*).
+> (a) **m³ de la tanda**: `PPP_Web_Config.tanda_m3_max_mezcla` **0,80 → 1,00**. Es sólo config, no hay código nuevo:
+> la tanda ya **acumula** entre corridas (v13.67) y cierra al cruzar el tope, y un cliente solo que pida más se va
+> solo con todo lo suyo. Por debajo de `tanda_m3_min` (0,60) la tanda **sigue abierta** esperando más, que es lo que
+> ya hacía con 0,80. Aplica a **todas** las tandas (confirmado con el dueño), no a una zona.
+> (b) **Segundo camión**: RPC nueva **`gv_ppp_web_camion_nuevo(p_fecha, p_filas)`** — a qué camión (Capital / GBA
+> Sur / GBA Oeste / GBA Norte, la misma etiqueta del armado) iría cada parada de la tanda y si ese camión **ya va**
+> ese día, mirando tandas web + ISIS sin súper / retira / expo ni KRIKOS. `aprConfirmar` la llama y suma el aviso
+> *"El mar 15/9 ya salen 2 camión(es) y esto abre otro: GBA Oeste. ¿Seguro que vas a usar un segundo camión?"*.
+> No pregunta si es súper ni si es el primer camión del día. Si la RPC falla, no traba. `sql/gv_ppp_web_camion_nuevo.sql`,
+> test `apr-pasos` (3 chequeos nuevos), §3.bf.
 >
 > Nota **v13.85** (sólo front) — **Reloj: hace cuánto llegó cada pedido** (dueño 08/09: *"poné un reloj que diga hace
 > cuánto llegó un pedido, para trackear cuántos días lleva sin programarse"*). En cada tarjeta de A Programar, primer

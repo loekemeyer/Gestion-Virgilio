@@ -34,6 +34,7 @@ const { chromium } = require("/opt/node22/lib/node_modules/playwright");
           if (window.__falla) return { ok: false, status: 400, json: async () => ({ message: "cupo lleno" }), text: async () => '{"message":"cupo lleno"}', headers: { get: () => null } };
           return ok([{ np_programadas: 2, m3: 0.7, lineas_base: 20, aviso_dia: null }]);
         }
+        if (m[1] === "gv_ppp_web_camion_nuevo") return ok(window.__cam || []);
         if (m[1] === "gv_ppp_web_calendario") return ok([{ dia: "2026-09-15", habil: true, m3: 3.77, tandas: 6, np: 11, cupo: 6, resta: 2.23 }, { dia: "2026-09-16", habil: true, m3: 0, tandas: 0, np: 0, cupo: 6, resta: 6 }]);
         return ok([]);
       }
@@ -94,14 +95,35 @@ const { chromium } = require("/opt/node22/lib/node_modules/playwright");
     _apr.m3Min = 0.6;
     calls.length = 0;
     aprElegirDia("2026-09-11"); await aprConfirmar();
-    out.pregLleno = { txt: preg[preg.length - 1] || "", rpc: calls.length };
+    out.pregLleno = { txt: preg[preg.length - 1] || "", rpc: calls.filter((c) => /^gv_ppp_web_tanda_/.test(c.fn)).length };
     aprElegirDia("2026-09-11"); aprElegirDia("2026-09-08"); await aprConfirmar();
-    out.pregPronto = { txt: preg[preg.length - 1] || "", rpc: calls.length };
+    out.pregPronto = { txt: preg[preg.length - 1] || "", rpc: calls.filter((c) => /^gv_ppp_web_tanda_/.test(c.fn)).length };
     // el día libre con 0,70 m³ (> 0,60) no pregunta nada
     preg.length = 0; aprElegirDia("2026-09-08"); aprElegirDia("2026-09-16");
     window.confirm = () => true;
     calls.length = 0; await aprConfirmar();
     out.sinPreg = { preg: preg.length, fns: calls.map((c) => c.fn).filter((f) => /^gv_ppp_web_tanda_/.test(f)).join(">") };
+    // v13.86: segundo camión el mismo día → pregunta (salvo súper, y salvo que sea el primero del día)
+    preg.length = 0; window.confirm = (m) => { preg.push(String(m)); return false; };
+    window.__cam = [{ camion: "GBA Oeste", ya_va: false, paradas: 2, camiones_dia: 2, es_super: false }];
+    _apr.paso = 2; _apr.diaSel = "2026-09-16"; calls.length = 0;
+    await aprConfirmar();
+    out.pregCamion = { txt: preg[0] || "", rpc: calls.filter((c) => /^gv_ppp_web_tanda_/.test(c.fn)).length };
+    // súper, o primer camión del día → sin aviso
+    preg.length = 0; window.confirm = (m) => { preg.push(String(m)); return true; };
+    window.__cam = [{ camion: "Super", ya_va: false, paradas: 1, camiones_dia: 2, es_super: true }];
+    _apr.paso = 2; _apr.diaSel = "2026-09-16"; calls.length = 0;
+    await aprConfirmar();
+    out.camSuper = preg.join(" ");
+    _apr.sel = {}; aprSel("lk:1401"); aprSel("lk:1402");
+    preg.length = 0;
+    window.__cam = [{ camion: "Capital", ya_va: false, paradas: 2, camiones_dia: 0, es_super: false }];
+    _apr.paso = 2; _apr.diaSel = "2026-09-16"; calls.length = 0;
+    await aprConfirmar();
+    out.camPrimero = preg.join(" ");
+    window.__cam = [];
+    _apr.sel = {}; aprSel("lk:1401"); aprSel("lk:1402");
+
     // tanda chica: un solo pedido de 0,25 m³
     _apr.sel = {}; aprSel("lk:1401"); _apr.paso = 2; _apr.diaSel = "2026-09-16";
     preg.length = 0; window.confirm = (m) => { preg.push(String(m)); return true; };
@@ -145,6 +167,11 @@ const { chromium } = require("/opt/node22/lib/node_modules/playwright");
   chk(/antes de la anticipación mínima/.test(r.pregPronto.txt) && r.pregPronto.rpc === 0, "un día MUY PRONTO pregunta (v13.84: ya no lo bloquea)");
   chk(r.sinPreg.preg === 0 && /gv_ppp_web_tanda_programar/.test(r.sinPreg.fns), "un día libre con 0,70 m³ no pregunta nada");
   chk(/0,25 m³, menos de los 0,60/.test(r.pregChica.txt) && r.pregChica.programo, "una tanda de menos de 0,60 m³ pregunta y, si se acepta, programa");
+  // v13.86 (dueño: "¿seguro que vas a usar un segundo camión?")
+  chk(/ya salen 2 camión\(es\) y esto abre otro: GBA Oeste/.test(r.pregCamion.txt) && /segundo camión/.test(r.pregCamion.txt) && r.pregCamion.rpc === 0,
+      "un camión NUEVO en un día que ya tiene camiones pregunta, y si se dice que no, no programa");
+  chk(!/segundo camión/.test(r.camSuper), "el súper no pregunta por el camión (" + r.camSuper.slice(0, 40) + ")");
+  chk(!/segundo camión/.test(r.camPrimero), "el primer camión del día tampoco pregunta");
   chk(r.falla.fns === "gv_ppp_web_tanda_nueva>gv_ppp_web_tanda_agregar>gv_ppp_web_tanda_agregar>gv_ppp_web_tanda_programar>gv_ppp_web_tanda_descartar" && r.falla.paso === 2 && r.falla.err && r.falla.sel === 2, "si programar falla: descarta la tanda y se queda en el paso 2 con la selección");
   chk(r.okk.fns === "gv_ppp_web_tanda_nueva>gv_ppp_web_tanda_agregar>gv_ppp_web_tanda_agregar>gv_ppp_web_tanda_programar" && r.okk.fecha === "2026-09-15" && r.okk.paso === 1 && r.okk.sel === 0 && /✅ E09A programada para el mar 15\/9/.test(r.okk.msg) && !r.okk.err, "Programar ✓ = nueva → agregar ×2 → programar, y vuelve al paso 1 vacío");
   chk(errs.length === 0, "sin errores de página" + (errs.length ? ": " + errs[0] : ""));

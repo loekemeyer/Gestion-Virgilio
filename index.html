@@ -7252,7 +7252,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v13.85";
+const APP_VERSION = "v13.86";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -32900,6 +32900,20 @@ async function aprConfirmar() {
   // v13.84 (dueño: "si quiero programar menos de 0,60, que me pregunte si estoy seguro"): PPP_Web_Config.tanda_m3_min
   const min = Number(_apr.m3Min) > 0 ? Number(_apr.m3Min) : 0.6;
   if (r.m3 < min) avisos.push("La tanda queda en " + aprNum(r.m3, 2) + " m³, menos de los " + aprNum(min, 2) + " m³ que conviene por camión.");
+  // v13.86 (dueño: "si se programa algo para un segundo camión para un mismo día, salvo súper, que pida
+  // confirmación"). El backend dice a qué camión iría cada parada y si ese camión ya va ese día
+  // (gv_ppp_web_camion_nuevo). Si falla, no traba: se programa sin este aviso.
+  try {
+    const cam = await aprRpc("gv_ppp_web_camion_nuevo", {
+      p_fecha: fecha,
+      p_filas: r.peds.map(function (p) { return { zona: p.zona || "", barrio: p.localidad || "", direccion: p.direccion || "" }; })
+    }) || [];
+    const nuevos = cam.filter(function (c) { return !c.ya_va && !c.es_super && Number(c.camiones_dia) > 0; });
+    if (nuevos.length) {
+      avisos.push("El " + aprDiaCorto(fecha) + " ya salen " + Number(nuevos[0].camiones_dia) + " camión(es) y esto abre otro: " +
+        nuevos.map(function (c) { return c.camion; }).join(", ") + ". ¿Seguro que vas a usar un segundo camión?");
+    }
+  } catch (_e) {}
   if (avisos.length && !confirm("⚠ " + avisos.join("\n⚠ ") + "\n\n¿Programo igual " + r.n + " pedido" + (r.n === 1 ? "" : "s") + " para el " + aprDiaCorto(fecha) + "?")) return;
   await aprGenerarTanda(fecha, keys, { sinConfirm: true });   // arma + programa; si falla, descarta (ninguna tanda sin fecha)
   if (!_apr.msgErr) { _apr.sel = {}; _apr.diaSel = null; _apr.paso = 1; }

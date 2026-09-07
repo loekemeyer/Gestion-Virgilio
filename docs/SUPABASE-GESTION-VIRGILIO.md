@@ -1384,6 +1384,39 @@ es de Chef y pisa al LK 217): cuando Gestión alimente el tracking, escribir el 
 una función `gv_*` y pedir columna `empresa` en PaginaLK. Y el Excel ISIS de Facturación manda
 `N_Pedido` contador (no el id), como el mail: ISIS numera 98xxx por su cuenta.
 
+### 3.bf ✅ Tanda hasta 1 m³ y aviso de segundo camión (v13.86) — 2026-09-08 martes
+
+**Qué dijo el dueño.** *"Mínimo 0.6, máximo 1 m3, salvo pedidos de 1 solo cliente superiores a 1m3."* Y: *"si se
+programa algo para un segundo camión para un mismo día (salvo que sea súper), debe pedirle confirmación: ¿seguro
+que vas a usar un segundo camión?"*. Confirmado con él: vale para **todas** las tandas (no una zona), y por debajo
+de 0,60 la tanda **sigue abierta** acumulando.
+
+**(a) m³ — sólo config, sin código nuevo.** `PPP_Web_Config.tanda_m3_max_mezcla` **0,80 → 1,00**. La mecánica ya
+estaba: `ppp_web_armar_tandas` v7 (v13.67) deja abiertas las tandas con `m3 < tope`, les suma clientes entre
+corridas y las cierra al cruzarlo; un cliente cuyo pedido solo llega al tope (`m3_cli >= v_tope`) va solo con todo
+lo suyo. Con el tope en 1,00 eso da exactamente lo pedido. `tanda_m3_min` (0,60) sigue siendo el piso deseable: la
+tanda no se cierra por debajo, y a mano `aprConfirmar` pregunta (v13.84). Rollback: `update "PPP_Web_Config" set
+valor = 0.80 where clave = 'tanda_m3_max_mezcla'`.
+
+**(b) Segundo camión — migración `gv_ppp_web_camion_nuevo_v1386`.** RPC nueva
+`gv_ppp_web_camion_nuevo(p_fecha date, p_filas jsonb)` → `(camion, ya_va, paradas, camiones_dia, es_super)`.
+Resuelve el camión de cada parada con `gv_ppp_web_camion(zona, gv_ppp_web_sector(...))` —la misma etiqueta que usa
+el armado para reusar camión (v13.60)— y lo cruza con los camiones que ya van ese día (`PPP_Web_Programacion` +
+`gv_ppp_programacion_diaria`, sin súper/retira/expo ni KRIKOS). SECURITY DEFINER, sólo lee, execute a
+anon/authenticated. Probada con `SET ROLE anon` sobre el 15/09 (3 camiones ese día): zona 1 → Capital `ya_va=true`;
+zona 6 → GBA Norte `ya_va=true`; súper → `es_super=true`; día vacío (20/10) → `camiones_dia=0`.
+
+**Front.** `aprConfirmar` la llama y agrega el aviso cuando hay alguna fila con `ya_va=false`, `es_super=false` y
+`camiones_dia > 0`. No pregunta por el súper ni por el primer camión del día. Si la RPC falla, no traba.
+
+**Efecto medido del tope nuevo** sobre las tandas ya programadas de hoy en adelante: con 1,00 quedan como "puede
+recibir más" E01A del 14/09 (0,985 m³) y E03A del 15/09 (0,938) —con 0,80 estaban cerradas—; D69D (1,184, un solo
+cliente) sigue cerrada; el resto (E01B 0,483 · E01C 0,577 · E01D 0,468 · E01E 0,267 · E01F 0,547 · D68G 0,105 ·
+D69E 0,136) sigue abierto por debajo de 0,60, esperando más carga. Nada se reprogramó ni se movió: el tope sólo
+decide cuándo una tanda deja de recibir.
+
+**Rollback.** `drop function public.gv_ppp_web_camion_nuevo(date, jsonb);` — el front ignora el error y programa.
+
 ### 3.be ✅ La anticipación mínima avisa en vez de bloquear (v13.84) — 2026-09-08 martes
 
 **Qué dijo el dueño** (sobre el paso 2 de A Programar): *"dejame programar si quiero para antes"*.
