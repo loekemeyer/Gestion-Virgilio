@@ -1438,6 +1438,18 @@ necesites al jueves."*
 jue 10: 7,776 → **8,103 m³** (Capital 3,735 + GBA Sur 4,368). Los dos días ya venían por encima del cupo de
 6,00 m³, así que no se pudo dejar ninguno en cupo moviendo entre ellos; sí quedaron parejos.
 
+**Coletazo: D60E quedaba suelta.** El dueño lo vio enseguida (*"el de D60E, ¿no queda suelto? ¿cuánta distancia
+hay entre D66B y D60E?"*). Con GBA Sur mudado al jueves, el miércoles le quedaba **D60E sola**: Betbeze Gimenez
+Nahuel, Av. Luro 6099, **Gregorio de Laferrere** (La Matanza), 0,214 m³ — un camión de GBA Oeste entero para una
+parada. Medido: **~13 km** en línea recta hasta D66B (Zuviría 5352, **Villa Lugano**); aproximado, porque hay geo
+exacta de Betbeze (`GV_Geo_Cliente`, −34.749634 / −58.585982) pero no de Zuviría, así que se midió contra dos
+puntos de Lugano que sí están (12,8 y 13,5 km). Sectores **B** (Capital Sur) y **M** (GBA Oeste): **no son
+vecinos** (B linda con A, C, D, J; M con C, E, N), o sea que el armado nunca los junta. Dueño: *"pasala al
+viernes 11"*, que ya tenía camión de GBA Oeste (E07A, 4,313 m³). Hecho con la RPC nueva `gv_ppp_tanda_mover`
+—la misma que usa el botón de la app— : 2 NP, 0,214 m³. Quedó vie 11 GBA Oeste = **4,527 m³** (D60E + E07A) y el
+mié 09 con Capital (D66B) + súper, sin camiones sueltos. Backup:
+`sql/backups/reprogramacion_20260907_d60e_al_viernes.sql`.
+
 **Rollback.** `sql/backups/reprogramacion_20260907_2533_al_miercoles.sql` (9 updates, deja todo como estaba
 tras la reprogramación del 06/09).
 
