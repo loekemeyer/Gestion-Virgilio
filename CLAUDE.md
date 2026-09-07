@@ -41,10 +41,13 @@ cada artículo de Loekemeyer va con **"L" al final** (505 → 505L; 438E → 438
 stock a la góndola LK (`pkEmpresaArt`), el m³ sale de `vista_volumen_articulo_resuelto` (tiene los `NNNL`), el
 precio de la lista LK pelando la L (`gv_ppp_np_valor` v13.71), y la factura / Excel ISIS llevan el código crudo
 con L. **Nunca** recodificar 7xx→5xx ni "pasar a LK" un pedido de Chef. Informe: `docs/INFORME-PEDIDOS-LK-POR-CHEF.md`.
-**Excepción (v13.75, dueño 07/09): *"los que le hacemos FC E vendiéndole art. de Loeke son los que no van"*** — si al
-cliente LK le facturó artículos de Loeke en los últimos 180 días (`PPP_Web_Config.doble_lk_dias`; `sales_lines` de LK vía
-`gv_cuits_con_fc_lk` + `isis_lk.documentos`, **por CUIT** — v13.76: *"el cod cliente no significa nada, sólo el CUIT es lo que vale"*), su pedido web de Chef **no se programa** (motivo `cliente_fc_lk` de
-`gv_pedidos_web_excluidos` v4): lo tipea compras en ISIS LK. Ser cliente de las dos empresas, solo, no es problema. §3.az y §3.ba.
+**Tierra del Fuego (v13.77, dueño 07/09): *"los que le hacemos FC E [Factura E] vendiéndole art. de Loeke … el pedido se arma
+como Loeke (con una L al final) y después va a ISIS de CH, no de LK"*** — un pedido de la página LK con sucursal de entrega en
+Tierra del Fuego sigue siendo NP **LK** (se pickea de la góndola Loeke), pero cada artículo lleva **L** (505L) y el Excel ISIS va
+al de **Chef** con el código de cliente de Chef del mismo CUIT (vista `v_pedidos_web` de LK: `isis_empresa`, `cod_isis`;
+`_facXlsArmar`). Los 10 clientes LK de TdF ya cruzan por CUIT. Ser cliente de las dos empresas, solo, no es problema; **el cod
+cliente no significa nada, sólo el CUIT vale** (v13.76). La regla v13.75/76 ("cliente con FC en LK → no se programa",
+`cliente_fc_lk`) fue un malentendido y está **apagada** (`doble_lk_dias = 0`). §3.az, §3.ba y §3.bb.
 
 ## ⚠ PROTOCOLO OBLIGATORIO: Backend vs Front-end — preguntar ANTES de implementar
 

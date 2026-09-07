@@ -7187,7 +7187,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v13.76";
+const APP_VERSION = "v13.77";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -36231,11 +36231,15 @@ async function facXlsBajar() {
       if (!ok) return;
     }
     // v13.72 (dueño: "dos archivos: ISIS LK y ISIS CH"): cada ISIS importa el suyo sin mirar.
-    const porEmp = { LK: filas.filter(function (r) { return !/^\s*CH\s/i.test(String(r.np)); }), CH: filas.filter(function (r) { return /^\s*CH\s/i.test(String(r.np)); }) };
+    // v13.77: una NP LK de Tierra del Fuego va al archivo CH (isisEmp), con el código Chef del cliente.
+    const _isisDe = function (r) { return r.isisEmp || (/^\s*CH\s/i.test(String(r.np)) ? "CH" : "LK"); };
+    const porEmp = { LK: filas.filter(function (r) { return _isisDe(r) === "LK"; }), CH: filas.filter(function (r) { return _isisDe(r) === "CH"; }) };
     for (const emp of ["LK", "CH"]) {
       if (!porEmp[emp].length) continue;
       if (FAC_XLS_FORMATO === "xls") _facXlsDescargar(porEmp[emp], emp); else _facXlsDescargarXlsx(porEmp[emp], emp);
     }
+    const tdfNps = filas.filter(function (r) { return r.tdf; }).map(function (r) { return r.np + " (" + r.codLk + " → Chef " + r.cod + ")"; });
+    if (tdfNps.length) { try { alert("Tierra del Fuego: " + tdfNps.length + " NP de Loeke fueron al archivo de ISIS CHEF con el código de cliente de Chef y los artículos con L:\n" + tdfNps.join("\n")); } catch (_e) {} }
 
     // Bajó: las NP que fueron en el archivo quedan facturadas.
     const enArchivo = Array.from(new Set(filas.map(function (r) { return String(r.np); })));
@@ -36327,6 +36331,21 @@ async function _facXlsArmar(nps) {
       if (rc.ok) for (const x of (await rc.json() || [])) if (x.v != null && x.v !== "") vendChef[String(x.order_id)] = String(x.v);
     } catch (_e) {}
   }
+  // v13.77 (dueño: "Tierra del Fuego: el pedido se arma como Loeke, con L al final, y después va a ISIS de CH, no
+  // de LK"): un pedido de la página LK con entrega en Tierra del Fuego sale de la vista con isis_empresa = 'chef' y
+  // cod_isis = código del mismo CUIT en Chef. Acá sólo se enruta: la fila va al archivo CH con ese código y tope 15;
+  // los artículos ya vienen con la L desde la vista (505L), que es como los espera ISIS Chef (FC E).
+  const isisChefBy = {};   // order_id LK → cod Chef
+  const ordersLk = Object.keys(orderByNp).filter(function (k) { return orderByNp[k].empresa === "lk"; }).map(function (k) { return orderByNp[k].order_id; });
+  if (ordersLk.length) {
+    try {
+      const tokLk2 = await pwebLkToken();
+      const ri = await fetch(PWEB_LK_URL + "/rest/v1/v_pedidos_web_np?select=order_id,cod_isis&empresa=eq.lk&isis_empresa=eq.chef&order_id=in.(" + [...new Set(ordersLk)].join(",") + ")", {
+        headers: { apikey: PWEB_LK_ANON, Authorization: "Bearer " + tokLk2 }, cache: "no-store"
+      });
+      if (ri.ok) for (const x of (await ri.json() || [])) if (x.cod_isis) isisChefBy[String(x.order_id)] = String(x.cod_isis);
+    } catch (_e) {}
+  }
 
   // Cabecera (cod cliente, razón social) desde la lista que ya está en pantalla
   const cab = {};
@@ -36388,10 +36407,13 @@ async function _facXlsArmar(nps) {
       suc = String(best.m.sucursal_entrega || "");
     }
 
+    const tdf = (orderByNp[np] && orderByNp[np].empresa === "lk") ? (isisChefBy[String(orderByNp[np].order_id)] || "") : "";   // v13.77
     out.push({
-      np: np, cod: c.cod, rs: c.rs, fechaTxt: _facXlsDDMMYYYY(fecha),
+      np: np, cod: tdf || c.cod, rs: c.rs, fechaTxt: _facXlsDDMMYYYY(fecha),
       vend: (orderByNp[np] && orderByNp[np].empresa === "chef") ? (vendChef[String(orderByNp[np].order_id)] || "") : (vendBy[c.cod] || ""),   // v13.72
-      suc: suc, tope: _facXlsTope(np), lineas: lineas,
+      suc: suc, tope: tdf ? 15 : _facXlsTope(np), lineas: lineas,
+      isisEmp: tdf ? "CH" : (_facXlsEmpresa(np) === "chef" ? "CH" : "LK"),   // v13.77: a qué archivo va
+      tdf: !!tdf, codLk: c.cod,
       excede: lineas.some(function (l) { return l.excede; })
     });
   });

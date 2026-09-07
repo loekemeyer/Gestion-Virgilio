@@ -391,3 +391,25 @@ grant select on public.v_pedidos_web_np to authenticated;
 --   select order_id, np_idx, cod, razon_social, lineas, cajas
 --     from public.get_pedidos_web_np_chef(30) order by order_id desc, np_idx;
 -- ============================================================================
+
+-- =============================================================================
+-- v13.77 (2026-09-07) — TIERRA DEL FUEGO (migración gv_pedidos_web_tierra_del_fuego_v1377, proyecto LK).
+-- Dueño: "los que le hacemos FC E [Factura E, área aduanera especial] vendiéndole art. de Loeke … el pedido se
+-- arma como Loeke (con una L al final) y después va a ISIS de CH, no de LK". Un pedido de la página LK cuya
+-- sucursal de entrega (customer_delivery_addresses.provincia) es Tierra del Fuego:
+--   · v_pedidos_web: cada `art` lleva "L" al final (505 → 505L, 438E → 438EL; nunca dos L), y dos columnas
+--     nuevas al final: isis_empresa ('chef' si es TdF, si no 'lk') y cod_isis (código del MISMO CUIT en
+--     chef_padron; para el resto, el cod_cliente).
+--   · v_pedidos_web_np: propaga min(isis_empresa), min(cod_isis) al final. Y pasa a security_invoker = true
+--     (estaba SIN la opción aunque la doc de arriba decía que sí: corría como dueño y salteaba la RLS de
+--     orders; con security_invoker anon = permission denied y authenticated sin JWT = 0 filas).
+--   · gv_pedidos_web_np_lk (Edge Function): drop + create con las dos columnas al final; grants iguales
+--     (service_role, gv_reader).
+-- El resto del circuito no cambia: la NP sigue siendo LK, el picking manda la L a la góndola Loeke
+-- (pkEmpresaArt), el m³ sale de virgilio_volumen_map (tiene los NNNL), gv_ppp_np_valor valúa la L con la
+-- lista LK, y Facturación (_facXlsArmar) enruta la NP al Excel de ISIS CHEF con cod_isis y tope 15.
+-- Medido al aplicar: 1.483 NP en la vista, 4 con isis_empresa = chef (pedidos 1228 Alesso Vilarino → Chef
+-- 2600, 385 Domingo Granja → 2461, 384 Aimetta → 2460; todas con L), 0 sin cod_isis, 0 no-TdF con L,
+-- 0 no-TdF con cod_isis distinto del cod. Rollback: volver a las definiciones de arriba (sin las dos columnas)
+-- y recrear gv_pedidos_web_np_lk sin ellas.
+-- =============================================================================

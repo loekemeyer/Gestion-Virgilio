@@ -133,3 +133,7 @@ grant execute on function public.gv_pedidos_web_excluidos(jsonb) to anon, authen
 -- SET ROLE anon: 201 (fc_lk 22/08), 206 y 208 (FC 02–03/09 en documentos, por CUIT) → cliente_fc_lk; pedido
 -- con cod_alt pero sin cuit → nada; CUIT sin FC → nada; pedido LK → nada.
 -- =============================================================================
+
+-- v13.77 (2026-09-07): `doble_lk_dias = 0` → el motivo 'cliente_fc_lk' (v13.75/76) queda APAGADO por el dueño.
+-- "FC E" era Factura E de Tierra del Fuego (la emite Chef), no "cliente con FC en LK". La regla real vive en LK:
+-- sql/pedidos_web_lk.sql (v13.77). El código de la v4 queda por si sirve; con 0 no excluye nada.

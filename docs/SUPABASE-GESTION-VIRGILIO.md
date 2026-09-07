@@ -1384,6 +1384,43 @@ es de Chef y pisa al LK 217): cuando Gestión alimente el tracking, escribir el 
 una función `gv_*` y pedir columna `empresa` en PaginaLK. Y el Excel ISIS de Facturación manda
 `N_Pedido` contador (no el id), como el mail: ISIS numera 98xxx por su cuenta.
 
+### 3.bb ✅ Tierra del Fuego: pedido LK con L, Excel a ISIS Chef; regla `cliente_fc_lk` apagada (v13.77) — 2026-09-07 lunes (feriado)
+
+**Qué dijo el dueño.** *"Buscá los clientes de Loeke que se entreguen en la provincia de Tierra del Fuego. Esos
+son los que hay que lograr cruzar con cod de cliente de Chef."* Y sobre "no van": *"esos son los que el pedido se
+arma como Loeke (con una L al final) y después va a ISIS de CH, no de LK"*. O sea: **"FC E" = Factura E** (área
+aduanera especial). La emite Chef (`isis_ch.documentos`: 256 `FC Electr. E`; LK: 0 con letra E). La regla
+v13.75/76 ("cliente con FC en LK → no se programa", 154 clientes) era otra cosa → **apagada**:
+`update "PPP_Web_Config" set valor = 0 where clave = 'doble_lk_dias'` (dueño: "apagala"). El código v4 queda.
+
+**Los clientes.** `customer_delivery_addresses.provincia = 'Tierra del Fuego'` (13 sucursales, 10 clientes LK):
+490 Aimetta → Chef 2460 · 687 Domingo Granja → 2461 · 771 S.A. Imp. y Exp. de la Patagonia → 1804 · 1941 Alesso
+Vilarino → 2600 · 2293 Il Cheff → 2465 · 2322 La Victoria → 2458 · 2528 Caticha → 2508 · 3831 El Martillo → 2643 ·
+4207 South Naz → 2714 · 4245 Ferreyra → 2691. **Los 10 cruzan por CUIT** (`gv_clientes_lk_ch`). Chef les factura
+FC E (2460: 70; 2465: 33; 2643: 26…); `sales_lines` de Chef muestra que compran artículos 5xx (de Loeke).
+
+**LK (migración `gv_pedidos_web_tierra_del_fuego_v1377`).** `v_pedidos_web`: `art` lleva `L` al final cuando la
+sucursal de entrega es de Tierra del Fuego (y no termina ya en L); columnas nuevas al final `isis_empresa`
+('chef' / 'lk') y `cod_isis` (código del mismo CUIT en `chef_padron`; si no, el `cod_cliente`).
+`v_pedidos_web_np`: propaga `min(isis_empresa)`, `min(cod_isis)` y pasa a **`security_invoker = true`** (no lo
+tenía, aunque `sql/pedidos_web_lk.sql` lo documentaba: corría como dueño). `gv_pedidos_web_np_lk`: drop + create
+con las dos columnas al final; grants iguales (`service_role`, `gv_reader`; sin anon/authenticated).
+
+**Impacto medido.** 1.483 NP en la vista; **4 con `isis_empresa = chef`** (1228 Alesso Vilarino → 2600, 385
+Domingo Granja → 2461, 384 Aimetta → 2460, todas con L: `026L,066L,…,438EL,502L,505L…`); 0 TdF sin `cod_isis`;
+0 no-TdF con L; 0 no-TdF con `cod_isis ≠ cod`. Las 4 son anteriores a `gestion_desde`: hoy no cambia nada
+programado. RLS: `set role anon` → permission denied; `set role authenticated` sin JWT → 0 filas. `virgilio_volumen_map`
+tiene los `NNNL` (505L = 0,0024) → m³ bien. `gv_ppp_np_valor` ya valúa la L con la lista LK para cualquier NP.
+
+**Gestión (front).** NP sigue **LK**, picking a la góndola Loeke (`pkEmpresaArt`: L → LK), PPP_Web_Base con `505L`,
+Entregas_Virgilio crudo `505L`. Facturación: `_facXlsArmar` consulta `v_pedidos_web_np` (`isis_empresa=eq.chef`,
+por `order_id`) y la NP va al **Excel de ISIS CHEF** con `cod_isis` y tope 15; `facXlsBajar` parte por `isisEmp` y
+avisa "Tierra del Fuego: N NP … (1941 → Chef 2600)". Sin respuesta de LK, como antes. Edge Function: sin cambios
+(las columnas nuevas viajan y se ignoran; la L llega en `items`). Test `tests/fac-tdf.cjs`.
+
+**Rollback.** Bloque v13.77 de `sql/pedidos_web_lk.sql` (volver a las vistas sin las dos columnas y recrear
+`gv_pedidos_web_np_lk`); el front ignora columnas que no vienen.
+
 ### 3.ba ✅ `cliente_fc_lk` por CUIT, no por código (v13.76) — 2026-09-07 lunes (feriado)
 
 **Qué dijo el dueño** (sobre §3.az): *"el cod cliente no significa nada. Sólo el CUIT es lo que vale."*

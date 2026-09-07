@@ -12,11 +12,27 @@
 > única**; no se replica. Ante la duda entre parche rápido y fix de raíz → **fix
 > de raíz**.
 >
-> Última actualización: 2026-09-07 (lunes) · Versión app al documentar: **v13.76**
+> Última actualización: 2026-09-07 (lunes) · Versión app al documentar: **v13.77**
 >
 > ⚠⚠ **Desde el lunes 2026-09-07 los operarios usan GESTIÓN, no Producción** (dueño, sábado a la
 > noche: *"el lunes van a empezar a usar GV, no más PV"*). Las tandas web viven en
 > `PPP_Web_Programacion` y Producción no las ve. URL: la de GitHub Pages de este repo.
+>
+> Nota **v13.77** (backend LK + front) — **TIERRA DEL FUEGO: "el pedido se arma como Loeke (con una L al final) y
+> después va a ISIS de CH, no de LK"** (dueño 07/09). Aclaración del dueño sobre v13.75/76: "FC E" era la **Factura E**
+> de Tierra del Fuego (área aduanera especial; la emite **Chef**: 256 `FC Electr. E` en `isis_ch.documentos`, cero en
+> LK), no "cliente con FC en LK" → **la regla `cliente_fc_lk` se APAGÓ** (`PPP_Web_Config.doble_lk_dias = 0`; el
+> código queda). Los 10 clientes de LK con sucursal de entrega en Tierra del Fuego (Aimetta 490, Domingo Granja 687,
+> S.A. Imp. y Exp. de la Patagonia 771, Alesso Vilarino 1941, Il Cheff 2293, La Victoria 2322, Caticha 2528, El
+> Martillo 3831, South Naz 4207, Ferreyra 4245) **ya cruzan por CUIT** con un código de Chef (`gv_clientes_lk_ch`).
+> Regla nueva, en la vista **`v_pedidos_web`** de LK (`sql/pedidos_web_lk.sql`): si la sucursal de entrega del pedido
+> LK es de provincia Tierra del Fuego, cada artículo sale con **L** (505L, 438EL) y el pedido trae
+> `isis_empresa = 'chef'` y `cod_isis` = código Chef del mismo CUIT (`chef_padron`); `v_pedidos_web_np` y
+> `gv_pedidos_web_np_lk` propagan las dos columnas. Todo lo demás sigue igual: NP **LK**, picking de la góndola
+> Loeke (la L manda ahí), m³ y valor con los `NNNL`. En **Facturación**, `_facXlsArmar` consulta esas dos columnas y la
+> NP va al **Excel de ISIS CHEF** con el código Chef y tope 15 (aviso al bajar: "1941 → Chef 2600"); sin respuesta
+> de LK, como antes. De paso `v_pedidos_web_np` quedó con `security_invoker = true` (no lo tenía). Test
+> `tests/fac-tdf.cjs`. §3.bb.
 >
 > Nota **v13.76** (backend LK + Virgilio + Edge Function v19 + front) — **"El cod cliente no significa nada, sólo el
 > CUIT es lo que vale"** (dueño 07/09, sobre la v13.75). La regla `cliente_fc_lk` pasa a decidirse por **CUIT**: el
