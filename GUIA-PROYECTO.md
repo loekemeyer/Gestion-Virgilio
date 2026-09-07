@@ -12,11 +12,36 @@
 > única**; no se replica. Ante la duda entre parche rápido y fix de raíz → **fix
 > de raíz**.
 >
-> Última actualización: 2026-09-07 (lunes) · Versión app al documentar: **v14.06**
+> Última actualización: 2026-09-07 (lunes) · Versión app al documentar: **v14.08**
 >
 > ⚠⚠ **Desde el lunes 2026-09-07 los operarios usan GESTIÓN, no Producción** (dueño, sábado a la
 > noche: *"el lunes van a empezar a usar GV, no más PV"*). Las tandas web viven en
 > `PPP_Web_Programacion` y Producción no las ve. URL: la de GitHub Pages de este repo.
+>
+> Nota **v14.08** (sólo front) — **Facturación muestra la fecha de ENTREGA de la PPP** (dueño 07/09, con
+> captura de "Facturación — NPs a FC": *"acá pone la fecha de la PPP también"* · *"de entrega"*). El dato ya
+> estaba en la fila (`fechaSalida` = la fecha de entrega de la tanda) pero vivía **sólo en el globito del
+> número de NP**: había que pasar el mouse por cada uno. Ahora es la columna **📅 Entrega**, entre NP y Cod.
+> Las filas ya venían ordenadas por esa fecha, así que se lee de corrido. Anchos rebalanceados para que sigan
+> sumando 100 % (Razón Social 28 → 21, Cod 8 → 7). `tests/fac-fecha-entrega.cjs` (9 chequeos).
+>
+> Nota **v14.07** (sólo front) — **El 🔄 de A Programar arma lo que se pueda antes de releer** (dueño 07/09:
+> *"si toco el botón de las flechitas para actualizar, no sólo que traiga las NP que fueron llegando sino que
+> también programe si tiene para programar automático"*). Antes sólo releía: un pedido que entraba quedaba en
+> A Programar hasta que pasara el cron intradía (cada 15 min). Ahora el botón dispara **la misma Edge Function
+> del cron 73** (`gv-ppp-web-tandas-diarias` con `{"intradia": true}`, idempotente) y **recién después** relee;
+> mientras tanto la barra dice "Armando lo que se pueda…". Si el armado falla o tarda, **releé igual**: nunca
+> deja la pantalla vieja, y no se dispara dos veces a la vez.
+>
+> **Sin backend nuevo**: la función tiene `verify_jwt`, así que va con el **token del supervisor**
+> (`facAuthWriteHeaders`); adentro sigue usando su propio `service_role`, igual que cuando la llama el cron.
+> Ninguna clave de servicio toca el navegador. `tests/apr-actualizar.cjs` (9 chequeos).
+>
+> **Dato (07/09): el agregado de Osa volvió a tanda propia.** Dueño: *"osa no puede quedar en D66B el pedidito
+> chiquito del agregado, tiene que ir en una nueva tanda"* — revierte, para este caso, la fusión que había
+> hecho la otra sesión con la regla del agregado. `LK 0024` (0,026 m³) pasó de `D66B` a **`D66G`**, mismo día
+> (mié 09/09) y mismo camión. El miércoles Osa queda con `D66B` (98650 + 98667 = 4,041 m³, de ISIS) y `D66G`
+> (el agregado, de la página). Backup y rollback en `sql/backups/osa_20260907_agregado_en_tanda_propia.sql`.
 >
 > Nota **v14.06** (sólo front) — **Cada atrasado muestra SU fecha de entrega** (dueño 07/09, sobre los 13 que
 > no salieron: *"si no salieron, que figuren en la PPP con su fecha de entrega; mañana martes lo mira la

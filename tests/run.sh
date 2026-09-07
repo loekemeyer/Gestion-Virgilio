@@ -320,3 +320,9 @@ PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node te
 
 echo "== ppp-mover-popup (v14.04: 'Mover de día' abre un pop-up con un botón por día y los m³ de cada uno) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/ppp-mover-popup.cjs
+
+echo "== apr-actualizar (v14.07: el 🔄 de A Programar arma lo que se pueda antes de releer) =="
+PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/apr-actualizar.cjs
+
+echo "== fac-fecha-entrega (v14.08: Facturación muestra la fecha de ENTREGA de la PPP como columna) =="
+PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/fac-fecha-entrega.cjs

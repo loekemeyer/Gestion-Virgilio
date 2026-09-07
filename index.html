@@ -2880,6 +2880,9 @@ tr.ppp-err-zona > td{ background:#fffbeb !important; }
 .fac-neto-cell .fac-neto-load{ color: #cbd5e1; font-weight: 700; }
 .fac-neto-cell .fac-neto-na{ color: #94a3b8; font-weight: 600; }
 .fac-neto-cell .fac-neto-falta{ display: block; font-size: 10px; font-weight: 700; color: #b45309; margin-top: 1px; white-space: nowrap; }
+/* v14.08 (dueño: "acá pone la fecha de la PPP también — de entrega"): la fecha de entrega deja de
+   estar sólo en el globito del NP y va como columna. Las filas ya venían ordenadas por ella. */
+.fac-np-tbl td.fac-fe-cell{ font-size: 12px; font-weight: 700; color: #0f172a; white-space: nowrap; font-variant-numeric: tabular-nums; }
 .fac-np-tbl th .fac-th-siva{ font-size: 9px; font-weight: 700; color: #94a3b8; white-space: nowrap; }
 /* v13.16: casillas del Excel ISIS tocables desde el celular (nativas quedaban en 13px) */
 .fac-np-tbl .fac-xls-chk, .fac-np-tbl #facXlsChkAll{ width: auto; transform: scale(1.4); cursor: pointer; }
@@ -7279,7 +7282,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v14.06";
+const APP_VERSION = "v14.08";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -33321,6 +33324,7 @@ let _apr = {
   cal: [],          // gv_ppp_web_calendario, de HOY para adelante
   salida: {},       // v13.21: order_id → { dia, motivo, detalle } (gv_ppp_web_dia_salida)
   log: null,        // idea 2048: última fila de GV_Tandas_Auto_Log (¿corrió el armado automático?)
+  armando: false,   // v14.07: el 🔄 está disparando el armado automático antes de releer
   aviso: "",        // v13.58: "Chef no respondió" (se ven sólo los de LK)
 
   horizonte: 21,    // cuántos días muestra la lista
@@ -33665,6 +33669,35 @@ async function aprCargarLog() {
     _apr.log = rows && rows[0] ? rows[0] : null;
   } catch (_e) { _apr.log = null; }
 }
+/* v14.07 (dueño 07/09: "si toco el botón de las flechitas para actualizar, no sólo que traiga las NP
+   que fueron llegando sino que también programe si tiene para programar automático").
+   El 🔄 sólo releía: si entraba un pedido, quedaba en "A Programar" hasta que el cron intradía pasara
+   (cada 15 min). Ahora primero DISPARA el armado automático —la misma Edge Function del cron 73, con
+   {"intradia": true}, que es idempotente— y recién después relee. Si el armado falla o tarda, igual
+   se relee: nunca deja la pantalla sin actualizar.
+   No hace falta backend nuevo: la función tiene verify_jwt, así que va con el token del supervisor
+   (facAuthWriteHeaders). Adentro usa su propio service_role, como cuando la llama el cron. */
+async function aprArmarAhora() {
+  const h = await facAuthWriteHeaders();
+  if (!h) return { ok: false, motivo: "sin sesión" };
+  const ctl = typeof AbortController === "function" ? new AbortController() : null;
+  const to = setTimeout(function () { try { ctl && ctl.abort(); } catch (_e) {} }, 45000);
+  try {
+    const r = await fetch(SUPABASE_URL + "/functions/v1/gv-ppp-web-tandas-diarias",
+      { method: "POST", headers: h, body: JSON.stringify({ intradia: true }), signal: ctl ? ctl.signal : undefined });
+    clearTimeout(to);
+    let j = null; try { j = await r.json(); } catch (_e) {}
+    return { ok: r.ok, data: j };
+  } catch (e) { clearTimeout(to); return { ok: false, motivo: (e && e.message) || String(e) }; }
+}
+/* El 🔄 de A Programar: arma lo que se pueda y después relee. */
+async function aprActualizar() {
+  if (_apr.armando || _apr.cargando) return;
+  _apr.armando = true; aprRender();
+  try { await aprArmarAhora(); } catch (_e) {}
+  _apr.armando = false;
+  await aprCargar();       // aprCargar ya recarga el log del armado automático
+}
 function aprLogHtml() {
   const l = _apr.log; if (!l) return "";
   const dt = l.corrida_en ? new Date(l.corrida_en) : null;
@@ -34003,8 +34036,8 @@ function aprRender() {
   // v13.58: sin selector Loekemeyer/Chef — se ven las dos empresas juntas.
   h += '<div class="apr-bar">' +
        '<span class="apr-bar-t">LK + Chef</span>' +
-       '<button class="apr-reload" onclick="aprCargar()" title="Volver a leer">🔄</button>' +
-       (_apr.cargando ? '<span class="apr-load">Cargando…</span>' : (_apr.cargandoChef ? '<span class="apr-load">LK listo · cargando Chef…</span>' : '')) +
+       '<button class="apr-reload" onclick="aprActualizar()" title="Arma lo que se pueda programar solo y vuelve a leer">🔄</button>' +
+       (_apr.armando ? '<span class="apr-load">Armando lo que se pueda…</span>' : (_apr.cargando ? '<span class="apr-load">Cargando…</span>' : (_apr.cargandoChef ? '<span class="apr-load">LK listo · cargando Chef…</span>' : ''))) +
        '<span class="apr-pasos"><b class="' + (_apr.paso === 1 ? 'on' : '') + '">① Pedidos</b> <b class="' + (_apr.paso === 2 ? 'on' : '') + '">② Día</b></span>' +
        '</div>';
 
@@ -38219,6 +38252,7 @@ function facRender(tandas){
           ? `<input type="checkbox" class="fac-xls-chk" data-np="${escapeHtml(f.np)}"${_facXlsSel.has(String(f.np)) ? ' checked' : ''} onchange="facXlsToggle(this.getAttribute('data-np'))" title="NP de la página: marcá y bajá el Excel ISIS para facturarla">`
           : `<span class="fac-xls-no" title="NP de ISIS: se factura con el tilde ✓, no va al Excel">—</span>`}</td>
         <td class="fac-np-cell" title="${escapeHtml(_npTip)}">${escapeHtml(f.np)}${_npSrcChip(f.np)}</td>
+        <td class="center fac-fe-cell">${f.fechaSalida ? escapeHtml(String(f.fechaSalida)) : '<span class="fac-lios0">—</span>'}</td>
         <td class="fac-cod-cell">${escapeHtml(f.cod)}</td>
         <td class="fac-rs-cell"><span class="fac-rs-name">${escapeHtml(f.rs)}</span>${_ft ? facTareaBadge(f.np) : ''}</td>
         <td class="fac-falta-col">${facFaltAgregDist(f.np)}</td>
@@ -38248,8 +38282,9 @@ function facRender(tandas){
           <tr>
             <th class="center" style="width:4%" title="Excel ISIS: sólo las NP de la página (LK / CH). Las de ISIS se facturan con el tilde. La casilla de arriba marca o desmarca todas las web."><input type="checkbox" id="facXlsChkAll" onchange="facXlsTodas(this.checked)"></th>
             <th style="width:11%" title="Nota de pedido. Pasá el mouse sobre el número para ver Tanda y fecha de Salida.">NP</th>
-            <th style="width:8%">Cod</th>
-            <th style="width:28%">Razón Social</th>
+            <th class="center" style="width:8%" title="Fecha de ENTREGA de la PPP (el día para el que está programado el pedido). Las filas vienen ordenadas por esta fecha.">📅 Entrega</th>
+            <th style="width:7%">Cod</th>
+            <th style="width:21%">Razón Social</th>
             <th style="width:20%" title="Ajustes respecto del pedido original — asistencia para cargar la factura:&#10;• FALTANTE (rojo, cod −N): faltó, restá N cajas de la factura o no la pongas.&#10;• AGREGADO (verde, cod +N): se armó algo que no estaba en el pedido, sumá N cajas a la factura.&#10;Los ítems armados iguales al pedido no aparecen (no hay que ajustar nada).">Faltantes y Agregados</th>
             <th class="center" style="width:5%" title="Líos ARMADOS (los que se cargaron al camión). Refleja lo real, no el pedido original.">Líos</th>
             <th class="center" style="width:5%" title="Cajas ARMADAS (las que se cargaron al camión). Refleja lo real, no el pedido original.">Cajas</th>
