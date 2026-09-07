@@ -1290,9 +1290,12 @@ justo una tanda de ISIS) que ningún operario tocó, o `null`. Revocada de `publ
 la v13.93; después `drop function public.gv_ppp_web_tanda_abierta_cliente(text,text,date);` (no la
 llama nadie más). Definición completa y comentada: `sql/gv_ppp_web_tanda_abierta_cliente.sql`.
 
-**Pendiente del dueño:** el pedido **1354 de Osa** ya está a mano en `D66G`/09-09. Bajo esta regla
-le tocaría estar **dentro de `D66B`** (que sigue sin tocar). No se movió: hay que preguntarle si
-quiere juntarlas ahora o dejarlo como está.
+**Aplicado al 1354 de Osa (mismo día).** El dueño, preguntado si juntarlas: *"me da igual"* → se
+aplicó la regla. La `D66B` seguía con **0 eventos** de operario, así que el 1354 pasó de `D66G` a
+**`D66B`**. La tanda del miércoles 9 queda con las tres NP del cliente: 98650 (2,710) + 98667
+(1,331) de ISIS + `LK 0024` (0,026) de la web = **4,067 m³, un solo camión y un solo picking**.
+`D66G` queda vacía y sin uso. Rollback:
+`sql/backups/ppp_web_programacion_20260907_1354_pre_merge_d66b.sql`.
 
 ### 3.ca ✅ El pedido web se engancha al camión que YA va al cliente (v13.93) — 2026-09-07
 

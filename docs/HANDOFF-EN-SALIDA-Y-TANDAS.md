@@ -32,9 +32,10 @@ cliente"*. **El corte es "¿ya se tocó?" (EP/TP/AP/TAP), no "¿es de ISIS o es 
 `gv_ppp_web_tanda_abierta_cliente`. Detalle y medición: `docs/SUPABASE-GESTION-VIRGILIO.md` §3.ca y
 §3.cb; SQL en `sql/gv_ppp_web_dia_cliente.sql` y `sql/gv_ppp_web_tanda_abierta_cliente.sql`.
 
-⚠ **Lo único que queda, y es del dueño:** el pedido **1354 de Osa** está a mano en `D66G`/09-09.
-Bajo la regla nueva le tocaría estar **dentro de `D66B`**, que sigue sin tocar. **No se movió** —
-hay que preguntarle si quiere juntarlas ahora o dejarlo así.
+**Cerrado también el 1354 de Osa.** El dueño dijo *"me da igual"*, así que se aplicó la regla: la
+`D66B` no tenía ningún evento de operario y el 1354 pasó de `D66G` a **`D66B`**. El miércoles 9 el
+cliente queda con una sola tanda: 98650 + 98667 (ISIS) + `LK 0024` (web) = **4,067 m³**. Rollback:
+`sql/backups/ppp_web_programacion_20260907_1354_pre_merge_d66b.sql`.
 
 ---
 
