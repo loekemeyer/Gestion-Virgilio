@@ -12,26 +12,26 @@
 > única**; no se replica. Ante la duda entre parche rápido y fix de raíz → **fix
 > de raíz**.
 >
-> Última actualización: 2026-09-07 (lunes) · Versión app al documentar: **v13.97**
+> Última actualización: 2026-09-07 (lunes) · Versión app al documentar: **v14.00**
 >
 > ⚠⚠ **Desde el lunes 2026-09-07 los operarios usan GESTIÓN, no Producción** (dueño, sábado a la
 > noche: *"el lunes van a empezar a usar GV, no más PV"*). Las tandas web viven en
 > `PPP_Web_Programacion` y Producción no las ve. URL: la de GitHub Pages de este repo.
 >
-> Nota **v13.97** (sólo front) — **Los códigos de evento no se muestran más: van los nombres de siempre**
-> (dueño 07/09: *"yo nunca entendí CCR y CCN; para mí es control remitos, carga camión y recepción remitos, sólo
-> esos nombres entiendo"*). Tenía razón: `CCR`/`CCN`/`CRN`/`TAP`/`TAL` son claves de
-> `Registros_Produccion_Virgilio`, no algo que tenga que leer el que mira la pantalla, y se colaban en los
-> `title` de En Salida y de la tabla de tandas (*"evento CCN"*, *"Armado terminado (TAP)"*, *"No hay evento
-> TAL"*). Se limpiaron todos.
+> Nota **v14.00** (sólo front) — **REVERTIDA la v13.97: en la app los códigos se quedan.** El dueño dijo
+> *"yo nunca entendí CCR y CCN; para mí es control remitos, carga camión y recepción remitos, sólo esos nombres
+> entiendo"* y se leyó como un pedido de cambiar la pantalla. **No lo era**: era para que se lo explicaran a
+> **él** con esos nombres. Su corrección, textual: ***"en la app no tenías que cambiar nada. CR, TAP, CC, RR
+> para operarios está ok"***. Los operarios usan esos códigos todos los días y son los de los botones: tocarlos
+> les cambia la herramienta por nada.
 >
-> Además **En Salida abre con los tres pasos escritos**, en orden y con su nombre:
-> **1. Control Remitos** *(se puede saltear si los remitos no llegaron)* **→ 2. Carga Camión → 3. Recepción
-> Remitos** *(= entregado)*. `tests/ppp-sin-codigos.cjs` es el candado: barre las cinco solapas —texto y
-> `title`— y falla si algún código vuelve a la pantalla.
+> Se deshizo todo lo de la v13.97: vuelven los `title` como estaban, se saca la banda de los tres pasos de En
+> Salida y se borra `tests/ppp-sin-codigos.cjs` (era un candado contra un cambio que no había que hacer).
 >
-> **Equivalencias, para leer la tabla de eventos** (esto vive acá, no en la app): `CR`/`CCR` = Control Remitos ·
-> `CC`/`CCN` = Carga Camión · `RR`/`CRN` = Recepción Remitos · `TAP` = armado terminado · `TAL` = armado de la NP.
+> **Lo que sí queda —y es lo único que valía— es la equivalencia, acá, para hablar con el dueño:**
+> `CR`/`CCR` = **Control Remitos** · `CC`/`CCN` = **Carga Camión** · `RR`/`CRN` = **Recepción Remitos** ·
+> `TAP` = armado terminado · `TAL` = armado de la NP. **En el chat se le habla con los nombres, no con los
+> códigos**; en la app y en la base, los códigos siguen siendo los de siempre.
 >
 > Nota **v13.95** (sólo front) — **Con un acordeón abierto, la PPP scrollea en vez de achicarse**
 > (dueño 07/09, con captura del miércoles 9 desplegado: *"sólo para cuando hay algo tipo acordeón, ahí sí

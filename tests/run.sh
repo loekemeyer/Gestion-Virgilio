@@ -317,6 +317,3 @@ PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node te
 
 echo "== ppp-fit-acordeon (v13.95: con un acordeón abierto la PPP scrollea en vez de achicarse y cortar) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/ppp-fit-acordeon.cjs
-
-echo "== ppp-sin-codigos (v13.97: en pantalla van Control Remitos / Carga Camión / Recepción Remitos, nunca los códigos) =="
-PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/ppp-sin-codigos.cjs
