@@ -3257,6 +3257,63 @@ cobertura volvió a moverse (368 → 371 → 373).
 
 **Rollback:** en la cabecera de `sql/gv_geo_fallidas_v1419.sql`.
 
+## 3.bn ✅ No se entrega en el interior: el padrón estaba mal leído (v14.20) — 2026-09-07
+
+**La corrección del dueño, textual:** *"no entrego en ninguno del interior"* y, cuando le mostré
+lo que tenía, *"quién del interior tenés? está mal, no entrego en esa dirección"*.
+
+**Tenía razón.** En `customer_delivery_addresses` (LK), **`localidad` y `provincia` son del
+CLIENTE, no de la dirección de entrega**. Caso real, cliente 15 (Bazar Tifni):
+
+| campo | valor |
+|---|---|
+| `direccion_entrega` | `Las Casas 3553` |
+| `localidad` / `provincia` | `Rosario` / `Santa Fe` ← **del cliente** |
+| `direccion_expreso` | `LAS CASAS 3553, Boedo` ← **donde se entrega**, CABA |
+| `zona_expreso` | `Boedo` |
+
+Misma calle y altura, en Boedo. La entrega es en el **depósito del expreso**, en Buenos Aires.
+La v14.16 pegaba la calle con la localidad del cliente y le preguntaba a Nominatim por
+*"Las Casas 3553, Rosario, Santa Fe"*, que no existe. **Ése era el motivo de que fallaran todas
+las del interior**, y de paso el que tapaba la cola (§3.bm).
+
+**Medido** sobre las 573 filas de "interior" con dato de expreso: **533 (93,0 %)** tienen la
+misma calle y altura en `direccion_entrega` y `direccion_expreso`, y **573 (100 %)** tienen
+barrio de CABA y `zona_expreso` cargada.
+
+**Conclusión: no existe una entrega en el interior.** Las 2.307 direcciones son de AMBA.
+
+**Qué cambió**
+
+- `GV_Clientes_Direcciones` suma `barrio_entrega`, `dir_expreso` y `nombre_expreso`.
+  `barrio_entrega` = `zona_expreso` → barrio de `direccion_expreso` → `localidad`.
+- El **`dir_key` pasa a armarse con el barrio DE ENTREGA**, no con la localidad del cliente.
+- `amba` queda en `true` para las 2.307; la columna se deja por compatibilidad.
+- `gv_geo_faltantes_padron` usa `barrio_entrega` y **manda `provincia` en null**: mandar la del
+  cliente hacía buscar a 800 km.
+- `gv_geo_cobertura` se parte por si el **cliente** es del interior (el corte que importa), no
+  por `amba`, que ahora es siempre true.
+- Edge Function `gv-sync-padron-direcciones` **v3**: pide `direccion_expreso` y, si el proyecto
+  no la tiene (Chef puede no tenerla), reintenta sin ella en vez de perder ese padrón entero.
+
+**Resultado medido, corridas consecutivas:**
+
+| corrida | ubicadas de 40 |
+|---|---|
+| 19:03 (antes) | **7** |
+| 19:11 (después) | **30** |
+
+**Dos cosas que hubo que arreglar de paso**
+
+1. Los fallos de `GV_Geo_Fallidas` estaban anotados contra la clave vieja → se borraron, esas
+   direcciones merecían otra oportunidad con el barrio correcto.
+2. Al cambiar el `dir_key`, las ~300 ya ubicadas dejaron de matchear (Chef AMBA cayó de 303 a 23
+   en la vista). Las coordenadas no se habían perdido: se **copiaron a la clave nueva** con un
+   `insert … select` en vez de volver a pedírselas a Nominatim. Verificado: Chef AMBA volvió a
+   303 (89,9 %).
+
+**Rollback y SQL completo:** `sql/gv_geo_barrio_entrega_v1420.sql`.
+
 ## 4. Incidente de seguridad — 2026-09-04 (cerrado)
 
 `public.vista_pedidos_web_feed` tenía `select` para `anon`. Los esquemas `fuentes` y

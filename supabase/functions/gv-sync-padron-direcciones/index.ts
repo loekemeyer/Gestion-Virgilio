@@ -24,8 +24,19 @@
 // desaparece del padrón queda acá, y no molesta —lo único que hace es tener una
 // ubicación de más.
 //
-// `amba` se marca por provincia (CABA / Buenos Aires). Sirve para ubicar primero
-// lo que sube a NUESTROS camiones; el interior sale por expreso y va después.
+// ⚠ v14.20 — CORRECCIÓN IMPORTANTE. Dueño: *"no entrego en ninguno del interior"*.
+//
+// `localidad` y `provincia` son del CLIENTE, no de la dirección de entrega. Un cliente de
+// Rosario tiene `direccion_entrega = "Las Casas 3553"` y `localidad = Rosario`, pero la entrega
+// es en **"LAS CASAS 3553, Boedo"** — la misma calle y altura, en CABA: el depósito del expreso.
+// Medido sobre las 573 filas de "interior" con dato de expreso: **93% misma calle y altura, y
+// el 100% con barrio de CABA**. Pegar la calle con la localidad del cliente y preguntarle a
+// Nominatim por "Las Casas 3553, Rosario, Santa Fe" no encuentra nada, que es exactamente por
+// qué fallaban todas.
+//
+// Entonces: **no existe una entrega en el interior**. El barrio de entrega sale de
+// `zona_expreso` (Boedo, Barracas, Pompeya, Soldati…), con `localidad` de respaldo, y `amba`
+// queda en true para todas.
 //
 // Secrets: WEB_SUPABASE_URL, WEB_SERVICE_KEY (los mismos que usa sync-clientes-dto).
 // ══════════════════════════════════════════════════════════════════════════
@@ -68,11 +79,6 @@ function dirKey(dir: unknown, barrio: unknown) {
   return n(dir) + "|" + n(barrio);
 }
 
-function esAmba(prov: unknown) {
-  const p = String(prov ?? "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().trim();
-  return p === "caba" || p === "capital federal" || p === "ciudad de buenos aires" || p === "buenos aires";
-}
-
 Deno.serve(async (_req: Request): Promise<Response> => {
   const t0 = Date.now();
   try {
@@ -83,7 +89,12 @@ Deno.serve(async (_req: Request): Promise<Response> => {
     const avisos: string[] = [];
 
     const CLI = "customers?select=id,cod_cliente,business_name";
-    const DIR = "customer_delivery_addresses?select=customer_id,slot,direccion_entrega,localidad,provincia,cp,zona_expreso";
+    // Chef y LK no tienen exactamente las mismas columnas: `direccion_expreso` existe en LK y
+    // puede no estar en Chef. PostgREST devuelve 400 ante una columna desconocida y eso se
+    // llevaría puesto el padrón entero de Chef, así que se pide lo completo y, si falla, se
+    // reintenta con el mínimo. Sin `direccion_expreso` el barrio sale igual de `zona_expreso`.
+    const DIR_COMPLETO = "customer_delivery_addresses?select=customer_id,slot,direccion_entrega,localidad,provincia,cp,zona_expreso,nombre_expreso,direccion_expreso";
+    const DIR_MINIMO   = "customer_delivery_addresses?select=customer_id,slot,direccion_entrega,localidad,provincia,cp,zona_expreso";
 
     for (const emp of [
       { empresa: "lk", base: LK_URL, key: LK_KEY, obligatorio: true },
@@ -93,7 +104,12 @@ Deno.serve(async (_req: Request): Promise<Response> => {
       let clientes: Record<string, unknown>[], dirs: Record<string, unknown>[];
       try {
         clientes = await rest(emp.base, emp.key, CLI);
-        dirs = await rest(emp.base, emp.key, DIR);
+        try {
+          dirs = await rest(emp.base, emp.key, DIR_COMPLETO);
+        } catch (_e) {
+          avisos.push(emp.empresa + ": sin direccion_expreso, se usa zona_expreso");
+          dirs = await rest(emp.base, emp.key, DIR_MINIMO);
+        }
       } catch (e) {
         if (emp.obligatorio) throw e;
         avisos.push(emp.empresa + ": " + (e instanceof Error ? e.message : String(e)));
@@ -110,6 +126,12 @@ Deno.serve(async (_req: Request): Promise<Response> => {
         const c = porId.get(String(d.customer_id));
         if (!c || c.cod_cliente == null) continue;
         const localidad = String(d.localidad ?? "").trim() || null;
+        const zona = String(d.zona_expreso ?? "").trim();
+        const dirExp = String(d.direccion_expreso ?? "").trim();
+        // El barrio DONDE SE ENTREGA: `zona_expreso` manda. Si no está, se prueba con lo que
+        // viene después de la coma en `direccion_expreso` ("LAS CASAS 3553, Boedo") y recién
+        // al final con la localidad del cliente.
+        const barrioEntrega = zona || (dirExp.includes(",") ? dirExp.split(",").slice(1).join(",").trim() : "") || localidad;
         filas.push({
           empresa: emp.empresa,
           cod: String(c.cod_cliente),
@@ -120,8 +142,14 @@ Deno.serve(async (_req: Request): Promise<Response> => {
           provincia: String(d.provincia ?? "").trim() || null,
           cp: d.cp == null ? null : String(d.cp),
           zona_expreso: String(d.zona_expreso ?? "").trim() || null,
-          dir_key: dirKey(dir, localidad),
-          amba: esAmba(d.provincia),
+          barrio_entrega: barrioEntrega,
+          nombre_expreso: String(d.nombre_expreso ?? "").trim() || null,
+          dir_expreso: dirExp || null,
+          // El dir_key se arma con el barrio DE ENTREGA, que es contra lo que se geocodifica.
+          dir_key: dirKey(dir, barrioEntrega),
+          // Todas son AMBA: no se entrega en el interior. Se deja la columna por compatibilidad
+          // y para poder detectar si algún día aparece una excepción real.
+          amba: true,
           actualizado_at: new Date().toISOString(),
         });
         n++;

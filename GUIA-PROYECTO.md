@@ -12,7 +12,7 @@
 > única**; no se replica. Ante la duda entre parche rápido y fix de raíz → **fix
 > de raíz**.
 >
-> Última actualización: 2026-09-07 (lunes) · Versión app al documentar: **v14.19**
+> Última actualización: 2026-09-07 (lunes) · Versión app al documentar: **v14.20**
 >
 > ⚠⚠ **Desde el lunes 2026-09-07 los operarios usan GESTIÓN, no Producción** (dueño, sábado a la
 > noche: *"el lunes van a empezar a usar GV, no más PV"*). Las tandas web viven en
@@ -40,6 +40,25 @@
 > **El caso Osa quedó resuelto a mano y no se toca**: mié 09/09, camión 09, misma dirección —
 > `E09A` = 98650 + 98667 (ISIS, 4,041 m³) · `E09B` = `LK 0024` (web, 0,026 m³). Se pickean por separado.
 > La otra sesión lo volvió a juntar (commit `7f431fb`) leyendo la regla vieja; se revirtió en la base.
+>
+> Nota **v14.20** (backend) — **No se entrega en el interior: el padrón estaba mal leído.** Dueño:
+> *"no entrego en ninguno del interior"* · *"quién del interior tenés? está mal, no entrego en esa
+> dirección"*. En `customer_delivery_addresses`, **`localidad` y `provincia` son del CLIENTE, no de
+> la dirección de entrega**. Bazar Tifni (cod 15): `direccion_entrega = "Las Casas 3553"`,
+> `localidad = Rosario` — pero `direccion_expreso = "LAS CASAS 3553, **Boedo**"`. Misma calle y
+> altura, en CABA: se entrega en el depósito del expreso. La v14.16 pegaba la calle con la
+> localidad del cliente y le pedía a Nominatim *"Las Casas 3553, Rosario, Santa Fe"*, que no
+> existe — **por eso fallaban todas las del interior**. Medido sobre las 573 con dato de expreso:
+> **93 % misma calle y altura, 100 % con barrio de CABA**. Se agregó `barrio_entrega` (=
+> `zona_expreso` → barrio de `direccion_expreso` → `localidad`), el `dir_key` pasa a armarse con
+> él, y `amba` queda en `true` para las 2.307. **Resultado medido**: la corrida de las 19:03 ubicó
+> 7 de 40; la de las 19:11, ya con el arreglo, **30 de 40**. De paso hubo que rescatar las ~300 ya
+> ubicadas, que al cambiar la clave dejaron de matchear: se copiaron sus coordenadas a la clave
+> nueva en vez de volver a pedirlas. `sql/gv_geo_barrio_entrega_v1420.sql`, Edge Function
+> `gv-sync-padron-direcciones` v3.
+>
+> *(La v14.19 documentó su nota pero el bump de `APP_VERSION`/`SW_VERSION` no llegó a entrar en su
+> commit: el badge saltó de v14.18 a v14.20.)*
 >
 > Nota **v14.19** (backend) — **La cola de geocodificación se tapaba.** Defecto de la v14.16,
 > encontrado el mismo día: `gv_geo_faltantes_padron` devuelve siempre el mismo orden y los fallos
