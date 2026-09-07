@@ -1241,6 +1241,59 @@ los del limbo, la RPC los va a marcar `en_produccion` sola y dejan de aparecer.
 `gestion_desde`; redeployar la Edge Fn v9 (no llama a la RPC); front v12.88. Los feeds de LK
 tal como estaban antes de todo el día: `sql/backups/gv_pedidos_web_np_feeds_20260904_pre_filtro_enviado.sql`.
 
+### 3.cb ✅ Si esa tanda todavía no se tocó, el pedido va ADENTRO (v14.05) — 2026-09-07
+
+**La corrección del dueño, textual:**
+
+> *"Por el único motivo que pedí que el agregado de Osa se programe en una tanda nueva y no se
+> incorpore a una actual, es porque la primera de Osa es pedido de ISIS y el agregado, del nuevo
+> formato. Sólo en caso que ya se haya pickeado (o pasos posteriores), esa norma se mantiene en
+> el futuro; si todavía ni se pickeó, el agregado se agrega a la tanda actual del cliente."*
+
+**O sea: el corte es "¿ya se tocó?", no "¿es de ISIS o es web?".** La v13.93 (§3.ca) ya llevaba
+el pedido al **día** en que el cliente tenía camión, pero siempre abriendo una tanda **nueva** —
+así nació la `D66G` al lado de la `D66B` de Osa. Con esta versión, si la tanda que el cliente ya
+tiene ese día está **intacta**, el pedido entra a **esa** tanda; si ya la empezaron, recién ahí se
+abre la tanda nueva (el comportamiento v13.93, que queda como fallback).
+
+**Qué cuenta como "tocada":** que exista en `Registros_Produccion_Virgilio` un evento **EP · TP ·
+AP · TAP** con esa tanda. Verificado sobre los últimos 20 días: esos cuatro códigos guardan **el
+código de tanda pelado** en `texto` (89 AP, 91 EP, 90 TP, 132 TAP, ninguno con `|`), así que el
+match es directo; igual se miran los tres primeros segmentos del `|` por las dudas. CC/CCN no hace
+falta mirarlos: no hay carga sin armado previo.
+
+**Objeto nuevo:** `gv_ppp_web_tanda_abierta_cliente(p_empresa, p_cod, p_fecha)` → devuelve la tanda
+del cliente ese día (mira las **dos** programaciones, web e ISIS, porque el caso que lo motivó es
+justo una tanda de ISIS) que ningún operario tocó, o `null`. Revocada de `public`/`anon`.
+
+**Dónde se engancha:** bloque **(a1)** de `gv_ppp_web_armar_pendientes`, antes del (a2). Escribe
+**directo** en `PPP_Web_Programacion` con esa tanda; `ppp_web_armar_tandas` no servía porque su
+`_open` sólo mira tandas **web** del día y la del caso es de ISIS. Lo que queda con tanda ahí,
+(a2), (b) y (c) lo saltean solos por su filtro de "no programado".
+
+**Medido (todo dentro de `begin … rollback`, 0 filas escritas):**
+
+| caso | resultado |
+|---|---|
+| Osa 2533, `D66B` intacta | entra a **`D66B` · 09/09** (antes: tanda nueva) |
+| `D66B` tocada (EP), `D66G` abierta | **`D66G` · 09/09** — no toca la pickeada |
+| `D66B` y `D66G` tocadas | **`D66H` · 09/09** — tanda nueva, mismo camión 66 |
+| cliente sin camión en la ventana | **`E03C` · 15/09** — cascada normal, intacta |
+
+`gv_ppp_web_tanda_abierta_cliente('lk','2533','2026-09-09')` → `D66B`;
+`('lk','4274','2026-09-04')` → `null` (la `D56D` ya está pickeada); `('lk','9999',…)` → `null`.
+
+**Grep 0 en el repo de Producción** para `gv_ppp_web_tanda_abierta_cliente` y para
+`gv_ppp_web_armar_pendientes`.
+
+**Rollback:** `sql/backups/gv_ppp_web_armar_pendientes_20260907_pre_a1.sql` devuelve el armador a
+la v13.93; después `drop function public.gv_ppp_web_tanda_abierta_cliente(text,text,date);` (no la
+llama nadie más). Definición completa y comentada: `sql/gv_ppp_web_tanda_abierta_cliente.sql`.
+
+**Pendiente del dueño:** el pedido **1354 de Osa** ya está a mano en `D66G`/09-09. Bajo esta regla
+le tocaría estar **dentro de `D66B`** (que sigue sin tocar). No se movió: hay que preguntarle si
+quiere juntarlas ahora o dejarlo como está.
+
 ### 3.ca ✅ El pedido web se engancha al camión que YA va al cliente (v13.93) — 2026-09-07
 
 **El caso.** Osa Distribuidora (cod 2533, Villa Lugano, Zona 1) tenía camión el miércoles 9 —
