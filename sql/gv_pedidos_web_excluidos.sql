@@ -1,3 +1,5 @@
+-- ⚠ v13.72: la función viva es la v2 (migración gv_excluidos_doble_lk_y_alerta_sin_eventos_v1372): lee `cod_alt` y
+-- agrega el motivo 'en_produccion_lk' (pedido Chef que ISIS LK ya tiene, mismo CUIT y día). Ver §3.ax.
 -- =============================================================================
 -- gv_pedidos_web_excluidos.sql — LA REGLA DE "PENDIENTE PARA GESTIÓN"
 -- Proyecto Virgilio (hrxfctzncixxqmpfhskv) · objetos NUEVOS, prefijo gv_, sólo lectura

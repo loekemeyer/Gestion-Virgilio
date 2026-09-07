@@ -1384,6 +1384,36 @@ es de Chef y pisa al LK 217): cuando Gestión alimente el tracking, escribir el 
 una función `gv_*` y pedir columna `empresa` en PaginaLK. Y el Excel ISIS de Facturación manda
 `N_Pedido` contador (no el id), como el mail: ISIS numera 98xxx por su cuenta.
 
+### 3.ax ✅ Chef: vendedor propio, Excel partido, doble contra ISIS LK, RPC buena; alerta sin eventos (v13.72) — 2026-09-07 lunes (feriado, 04:30)
+
+**Decisiones del dueño (07/09, por pregunta):** vendedor del padrón Chef · dos archivos ISIS LK / ISIS CH · detectar el doble
+por CUIT y fecha · el cron de Chef sigue apagado.
+
+**LK (`kwkclwhmoygunqmlegrg`), migración `gv_chef_admin_y_cods_lk_de_chef_v1372`:**
+- `gv_pedidos_web_np_chef_admin(p_dias)`: `security definer`, candado `public.admins` por `auth.uid()` (igual que
+  `get_pedidos_web_np_chef`), devuelve `gv_pedidos_web_np_chef` (con `direccion_expreso`, `np_total`, `v`). Grant a
+  `authenticated`, `service_role`, `gv_reader`. El front (A Programar y `pppTraerPedidosWeb`) la usa en vez de la vieja.
+- `gv_cods_lk_de_chef(p_cods_ch text[])` → `(cod_ch, cod_lk, cuit)` desde `gv_clientes_lk_ch`. Probado: 2701→4044,
+  2393→2317, 271→288.
+
+**Virgilio, migración `gv_excluidos_doble_lk_y_alerta_sin_eventos_v1372`:**
+- `gv_pedidos_web_excluidos` v2: lee `cod_alt` de cada pedido y agrega el motivo **`en_produccion_lk`**: pedido `chef` con
+  `cod_alt` no nulo y una NP `^9` en `np_prod` con `cod = cod_alt` y `PPP_Base_Pedidos.fecha = fecha_recep`. Medición:
+  `{chef, 208, cod 2701, cod_alt 4044, fecha 2026-08-24}` → `anterior_al_cambio` + `en_produccion_lk` (el caso real de
+  P&M Bazar, ISIS LK 98544/98545). Lo mandan la Edge Function v17 (`soloPendientes`, mapeo vía `gv_cods_lk_de_chef`) y A
+  Programar (`aprTraerPedidos`), que además lista los dobles en un cartel rojo. Sin mapeo no se detecta, no se rompe.
+- `gv_alerta_sin_eventos_telegram()` + **cron 76 `gv-alerta-sin-eventos`** (`30 13 * * 1-5` UTC = 10:30 ART): si el día es
+  hábil (`gv_es_dia_habil`) y no hay eventos de operarios (legajo ∉ {0,1}) en `Registros_Produccion_Virgilio` hoy →
+  `tg_enqueue` (dedup `gv_sin_eventos_<fecha>`) + `tg_outbox_flush`. Probado hoy (feriado): no encola. Apagar:
+  `select cron.alter_job(76, active := false)`.
+
+**Front (v13.72):** Excel ISIS → `_facXlsArmar` trae el `vend` de Chef por `order_id` (`gv_pedidos_web_np_chef_admin(60)`)
+y `facXlsBajar` baja un archivo por empresa (`PEDIDOS_WEB_ISIS_LK_…` / `PEDIDOS_WEB_ISIS_CH_…`, xlsx y xls). Tests:
+`fac-excel-isis`, `pweb-en-ppp`, `pweb-pendiente`, `apr-programar`.
+
+**Rollback:** LK `drop function gv_pedidos_web_np_chef_admin, gv_cods_lk_de_chef` (y volver el front a
+`get_pedidos_web_np_chef`); Virgilio reaplicar `sql/gv_pedidos_web_excluidos.sql` (v1) y `cron.unschedule('gv-alerta-sin-eventos')`.
+
 ### 3.aw ✅ NP web = contador propio, un número por bloque, sin sufijo (v13.70) — 2026-09-07 lunes (feriado, 03:00)
 
 **Dueño:** *"el pedido tiene que ser único. No puede haber cuatro variantes de un pedido cuando se separa en cuatro.

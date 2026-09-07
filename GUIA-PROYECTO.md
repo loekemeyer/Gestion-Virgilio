@@ -12,12 +12,27 @@
 > única**; no se replica. Ante la duda entre parche rápido y fix de raíz → **fix
 > de raíz**.
 >
-> Última actualización: 2026-09-06 (domingo) · Versión app al documentar: **v13.71**
+> Última actualización: 2026-09-06 (domingo) · Versión app al documentar: **v13.72**
 >
 > ⚠⚠ **Desde el lunes 2026-09-07 los operarios usan GESTIÓN, no Producción** (dueño, sábado a la
 > noche: *"el lunes van a empezar a usar GV, no más PV"*). Las tandas web viven en
 > `PPP_Web_Programacion` y Producción no las ve. URL: la de GitHub Pages de este repo.
 >
+> Nota **v13.72** (backend LK + Virgilio + Edge Function v17 + front) — **cuatro pendientes del dueño (07/09) en uno:**
+> (a) **Vendedor de una NP de Chef en el Excel ISIS** sale del pedido de Chef (`sheets_payload.vend` vía la RPC nueva de
+> LK `gv_pedidos_web_np_chef_admin`), nunca del padrón LK por código (2393 de Chef ≠ 2393 de LK); si no hay, vacío.
+> (b) **El Excel ISIS se parte en dos archivos**, `PEDIDOS_WEB_ISIS_LK_…` y `PEDIDOS_WEB_ISIS_CH_…` (xlsx y xls), cada
+> uno con sus NP; la hoja Resumen dice para qué ISIS es. (c) **Doble Chef/ISIS LK**: `gv_pedidos_web_excluidos` v2
+> acepta `cod_alt` (el código LK del mismo CUIT, `gv_cods_lk_de_chef` en LK, espejo de `gv_cods_chef_de_lk`) y excluye
+> con motivo `en_produccion_lk` un pedido Chef que ISIS LK ya tiene como NP 9xxxx del mismo cliente el mismo día
+> (probado con P&M Bazar: Chef 208 / cod_alt 4044 / 24-08 → `en_produccion_lk`). Lo mandan la Edge Function (v17,
+> `soloPendientes`) y A Programar, que además avisa arriba: "N pedido(s) de Chef ya está(n) en ISIS LK … NO se
+> programan". (d) **A Programar y la PPP leen la RPC buena de Chef** (`gv_pedidos_web_np_chef_admin`, con
+> `direccion_expreso` y `np_total`, mismo candado de admins que `get_pedidos_web_np_chef`). Además **alerta Telegram
+> `gv-alerta-sin-eventos`** (cron 76, lun–vie 10:30 ART): día hábil sin ningún evento de operarios → mensaje al grupo
+> (`gv_alerta_sin_eventos_telegram`, dedup por día; probado hoy feriado: no manda). El cron de Chef
+> (`procesar-pedidos-web`) **sigue apagado** a propósito (dueño: "no, dejalo apagado"). §3.ax.
+
 > Nota **v13.71** (backend) — **Regla del dueño (07/09): un pedido que entra por la página de Chef ES de Chef, aunque
 > el cliente sea de LK: se factura por Chef, y cada artículo de LOEKEMEYER va con "L" al final (505 → 505L).** Es la
 > misma regla de las páginas (`paginach` / `pagina-LK-copia`, `admin-supercot.js`: `addLSuffix = isChef` → `codLk + "L"`;

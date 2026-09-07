@@ -7173,7 +7173,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v13.71";
+const APP_VERSION = "v13.72";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -25977,7 +25977,7 @@ async function pppTraerPedidosWeb(empresa) {
   if (emp === "chef") {
     // Chef vive en otro proyecto y se lee por FDW (~3,3 s), así que va por RPC
     // aparte: unida a la vista de Loekemeyer, cada carga pagaría ese costo.
-    const rc = await fetch(PWEB_LK_URL + "/rest/v1/rpc/get_pedidos_web_np_chef", {
+    const rc = await fetch(PWEB_LK_URL + "/rest/v1/rpc/gv_pedidos_web_np_chef_admin", {
       method: "POST",
       headers: { apikey: PWEB_LK_ANON, Authorization: "Bearer " + tok, "Content-Type": "application/json" },
       body: JSON.stringify({ p_dias: PWEB_VENTANA_DIAS })
@@ -32817,6 +32817,7 @@ async function aprGet(path) {
    que antes); si falla sólo Chef, se ven los de LK y un aviso dice que Chef no respondió:
    antes que dejar la pantalla en blanco por una empresa, mostrar la otra y avisar. */
 async function aprTraerTodos() {
+  _apr.dobles = [];   // v13.72
   const rs = await Promise.allSettled([aprTraerPedidos("lk"), aprTraerPedidos("chef")]);
   if (rs[0].status === "rejected") throw rs[0].reason;
   _apr.aviso = rs[1].status === "rejected"
@@ -32834,7 +32835,7 @@ async function aprTraerPedidos(e) {
   const tok = await pwebLkToken();
   let nps;
   if (emp === "chef") {
-    const rc = await fetch(PWEB_LK_URL + "/rest/v1/rpc/get_pedidos_web_np_chef", {
+    const rc = await fetch(PWEB_LK_URL + "/rest/v1/rpc/gv_pedidos_web_np_chef_admin", {
       method: "POST",
       headers: { apikey: PWEB_LK_ANON, Authorization: "Bearer " + tok, "Content-Type": "application/json" },
       body: JSON.stringify({ p_dias: PWEB_VENTANA_DIAS })
@@ -32863,11 +32864,31 @@ async function aprTraerPedidos(e) {
   const _porPedido = new Map();
   for (const n of nps) { const k = String(n.order_id); if (!_porPedido.has(k)) _porPedido.set(k, n); }
   if (_porPedido.size) {
+    // v13.72 (dueño: "detectarlo por CUIT y fecha"): para Chef se manda también el código LK del mismo
+    // cliente (gv_cods_lk_de_chef, por CUIT), así el backend detecta un pedido Chef que compras tipeó en
+    // ISIS LK. Si el mapeo falla, no se detecta el doble pero no se rompe la carga.
+    const codAlt = new Map();
+    if (emp === "chef") {
+      try {
+        const cods = [...new Set([..._porPedido.values()].map(function (n) { return String(n.cod || "").trim(); }).filter(Boolean))];
+        const rm = await fetch(PWEB_LK_URL + "/rest/v1/rpc/gv_cods_lk_de_chef", {
+          method: "POST", headers: { apikey: PWEB_LK_ANON, Authorization: "Bearer " + tok, "Content-Type": "application/json" },
+          body: JSON.stringify({ p_cods_ch: cods })
+        });
+        if (rm.ok) for (const x of (await rm.json() || [])) codAlt.set(String(x.cod_ch), String(x.cod_lk));
+      } catch (_e) {}
+    }
     const ex = await aprRpc("gv_pedidos_web_excluidos", { p_pedidos: [..._porPedido.values()].map(function (n) {
       // v12.94 — `enviado_a_compras`: lo que ya salió a ISIS por el mail es de Producción.
-      return { empresa: emp, order_id: n.order_id, cod: n.cod || "", fecha_recep: n.fecha_recep || null, enviado_a_compras: !!n.enviado_a_compras };
+      return { empresa: emp, order_id: n.order_id, cod: n.cod || "", cod_alt: codAlt.get(String(n.cod || "").trim()) || null,
+               fecha_recep: n.fecha_recep || null, enviado_a_compras: !!n.enviado_a_compras };
     }) }) || [];
     const fuera = new Set(ex.map(function (x) { return String(x.order_id); }));
+    // v13.72: los dobles (tipeados en ISIS LK) se avisan arriba de A Programar
+    for (const x of ex) if (x.motivo === "en_produccion_lk") {
+      const n = _porPedido.get(String(x.order_id)) || {};
+      (_apr.dobles = _apr.dobles || []).push({ empresa: emp, order_id: x.order_id, cod: n.cod || "", rs: n.razon_social || "", cod_alt: codAlt.get(String(n.cod || "").trim()) || "" });
+    }
     nps = nps.filter(function (n) { return !fuera.has(String(n.order_id)); });
   }
 
@@ -33281,6 +33302,10 @@ function aprRender() {
 
   if (_apr.err) h += '<div class="apr-err">⚠ ' + escapeHtml(_apr.err) + '</div>';
   if (_apr.aviso) h += '<div class="apr-err">⚠ ' + escapeHtml(_apr.aviso) + '</div>';
+  // v13.72: pedido de Chef que compras ya tipeó en ISIS LK (mismo CUIT, mismo día): no se programa, se avisa
+  if ((_apr.dobles || []).length) h += '<div class="apr-err">⚠ ' + _apr.dobles.length + ' pedido(s) de Chef ya está(n) en ISIS LK (mismo cliente por CUIT, mismo día) y NO se programan: ' +
+    escapeHtml(_apr.dobles.map(function (d) { return pwebPedidoLabel(d.empresa, d.order_id) + " " + (d.rs || d.cod) + (d.cod_alt ? " (LK " + d.cod_alt + ")" : ""); }).join(" · ")) +
+    '. Si el de ISIS LK está mal, anulalo ahí y recargá.</div>';
   if (_apr.msg) h += '<div class="' + (_apr.msgErr ? "apr-err" : "apr-msg") + '">' + escapeHtml(_apr.msg) + '</div>';
   h += aprLogHtml();   // idea 2048
 
@@ -35979,7 +36004,7 @@ function _facXlsxBlob(hojas) {        // hojas: [{nombre, filas}]
 
 /* Baja el contenido como .xlsx moderno. Mismas columnas y mismo orden que el
    .xls XML 2003; cambia sólo el envase. */
-function _facXlsDescargarXlsx(filas) {
+function _facXlsDescargarXlsx(filas, emp) {
   const items = _facXlsFilasPlanas(filas);
   const filasHoja = items.map(function (it) {
     return [it.fecha, String(it.N_Pedido), it.cliente, it.vend, it.articulo, it.cajas, it.uni,
@@ -35989,7 +36014,7 @@ function _facXlsDescargarXlsx(filas) {
   items.forEach(function (it) { const k = it.cliente + "|" + it.N_Pedido; if (!grupos[k]) grupos[k] = { c: it.cliente, n: it.N_Pedido, q: 0 }; grupos[k].q++; });
   const desg = Object.keys(grupos).map(function (k) { return grupos[k]; }).sort(function (a, b) { return a.n - b.n; });
   const resumen = [
-    ["PEDIDOS WEB DE GESTION VIRGILIO — IMPORTAR EN ISIS"],
+    ["PEDIDOS WEB DE GESTION VIRGILIO — IMPORTAR EN ISIS " + (emp || "")],
     ["NP de Gestion (todavia no existen en ISIS; ISIS les asigna su numero al importar): " + filas.map(function (r) { return r.np; }).join(", ")],
     [],
     ["Pedidos", "NP"],
@@ -36004,7 +36029,7 @@ function _facXlsDescargarXlsx(filas) {
   const blob = _facXlsxBlob([{ nombre: dd + " 9Hs", filas: filasHoja }, { nombre: "Resumen", filas: resumen }]);
   const a = document.createElement("a");
   a.href = URL.createObjectURL(blob);
-  a.download = "PEDIDOS_WEB_ISIS_" + dd + ".xlsx";
+  a.download = "PEDIDOS_WEB_ISIS_" + (emp ? emp + "_" : "") + dd + ".xlsx";
   document.body.appendChild(a); a.click();
   setTimeout(function () { URL.revokeObjectURL(a.href); a.remove(); }, 1500);
 }
@@ -36146,7 +36171,12 @@ async function facXlsBajar() {
         "Pasa cuando la NP se armó dos veces. En el archivo va lo PEDIDO, no la suma.\n\n¿Bajo igual?");
       if (!ok) return;
     }
-    if (FAC_XLS_FORMATO === "xls") _facXlsDescargar(filas); else _facXlsDescargarXlsx(filas);
+    // v13.72 (dueño: "dos archivos: ISIS LK y ISIS CH"): cada ISIS importa el suyo sin mirar.
+    const porEmp = { LK: filas.filter(function (r) { return !/^\s*CH\s/i.test(String(r.np)); }), CH: filas.filter(function (r) { return /^\s*CH\s/i.test(String(r.np)); }) };
+    for (const emp of ["LK", "CH"]) {
+      if (!porEmp[emp].length) continue;
+      if (FAC_XLS_FORMATO === "xls") _facXlsDescargar(porEmp[emp], emp); else _facXlsDescargarXlsx(porEmp[emp], emp);
+    }
 
     // Bajó: las NP que fueron en el archivo quedan facturadas.
     const enArchivo = Array.from(new Set(filas.map(function (r) { return String(r.np); })));
@@ -36210,7 +36240,7 @@ async function _facXlsArmar(nps) {
     // La fecha de una NP de ISIS sale de PPP_Base_Pedidos; una NP web NO está ahí,
     // así que su fecha de recepción se guarda al programar y se lee de acá. Sin
     // esto el Excel salía con la fecha vacía para todo lo que viene de la página.
-    fetch(SUPABASE_URL + "/rest/v1/PPP_Web_Programacion?select=np,np_idx,empresa,fecha_recep&fecha_recep=not.is.null&limit=5000", { headers: H, cache: "no-store" }).then(function (r) { return r.ok ? r.json() : []; }).catch(function () { return []; })
+    fetch(SUPABASE_URL + "/rest/v1/PPP_Web_Programacion?select=np,np_idx,empresa,order_id,fecha_recep&limit=5000", { headers: H, cache: "no-store" }).then(function (r) { return r.ok ? r.json() : []; }).catch(function () { return []; })
   ]);
 
   const uxbBy = {}; (uxb || []).forEach(function (x) { const k = String(x.cod || "").replace(/^0+/, ""); if (k) uxbBy[k] = Number(x.uxb) || null; });
@@ -36219,10 +36249,25 @@ async function _facXlsArmar(nps) {
     const f = String(x.fecha || "").slice(0, 10), k = String(x.pedido);
     if (f && (!fechaBy[k] || f < fechaBy[k])) fechaBy[k] = f;
   });
+  const orderByNp = {};   // v13.72: NP web → (empresa, order_id), para el vendedor de Chef
   (web || []).forEach(function (x) {
     const f = String(x.fecha_recep || "").slice(0, 10);
-    if (f && x.np) fechaBy[pwebNpLabel(x.empresa, x.np, x.np_idx)] = f;
+    if (x.np) { const lab = pwebNpLabel(x.empresa, x.np, x.np_idx); orderByNp[lab] = { empresa: String(x.empresa || "lk").toLowerCase(), order_id: x.order_id }; if (f) fechaBy[lab] = f; }
   });
+  // v13.72 (dueño: "vendedor del padrón Chef"): el vend de una NP de Chef sale del pedido de Chef
+  // (sheets_payload.vend, vía gv_pedidos_web_np_chef_admin), no del padrón LK por código (2393 de Chef
+  // es Addoumie; 2393 de LK es otro cliente). Si falla, vacío: nunca el de LK.
+  const vendChef = {};
+  if (Object.keys(orderByNp).some(function (k) { return orderByNp[k].empresa === "chef"; })) {
+    try {
+      const tokLk = await pwebLkToken();
+      const rc = await fetch(PWEB_LK_URL + "/rest/v1/rpc/gv_pedidos_web_np_chef_admin", {
+        method: "POST", headers: { apikey: PWEB_LK_ANON, Authorization: "Bearer " + tokLk, "Content-Type": "application/json" },
+        body: JSON.stringify({ p_dias: 60 })
+      });
+      if (rc.ok) for (const x of (await rc.json() || [])) if (x.v != null && x.v !== "") vendChef[String(x.order_id)] = String(x.v);
+    } catch (_e) {}
+  }
 
   // Cabecera (cod cliente, razón social) desde la lista que ya está en pantalla
   const cab = {};
@@ -36286,14 +36331,15 @@ async function _facXlsArmar(nps) {
 
     out.push({
       np: np, cod: c.cod, rs: c.rs, fechaTxt: _facXlsDDMMYYYY(fecha),
-      vend: vendBy[c.cod] || "", suc: suc, tope: _facXlsTope(np), lineas: lineas,
+      vend: (orderByNp[np] && orderByNp[np].empresa === "chef") ? (vendChef[String(orderByNp[np].order_id)] || "") : (vendBy[c.cod] || ""),   // v13.72
+      suc: suc, tope: _facXlsTope(np), lineas: lineas,
       excede: lineas.some(function (l) { return l.excede; })
     });
   });
   return out;
 }
 
-function _facXlsDescargar(filas) {
+function _facXlsDescargar(filas, emp) {
   // Un número de pedido por TRAMO: cada NP se corta de a 18 líneas (Loekemeyer)
   // o 15 (Chef), en orden de código, igual que hace ISIS al importar.
   const items = [];
@@ -36322,7 +36368,7 @@ function _facXlsDescargar(filas) {
   const blob = new Blob([xml], { type: "application/vnd.ms-excel" });
   const a = document.createElement("a");
   a.href = URL.createObjectURL(blob);
-  a.download = "PEDIDOS_WEB_ISIS_" + dd + "_" + hhmm + ".xls";
+  a.download = "PEDIDOS_WEB_ISIS_" + (emp ? emp + "_" : "") + dd + "_" + hhmm + ".xls";
   document.body.appendChild(a); a.click();
   setTimeout(function () { URL.revokeObjectURL(a.href); a.remove(); }, 1500);
 }

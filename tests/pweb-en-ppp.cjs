@@ -87,7 +87,7 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
       const u = String(url); urls.push(u);
       if (u.includes("admin-login-otp"))    return json({ email: "a@b.c", tmp_password: "x" });
       if (u.includes("/auth/v1/token"))     return json({ access_token: "lk", expires_in: 3600 });
-      if (u.includes("get_pedidos_web_np_chef")) return json([
+      if (u.includes("gv_pedidos_web_np_chef_admin")) return json([
         { empresa: "chef", order_id: 213, np_idx: 2, cod: "2393", razon_social: "Addoumie",
           fecha_recep: "2026-09-02", hora_recep: "10:25", direccion: "San Luis 1524 - Rosario Norte",
           enviado_a_compras: null, lineas: 2, cajas: 2, items: [{ art: "052", cajas: 1 }],
@@ -99,8 +99,8 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
       return json([]);
     };
     const filas = await pppTraerPedidosWeb("chef");
-    return { np: (filas[0] || {}).np, usaRpc: urls.some(u => u.includes("get_pedidos_web_np_chef")),
-             noUsaVistaLk: !urls.some(u => u.includes("v_pedidos_web_np")) };
+    return { np: (filas[0] || {}).np, usaRpc: urls.some(u => u.includes("gv_pedidos_web_np_chef_admin")),
+             noUsaVistaLk: !urls.some(u => u.includes("/rest/v1/v_pedidos_web_np")) };
   });
 
   // (e) 403 de la RLS

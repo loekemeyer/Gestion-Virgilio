@@ -16,7 +16,8 @@
 //      devuelven EXACTAMENTE las mismas columnas — CRUDAS, sin filtrar
 //   2b. `gv_pedidos_web_excluidos` — saca lo que NO es de Gestión: lo anterior a
 //      `gestion_desde` y lo que Producción/ISIS ya conoce (regla del dueño,
-//      2026-09-04). Si esta llamada falla, no se programa nada: falla cerrado.
+//      2026-09-04); v13.72: también un pedido Chef tipeado en ISIS LK (mismo CUIT, mismo
+//      día, via gv_cods_lk_de_chef). Si esta llamada falla, no se programa nada: falla cerrado.
 //   3. `gv_ppp_web_np_asignar`  — asigna la NP de cada bloque (v13.70: contador propio, un número por bloque)
 //   4. `ppp_web_resync`         — pone al día lo YA programado que cambió
 //   5. `gv_ppp_web_zona_lote`   — resuelve la zona de cada NP
@@ -163,10 +164,24 @@ async function soloPendientes(
   const porPedido = new Map<string, Fila>();
   for (const n of filas) { const k = String(n.order_id); if (!porPedido.has(k)) porPedido.set(k, n); }
   if (!porPedido.size) return { filas, excluidos: {}, pedidos_crudos: 0 };
-  const p_pedidos = [...porPedido.values()].map((n) => ({
+  const p_pedidos: Record<string, unknown>[] = [...porPedido.values()].map((n) => ({
     empresa: emp, order_id: n.order_id, cod: n.cod ?? "", fecha_recep: n.fecha_recep ?? null,
-    enviado_a_compras: !!n.enviado_a_compras,
+    enviado_a_compras: !!n.enviado_a_compras, cod_alt: null as string | null,
   }));
+  // v13.72 (dueño: "detectarlo por CUIT y fecha"): para Chef va también el código LK del mismo cliente
+  // (gv_cods_lk_de_chef, por CUIT); con eso gv_pedidos_web_excluidos detecta un pedido Chef que compras
+  // tipeó en ISIS LK ('en_produccion_lk'). Sin mapeo no se detecta, pero no se rompe.
+  if (emp === "chef") {
+    try {
+      const cods = [...new Set(p_pedidos.map((x) => String(x.cod ?? "").trim()).filter(Boolean))];
+      const rm = await lk("/rest/v1/rpc/gv_cods_lk_de_chef", { method: "POST", body: JSON.stringify({ p_cods_ch: cods }) });
+      if (rm.ok) {
+        const alt = new Map<string, string>();
+        for (const x of await rm.json() as { cod_ch: string; cod_lk: string }[]) alt.set(String(x.cod_ch), String(x.cod_lk));
+        for (const x of p_pedidos) x.cod_alt = alt.get(String(x.cod ?? "").trim()) ?? null;
+      }
+    } catch (_e) { /* sin mapeo no hay detección del doble; el armado sigue */ }
+  }
   const ex = await vgRpc<{ empresa: string; order_id: number; motivo: string }[]>(
     "gv_pedidos_web_excluidos", { p_pedidos });
   const fuera = new Set(ex.map((x) => String(x.order_id)));
