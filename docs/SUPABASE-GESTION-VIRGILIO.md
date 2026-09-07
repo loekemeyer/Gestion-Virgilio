@@ -1384,6 +1384,36 @@ es de Chef y pisa al LK 217): cuando Gestión alimente el tracking, escribir el 
 una función `gv_*` y pedir columna `empresa` en PaginaLK. Y el Excel ISIS de Facturación manda
 `N_Pedido` contador (no el id), como el mail: ISIS numera 98xxx por su cuenta.
 
+### 3.ba ✅ `cliente_fc_lk` por CUIT, no por código (v13.76) — 2026-09-07 lunes (feriado)
+
+**Qué dijo el dueño** (sobre §3.az): *"el cod cliente no significa nada. Sólo el CUIT es lo que vale."*
+
+**LK (migración `gv_cuits_de_chef_y_cuits_con_fc_lk_v1376`).** `gv_cuits_de_chef(p_cods_ch)` → CUIT (dígitos)
+de cada código de Chef desde `chef_padron` (todos los clientes). `gv_cuits_con_fc_lk(p_cuits, p_dias)` →
+`(cuit, ultima_fc, fcs, cods_lk)` desde `sales_lines` → `customers` (`cod_cliente` bigint → `::text`), sin
+`sales_excluded_items`. Las dos SECURITY DEFINER, execute a `authenticated`/`service_role`/`gv_reader`, sin
+`anon`. **Se dropeó `gv_clientes_lk_con_fc`** (v13.75, por código; la creamos nosotros ese mismo día, nadie más
+la llamaba). Datos: en LK no hay CUIT con más de un código (`customers`), 9 clientes sin CUIT; en
+`isis_lk.documentos` (180 días) ningún CUIT nulo ni con más de un código. `sql/gv_cuits_con_fc_lk.sql`.
+
+**Virgilio (migración `gv_excluidos_cliente_fc_lk_por_cuit_v1376`).** `gv_pedidos_web_excluidos` v4: lee `cuit`
+(dígitos) de cada pedido; `cliente_fc_lk` = pedido de Chef con CUIT y (`fc_lk ≥ fecha − doble_lk_dias` o
+`isis_lk.documentos` `factura_venta` con `regexp_replace(contraparte_cuit,'\D','')` = CUIT y `fecha ≥ fecha −
+doble_lk_dias`). `cod_alt` ya no interviene en este motivo; sigue en `en_produccion_lk`. Grants iguales.
+
+**Impacto medido** (`SET ROLE anon`, fecha 04/09): 201 CUIT 30708108479 con `fc_lk` 22/08 → `cliente_fc_lk`;
+206 (20115279751) y 208 (30717393240) sin `fc_lk`, FC 02–03/09 en `documentos` → `cliente_fc_lk`; pedido con
+`cod_alt` 4044 pero sin CUIT → nada (antes sí); CUIT sin FC → nada; pedido LK → nada. `gv_cuits_de_chef` con
+`SET ROLE gv_reader`: 2701 → 30717393240, 2715 → 30715209833, 2686, 2466 OK. `gv_cuits_con_fc_lk`: los 4 CUIT
+del cartel con su última FC de `sales_lines` (22/08, 24/08, 23/03, 16/04) y su código LK.
+
+**Front / Edge.** A Programar llama `gv_cuits_de_chef` + `gv_cuits_con_fc_lk` y manda `cuit` y `fc_lk`; el
+cartel 🧾 muestra "CUIT …, LK …, FC dd/mm". Edge Function **v19**: lo mismo en `soloPendientes`, en un `try`
+aparte del mapeo de códigos (si falla el CUIT, el backend decide con lo que tiene).
+
+**Rollback.** `doble_lk_dias = 0` apaga la regla. Volver a v3 (bloque v13.75) y recrear
+`gv_clientes_lk_con_fc` desde el bloque v13.75 de `sql/gv_cuits_con_fc_lk.sql` (git).
+
 ### 3.az ✅ "Los que le hacemos FC en LK no van": motivo `cliente_fc_lk` (v13.75) — 2026-09-07 lunes (feriado)
 
 **Qué dijo el dueño** (sobre el cartel de 4 dobles de v13.72): *"no es problema que sean clientes de Loeke y de

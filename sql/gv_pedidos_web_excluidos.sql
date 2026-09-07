@@ -123,3 +123,13 @@ grant execute on function public.gv_pedidos_web_excluidos(jsonb) to anon, authen
 -- 2517 (fc_lk 22/08), 2183, 1816 y 4044 (FC 02–03/09 sólo en documentos) → cliente_fc_lk; cod_alt sin FC
 -- o sin cod_alt → nada; pedido LK → nada.
 -- =============================================================================
+
+-- =============================================================================
+-- v13.76 (2026-09-07) — v4 (migración gv_excluidos_cliente_fc_lk_por_cuit_v1376). Dueño: "el cod cliente no
+-- significa nada, sólo el CUIT es lo que vale". 'cliente_fc_lk' se decide por el CUIT del cliente del pedido
+-- (`cuit` en cada pedido, dígitos; sale de chef_padron vía gv_cuits_de_chef en LK): `fc_lk` = última FC de ese
+-- CUIT en sales_lines (gv_cuits_con_fc_lk) o isis_lk.documentos por contraparte_cuit. Ya no mira cod_alt para
+-- este motivo (cod_alt sigue sólo en 'en_produccion_lk', porque la PPP de ISIS no trae CUIT). Probado con
+-- SET ROLE anon: 201 (fc_lk 22/08), 206 y 208 (FC 02–03/09 en documentos, por CUIT) → cliente_fc_lk; pedido
+-- con cod_alt pero sin cuit → nada; CUIT sin FC → nada; pedido LK → nada.
+-- =============================================================================

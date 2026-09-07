@@ -12,11 +12,21 @@
 > única**; no se replica. Ante la duda entre parche rápido y fix de raíz → **fix
 > de raíz**.
 >
-> Última actualización: 2026-09-07 (lunes) · Versión app al documentar: **v13.75**
+> Última actualización: 2026-09-07 (lunes) · Versión app al documentar: **v13.76**
 >
 > ⚠⚠ **Desde el lunes 2026-09-07 los operarios usan GESTIÓN, no Producción** (dueño, sábado a la
 > noche: *"el lunes van a empezar a usar GV, no más PV"*). Las tandas web viven en
 > `PPP_Web_Programacion` y Producción no las ve. URL: la de GitHub Pages de este repo.
+>
+> Nota **v13.76** (backend LK + Virgilio + Edge Function v19 + front) — **"El cod cliente no significa nada, sólo el
+> CUIT es lo que vale"** (dueño 07/09, sobre la v13.75). La regla `cliente_fc_lk` pasa a decidirse por **CUIT**: el
+> CUIT de cada cliente de Chef sale del padrón (`gv_cuits_de_chef`, `chef_padron` en LK, todos los clientes y no
+> sólo los 357 apareados), la última FC de LK se busca por CUIT en `sales_lines` → `customers`
+> (**`gv_cuits_con_fc_lk`**, reemplaza a `gv_clientes_lk_con_fc` que se dropeó) y en Virgilio
+> `gv_pedidos_web_excluidos` v4 compara contra `isis_lk.documentos.contraparte_cuit`. El código LK (`cod_alt`) queda
+> sólo para `en_produccion_lk` (la PPP de ISIS no trae CUIT). El cartel muestra el CUIT, el código LK si lo hay y la
+> última FC. Probado: 201 (FC 22/08 en `sales_lines`), 206 y 208 (FC 02–03/09 sólo en `documentos`) →
+> `cliente_fc_lk`; pedido con código LK pero sin CUIT → nada. `sql/gv_cuits_con_fc_lk.sql`, §3.ba.
 >
 > Nota **v13.75** (backend LK + Virgilio + Edge Function v18 + front) — **"Los que le hacemos FC en LK no van"**
 > (dueño 07/09, sobre el cartel de dobles de v13.72: *"no es problema que sean clientes de Loeke y de Chef. Pero

@@ -43,8 +43,8 @@ precio de la lista LK pelando la L (`gv_ppp_np_valor` v13.71), y la factura / Ex
 con L. **Nunca** recodificar 7xx→5xx ni "pasar a LK" un pedido de Chef. Informe: `docs/INFORME-PEDIDOS-LK-POR-CHEF.md`.
 **Excepción (v13.75, dueño 07/09): *"los que le hacemos FC E vendiéndole art. de Loeke son los que no van"*** — si al
 cliente LK le facturó artículos de Loeke en los últimos 180 días (`PPP_Web_Config.doble_lk_dias`; `sales_lines` de LK vía
-`gv_clientes_lk_con_fc` + `isis_lk.documentos`), su pedido web de Chef **no se programa** (motivo `cliente_fc_lk` de
-`gv_pedidos_web_excluidos` v3): lo tipea compras en ISIS LK. Ser cliente de las dos empresas, solo, no es problema. §3.az.
+`gv_cuits_con_fc_lk` + `isis_lk.documentos`, **por CUIT** — v13.76: *"el cod cliente no significa nada, sólo el CUIT es lo que vale"*), su pedido web de Chef **no se programa** (motivo `cliente_fc_lk` de
+`gv_pedidos_web_excluidos` v4): lo tipea compras en ISIS LK. Ser cliente de las dos empresas, solo, no es problema. §3.az y §3.ba.
 
 ## ⚠ PROTOCOLO OBLIGATORIO: Backend vs Front-end — preguntar ANTES de implementar
 

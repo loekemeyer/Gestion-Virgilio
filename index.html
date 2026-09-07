@@ -7187,7 +7187,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v13.75";
+const APP_VERSION = "v13.76";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -32896,22 +32896,33 @@ async function aprTraerPedidos(e) {
     // que no van"): última FC de LK del cliente (sales_lines, lote mensual) → el backend suma isis_lk.documentos
     // (diario) y decide 'cliente_fc_lk' con la ventana PPP_Web_Config.doble_lk_dias (180). Si falla, decide sólo
     // con documentos.
-    const fcLk = new Map();
-    if (emp === "chef" && codAlt.size) {
+    // v13.76 (dueño: "el cod cliente no significa nada, sólo el CUIT es lo que vale"): el CUIT de cada cliente
+    // de Chef sale del padrón (gv_cuits_de_chef) y la última FC de LK se busca por CUIT (gv_cuits_con_fc_lk).
+    const cuitDe = new Map(), fcLk = new Map();
+    if (emp === "chef") {
       try {
-        const rf = await fetch(PWEB_LK_URL + "/rest/v1/rpc/gv_clientes_lk_con_fc", {
+        const cods = [...new Set([..._porPedido.values()].map(function (n) { return String(n.cod || "").trim(); }).filter(Boolean))];
+        const rc = await fetch(PWEB_LK_URL + "/rest/v1/rpc/gv_cuits_de_chef", {
           method: "POST", headers: { apikey: PWEB_LK_ANON, Authorization: "Bearer " + tok, "Content-Type": "application/json" },
-          body: JSON.stringify({ p_cods_lk: [...new Set(codAlt.values())], p_dias: 400 })
+          body: JSON.stringify({ p_cods_ch: cods })
         });
-        if (rf.ok) for (const x of (await rf.json() || [])) fcLk.set(String(x.cod_lk), String(x.ultima_fc || ""));
+        if (rc.ok) for (const x of (await rc.json() || [])) if (x.cuit) cuitDe.set(String(x.cod_ch), String(x.cuit));
+        if (cuitDe.size) {
+          const rf = await fetch(PWEB_LK_URL + "/rest/v1/rpc/gv_cuits_con_fc_lk", {
+            method: "POST", headers: { apikey: PWEB_LK_ANON, Authorization: "Bearer " + tok, "Content-Type": "application/json" },
+            body: JSON.stringify({ p_cuits: [...new Set(cuitDe.values())], p_dias: 400 })
+          });
+          if (rf.ok) for (const x of (await rf.json() || [])) fcLk.set(String(x.cuit), String(x.ultima_fc || ""));
+        }
       } catch (_e) {}
     }
     const ex = await aprRpc("gv_pedidos_web_excluidos", { p_pedidos: [..._porPedido.values()].map(function (n) {
       // v12.94 — `enviado_a_compras`: lo que ya salió a ISIS por el mail es de Producción.
-      const alt = codAlt.get(String(n.cod || "").trim()) || null;
-      return { empresa: emp, order_id: n.order_id, cod: n.cod || "", cod_alt: alt,
+      const k = String(n.cod || "").trim();
+      const alt = codAlt.get(k) || null, cuit = cuitDe.get(k) || null;
+      return { empresa: emp, order_id: n.order_id, cod: n.cod || "", cod_alt: alt, cuit: cuit,
                fecha_recep: n.fecha_recep || null, enviado_a_compras: !!n.enviado_a_compras,
-               fc_lk: (alt && fcLk.get(alt)) || null };
+               fc_lk: (cuit && fcLk.get(cuit)) || null };
     }) }) || [];
     const fuera = new Set(ex.map(function (x) { return String(x.order_id); }));
     // v13.72: los dobles (tipeados en ISIS LK) se avisan arriba de A Programar; v13.75: también los clientes
@@ -32920,8 +32931,9 @@ async function aprTraerPedidos(e) {
     for (const x of ex) if ((x.motivo === "en_produccion_lk" || x.motivo === "cliente_fc_lk") && !_yaDoble.has(String(x.order_id))) {
       _yaDoble.add(String(x.order_id));
       const n = _porPedido.get(String(x.order_id)) || {};
-      const alt = codAlt.get(String(n.cod || "").trim()) || "";
-      (_apr.dobles = _apr.dobles || []).push({ empresa: emp, order_id: x.order_id, cod: n.cod || "", rs: n.razon_social || "", cod_alt: alt, motivo: x.motivo, fc_lk: fcLk.get(alt) || "" });
+      const k = String(n.cod || "").trim();
+      const alt = codAlt.get(k) || "", cuit = cuitDe.get(k) || "";
+      (_apr.dobles = _apr.dobles || []).push({ empresa: emp, order_id: x.order_id, cod: n.cod || "", rs: n.razon_social || "", cod_alt: alt, cuit: cuit, motivo: x.motivo, fc_lk: fcLk.get(cuit) || "" });
     }
     nps = nps.filter(function (n) { return !fuera.has(String(n.order_id)); });
   }
@@ -33341,7 +33353,14 @@ function aprRender() {
   // de Loeke son los que no van"): dos carteles distintos — ya tipeado hoy en ISIS LK / cliente que factura por LK.
   const _dobHoy = (_apr.dobles || []).filter(function (d) { return d.motivo !== "cliente_fc_lk"; });
   const _dobFc  = (_apr.dobles || []).filter(function (d) { return d.motivo === "cliente_fc_lk"; });
-  const _dobTxt = function (d) { return pwebPedidoLabel(d.empresa, d.order_id) + " " + (d.rs || d.cod) + (d.cod_alt ? " (LK " + d.cod_alt + (d.fc_lk ? ", FC " + aprDiaCorto(d.fc_lk) : "") + ")" : ""); };
+  // v13.76: se muestra el CUIT (es lo que vale), el código LK si lo hay y la última FC
+  const _dobTxt = function (d) {
+    const partes = [];
+    if (d.cuit) partes.push("CUIT " + d.cuit);
+    if (d.cod_alt) partes.push("LK " + d.cod_alt);
+    if (d.fc_lk) partes.push("FC " + aprDiaCorto(d.fc_lk));
+    return pwebPedidoLabel(d.empresa, d.order_id) + " " + (d.rs || d.cod) + (partes.length ? " (" + partes.join(", ") + ")" : "");
+  };
   if (_dobHoy.length) h += '<div class="apr-err">⚠ ' + _dobHoy.length + ' pedido(s) de Chef ya está(n) en ISIS LK (mismo cliente por CUIT, mismo día) y NO se programan: ' +
     escapeHtml(_dobHoy.map(_dobTxt).join(" · ")) + '. Si el de ISIS LK está mal, anulalo ahí y recargá.</div>';
   if (_dobFc.length) h += '<div class="apr-err">🧾 ' + _dobFc.length + ' pedido(s) de Chef son de clientes a los que LK les factura artículos de Loeke (FC Electr. en ISIS LK en los últimos ' + (_apr.dobleDias || 180) + ' días): NO se programan, los tipea compras en ISIS LK: ' +

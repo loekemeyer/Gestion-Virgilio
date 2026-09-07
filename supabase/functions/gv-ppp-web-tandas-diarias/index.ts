@@ -18,7 +18,7 @@
 //      `gestion_desde` y lo que Producción/ISIS ya conoce (regla del dueño,
 //      2026-09-04); v13.72: también un pedido Chef tipeado en ISIS LK (mismo CUIT, mismo
 //      día, via gv_cods_lk_de_chef); v18 (v13.75): y un pedido Chef de un cliente al que LK le facturó
-//      artículos de Loeke en los últimos 180 días ('cliente_fc_lk': sales_lines via gv_clientes_lk_con_fc
+//      artículos de Loeke en los últimos 180 días (v19, v13.76: por CUIT — gv_cuits_de_chef + gv_cuits_con_fc_lk
 //      + isis_lk.documentos en el backend). Si esta llamada falla, no se programa nada: falla cerrado.
 //   3. `gv_ppp_web_np_asignar`  — asigna la NP de cada bloque (v13.70: contador propio, un número por bloque)
 //   4. `ppp_web_resync`         — pone al día lo YA programado que cambió
@@ -168,7 +168,7 @@ async function soloPendientes(
   if (!porPedido.size) return { filas, excluidos: {}, pedidos_crudos: 0 };
   const p_pedidos: Record<string, unknown>[] = [...porPedido.values()].map((n) => ({
     empresa: emp, order_id: n.order_id, cod: n.cod ?? "", fecha_recep: n.fecha_recep ?? null,
-    enviado_a_compras: !!n.enviado_a_compras, cod_alt: null as string | null, fc_lk: null as string | null,
+    enviado_a_compras: !!n.enviado_a_compras, cod_alt: null as string | null, cuit: null as string | null, fc_lk: null as string | null,
   }));
   // v13.72 (dueño: "detectarlo por CUIT y fecha"): para Chef va también el código LK del mismo cliente
   // (gv_cods_lk_de_chef, por CUIT); con eso gv_pedidos_web_excluidos detecta un pedido Chef que compras
@@ -181,20 +181,31 @@ async function soloPendientes(
         const alt = new Map<string, string>();
         for (const x of await rm.json() as { cod_ch: string; cod_lk: string }[]) alt.set(String(x.cod_ch), String(x.cod_lk));
         for (const x of p_pedidos) x.cod_alt = alt.get(String(x.cod ?? "").trim()) ?? null;
-        // v18 (v13.75, dueño: "los que le hacemos FC E vendiéndole art. de Loeke —buscá en sales_lines— son los
-        // que no van"): última FC de LK del cliente (sales_lines) → gv_pedidos_web_excluidos la suma a
-        // isis_lk.documentos y devuelve 'cliente_fc_lk' (ventana PPP_Web_Config.doble_lk_dias).
-        const codsLk = [...new Set(p_pedidos.map((x) => x.cod_alt).filter(Boolean))] as string[];
-        if (codsLk.length) {
-          const rf = await lk("/rest/v1/rpc/gv_clientes_lk_con_fc", { method: "POST", body: JSON.stringify({ p_cods_lk: codsLk, p_dias: 400 }) });
+      }
+    } catch (_e) { /* sin mapeo no hay detección del doble; el armado sigue */ }
+    // v18 (v13.75, dueño: "los que le hacemos FC E vendiéndole art. de Loeke —buscá en sales_lines— son los que no
+    // van") + v19 (v13.76, dueño: "el cod cliente no significa nada, sólo el CUIT es lo que vale"): CUIT de cada
+    // cliente de Chef (gv_cuits_de_chef, padrón) y última FC de LK de ese CUIT (gv_cuits_con_fc_lk, sales_lines)
+    // → gv_pedidos_web_excluidos lo suma a isis_lk.documentos por CUIT y devuelve 'cliente_fc_lk'
+    // (ventana PPP_Web_Config.doble_lk_dias).
+    try {
+      const cods = [...new Set(p_pedidos.map((x) => String(x.cod ?? "").trim()).filter(Boolean))];
+      const rc = await lk("/rest/v1/rpc/gv_cuits_de_chef", { method: "POST", body: JSON.stringify({ p_cods_ch: cods }) });
+      if (rc.ok) {
+        const cuitDe = new Map<string, string>();
+        for (const x of await rc.json() as { cod_ch: string; cuit: string | null }[]) if (x.cuit) cuitDe.set(String(x.cod_ch), String(x.cuit));
+        for (const x of p_pedidos) x.cuit = cuitDe.get(String(x.cod ?? "").trim()) ?? null;
+        const cuits = [...new Set(p_pedidos.map((x) => x.cuit).filter(Boolean))] as string[];
+        if (cuits.length) {
+          const rf = await lk("/rest/v1/rpc/gv_cuits_con_fc_lk", { method: "POST", body: JSON.stringify({ p_cuits: cuits, p_dias: 400 }) });
           if (rf.ok) {
             const fc = new Map<string, string>();
-            for (const x of await rf.json() as { cod_lk: string; ultima_fc: string }[]) fc.set(String(x.cod_lk), String(x.ultima_fc ?? ""));
-            for (const x of p_pedidos) x.fc_lk = (x.cod_alt && fc.get(String(x.cod_alt))) || null;
+            for (const x of await rf.json() as { cuit: string; ultima_fc: string }[]) fc.set(String(x.cuit), String(x.ultima_fc ?? ""));
+            for (const x of p_pedidos) x.fc_lk = (x.cuit && fc.get(String(x.cuit))) || null;
           }
         }
       }
-    } catch (_e) { /* sin mapeo no hay detección del doble; el armado sigue */ }
+    } catch (_e) { /* sin CUIT el backend decide sólo con lo que tiene; el armado sigue */ }
   }
   const ex = await vgRpc<{ empresa: string; order_id: number; motivo: string }[]>(
     "gv_pedidos_web_excluidos", { p_pedidos });
