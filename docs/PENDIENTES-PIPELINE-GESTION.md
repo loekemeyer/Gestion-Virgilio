@@ -27,6 +27,7 @@
 | 4 | Borrar pedido de prueba 1352 | ✅ Borrado (Virgilio + LK), backup `sql/backups/pedido_prueba_1352_20260907_pre_borrado.sql`. |
 | 5 | Instructivo desactualizado | ✅ `docs/PRIMEROS-DIAS-CON-GESTION.md` según la base (v13.60). |
 | 6 | Basura en LK `bot_customer_whatsapps` | ⏳ A pedido del dueño (proyecto LK). |
+| 7 | Pedidos de clientes LK cargados por Chef | 📄 Informe `docs/INFORME-PEDIDOS-LK-POR-CHEF.md` (07/09): 3 decisiones del dueño (facturar por Chef o pasar a LK; Excel ISIS partido en dos; tanda mixta o no). Bugs concretos: vendedor de LK en NP CH, un solo Excel para dos ISIS, ISIS LK puede tipear un pedido Chef sin que Gestión lo excluya. |
 
 ## ⚠⚠ LEER PRIMERO — el modelo, en palabras del dueño (2026-09-04, a la tarde)
 
