@@ -75,6 +75,23 @@ const { chromium } = require("/opt/node22/lib/node_modules/playwright");
     out.totalPie = /<td>Total<\/td>/.test(html) && /<td class="hr-m3c num">2,4<\/td>/.test(html);
     // dos NP de la misma parada con observaciones distintas → van juntas, sin repetir el renglón
     out.obs = /⚑ 11:00Hs · OC 9400146407/.test(html) && (html.match(/hr-obs/g) || []).length === 1;
+    // v14.18 — columna Viaje: manejo acumulado desde el depósito, sin la descarga.
+    out.vjeCol = /<th class="num">Viaje<\/th>/.test(html);
+    out.vjeCeldas = (html.match(/class="hr-vje num"/g) || []).length;           // 5 paradas + el total
+    out.vjeSinUbic = /class="hr-vje num"><span class="hr-sinu">—<\/span>/.test(html);
+    out.vjeNota = /manejo acumulado<\/b> desde el depósito/.test(html) && /sin contar la descarga/.test(html);
+    // los acumulados salen en orden creciente (es una suma a lo largo del recorrido)
+    out.vjeAcum = (html.match(/class="hr-vje num"><b>([^<]+)<\/b>/g) || []).map((x) => x.replace(/.*<b>|<\/b>/g, ""));
+    // el cálculo puro, sin pasar por el html
+    out.minCortoLargo = [_pppHojaMin(1), _pppHojaMin(10), _pppHojaMin(50)];
+    out.hhmm = [_pppHojaHhMm(7), _pppHojaHhMm(95), _pppHojaHhMm(null)];
+    out.saltaSinUbic = (function () {
+      // una parada sin lat NO tiene que cortar la cuenta ni sumar
+      const dep = { lat: -34.628, lng: -58.411 };
+      const ps = [{ lat: -34.60, lng: -58.42 }, { lat: null, lng: null }, { lat: -34.59, lng: -58.43 }];
+      const tot = _pppHojaTiempos(ps, dep);
+      return ps[1]._acum === null && Number.isFinite(ps[2]._acum) && ps[2]._acum === tot && tot === ps[0]._min + ps[2]._min;
+    })();
 
     // el overlay abre con el nombre del camión
     _pppHoja["20260911|n01"] = H;
@@ -137,6 +154,16 @@ const { chromium } = require("/opt/node22/lib/node_modules/playwright");
   chk(r.totalPie, "y una fila de Total con las NP y los m³");
   chk(r.obs, "las observaciones de ISIS salen en la hoja, juntas por parada (11:00Hs · OC 9400146407)");
   chk(r.hayCssPrint, "y una hoja de impresión (@media print)");
+  chk(r.vjeCol, "v14.18: la hoja tiene columna Viaje");
+  chk(r.vjeCeldas === 6, "una celda de Viaje por parada + la del total (6): " + r.vjeCeldas);
+  chk(r.vjeSinUbic, "la parada sin ubicación muestra — y no un número inventado");
+  chk(r.vjeNota, "y la hoja aclara que es manejo acumulado SIN la descarga (lo que pidió el dueño)");
+  chk(r.vjeAcum.length === 5 && r.vjeAcum.every((v) => /^(\d+′|\d+:\d{2})$/.test(v)),
+      "los acumulados salen formateados (" + r.vjeAcum.join(" · ") + ")");
+  chk(r.minCortoLargo[0] === 5 && r.minCortoLargo[1] === 33 && r.minCortoLargo[2] === 102,
+      "el tramo corto es el más lento por km y el largo el más rápido: " + r.minCortoLargo.join("/") + " min para 1/10/50 km");
+  chk(JSON.stringify(r.hhmm) === '["7′","1:35","—"]', "formato de tiempo: " + r.hhmm.join(" · "));
+  chk(r.saltaSinUbic, "una parada sin ubicación no corta la cuenta del acumulado ni suma minutos");
   chk(r.abre && /Camión 1/.test(r.titulo), "el overlay abre con el nombre del camión (" + r.titulo + ")");
   chk(r.cierra, "y cierra");
   chk(!r.crudo, "sin undefined/NaN en la hoja");

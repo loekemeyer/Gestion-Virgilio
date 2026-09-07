@@ -7308,7 +7308,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v14.17";
+const APP_VERSION = "v14.18";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -30320,6 +30320,55 @@ function _pppHojaParadas(paradas) {
   }
   return out;
 }
+/* =====================================================================================
+   v14.18 — TIEMPO DE VIAJE desde el depósito hasta cada parada.
+   Dueño 07/09: *"tendríamos que agregarle el tiempo de viaje que tiene desde Virgilio hasta cada
+   destino (sin incluir el tiempo de demora en cada destino)"*.
+
+   Se acumula a lo largo del recorrido —depósito → 1ª → 2ª → …—, contando SÓLO manejo: lo que el
+   camión tarda parado en cada puerta no entra, que es justo lo que pidió. Así la columna dice
+   "a esta parada llegás con 0:41 de manejo encima", y el que arma el día le suma la descarga.
+
+   NO hay API de ruteo: la CSP del navegador sólo deja bajar librerías de los CDN permitidos, y
+   pegarle a un servicio de rutas desde la página está bloqueado. Así que es una ESTIMACIÓN, y se
+   dice en la hoja para que nadie la lea como un horario:
+
+     1. distancia en línea recta (`_rtHav`, la misma que ordena el recorrido)
+     2. × 1,35 — lo que la calle real agrega sobre la línea recta en el AMBA (manzanas, mano
+        única, autopista que no va derecho)
+     3. ÷ una velocidad que depende del tramo, porque no es lo mismo cruzar tres barrios que
+        irse a Luján:
+          tramo < 5 km   → 18 km/h  (semáforo tras semáforo, es casi todo ciudad)
+          5 a 15 km      → 25 km/h
+          > 15 km        → 40 km/h  (sale a la autopista o a la ruta)
+
+   Redondea para arriba al minuto y nunca devuelve 0: una parada siempre cuesta algo llegar.
+   Las paradas sin ubicación no suman ni cortan la cuenta — se saltean y quedan con "—". */
+const HR_FACTOR_CALLE = 1.35;
+function _pppHojaMin(km) {
+  const vel = km < 5 ? 18 : (km <= 15 ? 25 : 40);
+  return Math.max(1, Math.ceil((km * HR_FACTOR_CALLE / vel) * 60));
+}
+function _pppHojaHhMm(min) {
+  if (!Number.isFinite(min)) return "—";
+  const h = Math.floor(min / 60), m = Math.round(min % 60);
+  return h ? (h + ":" + (m < 10 ? "0" + m : m)) : (m + "′");
+}
+/* Recorre las paradas EN ORDEN DE ENTREGA y les cuelga:
+     s._km   km de calle estimados del tramo anterior hasta acá
+     s._min  minutos de ese tramo
+     s._acum minutos de manejo acumulados desde el depósito
+   Devuelve el total de manejo (sin la vuelta al depósito: al fletero le interesa la ida). */
+function _pppHojaTiempos(paradas, depot) {
+  let prev = depot, acum = 0;
+  for (const s of (paradas || [])) {
+    if (!(Number.isFinite(s.lat) && Number.isFinite(s.lng)) || !prev) { s._km = s._min = s._acum = null; continue; }
+    const km = _rtHav(prev, s) * HR_FACTOR_CALLE;
+    s._km = km; s._min = _pppHojaMin(_rtHav(prev, s)); acum += s._min; s._acum = acum;
+    prev = s;
+  }
+  return acum;
+}
 function _pppHojaCss() {
   if (document.getElementById("pppHrCss")) return;
   const s = document.createElement("style"); s.id = "pppHrCss";
@@ -30353,7 +30402,12 @@ function _pppHojaCss() {
     ".hr-obs{font-size:12px;font-weight:800;color:#92400e;margin-top:2px;}" +
     ".hr-npc{width:150px;font-size:11.5px;color:#475569;}" +
     ".hr-npc b{display:block;font-size:12.5px;color:#0f172a;}" +
-    ".hr-m3c{width:56px;font-weight:800;color:#0f766e;font-variant-numeric:tabular-nums;}" +
+    ".hr-m3c{width:44px;font-weight:800;color:#0f766e;font-variant-numeric:tabular-nums;}" +
+    /* v14.18 — columna Viaje: arriba el manejo acumulado desde el depósito, abajo el tramo. */
+    ".hr-vje{width:62px;font-variant-numeric:tabular-nums;color:#1d4ed8;}" +
+    ".hr-vje b{display:block;font-size:13px;font-weight:800;}" +
+    ".hr-vje small{display:block;font-size:10px;color:#64748b;font-weight:700;white-space:nowrap;}" +
+    ".hr-est{font-size:11.5px;color:#475569;background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:7px 10px;margin-top:9px;line-height:1.45;}" +
     ".hr-fir{width:190px;border-left:1px dashed #cbd5e1;}" +
     ".hr-fir i{display:block;height:26px;border-bottom:1px solid #cbd5e1;}" +
     ".hr-sinu{font-size:11.5px;color:#b45309;font-weight:800;}" +
@@ -30380,7 +30434,8 @@ function _pppHojaCss() {
     ".hr-tbl th{color:#000;border-bottom:1.5px solid #000;}" +
     ".hr-tbl td{border-bottom:1px solid #94a3b8;padding:9px 6px;}" +
     ".hr-tbl td.n span{background:#fff;color:#000;border:1.5px solid #000;}" +
-    ".hr-rs,.hr-dir,.hr-npc b,.hr-m3c,.hr-obs{color:#000;}" +
+    ".hr-rs,.hr-dir,.hr-npc b,.hr-m3c,.hr-obs,.hr-vje b{color:#000;}" +
+    ".hr-vje small{color:#333;}.hr-est{display:block;border-color:#94a3b8;background:#fff;color:#000;font-size:10.5px;}" +
     ".hr-fir{border-left:1px solid #94a3b8;}.hr-fir i{height:30px;border-bottom:1px solid #000;}" +
     ".hr-pie{display:block;}}";
   document.head.appendChild(s);
@@ -30394,6 +30449,8 @@ function pppHojaHtml(H) {
   const geo = _pppGeo || {};
   const depot = geo[RT_DEPOT_KEY] || { lat: -34.6037, lng: -58.4 };
   const urls = conUbic.length ? _rtMapsUrls(depot, conUbic) : [];
+  // v14.18 — minutos de MANEJO acumulados desde el depósito hasta cada parada (sin la descarga).
+  const totalMin = _pppHojaTiempos(paradas, depot);
   let h = '<div class="hr-sub">' + escapeHtml(H.fecha || "") + ' · <b>' + paradas.length + '</b> parada' + (paradas.length === 1 ? '' : 's') +
     ' · <b>' + H.nps + '</b> NP · ' + _pppFmtM3(H.m3) + ' m³</div>';
   // v13.92 (dueño: "más útil quizás sería una impresión, más que Google Maps"): imprimir es el
@@ -30410,8 +30467,9 @@ function pppHojaHtml(H) {
     '<div class="hr-doc-s">Entrega ' + escapeHtml(H.fecha || "") + ' · ' + paradas.length + ' parada' + (paradas.length === 1 ? '' : 's') +
     ' · ' + H.nps + ' NP · ' + _pppFmtM3(H.m3) + ' m³ · sale del depósito Virgilio 2788</div>' +
     '<div class="hr-doc-f">Fletero: ______________________________  ·  Patente: ________________  ·  Salida: ______ hs</div></div>';
-  h += '<table class="hr-tbl"><colgroup><col style="width:34px"><col><col style="width:170px"><col style="width:46px"><col style="width:215px"></colgroup>' +
-    '<thead><tr><th>Nº</th><th>Cliente · dirección</th><th>Notas de pedido</th><th class="num">m³</th><th>Recibí conforme — firma y aclaración</th></tr></thead><tbody>';
+  h += '<table class="hr-tbl"><colgroup><col style="width:34px"><col><col style="width:150px"><col style="width:44px"><col style="width:62px"><col style="width:190px"></colgroup>' +
+    '<thead><tr><th>Nº</th><th>Cliente · dirección</th><th>Notas de pedido</th><th class="num">m³</th>' +
+    '<th class="num">Viaje</th><th>Recibí conforme — firma y aclaración</th></tr></thead><tbody>';
   paradas.forEach(function (s, i) {
     h += '<tr><td class="n"><span>' + (i + 1) + '</span></td>' +
       '<td><div class="hr-rs">' + escapeHtml(s.rs || (s.cod ? "Cód " + s.cod : "—")) + (s.cod ? ' <small>· cód ' + escapeHtml(s.cod) + '</small>' : '') + '</div>' +
@@ -30421,10 +30479,19 @@ function pppHojaHtml(H) {
       '<td class="hr-npc"><b>' + s.nps.length + ' NP</b>' + escapeHtml(s.nps.join(" · ")) +
       (s.tandas.length ? '<br>tanda ' + escapeHtml(s.tandas.join(" · ")) : '') + '</td>' +
       '<td class="hr-m3c num">' + _pppFmtM3(s.m3) + '</td>' +
+      '<td class="hr-vje num">' + (Number.isFinite(s._acum)
+        ? '<b>' + _pppHojaHhMm(s._acum) + '</b><small>+' + s._min + '′ · ' + s._km.toFixed(1).replace(".", ",") + ' km</small>'
+        : '<span class="hr-sinu">—</span>') + '</td>' +
       '<td class="hr-fir"><i></i></td></tr>';
   });
   h += '</tbody><tfoot><tr><td></td><td>Total</td><td class="hr-npc"><b>' + H.nps + ' NP</b></td>' +
-    '<td class="hr-m3c num">' + _pppFmtM3(H.m3) + '</td><td class="hr-fir"></td></tr></tfoot></table>';
+    '<td class="hr-m3c num">' + _pppFmtM3(H.m3) + '</td>' +
+    '<td class="hr-vje num"><b>' + (totalMin ? _pppHojaHhMm(totalMin) : '—') + '</b><small>sólo manejo</small></td>' +
+    '<td class="hr-fir"></td></tr></tfoot></table>';
+  if (totalMin) h += '<div class="hr-est">⏱ La columna <b>Viaje</b> es el tiempo de <b>manejo acumulado</b> desde el depósito hasta esa parada, ' +
+    '<b>sin contar la descarga</b>. Es una <b>estimación</b> por distancia (no consulta el tránsito): ' +
+    'línea recta × 1,35 de calle, a 18 km/h los tramos cortos, 25 los medios y 40 los de más de 15 km. ' +
+    'Sumale vos el tiempo de cada puerta.</div>';
   h += '<div class="hr-pie">Lo que no se entrega vuelve al depósito y hay que avisarlo el mismo día: la NP queda como no entregada y se reprograma.</div></div>';
   return h;
 }

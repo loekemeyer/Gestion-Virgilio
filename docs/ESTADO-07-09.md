@@ -15,11 +15,11 @@
 
 | # | Qué | Por qué no lo puede hacer otro |
 |---|---|---|
-| **A1** | **Rotar `isis_supabase_service_key` y `LK_WA_TOKEN`** | Se rotan desde el dashboard de Supabase / Meta. Ver §"El agujero" abajo — es lo más urgente de toda la lista |
+| **A1** | **Rotar `isis_supabase_service_key` y `LK_WA_TOKEN`** | Se rotan desde el dashboard de Supabase / Meta. La lectura pública ya se tapó (ver abajo), pero las claves siguen quemadas |
 | **A2** | Cargar `KRIKOS_IMAP_PASS` en el Vault de LK: `select vault.create_secret('<password>', 'KRIKOS_IMAP_PASS');` | Es la password de `ventas@loekemeyer.com` |
 | **A3** | Mergear a `main` la rama `claude/krikos-tema-anterior-v0l88o` de **`pagina-LK-copia`** | Ese repo no está atado a la sesión de Gestión |
-| **A4** | Chequear la PC de la oficina **el martes después de las 10** | Acceso físico. **No hoy** — ver B3 |
-| **A5** | Definir la pregunta de los $3,88 M de diferencia de facturación | Es una decisión de negocio, no un bug |
+| **A4** | Chequear la PC de la oficina **el martes después de las 10** | Acceso físico. **No hoy** — ver E1 |
+| **A5** | Los descuentos de cadena que Gestión no tiene cargados (Cencosud 2444, Dorinka 2686, Superimperio 961, 1806, 4254) | Hay que pedirle la lista a quien maneja esos acuerdos — ver §"Los $10,7 M" |
 
 ### El agujero (A1) — es lo primero
 
@@ -38,7 +38,9 @@ Se verificó quién lee `app_settings` desde el front: los tres lugares del pane
 clave**, `web_order_discount` (`admin/sugerencias.js:31`, `admin/osa/js/app.js:1515`,
 `admin/admin.js:10358`). O sea que tapar las dos secretas no rompe nada visible.
 
-**Mitigación inmediata** (reversible, no rompe el front) — no aplicada, espera el OK:
+**Mitigación — ✅ APLICADA el 07/09 16:54.** Verificado después con `set local role anon`: las dos
+secretas ya no salen y `web_order_discount` sí, así que el front quedó intacto.
+Rollback: `create policy app_settings_select_all on public.app_settings for select to anon, authenticated using (true);`
 
 ```sql
 drop policy app_settings_select_all on public.app_settings;
@@ -56,20 +58,22 @@ en el Vault, no en una tabla. Eso es A1 y es del dueño.
 
 | # | Qué | Cuándo vence |
 |---|---|---|
-| **B1** | ¿Aplico la mitigación de `app_settings` de arriba? | Cuanto antes |
-| **B2** | El cron 77 (cruce de facturación) arranca **mañana 18:30** listando las **145 NP viejas** de una vez (**−$10.675.643**). ¿Marco ese backlog como ya avisado para que sólo avise lo nuevo? | **Martes 18:30** |
-| **B3** | Luján (Extralimp, 4114, NP 98651, 0,745 m³): ¿queda el mar 15 en camión propio, o se pasa al vie 11 con Dorinka (Moreno)? | Antes del mar 15 |
+| **B1** | Luján (Extralimp, 4114, NP 98651, 0,745 m³): ¿queda el mar 15 en camión propio, o se pasa al vie 11 con Dorinka (Moreno)? | Antes del mar 15 |
 
-**B2, el SQL** (insert en tabla nuestra, reversible con un `delete`):
+### Los $10,7 M del cruce de facturación — no eran un problema, eran tres
 
-```sql
-insert into public."GV_Cruce_Avisadas"(np, diff, estado)
-select np, diff, 'diff' from public.gv_vista_cruce_facturacion
- where estado='diff' and fecha_salida >= current_date - 45 and not es_super
-on conflict do nothing;
-```
+El handoff decía "145 NP con diferencia, −$10.675.643" y lo dejaba ahí. Abierto, se parte así:
 
-Si no se decide nada, mañana llega el digest completo. No rompe nada, sólo es ruidoso.
+| grupo | NP | $ | qué es |
+|---|---|---|---|
+| **A** · mismas cajas, descuento > 5 % | 13 | **−7.383.286** | **Descuentos de cadena que Gestión no tiene cargados.** Cinco clientes: **2444 Cencosud, 2686 Dorinka, 961 Superimperio, 1806, 4254**. La factura sale bien; lo que está mal es nuestro precio. No es un error de facturación → **A5** |
+| **B** · mismas cajas, diferencia chica | 90 | **+1.652.037** | Ruido de redondeo de precio, y encima **a favor**. No hay nada que mirar |
+| **C** · **cajas distintas** | 42 | **−4.944.393** | **Esto sí hay que mirarlo.** O se facturó de menos, o `cajas_ent` viene inflada (devoluciones o faltantes mal cerrados) |
+
+**Hecho el 07/09:** se marcaron como avisadas las **103 de A y B** (las explicadas) para que el
+digest del cron 77 no empiece tirando todo junto. **Las 42 de C quedan vivas** y salen mañana
+18:30 — que es exactamente la lista que hay que revisar.
+Rollback: `delete from public."GV_Cruce_Avisadas";`
 
 ---
 
@@ -77,7 +81,7 @@ Si no se decide nada, mañana llega el digest completo. No rompe nada, sólo es 
 
 | # | Qué | Estado medido hoy |
 |---|---|---|
-| **C1** | Geocodificación de **todo** el padrón (v14.16) | **104 de 2.307** ubicadas · 1.991 en cola · ~200/h · termina esta noche |
+| **C1** | Geocodificación de **todo** el padrón (v14.16) | ~104 de 2.307 al momento de escribir esto · ~200/h · termina esta noche. Mirar con `select * from public.gv_geo_cobertura;` |
 | **C2** | Cron 75 acelerado a `*/10 * * * *` para drenar | **Hay que devolverlo a `20 */6 * * *`** cuando C1 termine. Ya hay un recordatorio puesto |
 | **C3** | Cron 79 `gv-sync-padron-direcciones`, 05:40 ART | Refresca el padrón todos los días |
 | **C4** | Crons 77 y 78 (cruce de facturación e ingesta de ISIS) | Activos y bien hechos: los dos chequean `gv_es_dia_habil` antes de avisar |
@@ -96,6 +100,10 @@ Si no se decide nada, mañana llega el digest completo. No rompe nada, sólo es 
   fallback a 11 km.
 - **v14.17** — mergeada la rama de la Bandeja Krikos de **este** repo. Se ve por
   🌐 Panel Web LK → PDF Krikos → Bandeja Krikos. Vacía hasta A2.
+- **v14.18** — la hoja de ruta del fletero lleva **columna Viaje**: el manejo acumulado desde el
+  depósito hasta cada parada, sin la descarga. Es lo que había pedido el dueño y no se podía hacer
+  hasta que el depósito quedó geocodificado en la v14.16.
+- **Tapada la lectura pública de las dos claves** en `app_settings` de LK (ver A1).
 - **Cruce Facturación ↔ ISIS** con asignación 1-a-1: ambiguos **52 → 0**, 0 facturas duplicadas.
 - **Tests**: las 2 fallas de `ppp-plan-nueva` que arrastraban los handoffs **ya no existen**. Eran
   aserciones de la v13.33 ("sin Atrasados en Programación") que contradecían la corrección del
@@ -105,7 +113,7 @@ Si no se decide nada, mañana llega el digest completo. No rompe nada, sólo es 
 
 ## E · Correcciones a lo que decían los handoffs
 
-Tres cosas que llegaron mal escritas y conviene no repetir:
+Cuatro cosas que llegaron mal escritas y conviene no repetir:
 
 1. **"La ingesta de PDF está caída hace 52,6 h."** No está caída. Último PDF: **sábado 05/09
    08:31**. Después vino domingo, y **hoy lunes es feriado** (Día del Metalúrgico, está en
@@ -115,6 +123,9 @@ Tres cosas que llegaron mal escritas y conviene no repetir:
 3. **La v14.05 leyó la regla del agregado al revés** y metía pedidos de la página adentro de
    tandas de ISIS. Corregido en la v14.12. Si otra sesión vuelve a renombrar tandas, chequear que
    no vuelva a juntar Osa.
+4. **"$3,88 M de diferencia por cajas distintas."** El número real es **−$4.944.393** en 42 NP, y
+   la parte grande de los $10,7 M no es esa: son **$7,4 M de descuentos de cadena** que no tenemos
+   cargados. Ver §"Los $10,7 M".
 
 ---
 
@@ -124,7 +135,6 @@ Tres cosas que llegaron mal escritas y conviene no repetir:
 |---|---|
 | **13 pedidos atrasados que nunca salieron** (6,98 m³): 9 de Cencosud (2444, sin tanda) + 4 con picking hecho y sin armado (D57C ×2, D57D ×2) | Los mira la administrativa el martes |
 | **Recorridos feos**: D69 (mar 15, 55,7 km punta a punta por Luján) y D68 (lun 14, 38,9 km, mezcla GBA Sur con GBA Oeste). Los dos vienen armados así **desde ISIS**, no de la regla nuestra | Se rehace el análisis cuando termine C1, con todas las paradas y el tiempo desde el depósito |
-| **Tiempo de viaje depósito → destino** | Ya se puede: el depósito quedó geocodificado (D). Falta implementarlo |
 | **Mostrar la fecha de entrega del súper** en "A Programar" (idea 9357) | Sin empezar **a propósito**: hoy viajarían 0 fechas y exponerla obliga a tocar la cadena `v_pedidos_web` → `v_pedidos_web_np`, que también usan el job de las 00:01 y el intradía. Se hace cuando entre la primera OC de verdad |
 | **Idea 2482** — "➕ Agregar artículos" dentro de Gestión llamando a `edit_order_fast` de LK | Diferida por el dueño |
 | **Auditoría del bot de WhatsApp**: 45 puntos, repo `loekemeyer/GestOpClientes` | Ese repo no está atado a esta sesión. Los puntos 2 a 6 (RLS de `wa_agente_*`, webhook sin firma, idempotencia por `wamid`, FAQs, escalaciones sin consumidor) son todos de allá |
@@ -137,8 +147,9 @@ Tres cosas que llegaron mal escritas y conviene no repetir:
 
 ## Para arrancar el martes, en orden
 
-1. Decidir **B1** (tapar `app_settings`) y arrancar **A1** (rotar las dos claves).
-2. Decidir **B2** antes de las 18:30.
-3. Después de las 10, mirar si entró algún PDF de ISIS. Si no entró, ahí sí ir a la PC (**A4**).
-4. **A2** + **A3** para que Krikos empiece a andar.
-5. Cuando C1 termine: devolver el cron 75 y rehacer el análisis de recorridos.
+1. **A1** — rotar las dos claves. La lectura pública ya está tapada, pero siguen quemadas.
+2. Después de las 10, mirar si entró algún PDF de ISIS. Si no entró, ahí sí ir a la PC (**A4**).
+3. **A2** + **A3** para que Krikos empiece a andar.
+4. A las 18:30 llega el digest con las **42 NP de cajas distintas**: esa es la lista a revisar.
+5. **A5** — conseguir los descuentos de las cinco cadenas.
+6. Cuando C1 termine: devolver el cron 75 y rehacer el análisis de recorridos con los tiempos.

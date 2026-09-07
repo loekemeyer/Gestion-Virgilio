@@ -12,7 +12,7 @@
 > única**; no se replica. Ante la duda entre parche rápido y fix de raíz → **fix
 > de raíz**.
 >
-> Última actualización: 2026-09-07 (lunes) · Versión app al documentar: **v14.17**
+> Última actualización: 2026-09-07 (lunes) · Versión app al documentar: **v14.18**
 >
 > ⚠⚠ **Desde el lunes 2026-09-07 los operarios usan GESTIÓN, no Producción** (dueño, sábado a la
 > noche: *"el lunes van a empezar a usar GV, no más PV"*). Las tandas web viven en
@@ -40,6 +40,20 @@
 > **El caso Osa quedó resuelto a mano y no se toca**: mié 09/09, camión 09, misma dirección —
 > `E09A` = 98650 + 98667 (ISIS, 4,041 m³) · `E09B` = `LK 0024` (web, 0,026 m³). Se pickean por separado.
 > La otra sesión lo volvió a juntar (commit `7f431fb`) leyendo la regla vieja; se revirtió en la base.
+>
+> Nota **v14.18** — **La hoja de ruta ahora dice cuánto se tarda en llegar a cada parada** (dueño
+> 07/09: *"tendríamos que agregarle el tiempo de viaje que tiene desde Virgilio hasta cada destino
+> (sin incluir el tiempo de demora en cada destino)"*). Columna **Viaje**: arriba el manejo
+> **acumulado** desde el depósito hasta esa parada, abajo el tramo (`+12′ · 4,3 km`). No cuenta la
+> descarga, que es justo lo que pidió; el que arma el día le suma el tiempo de puerta.
+> **Es una estimación y la hoja lo dice**: no hay API de ruteo (la CSP sólo deja bajar librerías de
+> los CDN permitidos), así que sale de la línea recta × **1,35** de calle, a **18 km/h** los tramos
+> de menos de 5 km, **25** entre 5 y 15, y **40** de ahí para arriba — un tramo corto es casi todo
+> semáforo y uno largo sale a la autopista. Una parada sin ubicación muestra `—` y **no corta ni
+> ensucia el acumulado**. Esto recién se pudo hacer ahora porque **el depósito no estaba
+> geocodificado** hasta la v14.16 (`PPP_Geo.__deposito_virgilio_2788__`): antes el cálculo hubiera
+> salido de un punto a 11 km del real. `_pppHojaTiempos` / `_pppHojaMin` / `_pppHojaHhMm`, test
+> `tests/ppp-hoja-ruta.cjs` (8 chequeos nuevos).
 >
 > Nota **v14.17** — **La Bandeja Krikos ya está en el espejo del panel admin.** El `CLAUDE.md`
 > prohíbe dejar ramas dando vueltas, así que se mergeó a `main` la rama gemela de este repo
