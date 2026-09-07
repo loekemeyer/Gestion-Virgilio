@@ -6,6 +6,7 @@ Cada idea queda acá (durable, versionada) y además en la tabla `agente_propues
 en su rama `idea/<código>`, se recuerda en el Telegram de las 8 **todos los días
 hasta que el usuario la active**, y se mergea a `main` cuando el usuario dice el número.
 
+- [ ] **6600** (2026-09-07) — **El mensaje de gerencia por WhatsApp, no por Telegram.** Dueño, a la noche: *"el mensaje de gerencia quiero que se haga por plantilla de WhatsApp para que llegue por WhatsApp en lugar de por Telegram. Guardá la idea y mañana reclamámela."* Falta definir con él **cuál** de los tres es "el de gerencia" (reporte-diario cron 16 · semanal cron 18 · digest de agentes cron 40). Ojo: fuera de la ventana de 24 h sólo se puede mandar **plantilla aprobada por Meta**, hay que crearla y hacerla aprobar con los campos del reporte, y hoy `wa_real_redirect_date` está vencida y `pedido_recordatorio_25` viene fallando con el 132001 de Meta (plantilla no aprobada) — conviene mirar eso antes de agregar otra. — _pendiente_
 - [ ] **2482** (2026-09-07) — Agregar artículos a un pedido **desde Gestión** (botón "➕ Agregar artículos" en la tarjeta del pedido, llamando a la RPC `edit_order_fast` de LK con el mismo candado server-side: sólo sumar, hasta que se factura). Hoy hay que entrar a la página. Dueño: *"guardalo como idea pero todavía no"*. — _pendiente_
 - `[ ]` = pendiente / esperando activación · `[x]` = activada (mergeada a main) ·
   `~~tachada~~` = descartada.
