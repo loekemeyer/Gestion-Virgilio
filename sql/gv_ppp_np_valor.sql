@@ -49,3 +49,13 @@ group by np, empresa;
 
 revoke all on public.gv_ppp_np_valor from anon, authenticated;
 grant select on public.gv_ppp_np_valor to anon, authenticated;
+
+-- =============================================================================
+-- v13.71 (2026-09-07) — artículo con "L" al final en una NP de Chef = artículo de LOEKEMEYER
+-- vendido por Chef (505L, 438EL). Regla de las páginas (paginach / pagina-LK-copia,
+-- admin-supercot.js: `addLSuffix = isChef` → `codLk + "L"`), confirmada por el dueño: "el
+-- pedido es de Chef, se factura por Chef, el 505 se factura como 505L". Se valúa con la lista
+-- de LK por el código pelado (antes buscaba 505L en precios_venta_chef → sin precio).
+-- Migración gv_ppp_np_valor_articulo_L_v1371: agrega el CTE `lin2` (empresa_precio /
+-- articulo_precio) entre `lin` y `pr`; el resto igual.
+-- =============================================================================

@@ -12,12 +12,25 @@
 > única**; no se replica. Ante la duda entre parche rápido y fix de raíz → **fix
 > de raíz**.
 >
-> Última actualización: 2026-09-06 (domingo) · Versión app al documentar: **v13.70**
+> Última actualización: 2026-09-06 (domingo) · Versión app al documentar: **v13.71**
 >
 > ⚠⚠ **Desde el lunes 2026-09-07 los operarios usan GESTIÓN, no Producción** (dueño, sábado a la
 > noche: *"el lunes van a empezar a usar GV, no más PV"*). Las tandas web viven en
 > `PPP_Web_Programacion` y Producción no las ve. URL: la de GitHub Pages de este repo.
 >
+> Nota **v13.71** (backend) — **Regla del dueño (07/09): un pedido que entra por la página de Chef ES de Chef, aunque
+> el cliente sea de LK: se factura por Chef, y cada artículo de LOEKEMEYER va con "L" al final (505 → 505L).** Es la
+> misma regla de las páginas (`paginach` / `pagina-LK-copia`, `admin-supercot.js`: `addLSuffix = isChef` → `codLk + "L"`;
+> el ítem queda `is_loke`; el payload de la hoja "Pedidos CH" ya viaja con la L, y `gv_pedidos_web_np_chef` la conserva).
+> En Gestión ya estaba casi todo: `pkEmpresaArt` (v12.37) manda un código con L a la góndola/stock de LK, `pkStripL` /
+> `codEmpSplit` (v12.39) pelan la L sólo para el picking, `vista_volumen_articulo_resuelto` tiene los m³ de los `NNNL`
+> (505L = 0,0024), y la factura / `Entregas_Virgilio` / el Excel ISIS llevan el código crudo `505L`, que es lo que espera
+> el ISIS de Chef. Faltaba **`gv_ppp_np_valor`** (migración `gv_ppp_np_valor_articulo_L_v1371`): un `505L` en NP de Chef
+> se valúa con la lista de LK por `505` (antes quedaba sin precio). Nada de "pasar a LK": queda Chef. Quedan como
+> pendientes del informe (`docs/INFORME-PEDIDOS-LK-POR-CHEF.md`): el vendedor de una NP CH en el Excel sale del padrón
+> LK por código (puede ser otro cliente), el Excel ISIS es uno solo para los dos ISIS, y un pedido Chef tipeado en ISIS
+> LK no se detecta como doble.
+
 > Nota **v13.70** (backend + datos + front + Edge Function) — **NP web = CONTADOR propio, un número por bloque, sin
 > sufijo** (dueño: *"el pedido tiene que ser único; no puede haber cuatro variantes cuando se separa en cuatro; guardá el
 > ID de la página pero que sea un número de pedido diferente; LK y 4 dígitos, no importa que no tenga relación con el ID"*).

@@ -54,7 +54,18 @@ Torres y Liva 271/CH = 288/LK; con el mismo número en las dos: Horcada 85, Sala
   Plast, Colucci, Renatek ×4, Arylo ×2…). Es el caso normal, no la excepción.
 - Programados por Gestión en Chef: 216 Elbantonio (E01F, 14/09) y 217 Gifel (D69E, 15/09), sin espejo LK.
 
-## Lo que tiene que decidir el dueño
+## Decisión del dueño (07/09, después del informe)
+
+*"Es un cliente que pide por Chef, pero se factura por Chef directamente; para mí el pedido es para Chef. Se va a
+facturar con la L al final cada artículo: el 505 se factura como 505L."* → Se mantiene como está el pipeline (pedido
+Chef, cod Chef, factura Chef). La regla de la "L" ya vive en las páginas (`admin-supercot.js`, `addLSuffix = isChef`,
+ítem `is_loke`) y en Gestión (`pkEmpresaArt`, `pkStripL`, `codEmpSplit`, m³ de `NNNL`); v13.71 la completa en
+`gv_ppp_np_valor`. Lo que hizo compras con P&M Bazar (recodificar a LK y tipear en ISIS LK) va contra la regla.
+
+Quedan sin decidir (puntos 1, 2 y 3 de "dónde se rompe"): vendedor de una NP CH en el Excel, Excel único para dos
+ISIS, y detección de un pedido Chef tipeado en ISIS LK.
+
+## Lo que tenía que decidir el dueño (preguntas originales)
 
 1. Un pedido de un cliente LK entrado por Chef, ¿**se factura por Chef** (como hoy) o hay que poder **pasarlo a LK**? Si
    es lo segundo, hace falta un mapa de artículos Chef→LK (lo que hizo compras a mano con el 208) y el cod LK por CUIT.
