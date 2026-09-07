@@ -10,11 +10,13 @@
 
 | día | qué pasa |
 |---|---|
-| **lun 7** | Día del Metalúrgico. No se trabaja (`GV_Dias_No_Habiles`). A las 00:01 el job arma lo web pendiente **para el viernes 11**. |
+| **lun 7** | Día del Metalúrgico. No se trabaja (`GV_Dias_No_Habiles`). **Al 07/09 el automático (crons 71 y 73) estuvo apagado hasta que se implementó "acumular hasta 0,80" (v13.67); al prenderse, arma lo web pendiente para el primer día con cupo (hoy: mar 15).** |
 | **mar 8** | Primer día real con Gestión. **v13.60 (dom 6 a la noche): el lunes 7 es feriado y nada estaba armado, así que la semana se corrió UN día hábil (salvo súper).** Sale el martes sólo lo ya armado: **D59A Coto y D61A Carrefour** (8,87 m³). Ese día se pickea y arma lo del **mié 9: D60A–F (9 NP, 4,58 m³, GBA Sur/Oeste) + D62A Patagonia** (pickeada el 3/9, falta armar). Después: jue 10 = D66A–F (7,78) · vie 11 = D67A–K (5,76) + E07A Chango Mas · lun 14 = D68A–G + E01A–F (6,58, primer día con web) · mar 15 = D69A–E + E03A–B. Matiz D71A sigue el mié 16. |
 | **mié 9** | ISIS: 10,77 m³ (D62A, D66A–F). |
 | **jue 10** | ISIS: 5,76 m³ (D67A–K). |
-| **vie 11** | ISIS: 3,14 m³ (D68A–F) + **las primeras tandas web, ya programadas el sábado**: E01A (1344), E01B (1345+1347), E01C (1348+1351), E01D (1342+1346), E01E (1343), E02A (Chef 216) y E04A (1349 Bazar Mónica) = 3,43 m³ + **E07A 44619 Chango Mas (4,31, ISIS sin tanda → override)**. |
+| **vie 11** | **Corregido 07/09 (v13.60 corrió la semana un día hábil):** sale D67A–K (35 NP, 5,76 m³, Capital) + **E07A 44619 Chango Mas (4,31, súper con turno; ISIS sin tanda → override)**. Las tandas web pasaron al lunes 14. |
+| **lun 14** | D68A–F (13 NP, 3,14 m³, GBA Sur/Oeste) + D68G (1349 Bazar Mónica, zona 5) + **las primeras tandas web**: E01A (1344), E01B (1345+1347), E01C (1348+1351), E01D (1342+1346), E01E (1343), E01F (Chef 216) = 3,33 m³. Total 6,58 m³. |
+| **mar 15** | D69A–C (5 NP, 1,51 m³) + D69D (1341 Orfali) + D69E (Chef 217 Gifel) + E03A (1350 Cuyana, 4 NP, 0,94) + E03B (1352, pedido de prueba: se borra). |
 | **lun 14** | ISIS: 1,51 (D69A–C) + E03A (1350 Cuyana, 0,94), E05A (1341 Orfali, 1,18), E06A (CH 0217 Gifel) = 3,77 m³. |
 
 Los 4 días de colchón (`dias_anticipacion_min = 4`) están para esto: ver qué falta antes de que una tanda
@@ -116,8 +118,8 @@ web llegue al depósito. Cupo diario = pickers típicos × 3 m³ (hoy 2 → 6), 
   justo 508 (16 en stock, 18 pedidas en total). Hay 4 días para producir; si no, salen con faltante como
   cualquier tanda.
 - [x] ~~Pedidos web que NO se arman solos~~ — **v13.47 (domingo a la tarde)**: el automático los programa
-  solo si tienen día: LK 1349 Bazar Mónica → vie 11 E04A (camión zona 5), LK 1350 Cuyana → lun 14 E03A, LK 1341
-  Orfali E05A y CH 0217 Gifel E06A → lun 14 (camión zona 6, D69C). Las tandas siguen la letra E (E07A la próxima). Queda a mano sólo **LK 1340 Garbarino (Retira, 0,03)**.
+  solo si tienen día: LK 1349 Bazar Mónica → lun 14 **D68G** (camión D68, zona 5; era E04A vie 11), LK 1350 Cuyana → mar 15 E03A, LK 1341
+  Orfali **D69D** y CH 0217 Gifel **D69E** → mar 15 (camión D69, zona 6; eran E05A/E06A lun 14). Renombres y corrimiento: v13.60. Queda a mano sólo **LK 1340 Garbarino (Retira, 0,03)**.
   Chef 215 Dorinka quedó excluido porque ya es el 44619 de ISIS.
 - [ ] Chef: password de `ch_ppp_reader` + correr `paginach/sql/gv_estado_mis_pedidos_chef.sql` (para que el cliente vea el estado).
 - [ ] Decisiones abiertas: orden de carga por cod cliente (1/2/3); zonas manuales ¿se suman solas a un camión

@@ -17,6 +17,17 @@
 
 ---
 
+## 📌 Pendientes unificados al 2026-09-07 (lista del otro chat, `docs/HANDOFF-EN-SALIDA-Y-TANDAS.md`)
+
+| # | Qué | Estado |
+|---|---|---|
+| 1 | Automático apagado: la tanda tiene que acumular hasta 0,80 | ✅ v13.67 (`ppp_web_armar_tandas` v7). Crons 71/73 prendidos. Zonas auto `1,2,3` (dueño). |
+| 2 | "Botón regenerar rearma todo" | ✅ No existe tal botón; fue la reprogramación SQL de v13.60. |
+| 3 | 8 NP con CCR sin CCN | ⏳ Operación, no código. El dueño lo mira el martes 8 (chip "CCR sin CCN" en En Salida). |
+| 4 | Borrar pedido de prueba 1352 | ✅ Borrado (Virgilio + LK), backup `sql/backups/pedido_prueba_1352_20260907_pre_borrado.sql`. |
+| 5 | Instructivo desactualizado | ✅ `docs/PRIMEROS-DIAS-CON-GESTION.md` según la base (v13.60). |
+| 6 | Basura en LK `bot_customer_whatsapps` | ⏳ A pedido del dueño (proyecto LK). |
+
 ## ⚠⚠ LEER PRIMERO — el modelo, en palabras del dueño (2026-09-04, a la tarde)
 
 Después de ver cómo se estaba encarando lo que sigue, el dueño frenó y lo dijo así:

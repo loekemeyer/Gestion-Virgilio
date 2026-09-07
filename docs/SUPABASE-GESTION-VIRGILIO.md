@@ -1384,6 +1384,33 @@ es de Chef y pisa al LK 217): cuando Gestión alimente el tracking, escribir el 
 una función `gv_*` y pedir columna `empresa` en PaginaLK. Y el Excel ISIS de Facturación manda
 `N_Pedido` contador (no el id), como el mail: ISIS numera 98xxx por su cuenta.
 
+### 3.av ✅ La tanda ACUMULA hasta 0,80 entre corridas; crons 71/73 prendidos; 1352 borrado (v13.67) — 2026-09-07 lunes (feriado, 01:30)
+
+**Pendientes unificados del otro chat (`docs/HANDOFF-EN-SALIDA-Y-TANDAS.md`), resueltos acá:**
+
+1. **Acumular hasta 0,80** — `ppp_web_armar_tandas` **v7** (migraciones `ppp_web_armar_tandas_v7_acumula_v1367` y
+   `_v7b_acumula_fix_v1367`; repo `sql/ppp_web_armar_tandas_v7_acumula.sql`). `_open` se siembra con las tandas web del
+   mismo día y empresa que sigan abiertas (m³ < tope), de reparto, sin cliente 'solo' y sin ningún evento de operario
+   (PK/PKC/EP/TP/TAP/AP/CC/CCN en `Registros_Produccion_Virgilio`); sus paradas van a `_open_stops`. Una tanda abierta
+   recibe al cliente aunque cruce el tope, y ahí se cierra. Sin timeout. **Dueño 07/09: zonas automáticas quedan en
+   `1,2,3`** (no sólo 1). **Medición** (`gv_ppp_web_armar_pendientes_simular('lk','2026-09-14', 3 pedidos zona 1,
+   forzados al 14)`): Pompeya 0,30 → **E01C** (0,58 → 0,88, se cerró); Soldati 0,20 + Barracas 0,15 → **E01B** (0,48 →
+   0,83). Cero tandas nuevas, cero filas escritas. Antes (v6) cada uno abría tanda propia.
+   **Crons 71 (00:01) y 73 (intradía) vueltos a `active = true`** el 07/09 01:30 con el OK del dueño. Apagar:
+   `select cron.alter_job(71, active := false); select cron.alter_job(73, active := false);`
+2. **"Botón regenerar rearma todo"** — no existe tal botón (grep `regenerar|rearmar` en index.html: nada). El
+   `actualizado_at = 2026-09-06 20:40:59` de las 26 filas fue la reprogramación por SQL de v13.60 (§3.at). Cerrado.
+3. **8 NP con CCR sin CCN** (98474, 98509, 98585–98590) — es operación, no código; el dueño lo mira el martes.
+   Quedan con el chip "CCR sin CCN" en En Salida.
+4. **Pedido de prueba 1352 borrado** (dueño: *"sí, borralo"*). Backup restore-ready
+   `sql/backups/pedido_prueba_1352_20260907_pre_borrado.sql`. Borrado en Virgilio (`PPP_Web_Programacion`,
+   `PPP_Web_Base`, `PPP_Web_NP`: 1 fila cada una) y en LK (`orders` 1352, `order_items` 18876). `lk_pedidos_match`
+   se limpia sola (cron ventana 14 días). E03B dejó de existir.
+5. **Instructivo** `docs/PRIMEROS-DIAS-CON-GESTION.md` corregido a lo que dice la base (vie 11 = D67 + E07A; lun 14 =
+   D68A–G + E01A–F; mar 15 = D69A–E + E03A).
+6. **Basura en LK `bot_customer_whatsapps`** (columna `empresa` con razones sociales; `cod_cliente` null en el 2º
+   número de Lin Xiuhui) — sin tocar, es del proyecto LK; a pedido.
+
 ### 3.au ✅ En Salida: fecha de carga, estado por NP y Recepción de Remitos embebida (v13.62) — 2026-09-07 (madrugada)
 
 Dueño: *"El módulo En Salida tiene una estética completamente fea y le faltan datos. Quiero que

@@ -12,12 +12,21 @@
 > única**; no se replica. Ante la duda entre parche rápido y fix de raíz → **fix
 > de raíz**.
 >
-> Última actualización: 2026-09-06 (domingo) · Versión app al documentar: **v13.66**
+> Última actualización: 2026-09-06 (domingo) · Versión app al documentar: **v13.67**
 >
 > ⚠⚠ **Desde el lunes 2026-09-07 los operarios usan GESTIÓN, no Producción** (dueño, sábado a la
 > noche: *"el lunes van a empezar a usar GV, no más PV"*). Las tandas web viven en
 > `PPP_Web_Programacion` y Producción no las ve. URL: la de GitHub Pages de este repo.
 >
+> Nota **v13.67** (backend + datos) — **la tanda ACUMULA entre corridas hasta 0,80 m³** (pendiente nº 1 del otro chat,
+> `docs/HANDOFF-EN-SALIDA-Y-TANDAS.md`): `ppp_web_armar_tandas` v7 siembra `_open` con las tandas web del mismo día y
+> empresa que sigan abiertas (m³ < tope) y que nadie haya empezado a pickear; una tanda abierta recibe al pedido aunque
+> cruce el tope y ahí se cierra. Probado: Pompeya 0,30 → E01C (0,58 → 0,88, cerrada); Soldati + Barracas → E01B.
+> **Crons 71 y 73 prendidos de nuevo** (07/09 01:30, OK del dueño); zonas automáticas siguen `1,2,3`. Además: pedido de
+> prueba **1352 borrado** (Virgilio + LK, backup `sql/backups/pedido_prueba_1352_20260907_pre_borrado.sql`), instructivo
+> corregido, y "botón regenerar" no existe (fue la reprogramación por SQL de v13.60). §3.av. SQL:
+> `sql/ppp_web_armar_tandas_v7_acumula.sql`.
+
 > Nota **v13.66** (front; el número v13.65 lo tomó el otro chat con un doc de traspaso) — **A Programar vuelve a las TRES COLUMNAS; la planilla se borró** (dueño: *"no me gusta
 > lo que armaste, no me gusta para nada; volvé al formato anterior"*). Se fue `aprPlanillaHtml` con su CSS, su test
 > y el interruptor de vista; vuelven los botones "＋ Nueva tanda LK / Chef". Quedó lo que sí sirve: (a) **soltar un
