@@ -7278,7 +7278,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v14.03";
+const APP_VERSION = "v14.04";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -28346,7 +28346,13 @@ function _pppTandaNps(tanda) {
 async function pppTandaFecha(id, tanda) {
   const inp = document.getElementById(id + "_d"); if (!inp || !inp.value) { pppSetStatus("Elegí una fecha primero.", false); return; }
   const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(inp.value); if (!m) return;
-  const iso = m[1] + "-" + m[2] + "-" + m[3], f = m[3] + "/" + m[2] + "/" + m[1];
+  return pppTandaMover(tanda, m[1] + "-" + m[2] + "-" + m[3]);
+}
+/* v14.04 — el mismo movimiento, pero recibiendo la fecha ya elegida (del pop-up de días o del
+   campo de fecha viejo). Devuelve true si movió. */
+async function pppTandaMover(tanda, iso) {
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(iso || "")); if (!m) return false;
+  const f = m[3] + "/" + m[2] + "/" + m[1];
   const t = String(tanda).toUpperCase();
   const filas = (_pppParsed.prog || []).filter(function (p) { return String(p.tanda || "").toUpperCase() === t; });
   const avisos = [];
@@ -28362,7 +28368,7 @@ async function pppTandaFecha(id, tanda) {
   if (!confirm("¿Mover TODA la tanda " + t + " al " + f + "?" +
       (filas.length ? "\n\n" + filas.length + " pedido(s)." : "") +
       (avisos.length ? "\n\n⚠ " + avisos.join("\n⚠ ") : "") +
-      "\n\nLo ven todos, también el operario en su celular.")) return;
+      "\n\nLo ven todos, también el operario en su celular.")) return false;
   pppSetStatus("Moviendo la tanda " + t + "…", true);
   try {
     const r = await aprRpc("gv_ppp_tanda_mover", { p_tanda: t, p_fecha: iso, p_por: (typeof _faltMiLegajo === "function" ? _faltMiLegajo() : "") || null });
@@ -28370,11 +28376,137 @@ async function pppTandaFecha(id, tanda) {
     pppSetStatus("✓ Tanda " + t + " movida al " + f + ": " + (x.movidas || 0) + " pedido(s) · " + (x.m3 || 0) + " m³." + (x.aviso ? "  ⚠ " + x.aviso : ""), true);
     if (x.aviso) { try { alert("Se movió, pero ojo:\n\n" + x.aviso); } catch (_e) {} }
     await pppLoadProgFromSupabase();
+    return true;
   } catch (e) {
     const msg = (e && e.message) ? e.message : String(e);
     pppSetStatus("⚠ No se pudo mover: " + msg, false);
     try { alert("No se pudo mover la tanda " + t + ":\n\n" + msg); } catch (_e) {}
+    return false;
   }
+}
+/* =====================================================================================
+   v14.04 — POP-UP para mover una tanda de día (dueño 07/09: "cuando toco el botón, que me abra un
+   pop up para ponerme los botones de cada día y cuántos m³ tiene cada uno").
+   Antes el botón abría un `<input type=date>` pelado: había que saber de memoria cómo venía cada
+   día. Ahora abre una grilla con UN BOTÓN POR DÍA y, en cada uno, los m³ que ya tiene, el cupo y
+   cuánto queda libre — el mismo calendario que usa A Programar (`gv_ppp_web_calendario`, que suma
+   ISIS + web). Tocar un día mueve la tanda ahí, con los mismos avisos de siempre (segundo camión,
+   cupo, tanda ya empezada).
+   ===================================================================================== */
+let _pppMov = null;   // { tanda, id, m3, np, actual (ISO), cal:[], cargando }
+function _pppMovCss() {
+  if (document.getElementById("pppMovCss")) return;
+  const st = document.createElement("style"); st.id = "pppMovCss";
+  st.textContent = "#pppMovOverlay{display:none;position:fixed;inset:0;z-index:1500;background:rgba(2,6,23,.74);overflow:auto;padding:14px;}" +
+    "#pppMovOverlay.show{display:block;}" +
+    ".mv-card{background:#f8fafc;max-width:860px;margin:0 auto;border-radius:16px;overflow:hidden;box-shadow:0 24px 70px rgba(0,0,0,.5);}" +
+    ".mv-head{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:13px 16px;background:linear-gradient(90deg,#1e6bd6,#0b2f63);color:#fff;}" +
+    ".mv-title{font-size:18px;font-weight:800;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}" +
+    ".mv-close{background:#dc2626;color:#fff;border:none;border-radius:8px;padding:6px 14px;font-weight:800;cursor:pointer;width:auto;flex-shrink:0;}" +
+    ".mv-body{padding:14px 16px;}" +
+    ".mv-sub{font-size:12.5px;color:#475569;font-weight:700;margin-bottom:11px;font-variant-numeric:tabular-nums;}" +
+    ".mv-sub b{color:#0f172a;}" +
+    ".mv-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(158px,1fr));gap:9px;}" +
+    ".mv-d{position:relative;text-align:left;background:#fff;border:1px solid #dbe3ee;border-radius:11px;padding:9px 11px;cursor:pointer;width:auto;font:inherit;}" +
+    ".mv-d:hover{border-color:#1e6bd6;box-shadow:0 3px 10px rgba(30,107,214,.14);}" +
+    ".mv-d-dow{display:block;font-size:11px;font-weight:800;letter-spacing:.5px;text-transform:uppercase;color:#64748b;}" +
+    ".mv-d-num{display:block;font-size:16px;font-weight:800;color:#0f172a;line-height:1.15;}" +
+    ".mv-d-m3{display:block;margin-top:5px;font-size:12.5px;font-weight:800;color:#0f766e;font-variant-numeric:tabular-nums;}" +
+    ".mv-d-q{display:block;font-size:11.5px;color:#64748b;font-weight:700;}" +
+    ".mv-bar{height:5px;background:#e2e8f0;border-radius:999px;overflow:hidden;margin-top:6px;}" +
+    ".mv-bar i{display:block;height:100%;background:#0f766e;}" +
+    ".mv-d.lleno .mv-bar i{background:#d97706;}.mv-d.lleno .mv-d-q{color:#b45309;}" +
+    ".mv-d.pronto{border-style:dashed;}" +
+    ".mv-d.hoy{border-color:#1e6bd6;}" +
+    ".mv-d.actual{background:#eff6ff;border-color:#1e6bd6;cursor:default;}" +
+    ".mv-d.actual:hover{box-shadow:none;}" +
+    ".mv-d.nohabil{background:#f1f5f9;color:#94a3b8;cursor:not-allowed;}" +
+    ".mv-d.nohabil .mv-d-num,.mv-d.nohabil .mv-d-dow{color:#94a3b8;}" +
+    ".mv-tag{position:absolute;top:7px;right:8px;font-size:9.5px;font-weight:800;letter-spacing:.4px;text-transform:uppercase;border-radius:999px;padding:1px 7px;}" +
+    ".mv-tag.aca{background:#1e6bd6;color:#fff;}.mv-tag.hoy{background:#dbeafe;color:#1e40af;}" +
+    ".mv-tag.lleno{background:#fef3c7;color:#92400e;}.mv-tag.pronto{background:#ede9fe;color:#5b21b6;}" +
+    ".mv-note{font-size:11.5px;color:#64748b;background:#f1f5f9;border-radius:8px;padding:8px 11px;margin-bottom:11px;}" +
+    ".mv-cargando{padding:26px;text-align:center;color:#64748b;font-weight:700;}" +
+    ".mv-mas{margin-top:11px;text-align:center;}" +
+    ".mv-mas button{background:#fff;border:1px solid #cbd5e1;border-radius:9px;padding:7px 14px;font-size:12.5px;font-weight:800;color:#1e6bd6;cursor:pointer;width:auto;}";
+  document.head.appendChild(st);
+}
+function pppMovCerrar() { const o = document.getElementById("pppMovOverlay"); if (o) o.classList.remove("show"); }
+function pppMovMas() { if (_pppMov) { _pppMov.dias = (_pppMov.dias || 21) + 21; pppMovCargar(); } }
+async function pppMovCargar() {
+  if (!_pppMov) return;
+  _pppMov.cargando = true; pppMovRender();
+  const hoy = new Date();
+  const fin = new Date(hoy.getFullYear(), hoy.getMonth(), hoy.getDate() + (_pppMov.dias || 21));
+  const iso = function (d) { return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0"); };
+  try { _pppMov.cal = await aprRpc("gv_ppp_web_calendario", { p_desde: iso(hoy), p_hasta: iso(fin) }) || []; }
+  catch (_e) { _pppMov.cal = []; }
+  _pppMov.cargando = false; pppMovRender();
+}
+function pppMovRender() {
+  const body = document.getElementById("pppMovBody"); if (!body || !_pppMov) return;
+  const M = _pppMov;
+  let h = '<div class="mv-sub"><b>' + M.np + '</b> pedido' + (M.np === 1 ? '' : 's') + ' · <b>' + _pppFmtM3(M.m3) + ' m³</b>' +
+    (M.actualTxt ? ' · hoy está el <b>' + escapeHtml(M.actualTxt) + '</b>' : '') + '</div>';
+  h += '<div class="mv-note">Tocá el día al que la querés mover. Los m³ de cada día son <b>todo lo que ya tiene programado</b> (ISIS y web). Se guarda en el servidor: <b>lo ven todos</b>, también el operario. Una tanda ya empezada no se puede mover.</div>';
+  if (M.cargando && !(M.cal || []).length) { body.innerHTML = h + '<div class="mv-cargando">Cargando los días…</div>'; return; }
+  if (!(M.cal || []).length) { body.innerHTML = h + '<div class="mv-cargando">No pude leer el calendario. Probá de nuevo.</div>'; return; }
+  const DOW = ["Dom", "Lun", "Mar", "Mié", "Jue", "Vie", "Sáb"], MES = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"];
+  const hoyISO = (function () { const d = new Date(); return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0"); })();
+  h += '<div class="mv-grid">';
+  for (const d of M.cal) {
+    const dISO = String(d.dia).slice(0, 10);
+    if (dISO < hoyISO) continue;
+    const q = dISO.split("-"), dt = new Date(Number(q[0]), Number(q[1]) - 1, Number(q[2]));
+    const m3 = Number(d.m3) || 0, cupo = Number(d.cupo) || 0;
+    const lleno = cupo > 0 && m3 >= cupo, pct = cupo > 0 ? Math.min(100, Math.round(m3 / cupo * 100)) : 0;
+    const noHabil = d.habil === false, esActual = dISO === M.actual, esHoy = dISO === hoyISO;
+    const pronto = d.muy_pronto === true && !noHabil;
+    const cls = ["mv-d"];
+    if (noHabil) cls.push("nohabil"); else if (esActual) cls.push("actual");
+    if (lleno) cls.push("lleno"); if (pronto) cls.push("pronto"); if (esHoy) cls.push("hoy");
+    const tag = esActual ? '<span class="mv-tag aca">está acá</span>'
+      : (esHoy ? '<span class="mv-tag hoy">hoy</span>'
+      : (lleno ? '<span class="mv-tag lleno">completo</span>'
+      : (pronto ? '<span class="mv-tag pronto">muy pronto</span>' : '')));
+    const cuerpo = noHabil
+      ? '<span class="mv-d-m3">No hábil</span>'
+      : '<span class="mv-d-m3">' + _pppFmtM3(m3) + (cupo ? ' / ' + _pppFmtM3(cupo) : '') + ' m³</span>' +
+        '<span class="mv-d-q">' + (cupo ? (m3 >= cupo ? 'pasado por ' + _pppFmtM3(m3 - cupo) + ' m³' : 'quedan ' + _pppFmtM3(cupo - m3) + ' m³') : (d.tandas || 0) + ' tanda(s)') + '</span>' +
+        (cupo ? '<div class="mv-bar"><i style="width:' + pct + '%"></i></div>' : '');
+    h += '<button class="' + cls.join(" ") + '"' + (noHabil || esActual ? ' disabled' : ' onclick="pppMovElegir(\'' + dISO + '\')"') + '>' + tag +
+      '<span class="mv-d-dow">' + DOW[dt.getDay()] + '</span><span class="mv-d-num">' + dt.getDate() + ' ' + MES[dt.getMonth()] + '</span>' + cuerpo + '</button>';
+  }
+  h += '</div><div class="mv-mas"><button onclick="pppMovMas()">Ver más días →</button></div>';
+  body.innerHTML = h;
+}
+async function pppMovElegir(iso) {
+  if (!_pppMov) return;
+  const t = _pppMov.tanda;
+  const ok = await pppTandaMover(t, iso);
+  if (ok) pppMovCerrar(); else pppMovCargar();
+}
+function pppMoverAbrir(tanda) {
+  const t = String(tanda || "").toUpperCase(); if (!t || t === "—") return;
+  const filas = (_pppParsed.prog || []).filter(function (p) { return String(p.tanda || "").toUpperCase() === t; });
+  let m3 = 0; for (const p of filas) m3 += Number(p.m3) || 0;
+  const fe = filas.length ? String(filas[0].fecha_entrega || "") : "";
+  const mm = /^(\d{2})\/(\d{2})\/(\d{4})/.exec(fe) ;
+  _pppMov = { tanda: t, np: filas.length, m3: m3, dias: 21, cal: [], cargando: true,
+              actual: mm ? (mm[3] + "-" + mm[2] + "-" + mm[1]) : String(fe).slice(0, 10),
+              actualTxt: mm ? (mm[1] + "/" + mm[2]) : "" };
+  _pppMovCss();
+  let o = document.getElementById("pppMovOverlay");
+  if (!o) {
+    o = document.createElement("div"); o.id = "pppMovOverlay";
+    o.innerHTML = '<div class="mv-card"><div class="mv-head"><div class="mv-title" id="pppMovTitle"></div>' +
+      '<button class="mv-close" onclick="pppMovCerrar()">Cerrar</button></div><div class="mv-body" id="pppMovBody"></div></div>';
+    o.addEventListener("click", function (e) { if (e.target === o) pppMovCerrar(); });
+    document.body.appendChild(o);
+  }
+  document.getElementById("pppMovTitle").textContent = "📅 Mover la tanda " + t + " a otro día";
+  o.classList.add("show");
+  pppMovCargar();
 }
 function pppTandaAProgramar(tanda) {
   const t = String(tanda).toUpperCase(); if (!confirm("¿Devolver toda la tanda " + t + " a 'A Programar'? (le saca la tanda, la fecha y la programación)")) return;
@@ -30519,7 +30651,9 @@ function _pppTandaBlocksHtml(dk, ped) {
       : (!PPP_READONLY
           ? ' <button class="ppp-pencil-btn" onclick="event.stopPropagation();pppSetMode(\'__BLOCKID__\',\'edit\')" title="Editar: fecha / mover / devolver">✏️ Editar</button>'
           : (window.__isSupervisor
-              ? ' <button class="ppp-pencil-btn" onclick="event.stopPropagation();pppSetMode(\'__BLOCKID__\',\'edit\')" title="Mover toda la tanda a otro día (lo ven todos, también el operario)">📅 Mover de día</button>'
+              // v14.04 (dueño: "que me abra un pop up con los botones de cada día y cuántos m³ tiene cada uno"):
+              // el botón ya no despliega un campo de fecha pelado, abre la grilla de días con su carga.
+              ? ' <button class="ppp-pencil-btn" onclick="event.stopPropagation();pppMoverAbrir(\'' + t.replace(/'/g, "") + '\')" title="Mover toda la tanda a otro día (lo ven todos, también el operario)">📅 Mover de día</button>'
               : ''));
     const entBtn = (t !== "—" && !PPP_READONLY) ? ' <button class="ppp-tanda-ent" onclick="event.stopPropagation();pppSetMode(\'__BLOCKID__\',\'ctrl\')" title="Marcar entregas (local)">✓ Controlar</button>' : '';   // en solo-lectura el control es POR NP (tilde en cada fila)
     html += _pppBlock("plan_" + dk + "_" + t, (es ? "🛒 " : "") + (t === "—" ? "Sin tanda" : "Tanda " + escapeHtml(t)), es ? "ppp-tanda-super" : "", byT[t].length + " ped · " + _pppM3Sum(byT[t]).toFixed(2) + " m³", byT[t], pencil + entBtn, (t !== "—" ? t : null));

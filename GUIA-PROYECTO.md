@@ -12,11 +12,29 @@
 > única**; no se replica. Ante la duda entre parche rápido y fix de raíz → **fix
 > de raíz**.
 >
-> Última actualización: 2026-09-07 (lunes) · Versión app al documentar: **v14.03**
+> Última actualización: 2026-09-07 (lunes) · Versión app al documentar: **v14.04**
 >
 > ⚠⚠ **Desde el lunes 2026-09-07 los operarios usan GESTIÓN, no Producción** (dueño, sábado a la
 > noche: *"el lunes van a empezar a usar GV, no más PV"*). Las tandas web viven en
 > `PPP_Web_Programacion` y Producción no las ve. URL: la de GitHub Pages de este repo.
+>
+> Nota **v14.04** (sólo front) — **"📅 Mover de día" abre un POP-UP con un botón por día y los m³ de cada
+> uno** (dueño 07/09: *"cuando toco el botón, que me abra un pop up para ponerme los botones de cada día y
+> cuántos m³ tiene cada uno"*). Antes abría un `<input type=date>` pelado: había que saber de memoria cómo
+> venía cada día para elegir bien.
+>
+> El pop-up (`pppMoverAbrir`) muestra arriba **cuántos pedidos y cuántos m³** tiene la tanda y **dónde está
+> hoy**, y abajo una grilla con **un botón por día**: los m³ que ya tiene **sobre el cupo**, **cuánto queda
+> libre** y una barra de carga. Sale del mismo calendario que usa A Programar (`gv_ppp_web_calendario`, que
+> suma **ISIS + web**). Etiquetas: `HOY`, `ESTÁ ACÁ` (el día actual de la tanda, no se puede elegir),
+> `COMPLETO` (pasado de cupo, se puede elegir igual y dice por cuánto se pasa) y los **no hábiles** en gris,
+> sin poder elegirse. "Ver más días →" agrega 21 días más.
+>
+> Tocar un día mueve la tanda ahí con **los mismos avisos de siempre**: pregunta si el día abre un **segundo
+> camión** (`gv_ppp_web_camion_nuevo`) y el backend sigue rechazando una **tanda ya empezada**. Si el
+> movimiento falla, **el pop-up no se cierra** y se puede elegir otro día. `pppTandaFecha` se partió en dos:
+> ahora `pppTandaMover(tanda, iso)` hace el trabajo y devuelve si movió; el campo de fecha viejo (modo
+> editable) sigue funcionando y llama a la misma función. `tests/ppp-mover-popup.cjs` (16 chequeos).
 >
 > Nota **v14.03** (datos, sin cambios de app) — **Artículo 578: precio $1.000 y 12 por caja** (dueño 07/09:
 > *"578, 12 x caja. precio por ahora ponele $1000"*). El pedido web 1354 de Osa lleva 5 cajas del **578

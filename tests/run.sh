@@ -317,3 +317,6 @@ PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node te
 
 echo "== ppp-fit-acordeon (v13.95: con un acordeón abierto la PPP scrollea en vez de achicarse y cortar) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/ppp-fit-acordeon.cjs
+
+echo "== ppp-mover-popup (v14.04: 'Mover de día' abre un pop-up con un botón por día y los m³ de cada uno) =="
+PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/ppp-mover-popup.cjs
