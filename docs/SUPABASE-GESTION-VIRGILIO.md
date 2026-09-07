@@ -1384,6 +1384,29 @@ es de Chef y pisa al LK 217): cuando Gestión alimente el tracking, escribir el 
 una función `gv_*` y pedir columna `empresa` en PaginaLK. Y el Excel ISIS de Facturación manda
 `N_Pedido` contador (no el id), como el mail: ISIS numera 98xxx por su cuenta.
 
+### 3.bh ✅ Datos: la tanda del 2533 se adelantó al miércoles — 2026-09-07 lunes
+
+**Qué pidió el dueño.** *"La tanda del cliente 2533 adelantala para el miércoles y posterga lo del miércoles que
+necesites al jueves."*
+
+**Qué se movió** (todo por `GV_PPP_Prog_Override`, sin tocar `PPP_Programacion_Diaria`, que es compartida):
+- **D66B** (Osa Distribuidora SRL "Chemelo", cod 2533, Zona 1 - CABA Sur, NP 98650 + 98667, 4,041 m³):
+  jue 10/09 → **mié 09/09**. Vuelve a la fecha que tenía antes de la reprogramación del 06/09.
+- Para hacerle lugar, el **camión de GBA Sur del miércoles entero** pasa al jueves (4,368 m³): D60F (98603),
+  D60B (98534/98535), D60A (98494/95/96), D60C (98530). Se movió el camión completo y no sólo la tanda más
+  grande para no partir un camión entre dos días.
+- **No se tocó** D62A (súper La Anónima, 2,992 m³): es súper y además **ya está empezada** (EP/PKC/PSP/PUB/TP
+  desde el 03/09). Tampoco D60E (Zona 5 - GBA Oeste, 0,214), que no hacía falta mover.
+
+**Verificado antes de mover:** ninguna de las 4 tandas movidas tiene eventos en `Registros_Produccion_Virgilio`.
+
+**Resultado.** mié 09: 7,574 → **7,247 m³** (súper 2,992 + GBA Oeste 0,214 + Capital 4,041, o sea D66B sola).
+jue 10: 7,776 → **8,103 m³** (Capital 3,735 + GBA Sur 4,368). Los dos días ya venían por encima del cupo de
+6,00 m³, así que no se pudo dejar ninguno en cupo moviendo entre ellos; sí quedaron parejos.
+
+**Rollback.** `sql/backups/reprogramacion_20260907_2533_al_miercoles.sql` (9 updates, deja todo como estaba
+tras la reprogramación del 06/09).
+
 ### 3.bg ✅ `bot_customer_whatsapps` de LK vaciada: eran todos números de prueba — 2026-09-07 lunes
 
 **Qué dijo el dueño.** Sobre el pendiente 6 (basura en la columna `empresa`): *"fueron wpp de prueba"*, *"209 y 217

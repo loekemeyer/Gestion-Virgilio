@@ -6,6 +6,7 @@ Cada idea queda acá (durable, versionada) y además en la tabla `agente_propues
 en su rama `idea/<código>`, se recuerda en el Telegram de las 8 **todos los días
 hasta que el usuario la active**, y se mergea a `main` cuando el usuario dice el número.
 
+- [ ] **2482** (2026-09-07) — Agregar artículos a un pedido **desde Gestión** (botón "➕ Agregar artículos" en la tarjeta del pedido, llamando a la RPC `edit_order_fast` de LK con el mismo candado server-side: sólo sumar, hasta que se factura). Hoy hay que entrar a la página. Dueño: *"guardalo como idea pero todavía no"*. — _pendiente_
 - `[ ]` = pendiente / esperando activación · `[x]` = activada (mergeada a main) ·
   `~~tachada~~` = descartada.
 - El código de 4 dígitos es el mismo que en la tabla y en el Telegram.
