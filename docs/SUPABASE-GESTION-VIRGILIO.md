@@ -3081,6 +3081,85 @@ cargada**, ni de los 8 pedidos observados ni de sus compañeros de camión. Eso 
 
 ---
 
+## 3.bk El reporte de la página ve el depósito de Gestión (v14.13) — 2026-09-07
+
+**El pedido.** *"Hicimos un reporte diario/semanal/mensual para la página. Quiero que incluya lo
+que pasa en Gestión Virgilio (armado de pedidos y despacho de los mismos)."* Al revisar qué había,
+resultó que el reporte —que vive en el proyecto **LK**, funciones `rep_*`, sale por Telegram con
+los crons 29 (diario, lun–sáb 08:00 ART), 30 (semanal, lun) y 31 (mensual, días 3/5/8/12)— **ya
+traía** dos bloques de depósito: lo despachado por día y lo pendiente de facturar. Los dos estaban
+mal, por tres motivos distintos.
+
+**1. No veía nada de lo que arma Gestión desde la página.** El espejo de LK copia
+`virgilio.programacion_diaria`, que es la tabla **cruda** `PPP_Programacion_Diaria`. Las NP web
+viven en `PPP_Web_Programacion` (29 al 07/09, las 29 con tanda) y no aparecían en ningún número.
+Y como copia la tabla cruda, también se traía las **10 filas que `GV_PPP_Prog_Override.oculto`
+esconde** (las NP de ISIS que duplican un pedido web ya programado acá).
+
+**2. El filtro de empresa era `left(np,1) = '9'`.** Desde la v13.70 la NP web es un contador propio
+con etiqueta `LK 0001` / `CH 0002`. La primera NP web que se facturara iba a caer del reporte **sin
+error y sin aviso** — ni en el despacho ni en el backlog. Todavía no pasó (`Facturacion_NP` no tiene
+ninguna NP no numérica), así que se arregló antes de que pasara.
+
+**3. LK reconstruía la plata y le daba de más.** Valorizaba sobre lo **pedido** y después corregía
+con un ratio global de cajas entregadas/pedidas. Contra el neto que Gestión ya calcula en
+`gv_vista_facturacion_neto` —cajas **entregadas** × uxb × precio × (1−dto_vol) × factor web/súper,
+con lista propia de supermercado y la L de Chef resuelta— la diferencia iba de **+0,5% a +14,5%**
+según el día:
+
+| Fecha | LK reconstruía | Neto real (Gestión) | Dif |
+|---|---|---|---|
+| 04/09 | $14,19 M | $13,96 M | +2% |
+| 03/09 | $28,30 M | $28,16 M | +1% |
+| 02/09 | $0,93 M | $1,15 M | −19% |
+| 01/09 | $15,26 M | $14,61 M | +4% |
+| 31/08 | $25,34 M | $21,74 M | +17% |
+| 27/08 | $19,21 M | $16,78 M | +15% |
+
+El 31/08 además la foto vieja había guardado **25 NP pero valorizado sólo 5** y nunca se rehizo: el
+`on conflict` sólo pisaba si venían **más** NP valorizadas que la vez anterior, y no volvieron.
+
+**Qué se hizo de este lado** (`sql/gv_lk_np_feed.sql`): una vista **nueva**, `gv_lk_np_feed`, con
+una fila por NP —ISIS y web juntas— que expone lo que el reporte necesita: cliente, tanda, zona,
+fecha de entrega, m³, si está facturada y cuándo, el **neto facturado**, cajas pedidas/entregadas, y
+el **valor de lista** de lo pendiente. Lee `gv_ppp_programacion_diaria` (la vista, no la tabla), así
+que el override manda. `security_invoker = true`, `revoke` de `anon`/`authenticated`, `grant select`
+sólo a `lk_ppp_reader` y a `service_role`.
+
+Para que la vista funcione con los permisos de quien la llama hicieron falta **15 grants de SELECT y
+9 policies** `lk_ppp_reader_sel` — `Entregas_Virgilio`, `PPP_Web_Base`, `PPP_Web_Config` (la lee
+`gv_espejo_corte()`), `GV_PPP_Prog_Override`, `clientes_dto`, `precios_venta`, `precios_venta_chef`,
+`cobranzas_cliente_cadena`, `cobranzas_super_cadena` y las vistas `gv_*` intermedias. Todo lectura,
+todo aditivo: ni un `update`, ni un trigger, ni un `drop`.
+
+**Del lado LK** (repo `pagina-LK-copia`, `sql/reporte_deposito_gestion.sql`): foreign table sobre el
+feed, espejo local `ppp_np_feed` refrescado dentro de `sincronizar_ppp()` (bloque propio con su
+`EXCEPTION`, antes de `rep_snapshot_despacho`), y las cuatro funciones del reporte reescritas.
+**La plata vieja no se pisó**: el neto entra en columnas nuevas (`rep_despacho_diario.plata_neto`,
+`np_neto`) y los textos leen `coalesce(plata_neto, plata)`, así que los días viejos sin neto siguen
+mostrando el número de antes en vez de un hueco. El **mensual**, que no tenía nada de depósito, suma
+un bloque 🚚 DEPÓSITO con lo despachado del mes cerrado y lo pendiente de hoy.
+
+**Medición.** Pendiente de facturar: **antes 102 NP · 60,4 m³ · $192,0 M → ahora 127 NP · 65,8 m³ ·
+$221,1 M**. La diferencia son exactamente las **25 NP web de LK = $29,0 M** que no se veían (0 líneas
+sin precio), y **ninguna NP** de las que salían antes se perdió. Coherencia contra el ERP: agosto
+despachado $510,6 M contra $522,4 M facturados = **98%**. Los m³ del feed dan idénticos a
+`Facturacion_NP` día por día. Costo: 634 ms + 311 ms, corre 1×/día.
+
+**Lo que queda cojo, a propósito:** el **pendiente** de un supermercado con lista propia se valoriza
+a lista general si la NP no tiene líneas en el espejo de LK (lo **facturado** no: ese ya sale bien);
+15 de los 20 días de agosto tienen neto y los otros 5 caen al número viejo; y el espejo corre una
+sola vez por día (cron 19, 07:00 ART), no hay nada intradía.
+
+**Nada de esto separa lo de ISIS de lo web en pantalla** (regla del dueño, v13.64): `rep_ppp()`
+devuelve `nps_web` pero el texto no lo imprime.
+
+**Rollback:** `drop view public.gv_lk_np_feed;` + las 9 `drop policy` y los 15 `revoke` que lista
+`sql/gv_lk_np_feed.sql`; del lado LK, el rollback de `sql/reporte_deposito_gestion.sql` y restaurar
+las funciones desde `sql/backups/rep_funciones_20260907_pre_np_feed.sql`.
+
+---
+
 ## 4. Incidente de seguridad — 2026-09-04 (cerrado)
 
 `public.vista_pedidos_web_feed` tenía `select` para `anon`. Los esquemas `fuentes` y

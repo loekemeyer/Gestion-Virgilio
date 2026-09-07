@@ -9497,6 +9497,17 @@ día con >1 sucursal distinta — el único caso que el string no resuelve), `or
 (desempate por hora), `synced_at`. RLS: anon/authenticated SELECT; escribe solo
 `lk_ppp_reader`. Ver `sql/lk_pedidos_match.sql`.
 
+**`gv_lk_np_feed`** (vista, v14.13, 2026-09-07) — el feed que consume el **reporte diario /
+semanal / mensual de la página LK** (funciones `rep_*` del proyecto LK, salen por Telegram).
+Una fila por NP, **ISIS y web juntas**: cliente, tanda, zona, fecha de entrega, m³, si está
+facturada y cuándo, el **neto facturado** (de `gv_vista_facturacion_neto`: cajas entregadas ×
+uxb × precio × (1−dto) × factor web/súper), cajas pedidas/entregadas y el **valor de lista**
+de lo pendiente (de `gv_ppp_np_valor`). Lee `gv_ppp_programacion_diaria`, o sea que respeta el
+override que oculta las NP de ISIS duplicadas. `security_invoker = true`, `grant select` sólo a
+`lk_ppp_reader` y `service_role`. Existe porque LK leía la tabla cruda —no veía ninguna NP web,
+contaba las 10 ocultas y reconstruía la plata con hasta +14% de más. Ver `sql/gv_lk_np_feed.sql`
+y §3.bk de `docs/SUPABASE-GESTION-VIRGILIO.md`.
+
 **`Alertas_Pedidos_Web`** (v8.83) — alertas de **pedidos web anómalos** detectados por el
 Mayorista. Una fila por alerta:
 
