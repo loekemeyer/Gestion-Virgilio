@@ -3334,3 +3334,40 @@ ISIS". **La lista de arriba son NP pendientes: todavía no tienen factura, ahí 
 cruzar** — por eso el cruce vive en las tildadas, que son las que la operadora acaba de
 facturar (el agente que sube los PDF corre cada ~1 min). Además el botón "🔍 Cruce con ISIS"
 lleva un número rojo con las NP en diferencia de los últimos 30 días.
+
+---
+
+## §3.bd — v14.15 (2026-09-07): watchdog de la ingesta de PDF de ISIS
+
+**El agujero.** Los PDF de factura que emite ISIS **no los levanta nada de Supabase**: los
+sube un agente Python que corre en una PC de la oficina, mira las carpetas `PDF_ISIS` /
+`PDF_ISISCHEF`, parsea con `pypdf` y escribe en los buckets `isis-lk` / `isis-ch` y en
+`isis_lk.documentos` / `isis_ch.documentos`. Si esa máquina se apaga o la tarea programada no
+arranca, **no entra ninguna factura y no se entera nadie**: el trigger `wa_factura_notificar`
+nunca corre (cero avisos de WhatsApp) y el cruce de Facturación se queda sin comprobantes.
+Todo falla en silencio.
+
+Al 07/09 la ingesta llevaba **52,6 h parada** — último PDF de Loeke el 05/09 08:31, de Chef el
+04/09 16:08 — y nada en el sistema lo decía.
+
+**El watchdog.** `gv_alerta_ingesta_isis_telegram(p_horas integer default 2)` mira el
+`max(procesado_at)` de los dos `ingesta_log`; si pasaron más de 2 h avisa por Telegram con el
+último horario de cada empresa y qué queda roto mientras tanto. Sólo días hábiles
+(`gv_es_dia_habil`) y **un aviso por día** (dedup `gv_ingesta_parada_<fecha>`): mientras siga
+caída no repite. Umbral parametrizado, así que subirlo o bajarlo no toca código.
+
+**Cron 78 `gv-alerta-ingesta-isis`**, `*/30 13-22 * * 1-5` = 10:00–19:00 ART, que es la ventana
+en la que la ingesta tiene actividad real (medido sobre 60 días: Loeke 14–17 h concentra el
+99%, Chef pico a las 16).
+
+El lunes 07/09 es feriado (Día del Metalúrgico, cargado en `GV_Dias_No_Habiles`), así que el
+watchdog calla ese día y, si la ingesta sigue caída, el primer aviso sale el **martes 08 a las
+10:00**.
+
+**Rollback:** `select cron.unschedule('gv-alerta-ingesta-isis');`
+**SQL:** `sql/gv_alerta_ingesta_isis.sql` (y `sql/gv_alerta_cruce_facturacion.sql` para el §3.bc).
+
+⚠ **Pendiente que este watchdog NO resuelve: el script del agente no está versionado en ningún
+repo**, sólo existe en esa PC. Su hermano de las notas de crédito sí está
+(`agente-local/nc_ingest.py`) y sirve de patrón, pero el parser de facturas se perdería con la
+máquina. Hay que traerlo y commitearlo.
