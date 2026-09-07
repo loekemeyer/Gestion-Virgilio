@@ -12,7 +12,7 @@
 > única**; no se replica. Ante la duda entre parche rápido y fix de raíz → **fix
 > de raíz**.
 >
-> Última actualización: 2026-09-07 (lunes) · Versión app al documentar: **v14.12**
+> Última actualización: 2026-09-07 (lunes) · Versión app al documentar: **v14.16**
 >
 > ⚠⚠ **Desde el lunes 2026-09-07 los operarios usan GESTIÓN, no Producción** (dueño, sábado a la
 > noche: *"el lunes van a empezar a usar GV, no más PV"*). Las tandas web viven en
@@ -40,6 +40,20 @@
 > **El caso Osa quedó resuelto a mano y no se toca**: mié 09/09, camión 09, misma dirección —
 > `E09A` = 98650 + 98667 (ISIS, 4,041 m³) · `E09B` = `LK 0024` (web, 0,026 m³). Se pickean por separado.
 > La otra sesión lo volvió a juntar (commit `7f431fb`) leyendo la regla vieja; se revirtió en la base.
+>
+> Nota **v14.16** (backend) — **Ahora se ubica TODO el padrón, no sólo lo que está programado**
+> (dueño 07/09: *"tenés que tener a todo ubicado. sin falta de ninguno, inclusive aunque no hayan mandado
+> pedido"*). El geocodificador miraba únicamente la programación de la semana, así que al abrir el día había
+> **64 direcciones ubicadas** en total. Se agregó `GV_Clientes_Direcciones` (espejo del padrón de direcciones
+> de entrega de LK y Chef, **2.307** filas: 1.255 AMBA + 1.052 interior), la Edge Function
+> `gv-sync-padron-direcciones` que la llena (cron **79**, 05:40 ART) y la vista `gv_geo_faltantes_padron`
+> (AMBA primero). `gv-geocodificar` drena primero lo programado y después el padrón: **2.066 por ubicar**.
+> Las del padrón **no** se escriben en `PPP_Geo` (compartida con Producción) y las 1.041 del interior se
+> preguntan con su provincia real, no con el viewbox del AMBA. El cron 75 se aceleró a `*/10 * * * *` para
+> drenarlas (≈ 9 h); **volver a `20 */6 * * *` cuando `gv_geo_cobertura` esté en verde**. Además se cargó el
+> **depósito**, que no estaba: `PPP_Geo.__deposito_virgilio_2788__` = `-34.6157998, -58.5252267` (Virgilio
+> 2788, Villa Real) — antes el front caía a un fallback a 11 km. Detalle: §3.bl de
+> `docs/SUPABASE-GESTION-VIRGILIO.md`; SQL y rollback en `sql/gv_padron_direcciones_v1416.sql`.
 >
 > Nota **v14.11** (sólo front) — **Los dos avisos de Programación, en una sola fila** (dueño 07/09, con
 > captura: *"estos dos botones que sean un poco más anchos pero que ambos vayan en una sola fila, no en 2 como

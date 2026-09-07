@@ -3160,6 +3160,63 @@ las funciones desde `sql/backups/rep_funciones_20260907_pre_np_feed.sql`.
 
 ---
 
+## 3.bl ✅ Ahora se ubica TODO el padrón, no sólo lo programado (v14.16) — 2026-09-07
+
+**El pedido, textual:** *"tenés que tener a todo ubicado. sin falta de ninguno, inclusive aunque
+no hayan mandado pedido"*.
+
+**Qué estaba mal.** `gv-geocodificar` (cron 75) sólo miraba `gv_geo_faltantes`, que sale de la
+**programación** de los últimos 7 días para adelante. Un cliente que no pidió esta semana no tenía
+lat/lng. El día que entra su pedido, el orden de carga del camión lo manda al final y el reparto se
+arma a ciegas. Al abrir el día había **64 direcciones ubicadas en total** sobre un padrón de más de
+dos mil.
+
+**Lo que se agregó** (todo nuevo, con prefijo nuestro; nada compartido se modificó):
+
+| Objeto | Qué es |
+|---|---|
+| `GV_Clientes_Direcciones` (tabla, RLS on) | espejo del padrón de direcciones de entrega de LK y Chef |
+| `gv-sync-padron-direcciones` (Edge Fn, verify_jwt off) | la llena; cron **79**, `40 8 * * *` (05:40 ART) |
+| `gv_geo_faltantes_padron` (vista, `security_invoker`) | lo del padrón sin ubicar, **AMBA primero** |
+| `gv_geo_cobertura` (vista, `security_invoker`) | cuánto falta, por ámbito y empresa |
+
+**`gv-geocodificar` v9.** Primero drena lo programado (es lo que sale esta semana) y, si sobra
+lote, sigue con el padrón. Dos diferencias con lo programado:
+
+1. **Las del padrón NO se escriben en `PPP_Geo`.** Esa tabla es compartida con Producción y sólo
+   tiene sentido que crezca con lo que de verdad se programó; el padrón vive en `GV_Geo_Cliente`.
+2. **El interior usa su provincia real.** La cascada vieja forzaba `viewbox` del AMBA y
+   `state=Buenos Aires`; con eso, un cliente de Río Cuarto o de Trelew queda sin ubicar o —peor—
+   cae en una calle homónima del conurbano. Ahora hay una rama aparte: búsqueda estructurada
+   `street`+`city`+`state`, sin viewbox, verificada contra el centro de esa localidad **de esa
+   provincia** con radio 40 km (el AMBA sigue con 20). El cache de centros lleva la provincia en
+   la clave: hay un "San Martín" en Buenos Aires, otro en Mendoza y otro en Corrientes.
+
+**Medido el mismo día.**
+
+- `GV_Clientes_Direcciones` → **2.307** direcciones: LK 918 AMBA + 684 interior, Chef 337 AMBA +
+  368 interior.
+- `gv_geo_faltantes_padron` → **2.066** por ubicar (1.025 AMBA + 1.041 interior). Las 241 de
+  diferencia son Retira o dirección que `gv_dir_geo_query` descarta.
+- Corrida de prueba `{"max": 8}` → 4 ubicadas, 4 fallaron (`GV_Geo_Log` id 19).
+- Cron 75 acelerado de `20 */6 * * *` a `*/10 * * * *`: 40 por corrida × 6 corridas/h ≈ **9 h**
+  para drenarlo. Aun así el promedio queda muy por debajo del límite de Nominatim (1 llamada por
+  segundo), porque cada corrida usa ~45 s de los 600 disponibles. **Volver a `20 */6 * * *`
+  cuando `gv_geo_cobertura` esté en verde.**
+
+**Y el depósito, que no estaba.** `PPP_Geo` no tenía la fila `__deposito_virgilio_2788__`, así que
+el front caía al fallback "centro de CABA" (`-34.6037, -58.4`), a **11 km** del depósito real.
+Quedó cargado: **Virgilio 2788, Villa Real, CABA → -34.6157998, -58.5252267**. Sin esto no se puede
+calcular ningún tiempo de viaje depósito → destino.
+
+**Ojo con Chef.** No se lee por el espejo de LK: `chef_customers` y
+`chef_customer_delivery_addresses` son tablas FOREIGN (postgres_fdw contra Chef) y el
+`service_role` de LK no tiene user mapping —devuelven `42704 user mapping not found for user
+"service_role", server "chef_db"`—. La Edge Function va directo al proyecto de Chef con
+`CHEF_SERVICE_KEY`, igual que `sync-clientes-dto`. Si esa clave falta, Chef se saltea y LK sigue.
+
+**Rollback:** en `sql/gv_padron_direcciones_v1416.sql`.
+
 ## 4. Incidente de seguridad — 2026-09-04 (cerrado)
 
 `public.vista_pedidos_web_feed` tenía `select` para `anon`. Los esquemas `fuentes` y

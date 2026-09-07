@@ -8,9 +8,18 @@
 // era del 21/08 y quedaban 43 de 54 direcciones sin ubicar. Sin ubicación, el
 // orden de carga del camión manda ese pedido al final y el reparto se arma mal.
 //
+// v14.16 (2026-09-07) — el dueño lo estiró a TODO el padrón: *"tenés que tener a
+// todo ubicado. sin falta de ninguno, inclusive aunque no hayan mandado pedido"*.
+// Antes sólo se ubicaba lo PROGRAMADO, así que un cliente que no pidió esta semana
+// no tenía ubicación y el día que entra su pedido el reparto se arma a ciegas.
+// Ahora, cuando lo programado ya está, la corrida sigue con `gv_geo_faltantes_padron`
+// (2.307 direcciones de entrega de LK + Chef, AMBA primero). Dos diferencias con lo
+// programado: las del padrón NO se escriben en `PPP_Geo` (compartida con Producción),
+// y las 1.041 del interior usan su provincia real en vez del viewbox del AMBA.
+//
 // Hace, en orden:
 //   1. lee `gv_geo_faltantes` (ISIS + web, sin las que ya están por (cód,dir)
-//      ni por dirección; Retira no cuenta)
+//      ni por dirección; Retira no cuenta) y, si sobra lote, `gv_geo_faltantes_padron`
 //   2. por cada una le pregunta a Nominatim/OpenStreetMap, UNA POR SEGUNDO —
 //      es el límite de la política de uso gratuita y no se negocia
 //   3. escribe la ubicación en `GV_Geo_Cliente` (cód + dirección: nuestra) y
@@ -47,7 +56,19 @@ type Falt = {
   // v13.41: `dir_query` y `barrio_geo` vienen YA corregidos por `GV_Geo_Correccion` (la vista los
   // resuelve). Acá no se sabe nada de correcciones: se pregunta lo que la vista entrega.
   dir_query: string; barrio_geo: string | null; corregida?: boolean;
+  // v14.16 — sólo vienen en las filas de `gv_geo_faltantes_padron` (el padrón entero).
+  // `provincia` manda: sin ella se asume AMBA, que es como se venía trabajando.
+  empresa?: string; provincia?: string | null; amba?: boolean;
 };
+
+/* v14.16 — ¿la dirección es del AMBA? Fuera del AMBA no se puede usar ni el viewbox de Buenos
+   Aires ni `state=Buenos Aires`: un cliente de Río Cuarto (Córdoba) o de Trelew (Chubut) queda
+   sin ubicar o, peor, cae en una calle homónima del conurbano. */
+function esAmba(f: Falt) {
+  if (typeof f.amba === "boolean") return f.amba;
+  const p = plano(f.provincia);
+  return !p || p === "caba" || p === "capital federal" || p === "ciudad de buenos aires" || p === "buenos aires";
+}
 
 const H = { apikey: KEY, Authorization: "Bearer " + KEY, "Content-Type": "application/json" };
 
@@ -90,21 +111,25 @@ function kmEntre(a: { lat: number; lng: number }, b: { lat: number; lng: number 
   const s = Math.sin(dLat / 2) ** 2 + Math.cos(a.lat * Math.PI / 180) * Math.cos(b.lat * Math.PI / 180) * Math.sin(dLng / 2) ** 2;
   return 2 * R * Math.asin(Math.min(1, Math.sqrt(s)));
 }
-async function centroBarrio(barrio: string) {
-  const k = plano(barrio);
+async function centroBarrio(barrio: string, provincia?: string | null) {
+  // v14.16 — la provincia entra en la clave del cache y en la búsqueda: hay un "San Martín" en
+  // Buenos Aires, otro en Mendoza y otro en Corrientes.
+  const prov = String(provincia || "").trim() || "Buenos Aires";
+  const k = plano(barrio) + "|" + plano(prov);
   if (_centros.has(k)) return _centros.get(k)!;
   await new Promise((r) => setTimeout(r, ESPERA_MS));   // es una llamada más a Nominatim: 1 por segundo
   // Búsqueda ESTRUCTURADA (city + state), no libre: "Luján, Argentina" a secas puede ser Luján de
   // Cuyo (Mendoza), un río o un barrio que se llame así. Con city= sólo devuelve la localidad.
   // Un barrio de CABA (Flores, Parque Patricios) también sale por city=: Nominatim lo resuelve
   // como suburb de Buenos Aires.
-  const res = await nominatim("format=jsonv2&limit=1&countrycodes=ar&viewbox=-58.80,-34.40,-58.05,-34.85&city=" + encodeURIComponent(barrio) + "&state=" + encodeURIComponent("Buenos Aires") + "&country=Argentina");
+  const ambaBox = plano(prov) === "buenos aires" || plano(prov) === "caba" ? "&viewbox=-58.80,-34.40,-58.05,-34.85" : "";
+  const res = await nominatim("format=jsonv2&limit=1&countrycodes=ar" + ambaBox + "&city=" + encodeURIComponent(barrio) + "&state=" + encodeURIComponent(prov) + "&country=Argentina");
   const c = res.c ? { lat: res.c.lat, lng: res.c.lng } : null;
   _centros.set(k, c);
   return c;
 }
 
-async function nominatim(qs: string, barrioExigido?: string) {
+async function nominatim(qs: string, barrioExigido?: string, provincia?: string | null, radioKm?: number) {
   const r = await fetch("https://nominatim.openstreetmap.org/search?" + qs,
     { headers: { Accept: "application/json", "User-Agent": UA } });
   if (!r.ok) return { c: null as null | Coord, err: "HTTP " + r.status };
@@ -113,10 +138,11 @@ async function nominatim(qs: string, barrioExigido?: string) {
   const lat = +j[0].lat, lng = +j[0].lon;
   if (!isFinite(lat) || !isFinite(lng)) return { c: null, err: "coordenada inválida" };
   if (barrioExigido) {
-    const centro = await centroBarrio(barrioExigido);
+    const centro = await centroBarrio(barrioExigido, provincia);
     if (!centro) return { c: null, err: "no se pudo ubicar el barrio " + barrioExigido + " para verificar" };
     const km = kmEntre(centro, { lat, lng });
-    if (km > RADIO_KM) return { c: null, err: "cayó a " + Math.round(km) + " km de " + barrioExigido };
+    const tope = radioKm || RADIO_KM;
+    if (km > tope) return { c: null, err: "cayó a " + Math.round(km) + " km de " + barrioExigido };
   }
   return { c: { lat, lng, comp: j[0].address || null }, err: "" };
 }
@@ -134,10 +160,36 @@ async function nominatim(qs: string, barrioExigido?: string) {
         cuadras ordena el reparto igual de bien; queda marcada `precision = 'calle'` para
         poder revisarla. Sin barrio no se intenta: "Rivadavia" solo es cualquier lado.
    Cada intento cuesta 1 segundo (política de Nominatim), y sólo se hacen si el anterior falló. */
-async function geocodificar(dir: string, barrio: string | null) {
-  const AMBA = "&viewbox=-58.80,-34.40,-58.05,-34.85";
+async function geocodificar(dir: string, barrio: string | null, provincia?: string | null, amba = true) {
+  const AMBA = amba ? "&viewbox=-58.80,-34.40,-58.05,-34.85" : "";
   const base = "format=jsonv2&addressdetails=1&limit=1&countrycodes=ar";
   const bOk = barrioOk(barrio);
+
+  // v14.16 — INTERIOR (el padrón trae 1.041 direcciones fuera del AMBA, que salen por expreso).
+  // Ahí la cascada del AMBA no sirve: se pregunta con la provincia real, sin viewbox, y se
+  // verifica contra el centro de la localidad de esa provincia con un radio más generoso
+  // (un partido/departamento del interior es mucho más grande que uno del conurbano).
+  if (!amba) {
+    const prov = String(provincia || "").trim();
+    const RADIO_INT = 40;
+    const intentosInt: { qs: string; precision: string }[] = [
+      { qs: base + "&street=" + encodeURIComponent(dir) + (bOk ? "&city=" + encodeURIComponent(bOk) : "") + (prov ? "&state=" + encodeURIComponent(prov) : "") + "&country=Argentina", precision: "exacta" },
+      { qs: base + "&q=" + encodeURIComponent([dir, bOk, prov, "Argentina"].filter(Boolean).join(", ")), precision: "exacta" },
+    ];
+    const calleInt = dir.replace(/\s+\d[\d\/\-\s]*[a-zA-Z]?\s*$/, "").trim();
+    if (bOk && calleInt && calleInt !== dir) {
+      intentosInt.push({ qs: base + "&street=" + encodeURIComponent(calleInt) + "&city=" + encodeURIComponent(bOk) + (prov ? "&state=" + encodeURIComponent(prov) : "") + "&country=Argentina", precision: "calle" });
+    }
+    let errInt = "sin resultado";
+    for (let i = 0; i < intentosInt.length; i++) {
+      if (i) await new Promise((r) => setTimeout(r, ESPERA_MS));
+      const res = await nominatim(intentosInt[i].qs, bOk || undefined, prov || undefined, RADIO_INT);
+      if (res.c) return { c: res.c, err: "", intento: i + 1, precision: intentosInt[i].precision };
+      errInt = res.err;
+    }
+    return { c: null as null | Coord, err: errInt, intento: intentosInt.length, precision: "" };
+  }
+
   // `exigir`: el resultado tiene que caer a ≤ RADIO_KM del barrio pedido o se descarta. Va en TODOS
   // los intentos (v13.43): el dueño aclaró que una dirección de otra provincia nunca es punto de
   // entrega —se entrega al expreso en Buenos Aires—, así que un resultado lejos del barrio es
@@ -182,19 +234,35 @@ Deno.serve(async (req) => {
     const body = await req.json().catch(() => ({}));
     const tope = Math.min(Math.max(Number(body?.max) || MAX_POR_CORRIDA, 1), 200);
 
+    // 1º lo PROGRAMADO (sale esta semana: es lo urgente).
     const falt: Falt[] = await rest("gv_geo_faltantes?select=*&limit=500");
-    if (!falt.length) {
+
+    // 2º el PADRÓN entero (v14.16, pedido del dueño: *"tenés que tener a todo ubicado. sin falta
+    //    de ninguno, inclusive aunque no hayan mandado pedido"*). Sólo se pide lo que entra en el
+    //    lote de esta corrida, así que no cuesta nada cuando ya está todo ubicado.
+    let padron: Falt[] = [];
+    let padronPendiente = 0;
+    if (falt.length < tope) {
+      padron = await rest("gv_geo_faltantes_padron?select=*&limit=" + (tope - falt.length));
+      const c = await fetch(URL_ + "/rest/v1/gv_geo_faltantes_padron?select=cod", {
+        headers: { ...H, Prefer: "count=exact", Range: "0-0" },
+      });
+      padronPendiente = Number(String(c.headers.get("content-range") || "").split("/")[1]) || padron.length;
+    }
+
+    if (!falt.length && !padron.length) {
       await log("sin_faltantes", 0, 0, 0, "", null);
       return Response.json({ ok: true, estado: "sin_faltantes", faltaban: 0 });
     }
 
-    const lote = falt.slice(0, tope);
+    const lote = [...falt.slice(0, tope), ...padron].slice(0, tope);
     let ubicadas = 0, aproximadas = 0; const errores: { cod: string; dir: string; err: string }[] = [];
     const porCalle: { cod: string; dir: string }[] = [];
 
     for (let i = 0; i < lote.length; i++) {
       const f = lote[i];
-      const { c, err, precision } = await geocodificar(f.dir_query, f.barrio_geo || f.barrio);
+      const delPadron = f.fuente === "PADRON";
+      const { c, err, precision } = await geocodificar(f.dir_query, f.barrio_geo || f.barrio, f.provincia, esAmba(f));
       if (c) {
         if (precision === "calle") { aproximadas++; porCalle.push({ cod: f.cod, dir: f.direccion }); }
         // Nuestra tabla: la fuente canónica de Gestión.
@@ -207,10 +275,15 @@ Deno.serve(async (req) => {
           }),
         }).catch((e) => errores.push({ cod: f.cod, dir: f.direccion, err: "GV_Geo_Cliente: " + e.message }));
         // Compartida con Producción: SÓLO agregar. Si la clave ya está, no se toca.
-        await rest("PPP_Geo", {
-          method: "POST", headers: { Prefer: "resolution=ignore-duplicates,return=minimal" },
-          body: JSON.stringify({ dir_key: f.dir_key, direccion: f.direccion, barrio: f.barrio, lat: c.lat, lng: c.lng, comp: c.comp }),
-        }).catch((e) => errores.push({ cod: f.cod, dir: f.direccion, err: "PPP_Geo: " + e.message }));
+        // v14.16: las del PADRÓN no van acá. `PPP_Geo` la lee la app de Producción y sólo tiene
+        // sentido que crezca con lo que de verdad se programó; el padrón (2.300 direcciones,
+        // muchas del interior que salen por expreso) vive en nuestra `GV_Geo_Cliente`.
+        if (!delPadron) {
+          await rest("PPP_Geo", {
+            method: "POST", headers: { Prefer: "resolution=ignore-duplicates,return=minimal" },
+            body: JSON.stringify({ dir_key: f.dir_key, direccion: f.direccion, barrio: f.barrio, lat: c.lat, lng: c.lng, comp: c.comp }),
+          }).catch((e) => errores.push({ cod: f.cod, dir: f.direccion, err: "PPP_Geo: " + e.message }));
+        }
         ubicadas++;
       } else {
         errores.push({ cod: f.cod, dir: f.dir_query, err });
@@ -218,11 +291,11 @@ Deno.serve(async (req) => {
       if (i < lote.length - 1) await new Promise((r) => setTimeout(r, ESPERA_MS));
     }
 
-    const quedan = falt.length - ubicadas;
+    const quedan = Math.max(0, falt.length + padronPendiente - ubicadas);
     const motivo = [quedan > 0 ? quedan + " sin ubicar todavía" : "", aproximadas ? aproximadas + " por la calle (sin altura en OSM)" : ""].filter(Boolean).join(" · ");
     await log("ok", lote.length, ubicadas, errores.length, motivo,
       (errores.length || porCalle.length) ? { errores: errores.slice(0, 40), por_calle: porCalle.slice(0, 40) } : null);
-    return Response.json({ ok: true, estado: "ok", faltaban: falt.length, pedidas: lote.length, ubicadas, aproximadas, fallaron: errores.length, quedan, errores: errores.slice(0, 40), por_calle: porCalle, ms: Date.now() - t0 });
+    return Response.json({ ok: true, estado: "ok", faltaban: falt.length, padron_pendiente: padronPendiente, pedidas: lote.length, ubicadas, aproximadas, fallaron: errores.length, quedan, errores: errores.slice(0, 40), por_calle: porCalle, ms: Date.now() - t0 });
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     await log("error", 0, 0, 0, msg, null);

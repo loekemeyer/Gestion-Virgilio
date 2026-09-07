@@ -68,8 +68,14 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
     out.kpiPedSub = (function () { const m = /<div class="l">Pedidos<\/div><div class="v">[^<]*<\/div><div class="s">([^<]*)<\/div>/.exec(html); return m ? m[1] : null; })();
     out.dias = (html.match(/class="pn-day(?: |")/g) || []).length;
     out.vacios = (html.match(/pn-day empty/g) || []).length;
-    // v13.33: ni carteles ni tarjeta de Atrasados en Programación (dueño: "es un dato de gerencia")
-    out.alerta = !/pn-alert/.test(html) && !/pppPlanAbrir\('venc'\)/.test(html) && !/Atrasados/.test(html) && !/pn-flags/.test(html);
+    // v14.06 — la v13.33 había sacado los atrasados de Programación ("es un dato de gerencia") y el
+    // dueño lo revirtió el 07/09: *"hoy para ver los pedidos atrasados tengo que entrar a control para
+    // que me aparezca el botón que me lleve de nuevo a programación, una locura"*. Ahora la banda vive
+    // acá y abre la lista en la misma solapa. Lo que sigue sin volver son los carteles grandes de la
+    // v13.05/v13.25 (`pn-alert`, `pn-flags`) y la tarjeta-KPI de Atrasados.
+    out.alerta = !/pn-alert/.test(html) && !/pn-flags/.test(html);
+    // v14.11: la banda de atrasados y el botón de "cargados sin controlar" van en UNA fila (.pn-avisos)
+    out.bandaVenc = /pn-venc-band/.test(html) && /pppPlanAbrir\('venc'\)/.test(html) && /2 atrasados/.test(html) && /pn-avisos/.test(html);
     out.hoyBadge = /class="hoy">HOY/.test(html) === (hab[0].getTime() === _pppKeyDate(_pppHoyKey()).getTime());
     out.dia1 = /Camión 1 · Zona 1 - CABA Sur/.test(html) && /Camión 2 · Zona 6 - GBA Norte/.test(html) && /\$ 6\.000\.000/.test(html);   // 3,7+0,8+0,9+0,6 m³ × 1 M
     out.retira = /Retira en fábrica/.test(html);
@@ -121,7 +127,7 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
     out.tabPlanN = />🗓️ Programación \(11\)</.test(html);
     _pppTab = "resumen"; pppRenderProg();
     html = document.getElementById("pppPreview").innerHTML;
-    out.resumenVenc = /ppp-res-note rep">⏰ <b>2<\/b> pedido\(s\) con fecha de entrega vencida: <b>2 sin salir → hay que reprogramar<\/b>\. /.test(html) && /pppTab\('plan'\);pppPlanAbrir\('venc'\)/.test(html);
+    out.resumenVenc = /pedido\(s\) con fecha de entrega vencida/.test(html);
     _pppTab = "plan"; pppRenderProg();
     // día 2: Retira no cuenta como camión ni tiene orden de carga
     pppPlanAbrir(_pppDateKey(hab[1]));
@@ -154,10 +160,11 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
     ["KPI camiones 6 (por n° de tanda y día; Retira no cuenta; +1 web)", r.kpiCam === "6"],
     ["KPI volumen 20,7 m³ (20,4 ISIS + 0,3 web)",             r.kpiVol === "20,7 m³"],
     ["KPI valor $ 20.400.000 (corto: $20,4 M en celular)",  r.kpiVal === "$ 20.400.000|$20,4 M"],
-    ["v13.33: Atrasados fuera de Programación, en Resumen con acceso a la lista", r.kpiAt === null && r.resumenVenc === true],
+    ["v14.06: la banda de Atrasados vive en Programación y abre la lista ahí mismo (sin tarjeta-KPI)", r.kpiAt === null && r.bandaVenc === true],
     ["6 tarjetas de día, 1 vacía (v13.53: la web llena el día 3)", r.dias === 6 && r.vacios === 1],
     ["v13.53: la tanda web con fecha ISO se ve en su día (Tanda E09A · LK 1360)", r.webDia3 === true],
-    ["v13.33: sin carteles ni tarjeta de Atrasados en Programación", r.alerta === true],
+    ["sin los carteles grandes de la v13.05/v13.25 (pn-alert / pn-flags)", r.alerta === true],
+    ["Resumen sigue avisando de los vencidos", r.resumenVenc === true],
     ["HOY sólo si hoy es hábil",                              r.hoyBadge === true],
     ["día 1: dos camiones por zona con $",                    r.dia1 === true],
     ["día 2: Retira en fábrica aparte",                       r.retira === true],
