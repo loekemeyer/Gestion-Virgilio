@@ -7433,7 +7433,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v14.47";
+const APP_VERSION = "v14.48";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -41121,7 +41121,7 @@ function concilRender() {
     '<th>NP</th><th>Cliente</th><th>Facturado</th><th style="text-align:right;">Cajas ges/isis</th>' +
     '<th style="text-align:right;">Gestión (mandado)</th><th style="text-align:right;">ISIS (facturado)</th>' +
     '<th style="text-align:right;">Diferencia</th><th>Estado</th><th>¿Por qué?</th><th>Comparar</th></tr></thead><tbody>';
-  h += shown.map(function (r) {
+  h += shown.map(function (r, i) {
     var est = CONCIL_EST[r.estado] || ["#334155", r.estado];
     var sp = r.storage_path ? String(r.storage_path).replace(/\\/g, "\\\\").replace(/'/g, "\\'") : "";
     var curDiff = (r.neto_actual != null && r.factura_neto != null) ? (Number(r.factura_neto) - Number(r.neto_actual)) : null;
@@ -41132,7 +41132,10 @@ function concilRender() {
     var diffCell = r.corregido
       ? '<span style="color:#047857;font-weight:bold;" title="Se mandó con ' + (r.diff != null ? _fmtPlata(r.diff) + (r.diff_pct != null ? " (" + r.diff_pct + "%)" : "") : "—") + '">✔ igual hoy</span>'
       : (r.diff != null ? '<span style="color:' + (r.diff > 0 ? "#dc2626" : (r.diff < 0 ? "#b45309" : "#334155")) + ';">' + _fmtPlata(r.diff) + (r.diff_pct != null ? ' (' + (r.diff_pct > 0 ? "+" : "") + r.diff_pct + '%)' : '') + '</span>' : "—");
-    var motivoCell = r.corregido ? '' : (r.motivo ? escapeHtml(r.motivo) : "");
+    // v14.42 — el motivo NO viene en el listado (evita el timeout): se pide on-demand por NP
+    // (concilCargarMotivos), sólo para las filas con diferencia no corregidas.
+    var needMot = (r.estado === "diff" && !r.corregido && r.factura_neto != null);
+    var motivoCell = r.motivo ? escapeHtml(r.motivo) : (needMot ? '<span style="color:#94a3b8;">…</span>' : "");
     return '<tr>' +
       '<td><b>' + escapeHtml(r.np || "") + '</b> ' + _npSrcChip(r.np) + '</td>' +
       '<td>' + escapeHtml((r.cod_cliente || "") + " " + (r.razon_social || "—")) + (r.es_super ? " 🛒" : "") + '</td>' +
@@ -41142,14 +41145,35 @@ function concilRender() {
       '<td class="num">' + (r.factura_neto != null ? _fmtPlata(r.factura_neto) : "—") + '</td>' +
       '<td class="num" style="font-weight:bold;">' + diffCell + '</td>' +
       '<td class="fac-cc-est">' + estCell + '</td>' +
-      '<td style="font-size:12px;color:#b45309;max-width:220px;">' + motivoCell + '</td>' +
+      '<td id="concilMot' + i + '" style="font-size:12px;color:#b45309;max-width:220px;">' + motivoCell + '</td>' +
       '<td style="white-space:nowrap;">' + '<button class="fac-cc-det" title="Abre la factura de ISIS y el detalle de Gestión lado a lado, para comparar" onclick="concilDetalle(\'' + String(r.np).replace(/'/g, "\\'") + '\')">🔍 Comparar</button>' + (r.comprobante_id ? ' <span style="font-size:11px;color:#64748b;">' + escapeHtml(r.comprobante_id) + '</span>' : '') + '</td>' +
       '</tr>';
   }).join("");
   h += '</tbody></table></div>';
   cont.innerHTML = h;
+  concilCargarMotivos(shown);
 }
 window.concilRender = concilRender;
+
+/* v14.42 — carga on-demand del "¿Por qué?" (motivo) por NP, en paralelo y sin bloquear el
+   render. Backend gv_conciliacion_motivo(np) (SÓLO LEE). Antes venía en el listado y por cada
+   fila con diferencia re-materializaba el cruce completo → gv_conciliacion_lista hacía timeout. */
+function concilCargarMotivos(shown) {
+  (shown || []).forEach(function (r, i) {
+    if (r.motivo) return; // ya vino (por si un día se precalcula)
+    if (!(r.estado === "diff" && !r.corregido && r.factura_neto != null)) return;
+    sb.rpc("gv_conciliacion_motivo", { p_np: r.np }).then(function (res) {
+      var td = document.getElementById("concilMot" + i); if (!td) return;
+      if (res.error) { td.innerHTML = '<span style="color:#cbd5e1;">—</span>'; return; }
+      var m = res.data; // escalar text
+      r.motivo = m || "";
+      td.innerHTML = m ? escapeHtml(String(m)) : '<span style="color:#cbd5e1;">—</span>';
+    }).catch(function () {
+      var td = document.getElementById("concilMot" + i); if (td) td.innerHTML = '<span style="color:#cbd5e1;">—</span>';
+    });
+  });
+}
+window.concilCargarMotivos = concilCargarMotivos;
 
 /* v14.31 — 📋 detalle "a facturar" de una NP (líneas de Gestión: cajas entregadas × lista ×
    descuento), para comparar contra el PDF de ISIS y ver dónde está la diferencia.
