@@ -7433,7 +7433,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v14.42";
+const APP_VERSION = "v14.43";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -41271,7 +41271,7 @@ function concilDetRender(row, cmp) {
   var pdfPane = '<div id="concilDetPdf" style="flex:1 1 520px;min-width:340px;min-height:520px;height:76vh;background:#334155;border-radius:8px;display:flex;align-items:center;justify-content:center;color:#e2e8f0;overflow:hidden;">' +
     (sp ? 'Cargando factura…' : 'Sin factura de ISIS todavía — aparece acá cuando ISIS la sube.') + '</div>';
   h += '<div style="display:flex;gap:12px;flex-wrap:wrap;align-items:stretch;">' + tbl + pdfPane + '</div>';
-  h += '<div style="margin-top:8px;font-size:12px;color:#94a3b8;">Izquierda: cada artículo, Gestión (cálculo actual) vs la factura de ISIS. Fila resaltada = donde hay diferencia. Derecha: la factura para verlo con tus ojos.</div>';
+  h += '<div style="margin-top:8px;font-size:12px;color:#94a3b8;">Izquierda: cada artículo, Gestión (cálculo actual) vs la factura de ISIS. Fila resaltada = donde hay diferencia. Derecha: la factura para verlo con tus ojos. El importe de ISIS por renglón está al <b>neto</b> (el descuento global de la factura —ej. 2% web— se prorratea en cada ítem), para comparar neto contra neto.</div>';
   body.innerHTML = h;
 }
 window.concilDetRender = concilDetRender;

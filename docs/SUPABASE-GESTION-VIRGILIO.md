@@ -4067,6 +4067,7 @@ verde) con el diff original en el tooltip. Además, nueva **columna "¿Por qué?
 precio: <cods>, N sin precio, N sólo factura/Gestión. Backend: `gv_conciliacion_estricto_motivo_v1438`.
 98484 hoy: estado "Diferencia", motivo "dif. pareja −2,0% (lista/descuento/factor) · precio: 809E ·
 1 sólo en factura". Smoke `fac-conciliacion` actualizado.
+
 ---
 
 ## §3.bh — v14.42 (2026-09-08): Facturación — fecha de descarga, condición de pago, historial y el nombre del cliente de la NP web
@@ -4150,3 +4151,13 @@ drop table public."GV_Fac_Export";
 ```
 (el front tolera que no estén: la solapa muestra el error y el resto de Facturación no se toca. Para
 volver la col A a la fecha del pedido: en `_facXlsFilasPlanas`, `fecha: hoyTxt` → `fecha: r.fechaTxt`.)
+
+**v14.43 (08/09) — Conciliación: prorrateo del descuento global de ISIS (neto vs neto).** Luis vio
+que LK 0011 daba diff $0 al neto pero cada renglón marcaba 2% en rojo. Causa: la página LK mete el
+2% web en el BRUTO de cada ítem y ISIS lo aplica como UN renglón global ("2% Descuento Web", que el
+parser detecta pero con importe null). `gv_conciliacion_comparar` ahora excluye las líneas sin código
+y multiplica cada renglón de ISIS por el factor = `subt_gravado` (neto) / suma de renglones brutos →
+compara neto contra neto. El neto es el dato confiable del parser (medido: neto = renglones × 0,98 en
+5/5 facturas web). LK 0011 cierra a $0 en todos los renglones; Vargas 98484 queda con la única
+diferencia REAL (809E, $3.005 vs $4.060 = todo el desvío de $11.662). Backend:
+`gv_conciliacion_comparar_prorrateo_v1441`. Front: nota en el modal. Sólo lectura, todo `gv_`.

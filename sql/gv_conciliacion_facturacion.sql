@@ -206,3 +206,15 @@ grant execute on function public.gv_conciliacion_detalle(text) to anon, authenti
 --     (dif. pareja %, descuento, precio: <cods>, N sin precio, N sólo factura/Gestión).
 -- (SQL vigente aplicado por migración gv_conciliacion_estricto_motivo_v1438.)
 -- ══════════════════════════════════════════════════════════════════════════
+
+-- ══════════════════════════════════════════════════════════════════════════
+-- v14.41 (2026-09-08) — comparar: PRORRATEO del descuento global de ISIS.
+-- La página LK mete el 2% web en el BRUTO de cada renglón; ISIS lo aplica como UN renglón
+-- global sobre el total ("2% Descuento Web", que el parser detecta pero con importe null).
+-- Así, renglón a renglón Gestión (neto) contra ISIS (bruto) daba 2% de diferencia falsa en todos.
+-- Fix: gv_conciliacion_comparar excluye las líneas sin código y multiplica cada renglón de ISIS
+-- por el factor = subt_gravado (neto) / suma de renglones brutos → compara NETO vs NETO. El neto
+-- (subt_gravado) es el dato confiable del parser (medido: neto = renglones × 0,98 en 5/5 facturas web).
+-- Efecto: LK 0011 cierra a $0 en cada renglón; Vargas 98484 queda con la única diferencia REAL,
+-- el 809E ($3.005 vs $4.060). (Aplicado por migración gv_conciliacion_comparar_prorrateo_v1441.)
+-- ══════════════════════════════════════════════════════════════════════════
