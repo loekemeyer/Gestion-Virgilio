@@ -763,6 +763,15 @@ button {
 #pppOverlay .ppp-tablewrap, #pppOverlay .ppp-ocup-chart-wrap, #pppOverlay .ppp-restbl-wrap{ overflow:visible; }
 .apr-reload{ border:1px solid #cbd5e1; background:#fff; border-radius:8px; padding:5px 10px !important; cursor:pointer; font-size:14px; }
 .apr-load{ font-size:12.5px; color:#64748b; }
+/* Relojito: mientras chequea las DOS bases (LK + Chef) en Supabase, avisa que todavía
+   no terminó (tarda ~10 s). Reloj girando + contador de segundos en vivo. */
+.apr-reloj{ display:flex; align-items:center; gap:9px; background:#fffbeb; border:1px solid #fde68a;
+  border-left:5px solid #f59e0b; color:#92400e; padding:8px 12px; border-radius:8px; margin:6px 2px;
+  font-weight:700; font-size:13px; }
+.apr-reloj-ic{ font-size:17px; display:inline-block; animation:aprRelojGira 1.1s linear infinite; }
+.apr-reloj-seg{ margin-left:2px; background:#fde68a; color:#78350f; border-radius:999px; padding:1px 9px;
+  font-variant-numeric:tabular-nums; }
+@keyframes aprRelojGira{ from{ transform:rotate(0); } to{ transform:rotate(360deg); } }
 .apr-err{ background:#fee2e2; border-left:5px solid #b91c1c; color:#7f1d1d; padding:8px 10px; border-radius:6px; margin:6px 2px; font-weight:600; }
 .apr-msg{ background:#ecfdf5; border-left:5px solid #059669; color:#065f46; padding:8px 10px; border-radius:6px; margin:6px 2px; font-weight:600; }
 
@@ -7386,7 +7395,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v14.33";
+const APP_VERSION = "v14.34";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -33923,6 +33932,27 @@ async function aprArmarAhora() {
     return { ok: r.ok, data: j };
   } catch (e) { clearTimeout(to); return { ok: false, motivo: (e && e.message) || String(e) }; }
 }
+/* Relojito de "A Programar": ¿sigue chequeando alguna de las dos bases? */
+function aprCargandoAlgo() { return !!(_apr.cargando || _apr.cargandoChef || _apr.armando); }
+/* Mantiene el contador de segundos en vivo mientras controla, sin re-dibujar toda la
+   pantalla cada segundo (sólo toca el texto del <b class="apr-reloj-seg">). */
+function aprRelojSync() {
+  const activo = aprCargandoAlgo();
+  if (!activo) {
+    _apr.relojDesde = 0;
+    if (_apr.relojTimer) { clearInterval(_apr.relojTimer); _apr.relojTimer = null; }
+    return;
+  }
+  if (!_apr.relojDesde) _apr.relojDesde = Date.now();
+  aprRelojPintar();
+  if (!_apr.relojTimer) _apr.relojTimer = setInterval(aprRelojPintar, 1000);
+}
+function aprRelojPintar() {
+  const el = document.querySelector('.apr-reloj-seg');
+  if (!el) { if (_apr.relojTimer) { clearInterval(_apr.relojTimer); _apr.relojTimer = null; } return; }
+  const s = _apr.relojDesde ? Math.floor((Date.now() - _apr.relojDesde) / 1000) : 0;
+  el.textContent = s + 's';
+}
 /* El 🔄 de A Programar: arma lo que se pueda y después relee. */
 async function aprActualizar() {
   if (_apr.armando || _apr.cargando) return;
@@ -34277,6 +34307,13 @@ function aprRender() {
        '<span class="apr-pasos"><b class="' + (_apr.paso === 1 ? 'on' : '') + '">① Pedidos</b> <b class="' + (_apr.paso === 2 ? 'on' : '') + '">② Día</b></span>' +
        '</div>';
 
+  // Relojito: mientras no confirme que chequeó las DOS bases (LK + Chef) en Supabase, el que
+  // mira tiene que saber que todavía no terminó de controlar si hay pedidos nuevos (~10 s).
+  if (aprCargandoAlgo()) {
+    const _rq = _apr.armando ? 'Armando lo que se pueda' : (_apr.cargando ? 'Controlando en Supabase si hay pedidos nuevos' : 'LK listo · falta confirmar Chef');
+    h += '<div class="apr-reloj"><span class="apr-reloj-ic">⏳</span><span>' + _rq + '… <b class="apr-reloj-seg">0s</b></span></div>';
+  }
+
   if (_apr.err) h += '<div class="apr-err">⚠ ' + escapeHtml(_apr.err) + '</div>';
   if (_apr.aviso) h += '<div class="apr-err">⚠ ' + escapeHtml(_apr.aviso) + '</div>';
   // v13.72: pedido de Chef que compras ya tipeó en ISIS LK (mismo CUIT, mismo día): no se programa, se avisa
@@ -34320,6 +34357,7 @@ function aprRender() {
   box.querySelectorAll(".apr-scroll").forEach(function (e, i) {
     if (scrolls[i]) e.scrollTop = scrolls[i];
   });
+  aprRelojSync();  // relojito con el contador de segundos en vivo mientras controla las dos bases
 }
 
 /* v13.34 (dueño: "siguen figurando ahí pedidos que según eso ya fueron programados") — el cartel
@@ -34362,10 +34400,12 @@ function aprColPedidos() {
     '<div class="apr-scroll">';
   if (!lista.length) {
     // v13.88 (dueño: "tendría que ponerme un listo o algo"): terminado se dice fuerte, no en gris chiquito.
-    h += _apr.listo
+    // Mientras siga chequeando alguna base (LK o Chef), NO decir "Listo" todavía: podría estar
+    // por caer un pedido nuevo de la base que falta. El relojito de arriba ya avisa que controla.
+    h += (_apr.listo && !aprCargandoAlgo())
       ? (q ? '<div class="apr-vacio">Ningún pedido coincide con «' + escapeHtml(q) + '».</div>'
            : '<div class="apr-listo">✅ <b>Listo: no queda nada por programar.</b><div class="apr-listo-sub">Todo lo que entró ya tiene tanda y día. Si llega un pedido nuevo aparece acá solo.</div></div>')
-      : '<div class="apr-vacio">Cargando pedidos…</div>';
+      : '<div class="apr-vacio">⏳ Controlando en Supabase si hay pedidos nuevos…</div>';
   }
   for (const p of lista) {
     const id = "p" + p.order_id, ab = !!_apr.exp[id];
