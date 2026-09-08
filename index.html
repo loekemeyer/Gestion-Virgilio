@@ -7405,7 +7405,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v14.39";
+const APP_VERSION = "v14.40";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -40897,13 +40897,19 @@ function concilRender() {
   var h = '<div style="overflow-x:auto;"><table class="fac-concil-tbl"><thead><tr>' +
     '<th>NP</th><th>Cliente</th><th>Facturado</th><th style="text-align:right;">Cajas ges/isis</th>' +
     '<th style="text-align:right;">Gestión (mandado)</th><th style="text-align:right;">ISIS (facturado)</th>' +
-    '<th style="text-align:right;">Diferencia</th><th>Estado</th><th>Comparar</th></tr></thead><tbody>';
+    '<th style="text-align:right;">Diferencia</th><th>Estado</th><th>¿Por qué?</th><th>Comparar</th></tr></thead><tbody>';
   h += shown.map(function (r) {
     var est = CONCIL_EST[r.estado] || ["#334155", r.estado];
     var sp = r.storage_path ? String(r.storage_path).replace(/\\/g, "\\\\").replace(/'/g, "\\'") : "";
+    var curDiff = (r.neto_actual != null && r.factura_neto != null) ? (Number(r.factura_neto) - Number(r.neto_actual)) : null;
     var estCell = r.corregido
-      ? '<span style="color:#047857;font-weight:800;" title="Tenía una diferencia de ' + (r.diff != null ? _fmtPlata(r.diff) : "") + ', pero el cálculo actual de Gestión ya coincide con ISIS. Tocá 🔍 Comparar para ver qué era.">✔ Corregido</span>'
+      ? '<span style="color:#047857;font-weight:800;" title="Se mandó a facturar con una diferencia de ' + (r.diff != null ? _fmtPlata(r.diff) : "") + ', pero el cálculo actual de Gestión ya da IGUAL que ISIS. Tocá 🔍 Comparar.">✔ Corregido</span>'
       : '<span style="color:' + est[0] + '">' + est[1] + '</span>';
+    // Diferencia: en las corregidas mostramos el estado ACTUAL (≈$0, verde); en el resto, el diff del snapshot.
+    var diffCell = r.corregido
+      ? '<span style="color:#047857;font-weight:bold;" title="Se mandó con ' + (r.diff != null ? _fmtPlata(r.diff) + (r.diff_pct != null ? " (" + r.diff_pct + "%)" : "") : "—") + '">✔ igual hoy</span>'
+      : (r.diff != null ? '<span style="color:' + (r.diff > 0 ? "#dc2626" : (r.diff < 0 ? "#b45309" : "#334155")) + ';">' + _fmtPlata(r.diff) + (r.diff_pct != null ? ' (' + (r.diff_pct > 0 ? "+" : "") + r.diff_pct + '%)' : '') + '</span>' : "—");
+    var motivoCell = r.corregido ? '' : (r.motivo ? escapeHtml(r.motivo) : "");
     return '<tr>' +
       '<td><b>' + escapeHtml(r.np || "") + '</b> ' + _npSrcChip(r.np) + '</td>' +
       '<td>' + escapeHtml((r.cod_cliente || "") + " " + (r.razon_social || "—")) + (r.es_super ? " 🛒" : "") + '</td>' +
@@ -40911,8 +40917,9 @@ function concilRender() {
       '<td class="num">' + (r.cajas_ent != null ? Math.round(Number(r.cajas_ent)) : "—") + (r.factura_cajas != null ? ' <span style="color:#94a3b8;">/ ' + Math.round(Number(r.factura_cajas)) + '</span>' : '') + '</td>' +
       '<td class="num">' + (r.neto_gestion != null ? _fmtPlata(r.neto_gestion) : "—") + (r.items_sin_precio > 0 ? ' <span style="font-size:11px;color:#b45309;" title="artículos sin precio de lista">' + r.items_sin_precio + ' s/precio</span>' : '') + '</td>' +
       '<td class="num">' + (r.factura_neto != null ? _fmtPlata(r.factura_neto) : "—") + '</td>' +
-      '<td class="num" style="font-weight:bold;color:' + (r.diff > 0 ? "#dc2626" : (r.diff < 0 ? "#b45309" : "#334155")) + '">' + (r.diff != null ? (_fmtPlata(r.diff) + (r.diff_pct != null ? ' (' + (r.diff_pct > 0 ? "+" : "") + r.diff_pct + '%)' : '')) : "—") + '</td>' +
+      '<td class="num" style="font-weight:bold;">' + diffCell + '</td>' +
       '<td class="fac-cc-est">' + estCell + '</td>' +
+      '<td style="font-size:12px;color:#b45309;max-width:220px;">' + motivoCell + '</td>' +
       '<td style="white-space:nowrap;">' + '<button class="fac-cc-det" title="Abre la factura de ISIS y el detalle de Gestión lado a lado, para comparar" onclick="concilDetalle(\'' + String(r.np).replace(/'/g, "\\'") + '\')">🔍 Comparar</button>' + (r.comprobante_id ? ' <span style="font-size:11px;color:#64748b;">' + escapeHtml(r.comprobante_id) + '</span>' : '') + '</td>' +
       '</tr>';
   }).join("");

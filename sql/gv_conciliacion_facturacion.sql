@@ -195,3 +195,14 @@ grant execute on function public.gv_conciliacion_detalle(text) to anon, authenti
 --   drop function if exists public.gv_conciliacion_comparar(text);
 -- (SQL vigente aplicado por migración gv_conciliacion_diag_corregido_v1434.)
 -- ══════════════════════════════════════════════════════════════════════════
+
+-- ══════════════════════════════════════════════════════════════════════════
+-- v14.38 (2026-09-08) — "corregido"/"ok" = IDÉNTICO (tolerancia estricta $100, no 1%) +
+-- columna "¿Por qué?" (motivo) en la lista. Pedido de Luis: "corregido = que dé IGUAL
+-- ISIS = Gestión; tiene que ser idéntico" (Vargas 98484 marcaba corregido con 0,76% de dif).
+--   · gv_conciliacion_lista: estado 'ok' y flag 'corregido' pasan a exigir |dif| <= $100 (antes
+--     greatest(50, neto*0.01) = 1%). Suma columna `motivo` (sólo filas con diferencia).
+--   · gv_conciliacion_motivo(np): arma el texto de la causa a partir de gv_conciliacion_comparar
+--     (dif. pareja %, descuento, precio: <cods>, N sin precio, N sólo factura/Gestión).
+-- (SQL vigente aplicado por migración gv_conciliacion_estricto_motivo_v1438.)
+-- ══════════════════════════════════════════════════════════════════════════

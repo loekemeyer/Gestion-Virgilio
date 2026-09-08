@@ -38,7 +38,8 @@ const { chromium } = require("/opt/node22/lib/node_modules/playwright");
         fecha_salida: "2026-09-08", cajas_ent: 300, neto_gestion: 8561760, items_sin_precio: 2,
         registrado_at: "2026-09-08T10:00:00-03:00", factura_neto: 7791011.1, factura_cajas: 298,
         comprobante_id: "A-0001-00000777", doc_fecha: "2026-09-08", storage_path: "2026/09/ch_777.pdf",
-        es_super: false, diff: -770748.9, diff_pct: -9, estado: "diff", neto_actual: 7790500, corregido: true, total_count: 3 }
+        es_super: false, diff: -770748.9, diff_pct: -9, estado: "diff", neto_actual: 7000000, corregido: false,
+        motivo: "precio: 809E · dif. pareja -2.0% (lista/descuento/factor)", total_count: 3 }
     ];
     const cmpRows = [
       { cod: "501", descripcion: "Abrelatas", cajas_ges: 5, cajas_isis: 5, precio_ges: 5520, precio_isis: 5520, dto_ges: 6, dto_isis: 6, importe_ges: 152550.72, importe_isis: 155664, diff: 3113.28, sin_precio_ges: false, motivo: "importe" },
@@ -84,8 +85,9 @@ const { chromium } = require("/opt/node22/lib/node_modules/playwright");
     let openedTab = false;
     window.open = function () { openedTab = true; return null; };
 
-    // corregido: la lista muestra "✔ Corregido" en la fila que tuvo diferencia y ya coincide
-    out.corrEnLista = /Corregido/.test(out.html);
+    // columna "¿Por qué?" con la causa de la diferencia
+    out.motivoCol = /¿Por qué/.test(out.html);
+    out.motivoTxt = /809E/.test(out.html);
 
     // UN SOLO botón por fila ("🔍 Comparar") → modal con diagnóstico + comparación + PDF
     out.hayDetBtn = tabla ? tabla.querySelectorAll("button.fac-cc-det").length : 0;
@@ -100,7 +102,6 @@ const { chromium } = require("/opt/node22/lib/node_modules/playwright");
     out.detTwoPane = !!document.getElementById("concilDetPdf");   // panel del PDF embebido, al lado de la comparación
     out.diag = /Diagn[óo]stico/.test(out.detHtml);
     out.diagPrecio = /809E/.test(out.detHtml);           // el diagnóstico marca el precio distinto
-    out.corrLegend = /Ya corregido/.test(out.detHtml);   // la leyenda del error corregido
 
     // el botón "⤢ Ver la factura en grande" abre el visor grande en un popup (no pestaña)
     const grande = detBody ? detBody.querySelector("button.fac-concil-btn") : null;
@@ -149,11 +150,11 @@ const { chromium } = require("/opt/node22/lib/node_modules/playwright");
   if (r.pdfEnFila !== 0) fails.push("no debería haber botón 📄 suelto en la fila (todo va por 🔍 Comparar), hay " + r.pdfEnFila);
   if (!/LK 0004/.test(r.html)) fails.push("la NP web no aparece");
   if (!/FC-A-0005-00000908/.test(r.html)) fails.push("falta el nº de comprobante");
-  if (!/Sin factura aún/.test(r.html) || !/OK/.test(r.html) || !/Corregido/.test(r.html)) fails.push("faltan estados (OK / Sin factura / Corregido)");
+  if (!/Sin factura aún/.test(r.html) || !/OK/.test(r.html) || !/Diferencia/.test(r.html)) fails.push("faltan estados (OK / Sin factura / Diferencia)");
   if (!/2 s\/precio/.test(r.html)) fails.push("no marca artículos sin precio");
   if (!/1 OK/.test(r.resumen) || !/1 con diferencia/.test(r.resumen) || !/1 sin factura/.test(r.resumen)) fails.push("resumen no usa los totales: " + r.resumen);
-  if (!/ya corregidas/.test(r.resumen)) fails.push("el resumen no cuenta las corregidas: " + r.resumen);
-  if (!r.corrEnLista) fails.push("la lista no muestra el badge ✔ Corregido");
+  if (!r.motivoCol) fails.push("falta la columna '¿Por qué?'");
+  if (!r.motivoTxt) fails.push("la columna motivo no muestra la causa (809E)");
   if (!r.detTwoPane) fails.push("el modal no tiene el panel del PDF embebido al lado de la comparación (#concilDetPdf)");
   if (!r.pdfPopup) fails.push("el '⤢ Ver en grande' no abre el visor de PDF en un popup en la página");
   if (!r.noNewTab) fails.push("se abrió una pestaña nueva (window.open) en vez de popup");
@@ -162,8 +163,7 @@ const { chromium } = require("/opt/node22/lib/node_modules/playwright");
   if (!/501/.test(r.detHtml) || !/809E/.test(r.detHtml)) fails.push("la comparación no muestra los códigos");
   if (!r.diag) fails.push("no aparece el bloque de Diagnóstico");
   if (!r.diagPrecio) fails.push("el diagnóstico no señala el precio distinto (809E)");
-  if (!r.corrLegend) fails.push("no aparece la leyenda 'Ya corregido' en el detalle de la NP corregida");
-  if (r.filasSoloDiff !== 1) fails.push("'Sólo diferencias' debería dejar 1 fila (la corregida/diff), dejó " + r.filasSoloDiff);
+  if (r.filasSoloDiff !== 1) fails.push("'Sólo diferencias' debería dejar 1 fila (la que tiene diferencia), dejó " + r.filasSoloDiff);
   if (!r.toggleOn) fails.push("el toggle no quedó en ON");
   if (r.filasTodas !== 3) fails.push("al apagar el toggle deberían volver las 3 filas, hay " + r.filasTodas);
   if (!r.volvioFact) fails.push("no vuelve a Facturador");

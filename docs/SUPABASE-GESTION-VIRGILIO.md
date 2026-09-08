@@ -4056,3 +4056,14 @@ tablas.
 **Rollback.** `truncate public.whatsapp_clientes; insert into public.whatsapp_clientes select * from
 public."GV_Backup_whatsapp_clientes_20260908"; drop table public."GV_Clientes_Whatsapp";`
 SQL completo: `sql/gv_clientes_whatsapp_carga_20260908.sql`.
+**v14.40 (08/09) — Conciliación: "corregido" = IDÉNTICO + columna "¿Por qué?".** Luis marcó que
+la 98484 aparecía "✔ Corregido" con −5,28% en pantalla. Dos cosas: (a) el badge usaba la
+tolerancia del 1% → el cálculo actual estaba a 0,76% de ISIS ($11.663 sobre $1,53 M) y lo daba
+por corregido. Ahora **'ok' y 'corregido' exigen |dif| ≤ $100** (idéntico salvo redondeo); 98484
+vuelve a "Diferencia". (b) La columna Diferencia mostraba el diff del snapshot (−5,28%) al lado de
+"Corregido" → contradictorio; ahora en filas corregidas muestra el estado ACTUAL ("✔ igual hoy",
+verde) con el diff original en el tooltip. Además, nueva **columna "¿Por qué?"** con la causa
+(`gv_conciliacion_motivo` a partir de la comparación línea a línea): dif. pareja %, descuento,
+precio: <cods>, N sin precio, N sólo factura/Gestión. Backend: `gv_conciliacion_estricto_motivo_v1438`.
+98484 hoy: estado "Diferencia", motivo "dif. pareja −2,0% (lista/descuento/factor) · precio: 809E ·
+1 sólo en factura". Smoke `fac-conciliacion` actualizado.
