@@ -189,3 +189,72 @@ on conflict (dir_key) do nothing;
 
 -- Y devolver a la cola todo lo que se habia dado por perdido, ahora que la consulta es otra.
 select public.gv_geo_reintentar();   -- → 70
+
+-- ══════════════════════════════════════════════════════════════════════════════════════════
+-- SEGUNDA TANDA DE CORRECCIONES — v14.27 (2026-09-07, la misma noche)
+-- ══════════════════════════════════════════════════════════════════════════════════════════
+-- Con el normalizador puesto, la cola se vació: `gv_geo_faltantes_padron` llegó a 0 y el log
+-- dio `pedidas 0`. Cobertura 376 de 489. Las 49 que quedaron son las que fallaron 3 veces, y
+-- al mirarlas otra vez volvían a agruparse en patrones, no en 49 problemas sueltos:
+--
+--   · SEIS clientes en Av. Jujuy con barrio "Constitucion". El error era siempre
+--     "cayó a 640 km de Constitucion". Se verificó desde la base que `centroBarrio` NO es el
+--     culpable: `city=Constitucion&state=Buenos Aires` devuelve la Constitución correcta, la de
+--     CABA (-34.6242, -58.3836). Lo que fallaba era la consulta de la DIRECCIÓN: "Av Jujuy 1240,
+--     Constitucion, Buenos Aires" le pegaba a la PROVINCIA de Jujuy, y el verificador geográfico
+--     —bien— lo tiraba. O sea que el guard funcionó: no ubicó nada mal, sólo no ubicó.
+--     Arreglo: "Avenida Jujuy NNNN" + barrio San Cristóbal. Es el mismo que ya había funcionado
+--     con los cód 1284 y 1917 en la tanda anterior.
+--   · CINCO direcciones en "Donofrio", Ciudadela → la calle se escribe **D'Onofrio**.
+--   · DOS del Mercado Central escritas como esquina sin altura ("Circunv s/n y calle De la
+--     Pala") → el mismo predio que el cód 1916, que sí ubicó: Av. Circunvalación 550, Tapiales.
+--   · El resto, abreviaturas de nombre propio que el normalizador no puede adivinar porque no
+--     son un patrón sino un nombre: `Cjal` = Concejal, `Chilavet M Cnel.` = Coronel Chilavert,
+--     `Av Raul Scalabr` = Raúl Scalabrini Ortiz, `Av. Int. Ravanal` = Intendente **Rabanal**
+--     (con b), `Int P Quintana` = Intendente Pérez Quintana.
+--   · Y dos barrios mal escritos o mal asignados: `Adolfo Sordeaux` → **Sourdeaux**, y
+--     `Virgilio 2788` que está en Villa Real, no en Villa Devoto.
+--
+-- Lo que se dejó afuera a propósito, porque adivinar una calle es peor que no ubicarla:
+--   `Ortiz Carlos 1291` (¿invertido?), `Humberto Pino 3352`, `S Ortiz Y Aguirre 0` (esquina con
+--   altura 0), `Panamericana 54,5` (un km, no una altura), `Junin, Buenos Aires` (sin altura),
+--   `AV. 22 DE OCTUBRE 235, CHIVILCOY` (interior: no se entrega), y Osa (retira en fábrica).
+--
+-- Las que no resuelvan vuelven solas a `GV_Geo_Fallidas` a los 3 intentos. No hay riesgo.
+
+with fix(cod, dir_like, dir_ok, barrio_ok, nota) as (values
+  ('459', 'Av Jujuy 1470',       'Avenida Jujuy 1470',            'San Cristobal', 'barrio Constitucion + calle Jujuy: la consulta pegaba en la provincia de Jujuy'),
+  ('587', 'Av Jujuy 1464',       'Avenida Jujuy 1464',            'San Cristobal', 'idem'),
+  ('75',  'Jujuy 1591',          'Avenida Jujuy 1591',            'San Cristobal', 'idem'),
+  ('4186','Av Jujuy 1446',       'Avenida Jujuy 1446',            'San Cristobal', 'idem'),
+  ('3971','Av Jujuy 1259',       'Avenida Jujuy 1259',            'San Cristobal', 'idem'),
+  ('4113','Av San Juan B De La Salle 1926','San Juan Bautista de La Salle 1926','Parque Avellaneda','abreviatura'),
+  ('3938','Av. Int. Ravanal 3159','Avenida Intendente Rabanal 3159','Soldati',     'la calle es Rabanal, con b'),
+  ('771', 'Int P Quintana 3850', 'Intendente Perez Quintana 3850','Ituzaingo',     'inicial suelta'),
+  ('3827','Cjal Tribulato 1883', 'Concejal Tribulato 1883',       'San Miguel',    'Cjal = Concejal'),
+  ('4122','Tte Gral Juan Peron 2364','Peron 2364',                'Balvanera',     'en CABA la calle es Peron a secas'),
+  ('3939','Av. J.M. Moreno 328', 'Avenida Jose Maria Moreno 328', 'Caballito',     'iniciales'),
+  ('69',  'Av H Yrigoyen 8702',  'Avenida Hipolito Yrigoyen 8702','Lomas De Zamora','inicial suelta'),
+  ('3855','Av Raul Scalabr 2099','Avenida Raul Scalabrini Ortiz 2099','Palermo',   'truncado'),
+  ('4080','J. M. Pérez 977 - Luján','J. M. Perez 977',            'Lujan',         'le sobraba "- Lujan"'),
+  ('4258','Boulevar S Martin 3055','Boulevard San Martin 3055',   'El Palomar',    'abreviatura'),
+  ('4061','Chilavet M Cnel. 6546','Coronel Chilavert 6546',       'Villa Riachuelo','apellido invertido y cortado'),
+  ('4218','Winter 4384',         'Winter 4384',                   'Adolfo Sourdeaux','el barrio se escribe Sourdeaux'),
+  ('4256','Virgilio 2788',       'Virgilio 2788',                 'Villa Real',    'la altura 2788 de Virgilio es Villa Real, no Villa Devoto'),
+  ('4112','Circunv s/n y calle De la Pala','Avenida Circunvalacion 550','Tapiales','esquina sin altura; el Mercado Central esta en Tapiales'),
+  ('4112','Av Circunvalacion y De la Pala','Avenida Circunvalacion 550','Tapiales','idem'),
+  ('3814','Donofrio 128',        'D''Onofrio 128',                'Ciudadela',     'la calle es D''Onofrio'),
+  ('3814','Donofrio 39',         'D''Onofrio 39',                 'Ciudadela',     'idem'),
+  ('3918','Donofrio 258',        'D''Onofrio 258',                'Ciudadela',     'idem'),
+  ('4024','Donofrio 20',         'D''Onofrio 20',                 'Ciudadela',     'idem'),
+  ('4024','Donofrio 30',         'D''Onofrio 30',                 'Ciudadela',     'idem')
+)
+insert into public."GV_Geo_Correccion" (dir_key, cod, direccion_mal, direccion_ok, barrio_ok, nota)
+select distinct on (d.dir_key) d.dir_key, d.cod, d.direccion, f.dir_ok, f.barrio_ok, f.nota
+  from fix f
+  join public."GV_Clientes_Direcciones" d
+    on d.cod = f.cod and d.direccion = f.dir_like
+on conflict (dir_key) do nothing;
+-- → 25 filas
+
+select public.gv_geo_reintentar();   -- → 47, y la cola vuelve a 49

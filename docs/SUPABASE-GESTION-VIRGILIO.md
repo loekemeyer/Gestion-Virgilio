@@ -3343,6 +3343,46 @@ select * from public.gv_geo_cobertura;
 De las 13 correcciones a mano, **11 ya quedaron ubicadas** en la primera pasada; faltan
 `Calle Constitucion 2587` y `Avenida Juan B. Justo 8587`, que todavía no salieron en la cola.
 
+**Y al rato la cola llegó a CERO** (`gv_geo_faltantes_padron` = 0, el log da `pedidas 0`):
+cobertura **376 de 489**, chef 38/43 con **0 faltantes**. El cron 75 volvió a su horario normal,
+`20 */6 * * *`.
+
+## 3.bp ✅ Segunda tanda de correcciones: Av. Jujuy caía a 640 km (v14.27) — 2026-09-07
+
+Las 49 que quedaron después de vaciar la cola **tampoco eran 49 problemas**: volvían a agruparse.
+
+**Seis clientes en Av. Jujuy con barrio "Constitucion"**, todos con el mismo error: *"cayó a 640
+km de Constitucion"*. La primera hipótesis —que `centroBarrio` estuviera resolviendo la
+Constitución del interior— **se descartó midiendo**: desde la base, `city=Constitucion&state=Buenos
+Aires` devuelve la Constitución correcta, la de CABA (-34.6242, -58.3836), igual que con
+`state=Ciudad Autónoma`. Lo que fallaba era la consulta de la **dirección**: `"Av Jujuy 1240,
+Constitucion, Buenos Aires"` le pegaba a la **provincia de Jujuy**, y el verificador geográfico
+—bien— lo descartaba. O sea que el guard de la v13.42 hizo exactamente lo que tiene que hacer:
+no ubicó nada mal, sólo no ubicó. Arreglo: `Avenida Jujuy NNNN` + barrio San Cristóbal, el mismo
+que ya había funcionado con los cód 1284 y 1917.
+
+Los otros grupos:
+
+- **Cinco direcciones en "Donofrio", Ciudadela** → la calle se escribe **D'Onofrio**.
+- **Dos del Mercado Central escritas como esquina sin altura** (`Circunv s/n y calle De la Pala`)
+  → el mismo predio que el cód 1916, que sí ubicó: Av. Circunvalación 550, Tapiales.
+- **Abreviaturas de nombre propio**, que el normalizador no puede adivinar porque no son un
+  patrón sino un nombre: `Cjal` = Concejal · `Chilavet M Cnel.` = Coronel Chilavert ·
+  `Av Raul Scalabr` = Raúl Scalabrini Ortiz · `Av. Int. Ravanal` = Intendente **Rabanal** (con b)
+  · `Int P Quintana` = Intendente Pérez Quintana.
+- **Dos barrios mal escritos o mal asignados**: `Adolfo Sordeaux` → **Sourdeaux**, y
+  `Virgilio 2788`, que está en Villa Real y no en Villa Devoto.
+
+**25 correcciones**, y `gv_geo_reintentar()` devolvió 47 a la cola.
+
+**Lo que se dejó afuera a propósito**, porque adivinar una calle es peor que no ubicarla:
+`Ortiz Carlos 1291` (¿invertido?), `Humberto Pino 3352`, `S Ortiz Y Aguirre 0` (esquina con
+altura 0), `Panamericana 54,5` (es un kilómetro, no una altura), `Junin, Buenos Aires` (sin
+altura), `AV. 22 DE OCTUBRE 235, CHIVILCOY` (interior: no se entrega) y Osa (retira en fábrica).
+Las que no resuelvan vuelven solas a `GV_Geo_Fallidas` a los 3 intentos.
+
+**Archivo:** `sql/gv_geo_normalizar_v1426.sql` (la segunda tanda está al final del mismo archivo).
+
 **Archivo:** `sql/gv_geo_normalizar_v1426.sql` (incluye el rollback en la cabecera: sacar el
 `gv_dir_geo_normalizar(...)` del `dir_query` de las dos vistas y dropear la función; no escribe
 nada, no hay datos que restaurar).

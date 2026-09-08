@@ -12,7 +12,17 @@
 > única**; no se replica. Ante la duda entre parche rápido y fix de raíz → **fix
 > de raíz**.
 >
-> Última actualización: 2026-09-07 (lunes) · Versión app al documentar: **v14.26**
+> Última actualización: 2026-09-07 (lunes) · Versión app al documentar: **v14.27**
+>
+> Nota **v14.27** (backend) — **La cola de geocodificación llegó a cero** (376 de 489; Chef sin
+> faltantes) y el cron 75 volvió a `20 */6 * * *`. Las 49 que quedaron **tampoco eran 49 problemas**:
+> seis clientes de Av. Jujuy con barrio "Constitución" que caían **a 640 km**, cinco en "Donofrio"
+> (Ciudadela, la calle es **D'Onofrio**), dos del Mercado Central escritas como esquina sin altura,
+> y un puñado de abreviaturas de nombre propio (`Cjal` = Concejal, `Chilavet M Cnel.` = Coronel
+> Chilavert, `Av. Int. Ravanal` = Intendente **Rabanal** con b). Lo de Jujuy se midió antes de
+> arreglarlo: `centroBarrio` **no** era el culpable —devuelve la Constitución de CABA correcta— sino
+> la consulta de la dirección, que le pegaba a la **provincia** de Jujuy; el verificador geográfico
+> la descartó bien. 25 correcciones más en `GV_Geo_Correccion`. §3.bp.
 >
 > ⚠⚠ **Desde el lunes 2026-09-07 los operarios usan GESTIÓN, no Producción** (dueño, sábado a la
 > noche: *"el lunes van a empezar a usar GV, no más PV"*). Las tandas web viven en
