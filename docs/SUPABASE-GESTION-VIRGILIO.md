@@ -4203,3 +4203,11 @@ compartido). Si algún día hiciera falta, se les agrega la misma rama por empre
 `gv_bkp_precios_venta_chef_20260908` (101). Rollback: volver el join de la vista a
 `left join precios_venta pv on canon_cod(pv.cod)=b.cod_precio` y re-mergear Chef en `precios_venta` en
 la Edge Function. Archivos: `supabase/functions/sync-precios-venta/index.ts`, `sql/gv_cruce_facturacion.sql`.
+
+**v14.45 (08/09) — refresco cada 15 min.** El sync de precios pasó de diario (06:00 ART, con guarda de
+24 h) a **cada 15 min** (`cron.alter_job(66, schedule := '*/15 * * * *')`, guarda sacada). Motivo: que un
+cambio de precio en LK/Chef se refleje casi en vivo (lag ≤ 15 min) **sin poner un trigger en los
+proyectos de las páginas** (evaluado: trigger en `products` de LK/Chef corre para la app de esas páginas
+y es cross-project → descartado). La función es idempotente y liviana (~330 LK + ~100 Chef), correrla
+seguido no molesta. Watchdog: subir el umbral del job 66 a ~120 min. `sql/sync_precios_venta.sql`.
+Rollback: `cron.alter_job(66, schedule := '0 9 * * *', command := <bloque con guarda de 24 h>)`.

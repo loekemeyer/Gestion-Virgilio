@@ -1,6 +1,6 @@
 -- ============================================================
---  sync_precios_venta — cron que refresca precios_venta + cob_uxb_lk
---  desde LK + Chef vía la Edge Function sync-precios-venta.
+--  sync_precios_venta — cron que refresca precios_venta + precios_venta_chef
+--  + cob_uxb_lk desde LK + Chef vía la Edge Function sync-precios-venta.
 --  Proyecto Supabase: Control Partes Talleristas (hrxfctzncixxqmpfhskv)
 --
 --  PATRÓN: idéntico a sync-clientes-dto-14d. pg_cron llama a la Edge
@@ -8,51 +8,47 @@
 --  de LK via REST (WEB_SERVICE_KEY) y products de Chef via REST
 --  (CHEF_KEY — publishable key) y hace upsert en Virgilio.
 --
---  FRECUENCIA: diaria a las 06:00 ART (09:00 UTC). Los precios cambian
---  con poca frecuencia (actualizaciones de lista); una vez por día es
---  más que suficiente y alinea con los otros syncs matutinos.
+--  FRECUENCIA (v14.45, 2026-09-08): cada 15 min (*/15 * * * *). Pedido del
+--  dueño: que un cambio de precio en LK/Chef se refleje casi en vivo (lag
+--  máximo 15 min) sin poner un trigger en los proyectos de las páginas. La
+--  función es idempotente y liviana (~330 LK + ~100 Chef), correrla seguido
+--  no molesta. Antes era diaria a las 06:00 ART con guarda de 24 h; la guarda
+--  se sacó (si no, saltearía todas las corridas del día menos la primera).
 --
---  CONDICIÓN: solo dispara si el dato tiene más de 24 h de antigüedad
---  (max(actualizado) < now() - interval '24 hours'), para no gastar un
---  invocación si ya se sincronizó hoy por otro camino.
---
---  TABLAS DESTINO:
---    precios_venta     — cod, precio_unit, uxb, descripcion (de LK + Chef products)
---    cob_uxb_lk        — cod, uxb (de products ∪ loke_products)
+--  TABLAS DESTINO (v14.44 — listas SEPARADAS por empresa):
+--    precios_venta      — cod, precio_unit, uxb, descripcion (SÓLO LK products)
+--    precios_venta_chef — cod, precio_unit, uxb, descripcion (SÓLO Chef products)
+--    cob_uxb_lk         — cod, uxb (de products ∪ loke_products de LK)
 --
 --  FUENTES:
 --    LK  (kwkclwhmoygunqmlegrg) → products, loke_products (WEB_SERVICE_KEY)
 --    Chef (nkhzocgdpwtgrmwleihr) → products (CHEF_KEY, publishable key)
---    LK y Chef tienen catálogos separados (rangos de código distintos).
---    Si coincide un código, Chef gana (catálogo más reciente).
+--    LK y Chef son DOS listas separadas (v14.44). Antes se mergeaban en
+--    precios_venta con "Chef gana", lo que ensuciaba las NP de LK con códigos
+--    compartidos (809E). La valuación se enruta por empresa (ver §3.bi).
 --
 --  WATCHDOG: agregar el jobid al VALUES de watchdog_syncs_externos()
---  con umbral de 2880 min (48 h, ~2x el período de 24 h).
+--  con umbral holgado (p.ej. 120 min, ~8x el período de 15 min).
 -- ============================================================
 
 -- La Edge Function se deploya manualmente (Dashboard o MCP).
 -- Nombre: sync-precios-venta, verify_jwt: OFF.
 -- Deployada: 2026-08-31 (con soporte LK + Chef).
 
--- Cron job (jobid 66, creado 2026-08-31):
--- select cron.schedule(
---   'sync-precios-venta',
---   '0 9 * * *',          -- 09:00 UTC = 06:00 ART
---   $body$
---   do $inner$
---   begin
---     if (select max(actualizado) from public.precios_venta) > now() - interval '24 hours' then
---       raise notice 'sync-precios-venta: dato fresco (< 24 h), salteado';
---       return;
---     end if;
---     perform net.http_post(
---       url     := 'https://hrxfctzncixxqmpfhskv.supabase.co/functions/v1/sync-precios-venta',
---       headers := '{"Content-Type":"application/json"}'::jsonb,
---       body    := '{}'::jsonb
---     );
---   end $inner$;
+-- Cron job (jobid 66, creado 2026-08-31; frecuencia bajada a 15 min v14.45 2026-09-08):
+-- select cron.alter_job(
+--   66,
+--   schedule := '*/15 * * * *',
+--   command  := $body$
+--   select net.http_post(
+--     url     := 'https://hrxfctzncixxqmpfhskv.supabase.co/functions/v1/sync-precios-venta',
+--     headers := '{"Content-Type":"application/json"}'::jsonb,
+--     body    := '{}'::jsonb
+--   );
 --   $body$
 -- );
+-- Para volver a diario con guarda de 24 h: cron.alter_job(66, schedule := '0 9 * * *',
+--   command := <bloque do/begin con el if max(actualizado) > now()-24h return>).
 --
 -- Para ver el jobid asignado:
 --   select jobid, jobname from cron.job where jobname = 'sync-precios-venta';
