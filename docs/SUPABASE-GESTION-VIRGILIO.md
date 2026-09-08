@@ -3980,3 +3980,19 @@ select cron.alter_job(61,
   $cmd$);
 ```
 (y redeployar la v1 de la función si se quisiera volver al upsert total; la v2 es un superset, no hace falta).
+**v14.37 (08/09) — Conciliación: toggle, diagnóstico de la diferencia y "ya corregido".** Pedido
+de Luis. (1) El **"↻ Refrescar"** sí funciona (re-consulta; como el match con ISIS es en vivo,
+actualiza la columna ISIS/dif a medida que ISIS sube facturas) — ahora con feedback "Actualizando…".
+(2) Switch **"Sólo diferencias"** al lado de Refrescar: filtra en memoria a las NP con diferencia
+(o que la tuvieron y ya se corrigieron). (3) **Diagnóstico**: `gv_conciliacion_comparar(np)` compara
+línea a línea el cálculo ACTUAL de Gestión vs los `documento_items` de la factura de ISIS matcheada
+(precio, dto_1+dto_2, cajas, importe), con un `motivo` por renglón; el modal 🔍 Comparar arma un
+bloque "🩺 Diagnóstico" (descuento distinto, diferencia pareja de X% → lista/descuento/factor,
+precio puntual, artículos sin precio, faltantes de un lado) + la tabla Gestión‑vs‑ISIS resaltando
+los renglones con diferencia, al lado del PDF. (4) **Corregido**: `gv_conciliacion_lista` suma
+`neto_actual` (recálculo en vivo) y `corregido` (tenía diff en el snapshot pero hoy el cálculo ya
+coincide con ISIS) → la fila muestra **✔ Corregido** y el modal una leyenda con el error original
+(cuánto era) y que ya está corregido. Caso testigo Vargas (98484): el 6% de descuento ya se
+corrigió; queda ~2% del factor web ×0,98 + un precio puntual (809E $3.005 vs $4.060). Backend:
+migración `gv_conciliacion_diag_corregido_v1434` (`sql/gv_conciliacion_facturacion.sql`). Smoke:
+`tests/fac-conciliacion.cjs` ampliado. Sólo lectura, todo `gv_`.

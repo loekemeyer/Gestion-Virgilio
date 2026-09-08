@@ -28,17 +28,21 @@ const { chromium } = require("/opt/node22/lib/node_modules/playwright");
         fecha_salida: "2026-09-08", cajas_ent: 585, neto_gestion: 16136550, items_sin_precio: 0,
         registrado_at: "2026-09-08T12:01:00-03:00", factura_neto: 16136550, factura_cajas: 585,
         comprobante_id: "FC-A-0005-00000908", doc_fecha: "2026-09-08", storage_path: "2026/09/fa_908.pdf",
-        es_super: false, diff: 0, diff_pct: 0, estado: "ok", total_count: 3 },
+        es_super: false, diff: 0, diff_pct: 0, estado: "ok", neto_actual: 16136550, corregido: false, total_count: 3 },
       { np: "LK 0004", empresa: "lk", tanda: "E01A", cod_cliente: "302", razon_social: "PEDIDO WEB",
         fecha_salida: "2026-09-08", cajas_ent: 12, neto_gestion: 500000, items_sin_precio: 1,
         registrado_at: "2026-09-08T11:30:00-03:00", factura_neto: null, factura_cajas: null,
         comprobante_id: null, doc_fecha: null, storage_path: null, es_super: false,
-        diff: null, diff_pct: null, estado: "sin_factura", total_count: 3 },
+        diff: null, diff_pct: null, estado: "sin_factura", neto_actual: 500000, corregido: false, total_count: 3 },
       { np: "44601", empresa: "chef", tanda: "D69D", cod_cliente: "801", razon_social: "CHEF CLIENTE",
         fecha_salida: "2026-09-08", cajas_ent: 300, neto_gestion: 8561760, items_sin_precio: 2,
         registrado_at: "2026-09-08T10:00:00-03:00", factura_neto: 7791011.1, factura_cajas: 298,
         comprobante_id: "A-0001-00000777", doc_fecha: "2026-09-08", storage_path: "2026/09/ch_777.pdf",
-        es_super: false, diff: -770748.9, diff_pct: -9, estado: "diff", total_count: 3 }
+        es_super: false, diff: -770748.9, diff_pct: -9, estado: "diff", neto_actual: 7790500, corregido: true, total_count: 3 }
+    ];
+    const cmpRows = [
+      { cod: "501", descripcion: "Abrelatas", cajas_ges: 5, cajas_isis: 5, precio_ges: 5520, precio_isis: 5520, dto_ges: 6, dto_isis: 6, importe_ges: 152550.72, importe_isis: 155664, diff: 3113.28, sin_precio_ges: false, motivo: "importe" },
+      { cod: "809E", descripcion: "Corta Queso", cajas_ges: 1, cajas_isis: 1, precio_ges: 3005, precio_isis: 4060, dto_ges: 6, dto_isis: 6, importe_ges: 33218.47, importe_isis: 45796.8, diff: 12578.33, sin_precio_ges: false, motivo: "precio" }
     ];
     window.fetch = async (url, opt) => {
       const u = String(url); const m = /\/rpc\/([a-z_]+)/.exec(u);
@@ -47,10 +51,7 @@ const { chromium } = require("/opt/node22/lib/node_modules/playwright");
         calls.push({ fn: m[1], body: JSON.parse((opt && opt.body) || "{}") });
         if (m[1] === "gv_conciliacion_lista") return ok(filas);
         if (m[1] === "gv_conciliacion_totales") return ok([{ estado: "ok", n: 1, suma_diff: 0 }, { estado: "diff", n: 1, suma_diff: -770748.9 }, { estado: "sin_factura", n: 1, suma_diff: 0 }]);
-        if (m[1] === "gv_conciliacion_detalle") return ok([
-          { cod: "501", cajas_ped: 5, cajas_ent: 5, uxb: 6, precio_lista: 5520, dto_vol: 0, importe_ent: 165600, neto_linea: 162288, sin_precio: false },
-          { cod: "970E", cajas_ped: 1, cajas_ent: 0, uxb: 12, precio_lista: 2450, dto_vol: 0, importe_ent: 0, neto_linea: 0, sin_precio: true }
-        ]);
+        if (m[1] === "gv_conciliacion_comparar") return ok(cmpRows);
         return ok([]);
       }
       return ok([]);   // Facturacion_NP POST, drenajes, etc.
@@ -83,16 +84,23 @@ const { chromium } = require("/opt/node22/lib/node_modules/playwright");
     let openedTab = false;
     window.open = function () { openedTab = true; return null; };
 
-    // UN SOLO botón por fila ("🔍 Comparar") → modal con el PDF y el detalle lado a lado.
+    // corregido: la lista muestra "✔ Corregido" en la fila que tuvo diferencia y ya coincide
+    out.corrEnLista = /Corregido/.test(out.html);
+
+    // UN SOLO botón por fila ("🔍 Comparar") → modal con diagnóstico + comparación + PDF
     out.hayDetBtn = tabla ? tabla.querySelectorAll("button.fac-cc-det").length : 0;
     out.pdfEnFila = tabla ? tabla.querySelectorAll("button.fac-cc-pdf").length : 0;  // ya NO hay botón 📄 suelto
-    const detBtn = tabla ? tabla.querySelector("button.fac-cc-det") : null;
+    const detBtns = tabla ? tabla.querySelectorAll("button.fac-cc-det") : [];
+    const detBtn = detBtns[2] || detBtns[0];   // la 3ª fila (44601) es la "corregida"
     if (detBtn) detBtn.click();
     await new Promise((res) => setTimeout(res, 200));
     const detBody = document.getElementById("concilDetBody");
     out.detHtml = detBody ? detBody.innerHTML : "";
     out.detLineas = detBody ? detBody.querySelectorAll("tbody tr").length : 0;
-    out.detTwoPane = !!document.getElementById("concilDetPdf");   // panel del PDF embebido, al lado de la lista
+    out.detTwoPane = !!document.getElementById("concilDetPdf");   // panel del PDF embebido, al lado de la comparación
+    out.diag = /Diagn[óo]stico/.test(out.detHtml);
+    out.diagPrecio = /809E/.test(out.detHtml);           // el diagnóstico marca el precio distinto
+    out.corrLegend = /Ya corregido/.test(out.detHtml);   // la leyenda del error corregido
 
     // el botón "⤢ Ver la factura en grande" abre el visor grande en un popup (no pestaña)
     const grande = detBody ? detBody.querySelector("button.fac-concil-btn") : null;
@@ -103,6 +111,15 @@ const { chromium } = require("/opt/node22/lib/node_modules/playwright");
     out.noNewTab = !openedTab;
     if (typeof concilPdfClose === "function") concilPdfClose();
     if (typeof concilDetClose === "function") concilDetClose();
+
+    // toggle "Sólo diferencias": deja sólo las con diferencia (o corregidas)
+    concilToggleSoloDiff();
+    await new Promise((res) => setTimeout(res, 50));
+    out.filasSoloDiff = tabla.querySelectorAll("tbody tr").length;
+    out.toggleOn = /ON/.test((document.getElementById("concilBtnSoloDiff") || {}).innerHTML || "");
+    concilToggleSoloDiff();
+    await new Promise((res) => setTimeout(res, 50));
+    out.filasTodas = tabla.querySelectorAll("tbody tr").length;
 
     // volver a Facturador
     facSetTab("fact");
@@ -132,16 +149,23 @@ const { chromium } = require("/opt/node22/lib/node_modules/playwright");
   if (r.pdfEnFila !== 0) fails.push("no debería haber botón 📄 suelto en la fila (todo va por 🔍 Comparar), hay " + r.pdfEnFila);
   if (!/LK 0004/.test(r.html)) fails.push("la NP web no aparece");
   if (!/FC-A-0005-00000908/.test(r.html)) fails.push("falta el nº de comprobante");
-  if (!/Sin factura aún/.test(r.html) || !/Diferencia/.test(r.html) || !/OK/.test(r.html)) fails.push("faltan estados");
+  if (!/Sin factura aún/.test(r.html) || !/OK/.test(r.html) || !/Corregido/.test(r.html)) fails.push("faltan estados (OK / Sin factura / Corregido)");
   if (!/2 s\/precio/.test(r.html)) fails.push("no marca artículos sin precio");
   if (!/1 OK/.test(r.resumen) || !/1 con diferencia/.test(r.resumen) || !/1 sin factura/.test(r.resumen)) fails.push("resumen no usa los totales: " + r.resumen);
-  if (!r.detTwoPane) fails.push("el modal no tiene el panel del PDF embebido al lado de la lista (#concilDetPdf)");
+  if (!/ya corregidas/.test(r.resumen)) fails.push("el resumen no cuenta las corregidas: " + r.resumen);
+  if (!r.corrEnLista) fails.push("la lista no muestra el badge ✔ Corregido");
+  if (!r.detTwoPane) fails.push("el modal no tiene el panel del PDF embebido al lado de la comparación (#concilDetPdf)");
   if (!r.pdfPopup) fails.push("el '⤢ Ver en grande' no abre el visor de PDF en un popup en la página");
   if (!r.noNewTab) fails.push("se abrió una pestaña nueva (window.open) en vez de popup");
   if (r.hayDetBtn !== 3) fails.push("esperaba un botón 🔍 Comparar por fila (3), hay " + r.hayDetBtn);
-  if (r.detLineas !== 2) fails.push("el detalle a facturar no muestra las 2 líneas, hay " + r.detLineas);
-  if (!/501/.test(r.detHtml) || !/162\.288/.test(r.detHtml)) fails.push("el detalle no muestra cód/importe de la línea");
-  if (!/s\/precio/.test(r.detHtml)) fails.push("el detalle no marca la línea sin precio");
+  if (r.detLineas !== 2) fails.push("la comparación no muestra las 2 líneas, hay " + r.detLineas);
+  if (!/501/.test(r.detHtml) || !/809E/.test(r.detHtml)) fails.push("la comparación no muestra los códigos");
+  if (!r.diag) fails.push("no aparece el bloque de Diagnóstico");
+  if (!r.diagPrecio) fails.push("el diagnóstico no señala el precio distinto (809E)");
+  if (!r.corrLegend) fails.push("no aparece la leyenda 'Ya corregido' en el detalle de la NP corregida");
+  if (r.filasSoloDiff !== 1) fails.push("'Sólo diferencias' debería dejar 1 fila (la corregida/diff), dejó " + r.filasSoloDiff);
+  if (!r.toggleOn) fails.push("el toggle no quedó en ON");
+  if (r.filasTodas !== 3) fails.push("al apagar el toggle deberían volver las 3 filas, hay " + r.filasTodas);
   if (!r.volvioFact) fails.push("no vuelve a Facturador");
   if (!r.registrar || String(r.registrar.p_np) !== "98700") fails.push("facturar no dispara gv_conciliacion_registrar con la NP: " + JSON.stringify(r.registrar));
   if (/undefined|NaN/.test(r.html)) fails.push("undefined/NaN en la tabla");

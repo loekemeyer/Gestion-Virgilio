@@ -4179,6 +4179,13 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
   .fac-concil-bar{ display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin-bottom:10px; }
   .fac-concil-inp{ padding:8px 10px; border:1px solid #cbd5e1; border-radius:8px; font-size:14px; width:auto; min-width:150px; }
   .fac-concil-btn{ width:auto; padding:8px 14px; background:#1e6bd6; color:#fff; border:none; border-radius:8px; font-weight:700; cursor:pointer; }
+  .fac-concil-toggle{ width:auto; padding:8px 14px; background:#fff; color:#334155; border:1.5px solid #cbd5e1; border-radius:8px; font-weight:700; cursor:pointer; }
+  .fac-concil-toggle.on{ background:#fee2e2; color:#b91c1c; border-color:#fca5a5; }
+  .fac-cc-corr{ display:inline-block; margin-left:6px; font-size:10.5px; font-weight:800; padding:1px 6px; border-radius:999px; background:#d1fae5; color:#047857; }
+  .fac-diag{ background:#fffbeb; border:1px solid #fde68a; border-radius:10px; padding:10px 12px; margin-bottom:10px; font-size:13px; color:#78350f; }
+  .fac-diag b{ color:#92400e; }
+  .fac-diag ul{ margin:6px 0 0; padding-left:18px; }
+  .fac-corr-leg{ background:#ecfdf5; border:1px solid #6ee7b7; border-radius:10px; padding:10px 12px; margin-bottom:10px; font-size:13px; color:#065f46; }
   .fac-concil-res{ margin-bottom:10px; color:#64748b; font-size:13px; }
   .fac-concil-tbl{ width:100%; border-collapse:collapse; font-size:13px; }
   .fac-concil-tbl th{ background:#f1f5f9; padding:8px; text-align:left; border-bottom:1px solid #cbd5e1; position:sticky; top:0; font-size:11.5px; color:#475569; }
@@ -4235,7 +4242,8 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
       <select id="concilEmp" class="fac-concil-inp" onchange="_concil.empresa=this.value||null;concilRefresh();">
         <option value="">Todas las empresas</option><option value="lk">Loekemeyer</option><option value="chef">Chef</option>
       </select>
-      <button class="fac-concil-btn" onclick="concilRefresh()">↻ Refrescar</button>
+      <button id="concilBtnRefr" class="fac-concil-btn" onclick="concilRefresh()">↻ Refrescar</button>
+      <button id="concilBtnSoloDiff" class="fac-concil-toggle" onclick="concilToggleSoloDiff()" title="Mostrar sólo las NP con diferencia (o que la tuvieron y ya se corrigieron)">Sólo diferencias: <b>OFF</b></button>
     </div>
     <div id="concilResumen" class="fac-concil-res">Cargando…</div>
     <div id="concilTabla"></div>
@@ -7395,7 +7403,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v14.36";
+const APP_VERSION = "v14.37";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -40734,14 +40742,25 @@ function facSetTab(tab) {
 }
 window.facSetTab = facSetTab;
 
-var _concil = { q: "", empresa: null, rows: [], tot: null, cargando: false };
+var _concil = { q: "", empresa: null, rows: [], tot: null, cargando: false, soloDiff: false };
 window._concil = _concil;
 var CONCIL_EST = { ok: ["#059669", "OK"], diff: ["#dc2626", "Diferencia"], sin_factura: ["#64748b", "Sin factura aún"], sin_neto: ["#94a3b8", "Sin neto calculado"] };
 function _concilFecha(ts) { if (!ts) return "—"; try { var d = new Date(ts); return String(d.getDate()).padStart(2, "0") + "/" + String(d.getMonth() + 1).padStart(2, "0") + " " + String(d.getHours()).padStart(2, "0") + ":" + String(d.getMinutes()).padStart(2, "0"); } catch (_e) { return String(ts).slice(0, 16); } }
+/* v14.34 — switch "Sólo diferencias": muestra sólo las NP con diferencia (o que la tuvieron y
+   ya se corrigieron). Filtra en memoria, no re-consulta. */
+function concilToggleSoloDiff() {
+  _concil.soloDiff = !_concil.soloDiff;
+  var b = document.getElementById("concilBtnSoloDiff");
+  if (b) { b.classList.toggle("on", _concil.soloDiff); b.innerHTML = "Sólo diferencias: <b>" + (_concil.soloDiff ? "ON" : "OFF") + "</b>"; }
+  concilRender();
+}
+window.concilToggleSoloDiff = concilToggleSoloDiff;
+function _concilEsDiff(r) { return r.estado === "diff" || r.corregido; }
 
 async function concilRefresh() {
   var cont = document.getElementById("concilTabla"); if (!cont) return;
   if (_concil.cargando) return; _concil.cargando = true;
+  var rb = document.getElementById("concilBtnRefr"); if (rb) { rb.disabled = true; rb.textContent = "Actualizando…"; }
   if (!_concil.rows.length) cont.innerHTML = '<div style="padding:20px;color:#64748b;">Cargando…</div>';
   try {
     var pr = await Promise.all([
@@ -40754,9 +40773,10 @@ async function concilRefresh() {
     _concil.tot = tot;
   } catch (e) {
     cont.innerHTML = '<div style="padding:20px;color:#b91c1c;">No se pudo cargar la conciliación: ' + escapeHtml((e && e.message) || String(e)) + '</div>';
-    _concil.cargando = false; return;
+    _concil.cargando = false; if (rb) { rb.disabled = false; rb.textContent = "↻ Refrescar"; } return;
   }
   _concil.cargando = false;
+  if (rb) { rb.disabled = false; rb.textContent = "↻ Refrescar"; }
   concilRender();
 }
 window.concilRefresh = concilRefresh;
@@ -40806,21 +40826,29 @@ function concilRender() {
   var rows = _concil.rows, tot = _concil.tot || {};
   function _n(k) { return tot[k] ? tot[k].n : 0; }
   var nTot = Object.keys(tot).reduce(function (a, k) { return a + tot[k].n; }, 0) || rows.length;
+  var nCorr = rows.filter(function (r) { return r.corregido; }).length;
+  var shown = _concil.soloDiff ? rows.filter(_concilEsDiff) : rows;
   if (res) res.innerHTML =
     '<b>' + nTot + '</b> NP mandadas a facturar · ' +
     '<span style="color:#059669;">' + _n("ok") + ' OK</span> · ' +
     '<span style="color:#dc2626;">' + _n("diff") + ' con diferencia' + (tot.diff ? ' (' + _fmtPlata(tot.diff.suma) + ')' : '') + '</span> · ' +
+    (nCorr ? '<span style="color:#047857;">' + nCorr + ' ya corregidas</span> · ' : '') +
     '<span style="color:#64748b;">' + _n("sin_factura") + ' sin factura aún</span> · ' +
     '<span style="color:#94a3b8;">' + _n("sin_neto") + ' sin neto</span>' +
-    '<div style="margin-top:4px;font-size:12px;color:#94a3b8;">Snapshot: <b>Gestión</b> = lo que se mandó a facturar (cajas entregadas × lista × descuento, congelado al facturar). <b>ISIS</b> = neto de la factura parseada (match por cliente + fecha ±3 días + cajas; se completa cuando ISIS la sube). Los súper (🛒) no están bien modelados en el cálculo — su diferencia es esperada.</div>';
+    (_concil.soloDiff ? ' · <b style="color:#b91c1c;">mostrando sólo diferencias</b>' : '') +
+    '<div style="margin-top:4px;font-size:12px;color:#94a3b8;">Snapshot: <b>Gestión</b> = lo que se mandó a facturar (cajas entregadas × lista × descuento, congelado al facturar). <b>ISIS</b> = neto de la factura parseada (match por cliente + fecha ±3 días + cajas; se completa cuando ISIS la sube). <b>✔ Corregido</b> = tenía diferencia pero el cálculo actual ya coincide con ISIS. Los súper (🛒) no están bien modelados en el cálculo — su diferencia es esperada.</div>';
   if (!rows.length) { cont.innerHTML = '<div style="padding:20px;color:#64748b;text-align:center;">Todavía no se mandó nada a facturar. Cada NP que factures (Excel ISIS o tilde ✓) aparece acá.</div>'; return; }
+  if (!shown.length) { cont.innerHTML = '<div style="padding:20px;color:#64748b;text-align:center;">No hay NP con diferencia. 🎉 (Sacá "Sólo diferencias" para ver todas.)</div>'; return; }
   var h = '<div style="overflow-x:auto;"><table class="fac-concil-tbl"><thead><tr>' +
     '<th>NP</th><th>Cliente</th><th>Facturado</th><th style="text-align:right;">Cajas ges/isis</th>' +
     '<th style="text-align:right;">Gestión (mandado)</th><th style="text-align:right;">ISIS (facturado)</th>' +
     '<th style="text-align:right;">Diferencia</th><th>Estado</th><th>Comparar</th></tr></thead><tbody>';
-  h += rows.map(function (r) {
+  h += shown.map(function (r) {
     var est = CONCIL_EST[r.estado] || ["#334155", r.estado];
     var sp = r.storage_path ? String(r.storage_path).replace(/\\/g, "\\\\").replace(/'/g, "\\'") : "";
+    var estCell = r.corregido
+      ? '<span style="color:#047857;font-weight:800;" title="Tenía una diferencia de ' + (r.diff != null ? _fmtPlata(r.diff) : "") + ', pero el cálculo actual de Gestión ya coincide con ISIS. Tocá 🔍 Comparar para ver qué era.">✔ Corregido</span>'
+      : '<span style="color:' + est[0] + '">' + est[1] + '</span>';
     return '<tr>' +
       '<td><b>' + escapeHtml(r.np || "") + '</b> ' + _npSrcChip(r.np) + '</td>' +
       '<td>' + escapeHtml((r.cod_cliente || "") + " " + (r.razon_social || "—")) + (r.es_super ? " 🛒" : "") + '</td>' +
@@ -40829,7 +40857,7 @@ function concilRender() {
       '<td class="num">' + (r.neto_gestion != null ? _fmtPlata(r.neto_gestion) : "—") + (r.items_sin_precio > 0 ? ' <span style="font-size:11px;color:#b45309;" title="artículos sin precio de lista">' + r.items_sin_precio + ' s/precio</span>' : '') + '</td>' +
       '<td class="num">' + (r.factura_neto != null ? _fmtPlata(r.factura_neto) : "—") + '</td>' +
       '<td class="num" style="font-weight:bold;color:' + (r.diff > 0 ? "#dc2626" : (r.diff < 0 ? "#b45309" : "#334155")) + '">' + (r.diff != null ? (_fmtPlata(r.diff) + (r.diff_pct != null ? ' (' + (r.diff_pct > 0 ? "+" : "") + r.diff_pct + '%)' : '')) : "—") + '</td>' +
-      '<td class="fac-cc-est" style="color:' + est[0] + '">' + est[1] + '</td>' +
+      '<td class="fac-cc-est">' + estCell + '</td>' +
       '<td style="white-space:nowrap;">' + '<button class="fac-cc-det" title="Abre la factura de ISIS y el detalle de Gestión lado a lado, para comparar" onclick="concilDetalle(\'' + String(r.np).replace(/'/g, "\\'") + '\')">🔍 Comparar</button>' + (r.comprobante_id ? ' <span style="font-size:11px;color:#64748b;">' + escapeHtml(r.comprobante_id) + '</span>' : '') + '</td>' +
       '</tr>';
   }).join("");
@@ -40852,18 +40880,19 @@ async function concilDetalle(np) {
   }
   ov.style.display = "flex";
   ov.innerHTML = '<div style="background:#fff;border-radius:14px;width:min(1400px,97vw);max-height:94vh;display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(0,0,0,.5);overflow:hidden;"><div id="concilDetBody" style="padding:16px;overflow:auto;">Cargando…</div></div>';
-  var lines = [];
+  var cmp = [];
   try {
-    var r = await sb.rpc("gv_conciliacion_detalle", { p_np: np });
+    // v14.34 — comparación línea a línea Gestión vs factura de ISIS (para diagnosticar la diferencia)
+    var r = await sb.rpc("gv_conciliacion_comparar", { p_np: np });
     if (r.error) throw r.error;
-    lines = r.data || [];
+    cmp = r.data || [];
   } catch (e) {
     var b0 = document.getElementById("concilDetBody");
     if (b0) b0.innerHTML = '<div style="color:#b91c1c;">No se pudo cargar el detalle: ' + escapeHtml((e && e.message) || String(e)) + '</div><div style="margin-top:12px;text-align:right;"><button class="fac-concil-btn" onclick="concilDetClose()">Cerrar</button></div>';
     return;
   }
-  concilDetRender(row, lines);
-  // v14.32 — embeber el PDF de la factura AL LADO de la lista (mismo modal), para comparar.
+  concilDetRender(row, cmp);
+  // v14.32 — embeber el PDF de la factura AL LADO de la comparación (mismo modal).
   if (row.storage_path) {
     _concilSignedUrl(row.empresa, row.storage_path).then(function (url) {
       var pane = document.getElementById("concilDetPdf");
@@ -40878,44 +40907,86 @@ window.concilDetalle = concilDetalle;
 function concilDetClose() { var ov = document.getElementById("concilDetOverlay"); if (ov) ov.style.display = "none"; }
 window.concilDetClose = concilDetClose;
 
-function concilDetRender(row, lines) {
+/* v14.34 — diagnóstico de la diferencia a partir de la comparación línea a línea (cmp). */
+function _concilDiag(cmp, hayFactura) {
+  var b = [];
+  var precio = cmp.filter(function (x) { return x.motivo === "precio"; });
+  var sinP = cmp.filter(function (x) { return x.motivo === "sin_precio"; });
+  var soloFact = cmp.filter(function (x) { return x.motivo === "falta_en_gestion"; });
+  var soloGes = cmp.filter(function (x) { return x.motivo === "no_facturado" && Number(x.cajas_ges || 0) > 0; });
+  var dtoDif = cmp.filter(function (x) { return x.motivo === "descuento"; });
+  // diferencia pareja en los renglones que sí coinciden (excluye precio distinto y faltantes)
+  var m = cmp.filter(function (x) { return x.importe_ges != null && x.importe_isis != null && Number(x.importe_isis) !== 0 && x.motivo !== "precio"; });
+  var sg = m.reduce(function (a, x) { return a + Number(x.importe_ges); }, 0);
+  var si = m.reduce(function (a, x) { return a + Number(x.importe_isis); }, 0);
+  var pct = si ? Math.round((1 - sg / si) * 1000) / 10 : 0;   // + = Gestión calculó de MENOS
+  if (dtoDif.length) b.push("Descuento distinto en " + dtoDif.length + " renglón(es): Gestión " + (dtoDif[0].dto_ges != null ? dtoDif[0].dto_ges + "%" : "—") + " vs ISIS " + (dtoDif[0].dto_isis != null ? dtoDif[0].dto_isis + "%" : "—") + ".");
+  if (Math.abs(pct) >= 0.5) b.push("Diferencia <b>pareja de " + pct + "%</b> en el resto de los renglones (Gestión " + (pct > 0 ? "por debajo" : "por encima") + " de ISIS) → revisá <b>descuento / lista de precios / factor</b>, no un artículo puntual.");
+  if (precio.length) b.push("Precio distinto en " + precio.length + " artículo(s): " + precio.slice(0, 4).map(function (x) { return escapeHtml(x.cod) + " (" + _fmtPlata(x.precio_ges) + " vs " + _fmtPlata(x.precio_isis) + ")"; }).join(", ") + (precio.length > 4 ? "…" : "") + ".");
+  if (sinP.length) b.push(sinP.length + " artículo(s) <b>sin precio de lista</b> en Gestión (el calculado queda corto): " + sinP.slice(0, 6).map(function (x) { return escapeHtml(x.cod); }).join(", ") + ".");
+  if (soloFact.length) b.push(soloFact.length + " artículo(s) en la <b>factura de ISIS que Gestión no tiene</b>: " + soloFact.slice(0, 6).map(function (x) { return escapeHtml(x.cod); }).join(", ") + ".");
+  if (soloGes.length) b.push(soloGes.length + " artículo(s) en <b>Gestión que la factura no incluye</b>: " + soloGes.slice(0, 6).map(function (x) { return escapeHtml(x.cod); }).join(", ") + ".");
+  if (!hayFactura) return null;
+  if (!b.length) b.push("No se detectó una causa puntual — los renglones coinciden con la factura.");
+  return b;
+}
+
+function concilDetRender(row, cmp) {
   var body = document.getElementById("concilDetBody"); if (!body) return;
-  var sumGes = lines.reduce(function (a, l) { return a + (Number(l.neto_linea) || 0); }, 0);
-  var totIsis = (row.factura_neto != null) ? Number(row.factura_neto) : null;
+  var hayFactura = cmp.some(function (x) { return x.importe_isis != null; }) || row.factura_neto != null;
+  var sumGes = cmp.reduce(function (a, x) { return a + (Number(x.importe_ges) || 0); }, 0);
+  var sumIsis = cmp.reduce(function (a, x) { return a + (Number(x.importe_isis) || 0); }, 0);
+  var totIsis = (row.factura_neto != null) ? Number(row.factura_neto) : (hayFactura ? sumIsis : null);
   var diff = (totIsis != null && row.neto_gestion != null) ? (totIsis - Number(row.neto_gestion)) : (row.diff != null ? Number(row.diff) : null);
   var sp = row.storage_path ? String(row.storage_path).replace(/\\/g, "\\\\").replace(/'/g, "\\'") : "";
   var h = '<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:8px;">' +
-    '<b style="font-size:18px;">📋 A facturar — NP ' + escapeHtml(String(row.np)) + '</b>' +
+    '<b style="font-size:18px;">🔍 Comparar — NP ' + escapeHtml(String(row.np)) + '</b>' +
     (typeof _npSrcChip === "function" ? _npSrcChip(row.np) : "") +
     '<span style="color:#475569;">' + escapeHtml((row.cod_cliente || "") + " " + (row.razon_social || "")) + (row.es_super ? " 🛒" : "") + '</span>' +
     '<button style="margin-left:auto;width:auto;background:#dc2626;color:#fff;border:none;border-radius:8px;padding:6px 14px;font-weight:800;cursor:pointer;" onclick="concilDetClose()">Cerrar</button>' +
     '</div>';
+  // Leyenda "ya corregido"
+  if (row.corregido) {
+    h += '<div class="fac-corr-leg">✔ <b>Ya corregido.</b> Cuando se mandó a facturar, Gestión calculó <b>' + _fmtPlata(row.neto_gestion) + '</b> y la factura de ISIS salió <b>' + _fmtPlata(row.factura_neto) + '</b> (diferencia ' + _fmtPlata(row.diff) + (row.diff_pct != null ? ", " + row.diff_pct + "%" : "") + '). El cálculo <b>actual</b> de Gestión (' + _fmtPlata(row.neto_actual) + ') ya coincide con la factura → el error está corregido. Abajo, la comparación con el cálculo de hoy.</div>';
+  }
+  // Diagnóstico
+  var diag = _concilDiag(cmp, hayFactura);
+  if (diag) {
+    h += '<div class="fac-diag"><b>🩺 Diagnóstico de la diferencia</b><ul><li>' + diag.join("</li><li>") + '</li></ul></div>';
+  }
   h += '<div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:10px;font-size:13px;">' +
-    '<div style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:10px;padding:8px 12px;"><small style="color:#1e40af;font-weight:800;">GESTIÓN (mandado)</small><br><b style="font-size:17px;">' + _fmtPlata(row.neto_gestion != null ? row.neto_gestion : sumGes) + '</b></div>' +
+    '<div style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:10px;padding:8px 12px;"><small style="color:#1e40af;font-weight:800;">GESTIÓN (mandado)</small><br><b style="font-size:17px;">' + _fmtPlata(row.neto_gestion != null ? row.neto_gestion : sumGes) + '</b>' + (row.neto_actual != null && row.neto_gestion != null && Math.abs(Number(row.neto_actual) - Number(row.neto_gestion)) > 1 ? '<br><small style="color:#64748b;">hoy calcula ' + _fmtPlata(row.neto_actual) + '</small>' : '') + '</div>' +
     '<div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:8px 12px;"><small style="color:#475569;font-weight:800;">ISIS (facturado)</small><br><b style="font-size:17px;">' + (totIsis != null ? _fmtPlata(totIsis) : "—") + '</b></div>' +
-    '<div style="background:' + (diff && Math.abs(diff) > 0 ? "#fef2f2;border:1px solid #fecaca;" : "#f0fdf4;border:1px solid #bbf7d0;") + 'border-radius:10px;padding:8px 12px;"><small style="color:#475569;font-weight:800;">DIFERENCIA</small><br><b style="font-size:17px;color:' + (diff > 0 ? "#dc2626" : (diff < 0 ? "#b45309" : "#166534")) + ';">' + (diff != null ? _fmtPlata(diff) : "—") + '</b></div>' +
+    '<div style="background:' + (diff && Math.abs(diff) > 0 ? "#fef2f2;border:1px solid #fecaca;" : "#f0fdf4;border:1px solid #bbf7d0;") + 'border-radius:10px;padding:8px 12px;"><small style="color:#475569;font-weight:800;">DIFERENCIA (mandado)</small><br><b style="font-size:17px;color:' + (diff > 0 ? "#dc2626" : (diff < 0 ? "#b45309" : "#166534")) + ';">' + (diff != null ? _fmtPlata(diff) : "—") + '</b></div>' +
     (sp ? '<button class="fac-concil-btn" style="align-self:center;" onclick="concilAbrirFactura(\'' + (row.empresa || "lk") + '\',\'' + sp + '\')">⤢ Ver la factura en grande</button>' : '') +
     '</div>';
-  // Dos paneles: IZQ = listado a facturar (Gestión) · DER = el PDF de la factura de ISIS embebido.
-  var tbl = '<div style="flex:1 1 420px;min-width:300px;overflow:auto;max-height:76vh;"><table class="fac-concil-tbl"><thead><tr>' +
-    '<th>Cód</th><th>Artículo</th><th style="text-align:right;">Cajas ent</th><th style="text-align:right;">U×B</th>' +
-    '<th style="text-align:right;">Precio lista</th><th style="text-align:right;">Importe</th></tr></thead><tbody>';
-  tbl += lines.map(function (l) {
-    var nom = (typeof window.artNombre === "function") ? window.artNombre(l.cod) : "";
-    return '<tr>' +
-      '<td><b>' + escapeHtml(String(l.cod || "")) + '</b></td>' +
-      '<td style="font-size:12px;color:#475569;">' + escapeHtml(nom || "") + (l.sin_precio ? ' <span style="color:#b45309;font-weight:700;" title="sin precio de lista: el calculado queda corto">⚠ s/precio</span>' : '') + '</td>' +
-      '<td class="num">' + (l.cajas_ent != null ? Math.round(Number(l.cajas_ent)) : "—") + '</td>' +
-      '<td class="num">' + (l.uxb != null ? Math.round(Number(l.uxb)) : "—") + '</td>' +
-      '<td class="num">' + (l.precio_lista != null ? _fmtPlata(l.precio_lista) : "—") + (l.dto_vol > 0 ? ' <span style="font-size:11px;color:#64748b;">−' + Math.round(Number(l.dto_vol) * 100) + '%</span>' : '') + '</td>' +
-      '<td class="num"><b>' + (l.neto_linea != null ? _fmtPlata(l.neto_linea) : "—") + '</b></td>' +
+  // IZQ = comparación línea a línea Gestión vs ISIS · DER = el PDF embebido.
+  var MOT = { precio: ["#b91c1c", "precio"], descuento: ["#b45309", "descuento"], sin_precio: ["#b45309", "s/precio"], falta_en_gestion: ["#7c3aed", "sólo factura"], no_facturado: ["#64748b", "sólo Gestión"], importe: ["#b45309", "importe"], ok: ["#94a3b8", ""] };
+  var tbl = '<div style="flex:1 1 480px;min-width:320px;overflow:auto;max-height:76vh;"><table class="fac-concil-tbl"><thead><tr>' +
+    '<th>Cód</th><th>Artículo</th><th style="text-align:right;">Cajas g/i</th><th style="text-align:right;">Precio g/i</th>' +
+    '<th style="text-align:right;">Dto g/i</th><th style="text-align:right;">Gestión</th><th style="text-align:right;">ISIS</th><th style="text-align:right;">Δ</th></tr></thead><tbody>';
+  tbl += cmp.map(function (x) {
+    var nom = (typeof window.artNombre === "function") ? window.artNombre(x.cod) : "";
+    var mot = MOT[x.motivo] || ["#334155", x.motivo || ""];
+    var bad = x.motivo && x.motivo !== "ok" && x.motivo !== "no_facturado";
+    var _pi = function (v) { return v == null ? "—" : _fmtPlata(v); };
+    var _c = function (v) { return v == null ? "—" : Math.round(Number(v)); };
+    return '<tr' + (bad ? ' style="background:#fff7ed;"' : '') + '>' +
+      '<td><b>' + escapeHtml(String(x.cod || "")) + '</b></td>' +
+      '<td style="font-size:12px;color:#475569;">' + escapeHtml(nom || (x.descripcion || "")) + (mot[1] ? ' <span style="font-size:10.5px;font-weight:800;color:' + mot[0] + ';">· ' + mot[1] + '</span>' : '') + '</td>' +
+      '<td class="num">' + _c(x.cajas_ges) + ' / ' + _c(x.cajas_isis) + '</td>' +
+      '<td class="num">' + _pi(x.precio_ges) + ' / ' + _pi(x.precio_isis) + '</td>' +
+      '<td class="num">' + (x.dto_ges != null ? x.dto_ges + "%" : "—") + ' / ' + (x.dto_isis != null ? x.dto_isis + "%" : "—") + '</td>' +
+      '<td class="num">' + _pi(x.importe_ges) + '</td>' +
+      '<td class="num">' + _pi(x.importe_isis) + '</td>' +
+      '<td class="num" style="font-weight:bold;color:' + (x.diff > 0 ? "#dc2626" : (x.diff < 0 ? "#b45309" : "#334155")) + ';">' + (x.diff != null && Number(x.diff) !== 0 ? _fmtPlata(x.diff) : "—") + '</td>' +
       '</tr>';
   }).join("");
-  tbl += '</tbody><tfoot><tr style="border-top:2px solid #cbd5e1;font-weight:800;"><td colspan="5" style="text-align:right;padding:8px;">Total Gestión</td><td class="num" style="padding:8px;">' + _fmtPlata(sumGes) + '</td></tr></tfoot></table></div>';
-  var pdfPane = '<div id="concilDetPdf" style="flex:1 1 560px;min-width:340px;min-height:520px;height:76vh;background:#334155;border-radius:8px;display:flex;align-items:center;justify-content:center;color:#e2e8f0;overflow:hidden;">' +
+  tbl += '</tbody><tfoot><tr style="border-top:2px solid #cbd5e1;font-weight:800;"><td colspan="5" style="text-align:right;padding:8px;">Total</td><td class="num" style="padding:8px;">' + _fmtPlata(sumGes) + '</td><td class="num" style="padding:8px;">' + (hayFactura ? _fmtPlata(sumIsis) : "—") + '</td><td class="num" style="padding:8px;">' + (hayFactura ? _fmtPlata(sumIsis - sumGes) : "—") + '</td></tr></tfoot></table></div>';
+  var pdfPane = '<div id="concilDetPdf" style="flex:1 1 520px;min-width:340px;min-height:520px;height:76vh;background:#334155;border-radius:8px;display:flex;align-items:center;justify-content:center;color:#e2e8f0;overflow:hidden;">' +
     (sp ? 'Cargando factura…' : 'Sin factura de ISIS todavía — aparece acá cuando ISIS la sube.') + '</div>';
   h += '<div style="display:flex;gap:12px;flex-wrap:wrap;align-items:stretch;">' + tbl + pdfPane + '</div>';
-  h += '<div style="margin-top:8px;font-size:12px;color:#94a3b8;">Importe = cajas entregadas × U×B × precio de lista × (1 − descuento). Es lo que Gestión mandó a facturar; a la derecha, la factura real de ISIS para comparar renglón por renglón.</div>';
+  h += '<div style="margin-top:8px;font-size:12px;color:#94a3b8;">Izquierda: cada artículo, Gestión (cálculo actual) vs la factura de ISIS. Fila resaltada = donde hay diferencia. Derecha: la factura para verlo con tus ojos.</div>';
   body.innerHTML = h;
 }
 window.concilDetRender = concilDetRender;

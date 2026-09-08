@@ -179,3 +179,19 @@ as $$
    order by (i.cajas_ent is null), i.cod;
 $$;
 grant execute on function public.gv_conciliacion_detalle(text) to anon, authenticated;
+
+-- ══════════════════════════════════════════════════════════════════════════
+-- v14.34 (2026-09-08) — neto EN VIVO + flag "corregido" + diagnóstico línea a línea.
+-- Pedido de Luis: (a) toggle "sólo diferencias" (front), (b) diagnóstico de a qué se debe
+-- la diferencia (item sin precio, descuento/lista, precio puntual), (c) detectar si un
+-- cambio posterior ya la corrigió → mostrar OK + leyenda del error original.
+--   · gv_conciliacion_lista suma `neto_actual` (recálculo en vivo de gv_vista_facturacion_neto)
+--     y `corregido` (tenía diff en el snapshot pero el cálculo actual ya coincide con ISIS).
+--   · gv_conciliacion_comparar(np): compara LÍNEA A LÍNEA Gestión (cálculo actual) vs los
+--     documento_items de la factura de ISIS matcheada (precio, dto_1+dto_2, cajas, importe),
+--     full outer join por canon_cod, con un `motivo` por renglón (precio/descuento/sin_precio/
+--     falta_en_gestion/no_facturado/importe/ok). El front arma el diagnóstico a partir de eso.
+-- ROLLBACK: recrear gv_conciliacion_lista con la firma vieja (sin neto_actual/corregido) y
+--   drop function if exists public.gv_conciliacion_comparar(text);
+-- (SQL vigente aplicado por migración gv_conciliacion_diag_corregido_v1434.)
+-- ══════════════════════════════════════════════════════════════════════════
