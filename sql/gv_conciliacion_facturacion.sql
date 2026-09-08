@@ -218,3 +218,24 @@ grant execute on function public.gv_conciliacion_detalle(text) to anon, authenti
 -- Efecto: LK 0011 cierra a $0 en cada renglón; Vargas 98484 queda con la única diferencia REAL,
 -- el 809E ($3.005 vs $4.060). (Aplicado por migración gv_conciliacion_comparar_prorrateo_v1441.)
 -- ══════════════════════════════════════════════════════════════════════════
+
+-- ══════════════════════════════════════════════════════════════════════════
+-- v14.48 (2026-09-08) — FIX del TIMEOUT de la pestaña Conciliación.
+-- SÍNTOMA: "No se pudo cargar la conciliación: canceling statement due to statement timeout".
+-- CAUSA (medida): gv_conciliacion_lista tardaba ~8,5 s para 20 filas y PostgREST (rol anon,
+--   statement_timeout = 8 s) la cancelaba. El 80% del costo era `motivo` en el SELECT del
+--   listado: `public.gv_conciliacion_motivo(np)` corría UNA VEZ POR FILA con diferencia y cada
+--   llamada re-materializa el cruce completo (gv_vista_cruce_facturacion + gv_vista_facturacion_neto,
+--   que recorren ~9.800 entregas y ~28.000 documentos enteros). El join en vivo solo ya cuesta ~1,6 s.
+-- FIX (backend): gv_conciliacion_lista YA NO calcula motivo → devuelve null::text. La firma NO
+--   cambia (la columna `motivo` sigue existiendo). Se agrega red de seguridad
+--   `set statement_timeout to '20000'` en la función (SECURITY DEFINER) por si el cruce crece.
+-- FIX (front, index.html): concilRender pinta la celda "¿Por qué?" con "…" para las filas 'diff'
+--   no corregidas y concilCargarMotivos() pide gv_conciliacion_motivo(np) on-demand, en paralelo,
+--   sin bloquear el render. gv_conciliacion_motivo NO se toca (sólo lee).
+-- MEDIDO: explain analyze gv_conciliacion_lista(300,0,null,null): 8.492 ms → 1.732 ms.
+-- Migración aplicada: gv_conciliacion_lista_sin_motivo_v1448 (idempotente, CREATE OR REPLACE).
+-- ROLLBACK: recrear gv_conciliacion_lista con el `case when j2.estado='diff' ... then
+--   public.gv_conciliacion_motivo(j2.np) end as motivo` y sin el SET statement_timeout
+--   (definición previa guardada en la migración/backup del 2026-09-08).
+-- ══════════════════════════════════════════════════════════════════════════
