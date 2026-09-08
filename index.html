@@ -795,6 +795,8 @@ button {
 .pn-reprog .l span{ background:#fff; border:1px solid #fecaca; border-radius:8px; padding:4px 8px; font-weight:700; color:#7f1d1d; font-size:12.5px; }
 .pn-reprog .l span small{ font-weight:600; color:#b91c1c; opacity:.85; }
 .pn-reprog .h{ font-size:12px; color:#7f1d1d; opacity:.9; }
+.pn-reprog-btn{ margin-left:8px; background:#b91c1c; color:#fff; border:none; border-radius:7px; padding:3px 9px; font-size:11.5px; font-weight:800; cursor:pointer; width:auto; }
+.pn-reprog-btn:hover{ background:#991b1b; }
 .pn-carga .t.rep{ color:#b91c1c; font-weight:800; }
 .ppp-res-note.rep{ background:#fef2f2; border-color:#fca5a5; color:#991b1b; }
 .apr-q{ width:100%; box-sizing:border-box; padding:7px 10px; border:1px solid #cbd5e1; border-radius:8px; font-size:13px; margin-bottom:8px; }
@@ -7403,7 +7405,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v14.38";
+const APP_VERSION = "v14.39";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -28607,9 +28609,55 @@ function pppMovRender() {
 }
 async function pppMovElegir(iso) {
   if (!_pppMov) return;
+  if (_pppMov.reprogNps) return pppReprogElegir(iso);   // v14.36: pop-up reutilizado para reprogramar un ISIS
   const t = _pppMov.tanda;
   const ok = await pppTandaMover(t, iso);
   if (ok) pppMovCerrar(); else pppMovCargar();
+}
+/* v14.36 — Reprogramar un pedido de ISIS que NO salió (tanda sin armar) a un día nuevo, POR SU NÚMERO.
+   Reusa el mismo pop-up de días de mover tandas (gv_ppp_web_calendario). Al elegir el día llama a
+   gv_ppp_isis_programar, que escribe GV_PPP_Prog_Override (no toca la tabla que comparte Producción ni
+   renumera la NP: se programa con su número de ISIS). Se ve en todos lados. Sólo supervisor/edición. */
+function pppReprogAbrir(np) {
+  const n = String(np || "").trim(); if (!n) return;
+  const p = (_pppParsed.prog || []).find(function (x) { return String(x.np) === n; }) || {};
+  const label = n + (p.razon_social ? " · " + p.razon_social : (p.cod ? " · " + p.cod : ""));
+  _pppMov = { reprogNps: [n], reprogLabel: label, np: 1, m3: Number(p.m3) || 0,
+              dias: 21, cal: [], cargando: true, actual: "", actualTxt: "" };
+  _pppMovCss();
+  let o = document.getElementById("pppMovOverlay");
+  if (!o) {
+    o = document.createElement("div"); o.id = "pppMovOverlay";
+    o.innerHTML = '<div class="mv-card"><div class="mv-head"><div class="mv-title" id="pppMovTitle"></div>' +
+      '<button class="mv-close" onclick="pppMovCerrar()">Cerrar</button></div><div class="mv-body" id="pppMovBody"></div></div>';
+    o.addEventListener("click", function (e) { if (e.target === o) pppMovCerrar(); });
+    document.body.appendChild(o);
+  }
+  document.getElementById("pppMovTitle").textContent = "📅 Reprogramar " + label + " a un día";
+  o.classList.add("show");
+  pppMovCargar();
+}
+async function pppReprogElegir(iso) {
+  if (!_pppMov || !_pppMov.reprogNps) return;
+  const nps = _pppMov.reprogNps.slice();
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(iso || "")); if (!m) return;
+  const dTxt = m[3] + "/" + m[2];
+  if (!confirm("¿Reprogramar " + (_pppMov.reprogLabel || nps.join(", ")) + " para el " + dTxt + "?\n\n" +
+               "Se programa con su número de ISIS (no se renumera). Lo ven todos, también el operario.")) return;
+  pppSetStatus("Reprogramando " + nps.join(", ") + "…", true);
+  try {
+    const r = await aprRpc("gv_ppp_isis_programar", { p_nps: nps, p_fecha: iso, p_por: await aprQuien() });
+    const x = (r && r[0]) || {};
+    pppMovCerrar();
+    pppSetStatus("✓ " + (x.codigo || "") + " reprogramada al " + dTxt + ": " + (x.np_programadas || 0) + " NP de ISIS · " + aprNum(x.m3) + " m³." + (x.aviso ? "  ⚠ " + x.aviso : ""), true);
+    if (x.aviso) { try { alert("Se reprogramó, pero ojo:\n\n" + x.aviso); } catch (_e) {} }
+    await pppLoadProgFromSupabase();
+  } catch (e) {
+    const msg = (e && e.message) ? e.message : String(e);
+    pppSetStatus("⚠ No se pudo reprogramar: " + msg, false);
+    try { alert("No se pudo reprogramar " + (_pppMov && _pppMov.reprogLabel || nps.join(", ")) + ":\n\n" + msg); } catch (_e) {}
+    pppMovCargar();
+  }
 }
 function pppMoverAbrir(tanda) {
   const t = String(tanda || "").toUpperCase(); if (!t || t === "—") return;
@@ -30777,9 +30825,16 @@ function _pppPlanDiaHtml(programados, key, opts) {
     const reprog = ped.filter(function (p) { return _pppEstadoPed(p) !== "armado"; });
     const sinRem = ped.length - reprog.length;
     if (reprog.length) {
+      // v14.36 (dueño: "no tengo herramientas desde ahí para programarlos directo en un día"): botón
+      // por pedido que abre el pop-up de días y lo reprograma con su NÚMERO de ISIS (gv_ppp_isis_programar
+      // → GV_PPP_Prog_Override; no renumera ni toca la tabla compartida). Sólo supervisor/edición.
+      const _puedeReprog = (window.__isSupervisor || !PPP_READONLY);
       h += '<div class="pn-reprog"><b>⚠ ' + reprog.length + ' pedido' + (reprog.length === 1 ? '' : 's') + ' NO ' + (reprog.length === 1 ? 'salió' : 'salieron') + ' — hay que reprogramar' + (reprog.length === 1 ? 'lo' : 'los') + '</b>' +
-        '<div class="l">' + reprog.map(function (p) { return '<span>' + escapeHtml(String(p.np)) + ' · ' + escapeHtml(p.razon_social || p.cod || "—") + ' <small>' + escapeHtml(String(p.tanda || "—").toUpperCase()) + ' · ' + escapeHtml(p.fecha_entrega || "") + '</small></span>'; }).join('') + '</div>' +
-        '<div class="h">La tanda nunca se armó, así que el pedido no subió a ningún camión. Ponele fecha nueva (✏️ Editar en su tanda, abajo) o sacalo de ISIS.</div></div>';
+        '<div class="l">' + reprog.map(function (p) {
+          const btn = _puedeReprog ? ' <button class="pn-reprog-btn" onclick="event.stopPropagation();pppReprogAbrir(\'' + escapeHtml(String(p.np)) + '\')" title="Reprogramar este pedido a un día nuevo">📅 Reprogramar</button>' : '';
+          return '<span>' + escapeHtml(String(p.np)) + ' · ' + escapeHtml(p.razon_social || p.cod || "—") + ' <small>' + escapeHtml(String(p.tanda || "—").toUpperCase()) + ' · ' + escapeHtml(p.fecha_entrega || "") + '</small>' + btn + '</span>';
+        }).join('') + '</div>' +
+        '<div class="h">La tanda nunca se armó, así que el pedido no subió a ningún camión. ' + (_puedeReprog ? 'Reprogramalo a un día con <b>📅 Reprogramar</b>, ' : 'Ponele fecha nueva (✏️ Editar en su tanda, abajo) ') + 'o sacalo de ISIS.</div></div>';
     }
     h += '<div class="pn-note"><b>' + sinRem + '</b> ' + (sinRem === 1 ? 'pedido salió' : 'pedidos salieron') + ' con la tanda armada y nadie marcó el remito: en <b>Recepción Remitos → Controlado</b> pasan a entregados y desaparecen de acá.</div>';
   }
