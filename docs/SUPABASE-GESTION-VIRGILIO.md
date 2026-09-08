@@ -3932,3 +3932,51 @@ delete from public."GV_PPP_Prog_Override" where nota like 'v14.35%';
 ```
 (el front tolera que la vista no exista: `aprTraerIsis` devuelve `[]` y la solapa sigue mostrando los
 pedidos de la página).
+
+## 3.bo ✅ Descuento de cliente casi en vivo: sync cada 15 min + upsert condicional (v14.36) — 2026-09-08
+
+**Contexto.** El `dto_vol` que usa Facturación (`facturacion_neto`, `gv_lk_np_feed`) sale de la tabla
+local `clientes_dto`, que refresca la Edge Function `sync-clientes-dto` desde `customers.dto_vol` de
+**LK** (`kwkclwhmoygunqmlegrg`) y **Chef** (`nkhzocgdpwtgrmwleihr`). El cron 61 sólo disparaba si el
+snapshot tenía **>14 días** → un cambio de descuento hecho desde loekemeyer.com / chefsrl.com podía
+tardar hasta 14 días en llegar al facturador. Pedido del dueño: que llegue solo, más seguido.
+
+**Qué se hizo.**
+1. **Edge Function `sync-clientes-dto` v2 (deploy v9, `verify_jwt=false`).** Ahora hace **upsert
+   condicional**: primero lee `clientes_dto` (`fetchActual`), arma el diff contra LK+Chef y **escribe
+   sólo las filas nuevas o cuyo `dto_vol` cambió**. Antes reescribía las ~2034 filas en cada corrida.
+   Devuelve `{ok, cambios, evaluados, lk, chef}`. Con esto puede correr seguido sin churn ni dead tuples.
+   Fuente: `supabase/functions/sync-clientes-dto/index.ts`.
+2. **Cron 61 (`sync-clientes-dto-14d`, el nombre quedó, no se pudo renombrar por permisos):**
+   `0 8 * * *` con guard de 14 días → **`*/15 * * * *`** sin guard. El `http_post` va sin auth
+   (por eso la función tiene que quedar `verify_jwt=false`).
+
+**Medido (08/09).**
+- Editado `dto_vol` de LK 4091 (Swing Bazar) 0 → 0,05 y LK 4254 (Vargas) 0 → 0,06 desde el front:
+  ambos aparecieron en `customers` al toque.
+- Corrida vía el path del cron (sin Authorization) → `200 {ok:true, cambios:1, evaluados:2034}`:
+  detectó la única fila cambiada (4254) y escribió esa nada más. Verificado que `clientes_dto` 4091
+  y 4254 quedaron en 0,05 y 0,06.
+- Sin cambios pendientes ⇒ `cambios:0`, cero escrituras.
+
+**⚠ Tropiezo (resuelto):** el primer deploy por MCP dejó `verify_jwt=true` por default → el cron
+recibía `401 UNAUTHORIZED_NO_AUTH_HEADER`. Se redeployó con `verify_jwt=false`. **Al redeployar
+esta función, pasar SIEMPRE `verify_jwt=false`.**
+
+**Backup:** `clientes_dto_bkp_20260908` (2035 filas), borrable cuando se confirme todo OK.
+
+**Rollback:**
+```sql
+select cron.alter_job(61,
+  schedule := '0 8 * * *',
+  command  := $cmd$
+    SELECT CASE
+      WHEN (SELECT COALESCE(max(actualizado), 'epoch'::timestamptz) FROM public.clientes_dto)
+           < now() - interval '14 days'
+      THEN net.http_post(
+             url := 'https://hrxfctzncixxqmpfhskv.supabase.co/functions/v1/sync-clientes-dto',
+             body := '{}'::jsonb, headers := '{"Content-Type":"application/json"}'::jsonb)
+      ELSE NULL END;
+  $cmd$);
+```
+(y redeployar la v1 de la función si se quisiera volver al upsert total; la v2 es un superset, no hace falta).

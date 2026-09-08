@@ -1,7 +1,7 @@
 // sync-clientes-dto — refresca public.clientes_dto (dto_vol por cliente) desde los DOS padrones:
 //   1. LK    customers.dto_vol (WEB_SERVICE_KEY, service_role de LK)   -> empresa='lk'
 //   2. Chef  customers.dto_vol (CHEF_SERVICE_KEY, service_role de Chef) -> empresa='chef'
-// Idempotente. Lo dispara pg_cron cada 14 dias (job sync-clientes-dto-14d).
+// Idempotente. Lo dispara pg_cron (job sync-clientes-dto-14d).
 // clientes_dto tiene PK compuesta (cod_cliente, empresa): las numeraciones de LK y Chef son
 // INDEPENDIENTES (mismo codigo = otro cliente en cada empresa), asi que el dto se resuelve por
 // (codigo, empresa). El join de facturacion deriva la empresa de la NP (^9 = lk, resto = chef).
@@ -12,6 +12,12 @@
 // url de Chef, CHEF_SERVICE_KEY = service_role de Chef (agregar a mano). SUPABASE_URL /
 // SUPABASE_SERVICE_ROLE_KEY los inyecta Supabase.
 // verify_jwt = OFF (endpoint interno idempotente; solo pulls -> upsert). Deploy manual/MCP.
+//
+// v2 (2026-09-08): UPSERT CONDICIONAL. Antes reescribia las ~2034 filas en CADA corrida (upsert
+// merge-duplicates de todo el padron), lo que generaba dead tuples inutiles al correr seguido.
+// Ahora lee primero clientes_dto y SOLO escribe las filas nuevas o cuyo dto_vol cambio. Con esto
+// el cron puede correr cada 15 min sin churn: si nadie edito un dto, no escribe nada. Se devuelve
+// `cambios` (filas escritas) y `evaluados` (total del padron) para poder ver si movio algo.
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 
 const LK_URL = Deno.env.get("WEB_SUPABASE_URL") || "https://kwkclwhmoygunqmlegrg.supabase.co";
@@ -50,6 +56,28 @@ async function fetchDtos(baseUrl: string, key: string): Promise<Map<string, numb
   return seen;
 }
 
+// Lee el estado ACTUAL de clientes_dto en Virgilio (paginado) -> mapa "empresa|cod" -> dto_vol.
+// Sirve para escribir solo lo que cambio.
+async function fetchActual(): Promise<Map<string, number>> {
+  const seen = new Map<string, number>();
+  let offset = 0;
+  while (true) {
+    const url = SB_URL + "/rest/v1/clientes_dto?select=cod_cliente,empresa,dto_vol&order=cod_cliente.asc" +
+      "&limit=" + PAGE + "&offset=" + offset;
+    const r = await fetch(url, { headers: { apikey: SB_KEY, Authorization: "Bearer " + SB_KEY } });
+    if (!r.ok) throw new Error("actual REST " + r.status + ": " + (await r.text()).slice(0, 200));
+    const page: { cod_cliente: string | number | null; empresa: string; dto_vol: number | null }[] = await r.json();
+    for (const x of page) {
+      if (!x || x.cod_cliente == null) continue;
+      seen.set(x.empresa + "|" + String(x.cod_cliente), Number(x.dto_vol) || 0);
+    }
+    if (page.length < PAGE) break;
+    offset += PAGE;
+    if (offset > 100000) break;
+  }
+  return seen;
+}
+
 Deno.serve(async (_req: Request): Promise<Response> => {
   try {
     if (!LK_KEY) return json({ ok: false, error: "falta WEB_SERVICE_KEY" }, 501);
@@ -74,30 +102,43 @@ Deno.serve(async (_req: Request): Promise<Response> => {
       chefError = "falta CHEF_SERVICE_KEY (secreto en Supabase); Chef salteado";
     }
 
-    // ── 3) Filas con empresa; PK compuesta (cod_cliente, empresa) ──
-    const upserts: { cod_cliente: string; empresa: string; dto_vol: number; actualizado: string }[] = [];
-    for (const [cod_cliente, dto_vol] of lk) upserts.push({ cod_cliente, empresa: "lk", dto_vol, actualizado: nowIso });
-    for (const [cod_cliente, dto_vol] of chef) upserts.push({ cod_cliente, empresa: "chef", dto_vol, actualizado: nowIso });
+    // ── 3) Estado actual en Virgilio, para escribir SOLO lo que cambio ──
+    const actual = await fetchActual();
 
-    // ── 4) upsert en Virgilio (merge-duplicates por PK compuesta) ──
-    const batchSize = 500;
+    // ── 4) Diff: filas nuevas o con dto_vol distinto ──
+    const upserts: { cod_cliente: string; empresa: string; dto_vol: number; actualizado: string }[] = [];
+    let evaluados = 0;
+    const considerar = (cod_cliente: string, empresa: string, dto_vol: number) => {
+      evaluados++;
+      const prev = actual.get(empresa + "|" + cod_cliente);
+      if (prev === undefined || prev !== dto_vol) {
+        upserts.push({ cod_cliente, empresa, dto_vol, actualizado: nowIso });
+      }
+    };
+    for (const [cod_cliente, dto_vol] of lk) considerar(cod_cliente, "lk", dto_vol);
+    for (const [cod_cliente, dto_vol] of chef) considerar(cod_cliente, "chef", dto_vol);
+
+    // ── 5) upsert en Virgilio (merge-duplicates por PK compuesta) SOLO de lo que cambio ──
     let total = 0;
-    for (let i = 0; i < upserts.length; i += batchSize) {
-      const batch = upserts.slice(i, i + batchSize);
-      const w = await fetch(SB_URL + "/rest/v1/clientes_dto?on_conflict=cod_cliente,empresa", {
-        method: "POST",
-        headers: {
-          apikey: SB_KEY, Authorization: "Bearer " + SB_KEY,
-          "Content-Type": "application/json",
-          Prefer: "resolution=merge-duplicates,return=minimal",
-        },
-        body: JSON.stringify(batch),
-      });
-      if (!w.ok) return json({ ok: false, error: "Virgilio upsert " + w.status, detail: (await w.text()).slice(0, 300) }, 502);
-      total += batch.length;
+    if (upserts.length) {
+      const batchSize = 500;
+      for (let i = 0; i < upserts.length; i += batchSize) {
+        const batch = upserts.slice(i, i + batchSize);
+        const w = await fetch(SB_URL + "/rest/v1/clientes_dto?on_conflict=cod_cliente,empresa", {
+          method: "POST",
+          headers: {
+            apikey: SB_KEY, Authorization: "Bearer " + SB_KEY,
+            "Content-Type": "application/json",
+            Prefer: "resolution=merge-duplicates,return=minimal",
+          },
+          body: JSON.stringify(batch),
+        });
+        if (!w.ok) return json({ ok: false, error: "Virgilio upsert " + w.status, detail: (await w.text()).slice(0, 300) }, 502);
+        total += batch.length;
+      }
     }
 
-    return json({ ok: true, sincronizados: total, lk: lk.size, chef: chef.size, chef_error: chefError || undefined, ts: nowIso });
+    return json({ ok: true, cambios: total, evaluados, lk: lk.size, chef: chef.size, chef_error: chefError || undefined, ts: nowIso });
   } catch (e) {
     return json({ ok: false, error: String((e as Error)?.message || e).slice(0, 300) }, 500);
   }
