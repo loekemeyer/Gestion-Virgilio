@@ -3770,3 +3770,64 @@ watchdog calla ese día y, si la ingesta sigue caída, el primer aviso sale el *
 repo**, sólo existe en esa PC. Su hermano de las notas de crédito sí está
 (`agente-local/nc_ingest.py`) y sirve de patrón, pero el parser de facturas se perdería con la
 máquina. Hay que traerlo y commitearlo.
+
+## §3.be — v14.30 (2026-09-08): Conciliación forward-looking (pestaña de Facturación)
+
+**Qué pidió Luis.** Partir el módulo de Facturación en dos solapas: **Facturador** (lo de
+siempre) y **Conciliación**. Conciliación NO es el cruce retrospectivo de 30 días (ese sigue
+existiendo en "🔍 Cruce con ISIS" → Deuda/Cobranzas, §ver `gv_cruce_facturacion`). Es un
+**registro forward-looking**: *"a partir de hoy, siempre que se manda algo a facturar desde
+Gestión, ponelo en una tabla y en otra columna el monto de la factura parseada que le
+corresponde"*, más recientes arriba. Y *"este módulo debería ser un SNAPSHOT de lo que se
+mandó vs lo que se facturó realmente; el resto del pipeline siempre en vivo"*.
+
+**El disparador (orden del dueño, confirmado en el código).** Las dos formas de facturar
+pasan por el MISMO choke point del front, `facMarcarFacturada`:
+- **NP web (LK/CH):** se marca la casilla y se baja el **Excel ISIS** (`facXlsBajar`) →
+  *bajar el Excel ES la facturación* (no hay tilde adicional); después una persona lo importa
+  a mano en ISIS.
+- **NP de ISIS:** botón **✓** (tilde, `facTickNP`).
+Ahí mismo, con la NP ya escrita en `Facturacion_NP`, el front dispara la RPC de registro.
+
+**Objetos nuevos (todo `GV_`/`gv_`, no toca nada de Producción). SQL: `sql/gv_conciliacion_facturacion.sql`.**
+- **`GV_Conciliacion_Facturacion`** — tabla nuestra, RLS prendida, policy `select` a
+  anon/authenticated, **sin** insert/update/delete a la anon key. PK = `np` (un envío por NP;
+  si se re-factura, no se repisa el snapshot original). Columnas: `empresa, tanda, cod_cliente,
+  razon_social, fecha_salida, cajas_ent, neto_gestion` (SNAPSHOT del neto que Gestión calculó),
+  `items_sin_precio, origen ('web'|'isis'), registrado_at`.
+- **`gv_conciliacion_registrar(p_np text)`** — SECURITY DEFINER. Congela el neto de Gestión
+  desde `gv_vista_facturacion_neto` (= cajas ENTREGADAS × lista × descuento, web ×0,98) + los
+  datos de la NP de `Facturacion_NP`. `ON CONFLICT (np) DO NOTHING`.
+- **`gv_conciliacion_lista(p_limit,p_offset,p_q,p_empresa)`** — SECURITY DEFINER. Snapshot ⋈
+  factura parseada **en vivo** (`left join gv_vista_cruce_facturacion` por np: neto real, cajas,
+  comprobante, PDF, es_super). La diferencia y el estado (`ok`/`diff`/`sin_factura`/`sin_neto`)
+  se recalculan CONTRA el neto congelado. Orden `registrado_at desc` (más recientes arriba).
+- **`gv_conciliacion_totales(p_empresa)`** — SECURITY DEFINER, resumen por estado.
+
+**Front (`index.html`).** Barra de 2 solapas en `#facturacionModal` (`facSetTab`), el contenido
+viejo envuelto en `#facPanelFact`, el nuevo en `#facPanelConcil` (`_concil`, `concilRefresh`,
+`concilRender`, `concilAbrirFactura` reusa `deudaAbrirFactura` para el PDF). El registro del
+snapshot se hace por **`fetch` directo** a `/rest/v1/rpc/gv_conciliacion_registrar` con los
+`headers` que ya tiene `facMarcarFacturada` — NO por `sb.rpc`, porque `facMarcarFacturada` vive
+en el primer `<script>` y `const sb` en el segundo (no comparten scope; el bloque A habla con
+Supabase por `fetch`). El botón "🔍 Cruce con ISIS" queda como estaba (decisión de Luis).
+
+**Medición al crear (08/09).** Tabla arranca **vacía** (se llena desde la próxima facturación).
+Probado con la NP real 98619 (facturada hoy 09:01): `gv_conciliacion_registrar('98619')` congeló
+`neto_gestion = 16.136.550`; `gv_conciliacion_lista` la cruzó con la factura ISIS
+`FC-A-0005-00000908` (`factura_neto = 16.136.550`) → diff 0, estado `ok`. Fila de prueba borrada
+después. Advisors de seguridad: la tabla queda limpia (RLS + policy, `search_path` fijo); los 2
+WARN `*_security_definer_function_executable` son el mismo patrón que ya usan las RPC del cruce
+(exponer un cálculo a la anon key sin dar acceso directo a las vistas/FDW), intencional.
+
+**Smoke:** `tests/fac-conciliacion.cjs` (2 solapas, snapshot Gestión vs ISIS, estados, 📄, y que
+el snapshot se registre al facturar). En `tests/run.sh`.
+
+**Rollback:**
+```sql
+drop function if exists public.gv_conciliacion_totales(text);
+drop function if exists public.gv_conciliacion_lista(int,int,text,text);
+drop function if exists public.gv_conciliacion_registrar(text);
+drop table if exists public."GV_Conciliacion_Facturacion";
+```
+y en el front sacar la barra de solapas / `facSetTab` / `concil*` y el `fetch` del registrar.

@@ -1,0 +1,157 @@
+-- ══════════════════════════════════════════════════════════════════════════
+-- gv_conciliacion_facturacion.sql — CONCILIACIÓN forward-looking (pestaña nueva)
+-- v14.30 · 2026-09-08 · Virgilio (hrxfctzncixxqmpfhskv) · objetos NUEVOS gv_/GV_
+-- ══════════════════════════════════════════════════════════════════════════
+-- QUÉ ES (pedido de Luis, 08/09): la pestaña "Conciliación" de Facturación no es el
+-- cruce retrospectivo de 30 días (ese sigue existiendo en "🔍 Cruce con ISIS" y en
+-- Deuda/Cobranzas). Es un REGISTRO FORWARD-LOOKING: a partir de hoy, cada vez que se
+-- manda algo a facturar desde Gestión (NP web = bajar el Excel ISIS · NP de ISIS =
+-- tilde ✓ — las dos pasan por facMarcarFacturada en el front), se guarda UNA FILA con
+-- el monto que Gestión definió que correspondía facturar (SNAPSHOT, congelado), y en
+-- otra columna aparece el monto de la factura parseada de ISIS que le corresponde
+-- (se completa solo cuando ISIS la sube). Más recientes arriba.
+--
+-- POR QUÉ SNAPSHOT: "este módulo debería ser un snapshot de lo que se mandó vs lo que
+-- se facturó realmente; el resto del pipeline siempre en vivo" (Luis). El neto de
+-- Gestión se recalcula solo en el resto del pipeline (cambia con lista/cajas); acá se
+-- congela lo que se envió ese día. El neto de la factura (ISIS) se resuelve en vivo
+-- contra los documentos parseados hasta que aparece.
+--
+-- COMPARTIDA: todo lleva prefijo GV_/gv_ y NO lo lee Producción Virgilio. No se toca
+-- ningún objeto de Producción. Se REUSA (sólo lectura) gv_vista_facturacion_neto y
+-- gv_vista_cruce_facturacion (creados en gv_cruce_facturacion.sql, v13.10/v14.13).
+--
+-- ROLLBACK:
+--   drop function if exists public.gv_conciliacion_lista(int,int,text,text);
+--   drop function if exists public.gv_conciliacion_registrar(text);
+--   drop table if exists public."GV_Conciliacion_Facturacion";
+-- ══════════════════════════════════════════════════════════════════════════
+
+-- 1) La tabla del snapshot. Nuestra (GV_), RLS prendida. La NP es la clave: una NP se
+--    manda a facturar una vez; si se re-factura, el snapshot original NO se pisa
+--    (ON CONFLICT DO NOTHING en el registrar) — es lo que se envió la primera vez.
+create table if not exists public."GV_Conciliacion_Facturacion" (
+  np              text primary key,
+  empresa         text,
+  tanda           text,
+  cod_cliente     text,
+  razon_social    text,
+  fecha_salida    date,
+  cajas_ent       numeric,
+  neto_gestion    numeric,            -- SNAPSHOT: lo que Gestión calculó al facturar
+  items_sin_precio integer,
+  origen          text,               -- 'web' | 'isis' (informativo)
+  registrado_at   timestamptz not null default now()
+);
+
+alter table public."GV_Conciliacion_Facturacion" enable row level security;
+
+-- Lectura para el front (anon/authenticated). La escritura va SÓLO por la RPC
+-- SECURITY DEFINER de abajo; no se da INSERT/UPDATE/DELETE directo a la anon key.
+drop policy if exists gv_concil_sel on public."GV_Conciliacion_Facturacion";
+create policy gv_concil_sel on public."GV_Conciliacion_Facturacion"
+  for select to anon, authenticated using (true);
+
+revoke insert, update, delete on public."GV_Conciliacion_Facturacion" from anon, authenticated;
+grant select on public."GV_Conciliacion_Facturacion" to anon, authenticated;
+
+-- 2) Registrar el snapshot al momento de facturar. Congela el neto que Gestión calculó
+--    (gv_vista_facturacion_neto = cajas ENTREGADAS × lista × descuento, web ×0,98) y
+--    los datos de la NP (Facturacion_NP). ON CONFLICT DO NOTHING: no repisa el primer envío.
+create or replace function public.gv_conciliacion_registrar(p_np text)
+returns void
+language sql
+volatile
+security definer
+set search_path = public, pg_temp
+as $$
+  insert into public."GV_Conciliacion_Facturacion"
+    (np, empresa, tanda, cod_cliente, razon_social, fecha_salida,
+     cajas_ent, neto_gestion, items_sin_precio, origen)
+  select f.np,
+         public.gv_empresa_de_np_texto(f.np),
+         f.tanda,
+         coalesce(n.cod_cliente, f.cod_cliente),
+         f.razon_social,
+         f.fecha_salida,
+         n.cajas_ent,
+         n.neto,
+         n.items_sin_precio,
+         case when f.np ~* '^\s*(LK|CH)' then 'web' else 'isis' end
+    from public."Facturacion_NP" f
+    left join public.gv_vista_facturacion_neto n on n.np = f.np
+   where regexp_replace(f.np, '\.0+$', '') = regexp_replace(p_np, '\.0+$', '')
+   order by f.facturado_at desc nulls last
+   limit 1
+  on conflict (np) do nothing;
+$$;
+grant execute on function public.gv_conciliacion_registrar(text) to anon, authenticated;
+
+-- 3) La lista de la pestaña: snapshot ⋈ factura parseada (en vivo). El neto de Gestión
+--    sale del snapshot (congelado); el de ISIS y el match salen de gv_vista_cruce_facturacion
+--    (mismo match cliente + fecha ±3 + cajas que usa el cruce). La diferencia y el estado
+--    se recalculan CONTRA el snapshot. Más recientes arriba.
+create or replace function public.gv_conciliacion_lista(
+  p_limit   int  default 200,
+  p_offset  int  default 0,
+  p_q       text default null,
+  p_empresa text default null)
+returns table (
+  np text, empresa text, tanda text, cod_cliente text, razon_social text,
+  fecha_salida date, cajas_ent numeric, neto_gestion numeric, items_sin_precio integer,
+  registrado_at timestamptz,
+  factura_neto numeric, factura_cajas numeric, comprobante_id text, doc_fecha date,
+  storage_path text, es_super boolean,
+  diff numeric, diff_pct numeric, estado text, total_count bigint)
+language sql
+security definer
+set search_path = public, pg_temp
+as $$
+  with j as (
+    select s.np, s.empresa, s.tanda, s.cod_cliente, s.razon_social,
+           s.fecha_salida, s.cajas_ent, s.neto_gestion, s.items_sin_precio, s.registrado_at,
+           c.factura_neto, c.factura_cajas, c.comprobante_id, c.doc_fecha, c.storage_path,
+           coalesce(c.es_super, false) as es_super,
+           case when c.factura_neto is not null and s.neto_gestion is not null
+                then round(c.factura_neto - s.neto_gestion, 2) end as diff,
+           case when c.factura_neto is not null and s.neto_gestion is not null and s.neto_gestion <> 0
+                then round((c.factura_neto - s.neto_gestion) / s.neto_gestion * 100, 2) end as diff_pct,
+           case when s.neto_gestion is null then 'sin_neto'
+                when c.factura_neto is null then 'sin_factura'
+                when abs(c.factura_neto - s.neto_gestion) <= greatest(50, s.neto_gestion * 0.01) then 'ok'
+                else 'diff' end as estado
+      from public."GV_Conciliacion_Facturacion" s
+      left join public.gv_vista_cruce_facturacion c on c.np = s.np
+  )
+  select j.*, count(*) over ()::bigint as total_count
+    from j
+   where (p_empresa is null or p_empresa = '' or j.empresa = p_empresa)
+     and (p_q is null or p_q = ''
+          or j.razon_social ilike '%'||p_q||'%' or j.cod_cliente ilike '%'||p_q||'%' or j.np ilike '%'||p_q||'%')
+   order by j.registrado_at desc
+   limit greatest(p_limit, 1) offset greatest(p_offset, 0)
+$$;
+grant execute on function public.gv_conciliacion_lista(int, int, text, text) to anon, authenticated;
+
+-- 4) Totales del período (para el resumen arriba de la tabla).
+create or replace function public.gv_conciliacion_totales(
+  p_empresa text default null)
+returns table (estado text, n bigint, suma_diff numeric)
+language sql
+security definer
+set search_path = public, pg_temp
+as $$
+  with j as (
+    select case when s.neto_gestion is null then 'sin_neto'
+                when c.factura_neto is null then 'sin_factura'
+                when abs(c.factura_neto - s.neto_gestion) <= greatest(50, s.neto_gestion * 0.01) then 'ok'
+                else 'diff' end as estado,
+           case when c.factura_neto is not null and s.neto_gestion is not null
+                then round(c.factura_neto - s.neto_gestion, 2) end as diff
+      from public."GV_Conciliacion_Facturacion" s
+      left join public.gv_vista_cruce_facturacion c on c.np = s.np
+     where (p_empresa is null or p_empresa = '' or s.empresa = p_empresa)
+  )
+  select estado, count(*)::bigint, coalesce(sum(diff), 0) from j group by estado;
+$$;
+grant execute on function public.gv_conciliacion_totales(text) to anon, authenticated;

@@ -12,7 +12,19 @@
 > única**; no se replica. Ante la duda entre parche rápido y fix de raíz → **fix
 > de raíz**.
 >
-> Última actualización: 2026-09-08 (martes) · Versión app al documentar: **v14.29**
+> Última actualización: 2026-09-08 (martes) · Versión app al documentar: **v14.30**
+>
+> Nota **v14.30** (front + backend) — **Facturación en dos pestañas: Facturador y Conciliación.**
+> Pedido de Luis (08/09). *Facturador* = el módulo de siempre. *Conciliación* = registro
+> **forward-looking**: a partir de hoy, cada vez que se manda algo a facturar desde Gestión (NP web
+> = bajar el Excel ISIS · NP de ISIS = tilde ✓ — las dos pasan por `facMarcarFacturada`), se guarda
+> una fila con el **monto que Gestión definió (SNAPSHOT congelado)** y, en la misma fila, el **neto
+> de la factura parseada de ISIS** que le corresponde (en vivo, se completa cuando ISIS la sube).
+> Más recientes arriba. Backend nuevo (todo `GV_`/`gv_`, no toca Producción): tabla
+> `GV_Conciliacion_Facturacion` + RPC `gv_conciliacion_registrar` (congela el neto), `_lista`,
+> `_totales`. El "🔍 Cruce con ISIS" (retrospectivo, 30 días) queda como estaba. Probado con la NP
+> 98619 (snapshot $16.136.550 = factura `FC-A-0005-00000908`, diff 0). Detalle: `docs/SUPABASE-GESTION-VIRGILIO.md`
+> §3.be, `sql/gv_conciliacion_facturacion.sql`, smoke `tests/fac-conciliacion.cjs`.
 >
 > Nota **v14.29** (front) — **Uniformidad visual de la PPP: la barra de solapas es igual en todas
 > las pantallas.** Pedido de Luis Rial (08/09): *A Programar* mostraba **"…"** en vez de las cantidades
