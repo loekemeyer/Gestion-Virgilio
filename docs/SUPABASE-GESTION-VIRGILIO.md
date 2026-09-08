@@ -4211,3 +4211,22 @@ proyectos de las páginas** (evaluado: trigger en `products` de LK/Chef corre pa
 y es cross-project → descartado). La función es idempotente y liviana (~330 LK + ~100 Chef), correrla
 seguido no molesta. Watchdog: subir el umbral del job 66 a ~120 min. `sql/sync_precios_venta.sql`.
 Rollback: `cron.alter_job(66, schedule := '0 9 * * *', command := <bloque con guarda de 24 h>)`.
+
+## §3.bj — v14.46 (2026-09-08): `gv_articulo_empresa`, la identidad de empresa por artículo (Fase 1)
+
+Fase 1 del modelo pedido por el dueño: *"la empresa del código determinada por una columna de
+identidad (cod: 505, empresa: LK), que aparezca en todo el pipeline"*. Vista nueva
+`public.gv_articulo_empresa (cod_canon, empresa, es_dual)` = fuente única de a qué empresa/góndola
+pertenece cada artículo, para dejar de derivarla de los dígitos de la NP (`empresa_de_np`) o de
+codificarla en el string (` LK`/` CH`).
+
+Reglas: LK = artículo de Loekemeyer (catálogo `precios_venta ∪ cob_uxb_lk`, incluye los ~96 que
+Chef **revende** → góndola Loeke con L, **no** son dual); CH = artículo propio de Chef; **dual** =
+mismo código, producto distinto en cada empresa (`437E/438E/439E/809E`, `codigos_duales`) → 2
+filas, la NP decide. Sólo lectura, `security_invoker`, se re-deriva sola (catálogos frescos por
+cron 66 c/15 min). **No toca Producción** (objeto nuevo `gv_`).
+
+Medido: **381 LK no-dual + 4 duales (LK y CH) = 389 filas**. Dato: **0 artículos propios de Chef**
+hoy — todo el catálogo Chef es Loeke revendido + los 4 duales. `sql/gv_articulo_empresa.sql`.
+Rollback: `drop view public.gv_articulo_empresa;`. Sigue Fase 2 (persistir `empresa` como columna
+en el pipeline web) — ver `docs/MAPA-CONVERSIONES-PIPELINE.md`.
