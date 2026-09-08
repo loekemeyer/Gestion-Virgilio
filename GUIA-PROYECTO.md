@@ -12,7 +12,23 @@
 > única**; no se replica. Ante la duda entre parche rápido y fix de raíz → **fix
 > de raíz**.
 >
-> Última actualización: 2026-09-08 (martes) · Versión app al documentar: **v14.30**
+> Última actualización: 2026-09-08 (martes) · Versión app al documentar: **v14.41**
+>
+> Nota **v14.41** (datos, proyecto LK) — **Gigot Cosméticos y Matiz SA eran el mismo cliente.**
+> Mismo CUIT (30-62743503-3) partido en dos: la cuenta web era `cod 5000 "Gigot Cosméticos"` y ISIS
+> factura como `cod 4263 "Matiz SA"` (FC A 0004-00035713 del 26/08, $12.039.500, 208 cajas, NP 98109,
+> más 3 NP en PPP). ISIS nunca vio el 5000 —cero comprobantes en 7 años y 31.071 facturas LK— y
+> `customers` tiene UNIQUE sobre `cuit`, así que Matiz nunca pudo abrirse cuenta propia: era **una
+> fila sola con el código y el nombre equivocados**. Se unificó en 4263 "Matiz SA" (mismo `id`, mismo
+> login). Y se borraron **121 líneas de `sales_lines`** que eran una **carga a mano** para poblarle
+> los sugeridos: todas sin `boxes`/`import_batch`/`row_hash`, fechadas el día en que se creó la
+> cuenta, con 33 de 35 artículos repetidos hasta 4 veces (ningún otro cliente repite un artículo el
+> mismo día) y con **códigos del catálogo LK que este cliente no compra** — el dueño: *"compra por
+> fuera de la página porque necesita sus propios códigos"* (compró 55215, que ni está en el catálogo).
+> Alimentaban los sugeridos y el detector de anomalías con ruido. Impacto medido: `sales_lines` con
+> boxes NULL **122 → 0** (se apagó esa alerta 🟠 de `rep_salud`), `mv_loke_sales_agg` 187.779 → 187.744.
+> Backups con RLS (`bkp_matiz_20260908_*`) y rollback en `sql/lk_unificar_matiz_gigot_v1441.sql`.
+> Corrige un diagnóstico previo ("cero facturas de ese CUIT"): la búsqueda usaba el CUIT sin guiones.
 >
 > Nota **v14.30** (front + backend) — **Facturación en dos pestañas: Facturador y Conciliación.**
 > Pedido de Luis (08/09). *Facturador* = el módulo de siempre. *Conciliación* = registro
