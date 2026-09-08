@@ -3383,6 +3383,32 @@ Las que no resuelvan vuelven solas a `GV_Geo_Fallidas` a los 3 intentos.
 
 **Archivo:** `sql/gv_geo_normalizar_v1426.sql` (la segunda tanda está al final del mismo archivo).
 
+### Dónde quedó (medido al cierre del 07/09, 22:20 ART)
+
+```sql
+select * from public.gv_geo_cobertura;
+--  chef    43 direcciones · 38 ubicadas · 5 retira · faltan  0
+--  lk     446 direcciones · 363 ubicadas · 59 retira · faltan 24
+--  total  489            · 401          · 64        · faltan 24
+```
+
+**401 de 425 direcciones geocodificables** (las 64 de "retira" no van al reparto): **94%**.
+Arrancó el día en 368 sobre un padrón de 2.307 sin acotar. El cron 75 quedó en `20 */6 * * *`.
+
+**Las 24 que faltan son 24 clientes distintos, una dirección cada uno**, así que el costo real
+es: esas paradas van últimas en el reparto hasta que se arreglen (el `?` de la hoja de ruta).
+Ninguna es del interior salvo Chivilcoy, que no se entrega, y Osa, que retira en fábrica.
+
+Un tercio son direcciones **que parecen normales** y Nominatim igual no encuentra
+(`Av Entre Rios 637`, `Espinoza 2321`, `Av Nazca 1866`, `Av. Italia 2550`, `Av Belgrano 3180`,
+`America 4175`, `Moises Lebenson 24`, `Julio Godoy 4656`, `John W. Cooke 3255`). Ahí ya no hay
+patrón que exprimir: es el límite de Nominatim con direcciones argentinas abreviadas.
+
+⚠ **Decisión del dueño, pendiente:** para ese último tramo el camino es un geocodificador pago
+(Google Geocoding API tolera abreviaturas, acentos y typos mucho mejor). Serían **~US$2 por
+única vez** para las 425 del padrón a US$5/1.000, más los clientes nuevos. No se contrató nada:
+hace falta que él decida y que consiga la API key.
+
 **Archivo:** `sql/gv_geo_normalizar_v1426.sql` (incluye el rollback en la cabecera: sacar el
 `gv_dir_geo_normalizar(...)` del `dir_query` de las dos vistas y dropear la función; no escribe
 nada, no hay datos que restaurar).
