@@ -5789,7 +5789,8 @@ async function bulkSendDayReplay(legajoStr, historySnapshot) {
       descripcion: item.descripcion || (desc[item.opcion] || ""),
       texto:       (item.texto || "").trim(),
       ts_cliente:  new Date(item.ts || Date.now()).toISOString(),
-      ts_inicio:   item.ts_inicio_iso || null
+      ts_inicio:   item.ts_inicio_iso || null,
+      gv_app:      GV_APP_TAG
     }));
   if (!bulkPayload.length) return;
   try {
@@ -7310,7 +7311,8 @@ async function trySendOneReport(payload, timeoutMs) {
         descripcion: payload.descripcion,
         texto:       payload.texto,
         ts_cliente:  new Date(payload.ts).toISOString(),
-        ts_inicio:   payload.ts_inicio_iso || null            // solo poblado en cierres
+        ts_inicio:   payload.ts_inicio_iso || null,           // solo poblado en cierres
+        gv_app:      GV_APP_TAG                               // v14.51 — quién mandó esto (NULL = Producción)
       }),
       keepalive: true,        // sobrevive a cambios de pantalla / cierres rápidos
       signal: ctrl.signal
@@ -7434,7 +7436,23 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v14.50";
+const APP_VERSION = "v14.51";
+
+/* v14.51 — Sello de app en cada evento de operario (columna gv_app de
+   Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
+   Virgilio, que no manda esta columna: por eso NULL significa "lo mandó
+   Producción" y no hay que tocar nada allá.
+
+   Para qué: hasta hoy no había forma de saber desde qué app trabajaba cada
+   operario. Se podía deducir sólo cuando alguien tocaba una tanda que existe
+   únicamente en `PPP_Web_Programacion` (el 08/09 hubo una sola, E01D), así que
+   de los demás no se sabía nada. Va también la versión, que responde de paso
+   si al celular le bajó la build nueva o quedó con una vieja cacheada.
+
+   Se lee así:
+     select gv_app, count(*) from "Registros_Produccion_Virgilio"
+      where created_at >= current_date group by 1;   -- NULL = Producción */
+const GV_APP_TAG = "gestion@" + APP_VERSION;
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco

@@ -45,6 +45,9 @@ PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node te
 echo "== ssg-switch (regresión: switch admin del aviso 'picking sin stock') =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/ssg-switch.cjs
 
+echo "== gv-app-tag (regresión: el sello gv_app viaja en cada evento; NULL = Producción) =="
+PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/gv-app-tag.cjs
+
 echo "== fac-npc (regresión: aviso faltantes en Facturación + consulta NP/Líos) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/fac-npc.cjs
 

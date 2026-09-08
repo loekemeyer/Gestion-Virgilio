@@ -4248,3 +4248,64 @@ borra si el pull trajo filas (si LK o Chef fallan, no vacía la tabla). Medido: 
 337 → **222** (LK exacto), `precios_venta_chef` 101 (sin viejas). `gv_articulo_empresa`: 613 → CH,
 98 propios de Chef. Backup previo: `gv_bkp_precios_venta_20260908_pre_reconcile` (337) /
 `_chef_..._pre_reconcile` (101). Anotado en `docs/ROLLBACK-PRODUCCION.md`. `supabase/functions/sync-precios-venta/index.ts`.
+
+---
+
+## 3.bl `gv_app` — de qué app salió cada evento de operario — 2026-09-08 (v14.51)
+
+**El problema.** Desde el lunes 07/09 los operarios tienen que usar Gestión. No había forma de
+verificarlo: `Registros_Produccion_Virgilio` es la **misma tabla** para las dos apps y no guarda
+nada que las distinga — ni URL, ni user_agent, ni versión. `Auditoria_Produccion_Virgilio` sí tiene
+`user_agent`, pero sólo se llena en reintentos y errores (**0 filas** el 08/09); `errores_cliente`
+sólo cuando algo se rompe.
+
+El martes 08/09 lo único que se pudo probar fue por rebote: el legajo **277** pickeó (11:47) y armó
+(13:49) la tanda **E01D**, que existe únicamente en `PPP_Web_Programacion` — **0 filas** en la
+`PPP_Programacion_Diaria` de Producción. Ese día hubo **una sola** tanda de Gestión, así que de 104,
+237 y 8 no se pudo afirmar nada: trabajaron tandas de ISIS, visibles desde las dos apps.
+
+**La columna.** Gestión manda `gv_app = 'gestion@' + APP_VERSION` en **los dos** caminos de
+escritura de `index.html` — `trySendOneReport` (el envío de a uno) y `bulkSendDayReplay` (el replay
+del día al Terminar Día). Producción **no la manda y no hay que tocarla**: su payload nombra las
+columnas una por una, así que sigue insertando igual y su `gv_app` queda NULL.
+
+```
+gv_app IS NULL            → lo mandó Producción Virgilio
+gv_app LIKE 'gestion@%'   → lo mandó Gestión, y dice con qué versión
+```
+
+La versión va de yapa y responde otra pregunta abierta: si al celular le bajó la build nueva o
+quedó con una vieja cacheada en el Service Worker.
+
+**Por qué se puede sobre una tabla compartida.** El protocolo permite agregar una columna nullable,
+sin default que reescriba, sin backfill y con prefijo `gv_`. Es exactamente eso: sin trigger
+(prohibido acá), sin tocar ninguna fila existente y sin modificar ningún objeto de Producción.
+Verificado **antes** de correrlo, no después:
+
+- Producción **no hace `select *`** sobre la tabla — sus referencias en `index.html`,
+  `productividad.html`, `recepcion.js` y `sw.js` nombran columnas. El único `SELECT *` del repo
+  está **comentado**, en un SQL de rollback del 2026-08-13.
+- Los **grants son a nivel tabla** (`anon`/`authenticated` con INSERT sobre la tabla, sin ACL por
+  columna) → la columna nueva queda cubierta sola, no hace falta ningún grant.
+- La policy de INSERT es `insert_all` con **`with_check = true`** — no enumera columnas, así que no
+  rechaza el payload nuevo.
+
+**Cómo se lee (el control diario):**
+
+```sql
+select coalesce(gv_app, 'PRODUCCIÓN (sin sello)') as app, legajo, count(*)
+  from public."Registros_Produccion_Virgilio"
+ where created_at >= current_date and legajo not in ('0','1')
+ group by 1, 2 order by 3 desc;
+```
+
+**⚠ Ojo al leerlo los primeros días.** Un celular que quedó con la build **vieja de Gestión**
+cacheada tampoco manda el sello, así que NULL es "Producción **o** Gestión desactualizada". Se
+despeja solo: en cuanto ese celu tome la v14.51 empieza a sellar. Por eso el tag lleva la versión.
+
+**Regresión:** `tests/gv-app-tag.cjs` — cubre los dos caminos de escritura (el bulk es fácil de
+olvidar) y que el tag se arme con `APP_VERSION`, no con un literal suelto. Si Gestión dejara de
+mandarlo, sus eventos pasarían a contarse como de Producción y el control mentiría en silencio.
+
+**Rollback:** `alter table public."Registros_Produccion_Virgilio" drop column gv_app;` + sacar
+`gv_app` de los dos payloads de `index.html`. SQL: `sql/gv_app_sello_eventos_v1451.sql`.

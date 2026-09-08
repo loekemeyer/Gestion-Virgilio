@@ -12,7 +12,21 @@
 > única**; no se replica. Ante la duda entre parche rápido y fix de raíz → **fix
 > de raíz**.
 >
-> Última actualización: 2026-09-08 (martes) · Versión app al documentar: **v14.41**
+> Última actualización: 2026-09-08 (martes) · Versión app al documentar: **v14.51**
+>
+> Nota **v14.51** (front + backend) — **`gv_app`: ahora se sabe desde qué app trabajó cada
+> operario.** `Registros_Produccion_Virgilio` es la misma tabla para Gestión y Producción y no
+> guardaba nada que las distinga (ni URL, ni user_agent, ni versión), así que no había cómo
+> verificar que los operarios hubieran pasado a Gestión: el 08/09 lo único demostrable fue que el
+> legajo 277 pickeó y armó **E01D**, tanda que existe sólo en `PPP_Web_Programacion`. Gestión ahora
+> manda **`gv_app = 'gestion@' + APP_VERSION`** en los dos caminos de escritura (`trySendOneReport`
+> y `bulkSendDayReplay`); Producción no la manda y **no hay que tocarla**, así que **NULL =
+> Producción**. La versión va de yapa: dice si al celu le bajó la build nueva o quedó una cacheada.
+> Permitido sobre tabla compartida por ser columna nullable, sin default, sin backfill y con
+> prefijo `gv_`; verificado antes de correrlo que Producción no hace `select *`, que los grants son
+> a nivel tabla y que la policy `insert_all` tiene `with_check = true` (no enumera columnas).
+> Control diario y rollback en `docs/SUPABASE-GESTION-VIRGILIO.md` §3.bl,
+> `sql/gv_app_sello_eventos_v1451.sql`, regresión `tests/gv-app-tag.cjs`.
 >
 > Nota **v14.41** (datos, proyecto LK) — **Gigot Cosméticos y Matiz SA eran el mismo cliente.**
 > Mismo CUIT (30-62743503-3) partido en dos: la cuenta web era `cod 5000 "Gigot Cosméticos"` y ISIS
