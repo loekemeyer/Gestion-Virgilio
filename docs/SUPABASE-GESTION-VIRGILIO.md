@@ -3347,6 +3347,67 @@ De las 13 correcciones a mano, **11 ya quedaron ubicadas** en la primera pasada;
 cobertura **376 de 489**, chef 38/43 con **0 faltantes**. El cron 75 volvió a su horario normal,
 `20 */6 * * *`.
 
+## 3.bq ✅ La Estadística Madre venía calculando sin agosto (v14.28) — 2026-09-08
+
+⚠ **Esto es del proyecto LK** (`kwkclwhmoygunqmlegrg`), no de Virgilio. Se anota acá porque el
+repo de LK no está adjunto; el SQL está en `sql/lk_refresh_mvs_v1428.sql` y **hay que copiarlo
+al repo de LK**.
+
+El reporte de salud del 08/09 avisaba *"🔴 cron refresh-mvs-daily · falla desde hace 56 días"*.
+El error, que nadie había leído:
+
+```
+ERROR:  permission denied for table sales_line
+CONTEXT: remote SQL command: SELECT customer_code, item_code, invoice_date, boxes
+         FROM public.sales_lines WHERE ((invoice_date IS NOT NULL))
+```
+
+`remote SQL command` = va por `postgres_fdw` contra **Chef**. El usuario mapeado es `loke_reader`
+y no tiene `SELECT` sobre `public.sales_line` del lado de Chef. Sobre `customers` sí:
+`mv_chef_customers_resolved` refrescaba bien.
+
+**Pero lo caro no era eso.** El cron corría los tres REFRESH **en un solo comando**, o sea una
+sola transacción: cuando el segundo fallaba, **se revertían los tres**. `mv_loke_sales_agg`, que
+es 100% local y no tiene nada que ver con Chef, quedó congelada:
+
+| | filas | hasta |
+|---|---|---|
+| `mv_loke_sales_agg` | 183.740 | **2026-07** |
+| `sales_lines` (viva) | 233.898 | **2026-08-31** |
+
+Y `refresh_estadistica_madre_cache` corre todos los días leyendo esa MV: el cron 13 "andaba
+bien", sólo que **sobre datos que se cortaban en julio**.
+
+**Arreglo:** `lk_refresh_mvs()` — cada MV en su propio bloque con `EXCEPTION`, y el resultado
+anotado en `lk_refresh_mvs_log`. Medido al aplicarlo:
+
+```
+mv_loke_sales_agg           ok=true    9.696 ms   183.740 → 187.779 filas, jul → ago
+mv_chef_sales_loke          ok=false   6.065 ms   permission denied for table sales_line
+mv_chef_customers_resolved  ok=true   26.187 ms   757 → 762 filas
+refresh_estadistica_madre_cache() → 537           (ya con agosto adentro)
+```
+
+⚠ **El efecto secundario que hubo que compensar.** Con el arreglo el cron **termina OK aunque
+una MV falle**, así que el chequeo 1 de `rep_salud` (crons cuya última corrida falló) dejaría de
+verlo y el problema de Chef se volvería **invisible**. Por eso va también la **rama 1b** de
+`rep_salud`, que además dice *cuál* MV y *por qué* — mejor que el "cron falla desde hace 56 días"
+de antes. Se inyectó sobre la definición viva con un `DO` que aborta si no encuentra el ancla, en
+vez de retipear la función: `rep_salud` tiene siete chequeos que hoy funcionan y un error de
+transcripción se llevaría alguno puesto **sin que se note** (devuelve filas, no falla).
+
+Resultado en el reporte:
+
+```
+antes:  🔴 cron refresh-mvs-daily · falla desde hace 56 días
+ahora:  🔴 materialized view mv_chef_sales_loke · falló al refrescar
+           → permission denied for table sales_line
+```
+
+**Lo que sigue abierto (del dueño, o de quien tenga acceso a Chef):** en el proyecto de Chef
+(`nkhzocgdpwtgrmwleihr`, que esta sesión **no puede tocar**), `grant select on public.sales_line
+to loke_reader;`. Hasta entonces `mv_chef_sales_loke` sigue clavada en 2026-02-23.
+
 ## 3.bp ✅ Segunda tanda de correcciones: Av. Jujuy caía a 640 km (v14.27) — 2026-09-07
 
 Las 49 que quedaron después de vaciar la cola **tampoco eran 49 problemas**: volvían a agruparse.

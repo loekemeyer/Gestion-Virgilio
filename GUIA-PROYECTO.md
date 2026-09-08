@@ -12,7 +12,29 @@
 > única**; no se replica. Ante la duda entre parche rápido y fix de raíz → **fix
 > de raíz**.
 >
-> Última actualización: 2026-09-07 (lunes) · Versión app al documentar: **v14.27**
+> Última actualización: 2026-09-08 (martes) · Versión app al documentar: **v14.28**
+>
+> Nota **v14.28** (backend, dos cosas) — **(a) La Estadística Madre venía calculando sin agosto.**
+> El reporte de salud decía *"cron refresh-mvs-daily falla desde hace 56 días"*; el error real era
+> `permission denied for table sales_line` **por el FDW contra Chef** (`loke_reader` no puede leer
+> esa tabla). Lo caro no era eso: los **tres REFRESH iban en un solo comando**, o sea una sola
+> transacción, así que el fallo de Chef **revertía también** `mv_loke_sales_agg`, que es 100% local.
+> Quedó clavada en **julio** mientras `sales_lines` llegaba al **31/08**. Se partió en
+> `lk_refresh_mvs()`, cada MV en su bloque: `mv_loke_sales_agg` 183.740 → **187.779 filas, hasta
+> agosto**, y `mv_chef_customers_resolved` 757 → 762. **Falta del lado de Chef:**
+> `grant select on public.sales_line to loke_reader;`. ⚠ Con el arreglo el cron termina OK aunque
+> una MV falle, así que el chequeo de "cron fallado" dejaría de verlo: se agregó la rama 1b de
+> `rep_salud`, que dice **cuál** MV y **por qué**. ⚠ Corre en **LK**, no en Virgilio:
+> `sql/lk_refresh_mvs_v1428.sql`, hay que copiarlo al repo de LK.
+> **(b) El barrio que llega dos veces.** ISIS escribe el barrio adentro de la calle *y* lo manda
+> aparte → `"Avalos 188, Paternal, Paternal, Buenos Aires"` y Nominatim no encuentra nada. Tres
+> correcciones a mano en dos días por el mismo patrón (cód 45, 4045 y 738), así que va al código:
+> `gv_dir_geo_normalizar(dir, barrio)` saca la cola `", Barrio"` **sólo cuando repite** el barrio de
+> entrega — el caso parecido que NO hay que tocar es el depósito del expreso (`"Las Casas 3553,
+> Boedo"` con barrio Barracas), donde la cola es el dato bueno. 9 direcciones programadas cambian,
+> 0 del padrón. `sql/gv_geo_barrio_duplicado_v1428.sql`.
+>
+> Última actualización previa: 2026-09-07 (lunes) · Versión app: **v14.27**
 >
 > Nota **v14.27** (backend) — **La cola de geocodificación llegó a cero** (376 de 489; Chef sin
 > faltantes) y el cron 75 volvió a `20 */6 * * *`. Las 49 que quedaron **tampoco eran 49 problemas**:
