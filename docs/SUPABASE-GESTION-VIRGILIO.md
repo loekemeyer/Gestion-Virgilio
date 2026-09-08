@@ -3847,3 +3847,12 @@ y el 📄 al lado, para comparar renglón por renglón. Backend: `gv_conciliacio
 (SECURITY DEFINER, lee `gv_vista_facturacion_neto_items`). Front: `concilDetalle`/`concilDetRender`
 (modal `#concilDetOverlay`). Smoke ampliado en `tests/fac-conciliacion.cjs`.
 Rollback: `drop function if exists public.gv_conciliacion_detalle(text);`
+
+**v14.32 (08/09) — la factura abre en POPUP, no en pestaña nueva.** Pedido de Luis: *"que la
+factura la abra en un popup y no que la mande a una pestaña diferente, para facilitar
+visualización/comparación"*. `concilAbrirFactura` ya no delega en `deudaAbrirFactura`
+(`window.open(_blank)`): abre un modal in-page (`#concilPdfOverlay`) con la firma temporal
+(`_concilSignedUrl`, `sb.storage.createSignedUrl` 600 s) embebida en un `<iframe>`. Y el modal
+📋 de detalle pasó a DOS paneles: izquierda el listado a facturar de Gestión, derecha el PDF de
+la factura de ISIS embebido — para comparar renglón por renglón sin salir de la pantalla; el
+botón del header quedó como "⤢ Ver la factura en grande" (abre el popup grande). Sólo front.

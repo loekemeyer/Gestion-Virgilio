@@ -7386,7 +7386,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v14.31";
+const APP_VERSION = "v14.32";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -40657,8 +40657,44 @@ async function concilRefresh() {
 }
 window.concilRefresh = concilRefresh;
 
-function concilAbrirFactura(empresa, sp) { if (!sp) return; return (window.deudaAbrirFactura || deudaAbrirFactura)(empresa, sp); }
+/* v14.32 — la factura de ISIS abre en un POPUP dentro de la página (iframe), no en otra
+   pestaña, para poder compararla con el listado a facturar sin salir de la pantalla. */
+async function _concilSignedUrl(empresa, sp) {
+  var bucket = (empresa === "chef") ? "isis-ch" : "isis-lk";
+  var r = await sb.storage.from(bucket).createSignedUrl(sp, 600);
+  if (r.error) throw r.error;
+  return r.data.signedUrl;
+}
+async function concilAbrirFactura(empresa, sp) {
+  if (!sp) return;
+  if (typeof requireSupervisor === "function" && !requireSupervisor()) return;
+  var ov = document.getElementById("concilPdfOverlay");
+  if (!ov) {
+    ov = document.createElement("div"); ov.id = "concilPdfOverlay";
+    ov.style.cssText = "position:fixed;inset:0;background:rgba(2,6,23,.7);z-index:9700;display:flex;align-items:center;justify-content:center;padding:16px;font-family:Arial,sans-serif;";
+    ov.addEventListener("click", function (e) { if (e.target === ov) concilPdfClose(); });
+    document.body.appendChild(ov);
+  }
+  ov.style.display = "flex";
+  ov.innerHTML = '<div style="background:#fff;border-radius:14px;width:min(1000px,95vw);height:92vh;display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(0,0,0,.6);overflow:hidden;">' +
+    '<div style="display:flex;align-items:center;gap:10px;padding:10px 14px;background:#0f172a;color:#fff;flex:0 0 auto;">' +
+      '<b>📄 Factura de ISIS</b><span style="color:#94a3b8;font-size:12px;">' + escapeHtml(String(sp).split("/").pop() || "") + '</span>' +
+      '<button style="margin-left:auto;width:auto;background:#dc2626;color:#fff;border:none;border-radius:8px;padding:6px 14px;font-weight:800;cursor:pointer;" onclick="concilPdfClose()">Cerrar ✕</button>' +
+    '</div>' +
+    '<div id="concilPdfWrap" style="flex:1;min-height:0;background:#334155;display:flex;align-items:center;justify-content:center;color:#e2e8f0;">Cargando factura…</div>' +
+  '</div>';
+  try {
+    var url = await _concilSignedUrl(empresa, sp);
+    var wrap = document.getElementById("concilPdfWrap");
+    if (wrap) wrap.innerHTML = '<iframe src="' + url + '" style="border:0;width:100%;height:100%;" title="Factura ISIS"></iframe>';
+  } catch (e) {
+    var w2 = document.getElementById("concilPdfWrap");
+    if (w2) w2.innerHTML = '<div style="padding:20px;color:#fecaca;">No se pudo abrir la factura: ' + escapeHtml((e && e.message) || String(e)) + '</div>';
+  }
+}
 window.concilAbrirFactura = concilAbrirFactura;
+function concilPdfClose() { var ov = document.getElementById("concilPdfOverlay"); if (ov) { ov.style.display = "none"; ov.innerHTML = ""; } }
+window.concilPdfClose = concilPdfClose;
 
 function concilRender() {
   var cont = document.getElementById("concilTabla"), res = document.getElementById("concilResumen");
@@ -40711,7 +40747,7 @@ async function concilDetalle(np) {
     document.body.appendChild(ov);
   }
   ov.style.display = "flex";
-  ov.innerHTML = '<div style="background:#fff;border-radius:14px;max-width:820px;width:100%;max-height:90vh;display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(0,0,0,.5);overflow:hidden;"><div id="concilDetBody" style="padding:16px;overflow:auto;">Cargando…</div></div>';
+  ov.innerHTML = '<div style="background:#fff;border-radius:14px;width:min(1180px,96vw);max-height:92vh;display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(0,0,0,.5);overflow:hidden;"><div id="concilDetBody" style="padding:16px;overflow:auto;">Cargando…</div></div>';
   var lines = [];
   try {
     var r = await sb.rpc("gv_conciliacion_detalle", { p_np: np });
@@ -40723,6 +40759,16 @@ async function concilDetalle(np) {
     return;
   }
   concilDetRender(row, lines);
+  // v14.32 — embeber el PDF de la factura AL LADO de la lista (mismo modal), para comparar.
+  if (row.storage_path) {
+    _concilSignedUrl(row.empresa, row.storage_path).then(function (url) {
+      var pane = document.getElementById("concilDetPdf");
+      if (pane) pane.innerHTML = '<iframe src="' + url + '" style="border:0;width:100%;height:100%;min-height:440px;" title="Factura ISIS"></iframe>';
+    }).catch(function (e) {
+      var pane = document.getElementById("concilDetPdf");
+      if (pane) pane.innerHTML = '<div style="padding:16px;color:#fecaca;">No se pudo cargar el PDF: ' + escapeHtml((e && e.message) || String(e)) + '</div>';
+    });
+  }
 }
 window.concilDetalle = concilDetalle;
 function concilDetClose() { var ov = document.getElementById("concilDetOverlay"); if (ov) ov.style.display = "none"; }
@@ -40744,12 +40790,13 @@ function concilDetRender(row, lines) {
     '<div style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:10px;padding:8px 12px;"><small style="color:#1e40af;font-weight:800;">GESTIÓN (mandado)</small><br><b style="font-size:17px;">' + _fmtPlata(row.neto_gestion != null ? row.neto_gestion : sumGes) + '</b></div>' +
     '<div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:8px 12px;"><small style="color:#475569;font-weight:800;">ISIS (facturado)</small><br><b style="font-size:17px;">' + (totIsis != null ? _fmtPlata(totIsis) : "—") + '</b></div>' +
     '<div style="background:' + (diff && Math.abs(diff) > 0 ? "#fef2f2;border:1px solid #fecaca;" : "#f0fdf4;border:1px solid #bbf7d0;") + 'border-radius:10px;padding:8px 12px;"><small style="color:#475569;font-weight:800;">DIFERENCIA</small><br><b style="font-size:17px;color:' + (diff > 0 ? "#dc2626" : (diff < 0 ? "#b45309" : "#166534")) + ';">' + (diff != null ? _fmtPlata(diff) : "—") + '</b></div>' +
-    (sp ? '<button class="fac-concil-btn" style="align-self:center;" onclick="concilAbrirFactura(\'' + (row.empresa || "lk") + '\',\'' + sp + '\')">📄 Ver factura ISIS</button>' : '') +
+    (sp ? '<button class="fac-concil-btn" style="align-self:center;" onclick="concilAbrirFactura(\'' + (row.empresa || "lk") + '\',\'' + sp + '\')">⤢ Ver la factura en grande</button>' : '') +
     '</div>';
-  h += '<div style="overflow:auto;"><table class="fac-concil-tbl"><thead><tr>' +
+  // Dos paneles: IZQ = listado a facturar (Gestión) · DER = el PDF de la factura de ISIS embebido.
+  var tbl = '<div style="flex:1 1 440px;min-width:320px;overflow:auto;max-height:62vh;"><table class="fac-concil-tbl"><thead><tr>' +
     '<th>Cód</th><th>Artículo</th><th style="text-align:right;">Cajas ent</th><th style="text-align:right;">U×B</th>' +
     '<th style="text-align:right;">Precio lista</th><th style="text-align:right;">Importe</th></tr></thead><tbody>';
-  h += lines.map(function (l) {
+  tbl += lines.map(function (l) {
     var nom = (typeof window.artNombre === "function") ? window.artNombre(l.cod) : "";
     return '<tr>' +
       '<td><b>' + escapeHtml(String(l.cod || "")) + '</b></td>' +
@@ -40760,8 +40807,11 @@ function concilDetRender(row, lines) {
       '<td class="num"><b>' + (l.neto_linea != null ? _fmtPlata(l.neto_linea) : "—") + '</b></td>' +
       '</tr>';
   }).join("");
-  h += '</tbody><tfoot><tr style="border-top:2px solid #cbd5e1;font-weight:800;"><td colspan="5" style="text-align:right;padding:8px;">Total Gestión</td><td class="num" style="padding:8px;">' + _fmtPlata(sumGes) + '</td></tr></tfoot></table></div>';
-  h += '<div style="margin-top:8px;font-size:12px;color:#94a3b8;">Importe = cajas entregadas × U×B × precio de lista × (1 − descuento)' + (row.empresa === "lk" || /^\s*LK/i.test(String(row.np)) ? "" : "") + '. Es lo que Gestión mandó a facturar; comparalo con la factura de ISIS (📄) para ver la diferencia.</div>';
+  tbl += '</tbody><tfoot><tr style="border-top:2px solid #cbd5e1;font-weight:800;"><td colspan="5" style="text-align:right;padding:8px;">Total Gestión</td><td class="num" style="padding:8px;">' + _fmtPlata(sumGes) + '</td></tr></tfoot></table></div>';
+  var pdfPane = '<div id="concilDetPdf" style="flex:1 1 440px;min-width:320px;min-height:440px;max-height:62vh;background:#334155;border-radius:8px;display:flex;align-items:center;justify-content:center;color:#e2e8f0;overflow:hidden;">' +
+    (sp ? 'Cargando factura…' : 'Sin factura de ISIS todavía — aparece acá cuando ISIS la sube.') + '</div>';
+  h += '<div style="display:flex;gap:12px;flex-wrap:wrap;align-items:stretch;">' + tbl + pdfPane + '</div>';
+  h += '<div style="margin-top:8px;font-size:12px;color:#94a3b8;">Importe = cajas entregadas × U×B × precio de lista × (1 − descuento). Es lo que Gestión mandó a facturar; a la derecha, la factura real de ISIS para comparar renglón por renglón.</div>';
   body.innerHTML = h;
 }
 window.concilDetRender = concilDetRender;

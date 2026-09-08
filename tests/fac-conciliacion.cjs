@@ -79,13 +79,16 @@ const { chromium } = require("/opt/node22/lib/node_modules/playwright");
     out.filas = tabla ? tabla.querySelectorAll("tbody tr").length : 0;
     out.pdf = tabla ? tabla.querySelectorAll("button.fac-cc-pdf").length : 0;
 
-    // 📄 abre la factura con empresa + path
-    let abierto = null;
-    window.deudaAbrirFactura = async (e, sp) => { abierto = { e, sp }; };
+    // 📄 abre la factura en un POPUP en la misma página (no en otra pestaña)
+    let openedTab = false;
+    window.open = function () { openedTab = true; return null; };
     const pdfBtn = tabla ? tabla.querySelector("button.fac-cc-pdf") : null;
     if (pdfBtn) pdfBtn.click();
-    await new Promise((res) => setTimeout(res, 50));
-    out.abierto = abierto;
+    await new Promise((res) => setTimeout(res, 150));
+    const pov = document.getElementById("concilPdfOverlay");
+    out.pdfPopup = !!(pov && pov.style.display === "flex");
+    out.noNewTab = !openedTab;
+    if (typeof concilPdfClose === "function") concilPdfClose();
 
     // 📋 detalle "a facturar" → modal con las líneas de Gestión
     const detBtn = tabla ? tabla.querySelector("button.fac-cc-det") : null;
@@ -95,6 +98,7 @@ const { chromium } = require("/opt/node22/lib/node_modules/playwright");
     const detBody = document.getElementById("concilDetBody");
     out.detHtml = detBody ? detBody.innerHTML : "";
     out.detLineas = detBody ? detBody.querySelectorAll("tbody tr").length : 0;
+    out.detTwoPane = !!document.getElementById("concilDetPdf");
     if (typeof concilDetClose === "function") concilDetClose();
 
     // volver a Facturador
@@ -128,7 +132,9 @@ const { chromium } = require("/opt/node22/lib/node_modules/playwright");
   if (!/Sin factura aún/.test(r.html) || !/Diferencia/.test(r.html) || !/OK/.test(r.html)) fails.push("faltan estados");
   if (!/2 s\/precio/.test(r.html)) fails.push("no marca artículos sin precio");
   if (!/1 OK/.test(r.resumen) || !/1 con diferencia/.test(r.resumen) || !/1 sin factura/.test(r.resumen)) fails.push("resumen no usa los totales: " + r.resumen);
-  if (!r.abierto || r.abierto.e !== "lk" || r.abierto.sp !== "2026/09/fa_908.pdf") fails.push("📄 no abre la factura: " + JSON.stringify(r.abierto));
+  if (!r.pdfPopup) fails.push("el 📄 no abre el PDF en un popup dentro de la página");
+  if (!r.noNewTab) fails.push("el 📄 abrió una pestaña nueva (window.open) en vez del popup");
+  if (!r.detTwoPane) fails.push("el detalle no tiene el panel del PDF embebido (#concilDetPdf)");
   if (r.hayDetBtn !== 3) fails.push("esperaba un 📋 por fila (3), hay " + r.hayDetBtn);
   if (r.detLineas !== 2) fails.push("el detalle a facturar no muestra las 2 líneas, hay " + r.detLineas);
   if (!/501/.test(r.detHtml) || !/162\.288/.test(r.detHtml)) fails.push("el detalle no muestra cód/importe de la línea");
