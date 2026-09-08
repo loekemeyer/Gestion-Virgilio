@@ -4220,6 +4220,18 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
   <div class="fac-tabs2">
     <button id="facTab2Fact" class="fac-tab2 on" onclick="facSetTab('fact')">🧾 Facturador</button>
     <button id="facTab2Concil" class="fac-tab2" onclick="facSetTab('concil')" title="Snapshot: lo que Gestión mandó a facturar vs el neto de la factura parseada de ISIS. Más recientes arriba.">🔍 Conciliación</button>
+    <button id="facTab2Desc" class="fac-tab2" onclick="facSetTab('desc')" title="Todo lo que se descargó: los Excel que se mandaron a ISIS (con su detalle, para volver a mirarlo o bajarlo) y las facturas en PDF que cargó ISIS.">📥 Descargas</button>
+  </div>
+  <!-- v14.36 — historial de descargas. El Excel se arma en el navegador y se baja: antes no
+       quedaba nada y el detalle se perdía apenas cerrabas el archivo. Ahora cada descarga se
+       registra en GV_Fac_Export con sus filas, y acá se puede ver y volver a bajar. -->
+  <div id="facPanelDesc" style="display:none">
+    <div class="fac-desc-top">
+      <button id="facDescT1" class="fac-desc-tab on" onclick="facDescTab('excel')">⬇ Excel a ISIS</button>
+      <button id="facDescT2" class="fac-desc-tab" onclick="facDescTab('pdf')">📄 Facturas de ISIS (PDF)</button>
+      <button class="fac-desc-rel" onclick="facDescRefresh(true)" title="Volver a leer">🔄</button>
+    </div>
+    <div id="facDescCont"><div class="fac-empty">Cargando…</div></div>
   </div>
   <div id="facPanelFact">
   <div id="facContainer">
@@ -4299,6 +4311,22 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
   .npc-meta b{ color:#334155; font-weight:700; }
   .npc-falt-det{ margin-top:8px; font-size:12px; font-weight:700; color:#991b1b; background:#fef2f2; border:1px solid #fca5a5; border-radius:8px; padding:5px 9px; }
   @media (max-width:640px){ .npc-inp{ flex-basis:calc(50% - 4px); } .npc-filters .npc-inp-all{ flex-basis:100%; } .npc-rs{ flex-basis:100%; } }
+  /* v14.36 — historial de descargas de Facturación */
+  .fac-desc-top{ display:flex; gap:7px; align-items:center; margin:10px 0 9px; flex-wrap:wrap; }
+  .fac-desc-tab{ width:auto; margin:0; padding:7px 14px; border:1px solid #cbd5e1; border-radius:9px; background:#fff; font-size:13px; font-weight:800; color:#475569; cursor:pointer; }
+  .fac-desc-tab.on{ background:#0f172a; border-color:#0f172a; color:#fff; }
+  .fac-desc-rel{ width:auto; margin:0 0 0 auto; padding:7px 12px; border:1px solid #cbd5e1; border-radius:9px; background:#fff; font-size:13px; cursor:pointer; }
+  .fac-desc-wrap{ max-width:980px; overflow-x:auto; }
+  .fac-desc-tbl{ border-collapse:collapse; font-size:12.5px; }
+  .fac-desc-tbl th{ text-align:left; background:#f1f5f9; color:#334155; font-weight:800; padding:6px 10px; border-bottom:1px solid #e2e8f0; white-space:nowrap; }
+  .fac-desc-tbl td{ padding:6px 10px; border-bottom:1px solid #f1f5f9; vertical-align:middle; white-space:nowrap; }
+  .fac-desc-tbl tr:hover td{ background:#f8fafc; }
+  .fac-desc-arch{ font-weight:700; color:#0f172a; }
+  .fac-desc-nps{ color:#64748b; max-width:330px; overflow:hidden; text-overflow:ellipsis; }
+  .fac-desc-b{ width:auto; margin:0 3px 0 0; padding:4px 10px; border:1px solid #cbd5e1; border-radius:7px; background:#fff; font-size:12px; font-weight:700; color:#334155; cursor:pointer; }
+  .fac-desc-b.p{ background:#0f766e; border-color:#0f766e; color:#fff; }
+  .fac-desc-det{ margin:8px 0 14px; border:1px solid #e2e8f0; border-radius:11px; padding:9px 11px; background:#fff; max-width:980px; }
+  .fac-desc-det h4{ margin:0 0 7px; font-size:13.5px; color:#0f172a; }
   /* v5.50 — botón imprimir remito de armado (por NP) */
   .npc-print{ flex:0 0 auto; width:auto; margin:0; padding:3px 9px; border:1px solid #cbd5e1; border-radius:7px; background:#fff; font-size:12.5px; font-weight:700; color:#334155; cursor:pointer; line-height:1.4; }
   .npc-print:hover{ background:#f1f5f9; border-color:#94a3b8; }
@@ -7405,7 +7433,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v14.41";
+const APP_VERSION = "v14.42";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -36417,7 +36445,13 @@ async function npcLoad(force){
         fetch(ppUrl,   { headers: H, cache: "no-store" }).then(function(r){ return r.ok ? r.json() : []; }).catch(function(){ return []; }),
         (tandaIn ? fetch(pkUrl, { headers: H, cache: "no-store" }).then(function(r){ return r.ok ? r.json() : []; }).catch(function(){ return []; }) : Promise.resolve([])),
         getEmpleadosNombres().catch(function(){ return null; }),   // legajo→nombre (cacheado 1h)
-        fetch(SUPABASE_TABLE_ENDPOINT + "?opcion=eq.CP&select=texto&limit=20000", { headers: H, cache: "no-store" }).then(function(r){ return r.ok ? r.json() : []; }).catch(function(){ return []; })   // v6.33: CP → qué salió de "a guardar"
+        fetch(SUPABASE_TABLE_ENDPOINT + "?opcion=eq.CP&select=texto&limit=20000", { headers: H, cache: "no-store" }).then(function(r){ return r.ok ? r.json() : []; }).catch(function(){ return []; }),   // v6.33: CP → qué salió de "a guardar"
+        // v14.36 (dueño 08/09: "la NP que se carga directamente a la página no tiene nombre de
+        // cliente, tiene que aparecer"). Las otras dos fuentes de cabecera —gv_ppp_entregados_meta y
+        // gv_ppp_programacion_diaria— son el espejo de ISIS y NO contienen las NP de la página
+        // ("LK 0011", "CH 0003"): por eso salían sin razón social. Las web viven en
+        // PPP_Web_Programacion, y gv_ppp_web_estado ya las expone con su etiqueta (np_label).
+        fetch(SUPABASE_URL + "/rest/v1/gv_ppp_web_estado?select=np_label,cod_cliente,razon_social,tanda,fecha_entrega&limit=20000", { headers: H, cache: "no-store" }).then(function(r){ return r.ok ? r.json() : []; }).catch(function(){ return []; })
       ]);
       const ent = par[0], meta = par[1], pp = par[2], pk = par[3] || [];
       // v6.33 — CP con origen "a guardar": qué código(s) de cada NP salieron de a_guardar
@@ -36446,6 +36480,11 @@ async function npcLoad(force){
       });
       const metaMap = new Map(); meta.forEach(function(x){ const np = String(x.np || "").trim().replace(/\.0+$/, ""); if (np && !metaMap.has(np)) metaMap.set(np, { cod: String(x.cod || "").trim(), rs: String(x.rs || "").trim() }); });
       const ppMap = new Map(); pp.forEach(function(x){ const np = String(x.np || "").trim().replace(/\.0+$/, ""); if (np && !ppMap.has(np)) ppMap.set(np, { cod: String(x.cod || "").trim(), rs: String(x.razon_social || "").trim(), fecha: String(x.fecha_entrega || "").slice(0, 10), tanda: String(x.tanda || "").trim().toUpperCase() }); });
+      // v14.36: las NP de la página, con la MISMA forma que ppMap (se consultan igual más abajo).
+      (par[6] || []).forEach(function(x){
+        const np = String(x.np_label || "").trim(); if (!np || ppMap.has(np)) return;
+        ppMap.set(np, { cod: String(x.cod_cliente || "").trim(), rs: String(x.razon_social || "").trim(), fecha: String(x.fecha_entrega || "").slice(0, 10), tanda: String(x.tanda || "").trim().toUpperCase() });
+      });
       // 3) Merge por NP (prioridad de fuentes según cuál es más confiable por campo).
       const rows = nps.map(function(np){
         const t = tal.get(np) || {}; const e = entMeta.get(np) || {}; const m = metaMap.get(np) || {}; const pd = ppMap.get(np) || {};
@@ -37181,7 +37220,7 @@ function _facXlsDescargarXlsx(filas, emp) {
   const items = _facXlsFilasPlanas(filas);
   const filasHoja = items.map(function (it) {
     return [it.fecha, String(it.N_Pedido), it.cliente, it.vend, it.articulo, it.cajas, it.uni,
-            it.sucursal, "", "", it.pctDto, ""];
+            it.sucursal, it.leyenda2 || "", it.condPago || "", it.pctDto, ""];
   });
   const grupos = {};
   items.forEach(function (it) { const k = it.cliente + "|" + it.N_Pedido; if (!grupos[k]) grupos[k] = { c: it.cliente, n: it.N_Pedido, q: 0 }; grupos[k].q++; });
@@ -37205,6 +37244,7 @@ function _facXlsDescargarXlsx(filas, emp) {
   a.download = "PEDIDOS_WEB_ISIS_" + (emp ? emp + "_" : "") + dd + ".xlsx";
   document.body.appendChild(a); a.click();
   setTimeout(function () { URL.revokeObjectURL(a.href); a.remove(); }, 1500);
+  return a.download;   // v14.36: el nombre va al historial de descargas
 }
 
 /* Port literal de generateExcel() de la Edge Function procesar-pedidos-db:
@@ -37350,7 +37390,10 @@ async function facXlsBajar() {
     const porEmp = { LK: filas.filter(function (r) { return _isisDe(r) === "LK"; }), CH: filas.filter(function (r) { return _isisDe(r) === "CH"; }) };
     for (const emp of ["LK", "CH"]) {
       if (!porEmp[emp].length) continue;
-      if (FAC_XLS_FORMATO === "xls") _facXlsDescargar(porEmp[emp], emp); else _facXlsDescargarXlsx(porEmp[emp], emp);
+      // v14.36: el archivo y su detalle quedan guardados (GV_Fac_Export) para poder mirarlo
+      // después. Best-effort: si la RPC falla, el Excel ya se bajó igual.
+      const _arch = (FAC_XLS_FORMATO === "xls") ? _facXlsDescargar(porEmp[emp], emp) : _facXlsDescargarXlsx(porEmp[emp], emp);
+      try { await facDescRegistrar(_arch, emp, porEmp[emp]); } catch (_e) {}
     }
     const tdfNps = filas.filter(function (r) { return r.tdf; }).map(function (r) { return r.np + " (" + r.codLk + " → Chef " + r.cod + ")"; });
     if (tdfNps.length) { try { alert("Tierra del Fuego: " + tdfNps.length + " NP de Loeke fueron al archivo de ISIS CHEF con el código de cliente de Chef y los artículos con L:\n" + tdfNps.join("\n")); } catch (_e) {} }
@@ -37378,8 +37421,16 @@ async function facXlsBajar() {
   }
 }
 
+/* v14.36 (dueño 08/09: "en la columna A la fecha del día en que bajó el reporte") — la col A
+   dejó de ser la fecha de RECEPCIÓN del pedido y pasa a ser la del día de la descarga.
+   ⚠ ISIS toma esa fecha como fecha del pedido al importar: una NP de la semana pasada que se
+   baje hoy entra a ISIS con la fecha de hoy. Es lo pedido; la fecha de recepción real sigue
+   viva en Virgilio (PPP_Web_Programacion.fecha_recep / PPP_Base_Pedidos.fecha). */
+function _facXlsHoyTxt() { return _facXlsDDMMYYYY(_facXlsFechaAR(new Date())); }
+
 /* Las mismas filas que van al archivo (una por línea, ya partidas en pedidos). */
 function _facXlsFilasPlanas(filas) {
+  const hoyTxt = _facXlsHoyTxt();
   const items = [];
   let n = 0;
   filas.forEach(function (r) {
@@ -37387,10 +37438,13 @@ function _facXlsFilasPlanas(filas) {
       n++;
       r.lineas.slice(i, i + r.tope).forEach(function (l) {
         items.push({
-          np: r.np, fecha: r.fechaTxt, N_Pedido: n, cliente: r.cod, vend: r.vend,
+          np: r.np, fecha: hoyTxt, fechaRecep: r.fechaTxt, N_Pedido: n, cliente: r.cod, rs: r.rs, vend: r.vend,
           articulo: l.art, cajas: String(l.cajas),
           uni: l.uxb ? String(l.cajas * l.uxb) : "",
-          sucursal: r.suc, leyenda2: "", condPago: "",
+          sucursal: r.suc, leyenda2: "",
+          // v14.36: la condición de pago que eligió el cliente en la página (LK/Chef). Para una NP
+          // de ISIS no existe en ningún lado nuestro y queda vacía, como antes.
+          condPago: r.cond || "",
           pctDto: "2% Descuento Web", numOC: ""
         });
       });
@@ -37434,6 +37488,11 @@ async function _facXlsArmar(nps) {
   // v13.72 (dueño: "vendedor del padrón Chef"): el vend de una NP de Chef sale del pedido de Chef
   // (sheets_payload.vend, vía gv_pedidos_web_np_chef_admin), no del padrón LK por código (2393 de Chef
   // es Addoumie; 2393 de LK es otro cliente). Si falla, vacío: nunca el de LK.
+  // v14.36 (dueño 08/09: "en la columna J la condición de pago que eligió el cliente, la que está
+  // cargada en la NP de la página"): el código de condición vive en LK (`v_pedidos_web_np`) y en la
+  // RPC de Chef, las dos ya lo devuelven como `condicion_pago_code`. Clave: empresa + order_id (la
+  // condición es del PEDIDO, no del bloque). Si no se puede leer, la columna va vacía como antes.
+  const condByOrder = {};
   const vendChef = {};
   if (Object.keys(orderByNp).some(function (k) { return orderByNp[k].empresa === "chef"; })) {
     try {
@@ -37442,7 +37501,10 @@ async function _facXlsArmar(nps) {
         method: "POST", headers: { apikey: PWEB_LK_ANON, Authorization: "Bearer " + tokLk, "Content-Type": "application/json" },
         body: JSON.stringify({ p_dias: 60 })
       });
-      if (rc.ok) for (const x of (await rc.json() || [])) if (x.v != null && x.v !== "") vendChef[String(x.order_id)] = String(x.v);
+      if (rc.ok) for (const x of (await rc.json() || [])) {
+        if (x.v != null && x.v !== "") vendChef[String(x.order_id)] = String(x.v);
+        if (x.condicion_pago_code != null && x.condicion_pago_code !== "") condByOrder["chef:" + x.order_id] = String(x.condicion_pago_code);
+      }
     } catch (_e) {}
   }
   // v13.77 (dueño: "Tierra del Fuego: el pedido se arma como Loeke, con L al final, y después va a ISIS de CH, no
@@ -37458,6 +37520,14 @@ async function _facXlsArmar(nps) {
         headers: { apikey: PWEB_LK_ANON, Authorization: "Bearer " + tokLk2 }, cache: "no-store"
       });
       if (ri.ok) for (const x of (await ri.json() || [])) if (x.cod_isis) isisChefBy[String(x.order_id)] = String(x.cod_isis);
+    } catch (_e) {}
+    // v14.36: la condición de pago de los pedidos de LK (una vuelta más, sin filtro de TdF).
+    try {
+      const tokLk3 = await pwebLkToken();
+      const rp = await fetch(PWEB_LK_URL + "/rest/v1/v_pedidos_web_np?select=order_id,condicion_pago_code&empresa=eq.lk&order_id=in.(" + [...new Set(ordersLk)].join(",") + ")", {
+        headers: { apikey: PWEB_LK_ANON, Authorization: "Bearer " + tokLk3 }, cache: "no-store"
+      });
+      if (rp.ok) for (const x of (await rp.json() || [])) if (x.condicion_pago_code != null && x.condicion_pago_code !== "") condByOrder["lk:" + x.order_id] = String(x.condicion_pago_code);
     } catch (_e) {}
   }
 
@@ -37528,6 +37598,7 @@ async function _facXlsArmar(nps) {
       np: np, cod: tdf || c.cod, rs: c.rs, fechaTxt: _facXlsDDMMYYYY(fecha),
       vend: (orderByNp[np] && orderByNp[np].empresa === "chef") ? (vendChef[String(orderByNp[np].order_id)] || "") : (vendBy[c.cod] || ""),   // v13.72
       suc: suc, tope: tdf ? 15 : _facXlsTope(np), lineas: lineas,
+      cond: (orderByNp[np] ? (condByOrder[orderByNp[np].empresa + ":" + orderByNp[np].order_id] || "") : ""),   // v14.36: col J
       isisEmp: tdf ? "CH" : (_facXlsEmpresa(np) === "chef" ? "CH" : "LK"),   // v13.77: a qué archivo va
       tdf: !!tdf, codLk: c.cod,
       excede: lineas.some(function (l) { return l.excede; })
@@ -37539,24 +37610,9 @@ async function _facXlsArmar(nps) {
 function _facXlsDescargar(filas, emp) {
   // Un número de pedido por TRAMO: cada NP se corta de a 18 líneas (Loekemeyer)
   // o 15 (Chef), en orden de código, igual que hace ISIS al importar.
-  const items = [];
-  let n = 0;
-  filas.forEach(function (r) {
-    for (let i = 0; i < r.lineas.length; i += r.tope) {
-      n++;
-      r.lineas.slice(i, i + r.tope).forEach(function (l) {
-        items.push({
-          fecha: r.fechaTxt, N_Pedido: n, cliente: r.cod, vend: r.vend,
-          articulo: l.art, cajas: String(l.cajas),
-          uni: l.uxb ? String(l.cajas * l.uxb) : "",
-          sucursal: r.suc,
-          leyenda2: "",            // deuda / límite de crédito / plazo viven sólo en LK
-          condPago: "",            // el código de condición no está espejado en Virgilio
-          pctDto: "2% Descuento Web", numOC: ""
-        });
-      });
-    }
-  });
+  // v14.36: una sola fuente de filas para los dos formatos (antes el .xls las rearmaba aparte
+  // y por eso la fecha y la condición de pago había que tocarlas en dos lugares).
+  const items = _facXlsFilasPlanas(filas);
   const hoy = _facXlsFechaAR(new Date());
   const dd = _facXlsDDMMYYYY(hoy).replace(/\//g, "-").slice(0, 5) + "-" + hoy.slice(2, 4);
   let hhmm = "";
@@ -37568,6 +37624,7 @@ function _facXlsDescargar(filas, emp) {
   a.download = "PEDIDOS_WEB_ISIS_" + (emp ? emp + "_" : "") + dd + "_" + hhmm + ".xls";
   document.body.appendChild(a); a.click();
   setTimeout(function () { URL.revokeObjectURL(a.href); a.remove(); }, 1500);
+  return a.download;   // v14.36: el nombre va al historial de descargas
 }
 
 function facTodayKey(){
@@ -40786,16 +40843,182 @@ window.cruceRender = cruceRender;
    El snapshot lo escribe gv_conciliacion_registrar, disparado desde facMarcarFacturada
    (choke point de las dos formas de facturar: Excel ISIS de web y tilde ✓ de ISIS). */
 function facSetTab(tab) {
-  var isC = (tab === "concil");
-  var pf = document.getElementById("facPanelFact"), pc = document.getElementById("facPanelConcil");
-  var bf = document.getElementById("facTab2Fact"), bc = document.getElementById("facTab2Concil");
-  if (pf) pf.style.display = isC ? "none" : "";
-  if (pc) pc.style.display = isC ? "" : "none";
-  if (bf) bf.classList.toggle("on", !isC);
-  if (bc) bc.classList.toggle("on", isC);
-  if (isC) concilRefresh();
+  // v14.36: tres paneles (Facturador · Conciliación · Descargas).
+  var t = (tab === "concil" || tab === "desc") ? tab : "fact";
+  var pan = { fact: "facPanelFact", concil: "facPanelConcil", desc: "facPanelDesc" };
+  var btn = { fact: "facTab2Fact", concil: "facTab2Concil", desc: "facTab2Desc" };
+  for (var k in pan) {
+    var pe = document.getElementById(pan[k]); if (pe) pe.style.display = (k === t) ? "" : "none";
+    var be = document.getElementById(btn[k]); if (be) be.classList.toggle("on", k === t);
+  }
+  if (t === "concil") concilRefresh();
+  if (t === "desc") facDescRefresh();
 }
 window.facSetTab = facSetTab;
+
+/* ═══ v14.36 — DESCARGAS ═══════════════════════════════════════════════════════════════
+   Dueño (08/09): "una vez que descargo el excel no puedo ver el detalle más; necesito poder
+   verlo para chequear la información" + "que ahí aparezcan los que se fueron descargando a lo
+   largo del tiempo". Dos solapas: los Excel que se mandaron a ISIS (GV_Fac_Export, con el
+   detalle guardado para verlo en pantalla o volver a bajarlo) y los PDF de factura de ISIS
+   (los mismos de Conciliación, todos juntos y por fecha). */
+var _facDesc = { tab: "excel", rows: null, det: null, detId: null, cargando: false, err: "" };
+window._facDesc = _facDesc;
+function facDescTab(t) { _facDesc.tab = (t === "pdf") ? "pdf" : "excel"; _facDesc.det = null; _facDesc.detId = null; facDescRefresh(); }
+window.facDescTab = facDescTab;
+
+function _facDescFecha(ts) {
+  if (!ts) return "—";
+  try {
+    var d = new Date(ts);
+    return String(d.getDate()).padStart(2, "0") + "/" + String(d.getMonth() + 1).padStart(2, "0") + "/" + d.getFullYear() +
+           " " + String(d.getHours()).padStart(2, "0") + ":" + String(d.getMinutes()).padStart(2, "0");
+  } catch (_e) { return String(ts).slice(0, 16); }
+}
+
+async function facDescRefresh(force) {
+  var cont = document.getElementById("facDescCont"); if (!cont) return;
+  if (_facDesc.cargando) return;
+  if (_facDesc.tab === "pdf") {
+    // Los PDF ya los trae la conciliación; sólo se listan los que tienen archivo.
+    if (force || !_concil.rows.length) { try { await concilRefresh(); } catch (_e) {} }
+    facDescRender(); return;
+  }
+  if (!force && _facDesc.rows) { facDescRender(); return; }
+  _facDesc.cargando = true; _facDesc.err = "";
+  cont.innerHTML = '<div class="fac-empty">Cargando descargas…</div>';
+  try {
+    var r = await facRpc("gv_fac_export_lista", { p_limit: 300 });
+    _facDesc.rows = r || [];
+  } catch (e) { _facDesc.err = (e && e.message) ? e.message : String(e); _facDesc.rows = []; }
+  _facDesc.cargando = false;
+  facDescRender();
+}
+window.facDescRefresh = facDescRefresh;
+
+function facDescRender() {
+  var cont = document.getElementById("facDescCont"); if (!cont) return;
+  var b1 = document.getElementById("facDescT1"), b2 = document.getElementById("facDescT2");
+  if (b1) b1.classList.toggle("on", _facDesc.tab === "excel");
+  if (b2) b2.classList.toggle("on", _facDesc.tab === "pdf");
+
+  if (_facDesc.tab === "pdf") {
+    var pdfs = (_concil.rows || []).filter(function (r) { return !!r.storage_path; });
+    if (!pdfs.length) { cont.innerHTML = '<div class="fac-empty">Todavía no hay facturas de ISIS cargadas.</div>'; return; }
+    var hp = '<div class="fac-desc-wrap"><table class="fac-desc-tbl"><thead><tr>' +
+      '<th>Fecha factura</th><th>NP</th><th>Cliente</th><th>Comprobante</th><th>Archivo</th><th></th></tr></thead><tbody>';
+    pdfs.forEach(function (r) {
+      var sp = String(r.storage_path || "").replace(/\\/g, "\\\\").replace(/'/g, "\\'");
+      var f = r.doc_fecha ? String(r.doc_fecha).slice(0, 10).split("-").reverse().join("/") : _facDescFecha(r.registrado_at);
+      hp += '<tr><td>' + escapeHtml(f) + '</td>' +
+        '<td class="fac-desc-arch">' + escapeHtml(String(r.np || "—")) + '</td>' +
+        '<td>' + escapeHtml(String(r.razon_social || r.cod_cliente || "—")) + '</td>' +
+        '<td>' + escapeHtml(String(r.comprobante_id || "—")) + '</td>' +
+        '<td class="fac-desc-nps">' + escapeHtml(String(r.storage_path).split("/").pop() || "") + '</td>' +
+        '<td><button class="fac-desc-b p" onclick="concilAbrirFactura(\'' + escapeHtml(String(r.empresa || "lk")) + '\',\'' + sp + '\')">📄 Ver</button></td></tr>';
+    });
+    cont.innerHTML = hp + "</tbody></table></div>";
+    return;
+  }
+
+  if (_facDesc.err) { cont.innerHTML = '<div class="fac-empty" style="color:#b91c1c;">No se pudo leer el historial: ' + escapeHtml(_facDesc.err) + '</div>'; return; }
+  var rows = _facDesc.rows || [];
+  if (!rows.length) {
+    cont.innerHTML = '<div class="fac-empty">Todavía no bajaste ningún Excel desde acá.<br><span style="font-size:12.5px;color:#94a3b8;">Se guardan a partir de la v14.36: cada vez que toques “⬇ Excel ISIS” queda su detalle.</span></div>';
+    return;
+  }
+  var h = '<div class="fac-desc-wrap"><table class="fac-desc-tbl"><thead><tr>' +
+    '<th>Bajado</th><th>Archivo</th><th>ISIS</th><th>NP</th><th>Líneas</th><th>Quién</th><th></th></tr></thead><tbody>';
+  rows.forEach(function (r) {
+    h += '<tr><td>' + escapeHtml(_facDescFecha(r.creado_at)) + '</td>' +
+      '<td class="fac-desc-arch">' + escapeHtml(String(r.archivo || "")) + '</td>' +
+      '<td>' + escapeHtml(String(r.empresa || "—")) + '</td>' +
+      '<td class="fac-desc-nps" title="' + escapeHtml((r.nps || []).join(", ")) + '">' + (r.n_nps || 0) + ' · ' + escapeHtml((r.nps || []).slice(0, 4).join(", ")) + ((r.nps || []).length > 4 ? "…" : "") + '</td>' +
+      '<td>' + (r.n_filas || 0) + '</td>' +
+      '<td>' + escapeHtml(String(r.creado_por || "—")) + '</td>' +
+      '<td><button class="fac-desc-b" onclick="facDescVer(' + r.id + ')">🔎 Detalle</button>' +
+          '<button class="fac-desc-b p" onclick="facDescBajar(' + r.id + ')">⬇ Bajar</button></td></tr>';
+  });
+  h += "</tbody></table></div>";
+  if (_facDesc.det && _facDesc.detId) {
+    var meta = rows.find(function (x) { return String(x.id) === String(_facDesc.detId); }) || {};
+    h += '<div class="fac-desc-det"><h4>🔎 ' + escapeHtml(String(meta.archivo || "")) + ' · ' + _facDesc.det.length + ' líneas</h4>' +
+      '<div class="fac-desc-wrap"><table class="fac-desc-tbl"><thead><tr>' +
+      '<th>NP</th><th>A · Fecha</th><th>N° Ped</th><th>Cliente</th><th>Vend</th><th>Artículo</th><th>Cajas</th><th>Uni</th><th>Sucursal</th><th>J · Cond. pago</th></tr></thead><tbody>' +
+      _facDesc.det.map(function (it) {
+        return '<tr><td>' + escapeHtml(String(it.np || "")) + '</td><td>' + escapeHtml(String(it.fecha || "")) + '</td>' +
+          '<td>' + escapeHtml(String(it.N_Pedido || "")) + '</td><td>' + escapeHtml(String(it.cliente || "")) + (it.rs ? ' <span style="color:#64748b">· ' + escapeHtml(String(it.rs)) + '</span>' : '') + '</td>' +
+          '<td>' + escapeHtml(String(it.vend || "")) + '</td><td>' + escapeHtml(String(it.articulo || "")) + '</td>' +
+          '<td>' + escapeHtml(String(it.cajas || "")) + '</td><td>' + escapeHtml(String(it.uni || "")) + '</td>' +
+          '<td>' + escapeHtml(String(it.sucursal || "")) + '</td><td>' + escapeHtml(String(it.condPago || "")) + '</td></tr>';
+      }).join("") + '</tbody></table></div></div>';
+  }
+  cont.innerHTML = h;
+}
+
+async function facDescCargarDet(id) {
+  if (_facDesc.detId === String(id) && _facDesc.det) return _facDesc.det;
+  var d = await facRpc("gv_fac_export_detalle", { p_id: id });
+  _facDesc.det = Array.isArray(d) ? d : []; _facDesc.detId = String(id);
+  return _facDesc.det;
+}
+async function facDescVer(id) {
+  if (_facDesc.detId === String(id) && _facDesc.det) { _facDesc.det = null; _facDesc.detId = null; facDescRender(); return; }
+  try { await facDescCargarDet(id); } catch (e) { try { alert("No pude leer el detalle: " + ((e && e.message) || e)); } catch (_e) {} return; }
+  facDescRender();
+}
+window.facDescVer = facDescVer;
+
+/* Volver a bajar el archivo desde el detalle guardado. Se regenera con el MISMO armador
+   (_facXlsXml), así que sale idéntico al original — no se recalcula nada contra la base
+   (PPP_Base_Pedidos es amnésica: las líneas de una NP vieja ya no están). */
+async function facDescBajar(id) {
+  var rows = _facDesc.rows || [];
+  var meta = rows.find(function (x) { return String(x.id) === String(id); }) || {};
+  var det;
+  try { det = await facDescCargarDet(id); } catch (e) { try { alert("No pude leer el detalle: " + ((e && e.message) || e)); } catch (_e) {} return; }
+  if (!det.length) { try { alert("Esa descarga no tiene detalle guardado."); } catch (_e) {} return; }
+  var nombre = String(meta.archivo || ("PEDIDOS_WEB_ISIS_" + id + ".xls"));
+  var etiqueta = String(det[0] && det[0].fecha || "").replace(/\//g, "-").slice(0, 5) + " 9Hs";
+  var xml = _facXlsXml(det, etiqueta, (meta.nps || []));
+  var blob = new Blob([xml], { type: "application/vnd.ms-excel" });
+  var a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = nombre.replace(/\.xlsx$/i, ".xls");
+  document.body.appendChild(a); a.click();
+  setTimeout(function () { URL.revokeObjectURL(a.href); a.remove(); }, 1500);
+}
+window.facDescBajar = facDescBajar;
+
+/* Registra la descarga con su detalle. Best-effort: si falla, el archivo ya se bajó igual. */
+async function facDescRegistrar(archivo, emp, filas) {
+  var items = _facXlsFilasPlanas(filas);
+  var nps = Array.from(new Set(filas.map(function (r) { return String(r.np); })));
+  await facRpc("gv_fac_export_registrar", {
+    p_archivo: archivo, p_tipo: "excel_isis", p_empresa: emp || null,
+    p_formato: FAC_XLS_FORMATO, p_nps: nps, p_n_filas: items.length,
+    p_detalle: items, p_por: await facQuien()
+  });
+  _facDesc.rows = null;   // se relee la próxima vez que se abra la solapa
+}
+
+/* Una RPC de Facturación con la sesión del supervisor (mismo patrón que aprRpc). */
+async function facRpc(fn, body) {
+  var h = await facAuthWriteHeaders();
+  if (!h) throw new Error("Necesitás iniciar sesión de supervisor.");
+  var r = await fetch(SUPABASE_URL + "/rest/v1/rpc/" + fn, { method: "POST", headers: h, body: JSON.stringify(body || {}) });
+  if (!r.ok) { var t = await r.text(); var m = t; try { m = (JSON.parse(t).message) || t; } catch (_e) {} throw new Error(m); }
+  var tx = await r.text();
+  return tx ? JSON.parse(tx) : null;
+}
+async function facQuien() {
+  try { if (typeof aprQuien === "function") return await aprQuien(); } catch (_e) {}
+  return null;
+}
+window.facDescRegistrar = facDescRegistrar;
+window.facDescRender = facDescRender;
+window.facRpc = facRpc;
+
 
 var _concil = { q: "", empresa: null, rows: [], tot: null, cargando: false, soloDiff: false };
 window._concil = _concil;

@@ -338,3 +338,6 @@ PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node te
 
 echo "== apr-isis-sin-tanda (v14.35: las NP de ISIS sin tanda entran a A Programar y se programan con su número) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/apr-isis-sin-tanda.cjs
+
+echo "== fac-descargas (v14.36: col A fecha de descarga · col J condición de pago · solapa Descargas · razón social de la NP web) =="
+PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/fac-descargas.cjs

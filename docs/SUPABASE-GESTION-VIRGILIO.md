@@ -4067,3 +4067,86 @@ verde) con el diff original en el tooltip. Además, nueva **columna "¿Por qué?
 precio: <cods>, N sin precio, N sólo factura/Gestión. Backend: `gv_conciliacion_estricto_motivo_v1438`.
 98484 hoy: estado "Diferencia", motivo "dif. pareja −2,0% (lista/descuento/factor) · precio: 809E ·
 1 sólo en factura". Smoke `fac-conciliacion` actualizado.
+---
+
+## §3.bh — v14.42 (2026-09-08): Facturación — fecha de descarga, condición de pago, historial y el nombre del cliente de la NP web
+
+Cuatro pedidos del dueño en el mismo mensaje.
+
+### (a) Columna A del Excel = el día en que se baja el reporte
+
+Antes la col A era `r.fechaTxt` = la **fecha de recepción** de la NP (de `PPP_Base_Pedidos.fecha`
+para las de ISIS, de `PPP_Web_Programacion.fecha_recep` para las web). Ahora es la fecha de **hoy**
+(`_facXlsHoyTxt()`, zona AR).
+
+> ⚠ **Consecuencia, dicha antes de hacerlo:** ISIS toma esa fecha como fecha del pedido al importar.
+> Una NP de la semana pasada que se baje hoy entra a ISIS con la fecha de hoy. La fecha de recepción
+> real **no se pierde**: sigue en `PPP_Web_Programacion.fecha_recep` / `PPP_Base_Pedidos.fecha`, y
+> ahora también viaja en el detalle guardado de cada descarga (`fechaRecep`).
+
+De paso se unificó el armado: `_facXlsDescargar` (.xls XML 2003) ya no rearma las filas por su
+cuenta — usa `_facXlsFilasPlanas`, la misma que el `.xlsx`. Antes la fecha y la condición de pago
+había que tocarlas en **dos** lugares y era cuestión de tiempo que se desincronizaran.
+
+### (b) Columna J = la condición de pago que eligió el cliente
+
+Estaba **hardcodeada en `""`** con el comentario *"el código de condición no está espejado en
+Virgilio"*. Sí está, del lado de LK: `v_pedidos_web_np.condicion_pago_code` (LK) y
+`gv_pedidos_web_np_chef_admin` (Chef) lo devuelven los dos. `_facXlsArmar` arma `condByOrder`
+(clave `empresa:order_id` — la condición es del **pedido**, no del bloque) con una vuelta más a LK,
+y cada fila sale con `cond`. Si la lectura falla, la columna va vacía como antes.
+
+**Una NP de ISIS no tiene condición de pago acá** (nunca pasó por la página): queda vacía. Es lo
+correcto — el dato no existe de nuestro lado.
+
+En el `.xlsx` las columnas I y J estaban escritas como `""` literales en el array de la fila; ahora
+llevan `leyenda2` y `condPago`. El `.xls` XML ya las tomaba del item.
+
+### (c) Solapa **📥 Descargas**: historial de Excel + los PDF de factura
+
+Dueño: *"una vez que descargo el excel no puedo ver el detalle más… hacé una ventana dentro del
+módulo de Facturación que tenga los pdf descargados y que ahí aparezcan los que se fueron
+descargando a lo largo del tiempo"*. Eligió **las dos cosas**.
+
+- **`GV_Fac_Export`** (tabla nueva, prefijo `GV_`, RLS sin policy para `anon`): una fila por
+  descarga con `archivo`, `empresa`, `formato`, `nps[]`, `n_filas`, `creado_por` y **`detalle`
+  (jsonb)** = las mismas líneas que se escribieron en el Excel.
+- **RPC con gate de supervisor** (`gv_es_supervisor_o_servicio`): `gv_fac_export_registrar`,
+  `gv_fac_export_lista` (liviana, sin el detalle) y `gv_fac_export_detalle(id)`. `anon` no escribe
+  ni lee la tabla directo (`docs/RIESGO-ESTRUCTURAL-CANON.md`).
+- **Front**: `facSetTab` pasó a tres paneles. La solapa tiene dos sub-solapas —
+  **Excel a ISIS** (🔎 Detalle en pantalla, ⬇ Bajar de nuevo) y **Facturas de ISIS (PDF)** (los
+  mismos de Conciliación, filtrados por `storage_path`, abiertos con `concilAbrirFactura`).
+- **Volver a bajar** regenera el archivo con `_facXlsXml` desde el `detalle` guardado: **no**
+  recalcula contra la base, porque `PPP_Base_Pedidos` es amnésica y las líneas de una NP vieja ya
+  no están. Sale idéntico al original.
+- El registro es **best-effort** dentro de `facXlsBajar`: si la RPC falla, el Excel ya se bajó.
+
+Sólo guarda **de la v14.42 en adelante**; lo bajado antes no existe en ningún lado.
+
+### (d) La NP cargada por la página no mostraba el nombre del cliente
+
+En **Consulta de Notas de Pedido — Composición a líos** (`npcLoad`). La cabecera (cod + razón
+social) salía de `gv_ppp_entregados_meta` y `gv_ppp_programacion_diaria`, que son el **espejo de
+ISIS** y no contienen las NP de la página (`LK 0011`, `CH 0003`): por eso salían en blanco. Se sumó
+`gv_ppp_web_estado` (que ya expone `np_label`, `cod_cliente`, `razon_social`, `tanda`,
+`fecha_entrega`) como tercera fuente, con la misma forma que `ppMap`.
+
+### Medido / test
+
+`tests/fac-descargas.cjs` (17 chequeos, en `tests/run.sh`): col A = hoy y `fechaRecep` conservada,
+col J con el code, el XML sigue con 12 columnas, la solapa abre y lista, 🔎 Detalle pide el detalle,
+la sub-solapa de PDF lista y abre con el visor de siempre, registrar manda archivo + NP + detalle, y
+las dos NP (web e ISIS) muestran razón social en Consulta de NP.
+
+SQL: `sql/gv_fac_export_v1436.sql`.
+
+**ROLLBACK:**
+```sql
+drop function public.gv_fac_export_detalle(bigint);
+drop function public.gv_fac_export_lista(integer);
+drop function public.gv_fac_export_registrar(text, text, text, text, text[], integer, jsonb, text);
+drop table public."GV_Fac_Export";
+```
+(el front tolera que no estén: la solapa muestra el error y el resto de Facturación no se toca. Para
+volver la col A a la fecha del pedido: en `_facXlsFilasPlanas`, `fecha: hoyTxt` → `fecha: r.fechaTxt`.)
