@@ -3831,3 +3831,10 @@ drop function if exists public.gv_conciliacion_registrar(text);
 drop table if exists public."GV_Conciliacion_Facturacion";
 ```
 y en el front sacar la barra de solapas / `facSetTab` / `concil*` y el `fetch` del registrar.
+
+**Backfill (08/09, pedido de Luis).** Se cargaron a mano las NP facturadas desde el viernes
+04/09 (`facturado_at >= 2026-09-04 -03`), mismo cálculo que el registrar (neto de
+`gv_vista_facturacion_neto`, `registrado_at = facturado_at`, `on conflict do nothing`): **8 NP**
+→ 7 `ok` + 1 `diff` (−$85.264,12). De ahí en adelante se llena sola desde `facMarcarFacturada`.
+Rollback del backfill: `delete from public."GV_Conciliacion_Facturacion" where registrado_at < now();`
+(o el `drop table` del rollback general).
