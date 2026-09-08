@@ -3838,3 +3838,12 @@ y en el front sacar la barra de solapas / `facSetTab` / `concil*` y el `fetch` d
 → 7 `ok` + 1 `diff` (−$85.264,12). De ahí en adelante se llena sola desde `facMarcarFacturada`.
 Rollback del backfill: `delete from public."GV_Conciliacion_Facturacion" where registrado_at < now();`
 (o el `drop table` del rollback general).
+
+**v14.31 (08/09) — 📋 detalle "a facturar" por NP.** Pedido de Luis: *"además del PDF de la
+factura, mostrame el listado a facturar que aparecía en la página, para visualizar el error"*.
+Botón 📋 en cada fila de Conciliación → modal con las líneas que Gestión mandó a facturar
+(cód, artículo, cajas entregadas, U×B, precio de lista, importe) + los totales Gestión/ISIS/diff
+y el 📄 al lado, para comparar renglón por renglón. Backend: `gv_conciliacion_detalle(p_np)`
+(SECURITY DEFINER, lee `gv_vista_facturacion_neto_items`). Front: `concilDetalle`/`concilDetRender`
+(modal `#concilDetOverlay`). Smoke ampliado en `tests/fac-conciliacion.cjs`.
+Rollback: `drop function if exists public.gv_conciliacion_detalle(text);`

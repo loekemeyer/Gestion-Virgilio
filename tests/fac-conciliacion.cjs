@@ -47,6 +47,10 @@ const { chromium } = require("/opt/node22/lib/node_modules/playwright");
         calls.push({ fn: m[1], body: JSON.parse((opt && opt.body) || "{}") });
         if (m[1] === "gv_conciliacion_lista") return ok(filas);
         if (m[1] === "gv_conciliacion_totales") return ok([{ estado: "ok", n: 1, suma_diff: 0 }, { estado: "diff", n: 1, suma_diff: -770748.9 }, { estado: "sin_factura", n: 1, suma_diff: 0 }]);
+        if (m[1] === "gv_conciliacion_detalle") return ok([
+          { cod: "501", cajas_ped: 5, cajas_ent: 5, uxb: 6, precio_lista: 5520, dto_vol: 0, importe_ent: 165600, neto_linea: 162288, sin_precio: false },
+          { cod: "970E", cajas_ped: 1, cajas_ent: 0, uxb: 12, precio_lista: 2450, dto_vol: 0, importe_ent: 0, neto_linea: 0, sin_precio: true }
+        ]);
         return ok([]);
       }
       return ok([]);   // Facturacion_NP POST, drenajes, etc.
@@ -83,6 +87,16 @@ const { chromium } = require("/opt/node22/lib/node_modules/playwright");
     await new Promise((res) => setTimeout(res, 50));
     out.abierto = abierto;
 
+    // 📋 detalle "a facturar" → modal con las líneas de Gestión
+    const detBtn = tabla ? tabla.querySelector("button.fac-cc-det") : null;
+    out.hayDetBtn = tabla ? tabla.querySelectorAll("button.fac-cc-det").length : 0;
+    if (detBtn) detBtn.click();
+    await new Promise((res) => setTimeout(res, 200));
+    const detBody = document.getElementById("concilDetBody");
+    out.detHtml = detBody ? detBody.innerHTML : "";
+    out.detLineas = detBody ? detBody.querySelectorAll("tbody tr").length : 0;
+    if (typeof concilDetClose === "function") concilDetClose();
+
     // volver a Facturador
     facSetTab("fact");
     out.volvioFact = document.getElementById("facPanelFact").style.display !== "none" && document.getElementById("facPanelConcil").style.display === "none";
@@ -115,11 +129,15 @@ const { chromium } = require("/opt/node22/lib/node_modules/playwright");
   if (!/2 s\/precio/.test(r.html)) fails.push("no marca artículos sin precio");
   if (!/1 OK/.test(r.resumen) || !/1 con diferencia/.test(r.resumen) || !/1 sin factura/.test(r.resumen)) fails.push("resumen no usa los totales: " + r.resumen);
   if (!r.abierto || r.abierto.e !== "lk" || r.abierto.sp !== "2026/09/fa_908.pdf") fails.push("📄 no abre la factura: " + JSON.stringify(r.abierto));
+  if (r.hayDetBtn !== 3) fails.push("esperaba un 📋 por fila (3), hay " + r.hayDetBtn);
+  if (r.detLineas !== 2) fails.push("el detalle a facturar no muestra las 2 líneas, hay " + r.detLineas);
+  if (!/501/.test(r.detHtml) || !/162\.288/.test(r.detHtml)) fails.push("el detalle no muestra cód/importe de la línea");
+  if (!/s\/precio/.test(r.detHtml)) fails.push("el detalle no marca la línea sin precio");
   if (!r.volvioFact) fails.push("no vuelve a Facturador");
   if (!r.registrar || String(r.registrar.p_np) !== "98700") fails.push("facturar no dispara gv_conciliacion_registrar con la NP: " + JSON.stringify(r.registrar));
   if (/undefined|NaN/.test(r.html)) fails.push("undefined/NaN en la tabla");
   if (errs.length) fails.push("pageerror: " + errs.join(" | "));
 
   if (fails.length) { console.error("FAIL fac-conciliacion:\n - " + fails.join("\n - ")); process.exit(1); }
-  console.log("OK fac-conciliacion: 2 solapas, snapshot Gestión vs ISIS, estados, 📄, y el snapshot se registra al facturar");
+  console.log("OK fac-conciliacion: 2 solapas, snapshot Gestión vs ISIS, estados, 📄 factura, 📋 detalle a facturar, y el snapshot se registra al facturar");
 })();

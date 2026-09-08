@@ -155,3 +155,27 @@ as $$
   select estado, count(*)::bigint, coalesce(sum(diff), 0) from j group by estado;
 $$;
 grant execute on function public.gv_conciliacion_totales(text) to anon, authenticated;
+
+-- ══════════════════════════════════════════════════════════════════════════
+-- v14.31 (2026-09-08) — DETALLE "a facturar" por NP (pedido de Luis: "mostrame además
+-- del PDF, el listado de a facturar que aparecía en la página, para visualizar el error").
+-- Devuelve las líneas por artículo que Gestión mandó a facturar (cajas ENTREGADAS × lista ×
+-- descuento, web ×0,98), para comparar contra el PDF de ISIS. Sólo lee. La usa el botón 📋
+-- de la pestaña Conciliación.
+-- ROLLBACK: drop function if exists public.gv_conciliacion_detalle(text);
+-- ══════════════════════════════════════════════════════════════════════════
+create or replace function public.gv_conciliacion_detalle(p_np text)
+returns table (
+  cod text, cajas_ped numeric, cajas_ent numeric, uxb numeric,
+  precio_lista numeric, dto_vol numeric, importe_ent numeric, neto_linea numeric, sin_precio boolean)
+language sql
+security definer
+set search_path = public, pg_temp
+as $$
+  select i.cod, i.cajas_ped, i.cajas_ent, i.uxb, i.precio_lista, i.dto_vol, i.importe_ent,
+         round(coalesce(i.importe_ent, 0) * i.factor_web, 2) as neto_linea, i.sin_precio
+    from public.gv_vista_facturacion_neto_items i
+   where i.np = regexp_replace(p_np, '\.0+$', '')
+   order by (i.cajas_ent is null), i.cod;
+$$;
+grant execute on function public.gv_conciliacion_detalle(text) to anon, authenticated;
