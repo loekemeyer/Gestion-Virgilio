@@ -113,10 +113,19 @@ como optimización, pero el trigger es el que manda.
 
 ## ⚠⚠ PROTOCOLO OBLIGATORIO: la base es COMPARTIDA con Producción Virgilio
 
+> **Actualización del dueño (2026-09-08): Producción Virgilio YA NO SE USA** (todo migró a
+> Gestión). **Ya no se condiciona un cambio de Gestión por "no romper Producción".** Las reglas
+> de abajo (agregar en vez de modificar, overrides, etc.) siguen siendo **buena disciplina** —
+> reducen riesgo y mantienen el rollback limpio— pero **dejaron de ser un bloqueo**: si lo
+> correcto es tocar un objeto compartido/de Producción, se hace. La contrapartida es
+> **obligatoria**: todo cambio que toque un objeto compartido/de Producción se anota en
+> **`docs/ROLLBACK-PRODUCCION.md`** con impacto y rollback exacto (ese archivo es la fuente
+> única para desarmar lo que afecte a Producción). Los backups siguen siendo obligatorios.
+
 **Gestión Virgilio y Producción Virgilio usan el MISMO proyecto Supabase
 (`hrxfctzncixxqmpfhskv`) y la MISMA anon key.** Producción Virgilio (repo
-`loekemeyer/Produccion-Virgilio`) es la app que los operarios **están usando en
-este momento**. Cualquier cosa que se toque en `public.*` —una fila, una columna,
+`loekemeyer/Produccion-Virgilio`) fue la app que usaban los operarios (hasta el
+2026-09-07). Cualquier cosa que se toque en `public.*` —una fila, una columna,
 una función, un trigger, un cron, un grant— la ve esa app al instante.
 
 **Regla del dueño (2026-09-04): sobre una tabla compartida se AGREGA, nunca se
