@@ -3996,3 +3996,63 @@ coincide con ISIS) → la fila muestra **✔ Corregido** y el modal una leyenda 
 corrigió; queda ~2% del factor web ×0,98 + un precio puntual (809E $3.005 vs $4.060). Backend:
 migración `gv_conciliacion_diag_corregido_v1434` (`sql/gv_conciliacion_facturacion.sql`). Smoke:
 `tests/fac-conciliacion.cjs` ampliado. Sólo lectura, todo `gv_`.
+
+## §3.bg — v14.38 (2026-09-08): 358 teléfonos de WhatsApp cargados, y la tabla vieja no distingue empresa
+
+**Qué pasó.** El dueño devolvió el listado de clientes sin WhatsApp
+(`clientes_whatsapp_completadoNuevo.xlsx`) con la columna I completada: **358 teléfonos**
+(**235 de Loekemeyer + 123 de Chef**), todos en formato `+549XXXXXXXXXX`.
+
+**Dónde se escribió y por qué.** La fuente de verdad de los teléfonos es
+**`public.whatsapp_clientes` de VIRGILIO**, no la tabla de LK: `sincronizar_ppp()` (LK, cron **19**,
+`0 10 * * *` UTC = 07:00 ART) hace `DELETE ALL + INSERT` de `public.wa_clientes_telefono` leyendo
+`virgilio.whatsapp_clientes` por FDW. Escribir en LK se habría perdido en la corrida siguiente.
+
+**El problema de fondo (queda abierto).** `whatsapp_clientes` tiene **PK `(cod_cliente)` y no guarda
+empresa**, y hay **314 códigos que existen a la vez en LK y en Chef con clientes distintos**
+(LK 1104 = Ramirez Miguel; CH 1104 = Monica Gerbaudo). `vista_avisar_programacion` resuelve el
+teléfono con `LEFT JOIN LATERAL … WHERE trim(whatsapp_clientes.cod_cliente) = g.cod`, o sea **por
+código solo**. Por eso se creó la tabla canónica:
+
+```sql
+public."GV_Clientes_Whatsapp" (empresa, cod_cliente, telefono, razon_social, origen, actualizado)
+  primary key (empresa, cod_cliente)   -- RLS on: select anon+authenticated, all authenticated
+```
+
+**Qué se cargó.**
+
+| Tabla | Filas | Nota |
+|---|---|---|
+| `GV_Clientes_Whatsapp` | **358** (LK 235 · CH 123) | canónica, con empresa. Nada se pierde |
+| `whatsapp_clientes` | **+332** (610 → **942**) | espejo de compatibilidad, `on conflict do nothing` |
+| `GV_Backup_whatsapp_clientes_20260908` | 610 | backup previo (protocolo) |
+
+**Los 13 que NO se espejaron.** Códigos que están en LK y en Chef con **teléfonos distintos** —
+`94, 820, 984, 1941, 2152, 2207, 2256, 2340, 2358, 2383, 2400, 2473, 2516`. La tabla vieja sólo
+puede guardar uno; mandarle el aviso al cliente equivocado es peor que no mandarlo. Están completos
+en `GV_Clientes_Whatsapp`. **Para destrabarlos hay que hacer que la vista resuelva por
+(empresa, cod)**, no por cod.
+
+**Medición (post-carga).**
+
+```sql
+-- 0 filas viejas alteradas, 610 → 942
+select (select count(*) from public.whatsapp_clientes w
+          join public."GV_Backup_whatsapp_clientes_20260908" b using (cod_cliente)
+         where w.telefono is distinct from b.telefono) as alteradas,
+       (select count(*) from public.whatsapp_clientes) as ahora;
+-- 26 = los 13 códigos x 2 empresas, sin espejar a propósito
+select count(*) from public."GV_Clientes_Whatsapp" g
+ where not exists (select 1 from public.whatsapp_clientes w where w.cod_cliente = g.cod_cliente);
+```
+
+**Cuándo lo ve el bot de LK.** En la próxima corrida del cron 19 (07:00 ART). Para adelantarlo:
+`select public.sincronizar_ppp();` en el proyecto LK.
+
+**A revisar por el dueño.** `LK 311 Schell Venancio Raul` quedó con `+5215615697005` — prefijo **+52
+(México)**, único no argentino de los 358. Se cargó tal cual vino; si es error, corregirlo en las dos
+tablas.
+
+**Rollback.** `truncate public.whatsapp_clientes; insert into public.whatsapp_clientes select * from
+public."GV_Backup_whatsapp_clientes_20260908"; drop table public."GV_Clientes_Whatsapp";`
+SQL completo: `sql/gv_clientes_whatsapp_carga_20260908.sql`.
