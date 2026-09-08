@@ -7386,7 +7386,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v14.32";
+const APP_VERSION = "v14.33";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -40713,7 +40713,7 @@ function concilRender() {
   var h = '<div style="overflow-x:auto;"><table class="fac-concil-tbl"><thead><tr>' +
     '<th>NP</th><th>Cliente</th><th>Facturado</th><th style="text-align:right;">Cajas ges/isis</th>' +
     '<th style="text-align:right;">Gestión (mandado)</th><th style="text-align:right;">ISIS (facturado)</th>' +
-    '<th style="text-align:right;">Diferencia</th><th>Estado</th><th>Factura</th></tr></thead><tbody>';
+    '<th style="text-align:right;">Diferencia</th><th>Estado</th><th>Comparar</th></tr></thead><tbody>';
   h += rows.map(function (r) {
     var est = CONCIL_EST[r.estado] || ["#334155", r.estado];
     var sp = r.storage_path ? String(r.storage_path).replace(/\\/g, "\\\\").replace(/'/g, "\\'") : "";
@@ -40726,7 +40726,7 @@ function concilRender() {
       '<td class="num">' + (r.factura_neto != null ? _fmtPlata(r.factura_neto) : "—") + '</td>' +
       '<td class="num" style="font-weight:bold;color:' + (r.diff > 0 ? "#dc2626" : (r.diff < 0 ? "#b45309" : "#334155")) + '">' + (r.diff != null ? (_fmtPlata(r.diff) + (r.diff_pct != null ? ' (' + (r.diff_pct > 0 ? "+" : "") + r.diff_pct + '%)' : '')) : "—") + '</td>' +
       '<td class="fac-cc-est" style="color:' + est[0] + '">' + est[1] + '</td>' +
-      '<td style="white-space:nowrap;">' + '<button class="fac-cc-det" title="Ver el listado a facturar (líneas de Gestión) para compararlo con la factura de ISIS" onclick="concilDetalle(\'' + String(r.np).replace(/'/g, "\\'") + '\')">📋</button> ' + (r.comprobante_id ? '<span style="font-size:11px;color:#64748b;">' + escapeHtml(r.comprobante_id) + '</span>' : '') + (sp ? ' <button class="fac-cc-pdf" title="Ver la factura (PDF de ISIS)" onclick="concilAbrirFactura(\'' + (r.empresa || "lk") + '\',\'' + sp + '\')">📄</button>' : '') + '</td>' +
+      '<td style="white-space:nowrap;">' + '<button class="fac-cc-det" title="Abre la factura de ISIS y el detalle de Gestión lado a lado, para comparar" onclick="concilDetalle(\'' + String(r.np).replace(/'/g, "\\'") + '\')">🔍 Comparar</button>' + (r.comprobante_id ? ' <span style="font-size:11px;color:#64748b;">' + escapeHtml(r.comprobante_id) + '</span>' : '') + '</td>' +
       '</tr>';
   }).join("");
   h += '</tbody></table></div>';
@@ -40747,7 +40747,7 @@ async function concilDetalle(np) {
     document.body.appendChild(ov);
   }
   ov.style.display = "flex";
-  ov.innerHTML = '<div style="background:#fff;border-radius:14px;width:min(1180px,96vw);max-height:92vh;display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(0,0,0,.5);overflow:hidden;"><div id="concilDetBody" style="padding:16px;overflow:auto;">Cargando…</div></div>';
+  ov.innerHTML = '<div style="background:#fff;border-radius:14px;width:min(1400px,97vw);max-height:94vh;display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(0,0,0,.5);overflow:hidden;"><div id="concilDetBody" style="padding:16px;overflow:auto;">Cargando…</div></div>';
   var lines = [];
   try {
     var r = await sb.rpc("gv_conciliacion_detalle", { p_np: np });
@@ -40793,7 +40793,7 @@ function concilDetRender(row, lines) {
     (sp ? '<button class="fac-concil-btn" style="align-self:center;" onclick="concilAbrirFactura(\'' + (row.empresa || "lk") + '\',\'' + sp + '\')">⤢ Ver la factura en grande</button>' : '') +
     '</div>';
   // Dos paneles: IZQ = listado a facturar (Gestión) · DER = el PDF de la factura de ISIS embebido.
-  var tbl = '<div style="flex:1 1 440px;min-width:320px;overflow:auto;max-height:62vh;"><table class="fac-concil-tbl"><thead><tr>' +
+  var tbl = '<div style="flex:1 1 420px;min-width:300px;overflow:auto;max-height:76vh;"><table class="fac-concil-tbl"><thead><tr>' +
     '<th>Cód</th><th>Artículo</th><th style="text-align:right;">Cajas ent</th><th style="text-align:right;">U×B</th>' +
     '<th style="text-align:right;">Precio lista</th><th style="text-align:right;">Importe</th></tr></thead><tbody>';
   tbl += lines.map(function (l) {
@@ -40808,7 +40808,7 @@ function concilDetRender(row, lines) {
       '</tr>';
   }).join("");
   tbl += '</tbody><tfoot><tr style="border-top:2px solid #cbd5e1;font-weight:800;"><td colspan="5" style="text-align:right;padding:8px;">Total Gestión</td><td class="num" style="padding:8px;">' + _fmtPlata(sumGes) + '</td></tr></tfoot></table></div>';
-  var pdfPane = '<div id="concilDetPdf" style="flex:1 1 440px;min-width:320px;min-height:440px;max-height:62vh;background:#334155;border-radius:8px;display:flex;align-items:center;justify-content:center;color:#e2e8f0;overflow:hidden;">' +
+  var pdfPane = '<div id="concilDetPdf" style="flex:1 1 560px;min-width:340px;min-height:520px;height:76vh;background:#334155;border-radius:8px;display:flex;align-items:center;justify-content:center;color:#e2e8f0;overflow:hidden;">' +
     (sp ? 'Cargando factura…' : 'Sin factura de ISIS todavía — aparece acá cuando ISIS la sube.') + '</div>';
   h += '<div style="display:flex;gap:12px;flex-wrap:wrap;align-items:stretch;">' + tbl + pdfPane + '</div>';
   h += '<div style="margin-top:8px;font-size:12px;color:#94a3b8;">Importe = cajas entregadas × U×B × precio de lista × (1 − descuento). Es lo que Gestión mandó a facturar; a la derecha, la factura real de ISIS para comparar renglón por renglón.</div>';

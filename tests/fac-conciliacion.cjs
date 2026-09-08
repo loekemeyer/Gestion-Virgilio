@@ -79,26 +79,29 @@ const { chromium } = require("/opt/node22/lib/node_modules/playwright");
     out.filas = tabla ? tabla.querySelectorAll("tbody tr").length : 0;
     out.pdf = tabla ? tabla.querySelectorAll("button.fac-cc-pdf").length : 0;
 
-    // 📄 abre la factura en un POPUP en la misma página (no en otra pestaña)
+    // Nadie debe abrir una pestaña nueva: todo va en popups en la misma página.
     let openedTab = false;
     window.open = function () { openedTab = true; return null; };
-    const pdfBtn = tabla ? tabla.querySelector("button.fac-cc-pdf") : null;
-    if (pdfBtn) pdfBtn.click();
-    await new Promise((res) => setTimeout(res, 150));
-    const pov = document.getElementById("concilPdfOverlay");
-    out.pdfPopup = !!(pov && pov.style.display === "flex");
-    out.noNewTab = !openedTab;
-    if (typeof concilPdfClose === "function") concilPdfClose();
 
-    // 📋 detalle "a facturar" → modal con las líneas de Gestión
-    const detBtn = tabla ? tabla.querySelector("button.fac-cc-det") : null;
+    // UN SOLO botón por fila ("🔍 Comparar") → modal con el PDF y el detalle lado a lado.
     out.hayDetBtn = tabla ? tabla.querySelectorAll("button.fac-cc-det").length : 0;
+    out.pdfEnFila = tabla ? tabla.querySelectorAll("button.fac-cc-pdf").length : 0;  // ya NO hay botón 📄 suelto
+    const detBtn = tabla ? tabla.querySelector("button.fac-cc-det") : null;
     if (detBtn) detBtn.click();
     await new Promise((res) => setTimeout(res, 200));
     const detBody = document.getElementById("concilDetBody");
     out.detHtml = detBody ? detBody.innerHTML : "";
     out.detLineas = detBody ? detBody.querySelectorAll("tbody tr").length : 0;
-    out.detTwoPane = !!document.getElementById("concilDetPdf");
+    out.detTwoPane = !!document.getElementById("concilDetPdf");   // panel del PDF embebido, al lado de la lista
+
+    // el botón "⤢ Ver la factura en grande" abre el visor grande en un popup (no pestaña)
+    const grande = detBody ? detBody.querySelector("button.fac-concil-btn") : null;
+    if (grande) grande.click();
+    await new Promise((res) => setTimeout(res, 150));
+    const pov = document.getElementById("concilPdfOverlay");
+    out.pdfPopup = !!(pov && pov.style.display === "flex");
+    out.noNewTab = !openedTab;
+    if (typeof concilPdfClose === "function") concilPdfClose();
     if (typeof concilDetClose === "function") concilDetClose();
 
     // volver a Facturador
@@ -126,16 +129,16 @@ const { chromium } = require("/opt/node22/lib/node_modules/playwright");
   if (!r.calls.includes("gv_conciliacion_lista")) fails.push("no llamó a gv_conciliacion_lista");
   if (!r.calls.includes("gv_conciliacion_totales")) fails.push("no pidió los totales");
   if (r.filas !== 3) fails.push("esperaba 3 filas, hay " + r.filas);
-  if (r.pdf !== 2) fails.push("esperaba 2 botones 📄 (sólo con storage_path), hay " + r.pdf);
+  if (r.pdfEnFila !== 0) fails.push("no debería haber botón 📄 suelto en la fila (todo va por 🔍 Comparar), hay " + r.pdfEnFila);
   if (!/LK 0004/.test(r.html)) fails.push("la NP web no aparece");
   if (!/FC-A-0005-00000908/.test(r.html)) fails.push("falta el nº de comprobante");
   if (!/Sin factura aún/.test(r.html) || !/Diferencia/.test(r.html) || !/OK/.test(r.html)) fails.push("faltan estados");
   if (!/2 s\/precio/.test(r.html)) fails.push("no marca artículos sin precio");
   if (!/1 OK/.test(r.resumen) || !/1 con diferencia/.test(r.resumen) || !/1 sin factura/.test(r.resumen)) fails.push("resumen no usa los totales: " + r.resumen);
-  if (!r.pdfPopup) fails.push("el 📄 no abre el PDF en un popup dentro de la página");
-  if (!r.noNewTab) fails.push("el 📄 abrió una pestaña nueva (window.open) en vez del popup");
-  if (!r.detTwoPane) fails.push("el detalle no tiene el panel del PDF embebido (#concilDetPdf)");
-  if (r.hayDetBtn !== 3) fails.push("esperaba un 📋 por fila (3), hay " + r.hayDetBtn);
+  if (!r.detTwoPane) fails.push("el modal no tiene el panel del PDF embebido al lado de la lista (#concilDetPdf)");
+  if (!r.pdfPopup) fails.push("el '⤢ Ver en grande' no abre el visor de PDF en un popup en la página");
+  if (!r.noNewTab) fails.push("se abrió una pestaña nueva (window.open) en vez de popup");
+  if (r.hayDetBtn !== 3) fails.push("esperaba un botón 🔍 Comparar por fila (3), hay " + r.hayDetBtn);
   if (r.detLineas !== 2) fails.push("el detalle a facturar no muestra las 2 líneas, hay " + r.detLineas);
   if (!/501/.test(r.detHtml) || !/162\.288/.test(r.detHtml)) fails.push("el detalle no muestra cód/importe de la línea");
   if (!/s\/precio/.test(r.detHtml)) fails.push("el detalle no marca la línea sin precio");
@@ -145,5 +148,5 @@ const { chromium } = require("/opt/node22/lib/node_modules/playwright");
   if (errs.length) fails.push("pageerror: " + errs.join(" | "));
 
   if (fails.length) { console.error("FAIL fac-conciliacion:\n - " + fails.join("\n - ")); process.exit(1); }
-  console.log("OK fac-conciliacion: 2 solapas, snapshot Gestión vs ISIS, estados, 📄 factura, 📋 detalle a facturar, y el snapshot se registra al facturar");
+  console.log("OK fac-conciliacion: 2 solapas, snapshot Gestión vs ISIS, un botón 🔍 Comparar (PDF + detalle lado a lado), popups en la página, y el snapshot se registra al facturar");
 })();

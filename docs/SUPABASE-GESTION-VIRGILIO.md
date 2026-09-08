@@ -3856,3 +3856,10 @@ visualización/comparación"*. `concilAbrirFactura` ya no delega en `deudaAbrirF
 📋 de detalle pasó a DOS paneles: izquierda el listado a facturar de Gestión, derecha el PDF de
 la factura de ISIS embebido — para comparar renglón por renglón sin salir de la pantalla; el
 botón del header quedó como "⤢ Ver la factura en grande" (abre el popup grande). Sólo front.
+
+**v14.33 (08/09) — un solo botón "🔍 Comparar": PDF + detalle en paralelo.** Pedido de Luis:
+para los casos con diferencia, ver la factura de ISIS y el detalle a facturar de Gestión juntos.
+Se sacó el botón 📄 suelto de la fila; ahora hay UN botón por fila ("🔍 Comparar") que abre el
+modal grande (≈1400px) con dos paneles lado a lado: izquierda el listado a facturar de Gestión,
+derecha el PDF de la factura embebido (iframe, 76vh). Dentro sigue el "⤢ Ver la factura en grande"
+para el visor a pantalla casi completa. Nada abre pestaña nueva. Sólo front.
