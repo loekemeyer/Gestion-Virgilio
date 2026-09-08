@@ -11,6 +11,14 @@ saldo ≠ 0 aunque no esté en el catálogo). **Corte**: 2026-08-04.
 Saldos tomados de `vista_saldos_insumos_x_unidad` (separados por unidad; el saldo
 único de `vista_saldos_stock` mezcla kg/Uni/Bolsas/MC — ver idea 7382).
 
+> ⚠ **Códigos que son producto de venta E insumo a la vez** (2026-09-08). Algunos `cod_art`
+> aparecen acá (depósito `insumos`, `empresa='Mixto'`) **y también** como producto terminado en la
+> solapa **Stocks** (depósitos `terminado`/`racks`/… partidos por empresa CH/LK). No es duplicado ni
+> error: es el mismo código usado en dos roles. **No se debe "splittear" ni mover a CH/LK el saldo de
+> `insumos`** — los insumos no se parten por empresa. Casos hoy: **437E, 439E, 590E, 584E, 035E, 440E**.
+> Distinto de un fantasma de terminado (caso 809E, `docs/SUPABASE-GESTION-VIRGILIO.md` §3.br). Ver la
+> nota del modelo de datos en `GUIA-PROYECTO.md` (2026-09-08).
+
 ---
 
 ## El problema hoy

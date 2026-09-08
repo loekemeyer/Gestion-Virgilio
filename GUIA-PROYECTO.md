@@ -14,6 +14,23 @@
 >
 > Última actualización: 2026-09-08 (martes) · Versión app al documentar: **v14.41**
 >
+> Nota **2026-09-08** (modelo de datos) — **⚠ Hay códigos que son a la vez PRODUCTO DE VENTA e INSUMO.**
+> No es un error ni un duplicado: un mismo `cod_art` puede tener stock en dos roles al mismo tiempo dentro de
+> `Movimientos_Stock`, separados por **depósito**:
+> - **Producto de venta** → depósitos `terminado` / `racks` / `gondola` / `a_facturar` / etc. Va **partido por
+>   empresa** (`empresa = CH` o `LK`) porque es dual, y se ve en la solapa **Stocks**.
+> - **Insumo** → depósito `insumos`, `empresa = Mixto` (los insumos **no** se parten por empresa). Se ve en la
+>   solapa **Insumos**, NO en Stocks. Muchas veces la descripción difiere en mayúsc./abrev. y la unidad puede
+>   ser `Uni`/`MC`/`(s/u)`.
+>
+> O sea: el saldo grande en `empresa='Mixto', deposito='insumos'` de estos códigos **es correcto** y no hay que
+> "splittearlo" a CH/LK ni confundirlo con un fantasma de terminado. Códigos con esta doble identidad hoy
+> (producto | insumo): **437E** (Colador 16cm | 2592), **439E** (Colador de Pasta | 499), **590E**
+> (Pincel Silicona 11g | 2396), **584E** (Aceitera 400ml | 1200), **035E** (Cernidor de Harina | 528),
+> **440E** (Colador Extensible | 192). Distinto del caso **809E**, que sí era un fantasma real en `terminado`
+> (ver `docs/SUPABASE-GESTION-VIRGILIO.md` §3.br). Regla para cualquier chat: antes de tocar un saldo Mixto,
+> mirar el **depósito** — si es `insumos`, es la cara insumo del código, se deja quieto.
+>
 > Nota **v14.41** (datos, proyecto LK) — **Gigot Cosméticos y Matiz SA eran el mismo cliente.**
 > Mismo CUIT (30-62743503-3) partido en dos: la cuenta web era `cod 5000 "Gigot Cosméticos"` y ISIS
 > factura como `cod 4263 "Matiz SA"` (FC A 0004-00035713 del 26/08, $12.039.500, 208 cajas, NP 98109,

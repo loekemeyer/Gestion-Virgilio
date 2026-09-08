@@ -4187,9 +4187,13 @@ values (now(), '809E', 'Corta  Queso X 12', 'terminado', -11, 'ajuste',
 familia con stock en CH/LK). Se forzó `REFRESH MATERIALIZED VIEW CONCURRENTLY vista_stock_procesada`
 y `refresh_stocks_carga_rapida()` (igual autorefrescan solos: crons 55 cada 2', 57 cada 5').
 
-**Barrido de otros duales:** sólo 809E tenía este fantasma limpio. `438E` está limpio (Mixto = 0).
-`437E` (Mixto 2592, CH 16, LK 302) y `439E` (Mixto 499, CH 0, LK 46) tienen saldo Mixto **grande y
-sin marca de split** → NO es fantasma, es stock que todavía no se separó por empresa. **No se
-tocaron**: borrarlos sería matar cajas reales. Quedan para revisar con el dueño si/ cuándo splittearlos.
+**Barrido de otros duales:** sólo 809E tenía este fantasma limpio (residuo en `terminado`). `438E` está
+limpio (Mixto = 0). `437E` (Mixto 2592) y `439E` (Mixto 499) tienen saldo Mixto grande **pero en depósito
+`insumos`, no en `terminado`** → **NO es fantasma ni stock sin splittear**: es que esos códigos son
+**producto de venta E insumo a la vez** (el mismo código en dos roles). El producto ya está bien partido
+CH/LK en la solapa Stocks; el saldo `insumos`/Mixto es la cara insumo (solapa Insumos) y **no se parte por
+empresa**. Confirmado por el dueño el 08/09 (*"hay insumos que tienen el mismo código que esos productos de
+venta pero que son insumos"*). **No se tocan.** Códigos con esta doble identidad: 437E, 439E, 590E, 584E,
+035E, 440E. Regla documentada en `GUIA-PROYECTO.md` (nota 2026-09-08) y `docs/INSUMOS-CATEGORIAS.md`.
 
 **Rollback:** `delete from "Movimientos_Stock" where id = 52644879;` (vuelve el saldo Mixto a 11).
