@@ -4212,6 +4212,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
     </div>
     <div class="fac-top-acts">
       <button id="facBtnXlsIsis" onclick="facXlsBajar()" title="Arma el Excel para importar en ISIS con las cajas ENTREGADAS de las NP de la página que marcaste. Al bajarlo, esas NP quedan FACTURADAS (es su tilde). Las NP de ISIS no van acá: se tildan.">⬇ Excel ISIS <span style="font-weight:600;opacity:.85">(NP web)</span></button>
+      <button id="facBtnJsonIsis" onclick="facJsonIsis()" title="Arma el MISMO pedido que el Excel (cajas armadas, código con L, ruteo Tierra del Fuego) pero en el sobre JSON del contrato ISIS API v2.0. No manda ni factura nada: lo muestra para copiar o descargar (prueba de conexión con ISIS y gate manual). ISIS lo consume por la API isis-api.">📤 JSON ISIS <span style="font-weight:600;opacity:.85">(NP web)</span></button>
       <button id="facBtnCruce" onclick="openCobros('cruce')" title="Cruza cada NP facturada (lo que Gestión calculó con las cajas entregadas y la lista) contra la factura real que cargó ISIS (el PDF): neto, cajas y diferencia. Sólo mira, no corrige nada.">🔍 Cruce con ISIS</button>
       <button class="fac-close-btn" onclick="closeFacturacion()">Cerrar</button>
     </div>
@@ -7433,7 +7434,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v14.48";
+const APP_VERSION = "v14.49";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -37418,6 +37419,152 @@ async function facXlsBajar() {
     try { alert("No se pudo armar el archivo: " + ((e && e.message) || e)); } catch (_e) {}
   } finally {
     if (b) { b.disabled = false; b.innerHTML = txt; facXlsBtnSync(); }
+  }
+}
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   v14.49 — Botón JSON para ISIS (contrato API v2.0, docs/ISIS-API-ESPECIFICACION.md).
+   Reunión 04/09 (ticket TkT115966): reemplazar el Excel por un JSON. Modelo elegido:
+   ISIS BAJA los pedidos (pull) por la Edge Function isis-api — no hay endpoint de ISIS
+   para hacerle POST. Este botón NO manda ni factura: arma el MISMO pedido que el Excel
+   (mismas cajas armadas, misma L, mismo ruteo Tierra del Fuego → CH) en el sobre JSON del
+   contrato, y lo muestra para COPIAR / DESCARGAR. Sirve para: (1) el JSON de ejemplo que
+   pidió Horacio para la prueba de conexión, (2) el gate manual (el supervisor elige qué NP).
+   La fuente de verdad del backend es isis-api; este JSON es la vista/optimización de UX,
+   armado sobre el mismo _facXlsArmar() que ya respeta todas las reglas del pedido. ───── */
+function _facJsonAhoraIso() {
+  // ISO-8601 con offset fijo -03:00 (America/Argentina/Buenos_Aires), como el contrato.
+  const p = {};
+  try {
+    new Intl.DateTimeFormat("en-CA", {
+      timeZone: "America/Argentina/Buenos_Aires", hour12: false,
+      year: "numeric", month: "2-digit", day: "2-digit",
+      hour: "2-digit", minute: "2-digit", second: "2-digit"
+    }).formatToParts(new Date()).forEach(function (x) { p[x.type] = x.value; });
+  } catch (_e) { return new Date().toISOString(); }
+  return p.year + "-" + p.month + "-" + p.day + "T" + (p.hour === "24" ? "00" : p.hour) + ":" + p.minute + ":" + p.second + "-03:00";
+}
+
+/* m³ / fecha de entrega / tanda de una NP salen de la lista ya cargada en pantalla
+   (_facLastTandas), igual que hace facXlsBajar para marcar facturada. */
+function _facJsonTandaDe(np) {
+  for (const t of (_facLastTandas || [])) {
+    const pp = (t.pedidos || []).find(function (p) { return String(p.np) === String(np); });
+    if (pp) return { m3: pp.m3 || 0, fecha: t.fechaEntregaRaw || "", tanda: t.tanda || "" };
+  }
+  return null;
+}
+
+/* Una fila de _facXlsArmar() → el sobre JSON del contrato v2.0 (§6 de la especificación).
+   La clave es `referencia` (LK 1344), NO una NP: la NP la pone ISIS al facturar. */
+function _facJsonPedido(fila, tanda) {
+  const items = (fila.lineas || []).map(function (l) {
+    const o = { cod_art: l.art, cajas: l.cajas };   // art = código realmente preparado (con L)
+    if (l.uxb) o.uxb = l.uxb;
+    return o;
+  });
+  const totCajas = items.reduce(function (s, i) { return s + (Number(i.cajas) || 0); }, 0);
+  const ped = { source: "Virgilio", cod_cliente: String(fila.cod || ""), sucursal_entrega: fila.suc || "", vend: String(fila.vend || "") };
+  // v14.36: `cond` es el condicion_pago_code que eligió el cliente en la página (o "" para ISIS).
+  if (fila.cond !== "" && fila.cond != null) ped.condicion_pago_code = /^\d+$/.test(String(fila.cond)) ? Number(fila.cond) : String(fila.cond);
+  ped.observaciones = "";
+  ped.items = items;
+  const ctrl = { items: items.length, cajas: totCajas, moneda: "ARS",
+    nota: "Informativo, sólo para control. El importe a facturar lo determina ISIS con su lista de precios." };
+  if (tanda && tanda.m3 != null) ctrl.m3 = tanda.m3;
+  return {
+    referencia: String(fila.np),
+    empresa: fila.isisEmp === "CH" ? "CH" : "LK",
+    estado_integracion: "pendiente",
+    terminado_en: _facJsonAhoraIso(),
+    fecha_entrega: (tanda && tanda.fecha) ? String(tanda.fecha).slice(0, 10) : "",
+    pedido: ped,
+    control: ctrl
+  };
+}
+
+/* Muestra el JSON armado en un overlay, con Copiar y Descargar .json. */
+function _facJsonMostrar(pedidos) {
+  const jsonTxt = JSON.stringify(pedidos, null, 2);
+  const old = document.getElementById("facJsonModal");
+  if (old) old.remove();
+  const ov = document.createElement("div");
+  ov.id = "facJsonModal";
+  ov.style.cssText = "position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:2000;display:flex;align-items:center;justify-content:center;padding:14px;";
+  ov.onclick = function (e) { if (e.target === ov) ov.remove(); };
+  const nombre = "PEDIDOS_ISIS_" + _facJsonAhoraIso().slice(0, 10) + "_" + pedidos.length + "np.json";
+  const box = document.createElement("div");
+  box.style.cssText = "background:#fff;border-radius:12px;max-width:760px;width:100%;max-height:88vh;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 12px 40px rgba(0,0,0,.35);";
+  const head = document.createElement("div");
+  head.style.cssText = "padding:12px 14px;background:#0f172a;color:#fff;display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;";
+  head.innerHTML = '<b style="font-size:14px;">📤 JSON para ISIS · ' + pedidos.length + ' pedido' + (pedidos.length === 1 ? '' : 's') +
+    '</b><span style="font-size:11.5px;opacity:.8;">Contrato API v2.0 · no se manda ni factura: ISIS lo baja por la API</span>';
+  const pre = document.createElement("pre");
+  pre.textContent = jsonTxt;
+  pre.style.cssText = "margin:0;padding:14px;overflow:auto;flex:1;font-size:12px;line-height:1.45;white-space:pre;background:#f8fafc;color:#0f172a;";
+  const foot = document.createElement("div");
+  foot.style.cssText = "padding:10px 14px;display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap;border-top:1px solid #e2e8f0;";
+  const bCopy = document.createElement("button");
+  bCopy.textContent = "📋 Copiar JSON";
+  bCopy.style.cssText = "padding:9px 16px;border:0;border-radius:8px;background:#2563eb;color:#fff;font-weight:700;cursor:pointer;";
+  bCopy.onclick = function () {
+    const done = function () { bCopy.textContent = "✓ Copiado"; setTimeout(function () { bCopy.textContent = "📋 Copiar JSON"; }, 1400); };
+    try {
+      if (navigator.clipboard && navigator.clipboard.writeText) { navigator.clipboard.writeText(jsonTxt).then(done, function () { _facJsonCopyFallback(pre, done); }); }
+      else _facJsonCopyFallback(pre, done);
+    } catch (_e) { _facJsonCopyFallback(pre, done); }
+  };
+  const bDown = document.createElement("button");
+  bDown.textContent = "⬇ Descargar .json";
+  bDown.style.cssText = "padding:9px 16px;border:1px solid #cbd5e1;border-radius:8px;background:#fff;color:#0f172a;font-weight:700;cursor:pointer;";
+  bDown.onclick = function () {
+    const blob = new Blob([jsonTxt], { type: "application/json" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob); a.download = nombre;
+    document.body.appendChild(a); a.click();
+    setTimeout(function () { URL.revokeObjectURL(a.href); a.remove(); }, 1500);
+  };
+  const bClose = document.createElement("button");
+  bClose.textContent = "Cerrar";
+  bClose.style.cssText = "padding:9px 16px;border:1px solid #cbd5e1;border-radius:8px;background:#fff;color:#64748b;font-weight:700;cursor:pointer;";
+  bClose.onclick = function () { ov.remove(); };
+  foot.appendChild(bCopy); foot.appendChild(bDown); foot.appendChild(bClose);
+  box.appendChild(head); box.appendChild(pre); box.appendChild(foot);
+  ov.appendChild(box);
+  document.body.appendChild(ov);
+}
+function _facJsonCopyFallback(pre, done) {
+  try {
+    const sel = window.getSelection(); const rng = document.createRange();
+    rng.selectNodeContents(pre); sel.removeAllRanges(); sel.addRange(rng);
+    document.execCommand("copy"); sel.removeAllRanges(); done();
+  } catch (_e) { try { alert("No pude copiar solo. Seleccioná el texto y copialo a mano."); } catch (_e2) {} }
+}
+
+/* Botón 📤 JSON ISIS. Mismo criterio que el Excel: sólo NP de la página (las de ISIS
+   las carga ISIS por su lado). NO marca facturada — es preview/gate manual. */
+async function facJsonIsis() {
+  if (!requireSupervisor()) return;
+  const isis = Array.from(_facXlsSel).filter(function (n) { return !facNpEsWeb(n); });
+  if (isis.length) {
+    isis.forEach(function (n) { _facXlsSel.delete(n); });
+    try { alert("Las NP de ISIS (" + isis.join(", ") + ") no van al JSON: ISIS las carga por su lado. Las saqué de la selección."); } catch (_e) {}
+    facXlsBtnSync();
+  }
+  const nps = Array.from(_facXlsSel);
+  if (!nps.length) { try { alert("Marcá en la lista las NP de la página que querés ver como JSON (la casilla de la izquierda) y después tocá el botón."); } catch (_e) {} return; }
+  const b = document.getElementById("facBtnJsonIsis");
+  const txt = b ? b.innerHTML : "";
+  if (b) { b.disabled = true; b.innerHTML = "Armando…"; }
+  try {
+    const filas = await _facXlsArmar(nps);
+    if (!filas.length) { try { alert("Ninguna de las NP marcadas tiene artículos armados con cajas entregadas."); } catch (_e) {} return; }
+    const pedidos = filas.map(function (f) { return _facJsonPedido(f, _facJsonTandaDe(f.np)); });
+    _facJsonMostrar(pedidos);
+  } catch (e) {
+    try { alert("No se pudo armar el JSON: " + ((e && e.message) || e)); } catch (_e) {}
+  } finally {
+    if (b) { b.disabled = false; b.innerHTML = txt; }
   }
 }
 
