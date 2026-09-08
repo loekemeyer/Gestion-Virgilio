@@ -4309,3 +4309,48 @@ mandarlo, sus eventos pasarían a contarse como de Producción y el control ment
 
 **Rollback:** `alter table public."Registros_Produccion_Virgilio" drop column gv_app;` + sacar
 `gv_app` de los dos payloads de `index.html`. SQL: `sql/gv_app_sello_eventos_v1451.sql`.
+
+---
+
+## §3.bp — v14.52 (2026-09-08): API ISIS v2.0 (Fase 1) — el endpoint sirve el pedido por REFERENCIA
+
+Reunión 04/09 con ISIS (ticket **TkT115966**): reemplazar el Excel por un **JSON** que ISIS
+**baja** (pull). Contrato en `docs/ISIS-API-ESPECIFICACION.md` §6. Hasta hoy el servicio
+desplegado era **v1.0** (por NP numérica, con acuse) y no podía servir pedidos web ("LK 0011" →
+`np::bigint` = 11). Esta Fase 1 lo lleva a v2.0 **del lado Virgilio**, sin tocar nada compartido.
+
+**Objetos nuevos (todos `gv_`, EXECUTE sólo `service_role`), en `sql/gv_isis_api_v2.sql`:**
+- `gv_isis_pedido_json(p_ref)` — el sobre §6 por referencia: `referencia`, `empresa`,
+  `estado_integracion`, `terminado_en`, `fecha_entrega`, `pedido{source, cod_cliente,
+  razon_social, items[{cod_art, cajas, uxb}], …}`, `control{items, cajas, neto_estimado,
+  moneda}`. `cajas` = lo ARMADO (sale de `Entregas_Virgilio`); `neto_estimado` de
+  `vista_facturacion_neto`. Los campos comerciales de LK (`vend`, `condicion_pago[_code]`,
+  `payment_term`, `sucursal_entrega`) van **NULL** en Fase 1.
+- `gv_isis_pedidos_lista(p_estado, p_empresa, p_desde, p_limit)` — cabeceras por estado, **sólo
+  referencias web** (`np ILIKE 'LK %'/'CH %'`): los NP numéricos ya están en ISIS y no se le ofrecen
+  (evita doble carga).
+- `gv_isis_pedido_marcar_entregado(p_ref)` — `pendiente → entregado` al bajarlo.
+
+**Edge Function `isis-api` → v2.0 (deploy v3, `verify_jwt=false`):** rutas `GET /ping`,
+`GET /pedidos`, `GET /pedidos/{referencia}` (acepta "LK 0011" url-encoded, lo pasa a entregado).
+**Se sacaron las rutas de acuse** (`POST …/acuse`). Llama a las 3 RPCs `gv_`. La v1.0
+(`isis_pedido_json`, `isis_api_pendientes`, `isis_api_pedido`, `isis_api_acuse`) **queda intacta**
+en la base por si hay que volver.
+
+**Token para la prueba de Horacio:** alta de `isis_api_tokens` id 3 ("ISIS Horacio - prueba
+conexion v2.0"). El texto en claro se entregó al dueño por chat (en la base sólo vive el sha256).
+
+**Medido (08/09):** `gv_isis_pedidos_lista('pendiente')` = 1 pedido web (`LK 0011`, CH, 4 items, 40
+cajas). `gv_isis_pedido_json('LK 0011')` = sobre §6 completo, `neto_estimado` 751111.20. La lista
+NO devuelve los ~19 NP numéricos que hay en la cola. No se pudo hacer el smoke HTTP desde el sandbox
+(el proxy de egress bloquea `*.supabase.co` por política) — lo valida Horacio, que es el paso 2 del plan.
+
+**Rollback:** `drop function public.gv_isis_pedido_json(text), public.gv_isis_pedidos_lista(text,text,timestamptz,int), public.gv_isis_pedido_marcar_entregado(text);`
+y redeploy de la Edge Function con el `index.ts` v1.0 (está en git, commit anterior). Baja del token:
+`update public.isis_api_tokens set activo=false where id=3;`.
+
+**Falta (Fase 2, NO en esta entrega):** (a) el **disparador** pasa del tilde de facturación al
+**cierre del armado** (hoy la cola se llena por el trigger sobre `Facturacion_NP`, que además mete
+NP numéricas — por eso la lista filtra web); (b) **campos comerciales** de LK (guardarlos al tomar
+el pedido); (c) **sufijo L / cod de cliente Chef** para TdF (hoy `canon_cod` devuelve "504", no "504L").
+Es el cambio que reemplaza al Excel de verdad; se hace cuando la conexión de Horacio dé OK.

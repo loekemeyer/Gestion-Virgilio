@@ -385,8 +385,12 @@ matchea 1:1. Se resuelve con `candidatos_cercanos`, no con un acuse de ISIS.
 
 ### ⚠ Estado del código respecto de esta v2.0
 
-**El servicio desplegado todavía implementa la v1.0.** Este documento es el contrato; el
-código va detrás. Falta:
+**Fase 1 desplegada (v14.51, 2026-09-08).** El servicio ya sirve el sobre v2.0 **por
+referencia**, sólo pedidos web, sin acuse (Edge Function `isis-api` v3; RPCs `gv_isis_*` en
+`sql/gv_isis_api_v2.sql`). Ver `docs/SUPABASE-GESTION-VIRGILIO.md` §3.bp. Hecho: puntos 1, 3 y 4
+de abajo. **Falta (Fase 2):** el punto 2 (campos comerciales de LK, hoy van NULL) y el punto 5
+(el disparador pasa del tilde de facturación al cierre del armado). La v1.0 queda intacta en la
+base por si hay que volver. Lista histórica de lo que pedía la v2.0:
 
 1. **`isis_pedido_json(np)` → `isis_pedido_json(referencia)`.** Hoy arma el JSON desde
    `Facturacion_NP` + `Entregas_Virgilio` y emite `np`, `cajas_pedidas`/`cajas`,
