@@ -44,13 +44,28 @@
 --   la rama 1b de `rep_salud` (abajo), que además dice *cuál* MV y *por qué* — mejor que el
 --   "cron falla desde hace 56 días" de antes.
 --
--- LO QUE SIGUE ABIERTO (del dueño, o de quien tenga acceso a Chef)
--- ===============================================================
---   En el proyecto de **Chef** (nkhzocgdpwtgrmwleihr), que esta sesión no puede tocar:
+-- LO QUE FALTABA, Y SE HIZO EL MISMO DIA
+-- =====================================
+--   En el proyecto de **Chef** (nkhzocgdpwtgrmwleihr), que esta sesión no puede tocar (está en
+--   otra organización de Supabase), lo corrió el dueño:
 --
---     grant select on public.sales_line to loke_reader;
+--     grant usage  on schema public to loke_reader;
+--     grant select on public.sales_line  to loke_reader;
+--     grant select on public.sales_lines to loke_reader;
 --
---   Hasta entonces `mv_chef_sales_loke` sigue clavada en 2026-02-23.
+--   Verificado desde LK: las tres MV en ok = true, y `mv_chef_sales_loke` pasó de fallar en 6 s
+--   (permission denied) a 17,5 s de trabajo real.
+--
+--   ⚠ PERO EL NÚMERO NO SE MOVIÓ: quedó en 2.227 filas, hasta 2026-02-23. No es que la MV siga
+--   rota —ahora lee bien—, es que no hay dato nuevo del otro lado:
+--
+--     select count(*), min(invoice_date), max(invoice_date)
+--       from public.chef_sales_lines where invoice_date is not null;
+--     -- 36.770 filas · 2020-01-02 -> 2026-02-23
+--
+--   Las ventas de Chef no se cargan desde el 23/02: seis meses y medio. Es el lote mensual del
+--   ERP que se sube a mano entre el 2 y el 14; para LK se viene subiendo, para Chef no.
+--   Pasó desapercibido porque el chequeo 4 de rep_salud mira SOLO `empresa='lk'`.
 --
 -- MEDIDO DESPUÉS DE APLICAR
 -- =========================

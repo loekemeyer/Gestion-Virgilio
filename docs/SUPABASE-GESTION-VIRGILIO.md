@@ -3404,9 +3404,37 @@ ahora:  🔴 materialized view mv_chef_sales_loke · falló al refrescar
            → permission denied for table sales_line
 ```
 
-**Lo que sigue abierto (del dueño, o de quien tenga acceso a Chef):** en el proyecto de Chef
-(`nkhzocgdpwtgrmwleihr`, que esta sesión **no puede tocar**), `grant select on public.sales_line
-to loke_reader;`. Hasta entonces `mv_chef_sales_loke` sigue clavada en 2026-02-23.
+**Lo que faltaba, y se hizo el mismo día.** En el proyecto de Chef (`nkhzocgdpwtgrmwleihr`, que
+esta sesión **no puede tocar** — está en otra organización de Supabase), lo corrió el dueño:
+
+```sql
+grant usage on schema public to loke_reader;
+grant select on public.sales_line  to loke_reader;
+grant select on public.sales_lines to loke_reader;
+```
+
+Verificado desde LK: las tres MV en `ok = true`, y `mv_chef_sales_loke` pasó de fallar en 6 s
+(*permission denied*) a **17,5 s de trabajo real**. Mientras corría se vio en `pg_stat_activity`
+esperando en `PostgresFdwGetResult`, o sea trayendo filas de verdad.
+
+### ⚠ Pero el número no se movió, y eso destapó otra cosa
+
+`mv_chef_sales_loke` quedó igual: **2.227 filas, hasta 2026-02-23**. No es que la MV siga rota
+—ahora lee bien—; es que **no hay dato nuevo del otro lado**. Mirando el crudo por el FDW:
+
+```sql
+select count(*), min(invoice_date), max(invoice_date)
+  from public.chef_sales_lines where invoice_date is not null;
+-- 36.770 filas · 2020-01-02 → 2026-02-23
+```
+
+**Las ventas de Chef no se cargan desde el 23 de febrero**: seis meses y medio. Es el lote
+mensual del ERP, el que se sube a mano entre el 2 y el 14 de cada mes — para LK se viene
+subiendo, para Chef se dejó de hacer.
+
+Y pasó desapercibido porque **el chequeo 4 de `rep_salud` mira sólo `empresa='lk'`**
+(`from sales_lines where empresa='lk'`). Queda propuesto al dueño: sumarle la pata de Chef, o
+—si esa data ya no le importa a nadie— sacar la MV en vez de arrastrarla.
 
 ## 3.bp ✅ Segunda tanda de correcciones: Av. Jujuy caía a 640 km (v14.27) — 2026-09-07
 
