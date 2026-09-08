@@ -4226,7 +4226,25 @@ mismo código, producto distinto en cada empresa (`437E/438E/439E/809E`, `codigo
 filas, la NP decide. Sólo lectura, `security_invoker`, se re-deriva sola (catálogos frescos por
 cron 66 c/15 min). **No toca Producción** (objeto nuevo `gv_`).
 
-Medido: **381 LK no-dual + 4 duales (LK y CH) = 389 filas**. Dato: **0 artículos propios de Chef**
-hoy — todo el catálogo Chef es Loeke revendido + los 4 duales. `sql/gv_articulo_empresa.sql`.
-Rollback: `drop view public.gv_articulo_empresa;`. Sigue Fase 2 (persistir `empresa` como columna
-en el pipeline web) — ver `docs/MAPA-CONVERSIONES-PIPELINE.md`.
+Medido (mirrors reconciliados, ver §3.bk): **282 LK no-dual + 98 propios de Chef + 4 duales (LK y
+CH) = 388 filas**. `sql/gv_articulo_empresa.sql`. Rollback: `drop view public.gv_articulo_empresa;`.
+Sigue Fase 2 (persistir `empresa` como columna en el pipeline web) — ver `docs/MAPA-CONVERSIONES-PIPELINE.md`.
+
+> ⚠ **Corrección (misma sesión):** la primera versión reportó "0 artículos propios de Chef", falso.
+> `precios_venta` arrastraba 115 filas viejas de Chef (del merge previo al split v14.44) que la vista
+> contaba como LK. Se arregló con la reconciliación del sync (§3.bk); el número real es 98 propios de Chef.
+
+## §3.bk — v14.47 (2026-09-08): el sync RECONCILIA (los mirrors = catálogo exacto)
+
+`sync-precios-venta` hacía `upsert` **sin borrar**: una fila que salía del catálogo de origen
+quedaba para siempre. Tras el split v14.44 eso dejó **115 filas viejas de Chef** en `precios_venta`
+(valores del viejo "Chef gana"), que ensuciaban `gv_articulo_empresa` (las tomaba como LK → "0
+propios de Chef", mal; p.ej. **613** aparecía LK cuando es de Chef). Las NP no se veían afectadas
+(una NP de LK no pide un código que no es de LK), pero la identidad por artículo sí.
+
+Fix: la función ahora **reconcilia** cada mirror — después del upsert, `DELETE … where actualizado
+< nowIso` (lo que no se refrescó en esta corrida = ya no está en el catálogo). **Guarda**: sólo
+borra si el pull trajo filas (si LK o Chef fallan, no vacía la tabla). Medido: `precios_venta`
+337 → **222** (LK exacto), `precios_venta_chef` 101 (sin viejas). `gv_articulo_empresa`: 613 → CH,
+98 propios de Chef. Backup previo: `gv_bkp_precios_venta_20260908_pre_reconcile` (337) /
+`_chef_..._pre_reconcile` (101). Anotado en `docs/ROLLBACK-PRODUCCION.md`. `supabase/functions/sync-precios-venta/index.ts`.

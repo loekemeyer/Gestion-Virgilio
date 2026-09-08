@@ -15,8 +15,12 @@
 --   · dual = MISMO código, PRODUCTO DISTINTO en cada empresa (437E/438E/439E/809E, tabla
 --            public.codigos_duales) → 2 filas (LK y CH); la empresa la decide la NP.
 --
--- Medido al crearla (08/09): 381 LK no-dual + 4 duales (cada uno LK y CH) = 389 filas.
--- 0 artículos propios de Chef hoy (todo el catálogo Chef es Loeke revendido + los 4 duales).
+-- Medido (08/09, con los mirrors ya RECONCILIADOS, v14.47): 282 LK no-dual + 98 propios de
+-- Chef + 4 duales (cada uno LK y CH) = 388 filas.
+--   ⚠ OJO: depende de que precios_venta / precios_venta_chef sean el catálogo EXACTO. Antes de
+--   v14.47 precios_venta arrastraba 115 filas viejas de Chef (del merge "Chef gana" previo al
+--   split v14.44) que NUNCA se borraban → esta vista las tomaba como LK y daba "0 propios de
+--   Chef" (mal). El sync ahora reconcilia (borra lo que no está en el catálogo de origen).
 --
 -- Se re-deriva sola: los catálogos los refresca sync-precios-venta cada 15 min (cron 66).
 -- NO toca Producción (objeto nuevo gv_). Rollback: drop view public.gv_articulo_empresa;

@@ -65,6 +65,24 @@ agregarles a esas 4 vistas de Producción la misma rama que `gv_vista_facturacio
 (LK→`precios_venta`, Chef→`precios_venta_chef`). No se hizo porque Producción no se usa; queda
 como opción si algún día se la quiere dejar consistente en vez de revertir.
 
+### v14.47 (2026-09-08) — `sync-precios-venta` RECONCILIA (borra lo que no está en el catálogo)
+
+**Qué se cambió.** La Edge Function ahora, después del upsert, borra de `precios_venta` y
+`precios_venta_chef` las filas cuyo `actualizado < nowIso` (las que no están en el catálogo de
+origen). Sacó las 115 filas viejas de Chef que quedaban en `precios_venta` (337 → 222).
+
+**Qué de Producción se ve afectado.** Las vistas de Producción que leen `precios_venta` sin
+enrutar (ver v14.44) ahora, para un código que **no** es de LK (p.ej. 613, propio de Chef), lo
+ven como **sin precio** en vez de con el valor viejo de Chef. Es lo correcto (ese código no es de
+LK), pero cambia el número para esas vistas. Gestión no se ve afectada (usa `precios_venta_chef`
+para Chef).
+
+**Rollback:** restaurar las filas viejas desde el backup
+`public.gv_bkp_precios_venta_20260908_pre_reconcile` (337 filas):
+`insert into precios_venta select * from public.gv_bkp_precios_venta_20260908_pre_reconcile on conflict (cod) do update set precio_unit=excluded.precio_unit, actualizado=excluded.actualizado;`
+y volver la función a la versión sin `reconcileStale` (commit anterior). Pero ojo: la próxima
+corrida del cron volvería a reconciliar salvo que también se revierta la función.
+
 ### v14.45 (2026-09-08) — `sync-precios-venta` cada 15 min (cron 66)
 
 **Qué se cambió.** Cron 66 pasó de diario (06:00 ART, guarda de 24 h) a `*/15 * * * *`, sin guarda.
@@ -79,6 +97,8 @@ como opción si algún día se la quiere dejar consistente en vez de revertir.
 |---|---|---|
 | `public.gv_bkp_precios_venta_20260908` | `precios_venta` antes del split (337 filas, lista mezclada) | 2026-09-08 |
 | `public.gv_bkp_precios_venta_chef_20260908` | `precios_venta_chef` antes del re-sync (101 filas) | 2026-09-08 |
+| `public.gv_bkp_precios_venta_20260908_pre_reconcile` | `precios_venta` antes de reconciliar (337, con las 115 viejas) | 2026-09-08 |
+| `public.gv_bkp_precios_venta_chef_20260908_pre_reconcile` | `precios_venta_chef` antes de reconciliar (101) | 2026-09-08 |
 
 > Estos backups son tablas en `public`. Borrarlos cuando el cambio esté consolidado y ya no se
 > quiera el rollback (`drop table public.gv_bkp_precios_venta_20260908;` …).

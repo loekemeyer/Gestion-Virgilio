@@ -3,6 +3,9 @@
 //   1. LK products + loke_products (WEB_SERVICE_KEY) → precios_venta + cob_uxb_lk
 //   2. Chef products (CHEF_KEY — publishable key, lectura pública) → precios_venta_chef
 // v14.44: listas SEPARADAS por empresa (antes merge con "Chef gana", ensuciaba LK).
+// v14.47: RECONCILIA — borra de cada mirror lo que ya no está en su catálogo de origen,
+//         así precios_venta = catálogo LK exacto y precios_venta_chef = catálogo Chef exacto
+//         (antes el upsert sin delete dejaba filas viejas que ensuciaban gv_articulo_empresa).
 // Idempotente. Lo dispara pg_cron (job sync-precios-venta).
 // Secrets (ya existentes, los usa arca-wsfe y sync-clientes-dto):
 //   WEB_SERVICE_KEY    = service_role de LK
@@ -64,6 +67,18 @@ async function upsert(table: string, conflict: string, rows: Record<string, unkn
   return total;
 }
 
+// v14.47: borra las filas que YA NO están en el catálogo de origen (las que no se
+// refrescaron en esta corrida → actualizado < cutoff). Deja el mirror = catálogo exacto.
+// Sólo se llama si se escribió al menos una fila (guarda contra un pull vacío que
+// borraría todo). El cutoff es el nowIso de esta corrida.
+async function reconcileStale(table: string, cutoffIso: string): Promise<void> {
+  const w = await fetch(`${SB_URL}/rest/v1/${table}?actualizado=lt.${encodeURIComponent(cutoffIso)}`, {
+    method: "DELETE",
+    headers: { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}`, Prefer: "return=minimal" },
+  });
+  if (!w.ok) throw new Error(`reconcile ${table} ${w.status}: ${(await w.text()).slice(0, 200)}`);
+}
+
 Deno.serve(async (_req: Request): Promise<Response> => {
   try {
     if (!LK_KEY) return json({ ok: false, error: "falta WEB_SERVICE_KEY" }, 501);
@@ -108,10 +123,14 @@ Deno.serve(async (_req: Request): Promise<Response> => {
     };
     const preciosRows = mapProductos(lkProducts);
     const nPrecios = await upsert("precios_venta", "cod", preciosRows);
+    // Reconciliar: sacar de precios_venta lo que ya no está en el catálogo de LK
+    // (guarda: sólo si el pull trajo filas, para no vaciar la tabla si LK falla).
+    if (preciosRows.length) await reconcileStale("precios_venta", nowIso);
 
     // Chef → precios_venta_chef (antes se cargaba a mano, ver sql/cobranzas_chef_sync.sql).
     const preciosChefRows = mapProductos(chefProducts);
     const nPreciosChef = preciosChefRows.length ? await upsert("precios_venta_chef", "cod", preciosChefRows) : 0;
+    if (preciosChefRows.length) await reconcileStale("precios_venta_chef", nowIso);
 
     // ── 4) cob_uxb_lk — uxb de LK products ∪ loke_products ──
     const lokeProducts = await fetchAll(LK_URL, LK_KEY, "loke_products", "cod,list_price,uxb,description");
