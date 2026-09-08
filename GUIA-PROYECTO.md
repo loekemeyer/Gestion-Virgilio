@@ -12,7 +12,21 @@
 > única**; no se replica. Ante la duda entre parche rápido y fix de raíz → **fix
 > de raíz**.
 >
-> Última actualización: 2026-09-07 (lunes) · Versión app al documentar: **v14.27**
+> Última actualización: 2026-09-08 (martes) · Versión app al documentar: **v14.28**
+>
+> Nota **v14.28** (front) — **Uniformidad visual de la PPP: la barra de solapas es igual en todas
+> las pantallas.** Pedido de Luis Rial (08/09): *A Programar* mostraba **"…"** en vez de las cantidades
+> de las otras solapas y la botonera se veía de otro tamaño que en *Programación* (y distinta entre
+> las hojas/semanas). Causa: la barra vivía DENTRO de `.planim-body`, que *Programación* achica con un
+> **zoom automático** para entrar entera en una pantalla (`pppFitPantalla`, v13.81/83/95), mientras que
+> *A Programar* va al 100% y encima mandaba `null` en los contadores (`pppTabsHtml(..., null, null, null)`).
+> Arreglo: la barra pasó a un contenedor propio **`#pppTabsBar` fuera del `.planim-body`** → tamaño
+> constante en toda solapa y toda hoja; el zoom sólo achica el contenido de abajo. Y los contadores se
+> calculan aparte en **`pppTabCounts()`** (lectura en memoria, sin efectos, replica el filtrado de
+> `pppRenderProg`) y se pintan con **`pppPaintTabs()`**, así *A Programar* también muestra los números
+> reales. El badge es el **TOTAL** (ya no se achica con la búsqueda). Decisión de Luis: las hojas/semanas
+> **siguen con auto-ajuste por hoja** (no se tocó `pppFitPantalla`). Smoke: `ppp-en-salida`, `apr-*`,
+> `ppp-fit-acordeon`, `dead-handlers` en verde.
 >
 > Nota **v14.27** (backend) — **La cola de geocodificación llegó a cero** (376 de 489; Chef sin
 > faltantes) y el cron 75 volvió a `20 */6 * * *`. Las 49 que quedaron **tampoco eran 49 problemas**:

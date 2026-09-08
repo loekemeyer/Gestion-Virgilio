@@ -2209,6 +2209,10 @@ button.pk-anular small{ display:block; font-size:12px; font-weight:700; opacity:
 @media (max-width:560px){ }
 /* Vista PPP (Programación / Entregados) */
 .ppp-tabs{ display:flex; gap:8px; margin:6px 0 8px; flex-wrap:wrap; }
+/* v14.28: contenedor de las solapas, fuera del área con zoom → tamaño constante en todas
+   las solapas y en todas las hojas de Programación. Alineado con el contenido (max 1500, centrado). */
+.ppp-tabsbar{ background:#f8fafc; padding:8px 12px 4px; border-bottom:1px solid #e2e8f0; }
+.ppp-tabsbar .ppp-tabs{ max-width:1500px; margin:0 auto; }
 .ppp-search{ display:flex; align-items:center; gap:8px; margin:0 0 8px; }
 .ppp-search input{ flex:1; min-width:0; padding:7px 12px; font-size:14px; border:1.5px solid #cbd5e1; border-radius:9px; background:#fff; box-sizing:border-box; }
 .ppp-search input:focus{ outline:none; border-color:#2563eb; box-shadow:0 0 0 3px rgba(37,99,235,.12); }
@@ -4554,6 +4558,9 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
       <span class="recp-admin-title">🗓️ PPP</span>
       <button class="recp-admin-close" onclick="closePPP()">Cerrar</button>
     </div>
+    <!-- v14.28: la barra de solapas va ACÁ, fuera del .planim-body (que se achica con zoom),
+         así queda del MISMO tamaño en todas las solapas y hojas. La pinta pppPaintTabs(). -->
+    <div id="pppTabsBar" class="ppp-tabsbar"></div>
     <div class="planim-body">
       <div id="pppAlertBanner" class="ppp-alert-banner"><div id="pppAlertCards"></div></div>
       <!-- v13.25 (dueño): Importar/Exportar Excel ya no tienen sentido en Gestión (los pedidos entran por la
@@ -7347,7 +7354,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v14.27";
+const APP_VERSION = "v14.28";
 
 /* v4.50 — Baliza de errores: manda los errores de JS a Supabase (tabla
    errores_cliente, best-effort) para poder VER los crashes / pantallas en blanco
@@ -30844,6 +30851,43 @@ function pppTabsHtml(cProg, cPlan, cViaje, cEnt) {
     b("ocup",    "📦 Ocupación") +
   '</div>';
 }
+/* v14.28 — contadores de las solapas calculados aparte, para que A Programar también
+   muestre los NÚMEROS reales (antes mandaba "…" en Programación/En Salida/Entregados) y
+   para que la barra —que ahora vive fuera del zoom— los tenga en cualquier solapa. Es
+   LECTURA en memoria, sin efectos (no llama a _pppComputeErrors ni _pppEmitError). Replica
+   el mismo filtrado que pppRenderProg; el badge es el TOTAL (no se achica con la búsqueda). */
+function pppTabCounts() {
+  const c = { prog: (typeof _apr !== "undefined" && _apr && _apr.listo) ? _apr.pedidos.length : null, plan: null, viaje: null, ent: null };
+  try {
+    if (typeof _pppParsed === "undefined" || !_pppParsed || !_pppParsed.prog) return c;
+    const ed = pppLoadEdits();
+    const merge = function (p) {
+      if (PPP_READONLY) return p;
+      const e = ed[String(p.np)]; if (!e) return p;
+      const o = Object.assign({}, p);
+      if (e.tanda != null) o.tanda = e.tanda;
+      if (e.fecha_entrega != null) o.fecha_entrega = e.fecha_entrega;
+      if (e.programmed != null) o.programmed = e.programmed;
+      return o;
+    };
+    const all = []; const _vistos = {};
+    for (const p of (_pppParsed.prog || [])) { const k = String(p.np).trim(); if (!k || _vistos[k]) continue; _vistos[k] = 1; all.push(merge(p)); }
+    const ent = pppLoadEntregados();
+    const _sal = _pppEnSalida || new Map();
+    const _fuera = function (p) { return ent.has(String(p.np)) || _sal.has(_pppNpNorm(p.np)); };
+    const programados = all.filter(function (p) { return !_fuera(p) && p.programmed; });
+    c.plan = Math.max(0, programados.length - _pppPlanAgrupar(programados).venc.length);
+    const split = (_pppDelivered != null && _pppMetaEntSet != null && _pppEnSalida != null) ? _pppSplitDelivered() : null;
+    c.viaje = split ? split.enViaje.length : null;
+    c.ent = split ? split.entregados.length : (_pppDelivered ? _pppDelivered.length : all.filter(function (p) { return ent.has(String(p.np)); }).length);
+  } catch (_e) {}
+  return c;
+}
+function pppPaintTabs() {
+  const bar = document.getElementById("pppTabsBar"); if (!bar) return;
+  const c = pppTabCounts();
+  bar.innerHTML = pppTabsHtml(c.prog, c.plan, c.viaje, c.ent);
+}
 
 function pppRenderProg() {
   const box = document.getElementById("pppPreview"); if (!box) return;
@@ -30903,14 +30947,10 @@ function pppRenderProg() {
     const mt = function (p) { return _pppSearchStr(p).indexOf(q) >= 0; };
     programados = programados.filter(mt); aProgramar = aProgramar.filter(mt); entreg = entreg.filter(mt);
   }
-  // v9.72 — split de facturados en "En viaje" (sin confirmar entrega) y "Entregados" (confirmados)
-  const _pppSplit = (_pppDelivered != null && _pppMetaEntSet != null && _pppEnSalida != null) ? _pppSplitDelivered() : null;
-  // v13.33: la solapa Programación cuenta lo que se programa (fecha por delante). Los de fecha
-  // vencida sin cargar son un dato de gerencia y se miran desde Resumen.
-  const _nPlanTab = programados.length - _pppPlanAgrupar(programados).venc.length;
-  let html = pppTabsHtml((_apr && _apr.listo) ? _apr.pedidos.length : null, Math.max(0, _nPlanTab),
-    (_pppSplit ? _pppSplit.enViaje.length : null),
-    (_pppSplit ? _pppSplit.entregados.length : (_pppDelivered ? _pppDelivered.length : entreg.length)));
+  // v14.28: la barra de solapas se pinta aparte (fuera del zoom, con los contadores reales
+  // y estables — el TOTAL, no la búsqueda). Antes iba prependeada acá con pppTabsHtml.
+  pppPaintTabs();
+  let html = "";
   html += '<div class="ppp-search"><input id="pppSearchInp" type="search" autocomplete="off" placeholder="🔎 Buscar: NP, cliente, cód, tanda, localidad, zona, fecha…" value="' + escapeHtml(_pppSearch) + '" oninput="pppSetSearch(this.value)">' + (_pppSearch ? '<button class="ppp-search-clr" onclick="pppSetSearch(\'\')" title="Limpiar búsqueda">✕</button><span class="ppp-search-n">' + (programados.length + aProgramar.length + entreg.length) + ' coincidencia(s)</span>' : '') + '</div>';
   // v13.12 — el aviso amarillo "N pedidos salieron en una fecha distinta a la programada" (v8.61)
   // se sacó de acá (dueño: "sacá esas 2 alertas"). La marca sigue por pedido en Pedidos Entregados.
@@ -34192,7 +34232,10 @@ function aprRender() {
   const box = document.getElementById("pppPreview"); if (!box) return;
   if (!_apr.listo && !_apr.cargando && !_apr.err) { aprCargar(); }
 
-  let h = pppTabsHtml(_apr.listo ? _apr.pedidos.length : null, null, null, null);
+  // v14.28: la barra de solapas se pinta aparte (misma barra que Programación, fuera del zoom,
+  // con los números reales de todas las solapas — antes acá iban "…").
+  pppPaintTabs();
+  let h = "";
 
   // v13.58: sin selector Loekemeyer/Chef — se ven las dos empresas juntas.
   h += '<div class="apr-bar">' +
