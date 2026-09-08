@@ -65,6 +65,18 @@ agregarles a esas 4 vistas de Producción la misma rama que `gv_vista_facturacio
 (LK→`precios_venta`, Chef→`precios_venta_chef`). No se hizo porque Producción no se usa; queda
 como opción si algún día se la quiere dejar consistente en vez de revertir.
 
+### v14.48 (2026-09-08) — columna `gv_empresa` generada en `Entregas_Virgilio`
+
+**Qué se cambió.** `alter table public."Entregas_Virgilio" add column gv_empresa text generated
+always as (public.gv_empresa_de_np_texto(np)) stored;` — columna GENERADA STORED, read-only.
+
+**Qué de Producción se ve afectado.** Nada: es una columna nueva que ningún writer escribe y que
+Producción no selecciona. Se computa sola para las filas existentes y futuras. (El `alter` de una
+columna generada reescribe la tabla una vez — 9.8k filas, instantáneo.)
+
+**Rollback:** `alter table public."Entregas_Virgilio" drop column gv_empresa;` (sin pérdida de datos:
+la columna es derivada). `sql/entregas_virgilio_gv_empresa.sql`.
+
 ### v14.47 (2026-09-08) — `sync-precios-venta` RECONCILIA (borra lo que no está en el catálogo)
 
 **Qué se cambió.** La Edge Function ahora, después del upsert, borra de `precios_venta` y
