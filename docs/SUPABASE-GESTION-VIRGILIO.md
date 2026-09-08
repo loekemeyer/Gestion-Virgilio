@@ -4161,3 +4161,35 @@ compara neto contra neto. El neto es el dato confiable del parser (medido: neto 
 5/5 facturas web). LK 0011 cierra a $0 en todos los renglones; Vargas 98484 queda con la única
 diferencia REAL (809E, $3.005 vs $4.060 = todo el desvío de $11.662). Backend:
 `gv_conciliacion_comparar_prorrateo_v1441`. Front: nota en el modal. Sólo lectura, todo `gv_`.
+
+## 3.br ✅ 809E fantasma: dos "809E CH" en Stock y Compras — 2026-09-08
+
+**Síntoma (Luis):** en Stock y Compras aparecían DOS filas `809E` de CH: la buena
+(`809E CH`, "Corta Queso X 12", 489 cajas) y otra pelada `809E` (11 cajas, cap 388)
+que la app también rotula CH porque 809E es de Chef.
+
+**Causa:** residuo de la migración a stock-por-empresa. En `Movimientos_Stock` el código
+`809E` tiene saldo por empresa: `CH` = 489 (bueno), `LK` = 32 (Corta Pizza Familiar) y
+`Mixto` = 11 (viejo, sin empresa). El stock físico real ya se había repartido entero a
+CH/LK en el conteo del 01-08 (M13–M15 → 809E CH, J13/J14 → 809E LK). Pero el "reset previo
+conteo 01-08" (id 20653) fue **-68 en vez de -79** (el saldo Mixto/terminado previo era 79),
+así que quedaron **11 cajas fantasma** en `Mixto/terminado`, congeladas desde el 18/08. No
+crecían; sólo ensuciaban la pantalla y sumaban 11 cajas inexistentes al total de Chef.
+
+**Fix (dato, NO código):** un ajuste compensatorio, sólo agrega fila (nunca modifica):
+```sql
+insert into "Movimientos_Stock" (ts, cod_art, descripcion, deposito, delta, tipo, ref, legajo, empresa)
+values (now(), '809E', 'Corta  Queso X 12', 'terminado', -11, 'ajuste',
+        'anular fantasma 809E Mixto: reset conteo 01-08 fue -68 en vez de -79 (11 residuales); stock fisico real ya esta en 809E CH/LK',
+        '0', 'Mixto');   -- id 52644879
+```
+`Mixto/809E` quedó en **0**; la fila pelada `809E` sale en 0 y se oculta sola (base en 0 con
+familia con stock en CH/LK). Se forzó `REFRESH MATERIALIZED VIEW CONCURRENTLY vista_stock_procesada`
+y `refresh_stocks_carga_rapida()` (igual autorefrescan solos: crons 55 cada 2', 57 cada 5').
+
+**Barrido de otros duales:** sólo 809E tenía este fantasma limpio. `438E` está limpio (Mixto = 0).
+`437E` (Mixto 2592, CH 16, LK 302) y `439E` (Mixto 499, CH 0, LK 46) tienen saldo Mixto **grande y
+sin marca de split** → NO es fantasma, es stock que todavía no se separó por empresa. **No se
+tocaron**: borrarlos sería matar cajas reales. Quedan para revisar con el dueño si/ cuándo splittearlos.
+
+**Rollback:** `delete from "Movimientos_Stock" where id = 52644879;` (vuelve el saldo Mixto a 11).
