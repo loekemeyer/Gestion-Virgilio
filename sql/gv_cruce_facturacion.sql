@@ -43,6 +43,9 @@ as $$
 $$;
 grant execute on function public.gv_empresa_de_np_texto(text) to anon, authenticated;
 
+-- v14.44 (2026-09-08): valuación ENRUTADA por empresa (LK → precios_venta, Chef →
+-- precios_venta_chef) + artículo "L" (v13.71/73). Incluye la migración del sufijo L
+-- (es_articulo_l / cod_precio) que antes vivía sólo como nota al pie.
 create or replace view public.gv_vista_facturacion_neto_items
 with (security_invoker = true) as
 with ent as (
@@ -59,6 +62,10 @@ with ent as (
 ), base as (
   select ent.*,
          public.gv_empresa_de_np_texto(ent.np) as empresa,
+         (public.gv_empresa_de_np_texto(ent.np) = 'chef' and ent.cod_canon ~ '^[0-9]+E?L$') as es_articulo_l,
+         case when public.gv_empresa_de_np_texto(ent.np) = 'chef' and ent.cod_canon ~ '^[0-9]+E?L$'
+              then regexp_replace(ent.cod_canon, 'L$', '')
+              else ent.cod_canon end as cod_precio,
          (select cc2.super_key
             from public.cobranzas_cliente_cadena cc2
             join public.cobranzas_super_cadena sc on sc.super_key = cc2.super_key and not sc.usa_lista_general
@@ -69,26 +76,29 @@ with ent as (
 )
 select b.np,
        b.cc as cod_cliente,
-       coalesce(pv.cod, b.cod_orig) as cod,
+       case when b.es_articulo_l then b.cod_orig else coalesce(pv.cod, pc.cod, b.cod_orig) end as cod,
        b.cajas_ped, b.cajas_ent, b.cajas_falto,
-       coalesce(ps.uxb, pv.uxb) as uxb,
-       coalesce(ps.precio_unit, pv.precio_unit) as precio_lista,
+       coalesce(ps.uxb, pv.uxb, pc.uxb) as uxb,
+       coalesce(ps.precio_unit, pv.precio_unit, pc.precio_unit) as precio_lista,
        case when b.super_key is not null then 0 else coalesce(cd.dto_vol, 0) end as dto_vol,
-       case when coalesce(ps.precio_unit, pv.precio_unit) is not null and coalesce(ps.precio_unit, pv.precio_unit) > 0
-            then round(b.cajas_ent * coalesce(ps.uxb, pv.uxb, 1) * coalesce(ps.precio_unit, pv.precio_unit)
+       case when coalesce(ps.precio_unit, pv.precio_unit, pc.precio_unit) is not null and coalesce(ps.precio_unit, pv.precio_unit, pc.precio_unit) > 0
+            then round(b.cajas_ent * coalesce(ps.uxb, pv.uxb, pc.uxb, 1) * coalesce(ps.precio_unit, pv.precio_unit, pc.precio_unit)
                        * (1 - case when b.super_key is not null then 0 else coalesce(cd.dto_vol, 0) end), 2)
             else null end as importe_ent,
-       case when coalesce(ps.precio_unit, pv.precio_unit) is not null and coalesce(ps.precio_unit, pv.precio_unit) > 0
-            then round(b.cajas_ped * coalesce(ps.uxb, pv.uxb, 1) * coalesce(ps.precio_unit, pv.precio_unit)
+       case when coalesce(ps.precio_unit, pv.precio_unit, pc.precio_unit) is not null and coalesce(ps.precio_unit, pv.precio_unit, pc.precio_unit) > 0
+            then round(b.cajas_ped * coalesce(ps.uxb, pv.uxb, pc.uxb, 1) * coalesce(ps.precio_unit, pv.precio_unit, pc.precio_unit)
                        * (1 - case when b.super_key is not null then 0 else coalesce(cd.dto_vol, 0) end), 2)
             else null end as importe_ped,
-       (coalesce(ps.precio_unit, pv.precio_unit) is null or coalesce(ps.precio_unit, pv.precio_unit) <= 0) as sin_precio,
+       (coalesce(ps.precio_unit, pv.precio_unit, pc.precio_unit) is null or coalesce(ps.precio_unit, pv.precio_unit, pc.precio_unit) <= 0) as sin_precio,
        b.cod_canon,
        case when b.super_key is not null then 1.0 else 0.98 end as factor_web,
        (b.super_key is not null) as es_super
   from base b
   left join public.clientes_dto cd on cd.cod_cliente = b.cc and cd.empresa = b.empresa
-  left join public.precios_venta pv on canon_cod(pv.cod) = b.cod_canon
+  left join public.precios_venta pv
+         on (b.empresa <> 'chef' or b.es_articulo_l) and canon_cod(pv.cod) = b.cod_precio
+  left join public.precios_venta_chef pc
+         on (b.empresa = 'chef' and not b.es_articulo_l) and canon_cod(pc.cod) = b.cod_precio
   left join public.cobranzas_precios_super ps on b.super_key is not null and ps.super_key = b.super_key and ps.nc = cob_norm_cod(b.cod_orig);
 revoke all on public.gv_vista_facturacion_neto_items from anon, authenticated;
 
@@ -227,4 +237,27 @@ grant execute on function public.gv_cruce_facturacion_totales(date, date, text) 
 -- Medido: sólo cambiaron las 3 NP con L (44483 diff 1.873.710 → 365.760; 44600 → −163.567;
 -- 44601 → −770.748); conteo por estado idéntico (ok 460 / diff 157 / ambiguo 124 / sin_factura
 -- 80 / sin_neto 366). Rollback: volver a la definición de arriba (join por cod_canon).
+-- NOTA v14.44: esta migración quedó FUNDIDA en el cuerpo de la vista de arriba.
+-- =============================================================================
+
+-- =============================================================================
+-- v14.44 (2026-09-08) — VALUACIÓN ENRUTADA POR EMPRESA. Raíz del defasaje 809E: la
+-- Edge Function sync-precios-venta mergeaba LK y Chef en precios_venta con "si el
+-- código coincide, Chef gana", así que una NP de LK con un código compartido
+-- (809E, 437E, 438E) tomaba el precio de Chef (809E → 3005 en vez de 4060 de LK;
+-- también 437E 5180→4655 y 438E 7320→6615). Fix en dos partes:
+--   1) sync-precios-venta v14.44: precios_venta = SÓLO LK, precios_venta_chef = SÓLO
+--      Chef (antes se cargaba a mano). Cada lista es de su empresa.
+--   2) gv_vista_facturacion_neto_items (cuerpo de arriba) enruta el join:
+--        NP de LK  → precios_venta (pv)
+--        NP de Chef → precios_venta_chef (pc)
+--        artículo "L" en NP de Chef (505L) → pv por el código pelado (regla v13.71/73).
+-- Medido (08/09): 809E LK 4060 (29 NP) / Chef 3005 (42 NP); 437E 4655/5180; 438E
+-- 6615/7320; 438EL → 6615 (LK pelado). NP 98484 (Vargas) neto 1.530.177,68 = factura
+-- 1.530.177,68 → estado 'ok' (era 'diff' por 809E). Chef sin cambios (sus precios
+-- compartidos ya eran los de Chef). gv_ppp_np_valor y cobranzas_precios ya enrutaban
+-- por empresa → quedan correctos automáticamente al ser precios_venta sólo LK.
+-- Backup: public.gv_bkp_precios_venta_20260908 / gv_bkp_precios_venta_chef_20260908.
+-- Rollback: volver el join a `left join precios_venta pv on canon_cod(pv.cod)=b.cod_precio`
+-- y re-mergear Chef en precios_venta en la Edge Function.
 -- =============================================================================

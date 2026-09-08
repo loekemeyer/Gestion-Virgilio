@@ -4161,3 +4161,45 @@ compara neto contra neto. El neto es el dato confiable del parser (medido: neto 
 5/5 facturas web). LK 0011 cierra a $0 en todos los renglones; Vargas 98484 queda con la única
 diferencia REAL (809E, $3.005 vs $4.060 = todo el desvío de $11.662). Backend:
 `gv_conciliacion_comparar_prorrateo_v1441`. Front: nota en el modal. Sólo lectura, todo `gv_`.
+
+## §3.bi — v14.44 (2026-09-08): dos listas de precios separadas por empresa (raíz del defasaje 809E)
+
+**El bug.** El diff de Vargas (98484) no era de descuentos: era de **precio de lista**. El 809E vale
+**$4.060 en LK** y **$3.005 en Chef**, y una NP de LK estaba tomando el de Chef. Raíz: la Edge Function
+`sync-precios-venta` (cron 66, 09:00) traía `products` de LK y de Chef y los **mergeaba en una sola
+tabla `precios_venta` con "si el código coincide, Chef gana"**. Los 3 códigos compartidos quedaban con
+el precio de Chef para todos: 809E 3005 (LK real 4060), 437E 5180 (LK 4655), 438E 7320 (LK 6615).
+`precios_venta_chef` existía pero se cargaba **a mano** (última vez 17/08) y sólo la leían
+`gv_ppp_np_valor` y `cobranzas_precios`, que ya enrutaban por empresa; el resto de la valuación leía la
+lista mezclada.
+
+**El fix (dos partes).**
+1. **`sync-precios-venta` v14.44** (Edge Function, redeploy): `precios_venta` = **sólo LK**,
+   `precios_venta_chef` = **sólo Chef** (ahora automático, ya no a mano). Cada lista es de su empresa.
+2. **`gv_vista_facturacion_neto_items`** (migración `gv_vista_facturacion_neto_items_ruta_empresa_v1444`):
+   el join se enruta por empresa, igual que `gv_ppp_np_valor`:
+   - NP de LK → `precios_venta` (`pv`)
+   - NP de Chef → `precios_venta_chef` (`pc`)
+   - artículo **"L"** en NP de Chef (505L, 438EL) → `pv` por el código pelado (regla v13.71/73).
+   Se fundió también la migración del sufijo L (antes vivía como nota al pie).
+
+`gv_ppp_np_valor` y `cobranzas_precios` (base = `precios_venta` como 'lk' ∪ `precios_venta_chef` como
+'ch') quedaron correctos **solos** al ser `precios_venta` sólo LK. `gv_fac_ajustes_isis` no cambia:
+usa `precios_venta EXCEPT precios_venta_chef`, que da lo mismo con la lista mezclada (LK∪Chef \ Chef =
+LK\Chef) que con LK sola (LK \ Chef).
+
+**Medido (08/09).** Enrutamiento en las líneas reales: 809E → LK 4060 (29 NP) / Chef 3005 (42 NP);
+437E → 4655/5180; 438E → 6615/7320; 438EL → 6615 (LK pelado). **NP 98484 (Vargas): neto calculado
+1.530.177,68 = factura ISIS 1.530.177,68, diff $0, estado `ok`** (era `diff`). Chef **sin cambios**
+(sus precios compartidos ya eran los de Chef). Corte por estado (30 días): LK ok 257 / diff 41 /
+sin_factura 49; Chef ok 31 / diff 16 / sin_factura 11.
+
+**Producción.** Sus vistas sin `gv_` (`vista_facturacion_neto_items`, `vista_facturable_anticipado`,
+`vista_plata_perdida`) siguen leyendo `precios_venta` sin enrutar → valúan Chef contra la lista de LK.
+Es aceptado: Producción ya no se usa (todo migró a Gestión). No se tocaron esas vistas (regla de lo
+compartido). Si algún día hiciera falta, se les agrega la misma rama por empresa.
+
+**Backup / rollback.** Snapshot: `public.gv_bkp_precios_venta_20260908` (337 filas) y
+`gv_bkp_precios_venta_chef_20260908` (101). Rollback: volver el join de la vista a
+`left join precios_venta pv on canon_cod(pv.cod)=b.cod_precio` y re-mergear Chef en `precios_venta` en
+la Edge Function. Archivos: `supabase/functions/sync-precios-venta/index.ts`, `sql/gv_cruce_facturacion.sql`.

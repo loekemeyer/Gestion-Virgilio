@@ -1,6 +1,8 @@
-// sync-precios-venta — refresca precios_venta y cob_uxb_lk desde:
-//   1. LK products + loke_products (WEB_SERVICE_KEY)
-//   2. Chef products (CHEF_KEY — publishable key, lectura pública)
+// sync-precios-venta — refresca precios_venta (LK), precios_venta_chef (Chef) y
+// cob_uxb_lk desde:
+//   1. LK products + loke_products (WEB_SERVICE_KEY) → precios_venta + cob_uxb_lk
+//   2. Chef products (CHEF_KEY — publishable key, lectura pública) → precios_venta_chef
+// v14.44: listas SEPARADAS por empresa (antes merge con "Chef gana", ensuciaba LK).
 // Idempotente. Lo dispara pg_cron (job sync-precios-venta).
 // Secrets (ya existentes, los usa arca-wsfe y sync-clientes-dto):
 //   WEB_SERVICE_KEY    = service_role de LK
@@ -83,32 +85,33 @@ Deno.serve(async (_req: Request): Promise<Response> => {
       }
     }
 
-    // ── 3) Merge → precios_venta ──
-    // LK y Chef tienen rangos de código distintos; si coinciden, Chef gana
-    // (es el catálogo más reciente para ese código).
-    const preciosMap = new Map<string, { precio_unit: number; uxb: number | null; descripcion: string }>();
-    for (const p of lkProducts) {
-      const cod = (p.cod || "").trim();
-      if (!cod || !p.list_price || p.list_price <= 0) continue;
-      preciosMap.set(cod, {
-        precio_unit: p.list_price,
-        uxb: p.uxb ?? null,
-        descripcion: (p.description || "").slice(0, 200),
-      });
-    }
-    for (const p of chefProducts) {
-      const cod = (p.cod || "").trim();
-      if (!cod || !p.list_price || p.list_price <= 0) continue;
-      preciosMap.set(cod, {
-        precio_unit: p.list_price,
-        uxb: p.uxb ?? null,
-        descripcion: (p.description || "").slice(0, 200),
-      });
-    }
-    const preciosRows = Array.from(preciosMap, ([cod, v]) => ({
-      cod, precio_unit: v.precio_unit, uxb: v.uxb, descripcion: v.descripcion, actualizado: nowIso,
-    }));
+    // ── 3) precios_venta = SÓLO LK · precios_venta_chef = SÓLO Chef ──
+    // v14.44 (2026-09-08): LK y Chef son DOS listas separadas. Antes se mergeaban
+    // en precios_venta con "si coinciden, Chef gana" → una NP de LK con un código
+    // compartido (809E, 437E, 438E) tomaba el precio de Chef (809E 3005 en vez de
+    // 4060). Ahora cada lista es de su empresa y la valuación se enruta por empresa
+    // (gv_vista_facturacion_neto_items, gv_ppp_np_valor, cobranzas_precios).
+    const mapProductos = (prods: Product[]) => {
+      const m = new Map<string, { precio_unit: number; uxb: number | null; descripcion: string }>();
+      for (const p of prods) {
+        const cod = (p.cod || "").trim();
+        if (!cod || !p.list_price || p.list_price <= 0) continue;
+        m.set(cod, {
+          precio_unit: p.list_price,
+          uxb: p.uxb ?? null,
+          descripcion: (p.description || "").slice(0, 200),
+        });
+      }
+      return Array.from(m, ([cod, v]) => ({
+        cod, precio_unit: v.precio_unit, uxb: v.uxb, descripcion: v.descripcion, actualizado: nowIso,
+      }));
+    };
+    const preciosRows = mapProductos(lkProducts);
     const nPrecios = await upsert("precios_venta", "cod", preciosRows);
+
+    // Chef → precios_venta_chef (antes se cargaba a mano, ver sql/cobranzas_chef_sync.sql).
+    const preciosChefRows = mapProductos(chefProducts);
+    const nPreciosChef = preciosChefRows.length ? await upsert("precios_venta_chef", "cod", preciosChefRows) : 0;
 
     // ── 4) cob_uxb_lk — uxb de LK products ∪ loke_products ──
     const lokeProducts = await fetchAll(LK_URL, LK_KEY, "loke_products", "cod,list_price,uxb,description");
@@ -124,6 +127,7 @@ Deno.serve(async (_req: Request): Promise<Response> => {
     return json({
       ok: true,
       precios_venta: nPrecios,
+      precios_venta_chef: nPreciosChef,
       precios_lk: lkProducts.filter(p => (p.cod || "").trim() && p.list_price && p.list_price > 0).length,
       precios_chef: chefProducts.filter(p => (p.cod || "").trim() && p.list_price && p.list_price > 0).length,
       chef_error: chefError || undefined,
