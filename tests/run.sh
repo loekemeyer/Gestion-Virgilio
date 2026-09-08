@@ -335,3 +335,6 @@ PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node te
 
 echo "== ppp-prolijo (v14.10: sin columna muda en camiones sin orden de carga; lista de tandas larga resumida) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/ppp-prolijo.cjs
+
+echo "== apr-isis-sin-tanda (v14.35: las NP de ISIS sin tanda entran a A Programar y se programan con su número) =="
+PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/apr-isis-sin-tanda.cjs

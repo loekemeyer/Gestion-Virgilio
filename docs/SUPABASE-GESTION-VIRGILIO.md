@@ -3863,3 +3863,72 @@ Se sacó el botón 📄 suelto de la fila; ahora hay UN botón por fila ("🔍 C
 modal grande (≈1400px) con dos paneles lado a lado: izquierda el listado a facturar de Gestión,
 derecha el PDF de la factura embebido (iframe, 76vh). Dentro sigue el "⤢ Ver la factura en grande"
 para el visor a pantalla casi completa. Nada abre pestaña nueva. Sólo front.
+
+---
+
+## §3.bf — v14.35 (2026-09-08): las NP de ISIS **sin tanda** entran a "A Programar"
+
+**El pedido del dueño (08/09):** *"necesito que aparezcan en A Programar así lo programo"*, con la
+lista de NP 98686-98694 (LK), 44618 (Chef) y 44609-44617 (Cencosud).
+
+### Qué estaba pasando
+
+Esas NP estaban en `PPP_Programacion_Diaria` con **fecha de entrega puesta y `tanda = ''`**. Tierra
+de nadie:
+
+- **En "A Programar" no salían** porque esa solapa lista **pedidos de la página** (`order_id`, vista
+  `v_pedidos_web_np` de LK y RPC `gv_pedidos_web_np_chef_admin`) y `gv_pedidos_web_excluidos` las saca
+  con dos motivos a la vez: `anterior_al_cambio` (`fecha_recep = 02/09` < `gestion_desde = 03/09`) y
+  `en_produccion` (ISIS ya les dio NP). Los `orders` de LK eran 1330/1331/1332/1335/1337/1338/1339 y el
+  de Chef el 214. Las de Cencosud **ni siquiera son pedidos web**: entraron por el Excel de Krikos, no
+  hay `order_id` que mostrar.
+- **En la solapa Programación sí estaban** (bajo su día, en el grupo "sin tanda"), pero nadie las podía
+  pickear y el cupo del día no las contaba.
+
+### Por qué NO se arregló desexcluyéndolas
+
+Si entraran por la vía web, `gv_ppp_web_tanda_agregar` les asignaría una **NP web nueva** (`LK 00xx`) y
+al facturar el Excel de ISIS las cargaría **otra vez**: dobles. Estas NP ya existen en ISIS; hay que
+programarlas **con su número**.
+
+### Lo que se hizo
+
+- **`gv_ppp_isis_sin_tanda`** (vista, `security_invoker`): NP de ISIS **viva** (no facturada, no
+  entregada, no cancelada) que está en `gv_ppp_programacion_diaria` sin tanda, con cliente, zona, m³ y
+  las líneas/cajas de `PPP_Base_Pedidos`. `es_super` usa la MISMA expresión que `gv_ppp_super_mezclado`
+  (`zona ~* 'super|coto|carrefour|chango|krikos'`).
+- **`gv_ppp_isis_programar(p_nps, p_fecha, p_por)`** (SECURITY DEFINER): arma UNA tanda con esas NP y la
+  escribe en **`GV_PPP_Prog_Override`** (np, tanda, fecha_entrega, nota). **No toca
+  `PPP_Programacion_Diaria`**, que es compartida con Producción. Es el mismo mecanismo de
+  `gv_ppp_tanda_mover` (§3.bb, v13.87) y del override manual de 44619 → E07A (§3.ap, v13.50). El código
+  sale de `gv_ppp_web_tanda_codigo_nuevo()`, que ya cuenta el override, así que no repite.
+  - Gate de supervisor (`gv_es_supervisor_o_servicio`).
+  - Corta si alguna NP dejó de estar sin tanda (otro la programó mientras tanto) y dice cuál.
+  - **Regla del dueño v14.23**: mezclar un súper con clientes en la misma tanda es **error**, no aviso.
+    Como el código es de camión nuevo, un súper nunca cae en el camión de un cliente.
+  - Avisos que **no** bloquean (los muestra el front): cupo del día pasado, día no hábil.
+- **Front (`A Programar`)**: `aprTraerIsis()` las trae y se suman a `_apr.pedidos` disfrazadas de pedido
+  (`order_id = "np" + np`, `_isis: true`) para reusar tal cual el tildado, el paso 2, los avisos del día
+  y la botonera. La tarjeta muestra la **NP real** (`aprPedLabel`) y un chip **"🧾 de ISIS · la programás
+  vos"** (el armado automático no las toca). **No se pueden juntar** con un pedido de la página en la
+  misma tanda: son dos escrituras distintas (`aprPasoDia` y `aprGenerarTanda` lo bloquean).
+
+### Medido (08/09)
+
+`select * from gv_ppp_isis_sin_tanda` → **10 filas**: 98686-98694 (LK, cliente 1792 Dapelo ×7, 1618
+Oriental Party, 1964 Veronesi) y 44618 (Chef, 1544 Perez), todas con entrega 14/09 y su zona. Las 9 de
+Cencosud (44609-44617) **ya no están**: el espejo del Excel les trajo tanda (D72A/D72B/D72C, 10 y 11/09),
+así que la vista las deja fuera sola — que es lo que tiene que pasar.
+
+Test: `tests/apr-isis-sin-tanda.cjs` (14 chequeos, en `tests/run.sh`). SQL:
+`sql/gv_ppp_isis_sin_tanda_v1435.sql`.
+
+**ROLLBACK:**
+```sql
+drop function public.gv_ppp_isis_programar(text[], date, text);
+drop view public.gv_ppp_isis_sin_tanda;
+-- y para deshacer lo ya programado por acá:
+delete from public."GV_PPP_Prog_Override" where nota like 'v14.35%';
+```
+(el front tolera que la vista no exista: `aprTraerIsis` devuelve `[]` y la solapa sigue mostrando los
+pedidos de la página).
