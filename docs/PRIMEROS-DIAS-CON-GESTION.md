@@ -121,7 +121,7 @@ web llegue al depósito. Cupo diario = pickers típicos × 3 m³ (hoy 2 → 6), 
   solo si tienen día: LK 1349 Bazar Mónica → lun 14 **D68G** (camión D68, zona 5; era E04A vie 11), LK 1350 Cuyana → mar 15 E03A, LK 1341
   Orfali **D69D** y CH 0217 Gifel **D69E** → mar 15 (camión D69, zona 6; eran E05A/E06A lun 14). Renombres y corrimiento: v13.60. Queda a mano sólo **LK 1340 Garbarino (Retira, 0,03)**.
   Chef 215 Dorinka quedó excluido porque ya es el 44619 de ISIS.
-- [ ] Chef: password de `ch_ppp_reader` + correr `paginach/sql/gv_estado_mis_pedidos_chef.sql` (para que el cliente vea el estado).
+- [x] Chef: password de `ch_ppp_reader` + correr `paginach/sql/gv_estado_mis_pedidos_chef.sql` (para que el cliente vea el estado). **Hecho el 2026-09-08.** El dueño puso la contraseña en Virgilio y corrió el archivo en Chef, en dos partes (primero el FDW + la RPC, después `edit_order_fast`). Verificado: del lado de Chef `select * from virgilio.gv_pedido_web_estado_pagina where empresa='chef'` trae filas, y del lado de Virgilio la vista da **3 pedidos de Chef en `programado`** (y 20 de LK). Ninguno facturado todavía, así que el candado "facturado → no editable" no bloquea nada hoy; se activa solo cuando se facture.
 - [ ] Decisiones abiertas: orden de carga por cod cliente (1/2/3); zonas manuales ¿se suman solas a un camión
   existente del día?
 
