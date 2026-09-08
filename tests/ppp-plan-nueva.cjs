@@ -124,7 +124,10 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
     html = document.getElementById("pppPreview").innerHTML;
     out.hoja1Vuelve = /Próximos 6 días hábiles/.test(html) && /Más adelante:/.test(html) && kpi("Pedidos") === "11";
     // v13.33: los atrasados se miran desde Resumen
-    out.tabPlanN = />🗓️ Programación \(11\)</.test(html);
+    // v14.29: la barra de solapas se pinta APARTE, en #pppTabsBar (fuera de #pppPreview y del zoom),
+    // así que el contador de la solapa se lee de ahí, no del preview.
+    pppPaintTabs();
+    out.tabPlanN = />🗓️ Programación \(11\)</.test((document.getElementById("pppTabsBar") || {}).innerHTML || "");
     _pppTab = "resumen"; pppRenderProg();
     html = document.getElementById("pppPreview").innerHTML;
     out.resumenVenc = /pedido\(s\) con fecha de entrega vencida/.test(html);
