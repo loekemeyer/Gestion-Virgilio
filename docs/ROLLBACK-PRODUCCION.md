@@ -65,6 +65,32 @@ agregarles a esas 4 vistas de Producción la misma rama que `gv_vista_facturacio
 (LK→`precios_venta`, Chef→`precios_venta_chef`). No se hizo porque Producción no se usa; queda
 como opción si algún día se la quiere dejar consistente en vez de revertir.
 
+### v14.51 (2026-09-08) — columna `gv_app` en `Registros_Produccion_Virgilio`
+
+**Qué se cambió.** `alter table public."Registros_Produccion_Virgilio" add column gv_app text;` —
+nullable, sin default, sin backfill. Gestión manda `gv_app = 'gestion@' + APP_VERSION` en sus dos
+caminos de escritura (`trySendOneReport` y `bulkSendDayReplay`); Producción **no la manda**, así que
+**NULL = Producción**. Sirve para saber desde qué app trabajó cada operario, que hasta ahora no se
+podía: la tabla es la misma para las dos y no guardaba ni URL, ni user_agent, ni versión.
+
+**Qué de Producción se ve afectado.** Nada. Verificado antes de correrlo, no después:
+- Producción **no hace `select *`** sobre la tabla — sus referencias en `index.html`,
+  `productividad.html`, `recepcion.js` y `sw.js` nombran columnas. El único `SELECT *` del repo está
+  **comentado**, en un SQL de rollback del 2026-08-13.
+- Los **grants son a nivel tabla** (`anon`/`authenticated` con INSERT, sin ACL por columna) → la
+  columna nueva queda cubierta sola, no hizo falta ningún grant.
+- La policy de INSERT es `insert_all` con **`with_check = true`** — no enumera columnas, así que no
+  rechaza el payload nuevo.
+- Sin trigger (habría corrido también para Producción) y sin tocar ninguna fila existente.
+
+Si Producción volviera a usarse, sigue insertando igual: sus filas quedan con `gv_app` NULL, que es
+justamente lo que las identifica.
+
+**Rollback:** `alter table public."Registros_Produccion_Virgilio" drop column gv_app;` + sacar
+`gv_app` de los dos payloads de `index.html`. Sin pérdida de datos operativos (la columna es sólo
+procedencia). `sql/gv_app_sello_eventos_v1451.sql`, §3.bl de `SUPABASE-GESTION-VIRGILIO.md`,
+regresión `tests/gv-app-tag.cjs`.
+
 ### v14.48 (2026-09-08) — columna `gv_empresa` generada en `Entregas_Virgilio`
 
 **Qué se cambió.** `alter table public."Entregas_Virgilio" add column gv_empresa text generated
