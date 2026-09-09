@@ -144,6 +144,21 @@ corrida del cron volvería a reconciliar salvo que también se revierta la funci
 
 ---
 
+## 1.z — OC_Maximos: sacar los E importados ('Racks') del flujo de OC (v14.60, 2026-09-09)
+
+**Regla del dueño (09/09):** *"Todos los de E son importados. No se piden por OC salvo por los de
+Danica."* En `OC_Maximos`, **`Racks` NO es un proveedor** — es donde se estiba lo importado. Los
+**78 códigos E** con `proveedor='Racks'` entraban al flujo de OC (`tiene_prov_real` ⇒ `maximo`/
+`a_pedir` ⇒ generador `ocs-auto-*` + `vista_generador_oc`). Se les sacó el proveedor. **Garcia (11)
+y Log/ Fabr (9) son proveedores REALES y quedan** (Danica ≈ Garcia, según el dueño).
+
+- **Objeto compartido tocado:** `public."OC_Maximos"` (config, la lee Producción también).
+- **Cambio:** `update public."OC_Maximos" set proveedor = null where btrim(coalesce(proveedor,''))='Racks';` (78 filas, todas `cod ~* 'E'`, 0 no-E, sin `proveedor2='Racks'`). No se tocó `activo` (no los marca discontinuos) ni Garcia/Log-Fabr.
+- **Impacto medido:** después, esas 78 → `tiene_prov_real=false` ⇒ fuera del generador (`where activo and total>0 and tiene_prov_real`) y del INSERT (exige `proveedor`). El generador real (`vista_generador_oc.total`) ya daba 0 para ellas. Nota: `vista_stock_procesada.a_pedir` sigue mostrando un número por proyección en la fila BASE huérfana (ej. 809E=283), pero el abast tab ya saltea `es_importado` y no genera OC.
+- **Rollback exacto:** `sql/backups/oc_maximos_racks_a_null_20260909.sql` (re-set `proveedor='Racks'` en los 78 códigos) + `refresh materialized view public.vista_stock_procesada;`.
+
+---
+
 ## 2. Backups vigentes (para restore puntual)
 
 | backup | qué guarda | fecha |
