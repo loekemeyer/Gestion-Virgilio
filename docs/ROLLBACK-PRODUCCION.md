@@ -144,10 +144,37 @@ corrida del cron volvería a reconciliar salvo que también se revierta la funci
 
 ---
 
+### v14.59 (2026-09-09) — descontar la OC al recibir (`Ordenes_Compra`)
+
+**Qué se cambió.** Nueva función `public.gv_oc_aplicar_recepcion(text, jsonb)` (SECURITY DEFINER,
+grant a anon/authenticated) que el front llama tras cada recepción exitosa y hace `UPDATE` de
+`public."Ordenes_Compra"` (`cantidad_recibida` +=, `estado`='recibida' al completar, `fecha_entrega_real`).
+Antes esa columna no se tocaba nunca (0 de 729 OCs con `cantidad_recibida > 0`).
+**Impacto en Producción:** `Ordenes_Compra` la puebla `generar_ocs_automaticas` (objeto de Gestión);
+Producción ya no se usa. El cambio sólo hace que las OCs reflejen lo recibido (que es lo correcto).
+No hay trigger: la escritura sale del front vía la RPC, no corre sola para nadie más.
+**Backup previo:** `public."GV_Backup_Ordenes_Compra_20260909"` (729 filas, snapshot completo).
+**Rollback:**
+```sql
+-- 1) dejar de descontar
+drop function if exists public.gv_oc_aplicar_recepcion(text, jsonb);
+-- 2) restaurar cantidad_recibida/estado/fecha_entrega_real desde el snapshot
+update public."Ordenes_Compra" o
+   set cantidad_recibida   = b.cantidad_recibida,
+       estado              = b.estado,
+       fecha_entrega_real  = b.fecha_entrega_real
+  from public."GV_Backup_Ordenes_Compra_20260909" b
+ where b.id = o.id;
+```
+(Y sacar la llamada `supabase.rpc("gv_oc_aplicar_recepcion", …)` de `recepcion.js`.)
+
+---
+
 ## 2. Backups vigentes (para restore puntual)
 
 | backup | qué guarda | fecha |
 |---|---|---|
+| `public.GV_Backup_Ordenes_Compra_20260909` | `Ordenes_Compra` completa antes de descontar al recibir (729 filas) | 2026-09-09 |
 | `public.gv_bkp_precios_venta_20260908` | `precios_venta` antes del split (337 filas, lista mezclada) | 2026-09-08 |
 | `public.gv_bkp_precios_venta_chef_20260908` | `precios_venta_chef` antes del re-sync (101 filas) | 2026-09-08 |
 | `public.gv_bkp_precios_venta_20260908_pre_reconcile` | `precios_venta` antes de reconciliar (337, con las 115 viejas) | 2026-09-08 |

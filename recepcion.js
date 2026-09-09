@@ -1635,6 +1635,16 @@ async function opEnviar() {
 
   // Suma al acumulador del día para que Producción cierre RT con esta cantidad.
   recpAddCajas(totalCajas);
+  // v14.59 — descuenta la OC vigente del proveedor al recibir (backend gv_oc_aplicar_recepcion,
+  // en cascada, sin negativos). Así las cantidades a recibir BAJAN y la OC deja de figurar/
+  // imprimirse cuando se completa — antes cantidad_recibida no se tocaba nunca. Best-effort:
+  // si falla, no bloquea la recepción; la OC simplemente no se descuenta esta vez.
+  try {
+    supabase.rpc("gv_oc_aplicar_recepcion", {
+      nombre_ent: opState.tallNombre,
+      items: items.map(function (i) { return { cod: i.cod, cajas: i.cajas }; })
+    }).then(function () {}, function () {});
+  } catch (_e) {}
   // v11.98: cierra el toggle RT automáticamente (el operario ya no tiene que volver
   // a la botonera para terminar el inicio→fin de Recepción Mercadería).
   try { if (typeof window.autoCloseRT === "function") window.autoCloseRT(RECP.legajo); } catch (_e) {}

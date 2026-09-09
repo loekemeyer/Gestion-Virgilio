@@ -4405,3 +4405,33 @@ drop table if exists public.wa_prog_snapshot;
 
 _(Sin bump de APP_VERSION/SW_VERSION: no cambia la app ni el pipeline de Virgilio; son objetos
 `wa_*` de otro proyecto que sólo leen esta base. Anotado a pedido del dueño para dejarlo fichado.)_
+
+## §3.bl — v14.59 (2026-09-09): descontar la OC al recibir mercadería
+
+**Problema.** Al recibir, el módulo escribía en `Entregas Tallerista Virgilio` / `Entregas Prov AT` /
+`Movimientos_Stock` / `Control_Modo_OP`, pero **nunca** tocaba `Ordenes_Compra.cantidad_recibida`.
+`oc_vigentes_por_proveedor` calcula `pend = cantidad - cantidad_recibida`, así que las cantidades a
+recibir no bajaban nunca (medido: **0 de 729 OCs con `cantidad_recibida > 0`, 0 en estado `recibida`**)
+y la operadora seguía imprimiendo las OCs.
+
+**Fix.** Función `gv_oc_aplicar_recepcion(nombre_ent text, items jsonb)` (SECURITY DEFINER, grant a
+anon/authenticated), que el front (`recepcion.js`) llama best-effort tras cada recepción exitosa.
+Descuenta en **cascada** sobre las filas de la fecha más nueva del proveedor+código (igual a como
+`oc_vigentes_por_proveedor` agrega lo que ve el operario), llenando cada fila hasta su `cantidad`
+(nunca la pasa: si la pasara, la fila se cae de la vista por el filtro `(cantidad-recibida)>0` y el
+total queda mal), marcando `estado='recibida'` la que se completa y seteando `fecha_entrega_real`.
+El **excedente** (lo recibido por encima de lo pedido) **no** entra a la OC: se avisa aparte al dueño
+(botón a Tomás, pendiente del nº de WhatsApp). Match idéntico a `oc_vigentes_por_proveedor`
+(`norm_nombre` + alias Pettofrezza→Rafael + split del proveedor; `norm_cod`). SQL: `sql/gv_oc_aplicar_recepcion.sql`.
+
+**Prueba (en transacción con `rollback`, datos intactos).** Garcia/505 tenía a la fecha nueva
+(09-09) dos OCs: 287 + 293 = 580 pend. Recibiendo 600 → llenó ambas (→ `recibida`), sobraron 20
+(al aviso), y `oc_vigentes_por_proveedor('Garcia')` para 505 pasó a mostrar la OC más vieja
+(234, del 02-09) como nueva vigente. Correcto: descuenta lo nuevo y saca la OP completada.
+
+**Backup + rollback:** `public."GV_Backup_Ordenes_Compra_20260909"` (729 filas) y bloque en
+`docs/ROLLBACK-PRODUCCION.md` §1 (v14.59).
+
+**Nota de idempotencia.** La RPC es best-effort y no dedupe: si el operario RE-envía a mano el mismo
+remito (lo confirma en el aviso de duplicado v14.58), se descuenta dos veces. Igual que el stock, el
+control queda en el aviso de duplicado.
