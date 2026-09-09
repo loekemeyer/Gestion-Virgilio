@@ -1562,37 +1562,58 @@ async function opEnviar() {
   // Falla ABIERTO: si el chequeo no se puede hacer (red), no bloquea la carga.
   if (String(opState.remito || "").trim()) {
     let aviso = null;
-    // (a) mismo remito + línea, cargado hoy (Control_Modo_OP → Pendientes)
+    // (a) mismo remito + línea, cargado hoy (Control_Modo_OP → Pendientes). Comparamos
+    //     ARTÍCULOS: repetir un código que ya se cargó hoy DUPLICA stock (aviso fuerte);
+    //     cargar SOLO códigos nuevos del mismo remito es un complemento legítimo —ej.: un
+    //     artículo fuera de la OC que el dueño recién habilita y se carga aparte una vez
+    //     autorizado— así que ahí el aviso es informativo, no de duplicado.
     try {
       const desde = opTodayStr() + "T00:00:00-03:00";
       let qc = supabase.from("Control_Modo_OP")
-        .select("codigo,created_at")
+        .select("codigo,created_at,detalle")
         .eq("remito", opState.remito)
         .neq("estado", "anulado")
         .gte("created_at", desde)
-        .order("created_at", { ascending: true })
-        .limit(1);
+        .order("created_at", { ascending: true });
       if (opState.linea) qc = qc.eq("linea", opState.linea);
       const { data: cmo } = await qc;
       if (cmo && cmo.length) {
+        // Códigos ya cargados hoy para este remito+línea (parse del `detalle`: "COD → N · COD → N").
+        const yaCods = new Set();
+        cmo.forEach(function (r) {
+          String(r.detalle || "").split("·").forEach(function (p) {
+            const cod = p.split("→")[0].trim();
+            if (cod) yaCods.add(cod);
+          });
+        });
+        const repetidos = items.filter(function (i) { return yaCods.has(String(i.cod).trim()); }).map(function (i) { return i.cod; });
+        const nuevos = items.filter(function (i) { return !yaCods.has(String(i.cod).trim()); }).map(function (i) { return i.cod; });
+        const primera = cmo[0];
         let hh = "";
-        try { if (cmo[0].created_at) hh = new Date(cmo[0].created_at).toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit", timeZone: "America/Argentina/Buenos_Aires" }); } catch (_e) {}
-        aviso = "⚠ El remito " + opState.remito + (opState.linea ? " (" + opState.linea + ")" : "") +
-          " YA SE CARGÓ HOY" + (hh ? " a las " + hh : "") +
-          (cmo[0].codigo ? " · código " + cmo[0].codigo : "") + ".";
+        try { if (primera.created_at) hh = new Date(primera.created_at).toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit", timeZone: "America/Argentina/Buenos_Aires" }); } catch (_e) {}
+        const ref = "remito " + opState.remito + (opState.linea ? " (" + opState.linea + ")" : "") +
+          " ya se cargó hoy" + (hh ? " a las " + hh : "") + (primera.codigo ? " · código " + primera.codigo : "");
+        if (repetidos.length) {
+          aviso = "⚠ El " + ref + ". Esa carga YA incluía: " + repetidos.join(", ") + "." +
+            (nuevos.length ? "\nNuevos en esta carga: " + nuevos.join(", ") + "." : "") +
+            "\n\nSi cargás los repetidos se DUPLICAN las cajas y el stock.";
+        } else {
+          aviso = "ℹ El " + ref + ", con otros artículos.\nAhora vas a AGREGAR: " + nuevos.join(", ") +
+            ".\n\nSon códigos distintos: no duplica. (Normal si completás un remito que quedó a medias, ej.: artículos habilitados después.)";
+        }
       }
     } catch (_e) { /* chequeo falla abierto: no bloquea la carga */ }
-    // (b) histórico por remito + tallerista/proveedor en la tabla de Entregas
+    // (b) histórico por remito + tallerista/proveedor en la tabla de Entregas (idea 9047)
     if (!aviso) {
       try {
         let q = supabase.from(tabla).select("Remito").eq("Remito", opState.remito).limit(1);
         q = (opState.tipo === 'prov_at') ? q.eq("Proveedor", opState.tallNombre) : q.eq("Codigo_Tall", opState.tallCod);
         const { data: yaHay } = await q;
-        if (yaHay && yaHay.length) aviso = "⚠ El remito " + opState.remito + " ya figura cargado para " + opState.tallNombre + ".";
+        if (yaHay && yaHay.length) aviso = "⚠ El remito " + opState.remito + " ya figura cargado para " + opState.tallNombre + ".\n\nSi lo reenviás se DUPLICAN las cajas y el stock.";
       } catch (_e) { /* chequeo falla abierto: no bloquea la carga */ }
     }
     if (aviso) {
-      const ok = confirm(aviso + "\n\nSi lo cargás de nuevo se DUPLICAN las cajas y el stock.\n\n¿Cargarlo igual?");
+      const ok = confirm(aviso + "\n\n¿Cargar igual?");
       if (!ok) { btn.disabled = false; btn.textContent = prev; return; }
     }
   }
