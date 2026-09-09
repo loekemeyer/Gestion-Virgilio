@@ -7444,7 +7444,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v14.57";
+const APP_VERSION = "v14.58";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -15983,15 +15983,26 @@ async function stkOpenPedidos() {
    • Excedente / Racks: en qué UBICACIÓN está (excedente = Movimientos_Stock.ubicacion;
      racks = Racks_Planimetria). */
 function _stkNormCod(c) { return String(c == null ? "" : c).toUpperCase().replace(/\s+/g, "").replace(/^0+(?=\d)/, ""); }
+/* v14.58 — split por empresa (Nivel 2, v14.44+): la fila del stock es "439E CH" / "438E LK",
+   pero Movimientos_Stock guarda cod_art BARE ("439E") + columna `empresa`. Los pop-ups de
+   movimientos (góndola, pickeados, excedente, racks, a facturar…) matcheaban _stkNormCod("439ECH")
+   contra "439E" → nunca daba y salía "Sin movimientos" en TODA fila con sufijo. Estos helpers
+   matchean por código BASE y, si la fila tiene sufijo, filtran por esa empresa. */
+function _stkEmpDe(cod) { var m = String(cod == null ? "" : cod).match(/\s+(LK|CH|LOKE)$/i); return m ? m[1].toUpperCase().replace("LOKE", "LK") : ""; }
+function _stkMovMatch(mv, codN, emp) {
+  if (_stkNormCod(codBase(mv.cod_art)) !== codN) return false;
+  if (emp && mv.empresa != null && String(mv.empresa).trim() && String(mv.empresa).toUpperCase() !== emp) return false;
+  return true;
+}
 const _STK_ESTADIO_LBL = { separar_pedidos: "📦 Pickeado", a_facturar: "🧾 A facturar" };
 async function stkOpenEstadioArt(codEnc, dep) {
   if (!_stk) return;
-  const cod = decodeURIComponent(codEnc), codN = _stkNormCod(cod);
+  const cod = decodeURIComponent(codEnc), codN = _stkNormCod(codBase(cod)), emp = _stkEmpDe(cod);
   _stkPopShell((_STK_ESTADIO_LBL[dep] || dep) + " — " + escapeHtml(cod), "stkPopBody");
   const body = document.getElementById("stkPopBody"); if (body) body.innerHTML = '<div class="stkpop-empty">Cargando NPs…</div>';
   const by = {};
   _stk.movs.forEach(function (mv) {
-    if (mv.deposito !== dep || _stkNormCod(mv.cod_art) !== codN || !_stkWin(mv, true)) return;
+    if (mv.deposito !== dep || !_stkMovMatch(mv, codN, emp) || !_stkWin(mv, true)) return;
     // v6.29: agrupar por la TANDA/NP BASE (lo de antes del "|"). El facturado del
     // cliente usa ref=tanda|NP y los ajustes ref=NP; sin esto el detalle no descuenta
     // lo ya facturado y mostraba de más (ej. 530 decía 4 cuando el saldo era 1).
@@ -16025,7 +16036,7 @@ async function stkOpenEstadioArt(codEnc, dep) {
     const H = { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY };
     try {
       const rows = await fetch(SUPABASE_URL + "/rest/v1/gv_ppp_base_pedidos?pedido=in.(" + allNps.map(encodeURIComponent).join(",") + ")&select=pedido,articulo,cajas&limit=20000", { headers: H, cache: "no-store" }).then(function (r) { return r.ok ? r.json() : []; });
-      rows.forEach(function (x) { if (_stkNormCod(x.articulo) !== codN) return; const np = String(x.pedido || "").trim().replace(/\.0+$/, ""); if (np) pidio[np] = (pidio[np] || 0) + (Number(x.cajas) || 0); });
+      rows.forEach(function (x) { if (_stkNormCod(codBase(x.articulo)) !== codN) return; const np = String(x.pedido || "").trim().replace(/\.0+$/, ""); if (np) pidio[np] = (pidio[np] || 0) + (Number(x.cajas) || 0); });
     } catch (_e) {}
     if (npRefs.length) {
       try {
@@ -16093,14 +16104,14 @@ async function stkOpenEstadioArt(codEnc, dep) {
 }
 async function stkOpenExcedenteArt(codEnc) {
   if (!_stk) return;
-  const cod = decodeURIComponent(codEnc), codN = _stkNormCod(cod);
+  const cod = decodeURIComponent(codEnc), codN = _stkNormCod(codBase(cod)), emp = _stkEmpDe(cod);
   // v8.90: desconcatenación — título y mensajes con código base
   const _codBex = codBase(cod);
   _stkPopShell("🧊 Excedente — " + escapeHtml(_codBex), "stkPopBody");
   const body = document.getElementById("stkPopBody"); if (!body) return;
   const byU = {}; let sinU = 0;
   _stk.movs.forEach(function (mv) {
-    if (mv.deposito !== "excedente" || _stkNormCod(mv.cod_art) !== codN || !_stkWin(mv, true)) return;
+    if (mv.deposito !== "excedente" || !_stkMovMatch(mv, codN, emp) || !_stkWin(mv, true)) return;
     const u = String(mv.ubicacion || "").trim(), d = Number(mv.delta) || 0;
     if (u) byU[u] = (byU[u] || 0) + d; else sinU += d;
   });
@@ -16120,8 +16131,8 @@ async function stkOpenExcedenteArt(codEnc) {
 }
 async function stkOpenRacksArt(codEnc) {
   if (!_stk) return;
-  const cod = decodeURIComponent(codEnc), codN = _stkNormCod(cod);
-  _stkPop = { kind: "racksArt", cod: cod, codN: codN, dep: "racks", titulo: "Racks", icono: "🏗", desde: "", hasta: "", pos: [] };
+  const cod = decodeURIComponent(codEnc), codN = _stkNormCod(codBase(cod)), emp = _stkEmpDe(cod);
+  _stkPop = { kind: "racksArt", cod: cod, codN: codN, emp: emp, dep: "racks", titulo: "Racks", icono: "🏗", desde: "", hasta: "", pos: [] };
   _stkPopShell("🏗 Racks — " + escapeHtml(codBase(cod)), "stkPopBody");
   const body = document.getElementById("stkPopBody"); if (body) body.innerHTML = '<div class="stkpop-empty">Cargando…</div>';
   let rows = [];
@@ -16130,7 +16141,7 @@ async function stkOpenRacksArt(codEnc) {
     rows = await fetch(SUPABASE_URL + "/rest/v1/Racks_Planimetria?select=sector,cod_art,master_cajas,innercajas&estado=eq.ocupado&limit=5000", { headers: H, cache: "no-store" }).then(function (r) { return r.ok ? r.json() : []; });
   } catch (_e) {}
   if (!_stkPop || _stkPop.kind !== "racksArt" || _stkPop.codN !== codN) return;   // cambió de popup mientras cargaba
-  _stkPop.pos = (rows || []).filter(function (x) { return _stkNormCod(x.cod_art) === codN; })
+  _stkPop.pos = (rows || []).filter(function (x) { return _stkNormCod(codBase(x.cod_art)) === codN; })
     .sort(function (a, b) { return String(a.sector).localeCompare(String(b.sector), undefined, { numeric: true }); });
   stkRacksArtRender();
   _stkQuienLoad(stkRacksArtRender);   // v6.66 — 👤 siglas + legajo en los movimientos de racks
@@ -16193,7 +16204,7 @@ function _stkFmtFechaNP(v) {
 }
 async function stkOpenCajasPedidasArt(codEnc) {
   if (!_stk) return;
-  const cod = decodeURIComponent(codEnc), codN = _stkNormCod(cod);
+  const cod = decodeURIComponent(codEnc), codN = _stkNormCod(codBase(cod));
   // v8.89: desconcatenación — buscar por código base en la base de picking y filtrar por marca
   const _codB = codBase(cod), _codDisp = codBase(cod);
   const _sfx = String(cod || "").match(/\s+(LK|CH|LOKE)$/i);
@@ -16254,7 +16265,7 @@ async function stkOpenCajasPedidasArt(codEnc) {
   } catch (_e) {}
   const pickTandas = {}, sepTandas = {};
   _stk.movs.forEach(function (mv) {
-    if (_stkNormCod(mv.cod_art) !== codN || !_stkWin(mv, true)) return;
+    if (!_stkMovMatch(mv, codN, _empFiltro) || !_stkWin(mv, true)) return;
     const ref = String(mv.ref || "").toUpperCase();
     if (mv.deposito === "separar_pedidos" && mv.tipo === "picking" && Number(mv.delta) > 0) pickTandas[ref] = true;
     if (mv.deposito === "a_facturar" && mv.tipo === "separado" && Number(mv.delta) > 0) sepTandas[ref] = true;
@@ -16327,17 +16338,21 @@ function stkCajasPedidasExport() {
 async function stkOpenMovsArt(codEnc, dep, titulo, icono) {
   if (!_stk) return;
   const cod = decodeURIComponent(codEnc);
-  _stkPop = { kind: "movsArt", cod: cod, codN: _stkNormCod(cod), dep: dep, titulo: titulo || dep, icono: icono || "🔁", desde: "", hasta: "", npByTanda: {} };
+  _stkPop = { kind: "movsArt", cod: cod, codN: _stkNormCod(codBase(cod)), emp: _stkEmpDe(cod), dep: dep, titulo: titulo || dep, icono: icono || "🔁", desde: "", hasta: "", npByTanda: {} };
   _stkPopShell((icono || "🔁") + " " + (titulo || dep) + " — " + escapeHtml(codBase(cod)), "stkPopBody");
   // v10.42: fetch fresco de movimientos SOLO de este artículo (no depender de _stk.movs que puede estar viejo)
   // v10.43: stocks_carga_rapida guarda cod SIN ceros (26, 7, 35E) pero Movimientos_Stock
   //         guarda CON ceros (026, 007, 035E). Query con ambos formatos via or().
+  // v14.58: la fila puede venir con sufijo de empresa ("439E CH"); Movimientos_Stock guarda
+  //         cod_art BARE + columna `empresa`, así que la query va por código BASE (sin sufijo)
+  //         y el filtro por empresa se aplica en _stkMovMatch/_stkMovsBlock.
   try {
-    var _codPad = cod.replace(/^(\d+)/, function (m) { return m.padStart(3, "0"); });
-    var _codFilter = (_codPad !== cod)
-      ? "or=(cod_art.eq." + encodeURIComponent(cod) + ",cod_art.eq." + encodeURIComponent(_codPad) + ")"
-      : "cod_art=eq." + encodeURIComponent(cod);
-    var _freshMovs = await supaFetchAllSafe(SUPABASE_URL + '/rest/v1/Movimientos_Stock', 'select=id,cod_art,deposito,tipo,delta,ref,ts,legajo,descripcion,ubicacion&' + _codFilter + '&order=ts.asc&limit=50000');
+    var _codBare = codBase(cod);
+    var _codPad = _codBare.replace(/^(\d+)/, function (m) { return m.padStart(3, "0"); });
+    var _codFilter = (_codPad !== _codBare)
+      ? "or=(cod_art.eq." + encodeURIComponent(_codBare) + ",cod_art.eq." + encodeURIComponent(_codPad) + ")"
+      : "cod_art=eq." + encodeURIComponent(_codBare);
+    var _freshMovs = await supaFetchAllSafe(SUPABASE_URL + '/rest/v1/Movimientos_Stock', 'select=id,cod_art,empresa,deposito,tipo,delta,ref,ts,legajo,descripcion,ubicacion&' + _codFilter + '&order=ts.asc&limit=50000');
     if (_freshMovs && Array.isArray(_freshMovs) && _stkPop && _stkPop.cod === cod) {
       _stkPop._freshMovs = _freshMovs;
     }
@@ -16556,7 +16571,7 @@ function _stkRtoDetail(mv) {
    tabla Entró/Salió/Saldo corrido). Lo comparten Góndola/A guardar (stkMovsArtRender)
    y Racks (stkRacksArtRender, que además muestra las posiciones arriba). v5.101. */
 function _stkMovsBlock() {
-  const dep = _stkPop.dep, codN = _stkPop.codN, round1 = function (n) { return Math.round(n * 10) / 10; };
+  const dep = _stkPop.dep, codN = _stkPop.codN, emp = _stkPop.emp || "", round1 = function (n) { return Math.round(n * 10) / 10; };
   // v8.73: cuando el popup es de racks (kind=racksArt), incluir también racks_ch
   // porque la columna "Racks" suma ambos depósitos (v7.54).
   const _depMatch = _stkPop.kind === "racksArt"
@@ -16567,7 +16582,7 @@ function _stkMovsBlock() {
   // v10.42: usar movimientos frescos del artículo si están disponibles, sino fallback a _stk.movs
   const _movsSource = (_stkPop && _stkPop._freshMovs) ? _stkPop._freshMovs : _stk.movs;
   const list = _movsSource.filter(function (mv) {
-    if (!_depMatch(mv.deposito) || _stkNormCod(mv.cod_art) !== codN || !_stkWin(mv, true)) return false;
+    if (!_depMatch(mv.deposito) || !_stkMovMatch(mv, codN, emp) || !_stkWin(mv, true)) return false;
     if (Number(mv.delta) === 0) return false;   // v8.90: ocultar movimientos con cantidad 0 (ruido)
     const t = new Date(mv.ts).getTime();
     if (desdeT && t < desdeT) return false;
