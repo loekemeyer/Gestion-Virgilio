@@ -7444,7 +7444,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v14.58";
+const APP_VERSION = "v14.59";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -11290,6 +11290,20 @@ async function stockGetCutoff() {
 function stockComputeSaldos(movs, cutoff, asOf) {
   const m = {}, cut = cutoff ? new Date(cutoff).getTime() : 0;
   const lim = asOf ? new Date(asOf).getTime() : 0;   // "a fecha/hora": ignorar lo POSTERIOR (el 'inicial' es baseline y siempre cuenta)
+  // v14.59 — SOLO en modo "A esa fecha" (asOf): keyear igual que la vista en vivo. Los códigos
+  // que la vista PARTE por empresa ("809E CH"/"809E LK", duales) se recomputan partidos, mirando
+  // la empresa del movimiento, así el As-Of coincide con lo que se ve en vivo (antes agregaba las
+  // dos empresas en un "809E" solo, mezclando dos artículos distintos). Sin asOf (Conteo, drenaje,
+  // FC, etc.) NO cambia nada: sigue la clave BARE por cod_art de siempre. El set de duales sale de
+  // _stk.viewRows (la propia vista), así un LK puro NO se suffixa (la vista tampoco lo suffixa).
+  var _splitCod = null;
+  if (asOf) {
+    _splitCod = {};   // baseNorm|EMP -> cod exacto de la vista ("809E CH")
+    (((typeof _stk !== "undefined" && _stk) ? _stk.viewRows : null) || []).forEach(function (r) {
+      var c = String(r.cod || ""), e = _stkEmpDe(c);
+      if (e) _splitCod[_stkNormCod(codBase(c)) + "|" + e] = c;
+    });
+  }
   movs.forEach(function (mv) {
     if (lim && mv.tipo !== "inicial" && new Date(mv.ts).getTime() > lim) return;
     // El stock inicial (tipo 'inicial') SIEMPRE cuenta como base, aunque sea
@@ -11298,7 +11312,11 @@ function stockComputeSaldos(movs, cutoff, asOf) {
     // borrarlos. Así se puede cargar el inicial de varios depósitos en cualquier
     // orden y marcar inicio una sola vez, sin que un depósito pise a otro.
     if (cut && mv.tipo !== "inicial" && new Date(mv.ts).getTime() < cut) return;
-    const k = String(mv.cod_art);
+    let k = String(mv.cod_art);
+    if (_splitCod) {
+      var _e = String(mv.empresa == null ? "" : mv.empresa).toUpperCase();
+      if (_e === "LK" || _e === "CH") { var _sk = _splitCod[_stkNormCod(codBase(mv.cod_art)) + "|" + _e]; if (_sk) k = _sk; }
+    }
     if (!m[k]) m[k] = { cod: k, desc: mv.descripcion || "", a_guardar: 0, terminado: 0, excedente: 0, separar_pedidos: 0, a_facturar: 0, _uni: "", _ubi: "" };
     if (mv.descripcion && !m[k].desc) m[k].desc = mv.descripcion;
     // v6.25: medida (unidad) y sector (ubicacion) del movimiento MÁS RECIENTE con dato
