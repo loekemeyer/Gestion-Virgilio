@@ -12,7 +12,21 @@
 > única**; no se replica. Ante la duda entre parche rápido y fix de raíz → **fix
 > de raíz**.
 >
-> Última actualización: 2026-09-08 (martes) · Versión app al documentar: **v14.51**
+> Última actualización: 2026-09-09 (miércoles) · Versión app al documentar: **v14.53**
+>
+> Nota **v14.53** (seguridad, proyecto LK) — **🔴 la facturación se leía con la anon key.**
+> `rep_texto_hoy(date)` y `rep_enviar_hoy()` (las del reporte de gerencia que sale 20:00 por
+> Telegram, cron 36) eran `SECURITY DEFINER` con EXECUTE para **PUBLIC / anon / authenticated**.
+> La anon key de LK es pública por diseño —va en la página y en `admin/admin.js`—, así que
+> cualquiera podía pedir `/rest/v1/rpc/rep_texto_hoy` y recibir la plata del día y la del mes.
+> **Medido, no deducido**: con `set local role anon` devolvió el reporte entero. `rep_enviar_hoy`
+> además dejaba a cualquiera meter mensajes en la cola de Telegram de gerencia o quemar el
+> `dedup_key` del día. Era descuido y no decisión: `rep_salud()`, de la misma familia, estaba
+> bien. Revocado; comprobado en las dos direcciones (anon → 42501, service_role → sigue
+> devolviendo, cron 36 corre como `postgres` y no se toca). Ningún front las llamaba (grep sobre
+> los cuatro repos, cero hits). **Pendiente grande: hay 47 funciones `SECURITY DEFINER`
+> ejecutables por anon y nadie las revisó una por una.**
+> Detalle en `gestopclientes/sql/061_rep_hoy_fuga_anon.sql`.
 >
 > Nota **v14.51** (front + backend) — **`gv_app`: ahora se sabe desde qué app trabajó cada
 > operario.** `Registros_Produccion_Virgilio` es la misma tabla para Gestión y Producción y no
