@@ -4384,6 +4384,14 @@ Gestión — no tocan ningún objeto `gv_*`/`PPP_*`/`Registros_*`):
 avanza (se arma y sale), así que como métrica del día se encogía. El dueño de LK pidió que
 "programados" muestre lo que **hubo** programado para el día y no baje → foto al inicio del día.
 
+**Dependencia nueva (2026-09-09): el aviso de facturación de LK LEE `gv_cruce_facturacion_nps`.**
+La función `wa_grupos_dia_cuit` (arma el mensaje de WhatsApp consolidado por cliente) pasó a
+linkear NP↔factura con **el cruce de Gestión** (`gv_cruce_facturacion_nps`) en vez de la vieja
+`vista_np_factura` de LK — porque el cruce asigna 1:1 por cajas aunque el neto discrepe (NP con
+neto=0, ej. 98650) y reconcilia el neto web (ej. `LK 0011`). **Sólo lo lee** (no lo modifica). Si
+algún día cambia la firma/salida de `gv_cruce_facturacion_nps` (hoy devuelve `np, comprobante_id,
+storage_path, factura_total, empresa, estado, cajas…`), avisar: rompería el aviso de LK.
+
 **Impacto en Gestión: ninguno.** Sólo lectura; el cron es un `select` a las 00:30. No modifica
 tablas ni vistas de Gestión/Producción. No hay trigger sobre tablas compartidas.
 
