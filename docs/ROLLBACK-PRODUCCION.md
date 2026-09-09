@@ -170,6 +170,26 @@ update public."Ordenes_Compra" o
 
 ---
 
+### v14.60 (2026-09-09) — "la nueva pisa la vieja" (OC vigente = la de fecha más nueva)
+
+**Qué se cambió.** Dos funciones, para que una OC nueva del mismo proveedor+código deje muerta a
+la vieja (que no reaparezca al completar la nueva):
+- `public.oc_vigentes_por_proveedor(text)` — `create or replace`. En `oc_filtrada` el `WHERE` pasó de
+  `estado <> 'recibida' AND (cantidad - cantidad_recibida) > 0` a `lower(estado) NOT IN ('cerrada','anulada')`
+  (ahora las 'recibida' cuentan para `max_fecha`; el `HAVING pend>0` saca las completas).
+- `public.gv_oc_aplicar_recepcion(text, jsonb)` — mismo criterio: fija `max_fecha` incluyendo 'recibida'
+  y sólo descuenta esa fecha.
+**Impacto en Producción:** `oc_vigentes_por_proveedor` la usa sólo el módulo de recepción de Gestión
+(`recepcion.js`), no Producción. Sin cambio de display hoy (0 OCs 'recibida'); sólo cambia el
+comportamiento post-recepción. Efecto lateral: una OC 'cerrada' ya no figura como vigente (antes sí).
+**Rollback:** volver a poner en `oc_filtrada` de `oc_vigentes_por_proveedor` el `WHERE`
+`... AND lower(coalesce(estado,'')) <> 'recibida' AND (cantidad - coalesce(cantidad_recibida,0)) > 0 ...`
+(definición previa completa en el git, commit anterior a v14.60), y en `gv_oc_aplicar_recepcion` el
+`WHERE ... <> 'recibida' AND (cantidad - coalesce(cantidad_recibida,0)) > 0`. Datos: restore desde
+`GV_Backup_Ordenes_Compra_20260909` (bloque de v14.59 arriba). SQL vigente: `sql/oc_nueva_pisa_vieja_v1460.sql`.
+
+---
+
 ## 2. Backups vigentes (para restore puntual)
 
 | backup | qué guarda | fecha |

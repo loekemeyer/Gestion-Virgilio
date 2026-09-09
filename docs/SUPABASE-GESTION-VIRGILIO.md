@@ -4435,3 +4435,27 @@ El **excedente** (lo recibido por encima de lo pedido) **no** entra a la OC: se 
 **Nota de idempotencia.** La RPC es best-effort y no dedupe: si el operario RE-envía a mano el mismo
 remito (lo confirma en el aviso de duplicado v14.58), se descuenta dos veces. Igual que el stock, el
 control queda en el aviso de duplicado.
+
+## §3.bm — v14.60 (2026-09-09): "la nueva pisa la vieja" (OC vigente = la de fecha más nueva)
+
+**Regla del dueño.** Para un mismo proveedor+código, la OC de fecha MÁS NUEVA es la única viva; las
+más viejas quedan muertas y NO reaparecen. Antes (v14.59), al completar la OC nueva al recibir, la
+vista caía a mostrar una OC vieja pendiente (caso Garcia/505: quedaba la del 02-09 con 234).
+
+**Cambio (dos funciones, mismo criterio).**
+- `oc_vigentes_por_proveedor(text)` — `max_fecha` se calcula sobre las OCs no cerradas/anuladas
+  INCLUYENDO las 'recibida' (para que una OC nueva ya recibida tape a las viejas). Se sacó el filtro
+  por fila `(cantidad-recibida)>0` y la exclusión de 'recibida' del pre-filtro; el `HAVING sum(pend)>0`
+  saca los códigos con la OC nueva completa, y las viejas nunca están en `max_fecha`.
+- `gv_oc_aplicar_recepcion(text,jsonb)` — fija `max_fecha` igual (incluyendo 'recibida') y descuenta
+  SOLO esa fecha. Si la OC nueva ya no tiene lugar, lo recibido es excedente (aviso a Tomás), nunca
+  descuenta una OC vieja.
+
+**Prueba (transacción con `rollback`).** Garcia/505 (dos OCs del 09-09 = 580 pend, más viejas del
+02/08 sin usar). Recibiendo 600 → 505 desaparece de `oc_vigentes_por_proveedor('Garcia')` (0 filas):
+la vieja de 234 ya NO reaparece. Recibiendo 100 → queda ped=580, rec=100, pend=480. Correcto.
+
+**Efecto lateral (menor).** Una OC en estado 'cerrada' ya no figura como vigente (antes la vista sólo
+excluía 'recibida'). Hoy hay 1 'cerrada'.
+
+**Rollback:** `docs/ROLLBACK-PRODUCCION.md` §1 (v14.60). SQL vigente: `sql/oc_nueva_pisa_vieja_v1460.sql`.

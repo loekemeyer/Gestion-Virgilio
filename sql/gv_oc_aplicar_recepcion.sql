@@ -1,3 +1,6 @@
+-- ⚠ v14.60 (2026-09-09): esta función fue REVISADA para "la nueva pisa la vieja".
+-- Versión vigente (y la vista oc_vigentes_por_proveedor): sql/oc_nueva_pisa_vieja_v1460.sql
+
 -- v14.59 (2026-09-09) — Descontar la OC al recibir mercadería.
 --
 -- PROBLEMA: al recibir, el módulo escribía en "Entregas Tallerista Virgilio" /
