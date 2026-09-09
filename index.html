@@ -3578,16 +3578,24 @@ table.facfc-tbl tr.facneto-row-falt td{ background: #fef2f2; }
 /* Encabezado de Facturación: "Excel ISIS" y "Cerrar" van juntos en la misma línea.
    Hace falta el contenedor porque el button{width:100%} global empujaba a Cerrar
    a la línea de abajo en el celular. */
-.fac-top-acts{ display:flex; align-items:center; gap:8px; margin-left:auto; flex:0 0 auto; }
-.fac-top-acts #facBtnXlsIsis{
-  width:auto; flex:0 0 auto; margin:0; padding:8px 12px; font-size:13px; font-weight:800;
-  border:1px solid #fcd34d; border-radius:8px; background:#fffbeb; color:#78350f; cursor:pointer;
+/* v14.53 — Los 4 botones (Excel ISIS · JSON ISIS · Cruce · Cerrar) en una grilla
+   2×2 pareja: mismo tamaño y alineados en dos filas prolijas, para que en el celular
+   no se desborden ni queden de distinto ancho. */
+.fac-top-acts{
+  display:grid; grid-template-columns:1fr 1fr; gap:8px;
+  margin-left:auto; width:100%; max-width:430px; flex:0 0 auto;
 }
-/* v13.73: "Cruce con ISIS" al lado del Excel — abre la pestaña del cruce (Deuda / Cobranzas) */
-.fac-top-acts #facBtnCruce{
-  width:auto; flex:0 0 auto; margin:0; padding:8px 12px; font-size:13px; font-weight:800;
-  border:1px solid #93c5fd; border-radius:8px; background:#eff6ff; color:#1e3a8a; cursor:pointer;
+.fac-top-acts > button{
+  width:100%; margin:0; box-sizing:border-box; min-height:44px;
+  padding:8px 10px; font-size:13px; font-weight:800; border-radius:8px;
+  display:inline-flex; align-items:center; justify-content:center; text-align:center;
+  line-height:1.15; white-space:normal; cursor:pointer;
 }
+.fac-top-acts > button > span{ margin-left:4px; }   /* el "(NP web)" / "(prueba)" no se pega al texto */
+.fac-top-acts #facBtnXlsIsis{ border:1px solid #fcd34d; background:#fffbeb; color:#78350f; }
+.fac-top-acts #facBtnJsonIsis{ border:1px solid #a5b4fc; background:#eef2ff; color:#3730a3; }
+/* v13.73: "Cruce con ISIS" — abre la pestaña del cruce (Deuda / Cobranzas) */
+.fac-top-acts #facBtnCruce{ border:1px solid #93c5fd; background:#eff6ff; color:#1e3a8a; }
 .fac-top-acts .fac-close-btn{ margin:0; }
 /* Casilla "marcar para el Excel de prueba de ISIS" en cada fila de Facturación.
    Grande a propósito: se toca con el dedo desde el celular. */
@@ -7436,7 +7444,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v14.54";
+const APP_VERSION = "v14.55";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
