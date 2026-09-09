@@ -4405,3 +4405,33 @@ drop table if exists public.wa_prog_snapshot;
 
 _(Sin bump de APP_VERSION/SW_VERSION: no cambia la app ni el pipeline de Virgilio; son objetos
 `wa_*` de otro proyecto que sólo leen esta base. Anotado a pedido del dueño para dejarlo fichado.)_
+
+## §3.bl — Excel ISIS: "2% Descuento Web" (col K) solo para pedidos web del cliente (v14.56, 2026-09-09)
+
+**Regla del dueño (2026-09-09):** en el Excel que Facturación baja para ISIS, la columna
+**K** con la leyenda `"2% Descuento Web"` va **SOLO** para los pedidos que el cliente arma
+él mismo por la página. Los pedidos cargados por un admin — **Cargar Cotizadores, PDF
+Krikos, Excel Fmto Cltes y Pedidos sin cot** — llevan la **col K vacía**.
+
+**Antes (bug):** `_facXlsFilasPlanas` ponía `pctDto: "2% Descuento Web"` **hardcodeado en
+todas las filas** (se agregó el 07/09 con el export de Facturación, sin condicionar por
+origen). Cuando los módulos de admin empezaron a facturar por el mismo export, arrastraban
+la leyenda sin corresponder.
+
+**Señal usada:** `sheets_payload.source`. La página del cliente pone `"Web"`; los módulos de
+admin ponen `"Cotizador"` / `"Krikos"` / `"Excel"` / `"Sin Cotizador"`. **No** se puede usar
+el código de condición de pago porque Cargar Cotizadores comparte 8-13/18 con la web.
+
+**Backend (proyecto LK `kwkclwhmoygunqmlegrg`):** RPC **nueva y aditiva**
+`gv_web_np_source(p_order_ids bigint[])` → `(empresa, order_id, source)`; lee
+`public.orders` (LK) y `public.chef_orders` (Chef por FDW). `SECURITY DEFINER` con guard de
+`admins`, `EXECUTE` revocado a `anon`/`public` y otorgado a `authenticated`. **No se
+modificó ninguna vista/función de facturación existente** (`v_pedidos_web`,
+`v_pedidos_web_np`, `gv_pedidos_web_np_chef*` quedaron intactas). SQL y rollback (`drop
+function …`) en `sql/gv_web_np_source.sql`.
+
+**Front (Gestión `index.html`):** `_facXlsArmar` llama la RPC una vez con todos los
+`order_id` del export, arma `srcByOrder[empresa:order_id]` y marca `esWeb = source==='Web'`
+por NP; `_facXlsFilasPlanas` pone `pctDto = esWeb ? "2% Descuento Web" : ""`.
+
+**Medición (LK, 60 días):** `source` = Web 334 · Cotizador 67 · Krikos 13 · Excel 5 · vacío 1.
