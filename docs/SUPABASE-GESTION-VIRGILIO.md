@@ -4354,3 +4354,46 @@ y redeploy de la Edge Function con el `index.ts` v1.0 (está en git, commit ante
 NP numéricas — por eso la lista filtra web); (b) **campos comerciales** de LK (guardarlos al tomar
 el pedido); (c) **sufijo L / cod de cliente Chef** para TdF (hoy `canon_cod` devuelve "504", no "504L").
 Es el cambio que reemplaza al Excel de verdad; se hace cuando la conexión de Horacio dé OK.
+
+## §3.bq — 2026-09-09: objetos `wa_*` del dashboard LK (GestOpClientes) en este proyecto
+
+**Qué es.** El dashboard **"Pipeline de facturas"** de LK/GestOpClientes (repo
+`loekemeyer/GestOpClientes`, bot de WhatsApp) vive en el proyecto LK
+(`kwkclwhmoygunqmlegrg`) pero **lee la producción de ESTE proyecto** para 3 de sus
+columnas. La fuente de verdad y el SQL están en `GestOpClientes/sql/isis_wa_dashboard.sql`;
+esto queda acá sólo para que Gestión sepa qué objetos `wa_*` y qué cron corren en su base.
+
+**Objetos creados acá por GestOpClientes** (todos prefijo `wa_`, **sólo leen** datos de
+Gestión — no tocan ningún objeto `gv_*`/`PPP_*`/`Registros_*`):
+
+- **`wa_prog_snapshot(dia date pk, programados int, tomado_at timestamptz)`** — foto diaria del
+  contador "programados". RLS **prendida**, sin policies (sólo `service_role`/definer).
+- **`wa_snapshot_programados(p_dia date)`** — `SECURITY DEFINER`, `EXECUTE` revocado a
+  `public`/`anon`/`authenticated`. Cuenta *distinct NP* programados para el día y congela el
+  número (`greatest`: nunca baja). Los DOS universos de NP: ISIS remanentes `9xxxx/4xxxx`
+  (`gv_ppp_programacion_diaria`) + web-nativas `LK/CH` (`PPP_Web_Programacion`, clave `empresa,np`).
+- **cron `wa-prog-snapshot-diario`** — `30 3 * * *` (03:30 UTC = **00:30 ART**, después del job de
+  programación 00:01). Corre `select public.wa_snapshot_programados();`.
+- **`wa_dashboard_rango(desde,hasta)`** (ya existía; reapuntado el 09/09) — lee:
+  · *programados* = foto `wa_prog_snapshot` (fallback en vivo = mismo conteo);
+  · *armados* = evento **`TAL`** (armado de la NP) en `Registros_Produccion_Virgilio` por `ts_cliente`
+    (cuenta ISIS y web: el TAL trae la etiqueta completa `98667` / `LK 0011`);
+  · *facturados* = `Facturacion_NP` por `facturado_at`.
+
+**Por qué "foto".** La programación viva (`gv_ppp_programacion_diaria`) drena cuando el pedido
+avanza (se arma y sale), así que como métrica del día se encogía. El dueño de LK pidió que
+"programados" muestre lo que **hubo** programado para el día y no baje → foto al inicio del día.
+
+**Impacto en Gestión: ninguno.** Sólo lectura; el cron es un `select` a las 00:30. No modifica
+tablas ni vistas de Gestión/Producción. No hay trigger sobre tablas compartidas.
+
+**Rollback (si molestara):**
+```sql
+select cron.unschedule('wa-prog-snapshot-diario');
+drop function if exists public.wa_snapshot_programados(date);
+drop table if exists public.wa_prog_snapshot;
+-- wa_dashboard_rango es de GestOpClientes; su definición previa está en el git de ese repo.
+```
+
+_(Sin bump de APP_VERSION/SW_VERSION: no cambia la app ni el pipeline de Virgilio; son objetos
+`wa_*` de otro proyecto que sólo leen esta base. Anotado a pedido del dueño para dejarlo fichado.)_
