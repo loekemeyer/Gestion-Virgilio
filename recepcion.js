@@ -2439,7 +2439,9 @@ function pendFotoRow(id) {
   btn.className = "fotoViewBtn" + (_pendRows[id].foto_vista ? " viewed" : "");
   btn.textContent = _pendRows[id].foto_vista ? "✓ Foto vista" : "👁 Ver foto";
   btn.onclick = function () {
-    if (_pendRows[id].sent) return;
+    /* v14.56 — la foto SIEMPRE se puede volver a ver, aunque ya se haya enviado
+       todo (antes `if (_pendRows[id].sent) return;` mataba el botón). Ver la foto
+       no cambia nada persistido; solo marca foto_vista la primera vez. */
     const ov = document.createElement("div"); ov.className = "fotoOverlay";
     const box = document.createElement("div"); box.className = "fotoOverlayBox";
     const imgWrap = document.createElement("div"); imgWrap.className = "fotoOverlayImg";
