@@ -1552,20 +1552,49 @@ async function opEnviar() {
     }));
   }
 
-  // idea 9047: dedup de remito. Reenviar el mismo remito (timeout ambiguo / recarga con
-  // mala señal de depósito) duplicaba cajas en Movimientos_Stock y filas de Entregas. Antes
-  // de insertar chequeamos si ese remito ya está cargado para este proveedor/tallerista y
-  // pedimos confirmación. Falla ABIERTO: si el chequeo no se puede hacer (red), no bloquea.
+  // idea 9047 + v14.57: dedup de remito. Reenviar el mismo remito (timeout ambiguo /
+  // recarga con mala señal de depósito) duplicaba cajas en Movimientos_Stock y filas de
+  // Entregas. Antes de insertar avisamos si ese remito ya está cargado. Dos chequeos, UN
+  // solo aviso blando (deja seguir si confirma):
+  //  (a) HOY en Control_Modo_OP por remito + línea → es lo que el supervisor ve repetido
+  //      en Pendientes; mostramos el código ya asignado y la hora de la carga previa.
+  //  (b) histórico en la tabla de Entregas por remito + tallerista/proveedor (idea 9047).
+  // Falla ABIERTO: si el chequeo no se puede hacer (red), no bloquea la carga.
   if (String(opState.remito || "").trim()) {
+    let aviso = null;
+    // (a) mismo remito + línea, cargado hoy (Control_Modo_OP → Pendientes)
     try {
-      let q = supabase.from(tabla).select("Remito").eq("Remito", opState.remito).limit(1);
-      q = (opState.tipo === 'prov_at') ? q.eq("Proveedor", opState.tallNombre) : q.eq("Codigo_Tall", opState.tallCod);
-      const { data: yaHay } = await q;
-      if (yaHay && yaHay.length) {
-        const ok = confirm("⚠ El remito " + opState.remito + " ya figura cargado para " + opState.tallNombre + ".\n\nSi lo reenviás se DUPLICAN las cajas y el stock.\n\n¿Cargarlo igual?");
-        if (!ok) { btn.disabled = false; btn.textContent = prev; return; }
+      const desde = opTodayStr() + "T00:00:00-03:00";
+      let qc = supabase.from("Control_Modo_OP")
+        .select("codigo,created_at")
+        .eq("remito", opState.remito)
+        .neq("estado", "anulado")
+        .gte("created_at", desde)
+        .order("created_at", { ascending: true })
+        .limit(1);
+      if (opState.linea) qc = qc.eq("linea", opState.linea);
+      const { data: cmo } = await qc;
+      if (cmo && cmo.length) {
+        let hh = "";
+        try { if (cmo[0].created_at) hh = new Date(cmo[0].created_at).toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit", timeZone: "America/Argentina/Buenos_Aires" }); } catch (_e) {}
+        aviso = "⚠ El remito " + opState.remito + (opState.linea ? " (" + opState.linea + ")" : "") +
+          " YA SE CARGÓ HOY" + (hh ? " a las " + hh : "") +
+          (cmo[0].codigo ? " · código " + cmo[0].codigo : "") + ".";
       }
     } catch (_e) { /* chequeo falla abierto: no bloquea la carga */ }
+    // (b) histórico por remito + tallerista/proveedor en la tabla de Entregas
+    if (!aviso) {
+      try {
+        let q = supabase.from(tabla).select("Remito").eq("Remito", opState.remito).limit(1);
+        q = (opState.tipo === 'prov_at') ? q.eq("Proveedor", opState.tallNombre) : q.eq("Codigo_Tall", opState.tallCod);
+        const { data: yaHay } = await q;
+        if (yaHay && yaHay.length) aviso = "⚠ El remito " + opState.remito + " ya figura cargado para " + opState.tallNombre + ".";
+      } catch (_e) { /* chequeo falla abierto: no bloquea la carga */ }
+    }
+    if (aviso) {
+      const ok = confirm(aviso + "\n\nSi lo cargás de nuevo se DUPLICAN las cajas y el stock.\n\n¿Cargarlo igual?");
+      if (!ok) { btn.disabled = false; btn.textContent = prev; return; }
+    }
   }
 
   const { error } = await supabase.from(tabla).insert(rows);
