@@ -7444,7 +7444,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v14.55";
+const APP_VERSION = "v14.56";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -37621,7 +37621,9 @@ function _facXlsFilasPlanas(filas) {
           // v14.36: la condición de pago que eligió el cliente en la página (LK/Chef). Para una NP
           // de ISIS no existe en ningún lado nuestro y queda vacía, como antes.
           condPago: r.cond || "",
-          pctDto: "2% Descuento Web", numOC: ""
+          // v14.56: solo los pedidos que el cliente arma por la web llevan la leyenda;
+          // Cotizador/Excel/Krikos/Sin Cotizador van con la col K vacía.
+          pctDto: r.esWeb ? "2% Descuento Web" : "", numOC: ""
         });
       });
     }
@@ -37707,6 +37709,26 @@ async function _facXlsArmar(nps) {
     } catch (_e) {}
   }
 
+  // v14.56: origen del pedido (source) para la col K "2% Descuento Web": SOLO los
+  // pedidos que el cliente arma él mismo por la web (sheets_payload.source = "Web")
+  // llevan la leyenda; los cargados por admin (Cotizador/Excel/Krikos/Sin Cotizador)
+  // van con la col K vacía. Lo resuelve la RPC gv_web_np_source (LK + Chef por FDW).
+  const srcByOrder = {};
+  const allOids = [...new Set(Object.keys(orderByNp).map(function (k) { return orderByNp[k].order_id; }).filter(function (x) { return x != null; }))];
+  if (allOids.length) {
+    try {
+      const tokS = await pwebLkToken();
+      const rs = await fetch(PWEB_LK_URL + "/rest/v1/rpc/gv_web_np_source", {
+        method: "POST",
+        headers: { apikey: PWEB_LK_ANON, Authorization: "Bearer " + tokS, "Content-Type": "application/json" },
+        body: JSON.stringify({ p_order_ids: allOids })
+      });
+      if (rs.ok) for (const x of (await rs.json() || [])) {
+        srcByOrder[String(x.empresa || "").toLowerCase() + ":" + x.order_id] = String(x.source || "");
+      }
+    } catch (_e) {}
+  }
+
   // Cabecera (cod cliente, razón social) desde la lista que ya está en pantalla
   const cab = {};
   (_facLastTandas || []).forEach(function (t) {
@@ -37775,6 +37797,7 @@ async function _facXlsArmar(nps) {
       vend: (orderByNp[np] && orderByNp[np].empresa === "chef") ? (vendChef[String(orderByNp[np].order_id)] || "") : (vendBy[c.cod] || ""),   // v13.72
       suc: suc, tope: tdf ? 15 : _facXlsTope(np), lineas: lineas,
       cond: (orderByNp[np] ? (condByOrder[orderByNp[np].empresa + ":" + orderByNp[np].order_id] || "") : ""),   // v14.36: col J
+      esWeb: (orderByNp[np] ? (srcByOrder[orderByNp[np].empresa + ":" + orderByNp[np].order_id] === "Web") : false),   // v14.56: col K solo si es pedido web del cliente
       isisEmp: tdf ? "CH" : (_facXlsEmpresa(np) === "chef" ? "CH" : "LK"),   // v13.77: a qué archivo va
       tdf: !!tdf, codLk: c.cod,
       excede: lineas.some(function (l) { return l.excede; })
