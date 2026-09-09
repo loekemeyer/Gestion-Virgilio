@@ -103,6 +103,21 @@ columna generada reescribe la tabla una vez — 9.8k filas, instantáneo.)
 **Rollback:** `alter table public."Entregas_Virgilio" drop column gv_empresa;` (sin pérdida de datos:
 la columna es derivada). `sql/entregas_virgilio_gv_empresa.sql`.
 
+### v14.54 (2026-09-09) — `gv_cod_stock` normaliza el código en las vistas de proyección
+
+**Qué se cambió.** `create or replace` de 3 vistas COMPARTIDAS (`vista_venta_mensual`,
+`vista_recepcion_mensual`, `vista_stock_vs_pedidos`) para que normalicen el código con la nueva
+función `public.gv_cod_stock` (pela `·celda`, sufijo empresa, ceros y la **L**). Antes venta y
+demanda no pelaban la L → `439EL` era un SKU fantasma en abastecimiento/OCs. `security_invoker=true`
+preservado; sólo cambia la normalización del código, columnas/estructura idénticas.
+
+**Qué de Producción se ve afectado.** Mejora para las dos: la proyección deja de partir un artículo
+en `439E`/`439EL`. No toca datos (son vistas). Medido: 0 códigos L en las 5 vistas de proyección;
+`439E` consolidó la demanda que iba a `439EL`.
+
+**Rollback:** correr `sql/backups/proyeccion_views_20260909_pre_v1454.sql` (restaura los 3 defs
+viejos) y `drop function public.gv_cod_stock(text);`. `sql/gv_cod_stock.sql`.
+
 ### v14.47 (2026-09-08) — `sync-precios-venta` RECONCILIA (borra lo que no está en el catálogo)
 
 **Qué se cambió.** La Edge Function ahora, después del upsert, borra de `precios_venta` y
