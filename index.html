@@ -7469,7 +7469,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v14.65";
+const APP_VERSION = "v14.66";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -15707,7 +15707,7 @@ async function openPedidosImportacion() {
 }
 /* v10.38 — filtro Solo Pedido / Ver Todo. */
 function pedImpSetFiltro(solo) { if (!_stkPop || _stkPop.kind !== "pedImp") return; _stkPop.soloPedir = !!solo; _pedImpRender(); }
-/* Filtro por proveedor chino: "" = todas las tarjetas, o el nombre de un proveedor = solo esa. */
+/* Filtro por PROVEEDOR: "" = todas las tarjetas (un box por proveedor), o el nombre de un proveedor = solo ese box. */
 function pedImpSetProv(provEnc) { if (!_stkPop || _stkPop.kind !== "pedImp") return; _stkPop.provFiltro = decodeURIComponent(provEnc || ""); _pedImpRender(); }
 function pedImpToggle() { if (!_stkPop || _stkPop.kind !== "pedImp") return; _stkPop.soloPedir = !_stkPop.soloPedir; _pedImpRender(); }
 /* v10.38 — MASTER CAJAS del pedido, editable por código (se puede poner 0). Vacío = vuelve al
@@ -15760,7 +15760,7 @@ function _pedImpRender() {
   const provFiltro = (_stkPop.provFiltro && provOrder.indexOf(_stkPop.provFiltro) >= 0) ? _stkPop.provFiltro : "";
   if (provOrder.length > 1) {
     h += '<div style="margin-bottom:12px;display:flex;gap:8px;flex-wrap:wrap;align-items:center">' +
-      '<span style="font-size:12px;font-weight:800;color:#64748b;text-transform:uppercase;letter-spacing:.4px">🏭 Chino:</span>' +
+      '<span style="font-size:12px;font-weight:800;color:#64748b;text-transform:uppercase;letter-spacing:.4px">🏭 Proveedor:</span>' +
       '<button style="' + _fbtn(!provFiltro) + '" onclick="pedImpSetProv(\'\')">Todos</button>' +
       provOrder.map(function (p) { return '<button style="' + _fbtn(provFiltro === p) + '" onclick="pedImpSetProv(\'' + encodeURIComponent(p) + '\')">' + escapeHtml(p) + '</button>'; }).join('') +
       '</div>';
