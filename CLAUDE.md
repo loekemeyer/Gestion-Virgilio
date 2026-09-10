@@ -382,13 +382,19 @@ borró). Layout:
   Si se desalinean, el celular se queda con el JS viejo cacheado — pasó, y por eso los
   operarios corrieron 5 versiones atrás sin que nadie lo notara.
 
-### Admin de Cervantes (Gestión Productiva 2.0) — botón, no copia
+### Admin de Cervantes — dos pantallas, en otros repos (link, no copia)
 
-- El **admin de Cervantes** es **otro repo**: `Gestion-Productiva-2.0` (GP2). Acá no se
-  copia nada: el panel supervisor tiene el botón **🏭 Admin Cervantes (GP2)**
-  (`openAdminCervantes`, v14.72) que resuelve `../Gestion-Productiva-2.0/GP2_MODULOS.html`
-  relativo a la página (para no clavar el host) y lo abre en **pestaña nueva** — es otra
-  app, con su navegación, y el supervisor no tiene que perder Gestión.
+- **El supervisor que elige Cervantes en el selector de planta NO va a la pantalla de
+  operario: va al admin** (`chooseCervantes` → `showCervAdmin`, v14.73). El operario sigue
+  derecho a `./cervantes/`. La distinción es `__identity.type === "supervisor"`.
+- **Por ahora los admin de Cervantes son DOS** (decisión del dueño, 2026-09-10), cada uno en
+  su repo, así que la pantalla `#cervAdmin` muestra las dos tarjetas y linkea a la **raíz**
+  de cada una (cada repo decide adónde entrar desde su propio `index.html`):
+  **Gestión Productiva (entero)** → `../GestionProductivaEntero/` · **Gestión Productiva 2.0**
+  → `../Gestion-Productiva-2.0/`. Se resuelven **relativo a la página** para no clavar el host.
+  **No se copia nada** de esos repos acá — el error de `/cervantes/` no se repite.
+- El botón **🏭 Admin Cervantes (GP2)** del panel supervisor abre **esa misma pantalla**
+  (`openAdminCervantes` → `showCervAdmin`): una sola puerta, no dos criterios.
 - **No hace falta puente de sesión** (a diferencia de `/admin/` de LK, que necesita
   `lk_bridge_vjwt` porque es OTRO proyecto Supabase): GP2 usa el **mismo proyecto**
   `hrxfctzncixxqmpfhskv` y el **mismo origin**, con el `storageKey` default, así que la

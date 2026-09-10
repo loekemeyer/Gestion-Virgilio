@@ -4569,7 +4569,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
        Virgilio queda en esta misma página; Cervantes redirige a ./cervantes/
        (sesión compartida, no re-pide login). -->
   <style>
-    #plantSelector .ps-title { text-align:center; font-size:26px; font-weight:800; margin:6px 0 22px; }
+    #plantSelector .ps-title, #cervAdmin .ps-title { text-align:center; font-size:26px; font-weight:800; margin:6px 0 22px; }
     .plant-cards { display:flex; flex-direction:column; gap:16px; max-width:460px; margin:0 auto; }
     .plant-card {
       width:100%; display:flex; align-items:center; gap:18px; min-height:104px;
@@ -4588,7 +4588,9 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
     }
     .plant-name { flex:1; font-size:30px; font-weight:800; letter-spacing:-.01em; }
     .plant-go { flex:0 0 auto; font-size:30px; opacity:.85; }
-    #plantSelector .auth-logout-row { margin-top:24px; }
+    #plantSelector .auth-logout-row, #cervAdmin .auth-logout-row { margin-top:24px; }
+    /* Dos botones al pie (Cambiar planta / Salir): que respiren y no se peguen. */
+    #cervAdmin .auth-logout-row { display:flex; gap:12px; justify-content:center; flex-wrap:wrap; }
   </style>
   <div id="plantSelector" class="hidden">
     <div class="app-brand">Gestion <span class="app-brand-hi">Virgilio</span></div>
@@ -4606,6 +4608,32 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
       </button>
     </div>
     <div class="auth-logout-row">
+      <button class="auth-logout-btn" onclick="signOutGoogle()">Salir</button>
+    </div>
+  </div>
+
+  <!-- ADMIN DE CERVANTES (supervisor). Elegir Cervantes siendo supervisor NO lleva a
+       la pantalla de operario: lleva acá. Por ahora son DOS pantallas de admin, cada
+       una en su repo (Gestión Productiva Entero y Gestión Productiva 2.0), así que no
+       se copia nada: se linkea a la raíz de cada una y cada repo decide dónde entrar.
+       Son el mismo origin y el mismo proyecto Supabase → la sesión ya viaja sola. -->
+  <div id="cervAdmin" class="hidden">
+    <div class="app-brand">Gestion <span class="app-brand-hi">Virgilio</span></div>
+    <h1 class="ps-title">Admin de Cervantes</h1>
+    <div class="plant-cards">
+      <button class="plant-card plant-cer" onclick="abrirAdminCervantes('entero')">
+        <span class="plant-badge">GP</span>
+        <span class="plant-name">Gestion Productiva<br><span style="font-size:19px;font-weight:600;opacity:.85;">(entero)</span></span>
+        <span class="plant-go">&rsaquo;</span>
+      </button>
+      <button class="plant-card plant-cer" onclick="abrirAdminCervantes('gp2')">
+        <span class="plant-badge">2.0</span>
+        <span class="plant-name">Gestion Productiva 2.0</span>
+        <span class="plant-go">&rsaquo;</span>
+      </button>
+    </div>
+    <div class="auth-logout-row">
+      <button class="auth-logout-btn" onclick="cambiarPlanta()">&larr; Cambiar planta</button>
       <button class="auth-logout-btn" onclick="signOutGoogle()">Salir</button>
     </div>
   </div>
@@ -7470,7 +7498,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v14.72";
+const APP_VERSION = "v14.73";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -26238,22 +26266,16 @@ async function openPanelWebLK() {
   location.href = "admin/admin.html";
 }
 
-/* ===== Admin de CERVANTES (Gestión Productiva 2.0) — v14.72 =====
-   Vive en OTRO repo (`Gestion-Productiva-2.0`), no acá, así que es un link, no
-   una copia. Se resuelve relativo a esta página (en Pages queda
-   `…/Gestion-Productiva-2.0/GP2_MODULOS.html`) para no clavar el host.
-   No hace falta puente de sesión: es el MISMO origin y el MISMO proyecto
-   Supabase con el storageKey default, así que la sesión de Google del
-   supervisor ya se ve del otro lado y su login entra solo (`getSession()` →
-   `procesarSesion`) — cuando ese login esté prendido, hoy está en
-   `GP2_AUTH_ON = false`. Abre en PESTAÑA NUEVA: es otra app, con su propia
-   navegación y sin botón de volver; el supervisor no tiene que perder Gestión. */
+/* ===== Admin de CERVANTES — v14.73 =====
+   Los admin de Cervantes viven en OTROS repos (Gestión Productiva entero y 2.0),
+   así que acá no se copia nada: este botón abre la MISMA pantalla que le sale al
+   supervisor cuando elige Cervantes en el selector de planta, para que haya una
+   sola puerta y no dos criterios. No hace falta puente de sesión (a diferencia del
+   /admin/ de LK, que es otro proyecto Supabase): mismo origin y mismo proyecto, con
+   el storageKey default, así que la sesión del supervisor ya se ve del otro lado. */
 function openAdminCervantes() {
   if (!requireSupervisor()) return;
-  var url;
-  try { url = new URL("../Gestion-Productiva-2.0/GP2_MODULOS.html", window.location.href).href; }
-  catch (_e) { url = "../Gestion-Productiva-2.0/GP2_MODULOS.html"; }
-  window.open(url, "_blank", "noopener");
+  showCervAdmin();
 }
 
 /* ===== Editor de Planimetría — escribe DIRECTO a Supabase (tabla "Planimetria").
@@ -40528,6 +40550,7 @@ function showLoggedOut() {
   $("supervisorPanel").classList.add("hidden");
   $("conteoPanel").classList.add("hidden");
   $("plantSelector").classList.add("hidden");
+  $("cervAdmin").classList.add("hidden");
   $("btnHistDias").classList.add("hidden");   // 📅 no aplica en el login (sin operario)
   _setCambiarPlanta(false);
   setHistorySpace(true);
@@ -40548,6 +40571,7 @@ function showSelector() {
   $("supervisorPanel").classList.add("hidden");
   $("conteoPanel").classList.add("hidden");
   $("plantSelector").classList.remove("hidden");
+  $("cervAdmin").classList.add("hidden");
   $("btnHistDias").classList.add("hidden");   // 📅 no aplica en el selector
   _setCambiarPlanta(false);
   setHistorySpace(false);
@@ -40560,6 +40584,7 @@ function showSupervisor(email) {
   $("authBlock").classList.add("hidden");
   $("legajoEntry").classList.add("hidden");
   $("plantSelector").classList.add("hidden");
+  $("cervAdmin").classList.add("hidden");
   $("supervisorPanel").classList.remove("hidden");
   _setCambiarPlanta(true);
   setHistorySpace(false);   // el "Resumen de hoy" no aplica al supervisor
@@ -40588,6 +40613,7 @@ function showOperario(emp) {
   $("authBlock").classList.add("hidden");
   $("supervisorPanel").classList.add("hidden");
   $("plantSelector").classList.add("hidden");
+  $("cervAdmin").classList.add("hidden");
   // El operario aterriza en esta pantalla: saludo + "Continuar" + "Resumen de
   // hoy" (historial de sus acciones del día). Desde acá pasa a la grilla EP/TP.
   $("legajoEntry").classList.remove("hidden");
@@ -40616,6 +40642,7 @@ function showConteo(email) {
   $("legajoEntry").classList.add("hidden");
   $("supervisorPanel").classList.add("hidden");
   $("plantSelector").classList.add("hidden");
+  $("cervAdmin").classList.add("hidden");
   $("conteoPanel").classList.remove("hidden");
   _setCambiarPlanta(false);
   setHistorySpace(false);
@@ -40691,8 +40718,40 @@ window.chooseVirgilio = function () {
   _renderIdentity();
 };
 window.chooseCervantes = function () {
-  // Cervantes vive en ./cervantes/ y levanta la misma sesión (mismo origin).
+  // v14.73 — El SUPERVISOR que elige Cervantes NO va a la pantalla de operario:
+  // va al admin. Hoy son dos (Gestión Productiva entero y 2.0), así que se le
+  // muestran las dos. El operario sigue derecho a ./cervantes/, que levanta la
+  // misma sesión (mismo origin).
+  if (__identity && __identity.type === "supervisor") { showCervAdmin(); return; }
   window.location.href = "./cervantes/";
+};
+
+/* Pantalla "Admin de Cervantes" (solo supervisor). */
+function showCervAdmin() {
+  __plantChosen = false;
+  window.__isSupervisor = false;
+  $("authBlock").classList.add("hidden");
+  $("legajoEntry").classList.add("hidden");
+  $("supervisorPanel").classList.add("hidden");
+  $("conteoPanel").classList.add("hidden");
+  $("plantSelector").classList.add("hidden");
+  $("cervAdmin").classList.remove("hidden");
+  $("btnHistDias").classList.add("hidden");
+  _setCambiarPlanta(false);
+  setHistorySpace(false);
+  setLegajoTitle(null);
+  if (__identity) setUserTag(__identity.nombre || __identity.email || "");
+}
+window.showCervAdmin = showCervAdmin;
+
+/* Los dos admin de Cervantes viven en OTROS repos, así que son links y no copias.
+   Se resuelven relativo a esta página (en Pages quedan de hermanos) para no clavar
+   el host, y cada repo decide adónde entrar desde su propio index. */
+window.abrirAdminCervantes = function (cual) {
+  var rel = (cual === "gp2") ? "../Gestion-Productiva-2.0/" : "../GestionProductivaEntero/";
+  var url;
+  try { url = new URL(rel, window.location.href).href; } catch (_e) { url = rel; }
+  window.location.href = url;
 };
 window.cambiarPlanta = function () {
   __plantChosen = false;
