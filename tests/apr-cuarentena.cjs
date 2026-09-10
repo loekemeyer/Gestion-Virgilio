@@ -52,6 +52,22 @@ const { chromium } = require("/opt/node22/lib/node_modules/playwright");
     out.pEstActivo = cuarEstadoSuspende("Activo");
     out.pEstVacio = cuarEstadoSuspende("");
 
+    // parser Deuda (Crystal agrupado): cabecera(A=cod texto,B=razón) + detalle(E=FCA,L=idx11) + subtotal(sólo L)
+    const daoa = [
+      ["Vto.","Emisión","Días","Div.","Comprobante","","","","","","","Pendiente","Acumulado"],
+      ["","","","","","Division Unica"],
+      ["1104","Ramirez Miguel","","","","","dir","tel"],
+      [46231,46231,44,"Div","FCA",400,"x","Admin",1,"$",0,516747.92,516747.92],
+      ["","","","","","","","","","","",516747.92],
+      ["1361","Santone","","","",""],
+      [46230,46230,45,"Div","FCA",401,"y","Admin",1,"$",0,1000,1000],
+      [46231,46231,44,"Div","FCA",402,"y","Admin",1,"$",0,725822.09,726822.09],
+      ["","","","","","","","","","","",726822.09],
+      ["1274","Credito SA","","","",""],
+      [46000,46000,10,"Div","FCA",403,"z","Admin",1,"$",0,-16023,-16023]
+    ];
+    out.deuda = cuarParseDeudaCrystal(daoa);
+
     // (2) un pedido marcado por deuda + supera crédito: sale de la lista y cae en cuarentena
     _apr.pedidos = [
       mk({ order_id: 100, razon_social: "Cliente Deudor", cuarentena_motivos: ["deuda", "limite_credito"] }),
@@ -100,6 +116,15 @@ const { chromium } = require("/opt/node22/lib/node_modules/playwright");
   chk(r.pEstSinCta === true, "Estado 'Sin Cta.Cte.' → cuarentena (true)");
   chk(r.pEstActivo === false, "Estado 'Activo' → false");
   chk(r.pEstVacio === null, "Estado vacío → null");
+  // parser Deuda
+  chk(r.deuda.length === 3, "Deuda: 3 clientes (la fila 'Vto.' NO cuenta) — dio " + r.deuda.length);
+  const d1104 = r.deuda.find(function (c) { return c.cod === "1104"; });
+  const d1361 = r.deuda.find(function (c) { return c.cod === "1361"; });
+  const d1274 = r.deuda.find(function (c) { return c.cod === "1274"; });
+  chk(d1104 && Math.abs(d1104.deuda - 516747.92) < 0.01 && d1104.docs === 1, "Deuda 1104 Ramirez = 516747.92 (1 doc)");
+  chk(d1361 && Math.abs(d1361.deuda - 726822.09) < 0.01 && d1361.docs === 2, "Deuda 1361 multi-doc suma = 726822.09 (2 docs)");
+  chk(d1274 && Math.abs(d1274.deuda - (-16023)) < 0.01, "Deuda 1274 negativa = -16023 (no cae en cuarentena)");
+  chk(!r.deuda.some(function (c) { return c.cod === "Vto."; }), "la fila de encabezado 'Vto.' no se toma como cliente");
   chk(errs.length === 0, "sin errores de página" + (errs.length ? " (" + errs.join(" | ") + ")" : ""));
 
   await b.close();

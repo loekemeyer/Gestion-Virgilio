@@ -4621,3 +4621,26 @@ mapea clavado (cod→A, cuit→H, razón→C, estado→D, límite→AV; probado 
   3. **Deuda** (reportes Deuda LK/CH, formato aún no recibido): saldo adeudado → cuarentena.
 - Prueba backend (supervisor simulado): 3 filas con estados Suspendido / Sin Cta.Cte. / Activo →
   `estado` + `suspendido` + `limite_credito` (0 se guarda como 0) correctos; luego borradas.
+
+### Addendum v14.84 (2026-09-10) — reportes "Deuda" (Crystal agrupado) + reglas de marcado
+
+El dueño mandó los **Deuda LK/CH** (export **Crystal Reports "Ficha Vto."**, `.xls` BIFF real, no
+tabla plana): fila 1 encabezados (`L = Pendiente`), y por cliente una **cabecera** (`A` código texto,
+`B` razón social, sin comprobante) + filas de **detalle** (`E` = comprobante FCA…, `L` = pendiente) +
+una fila **subtotal** (sólo `L`). **Total del cliente = suma de la col L de sus comprobantes** (puede
+ser negativo = saldo a favor). El front lo parsea con `cuarParseDeudaCrystal` (SheetJS ya lee `.xls`),
+descartando la fila de encabezado (código debe ser dígitos). Medido: LK 183 clientes (45 negativos,
+85 multi-doc), CH 41; Ramírez (1104) = 516.747,92 (coincide con la col L del subtotal).
+
+**Reglas de marcado que fijó el dueño (las tres son OR; con una alcanza para ir a cuarentena):**
+1. **Estado** Suspendido o Sin Cta.Cte. → todos los pedidos del cliente.
+2. **Deuda** total **> $1.000** → todos los pedidos del cliente.
+3. **Límite de crédito**: la cuarentena es **por pedido de la página** (todas sus NP van juntas). Se
+   lleva el **acumulado** de los pedidos del cliente **no facturados y NO en cuarentena** (con
+   descuentos, sin IVA), en orden de llegada. Cuando entra un pedido nuevo, si `acumulado + total > límite`
+   → ese pedido (todas sus NP) a cuarentena y **no** suma al acumulado (no consume crédito hasta
+   liberarse). `límite = 0` = infinito.
+
+Estado (v14.84): las **4 importaciones** llenan `GV_Cuarentena_Fuente` (búsqueda: cod/estado/suspendido/
+límite; deuda: cod/deuda). **Falta el MARCADO** (aplicar estas 3 reglas al feed de A Programar y que el
+automático 71/73 lo respete) — próxima fase.

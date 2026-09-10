@@ -31,9 +31,19 @@
 --   H(7)  CUIT                      → cuit
 --   AV(47) Límite de Crédito        → limite_credito (0 = infinito)
 -- suspendido = (Estado ∈ {Suspendido, Sin Cta.Cte.}). El front auto-detecta por
--- encabezado y deja re-mapear. REGLA DE LÍMITE (marcado, fase próxima): un cliente
--- va a cuarentena si el total de sus pedidos EN PROGRAMACIÓN (con descuentos, sin
--- IVA) es MAYOR a su límite; límite 0 = sin tope.
+-- encabezado y deja re-mapear. REGLA DE LÍMITE (marcado, fase próxima): un pedido
+-- va a cuarentena si al sumarlo al acumulado NO facturado y NO en cuarentena del
+-- cliente (con descuentos, sin IVA) se SUPERA su límite; límite 0 = sin tope. Un
+-- pedido en cuarentena NO consume crédito hasta que se libere.
+--
+-- LAYOUT REAL de "Deuda" (verificado 2026-09-10, LK y CH, export Crystal "Ficha
+-- Vto.", AGRUPADO — NO es tabla plana): fila 1 encabezados (L = "Pendiente"); por
+-- cliente: una CABECERA (A = código texto, B = razón social, sin comprobante) +
+-- filas de DETALLE (E = comprobante FCA…, L = pendiente) + una fila SUBTOTAL (sólo
+-- L). El total del cliente = SUMA de "Pendiente" (col L) de sus comprobantes; puede
+-- ser negativo (saldo a favor). El front lo parsea con `cuarParseDeudaCrystal`.
+-- REGLA DE DEUDA (marcado): total > $1.000 → todos los pedidos del cliente a
+-- cuarentena. Se guardan todos los clientes; el umbral se aplica al marcar.
 -- ══════════════════════════════════════════════════════════════════════════
 
 -- ── 1. Tabla fuente ─────────────────────────────────────────────────────────

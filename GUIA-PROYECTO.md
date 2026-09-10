@@ -12,7 +12,18 @@
 > única**; no se replica. Ante la duda entre parche rápido y fix de raíz → **fix
 > de raíz**.
 >
-> Última actualización: 2026-09-10 (jueves) · Versión app al documentar: **v14.83**
+> Última actualización: 2026-09-10 (jueves) · Versión app al documentar: **v14.84**
+>
+> Nota **v14.84 (2026-09-10) — CUARENTENA: importación de "Deuda" (Crystal agrupado) + reglas cerradas.**
+> Los reportes **Deuda LK/CH** son un export **Crystal "Ficha Vto."** (`.xls` real, agrupado): cabecera por
+> cliente (A código, B razón) + detalle de comprobantes (col L "Pendiente") + subtotal. **Total del cliente =
+> suma de la col L** (puede ser negativo). El front lo parsea aparte (`cuarParseDeudaCrystal`; SheetJS ya lee
+> `.xls`). Con esto **las 4 importaciones andan**. **Reglas de marcado del dueño (OR):** (1) Estado
+> Suspendido/Sin Cta.Cte. → cuarentena; (2) **Deuda > $1.000** → cuarentena; (3) **Límite**: por pedido de la
+> página (todas sus NP juntas), llevando el acumulado de pedidos **no facturados y NO en cuarentena** (con
+> dtos, sin IVA); si `acumulado + total > límite` → cuarentena y no consume crédito hasta liberarse (límite 0 =
+> ∞). **Falta el marcado** (aplicar las 3 reglas al feed + que el automático 71/73 lo respete). §3.bs (addenda)
+> de `docs/SUPABASE-GESTION-VIRGILIO.md`.
 >
 > Nota **v14.83 (2026-09-10) — CUARENTENA: layout real de "Búsqueda CL" + reglas del dueño.**
 > Con los archivos reales (LK y CH idénticos): `A Código`, `C Razón Social`, `D Estado`

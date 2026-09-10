@@ -7559,7 +7559,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v14.83";
+const APP_VERSION = "v14.84";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -35328,11 +35328,11 @@ function cuarModalEl() {
   return el;
 }
 function cuarImportAbrir(empresa, tipo) {
-  _cuarImp = { open: true, empresa: empresa, tipo: tipo, fname: "", headers: [], dataRows: [], map: {}, err: "", saving: false, loading: false };
+  _cuarImp = { open: true, empresa: empresa, tipo: tipo, fname: "", headers: [], dataRows: [], deuda: [], map: {}, err: "", saving: false, loading: false };
   cuarModalEl().hidden = false; cuarImportRender();
 }
 function cuarImportCerrar() { const el = document.getElementById("cuarModal"); if (el) el.hidden = true; _cuarImp.open = false; }
-function cuarImportOtro() { _cuarImp.headers = []; _cuarImp.dataRows = []; _cuarImp.map = {}; _cuarImp.fname = ""; _cuarImp.err = ""; cuarImportRender(); }
+function cuarImportOtro() { _cuarImp.headers = []; _cuarImp.dataRows = []; _cuarImp.deuda = []; _cuarImp.map = {}; _cuarImp.fname = ""; _cuarImp.err = ""; cuarImportRender(); }
 function cuarImportSetMap(key, val) { _cuarImp.map[key] = (val === "") ? "" : parseInt(val, 10); cuarImportRender(); }
 async function cuarImportFile(input) {
   const f = input && input.files && input.files[0]; if (!f) return;
@@ -35342,21 +35342,65 @@ async function cuarImportFile(input) {
     const buf = await f.arrayBuffer();
     const wb = XLSX.read(buf, { type: "array" });
     const ws = wb.Sheets[wb.SheetNames[0]];
-    const aoa = XLSX.utils.sheet_to_json(ws, { header: 1, raw: false, defval: "" });
-    let hr = 0;
-    for (let i = 0; i < Math.min(aoa.length, 30); i++) {
-      const ne = (aoa[i] || []).filter(function (c) { return String(c).trim() !== ""; }).length;
-      const tx = (aoa[i] || []).some(function (c) { return /[a-zA-Z]/.test(String(c)); });
-      if (ne >= 2 && tx) { hr = i; break; }
+    if (_cuarImp.tipo === "deuda") {
+      // Reporte "Deuda" = Crystal AGRUPADO (una cabecera por cliente + detalle + subtotal).
+      // Se lee con raw:true para distinguir la cabecera (A = código texto) del detalle (A = fecha nº).
+      const aoa = XLSX.utils.sheet_to_json(ws, { header: 1, raw: true, defval: "" });
+      _cuarImp.deuda = cuarParseDeudaCrystal(aoa);
+      _cuarImp.loading = false;
+      if (!_cuarImp.deuda.length) _cuarImp.err = "No encontré clientes con deuda (¿el archivo tiene otro formato?).";
+    } else {
+      const aoa = XLSX.utils.sheet_to_json(ws, { header: 1, raw: false, defval: "" });
+      let hr = 0;
+      for (let i = 0; i < Math.min(aoa.length, 30); i++) {
+        const ne = (aoa[i] || []).filter(function (c) { return String(c).trim() !== ""; }).length;
+        const tx = (aoa[i] || []).some(function (c) { return /[a-zA-Z]/.test(String(c)); });
+        if (ne >= 2 && tx) { hr = i; break; }
+      }
+      _cuarImp.headers = (aoa[hr] || []).map(function (c) { return String(c == null ? "" : c).trim(); });
+      _cuarImp.dataRows = aoa.slice(hr + 1).filter(function (r) { return (r || []).some(function (c) { return String(c).trim() !== ""; }); });
+      _cuarImp.map = cuarAutoMap(_cuarImp.headers, _cuarImp.tipo);
+      _cuarImp.loading = false;
+      if (!_cuarImp.headers.length) _cuarImp.err = "No encontré encabezados en el archivo.";
     }
-    _cuarImp.headers = (aoa[hr] || []).map(function (c) { return String(c == null ? "" : c).trim(); });
-    _cuarImp.dataRows = aoa.slice(hr + 1).filter(function (r) { return (r || []).some(function (c) { return String(c).trim() !== ""; }); });
-    _cuarImp.map = cuarAutoMap(_cuarImp.headers, _cuarImp.tipo);
-    _cuarImp.loading = false;
-    if (!_cuarImp.headers.length) _cuarImp.err = "No encontré encabezados en el archivo.";
   } catch (e) { _cuarImp.err = String((e && e.message) || e); _cuarImp.loading = false; }
   try { input.value = ""; } catch (_e) {}
   cuarImportRender();
+}
+/* Reporte "Deuda" (Crystal agrupado). Estructura verificada (LK y CH, "Ficha Vto."):
+   fila 1 = encabezados (L = "Pendiente"), luego por cliente:
+     · CABECERA: A = código (texto), B = razón social, sin comprobante (E vacío)
+     · DETALLE:  E = comprobante (FCA…), L = pendiente del comprobante
+     · SUBTOTAL: sólo L (se ignora: ya sumamos el detalle)
+   Total del cliente = suma de "Pendiente" (col L, idx 11) de sus comprobantes.
+   Puede ser negativo (saldo a favor). La regla > $1.000 se aplica al MARCAR. */
+function cuarNumRaw(v) { if (v == null || v === "") return 0; if (typeof v === "number") return v; const n = cuarParseNum(v); return n == null ? 0 : n; }
+function cuarParseDeudaCrystal(aoa) {
+  const cli = []; let cur = null;
+  for (const row of (aoa || [])) {
+    const A = row[0], B = row[1], E = row[4], L = row[11];
+    const cod = (A == null ? "" : String(A).trim());
+    const bt = (B == null ? "" : String(B).trim());
+    const et = (E == null ? "" : String(E).trim());
+    const isHeader = /^\d+$/.test(cod) && bt !== "" && et === "";
+    const isDetail = et !== "" && et.toUpperCase() !== "COMPROBANTE";
+    if (isHeader) { if (cur) cli.push(cur); cur = { cod: cod, razon_social: bt, deuda: 0, docs: 0 }; }
+    else if (cur && isDetail) { cur.deuda += cuarNumRaw(L); cur.docs++; }
+  }
+  if (cur) cli.push(cur);
+  return cli;
+}
+function cuarDeudaPreviewHtml() {
+  const s = _cuarImp, cli = s.deuda || [];
+  const may = cli.filter(function (c) { return c.deuda > 1000; }).length;
+  let h = '<div class="cuar-file-ok">📄 ' + escapeHtml(s.fname) + ' · ' + cli.length + ' clientes · <b>' + may + '</b> con deuda &gt; $1.000 → cuarentena</div>' +
+    '<div class="cuar-prev"><table><thead><tr><th>Código</th><th>Razón social</th><th>Deuda</th><th>Cuarent.</th></tr></thead><tbody>';
+  const top = cli.slice().sort(function (a, b) { return b.deuda - a.deuda; }).slice(0, 8);
+  for (const c of top) {
+    h += '<tr><td>' + escapeHtml(c.cod) + '</td><td>' + escapeHtml(c.razon_social || "—") + '</td><td>' + aprNum(c.deuda, 2) + '</td><td>' + (c.deuda > 1000 ? "🚧 sí" : "no") + '</td></tr>';
+  }
+  h += '</tbody></table></div><div class="cuar-m-sub">Se guardan los ' + cli.length + ' clientes; la regla <b>&gt; $1.000</b> se aplica al marcar. Muestro los 8 de mayor deuda.</div>';
+  return h;
 }
 function cuarPreviewHtml() {
   const s = _cuarImp, rows = s.dataRows.slice(0, 6);
@@ -35388,18 +35432,22 @@ function cuarImportRender() {
     return o;
   };
   const fld = function (label, key) { return '<label class="cuar-map-row"><span>' + label + '</span><select onchange="cuarImportSetMap(\'' + key + '\',this.value)">' + opt(s.map[key]) + '</select></label>'; };
+  const hasData = s.tipo === "deuda" ? ((s.deuda || []).length > 0) : (s.headers.length > 0);
+  const nGuardar = s.tipo === "deuda" ? (s.deuda || []).length : s.dataRows.length;
   let body;
-  if (!s.headers.length) {
+  if (!hasData) {
     body = '<p class="cuar-m-sub">Subí el <b>.xls</b> exportado del ERP. Saco los clientes y ' +
-      (s.tipo === "deuda" ? 'su <b>deuda</b>' : 'su <b>límite de crédito</b> y si están <b>suspendidos</b>') + '.</p>' +
+      (s.tipo === "deuda" ? 'su <b>deuda</b> total' : 'su <b>límite de crédito</b> y si están <b>suspendidos</b>') + '.</p>' +
       '<input class="cuar-file" type="file" accept=".xls,.xlsx,.csv" onchange="cuarImportFile(this)">' +
       (s.loading ? '<div class="cuar-m-load">Leyendo el archivo…</div>' : "");
+  } else if (s.tipo === "deuda") {
+    body = cuarDeudaPreviewHtml() +
+      '<button class="cuar-file-again" onclick="cuarImportOtro()">Elegir otro archivo</button>';
   } else {
     body = '<div class="cuar-file-ok">📄 ' + escapeHtml(s.fname) + ' · ' + s.dataRows.length + ' filas</div>' +
       '<div class="cuar-map">' +
         fld("Código de cliente", "cod") + fld("CUIT", "cuit") + fld("Razón social", "razon_social") +
-        (s.tipo === "busqueda" ? fld("Estado (Activo/Suspendido/Sin Cta.Cte.)", "estado") + fld("Límite de crédito", "limite_credito")
-                               : fld("Deuda / Saldo", "deuda")) +
+        fld("Estado (Activo/Suspendido/Sin Cta.Cte.)", "estado") + fld("Límite de crédito", "limite_credito") +
       '</div>' + cuarPreviewHtml() +
       '<button class="cuar-file-again" onclick="cuarImportOtro()">Elegir otro archivo</button>';
   }
@@ -35409,25 +35457,25 @@ function cuarImportRender() {
       '<div class="cuar-m-head"><b>📥 Importar ' + escapeHtml(cuarFuenteLabel(s.empresa, s.tipo)) + '</b>' +
         '<button class="cuar-m-x" onclick="cuarImportCerrar()">✕</button></div>' +
       '<div class="cuar-m-body">' + body + (s.err ? '<div class="cuar-m-err">⚠ ' + escapeHtml(s.err) + '</div>' : "") + '</div>' +
-      (s.headers.length ? '<div class="cuar-m-foot"><button class="cuar-save" ' + (s.saving ? "disabled" : "") + ' onclick="cuarImportGuardar()">' + (s.saving ? "Guardando…" : "Guardar " + s.dataRows.length + " filas") + '</button></div>' : "") +
+      (hasData ? '<div class="cuar-m-foot"><button class="cuar-save" ' + (s.saving ? "disabled" : "") + ' onclick="cuarImportGuardar()">' + (s.saving ? "Guardando…" : "Guardar " + nGuardar + (s.tipo === "deuda" ? " clientes" : " filas")) + '</button></div>' : "") +
     '</div>';
 }
 async function cuarImportGuardar() {
   const s = _cuarImp;
-  if (s.map.cod === "" && s.map.cuit === "") { s.err = "Mapeá al menos Código o CUIT."; cuarImportRender(); return; }
-  const rows = [];
-  for (const r of s.dataRows) {
-    const cod = cuarCell(r, s.map.cod), cuit = cuarCell(r, s.map.cuit);
-    if (!cod && !cuit) continue;
-    const o = { cod: cod || null, cuit: cuit || null, razon_social: cuarCell(r, s.map.razon_social) || null };
-    if (s.tipo === "busqueda") {
+  let rows = [];
+  if (s.tipo === "deuda") {
+    rows = (s.deuda || []).map(function (c) { return { cod: c.cod, razon_social: c.razon_social || null, deuda: c.deuda }; });
+  } else {
+    if (s.map.cod === "" && s.map.cuit === "") { s.err = "Mapeá al menos Código o CUIT."; cuarImportRender(); return; }
+    for (const r of s.dataRows) {
+      const cod = cuarCell(r, s.map.cod), cuit = cuarCell(r, s.map.cuit);
+      if (!cod && !cuit) continue;
+      const o = { cod: cod || null, cuit: cuit || null, razon_social: cuarCell(r, s.map.razon_social) || null };
       const est = cuarCell(r, s.map.estado); if (est) o.estado = est;
       const sp = cuarEstadoSuspende(est); if (sp != null) o.suspendido = sp;
       const lc = cuarParseNum(cuarCell(r, s.map.limite_credito)); if (lc != null) o.limite_credito = lc;
-    } else {
-      const d = cuarParseNum(cuarCell(r, s.map.deuda)); if (d != null) o.deuda = d;
+      rows.push(o);
     }
-    rows.push(o);
   }
   if (!rows.length) { s.err = "No saqué ninguna fila con cliente (revisá el mapeo)."; cuarImportRender(); return; }
   s.saving = true; s.err = ""; cuarImportRender();
