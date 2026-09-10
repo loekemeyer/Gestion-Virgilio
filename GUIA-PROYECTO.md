@@ -12,7 +12,20 @@
 > única**; no se replica. Ante la duda entre parche rápido y fix de raíz → **fix
 > de raíz**.
 >
-> Última actualización: 2026-09-10 (jueves) · Versión app al documentar: **v14.84**
+> Última actualización: 2026-09-10 (jueves) · Versión app al documentar: **v14.88**
+>
+> Nota **v14.88 (2026-09-10) — CUARENTENA: liberar + Config. Cuarentena + carga inicial + ficha nueva.**
+> (1) **Liberar**: dentro de la ficha del pedido en cuarentena hay un botón **"➡ Enviar a Pedidos a
+> programar"** (`cuarLiberar` → `gv_cuarentena_liberar`, tabla `GV_Cuarentena_Liberados`): el pedido sale del
+> sector y entra al pipeline **manteniendo el badge** (se auto-programa si es zona automática, o se suma a
+> tandas a mano). El marcado y el cron **excluyen** los liberados. (2) **Ficha rediseñada**: NP en grande
+> (LK/CH/ISIS), zona, m³, razón social, y **3 badges** separados (⛔ suspendido / 💰 deuda / 📈 excede crédito).
+> (3) **Pestaña "Config. Cuarentena"** en la PPP (a la derecha de Ocupación): ahí se movieron los **4 botones**
+> de importación, cada uno con el texto **"última vez cargada DdHhMmSs"** (se pone rojo + `!!!` pasados 7 días).
+> (4) **Carga inicial** de los 4 .xls que pasó el dueño (lk/chef Búsqueda + Deuda: 1283/763/183/40 filas,
+> lote `inicial_20260910`). Backend v14.86/87 (valorización criterio Facturación + límite greedy + el cron
+> respeta la cuarentena) ya estaba. §3.bs / §3.bs.2 de `docs/SUPABASE-GESTION-VIRGILIO.md`; `sql/gv_cuarentena.sql`;
+> test `tests/apr-cuarentena.cjs`.
 >
 > Nota **v14.84 (2026-09-10) — CUARENTENA: importación de "Deuda" (Crystal agrupado) + reglas cerradas.**
 > Los reportes **Deuda LK/CH** son un export **Crystal "Ficha Vto."** (`.xls` real, agrupado): cabecera por

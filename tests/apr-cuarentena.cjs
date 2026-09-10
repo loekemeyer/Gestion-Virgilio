@@ -27,19 +27,28 @@ const { chromium } = require("/opt/node22/lib/node_modules/playwright");
     out.vacioCuenta = /🚧 Cuarentena <b>\(0\)<\/b>/.test(html);
     out.listaNormal2 = /📋 Pedidos a programar <b>\(2\)<\/b>/.test(html);
     out.textoVacio = /Sin pedidos retenidos/.test(html);
-    // los 4 botones de importación, con las etiquetas pedidas
-    out.btnBusqLk = /Importar Búsqueda CL LK/.test(html);
-    out.btnBusqCh = /Importar Búsqueda CL CH/.test(html);
-    out.btnDeudaLk = /Importar Deuda LK/.test(html);
-    out.btnDeudaCh = /Importar Deuda CH/.test(html);
-    out.cuatroBotones = (html.match(/cuar-btn/g) || []).length === 4;
-    out.statSinCargar = (html.match(/sin cargar/g) || []).length === 4;
+    // v14.88: los 4 botones de importación se movieron a la pestaña "Config. Cuarentena";
+    // el sector Cuarentena ya NO los muestra (sólo el botón "Ver ejemplo").
+    out.sectorSinBotones = (html.match(/cuar-btn/g) || []).length === 0;
 
-    // resumen cargado → stat con conteos
+    // v14.88: la pestaña Config. Cuarentena tiene los 4 botones + el timer de última carga
+    _pppTab = "cuarcfg"; pppRenderProg(); await new Promise((res) => setTimeout(res, 50));
+    let cfg = document.getElementById("pppPreview").innerHTML;
+    out.cfgTab = /Config\. Cuarentena/.test(cfg);
+    out.btnBusqLk = /Importar Búsqueda CL LK/.test(cfg);
+    out.btnBusqCh = /Importar Búsqueda CL CH/.test(cfg);
+    out.btnDeudaLk = /Importar Deuda LK/.test(cfg);
+    out.btnDeudaCh = /Importar Deuda CH/.test(cfg);
+    out.cuatroBotones = (cfg.match(/cuar-btn/g) || []).length === 4;
+    out.statSinCargar = (cfg.match(/sin cargar/g) || []).length === 4;
+
+    // resumen cargado → stat con conteos (en el title) y "última vez cargada"
     _apr.cuarResumen = [{ empresa: "lk", tipo: "busqueda", filas: 764, con_cuit: 700, suspendidos: 12, con_deuda: 0, con_limite: 700, lote: "L1", cargado_por: "sup@x", cargado_at: "2026-09-10T12:00:00" }];
-    aprRender(); await new Promise((res) => setTimeout(res, 50));
-    html = document.getElementById("pppPreview").innerHTML;
-    out.statConteo = /764 cli · 700 c\/límite · 12 susp/.test(html);
+    pppRenderProg(); await new Promise((res) => setTimeout(res, 50));
+    cfg = document.getElementById("pppPreview").innerHTML;
+    out.statConteo = /764 cli · 700 c\/límite · 12 susp/.test(cfg);
+    out.statTimer = /última vez cargada/.test(cfg);
+    _pppTab = "prog"; aprRender(); await new Promise((res) => setTimeout(res, 50));
 
     // parser: auto-map contra los encabezados REALES del reporte Búsqueda CL + números AR + estado
     out.pMap = cuarAutoMap(["Código", "Razón Social de Búsqueda", "Razón Social", "Estado", "CUIT", "Límite de Crédito"], "busqueda");
@@ -79,7 +88,8 @@ const { chromium } = require("/opt/node22/lib/node_modules/playwright");
     html = document.getElementById("pppPreview").innerHTML;
     out.demoTag = /EJEMPLO/.test(html);
     out.demoCli = /CLIENTE DE EJEMPLO S\.A\./.test(html);
-    out.demoMotivo = /Deuda · Excede crédito/.test(html);
+    // v14.88: la ficha muestra 3 badges separados, no el texto unido
+    out.demoMotivo = /cuar-badge b-deuda/.test(html) && /cuar-badge b-limite/.test(html);
     out.demoCuenta = /🚧 Cuarentena <b>\(1\)<\/b>/.test(html);
     out.demoBtnQuitar = /Quitar ejemplo/.test(html);
     _apr.cuarDemo = false;
@@ -96,7 +106,9 @@ const { chromium } = require("/opt/node22/lib/node_modules/playwright");
     html = document.getElementById("pppPreview").innerHTML;
     out.cuentaCuar1 = /🚧 Cuarentena <b>\(1\)<\/b>/.test(html);
     out.listaNormal1 = /📋 Pedidos a programar <b>\(1\)<\/b>/.test(html);
-    out.badge = /apr-chip-cuar/.test(html) && /Deuda · Excede crédito/.test(html);
+    // v14.88: badges separados (b-deuda + b-limite) + botón "Enviar a Pedidos a programar"
+    out.badge = /cuar-badge b-deuda/.test(html) && /cuar-badge b-limite/.test(html);
+    out.enviarBtn = /cuar-enviar/.test(html) && /Enviar a Pedidos a programar/.test(html);
     out.motivo = /El cliente tiene deuda mayor a \$1\.000\. El pedido supera el límite de crédito del cliente\./.test(html);
     // el deudor no aparece como tarjeta tildable (sin checkbox de selección en su tarjeta)
     out.deudorCliente = /Cliente Deudor/.test(html);
@@ -116,15 +128,19 @@ const { chromium } = require("/opt/node22/lib/node_modules/playwright");
   chk(r.listaNormal2, "sin retenidos: los 2 pedidos van a la lista normal");
   chk(r.cuentaCuar1, "con 1 retenido: Cuarentena (1)");
   chk(r.listaNormal1, "el retenido sale de la lista normal (queda 1)");
-  chk(r.badge, "el retenido lleva badge con la etiqueta del motivo");
+  chk(r.badge, "el retenido lleva 3 badges separados (deuda + límite)");
+  chk(r.enviarBtn, "la ficha tiene el botón 'Enviar a Pedidos a programar'");
   chk(r.motivo, "el retenido muestra el texto del motivo");
   chk(r.deudorCliente, "el cliente deudor se ve en el sector");
   chk(r.soloUnCheckbox, "el retenido NO es tildable (solo el normal tiene checkbox)");
-  // botones de importación
-  chk(r.btnBusqLk && r.btnBusqCh && r.btnDeudaLk && r.btnDeudaCh, "los 4 botones con sus etiquetas exactas");
-  chk(r.cuatroBotones, "exactamente 4 botones cuar-btn");
-  chk(r.statSinCargar, "cada botón dice 'sin cargar' cuando no hay resumen");
-  chk(r.statConteo, "con resumen: '764 cli · 700 c/límite · 12 susp'");
+  // v14.88: los botones se movieron a la pestaña Config. Cuarentena
+  chk(r.sectorSinBotones, "el sector Cuarentena ya NO muestra los 4 botones");
+  chk(r.cfgTab, "existe la pestaña 'Config. Cuarentena'");
+  chk(r.btnBusqLk && r.btnBusqCh && r.btnDeudaLk && r.btnDeudaCh, "Config: los 4 botones con sus etiquetas exactas");
+  chk(r.cuatroBotones, "Config: exactamente 4 botones cuar-btn");
+  chk(r.statSinCargar, "Config: cada botón dice 'sin cargar' cuando no hay resumen");
+  chk(r.statConteo, "Config: con resumen, el title trae '764 cli · 700 c/límite · 12 susp'");
+  chk(r.statTimer, "Config: muestra 'última vez cargada …'");
   // parser
   chk(r.pMap.cod === 0 && r.pMap.cuit === 4 && r.pMap.razon_social === 2 && r.pMap.estado === 3 && r.pMap.limite_credito === 5, "auto-map búsqueda contra encabezados reales (Código/CUIT/Razón Social/Estado/Límite de Crédito)");
   chk(r.pMapDeuda.cod === 0 && r.pMapDeuda.cuit === 1 && r.pMapDeuda.deuda === 3, "auto-map deuda (cod/cuit/saldo)");

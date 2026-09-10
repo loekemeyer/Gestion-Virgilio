@@ -4704,3 +4704,27 @@ monto; el límite necesita esta valorización en el cron.
   y `gv_cuarentena_limite` pasó a `es_supervisor_virgilio() OR gv_es_supervisor_o_servicio()`.
 - **Nota valorización de la base**: al registro armado no le queda guardada la condición de pago, así que la
   base usa el 2% web flat (criterio Facturación); los pendientes sí aplican el 2% condicional por su `cond`.
+
+### §3.bs.2 — v14.88 (2026-09-10): liberar de cuarentena + carga inicial + Config. Cuarentena
+
+- **Liberar un pedido**: `GV_Cuarentena_Liberados` (tabla, RLS on, gate supervisor) +
+  `gv_cuarentena_liberar(p_empresa, p_order_id, p_motivos)` (inserta on conflict) +
+  `gv_cuarentena_liberados()` (lista). Un pedido liberado **sale del sector** y va a "Pedidos a
+  programar" **manteniendo el badge** (se auto-programa si es zona automática, o se agrega a
+  tandas a mano). `gv_cuarentena_marcar` y `gv_cuarentena_limite` **excluyen** los liberados
+  (LEFT JOIN … IS NULL), así que el cron tampoco los retiene. Front: `aprEnCuarentena` mira
+  `p._cuarLiberado`; `cuarMarcarPedidos` trae los liberados en paralelo y los etiqueta para la
+  lista normal con `🚧 Liberado de cuarentena` + badges. Deshacer: `delete from public."GV_Cuarentena_Liberados";`
+- **Carga inicial** (lote `inicial_20260910`, vía `gv_cuarentena_cargar`): lk/busqueda **1283**
+  (202 susp · 817 c/límite), chef/busqueda **763** (211 · 216), lk/deuda **183** (138 > 0),
+  chef/deuda **40** (27 > 0). Layout confirmado A/C/D/H/AV (búsqueda) y Crystal agrupado (deuda).
+  Chequeo: `select * from public.gv_cuarentena_fuente_resumen();` (como supervisor).
+- **Front — pestaña "Config. Cuarentena"** (nueva, a la derecha de Ocupación en la PPP,
+  `_pppTab === "cuarcfg"` → `cuarConfigHtml`): los **4 botones** de importación se movieron acá
+  (ya no en el sector), cada uno con su **timer "última vez cargada DdHhMmSs"** (rojo + `!!!` a
+  los 7 días, `cuarStatHtml`/`cuarTickStart`). El sector 🚧 Cuarentena de A Programar sólo deja
+  el botón "Ver ejemplo". **Ficha de pedido rediseñada**: NP grande (LK/CH/ISIS) + zona + m³ +
+  razón social, **3 badges separados** (⛔ suspendido / 💰 deuda / 📈 excede crédito, `aprCuarBadgesHtml`)
+  y el botón verde **"➡ Enviar a Pedidos a programar"** (`cuarLiberar`).
+- Backend aplicado por migración; volcar con `pg_get_functiondef` si se recrea. Smoke:
+  `tests/apr-cuarentena.cjs`.

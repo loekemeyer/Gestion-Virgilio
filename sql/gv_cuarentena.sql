@@ -177,3 +177,14 @@ comment on function public.gv_cuarentena_fuente_resumen() is
 -- gv_cuarentena_limite(p_pendientes jsonb) — greedy con BASE (armados no facturados) por cliente.
 -- gv_cuarentena_marcar / _limite: gate es_supervisor_virgilio() OR gv_es_supervisor_o_servicio()
 --   (para que el cron service_role pueda evaluarlos). Volcar con pg_get_functiondef si se recrea.
+--
+-- ── v14.88: liberar de cuarentena + carga inicial ──
+-- GV_Cuarentena_Liberados (tabla) + gv_cuarentena_liberar(empresa,order_id,motivos) +
+--   gv_cuarentena_liberados(): un pedido "liberado" sale del sector y va a Pedidos a programar
+--   MANTENIENDO el badge; gv_cuarentena_marcar/_limite lo excluyen del sector. Gate supervisor.
+-- CARGA INICIAL (2026-09-10, lote 'inicial_20260910') hecha con gv_cuarentena_cargar:
+--   lk/busqueda 1283 (202 susp · 817 c/límite), chef/busqueda 763 (211 · 216),
+--   lk/deuda 183 (138 >0), chef/deuda 40 (27 >0). Verificado con gv_cuarentena_fuente_resumen().
+-- FRONT v14.88: los 4 botones de importación viven en la pestaña "Config. Cuarentena" (PPP,
+--   a la derecha de Ocupación); el sector Cuarentena muestra la ficha rediseñada (NP grande,
+--   zona, m³, razón social, 3 badges y botón "Enviar a Pedidos a programar") + timer de carga.
