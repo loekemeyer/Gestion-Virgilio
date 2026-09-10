@@ -350,3 +350,6 @@ PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node te
 
 echo "== fac-descargas (v14.36: col A fecha de descarga · col J condición de pago · solapa Descargas · razón social de la NP web) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/fac-descargas.cjs
+
+echo "== pk-excedente-vista (v14.92: pkFetchExcedente lee cajas de vista_saldos_stock, no suma movimientos truncados a 1000) =="
+PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/pk-excedente-vista.cjs

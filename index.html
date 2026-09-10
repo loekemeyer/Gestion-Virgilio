@@ -7598,7 +7598,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v14.91";
+const APP_VERSION = "v14.92";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -9336,7 +9336,17 @@ async function showPickingList(tanda, legajo, opts) {
 function pkFmt(n) { const r = Math.round(n * 100) / 100; return (r === Math.round(r) ? String(Math.round(r)) : String(r)).replace(".", ","); }
 /* v4.26: saldo de EXCEDENTE por artículo + ubicaciones (el excedente no tiene lugar
    fijo: la ubicación se cargó en el MG). Devuelve { ART: {cajas, ubics:[]} } solo
-   para los que tienen saldo > 0. Best-effort. */
+   para los que tienen saldo > 0. Best-effort.
+   v14.92 — ⚠ BUG (2026-09-10, lo reportaron los operarios: 546/587/502 "mandados al
+   excedente" con excedente 0): esta función sumaba los deltas de Movimientos_Stock
+   (deposito=excedente) con `limit=5000`, pero PostgREST corta en 1000 filas (db-max-rows,
+   misma clase que v5.41/v5.42) y el excedente ya tiene 5.500+ movimientos. Con la ventana
+   de 1000 se perdían los pickings viejos (negativos) y quedaban los ajustes/guardados
+   nuevos (positivos) → saldo FANTASMA (502: 26 en el front, 0 real) → el picking salteaba
+   la góndola y mandaba al excedente. Ahora las CAJAS salen de `vista_saldos_stock`
+   (fuente de verdad, respeta el cutoff, 1 fila por artículo) y de los movimientos sólo
+   se leen las UBICACIONES (entradas con delta>0 y ubicación cargada: ~200 filas en toda
+   la tabla, lejos del tope). */
 async function pkFetchExcedente(arts) {
   try {
     if (!arts || !arts.length) return {};
@@ -9346,22 +9356,31 @@ async function pkFetchExcedente(arts) {
     // se arma sin el excedente (se levanta todo de góndola) → degradación aceptable.
     const _ctrl = (typeof AbortController !== "undefined") ? new AbortController() : null;
     const _to = _ctrl ? setTimeout(function () { try { _ctrl.abort(); } catch (_e) {} }, 7000) : null;
-    let r;
+    let rs, ru;
     try {
-      r = await fetch(SUPABASE_STOCK_ENDPOINT + "?deposito=eq.excedente&cod_art=in.(" + inList + ")&select=cod_art,delta,ubicacion,ts&order=ts.desc&limit=5000", { headers: H, cache: "no-store", signal: _ctrl ? _ctrl.signal : undefined });
+      const res = await Promise.all([
+        fetch(SUPABASE_URL + "/rest/v1/vista_saldos_stock?cod_art=in.(" + inList + ")&select=cod_art,excedente&limit=1000", { headers: H, cache: "no-store", signal: _ctrl ? _ctrl.signal : undefined }),
+        fetch(SUPABASE_STOCK_ENDPOINT + "?deposito=eq.excedente&delta=gt.0&ubicacion=not.is.null&cod_art=in.(" + inList + ")&select=cod_art,ubicacion,ts&order=ts.desc&limit=1000", { headers: H, cache: "no-store", signal: _ctrl ? _ctrl.signal : undefined })
+      ]);
+      rs = res[0]; ru = res[1];
     } finally { if (_to) clearTimeout(_to); }
-    if (!r.ok) return {};
-    const rows = await r.json();
-    const m = {};
-    rows.forEach(function (mv) {
-      const k = String(mv.cod_art).toUpperCase();
-      if (!m[k]) m[k] = { cajas: 0, ubics: [] };
-      m[k].cajas += Number(mv.delta || 0);
-      const u = String(mv.ubicacion || "").trim();
-      if (Number(mv.delta) > 0 && u && m[k].ubics.indexOf(u) < 0) m[k].ubics.push(u);   // ubicaciones de las entradas, recientes primero
-    });
+    if (!rs.ok) return {};
+    const saldos = await rs.json();
     const out = {};
-    Object.keys(m).forEach(function (k) { if (Math.round(m[k].cajas * 1000) / 1000 > 0) out[k] = m[k]; });
+    (Array.isArray(saldos) ? saldos : []).forEach(function (x) {
+      const k = String(x.cod_art).toUpperCase();
+      const cajas = Number(x.excedente || 0);
+      if (Math.round(cajas * 1000) / 1000 > 0) out[k] = { cajas: cajas, ubics: [] };
+    });
+    if (ru && ru.ok) {
+      const rows = await ru.json();
+      (Array.isArray(rows) ? rows : []).forEach(function (mv) {
+        const k = String(mv.cod_art).toUpperCase();
+        if (!out[k]) return;
+        const u = String(mv.ubicacion || "").trim();
+        if (u && out[k].ubics.indexOf(u) < 0) out[k].ubics.push(u);   // ubicaciones de las entradas, recientes primero
+      });
+    }
     return out;
   } catch (_e) { return {}; }
 }
