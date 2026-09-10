@@ -12,7 +12,14 @@
 > única**; no se replica. Ante la duda entre parche rápido y fix de raíz → **fix
 > de raíz**.
 >
-> Última actualización: 2026-09-10 (jueves) · Versión app al documentar: **v14.88**
+> Última actualización: 2026-09-10 (jueves) · Versión app al documentar: **v14.89**
+>
+> Nota **v14.89 (2026-09-10, Luis) — CUARENTENA: botón "A cobranzas" (WhatsApp fijo).** En la ficha de un
+> pedido en cuarentena, botón **"💬 A cobranzas"** que abre WhatsApp al número **fijo** de cobranzas
+> (`+5491165574113`) con un mensaje ya armado (NP, cliente, motivo, m³) para que decidan si se libera.
+> `cuarWppCobranzas` / `cuarWppMsg` en `index.html`, CSS `.cuar-acciones` / `.cuar-wpp-cob`. **Pendiente
+> (idea 8833):** el botón "WhatsApp **al vendedor** del cliente" — bloqueado porque en la base **no hay
+> teléfono de vendedor** (`Wpp_Vendedores.contacto_wsp` es el nombre, no un número).
 >
 > Nota **v14.88 (2026-09-10) — CUARENTENA: liberar + Config. Cuarentena + carga inicial + ficha nueva.**
 > (1) **Liberar**: dentro de la ficha del pedido en cuarentena hay un botón **"➡ Enviar a Pedidos a

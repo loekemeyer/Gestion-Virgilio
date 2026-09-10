@@ -862,6 +862,12 @@ button {
 .cuar-badge.b-susp{ background:#e0e7ff; color:#3730a3; border:1px solid #c7d2fe; }
 .cuar-enviar{ width:100%; margin-top:8px; background:#166534; color:#fff; border:none; border-radius:8px; padding:7px 8px; font-size:12px; font-weight:800; cursor:pointer; }
 .cuar-enviar:hover{ background:#14532d; }
+/* v14.89 — fila de acciones de la ficha (A cobranzas + Enviar) */
+.cuar-acciones{ display:flex; flex-direction:column; gap:6px; margin-top:8px; }
+.cuar-acciones .cuar-enviar{ margin-top:0; }
+.cuar-wpp{ width:100%; border:none; border-radius:8px; padding:7px 8px; font-size:12px; font-weight:800; cursor:pointer; }
+.cuar-wpp-cob{ background:#128c7e; color:#fff; }
+.cuar-wpp-cob:hover{ background:#0e7568; }
 .cuar-liberado-nota{ font-size:11px; font-weight:800; color:#166534; margin-top:5px; }
 .cuar-demo-hint{ display:block; font-size:10.5px; color:#b45309; margin-top:3px; }
 /* v14.88 — pestaña Config. Cuarentena */
@@ -7589,7 +7595,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v14.88";
+const APP_VERSION = "v14.89";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -35301,7 +35307,10 @@ function aprColCuarentena() {
       '<div class="cuar-card-cli">' + escapeHtml(p.razon_social || p.cod || ("#" + p.order_id)) + '</div>' +
       '<div class="cuar-card-zona">📍 ' + escapeHtml(p.zona || "sin zona") + '</div>' +
       aprCuarBadgesHtml(p) +
-      '<button class="cuar-enviar" onclick="cuarLiberar(\'' + (p.empresa || "lk") + '\',\'' + escapeHtml(String(p.order_id)) + '\')">➡ Enviar a Pedidos a programar</button>' +
+      '<div class="cuar-acciones">' +
+        '<button class="cuar-wpp cuar-wpp-cob" onclick="cuarWppCobranzas(\'' + (p.empresa || "lk") + '\',\'' + escapeHtml(String(p.order_id)) + '\')" title="Escribir a cobranzas por WhatsApp (+54 9 11 6557-4113) para que chequee este pedido">💬 A cobranzas</button>' +
+        '<button class="cuar-enviar" onclick="cuarLiberar(\'' + (p.empresa || "lk") + '\',\'' + escapeHtml(String(p.order_id)) + '\')">➡ Enviar a Pedidos a programar</button>' +
+      '</div>' +
     '</div>';
   }
   return h + '</div></div>';
@@ -35319,6 +35328,26 @@ async function cuarLiberar(empresa, orderId) {
     aprRender();
     aprCargar();
   } catch (e) { _apr.msg = String((e && e.message) || e); _apr.msgErr = true; aprRender(); }
+}
+
+/* v14.89 — Botón "A cobranzas": abre WhatsApp al teléfono FIJO de cobranzas (+5491165574113)
+   con un mensaje ya armado que identifica el pedido, para que chequeen si se libera o no.
+   (El botón "WhatsApp al vendedor del cliente" quedó pendiente: en la base no hay teléfono
+   de vendedor cargado — `Wpp_Vendedores.contacto_wsp` guarda el NOMBRE, no un número.) */
+const CUAR_WPP_COBRANZAS = "5491165574113";
+function cuarWppMsg(p) {
+  const np = (p && p._demo) ? "web LK 9999" : aprPedLabel(p || {});
+  const cli = (p && (p.razon_social || p.cod)) || "";
+  const cod = (p && p.cod) ? " (cód " + p.cod + ")" : "";
+  return "🚧 Cuarentena — a chequear\n" + np + "\n" + cli + cod +
+    "\nMotivo: " + aprCuarentenaEtiqueta(p || {}) + "\nm³: " + aprNum(p && p.m3);
+}
+function cuarWppCobranzas(empresa, orderId) {
+  let p;
+  if (String(orderId) === "EJEMPLO") p = cuarDemoPedido();
+  else p = (_apr.pedidosTodos || []).find(function (x) { return aprKey(x.empresa, x.order_id) === String(empresa) + ":" + String(orderId); });
+  const url = "https://wa.me/" + CUAR_WPP_COBRANZAS + "?text=" + encodeURIComponent(cuarWppMsg(p || {}));
+  try { window.open(url, "_blank", "noopener"); } catch (_e) { try { location.href = url; } catch (_e2) {} }
 }
 
 /* ── CUARENTENA · importación de reportes (.xls) ─────────────────────────────

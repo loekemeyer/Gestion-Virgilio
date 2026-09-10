@@ -109,6 +109,7 @@ const { chromium } = require("/opt/node22/lib/node_modules/playwright");
     // v14.88: badges separados (b-deuda + b-limite) + botón "Enviar a Pedidos a programar"
     out.badge = /cuar-badge b-deuda/.test(html) && /cuar-badge b-limite/.test(html);
     out.enviarBtn = /cuar-enviar/.test(html) && /Enviar a Pedidos a programar/.test(html);
+    out.cobranzasBtn = /cuar-wpp-cob/.test(html) && /A cobranzas/.test(html);  // v14.89
     out.motivo = /El cliente tiene deuda mayor a \$1\.000\. El pedido supera el límite de crédito del cliente\./.test(html);
     // el deudor no aparece como tarjeta tildable (sin checkbox de selección en su tarjeta)
     out.deudorCliente = /Cliente Deudor/.test(html);
@@ -130,6 +131,7 @@ const { chromium } = require("/opt/node22/lib/node_modules/playwright");
   chk(r.listaNormal1, "el retenido sale de la lista normal (queda 1)");
   chk(r.badge, "el retenido lleva 3 badges separados (deuda + límite)");
   chk(r.enviarBtn, "la ficha tiene el botón 'Enviar a Pedidos a programar'");
+  chk(r.cobranzasBtn, "la ficha tiene el botón '💬 A cobranzas' (WhatsApp fijo)");
   chk(r.motivo, "el retenido muestra el texto del motivo");
   chk(r.deudorCliente, "el cliente deudor se ve en el sector");
   chk(r.soloUnCheckbox, "el retenido NO es tildable (solo el normal tiene checkbox)");
