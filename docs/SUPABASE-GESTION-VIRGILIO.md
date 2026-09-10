@@ -4644,3 +4644,20 @@ descartando la fila de encabezado (código debe ser dígitos). Medido: LK 183 cl
 Estado (v14.84): las **4 importaciones** llenan `GV_Cuarentena_Fuente` (búsqueda: cod/estado/suspendido/
 límite; deuda: cod/deuda). **Falta el MARCADO** (aplicar estas 3 reglas al feed de A Programar y que el
 automático 71/73 lo respete) — próxima fase.
+
+### Addendum v14.85 (2026-09-10) — MARCADO (Estado + Deuda) + pedido de ejemplo
+
+- **`gv_cuarentena_marcar(p_pedidos jsonb)`** (SECURITY DEFINER, sólo supervisor): recibe
+  `[{order_id, empresa, cod}]` y devuelve los que van a cuarentena con su(s) `motivos[]`. Reglas de
+  esta versión: **Estado** (Suspendido → `suspendido`, Sin Cta.Cte. → `sin_cta_cte`) y **Deuda > $1.000**
+  (→ `deuda`). Matchea por **empresa + cod** (sirve LK y Chef). Probado: cod suspendido → `sin_cta_cte`,
+  cod con deuda 50.000 → `deuda`, deuda 800 y cod inexistente → no caen.
+- **Front**: `cuarMarcarPedidos()` corre después de cargar A Programar (LK+Chef+ISIS), etiqueta cada
+  pedido (`cuarentena_motivos`) → `aprEnCuarentena` lo saca de la lista normal y lo pone en 🚧 Cuarentena.
+  Se refresca en cada carga (si el cliente se libera, se destilda).
+- **Pedido de EJEMPLO** (`cuarDemoPedido` + botón "👁 Ver ejemplo"): inyecta una tarjeta de prueba
+  (front-only, tag EJEMPLO) para ver el sector sin datos reales. No toca la base.
+- **PENDIENTE — regla de LÍMITE**: falta. Necesita el **monto del pedido valorizado** (con dtos, sin IVA,
+  a nivel order antes de romperse en NP) — vive del lado **LK** — y el **acumulado** de los pedidos del
+  cliente no facturados y no en cuarentena (A Programar + Programación). Y que el armado automático
+  (crons 71/73) respete la cuarentena (hoy el marcado es sólo de pantalla; el cron todavía no lo mira).

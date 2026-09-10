@@ -68,6 +68,23 @@ const { chromium } = require("/opt/node22/lib/node_modules/playwright");
     ];
     out.deuda = cuarParseDeudaCrystal(daoa);
 
+    // etiqueta del motivo sin_cta_cte
+    out.etqSinCta = aprCuarentenaEtiqueta({ cuarentena_motivos: ["sin_cta_cte"] });
+    out.etqCombo = aprCuarentenaEtiqueta({ cuarentena_motivos: ["deuda", "limite_credito"] });
+    // pedido de EJEMPLO (demo)
+    _apr.cuarDemo = true; _apr.pedidos = [mk({ order_id: 100 })];
+    aprRender(); await new Promise((res) => setTimeout(res, 80));
+    html = document.getElementById("pppPreview").innerHTML;
+    out.demoTag = /EJEMPLO/.test(html);
+    out.demoCli = /CLIENTE DE EJEMPLO S\.A\./.test(html);
+    out.demoMotivo = /Deuda · Excede crédito/.test(html);
+    out.demoCuenta = /🚧 Cuarentena <b>\(1\)<\/b>/.test(html);
+    out.demoBtnQuitar = /Quitar ejemplo/.test(html);
+    _apr.cuarDemo = false;
+    aprRender(); await new Promise((res) => setTimeout(res, 40));
+    html = document.getElementById("pppPreview").innerHTML;
+    out.demoOff = !/EJEMPLO/.test(html) && /👁 Ver ejemplo/.test(html);
+
     // (2) un pedido marcado por deuda + supera crédito: sale de la lista y cae en cuarentena
     _apr.pedidos = [
       mk({ order_id: 100, razon_social: "Cliente Deudor", cuarentena_motivos: ["deuda", "limite_credito"] }),
@@ -78,7 +95,7 @@ const { chromium } = require("/opt/node22/lib/node_modules/playwright");
     out.cuentaCuar1 = /🚧 Cuarentena <b>\(1\)<\/b>/.test(html);
     out.listaNormal1 = /📋 Pedidos a programar <b>\(1\)<\/b>/.test(html);
     out.badge = /apr-chip-cuar/.test(html) && /Deuda · Excede crédito/.test(html);
-    out.motivo = /El cliente tiene deuda\. El pedido supera el límite de crédito del cliente\./.test(html);
+    out.motivo = /El cliente tiene deuda mayor a \$1\.000\. El pedido supera el límite de crédito del cliente\./.test(html);
     // el deudor no aparece como tarjeta tildable (sin checkbox de selección en su tarjeta)
     out.deudorCliente = /Cliente Deudor/.test(html);
     const chks = [...document.querySelectorAll(".apr-sel-chk")].length;
@@ -125,6 +142,14 @@ const { chromium } = require("/opt/node22/lib/node_modules/playwright");
   chk(d1361 && Math.abs(d1361.deuda - 726822.09) < 0.01 && d1361.docs === 2, "Deuda 1361 multi-doc suma = 726822.09 (2 docs)");
   chk(d1274 && Math.abs(d1274.deuda - (-16023)) < 0.01, "Deuda 1274 negativa = -16023 (no cae en cuarentena)");
   chk(!r.deuda.some(function (c) { return c.cod === "Vto."; }), "la fila de encabezado 'Vto.' no se toma como cliente");
+  // etiquetas de motivo
+  chk(r.etqSinCta === "Sin Cta.Cte.", "motivo sin_cta_cte → 'Sin Cta.Cte.'");
+  chk(r.etqCombo === "Deuda · Excede crédito", "combo deuda+límite → 'Deuda · Excede crédito'");
+  // pedido de ejemplo
+  chk(r.demoTag && r.demoCli && r.demoMotivo, "el ejemplo muestra tag EJEMPLO + cliente + motivo");
+  chk(r.demoCuenta, "el ejemplo cuenta en Cuarentena (1)");
+  chk(r.demoBtnQuitar, "con ejemplo activo el botón dice 'Quitar ejemplo'");
+  chk(r.demoOff, "al quitar el ejemplo desaparece y el botón vuelve a 'Ver ejemplo'");
   chk(errs.length === 0, "sin errores de página" + (errs.length ? " (" + errs.join(" | ") + ")" : ""));
 
   await b.close();

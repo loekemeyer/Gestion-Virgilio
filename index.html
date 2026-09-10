@@ -819,6 +819,11 @@ button {
 .cuar-tool .cuar-btn:hover{ background:#7c2d12; }
 .cuar-stat{ font-size:10.5px; color:#9a3412; text-align:center; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 .cuar-stat-vacio{ color:#c2a08c; font-style:italic; }
+.cuar-demo-row{ text-align:center; margin:-4px 0 8px; }
+.cuar-demo-btn{ background:transparent; border:1px dashed #c2410c; color:#9a3412; border-radius:7px; padding:3px 10px; font-size:11.5px; font-weight:700; cursor:pointer; width:auto; margin-top:0; }
+.cuar-demo-btn:hover{ background:#fff1e7; }
+.cuar-demo-tag{ background:#fde68a; color:#92400e; font-size:10px; font-weight:800; border-radius:5px; padding:1px 6px; margin-left:auto; letter-spacing:.5px; flex:0 0 auto; }
+.apr-card-demo{ border-style:dashed; }
 /* pop-up de importación (colgado de <body>, fuera del zoom de la PPP) */
 .cuar-modal{ position:fixed; inset:0; z-index:100000; }
 .cuar-m-back{ position:absolute; inset:0; background:rgba(15,23,42,.55); }
@@ -7559,7 +7564,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v14.84";
+const APP_VERSION = "v14.85";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -34724,7 +34729,7 @@ async function aprCargar() {
     _apr.cargando = false;
     _apr.cargandoChef = true;
     _apr.aviso = "";
-    if (_pppTab === "prog") { aprRender(); aprCargarSalida().then(function () { if (_pppTab === "prog") aprRender(); }); }
+    if (_pppTab === "prog") { aprRender(); aprCargarSalida().then(function () { if (_pppTab === "prog") aprRender(); }); cuarMarcarPedidos(); }
 
     // ── Chef, cuando llegue ──
     try {
@@ -34745,7 +34750,7 @@ async function aprCargar() {
   // v13.34 — el día de salida (gv_ppp_web_dia_salida) es UNA vuelta de red más y sólo llena
   // los chips. Antes se esperaba antes de dibujar nada; ahora la lista se ve primero y los
   // chips ("🚚 …") se completan cuando llega.
-  if (!_apr.err) aprCargarSalida().then(function () { if (_pppTab === "prog") aprRender(); });
+  if (!_apr.err) { aprCargarSalida().then(function () { if (_pppTab === "prog") aprRender(); }); cuarMarcarPedidos(); }
 }
 
 /* ── Acciones ──────────────────────────────────────────────────────────── */
@@ -35205,17 +35210,18 @@ function aprCuarentenaMotivos(p) {
   return [];
 }
 function aprCuarentenaEtiqueta(p) {
-  const T = { deuda: "Deuda", suspendido: "Suspendido", limite_credito: "Excede crédito", cuarentena: "Retenido" };
+  const T = { deuda: "Deuda", suspendido: "Suspendido", sin_cta_cte: "Sin Cta.Cte.", limite_credito: "Excede crédito", cuarentena: "Retenido" };
   const ms = aprCuarentenaMotivos(p);
   return ms.length ? ms.map(function (m) { return T[m] || m; }).join(" · ") : "Retenido";
 }
 function aprCuarentenaMotivo(p) {
-  const T = { deuda: "El cliente tiene deuda.", suspendido: "El cliente está suspendido.", limite_credito: "El pedido supera el límite de crédito del cliente.", cuarentena: "Pedido retenido en cuarentena." };
+  const T = { deuda: "El cliente tiene deuda mayor a $1.000.", suspendido: "El cliente está suspendido.", sin_cta_cte: "El cliente figura Sin Cta.Cte.", limite_credito: "El pedido supera el límite de crédito del cliente.", cuarentena: "Pedido retenido en cuarentena." };
   const ms = aprCuarentenaMotivos(p);
   return ms.length ? ms.map(function (m) { return T[m] || m; }).join(" ") : "Pedido retenido en cuarentena.";
 }
 function aprColCuarentena() {
-  const lista = (_apr.pedidos || []).filter(aprEnCuarentena);
+  let lista = (_apr.pedidos || []).filter(aprEnCuarentena);
+  if (_apr.cuarDemo) lista = [cuarDemoPedido()].concat(lista);   // v14.84: pedido de ejemplo
   let h = '<div class="apr-col apr-col-cuar">' +
     '<div class="apr-col-t">🚧 Cuarentena <b>(' + lista.length + ')</b>' +
       '<span class="apr-cuar-help" title="Pedidos de clientes con deuda, suspendidos o que superan su límite de crédito. No se programan (ni a mano ni por el automático): hay que liberarlos primero.">ⓘ</span>' +
@@ -35227,14 +35233,15 @@ function aprColCuarentena() {
   }
   h += '<div class="apr-scroll">';
   for (const p of lista) {
-    h += '<div class="apr-card apr-card-cuar" title="' + escapeHtml(aprCuarentenaMotivo(p)) + '">' +
+    h += '<div class="apr-card apr-card-cuar' + (p._demo ? ' apr-card-demo' : '') + '" title="' + escapeHtml(aprCuarentenaMotivo(p)) + '">' +
       '<div class="apr-card-h">' +
         '<span class="apr-chip apr-chip-cuar">🚧 ' + escapeHtml(aprCuarentenaEtiqueta(p)) + '</span>' +
         '<span class="apr-card-cli">' + escapeHtml(p.razon_social || p.cod || ("#" + p.order_id)) + '</span>' +
+        (p._demo ? '<span class="cuar-demo-tag">EJEMPLO</span>' : '') +
       '</div>' +
       '<div class="apr-card-d">' +
         '<span class="apr-chip apr-chip-z">' + escapeHtml(p.zona || "sin zona") + '</span>' +
-        '<span class="apr-chip apr-chip-ped">' + escapeHtml(aprPedLabel(p)) + '</span>' +
+        '<span class="apr-chip apr-chip-ped">' + escapeHtml(p._demo ? "web LK 9999" : aprPedLabel(p)) + '</span>' +
         '<span class="apr-chip apr-chip-m3">' + aprNum(p.m3) + ' m³</span>' +
       '</div>' +
       '<div class="apr-cuar-motivo">' + escapeHtml(aprCuarentenaMotivo(p)) + '</div>' +
@@ -35273,7 +35280,8 @@ function aprCuarToolsHtml() {
       '<button class="cuar-btn" onclick="cuarImportAbrir(\'' + empresa + '\',\'' + tipo + '\')">📥 Importar ' + cuarFuenteLabel(empresa, tipo) + '</button>' +
       cuarStatHtml(empresa, tipo) + '</div>';
   };
-  return '<div class="cuar-tools">' + b("lk", "busqueda") + b("chef", "busqueda") + b("lk", "deuda") + b("chef", "deuda") + '</div>';
+  return '<div class="cuar-tools">' + b("lk", "busqueda") + b("chef", "busqueda") + b("lk", "deuda") + b("chef", "deuda") + '</div>' +
+    '<div class="cuar-demo-row"><button class="cuar-demo-btn" onclick="cuarDemoToggle()">' + (_apr.cuarDemo ? "✕ Quitar ejemplo" : "👁 Ver ejemplo") + '</button></div>';
 }
 async function cuarResumenCargar() {
   if (_apr.cuarResumenLoading) return;
@@ -35283,6 +35291,35 @@ async function cuarResumenCargar() {
   _apr.cuarResumenLoading = false;
   if (_pppTab === "prog") aprRender();
 }
+
+/* v14.84 — MARCADO: le pasa al backend los pedidos de A Programar (order_id, empresa, cod) y el
+   backend (gv_cuarentena_marcar) devuelve los que van a cuarentena por Estado o Deuda (>1000),
+   con su(s) motivo(s). Se etiqueta cada pedido → aprEnCuarentena lo saca de la lista normal y lo
+   pone en el sector. Vale para LK y Chef (el código es por empresa, se matchea empresa+cod). */
+async function cuarMarcarPedidos() {
+  const peds = _apr.pedidos || [];
+  if (!peds.length) { if (_pppTab === "prog") aprRender(); return; }
+  try {
+    const res = (await aprRpc("gv_cuarentena_marcar", {
+      p_pedidos: peds.map(function (p) { return { order_id: String(p.order_id), empresa: p.empresa || "lk", cod: String(p.cod || "").trim() }; })
+    })) || [];
+    const byKey = {};
+    res.forEach(function (r) { byKey[String(r.empresa) + ":" + String(r.order_id)] = r.motivos || []; });
+    (_apr.pedidosTodos || []).forEach(function (p) {
+      if (p._demo) return;
+      const k = aprKey(p.empresa, p.order_id);
+      if (byKey[k] && byKey[k].length) p.cuarentena_motivos = byKey[k];
+      else if (p.cuarentena_motivos) delete p.cuarentena_motivos;   // se liberó / ya no aplica
+    });
+  } catch (_e) { /* si falla, no marca; no rompe la pantalla */ }
+  if (_pppTab === "prog") aprRender();
+}
+/* Pedido de EJEMPLO para ver el sector sin datos reales (dueño: "poneme un pedido de prueba"). */
+function cuarDemoPedido() {
+  return { order_id: "EJEMPLO", empresa: "lk", cod: "9999", razon_social: "CLIENTE DE EJEMPLO S.A.",
+           zona: "Zona 1 - CABA Sur", m3: 0.42, cuarentena_motivos: ["deuda", "limite_credito"], _demo: true };
+}
+function cuarDemoToggle() { _apr.cuarDemo = !_apr.cuarDemo; aprRender(); }
 
 /* helpers de parseo */
 function cuarNorm(s) { return String(s == null ? "" : s).toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[^a-z0-9]/g, ""); }
