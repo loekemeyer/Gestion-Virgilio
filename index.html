@@ -7469,7 +7469,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v14.63";
+const APP_VERSION = "v14.64";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -15740,7 +15740,7 @@ function _pedImpRender() {
   items.forEach(function (it) { const prov = it.prov || "(sin proveedor)"; if (!byProv[prov]) { byProv[prov] = []; provOrder.push(prov); } byProv[prov].push(it); });
   provOrder.sort(function (a, b) { const ia = _IMPORTADOR_DE[a] || "zz", ib = _IMPORTADOR_DE[b] || "zz"; return String(ia).localeCompare(String(ib)) || String(a).localeCompare(String(b)); });
   let h = _impTabsHtml('ped');
-  h += '<div class="stkpop-hint">Pedidos a los proveedores chinos (índice <b>' + (data.meses || 10) + ' meses</b>). El pedido va en <b>master cajas redondas</b> — tocá la celda <b>MC</b> para ajustarlo (poné <b>0</b> para no pedir). <b>Unidades = MC × uni/master</b>. 🧩 = parte. <b>✏️</b> en curso · <b>📥</b> llegó · <b>🖨</b> PDF por proveedor (Cód · MC · Unidades, sin FOB) para que el chino cotice. <small style="color:#94a3b8">En pantalla angosta la tabla se <b>desliza al costado</b> (la columna Código queda fija).</small></div>';
+  h += '<div class="stkpop-hint">Pedidos a los proveedores chinos (índice <b>' + (data.meses || 10) + ' meses</b>). El pedido va en <b>master cajas redondas</b> — tocá la celda <b>MC</b> para ajustarlo (poné <b>0</b> para no pedir). <b>Unidades = MC × uni/master</b>. 🧩 = parte. <b>✏️</b> en curso (unidades + fecha estimada de entrega) · <b>📥</b> llegó · <b>🖨</b> PDF por proveedor (Cód · MC · Unidades, sin FOB) para que el chino cotice. <small style="color:#94a3b8">En pantalla angosta la tabla se <b>desliza al costado</b> (la columna Código queda fija).</small></div>';
   // Fecha estimada de ENTREGA global (se muestra en el carrito del portal LK).
   const _entrega = (data.entregaGlobal || "");
   h += '<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:12px;padding:10px 14px;background:#eff6ff;border:1px solid #bfdbfe;border-radius:10px">' +
@@ -15794,7 +15794,7 @@ function _pedImpRender() {
         const multi = (it.det || []).length > 1;
         const lbl = (multi && d.marca) ? ('<span style="font-size:10px;color:#64748b;margin-right:2px">' + escapeHtml(d.marca) + '</span>') : '';
         return '<div style="margin:1px 0">' + (lbl ? lbl + '<br>' : '') + '<span style="white-space:nowrap">' +
-          '<button class="stk-btn" style="padding:3px 7px;font-size:12px" title="Editar unidades en curso" onclick="pedImpSetCurso(' + d.id + ',\'' + _codEncV + '\',' + (d.curso || 0) + ')">✏️</button> ' +
+          '<button class="stk-btn" style="padding:3px 7px;font-size:12px" title="Cargar pedido en curso: unidades + fecha estimada de entrega" onclick="pedImpSetCurso(' + d.id + ',\'' + _codEncV + '\',' + (d.curso || 0) + ')">✏️</button> ' +
           '<button class="stk-btn ok" style="padding:3px 7px;font-size:12px" title="Marcar que llegó" onclick="pedImpLlego(' + d.id + ',\'' + _codEncV + '\',' + (d.curso || 0) + ')">📥</button></span></div>';
       }).join('');
       const _m3m = Number(it.m3Master) || 0;
@@ -15999,14 +15999,52 @@ async function pedImpSetEntregaGlobal(val) {
     if (_stkPop && _stkPop.data) _stkPop.data.entregaGlobal = v;
   } catch (e) { try { alert("No se pudo guardar la fecha de entrega: " + (e.message || e)); } catch (_e) {} }
 }
+// dd/mm/aaaa (o dd/mm, dd-mm-aaaa, yyyy-mm-dd) → 'YYYY-MM-DD'. "" = borrar, null = inválido.
+function _pedImpParseFechaISO(s) {
+  s = String(s == null ? "" : s).trim();
+  if (!s) return "";
+  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
+  var m = s.match(/^(\d{1,2})[\/\-.](\d{1,2})(?:[\/\-.](\d{2,4}))?$/);
+  if (!m) return null;
+  var d = parseInt(m[1], 10), mo = parseInt(m[2], 10);
+  var y = m[3] ? parseInt(m[3], 10) : new Date().getFullYear();
+  if (y < 100) y += 2000;
+  if (d < 1 || d > 31 || mo < 1 || mo > 12) return null;
+  return y + "-" + String(mo).padStart(2, "0") + "-" + String(d).padStart(2, "0");
+}
+function _isoToDdMmAaaa(iso) {
+  var m = String(iso || "").match(/^(\d{4})-(\d{2})-(\d{2})/);
+  return m ? (m[3] + "/" + m[2] + "/" + m[1]) : "";
+}
+// Cargar un pedido YA HECHO (en curso): unidades + fecha estimada de entrega.
+// Las unidades van a Importados.pedido_curso (el motor las resta de "a pedir", así
+// no re-pide lo ya pedido). La fecha va a reingreso_est (la lee el portal LK).
 async function pedImpSetCurso(id, codEnc, curso) {
   var cod = decodeURIComponent(codEnc);
-  var val; try { val = prompt("Unidades EN CURSO (pedido a China / en camino) de " + cod + ":", String(Math.round(curso || 0))); } catch (_e) { return; }
+  var val; try { val = prompt("Unidades EN CURSO (pedido ya hecho / en camino) de " + cod + ":", String(Math.round(curso || 0))); } catch (_e) { return; }
   if (val == null) return;
   var uni = parseInt(String(val).replace(/[^\d]/g, ""), 10);
   if (!(uni >= 0)) { try { alert("Número inválido."); } catch (_e) {} return; }
   try { await _pedImpRpc("importados_set_curso", { p_id: id, p_uni: uni }); }
   catch (e) { try { alert("No se pudo guardar: " + (e.message || e)); } catch (_e) {} return; }
+  // Fecha estimada de entrega de ESE pedido (opcional). Enter vacío = sin fecha;
+  // Cancelar = dejar la que estaba.
+  var curFecha = "";
+  try { ((_stkPop && _stkPop.data && _stkPop.data.items) || []).some(function (it) { if (String(it.cod).toUpperCase().trim() === cod.toUpperCase().trim()) { curFecha = it.reingresoEst ? _isoToDdMmAaaa(it.reingresoEst) : ""; return true; } return false; }); } catch (_e) {}
+  var fv; try { fv = prompt("Fecha estimada de entrega de este pedido (dd/mm/aaaa).\nVacío = sin fecha · Cancelar = dejar como está.", curFecha); } catch (_e) { fv = null; }
+  if (fv !== null) {
+    var iso = _pedImpParseFechaISO(fv);
+    if (iso === null) { try { alert("Fecha inválida (usá dd/mm/aaaa); se dejó como estaba."); } catch (_e) {} }
+    else {
+      try {
+        await fetch(SUPABASE_URL + "/rest/v1/Importados?cod_art=eq." + encodeURIComponent(cod), {
+          method: "PATCH",
+          headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY, "Content-Type": "application/json", Prefer: "return=minimal" },
+          body: JSON.stringify({ reingreso_est: iso || null, actualizado: new Date().toISOString() })
+        });
+      } catch (e) { try { alert("Se guardó 'en curso', pero no la fecha: " + (e.message || e)); } catch (_e) {} }
+    }
+  }
   await pedImpReload();
 }
 async function pedImpLlego(id, codEnc, curso) {
