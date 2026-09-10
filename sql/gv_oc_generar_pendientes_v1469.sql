@@ -77,6 +77,10 @@ begin
 
     n_ins := n_ins + 1;
   end loop;
+  -- v14.70: al generar OCs nuevas, materializar "la última anula la anterior" + recibido por
+  -- ventana desde la primera OC (idempotente). La vista del operario ya lo respeta por max_fecha;
+  -- esto deja el estado guardado consistente en el acto. Ver sql/gv_oc_recompute_recibido_v1470.sql.
+  if n_ins > 0 then perform public.gv_oc_recompute_recibido(); end if;
   return n_ins;
 end;
 $function$;

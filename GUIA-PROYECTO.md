@@ -12,7 +12,20 @@
 > única**; no se replica. Ante la duda entre parche rápido y fix de raíz → **fix
 > de raíz**.
 >
-> Última actualización: 2026-09-10 (jueves) · Versión app al documentar: **v14.69**
+> Última actualización: 2026-09-10 (jueves) · Versión app al documentar: **v14.70**
+>
+> Nota **v14.70 (2026-09-10) — Auto-descuento de OC "desde la primera OC" + "la última anula la
+> anterior".** Pedido del dueño. Antes el descuento sólo tocaba la OC más nueva y recién desde el
+> 09/09 → el **% de lleno por OC** salía 0 para casi todas (5 de 620 con recibido). Ahora un
+> recálculo idempotente (`gv_oc_recompute_recibido`) atribuye lo entregado a **cada** OC por su
+> ventana `[fecha_OC, min(OC siguiente mismo prov+cód, fecha_OC+120d))`, cruzando las **dos**
+> fuentes de recepción (`Entregas Tallerista Virgilio` **y** `Entregas Prov AT` — talleristas **y**
+> prov. artículo terminado), topeado al pedido. Y **anula** (`estado='anulada'`, parcial congelado)
+> toda OC que no sea la más nueva de su proveedor+código; sólo la última queda viva. `gv_oc_aplicar_recepcion`
+> (recepción en vivo) y `gv_oc_generar_pendientes` (al generar) disparan el recálculo. Backfill de
+> una vez: 474 filas (anulada 426 / pendiente 159 / recibida 34 / cerrada 1). Testigo Carriero/321:
+> 37/16/58/33/50% en las viejas anuladas, la del 09/09 pendiente. `sql/gv_oc_recompute_recibido_v1470.sql`,
+> `docs/SUPABASE-GESTION-VIRGILIO.md` §3.bp, backup `GV_Backup_Ordenes_Compra_20260910`.
 >
 > Nota **v14.67–v14.69 (2026-09-10) — Cervantes: se termina la copia, `Gestion-Virgilio` pasa a ser
 > el repo fuente.** La app de Cervantes vivía en dos lados: el repo `Registro-Produccion-2.0` y la

@@ -34,6 +34,51 @@ numeración) y en `docs/SUPABASE-GESTION-VIRGILIO.md`.
 
 ## 1. Registro de cambios que tocan objetos compartidos / de Producción
 
+### v14.70 (2026-09-10) — Auto-descuento de OC "desde la primera OC" + "la última anula la anterior"
+
+**Qué se cambió (tabla compartida `Ordenes_Compra` + funciones).**
+1. **Datos (backfill):** se pobló `cantidad_recibida` de TODAS las OCs cruzando lo entregado
+   (`Entregas Tallerista Virgilio` + `Entregas Prov AT`) contra cada OC por su ventana
+   `[fecha_OC, min(OC siguiente mismo prov+cód, fecha_OC+120d))`, topeado al `cantidad`. Y se
+   marcó `estado='anulada'` en toda OC que NO es la más nueva de su proveedor+código (parcial
+   recibido congelado); la más nueva queda `pendiente` (o `recibida` si se completó). Las
+   `cerrada` no se tocaron. **474 filas** cambiadas (426 anulada / 159 pendiente / 34 recibida / 1 cerrada).
+   **Backup:** `public."GV_Backup_Ordenes_Compra_20260910"` (620 filas, RLS ON, sólo service_role).
+2. **Backend (funciones):**
+   - Nuevas: `gv_norm_prov_key(text)`, `gv_norm_prov_keys(text)`, `gv_prov_match(text[],text[])`
+     (helpers de match de proveedor, IMMUTABLE, search_path=public).
+   - Nueva: `gv_oc_recompute_recibido(text,text)` (SECURITY DEFINER) — recálculo idempotente.
+   - **Reescrita** `gv_oc_aplicar_recepcion(text,jsonb)`: ahora llama al recálculo por
+     proveedor+código en vez del descuento incremental a la OC más nueva.
+   - **Modificada** `gv_oc_generar_pendientes(jsonb)`: dispara `gv_oc_recompute_recibido()` al
+     generar OCs nuevas.
+   SQL: `sql/gv_oc_recompute_recibido_v1470.sql`.
+
+**Impacto medido.** Antes: `cantidad_recibida>0` en 5 de 620 OCs. Después:
+`select estado,count(*) from "Ordenes_Compra" group by estado` → anulada 426, pendiente 159,
+recibida 34, cerrada 1. `oc_vigentes_por_proveedor('Carriero')` → 321 pend 234 / 840 pend 76
+(sólo la última OC viva). `gv_oc_recompute_recibido()` corrido 2da vez = 0 filas (idempotente).
+
+**Rollback.**
+```sql
+-- 1) restaurar Ordenes_Compra desde el snapshot
+update public."Ordenes_Compra" o
+   set cantidad_recibida = b.cantidad_recibida,
+       estado            = b.estado,
+       fecha_entrega_real = b.fecha_entrega_real
+  from public."GV_Backup_Ordenes_Compra_20260910" b
+ where o.id = b.id;
+-- 2) volver gv_oc_aplicar_recepcion y gv_oc_generar_pendientes a su versión previa
+--    (git: sql/gv_oc_aplicar_recepcion.sql / oc_nueva_pisa_vieja_v1460.sql / gv_oc_generar_pendientes_v1469.sql
+--     ANTES de v14.70) y:
+drop function if exists public.gv_oc_recompute_recibido(text,text);
+drop function if exists public.gv_prov_match(text[],text[]);
+drop function if exists public.gv_norm_prov_keys(text);
+drop function if exists public.gv_norm_prov_key(text);
+```
+(El backfill NO es reversible por fórmula: usar el snapshot. `estado='anulada'` es un valor
+nuevo; las vistas ya lo excluían junto con `cerrada`.)
+
 ### v14.69 (2026-09-10) — Guarda anti-doble-generación de OCs + limpieza de duplicados
 
 **Qué se cambió (tabla compartida `Ordenes_Compra`).**

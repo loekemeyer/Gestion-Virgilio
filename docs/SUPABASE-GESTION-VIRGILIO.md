@@ -4546,3 +4546,38 @@ la vieja de 234 ya NO reaparece. Recibiendo 100 → queda ped=580, rec=100, pend
 excluía 'recibida'). Hoy hay 1 'cerrada'.
 
 **Rollback:** `docs/ROLLBACK-PRODUCCION.md` §1 (v14.60). SQL vigente: `sql/oc_nueva_pisa_vieja_v1460.sql`.
+
+## §3.bp — v14.70 (2026-09-10): auto-descuento "desde la primera OC" + backfill + anular las viejas
+
+**Pedido del dueño.** *"Arreglá el auto-descuento para que aplique desde la primera OC"* +
+*"Siempre la última OC anula la anterior"*. La v14.59/60 sólo descontaba la OC más nueva y recién
+desde el 09/09, así que el `% de lleno` por OC salía 0 para casi todas (medido: 5 de 620 OCs con
+`cantidad_recibida > 0`), y "la nueva pisa la vieja" vivía sólo en la vista (el estado guardado de
+las viejas seguía 'pendiente').
+
+**Cambio.** Recálculo idempotente que atribuye lo entregado a CADA OC por su ventana y materializa
+el estado. Alimenta de las DOS fuentes (talleristas Y prov. artículo terminado):
+`Entregas Tallerista Virgilio` + `Entregas Prov AT`.
+- **Ventana por OC:** `[fecha_OC, min(fecha OC siguiente mismo prov+cód, fecha_OC+120d))`. Las
+  entregas anteriores a la OC no cuentan. `cantidad_recibida` se topea al `cantidad` (excedente no
+  entra; aviso aparte). Mismo criterio que el visualizador del front (`ocBuildRecep`, v7.52/7.58).
+- **"La última anula la anterior":** por prov+código la OC de fecha más nueva (no cerrada/anulada)
+  queda viva; las anteriores en 'pendiente' → **`estado='anulada'`** con su parcial CONGELADO (para
+  el histórico del % de lleno). Las 'cerrada' no se tocan.
+- **Funciones:** helpers `gv_norm_prov_key` / `gv_norm_prov_keys` / `gv_prov_match`;
+  `gv_oc_recompute_recibido(p_nombre,p_cod)` (núcleo idempotente, SECURITY DEFINER);
+  `gv_oc_aplicar_recepcion(text,jsonb)` **reescrita** para recalcular por prov+código (ignora
+  `items.cajas`; las entregas ya están insertadas cuando el front la llama);
+  `gv_oc_generar_pendientes(jsonb)` ahora dispara el recálculo al generar OCs nuevas.
+  SQL: `sql/gv_oc_recompute_recibido_v1470.sql`.
+
+**Medición.** Backfill de una vez (`select gv_oc_recompute_recibido();`) → **474 filas**. Estado
+después: `anulada 426 / pendiente 159 / recibida 34 / cerrada 1` (620 total). Caso testigo
+**Carriero/321**: OCs 29/07..02/09 → 37/16/58/33/50% **anuladas** (parcial congelado), la del 09/09
+`pendiente` 0%; `oc_vigentes_por_proveedor('Carriero')` sólo muestra 321 pend 234 y 840 pend 76.
+Correr el recálculo 2da vez = **0 filas** (idempotente). Advisors: backup con RLS ON, helpers con
+`search_path` fijo.
+
+**Backup + rollback:** `public."GV_Backup_Ordenes_Compra_20260910"` (620 filas, RLS ON) y
+`docs/ROLLBACK-PRODUCCION.md` §1 (v14.70). El backfill se deshace SÓLO desde el snapshot (no por
+fórmula).
