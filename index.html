@@ -7469,7 +7469,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v14.64";
+const APP_VERSION = "v14.65";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -15707,6 +15707,8 @@ async function openPedidosImportacion() {
 }
 /* v10.38 — filtro Solo Pedido / Ver Todo. */
 function pedImpSetFiltro(solo) { if (!_stkPop || _stkPop.kind !== "pedImp") return; _stkPop.soloPedir = !!solo; _pedImpRender(); }
+/* Filtro por proveedor chino: "" = todas las tarjetas, o el nombre de un proveedor = solo esa. */
+function pedImpSetProv(provEnc) { if (!_stkPop || _stkPop.kind !== "pedImp") return; _stkPop.provFiltro = decodeURIComponent(provEnc || ""); _pedImpRender(); }
 function pedImpToggle() { if (!_stkPop || _stkPop.kind !== "pedImp") return; _stkPop.soloPedir = !_stkPop.soloPedir; _pedImpRender(); }
 /* v10.38 — MASTER CAJAS del pedido, editable por código (se puede poner 0). Vacío = vuelve al
    calculado. El pedido se cuenta en master cajas REDONDAS → unidades = MC × uni_master. */
@@ -15754,17 +15756,28 @@ function _pedImpRender() {
     '<button style="' + _fbtn(soloPedir) + '" onclick="pedImpSetFiltro(true)">Solo Pedido</button>' +
     '<button style="' + _fbtn(!soloPedir) + '" onclick="pedImpSetFiltro(false)">Ver Todo</button>' +
     '<button class="mva-clear" style="background:#166534;color:#fff;border-color:#166534" onclick="pedImpExportExcel()" title="Bajar a Excel lo que se está viendo">📥 Excel</button></div>';
-  // totales (respetan el MC editado)
-  const _gUsd = items.reduce(function (s, it) { return s + _pedImpUsdOf(it); }, 0);
-  const _gM3 = items.reduce(function (s, it) { return s + _pedImpM3Of(it); }, 0);
-  const _nSinFob = items.filter(function (it) { return _pedImpMcOf(it) > 0 && !(it.fobUni > 0); }).length;
-  const _nSinVol = items.filter(function (it) { return _pedImpMcOf(it) > 0 && !(it.m3Master > 0); }).length;
+  // Filtro por proveedor chino: "Todos" (todas las tarjetas) o una sola.
+  const provFiltro = (_stkPop.provFiltro && provOrder.indexOf(_stkPop.provFiltro) >= 0) ? _stkPop.provFiltro : "";
+  if (provOrder.length > 1) {
+    h += '<div style="margin-bottom:12px;display:flex;gap:8px;flex-wrap:wrap;align-items:center">' +
+      '<span style="font-size:12px;font-weight:800;color:#64748b;text-transform:uppercase;letter-spacing:.4px">🏭 Chino:</span>' +
+      '<button style="' + _fbtn(!provFiltro) + '" onclick="pedImpSetProv(\'\')">Todos</button>' +
+      provOrder.map(function (p) { return '<button style="' + _fbtn(provFiltro === p) + '" onclick="pedImpSetProv(\'' + encodeURIComponent(p) + '\')">' + escapeHtml(p) + '</button>'; }).join('') +
+      '</div>';
+  }
+  // totales (respetan el MC editado y el proveedor elegido)
+  const itemsView = provFiltro ? items.filter(function (it) { return (it.prov || "(sin proveedor)") === provFiltro; }) : items;
+  const _gUsd = itemsView.reduce(function (s, it) { return s + _pedImpUsdOf(it); }, 0);
+  const _gM3 = itemsView.reduce(function (s, it) { return s + _pedImpM3Of(it); }, 0);
+  const _nSinFob = itemsView.filter(function (it) { return _pedImpMcOf(it) > 0 && !(it.fobUni > 0); }).length;
+  const _nSinVol = itemsView.filter(function (it) { return _pedImpMcOf(it) > 0 && !(it.m3Master > 0); }).length;
   h += '<div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:12px">' +
     '<div style="flex:1;min-width:150px;background:#ecfdf5;border:1px solid #a7f3d0;border-radius:10px;padding:10px 14px"><div style="font-size:11px;color:#047857;font-weight:700;text-transform:uppercase;letter-spacing:.4px">Total pedido (FOB)</div><div style="font-size:22px;font-weight:800;color:#065f46">u$s ' + Math.round(_gUsd).toLocaleString("es-AR") + '</div>' + (_nSinFob ? '<div style="font-size:11px;color:#b45309">⚠ ' + _nSinFob + ' ítem(s) sin FOB cargado</div>' : '') + '</div>' +
     '<div style="flex:1;min-width:150px;background:#eff6ff;border:1px solid #bfdbfe;border-radius:10px;padding:10px 14px"><div style="font-size:11px;color:#1d4ed8;font-weight:700;text-transform:uppercase;letter-spacing:.4px">Volumen total</div><div style="font-size:22px;font-weight:800;color:#1e3a8a">' + (Math.round(_gM3 * 100) / 100).toLocaleString("es-AR") + ' m³</div>' + (_nSinVol ? '<div style="font-size:11px;color:#b45309">⚠ ' + _nSinVol + ' ítem(s) sin volumen cargado</div>' : '') + '</div>' +
     '</div>';
   let algo = false;
   provOrder.forEach(function (prov) {
+    if (provFiltro && prov !== provFiltro) return;   // ver solo el chino elegido
     const arr = byProv[prov]; if (!arr || !arr.length) return;
     algo = true;
     const imp = _IMPORTADOR_DE[prov] || "(sin importador)";
