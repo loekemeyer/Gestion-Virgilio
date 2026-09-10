@@ -7444,7 +7444,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v14.60";
+const APP_VERSION = "v14.61";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -12856,6 +12856,14 @@ async function ocgFetchImportados() {
     const vm = await supaFetchAllSafe(SUPABASE_URL + "/rest/v1/Importados_Volumen", "select=cod,largo_cm,ancho_cm,alto_cm,m3_master,uni_master");
     (vm || []).forEach(function (r) { volMaster[String(r.cod).toUpperCase().trim()] = { m3: Number(r.m3_master) || 0, um: Number(r.uni_master) || 0, l: Number(r.largo_cm) || 0, a: Number(r.ancho_cm) || 0, h: Number(r.alto_cm) || 0 }; });
   } catch (_e) {}
+  // Reingreso estimado por artículo importado (columna Importados.reingreso_est).
+  // Lo edita el usuario acá; LK lo lee (vista v_lk_reingresos) para mostrar "Reingreso Est
+  // dd/mm" en el portal cuando el artículo está sin stock.
+  const reingresoEst = {};
+  try {
+    const rg = await supaFetchAllSafe(SUPABASE_URL + "/rest/v1/Importados", "select=cod_art,reingreso_est&reingreso_est=not.is.null");
+    (rg || []).forEach(function (r) { if (r.reingreso_est) reingresoEst[String(r.cod_art).toUpperCase().trim()] = String(r.reingreso_est).slice(0, 10); });
+  } catch (_e) {}
   const items = [];
   Object.keys(by).forEach(function (k) {
     const o = by[k];
@@ -12881,7 +12889,7 @@ async function ocgFetchImportados() {
     // v10.06 — cotización USD = unidades a pedir × FOB unitario (por ítem; el total se suma en el render)
     const fobUni = o.fob || 0;
     const usdTotal = (fobUni > 0) ? (aPedirUni * fobUni) : 0;
-    items.push({ cod: o.cod, desc: o.desc, prov: o.prov, proyUni: Math.round(proyUni), meses: meses, objetivoUni: objetivoUni, stockUni: Math.round(stockTot), stockPropio: Math.round(o.stockUni), stockParteU: Math.round(stockParteU), stockParteCods: (sp ? sp.partes : ""), enCurso: Math.round(o.enCurso), aPedirUni: aPedirUni, uxc: o.uxc, uniMaster: uniMaster, cajasEsMaster: cajasEsMaster, aPedirCajas: aPedirCajas, fobUni: fobUni, usdTotal: usdTotal, m3Master: m3Master, m3Dims: vm ? { l: vm.l, a: vm.a, h: vm.h } : null, m3Total: m3Total, esParte: esParte, parteDet: (pp ? pp.detalle : null), det: o.det || [] });
+    items.push({ cod: o.cod, desc: o.desc, prov: o.prov, proyUni: Math.round(proyUni), meses: meses, objetivoUni: objetivoUni, stockUni: Math.round(stockTot), stockPropio: Math.round(o.stockUni), stockParteU: Math.round(stockParteU), stockParteCods: (sp ? sp.partes : ""), enCurso: Math.round(o.enCurso), aPedirUni: aPedirUni, uxc: o.uxc, uniMaster: uniMaster, cajasEsMaster: cajasEsMaster, aPedirCajas: aPedirCajas, fobUni: fobUni, usdTotal: usdTotal, m3Master: m3Master, m3Dims: vm ? { l: vm.l, a: vm.a, h: vm.h } : null, m3Total: m3Total, esParte: esParte, parteDet: (pp ? pp.detalle : null), reingresoEst: (reingresoEst[kk] || ""), det: o.det || [] });
   });
   return { items: items, meses: meses };
 }
@@ -15028,7 +15036,7 @@ var STK_POP_CSS =
   // entre sí) y con overflow-x:hidden cortaba m³ y Acciones. Acá: anchos por <colgroup>,
   // scroll horizontal, header en 2 líneas y primera columna fija al hacer scroll.
   ".mva-tblwrap.wide{overflow-x:auto;-webkit-overflow-scrolling:touch;}" +
-  ".mva-tbl.wide{width:100%;min-width:1246px;}" +   // = suma del <colgroup> de Pedidos Importación
+  ".mva-tbl.wide{width:100%;min-width:1366px;}" +   // = suma del <colgroup> de Pedidos Importación (incl. Reingreso)
   ".mva-tbl.wide th.num,.mva-tbl.wide td.num{width:auto;}" +   // manda el <colgroup>, no el 15% genérico
   ".mva-tbl.wide th,.mva-tbl.wide td{vertical-align:middle;overflow:hidden;}" +
   ".mva-tbl.wide thead th,.mva-tbl.wide td:nth-child(2){text-overflow:ellipsis;}" +   // solo header y Descripción cortan con «…»
@@ -15658,6 +15666,11 @@ async function openPedidosImportacion() {
   body.innerHTML = '<div class="stkpop-empty">Calculando pedidos de importación…</div>';
   let data = { items: [], meses: 10 };
   try { data = await ocgFetchImportados(); } catch (_e) {}
+  // Fecha estimada de entrega global (Stock_Config) — la muestra el carrito de LK.
+  try {
+    const cfg = await supaFetchAllSafe(SUPABASE_URL + "/rest/v1/Stock_Config", "select=valor&clave=eq.entrega_estimada_global");
+    data.entregaGlobal = (cfg && cfg[0] && cfg[0].valor) ? String(cfg[0].valor).slice(0, 10) : "";
+  } catch (_e) { data.entregaGlobal = ""; }
   _stkPop = { kind: "pedImp", data: data, soloPedir: true };
   _pedImpRender();
 }
@@ -15697,6 +15710,13 @@ function _pedImpRender() {
   provOrder.sort(function (a, b) { const ia = _IMPORTADOR_DE[a] || "zz", ib = _IMPORTADOR_DE[b] || "zz"; return String(ia).localeCompare(String(ib)) || String(a).localeCompare(String(b)); });
   let h = _impTabsHtml('ped');
   h += '<div class="stkpop-hint">Pedidos a los proveedores chinos (índice <b>' + (data.meses || 10) + ' meses</b>). El pedido va en <b>master cajas redondas</b> — tocá la celda <b>MC</b> para ajustarlo (poné <b>0</b> para no pedir). <b>Unidades = MC × uni/master</b>. 🧩 = parte. <b>✏️</b> en curso · <b>📥</b> llegó · <b>🖨</b> PDF por proveedor (Cód · MC · Unidades, sin FOB) para que el chino cotice. <small style="color:#94a3b8">En pantalla angosta la tabla se <b>desliza al costado</b> (la columna Código queda fija).</small></div>';
+  // Fecha estimada de ENTREGA global (se muestra en el carrito del portal LK).
+  const _entrega = (data.entregaGlobal || "");
+  h += '<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:12px;padding:10px 14px;background:#eff6ff;border:1px solid #bfdbfe;border-radius:10px">' +
+    '<span style="font-size:13px;font-weight:800;color:#1e3a8a">📅 Fecha estimada de entrega (portal LK)</span>' +
+    '<input type="date" value="' + _entrega + '" onchange="pedImpSetEntregaGlobal(this.value)" style="padding:6px 8px;border:1px solid ' + (_entrega ? '#1d4ed8' : '#cbd5e1') + ';border-radius:8px;font-size:13px;background:#fff">' +
+    '<span style="font-size:11px;color:#64748b">Se muestra a los clientes en el carrito antes de confirmar. Vacío = no se muestra.</span>' +
+    '</div>';
   // filtro Solo Pedido / Ver Todo + Excel
   const _fbtn = function (on) { return 'width:auto;flex:0 0 auto;padding:8px 14px;border-radius:999px;border:1px solid ' + (on ? '#0f766e' : '#cbd5e1') + ';background:' + (on ? '#0f766e' : '#fff') + ';color:' + (on ? '#fff' : '#334155') + ';font-size:13px;font-weight:800;cursor:pointer'; };
   h += '<div style="margin-bottom:10px;display:flex;gap:8px;flex-wrap:wrap;">' +
@@ -15730,8 +15750,8 @@ function _pedImpRender() {
     // v11.70 — anchos explícitos por <colgroup> (suman los 1180px del min-width): sin esto
     // las 14 columnas se pisaban entre sí. Bloque diagnóstico (proy→a pedir) | bloque pedido (MC→m³).
     h += '<div class="mva-tblwrap wide"><table class="mva-tbl wide">' +
-      '<colgroup><col style="width:104px"><col><col style="width:68px"><col style="width:78px"><col style="width:96px"><col style="width:68px"><col style="width:72px"><col style="width:98px"><col style="width:98px"><col style="width:80px"><col style="width:78px"><col style="width:92px"><col style="width:58px"><col style="width:96px"></colgroup>' +
-      '<thead><tr><th>Código</th><th>Descripción</th><th class="num">Proy u/mes</th><th class="num">Objetivo</th><th class="num">Stock</th><th class="num">En curso</th><th class="num">A pedir u</th><th class="num" title="Unidades por master caja (del Excel de quiebres / Importados_Volumen). Tocá el ✏ para editar el volumen.">uni/master</th><th class="num" title="Master cajas a pedir (editable). Poné 0 para no pedir. Vacío = vuelve al calculado.">MC pedido</th><th class="num" title="Unidades = MC × uni/master (master cajas redondas)">Unidades</th><th class="num" title="FOB unitario (USD)">FOB u$s/u</th><th class="num" title="u$s = unidades × FOB">u$s</th><th class="num" title="m³ = MC × m³/master">m³</th><th>Acciones</th></tr></thead><tbody>';
+      '<colgroup><col style="width:104px"><col><col style="width:68px"><col style="width:78px"><col style="width:96px"><col style="width:68px"><col style="width:72px"><col style="width:98px"><col style="width:98px"><col style="width:80px"><col style="width:78px"><col style="width:92px"><col style="width:58px"><col style="width:120px"><col style="width:96px"></colgroup>' +
+      '<thead><tr><th>Código</th><th>Descripción</th><th class="num">Proy u/mes</th><th class="num">Objetivo</th><th class="num">Stock</th><th class="num">En curso</th><th class="num">A pedir u</th><th class="num" title="Unidades por master caja (del Excel de quiebres / Importados_Volumen). Tocá el ✏ para editar el volumen.">uni/master</th><th class="num" title="Master cajas a pedir (editable). Poné 0 para no pedir. Vacío = vuelve al calculado.">MC pedido</th><th class="num" title="Unidades = MC × uni/master (master cajas redondas)">Unidades</th><th class="num" title="FOB unitario (USD)">FOB u$s/u</th><th class="num" title="u$s = unidades × FOB">u$s</th><th class="num" title="m³ = MC × m³/master">m³</th><th class="num" title="Fecha estimada de reingreso del importado. Se muestra en el portal LK (Reingreso Est dd/mm) cuando el artículo está sin stock. Vacío = no se muestra.">Reingreso</th><th>Acciones</th></tr></thead><tbody>';
     arr.sort(function (a, b) { return _pedImpUniOf(b) - _pedImpUniOf(a) || (b.aPedirUni - a.aPedirUni); }).forEach(function (it) {
       const badge = it.esParte ? ' <span style="color:#7c3aed" title="Parte">🧩</span>' : '';
       const _stkShow = Math.max(0, Number(it.stockUni) || 0);
@@ -15763,7 +15783,9 @@ function _pedImpRender() {
       const usdTxt = _usd > 0 ? '<b style="color:#065f46">u$s ' + Math.round(_usd).toLocaleString("es-AR") + '</b>' : '<span style="color:#cbd5e1">—</span>';
       const _m3 = _pedImpM3Of(it);
       const m3Txt = _m3 > 0 ? '<b style="color:#0369a1">' + (Math.round(_m3 * 100) / 100) + '</b>' : '<span style="color:#cbd5e1">—</span>';
-      h += '<tr><td><b>' + escapeHtml(codCanon(it.cod)) + '</b>' + badge + '</td><td style="font-size:12px;white-space:nowrap" title="' + escapeHtml(it.desc || "") + '">' + escapeHtml(artNombre(it.cod, it.desc)) + '</td><td class="num">' + it.proyUni + '</td><td class="num">' + it.objetivoUni + '</td><td class="num">' + stockTxt + '</td><td class="num">' + it.enCurso + '</td><td class="num" style="color:#94a3b8">' + it.aPedirUni + '</td><td class="num">' + umTxt + '</td><td class="num">' + mcInput + '</td><td class="num">' + uniTxt + '</td><td class="num">' + fobTxt + '</td><td class="num">' + usdTxt + '</td><td class="num">' + m3Txt + '</td><td>' + actHtml + '</td></tr>';
+      const _rg = it.reingresoEst ? String(it.reingresoEst).slice(0, 10) : "";
+      const rgInput = '<input type="date" value="' + _rg + '" onchange="pedImpSetReingreso(\'' + _codEncV + '\',this.value)" onclick="event.stopPropagation()" title="Fecha de reingreso estimado (se muestra en el portal LK cuando está sin stock)" style="width:118px;padding:4px 6px;border:1px solid ' + (_rg ? '#b45309' : '#cbd5e1') + ';border-radius:8px;font-size:12px;background:' + (_rg ? '#fff7ed' : '#fff') + '">';
+      h += '<tr><td><b>' + escapeHtml(codCanon(it.cod)) + '</b>' + badge + '</td><td style="font-size:12px;white-space:nowrap" title="' + escapeHtml(it.desc || "") + '">' + escapeHtml(artNombre(it.cod, it.desc)) + '</td><td class="num">' + it.proyUni + '</td><td class="num">' + it.objetivoUni + '</td><td class="num">' + stockTxt + '</td><td class="num">' + it.enCurso + '</td><td class="num" style="color:#94a3b8">' + it.aPedirUni + '</td><td class="num">' + umTxt + '</td><td class="num">' + mcInput + '</td><td class="num">' + uniTxt + '</td><td class="num">' + fobTxt + '</td><td class="num">' + usdTxt + '</td><td class="num">' + m3Txt + '</td><td class="num">' + rgInput + '</td><td>' + actHtml + '</td></tr>';
     });
     h += '</tbody></table></div></div>';
   });
@@ -15905,6 +15927,46 @@ async function pedImpEditFob(codEnc) {
     });
     await pedImpReload();
   } catch (e) { try { alert("No se pudo guardar el FOB: " + (e.message || e)); } catch (_e) {} }
+}
+// Fecha de REINGRESO estimado del artículo importado (Importados.reingreso_est).
+// La lee LK (vista v_lk_reingresos → portal) para mostrar "Reingreso Est dd/mm"
+// cuando el artículo está sin stock. Vacío = borra la fecha. dd/mm se arma en LK.
+async function pedImpSetReingreso(codEnc, val) {
+  var cod = decodeURIComponent(codEnc);
+  var v = String(val == null ? "" : val).trim();   // 'YYYY-MM-DD' o '' para borrar
+  try {
+    await fetch(SUPABASE_URL + "/rest/v1/Importados?cod_art=eq." + encodeURIComponent(cod), {
+      method: "PATCH",
+      headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY, "Content-Type": "application/json", Prefer: "return=minimal" },
+      body: JSON.stringify({ reingreso_est: v || null, actualizado: new Date().toISOString() })
+    });
+    // reflejar en memoria sin recalcular todo el pedido
+    try {
+      var data = (_stkPop && _stkPop.data) || {};
+      (data.items || []).forEach(function (it) { if (String(it.cod).toUpperCase().trim() === cod.toUpperCase().trim()) it.reingresoEst = v; });
+    } catch (_e) {}
+    _pedImpRender();
+  } catch (e) { try { alert("No se pudo guardar el reingreso: " + (e.message || e)); } catch (_e) {} }
+}
+// Fecha ESTIMADA DE ENTREGA global (Stock_Config['entrega_estimada_global']).
+// La lee LK (cron → app_settings) y la muestra en el carrito antes de confirmar.
+async function pedImpSetEntregaGlobal(val) {
+  var v = String(val == null ? "" : val).trim();   // 'YYYY-MM-DD' o '' para borrar
+  try {
+    if (!v) {
+      await fetch(SUPABASE_URL + "/rest/v1/Stock_Config?clave=eq.entrega_estimada_global", {
+        method: "DELETE",
+        headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY, Prefer: "return=minimal" }
+      });
+    } else {
+      await fetch(SUPABASE_URL + "/rest/v1/Stock_Config?on_conflict=clave", {
+        method: "POST",
+        headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY, "Content-Type": "application/json", Prefer: "resolution=merge-duplicates,return=minimal" },
+        body: JSON.stringify({ clave: "entrega_estimada_global", valor: v })
+      });
+    }
+    if (_stkPop && _stkPop.data) _stkPop.data.entregaGlobal = v;
+  } catch (e) { try { alert("No se pudo guardar la fecha de entrega: " + (e.message || e)); } catch (_e) {} }
 }
 async function pedImpSetCurso(id, codEnc, curso) {
   var cod = decodeURIComponent(codEnc);
