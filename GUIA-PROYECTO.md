@@ -12,9 +12,9 @@
 > única**; no se replica. Ante la duda entre parche rápido y fix de raíz → **fix
 > de raíz**.
 >
-> Última actualización: 2026-09-10 (jueves) · Versión app al documentar: **v14.92**
+> Última actualización: 2026-09-10 (jueves) · Versión app al documentar: **v14.93**
 >
-> Nota **v14.92 (2026-09-10) — PICKING: fix "manda al excedente pero no hay excedente" (546/587/502).**
+> Nota **v14.93 (2026-09-10) — PICKING: fix "manda al excedente pero no hay excedente" (546/587/502).** (Iba como v14.92; se renumeró porque otra sesión usó ese número para la idea 6064.)
 > Lo reportaron los operarios. Causa: `pkFetchExcedente` (la que decide si un artículo se levanta del
 > excedente y saltea la góndola, v4.26) **sumaba los deltas de `Movimientos_Stock`** con
 > `deposito=excedente&limit=5000`, pero **PostgREST corta en 1000 filas** (`db-max-rows`, misma clase de

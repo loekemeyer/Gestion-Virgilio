@@ -1,4 +1,4 @@
-/* Regresión v14.92 — pkFetchExcedente NO suma movimientos (PostgREST corta en 1000 filas y
+/* Regresión v14.93 — pkFetchExcedente NO suma movimientos (PostgREST corta en 1000 filas y
    el excedente tiene 5.500+): las CAJAS salen de vista_saldos_stock y de Movimientos_Stock
    sólo las UBICACIONES (delta>0 con ubicación). Caso real 2026-09-10: 502 tenía 26 cajas
    "fantasma" en el front (ventana de 1000) y 0 real → el picking mandaba al excedente.

@@ -7598,7 +7598,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v14.92";
+const APP_VERSION = "v14.93";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -9337,7 +9337,7 @@ function pkFmt(n) { const r = Math.round(n * 100) / 100; return (r === Math.roun
 /* v4.26: saldo de EXCEDENTE por artículo + ubicaciones (el excedente no tiene lugar
    fijo: la ubicación se cargó en el MG). Devuelve { ART: {cajas, ubics:[]} } solo
    para los que tienen saldo > 0. Best-effort.
-   v14.92 — ⚠ BUG (2026-09-10, lo reportaron los operarios: 546/587/502 "mandados al
+   v14.93 — ⚠ BUG (2026-09-10, lo reportaron los operarios: 546/587/502 "mandados al
    excedente" con excedente 0): esta función sumaba los deltas de Movimientos_Stock
    (deposito=excedente) con `limit=5000`, pero PostgREST corta en 1000 filas (db-max-rows,
    misma clase que v5.41/v5.42) y el excedente ya tiene 5.500+ movimientos. Con la ventana
