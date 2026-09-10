@@ -355,7 +355,11 @@ borró). Layout:
 - ⚠ **`/cervantes/` es una copia**: si Cervantes cambia en `Registro-Produccion-2.0`,
   hay que **re-traer** los archivos (`app.js`, `index.html`, `manifest.json`,
   `styles.css`, `sw.js`) y volver a poner el botón "Cambiar planta". Último sync desde
-  commit `d2d6a59` (2026-06-04).
+  commit `c429f2f` (2026-09-10, app v1.8.63). Ajustes propios de la copia que NO se
+  revierten al re-sincronizar: (a) el bloque **GATE DE SESIÓN** en el `<head>` de
+  `cervantes/index.html` (login global en la raíz; Cervantes no tiene login propio),
+  (b) el botón **← Cambiar planta** arriba del `<h1>` de legajo, (c) los `?v=` y el
+  badge alineados a `LOCAL_VERSION` de `app.js`.
 
 ## Panel Web LK bajo `/admin/`
 
