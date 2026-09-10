@@ -41,16 +41,16 @@ const { chromium } = require("/opt/node22/lib/node_modules/playwright");
     html = document.getElementById("pppPreview").innerHTML;
     out.statConteo = /764 cli · 700 c\/límite · 12 susp/.test(html);
 
-    // parser: auto-map + números AR + suspendido
-    out.pMap = cuarAutoMap(["Codigo", "CUIT", "Razon Social", "Limite Credito", "Estado"], "busqueda");
+    // parser: auto-map contra los encabezados REALES del reporte Búsqueda CL + números AR + estado
+    out.pMap = cuarAutoMap(["Código", "Razón Social de Búsqueda", "Razón Social", "Estado", "CUIT", "Límite de Crédito"], "busqueda");
     out.pMapDeuda = cuarAutoMap(["Cod", "Cuit", "Nombre", "Saldo"], "deuda");
     out.pNum1 = cuarParseNum("1.234.567,89");
     out.pNum2 = cuarParseNum("$ 50000");
     out.pNum3 = cuarParseNum("");
-    out.pSuspSi = cuarParseSusp("SUSPENDIDO");
-    out.pSuspNo = cuarParseSusp("Activo");
-    out.pSuspSN = cuarParseSusp("S");
-    out.pSuspVacio = cuarParseSusp("");
+    out.pEstSusp = cuarEstadoSuspende("Suspendido");
+    out.pEstSinCta = cuarEstadoSuspende("Sin Cta.Cte.");
+    out.pEstActivo = cuarEstadoSuspende("Activo");
+    out.pEstVacio = cuarEstadoSuspende("");
 
     // (2) un pedido marcado por deuda + supera crédito: sale de la lista y cae en cuarentena
     _apr.pedidos = [
@@ -91,14 +91,15 @@ const { chromium } = require("/opt/node22/lib/node_modules/playwright");
   chk(r.statSinCargar, "cada botón dice 'sin cargar' cuando no hay resumen");
   chk(r.statConteo, "con resumen: '764 cli · 700 c/límite · 12 susp'");
   // parser
-  chk(r.pMap.cod === 0 && r.pMap.cuit === 1 && r.pMap.razon_social === 2 && r.pMap.limite_credito === 3 && r.pMap.suspendido === 4, "auto-map búsqueda (cod/cuit/razón/límite/estado)");
+  chk(r.pMap.cod === 0 && r.pMap.cuit === 4 && r.pMap.razon_social === 2 && r.pMap.estado === 3 && r.pMap.limite_credito === 5, "auto-map búsqueda contra encabezados reales (Código/CUIT/Razón Social/Estado/Límite de Crédito)");
   chk(r.pMapDeuda.cod === 0 && r.pMapDeuda.cuit === 1 && r.pMapDeuda.deuda === 3, "auto-map deuda (cod/cuit/saldo)");
   chk(r.pNum1 === 1234567.89, "número AR 1.234.567,89 → 1234567.89 (dio " + r.pNum1 + ")");
   chk(r.pNum2 === 50000, "número '$ 50000' → 50000");
   chk(r.pNum3 === null, "vacío → null");
-  chk(r.pSuspSi === true && r.pSuspSN === true, "SUSPENDIDO / S → true");
-  chk(r.pSuspNo === false, "Activo → false");
-  chk(r.pSuspVacio === null, "estado vacío → null");
+  chk(r.pEstSusp === true, "Estado 'Suspendido' → cuarentena (true)");
+  chk(r.pEstSinCta === true, "Estado 'Sin Cta.Cte.' → cuarentena (true)");
+  chk(r.pEstActivo === false, "Estado 'Activo' → false");
+  chk(r.pEstVacio === null, "Estado vacío → null");
   chk(errs.length === 0, "sin errores de página" + (errs.length ? " (" + errs.join(" | ") + ")" : ""));
 
   await b.close();

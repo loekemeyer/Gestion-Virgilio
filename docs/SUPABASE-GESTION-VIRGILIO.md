@@ -4602,3 +4602,22 @@ Esta tabla es la **fuente del filtro**, todavía no marca los pedidos. Falta la 
 estos datos, decida qué pedido va a cuarentena (`cuarentena_motivos` en el feed de A Programar) y
 que el armado automático (crons 71/73) la respete. A definir con el dueño (matcheo por `cod`/`cuit`,
 y el límite de crédito contra el monto del pedido).
+
+### Addendum v14.83 (2026-09-10) — layout REAL de "Búsqueda CL" y columna `estado`
+
+El dueño mandó los dos archivos **Búsqueda CL LK/CH** (idénticos en formato, 86 columnas):
+`A Código` · `C Razón Social` · `D Estado` (Activo / Suspendido / **Sin Cta.Cte.**) · `H CUIT` ·
+`AN Cód.Vendedor` · `AP Cód.Cobrador` · `AV Límite de Crédito`. El auto-detector por encabezado
+mapea clavado (cod→A, cuit→H, razón→C, estado→D, límite→AV; probado contra los 86 headers).
+
+- Se agregó la columna **`GV_Cuarentena_Fuente.estado`** (texto crudo del Estado) y el front deriva
+  **`suspendido = (Estado ∈ {Suspendido, Sin Cta.Cte.})`** (`cuarEstadoSuspende`). El `raw` guarda
+  igual la fila mapeada.
+- **Regla de negocio que el dueño fijó** (para el marcado, fase próxima):
+  1. Estado **Suspendido** o **Sin Cta.Cte.** → el cliente va a **cuarentena** (todos sus pedidos).
+  2. **Límite de crédito**: si el total de los pedidos del cliente **en Programación**, con
+     descuentos y **sin IVA**, es **MAYOR** al `limite_credito` → cuarentena. **`limite_credito = 0`
+     = infinito** (sin tope).
+  3. **Deuda** (reportes Deuda LK/CH, formato aún no recibido): saldo adeudado → cuarentena.
+- Prueba backend (supervisor simulado): 3 filas con estados Suspendido / Sin Cta.Cte. / Activo →
+  `estado` + `suspendido` + `limite_credito` (0 se guarda como 0) correctos; luego borradas.

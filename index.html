@@ -7559,7 +7559,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v14.82";
+const APP_VERSION = "v14.83";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -35295,12 +35295,13 @@ function cuarParseNum(v) {
   else if (s.indexOf(",") >= 0) s = s.replace(",", ".");
   const n = parseFloat(s); return isNaN(n) ? null : n;
 }
-function cuarParseSusp(v) {
-  const t = cuarNorm(v);
+/* Estado del reporte Búsqueda CL → ¿va a cuarentena?  Suspendido / Sin Cta.Cte. = sí. */
+function cuarEstadoSuspende(v) {
+  const t = cuarNorm(v);               // "suspendido" · "sinctacte" · "activo"
   if (t === "") return null;
-  if (/^(si|s|x|1|true|suspend|inactiv|baja|bloq|deshab|nohab)/.test(t)) return true;
-  if (/^(no|n|0|false|activ|habil|vigente|ok|aldia)/.test(t)) return false;
-  return null;
+  if (t.indexOf("suspend") >= 0 || t.indexOf("sincta") >= 0) return true;
+  if (t.indexOf("activo") >= 0) return false;
+  return null;                          // desconocido → no fuerza cuarentena
 }
 function cuarFind(headers, res) {
   for (const rx of res) for (let i = 0; i < headers.length; i++) if (rx.test(cuarNorm(headers[i]))) return i;
@@ -35308,12 +35309,12 @@ function cuarFind(headers, res) {
 }
 function cuarAutoMap(headers, tipo) {
   const m = {};
-  m.cod = cuarFind(headers, [/^cod(igo)?(cliente|cli)?$/, /codcliente/, /^cliente$/, /^cod/, /codigo/]);
-  m.cuit = cuarFind(headers, [/^cuit$/, /cuit/, /cuil/, /docid/, /^dni$/]);
-  m.razon_social = cuarFind(headers, [/razon(social)?/, /razonsoc/, /nombre/, /denomin/, /fantasia/]);
+  m.cod = cuarFind(headers, [/^cod(igo)?(cliente|cli)?$/, /codcliente/, /^cod$/, /^codigo$/]);
+  m.cuit = cuarFind(headers, [/^cuit$/, /cuit/, /cuil/, /^dni$/]);
+  m.razon_social = cuarFind(headers, [/^razonsocial$/, /razonsocial/, /razon/, /nombre/, /denomin/, /fantasia/]);
   if (tipo === "busqueda") {
-    m.limite_credito = cuarFind(headers, [/limitecred/, /credito/, /limcred/, /tope/, /limite/]);
-    m.suspendido = cuarFind(headers, [/suspend/, /^estado$/, /estadocli/, /bloque/, /activo/, /habilit/, /baja/]);
+    m.estado = cuarFind(headers, [/^estado$/, /estadocli/, /situacion/]);
+    m.limite_credito = cuarFind(headers, [/limite.*cred/, /^limitedecredito$/, /credito/, /^limite$/]);
   } else {
     m.deuda = cuarFind(headers, [/deuda/, /saldo/, /adeud/, /^importe$/, /^total$/, /debe/, /^pendiente$/]);
   }
@@ -35360,7 +35361,7 @@ async function cuarImportFile(input) {
 function cuarPreviewHtml() {
   const s = _cuarImp, rows = s.dataRows.slice(0, 6);
   const cols = s.tipo === "busqueda"
-    ? [["Código", "cod"], ["CUIT", "cuit"], ["Razón social", "razon_social"], ["Límite", "limite_credito"], ["Susp.", "suspendido"]]
+    ? [["Código", "cod"], ["Razón social", "razon_social"], ["Estado", "estado"], ["Cuarent.", "_susp"], ["Límite", "limite_credito"]]
     : [["Código", "cod"], ["CUIT", "cuit"], ["Razón social", "razon_social"], ["Deuda", "deuda"]];
   let h = '<div class="cuar-prev"><table><thead><tr>';
   for (const c of cols) h += '<th>' + c[0] + '</th>';
@@ -35368,9 +35369,10 @@ function cuarPreviewHtml() {
   for (const r of rows) {
     h += '<tr>';
     for (const c of cols) {
-      let v = cuarCell(r, s.map[c[1]]);
-      if (c[1] === "suspendido") { const b = cuarParseSusp(v); v = b === true ? "Sí" : (b === false ? "No" : (v || "—")); }
-      else if (c[1] === "limite_credito" || c[1] === "deuda") { const n = cuarParseNum(v); v = n == null ? "—" : aprNum(n, 2); }
+      let v;
+      if (c[1] === "_susp") { const b = cuarEstadoSuspende(cuarCell(r, s.map.estado)); v = b === true ? "🚧 sí" : (b === false ? "no" : "—"); }
+      else { v = cuarCell(r, s.map[c[1]]); }
+      if (c[1] === "limite_credito" || c[1] === "deuda") { const n = cuarParseNum(v); v = n == null ? "—" : (n === 0 ? "∞ (0)" : aprNum(n, 2)); }
       h += '<td>' + escapeHtml(v || "—") + '</td>';
     }
     h += '</tr>';
@@ -35396,7 +35398,7 @@ function cuarImportRender() {
     body = '<div class="cuar-file-ok">📄 ' + escapeHtml(s.fname) + ' · ' + s.dataRows.length + ' filas</div>' +
       '<div class="cuar-map">' +
         fld("Código de cliente", "cod") + fld("CUIT", "cuit") + fld("Razón social", "razon_social") +
-        (s.tipo === "busqueda" ? fld("Límite de crédito", "limite_credito") + fld("Suspendido / Estado", "suspendido")
+        (s.tipo === "busqueda" ? fld("Estado (Activo/Suspendido/Sin Cta.Cte.)", "estado") + fld("Límite de crédito", "limite_credito")
                                : fld("Deuda / Saldo", "deuda")) +
       '</div>' + cuarPreviewHtml() +
       '<button class="cuar-file-again" onclick="cuarImportOtro()">Elegir otro archivo</button>';
@@ -35419,8 +35421,9 @@ async function cuarImportGuardar() {
     if (!cod && !cuit) continue;
     const o = { cod: cod || null, cuit: cuit || null, razon_social: cuarCell(r, s.map.razon_social) || null };
     if (s.tipo === "busqueda") {
+      const est = cuarCell(r, s.map.estado); if (est) o.estado = est;
+      const sp = cuarEstadoSuspende(est); if (sp != null) o.suspendido = sp;
       const lc = cuarParseNum(cuarCell(r, s.map.limite_credito)); if (lc != null) o.limite_credito = lc;
-      const sp = cuarParseSusp(cuarCell(r, s.map.suspendido)); if (sp != null) o.suspendido = sp;
     } else {
       const d = cuarParseNum(cuarCell(r, s.map.deuda)); if (d != null) o.deuda = d;
     }

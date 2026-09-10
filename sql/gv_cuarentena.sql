@@ -23,6 +23,17 @@
 --
 -- Gate de seguridad: es_supervisor_virgilio() (definido en sql/deudores.sql;
 -- se REUSA la función de permiso, no datos). Sin sesión de supervisor: rechazo.
+--
+-- LAYOUT REAL de "Búsqueda CL" (verificado 2026-09-10, LK y CH idénticos, 86 cols):
+--   A(0)  Código                    → cod (clave, por empresa)
+--   C(2)  Razón Social              → razon_social
+--   D(3)  Estado                    → estado (Activo / Suspendido / Sin Cta.Cte.)
+--   H(7)  CUIT                      → cuit
+--   AV(47) Límite de Crédito        → limite_credito (0 = infinito)
+-- suspendido = (Estado ∈ {Suspendido, Sin Cta.Cte.}). El front auto-detecta por
+-- encabezado y deja re-mapear. REGLA DE LÍMITE (marcado, fase próxima): un cliente
+-- va a cuarentena si el total de sus pedidos EN PROGRAMACIÓN (con descuentos, sin
+-- IVA) es MAYOR a su límite; límite 0 = sin tope.
 -- ══════════════════════════════════════════════════════════════════════════
 
 -- ── 1. Tabla fuente ─────────────────────────────────────────────────────────
@@ -33,8 +44,9 @@ create table if not exists public."GV_Cuarentena_Fuente" (
   cod            text,                 -- código de cliente tal como viene (trim)
   cuit           text,                 -- normalizado a dígitos (11), nullable
   razon_social   text,
-  limite_credito numeric,             -- de 'busqueda'
-  suspendido     boolean,             -- de 'busqueda' (estado); null = desconocido
+  estado         text,                -- de 'busqueda': texto crudo (Activo / Suspendido / Sin Cta.Cte.)
+  limite_credito numeric,             -- de 'busqueda' (0 = infinito)
+  suspendido     boolean,             -- de 'busqueda': true si estado ∈ {Suspendido, Sin Cta.Cte.}
   deuda          numeric,             -- de 'deuda' (saldo adeudado)
   raw            jsonb,               -- fila original mapeada por encabezado, para re-derivar
   lote           text not null,       -- id de la corrida de importación
@@ -91,12 +103,13 @@ begin
   delete from public."GV_Cuarentena_Fuente" where empresa = p_empresa and tipo = p_tipo;
 
   insert into public."GV_Cuarentena_Fuente"
-    (empresa, tipo, cod, cuit, razon_social, limite_credito, suspendido, deuda, raw, lote, cargado_por)
+    (empresa, tipo, cod, cuit, razon_social, estado, limite_credito, suspendido, deuda, raw, lote, cargado_por)
   select
     p_empresa, p_tipo,
     nullif(trim(r->>'cod'), ''),
     nullif(regexp_replace(coalesce(r->>'cuit',''), '\D', '', 'g'), ''),
     nullif(trim(r->>'razon_social'), ''),
+    nullif(trim(r->>'estado'), ''),
     case when nullif(r->>'limite_credito','') is not null then (r->>'limite_credito')::numeric end,
     case when r ? 'suspendido' and jsonb_typeof(r->'suspendido') = 'boolean'
          then (r->>'suspendido')::boolean end,

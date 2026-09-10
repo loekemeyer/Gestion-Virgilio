@@ -12,7 +12,17 @@
 > única**; no se replica. Ante la duda entre parche rápido y fix de raíz → **fix
 > de raíz**.
 >
-> Última actualización: 2026-09-10 (jueves) · Versión app al documentar: **v14.82**
+> Última actualización: 2026-09-10 (jueves) · Versión app al documentar: **v14.83**
+>
+> Nota **v14.83 (2026-09-10) — CUARENTENA: layout real de "Búsqueda CL" + reglas del dueño.**
+> Con los archivos reales (LK y CH idénticos): `A Código`, `C Razón Social`, `D Estado`
+> (Activo/Suspendido/**Sin Cta.Cte.**), `H CUIT`, `AV Límite de Crédito`. El importador los
+> auto-detecta por encabezado (clavado). Se guarda el **Estado** crudo (columna nueva `estado`) y se
+> deriva `suspendido = Estado ∈ {Suspendido, Sin Cta.Cte.}`. **Reglas que fijó el dueño para el
+> marcado (fase próxima):** (1) Suspendido o Sin Cta.Cte. → cuarentena; (2) si el total de los pedidos
+> del cliente **en Programación**, con descuentos y **sin IVA**, es **mayor** al límite → cuarentena
+> (**límite 0 = infinito**); (3) Deuda → cuarentena. Detalle en §3.bs (addendum) de
+> `docs/SUPABASE-GESTION-VIRGILIO.md`.
 >
 > Nota **v14.82 (2026-09-10) — CUARENTENA: 4 botones para cargar reportes por .xls (idea 8877).**
 > En el sector 🚧 Cuarentena hay **cuatro botones**: **Importar Búsqueda CL LK/CH** (traen **límite de
