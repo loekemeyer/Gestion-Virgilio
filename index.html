@@ -3570,11 +3570,16 @@ table.facfc-tbl tr.facneto-row-falt td{ background: #fef2f2; }
   padding: 8px 12px; border-radius: 6px; margin-bottom: 10px;
   font-size: 13px; font-weight: bold; text-align: center;
 }
+/* v14.79 — El encabezado es UNA tarjeta: titulo a la izquierda, los 4 botones a la
+   derecha, y las pestanas pegadas abajo (mismo borde, mismo ancho). Antes las
+   pestanas colgaban sueltas y no coincidian con el borde izquierdo del titulo. */
 .fac-top{
   display: flex; justify-content: space-between; align-items: center;
-  margin-bottom: 12px; flex-wrap: wrap; gap: 8px;
+  margin-bottom: 0; flex-wrap: wrap; gap: 12px;
+  background: #fff; border: 1px solid #e2e8f0; border-bottom: none;
+  border-radius: 12px 12px 0 0; padding: 10px 14px;
 }
-.fac-top h1{ font-size: 22px; margin: 0; color: #0f172a; }
+.fac-top h1{ font-size: 22px; margin: 0; color: #0f172a; display:flex; align-items:center; gap:8px; }
 /* Encabezado de Facturación: "Excel ISIS" y "Cerrar" van juntos en la misma línea.
    Hace falta el contenedor porque el button{width:100%} global empujaba a Cerrar
    a la línea de abajo en el celular. */
@@ -3582,21 +3587,29 @@ table.facfc-tbl tr.facneto-row-falt td{ background: #fef2f2; }
    2×2 pareja: mismo tamaño y alineados en dos filas prolijas, para que en el celular
    no se desborden ni queden de distinto ancho. */
 .fac-top-acts{
-  display:grid; grid-template-columns:1fr 1fr; gap:8px;
-  margin-left:auto; width:100%; max-width:430px; flex:0 0 auto;
+  display:grid; grid-template-columns:repeat(2, minmax(0,1fr)); gap:8px;
+  margin-left:auto; width:100%; max-width:400px; flex:0 0 auto;
 }
 .fac-top-acts > button{
-  width:100%; margin:0; box-sizing:border-box; min-height:44px;
-  padding:8px 10px; font-size:13px; font-weight:800; border-radius:8px;
+  width:100%; margin:0; box-sizing:border-box; height:40px; min-height:40px;
+  padding:0 10px; font-size:12.5px; font-weight:800; border-radius:8px;
+  border:1px solid transparent;
   display:inline-flex; align-items:center; justify-content:center; text-align:center;
-  line-height:1.15; white-space:normal; cursor:pointer;
+  gap:4px; line-height:1.1; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+  cursor:pointer; box-shadow:none;
 }
-.fac-top-acts > button > span{ margin-left:4px; }   /* el "(NP web)" / "(prueba)" no se pega al texto */
+.fac-top-acts > button:hover{ filter:brightness(.97); }
+.fac-top-acts > button > span{ margin-left:0; font-size:11.5px; }  /* el "(NP web)" / "(prueba)" */
 .fac-top-acts #facBtnXlsIsis{ border:1px solid #fcd34d; background:#fffbeb; color:#78350f; }
 .fac-top-acts #facBtnJsonIsis{ border:1px solid #a5b4fc; background:#eef2ff; color:#3730a3; }
 /* v13.73: "Cruce con ISIS" — abre la pestaña del cruce (Deuda / Cobranzas) */
 .fac-top-acts #facBtnCruce{ border:1px solid #93c5fd; background:#eff6ff; color:#1e3a8a; }
-.fac-top-acts .fac-close-btn{ margin:0; }
+.fac-top-acts .fac-close-btn{ margin:0; border:1px solid #dc2626; }
+@media (max-width:480px){                       /* celular: los 4 llenan el ancho, sin recortarse */
+  .fac-top-acts{ max-width:none; }
+  .fac-top-acts > button{ font-size:11.5px; padding:0 6px; }
+  .fac-top-acts > button > span{ font-size:10.5px; }
+}
 /* Casilla "marcar para el Excel de prueba de ISIS" en cada fila de Facturación.
    Grande a propósito: se toca con el dedo desde el celular. */
 .fac-xls-cell{ padding:4px 2px !important; }
@@ -4183,8 +4196,10 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
   tr.fac-en-progreso .fac-btn-tick{ background:#ea580c; }
   tr.fac-en-progreso .fac-btn-tick:hover{ background:#c2410c; }
   /* v14.30: pestañas Facturador / Conciliación */
-  .fac-tabs2{ display:flex; gap:8px; margin:0 0 12px; flex-wrap:wrap; }
-  .fac-tab2{ width:auto; padding:9px 18px; border-radius:10px; border:1px solid #c7d2fe; background:#eef2ff; color:#3730a3; font-size:14px; font-weight:800; cursor:pointer; }
+  .fac-tabs2{ display:flex; gap:8px; flex-wrap:wrap;
+    max-width:1400px; margin:0 auto 12px; padding:10px 14px;
+    background:#fff; border:1px solid #e2e8f0; border-top:none; border-radius:0 0 12px 12px; }
+  .fac-tab2{ width:auto; margin:0; padding:8px 16px; border-radius:9px; border:1px solid #c7d2fe; background:#eef2ff; color:#3730a3; font-size:13.5px; font-weight:800; cursor:pointer; }
   .fac-tab2.on{ background:#1e6bd6; border-color:#1e6bd6; color:#fff; }
   .fac-concil-bar{ display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin-bottom:10px; }
   .fac-concil-inp{ padding:8px 10px; border:1px solid #cbd5e1; border-radius:8px; font-size:14px; width:auto; min-width:150px; }
@@ -7498,7 +7513,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v14.78";
+const APP_VERSION = "v14.79";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
