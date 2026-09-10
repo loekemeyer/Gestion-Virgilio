@@ -1,0 +1,2293 @@
+<!doctype html>
+<html lang="es">
+<head>
+<script src="../auth-guard.js"></script>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Recepción Insumos</title>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:Arial,sans-serif;background:#f5f6f8;padding:12px}
+  .card{max-width:640px;margin:auto;background:#fff;border-radius:12px;box-shadow:0 2px 12px rgba(0,0,0,.08);overflow:hidden}
+  .header{background:#1a1a1a;color:#fff;padding:14px 18px;display:flex;justify-content:space-between;align-items:center}
+  .header h1{font-size:24px;font-weight:700;letter-spacing:.3px}
+  .header button{background:#fff;color:#111;border:none;padding:8px 14px;border-radius:6px;font-weight:700;cursor:pointer;font-size:18px}
+
+  .steps{padding:14px 18px}
+  .row{display:flex;gap:10px;flex-wrap:wrap;margin:10px 0;align-items:center}
+  label.lbl{font-weight:800;font-size:20px;min-width:80px}
+  select,input[type="text"]{height:40px;border:2px solid #d0d7de;border-radius:8px;padding:0 10px;font-size:21px}
+  select{min-width:160px}
+  input[type="text"]{width:160px}
+
+  .btn{padding:10px 16px;border-radius:8px;border:none;font-weight:800;cursor:pointer;font-size:20px}
+  .btn-primary{background:#111;color:#fff}
+  .btn-primary:disabled{opacity:.4;cursor:not-allowed}
+  .btn-secondary{background:#fff;border:2px solid #d0d7de;color:#111}
+
+  .status{margin:8px 0;font-size:20px;padding:6px 0}
+  .ok{color:#0a7a2f}
+  .bad{color:#b42318}
+
+  .grid{display:grid;grid-template-columns:100px 80px minmax(180px,1fr);gap:8px;align-items:center}
+  .grid .h{font-weight:900;font-size:18px;color:#333}
+  .grid input[data-role="cant"]{width:100%;text-align:center;height:38px;border:2px solid #d0d7de;border-radius:8px;font-size:23px;font-weight:700}
+  .grid input[data-role="cant"].has-val{border-color:#0a7a2f;background:#f3fbf6}
+  .codeRO{background:#f6f8fa;width:100%;text-align:left;letter-spacing:0}
+  .descCell{font-size:18px;color:#333;line-height:1.25;word-break:break-word}
+
+  .overlay{position:fixed;inset:0;background:rgba(0,0,0,.45);display:none;align-items:center;justify-content:center;padding:16px;z-index:100}
+  .overlay.open{display:flex}
+  .modal{width:min(720px,100%);max-height:90vh;overflow-y:auto;background:#fff;border-radius:14px;padding:14px;box-shadow:0 18px 50px rgba(0,0,0,.2)}
+  .modal-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px}
+  .modal-title{font-weight:900}
+  .modal-actions{display:flex;gap:10px;justify-content:flex-end;margin-top:12px}
+  .hint{font-size:17px;color:#666;margin-top:6px}
+
+  .successBox{display:none;margin:12px 0;border:2px solid #c7e8d1;background:#f3fbf6;border-radius:12px;padding:16px;text-align:center}
+  .successBox .title{font-weight:900;font-size:23px;margin-bottom:4px}
+
+  .remito-row{margin:10px 0}
+  .remito-row input{width:200px}
+
+  .hidden{display:none}
+  .provs-grid{display:flex;flex-wrap:wrap;gap:8px;margin:8px 0}
+  .prov-btn{padding:8px 14px;border-radius:8px;border:2px solid #d0d7de;background:#fff;font-weight:700;cursor:pointer;font-size:20px}
+  .prov-btn.active{background:#111;color:#fff;border-color:#111}
+
+  .search-box{margin:12px 0;padding:12px;background:#f6f8fa;border-radius:8px}
+  .search-box input{width:100%;padding:10px;font-size:18px;border:2px solid #d0d7de;border-radius:6px}
+  /* Buscador de medida (flejes): 2 secciones (Flejes + Varillas) en UNA linea real (nowrap) */
+  #flejesSearch{display:none}
+  #flejesSearch .dual-search{display:flex;gap:14px;align-items:flex-start;flex-wrap:nowrap}
+  #flejesSearch .dual-col{flex:1 1 0;min-width:0}
+  #flejesSearch .dual-title{font-weight:900;font-size:30px;color:#0b3b73;margin:0 0 10px;text-align:center;white-space:nowrap}
+  #flejesSearch .sec-search-row{gap:6px}
+  #flejesSearch .sec-search-row .fm{padding:8px 6px;font-size:17px;min-width:0}
+  #flejesSearch .sec-search-row .x-sep{font-size:18px}
+
+  /* auto-fit y no auto-fill: con auto-fill se reservaban columnas vacias cuando el proveedor
+     tenia pocos articulos (Ing. Barbetta Alberto, 2 items, dejaba un hueco de una columna).
+     auto-fit colapsa las columnas sobrantes; con muchos items el resultado es identico. */
+  .items-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:12px;margin:12px 0}
+  .sec-title{font-size:19px;font-weight:900;color:#0b3b73;margin:14px 0 6px;padding:6px 10px;background:#eef4fb;border-left:4px solid #0b5cad;border-radius:4px}
+  .sec-search-row{display:flex;align-items:center;gap:8px;margin:8px 0}
+  .sec-search-row .fm{flex:1;min-width:0;padding:8px 12px;text-align:center;border:2px solid #d0d7de;border-radius:6px;font-size:18px;font-weight:800}
+  .sec-search-row .fm.on{border-color:#0a7a2f;background:#f3fbf6}
+  .sec-search-row .x-sep{font-size:20px;font-weight:900;color:#333}
+  .sec-search-row .clear{background:#fff;border:2px solid #d0d7de;border-radius:6px;padding:8px 12px;font-weight:800;cursor:pointer;font-size:15px}
+  .item-btn{padding:16px 6px;background:#fff;border:2px solid #d0d7de;border-radius:8px;cursor:pointer;text-align:center;font-weight:600;font-size:22px;transition:all .2s;overflow:hidden}
+  .item-btn:hover{border-color:#111;background:#f6f8fa}
+  .item-btn.active{background:#111;color:#fff;border-color:#111}
+  /* Cuando el boton queda activo (bg negro), forzar texto claro en medida/sector/code/isis
+     porque tienen color:#111 hardcoded y quedarian invisibles. */
+  .item-btn.active .medida,
+  .item-btn.active .sector,
+  .item-btn.active .isis{color:#fff}
+  .item-btn.active .code{color:#7ab8ff}
+  .item-btn .code{display:block;font-size:24px;font-weight:800;color:#0066cc}
+  .item-btn .isis{display:block;font-size:16px;color:#666;margin-top:4px}
+  .item-btn .medida{display:block;font-size:28px;font-weight:900;color:#111;margin-top:0;line-height:1.15;white-space:normal;overflow-wrap:anywhere;word-break:break-word}
+  .item-btn .sector{display:block;font-size:37px;color:#111;margin-top:10px;font-weight:900;letter-spacing:.5px}
+
+  .input-kg-popup{position:fixed;inset:0;background:rgba(0,0,0,.5);display:none;align-items:center;justify-content:center;z-index:200}
+  .input-kg-popup.open{display:flex}
+  .kg-modal{background:#fff;border-radius:16px;padding:38px;width:96%;max-width:700px;box-shadow:0 10px 40px rgba(0,0,0,.3)}
+  .kg-modal h3{margin-bottom:22px;font-size:36px;font-weight:700}
+  .kg-modal .item-info{background:#f6f8fa;padding:18px;border-radius:10px;margin-bottom:22px;font-size:24px}
+  .kg-modal input{width:100%;padding:16px;font-size:28px;border:2px solid #d0d7de;border-radius:8px;margin-bottom:20px;text-align:center}
+  .kg-modal .actions{display:flex;gap:12px}
+  .kg-modal button{flex:1;padding:18px;font-size:25px;font-weight:700;border:none;border-radius:8px;cursor:pointer}
+  /* Grilla de rollos por peso (flejes) */
+  .rg-label{font-size:23px;font-weight:700;margin-bottom:12px}
+  .rg-scroll{overflow-x:auto}
+  table.rollos-grid{border-collapse:collapse;margin:0 auto}
+  table.rollos-grid th{font-size:22px;font-weight:700;text-align:right;padding:7px 12px;color:#444;white-space:nowrap}
+  table.rollos-grid td{padding:6px 6px;text-align:center;vertical-align:middle}
+  table.rollos-grid input{width:104px;padding:14px 6px;font-size:28px;border:2px solid #d0d7de;border-radius:8px;margin:0;text-align:center}
+  table.rollos-grid .rg-one{display:inline-block;min-width:104px;font-size:28px;font-weight:700}
+  table.rollos-grid .rg-row-rm td{padding:0}
+  table.rollos-grid .rg-row-kgtot th{font-size:23px}
+  table.rollos-grid .rg-row-kgtot td{font-size:28px;font-weight:800;color:#1769aa}
+  table.rollos-grid .rg-row-total th,table.rollos-grid .rg-row-total td{font-size:28px;font-weight:800;padding-top:14px}
+  table.rollos-grid .rg-row-total td{text-align:center}
+  .rg-rm{border:none;background:none;color:#b91c1c;font-size:34px;font-weight:900;line-height:1;padding:0 6px;cursor:pointer;flex:none}
+  #rgPlus{border:none;background:#1769aa;color:#fff;border-radius:50%;width:50px;height:50px;font-size:32px;line-height:1;padding:0;cursor:pointer}
+  .rg-estip{margin-top:12px;text-align:center;font-size:21px;font-weight:800}
+  .rg-estip.rg-est-ok{color:#0a7a2f}
+  .rg-estip.rg-est-bad{color:#b91c1c}
+
+  /* Seccion OC insumos (home) */
+  .oc-block{margin-top:18px;padding:12px 14px;background:#eef4fb;border:1px solid #c8dcef;border-radius:10px}
+  .oc-block-hdr{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}
+  .oc-block-hdr h3{font-size:20px;font-weight:800;color:#0b3b73}
+  .oc-block-hdr .btn-upload-oc{background:#0b5cad;color:#fff;border:none;padding:8px 14px;border-radius:8px;font-weight:800;font-size:17px;cursor:pointer}
+  .oc-list{display:flex;flex-direction:column;gap:6px}
+  .oc-item{display:flex;justify-content:space-between;align-items:center;padding:10px 12px;background:#fff;border:1.5px solid #c8dcef;border-radius:8px;cursor:pointer;font-size:19px;transition:all .15s}
+  .oc-item:hover{background:#f0f7ff;border-color:#0b5cad}
+  .oc-item .oc-prov{font-weight:800;color:#0b3b73}
+  .oc-item .oc-fecha{color:#555;font-size:17px}
+  .oc-empty{padding:10px;color:#777;text-align:center;font-style:italic;font-size:17px}
+  /* OC/Rec dentro de cada boton de articulo */
+  .item-btn .oc{display:block;margin-top:10px;font-size:22px;font-weight:900;color:#0b5cad;background:#eef4fb;padding:8px 6px;border-radius:6px;white-space:nowrap}
+  .item-btn .rec{display:block;margin-top:5px;font-size:20px;font-weight:800;color:#0a7a2f;background:#f3fbf6;padding:6px;border-radius:5px}
+  .item-btn .falta{display:block;margin-top:4px;font-size:18px;color:#b91c1c;font-weight:800}
+  .item-btn .sinoc{display:block;margin-top:10px;font-size:20px;color:#888;font-style:italic;font-weight:700}
+  .item-btn.tiene-oc{border-color:#0b5cad;background:#fbfdff}
+  /* Modal subir OC PDF */
+  .oc-upload-zone{border:3px dashed #c8dcef;border-radius:10px;padding:30px;text-align:center;background:#fbfdff;margin-bottom:12px;cursor:pointer}
+  .oc-upload-zone:hover{border-color:#0b5cad;background:#eef4fb}
+  .oc-upload-zone.has-file{border-color:#0a7a2f;background:#f3fbf6}
+  .oc-thumb{max-width:100%;max-height:240px;margin:8px auto;display:block;border-radius:6px}
+  /* Modal revision de OC extraida */
+  #ocReviewModal .rev-hdr{display:grid;grid-template-columns:1fr 1fr;gap:10px;padding:10px;background:#f6f8fa;border-radius:8px;margin-bottom:10px;font-size:16px}
+  #ocReviewModal .rev-hdr .lbl{font-weight:800;color:#333;margin-right:4px}
+  #ocReviewModal table.rev-lines{width:100%;border-collapse:collapse;margin:10px 0;font-size:15px}
+  #ocReviewModal table.rev-lines th,#ocReviewModal table.rev-lines td{border:1px solid #d0d7de;padding:6px;text-align:left}
+  #ocReviewModal table.rev-lines th{background:#eef4fb;font-weight:800;color:#0b3b73}
+  #ocReviewModal table.rev-lines input{width:100%;border:1px solid #d0d7de;border-radius:4px;padding:4px;font-size:15px}
+  #ocReviewModal .warn{background:#fff4e0;border:1px solid #f0b400;color:#8a5a00;padding:8px 10px;border-radius:6px;margin:8px 0;font-weight:700;font-size:15px}
+  /* Detalle OC — mismo layout que el PDF de la OC: todo centrado, solo la descripcion a la izquierda. */
+  #ocDetalleTable th,#ocDetalleTable td{border:1px solid #d0d7de;padding:8px 8px;text-align:center;vertical-align:middle}
+  #ocDetalleTable th{background:#eef4fb;font-weight:800;color:#0b3b73}
+  #ocDetalleTable td:nth-child(2){text-align:left}
+  #ocDetalleTable tr.rec-parcial{background:#f3fbf6}
+  #ocDetalleTable tr.rec-total{background:#eef4fb;color:#666}
+  #ocDetalleTable td.num{text-align:center;font-variant-numeric:tabular-nums}
+  #ocDetalleHdr .lbl{font-weight:800;color:#333;margin-right:4px}
+  #ocDetalleTable tr.rec-sub td{background:#fbfdff;color:#0b5cad;font-size:13px;padding:3px 8px;border-top:none;text-align:center}
+  #ocDetalleTable tr.rec-sub td:first-child{padding-left:28px;font-style:italic;color:#666;text-align:left}
+</style>
+</head>
+<body>
+
+<div class="card">
+  <div class="header">
+    <h1>Recepción Insumos</h1>
+    <button onclick="gpHome()">Atrás</button>
+  </div>
+  <script>
+    function gpHome(){
+      var r = sessionStorage.getItem('gp_role') || 'admin';
+      window.location.href = (r === 'envios') ? '../envios-only.html' : '../Inicio/index.html';
+    }
+  </script>
+
+  <div class="steps">
+    <!-- Paso 1: Rubro -->
+    <div id="step1">
+      <div class="row">
+        <label class="lbl">Rubro</label>
+      </div>
+      <div class="provs-grid" id="rubroGrid">
+        <button class="prov-btn" data-rubro="Flejes">Flejes</button>
+        <button class="prov-btn" data-rubro="Cajas">Cajas</button>
+        <button class="prov-btn" data-rubro="Plasticos">Plásticos</button>
+        <button class="prov-btn" data-rubro="Cartones">Cartones</button>
+        <button class="prov-btn" data-rubro="Remaches">Remaches</button>
+        <button class="prov-btn" data-rubro="Bombillas">Bombillas</button>
+      </div>
+
+      <!-- Paso 2: Proveedor -->
+      <div id="provSection" class="hidden">
+        <div class="row">
+          <label class="lbl">Proveedor</label>
+        </div>
+        <div class="provs-grid" id="provGrid"></div>
+      </div>
+
+      <!-- Remito -->
+      <div id="remitoSection" class="hidden remito-row">
+        <div class="row">
+          <label class="lbl">N° Remito</label>
+          <input type="text" id="txtRemito" placeholder="Opcional">
+        </div>
+      </div>
+
+      <div class="row" id="btnContinuarRow" class="hidden" style="display:none">
+        <button id="btnContinuar" class="btn btn-primary" disabled>Cargar artículos</button>
+      </div>
+
+      <!-- Seccion OC insumos: al final del flujo, no corta Rubro -> Proveedor -> Cargar. -->
+      <div class="oc-block" id="ocBlock" style="margin-top:24px">
+        <div class="oc-block-hdr">
+          <h3>OC insumos</h3>
+          <button class="btn-upload-oc" id="btnAbrirSubirOC" type="button">📄 Subir OC PDF</button>
+        </div>
+        <div class="oc-list" id="ocList">
+          <div class="oc-empty">Cargando OCs pendientes…</div>
+        </div>
+      </div>
+    </div>
+
+    <div id="statusMsg" class="status"></div>
+    <div id="successBox" class="successBox">
+      <div class="title">Recepción registrada</div>
+      <div id="successDetail"></div>
+      <br>
+      <button class="btn btn-primary" onclick="location.reload()">Nueva recepción</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal artículos -->
+<div id="overlay" class="overlay">
+  <div class="modal">
+    <div class="modal-header" style="display:flex;align-items:center;gap:10px">
+      <div class="modal-title" id="modalTitle" style="flex:1">Artículos</div>
+      <button id="sendModal" class="btn btn-primary">Registrar</button>
+      <button class="btn btn-secondary" id="closeModal">✕</button>
+    </div>
+
+    <div class="search-box">
+      <input type="text" id="searchInput" placeholder="Buscar por código, medida o ISIS..." />
+      <!-- Buscador Flejes: 2 secciones (Flejes + Varillas) en UNA sola linea.
+           Al escribir en uno, la otra seccion se oculta (solo se muestran los items del que se busca). -->
+      <div id="flejesSearch" style="display:none">
+        <div class="dual-search">
+          <div class="dual-col">
+            <div class="dual-title">Flejes</div>
+            <div class="sec-search-row">
+              <input class="fm" id="fl_a" type="text" inputmode="decimal" placeholder="a mm">
+              <span class="x-sep">X</span>
+              <input class="fm" id="fl_b" type="text" inputmode="decimal" placeholder="b mm">
+            </div>
+          </div>
+          <div class="dual-col">
+            <div class="dual-title">Varillas / Redondos</div>
+            <div class="sec-search-row">
+              <input class="fm" id="va_a" type="text" inputmode="decimal" placeholder="a mm">
+              <span class="x-sep">X</span>
+              <input class="fm" id="va_b" type="text" inputmode="decimal" placeholder="b mm">
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div id="lines"></div>
+
+    <div class="hint" id="modalHint">Selecciona los artículos y anota la cantidad.</div>
+    <div class="modal-actions">
+      <button id="cancelModal" class="btn btn-secondary">Cancelar</button>
+    </div>
+    <div id="modalMsg" class="status"></div>
+  </div>
+</div>
+
+<!-- Modal para ingresar datos -->
+<div id="inputKgPopup" class="input-kg-popup">
+  <div class="kg-modal">
+    <h3 id="kgModalTitle">Cantidad en KG</h3>
+    <div class="item-info" id="kgItemInfo"></div>
+
+    <div id="flejesRollosGrid" style="display:none"></div>
+
+    <div id="kgInputGroup">
+      <label id="kgUnitLabel" style="display:block;margin-bottom:8px;font-size:16px;font-weight:700">KG</label>
+      <input type="text" id="inputKgValue" inputmode="decimal" placeholder="0,0" />
+    </div>
+
+    <div id="paqInputGroup" style="display:none">
+      <div id="paqUppHint" style="margin-bottom:10px;font-size:18px;font-weight:800;color:#0b5cad;background:#eef4fb;padding:8px 12px;border-radius:8px;text-align:center"></div>
+      <label style="display:block;margin-bottom:8px;font-size:16px;font-weight:700">Paquetes</label>
+      <input type="text" id="inputPaquetes" inputmode="numeric" placeholder="0" />
+      <label style="display:block;margin:14px 0 8px;font-size:16px;font-weight:700">Unidades sueltas</label>
+      <input type="text" id="inputSueltas" inputmode="numeric" placeholder="0" />
+      <div id="paqTotalLine" style="margin-top:16px;font-size:22px;font-weight:900;text-align:right">Total: 0</div>
+    </div>
+
+    <div id="rollosInputGroup" style="display:none;margin-top:14px">
+      <label style="display:block;margin-bottom:8px;font-size:16px;font-weight:700">Rollos</label>
+      <input type="text" id="inputRollos" inputmode="numeric" placeholder="0" />
+    </div>
+
+    <div id="pesoRolloInputGroup" style="display:none;margin-top:14px">
+      <label style="display:block;margin-bottom:8px;font-size:16px;font-weight:700">Peso x Rollo</label>
+      <input type="text" id="inputPesoRollo" inputmode="decimal" placeholder="0,0" />
+    </div>
+
+    <div class="actions" style="margin-top:20px">
+      <button class="btn btn-secondary" id="kgCancelBtn">Cancelar</button>
+      <button class="btn btn-primary" id="kgConfirmBtn">Confirmar</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal previo (flejes): KG estipulados según remito -->
+<div id="estipPopup" class="input-kg-popup">
+  <div class="kg-modal">
+    <h3>KG Estipulados</h3>
+    <div class="item-info" id="estipItemInfo"></div>
+    <label style="display:block;margin-bottom:8px;font-size:18px;font-weight:700">KG estipulados (según remito)</label>
+    <input type="text" id="inputEstip" inputmode="decimal" placeholder="0,0" />
+    <div class="actions" style="margin-top:20px">
+      <button class="btn btn-secondary" id="estipCancelBtn">Cancelar</button>
+      <button class="btn btn-primary" id="estipNextBtn">Continuar</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: Subir OC PDF -->
+<div id="ocUploadOverlay" class="overlay">
+  <div class="modal" style="max-width:640px">
+    <div class="modal-header">
+      <div class="modal-title">Subir Orden de Compra (PDF)</div>
+      <button class="btn btn-secondary" id="ocUploadClose">✕</button>
+    </div>
+    <div style="display:flex;gap:12px;margin-bottom:12px;align-items:center;padding:12px;background:#f6f8fa;border-radius:8px">
+      <label style="font-size:16px;font-weight:700;color:#333">Empresa:</label>
+      <label style="font-size:16px;cursor:pointer">
+        <input type="radio" name="ocEmpresa" value="LK" checked style="transform:scale(1.3);margin-right:6px"> LK
+      </label>
+      <label style="font-size:16px;cursor:pointer">
+        <input type="radio" name="ocEmpresa" value="CH" style="transform:scale(1.3);margin-right:6px"> CH
+      </label>
+      <div style="font-size:12px;color:#888;margin-left:auto">Filtra el catálogo de códigos</div>
+    </div>
+    <div class="oc-upload-zone" id="ocUploadZone">
+      <div style="font-size:18px;color:#555">Tocá acá para seleccionar el PDF de la OC</div>
+      <div style="font-size:14px;color:#888;margin-top:6px">PDF, JPG o PNG · hasta 10 MB</div>
+      <input type="file" id="ocFileInput" accept="application/pdf,image/*" style="display:none">
+      <div id="ocPreview" style="display:none;margin-top:10px">
+        <div id="ocFileName" style="font-weight:800;color:#0a7a2f;margin-bottom:6px"></div>
+        <img id="ocThumb" class="oc-thumb" style="display:none">
+      </div>
+    </div>
+    <div id="ocUploadMsg" class="status"></div>
+    <div class="modal-actions">
+      <button class="btn btn-secondary" id="ocUploadCancel">Cancelar</button>
+      <button class="btn btn-primary" id="ocUploadAnalyze" disabled>Analizar</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: Detalle de una OC (click desde la home) -->
+<div id="ocDetalleOverlay" class="overlay">
+  <div class="modal" id="ocDetalleModal" style="max-width:820px">
+    <div class="modal-header">
+      <div class="modal-title" id="ocDetalleTitle">Detalle OC</div>
+      <button class="btn btn-secondary" id="ocDetalleClose">✕</button>
+    </div>
+    <div id="ocDetalleHdr" style="padding:10px;background:#f6f8fa;border-radius:8px;margin-bottom:10px;font-size:16px"></div>
+    <div style="overflow-x:auto">
+      <table class="rev-lines" id="ocDetalleTable" style="width:100%;border-collapse:collapse;font-size:15px">
+        <thead><tr>
+          <th style="width:90px">Código</th>
+          <th>Descripción</th>
+          <th style="width:80px">Cant OC</th>
+          <th style="width:80px">Recibido</th>
+          <th style="width:80px">Pendiente</th>
+          <th style="width:100px">Fecha orig.</th>
+          <th style="width:100px">Próx. estim.</th>
+        </tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-secondary" id="ocDetalleCancel">Cerrar</button>
+      <button class="btn btn-primary" id="ocDetalleRecep">Recepcionar</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: Revisar OC extraida -->
+<div id="ocReviewOverlay" class="overlay">
+  <div class="modal" id="ocReviewModal" style="max-width:900px">
+    <div class="modal-header">
+      <div class="modal-title">Revisar OC extraída</div>
+      <button class="btn btn-secondary" id="ocReviewClose">✕</button>
+    </div>
+    <div class="rev-hdr" id="ocReviewHdr"></div>
+    <div id="ocReviewWarn"></div>
+    <div style="overflow-x:auto">
+      <table class="rev-lines" id="ocReviewTable"></table>
+    </div>
+    <div id="ocReviewMsg" class="status"></div>
+    <div class="modal-actions">
+      <button class="btn btn-secondary" id="ocReviewCancel">Cancelar</button>
+      <button class="btn btn-primary" id="ocReviewConfirm">Confirmar e importar</button>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<!-- pdf.js para parser LOCAL de OCs (sin edge function ni IA). Mismo CDN que usa Facturas/index.html -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script>
+  // Worker de pdf.js (misma version)
+  if (window.pdfjsLib) pdfjsLib.GlobalWorkerOptions.workerSrc =
+    "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
+</script>
+<script>
+"use strict";
+
+const SUPABASE_URL = "https://hrxfctzncixxqmpfhskv.supabase.co";
+const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhyeGZjdHpuY2l4eHFtcGZoc2t2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzI3MjQyNjEsImV4cCI6MjA4ODMwMDI2MX0.4L6wguch8UZGhC2VpzrWcCjJGUV-IkYsl9JoCWrOLUs";
+const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+// Proveedores por rubro
+const PROVEEDORES = {
+  Flejes: ["Basconia","Aperam","Hermac","Brawin","Altrak","Szapiro","EstaMetal","JL Metales","Alami"],
+  Cajas: ["Corrugadora"],
+  // Plasticos: proveedores REALES (fuente: hoja "Pedido VACIO" del Conteo de Plasticos).
+  // La lista vieja mezclaba matrices/insumos (Regatones, Base Afila, Mango Ergon., Mangos
+  // Abrelata, Capuchon Mariposa, Bujes Abrelatas, M. Pelador, Mangos NM) con proveedores:
+  // 17 de 19 botones no matcheaban ningun valor de Partes_Plasticas.Proveedor.
+  // "Rodar" era el titulo del bloque de Rafael Pettofrezza (mismo proveedor); "Esther" paso
+  // a Pettofrezza.
+  Plasticos: ["Pat Bet Plast","Rafael Pettofrezza","Telleria","Maspoli","Pintos","JL Matriceria","Ing. Barbetta Alberto","Martin Facciolo","Packaging y Servicios","CC Galvanoquimica"],
+  Cartones: ["Grafica Pol"],
+  Remaches: ["Bella Vista","Dilmax","Electronica Mandelli","Imel"],
+  Bombillas: ["Por definir"]
+};
+
+// Unidad por rubro (default) + excepciones por proveedor
+// Tipos: "Kg" (decimal), "Uni" (entero), "Millares" (entero), "Litros" (decimal), "Cajas" (entero)
+const UNIDADES = {
+  Flejes:    { _default: "Kg" },
+  Cajas:     { _default: "Cajas" },
+  Cartones:  { _default: "Uni" },
+  Plasticos: { _default: "Uni", "Martin Facciolo": "Kg" },
+  Remaches:  { _default: "Kg", "Dilmax": "Litros" },
+  Bombillas: { _default: "Uni" }
+};
+
+function getUnidad(rubro, prov) {
+  const cfg = UNIDADES[rubro] || {};
+  return cfg[prov] || cfg._default || "Uni";
+}
+
+function esDecimal(unidad) {
+  return unidad === "Kg" || unidad === "Litros";
+}
+
+// Tablas fuente por rubro
+const TABLAS = {
+  Flejes:    { tabla: "Flejes",           colCod: "N Fleje",  colDesc: "Descripción",           colIsis: "Cod_ISIS", colMedida: "Medida mm", colSector: "Sector", colProv: "Proveedor" },
+  Cajas:     { tabla: "Cajas",            colCod: "N_Caja",   colDesc: "Sector",                colIsis: "Cod_ISIS_LK", colMedida: "Medidas", colSector: "Sector", colProv: null },
+  // filtroNo: excluye los articulos discontinuados. Siguen en la tabla para el historico de
+  // stock, pero no se compran mas, asi que no tienen que aparecer para recepcionar.
+  Plasticos: { tabla: "Partes_Plasticas", colCod: "Sector",   colDesc: "Descripcion",           colIsis: ["Cod_ISIS_LK","Cod_ISIS_CH"], colSector: "Sector", colProv: "Proveedor", filtroNo: { col: "Discontinuado", val: true } },
+  Cartones:  { tabla: "Despiece x Articulo", colCod: "COD",   colDesc: "Descripcion de partes", colProv: null, filtro: { col: "Rubro", val: "Cartones" } },
+  // Remaches: especial - une Remaches SC + Remaches SP. Manejado por separado en cargarRemaches().
+  Remaches:  { especial: "remaches" },
+  Bombillas: { tabla: "Sector Bombilla",  colCod: "Sector",   colDesc: "Descripcion",           colIsis: "Cod_ISIS", colSector: "Sector", colProv: null }
+};
+
+let rubroSel = "";
+let provSel = "";
+let items = [];
+let filteredItems = [];
+let selectedItem = null;
+
+// ===== OCs pendientes =====
+// ocByCodigo: Map<clave_normalizada, { id, cantidad, cantidad_recibida, fecha, fecha_estimada }>
+// La clave es el Cod_ISIS (nuevo) o el codigo interno (fallback). Se indexa por AMBOS
+// para poder matchear items por isis o por codigo.
+// Se llena al abrir la botonera con las OCs pendientes del (rubro, proveedor) actual.
+let ocByCodigo = new Map();
+// ocPendientesAll: todas las OCs pendientes (todos los rubros/proveedores) — para la lista de la home.
+let ocPendientesAll = [];
+// Estados posibles: 'pendiente' | 'anulada' | 'cerrada'. Text libre en la tabla (sin CHECK).
+const OC_ESTADO_ACTIVO = "pendiente";
+// Padding: los codigos del PDF vienen "66" pero en Despiece x Articulo estan "066".
+function padCodigo(c) {
+  const s = String(c ?? "").trim();
+  return /^\d{1,3}$/.test(s) ? s.padStart(3, "0") : s;
+}
+function normCodigo(c) { return padCodigo(c).toUpperCase(); }
+// Inverso proveedor -> rubro (para saber a que rubro pertenece una OC dado su proveedor).
+const PROV_TO_RUBRO = (() => {
+  const m = new Map();
+  // Se deriva de PROVEEDORES. Antes la lista estaba copiada aca y se desincronizaba.
+  for (const [rubro, provs] of Object.entries(PROVEEDORES)) provs.forEach(p => m.set(p.toLowerCase(), rubro));
+  return m;
+})();
+
+const rubroGrid = document.getElementById("rubroGrid");
+const provSection = document.getElementById("provSection");
+const provGrid = document.getElementById("provGrid");
+const remitoSection = document.getElementById("remitoSection");
+const btnContinuarRow = document.getElementById("btnContinuarRow");
+const btnContinuar = document.getElementById("btnContinuar");
+const statusMsg = document.getElementById("statusMsg");
+const successBox = document.getElementById("successBox");
+const successDetail = document.getElementById("successDetail");
+const overlay = document.getElementById("overlay");
+const linesWrap = document.getElementById("lines");
+const modalTitle = document.getElementById("modalTitle");
+const modalMsg = document.getElementById("modalMsg");
+const txtRemito = document.getElementById("txtRemito");
+const searchInput = document.getElementById("searchInput");
+const inputKgPopup = document.getElementById("inputKgPopup");
+const kgItemInfo = document.getElementById("kgItemInfo");
+const inputKgValue = document.getElementById("inputKgValue");
+const kgConfirmBtn = document.getElementById("kgConfirmBtn");
+const kgCancelBtn = document.getElementById("kgCancelBtn");
+
+function esc(s) { return String(s??"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;"); }
+
+function arDateISO() {
+  return new Intl.DateTimeFormat("sv-SE",{timeZone:"America/Argentina/Buenos_Aires",year:"numeric",month:"2-digit",day:"2-digit"}).format(new Date());
+}
+
+// ===== Rubro =====
+rubroGrid.querySelectorAll(".prov-btn").forEach(btn => {
+  btn.addEventListener("click", () => {
+    rubroSel = btn.dataset.rubro;
+    rubroGrid.querySelectorAll(".prov-btn").forEach(b => b.classList.remove("active"));
+    btn.classList.add("active");
+    renderProveedores();
+  });
+});
+
+function renderProveedores() {
+  const provs = PROVEEDORES[rubroSel] || [];
+  provGrid.innerHTML = "";
+  provSel = "";
+
+  if (provs.length === 1) {
+    provSel = provs[0];
+    provSection.classList.add("hidden");
+  } else {
+    provs.forEach(p => {
+      const btn = document.createElement("button");
+      btn.className = "prov-btn";
+      btn.textContent = p;
+      btn.addEventListener("click", () => {
+        provSel = p;
+        provGrid.querySelectorAll(".prov-btn").forEach(b => b.classList.remove("active"));
+        btn.classList.add("active");
+        updateReady();
+      });
+      provGrid.appendChild(btn);
+    });
+    provSection.classList.remove("hidden");
+  }
+
+  remitoSection.classList.remove("hidden");
+  updateReady();
+}
+
+function updateReady() {
+  const ok = rubroSel && provSel;
+  btnContinuar.disabled = !ok;
+  btnContinuarRow.style.display = "";
+}
+
+// ===== Cargar artículos =====
+// colIsis puede ser una columna ("Cod_ISIS") o varias (["Cod_ISIS_LK","Cod_ISIS_CH"]):
+// Partes_Plasticas guarda el codigo de cada empresa por separado, igual que Cajas.
+// Devuelve [principal, alternativo] ya limpios, sin vacios.
+function leerIsis(row, colIsis) {
+  if (!colIsis) return ["", ""];
+  const cols = Array.isArray(colIsis) ? colIsis : [colIsis];
+  const vals = cols.map(c => String(row[c] ?? "").trim()).filter(Boolean);
+  return [vals[0] || "", vals[1] || ""];
+}
+
+btnContinuar.addEventListener("click", async () => {
+  btnContinuar.disabled = true;
+  statusMsg.textContent = "Cargando artículos...";
+  statusMsg.className = "status";
+
+  try {
+    const cfg = TABLAS[rubroSel];
+    let data, error;
+
+    if (cfg.especial === "remaches") {
+      // Remaches: la recepcion de insumo es SOLO el CRUDO (Remaches SC). Los procesados
+      // (Remaches SP: niquelado/zincado) NO se reciben del proveedor — vienen de un PS
+      // (ej. V9C crudo de Bella Vista -> Guazzaroni niquela -> V9). Por eso no se listan aca.
+      const scRes = await sb.from("Remaches SC").select("*").eq("Proveedor", provSel);
+      if (scRes.error) throw scRes.error;
+      data = (scRes.data || []).map(r => ({ cod: r["SC"], desc: r["Descripción"], isis: r["Cod_ISIS"] || "", medida: "", sector: r["SC"] || "" }));
+      data.sort((a,b) => String(a.cod).localeCompare(String(b.cod), "es"));
+    } else {
+      let query = sb.from(cfg.tabla).select("*");
+      if (cfg.colProv && provSel) query = query.eq(cfg.colProv, provSel);
+      if (cfg.filtro) query = query.eq(cfg.filtro.col, cfg.filtro.val);
+      if (cfg.filtroNo) query = query.neq(cfg.filtroNo.col, cfg.filtroNo.val);
+      const res = await query.order(cfg.colCod, { ascending: true });
+      if (res.error) throw res.error;
+      data = (res.data || []).map(r => ({
+        cod: String(r[cfg.colCod] ?? "").trim(),
+        desc: String(r[cfg.colDesc] ?? "").trim(),
+        isis: leerIsis(r, cfg.colIsis)[0],
+        isisAlt: leerIsis(r, cfg.colIsis)[1],
+        medida: cfg.colMedida ? String(r[cfg.colMedida] ?? "").trim() : "",
+        sector: cfg.colSector ? String(r[cfg.colSector] ?? "").trim() : "",
+        uniXPaq: r["Uni_x_Paq"] ?? r["Un_x_Paq"] ?? ""
+      }));
+    }
+
+    const seen = new Set();
+    items = data.filter(r => {
+      const cod = String(r.cod ?? "").trim();
+      if (!cod || seen.has(cod)) return false;
+      seen.add(cod);
+      return true;
+    }).map(r => ({
+      codigo: String(r.cod).trim(),
+      descripcion: String(r.desc ?? "").trim(),
+      isis: String(r.isis ?? "").trim(),
+      isisAlt: String(r.isisAlt ?? "").trim(),
+      medida: String(r.medida ?? "").trim(),
+      sector: String(r.sector ?? "").trim(),
+      uniXPaq: Number(String(r.uniXPaq ?? "").replace(",", ".")) || 0,
+      _cant: "",
+      _rollos: "",
+      _pesoRollo: ""
+    }));
+
+    // Cartones: el "unidades por paquete" no vive en Despiece; se toma de cat_cartones
+    // (misma fuente que el relevamiento) via la vista publica v_cat_cartones. Match por COD.
+    // Los cartones sin uni_x_paq (prescintos, etiquetas, film...) quedan en 0 -> input simple.
+    if (rubroSel === "Cartones") {
+      const { data: catCart } = await sb.from("v_cat_cartones").select("cod, uni_x_paq");
+      if (Array.isArray(catCart)) {
+        const uppByCod = new Map();
+        catCart.forEach(c => {
+          const cod = String(c.cod ?? "").trim();
+          const upp = Number(String(c.uni_x_paq ?? "").replace(",", ".")) || 0;
+          if (cod && upp > 0) uppByCod.set(cod, upp);
+        });
+        items.forEach(it => { if (!it.uniXPaq) it.uniXPaq = uppByCod.get(it.codigo) || 0; });
+      }
+    }
+
+    if (!items.length) {
+      statusMsg.textContent = "No hay artículos para este proveedor.";
+      statusMsg.className = "status bad";
+      btnContinuar.disabled = false;
+      return;
+    }
+
+    // Precargar OCs pendientes del (rubro, proveedor) actual -> map por codigo
+    await refrescarOCsDelProveedor(rubroSel, provSel);
+
+    statusMsg.textContent = "";
+    modalTitle.textContent = `${provSel} — ${items.length} artículos`;
+    buildModal();
+    overlay.classList.add("open");
+
+  } catch (err) {
+    console.error(err);
+    statusMsg.textContent = "Error: " + err.message;
+    statusMsg.className = "status bad";
+    btnContinuar.disabled = false;
+  }
+});
+
+// ===== Modal =====
+// Ordena los items para dejar arriba los que tienen OC pendiente (primero parcialmente
+// recibidos, despues sin recibir), y al final los sin OC. Preserva orden original dentro
+// de cada grupo.
+function sortItemsByOC(arr) {
+  const prio = (it) => {
+    const oc = getOCForItem(it);
+    if (!oc) return 3;
+    const rec = Number(oc.cantidad_recibida || 0);
+    if (rec > 0 && rec < Number(oc.cantidad || 0)) return 0; // parcial
+    return 1; // pendiente sin recibir aun
+  };
+  return arr
+    .map((it, i) => ({ it, i, p: prio(it) }))
+    .sort((a, b) => (a.p - b.p) || (a.i - b.i))
+    .map(x => x.it);
+}
+
+// Regla Fleje vs Varilla:
+// - Si la medida trae Ø / ⌀ / "diam" -> es una VARILLA (redondo) aunque tenga "x"
+//   (formato tipico "Ø2 x 600" = varilla de 2mm diametro por 600mm largo).
+// - Si no tiene diametro y tiene "x" -> Fleje (planchuela, formato "77 x 1,25").
+// - En cualquier otro caso (mm sueltos, N°, etc) -> Varilla.
+function esFleje(item) {
+  const m = String(item.medida || "");
+  if (/Ø|⌀|\bdiam\b/i.test(m)) return false;
+  return /x/i.test(m);
+}
+
+// Arma un boton para un item. Formato nuevo:
+//   [Medida arriba, grande y en negrita]
+//   [OC: cant unidad · Rec/Falta   ó   "sin OC"]
+//   [Sector abajo]
+// Ya NO muestra N° Fleje / codigo interno.
+function buildItemBtn(item) {
+  const btn = document.createElement("button");
+  const oc = getOCForItem(item);
+  const clases = ["item-btn"];
+  if (item._cant) clases.push("active");
+  if (oc) clases.push("tiene-oc");
+  btn.className = clases.join(" ");
+  // 1) Etiqueta principal del boton
+  //    Cajas: "Caja N" (N = N_Caja / item.codigo) para identificar directo, sin medida.
+  //    Resto: medida (o fallback a descripcion/codigo si no hay medida).
+  const label = (rubroSel === "Cajas")
+    ? `Caja ${item.codigo}`
+    : (item.medida || item.descripcion || item.codigo);
+  btn.innerHTML = `<div class="medida">${esc(label)}</div>`;
+  // 2) OC / sin OC
+  if (oc) {
+    const cant = Number(oc.cantidad || 0);
+    const rec  = Number(oc.cantidad_recibida || 0);
+    const unidad = getUnidad(rubroSel, provSel);
+    btn.innerHTML += `<div class="oc">OC: ${cant.toLocaleString("es-AR")} ${esc(unidad)}</div>`;
+    if (rec > 0) {
+      btn.innerHTML += `<div class="rec">Rec: ${rec.toLocaleString("es-AR")}</div>`;
+      const falta = cant - rec;
+      if (falta > 0) btn.innerHTML += `<div class="falta">Falta: ${falta.toLocaleString("es-AR")}</div>`;
+    }
+  } else {
+    btn.innerHTML += `<div class="sinoc">sin OC</div>`;
+  }
+  // 3) Sector abajo
+  if (item.sector) btn.innerHTML += `<div class="sector">${esc(item.sector)}</div>`;
+  // 4) Cantidad cargada (si ya se registro), en la unidad del rubro
+  if (item._cant) {
+    let extra;
+    const u = getUnidad(rubroSel, provSel);
+    const uTxt = u === "Kg" ? "kg" : u === "Cajas" ? "cajas" : u === "Millares" ? "millares" : u === "Litros" ? "L" : "uni";
+    if (item._paqBreak) {
+      extra = `${esc(item._cant)} ${uTxt} (${item._paqBreak.paquetes} paq + ${item._paqBreak.sueltas})`;
+    } else {
+      extra = `${esc(item._cant)} ${uTxt}`;
+      if (item._rollos) extra += ` · ${item._rollos} rollos`;
+    }
+    btn.innerHTML += `<div class="medida" style="margin-top:8px;color:#0a7a2f;font-weight:700">${extra}</div>`;
+  }
+  btn.addEventListener("click", () => onItemClick(item));
+  return btn;
+}
+
+function renderItems() {
+  linesWrap.innerHTML = "";
+  // Flejes: se divide en 2 secciones (Flejes + Varillas). Si el usuario esta buscando
+  // en uno de los 2 (algun input con contenido), SOLO se muestra esa seccion; el otro
+  // grupo se oculta entero.
+  if (rubroSel === "Flejes") {
+    const flActivo = !!(document.getElementById("fl_a").value.trim() || document.getElementById("fl_b").value.trim());
+    const vaActivo = !!(document.getElementById("va_a").value.trim() || document.getElementById("va_b").value.trim());
+    // Nada de botones hasta que se busque en algun input. Evita la avalancha inicial.
+    if (!flActivo && !vaActivo) {
+      linesWrap.innerHTML = '<div style="text-align:center;color:#888;padding:20px;font-style:italic;font-size:17px">Escribí una medida arriba para ver los items.</div>';
+      return;
+    }
+    const soloUno  = flActivo !== vaActivo; // exactamente uno activo
+    const mostrarFlejes   = !soloUno || flActivo;
+    const mostrarVarillas = !soloUno || vaActivo;
+    const flejes   = mostrarFlejes   ? sortItemsByOC(filteredItems.filter(esFleje))            : [];
+    const varillas = mostrarVarillas ? sortItemsByOC(filteredItems.filter(it => !esFleje(it))) : [];
+    if (flejes.length) {
+      const h = document.createElement("div");
+      h.className = "sec-title";
+      h.textContent = `Flejes (${flejes.length})`;
+      linesWrap.appendChild(h);
+      const g = document.createElement("div"); g.className = "items-grid";
+      flejes.forEach(it => g.appendChild(buildItemBtn(it)));
+      linesWrap.appendChild(g);
+    }
+    if (varillas.length) {
+      const h = document.createElement("div");
+      h.className = "sec-title";
+      h.textContent = `Varillas / Redondos (${varillas.length})`;
+      linesWrap.appendChild(h);
+      const g = document.createElement("div"); g.className = "items-grid";
+      varillas.forEach(it => g.appendChild(buildItemBtn(it)));
+      linesWrap.appendChild(g);
+    }
+    if (!flejes.length && !varillas.length) {
+      linesWrap.innerHTML = '<div style="text-align:center;color:#777;padding:12px;font-style:italic;font-size:15px">Sin resultados.</div>';
+    }
+    return;
+  }
+  // Resto de rubros: 1 grilla
+  const ordered = sortItemsByOC(filteredItems);
+  const g = document.createElement("div"); g.className = "items-grid";
+  ordered.forEach(it => g.appendChild(buildItemBtn(it)));
+  linesWrap.appendChild(g);
+}
+
+// Normaliza numeros para comparar medidas: quita espacios, unifica coma/punto, minuscula.
+function normDim(s) { return String(s || "").toLowerCase().replace(/\s+/g, "").replace(/,/g, ".").replace(/×/g, "x"); }
+
+function filterItems() {
+  if (rubroSel === "Flejes") {
+    // 2 buscadores: uno para Flejes (planchuelas), otro para Varillas. Cada uno con 2
+    // inputs de medida (a X b) que se buscan como substring (sin importar el orden).
+    // El filtro se aplica SOLO al grupo que corresponde (Flejes o Varillas). El otro
+    // grupo se muestra completo, salvo que se este buscando en el (entonces se filtra).
+    const fA = normDim(document.getElementById("fl_a").value);
+    const fB = normDim(document.getElementById("fl_b").value);
+    const vA = normDim(document.getElementById("va_a").value);
+    const vB = normDim(document.getElementById("va_b").value);
+    // pintar bordes "on" para feedback visual
+    ["fl_a","fl_b","va_a","va_b"].forEach(id => {
+      const el = document.getElementById(id);
+      el.classList.toggle("on", el.value.trim() !== "");
+    });
+    const matchTokens = (medida, toks) => {
+      const m = normDim(medida);
+      return toks.every(t => m.includes(t));
+    };
+    filteredItems = items.filter(it => {
+      const isFl = esFleje(it);
+      const toks = isFl ? [fA, fB].filter(Boolean) : [vA, vB].filter(Boolean);
+      if (!toks.length) return true;
+      return matchTokens(it.medida, toks);
+    });
+  } else {
+    const q = searchInput.value.toLowerCase();
+    filteredItems = items.filter(it => {
+      const text = (it.codigo + " " + it.descripcion + " " + it.isis + " " + it.isisAlt + " " + it.medida + " " + it.sector).toLowerCase();
+      return text.includes(q);
+    });
+  }
+  renderItems();
+}
+
+function buildModal() {
+  linesWrap.innerHTML = "";
+  modalMsg.textContent = "";
+  const esFlejes = rubroSel === "Flejes";
+  searchInput.style.display = esFlejes ? "none" : "";
+  document.getElementById("flejesSearch").style.display = esFlejes ? "block" : "none";
+  searchInput.value = "";
+  ["fl_a","fl_b","va_a","va_b"].forEach(id => {
+    const el = document.getElementById(id); el.value = ""; el.classList.remove("on");
+  });
+  filteredItems = [...items];
+
+  // Ocultar el buscador de la seccion (Flejes o Varillas) que este vacia para este proveedor.
+  if (esFlejes) {
+    const hayFl = items.some(esFleje);
+    const hayVa = items.some(it => !esFleje(it));
+    const cols = document.querySelectorAll("#flejesSearch .dual-col");
+    if (cols[0]) cols[0].style.display = hayFl ? "" : "none";
+    if (cols[1]) cols[1].style.display = hayVa ? "" : "none";
+  }
+
+  const uH = getUnidad(rubroSel, provSel);
+  const uHTxt = uH === "Kg" ? "en kg" : uH === "Litros" ? "en litros" : uH === "Cajas" ? "en cajas"
+              : uH === "Millares" ? "en millares" : "en unidades";
+  document.getElementById("modalHint").textContent = `Selecciona los artículos y anota la cantidad ${uHTxt}.`;
+
+  searchInput.addEventListener("input", filterItems);
+  renderItems();
+  setTimeout(() => {
+    if (esFlejes) {
+      // Focus al buscador de la seccion que tenga items (si solo hay una)
+      const fl = document.getElementById("fl_a");
+      const va = document.getElementById("va_a");
+      const hayFl = items.some(esFleje);
+      (hayFl ? fl : va).focus();
+    } else {
+      searchInput.focus();
+    }
+  }, 100);
+}
+
+// Listeners del buscador Flejes (2 secciones × 2 inputs) — registrados 1 sola vez.
+(() => {
+  const sanit = (el) => { el.value = el.value.replace(/[^0-9.,]/g, "").replace(/([.,].*)[.,]/g, "$1"); };
+  ["fl_a","fl_b","va_a","va_b"].forEach(id => {
+    const el = document.getElementById(id);
+    el.addEventListener("input", () => { sanit(el); filterItems(); });
+  });
+})();
+
+// ===== Grilla de rollos por peso (flejes) =====
+// Modelo: flejesCols = [ {count, kg}, ... ]. col0 = "bulk" (varios del mismo peso,
+// count editable). col>=1 = rollos sueltos de otro peso (count fijo = 1). El "+"
+// agrega un rollo suelto y descuenta 1 del bulk. Total Kg = Σ count*kg = lo guardado.
+let flejesCols = [];
+
+function rgFmt(n) {
+  return Number(n || 0).toLocaleString("es-AR", { minimumFractionDigits: 0, maximumFractionDigits: 3 });
+}
+
+function rgComputa() {
+  let grand = 0, totalRollos = 0;
+  const kt = flejesCols.map((c, i) => {
+    const cnt = i === 0 ? (parseInt(c.count, 10) || 0) : 1;
+    const kg = parseFloat(String(c.kg).replace(",", ".")) || 0;
+    totalRollos += cnt;
+    const v = cnt * kg;
+    grand += v;
+    return v;
+  });
+  return { kt, grand, totalRollos };
+}
+
+function rgSync(grand, totalRollos) {
+  document.getElementById("inputKgValue").value = grand ? String(grand) : "";
+  document.getElementById("inputRollos").value = totalRollos ? String(totalRollos) : "";
+}
+
+function recalcFlejesTotalsOnly() {
+  const { kt, grand, totalRollos } = rgComputa();
+  const cont = document.getElementById("flejesRollosGrid");
+  cont.querySelectorAll(".rg-row-kgtot td:not(.rg-pad)").forEach((td, idx) => {
+    if (kt[idx] !== undefined) td.textContent = rgFmt(kt[idx]);
+  });
+  const totalCell = cont.querySelector(".rg-row-total td");
+  if (totalCell) totalCell.textContent = `${rgFmt(grand)} kg · ${totalRollos} rollo(s)`;
+  const estipWrap = document.getElementById("rgEstipWrap");
+  if (estipWrap) estipWrap.innerHTML = rgEstipInfo(grand);
+  rgSync(grand, totalRollos);
+}
+
+function renderFlejesGrid() {
+  const cont = document.getElementById("flejesRollosGrid");
+  const { kt, grand, totalRollos } = rgComputa();
+  const n = flejesCols.length;
+  const hayOdd = flejesCols.length > 1;
+  const rmTds = flejesCols.map((c, i) => i === 0
+    ? `<td></td>`
+    : `<td><button class="rg-rm" type="button" data-i="${i}" title="Quitar rollo">×</button></td>`
+  ).join("");
+  const rolloTds = flejesCols.map((c, i) => i === 0
+    ? `<td><input class="rg-count" inputmode="numeric" value="${esc(String(c.count || ""))}" placeholder="0"></td>`
+    : `<td><span class="rg-one">1</span></td>`
+  ).join("");
+  const kgTds = flejesCols.map((c, i) =>
+    `<td><input class="rg-kg" data-i="${i}" inputmode="decimal" value="${esc(String(c.kg || ""))}" placeholder="0,0"></td>`
+  ).join("");
+  const kgTotTds = flejesCols.map((c, i) => `<td>${rgFmt(kt[i])}</td>`).join("");
+  cont.innerHTML = `
+    <div class="rg-label">Rollos y peso</div>
+    <div class="rg-scroll">
+    <table class="rollos-grid">
+      ${hayOdd ? `<tr class="rg-row-rm"><th></th>${rmTds}<td class="rg-pad"></td></tr>` : ""}
+      <tr class="rg-row-rollo"><th>Rollo</th>${rolloTds}<td class="rg-pad"></td></tr>
+      <tr class="rg-row-kg"><th>Kg</th>${kgTds}<td class="rg-plus-cell"><button id="rgPlus" type="button" title="Agregar un rollo de otro peso">+</button></td></tr>
+      <tr class="rg-row-kgtot"><th>Kg Total</th>${kgTotTds}<td class="rg-pad"></td></tr>
+      <tr class="rg-row-total"><th>Total</th><td colspan="${n + 1}">${rgFmt(grand)} kg · ${totalRollos} rollo(s)</td></tr>
+    </table>
+    </div>
+    <div id="rgEstipWrap">${rgEstipInfo(grand)}</div>`;
+  rgSync(grand, totalRollos);
+
+  const countEl = cont.querySelector(".rg-count");
+  if (countEl) countEl.addEventListener("input", () => {
+    countEl.value = countEl.value.replace(/\D/g, "");
+    flejesCols[0].count = countEl.value;
+    recalcFlejesTotalsOnly();
+  });
+  cont.querySelectorAll(".rg-kg").forEach(el => el.addEventListener("input", () => {
+    el.value = el.value.replace(/[^0-9.,]/g, "").replace(/([.,].*)[.,]/g, "$1");
+    flejesCols[Number(el.dataset.i)].kg = el.value;
+    recalcFlejesTotalsOnly();
+  }));
+  cont.querySelectorAll(".rg-rm").forEach(el => el.addEventListener("click", () => {
+    const i = Number(el.dataset.i);
+    flejesCols[0].count = String((parseInt(flejesCols[0].count, 10) || 0) + 1);
+    flejesCols.splice(i, 1);
+    renderFlejesGrid();
+  }));
+  const plus = document.getElementById("rgPlus");
+  if (plus) plus.addEventListener("click", () => {
+    const b = parseInt(flejesCols[0].count, 10) || 0;
+    if (b > 0) flejesCols[0].count = String(b - 1);
+    flejesCols.push({ count: 1, kg: "" });
+    renderFlejesGrid();
+  });
+}
+
+// Click en un artículo: flejes preguntan primero los KG estipulados; el resto va directo.
+function onItemClick(item) {
+  if (rubroSel === "Flejes") openEstipPopup(item);
+  else openKgPopup(item);
+}
+
+function openEstipPopup(item) {
+  selectedItem = item;
+  // Info del item + linea "OC: xxx" (cantidad + pendiente) si hay una OC vigente.
+  const oc = getOCForItem(item);
+  let ocLine = "";
+  if (oc) {
+    const cant = Number(oc.cantidad || 0);
+    const rec  = Number(oc.cantidad_recibida || 0);
+    const pend = Math.max(0, cant - rec);
+    const unidad = getUnidad(rubroSel, provSel);
+    ocLine = `<br><span style="color:#0b5cad;font-weight:800">OC: ${cant.toLocaleString("es-AR")} ${esc(unidad)}` +
+             (rec > 0 ? ` · Recibido ${rec.toLocaleString("es-AR")} · <b>Pendiente ${pend.toLocaleString("es-AR")}</b>` : "") +
+             `</span>`;
+  }
+  document.getElementById("estipItemInfo").innerHTML =
+    `<strong>${esc(item.codigo)}</strong> - ${esc(item.descripcion)}` +
+    (item.medida ? `<br>Medida: <strong>${esc(item.medida)}</strong>` : "") +
+    ocLine;
+  document.getElementById("inputEstip").value = item._estipulado || "";
+  document.getElementById("estipPopup").classList.add("open");
+  setTimeout(() => document.getElementById("inputEstip").focus(), 100);
+}
+
+function closeEstipPopup() {
+  document.getElementById("estipPopup").classList.remove("open");
+}
+
+// Info del estipulado vs total (para mostrar debajo del Total en la grilla).
+function rgEstipInfo(grand) {
+  const est = parseFloat(String((selectedItem && selectedItem._estipulado) || "").replace(",", ".")) || 0;
+  if (!est) return "";
+  const dif = Math.round((grand - est) * 100) / 100;
+  if (Math.abs(dif) < 0.05) return `<div class="rg-estip rg-est-ok">Estipulado: ${rgFmt(est)} kg · coincide ✓</div>`;
+  if (dif < 0) return `<div class="rg-estip rg-est-bad">Estipulado: ${rgFmt(est)} kg · faltan ${rgFmt(-dif)} kg</div>`;
+  return `<div class="rg-estip rg-est-bad">Estipulado: ${rgFmt(est)} kg · sobran ${rgFmt(dif)} kg</div>`;
+}
+
+function openKgPopup(item) {
+  selectedItem = item;
+  kgItemInfo.innerHTML = `<strong>${esc(item.codigo)}</strong> - ${esc(item.descripcion)}`;
+  if (item.isis) kgItemInfo.innerHTML += ` <br><small>ISIS: ${esc(item.isis)}</small>`;
+  if (rubroSel === "Flejes") kgItemInfo.innerHTML += ` <br>Medida: <strong>${esc(item.medida || "—")}</strong>`;
+
+  // Flejes: grilla de rollos por peso. Rubros con "unidades por paquete" (Cajas/Cartones):
+  // input de paquetes + unidades sueltas. Resto: input simple en la unidad del rubro.
+  const isFlejes = rubroSel === "Flejes";
+  const upp = Number(item.uniXPaq) || 0;
+  const usaPaq = !isFlejes && upp > 0;
+  document.getElementById("flejesRollosGrid").style.display = isFlejes ? "block" : "none";
+  document.getElementById("kgInputGroup").style.display = (isFlejes || usaPaq) ? "none" : "block";
+  document.getElementById("paqInputGroup").style.display = usaPaq ? "block" : "none";
+  document.getElementById("rollosInputGroup").style.display = "none";
+  document.getElementById("pesoRolloInputGroup").style.display = "none";
+
+  // Titulo + label segun la unidad real del rubro (no "KG" fijo).
+  const unidadItem = getUnidad(rubroSel, provSel);
+  const UNIDAD_LABEL = { Kg: "Kg", Uni: "Unidades", Millares: "Millares", Litros: "Litros", Cajas: "Cajas" };
+  const unidadTxt = UNIDAD_LABEL[unidadItem] || unidadItem;
+  document.getElementById("kgModalTitle").textContent = isFlejes
+    ? "Recepción de Fleje"
+    : (usaPaq ? "Cantidad (paquetes + sueltas)" : ("Cantidad en " + unidadTxt));
+  const kgUnitLabel = document.getElementById("kgUnitLabel");
+  if (kgUnitLabel) kgUnitLabel.textContent = unidadTxt;
+
+  if (isFlejes) {
+    flejesCols = (Array.isArray(item._rollosBreak) && item._rollosBreak.length)
+      ? item._rollosBreak.map((c, i) => ({ count: i === 0 ? String(c.count) : 1, kg: (c.kg || c.kg === 0) ? String(c.kg) : "" }))
+      : [{ count: "", kg: "" }];
+    renderFlejesGrid();
+  } else if (usaPaq) {
+    document.getElementById("paqUppHint").textContent = `Cada paquete tiene ${upp.toLocaleString("es-AR")} unidades`;
+    document.getElementById("inputPaquetes").value = item._paq || "";
+    document.getElementById("inputSueltas").value = item._sueltas || "";
+    recalcPaqTotal();
+  } else {
+    inputKgValue.value = item._cant || "";
+  }
+
+  inputKgPopup.classList.add("open");
+  setTimeout(() => {
+    const f = isFlejes ? document.querySelector("#flejesRollosGrid .rg-count")
+            : usaPaq ? document.getElementById("inputPaquetes")
+            : inputKgValue;
+    if (f) f.focus();
+  }, 100);
+}
+
+function closeKgPopup() {
+  inputKgPopup.classList.remove("open");
+  selectedItem = null;
+}
+
+function closeModalFn() {
+  overlay.classList.remove("open");
+  btnContinuar.disabled = false;
+  searchInput.removeEventListener("input", filterItems);
+}
+
+document.getElementById("closeModal").onclick = closeModalFn;
+document.getElementById("cancelModal").onclick = closeModalFn;
+overlay.addEventListener("click", e => { if (e.target === overlay) closeModalFn(); });
+
+// Manejo del popup de kg
+inputKgValue.addEventListener("input", () => {
+  let v = inputKgValue.value.replace(/[^0-9.,]/g, "").replace(/([.,].*)[.,]/g, "$1");
+  // Unidades enteras (Uni/Millares/Cajas): no permitir decimales.
+  if (!esDecimal(getUnidad(rubroSel, provSel))) v = v.replace(/[.,]/g, "");
+  inputKgValue.value = v;
+});
+
+// Popup paquetes + unidades sueltas (Cajas/Cartones)
+function recalcPaqTotal() {
+  const upp = Number(selectedItem && selectedItem.uniXPaq) || 0;
+  const paq = parseInt(document.getElementById("inputPaquetes").value, 10) || 0;
+  const sueltas = parseInt(document.getElementById("inputSueltas").value, 10) || 0;
+  const total = paq * upp + sueltas;
+  const u = getUnidad(rubroSel, provSel);
+  const uTxt = u === "Cajas" ? "cajas" : "uni";
+  document.getElementById("paqTotalLine").textContent = `Total: ${total.toLocaleString("es-AR")} ${uTxt}`;
+  return total;
+}
+["inputPaquetes", "inputSueltas"].forEach(id => {
+  const el = document.getElementById(id);
+  el.addEventListener("input", () => {
+    el.value = el.value.replace(/\D/g, "");
+    recalcPaqTotal();
+  });
+  el.addEventListener("keydown", e => { if (e.key === "Enter") kgConfirmBtn.click(); });
+});
+
+document.getElementById("inputRollos").addEventListener("input", () => {
+  document.getElementById("inputRollos").value = document.getElementById("inputRollos").value.replace(/\D/g, "");
+});
+
+document.getElementById("inputPesoRollo").addEventListener("input", () => {
+  const el = document.getElementById("inputPesoRollo");
+  el.value = el.value.replace(/[^0-9.,]/g, "").replace(/([.,].*)[.,]/g, "$1");
+});
+
+inputKgValue.addEventListener("keydown", e => {
+  if (e.key === "Enter") kgConfirmBtn.click();
+});
+
+document.getElementById("inputRollos").addEventListener("keydown", e => {
+  if (e.key === "Enter") kgConfirmBtn.click();
+});
+
+document.getElementById("inputPesoRollo").addEventListener("keydown", e => {
+  if (e.key === "Enter") kgConfirmBtn.click();
+});
+
+// ===== Modal previo: KG estipulados (flejes) =====
+document.getElementById("inputEstip").addEventListener("input", () => {
+  const el = document.getElementById("inputEstip");
+  el.value = el.value.replace(/[^0-9.,]/g, "").replace(/([.,].*)[.,]/g, "$1");
+});
+document.getElementById("estipNextBtn").addEventListener("click", () => {
+  if (!selectedItem) return;
+  selectedItem._estipulado = document.getElementById("inputEstip").value.trim();
+  closeEstipPopup();
+  openKgPopup(selectedItem);
+});
+document.getElementById("estipCancelBtn").addEventListener("click", closeEstipPopup);
+document.getElementById("inputEstip").addEventListener("keydown", e => {
+  if (e.key === "Enter") document.getElementById("estipNextBtn").click();
+});
+document.getElementById("estipPopup").addEventListener("click", e => {
+  if (e.target === document.getElementById("estipPopup")) closeEstipPopup();
+});
+
+kgConfirmBtn.addEventListener("click", () => {
+  if (!selectedItem) return;
+  const isFlejes = rubroSel === "Flejes";
+
+  // Rubros con paquetes (Cajas/Cartones): total = paquetes x uni_x_paq + sueltas.
+  const upp = Number(selectedItem.uniXPaq) || 0;
+  if (!isFlejes && upp > 0) {
+    const paq = parseInt(document.getElementById("inputPaquetes").value, 10) || 0;
+    const sueltas = parseInt(document.getElementById("inputSueltas").value, 10) || 0;
+    const total = paq * upp + sueltas;
+    if (total > 0) {
+      selectedItem._paq = String(paq);
+      selectedItem._sueltas = String(sueltas);
+      selectedItem._cant = String(total);
+      selectedItem._paqBreak = { paquetes: paq, uni_x_paq: upp, sueltas };
+      renderItems();
+    }
+    closeKgPopup();
+    return;
+  }
+
+  if (isFlejes) recalcFlejesTotalsOnly(); // asegura inputKgValue/inputRollos al día
+  const val = inputKgValue.value.trim();
+
+  if (val && Number(val.replace(",", ".")) > 0) {
+    if (isFlejes) {
+      // Confirmación si el total difiere > 5% de lo estipulado (remito).
+      const estip = Number(String(selectedItem._estipulado || "").replace(",", ".")) || 0;
+      const real = Number(val.replace(",", ".")) || 0;
+      if (estip && Math.abs(real - estip) > 0.05 * estip) {
+        const dif = real - estip;
+        const detalle = dif < 0 ? `faltan ${rgFmt(-dif)} kg` : `sobran ${rgFmt(dif)} kg`;
+        if (!confirm(`¿Seguro? Difiere del remito.\nEstipulado: ${rgFmt(estip)} kg · cargaste: ${rgFmt(real)} kg (${detalle}).`)) {
+          return; // "No": vuelve a la grilla (no cierra ni guarda)
+        }
+      }
+    }
+    selectedItem._cant = val;
+    if (isFlejes) {
+      selectedItem._rollos = document.getElementById("inputRollos").value.trim();
+      selectedItem._pesoRollo = "";
+      selectedItem._rollosBreak = flejesCols.map((c, i) => ({
+        count: i === 0 ? (parseInt(c.count, 10) || 0) : 1,
+        kg: parseFloat(String(c.kg).replace(",", ".")) || 0
+      })).filter(c => c.count > 0);
+    }
+    renderItems();
+    closeKgPopup();
+  } else {
+    closeKgPopup();
+  }
+});
+
+kgCancelBtn.addEventListener("click", closeKgPopup);
+
+inputKgPopup.addEventListener("click", e => {
+  if (e.target === inputKgPopup) closeKgPopup();
+});
+
+// Aviso por Telegram (grupo de alertas) si un fleje difiere > 5% de lo estipulado (remito).
+// La diferencia puede ser positiva o negativa. Encola por RPC (rc_alerta_recepcion_fleje).
+// Rubro -> nombre singular para el título / etiqueta del ítem.
+const RUBRO_SINGULAR = { Flejes: "FLEJE", Cajas: "CAJA", Plasticos: "PLÁSTICO", "Plásticos": "PLÁSTICO", Cartones: "CARTÓN", Remaches: "REMACHE" };
+
+async function avisarDiferenciasFlejesTelegram(flejes, remito) {
+  const parse = (s) => Number(String(s == null ? "" : s).replace(",", ".")) || 0;
+  const fmt = (n) => Number(n).toLocaleString("es-AR", { maximumFractionDigits: 3 });
+  let hoy = "", fechaHora = "";
+  try { hoy = new Date().toLocaleDateString("en-CA", { timeZone: "America/Argentina/Buenos_Aires" }); } catch (e) {}
+  try { fechaHora = new Date().toLocaleString("es-AR", { timeZone: "America/Argentina/Buenos_Aires" }); } catch (e) {}
+  // Responsable (quién cargó): usuario logueado (Google/Supabase) o sessionStorage.
+  let responsable = "";
+  try { const { data } = await sb.auth.getUser(); responsable = (data && data.user && (data.user.email || data.user.user_metadata?.full_name)) || ""; } catch (e) {}
+  if (!responsable) { try { responsable = sessionStorage.getItem("gp_user") || sessionStorage.getItem("gp_role") || ""; } catch (e) {} }
+
+  const rubroUp = RUBRO_SINGULAR[rubroSel] || String(rubroSel).toUpperCase();
+  const rubroCap = rubroUp.charAt(0) + rubroUp.slice(1).toLowerCase();
+
+  for (const it of flejes) {
+    const estip = parse(it._estipulado);
+    if (!estip) continue;                       // sin estipulado no se compara
+    const real = parse(it._cant);
+    const dif = real - estip;
+    if (Math.abs(dif) <= 0.05 * estip) continue; // dentro del 5%
+    const pct = dif / estip * 100;
+    const signo = dif > 0 ? "+" : "";
+    const pctTxt = signo + pct.toFixed(1).replace(".", ",");
+    const desglose = (Array.isArray(it._rollosBreak) ? it._rollosBreak : [])
+      .map(c => `${c.count}×${fmt(c.kg)}`).join(" + ") || "—";
+    const text =
+      `📦⚠️ RECEPCIÓN DE ${rubroUp} — diferencia ${pctTxt}% vs remito\n` +
+      `Proveedor: ${provSel}\n` +
+      `${rubroCap}: ${it.codigo} - ${it.descripcion}\n` +
+      `Medida: ${it.medida || "—"}\n` +
+      `KG remito (estipulado): ${fmt(estip)} kg\n` +
+      `KG recibido (real): ${fmt(real)} kg\n` +
+      `Diferencia: ${signo}${fmt(dif)} kg (${pctTxt}%)\n` +
+      `Rollos: ${desglose}\n` +
+      `Remito: ${remito || "—"}\n` +
+      `Cargó: ${responsable || "—"}\n` +
+      `Fecha: ${fechaHora || "—"}`;
+    const dedup = `recep_dif_fleje_${String(remito || "sr").replace(/\s+/g, "")}_${it.codigo}_${hoy}`;
+    try { await sb.rpc("rc_alerta_recepcion_fleje", { p_text: text, p_dedup: dedup }); }
+    catch (e) { console.error("aviso telegram dif fleje:", e); }
+  }
+}
+
+// ===== Enviar =====
+document.getElementById("sendModal").addEventListener("click", async () => {
+  const unidad = getUnidad(rubroSel, provSel);
+  const parseCant = (s) => Number(String(s || "").replace(",", ".")) || 0;
+
+  const toSend = items.filter(it => parseCant(it._cant) > 0);
+  if (!toSend.length) {
+    modalMsg.textContent = "Completá al menos una cantidad.";
+    modalMsg.className = "status bad";
+    return;
+  }
+
+  const resumen = toSend.map(it => `${it.codigo}: ${it._cant} ${unidad}`).join("\n");
+  if (!confirm(`Registrar recepción de ${provSel}?\n\n${resumen}`)) return;
+
+  const sendBtn = document.getElementById("sendModal");
+  sendBtn.disabled = true;
+  modalMsg.textContent = "Guardando...";
+  modalMsg.className = "status";
+
+  try {
+    const remito = txtRemito.value.trim();
+    const registros = toSend.map(it => {
+      const reg = {
+        fecha: arDateISO(),
+        proveedor: provSel,
+        rubro: rubroSel,
+        codigo: it.codigo,
+        descripcion: it.descripcion,
+        cantidad: parseCant(it._cant),
+        unidad: unidad,
+        remito: remito || null
+      };
+      // Agregar campos adicionales para Flejes
+      if (rubroSel === "Flejes") {
+        reg.rollos = it._rollos ? parseInt(it._rollos) || null : null;
+        reg.peso_x_rollo = null; // reemplazado por el desglose por peso
+        reg.rollos_json = (Array.isArray(it._rollosBreak) && it._rollosBreak.length) ? it._rollosBreak : null;
+        reg.kg_estipulado = it._estipulado ? parseFloat(String(it._estipulado).replace(",", ".")) || null : null;
+      } else if (it._paqBreak) {
+        // Cajas/Cartones: guardar desglose paquetes + sueltas para trazabilidad.
+        reg.rollos = it._paqBreak.paquetes || null;
+        reg.rollos_json = it._paqBreak;
+      }
+      return reg;
+    });
+
+    const { data, error } = await sb.from("Recepcion_Insumos").insert(registros).select();
+    if (error) throw error;
+    if (!data || data.length === 0) {
+      modalMsg.textContent = "No se registró ningún artículo. Sesión expirada? Reingresá con Google.";
+      modalMsg.className = "status bad";
+      sendBtn.disabled = false;
+      return;
+    }
+
+    // Aviso Telegram (grupo de alertas) si algún fleje difiere > 5% del remito.
+    if (rubroSel === "Flejes") { try { await avisarDiferenciasFlejesTelegram(toSend, remito); } catch (e) { console.error(e); } }
+
+    // Actualiza cantidad_recibida en las OCs pendientes que matchean (proveedor, codigo).
+    // Cierra la OC (estado='cerrada' + fecha_entrega_real=hoy) si Rec >= cantidad.
+    try { await actualizarOCsRecibido(toSend); } catch (e) { console.error("actualizar OCs:", e); }
+
+    overlay.classList.remove("open");
+    successDetail.textContent = `${data.length} artículo(s) de ${provSel} · Remito: ${remito || "—"}`;
+    successBox.style.display = "block";
+    statusMsg.textContent = "";
+
+  } catch (err) {
+    console.error(err);
+    modalMsg.textContent = "Error: " + err.message;
+    modalMsg.className = "status bad";
+    sendBtn.disabled = false;
+  }
+});
+
+
+/* ============================================================
+   SECCION OC INSUMOS
+   ============================================================
+   Vive en la home (debajo del selector de rubro):
+   - Lista las OCs pendientes de todos los rubros/proveedores.
+   - Boton "Subir OC PDF" -> upload -> edge function leer-oc ->
+     modal revision -> INSERT batch en Ordenes_Compra + anular
+     previas del mismo proveedor.
+   - Click en una linea -> setea rubro+proveedor y dispara
+     btnContinuar para saltar directo a la botonera con OC/Rec.
+   ============================================================ */
+
+const ocBlock          = document.getElementById("ocBlock");
+const ocListEl         = document.getElementById("ocList");
+const btnAbrirSubirOC  = document.getElementById("btnAbrirSubirOC");
+const ocUploadOverlay  = document.getElementById("ocUploadOverlay");
+const ocReviewOverlay  = document.getElementById("ocReviewOverlay");
+const ocFileInput      = document.getElementById("ocFileInput");
+const ocUploadZone     = document.getElementById("ocUploadZone");
+const ocFileName       = document.getElementById("ocFileName");
+const ocThumb          = document.getElementById("ocThumb");
+const ocPreview        = document.getElementById("ocPreview");
+const ocUploadAnalyze  = document.getElementById("ocUploadAnalyze");
+const ocUploadMsg      = document.getElementById("ocUploadMsg");
+
+// NOTA: eliminada dependencia de edge function `leer-oc` (Anthropic Vision).
+// El parseo ahora es LOCAL con pdf.js — cero costo, cero API key, offline-friendly.
+// Ventaja: cero latencia y no falla si Anthropic esta caido. Desventaja: parser
+// hardcodeado a este layout de OC (proveedores Loekemeyer / Chef). Si mañana el
+// formato del PDF cambia, hay que re-tocar `parsearPDFLocalmente`.
+
+let ocFileBuf = null;   // { name, mime, dataUrl }
+let ocDraft   = null;   // JSON extraido: { cabecera, lineas }
+
+/* ---------- Home: listado de OCs pendientes ---------- */
+
+// Formatea la fecha (viene YYYY-MM-DD desde Postgres) en formato corto DD-M.
+function fmtFechaCorta(iso) {
+  if (!iso) return "—";
+  const s = String(iso);
+  const m = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (!m) return s;
+  return `${Number(m[3])}-${Number(m[2])}`;
+}
+
+// Carga todas las OCs pendientes (todos los rubros/proveedores). Se llama al init y
+// despues de cada operacion que crea/anula/cierra OCs.
+async function cargarOCsPendientesHome() {
+  try {
+    const { data, error } = await sb.from("Ordenes_Compra")
+      .select('id, rubro, proveedor, codigo, cantidad, cantidad_recibida, fecha, fecha_estimada_proveedor')
+      .eq("estado", OC_ESTADO_ACTIVO)
+      .in("rubro", ["Flejes","Cajas","Plasticos","Cartones","Remaches","Bombillas"])
+      .order("proveedor", { ascending: true })
+      .order("fecha", { ascending: true });
+    if (error) throw error;
+    ocPendientesAll = data || [];
+    renderOCsHome();
+  } catch (err) {
+    console.error("cargarOCsPendientesHome:", err);
+    ocListEl.innerHTML = '<div class="oc-empty" style="color:#b91c1c">Error cargando OCs: ' + esc(err.message) + '</div>';
+  }
+}
+
+// Agrupa las OCs por (proveedor, rubro) y muestra 1 linea por grupo (el proveedor puede
+// tener multiples lineas de una misma OC importada — para el usuario es "una OC").
+// La fecha mostrada por ahora es fecha_estimada_proveedor (o fecha de la OC como fallback).
+// TODO: cuando exista el modulo que define "fecha entrego", enchufarlo aca.
+function renderOCsHome() {
+  if (!ocPendientesAll.length) {
+    ocListEl.innerHTML = '<div class="oc-empty">No hay OCs pendientes.</div>';
+    return;
+  }
+  // Agrupar por (proveedor|rubro|fecha_pedido)
+  const grupos = new Map();
+  for (const oc of ocPendientesAll) {
+    const key = `${oc.proveedor||"—"}||${oc.rubro||"—"}||${oc.fecha||""}`;
+    if (!grupos.has(key)) grupos.set(key, { proveedor: oc.proveedor||"—", rubro: oc.rubro, fecha: oc.fecha, fechaEnt: oc.fecha_estimada_proveedor, cant: 0, rec: 0 });
+    const g = grupos.get(key);
+    g.cant += Number(oc.cantidad || 0);
+    g.rec  += Number(oc.cantidad_recibida || 0);
+    if (oc.fecha_estimada_proveedor && (!g.fechaEnt || oc.fecha_estimada_proveedor < g.fechaEnt)) g.fechaEnt = oc.fecha_estimada_proveedor;
+  }
+  const filas = [...grupos.values()];
+  filas.sort((a,b) => (a.fechaEnt||"9999") < (b.fechaEnt||"9999") ? -1 : 1);
+  ocListEl.innerHTML = "";
+  filas.forEach(g => {
+    const row = document.createElement("div");
+    row.className = "oc-item";
+    row.dataset.rubro = g.rubro;
+    row.dataset.proveedor = g.proveedor;
+    const fechaTxt = fmtFechaCorta(g.fechaEnt || g.fecha);
+    const restante = g.cant - g.rec;
+    const badge = restante > 0 && restante < g.cant ? ` <span style="color:#0a7a2f">(Rec: ${g.rec.toLocaleString("es-AR")}/${g.cant.toLocaleString("es-AR")})</span>` : "";
+    row.innerHTML =
+      `<span class="oc-prov">${esc(g.proveedor)}${badge}</span>` +
+      `<span class="oc-fecha">${esc(g.rubro)} · ${esc(fechaTxt)}</span>`;
+    row.addEventListener("click", () => abrirDetalleOC(g.rubro, g.proveedor, g.fecha));
+    ocListEl.appendChild(row);
+  });
+}
+
+// Abre el modal de detalle con TODAS las lineas pendientes de esa OC (mismo grupo
+// proveedor+rubro+fecha_pedido). Boton "Recepcionar" dispara saltarAOC (flujo viejo).
+async function abrirDetalleOC(rubro, proveedor, fecha) {
+  const ov      = document.getElementById("ocDetalleOverlay");
+  const title   = document.getElementById("ocDetalleTitle");
+  const hdr     = document.getElementById("ocDetalleHdr");
+  const tbody   = document.querySelector("#ocDetalleTable tbody");
+  const btnRec  = document.getElementById("ocDetalleRecep");
+  title.textContent = `OC · ${proveedor} · ${rubro}`;
+  hdr.innerHTML = `<span class="lbl">Proveedor:</span>${esc(proveedor)} &nbsp; <span class="lbl">Rubro:</span>${esc(rubro)} &nbsp; <span class="lbl">Fecha pedido:</span>${esc(fmtFechaCorta(fecha))}`;
+  tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:#888;padding:14px">Cargando…</td></tr>';
+  btnRec.dataset.rubro = rubro;
+  btnRec.dataset.proveedor = proveedor;
+  ov.classList.add("open");
+  try {
+    // 1) Lineas de la OC (incluye fecha estimada original y ultima)
+    const { data: ocData, error } = await sb.from("Ordenes_Compra")
+      .select('id, codigo, descripcion, cantidad, cantidad_recibida, unidad, fecha_estimada_original, fecha_estimada_proveedor')
+      .eq("estado", OC_ESTADO_ACTIVO)
+      .eq("proveedor", proveedor)
+      .eq("rubro", rubro)
+      .eq("fecha", fecha)
+      .order("codigo", { ascending: true });
+    if (error) throw error;
+    const lineas = ocData || [];
+    if (!lineas.length) {
+      tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:#888;padding:14px">Sin lineas pendientes.</td></tr>';
+      return;
+    }
+
+    // 2) Recepciones aplicadas: match por (proveedor, rubro, codigo IN) con fecha de
+    //    recepcion >= fecha del pedido (para descartar recepciones anteriores no ligadas).
+    const codigos = [...new Set(lineas.map(l => l.codigo).filter(Boolean))];
+    let recByCod = new Map();
+    if (codigos.length) {
+      const { data: recData } = await sb.from("Recepcion_Insumos")
+        .select('fecha, codigo, cantidad, unidad, remito, rollos')
+        .eq("proveedor", proveedor)
+        .eq("rubro", rubro)
+        .in("codigo", codigos)
+        .gte("fecha", fecha)
+        .order("fecha", { ascending: true });
+      for (const r of (recData || [])) {
+        const k = String(r.codigo || "");
+        if (!recByCod.has(k)) recByCod.set(k, []);
+        recByCod.get(k).push(r);
+      }
+    }
+
+    const rowsHtml = lineas.map(l => {
+      const cant = Number(l.cantidad || 0);
+      const rec  = Number(l.cantidad_recibida || 0);
+      const pend = Math.max(0, cant - rec);
+      const cls = rec >= cant && cant > 0 ? "rec-total" : (rec > 0 ? "rec-parcial" : "");
+      const u = l.unidad ? " " + esc(l.unidad) : "";
+      const recs = recByCod.get(String(l.codigo || "")) || [];
+      // Sub-filas por cada recepcion aplicada
+      const subs = recs.map(r => {
+        const rq = Number(r.cantidad || 0);
+        const ru = r.unidad ? " " + esc(r.unidad) : "";
+        const remito = r.remito ? ` · Rem ${esc(r.remito)}` : "";
+        const rollos = r.rollos ? ` · ${r.rollos} rollo(s)` : "";
+        return `<tr class="rec-sub">
+          <td colspan="2">↳ ${esc(fmtFechaCorta(r.fecha))}${remito}${rollos}</td>
+          <td class="num"></td>
+          <td class="num">${rq.toLocaleString("es-AR")}${ru}</td>
+          <td class="num"></td>
+          <td colspan="2"></td>
+        </tr>`;
+      }).join("");
+      // Fechas: original (nunca se toca) + proxima estimada (se pisa con cada nueva promesa).
+      // Si son iguales, mostramos solo una; si difieren, la proxima se pinta en naranja.
+      const fOri = l.fecha_estimada_original ? fmtFechaCorta(l.fecha_estimada_original) : "—";
+      const fProx = l.fecha_estimada_proveedor ? fmtFechaCorta(l.fecha_estimada_proveedor) : "—";
+      const proxHtml = (l.fecha_estimada_proveedor && l.fecha_estimada_original && l.fecha_estimada_proveedor !== l.fecha_estimada_original)
+        ? `<span style="color:#c9640a;font-weight:800">${esc(fProx)}</span>`
+        : esc(fProx);
+      return `<tr class="${cls}">
+        <td><strong>${esc(l.codigo || "—")}</strong></td>
+        <td>${esc(l.descripcion || "—")}</td>
+        <td class="num">${cant.toLocaleString("es-AR")}${u}</td>
+        <td class="num">${rec.toLocaleString("es-AR")}</td>
+        <td class="num"><strong>${pend.toLocaleString("es-AR")}</strong></td>
+        <td>${esc(fOri)}</td>
+        <td>${proxHtml}</td>
+      </tr>${subs}`;
+    }).join("");
+
+    tbody.innerHTML = rowsHtml;
+  } catch (err) {
+    tbody.innerHTML = `<tr><td colspan="7" style="color:#b91c1c;padding:14px">Error: ${esc(err.message)}</td></tr>`;
+  }
+}
+
+document.getElementById("ocDetalleClose").addEventListener("click", () => document.getElementById("ocDetalleOverlay").classList.remove("open"));
+document.getElementById("ocDetalleCancel").addEventListener("click", () => document.getElementById("ocDetalleOverlay").classList.remove("open"));
+document.getElementById("ocDetalleOverlay").addEventListener("click", (e) => { if (e.target.id === "ocDetalleOverlay") document.getElementById("ocDetalleOverlay").classList.remove("open"); });
+document.getElementById("ocDetalleRecep").addEventListener("click", () => {
+  const btn = document.getElementById("ocDetalleRecep");
+  document.getElementById("ocDetalleOverlay").classList.remove("open");
+  saltarAOC(btn.dataset.rubro, btn.dataset.proveedor);
+});
+
+// Click en una linea de OC insumos -> setear rubro+proveedor y disparar continuar.
+async function saltarAOC(rubro, proveedor) {
+  const btnRubro = rubroGrid.querySelector(`.prov-btn[data-rubro="${rubro}"]`);
+  if (btnRubro) btnRubro.click();
+  // esperar a que renderProveedores termine y despues elegir prov
+  setTimeout(() => {
+    // Si el rubro tiene un solo proveedor (ej. Cartones/Grafica Pol), ya quedo asignado.
+    if (!provSel) {
+      const btns = [...provGrid.querySelectorAll(".prov-btn")];
+      const btnProv = btns.find(b => (b.textContent||"").trim().toLowerCase() === String(proveedor||"").trim().toLowerCase());
+      if (btnProv) btnProv.click();
+    }
+    setTimeout(() => { if (!btnContinuar.disabled) btnContinuar.click(); }, 100);
+  }, 100);
+}
+
+/* ---------- Fetch OCs del proveedor actual (para botonera) ---------- */
+
+async function refrescarOCsDelProveedor(rubro, proveedor) {
+  ocByCodigo = new Map();
+  try {
+    const { data, error } = await sb.from("Ordenes_Compra")
+      .select('id, codigo, cantidad, cantidad_recibida, fecha, fecha_estimada_proveedor')
+      .eq("rubro", rubro)
+      .eq("proveedor", proveedor)
+      .eq("estado", OC_ESTADO_ACTIVO);
+    if (error) throw error;
+    // La OC.codigo es el Cod_ISIS nuevo (que puso enriquecerConCatalogo). Indexamos por
+    // ese valor Y por su version padded, para que matchee tanto contra item.isis como
+    // contra item.codigo cuando el codigo del item es el Cod_ISIS.
+    for (const r of (data || [])) {
+      const rawKey = normCodigo(r.codigo);
+      const prev = ocByCodigo.get(rawKey);
+      if (!prev || String(r.fecha) > String(prev.fecha)) ocByCodigo.set(rawKey, r);
+    }
+  } catch (e) { console.error("refrescarOCsDelProveedor:", e); }
+}
+
+// Devuelve la OC pendiente asociada a un item (matchea por Cod_ISIS o por codigo).
+function getOCForItem(item) {
+  // Se prueban los dos codigos ISIS (LK y CH) ademas del codigo interno del item.
+  for (const k of [item.isis, item.isisAlt, item.codigo]) {
+    if (!k) continue;
+    const hit = ocByCodigo.get(normCodigo(k));
+    if (hit) return hit;
+  }
+  return null;
+}
+
+/* ---------- Actualizar cantidad_recibida despues de recibir ---------- */
+
+// Para cada item recibido, chequea si tiene OC pendiente en ocByCodigo. Si si:
+//   - Suma la nueva cantidad a cantidad_recibida.
+//   - Si supera cantidad, marca estado='cerrada' + fecha_entrega_real=hoy.
+async function actualizarOCsRecibido(toSend) {
+  const hoy = arDateISO();
+  // Acumulador de items con recepcion parcial > 15% pendiente — al final aviso al
+  // operario todos juntos y le ofrezco cargar la nueva fecha estimada por item.
+  const pendientesGrandes = [];
+  for (const it of toSend) {
+    const oc = getOCForItem(it);
+    if (!oc) continue;
+    const cant = Number(oc.cantidad || 0);
+    const recPrev = Number(oc.cantidad_recibida || 0);
+    const recNueva = Number(String(it._cant).replace(",", ".")) || 0;
+    const recTotal = Math.round(recPrev + recNueva); // cantidad_recibida es integer
+    const patch = { cantidad_recibida: recTotal };
+    if (recTotal >= cant) {
+      patch.estado = "cerrada";
+      patch.fecha_entrega_real = hoy;
+    }
+    try {
+      await sb.from("Ordenes_Compra").update(patch).eq("id", oc.id);
+    } catch (e) { console.error("update OC id="+oc.id, e); }
+    // Regla: si sigue pendiente > 15% del total, pedirle al operario nueva fecha.
+    if (cant > 0 && recTotal < cant) {
+      const pend = cant - recTotal;
+      if (pend / cant > 0.15) {
+        pendientesGrandes.push({ oc_id: oc.id, codigo: oc.codigo, cant, recTotal, pend });
+      }
+    }
+  }
+  // Refresca la lista de la home antes de mostrar el aviso (por si el usuario cierra).
+  await cargarOCsPendientesHome();
+
+  // Aviso post-recepcion. No bloqueante — es un "recordatorio" para pedirle al prov
+  // una nueva fecha de entrega y cargarla en la OC.
+  if (pendientesGrandes.length) {
+    const lista = pendientesGrandes.map(p =>
+      `• ${p.codigo}: falta ${p.pend.toLocaleString("es-AR")} de ${p.cant.toLocaleString("es-AR")} (>15%)`
+    ).join("\n");
+    // 1) Aviso simple
+    const querePreguntar = confirm(
+      "Estas OCs quedaron con más del 15% pendiente:\n\n" + lista +
+      "\n\nPedile al proveedor una NUEVA fecha estimada de entrega.\n\n¿Querés cargar las nuevas fechas ahora?"
+    );
+    if (querePreguntar) {
+      // Prompt por item (opcional dejar vacio para saltar)
+      for (const p of pendientesGrandes) {
+        const nueva = prompt(`Nueva fecha estimada para ${p.codigo} (YYYY-MM-DD, vacío = omitir):`, "");
+        if (nueva && /^\d{4}-\d{2}-\d{2}$/.test(nueva.trim())) {
+          try {
+            await sb.from("Ordenes_Compra").update({ fecha_estimada_proveedor: nueva.trim() }).eq("id", p.oc_id);
+          } catch (e) { console.error("update fecha_estimada oc="+p.oc_id, e); }
+        }
+      }
+      await cargarOCsPendientesHome();
+    }
+  }
+}
+
+/* ---------- Subir OC PDF -> edge function leer-oc -> modal revision ---------- */
+
+btnAbrirSubirOC.addEventListener("click", () => {
+  ocFileBuf = null;
+  ocDraft = null;
+  ocFileInput.value = "";
+  ocPreview.style.display = "none";
+  ocThumb.style.display = "none";
+  ocFileName.textContent = "";
+  ocUploadZone.classList.remove("has-file");
+  ocUploadAnalyze.disabled = true;
+  ocUploadMsg.textContent = "";
+  ocUploadMsg.className = "status";
+  ocUploadOverlay.classList.add("open");
+});
+
+document.getElementById("ocUploadClose").addEventListener("click", () => ocUploadOverlay.classList.remove("open"));
+document.getElementById("ocUploadCancel").addEventListener("click", () => ocUploadOverlay.classList.remove("open"));
+ocUploadOverlay.addEventListener("click", (e) => { if (e.target === ocUploadOverlay) ocUploadOverlay.classList.remove("open"); });
+
+ocUploadZone.addEventListener("click", () => ocFileInput.click());
+
+ocFileInput.addEventListener("change", async () => {
+  const f = ocFileInput.files && ocFileInput.files[0];
+  if (!f) return;
+  if (f.size > 10 * 1024 * 1024) { ocUploadMsg.textContent = "El archivo es mayor a 10 MB."; ocUploadMsg.className = "status bad"; return; }
+  const buf = await new Promise((res, rej) => {
+    const r = new FileReader();
+    r.onload = () => res(r.result);
+    r.onerror = () => rej(r.error);
+    r.readAsDataURL(f);
+  });
+  ocFileBuf = { name: f.name, mime: f.type || "application/pdf", dataUrl: buf };
+  ocFileName.textContent = f.name;
+  ocPreview.style.display = "block";
+  ocUploadZone.classList.add("has-file");
+  ocUploadAnalyze.disabled = false;
+  if ((f.type || "").startsWith("image/")) {
+    ocThumb.src = buf;
+    ocThumb.style.display = "block";
+  } else {
+    ocThumb.style.display = "none";
+  }
+});
+
+ocUploadAnalyze.addEventListener("click", async () => {
+  if (!ocFileBuf) return;
+  ocUploadAnalyze.disabled = true;
+  ocUploadMsg.textContent = "Leyendo PDF...";
+  ocUploadMsg.className = "status";
+  try {
+    if (!ocFileBuf.mime.includes("pdf")) {
+      throw new Error("El parser local solo acepta PDF (no imagen). Si necesitas subir foto, avisame para reactivar la edge function con IA.");
+    }
+    if (!window.pdfjsLib) throw new Error("pdf.js no cargo (verifica conexion a cdnjs).");
+
+    // 1) Parseo local del PDF: extrae cabecera + lineas crudas (cod_isis, lk, ch)
+    const parsed = await parsearPDFLocalmente(ocFileBuf.dataUrl);
+    // 2) Enriquecer con catalogo Supabase para traer codigo-tablet y descripcion
+    // Empresa (LK|CH) elegida arriba en el modal: filtra Codigos_ISIS_Map para evitar
+    // matches cruzados (codigo_interno 1131500 es Mango Sacafuente en LK y FLEJE 1006 48x1.25 en CH).
+    const empresaSel = (document.querySelector('input[name="ocEmpresa"]:checked') || {}).value || "LK";
+    ocUploadMsg.textContent = "Buscando en catálogo (" + empresaSel + ")...";
+    const data = await enriquecerConCatalogo(parsed, empresaSel);
+    ocDraft = data;
+    ocUploadOverlay.classList.remove("open");
+    abrirRevisionOC(data);
+  } catch (err) {
+    console.error(err);
+    ocUploadMsg.textContent = "Error: " + err.message;
+    ocUploadMsg.className = "status bad";
+    ocUploadAnalyze.disabled = false;
+  }
+});
+
+/* ---------- Parser PDF LOCAL (sin IA) ---------- */
+// Convierte un data URL de PDF en:
+//   { cabecera: { fecha_pedido YYYY-MM-DD, cod_prov, razon_social_raw },
+//     variante: 'flejes' | 'cajas' | 'cartones',
+//     lineas:   [{ cod_isis, lk, ch, cantidad }] }
+// Se apoya en pdf.js. Usa las posiciones (x, y) de cada text item para reconstruir
+// la tabla, agrupando por Y con tolerancia y ordenando por X dentro de cada fila.
+async function parsearPDFLocalmente(dataUrl) {
+  // dataUrl -> ArrayBuffer
+  const bin = atob(dataUrl.split(",")[1] || "");
+  const buf = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) buf[i] = bin.charCodeAt(i);
+
+  const pdf = await pdfjsLib.getDocument({ data: buf }).promise;
+  const items = [];
+  for (let p = 1; p <= pdf.numPages; p++) {
+    const page = await pdf.getPage(p);
+    const tc = await page.getTextContent();
+    // Los items traen transform=[a,b,c,d,e,f]; e=x, f=y (Y crece hacia arriba en PDF).
+    // Negamos Y para trabajar top-down.
+    const vh = page.view[3]; // altura del viewport para normalizar
+    tc.items.forEach(it => {
+      if (!it.str || !it.str.trim()) return;
+      const x = it.transform[4];
+      const y = vh - it.transform[5]; // top-down
+      items.push({ text: it.str.trim(), x, y, page: p });
+    });
+  }
+  // Agrupar por Y con tolerancia (mismo Y ≡ dif ≤ 3pt), respetando pagina
+  items.sort((a, b) => (a.page - b.page) || (a.y - b.y) || (a.x - b.x));
+  const rows = [];
+  let cur = [];
+  let lastY = null, lastPage = null;
+  for (const it of items) {
+    const newPage = it.page !== lastPage;
+    if (cur.length === 0 || (!newPage && Math.abs(it.y - lastY) <= 3)) {
+      cur.push(it);
+    } else {
+      rows.push(cur);
+      cur = [it];
+    }
+    lastY = it.y; lastPage = it.page;
+  }
+  if (cur.length) rows.push(cur);
+  const lines = rows.map(r => {
+    const sorted = r.slice().sort((a, b) => a.x - b.x);
+    return {
+      y: r[0].y,
+      page: r[0].page,
+      text: sorted.map(i => i.text).join(" "),
+      items: sorted,
+    };
+  });
+
+  const fullText = lines.map(l => l.text).join("\n");
+
+  // Cabecera. Fecha por regex normal.
+  const mFecha = fullText.match(/FECHA\s+PEDIDO:?\s*(\d{2})\/(\d{2})\/(\d{4})/i);
+  const fecha_pedido = mFecha ? `${mFecha[3]}-${mFecha[2]}-${mFecha[1]}` : null;
+
+  // Cod prov por LOOKUP POSICIONAL: buscar el item "COD" y luego un numero 3-8
+  // digitos en la misma banda vertical (Y ± 30) y a la derecha (X > COD.x + 20).
+  // La regex fallaria porque entre "COD" y "PROV:" hay lineas de texto (razon social
+  // partida) y el numero suele estar arriba a la derecha del label.
+  let cod_prov = "";
+  const codItem = items.find(i => i.text === "COD" || i.text === "COD:");
+  if (codItem) {
+    const near = items.filter(it =>
+      it.page === codItem.page &&
+      Math.abs(it.y - codItem.y) < 30 &&
+      it.x > codItem.x + 20 && it.x < codItem.x + 130 &&
+      /^\d{3,8}$/.test(it.text)
+    );
+    if (near.length) cod_prov = near[0].text;
+  }
+
+  // Razon social: heuristica — palabras alfabeticas (no todo dígitos) que caigan en la banda
+  // vertical entre "ORDEN DE COMPRA" y "FACTURAR", excluyendo columna derecha (Chef/Cervantes/Villa/etc)
+  // y las etiquetas fijas.
+  const idxOrden    = lines.findIndex(l => /ORDEN\s+DE\s+COMPRA/i.test(l.text));
+  const idxFacturar = lines.findIndex(l => /FACTURAR/i.test(l.text));
+  const IGNORE = /^(RAZON|SOCIAL|COD|PROV|CUIT|DIRECCION|LOCALIDAD|ENTREGA|EN|ORDEN|DE|COMPRA|FECHA|PEDIDO|LOEKEMEYER|Hnos\.?|S\.R\.L|Chef|SRL|Cervantes|Villa|Devoto|Real|CABA|Virgilio|\d{4}|30-\d+-\d+|30-\d+)$/i;
+  let razonPieces = [];
+  if (idxOrden > -1 && idxFacturar > -1) {
+    for (let i = idxOrden; i < idxFacturar; i++) {
+      const line = lines[i];
+      for (const it of line.items) {
+        // La banda de razon social esta en x aprox 90-200 (columna izquierda),
+        // y estos textos son letras (no fechas ni CUIT ni 4 digitos).
+        if (it.x < 90 || it.x > 250) continue;
+        if (IGNORE.test(it.text)) continue;
+        if (/^\d+$/.test(it.text)) continue;
+        if (it.text.includes(":")) continue; // "SOCIAL:", "PROV:", "COD:", "EN:", etc
+        razonPieces.push(it.text);
+      }
+    }
+  }
+  const razon_social_raw = razonPieces.join(" ").replace(/\s+/g, " ").trim();
+
+  // Detectar variante mirando el header de la tabla (que ocupa 2-3 filas por
+  // envolver los nombres largos). "Medida" a veces cae 1-2 filas ARRIBA del "Cód ISIS"
+  // (caso Aperam/Brawin), por eso miramos [idxHeader-2, idxHeader+4].
+  const idxHeader = lines.findIndex(l => /C[oó]d\s*ISIS/i.test(l.text));
+  let variante = "cartones";
+  if (idxHeader > -1) {
+    const headerText = lines.slice(Math.max(0, idxHeader - 2), idxHeader + 4).map(l => l.text).join(" ");
+    if (/\bMedida\b/i.test(headerText))      variante = "flejes";
+    else if (/N°?\s*Caja/i.test(headerText)) variante = "cajas";
+    else                                      variante = "cartones";
+  }
+
+  // Parsear items: entre el header y el fin del PDF. Cada item se compone de varias
+  // filas cercanas — el "ancla" es la fila cuyo PRIMER token es un numero de 3-8
+  // digitos (el Cod ISIS) Y esta en la COLUMNA de Cod ISIS (leftmost). Filtramos
+  // por X para no confundir con valores de "Pedido KG" que tambien pueden ser 3
+  // digitos y caer como primer token de una fila (falso ancla).
+  const bodyLines = idxHeader > -1 ? lines.slice(idxHeader + 1) : lines;
+  // 1) Detectar la X de la columna Cod ISIS desde el header. Si no se puede,
+  //    fallback al minimo X entre las anclas candidatas (que es donde estan los
+  //    codigos reales, no los valores de Pedido).
+  let codIsisX = null;
+  if (idxHeader > -1) {
+    const hdrItem = lines[idxHeader].items.find(it => /^C[oó]d/i.test(it.text) || /ISIS/i.test(it.text));
+    if (hdrItem) codIsisX = hdrItem.x;
+  }
+  if (codIsisX == null) {
+    const cands = bodyLines.map(l => l.items[0]).filter(it => it && /^\d{3,8}$/.test(it.text));
+    if (cands.length) codIsisX = Math.min(...cands.map(c => c.x));
+  }
+  const inCodIsisCol = (x) => codIsisX == null || Math.abs(x - codIsisX) <= 50;
+
+  const anclas = [];
+  bodyLines.forEach((line, idx) => {
+    const first = line.items[0];
+    if (!first || !/^\d{3,8}$/.test(first.text)) return;
+    if (!inCodIsisCol(first.x)) return; // descarta falsos anclas (Pedido KG, N° Ord, etc)
+    // Ultimo numerico de la fila = Pedido total (fallback)
+    const nums = line.items.slice(1).map(i => i.text).filter(t => /^\d+$/.test(t)).map(Number);
+    anclas.push({ idx, cod_isis: first.text, pedido_raw: nums.length ? nums[nums.length - 1] : null });
+  });
+  // Cada ancla arranca vacia; asignamos LK/CH por TOKEN (no por fila entera).
+  const lineas = anclas.map(a => ({ cod_isis: a.cod_isis, lk: 0, ch: 0, pedido_raw: a.pedido_raw }));
+
+  // Y del ancla (Y del PRIMER item de la fila que la contiene). Y es coordenada real
+  // del PDF (top-down), mucho mas estable que el idx de fila.
+  const ancYs = anclas.map(a => ({
+    y: bodyLines[a.idx].y || bodyLines[a.idx].items[0].y,
+    page: bodyLines[a.idx].page || bodyLines[a.idx].items[0].page,
+  }));
+
+  // Recolectar TODOS los tokens LK/CH del cuerpo con su valor adyacente (el siguiente
+  // token numerico en la MISMA fila, ordenado por X asc). Guardamos (y, page) para
+  // luego asignar cada uno al ancla mas cercana por Y (dentro de la misma pagina).
+  //
+  // Esto es mas robusto que asignar por fila-idx porque:
+  // - Un item "denso" con descripcion multi-linea puede tener LK/CH exactamente entre
+  //   2 anclas por row-idx, y ambas anclas se lo peleaban -> se perdia.
+  // - La Y real refleja distancia visual: la CH del item N esta claramente mas cerca
+  //   del ancla N que del ancla N+1, aunque el idx sugiera empate.
+  const empEvents = [];
+  for (const line of bodyLines) {
+    for (let k = 0; k < line.items.length; k++) {
+      const it = line.items[k];
+      if (it.text !== "LK" && it.text !== "CH") continue;
+      // Buscar el siguiente token numerico en la misma fila (X asc).
+      const nxt = line.items.slice(k + 1).find(t => /^\d+$/.test(t.text));
+      if (nxt) empEvents.push({ label: it.text, value: Number(nxt.text), y: it.y, page: it.page });
+    }
+  }
+
+  for (const ev of empEvents) {
+    let bestA = -1, bestDy = Infinity;
+    for (let a = 0; a < ancYs.length; a++) {
+      if (ancYs[a].page !== ev.page) continue;
+      const dy = Math.abs(ancYs[a].y - ev.y);
+      if (dy < bestDy) { bestDy = dy; bestA = a; }
+    }
+    if (bestA < 0) continue;
+    if (ev.label === "LK") lineas[bestA].lk = ev.value;
+    else if (ev.label === "CH") lineas[bestA].ch = ev.value;
+  }
+
+  // Cantidad final = LK + CH (o `pedido_raw` como fallback si LK/CH no aparecen)
+  lineas.forEach(l => { l.cantidad = (l.lk || 0) + (l.ch || 0) || (l.pedido_raw || 0); });
+
+  return {
+    cabecera: { fecha_pedido, cod_prov, razon_social_raw, entrega_en: "Cervantes 2868", facturacion: "Loekemeyer 85% Chef 15%" },
+    variante,
+    lineas: lineas.filter(l => l.cantidad > 0),
+  };
+}
+
+/* ---------- Enriquecer con catalogo Supabase ---------- */
+// Traduce `cod_isis` del PDF -> `Cod_ISIS nuevo` (lo que va a Ordenes_Compra.codigo)
+// + descripcion + sector.
+//
+// Flujo:
+// 1. Match directo en tabla del rubro por Cod_ISIS = cod_del_pdf (asumiendo que ya es nuevo).
+// 2. Si NO matchea: SELECT en Codigos_ISIS_Map WHERE codigo_interno = cod_del_pdf
+//    -> devuelve el nuevo_codigo -> reintento en tabla del rubro.
+// 3. Si sigue sin matchear -> celda roja, el operario elige a mano.
+async function enriquecerConCatalogo(parsed, empresa = "LK") {
+  const { cabecera, variante, lineas } = parsed;
+  // empresa (LK|CH) filtra Codigos_ISIS_Map. Los codigos internos y nuevos codigos
+  // se solapan entre las dos empresas con productos totalmente distintos, asi que
+  // sin este filtro se traducirian a un producto equivocado silenciosamente.
+  const empresaFiltro = (empresa === "CH") ? "CH" : "LK";
+
+  // Match proveedor por substring razon social contra listado hardcoded PROVEEDORES.
+  let proveedor = "";
+  const razonLC = (cabecera.razon_social_raw || "").toLowerCase();
+  outer: for (const [rubro, provs] of Object.entries(PROVEEDORES)) {
+    for (const p of provs) {
+      const toks = p.toLowerCase().split(/\s+/).filter(t => t.length >= 3);
+      if (toks.length && toks.every(t => razonLC.includes(t))) { proveedor = p; break outer; }
+    }
+  }
+
+  let rubro = proveedor ? PROV_TO_RUBRO.get(proveedor.toLowerCase()) : "";
+  if (!rubro) rubro = { flejes: "Flejes", cajas: "Cajas", cartones: "Cartones" }[variante] || "";
+
+  const cods_pdf = lineas.map(l => String(l.cod_isis));
+
+  // PASO 1: Traducir codigos viejos a nuevos via Codigos_ISIS_Map.
+  // Traigo TODAS las filas del map donde codigo_interno o nuevo_codigo esta en cods_pdf.
+  // Con eso armo: cod_pdf -> nuevo_codigo (el que va a matchear en la tabla del rubro).
+  //             + cod_pdf -> descripcion (fallback si no matchea en la tabla).
+  const orClause = cods_pdf.map(c => `codigo_interno.eq.${c},nuevo_codigo.eq.${c}`).join(",");
+  const isisMapRes = orClause
+    ? await sb.from("Codigos_ISIS_Map").select("codigo_interno,nuevo_codigo,descripcion,rubro").eq("empresa", empresaFiltro).or(orClause)
+    : { data: [] };
+  const trad = new Map();     // cod_pdf -> { nuevo, codigos[], descripcion_map, rubro_map }
+  (isisMapRes.data || []).forEach(r => {
+    for (const c of [r.codigo_interno, r.nuevo_codigo]) {
+      if (c != null && cods_pdf.includes(String(c))) {
+        // preferir el registro cuyo codigo_interno matchea (mas explicito)
+        if (!trad.has(String(c)) || String(c) === r.codigo_interno) {
+          // Las tablas de rubro NO guardan todas el mismo lado del map: Flejes.Cod_ISIS usa
+          // el nuevo_codigo (4 digitos) pero Partes_Plasticas.Cod_ISIS y Cajas.Cod_ISIS_LK
+          // usan el codigo_interno (7 digitos). Por eso se prueban los dos, en ese orden
+          // (nuevo primero para no cambiar el comportamiento de Flejes), y el propio codigo
+          // del PDF como ultimo recurso.
+          const codigos = [...new Set([r.nuevo_codigo, r.codigo_interno, c].filter(x => x != null).map(String))];
+          trad.set(String(c), { nuevo: String(r.nuevo_codigo || c), codigos, descripcion_map: r.descripcion, rubro_map: r.rubro });
+        }
+      }
+    }
+  });
+  // Fallback: si no hubo match, asumir que ya es el nuevo.
+  cods_pdf.forEach(c => { if (!trad.has(c)) trad.set(c, { nuevo: c, codigos: [c] }); });
+
+  // Candidatos que vamos a buscar en la tabla del rubro (ambos lados del map)
+  const nuevos_codes = [...new Set([].concat(...[...trad.values()].map(v => v.codigos)))];
+  // Devuelve la fila del catalogo que matchee cualquiera de los codigos candidatos.
+  const buscarIsis = (byIsis, t) => { for (const k of (t.codigos || [t.nuevo])) { const r = byIsis.get(String(k)); if (r) return r; } return undefined; };
+
+  // PASO 2: Buscar en la tabla del rubro por Cod_ISIS = nuevo_codigo.
+  let mapaCod = new Map();     // cod_pdf -> { codigo (el que va a Ordenes_Compra.codigo), descripcion, sector }
+  if (rubro === "Flejes") {
+    const { data } = await sb.from("Flejes").select('"N Fleje","Cod_ISIS","Descripción","Medida mm","Sector"').in("Cod_ISIS", nuevos_codes);
+    const byIsis = new Map((data || []).map(r => [String(r.Cod_ISIS), r]));
+    cods_pdf.forEach(c => {
+      const t = trad.get(c); const r = buscarIsis(byIsis, t);
+      if (r) mapaCod.set(c, { codigo: String(r.Cod_ISIS || t.nuevo), descripcion: String(r["Descripción"] || "").trim() + (r["Medida mm"] ? " (" + r["Medida mm"] + ")" : ""), sector: String(r.Sector || "") });
+    });
+  } else if (rubro === "Cajas") {
+    // Cajas usa Cod_ISIS_LK / Cod_ISIS_CH (2 columnas). Buscamos en ambas.
+    const { data } = await sb.from("Cajas").select('"N_Caja","Cod_ISIS_LK","Cod_ISIS_CH","Sector","Medidas"');
+    (data || []).forEach(r => {
+      for (const c of [r.Cod_ISIS_LK, r.Cod_ISIS_CH]) {
+        if (c == null) continue;
+        cods_pdf.forEach(pdf => {
+          const t = trad.get(pdf);
+          if ((t.codigos || [t.nuevo]).includes(String(c)) && !mapaCod.has(pdf)) {
+            mapaCod.set(pdf, { codigo: String(c), descripcion: [r.Sector, r.Medidas].filter(Boolean).join(" · "), sector: String(r.Sector || "") });
+          }
+        });
+      }
+    });
+  } else if (rubro === "Plasticos") {
+    // Partes_Plasticas guarda el codigo por empresa (Cod_ISIS_LK / Cod_ISIS_CH); se indexan ambos.
+    const { data } = await sb.from("Partes_Plasticas").select('"Cod_ISIS_LK","Cod_ISIS_CH","Descripcion","Sector"').neq("Discontinuado", true);
+    const byIsis = new Map();
+    (data || []).forEach(r => {
+      for (const c of [r.Cod_ISIS_LK, r.Cod_ISIS_CH]) {
+        if (c != null && String(c).trim() && !byIsis.has(String(c))) byIsis.set(String(c), r);
+      }
+    });
+    cods_pdf.forEach(c => {
+      const t = trad.get(c); const r = buscarIsis(byIsis, t);
+      if (r) mapaCod.set(c, { codigo: String(r.Sector || t.nuevo), descripcion: String(r.Descripcion || ""), sector: String(r.Sector || "") });
+    });
+  } else if (rubro === "Cartones") {
+    // Cartones tiene 2 caminos:
+    // (a) Sector Carton por Cod_ISIS (nuevo)
+    // (b) Despiece x Articulo por COD (padded) -- legacy si el PDF trae COD viejo
+    const scRes = await sb.from("Sector Carton").select('"Sector","Cod_ISIS","Descripcion"').in("Cod_ISIS", nuevos_codes);
+    const byIsis = new Map((scRes.data || []).map(r => [String(r.Cod_ISIS), r]));
+    cods_pdf.forEach(c => {
+      const t = trad.get(c); const r = buscarIsis(byIsis, t);
+      if (r) mapaCod.set(c, { codigo: String(r.Cod_ISIS || t.nuevo), descripcion: String(r.Descripcion || ""), sector: String(r.Sector || "") });
+    });
+    // Fallback a Despiece x Articulo (Cartones) por COD padded
+    const faltantes = cods_pdf.filter(c => !mapaCod.has(c));
+    if (faltantes.length) {
+      const cods_padded = faltantes.map(padCodigo);
+      const { data } = await sb.from("Despiece x Articulo").select('"COD","Descripcion de partes"').in("COD", cods_padded).eq("Rubro", "Cartones");
+      (data || []).forEach(r => {
+        const orig = faltantes.find(c => padCodigo(c) === String(r.COD));
+        if (orig && !mapaCod.has(orig)) mapaCod.set(orig, { codigo: String(r.COD), descripcion: String(r["Descripcion de partes"] || ""), sector: "" });
+      });
+    }
+  } else if (rubro === "Remaches") {
+    const [{ data: sc }, { data: sp }] = await Promise.all([
+      sb.from("Remaches SC").select('"SC","Cod_ISIS","Descripción"').in("Cod_ISIS", nuevos_codes),
+      sb.from("Remaches SP").select('"SP","Cod_ISIS","Descripción"').in("Cod_ISIS", nuevos_codes),
+    ]);
+    const byIsis = new Map();
+    (sc || []).forEach(r => byIsis.set(String(r.Cod_ISIS), { cod: r.SC, desc: r["Descripción"], sector: r.SC }));
+    (sp || []).forEach(r => { if (!byIsis.has(String(r.Cod_ISIS))) byIsis.set(String(r.Cod_ISIS), { cod: r.SP, desc: r["Descripción"], sector: r.SP }); });
+    cods_pdf.forEach(c => {
+      const t = trad.get(c); const r = buscarIsis(byIsis, t);
+      if (r) mapaCod.set(c, { codigo: String(r.cod || t.nuevo), descripcion: String(r.desc || ""), sector: String(r.sector || "") });
+    });
+  } else if (rubro === "Bombillas") {
+    const { data } = await sb.from("Sector Bombilla").select('"Sector","Cod_ISIS","Descripcion"').in("Cod_ISIS", nuevos_codes);
+    const byIsis = new Map((data || []).map(r => [String(r.Cod_ISIS), r]));
+    cods_pdf.forEach(c => {
+      const t = trad.get(c); const r = buscarIsis(byIsis, t);
+      if (r) mapaCod.set(c, { codigo: String(r.Cod_ISIS || t.nuevo), descripcion: String(r.Descripcion || ""), sector: String(r.Sector || "") });
+    });
+  }
+
+  // Reconstruir lineas al shape que espera abrirRevisionOC
+  const lineasEnriquecidas = lineas.map(l => {
+    const m = mapaCod.get(String(l.cod_isis));
+    const t = trad.get(String(l.cod_isis));
+    return {
+      cod_isis: l.cod_isis,
+      codigo_tablet: m ? m.codigo : (t && t.nuevo !== l.cod_isis ? t.nuevo : ""),   // si sabemos el nuevo pero no matcheo la tabla, mostrarlo igual
+      descripcion:   m ? m.descripcion : (t && t.descripcion_map ? t.descripcion_map + " (no en catalogo)" : ""),
+      sector:        m ? m.sector : "",
+      pedido_uni_lk: l.lk || 0,
+      pedido_uni_ch: l.ch || 0,
+      cantidad: l.cantidad,
+      fecha_pos_ent: null,
+    };
+  });
+
+  return {
+    cabecera: {
+      ...cabecera,
+      razon_social_proveedor: cabecera.razon_social_raw,
+      proveedor_match: proveedor,
+      rubro_deducido: rubro,
+    },
+    variante,
+    lineas: lineasEnriquecidas,
+  };
+}
+
+/* ---------- Modal revision de OC extraida ---------- */
+
+function abrirRevisionOC(data) {
+  const cab = data.cabecera || {};
+  const lineas = Array.isArray(data.lineas) ? data.lineas : [];
+  // El enriquecimiento ya matcheo proveedor y rubro. Si por alguna razon no matcheo,
+  // el operario elige a mano.
+  const provMatch  = cab.proveedor_match || "";
+  const rubroMatch = cab.rubro_deducido  || "";
+
+  const hdr = document.getElementById("ocReviewHdr");
+  hdr.innerHTML =
+    `<div><span class="lbl">Proveedor (PDF):</span><br>${esc(cab.razon_social_proveedor || "—")}${cab.cod_prov ? " · COD " + esc(cab.cod_prov) : ""}</div>` +
+    `<div><span class="lbl">Match sistema:</span>
+       <select id="ocRevProv" style="font-size:16px;padding:4px 6px;width:100%">
+         ${["", ...(PROVEEDORES[rubroMatch] || Object.values(PROVEEDORES).flat())].map(p => `<option value="${esc(p)}" ${p===provMatch?"selected":""}>${p || "(elegir…)"}</option>`).join("")}
+       </select>
+    </div>` +
+    `<div><span class="lbl">Rubro:</span>
+       <select id="ocRevRubro" style="font-size:16px;padding:4px 6px;width:100%">
+         ${["", "Flejes","Cajas","Plasticos","Cartones","Remaches","Bombillas"].map(r => `<option value="${esc(r)}" ${r===rubroMatch?"selected":""}>${r || "(elegir…)"}</option>`).join("")}
+       </select>
+    </div>` +
+    `<div><span class="lbl">Fecha pedido:</span> <input id="ocRevFecha" type="date" value="${esc(cab.fecha_pedido || arDateISO())}" style="font-size:16px;padding:4px 6px"></div>` +
+    `<div><span class="lbl">Fecha estimada de entrega:</span> <input id="ocRevFechaEst" type="date" style="font-size:16px;padding:4px 6px"> <small style="color:#888">(la que dio el prov)</small></div>` +
+    `<div><span class="lbl">Facturación:</span> ${esc(cab.facturacion || "—")}</div>` +
+    `<div><span class="lbl">Entrega en:</span> ${esc(cab.entrega_en || "—")}</div>`;
+
+  // Contar cuantas lineas no matchearon con el catalogo (codigo_tablet vacio).
+  const sinMatch = lineas.filter(l => !l.codigo_tablet).length;
+
+  // Detectar si HAY alguna linea donde el PDF trajo el codigo VIEJO (o sea, viejo !== nuevo).
+  // Si NINGUNA tiene viejo distinto, colapsamos las 2 columnas a UNA sola "Cod ISIS".
+  const hayViejo = lineas.some(l => l.cod_isis && l.codigo_tablet && String(l.cod_isis) !== String(l.codigo_tablet));
+
+  const tabla = document.getElementById("ocReviewTable");
+  const thViejo  = hayViejo ? `<th style="width:90px">Cod ISIS viejo</th>` : "";
+  const thNuevo  = hayViejo ? `<th style="width:90px">Cod ISIS nuevo</th>` : `<th style="width:100px">Cod ISIS</th>`;
+  tabla.innerHTML =
+    `<thead><tr>
+      ${thViejo}${thNuevo}
+      <th>Descripción</th>
+      <th style="width:80px">LK</th>
+      <th style="width:80px">CH</th>
+      <th style="width:110px">Total</th>
+    </tr></thead><tbody>` +
+    lineas.map((l, i) => {
+      const lk = Number(l.pedido_uni_lk || 0);
+      const ch = Number(l.pedido_uni_ch || 0);
+      const bad = !l.codigo_tablet;
+      // El "viejo" solo se muestra si esta linea realmente tuvo traduccion (viejo !== nuevo).
+      // Si el PDF trajo directo el nuevo, el "viejo" queda vacio (o la celda entera se oculta
+      // cuando el modo global es de "una sola columna").
+      const tuvoTrad = l.cod_isis && l.codigo_tablet && String(l.cod_isis) !== String(l.codigo_tablet);
+      const tdViejo = hayViejo
+        ? `<td><input data-l="${i}" data-f="cod_isis" value="${esc(tuvoTrad ? l.cod_isis : "")}" placeholder="—" style="color:#888"></td>`
+        : "";
+      return `<tr${bad ? ' style="background:#fff4e0"' : ''}>
+        ${tdViejo}
+        <td><input data-l="${i}" data-f="codigo_tablet" value="${esc(l.codigo_tablet || l.cod_isis || "")}"${bad ? ' style="border-color:#b91c1c;background:#ffe4e4"' : ''} placeholder="obligatorio"></td>
+        <td><input data-l="${i}" data-f="descripcion" value="${esc(l.descripcion || "")}"></td>
+        <td><input data-l="${i}" data-f="pedido_uni_lk" inputmode="numeric" value="${lk}"></td>
+        <td><input data-l="${i}" data-f="pedido_uni_ch" inputmode="numeric" value="${ch}"></td>
+        <td class="tot-cell" data-i="${i}"><strong>${(lk+ch).toLocaleString("es-AR")}</strong></td>
+      </tr>`;
+    }).join("") +
+    `</tbody>`;
+
+  // Recalcular total al editar LK o CH
+  tabla.querySelectorAll('input[data-f="pedido_uni_lk"],input[data-f="pedido_uni_ch"]').forEach(el => {
+    el.addEventListener("input", (e) => {
+      const i = Number(e.target.dataset.l);
+      const lk = Number(tabla.querySelector(`input[data-l="${i}"][data-f="pedido_uni_lk"]`).value || 0);
+      const ch = Number(tabla.querySelector(`input[data-l="${i}"][data-f="pedido_uni_ch"]`).value || 0);
+      tabla.querySelector(`.tot-cell[data-i="${i}"] strong`).textContent = (lk+ch).toLocaleString("es-AR");
+    });
+  });
+
+  const warns = [];
+  if (!provMatch) warns.push("No pudimos matchear la razón social. Elegí el proveedor a mano antes de confirmar.");
+  if (sinMatch)   warns.push(`${sinMatch} línea(s) no matchearon con el catálogo del rubro (celdas rojas). Escribí el "Cód tablet" a mano o corregí el Cod ISIS.`);
+  document.getElementById("ocReviewWarn").innerHTML = warns.length
+    ? warns.map(w => `<div class="warn">⚠ ${esc(w)}</div>`).join("")
+    : "";
+  document.getElementById("ocReviewMsg").textContent = "";
+
+  ocReviewOverlay.classList.add("open");
+}
+
+document.getElementById("ocReviewClose").addEventListener("click", () => ocReviewOverlay.classList.remove("open"));
+document.getElementById("ocReviewCancel").addEventListener("click", () => ocReviewOverlay.classList.remove("open"));
+ocReviewOverlay.addEventListener("click", (e) => { if (e.target === ocReviewOverlay) ocReviewOverlay.classList.remove("open"); });
+
+document.getElementById("ocReviewConfirm").addEventListener("click", async () => {
+  const btn = document.getElementById("ocReviewConfirm");
+  const msg = document.getElementById("ocReviewMsg");
+  const proveedor = document.getElementById("ocRevProv").value.trim();
+  const rubro     = document.getElementById("ocRevRubro").value.trim();
+  const fecha     = document.getElementById("ocRevFecha").value.trim();
+  const fechaEst  = document.getElementById("ocRevFechaEst").value.trim() || null;
+  if (!proveedor || !rubro || !fecha) { msg.textContent = "Faltan proveedor, rubro o fecha."; msg.className = "status bad"; return; }
+
+  // Reconstruir lineas desde los inputs del modal.
+  // `codigo_tablet` es lo que va a Ordenes_Compra.codigo (el N Fleje / N_Caja / COD que
+  // matchea con la botonera de recepcion). El cod_isis del PDF solo se guarda en notas
+  // por referencia.
+  const tabla = document.getElementById("ocReviewTable");
+  const filas = [...tabla.querySelectorAll("tbody tr")].map((tr, i) => {
+    const g = (f) => tr.querySelector(`input[data-f="${f}"]`).value.trim();
+    const lk = Number(g("pedido_uni_lk")) || 0;
+    const ch = Number(g("pedido_uni_ch")) || 0;
+    const total = lk + ch;
+    return {
+      cod_isis: g("cod_isis"),
+      codigo_tablet: g("codigo_tablet"),
+      descripcion: g("descripcion"),
+      cantidad: total,
+    };
+  }).filter(l => l.codigo_tablet && l.cantidad > 0);
+
+  if (!filas.length) { msg.textContent = "No hay lineas con Cód tablet completo y cantidad > 0."; msg.className = "status bad"; return; }
+
+  btn.disabled = true;
+  msg.textContent = "Buscando OCs previas...";
+  msg.className = "status";
+
+  try {
+    // Regla "ESTE PEDIDO ANULA CUALQUIER PEDIDO ANTERIOR": anula todas las OCs pendientes
+    // del mismo (proveedor, rubro).
+    const { data: previas } = await sb.from("Ordenes_Compra")
+      .select("id")
+      .eq("proveedor", proveedor)
+      .eq("rubro", rubro)
+      .eq("estado", OC_ESTADO_ACTIVO);
+    if (previas && previas.length) {
+      if (!confirm(`Se van a ANULAR ${previas.length} línea(s) de OCs anteriores de ${proveedor} (${rubro}) antes de importar la nueva.\n\n¿Continuar?`)) {
+        btn.disabled = false; msg.textContent = ""; return;
+      }
+      const ids = previas.map(p => p.id);
+      const { error: errUpd } = await sb.from("Ordenes_Compra").update({ estado: "anulada" }).in("id", ids);
+      if (errUpd) throw errUpd;
+    }
+
+    // Determinar unidad segun rubro/proveedor (mismo mapeo que en Recepcion)
+    const unidad = getUnidad(rubro, proveedor);
+    const registros = filas.map(l => ({
+      fecha: fecha,
+      rubro: rubro,
+      proveedor: proveedor,
+      codigo: l.codigo_tablet,
+      descripcion: l.descripcion || null,
+      cantidad: l.cantidad,
+      cantidad_recibida: 0,
+      unidad: unidad,
+      estado: OC_ESTADO_ACTIVO,
+      // Fecha "posible de entrega" original (la que dio el proveedor). Se preserva
+      // en fecha_estimada_original y ademas se refleja en fecha_estimada_proveedor
+      // como valor inicial (esta se pisa cuando hay una nueva promesa).
+      fecha_estimada_proveedor: fechaEst,
+      fecha_estimada_original: fechaEst,
+      notas: "Importado desde PDF · Cod ISIS: " + (l.cod_isis || "?")
+    }));
+
+    msg.textContent = "Insertando " + registros.length + " lineas...";
+    const { data: ins, error: errIns } = await sb.from("Ordenes_Compra").insert(registros).select();
+    if (errIns) throw errIns;
+
+    ocReviewOverlay.classList.remove("open");
+    alert(`OC importada: ${ins.length} lineas de ${proveedor} (${rubro}).`);
+    await cargarOCsPendientesHome();
+  } catch (err) {
+    console.error(err);
+    msg.textContent = "Error: " + err.message;
+    msg.className = "status bad";
+    btn.disabled = false;
+  }
+});
+
+/* ---------- Init ---------- */
+cargarOCsPendientesHome();
+
+</script>
+</body>
+</html>

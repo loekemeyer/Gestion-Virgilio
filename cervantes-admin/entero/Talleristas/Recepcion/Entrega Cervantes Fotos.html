@@ -1,0 +1,1079 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <script src="../../auth-guard.js"></script>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Entrega Cervantes Fotos</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Inter', sans-serif;
+      background: #d9d9de; padding: 20px; min-height: 100vh;
+    }
+    .top-bar {
+      max-width: 1000px; margin: 0 auto 20px;
+      display: flex; align-items: center; gap: 14px;
+    }
+    .btn-volver {
+      height: 40px; padding: 0 20px; border-radius: 999px;
+      border: 2px solid #b9b9b9; background: #f7f7f7;
+      font-size: 14px; cursor: pointer; font-weight: 700;
+    }
+    .btn-volver:hover { background: #e5e5e5; border-color: #7f7f7f; }
+    .top-bar h1 { font-size: 22px; flex: 1; color: #1e293b; }
+
+    .main-card {
+      max-width: 1000px; margin: 0 auto 20px;
+      background: #fff; border: 1px solid #cfcfcf;
+      border-radius: 14px; overflow: hidden;
+    }
+    .card-header {
+      background: #111; color: #fff; padding: 16px 22px;
+      display: flex; justify-content: space-between; align-items: center;
+    }
+    .card-header h2 { font-size: 17px; color: #fff; }
+    .card-body { padding: 22px; }
+
+    /* UPLOAD ZONE */
+    .upload-zone {
+      border: 2px dashed #cbd5e1; border-radius: 12px;
+      padding: 40px 20px; text-align: center;
+      cursor: pointer; transition: all .2s;
+      background: #f8fafc; position: relative;
+    }
+    .upload-zone:hover, .upload-zone.dragover {
+      border-color: #3b82f6; background: #eff6ff;
+    }
+    .upload-zone svg { width: 48px; height: 48px; color: #94a3b8; margin-bottom: 12px; }
+    .upload-zone p { font-size: 14px; color: #64748b; margin-bottom: 4px; }
+    .upload-zone .hint { font-size: 12px; color: #94a3b8; }
+    .upload-zone input { display: none; }
+
+    /* PREVIEW */
+    .preview-area {
+      display: none; margin-top: 16px;
+      border: 1px solid #e2e8f0; border-radius: 12px;
+      overflow: hidden; background: #f8fafc;
+    }
+    .preview-area.visible { display: flex; gap: 0; }
+    .preview-img-wrap {
+      flex: 0 0 280px; max-height: 400px; overflow: auto;
+      border-right: 1px solid #e2e8f0; background: #f1f5f9;
+      display: flex; align-items: flex-start; justify-content: center;
+      padding: 8px;
+    }
+    .preview-img-wrap img {
+      max-width: 100%; height: auto; border-radius: 6px;
+      cursor: zoom-in;
+    }
+
+    /* LIGHTBOX */
+    .lightbox {
+      display: none; position: fixed; inset: 0; z-index: 9999;
+      background: rgba(0,0,0,.85); justify-content: center; align-items: center;
+      cursor: zoom-out;
+    }
+    .lightbox.visible { display: flex; }
+    .lightbox img {
+      max-width: 92vw; max-height: 92vh; border-radius: 8px;
+      box-shadow: 0 8px 40px rgba(0,0,0,.5); object-fit: contain;
+    }
+    .lightbox-close {
+      position: absolute; top: 16px; right: 20px;
+      width: 40px; height: 40px; border-radius: 50%;
+      border: none; background: rgba(255,255,255,.15); color: #fff;
+      font-size: 22px; cursor: pointer; display: flex;
+      align-items: center; justify-content: center;
+      backdrop-filter: blur(4px);
+    }
+    .lightbox-close:hover { background: rgba(255,255,255,.3); }
+    .preview-info {
+      flex: 1; padding: 16px; display: flex; flex-direction: column; gap: 8px;
+    }
+    .preview-filename {
+      font-size: 13px; font-weight: 600; color: #334155;
+      display: flex; align-items: center; gap: 8px;
+    }
+    .preview-filename .file-size { font-weight: 400; color: #94a3b8; }
+
+    .btn-row { display: flex; gap: 10px; margin-top: 8px; }
+    .btn-analizar {
+      height: 42px; padding: 0 28px; border: none; border-radius: 10px;
+      background: #111; color: #fff; font-weight: 700; font-size: 14px;
+      cursor: pointer; display: flex; align-items: center; gap: 8px;
+      transition: opacity .15s;
+    }
+    .btn-analizar:hover { opacity: .85; }
+    .btn-analizar:disabled { opacity: .4; cursor: not-allowed; }
+    .btn-analizar svg { width: 18px; height: 18px; }
+    .btn-limpiar {
+      height: 42px; padding: 0 20px; border: 1.5px solid #d1d5db;
+      border-radius: 10px; background: #fff; font-weight: 600;
+      font-size: 13px; cursor: pointer; color: #6b7280;
+    }
+    .btn-limpiar:hover { background: #f9fafb; border-color: #9ca3af; }
+
+    /* ROTATE BUTTONS */
+    .rotate-row { display: flex; gap: 6px; margin-top: 6px; align-items: center; }
+    .rotate-row span { font-size: 12px; color: #94a3b8; font-weight: 600; }
+    .btn-rotate {
+      width: 36px; height: 36px; border: 1.5px solid #d1d5db; border-radius: 8px;
+      background: #fff; cursor: pointer; display: flex; align-items: center;
+      justify-content: center; font-size: 18px; color: #64748b; transition: all .15s;
+    }
+    .btn-rotate:hover { border-color: #3b82f6; color: #3b82f6; background: #eff6ff; }
+    .btn-rotate.active { border-color: #3b82f6; background: #dbeafe; color: #1e40af; }
+    .rotate-label { font-size: 11px; color: #94a3b8; margin-left: 4px; }
+
+    /* LOADING */
+    .loading { display: none; margin-top: 16px; text-align: center; padding: 30px; }
+    .loading.visible { display: block; }
+    .spinner {
+      width: 36px; height: 36px; border: 3px solid #e2e8f0;
+      border-top-color: #111; border-radius: 50%;
+      animation: spin .7s linear infinite; margin: 0 auto 12px;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .loading p { font-size: 14px; color: #64748b; }
+
+    /* RESULTADOS */
+    .resultado { display: none; margin-top: 16px; }
+    .resultado.visible { display: block; }
+    .resultado-header {
+      display: flex; align-items: center; justify-content: space-between;
+      margin-bottom: 12px;
+    }
+    .resultado-header h3 { font-size: 16px; font-weight: 700; color: #111; }
+
+    .datos-grid {
+      display: grid; grid-template-columns: 1fr 1fr;
+      gap: 8px; margin-bottom: 16px;
+    }
+    .dato-card {
+      background: #f8fafc; border: 1px solid #e5e7eb;
+      border-radius: 10px; padding: 10px 14px;
+    }
+    .dato-card .label {
+      font-size: 11px; font-weight: 600; color: #94a3b8;
+      text-transform: uppercase; letter-spacing: .5px;
+      margin-bottom: 2px;
+    }
+    .dato-card .value {
+      font-size: 15px; font-weight: 600; color: #1e293b;
+    }
+    .dato-card.full { grid-column: 1 / -1; }
+
+    .dato-card input {
+      width: 100%; height: 32px; border: 1px solid #cbd5e1; border-radius: 6px;
+      padding: 0 8px; font-size: 14px; font-weight: 600; color: #1e293b;
+      font-family: inherit;
+    }
+
+    /* ITEMS TABLE */
+    .items-section { margin-bottom: 12px; }
+    .items-section h4 {
+      font-size: 13px; font-weight: 700; color: #64748b;
+      text-transform: uppercase; letter-spacing: .5px;
+      margin-bottom: 8px;
+    }
+    .items-table {
+      width: 100%; border-collapse: collapse;
+      font-size: 13px; border-radius: 8px; overflow: hidden;
+      border: 1px solid #e5e7eb;
+    }
+    .items-table th {
+      background: #f1f5f9; text-align: left; padding: 8px 12px;
+      font-size: 12px; font-weight: 600; color: #64748b;
+      border-bottom: 1px solid #e5e7eb;
+    }
+    .items-table td {
+      padding: 8px 12px; border-bottom: 1px solid #f0f0f0;
+      color: #334155;
+    }
+    .items-table tr:last-child td { border-bottom: none; }
+    .items-table .num { text-align: right; font-variant-numeric: tabular-nums; }
+    .items-table input {
+      width: 100%; border: 1px solid #cbd5e1; border-radius: 4px;
+      padding: 4px 6px; font-size: 13px; font-family: inherit;
+    }
+
+    /* TOTALES */
+    .totales-row {
+      display: flex; gap: 8px; justify-content: flex-end; margin-top: 12px;
+    }
+    .total-card {
+      background: #111; border: 1px solid #111;
+      border-radius: 10px; padding: 10px 18px; text-align: right;
+    }
+    .total-card .label {
+      font-size: 11px; font-weight: 600; color: #94a3b8;
+      text-transform: uppercase; margin-bottom: 2px;
+    }
+    .total-card .value { font-size: 17px; font-weight: 800; color: #fff; }
+
+    .btn-actions { display: flex; gap: 10px; margin-top: 16px; justify-content: flex-end; }
+    .btn-editar {
+      height: 42px; padding: 0 22px; border: 2px solid #3b82f6; border-radius: 10px;
+      background: #fff; color: #3b82f6; font-weight: 700; font-size: 14px;
+      cursor: pointer; display: flex; align-items: center; gap: 6px;
+    }
+    .btn-editar:hover { background: #eff6ff; }
+    .btn-reescanear {
+      height: 42px; padding: 0 22px; border: 2px solid #f59e0b; border-radius: 10px;
+      background: #fff; color: #b45309; font-weight: 700; font-size: 14px;
+      cursor: pointer; display: flex; align-items: center; gap: 6px;
+    }
+    .btn-reescanear:hover { background: #fffbeb; }
+    .btn-guardar {
+      height: 42px; padding: 0 22px; border: 2px solid #22c55e; border-radius: 10px;
+      background: #22c55e; color: #fff; font-weight: 700; font-size: 14px;
+      cursor: pointer; display: flex; align-items: center; gap: 6px;
+    }
+    .btn-guardar:hover { background: #16a34a; border-color: #16a34a; }
+    .btn-guardar:disabled { opacity: .4; cursor: not-allowed; }
+    .save-msg {
+      margin-top: 10px; padding: 10px 14px; border-radius: 8px;
+      font-size: 13px; font-weight: 600; display: none;
+    }
+    .save-msg.visible { display: block; }
+    .save-msg.ok { background: #f0fdf4; border: 1px solid #86efac; color: #166534; }
+    .save-msg.error { background: #fef2f2; border: 1px solid #fca5a5; color: #dc2626; }
+
+    .error-msg {
+      display: none; margin-top: 16px; padding: 14px 18px;
+      background: #fef2f2; border: 1px solid #fecaca;
+      border-radius: 10px; color: #991b1b; font-size: 13px;
+    }
+    .error-msg.visible { display: block; }
+
+    /* EDIT ROW BTN */
+    .btn-edit-row {
+      border: none; background: none; cursor: pointer; font-size: 15px;
+      color: #94a3b8; padding: 2px 6px; border-radius: 4px; transition: all .15s;
+    }
+    .btn-edit-row:hover { color: #3b82f6; background: #eff6ff; }
+    .btn-save-row {
+      border: none; background: #22c55e; color: #fff; cursor: pointer;
+      font-size: 12px; font-weight: 700; padding: 4px 10px; border-radius: 6px;
+    }
+    .btn-save-row:hover { background: #16a34a; }
+    .items-table input.inline-edit {
+      width: 100%; border: 1.5px solid #3b82f6; border-radius: 4px;
+      padding: 3px 6px; font-size: 13px; font-family: inherit; background: #eff6ff;
+    }
+
+    /* CONFIANZA BADGES (motor rectificado) */
+    .conf-badge {
+      display: inline-block; padding: 2px 8px; border-radius: 999px;
+      font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .3px;
+    }
+    .conf-alta  { background: #dcfce7; color: #166534; border: 1px solid #86efac; }
+    .conf-media { background: #fef9c3; color: #854d0e; border: 1px solid #fde047; }
+    .conf-baja  { background: #fee2e2; color: #991b1b; border: 1px solid #fca5a5; }
+    .items-table tr.row-baja  { background: #fef2f2; }
+    .items-table tr.row-media { background: #fefce8; }
+    .dato-card.conf-media { border: 2px solid #facc15; }
+    .dato-card.conf-baja  { border: 2px solid #ef4444; }
+
+    @media (max-width: 640px) {
+      .preview-area.visible { flex-direction: column; }
+      .preview-img-wrap { flex: none; max-height: 200px; border-right: none; border-bottom: 1px solid #e2e8f0; }
+      .datos-grid { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+
+  <div class="top-bar">
+    <button class="btn-volver" onclick="location.href='../../Inicio/'">&larr; Volver</button>
+    <h1>Entrega Cervantes Fotos</h1>
+  </div>
+
+  <div class="main-card">
+    <div class="card-header">
+      <h2>Analizar Remito de Tallerista con IA</h2>
+    </div>
+    <div class="card-body">
+
+      <div class="upload-zone" id="uploadZone">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M12 16V4m0 0L8 8m4-4l4 4"/><path d="M20 16v2a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2v-2"/></svg>
+        <p>Arrastra una imagen o hace click para seleccionar</p>
+        <span class="hint">JPG, PNG o PDF - Max 10MB</span>
+        <input type="file" id="fileInput" accept="image/*,.pdf" />
+      </div>
+
+      <div class="preview-area" id="previewArea">
+        <div class="preview-img-wrap">
+          <img id="previewImg" src="" alt="Preview" />
+        </div>
+        <div class="preview-info">
+          <div class="preview-filename">
+            <span id="fileName">remito.jpg</span>
+            <span class="file-size" id="fileSize">1.2 MB</span>
+          </div>
+          <div class="rotate-row">
+            <span>Rotar:</span>
+            <button class="btn-rotate" id="btnRotL" title="Rotar 90° izquierda">&#8634;</button>
+            <button class="btn-rotate" id="btnRotR" title="Rotar 90° derecha">&#8635;</button>
+            <span class="rotate-label" id="rotateLabel">0°</span>
+          </div>
+          <div class="rotate-row" style="margin-top:8px;gap:14px;flex-wrap:wrap">
+            <label style="display:flex;align-items:center;gap:6px;font-size:13px;color:#334155;font-weight:600">
+              Modelo IA:
+              <select id="selModelo" style="padding:3px 6px;border:1px solid #cbd5e1;border-radius:6px;font-family:inherit;font-size:13px;font-weight:600">
+                <option value="claude" selected>Claude Sonnet 4.6 (recomendado)</option>
+                <option value="gpt">GPT-4o</option>
+              </select>
+              <span class="rotate-label" id="preprocStatus" style="margin-left:0"></span>
+            </label>
+          </div>
+          <div class="btn-row">
+            <button class="btn-analizar" id="btnAnalizar">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+              Analizar Remito
+            </button>
+            <button class="btn-limpiar" id="btnLimpiar">Limpiar</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="loading" id="loading">
+        <div class="spinner"></div>
+        <p>Analizando remito con IA...</p>
+      </div>
+
+      <div class="error-msg" id="errorMsg"></div>
+
+      <div class="resultado" id="resultado">
+        <div class="resultado-header">
+          <h3>Datos Extraidos del Remito</h3>
+        </div>
+
+        <div class="datos-grid" id="datosGrid"></div>
+
+        <div class="items-section">
+          <h4>Articulos Entregados</h4>
+          <table class="items-table">
+            <thead>
+              <tr>
+                <th>Codigo Articulo</th>
+                <th>Descripcion</th>
+                <th class="num">Cajas</th>
+                <th class="num">KG</th>
+                <th>Confianza</th>
+                <th>Observaciones</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody id="itemsBody"></tbody>
+          </table>
+        </div>
+
+        <div class="totales-row" id="totalesRow"></div>
+
+        <div class="btn-actions">
+          <button class="btn-guardar" id="btnGuardar" style="display:none">&#10003; Guardar Entrega</button>
+          <button class="btn-editar" id="btnEditar">&#9998; Editar datos</button>
+          <button class="btn-reescanear" id="btnReescanear">&#8635; Re-escanear</button>
+        </div>
+        <div class="save-msg" id="saveMsg"></div>
+      </div>
+
+    </div>
+  </div>
+
+  <div class="lightbox" id="lightbox">
+    <button class="lightbox-close" id="lightboxClose">&times;</button>
+    <img id="lightboxImg" src="" alt="Zoom" />
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+  <script>
+    const SUPABASE_URL = "https://hrxfctzncixxqmpfhskv.supabase.co";
+    const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhyeGZjdHpuY2l4eHFtcGZoc2t2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzI3MjQyNjEsImV4cCI6MjA4ODMwMDI2MX0.4L6wguch8UZGhC2VpzrWcCjJGUV-IkYsl9JoCWrOLUs";
+    const EDGE_FN = SUPABASE_URL + "/functions/v1/leer-remito-tallerista";
+    const ENTREGAS_TABLE = "Entregas Tallerista Cervantes";
+    const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+    const uploadZone = document.getElementById("uploadZone");
+    const fileInput  = document.getElementById("fileInput");
+    const previewArea = document.getElementById("previewArea");
+    const previewImg = document.getElementById("previewImg");
+    const fileName   = document.getElementById("fileName");
+    const fileSize   = document.getElementById("fileSize");
+    const btnAnalizar = document.getElementById("btnAnalizar");
+    const btnLimpiar = document.getElementById("btnLimpiar");
+    const loading    = document.getElementById("loading");
+    const errorMsg   = document.getElementById("errorMsg");
+    const resultado  = document.getElementById("resultado");
+    const datosGrid  = document.getElementById("datosGrid");
+    const itemsBody  = document.getElementById("itemsBody");
+    const totalesRow = document.getElementById("totalesRow");
+    const btnEditar  = document.getElementById("btnEditar");
+    const btnReescanear = document.getElementById("btnReescanear");
+    const btnGuardar = document.getElementById("btnGuardar");
+    const saveMsg = document.getElementById("saveMsg");
+
+    let currentFile = null;
+    let originalB64 = null; // imagen original sin rotar
+    let currentB64 = null;  // imagen rotada (la que se envía)
+    let lastResultado = null;
+    let isEditing = false;
+    let rotationDeg = 0;
+    let despieceMap = new Map(); // COD -> ARTICULO
+
+    // Precargar descripciones de artículos
+    (async function cargarDespiece() {
+      const PAGE = 1000; let from = 0;
+      while (true) {
+        const { data, error } = await sb.from("Despiece x Articulo").select("COD, ARTICULO").range(from, from + PAGE - 1);
+        if (error || !data || !data.length) break;
+        data.forEach(r => {
+          const cod = String(r.COD || "").trim().toUpperCase();
+          if (cod && !despieceMap.has(cod)) despieceMap.set(cod, r.ARTICULO || "");
+        });
+        if (data.length < PAGE) break;
+        from += PAGE;
+      }
+    })();
+
+    // Lightbox
+    const lightbox = document.getElementById("lightbox");
+    const lightboxImg = document.getElementById("lightboxImg");
+    const lightboxClose = document.getElementById("lightboxClose");
+    previewImg.addEventListener("click", () => {
+      if (!currentB64) return;
+      lightboxImg.src = currentB64;
+      lightbox.classList.add("visible");
+    });
+    lightboxClose.addEventListener("click", () => lightbox.classList.remove("visible"));
+    lightbox.addEventListener("click", () => lightbox.classList.remove("visible"));
+
+    const btnRotL = document.getElementById("btnRotL");
+    const btnRotR = document.getElementById("btnRotR");
+    const rotateLabel = document.getElementById("rotateLabel");
+
+    // Upload zone events
+    uploadZone.addEventListener("click", () => fileInput.click());
+    uploadZone.addEventListener("dragover", e => { e.preventDefault(); uploadZone.classList.add("dragover"); });
+    uploadZone.addEventListener("dragleave", () => uploadZone.classList.remove("dragover"));
+    uploadZone.addEventListener("drop", e => {
+      e.preventDefault();
+      uploadZone.classList.remove("dragover");
+      if (e.dataTransfer.files.length) handleFile(e.dataTransfer.files[0]);
+    });
+    fileInput.addEventListener("change", () => { if (fileInput.files.length) handleFile(fileInput.files[0]); });
+
+    function handleFile(file) {
+      if (file.size > 10 * 1024 * 1024) { showError("El archivo supera 10MB."); return; }
+      currentFile = file;
+      fileName.textContent = file.name;
+      fileSize.textContent = (file.size / 1024 / 1024).toFixed(2) + " MB";
+      rotationDeg = 0;
+      rotateLabel.textContent = "0°";
+
+      const reader = new FileReader();
+      reader.onload = e => {
+        originalB64 = e.target.result;
+        currentB64 = originalB64;
+        previewImg.src = currentB64;
+        uploadZone.style.display = "none";
+        previewArea.classList.add("visible");
+        hideResults();
+      };
+      reader.readAsDataURL(file);
+    }
+
+    // Rotación con canvas
+    function rotateImage(b64, degrees) {
+      return new Promise(resolve => {
+        const img = new Image();
+        img.onload = () => {
+          const canvas = document.createElement("canvas");
+          const ctx = canvas.getContext("2d");
+          const rad = (degrees % 360) * Math.PI / 180;
+          const sin = Math.abs(Math.sin(rad));
+          const cos = Math.abs(Math.cos(rad));
+          canvas.width = Math.round(img.width * cos + img.height * sin);
+          canvas.height = Math.round(img.width * sin + img.height * cos);
+          ctx.translate(canvas.width / 2, canvas.height / 2);
+          ctx.rotate(rad);
+          ctx.drawImage(img, -img.width / 2, -img.height / 2);
+          resolve(canvas.toDataURL("image/jpeg", 0.92));
+        };
+        img.src = b64;
+      });
+    }
+
+    // Pre-proceso: grayscale + contrast stretch para apagar el fondo punteado gris
+    // y resaltar el trazo oscuro de lapicera/fibron. Tambien limita el lado mayor a
+    // 1800px para que el payload no se vaya al techo.
+    // Curva: brillo < UMBRAL_BAJO → 0 (negro puro), > UMBRAL_ALTO → 255 (blanco puro),
+    // entre medio interpolacion lineal. Esto "tira" los grises del fondo a blanco sin
+    // destruir trazos finos.
+    function preprocesarImagen(b64) {
+      return new Promise(resolve => {
+        const img = new Image();
+        img.onload = () => {
+          const MAX_DIM = 1800;
+          let w = img.width, h = img.height;
+          if (Math.max(w, h) > MAX_DIM) {
+            const r = MAX_DIM / Math.max(w, h);
+            w = Math.round(w * r);
+            h = Math.round(h * r);
+          }
+          const canvas = document.createElement("canvas");
+          canvas.width = w;
+          canvas.height = h;
+          const ctx = canvas.getContext("2d");
+          ctx.drawImage(img, 0, 0, w, h);
+
+          const imgData = ctx.getImageData(0, 0, w, h);
+          const px = imgData.data;
+          const UMBRAL_BAJO = 90;   // <= 90 → negro
+          const UMBRAL_ALTO = 175;  // >= 175 → blanco
+          const rango = UMBRAL_ALTO - UMBRAL_BAJO;
+          for (let i = 0; i < px.length; i += 4) {
+            const lum = 0.299 * px[i] + 0.587 * px[i+1] + 0.114 * px[i+2];
+            let v;
+            if (lum <= UMBRAL_BAJO) v = 0;
+            else if (lum >= UMBRAL_ALTO) v = 255;
+            else v = Math.round(((lum - UMBRAL_BAJO) / rango) * 255);
+            px[i] = px[i+1] = px[i+2] = v;
+          }
+          ctx.putImageData(imgData, 0, 0);
+          resolve(canvas.toDataURL("image/jpeg", 0.92));
+        };
+        img.src = b64;
+      });
+    }
+
+    async function applyRotation(delta) {
+      if (!originalB64) return;
+      rotationDeg = (rotationDeg + delta + 360) % 360;
+      rotateLabel.textContent = rotationDeg + "°";
+      if (rotationDeg === 0) {
+        currentB64 = originalB64;
+      } else {
+        currentB64 = await rotateImage(originalB64, rotationDeg);
+      }
+      previewImg.src = currentB64;
+    }
+
+    btnRotL.addEventListener("click", () => applyRotation(-90));
+    btnRotR.addEventListener("click", () => applyRotation(90));
+
+    btnLimpiar.addEventListener("click", limpiar);
+    function limpiar() {
+      currentFile = null; originalB64 = null; currentB64 = null;
+      rotationDeg = 0;
+      rotateLabel.textContent = "0°";
+      fileInput.value = "";
+      previewArea.classList.remove("visible");
+      uploadZone.style.display = "";
+      hideResults();
+    }
+
+    function hideResults() {
+      resultado.classList.remove("visible");
+      loading.classList.remove("visible");
+      errorMsg.classList.remove("visible");
+      btnGuardar.style.display = "none";
+      btnGuardar.disabled = false;
+      saveMsg.className = "save-msg";
+    }
+
+    function showError(msg) {
+      errorMsg.textContent = msg;
+      errorMsg.classList.add("visible");
+      loading.classList.remove("visible");
+    }
+
+    function esc(s) {
+      return String(s || "").replace(/&/g,"&amp;").replace(/"/g,"&quot;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+    }
+
+
+    // Llamada a Edge Function
+    async function callEdge(payload) {
+      const res = await fetch(EDGE_FN, {
+        method: "POST",
+        headers: {
+          "Authorization": "Bearer " + SUPABASE_KEY,
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify(payload)
+      });
+      const data = await res.json();
+      if (!res.ok || data.error) throw new Error(data.error || "Error al analizar");
+      return data;
+    }
+
+    // Buscar códigos del tallerista en Partes x Tallerista
+    async function getCodigosTallerista(nombre) {
+      // Buscar por primera palabra del nombre (ej: "MARTIN CORNEJO" -> buscar "Martin")
+      const primerNombre = nombre.trim().split(/\s+/)[0];
+      const { data } = await sb.from("Partes x Tallerista")
+        .select("cod")
+        .ilike("tallerista", primerNombre + "%");
+      if (!data || !data.length) return [];
+      return [...new Set(data.map(r => String(r.cod || "").trim()).filter(Boolean))].sort();
+    }
+
+    // Analizar en 2 pasos. v15+: el paso 2 paso de "OCR sobre foto cruda" a
+    // "rectificar+limpiar en cliente y mandar grilla compuesta a paso 3 (Edge Fn)".
+    // El checkbox chkPreproc queda como fallback: si esta TILDADO, se mantiene el
+    // flujo viejo (paso 1+2) por compatibilidad con plantillas viejas sin fiduciales.
+    // Flujo unico (legacy): pre-proceso de imagen + paso 1 (encabezado) + paso 2 (cajas
+    // contra lista de cods conocidos de Partes x Tallerista). El flujo rectificado con
+    // fiduciales quedo desactivado por decision del usuario (2026-05-27); el motor
+    // sigue en disco (ocr-segmentos/lector-rectificado.js) por si se reactiva.
+    const preprocStatus = document.getElementById("preprocStatus");
+    btnAnalizar.addEventListener("click", async () => {
+      if (!currentB64) return;
+      hideResults();
+      loading.classList.add("visible");
+      btnAnalizar.disabled = true;
+
+      try {
+        const modeloUI = ((document.getElementById("selModelo") || {}).value) || "claude";
+
+        loading.querySelector("p").textContent = "Procesando imagen...";
+        const imgParaModelo = await preprocesarImagen(currentB64);
+        if (preprocStatus) preprocStatus.textContent = "— ultimo analisis: " + modeloUI;
+        const imgPayload = { imagen: imgParaModelo, mime: "image/jpeg", modelo: modeloUI };
+
+        loading.querySelector("p").textContent = "Paso 1/2: Leyendo encabezado con " + modeloUI + "...";
+        const encabezado = await callEdge({ ...imgPayload, paso: 1 });
+        const tallerista = String(encabezado.tallerista || "").trim();
+        if (!tallerista) throw new Error("No se pudo leer el nombre del tallerista");
+
+        const codigos = await getCodigosTallerista(tallerista);
+        if (!codigos.length) throw new Error("No se encontraron artículos para el tallerista: " + tallerista);
+
+        loading.querySelector("p").textContent = "Paso 2/2: Leyendo cajas con " + modeloUI + " (" + codigos.length + " articulos)...";
+        const detalle = await callEdge({ ...imgPayload, paso: 2, codigos });
+
+        await renderResultado({
+          tallerista: encabezado.tallerista,
+          fecha: encabezado.fecha,
+          codigo_proveedor: encabezado.codigo_proveedor,
+          numero_remito: encabezado.numero_remito,
+          // v24+: paso 2 ahora devuelve confianza por cod. Usarla tal cual.
+          articulos: detalle.articulos || [],
+          cods_desconocidos: detalle.cods_desconocidos || [],
+          _flujo: "legacy",
+        });
+      } catch (err) {
+        showError("Error: " + err.message);
+      } finally {
+        btnAnalizar.disabled = false;
+        loading.querySelector("p").textContent = "Analizando remito con IA...";
+      }
+    });
+
+    // Los remitos solo traen DD/MM (sin año). Si la IA devolvio año, lo descartamos
+    // y reasignamos segun el mes actual: si el mes leido es muy posterior al actual,
+    // probablemente sea del año anterior (rollover de enero).
+    function normalizarFechaSoloDDMM(fechaStr){
+      if (!fechaStr || typeof fechaStr !== 'string') return fechaStr;
+      const s = fechaStr.trim();
+      // Extraer dia/mes ignorando cualquier año que venga.
+      let dia, mes;
+      let m = s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
+      if (m) { mes = +m[2]; dia = +m[3]; }
+      else {
+        m = s.match(/^(\d{1,2})[\/\-](\d{1,2})(?:[\/\-]\d{2,4})?$/);
+        if (!m) return fechaStr;
+        dia = +m[1]; mes = +m[2];
+      }
+      if (!(dia >= 1 && dia <= 31) || !(mes >= 1 && mes <= 12)) return fechaStr;
+      // Año: actual por defecto. Si mes leido > mes actual + 1 → año anterior (rollover).
+      const hoy = new Date();
+      const mesActual = hoy.getMonth() + 1;
+      let anio = hoy.getFullYear();
+      if (mes > mesActual + 1) anio -= 1;
+      return String(dia).padStart(2,'0') + '/' + String(mes).padStart(2,'0') + '/' + anio;
+    }
+
+    async function renderResultado(d) {
+      loading.classList.remove("visible");
+      lastResultado = d;
+      isEditing = false;
+      btnEditar.innerHTML = "&#9998; Editar datos";
+
+      // Forzar año correcto: el remito solo tiene DD/MM, la IA inventa el año.
+      d.fecha = normalizarFechaSoloDDMM(d.fecha);
+
+      // Datos principales — solo advertir si la fecha es inexistente.
+      // Si vienen confianzas de paso 3 (rectificado), pintamos borde por nivel.
+      const vfecha = validarFecha(d.fecha);
+      const fechaExtra = !vfecha.ok
+        ? '<div style="color:#c62828;font-size:11px;font-weight:700;margin-top:2px;">⚠ ' + esc(vfecha.error) + '</div>'
+        : '';
+      const fechaBorder = !vfecha.ok ? 'border: 2px solid #c62828;' : '';
+      const confs = d._confianzas || {};
+      const confClass = (c) => (c === "media" || c === "baja") ? ("conf-" + c) : "";
+      const confExtra = (c) => (c === "media" || c === "baja")
+        ? `<div style="margin-top:4px"><span class="conf-badge conf-${c}">${c}</span></div>`
+        : "";
+      const campos = [
+        { label: "Tallerista", key: "tallerista", value: d.tallerista, extra: '', cls: '', style: '' },
+        { label: "Fecha del Remito", key: "fecha", value: d.fecha, extra: fechaExtra + confExtra(confs.fecha), cls: confClass(confs.fecha), style: fechaBorder },
+        { label: "Codigo Proveedor (cod CH)", key: "codigo_proveedor", value: d.codigo_proveedor, extra: confExtra(confs.cod_ch), cls: confClass(confs.cod_ch), style: '' },
+        { label: "N° Carga Portal", key: "numero_remito", value: d.numero_remito, extra: confExtra(confs.ncp), cls: confClass(confs.ncp), style: '' },
+      ];
+      datosGrid.innerHTML = campos.map(c =>
+        `<div class="dato-card ${c.cls}" data-field="${c.key}" style="${c.style}">
+          <div class="label">${c.label}</div>
+          <div class="value">${esc(c.value) || '-'}</div>
+          ${c.extra}
+        </div>`
+      ).join("");
+
+      // Items - completar descripción desde Despiece.
+      // Modo rectificado: mostrar TODOS los cods (incluso cajas=0) para que el operario
+      //                   pueda revisar visualmente que no se haya perdido nada.
+      // Modo legacy:      filtrar los que tienen 0 cajas y 0 kg (comportamiento original).
+      const allItems = d.articulos || [];
+      allItems.forEach(it => {
+        if (!it.descripcion || it.descripcion.trim() === "") {
+          const cod = String(it.codigo || "").trim().toUpperCase();
+          const desc = despieceMap.get(cod);
+          if (desc) it.descripcion = desc;
+        }
+      });
+      // Mostrar SIEMPRE todos los items que devolvio el modelo. Antes el flujo legacy
+      // filtraba cajas>0 lo que ocultaba items donde la IA los marco erroneamente en 0
+      // (ej. casilla con trazo no detectado). Mejor que el operario vea los cods del
+      // tallerista y corrija los que estan mal antes de guardar. btnGuardar igual filtra
+      // cajas>0 al insertar, asi que los 0s no se persisten.
+      const items = allItems;
+
+      itemsBody.innerHTML = items.map((it, idx) => {
+        const conf = it.confianza || null;
+        const rowCls = (conf === "media") ? "row-media" : (conf === "baja" ? "row-baja" : "");
+        const confCell = conf
+          ? `<span class="conf-badge conf-${conf}">${conf}</span>`
+          : '<span style="color:#a0aec0">—</span>';
+        return `<tr data-idx="${idx}" class="${rowCls}">
+          <td>${esc(it.codigo)}</td>
+          <td>${esc(it.descripcion)}</td>
+          <td class="num"><strong>${it.cajas ? it.cajas : '-'}</strong></td>
+          <td class="num">${it.kg ? it.kg : '-'}</td>
+          <td>${confCell}</td>
+          <td>${esc(it.observaciones)}</td>
+          <td><button class="btn-edit-row" title="Editar" data-idx="${idx}">&#9998;</button></td>
+        </tr>`;
+      }).join("");
+
+      // Lápiz: editar fila inline. td 4 ahora es la celda Confianza (read-only,
+      // no se edita: si el operario cambia el valor, marcamos confianza=alta).
+      itemsBody.querySelectorAll(".btn-edit-row").forEach(btn => {
+        btn.addEventListener("click", () => {
+          const idx = Number(btn.dataset.idx);
+          const it = items[idx];
+          const tr = btn.closest("tr");
+          const tds = tr.querySelectorAll("td");
+          tds[0].innerHTML = `<input class="inline-edit" value="${esc(it.codigo)}" />`;
+          tds[1].innerHTML = `<input class="inline-edit" value="${esc(it.descripcion)}" />`;
+          tds[2].innerHTML = `<input class="inline-edit" style="width:60px;text-align:right" value="${it.cajas || 0}" />`;
+          tds[3].innerHTML = `<input class="inline-edit" style="width:60px;text-align:right" value="${it.kg || 0}" />`;
+          // tds[4] = Confianza (no editable)
+          tds[5].innerHTML = `<input class="inline-edit" value="${esc(it.observaciones)}" />`;
+          tds[6].innerHTML = `<button class="btn-save-row" data-idx="${idx}">OK</button>`;
+          tds[6].querySelector(".btn-save-row").addEventListener("click", () => {
+            const inputs = tr.querySelectorAll("input");
+            items[idx].codigo = inputs[0].value;
+            items[idx].descripcion = inputs[1].value;
+            items[idx].cajas = Number(inputs[2].value) || 0;
+            items[idx].kg = Number(inputs[3].value) || 0;
+            items[idx].observaciones = inputs[4].value;
+            // Si el operario corrigio la cifra, la confianza ahora es manual = alta
+            items[idx].confianza = "alta";
+            if (lastResultado) lastResultado.articulos = allItems;
+            renderResultado(lastResultado);
+          });
+        });
+      });
+
+      // Totales
+      const totalCajas = items.reduce((s, it) => s + (Number(it.cajas) || 0), 0);
+      const totalKg = items.reduce((s, it) => s + (Number(it.kg) || 0), 0);
+      let totalesHtml = `<div class="total-card">
+        <div class="label">Total Cajas</div>
+        <div class="value">${totalCajas}</div>
+      </div>`;
+      if (totalKg > 0) {
+        totalesHtml += `<div class="total-card">
+          <div class="label">Total KG</div>
+          <div class="value">${totalKg.toLocaleString("es-AR", { maximumFractionDigits: 1 })}</div>
+        </div>`;
+      }
+      totalesRow.innerHTML = totalesHtml;
+
+      // ====== CODS DESCONOCIDOS (modo legacy, paso 2): el modelo vio cods en la foto
+      // que NO estan en Partes x Tallerista para este tallerista. NO se guardan en DB,
+      // se muestran solo como advertencia para que el operario/IT decida si agregarlos
+      // a la tabla madre Articulos Virgilio X Tallerista.
+      const desconocidos = Array.isArray(d.cods_desconocidos) ? d.cods_desconocidos : [];
+      let descEl = document.getElementById("descSection");
+      if (!descEl) {
+        descEl = document.createElement("div");
+        descEl.id = "descSection";
+        descEl.style.cssText = "margin-top:14px;";
+        totalesRow.parentNode.insertBefore(descEl, totalesRow);
+      }
+      if (desconocidos.length){
+        descEl.innerHTML = `
+          <div style="background:#fef3c7;border:2px solid #f59e0b;border-radius:10px;padding:14px 18px;">
+            <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
+              <span style="font-size:18px;">⚠</span>
+              <strong style="color:#92400e;font-size:14px;">Códigos detectados en el remito pero NO en la base de datos</strong>
+            </div>
+            <p style="color:#78350f;font-size:12.5px;margin-bottom:10px;">
+              Estos códigos aparecen impresos en la foto pero no están dados de alta para
+              <strong>${esc(d.tallerista || "este tallerista")}</strong> en
+              <code>Partes x Tallerista</code>. <strong>NO se van a guardar.</strong>
+              Si son códigos válidos, hay que agregarlos a la tabla madre
+              <code>Articulos Virgilio X Tallerista</code>.
+            </p>
+            <table class="items-table" style="background:#fff;">
+              <thead>
+                <tr>
+                  <th>Codigo</th>
+                  <th class="num">Cajas leidas</th>
+                  <th>Confianza</th>
+                  <th>Observaciones</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${desconocidos.map(it => {
+                  const c = it.confianza || null;
+                  const confCell = c ? `<span class="conf-badge conf-${c}">${c}</span>` : '<span style="color:#a0aec0">—</span>';
+                  return `<tr>
+                    <td><strong>${esc(it.codigo)}</strong></td>
+                    <td class="num">${it.cajas != null ? it.cajas : '-'}</td>
+                    <td>${confCell}</td>
+                    <td>${esc(it.observaciones)}</td>
+                  </tr>`;
+                }).join("")}
+              </tbody>
+            </table>
+          </div>
+        `;
+      } else {
+        descEl.innerHTML = "";
+      }
+
+      resultado.classList.add("visible");
+      btnGuardar.style.display = "";
+      btnGuardar.disabled = false;
+      saveMsg.className = "save-msg";
+    }
+
+    // Validar fecha leida del remito. Acepta DD/MM, DD/MM/YYYY, DD-MM, DD-MM-YYYY, YYYY-MM-DD.
+    // Devuelve { ok, fechaISO, error, advertencia }.
+    function validarFecha(str) {
+      if (!str || typeof str !== 'string') return { ok: false, error: 'Sin fecha leída' };
+      const s = str.trim();
+      let dia, mes, anio;
+      const hoy = new Date();
+      const anioActual = hoy.getFullYear();
+
+      // YYYY-MM-DD
+      let m = s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
+      if (m) { anio = +m[1]; mes = +m[2]; dia = +m[3]; }
+      else {
+        // DD/MM[/YYYY] o DD-MM[-YYYY]
+        m = s.match(/^(\d{1,2})[\/\-](\d{1,2})(?:[\/\-](\d{2,4}))?$/);
+        if (!m) return { ok: false, error: 'Formato no reconocido: "' + s + '"' };
+        dia = +m[1]; mes = +m[2];
+        anio = m[3] ? (+m[3] < 100 ? 2000 + +m[3] : +m[3]) : anioActual;
+      }
+
+      // Validar rangos
+      if (!(dia >= 1 && dia <= 31)) return { ok: false, error: 'Día inválido: ' + dia };
+      if (!(mes >= 1 && mes <= 12)) {
+        // Heurística: si mes > 12 pero dia <= 12, probablemente esté invertido (MM/DD en lugar de DD/MM)
+        const sugerencia = (mes > 12 && dia >= 1 && dia <= 12)
+          ? ' — ¿quizás escribiste MM/DD? Probá invertir: ' + String(mes).padStart(2,'0') + '/' + String(dia).padStart(2,'0')
+          : '';
+        return { ok: false, error: 'Mes inválido: ' + mes + sugerencia };
+      }
+
+      // Validar dias por mes (incluye febrero bisiesto)
+      const NOMBRE_MES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+      const bisiesto = (anio % 4 === 0 && anio % 100 !== 0) || (anio % 400 === 0);
+      const diasPorMes = [31, bisiesto ? 29 : 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+      const maxDia = diasPorMes[mes - 1];
+      if (dia > maxDia) {
+        const nombreMes = NOMBRE_MES[mes - 1];
+        let err;
+        if (mes === 2 && dia === 29 && !bisiesto) {
+          err = anio + ' no es año bisiesto — Febrero tiene 28 días';
+        } else {
+          err = nombreMes + ' tiene ' + maxDia + ' días (escrito: ' + dia + ')';
+        }
+        return { ok: false, error: err };
+      }
+
+      // Segunda verificacion defensiva via Date (por si acaso)
+      const d = new Date(anio, mes - 1, dia);
+      if (d.getDate() !== dia || d.getMonth() !== mes - 1 || d.getFullYear() !== anio) {
+        return { ok: false, error: 'Fecha inexistente: ' + dia + '/' + mes + '/' + anio };
+      }
+
+      const iso = anio + '-' + String(mes).padStart(2,'0') + '-' + String(dia).padStart(2,'0');
+      return { ok: true, fechaISO: iso };
+    }
+
+    function arDateISO(){
+      const fmt = new Intl.DateTimeFormat("sv-SE", {
+        timeZone: "America/Argentina/Buenos_Aires",
+        year: "numeric", month: "2-digit", day: "2-digit"
+      });
+      return fmt.format(new Date());
+    }
+
+    function formatTallName(nombre){
+      const first = String(nombre || "").trim().split(/\s+/)[0];
+      if (!first) return nombre;
+      return first.charAt(0).toUpperCase() + first.slice(1).toLowerCase();
+    }
+
+    // GUARDAR ENTREGA en Supabase
+    btnGuardar.addEventListener("click", async () => {
+      if (!lastResultado || btnGuardar.disabled) return;
+
+      const articulos = (lastResultado.articulos || []).filter(it => (Number(it.cajas) || 0) > 0);
+      if (!articulos.length){
+        saveMsg.className = "save-msg visible error";
+        saveMsg.textContent = "No hay artículos con cajas > 0 para guardar.";
+        return;
+      }
+
+      const tallNombre = formatTallName(lastResultado.tallerista);
+
+      // Validar fecha leida del remito
+      const fechaRaw = lastResultado.fecha || arDateISO();
+      const vf = validarFecha(fechaRaw);
+      if (!vf.ok) {
+        saveMsg.className = "save-msg visible error";
+        saveMsg.textContent = "Fecha invalida del remito: " + vf.error + ". Editá la fecha antes de guardar.";
+        return;
+      }
+      const fecha = vf.fechaISO;
+
+      const detalle = articulos
+        .map(it => `${it.codigo} - ${it.descripcion || ""} - ${it.cajas} cajas`)
+        .join("\n");
+
+      if (!confirm(`¿Guardar entrega de ${tallNombre}?\nFecha: ${fecha}\n\n${detalle}`)) return;
+
+      btnGuardar.disabled = true;
+      saveMsg.className = "save-msg visible ok";
+      saveMsg.textContent = "Guardando...";
+
+      try {
+        // Codigo_Tall es NOT NULL en la tabla. Resolverlo desde codigo_proveedor (cod CH)
+        // leido del remito. Si no se pudo leer / no es numerico -> 0 (la tabla acepta 0
+        // como sentinel; el operario despues puede actualizar manualmente).
+        // NO mandamos "Sucursal": la columna no existe (la sucursal Cervantes vs Virgilio
+        // se infiere del modulo de carga; esta tabla recibe ambos).
+        const codigoTall = Number(lastResultado.codigo_proveedor) || 0;
+        if (!codigoTall) {
+          console.warn("[Entrega Cervantes Fotos] Codigo_Tall=0 al guardar; el cod CH no se pudo leer del remito.");
+        }
+        const registros = articulos.map(it => ({
+          "Nombre_Tall": tallNombre,
+          "Codigo_Tall": codigoTall,
+          "Cod": String(it.codigo || "").trim(),
+          "Cajas": Number(it.cajas) || 0,
+          "Fecha": fecha,
+        }));
+        // TODO GRJ: cuando se sume soporte para talleristas con GRJ (Carlos/Martin),
+        // replicar la logica de Recepcion Cervantes.html lineas 969-1052 (isGRJ /
+        // esGrjRealKg / esTransUnidades + GRJ_COMPONENTES + GRJ_PESOS).
+        // Para Lucho (primer tallerista soportado) NO hay GRJ, asi que el INSERT
+        // simple alcanza.
+
+        const { error } = await sb.from(ENTREGAS_TABLE).insert(registros);
+        if (error) throw new Error(error.message);
+
+        saveMsg.className = "save-msg visible ok";
+        saveMsg.textContent = `Entrega guardada: ${articulos.length} artículos de ${tallNombre}.`;
+      } catch (err) {
+        saveMsg.className = "save-msg visible error";
+        saveMsg.textContent = "Error al guardar: " + err.message;
+        btnGuardar.disabled = false;
+      }
+    });
+
+    // EDITAR - convierte los campos en inputs editables
+    btnEditar.addEventListener("click", () => {
+      if (!lastResultado) return;
+
+      if (!isEditing) {
+        isEditing = true;
+        btnEditar.innerHTML = "&#10003; Guardar cambios";
+
+        // Hacer editables los datos principales
+        datosGrid.querySelectorAll(".dato-card").forEach(card => {
+          const valueEl = card.querySelector(".value");
+          const val = valueEl.textContent.trim();
+          valueEl.innerHTML = '<input type="text" value="' + (val === "-" ? "" : val).replace(/"/g, '&quot;') + '" />';
+        });
+
+        // Hacer editables los items. Saltar td 4 (Confianza, read-only) y td 6 (boton).
+        itemsBody.querySelectorAll("tr").forEach(tr => {
+          const tds = tr.querySelectorAll("td");
+          const editables = [0, 1, 2, 3, 5]; // Codigo, Desc, Cajas, KG, Observaciones
+          editables.forEach(i => {
+            if (!tds[i]) return;
+            const val = tds[i].textContent.trim();
+            tds[i].innerHTML = '<input type="text" value="' + val.replace(/"/g, '&quot;') + '" />';
+          });
+        });
+      } else {
+        // Guardar cambios
+        isEditing = false;
+        btnEditar.innerHTML = "&#9998; Editar datos";
+
+        const campos = ["tallerista","fecha","codigo_proveedor","numero_remito"];
+        datosGrid.querySelectorAll(".dato-card").forEach((card, i) => {
+          const input = card.querySelector("input");
+          if (input && campos[i]) lastResultado[campos[i]] = input.value;
+        });
+
+        const rows = itemsBody.querySelectorAll("tr");
+        lastResultado.articulos = [];
+        rows.forEach(tr => {
+          const inputs = tr.querySelectorAll("input");
+          if (inputs.length >= 5) {
+            // Si el operario edito, marcamos confianza como "alta" (revisada manual).
+            lastResultado.articulos.push({
+              codigo: inputs[0].value,
+              descripcion: inputs[1].value,
+              cajas: Number(inputs[2].value) || 0,
+              kg: Number(inputs[3].value) || 0,
+              observaciones: inputs[4].value,
+              confianza: "alta",
+            });
+          }
+        });
+
+        renderResultado(lastResultado);
+      }
+    });
+
+    // RE-ESCANEAR (usa el mismo flujo de 2 pasos)
+    btnReescanear.addEventListener("click", () => {
+      btnAnalizar.click();
+    });
+  </script>
+</body>
+</html>

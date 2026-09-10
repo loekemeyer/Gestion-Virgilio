@@ -382,19 +382,36 @@ borró). Layout:
   Si se desalinean, el celular se queda con el JS viejo cacheado — pasó, y por eso los
   operarios corrieron 5 versiones atrás sin que nadie lo notara.
 
-### Admin de Cervantes — dos pantallas, en otros repos (link, no copia)
+### Admin de Cervantes — dos pantallas, COPIADAS acá (`cervantes-admin/`)
 
 - **El supervisor que elige Cervantes en el selector de planta NO va a la pantalla de
   operario: va al admin** (`chooseCervantes` → `showCervAdmin`, v14.73). El operario sigue
   derecho a `./cervantes/`. La distinción es `__identity.type === "supervisor"`.
-- **Por ahora los admin de Cervantes son DOS** (decisión del dueño, 2026-09-10), cada uno en
-  su repo, así que la pantalla `#cervAdmin` muestra las dos tarjetas y linkea a la **raíz**
-  de cada una (cada repo decide adónde entrar desde su propio `index.html`):
-  **Gestión Productiva (entero)** → `../GestionProductivaEntero/` · **Gestión Productiva 2.0**
-  → `../Gestion-Productiva-2.0/`. Se resuelven **relativo a la página** para no clavar el host.
-  **No se copia nada** de esos repos acá — el error de `/cervantes/` no se repite.
+- **Los admin de Cervantes son DOS y están COPIADOS acá** (decisión del dueño, 2026-09-10:
+  *"copia, no link… ya que esto es una integración"*): `cervantes-admin/entero/` (repo
+  `GestionProductivaEntero`) y `cervantes-admin/gp2/` (repo `Gestion-Productiva-2.0`). La
+  pantalla `#cervAdmin` muestra las dos tarjetas. **Todo Cervantes vive en este repo**: la
+  app de operario en `cervantes/` y los dos admin acá.
+- **De la copia se dejaron afuera** los archivos de repo, no de app: `.git`, `.claude`,
+  `.vscode`, `.mcp.json`, `.planning`, `CLAUDE.md`, `LOCKS.txt` y los `.bat`. El `CLAUDE.md`
+  sobre todo: si entra, una sesión de Claude en ESTE repo se come las instrucciones de los
+  otros dos (locks, reglas contradictorias). **No traerlo nunca.**
+- **Parches propios de estas copias** (no revertirlos al re-sincronizar):
+  1. **Ningún rechazo de whitelist hace `signOut()`** (`entero/login.html`, `gp2/login.html`).
+     La sesión de Google es **compartida** con Gestión (mismo origin, mismo proyecto): cerrarla
+     ahí echaba al supervisor de Gestión entera sólo por no estar en `usuarios_permitidos`
+     (que hoy tiene **2 mails**: `loekemeyer.n8n@` admin y `loekemeyer.logistica@` envíos).
+     Ahora sólo se limpia el `sessionStorage` de esa app.
+  2. **`entero/Inicio/index.html`**: el botón "Cerrar sesión" pasó a **"← Volver a Gestión"**
+     (`../../../`) — hacía `signOut` + borraba las claves `sb-*`, o sea te echaba de todo.
+  3. **`gp2/GP2_MODULOS.html`**: link **"← Volver a Gestión"** en el header (`../../`).
+- **`.nojekyll` en la raíz**: sin eso, Pages corre Jekyll y **no publica** lo que empieza con
+  `_` — y las copias traen varios (`_backup_relevamiento_*`, `_export`, `_archivo`).
 - El botón **🏭 Admin Cervantes (GP2)** del panel supervisor abre **esa misma pantalla**
   (`openAdminCervantes` → `showCervAdmin`): una sola puerta, no dos criterios.
+- ⚠ **Ojo, deuda heredada**: cada admin trae adentro su propio `Produccion/RegistroApp/`, o
+  sea que en el repo ahora hay **más de una copia** de la app de registro además de
+  `cervantes/`. No se tocó; si algún día se unifica, es ahí donde hay que mirar.
 - **No hace falta puente de sesión** (a diferencia de `/admin/` de LK, que necesita
   `lk_bridge_vjwt` porque es OTRO proyecto Supabase): GP2 usa el **mismo proyecto**
   `hrxfctzncixxqmpfhskv` y el **mismo origin**, con el `storageKey` default, así que la

@@ -1,0 +1,194 @@
+<!doctype html>
+<html lang="es">
+<head>
+<!-- v1.0.0 (2026-09-02) — Módulo Recepción Unificada. Checklist para el sector Pagos:
+     todo lo que entró (insumos vía OC + entregas de talleristas) en una sola vista, con
+     cod_prov y cod_isis por ítem para cotejar contra facturas antes de cargarlas.
+     Fuente: vista GP2.v_recepcion_unificada. Idea 7203. -->
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Recepciones · Checklist Pagos · GP2</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="../supabase-config.js?v=20260905k"></script>
+<script src="../gp2-ui.js?v=20260905a"></script>
+<script src="../gp2-numero.js?v=20260905m"></script>
+<link rel="stylesheet" href="../gp2-modulo.css?v=20260903b"/>
+<link rel="icon" type="image/png" href="../GP2_favicon.png">
+<link rel="apple-touch-icon" href="../GP2_favicon.png">
+<style>
+  .filtros{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin:10px 0;padding:12px;background:#f6f8fa;border-radius:10px}
+  .filtros label{font-weight:700;font-size:15px;color:#111}
+  .filtros input[type=text], .filtros input[type=date], .filtros select{
+    padding:9px;font-size:18px;border:2px solid #d0d7de;border-radius:8px;color:#111;background:#fff;min-height:44px}
+  .chips{display:flex;gap:8px;flex-wrap:wrap}
+  .chip{padding:8px 14px;border-radius:20px;border:2px solid #d0d7de;background:#fff;font-weight:700;font-size:15px;cursor:pointer;color:#111;min-height:44px}
+  .chip.active{background:#111;color:#fff;border-color:#111}
+  .kpis{display:flex;gap:10px;flex-wrap:wrap;margin:8px 0}
+  .kpi{padding:10px 14px;border-radius:10px;background:#eef2f7;border:2px solid #d0d7de;font-weight:800;font-size:16px}
+  .kpi span.n{color:#0b3b73;margin-left:8px;font-size:18px}
+  table.rec{width:100%;border-collapse:collapse;font-size:15px;background:#fff}
+  table.rec th, table.rec td{padding:9px 8px;border-bottom:1px solid #e2e6ea;text-align:left;vertical-align:top}
+  table.rec th{background:#f2f5f8;font-size:14px;color:#111;text-transform:uppercase;letter-spacing:.02em}
+  td.num{text-align:right;font-variant-numeric:tabular-nums}
+  .badge{padding:4px 10px;border-radius:14px;font-size:12px;font-weight:800;display:inline-block}
+  .badge.insumo{background:#e3f2fd;color:#0b3b73}
+  .badge.tallerista{background:#fff3e0;color:#8a4b00}
+  .badge.ok{background:#e8f5e9;color:#0a7a2f}
+  .badge.pend{background:#ffebee;color:#b71c1c}
+  .cod{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-weight:700;color:#111}
+  .muted{color:#666;font-size:13px}
+  .btn-print{padding:11px 18px;font-size:16px;font-weight:800;border-radius:8px;border:2px solid #111;background:#111;color:#fff;cursor:pointer;min-height:44px}
+  @media print {
+    .filtros, .header .hbtns, .btn-print { display:none !important; }
+    body { background:#fff !important; }
+  }
+</style>
+</head>
+<body>
+
+<div class="card">
+  <div class="header">
+    <h1>Recepciones · Checklist Pagos</h1>
+    <div class="hbtns"><a href="../GP2_MODULOS.html">Atrás</a></div>
+  </div>
+
+  <p class="muted" style="margin:0 0 10px">
+    Todo lo que entró — insumos por OC y entregas de talleristas — en una sola vista.
+    Sirve para cotejar contra facturas antes de cargarlas al sistema. Cada línea trae
+    <b>cod_prov</b> (código ISIS del proveedor) y <b>cod_isis</b> (código del ítem).
+  </p>
+
+  <div class="filtros">
+    <div class="chips" id="chOrigen">
+      <button type="button" class="chip active" data-o="todo">Todo</button>
+      <button type="button" class="chip" data-o="insumo">Insumos</button>
+      <button type="button" class="chip" data-o="tallerista">Talleristas</button>
+    </div>
+    <div class="chips" id="chFact">
+      <button type="button" class="chip active" data-f="todo">Con y sin factura</button>
+      <button type="button" class="chip" data-f="con">Con factura</button>
+      <button type="button" class="chip" data-f="sin">Sin factura</button>
+    </div>
+    <label>Desde <input type="date" id="fDesde"/></label>
+    <label>Hasta <input type="date" id="fHasta"/></label>
+    <input type="text" id="q" placeholder="Buscar proveedor, código, remito…" style="flex:1;min-width:200px" inputmode="search"/>
+    <button type="button" class="btn-print" id="btnPrint">Imprimir checklist</button>
+  </div>
+
+  <div class="kpis">
+    <div class="kpi">Filas <span class="n" id="kpN">0</span></div>
+    <div class="kpi">Insumos <span class="n" id="kpIns">0</span></div>
+    <div class="kpi">Talleristas <span class="n" id="kpTal">0</span></div>
+    <div class="kpi">Sin factura <span class="n" id="kpSin">0</span></div>
+  </div>
+
+  <div class="table-wrap">
+    <table class="rec" id="tbl">
+      <thead><tr>
+        <th>Fecha</th>
+        <th>Origen</th>
+        <th>Remito</th>
+        <th>Cod prov</th>
+        <th>Proveedor</th>
+        <th>Cod ISIS</th>
+        <th>Ítem</th>
+        <th class="num">Cantidad</th>
+        <th>Unidad</th>
+        <th>Factura</th>
+        <th>Fecha fac.</th>
+      </tr></thead>
+      <tbody id="tb"></tbody>
+    </table>
+  </div>
+</div>
+
+<script>
+(function(){
+  const SB = GP2_SB();
+  let ROWS = [];
+  let filt = { origen:'todo', fact:'todo', q:'', desde:null, hasta:null };
+
+  var esc = GP2UI.esc;   /* helper de la casa, gp2-ui.js (2026-09-05) */
+  function fmtNum(n){ return GP2N.fmt(n, 2); }   /* la regla de numero de la casa (gp2-numero.js) */
+  function fmtFecha(s){
+    if (!s) return '';
+    try { return new Date(s).toLocaleDateString('es-AR', {day:'2-digit', month:'2-digit', year:'numeric'}); }
+    catch(e){ return String(s).slice(0,10); }
+  }
+
+  function pinta(){
+    const q = filt.q.trim().toLowerCase();
+    const rows = ROWS.filter(r => {
+      if (filt.origen !== 'todo' && r.origen !== filt.origen) return false;
+      if (filt.fact === 'con' && !r.numero_factura) return false;
+      if (filt.fact === 'sin' &&  r.numero_factura) return false;
+      if (filt.desde && r.fecha_recepcion && r.fecha_recepcion.slice(0,10) < filt.desde) return false;
+      if (filt.hasta && r.fecha_recepcion && r.fecha_recepcion.slice(0,10) > filt.hasta) return false;
+      if (q){
+        const hay = (r.nombre_prov||'') + ' ' + (r.cod_prov||'') + ' ' + (r.cod_isis||'') +
+                    ' ' + (r.descripcion||'') + ' ' + (r.remito||'') + ' ' + (r.numero_factura||'');
+        if (hay.toLowerCase().indexOf(q) < 0) return false;
+      }
+      return true;
+    });
+    rows.sort((a,b) => (b.fecha_recepcion||'').localeCompare(a.fecha_recepcion||''));
+
+    document.getElementById('kpN').textContent    = rows.length;
+    document.getElementById('kpIns').textContent  = rows.filter(r => r.origen==='insumo').length;
+    document.getElementById('kpTal').textContent  = rows.filter(r => r.origen==='tallerista').length;
+    document.getElementById('kpSin').textContent  = rows.filter(r => !r.numero_factura).length;
+
+    const tb = document.getElementById('tb');
+    tb.innerHTML = rows.map(r => {
+      const badgeOrig = '<span class="badge ' + r.origen + '">' + (r.origen==='insumo'?'Insumo':'Tallerista') + '</span>';
+      const badgeFact = r.numero_factura
+        ? '<span class="badge ok">' + esc(r.numero_factura) + '</span>'
+        : '<span class="badge pend">SIN FACT.</span>';
+      return '<tr>' +
+        '<td>' + esc(fmtFecha(r.fecha_recepcion)) + '</td>' +
+        '<td>' + badgeOrig + '</td>' +
+        '<td>' + esc(r.remito||'') + '</td>' +
+        '<td class="cod">' + esc(r.cod_prov||'—') + '</td>' +
+        '<td>' + esc(r.nombre_prov||'') + '</td>' +
+        '<td class="cod">' + esc(r.cod_isis||'') + '</td>' +
+        '<td>' + esc(r.descripcion||'') + '</td>' +
+        '<td class="num">' + fmtNum(r.cantidad||0) + '</td>' +
+        '<td>' + esc(r.unidad||'') + '</td>' +
+        '<td>' + badgeFact + '</td>' +
+        '<td>' + esc(fmtFecha(r.fecha_factura)) + '</td>' +
+      '</tr>';
+    }).join('');
+    if (!rows.length) tb.innerHTML = '<tr><td colspan="11" style="padding:20px;text-align:center;color:#666">Sin recepciones para estos filtros.</td></tr>';
+  }
+
+  async function cargar(){
+    const { data, error } = await SB.schema('GP2').from('v_recepcion_unificada')
+      .select('*').order('fecha_recepcion', { ascending: false }).limit(2000);
+    if (error){ alert('Error cargando recepciones: ' + error.message); return; }
+    ROWS = data || [];
+    pinta();
+  }
+
+  // Filtros
+  document.getElementById('chOrigen').addEventListener('click', function(e){
+    const b = e.target.closest('.chip'); if (!b) return;
+    this.querySelectorAll('.chip').forEach(c => c.classList.remove('active'));
+    b.classList.add('active');
+    filt.origen = b.dataset.o; pinta();
+  });
+  document.getElementById('chFact').addEventListener('click', function(e){
+    const b = e.target.closest('.chip'); if (!b) return;
+    this.querySelectorAll('.chip').forEach(c => c.classList.remove('active'));
+    b.classList.add('active');
+    filt.fact = b.dataset.f; pinta();
+  });
+  document.getElementById('fDesde').addEventListener('change', function(){ filt.desde = this.value || null; pinta(); });
+  document.getElementById('fHasta').addEventListener('change', function(){ filt.hasta = this.value || null; pinta(); });
+  document.getElementById('q').addEventListener('input', function(){ filt.q = this.value; pinta(); });
+  document.getElementById('btnPrint').addEventListener('click', function(){ window.print(); });
+
+  cargar();
+})();
+</script>
+</body>
+</html>

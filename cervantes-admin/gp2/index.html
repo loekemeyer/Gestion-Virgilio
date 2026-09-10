@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Gestión Productiva</title>
+  <!-- PWA: esta pagina es el start_url del manifest. Redirige enseguida, asi que
+       no registra el SW (de eso se encargan GP2_MODULOS.html y login.html). -->
+  <link rel="manifest" href="manifest.json?v=20260829h">
+  <link rel="apple-touch-icon" href="apple-touch-icon.png?v=20260829j">
+  <meta name="theme-color" content="#ffffff">
+  <link rel="icon" type="image/png" href="GP2_favicon.png?v=1.2.0">
+  <!-- auth-guard trae el interruptor GP2_AUTH_ON. Aca no controla nada:
+       en esta pagina solo se usa para decidir a donde entrar. -->
+  <script src="auth-guard.js?v=20260904t"></script>
+  <script>
+    // Entry point.
+    (function () {
+      // Login apagado -> derecho al menu, sin pasar por login.
+      if (window.GP2_AUTH_ON === false) {
+        window.location.replace('GP2_MODULOS.html');
+        return;
+      }
+      if (sessionStorage.getItem('gp_auth') === 'ok') {
+        var role = sessionStorage.getItem('gp_role') || 'admin';
+        window.location.replace(role === 'envios' ? 'envios-only.html' : 'GP2_MODULOS.html');
+      } else {
+        window.location.replace('login.html');
+      }
+    })();
+  </script>
+</head>
+<body></body>
+</html>

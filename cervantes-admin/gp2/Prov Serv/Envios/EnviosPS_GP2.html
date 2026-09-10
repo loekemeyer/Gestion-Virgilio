@@ -1,0 +1,383 @@
+<!doctype html>
+<html lang="es">
+<head>
+<!-- v1.2.0 — la marca F se persiste en GP2.faltante_marcado (marcar/resolver_faltante, best-effort) -->
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Envío a Proveedores de Servicios · GP2</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="../../supabase-config.js?v=20260905k"></script>
+<link rel="stylesheet" href="../../gp2-modulo.css?v=20260903b"/>
+<link rel="stylesheet" href="../../tandas-popup.css?v=20260903b"/>
+<link rel="icon" type="image/png" href="../../GP2_favicon.png">
+<link rel="apple-touch-icon" href="../../GP2_favicon.png">
+</head>
+<body>
+
+<div class="card">
+  <div class="header">
+    <h1>Envío a Proveedores de Servicios</h1>
+    <div class="hbtns">
+      <button class="hlink hidden" id="btnVolver" type="button">← Cambiar proveedor</button>
+      <a href="../Control/ControlPS_GP2.html">Control</a>
+      <a href="../../GP2_MODULOS.html">Atrás</a>
+    </div>
+  </div>
+
+  <div class="steps">
+
+    <!-- FASE 0 — elegir proveedor -->
+    <div id="fase0">
+      <div class="row"><label class="lbl">Proveedor de Servicio</label></div>
+      <div class="provs-grid" id="psGrid"></div>
+      <div id="status" class="status">Cargando…</div>
+    </div>
+
+    <!-- FASE 1 — cargar cajones + kg neto -->
+    <div id="fase1" class="hidden">
+      <div class="row" style="justify-content:space-between">
+        <div class="row" style="margin:0">
+          <label class="lbl" id="fase1Title">Proveedor</label>
+        </div>
+        <div class="row" style="margin:0">
+          <label class="lbl" style="font-size:16px">Fecha</label>
+          <input type="date" id="fFecha">
+          <button class="btn btn-secondary" id="btnLimpiar" type="button" title="Vaciar todo lo cargado">🗑 Limpiar</button>
+          <button class="btn btn-primary" id="btnEnviar" type="button" disabled>Enviar</button>
+        </div>
+      </div>
+
+      <div class="search-box"><input type="text" id="q" placeholder="Buscar por SC, parte o descripción…"></div>
+
+      <div class="table-wrap">
+        <table class="t">
+          <thead><tr>
+            <th>SC</th>
+            <th class="num">Cajón<br>envío</th>
+            <th class="num">Cajón envío<br>KG Neto</th>
+            <th class="ctr" title="Cargar por tandas">T</th>
+            <th class="ctr" title="Marcar faltante">F</th>
+            <th class="sep">Parte</th>
+            <th class="num">Online PS<br>Cajón</th>
+            <th class="num">Online SP<br>Cajón</th>
+            <th class="num">Max<br>Cajón</th>
+            <th class="num" title="Máximo físico del Sector Procesado − online SP − online PS">Sugerido<br>Cajón</th>
+          </tr></thead>
+          <tbody id="tbody"></tbody>
+        </table>
+      </div>
+      <div id="tblEmpty" class="empty hidden">Este proveedor no tiene partes configuradas en ruta_paso.</div>
+      <div id="msg1" class="status"></div>
+    </div>
+
+    <!-- FASE 3 — confirmación -->
+    <div id="fase3" class="hidden">
+      <div class="successBox">
+        <div class="title">✓ Envío registrado</div>
+        <div>Tu código de envío:</div>
+        <div class="code" id="successCode">—</div>
+        <div id="successDetail" style="font-size:17px;color:#444"></div>
+      </div>
+      <div class="row" style="justify-content:center">
+        <button class="btn btn-primary" id="btnVolverPS" type="button">← Cambiar proveedor</button>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script src="../../tandas-popup.js?v=20260905i"></script>
+<script src="../../gp2-ui.js?v=20260905a"></script>
+<script src="../../gp2-numero.js?v=20260905m"></script>
+<script src="../../gp2-envios-common.js?v=20260905c"></script>
+<script>
+"use strict";
+
+var E = GP2EE;
+var $ = GP2UI.$, esc = GP2UI.esc, num = E.num, fmt = E.fmt, aCajones = E.aCajones, hoyISO = E.hoyISO;
+
+var SB = E.sb();
+
+var D = { ps:[], partes:{} };
+var selPS = null;      // {id,nombre,cod_prov,proceso}
+
+/* buffer por par (SC, SP): hay proveedores con el mismo SC en 2 filas con SP
+   distinto; con solo sc_id se pisan. (clave v2, ver keyDe) */
+var BUF = E.buffer("gp2_enviosPS_buffer2", function(){ return { caj:"", kg:"", falt:false, tandas:[] }; });
+/* La clave es SOLO la pieza que se envia. Antes era el par (SC, SP) y eso
+   hacia que una pieza con VARIAS salidas apareciera repetida: Maspoli recibe
+   una sola virola D13 y devuelve tres mangos distintos (PEP7, PC12, PEP8), asi
+   que la pantalla mostraba tres filas de la MISMA virola. No era solo feo: el
+   envio no usa el SP para nada (crear_envio_ps recibe unicamente p_comp_sc_id),
+   asi que cargar las tres filas registraba TRES envios de la misma virola.
+   En Entregas es al reves y ahi sigue por par: al recibir hay que decir cual de
+   los tres mangos devolvio (crear_entrega_ps si recibe p_comp_sp_id). */
+function keyDe(x){ return String(x.sc_id); }
+
+function esCargada(it){ return num(it.caj)>0 || num(it.kg)>0; }
+function tieneAlgo(it){ return esCargada(it) || it.falt; }
+
+/* ---------- carga ---------- */
+async function cargar(){
+  var r = await SB.rpc("envios_ps_bundle");
+  if (r.error){ $("status").textContent = "Error: "+r.error.message; return; }
+  D = r.data || { ps:[], partes:{} };
+  BUF.load();
+  renderPS();
+  $("status").textContent = (D.ps||[]).length + " proveedores con partes configuradas.";
+}
+
+function renderPS(){
+  E.gridContrapartes("psGrid", D.ps, {
+    vacio: "Sin proveedores configurados.",
+    meta: function(p){
+      // Cuenta PIEZAS A ENVIAR, no pares (pieza que entra, pieza que sale). A
+      // Maspoli se le manda UNA virola y devuelve tres mangos distintos: el
+      // boton decia "3 partes" cuando lo que se envia es una sola
+      // [usuario 2026-09-03: "en envio a Maspoli deberia aparecer 1 parte, lo
+      // que hace es entregar 3 partes"]. Misma correccion que ya se hizo en la
+      // tabla; esto era lo que faltaba.
+      var n = agruparPorSC((D.partes||{})[p.id]||[]).length;
+      var cargado = E.cargadasDe(BUF.all[p.id], tieneAlgo).length;
+      return esc(p.proceso||"—") + " · " + n + " partes" + (cargado? " · "+cargado+" cargadas":"");
+    },
+    onPick: elegirPS
+  });
+}
+
+function elegirPS(p){
+  selPS = p;
+  $("fase1Title").textContent = p.nombre + (p.proceso? " · "+p.proceso : "");
+  E.mostrarFase(1);
+  if (!$("fFecha").value) $("fFecha").value = hoyISO();
+  $("q").value = "";
+  renderTabla();
+}
+
+function volverPS(){
+  selPS = null;
+  E.mostrarFase(0);
+  renderPS();
+}
+
+/* ---------- tabla ---------- */
+function partesFiltradas(){
+  var arr = E.filtrar((D.partes||{})[selPS.id] || [], $("q").value, function(x){
+    return String(x.sc_cod||"")+" "+String(x.sc_desc||"")+" "+
+           String(x.sp_cod||"")+" "+String(x.sp_desc||"");
+  });
+  return agruparPorSC(arr);
+}
+
+/* Junta en UNA fila las salidas de la misma pieza enviada. Lo que se manda es
+   la pieza; que vuelva convertida en una cosa o en tres es asunto de la
+   entrega. El sugerido se SUMA (hay que mandar para las tres salidas) y el
+   online del SP tambien. */
+function agruparPorSC(arr){
+  var porSC = {}, orden = [];
+  arr.forEach(function(x){
+    var k = String(x.sc_id);
+    if (!porSC[k]) {
+      porSC[k] = Object.assign({}, x, { salidas: [] });
+      orden.push(k);
+    }
+    if (x.sp_id != null) porSC[k].salidas.push({
+      sp_id: x.sp_id, sp_cod: x.sp_cod, sp_desc: x.sp_desc,
+      sp_unixcaj: x.sp_unixcaj, online_sp: x.online_sp, maximo_sp: x.maximo_sp
+    });
+  });
+  return orden.map(function(k){ return porSC[k]; });
+}
+
+function renderTabla(){
+  var arr = partesFiltradas();
+  var tb = $("tbody");
+  tb.innerHTML = "";
+  $("tblEmpty").classList.toggle("hidden", arr.length>0);
+
+  arr.forEach(function(x){
+    var it = BUF.item(selPS.id, keyDe(x));
+    var t = E.tandaTotales(it, ["caj","kg"]);
+    var vCaj = t.hayT ? (t.tot.caj||"") : it.caj;
+    var vKg  = t.hayT ? (t.tot.kg ||"") : it.kg;
+
+    var onPS  = aCajones(x.online_ps, x.sc_unixcaj);
+    // maximo/maximo_sp llegan sin coalesce: null = dato faltante, no 0
+    var maxCaj= (x.maximo==null)    ? null : aCajones(x.maximo, x.sc_unixcaj);
+
+    // Sugerido a enviar = maximo FISICO del Sector Procesado - online SP - online PS
+    // (todo en cajones; regla usuario 2026-08-29). Sin maximo fisico cargado -> "—".
+    // Con varias salidas se SUMA una por una: hay que mandar para todas. Si a
+    // alguna le falta el maximo fisico, esa no aporta y el total queda corto,
+    // asi que se marca con "—" en vez de mentir un numero.
+    var sals  = x.salidas || [];
+    var onSP = 0, sug = 0, faltaDato = (onPS == null) || sals.length === 0;
+    sals.forEach(function(sp){
+      var o = aCajones(sp.online_sp, sp.sp_unixcaj);
+      var m = (sp.maximo_sp == null) ? null : aCajones(sp.maximo_sp, sp.sp_unixcaj);
+      if (o == null || m == null) { faltaDato = true; return; }
+      onSP += o;
+      sug  += Math.max(0, m - o - onPS);
+    });
+    if (faltaDato) { onSP = null; sug = null; }
+
+    var tr = document.createElement("tr");
+    tr.dataset.k = keyDe(x);
+    if (it.falt) tr.className = "falt";
+    tr.innerHTML =
+      '<td><span class="cod">'+esc(x.sc_cod)+'</span><br><small style="color:#777">'+esc(x.sc_desc||"")+'</small></td>'+
+      E.tdInput("caj", vCaj, t.hayT)+
+      E.tdInput("kg",  vKg,  t.hayT, null, "decimal")+
+      E.tdTanda(it)+
+      E.tdFalt(it)+
+      '<td class="sep">'+((x.salidas||[]).length
+          ? (x.salidas||[]).map(function(sp){
+              return esc(sp.sp_cod)+'<br><small style="color:#777">'+esc(sp.sp_desc||"")+'</small>';
+            }).join('<br>')
+          : "—")+'</td>'+
+      '<td class="num">'+(onPS==null?"—":fmt(onPS))+'</td>'+
+      '<td class="num">'+(onSP==null?"—":fmt(onSP))+'</td>'+
+      '<td class="num">'+(maxCaj==null?"—":fmt(maxCaj))+'</td>'+
+      '<td class="num">'+(sug==null?"—":(sug>0?'<b style="color:#b42318">'+fmt(sug)+'</b>':fmt(sug)))+'</td>';
+    tb.appendChild(tr);
+  });
+
+  actualizarEnviar();
+}
+
+function itemDeFila(tr){
+  var k = tr.dataset.k;
+  var meta = E.buscarMeta((D.partes||{})[selPS.id] || [], k, keyDe);
+  return { k:k, meta:meta, buf:BUF.item(selPS.id, k) };
+}
+
+function cargadas(){ return E.cargadasDe(BUF.de(selPS.id), esCargada); }
+
+function actualizarEnviar(){ E.actualizarEnviar(cargadas().length, "Enviar"); }
+
+/* ---------- eventos de la tabla (delegación) ---------- */
+$("tbody").addEventListener("input", function(e){
+  var inp = e.target.closest("input.cell-in");
+  if (!inp || inp.readOnly) return;
+  var d = itemDeFila(inp.closest("tr"));
+  d.buf[inp.dataset.f] = inp.value;
+  BUF.save();
+  actualizarEnviar();
+});
+
+$("tbody").addEventListener("click", function(e){
+  var btn = e.target.closest("button[data-a]");
+  if (!btn) return;
+  var d = itemDeFila(btn.closest("tr"));
+
+  if (btn.dataset.a === "falt"){
+    d.buf.falt = !d.buf.falt;
+    BUF.save();
+    // ademas del buffer, la F se persiste en GP2.faltante_marcado (best-effort).
+    // El componente faltante es el SC (lo crudo que habia que mandar al PS).
+    var scId = d.meta ? d.meta.sc_id : String(d.k).split(":")[0];
+    E.persistirFalt(SB, d.buf.falt, scId, "envios_ps", "Envio a "+selPS.nombre);
+    renderTabla();
+    return;
+  }
+
+  if (btn.dataset.a === "tandas"){
+    E.abrirTandas({
+      titulo: "Tandas — " + (d.meta ? d.meta.sc_cod : ""),
+      buf: d.buf,
+      campos: ["caj","kg"],
+      onDone: function(){ BUF.save(); renderTabla(); }
+    });
+  }
+});
+
+$("q").addEventListener("input", renderTabla);
+
+$("btnLimpiar").addEventListener("click", function(){
+  if (!selPS) return;
+  if (!confirm("¿Vaciar todo lo cargado para "+selPS.nombre+"?")) return;
+  BUF.borrar(selPS.id);
+  renderTabla();
+});
+
+$("btnVolver").addEventListener("click", volverPS);
+$("btnVolverPS").addEventListener("click", volverPS);
+
+/* ---------- enviar ---------- */
+$("btnEnviar").addEventListener("click", async function(){
+  if (!selPS) return;
+  var items = cargadas();
+  if (!items.length) return;
+
+  var arr = (D.partes||{})[selPS.id] || [];
+  var metaPorK = {};
+  arr.forEach(function(x){ metaPorK[keyDe(x)] = x; });
+
+  // el kg neto es obligatorio cuando se declararon cajones
+  var faltanKg = items.filter(function(o){ return num(o.it.caj)>0 && !(num(o.it.kg)>0); })
+                      .map(function(o){ return (metaPorK[o.k]||{}).sc_cod || o.k; });
+  if (faltanKg.length){
+    alert("Falta cargar Kg neto para: " + faltanKg.join(", "));
+    return;
+  }
+
+  var resumen = items.map(function(o){
+    var m = metaPorK[o.k] || {};
+    return (m.sc_cod||o.k)+": "+fmt(num(o.it.caj),1)+" caj / "+fmt(num(o.it.kg),0)+" kg";
+  }).join("\n");
+  if (!confirm("Enviar a "+selPS.nombre+":\n\n"+resumen)) return;
+
+  var fecha = $("fFecha").value || hoyISO();
+  var btn = $("btnEnviar");
+  btn.disabled = true; btn.textContent = "Enviando…";
+  $("msg1").textContent = "";
+
+  var res = await E.guardarItems(items, {
+    rpc: function(o){
+      var m = metaPorK[o.k] || {};
+      return SB.rpc("crear_envio_ps", {
+        p_ps_id: selPS.id,
+        p_comp_sc_id: Number(m.sc_id != null ? m.sc_id : String(o.k).split(":")[0]),
+        p_cantidad: num(o.it.kg),
+        p_unidad: "kg",
+        p_fecha: fecha,
+        p_cajones: num(o.it.caj) || null,
+        p_faltante: !!o.it.falt
+      });
+    },
+    // ya quedo registrado en la BD: fuera del buffer YA (si otro item falla
+    // y se reintenta Enviar, este no se manda de nuevo)
+    onOk: function(o){ delete BUF.de(selPS.id)[o.k]; BUF.save(); },
+    codDe: function(o){ return (metaPorK[o.k]||{}).sc_cod || o.k; }
+  });
+
+  btn.disabled = false;
+
+  if (res.errs.length){
+    renderTabla(); // limpia de la tabla los items ya registrados; quedan solo los que fallaron
+    $("msg1").innerHTML = '<span style="color:#b91c1c">Se registraron '+res.ok+' de '+items.length+
+      '. Errores:<br>'+esc(res.errs.join(" | "))+'</span>';
+    return;
+  }
+  actualizarEnviar();
+
+  // conservar las marcas F sin cantidad (no viajan a la BD, que no se pierdan en silencio)
+  var b2 = BUF.de(selPS.id), faltSolo = 0;
+  Object.keys(b2).forEach(function(k){
+    var it2 = b2[k];
+    if (it2.falt && !esCargada(it2)) faltSolo++;
+    else delete b2[k];
+  });
+  if (!faltSolo) delete BUF.all[selPS.id];
+  BUF.save();
+
+  E.mostrarExito(res.ok + " partes enviadas a " + selPS.nombre + " · " + fecha +
+    (faltSolo ? " · OJO: "+faltSolo+" marca(s) F sin cantidad NO se registran (siguen cargadas)" : ""));
+});
+
+/* ---------- boot ---------- */
+$("fFecha").value = hoyISO();
+cargar().catch(function(e){ $("status").textContent = "Error: "+(e && e.message ? e.message : e); });
+</script>
+</body>
+</html>

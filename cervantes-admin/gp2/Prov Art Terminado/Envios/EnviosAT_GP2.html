@@ -1,0 +1,184 @@
+<!doctype html>
+<html lang="es">
+<head>
+<!-- v1.0.1 — Envio de carton y cajas a los Prov de Articulo Terminado (cartones en paquetes de 250) -->
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Envío Cartón/Cajas · Prov AT · GP2</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="../../supabase-config.js?v=20260905k"></script>
+<script src="../../gp2-ui.js?v=20260905a"></script>
+<script src="../../gp2-numero.js?v=20260905m"></script>
+<link rel="stylesheet" href="../../gp2-modulo.css?v=20260903b"/>
+<link rel="icon" type="image/png" href="../../GP2_favicon.png">
+<link rel="apple-touch-icon" href="../../GP2_favicon.png">
+<style>
+  .provs{display:flex;gap:8px;flex-wrap:wrap;margin:10px 0}
+  .prov-btn{padding:10px 16px;border-radius:10px;border:2px solid #d0d7de;background:#fff;font-weight:800;cursor:pointer;font-size:17px;color:#111}
+  .prov-btn.active{background:#111;color:#fff;border-color:#111}
+  .items{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:10px;margin:12px 0}
+  .item-btn{padding:14px 8px;background:#fff;border:2px solid #d0d7de;border-radius:10px;cursor:pointer;text-align:center}
+  .item-btn:hover{border-color:#111}
+  .item-btn .code{display:block;font-size:20px;font-weight:800;color:#0066cc}
+  .item-btn .desc{display:block;font-size:14px;color:#333;margin-top:4px;overflow-wrap:anywhere}
+  .item-btn .stk{display:block;font-size:13px;color:#0a7a2f;font-weight:700;margin-top:4px}
+  .item-btn .env{display:block;font-size:12px;color:#555;margin-top:2px}
+  .popup{position:fixed;inset:0;background:rgba(0,0,0,.5);display:none;align-items:center;justify-content:center;z-index:200;padding:16px}
+  .popup.open{display:flex}
+  .pop-card{background:#fff;border-radius:14px;width:100%;max-width:440px;padding:22px}
+  .pop-card h3{font-size:22px;font-weight:800;margin-bottom:10px}
+  .pop-card .info{background:#f6f8fa;border-radius:8px;padding:10px;margin-bottom:12px;font-size:16px}
+  .pop-card input{width:100%;padding:12px;font-size:24px;text-align:center;border:2px solid #d0d7de;border-radius:8px}
+  .conv{font-size:17px;color:#0b3b73;font-weight:700;text-align:center;padding:6px 0;min-height:26px}
+  .pop-actions{display:flex;gap:10px;margin-top:10px}
+  .pop-actions button{flex:1;padding:12px;font-size:17px;font-weight:800;border-radius:8px;cursor:pointer;border:2px solid #d0d7de;background:#fff}
+  .pop-actions .ok{background:#111;color:#fff;border-color:#111}
+  .ult{margin-top:16px}
+  .ult table{width:100%}
+</style>
+</head>
+<body>
+
+<div class="card">
+  <div class="header">
+    <h1>Envío Cartón/Cajas · Prov AT</h1>
+    <div class="hbtns"><a href="../../GP2_MODULOS.html">Atrás</a></div>
+  </div>
+
+  <div class="steps">
+    <div class="row"><b style="font-size:18px">Proveedor de Artículo Terminado:</b></div>
+    <div class="provs" id="provs"></div>
+
+    <div id="zona" class="hidden">
+      <div class="search-box"><input type="text" id="q" placeholder="Buscar cartón o caja…"></div>
+      <div class="items" id="items"></div>
+    </div>
+
+    <div class="ult">
+      <h2 style="font-size:18px;margin:14px 0 6px">Últimos envíos</h2>
+      <div class="table-wrap"><table class="t">
+        <thead><tr><th>Fecha</th><th>Prov AT</th><th>Insumo</th><th style="text-align:right">Cantidad</th></tr></thead>
+        <tbody id="ultBody"></tbody>
+      </table></div>
+    </div>
+    <div id="status" class="status">Cargando…</div>
+  </div>
+</div>
+
+<div class="popup" id="popup">
+  <div class="pop-card">
+    <h3 id="popTitle"></h3>
+    <div class="info" id="popInfo"></div>
+    <input id="popQty" inputmode="numeric" placeholder="">
+    <div class="conv" id="popConv"></div>
+    <div class="pop-actions">
+      <button type="button" id="popCancel">Cancelar</button>
+      <button type="button" class="ok" id="popOk">Enviar</button>
+    </div>
+    <div id="popMsg" class="status"></div>
+  </div>
+</div>
+
+<script>
+var SB = GP2_SB();
+var $ = GP2UI.$;
+var esc = GP2UI.esc;   /* helper de la casa, gp2-ui.js (2026-09-05) */
+function fmt(n,d){ return GP2N.fmt(n, d==null?0:d); }   /* la regla de numero de la casa (gp2-numero.js) */
+
+var D={}, provSel=null, itemSel=null, PAQ=250;
+
+async function boot(){
+  var r=await SB.rpc('envios_prov_at_bundle');
+  if(r.error){ $('status').textContent='Error: '+r.error.message; return; }
+  D=r.data||{};
+  PAQ=Number(D.paq)||250;
+  var g=$('provs'); g.innerHTML='';
+  (D.provs||[]).forEach(function(p){
+    var b=document.createElement('button'); b.type='button'; b.className='prov-btn'; b.textContent=p.nombre;
+    b.addEventListener('click',function(){
+      provSel=p;
+      g.querySelectorAll('.prov-btn').forEach(x=>x.classList.remove('active'));
+      b.classList.add('active');
+      $('zona').classList.remove('hidden');
+      pintarItems();
+    });
+    g.appendChild(b);
+  });
+  pintarUltimos();
+  $('status').textContent='';
+}
+
+function onlineDe(provId, compId){
+  var f=(D.online_prov||[]).filter(function(x){ return x.prov_id===provId && x.comp_id===compId; })[0];
+  return f ? Number(f.cantidad) : 0;
+}
+
+function pintarItems(){
+  var q=($('q').value||'').trim().toLowerCase();
+  var g=$('items'); g.innerHTML='';
+  (D.insumos||[]).filter(function(i){
+    return !q || ((i.codigo||'')+' '+(i.descripcion||'')).toLowerCase().includes(q);
+  }).forEach(function(i){
+    var b=document.createElement('button'); b.type='button'; b.className='item-btn';
+    var esCarton = i.sector_id===10;
+    b.innerHTML='<span class="code">'+esc(i.codigo||'—')+'</span>'+
+      '<span class="desc">'+esc(i.descripcion||'')+'</span>'+
+      '<span class="stk">Stock: '+fmt(i.online)+' uni'+(esCarton?(' ('+fmt((i.online||0)/PAQ,2)+' paq)'):'')+'</span>'+
+      (provSel?('<span class="env">En '+esc(provSel.nombre)+': '+fmt(onlineDe(provSel.id, i.comp_id))+' uni</span>'):'');
+    b.addEventListener('click',function(){ abrirPopup(i); });
+    g.appendChild(b);
+  });
+}
+
+function abrirPopup(i){
+  itemSel=i;
+  var esCarton=i.sector_id===10;
+  $('popTitle').textContent=(i.codigo||'')+' — '+(i.descripcion||'');
+  $('popInfo').innerHTML='Para <b>'+esc(provSel.nombre)+'</b> · stock en '+esc(i.sector)+': <b>'+fmt(i.online)+' uni</b>'+
+    (esCarton?(' · los cartones van en <b>paquetes de '+PAQ+'</b>'):'');
+  $('popQty').value=''; $('popQty').placeholder = esCarton ? ('paquetes de '+PAQ) : 'unidades';
+  $('popConv').textContent=''; $('popMsg').textContent='';
+  $('popup').classList.add('open');
+  setTimeout(function(){ $('popQty').focus(); },50);
+}
+
+$('popQty').addEventListener('input', function(){
+  var v=GP2N.entero($('popQty').value);
+  var esCarton=itemSel&&itemSel.sector_id===10;
+  $('popConv').textContent = (esCarton&&v>0) ? ('= '+fmt(v*PAQ)+' unidades') : '';
+});
+$('popCancel').addEventListener('click', function(){ $('popup').classList.remove('open'); });
+$('popup').addEventListener('click', function(e){ if(e.target===$('popup')) $('popup').classList.remove('open'); });
+
+$('popOk').addEventListener('click', async function(){
+  var m=$('popMsg');
+  var v=GP2N.entero($('popQty').value);
+  if(v<=0){ m.className='status bad'; m.textContent='Ingresá una cantidad (> 0).'; return; }
+  var esCarton=itemSel.sector_id===10;
+  var uni = esCarton ? v*PAQ : v;
+  $('popOk').disabled=true;
+  try{
+    var r=await SB.rpc('crear_envio_prov_at',{ p_prov_at_id:provSel.id, p_comp_id:itemSel.comp_id, p_cantidad:uni, p_unidad:'uni', p_fecha:null });
+    if(r.error) throw r.error;
+    $('popup').classList.remove('open');
+    await boot();
+    if(provSel){ var chip=[...document.querySelectorAll('.prov-btn')].find(b=>b.textContent===provSel.nombre); if(chip) chip.click(); }
+    $('status').className='status ok';
+    $('status').textContent='✓ Enviado: '+(esCarton?(v+' paquetes = '+fmt(uni)+' uni'):(fmt(uni)+' uni'))+' de '+itemSel.codigo+' a '+provSel.nombre+'.';
+    setTimeout(function(){ $('status').textContent=''; $('status').className='status'; }, 6000);
+  }catch(e){ m.className='status bad'; m.textContent='Error: '+(e.message||e); }
+  finally{ $('popOk').disabled=false; }
+});
+
+function pintarUltimos(){
+  $('ultBody').innerHTML=(D.ultimos||[]).map(function(u){
+    return '<tr><td>'+new Date(u.fecha).toLocaleDateString('es-AR')+'</td><td>'+esc(u.prov)+'</td>'+
+      '<td>'+esc(u.comp)+'</td><td style="text-align:right">'+fmt(u.cantidad)+'</td></tr>';
+  }).join('') || '<tr><td colspan="4" style="color:#888">Sin envíos todavía.</td></tr>';
+}
+
+$('q').addEventListener('input', pintarItems);
+boot();
+</script>
+</body>
+</html>

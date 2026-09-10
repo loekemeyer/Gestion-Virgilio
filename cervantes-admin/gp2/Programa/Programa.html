@@ -1,0 +1,487 @@
+<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Loekemeyer · ¿Qué necesito para producir?</title>
+<style>
+ *{box-sizing:border-box}
+ body{margin:0;background:#ebeff4;color:#385475;font:13px/1.4 -apple-system,Segoe UI,Roboto,sans-serif}
+ .top{background:linear-gradient(90deg,#e7f0f8,#e7f0f8);padding:10px 16px;display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}
+ .top h1{margin:0;font-size:16px}
+ .top .sel{display:flex;gap:8px;align-items:center;font-size:13px;flex-wrap:wrap}
+ /* letra grande (regla de accesibilidad: minimo 18px en campos de carga) */
+ .top select,.top input{background:#eaeff6;color:#385475;border:1px solid #cddaea;border-radius:6px;padding:6px 10px;font-size:18px;font-family:inherit}
+ .top input{width:110px}
+ .top select{max-width:70vw}
+ .canvas{padding:14px;overflow-x:auto;min-height:calc(100vh - 50px)}
+ .hero{background:linear-gradient(135deg,#f8eee7,#f8ede7);border:1px solid #eadbcd;border-radius:12px;padding:12px 16px;margin-bottom:14px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px}
+ .hero .cod{font-size:28px;font-weight:800;color:#985716}
+ .hero .fam{font-size:14px;color:#8e4c20}
+ .hero .kpi{background:rgba(0,0,0,.25);border-radius:8px;padding:6px 10px;font-size:11px;color:#865e27}
+ .hero .kpi b{color:#985716;font-size:14px;margin-right:3px}
+ .section-title{font-size:11px;text-transform:uppercase;letter-spacing:.6px;color:#475569;margin:16px 0 8px}
+ .lane{background:#ebf0f5;border:1px solid #d1dae6;border-radius:10px;padding:10px;margin-bottom:8px}
+ .lane.conv{border-color:#d8cdea;background:#edebf5}
+ .lane .head{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;font-size:12px;color:#475569;flex-wrap:wrap;gap:8px}
+ .lane .head b{color:#385775}
+ .lane .head .fkg{background:#f6f2ea;color:#985716;padding:2px 10px;border-radius:10px;font-weight:800;font-size:12px}
+ .flow{display:flex;gap:0;align-items:stretch;flex-wrap:nowrap;padding-bottom:4px;overflow-x:auto}
+ .flow.branch{margin-bottom:6px;padding-left:0}
+ .branch-lbl{font-size:10px;color:#4f1698;text-transform:uppercase;letter-spacing:.5px;font-weight:700;margin:6px 0 2px;padding-left:2px}
+ .converge-bar{display:flex;align-items:center;gap:8px;margin:6px 0;color:#4f1698;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px}
+ .converge-bar .line{flex:1;height:1px;background:linear-gradient(90deg,transparent,#eee9f6,transparent)}
+ .node{background:#eaeff6;border:1px solid #d2d9e5;border-radius:7px;padding:6px 9px;min-width:110px;max-width:220px;display:flex;flex-direction:column;justify-content:center;flex-shrink:0}
+ .node .tp{font-size:9px;text-transform:uppercase;letter-spacing:.4px;color:#475569;font-weight:700}
+ .node .nm{font-size:12px;font-weight:700;margin-top:1px;font-family:ui-monospace,SF Mono,monospace}
+ .node .ex{font-size:10px;color:#475569;margin-top:1px}
+ .node .rend{font-size:10px;color:#92611b;margin-top:2px;font-weight:600}
+ .node .qty{font-size:10px;color:#166398;font-weight:700;background:#eaeff5;padding:1px 6px;border-radius:6px;margin-top:3px;align-self:flex-start}
+ .node.n-sector{border-style:dashed;border-width:2px;min-width:120px}
+ .node.n-sector .tp{font-size:10px}
+ .node.n-sector .nm{font-size:14px;letter-spacing:.6px}
+ .node .kg{font-size:10px;color:#985716;font-weight:800;background:#f6f2ea;padding:1px 6px;border-radius:6px;margin-top:3px;align-self:flex-start}
+ .arr{color:#3a5068;font-size:20px;padding:0 4px;align-self:center;user-select:none;flex-shrink:0}
+ .arr.plus{color:#4f1698;font-size:18px;font-weight:700}
+ .n-fleje{background:#e9eff7;border-color:#cddbea}.n-fleje .tp,.n-fleje .nm{color:#165d98}
+ .n-matriz{background:#f5f0ea;border-color:#eadecd}.n-matriz .tp,.n-matriz .nm{color:#92611b}
+ .n-crudo{background:#eaf5ef;border-color:#cde9d9}.n-crudo .tp,.n-crudo .nm{color:#258858}
+ .n-prov{background:#efecf4;border-color:#d8cdea}.n-prov .tp,.n-prov .nm{color:#4f1698}
+ .n-proc{background:#f4ebef;border-color:#eacdda}.n-proc .tp,.n-proc .nm{color:#981645}
+ .n-tall{background:#ebf4f2;border-color:#cdeae2}.n-tall .tp,.n-tall .nm{color:#1c917b}
+ .n-afil{background:#f4ecf2;border-color:#eacde1}.n-afil .tp,.n-afil .nm{color:#981679}
+ .n-virg{background:#f8eee7;border-color:#eadbcd}.n-virg .tp,.n-virg .nm{color:#985716}
+ .n-insu{background:#f5eeea;border-color:#eadbcd}.n-insu .tp,.n-insu .nm{color:#8e4c20}
+ .n-sub{background:#efeaf5;border-color:#d8cdea}.n-sub .tp,.n-sub .nm{color:#4f1698}
+ .n-tr{background:#ededf2;border-color:#d5d5e2}.n-tr .tp,.n-tr .nm{color:#363678}
+ .flejes-total{background:#f5f0ea;border:1px solid #eadecd;border-radius:10px;padding:10px 14px;margin-top:14px}
+ .flejes-total h3{margin:0 0 8px;color:#92611b;font-size:12px;text-transform:uppercase;letter-spacing:.5px}
+ .fleje-row{display:flex;justify-content:space-between;padding:5px 0;font-size:12px;border-bottom:1px solid #e9e0ce}
+ .fleje-row:last-child{border-bottom:0}
+ .fleje-row .fname{color:#92611b;font-weight:600}
+ .fleje-row .fkg{color:#985716;font-weight:800;background:#f6f2ea;padding:2px 10px;border-radius:10px}
+</style><link rel="icon" type="image/png" href="../GP2_favicon.png">
+<link rel="apple-touch-icon" href="../GP2_favicon.png">
+<link rel="stylesheet" href="../gp2-claro.css?v=20260903b">
+</head>
+<body>
+<div id="gp2-logobar" style="position:relative;background:#e8edf7;text-align:center;padding:6px 0;border-bottom:1px solid #d0dae7"><a href="../GP2_MODULOS.html" style="position:absolute;left:10px;top:50%;transform:translateY(-50%);color:#385475;text-decoration:none;font-weight:700;font-size:15px;padding:5px 10px;border:1px solid #d1d9e5;border-radius:8px;background:#e9eef7">← Atrás</a><a href="../GP2_MODULOS.html" style="text-decoration:none"><img src="../GP2_logo.png" alt="GP2 · Gestión Productiva" style="height:40px;vertical-align:middle"></a></div>
+
+<div class="top">
+ <h1>🏭 Loekemeyer · ¿Qué necesito para producir?</h1>
+ <div class="sel">
+  Artículo <select id="art"></select>
+  Unidades <input inputmode="numeric" id="uni" type="number" value="1000" min="1">
+  <span id="tallAltBox" style="display:none">Tallerista <select id="tallAlt"></select></span>
+ </div>
+</div>
+<div class="canvas" id="canvas"></div>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="../supabase-config.js?v=20260905k"></script>
+<script src="../gp2-ui.js?v=20260905a"></script>
+<script src="../gp2-numero.js?v=20260905m"></script>
+<script>var D={};
+
+var SB=GP2_SB();
+function __run(){
+var esc = GP2UI.esc;   /* helper de la casa, gp2-ui.js (2026-09-05) */
+function sName(sid){var s=D.sect[String(sid)];return s?s.t:"?"}
+var SECT2CLS={"crudo":"crudo","procesado":"proc","movimiento":"tr","afilado":"afil","fleje":"fleje","plástico":"insu","bombilla":"insu","remache":"insu","garage":"sub","cartón":"insu","caja":"insu","terminado":"virg"};
+function sCls(sid){return SECT2CLS[sName(sid)]||"crudo"}
+function cById(cid){return D.comp[String(cid)]||{cod:"?",d:"",s:null}}
+function fmt(n){if(n==null||isNaN(n))return "?";n=Number(n);return GP2N.fmt(n, n>=100?0:n>=10?1:n>=1?2:3, null, true);}   /* la regla de numero de la casa; decimales segun magnitud */
+
+// Defensive: ordenar rp por 'orden' aunque en Excel esté fuera de orden físico
+for(var _rid in D.rp)D.rp[_rid].sort(function(a,b){return a.o-b.o;});
+var sel=document.getElementById("art");
+D.art.slice().sort(function(a,b){return (parseInt(a.cod)||9999)-(parseInt(b.cod)||9999);}).forEach(function(a){
+ var o=document.createElement("option");o.value=a.id;o.textContent=a.cod+"  —  "+a.fam;sel.appendChild(o);
+});
+
+function expandBOM(aid){
+ var need={};
+ var bom=D.bom.filter(function(b){return b.a===aid;});
+ // vis por rama: corta ciclos en componente_bom (padre->hijo->padre) sin romper diamantes (mismo patron que Faltantes)
+ function add(cid,q,vis){if(vis[cid])return;var v=Object.assign({},vis);v[cid]=1;need[cid]=(need[cid]||0)+q;var subs=D.children[String(cid)]||[];subs.forEach(function(s){add(s.c,q*s.q,v);});}
+ bom.forEach(function(b){add(b.c,b.q,{});});
+ return {need:need,bom:bom};
+}
+
+function node(tp,cls,nm,ex,extra,qty,kg){
+ var h='<div class="node n-'+cls+'">';
+ h+='<div class="tp">'+esc(tp)+'</div>';
+ h+='<div class="nm">'+esc(nm)+'</div>';
+ if(ex)h+='<div class="ex">'+esc(ex)+'</div>';
+ if(extra)h+='<div class="rend">'+esc(extra)+'</div>';
+ if(qty!=null)h+='<div class="qty">× '+fmt(qty)+'</div>';
+ if(kg!=null)h+='<div class="kg">'+fmt(kg)+' kg</div>';
+ h+='</div>';
+ return h;
+}
+function sectorNode(sec,cod,qty){
+ var cls=SECT2CLS[sec]||'crudo';
+ var h='<div class="node n-'+cls+' n-sector">';
+ h+='<div class="tp">📦 Sector</div>';
+ h+='<div class="nm">'+esc(sec.toUpperCase())+'</div>';
+ if(cod)h+='<div class="ex">stock '+esc(cod)+'</div>';
+ if(qty!=null)h+='<div class="qty">× '+fmt(qty)+'</div>';
+ h+='</div>';
+ return h;
+}
+
+function pasoNode(p,need,uni){
+ var tp="",cls="",nm="",ex="",extra="";
+ var ce=cById(p.ce), cs=cById(p.cs);
+ if(p.tp==="matriz"){var mx=D.mat[String(p.m)]||{};tp="MATRIZ N°"+mx.n;cls="matriz";nm=cs.cod||"?";ex=(cs.d||mx.d||"");if(mx.r)extra="⚙️ "+mx.r+" uni/kg";}
+ else if(p.tp==="proveedor_servicio"){var px=D.prov[String(p.pr)]||{};tp="PROV "+(px.n||"?");cls="prov";nm=cs.cod||ce.cod||"?";ex=(px.p||"")+(cs.cod?(" · "+cs.cod):"");}
+ else if(p.tp==="tallerista"){var tx=D.tall[String(p.ta)]||"(sin asignar)";tp="TALLERISTA";cls="tall";nm=tx.trim();ex=(ce.cod||"")+" → "+(cs.cod||"?");}
+ else if(p.tp==="afilado"){tp="AFILADO";cls="afil";nm="Afilar";ex=(ce.cod||"")+" → "+(cs.cod||"?");}
+ else if(p.tp==="virgilio"){tp="VIRGILIO";cls="virg";nm="Distribución";ex="centro";}
+ else return "";
+ // Nodo matriz/prov/tallerista SIN qty (no son componentes)
+ var out=node(tp,cls,nm,ex,extra,null,null);
+ if(p.cs && p.tp!=='virgilio' && p.tp!=='tallerista'){
+  var csComp=cById(p.cs);var sn=sName(csComp.s);
+  if(sn && sn!=='terminado' && sn!=='fleje' && sn!=='?'){
+   // Solo el nodo sector lleva qty (fallback 1:1 con uni si no hay explícita)
+   var pq=(need[p.cs]?need[p.cs]*uni:uni);
+   out+='<span class="arr">→</span>'+sectorNode(sn,csComp.cod,pq);
+  }
+ }
+ return out;
+}
+
+function renderStandaloneLane(r,pasos,fl,need,uni,flejesTotal){
+ var qty=0, cs_final=null;
+ for(var i=pasos.length-1;i>=0;i--){var p=pasos[i];if(p.cs && need[p.cs]){cs_final=p.cs;qty=need[p.cs]*uni;break;}}
+ if(!cs_final){for(var i=pasos.length-1;i>=0;i--){if(pasos[i].cs){cs_final=pasos[i].cs;break;}}}
+ var mat0=null;
+ for(var i=0;i<pasos.length;i++){if(pasos[i].tp==="matriz"){mat0=D.mat[String(pasos[i].m)];break;}}
+ var rend=mat0?mat0.r:null;
+ var kg=(rend && qty)?qty/rend:0;
+ if(kg){flejesTotal[r.f]=(flejesTotal[r.f]||0)+kg;}
+ // fleje ahora es un componente que ingresa (ce del primer paso ingreso)
+ var flComp=null;
+ for(var i=0;i<pasos.length;i++){if(pasos[i].tp==="ingreso" && pasos[i].ce){flComp=cById(pasos[i].ce);break;}}
+ if(!flComp)flComp=cById(r.f);
+ var cs_desc = cs_final ? (" → "+cById(cs_final).cod+" ("+(cById(cs_final).d||"")+")") : "";
+ var H='<div class="lane"><div class="head"><b>'+esc((flComp.cod||"?")+' · '+(flComp.d||"")+cs_desc)+'</b>'+
+    (kg?'<span class="fkg">'+fmt(kg)+' kg fleje</span>':(qty?'<span style="color:#475569">sin rendimiento</span>':""))+
+    '</div><div class="flow">';
+ H+=node("INSUMO","fleje",flComp.cod||"?",flComp.d||"",rend?rend+" uni/kg":"",null,kg||null);
+ pasos.forEach(function(p){
+  if((p.tp==="fleje"||p.tp==="ingreso"))return;
+  H+='<span class="arr">→</span>'+pasoNode(p,need,uni);
+ });
+ H+='</div></div>';
+ return H;
+}
+
+function renderConvergenceLane(padre_id,ruta_list,need,uni,flejesTotal,aid){
+ var pc=cById(padre_id);
+ var hijos=D.children[String(padre_id)]||[];
+ // Identificar paso de convergencia (matriz o tallerista que arma padre) desde primera ruta que lo tenga
+ var convPaso=null, postPasos=null;
+ ruta_list.forEach(function(r){
+  if(convPaso)return;
+  var pasos=D.rp[String(r.id)]||[];
+  for(var i=0;i<pasos.length;i++){
+   if(pasos[i].cs===padre_id){convPaso=pasos[i];postPasos=pasos.slice(i+1);break;}
+  }
+ });
+
+ var qty_padre=need[padre_id]?need[padre_id]*uni:0;
+ if(!qty_padre && postPasos){
+  for(var pi=0;pi<postPasos.length;pi++){
+   var pc2=postPasos[pi].cs;
+   if(pc2 && need[pc2]){qty_padre=need[pc2]*uni;break;}
+  }
+ }
+ var H='<div class="lane conv"><div class="head"><b>🔀 Convergencia · '+esc(pc.cod+' · '+(pc.d||""))+'</b>'+
+    '<span style="color:#166398">× '+fmt(qty_padre)+' u</span></div>';
+
+ // Loop puro por hijos del componente_bom
+ var brN=0;
+ var usedRutas={};
+ hijos.forEach(function(h){
+  brN++;
+  var hc=cById(h.c);
+  var qty_hijo=qty_padre*(h.q||1);
+  // Buscar ruta productiva del articulo cuyo cs sea este hijo
+  var rutas_art=(D.rutas_by_art[String(aid)]||[]).filter(function(x){return x.f && !usedRutas[x.id];});
+  var matchRuta=null, matchIdx=-1;
+  for(var ri=0;ri<rutas_art.length;ri++){
+   var rr=rutas_art[ri]; var pps=D.rp[String(rr.id)]||[];
+   // buscar ÚLTIMO cs=h.c (incluye pasos intermedios que "pasan" el componente)
+   var lastMatch=-1;
+   for(var pi=0;pi<pps.length;pi++){if(pps[pi].cs===h.c)lastMatch=pi;}
+   if(lastMatch>=0){matchRuta=rr;matchIdx=lastMatch;break;}
+  }
+  if(matchRuta){
+   usedRutas[matchRuta.id]=1;
+   var pps=D.rp[String(matchRuta.id)]||[];
+   var prePasos=pps.slice(0,matchIdx+1);
+   var flComp2=null;
+   for(var i=0;i<prePasos.length;i++){if(prePasos[i].tp==="ingreso" && prePasos[i].ce){flComp2=cById(prePasos[i].ce);break;}}
+   if(!flComp2)flComp2=cById(matchRuta.f);
+   var mat0=null;
+   for(var i=0;i<prePasos.length;i++){if(prePasos[i].tp==="matriz"){mat0=D.mat[String(prePasos[i].m)];break;}}
+   var rend=mat0?mat0.r:null;
+   var kg=(rend && qty_hijo)?qty_hijo/rend:0;
+   if(kg){flejesTotal[matchRuta.f]=(flejesTotal[matchRuta.f]||0)+kg;}
+   var mergedNeed=Object.assign({},need);mergedNeed[h.c]=qty_hijo/uni;
+   var pasosNoFleje=prePasos.filter(function(p){return p.tp!=='fleje'&&p.tp!=='ingreso';});
+   // Si el "productor" es el mismo componente y no hay pasos productivos, solo mostrar el insumo (evita duplicado)
+   if(pasosNoFleje.length===0 && flComp2.id===hc.id){
+    H+='<div class="branch-lbl">Rama '+brN+' — Insumo '+esc(hc.cod||'?')+' · × '+fmt(qty_hijo)+' u</div>';
+    H+='<div class="flow branch">';
+    H+=node("INSUMO",sCls(hc.s),hc.cod||"?",hc.d||"","",qty_hijo,null);
+    H+='</div>';
+   } else {
+    H+='<div class="branch-lbl">Rama '+brN+' — '+esc((flComp2.cod||"?")+' produce '+hc.cod)+(kg?' · '+fmt(kg)+' kg fleje':'')+'</div>';
+    H+='<div class="flow branch">';
+    H+=node("INSUMO","fleje",flComp2.cod||"?",flComp2.d||"",rend?rend+" uni/kg":"",null,kg||null);
+    pasosNoFleje.forEach(function(p){
+     H+='<span class="arr">→</span>'+pasoNode(p,mergedNeed,uni);
+    });
+    if(pasosNoFleje.length===0){
+     var _sn=sName(hc.s);
+     H+='<span class="arr">→</span>'+node("COMPONENTE",sCls(hc.s),hc.cod,hc.d||"","",qty_hijo,null);
+     if(_sn && _sn!=='terminado' && _sn!=='fleje' && _sn!=='?'){
+      H+='<span class="arr">→</span>'+sectorNode(_sn,hc.cod,qty_hijo);
+     }
+    }
+    H+='</div>';
+   }
+   return;
+  }
+  // Fallback: insumo
+  var sn=sName(hc.s);
+  H+='<div class="branch-lbl">Rama '+brN+' — Insumo '+esc((hc.cod||'?')+' ('+sn+')')+' · × '+fmt(qty_hijo)+' u</div>';
+  H+='<div class="flow branch">';
+  H+=node("INSUMO",sCls(hc.s),hc.cod||"?",hc.d||"","",qty_hijo,null);
+  if(sn && sn!=='terminado' && sn!=='fleje' && sn!=='?'){
+   H+='<span class="arr">→</span>'+sectorNode(sn,hc.cod,qty_hijo);
+  }
+  H+='</div>';
+ });
+ // barra de convergencia
+ H+='<div class="converge-bar"><span class="line"></span>↓ Convergencia ↓<span class="line"></span></div>';
+ // paso conv + post
+ H+='<div class="flow">';
+ // convergencia node muestra padre como resultado
+ var mx=D.mat[String(convPaso.m)]||{};
+ var extra=mx.r?"⚙️ "+mx.r+" uni/kg":"";
+ var convTp,convCls,convNm,convEx;
+ if(convPaso.tp==="matriz"){convTp="MATRIZ N°"+mx.n;convCls="matriz";convNm=pc.cod;convEx=pc.d||"";}
+ else if(convPaso.tp==="tallerista"){var _tn=D.tall[String(convPaso.ta)]||"(sin asignar)";convTp="TALLERISTA";convCls="tall";convNm=(typeof _tn==='string'?_tn.trim():_tn.n||"?");convEx=pc.cod+" · "+(pc.d||"");}
+ else if(convPaso.tp==="proveedor_servicio"){var _px=D.prov[String(convPaso.pr)]||{};convTp="PROV "+(_px.n||"?");convCls="prov";convNm=pc.cod;convEx=(_px.p||"")+" · "+(pc.d||"");}
+ else {convTp=convPaso.tp.toUpperCase();convCls="prov";convNm=pc.cod;convEx=pc.d||"";}
+ H+=node(convTp,convCls,convNm,convEx,extra,qty_padre,null);
+ var _snConv=sName(pc.s);
+ if(_snConv && _snConv!=='terminado' && _snConv!=='fleje' && _snConv!=='?'){
+  H+='<span class="arr">→</span>'+sectorNode(_snConv,pc.cod,qty_padre);
+ }
+ (postPasos||[]).forEach(function(p){
+  H+='<span class="arr">→</span>'+pasoNode(p,need,uni);
+ });
+ H+='</div></div>';
+ return H;
+}
+
+function render(){
+ var aid=GP2N.entero(sel.value);
+ var uni=Math.max(1,GP2N.num(document.getElementById("uni").value)||1);
+ var a=D.art.find(function(x){return x.id===aid;});
+ if(!a){document.getElementById("canvas").innerHTML='<div style="padding:20px">Artículo no encontrado</div>';return;}
+ var ex=expandBOM(aid);
+ var need=ex.need, bom=ex.bom;
+ var rutas=(D.rutas_by_art[String(aid)]||[]);
+ var talls=D.tall_art[String(aid)]||[];
+ // Selector tallerista alternativo: rellenar dropdown y filtrar rutas
+ var tallAltBox=document.getElementById('tallAltBox');
+ var tallAlt=document.getElementById('tallAlt');
+ // FIX aud4-p6: selector usa tallerista_id, nombre es solo label (evita bug de espacios "Pettofrezza Rafael ")
+ var nomToId={};Object.keys(D.tall).forEach(function(k){nomToId[(D.tall[k]||'').trim()]=parseInt(k);});
+ var tallsIds=talls.map(function(n){return nomToId[(n||'').trim()];}).filter(Boolean);
+ if(tallsIds.length>1){
+  tallAltBox.style.display='';
+  if(tallAlt.dataset.aid!==String(aid)){
+   tallAlt.innerHTML='';
+   tallsIds.forEach(function(tid){tallAlt.innerHTML+='<option value="'+tid+'">'+esc((D.tall[String(tid)]||'').trim())+'</option>';});
+   tallAlt.dataset.aid=String(aid);
+  }
+  var tallElegidoId=GP2N.entero(tallAlt.value);
+  rutas=rutas.filter(function(r){
+   var pasos=D.rp[String(r.id)]||[];
+   var tids=pasos.filter(function(p){return p.tp==='tallerista' && p.ta;}).map(function(p){return parseInt(p.ta);});
+   if(!tids.length)return true;
+   return tids.indexOf(tallElegidoId)>=0;
+  });
+  talls=[(D.tall[String(tallElegidoId)]||'').trim()];
+ } else {
+  tallAltBox.style.display='none';
+ }
+ var rutas_prod=rutas.filter(function(r){return r.f;});
+ var rutas_ins=rutas.filter(function(r){return !r.f;});
+ var flejesTotal={};
+
+ // Agrupar por convergencia: {padre_sub_id: [ruta,...]}
+ var convergences={}; // padre_id → [rutaObj]
+ var rutas_en_conv={}; // ruta.id → padre_id
+ rutas_prod.forEach(function(r){
+  var pasos=D.rp[String(r.id)]||[];
+  for(var i=0;i<pasos.length;i++){
+   var cs=pasos[i].cs;
+   if(cs && D.children[String(cs)]){
+    convergences[cs]=convergences[cs]||[];
+    convergences[cs].push(r);
+    rutas_en_conv[r.id]=cs;
+    break; // primera convergencia por ruta
+   }
+  }
+ });
+ // filtrar convergences: solo padres que aparecen en need (bom expandido) o cuya continuación aporta
+ // (todas quedan, ya que están en rutas del articulo)
+
+ var H='';
+ H+='<div class="hero">'+
+    '<div><div class="cod">'+esc(a.cod)+'</div><div class="fam">'+esc(a.fam)+'</div></div>'+
+    '<div style="display:flex;gap:8px;flex-wrap:wrap">'+
+      '<div class="kpi"><b>'+fmt(uni)+'</b>unidades a producir</div>'+
+      '<div class="kpi"><b>'+bom.length+'</b>partes BOM</div>'+
+      '<div class="kpi"><b>'+Object.keys(need).length+'</b>componentes totales</div>'+
+      '<div class="kpi"><b>'+rutas_prod.length+'</b>rutas de producción</div>'+
+      (talls.length?'<div class="kpi"><b>'+esc(talls.join(" O "))+'</b>ensambla (alternativas)</div>':"")+
+    '</div></div>';
+
+ // Marcar rutas que producen hijos de un sub-conjunto convergente (se consumen dentro de la convergencia)
+ var childrenOfConv={};
+ Object.keys(convergences).forEach(function(padre){
+  (D.children[padre]||[]).forEach(function(h){childrenOfConv[h.c]=parseInt(padre);});
+ });
+ rutas_prod.forEach(function(r){
+  if(rutas_en_conv[r.id])return;
+  var pasos=D.rp[String(r.id)]||[];
+  // último cs de la ruta
+  var lastCs=null;
+  for(var i=pasos.length-1;i>=0;i--){if(pasos[i].cs){lastCs=pasos[i].cs;break;}}
+  if(lastCs && childrenOfConv[lastCs]){rutas_en_conv[r.id]=childrenOfConv[lastCs];}
+ });
+
+ // Rutas standalone
+ var standalone=rutas_prod.filter(function(r){return !rutas_en_conv[r.id];});
+ if(standalone.length){
+  H+='<div class="section-title">1 · Partes que se fabrican en Cervantes ('+standalone.length+' rutas simples)</div>';
+  standalone.forEach(function(r){
+   var pasos=D.rp[String(r.id)]||[];
+   H+=renderStandaloneLane(r,pasos,{},need,uni,flejesTotal);
+  });
+ }
+ // Rutas con convergencia
+ var convKeys=Object.keys(convergences);
+ if(convKeys.length){
+  H+='<div class="section-title">2 · Convergencias · sub-conjuntos que unen 2+ rutas ('+convKeys.length+')</div>';
+  convKeys.forEach(function(padre){
+   H+=renderConvergenceLane(parseInt(padre),convergences[padre],need,uni,flejesTotal,aid);
+  });
+ }
+
+ // Sub-conjuntos NO cubiertos por rutas (BOM puro)
+ var subsCubiertos={};
+ convKeys.forEach(function(k){subsCubiertos[k]=1;});
+ var subKeys=Object.keys(D.children).filter(function(k){return need[parseInt(k)] && !subsCubiertos[k];});
+ if(subKeys.length){
+  H+='<div class="section-title">3 · Sub-conjuntos (BOM sin ruta explícita)</div>';
+  subKeys.forEach(function(k){
+   var pid=parseInt(k); var pc=cById(pid);
+   var pq=need[pid]*uni;
+   H+='<div class="lane"><div class="head"><b>'+esc(pc.cod+' · '+(pc.d||""))+'</b><span style="color:#166398">× '+fmt(pq)+' u</span></div><div class="flow">';
+   var hijos=D.children[k];
+   hijos.forEach(function(hh,i){
+    var hc=cById(hh.c);
+    var hq=hh.q*pq;
+    if(i>0)H+='<span class="arr plus">+</span>';
+    H+=node(sName(hc.s).toUpperCase(),sCls(hc.s),hc.cod,hc.d||"","",hq,null);
+   });
+   H+='<span class="arr">=</span>'+node(sName(pc.s).toUpperCase(),"sub",pc.cod,pc.d||"","sub-conjunto",pq,null);
+   H+='</div></div>';
+  });
+ }
+
+ if(rutas_ins.length){
+  H+='<div class="section-title">4 · Insumos comprados / transformados (entran al tallerista)</div>';
+  // FIX aud4-p7: agrupar por firma SIN tall → mostrar "Alex O Martin" en vez de dos líneas duplicadas
+  // FIX aud5-p3: agrupar talls por POSICIÓN/etapa, no juntar todos los talls de la ruta
+  var grupos={};
+  rutas_ins.forEach(function(r){
+   var pasos=D.rp[String(r.id)]||[];
+   var p0=pasos[0]||{}; var cidIni=p0.ce||p0.cs;
+   // Firma reemplaza cada tall por marcador de etapa: T_<orden>
+   var sigSinTall=cidIni+'|'+pasos.map(function(p,idx){return p.tp+':'+(p.pr||'')+':'+(p.ce||'')+':'+(p.cs||'')+(p.tp==='tallerista'?':T'+idx:'');}).join('>');
+   if(!grupos[sigSinTall])grupos[sigSinTall]={pasos:pasos,cidIni:cidIni,tallsPorPos:{}};
+   pasos.forEach(function(p,idx){
+    if(p.tp==='tallerista'&&p.ta){
+     var n=(D.tall[String(p.ta)]||'').trim();
+     grupos[sigSinTall].tallsPorPos[idx]=grupos[sigSinTall].tallsPorPos[idx]||[];
+     if(grupos[sigSinTall].tallsPorPos[idx].indexOf(n)<0)grupos[sigSinTall].tallsPorPos[idx].push(n);
+    }
+   });
+  });
+  Object.keys(grupos).forEach(function(k){
+   var g=grupos[k],pasos=g.pasos,cidIni=g.cidIni;
+   var comp=cById(cidIni);
+   var qFin=null,csFin=cidIni;
+   for(var ii=pasos.length-1;ii>=0;ii--){var pp=pasos[ii];if(pp.cs && need[pp.cs]){csFin=pp.cs;qFin=need[pp.cs]*uni;break;}}
+   if(qFin===null && need[cidIni])qFin=need[cidIni]*uni;
+   H+='<div class="lane" style="padding:6px 10px"><div class="head" style="margin-bottom:4px"><b>'+esc(comp.cod+' — '+(comp.d||""))+'</b>'+(qFin?'<span style="color:#166398">× '+fmt(qFin)+' u</span>':"")+'</div><div class="flow" style="align-items:center">';
+   H+=node("INSUMO",sCls(comp.s),comp.cod||"?",comp.d||"","",qFin,null);
+   pasos.forEach(function(p,idx){
+    if(idx===0)return;
+    if(p.tp==="proveedor_servicio"){
+     var pv=D.prov[String(p.pr)]||{n:"(sin prov)",p:""};
+     var csComp=cById(p.cs);
+     H+='<span class="arr">→</span>'+node("PROV.SERV.","prov",pv.n.trim(),pv.p||"","",qFin,null);
+     if(csComp)H+='<span class="arr">→</span>'+node((csComp.s?sName(csComp.s).toUpperCase():"COMP"),sCls(csComp.s),csComp.cod,csComp.d||"","",qFin,null);
+    }
+    else if(p.tp==="tallerista"){
+     var tallsEtapa=g.tallsPorPos[idx]||[(D.tall[String(p.ta)]||'').trim()];
+     var lbl=tallsEtapa.length>1?tallsEtapa.join(' O '):tallsEtapa[0];
+     H+='<span class="arr">→</span>'+node("TALLERISTA","tall",lbl,tallsEtapa.length>1?"(alternativas)":"","",qFin,null);
+    }
+    else if(p.tp==="virgilio"){H+='<span class="arr">→</span>'+node("VIRGILIO","virg","Distribución","artículo","",null,null);}
+   });
+   H+='</div></div>';
+  });
+ }
+
+ H+='<div class="section-title">5 · Convergencia final → Artículo → Virgilio</div>';
+ H+='<div class="lane"><div class="flow">';
+ if(talls.length){talls.forEach(function(t,i){H+=(i>0?'<span class="arr plus" style="color:#92611b">O</span>':"")+node("TALLERISTA","tall",t,"ensambla (alternativa)","",uni,null);});}
+ else H+=node("TALLERISTA","tall","(sin asignar)","tabla incompleta","",uni,null);
+ H+='<span class="arr">→</span>'+node("ARTÍCULO","virg",a.cod,a.fam+" terminado","",uni,null)+
+    '<span class="arr">→</span>'+node("VIRGILIO","virg","Distribución","centro logístico","",uni,null);
+ H+='</div></div>';
+
+
+ document.getElementById("canvas").innerHTML=H;
+}
+
+sel.addEventListener("change",function(){document.getElementById('tallAlt').dataset.aid='';render();});
+document.getElementById("uni").addEventListener("input",render);
+document.getElementById("tallAlt").addEventListener("change",render);
+var a501=D.art.find(function(a){return a.cod==="501";});
+sel.value=a501?a501.id:D.art[0].id;
+render();
+}
+async function __boot(){
+  try{
+    document.body.style.cursor='progress';
+    var r=await SB.rpc('programa_bundle');
+    if(r.error) throw r.error;
+    Object.assign(D, r.data);
+    __run();
+  }catch(e){
+    document.body.innerHTML='<p style=\'padding:24px;font-family:system-ui;color:#b3402f\'>Error cargando datos de Supabase: '+(e.message||e)+'</p>';
+    console.error(e);
+  }finally{ document.body.style.cursor=''; }
+}
+__boot();
+</script>
+</body></html>

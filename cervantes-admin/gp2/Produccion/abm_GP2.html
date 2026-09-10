@@ -1,0 +1,264 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <script src="../auth-guard.js?v=20260904t"></script>
+<script src="../gp2-ui.js?v=20260905a"></script>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>ABM Operarios · GP2</title>
+  <link rel="icon" type="image/png" href="../GP2_favicon.png">
+  <link rel="apple-touch-icon" href="../GP2_favicon.png">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="../supabase-config.js?v=20260905k"></script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'Inter', sans-serif; background: #d9d9de; padding: 20px; min-height: 100vh; }
+    .top-bar { max-width: 1100px; margin: 0 auto 16px; display: flex; align-items: center; gap: 14px; }
+    .btn-volver { height: 44px; padding: 0 22px; border-radius: 999px; border: 2px solid #b9b9b9; background: #f7f7f7; font-size: 16px; cursor: pointer; font-weight: 700; font-family: inherit; }
+    .btn-volver:hover { background: #e5e5e5; border-color: #e2e8f0; }
+    .top-bar h1 { font-size: 22px; flex: 1; color: #1e293b; }
+    .main-card { max-width: 1100px; margin: 0 auto 20px; background: #fff; border: 1px solid #cfcfcf; border-radius: 14px; overflow: hidden; }
+    .card-header { background: #111; color: #fff; padding: 14px 22px; display: flex; justify-content: space-between; align-items: center; }
+    .card-header h2 { font-size: 17px; color: #fff; margin: 0; }
+    .gran-pill { background: #ebeef5; color: #345779; padding: 4px 10px; border-radius: 999px; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .5px; }
+    .card-body { padding: 16px 22px 22px; }
+    .controls-row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-bottom: 14px; }
+    /* Los .ctrl-* estaban en 13px con 36px de alto: por debajo del piso de la casa
+       (campos 18px, tactil 44px). Estas pantallas no cargan gp2-modulo.css ni
+       gp2-claro.css, asi que nada las levantaba (corregido 2026-09-03). */
+    .ctrl-input, .ctrl-select { height: 44px; padding: 0 10px; border: 1.5px solid #cbd5e1; border-radius: 10px; font-size: 19px; font-family: inherit; background: #fff; }
+    .ctrl-input:focus, .ctrl-select:focus { border-color: #cdd8ea; outline: none; }
+    .btn-act { height: 44px; padding: 0 18px; border-radius: 10px; border: 1.5px solid #111; background: #111; color: #fff; font-size: 16px; font-weight: 700; cursor: pointer; font-family: inherit; }
+    .btn-act:hover { background: #333; }
+    .btn-act.ghost { background: #f8fafc; color: #475569; border-color: #cbd5e1; }
+    .btn-act.ghost:hover { background: #e2e8f0; }
+    .push { margin-left: auto; }
+    .seg { display: inline-flex; border: 1.5px solid #cbd5e1; border-radius: 999px; overflow: hidden; }
+    .seg button { border: none; background: #fff; padding: 11px 16px; min-height: 44px; font-size: 15px; font-weight: 700; color: #475569; cursor: pointer; font-family: inherit; }
+    .seg button.active { background: #111; color: #fff; }
+    .table-wrap { overflow-x: auto; border: 1px solid #e2e8f0; border-radius: 10px; }
+    table { width: 100%; border-collapse: collapse; font-size: 13px; background: #fff; }
+    thead th { background: #f1f5f9; color: #334155; font-weight: 700; font-size: 11px; text-transform: uppercase; letter-spacing: .3px; padding: 10px 12px; text-align: left; border-bottom: 2px solid #e2e8f0; white-space: nowrap; }
+    tbody td { padding: 9px 12px; border-bottom: 1px solid #f1f5f9; color: #334155; }
+    tbody tr:hover { background: #f8fafc; }
+    tr.inactivo td { color: #475569; }
+    .pill { font-size: 10px; font-weight: 800; padding: 3px 9px; border-radius: 999px; text-transform: uppercase; letter-spacing: .4px; }
+    .pill.si { background: #dcfce7; color: #15803d; }
+    .pill.no { background: #f1f5f9; color: #64748b; }
+    .row-btn { padding: 5px 11px; border-radius: 8px; border: 1.5px solid #cbd5e1; background: #f8fafc; font-size: 12px; font-weight: 700; color: #475569; cursor: pointer; font-family: inherit; margin-right: 5px; }
+    .row-btn:hover { background: #e2e8f0; }
+    .row-btn.danger { color: #b91c1c; border-color: #fecaca; background: #fef2f2; }
+    .msg { padding: 30px; text-align: center; color: #64748b; font-size: 14px; }
+    .msg.err { color: #dc2626; font-weight: 600; }
+    .topmsg { padding: 10px 14px; border-radius: 10px; font-size: 13px; font-weight: 600; margin-bottom: 12px; display: none; }
+    .topmsg.ok  { display: block; background: #dcfce7; color: #15803d; border: 1px solid #86efac; }
+    .topmsg.bad { display: block; background: #fee2e2; color: #991b1b; border: 1px solid #fecaca; }
+    .overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,.45); z-index: 100; align-items: center; justify-content: center; padding: 16px; }
+    .overlay.open { display: flex; }
+    .modal { background: #fff; border-radius: 14px; width: 100%; max-width: 420px; overflow: hidden; }
+    .modal-head { background: #111; color: #fff; padding: 14px 20px; font-size: 16px; font-weight: 700; }
+    .modal-body { padding: 18px 20px; }
+    .field { margin-bottom: 14px; }
+    /* Modal de alta de operario: es CARGA de datos, va con el piso de la casa. */
+    .field label { display: block; font-size: 15px; font-weight: 700; color: #475569; text-transform: uppercase; letter-spacing: .3px; margin-bottom: 5px; }
+    .field input, .field select { width: 100%; height: 44px; padding: 0 10px; border: 1.5px solid #cbd5e1; border-radius: 10px; font-size: 19px; font-family: inherit; }
+    .modal-foot { padding: 0 20px 20px; display: flex; gap: 10px; justify-content: flex-end; }
+    .note { font-size: 12px; color: #64748b; margin-top: 12px; }
+  </style>
+</head>
+<body>
+
+<div id="gp2-logobar" style="position:relative;background:#e8edf7;text-align:center;padding:6px 0;border-bottom:1px solid #d0dae7"><a href="../GP2_MODULOS.html" style="position:absolute;left:10px;top:50%;transform:translateY(-50%);color:#385475;text-decoration:none;font-weight:700;font-size:15px;padding:5px 10px;border:1px solid #d1d9e5;border-radius:8px;background:#e9eef7">← Atrás</a><a href="../GP2_MODULOS.html" style="text-decoration:none"><img src="../GP2_logo.png" alt="GP2 · Gestión Productiva" style="height:40px;vertical-align:middle"></a></div>
+
+<div class="top-bar">
+  <button class="btn-volver" onclick="location.href='../GP2_MODULOS.html'">&larr; Atrás</button>
+  <h1>ABM Operarios</h1>
+</div>
+
+<div class="main-card">
+  <div class="card-header">
+    <h2>Operarios de GP2</h2>
+    <span class="gran-pill">GP2</span>
+  </div>
+  <div class="card-body">
+    <div id="topmsg" class="topmsg"></div>
+
+    <div class="controls-row">
+      <input type="text" id="fBuscar" class="ctrl-input" placeholder="Buscar por nombre o legajo..." style="min-width:240px">
+      <div class="seg" id="segEstado">
+        <button data-v="activos" class="active">Activos</button>
+        <button data-v="inactivos">Inactivos</button>
+        <button data-v="todos">Todos</button>
+      </div>
+      <button class="btn-act push" id="btnNuevo">+ Nuevo operario</button>
+    </div>
+
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Legajo</th><th>Nombre</th><th>Tipo</th><th>Hora entrada</th><th>Estado</th><th></th>
+          </tr>
+        </thead>
+        <tbody id="tbody"><tr><td colspan="6" class="msg">Cargando...</td></tr></tbody>
+      </table>
+    </div>
+    <div class="note">Escribe directo en <b>GP2.empleado</b>. La baja es lógica: el operario queda inactivo (no se borra) para no romper el historial de <code>GP2.produccion</code>, que guarda el legajo.</div>
+  </div>
+</div>
+
+<div class="overlay" id="ovl">
+  <div class="modal">
+    <div class="modal-head" id="mHead">Nuevo operario</div>
+    <div class="modal-body">
+      <div class="field"><label>Legajo *</label><input type="text" id="mLegajo" inputmode="numeric" autocomplete="off"></div>
+      <div class="field"><label>Nombre *</label><input type="text" id="mNombre" autocomplete="off"></div>
+      <div class="field"><label>Tipo</label><input type="text" id="mTipo" autocomplete="off" placeholder="ej. operario"></div>
+      <div class="field"><label>Hora de entrada</label><input type="time" id="mHora"></div>
+      <div class="field"><label>Estado</label><select id="mActivo"><option value="true">Activo</option><option value="false">Inactivo</option></select></div>
+      <div id="mErr" style="color:#dc2626;font-size:13px;font-weight:600;min-height:18px"></div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn-act ghost" id="mCancel">Cancelar</button>
+      <button class="btn-act" id="mSave">Guardar</button>
+    </div>
+  </div>
+</div>
+
+<script>
+(function () {
+  "use strict";
+  var sb = GP2_SB();
+
+  var $ = GP2UI.$;
+  var ROWS = [], estado = 'activos', editId = null;
+
+  var esc = GP2UI.esc;   /* helper de la casa, gp2-ui.js (2026-09-05) */
+  function topmsg(txt, ok) {
+    var el = $('topmsg');
+    el.className = 'topmsg ' + (ok ? 'ok' : 'bad');
+    el.textContent = txt;
+    if (ok) setTimeout(function () { el.className = 'topmsg'; }, 4000);
+  }
+
+  async function cargar() {
+    var r = await sb.from('empleado').select('id,legajo,nombre,activo,tipo,hora_entrada').order('nombre');
+    if (r.error) { $('tbody').innerHTML = '<tr><td colspan="6" class="msg err">Error: ' + esc(r.error.message) + '</td></tr>'; return; }
+    ROWS = r.data || [];
+    render();
+  }
+
+  function render() {
+    var q = $('fBuscar').value.trim().toLowerCase();
+    var rows = ROWS.filter(function (e) {
+      if (estado === 'activos' && e.activo === false) return false;
+      if (estado === 'inactivos' && e.activo !== false) return false;
+      if (!q) return true;
+      return String(e.nombre || '').toLowerCase().indexOf(q) >= 0 || String(e.legajo || '').toLowerCase().indexOf(q) >= 0;
+    });
+
+    var tb = $('tbody');
+    if (!rows.length) { tb.innerHTML = '<tr><td colspan="6" class="msg">Sin operarios para ese filtro.</td></tr>'; return; }
+
+    tb.innerHTML = rows.map(function (e) {
+      var act = e.activo !== false;
+      return '<tr class="' + (act ? '' : 'inactivo') + '">' +
+        '<td><b>' + esc(e.legajo) + '</b></td>' +
+        '<td>' + esc(e.nombre) + '</td>' +
+        '<td>' + esc(e.tipo || '—') + '</td>' +
+        '<td>' + esc(e.hora_entrada ? String(e.hora_entrada).slice(0, 5) : '—') + '</td>' +
+        '<td><span class="pill ' + (act ? 'si' : 'no') + '">' + (act ? 'Activo' : 'Inactivo') + '</span></td>' +
+        '<td style="white-space:nowrap">' +
+          '<button class="row-btn" data-edit="' + e.id + '">Editar</button>' +
+          '<button class="row-btn ' + (act ? 'danger' : '') + '" data-toggle="' + e.id + '">' + (act ? 'Dar de baja' : 'Reactivar') + '</button>' +
+        '</td>' +
+      '</tr>';
+    }).join('');
+  }
+
+  function abrirModal(emp) {
+    editId = emp ? emp.id : null;
+    $('mHead').textContent = emp ? 'Editar operario' : 'Nuevo operario';
+    $('mLegajo').value = emp ? (emp.legajo || '') : '';
+    $('mNombre').value = emp ? (emp.nombre || '') : '';
+    $('mTipo').value   = emp ? (emp.tipo || '') : '';
+    $('mHora').value   = emp && emp.hora_entrada ? String(emp.hora_entrada).slice(0, 5) : '';
+    $('mActivo').value = emp && emp.activo === false ? 'false' : 'true';
+    $('mErr').textContent = '';
+    $('ovl').classList.add('open');
+    setTimeout(function () { $(emp ? 'mNombre' : 'mLegajo').focus(); }, 50);
+  }
+
+  function cerrarModal() { $('ovl').classList.remove('open'); editId = null; }
+
+  async function guardar() {
+    var legajo = $('mLegajo').value.trim();
+    var nombre = $('mNombre').value.trim();
+    if (!legajo) { $('mErr').textContent = 'Falta el legajo.'; return; }
+    if (!nombre) { $('mErr').textContent = 'Falta el nombre.'; return; }
+
+    var dup = ROWS.some(function (e) { return String(e.legajo).trim() === legajo && e.id !== editId; });
+    if (dup) { $('mErr').textContent = 'Ya existe un operario con el legajo ' + legajo + '.'; return; }
+
+    var payload = {
+      legajo: legajo,
+      nombre: nombre,
+      tipo: $('mTipo').value.trim() || null,
+      hora_entrada: $('mHora').value || null,
+      activo: $('mActivo').value === 'true'
+    };
+
+    if (editId) payload.id = editId;
+
+    $('mSave').disabled = true;
+    // La escritura pasa por RPC SECURITY DEFINER: anon no escribe empleado directo
+    // (el legajo cruza con la produccion, ver AUDITORIA_GP2_2026-08-31.md).
+    var r = await sb.rpc('empleado_guardar', { p: payload });
+    $('mSave').disabled = false;
+
+    if (r.error) { $('mErr').textContent = r.error.message; return; }
+    topmsg(editId ? 'Operario actualizado.' : 'Operario creado.', true);
+    cerrarModal();
+    cargar();
+  }
+
+  async function toggleActivo(id) {
+    var emp = ROWS.find(function (e) { return e.id === id; });
+    if (!emp) return;
+    var nuevo = emp.activo === false;
+    if (!nuevo && !confirm('¿Dar de baja a ' + emp.nombre + '? Queda inactivo, no se borra el historial.')) return;
+    var r = await sb.rpc('empleado_activar', { p_id: id, p_activo: nuevo });
+    if (r.error) { topmsg('Error: ' + r.error.message, false); return; }
+    topmsg(nuevo ? 'Operario reactivado.' : 'Operario dado de baja.', true);
+    cargar();
+  }
+
+  document.addEventListener('DOMContentLoaded', function () {
+    $('fBuscar').addEventListener('input', render);
+    $('btnNuevo').addEventListener('click', function () { abrirModal(null); });
+    $('mCancel').addEventListener('click', cerrarModal);
+    $('mSave').addEventListener('click', guardar);
+    $('ovl').addEventListener('click', function (e) { if (e.target === $('ovl')) cerrarModal(); });
+
+    $('segEstado').addEventListener('click', function (e) {
+      var b = e.target.closest('button[data-v]');
+      if (!b) return;
+      estado = b.dataset.v;
+      $('segEstado').querySelectorAll('button').forEach(function (x) { x.classList.toggle('active', x === b); });
+      render();
+    });
+
+    $('tbody').addEventListener('click', function (e) {
+      var ed = e.target.closest('button[data-edit]');
+      if (ed) { abrirModal(ROWS.find(function (x) { return x.id === Number(ed.dataset.edit); })); return; }
+      var tg = e.target.closest('button[data-toggle]');
+      if (tg) toggleActivo(Number(tg.dataset.toggle));
+    });
+
+    cargar();
+  });
+})();
+</script>
+</body>
+</html>

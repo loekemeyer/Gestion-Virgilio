@@ -1,0 +1,254 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Control Partes Prov. Servicio · GP2</title>
+<script src="../../auth-guard.js?v=20260904t"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="../../supabase-config.js?v=20260905k"></script>
+<script src="../../gp2-ui.js?v=20260905a"></script>
+<script src="../../gp2-numero.js?v=20260905m"></script>
+<script src="../../gp2-composicion.js?v=20260905d"></script>
+<script src="../../gp2-envios-common.js?v=20260905c"></script>
+<link rel="stylesheet" href="../../gp2-modulo.css?v=20260903b"/>
+<link rel="icon" type="image/png" href="../../GP2_favicon.png">
+<link rel="apple-touch-icon" href="../../GP2_favicon.png">
+</head>
+<body>
+
+<div class="card">
+  <div class="header">
+    <h1>Control Partes Prov. Servicio</h1>
+    <div class="hbtns">
+      <button class="hlink hidden" id="btnVolver" type="button">← Cambiar proveedor</button>
+      <button class="hlink hidden" id="btnCSV" type="button">⬇ Exportar CSV</button>
+      <button class="hlink hidden" id="btnImprimir" type="button">🖨 Imprimir</button>
+      <a href="../Envios/EnviosPS_GP2.html">Envío</a>
+      <a href="../Entregas/EntregaPS_GP2.html">Entrega</a>
+      <a href="../../GP2_MODULOS.html">Atrás</a>
+    </div>
+  </div>
+
+  <div class="steps">
+
+    <!-- FASE 0 — elegir proveedor -->
+    <div id="fase0">
+      <div class="row"><label class="lbl">Proveedor de servicio</label></div>
+      <div class="provs-grid" id="provGrid"></div>
+      <div id="status" class="status">Cargando…</div>
+    </div>
+
+    <!-- FASE 1 — control -->
+    <div id="fase1" class="hidden">
+      <div class="row"><label class="lbl" id="fase1Title">Proveedor</label></div>
+
+      <div class="aviso">
+        ⚠ <b>Datos parciales (schema GP2):</b> solo los proveedores con mapeo confirmado.
+        Los saldos están en unidades canónicas y el ledger histórico está incompleto
+        (faltan remaches y proveedores por mapear), así que algunos saldos pueden dar
+        negativos. Se muestran tal cual, sin corregir.
+      </div>
+
+      <div class="kpis" id="kpis"></div>
+
+      <div class="search-box no-print">
+        <input type="text" id="q" placeholder="Buscar por sector, descripción o código…">
+      </div>
+
+      <div class="table-wrap">
+        <table class="t">
+          <thead>
+            <tr>
+              <th id="colProv" class="hidden">Proveedor</th>
+              <th>Sector</th>
+              <th>Código</th>
+              <th>Descripción</th>
+              <th class="num sep">Enviado</th>
+              <th class="num">Entregado</th>
+              <th class="num">Saldo en PS</th>
+            </tr>
+          </thead>
+          <tbody id="tbody"></tbody>
+          <tfoot id="tfoot"></tfoot>
+        </table>
+      </div>
+      <div id="tblEmpty" class="empty hidden">Este proveedor no tiene partes configuradas.</div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+"use strict";
+
+/* Pantalla de SOLO CONSULTA, igual que Control Partes Tallerista (2026-09-08).
+   Antes tenia arriba un panel "Cargar movimiento PS" (envio/entrega) que
+   duplicaba las pantallas de Envio PS y Entrega PS del menu; se saco por
+   pedido del usuario: el control se mira, se carga en su pantalla. Los links
+   Envio / Entrega del header llevan justo ahi. */
+
+var SB = GP2EE.sb();
+
+var $ = GP2UI.$, esc = GP2UI.esc, fmt = GP2EE.fmt, clsSaldo = GP2UI.cls;
+var D = { proveedores: [] };
+var selP = null;   /* null en fase1 => modo "Todos" */
+
+function provs(){ return D.proveedores || []; }
+function partesDe(p){ return (p && p.partes) ? p.partes : []; }
+
+async function cargar(){
+  var r = await SB.rpc("control_ps_bundle");
+  if (r.error){ $("status").textContent = "Error: " + r.error.message; return; }
+  D = r.data || { proveedores: [] };
+  renderProv();
+  var gen = D.generado_en ? (" · generado " + new Date(D.generado_en).toLocaleString("es-AR")) : "";
+  $("status").textContent = provs().length + " proveedores con datos GP2." + gen;
+}
+
+function renderProv(){
+  var g = GP2EE.gridContrapartes("provGrid", provs(), {
+    vacio: "Sin proveedores con datos GP2.",
+    meta: function(p){
+      return esc(p.proceso || "—") + " · " + partesDe(p).length + " partes" +
+             (p.nombre_corto ? (" · " + esc(p.nombre_corto)) : "");
+    },
+    onPick: elegir
+  });
+  if (!provs().length) return;
+
+  // "Todos" — las partes de todos los proveedores juntas, con el proveedor como columna
+  var bt = document.createElement("button");
+  bt.type = "button"; bt.className = "prov-btn";
+  var totPartes = provs().reduce(function(s,p){ return s + partesDe(p).length; }, 0);
+  bt.innerHTML = "<b>Todos</b>" + '<span class="meta">' + provs().length + " proveedores · " + totPartes + " partes</span>";
+  bt.addEventListener("click", function(){ elegir(null); });
+  g.insertBefore(bt, g.firstChild);
+}
+
+function elegir(p){
+  selP = p;
+  $("fase1Title").textContent = p
+    ? (p.nombre + (p.proceso ? (" · " + p.proceso) : "") + (p.cod_prov ? (" · cod " + p.cod_prov) : ""))
+    : "Todos los proveedores";
+  $("colProv").classList.toggle("hidden", !!p);
+  $("fase0").classList.add("hidden");
+  $("fase1").classList.remove("hidden");
+  $("btnVolver").classList.remove("hidden");
+  $("btnImprimir").classList.remove("hidden");
+  $("btnCSV").classList.remove("hidden");
+  $("q").value = "";
+  render();
+}
+
+function volver(){
+  selP = null;
+  $("fase1").classList.add("hidden");
+  $("fase0").classList.remove("hidden");
+  $("btnVolver").classList.add("hidden");
+  $("btnImprimir").classList.add("hidden");
+  $("btnCSV").classList.add("hidden");
+  renderProv();
+}
+
+/* Cada fila lleva su proveedor para poder mostrarlo y exportarlo en modo Todos */
+function filasBase(){
+  var out = [];
+  (selP ? [selP] : provs()).forEach(function(p){
+    partesDe(p).forEach(function(x){
+      out.push(Object.assign({}, x, { _prov: p.nombre, _pid: p.ps_id }));
+    });
+  });
+  return out.sort(function(a,b){
+    return (selP ? 0 : String(a._prov).localeCompare(String(b._prov))) ||
+           String(a.codigo||"").localeCompare(String(b.codigo||""), "es", { numeric:true });
+  });
+}
+
+function filtradas(){
+  return GP2EE.filtrar(filasBase(), $("q").value, function(x){
+    return String(x.codigo||"") + " " + String(x.descripcion||"") + " " +
+           String(x.sector||"") + " " + String(x._prov||"");
+  });
+}
+
+function render(){
+  var arr = filtradas(), tb = $("tbody");
+  tb.innerHTML = "";
+  $("tblEmpty").classList.toggle("hidden", arr.length > 0);
+
+  var totEnv = 0, totEnt = 0, totSal = 0;
+
+  arr.forEach(function(x){
+    totEnv += Number(x.enviado||0);
+    totEnt += Number(x.entregado||0);
+    totSal += Number(x.saldo||0);
+
+    var tr = document.createElement("tr");
+    tr.innerHTML =
+      (selP ? "" : '<td>'+esc(x._prov||"")+'</td>')+
+      '<td>'+esc(x.sector||"—")+'</td>'+
+      '<td><span class="cod">'+esc(x.codigo)+'</span></td>'+
+      '<td>'+esc(x.descripcion||"")+'</td>'+
+      '<td class="num sep">'+fmt(x.enviado,0)+'</td>'+
+      '<td class="num">'+fmt(x.entregado,0)+'</td>'+
+      '<td class="num stk-cell '+clsSaldo(x.saldo)+'" data-cid="'+x.comp_id+'" data-pid="'+x._pid+'"'+
+        ' title="Ver cómo se compone">'+fmt(x.saldo,0)+'</td>';
+    tb.appendChild(tr);
+  });
+
+  $("tfoot").innerHTML = arr.length ? ('<tr>'+
+    '<td colspan="'+(selP?3:4)+'">'+arr.length+' partes</td>'+
+    '<td class="num sep">'+fmt(totEnv,0)+'</td>'+
+    '<td class="num">'+fmt(totEnt,0)+'</td>'+
+    '<td class="num '+clsSaldo(totSal)+'">'+fmt(totSal,0)+'</td></tr>') : "";
+
+  $("kpis").innerHTML =
+    '<div class="kpi"><div class="k">Partes</div><div class="v">'+arr.length+'</div></div>'+
+    '<div class="kpi"><div class="k">Enviado</div><div class="v">'+fmt(totEnv,0)+'</div></div>'+
+    '<div class="kpi"><div class="k">Entregado</div><div class="v">'+fmt(totEnt,0)+'</div></div>'+
+    '<div class="kpi"><div class="k">Saldo en PS</div><div class="v '+clsSaldo(totSal)+'">'+fmt(totSal,0)+'</div></div>';
+}
+
+/* CSV para Excel es-AR: el armado (separador ;, BOM, coma decimal) es el de la
+   casa, GP2UI.exportarCSV (gp2-ui.js); aca solo se eligen las columnas. */
+function exportarCSV(){
+  var arr = filtradas();
+  if (!arr.length){ alert("No hay filas para exportar."); return; }
+  var filas = [(selP ? [] : ["Proveedor"]).concat(
+    ["Sector","Codigo","Descripcion","Enviado","Entregado","Saldo en PS"])];
+
+  arr.forEach(function(x){
+    filas.push((selP ? [] : [x._prov||""]).concat([
+      x.sector||"", x.codigo||"", x.descripcion||"",
+      Number(x.enviado||0), Number(x.entregado||0), Number(x.saldo||0)
+    ]));
+  });
+
+  GP2UI.exportarCSV("control_ps_" + (selP ? String(selP.nombre).replace(/\s+/g,"_") : "todos"), filas);
+}
+
+/* El saldo en PS sale del mismo ledger que el resto del stock GP2:
+   la celda abre la composicion apuntando a la ubicacion de ese proveedor. */
+$("tbody").addEventListener("click", function(e){
+  var td = e.target.closest && e.target.closest("td.stk-cell");
+  if (!td || !window.GP2Composicion) return;
+  var x = filasBase().filter(function(y){
+    return String(y.comp_id) === String(td.dataset.cid) &&
+           String(y._pid)    === String(td.dataset.pid); })[0] || {};
+  window.GP2Composicion.abrir({
+    SB: SB, comp_id: td.dataset.cid,
+    ubic_tipo: "proveedor_servicio", ref_id: td.dataset.pid,
+    cod: x.codigo, desc: x.descripcion
+  });
+});
+
+$("q").addEventListener("input", render);
+$("btnVolver").addEventListener("click", volver);
+$("btnCSV").addEventListener("click", exportarCSV);
+$("btnImprimir").addEventListener("click", function(){ window.print(); });
+
+cargar().catch(function(e){ $("status").textContent = "Error: "+(e&&e.message?e.message:e); });
+</script>
+</body>
+</html>

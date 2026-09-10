@@ -1,0 +1,388 @@
+<!doctype html><html lang="es"><head><meta charset="utf-8">
+<script src="auth-guard.js?v=20260904t"></script>
+<!-- v1.21.0 (2026-09-04) - las 9 pantallas de stock por sector (Stock SP, Stock SC, Stock en Movimiento, Cajas, Cartones, Partes Plasticas, Remaches, Bombillas y Garage) eran 9 HTML casi iguales que solo cambiaban su STOCK_CFG: pasan a UNA sola, StockSector/StockSector_GP2.html?sector=N (mismos rotulos, mismo orden, mismo aspecto y botones), con la config de cada sector en el mapa SECTORES de gp2-stock-sector.js; los 9 HTML viejos se borran del repo. v1.20.0 (2026-09-04) - se saca "Compra Aperam -> Eclipse (Pagos)": la chapa 430 de Aperam ahora se recibe desde Recepcion Insumos -> Flejes tocando el item CHAPA430 (misma forma que Altrak, panel propio kg+remito -> cargar_compra_aperam_chapa, stock a Eclipse ubic 48). AperamEclipse_GP2.html queda legacy sin link. v1.19.0 (2026-09-04) - se saca "Charcas y Eclipse" del grupo PS: la MP de Altrak entra por Recepcion Insumos -> Flejes -> Altrak, y las ENTREGAS de Charcas (corto/largo) y Eclipse (1686) ahora se cargan en Entrega Prov Serv (paneles propios). El modulo separado CharcasEclipse queda jubilado (archivo legacy sin link). v1.18.0 (2026-09-04) - se saca "Compra Altrak -> Charcas (Pagos)": la entrega de Altrak ahora se carga desde Recepcion Insumos -> Flejes -> Altrak (opcion B, flujo propio kg + % corto/largo). Aperam -> Eclipse queda por ahora. v1.17.0 - entra "Charcas y Eclipse" al grupo PS (Prov. Servicio). Pantalla nueva
+     para los prov servicio "hibridos" que NO reciben Envio desde Cervantes (la MP
+     les llega directo del proveedor externo: Altrak->Charcas, Aperam->Eclipse) y
+     por eso no encajan en el flujo Envio/Entrega normal. Muestra stock MP del PS
+     + registra Entrega (F90/F90B via cargar_recepcion_charcas, 1686 via
+     cargar_recepcion_eclipse) + historial. Fase A del rework 2026-09-02: la
+     carga por rubros Filtros/Cortados de Recepcion Insumos queda duplicada por
+     ahora — se saca de alli en la Fase B. v1.16.0 - entra "Faltantes" al grupo Stocks (primero: es la alerta diaria): faltantes automaticos por stock online de Crudo/Procesado + marcas manuales; v1.15.0 - entra "Valorización · Cuánto vale el stock" al grupo Insumos (secundario): stock y pedido-a-máximo valorizados con el motor de costos nuevo (todo 1 USD de regulación); v1.14.0 - se disuelve el grupo "Herramientas GP2" (aprobado por el usuario): "Programa de Stock" pasa al grupo Despiece renombrado "¿Qué necesito para producir?" (su titulo real) como secundario; "Faltantes" se fusiona dentro de Despiece x Articulo (bloque de faltantes prorrateados por articulo) y su pantalla se borra; "Registrar Movimiento" se borra y sus 2 flujos propios (Ajuste +/- y Armado en fabrica) pasan a Stocks general — los otros 7 duplicaban pantallas dedicadas; v1.13.0 - el grupo Stocks pierde 3 botones (pedido del usuario): "Punto de Stock" se BORRA (no tenia sentido como pantalla; la logica de maximos sigue viva en la BD) y "Verificacion Integridad" + "Verificacion Madres" se FUSIONAN dentro de "Despiece x Articulo" (grupo Despiece): una sola pantalla por articulo con receta + rutas + avisos; v1.12.0 - Pintores se muda del grupo PS a Insumos, al lado de Inyectores: el usuario lo busco ahi y no lo encontro (los dos son "quien hace/pinta cada parte", configuracion); v1.11.0 - entra "Pintores · Quien pinta cada parte" en el grupo PS: hermana de Inyectores, pero en pintura pueden pintar VARIOS lo mismo, asi que los botones no se pisan y el consumo se reparte en partes iguales; v1.10.0 - Insumos con 3 niveles de importancia (pedido del usuario): arriba y a todo el ancho Ordenes de Compra y Recepcion Insumos, despues el stock de cada rubro, y ultimo y apagado Inyectores — la linea se habia perdido en un merge de la sesion paralela, el codigo estaba bien; v1.9.1 - Produccion llego a 15 modulos ("Orden de Produccion") y en pantalla baja el grupo abierto se pasaba 12px: las baldosas bajan de 64 a 56px; v1.9.0 - Prov. Art. Terminado gana su "Historial x Fecha" (?origen=provat): el grupo tenia un solo boton y el modulo ya tenia esa vista; v1.8.0 - celular: adentro de un grupo los modulos dejan de ser una lista de filas finitas y pasan a baldosas grandes en 2 columnas (igual en todos los rubros); hasta Produccion (14) entra en una pantalla; v1.7.0 - Control Envios y Entregas deja de ser un grupo suelto: se reparte en un boton "Historial x Fecha" dentro de Tallerista (?origen=tall) y otro dentro de PS (?origen=ps); v1.6.0 - un solo menu: entra "Entrega Virgilio" (unica pantalla sin version GP2 que no figuraba) y se saca "Inicio (dashboard)", que era el menu viejo duplicado; sus datos vivos (KPIs, badge de Disruptivas y aviso de espejo) se portaron aca; v1.5.0 - celular: los 13 grupos entran en UNA pantalla (grilla de 2 columnas, tarjetas mas grandes), se muestra el numero de version y se saco el texto que no son modulos (subtitulo y pie); v1.4.0 - entra "Inyectores · Quien hace cada parte" en el grupo Insumos; v1.3.0 - menu depurado: fuera Stock Online duplicado, Informes Virgilio y los 2 candados de Prov AT; v1.2.0 - es la pagina de entrada post-login (con auth-guard y Cerrar sesion); v1.1.0 - grupos 100% bloqueados arrancan minimizados; acordeon exclusivo; vista foco en celular -->
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>GP2 · Menú</title>
+<link rel="icon" type="image/png" href="GP2_favicon.png?v=1.2.0">
+<link rel="apple-touch-icon" href="apple-touch-icon.png?v=20260829j">
+<!-- PWA: con esto Chrome ofrece instalar GP2 y la abre en ventana propia,
+     sin barra de direcciones. El SW lo registra pwa.js al final del body. -->
+<link rel="manifest" href="manifest.json?v=20260830d">
+<meta name="theme-color" content="#ffffff">
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:#ffffff;color:#1e293b;font-family:-apple-system,Segoe UI,Roboto,Helvetica,sans-serif;min-height:100vh}
+
+/* ── header ── */
+.header{background:#ffffff;border-bottom:1px solid #e2e8f0;padding:20px 0 16px;text-align:center;position:relative}
+.header img{width:90%;max-width:400px;height:auto;border-radius:8px}
+.header-sub{color:#64748b;font-size:14px;margin-top:10px;letter-spacing:.3px}
+.header-sub b{color:#163e98}
+
+/* ── layout ── */
+.wrap{max-width:1200px;margin:0 auto;padding:20px 16px 80px}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:16px}
+
+/* ── cards ── */
+.card{background:#ffffff;border:1px solid #e2e8f0;border-radius:14px;overflow:hidden;transition:border-color .2s;box-shadow:0 1px 3px rgba(0,0,0,.06)}
+.card:hover{border-color:#bcccdc}
+.card.all-locked{opacity:.6;filter:saturate(.4)}
+.card.all-locked .card-body{pointer-events:none}
+.card.all-locked .card-head{background:#f1f5f9}
+
+.card-head{padding:14px 18px;display:flex;align-items:center;gap:10px;border-bottom:1px solid #e2e8f0;cursor:pointer;user-select:none;transition:background .15s}
+.card-head:hover{background:#f8fafc}
+.card-head .icon{font-size:24px;line-height:1;flex-shrink:0}
+.card-head .title{font-size:20px;font-weight:700;letter-spacing:.01em;color:#1e293b;flex:1}
+.card-head .badge{background:#dcfce7;color:#15803d;font-size:12px;font-weight:700;padding:2px 8px;border-radius:10px;letter-spacing:.5px}
+.card-head .chevron{color:#475569;font-size:18px;transition:transform .2s;font-weight:700}
+.card.collapsed .chevron{transform:rotate(-90deg)}
+.card.collapsed .card-body{display:none}
+
+.card-body{padding:8px 10px 12px}
+.btns{display:flex;flex-direction:column;gap:5px}
+
+/* ── botones activos ── */
+a.op{display:flex;align-items:center;gap:10px;padding:11px 14px;border-radius:10px;text-decoration:none;font-size:16px;font-weight:500;color:#1e293b;background:#f8fafc;border:1px solid #e2e8f0;transition:all .15s}
+a.op:hover{background:#eef4fb;border-color:#cddbea;transform:translateY(-1px);box-shadow:0 4px 12px rgba(0,0,0,.08)}
+a.op:active{transform:translateY(0)}
+a.op .arrow{color:#163e98;font-size:18px;margin-left:auto;font-weight:700;transition:color .15s}
+a.op:hover .arrow{color:#1d4ed8}
+a.op .dot{width:7px;height:7px;border-radius:50%;background:#e7f8ed;flex-shrink:0}
+
+/* ── tres niveles de importancia dentro de un grupo ──
+   Los pidio el usuario para Insumos: comprar y recibir es lo de todos los
+   dias, el stock de cada rubro va despues, y la config de quien fabrica
+   ultima. Se marcan en el MENU y sirven para cualquier grupo. */
+a.op.principal{background:#eff6ff;border-color:#cddbea;font-weight:700;font-size:17px;padding:14px}
+a.op.principal .dot{width:9px;height:9px}
+a.op.secundario{background:#fbfcfd;border-color:#eef2f6;color:#64748b;font-size:15px;padding:9px 14px}
+a.op.secundario .dot{background:#cbd5e1;width:6px;height:6px}
+a.op.secundario .arrow{color:#475569}
+
+/* ── boton que todavia abre la app anterior (schema public) ── */
+a.op.vieja{background:#fffbeb;border-color:#ead9cd;color:#7c2d12}
+a.op.vieja .dot{background:#f8efe7}
+a.op.vieja .tag{margin-left:auto;font-size:11px;font-weight:700;opacity:.8;white-space:nowrap}
+a.op.vieja .arrow{margin-left:8px;color:#b45309}
+
+/* ── botones locked ── */
+span.op.lock{display:flex;align-items:center;gap:10px;padding:9px 14px;border-radius:8px;font-size:16px;color:#475569;border:1px solid #eef2f6;background:#f8fafc;cursor:default}
+span.op.lock .lk{font-size:14px;margin-left:auto;opacity:.7}
+
+
+/* ── celular: los 13 grupos TIENEN que entrar en una sola pantalla ──
+   Con una columna no entran sin achicar las filas hasta volverlas ilegibles.
+   Con DOS columnas entran en 7 filas y encima cada grupo queda mas grande:
+   icono arriba, titulo abajo en 2 lineas si hace falta, y el numero de
+   modulos activos en la esquina. Toda la tarjeta es el area tocable. */
+@media (max-width:640px){
+  .header{padding:8px 0 6px}
+  .header img{width:52%;max-width:190px}
+  .header-sub{font-size:12px;margin-top:3px}
+  .wrap{padding:8px 8px 12px}
+  .foot{display:none}                      /* texto que no es un modulo: fuera */
+  .grid{grid-template-columns:1fr 1fr;gap:8px}
+  .card{border-radius:12px;position:relative}
+  .card-head{flex-direction:column;align-items:flex-start;justify-content:center;
+             gap:3px;padding:10px 11px;min-height:82px;border-bottom:0}
+  .card-head .icon{font-size:21px}
+  .card-head .title{font-size:15px;line-height:1.15;flex:none}
+  .card-head .badge{position:absolute;top:9px;right:9px;font-size:12px;padding:2px 8px}
+  .card.collapsed .chevron{display:none}    /* cerrado no aporta y roba una linea */
+  /* si la cantidad de grupos es impar, el ultimo ocupa el ancho entero para que
+     no quede un hueco raro al final (la clase la pone el JS) */
+  .card.solo{grid-column:1 / -1}
+  .card.solo .card-head{min-height:56px;flex-direction:row;align-items:center;gap:9px}
+  .card-body{padding:6px 8px 9px}
+  a.op,span.op.lock{font-size:15px;padding:11px 12px}
+
+  /* abierto: vuelve a una columna, para que los botones del grupo sean anchos */
+  body.focus .grid{grid-template-columns:1fr}
+  body.focus .card.open .card-head{flex-direction:row;align-items:center;gap:10px;
+                                   min-height:0;padding:13px 14px}
+  body.focus .card.open .card-head .title{font-size:18px}
+  body.focus .card.open .card-head .badge{position:static}
+
+  /* vista FOCO: con un grupo abierto se ve solo ese grupo, hasta cerrarlo */
+  body.focus .header,body.focus .foot{display:none}
+  body.focus .wrap{padding:0 0 30px}
+  body.focus .card:not(.open){display:none}
+  body.focus .card.open{border:0;border-radius:0;box-shadow:none;opacity:1;filter:none}
+  body.focus .card.open .card-head{position:sticky;top:0;z-index:5;background:#fff;border-bottom:1px solid #e2e8f0;padding:14px 14px}
+  body.focus .card.open .card-body{padding:8px 10px 12px}
+  /* el chevron pasa a ser el boton de cerrar */
+  body.focus .card.open .chevron{transform:none;font-size:0}
+  body.focus .card.open .chevron::after{content:"\2715\00a0 Cerrar";font-size:14px;font-weight:700;color:#163e98;white-space:nowrap}
+
+  /* ── adentro del grupo: botones GRANDES en grilla, igual que los grupos ──
+     Antes era una lista de filas finitas: se veian chicas, desperdiciaban el
+     ancho y con 14 modulos (Produccion) habia que scrollear. En 2 columnas
+     entran el doble por pantalla y cada boton es una baldosa tocable. */
+  body.focus .card.open .btns{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+  body.focus .card.open a.op,
+  body.focus .card.open span.op.lock{
+    flex-direction:column;align-items:center;justify-content:center;text-align:center;
+    gap:4px;min-height:76px;padding:12px 10px;font-size:16px;font-weight:600;
+    line-height:1.15;border-radius:12px;overflow-wrap:anywhere}
+  body.focus .card.open a.op .arrow{display:none}   /* en baldosa no aporta */
+  /* el puntito (verde = GP2, ambar = modulo viejo) va a la esquina: si queda en
+     el flujo se come una linea y empuja el nombre fuera del centro */
+  body.focus .card.open a.op{position:relative}
+  body.focus .card.open a.op .dot{position:absolute;top:8px;left:8px;margin:0}
+  body.focus .card.open span.op.lock .lk{margin:0}
+  /* nivel 1: baldosa a todo el ancho, mas alta y destacada — es lo que se
+     abre todos los dias, tiene que caer bajo el pulgar sin buscar */
+  body.focus .card.open a.op.principal{grid-column:1 / -1;min-height:66px;font-size:18px}
+  /* nivel 3: misma grilla que los rubros pero apagado, para que no compita */
+  body.focus .card.open a.op.secundario{min-height:56px;font-size:15px}   /* 15 es el piso de legibilidad que fija el test */
+  /* cantidad impar: el ultimo ocupa el ancho entero para que no quede colgado.
+     Los "principal" ya ocupan la fila entera, asi que no cuentan para la
+     paridad: se mira solo entre los que comparten la grilla de 2 columnas. */
+  body.focus .card.open .btns > :last-child:nth-child(odd){grid-column:1 / -1;min-height:56px}
+}
+
+/* celulares de pantalla baja (SE, o el navegador con su barra a la vista):
+   se comprime lo justo para que los 13 sigan entrando de una */
+@media (max-width:640px) and (max-height:700px){
+  .header img{width:42%;max-width:150px}
+  .grid{gap:6px}
+  .card-head{min-height:62px;padding:8px 10px}
+  .card-head .icon{font-size:18px}
+  .card-head .title{font-size:14px}
+  .card.solo .card-head{min-height:46px}
+  /* las baldosas del grupo abierto se achican lo justo para que el grupo mas
+     grande (Produccion, 15 modulos = 8 filas) tambien entre sin scrollear.
+     Cada modulo nuevo que entre a Produccion aprieta esto: el test avisa. */
+  body.focus .card.open .btns{gap:6px}
+  body.focus .card.open a.op,
+  body.focus .card.open span.op.lock{min-height:56px;padding:8px;font-size:15px}
+  body.focus .card.open .btns > :last-child:nth-child(odd){min-height:50px}
+}
+
+/* ── datos vivos que venian del dashboard viejo (Inicio/index_GP2.html) ── */
+#kpiResumen{display:block;margin-top:4px;font-size:12px;color:#475569}
+#kpiResumen b{color:#1e293b}
+#kpiResumen:empty{display:none}
+@media (max-width:640px){#kpiResumen{font-size:11px}}
+
+/* ── footer ── */
+.foot{max-width:1200px;margin:0 auto;padding:0 16px;color:#475569;font-size:12px;text-align:center}
+</style></head><body>
+
+<div class="header">
+  <!-- PARCHE DE LA COPIA (integración Gestión Virgilio): volver al panel de Gestión. -->
+  <a href="../../" style="position:absolute;top:10px;left:12px;font-size:14px;font-weight:700;color:#0e7490;background:#ecfeff;border:1px solid #a5f0fc;border-radius:999px;padding:6px 12px;text-decoration:none;z-index:5;">← Volver a Gestión</a>
+  <img src="GP2_logo.png?v=1.2.0" alt="GP2 · Gestión Productiva — Loekemeyer">
+  <!-- Solo la version. El cartel "Modulos con candado pendientes de migracion" se saco:
+       el candado ya se explica solo y en el celular esa linea robaba una fila de grupos. -->
+  <div class="header-sub">Versión <b id="appVersion">2.0</b><!-- con el login apagado
+    (GP2_AUTH_ON=false) no hay sesion que cerrar: el link se oculta solo -->
+    <span id="kpiResumen"></span><span id="sesion" hidden>&nbsp;·&nbsp; <a href="login.html?logout=1" onclick="try{sessionStorage.clear();}catch(e){}"
+    style="color:#b42318;text-decoration:none;font-weight:700">⎋ Cerrar sesión</a></span></div>
+  <script src="version.js?v=20260909a"></script>
+  <script>if (window.GP2_AUTH_ON !== false) document.getElementById('sesion').hidden = false;</script>
+</div>
+
+<div class="wrap"><div class="grid" id="grid"></div></div>
+<div class="foot">GP2 — schema propio, independiente de la app vieja</div>
+
+<script>
+const MENU = [
+ ["🔧","Tallerista", [
+   ["Control", "Talleristas/Control%20Tall/ControlTalleristas_GP2.html"],
+   ["Envío", "Talleristas/Envios/EnviosTalleristas_GP2.html"],
+   ["Entregas", "Talleristas/Recepcion/EntregasTalleristas_GP2.html"],
+   ["Devolución Cervantes", "Talleristas/Recepcion/DevolucionCervantes_GP2.html"],
+   ["Entrega Cervantes Fotos", null],
+   ["Entrega Virgilio", "Talleristas/Recepcion/Recepcion%20Virgilio.html", "vieja"],
+   ["ABM Artículos", "Talleristas/ABM%20Articulos/ABM_Articulos_GP2.html"],
+   ["Proporciones", "Talleristas/Proporciones/Proporciones_GP2.html"],
+   ["Faltante Partes", "Talleristas/Faltante%20Partes%20Tallerista/FaltantePartesTallerista_GP2.html"],
+   ["Historial x Fecha", "Control%20Envios%20y%20Entregas/ControlEnvios_GP2.html?origen=tall"],
+ ]],
+ ["☰","PS (Prov. Servicio)", [
+   ["Control", "Prov%20Serv/Control/ControlPS_GP2.html"],
+   ["Envío", "Prov%20Serv/Envios/EnviosPS_GP2.html"],
+   ["Entrega", "Prov%20Serv/Entregas/EntregaPS_GP2.html"],
+   ["Historial x Fecha", "Control%20Envios%20y%20Entregas/ControlEnvios_GP2.html?origen=ps"],
+ ]],
+ ["📦","Prov. Art. Terminado", [
+   ["Control de Stocks", "Prov%20Art%20Terminado/Control/ControlAT_GP2.html"],
+   ["Envío Cartón/Cajas", "Prov%20Art%20Terminado/Envios/EnviosAT_GP2.html"],
+   ["Entrega Prov AT", "Prov%20Art%20Terminado/Entregas/EntregasAT_GP2.html"],
+   ["Historial x Fecha", "Control%20Envios%20y%20Entregas/ControlEnvios_GP2.html?origen=provat"],
+ ]],
+ ["▦","Stocks", [
+   ["Faltantes", "Faltantes/Faltantes_GP2.html"],
+   ["Stock SP", "StockSector/StockSector_GP2.html?sector=2"],
+   ["Stock SC", "StockSector/StockSector_GP2.html?sector=1"],
+   ["Stock en Movimiento", "StockSector/StockSector_GP2.html?sector=3"],
+   ["Stock Tránsito PS", "StockTransitoPS/StockTransitoPS_GP2.html"],
+   ["Stocks general", "Stocks%20General/StockGeneral_GP2.html"],
+ ]],
+ ["⋯","Producción", [
+   ["Orden de Producción", "OrdenProduccion/OrdenProduccion.html"],
+   ["Registro Producción", "Produccion/RegistroApp/Operarios_GP2.html"],
+   ["Carga Manual Producción", "Produccion/RegistroApp/Registro_GP2.html"],
+   ["Informes Producción", "Informes/informe_persona_GP2.html"],
+   ["Informe x Matriz", "Informes/informe_matriz_GP2.html"],
+   ["Producciones Disruptivas", "Disruptivas/Disruptivas_GP2.html"],
+   ["Maestro Producción", "Produccion/maestro_GP2.html"],
+   ["Rendimiento x Mes", "Produccion/rendimiento_GP2.html"],
+   ["Alertas", "Alertas/alertas_GP2.html"],
+   ["ABM Operarios", "Produccion/abm_GP2.html"],
+   ["Monitor en Vivo · Operarios", "Produccion/monitor_GP2.html"],
+   ["Cierres del Día · Premios", "Produccion/monitor2_GP2.html"],
+   ["Tiempos Matrices", "Produccion/tiempos_GP2.html"],
+   ["Problemas con Matrices", "Produccion/ProblemasMatrices/ProblemasMatrices_GP2.html"],
+   ["Entrevistas", "Produccion/entrevistas_GP2.html"],
+ ]],
+ ["◈","Despiece", [
+   ["Despiece x Artículo", "Despiece%20x%20Articulo/Despiece_GP2.html"],
+   ["¿Qué necesito para producir?", "Programa/Programa.html", "secundario"],
+ ]],
+ ["✓","Control Carga Remitos", [ ["Ver Cargas", null] ]],
+ ["🧾","Facturas", [
+   ["Recepciones · Checklist Pagos", "Compras/Recepciones_GP2.html"],
+   ["Lectura de Facturas Entrantes", null],
+   ["Entrega Proveedores Cervantes", null],
+ ]],
+ ["▦","Insumos", [
+   // El orden y las marcas los pidio el usuario: primero lo que se usa todos
+   // los dias (comprar y recibir), despues el stock rubro por rubro, y ultimo
+   // Inyectores, que es configuracion — se toca cuando cambia un proveedor.
+   ["Órdenes de Compra", "Compras/OC_GP2.html", "principal"],
+   ["Recepción Insumos", "StockFlejes/RecepcionInsumos_GP2.html", "principal"],
+   ["Flejes", "StockFlejes/Flejes_GP2.html"],
+   ["Cajas", "StockSector/StockSector_GP2.html?sector=11"],
+   ["Cartones", "StockSector/StockSector_GP2.html?sector=10"],
+   ["Partes Plásticas", "StockSector/StockSector_GP2.html?sector=6"],
+   ["Remaches", "StockSector/StockSector_GP2.html?sector=8"],
+   ["Bombillas", "StockSector/StockSector_GP2.html?sector=7"],
+   ["Garage", "StockSector/StockSector_GP2.html?sector=9"],
+   ["Valorización · Cuánto vale el stock", "Compras/Valorizacion_GP2.html", "secundario"],
+   ["Inyectores · Quién hace cada parte", "Compras/Inyectores_GP2.html", "secundario"],
+   ["Pintores · Quién pinta cada parte", "Prov%20Serv/Pintores/Pintores_GP2.html", "secundario"],
+ ]],
+ /* Solo el Relevamiento GP2 nativo [usuario 2026-09-04: "borra relevamientos (viejo) y deja
+    solo relevamiento gp2 (nuevo) pero renombralo y ponele Relevamientos"]. El modulo viejo
+    (Relevamiento/relevamiento.html, schema relevamiento_cervantes) se BORRO del repo en la
+    auditoria del 2026-09-04 (ver REFACTOR_GP2.md); la tablet (envios-only.html) tambien abre el GP2. */
+ /* DOS ROLES, DOS PANTALLAS [usuario 2026-09-04]: el OPERARIO cuenta en "Relevamientos"
+    y ahi termina; el OPERADOR DEL SISTEMA compara conteo vs programa y toca el stock en
+    "Validacion de Stock". El operario nunca decide sobre el stock. */
+ ["🗒","Relevamiento", [ ["Relevamientos", "Relevamiento/Relevamiento_GP2.html"],
+                        ["Validación de Stock", "Relevamiento/Validacion_Stock.html"] ]],
+ ["🔗","Ventas", [ ["Chat Bot Ventas", null] ]],
+];
+
+const grid = document.getElementById("grid");
+MENU.forEach(([icon, titulo, items]) => {
+  const allLocked = items.every(i => !i[1]);
+  const activeCount = items.filter(i => i[1]).length;
+
+  const card = document.createElement("div");
+  // arrancan todos minimizados: en el celular se ven los 13 grupos de una,
+  // y los que estan 100% bloqueados ya no ocupan pantalla mostrando candados.
+  card.className = "card collapsed" + (allLocked ? " all-locked" : "");
+
+  // head
+  const head = document.createElement("div");
+  head.className = "card-head";
+  head.innerHTML =
+    '<span class="icon">' + icon + '</span>' +
+    '<span class="title">' + titulo + '</span>' +
+    (activeCount > 0 ? '<span class="badge">' + activeCount + '</span>' : '') +
+    '<span class="chevron">‹</span>';
+  head.addEventListener("click", () => {
+    const abrir = card.classList.contains("collapsed");
+    // acordeon exclusivo: abrir uno cierra el resto
+    document.querySelectorAll(".card").forEach(c => {
+      c.classList.add("collapsed"); c.classList.remove("open");
+    });
+    if (abrir) { card.classList.remove("collapsed"); card.classList.add("open"); }
+    // en celular el grupo abierto se queda solo en pantalla (CSS body.focus)
+    document.body.classList.toggle("focus", abrir);
+    if (abrir) window.scrollTo(0, 0);
+  });
+  card.appendChild(head);
+
+  // body
+  const body = document.createElement("div");
+  body.className = "card-body";
+  const box = document.createElement("div");
+  box.className = "btns";
+  items.forEach(([label, href, marca]) => {
+    // marca: lista separada por espacios. "vieja" = abre la app anterior;
+    // "principal"/"secundario" = peso dentro del grupo (lo pidio el usuario).
+    const marcas = String(marca || "").split(/\s+/).filter(Boolean);
+    const tiene = (m) => marcas.includes(m);
+    if (href) {
+      const a = document.createElement("a");
+      a.className = ["op"].concat(marcas).join(" ");
+      a.href = href;
+      if (tiene("vieja")) a.title = "Todavía sin versión GP2: abre la pantalla de la app anterior";
+      a.innerHTML = '<span class="dot"></span><span>' + label + '</span>' +
+        (tiene("vieja") ? '<span class="tag">app vieja</span>' : '') +
+        '<span class="arrow">›</span>';
+      box.appendChild(a);
+    } else {
+      const s = document.createElement("span"); s.className = "op lock";
+      s.innerHTML = '<span>' + label + '</span><span class="lk">🔒</span>';
+      box.appendChild(s);
+    }
+  });
+  body.appendChild(box);
+  card.appendChild(body);
+  grid.appendChild(card);
+});
+// Grilla de 2 columnas en celular: con una cantidad impar de grupos el ultimo
+// quedaria solo en media fila. Se lo marca para que ocupe el ancho entero.
+if (MENU.length % 2 === 1) grid.lastElementChild.classList.add("solo");
+</script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="supabase-config.js?v=20260905k"></script>
+<script>
+/* Datos vivos del menu. Antes vivian en Inicio/index_GP2.html, que era una copia
+   del menu viejo y quedo como redirect: el RPC "GP2".inicio_bundle() se trajo aca
+   para no perder los KPIs, el badge de Disruptivas ni — sobre todo — el aviso de
+   cargas de Virgilio que el espejo no pudo aplicar. */
+(async () => {
+  try {
+    const sb = GP2_SB();
+    const { data: bundle, error } = await sb.rpc("inicio_bundle");
+    if (error) { console.error(error); return; }
+    if (!bundle) return;
+    const al = bundle.alertas || {};
+
+    // Aviso 'cargas de Virgilio SIN aplicar' sacado a pedido del usuario 2026-08-31.
+
+    // Cuantas disruptivas quedan pendientes este mes, sobre su propio boton.
+    const nDis = Number(al.disruptivas_mes) || 0;
+    if (nDis > 0) {
+      const a = document.querySelector('a.op[href*="Disruptivas_GP2.html"] span:nth-child(2)');
+      if (a) a.textContent = a.textContent + " (" + nDis + ")";
+    }
+
+    // KPIs de hoy y del mes, debajo de la version.
+    const d = bundle.dia || {}, m = bundle.mes || {};
+    const kpi = document.getElementById("kpiResumen");
+    if (kpi) {
+      const f = v => Number(v || 0).toLocaleString("es-AR");
+      kpi.innerHTML = "Hoy: <b>" + f(d.uni) + "</b> uni · " + f(d.registros) + " reg · " +
+        f(d.empleados) + " oper &nbsp;|&nbsp; Mes: <b>" + f(m.uni) + "</b> uni · " +
+        f(m.registros) + " reg · " + f(m.empleados) + " oper";
+    }
+  } catch (e) { console.error(e); }
+})();
+</script>
+<script src="pwa.js?v=20260830e"></script>
+</body></html>

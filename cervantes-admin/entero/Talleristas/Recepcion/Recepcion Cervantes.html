@@ -1,0 +1,1396 @@
+<!doctype html>
+<html lang="es">
+<head>
+<script src="../../auth-guard.js"></script>
+<link rel="stylesheet" href="../../tandas-popup.css?v=20260604a">
+<script src="../../tandas-popup.js?v=20260604a"></script>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Recepción (test)</title>
+
+<style>
+  *{box-sizing:border-box}
+  body{font-family:Arial;background:#fafafa;padding:18px}
+  .card{max-width:560px;margin:auto;background:#fff;border:1px solid #d0d7de;border-radius:12px;padding:16px}
+  .row{display:flex;gap:10px;flex-wrap:wrap;margin:10px 0}
+  button{padding:10px 12px;border-radius:10px;border:2px solid #d0d7de;background:#fff;font-weight:800;cursor:pointer}
+  button.active{background:#111;color:#fff;border-color:#111}
+  button:disabled{opacity:.45;cursor:not-allowed}
+  .send{background:#111;color:#fff;border:0;opacity:.45}
+  .send.enabled{opacity:1}
+  .status{margin-top:10px;font-size:14px}
+  .ok{color:#0a7a2f;font-weight:800}
+  .bad{color:#b42318}
+
+  .overlay{position:fixed;inset:0;background:rgba(0,0,0,.45);display:none;align-items:center;justify-content:center;padding:16px}
+  .overlay.open{display:flex}
+  .modal{
+    width:min(920px, 100%);
+    max-height:92vh;
+    overflow-y:auto;
+    background:#fff;
+    border:1px solid #d0d7de;
+    border-radius:14px;
+    padding:18px;
+    box-shadow:0 18px 50px rgba(0,0,0,.2);
+  }
+  .modal-header{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:14px}
+  .modal-title{font-weight:900;font-size:20px}
+  .xbtn{border:2px solid #d0d7de;background:#fff;border-radius:10px;padding:10px 14px;cursor:pointer;font-weight:900;font-size:16px}
+
+  .grid{
+    display:grid;
+    grid-template-columns:130px 110px minmax(260px,1fr);
+    gap:12px;
+    align-items:center;
+  }
+  .grid.con-unidades{
+    grid-template-columns:130px 110px 110px minmax(260px,1fr);
+  }
+  .grid.con-grj-cajas{
+    grid-template-columns:130px 110px 110px 40px minmax(260px,1fr);
+  }
+  .grid .h{font-weight:900;font-size:16px;color:#333}
+  .grid input[data-role="cajas"],
+  .grid input[data-role="kg-grj"],
+  .grid input[data-role="cajas-grj"]{
+    width:100% !important;
+    min-width:0;
+    height:44px;
+    font-size:18px;
+    text-align:center;
+    letter-spacing:0 !important;
+  }
+
+  .descCell{
+    font-size:16px;
+    color:#333;
+    line-height:1.3;
+    white-space:normal;
+    word-break:break-word;
+    overflow-wrap:anywhere;
+  }
+
+  .modal-actions{display:flex;gap:10px;justify-content:flex-end;margin-top:14px}
+  .btn-primary{background:#111;color:#fff;border:0;padding:12px 18px;font-size:15px}
+  .btn-secondary{background:#fff;padding:12px 18px;font-size:15px}
+  .hint{font-size:14px;color:#444;margin:10px 0 0}
+
+  .hidden{display:none}
+
+  .successBox{
+    display:none;
+    margin-top:12px;
+    border:2px solid #c7e8d1;
+    background:#f3fbf6;
+    border-radius:12px;
+    padding:12px;
+  }
+  .successBox .title{font-weight:900;margin:0 0 6px}
+  .successCode{
+    font-size:22px;
+    font-weight:900;
+    letter-spacing:2px;
+    margin:6px 0 10px;
+  }
+  .okBtn{
+    background:#111;color:#fff;border:0;
+    padding:10px 14px;border-radius:10px;font-weight:900;
+  }
+  .codeRO{
+    background:#f6f8fa;
+    width:100% !important;
+    height:44px;
+    font-size:18px;
+    font-weight:800;
+    text-align:center !important;
+    letter-spacing:0 !important;
+  }
+
+  /* ===== Restyle tipo EnviosTall ===== */
+  .card{max-width:720px;padding:24px}
+
+  .header-top{
+    display:grid;
+    grid-template-columns:1fr auto 1fr;
+    align-items:center;
+    gap:12px;
+    margin-bottom:18px;
+  }
+  .header-top > :first-child{ justify-self:start; }
+  .header-top > :last-child{ justify-self:end; }
+  .header-top h2{
+    margin:0;
+    grid-column:2;
+    font-size:36px;
+    font-weight:800;
+    text-align:center;
+    line-height:1.1;
+  }
+  .btn-home{
+    height:54px;
+    padding:0 20px;
+    border-radius:12px;
+    border:2px solid #d0d7de;
+    background:#fff;
+    color:#111;
+    font-weight:700;
+    font-size:18px;
+    cursor:pointer;
+    white-space:nowrap;
+  }
+  .send{
+    height:54px;
+    padding:0 22px;
+    border-radius:12px;
+    font-size:18px;
+    font-weight:800;
+  }
+
+  /* Botones de tallerista como cards grandes */
+  .talleristas-grid{
+    display:grid;
+    grid-template-columns:repeat(2, 1fr);
+    gap:14px;
+    margin:10px 0;
+  }
+  .tall-btn{
+    min-height:100px;
+    border-radius:18px;
+    border:3px solid #c9c9c9;
+    background:#fff;
+    color:#111;
+    font-size:30px;
+    font-weight:700;
+    cursor:pointer;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+  }
+  .tall-btn.active{ background:#111;color:#fff;border-color:#111; }
+  .tall-btn:disabled{ opacity:.4;cursor:not-allowed; }
+
+  /* LK / CH */
+  .marca-grid{
+    display:grid;
+    grid-template-columns:repeat(2, 1fr);
+    gap:14px;
+    margin:10px 0;
+  }
+  .marca-btn{
+    min-height:70px;
+    border-radius:16px;
+    border:3px solid #c9c9c9;
+    background:#fff;
+    color:#111;
+    font-size:26px;
+    font-weight:800;
+    cursor:pointer;
+  }
+  .marca-btn.active{ background:#111;color:#fff;border-color:#111; }
+  .marca-btn:disabled{ opacity:.4;cursor:not-allowed; }
+
+  .fecha-row{ align-items:center;gap:10px;margin-top:14px; }
+  .fecha-row label{ font-weight:800;font-size:18px; }
+  #fechaEnvio{ height:44px;font-size:18px;border-radius:10px;border:2px solid #d0d7de;padding:0 12px; }
+  .status{ font-size:16px; }
+</style>
+</head>
+
+<body>
+ <script>
+   function gpHome(){
+     var r = sessionStorage.getItem('gp_role') || 'admin';
+     window.location.href = (r === 'envios') ? '../../envios-only.html' : '../../Inicio/index.html';
+   }
+ </script>
+<div class="card">
+  <div class="header-top">
+    <button onclick="gpHome()" class="btn-home" type="button">← Inicio</button>
+    <h2 id="recepcionTitulo">Recepción Cervantes</h2>
+    <button id="enviar" class="send" type="button" disabled>Enviar</button>
+  </div>
+
+  <div class="talleristas-grid">
+    <button id="poly" class="tall-btn" type="button">Poly</button>
+    <button id="martin" class="tall-btn" type="button">Martin</button>
+    <button id="carlos" class="tall-btn" type="button">Carlos</button>
+    <button id="lucho" class="tall-btn" type="button">Lucho</button>
+  </div>
+
+  <div class="marca-grid">
+    <button id="lk" class="marca-btn" type="button" disabled>LK</button>
+    <button id="ch" class="marca-btn" type="button" disabled>CH</button>
+  </div>
+
+  <div id="nombreTallProv" class="status"></div>
+
+  <div class="row fecha-row">
+    <label>Fecha:</label>
+    <input type="date" id="fechaEnvio">
+  </div>
+
+  <div id="status" class="status bad">Seleccioná un nombre para continuar.</div>
+
+  <div id="successBox" class="successBox">
+    <div class="title">Envío registrado</div>
+    <div>Tu código de envío:</div>
+    <div id="successCode" class="successCode">—</div>
+    <button id="okBtn" class="okBtn" type="button">OK</button>
+  </div>
+
+  <iframe name="sheet_iframe" style="display:none"></iframe>
+  <form id="sheetForm" action="https://script.google.com/macros/s/AKfycbz3jZ7oahGOULPWKnTJGTTh_HIpLpyILu8tWkNHg6U_r5s7R3osFh3cQV5G7FUq8oXs/exec" method="POST" target="sheet_iframe" class="hidden">
+    <input type="hidden" name="payload" id="payloadField" value="">
+  </form>
+</div>
+
+<div id="overlay" class="overlay" aria-hidden="true">
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+    <div class="modal-header">
+      <div id="modalTitle" class="modal-title">Código y Cajas</div>
+      <button id="closeModal" class="xbtn" type="button">✕</button>
+    </div>
+
+    <div class="grid" id="modalGridHeader" style="margin-bottom:8px">
+      <div class="h">Código</div>
+      <div class="h" id="modalCajasHeader">Cajas</div>
+      <div class="h" id="modalUnidadesHeader" class="hidden">Unidades</div>
+      <div class="h" id="modalCajasGrjHeader" class="hidden">Cajas</div>
+      <div class="h" id="modalTandaHeader" class="hidden" title="Tandas">T</div>
+      <div class="h">Descripción</div>
+    </div>
+
+    <div id="lines" class="grid"></div>
+
+    <div class="hint" id="modalHint">Tip: completá solo cajas. Solo acepta números enteros.</div>
+
+    <div class="modal-actions">
+      <button id="cancelModal" class="xbtn btn-secondary" type="button">Cancelar</button>
+      <button id="btnLimpiarRec" class="xbtn btn-secondary" type="button" title="Vaciar todo lo cargado">🗑 Limpiar</button>
+      <button id="sendModal" class="xbtn btn-primary" type="button">Enviar</button>
+    </div>
+
+    <div id="modalMsg" class="status" style="margin-top:10px"></div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+
+<script>
+  const SUCURSAL = "Cerv";
+
+  const SUPABASE_URL = "https://hrxfctzncixxqmpfhskv.supabase.co";
+  const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhyeGZjdHpuY2l4eHFtcGZoc2t2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzI3MjQyNjEsImV4cCI6MjA4ODMwMDI2MX0.4L6wguch8UZGhC2VpzrWcCjJGUV-IkYsl9JoCWrOLUs";
+
+  const PARTES_TABLE = "Partes x Tallerista";
+  const ENTREGAS_TABLE = "Entregas Tallerista Cervantes";
+
+  const WEBAPP_BASE = "https://script.google.com/macros/s/AKfycbz3jZ7oahGOULPWKnTJGTTh_HIpLpyILu8tWkNHg6U_r5s7R3osFh3cQV5G7FUq8oXs/exec";
+
+  // GRJ_COMPONENTES y GRJ_PESOS: por defecto hardcoded como fallback (si falla BD o primer render).
+  // Se sobrescriben con valores de Supabase (tabla GRJ_Componentes + vista v_grj_componentes_con_peso)
+  // vía cargarGRJDesdeBD() al iniciar. Migración 2026-04-19: fuente de verdad ahora es BD.
+  let GRJ_COMPONENTES = {
+    GRJ7:  ["A10","C10","V9"],
+    GRJ9:  ["A15","C10","V9"],
+    GRJ1:  ["C1","C10","V9"],
+    GRJ10: ["Fleje31","Fleje32","LLF7B","LLF8"],
+    G3:    ["G3"],
+    G4:    ["G4"],
+    558:   ["BOM8","BOMB12","CCV2B"]
+  };
+  let GRJ_PESOS = {
+    GRJ7:  0.0177 + 0.0037 + 0.000567,
+    GRJ9:  0.0177 + 0.0037 + 0.000567,
+    GRJ1:  0.0293 + 0.0037 + 0.000567,
+    GRJ10: 0.01463 + 0.01603 + 0.001590 + 0.035833,
+    G3:    0.035013,
+    G4:    0.045433,
+    558:   0.0147
+  };
+  function isGRJ(codigo){ return Boolean(GRJ_COMPONENTES[codigo]); }
+
+  // Transformaciones 1:1: codigos que están en GRJ_COMPONENTES (para descontar el componente)
+  // pero el usuario los carga en CAJAS/UNIDADES (no en Kg). Ej: M6 (Poly: M10→M6), M8 (Poly: M9→M8).
+  // El input se interpreta literal y se inserta como Cod=componente con Cajas=user_input + Cod_GRJ=cod
+  // para trazabilidad. Diferente de los GRJ "reales" que se cargan en Kg.
+  // Se deriva de GRJ_Componentes.es_transformacion_unidades=TRUE (cargado en cargarGRJDesdeBD).
+  let TRANSFORMACION_UNIDADES = new Set();
+  function esTransUnidades(codigo){ return TRANSFORMACION_UNIDADES.has(codigo); }
+  function esGrjRealKg(codigo){ return isGRJ(codigo) && !esTransUnidades(codigo); }
+
+  async function cargarGRJDesdeBD(){
+    try {
+      const [respComp, respFlag] = await Promise.all([
+        sb.from("v_grj_componentes_con_peso").select("cod_grj,componente,orden,peso_componente"),
+        sb.from("GRJ_Componentes").select("cod_grj,es_transformacion_unidades")
+      ]);
+      if (respComp.error || !respComp.data || !respComp.data.length) return;
+      const comp = {}, pesos = {};
+      for (const r of respComp.data){
+        if (!comp[r.cod_grj]) { comp[r.cod_grj] = []; pesos[r.cod_grj] = 0; }
+        comp[r.cod_grj].push({ c: r.componente, o: r.orden||0 });
+        pesos[r.cod_grj] += Number(r.peso_componente) || 0;
+      }
+      for (const cod of Object.keys(comp)){
+        GRJ_COMPONENTES[cod] = comp[cod].sort((a,b)=>a.o-b.o).map(x=>x.c);
+        GRJ_PESOS[cod] = pesos[cod];
+      }
+      // Poblar TRANSFORMACION_UNIDADES desde flag
+      if (!respFlag.error && respFlag.data) {
+        const trans = new Set();
+        respFlag.data.forEach(r => {
+          if (r.es_transformacion_unidades) trans.add(r.cod_grj);
+        });
+        TRANSFORMACION_UNIDADES = trans;
+      }
+    } catch(e){ /* silencioso */ }
+  }
+
+  // Descripciones para códigos de sector que no están en despieceMap (que usa CODs de artículo)
+  // Sectores SC que al entregar deben incrementar SC Kg.
+  // Se carga al inicio desde SC Kg.incrementa_sc_al_entregar=TRUE. Fallback hardcoded preservado.
+  let SC_SECTORES = new Set(["G3","G4"]);
+
+  (async function cargarSCSectores(){
+    try {
+      const sbTmp = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+      const { data, error } = await sbTmp.from("SC Kg").select("SC").eq("incrementa_sc_al_entregar", true);
+      if (error) { console.warn("[Recep Cervantes] No se pudo cargar SC_SECTORES:", error.message); return; }
+      if (data && data.length) SC_SECTORES = new Set(data.map(r => String(r.SC).trim()));
+    } catch (e) { console.warn("[Recep Cervantes] cargarSCSectores fallo:", e); }
+  })();
+
+  const DESC_EXTRA = {
+    G3: "Cpo Sacacorcho 520 p/cromar",
+    G4: "Cpo Sacacorcho 521 p/cromar",
+    JF1: "Tochos Zinc p/Rectificar"
+  };
+
+  // Qué artículos van a cada empresa por tallerista
+  // Si la empresa tiene lista explícita → solo esos; si no tiene lista → todo menos los de la otra empresa
+  const ARTICULOS_EMPRESA = {
+    CARLOS: { LK: ["GRJ7","GRJ9","GRJ10"], CH: [], never: ["A10","C1","C10","A15"] }, // CH va por Virgilio
+    MARTIN: { LK: ["GRJ1","GRJ7","G3","G4","X5","558"], CH: [], never: ["A10","C1","C10","A15","V9","X1","Toch"] }, // CH va por Virgilio. Toch ya no aplica (Lucho lo reemplaza con JF1)
+    POLY:   { LK: ["M6"], CH: ["M8"], never: ["M10","M9"] }, // En Cervantes Poly SOLO carga las transformaciones 1:1 (M6→M10 LK / M8→M9 CH). Los demás artículos de Poly (031/034/066/108/502/512/513/550 LK; 713/836/867 CH) se reciben en Virgilio.
+    LUCHO:  { LK: ["JF1"], CH: [], never: [] } // Lucho devuelve JF1 (Tochos Zinc p/Rectificar) tras procesar F7
+  };
+
+  const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+  // Sanity check: validar que Talleristas con rec_cerv=TRUE coincida con los botones hardcoded.
+  // Si diverge (alguien activó/desactivó rec_cerv en BD), avisar por consola.
+  // Refactor completo (botones dinamicos + ARTICULOS_EMPRESA en BD) pendiente.
+  (async function validarTalleristasCervantes(){
+    try {
+      const { data, error } = await sb
+        .from("Tall_ProvAT_PS")
+        .select("nombre")
+        .eq("rec_cerv", true)
+        .eq("activo", true);
+      if (error) { console.warn("[Recep Cervantes] No se pudo validar Talleristas:", error.message); return; }
+      const enBD = new Set((data||[]).map(r => String(r.nombre).trim()));
+      const hardcoded = new Set(["Carlos","Martin","Poly","Lucho"]);
+      const faltan = [...enBD].filter(n => !hardcoded.has(n));
+      const sobran = [...hardcoded].filter(n => !enBD.has(n));
+      if (faltan.length || sobran.length) {
+        console.warn("[Recep Cervantes] Divergencia con tabla Talleristas (rec_cerv=TRUE):",
+          { en_BD_no_en_HTML: faltan, en_HTML_no_en_BD: sobran });
+      }
+    } catch (e) { console.warn("[Recep Cervantes] Validacion Talleristas fallo:", e); }
+  })();
+
+  // Precargar descripciones de artículos desde Despiece
+  let despieceMap = new Map();
+  const despiecePromise = (async function cargarDespiece() {
+    const PAGE = 1000; let from = 0;
+    while (true) {
+      const { data, error } = await sb.from("Despiece x Articulo").select("COD, ARTICULO").range(from, from + PAGE - 1);
+      if (error || !data || !data.length) break;
+      data.forEach(r => {
+        const cod = String(r.COD || "").trim();
+        if (cod && !despieceMap.has(cod)) despieceMap.set(cod, r.ARTICULO || "");
+      });
+      if (data.length < PAGE) break;
+      from += PAGE;
+    }
+  })();
+
+  const poly = document.getElementById("poly");
+  const martin = document.getElementById("martin");
+  const carlos = document.getElementById("carlos");
+
+  const lk = document.getElementById("lk");
+  const ch = document.getElementById("ch");
+
+  const enviar = document.getElementById("enviar");
+  const status = document.getElementById("status");
+  const nombreTallProv = document.getElementById("nombreTallProv");
+
+  const successBox = document.getElementById("successBox");
+  const successCodeEl = document.getElementById("successCode");
+  const okBtn = document.getElementById("okBtn");
+
+  const overlay = document.getElementById("overlay");
+  const closeModal = document.getElementById("closeModal");
+  const cancelModal = document.getElementById("cancelModal");
+  const sendModal = document.getElementById("sendModal");
+  const linesWrap = document.getElementById("lines");
+  const modalMsg = document.getElementById("modalMsg");
+
+  const sheetForm = document.getElementById("sheetForm");
+  const payloadField = document.getElementById("payloadField");
+  const iframe = document.querySelector('iframe[name="sheet_iframe"]');
+  const fechaEnvioInput = document.getElementById("fechaEnvio");
+
+  // Inicializar fecha al día de hoy
+  fechaEnvioInput.value = arDateISO();
+
+  let tallerista = null;
+  let empresa = null;
+  let codigoProveedorResuelto = "";
+  let codigosPorNombre = {};
+  let isSubmitting = false;
+  let lastSendCode = null;
+  let fetchedCodes = [];
+  let allCodesForTallerista = [];
+  let cachePartes = {};
+  let proveedorValido = false;
+  let marcasDisponibles = [];
+
+  function formatName(nombre){
+    const mapaNombres = {
+      POLY: "Poly",
+      MARTIN: "Martin",
+      CARLOS: "Carlos",
+      LUCHO: "Lucho"
+    };
+
+    return mapaNombres[nombre] || (nombre.charAt(0) + nombre.slice(1).toLowerCase());
+  }
+
+  async function cargarMapaCodigos() {
+    const r = await fetch(`${WEBAPP_BASE}?action=getCodigosBotones`);
+    const j = await r.json();
+    if (!j.ok) throw new Error(j.error || "No se pudo cargar Cod x Tall");
+    codigosPorNombre = j.mapa || {};
+  }
+
+  // Mapa cod → linea (LK/CH) para filtrar por empresa cuando ARTICULOS_EMPRESA
+  // no tiene lista explícita (caso Poly: lista por linea, no por GRJ).
+  const codeLineaMap = new Map();
+
+  // Devuelve array de strings (solo codigos), con cache por tallerista
+  async function fetchCodesForTallerista(nombreTallerista, cacheKey){
+    if (cachePartes[cacheKey]) return cachePartes[cacheKey];
+    const { data, error } = await sb
+      .from(PARTES_TABLE)
+      .select("cod, cod_art, linea")
+      .ilike("tallerista", nombreTallerista.trim().split(/\s+/)[0] + "%");
+    if (error){ throw new Error(`Supabase error: ${error.message}`); }
+    const codes = [];
+    const seen = new Set();
+    (data || []).forEach(r => {
+      const codigo = String(r.cod || r.cod_art || "").trim();
+      if (!codigo) return;
+      const linea = String(r.linea || "").trim().toUpperCase();
+      if (linea && !codeLineaMap.has(codigo)) codeLineaMap.set(codigo, linea);
+      if (seen.has(codigo)) return;
+      seen.add(codigo);
+      codes.push(codigo);
+    });
+    codes.sort();
+    cachePartes[cacheKey] = codes;
+    return codes;
+  }
+
+  // Enriquece codigos con descripcion desde despieceMap (se llama al momento de usar)
+  function codesToItems(codes){
+    return codes.map(codigo => ({ codigo, desc: despieceMap.get(codigo) || DESC_EXTRA[codigo] || "" }));
+  }
+
+  // Filtra codigos segun reglas ARTICULOS_EMPRESA para tallerista+empresa
+  function filterByEmpresa(allCodes, tall, emp){
+    const reglas = ARTICULOS_EMPRESA[tall];
+    // Si hay lista explícita para esta empresa, devolverla directamente
+    // (no filtrar allCodes: los artículos GRJ a entregar ya no están en Partes x Tallerista)
+    if (reglas && reglas[emp]) return [...reglas[emp]];
+    // Sin lista explícita: filtrar primero por Linea (un cod_art tiene una sola linea
+    // en Articulos VxT). Si el cod no tiene linea cargada, dejarlo pasar (defensivo).
+    let codes = allCodes.filter(c => {
+      const linea = codeLineaMap.get(c);
+      return !linea || linea === emp;
+    });
+    if (!reglas) return codes;
+    // Excluir los "never" y los que van a otras empresas (lista explícita de la otra empresa)
+    const never = new Set(reglas.never || []);
+    if (never.size) codes = codes.filter(c => !never.has(c));
+    const excluir = new Set();
+    Object.entries(reglas).forEach(([e, codigos]) => {
+      if (e !== emp && e !== "never" && codigos) codigos.forEach(c => excluir.add(c));
+    });
+    return codes.filter(c => !excluir.has(c));
+  }
+
+  function setMarcaButtons(){
+    lk.disabled = false;
+    ch.disabled = false;
+  }
+
+  function selectTallerista(nombre){
+    tallerista = nombre;
+    empresa = null;
+    fetchedCodes = [];
+    allCodesForTallerista = [];
+    proveedorValido = false;
+    codigoProveedorResuelto = "";
+    marcasDisponibles = [];
+
+    poly.classList.toggle("active", nombre === "POLY");
+    martin.classList.toggle("active", nombre === "MARTIN");
+    carlos.classList.toggle("active", nombre === "CARLOS");
+    lucho.classList.toggle("active", nombre === "LUCHO");
+
+    // Título dinámico: "Recepción de <Tall>"
+    const recTit = document.getElementById("recepcionTitulo");
+    if (recTit) recTit.textContent = nombre ? `Recepción de ${formatName(nombre)}` : "Recepción Cervantes";
+
+    lk.classList.remove("active");
+    ch.classList.remove("active");
+    lk.disabled = true;
+    ch.disabled = true;
+
+    nombreTallProv.className = "status";
+    nombreTallProv.textContent = "Buscando marcas disponibles...";
+    status.className = "status bad";
+    status.textContent = "Buscando...";
+    update();
+
+    cargarOpcionesDeTallerista();
+  }
+
+  async function cargarOpcionesDeTallerista(){
+    try{
+      const nombreFormateado = formatName(tallerista);
+      const allCodes = await fetchCodesForTallerista(nombreFormateado, tallerista);
+      allCodesForTallerista = allCodes;
+
+      if (!allCodes.length){
+        nombreTallProv.className = "status bad";
+        nombreTallProv.textContent = `No se encontraron artículos para ${nombreFormateado}.`;
+        update();
+        return;
+      }
+
+      proveedorValido = true;
+      setMarcaButtons();
+      nombreTallProv.className = "status ok";
+      nombreTallProv.textContent = `${nombreFormateado}: elegí LK o CH.`;
+
+      if (empresa){
+        fetchedCodes = codesToItems(filterByEmpresa(allCodes, tallerista, empresa));
+      }
+      update();
+
+    } catch(e){
+      console.error(e);
+      nombreTallProv.className = "status bad";
+      nombreTallProv.textContent = "Error consultando artículos.";
+      update();
+    }
+  }
+
+  function selectEmpresa(v){
+    empresa = v;
+    lk.classList.toggle("active", v === "LK");
+    ch.classList.toggle("active", v === "CH");
+    if (allCodesForTallerista.length){
+      fetchedCodes = codesToItems(filterByEmpresa(allCodesForTallerista, tallerista, empresa));
+    }
+    resolverCodProveedor();
+  }
+
+  poly.onclick = () => selectTallerista("POLY");
+  martin.onclick = () => selectTallerista("MARTIN");
+  carlos.onclick = () => selectTallerista("CARLOS");
+  lucho.onclick = () => selectTallerista("LUCHO");
+  lk.onclick = () => selectEmpresa("LK");
+  ch.onclick = () => selectEmpresa("CH");
+
+  function ready(){
+    return !isSubmitting && !!tallerista && !!empresa && proveedorValido;
+  }
+
+  function update(){
+    const ok = ready();
+    enviar.disabled = !ok;
+    enviar.classList.toggle("enabled", ok);
+
+    if (ok) {
+      status.className = "status ok";
+      status.textContent = "Listo para continuar.";
+    } else if (tallerista && !empresa && marcasDisponibles.length > 1) {
+      status.className = "status bad";
+      status.textContent = "Elegí LK o CH.";
+    } else {
+      status.className = "status bad";
+      status.textContent = "Completá todo para continuar.";
+    }
+  }
+
+  function resolverCodProveedor(){
+    codigoProveedorResuelto = "";
+
+    if (!tallerista || !empresa){
+      update();
+      return;
+    }
+
+    const fila = codigosPorNombre[tallerista];
+    if (fila){
+      codigoProveedorResuelto = String(fila[empresa] || "").trim();
+    }
+
+    const nombreFormateado = formatName(tallerista);
+    if (codigoProveedorResuelto){
+      nombreTallProv.className = "status ok";
+      nombreTallProv.textContent = `${nombreFormateado} / ${empresa} - cód. prov. ${codigoProveedorResuelto}`;
+    } else {
+      nombreTallProv.className = "status ok";
+      nombreTallProv.textContent = `${nombreFormateado} / ${empresa}`;
+    }
+
+    update();
+  }
+
+  function arDateISO(){
+    const fmt = new Intl.DateTimeFormat("sv-SE", {
+      timeZone: "America/Argentina/Buenos_Aires",
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit"
+    });
+    return fmt.format(new Date());
+  }
+
+  function genNumericCode(len = 4){
+  const min = Math.pow(10, len - 1);
+  const max = Math.pow(10, len) - 1;
+  return String(Math.floor(min + Math.random() * (max - min + 1)));
+}
+
+  function showSuccess(code){
+    successCodeEl.textContent = code;
+    successBox.style.display = "block";
+  }
+
+  function hideSuccess(){
+    successBox.style.display = "none";
+    successCodeEl.textContent = "—";
+  }
+
+  function closeModalFn(){
+    overlay.classList.remove("open");
+    overlay.setAttribute("aria-hidden","true");
+  }
+
+  function openModalFn(){
+    modalMsg.textContent = "";
+    modalMsg.className = "status";
+    overlay.classList.add("open");
+    overlay.setAttribute("aria-hidden","false");
+  }
+
+  function resetAll(){
+    tallerista = null;
+    empresa = null;
+    codigoProveedorResuelto = "";
+    fetchedCodes = [];
+    allCodesForTallerista = [];
+    proveedorValido = false;
+    marcasDisponibles = [];
+
+    poly.classList.remove("active");
+    martin.classList.remove("active");
+    carlos.classList.remove("active");
+    lk.classList.remove("active");
+    ch.classList.remove("active");
+    lk.disabled = true;
+    ch.disabled = true;
+
+    nombreTallProv.textContent = "";
+    nombreTallProv.className = "status";
+
+    closeModalFn();
+    linesWrap.innerHTML = "";
+    modalMsg.textContent = "";
+    modalMsg.className = "status";
+
+    isSubmitting = false;
+    lastSendCode = null;
+
+    sendModal.disabled = false;
+    closeModal.disabled = false;
+    cancelModal.disabled = false;
+
+    hideSuccess();
+    update();
+  }
+
+  okBtn.onclick = () => resetAll();
+
+  function buildModalLinesWithCodes(items){
+    linesWrap.innerHTML = "";
+
+    if (!items.length){
+      const msg = document.createElement("div");
+      msg.style.gridColumn = "1 / -1";
+      msg.className = "status bad";
+      msg.textContent = "No hay códigos asociados.";
+      linesWrap.appendChild(msg);
+      return;
+    }
+
+    // Actualizar header y hint según si hay items GRJ "real" (Kg) o no.
+    // Las transformaciones 1:1 (M6, M8) cuentan como cajas, no GRJ.
+    const hayGrj = items.some(item => esGrjRealKg(item.codigo));
+    const esCarlos = tallerista === "CARLOS";
+    const modalTitle = document.getElementById("modalTitle");
+    const modalGridHeader = document.getElementById("modalGridHeader");
+    const hdrCajas = document.getElementById("modalCajasHeader");
+    const hdrUnidades = document.getElementById("modalUnidadesHeader");
+    const hintEl = document.getElementById("modalHint");
+
+    if (modalTitle) {
+      if (esCarlos) {
+        modalTitle.textContent = "Código y Kg";
+      } else {
+        modalTitle.textContent = hayGrj ? "Código y Kg" : "Código y Cajas";
+      }
+    }
+
+    // Detectar si TODOS los items son transformaciones 1:1 (M6/M8/etc) → mostrar "Unidades" en lugar de "Cajas".
+    // Poly entrega M6 (LK) o M8 (CH), ambas transformaciones 1:1, asi que su header pasa a "Unidades".
+    const todosTrans = items.length > 0 && items.every(it => esTransUnidades(it.codigo));
+
+    if (hdrCajas) {
+      if (esCarlos) {
+        hdrCajas.textContent = "Kg";
+      } else {
+        hdrCajas.textContent = hayGrj ? "Kg" : (todosTrans ? "Unidades" : "Cajas");
+      }
+    }
+
+    if (hdrUnidades) {
+      hdrUnidades.classList.toggle("hidden", !esCarlos);
+    }
+
+    // Header extra "Cajas" para GRJ Kg (Lucho, etc): operario carga Kg + Cajas manualmente.
+    const hdrCajasGrj = document.getElementById("modalCajasGrjHeader");
+    if (hdrCajasGrj) {
+      hdrCajasGrj.classList.toggle("hidden", !(hayGrj && !esCarlos));
+    }
+    // Header T (tandas) — solo cuando hay GRJ Kg
+    const hdrTanda = document.getElementById("modalTandaHeader");
+    if (hdrTanda) {
+      hdrTanda.classList.toggle("hidden", !(hayGrj && !esCarlos));
+    }
+
+    if (modalGridHeader) {
+      modalGridHeader.classList.toggle("con-unidades", esCarlos);
+      modalGridHeader.classList.toggle("con-grj-cajas", hayGrj && !esCarlos);
+    }
+
+    linesWrap.classList.toggle("con-unidades", esCarlos);
+    linesWrap.classList.toggle("con-grj-cajas", hayGrj && !esCarlos);
+
+    if (hintEl) {
+      if (esCarlos) {
+        hintEl.textContent = "Tip: completá Kg y Unidades por artículo.";
+      } else if (hayGrj) {
+        hintEl.textContent = "Tip: completá Kg + Cajas por artículo (Kg decimal, Cajas entero).";
+      } else if (todosTrans) {
+        hintEl.textContent = "Tip: completá unidades por artículo. Solo acepta números enteros.";
+      } else {
+        hintEl.textContent = "Tip: completá solo cajas. Solo acepta números enteros.";
+      }
+    }
+
+    items.forEach((item, i) => {
+      // esGrj solo para los que se cargan en Kg. Las transformaciones 1:1
+      // (M6, M8) son GRJ a nivel BD pero se cargan como cajas en el modal.
+      const esGrj = esGrjRealKg(item.codigo);
+      const esCarlosInput = tallerista === "CARLOS";
+
+      const code = document.createElement("input");
+      code.type = "text";
+      code.value = item.codigo;
+      code.readOnly = true;
+      code.className = "codeRO";
+      code.setAttribute("data-role","codigo");
+      code.setAttribute("data-idx", String(i));
+
+      const kg = document.createElement("input");
+      kg.type = "text";
+      kg.inputMode = esCarlosInput ? "decimal" : (esGrj ? "decimal" : "numeric");
+      kg.placeholder = esCarlosInput ? "0 kg" : (esGrj ? "0 kg" : "0");
+      kg.setAttribute("data-role", esCarlosInput ? "kg-carlos" : (esGrj ? "kg-grj" : "cajas"));
+      kg.setAttribute("data-idx", String(i));
+
+      kg.addEventListener("input", () => {
+        if (esCarlosInput || esGrj){
+          // Permitir coma o punto como separador decimal (se normaliza a punto al parsear).
+          kg.value = kg.value.replace(/[^\d.,]/g, "").replace(/([.,].*)[.,]/g, "$1");
+        } else {
+          kg.value = kg.value.replace(/\D/g, "");
+        }
+      });
+
+      kg.addEventListener("keydown", (e) => {
+        if (e.key === "Enter"){
+          e.preventDefault();
+          if (esCarlosInput){
+            const next = linesWrap.querySelector(`input[data-role="unidades"][data-idx="${i}"]`);
+            if (next) next.focus();
+          } else {
+            const role = esGrj ? "kg-grj" : "cajas";
+            const next = linesWrap.querySelector(`input[data-role="${role}"][data-idx="${i + 1}"]`);
+            if (next) next.focus();
+          }
+        }
+      });
+
+      linesWrap.appendChild(code);
+      linesWrap.appendChild(kg);
+
+      // Agregar input de unidades solo para Carlos
+      if (esCarlosInput){
+        const uni = document.createElement("input");
+        uni.type = "text";
+        uni.inputMode = "numeric";
+        uni.placeholder = "0 uni";
+        uni.setAttribute("data-role", "unidades");
+        uni.setAttribute("data-idx", String(i));
+
+        uni.addEventListener("input", () => {
+          uni.value = uni.value.replace(/\D/g, "");
+        });
+
+        uni.addEventListener("keydown", (e) => {
+          if (e.key === "Enter"){
+            e.preventDefault();
+            const next = linesWrap.querySelector(`input[data-role="kg-carlos"][data-idx="${i + 1}"]`);
+            if (next) next.focus();
+          }
+        });
+
+        linesWrap.appendChild(uni);
+      }
+
+      // Para GRJ Kg (Lucho, etc): agregar input Cajas manual (no esCarlos)
+      if (esGrj && !esCarlosInput){
+        const cajGrj = document.createElement("input");
+        cajGrj.type = "text";
+        cajGrj.inputMode = "numeric";
+        cajGrj.placeholder = "0 caj";
+        cajGrj.setAttribute("data-role", "cajas-grj");
+        cajGrj.setAttribute("data-idx", String(i));
+
+        cajGrj.addEventListener("input", () => {
+          cajGrj.value = cajGrj.value.replace(/\D/g, "");
+        });
+
+        cajGrj.addEventListener("keydown", (e) => {
+          if (e.key === "Enter"){
+            e.preventDefault();
+            const next = linesWrap.querySelector(`input[data-role="kg-grj"][data-idx="${i + 1}"]`);
+            if (next) next.focus();
+          }
+        });
+
+        linesWrap.appendChild(cajGrj);
+
+        // Botón T (tandas) — solo para GRJ Kg (Lucho, etc)
+        const tandaBtn = document.createElement("button");
+        tandaBtn.type = "button";
+        const tandaArr = tandasByIdxRec[i] || [];
+        const hayTandasRow = tandaArr.length > 0;
+        tandaBtn.className = "tanda-trigger" + (hayTandasRow ? " has-tandas" : "");
+        tandaBtn.textContent = hayTandasRow ? String(tandaArr.length) : "+";
+        tandaBtn.title = "Cargar por tandas";
+        tandaBtn.setAttribute("data-role", "tanda-btn");
+        tandaBtn.setAttribute("data-idx", String(i));
+        tandaBtn.addEventListener("click", () => abrirTandasFilaRec(i, item));
+        linesWrap.appendChild(tandaBtn);
+
+        // Si hay tandas, marcar kg/cajas como readonly con totales
+        if (hayTandasRow){
+          const totCaj = tandaArr.reduce((s, t) => s + (Number(t.caj) || 0), 0);
+          const totKg = tandaArr.reduce((s, t) => {
+            const n = parseFloat(String(t.kg || "0").replace(",", "."));
+            return s + (Number.isFinite(n) ? n : 0);
+          }, 0);
+          kg.value = String(totKg);
+          kg.readOnly = true;
+          kg.classList.add("input-with-tandas");
+          cajGrj.value = String(totCaj);
+          cajGrj.readOnly = true;
+          cajGrj.classList.add("input-with-tandas");
+        }
+      }
+
+      const desc = document.createElement("div");
+      desc.className = "descCell";
+      desc.textContent = item.desc || "";
+
+      linesWrap.appendChild(desc);
+    });
+
+    const firstKg = linesWrap.querySelector('input[data-role="cajas"][data-idx="0"]');
+    if (firstKg) firstKg.focus();
+  }
+
+  // Tandas (memoria efímera del modal) — solo aplica a GRJ Kg
+  const tandasByIdxRec = {};
+
+  function abrirTandasFilaRec(idx, item){
+    let initial = tandasByIdxRec[idx] || [];
+    // Preload desde inputs cargados a mano
+    if (initial.length === 0){
+      const kgIn = linesWrap.querySelector(`input[data-role="kg-grj"][data-idx="${idx}"]`);
+      const cajIn = linesWrap.querySelector(`input[data-role="cajas-grj"][data-idx="${idx}"]`);
+      const kg = parseFloat(String(kgIn?.value || "0").replace(",", ".")) || 0;
+      const caj = parseInt(cajIn?.value, 10) || 0;
+      if (kg > 0 || caj > 0) initial = [{ caj, kg, uni: 0 }];
+    }
+    window.tandasPopup.open({
+      titulo: `Tandas — ${item.desc || item.codigo}`,
+      initial,
+      pedirCaj: true,
+      pedirKg: true,
+      pedirUni: false,
+      onConfirm: (tandas, totales) => {
+        if (tandas.length === 0 && totales.caj === 0 && totales.kg === 0){
+          delete tandasByIdxRec[idx];
+          // Limpiar inputs
+          const kgIn = linesWrap.querySelector(`input[data-role="kg-grj"][data-idx="${idx}"]`);
+          const cajIn = linesWrap.querySelector(`input[data-role="cajas-grj"][data-idx="${idx}"]`);
+          if (kgIn){ kgIn.value = ""; kgIn.readOnly = false; kgIn.classList.remove("input-with-tandas"); }
+          if (cajIn){ cajIn.value = ""; cajIn.readOnly = false; cajIn.classList.remove("input-with-tandas"); }
+        } else {
+          tandasByIdxRec[idx] = tandas;
+          const kgIn = linesWrap.querySelector(`input[data-role="kg-grj"][data-idx="${idx}"]`);
+          const cajIn = linesWrap.querySelector(`input[data-role="cajas-grj"][data-idx="${idx}"]`);
+          if (kgIn){ kgIn.value = String(totales.kg); kgIn.readOnly = true; kgIn.classList.add("input-with-tandas"); }
+          if (cajIn){ cajIn.value = String(totales.caj); cajIn.readOnly = true; cajIn.classList.add("input-with-tandas"); }
+        }
+        // Actualizar texto del botón T
+        const btn = linesWrap.querySelector(`button[data-role="tanda-btn"][data-idx="${idx}"]`);
+        if (btn){
+          const arr = tandasByIdxRec[idx] || [];
+          btn.textContent = arr.length > 0 ? String(arr.length) : "+";
+          btn.classList.toggle("has-tandas", arr.length > 0);
+        }
+      }
+    });
+  }
+
+  // Popup confirmación Recepción Cervantes
+  function mostrarConfirmacionRecepcion(items, esCarlos){
+    return new Promise(resolve => {
+      let overlay = document.getElementById("confirmRecepcionOverlay");
+      if (!overlay){
+        overlay = document.createElement("div");
+        overlay.id = "confirmRecepcionOverlay";
+        overlay.style.cssText = "position:fixed;inset:0;background:rgba(0,0,0,.5);display:flex;align-items:center;justify-content:center;z-index:2500;padding:16px";
+        overlay.innerHTML = `
+          <div style="background:#fff;border-radius:14px;width:min(720px,100%);max-height:90vh;display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(0,0,0,.3);overflow:hidden">
+            <div style="background:#111;color:#fff;padding:14px 18px;font-weight:800;font-size:17px">Confirmar Recepción</div>
+            <div id="confirmRecepcionBody" style="padding:14px 18px;overflow-y:auto;flex:1"></div>
+            <div style="padding:12px 18px;display:flex;justify-content:flex-end;gap:10px;border-top:1px solid #e5e7eb">
+              <button id="confirmRecepcionCancel" type="button" style="background:#fff;color:#111;border:2px solid #d0d7de;border-radius:10px;padding:10px 20px;font-weight:800;cursor:pointer;font-size:15px">Cancelar</button>
+              <button id="confirmRecepcionOk" type="button" style="background:#111;color:#fff;border:0;border-radius:10px;padding:10px 24px;font-weight:800;cursor:pointer;font-size:15px">✓ Confirmar Recepción</button>
+            </div>
+          </div>
+        `;
+        document.body.appendChild(overlay);
+      }
+      const body = document.getElementById("confirmRecepcionBody");
+      const rows = items.map(it => {
+        const isGrj = esGrjRealKg(it.codigo);
+        const isTrans = esTransUnidades(it.codigo);
+        let cantidad = "";
+        if (esCarlos) cantidad = `<b>${it.kg}</b> kg · <b>${it.unidades}</b> uni`;
+        else if (isGrj) cantidad = `<b>${it.cajasGrj || 0}</b> caj · <b>${it.kg}</b> kg`;
+        else if (isTrans) cantidad = `<b>${it.cajas}</b> uni`;
+        else cantidad = `<b>${it.cajas}</b> cajas`;
+        return `<tr>
+          <td style="padding:8px 14px;border:1px solid #d0d7de;text-align:center;white-space:nowrap"><b>${esc(it.codigo)}</b></td>
+          <td style="padding:8px 14px;border:1px solid #d0d7de;text-align:center;white-space:nowrap">${esc(it.desc || "")}</td>
+          <td style="padding:8px 14px;border:1px solid #d0d7de;text-align:center;white-space:nowrap">${cantidad}</td>
+        </tr>`;
+      }).join("");
+      body.innerHTML = `
+        <div style="font-weight:700;margin-bottom:10px;color:#555;font-size:15px;text-align:center">${items.length} artículo${items.length>1?'s':''} de <b style="color:#111">${esc(tallerista)}</b></div>
+        <div style="display:flex;justify-content:center">
+          <table style="width:auto;border-collapse:collapse;font-size:16px;table-layout:auto">
+            <thead><tr style="background:#f3f4f6">
+              <th style="padding:8px 14px;border:1px solid #d0d7de;text-align:center;white-space:nowrap;font-size:15px">Código</th>
+              <th style="padding:8px 14px;border:1px solid #d0d7de;text-align:center;white-space:nowrap;font-size:15px">Descripción</th>
+              <th style="padding:8px 14px;border:1px solid #d0d7de;text-align:center;white-space:nowrap;font-size:15px">Cantidad</th>
+            </tr></thead>
+            <tbody>${rows}</tbody>
+          </table>
+        </div>
+      `;
+      overlay.style.display = "flex";
+      const cleanup = () => { overlay.style.display = "none"; };
+      document.getElementById("confirmRecepcionOk").onclick = () => { cleanup(); resolve(true); };
+      document.getElementById("confirmRecepcionCancel").onclick = () => { cleanup(); resolve(false); };
+      overlay.onclick = (e) => { if (e.target === overlay){ cleanup(); resolve(false); } };
+    });
+  }
+
+  // Helper esc local (HTML escape) si no existe
+  function esc(s){ return String(s == null ? "" : s).replaceAll("&","&amp;").replaceAll("<","&lt;").replaceAll(">","&gt;"); }
+
+  function getItemsFromModal(){
+  const codes = Array.from(linesWrap.querySelectorAll('input[data-role="codigo"]'));
+  const esCarlos = tallerista === "CARLOS";
+
+  return codes.map((c, i) => {
+    const cajasEl  = linesWrap.querySelector(`input[data-role="cajas"][data-idx="${i}"]`);
+    const kgGrjEl  = linesWrap.querySelector(`input[data-role="kg-grj"][data-idx="${i}"]`);
+    const cajasGrjEl = linesWrap.querySelector(`input[data-role="cajas-grj"][data-idx="${i}"]`);
+    const kgCarlosEl = linesWrap.querySelector(`input[data-role="kg-carlos"][data-idx="${i}"]`);
+    const unidadesEl = linesWrap.querySelector(`input[data-role="unidades"][data-idx="${i}"]`);
+
+    const cajasStr = cajasEl  ? cajasEl.value.trim()  : "";
+    const kgGrjStr = kgGrjEl  ? kgGrjEl.value.trim() : "";
+    const cajasGrjStr = cajasGrjEl ? cajasGrjEl.value.trim() : "";
+    const kgCarlosStr = kgCarlosEl ? kgCarlosEl.value.trim() : "";
+    const unidadesStr = unidadesEl ? unidadesEl.value.trim() : "";
+
+    const itemBase = fetchedCodes[i] || {};
+
+    return {
+      codigo: String(c.value || "").trim(),
+      cajas: cajasStr,
+      cajasGrj: cajasGrjStr,
+      kg:    kgGrjStr || kgCarlosStr,
+      unidades: unidadesStr,
+      desc:  String(itemBase.desc || "").trim()
+    };
+  });
+}
+
+  function sumCajas(items){
+    return items.reduce((acc, it) => acc + (Number(it.cajas) || 0), 0);
+  }
+
+  function filterItemsToSend(items){
+    const esCarlos = tallerista === "CARLOS";
+    return items.filter(it => {
+      if (esCarlos){
+        const kg = Number(it.kg);
+        const uni = Number(it.unidades);
+        const kgValido = it.kg !== "" && !Number.isNaN(kg) && kg > 0;
+        const uniValido = it.unidades !== "" && !Number.isNaN(uni) && uni > 0;
+        return kgValido || uniValido;
+      }
+      if (esGrjRealKg(it.codigo)){
+        const n = Number(it.kg);
+        return it.kg !== "" && !Number.isNaN(n) && n > 0;
+      }
+      // Transformaciones 1:1 (M6/M8) y normales: validan por cajas
+      const n = Number(it.cajas);
+      return it.cajas !== "" && !Number.isNaN(n) && n > 0;
+    });
+  }
+
+  enviar.onclick = async () => {
+    if (!proveedorValido){
+      status.className = "status bad";
+      status.textContent = "No hay una selección válida.";
+      return;
+    }
+    if (!ready()) return;
+
+    hideSuccess();
+
+    try{
+      enviar.disabled = true;
+      enviar.classList.remove("enabled");
+
+      if (!fetchedCodes.length){
+        status.className = "status bad";
+        status.textContent = "No hay códigos asociados.";
+        return;
+      }
+
+      buildModalLinesWithCodes(fetchedCodes);
+      openModalFn();
+
+    } catch (e){
+      console.error(e);
+      status.className = "status bad";
+      status.textContent = "Error armando la ventana.";
+    } finally {
+      enviar.disabled = !ready();
+      update();
+    }
+  };
+
+  closeModal.onclick = () => { if (!isSubmitting) closeModalFn(); };
+  cancelModal.onclick = () => { if (!isSubmitting) closeModalFn(); };
+
+  // Botón Limpiar — vaciar inputs y tandas del modal actual
+  const btnLimpiarRec = document.getElementById("btnLimpiarRec");
+  if (btnLimpiarRec){
+    btnLimpiarRec.onclick = () => {
+      if (isSubmitting) return;
+      if (!confirm("¿Vaciar todos los datos cargados del modal?")) return;
+      // Limpiar inputs
+      linesWrap.querySelectorAll('input[data-role="cajas"], input[data-role="kg-grj"], input[data-role="cajas-grj"], input[data-role="kg-carlos"], input[data-role="unidades"]').forEach(inp => {
+        inp.value = "";
+        inp.readOnly = false;
+        inp.classList.remove("input-with-tandas");
+      });
+      // Limpiar tandas
+      Object.keys(tandasByIdxRec).forEach(k => delete tandasByIdxRec[k]);
+      // Reset botones T
+      linesWrap.querySelectorAll('button[data-role="tanda-btn"]').forEach(btn => {
+        btn.textContent = "+";
+        btn.classList.remove("has-tandas");
+      });
+      modalMsg.textContent = "";
+    };
+  }
+
+  overlay.addEventListener("click", (e) => {
+    if (!isSubmitting && e.target === overlay) closeModalFn();
+  });
+
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape" && overlay.classList.contains("open") && !isSubmitting) closeModalFn();
+  });
+
+  iframe.addEventListener("load", () => {
+    if (!isSubmitting) return;
+
+    isSubmitting = false;
+    sendModal.disabled = false;
+    closeModal.disabled = false;
+    cancelModal.disabled = false;
+
+    update();
+
+    modalMsg.className = "status ok";
+    modalMsg.textContent = "Enviado a Sheet.";
+    status.className = "status ok";
+    status.textContent = "Enviado a Sheet.";
+
+    closeModalFn();
+
+    if (lastSendCode) showSuccess(lastSendCode);
+  });
+
+  sendModal.onclick = async () => {
+    if (isSubmitting) return;
+
+    if (!fetchedCodes.length){
+      modalMsg.className = "status bad";
+      modalMsg.textContent = "No hay códigos para enviar.";
+      return;
+    }
+
+    const rawItems = getItemsFromModal();
+    const items = filterItemsToSend(rawItems);
+
+    if (items.length === 0){
+      modalMsg.className = "status bad";
+      modalMsg.textContent = "Completá al menos una caja (> 0).";
+      return;
+    }
+
+    const esCarlos = tallerista === "CARLOS";
+    const ok = await mostrarConfirmacionRecepcion(items, esCarlos);
+    if (!ok) return;
+
+    lastSendCode = genNumericCode(4);
+
+    const fechaSeleccionada = fechaEnvioInput.value || arDateISO();
+
+    const payload = {
+      fecha: fechaSeleccionada,
+      empresa,
+      codTallProv: codigoProveedorResuelto,
+      sucursal: SUCURSAL,
+      codigoEnvio: lastSendCode,
+      items
+    };
+
+    try{
+      isSubmitting = true;
+      sendModal.disabled = true;
+      closeModal.disabled = true;
+      cancelModal.disabled = true;
+
+      update();
+
+      modalMsg.className = "status";
+      modalMsg.textContent = "Guardando...";
+
+      const esCarlos = tallerista === "CARLOS";
+
+      // Hoisteado fuera del if/else porque el bloque SC Kg de abajo lo necesita
+      // (antes vivía solo dentro del else y rompía con ReferenceError al enviar).
+      let normalItems = [];
+      let grjItems = esCarlos ? items : [];
+      let transItems = [];
+
+      // Caso Carlos: todos los items tienen Kg y Unidades
+      if (esCarlos){
+        const registrosCarlos = items.map(it => ({
+          "Nombre_Tall": formatName(tallerista),
+          "Codigo_Tall": Number(codigoProveedorResuelto) || 0,
+          "Cod": String(it.codigo || "").trim(),
+          "Cajas": Number(it.unidades) || 0,
+          "Fecha": fechaSeleccionada,
+          "Kg_GRJ": Number(it.kg) || 0,
+          "Cod_GRJ": String(it.codigo || "").trim()
+        }));
+        const { error: sbErr } = await sb.from(ENTREGAS_TABLE).insert(registrosCarlos);
+        if (sbErr) throw new Error("Error guardando en Supabase: " + sbErr.message);
+      } else {
+        // 3 grupos:
+        //  - normalItems: cargados como cajas, insert directo (Cod=cod del item).
+        //  - grjItems: GRJ "real" cargados en Kg, insert por componente con Cod_GRJ/Kg_GRJ.
+        //  - transItems: transformacion 1:1 (M6/M8), cargados como cajas pero insertan
+        //    contra el componente (M10/M9) para que descuente el sector predecesor.
+        normalItems = items.filter(it => !isGRJ(it.codigo));
+        grjItems    = items.filter(it => esGrjRealKg(it.codigo));
+        transItems  = items.filter(it => esTransUnidades(it.codigo));
+
+        // Insertar items normales tal cual
+        if (normalItems.length){
+          const registros = normalItems.map(it => ({
+            "Nombre_Tall": formatName(tallerista),
+            "Codigo_Tall": Number(codigoProveedorResuelto) || 0,
+            "Cod":  String(it.codigo || "").trim(),
+            "Cajas": Number(it.cajas) || 0,
+            "Fecha": fechaSeleccionada
+          }));
+          const { error: sbErr } = await sb.from(ENTREGAS_TABLE).insert(registros);
+          if (sbErr) throw new Error("Error guardando en Supabase: " + sbErr.message);
+        }
+
+        // Para items GRJ: usar Cajas del input manual del operario (campo cajasGrj).
+        // Antes se calculaba units = Math.round(Kg / KgxUni_GRJ); ahora es input directo.
+        // Cod_GRJ y Kg_GRJ siguen para trazabilidad.
+        if (grjItems.length){
+          const registrosGrj = [];
+          grjItems.forEach(it => {
+            const kg    = Number(it.kg) || 0;
+            const units = Number(it.cajasGrj) || 0;
+            (GRJ_COMPONENTES[it.codigo] || []).forEach(comp => {
+              registrosGrj.push({
+                "Nombre_Tall": formatName(tallerista),
+                "Codigo_Tall": Number(codigoProveedorResuelto) || 0,
+                "Cod":    comp,
+                "Cajas":  units,
+                "Fecha":  fechaSeleccionada,
+                "Cod_GRJ": it.codigo,
+                "Kg_GRJ":  kg
+              });
+            });
+          });
+          const { error: grjErr } = await sb.from(ENTREGAS_TABLE).insert(registrosGrj);
+          if (grjErr) throw new Error("Error guardando entregas GRJ: " + grjErr.message);
+        }
+
+        // Transformaciones 1:1 (M6/M8): el usuario cargó cajas/unidades y el sistema
+        // descuenta esa misma cantidad del componente (M10/M9). Kg_GRJ se computa
+        // multiplicando por el peso del componente para mantener la trazabilidad.
+        if (transItems.length){
+          const registrosTrans = [];
+          transItems.forEach(it => {
+            const cajas = Number(it.cajas) || 0;
+            if (cajas <= 0) return;
+            const kgxuni = GRJ_PESOS[it.codigo] || 0; // peso del componente (1 sola pieza)
+            const kgGrj  = cajas * kgxuni;
+            (GRJ_COMPONENTES[it.codigo] || []).forEach(comp => {
+              registrosTrans.push({
+                "Nombre_Tall": formatName(tallerista),
+                "Codigo_Tall": Number(codigoProveedorResuelto) || 0,
+                "Cod":    comp,
+                "Cajas":  cajas,
+                "Fecha":  fechaSeleccionada,
+                "Cod_GRJ": it.codigo,
+                "Kg_GRJ":  kgGrj
+              });
+            });
+          });
+          if (registrosTrans.length){
+            const { error: trErr } = await sb.from(ENTREGAS_TABLE).insert(registrosTrans);
+            if (trErr) throw new Error("Error guardando entregas 1:1: " + trErr.message);
+          }
+        }
+      }
+
+      // Incrementar SC Kg para sectores crudo (G3, G4, etc.)
+      const scItems = grjItems.filter(it => SC_SECTORES.has(it.codigo));
+      if (scItems.length){
+        for (const it of scItems){
+          const kg = Number(it.kg) || 0;
+          if (kg <= 0) continue;
+          const { data: scData } = await sb
+            .from("SC Kg")
+            .select('"Stock Inicial"')
+            .eq("SC", it.codigo)
+            .maybeSingle();
+          if (scData){
+            const stockActual = Number(scData["Stock Inicial"] || 0);
+            await sb.from("SC Kg")
+              .update({ "Stock Inicial": stockActual + kg })
+              .eq("SC", it.codigo);
+          }
+        }
+      }
+
+      // También enviar a Google Sheets como backup
+      payloadField.value = JSON.stringify(payload);
+      sheetForm.submit();
+
+    } catch(e){
+      isSubmitting = false;
+      sendModal.disabled = false;
+      closeModal.disabled = false;
+      cancelModal.disabled = false;
+
+      update();
+
+      modalMsg.className = "status bad";
+      modalMsg.textContent = "Error enviando: " + (e?.message || e);
+    }
+  };
+
+  // Pre-carga articulos de todos los talleristas al arrancar (despues de despiece)
+  async function precargarPartes(){
+    await despiecePromise;
+    await Promise.all(["POLY","MARTIN","CARLOS","LUCHO"].map(key =>
+      fetchCodesForTallerista(formatName(key), key).catch(() => {})
+    ));
+  }
+
+  Promise.all([cargarMapaCodigos(), precargarPartes(), cargarGRJDesdeBD()])
+    .then(() => update())
+    .catch(err => {
+      console.error(err);
+      status.className = "status bad";
+      status.textContent = "No se pudo cargar la hoja Cod x Tall.";
+    });
+</script>
+</body>
+</html>

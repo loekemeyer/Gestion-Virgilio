@@ -1,0 +1,122 @@
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  background: #f1f5f9;
+  color: #0f172a;
+  font-size: 14px;
+}
+.page { min-height: 100vh; padding: 20px; }
+.card {
+  max-width: 1400px; margin: 0 auto;
+  background: #fff; border-radius: 12px;
+  box-shadow: 0 2px 10px rgba(0,0,0,0.06);
+  padding: 20px 24px;
+}
+h1 { margin: 8px 0 4px; font-size: 22px; }
+.sub { color: #64748b; font-size: 13px; margin: 0 0 16px; }
+
+.btn {
+  padding: 6px 12px; border-radius: 6px; border: 0; cursor: pointer;
+  font-size: 13px; font-weight: 500;
+}
+.btn-dark { background: #0f172a; color: #fff; }
+.btn-dark:hover { background: #1e293b; }
+.btn-dark:disabled { background: #94a3b8; cursor: not-allowed; }
+.btn-ghost { background: #f1f5f9; color: #0f172a; border: 1px solid #e2e8f0; }
+.btn-ghost:hover:not(:disabled) { background: #e2e8f0; }
+.btn-ghost:disabled { opacity: 0.5; cursor: not-allowed; }
+.btn-volver { background: #f1f5f9; color: #0f172a; border: 1px solid #e2e8f0; padding: 4px 10px; font-size: 12px; }
+.btn-volver:hover { background: #e2e8f0; }
+
+.barra {
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+  padding: 10px 0 14px;
+}
+.barra label { color: #475569; font-size: 13px; }
+.barra select {
+  padding: 6px 10px; border: 1px solid #cbd5e1; border-radius: 6px;
+  min-width: 340px; background: #fff; font-size: 13px;
+}
+
+.status {
+  padding: 10px 14px; background: #f8fafc; border: 1px solid #e2e8f0;
+  border-radius: 6px; font-size: 13px; color: #475569; margin-bottom: 12px;
+}
+.status.ok { background: #ecfdf5; border-color: #bbf7d0; color: #166534; }
+.status.err { background: #fef2f2; border-color: #fecaca; color: #991b1b; }
+
+.tabla-wrap { overflow-x: auto; }
+table.trace {
+  border-collapse: collapse; width: 100%; font-size: 12.5px;
+}
+table.trace th, table.trace td {
+  border: 1px solid #e2e8f0; padding: 6px 9px; text-align: left;
+  vertical-align: top;
+}
+table.trace thead th {
+  background: #f1f5f9; color: #0f172a; font-weight: 600;
+  position: sticky; top: 0; z-index: 1;
+}
+table.trace tbody tr:nth-child(even) { background: #fafbfc; }
+table.trace .item-num { font-weight: 600; color: #475569; width: 40px; text-align: center; }
+table.trace .tall { background: #fef3c7; font-weight: 500; }
+table.trace .origen { background: #dcfce7; font-weight: 500; }
+table.trace .cod { font-family: "Consolas", monospace; color: #0369a1; font-weight: 500; }
+.resumen {
+  background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 8px;
+  padding: 10px 14px; margin-bottom: 14px; font-size: 13px;
+}
+.resumen b { color: #1e40af; }
+
+/* Cada celda "origen" es una fila horizontal de pasos, SIEMPRE a la derecha */
+.paso-row {
+  display: flex; align-items: center; gap: 6px; flex-wrap: nowrap;
+  white-space: nowrap;
+}
+.paso-cell {
+  background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px;
+  padding: 4px 8px; line-height: 1.5; font-size: 12px;
+  white-space: nowrap;
+}
+.paso-sep {
+  color: #94a3b8; font-size: 16px; padding: 0 2px;
+}
+td.origen {
+  max-width: none;
+  white-space: nowrap;
+}
+
+/* ── Inverso: columnas Tallerista..Item ANCLADAS a la derecha; Origen scrollea ──
+   Requiere border-collapse:separate para que sticky no pierda los bordes.
+   Los offsets `right` son acumulativos y dependen de los anchos fijos de abajo:
+   Item 46 · Desc 200 · Sector 70 · Partes/uni 68 · Tallerista 120  (total 504px). */
+table.trace.trace-frozen {
+  border-collapse: separate;
+  border-spacing: 0;
+  border-top: 1px solid #e2e8f0;
+  border-left: 1px solid #e2e8f0;
+}
+table.trace.trace-frozen th,
+table.trace.trace-frozen td {
+  border-top: 0; border-left: 0;
+  border-right: 1px solid #e2e8f0;
+  border-bottom: 1px solid #e2e8f0;
+}
+/* compacto: padding mínimo + TODO el contenido de las columnas fijas centrado */
+table.trace.trace-frozen th, table.trace.trace-frozen td { padding: 2px 5px; }
+table.trace.trace-frozen th:nth-child(n+2), table.trace.trace-frozen td:nth-child(n+2) { text-align: center; vertical-align: middle; }
+/* columnas fijas (2ª a 6ª): sticky a la derecha con ancho fijo.
+   right = suma de anchos de las columnas a su derecha (box-sizing:border-box → el padding no cuenta). */
+table.trace.trace-frozen th:nth-child(2), table.trace.trace-frozen td:nth-child(2) { position: sticky; right: 319px; width: 82px; min-width: 82px; max-width: 82px; box-shadow: -3px 0 5px -3px rgba(0,0,0,0.18); }
+table.trace.trace-frozen th:nth-child(3), table.trace.trace-frozen td:nth-child(3) { position: sticky; right: 267px; width: 52px; min-width: 52px; max-width: 52px; }
+table.trace.trace-frozen th:nth-child(4), table.trace.trace-frozen td:nth-child(4) { position: sticky; right: 213px; width: 54px; min-width: 54px; max-width: 54px; }
+table.trace.trace-frozen th:nth-child(5), table.trace.trace-frozen td:nth-child(5) { position: sticky; right: 38px;  width: 175px; min-width: 175px; max-width: 175px; }
+table.trace.trace-frozen th:nth-child(6), table.trace.trace-frozen td:nth-child(6) { position: sticky; right: 0;    width: 38px; min-width: 38px; max-width: 38px; }
+/* fondos opacos: sin esto el Origen se transparenta bajo las columnas ancladas */
+table.trace.trace-frozen tbody td:nth-child(n+2) { z-index: 1; background: #fff; }
+table.trace.trace-frozen tbody tr:nth-child(even) td:nth-child(n+2) { background: #fafbfc; }
+table.trace.trace-frozen tbody td.tall { background: #fef3c7 !important; }
+/* header: la esquina fija (thead cols 2-6) por encima de todo al scrollear */
+table.trace.trace-frozen thead th { z-index: 2; }
+table.trace.trace-frozen thead th:nth-child(n+2) { z-index: 3; }

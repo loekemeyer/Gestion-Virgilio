@@ -1,0 +1,255 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <script src="../auth-guard.js?v=20260904t"></script>
+<script src="../gp2-ui.js?v=20260905a"></script>
+<script src="../gp2-numero.js?v=20260905m"></script>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Entrevistas · GP2</title>
+  <link rel="icon" type="image/png" href="../GP2_favicon.png">
+  <link rel="apple-touch-icon" href="../GP2_favicon.png">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="../supabase-config.js?v=20260905k"></script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'Inter', sans-serif; background: #d9d9de; padding: 20px; min-height: 100vh; }
+    .top-bar { max-width: 1400px; margin: 0 auto 16px; display: flex; align-items: center; gap: 14px; }
+    .btn-volver { height: 44px; padding: 0 22px; border-radius: 999px; border: 2px solid #b9b9b9; background: #f7f7f7; font-size: 16px; cursor: pointer; font-weight: 700; font-family: inherit; }
+    .btn-volver:hover { background: #e5e5e5; border-color: #e2e8f0; }
+    .top-bar h1 { font-size: 22px; flex: 1; color: #1e293b; }
+    .main-card { max-width: 1400px; margin: 0 auto 20px; background: #fff; border: 1px solid #cfcfcf; border-radius: 14px; overflow: hidden; }
+    .card-header { background: #111; color: #fff; padding: 14px 22px; display: flex; justify-content: space-between; align-items: center; }
+    .card-header h2 { font-size: 17px; color: #fff; margin: 0; }
+    .gran-pill { background: #ebeef5; color: #345779; padding: 4px 10px; border-radius: 999px; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .5px; }
+    .card-body { padding: 16px 22px 22px; }
+    .controls-row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-bottom: 14px; }
+    .ctrl-group { display: flex; align-items: center; gap: 6px; }
+    .ctrl-group label { font-size: 15px; font-weight: 700; color: #475569; }
+    /* Los .ctrl-* estaban en 13px con 36px de alto: por debajo del piso de la casa
+       (campos 18px, tactil 44px). Estas pantallas no cargan gp2-modulo.css ni
+       gp2-claro.css, asi que nada las levantaba (corregido 2026-09-03). */
+    .ctrl-input, .ctrl-select { height: 44px; padding: 0 10px; border: 1.5px solid #cbd5e1; border-radius: 10px; font-size: 19px; font-family: inherit; background: #fff; min-width: 150px; }
+    .ctrl-input:focus, .ctrl-select:focus { border-color: #cdd8ea; outline: none; }
+    .btn-act { height: 44px; padding: 0 18px; border-radius: 10px; border: 1.5px solid #111; background: #111; color: #fff; font-size: 16px; font-weight: 700; cursor: pointer; font-family: inherit; }
+    .btn-act:hover { background: #333; }
+    .btn-act.ghost { background: #f8fafc; color: #475569; border-color: #cbd5e1; }
+    .btn-act.ghost:hover { background: #e2e8f0; }
+    .push { margin-left: auto; }
+    .stats-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 10px; margin-bottom: 14px; }
+    .stat-card { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 10px; padding: 10px 14px; }
+    .stat-label { font-size: 11px; color: #64748b; font-weight: 700; text-transform: uppercase; letter-spacing: .3px; }
+    .stat-value { font-size: 18px; color: #111; font-weight: 800; font-variant-numeric: tabular-nums; }
+    .stat-card.green .stat-value { color: #16a34a; }
+    .stat-card.red .stat-value { color: #dc2626; }
+    .stat-card.blue .stat-value { color: #163e98; }
+    .table-wrap { overflow-x: auto; border: 1px solid #e2e8f0; border-radius: 10px; }
+    table { width: 100%; border-collapse: collapse; font-size: 13px; background: #fff; }
+    thead th { background: #f1f5f9; color: #334155; font-weight: 700; font-size: 11px; text-transform: uppercase; letter-spacing: .3px; padding: 10px 10px; text-align: left; border-bottom: 2px solid #e2e8f0; white-space: nowrap; }
+    tbody td { padding: 8px 10px; border-bottom: 1px solid #f1f5f9; color: #334155; font-variant-numeric: tabular-nums; white-space: nowrap; }
+    tbody tr:hover { background: #f8fafc; }
+    td.num, th.num { text-align: right; }
+    .mz-tag { font-weight: 800; color: #1e40af; }
+    .puntaje-good { color: #16a34a; font-weight: 800; }
+    .puntaje-bad  { color: #dc2626; font-weight: 800; }
+    .puntaje-na   { color: #475569; }
+    .msg { padding: 30px; text-align: center; color: #64748b; font-size: 14px; }
+    .msg.err { color: #dc2626; font-weight: 600; }
+    .note { font-size: 12px; color: #64748b; margin-top: 10px; }
+  </style>
+</head>
+<body>
+
+<div id="gp2-logobar" style="position:relative;background:#e8edf7;text-align:center;padding:6px 0;border-bottom:1px solid #d0dae7"><a href="../GP2_MODULOS.html" style="position:absolute;left:10px;top:50%;transform:translateY(-50%);color:#385475;text-decoration:none;font-weight:700;font-size:15px;padding:5px 10px;border:1px solid #d1d9e5;border-radius:8px;background:#e9eef7">← Atrás</a><a href="../GP2_MODULOS.html" style="text-decoration:none"><img src="../GP2_logo.png" alt="GP2 · Gestión Productiva" style="height:40px;vertical-align:middle"></a></div>
+
+<div class="top-bar">
+  <button class="btn-volver" onclick="location.href='../GP2_MODULOS.html'">&larr; Atrás</button>
+  <h1>Entrevistas</h1>
+</div>
+
+<div class="main-card">
+  <div class="card-header">
+    <h2>Detalle de producciones para entrevistar al operario</h2>
+    <span class="gran-pill">GP2</span>
+  </div>
+  <div class="card-body">
+    <div class="controls-row">
+      <div class="ctrl-group"><label>Operario</label><select id="fOperario" class="ctrl-select"><option value="">Elegí un operario</option></select></div>
+      <div class="ctrl-group"><label>Desde</label><input type="date" id="fDesde" class="ctrl-input" style="min-width:140px"></div>
+      <div class="ctrl-group"><label>Hasta</label><input type="date" id="fHasta" class="ctrl-input" style="min-width:140px"></div>
+      <input type="text" id="fBuscar" class="ctrl-input" placeholder="Buscar matriz..." style="min-width:180px">
+      <button class="btn-act push" id="btnCargar">Cargar</button>
+      <button class="btn-act ghost" id="btnCSV">Exportar CSV</button>
+    </div>
+
+    <div class="stats-row" id="stats"></div>
+
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>Fecha</th>
+            <th>Matriz</th>
+            <th>Nombre matriz</th>
+            <th>Hora inicio</th>
+            <th>Hora fin</th>
+            <th class="num">Uni</th>
+            <th class="num">T. total seg</th>
+            <th class="num">T. total min</th>
+            <th class="num">T. hist. seg</th>
+            <th class="num">Seg/uni</th>
+            <th class="num">Puntaje</th>
+          </tr>
+        </thead>
+        <tbody id="tbody"><tr><td colspan="12" class="msg">Elegí un operario y tocá Cargar.</td></tr></tbody>
+      </table>
+    </div>
+    <div class="note">Lee <b>GP2.produccion</b>. El puntaje es tiempo histórico sobre tiempo trabajado (mayor a 100% = rindió más que el histórico); si la fila no tiene los segundos, se deriva del <code>premio</code> guardado. Las filas de tiempo muerto (sin unidades) no se listan.</div>
+  </div>
+</div>
+
+<script>
+(function () {
+  "use strict";
+  var sb = GP2_SB();
+
+  var $ = GP2UI.$;
+  var ROWS = [];
+
+  var esc = GP2UI.esc;   /* helper de la casa, gp2-ui.js (2026-09-05) */
+  function n2(v) { return GP2N.fmt(v, 2, '—'); }
+  function n0(v) { return GP2N.fmt(v, 0, '—'); }   /* la regla de numero de la casa (gp2-numero.js) */
+  /* fechas en Argentina (gp2-ui.js): antes toISOString corria el dia despues de las 21:00 */
+  function hoy() { return GP2UI.hoyAR(); }
+  function haceUnMes() { var d = new Date(); d.setMonth(d.getMonth() - 1); return GP2UI.hoyAR(d); }
+  function fechaAR(iso) {
+    try {
+      return new Intl.DateTimeFormat('es-AR', { timeZone: 'America/Argentina/Buenos_Aires', day: '2-digit', month: '2-digit', year: '2-digit' }).format(new Date(iso));
+    } catch (e) { return ''; }
+  }
+  function hhmm(t) { return t ? String(t).slice(0, 5) : '—'; }
+
+  async function cargarOperarios() {
+    var r = await sb.from('empleado').select('legajo,nombre,activo').order('nombre');
+    if (r.error) { console.warn('empleado:', r.error); return; }
+    var sel = $('fOperario');
+    (r.data || []).forEach(function (e) {
+      var o = document.createElement('option');
+      o.value = e.legajo;
+      o.textContent = e.nombre + ' (' + e.legajo + ')' + (e.activo === false ? ' · inactivo' : '');
+      sel.appendChild(o);
+    });
+  }
+
+  async function cargar() {
+    var leg = $('fOperario').value;
+    var tb = $('tbody');
+    if (!leg) { tb.innerHTML = '<tr><td colspan="12" class="msg">Elegí un operario.</td></tr>'; $('stats').innerHTML = ''; return; }
+    tb.innerHTML = '<tr><td colspan="12" class="msg">Cargando...</td></tr>';
+
+    var r = await sb.from('produccion')
+      .select('id,fecha,matriz_raw,nombre_matriz,uni,hora_inicio,hora_fin,segundos_trabajados,segundos_historico,premio,eliminar')
+      .eq('legajo', leg)
+      .gt('uni', 0)
+      .gte('fecha', $('fDesde').value + 'T00:00:00-03:00')
+      .lte('fecha', $('fHasta').value + 'T23:59:59-03:00')
+      .order('fecha', { ascending: false })
+      .limit(5000);
+
+    if (r.error) { tb.innerHTML = '<tr><td colspan="12" class="msg err">Error: ' + esc(r.error.message) + '</td></tr>'; return; }
+
+    ROWS = (r.data || []).filter(function (p) { return String(p.eliminar || '').toUpperCase() !== 'S'; }).map(function (p) {
+      var segs = Number(p.segundos_trabajados) || 0;
+      var hist = Number(p.segundos_historico) || 0;
+      var uni = Number(p.uni) || 0;
+      // Puntaje siempre en escala % (hist/trabajado). El premio guardado va en
+      // escala -10..+10 (premio = (1 - segs/hist) * 10): si faltan los segundos,
+      // se lo convierte a % con la inversa en vez de mezclar escalas.
+      var puntaje = (segs > 0 && hist > 0) ? (hist / segs) * 100
+        : ((p.premio != null && Number(p.premio) < 10) ? 100 / (1 - Number(p.premio) / 10) : null);
+      return {
+        id: p.id, fecha: p.fecha, matriz: p.matriz_raw || '', nombre: p.nombre_matriz || '',
+        hi: p.hora_inicio, hf: p.hora_fin, uni: uni, segs: segs, hist: hist,
+        segUni: uni > 0 && segs > 0 ? segs / uni : null, puntaje: puntaje
+      };
+    });
+    render();
+  }
+
+  function filtradas() {
+    var q = $('fBuscar').value.trim().toLowerCase();
+    if (!q) return ROWS;
+    return ROWS.filter(function (r) {
+      return r.matriz.toLowerCase().indexOf(q) >= 0 || String(r.nombre).toLowerCase().indexOf(q) >= 0;
+    });
+  }
+
+  function render() {
+    var rows = filtradas(), tb = $('tbody');
+    var tUni = 0, tSegs = 0, conP = 0, sumP = 0;
+    rows.forEach(function (r) {
+      tUni += r.uni; tSegs += r.segs;
+      if (r.puntaje != null) { conP++; sumP += r.puntaje; }
+    });
+    var prom = conP ? sumP / conP : null;
+
+    $('stats').innerHTML =
+      card('Producciones', n0(rows.length)) +
+      card('Unidades', n0(tUni), 'blue') +
+      card('Horas trabajadas', n2(tSegs / 3600)) +
+      card('Puntaje promedio', prom == null ? '—' : n2(prom) + '%', prom == null ? '' : (prom >= 100 ? 'green' : 'red'));
+
+    if (!rows.length) { tb.innerHTML = '<tr><td colspan="12" class="msg">Sin producciones en el rango elegido.</td></tr>'; return; }
+
+    tb.innerHTML = rows.map(function (r, i) {
+      var cls = r.puntaje == null ? 'puntaje-na' : (r.puntaje >= 100 ? 'puntaje-good' : 'puntaje-bad');
+      return '<tr>' +
+        '<td>' + (i + 1) + '</td>' +
+        '<td>' + fechaAR(r.fecha) + '</td>' +
+        '<td class="mz-tag">' + esc(r.matriz) + '</td>' +
+        '<td>' + esc(r.nombre) + '</td>' +
+        '<td>' + hhmm(r.hi) + '</td>' +
+        '<td>' + hhmm(r.hf) + '</td>' +
+        '<td class="num">' + n0(r.uni) + '</td>' +
+        '<td class="num">' + n0(r.segs) + '</td>' +
+        '<td class="num">' + n2(r.segs / 60) + '</td>' +
+        '<td class="num">' + n0(r.hist) + '</td>' +
+        '<td class="num">' + n2(r.segUni) + '</td>' +
+        '<td class="num ' + cls + '">' + (r.puntaje == null ? '—' : n2(r.puntaje) + '%') + '</td>' +
+        '</tr>';
+    }).join('');
+  }
+
+  function card(label, value, cls) {
+    return '<div class="stat-card ' + (cls || '') + '"><div class="stat-label">' + label + '</div><div class="stat-value">' + value + '</div></div>';
+  }
+
+  function csv() {
+    var rows = filtradas();
+    if (!rows.length) return;
+    /* el armado del CSV (;, BOM, coma decimal) es el de la casa: GP2UI.exportarCSV */
+    var filas = [['#', 'Fecha', 'Matriz', 'Nombre matriz', 'Hora inicio', 'Hora fin', 'Uni', 'T total seg', 'T total min', 'T hist seg', 'Seg/uni', 'Puntaje %']];
+    rows.forEach(function (r, i) {
+      filas.push([i + 1, fechaAR(r.fecha), r.matriz, r.nombre, hhmm(r.hi), hhmm(r.hf), r.uni, r.segs,
+        Number((r.segs / 60).toFixed(2)), r.hist,
+        r.segUni == null ? '' : Number(r.segUni.toFixed(3)),
+        r.puntaje == null ? '' : Number(r.puntaje.toFixed(2))]);
+    });
+    GP2UI.exportarCSV('entrevista_GP2', filas);
+  }
+
+  document.addEventListener('DOMContentLoaded', function () {
+    $('fDesde').value = haceUnMes();
+    $('fHasta').value = hoy();
+    $('btnCargar').addEventListener('click', cargar);
+    $('btnCSV').addEventListener('click', csv);
+    $('fBuscar').addEventListener('input', render);
+    $('fOperario').addEventListener('change', cargar);
+    cargarOperarios();
+  });
+})();
+</script>
+</body>
+</html>

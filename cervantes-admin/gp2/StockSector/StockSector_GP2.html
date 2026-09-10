@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Stock por sector · GP2</title>
+<!-- UNA pantalla para el stock de cada sector: se abre con ?sector=N y arma titulo,
+     botones, filtros y columnas desde el mapa SECTORES de ../gp2-stock-sector.js.
+     Reemplaza (2026-09-04) a los 9 HTML casi iguales que habia: Stock SC (1),
+     Stock SP (2), Stock en Movimiento (3), Partes Plasticas (6), Bombillas (7),
+     Remaches (8), Garage (9), Cartones (10) y Cajas (11). El aspecto y los
+     botones de cada una son los mismos de antes: lo que cambia por sector vive
+     en el mapa, no aca. -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="../supabase-config.js?v=20260905k"></script>
+<link rel="stylesheet" href="../gp2-modulo.css?v=20260903b"/>
+<link rel="icon" type="image/png" href="../GP2_favicon.png">
+<link rel="apple-touch-icon" href="../GP2_favicon.png">
+<style>
+  .seg{display:flex;gap:6px;flex-wrap:wrap}
+  table.t tr.bajo td{background:#fff7ed}
+  td.mov-cell,td.stk-cell{cursor:pointer;text-decoration:underline dotted}
+  td.mov-cell:hover,td.stk-cell:hover{background:#eef4fb}
+  .popup{position:fixed;inset:0;background:rgba(0,0,0,.5);display:none;align-items:center;justify-content:center;z-index:200;padding:16px}
+  .popup.open{display:flex}
+  .pop-card{background:#fff;border-radius:14px;width:100%;max-width:880px;max-height:86vh;overflow:auto;padding:20px}
+  .pop-head{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;margin-bottom:14px}
+  .pop-head h3{font-size:20px;font-weight:800}
+</style>
+</head>
+<body>
+
+<div class="card">
+  <div class="header">
+    <!-- titulo y botones (CSV, Recepcion, Control..., Stock SP/SC) los completa
+         gp2-stock-sector.js segun el sector; "Atras" queda fijo y siempre ultimo -->
+    <h1 id="titulo">Stock por sector</h1>
+    <div class="hbtns" id="hbtns">
+      <a href="../GP2_MODULOS.html">Atrás</a>
+    </div>
+  </div>
+
+  <div class="steps">
+    <div class="kpis" id="kpis"></div>
+    <div class="aviso hidden" id="avisoFactores"></div>
+
+    <div class="row">
+      <div class="seg">
+        <button class="seg-btn active" data-f="todos" type="button">Todos</button>
+        <button class="seg-btn" data-f="con" type="button">Con stock</button>
+        <button class="seg-btn" data-f="sin" type="button">Sin stock</button>
+        <button class="seg-btn" data-f="bajo" type="button">Bajo el máximo</button>
+        <button class="seg-btn" data-f="mov" type="button">Con movimientos</button>
+      </div>
+    </div>
+
+    <div class="search-box"><input type="text" id="q" placeholder="Buscar por código o descripción…"></div>
+
+    <div class="table-wrap">
+      <table class="t">
+        <!-- el thead lo arma gp2-stock-sector.js segun STOCK_CFG.columnas -->
+        <thead id="thead"></thead>
+        <tbody id="tbody"></tbody>
+      </table>
+    </div>
+    <div id="tblEmpty" class="empty hidden">Sin resultados.</div>
+    <div id="status" class="status">Cargando…</div>
+  </div>
+</div>
+
+<!-- popup detalle de movimientos -->
+<div class="popup" id="popup">
+  <div class="pop-card">
+    <div class="pop-head">
+      <h3 id="popTitle"></h3>
+      <button class="btn btn-secondary" id="popClose" type="button">Cerrar</button>
+    </div>
+    <div id="popBody"></div>
+  </div>
+</div>
+
+<script>
+window.SB_CLIENT = GP2_SB();
+</script>
+<script src="../gp2-ui.js?v=20260905a"></script>
+<script src="../gp2-numero.js?v=20260905m"></script>
+<script src="../gp2-composicion.js?v=20260905d"></script>
+<script src="../gp2-stock-sector.js?v=20260905j"></script>
+</body>
+</html>

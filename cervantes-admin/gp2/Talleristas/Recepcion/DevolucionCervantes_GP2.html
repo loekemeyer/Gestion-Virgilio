@@ -1,0 +1,229 @@
+<!doctype html>
+<html lang="es">
+<head>
+<!-- v1.0.2 — Devolucion de partes de talleristas: vuelve al sector o queda "Para Analizar" -->
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Devolución Cervantes · GP2</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="../../supabase-config.js?v=20260905k"></script>
+<script src="../../gp2-ui.js?v=20260905a"></script>
+<script src="../../gp2-numero.js?v=20260905m"></script>
+<link rel="stylesheet" href="../../gp2-modulo.css?v=20260903b"/>
+<link rel="icon" type="image/png" href="../../GP2_favicon.png">
+<link rel="apple-touch-icon" href="../../GP2_favicon.png">
+<style>
+  .chips{display:flex;gap:8px;flex-wrap:wrap;margin:8px 0}
+  .chip{padding:10px 16px;border-radius:10px;border:2px solid #d0d7de;background:#fff;font-weight:800;font-size:16px;cursor:pointer;color:#111}
+  .chip.active{background:#111;color:#fff;border-color:#111}
+  .dest-btns{display:flex;gap:10px;flex-wrap:wrap;margin:8px 0}
+  .dest-btns button{padding:12px 18px;border-radius:10px;border:2px solid #d0d7de;background:#fff;font-weight:800;font-size:16px;cursor:pointer}
+  .dest-btns button.sc.active{background:#e7f8ed;color:#fff;border-color:#cdead6}
+  .dest-btns button.ana.active{background:#f8e8e7;color:#fff;border-color:#eacfcd}
+  td.num{text-align:right;font-variant-numeric:tabular-nums}
+  .dev-in{width:100px;padding:8px;font-size:18px;text-align:right;border:2px solid #d0d7de;border-radius:8px}
+  tr.con-dev td{background:#eef7ee}
+  .motivo{width:100%;padding:10px;font-size:16px;border:2px solid #d0d7de;border-radius:8px;min-height:56px;resize:vertical}
+  .btn-conf{padding:12px 22px;font-size:18px;font-weight:800;border-radius:8px;border:2px solid #111;background:#111;color:#fff;cursor:pointer;margin-top:10px}
+  .btn-conf:disabled{opacity:.4;cursor:default}
+  .badge-dest{padding:4px 12px;border-radius:14px;font-size:13px;font-weight:800}
+  .badge-dest.sector{background:#e8f5e9;color:#0a7a2f}
+  .badge-dest.analizar{background:#ffebee;color:#b71c1c}
+</style>
+</head>
+<body>
+
+<div class="card">
+  <div class="header">
+    <h1>Devolución Talleristas Cervantes</h1>
+    <div class="hbtns"><a href="../../GP2_MODULOS.html">Atrás</a></div>
+  </div>
+
+  <div class="steps">
+    <div class="row"><b style="font-size:18px">Tallerista:</b></div>
+    <div class="chips" id="talls"></div>
+
+    <div id="zona" class="hidden">
+      <div class="row"><b style="font-size:18px">Destino de la devolución:</b></div>
+      <div class="dest-btns">
+        <button type="button" class="sc" id="destSC">Vuelve a sector</button>
+        <button type="button" class="ana" id="destAna">Para Analizar</button>
+      </div>
+
+      <div class="row" style="align-items:center;gap:8px">
+        <label style="font-weight:800">Fecha:</label>
+        <input type="date" id="fecha" style="padding:8px;border:2px solid #d0d7de;border-radius:8px;font-size:16px">
+      </div>
+
+      <div class="search-box"><input type="text" id="q" placeholder="Buscar parte…"></div>
+      <div class="table-wrap">
+        <table class="t">
+          <thead><tr><th>Parte</th><th>Sector</th><th class="num">Online</th><th class="num">Devuelve</th></tr></thead>
+          <tbody id="tbody"></tbody>
+        </table>
+      </div>
+      <div id="tblEmpty" class="empty hidden">Este tallerista no tiene stock online.</div>
+
+      <label style="font-weight:800;display:block;margin-top:10px">Motivo / observaciones (opcional):</label>
+      <textarea id="motivo" class="motivo" placeholder="Ej: piezas con rebaba, medida fuera de tolerancia..."></textarea>
+      <button type="button" class="btn-conf" id="btnConf" disabled>Confirmar Devolución</button>
+    </div>
+
+    <div style="margin-top:18px">
+      <h2 style="font-size:18px;margin:0 0 6px">Stock "Para Analizar"</h2>
+      <div class="table-wrap"><table class="t">
+        <thead><tr><th>Parte</th><th class="num">Cantidad</th></tr></thead>
+        <tbody id="anaBody"></tbody>
+      </table></div>
+    </div>
+
+    <div style="margin-top:18px">
+      <h2 style="font-size:18px;margin:0 0 6px">Últimas devoluciones</h2>
+      <div class="table-wrap"><table class="t">
+        <thead><tr><th>Fecha</th><th>Tallerista</th><th>Parte</th><th class="num">Cantidad</th><th>Destino</th><th>Motivo</th></tr></thead>
+        <tbody id="ultBody"></tbody>
+      </table></div>
+    </div>
+
+    <div id="status" class="status">Cargando…</div>
+  </div>
+</div>
+
+<script>
+var SB = GP2_SB();
+var $ = GP2UI.$;
+var esc = GP2UI.esc;   /* helper de la casa, gp2-ui.js (2026-09-05) */
+function fmt(n,d){ return GP2N.fmt(n, d==null?0:d, '—'); }   /* la regla de numero de la casa (gp2-numero.js) */
+var hoyAR = GP2UI.hoyAR;   /* helper de la casa, gp2-ui.js (2026-09-05): era una copia identica */
+
+var D={}, tallSel=null, destino=null, DEV={}; // comp_id -> cantidad
+
+async function boot(){
+  var r=await SB.rpc('devoluciones_tallerista_bundle');
+  if(r.error){ $('status').textContent='Error: '+r.error.message; return; }
+  D=r.data||{};
+  var g=$('talls'); g.innerHTML='';
+  (D.talleristas||[]).forEach(function(t){
+    var b=document.createElement('button'); b.type='button';
+    b.className='chip'+(tallSel&&tallSel.id===t.id?' active':''); b.textContent=t.nombre;
+    b.addEventListener('click',function(){
+      // DEV vive solo en memoria: cambiar de tallerista borraba TODO lo cargado sin
+      // preguntar. Un chip tocado sin querer despues de cargar 15 partes las perdia.
+      if (tallSel && tallSel.id !== t.id && Object.keys(DEV).length &&
+          !confirm('Tenés ' + Object.keys(DEV).length + ' parte(s) cargadas de ' + tallSel.nombre +
+                   ' sin registrar.\n\nSi cambiás a ' + t.nombre + ' se pierden. ¿Cambiar igual?')) return;
+      tallSel=t; DEV={};
+      g.querySelectorAll('.chip').forEach(x=>x.classList.remove('active'));
+      b.classList.add('active');
+      $('zona').classList.remove('hidden');
+      render();
+    });
+    g.appendChild(b);
+  });
+  pintarAnalizar(); pintarUltimas();
+  $('status').textContent='';
+}
+
+function partesDe(){
+  if(!tallSel) return [];
+  var q=($('q').value||'').trim().toLowerCase();
+  return (D.online||[]).filter(function(x){
+    if(x.tall_id!==tallSel.id) return false;
+    if(q && !(((x.codigo||'')+' '+(x.descripcion||'')).toLowerCase().includes(q))) return false;
+    return true;
+  });
+}
+
+function unidadDe(x){ return (x.um==='kg') ? 'kg' : 'uni'; }
+
+function render(){
+  var fs=partesDe();
+  $('tbody').innerHTML=fs.map(function(x){
+    var v=DEV[x.comp_id]||'';
+    return '<tr'+(v>0?' class="con-dev"':'')+'>'+
+      '<td><b>'+esc(x.codigo)+'</b><br><small style="color:#777">'+esc(x.descripcion||'')+'</small></td>'+
+      '<td>'+esc(x.sector||'—')+'</td>'+
+      '<td class="num">'+fmt(x.cantidad,2)+' '+unidadDe(x)+'</td>'+
+      '<td class="num"><input class="dev-in" data-in="'+x.comp_id+'" inputmode="decimal" value="'+(v||'')+'" placeholder="'+unidadDe(x)+'"></td>'+
+    '</tr>';
+  }).join('');
+  $('tblEmpty').classList.toggle('hidden', fs.length>0 || !tallSel);
+
+  document.querySelectorAll('.dev-in').forEach(function(inp){
+    inp.addEventListener('change',function(){
+      var v=GP2N.num(inp.value);   // la regla de numero de la casa (antes: replace(',','.') propio)
+      var id=Number(inp.dataset.in);
+      if(v>0) DEV[id]=v; else delete DEV[id];
+      render(); habilitar();
+    });
+  });
+  habilitar();
+}
+
+function habilitar(){
+  var n=Object.keys(DEV).length;
+  $('btnConf').disabled = !(tallSel && destino && n>0);
+  $('btnConf').textContent = n>0 ? ('Confirmar Devolución ('+n+' partes)') : 'Confirmar Devolución';
+}
+
+$('destSC').addEventListener('click',function(){
+  destino='sector'; $('destSC').classList.add('active'); $('destAna').classList.remove('active'); habilitar();
+});
+$('destAna').addEventListener('click',function(){
+  destino='analizar'; $('destAna').classList.add('active'); $('destSC').classList.remove('active'); habilitar();
+});
+
+$('btnConf').addEventListener('click', async function(){
+  var items=(D.online||[]).filter(function(x){ return x.tall_id===tallSel.id && DEV[x.comp_id]>0; });
+  if(!items.length) return;
+  $('btnConf').disabled=true;
+  var motivo=($('motivo').value||'').trim()||null;
+  var fecha=$('fecha').value ? ($('fecha').value+'T12:00:00-03:00') : null;
+  var avisos=[], hechas=0;
+  try{
+    for(var i=0;i<items.length;i++){
+      var x=items[i];
+      var r=await SB.rpc('crear_devolucion_tallerista',{
+        p_tallerista_id:tallSel.id, p_comp_id:x.comp_id, p_cantidad:DEV[x.comp_id],
+        p_unidad:unidadDe(x), p_destino:destino, p_motivo:motivo, p_fecha:fecha });
+      if(r.error) throw new Error(x.codigo+': '+r.error.message);
+      hechas++;
+      delete DEV[x.comp_id]; // ya registrada: fuera del buffer (un reintento no la duplica)
+      if(r.data && r.data.aviso) avisos.push(r.data.aviso);
+    }
+    DEV={}; $('motivo').value='';
+    await boot();
+    render();
+    $('status').className='status ok';
+    $('status').textContent='✓ Devolución registrada: '+hechas+' partes de '+tallSel.nombre+
+      (destino==='analizar'?' → Para Analizar.':' → vuelven a su sector.')+
+      (avisos.length?(' '+avisos.join(' ')):'');
+  }catch(e){
+    render(); // quedan marcadas solo las que fallaron
+    $('status').className='status bad';
+    $('status').textContent='Error (se cargaron '+hechas+' de '+items.length+', las cargadas ya no se reintentan): '+(e.message||e);
+  }finally{ $('btnConf').disabled=false; habilitar(); }
+});
+
+function pintarAnalizar(){
+  $('anaBody').innerHTML=(D.analizar||[]).map(function(x){
+    return '<tr><td><b>'+esc(x.codigo)+'</b> <small style="color:#777">'+esc(x.descripcion||'')+'</small></td>'+
+      '<td class="num">'+fmt(x.cantidad,2)+'</td></tr>';
+  }).join('') || '<tr><td colspan="2" style="color:#888">Nada para analizar.</td></tr>';
+}
+
+function pintarUltimas(){
+  $('ultBody').innerHTML=(D.ultimas||[]).map(function(u){
+    return '<tr><td>'+new Date(u.fecha).toLocaleDateString('es-AR')+'</td><td>'+esc(u.tallerista)+'</td>'+
+      '<td>'+esc(u.codigo)+'</td><td class="num">'+fmt(u.cantidad,2)+' '+esc(u.unidad)+'</td>'+
+      '<td><span class="badge-dest '+esc(u.destino)+'">'+(u.destino==='analizar'?'Analizar':'A sector')+'</span></td>'+
+      '<td>'+esc(u.motivo||'')+'</td></tr>';
+  }).join('') || '<tr><td colspan="6" style="color:#888">Sin devoluciones todavía.</td></tr>';
+}
+
+$('q').addEventListener('input', render);
+$('fecha').value=hoyAR();
+boot();
+</script>
+</body>
+</html>

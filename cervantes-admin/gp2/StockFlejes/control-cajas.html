@@ -1,0 +1,146 @@
+<!doctype html>
+<html lang="es">
+<head>
+<script src="../auth-guard.js?v=20260904t"></script>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Control Cajas · GP2</title>
+<link rel="icon" href="../GP2_favicon.png"/>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:Arial,sans-serif;background:#f5f6f8;padding:12px;color:#111}
+  .card{max-width:840px;margin:auto;background:#fff;border-radius:12px;box-shadow:0 2px 12px rgba(0,0,0,.08);overflow:hidden}
+  .header{background:#0b1220;color:#fff;padding:14px 18px;display:flex;justify-content:space-between;align-items:center}
+  .header h1{font-size:24px;font-weight:800;letter-spacing:.3px}
+  .header button{background:#fff;color:#111;border:none;padding:8px 14px;border-radius:6px;font-weight:800;cursor:pointer;font-size:18px}
+
+  .body{padding:14px 18px}
+  .status{margin:8px 0;font-size:18px}
+  .ok{color:#0a7a2f}
+  .bad{color:#b42318}
+
+  .filtros{display:flex;gap:10px;flex-wrap:wrap;align-items:center;padding:10px 14px;background:#f6f8fa;border:1px solid #eaecef;border-radius:8px;margin-bottom:12px}
+  .filtros label{font-weight:800;font-size:16px}
+  .filtros select{height:38px;border:2px solid #d0d7de;border-radius:8px;padding:0 10px;font-size:18px;background:#fff}
+  .filtros .cta-count{margin-left:auto;background:#0b5cad;color:#fff;padding:6px 12px;border-radius:6px;font-weight:800;font-size:15px}
+  .filtros .cta-count.done{background:#0a7a2f}
+
+  .rem-block{border:1px solid #d0d7de;border-radius:10px;margin-bottom:14px;overflow:hidden}
+  .rem-hdr{display:flex;justify-content:space-between;align-items:center;padding:10px 14px;background:#eef4fb;border-bottom:1px solid #d0d7de;font-size:16px;gap:10px;flex-wrap:wrap}
+  .rem-hdr .rem-title{font-weight:900;color:#0b3b73;font-size:17px}
+  .rem-hdr .rem-meta{color:#555;font-size:14px}
+  .rem-hdr .rem-badge{background:#0b5cad;color:#fff;padding:4px 10px;border-radius:6px;font-weight:800;font-size:14px;white-space:nowrap}
+  .rem-hdr .rem-badge.done{background:#0a7a2f}
+
+  .items-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:10px;padding:12px}
+  .item-btn{background:#fff;border:2px solid #d0d7de;border-radius:10px;padding:12px 8px;cursor:pointer;text-align:center;font-weight:700;transition:all .15s;position:relative}
+  .item-btn:hover{border-color:#0b5cad;background:#fbfdff}
+  .item-btn.done{border-color:#0a7a2f;background:#f3fbf6}
+  .item-btn .cod{display:block;font-size:24px;font-weight:900;color:#0066cc}
+  .item-btn .desc{display:block;font-size:16px;color:#111;margin-top:4px;font-weight:800}
+  .item-btn .decl{display:block;margin-top:10px;font-size:15px;color:#333;background:#f6f8fa;border-radius:6px;padding:6px}
+  .item-btn .decl b{color:#0b5cad;font-size:17px}
+  .item-btn .ctrl{display:block;margin-top:6px;font-size:14px;color:#0a7a2f;font-weight:800}
+  .item-btn .ctrl small{color:#555;font-weight:600;font-size:12px;display:block}
+  .item-btn .diff{display:block;margin-top:2px;font-size:13px;font-weight:800}
+  .item-btn .diff.dif{color:#b42318}
+  .item-btn .diff.ok{color:#0a7a2f}
+  .item-btn .tilde{position:absolute;top:6px;right:8px;color:#0a7a2f;font-size:22px;font-weight:900;display:none}
+  .item-btn.done .tilde{display:block}
+
+  .empty{padding:22px;color:#666;text-align:center;font-style:italic;font-size:17px}
+
+  /* Popup */
+  .overlay{position:fixed;inset:0;background:rgba(0,0,0,.5);display:none;align-items:center;justify-content:center;padding:16px;z-index:100}
+  .overlay.open{display:flex}
+  .modal{width:min(560px,100%);max-height:94vh;overflow-y:auto;background:#fff;border-radius:14px;padding:18px;box-shadow:0 20px 60px rgba(0,0,0,.3)}
+  .modal h3{font-size:22px;font-weight:800;margin-bottom:10px}
+  .modal .item-info{background:#f6f8fa;padding:12px;border-radius:8px;margin-bottom:12px;font-size:16px;line-height:1.45}
+  .modal .item-info b{color:#0b5cad}
+
+  .grid3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;align-items:end}
+  .grid3 .fld label{display:block;font-size:15px;font-weight:800;margin-bottom:4px;color:#333;text-align:center}
+  .grid3 .fld input{width:100%;padding:14px 6px;font-size:28px;text-align:center;border:2px solid #d0d7de;border-radius:8px;font-weight:900}
+  .grid3 .fld input:focus{outline:none;border-color:#0b5cad;background:#fbfdff}
+
+  .paq-line{margin-top:14px;padding:10px 12px;background:#eef4fb;border:1px solid #c8dcef;border-radius:8px;font-size:18px;font-weight:800;color:#0b3b73;text-align:center}
+  .paq-line b{color:#111}
+  .total-line{margin-top:10px;padding:14px;background:#111;color:#fff;border-radius:8px;font-size:24px;font-weight:900;text-align:center}
+  .diff-line{margin-top:8px;padding:10px 12px;border-radius:6px;font-size:16px;font-weight:800;text-align:center}
+  .diff-line.ok{background:#f3fbf6;color:#0a7a2f;border:1px solid #b8e0c2}
+  .diff-line.bad{background:#fef3f2;color:#b42318;border:1px solid #f4c7c3}
+
+  .actions{display:flex;gap:10px;margin-top:16px;flex-wrap:wrap}
+  .btn{padding:12px 16px;border:none;border-radius:8px;font-size:18px;font-weight:800;cursor:pointer;flex:1;min-width:110px}
+  .btn-primary{background:#111;color:#fff}
+  .btn-primary:disabled{opacity:.4;cursor:not-allowed}
+  .btn-secondary{background:#fff;color:#111;border:2px solid #d0d7de}
+  .btn-danger{background:#fff;color:#b42318;border:2px solid #f4c7c3}
+
+  .msg{margin-top:10px;font-size:15px}
+</style>
+</head>
+<body>
+
+<div class="card">
+  <div class="header">
+    <h1>Control Cajas</h1>
+    <button onclick="history.length>1?history.back():(window.location.href='../GP2_MODULOS.html')">Atrás</button>
+  </div>
+  <div class="body">
+    <div class="filtros">
+      <label>Estado</label>
+      <select id="selEstado">
+        <option value="pendientes" selected>Pendientes</option>
+        <option value="controladas">Controladas</option>
+        <option value="todas">Todas</option>
+      </select>
+      <label>Proveedor</label>
+      <select id="selProv"><option value="todos">Todos</option></select>
+      <span id="ctaCount" class="cta-count">0 items</span>
+    </div>
+
+    <div id="statusMsg" class="status"></div>
+    <div id="lista"></div>
+  </div>
+</div>
+
+<!-- Popup control por item -->
+<div id="ovCtrl" class="overlay">
+  <div class="modal">
+    <h3 id="ctrlTitle">Control caja</h3>
+    <div class="item-info" id="ctrlInfo"></div>
+
+    <div class="grid3">
+      <div class="fld">
+        <label>Base</label>
+        <input type="text" id="inBase" inputmode="numeric" placeholder="0" />
+      </div>
+      <div class="fld">
+        <label>Pisos</label>
+        <input type="text" id="inPisos" inputmode="numeric" placeholder="0" />
+      </div>
+      <div class="fld">
+        <label>Sueltas</label>
+        <input type="text" id="inSueltas" inputmode="numeric" placeholder="0" />
+      </div>
+    </div>
+
+    <div class="paq-line">Paquetes: <b id="lblPaq">0</b> &nbsp;·&nbsp; Cajas por paquete: <b id="lblUpp">25</b></div>
+    <div class="total-line" id="lblTotal">Total: 0 cajas</div>
+    <div class="diff-line" id="lblDiff" style="display:none"></div>
+
+    <div class="actions">
+      <button class="btn btn-secondary" id="btnCancel">Cancelar</button>
+      <button class="btn btn-danger" id="btnDesmarcar" style="display:none">Desmarcar</button>
+      <button class="btn btn-primary" id="btnConfirm" disabled>Confirmar control</button>
+    </div>
+    <div class="msg" id="ctrlMsg"></div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<script src="../supabase-config.js?v=20260905k"></script>
+<script src="control-cajas.js?v=1.1.2"></script>
+</body>
+</html>

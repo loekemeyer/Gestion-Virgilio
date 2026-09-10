@@ -4614,9 +4614,9 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
 
   <!-- ADMIN DE CERVANTES (supervisor). Elegir Cervantes siendo supervisor NO lleva a
        la pantalla de operario: lleva acá. Por ahora son DOS pantallas de admin, cada
-       una en su repo (Gestión Productiva Entero y Gestión Productiva 2.0), así que no
-       se copia nada: se linkea a la raíz de cada una y cada repo decide dónde entrar.
-       Son el mismo origin y el mismo proyecto Supabase → la sesión ya viaja sola. -->
+       una COPIADA acá adentro, en `cervantes-admin/` (entero y gp2). Es una integración:
+       todo vive en Gestión. Cada copia entra por su index.html y la sesión de Google ya
+       es la misma (mismo origin, mismo proyecto Supabase). -->
   <div id="cervAdmin" class="hidden">
     <div class="app-brand">Gestion <span class="app-brand-hi">Virgilio</span></div>
     <h1 class="ps-title">Admin de Cervantes</h1>
@@ -7498,7 +7498,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v14.73";
+const APP_VERSION = "v14.74";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -40744,14 +40744,12 @@ function showCervAdmin() {
 }
 window.showCervAdmin = showCervAdmin;
 
-/* Los dos admin de Cervantes viven en OTROS repos, así que son links y no copias.
-   Se resuelven relativo a esta página (en Pages quedan de hermanos) para no clavar
-   el host, y cada repo decide adónde entrar desde su propio index. */
+/* v14.74 — Los dos admin de Cervantes son COPIAS acá adentro (`cervantes-admin/`),
+   no links a otros repos: esto es una integración, todo vive en Gestión (decisión del
+   dueño, 2026-09-10). Cada copia entra por su propio index.html, que decide si va al
+   menú o al login; la sesión de Google ya es la misma. */
 window.abrirAdminCervantes = function (cual) {
-  var rel = (cual === "gp2") ? "../Gestion-Productiva-2.0/" : "../GestionProductivaEntero/";
-  var url;
-  try { url = new URL(rel, window.location.href).href; } catch (_e) { url = rel; }
-  window.location.href = url;
+  window.location.href = (cual === "gp2") ? "cervantes-admin/gp2/" : "cervantes-admin/entero/";
 };
 window.cambiarPlanta = function () {
   __plantChosen = false;

@@ -1,0 +1,211 @@
+<!doctype html>
+<html lang="es">
+<head>
+<!-- v1.0.0 — Entrega de articulo terminado de los Prov AT, nativa de GP2 (idea 7216).
+     Reemplaza a EntregasAT.html, que era la ultima pantalla del modulo que seguia
+     escribiendo en el esquema del vecino ("Entregas Prov AT" de public) mientras
+     Envios ya escribia en GP2 y el Control ya leia GP2. -->
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Entrega Prov AT · GP2</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="../../supabase-config.js?v=20260905k"></script>
+<script src="../../gp2-ui.js?v=20260905a"></script>
+<script src="../../gp2-numero.js?v=20260905m"></script>
+<link rel="stylesheet" href="../../gp2-modulo.css?v=20260903b"/>
+<link rel="icon" type="image/png" href="../../GP2_favicon.png">
+<link rel="apple-touch-icon" href="../../GP2_favicon.png">
+<style>
+  .provs{display:flex;gap:8px;flex-wrap:wrap;margin:10px 0}
+  .prov-btn{padding:11px 16px;min-height:44px;border-radius:10px;border:2px solid #d0d7de;background:#fff;font-weight:800;cursor:pointer;font-size:17px;color:#111}
+  .prov-btn.active{background:#111;color:#fff;border-color:#111}
+  .prov-btn small{display:block;font-size:13px;font-weight:600;color:#666}
+  .prov-btn.active small{color:#cfd8e3}
+  .cab{display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end;margin:10px 0}
+  .cab .fld{display:flex;flex-direction:column;gap:4px}
+  .cab label{font-size:15px;font-weight:800;color:#444}
+  .cab input{padding:10px 12px;min-height:44px;font-size:19px;border:2px solid #d0d7de;border-radius:8px}
+  td.num{text-align:right;font-variant-numeric:tabular-nums}
+  .caj-in{width:110px;padding:8px;font-size:19px;text-align:right;border:2px solid #d0d7de;border-radius:8px}
+  tr.con-carga td{background:#eef7ee}
+  .btn-conf{padding:13px 24px;font-size:19px;font-weight:800;border-radius:8px;border:2px solid #111;background:#111;color:#fff;cursor:pointer;margin-top:12px;min-height:44px}
+  .btn-conf:disabled{opacity:.4;cursor:default}
+  .badge-fac{padding:3px 10px;border-radius:12px;font-size:13px;font-weight:800;background:#e8f5e9;color:#0a7a2f}
+  .table-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch}
+</style>
+</head>
+<body>
+
+<div class="card">
+  <div class="header">
+    <h1>Entrega Prov AT</h1>
+    <div class="hbtns"><a href="../../GP2_MODULOS.html">Atrás</a></div>
+  </div>
+
+  <div class="steps">
+    <div class="row"><b style="font-size:18px">Proveedor de Artículo Terminado:</b></div>
+    <div class="provs" id="provs"></div>
+
+    <div id="zona" class="hidden">
+      <div class="cab">
+        <div class="fld">
+          <label for="fecha">Fecha</label>
+          <input type="date" id="fecha">
+        </div>
+        <div class="fld">
+          <label for="remito">Remito (opcional)</label>
+          <input type="text" id="remito" placeholder="N°" style="width:150px">
+        </div>
+      </div>
+
+      <div class="search-box"><input type="text" id="q" placeholder="Buscar artículo…"></div>
+      <div class="table-wrap">
+        <table class="t">
+          <thead><tr><th>Artículo</th><th class="num">N° caja</th><th class="num">Cajas que entrega</th></tr></thead>
+          <tbody id="tbody"></tbody>
+        </table>
+      </div>
+      <div id="tblEmpty" class="empty hidden">Este proveedor no tiene artículos asignados.</div>
+
+      <button type="button" class="btn-conf" id="btnConf" disabled>Confirmar Entrega</button>
+    </div>
+
+    <div style="margin-top:18px">
+      <h2 style="font-size:18px;margin:0 0 6px">Últimas entregas</h2>
+      <div class="table-wrap"><table class="t">
+        <thead><tr><th>Fecha</th><th>Prov AT</th><th>Artículo</th><th class="num">Cajas</th><th>Remito</th><th></th></tr></thead>
+        <tbody id="ultBody"></tbody>
+      </table></div>
+    </div>
+
+    <div id="status" class="status">Cargando…</div>
+  </div>
+</div>
+
+<script>
+var SB = GP2_SB();
+var $ = GP2UI.$;
+var esc = GP2UI.esc;   /* helper de la casa, gp2-ui.js (2026-09-05) */
+function fmt(n){ return GP2N.fmt(n, 0); }
+var hoyAR = GP2UI.hoyAR;   /* helper de la casa, gp2-ui.js (2026-09-05): era una copia identica */
+function fechaAR(f){
+  if(!f) return '';
+  // fecha_rto viene "YYYY-MM-DD"; las filas viejas traen el dia_mes "DD/MM/YY".
+  var m=/^(\d{4})-(\d{2})-(\d{2})$/.exec(String(f));
+  return m ? (m[3]+'/'+m[2]+'/'+m[1].slice(2)) : String(f);
+}
+
+var D={}, provSel=null, CARGA={};   // cod_art -> cajas
+
+async function boot(){
+  var r=await SB.rpc('entregas_prov_at_bundle');
+  if(r.error){ $('status').textContent='Error: '+r.error.message; return; }
+  D=r.data||{};
+  var g=$('provs'); g.innerHTML='';
+  (D.provs||[]).forEach(function(p){
+    var b=document.createElement('button'); b.type='button';
+    b.className='prov-btn'+(provSel&&provSel.id===p.id?' active':'');
+    b.innerHTML=esc(p.nombre)+'<small>'+p.arts+' art.</small>';
+    b.addEventListener('click',function(){
+      // CARGA vive solo en memoria: cambiar de proveedor con cosas cargadas las
+      // perdia sin avisar. Mismo cuidado que en DevolucionCervantes.
+      if (provSel && provSel.id !== p.id && Object.keys(CARGA).length &&
+          !confirm('Tenés ' + Object.keys(CARGA).length + ' artículo(s) cargados de ' + provSel.nombre +
+                   ' sin registrar.\n\nSi cambiás a ' + p.nombre + ' se pierden. ¿Cambiar igual?')) return;
+      provSel=p; CARGA={};
+      g.querySelectorAll('.prov-btn').forEach(function(x){ x.classList.remove('active'); });
+      b.classList.add('active');
+      $('zona').classList.remove('hidden');
+      render();
+    });
+    g.appendChild(b);
+  });
+  pintarUltimas();
+  $('status').textContent='';
+  $('status').className='status';
+}
+
+function artsDe(){
+  if(!provSel) return [];
+  var q=($('q').value||'').trim().toLowerCase();
+  return (D.arts||[]).filter(function(a){
+    if(a.prov_id!==provSel.id) return false;
+    if(q && !(((a.cod_art||'')+' '+(a.descripcion||'')).toLowerCase().includes(q))) return false;
+    return true;
+  });
+}
+
+function render(){
+  var as=artsDe();
+  $('tbody').innerHTML=as.map(function(a){
+    var v=CARGA[a.cod_art]||'';
+    return '<tr'+(v>0?' class="con-carga"':'')+'>'+
+      '<td><b>'+esc(a.cod_art)+'</b><br><small style="color:#777">'+esc(a.descripcion||'')+'</small></td>'+
+      '<td class="num">'+(a.n_caja==null?'—':esc(a.n_caja))+'</td>'+
+      '<td class="num"><input class="caj-in" data-cod="'+esc(a.cod_art)+'" inputmode="numeric" value="'+(v?fmt(v):'')+'" placeholder="cajas"></td>'+
+    '</tr>';
+  }).join('');
+  $('tblEmpty').classList.toggle('hidden', as.length>0 || !provSel);
+
+  document.querySelectorAll('.caj-in').forEach(function(inp){
+    inp.addEventListener('change',function(){
+      var v=GP2N.entero(inp.value);
+      var cod=inp.dataset.cod;
+      if(v>0) CARGA[cod]=v; else delete CARGA[cod];
+      render(); habilitar();
+    });
+  });
+  habilitar();
+}
+
+function habilitar(){
+  var n=Object.keys(CARGA).length;
+  $('btnConf').disabled = !(provSel && n>0);
+  $('btnConf').textContent = n>0 ? ('Confirmar Entrega ('+n+' art.)') : 'Confirmar Entrega';
+}
+
+$('btnConf').addEventListener('click', async function(){
+  var items=(D.arts||[]).filter(function(a){ return a.prov_id===provSel.id && CARGA[a.cod_art]>0; });
+  if(!items.length) return;
+  $('btnConf').disabled=true;
+  var remito=($('remito').value||'').trim()||null;
+  var fecha=$('fecha').value||null;
+  var hechas=0;
+  try{
+    for(var i=0;i<items.length;i++){
+      var a=items[i];
+      var r=await SB.rpc('crear_entrega_prov_at',{
+        p_prov_at_id:provSel.id, p_cod_art:a.cod_art, p_cajas:CARGA[a.cod_art],
+        p_remito:remito, p_fecha:fecha });
+      if(r.error) throw new Error(a.cod_art+': '+r.error.message);
+      hechas++;
+      delete CARGA[a.cod_art];   // ya registrada: fuera del buffer (un reintento no la duplica)
+    }
+    CARGA={}; $('remito').value='';
+    await boot();
+    render();
+    $('status').className='status ok';
+    $('status').textContent='✓ Entrega registrada: '+hechas+' artículo(s) de '+provSel.nombre+'.';
+  }catch(e){
+    render();   // quedan marcados solo los que fallaron
+    $('status').className='status bad';
+    $('status').textContent='Error (se cargaron '+hechas+' de '+items.length+
+      ', los cargados ya no se reintentan): '+(e.message||e);
+  }finally{ $('btnConf').disabled=false; habilitar(); }
+});
+
+function pintarUltimas(){
+  $('ultBody').innerHTML=(D.ultimas||[]).map(function(u){
+    return '<tr><td>'+esc(fechaAR(u.fecha))+'</td><td>'+esc(u.prov||'')+'</td>'+
+      '<td><b>'+esc(u.cod_art)+'</b> <small style="color:#777">'+esc(u.descripcion||'')+'</small></td>'+
+      '<td class="num">'+fmt(u.cajas)+'</td><td>'+esc(u.remito||'')+'</td>'+
+      '<td>'+(u.facturada?'<span class="badge-fac">facturada</span>':'')+'</td></tr>';
+  }).join('') || '<tr><td colspan="6" style="color:#888">Sin entregas todavía.</td></tr>';
+}
+
+$('q').addEventListener('input', render);
+$('fecha').value=hoyAR();
+boot();
+</script>
+</body>
+</html>

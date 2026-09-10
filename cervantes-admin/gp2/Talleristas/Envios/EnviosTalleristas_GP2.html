@@ -1,0 +1,349 @@
+<!doctype html>
+<html lang="es">
+<head>
+<!-- v1.2.0 — la marca F se persiste en GP2.faltante_marcado (marcar/resolver_faltante, best-effort) -->
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Envíos por Tallerista · GP2</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="../../supabase-config.js?v=20260905k"></script>
+<link rel="stylesheet" href="../../gp2-modulo.css?v=20260903b"/>
+<link rel="stylesheet" href="../../tandas-popup.css?v=20260903b"/>
+<link rel="icon" type="image/png" href="../../GP2_favicon.png">
+<link rel="apple-touch-icon" href="../../GP2_favicon.png">
+</head>
+<body>
+
+<div class="card">
+  <div class="header">
+    <h1>Envíos por Tallerista</h1>
+    <div class="hbtns">
+      <button class="hlink hidden" id="btnVolver" type="button">← Cambiar tallerista</button>
+      <a href="../Control%20Tall/ControlTalleristas_GP2.html">Control</a>
+      <a href="../Recepcion/EntregasTalleristas_GP2.html">Entrega</a>
+      <a href="../../GP2_MODULOS.html">Atrás</a>
+    </div>
+  </div>
+
+  <div class="steps">
+
+    <!-- FASE 0 — elegir tallerista -->
+    <div id="fase0">
+      <div class="row"><label class="lbl">Tallerista</label></div>
+      <div class="provs-grid" id="tallGrid"></div>
+      <div id="status" class="status">Cargando…</div>
+    </div>
+
+    <!-- FASE 1 — cargar el envío -->
+    <div id="fase1" class="hidden">
+      <div class="row" style="justify-content:space-between">
+        <div class="row" style="margin:0"><label class="lbl" id="fase1Title">Tallerista</label></div>
+        <div class="row" style="margin:0">
+          <label class="lbl" style="font-size:16px">Fecha</label>
+          <input type="date" id="fFecha">
+          <button class="btn btn-secondary" id="btnLimpiar" type="button" title="Vaciar todo lo cargado">🗑 Limpiar</button>
+          <button class="btn btn-primary" id="btnEnviar" type="button" disabled>Enviar</button>
+        </div>
+      </div>
+
+      <div class="search-box"><input type="text" id="q" placeholder="Buscar artículo por código, descripción o sector…"></div>
+
+      <div class="table-wrap">
+        <table class="t">
+          <thead><tr>
+            <th>Sec</th>
+            <th>Descripción</th>
+            <th class="num">Cjn<br>a Env.</th>
+            <th class="ctr" title="Marcar faltante">Falt</th>
+            <th class="num sep">Caj</th>
+            <th class="num">KG<br>Neto</th>
+            <th class="ctr" title="Cargar por tandas">T</th>
+            <th class="num">Uni</th>
+          </tr></thead>
+          <tbody id="tbody"></tbody>
+        </table>
+      </div>
+      <div id="tblEmpty" class="empty hidden">Este tallerista no tiene partes configuradas en ruta_paso.</div>
+      <div id="msg1" class="status"></div>
+    </div>
+
+    <!-- FASE 3 — listo para imprimir -->
+    <div id="fase3" class="hidden">
+      <div class="successBox no-print">
+        <div class="title">✓ Envío registrado</div>
+        <div>Tu código de envío:</div>
+        <div class="code" id="successCode">—</div>
+        <div id="successDetail" style="font-size:17px;color:#444"></div>
+      </div>
+
+      <div class="row"><label class="lbl" id="printTitle">Remito</label></div>
+      <div class="table-wrap">
+        <table class="t">
+          <thead><tr>
+            <th>Sec</th><th>Descripción</th>
+            <th class="num">Caj</th><th class="num">Kg</th><th class="num">Uni</th>
+          </tr></thead>
+          <tbody id="tbodyPrint"></tbody>
+          <tfoot id="tfootPrint"></tfoot>
+        </table>
+      </div>
+
+      <div class="row no-print" style="justify-content:center;margin-top:14px">
+        <button class="btn btn-secondary" id="btnImprimir" type="button">🖨 Imprimir</button>
+        <button class="btn btn-primary" id="btnVolverTall" type="button">← Cambiar tallerista</button>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script src="../../tandas-popup.js?v=20260905i"></script>
+<script src="../../gp2-ui.js?v=20260905a"></script>
+<script src="../../gp2-numero.js?v=20260905m"></script>
+<script src="../../gp2-envios-common.js?v=20260905c"></script>
+<script>
+"use strict";
+
+var E = GP2EE;
+var $ = GP2UI.$, esc = GP2UI.esc, fmt = E.fmt, hoyISO = E.hoyISO;
+/* parser historico de esta pantalla (ver GP2EE.num) */
+var num = E.num;   // parser completo: "1.234,5" = 1234,5 (el modo simple con el bug se elimino)
+
+var SB = E.sb();
+
+var D = { tall:[], partes:{} };
+var selT = null;
+var BUF = E.buffer("gp2_enviosTall_buffer", function(){ return { caj:"", kg:"", falt:false, tandas:[] }; });
+
+function esCargada(it){ return num(it.kg)>0 || num(it.caj)>0; }
+function tieneAlgo(it){ return num(it.caj)>0 || num(it.kg)>0 || it.falt; }
+
+/* Al tallerista se le manda lo del lado 'entrada' de ruta_paso. */
+function partesDe(tid){
+  var o=(D.partes||{})[tid]||{entrada:[],salida:[]};
+  return (o.entrada||[]).slice();
+}
+
+/* Uni a partir de lo cargado: si hay kg y factor, uni = kg / kg_x_uni. */
+function uniDe(x, it){
+  var kg=num(it.kg);
+  if (kg>0 && x.kg_x_uni) return kg/Number(x.kg_x_uni);
+  return 0;
+}
+
+async function cargar(){
+  var r = await SB.rpc("talleristas_bundle");
+  if (r.error){ $("status").textContent="Error: "+r.error.message; return; }
+  D = r.data || { tall:[], partes:{} };
+  BUF.load();
+  renderTall();
+  $("status").textContent = (D.tall||[]).length+" talleristas.";
+}
+
+function renderTall(){
+  E.gridContrapartes("tallGrid", D.tall, {
+    vacio: "Sin talleristas.",
+    meta: function(t){
+      var n=partesDe(t.id).length;
+      var cargado=E.cargadasDe(BUF.all[t.id], tieneAlgo).length;
+      return esc(t.cod_prov||"—")+" · "+n+" partes"+(cargado?(" · "+cargado+" cargadas"):"");
+    },
+    onPick: elegir
+  });
+}
+
+function elegir(t){
+  selT=t;
+  $("fase1Title").textContent=t.nombre+(t.cod_prov?(" · cod "+t.cod_prov):"");
+  E.mostrarFase(1);
+  if(!$("fFecha").value) $("fFecha").value=hoyISO();
+  $("q").value="";
+  render();
+}
+function volver(){
+  selT=null;
+  E.mostrarFase(0);
+  renderTall();
+}
+
+function filtradas(){
+  return E.filtrar(partesDe(selT.id), $("q").value, function(x){
+    return String(x.cod||"")+" "+String(x["desc"]||"")+" "+String(x.sector||"");
+  });
+}
+
+function render(){
+  var arr=filtradas(), tb=$("tbody");
+  tb.innerHTML="";
+  $("tblEmpty").classList.toggle("hidden", arr.length>0);
+
+  arr.forEach(function(x){
+    var it=BUF.item(selT.id, x.comp_id);
+    var t=E.tandaTotales(it, ["caj","kg"]);
+    var vCaj=t.hayT?(t.tot.caj||""):it.caj;
+    var vKg =t.hayT?(t.tot.kg ||""):it.kg;
+
+    // "Cjn a Env." = lo disponible en el sector, expresado en cajones
+    var cjnAEnv = x.uni_x_cajon ? Number(x.online_sector||0)/Number(x.uni_x_cajon) : null;
+    var uni = uniDe(x, { kg: vKg });
+
+    var tr=document.createElement("tr");
+    tr.dataset.cid=x.comp_id;
+    if(it.falt) tr.className="falt";
+    tr.innerHTML=
+      '<td>'+esc(x.sector||"—")+'</td>'+
+      '<td><span class="cod">'+esc(x.cod)+'</span><br><small class="sub">'+esc(x["desc"]||"")+'</small></td>'+
+      '<td class="num">'+(cjnAEnv==null?"—":fmt(cjnAEnv,2))+'</td>'+
+      E.tdFalt(it)+
+      E.tdInput("caj", vCaj, t.hayT, "sep")+
+      E.tdInput("kg",  vKg,  t.hayT, null, "decimal")+
+      E.tdTanda(it)+
+      '<td class="num">'+(uni>0?fmt(uni,0):"—")+'</td>';
+    tb.appendChild(tr);
+  });
+  actualizarEnviar();
+}
+
+function itemDeFila(tr){
+  var cid=tr.dataset.cid;
+  var meta=E.buscarMeta(partesDe(selT.id), cid, function(x){ return x.comp_id; });
+  return { cid:cid, meta:meta, buf:BUF.item(selT.id, cid) };
+}
+
+function cargadas(){ return E.cargadasDe(BUF.de(selT.id), esCargada); }
+
+function actualizarEnviar(){ E.actualizarEnviar(cargadas().length, "Enviar"); }
+
+$("tbody").addEventListener("input", function(e){
+  var inp=e.target.closest("input.cell-in");
+  if(!inp||inp.readOnly) return;
+  var d=itemDeFila(inp.closest("tr"));
+  d.buf[inp.dataset.f]=inp.value;
+  BUF.save();
+  // refrescar solo la columna Uni de esa fila
+  var tr=inp.closest("tr");
+  var uni=uniDe(d.meta||{}, d.buf);
+  tr.lastElementChild.textContent = uni>0?fmt(uni,0):"—";
+  actualizarEnviar();
+});
+
+$("tbody").addEventListener("click", function(e){
+  var btn=e.target.closest("button[data-a]");
+  if(!btn) return;
+  var d=itemDeFila(btn.closest("tr"));
+  if(btn.dataset.a==="falt"){
+    d.buf.falt=!d.buf.falt; BUF.save();
+    // ademas del buffer, la F se persiste en GP2.faltante_marcado (best-effort)
+    E.persistirFalt(SB, d.buf.falt, d.cid, "envios_tall", "Envio a "+selT.nombre);
+    render(); return;
+  }
+  if(btn.dataset.a==="tandas"){
+    E.abrirTandas({
+      titulo:"Tandas — "+(d.meta?d.meta.cod:""),
+      buf:d.buf,
+      campos:["caj","kg"],
+      onDone:function(){ BUF.save(); render(); }
+    });
+  }
+});
+
+$("q").addEventListener("input", render);
+$("btnVolver").addEventListener("click", volver);
+$("btnVolverTall").addEventListener("click", volver);
+$("btnImprimir").addEventListener("click", function(){ window.print(); });
+
+$("btnLimpiar").addEventListener("click", function(){
+  if(!selT) return;
+  if(!confirm("¿Vaciar todo lo cargado para "+selT.nombre+"?")) return;
+  BUF.borrar(selT.id);
+  render();
+});
+
+$("btnEnviar").addEventListener("click", async function(){
+  if(!selT) return;
+  var items=cargadas();
+  if(!items.length) return;
+
+  var arr=partesDe(selT.id), metaPor={};
+  arr.forEach(function(x){ metaPor[x.comp_id]=x; });
+
+  var faltanKg=items.filter(function(o){ return num(o.it.caj)>0 && !(num(o.it.kg)>0); })
+                    .map(function(o){ return (metaPor[o.k]||{}).cod||o.k; });
+  if(faltanKg.length){ alert("Falta cargar Kg neto para: "+faltanKg.join(", ")); return; }
+
+  var resumen=items.map(function(o){
+    var m=metaPor[o.k]||{};
+    return (m.cod||o.k)+": "+fmt(num(o.it.caj),1)+" caj / "+fmt(num(o.it.kg),0)+" kg";
+  }).join("\n");
+  if(!confirm("Enviar a "+selT.nombre+":\n\n"+resumen)) return;
+
+  var fecha=$("fFecha").value||hoyISO();
+  var btn=$("btnEnviar");
+  btn.disabled=true; btn.textContent="Enviando…";
+  $("msg1").textContent="";
+
+  var enviados=[];
+  var res=await E.guardarItems(items, {
+    rpc: function(o){
+      return SB.rpc("crear_envio_tallerista", {
+        p_tallerista_id: selT.id,
+        p_comp_id: Number(o.k),
+        p_cantidad: num(o.it.kg),
+        p_unidad: "kg",
+        p_fecha: fecha+"T12:00:00-03:00"
+      });
+    },
+    onOk: function(o){
+      // ya registrado: fuera del buffer (un reintento no lo duplica)
+      delete BUF.de(selT.id)[o.k];
+      BUF.save();
+      var m=metaPor[o.k]||{};
+      enviados.push({ m:m, caj:num(o.it.caj), kg:num(o.it.kg), uni:uniDe(m,o.it) });
+    },
+    codDe: function(o){ return (metaPor[o.k]||{}).cod||o.k; }
+  });
+
+  btn.disabled=false; actualizarEnviar();
+
+  if(res.errs.length){
+    render(); // en la tabla quedan cargados solo los que fallaron
+    $("msg1").innerHTML='<span style="color:#b91c1c">Se registraron '+res.ok+' de '+items.length+
+      ' (los registrados ya salieron de la carga; reintentá solo lo que quedó). Errores:<br>'+esc(res.errs.join(" | "))+'</span>';
+    return;
+  }
+
+  // Igual que las pantallas PS: las marcas F SIN cantidad no se registran
+  // (la RPC de talleristas no lleva faltante) pero NO se pierden — quedan
+  // cargadas para la proxima, con aviso. Antes se vaciaba el buffer entero.
+  var b2=BUF.de(selT.id), faltSolo=0;
+  Object.keys(b2).forEach(function(k2){
+    var it2=b2[k2];
+    if(it2.falt && !(num(it2.caj)>0 || num(it2.kg)>0)) faltSolo++;
+    else delete b2[k2];
+  });
+  if(!faltSolo) delete BUF.all[selT.id];
+  BUF.save();
+
+  // fase 3: remito para imprimir
+  var tCaj=0,tKg=0,tUni=0;
+  $("tbodyPrint").innerHTML = enviados.map(function(e){
+    tCaj+=e.caj; tKg+=e.kg; tUni+=e.uni;
+    return '<tr><td>'+esc(e.m.sector||"—")+'</td>'+
+      '<td><span class="cod">'+esc(e.m.cod||"")+'</span> '+esc(e.m["desc"]||"")+'</td>'+
+      '<td class="num">'+fmt(e.caj,1)+'</td><td class="num">'+fmt(e.kg,0)+'</td>'+
+      '<td class="num">'+fmt(e.uni,0)+'</td></tr>';
+  }).join("");
+  $("tfootPrint").innerHTML='<tr><td colspan="2">'+enviados.length+' partes</td>'+
+    '<td class="num">'+fmt(tCaj,0)+'</td><td class="num">'+fmt(tKg,2)+'</td>'+
+    '<td class="num">'+fmt(tUni,0)+'</td></tr>';
+
+  $("printTitle").textContent="Remito · "+selT.nombre+" · "+fecha;
+  E.mostrarExito(res.ok+" partes enviadas a "+selT.nombre+" · "+fecha+
+    (faltSolo?(" · OJO: "+faltSolo+" marca(s) F sin cantidad NO se registran (siguen cargadas)"):""));
+});
+
+$("fFecha").value=hoyISO();
+cargar().catch(function(e){ $("status").textContent="Error: "+(e&&e.message?e.message:e); });
+</script>
+</body>
+</html>

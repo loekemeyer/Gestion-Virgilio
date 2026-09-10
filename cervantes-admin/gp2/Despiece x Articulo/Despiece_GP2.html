@@ -1,0 +1,920 @@
+<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Despiece x Artículo (GP2)</title>
+<!-- v2.1.1 - FALTANTES DEL ARTICULO: absorbe lo unico propio de la pantalla Faltantes
+     (borrada 2026-08-30, aprobado por el usuario): el PRORRATEO del faltante por articulo.
+     Al abrir un articulo, un bloque muestra por componente y ubicacion: minimo, stock,
+     faltante global y cuanto de ese faltante es atribuible a ESTE articulo — misma
+     matematica (reparto ÷N entre talleristas compartidos y firma anti-duplicado de rutas
+     alternativas) portada 1:1 del JS viejo, sobre la MISMA RPC faltantes_bundle (lazy).
+     v2.0.0 - FUSION (pedido del usuario: "Que funcione mergeado todo en despiece x articulo"):
+     esta pantalla absorbe Verificacion (trazado de rutas, confirmar/reportar/resolver contra
+     ruta_revision — antes ruta_confirmada/ruta_problema, fusionadas el 2026-09-04 —, misma firma de deduplicacion) y VerifMadres (componentes
+     con kg_x_uni / uni_x_cajon faltantes). Por articulo se ve receta + rutas + avisos; arriba
+     un resumen global con filtro "solo artículos con pendientes". RPC nueva despiece_verif_bundle
+     (un solo viaje). Las pantallas viejas Verificacion_GP2 y VerifMadres_GP2 se borraron. -->
+<style>
+ *{box-sizing:border-box}
+ body{margin:0;background:#ebeff4;color:#385475;font:13px/1.4 -apple-system,Segoe UI,Roboto,sans-serif}
+ .top{background:linear-gradient(90deg,#e7f3f8,#e7f3f8);padding:12px 20px;display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}
+ .top h1{margin:0;font-size:18px;color:#1c8391}
+ .top .sub{font-size:11px;color:#336d7a}
+ .filters{padding:12px 20px;background:#ebf0f5;border-bottom:1px solid #d1dae6;display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+ .filters label{font-size:11px;text-transform:uppercase;color:#475569;letter-spacing:.5px;margin-right:2px}
+ .filters select,.filters input[type=text]{background:#eaeff6;color:#385475;border:1px solid #cddaea;border-radius:6px;padding:8px 10px;font-size:18px;font-family:inherit}
+ .filters input[type=text]{min-width:180px;flex:1}
+ .filters select{min-width:200px;max-width:100%}
+ .filters .chk{font-size:12px;color:#336d7a;display:flex;align-items:center;gap:6px;cursor:pointer;text-transform:none;letter-spacing:0}
+ .btn{background:#e9eff7;color:#385475;border:none;border-radius:6px;padding:8px 12px;cursor:pointer;font-size:17px;font-family:inherit;min-height:44px}
+ .btn:hover{background:#e9eff7}
+ .kpis{padding:12px 20px;display:flex;gap:10px;flex-wrap:wrap}
+ .kpi{background:#ebf0f5;border:1px solid #d1dae6;border-radius:8px;padding:10px 14px;min-width:104px}
+ .kpi .n{font-size:22px;font-weight:800;color:#1c8391}
+ .kpi .n.warn{color:#92611b}
+ .kpi .n.ok{color:#258858}
+ .kpi .lb{font-size:10px;text-transform:uppercase;color:#475569;letter-spacing:.6px}
+ .content{padding:0 20px 40px}
+ .art-section{margin:14px 0;border:1px solid #d1dae6;border-radius:8px;background:#eaeff6;overflow:hidden}
+ .art-head{padding:9px 14px;background:linear-gradient(90deg,#e9eff6,#ebf0f5);display:flex;align-items:center;gap:10px;cursor:pointer;user-select:none;flex-wrap:wrap}
+ .art-head:hover{background:#e9eff6}
+ .art-head .caret{color:#475569;transition:transform .15s;display:inline-block;width:12px}
+ .art-section.open .art-head .caret{transform:rotate(90deg)}
+ .art-head .cod{color:#1c8391;font-weight:800;font-size:15px}
+ .art-head .fam{color:#165d98;font-size:12px}
+ .art-head .stats{margin-left:auto;display:flex;gap:12px;font-size:11px;color:#475569;align-items:center;flex-wrap:wrap}
+ .art-head .stats b{color:#385475;font-size:13px}
+ .pill{display:inline-block;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:700}
+ .pill.warn{background:#f8f2e7;color:#92611b}
+ .pill.bad{background:#f8e8e9;color:#981622}
+ .pill.ok{background:#e7f8f3;color:#258858}
+ .art-body{display:none;padding:0}
+ .art-section.open .art-body{display:block}
+ .bloque{padding:8px 14px 4px;font-size:11px;text-transform:uppercase;letter-spacing:.6px;color:#475569;font-weight:700}
+ .tabla-wrap{overflow-x:auto}
+ table{border-collapse:collapse;font-size:12px;width:100%;min-width:640px}
+ th,td{padding:6px 12px;text-align:left;border-bottom:1px solid #d1dae6;white-space:nowrap}
+ th{color:#475569;text-transform:uppercase;font-size:10px;letter-spacing:.4px;background:#e9eff6}
+ td.num{text-align:right;font-family:ui-monospace,SF Mono,monospace}
+ td.falta{background:#f8ede7;color:#92611b;font-weight:700}
+ .f-fal{color:#981622;font-weight:700}
+ .f-ok{color:#258858}
+ .falt-nota{padding:6px 14px 12px;color:#475569;font-size:11px;font-style:italic}
+ tbody tr:hover{background:#eaeff6}
+ .sect-tag{display:inline-block;padding:2px 8px;border-radius:3px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.3px}
+ .st-crudo{background:#f8f2e7;color:#92611b}
+ .st-procesado{background:#e7f8f3;color:#258858}
+ .st-transito{background:#e9eff7;color:#165d98}
+ .st-afilado{background:#f4f2eb;color:#867828}
+ .st-fleje{background:#f8e7ee;color:#98163f}
+ .st-plástico{background:#efe9f6;color:#4f1698}
+ .st-bombilla{background:#e7f4f8;color:#1c8391}
+ .st-remache{background:#f3eded;color:#832b2b}
+ .st-garage{background:#edf4eb;color:#5d8628}
+ .st-cartón{background:#f7f1e9;color:#7c6331}
+ .st-caja{background:#ebeef4;color:#344e7a}
+ .st-terminado{background:#e7f8f2;color:#1c9166}
+ .st-none{background:#222;color:#888}
+ .empty{padding:24px;color:#475569;font-style:italic}
+ .muted{color:#5a6a7a}
+ /* ── rutas (viene de Verificacion_GP2, adaptado al tema oscuro) ── */
+ .ruta-card{margin:8px 14px;padding:10px 12px;background:#e9eff6;border:1px solid #d1dae6;border-radius:10px}
+ .ruta-card.incompleta{border-left:4px solid #eadecd}
+ .rc-head{display:flex;align-items:center;margin-bottom:8px;flex-wrap:wrap;gap:6px;font-size:12px;color:#336d7a}
+ .badge{padding:2px 8px;border-radius:10px;font-size:11px;font-weight:700}
+ .badge.ok{background:#e7f8f3;color:#258858}
+ .badge.inc{background:#f8e8e9;color:#981622}
+ .badge.conf{background:#e7f8f3;color:#258858}
+ .badge.pin{background:#f8f2e7;color:#92611b}
+ .badge.warn{background:#f8e8e9;color:#981622}
+ .ruta-flow{display:flex;flex-wrap:wrap;gap:4px;align-items:center}
+ .node,.node *{text-decoration:none!important;text-decoration-line:none!important;border:0!important;box-shadow:none!important}
+ .node{display:inline-flex;flex-direction:column;align-items:flex-start;gap:2px;color:#fff;padding:8px 14px;border-radius:8px;line-height:1.25;font-weight:800}
+ .node .nm{font-size:16px;font-weight:900;white-space:nowrap;text-decoration:none}
+ .node .sub{font-size:13px;opacity:.95;font-weight:700;white-space:nowrap;text-decoration:none}
+ .sep{color:#64748b;margin:0 3px;align-self:center}
+ .rc-actions{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}
+ .btn-conf{padding:8px 12px;border-radius:6px;border:1px solid #cddaea;font-size:12px;cursor:pointer;font-weight:700;background:#ebf0f5;color:#385475;min-height:40px}
+ .btn-conf.ok{background:#e7f8f3;color:#258858;border-color:#cdeade}
+ .btn-conf.pin{background:#f8f2e7;color:#92611b;border-color:#eadecd}
+ .btn-conf.warn{background:#f8e8e9;color:#981622;border-color:#eacdd1}
+ .btn-conf.resolve{background:#e7f4f8;color:#1c8391;border-color:#cde3ea}
+ .prob-item{margin-top:8px;padding:8px 10px;background:#f4eced;border-radius:6px;border:1px solid #eacdd2;font-size:12px;color:#981624}
+ .prob-item .prob-meta{color:#475569;font-size:11px;margin-top:4px}
+ .avisos{margin:8px 14px 14px;padding:10px 12px;background:#f6f2ea;border:1px solid #eae1cd;border-radius:10px;font-size:12px;color:#896424}
+ .avisos.limpio{background:#eaf5f0;border-color:#cdeade;color:#258858}
+ .avisos b{color:#92611b}
+ .avisos.limpio b{color:#258858}
+ .avisos ul{margin:6px 0 0;padding-left:18px}
+ .avisos li{margin:2px 0}
+ /* modal reportar problema */
+ .modal-bg{position:fixed;inset:0;background:rgba(0,0,0,.6);display:none;align-items:center;justify-content:center;z-index:200}
+ .modal-bg.on{display:flex}
+ .modal-box{background:#ebf0f5;border:1px solid #cddaea;border-radius:12px;padding:20px;max-width:420px;width:92%}
+ .modal-box h3{margin:0 0 12px;font-size:15px;color:#385475}
+ .modal-box textarea{width:100%;height:80px;background:#eaeff6;color:#385475;border:1.5px solid #cddaea;border-radius:8px;padding:8px;font-size:18px;font-family:inherit;resize:vertical}
+ .modal-actions{display:flex;gap:8px;justify-content:flex-end;margin-top:12px}
+ .modal-actions button{padding:10px 16px;border-radius:8px;border:none;font-size:13px;font-weight:700;cursor:pointer;min-height:44px}
+ .modal-ok{background:#e9eff7;color:#fff}.modal-cancel{background:#ebeff4;color:#336d7a}
+ @media (max-width:640px){
+  .top,.filters,.kpis,.content{padding-left:10px;padding-right:10px}
+  .kpi{min-width:calc(33% - 8px);padding:8px 10px;flex:1}
+  .kpi .n{font-size:18px}
+  .filters select{min-width:0;flex:1 1 100%}
+  .btn-conf{min-height:44px}
+  .ruta-card{margin:8px 6px}
+  .avisos{margin:8px 6px 12px}
+ }
+</style><link rel="icon" type="image/png" href="../GP2_favicon.png">
+<link rel="apple-touch-icon" href="../GP2_favicon.png">
+<link rel="stylesheet" href="../gp2-claro.css?v=20260903b">
+</head>
+<body>
+<div id="gp2-logobar" style="position:relative;background:#e8edf7;text-align:center;padding:6px 0;border-bottom:1px solid #d0dae7"><a href="../GP2_MODULOS.html" style="position:absolute;left:10px;top:50%;transform:translateY(-50%);color:#385475;text-decoration:none;font-weight:700;font-size:15px;padding:5px 10px;border:1px solid #d1d9e5;border-radius:8px;background:#e9eef7">← Atrás</a><a href="../GP2_MODULOS.html" style="text-decoration:none"><img src="../GP2_logo.png" alt="GP2 · Gestión Productiva" style="height:40px;vertical-align:middle"></a></div>
+
+<div class="top">
+  <div>
+    <h1>🔧 Despiece x Artículo</h1>
+    <div class="sub">Receta (BOM), ruta trazada y avisos por artículo — confirmá o reportá cada ruta acá mismo. Datos: schema GP2.</div>
+  </div>
+</div>
+<div class="filters">
+  <label>Artículo</label>
+  <select id="selArt"><option value="">— todos —</option></select>
+  <input id="q" type="text" placeholder="Buscar código, familia, componente, fleje...">
+  <label class="chk"><input type="checkbox" id="chkPend"> Solo artículos con pendientes</label>
+  <label class="chk">Usuario <input id="inpUsuario" type="text" placeholder="tu nombre" style="width:130px;background:#eaeff6;color:#385475;border:1px solid #cddaea;border-radius:6px;padding:6px 8px;font-size:18px;font-family:inherit"></label>
+  <button class="btn" id="expAll" style="margin-left:auto">Expandir todo</button>
+  <button class="btn" id="btnCSV">Exportar CSV</button>
+</div>
+<div class="kpis" id="kpis"></div>
+<div class="content" id="sections"></div>
+
+<div class="modal-bg" id="modalBg">
+  <div class="modal-box">
+    <h3>Reportar problema en esta ruta</h3>
+    <textarea id="modalTxt" placeholder="Describí el problema que encontraste…"></textarea>
+    <div class="modal-actions">
+      <button class="modal-cancel" onclick="cerrarModal()">Cancelar</button>
+      <button class="modal-ok" onclick="enviarReporte()">Reportar</button>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="../supabase-config.js?v=20260905k"></script>
+<script src="../gp2-ui.js?v=20260905a"></script>
+<script>var D={};</script>
+<script>
+var SB=GP2_SB();
+
+var esc = GP2UI.esc;   /* helper de la casa, gp2-ui.js (2026-09-05) */
+function fmtKg(v){if(v==null||v==='')return '';var n=Number(v);if(!isFinite(n))return '';return n.toString();}
+function fmtQ(v){if(v==null||v==='')return '';var n=Number(v);if(!isFinite(n))return esc(v);return Math.round(n*10000)/10000;}
+function norm(s){return String(s==null?'':s).trim().toUpperCase();}
+
+var SIN_ART='— sin artículo —';
+var open={};
+var MODAL_FIRMA=null;
+var selArt=document.getElementById('selArt');
+var fQ=document.getElementById('q');
+var chkPend=document.getElementById('chkPend');
+
+/* estado de rutas: firmas confirmadas + problemas por firma (misma firma de
+   deduplicacion que usaba Verificacion_GP2: F:<fleje>|tp:actor|... ) */
+var CONFIRMADAS=new Set();
+var PROBLEMAS_MAP={};
+function makeFirma(r,pasos){
+  var parts=['F:'+(r.fleje||'?')];
+  pasos.forEach(function(p){parts.push((p.tp||'?')+':'+(p.actor||p.cs||p.ce||''));});
+  return parts.join('|');
+}
+var RUTAS=[];           // [{r,pasos,completa,firma,idx}]
+var RUTAS_BY_ART={};    // cod articulo -> [x]
+var FIRMA_IDX={};       // firma -> x (para el modal)
+
+function rutaEstado(firma){
+  if(CONFIRMADAS.has(firma)) return 'conf';
+  var probs=PROBLEMAS_MAP[firma]||[];
+  if(probs.some(function(p){return p.estado==='pendiente';})) return 'warn';
+  if(probs.some(function(p){return p.estado==='resuelto';})) return 'pin';
+  return '';
+}
+
+function prepara(){
+  CONFIRMADAS=new Set();PROBLEMAS_MAP={};
+  (D.confirmadas||[]).forEach(function(c){CONFIRMADAS.add(c.firma);});
+  (D.problemas||[]).forEach(function(p){
+    (PROBLEMAS_MAP[p.firma]=PROBLEMAS_MAP[p.firma]||[]).push(p);
+  });
+  RUTAS=(D.rutas||[]).map(function(r,idx){
+    var pasos=r.pasos||[];
+    var completa=pasos.some(function(p){return p.tp==='virgilio'||p.tp==='tallerista';});
+    var firma=makeFirma(r,pasos);
+    var txt=norm([r.art,r.fam,r.fleje,r.fleje_desc,r.nom].concat(
+      pasos.map(function(p){return [p.actor,p.actor_desc,p.ce,p.ce_d,p.cs,p.cs_d,p.tp].join(' ');})
+    ).join(' '));
+    return {r:r,pasos:pasos,completa:completa,firma:firma,txt:txt,idx:idx};
+  });
+  RUTAS_BY_ART={};FIRMA_IDX={};
+  RUTAS.forEach(function(x){
+    var k=x.r.art||SIN_ART;
+    (RUTAS_BY_ART[k]=RUTAS_BY_ART[k]||[]).push(x);
+    FIRMA_IDX[x.firma]=x;
+  });
+}
+
+/* pendientes por articulo: rutas sin confirmar + componentes con datos
+   faltantes (lo que mostraba VerifMadres) + problemas pendientes */
+function artPend(a){
+  var rutas=RUTAS_BY_ART[a.cod]||[];
+  var sinConf=rutas.filter(function(x){return rutaEstado(x.firma)!=='conf';}).length;
+  var probPend=0;
+  rutas.forEach(function(x){
+    probPend+=(PROBLEMAS_MAP[x.firma]||[]).filter(function(p){return p.estado==='pendiente';}).length;
+  });
+  var faltas=(a.comp||[]).filter(function(c){return c.fkg||c.fuxc;});
+  return {rutas:rutas,sinConf:sinConf,probPend:probPend,faltas:faltas,
+          total:sinConf+probPend+faltas.length};
+}
+
+var open={};
+
+/* ═══════════ FALTANTES DEL ARTICULO ═══════════
+   Portado CON FIDELIDAD de Faltantes/Faltantes.html (pantalla borrada
+   2026-08-30). Es lo unico propio que tenia: el PRORRATEO del faltante
+   por articulo. La matematica es exactamente la misma:
+   - compsDeArt: BOM directo + sub-BOM recursivo + intermedios de rutas del art.
+   - minAporteArt: est_madre x qty x meses de la ubicacion; para flejes usa kg
+     via la primera matriz con FIRMA ANTI-DUPLICADO (las rutas alternativas que
+     solo cambian el tallerista cuentan UNA vez); si el tallerista final es
+     compartido, el aporte se reparte ÷N (idem sub-conjuntos armados por varios).
+   - faltaArt = faltaGlobal x (aporte del art / suma de aportes de todos los arts).
+   Datos: la MISMA RPC faltantes_bundle, cargada lazy al abrir un articulo. */
+var FD=null, FD_ERR=null, FD_LOADING=false, FX=null;
+function ensureFaltantes(){
+  if(FD||FD_ERR||FD_LOADING)return;
+  FD_LOADING=true;
+  SB.rpc('faltantes_bundle').then(function(r){
+    FD_LOADING=false;
+    if(r.error){FD_ERR=r.error.message||String(r.error);render();return;}
+    FD=r.data||{};
+    try{prepFaltantes();}catch(e){FD=null;FD_ERR=String((e&&e.message)||e);console.error(e);}
+    render();
+  });
+}
+function prepFaltantes(){
+  for(var _rid in FD.rp)FD.rp[_rid].sort(function(a,b){return a.o-b.o;});
+
+  // art.cod → cid (art terminado sector 12)
+  var codToComp={};
+  for(var cid0 in FD.comp){var c0=FD.comp[cid0];if(c0.s===12&&c0.cod)codToComp[c0.cod]=cid0;}
+  var artById={};
+  (FD.art||[]).forEach(function(a){artById[a.id]=a;});
+
+  // art del ultimo paso con art asignado en una ruta
+  function artDeRuta(pasos){
+    for(var i=pasos.length-1;i>=0;i--){if(pasos[i].art!=null)return pasos[i].art;}
+    return null;
+  }
+
+  // Comps requeridos por cada art: bom_art + bom_comp recursivo + intermedios de rutas
+  function compsDeArt(aid){
+    var acc={};
+    var bom=FD.bom_art[String(aid)]||[];
+    bom.forEach(function(it){acc[it.c]=(acc[it.c]||0)+it.q;});
+    var pending=Object.keys(acc).slice();
+    var visited={};
+    while(pending.length){
+      var cid=pending.shift();
+      if(visited[cid])continue;
+      visited[cid]=1;
+      var qbase=acc[cid];
+      (FD.bom_comp[cid]||[]).forEach(function(hh){
+        var newq=qbase*hh.q;
+        if(!acc[hh.c]){acc[hh.c]=newq;pending.push(String(hh.c));}
+        else acc[hh.c]+=newq;
+      });
+    }
+    for(var rid in FD.rp){
+      var pasos=FD.rp[rid];
+      if(artDeRuta(pasos)!==aid)continue;
+      pasos.forEach(function(p){
+        ['ce','cs','flje'].forEach(function(k){
+          var c=p[k];
+          if(c!=null&&!acc[c])acc[c]=1;
+        });
+      });
+    }
+    var artCid=codToComp[artById[aid]&&artById[aid].cod];
+    if(artCid&&!acc[artCid])acc[artCid]=1;
+    return acc;
+  }
+  var compsArt={};
+  (FD.art||[]).forEach(function(a){compsArt[a.id]=compsDeArt(a.id);});
+  var compUsadoPor={};
+  (FD.art||[]).forEach(function(a){
+    Object.keys(compsArt[a.id]).forEach(function(cid){
+      (compUsadoPor[cid]=compUsadoPor[cid]||[]).push(a.id);
+    });
+  });
+
+  // (aid, cid) → set de talleristas/provs validos (paso de ruta o tall final con BOM)
+  var validPares={};
+  function keyAC(aid,cid){return aid+':'+cid;}
+  (function(){
+    var tallFinalArt={};
+    for(var rid in FD.rp){
+      var pasos=FD.rp[rid];
+      var aid=artDeRuta(pasos);
+      if(aid==null)continue;
+      var last=null;
+      pasos.forEach(function(p){if(p.tall!=null)last=p.tall;});
+      if(last!=null){(tallFinalArt[aid]=tallFinalArt[aid]||{})[last]=1;}
+    }
+    function hijosBOM(cid){
+      var acc={};
+      (function rec(c,vis){
+        if(vis[c])return;var v=Object.assign({},vis);v[c]=1;
+        (FD.bom_comp[c]||[]).forEach(function(hh){acc[hh.c]=1;rec(hh.c,v);});
+      })(cid,{});
+      return Object.keys(acc).map(Number);
+    }
+    for(var rid2 in FD.rp){
+      var pasos2=FD.rp[rid2];
+      var aid2=artDeRuta(pasos2);
+      if(aid2==null)continue;
+      pasos2.forEach(function(p){
+        if(p.tall==null&&p.prov==null)return;
+        [p.ce,p.cs].forEach(function(c){
+          if(c==null)return;
+          var k=keyAC(aid2,c);
+          validPares[k]=validPares[k]||{};
+          if(p.tall!=null)validPares[k]['tall_'+p.tall]=1;
+          if(p.prov!=null)validPares[k]['prov_'+p.prov]=1;
+        });
+        if(p.cs!=null&&FD.bom_comp[String(p.cs)]){
+          hijosBOM(p.cs).forEach(function(hCid){
+            var k=keyAC(aid2,hCid);
+            validPares[k]=validPares[k]||{};
+            if(p.tall!=null)validPares[k]['tall_'+p.tall]=1;
+            if(p.prov!=null)validPares[k]['prov_'+p.prov]=1;
+          });
+        }
+      });
+    }
+    // Tall final: SOLO comps del BOM directo (arma con lo que recibe)
+    Object.keys(tallFinalArt).forEach(function(aid3){
+      var bomDirecto=FD.bom_art[String(aid3)]||[];
+      bomDirecto.forEach(function(it){
+        var k=keyAC(aid3,+it.c);
+        validPares[k]=validPares[k]||{};
+        Object.keys(tallFinalArt[aid3]).forEach(function(tid){
+          validPares[k]['tall_'+tid]=1;
+        });
+      });
+    });
+  })();
+  function esValidoParCompUbic(aid,cid,u){
+    if(u.tipo!=='tallerista'&&u.tipo!=='proveedor_servicio')return true;
+    var s=validPares[keyAC(aid,cid)];
+    if(!s)return false;
+    return !!s[(u.tipo==='tallerista'?'tall_':'prov_')+u.ref];
+  }
+
+  // Talls finales por art (para reparto ÷N en el armado final)
+  var tallsFinalArt={};
+  for(var rid3 in FD.rp){
+    var ps3=FD.rp[rid3];var aid3=artDeRuta(ps3);if(aid3==null)continue;
+    var last3=null;ps3.forEach(function(p){if(p.tall!=null)last3=p.tall;});
+    if(last3!=null){(tallsFinalArt[aid3]=tallsFinalArt[aid3]||{})[last3]=1;}
+  }
+  // Talls por armado de sub-conjunto: (aid, cid_subconj) → set talls
+  var tallsPorArmado={};
+  for(var rid4 in FD.rp){
+    var ps4=FD.rp[rid4];var aid4=artDeRuta(ps4);if(aid4==null)continue;
+    ps4.forEach(function(p){
+      if(p.tall!=null&&p.cs!=null&&FD.bom_comp[String(p.cs)]){
+        var kk=aid4+':'+p.cs;
+        tallsPorArmado[kk]=tallsPorArmado[kk]||{};
+        tallsPorArmado[kk][p.tall]=1;
+      }
+    });
+  }
+  // Comp → padres sub-conjunto
+  var padreSubConj={};
+  for(var pc in FD.bom_comp){
+    (FD.bom_comp[pc]||[]).forEach(function(hh){
+      (padreSubConj[hh.c]=padreSubConj[hh.c]||[]).push(+pc);
+    });
+  }
+
+  // Kg de fleje por (aid, fleje_cid) con FIRMA ANTI-DUPLICADO (ignora tallerista)
+  var flejeKg={},rutasVistas={};
+  for(var rid5 in FD.rp){
+    var ps5=FD.rp[rid5];
+    var aid5=artDeRuta(ps5);if(aid5==null)continue;
+    var a5=artById[aid5];if(!a5||!a5.est)continue;
+    var flje=null;
+    for(var i5=0;i5<ps5.length;i5++){if(ps5[i5].flje){flje=ps5[i5].flje;break;}}
+    if(!flje)continue;
+    var sig=aid5+'|'+flje+'|'+ps5.map(function(p){return p.tipo+':'+(p.mat||'')+':'+(p.prov||'')+':'+(p.ce||'')+':'+(p.cs||'')+':'+(p.flje||'');}).join('>');
+    if(rutasVistas[sig])continue;
+    rutasVistas[sig]=1;
+    var ppk=null,csP=null,j5,p5,m5;
+    for(j5=0;j5<ps5.length;j5++){
+      p5=ps5[j5];
+      if(p5.mat){m5=FD.mat[String(p5.mat)]||{};if(m5.primera&&m5.ppk>0){ppk=m5.ppk;csP=p5.cs;break;}}
+    }
+    if(!ppk){
+      for(j5=0;j5<ps5.length;j5++){
+        p5=ps5[j5];
+        if(p5.mat){m5=FD.mat[String(p5.mat)]||{};if(m5.ppk>0){ppk=m5.ppk;csP=p5.cs;break;}}
+      }
+    }
+    if(!ppk)continue;                 // sin factor de conversion: no computa kg
+    var qBom=1;var bomA5=FD.bom_art[String(aid5)]||[];
+    bomA5.forEach(function(it){if(it.c===csP)qBom=it.q;});
+    var key5=aid5+':'+flje;
+    flejeKg[key5]=(flejeKg[key5]||0)+a5.est*qBom/ppk;
+  }
+
+  // Min-aporte de un art a (comp, ubic) — reparto ÷N si el tallerista comparte
+  function minAporteArt(aid,cid,uid){
+    var a=artById[aid];if(!a||!a.est)return 0;
+    var u=FD.ubic[String(uid)];if(!u||!u.meses)return 0;
+    var bom=compsArt[aid]||{};
+    var qty=bom[cid];if(qty==null)return 0;
+    var c=FD.comp[String(cid)]||{};
+    var base;
+    if(c.um==='kg'){
+      base=(flejeKg[aid+':'+cid]||0)*u.meses;
+    }else{
+      base=a.est*qty*u.meses;
+    }
+    if(u.tipo==='tallerista'){
+      var tf=tallsFinalArt[aid]||{};
+      if(tf[u.ref]){
+        base=base/Object.keys(tf).length;
+      }else{
+        var padres=padreSubConj[cid]||[];
+        for(var i=0;i<padres.length;i++){
+          var arm=tallsPorArmado[aid+':'+padres[i]];
+          if(arm&&arm[u.ref]){
+            var nn=Object.keys(arm).length;
+            if(nn>1){base=base/nn;break;}
+          }
+        }
+      }
+    }
+    return c.um==='kg'?Math.round(base*100)/100:Math.round(base);
+  }
+
+  // Suma de aportes por (cid, uid) sobre TODOS los articulos (para prorratear)
+  var totalAporte={};
+  (FD.art||[]).forEach(function(a){
+    var bom=compsArt[a.id]||{};
+    Object.keys(bom).forEach(function(cid){
+      for(var k in FD.inv){
+        var pt=k.split(':');
+        if(pt[0]!==String(cid))continue;
+        var uid=+pt[1];
+        var u=FD.ubic[String(uid)];if(!u||!u.meses)continue;
+        if(!esValidoParCompUbic(a.id,+cid,u))continue;
+        var ap=minAporteArt(a.id,+cid,uid);
+        if(ap>0){
+          var tk=cid+':'+uid;
+          totalAporte[tk]=(totalAporte[tk]||0)+ap;
+        }
+      }
+    });
+  });
+
+  // Ubicaciones con minimo > 0 donde ESTE art aporta, con el prorrateo hecho
+  function ubicsDeComp(cid,aid){
+    var out=[];
+    for(var k in FD.inv){
+      var pt=k.split(':');
+      if(pt[0]===String(cid)){
+        var minTotal=FD.inv[k].min||0;
+        if(minTotal<=0)continue;
+        var u=FD.ubic[String(pt[1])]||{};
+        if(!esValidoParCompUbic(aid,+cid,u))continue;
+        var mAporte=minAporteArt(aid,+cid,+pt[1]);
+        if(mAporte<=0)continue;
+        var stock=FD.inv[k].cant||0;
+        var faltaGlobal=Math.max(0,minTotal-stock);
+        var tk=cid+':'+pt[1];
+        var totalAp=totalAporte[tk]||mAporte;
+        var faltaArt=totalAp>0?faltaGlobal*(mAporte/totalAp):0;
+        out.push({
+          uid:pt[1],
+          min:mAporte,
+          minTotal:minTotal,
+          cant:stock,
+          faltaGlobal:faltaGlobal,
+          faltaArt:mAporte>0&&FD.comp[String(cid)].um==='kg'?Math.round(faltaArt*100)/100:Math.round(faltaArt)
+        });
+      }
+    }
+    return out;
+  }
+
+  var artByCod={};
+  (FD.art||[]).forEach(function(a){artByCod[String(a.cod)]=a.id;});
+  FX={artById:artById,artByCod:artByCod,compsArt:compsArt,
+      compUsadoPor:compUsadoPor,ubicsDeComp:ubicsDeComp};
+}
+
+function renderFaltArt(a){
+  if(FD_ERR)return '<div class="empty">No se pudieron cargar los faltantes: '+esc(FD_ERR)+'</div>';
+  if(!FD||!FX)return '<div class="empty">Calculando faltantes…</div>';
+  var aid=FX.artByCod[String(a.cod)];
+  if(aid==null)return '<div class="empty">Sin datos de faltantes para este artículo.</div>';
+  var fa=FX.artById[aid]||{};
+  var dem=(fa.est||0)>0;
+  var bom=FX.compsArt[aid]||{};
+  var rows=[];
+  Object.keys(bom).sort(function(x,y){
+    var cx=FD.comp[x]||{},cy=FD.comp[y]||{};
+    return (cx.s||0)-(cy.s||0)||(cx.cod||'').localeCompare(cy.cod||'');
+  }).forEach(function(cid){
+    var c=FD.comp[cid]||{};
+    FX.ubicsDeComp(cid,aid).forEach(function(u){
+      rows.push({cid:cid,c:c,u:u,f:dem?u.faltaArt:0});
+    });
+  });
+  var h='';
+  if(!dem)h+='<div class="empty">Artículo sin demanda en la Est Madre: el faltante atribuible es 0.</div>';
+  if(!rows.length)return h+'<div class="empty">Ningún componente de este artículo tiene mínimo asignado en una ubicación donde el artículo aporte.</div>';
+  h+='<div class="tabla-wrap"><table class="falt-tabla"><thead><tr>'+
+    '<th>Cód</th><th>Componente</th><th>Ubicación</th>'+
+    '<th title="Mínimo total de esa ubicación (todos los artículos)">Mín. ubic</th>'+
+    '<th>Stock</th>'+
+    '<th title="Lo que falta en la ubicación, entre todos los artículos">Falta total</th>'+
+    '<th title="Parte del mínimo que aporta ESTE artículo (repartido entre talleristas si comparten)">Aporte art</th>'+
+    '<th title="Parte del faltante atribuible a ESTE artículo (prorrateo por aporte)">Falta art</th>'+
+    '<th>Un</th></tr></thead><tbody>';
+  rows.forEach(function(r){
+    var uo=FD.ubic[String(r.u.uid)]||{};
+    var uNom=uo.nom||'';
+    if(uo.tipo==='proveedor_servicio')uNom=uNom.replace(/^Prov\.\s*Serv\.\s*/i,'').trim();
+    else if(uo.tipo==='tallerista')uNom=uNom.replace(/^Tallerista\s*/i,'').trim();
+    var nUsan=(FX.compUsadoPor[r.cid]||[]).length;
+    h+='<tr>'+
+      '<td>'+esc(r.c.cod||'')+(nUsan>1?' <span class="muted">×'+nUsan+'</span>':'')+'</td>'+
+      '<td>'+esc(r.c.d||'')+'</td>'+
+      '<td>'+esc(uNom)+'</td>'+
+      '<td class="num">'+r.u.minTotal+'</td>'+
+      '<td class="num">'+r.u.cant+'</td>'+
+      '<td class="num '+(r.u.faltaGlobal>0?'f-fal':'f-ok')+'">'+r.u.faltaGlobal+'</td>'+
+      '<td class="num">'+r.u.min+'</td>'+
+      '<td class="num '+(r.f>0?'f-fal':'f-ok')+'">'+r.f+'</td>'+
+      '<td>'+esc(r.c.um||'uni')+'</td>'+
+    '</tr>';
+  });
+  h+='</tbody></table></div>';
+  h+='<div class="falt-nota">"Falta art" = del faltante de la ubicación, la parte proporcional al aporte de este artículo (×N = componente compartido con otros artículos). Para comprar → Órdenes de Compra; para producir → Orden de Producción.</div>';
+  return h;
+}
+
+function __run(){
+  prepara();
+  var arts=(D.art||[]).slice().sort(function(a,b){
+    return String(a.cod).localeCompare(String(b.cod),'es',{numeric:true});
+  });
+  if(RUTAS_BY_ART[SIN_ART]) arts.push({cod:SIN_ART,fam:'',comp:[],sinArt:true});
+  D.art=arts;
+  selArt.innerHTML='<option value="">— todos —</option>';
+  arts.forEach(function(a){
+    var o=document.createElement('option');
+    o.value=a.cod;
+    o.textContent=a.cod+(a.fam?' — '+a.fam:'');
+    selArt.appendChild(o);
+  });
+
+  selArt.addEventListener('change',function(){
+    if(selArt.value){open={};open[selArt.value]=1;}
+    render();
+    if(selArt.value){
+      var el=document.getElementById('art-'+cssId(selArt.value));
+      if(el)el.scrollIntoView({behavior:'smooth',block:'start'});
+    }
+  });
+  fQ.addEventListener('input',render);
+  chkPend.addEventListener('change',render);
+  document.getElementById('expAll').addEventListener('click',function(){
+    var vis=visibles();
+    var all=vis.every(function(a){return open[a.cod];});
+    vis.forEach(function(a){open[a.cod]=all?0:1;});
+    render();
+  });
+  document.getElementById('btnCSV').addEventListener('click',exportCSV);
+
+  var savedU=localStorage.getItem('gp2_usuario');
+  if(savedU)document.getElementById('inpUsuario').value=savedU;
+
+  wireLista();
+  render();
+}
+
+function cssId(cod){return String(cod).replace(/[^a-z0-9_-]/gi,'_');}
+function sectNom(sid){var s=(D.sect||{})[String(sid)];return s?s.nom:'';}
+function sectTipo(sid){var s=(D.sect||{})[String(sid)];return s?s.tipo:'';}
+function getUsuario(){
+  var inp=document.getElementById('inpUsuario');
+  var u=(inp&&inp.value.trim())||localStorage.getItem('gp2_usuario')||'';
+  if(u&&inp) try{localStorage.setItem('gp2_usuario',u);}catch(e){}
+  return u||'(sin nombre)';
+}
+
+function visibles(){
+  var q=fQ.value.trim().toLowerCase();
+  var selCod=selArt.value;
+  var soloPend=chkPend.checked;
+  return (D.art||[]).filter(function(a){
+    if(selCod&&a.cod!==selCod)return false;
+    if(soloPend&&artPend(a).total===0)return false;
+    if(!q)return true;
+    if(String(a.cod).toLowerCase().indexOf(q)>=0)return true;
+    if((a.fam||'').toLowerCase().indexOf(q)>=0)return true;
+    if((a.comp||[]).some(function(c){
+      return (c.cod||'').toLowerCase().indexOf(q)>=0||(c.d||'').toLowerCase().indexOf(q)>=0;
+    }))return true;
+    return (RUTAS_BY_ART[a.cod]||[]).some(function(x){return x.txt.indexOf(norm(q))>=0;});
+  });
+}
+
+/* ── nodos de la ruta (mismos colores que Verificacion_GP2) ── */
+var COLORES={
+  ingreso:{bg:'#6366f1',icon:'🔩',tp:'Ingreso'},
+  matriz:{bg:'#f59e0b',icon:'⚙️',tp:'Matriz'},
+  insumo:{bg:'#b45309',icon:'🧩',tp:'Insumo'},
+  proveedor_servicio:{bg:'#f43f5e',icon:'🏭',tp:'Proveedor'},
+  tallerista:{bg:'#8b5cf6',icon:'👷',tp:'Tallerista'},
+  virgilio:{bg:'#10b981',icon:'✅',tp:'Virgilio'},
+  otro:{bg:'#64748b',icon:'•',tp:''}
+};
+function nodo(p){
+  var col=COLORES[p.tp]||COLORES.otro;
+  var label;
+  if(p.actor) label=col.icon+' '+p.actor;
+  else if(p.tp==='virgilio') label=col.icon+' Art '+(p.art||p.ce||'');
+  else if(p.tp==='ingreso') label=col.icon+' '+(p.ce||'');
+  else label=col.icon+' '+(p.cs||p.ce||'');
+  var subParts=[];
+  if(p.cs&&p.tp!=='ingreso') subParts.push(p.cs);
+  var d=p.cs_d||p.actor_desc||p.ce_d||'';
+  if(d) subParts.push(d);
+  var sub=subParts.join(' · ');
+  return '<span class="node" style="background:'+col.bg+'">'+
+    '<span class="nm">'+esc(label)+'</span>'+
+    (sub?'<span class="sub">'+esc(sub)+'</span>':'')+
+    '</span>';
+}
+function renderRuta(x){
+  var estado=rutaEstado(x.firma);
+  var badgeInc=x.completa?'':'<span class="badge inc">Incompleta</span>';
+  var badgeEst='';
+  if(estado==='conf') badgeEst='<span class="badge conf">✅ Confirmada</span>';
+  else if(estado==='warn') badgeEst='<span class="badge warn">⚠ Problema</span>';
+  else if(estado==='pin') badgeEst='<span class="badge pin">📌 Revisar</span>';
+  var probs=(PROBLEMAS_MAP[x.firma]||[]).map(function(p){
+    var res=p.estado==='resuelto'?'<span style="color:#258858">✅ Resuelto</span> · ':'';
+    var btnRes=p.estado==='pendiente'?'<div style="margin-top:4px"><button class="btn-conf resolve" data-resolver="'+p.id+'">Marcar resuelto</button></div>':'';
+    return '<div class="prob-item">'+res+esc(p.problema)+
+      '<div class="prob-meta">Reportado por '+esc(p.por||p.reportado_por||'')+' · '+new Date(p.en||p.reportado_en).toLocaleDateString('es-AR')+'</div>'+btnRes+'</div>';
+  }).join('');
+  return '<div class="ruta-card'+(x.completa?'':' incompleta')+'" data-firma="'+esc(x.firma)+'">'+
+    '<div class="rc-head">Fleje <b style="color:#1c8391">'+esc(x.r.fleje||'?')+'</b>'+
+      (x.r.fleje_desc?'<span> · '+esc(x.r.fleje_desc)+'</span>':'')+badgeInc+badgeEst+'</div>'+
+    '<div class="ruta-flow">'+x.pasos.map(nodo).join('<span class="sep">›</span>')+'</div>'+
+    /* botones Confirmar/Revisar/Reportar quitados a pedido del usuario 2026-08-31 */
+    probs+'</div>';
+}
+
+function renderKpis(){
+  var arts=(D.art||[]).filter(function(a){return !a.sinArt;});
+  var sinConf=RUTAS.filter(function(x){return rutaEstado(x.firma)!=='conf';}).length;
+  var probPend=(D.problemas||[]).filter(function(p){return p.estado==='pendiente';}).length;
+  var m=D.madres||{};
+  var artsPend=(D.art||[]).filter(function(a){return artPend(a).total>0;}).length;
+  document.getElementById('kpis').innerHTML=
+    '<div class="kpi"><div class="n">'+arts.length+'</div><div class="lb">Artículos</div></div>'+
+    '<div class="kpi"><div class="n '+(sinConf?'warn':'ok')+'" id="kpiSinConf">'+sinConf+'</div><div class="lb">Rutas sin confirmar (de '+RUTAS.length+')</div></div>'+
+    '<div class="kpi"><div class="n '+(probPend?'warn':'ok')+'">'+probPend+'</div><div class="lb">Problemas pend.</div></div>'+
+    '<div class="kpi"><div class="n '+(m.sin_kg?'warn':'ok')+'">'+(m.sin_kg||0)+'</div><div class="lb">Comp. sin Kg x Uni</div></div>'+
+    '<div class="kpi"><div class="n '+(m.sin_uxc?'warn':'ok')+'">'+(m.sin_uxc||0)+'</div><div class="lb">Comp. sin Uni x Cajón</div></div>'+
+    '<div class="kpi"><div class="n '+(artsPend?'warn':'ok')+'">'+artsPend+'</div><div class="lb">Artículos con pendientes</div></div>';
+}
+
+function render(){
+  renderKpis();
+  var cont=document.getElementById('sections');
+  cont.innerHTML='';
+  var needFD=false;
+  var vis=visibles();
+  if(vis.length===0){cont.innerHTML='<div class="empty">Sin artículos para el filtro actual.</div>';return;}
+
+  vis.forEach(function(a){
+    var comps=a.comp||[];
+    var pend=artPend(a);
+    var sec=document.createElement('div');
+    sec.className='art-section'+(open[a.cod]?' open':'');
+    sec.id='art-'+cssId(a.cod);
+
+    var head=document.createElement('div');head.className='art-head';
+    var pesoTot=0,hayPeso=false;
+    comps.forEach(function(c){
+      if(c.kg!=null&&c.kg!==''){var k=Number(c.kg)*Number(c.q||1);if(isFinite(k)){pesoTot+=k;hayPeso=true;}}
+    });
+    var pills='';
+    if(pend.sinConf)pills+='<span class="pill warn">'+pend.sinConf+' ruta'+(pend.sinConf===1?'':'s')+' sin confirmar</span>';
+    if(pend.probPend)pills+='<span class="pill bad">'+pend.probPend+' problema'+(pend.probPend===1?'':'s')+'</span>';
+    if(pend.faltas.length)pills+='<span class="pill warn">'+pend.faltas.length+' comp. sin datos</span>';
+    if(!pend.total&&pend.rutas.length)pills+='<span class="pill ok">✓ al día</span>';
+    head.innerHTML='<span class="caret">▸</span>'+
+      '<span class="cod">'+esc(a.cod)+'</span>'+
+      '<span class="fam">'+esc(a.fam||'')+'</span>'+pills+
+      '<div class="stats">'+
+        (a.sinArt?'':'<span>Comp: <b>'+comps.length+'</b></span>')+
+        '<span>Rutas: <b>'+pend.rutas.length+'</b></span>'+
+        (a.por!=null?'<span>Uni/caja: <b>'+esc(a.por)+'</b></span>':'')+
+        (hayPeso?'<span>Peso: <b>'+(Math.round(pesoTot*100000)/100000)+'</b> kg</span>':'')+
+      '</div>';
+    head.addEventListener('click',function(){open[a.cod]=!open[a.cod];render();});
+    sec.appendChild(head);
+
+    var body=document.createElement('div');body.className='art-body';
+    var h='';
+    // 1) RECETA
+    if(!a.sinArt){
+      h+='<div class="bloque">Receta</div>';
+      if(comps.length===0){
+        h+='<div class="empty">Sin componentes cargados para este artículo.</div>';
+      }else{
+        h+='<div class="tabla-wrap"><table><thead><tr>'+
+          '<th>Cód. parte</th><th>Descripción</th><th>Sector</th>'+
+          '<th>Partes/uni</th><th>Kg x uni</th><th>Uni x cajón</th><th>UM</th>'+
+          '</tr></thead><tbody>';
+        comps.forEach(function(c){
+          var tipo=sectTipo(c.s)||'';
+          var cls='st-'+(tipo||'none').replace(/[^a-záéíóúñ]/gi,'');
+          h+='<tr>'+
+            '<td>'+esc(c.cod||'')+'</td>'+
+            '<td>'+esc(c.d||'')+'</td>'+
+            '<td>'+(tipo?'<span class="sect-tag '+cls+'">'+esc(tipo)+'</span>':'<span class="muted">—</span>')+'</td>'+
+            '<td class="num">'+fmtQ(c.q)+'</td>'+
+            '<td class="num'+(c.fkg?' falta':'')+'">'+(c.fkg?'FALTA':(c.kg!=null?fmtKg(c.kg):'<span class="muted">—</span>'))+'</td>'+
+            '<td class="num'+(c.fuxc?' falta':'')+'">'+(c.fuxc?'FALTA':(c.uxc!=null?esc(c.uxc):'<span class="muted">—</span>'))+'</td>'+
+            '<td>'+esc(c.um||'')+'</td>'+
+          '</tr>';
+        });
+        h+='</tbody></table></div>';
+      }
+    }
+    // 1b) FALTANTES prorrateados (lo unico propio de la vieja pantalla Faltantes)
+    if(!a.sinArt&&open[a.cod]){
+      h+='<div class="bloque">Faltantes del artículo</div>';
+      h+=renderFaltArt(a);
+      if(!FD&&!FD_ERR)needFD=true;
+    }
+    // 2) RUTAS trazadas (lo que era Verificacion Integridad)
+    h+='<div class="bloque">Rutas trazadas ('+pend.rutas.length+')</div>';
+    if(pend.rutas.length===0){
+      h+='<div class="empty">Sin rutas trazadas para este artículo.</div>';
+    }else{
+      h+=pend.rutas.map(renderRuta).join('');
+    }
+    // 3) AVISOS (lo que era Verificacion Madres, acotado a este articulo)
+    if(!a.sinArt){
+      if(pend.faltas.length){
+        h+='<div class="avisos"><b>⚠ Avisos:</b> componentes de este artículo con datos maestros faltantes:'+
+          '<ul>'+pend.faltas.map(function(c){
+            var qué=[];if(c.fkg)qué.push('Kg x Uni');if(c.fuxc)qué.push('Uni x Cajón');
+            return '<li><b>'+esc(c.cod)+'</b> — '+esc(c.d||'')+': falta '+qué.join(' y ')+'</li>';
+          }).join('')+'</ul></div>';
+      }else{
+        h+='<div class="avisos limpio"><b>✓ Sin avisos:</b> todos los componentes tienen sus datos maestros.</div>';
+      }
+    }
+    body.innerHTML=h;
+    sec.appendChild(body);
+    cont.appendChild(sec);
+  });
+  if(needFD)ensureFaltantes();
+}
+
+/* ── acciones sobre rutas: mismas RPCs que usaba Verificacion_GP2 ── */
+function wireLista(){
+  document.getElementById('sections').addEventListener('click',function(e){
+    var btn=e.target.closest('[data-act]');
+    if(btn){
+      e.stopPropagation();
+      var x=RUTAS[parseInt(btn.getAttribute('data-ridx'),10)];
+      if(!x)return;
+      var act=btn.getAttribute('data-act');
+      if(act==='conf')confirmarRuta(x);
+      else if(act==='pin')marcarRevisar(x);
+      else if(act==='warn')abrirReporte(x);
+      return;
+    }
+    var res=e.target.closest('[data-resolver]');
+    if(res){e.stopPropagation();resolverProblema(parseInt(res.getAttribute('data-resolver'),10));}
+  });
+}
+
+async function confirmarRuta(x){
+  var u=getUsuario();
+  var r=await SB.rpc('ruta_confirmar',{p_firma:x.firma,p_articulo:x.r.art||'',p_fleje:x.r.fleje||'',p_usuario:u});
+  if(r.error){alert('Error: '+r.error.message);return;}
+  CONFIRMADAS.add(x.firma);
+  delete PROBLEMAS_MAP[x.firma];
+  render();
+}
+async function marcarRevisar(x){
+  var u=getUsuario();
+  var r=await SB.rpc('ruta_reportar',{p_firma:x.firma,p_articulo:x.r.art||'',p_fleje:x.r.fleje||'',p_problema:'(pendiente de revisar)',p_usuario:u});
+  if(r.error){alert('Error: '+r.error.message);return;}
+  CONFIRMADAS.delete(x.firma);
+  (PROBLEMAS_MAP[x.firma]=PROBLEMAS_MAP[x.firma]||[]).push({id:r.data,firma:x.firma,problema:'(pendiente de revisar)',estado:'pendiente',por:u,en:new Date().toISOString()});
+  render();
+}
+function abrirReporte(x){
+  MODAL_FIRMA=x.firma;
+  document.getElementById('modalBg').classList.add('on');
+  document.getElementById('modalTxt').value='';
+  setTimeout(function(){document.getElementById('modalTxt').focus();},50);
+}
+function cerrarModal(){
+  document.getElementById('modalBg').classList.remove('on');
+  MODAL_FIRMA=null;
+}
+async function enviarReporte(){
+  var x=FIRMA_IDX[MODAL_FIRMA];
+  if(!x){cerrarModal();return;}
+  var prob=document.getElementById('modalTxt').value.trim();
+  if(!prob){alert('Describí el problema.');return;}
+  var u=getUsuario();
+  cerrarModal();
+  var r=await SB.rpc('ruta_reportar',{p_firma:x.firma,p_articulo:x.r.art||'',p_fleje:x.r.fleje||'',p_problema:prob,p_usuario:u});
+  if(r.error){alert('Error: '+r.error.message);return;}
+  CONFIRMADAS.delete(x.firma);
+  (PROBLEMAS_MAP[x.firma]=PROBLEMAS_MAP[x.firma]||[]).push({id:r.data,firma:x.firma,problema:prob,estado:'pendiente',por:u,en:new Date().toISOString()});
+  render();
+}
+async function resolverProblema(id){
+  var r=await SB.rpc('ruta_resolver',{p_id:id});
+  if(r.error){alert('Error: '+r.error.message);return;}
+  Object.keys(PROBLEMAS_MAP).forEach(function(firma){
+    PROBLEMAS_MAP[firma].forEach(function(p){if(p.id===id)p.estado='resuelto';});
+  });
+  render();
+}
+
+function exportCSV(){
+  var vis=visibles();
+  var SEP=';';
+  var q=function(v){return '"'+String(v==null?'':v).replace(/"/g,'""')+'"';};
+  var linea=function(arr){return arr.map(q).join(SEP);};
+  var filas=[];
+  filas.push(linea(['Despiece x Artículo (GP2)']));
+  filas.push(linea(['Generado',GP2UI.hoyAR()]));
+  filas.push('');
+  filas.push(linea(['Cod Art','Familia','Cod Parte','Descripción','Sector','Partes/uni','Kg x uni','Uni x cajón','UM','Falta datos']));
+  vis.forEach(function(a){
+    (a.comp||[]).forEach(function(c){
+      var f=[];if(c.fkg)f.push('kg');if(c.fuxc)f.push('uxc');
+      filas.push(linea([a.cod,a.fam||'',c.cod||'',c.d||'',sectNom(c.s),c.q,c.kg,c.uxc,c.um||'',f.join('+')]));
+    });
+  });
+  filas.push('');
+  filas.push(linea(['Cod Art','Fleje','Pasos','Completa','Estado']));
+  vis.forEach(function(a){
+    (RUTAS_BY_ART[a.cod]||[]).forEach(function(x){
+      var pasosTxt=x.pasos.map(function(p){
+        return ((COLORES[p.tp]||COLORES.otro).tp||p.tp)+':'+(p.actor||p.cs||p.ce||'');
+      }).join(' -> ');
+      filas.push(linea([a.cod,x.r.fleje||'',pasosTxt,x.completa?'Si':'No',rutaEstado(x.firma)||'pendiente']));
+    });
+  });
+  var csv='﻿'+filas.join('\r\n');
+  var blob=new Blob([csv],{type:'text/csv;charset=utf-8'});
+  var url=URL.createObjectURL(blob);
+  var el=document.createElement('a');el.href=url;el.download='despiece_gp2_'+GP2UI.hoyAR()+'.csv';el.click();
+  URL.revokeObjectURL(url);
+}
+
+async function __boot(){
+  try{
+    document.body.style.cursor='progress';
+    var r=await SB.rpc('despiece_verif_bundle');
+    if(r.error)throw r.error;
+    Object.assign(D,r.data);
+    __run();
+  }catch(e){
+    document.body.innerHTML='<p style="padding:24px;font-family:system-ui;color:#981616">Error cargando datos de Supabase: '+(e.message||e)+'</p>';
+    console.error(e);
+  }finally{document.body.style.cursor='';}
+}
+__boot();
+</script>
+</body></html>

@@ -1,0 +1,117 @@
+/* Accesibilidad (regla usuario 2026-08-30): letra GRANDE en todo campo de carga —
+   alguien que ve mal tiene que poder escribir sin equivocarse. 18px de piso
+   (ademas evita el zoom automatico de iOS, que salta con menos de 16px).
+   Los estilos propios de cada pantalla pueden subirla, nunca bajarla. */
+input, select, textarea { font-size: 18px; }
+
+/* ============================================================
+   gp2-modulo.css — esqueleto compartido de los modulos GP2.
+
+   Reproduce la estructura de Gestion Productiva Entero:
+     card blanca + header negro
+     fase0: fila de chips (proveedor / tallerista)
+     fase1: tabla editable (cantidad + tandas + faltante)
+     fase3: confirmacion
+
+   Lo usan: PS Envio, PS Entrega, Tallerista Control/Envio/Entrega.
+   ============================================================ */
+
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:Arial,sans-serif;background:#f5f6f8;padding:12px;color:#111}
+
+/* ---- card + header ---- */
+.card{max-width:1180px;margin:auto;background:#fff;border-radius:12px;box-shadow:0 2px 12px rgba(0,0,0,.08);overflow:hidden}
+.header{background:#1a1a1a;color:#fff;padding:14px 18px;display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}
+.header h1{font-size:24px;font-weight:700}
+.header .hbtns{display:flex;gap:8px;flex-wrap:wrap}
+.header a,.header button.hlink{background:#fff;color:#111;padding:8px 14px;border-radius:6px;font-weight:700;font-size:18px;text-decoration:none;border:none;cursor:pointer;
+  display:inline-flex;align-items:center;min-height:44px}  /* accesibilidad: mismo look, area tocable de 44px */
+
+.steps{padding:14px 18px}
+.row{display:flex;gap:10px;flex-wrap:wrap;margin:10px 0;align-items:center}
+label.lbl{font-weight:800;font-size:20px}
+input[type="date"]{height:40px;border:2px solid #d0d7de;border-radius:8px;padding:0 10px;font-size:20px}
+
+/* ---- botones ---- */
+.btn{padding:10px 16px;min-height:44px;border-radius:8px;border:none;font-weight:800;cursor:pointer;font-size:20px}
+.btn-primary{background:#111;color:#fff}
+.btn-secondary{background:#fff;border:2px solid #d0d7de;color:#111}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+
+.status{margin:8px 0;font-size:18px;color:#555;min-height:10px}
+
+/* ---- chips (fase 0) ---- */
+.provs-grid{display:flex;flex-wrap:wrap;gap:8px;margin:8px 0}
+.prov-btn{padding:10px 16px;border-radius:8px;border:2px solid #d0d7de;background:#fff;font-weight:700;cursor:pointer;font-size:19px;color:#111;text-align:left}
+.prov-btn:hover{border-color:#111}
+.prov-btn.active{background:#111;color:#fff;border-color:#111}
+.prov-btn .meta{display:block;font-size:14px;color:#777;font-weight:700;margin-top:3px}
+.prov-btn.active .meta{color:#cfcfcf}
+
+/* ---- buscador ---- */
+.search-box{margin:12px 0;padding:12px;background:#f6f8fa;border-radius:8px}
+.search-box input{width:100%;padding:10px;font-size:18px;border:2px solid #d0d7de;border-radius:6px}
+
+/* ---- tabla ---- */
+.table-wrap{overflow-x:auto;border:1px solid #e5e9ee;border-radius:10px}
+table.t{width:100%;border-collapse:collapse;font-size:17px;background:#fff}
+table.t th{background:#f6f8fa;color:#333;text-align:left;padding:9px 8px;border-bottom:2px solid #e5e9ee;font-size:13px;text-transform:uppercase;white-space:nowrap}
+table.t td{padding:7px 8px;border-bottom:1px solid #eef1f4;vertical-align:middle}
+table.t td.num,table.t th.num{text-align:right;font-variant-numeric:tabular-nums}
+table.t td.ctr,table.t th.ctr{text-align:center}
+table.t tr.falt td{background:#fff7ed}
+table.t tfoot td{font-weight:900;background:#f6f8fa;border-top:2px solid #e5e9ee}
+.sep{border-left:2px solid #e5e9ee}
+.cod{font-weight:900;color:#0066cc}
+.proc{color:#555}
+.sub{color:#777;font-size:14px}
+
+/* ---- filtros segmentados (Todos / Con stock / Sin stock / ...) ----
+   Estaban copiados IDENTICOS en 9 pantallas de stock (Flejes x6, SC, SP,
+   Movimiento) y median 38px de alto, por debajo del minimo tactil de 44.
+   Unificados aca 2026-09-03: se toca una vez y valen para las 9. */
+.seg-btn{padding:11px 14px;min-height:44px;border-radius:8px;border:2px solid #d0d7de;background:#fff;font-weight:700;cursor:pointer;font-size:17px;color:#111}
+.seg-btn.active{background:#111;color:#fff;border-color:#111}
+
+/* ---- celdas editables ---- */
+.cell-in{width:96px;padding:7px 8px;font-size:18px;border:2px solid #d0d7de;border-radius:6px;text-align:right;font-variant-numeric:tabular-nums}
+.cell-in:focus{outline:none;border-color:#111}
+.cell-in.ro{background:#f6f8fa;color:#555}
+/* 44px = minimo tactil de la casa. Median 34 y son los botones de TODA la carga
+   de envios y entregas (tandas y faltante), que se tocan con el dedo en la
+   tablet del galpon. El .cell-in de al lado tiene ancho fijo, asi que agrandarlos
+   no revienta la columna (2026-09-03). */
+.tanda-btn{width:44px;height:44px;border-radius:8px;border:2px solid #d0d7de;background:#fff;font-weight:900;cursor:pointer;font-size:18px;color:#111}
+.tanda-btn.on{background:#0066cc;border-color:#0066cc;color:#fff}
+.falt-box{width:44px;height:44px;border-radius:8px;border:2px solid #d0d7de;background:#fff;font-weight:900;cursor:pointer;font-size:18px;color:#111}
+.falt-box.on{background:#c2410c;border-color:#c2410c;color:#fff}
+
+/* ---- saldos ---- */
+.pos{color:#0a7a2f;font-weight:800}
+.neg{color:#b91c1c;font-weight:800}
+.cero{color:#999}
+
+/* ---- varios ---- */
+.empty{color:#888;padding:16px;text-align:center;font-style:italic;font-size:18px}
+.hidden{display:none!important}
+
+.successBox{margin:12px 0;border:2px solid #c7e8d1;background:#f3fbf6;border-radius:12px;padding:22px;text-align:center}
+.successBox .title{font-weight:900;font-size:24px;color:#0a7a2f;margin-bottom:10px}
+.successBox .code{font-size:46px;font-weight:900;letter-spacing:5px;color:#111;margin:10px 0}
+
+/* ---- aviso (estado de los datos) ---- */
+.aviso{background:#fffbeb;border:1px solid #fde68a;color:#7a5200;border-radius:10px;padding:10px 14px;font-size:15px;line-height:1.45;margin:10px 0}
+.aviso b{color:#5c3d00}
+.aviso code{background:#fef3c7;padding:1px 5px;border-radius:4px;font-size:14px}
+
+/* ---- KPIs ---- */
+.kpis{display:flex;gap:10px;flex-wrap:wrap;margin:10px 0}
+.kpi{background:#f6f8fa;border:1px solid #e5e9ee;border-radius:10px;padding:10px 16px;min-width:130px}
+.kpi .k{font-size:13px;color:#666;text-transform:uppercase;font-weight:700}
+.kpi .v{font-size:26px;font-weight:900;font-variant-numeric:tabular-nums}
+
+@media print{
+  body{background:#fff;padding:0}
+  .header,.search-box,.btn,.provs-grid,.no-print{display:none!important}
+  .card{box-shadow:none;max-width:none}
+}

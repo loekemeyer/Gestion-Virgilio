@@ -1,0 +1,280 @@
+<!doctype html>
+<html lang="es">
+<head>
+<!-- v1.0.0 — Faltantes automaticos por stock online (5 cajones por ubicacion) + marcas manuales persistidas -->
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Faltantes · GP2</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="../supabase-config.js?v=20260905k"></script>
+<script src="../gp2-ui.js?v=20260905a"></script>
+<script src="../gp2-numero.js?v=20260905m"></script>
+<link rel="stylesheet" href="../gp2-modulo.css?v=20260903b"/>
+<link rel="icon" type="image/png" href="../GP2_favicon.png">
+<link rel="apple-touch-icon" href="../GP2_favicon.png">
+<style>
+/* tabs Crudo | Procesado */
+.tabs{display:flex;gap:8px;margin:12px 0;flex-wrap:wrap}
+.tab-btn{flex:1;min-width:140px;min-height:52px;border-radius:10px;border:2px solid #d0d7de;background:#fff;
+  font-size:20px;font-weight:800;color:#111;cursor:pointer}
+.tab-btn.active{background:#111;color:#fff;border-color:#111}
+
+/* filas por gravedad */
+table.t tr.r-falt td{background:#fef2f2}
+table.t tr.r-marca td{background:#fffbeb}
+
+.pill-falt{display:inline-block;background:#b91c1c;color:#fff;border-radius:999px;padding:3px 10px;
+  font-size:14px;font-weight:800;white-space:nowrap;margin-top:3px}
+.pill-corta{display:inline-block;background:#fee2e2;color:#b91c1c;border:1px solid #fca5a5;border-radius:8px;
+  padding:2px 8px;font-size:13px;font-weight:800;white-space:nowrap;margin-top:3px}
+.badge-marca{display:inline-block;background:#fef3c7;color:#7a5200;border:1px solid #fde68a;border-radius:8px;
+  padding:3px 8px;font-size:14px;font-weight:700;margin:2px 4px 2px 0}
+.btn-resolver{min-height:44px;padding:6px 14px;border-radius:8px;border:2px solid #0a7a2f;background:#fff;
+  color:#0a7a2f;font-weight:800;font-size:17px;cursor:pointer}
+.btn-resolver:hover{background:#f3fbf6}
+.dias{font-size:19px;font-weight:900;font-variant-numeric:tabular-nums}
+.dias.rojo{color:#b91c1c}
+.dias.verde{color:#0a7a2f}
+
+/* popup marcar faltante */
+.overlay{position:fixed;inset:0;background:rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center;padding:14px;z-index:50}
+.popup{background:#fff;border-radius:12px;padding:18px;max-width:520px;width:100%;box-shadow:0 8px 30px rgba(0,0,0,.25)}
+.popup h2{font-size:22px;margin-bottom:12px}
+.popup label{display:block;font-weight:800;font-size:18px;margin:10px 0 4px}
+.popup select,.popup input{width:100%;padding:10px;font-size:18px;border:2px solid #d0d7de;border-radius:8px}
+.popup .acciones{display:flex;gap:10px;justify-content:flex-end;margin-top:16px}
+.popup .btn{min-height:48px}
+</style>
+</head>
+<body>
+
+<div class="card">
+  <div class="header">
+    <h1>Faltantes</h1>
+    <div class="hbtns">
+      <a href="../GP2_MODULOS.html">Atrás</a>
+    </div>
+  </div>
+
+  <div class="steps">
+    <div class="tabs">
+      <button type="button" class="tab-btn active" id="tabCrudo" data-s="1">Crudo</button>
+      <button type="button" class="tab-btn" id="tabProc" data-s="2">Procesado</button>
+    </div>
+
+    <div class="kpis">
+      <div class="kpi"><div class="k">Faltantes autom.</div><div class="v" id="kFalt">—</div></div>
+      <div class="kpi"><div class="k">Marcas abiertas</div><div class="v" id="kMarcas">—</div></div>
+      <div class="kpi"><div class="k">Ubicación corta</div><div class="v" id="kCortas">—</div></div>
+    </div>
+
+    <div class="row" style="justify-content:space-between">
+      <div class="status" id="status" style="margin:0">Cargando…</div>
+      <button class="btn btn-primary" id="btnMarcar" type="button">+ Marcar faltante</button>
+    </div>
+
+    <div class="aviso hidden" id="avisoUxc"></div>
+
+    <div class="table-wrap">
+      <table class="t">
+        <thead><tr>
+          <th>Componente</th>
+          <th class="num">Stock</th>
+          <th class="num">Consumo<br>/mes</th>
+          <th class="num">Alcanza</th>
+          <th class="num sep">Máximo<br>(<span id="thMaxCaj">5</span> caj)</th>
+          <th class="num">Llena<br>alcanza</th>
+          <th>Marcas</th>
+        </tr></thead>
+        <tbody id="tbody"></tbody>
+      </table>
+    </div>
+    <div id="tblEmpty" class="empty hidden">Sin componentes en este sector.</div>
+  </div>
+</div>
+
+<!-- popup marcar faltante -->
+<div class="overlay hidden" id="ovMarcar">
+  <div class="popup">
+    <h2>Marcar faltante</h2>
+    <label for="mComp">Componente</label>
+    <select id="mComp"></select>
+    <label for="mNota">Nota (opcional)</label>
+    <input type="text" id="mNota" placeholder="Ej: no hay para mandar a pintar">
+    <label for="mUser">Tu nombre</label>
+    <input type="text" id="mUser" placeholder="Quién marca">
+    <div class="acciones">
+      <button class="btn btn-secondary" id="mCancelar" type="button">Cancelar</button>
+      <button class="btn btn-primary" id="mConfirmar" type="button">Marcar</button>
+    </div>
+  </div>
+</div>
+
+<script>
+"use strict";
+var SB = GP2_SB();
+var $ = GP2UI.$;
+var esc = GP2UI.esc;   /* helper de la casa, gp2-ui.js (2026-09-05) */
+function fmt(n,d){ return GP2N.fmt(n, d==null?0:d); }   /* la regla de numero de la casa (gp2-numero.js) */
+
+var D = { estado:[], marcas:[], pendientes_uxc:[], max_cajones:5, umbral_cajones:1 };
+var tab = 1; // 1 = Crudo, 2 = Procesado
+
+var ORIGEN_LBL = { envios_tall:"Envíos Tallerista", envios_ps:"Envíos PS", operario:"Operario", manual:"Manual" };
+
+async function cargar(){
+  var r = await SB.rpc("faltantes_estado_bundle");
+  if (r.error){ $("status").textContent = "Error: " + r.error.message; return; }
+  D = r.data || D;
+  $("thMaxCaj").textContent = fmt(D.max_cajones, 0);
+  render();
+}
+
+function marcasDe(compId){
+  return (D.marcas||[]).filter(function(m){ return m.comp_id === compId; });
+}
+
+function filas(){
+  return (D.estado||[]).filter(function(x){ return x.sector_id === tab; });
+}
+
+/* orden por gravedad: 1) faltante automatico, 2) con marca manual abierta, 3) el resto por cobertura */
+function ordenar(arr){
+  function grupo(x){
+    if (x.falt_auto === true) return 0;
+    if (marcasDe(x.comp_id).length) return 1;
+    return 2;
+  }
+  return arr.slice().sort(function(a,b){
+    var ga = grupo(a), gb = grupo(b);
+    if (ga !== gb) return ga - gb;
+    var ca = (a.cob_dias == null ? 1e9 : Number(a.cob_dias));
+    var cb = (b.cob_dias == null ? 1e9 : Number(b.cob_dias));
+    if (ca !== cb) return ca - cb;
+    return String(a.cod).localeCompare(String(b.cod));
+  });
+}
+
+function render(){
+  var arr = ordenar(filas());
+  var tb = $("tbody");
+  tb.innerHTML = "";
+  $("tblEmpty").classList.toggle("hidden", arr.length > 0);
+
+  var nFalt = 0, nCortas = 0;
+  var marcasTab = (D.marcas||[]).filter(function(m){ return m.sector_id === tab; });
+
+  arr.forEach(function(x){
+    var marcas = marcasDe(x.comp_id);
+    var esFalt = (x.falt_auto === true);
+    if (esFalt) nFalt++;
+    if (x.ubic_corta) nCortas++;
+
+    var tr = document.createElement("tr");
+    tr.className = esFalt ? "r-falt" : (marcas.length ? "r-marca" : "");
+
+    var stockHtml = fmt(x.stock, 0) + " uni" +
+      (x.caj_stock != null ? '<br><small class="sub">' + fmt(x.caj_stock, 2) + " caj</small>" : "");
+    if (esFalt){
+      stockHtml += '<br><span class="pill-falt">menos de ' + fmt(D.umbral_cajones, 0) +
+        (Number(D.umbral_cajones) === 1 ? " cajón" : " cajones") + ": " + fmt(x.stock, 0) + " uni</span>";
+    }
+
+    var alcanzaHtml = (x.cob_dias == null)
+      ? '—<br><small class="sub">sin consumo</small>'
+      : '<span class="dias' + (Number(x.cob_dias) < 30 ? " rojo" : " verde") + '">' + fmt(x.cob_dias, 1) + ' días</span>';
+
+    var maxHtml = (x.maximo == null)
+      ? '—<br><small class="sub">sin uni×cajón</small>'
+      : fmt(x.maximo, 0) + ' uni';
+
+    var llenaHtml = (x.cob_llena_dias == null) ? "—"
+      : '<span class="dias' + (x.ubic_corta ? " rojo" : "") + '">' + fmt(x.cob_llena_dias, 1) + ' días</span>' +
+        (x.ubic_corta ? '<br><span class="pill-corta">⚠ la ubicación no alcanza</span>' : "");
+
+    var marcasHtml = marcas.map(function(m){
+      return '<span class="badge-marca">' + esc(ORIGEN_LBL[m.origen] || m.origen) +
+        (m.nota ? " · " + esc(m.nota) : "") + (m.por ? " · " + esc(m.por) : "") + '</span>' +
+        '<button type="button" class="btn-resolver" data-mid="' + m.id + '" data-cod="' + esc(m.cod) + '">Resolver</button>';
+    }).join("<br>");
+
+    tr.innerHTML =
+      '<td><span class="cod">' + esc(x.cod) + '</span><br><small class="sub">' + esc(x["desc"] || "") + '</small></td>' +
+      '<td class="num">' + stockHtml + '</td>' +
+      '<td class="num">' + (x.consumo_mes > 0 ? fmt(x.consumo_mes, 0) : "—") + '</td>' +
+      '<td class="num">' + alcanzaHtml + '</td>' +
+      '<td class="num sep">' + maxHtml + '</td>' +
+      '<td class="num">' + llenaHtml + '</td>' +
+      '<td>' + (marcasHtml || "") + '</td>';
+    tb.appendChild(tr);
+  });
+
+  $("kFalt").textContent = fmt(nFalt, 0);
+  $("kMarcas").textContent = fmt(marcasTab.length, 0);
+  $("kCortas").textContent = fmt(nCortas, 0);
+  $("status").textContent = arr.length + " componentes de " + (tab === 1 ? "Crudo" : "Procesado") + ".";
+
+  var pend = (D.pendientes_uxc||[]).filter(function(p){ return p.sector_id === tab; });
+  $("avisoUxc").classList.toggle("hidden", !pend.length);
+  if (pend.length){
+    $("avisoUxc").innerHTML = "<b>Sin uni×cajón (máximo pendiente):</b> " +
+      pend.map(function(p){ return "<code>" + esc(p.cod) + "</code> " + esc(p["desc"] || ""); }).join(" · ") +
+      " — cargar el dato para que entren al cálculo de 5 cajones.";
+  }
+}
+
+function setTab(s){
+  tab = s;
+  $("tabCrudo").classList.toggle("active", s === 1);
+  $("tabProc").classList.toggle("active", s === 2);
+  render();
+}
+$("tabCrudo").addEventListener("click", function(){ setTab(1); });
+$("tabProc").addEventListener("click", function(){ setTab(2); });
+
+/* ---- resolver una marca ---- */
+$("tbody").addEventListener("click", async function(e){
+  var btn = e.target.closest("button[data-mid]");
+  if (!btn) return;
+  if (!confirm("¿Resolver la marca de faltante de " + btn.dataset.cod + "?")) return;
+  btn.disabled = true;
+  var r = await SB.rpc("resolver_faltante", { p_id: Number(btn.dataset.mid) });
+  if (r.error){ alert("Error: " + r.error.message); btn.disabled = false; return; }
+  await cargar();
+});
+
+/* ---- marcar faltante a mano ---- */
+$("btnMarcar").addEventListener("click", function(){
+  var sel = $("mComp");
+  sel.innerHTML = filas().slice().sort(function(a,b){ return String(a.cod).localeCompare(String(b.cod)); })
+    .map(function(x){ return '<option value="' + x.comp_id + '">' + esc(x.cod) + " — " + esc(x["desc"] || "") + '</option>'; })
+    .join("");
+  $("mNota").value = "";
+  try { $("mUser").value = localStorage.getItem("gp2_usuario") || ""; } catch (e) {}
+  $("ovMarcar").classList.remove("hidden");
+});
+$("mCancelar").addEventListener("click", function(){ $("ovMarcar").classList.add("hidden"); });
+$("ovMarcar").addEventListener("click", function(e){ if (e.target === $("ovMarcar")) $("ovMarcar").classList.add("hidden"); });
+
+$("mConfirmar").addEventListener("click", async function(){
+  var compId = GP2N.entero($("mComp").value);
+  if (!compId) return;
+  var usuario = $("mUser").value.trim();
+  if (usuario) try { localStorage.setItem("gp2_usuario", usuario); } catch (e) {}
+  var btn = $("mConfirmar");
+  btn.disabled = true; btn.textContent = "Marcando…";
+  var r = await SB.rpc("marcar_faltante", {
+    p_comp_id: compId, p_origen: "manual",
+    p_nota: $("mNota").value.trim() || null,
+    p_usuario: usuario || null
+  });
+  btn.disabled = false; btn.textContent = "Marcar";
+  if (r.error){ alert("Error: " + r.error.message); return; }
+  $("ovMarcar").classList.add("hidden");
+  await cargar();
+});
+
+cargar().catch(function(e){ $("status").textContent = "Error: " + (e && e.message ? e.message : e); });
+</script>
+</body>
+</html>

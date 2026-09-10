@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Producciones Disruptivas (GP2)</title>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
+  <style>
+    /* CSS minimo autonomo (el modulo real usa ../Informes/informes.css) */
+    :root { --bg:#f6f7f9; --card:#fff; --ink:#1f2937; --muted:#6b7280; --line:#e3e6eb;
+            --pos:#16a34a; --neg:#dc2626; --dark:#111; }
+    * { box-sizing:border-box; }
+    body { margin:0; font-family:Inter,system-ui,Arial,sans-serif; background:var(--bg); color:var(--ink); }
+    .page { max-width:1200px; margin:0 auto; padding:18px; }
+    .card { background:var(--card); border:1px solid var(--line); border-radius:12px; padding:18px; }
+    .header { display:flex; justify-content:space-between; align-items:flex-start; gap:12px; }
+    h1 { margin:0 0 4px; font-size:22px; }
+    .muted { color:var(--muted); margin:0; font-size:13px; }
+    .filtros { display:flex; gap:14px; margin:16px 0; flex-wrap:wrap; }
+    .field { display:flex; flex-direction:column; gap:4px; }
+    .field label { font-size:12px; color:var(--muted); }
+    .field input { padding:6px 8px; border:1px solid var(--line); border-radius:8px; }
+    /* 44px = minimo tactil de la casa (2026-09-03). */
+    .btn { padding:10px 16px; min-height:44px; border:1px solid var(--line); border-radius:8px; background:#fff; cursor:pointer; font-size:16px; }
+    .btn-dark { background:var(--dark); color:#fff; border-color:var(--dark); }
+    .btn-icon { border:1px solid var(--line); background:#fff; border-radius:6px; padding:2px 7px; cursor:pointer; margin:0 1px; }
+    .hidden { display:none !important; }
+    .emp-chips { display:flex; flex-wrap:wrap; gap:6px; margin-bottom:12px; }
+    .emp-chip { display:flex; flex-direction:column; justify-content:center; align-items:center; line-height:1.1; padding:7px 11px;
+                min-height:44px; border:1px solid var(--line); border-radius:8px; background:#fff; cursor:pointer; font-size:14px; }
+    .emp-chip.active { background:var(--dark); color:#fff; border-color:var(--dark); }
+    .emp-chip-l2 { font-size:12px; opacity:.75; }
+    .status { color:var(--muted); font-size:13px; margin:8px 0; }
+    .resumen { display:flex; gap:12px; flex-wrap:wrap; margin:8px 0 16px; }
+    .resumen-card { border:1px solid var(--line); border-radius:10px; padding:10px 18px; min-width:120px; text-align:center; }
+    .resumen-card .val { font-size:24px; font-weight:800; }
+    .resumen-card .lbl { font-size:12px; color:var(--muted); }
+    .pos { color:var(--pos); } .neg { color:var(--neg); }
+    .informe-wrap { border:1px solid var(--line); border-radius:10px; overflow:hidden; }
+    .informe-title { background:#f3f4f6; padding:8px 12px; font-weight:700; font-size:14px; }
+    .informe-scroll { overflow-x:auto; }
+    table.tbl { border-collapse:collapse; width:100%; font-size:12px; }
+    table.tbl th, table.tbl td { border-bottom:1px solid var(--line); padding:5px 8px; }
+    table.tbl th { background:#fafafa; text-align:left; position:sticky; top:0; }
+    td.c { text-align:center; } td.r { text-align:right; } td.b { font-weight:700; }
+    .modal-overlay { position:fixed; inset:0; background:rgba(0,0,0,.4); display:flex; align-items:center; justify-content:center; z-index:50; }
+    .modal-box { background:#fff; border-radius:12px; width:min(560px,92vw); overflow:hidden; }
+    .modal-header { background:var(--dark); color:#fff; padding:12px 16px; font-weight:700; }
+    .modal-body { padding:16px; }
+    .modal-fields { display:flex; flex-wrap:wrap; gap:12px; margin-top:10px; }
+    .modal-fields .field input { width:130px; }
+    .modal-footer { display:flex; justify-content:flex-end; gap:8px; padding:12px 16px; border-top:1px solid var(--line); }
+    .lbl { color:var(--muted); font-size:12px; }
+  </style>
+<link rel="icon" type="image/png" href="../GP2_favicon.png">
+<link rel="apple-touch-icon" href="../GP2_favicon.png">
+<link rel="stylesheet" href="../gp2-claro.css?v=20260903b">
+</head>
+<body>
+<div id="gp2-logobar" style="position:relative;background:#0b1220;text-align:center;padding:6px 0;border-bottom:1px solid #1c2836"><a href="../GP2_MODULOS.html" style="position:absolute;left:10px;top:50%;transform:translateY(-50%);color:#cbd5e1;text-decoration:none;font-weight:700;font-size:15px;padding:5px 10px;border:1px solid #33415a;border-radius:8px;background:#101a2b">← Atrás</a><a href="../GP2_MODULOS.html" style="text-decoration:none"><img src="../GP2_logo.png" alt="GP2 · Gestión Productiva" style="height:40px;vertical-align:middle"></a></div>
+
+  <div class="page">
+    <div class="card">
+      <div class="header">
+        <div>
+          <h1>Producciones Disruptivas <span style="font-size:13px;color:#7c3aed;">· GP2</span></h1>
+          <p class="muted">Registros con puntaje mayor a 5 o menor a -5 (schema GP2)</p>
+        </div>
+        <button class="btn btn-dark" onclick="window.location.href='../Inicio/index.html'">Inicio</button>
+      </div>
+
+      <div class="filtros">
+        <div class="field"><label>Desde</label><input type="date" id="fechaDesde" /></div>
+        <div class="field"><label>Hasta</label><input type="date" id="fechaHasta" /></div>
+      </div>
+
+      <div id="empGrid" class="emp-chips hidden"></div>
+
+      <div style="margin-bottom:8px">
+        <button id="btnExcelDisr" class="btn btn-dark hidden" onclick="exportarExcelDisruptivas()">Excel</button>
+      </div>
+
+      <div id="status" class="status"></div>
+      <div id="result"></div>
+    </div>
+  </div>
+
+  <script src="../supabase-config.js?v=20260905k"></script>
+  <script src="../gp2-ui.js?v=20260905a"></script>
+  <script src="../gp2-numero.js?v=20260905m"></script>
+<script src="disruptivas_GP2.js?v=20260905q"></script>
+</body>
+</html>
