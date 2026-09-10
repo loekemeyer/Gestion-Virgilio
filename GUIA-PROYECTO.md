@@ -12,7 +12,25 @@
 > única**; no se replica. Ante la duda entre parche rápido y fix de raíz → **fix
 > de raíz**.
 >
-> Última actualización: 2026-09-10 (jueves) · Versión app al documentar: **v14.90**
+> Última actualización: 2026-09-10 (jueves) · Versión app al documentar: **v14.93**
+>
+> Nota **v14.93 (2026-09-10) — PICKING: fix "manda al excedente pero no hay excedente" (546/587/502).** (Iba como v14.92; se renumeró porque otra sesión usó ese número para la idea 6064.)
+> Lo reportaron los operarios. Causa: `pkFetchExcedente` (la que decide si un artículo se levanta del
+> excedente y saltea la góndola, v4.26) **sumaba los deltas de `Movimientos_Stock`** con
+> `deposito=excedente&limit=5000`, pero **PostgREST corta en 1000 filas** (`db-max-rows`, misma clase de
+> bug que v5.41/v5.42) y el excedente ya tiene **5.544 movimientos**. Con la ventana de 1000 se perdían
+> los pickings viejos (negativos) y quedaban los ajustes/guardados nuevos (positivos) → **saldo fantasma**.
+> Medido sobre la tanda D67C (53 artículos, 2.418 filas de excedente): 502 → 26 en el front / 0 real;
+> 315 → 13 / 0; 512 → 39 / 0; 066 → 71 / 137; 207 → 50 / 30. Qué artículos caen depende de la mezcla de
+> la tanda (por eso 546/587 en otras). Ni la planimetría (502 A01 · 546 F45 · 587 H23) ni el stock
+> estaban mal. **Fix (front, sin tocar Supabase):** las **cajas** salen de **`vista_saldos_stock`**
+> (fuente de verdad, respeta el `cutoff_ts`, 1 fila por artículo — la misma que usan MG y
+> `showExcModal`) y de los movimientos sólo se leen las **ubicaciones** (entradas `delta>0` con
+> `ubicacion` cargada: 198 filas en toda la tabla, lejos del tope). Mismo timeout de 7 s (v5.97); si la
+> vista falla → `{}` (todo de góndola). `showExcModal` (bajar excedente a góndola) usa la misma
+> función sólo para ubicaciones: sin cambio. Test `tests/pk-excedente-vista.cjs` en el runner.
+> ⚠ Regla que sigue vigente: **nunca confiar en `limit=N` para "traer todo"** — si la tabla puede
+> superar 1000 filas, `supaFetchAll` o leer el saldo de la vista.
 >
 > Nota **v14.90 (2026-09-10, Luis) — CUARENTENA: botón WhatsApp al vendedor/cliente (idea 8833).**
 > En la ficha, botón **"💬 Vendedor · Nombre"** (o **"💬 Cliente"**, o **"Sin tel."**) que abre WhatsApp con
