@@ -91,6 +91,32 @@ justamente lo que las identifica.
 procedencia). `sql/gv_app_sello_eventos_v1451.sql`, §3.bl de `SUPABASE-GESTION-VIRGILIO.md`,
 regresión `tests/gv-app-tag.cjs`.
 
+### v14.62 (2026-09-10) — columna `gv_nombre_prueba` en `Registros_Produccion_Virgilio` (legajo 600 = entrevistas)
+
+**Qué se cambió.** `alter table public."Registros_Produccion_Virgilio" add column gv_nombre_prueba text;` —
+nullable, sin default, sin backfill (mismo patrón exacto que `gv_app`). El legajo **600** es el legajo
+COMPARTIDO de entrevistas/prueba: cada candidato entra con 600, registra su nombre y hace la prueba
+**real** (persiste eventos y descuenta stock, igual que un operario — **no** es como el 0/1, que no
+persisten). Para saber quién hizo cada prueba, Gestión manda `gv_nombre_prueba = <nombre del candidato>`
+en sus dos caminos de escritura (`trySendOneReport` y `bulkSendDayReplay`) **sólo** cuando el legajo es
+600; en cualquier otro evento va NULL. Se agregó también la función `es_legajo_entrevista(text)` (fuente
+de verdad de "cuál es el legajo de entrevista", hoy 600) y la vista supervisor `gv_pruebas_entrevistas`.
+
+**Qué de Producción se ve afectado.** Nada, por lo mismo que `gv_app` (verificado antes, no después):
+grants a nivel tabla → la columna queda cubierta sola; policy `insert_all` con `with_check = true` → no
+enumera columnas; sin trigger; sin tocar filas existentes; Producción no hace `select *`. `es_legajo_entrevista`
+y `gv_pruebas_entrevistas` son objetos **nuevos** con prefijo `gv_`/`es_legajo_` que Producción no referencia.
+
+**Rollback:**
+```sql
+alter table public."Registros_Produccion_Virgilio" drop column gv_nombre_prueba;
+drop view if exists public.gv_pruebas_entrevistas;
+drop function if exists public.es_legajo_entrevista(text);
+```
+\+ sacar `gv_nombre_prueba`/`esLegajoEntrevista`/`promptNombreEntrevista` de `index.html`. Sin pérdida de
+datos operativos. `sql/gv_nombre_prueba_entrevistas_v1462.sql`, `sql/gv_pruebas_entrevistas_v1462.sql`,
+regresión `tests/entrevista-legajo600.cjs`.
+
 ### v14.48 (2026-09-08) — columna `gv_empresa` generada en `Entregas_Virgilio`
 
 **Qué se cambió.** `alter table public."Entregas_Virgilio" add column gv_empresa text generated

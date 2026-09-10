@@ -4428,3 +4428,35 @@ código de la col J, que ya viene de `v_pedidos_web_np` para LK y de la RPC de C
 **Nota:** un enfoque previo (mismo día) resolvía esto por `sheets_payload.source` con una RPC
 `gv_web_np_source`; al corregirse la regla a "por código" se **descartó y se dropeó** la RPC
 (no quedó ningún objeto nuevo en la base). La regla por código no necesita el `source`.
+
+## §3.br — v14.62 (2026-09-10): Legajo **600** = ENTREVISTAS / PRUEBA con nombre
+
+**Qué pidió el dueño.** *"Todos los legajos seiscientos [que] sean legajos de prueba… que cada uno
+pueda poner legajo 600, que cuando ponga ese número pueda registrar su nombre y que en función de eso
+pueda hacer la prueba. Que descuente stocks y todo. Que todos los de entrevistas usen el 600."*
+
+**Diseño (confirmado con el dueño).** El **600** es un legajo **compartido** de entrevistas. No es como
+el `0`/`1` (`es_legajo_test`, que **no** persisten ni descuentan): el 600 hace la prueba **real** →
+**persiste eventos y descuenta stock igual que un operario, y entra en los reportes**. Como es compartido,
+cada candidato **registra su nombre** al entrar, y **cada evento se sella con ese nombre** para poder
+distinguir quién hizo cada prueba.
+
+**Backend (fuente de verdad).**
+- Columna nueva `gv_nombre_prueba text` en `Registros_Produccion_Virgilio` (nullable, sin default, sin
+  backfill, prefijo `gv_` → mismo patrón seguro y verificado que `gv_app`, §3.bl). Ver `ROLLBACK-PRODUCCION.md`.
+- Función `es_legajo_entrevista(text)` → `btrim = '600'` (inmutable, parallel safe, sin `search_path`).
+  Es la fuente de verdad de "cuál es el legajo de entrevista". `sql/gv_nombre_prueba_entrevistas_v1462.sql`.
+- Vista supervisor `gv_pruebas_entrevistas` (security_invoker): candidatos del 600 por día — nombre,
+  cantidad de eventos, ventana y acciones. `sql/gv_pruebas_entrevistas_v1462.sql`.
+
+**Front (`index.html`, espejo de UX).** `esLegajoEntrevista()` + `INTERVIEW_LEGAJO="600"`. `loginWithLegajo`:
+si se tipea 600 **no** busca en `Empleados` (no existe a propósito), abre `promptNombreEntrevista()` (modal
+propio, no `window.prompt` — poco confiable en el TWA) y arma la sesión con `{legajo:"600", nombre}`.
+`_enqueueReportRaw` sella `payload.gv_nombre_prueba` con el nombre de la sesión (leído de `localStorage
+vir_legajo_auth`), y los dos caminos de escritura (`trySendOneReport` y `bulkSendDayReplay`) lo mandan sólo
+para el 600. `_gvNombrePrueba()` lee `localStorage` directo porque la sesión la escribe el módulo de auth,
+cuyo scope no ve el script clásico.
+
+**Medición.** `select * from public.gv_pruebas_entrevistas;` lista los candidatos y sus eventos por día.
+Regresión: `tests/entrevista-legajo600.cjs` (clasifica 600 vs operario vs 0/1; verifica que el 600 persiste,
+que `_enqueueReportRaw` sella, y que envío individual y bulk mandan el nombre).

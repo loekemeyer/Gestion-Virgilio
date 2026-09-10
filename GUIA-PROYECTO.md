@@ -12,7 +12,22 @@
 > única**; no se replica. Ante la duda entre parche rápido y fix de raíz → **fix
 > de raíz**.
 >
-> Última actualización: 2026-09-09 (miércoles) · Versión app al documentar: **v14.53**
+> Última actualización: 2026-09-10 (jueves) · Versión app al documentar: **v14.62**
+>
+> Nota **v14.62** (front + backend) — **Legajo 600 = ENTREVISTAS / PRUEBA con nombre.** Para las
+> entrevistas de gente que va a trabajar: cada candidato entra con el legajo **600** (compartido),
+> registra su **nombre** y hace la prueba **real**. A diferencia del `0`/`1` (`es_legajo_test`, que
+> **no** persisten ni descuentan stock), el **600 SÍ persiste y descuenta stock igual que un
+> operario, y entra en los reportes** — para eso se pidió. Como es compartido, cada evento del 600 se
+> **sella con el nombre del candidato** (columna nueva `gv_nombre_prueba` en `Registros_Produccion_Virgilio`,
+> nullable/`gv_`, mismo patrón seguro que `gv_app`). Backend fuente de verdad: función
+> `es_legajo_entrevista(text)` (hoy 600) y vista supervisor `gv_pruebas_entrevistas` (candidatos por
+> día). Front: al tipear 600 en "Entrar con legajo" no busca en `Empleados`, abre un modal para el
+> nombre y arma la sesión; `trySendOneReport`/`bulkSendDayReplay` mandan el nombre. Ver quién hizo
+> pruebas: `select * from public.gv_pruebas_entrevistas;`. Detalle y rollback en
+> `docs/SUPABASE-GESTION-VIRGILIO.md` §3.br y `docs/ROLLBACK-PRODUCCION.md`,
+> `sql/gv_nombre_prueba_entrevistas_v1462.sql`, `sql/gv_pruebas_entrevistas_v1462.sql`,
+> regresión `tests/entrevista-legajo600.cjs`.
 >
 > Nota **v14.53** (seguridad, proyecto LK) — **🔴 la facturación se leía con la anon key.**
 > `rep_texto_hoy(date)` y `rep_enviar_hoy()` (las del reporte de gerencia que sale 20:00 por

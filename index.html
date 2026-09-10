@@ -5798,7 +5798,9 @@ async function bulkSendDayReplay(legajoStr, historySnapshot) {
       texto:       (item.texto || "").trim(),
       ts_cliente:  new Date(item.ts || Date.now()).toISOString(),
       ts_inicio:   item.ts_inicio_iso || null,
-      gv_app:      GV_APP_TAG
+      gv_app:      GV_APP_TAG,
+      // v14.62 — recuperar también el sello de nombre en el replay del día del legajo de entrevista (600)
+      gv_nombre_prueba: esLegajoEntrevista(legajoStr) ? (item.gv_nombre_prueba || (item.payload && item.payload.gv_nombre_prueba) || _gvNombrePrueba() || null) : null
     }));
   if (!bulkPayload.length) return;
   try {
@@ -7106,12 +7108,34 @@ async function registerBackgroundSync() {
    legajo 0 movió stock real y desincronizó la alerta). */
 function esLegajoPrueba(leg) { const s = String(leg == null ? "" : leg).trim(); return s === "0" || s === "1"; }
 function esOperadorPrueba() { try { const el = document.getElementById("legajoInput"); return esLegajoPrueba(el ? el.value : ""); } catch (_e) { return false; } }
+/* v14.62 — Legajo 600 = ENTREVISTAS / PRUEBA con nombre. A diferencia del 0/1
+   (esLegajoPrueba), el 600 SÍ persiste y descuenta stock: es una prueba REAL.
+   Es un legajo COMPARTIDO — cada candidato entra con 600 y registra su nombre, y
+   cada evento se sella con ese nombre (columna gv_nombre_prueba). Espejo del
+   backend es_legajo_entrevista(). */
+const INTERVIEW_LEGAJO = "600";
+function esLegajoEntrevista(leg) { return String(leg == null ? "" : leg).trim() === INTERVIEW_LEGAJO; }
+/* Nombre del candidato de la sesión de entrevista (sólo si el legajo logueado es 600).
+   Lee localStorage directo (la sesión de legajo la escribe el módulo de auth, cuyo
+   scope no es visible desde este script clásico). La clave espeja LEGAJO_AUTH_KEY. */
+function _gvNombrePrueba() {
+  try {
+    const raw = localStorage.getItem("vir_legajo_auth");
+    if (!raw) return "";
+    const s = JSON.parse(raw);
+    if (s && esLegajoEntrevista(s.legajo)) return String(s.nombre || "").trim();
+  } catch (_e) {}
+  return "";
+}
 /* v7.87-fix — _enqueueReportRaw: lógica interna de encolado, sin el gate de
    operador-prueba. Separada para que enqueueAutoClose pueda chequear
    esLegajoPrueba(payload.legajo) en vez de leer el input DOM (bug: si el input
    mostraba "0" al cambiar de día, el auto-cierre de legajos reales se descartaba). */
 function _enqueueReportRaw(payload) {
   const fechaHist = payload.ts ? isoToDayKey(payload.ts) : getTodayKey();
+  // v14.62 — sellar el nombre del candidato en los eventos del legajo de entrevista (600),
+  // atado al momento de encolar (por si otro candidato entra antes de que la cola despache).
+  try { if (esLegajoEntrevista(payload.legajo) && payload.gv_nombre_prueba == null) payload.gv_nombre_prueba = _gvNombrePrueba() || null; } catch (_e) {}
   const item = {
     id: payload.id,
     payload,
@@ -7320,7 +7344,8 @@ async function trySendOneReport(payload, timeoutMs) {
         texto:       payload.texto,
         ts_cliente:  new Date(payload.ts).toISOString(),
         ts_inicio:   payload.ts_inicio_iso || null,           // solo poblado en cierres
-        gv_app:      GV_APP_TAG                               // v14.51 — quién mandó esto (NULL = Producción)
+        gv_app:      GV_APP_TAG,                              // v14.51 — quién mandó esto (NULL = Producción)
+        gv_nombre_prueba: payload.gv_nombre_prueba || null    // v14.62 — nombre del candidato si es legajo de entrevista (600)
       }),
       keepalive: true,        // sobrevive a cambios de pantalla / cierres rápidos
       signal: ctrl.signal
@@ -7444,7 +7469,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v14.61";
+const APP_VERSION = "v14.62";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -40732,6 +40757,45 @@ window.endDaySignOut = async function () {
   showLoggedOut();
 };
 
+/* v14.62 — Modal para que el candidato de entrevista (legajo 600) registre su
+   nombre antes de empezar la prueba. Se hace con DOM propio (no window.prompt,
+   que en el TWA de Play Store es poco confiable). Devuelve el nombre (trim) o "". */
+function promptNombreEntrevista() {
+  return new Promise(function (resolve) {
+    const ov = document.createElement("div");
+    ov.setAttribute("role", "dialog");
+    ov.style.cssText = "position:fixed;inset:0;z-index:100000;background:rgba(15,23,42,.72);display:flex;align-items:center;justify-content:center;padding:20px;";
+    const box = document.createElement("div");
+    box.style.cssText = "background:#fff;border-radius:16px;max-width:380px;width:100%;padding:22px 20px;box-shadow:0 12px 40px rgba(0,0,0,.35);font-family:inherit;";
+    box.innerHTML =
+      '<div style="font-size:20px;font-weight:800;color:#0f172a;margin-bottom:4px;">Prueba de entrevista</div>' +
+      '<div style="font-size:13.5px;color:#475569;margin-bottom:14px;line-height:1.4;">Escribí tu <b>nombre y apellido</b>. Vas a hacer la prueba real (descuenta stock de verdad) y queda registrada con tu nombre.</div>' +
+      '<input id="entrevistaNombreInput" type="text" autocomplete="name" placeholder="Nombre y apellido" style="width:100%;box-sizing:border-box;font-size:18px;padding:12px;border:2px solid #cbd5e1;border-radius:10px;margin-bottom:6px;">' +
+      '<div id="entrevistaNombreErr" style="min-height:16px;font-size:12.5px;color:#b91c1c;margin-bottom:10px;"></div>' +
+      '<div style="display:flex;gap:10px;">' +
+        '<button id="entrevistaCancel" style="flex:1;padding:12px;border:2px solid #cbd5e1;background:#f8fafc;color:#334155;border-radius:10px;font-weight:700;font-size:15px;cursor:pointer;">Cancelar</button>' +
+        '<button id="entrevistaOk" class="primary-btn" style="flex:2;padding:12px;border:none;border-radius:10px;font-weight:800;font-size:15px;cursor:pointer;">Empezar prueba</button>' +
+      '</div>';
+    ov.appendChild(box);
+    document.body.appendChild(ov);
+    const inp = box.querySelector("#entrevistaNombreInput");
+    const err = box.querySelector("#entrevistaNombreErr");
+    let done = false;
+    function close(val) { if (done) return; done = true; try { document.body.removeChild(ov); } catch (_e) {} resolve(val); }
+    function confirm() {
+      const v = String(inp.value || "").trim();
+      if (v.length < 2) { err.textContent = "Poné al menos tu nombre."; inp.focus(); return; }
+      close(v);
+    }
+    box.querySelector("#entrevistaOk").onclick = confirm;
+    box.querySelector("#entrevistaCancel").onclick = function () { close(""); };
+    ov.addEventListener("click", function (e) { if (e.target === ov) close(""); });
+    inp.addEventListener("keydown", function (e) { if (e.key === "Enter") confirm(); if (e.key === "Escape") close(""); });
+    setTimeout(function () { try { inp.focus(); } catch (_e) {} }, 40);
+  });
+}
+window.promptNombreEntrevista = promptNombreEntrevista;
+
 /* Login alternativo sin Google: el operario tipea su número de legajo y lo
    resolvemos contra Empleados (mismo lookup que email->legajo). No usa
    Supabase Auth; la sesión se guarda en localStorage y dura el día. */
@@ -40744,10 +40808,20 @@ window.loginWithLegajo = async function () {
     if (errEl) errEl.textContent = "Ingresá tu número de legajo";
     return;
   }
-  const emp = await resolveEmpleadoByLegajo(raw);
-  if (!emp) {
-    if (errEl) errEl.textContent = "No encontramos ese legajo en Empleados. Avisá al supervisor.";
-    return;
+  // v14.62 — Legajo 600 = ENTREVISTA / PRUEBA. No está en Empleados a propósito: es
+  // compartido. Cada candidato pone su NOMBRE y hace la prueba real (descuenta stock);
+  // cada evento queda sellado con ese nombre (gv_nombre_prueba).
+  let emp;
+  if (esLegajoEntrevista(raw)) {
+    const nombre = await promptNombreEntrevista();
+    if (!nombre) { if (errEl) errEl.textContent = "Poné tu nombre para empezar la prueba."; return; }
+    emp = { legajo: INTERVIEW_LEGAJO, nombre: nombre };
+  } else {
+    emp = await resolveEmpleadoByLegajo(raw);
+    if (!emp) {
+      if (errEl) errEl.textContent = "No encontramos ese legajo en Empleados. Avisá al supervisor.";
+      return;
+    }
   }
   saveLegajoSession(emp, todayKeyBsAs() || "");
   __identity = { type: "operario", emp: emp, nombre: emp.nombre || ("Legajo " + emp.legajo) };

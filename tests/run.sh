@@ -48,6 +48,9 @@ PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node te
 echo "== gv-app-tag (regresión: el sello gv_app viaja en cada evento; NULL = Producción) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/gv-app-tag.cjs
 
+echo "== entrevista-legajo600 (regresión: legajo 600 persiste + sella gv_nombre_prueba; 0/1 no) =="
+PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/entrevista-legajo600.cjs
+
 echo "== fac-npc (regresión: aviso faltantes en Facturación + consulta NP/Líos) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/fac-npc.cjs
 
