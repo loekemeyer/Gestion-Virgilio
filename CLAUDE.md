@@ -393,9 +393,18 @@ borró). Layout:
   pantalla `#cervAdmin` muestra las dos tarjetas. **Todo Cervantes vive en este repo**: la
   app de operario en `cervantes/` y los dos admin acá.
 - **De la copia se dejaron afuera** los archivos de repo, no de app: `.git`, `.claude`,
-  `.vscode`, `.mcp.json`, `.planning`, `CLAUDE.md`, `LOCKS.txt` y los `.bat`. El `CLAUDE.md`
-  sobre todo: si entra, una sesión de Claude en ESTE repo se come las instrucciones de los
-  otros dos (locks, reglas contradictorias). **No traerlo nunca.**
+  `.vscode`, `.mcp.json`, `.planning`, `LOCKS.txt` y los `.bat`.
+- **Los `CLAUDE.md` de los dos admin SÍ están, pero RENOMBRADOS** (v14.75):
+  `cervantes-admin/entero/claude-admin--GestionProductivaEntero.md` y
+  `cervantes-admin/gp2/claude-admin--Gestion-Productiva-2.0.md`. Ahí está cómo opera cada
+  admin (tablas madre vs derivadas, orden de normalización, "casa del vecino", convenciones,
+  trampas conocidas) y no está repetido en ningún otro `.md`. **Nunca renombrarlos de vuelta
+  a `CLAUDE.md`**: con ese nombre se cargan como instrucciones del proyecto y una sesión de
+  Gestión Virgilio pasa a obedecer las reglas de otro repo. Cada uno abre con un banner que
+  lo aclara. Las reglas que mandan acá son las de ESTE archivo.
+- **Los 5 agentes de GP2** quedaron archivados en `cervantes-admin/gp2/agentes/` (fuera de
+  `.claude/`, con su README): se conserva el trabajo si aquel repo se apaga, sin que una
+  sesión de acá los cargue sola. Para usarlos hay que copiarlos a `.claude/agents/` a mano.
 - **Parches propios de estas copias** (no revertirlos al re-sincronizar):
   1. **Ningún rechazo de whitelist hace `signOut()`** (`entero/login.html`, `gp2/login.html`).
      La sesión de Google es **compartida** con Gestión (mismo origin, mismo proyecto): cerrarla
