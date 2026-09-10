@@ -231,6 +231,28 @@ comportamiento post-recepción. Efecto lateral: una OC 'cerrada' ya no figura co
 
 ---
 
+### 2026-09-10 — `ventas_mensuales_cod` manda un header secreto a LK (cierre de leak en LK)
+
+**Qué se cambió.** `public.ventas_mensuales_cod(text,int)` (la usa el popup "de dónde sale la
+proyección" en `index.html`) ahora manda un header `x-feed-secret` en su llamada `http()` a LK
+(`fn_ventas_mensuales_virgilio`). Motivo: esa función de LK estaba abierta a cualquiera con la anon
+key pública (leak de volúmenes mensuales por artículo). LK ahora exige ese header; sin él devuelve
+`[]`. El secreto vive en `app_settings.virgilio_feed_secret` de **LK** y está embebido como
+constante `s` en esta función (mismo nivel que la anon key `k` que ya estaba hardcodeada acá).
+
+**Impacto en Producción:** ninguno — Producción no usa ese popup (es del panel comercial/LK). La
+función devuelve lo mismo para el llamador legítimo (verificado: `ventas_mensuales_cod('505',6)` →
+6 meses OK). Es un `create or replace` de una función compartida, permitido bajo la regla del
+2026-09-08 (Producción ya no se usa), anotado acá como corresponde.
+
+**Rollback:** `create or replace` de `ventas_mensuales_cod` sacando el tercer header
+`public.http_header('x-feed-secret', s)` y la constante `s` (definición previa en git / en el runbook
+`sql/pendiente_8436_http_ssrf_runbook.sql`). Del lado LK, sacar el CTE `gate` de
+`fn_ventas_mensuales_virgilio`. Detalle completo en el repo GestOpClientes,
+`docs/PENDIENTES-SEGURIDAD-2026-09-09.md`.
+
+---
+
 ## 2. Backups vigentes (para restore puntual)
 
 | backup | qué guarda | fecha |
