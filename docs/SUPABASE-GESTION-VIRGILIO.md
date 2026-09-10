@@ -4460,3 +4460,57 @@ cuyo scope no ve el script clásico.
 **Medición.** `select * from public.gv_pruebas_entrevistas;` lista los candidatos y sus eventos por día.
 Regresión: `tests/entrevista-legajo600.cjs` (clasifica 600 vs operario vs 0/1; verifica que el 600 persiste,
 que `_enqueueReportRaw` sella, y que envío individual y bulk mandan el nombre).
+
+## §3.bn — v14.59 (2026-09-09): descontar la OC al recibir mercadería
+
+**Problema.** Al recibir, el módulo escribía en `Entregas Tallerista Virgilio` / `Entregas Prov AT` /
+`Movimientos_Stock` / `Control_Modo_OP`, pero **nunca** tocaba `Ordenes_Compra.cantidad_recibida`.
+`oc_vigentes_por_proveedor` calcula `pend = cantidad - cantidad_recibida`, así que las cantidades a
+recibir no bajaban nunca (medido: **0 de 729 OCs con `cantidad_recibida > 0`, 0 en estado `recibida`**)
+y la operadora seguía imprimiendo las OCs.
+
+**Fix.** Función `gv_oc_aplicar_recepcion(nombre_ent text, items jsonb)` (SECURITY DEFINER, grant a
+anon/authenticated), que el front (`recepcion.js`) llama best-effort tras cada recepción exitosa.
+Descuenta en **cascada** sobre las filas de la fecha más nueva del proveedor+código (igual a como
+`oc_vigentes_por_proveedor` agrega lo que ve el operario), llenando cada fila hasta su `cantidad`
+(nunca la pasa: si la pasara, la fila se cae de la vista por el filtro `(cantidad-recibida)>0` y el
+total queda mal), marcando `estado='recibida'` la que se completa y seteando `fecha_entrega_real`.
+El **excedente** (lo recibido por encima de lo pedido) **no** entra a la OC: se avisa aparte al dueño
+(botón a Tomás, pendiente del nº de WhatsApp). Match idéntico a `oc_vigentes_por_proveedor`
+(`norm_nombre` + alias Pettofrezza→Rafael + split del proveedor; `norm_cod`). SQL: `sql/gv_oc_aplicar_recepcion.sql`.
+
+**Prueba (en transacción con `rollback`, datos intactos).** Garcia/505 tenía a la fecha nueva
+(09-09) dos OCs: 287 + 293 = 580 pend. Recibiendo 600 → llenó ambas (→ `recibida`), sobraron 20
+(al aviso), y `oc_vigentes_por_proveedor('Garcia')` para 505 pasó a mostrar la OC más vieja
+(234, del 02-09) como nueva vigente. Correcto: descuenta lo nuevo y saca la OP completada.
+
+**Backup + rollback:** `public."GV_Backup_Ordenes_Compra_20260909"` (729 filas) y bloque en
+`docs/ROLLBACK-PRODUCCION.md` §1 (v14.59).
+
+**Nota de idempotencia.** La RPC es best-effort y no dedupe: si el operario RE-envía a mano el mismo
+remito (lo confirma en el aviso de duplicado v14.58), se descuenta dos veces. Igual que el stock, el
+control queda en el aviso de duplicado.
+
+## §3.bo — v14.60 (2026-09-09): "la nueva pisa la vieja" (OC vigente = la de fecha más nueva)
+
+**Regla del dueño.** Para un mismo proveedor+código, la OC de fecha MÁS NUEVA es la única viva; las
+más viejas quedan muertas y NO reaparecen. Antes (v14.59), al completar la OC nueva al recibir, la
+vista caía a mostrar una OC vieja pendiente (caso Garcia/505: quedaba la del 02-09 con 234).
+
+**Cambio (dos funciones, mismo criterio).**
+- `oc_vigentes_por_proveedor(text)` — `max_fecha` se calcula sobre las OCs no cerradas/anuladas
+  INCLUYENDO las 'recibida' (para que una OC nueva ya recibida tape a las viejas). Se sacó el filtro
+  por fila `(cantidad-recibida)>0` y la exclusión de 'recibida' del pre-filtro; el `HAVING sum(pend)>0`
+  saca los códigos con la OC nueva completa, y las viejas nunca están en `max_fecha`.
+- `gv_oc_aplicar_recepcion(text,jsonb)` — fija `max_fecha` igual (incluyendo 'recibida') y descuenta
+  SOLO esa fecha. Si la OC nueva ya no tiene lugar, lo recibido es excedente (aviso a Tomás), nunca
+  descuenta una OC vieja.
+
+**Prueba (transacción con `rollback`).** Garcia/505 (dos OCs del 09-09 = 580 pend, más viejas del
+02/08 sin usar). Recibiendo 600 → 505 desaparece de `oc_vigentes_por_proveedor('Garcia')` (0 filas):
+la vieja de 234 ya NO reaparece. Recibiendo 100 → queda ped=580, rec=100, pend=480. Correcto.
+
+**Efecto lateral (menor).** Una OC en estado 'cerrada' ya no figura como vigente (antes la vista sólo
+excluía 'recibida'). Hoy hay 1 'cerrada'.
+
+**Rollback:** `docs/ROLLBACK-PRODUCCION.md` §1 (v14.60). SQL vigente: `sql/oc_nueva_pisa_vieja_v1460.sql`.

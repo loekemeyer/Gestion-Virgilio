@@ -2440,6 +2440,20 @@
 > con parámetro `p_nombre` (incorrecto) → `nombre_ent` (correcto). Sin el fix las cantidades de OC no
 > aparecían en los botones de artículo.
 >
+> Nota **v14.59–v14.61 (2026-09-09) — OC en recepción: descuento, "la nueva pisa la vieja" y aviso de exceso a Thomas.**
+> **(v14.59)** Al recibir se descuenta la OC del proveedor: la RPC **`gv_oc_aplicar_recepcion(nombre_ent, items)`**
+> (la llama `recepcion.js` best-effort tras enviar) suma a `Ordenes_Compra.cantidad_recibida` la OC de la
+> **fecha más nueva** del proveedor+código, marcando `recibida` la que se completa. Antes `cantidad_recibida`
+> no se tocaba nunca (0/729) y por eso las cantidades a recibir no bajaban y se seguían imprimiendo.
+> **(v14.60)** Regla del dueño **"la nueva pisa la vieja"**: la OC vigente es siempre la de fecha más nueva;
+> las viejas quedan muertas y no reaparecen. `oc_vigentes_por_proveedor` y `gv_oc_aplicar_recepcion` calculan
+> `max_fecha` incluyendo las `recibida` (el `HAVING pend>0` saca las completas). SQL: `sql/oc_nueva_pisa_vieja_v1460.sql`.
+> **(v14.61)** Cuando el operario carga **más que lo habilitado** (`n > pend`), el aviso en vivo del popup de
+> cajas muestra **"estás recibiendo más mercadería que la habilitada"** + botón **📲 Escribirle a Thomas**
+> (WhatsApp `wa.me/5491162521635`) con mensaje prearmado: proveedor, OC pide, por recibir, pendiente, excedente,
+> stock de góndola y si el excedente entra en góndola (`Capacidad_Sector` − `vista_saldos_stock.terminado`).
+> Detalle backend: `docs/SUPABASE-GESTION-VIRGILIO.md` §3.bn/§3.bo.
+>
 > Nota **2026-08-27 — Facturación neto/faltantes: cálculo centralizado en vistas (`sql/facturacion_neto.sql`).**
 > El neto y los faltantes dejan de vivir sólo en el front: el cálculo está en **vistas en vivo**
 > (no se persiste — es dato derivado, fuente única). Objetos: **`vista_facturacion_neto_items`**
