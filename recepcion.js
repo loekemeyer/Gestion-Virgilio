@@ -1300,6 +1300,10 @@ function openCajas(cod) {
   // v7.07: recordatorio de la OC vigente mientras carga las cajas.
   const oc = ocDeCod(cod);
   opState.cajasOc = oc || null;   // v8.60 — guardado para el aviso de exceso en vivo
+  // v14.61 — si hay OC, precargo stock/capacidad de góndola de este código para el mensaje a
+  // Thomas (así el botón arma el WhatsApp sincrónico, sin esperar la red al tocarlo).
+  opState.cajasGond = null;
+  if (oc) { try { _opPrefetchGond(cod); } catch (_e) {} }
   if (opCajasOc) {
     if (oc) {
       opCajasOc.style.display = "";
@@ -1329,11 +1333,69 @@ function _opCajasExceso() {
   const n = _esCodDecimal(opState.cajasCod) ? (parseFloat(opCajasInput.value) || 0) : (parseInt(opCajasInput.value, 10) || 0);
   if (n > oc.pend) {
     opCajasOc.style.background = "#fef2f2"; opCajasOc.style.borderColor = "#fca5a5";
-    opCajasOc.innerHTML = _opCajasOcBase(oc) + '<br><b style="color:#b91c1c;">⚠ Cargás ' + n + ' pero por OC faltan ' + oc.pend + '. Revisá que no sea un error de tipeo.</b>';
+    // v14.61 — aviso claro + botón para escribirle a Thomas por WhatsApp con el mensaje prearmado
+    // (proveedor, pedido, por recibir, pendiente, excedente, stock góndola y si entra). El dueño
+    // decide con todos los datos si el excedente entra o se devuelve.
+    opCajasOc.innerHTML = _opCajasOcBase(oc) +
+      '<br><b style="color:#b91c1c;">⚠ Estás recibiendo más mercadería que la que tenés habilitada: cargás ' + n +
+      ' y por OC faltan ' + oc.pend + '.</b>' +
+      '<br><button type="button" class="waThomasBtn" style="margin-top:8px;padding:8px 12px;border:0;border-radius:8px;background:#25d366;color:#fff;font-weight:700;font-size:14px;cursor:pointer;">📲 Escribirle a Thomas</button>';
+    const b = opCajasOc.querySelector(".waThomasBtn");
+    if (b) b.onclick = function () { opWhatsExceso(n); };
   } else {
     opCajasOc.style.background = ""; opCajasOc.style.borderColor = "";
     opCajasOc.innerHTML = _opCajasOcBase(oc);
   }
+}
+/* v14.61 — precarga stock de góndola (vista_saldos_stock.terminado) y capacidad
+   (Capacidad_Sector.cajas_max) del código, para el mensaje a Thomas. Best-effort: si no hay
+   dato, el mensaje dice "s/dato". */
+async function _opPrefetchGond(cod) {
+  const k = String(cod || "").trim();
+  if (!k) return;
+  try {
+    await sessionReady;
+    const res = await Promise.all([
+      supabase.from("Capacidad_Sector").select("cajas_max").eq("cod", k),
+      supabase.from("vista_saldos_stock").select("terminado").eq("cod_art", k)
+    ]);
+    let cap = 0, hasCap = false;
+    ((res[0] && res[0].data) || []).forEach(function (r) { hasCap = true; cap += Number(r.cajas_max) || 0; });
+    let gond = 0, hasG = false;
+    ((res[1] && res[1].data) || []).forEach(function (r) { hasG = true; gond += Number(r.terminado) || 0; });
+    if (opState.cajasCod === k) opState.cajasGond = { cap: hasCap ? cap : null, gond: hasG ? gond : null };
+  } catch (_e) { /* best-effort: queda null → "s/dato" */ }
+}
+/* v14.61 — WhatsApp a Thomas (dueño) con el resumen del exceso, mensaje prearmado. */
+const WA_THOMAS = "5491162521635";
+function opWhatsExceso(n) {
+  const oc = opState.cajasOc || {};
+  const prov = opState.tallNombre || "?";
+  const cod = opState.cajasCod || "?";
+  const ped = oc.ped || 0, pend = oc.pend || 0;
+  const exced = Math.max(0, n - pend);
+  const g = opState.cajasGond || {};
+  const gond = (g.gond != null) ? g.gond : null;
+  const cap = (g.cap != null) ? g.cap : null;
+  const libre = (cap != null && gond != null) ? (cap - gond) : null;
+  const entra = (libre != null)
+    ? (libre >= exced ? ("SÍ (" + libre + " libres en góndola)") : ("NO (solo " + libre + " libres en góndola)"))
+    : "s/dato de capacidad";
+  const L = [
+    "Hola Thomas, exceso al recibir mercadería:",
+    "Proveedor: " + prov,
+    "Código: " + cod,
+    "OC pide: " + ped,
+    "Estoy por recibir: " + n,
+    "Pendiente de recibir: " + pend,
+    "Excedente sobre lo habilitado: " + exced,
+    "Stock actual en góndola: " + (gond != null ? gond : "s/dato"),
+    "¿Entra el excedente en góndola?: " + entra,
+    "",
+    "¿Lo recibo?"
+  ];
+  const url = "https://wa.me/" + WA_THOMAS + "?text=" + encodeURIComponent(L.join("\n"));
+  try { window.open(url, "_blank"); } catch (_e) { location.href = url; }
 }
 function closeCajas() { opCajasModal.classList.remove("open"); opState.cajasCod = null; }
 // v11.78: códigos con decimales permitidos (cajas fraccionarias)
