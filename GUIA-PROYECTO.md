@@ -12,7 +12,28 @@
 > única**; no se replica. Ante la duda entre parche rápido y fix de raíz → **fix
 > de raíz**.
 >
-> Última actualización: 2026-09-10 (jueves) · Versión app al documentar: **v14.78**
+> Última actualización: 2026-09-10 (jueves) · Versión app al documentar: **v14.81**
+>
+> Nota **v14.81 (2026-09-10) — Submódulo CUARENTENA en "A Programar" (idea usuario 8877, prioridad 1).**
+> **MOTIVO (pedido del dueño):** un pedido no debería salir a Programación si el cliente tiene **deuda**,
+> está **suspendido** o el pedido **supera su límite de crédito**. Hoy esos pedidos entran igual a "A
+> Programar" y los puede tomar el armado automático.
+> **IDEA DE FUNCIONAMIENTO:** el pedido en cuarentena lleva un **badge** (🚧) con el motivo, sale de la
+> lista "📋 Pedidos a programar" y va a un **sector aparte "🚧 Cuarentena"**; **no** se puede tildar ni
+> programar (ni a mano ni por el automático) hasta liberarlo.
+> **ESTADO — PASO 1 (sólo front, este release):** el sector visual y el enganche están hechos. En A
+> Programar (paso 1) aparece siempre la columna **🚧 Cuarentena**; un pedido con la marca sale de la lista
+> normal, no se tilda, y muestra badge + motivo. Funciones en `index.html`: `aprEnCuarentena`,
+> `aprCuarentenaMotivos/Etiqueta/Motivo`, `aprColCuarentena`; CSS `.apr-col-cuar` / `.apr-chip-cuar` /
+> `.apr-card-cuar`; test `tests/apr-cuarentena.cjs`. La marca se lee del pedido: `p.cuarentena` (bool) o
+> `p.cuarentena_motivos` (array: `deuda` · `suspendido` · `limite_credito`). Mientras ningún pedido la
+> traiga, el sector queda vacío.
+> **PENDIENTE (definir con el dueño antes del paso 2):** (a) **backend vs front** para la lógica de
+> calificación — por el protocolo del `CLAUDE.md` (regla de negocio → backend), debería resolverse en una
+> RPC/vista que marque cada pedido; (b) **de dónde salen los datos**: hoy **ninguna tabla de Gestión**
+> tiene deuda / estado de suspensión / límite de crédito — eso vive del lado **LK/ERP**, así que hay que
+> traerlo por FDW o un feed, igual que se hace con la PPP. Hasta cerrar eso, el sector es sólo el
+> contenedor. Registrada en `docs/IDEAS-USUARIO.md` y `agente_propuestas` (8877).
 >
 > Nota **v14.77–v14.78 (2026-09-10) — Pedidos Importación: cargar un pedido YA HECHO por fuera.**
 > Cuando el pedido al chino se emite en la plataforma del proveedor, Gestión no se enteraba y el

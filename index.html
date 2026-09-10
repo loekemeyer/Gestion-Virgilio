@@ -802,6 +802,16 @@ button {
 .apr-q{ width:100%; box-sizing:border-box; padding:7px 10px; border:1px solid #cbd5e1; border-radius:8px; font-size:13px; margin-bottom:8px; }
 .apr-scroll{ display:flex; flex-direction:column; gap:7px; }   /* v13.61: sin scroll interno (dueño: "no quiero barras de scroll en ninguna parte de la PPP") */
 .apr-vacio{ color:#94a3b8; font-size:13px; padding:14px 4px; text-align:center; }
+/* v14.81 — SUBMÓDULO CUARENTENA (idea usuario 8877): pedidos retenidos (deuda / suspendido /
+   supera límite de crédito). No se programan solos; van a este sector con badge. */
+.apr-col-cuar{ background:#fff7ed; border-color:#fed7aa; }
+.apr-col-cuar .apr-col-t{ color:#9a3412; }
+.apr-cuar-help{ font-weight:800; color:#c2410c; cursor:help; margin-left:5px; }
+.apr-col-cuar .apr-vacio{ color:#b45309; }
+.apr-col-cuar .apr-vacio b{ color:#9a3412; }
+.apr-chip-cuar{ background:#c2410c; color:#fff; font-weight:800; }
+.apr-card-cuar{ border-left-color:#c2410c; background:#fffbf5; cursor:default; }
+.apr-cuar-motivo{ font-size:12px; color:#9a3412; margin-top:5px; font-weight:600; line-height:1.4; }
 
 /* Tarjeta de PEDIDO (lo que se arrastra) */
 .apr-card{ background:#fff; border:1px solid #dbe3ec; border-left:4px solid #1e6bd6; border-radius:8px; padding:7px 9px; cursor:grab; }
@@ -7519,7 +7529,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v14.80";
+const APP_VERSION = "v14.81";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -35026,7 +35036,7 @@ function aprRender() {
   // existe mientras haya pedidos tildados. Al programar se vacía la selección, así que vuelve solo al paso 1.
   if (_apr.paso === 2 && !aprSelKeys().length) { _apr.paso = 1; _apr.diaSel = null; }
   if (_apr.paso === 2) h += '<div class="apr-wrap apr-2col">' + aprPaso2Html() + '</div>';
-  else h += '<div class="apr-wrap' + (conTandas ? '' : ' apr-2col') + '">' + aprColPedidos() + (conTandas ? aprColTandas() : '') + '</div>';
+  else h += '<div class="apr-wrap' + (conTandas ? '' : ' apr-2col') + '">' + aprColPedidos() + aprColCuarentena() + (conTandas ? aprColTandas() : '') + '</div>';
   h += aprFootHtml();
 
   // Cada acción re-dibuja las tres columnas. Sin esto, sacar un pedido de una
@@ -35067,7 +35077,9 @@ function aprPorQueHtml(lista) {
 }
 function aprColPedidos() {
   const q = _apr.q;
-  let lista = _apr.pedidos;
+  // v14.81: los pedidos en cuarentena (deuda / suspendido / supera crédito) salen de la lista
+  // normal y van a su propio sector (aprColCuarentena). No se pueden tildar ni programar.
+  let lista = (_apr.pedidos || []).filter(function (p) { return !aprEnCuarentena(p); });
   if (q) lista = lista.filter(function (p) {
     return (p.razon_social + " " + p.cod + " " + p.zona + " " + p.localidad + " " + p.order_id).toLowerCase().indexOf(q) >= 0;
   });
@@ -35129,6 +35141,67 @@ function aprColPedidos() {
       h += '</div>';
     }
     h += '</div>';
+  }
+  return h + '</div></div>';
+}
+
+/* ── SUBMÓDULO CUARENTENA (v14.81, idea usuario 8877) ─────────────────────────────────────────
+   MOTIVO: un pedido no debería salir a Programación si el cliente tiene DEUDA, está SUSPENDIDO
+   o el pedido SUPERA su límite de crédito. Antes esos pedidos entraban igual a "A Programar" y
+   los podía tomar el armado automático.
+   IDEA DE FUNCIONAMIENTO:
+     · El pedido en cuarentena lleva un BADGE (🚧) con el motivo.
+     · Sale de la lista "Pedidos a programar" y va a este sector aparte.
+     · NO se puede tildar ni programar (ni a mano ni por el automático): hay que liberarlo primero.
+   ESTADO (paso 1): sólo el sector visual + el enganche. La lógica de calificación
+   (deuda/suspendido/límite) y de dónde salen esos datos queda PENDIENTE de definir con el dueño
+   (backend vs front). Hasta que el pedido traiga la marca (p.cuarentena / p.cuarentena_motivos),
+   ningún pedido cae acá y el sector queda vacío. */
+function aprEnCuarentena(p) {
+  return !!(p && (p.cuarentena || p.cuarentena_motivo ||
+    (Array.isArray(p.cuarentena_motivos) && p.cuarentena_motivos.length)));
+}
+function aprCuarentenaMotivos(p) {
+  if (!p) return [];
+  if (Array.isArray(p.cuarentena_motivos)) return p.cuarentena_motivos;
+  if (p.cuarentena_motivo) return [p.cuarentena_motivo];
+  if (p.cuarentena) return ["cuarentena"];
+  return [];
+}
+function aprCuarentenaEtiqueta(p) {
+  const T = { deuda: "Deuda", suspendido: "Suspendido", limite_credito: "Excede crédito", cuarentena: "Retenido" };
+  const ms = aprCuarentenaMotivos(p);
+  return ms.length ? ms.map(function (m) { return T[m] || m; }).join(" · ") : "Retenido";
+}
+function aprCuarentenaMotivo(p) {
+  const T = { deuda: "El cliente tiene deuda.", suspendido: "El cliente está suspendido.", limite_credito: "El pedido supera el límite de crédito del cliente.", cuarentena: "Pedido retenido en cuarentena." };
+  const ms = aprCuarentenaMotivos(p);
+  return ms.length ? ms.map(function (m) { return T[m] || m; }).join(" ") : "Pedido retenido en cuarentena.";
+}
+function aprColCuarentena() {
+  const lista = (_apr.pedidos || []).filter(aprEnCuarentena);
+  let h = '<div class="apr-col apr-col-cuar">' +
+    '<div class="apr-col-t">🚧 Cuarentena <b>(' + lista.length + ')</b>' +
+      '<span class="apr-cuar-help" title="Pedidos de clientes con deuda, suspendidos o que superan su límite de crédito. No se programan (ni a mano ni por el automático): hay que liberarlos primero.">ⓘ</span>' +
+    '</div>';
+  if (!lista.length) {
+    h += '<div class="apr-vacio">Sin pedidos retenidos. Acá caen los de clientes con <b>deuda</b>, <b>suspendidos</b> o que <b>superan su límite de crédito</b>: no se programan solos.</div>';
+    return h + '</div>';
+  }
+  h += '<div class="apr-scroll">';
+  for (const p of lista) {
+    h += '<div class="apr-card apr-card-cuar" title="' + escapeHtml(aprCuarentenaMotivo(p)) + '">' +
+      '<div class="apr-card-h">' +
+        '<span class="apr-chip apr-chip-cuar">🚧 ' + escapeHtml(aprCuarentenaEtiqueta(p)) + '</span>' +
+        '<span class="apr-card-cli">' + escapeHtml(p.razon_social || p.cod || ("#" + p.order_id)) + '</span>' +
+      '</div>' +
+      '<div class="apr-card-d">' +
+        '<span class="apr-chip apr-chip-z">' + escapeHtml(p.zona || "sin zona") + '</span>' +
+        '<span class="apr-chip apr-chip-ped">' + escapeHtml(aprPedLabel(p)) + '</span>' +
+        '<span class="apr-chip apr-chip-m3">' + aprNum(p.m3) + ' m³</span>' +
+      '</div>' +
+      '<div class="apr-cuar-motivo">' + escapeHtml(aprCuarentenaMotivo(p)) + '</div>' +
+    '</div>';
   }
   return h + '</div></div>';
 }
