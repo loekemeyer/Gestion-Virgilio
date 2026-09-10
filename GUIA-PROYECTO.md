@@ -12,7 +12,20 @@
 > única**; no se replica. Ante la duda entre parche rápido y fix de raíz → **fix
 > de raíz**.
 >
-> Última actualización: 2026-09-10 (jueves) · Versión app al documentar: **v14.69**
+> Última actualización: 2026-09-10 (jueves) · Versión app al documentar: **v14.78**
+>
+> Nota **v14.77–v14.78 (2026-09-10) — Pedidos Importación: cargar un pedido YA HECHO por fuera.**
+> Cuando el pedido al chino se emite en la plataforma del proveedor, Gestión no se enteraba y el
+> motor lo volvía a pedir. El botón **➕ Cargar pedido ya hecho** (módulo 📦 Pedidos Importación)
+> abre **un solo pop-up**: **proveedor** + **fecha estimada de entrega**, y los renglones de dos
+> maneras — **(1)** eligiendo de la lista de artículos de ese proveedor (con filtro) y tipeando las
+> unidades, o **(2)** escribiendo/pegando `código unidades`, una línea por artículo. En las dos, las
+> unidades se reconvierten **en vivo** a **cajas** (`uni_x_caja`, la inner) y a **master cajas**
+> (`uni_master` de `Importados_Volumen`); el ⚠ avisa cuando no entra justo en la caja. Al guardar,
+> las unidades se **suman** a `Importados.pedido_curso` (RPC `importados_set_curso`, que es
+> absoluto → se manda `curso actual + lo cargado`) y la fecha va a `Importados.reingreso_est` (la
+> lee el portal LK). La v14.77 hacía lo mismo con `prompt()` encadenados, de a un artículo; la
+> v14.78 lo reemplazó por el pop-up. Smoke: `tests/pedimp-hecho.cjs`.
 >
 > Nota **v14.67–v14.69 (2026-09-10) — Cervantes: se termina la copia, `Gestion-Virgilio` pasa a ser
 > el repo fuente.** La app de Cervantes vivía en dos lados: el repo `Registro-Produccion-2.0` y la
