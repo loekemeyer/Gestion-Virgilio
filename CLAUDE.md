@@ -355,11 +355,13 @@ borró). Layout:
 - ⚠ **`/cervantes/` es una copia**: si Cervantes cambia en `Registro-Produccion-2.0`,
   hay que **re-traer** los archivos (`app.js`, `index.html`, `manifest.json`,
   `styles.css`, `sw.js`) y volver a poner el botón "Cambiar planta". Último sync desde
-  commit `c429f2f` (2026-09-10, app v1.8.63). Ajustes propios de la copia que NO se
-  revierten al re-sincronizar: (a) el bloque **GATE DE SESIÓN** en el `<head>` de
-  `cervantes/index.html` (login global en la raíz; Cervantes no tiene login propio),
-  (b) el botón **← Cambiar planta** arriba del `<h1>` de legajo, (c) los `?v=` y el
-  badge alineados a `LOCAL_VERSION` de `app.js`.
+  commit `68eec03` (2026-09-10, app v1.9.0). **Hoy la copia difiere del fuente en UNA
+  sola línea**: el botón **← Cambiar planta** arriba del `<h1>` de legajo en
+  `cervantes/index.html`. Todo lo demás se copia tal cual (`diff` contra el repo fuente
+  tiene que dar sólo esa línea). El **gate de sesión** ya vive upstream y se adapta
+  solo: bajo `/cervantes/` sin sesión vuelve a `../` (login global), suelto cae a la
+  pantalla de legajo. Los `?v=` y el badge van alineados a `LOCAL_VERSION` de `app.js`
+  y a `CACHE_VERSION` de `sw.js` — si se desalinean, el celular queda con el JS viejo.
 
 ## Panel Web LK bajo `/admin/`
 
