@@ -7598,7 +7598,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v14.90";
+const APP_VERSION = "v14.91";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -35316,7 +35316,7 @@ function aprColCuarentena() {
       aprCuarBadgesHtml(p) +
       '<div class="cuar-acciones">' +
         cuarWppContactoBtn(p) +
-        '<button class="cuar-wpp cuar-wpp-cob" onclick="cuarWppCobranzas(\'' + (p.empresa || "lk") + '\',\'' + escapeHtml(String(p.order_id)) + '\')" title="Escribir a cobranzas por WhatsApp (+54 9 11 6557-4113) para que chequee este pedido">💬 A cobranzas</button>' +
+        '<button class="cuar-wpp cuar-wpp-cob" onclick="cuarWppCobranzas(\'' + (p.empresa || "lk") + '\',\'' + escapeHtml(String(p.order_id)) + '\')" title="Escribir a Vivi (cobranzas) por WhatsApp (+54 9 11 6557-4113) para que chequee este pedido">💬 A cobranzas (Vivi)</button>' +
         '<button class="cuar-enviar" onclick="cuarLiberar(\'' + (p.empresa || "lk") + '\',\'' + escapeHtml(String(p.order_id)) + '\')">➡ Enviar a Pedidos a programar</button>' +
       '</div>' +
     '</div>';
