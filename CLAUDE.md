@@ -382,6 +382,24 @@ borró). Layout:
   Si se desalinean, el celular se queda con el JS viejo cacheado — pasó, y por eso los
   operarios corrieron 5 versiones atrás sin que nadie lo notara.
 
+### Admin de Cervantes (Gestión Productiva 2.0) — botón, no copia
+
+- El **admin de Cervantes** es **otro repo**: `Gestion-Productiva-2.0` (GP2). Acá no se
+  copia nada: el panel supervisor tiene el botón **🏭 Admin Cervantes (GP2)**
+  (`openAdminCervantes`, v14.72) que resuelve `../Gestion-Productiva-2.0/GP2_MODULOS.html`
+  relativo a la página (para no clavar el host) y lo abre en **pestaña nueva** — es otra
+  app, con su navegación, y el supervisor no tiene que perder Gestión.
+- **No hace falta puente de sesión** (a diferencia de `/admin/` de LK, que necesita
+  `lk_bridge_vjwt` porque es OTRO proyecto Supabase): GP2 usa el **mismo proyecto**
+  `hrxfctzncixxqmpfhskv` y el **mismo origin**, con el `storageKey` default, así que la
+  sesión de Google del supervisor ya se ve del otro lado y el login de GP2 entra solo
+  (`getSession()` → `procesarSesion` → whitelist `GP2.get_role_for_email`).
+- ⚠ **Hoy el login de GP2 está APAGADO**: `GP2_AUTH_ON = false` en su `auth-guard.js`
+  (lo apagó el usuario el 2026-08-29: *"la página ya está privada y va a costar que
+  accedan, por ahora prefiero que esté suelto"*). O sea que ese botón hoy entra **sin
+  pedir nada**. Para volver a prenderlo hay que tocar el OTRO repo: `true` ahí y bumpear
+  el `?v=` de `auth-guard.js` en sus HTML.
+
 ## Panel Web LK bajo `/admin/`
 
 Desde v9.11 el repo hospeda una **copia del panel admin de PaginaLK** bajo

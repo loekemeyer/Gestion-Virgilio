@@ -4545,6 +4545,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
       <button class="sup-action-btn" onclick="openPlataPerdida()"><span class="sup-ico">💸</span><span>Plata perdida de facturar</span></button>
       <button class="sup-action-btn" onclick="openDatosProducto()" style="position:relative;"><span class="sup-ico">🚦</span><span>Completar datos producto</span><span id="dpBadge" class="dp-badge" style="display:none;"></span></button>
       <button class="sup-action-btn" onclick="openConfiguracion()"><span class="sup-ico">⚙️</span><span>Configuración</span></button>
+      <button class="sup-action-btn" onclick="openAdminCervantes()"><span class="sup-ico">🏭</span><span>Admin Cervantes (GP2)</span></button>
       <button class="sup-action-btn" onclick="openOperarioView()"><span class="sup-ico">👁️</span><span>Ver módulo operarios</span></button>
     </div>
     <style id="ssgSwCss">
@@ -7469,7 +7470,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v14.71";
+const APP_VERSION = "v14.72";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -26235,6 +26236,24 @@ async function openPanelWebLK() {
     if (tok) sessionStorage.setItem("lk_bridge_vjwt", tok);
   } catch (_e) {}
   location.href = "admin/admin.html";
+}
+
+/* ===== Admin de CERVANTES (Gestión Productiva 2.0) — v14.72 =====
+   Vive en OTRO repo (`Gestion-Productiva-2.0`), no acá, así que es un link, no
+   una copia. Se resuelve relativo a esta página (en Pages queda
+   `…/Gestion-Productiva-2.0/GP2_MODULOS.html`) para no clavar el host.
+   No hace falta puente de sesión: es el MISMO origin y el MISMO proyecto
+   Supabase con el storageKey default, así que la sesión de Google del
+   supervisor ya se ve del otro lado y su login entra solo (`getSession()` →
+   `procesarSesion`) — cuando ese login esté prendido, hoy está en
+   `GP2_AUTH_ON = false`. Abre en PESTAÑA NUEVA: es otra app, con su propia
+   navegación y sin botón de volver; el supervisor no tiene que perder Gestión. */
+function openAdminCervantes() {
+  if (!requireSupervisor()) return;
+  var url;
+  try { url = new URL("../Gestion-Productiva-2.0/GP2_MODULOS.html", window.location.href).href; }
+  catch (_e) { url = "../Gestion-Productiva-2.0/GP2_MODULOS.html"; }
+  window.open(url, "_blank", "noopener");
 }
 
 /* ===== Editor de Planimetría — escribe DIRECTO a Supabase (tabla "Planimetria").
