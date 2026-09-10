@@ -11,6 +11,22 @@ código, comentarios ni mensajes de commit).
 
 ---
 
+## ⚠ REGLA: borrar un pedido = borrarlo de TODOS lados (todos los repos/proyectos)
+
+Cuando el usuario pida **borrar un pedido**, borrarlo de **todos los lugares donde ese pedido
+interviene**, no de uno solo. Un pedido web vive en varios proyectos a la vez:
+
+1. **Página de la empresa** (su propio proyecto Supabase): `orders` + `order_items`
+   — LK = `kwkclwhmoygunqmlegrg` (repo `pagina-LK-copia`); Chef = `nkhzocgdpwtgrmwleihr` (repo `paginach`).
+2. **Gestión Virgilio** (`hrxfctzncixxqmpfhskv`): la NP y la programación. Buscar el `order_id`
+   (filtrando `empresa` = `lk`/`chef`) en `PPP_Web_NP`, `PPP_Web_Programacion`, `PPP_Web_Base`,
+   `PPP_Web_Tanda_Items`. Si ya está en tanda/picking, avisarlo antes de borrar.
+
+**Backup antes de cada borrado** (protocolo de Supabase). Borrar hijos antes que padres
+(`order_items` antes de `orders`). Al terminar, reportar en qué lugares apareció y de cuáles se borró.
+
+---
+
 App web (PWA, sin framework) para registrar producción de depósito (picking,
 armado, carga de camión, recepción). La usan operarios desde el celular y
 supervisores desde un monitor. Se sirve por GitHub Pages desde `main`.
