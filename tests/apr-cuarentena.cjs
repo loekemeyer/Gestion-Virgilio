@@ -19,6 +19,7 @@ const { chromium } = require("/opt/node22/lib/node_modules/playwright");
     document.getElementById("pppOverlay").classList.add("show");
 
     // (1) sin pedidos en cuarentena: el sector existe igual, vacío
+    _apr.cuarResumen = [];  // evita el fetch de resumen; muestra "sin cargar"
     _apr.pedidos = [mk({ order_id: 100 }), mk({ order_id: 101, razon_social: "Cliente Dos" })];
     aprRender(); await new Promise((res) => setTimeout(res, 200));
     let html = document.getElementById("pppPreview").innerHTML;
@@ -26,6 +27,30 @@ const { chromium } = require("/opt/node22/lib/node_modules/playwright");
     out.vacioCuenta = /🚧 Cuarentena <b>\(0\)<\/b>/.test(html);
     out.listaNormal2 = /📋 Pedidos a programar <b>\(2\)<\/b>/.test(html);
     out.textoVacio = /Sin pedidos retenidos/.test(html);
+    // los 4 botones de importación, con las etiquetas pedidas
+    out.btnBusqLk = /Importar Búsqueda CL LK/.test(html);
+    out.btnBusqCh = /Importar Búsqueda CL CH/.test(html);
+    out.btnDeudaLk = /Importar Deuda LK/.test(html);
+    out.btnDeudaCh = /Importar Deuda CH/.test(html);
+    out.cuatroBotones = (html.match(/cuar-btn/g) || []).length === 4;
+    out.statSinCargar = (html.match(/sin cargar/g) || []).length === 4;
+
+    // resumen cargado → stat con conteos
+    _apr.cuarResumen = [{ empresa: "lk", tipo: "busqueda", filas: 764, con_cuit: 700, suspendidos: 12, con_deuda: 0, con_limite: 700, lote: "L1", cargado_por: "sup@x", cargado_at: "2026-09-10T12:00:00" }];
+    aprRender(); await new Promise((res) => setTimeout(res, 50));
+    html = document.getElementById("pppPreview").innerHTML;
+    out.statConteo = /764 cli · 700 c\/límite · 12 susp/.test(html);
+
+    // parser: auto-map + números AR + suspendido
+    out.pMap = cuarAutoMap(["Codigo", "CUIT", "Razon Social", "Limite Credito", "Estado"], "busqueda");
+    out.pMapDeuda = cuarAutoMap(["Cod", "Cuit", "Nombre", "Saldo"], "deuda");
+    out.pNum1 = cuarParseNum("1.234.567,89");
+    out.pNum2 = cuarParseNum("$ 50000");
+    out.pNum3 = cuarParseNum("");
+    out.pSuspSi = cuarParseSusp("SUSPENDIDO");
+    out.pSuspNo = cuarParseSusp("Activo");
+    out.pSuspSN = cuarParseSusp("S");
+    out.pSuspVacio = cuarParseSusp("");
 
     // (2) un pedido marcado por deuda + supera crédito: sale de la lista y cae en cuarentena
     _apr.pedidos = [
@@ -60,6 +85,20 @@ const { chromium } = require("/opt/node22/lib/node_modules/playwright");
   chk(r.motivo, "el retenido muestra el texto del motivo");
   chk(r.deudorCliente, "el cliente deudor se ve en el sector");
   chk(r.soloUnCheckbox, "el retenido NO es tildable (solo el normal tiene checkbox)");
+  // botones de importación
+  chk(r.btnBusqLk && r.btnBusqCh && r.btnDeudaLk && r.btnDeudaCh, "los 4 botones con sus etiquetas exactas");
+  chk(r.cuatroBotones, "exactamente 4 botones cuar-btn");
+  chk(r.statSinCargar, "cada botón dice 'sin cargar' cuando no hay resumen");
+  chk(r.statConteo, "con resumen: '764 cli · 700 c/límite · 12 susp'");
+  // parser
+  chk(r.pMap.cod === 0 && r.pMap.cuit === 1 && r.pMap.razon_social === 2 && r.pMap.limite_credito === 3 && r.pMap.suspendido === 4, "auto-map búsqueda (cod/cuit/razón/límite/estado)");
+  chk(r.pMapDeuda.cod === 0 && r.pMapDeuda.cuit === 1 && r.pMapDeuda.deuda === 3, "auto-map deuda (cod/cuit/saldo)");
+  chk(r.pNum1 === 1234567.89, "número AR 1.234.567,89 → 1234567.89 (dio " + r.pNum1 + ")");
+  chk(r.pNum2 === 50000, "número '$ 50000' → 50000");
+  chk(r.pNum3 === null, "vacío → null");
+  chk(r.pSuspSi === true && r.pSuspSN === true, "SUSPENDIDO / S → true");
+  chk(r.pSuspNo === false, "Activo → false");
+  chk(r.pSuspVacio === null, "estado vacío → null");
   chk(errs.length === 0, "sin errores de página" + (errs.length ? " (" + errs.join(" | ") + ")" : ""));
 
   await b.close();

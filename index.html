@@ -812,6 +812,36 @@ button {
 .apr-chip-cuar{ background:#c2410c; color:#fff; font-weight:800; }
 .apr-card-cuar{ border-left-color:#c2410c; background:#fffbf5; cursor:default; }
 .apr-cuar-motivo{ font-size:12px; color:#9a3412; margin-top:5px; font-weight:600; line-height:1.4; }
+/* v14.82 — 4 botones de importación de reportes en el sector Cuarentena */
+.cuar-tools{ display:grid; grid-template-columns:1fr 1fr; gap:6px; margin-bottom:9px; }
+.cuar-tool{ display:flex; flex-direction:column; gap:3px; min-width:0; }
+.cuar-tool .cuar-btn{ width:100%; background:#9a3412; color:#fff; border:none; border-radius:8px; padding:7px 8px; font-size:12px; font-weight:700; cursor:pointer; margin-top:0; line-height:1.25; }
+.cuar-tool .cuar-btn:hover{ background:#7c2d12; }
+.cuar-stat{ font-size:10.5px; color:#9a3412; text-align:center; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.cuar-stat-vacio{ color:#c2a08c; font-style:italic; }
+/* pop-up de importación (colgado de <body>, fuera del zoom de la PPP) */
+.cuar-modal{ position:fixed; inset:0; z-index:100000; }
+.cuar-m-back{ position:absolute; inset:0; background:rgba(15,23,42,.55); }
+.cuar-m-card{ position:absolute; left:50%; top:50%; transform:translate(-50%,-50%); width:min(560px,94vw); max-height:90vh; overflow:auto; background:#fff; border-radius:14px; box-shadow:0 20px 50px rgba(0,0,0,.3); display:flex; flex-direction:column; }
+.cuar-m-head{ display:flex; align-items:center; justify-content:space-between; padding:12px 16px; border-bottom:1px solid #e2e8f0; font-size:15px; color:#0f172a; }
+.cuar-m-x{ border:0; background:transparent; font-size:18px; cursor:pointer; color:#64748b; width:auto; padding:0 4px; }
+.cuar-m-body{ padding:14px 16px; }
+.cuar-m-sub{ font-size:13px; color:#475569; margin:0 0 10px; line-height:1.45; }
+.cuar-file{ font-size:13px; }
+.cuar-file-ok{ font-size:13px; font-weight:700; color:#166534; margin-bottom:10px; }
+.cuar-map{ display:grid; gap:7px; margin-bottom:10px; }
+.cuar-map-row{ display:grid; grid-template-columns:150px 1fr; align-items:center; gap:8px; font-size:12.5px; color:#334155; }
+.cuar-map-row select{ padding:5px 7px; border:1px solid #cbd5e1; border-radius:7px; font-size:12.5px; width:100%; }
+.cuar-prev{ overflow-x:auto; border:1px solid #e2e8f0; border-radius:8px; margin-bottom:8px; }
+.cuar-prev table{ border-collapse:collapse; width:100%; font-size:11.5px; }
+.cuar-prev th, .cuar-prev td{ border:1px solid #eef2f7; padding:4px 6px; text-align:left; white-space:nowrap; }
+.cuar-prev th{ background:#f8fafc; color:#475569; }
+.cuar-file-again{ margin-top:2px; background:#f1f5f9; border:1px solid #cbd5e1; border-radius:7px; padding:5px 10px; cursor:pointer; width:auto; color:#334155; font-size:12px; }
+.cuar-m-foot{ padding:12px 16px; border-top:1px solid #e2e8f0; text-align:right; }
+.cuar-save{ background:#166534; color:#fff; border:none; border-radius:8px; padding:8px 16px; font-weight:800; cursor:pointer; width:auto; }
+.cuar-save[disabled]{ opacity:.6; cursor:default; }
+.cuar-m-err{ color:#b42318; font-size:12.5px; margin-top:8px; }
+.cuar-m-load{ color:#475569; font-size:12.5px; margin-top:8px; }
 
 /* Tarjeta de PEDIDO (lo que se arrastra) */
 .apr-card{ background:#fff; border:1px solid #dbe3ec; border-left:4px solid #1e6bd6; border-radius:8px; padding:7px 9px; cursor:grab; }
@@ -7529,7 +7559,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v14.81";
+const APP_VERSION = "v14.82";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -34206,8 +34236,12 @@ let _apr = {
   sel: {},          // clave empresa:order_id → true (los pedidos tildados para la tanda)
   diaSel: null,     // día elegido en el paso 2
   cargandoChef: false,
-  m3Min: 0.6        // v13.84: PPP_Web_Config.tanda_m3_min (se relee en cada carga)
+  m3Min: 0.6,       // v13.84: PPP_Web_Config.tanda_m3_min (se relee en cada carga)
+  // v14.82 — CUARENTENA: resumen de lo cargado por los 4 botones de importación
+  cuarResumen: null, cuarResumenLoading: false
 };
+// v14.82 — estado del pop-up de importación de reportes de cuarentena
+let _cuarImp = { open: false };
 
 /* v13.81 — DOS PASOS. Paso 1: tildar los pedidos que van juntos (misma empresa). Paso 2: tocar el
    día. Recién ahí se arma la tanda (código automático) y se programa, en una sola operación
@@ -34988,6 +35022,8 @@ function aprRender() {
   // v14.29: la barra de solapas se pinta aparte (misma barra que Programación, fuera del zoom,
   // con los números reales de todas las solapas — antes acá iban "…").
   pppPaintTabs();
+  // v14.82: resumen de los reportes de cuarentena (una sola vez; se refresca al importar)
+  if (_apr.cuarResumen === null && !_apr.cuarResumenLoading) cuarResumenCargar();
   let h = "";
 
   // v13.58: sin selector Loekemeyer/Chef — se ven las dos empresas juntas.
@@ -35183,7 +35219,8 @@ function aprColCuarentena() {
   let h = '<div class="apr-col apr-col-cuar">' +
     '<div class="apr-col-t">🚧 Cuarentena <b>(' + lista.length + ')</b>' +
       '<span class="apr-cuar-help" title="Pedidos de clientes con deuda, suspendidos o que superan su límite de crédito. No se programan (ni a mano ni por el automático): hay que liberarlos primero.">ⓘ</span>' +
-    '</div>';
+    '</div>' +
+    aprCuarToolsHtml();   // v14.82: 4 botones de importación de reportes (.xls)
   if (!lista.length) {
     h += '<div class="apr-vacio">Sin pedidos retenidos. Acá caen los de clientes con <b>deuda</b>, <b>suspendidos</b> o que <b>superan su límite de crédito</b>: no se programan solos.</div>';
     return h + '</div>';
@@ -35204,6 +35241,199 @@ function aprColCuarentena() {
     '</div>';
   }
   return h + '</div></div>';
+}
+
+/* ── CUARENTENA · importación de reportes (.xls) ─────────────────────────────
+   v14.82 (idea usuario 8877). Cuatro botones en el sector Cuarentena suben una
+   planilla del ERP y llenan la tabla GV_Cuarentena_Fuente (backend, reemplazo
+   total por empresa+tipo). De ahí saldrá la marca de qué pedido va a cuarentena.
+     · Búsqueda CL LK/CH → tipo 'busqueda' (límite de crédito + suspendido)
+     · Deuda LK/CH       → tipo 'deuda'    (saldo adeudado)
+   El parseo (SheetJS vendorizado) es sólo lectura en el navegador; la fuente de
+   verdad es el backend. Auto-detecta columnas por encabezado y deja MAPEARLAS a
+   mano (no asume el layout del archivo). */
+function cuarFuenteLabel(empresa, tipo) {
+  return (tipo === "deuda" ? "Deuda " : "Búsqueda CL ") + (empresa === "chef" ? "CH" : "LK");
+}
+function cuarResumenDe(empresa, tipo) {
+  return (_apr.cuarResumen || []).find(function (x) { return x.empresa === empresa && x.tipo === tipo; }) || null;
+}
+function cuarStatHtml(empresa, tipo) {
+  const r = cuarResumenDe(empresa, tipo);
+  if (!r) return '<span class="cuar-stat cuar-stat-vacio">sin cargar</span>';
+  const partes = [r.filas + " cli"];
+  if (tipo === "busqueda") { if (r.con_limite) partes.push(r.con_limite + " c/límite"); if (r.suspendidos) partes.push(r.suspendidos + " susp"); }
+  else { if (r.con_deuda) partes.push(r.con_deuda + " c/deuda"); }
+  const tit = "lote " + (r.lote || "—") + (r.cargado_por ? " · " + r.cargado_por : "") + (r.cargado_at ? " · " + String(r.cargado_at).slice(0, 16).replace("T", " ") : "");
+  return '<span class="cuar-stat" title="' + escapeHtml(tit) + '">' + escapeHtml(partes.join(" · ")) + '</span>';
+}
+function aprCuarToolsHtml() {
+  const b = function (empresa, tipo) {
+    return '<div class="cuar-tool">' +
+      '<button class="cuar-btn" onclick="cuarImportAbrir(\'' + empresa + '\',\'' + tipo + '\')">📥 Importar ' + cuarFuenteLabel(empresa, tipo) + '</button>' +
+      cuarStatHtml(empresa, tipo) + '</div>';
+  };
+  return '<div class="cuar-tools">' + b("lk", "busqueda") + b("chef", "busqueda") + b("lk", "deuda") + b("chef", "deuda") + '</div>';
+}
+async function cuarResumenCargar() {
+  if (_apr.cuarResumenLoading) return;
+  _apr.cuarResumenLoading = true;
+  try { _apr.cuarResumen = (await aprRpc("gv_cuarentena_fuente_resumen")) || []; }
+  catch (_e) { _apr.cuarResumen = _apr.cuarResumen || []; }
+  _apr.cuarResumenLoading = false;
+  if (_pppTab === "prog") aprRender();
+}
+
+/* helpers de parseo */
+function cuarNorm(s) { return String(s == null ? "" : s).toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[^a-z0-9]/g, ""); }
+function cuarCell(row, idx) { return (idx === "" || idx == null) ? "" : String(row[idx] == null ? "" : row[idx]).trim(); }
+function cuarParseNum(v) {
+  if (v == null) return null;
+  let s = String(v).replace(/[^\d,.\-]/g, "");
+  if (s === "" || s === "-") return null;
+  if (s.indexOf(",") >= 0 && s.indexOf(".") >= 0) s = s.replace(/\./g, "").replace(",", ".");
+  else if (s.indexOf(",") >= 0) s = s.replace(",", ".");
+  const n = parseFloat(s); return isNaN(n) ? null : n;
+}
+function cuarParseSusp(v) {
+  const t = cuarNorm(v);
+  if (t === "") return null;
+  if (/^(si|s|x|1|true|suspend|inactiv|baja|bloq|deshab|nohab)/.test(t)) return true;
+  if (/^(no|n|0|false|activ|habil|vigente|ok|aldia)/.test(t)) return false;
+  return null;
+}
+function cuarFind(headers, res) {
+  for (const rx of res) for (let i = 0; i < headers.length; i++) if (rx.test(cuarNorm(headers[i]))) return i;
+  return "";
+}
+function cuarAutoMap(headers, tipo) {
+  const m = {};
+  m.cod = cuarFind(headers, [/^cod(igo)?(cliente|cli)?$/, /codcliente/, /^cliente$/, /^cod/, /codigo/]);
+  m.cuit = cuarFind(headers, [/^cuit$/, /cuit/, /cuil/, /docid/, /^dni$/]);
+  m.razon_social = cuarFind(headers, [/razon(social)?/, /razonsoc/, /nombre/, /denomin/, /fantasia/]);
+  if (tipo === "busqueda") {
+    m.limite_credito = cuarFind(headers, [/limitecred/, /credito/, /limcred/, /tope/, /limite/]);
+    m.suspendido = cuarFind(headers, [/suspend/, /^estado$/, /estadocli/, /bloque/, /activo/, /habilit/, /baja/]);
+  } else {
+    m.deuda = cuarFind(headers, [/deuda/, /saldo/, /adeud/, /^importe$/, /^total$/, /debe/, /^pendiente$/]);
+  }
+  return m;
+}
+
+/* modal */
+function cuarModalEl() {
+  let el = document.getElementById("cuarModal");
+  if (!el) { el = document.createElement("div"); el.id = "cuarModal"; el.className = "cuar-modal"; el.hidden = true; document.body.appendChild(el); }
+  return el;
+}
+function cuarImportAbrir(empresa, tipo) {
+  _cuarImp = { open: true, empresa: empresa, tipo: tipo, fname: "", headers: [], dataRows: [], map: {}, err: "", saving: false, loading: false };
+  cuarModalEl().hidden = false; cuarImportRender();
+}
+function cuarImportCerrar() { const el = document.getElementById("cuarModal"); if (el) el.hidden = true; _cuarImp.open = false; }
+function cuarImportOtro() { _cuarImp.headers = []; _cuarImp.dataRows = []; _cuarImp.map = {}; _cuarImp.fname = ""; _cuarImp.err = ""; cuarImportRender(); }
+function cuarImportSetMap(key, val) { _cuarImp.map[key] = (val === "") ? "" : parseInt(val, 10); cuarImportRender(); }
+async function cuarImportFile(input) {
+  const f = input && input.files && input.files[0]; if (!f) return;
+  _cuarImp.err = ""; _cuarImp.fname = f.name; _cuarImp.loading = true; cuarImportRender();
+  try {
+    const XLSX = await pppLoadXlsx();
+    const buf = await f.arrayBuffer();
+    const wb = XLSX.read(buf, { type: "array" });
+    const ws = wb.Sheets[wb.SheetNames[0]];
+    const aoa = XLSX.utils.sheet_to_json(ws, { header: 1, raw: false, defval: "" });
+    let hr = 0;
+    for (let i = 0; i < Math.min(aoa.length, 30); i++) {
+      const ne = (aoa[i] || []).filter(function (c) { return String(c).trim() !== ""; }).length;
+      const tx = (aoa[i] || []).some(function (c) { return /[a-zA-Z]/.test(String(c)); });
+      if (ne >= 2 && tx) { hr = i; break; }
+    }
+    _cuarImp.headers = (aoa[hr] || []).map(function (c) { return String(c == null ? "" : c).trim(); });
+    _cuarImp.dataRows = aoa.slice(hr + 1).filter(function (r) { return (r || []).some(function (c) { return String(c).trim() !== ""; }); });
+    _cuarImp.map = cuarAutoMap(_cuarImp.headers, _cuarImp.tipo);
+    _cuarImp.loading = false;
+    if (!_cuarImp.headers.length) _cuarImp.err = "No encontré encabezados en el archivo.";
+  } catch (e) { _cuarImp.err = String((e && e.message) || e); _cuarImp.loading = false; }
+  try { input.value = ""; } catch (_e) {}
+  cuarImportRender();
+}
+function cuarPreviewHtml() {
+  const s = _cuarImp, rows = s.dataRows.slice(0, 6);
+  const cols = s.tipo === "busqueda"
+    ? [["Código", "cod"], ["CUIT", "cuit"], ["Razón social", "razon_social"], ["Límite", "limite_credito"], ["Susp.", "suspendido"]]
+    : [["Código", "cod"], ["CUIT", "cuit"], ["Razón social", "razon_social"], ["Deuda", "deuda"]];
+  let h = '<div class="cuar-prev"><table><thead><tr>';
+  for (const c of cols) h += '<th>' + c[0] + '</th>';
+  h += '</tr></thead><tbody>';
+  for (const r of rows) {
+    h += '<tr>';
+    for (const c of cols) {
+      let v = cuarCell(r, s.map[c[1]]);
+      if (c[1] === "suspendido") { const b = cuarParseSusp(v); v = b === true ? "Sí" : (b === false ? "No" : (v || "—")); }
+      else if (c[1] === "limite_credito" || c[1] === "deuda") { const n = cuarParseNum(v); v = n == null ? "—" : aprNum(n, 2); }
+      h += '<td>' + escapeHtml(v || "—") + '</td>';
+    }
+    h += '</tr>';
+  }
+  return h + '</tbody></table></div>';
+}
+function cuarImportRender() {
+  const el = cuarModalEl(); if (el.hidden) return;
+  const s = _cuarImp;
+  const opt = function (sel) {
+    let o = '<option value="">— (ninguna)</option>';
+    for (let i = 0; i < s.headers.length; i++) o += '<option value="' + i + '"' + (String(sel) === String(i) ? " selected" : "") + '>' + escapeHtml(s.headers[i] || ("col " + (i + 1))) + '</option>';
+    return o;
+  };
+  const fld = function (label, key) { return '<label class="cuar-map-row"><span>' + label + '</span><select onchange="cuarImportSetMap(\'' + key + '\',this.value)">' + opt(s.map[key]) + '</select></label>'; };
+  let body;
+  if (!s.headers.length) {
+    body = '<p class="cuar-m-sub">Subí el <b>.xls</b> exportado del ERP. Saco los clientes y ' +
+      (s.tipo === "deuda" ? 'su <b>deuda</b>' : 'su <b>límite de crédito</b> y si están <b>suspendidos</b>') + '.</p>' +
+      '<input class="cuar-file" type="file" accept=".xls,.xlsx,.csv" onchange="cuarImportFile(this)">' +
+      (s.loading ? '<div class="cuar-m-load">Leyendo el archivo…</div>' : "");
+  } else {
+    body = '<div class="cuar-file-ok">📄 ' + escapeHtml(s.fname) + ' · ' + s.dataRows.length + ' filas</div>' +
+      '<div class="cuar-map">' +
+        fld("Código de cliente", "cod") + fld("CUIT", "cuit") + fld("Razón social", "razon_social") +
+        (s.tipo === "busqueda" ? fld("Límite de crédito", "limite_credito") + fld("Suspendido / Estado", "suspendido")
+                               : fld("Deuda / Saldo", "deuda")) +
+      '</div>' + cuarPreviewHtml() +
+      '<button class="cuar-file-again" onclick="cuarImportOtro()">Elegir otro archivo</button>';
+  }
+  el.innerHTML =
+    '<div class="cuar-m-back" onclick="cuarImportCerrar()"></div>' +
+    '<div class="cuar-m-card">' +
+      '<div class="cuar-m-head"><b>📥 Importar ' + escapeHtml(cuarFuenteLabel(s.empresa, s.tipo)) + '</b>' +
+        '<button class="cuar-m-x" onclick="cuarImportCerrar()">✕</button></div>' +
+      '<div class="cuar-m-body">' + body + (s.err ? '<div class="cuar-m-err">⚠ ' + escapeHtml(s.err) + '</div>' : "") + '</div>' +
+      (s.headers.length ? '<div class="cuar-m-foot"><button class="cuar-save" ' + (s.saving ? "disabled" : "") + ' onclick="cuarImportGuardar()">' + (s.saving ? "Guardando…" : "Guardar " + s.dataRows.length + " filas") + '</button></div>' : "") +
+    '</div>';
+}
+async function cuarImportGuardar() {
+  const s = _cuarImp;
+  if (s.map.cod === "" && s.map.cuit === "") { s.err = "Mapeá al menos Código o CUIT."; cuarImportRender(); return; }
+  const rows = [];
+  for (const r of s.dataRows) {
+    const cod = cuarCell(r, s.map.cod), cuit = cuarCell(r, s.map.cuit);
+    if (!cod && !cuit) continue;
+    const o = { cod: cod || null, cuit: cuit || null, razon_social: cuarCell(r, s.map.razon_social) || null };
+    if (s.tipo === "busqueda") {
+      const lc = cuarParseNum(cuarCell(r, s.map.limite_credito)); if (lc != null) o.limite_credito = lc;
+      const sp = cuarParseSusp(cuarCell(r, s.map.suspendido)); if (sp != null) o.suspendido = sp;
+    } else {
+      const d = cuarParseNum(cuarCell(r, s.map.deuda)); if (d != null) o.deuda = d;
+    }
+    rows.push(o);
+  }
+  if (!rows.length) { s.err = "No saqué ninguna fila con cliente (revisá el mapeo)."; cuarImportRender(); return; }
+  s.saving = true; s.err = ""; cuarImportRender();
+  try {
+    const n = await aprRpc("gv_cuarentena_cargar", { p_empresa: s.empresa, p_tipo: s.tipo, p_rows: rows });
+    s.saving = false; cuarImportCerrar();
+    _apr.msg = "Cuarentena: cargué " + n + " filas de " + cuarFuenteLabel(s.empresa, s.tipo) + "."; _apr.msgErr = false;
+    cuarResumenCargar(); aprRender();
+  } catch (e) { s.saving = false; s.err = String((e && e.message) || e); cuarImportRender(); }
 }
 
 function aprColTandas() {

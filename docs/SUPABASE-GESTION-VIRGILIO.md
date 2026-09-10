@@ -4546,3 +4546,59 @@ la vieja de 234 ya NO reaparece. Recibiendo 100 → queda ped=580, rec=100, pend
 excluía 'recibida'). Hoy hay 1 'cerrada'.
 
 **Rollback:** `docs/ROLLBACK-PRODUCCION.md` §1 (v14.60). SQL vigente: `sql/oc_nueva_pisa_vieja_v1460.sql`.
+
+## §3.bs — v14.82 (2026-09-10): CUARENTENA — fuente de datos por .xls (idea usuario 8877)
+
+Submódulo **🚧 Cuarentena** en "A Programar" (PPP). Objetivo: retener pedidos de clientes con
+**deuda**, **suspendidos** o que **superan su límite de crédito** — no salen a Programación.
+Esos datos NO viven en Gestión: se cargan a mano subiendo planillas del ERP desde **4 botones**
+del sector Cuarentena.
+
+### Objetos (todos NUEVOS y dedicados — pedido del dueño: "creá una tabla nueva, nada preexistente")
+
+- **`public."GV_Cuarentena_Fuente"`** — una fila por cliente por `(empresa, tipo)`.
+  `empresa ∈ {lk,chef}`, `tipo ∈ {busqueda,deuda}`. Columnas: `cod`, `cuit` (dígitos),
+  `razon_social`, `limite_credito`, `suspendido`, `deuda`, `raw jsonb`, `lote`, `cargado_por`,
+  `cargado_at`. **RLS on, SIN policies**, y `revoke all … from anon, authenticated, public`
+  (los default privileges del schema abren INSERT/UPDATE/DELETE a anon; hay que revocarlos).
+  → sólo la tocan las funciones SECURITY DEFINER. **No cuelga de `deudores`/ISIS.**
+- **`gv_cuarentena_cargar(p_empresa, p_tipo, p_rows jsonb, p_lote default null)`** → integer.
+  Gate `es_supervisor_virgilio()`. **Reemplazo TOTAL** de `(empresa, tipo)` (delete + insert).
+  Normaliza `cuit` a dígitos, trimea `cod`, descarta filas sin `cod` ni `cuit`. Devuelve cuántas
+  quedaron. `revoke anon`, `grant authenticated, service_role`.
+- **`gv_cuarentena_fuente_resumen()`** → conteos por `(empresa, tipo)` (filas, con_cuit,
+  suspendidos, con_deuda, con_limite, lote, cargado_por, cargado_at) para pintar debajo de cada
+  botón. `where es_supervisor_virgilio()` (si no, 0 filas). `revoke anon`.
+
+SQL: `sql/gv_cuarentena.sql`. Migración aplicada: `gv_cuarentena_fuente`.
+
+### Front (index.html, v14.82, sólo lectura del .xls en el navegador)
+
+4 botones en el sector Cuarentena (`aprCuarToolsHtml`): **Importar Búsqueda CL LK/CH** (tipo
+`busqueda` → límite + suspendido) e **Importar Deuda LK/CH** (tipo `deuda` → saldo). Cada uno abre
+un pop-up (`cuarImport*`, modal colgado de `<body>`, fuera del zoom de la PPP) que lee el .xls con
+el SheetJS ya vendorizado (`pppLoadXlsx`), **auto-detecta las columnas por encabezado** y deja
+**mapearlas a mano** (no asume layout), muestra preview y al Guardar llama `gv_cuarentena_cargar`.
+Debajo de cada botón, `gv_cuarentena_fuente_resumen` muestra qué se cargó.
+
+### Medido / prueba
+
+- End-to-end con `set_config('request.jwt.claims', …)` simulando supervisor: cargó 2 de 3 filas
+  (descartó la sin cod ni cuit), `cuit` normalizado (`30-12345678-9` → `30123456789`), `cod`
+  trimeado, `suspendido` boolean, `limite_credito` numérico, `lote`/`cargado_por` sellados. Luego
+  se borraron las filas de prueba (tabla queda en 0).
+- Advisor de seguridad: la tabla sale **sólo** con `rls_enabled_no_policy` (INFO) — es el diseño
+  buscado (acceso únicamente por las RPC gateadas). Sin `rls_disabled` ni warnings.
+- Smoke: `tests/apr-cuarentena.cjs` (4 botones + etiquetas, resumen, auto-map, parseo AR/estado).
+
+### Rollback
+
+Todo nuevo, nada compartido → NO va a `ROLLBACK-PRODUCCION.md`.
+`drop function public.gv_cuarentena_cargar(text,text,jsonb,text); drop function public.gv_cuarentena_fuente_resumen(); drop table public."GV_Cuarentena_Fuente";`
+
+### PENDIENTE (próximo paso)
+
+Esta tabla es la **fuente del filtro**, todavía no marca los pedidos. Falta la lógica que, con
+estos datos, decida qué pedido va a cuarentena (`cuarentena_motivos` en el feed de A Programar) y
+que el armado automático (crons 71/73) la respete. A definir con el dueño (matcheo por `cod`/`cuit`,
+y el límite de crédito contra el monto del pedido).

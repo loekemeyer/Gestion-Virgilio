@@ -12,7 +12,19 @@
 > única**; no se replica. Ante la duda entre parche rápido y fix de raíz → **fix
 > de raíz**.
 >
-> Última actualización: 2026-09-10 (jueves) · Versión app al documentar: **v14.81**
+> Última actualización: 2026-09-10 (jueves) · Versión app al documentar: **v14.82**
+>
+> Nota **v14.82 (2026-09-10) — CUARENTENA: 4 botones para cargar reportes por .xls (idea 8877).**
+> En el sector 🚧 Cuarentena hay **cuatro botones**: **Importar Búsqueda CL LK/CH** (traen **límite de
+> crédito** + **suspendido**) e **Importar Deuda LK/CH** (traen **deuda/saldo**). Cada uno abre un pop-up
+> que lee la planilla del ERP con el SheetJS ya vendorizado, **auto-detecta las columnas por encabezado y
+> deja mapearlas a mano** (no asume el layout), muestra preview y al Guardar llena la tabla nueva
+> **`GV_Cuarentena_Fuente`** (backend, reemplazo total por empresa+tipo, gate de supervisor). Debajo de
+> cada botón se ve qué se cargó. **Tabla nueva y dedicada** (pedido del dueño), NO cuelga de `deudores`/ISIS.
+> Funciones front `cuarImport*` / `aprCuarToolsHtml`; backend `gv_cuarentena_cargar` /
+> `gv_cuarentena_fuente_resumen`; `sql/gv_cuarentena.sql`; §3.bs de `docs/SUPABASE-GESTION-VIRGILIO.md`;
+> test `tests/apr-cuarentena.cjs`. **PENDIENTE:** con esos datos, marcar qué pedido va a cuarentena y que
+> el automático (crons 71/73) lo respete — a definir con el dueño.
 >
 > Nota **v14.81 (2026-09-10) — Submódulo CUARENTENA en "A Programar" (idea usuario 8877, prioridad 1).**
 > **MOTIVO (pedido del dueño):** un pedido no debería salir a Programación si el cliente tiene **deuda**,
