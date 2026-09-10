@@ -34,6 +34,36 @@ numeración) y en `docs/SUPABASE-GESTION-VIRGILIO.md`.
 
 ## 1. Registro de cambios que tocan objetos compartidos / de Producción
 
+### v14.69 (2026-09-10) — Guarda anti-doble-generación de OCs + limpieza de duplicados
+
+**Qué se cambió (tabla compartida `Ordenes_Compra`).**
+1. **Datos:** se borraron **109 filas duplicadas** del `2026-09-09`. El generador se corrió DOS
+   veces ese día (14:25 y 15:40) → cada línea quedó insertada dos veces (todas las OCs mostraban
+   cada artículo repetido, con el pedido al doble). Se dejó la 1ra corrida (id más chico por
+   `fecha+proveedor+codigo`); ninguna duplicada tenía recepción (`cantidad_recibida=0`).
+   **Backup:** `public."GV_Backup_OC_dup_20260909"` (224 filas, las del día completo antes de borrar).
+2. **Backend:** nueva RPC `public.gv_oc_generar_pendientes(jsonb)` (SECURITY DEFINER, grant sólo
+   `authenticated`). El front (`index.html` `ocgGenerar`) ya no hace POST crudo a `Ordenes_Compra`;
+   llama a la RPC, que es **idempotente por día**: por `(fecha,proveedor,codigo)` borra la línea
+   pendiente SIN recepción y recién ahí inserta → re-generar refresca, no duplica. Las líneas
+   recibidas/cerradas no se tocan ni se re-insertan.
+
+**Impacto medido.** Antes del fix: `select count(*) from "Ordenes_Compra" where fecha='2026-09-09'`
+= 224 (109 grupos duplicados). Después: 115 filas, `grupos_dup_totales = 0` en toda la tabla.
+
+**Rollback.**
+```sql
+-- 1) restaurar los duplicados borrados (si hiciera falta)
+insert into public."Ordenes_Compra"
+  select * from public."GV_Backup_OC_dup_20260909" b
+  where not exists (select 1 from public."Ordenes_Compra" o where o.id = b.id);
+-- 2) sacar la guarda backend
+drop function if exists public.gv_oc_generar_pendientes(jsonb);
+-- 3) revertir el front: ocgGenerar vuelve al POST a SUPABASE_OC_ENDPOINT (commit v14.69).
+-- backup table: drop table public."GV_Backup_OC_dup_20260909";  -- recién cuando esté OK
+```
+SQL fuente: `sql/gv_oc_generar_pendientes_v1469.sql`.
+
 ### v14.44 (2026-09-08) — `precios_venta` pasó a ser SÓLO LK
 
 **Qué se cambió.** La Edge Function `sync-precios-venta` **dejó de mergear** LK+Chef en

@@ -3559,6 +3559,38 @@ barrio de CABA y `zona_expreso` cargada.
 
 **Rollback y SQL completo:** `sql/gv_geo_barrio_entrega_v1420.sql`.
 
+## 3.br ✅ Las OCs mostraban cada artículo DOS veces (v14.69) — 2026-09-10
+
+**Síntoma (dueño, con captura):** en la pantalla de Órdenes de Compra cada línea aparecía
+repetida (058 Cierra Bolsa dos veces, 229 Ñoquera dos veces, …) *"y pasa esto en todas las OCs"*.
+
+**No era la pantalla, eran los datos.** El generador (`ocgGenerar`) hacía un **POST crudo** a
+`Ordenes_Compra` sin ninguna guarda. Se corrió **dos veces el 2026-09-09** (`created_at` 14:25:25 y
+15:40:38) → insertó TODAS las líneas de nuevo. La pantalla (`x.rows.forEach`) simplemente mostraba
+lo que había: dos filas idénticas por artículo, y el pedido/impreso al tallerista salía al doble.
+
+Confirmación:
+```sql
+-- 224 filas el 09-09, exactamente el doble de los 112 códigos distintos; 15:40 = 2da corrida
+select fecha,proveedor,count(*)-count(distinct codigo) dup from "Ordenes_Compra"
+where fecha='2026-09-09' group by 1,2 having count(*)>count(distinct codigo);
+```
+
+**Fix (backend, decisión del dueño).**
+1. **Limpieza:** backup a `GV_Backup_OC_dup_20260909` (224 filas) → borrado de **109 duplicados**
+   (se dejó el id más chico por `fecha+proveedor+codigo`; ninguno con recepción). Quedó en 115
+   filas, 0 grupos duplicados en toda la tabla.
+2. **Guarda:** RPC `gv_oc_generar_pendientes(jsonb)` (SECURITY DEFINER, grant sólo `authenticated`).
+   El front la llama en vez del POST. Es **idempotente por día**: por `(fecha,proveedor,codigo)`
+   borra la línea pendiente sin recepción y recién inserta → volver a generar refresca, no duplica;
+   nunca toca ni re-inserta sobre una recibida/cerrada.
+
+**Impacto medido:** antes 224 filas / 109 dup; después 115 filas / 0 dup. Correr el generador dos
+veces ahora deja el mismo resultado (probado: la RPC devuelve las mismas líneas, sin sumar filas).
+
+**SQL / rollback:** `sql/gv_oc_generar_pendientes_v1469.sql` y `docs/ROLLBACK-PRODUCCION.md`
+(tabla compartida `Ordenes_Compra`).
+
 ## 4. Incidente de seguridad — 2026-09-04 (cerrado)
 
 `public.vista_pedidos_web_feed` tenía `select` para `anon`. Los esquemas `fuentes` y
