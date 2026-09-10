@@ -7469,7 +7469,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v14.66";
+const APP_VERSION = "v14.67";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -13103,7 +13103,11 @@ async function ocgGenerar() {
   const headers = await facAuthWriteHeaders({ "Prefer": "return=minimal" });
   if (!headers) { alert(authNoSesionMsg("Para generar las OCs necesitás iniciar sesión con Google (supervisor).")); return; }
   try {
-    const r = await fetch(SUPABASE_OC_ENDPOINT, { method: "POST", headers: headers, body: JSON.stringify(rows) });
+    // v14.61 — RPC idempotente por día (guarda anti-doble-generación). Antes era un POST crudo
+    // a Ordenes_Compra: correr el generador dos veces el mismo día duplicaba TODAS las líneas
+    // (bug del 2026-09-09). La RPC, por (fecha,proveedor,codigo), reemplaza la línea pendiente
+    // sin recepción y no toca ni duplica las ya recibidas/cerradas.
+    const r = await fetch(SUPABASE_URL + "/rest/v1/rpc/gv_oc_generar_pendientes", { method: "POST", headers: headers, body: JSON.stringify({ p_rows: rows }) });
     if (!r.ok) throw new Error("HTTP " + r.status);
     _oc.rows = await ocFetchRows(); _oc.recepByRow = ocBuildRecep();
     _oc.view = "list"; ocRender();
