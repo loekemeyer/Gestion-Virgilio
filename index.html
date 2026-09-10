@@ -12909,6 +12909,12 @@ async function ocgEnter() {
     const itemsAll = [];
     (rows || []).forEach(function (r) {
       const cod = String(r.cod).toUpperCase().trim();
+      // v14.61 — regla del dueño (09/09): los códigos "E" son IMPORTADOS y no se piden por OC,
+      // salvo los que tienen proveedor real (Garcia / Log/ Fabr). Los E importados SIN proveedor
+      // (los que se estibaban como "Racks", ya limpiado en OC_Maximos) se OCULTAN del generador:
+      // ensuciaban la lista con cantidades que no se pueden ordenar. Siguen visibles/editables en
+      // la pestaña Config (ocgEnterCfg) por si hay que asignarles un proveedor.
+      if (cod.indexOf("E") >= 0 && !r.tiene_prov_real) return;
       const maxCajas = Math.round(Number(r.maximo) || 0);
       const demanda = Math.round(Number(r.pedidos) || 0);
       const stock = Math.round(Number(r.stock) || 0);
