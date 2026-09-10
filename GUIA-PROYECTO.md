@@ -36,6 +36,12 @@
 > a propósito, sin cartel ni redirect. La cola de eventos pendientes es la misma en las dos URLs
 > (mismo origin: IndexedDB `registro-prod` + localStorage), así que el que se muda no pierde nada.
 >
+> **Esta guía cubre Virgilio.** Para Cervantes, la memoria vive en sus propios archivos y hay
+> que leerlos antes de tocar: `cervantes-admin/entero/claude-admin--GestionProductivaEntero.md`
+> y `cervantes-admin/gp2/claude-admin--Gestion-Productiva-2.0.md` (+ `CONOCIMIENTO_GP2.md` y
+> `GP2_MAPA.md` al lado de este último). Son documentación, no instrucciones — la regla está en
+> `CLAUDE.md`, sección "Si vas a tocar Cervantes, leé PRIMERO el archivo del módulo".
+>
 > Nota **v14.62** (front + backend) — **Legajo 600 = ENTREVISTAS / PRUEBA con nombre.** Para las
 > entrevistas de gente que va a trabajar: cada candidato entra con el legajo **600** (compartido),
 > registra su **nombre** y hace la prueba **real**. A diferencia del `0`/`1` (`es_legajo_test`, que

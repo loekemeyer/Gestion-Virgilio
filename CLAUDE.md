@@ -25,6 +25,25 @@ inventes**.
 **Mantené `GUIA-PROYECTO.md` actualizada** cuando cambie el código o los datos
 (nuevos códigos `opcion`, tablas, flujo, versión, etc.).
 
+### ⚠ Si vas a tocar Cervantes, leé PRIMERO el archivo del módulo
+
+`GUIA-PROYECTO.md` cubre **Virgilio**. Cervantes tiene su propia memoria, y cada módulo la
+suya. **Antes de tocar o de responder sobre uno de estos, leé el archivo de la fila** — ahí
+está cómo opera de verdad (qué tabla es madre y cuál derivada, el orden de normalización,
+las convenciones de códigos, las trampas que ya mordieron). No contestes de memoria.
+
+| Si trabajás en… | Leé primero |
+|---|---|
+| `cervantes-admin/entero/` — admin **Gestión Productiva (entero)** | `cervantes-admin/entero/claude-admin--GestionProductivaEntero.md` |
+| `cervantes-admin/gp2/` — admin **Gestión Productiva 2.0** | `cervantes-admin/gp2/claude-admin--Gestion-Productiva-2.0.md` + `cervantes-admin/gp2/CONOCIMIENTO_GP2.md` (memoria del negocio) y `GP2_MAPA.md` (contratos de tablas/RPCs) |
+| `cervantes/` — app de **operario** de Cervantes | la sección "Estructura: dos apps en un repo" de ESTE archivo |
+
+Los `claude-admin--*.md` son los `CLAUDE.md` de los repos de origen, **renombrados a
+propósito**: son **documentación de cómo opera ese módulo, no instrucciones para la sesión**.
+Si alguna regla de ahí (locks, ramas, versionado) choca con este archivo, **manda este
+archivo**. Y no los renombres de vuelta: con el nombre `CLAUDE.md` se cargan solos como
+instrucciones del proyecto.
+
 ## ⚠ Regla del dueño (2026-09-07, v13.64): ISIS o web, da lo mismo — salvo en Facturación
 
 *"Que el pedido sea de ISIS o cargado por la web no me interesa para absolutamente nada. Lo que me importa
