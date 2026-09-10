@@ -9,13 +9,13 @@
   <meta name="mobile-web-app-capable" content="yes" />
   <meta name="theme-color" content="#1e40af" />
   <title>Registro Produccion</title>
-  <link rel="stylesheet" href="styles.css?v=1.9.0" />
+  <link rel="stylesheet" href="styles.css?v=1.9.1" />
   <link rel="icon" href="data:,">
   <link rel="manifest" href="manifest.json" />
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <!-- Anti-flash: la pantalla queda oculta hasta que el gate confirme sesión. -->
   <style>#legajoScreen{visibility:hidden;}</style>
-  <!-- ===== GATE DE SESIÓN (v1.9.0) =====
+  <!-- ===== GATE DE SESIÓN (v1.9.1) =====
        El login es GLOBAL y vive en la raíz de Gestión (`../`). Esta app corre en
        dos lugares y el gate se adapta solo:
          · como sub-app (`/cervantes/` de Gestión Virgilio) → sin sesión vuelve al
@@ -48,6 +48,25 @@
       var ls = document.getElementById("legajoScreen");
       var h1 = ls ? ls.querySelector("h1") : null;
       if (h1) h1.textContent = nombre ? ("Hola, " + nombre) : ("Legajo " + legajo);
+      // (v1.9.1) Escape para el equipo COMPARTIDO: el operario que agarra la
+      // tablet puede no ser el de la sesión guardada. Sin esto quedaba tomando
+      // producción con el legajo del anterior, y con el input escondido no
+      // tenía cómo darse cuenta ni cambiarlo.
+      if (ls && !document.getElementById("cambiarOperario")) {
+        var a = document.createElement("a");
+        a.id = "cambiarOperario";
+        a.href = "#";
+        a.textContent = "¿No sos vos? Cambiar operario";
+        a.style.cssText = "display:block;margin:6px 0 10px;font-size:15px;font-weight:600;color:#0e7490;text-decoration:underline;";
+        a.onclick = function (ev) {
+          ev.preventDefault();
+          try { localStorage.removeItem(LEGAJO_KEY); } catch (_e) {}
+          if (i) { i.value = ""; i.style.display = ""; try { i.dispatchEvent(new Event("input", { bubbles: true })); } catch (_e2) {} i.focus(); }
+          if (h1) h1.textContent = "Ingresa tu numero de Operario";
+          a.remove();
+        };
+        if (h1 && h1.nextSibling) ls.insertBefore(a, h1.nextSibling); else ls.appendChild(a);
+      }
       reveal();
     }
     function fetchEmpByEmail(email) {
@@ -86,7 +105,7 @@
 </head>
 <body>
 
-  <div id="syncBadge" title="Tocar para forzar envio" style="position:fixed;bottom:6px;left:8px;font-size:12px;font-weight:800;z-index:100;cursor:pointer;padding:4px 10px;border-radius:999px;user-select:none;background:#f1f5f9;color:#475569;border:1px solid #e2e8f0;">v1.9.0 &#10003;</div>
+  <div id="syncBadge" title="Tocar para forzar envio" style="position:fixed;bottom:6px;left:8px;font-size:12px;font-weight:800;z-index:100;cursor:pointer;padding:4px 10px;border-radius:999px;user-select:none;background:#f1f5f9;color:#475569;border:1px solid #e2e8f0;">v1.9.1 &#10003;</div>
 
   <!-- LEGAJO -->
   <div id="legajoScreen">
@@ -189,6 +208,6 @@
     </div>
   </div>
 
-  <script src="app.js?v=1.9.0"></script>
+  <script src="app.js?v=1.9.1"></script>
 </body>
 </html>

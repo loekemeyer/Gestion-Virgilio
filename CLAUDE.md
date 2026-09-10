@@ -367,6 +367,12 @@ borró). Layout:
   **no se vuelve a pedir el legajo**: lo precarga, esconde el input y saluda por nombre. Los
   supervisores de la lista tipean el legajo. Sin sesión: bajo `/cervantes/` vuelve a `../`;
   en la URL suelta cae a la pantalla de legajo (el gate detecta dónde corre).
+  **Un operario puede trabajar en las dos plantas** (regla del dueño, 2026-09-10: *"se tiene
+  que poder, porque pueden ir entre Cervantes y Virgilio"*) → Cervantes **NO** filtra por
+  `Empleados.Sede`; un legajo de sede V entra igual. Por eso el saludo lleva al lado
+  **"¿No sos vos? Cambiar operario"** (v1.9.1): en un equipo compartido borra la sesión del
+  anterior y devuelve el campo de legajo, que si no quedaba escondido y el que agarraba la
+  tablet tomaba producción con el legajo del otro.
 - **Al tocar Cervantes**: subir `LOCAL_VERSION` (`cervantes/app.js`), `CACHE_VERSION`
   (`cervantes/sw.js`) y los `?v=` + el badge de `cervantes/index.html` **al mismo número**.
   Si se desalinean, el celular se queda con el JS viejo cacheado — pasó, y por eso los

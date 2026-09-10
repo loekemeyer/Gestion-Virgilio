@@ -288,7 +288,7 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   /* ================= VERSION (unica fuente de verdad) ================= */
-  const LOCAL_VERSION = "v1.9.0";
+  const LOCAL_VERSION = "v1.9.1";
 
   /* ================= KEYS STORAGE ================= */
   const APP_TAG = "_Cervantes";
