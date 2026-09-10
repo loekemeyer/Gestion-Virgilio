@@ -4728,3 +4728,18 @@ monto; el límite necesita esta valorización en el cron.
   y el botón verde **"➡ Enviar a Pedidos a programar"** (`cuarLiberar`).
 - Backend aplicado por migración; volcar con `pg_get_functiondef` si se recrea. Smoke:
   `tests/apr-cuarentena.cjs`.
+
+### §3.bs.3 — v14.89/90 (2026-09-10, Luis): botones WhatsApp en la ficha de Cuarentena
+
+- **v14.89 — "💬 A cobranzas"**: abre WhatsApp al número **fijo** de cobranzas (`5491165574113`,
+  `CUAR_WPP_COBRANZAS` en `index.html`) con un mensaje ya armado (NP, cliente, motivo, m³). Sin backend.
+- **v14.90 — "💬 Vendedor/Cliente" (idea 8833)**: RPC **`gv_cuar_contacto_lote(p_pedidos jsonb)`**
+  (SECURITY DEFINER, gate `es_supervisor_virgilio()`, sólo `authenticated`/`service_role`) resuelve por
+  `(empresa, cod)` reusando las tablas del módulo **Avisar programación**: `clientes_vendedor` (cod→vend),
+  `whatsapp_vendedores` (vend→tel/nombre), `whatsapp_clientes` (cod→tel). Devuelve `tipo`
+  (`vendedor`/`cliente`/`ninguno`), `nombre`, `telefono`. Regla: **vendedor** si el cliente tiene vend y no es
+  fábrica(`'7'`)/súper(`'20'`) con tel cargado; si no, **cliente**; si no hay tel, `ninguno`. Front:
+  `cuarContactoCargar` cachea el lote en `_apr.cuarContacto` (se resetea en `cuarMarcarPedidos`), y
+  `cuarWppContacto` abre `wa.me` con el helper `_avpTel`/`_avpWa` (normaliza el tel argentino) del módulo
+  Avisar. **Nota**: `clientes_vendedor`/`whatsapp_clientes` están keadas por cod **LK**; un pedido de Chef
+  cae en "Sin tel." salvo que su cod exista ahí. Rollback: `drop function public.gv_cuar_contacto_lote(jsonb);`.

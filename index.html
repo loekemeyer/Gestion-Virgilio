@@ -868,6 +868,9 @@ button {
 .cuar-wpp{ width:100%; border:none; border-radius:8px; padding:7px 8px; font-size:12px; font-weight:800; cursor:pointer; }
 .cuar-wpp-cob{ background:#128c7e; color:#fff; }
 .cuar-wpp-cob:hover{ background:#0e7568; }
+.cuar-wpp-cli{ background:#25863f; color:#fff; }
+.cuar-wpp-cli:hover{ background:#1e6e33; }
+.cuar-wpp-off{ background:#e2e8f0; color:#94a3b8; cursor:default; }
 .cuar-liberado-nota{ font-size:11px; font-weight:800; color:#166534; margin-top:5px; }
 .cuar-demo-hint{ display:block; font-size:10.5px; color:#b45309; margin-top:3px; }
 /* v14.88 — pestaña Config. Cuarentena */
@@ -7595,7 +7598,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v14.89";
+const APP_VERSION = "v14.90";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -34284,7 +34287,9 @@ let _apr = {
   cargandoChef: false,
   m3Min: 0.6,       // v13.84: PPP_Web_Config.tanda_m3_min (se relee en cada carga)
   // v14.82 — CUARENTENA: resumen de lo cargado por los 4 botones de importación
-  cuarResumen: null, cuarResumenLoading: false
+  cuarResumen: null, cuarResumenLoading: false,
+  // v14.90 — CUARENTENA: contacto WhatsApp (vendedor/cliente) por empresa:cod
+  cuarContacto: null, cuarContactoLoading: false
 };
 // v14.82 — estado del pop-up de importación de reportes de cuarentena
 let _cuarImp = { open: false };
@@ -35285,6 +35290,8 @@ function aprCuarentenaMotivo(p) {
 }
 function aprColCuarentena() {
   let lista = (_apr.pedidos || []).filter(aprEnCuarentena);
+  // v14.90: cargar (una vez) los contactos WhatsApp de los retenidos reales
+  if (_apr.cuarContacto === null && !_apr.cuarContactoLoading && lista.some(function (p) { return !p._demo; })) cuarContactoCargar();
   if (_apr.cuarDemo) lista = [cuarDemoPedido()].concat(lista);   // v14.84: pedido de ejemplo
   let h = '<div class="apr-col apr-col-cuar">' +
     '<div class="apr-col-t">🚧 Cuarentena <b>(' + lista.length + ')</b>' +
@@ -35308,6 +35315,7 @@ function aprColCuarentena() {
       '<div class="cuar-card-zona">📍 ' + escapeHtml(p.zona || "sin zona") + '</div>' +
       aprCuarBadgesHtml(p) +
       '<div class="cuar-acciones">' +
+        cuarWppContactoBtn(p) +
         '<button class="cuar-wpp cuar-wpp-cob" onclick="cuarWppCobranzas(\'' + (p.empresa || "lk") + '\',\'' + escapeHtml(String(p.order_id)) + '\')" title="Escribir a cobranzas por WhatsApp (+54 9 11 6557-4113) para que chequee este pedido">💬 A cobranzas</button>' +
         '<button class="cuar-enviar" onclick="cuarLiberar(\'' + (p.empresa || "lk") + '\',\'' + escapeHtml(String(p.order_id)) + '\')">➡ Enviar a Pedidos a programar</button>' +
       '</div>' +
@@ -35347,6 +35355,57 @@ function cuarWppCobranzas(empresa, orderId) {
   if (String(orderId) === "EJEMPLO") p = cuarDemoPedido();
   else p = (_apr.pedidosTodos || []).find(function (x) { return aprKey(x.empresa, x.order_id) === String(empresa) + ":" + String(orderId); });
   const url = "https://wa.me/" + CUAR_WPP_COBRANZAS + "?text=" + encodeURIComponent(cuarWppMsg(p || {}));
+  try { window.open(url, "_blank", "noopener"); } catch (_e) { try { location.href = url; } catch (_e2) {} }
+}
+
+/* v14.90 (idea 8833) — Botón WhatsApp al CONTACTO del cliente retenido: al VENDEDOR si el
+   cliente tiene (y no es fábrica/súper) con tel cargado, si no al CLIENTE. Reusa las tablas
+   del módulo "Avisar programación" vía la RPC gv_cuar_contacto_lote + el helper `_avpTel`. */
+function cuarContactoKey(p) { return String((p && p.empresa) || "lk") + ":" + String((p && p.cod) || "").trim(); }
+function cuarContactoDe(p) { return (_apr.cuarContacto || {})[cuarContactoKey(p)] || null; }
+async function cuarContactoCargar() {
+  if (_apr.cuarContactoLoading) return;
+  const lista = (_apr.pedidos || []).filter(function (p) { return !p._demo && aprEnCuarentena(p); });
+  if (!lista.length) { _apr.cuarContacto = {}; return; }
+  _apr.cuarContactoLoading = true;
+  try {
+    const res = await aprRpc("gv_cuar_contacto_lote", {
+      p_pedidos: lista.map(function (p) { return { empresa: p.empresa || "lk", cod: String(p.cod || "").trim() }; })
+    });
+    const m = {};
+    (res || []).forEach(function (r) { m[String(r.empresa) + ":" + String(r.cod)] = { tipo: r.tipo, nombre: r.nombre, telefono: r.telefono }; });
+    _apr.cuarContacto = m;
+  } catch (_e) { _apr.cuarContacto = _apr.cuarContacto || {}; }
+  _apr.cuarContactoLoading = false;
+  if (_pppTab === "prog") aprRender();
+}
+function cuarTituloCase(s) { return String(s || "").toLowerCase().replace(/\b\w/g, function (c) { return c.toUpperCase(); }); }
+function cuarWppContactoMsg(p, c) {
+  const np = aprPedLabel(p || {});
+  const cli = (p && (p.razon_social || p.cod)) || "";
+  const et = aprCuarentenaEtiqueta(p || {});
+  if (c && c.tipo === "vendedor")
+    return "Hola" + (c.nombre ? " " + cuarTituloCase(c.nombre) : "") + ", el pedido de " + cli + " (" + np + ") quedó retenido en Cuarentena.\nMotivo: " + et + ".\n¿Lo podés ver con el cliente?";
+  return "Hola, sobre el pedido " + np + " (" + cli + ").\nMotivo: " + et + ".";
+}
+/* Etiqueta del botón según el contacto resuelto (o estado de carga). */
+function cuarWppContactoBtn(p) {
+  if (p && p._demo) return '<button class="cuar-wpp cuar-wpp-cli" disabled title="En el ejemplo no se abre WhatsApp">💬 WhatsApp (ejemplo)</button>';
+  if (_apr.cuarContacto === null) return '<button class="cuar-wpp cuar-wpp-cli" disabled title="Buscando teléfono…">💬 …</button>';
+  const c = cuarContactoDe(p);
+  const emp = (p.empresa || "lk"), oid = escapeHtml(String(p.order_id));
+  if (c && c.telefono) {
+    const lbl = c.tipo === "vendedor" ? ("Vendedor" + (c.nombre ? " · " + cuarTituloCase(c.nombre) : "")) : "Cliente";
+    return '<button class="cuar-wpp cuar-wpp-cli" onclick="cuarWppContacto(\'' + emp + '\',\'' + oid + '\')" title="Abrir WhatsApp con el ' + escapeHtml(lbl) + '">💬 ' + escapeHtml(lbl) + '</button>';
+  }
+  return '<button class="cuar-wpp cuar-wpp-off" disabled title="No hay teléfono cargado del vendedor ni del cliente">💬 Sin tel.</button>';
+}
+function cuarWppContacto(empresa, orderId) {
+  if (String(orderId) === "EJEMPLO") return;
+  const p = (_apr.pedidosTodos || []).find(function (x) { return aprKey(x.empresa, x.order_id) === String(empresa) + ":" + String(orderId); });
+  const c = cuarContactoDe(p || { empresa: empresa, cod: "" });
+  if (!c || !c.telefono) { _apr.msg = "No hay teléfono cargado para ese cliente/vendedor."; _apr.msgErr = true; aprRender(); return; }
+  const url = _avpWa(c.telefono, cuarWppContactoMsg(p, c));   // _avpTel normaliza al formato wa.me
   try { window.open(url, "_blank", "noopener"); } catch (_e) { try { location.href = url; } catch (_e2) {} }
 }
 
@@ -35492,6 +35551,7 @@ async function cuarMarcarPedidos() {
       else { if (p.cuarentena_motivos) delete p.cuarentena_motivos; if (p._cuarLiberado) delete p._cuarLiberado; }
     });
   } catch (_e) { /* si falla, no marca; no rompe la pantalla */ }
+  _apr.cuarContacto = null;   // v14.90: cambió el set de retenidos → recargar contactos WhatsApp
   if (_pppTab === "prog") aprRender();
 }
 /* Pedido de EJEMPLO para ver el sector sin datos reales (dueño: "poneme un pedido de prueba"). */

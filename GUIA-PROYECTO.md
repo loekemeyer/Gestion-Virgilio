@@ -12,7 +12,16 @@
 > única**; no se replica. Ante la duda entre parche rápido y fix de raíz → **fix
 > de raíz**.
 >
-> Última actualización: 2026-09-10 (jueves) · Versión app al documentar: **v14.89**
+> Última actualización: 2026-09-10 (jueves) · Versión app al documentar: **v14.90**
+>
+> Nota **v14.90 (2026-09-10, Luis) — CUARENTENA: botón WhatsApp al vendedor/cliente (idea 8833).**
+> En la ficha, botón **"💬 Vendedor · Nombre"** (o **"💬 Cliente"**, o **"Sin tel."**) que abre WhatsApp con
+> el contacto que corresponde. Los teléfonos ya vivían en Virgilio, en las tablas del módulo **"Avisar
+> programación"**: `clientes_vendedor` (cod→vend), `whatsapp_vendedores` (vend→tel/nombre), `whatsapp_clientes`
+> (cod→tel). RPC **`gv_cuar_contacto_lote`** resuelve: **vendedor** si el cliente tiene y no es fábrica(7)/súper(20)
+> con tel cargado; si no, **cliente**; si no hay, "Sin tel." (Chef: si el cod no está en esas tablas, cae en
+> "Sin tel."). El front reusa el helper `_avpTel`/`_avpWa` del propio módulo Avisar. `cuarContactoCargar` /
+> `cuarWppContacto` en `index.html`, CSS `.cuar-wpp-cli` / `.cuar-wpp-off`.
 >
 > Nota **v14.89 (2026-09-10, Luis) — CUARENTENA: botón "A cobranzas" (WhatsApp fijo).** En la ficha de un
 > pedido en cuarentena, botón **"💬 A cobranzas"** que abre WhatsApp al número **fijo** de cobranzas
