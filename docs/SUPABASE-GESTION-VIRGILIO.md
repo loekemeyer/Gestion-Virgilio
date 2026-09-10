@@ -4743,3 +4743,26 @@ monto; el límite necesita esta valorización en el cron.
   `cuarWppContacto` abre `wa.me` con el helper `_avpTel`/`_avpWa` (normaliza el tel argentino) del módulo
   Avisar. **Nota**: `clientes_vendedor`/`whatsapp_clientes` están keadas por cod **LK**; un pedido de Chef
   cae en "Sin tel." salvo que su cod exista ahí. Rollback: `drop function public.gv_cuar_contacto_lote(jsonb);`.
+
+### §3.bs.4 — idea 6064 (2026-09-10): la deuda de Cuarentena avisa en los PORTALES (LK/Chef)
+
+El mismo saldo que la Cuarentena sube ~1x/semana a `GV_Cuarentena_Fuente` (tipo `deuda`) ahora le
+figura al cliente **en el portal, antes de confirmar el pedido**. Decisión del dueño: **sólo avisar,
+no bloquear**; umbral **$1.000**; mostrar **total + fecha de carga**; **LK y Chef**.
+
+- **Feed en Virgilio**: vista **`public.gv_deuda_feed`** (`empresa, cod, deuda, cargado_at`) sobre
+  `GV_Cuarentena_Fuente where tipo='deuda' and deuda is not null`. `revoke all` de public/anon/authenticated;
+  `grant select` a `lk_ppp_reader` (y a `chef_gv_reader` cuando se corra el setup de Chef). Hoy: 40 filas
+  chef ($131,5M), y las de lk.
+- **LK (HECHO, en producción)**: foreign table `virgilio.gv_deuda_feed` (server `virgilio_db`, rol
+  `lk_ppp_reader`) + RPC **`public.get_mi_deuda()`** en el proyecto LK (SECURITY DEFINER, resuelve el
+  cliente por `auth.uid()` vía `user_customer_links`/`customers`, filtra `empresa='lk'`; revocada de anon,
+  sólo `authenticated`). Front `pagina-LK-copia`: `cargarDeudaCliente()` la llama 1x por sesión al cargar
+  el perfil, cachea en `_deudaCliente`, y `renderDeudaAviso()` pinta el aviso `#deudaAviso` en el carrito
+  (no lo muestra a admin/vendedor). Best-effort: si la RPC/FDW falla, no molesta.
+- **Chef (FRONT hecho, BACKEND pendiente del dueño)**: el front `paginach` es el espejo del de LK
+  (`get_mi_deuda`, filtra `empresa='chef'`). **El backend NO se pudo aplicar desde la sesión** (el proyecto
+  Supabase de Chef `nkhzocgdpwtgrmwleihr` no es alcanzable por el MCP). Setup listo para correr a mano en
+  **`sql/gv_deuda_feed_chef_setup.sql`**: PART A (rol `chef_gv_reader` + grant en Virgilio) y PART B (server
+  FDW + foreign table + RPC `get_mi_deuda` en Chef), con placeholder de password. Hasta que se corra, el
+  front de Chef no muestra nada (la RPC no existe → best-effort silencioso).
