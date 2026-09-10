@@ -159,6 +159,33 @@ y Log/ Fabr (9) son proveedores REALES y quedan** (Danica ≈ Garcia, según el 
 
 ---
 
+## 1.aa — 6 writers de Movimientos_Stock pasan `empresa` explícita (v14.62, 2026-09-10)
+
+**Regla del dueño:** la columna `empresa` se agregó al pipeline para ser la fuente explícita; que
+el trigger la adivine es el parche. Para duales sin sufijo ni NP, el trigger caía en **'Mixto'** →
+stock al código base (oculto), ni LK ni CH. Se corrigieron los **6 writers** que insertaban en
+`Movimientos_Stock` sin `empresa`, para que la pasen explícita:
+
+- `registrar_baja_racks` → `item.emp` o `Racks_Planimetria.emp` del sector (cierra el gap de
+  reposición: bajar un rack CH ahora cae en góndola CH).
+- `racks_plani_ingreso` / `racks_plani_ingreso_nacional` → `p_emp` (ya lo recibían).
+- `aceptar_conteo` → `Capacidad_Sector.empresa` del sector contado.
+- `anular_modo_op` → `Control_Modo_OP.linea`.
+- `faltante_resolver` → empresa del separado/picking de esa tanda+cod (si es inequívoco).
+
+En todas: si no se puede determinar, queda `NULL` → el trigger decide (comportamiento previo).
+Verificado: el trigger `trg_normalizar_empresa_stock` RESPETA la empresa cuando llega != NULL/Mixto.
+
+- **Objetos compartidos tocados:** las 6 funciones (SECURITY DEFINER, las llama el front por nombre).
+- **SQL aplicado:** `sql/gv_empresa_en_writers_20260910.sql`.
+- **Rollback exacto:** `sql/backups/writers_movimientos_stock_pre_v1462_20260910.sql` (las 3 de racks
+  completas; conteo/anular/faltante = quitar `, empresa` del INSERT y el cálculo de `v_emp`).
+- **Nota:** no reasigna stock histórico. Al 10/09 no hay stock de duales en 'Mixto' (todo LK/CH),
+  pero 438E/439E tienen el 100% atribuido LK (default de migración D1) con la góndola CH en negativo
+  — eso se resuelve con un ajuste manual LK→CH según packaging, decisión del dueño.
+
+---
+
 ## 2. Backups vigentes (para restore puntual)
 
 | backup | qué guarda | fecha |
