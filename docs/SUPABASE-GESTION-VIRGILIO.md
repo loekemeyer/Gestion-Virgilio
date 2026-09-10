@@ -4661,3 +4661,28 @@ automático 71/73 lo respete) — próxima fase.
   a nivel order antes de romperse en NP) — vive del lado **LK** — y el **acumulado** de los pedidos del
   cliente no facturados y no en cuarentena (A Programar + Programación). Y que el armado automático
   (crons 71/73) respete la cuarentena (hoy el marcado es sólo de pantalla; el cron todavía no lo mira).
+
+### Addendum v14.86 (2026-09-10) — regla de LÍMITE: valorización propia + greedy
+
+Dueño: *"Gestión puede sacar el dato, Facturación ya calcula el monto de los pedidos armados; calculá el
+del pedido antes de Programación de la misma forma."* → **no hace falta traer nada de LK**: el pedido
+pendiente tiene sus ítems (art × cajas) en el feed, y se valoriza igual que Facturación.
+
+- **`gv_ppp_web_valor_items(p_empresa, p_cod, p_items, p_cond)`** → neto sin IVA, replicando
+  `gv_vista_facturacion_neto_items`: `cajas × uxb × precio_lista × (1-dto_vol) × factor_web`. Precios de
+  `precios_venta`/`precios_venta_chef`/listas súper (`cobranzas_precios_super`); `dto_vol` de
+  `clientes_dto`. **factor_web = 1.0** para súper (lista especial) **y el 2% web (0.98) es CONDICIONAL por
+  condición de pago** (dueño 2026-09-10): sólo códigos **8,9,10,11,12,13,18** (contado, 3 crédito, 2 e-cheq,
+  "prefiero no decidir"); el resto (1 "Sin Cotizador", etc.) → 1.0. Mismo criterio que el Excel ISIS.
+  **Verificado**: dif 0,00 contra `neto_original` de la vista en 3 NP reales (incluye súper).
+- **`gv_cuarentena_limite(p_pendientes jsonb)`** → greedy. Entra `[{order_id,empresa,cod,fecha_recep,items,cond}]`
+  (los pendientes de A Programar), valoriza cada uno, y por cliente con límite (>0) acumula en orden de
+  llegada; el que haría superar el límite va a cuarentena y **no consume crédito** (no suma). límite 0/null = ∞.
+  Verificado: 3 pedidos iguales, límite = 1,5× → el 1º entra, 2º y 3º a cuarentena.
+- **Front**: se agregó `condicion_pago_code` al feed y `cond` al pedido; `cuarMarcarPedidos` corre en paralelo
+  `gv_cuarentena_marcar` (estado+deuda) y `gv_cuarentena_limite` (límite, web) y fusiona los motivos.
+
+**PENDIENTE del límite**: (a) **base = crédito ya comprometido por lo YA programado** (hoy el greedy arranca
+en 0; falta sumar el neto de los pedidos programados no facturados del cliente — web + ISIS temporal);
+(b) que el **automático (crons 71/73) respete** la cuarentena. Estado/Deuda ya se pueden hacer respetar sin
+monto; el límite necesita esta valorización en el cron.

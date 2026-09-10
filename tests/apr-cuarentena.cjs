@@ -67,6 +67,8 @@ const { chromium } = require("/opt/node22/lib/node_modules/playwright");
       [46000,46000,10,"Div","FCA",403,"z","Admin",1,"$",0,-16023,-16023]
     ];
     out.deuda = cuarParseDeudaCrystal(daoa);
+    // flatten de items para el límite (todos los bloques del pedido juntos)
+    out.itemsFlat = cuarItemsDe({ bloques: [{ items: [{ art: "027", cajas: 2 }] }, { items: [{ art: "505", cajas: 3 }] }] });
 
     // etiqueta del motivo sin_cta_cte
     out.etqSinCta = aprCuarentenaEtiqueta({ cuarentena_motivos: ["sin_cta_cte"] });
@@ -150,6 +152,7 @@ const { chromium } = require("/opt/node22/lib/node_modules/playwright");
   chk(r.demoCuenta, "el ejemplo cuenta en Cuarentena (1)");
   chk(r.demoBtnQuitar, "con ejemplo activo el botón dice 'Quitar ejemplo'");
   chk(r.demoOff, "al quitar el ejemplo desaparece y el botón vuelve a 'Ver ejemplo'");
+  chk(r.itemsFlat.length === 2 && r.itemsFlat[0].art === "027" && r.itemsFlat[1].art === "505", "cuarItemsDe aplana los items de todos los bloques del pedido");
   chk(errs.length === 0, "sin errores de página" + (errs.length ? " (" + errs.join(" | ") + ")" : ""));
 
   await b.close();

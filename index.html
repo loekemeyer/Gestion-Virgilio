@@ -7564,7 +7564,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v14.85";
+const APP_VERSION = "v14.86";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -34408,7 +34408,7 @@ async function aprTraerPedidos(e) {
   } else {
     const desde = new Date(Date.now() - PWEB_VENTANA_DIAS * 86400000).toISOString().slice(0, 10);
     const r = await fetch(PWEB_LK_URL + "/rest/v1/v_pedidos_web_np"
-      + "?select=empresa,order_id,np_idx,cod,razon_social,fecha_recep,direccion,lineas,cajas,items,m3,m3_parcial,localidad,zona_expreso,nombre_expreso,direccion_expreso,enviado_a_compras"
+      + "?select=empresa,order_id,np_idx,cod,razon_social,fecha_recep,direccion,lineas,cajas,items,m3,m3_parcial,localidad,zona_expreso,nombre_expreso,direccion_expreso,enviado_a_compras,condicion_pago_code"
       + "&fecha_recep=gte." + desde + "&order=order_id.asc,np_idx.asc&limit=5000",
       { headers: { apikey: PWEB_LK_ANON, Authorization: "Bearer " + tok } });
     if (!r.ok) throw new Error("LK respondió " + r.status);
@@ -34476,6 +34476,7 @@ async function aprTraerPedidos(e) {
       cod: n.cod || "", razon_social: n.razon_social || "",
       fecha_recep: n.fecha_recep || "", zona: pwebZonaSugerida(n),
       localidad: pwebLocalidad(n), direccion: pwebDireccion(n),
+      cond: (n.condicion_pago_code == null ? "" : String(n.condicion_pago_code)),  // v14.85: condición de pago (2% web condicional)
       m3: 0, m3_parcial: false, lineas: 0, cajas: 0, bloques: []
     });
     const p = by.get(k);
@@ -35296,15 +35297,35 @@ async function cuarResumenCargar() {
    backend (gv_cuarentena_marcar) devuelve los que van a cuarentena por Estado o Deuda (>1000),
    con su(s) motivo(s). Se etiqueta cada pedido → aprEnCuarentena lo saca de la lista normal y lo
    pone en el sector. Vale para LK y Chef (el código es por empresa, se matchea empresa+cod). */
+function cuarItemsDe(p) {
+  const a = [];
+  (p.bloques || []).forEach(function (b) { (b.items || []).forEach(function (it) { a.push({ art: it.art, cajas: it.cajas }); }); });
+  return a;
+}
 async function cuarMarcarPedidos() {
   const peds = _apr.pedidos || [];
   if (!peds.length) { if (_pppTab === "prog") aprRender(); return; }
   try {
-    const res = (await aprRpc("gv_cuarentena_marcar", {
-      p_pedidos: peds.map(function (p) { return { order_id: String(p.order_id), empresa: p.empresa || "lk", cod: String(p.cod || "").trim() }; })
-    })) || [];
+    // (1) Estado + Deuda (por empresa+cod) y (2) Límite (valoriza + greedy, sólo web) — en paralelo.
+    const webPend = peds.filter(function (p) { return !p._demo && !p._isis; });
+    const [res, lim] = await Promise.all([
+      aprRpc("gv_cuarentena_marcar", {
+        p_pedidos: peds.map(function (p) { return { order_id: String(p.order_id), empresa: p.empresa || "lk", cod: String(p.cod || "").trim() }; })
+      }),
+      webPend.length ? aprRpc("gv_cuarentena_limite", {
+        p_pendientes: webPend.map(function (p) {
+          return { order_id: String(p.order_id), empresa: p.empresa || "lk", cod: String(p.cod || "").trim(),
+                   fecha_recep: p.fecha_recep || "", cond: p.cond || "", items: cuarItemsDe(p) };
+        })
+      }) : Promise.resolve([])
+    ]);
     const byKey = {};
-    res.forEach(function (r) { byKey[String(r.empresa) + ":" + String(r.order_id)] = r.motivos || []; });
+    (res || []).forEach(function (r) { byKey[String(r.empresa) + ":" + String(r.order_id)] = (r.motivos || []).slice(); });
+    (lim || []).forEach(function (r) {
+      const k = String(r.empresa) + ":" + String(r.order_id);
+      byKey[k] = byKey[k] || [];
+      if (byKey[k].indexOf("limite_credito") < 0) byKey[k].push("limite_credito");
+    });
     (_apr.pedidosTodos || []).forEach(function (p) {
       if (p._demo) return;
       const k = aprKey(p.empresa, p.order_id);
