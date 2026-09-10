@@ -160,6 +160,34 @@ async function traerChef(dias: number): Promise<Fila[]> {
  *  para el log. Los feeds de LK son CRUDOS a propósito: si esta llamada falla, la
  *  empresa entera falla y no se programa nada — antes que duplicar un pedido que
  *  Producción ya tiene, no tomar ninguno (2026-09-04, regla del dueño). */
+/** v14.86 — CUARENTENA: qué order_id NO se pueden programar solos (cliente con deuda,
+ *  suspendido / Sin Cta.Cte., o el pedido supera el límite de crédito). Corre las dos RPC de
+ *  Virgilio (estado+deuda y límite greedy con valorización propia). Si algo falla, devuelve vacío
+ *  (antes que frenar todo el armado por esto). Los pedidos siguen visibles en "A Programar". */
+async function pedidosEnCuarentena(emp: "lk" | "chef", filas: Fila[]): Promise<Set<string>> {
+  const porPed = new Map<string, { order_id: unknown; empresa: string; cod: string; fecha_recep: unknown; cond: string; items: { art: string; cajas: number }[] }>();
+  for (const n of filas) {
+    const k = String(n.order_id);
+    if (!porPed.has(k)) porPed.set(k, {
+      order_id: n.order_id, empresa: emp, cod: String(n.cod ?? "").trim(),
+      fecha_recep: n.fecha_recep ?? "", cond: n.condicion_pago_code != null ? String(n.condicion_pago_code) : "", items: [],
+    });
+    const p = porPed.get(k)!;
+    for (const it of (n.items as { art: string; cajas: number }[] ?? [])) p.items.push({ art: it.art, cajas: it.cajas });
+  }
+  const arr = [...porPed.values()];
+  if (!arr.length) return new Set();
+  const out = new Set<string>();
+  const [marc, lim] = await Promise.all([
+    vgRpc<{ order_id: number | string }[]>("gv_cuarentena_marcar",
+      { p_pedidos: arr.map((p) => ({ order_id: p.order_id, empresa: p.empresa, cod: p.cod })) }),
+    vgRpc<{ order_id: number | string }[]>("gv_cuarentena_limite", { p_pendientes: arr }),
+  ]);
+  for (const r of (marc ?? [])) out.add(String(r.order_id));
+  for (const r of (lim ?? [])) out.add(String(r.order_id));
+  return out;
+}
+
 async function soloPendientes(
   emp: "lk" | "chef", filas: Fila[],
 ): Promise<{ filas: Fila[]; excluidos: Record<string, number>; pedidos_crudos: number }> {
@@ -212,8 +240,13 @@ async function soloPendientes(
   const fuera = new Set(ex.map((x) => String(x.order_id)));
   const excluidos: Record<string, number> = {};
   for (const x of ex) excluidos[x.motivo] = (excluidos[x.motivo] ?? 0) + 1;
+  // v14.86 — y además, sacar los que van a CUARENTENA (no se programan solos).
+  const vivos = filas.filter((n) => !fuera.has(String(n.order_id)));
+  let cuar = new Set<string>();
+  try { cuar = await pedidosEnCuarentena(emp, vivos); } catch (_e) { /* no bloquea el armado */ }
+  if (cuar.size) excluidos["cuarentena"] = cuar.size;
   return {
-    filas: filas.filter((n) => !fuera.has(String(n.order_id))),
+    filas: vivos.filter((n) => !cuar.has(String(n.order_id))),
     excluidos, pedidos_crudos: porPedido.size,
   };
 }

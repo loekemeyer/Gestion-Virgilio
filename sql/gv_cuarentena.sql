@@ -170,3 +170,10 @@ grant execute on function public.gv_cuarentena_fuente_resumen() to authenticated
 comment on function public.gv_cuarentena_fuente_resumen() is
   'Cuarentena: conteos por (empresa, tipo) de GV_Cuarentena_Fuente para mostrar '
   'debajo de cada botón de importación. Sólo supervisor (si no, 0 filas).';
+
+-- ── v14.86/87: valorización + límite (aplicado por migraciones, la base manda) ──
+-- gv_ppp_web_valor_items(empresa,cod,items,cond) — neto sin IVA (criterio Facturación,
+--   2% web condicional por condición de pago 8,9,10,11,12,13,18; súper=lista especial).
+-- gv_cuarentena_limite(p_pendientes jsonb) — greedy con BASE (armados no facturados) por cliente.
+-- gv_cuarentena_marcar / _limite: gate es_supervisor_virgilio() OR gv_es_supervisor_o_servicio()
+--   (para que el cron service_role pueda evaluarlos). Volcar con pg_get_functiondef si se recrea.

@@ -4686,3 +4686,21 @@ pendiente tiene sus ítems (art × cajas) en el feed, y se valoriza igual que Fa
 en 0; falta sumar el neto de los pedidos programados no facturados del cliente — web + ISIS temporal);
 (b) que el **automático (crons 71/73) respete** la cuarentena. Estado/Deuda ya se pueden hacer respetar sin
 monto; el límite necesita esta valorización en el cron.
+
+### Addendum v14.87 (2026-09-10) — base del límite + el AUTOMÁTICO respeta la cuarentena
+
+- **Base (crédito ya comprometido)**: `gv_cuarentena_limite` ahora arranca el greedy con el neto de los
+  pedidos del cliente **YA ARMADOS y NO facturados** (base), no en 0. Sale de `PPP_Base_Pedidos` (ítems),
+  np→cod por `PPP_Web_Programacion` (web) + `PPP_Programacion_Diaria` (ISIS → incluye los dos canales),
+  excluyendo lo que está en `Facturacion_NP` (facturado). Se valoriza con `gv_ppp_web_valor_items` (criterio
+  Facturación). Verificado: cliente con $14,3M comprometido y límite $10M → el pendiente cae aunque sea chico.
+- **Importación NO aditiva** (dueño): cada import **borra y recarga** su fuente. Ya lo hace `gv_cuarentena_cargar`
+  (`delete where empresa+tipo` + insert). Re-importar Búsqueda CL LK reemplaza TODO lo de (lk, busqueda).
+- **El automático (crons 71/73) respeta la cuarentena**: la Edge Function `gv-ppp-web-tandas-diarias`
+  (`soloPendientes`) ahora, después del filtro de excluidos, saca los pedidos en cuarentena
+  (`pedidosEnCuarentena` → `gv_cuarentena_marcar` + `gv_cuarentena_limite`) antes de armar. Si las RPC fallan,
+  no filtra (no frena el armado). Los pedidos **siguen visibles en A Programar** (sector Cuarentena): sólo no
+  se auto-programan. Para que el cron (service_role) pueda llamar las RPC, el gate de `gv_cuarentena_marcar`
+  y `gv_cuarentena_limite` pasó a `es_supervisor_virgilio() OR gv_es_supervisor_o_servicio()`.
+- **Nota valorización de la base**: al registro armado no le queda guardada la condición de pago, así que la
+  base usa el 2% web flat (criterio Facturación); los pendientes sí aplican el 2% condicional por su `cond`.
