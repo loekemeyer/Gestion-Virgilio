@@ -12,7 +12,29 @@
 > única**; no se replica. Ante la duda entre parche rápido y fix de raíz → **fix
 > de raíz**.
 >
-> Última actualización: 2026-09-10 (jueves) · Versión app al documentar: **v14.62**
+> Última actualización: 2026-09-10 (jueves) · Versión app al documentar: **v14.69**
+>
+> Nota **v14.67–v14.69 (2026-09-10) — Cervantes: se termina la copia, `Gestion-Virgilio` pasa a ser
+> el repo fuente.** La app de Cervantes vivía en dos lados: el repo `Registro-Produccion-2.0` y la
+> **copia** pegada a mano en `/cervantes/`. La copia se había quedado **5 versiones atrás**
+> (v1.8.58 contra v1.8.63): los operarios que entraban por `/cervantes/` no tenían el popup de
+> variante de matriz, el botón **MM** ni el cambio de rotura en alimentador. Se re-sincronizó
+> (v14.67) y se alinearon los tokens de caché, que estaban desfasados **también upstream**
+> (`index.html` en `?v=1.8.59` con `app.js` en 1.8.63 → el celular seguía con el JS viejo).
+>
+> **Login (v1.9.0):** el login es **global y vive en la raíz de Gestión**; Cervantes ya no vuelve a
+> pedir el legajo cuando el operario viene logueado de ahí (lo precarga, esconde el input y saluda
+> por nombre). La sesión se comparte sola: **mismo origin** de GitHub Pages y mismo proyecto
+> Supabase. Sirve la sesión por legajo (`vir_legajo_auth`, válida el día) y la de Google (mail →
+> `Empleados`); los supervisores siguen tipeando el legajo. Sin sesión: bajo `/cervantes/` vuelve a
+> `../`, en la URL suelta cae a la pantalla de legajo de siempre.
+>
+> **Decisión del dueño (2026-09-10):** la integración es para que **los operarios de Registro
+> Producción pasen a Gestión Virgilio**. Desde ahora **el código de Cervantes se mantiene acá**, en
+> `cervantes/`; `Registro-Produccion-2.0` queda **congelado** (no se toca, no se re-sincroniza) y el
+> dueño **lo va a borrar** cuando termine la mudanza. La URL vieja se deja andando mientras tanto,
+> a propósito, sin cartel ni redirect. La cola de eventos pendientes es la misma en las dos URLs
+> (mismo origin: IndexedDB `registro-prod` + localStorage), así que el que se muda no pierde nada.
 >
 > Nota **v14.62** (front + backend) — **Legajo 600 = ENTREVISTAS / PRUEBA con nombre.** Para las
 > entrevistas de gente que va a trabajar: cada candidato entra con el legajo **600** (compartido),

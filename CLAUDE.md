@@ -340,7 +340,8 @@ Este repo junta **las dos plantas** (reemplaza al viejo repo `App-Produccion`, q
 borró). Layout:
 
 - **Raíz** → app **Virgilio** (sin cambios; la usa también la app de Play Store/TWA).
-- **`/cervantes/`** → **copia** de la app Cervantes (repo fuente `Registro-Produccion-2.0`).
+- **`/cervantes/`** → app **Cervantes** (desde 2026-09-10 **el fuente vive acá**; el repo
+  `Registro-Produccion-2.0` quedó congelado — ver más abajo).
 - **`/selector/`** → pantalla **"¿Dónde vas a trabajar hoy?"** que linkea a ambas:
   Virgilio `../` y Cervantes `../cervantes/`. Recuerda la última planta usada
   (`localStorage` `appprod_ultima_planta`, marca "Última vez"), **no redirige solo**.
@@ -352,16 +353,24 @@ borró). Layout:
 - **Entrada por defecto = Virgilio (raíz)**, no el selector (para no romper la URL
   actual ni la app de Play Store). Si se quisiera el selector como entrada, mover el
   selector a la raíz y Virgilio a `/virgilio/` (revisar TWA).
-- ⚠ **`/cervantes/` es una copia**: si Cervantes cambia en `Registro-Produccion-2.0`,
-  hay que **re-traer** los archivos (`app.js`, `index.html`, `manifest.json`,
-  `styles.css`, `sw.js`) y volver a poner el botón "Cambiar planta". Último sync desde
-  commit `68eec03` (2026-09-10, app v1.9.0). **Hoy la copia difiere del fuente en UNA
-  sola línea**: el botón **← Cambiar planta** arriba del `<h1>` de legajo en
-  `cervantes/index.html`. Todo lo demás se copia tal cual (`diff` contra el repo fuente
-  tiene que dar sólo esa línea). El **gate de sesión** ya vive upstream y se adapta
-  solo: bajo `/cervantes/` sin sesión vuelve a `../` (login global), suelto cae a la
-  pantalla de legajo. Los `?v=` y el badge van alineados a `LOCAL_VERSION` de `app.js`
-  y a `CACHE_VERSION` de `sw.js` — si se desalinean, el celular queda con el JS viejo.
+- ✅ **`/cervantes/` YA NO es una copia: es el fuente** (decisión del dueño, 2026-09-10).
+  La integración se hizo **para que los operarios de Registro Producción pasen a Gestión
+  Virgilio**, así que el código de Cervantes **se mantiene acá**, en `cervantes/`. El repo
+  `Registro-Produccion-2.0` quedó **congelado** en `68eec03` (app **v1.9.0**): no se toca,
+  no se re-sincroniza desde ahí, y el dueño **lo va a borrar** cuando termine la mudanza.
+  Su URL se deja andando mientras tanto **a propósito** — sin cartel ni redirect.
+  Nada se pierde al mudarse: es el **mismo origin** de GitHub Pages, así que la cola de
+  eventos pendientes (IndexedDB `registro-prod` + localStorage) y la sesión son las mismas
+  en las dos URLs.
+- **Login de Cervantes = el global de la raíz** (gate en el `<head>` de `cervantes/index.html`,
+  v1.9.0). Con sesión (Google autorizada, o sesión por legajo del día en `vir_legajo_auth`)
+  **no se vuelve a pedir el legajo**: lo precarga, esconde el input y saluda por nombre. Los
+  supervisores de la lista tipean el legajo. Sin sesión: bajo `/cervantes/` vuelve a `../`;
+  en la URL suelta cae a la pantalla de legajo (el gate detecta dónde corre).
+- **Al tocar Cervantes**: subir `LOCAL_VERSION` (`cervantes/app.js`), `CACHE_VERSION`
+  (`cervantes/sw.js`) y los `?v=` + el badge de `cervantes/index.html` **al mismo número**.
+  Si se desalinean, el celular se queda con el JS viejo cacheado — pasó, y por eso los
+  operarios corrieron 5 versiones atrás sin que nadie lo notara.
 
 ## Panel Web LK bajo `/admin/`
 
