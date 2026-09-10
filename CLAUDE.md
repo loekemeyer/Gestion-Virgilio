@@ -372,7 +372,11 @@ borró). Layout:
   `Empleados.Sede`; un legajo de sede V entra igual. Por eso el saludo lleva al lado
   **"¿No sos vos? Cambiar operario"** (v1.9.1): en un equipo compartido borra la sesión del
   anterior y devuelve el campo de legajo, que si no quedaba escondido y el que agarraba la
-  tablet tomaba producción con el legajo del otro.
+  tablet tomaba producción con el legajo del otro. Una sesión **de otro día** no se usa
+  (se valida `day` contra hoy AR) y desde v1.9.2 **se borra ahí mismo**, sin esperar a que
+  la limpie la raíz. Ojo: eso es la sesión de LOGIN; el **estado de trabajo** es otra cosa
+  y no se toca — vive en `prod_state_Cervantes_v2_supa::<día>::<legajo>` y su guard diario
+  retiene 14 días calendario (para no perder una matriz abierta el sábado).
 - **Al tocar Cervantes**: subir `LOCAL_VERSION` (`cervantes/app.js`), `CACHE_VERSION`
   (`cervantes/sw.js`) y los `?v=` + el badge de `cervantes/index.html` **al mismo número**.
   Si se desalinean, el celular se queda con el JS viejo cacheado — pasó, y por eso los
