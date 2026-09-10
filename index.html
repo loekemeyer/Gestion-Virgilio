@@ -7498,7 +7498,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v14.76";
+const APP_VERSION = "v14.77";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -15743,6 +15743,22 @@ function pedImpSetFiltro(solo) { if (!_stkPop || _stkPop.kind !== "pedImp") retu
 /* Filtro por PROVEEDOR: "" = todas las tarjetas (un box por proveedor), o el nombre de un proveedor = solo ese box. */
 function pedImpSetProv(provEnc) { if (!_stkPop || _stkPop.kind !== "pedImp") return; _stkPop.provFiltro = decodeURIComponent(provEnc || ""); _pedImpRender(); }
 function pedImpToggle() { if (!_stkPop || _stkPop.kind !== "pedImp") return; _stkPop.soloPedir = !_stkPop.soloPedir; _pedImpRender(); }
+/* Registrar un pedido YA HECHO por fuera (plataforma externa): busca el artículo
+   por código y carga unidades EN CURSO + fecha estimada de entrega (reutiliza
+   pedImpSetCurso). Así el motor no lo vuelve a pedir. */
+async function pedImpCargarPedidoHecho() {
+  var data = (_stkPop && _stkPop.data) || { items: [] };
+  var q; try { q = prompt("Cargar un pedido YA HECHO (plataforma externa).\n\nCódigo del artículo (ej. 026, 584E):", ""); } catch (_e) { return; }
+  if (q == null) return;
+  var norm = function (s) { s = String(s || "").toUpperCase().replace(/\s+/g, ""); return { raw: s, z: s.replace(/^0+/, "") }; };
+  var t = norm(q);
+  if (!t.raw) return;
+  var it = (data.items || []).find(function (x) { var c = norm(x.cod); return c.raw === t.raw || c.z === t.z; });
+  if (!it) { try { alert('No encontré el artículo "' + q + '" en importados.\nRevisá el código (probá con y sin la E).'); } catch (_e) {} return; }
+  var d = (it.det && it.det.length) ? it.det[0] : null;
+  if (!d) { try { alert("El artículo no tiene fila de importado para cargar."); } catch (_e) {} return; }
+  await pedImpSetCurso(d.id, encodeURIComponent(it.cod), d.curso || 0);
+}
 /* v10.38 — MASTER CAJAS del pedido, editable por código (se puede poner 0). Vacío = vuelve al
    calculado. El pedido se cuenta en master cajas REDONDAS → unidades = MC × uni_master. */
 function pedImpSetMC(codEnc, val) {
@@ -15788,7 +15804,8 @@ function _pedImpRender() {
   h += '<div style="margin-bottom:10px;display:flex;gap:8px;flex-wrap:wrap;">' +
     '<button style="' + _fbtn(soloPedir) + '" onclick="pedImpSetFiltro(true)">Solo Pedido</button>' +
     '<button style="' + _fbtn(!soloPedir) + '" onclick="pedImpSetFiltro(false)">Ver Todo</button>' +
-    '<button class="mva-clear" style="background:#166534;color:#fff;border-color:#166534" onclick="pedImpExportExcel()" title="Bajar a Excel lo que se está viendo">📥 Excel</button></div>';
+    '<button class="mva-clear" style="background:#166534;color:#fff;border-color:#166534" onclick="pedImpExportExcel()" title="Bajar a Excel lo que se está viendo">📥 Excel</button>' +
+    '<button class="mva-clear" style="background:#b45309;color:#fff;border-color:#b45309" onclick="pedImpCargarPedidoHecho()" title="Registrar un pedido ya hecho por fuera (unidades en curso + fecha estimada de entrega)">➕ Cargar pedido ya hecho</button></div>';
   // Filtro por proveedor chino: "Todos" (todas las tarjetas) o una sola.
   const provFiltro = (_stkPop.provFiltro && provOrder.indexOf(_stkPop.provFiltro) >= 0) ? _stkPop.provFiltro : "";
   if (provOrder.length > 1) {
