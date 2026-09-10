@@ -3574,10 +3574,10 @@ table.facfc-tbl tr.facneto-row-falt td{ background: #fef2f2; }
    derecha, y las pestanas pegadas abajo (mismo borde, mismo ancho). Antes las
    pestanas colgaban sueltas y no coincidian con el borde izquierdo del titulo. */
 .fac-top{
-  display: flex; justify-content: space-between; align-items: center;
-  margin-bottom: 0; flex-wrap: wrap; gap: 12px;
-  background: #fff; border: 1px solid #e2e8f0; border-bottom: none;
-  border-radius: 12px 12px 0 0; padding: 10px 14px;
+  display: flex; align-items: center;
+  margin-bottom: 12px; flex-wrap: wrap; gap: 10px 14px;
+  background: #fff; border: 1px solid #e2e8f0;
+  border-radius: 12px; padding: 10px 14px;
 }
 .fac-top h1{ font-size: 22px; margin: 0; color: #0f172a; display:flex; align-items:center; gap:8px; }
 /* Encabezado de Facturación: "Excel ISIS" y "Cerrar" van juntos en la misma línea.
@@ -4196,11 +4196,16 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
   tr.fac-en-progreso .fac-btn-tick{ background:#ea580c; }
   tr.fac-en-progreso .fac-btn-tick:hover{ background:#c2410c; }
   /* v14.30: pestañas Facturador / Conciliación */
-  .fac-tabs2{ display:flex; gap:8px; flex-wrap:wrap;
-    max-width:1400px; margin:0 auto 12px; padding:10px 14px;
-    background:#fff; border:1px solid #e2e8f0; border-top:none; border-radius:0 0 12px 12px; }
+  /* v14.80 — las pestañas van en la MISMA fila del título: ocupan el medio, así no
+     queda un hueco muerto entre el título y los botones en el monitor. */
+  .fac-tabs2{ display:flex; gap:8px; flex-wrap:wrap; align-items:center;
+    flex:1 1 auto; justify-content:flex-start; margin:0; padding:0; }
   .fac-tab2{ width:auto; margin:0; padding:8px 16px; border-radius:9px; border:1px solid #c7d2fe; background:#eef2ff; color:#3730a3; font-size:13.5px; font-weight:800; cursor:pointer; }
   .fac-tab2.on{ background:#1e6bd6; border-color:#1e6bd6; color:#fff; }
+  @media (max-width:480px){          /* celular: las 3 pestañas entran en UNA fila pareja */
+    .fac-tabs2{ display:grid; grid-template-columns:repeat(3,1fr); width:100%; }
+    .fac-tab2{ padding:8px 3px; font-size:11.5px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  }
   .fac-concil-bar{ display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin-bottom:10px; }
   .fac-concil-inp{ padding:8px 10px; border:1px solid #cbd5e1; border-radius:8px; font-size:14px; width:auto; min-width:150px; }
   .fac-concil-btn{ width:auto; padding:8px 14px; background:#1e6bd6; color:#fff; border:none; border-radius:8px; font-weight:700; cursor:pointer; }
@@ -4233,18 +4238,19 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
       <button id="facBtnRevertir" class="fac-btn-revertir" disabled onclick="facRevertir()" title="Borra todos los ticks pendientes de cierre">↺ Revertir</button>
       <span class="fac-chip"><span class="fac-dot" id="facDot"></span><span id="facStatusTxt">Cargando…</span></span>
     </div>
+    <!-- v14.30: dos pestañas — Facturador (lo de siempre) y Conciliación (snapshot vs factura ISIS).
+         v14.80: viven en la MISMA fila del título, entre el título y los 4 botones. -->
+    <div class="fac-tabs2">
+      <button id="facTab2Fact" class="fac-tab2 on" onclick="facSetTab('fact')">🧾 Facturador</button>
+      <button id="facTab2Concil" class="fac-tab2" onclick="facSetTab('concil')" title="Snapshot: lo que Gestión mandó a facturar vs el neto de la factura parseada de ISIS. Más recientes arriba.">🔍 Conciliación</button>
+      <button id="facTab2Desc" class="fac-tab2" onclick="facSetTab('desc')" title="Todo lo que se descargó: los Excel que se mandaron a ISIS (con su detalle, para volver a mirarlo o bajarlo) y las facturas en PDF que cargó ISIS.">📥 Descargas</button>
+    </div>
     <div class="fac-top-acts">
       <button id="facBtnXlsIsis" onclick="facXlsBajar()" title="Arma el Excel para importar en ISIS con las cajas ENTREGADAS de las NP de la página que marcaste. Al bajarlo, esas NP quedan FACTURADAS (es su tilde). Las NP de ISIS no van acá: se tildan.">⬇ Excel ISIS <span style="font-weight:600;opacity:.85">(NP web)</span></button>
       <button id="facBtnJsonIsis" onclick="facJsonIsis()" title="PRUEBA — TODAVÍA NO ESTÁ OPERATIVO. No envía a ISIS, no factura y no saca la NP de la lista: la facturación real se SIGUE haciendo con el Excel. Sólo arma el MISMO pedido que el Excel (cajas armadas, código con L, ruteo Tierra del Fuego) en el sobre JSON del contrato ISIS API v2.0, para copiar o descargar (prueba de conexión con Horacio).">📤 JSON ISIS <span style="font-weight:600;opacity:.85">(prueba)</span></button>
       <button id="facBtnCruce" onclick="openCobros('cruce')" title="Cruza cada NP facturada (lo que Gestión calculó con las cajas entregadas y la lista) contra la factura real que cargó ISIS (el PDF): neto, cajas y diferencia. Sólo mira, no corrige nada.">🔍 Cruce con ISIS</button>
       <button class="fac-close-btn" onclick="closeFacturacion()">Cerrar</button>
     </div>
-  </div>
-  <!-- v14.30: dos pestañas — Facturador (lo de siempre) y Conciliación (snapshot vs factura ISIS) -->
-  <div class="fac-tabs2">
-    <button id="facTab2Fact" class="fac-tab2 on" onclick="facSetTab('fact')">🧾 Facturador</button>
-    <button id="facTab2Concil" class="fac-tab2" onclick="facSetTab('concil')" title="Snapshot: lo que Gestión mandó a facturar vs el neto de la factura parseada de ISIS. Más recientes arriba.">🔍 Conciliación</button>
-    <button id="facTab2Desc" class="fac-tab2" onclick="facSetTab('desc')" title="Todo lo que se descargó: los Excel que se mandaron a ISIS (con su detalle, para volver a mirarlo o bajarlo) y las facturas en PDF que cargó ISIS.">📥 Descargas</button>
   </div>
   <!-- v14.36 — historial de descargas. El Excel se arma en el navegador y se baja: antes no
        quedaba nada y el detalle se perdía apenas cerrabas el archivo. Ahora cada descarga se
@@ -7513,7 +7519,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v14.79";
+const APP_VERSION = "v14.80";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
