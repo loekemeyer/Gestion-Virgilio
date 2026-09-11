@@ -4935,7 +4935,7 @@ suman doble el en curso y el backfill de baches les creó 2–3 baches.
 - **FOB corregido según el PI (v15.07, dueño: *"corregí FOB considerando lo de ese Excel"*)**: se cruzó
   `fob_uni` de las 13 filas Fujian contra el PI; la única diferencia era **825·CH 0,50 → 0,25** (id 76, backup
   `GV_Importados_bkp_fob825_20260911`). El resto ya coincidía. 111/112/113 (Loke) no vienen en el PI: sin tocar.
-- **uni × master corregido según el PI (v15.08, dueño: *"corregí uni x master"*)**: `Importados_Volumen` de las
+- **uni × master corregido según el PI (v15.09, dueño: *"corregí uni x master"*)**: `Importados_Volumen` de las
   13 filas Fujian pasa al **cartón real del embarque** (inner, master, medidas y m³ del "out carton" del PI; el CBM
   total del PI, 32,52 m³, cierra con esos cartones). Se alinea todo el packing y no sólo el número porque el m³ va
   atado al master. Cambios de master: 026/110/824/027/825 **96 → 144**, 440E **12 → 24**; el resto (437, 438, 439,
