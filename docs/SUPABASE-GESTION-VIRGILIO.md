@@ -5539,7 +5539,14 @@ Las 16 NP de ISIS normales, sin cambio (el fallback sólo entra cuando el valor 
 
 ---
 
-## §3.ce — El PKC dice DE DÓNDE salió cada caja (v15.41, 2026-09-11, pedido de Luis)
+## §3.«PKC-DEP» — El PKC dice DE DÓNDE salió cada caja (v15.41, 2026-09-11, pedido de Luis)
+
+> ⚠ **La letra de esta sección se asigna AL MERGEAR, no antes.** `main` se mueve muy rápido
+> (32 commits y 19 versiones en una hora el 11/09) y cada sesión que escribe acá toma la
+> letra siguiente: esta sección nació como §3.cd, tuvo que pasar a §3.ce, y para cuando se
+> mergee `main` ya va por §3.ci. Mientras viva en una rama se llama **`§3.«PKC-DEP»`**, que
+> es único y no choca con nadie. Al mergear: reemplazar por la letra libre que siga y
+> buscar `«PKC-DEP»` en el repo para actualizar las referencias de una sola pasada.
 
 **El problema.** El picking le dice al operario dónde ir: parte el artículo en **dos pasos**
 cuando hay excedente — uno de góndola con su sector y otro `art·EXC` con la ubicación del
