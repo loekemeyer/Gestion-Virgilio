@@ -4981,3 +4981,19 @@ Dueño: *"todos los datos que tengas que corregir, dale"*. Barrido sobre `v_impo
 - **Rollback**: `delete from "Importados_Mov_Stock" where ref like 'sync stock depósito 2026-09-11%'` (98 filas; o
   restaurar desde el backup); vista anterior en `sql/gv_importados_lk_ch_separados_v1501.sql`; uni×caja desde
   `GV_Importados_bkp_uxc_20260911`. SQL: `sql/gv_importados_stock_sync_v1511.sql`.
+
+### §3.bm.4 — Fechas de las impos en curso: Becky 2.ª 15/11; Kangli ya llegó (v15.12, 2026-09-11)
+
+- Dueño: *"la segunda de Becky llega 15/11"* → los 26 baches de Becky sin fecha (backfill de v14.94: 198E, 602E, 798E,
+  941E–999E) pasan a `fecha_reingreso = 2026-11-15`. La primera (19 líneas, 29/09) no cambia.
+- Dueño: *"Kangli no tiene pedido en curso, ¿no es el que llegó hace poco?"* → sí: `Movimientos_Stock` tiene la
+  **Recepción Remitos del 31/08** con las cajas exactas de cada bache (328E 168 cajas = 2.016 u, 361E 300 = 3.600,
+  363E 168, 366E 100, 367E 336, 368E 244, 810E 204, 870E 702). Los 8 baches pasan a `estado = 'llegado'` con
+  `unidades_llegadas = unidades` **sin insertar en `Importados_Mov_Stock`**: el stock del módulo ya quedó
+  sincronizado con el depósito en la v15.11 y ese depósito ya incluye la llegada; usar `gv_importado_bache_llego`
+  la habría contado dos veces. `gv_importados_resync` sobre los 34 importados → Kangli con 0 filas en curso.
+- Backup `GV_Importados_Baches_bkp_fechas_20260911` (34 filas). Rollback: `update "GV_Importados_Baches" b set
+  fecha_reingreso = k.fecha_reingreso, estado = k.estado, unidades_llegadas = k.unidades_llegadas from
+  "GV_Importados_Baches_bkp_fechas_20260911" k where k.id = b.id` + resync.
+- Quedan **sin fecha**: Hugo Wong (7 líneas, 132.336 u), Ownland (7, 81.072 u). Con fecha: Becky 29/09 y 15/11,
+  Fujian 01/11, Frontier 04/11.

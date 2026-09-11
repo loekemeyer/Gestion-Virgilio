@@ -396,3 +396,9 @@ Rollback: `update "Importados_Volumen" v set (uni_inner,uni_master,largo_cm,anch
 `ref like 'sync stock depósito 2026-09-11%'`. `Importados` ids 78/144/154: `uni_x_caja` al maestro. Backups
 `GV_Importados_Mov_Stock_bkp_20260911`, `GV_Importados_bkp_uxc_20260911`. Rollback: borrar las 98 filas por `ref`,
 vista de `sql/gv_importados_lk_ch_separados_v1501.sql`, uni×caja desde el backup. Detalle §3.bm.3.
+
+## Fechas de baches Becky / Kangli llegado — v15.12 (2026-09-11)
+
+`GV_Importados_Baches`: 26 de Becky `fecha_reingreso → 2026-11-15`; 8 de Kangli `estado → llegado`,
+`unidades_llegadas = unidades` (sin movimiento de stock). Backup `GV_Importados_Baches_bkp_fechas_20260911`.
+Rollback: restaurar fecha/estado/unidades_llegadas desde el backup por `id` + `gv_importados_resync`. Detalle §3.bm.4.
