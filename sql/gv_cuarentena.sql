@@ -238,3 +238,24 @@ as $function$
     and not exists (select 1 from public."GV_Cuarentena_Liberados" lb
                      where lb.empresa = m.empresa and lb.order_id = m.order_id);
 $function$;
+
+-- ════════════════════════════════════════════════════════════════════════════
+-- v15.04 (2026-09-11) — EL MOTIVO CON EL MONTO
+-- Dueño: *"Que diga ahí el motivo de la cuarentena: ej deuda $10000, límite de
+-- crédito superado x $100000, suspendido x pago"*.
+--
+-- Las dos RPC de marcado pasan a devolver también los NÚMEROS. Cambia el tipo de
+-- retorno, así que van con DROP + CREATE (no alcanza CREATE OR REPLACE).
+--   · gv_cuarentena_marcar → + deuda numeric, + estado text
+--   · gv_cuarentena_limite → + exceso numeric, + limite numeric
+-- La lógica de QUIÉN cae en cuarentena NO cambió (misma exención de súper de la
+-- v14.94, mismo greedy por límite): sólo se expone el detalle que ya se calculaba.
+--
+-- ⚠ OJO CON LOS PERMISOS: al dropear y recrear, Supabase le vuelve a dar EXECUTE a
+-- `anon` (event trigger propio del proyecto). Las dos son SECURITY DEFINER, así que
+-- hay que revocarlo a mano — si no, quedan ejecutables con la anon key pública.
+-- Estado correcto (el de antes): postgres, authenticated, service_role.
+--
+-- ROLLBACK: las definiciones previas están en
+-- sql/backups/cuarentena_20260911_marcar_limite_pre_v1504.sql
+-- ════════════════════════════════════════════════════════════════════════════

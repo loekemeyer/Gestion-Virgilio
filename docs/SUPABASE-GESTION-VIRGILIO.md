@@ -4808,6 +4808,44 @@ no bloquear**; umbral **$1.000**; mostrar **total + fecha de carga**; **LK y Che
   Zárate · `gv_ppp_super_mezclado` vacía.
 - **Rollback** (fila exacta): `sql/backups/cuarentena_20260911_np43_el_gran_bazar.sql`.
 
+### §3.bs.7 — v15.02-15.04 (2026-09-11): ficha de Cuarentena angosta y con el monto del motivo
+
+**Dueño (11/09):** *"la visual es espantosa"* → *"VERSIÓN ANGOSTA"* → *"que diga ahí el motivo de la
+cuarentena: ej deuda $10000, límite de crédito superado x $100000, suspendido x pago"*.
+
+**Front (`index.html`)**
+- **v15.02:** la ficha pasó a dos zonas (datos a la izquierda en `.cuar-info`, acciones a la derecha).
+  Los 3 botones dejaron de ser franjas verdes a ancho completo: ahora son compactos, con UNA sola
+  acción sólida (Enviar a programar) y las dos de WhatsApp de contorno. El m³ va pegado a la NP.
+- **v15.03:** **las fichas van ANGOSTAS**. `.apr-col-cuar .apr-scroll` es una grilla de tarjetas de
+  ~340px (`repeat(auto-fill, minmax(min(100%,300px), 340px))`): entran varias por fila y ninguna se
+  estira. Estirada quedaba con los datos a la izquierda, un mar de blanco en el medio y los botones
+  contra el borde derecho. El `min(100%, 300px)` evita que desborde dentro de una columna angosta.
+- **v15.04:** los badges muestran el monto: `💰 Deuda $291.923`, `📈 Excede crédito x $100.000`,
+  `⛔ Suspendido` (el texto del estado tal cual lo trae el reporte). El detalle viaja en
+  `p.cuarentena_detalle` y el tooltip largo repite los números. Si el monto no viene, el badge cae al
+  texto pelado de antes.
+
+**Backend (la lógica de negocio manda acá, el front sólo muestra)** — `sql/gv_cuarentena.sql`:
+- `gv_cuarentena_marcar` → ahora devuelve `(order_id, empresa, motivos[], **deuda**, **estado**)`.
+- `gv_cuarentena_limite` → ahora devuelve `(order_id, empresa, **exceso**, **limite**)`; el exceso sale
+  del mismo greedy que ya decidía la retención (`usado + monto - limite`).
+- **Quién cae en cuarentena NO cambió**: misma exención de súper de la v14.94, mismo greedy. Sólo se
+  expone el número que ya se calculaba. Medido: El Gran Bazar (lk 2375) $2.519,21 · Pérez Zárate
+  (4036) $291.923,09 · Villar (4103) $229.343,40 · Coto (801) sigue sin caer.
+- ⚠ **Cambian el tipo de retorno → van con DROP + CREATE.** Y ahí está la trampa: al recrearlas
+  Supabase le devuelve `EXECUTE` a **`anon`** (event trigger del proyecto). Las dos son
+  `SECURITY DEFINER`, así que hay que **revocárselo a mano**; si no, quedan ejecutables con la anon key
+  pública. Estado correcto y verificado después del cambio: `postgres`, `authenticated`, `service_role`.
+- La Edge Function `gv-ppp-web-tandas-diarias` sólo lee `r.order_id` de las dos, así que las columnas
+  nuevas no la tocan.
+- **Rollback:** `sql/backups/cuarentena_20260911_marcar_limite_pre_v1504.sql`.
+
+**De paso, verificado (11/09):** el armado automático **sí** respeta Cuarentena, aunque ninguna función
+`gv_ppp_web_*` la mencione — el filtro vive en la Edge Function (`pedidosEnCuarentena` dentro de
+`soloPendientes`, v14.86), que saca los retenidos antes de programar. O sea que una NP sacada de
+Programación por deuda no vuelve sola en la corrida siguiente.
+
 ## §3.bl — Baches de pedidos de importación (v14.94, 2026-09-11)
 
 **Qué:** el módulo "Pedidos Importación" ahora maneja **varios pedidos en curso por artículo, cada

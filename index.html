@@ -812,8 +812,16 @@ button {
 .apr-chip-cuar{ background:#c2410c; color:#fff; font-weight:800; }
 .apr-card-cuar{ border-left-color:#c2410c; background:#fffbf5; cursor:default; display:flex; flex-wrap:wrap; align-items:center; column-gap:14px; row-gap:8px; }
 /* v15.02 — la ficha se parte en dos: datos a la izquierda, acciones a la derecha.
-   Con flex-wrap, en una columna angosta se apilan solas como antes. */
+   Con flex-wrap, en una ficha angosta se apilan solas. */
 .cuar-info{ flex:1 1 230px; min-width:0; }
+/* v15.03 — LAS FICHAS VAN ANGOSTAS (dueño: "versión angosta"). Cuando el sector
+   Cuarentena ocupa todo el ancho de la pantalla, una ficha estirada quedaba con
+   los datos a la izquierda, un mar de blanco en el medio y los botones pegados
+   al borde derecho. Ahora son tarjetas de ancho fijo (~340px) en grilla: entran
+   varias por fila y ninguna se estira. `min(100%,300px)` en el minmax para que
+   dentro de una columna angosta de A Programar tampoco desborde. */
+.apr-col-cuar .apr-scroll{ display:grid; grid-template-columns:repeat(auto-fill, minmax(min(100%,300px), 340px)); align-content:start; gap:8px; }
+.apr-col-cuar .apr-scroll .apr-card{ margin-bottom:0; }
 .apr-cuar-motivo{ font-size:12px; color:#9a3412; margin-top:5px; font-weight:600; line-height:1.4; }
 /* v14.82 — 4 botones de importación de reportes en el sector Cuarentena */
 .cuar-tools{ display:grid; grid-template-columns:1fr 1fr; gap:6px; margin-bottom:9px; }
@@ -7614,7 +7622,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v15.03";
+const APP_VERSION = "v15.04";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -35637,17 +35645,34 @@ function aprTieneCuarMotivos(p) {
     (Array.isArray(p.cuarentena_motivos) && p.cuarentena_motivos.length)));
 }
 /* 3 badges separados (suspendido/deuda/límite), sólo los que aplican. */
+/* v15.04 (dueño: "que diga ahí el motivo de la cuarentena: ej deuda $10000") — los
+   montos vienen del backend en `cuarentena_detalle` (deuda, exceso, limite, estado).
+   Si por lo que sea no vino el número, el badge cae al texto pelado de antes. */
+function cuarPlata(n) {
+  const x = Number(n);
+  if (!isFinite(x)) return "";
+  return "$" + Math.round(Math.abs(x)).toLocaleString("es-AR");
+}
 function aprCuarBadgesHtml(p) {
   const ms = aprCuarentenaMotivos(p);
   if (!ms.length) return "";
   const has = function (x) { return ms.indexOf(x) >= 0; };
+  const d = p.cuarentena_detalle || {};
   let h = '<div class="cuar-badges">';
-  if (has("suspendido") || has("sin_cta_cte"))
-    h += '<span class="cuar-badge b-susp" title="' + (has("sin_cta_cte") ? "El cliente figura Sin Cta.Cte." : "El cliente está suspendido.") + '">⛔ ' + (has("sin_cta_cte") ? "Sin Cta.Cte." : "Suspendido") + '</span>';
-  if (has("deuda"))
-    h += '<span class="cuar-badge b-deuda" title="El cliente tiene deuda mayor a $1.000.">💰 Deuda</span>';
-  if (has("limite_credito"))
-    h += '<span class="cuar-badge b-limite" title="El pedido supera el límite de crédito del cliente.">📈 Excede crédito</span>';
+  if (has("suspendido") || has("sin_cta_cte")) {
+    // El texto sale del reporte de Cuarentena tal cual lo trae ("Suspendido",
+    // "Sin Cta.Cte."): si mañana el reporte detalla el motivo, aparece solo.
+    const txt = String(d.estado || "").trim() || (has("sin_cta_cte") ? "Sin Cta.Cte." : "Suspendido");
+    h += '<span class="cuar-badge b-susp" title="Estado del cliente en el reporte de Cuarentena: ' + escapeHtml(txt) + '">⛔ ' + escapeHtml(txt) + '</span>';
+  }
+  if (has("deuda")) {
+    const m = cuarPlata(d.deuda);
+    h += '<span class="cuar-badge b-deuda" title="El cliente tiene deuda mayor a $1.000' + (m ? " (" + m + ")" : "") + '.">💰 Deuda' + (m ? " " + m : "") + '</span>';
+  }
+  if (has("limite_credito")) {
+    const ex = cuarPlata(d.exceso), li = cuarPlata(d.limite);
+    h += '<span class="cuar-badge b-limite" title="El pedido supera el límite de crédito del cliente' + (li ? " (" + li + ")" : "") + '.">📈 Excede crédito' + (ex ? " x " + ex : "") + '</span>';
+  }
   return h + '</div>';
 }
 function aprCuarentenaMotivos(p) {
@@ -35663,7 +35688,16 @@ function aprCuarentenaEtiqueta(p) {
   return ms.length ? ms.map(function (m) { return T[m] || m; }).join(" · ") : "Retenido";
 }
 function aprCuarentenaMotivo(p) {
-  const T = { deuda: "El cliente tiene deuda mayor a $1.000.", suspendido: "El cliente está suspendido.", sin_cta_cte: "El cliente figura Sin Cta.Cte.", limite_credito: "El pedido supera el límite de crédito del cliente.", cuarentena: "Pedido retenido en cuarentena." };
+  const d = (p && p.cuarentena_detalle) || {};
+  const T = {
+    deuda: "El cliente tiene deuda" + (cuarPlata(d.deuda) ? " de " + cuarPlata(d.deuda) : " mayor a $1.000") + ".",
+    suspendido: "El cliente está " + (String(d.estado || "suspendido").trim().toLowerCase()) + ".",
+    sin_cta_cte: "El cliente figura Sin Cta.Cte.",
+    limite_credito: "El pedido supera el límite de crédito del cliente" +
+      (cuarPlata(d.limite) ? " (" + cuarPlata(d.limite) + ")" : "") +
+      (cuarPlata(d.exceso) ? " por " + cuarPlata(d.exceso) : "") + ".",
+    cuarentena: "Pedido retenido en cuarentena.",
+  };
   const ms = aprCuarentenaMotivos(p);
   return ms.length ? ms.map(function (m) { return T[m] || m; }).join(" ") : "Pedido retenido en cuarentena.";
 }
@@ -35918,17 +35952,28 @@ async function cuarMarcarPedidos() {
       aprRpc("gv_cuarentena_liberados")   // v14.88: los liberados van a la lista normal, con badge
     ]);
     const byKey = {};   // retenidos (no liberados) → sector
-    (res || []).forEach(function (r) { byKey[String(r.empresa) + ":" + String(r.order_id)] = (r.motivos || []).slice(); });
+    const detKey = {};  // v15.04: montos del motivo (deuda / exceso de crédito / estado)
+    (res || []).forEach(function (r) {
+      const k = String(r.empresa) + ":" + String(r.order_id);
+      byKey[k] = (r.motivos || []).slice();
+      detKey[k] = detKey[k] || {};
+      if (r.deuda != null) detKey[k].deuda = Number(r.deuda);
+      if (r.estado) detKey[k].estado = String(r.estado);
+    });
     (lim || []).forEach(function (r) {
       const k = String(r.empresa) + ":" + String(r.order_id);
       byKey[k] = byKey[k] || [];
       if (byKey[k].indexOf("limite_credito") < 0) byKey[k].push("limite_credito");
+      detKey[k] = detKey[k] || {};
+      if (r.exceso != null) detKey[k].exceso = Number(r.exceso);
+      if (r.limite != null) detKey[k].limite = Number(r.limite);
     });
     const libKey = {};  // liberados → badge en la lista normal
     (libs || []).forEach(function (r) { libKey[String(r.empresa) + ":" + String(r.order_id)] = (r.motivos && r.motivos.length ? r.motivos : ["cuarentena"]); });
     (_apr.pedidosTodos || []).forEach(function (p) {
       if (p._demo) return;
       const k = aprKey(p.empresa, p.order_id);
+      if (detKey[k]) p.cuarentena_detalle = detKey[k]; else if (p.cuarentena_detalle) delete p.cuarentena_detalle;
       if (libKey[k]) { p.cuarentena_motivos = libKey[k]; p._cuarLiberado = true; }
       else if (byKey[k] && byKey[k].length) { p.cuarentena_motivos = byKey[k]; p._cuarLiberado = false; }
       else { if (p.cuarentena_motivos) delete p.cuarentena_motivos; if (p._cuarLiberado) delete p._cuarLiberado; }
@@ -35940,7 +35985,8 @@ async function cuarMarcarPedidos() {
 /* Pedido de EJEMPLO para ver el sector sin datos reales (dueño: "poneme un pedido de prueba"). */
 function cuarDemoPedido() {
   return { order_id: "EJEMPLO", empresa: "lk", cod: "9999", razon_social: "CLIENTE DE EJEMPLO S.A.",
-           zona: "Zona 1 - CABA Sur", m3: 0.42, cuarentena_motivos: ["deuda", "limite_credito"], _demo: true };
+           zona: "Zona 1 - CABA Sur", m3: 0.42, cuarentena_motivos: ["deuda", "limite_credito"],
+           cuarentena_detalle: { deuda: 10000, exceso: 100000, limite: 250000 }, _demo: true };
 }
 function cuarDemoToggle() { _apr.cuarDemo = !_apr.cuarDemo; aprRender(); }
 
