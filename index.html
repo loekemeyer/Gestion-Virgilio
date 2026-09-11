@@ -1087,6 +1087,15 @@ body.apr-dnd-tanda .apr-col-nps, body.apr-dnd-tanda .apr-dia-cerrado{ opacity:.4
 .apr-sel-chip small{ font-weight:600; color:#3b82f6; }
 .apr-listo{ background:#dcfce7; border:1px solid #86efac; color:#14532d; border-radius:12px; padding:18px 16px; text-align:center; font-size:17px; }
 .apr-listo b{ color:#15803d; }
+/* v15.54 — estado de CARGA de A Programar, a propósito distinto del "Listo" verde: ámbar, punteado y
+   con el reloj pulsando. Se ve mientras controla LK + Chef (o arma) y desaparece al terminar. */
+.apr-cargando{ background:#fef3c7; border:1.5px dashed #f59e0b; color:#78350f; border-radius:12px; padding:18px 16px; text-align:center; font-size:17px; }
+.apr-cargando b{ color:#b45309; }
+.apr-cargando-ic{ display:block; font-size:26px; line-height:1; margin-bottom:6px; animation:aprPulse 1.2s ease-in-out infinite; }
+.apr-cargando-sub{ font-size:12.5px; color:#92400e; margin-top:6px; font-weight:400; line-height:1.4; }
+.apr-cargando-cuar{ font-size:14px; padding:12px 10px; }
+.apr-col-cargando .apr-col-t b{ color:#b45309; }
+@keyframes aprPulse{ 0%,100%{ opacity:1; } 50%{ opacity:.3; } }
 .apr-listo-sub{ margin-top:6px; font-size:13.5px; color:#166534; font-weight:600; }
 .apr-dia:not(.apr-dia-cerrado){ cursor:pointer; }
 .apr-dia.apr-dia-sel{ border-color:#16a34a; border-top-color:#16a34a; background:#f0fdf4; box-shadow:0 0 0 3px rgba(22,163,74,.22); }
@@ -7673,7 +7682,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v15.53";
+const APP_VERSION = "v15.54";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -35891,8 +35900,12 @@ function aprColPedidos() {
   // v13.85: el más viejo, arriba de todo (la lista ya viene ordenada por fecha de recepción)
   let viejo = null;
   for (const p of lista) { const n = aprDiasEspera(p.fecha_recep); if (n !== null && (viejo === null || n > viejo)) viejo = n; }
-  let h = '<div class="apr-col apr-col-nps">' +
-    '<div class="apr-col-t">📋 Pedidos a programar <b>(' + lista.length + ')</b>' +
+  // v15.54 (dueño: "hasta que piensa y encuentra si hay algo o no, que la visual no sea la misma que
+  // cuando ya procesó el control"): mientras controla LK + Chef (o arma), el contador va en "…" y el
+  // vacío es una caja ámbar que pulsa — nada que se parezca al "Listo" verde de cuando terminó.
+  const _cargando = !_apr.listo || aprCargandoAlgo();
+  let h = '<div class="apr-col apr-col-nps' + (_cargando ? ' apr-col-cargando' : '') + '">' +
+    '<div class="apr-col-t">📋 Pedidos a programar <b>(' + (_cargando ? '…' : lista.length) + ')</b>' +
       (viejo !== null && viejo >= 2 ? ' <span class="apr-chip apr-chip-esp' + (viejo >= 4 ? ' viejo' : ' medio') + '" title="El pedido más viejo de la lista">⏱ el más viejo, hace ' + viejo + ' días</span>' : '') +
     '</div>' +
     aprPorQueHtml(lista) +
@@ -35905,7 +35918,8 @@ function aprColPedidos() {
     h += (_apr.listo && !aprCargandoAlgo())
       ? (q ? '<div class="apr-vacio">Ningún pedido coincide con «' + escapeHtml(q) + '».</div>'
            : '<div class="apr-listo">✅ <b>Listo: no queda nada por programar.</b><div class="apr-listo-sub">Todo lo que entró ya tiene tanda y día. Si llega un pedido nuevo aparece acá solo.</div></div>')
-      : '<div class="apr-vacio">⏳ Controlando en Supabase si hay pedidos nuevos…</div>';
+      : '<div class="apr-cargando"><span class="apr-cargando-ic">⏳</span><b>Todavía controlando…</b>' +
+        '<div class="apr-cargando-sub">Estoy leyendo LK y Chef en Supabase. Hasta que termine no sé si hay pedidos para programar.</div></div>';
   }
   for (const p of lista) {
     const id = "p" + p.order_id, ab = !!_apr.exp[id];
@@ -36036,13 +36050,16 @@ function aprColCuarentena() {
   // v14.90: cargar (una vez) los contactos WhatsApp de los retenidos reales
   if (_apr.cuarContacto === null && !_apr.cuarContactoLoading && lista.some(function (p) { return !p._demo; })) cuarContactoCargar();
   if (_apr.cuarDemo) lista = [cuarDemoPedido()].concat(lista);   // v14.84: pedido de ejemplo
-  let h = '<div class="apr-col apr-col-cuar">' +
-    '<div class="apr-col-t">🚧 Cuarentena <b>(' + lista.length + ')</b>' +
+  const _cuarCargando = !_apr.listo || aprCargandoAlgo();   // v15.54: mismo criterio que la columna de pedidos
+  let h = '<div class="apr-col apr-col-cuar' + (_cuarCargando ? ' apr-col-cargando' : '') + '">' +
+    '<div class="apr-col-t">🚧 Cuarentena <b>(' + (_cuarCargando ? '…' : lista.length) + ')</b>' +
       '<span class="apr-cuar-help" title="Pedidos de clientes con deuda, suspendidos o que superan su límite de crédito. No se programan (ni a mano ni por el automático): hay que liberarlos primero.">ⓘ</span>' +
     '</div>' +
     cuarDemoRowHtml();   // v14.88: los 4 botones de importación se movieron a "Config. Cuarentena"
   if (!lista.length) {
-    h += '<div class="apr-vacio">Sin pedidos retenidos. Acá caen los de clientes con <b>deuda</b>, <b>suspendidos</b> o que <b>superan su límite de crédito</b>: no se programan solos.</div>';
+    h += _cuarCargando
+      ? '<div class="apr-cargando apr-cargando-cuar"><span class="apr-cargando-ic">⏳</span><b>Todavía controlando…</b></div>'
+      : '<div class="apr-vacio">Sin pedidos retenidos. Acá caen los de clientes con <b>deuda</b>, <b>suspendidos</b> o que <b>superan su límite de crédito</b>: no se programan solos.</div>';
     return h + '</div>';
   }
   h += '<div class="apr-scroll">';
