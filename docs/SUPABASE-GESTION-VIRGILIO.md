@@ -5512,8 +5512,27 @@ RR pasan a `gv_vista_control_remitos`; la cola de impresión, a `gv_vista_cola_i
 **Lo que NO estaba roto:** Carga Camión (`fetchCCData`) y Control Remitos (`fetchCCRData`) sacan la
 razón social de `Facturacion_NP`, que sí tiene las NP web (`LK 0001`, `LK 0003`, `LK 0011`).
 
-**Caso aparte que sigue vacío:** `98665` (D50E) — NP de ISIS sin fila en `PPP_Programacion_Diaria`;
-no es del formato nuevo y no se tocó.
+### §3.cd.1 — 98665: las NP de ISIS que ya salieron de la Programación también se completan (v15.44, 2026-09-11)
+
+Thomas pidió revisar la única fila que seguía vacía. **No era un dato perdido:** `98665` es
+**Merajver Marcelo Fabian (cod 2193)**, tanda **D50E**, facturada el **02/09** y con salida el 02/09
+— pero el operario le hizo CCR el 08/09 y CCN el **10/09**, así que volvió a caer en RR. Para
+entonces ISIS ya la había sacado de `PPP_Programacion_Diaria` (hay hueco entre 98664 y 98666) y
+nunca llegó a `PPP_Entregados_Meta`, así que las dos fuentes de la vista vieja estaban vacías.
+
+El dato sí existe en otras dos tablas: **`Facturacion_NP`** (razón social) y **`Entregas_Virgilio`**
+(`cod_cliente`). `gv_vista_control_remitos` suma las dos como último fallback, después del valor
+original y de `PPP_Web_Programacion`:
+
+| Fuente, en orden | Completa | Para qué NP |
+|---|---|---|
+| `vista_control_remitos` (ISIS) | cod + rs | las normales |
+| `PPP_Web_Programacion` | cod + rs | web (`LK 0003`) |
+| `Facturacion_NP` | rs | ISIS ya facturada y fuera de Programación |
+| `Entregas_Virgilio` | cod | ídem |
+
+**Medición:** las **18** filas de RR quedan con cliente; `98665` → `2193 · Merajver Marcelo Fabian`.
+Las 16 NP de ISIS normales, sin cambio (el fallback sólo entra cuando el valor viejo viene vacío).
 
 **Rollback:** apuntar el front a `vista_control_remitos` / `vista_cola_impresion` y
 `drop view public.gv_vista_control_remitos, public.gv_vista_cola_impresion;`
