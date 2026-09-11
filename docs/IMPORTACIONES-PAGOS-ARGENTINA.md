@@ -192,3 +192,76 @@ Lo que eso implica para el modelo:
 - BCRA, SEPAIMPO — Com. "A" 5060 y régimen informativo de seguimiento de pagos de importaciones.
 - Resúmenes de prensa especializada (aduananews, El Cronista, despachantesargentinos) sobre el
   pasaje de las SIRA al pago "a la vista" y los errores que bloquean pagos.
+
+## 4. El Excel de la cuenta NTL, importado (v15.89, 11/09/2026)
+
+Thomas mandó `Cuenta_Corriente_NTL.xlsx`: **6 hojas** — `Cuenta Corriente NTL` (la cuenta de Hong
+Kong entera, 179 movimientos desde el 19/06/2024), `Cuenta Corriente CH` (**la parte de Chef de esa
+misma cuenta**, 73 movimientos — no es un filtro: los importes son la porción de Chef), `Ownland`,
+`Frontier`, `Becky` y `Resumen`.
+
+### Cómo funciona el circuito (esto es lo que faltaba entender)
+
+1. **Entra efectivo a NTL** (`Efectivo Recibido`, "USD Depositados Efectivo (Damian)") — u$s
+   **140.300** en total. Cada depósito paga **3 % de "comisión por subida"** (transfer a Hong Kong).
+2. **NTL le gira a la fábrica**: `Advance` (el 30 %) y después `Balance` (el 70 %), cada uno con sus
+   **gastos bancarios** (u$s 7 a 15 por transferencia, a veces 60-100). Total transferido:
+   **u$s 385.462**.
+3. **Cuando la carga se nacionaliza entra el RECUPERO** (`Recupero NTL (proveedor)`): la plata vuelve
+   a NTL porque recién ahí se puede girar legalmente desde Argentina (§1). Total recuperado:
+   **u$s 241.021**. Sobre cada recupero NTL cobra su **5 % ("5% NTL s/FC")**.
+4. **Comisiones y gastos acumulados: u$s 20.389.**
+
+O sea que el "recupero de dólares al exterior" del que habla Thomas **es el crédito que repone el
+saldo de NTL**, y el ciclo se cierra ahí.
+
+**La columna `Empresa`** reparte cada movimiento en **`D`** (el efectivo depositado, todavía sin
+asignar), **`TN`** (Tierra Nativa) y **`CH`** (Chef) — los dos importadores que ya usa el módulo.
+
+### La imputación cruzada YA estaba en el Excel
+
+Las hojas por proveedor (`Ownland`, `Frontier`) tienen exactamente las tres patas que en §3 quedaron
+como "lo que todavía no está":
+
+| Columna | Qué es |
+|---|---|
+| **`Salido por`** | el **canal**: `NTL` o `Bco` (giro directo). Confirma el "hay casos y casos" |
+| **`A través de`** | la **carga/FC con la que se pagó** — la pata legal |
+| **`Fue a`** | la **carga que queda cubierta** — la pata comercial |
+
+Ejemplo textual de la hoja Ownland: `15/07/2025 · 4.719,84 · Bco · a través de CQ-9154 · fue a
+CQ-9342A`. Eso es, tal cual, pagar un pedido con la factura de otra carga.
+
+### Qué se importó
+
+| Tabla | Qué trae |
+|---|---|
+| **`GV_Imp_NTL_Mov`** | 252 movimientos: hoja `NTL` (179) + hoja `CH` (73), con fecha, descripción, débito/crédito/saldo, origen-destino, referencia (el proveedor), empresa y tipo (`T` transferencia / `G` gasto / `DEV`) |
+| **`GV_Imp_Prov_Mov`** | 28 movimientos de las hojas `Ownland` (21) y `Frontier` (7), con `salido_por`, `a_traves_de` y `fue_a` |
+
+**Importación FIEL: no se interpretó ni se corrigió nada.** Cada fila guarda su número de fila del
+Excel (`fila`) para poder volver al original.
+
+**Chequeo contra los totales que el propio Excel trae arriba**: créditos de la hoja NTL
+**406.081,80** contra los **406.082** del resumen, y créditos de la hoja CH **196.214,36** contra
+**196.214**. Cierran. En Ownland, girado 157.594,40 − recuperos 157.560,40 = **34**, que es la
+"Deuda real" que muestra esa hoja.
+
+### Lo que no cierra y espera a Thomas
+
+1. **Ownland: dos FOB distintos.** Esta planilla dice **34.956** (`China 52` / `CQ-9694`, y la fila
+   199 del ledger: *"FOB 34956 − 14000 Adelanto = 20.956"*), y la planilla de deudas del mismo día
+   decía **46.626**. El sistema tiene cargado 46.626.
+2. **Becky 1.ª carga.** La hoja `Becky` dice: 1.ª carga 23.622,50 con **anticipo 6.920,86** y
+   **16.701,60 pendientes**. En el sistema `PI B260601` figura con **0 pagado**, porque la planilla
+   de deudas no lo traía. Falta cargar ese anticipo.
+3. **Qué es `D`.** Por los movimientos parece el efectivo depositado todavía sin repartir entre TN y
+   CH, pero es una lectura mía, no un dato.
+4. **Cuatro fechas con el año cambiado** en el Excel (filas 35, 37, 43 de la hoja NTL y 28, 30, 32 de
+   la CH: dicen 2025/2026 donde por la secuencia del saldo van 2024/2025). **Se importaron tal cual.**
+
+### Lo que sigue
+
+La cuenta de NTL como **saldo propio** (entra lo que se le gira, sale lo que le paga a cada fábrica)
+ya tiene los datos para calcularse. Falta atar cada movimiento al `pedido_ref` del módulo y llevar
+`a_traves_de` / `fue_a` a `GV_Imp_Pagos`, que hoy sólo tiene `factura_ref` como texto libre.

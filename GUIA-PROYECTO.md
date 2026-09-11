@@ -11238,6 +11238,18 @@ distinta, empresa distinta.
 > **Marcado sin tocar**: Frontier FOB 14.400 vs 14.000 del motor y su llegada (04/11) que no cierra con el
 > embarque 26/10; Becky 2ª con el 30% pagado el 02/jun y 112 días hasta embarcar.
 
+> Nota **2026-09-11 (v15.89) — Importado el Excel de la cuenta corriente de NTL (6 hojas, 280 movimientos).**
+> Ahora está entendido el circuito completo: entra **efectivo** a NTL (u$s 140.300, con 3% de comisión por
+> subida) → NTL **gira** a la fábrica el Advance 30% y después el Balance 70% (u$s 385.462, con gastos
+> bancarios) → cuando la carga se nacionaliza entra el **RECUPERO** (u$s 241.021), que es la plata que
+> vuelve porque recién ahí se puede girar desde Argentina, y ahí NTL cobra su **5% s/FC**. Comisiones y
+> gastos acumulados: u$s 20.389. La columna `Empresa` reparte en **D** (efectivo sin asignar), **TN** y **CH**.
+> **Hallazgo**: la imputación cruzada que faltaba modelar **ya estaba en sus hojas por proveedor** —
+> `Salido por` (NTL o Bco), `A través de` (la carga con la que se pagó) y `Fue a` (la que queda cubierta).
+> Importado FIEL a `GV_Imp_NTL_Mov` (252) y `GV_Imp_Prov_Mov` (28); los totales cierran con los del Excel.
+> Detalle y lo que no cierra (el FOB de Ownland, el anticipo de la 1.ª Becky) en
+> **`docs/IMPORTACIONES-PAGOS-ARGENTINA.md` §4**.
+
 > Nota **2026-09-11 — Cómo se pagan las importaciones (marco para la cuenta corriente).**
 > Thomas explicó la operatoria: se le gira a **NTL**, un freight forwarder de Hong Kong, y **la salida de
 > dólares viaja siempre pegada a una importación YA NACIONALIZADA** (desde la Com. "A" 8226 del BCRA,
