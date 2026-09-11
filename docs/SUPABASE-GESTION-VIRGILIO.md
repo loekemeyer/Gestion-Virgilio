@@ -4769,6 +4769,28 @@ no bloquear**; umbral **$1.000**; mostrar **total + fecha de carga**; **LK y Che
   `ch_ppp_reader`; el `create user mapping if not exists` respetó el viejo y el SELECT se denegaba. Se borró
   `chef_gv_reader` y se le dio el grant al rol que Chef ya usa.
 
+### §3.bs.5 — v14.94 (2026-09-11): los SÚPER no se analizan por deuda + Pérez Zárate fuera de PPP
+
+**Regla del dueño (11/09):** *"Coto es súper. Los súper no se analiza si tiene o no tiene deuda."*
+
+- **`gv_cuarentena_marcar`** (backend, así el cron 71/73 también la respeta): la regla de **deuda** se
+  saltea cuando `(empresa, cod)` figura en **`cobranzas_cliente_cadena`** (la tabla de cadenas de súper:
+  12 lk + 2 ch; la misma que usa `gv_vista_cruce_facturacion.es_super`). **Trampa:** ahí Chef está como
+  `'ch'` y en `GV_Cuarentena_Fuente` como `'chef'` → el join normaliza. Estado (suspendido / sin cta.
+  cte.) y límite **no cambian**. Verificado con payload directo: Coto (lk 801, $132k) y Cencosud (chef
+  2444, $17,8M) **no caen**; Villar (4103) sí. Definición en `sql/gv_cuarentena.sql` (bloque v14.94);
+  rollback en `sql/backups/cuarentena_20260911_np56_perez_zarate_y_marcar_pre_super.sql`.
+- **Pérez Zárate S.R.L. (lk 4036, pedido 1380, NP 56) sacado de Programación** por pedido del dueño: se
+  había programado el 09/09 18:00 (tanda E12D, entrega 17/09), **antes** de que existiera el dato de
+  deuda (10/09 17:27), así que la regla no lo pudo frenar. Mecanismo = el del resync: se borró **sólo** la
+  fila de `PPP_Web_Programacion`, con guarda "tanda sin arrancar" (E12D: 0 eventos EP/TP/AP/TAP/CC; las
+  otras 5 NP de la tanda —46, 47, 54, 60, 61— quedan). La NP 56 y sus 14 ítems (`PPP_Web_Base`,
+  `LK 0056`) se dejan para reprogramar. Ahora figura **retenido en Cuarentena** (deuda $291.923) junto
+  con Villar. Los otros dos que se colaron antes de la carga: **Coto (NP 49, E16A)** ya no aplica (súper) y
+  **El Gran Bazar (NP 43, E12A, deuda $2.519)** queda como está salvo que el dueño diga lo contrario.
+- **Auditoría del mismo día:** las 4 importaciones siguen siendo la carga inicial del 10/09 (lote
+  `inicial_20260910`, `cargado_por` n8n) — Luis todavía no importó nada. Liberados: 0.
+
 ## §3.bl — Baches de pedidos de importación (v14.94, 2026-09-11)
 
 **Qué:** el módulo "Pedidos Importación" ahora maneja **varios pedidos en curso por artículo, cada

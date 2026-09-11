@@ -188,3 +188,53 @@ comment on function public.gv_cuarentena_fuente_resumen() is
 -- FRONT v14.88: los 4 botones de importación viven en la pestaña "Config. Cuarentena" (PPP,
 --   a la derecha de Ocupación); el sector Cuarentena muestra la ficha rediseñada (NP grande,
 --   zona, m³, razón social, 3 badges y botón "Enviar a Pedidos a programar") + timer de carga.
+
+-- ============================================================================
+-- v14.94 (2026-09-11) — gv_cuarentena_marcar: los SÚPER quedan EXENTOS de la regla de deuda
+-- Dueño: "Coto es súper. Los súper no se analiza si tiene o no tiene deuda."
+-- Fuente de "es súper": cobranzas_cliente_cadena (empresa, cod_cliente, super_key).
+-- OJO: ahí Chef figura como 'ch'; en GV_Cuarentena_Fuente como 'chef' → se normaliza.
+-- Estado (suspendido / sin cta. cte.) y límite de crédito NO cambian.
+-- Verificado: Coto (lk 801, $132k) y Cencosud (chef 2444, $17,8M) no caen; Villar (4103) sí.
+-- Backup de la definición previa: sql/backups/cuarentena_20260911_np56_perez_zarate_y_marcar_pre_super.sql
+-- ============================================================================
+create or replace function public.gv_cuarentena_marcar(p_pedidos jsonb)
+returns table(order_id text, empresa text, motivos text[])
+language sql
+security definer
+set search_path to 'public'
+as $function$
+  with ped as (
+    select nullif(trim(e->>'order_id'), '') as order_id,
+           lower(coalesce(e->>'empresa','lk')) as empresa,
+           nullif(trim(e->>'cod'), '') as cod
+    from jsonb_array_elements(coalesce(p_pedidos, '[]'::jsonb)) e
+  ),
+  marca as (
+    select p.order_id, p.empresa,
+      array_remove(array[
+        (select case when f.estado ilike '%suspend%' then 'suspendido'
+                     when f.estado ilike '%sin%cta%' then 'sin_cta_cte'
+                     when f.suspendido is true then 'suspendido' end
+           from public."GV_Cuarentena_Fuente" f
+          where f.empresa = p.empresa and f.tipo = 'busqueda'
+            and f.cod = p.cod and f.suspendido is true limit 1),
+        (select 'deuda' from public."GV_Cuarentena_Fuente" f
+          where f.empresa = p.empresa and f.tipo = 'deuda'
+            and f.cod = p.cod and coalesce(f.deuda,0) > 1000
+            and not exists (
+              select 1 from public.cobranzas_cliente_cadena cc
+               where cc.cod_cliente = p.cod
+                 and lower(cc.empresa) in (p.empresa, case p.empresa when 'chef' then 'ch' when 'ch' then 'chef' else p.empresa end))
+          limit 1)
+      ], null) as motivos
+    from ped p
+    where p.cod is not null and p.order_id is not null
+  )
+  select m.order_id, m.empresa, m.motivos
+  from marca m
+  where array_length(m.motivos, 1) >= 1
+    and (es_supervisor_virgilio() or gv_es_supervisor_o_servicio())
+    and not exists (select 1 from public."GV_Cuarentena_Liberados" lb
+                     where lb.empresa = m.empresa and lb.order_id = m.order_id);
+$function$;
