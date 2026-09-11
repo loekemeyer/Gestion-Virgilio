@@ -4787,9 +4787,26 @@ no bloquear**; umbral **$1.000**; mostrar **total + fecha de carga**; **LK y Che
   otras 5 NP de la tanda —46, 47, 54, 60, 61— quedan). La NP 56 y sus 14 ítems (`PPP_Web_Base`,
   `LK 0056`) se dejan para reprogramar. Ahora figura **retenido en Cuarentena** (deuda $291.923) junto
   con Villar. Los otros dos que se colaron antes de la carga: **Coto (NP 49, E16A)** ya no aplica (súper) y
-  **El Gran Bazar (NP 43, E12A, deuda $2.519)** queda como está salvo que el dueño diga lo contrario.
+  **El Gran Bazar (NP 43, E12A, deuda $2.519)** quedó como estaba hasta que el dueño lo mandó a Cuarentena
+  (§3.bs.6, v15.01).
 - **Auditoría del mismo día:** las 4 importaciones siguen siendo la carga inicial del 10/09 (lote
   `inicial_20260910`, `cargado_por` n8n) — Luis todavía no importó nada. Liberados: 0.
+
+### §3.bs.6 — v15.01 (2026-09-11): El Gran Bazar (NP 43) fuera de PPP → Cuarentena
+
+**Dueño (11/09):** *"El gran bazar, pasalo a cuarentena."* Mismo mecanismo que Pérez Zárate (§3.bs.5):
+
+- **El Gran Bazar S.R.L (lk 2375, pedido 1369, NP 43)** se había programado el 08/09 16:30 en **E12A**
+  (entrega 18/09, Soldati / Exp. Tradelog), **antes** de que existiera el dato de deuda (10/09 17:27).
+  Deuda en `GV_Cuarentena_Fuente`: **$2.519,21**. Liberados: 0.
+- Se borró **sólo** la fila de `PPP_Web_Programacion`, con guarda "tanda sin arrancar" en la misma
+  sentencia (E12A: 0 eventos EP/TP/AP/TAP/CC). La tanda queda con **7 NP**. La NP 43 (`PPP_Web_NP`) y
+  sus 7 ítems (`PPP_Web_Base`, `LK 0043`: 031x3, 034x2, 395x1, 544x4, 585Ex2, 587x2, 591x1) se dejan
+  para reprogramar. `PPP_Web_Tanda_Items`: 0 filas.
+- **Verificado después:** `PPP_Web_Programacion` sin 1369 · `gv_cuarentena_marcar` (como supervisor)
+  devuelve `motivos = {deuda}` para 1369 → figura **retenido en Cuarentena** junto con Villar y Pérez
+  Zárate · `gv_ppp_super_mezclado` vacía.
+- **Rollback** (fila exacta): `sql/backups/cuarentena_20260911_np43_el_gran_bazar.sql`.
 
 ## §3.bl — Baches de pedidos de importación (v14.94, 2026-09-11)
 
