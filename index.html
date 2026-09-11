@@ -7794,7 +7794,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v15.91";
+const APP_VERSION = "v15.92";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -32370,7 +32370,7 @@ function pppResumenHtml(prog) {
     const _rep = _venc.filter(function (p) { return _pppEstadoPed(p) !== "armado"; }).length;
     head += '<div class="ppp-res-note' + (_rep ? ' rep' : '') + '">⏰ <b>' + _nVenc + '</b> pedido(s) con fecha de entrega vencida: ' +
       (_rep ? '<b>' + _rep + ' sin salir → hay que reprogramar</b>' + (_nVenc - _rep ? ' · ' : '') : '') +
-      (_nVenc - _rep ? (_nVenc - _rep) + ' con la tanda armada y el remito sin marcar' : '') + '. ' +
+      (_nVenc - _rep ? (_nVenc - _rep) + ' con la tanda armada y la Carga Camión sin registrar' : '') + '. ' +
       // v13.94 (dueño: "tengo que entrar a Resumen para que me aparezca el botón que me lleve de
       // nuevo a Programación, una locura"): antes esto hacía pppTab('plan') + pppPlanAbrir('venc'),
       // o sea te sacaba de la solapa. Ahora la lista se abre ACÁ, debajo del cartel.
@@ -33719,7 +33719,12 @@ function _pppPlanDiaHtml(programados, key, opts) {
         }).join('') + '</div>' +
         '<div class="h">La tanda nunca se armó, así que el pedido no subió a ningún camión. ' + (_puedeReprog ? 'Volvelo a programar (<b>📅 Reprogramar</b> / <b>↩ A Programar</b>) o dalo de baja con <b>🚫 Cancelar</b>.' : 'Ponele fecha nueva (✏️ Editar en su tanda, abajo) o sacalo de ISIS.') + '</div></div>';
     }
-    h += '<div class="pn-note"><b>' + sinRem + '</b> ' + (sinRem === 1 ? 'pedido salió' : 'pedidos salieron') + ' con la tanda armada y nadie marcó el remito. A las <b>36 h</b> del armado pasan solos a <b>En Salida</b>, donde se cierran con <b>Controlado</b> (o ↩ si la mercadería volvió).</div>';
+    // v15.92 — el texto decía que "a las 36 h pasan solos a En Salida". Desde la v15.85 NO: a En Salida
+    // entra sólo lo que tiene Carga Camión (CCN) y fecha de carga (dueño: "acá no puede haber ningún pedido
+    // sin fecha, ni pedidos que no se hayan cargado a un camión"). El camino real es registrar la carga
+    // desde Carga Camión, que es lo que faltó: ahí el pedido pasa a En Salida y se cierra con Recepción
+    // Remitos. Dejar el texto viejo mandaba a la operadora a esperar algo que ya no pasa.
+    if (sinRem) h += '<div class="pn-note"><b>' + sinRem + '</b> ' + (sinRem === 1 ? 'pedido salió' : 'pedidos salieron') + ' con la tanda armada y <b>nadie registró la Carga Camión</b>. Mientras no se registre, el pedido queda acá: no entra a <b>En Salida</b> y no se puede cerrar. El que lo cargó tiene que marcarlo en <b>Carga Camión</b> — de ahí pasa a En Salida y se cierra con <b>Recepción Remitos</b>. Si la mercadería nunca salió, <b>📅 Reprogramar</b> o <b>🚫 Cancelar</b>.</div>';
   }
   const dk = esVenc ? "venc" : key;
   for (const c of cams) {
@@ -33776,7 +33781,7 @@ function _pppPlanDiaHtml(programados, key, opts) {
       let carga = "";
       if (esVenc) {
         carga = e === "armado"
-          ? '<div class="pn-carga"><span class="t">salió · <b>marcar remito</b></span></div>'
+          ? '<div class="pn-carga"><span class="t">salió · <b>falta la Carga Camión</b></span></div>'
           : '<div class="pn-carga"><span class="t rep">⚠ NO SALIÓ<br>reprogramar</span></div>';
       } else if (oc) {
         const esPrimero = primero && p === primero;

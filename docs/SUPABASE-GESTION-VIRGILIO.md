@@ -7596,3 +7596,32 @@ filas de cada código traía `gond = 0`.
 
 **Archivo:** `sql/gv_saldos_group_by_funciones_v1589.sql` · migración `gv_saldos_group_by_funciones_v1589`
 · backup de las definiciones previas en `sql/backups/funciones_vista_saldos_stock_20260911_pre_v1589.sql`.
+
+### §3.cn.1 — v15.92: el cartel de vencidos prometía algo que la v15.85 apagó
+
+Al sacar de En Salida lo que no tiene Carga Camión quedó un texto viejo mintiendo en la lista de
+**vencidos** de Programación:
+
+> *"N pedidos salieron con la tanda armada y nadie marcó el remito. **A las 36 h del armado pasan
+> solos a En Salida**, donde se cierran con Controlado."*
+
+Eso era la v15.55 (`armada_sin_carga`), que la v15.85 desactivó: **ya no pasan solos**. La
+operadora iba a esperar un pase automático que no va a ocurrir. Ahora dice lo que corresponde:
+
+> *"N pedidos salieron con la tanda armada y **nadie registró la Carga Camión**. Mientras no se
+> registre, el pedido queda acá: no entra a En Salida y no se puede cerrar. El que lo cargó tiene
+> que marcarlo en **Carga Camión** — de ahí pasa a En Salida y se cierra con **Recepción Remitos**.
+> Si la mercadería nunca salió, 📅 Reprogramar o 🚫 Cancelar."*
+
+Es el flujo que ya existe, no uno nuevo: **el que cargó el camión es el que marca la carga**. Por
+eso no se agregó ningún botón de "dar por cargado" desde el escritorio — escribiría un CCN sin
+legajo real de quien cargó, y la vista justamente descarta los CCN de legajo de prueba.
+
+También se ajustaron dos etiquetas que decían lo mismo viejo: la celda de la fila
+(`salió · marcar remito` → **`salió · falta la Carga Camión`**) y el cartel de Resumen
+(`… y el remito sin marcar` → **`… y la Carga Camión sin registrar`**).
+
+**Estado al cerrar (11/09):** quedan **15** pedidos en esa lista, todos de ISIS y todos con la
+tanda armada (TAP), esperando decisión de Thomas — 6 sin fecha de entrega (98585..98590, D56D,
+armadas 03/09, facturadas 04/09, **con CCR**: control de remitos hecho y carga sin registrar) y 9
+vencidas (44612..44617 Cencosud D72B/D72C, 98480/98481 D47B armadas el **27/08**, 98530 D60C).
