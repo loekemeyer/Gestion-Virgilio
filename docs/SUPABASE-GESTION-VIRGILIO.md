@@ -4932,9 +4932,11 @@ suman doble el en curso y el backfill de baches les creó 2–3 baches.
 - **Efecto en la página LK**: `lk_reingresos_feed()` ya devuelve 01/11 para 26, 27, 110, 35E, 438E, 439E y
   440E; hoy todos con `sin_stock=false` (el stock físico cubre lo pedido), así que la leyenda "Reingreso Est"
   no se ve hasta que alguno se quede sin stock. El cron 39 de LK lo espeja cada 30 min.
-- **Diferencias PI vs. ficha, NO tocadas (decisión del dueño)**: 825·CH FOB 0,50 en ficha vs **0,25** en el PI;
-  uni/master 824 y 825 = 96 en ficha vs **144** en el PI; 440E = 12 vs **24**. Si se corrigen, también hay que
-  revisar el m³ master (`Importados_Volumen`), que va atado al master.
+- **FOB corregido según el PI (v15.07, dueño: *"corregí FOB considerando lo de ese Excel"*)**: se cruzó
+  `fob_uni` de las 13 filas Fujian contra el PI; la única diferencia era **825·CH 0,50 → 0,25** (id 76, backup
+  `GV_Importados_bkp_fob825_20260911`). El resto ya coincidía. 111/112/113 (Loke) no vienen en el PI: sin tocar.
+- **Diferencias de uni/master NO tocadas**: 824 y 825 = 96 en ficha vs **144** en el PI; 440E = 12 vs **24**. Si se
+  corrigen, también hay que revisar el m³ master (`Importados_Volumen`), que va atado al master.
 - **Rollback**: `delete from "GV_Importados_Baches" where creado_por = 'PI HT26-06-600-R1'` (6 filas) +
   `select gv_importados_resync(id)` para 63, 65, 66, 67, 68, 164; `delete from "Importados" where id = 164`;
   `update "Importados" set cod_art='439E' where id=68`; `delete from "Importados_Volumen" where cod='439EL'`.

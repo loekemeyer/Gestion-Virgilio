@@ -376,3 +376,8 @@ id 68 `cod_art 439E→439EL`; alta id 164 (439E·CH). `Importados_Volumen`: alta
 Backups `GV_Importados_bkp_439_20260911`, `GV_Importados_Volumen_bkp_439_20260911`. Rollback: borrar los 6
 baches + `gv_importados_resync` de 63/65/66/67/68/164, `delete "Importados" id=164`, `update id=68 cod_art='439E'`,
 `delete "Importados_Volumen" cod='439EL'`. Detalle §3.bm.2.
+
+## FOB 825·CH según PI Fujian — v15.07 (2026-09-11)
+
+`Importados` id 76 (825·CH): `fob_uni 0.5 → 0.25`. Backup `GV_Importados_bkp_fob825_20260911`.
+Rollback: `update "Importados" set fob_uni = 0.5 where id = 76`. Detalle §3.bm.2.
