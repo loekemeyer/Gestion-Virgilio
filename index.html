@@ -7716,7 +7716,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v15.76";
+const APP_VERSION = "v15.77";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -8550,6 +8550,10 @@ document.getElementById("btnHistDias").addEventListener("click", openHistoryModa
    pisa/agrega a la estática. Si la tabla no existe o no hay red, no rompe nada:
    queda la planimetría estática. v2.78. */
 async function loadPlanimetriaRemote() {
+  // v15.77 — la fuente pasa a ser GV_Lugar (vía gv_lugar_articulo). Si no está o
+  // viene vacía, cae a "Planimetria" como siempre. Ninguno de los 25 consumidores
+  // de window.GONDOLA se entera: la FORMA no cambia.
+  if (await _gondolaDesdeGvLugar()) return;
   try {
     // OJO: sin `&_=`+Date.now() acá. PostgREST lo interpreta como filtro de una
     // columna inexistente y devuelve 400. El anti-caché lo da `cache:"no-store"`.
@@ -8564,6 +8568,51 @@ async function loadPlanimetriaRemote() {
       if (cod) window.GONDOLA[cod] = [String(row.sector || ""), (row.orden != null ? Number(row.orden) : 0)];
     });
   } catch (_e) { /* offline / sin tabla: queda la planimetría estática */ }
+}
+
+/* v15.77 — Llena window.GONDOLA desde GV_Lugar / GV_Lugar_Item (vista
+   gv_lugar_articulo) en vez de la tabla "Planimetria". Devuelve true si pudo.
+
+   ⚠ Mantiene la MISMA forma y las MISMAS claves, a propósito:
+
+   · `cod` pelado → el PRIMER lugar del recorrido de ese código. La tabla vieja
+     guardaba un solo sector por código; acá un código puede estar en varios
+     (el 437E está en F09-F12), así que se toma el de menor `orden`, que es al que
+     el operario llega primero.
+   · `cod + " " + empresa` (437E LK) → se sigue generando para los códigos que
+     viven en las DOS empresas. No es que nos guste: es que `pkCodEmpresa` todavía
+     lo busca, y si desaparece de golpe el picking cae al código pelado — que para
+     el 809E es la góndola de CHEF (M13) y ahí el operario trae un Corta Queso en
+     vez de un Corta Pizza. Esas claves se dejan de generar en el paso 2 del
+     `docs/PLAN-SACAR-SUFIJO-EMPRESA.md`, cuando los lectores ya no las usen.
+
+   O sea: misma salida, otra fuente. El cambio es dónde se lee, nada más. */
+async function _gondolaDesdeGvLugar() {
+  try {
+    const r = await fetch(SUPABASE_URL + "/rest/v1/gv_lugar_articulo?select=cod,empresa,sector,orden&tipo=eq.gondola&order=orden.asc&limit=5000",
+      { headers: { "apikey": SUPABASE_KEY, "Authorization": "Bearer " + SUPABASE_KEY }, cache: "no-store" });
+    if (!r.ok) return false;
+    const rows = await r.json();
+    if (!Array.isArray(rows) || !rows.length) return false;   // sin datos → que siga Planimetria
+    if (!window.GONDOLA) window.GONDOLA = {};
+    const empresasDe = {};
+    rows.forEach(function (x) {
+      const c = String(x.cod || "").trim().toUpperCase(); if (!c) return;
+      (empresasDe[c] || (empresasDe[c] = {}))[String(x.empresa || "").toUpperCase()] = 1;
+    });
+    rows.forEach(function (x) {
+      const c = String(x.cod || "").trim().toUpperCase(); if (!c) return;
+      const sec = String(x.sector || ""), ord = (x.orden != null ? Number(x.orden) : 0);
+      // rows viene ordenado por `orden`, así que el primero que toca cada clave es
+      // el de menor orden: sólo se escribe si no estaba.
+      if (!window.GONDOLA[c]) window.GONDOLA[c] = [sec, ord];
+      if (Object.keys(empresasDe[c] || {}).length > 1) {
+        const k = c + " " + String(x.empresa || "").toUpperCase();
+        if (!window.GONDOLA[k]) window.GONDOLA[k] = [sec, ord];
+      }
+    });
+    return true;
+  } catch (_e) { return false; }   // sin red / sin vista → cae a Planimetria
 }
 loadPlanimetriaRemote();   // al arrancar (para que el picking tenga la planimetría fresca)
 

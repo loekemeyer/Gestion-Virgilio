@@ -175,7 +175,7 @@ código ni datos. Si algo se ve raro el primer día, se apaga eso y se mira con 
 ## 6. Lo que falta construir antes de poder ejecutar esto
 
 - [x] **El editor fundido** — hecho en la **v15.76**. Ver abajo.
-- [ ] **Enrutar `window.GONDOLA`** a `gv_lugar_articulo` (§2.d).
+- [x] **Enrutar `window.GONDOLA`** a `gv_lugar_articulo` — hecho en la **v15.77**. Ver abajo.
 - [ ] **Regenerar `planimetria.js`** desde las tablas nuevas.
 - [x] Test del editor (`tests/lugar-editor.cjs`, 18 chequeos, ya en `tests/run.sh`).
 
@@ -210,3 +210,39 @@ patrón que `planim_write` / `cap_write`.
 ⚠ **`stkCapImport` no se replicó** a propósito: hace `DELETE ?id=gt.0` y recarga de un
 Excel. Sobre `GV_Lugar_Item` eso borra la planimetría entera. Si se quiere importador, va
 por `upsert` por `(sector, cod, clase)`.
+
+
+### El enrutamiento de `window.GONDOLA` (v15.77) — qué cambia en pantalla
+
+`loadPlanimetriaRemote` ahora llena `GONDOLA` desde `gv_lugar_articulo`. Si la vista no
+está, viene vacía o no hay red, **cae a `Planimetria`** como siempre (los tres caminos
+testeados). **Los 25 consumidores no se tocaron**: misma forma, otra fuente.
+
+Comparada la `GONDOLA` vieja contra la nueva sobre datos reales:
+
+| | |
+|:--|--:|
+| Mismo sector | 319 |
+| **Sector distinto** | **30** |
+| Sólo en la vieja | 20 (Acacia, los de 0 cajas, grafías — ya documentados) |
+| Sólo en la nueva | 0 |
+
+Los 30 son de dos clases, ninguna es un error:
+
+1. **El pelado apunta ahora al primer lugar del RECORRIDO.** `Planimetria` guardaba *un*
+   sector por código, arbitrario. El 437E está en F09–F12: la vieja decía F09, la nueva
+   dice **F12**, que es por donde el operario pasa primero. Camina menos.
+2. **Correcciones del relevamiento.** El `513` decía F13 —que es donde está el 438E— y el
+   depósito lo ubicó en F30.
+
+⚠ **Sobre el `orden`:** se verificó contra `Planimetria`, que es la verdad del recorrido —
+**22 pares invertidos de 42.195 (0,05 %)**. El recorrido está bien. (Una medición anterior
+contra la numeración del pasillo daba 265 "fuera de secuencia" y era un falso positivo: el
+recorrido real no sigue los números, pasa por F12 antes que por F09.)
+
+Las claves con sufijo (`437E LK`) **se siguen generando** para los códigos que viven en las
+dos empresas: `pkCodEmpresa` todavía las busca, y si desaparecen de golpe el picking cae al
+pelado — que para el 809E es la góndola de Chef. Se dejan de generar en el paso 2 del
+`PLAN-SACAR-SUFIJO-EMPRESA.md`.
+
+**Test:** `tests/gondola-gv-lugar.cjs` (10 chequeos, en la suite).

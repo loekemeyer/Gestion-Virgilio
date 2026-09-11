@@ -362,3 +362,6 @@ PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node te
 
 echo "== lugar-editor (v15.76: editor de LUGARES — GV_Lugar/GV_Lugar_Item, un código en varios lugares) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/lugar-editor.cjs
+
+echo "== gondola-gv-lugar (v15.77: window.GONDOLA sale de GV_Lugar, no de Planimetria) =="
+PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/gondola-gv-lugar.cjs
