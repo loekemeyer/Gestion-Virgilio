@@ -11238,6 +11238,15 @@ distinta, empresa distinta.
 > **Marcado sin tocar**: Frontier FOB 14.400 vs 14.000 del motor y su llegada (04/11) que no cierra con el
 > embarque 26/10; Becky 2ª con el 30% pagado el 02/jun y 112 días hasta embarcar.
 
+> Nota **2026-09-11 (v15.90) — La cuenta de NTL andando en la app: solapa 💱 NTL.**
+> Cuarta solapa del módulo de importación, con el **extracto navegable** del forwarder de Hong Kong: saldo de
+> hoy (**u$s 230,43**), saldo por empresa (**D** 129.601 · **TN** −76.857 · **CH** −52.513), los acumulados del
+> circuito y los **recuperos pendientes** (u$s 42.908). Cada movimiento queda clasificado (ingreso / recupero /
+> giro / comisión / gasto bancario) con lo que dice el propio Excel. **Prueba de integridad: el saldo corrido
+> recalculado coincide fila por fila con el del Excel — 177 filas, 0 diferencias.**
+> Y de paso salió que **el bloque resumen del Excel tiene dos números viejos**: el saldo de CH y un "Saldo
+> Final" de 12.335,33 que en realidad es el del 05/01/2026. §5 de `docs/IMPORTACIONES-PAGOS-ARGENTINA.md`.
+
 > Nota **2026-09-11 (v15.89) — Importado el Excel de la cuenta corriente de NTL (6 hojas, 280 movimientos).**
 > Ahora está entendido el circuito completo: entra **efectivo** a NTL (u$s 140.300, con 3% de comisión por
 > subida) → NTL **gira** a la fábrica el Advance 30% y después el Balance 70% (u$s 385.462, con gastos

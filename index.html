@@ -16620,6 +16620,7 @@ function _impTabsHtml(cur) {
   return '<div style="display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap">' +
     '<button style="' + t(cur === 'ped') + '" onclick="openPedidosImportacion()">📦 Pedidos</button>' +
     '<button style="' + t(cur === 'curso') + '" onclick="openImpEnCurso()" title="Los pedidos YA HECHOS que vienen en camino: qué día embarcan y qué día llegan. No mira lo que hay que pedir.">🚢 En curso</button>' +
+    '<button style="' + t(cur === 'ntl') + '" onclick="openImpNtl()" title="La cuenta corriente de NTL, el forwarder de Hong Kong: depósitos, giros a las fábricas, recuperos y comisiones.">💱 NTL</button>' +
     '<button style="' + t(cur === 'prov') + '" onclick="stkOpenProvImp()">🏭 Proveedores</button></div>';
 }
 async function stkOpenProvImp() {
@@ -18028,6 +18029,135 @@ async function impPagoBorrar(pagoId) {
   try { await _pedImpRpc("gv_imp_pago_borrar", { p_pago_id: pagoId }); _impPagos.dirty = true; }
   catch (e) { try { alert("No se pudo borrar: " + (e.message || e)); } catch (_e) {} return; }
   await _impPagosReload();
+}
+/* v15.90 — Solapa 💱 NTL: la cuenta corriente del forwarder de Hong Kong, que hasta ahora vivía
+   sólo en el Excel de Thomas. El circuito (efectivo → advance/balance a la fábrica → recupero
+   cuando se nacionaliza, con el 3% de subida y el 5% de NTL sobre la FC) está en
+   docs/IMPORTACIONES-PAGOS-ARGENTINA.md §4. Backend: gv_imp_ntl_resumen / _mov / _pendientes
+   sobre GV_Imp_NTL_Mov (importación fiel del Excel, saldo verificado fila por fila). */
+var _impNtl = null;
+async function openImpNtl() {
+  _stkPopShell("💱 Cuenta corriente NTL (Hong Kong)", "stkPopBody", true);
+  const body = document.getElementById("stkPopBody"); if (!body) return;
+  body.innerHTML = '<div class="stkpop-empty">Cargando la cuenta de NTL…</div>';
+  _stkPop = { kind: "impNtl" };
+  _impNtl = { resumen: [], movs: [], pend: [], empresa: "", prov: "", n: 60 };
+  await impNtlReload();
+}
+async function impNtlReload() {
+  if (!_impNtl) return;
+  try {
+    _impNtl.resumen = (await _pedImpRpc("gv_imp_ntl_resumen", {})) || [];
+    _impNtl.pend    = (await _pedImpRpc("gv_imp_ntl_pendientes", {})) || [];
+    _impNtl.movs    = (await _pedImpRpc("gv_imp_ntl_mov", { p_limit: _impNtl.n,
+                        p_empresa: _impNtl.empresa || null, p_proveedor: _impNtl.prov || null })) || [];
+  } catch (e) { _impNtl.err = (e.message || String(e)); }
+  _impNtlRender();
+}
+/* devuelven la promesa del reload: el extracto se vuelve a pedir al backend con el filtro puesto */
+function impNtlSetEmpresa(v) { if (!_impNtl) return; _impNtl.empresa = v || ""; return impNtlReload(); }
+function impNtlSetProv(enc) { if (!_impNtl) return; _impNtl.prov = decodeURIComponent(enc || ""); return impNtlReload(); }
+function impNtlMas() { if (!_impNtl) return; _impNtl.n = Math.min(500, (_impNtl.n || 60) + 100); return impNtlReload(); }
+/* Nombre legible de cada empresa del extracto. D = el efectivo depositado que todavía no se
+   repartió entre los dos importadores (lectura de los movimientos, a confirmar con Thomas). */
+function _impNtlEmpNom(e) {
+  if (e === "TN") return "Tierra Nativa";
+  if (e === "CH") return "Chef";
+  if (e === "D") return "Depósitos sin asignar";
+  return e || "—";
+}
+function _impNtlClaseChip(c) {
+  const m = { ingreso: ["ing", "💵 ingreso"], recupero: ["rec", "♻️ recupero"], giro: ["gir", "🏭 giro"],
+              comision: ["com", "comisión"], gasto_bancario: ["gas", "gasto banc."], devolucion: ["dev", "devolución"] };
+  const x = m[c] || ["otr", c || "—"];
+  return '<span class="intl-c ' + x[0] + '">' + x[1] + '</span>';
+}
+function _impNtlNum(n, dec) {
+  const v = Number(n) || 0;
+  return v.toLocaleString("es-AR", { minimumFractionDigits: dec || 0, maximumFractionDigits: dec || 0 });
+}
+function _impNtlRender() {
+  const body = document.getElementById("stkPopBody"); if (!body || !_stkPop || _stkPop.kind !== "impNtl") return;
+  if (!document.getElementById("impNtlCss")) {
+    const st = document.createElement("style"); st.id = "impNtlCss";
+    st.textContent =
+      ".intl-tbl{width:100%;border-collapse:collapse;background:#fff;border:1px solid #e2e8f0;border-radius:12px;overflow:hidden}" +
+      ".intl-tbl th{font-size:10.5px;text-transform:uppercase;letter-spacing:.3px;color:#64748b;font-weight:800;padding:8px 7px;border-bottom:2px solid #e2e8f0;text-align:left;white-space:nowrap}" +
+      ".intl-tbl td{padding:6px 7px;border-bottom:1px solid #f1f5f9;font-size:12.5px;color:#0f172a;vertical-align:middle}" +
+      ".intl-tbl td.num,.intl-tbl th.num{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}" +
+      ".intl-c{font-size:10.5px;font-weight:800;padding:2px 7px;border-radius:999px;white-space:nowrap}" +
+      ".intl-c.ing{background:#ecfdf5;color:#047857}.intl-c.rec{background:#eff6ff;color:#1d4ed8}" +
+      ".intl-c.gir{background:#fff7ed;color:#b45309}.intl-c.com{background:#fef2f2;color:#b91c1c}" +
+      ".intl-c.gas{background:#f8fafc;color:#64748b}.intl-c.dev{background:#faf5ff;color:#7c3aed}" +
+      ".intl-c.otr{background:#f1f5f9;color:#475569}" +
+      ".intl-neg{color:#b91c1c;font-weight:800}.intl-pos{color:#065f46;font-weight:800}";
+    document.head.appendChild(st);
+  }
+  const st = _impNtl;
+  let h = _impTabsHtml('ntl');
+  h += '<div class="stkpop-hint">La cuenta del <b>forwarder de Hong Kong</b>, importada del Excel de Thomas (saldo verificado <b>fila por fila</b> contra el original). El circuito: entra <b>efectivo</b> (3% de comisión por subida) → NTL le <b>gira</b> a la fábrica el Advance 30% y el Balance 70% → cuando la carga se nacionaliza entra el <b>recupero</b> y NTL cobra su <b>5% s/FC</b>. <code>D</code> = depósitos todavía sin repartir entre Tierra Nativa y Chef.</div>';
+  if (st.err) h += '<div class="stkpop-empty" style="color:#b91c1c">No se pudo leer: ' + escapeHtml(st.err) + '</div>';
+
+  const total = (st.resumen || []).reduce(function (a, r) { return a + (Number(r.saldo) || 0); }, 0);
+  const pend = (st.pend || []).reduce(function (a, r) { return a + (Number(r.monto) || 0); }, 0);
+  h += '<div class="imcu-kpi">' +
+    '<div style="background:#eef2ff;border:1px solid #c7d2fe"><div class="k" style="color:#4338ca">Saldo en NTL hoy</div><div class="v" style="color:#3730a3">u$s ' + _impNtlNum(total) + '</div></div>' +
+    (st.resumen || []).map(function (r) {
+      const s = Number(r.saldo) || 0;
+      return '<div style="background:#f8fafc;border:1px solid #e2e8f0"><div class="k" style="color:#475569">' + escapeHtml(_impNtlEmpNom(r.empresa)) + '</div>' +
+        '<div class="v" style="color:' + (s < 0 ? "#b91c1c" : "#065f46") + '">u$s ' + _impNtlNum(s) + '</div>' +
+        '<div style="font-size:10.5px;color:#94a3b8;font-weight:700">' + r.movimientos + ' mov.</div></div>';
+    }).join('') +
+    '</div>';
+  if (pend > 0) {
+    h += '<div style="margin-bottom:10px;padding:9px 13px;background:#eff6ff;border:1px solid #bfdbfe;border-radius:10px;font-size:12.5px;color:#1e3a8a">' +
+      '<b>♻️ Recuperos pendientes: u$s ' + _impNtlNum(pend) + '</b> — ' +
+      (st.pend || []).map(function (r) { return escapeHtml(r.concepto || '') + ' <b>' + _impNtlNum(r.monto) + '</b>' + (r.empresa ? ' <span style="opacity:.7">(' + escapeHtml(r.empresa) + ')</span>' : ''); }).join(' · ') +
+      '. Son los <b>directos</b>, sin pasar por NTL.</div>';
+  }
+  // acumulados del circuito
+  const suma = function (campo) { return (st.resumen || []).reduce(function (a, r) { return a + (Number(r[campo]) || 0); }, 0); };
+  h += '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;font-size:12px;color:#475569">' +
+    '<span style="background:#ecfdf5;border:1px solid #a7f3d0;border-radius:8px;padding:5px 10px">💵 Depositado <b>' + _impNtlNum(suma('ingresos')) + '</b></span>' +
+    '<span style="background:#fff7ed;border:1px solid #fed7aa;border-radius:8px;padding:5px 10px">🏭 Girado a fábricas <b>' + _impNtlNum(suma('girado_a_fabricas')) + '</b></span>' +
+    '<span style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;padding:5px 10px">♻️ Recuperado <b>' + _impNtlNum(suma('recuperos')) + '</b></span>' +
+    '<span style="background:#fef2f2;border:1px solid #fecaca;border-radius:8px;padding:5px 10px">Comisiones + gastos <b>' + _impNtlNum(suma('comisiones') + suma('gastos_bancarios')) + '</b></span>' +
+    '</div>';
+
+  // filtros
+  const _fb = function (on) { return 'width:auto;margin:0;flex:0 0 auto;padding:6px 12px;border-radius:999px;border:1px solid ' + (on ? '#0f766e' : '#cbd5e1') + ';background:' + (on ? '#0f766e' : '#fff') + ';color:' + (on ? '#fff' : '#334155') + ';font-size:12.5px;font-weight:800;cursor:pointer'; };
+  h += '<div class="imcu-fila"><span class="imcu-lbl">Empresa:</span>' +
+    '<button style="' + _fb(!st.empresa) + '" onclick="impNtlSetEmpresa(\'\')">Todas</button>' +
+    ['D', 'TN', 'CH'].map(function (e) { return '<button style="' + _fb(st.empresa === e) + '" onclick="impNtlSetEmpresa(\'' + e + '\')">' + escapeHtml(_impNtlEmpNom(e)) + '</button>'; }).join('') +
+    '</div>';
+  const provs = [];
+  (st.movs || []).forEach(function (m) { if (m.proveedor && provs.indexOf(m.proveedor) < 0) provs.push(m.proveedor); });
+  provs.sort();
+  if (st.prov && provs.indexOf(st.prov) < 0) provs.unshift(st.prov);
+  if (provs.length > 1) {
+    h += '<div class="imcu-fila"><span class="imcu-lbl">🏭 Proveedor:</span>' +
+      '<button style="' + _fb(!st.prov) + '" onclick="impNtlSetProv(\'\')">Todos</button>' +
+      provs.map(function (p) { return '<button style="' + _fb(st.prov === p) + '" onclick="impNtlSetProv(\'' + encodeURIComponent(p).replace(/'/g, "%27") + '\')">' + escapeHtml(p) + '</button>'; }).join('') +
+      '</div>';
+  }
+
+  h += '<div class="mva-tblwrap wide"><table class="intl-tbl">' +
+    '<thead><tr><th>Fecha</th><th>Movimiento</th><th>Tipo</th><th>Proveedor</th><th>Empresa</th><th class="num">Débito</th><th class="num">Crédito</th><th class="num">Saldo</th></tr></thead><tbody>';
+  (st.movs || []).forEach(function (m) {
+    const sal = Number(m.saldo) || 0;
+    h += '<tr>' +
+      '<td style="white-space:nowrap">' + (m.fecha ? _isoToDdMmAa(String(m.fecha).slice(0, 10)) : '<span style="color:#94a3b8">—</span>') + '</td>' +
+      '<td>' + escapeHtml(m.descripcion || '—') + (m.origen_destino ? '<div style="font-size:10.5px;color:#94a3b8">' + escapeHtml(String(m.origen_destino).slice(0, 70)) + '</div>' : '') + '</td>' +
+      '<td>' + _impNtlClaseChip(m.clase) + '</td>' +
+      '<td style="font-size:12px">' + escapeHtml(m.proveedor || '—') + '</td>' +
+      '<td style="font-size:11.5px;color:#64748b">' + escapeHtml(m.empresa || '—') + '</td>' +
+      '<td class="num">' + (Number(m.debito) > 0 ? '<span class="intl-neg">' + _impNtlNum(m.debito, 2) + '</span>' : '') + '</td>' +
+      '<td class="num">' + (Number(m.credito) > 0 ? '<span class="intl-pos">' + _impNtlNum(m.credito, 2) + '</span>' : '') + '</td>' +
+      '<td class="num" style="font-weight:800;color:' + (sal < 0 ? '#b91c1c' : '#0f172a') + '">' + _impNtlNum(sal) + '</td></tr>';
+  });
+  h += '</tbody></table></div>';
+  if ((st.movs || []).length >= (st.n || 60)) h += '<button class="apr-mas" onclick="impNtlMas()">Ver más movimientos</button>';
+  body.innerHTML = h;
 }
 function _impCursoLineasHtml(ls) {
   if (!ls.length) return '<div style="padding:10px 14px;color:#64748b;font-size:12.5px">Este pedido no tiene líneas en curso.</div>';
