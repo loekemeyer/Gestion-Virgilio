@@ -3651,6 +3651,41 @@ Detalle completo, con los pasos en orden, en `docs/PENDIENTES-PIPELINE-GESTION.m
 
 ---
 
+## 4.c `gv_venta_mensual_cliente` — quién compró, por artículo y mes (v15.81, 2026-09-11)
+
+Pedido del dueño: *"desde stock y compras, poder tocar en 1 mes y ver quién me compró (solo los
+primeros 5 clientes de cada mes y un sexto con Resto)"*, en **cajas**.
+
+`vista_venta_mensual` agrupa por `(cod, mes)` y pierde el **quién**. La vista nueva es su hermana
+abierta por cliente. **Objeto nuevo con prefijo `gv_`: no se tocó nada existente.**
+
+- `security_invoker = true`, `grant select` a `anon` y `authenticated`.
+- `Entregas_Virgilio` sólo guarda `cod_cliente`, así que la razón social se resuelve en cascada:
+  `PPP_Entregados_Meta.rs` (la más reciente por cod) → `PPP_Programacion_Diaria.razon_social` →
+  `GV_Clientes_Direcciones.razon_social` (el padrón) → el cod pelado. **Sin el 3er paso quedaban 8
+  clientes sin nombre**; con él, 0.
+- DDL versionado en `sql/gv_venta_mensual_cliente_v1581.sql`.
+
+**Impacto medido** (la consulta que lo prueba, no "no debería afectar"):
+
+```sql
+select (select count(*) from public.vista_venta_mensual) pares_viejo,
+       (select count(*) from (select distinct cod, mes from public.gv_venta_mensual_cliente) x) pares_nuevo,
+       (select count(*) from public.gv_venta_mensual_cliente) filas,
+       (select count(*) from public.gv_venta_mensual_cliente where razon_social ~ '^\d+$') sin_nombre,
+       (select count(*) from (
+          select v.cod from public.vista_venta_mensual v
+          join (select cod, mes, sum(cajas) cajas from public.gv_venta_mensual_cliente group by 1,2) c
+            on c.cod = v.cod and c.mes = v.mes where v.cajas <> c.cajas) d) difs;
+```
+
+→ `pares_viejo 845 · pares_nuevo 845 · filas 8.866 · sin_nombre 0 · difs 0`.
+
+**Rollback:** `drop view public.gv_venta_mensual_cliente;` — no la lee nadie más que el detalle de
+Abastecimiento, y Producción no la conoce.
+
+---
+
 ## 5. Pendientes
 
 > 📌 La lista **de negocio** de lo que falta para cerrar el pipeline —la nota que dejó el
