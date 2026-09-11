@@ -402,3 +402,10 @@ vista de `sql/gv_importados_lk_ch_separados_v1501.sql`, uni×caja desde el backu
 `GV_Importados_Baches`: 26 de Becky `fecha_reingreso → 2026-11-15`; 8 de Kangli `estado → llegado`,
 `unidades_llegadas = unidades` (sin movimiento de stock). Backup `GV_Importados_Baches_bkp_fechas_20260911`.
 Rollback: restaurar fecha/estado/unidades_llegadas desde el backup por `id` + `gv_importados_resync`. Detalle §3.bm.4.
+
+## PI Ownland OL-10139 + embarque de julio cerrado — v15.13 (2026-09-11)
+
+`GV_Importados_Baches`: +13 (`creado_por='PI OL-10139'`), 7 del backfill → `llegado` sin stock. `Importados`: alta id 165
+(119E), id 129 `fob_uni 0.7→0.47`. `Importados_Volumen`: alta 119E; 729E y 877E al PI. `Importados_Mov_Stock`: +1 `inicial` 0
+(119E). Backups `GV_Importados_Baches_bkp_ownland_20260911`, `GV_Importados_bkp_ownland_20260911`,
+`GV_Importados_Volumen_bkp_ownland_20260911`. Detalle y rollback §3.bm.5.

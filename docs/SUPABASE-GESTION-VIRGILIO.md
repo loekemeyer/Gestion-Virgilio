@@ -4997,3 +4997,28 @@ Dueño: *"todos los datos que tengas que corregir, dale"*. Barrido sobre `v_impo
   "GV_Importados_Baches_bkp_fechas_20260911" k where k.id = b.id` + resync.
 - Quedan **sin fecha**: Hugo Wong (7 líneas, 132.336 u), Ownland (7, 81.072 u). Con fecha: Becky 29/09 y 15/11,
   Fujian 01/11, Frontier 04/11.
+
+### §3.bm.5 — PI Ownland OL-10139 cargado; el embarque de julio cerrado como llegado (v15.13, 2026-09-11)
+
+- **PI OL-10139** (02/09/2026, FOB Shenzhen, 1×20', 98.376 u, u$s 13.988, *lead time 60 días desde el depósito*):
+  13 baches `en_curso` con `creado_por = 'PI OL-10139'` y **sin fecha** (el PI no trae la fecha del depósito; cuando
+  el dueño la dé se carga). Líneas: 729E·CH 2.160, 525E 12.096, 585E 6.840, 809E·LK 1.632 (corta pizza, "original
+  809ENS"; irá como 820E cuando el dueño lo dé de alta), 119E·Loke 1.872, 809E·CH 7.200, 819E 2.448, 702E·CH 6.192,
+  817E 1.440, 816E 6.144, 725E·CH 1.728, 877E·CH 1.536, **1000903 47.088 → cargado sobre 1546903** (id 153: es la
+  misma parte "cheese cutter without handle", mismo packing 48/144 y 28,5×14,5×29,5; el PI la renombra).
+  Chequeo: `sum(unidades - unidades_llegadas)` de Ownland `en_curso` = **98.376**.
+- **Los 7 baches de Ownland del backfill** (1546903 42.768, 503E 2.448, 525E 3.168, 574E 17.136, 702E 6.624, 725E
+  4.896, 809E·CH 4.032) eran el **embarque que entró el 22–23/07** (`Movimientos_Stock` tipo `ingreso`: 503E 204
+  cajas = 2.448 u, 525E 132 = 3.168, 574E 1.428 = 17.136, 702E 552 = 6.624, 725E 204 = 4.896, 809E 336 = 4.032).
+  Pasan a `llegado` **sin movimiento de stock** (el módulo ya está sincronizado con el depósito, v15.11).
+- **119E** (Corta queso Loke x12, Ownland, FOB 0,47, 12 u/caja) dado de alta: `Importados` id 165 + `Importados_Volumen`
+  (12/144, 44×26×28, 0,032032) + un `inicial` de 0 en `Importados_Mov_Stock` para que las entregas futuras resten.
+- **Datos corregidos según el PI**: FOB 809E·CH **0,70 → 0,47** (id 129); packing 729E (72/ctn, 42,5×27×36,
+  0,04131) y 877E (96/ctn, 51,5×31×37, 0,05907). **No tocado**: `Importados_Volumen` de 809E es UNA fila compartida
+  por 809E·LK (corta pizza, en el PI 96/ctn 54×33,5×32) y 809E·CH (corta queso, 144/ctn 44×26×28): queda la de CH,
+  que es la línea grande; el corta pizza tendrá su packing cuando exista 820E.
+- Backups `GV_Importados_Baches_bkp_ownland_20260911`, `GV_Importados_bkp_ownland_20260911`,
+  `GV_Importados_Volumen_bkp_ownland_20260911`. Rollback: `delete from "GV_Importados_Baches" where creado_por =
+  'PI OL-10139'`; restaurar estado/unidades_llegadas de los 7 viejos desde el backup; `delete from "Importados" where
+  id = 165` (+ su volumen y su `inicial`); FOB y volumen desde los backups; `gv_importados_resync` de cada importado.
+- **Impos en curso ahora**: Becky 29/09 y 15/11, Fujian 01/11, Frontier 04/11, Ownland sin fecha, Hugo Wong sin fecha.
