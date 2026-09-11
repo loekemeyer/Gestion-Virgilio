@@ -320,3 +320,30 @@ función devuelve lo mismo para el llamador legítimo (verificado: `ventas_mensu
 
 > Estos backups son tablas en `public`. Borrarlos cuando el cambio esté consolidado y ya no se
 > quiera el rollback (`drop table public.gv_bkp_precios_venta_20260908;` …).
+
+## Baches de importación — v14.94 (2026-09-11)
+
+**Objeto compartido tocado:** `public."Importados"` (columnas `pedido_curso`, `reingreso_est`) — ahora
+las escribe `gv_importados_resync()` como mirror de la tabla nueva `GV_Importados_Baches`. Objetos
+nuevos (no de Producción): tabla `GV_Importados_Baches` + RPCs `gv_importado_bache_*` /
+`gv_importados_resync` / `gv_importado_baches`.
+
+**Impacto medido:** backfill = 69 filas / 360.952 u; el mirror da los MISMOS valores que había (no cambia
+`enCurso` ni el feed a LK). Prueba 934E: 2 baches → reingreso = fecha más cercana; anular restaura.
+
+**Backup:** `public."GV_Importados_curso_bkp_20260911"` (id, cod_art, marca, pedido_curso, reingreso_est).
+
+**Rollback exacto:**
+```sql
+update public."Importados" im
+set pedido_curso = b.pedido_curso, reingreso_est = b.reingreso_est
+from public."GV_Importados_curso_bkp_20260911" b where b.id = im.id;
+drop function if exists public.gv_importado_baches(bigint);
+drop function if exists public.gv_importado_bache_borrar(bigint);
+drop function if exists public.gv_importado_bache_editar(bigint,numeric,date,boolean);
+drop function if exists public.gv_importado_bache_llego(bigint,numeric,text);
+drop function if exists public.gv_importado_bache_add(bigint,numeric,date,text);
+drop function if exists public.gv_importados_resync(bigint);
+drop table if exists public."GV_Importados_Baches";
+```
+Y revertir `index.html` (el "Cargar pedido ya hecho" volvía a `importados_set_curso` + PATCH `reingreso_est`).

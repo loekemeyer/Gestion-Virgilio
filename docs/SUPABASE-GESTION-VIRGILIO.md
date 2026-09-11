@@ -4768,3 +4768,28 @@ no bloquear**; umbral **$1.000**; mostrar **total + fecha de carga**; **LK y Che
   el rato**: mi setup creaba un rol nuevo `chef_gv_reader`, pero el user mapping preexistente apuntaba a
   `ch_ppp_reader`; el `create user mapping if not exists` respetó el viejo y el SELECT se denegaba. Se borró
   `chef_gv_reader` y se le dio el grant al rol que Chef ya usa.
+
+## §3.bl — Baches de pedidos de importación (v14.94, 2026-09-11)
+
+**Qué:** el módulo "Pedidos Importación" ahora maneja **varios pedidos en curso por artículo, cada
+uno con su propia fecha de reingreso** (antes había 1 sola: la segunda pisaba la primera).
+
+**Fuente de verdad:** tabla nueva `GV_Importados_Baches` (RLS on, sin policies anon; acceso sólo por
+RPCs `SECURITY DEFINER`). `Importados.pedido_curso` y `reingreso_est` quedan como **mirror derivado**
+que recalcula `gv_importados_resync(importado_id)`:
+- `pedido_curso` (por fila) = suma pendiente de baches en curso de esa fila.
+- `reingreso_est` (por cod `gv_cod_stock`) = fecha pendiente **más cercana** (o NULL) → uniforme por
+  cod, así `lk_reingresos_feed()` (usa `max(reingreso_est)`) manda la más cercana a la página LK.
+
+**RPCs:** `gv_importado_bache_add / _llego (total o parcial) / _editar / _borrar (anula)` y
+`gv_importado_baches(importado_id)` (listar). La llegada escribe en `Importados_Mov_Stock` (ingreso),
+igual que la vieja `importados_marcar_llegada`.
+
+**Front (index.html v14.94):** botón **📦 Baches** por fila (reemplaza ✏️/📥); "Cargar pedido ya hecho"
+inserta un bache por artículo (ya no pisa curso/fecha). Las viejas `pedImpSetCurso`/`pedImpLlego` y las
+RPCs `importados_set_curso`/`importados_marcar_llegada` quedaron **sin uso** (no borradas).
+
+**Backfill:** el "en curso" existente (69 filas, 360.952 u, 19 con fecha) pasó a 1 bache por fila.
+**Backup:** `GV_Importados_curso_bkp_20260911`. **SQL:** `sql/gv_importados_baches_v1494.sql`.
+**Prueba:** 934E con 2 baches (200@20/09 + 5760@29/09) → mirror curso 5960, reingreso 20/09 (la más
+cercana); anular el de prueba restauró 5760 / 29/09.

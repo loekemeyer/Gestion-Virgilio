@@ -7598,7 +7598,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v14.93";
+const APP_VERSION = "v14.94";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -16089,24 +16089,18 @@ async function pedHechoGuardar() {
   if (!iso) { var sinF = false; try { sinF = confirm("No pusiste fecha estimada de entrega.\n¿Guardar sin fecha?"); } catch (_e) {} if (!sinF) return; }
   st.guardando = true; _pedHechoPie();
   var okN = 0, errs = [];
+  var _leg = ""; try { _leg = String(window.__authEmail || ""); } catch (_e) { _leg = ""; }
   for (var i = 0; i < ls.length; i++) {
     var l = ls[i];
     var dets = (l.it.det || []);
     var d = dets.find(function (x) { return String(x.prov || "").trim() === st.prov; }) || dets[0];
     if (!d) { errs.push(l.it.cod + ": sin fila de importado"); continue; }
+    // Cada carga = UN bache nuevo (unidades + su fecha). No pisa lo anterior:
+    // el "en curso" queda como suma de baches y el reingreso = fecha más cercana.
     try {
-      await _pedImpRpc("importados_set_curso", { p_id: d.id, p_uni: Math.round((Number(d.curso) || 0) + l.uni) });
+      await _pedImpRpc("gv_importado_bache_add", { p_importado_id: d.id, p_unidades: l.uni, p_fecha: iso || null, p_legajo: _leg });
       okN++;
     } catch (e) { errs.push(l.it.cod + ": " + (e.message || e)); continue; }
-    if (iso) {
-      try {
-        await fetch(SUPABASE_URL + "/rest/v1/Importados?cod_art=eq." + encodeURIComponent(l.it.cod), {
-          method: "PATCH",
-          headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY, "Content-Type": "application/json", Prefer: "return=minimal" },
-          body: JSON.stringify({ reingreso_est: iso, actualizado: new Date().toISOString() })
-        });
-      } catch (e2) { errs.push(l.it.cod + ": se guardaron las unidades, no la fecha"); }
-    }
   }
   st.guardando = false;
   var t = _pedHechoTotales();
@@ -16216,9 +16210,9 @@ function _pedImpRender() {
       const actHtml = (it.det || []).map(function (d) {
         const multi = (it.det || []).length > 1;
         const lbl = (multi && d.marca) ? ('<span style="font-size:10px;color:#64748b;margin-right:2px">' + escapeHtml(d.marca) + '</span>') : '';
+        const _prv = encodeURIComponent(d.prov || it.prov || '');
         return '<div style="margin:1px 0">' + (lbl ? lbl + '<br>' : '') + '<span style="white-space:nowrap">' +
-          '<button class="stk-btn" style="padding:3px 7px;font-size:12px" title="Cargar pedido en curso: unidades + fecha estimada de entrega" onclick="pedImpSetCurso(' + d.id + ',\'' + _codEncV + '\',' + (d.curso || 0) + ')">✏️</button> ' +
-          '<button class="stk-btn ok" style="padding:3px 7px;font-size:12px" title="Marcar que llegó" onclick="pedImpLlego(' + d.id + ',\'' + _codEncV + '\',' + (d.curso || 0) + ')">📥</button></span></div>';
+          '<button class="stk-btn" style="padding:3px 9px;font-size:12px" title="Baches: cada pedido en curso con su propia fecha de reingreso. Alta, edición y llegadas (total o parcial). El En curso y el Reingreso salen de acá (la fecha más cercana)." onclick="pedImpBaches(' + d.id + ',\'' + _codEncV + '\',\'' + _prv + '\')">📦 Baches</button></span></div>';
       }).join('');
       const _m3m = Number(it.m3Master) || 0;
       const _dimTip = it.m3Dims && it.m3Dims.l ? (it.m3Dims.l + '×' + it.m3Dims.a + '×' + it.m3Dims.h + ' cm') : '';
@@ -16482,6 +16476,137 @@ async function pedImpLlego(id, codEnc, curso) {
   catch (e) { try { alert("No se pudo marcar la llegada: " + (e.message || e)); } catch (_e) {} return; }
   try { alert("✅ " + uni + " u de " + cod + " ingresadas al stock."); } catch (_e) {}
   await pedImpReload();
+}
+/* v14.94 — Baches de importación: cada pedido en curso es un BACHE con su propia fecha de
+   reingreso. El "en curso" de un artículo es la suma de baches pendientes y el reingreso que
+   ve la página LK es la fecha MÁS CERCANA. Backend: tabla GV_Importados_Baches + RPCs
+   gv_importado_bache_add / _llego / _editar / _borrar / gv_importado_baches (listar) +
+   gv_importados_resync (mantiene Importados.pedido_curso y reingreso_est como mirror). */
+var _impBaches = null;
+function _impBachesFmt(n) { return Number(n || 0).toLocaleString("es-AR"); }
+async function pedImpBaches(importadoId, codEnc, provEnc) {
+  var cod = decodeURIComponent(codEnc || "");
+  var prov = decodeURIComponent(provEnc || "");
+  _impBaches = { id: importadoId, cod: cod, prov: prov, rows: [], dirty: false };
+  if (!document.getElementById("impBachesCss")) {
+    var st = document.createElement("style"); st.id = "impBachesCss";
+    st.textContent =
+      "#impBachesOv{display:none;position:fixed;inset:0;z-index:1320;background:rgba(2,6,23,.78);overflow:auto;padding:14px}" +
+      "#impBachesOv.show{display:block}" +
+      ".ibc-card{background:#f8fafc;max-width:min(640px,96vw);margin:0 auto;border-radius:16px;overflow:hidden;box-shadow:0 24px 70px rgba(0,0,0,.55)}" +
+      ".ibc-head{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:12px 15px;background:linear-gradient(90deg,#0369a1,#0ea5e9);color:#fff}" +
+      ".ibc-head b{font-size:16px;font-weight:800}" +
+      ".ibc-x{background:rgba(255,255,255,.22);color:#fff;border:none;border-radius:8px;padding:6px 12px;font-size:13px;font-weight:800;cursor:pointer;width:auto;margin:0}" +
+      ".ibc-body{padding:12px 14px}" +
+      ".ibc-tbl{width:100%;border-collapse:collapse;background:#fff;border:1px solid #e2e8f0;border-radius:10px;overflow:hidden}" +
+      ".ibc-tbl th{font-size:10.5px;text-transform:uppercase;color:#64748b;font-weight:800;padding:7px 6px;border-bottom:2px solid #e2e8f0;text-align:left}" +
+      ".ibc-tbl td{padding:6px;border-bottom:1px solid #f1f5f9;font-size:13px;color:#0f172a;vertical-align:middle}" +
+      ".ibc-tbl td.num,.ibc-tbl th.num{text-align:right;font-variant-numeric:tabular-nums}" +
+      ".ibc-tag{font-size:11px;font-weight:800;padding:2px 7px;border-radius:999px;white-space:nowrap}" +
+      ".ibc-tag.en{background:#fff7ed;color:#b45309}.ibc-tag.ll{background:#f0fdf4;color:#166534}" +
+      ".ibc-b{border:0;border-radius:7px;padding:5px 9px;font-size:12px;font-weight:700;cursor:pointer;margin:0 2px 2px 0;width:auto}" +
+      ".ibc-b.ok{background:#166534;color:#fff}.ibc-b.ed{background:#e2e8f0;color:#0f172a}.ibc-b.rm{background:#fee2e2;color:#b91c1c}.ibc-b.add{background:#0369a1;color:#fff;padding:8px 14px}" +
+      ".ibc-empty{padding:16px;text-align:center;color:#64748b;font-size:13px}" +
+      ".ibc-foot{padding:11px 14px;background:#fff;border-top:1px solid #e2e8f0;display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}";
+    document.head.appendChild(st);
+  }
+  var ov = document.getElementById("impBachesOv");
+  if (!ov) { ov = document.createElement("div"); ov.id = "impBachesOv"; document.body.appendChild(ov); }
+  ov.classList.add("show");
+  await _impBachesReload();
+}
+function pedImpBachesCerrar() {
+  var ov = document.getElementById("impBachesOv"); if (ov) ov.classList.remove("show");
+  var d = _impBaches && _impBaches.dirty; _impBaches = null;
+  if (d) { try { pedImpReload(); } catch (_e) {} }
+}
+async function _impBachesReload() {
+  if (!_impBaches) return;
+  try { _impBaches.rows = (await _pedImpRpc("gv_importado_baches", { p_importado_id: _impBaches.id })) || []; }
+  catch (e) { _impBaches.rows = []; try { alert("No se pudieron leer los baches: " + (e.message || e)); } catch (_e) {} }
+  _impBachesRender();
+}
+function _impBachesRender() {
+  var ov = document.getElementById("impBachesOv"); if (!ov || !_impBaches) return;
+  var rows = _impBaches.rows || [];
+  var totalPend = rows.reduce(function (a, r) { return a + (r.estado === "en_curso" ? (Number(r.pendiente) || 0) : 0); }, 0);
+  var body = rows.map(function (r) {
+    var f = r.fecha_reingreso ? _isoToDdMmAaaa(String(r.fecha_reingreso).slice(0, 10)) : '<span style="color:#94a3b8">sin fecha</span>';
+    var enc = r.estado === "en_curso";
+    var lleg = (Number(r.unidades_llegadas) || 0) > 0 ? (' <span style="color:#64748b;font-size:11px">(llegó ' + _impBachesFmt(r.unidades_llegadas) + ')</span>') : "";
+    return "<tr>" +
+      '<td class="num">' + _impBachesFmt(r.unidades) + lleg + "</td>" +
+      '<td class="num">' + _impBachesFmt(r.pendiente) + "</td>" +
+      "<td>" + f + "</td>" +
+      '<td><span class="ibc-tag ' + (enc ? "en" : "ll") + '">' + (enc ? "en curso" : "llegado") + "</span></td>" +
+      '<td style="white-space:nowrap">' +
+        (enc ? '<button class="ibc-b ok" onclick="pedImpBacheLlego(' + r.id + ')">📥 Llegó</button>' +
+               '<button class="ibc-b ed" onclick="pedImpBacheEditar(' + r.id + ')" title="Editar unidades/fecha">✏️</button>' +
+               '<button class="ibc-b rm" onclick="pedImpBacheBorrar(' + r.id + ')" title="Anular">🗑</button>' : "—") +
+      "</td></tr>";
+  }).join("");
+  ov.innerHTML =
+    '<div class="ibc-card"><div class="ibc-head"><b>📦 Baches — ' + escapeHtml(codCanon(_impBaches.cod)) + (_impBaches.prov ? (" · " + escapeHtml(_impBaches.prov)) : "") + "</b>" +
+      '<button class="ibc-x" onclick="pedImpBachesCerrar()">Cerrar</button></div>' +
+    '<div class="ibc-body">' +
+      (rows.length
+        ? '<table class="ibc-tbl"><thead><tr><th class="num">Unidades</th><th class="num">Pendiente</th><th>Reingreso</th><th>Estado</th><th>Acciones</th></tr></thead><tbody>' + body + "</tbody></table>"
+        : '<div class="ibc-empty">Sin baches todavía. Agregá el primero.</div>') +
+    "</div>" +
+    '<div class="ibc-foot"><div style="font-size:13px;color:#334155">En curso pendiente: <b>' + _impBachesFmt(totalPend) + '</b> u · el reingreso que ve la página es la fecha <b>más cercana</b></div>' +
+      '<button class="ibc-b add" onclick="pedImpBacheAdd()">➕ Agregar bache</button></div></div>';
+}
+async function pedImpBacheAdd() {
+  if (!_impBaches) return;
+  var uv; try { uv = prompt("Unidades del bache (pedido en curso):", ""); } catch (_e) { return; }
+  if (uv === null) return;
+  var uni = parseInt(String(uv).replace(/[^\d]/g, ""), 10);
+  if (!(uni > 0)) { try { alert("Unidades inválidas."); } catch (_e) {} return; }
+  var fv; try { fv = prompt("Fecha estimada de reingreso (dd/mm/aaaa).\nVacío = sin fecha:", ""); } catch (_e) { fv = null; }
+  var iso = null;
+  if (fv !== null && String(fv).trim() !== "") { iso = _pedImpParseFechaISO(fv); if (iso === null) { try { alert("Fecha inválida (usá dd/mm/aaaa)."); } catch (_e) {} return; } }
+  var leg = ""; try { leg = String(window.__authEmail || ""); } catch (_e) {}
+  try { await _pedImpRpc("gv_importado_bache_add", { p_importado_id: _impBaches.id, p_unidades: uni, p_fecha: iso, p_legajo: leg }); _impBaches.dirty = true; }
+  catch (e) { try { alert("No se pudo agregar: " + (e.message || e)); } catch (_e) {} return; }
+  await _impBachesReload();
+}
+async function pedImpBacheLlego(bacheId) {
+  if (!_impBaches) return;
+  var r = (_impBaches.rows || []).find(function (x) { return x.id === bacheId; });
+  var pend = r ? (Number(r.pendiente) || 0) : 0;
+  var v; try { v = prompt("¿Cuántas unidades llegaron?\n(Entran al stock y bajan de 'en curso'. Podés cargar una llegada parcial.)", String(pend > 0 ? pend : "")); } catch (_e) { return; }
+  if (v === null) return;
+  var uni = parseInt(String(v).replace(/[^\d]/g, ""), 10);
+  if (!(uni > 0)) { try { alert("Número inválido."); } catch (_e) {} return; }
+  var leg = ""; try { leg = String(window.__authEmail || ""); } catch (_e) {}
+  try { await _pedImpRpc("gv_importado_bache_llego", { p_bache_id: bacheId, p_unidades: uni, p_legajo: leg }); _impBaches.dirty = true; }
+  catch (e) { try { alert("No se pudo marcar la llegada: " + (e.message || e)); } catch (_e) {} return; }
+  await _impBachesReload();
+}
+async function pedImpBacheEditar(bacheId) {
+  if (!_impBaches) return;
+  var r = (_impBaches.rows || []).find(function (x) { return x.id === bacheId; });
+  var curU = r ? String(r.unidades) : "";
+  var curF = (r && r.fecha_reingreso) ? _isoToDdMmAaaa(String(r.fecha_reingreso).slice(0, 10)) : "";
+  var uv; try { uv = prompt("Unidades del bache:", curU); } catch (_e) { return; }
+  if (uv === null) return;
+  var uni = parseInt(String(uv).replace(/[^\d]/g, ""), 10);
+  if (!(uni > 0)) { try { alert("Unidades inválidas."); } catch (_e) {} return; }
+  var fv; try { fv = prompt("Fecha de reingreso (dd/mm/aaaa).\nVacío = sin fecha:", curF); } catch (_e) { return; }
+  if (fv === null) return;
+  var iso = null;
+  if (String(fv).trim() !== "") { iso = _pedImpParseFechaISO(fv); if (iso === null) { try { alert("Fecha inválida (usá dd/mm/aaaa)."); } catch (_e) {} return; } }
+  try { await _pedImpRpc("gv_importado_bache_editar", { p_bache_id: bacheId, p_unidades: uni, p_fecha: iso, p_set_fecha: true }); _impBaches.dirty = true; }
+  catch (e) { try { alert("No se pudo editar: " + (e.message || e)); } catch (_e) {} return; }
+  await _impBachesReload();
+}
+async function pedImpBacheBorrar(bacheId) {
+  if (!_impBaches) return;
+  var ok = false; try { ok = confirm("¿Anular este bache? Sale del 'en curso'."); } catch (_e) { ok = false; }
+  if (!ok) return;
+  try { await _pedImpRpc("gv_importado_bache_borrar", { p_bache_id: bacheId }); _impBaches.dirty = true; }
+  catch (e) { try { alert("No se pudo anular: " + (e.message || e)); } catch (_e) {} return; }
+  await _impBachesReload();
 }
 function _stkWin(mv, exemptInicial) {
   const cut = _stk.cutoff ? new Date(_stk.cutoff).getTime() : 0;
