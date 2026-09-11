@@ -888,6 +888,10 @@ button {
    CTA verde abajo ocupando el ancho de la ficha (nunca desborda). */
 .cuar-enviar{ grid-column:1 / -1; width:100%; margin-top:0; background:#166534; color:#fff; border:none; border-radius:8px; padding:8px 10px; font-size:12.5px; font-weight:800; cursor:pointer; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; box-shadow:0 1px 2px rgba(22,101,52,.25); }
 .cuar-enviar:hover{ background:#14532d; box-shadow:0 2px 5px rgba(22,101,52,.3); }
+/* v15.46 — "Ya pagó" (cobranzas). Sólo aparece cuando el motivo incluye deuda. Va en su propia
+   fila, arriba del CTA y al ancho de la ficha: compartiendo fila, el texto del CTA se cortaba. */
+.cuar-pago{ grid-column:1 / -1; width:100%; margin-top:0; background:#fff; color:#166534; border:1.5px solid #86c79a; border-radius:8px; padding:7px 10px; font-size:12.5px; font-weight:800; cursor:pointer; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.cuar-pago:hover{ background:#f0faf2; border-color:#4f9d68; }
 /* v15.41 — fila de acciones: grilla 2 columnas, el botón Enviar abajo a todo
    el ancho. min-width:0 en los hijos para que el texto largo elipse en vez de
    estirar la grilla y salirse de la ficha. */
@@ -35997,15 +36001,49 @@ function aprColCuarentena() {
         '<div class="cuar-card-zona">📍 ' + escapeHtml(p.zona || "sin zona") + '</div>' +
         aprCuarBadgesHtml(p) +
       '</div>' +
-      '<div class="cuar-acciones">' +
+      '<div class="cuar-acciones' + (cuarTieneDeuda(p) ? ' cuar-acciones-pago' : '') + '">' +
         cuarWppContactoBtn(p) +
         '<button class="cuar-wpp cuar-wpp-cob" onclick="cuarWppCobranzas(\'' + (p.empresa || "lk") + '\',\'' + escapeHtml(String(p.order_id)) + '\')" title="Escribir a Vivi (cobranzas) por WhatsApp (+54 9 11 6557-4113) para que chequee este pedido">💬 A cobranzas (Vivi)</button>' +
+        cuarYaPagoBtn(p) +
         '<button class="cuar-enviar" onclick="cuarLiberar(\'' + (p.empresa || "lk") + '\',\'' + escapeHtml(String(p.order_id)) + '\')">➡ Enviar a Pedidos a programar</button>' +
       '</div>' +
     '</div>';
   }
   return h + '</div></div>';
 }
+/* v15.46 — Botón "Ya pagó" (dueño, 2026-09-11: "para que Viviana los pueda habilitar y que salgan
+   de cuarentena"). Es del CLIENTE, no del pedido: se registra el pago en `GV_Cuarentena_Pagados`
+   (RPC `gv_cuarentena_pago`) y desde ahí `gv_cuarentena_marcar` deja de marcarlo por deuda — o sea
+   salen TODOS los pedidos de ese cliente, no sólo éste. El pago vale contra el reporte de deuda
+   vigente: si mañana se sube uno más nuevo y el cliente sigue debiendo, vuelve solo a Cuarentena.
+   NO levanta "suspendido" ni "excede crédito": con esos motivos el pedido sigue retenido y se avisa. */
+function cuarTieneDeuda(p) { return (aprCuarentenaMotivos(p) || []).indexOf("deuda") >= 0; }
+function cuarYaPagoBtn(p) {
+  if (!cuarTieneDeuda(p)) return "";
+  const cod = String((p && p.cod) || "").trim();
+  if (!cod) return "";
+  return '<button class="cuar-pago" onclick="cuarYaPago(\'' + (p.empresa || "lk") + '\',\'' + escapeHtml(String(p.order_id)) + '\')"' +
+    ' title="El cliente pagó: sale de Cuarentena por deuda (todos sus pedidos). Si además está suspendido o excede el crédito, sigue retenido.">💚 Ya pagó</button>';
+}
+async function cuarYaPago(empresa, orderId) {
+  const key = String(empresa) + ":" + String(orderId);
+  const p = (_apr.pedidosTodos || []).find(function (x) { return aprKey(x.empresa, x.order_id) === key; });
+  if ((p && p._demo) || String(orderId) === "EJEMPLO") { _apr.cuarDemo = false; aprRender(); return; }
+  const cod = String((p && p.cod) || "").trim();
+  const cli = (p && (p.razon_social || p.cod)) || ("#" + orderId);
+  if (!cod) { _apr.msg = "Ese pedido no tiene código de cliente: no se puede marcar el pago."; _apr.msgErr = true; aprRender(); return; }
+  if (!confirm("¿" + cli + " ya pagó?\n\nSalen de Cuarentena TODOS los pedidos de ese cliente que estaban retenidos por deuda.\nSi al subir el próximo reporte sigue debiendo, vuelven solos.")) return;
+  try {
+    const r = await aprRpc("gv_cuarentena_pago", { p_empresa: empresa || "lk", p_cod: cod });
+    const otros = (aprCuarentenaMotivos(p) || []).filter(function (m) { return m !== "deuda"; });
+    _apr.msg = "💚 " + cli + " marcado como pagado" + ((r && r[0] && r[0].deuda_al_pagar != null) ? " (deuda $" + aprNum(r[0].deuda_al_pagar) + ")" : "") + "." +
+      (otros.length ? " Ojo: el pedido sigue retenido por " + otros.map(function (m) { return m === "limite_credito" ? "límite de crédito" : m === "sin_cta_cte" ? "Sin Cta.Cte." : m; }).join(" y ") + "." : "");
+    _apr.msgErr = false;
+    aprRender();
+    aprCargar();
+  } catch (e) { _apr.msg = String((e && e.message) || e); _apr.msgErr = true; aprRender(); }
+}
+
 /* Liberar: mandar el pedido a "Pedidos a programar" (mantiene el badge). Se auto-programa si es
    zona automática; si no, queda en la lista de arriba y se puede agregar a tandas. */
 async function cuarLiberar(empresa, orderId) {

@@ -160,11 +160,24 @@ async function traerChef(dias: number): Promise<Fila[]> {
  *  para el log. Los feeds de LK son CRUDOS a propósito: si esta llamada falla, la
  *  empresa entera falla y no se programa nada — antes que duplicar un pedido que
  *  Producción ya tiene, no tomar ninguno (2026-09-04, regla del dueño). */
+/** "$ 2.519,21" — igual que la ficha de Cuarentena. */
+function pesos(n: number | null | undefined): string {
+  if (n == null || isNaN(Number(n))) return "";
+  return "$" + Number(n).toLocaleString("es-AR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
 /** v14.86 — CUARENTENA: qué order_id NO se pueden programar solos (cliente con deuda,
  *  suspendido / Sin Cta.Cte., o el pedido supera el límite de crédito). Corre las dos RPC de
  *  Virgilio (estado+deuda y límite greedy con valorización propia). Si algo falla, devuelve vacío
- *  (antes que frenar todo el armado por esto). Los pedidos siguen visibles en "A Programar". */
-async function pedidosEnCuarentena(emp: "lk" | "chef", filas: Fila[]): Promise<Set<string>> {
+ *  (antes que frenar todo el armado por esto). Los pedidos siguen visibles en "A Programar".
+ *
+ *  v15.46 (dueño, 2026-09-11: *"si hay uno en cuarentena, que le aparezca a Viviana Gauna en
+ *  Planify"*): además le pasa la lista a `gv_cuarentena_planify_sync`, que le abre UNA tarea por
+ *  pedido a Viviana (employee_id 4) y se la cierra sola cuando el pedido sale. Va acá y no en el
+ *  front porque ésta es la única parte del sistema que conoce los pedidos web sin que nadie tenga
+ *  la pantalla abierta. Si el sync falla, el armado sigue igual: la tarea es un aviso, no un
+ *  bloqueo. Con `sync=false` (modo dry) no escribe ninguna tarea. */
+async function pedidosEnCuarentena(emp: "lk" | "chef", filas: Fila[], sync = true): Promise<Set<string>> {
   const porPed = new Map<string, { order_id: unknown; empresa: string; cod: string; fecha_recep: unknown; cond: string; items: { art: string; cajas: number }[] }>();
   for (const n of filas) {
     const k = String(n.order_id);
@@ -179,17 +192,54 @@ async function pedidosEnCuarentena(emp: "lk" | "chef", filas: Fila[]): Promise<S
   if (!arr.length) return new Set();
   const out = new Set<string>();
   const [marc, lim] = await Promise.all([
-    vgRpc<{ order_id: number | string }[]>("gv_cuarentena_marcar",
+    vgRpc<{ order_id: number | string; motivos: string[] | null; deuda: number | null; estado: string | null }[]>(
+      "gv_cuarentena_marcar",
       { p_pedidos: arr.map((p) => ({ order_id: p.order_id, empresa: p.empresa, cod: p.cod })) }),
-    vgRpc<{ order_id: number | string }[]>("gv_cuarentena_limite", { p_pendientes: arr }),
+    vgRpc<{ order_id: number | string; exceso: number | null; limite: number | null }[]>(
+      "gv_cuarentena_limite", { p_pendientes: arr }),
   ]);
-  for (const r of (marc ?? [])) out.add(String(r.order_id));
-  for (const r of (lim ?? [])) out.add(String(r.order_id));
+  // motivo en castellano, el mismo que ve el supervisor en la ficha
+  const motivo = new Map<string, string[]>();
+  const sumar = (id: string, txt: string) => { motivo.set(id, [...(motivo.get(id) ?? []), txt]); };
+  for (const r of (marc ?? [])) {
+    const id = String(r.order_id);
+    out.add(id);
+    for (const m of (r.motivos ?? [])) {
+      if (m === "deuda") sumar(id, "Deuda " + pesos(r.deuda));
+      else if (m === "sin_cta_cte") sumar(id, "Sin Cta.Cte.");
+      else sumar(id, "Suspendido" + (r.estado ? " (" + r.estado + ")" : ""));
+    }
+  }
+  for (const r of (lim ?? [])) {
+    const id = String(r.order_id);
+    out.add(id);
+    sumar(id, "Supera el limite de credito" + (r.exceso != null ? " por " + pesos(r.exceso) : ""));
+  }
+  if (sync) {
+    try {
+      const rs = new Map<string, string>(), m3 = new Map<string, number>();
+      for (const n of filas) {
+        const k = String(n.order_id);
+        if (!rs.has(k)) rs.set(k, String(n.razon_social ?? "").trim());
+        m3.set(k, (m3.get(k) ?? 0) + (Number(n.m3) || 0));
+      }
+      await vgRpc("gv_cuarentena_planify_sync", {
+        p_empresa: emp,
+        p_pedidos: [...out].map((id) => ({
+          order_id: id,
+          cod: porPed.get(id)?.cod ?? "",
+          razon_social: rs.get(id) ?? "",
+          motivo: (motivo.get(id) ?? ["Retenido en cuarentena"]).join(" · "),
+          m3: (Math.round((m3.get(id) ?? 0) * 1000) / 1000).toFixed(3),
+        })),
+      });
+    } catch (_e) { /* la tarea de Planify es un aviso: nunca frena el armado */ }
+  }
   return out;
 }
 
 async function soloPendientes(
-  emp: "lk" | "chef", filas: Fila[],
+  emp: "lk" | "chef", filas: Fila[], sync = true,
 ): Promise<{ filas: Fila[]; excluidos: Record<string, number>; pedidos_crudos: number }> {
   const porPedido = new Map<string, Fila>();
   for (const n of filas) { const k = String(n.order_id); if (!porPedido.has(k)) porPedido.set(k, n); }
@@ -243,7 +293,7 @@ async function soloPendientes(
   // v14.86 — y además, sacar los que van a CUARENTENA (no se programan solos).
   const vivos = filas.filter((n) => !fuera.has(String(n.order_id)));
   let cuar = new Set<string>();
-  try { cuar = await pedidosEnCuarentena(emp, vivos); } catch (_e) { /* no bloquea el armado */ }
+  try { cuar = await pedidosEnCuarentena(emp, vivos, sync); } catch (_e) { /* no bloquea el armado */ }
   if (cuar.size) excluidos["cuarentena"] = cuar.size;
   return {
     filas: vivos.filter((n) => !cuar.has(String(n.order_id))),
@@ -561,7 +611,7 @@ Deno.serve(async (req: Request) => {
         for (const emp of ["lk", "chef"] as const) {
           try {
             const crudas = emp === "lk" ? await traerLk(desde) : await traerChef(ventana);
-            const { filas, excluidos, pedidos_crudos } = await soloPendientes(emp, crudas);
+            const { filas, excluidos, pedidos_crudos } = await soloPendientes(emp, crudas, false);
             const zonas = await resolverZonas(filas.map((n) => {
               const b = barrioCrudo(n);
               return b.usaDireccion ? { ze: "", loc: "", dir: b.barrio } : { ze: b.barrio, loc: "", dir: "" };

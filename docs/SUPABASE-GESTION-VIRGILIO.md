@@ -5536,3 +5536,60 @@ Las 16 NP de ISIS normales, sin cambio (el fallback sólo entra cuando el valor 
 
 **Rollback:** apuntar el front a `vista_control_remitos` / `vista_cola_impresion` y
 `drop view public.gv_vista_control_remitos, public.gv_vista_cola_impresion;`
+
+
+## §3.ce — Cuarentena: "Ya pagó" y la tarea de Viviana en Planify (v15.46, 2026-09-11)
+
+Dos pedidos de Thomas del 11/09: *"si hay uno en cuarentena, que le aparezca a Viviana Gauna en
+Planify"* y *"agregame un botón en cada box que diga **Ya pagó**, para que Viviana los pueda
+habilitar y que salgan de cuarentena"*.
+
+### Ya pagó — es del CLIENTE, no del pedido
+
+| Objeto | Qué hace |
+|---|---|
+| `GV_Cuarentena_Pagados` (empresa, cod, pagado_at, pagado_por, fuente_at, deuda_al_pagar) | qué cliente marcó cobranzas como pagado. RLS prendida, sin policies: sólo por RPC |
+| `gv_cuarentena_pago(p_empresa, p_cod)` | SECURITY DEFINER, gate de supervisor. Registra el pago con la fecha del reporte de deuda vigente |
+| `gv_cuarentena_marcar` (v15.46) | ya no marca `deuda` si hay un pago **posterior** a `GV_Cuarentena_Fuente.cargado_at` |
+| `cuarYaPago` / `.cuar-pago` (index.html) | botón **💚 Ya pagó**, sólo si el motivo incluye deuda; pide confirmación porque libera todos los pedidos de ese cliente |
+
+El pago vale **contra el reporte de deuda que estaba cargado**: si después se sube uno más nuevo y
+el cliente sigue debiendo, vuelve solo a Cuarentena. No levanta *suspendido* ni *excede crédito* —
+con esos motivos el pedido sigue retenido y el front lo avisa en el mensaje.
+
+**Prueba (con rollback), cliente 2375 El Gran Bazar, deuda $2.519,21:**
+
+| Momento | `gv_cuarentena_marcar` |
+|---|---|
+| sin pago | 1 fila (motivo `deuda`) |
+| pago posterior al reporte | 0 filas — sale |
+| pago anterior a un reporte nuevo | 1 fila — vuelve |
+
+### La tarea de Viviana
+
+`gv_cuarentena_planify_sync(p_empresa, p_pedidos)` (sólo `service_role`) abre **una tarea por
+pedido retenido** en el Planify de **Viviana Gauna (employee_id 4)** y la cierra (`done = true`)
+cuando el pedido deja de estar en cuarentena. `GV_Cuarentena_Planify` (empresa, order_id, task_id,
+cerrada_at) es el registro que la hace idempotente.
+
+La dispara la **Edge Function `gv-ppp-web-tandas-diarias` v22** (crons 71 y 73, cada 15 min), no el
+front: es la única parte del sistema que conoce los pedidos web sin que nadie tenga la pantalla
+abierta. Si el sync falla, el armado sigue igual — la tarea es un aviso, no un bloqueo. En modo
+`dry` no escribe ninguna tarea (`soloPendientes(emp, crudas, false)`).
+
+Una lista vacía significa "no queda ninguno retenido" y **cierra todas las abiertas**: la Edge
+Function sólo llama al sync después de haber leído los pedidos y corrido `gv_cuarentena_marcar`,
+así que una corrida fallida no llega a cerrar nada.
+
+**Prueba (con rollback):** alta → 1 tarea; segunda corrida igual → 0 altas (idempotente); lista
+vacía → 1 cierre.
+
+**Incidente del mismo día:** la v21 de la Edge Function se deployó con un `PLACEHOLDER` en vez del
+código (error al llamar la herramienta de deploy) y quedó rota hasta que se redeployó el fuente
+real en la **v22**. El fuente versionado es
+`supabase/functions/gv-ppp-web-tandas-diarias/index.ts` — deployar siempre ESE contenido.
+
+**Rollback:** `drop function public.gv_cuarentena_pago(text,text);`,
+`drop function public.gv_cuarentena_planify_sync(text,jsonb);`,
+`drop table public."GV_Cuarentena_Pagados", public."GV_Cuarentena_Planify";`, volver
+`gv_cuarentena_marcar` a la v15.04 (sin el `not exists` de Pagados) y sacar del front `cuarYaPago`.
