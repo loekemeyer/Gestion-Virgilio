@@ -7622,7 +7622,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v15.17";
+const APP_VERSION = "v15.18";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -16069,7 +16069,7 @@ function _pedHechoRender() {
     '<div class="phc-body">' +
       '<div class="phc-row">' +
         '<div class="phc-f" style="flex:1 1 240px"><label>🏭 Proveedor</label><select onchange="pedHechoSetProv(this.value)">' + opts + '</select></div>' +
-        '<div class="phc-f" style="flex:0 0 auto"><label>📅 Fecha de entrega</label><input type="date" value="' + escapeHtml(st.fecha || "") + '" onchange="pedHechoSetFecha(this.value)"></div>' +
+        '<div class="phc-f" style="flex:0 0 auto"><label>📅 Fecha de entrega</label>' + _pedImpFechaInputHtml(st.fecha, "pedHechoSetFecha(v)", 'style="width:96px"') + '</div>' +
       '</div>' +
       '<div class="phc-tabs">' +
         '<button class="phc-tab' + (st.modo === "lista" ? " on" : "") + '" onclick="pedHechoSetModo(\'lista\')">1 · Elegir de la lista</button>' +
@@ -16175,7 +16175,7 @@ async function pedHechoGuardar() {
   try {
     alert((okN ? "✅ " + okN + " artículo(s) cargados como pedido en curso de " + st.prov +
       "\n" + _pedHechoFmt(t.uni) + " u · " + (Math.round(t.mc * 100) / 100).toLocaleString("es-AR") + " master cajas" +
-      (iso ? "\nEntrega estimada: " + _isoToDdMmAaaa(iso) : "") : "No se guardó nada.") +
+      (iso ? "\nEntrega estimada: " + _isoToDdMmAa(iso) : "") : "No se guardó nada.") +
       (errs.length ? "\n\n⚠ " + errs.join("\n") : ""));
   } catch (_e) {}
   await pedImpReload();
@@ -16227,7 +16227,7 @@ function _pedImpRender() {
   const _entrega = (data.entregaGlobal || "");
   h += '<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:12px;padding:10px 14px;background:#eff6ff;border:1px solid #bfdbfe;border-radius:10px">' +
     '<span style="font-size:13px;font-weight:800;color:#1e3a8a">📅 Fecha estimada de entrega (portal LK)</span>' +
-    '<input type="date" value="' + _entrega + '" onchange="pedImpSetEntregaGlobal(this.value)" style="padding:6px 8px;border:1px solid ' + (_entrega ? '#1d4ed8' : '#cbd5e1') + ';border-radius:8px;font-size:13px;background:#fff">' +
+    _pedImpFechaInputHtml(_entrega, "pedImpSetEntregaGlobal(v)", 'style="width:92px;padding:6px 8px;border:1px solid ' + (_entrega ? '#1d4ed8' : '#cbd5e1') + ';border-radius:8px;font-size:13px;background:#fff"') +
     '<span style="font-size:11px;color:#64748b">Se muestra a los clientes en el carrito antes de confirmar. Vacío = no se muestra.</span>' +
     '</div>';
   // filtro Solo Pedido / Ver Todo + Excel
@@ -16312,7 +16312,7 @@ function _pedImpRender() {
       const _m3 = _pedImpM3Of(it);
       const m3Txt = _m3 > 0 ? '<b style="color:#0369a1">' + (Math.round(_m3 * 100) / 100) + '</b>' : '<span style="color:#cbd5e1">—</span>';
       const _rg = it.reingresoEst ? String(it.reingresoEst).slice(0, 10) : "";
-      const rgInput = '<input type="date" value="' + _rg + '" onchange="pedImpSetReingreso(\'' + _codEncV + '\',this.value)" onclick="event.stopPropagation()" title="Fecha de reingreso estimado (se muestra en el portal LK cuando está sin stock)" style="width:118px;padding:4px 6px;border:1px solid ' + (_rg ? '#b45309' : '#cbd5e1') + ';border-radius:8px;font-size:12px;background:' + (_rg ? '#fff7ed' : '#fff') + '">';
+      const rgInput = _pedImpFechaInputHtml(_rg, "pedImpSetReingreso(\'" + _codEncV + "\',v)", 'onclick="event.stopPropagation()" title="Fecha de reingreso estimado (se muestra en el portal LK cuando está sin stock)" style="width:76px;padding:4px 6px;border:1px solid ' + (_rg ? '#b45309' : '#cbd5e1') + ';border-radius:8px;font-size:12px;background:' + (_rg ? '#fff7ed' : '#fff') + '"');
       h += '<tr><td><b>' + escapeHtml(codCanon(it.cod)) + '</b>' + badge + '</td><td style="font-size:12px;white-space:nowrap" title="' + escapeHtml(it.desc || "") + '">' + escapeHtml(artNombre(it.cod, it.desc)) + '</td><td class="num">' + it.proyUni + '</td><td class="num">' + it.objetivoUni + '</td><td class="num">' + stockTxt + '</td><td class="num">' + it.enCurso + '</td><td class="num" style="color:#94a3b8">' + it.aPedirUni + '</td><td class="num">' + umTxt + '</td><td class="num">' + mcInput + '</td><td class="num">' + uniTxt + '</td><td class="num">' + fobTxt + '</td><td class="num">' + usdTxt + '</td><td class="num">' + m3Txt + '</td><td class="num">' + rgInput + '</td><td>' + actHtml + '</td></tr>';
     });
     h += '</tbody></table></div></div>';
@@ -16513,6 +16513,25 @@ function _isoToDdMmAaaa(iso) {
   var m = String(iso || "").match(/^(\d{4})-(\d{2})-(\d{2})/);
   return m ? (m[3] + "/" + m[2] + "/" + m[1]) : "";
 }
+// v15.18 — dueño: "en el módulo para cargar pedidos poné formato dd/mm/yy, no mm/dd/yyyy".
+// Los <input type="date"> los pinta el navegador según su idioma (en-US → mm/dd/yyyy), así que
+// las fechas del módulo van como TEXTO dd/mm/aa: se muestran con _isoToDdMmAa y se leen con
+// _pedImpParseFechaISO (acepta dd/mm/aa, dd/mm/aaaa, dd/mm y yyyy-mm-dd).
+function _isoToDdMmAa(iso) {
+  var m = String(iso || "").match(/^(\d{4})-(\d{2})-(\d{2})/);
+  return m ? (m[3] + "/" + m[2] + "/" + m[1].slice(2)) : "";
+}
+// Campo de fecha en texto: valida, normaliza lo que se ve y llama al setter con el ISO ('' = borrar).
+function _pedImpFechaTxt(el, setter) {
+  var iso = _pedImpParseFechaISO(el.value);
+  if (iso === null) { try { alert("Fecha inválida: usá dd/mm/aa (ej. 29/11/26)."); } catch (_e) {} el.value = _isoToDdMmAa(el.getAttribute("data-iso") || ""); return; }
+  el.value = _isoToDdMmAa(iso); el.setAttribute("data-iso", iso);
+  try { setter(iso); } catch (_e) {}
+}
+function _pedImpFechaInputHtml(iso, onIso, extraAttrs) {
+  iso = String(iso || "").slice(0, 10);
+  return '<input type="text" inputmode="numeric" placeholder="dd/mm/aa" maxlength="10" value="' + escapeHtml(_isoToDdMmAa(iso)) + '" data-iso="' + escapeHtml(iso) + '" onchange="_pedImpFechaTxt(this,function(v){' + onIso + '})" ' + (extraAttrs || "") + '>';
+}
 // Cargar un pedido YA HECHO (en curso): unidades + fecha estimada de entrega.
 // Las unidades van a Importados.pedido_curso (el motor las resta de "a pedir", así
 // no re-pide lo ya pedido). La fecha va a reingreso_est (la lee el portal LK).
@@ -16611,7 +16630,7 @@ function _impBachesRender() {
   var rows = _impBaches.rows || [];
   var totalPend = rows.reduce(function (a, r) { return a + (r.estado === "en_curso" ? (Number(r.pendiente) || 0) : 0); }, 0);
   var body = rows.map(function (r) {
-    var f = r.fecha_reingreso ? _isoToDdMmAaaa(String(r.fecha_reingreso).slice(0, 10)) : '<span style="color:#94a3b8">sin fecha</span>';
+    var f = r.fecha_reingreso ? _isoToDdMmAa(String(r.fecha_reingreso).slice(0, 10)) : '<span style="color:#94a3b8">sin fecha</span>';
     var enc = r.estado === "en_curso";
     var lleg = (Number(r.unidades_llegadas) || 0) > 0 ? (' <span style="color:#64748b;font-size:11px">(llegó ' + _impBachesFmt(r.unidades_llegadas) + ')</span>') : "";
     return "<tr>" +
@@ -16642,9 +16661,9 @@ async function pedImpBacheAdd() {
   if (uv === null) return;
   var uni = parseInt(String(uv).replace(/[^\d]/g, ""), 10);
   if (!(uni > 0)) { try { alert("Unidades inválidas."); } catch (_e) {} return; }
-  var fv; try { fv = prompt("Fecha estimada de reingreso (dd/mm/aaaa).\nVacío = sin fecha:", ""); } catch (_e) { fv = null; }
+  var fv; try { fv = prompt("Fecha estimada de reingreso (dd/mm/aa).\nVacío = sin fecha:", ""); } catch (_e) { fv = null; }
   var iso = null;
-  if (fv !== null && String(fv).trim() !== "") { iso = _pedImpParseFechaISO(fv); if (iso === null) { try { alert("Fecha inválida (usá dd/mm/aaaa)."); } catch (_e) {} return; } }
+  if (fv !== null && String(fv).trim() !== "") { iso = _pedImpParseFechaISO(fv); if (iso === null) { try { alert("Fecha inválida (usá dd/mm/aa)."); } catch (_e) {} return; } }
   var leg = ""; try { leg = String(window.__authEmail || ""); } catch (_e) {}
   try { await _pedImpRpc("gv_importado_bache_add", { p_importado_id: _impBaches.id, p_unidades: uni, p_fecha: iso, p_legajo: leg }); _impBaches.dirty = true; }
   catch (e) { try { alert("No se pudo agregar: " + (e.message || e)); } catch (_e) {} return; }
@@ -16667,15 +16686,15 @@ async function pedImpBacheEditar(bacheId) {
   if (!_impBaches) return;
   var r = (_impBaches.rows || []).find(function (x) { return x.id === bacheId; });
   var curU = r ? String(r.unidades) : "";
-  var curF = (r && r.fecha_reingreso) ? _isoToDdMmAaaa(String(r.fecha_reingreso).slice(0, 10)) : "";
+  var curF = (r && r.fecha_reingreso) ? _isoToDdMmAa(String(r.fecha_reingreso).slice(0, 10)) : "";
   var uv; try { uv = prompt("Unidades del bache:", curU); } catch (_e) { return; }
   if (uv === null) return;
   var uni = parseInt(String(uv).replace(/[^\d]/g, ""), 10);
   if (!(uni > 0)) { try { alert("Unidades inválidas."); } catch (_e) {} return; }
-  var fv; try { fv = prompt("Fecha de reingreso (dd/mm/aaaa).\nVacío = sin fecha:", curF); } catch (_e) { return; }
+  var fv; try { fv = prompt("Fecha de reingreso (dd/mm/aa).\nVacío = sin fecha:", curF); } catch (_e) { return; }
   if (fv === null) return;
   var iso = null;
-  if (String(fv).trim() !== "") { iso = _pedImpParseFechaISO(fv); if (iso === null) { try { alert("Fecha inválida (usá dd/mm/aaaa)."); } catch (_e) {} return; } }
+  if (String(fv).trim() !== "") { iso = _pedImpParseFechaISO(fv); if (iso === null) { try { alert("Fecha inválida (usá dd/mm/aa)."); } catch (_e) {} return; } }
   try { await _pedImpRpc("gv_importado_bache_editar", { p_bache_id: bacheId, p_unidades: uni, p_fecha: iso, p_set_fecha: true }); _impBaches.dirty = true; }
   catch (e) { try { alert("No se pudo editar: " + (e.message || e)); } catch (_e) {} return; }
   await _impBachesReload();

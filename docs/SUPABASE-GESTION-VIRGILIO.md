@@ -5079,3 +5079,13 @@ Dueño: *"todos los datos que tengas que corregir, dale"*. Barrido sobre `v_impo
   "GV_Importados_Baches" where creado_por = 'PI BX260722D'` + resync; FOB y volumen desde los backups.
 - **Impos en curso, todas con fecha**: Becky 29/09 · Fujian 01/11 · Hugo Wong 03/11 · Frontier 04/11 · Becky 2.ª 15/11 ·
   Zhixin 29/11 · Ownland 18/12. Kangli: sin pedido (llegó el 31/08).
+
+### §3.bm.10 — Fechas del módulo de importación en dd/mm/aa (v15.18, 2026-09-11, sólo front)
+
+- Dueño: *"en el módulo para cargar pedidos poné formato dd/mm/yy, no mm/dd/yyyy"*. Los tres `<input type="date">`
+  del módulo (Fecha de entrega en "Cargar pedido ya hecho", Fecha estimada de entrega global y Reingreso por fila)
+  los pintaba el navegador según su idioma (en-US → mm/dd/yyyy). Pasan a **texto dd/mm/aa** con un helper común
+  (`_pedImpFechaInputHtml` / `_pedImpFechaTxt` / `_isoToDdMmAa`): se valida con `_pedImpParseFechaISO` (acepta
+  dd/mm/aa, dd/mm/aaaa, dd/mm y yyyy-mm-dd), se normaliza lo que se ve y se manda el ISO al mismo setter de antes
+  (`pedHechoSetFecha`, `pedImpSetEntregaGlobal`, `pedImpSetReingreso`). Fecha inválida → aviso y vuelve al valor
+  anterior. El gestor de baches muestra y pide dd/mm/aa. Sin cambios en la base: se sigue guardando `YYYY-MM-DD`.
