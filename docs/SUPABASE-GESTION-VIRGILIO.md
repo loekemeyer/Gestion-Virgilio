@@ -7549,8 +7549,19 @@ escrito para que la PPP lo muestre. Es exactamente lo que tenía que pasar.
 1316). La fecha de entrega viaja por `sheets_payload->>'fecha_entrega'`, que es de donde la
 lee esa vista (`fecha_entrega_txt`), y el importador la carga del mail de Krikos.
 
+**El filtro del espejo, probado** (en LK, con `BEGIN … ROLLBACK`): marcando a mano una OC
+como `parcial` y otra como `ok`, `sync_krikos_oc_virgilio()` devolvió **5** — las 4
+pendientes **más la `parcial`**, y la `ok` **no viajó**. Después del rollback Virgilio
+volvió solo a 6 filas / 0 parciales (el `postgres_fdw` propaga el rollback).
+
 **Para apagarlo:** `select cron.alter_job(43, active := false);` en LK. Nada más depende de
 él: las OC vuelven a cargarse a mano desde el panel.
+
+### Qué se ve hoy en A Programar
+
+Las 6 OC viejas quedaron en el bloque naranja con el motivo *"fecha de entrega vencida
+(dd/mm/aaaa) — se carga a mano si todavía va"*. Se van de ahí solas cuando alguien las
+descarta desde la Bandeja del panel, o si se cargan a mano.
 
 ### Rollback
 
