@@ -12,7 +12,7 @@
 > única**; no se replica. Ante la duda entre parche rápido y fix de raíz → **fix
 > de raíz**.
 >
-> Última actualización: 2026-09-11 (viernes) · Versión app al documentar: **v15.74**
+> Última actualización: 2026-09-11 (viernes) · Versión app al documentar: **v15.75**
 >
 > Nota **v15.40 (2026-09-11) — HANDOFF de planimetría / Acacia: `docs/HANDOFF-PLANIMETRIA-Y-ACACIA.md`.**
 > Thomas sigue este tema en otra sesión. Ahí está todo junto: los **13 artículos activos del catálogo LK
@@ -11158,6 +11158,17 @@ distinta, empresa distinta.
 >   (umbral ≈ 3× su período; dedup un aviso por sync por día). **No se creó tabla
 >   `Sync_Estado`**: `cron.job_run_details` ya tiene la verdad. DDL en
 >   `sql/watchdog_syncs_externos.sql`.
+
+> Nota **2026-09-11 (v15.75) — El depósito INSUMOS ya no infla el stock de los importados terminados.**
+> Lo encontró Thomas: 584E mostraba **1.290** (90 del módulo + 1.200 de insumos) contra **19 cajas** de la
+> pantalla de Stock. La v15.27 enganchaba insumo→importado por dos vías, y la **automática por código igual**
+> —pensada para partes y sueltos— se llevaba puestos también a los **terminados**: 584E, 035E, 440E y
+> 437E/439E·CH entraron sin que nadie los revisara, y el stock inflado **apagaba el repedido**.
+> Dueño: *"1200 uni hay en insumos"* (el saldo está bien, **no se tocó ningún dato**) y *"sí"* (esas unidades
+> **no son stock del terminado**). Arreglo: la vía automática queda **sólo para partes**; cualquier terminado
+> que deba contar insumos va escrito en `GV_Importados_Insumo_Map` (ahí se pasaron 437E y 439E·CH, que sí son
+> intencionales). Resultado: **584E a pedir 1.580 en vez de 380**, 035E 1.052 en vez de 524.
+> §3.cb de `docs/SUPABASE-GESTION-VIRGILIO.md` · problema #29.
 
 > Nota **2026-09-11 (v15.74) — Cuenta corriente con los chinos + las fechas de embarque, del Excel de Thomas.**
 > Mandó la foto de su planilla de deudas al exterior y se incorporó entera. **Las 6 fechas de EMBARQUE ya están

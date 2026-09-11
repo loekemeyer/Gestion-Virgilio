@@ -6501,3 +6501,57 @@ fecha/monto/beneficiario/tipo/factura, borrar). Test `tests/imp-cuenta-corriente
 
 En el `.sql`: drop de la vista, las 5 funciones y las 2 tablas, y `fecha_embarque` de vuelta desde
 `GV_Importados_Baches_bkp_cc_20260911`.
+
+## 3.cb El depósito INSUMOS deja de sumar al stock de los terminados que nadie revisó (v15.75) — 2026-09-11
+
+**Lo encontró Thomas** mirando Pedidos Importación: *"acá veo 1290 stock total hoy (1200+90) pero en
+stock veo 10 cajas de stock (19-9 pedidas) o sea 60 uni"*. Problema `github_repo_problemas` **#29**.
+
+### Causa raíz
+
+La v15.27 (§3.bm.19) engancha insumo → importado por **dos vías**: la tabla
+`GV_Importados_Insumo_Map` —los que el dueño revisó uno por uno— y una regla **automática por
+código igual**. Esa segunda vía estaba pensada para partes y sueltos pero **no lo verificaba**, así
+que se engancharon solos **5 artículos terminados**: 584E, 035E, 440E y 437E/439E·CH. El stock
+inflado **apaga el repedido**.
+
+Caso testigo **584E** (Aceitera 400 Ml): el módulo mostraba **1.290** = 90 del módulo + **1.200 del
+depósito insumos**, contra **19 cajas** de la pantalla de Stock (15 terminado + 4 a facturar = 114 u,
+9 cajas ya pedidas). El 1.200 sale de `Movimientos_Stock` depósito `insumos`: ajuste **+2.400 Uni**
+del 10/08, **−8** a Cervantes el 04/09 y ajuste **−1.192** el 04/09. **La cuenta cierra** (todo en
+Uni, no es el bug de mezclar MC con Uni de §3.bm.19), así que la pregunta era física.
+
+### Las dos respuestas del dueño (11/09)
+
+1. *"1200 uni hay en insumos"* → el saldo **es correcto**. **No se tocó ningún dato.**
+2. *"sí"* → esas unidades **no cuentan como stock del artículo terminado**.
+
+### El arreglo
+
+`sql/gv_importados_insumos_solo_partes_v1575.sql`. La vía automática por código igual queda **sólo
+para PARTES** (las de `Importados_Partes_Map`: 505C, 523C, 587C, 1000900, 1546903) — un join más en
+el CTE `link` de `gv_importados_stock_insumos`. **Cualquier terminado que tenga que contar el
+depósito insumos hay que escribirlo en `GV_Importados_Insumo_Map`**, que es donde vive lo decidido.
+Así el próximo código igual que aparezca en insumos no se engancha solo.
+
+**437E y 439E·CH sí son intencionales** (§3.bm.19: *"en Chef el 437E/439E arranca como insumo"*), así
+que en vez de quedar colgados de la regla automática **pasan al mapa**, con la nota del motivo.
+
+### Medido
+
+`gv_importados_stock_insumos` queda con 7 filas: las partes (505C 130.000 · 523C 6.000 ·
+1000900 107.500 · 1546903 16.848) y las del mapa (522E 2.000 · 437E 2.592 · 439E 384).
+**Salieron** 584E (1.200), 035E (528), 440E (192), 102E (0) y 590E (0).
+
+| Código | stock antes | stock ahora | a pedir antes | **a pedir ahora** |
+|---|---|---|---|---|
+| **584E** Aceitera 400 | 1.290 | **90** | 380 | **1.580** |
+| **035E** Cernidor | 1.116 | **588** | 524 | **1.052** |
+| **440E** Colador Ext. | 348 | **156** | 0 | 0 |
+| 437E·CH · 439E·CH · 522E · partes | — | sin cambio | — | sin cambio |
+
+### Rollback
+
+`delete from "GV_Importados_Insumo_Map" where insumo_cod in ('437E','439E')` + recrear la vista con
+la definición guardada en **`GV_bkp_def_gv_importados_stock_insumos_20260911`** (es la de
+`sql/gv_importados_stock_insumos_v1527.sql`, sin el join a `partes`). No toca objetos de Producción.
