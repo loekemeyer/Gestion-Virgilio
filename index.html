@@ -214,6 +214,12 @@ button {
 .row-6 { grid-template-columns: repeat(6, minmax(0, 1fr)); }
 .row-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 .row-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+/* v15.33 — a ≤430px las 6 columnas de row-6 (CR/RR/INS/CP/RC/IR) quedan tan angostas que
+   .box-desc parte palabras a la mitad ("Recepció"/"n Remitos"). 2 filas de 3 les da el doble
+   de ancho y alcanza para no cortar (revisor-render, auditoría 2026-09-11). */
+@media (max-width: 430px) {
+  .row-6 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
 
 .box { border: 2px solid #334155; border-radius: 10px; padding: 9px 5px; text-align: center; cursor: pointer; min-width: 0; transition: border-color .12s, transform .06s; }
 .box-sm { padding: 5px 4px; border-radius: 8px; }
@@ -3038,6 +3044,24 @@ tr.ppp-err-zona > td{ background:#fffbeb !important; }
 .cr-td-rs{ font-size: 13px; color: #334155; max-width: 220px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .cr-td-lios{ text-align: center; font-size: 15px; font-weight: 800; color: #b45309; white-space: nowrap; }
 .cr-td-lios.cr-lios0{ color: #94a3b8; font-weight: 600; }
+/* v15.33 — a ≤560px la tabla de 6 columnas (NP·Cod·RS·Líos·Controlado·Volvió) medía más que
+   la pantalla y sin ningún aviso: Líos, Controlado (el tilde que da sentido a la pantalla) y
+   el botón "s/salida" quedaban fuera de vista, sin scrollbar visible que lo delate (revisor-render,
+   auditoría 2026-09-11). Se pasa a tarjeta apilada por fila, cada celda con su etiqueta
+   (`data-label`, agregado en crRender). El click en la fila sigue tildando "Controlado" igual. */
+@media (max-width: 560px) {
+  .cr-table thead { display: none; }
+  .cr-table, .cr-table tbody, .cr-table tr, .cr-table td { display: block; width: 100%; }
+  .cr-row { border: 2px solid #e2e8f0; border-radius: 10px; margin-bottom: 8px; padding: 2px 12px; }
+  .cr-row.cc-on { border-color: #16a34a; }
+  .cr-row.cr-venc { border-color: #fca5a5; }
+  .cr-table td { border-bottom: 1px dashed #eef2f7; padding: 7px 0; }
+  .cr-table tr:last-child td:last-child, .cr-table td:last-child { border-bottom: none; }
+  .cr-table td[data-label]::before { content: attr(data-label); display: block; font-size: 10px; font-weight: 800; text-transform: uppercase; letter-spacing: .3px; color: #94a3b8; margin-bottom: 2px; }
+  .cr-td-rs{ max-width: none; white-space: normal; overflow: visible; text-overflow: clip; }
+  .cr-td-lios, .cr-td-ctrl { text-align: left; }
+  .cr-td-act { text-align: right; }
+}
 .fac-lios-cell{ text-align: center; font-weight: 800; color: #b45309; white-space: nowrap; }
 .fac-lios-cell .fac-lios0{ color: #94a3b8; font-weight: 600; }
 .fac-cajas-cell{ text-align: center; font-weight: 800; color: #0369a1; white-space: nowrap; }
@@ -7622,7 +7646,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v15.32";
+const APP_VERSION = "v15.33";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -7972,7 +7996,17 @@ function emitArmadoUbic(np, ubic, legajo) {
   if (typeof trySendOneReport === "function") trySendOneReport(payload).then(function (r) { if (r && r.ok) removeFromQueue(payload.id); }).catch(function () {});
   try { updatePendingIndicator(); } catch (_e) {}
 }
+let _sendLastCallMs = 0;
 async function send() {
+  // v15.33 — el único disabled=true del botón "Enviar" llega recién después de varios await
+  // (getActivityStatus, fetchMonitorSheet, tandaReservar…). Un doble-tap antes de eso ejecuta
+  // send() dos veces en paralelo: cada llamada arma un payload con id aleatorio distinto, así
+  // que las dos quedan encoladas sin dedupe posible (auditoría revisor-logica 2026-09-11).
+  // Guard por tiempo (no por bandera true/false): send() tiene varios `return` tempranos de
+  // validación, y una bandera habría quedado trabada para siempre en cualquiera de esos casos.
+  const _nowCall = Date.now();
+  if (_nowCall - _sendLastCallMs < 800) return;
+  _sendLastCallMs = _nowCall;
   const legajoStr   = String(legajoInput.value || "").trim();
   const opcion      = selected;
   const descripcion = desc[selected] || "";
@@ -24938,29 +24972,29 @@ const CC_REPARTO_DESDE_ISO = "2026-06-22T00:00:00-03:00";
    (eventos CCN). Facturacion_NP ya trae tanda y razón social → sin Google Sheet.
    Sin &_= en las URLs (PostgREST lo rechaza con 400). */
 async function fetchCCData() {
-  const headers = { "apikey": SUPABASE_KEY, "Authorization": "Bearer " + SUPABASE_KEY };
   const sinceTal = new Date(Date.now() - 7 * 24 * 3600 * 1000).toISOString();
   const desdeIso = CC_REPARTO_DESDE_ISO;   // ancla fija (piso); la frescura la da la Programación Diaria
-  const repUrl = SUPABASE_FACTURACION_NP_ENDPOINT
-    + "?cierre_id=not.is.null&facturado_at=gte." + encodeURIComponent(desdeIso)
-    + "&select=np,tanda,razon_social&limit=20000";
-  const ccnUrl = SUPABASE_TABLE_ENDPOINT
-    + "?opcion=eq.CCN&ts_cliente=gte." + encodeURIComponent(desdeIso)
-    + "&select=texto,ts_cliente&limit=20000";
+  const repQ = "cierre_id=not.is.null&facturado_at=gte." + encodeURIComponent(desdeIso)
+    + "&select=np,tanda,razon_social&order=np.asc";
+  const ccnQ = "opcion=eq.CCN&ts_cliente=gte." + encodeURIComponent(desdeIso)
+    + "&select=texto,ts_cliente&order=ts_cliente.asc";
   // v9.68 — NP ya ENTREGADAS (estado terminal del flujo, tabla propia). Se sacan del reparto:
   // el pedido sale del CC al cargarse (CCN) o, si olvidaron el CCN, al entregarse. Lo que queda es
   // lo que REALMENTE falta cargar (facturado, sin cargar, sin entregar) — incluidos los olvidados.
   // v11.23 ⚠ PostgREST corta en 1000 filas y la tabla ya tiene 2300+: un fetch simple
   // dejaba NPs entregadas fuera del set → reaparecían como pendientes de repartir.
-  // Se pagina con supaFetchAllSafe (ver _par más abajo).
+  // v15.33 — el mismo corte de 1000 filas afectaba TAMBIÉN a repUrl (Facturacion_NP) y a ccnUrl
+  // (eventos CCN): con +3 meses de reparto acumulado, un NP facturado real podía desaparecer sin
+  // aviso, o uno ya cargado podía reaparecer como pendiente (auditoría revisor-logica 2026-09-11).
+  // Las tres consultas del reparto pasan a supaFetchAll(Safe) igual que entrR, con `order=` explícito
+  // para que la paginación por rango sea determinística.
   // Líos por NP: eventos TAL (anotados al terminar armado). Mismo origen que usa Recepción Remitos.
-  const talUrl = SUPABASE_TABLE_ENDPOINT
-    + "?opcion=eq.TAL&ts_cliente=gte." + encodeURIComponent(sinceTal)
-    + "&select=texto&order=ts_cliente.asc&limit=20000";  // idea 3016: orden cronologico -> el ultimo lios.set gana (TAL mas reciente)
+  const talQ = "opcion=eq.TAL&ts_cliente=gte." + encodeURIComponent(sinceTal)
+    + "&select=texto&order=ts_cliente.asc";  // idea 3016: orden cronologico -> el ultimo lios.set gana (TAL mas reciente)
   const _par = await Promise.all([
-    fetch(repUrl, { headers, cache: "no-store" }).then(function (r) { if (!r.ok) throw new Error("HTTP " + r.status); return r.json(); }),
-    fetch(ccnUrl, { headers, cache: "no-store" }).then(function (r) { return r.ok ? r.json() : []; }),
-    fetch(talUrl, { headers, cache: "no-store" }).then(function (r) { return r.ok ? r.json() : []; }),
+    supaFetchAll(SUPABASE_FACTURACION_NP_ENDPOINT, repQ),         // fuente primaria: si falla, que reviente (no mostrar reparto vacío por error)
+    supaFetchAllSafe(SUPABASE_TABLE_ENDPOINT, ccnQ),
+    supaFetchAllSafe(SUPABASE_TABLE_ENDPOINT, talQ),
     fetchSinSalidaMap(desdeIso),
     supaFetchAllSafe(SUPABASE_URL + "/rest/v1/gv_ppp_entregados_meta", "select=np")
   ]);
@@ -25188,6 +25222,10 @@ function ccFinish() {
     }
   }
   const sel = _cc.items.filter(it => _cc.checked.has(it.np));
+  // v15.33 — a diferencia de Recepción Remitos (crFinish), tocar "Terminé" sin tildar ningún NP
+  // cerraba el toggle CC igual, sin avisar: quedaba tiempo de CC registrado sin ningún NP cargado
+  // (auditoría revisor-logica 2026-09-11).
+  if (!sel.length) { try { alert("Tildá al menos un NP " + (esRetira ? "entregado" : "cargado") + ", o tocá «Cerrar» para salir."); } catch (_e) {} return; }
   for (const it of sel) ccSendDetail(legajo, it.np, it.tanda, camionero);   // CCN por cada NP cargada (con camionero)
   if (camionero) ccUpsertCamionero(camionero);                  // guarda el nombre en el maestro Camioneros
   ccSendClose(legajo);                                          // cierre CC
@@ -25210,7 +25248,11 @@ function ccSendDetail(legajo, np, tanda, camionero) {
   // v11.47 — CCN texto: NP|TANDA|CAMIONERO. El camionero solo va en camión (en retira queda vacío).
   // Las vistas leen split_part [1]=np, [2]=tanda → el 3er campo no las afecta.
   const cam = String(camionero || "").trim();
-  const texto = (String(np) + "|" + String(tanda)).toUpperCase() + "|" + cam;
+  // v15.33 — "—" es el placeholder de PANTALLA cuando Facturacion_NP.tanda viene vacío; no debe
+  // persistirse literal en Registros_Produccion_Virgilio (otros lectores esperan un código real
+  // tipo C03A o nada, no el carácter "—" — auditoría revisor-logica 2026-09-11).
+  const tandaPersist = (String(tanda || "").trim() === "—") ? "" : tanda;
+  const texto = (String(np) + "|" + String(tandaPersist)).toUpperCase() + "|" + cam;
   const payload = {
     legajo: legajo, opcion: "CCN", descripcion: "Carga Camión NP",
     texto: texto,
@@ -25407,12 +25449,12 @@ function crRender() {
     const liosCls = (cell.txt === "—") ? " cr-lios0" : "";
     const liosTtl = cell.esCajas ? "cajas (retira)" : "líos";
     rows += `<tr class="cr-row${on ? " cc-on" : ""}${it.venc ? " cr-venc" : ""}" onclick="crToggle('${npc}')">` +
-            `<td class="cr-td-np">${escapeHtml(it.np)}${it.loadMs ? `<div class="cr-cc-date">🚚 ${crFmtCC(it.loadMs)}</div>` : ""}</td>` +
-            `<td class="cr-td-cod">${it.cod ? escapeHtml(it.cod) : "—"}</td>` +
-            `<td class="cr-td-rs">${escapeHtml(it.rs || "—")}${it.venc ? `<span class="cr-venc-tag">VENCIDO</span>` : ""}</td>` +
-            `<td class="cr-td-lios${liosCls}" title="${liosTtl}">${escapeHtml(cell.txt)}</td>` +
-            `<td class="cr-td-ctrl"><span class="cr-chk">${on ? "✓" : ""}</span></td>` +
-            `<td class="cr-td-act"><button class="cr-sinsal-btn" onclick="event.stopPropagation();crMarkSinSalida('${npc}')" title="El cliente no recibió — la mercadería volvió al depósito. Sale de acá y queda en «FC s/Salida» (Stocks).">↩ s/salida</button></td></tr>`;
+            `<td class="cr-td-np" data-label="NP">${escapeHtml(it.np)}${it.loadMs ? `<div class="cr-cc-date">🚚 ${crFmtCC(it.loadMs)}</div>` : ""}</td>` +
+            `<td class="cr-td-cod" data-label="Cod Cliente">${it.cod ? escapeHtml(it.cod) : "—"}</td>` +
+            `<td class="cr-td-rs" data-label="Razón Social">${escapeHtml(it.rs || "—")}${it.venc ? `<span class="cr-venc-tag">VENCIDO</span>` : ""}</td>` +
+            `<td class="cr-td-lios${liosCls}" data-label="${cell.esCajas ? "Cajas (retira)" : "Líos"}" title="${liosTtl}">${escapeHtml(cell.txt)}</td>` +
+            `<td class="cr-td-ctrl" data-label="Controlado"><span class="cr-chk">${on ? "✓" : ""}</span></td>` +
+            `<td class="cr-td-act" data-label="Volvió"><button class="cr-sinsal-btn" onclick="event.stopPropagation();crMarkSinSalida('${npc}')" title="El cliente no recibió — la mercadería volvió al depósito. Sale de acá y queda en «FC s/Salida» (Stocks).">↩ s/salida</button></td></tr>`;
   }
   html += `<div class="cr-tablewrap"><table class="cr-table"><thead><tr>` +
           `<th>NP</th><th>Cod Cliente</th><th>Razón Social</th>` +
@@ -25448,9 +25490,11 @@ function crFinish() {
 }
 function crSendDetail(legajo, np, tanda) {
   const nowMs = Date.now();
+  // v15.33 — ídem ccSendDetail: no persistir el placeholder "—" de pantalla.
+  const tandaPersist = (String(tanda || "").trim() === "—") ? "" : tanda;
   const payload = {
     legajo: legajo, opcion: "CRN", descripcion: "Control Remito NP",
-    texto: (String(np) + "|" + String(tanda)).toUpperCase(),
+    texto: (String(np) + "|" + String(tandaPersist)).toUpperCase(),
     ts: nowMs,
     id: ("crn_" + legajo + "_" + np + "_" + getTodayKey()).replace(/[^a-zA-Z0-9_\-]/g, ""),
     ts_inicio_iso: null
@@ -25534,21 +25578,20 @@ function ccrReleaseWakeLock() { try { if (_ccrWakeLock) { _ccrWakeLock.release()
 /* Facturados del reparto (igual que CC) MENOS los ya controlados en CR (eventos
    CCR), con los líos de TAL. NO resta los cargados (CCN): CR es independiente. */
 async function fetchCCRData() {
-  const headers = { "apikey": SUPABASE_KEY, "Authorization": "Bearer " + SUPABASE_KEY };
   const sinceTal = new Date(Date.now() - 7 * 24 * 3600 * 1000).toISOString();
-  const repUrl = SUPABASE_FACTURACION_NP_ENDPOINT
-    + "?cierre_id=not.is.null&facturado_at=gte." + encodeURIComponent(CC_REPARTO_DESDE_ISO)
-    + "&select=np,tanda,razon_social&limit=20000";
-  const ccrUrl = SUPABASE_TABLE_ENDPOINT
-    + "?opcion=eq.CCR&ts_cliente=gte." + encodeURIComponent(CC_REPARTO_DESDE_ISO)
-    + "&select=texto&limit=20000";
-  const talUrl = SUPABASE_TABLE_ENDPOINT
-    + "?opcion=eq.TAL&ts_cliente=gte." + encodeURIComponent(sinceTal)
-    + "&select=texto&order=ts_cliente.asc&limit=20000";  // idea 3016: orden cronologico -> el ultimo lios.set gana (TAL mas reciente)
+  // v15.33 — mismo fix que fetchCCData: Facturacion_NP y los eventos CCR pasan a
+  // supaFetchAll(Safe) con `order=` explícito, porque el fetch simple con `limit=20000` se corta
+  // en 1000 filas del lado de PostgREST (auditoría revisor-logica 2026-09-11).
+  const repQ = "cierre_id=not.is.null&facturado_at=gte." + encodeURIComponent(CC_REPARTO_DESDE_ISO)
+    + "&select=np,tanda,razon_social&order=np.asc";
+  const ccrQ = "opcion=eq.CCR&ts_cliente=gte." + encodeURIComponent(CC_REPARTO_DESDE_ISO)
+    + "&select=texto&order=ts_cliente.asc";
+  const talQ = "opcion=eq.TAL&ts_cliente=gte." + encodeURIComponent(sinceTal)
+    + "&select=texto&order=ts_cliente.asc";  // idea 3016: orden cronologico -> el ultimo lios.set gana (TAL mas reciente)
   const _par = await Promise.all([
-    fetch(repUrl, { headers, cache: "no-store" }).then(function (r) { if (!r.ok) throw new Error("HTTP " + r.status); return r.json(); }),
-    fetch(ccrUrl, { headers, cache: "no-store" }).then(function (r) { return r.ok ? r.json() : []; }),
-    fetch(talUrl, { headers, cache: "no-store" }).then(function (r) { return r.ok ? r.json() : []; })
+    supaFetchAll(SUPABASE_FACTURACION_NP_ENDPOINT, repQ),   // fuente primaria: si falla, que reviente
+    supaFetchAllSafe(SUPABASE_TABLE_ENDPOINT, ccrQ),
+    supaFetchAllSafe(SUPABASE_TABLE_ENDPOINT, talQ)
   ]);
   const repR = _par[0], ccrR = _par[1], talR = _par[2];
   const controlados = new Set();
@@ -25663,6 +25706,9 @@ function ccrFinish() {
   if (!_ccr) return;
   const legajo = _ccr.legajo;
   const sel = _ccr.items.filter(it => _ccr.checked.has(it.np));
+  // v15.33 — mismo guard que crFinish (RR): sin esto, "Terminé" sin tildar nada cerraba el
+  // toggle CR igual, sin avisar (auditoría revisor-logica 2026-09-11).
+  if (!sel.length) { try { alert("Tildá al menos un NP controlado, o tocá «Cerrar» para salir."); } catch (_e) {} return; }
   for (const it of sel) ccrSendDetail(legajo, it.np, it.tanda);   // CCR por cada NP controlada (NO alimenta RR)
   ccrSendClose(legajo);                                           // cierre toggle CR
   ccrClearChecked(legajo);
@@ -25681,9 +25727,12 @@ function ccrSendClose(legajo) {
 }
 function ccrSendDetail(legajo, np, tanda) {
   const nowMs = Date.now();
+  // v15.33 — ídem ccSendDetail: no persistir el placeholder "—" de pantalla (acá además agrupa
+  // visualmente por tanda en ccrRender, así que el "—" se mantiene para ESE uso).
+  const tandaPersist = (String(tanda || "").trim() === "—") ? "" : tanda;
   const payload = {
     legajo: legajo, opcion: "CCR", descripcion: "Control Remito CR NP",
-    texto: (String(np) + "|" + String(tanda)).toUpperCase(),
+    texto: (String(np) + "|" + String(tandaPersist)).toUpperCase(),
     ts: nowMs,
     id: ("ccr_" + legajo + "_" + np + "_" + getTodayKey()).replace(/[^a-zA-Z0-9_\-]/g, ""),
     ts_inicio_iso: null
