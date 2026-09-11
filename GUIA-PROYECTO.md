@@ -12,7 +12,7 @@
 > única**; no se replica. Ante la duda entre parche rápido y fix de raíz → **fix
 > de raíz**.
 >
-> Última actualización: 2026-09-11 (viernes) · Versión app al documentar: **v15.46**
+> Última actualización: 2026-09-11 (viernes) · Versión app al documentar: **v15.50**
 >
 > Nota **v15.40 (2026-09-11) — HANDOFF de planimetría / Acacia: `docs/HANDOFF-PLANIMETRIA-Y-ACACIA.md`.**
 > Thomas sigue este tema en otra sesión. Ahí está todo junto: los **13 artículos activos del catálogo LK
@@ -11158,6 +11158,28 @@ distinta, empresa distinta.
 >   (umbral ≈ 3× su período; dedup un aviso por sync por día). **No se creó tabla
 >   `Sync_Estado`**: `cron.job_run_details` ya tiene la verdad. DDL en
 >   `sql/watchdog_syncs_externos.sql`.
+
+> Nota **2026-09-11 (v15.50) — La columna Fecha de la PPP mostraba DOS formatos mezclados.**
+> En el Resumen convivían `2026-09-09` y `10/09/2026` en la misma columna. No es un tema de
+> estilo: es el **origen** de la NP. Las de ISIS pasan por `_pppSupaFecha` (`"2026-09-10
+> 00:00:00"` → `10/09/2026`); las de la página salían **crudas** de `PPP_Web_Programacion`
+> (columnas `date`, o sea `aaaa-mm-dd`). Como el Resumen le pone al día la fecha del **primer
+> pedido del grupo**, la tabla alternaba formato fila por fila según quién cayera primero.
+> - **Se normaliza en el origen**, no en la celda: `pppTraerWebProgramados` (y el camino viejo
+>   `pppTraerPedidosWeb`) pasan `fecha_recep` y `fecha_entrega` por `_pppSupaFecha`. Con eso
+>   quedan en dd/mm/aaaa **todas** las pantallas que leen esas filas: Programación, Resumen, el
+>   pop-up de composición, los camiones y la hoja de ruta — no sólo la que se reportó.
+> - **Y el camino inverso, que era el peligroso:** `pppGuardarWeb` mandaba `p.fecha_entrega` tal
+>   cual a esas columnas `date`. PostgREST corre con `DateStyle = 'ISO, MDY'`, así que un
+>   `10/09/2026` —lo que arma `_pppDeliveryDate` y lo que tipea el supervisor en el input, cuyo
+>   placeholder ya dice dd/mm/aaaa— se habría guardado como **9 de OCTUBRE**, y con día > 12
+>   habría hecho fallar el POST entero. Ahora va por `_pppFechaISO(...)`, que devuelve
+>   `aaaa-mm-dd` o `null`. Era **latente**: hoy esas filas las escriben los crons, todas en ISO
+>   (verificado, 30 filas más recientes de `PPP_Web_Programacion`, ninguna corrida).
+> - **Regresión nueva `tests/ppp-fecha-formato.cjs`** (falla con el código de antes, pasa con el
+>   de ahora): chequea que las filas web salgan dd/mm/aaaa, que el Resumen no imprima ninguna
+>   fecha en `aaaa-mm-dd`, y que a la base viaje ISO.
+> - Backend: **no se tocó nada.**
 
 > Nota **2026-09-11 (v15.46) — El REMITO IMPRESO de las NP de la página salía sin cliente ni fecha.**
 > Thomas, con la hoja en la mano: **NP CH 0005** (tanda E12B, impresa el 11/09 11:18) con

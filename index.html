@@ -7664,7 +7664,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v15.49";
+const APP_VERSION = "v15.50";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -27517,11 +27517,11 @@ async function pppTraerWebProgramados() {
       // v12.92 — la NP es el número de pedido de la página: si `np` viniera vacío se
       // arma igual desde order_id (es el mismo número). El bloque va en la etiqueta.
       np: (r.np == null) ? pwebPedidoLabel(r.empresa, r.order_id) : pwebNpLabel(r.empresa, r.np),   // v13.70
-      tanda: r.tanda || "—", tipo: "", fecha: r.fecha_recep || "",
+      tanda: r.tanda || "—", tipo: "", fecha: _pppSupaFecha(r.fecha_recep),
       cod: r.cod_cliente || "", razon_social: r.razon_social || "",
       m3: Number(r.m3) || 0,
       localidad: r.barrio || "",
-      fecha_entrega: r.fecha_entrega || "",
+      fecha_entrega: _pppSupaFecha(r.fecha_entrega),
       zona: r.zona || "",
       programmed: true,
       _web: true, _wEmp: r.empresa, _wOrder: r.order_id, _wIdx: r.np_idx,
@@ -27578,11 +27578,11 @@ async function pppTraerPedidosWeb(empresa) {
     const tanda = g.tanda || "";
     return {
       np: num ? pwebNpLabel(n.empresa || emp, num) : pwebPedidoLabel(n.empresa || emp, n.order_id),   // v13.70
-      tanda: tanda || "—", tipo: "", fecha: n.fecha_recep || "",
+      tanda: tanda || "—", tipo: "", fecha: _pppSupaFecha(n.fecha_recep),
       cod: n.cod || "", razon_social: n.razon_social || "",
       m3: Number(m3.toFixed(3)),
       localidad: pwebLocalidad(n),
-      fecha_entrega: g.fecha_entrega || "",
+      fecha_entrega: _pppSupaFecha(g.fecha_entrega),
       zona: g.zona || pwebZonaSugerida(n),
       programmed: !!tanda,
       // Lo necesario para guardar después, sin volver a pedirle nada a LK.
@@ -27728,8 +27728,8 @@ async function pppGuardarWeb(filas) {
     return {
       empresa: p._wEmp, order_id: p._wOrder, np_idx: p._wIdx, np: p._wNum,
       cod_cliente: p.cod, razon_social: p.razon_social, direccion: p._wDir,
-      barrio: p.localidad, fecha_recep: p.fecha || null,
-      tanda: p.tanda, zona: p.zona || null, fecha_entrega: p.fecha_entrega || null,
+      barrio: p.localidad, fecha_recep: _pppFechaISO(p.fecha),
+      tanda: p.tanda, zona: p.zona || null, fecha_entrega: _pppFechaISO(p.fecha_entrega),
       m3: p.m3, m3_parcial: !!p._wM3Parcial, lineas: p._wLineas, cajas: p._wCajas
     };
   });
@@ -28246,6 +28246,18 @@ function pppMergePedidos(nuevos) {
    de imports. */
 let _pppSupaNps = null;
 function _pppSupaFecha(s) { s = _pppS(s); if (!s) return ""; const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(s); return m ? (m[3] + "/" + m[2] + "/" + m[1]) : s; }
+/* v15.50 — inverso de _pppSupaFecha: "dd/mm/aaaa" (lo que se muestra y lo que tipea el
+   supervisor) → "aaaa-mm-dd", que es lo que esperan las columnas `date` de
+   PPP_Web_Programacion. Sin esto un "10/09/2026" viajaba crudo a PostgREST, que corre con
+   DateStyle 'ISO, MDY' y lo habría guardado como 9 de OCTUBRE (y con día > 12 habría
+   fallado el guardado entero). Devuelve null si no hay fecha, para escribir NULL. */
+function _pppFechaISO(s) {
+  s = _pppS(s); if (!s) return null;
+  let m = /^(\d{4})-(\d{2})-(\d{2})/.exec(s); if (m) return m[1] + "-" + m[2] + "-" + m[3];
+  m = /^(\d{1,2})\/(\d{1,2})\/(\d{2,4})/.exec(s); if (!m) return null;
+  let y = m[3]; if (y.length === 2) y = "20" + y;
+  return y + "-" + String(m[2]).padStart(2, "0") + "-" + String(m[1]).padStart(2, "0");
+}
 function _pppRowFromSupa(r) {
   const tanda = _pppS(r.tanda), fe = _pppSupaFecha(r.fecha_entrega);
   return {

@@ -327,6 +327,9 @@ PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node te
 echo "== ppp-movil (v14.25: la fila de la PPP en un teléfono de 390 px — el importe entero, sin scroll horizontal) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/ppp-movil.cjs
 
+echo "== ppp-fecha-formato (regresión v15.50: una sola fecha dd/mm/aaaa en la PPP; a la base va ISO) =="
+PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/ppp-fecha-formato.cjs
+
 echo "== ppp-atrasados (v14.06: los atrasados se ven sin rebotar de solapa — banda en Programación + lista adentro de Resumen) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/ppp-atrasados.cjs
 
