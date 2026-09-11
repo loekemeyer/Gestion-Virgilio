@@ -361,7 +361,7 @@ proy sólo códigos base), función `lk_reingresos_feed` (replace: sólo marca �
 (restaurar `cod_art` desde `GV_Importados_bkp_437_438_20260911`, borrar volumen `…EL`, y volver la
 vista/feed a `ltrim(upper(btrim(x)),'0')` sin filtros).
 
-## Limpieza Importados — v15.02 (2026-09-11)
+## Limpieza Importados — v15.05 (2026-09-11)
 
 `Importados`: id 129 (809E) `marca LK→CH`, `principal false→true`, descripción "Corta queso x12";
 **delete** de 11 filas `principal=false` (copias exactas) y 2 filas de `GV_Importados_Baches`.

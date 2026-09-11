@@ -4900,7 +4900,7 @@ ningún otro código tiene entregas con L. `Importados_Mov_Stock` no tiene códi
 360E/361E/366E (LK·Kangli ×2), 585E/811E/812E/813E/816E/817E/819E (LK·Ownland ×2), 809E ×3 —
 suman doble el en curso y el backfill de baches les creó 2–3 baches.
 
-### §3.bm.1 — Limpieza `Importados`: 809E corta queso → CH; 11 copias exactas borradas (v15.02, 2026-09-11)
+### §3.bm.1 — Limpieza `Importados`: 809E corta queso → CH; 11 copias exactas borradas (v15.05, 2026-09-11)
 
 - **809E**: id 129 "CORTA QUESO x 12" estaba como LK con `principal=false` (invisible) y **4.032 u en curso**.
   Dueño: *"809E es corta pizza para Loeke (la próxima impo viene con código nuevo, 820E) y 809E es corta
