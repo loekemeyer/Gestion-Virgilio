@@ -5593,3 +5593,49 @@ real en la **v22**. El fuente versionado es
 `drop function public.gv_cuarentena_planify_sync(text,jsonb);`,
 `drop table public."GV_Cuarentena_Pagados", public."GV_Cuarentena_Planify";`, volver
 `gv_cuarentena_marcar` a la v15.04 (sin el `not exists` de Pagados) y sacar del front `cuarYaPago`.
+
+
+## §3.cf — Mismo cliente en dos días + zona manual con día ya abierto (v15.48, 2026-09-11)
+
+Thomas, mirando la PPP del 15 y 16/09, marcó dos cosas.
+
+### 1. Orfali programado dos veces — ahora sale como alerta
+
+| NP | Tanda | Día | m³ |
+|---|---|---|---|
+| LK 0053 | E13A | 15/09 | 0,019 |
+| LK 0002 | D69D | 16/09 | 1,184 |
+
+Mismo cliente (Orfali Alfredo Luciano, 4188), misma zona, dos camiones. La vista
+**`gv_ppp_cliente_dos_dias`** lo detecta: junta las NP de la página con las de ISIS, cruza por
+**razón social normalizada** (el cod no sirve para cruzar LK con Chef y el espejo de ISIS no trae
+empresa) y se queda con los clientes que tienen entregas en **dos días separados por 7 días o
+menos**. Más lejos son dos pedidos con fecha pactada, no un error: el corte de 7 días saca a Matiz
+SA (16/09, 07/10 y 28/10), que la primera versión marcaba como falso positivo. Súper, Retira y Expo
+quedan afuera — entregan varios días a propósito.
+
+El front la pinta arriba de **A Programar** (`aprDosDiasCargar` / `aprDosDiasHtml`). Al 11/09 la
+vista devuelve exactamente el caso de Orfali y nada más.
+
+**Esto detecta, no impide.** El armado automático ya manda el pedido al día que el cliente tiene
+abierto (bloques (a1) y (a2) de `gv_ppp_web_armar_pendientes`, v14.05/v13.93); lo que se escapa es
+lo que se mueve **a mano** después, y para eso está la alerta.
+
+### 2. El piso mataba el enganche de las zonas manuales
+
+El bloque **(c)** (zonas no automáticas que ya tienen camión a la zona) preguntaba
+`gv_ppp_web_dia_camion(zona, v_min)` con `v_min = gv_ppp_web_dia_minimo()`, o sea **hoy + 4 días
+hábiles**. Los camiones ya armados para el 15 y el 16 caían antes de ese piso:
+
+| | desde el piso (17/09) | desde mañana |
+|---|---|---|
+| Zona 6 - GBA Norte | (ninguno) | **2026-09-15** |
+| Zona 7 - GBA Norte Lejos | (ninguno) | **2026-09-16** |
+
+Por eso LK 1389 (zona 7) y LK 1390 (zona 6) quedaban en **"sin camión previsto"** aunque el camión
+a su zona ya sale. El piso pasa a `current_date + 1`: la anticipación mínima es para **elegir** un
+día nuevo; un día que ya existe no hay que elegirlo. El cupo del día se sigue ignorando en este
+bloque, que es la regla del dueño ("si ya va un camión a esa zona, sumalo ahí").
+
+**Rollback:** `sql/gv_alerta_cliente_dos_dias_v1548.sql` (volver esa línea a `v_min` y
+`drop view public.gv_ppp_cliente_dos_dias`).

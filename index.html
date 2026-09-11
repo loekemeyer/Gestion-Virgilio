@@ -7664,7 +7664,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v15.47";
+const APP_VERSION = "v15.48";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -35735,6 +35735,8 @@ function aprRender() {
   pppPaintTabs();
   // v14.82: resumen de los reportes de cuarentena (una sola vez; se refresca al importar)
   if (_apr.cuarResumen === null && !_apr.cuarResumenLoading) cuarResumenCargar();
+  // v15.48: alerta de mismo cliente en dos días de la misma semana
+  if (_apr.dosDias === undefined && !_apr.dosDiasLoading) aprDosDiasCargar();
   let h = "";
 
   // v13.58: sin selector Loekemeyer/Chef — se ven las dos empresas juntas.
@@ -35771,6 +35773,7 @@ function aprRender() {
     escapeHtml(_dobHoy.map(_dobTxt).join(" · ")) + '. Si el de ISIS LK está mal, anulalo ahí y recargá.</div>';
   if (_dobFc.length) h += '<div class="apr-err">🧾 ' + _dobFc.length + ' pedido(s) de Chef son de clientes a los que LK les factura artículos de Loeke (FC Electr. en ISIS LK en los últimos ' + (_apr.dobleDias || 180) + ' días): NO se programan, los tipea compras en ISIS LK: ' +
     escapeHtml(_dobFc.map(_dobTxt).join(" · ")) + '.</div>';
+  h += aprDosDiasHtml();   // v15.48 — mismo cliente en dos días de la misma semana
   if (_apr.msg) h += '<div class="' + (_apr.msgErr ? "apr-err" : "apr-msg") + '">' + escapeHtml(_apr.msg) + '</div>';
   h += aprLogHtml();   // idea 2048
 
@@ -36220,6 +36223,38 @@ function cuarDemoRowHtml() {
     '<button class="cuar-demo-btn" onclick="cuarDemoToggle()">' +
     (_apr.cuarDemo ? "✕ Quitar ejemplo" : "👁 Ver ejemplo") + '</button></div>';
 }
+/* v15.48 (dueño, 2026-09-11: *"porque está programado Orfali para 2 días diferentes. no podría
+   pasar y tendría que salir como alerta"*) — mismo cliente con entregas en dos días separados por
+   una semana o menos, juntando las NP de la página y las de ISIS. La cuenta la hace el backend
+   (vista `gv_ppp_cliente_dos_dias`, que cruza por razón social normalizada y deja afuera Súper,
+   Retira y Expo); acá sólo se pinta. */
+async function aprDosDiasCargar() {
+  if (_apr.dosDiasLoading) return;
+  _apr.dosDiasLoading = true;
+  try {
+    const H = { "apikey": SUPABASE_KEY, "Authorization": "Bearer " + SUPABASE_KEY };
+    const r = await fetch(SUPABASE_URL + "/rest/v1/gv_ppp_cliente_dos_dias?select=cliente_key,razon_social,cod,np,tanda,dia,zona,m3&limit=500",
+      { headers: H, cache: "no-store" });
+    _apr.dosDias = r.ok ? (await r.json()) : [];
+  } catch (_e) { _apr.dosDias = _apr.dosDias || []; }
+  _apr.dosDiasLoading = false;
+  if (_pppTab === "prog") aprRender();
+}
+function aprDosDiasHtml() {
+  const filas = _apr.dosDias || [];
+  if (!filas.length) return "";
+  const porCli = {};
+  filas.forEach(function (f) { (porCli[f.cliente_key] = porCli[f.cliente_key] || []).push(f); });
+  const claves = Object.keys(porCli);
+  const txt = claves.map(function (k) {
+    const g = porCli[k].slice().sort(function (a, b) { return String(a.dia).localeCompare(String(b.dia)); });
+    return (g[0].razon_social || g[0].cod) + ": " +
+      g.map(function (f) { return f.np + " (" + f.tanda + ", " + aprDiaCorto(f.dia) + ")"; }).join(" y ");
+  }).join(" · ");
+  return '<div class="apr-err">⚠ ' + claves.length + ' cliente(s) con entregas en <b>días distintos de la misma semana</b> — tendrían que ir juntos: ' +
+    escapeHtml(txt) + '. Movelo a mano al día que corresponda.</div>';
+}
+
 async function cuarResumenCargar() {
   if (_apr.cuarResumenLoading) return;
   _apr.cuarResumenLoading = true;
