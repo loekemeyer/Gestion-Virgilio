@@ -816,7 +816,7 @@ button {
 .apr-col-cuar .apr-vacio{ color:#b45309; }
 .apr-col-cuar .apr-vacio b{ color:#9a3412; }
 .apr-chip-cuar{ background:#c2410c; color:#fff; font-weight:800; }
-.apr-card.apr-card-cuar{ border-left-color:#c2410c; background:#fffbf5; cursor:default; display:flex; flex-direction:column; align-items:stretch; gap:0; padding:9px 10px 10px; }
+.apr-card-cuar{ border-left-color:#c2410c; background:#fffbf5; cursor:default; display:flex; flex-direction:column; align-items:stretch; gap:0; padding:9px 10px 10px; }
 /* v15.41 — la ficha va apilada: datos arriba, barra de acciones abajo separada
    por una línea. Antes (v15.02) iban a la derecha con margin-left:auto y en la
    ficha angosta el botón verde quedaba nowrap contra el borde: se cortaba. */
@@ -7660,7 +7660,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v15.45";
+const APP_VERSION = "v15.46";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
