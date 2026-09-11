@@ -2874,12 +2874,21 @@ tr.ppp-err-zona > td{ background:#fffbeb !important; }
 .ppp-tool-inp{ width:84px; height:34px; font-size:14px; border:1px solid #cbd5e1; border-radius:8px; padding:0 8px; }
 .ppp-tool-n{ width:64px; font-family:Consolas,Menlo,monospace; }
 .ppp-tool-clear{ margin-left:auto; padding:7px 12px; font-size:12px; font-weight:700; border:1px solid #fecaca; border-radius:8px; background:#fff; color:#b42318; cursor:pointer; }
-.ppp-res-note{ font-size:13px; color:#92400e; background:#fffbeb; border:1px solid #fde68a; border-radius:8px; padding:8px 12px; margin-bottom:8px; }
-.ppp-res-leg{ font-size:12px; color:#475569; background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; padding:7px 10px; margin-bottom:8px; }
-.ppp-restbl-wrap{ overflow-x:auto; border:1px solid #e2e8f0; border-radius:10px; }
-.ppp-restbl{ width:100%; border-collapse:collapse; font-size:12px; }
-.ppp-restbl th{ background:#0f172a; color:#fff; padding:6px 9px; text-align:center; font-size:11px; font-weight:700; white-space:nowrap; line-height:1.15; }
-.ppp-restbl td{ padding:5px 9px; border-bottom:1px solid #eef2f7; text-align:center; white-space:nowrap; }
+/* v15.53 — los dos carteles del Resumen tampoco se estiran al ancho del contenedor: el marco
+   termina donde termina el texto (`display:table` = shrink-to-fit y sigue ocupando su renglón). */
+.ppp-res-note{ font-size:13px; color:#92400e; background:#fffbeb; border:1px solid #fde68a; border-radius:8px; padding:8px 12px; margin-bottom:8px; display:table; max-width:100%; }
+.ppp-res-leg{ font-size:12px; color:#475569; background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; padding:7px 10px; margin-bottom:8px; display:table; max-width:100%; }
+/* v15.53 (dueño: "columnas siempre lo más angostas posibles, ancho determinado por la info
+   más ancha de la columna"): la tabla NO se estira al ancho del contenedor. Con `width:100%`
+   el navegador repartía los ~700 px sobrantes entre las 14 columnas y cada celda quedaba con
+   aire adentro (la de Fecha medía 171 px para un "09/09/2026" de ~62 px). Con `width:auto` +
+   `table-layout:auto` cada columna mide lo que mide su contenido más ancho, y el marco
+   (inline-block) se ajusta a la tabla en vez de dibujar un rectángulo vacío hasta el borde. */
+.ppp-restbl-wrap{ overflow-x:auto; border:1px solid #e2e8f0; border-radius:10px;
+  display:table; max-width:100%; }
+.ppp-restbl{ width:auto; table-layout:auto; border-collapse:collapse; font-size:12px; }
+.ppp-restbl th{ background:#0f172a; color:#fff; padding:4px 6px; text-align:center; font-size:11px; font-weight:700; white-space:nowrap; line-height:1.1; }
+.ppp-restbl td{ padding:3px 6px; border-bottom:1px solid #eef2f7; text-align:center; white-space:nowrap; }
 .ppp-restbl td.f{ font-weight:700; color:#0f172a; text-align:left; }
 .ppp-restbl td.d{ color:#64748b; }
 /* v6.57/v6.58: celdas del Resumen clickeables → pop-up con de qué NPs se compone el número */
@@ -7664,7 +7673,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v15.52";
+const APP_VERSION = "v15.53";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -31020,7 +31029,7 @@ function pppResumenHtml(prog) {
   return head +
     '<div class="ppp-res-leg">🚚 Camiones por ruta: <b>Z1·Z2·Z3·Z4</b> Sur/Centro/Oeste · <b>Z5·Z6·Z7</b> Norte · Súper (1 por cliente) · Retira sin camión. Tope <b>' + CAP + ' m³/día</b>.</div>' +
     '<div class="ppp-restbl-wrap"><table class="ppp-restbl"><thead><tr>' +
-      '<th>Fecha</th><th>Día</th><th>Z1<br>Sur</th><th>Z2<br>Centro</th><th>Z3<br>Oeste</th><th>Z4<br>GBA&nbsp;S</th><th>Z5<br>GBA&nbsp;O</th><th>Z6<br>GBA&nbsp;N</th><th>Z7<br>Lejos</th><th>Retira</th><th>Súper</th><th>Total<br>m³</th><th>Cam.</th><th>Demora<br>(d)</th>' +
+      '<th>Fecha</th><th>Día</th><th>Z1<br>Sur</th><th>Z2<br>Centro</th><th>Z3<br>Oeste</th><th>Z4<br>GBA<br>Sur</th><th>Z5<br>GBA<br>Oeste</th><th>Z6<br>GBA<br>Norte</th><th>Z7<br>GBA<br>Lejos</th><th>Retira</th><th>Súper</th><th>Total<br>m³</th><th>Cam.</th><th>Demora<br>(d)</th>' +
     '</tr></thead><tbody>' + rows + totRow + '</tbody></table></div>';
 }
 

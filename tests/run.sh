@@ -330,6 +330,9 @@ PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node te
 echo "== ppp-fecha-formato (regresión v15.50: una sola fecha dd/mm/aaaa en la PPP; a la base va ISO) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/ppp-fecha-formato.cjs
 
+echo "== ppp-resumen-angosto (regresión v15.53: la tabla del Resumen no se estira; columnas al ancho del contenido) =="
+PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/ppp-resumen-angosto.cjs
+
 echo "== ppp-atrasados (v14.06: los atrasados se ven sin rebotar de solapa — banda en Programación + lista adentro de Resumen) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/ppp-atrasados.cjs
 

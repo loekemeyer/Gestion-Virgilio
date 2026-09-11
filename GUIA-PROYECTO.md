@@ -12,7 +12,7 @@
 > única**; no se replica. Ante la duda entre parche rápido y fix de raíz → **fix
 > de raíz**.
 >
-> Última actualización: 2026-09-11 (viernes) · Versión app al documentar: **v15.52**
+> Última actualización: 2026-09-11 (viernes) · Versión app al documentar: **v15.53**
 >
 > Nota **v15.40 (2026-09-11) — HANDOFF de planimetría / Acacia: `docs/HANDOFF-PLANIMETRIA-Y-ACACIA.md`.**
 > Thomas sigue este tema en otra sesión. Ahí está todo junto: los **13 artículos activos del catálogo LK
@@ -11158,6 +11158,28 @@ distinta, empresa distinta.
 >   (umbral ≈ 3× su período; dedup un aviso por sync por día). **No se creó tabla
 >   `Sync_Estado`**: `cron.job_run_details` ya tiene la verdad. DDL en
 >   `sql/watchdog_syncs_externos.sql`.
+
+> Nota **2026-09-11 (v15.53) — El Resumen de la PPP: columnas al ancho del contenido, no al de la pantalla.**
+> Dueño, con la captura: *"columnas siempre lo más angostas posibles, ancho determinado por la info
+> más ancha de la columna"*. La culpa era de **`.ppp-restbl{ width:100% }`**: con eso el navegador
+> reparte el sobrante entre las 14 columnas, así que el aire no está entre las celdas sino **adentro**
+> de cada una. Medido en un viewport de 1.600: la tabla ocupaba **1.558 px** y la columna Fecha **171 px**
+> para un `09/09/2026` de ~62 px.
+> - `width:auto` + `table-layout:auto`, padding de `6px 9px` / `5px 9px` a `4px 6px` / `3px 6px`, y el
+>   marco (`.ppp-restbl-wrap`) en `display:table` para que termine donde termina la tabla en vez de
+>   dibujar un rectángulo hasta el borde. Mismo `display:table` para los dos carteles de arriba
+>   (`.ppp-res-note`, `.ppp-res-leg`), que también se estiraban.
+> - Encabezados de las zonas de GBA a **tres filas** (`Z4 / GBA / Sur`): así el piso de la columna deja
+>   de ser `GBA S` y pasa a ser el dato.
+> - Resultado medido: **1.558 → 606 px (−61 %)** y el alto **338 → 297 px** (el padding vertical menor
+>   compensa la tercera fila del encabezado). Sobrante máximo por columna: **12 px**, que son
+>   exactamente los 6+6 del padding — o sea, cero espacio muerto.
+> - **No baja del piso de zoom**: `pppFitPantalla` sólo ACHICA (arranca en `z = 1` y nunca agranda),
+>   así que una tabla más angosta le da más margen, no la re-estira.
+> - **No se ocultó ninguna columna.** Una zona sin un solo m³ en todo el período sigue mostrándose con
+>   sus puntitos: eso cambiaría lo que se ve, no el ancho, y no se pidió.
+> - **Regresión nueva `tests/ppp-resumen-angosto.cjs`** (falla con el CSS de antes): compara el ancho
+>   de cada columna contra el de su contenido más ancho y exige ≤ 40 px de sobra.
 
 > Nota **2026-09-11 (v15.52) — Popup de Proyección: cajas ENTREGADAS por el proveedor, entre el mes y la barra.**
 > Pedido del dueño mirando el 321 (Rallador cilíndrico, Carriero): *"a la derecha del mes, poné las
