@@ -5144,3 +5144,13 @@ Dueño: *"todos los datos que tengas que corregir, dale"*. Barrido sobre `v_impo
   backup, `gv_importados_resync` por importado.
 - **Impos en curso**: Becky 29/09 (41.944) y 15/11 (48.056) · Fujian 01/11 · Hugo Wong 03/11 · Frontier 04/11 · Zhixin
   29/11 · Ownland 18/12.
+
+### §3.bm.14 — 587C: parte de 587, stock en Cervantes (GP2), lo pasa Alan (v15.22, 2026-09-11)
+
+- Dueño: *"587C es una parte que se usa para 587. Guardá que falta que te pase el stock. Pedíselo a Alan. Eso se guarda
+  en Cervantes (para GP2)"*. `Importados_Partes_Map` ya tiene 587C → 587. El stock de la parte **no está en Virgilio**
+  (el módulo lo muestra en 0): vive en Cervantes / GP2. Tarea en el Planify de **Alan Gonzalez (employee_id 5)** para que
+  lo pase; nota en `Importados.notas` de 587C (id 163). Cuando llegue el dato, cargarlo como `inicial` en
+  `Importados_Mov_Stock` (marca LK) o vía `vista_importados_stock_parte` según cómo se resuelva el stock de partes.
+- Idea a evaluar: leer el stock de las partes de Cervantes directo desde GP2 (mismo proyecto Supabase) en vez de cargarlo
+  a mano. Sin implementar.
