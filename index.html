@@ -779,6 +779,23 @@ button {
   font-variant-numeric:tabular-nums; }
 @keyframes aprRelojGira{ from{ transform:rotate(0); } to{ transform:rotate(360deg); } }
 .apr-err{ background:#fee2e2; border-left:5px solid #b91c1c; color:#7f1d1d; padding:8px 10px; border-radius:6px; margin:6px 2px; font-weight:600; }
+/* v15.85 — OC de super de Krikos sin cargar. Ancho al contenido, no al 100%: es un aviso
+   corto, no una tabla. Las filas se apilan solas en celular. */
+.apr-krikos{ background:#fff7ed; border:2px solid #ea580c; border-left:8px solid #ea580c; border-radius:10px; padding:11px 14px; margin:8px 2px; display:inline-block; max-width:100%; box-sizing:border-box; }
+.apr-krikos-t{ color:#7c2d12; font-size:17px; font-weight:900; line-height:1.25; }
+.apr-krikos-t u{ text-decoration-color:#ea580c; text-underline-offset:3px; }
+.apr-krikos-sub{ display:block; font-weight:600; font-size:12.5px; color:#9a3412; margin:4px 0 8px; }
+.apr-krikos-list{ display:flex; flex-direction:column; gap:4px; }
+.apr-krikos-r{ display:flex; align-items:center; gap:8px; flex-wrap:wrap; background:#fff; border:1px solid #fed7aa; border-radius:6px; padding:4px 8px; font-size:12.5px; }
+.apr-krikos-r.vencida{ border-color:#fca5a5; background:#fef2f2; }
+.apr-krikos-cad{ font-weight:800; color:#7c2d12; }
+.apr-krikos-nro{ font-family:Consolas,Menlo,monospace; color:#0f172a; }
+.apr-krikos-suc{ color:#64748b; font-size:11.5px; }
+.apr-krikos-fe{ color:#9a3412; font-weight:700; white-space:nowrap; }
+.apr-krikos-r.vencida .apr-krikos-fe{ color:#b91c1c; }
+.apr-krikos-nopdf{ background:#fee2e2; color:#b91c1c; border-radius:999px; padding:0 7px; font-size:10.5px; font-weight:800; }
+.apr-krikos-btn{ margin-left:auto; background:#ea580c; color:#fff; border-radius:6px; padding:2px 10px; font-size:11.5px; font-weight:800; text-decoration:none; white-space:nowrap; }
+.apr-krikos-pie{ font-size:12px; color:#7c2d12; margin-top:8px; background:#ffedd5; border-radius:6px; padding:6px 9px; }
 .apr-msg{ background:#ecfdf5; border-left:5px solid #059669; color:#065f46; padding:8px 10px; border-radius:6px; margin:6px 2px; font-weight:600; }
 
 /* v13.74 (dueño: "completamente feo e ilegible; hacé boxes que ocupen el ANCHO de la pantalla, no el alto"):
@@ -7757,7 +7774,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v15.84";
+const APP_VERSION = "v15.85";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -36819,6 +36836,7 @@ async function aprActualizar() {
   _apr.armando = true; aprRender();
   try { await aprArmarAhora(); } catch (_e) {}
   _apr.armando = false;
+  _apr.krikos = undefined;   // v15.85: el 🔄 también revisa si hay OC de súper nuevas
   await aprCargar();       // aprCargar ya recarga el log del armado automático
 }
 function aprLogHtml() {
@@ -37185,6 +37203,8 @@ function aprRender() {
   if (_apr.cuarResumen === null && !_apr.cuarResumenLoading) cuarResumenCargar();
   // v15.48: alerta de mismo cliente en dos días de la misma semana
   if (_apr.dosDias === undefined && !_apr.dosDiasLoading) aprDosDiasCargar();
+  // v15.85: OC de súper que bajó Krikos y todavía no se cargaron
+  if (_apr.krikos === undefined && !_apr.krikosLoading) aprKrikosCargar();
   let h = "";
 
   // v13.58: sin selector Loekemeyer/Chef — se ven las dos empresas juntas.
@@ -37222,6 +37242,7 @@ function aprRender() {
   if (_dobFc.length) h += '<div class="apr-err">🧾 ' + _dobFc.length + ' pedido(s) de Chef son de clientes a los que LK les factura artículos de Loeke (FC Electr. en ISIS LK en los últimos ' + (_apr.dobleDias || 180) + ' días): NO se programan, los tipea compras en ISIS LK: ' +
     escapeHtml(_dobFc.map(_dobTxt).join(" · ")) + '.</div>';
   h += aprDosDiasHtml();   // v15.48 — mismo cliente en dos días de la misma semana
+  h += aprKrikosHtml();    // v15.85 — OC de súper de Krikos sin cargar
   if (_apr.msg) h += '<div class="' + (_apr.msgErr ? "apr-err" : "apr-msg") + '">' + escapeHtml(_apr.msg) + '</div>';
   h += aprLogHtml();   // idea 2048
 
@@ -37696,6 +37717,76 @@ async function aprDosDiasCargar() {
   } catch (_e) { _apr.dosDias = _apr.dosDias || []; }
   _apr.dosDiasLoading = false;
   if (_pppTab === "prog") aprRender();
+}
+/* ===== v15.85 — OC de supermercados de Krikos, sin cargar =============================
+   Pedido del dueño (2026-09-11): *"yo quiero que se vea acá"* — en A Programar, no sólo en
+   la Bandeja del panel de LK.
+
+   ⚠ Una OC de Krikos NO es un pedido todavía: no tiene NP, ni artículos cargados en
+   Gestión, ni m³. No se puede tildar ni meter en una tanda — no se sabe qué lleva. Por eso
+   entra como AVISO arriba, separado de "Pedidos a programar", y no toca la selección.
+   Eso además respeta la regla del dueño de que el súper no se mezcla con clientes.
+
+   Los datos viven en el proyecto Supabase de LK (`krikos_oc_inbox`) y Virgilio no tiene
+   FDW contra LK, así que LK los empuja acá con `sync_krikos_oc_virgilio()` (cron
+   `krikos-oc-a-virgilio-10min`), mismo patrón que `lk_pedidos_match`. La tabla espejo es
+   `GV_Krikos_OC` y sólo trae lo PENDIENTE: una OC cargada o descartada desaparece sola. */
+async function aprKrikosCargar() {
+  if (_apr.krikosLoading) return;
+  _apr.krikosLoading = true;
+  try {
+    const H = { "apikey": SUPABASE_KEY, "Authorization": "Bearer " + SUPABASE_KEY };
+    const r = await fetch(SUPABASE_URL + "/rest/v1/GV_Krikos_OC?select=inbox_id,cadena,sucursal,nro_documento,fecha_entrega,fecha_entrega_d,link,tiene_pdf&order=fecha_entrega_d.asc&limit=200",
+      { headers: H, cache: "no-store" });
+    _apr.krikos = r.ok ? (await r.json()) : [];
+  } catch (_e) { _apr.krikos = _apr.krikos || []; }
+  _apr.krikosLoading = false;
+  if (_pppTab === "prog") aprRender();
+}
+/* Nombre corto de la cadena: el emisor viene con la razón social entera ("INC S.A.
+   (CARREFOUR)", "LA ANONIMA (SAIEP)") y en pantalla sólo estorba. */
+function aprKrikosCadena(c) {
+  const t = String(c || "").toUpperCase();
+  if (t.indexOf("CARREFOUR") >= 0) return "Carrefour";
+  if (t.indexOf("ANONIMA") >= 0) return "La Anónima";
+  if (t.indexOf("COTO") >= 0) return "Coto";
+  if (t.indexOf("DIARCO") >= 0) return "Diarco";
+  if (t.indexOf("CENCOSUD") >= 0) return "Cencosud";
+  if (t.indexOf("CHANGO") >= 0) return "Chango Más";
+  return String(c || "Súper").replace(/\s*\(.*$/, "").trim() || "Súper";
+}
+function aprKrikosHtml() {
+  const filas = _apr.krikos || [];
+  if (!filas.length) return "";
+  const hoy = getTodayKey();
+  // REGLA DEL DUEÑO (2026-09-11): *"Siempre quiero que se cargue directo a PPP y si la
+  // lógica del importe (ya explicado y hecho en paginaLK) NO DA, QUE LO ACLARE MUY GRANDE
+  // EN PPP"*. Hoy NINGUNA se importa sola —el parser de PDF por cadena vive en
+  // admin-supercot.js y corre a mano en el panel de LK—, así que TODAS caen en el "no dio"
+  // y el cartel tiene que decirlo fuerte, no ser una listita al costado.
+  let h = '<div class="apr-krikos">' +
+    '<div class="apr-krikos-t">🛒 ' + filas.length + ' orden' + (filas.length === 1 ? '' : 'es') +
+      ' de compra de súper <u>NO se pudo importar sola a la PPP</u></div>' +
+    '<div class="apr-krikos-sub">Llegaron por Krikos y están esperando. Todavía no son pedidos: no tienen NP ni m³, ' +
+      'así que <b>no se pueden tildar ni meter en una tanda</b>. Hay que cargarlas a mano o no salen.</div>' +
+    '<div class="apr-krikos-list">';
+  filas.forEach(function (f) {
+    const d = f.fecha_entrega_d || "";
+    const vencida = d && d < hoy;
+    h += '<div class="apr-krikos-r' + (vencida ? ' vencida' : '') + '">' +
+      '<span class="apr-krikos-cad">' + escapeHtml(aprKrikosCadena(f.cadena)) + '</span>' +
+      '<span class="apr-krikos-nro">' + escapeHtml(f.nro_documento || "") + '</span>' +
+      '<span class="apr-krikos-suc">' + escapeHtml(f.sucursal || "") + '</span>' +
+      '<span class="apr-krikos-fe" title="Fecha de entrega que pide el súper">' +
+        (d ? (vencida ? '⚠ venció ' : '📅 ') + aprDiaCorto(d) : '—') + '</span>' +
+      (f.tiene_pdf ? '' : '<span class="apr-krikos-nopdf" title="El link de Krikos no devolvió el PDF: sin el PDF no hay nada que importar">sin PDF</span>') +
+      (f.link ? '<a class="apr-krikos-btn" href="' + escapeHtml(f.link) + '" target="_blank" rel="noopener">Ver OC</a>' : '') +
+      '</div>';
+  });
+  h += '</div><div class="apr-krikos-pie">⚠ <b>El importador automático todavía no existe.</b> ' +
+    'Hasta que esté, se cargan a mano desde <b>🌐 Panel Web LK → PDF Krikos → Bandeja Krikos</b>. ' +
+    'Al cargarlas desaparecen de acá solas.</div></div>';
+  return h;
 }
 function aprDosDiasHtml() {
   const filas = _apr.dosDias || [];
