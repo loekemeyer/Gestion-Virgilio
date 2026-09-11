@@ -7598,7 +7598,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v14.99";
+const APP_VERSION = "v15.00";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -15930,31 +15930,61 @@ function _pedHechoDiv(uni, porUnidad) {
   if (Math.abs(q - Math.round(q)) < 1e-9) return _pedHechoFmt(Math.round(q));
   return '<span class="phc-warn" title="No entra justo: ' + _pedHechoFmt(uni) + ' u ÷ ' + _pedHechoFmt(porUnidad) + '">' + (Math.round(q * 100) / 100).toLocaleString("es-AR") + ' ⚠</span>';
 }
-/* Renglones efectivos según el modo: [{cod, it, uni, err}] */
+/* v15.00 — un artículo puede comprarse por LK o por CH (437E/438E: dos filas en Importados
+   con el mismo proveedor). Antes el popup tomaba la primera fila sin preguntar y el bache
+   podía caer en la marca equivocada. Ahora: filas del proveedor elegido y sus marcas. */
+function _pedHechoDetsProv(it) {
+  var st = _pedHecho; var dets = (it && it.det) || [];
+  if (!st || !st.prov) return dets;
+  var d = dets.filter(function (x) { return String(x.prov || "").trim() === st.prov; });
+  return d.length ? d : dets;
+}
+function _pedHechoMarcas(it) {
+  var m = [];
+  _pedHechoDetsProv(it).forEach(function (d) { var k = String(d.marca || "").trim().toUpperCase(); if (k && m.indexOf(k) < 0) m.push(k); });
+  return m;
+}
+/* Fila de Importados que recibe el bache: la del proveedor elegido y, si hay más de una
+   marca, la de la marca pedida. */
+function _pedHechoDet(it, marca) {
+  var dets = _pedHechoDetsProv(it);
+  if (marca) { var d = dets.find(function (x) { return String(x.marca || "").trim().toUpperCase() === marca; }); return d || null; }
+  return dets[0] || null;
+}
+/* Renglones efectivos según el modo: [{key, cod, marca, it, det, uni, err}]
+   key = "cod" o "cod|MARCA" cuando el artículo tiene más de una marca. */
 function _pedHechoLineas() {
   var st = _pedHecho; if (!st) return [];
+  var mk = function (cod, marca, uni) {
+    var it = _pedHechoItem(cod);
+    if (!it) return { key: cod, cod: cod, marca: marca, it: null, det: null, uni: uni, err: "Código no está en importados" };
+    var marcas = _pedHechoMarcas(it);
+    var m = marca || (marcas.length === 1 ? marcas[0] : "");
+    if (marcas.length > 1 && !m) return { key: it.cod, cod: it.cod, marca: "", it: it, det: null, uni: uni, err: it.cod + " se compra por " + marcas.join(" o ") + ": escribí " + it.cod + " " + marcas[0] + " " + (uni || 1000) };
+    if (m && marcas.length && marcas.indexOf(m) < 0) return { key: it.cod + "|" + m, cod: it.cod, marca: m, it: it, det: null, uni: uni, err: "Marca " + m + " no existe para " + it.cod + " (" + marcas.join("/") + ")" };
+    var det = _pedHechoDet(it, marcas.length > 1 ? m : "");
+    return { key: marcas.length > 1 ? (it.cod + "|" + m) : it.cod, cod: it.cod, marca: m, it: it, det: det, uni: uni, err: det ? (uni > 0 ? "" : "Unidades en 0") : "Sin fila de importado para ese proveedor" };
+  };
   if (st.modo === "texto") {
     var out = [];
     String(st.texto || "").split(/\r?\n/).forEach(function (ln) {
       var s = ln.trim(); if (!s) return;
-      var m = s.match(/^([A-Za-z0-9._\-]+)[\s,;:\t]+([\d.,]+)\s*$/);
-      if (!m) { out.push({ cod: s, it: null, uni: 0, err: "No entendí la línea (usá: código unidades)" }); return; }
-      var it = _pedHechoItem(m[1]);
-      var uni = _pedHechoNum(m[2]);
-      out.push({ cod: m[1].toUpperCase(), it: it, uni: uni, err: it ? (uni > 0 ? "" : "Unidades en 0") : "Código no está en importados" });
+      var m = s.match(/^([A-Za-z0-9._\-]+)(?:[\s\/]+(LK|CH))?[\s,;:\t]+([\d.,]+)\s*$/i);
+      if (!m) { out.push({ key: s, cod: s, marca: "", it: null, det: null, uni: 0, err: "No entendí la línea (usá: código unidades — o código LK/CH unidades)" }); return; }
+      out.push(mk(m[1].toUpperCase(), String(m[2] || "").toUpperCase(), _pedHechoNum(m[3])));
     });
     return out;
   }
   var arr = [];
-  Object.keys(st.sel || {}).forEach(function (cod) {
-    var uni = _pedHechoNum(st.sel[cod]); if (!(uni > 0)) return;
-    var it = _pedHechoItem(cod);
-    arr.push({ cod: cod, it: it, uni: uni, err: it ? "" : "Código no está en importados" });
+  Object.keys(st.sel || {}).forEach(function (key) {
+    var uni = _pedHechoNum(st.sel[key]); if (!(uni > 0)) return;
+    var p = String(key).split("|");
+    arr.push(mk(p[0], String(p[1] || "").toUpperCase(), uni));
   });
   return arr;
 }
 function _pedHechoTotales() {
-  var ls = _pedHechoLineas().filter(function (l) { return l.it && l.uni > 0; });
+  var ls = _pedHechoLineas().filter(function (l) { return l.det && l.uni > 0; });
   var u = 0, mc = 0, cj = 0;
   ls.forEach(function (l) {
     u += l.uni;
@@ -15984,12 +16014,12 @@ function pedHechoSetModo(m) { if (!_pedHecho) return; _pedHecho.modo = m; _pedHe
 function pedHechoBuscar(v) { if (!_pedHecho) return; _pedHecho.q = String(v || ""); _pedHechoRenderCuerpo(true); }
 /* Tipeo de unidades en el modo LISTA: NO re-renderiza (perdería el foco); actualiza sólo las
    celdas de cajas / master cajas de esa fila y el pie de totales. */
-function pedHechoSetUni(codEnc, val, idx) {
+function pedHechoSetUni(keyEnc, val, idx) {
   if (!_pedHecho) return;
-  var cod = decodeURIComponent(codEnc);
+  var key = decodeURIComponent(keyEnc);   // "cod" o "cod|MARCA" (v15.00)
   var uni = _pedHechoNum(val);
-  if (uni > 0) _pedHecho.sel[cod] = uni; else delete _pedHecho.sel[cod];
-  var it = _pedHechoItem(cod);
+  if (uni > 0) _pedHecho.sel[key] = uni; else delete _pedHecho.sel[key];
+  var it = _pedHechoItem(String(key).split("|")[0]);
   var cj = document.getElementById("phCj" + idx), mc = document.getElementById("phMc" + idx), tr = document.getElementById("phTr" + idx);
   if (cj && it) cj.innerHTML = _pedHechoDiv(uni, it.uxc);
   if (mc && it) mc.innerHTML = _pedHechoDiv(uni, it.uniMaster);
@@ -16032,8 +16062,8 @@ function _pedHechoRenderCuerpo(soloTabla) {
   var st = _pedHecho;
   if (st.modo === "texto") {
     el.innerHTML =
-      '<div class="phc-hint">Una línea por artículo: <b>código unidades</b> (ej. <code>505C 132000</code>). Sirve pegar del Excel — separador espacio, coma, punto y coma o tab. Las <b>cajas</b> y <b>master cajas</b> se calculan solas.</div>' +
-      '<textarea class="phc-ta" placeholder="505C 132000&#10;026 5000" oninput="pedHechoSetTexto(this.value)">' + escapeHtml(st.texto || "") + '</textarea>' +
+      '<div class="phc-hint">Una línea por artículo: <b>código unidades</b> (ej. <code>505C 132000</code>). Si el artículo se compra por LK y por CH, poné la marca: <code>438E CH 1224</code>. Sirve pegar del Excel — separador espacio, coma, punto y coma o tab. Las <b>cajas</b> y <b>master cajas</b> se calculan solas.</div>' +
+      '<textarea class="phc-ta" placeholder="505C 132000&#10;438E CH 1224&#10;026 5000" oninput="pedHechoSetTexto(this.value)">' + escapeHtml(st.texto || "") + '</textarea>' +
       '<div id="phPrev" style="margin-top:10px"></div>';
     _pedHechoPreview();
     return;
@@ -16044,14 +16074,23 @@ function _pedHechoRenderCuerpo(soloTabla) {
   var items = (data.items || []).filter(function (it) { return (it.prov || "(sin proveedor)") === st.prov; });
   if (q) items = items.filter(function (it) { return _pedHechoNorm(it.cod).raw.indexOf(q) >= 0 || String(it.desc || "").toUpperCase().indexOf(String(st.q).toUpperCase()) >= 0; });
   items.sort(function (a, b) { return String(a.cod).localeCompare(String(b.cod), "es", { numeric: true }); });
-  var filas = items.map(function (it, i) {
-    var uni = _pedHechoNum(st.sel[it.cod]);
-    var codEnc = encodeURIComponent(it.cod);
+  // v15.00 — un artículo con dos marcas (LK y CH) sale como DOS renglones, uno por marca.
+  var rows = [];
+  items.forEach(function (it) {
+    var marcas = _pedHechoMarcas(it);
+    if (marcas.length > 1) marcas.forEach(function (m) { rows.push({ it: it, key: it.cod + "|" + m, marca: m }); });
+    else rows.push({ it: it, key: it.cod, marca: "" });
+  });
+  var filas = rows.map(function (r, i) {
+    var it = r.it;
+    var uni = _pedHechoNum(st.sel[r.key]);
+    var keyEnc = encodeURIComponent(r.key);
+    var mBadge = r.marca ? ' <span style="font-size:10.5px;font-weight:800;color:#fff;background:' + (r.marca === "CH" ? "#b45309" : "#1e6bd6") + ';border-radius:999px;padding:1px 7px" title="Este artículo se compra por LK o por CH: cargá las unidades en la fila de la marca que pediste">' + escapeHtml(r.marca) + '</span>' : '';
     return '<tr id="phTr' + i + '"' + (uni > 0 ? ' class="on"' : '') + '>' +
-      '<td class="phc-cod">' + escapeHtml(it.cod) + '</td>' +
+      '<td class="phc-cod">' + escapeHtml(it.cod) + mBadge + '</td>' +
       '<td class="phc-desc" style="color:#475569">' + escapeHtml(String(it.desc || "").slice(0, 34)) + '</td>' +
       '<td class="num" style="color:#64748b">' + (it.uniMaster > 0 ? _pedHechoFmt(it.uniMaster) : (it.uxc > 0 ? _pedHechoFmt(it.uxc) + '*' : '—')) + '</td>' +
-      '<td class="num"><input class="phc-uni" inputmode="numeric" value="' + (uni > 0 ? uni : "") + '" oninput="pedHechoSetUni(\'' + codEnc + '\',this.value,' + i + ')" placeholder="0"></td>' +
+      '<td class="num"><input class="phc-uni" inputmode="numeric" value="' + (uni > 0 ? uni : "") + '" oninput="pedHechoSetUni(\'' + keyEnc + '\',this.value,' + i + ')" placeholder="0"></td>' +
       '<td class="num" id="phCj' + i + '">' + _pedHechoDiv(uni, it.uxc) + '</td>' +
       '<td class="num" id="phMc' + i + '">' + _pedHechoDiv(uni, it.uniMaster) + '</td></tr>';
   }).join("");
@@ -16070,9 +16109,10 @@ function _pedHechoPreview() {
   if (!ls.length) { el.innerHTML = ""; return; }
   el.innerHTML = '<table class="phc-tbl"><thead><tr><th>Código</th><th class="phc-desc">Descripción</th><th class="num">Unidades</th><th class="num">Cajas</th><th class="num">Master cajas</th></tr></thead><tbody>' +
     ls.map(function (l) {
-      if (!l.it) return '<tr><td class="phc-cod">' + escapeHtml(l.cod) + '</td><td colspan="4" class="phc-bad">' + escapeHtml(l.err) + '</td></tr>';
+      if (!l.it || !l.det) return '<tr><td class="phc-cod">' + escapeHtml(l.cod) + '</td><td colspan="4" class="phc-bad">' + escapeHtml(l.err) + '</td></tr>';
       var alerta = (_pedHecho.prov && (l.it.prov || "(sin proveedor)") !== _pedHecho.prov) ? ' <span class="phc-warn" title="Este código es de ' + escapeHtml(l.it.prov || "") + '">⚠ otro proveedor</span>' : '';
-      return '<tr' + (l.uni > 0 ? ' class="on"' : '') + '><td class="phc-cod">' + escapeHtml(l.it.cod) + '</td>' +
+      var mTxt = (l.marca && _pedHechoMarcas(l.it).length > 1) ? ' <b style="color:' + (l.marca === "CH" ? "#b45309" : "#1e6bd6") + '">' + escapeHtml(l.marca) + '</b>' : '';
+      return '<tr' + (l.uni > 0 ? ' class="on"' : '') + '><td class="phc-cod">' + escapeHtml(l.it.cod) + mTxt + '</td>' +
         '<td class="phc-desc" style="color:#475569">' + escapeHtml(String(l.it.desc || "").slice(0, 30)) + alerta + '</td>' +
         '<td class="num">' + (l.uni > 0 ? _pedHechoFmt(l.uni) : '<span class="phc-bad">0</span>') + '</td>' +
         '<td class="num">' + _pedHechoDiv(l.uni, l.it.uxc) + '</td>' +
@@ -16084,9 +16124,9 @@ function _pedHechoPreview() {
 async function pedHechoGuardar() {
   var st = _pedHecho; if (!st || st.guardando) return;
   if (!st.prov) { try { alert("Elegí el proveedor."); } catch (_e) {} return; }
-  var ls = _pedHechoLineas().filter(function (l) { return l.it && l.uni > 0; });
+  var ls = _pedHechoLineas().filter(function (l) { return l.det && l.uni > 0; });
   if (!ls.length) { try { alert("Cargá al menos un artículo con unidades."); } catch (_e) {} return; }
-  var malas = _pedHechoLineas().filter(function (l) { return !l.it || !(l.uni > 0); });
+  var malas = _pedHechoLineas().filter(function (l) { return !l.det || !(l.uni > 0); });
   if (malas.length) { var sigo = false; try { sigo = confirm("Hay " + malas.length + " línea(s) que no se van a guardar (código desconocido o unidades en 0).\n¿Guardar igual el resto?"); } catch (_e) {} if (!sigo) return; }
   var iso = String(st.fecha || "").slice(0, 10);
   if (!iso) { var sinF = false; try { sinF = confirm("No pusiste fecha estimada de entrega.\n¿Guardar sin fecha?"); } catch (_e) {} if (!sinF) return; }
@@ -16095,8 +16135,8 @@ async function pedHechoGuardar() {
   var _leg = ""; try { _leg = String(window.__authEmail || ""); } catch (_e) { _leg = ""; }
   for (var i = 0; i < ls.length; i++) {
     var l = ls[i];
-    var dets = (l.it.det || []);
-    var d = dets.find(function (x) { return String(x.prov || "").trim() === st.prov; }) || dets[0];
+    // v15.00 — la fila ya viene resuelta por proveedor + marca (LK/CH) desde _pedHechoLineas.
+    var d = l.det || null;
     if (!d) { errs.push(l.it.cod + ": sin fila de importado"); continue; }
     // Cada carga = UN bache nuevo (unidades + su fecha). No pisa lo anterior:
     // el "en curso" queda como suma de baches y el reingreso = fecha más cercana.
