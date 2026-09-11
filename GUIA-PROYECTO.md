@@ -11238,7 +11238,7 @@ distinta, empresa distinta.
 > **Marcado sin tocar**: Frontier FOB 14.400 vs 14.000 del motor y su llegada (04/11) que no cierra con el
 > embarque 26/10; Becky 2ª con el 30% pagado el 02/jun y 112 días hasta embarcar.
 
-> Nota **2026-09-11 (v15.94) — El mapa carga ↔ pedido se carga desde la pantalla, no por chat.**
+> Nota **2026-09-11 (v15.98) — El mapa carga ↔ pedido se carga desde la pantalla, no por chat.**
 > En vez de esperar que Thomas conteste qué carga es qué pedido, la pantalla se lo pregunta y lo guarda:
 > **🔗 Asignar** en cada fila de 📦 Cargas (elige de la lista de pedidos en curso del proveedor, o `0` = ninguno,
 > que también es una respuesta válida), y en 💵 **Giros** una columna nueva *"Cargas (a través de → fue a)"* que,

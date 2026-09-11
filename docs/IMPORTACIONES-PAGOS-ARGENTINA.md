@@ -345,7 +345,7 @@ Los dos sin match son los mismos que ya venían marcados por no dar el 30 % exac
 es el que destapó el mapa: **el adelanto de 14.000 fue a `CQ-9694`, pagado a través de `CQ-9553`** —
 que es, textual, la mecánica de pagar un pedido con la factura de otra carga.
 
-## 7. El mapa carga ↔ pedido se carga desde la pantalla (v15.94)
+## 7. El mapa carga ↔ pedido se carga desde la pantalla (v15.98)
 
 En vez de esperar que Thomas conteste por chat qué carga es qué pedido, la pantalla se lo pregunta
 y lo guarda. **El sistema sugiere; él confirma.**

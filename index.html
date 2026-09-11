@@ -7794,7 +7794,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v15.94";
+const APP_VERSION = "v15.98";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -31552,7 +31552,32 @@ async function pppVencCancelar(np) {
     try { alert("No se pudo cancelar " + n + ":\n\n" + msg); } catch (_e) {}
   }
 }
-window.pppVencVolver = pppVencVolver; window.pppVencCancelar = pppVencCancelar;
+/* v15.93 — SACAR DE LA PROGRAMACIÓN una NP de ISIS (Thomas, 11/09: "por las dudas, ponelos todos
+   sin programar para que los revise, los que no se cargaron el camión nunca, y son claramente
+   viejos"). Queda sin tanda y sin fecha → aparece en 📥 A Programar, que es donde se revisa y se
+   vuelve a programar. NO toca `PPP_Programacion_Diaria` (tabla compartida): la marca vive en
+   `GV_PPP_Prog_Override.desprogramada` y la respetan `gv_ppp_programacion_diaria` y
+   `gv_ppp_isis_sin_tanda`. El backend corta si la NP ya tiene Carga Camión o Recepción Remitos
+   (si salió, no se saca de la programación: se cierra con el remito). */
+async function pppVencSinProgramar(np) {
+  const n = String(np || "").trim(); if (!n) return;
+  if (_pppEsNpWeb(n)) return pppVencVolver(n);   // las web ya tenían su camino (↩ A Programar)
+  if (!confirm("¿Sacar " + n + " de la programación?\n\nQueda SIN tanda y SIN fecha, en «📥 A Programar», para revisarlo.\nNo se toca nada de ISIS y se puede volver a programar cuando quieras.")) return;
+  let motivo = "";
+  try { motivo = prompt("¿Por qué lo sacás? (queda en la nota del pedido)", "nunca se registró la carga al camión") || ""; } catch (_e) {}
+  pppSetStatus("Sacando " + n + " de la programación…", true);
+  try {
+    const r = await aprRpc("gv_ppp_isis_desprogramar", { p_nps: [n], p_motivo: (motivo.trim() || null), p_por: await aprQuien() });
+    const x = (r && r[0]) || {};
+    pppSetStatus("↩ " + n + " quedó SIN programar (" + (x.np_sacadas || 0) + " NP). Está en 📥 A Programar.", true);
+    await pppLoadProgFromSupabase();
+  } catch (e) {
+    const msg = (e && e.message) ? e.message : String(e);
+    pppSetStatus("⚠ No se pudo: " + msg, false);
+    try { alert("No pude sacar " + n + " de la programación:\n\n" + msg); } catch (_e) {}
+  }
+}
+window.pppVencVolver = pppVencVolver; window.pppVencSinProgramar = pppVencSinProgramar; window.pppVencCancelar = pppVencCancelar;
 /* v14.36 — Reprogramar un pedido de ISIS que NO salió (tanda sin armar) a un día nuevo, POR SU NÚMERO.
    Reusa el mismo pop-up de días de mover tandas (gv_ppp_web_calendario). Al elegir el día llama a
    gv_ppp_isis_programar, que escribe GV_PPP_Prog_Override (no toca la tabla que comparte Producción ni
@@ -33920,7 +33945,7 @@ function _pppPlanDiaHtml(programados, key, opts) {
     // sin fecha, ni pedidos que no se hayan cargado a un camión"). El camino real es registrar la carga
     // desde Carga Camión, que es lo que faltó: ahí el pedido pasa a En Salida y se cierra con Recepción
     // Remitos. Dejar el texto viejo mandaba a la operadora a esperar algo que ya no pasa.
-    if (sinRem) h += '<div class="pn-note"><b>' + sinRem + '</b> ' + (sinRem === 1 ? 'pedido salió' : 'pedidos salieron') + ' con la tanda armada y <b>nadie registró la Carga Camión</b>. Mientras no se registre, el pedido queda acá: no entra a <b>En Salida</b> y no se puede cerrar. El que lo cargó tiene que marcarlo en <b>Carga Camión</b> — de ahí pasa a En Salida y se cierra con <b>Recepción Remitos</b>. Si la mercadería nunca salió, <b>📅 Reprogramar</b> o <b>🚫 Cancelar</b>.</div>';
+    if (sinRem) h += '<div class="pn-note"><b>' + sinRem + '</b> ' + (sinRem === 1 ? 'pedido salió' : 'pedidos salieron') + ' con la tanda armada y <b>nadie registró la Carga Camión</b>. Mientras no se registre, el pedido queda acá: no entra a <b>En Salida</b> y no se puede cerrar. El que lo cargó tiene que marcarlo en <b>Carga Camión</b> — de ahí pasa a En Salida y se cierra con <b>Recepción Remitos</b>. Si no sabés si salió, <b>↩ Sin programar</b> lo saca de la programación (sin tanda ni fecha) y queda en <b>📥 A Programar</b> para revisarlo.</div>';
   }
   const dk = esVenc ? "venc" : key;
   for (const c of cams) {
@@ -33988,7 +34013,17 @@ function _pppPlanDiaHtml(programados, key, opts) {
         else carga = '<div class="pn-carga"><span class="n">' + n + 'º</span><span class="t">falta armar</span></div>';
       }
       const _npS = escapeHtml(String(np));
-      const _accPed = (!esVenc && (window.__isSupervisor || !PPP_READONLY) && e === "sin")
+      const _puedeAcc = (window.__isSupervisor || !PPP_READONLY);
+      // v15.93 (Thomas): en VENCIDOS, el pedido con la tanda armada y sin Carga Camión no tenía
+      // ninguna acción — la fila sólo decía "salió · marcar remito". Ahora se puede sacar de la
+      // programación: queda sin tanda ni fecha, en A Programar, para revisarlo. El backend corta
+      // si la NP ya tiene CCN o CRN (si salió de verdad, se cierra con el remito, no se saca).
+      const _accPed = !_puedeAcc ? ''
+        : (esVenc && e === "armado")
+        ? '<div class="pn-acc">' +
+            '<button class="pn-acc-b" onclick="event.stopPropagation();pppVencSinProgramar(\'' + _npS + '\')" title="Nunca se registró la carga al camión: sacalo de la programación (sin tanda ni fecha) y revisalo en A Programar">↩ Sin programar</button>' +
+          '</div>'
+        : (!esVenc && e === "sin")
         ? '<div class="pn-acc">' +
             (_pppEsNpWeb(np)
               ? '<button class="pn-acc-b" onclick="event.stopPropagation();pppVencVolver(\'' + _npS + '\')" title="Sacarlo de esta tanda y devolverlo a A Programar (pendiente)">↩ A Programar</button>'
