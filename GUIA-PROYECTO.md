@@ -12,7 +12,40 @@
 > única**; no se replica. Ante la duda entre parche rápido y fix de raíz → **fix
 > de raíz**.
 >
-> Última actualización: 2026-09-11 (viernes) · Versión app al documentar: **v14.95**
+> Última actualización: 2026-09-11 (viernes) · Versión app al documentar: **v15.34**
+>
+> Nota **v15.34 (2026-09-11, Thomas) — PLANIMETRÍA: qué alertas "sin lugar" son reales y cuáles son ruido.**
+> Relevamiento de artículos sin sector en `Planimetria` (360 códigos cargados sobre 685 sectores de
+> `Capacidad_Sector`). Salieron tres grupos, y **sólo el primero es un hueco de verdad**:
+>
+> · **(1) Huecos reales — 14 códigos activos del catálogo LK sin sector**: `231` / `232` / `233`
+>   (Palos de Amasar 30/40/50cm), `368E` (Rallador Hexagonal Inox 25cm), `537` (Pela y Pica ajo),
+>   `567` (Corta Palta) y **toda la línea Acacia** `989E` `990E` `991E` `992E` `993E` `996E` `997E`
+>   `998E`. De ésos, **11 ya se pickearon** (PKC real, tandas D50C…D67C/E10A entre el 01 y el 10/09);
+>   `368E`, `990E` y `991E` sólo se pidieron por la web, todavía sin pickear. Ninguno tiene saldo en
+>   `Movimientos_Stock deposito='gondola'`. Consulta para regenerar la lista: catálogo activo de LK
+>   (`products.active` en `kwkclwhmoygunqmlegrg`) menos `norm_cod(Planimetria.cod)`.
+> · **(2) Códigos de 5 dígitos (`55215`, `55219`, `55289`…) — NO llevan planimetría, es ruido esperado.**
+>   Regla del dueño (2026-09-11): *"los de 5 dígitos es sólo para un cliente y no se stockea en góndola;
+>   cuando llega se guarda en racks nomás"*. O sea: son artículos de **un único cliente**, no pasan por
+>   góndola, entran a **racks** y de ahí salen. No hay que darles sector: si aparece un PSP/RSP con un
+>   código de 5 dígitos, **se ignora**. (Los que ya saltaron: 55215 Palo de Amasar 40cm, 55219 Prensa
+>   Matambre, 55289 Colador de Mano Verde.)
+> · **(3) Recepciones mal tipeadas — falta la "E" final.** El RSP del 02/09 (remito 38087) marcó
+>   `599`, `943` y `948` como "sin planimetría": esos códigos **no existen**. Regla del dueño
+>   (2026-09-11): *"están mal recibidos, sólo existe con la E al final"* → los reales son **`599E`**
+>   (Pelador Madera Multifunción, J44), **`943E`** (Cucharón Ac. Inox, I08) y **`948E`** (Espumadera
+>   Ac. Inox, I11), los tres **con** sector. Mismo caso que 029→437E de la v5.08: el fix de raíz es la
+>   recepción, no la planimetría.
+>
+> **Ojo — PSP se dispara al ABRIR la tanda, no al pickear.** `pkNotifySinPlanim` corre cuando el picking
+> arma la lista (`index.html`), así que un PSP repetido significa "la tanda se abrió N veces", no "se
+> pickeó N veces". Para saber si un código se levantó de verdad hay que mirar **PKC**
+> (`texto = TANDA|COD|pedido|pickeado`). Caso testigo: **`578` (Descarozador de Aceitunas, baja en la
+> web) tiene 4 PSP (08, 09×2 y 10/09) y CERO PKC** → nunca se pickeó. Es la tanda **`E09B`** = NP
+> **LK 0024**, Osa Distribuidora (2533), 5 cajas, entrega 09/09: se abrió cuatro veces y quedó sin EP,
+> sin TP, sin TAP y sin carga. Es el `E09B` de la regla v14.12 (web separado del ISIS `E09A`, que sí
+> cerró completo el 08-09/09).
 >
 > Nota **v14.95 (2026-09-11, Thomas) — INSUMOS: las bolsas plásticas hablan con Gestión Productiva 2.0 (schema `GP2`).**
 > La materia prima plástica (PP, ABS, AI, NV, NR, N25, PE, PS — bolsas de 25 kg) la **compra GP2** y se
