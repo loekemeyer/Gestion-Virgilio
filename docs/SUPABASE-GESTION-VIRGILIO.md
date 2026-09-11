@@ -7276,6 +7276,128 @@ la llave.
 **No toca Producción:** la vista es nuestra (`gv_`), sólo lee, `security_invoker = true`.
 **Tests:** `tests/ppp-en-salida.cjs`, `tests/ppp-ensalida-estado.cjs`, `tests/version-sync.cjs` → OK.
 
+---
+
+## §3.co El camión no puede pasar de 8 h: viaje + 15′ por parada (v15.86) — 2026-09-11
+
+**Thomas:** *"también hay que considerar que al tiempo de viaje entre paradas (máx 8 hs en un día)
+hay que considerar que hay tiempo parado para descargar cada pedido. Considerá por ahora sólo 15'
+por parada x cliente. Más que 8 hs por día no se puede programar"*. Sobre los otros dos números:
+*"lo lógico para un camión, definí vos"*.
+
+**Los cuatro parámetros, en `PPP_Web_Config`** (se cambian por SQL, sin tocar código):
+
+| Clave | Valor | De dónde sale |
+|---|---:|---|
+| `jornada_horas_max` | 8 | Thomas |
+| `jornada_min_parada` | 15 | Thomas |
+| `jornada_km_h` | 28 | definido acá: velocidad de **marcha** de un camión en AMBA — no la comercial (22-25), porque el tiempo parado ya se cuenta aparte |
+| `jornada_factor_ruta` | 1,35 | definido acá: el recorrido por calle contra la línea recta (en ciudad en grilla, 1,27-1,40) |
+
+Los dos definidos acá **son una estimación** y se recalibran con las horas reales de la hoja de ruta
+(`GV_Viaje_Horas`, §3.bx) cuando empiecen a cargarse. Hasta entonces el número sirve para comparar
+camiones entre sí, no como promesa a un cliente.
+
+**Dónde vive el cálculo.** En el front (`_pppJornadaCam` en `index.html`), no en SQL, **a propósito**:
+el recorrido óptimo ya lo resuelve `_rtOptimize` (nearest-neighbour + 2-opt, v4.84) con las
+coordenadas que la PPP tiene cargadas; reescribir un TSP en plpgsql para el mismo resultado sería
+peor. Lo que sí vive en el backend es **la regla** — los cuatro números —, que es lo que se cambia.
+Una parada = una **dirección** (cód + dirección normalizada), igual que la hoja de ruta: las 4 NP de
+Dapelo en Almagro son una sola bajada, pero Almagro / Colegiales / Villa Crespo son tres.
+
+**Qué se ve.** En el panel de avisos de la PPP, primero de todo (obliga a mover pedidos de día, no a
+corregir un tipeo): *"🕗 Camión de más de 8 h (1): **16/09** · Camión 1 Zona 5 → **10,6 h** (viaje
+7,4 h + 13 paradas × 15′) · 207 km · lo estira **Luján** (a 56 km)"*. Retira nunca cuenta (no viaja).
+Si hay pedidos sin ubicación, lo dice: esos suman parada pero no km, así que el total queda **corto,
+nunca largo**.
+
+**Medido el 11/09 sobre lo ya programado** — tres de los cinco días se pasan:
+
+| Día | Ruta | Paradas | km | Horas | |
+|---|---|---:|---:|---:|---|
+| 16/09 | Norte | 13 | 207 | **10,6** | se pasa (sin Luján: 8,5 — sigue pasado) |
+| 15/09 | Sur/Centro/Oeste | 18 | 148 | **9,8** | se pasa |
+| 14/09 | Sur/Centro/Oeste | 16 | 135 | **8,8** | se pasa |
+| 17/09 | Sur/Centro/Oeste | 16 | 57 | 6,0 | entra |
+| 18/09 | Sur/Centro/Oeste | 4 | 51 | 2,8 | entra |
+
+Por ahora **avisa, no bloquea**: bloquear el armado automático con tres días ya programados por
+encima del tope dejaría pedidos sin fecha. `sql/gv_jornada_camion_v1586.sql` · test
+`tests/ppp-jornada-camion.cjs`.
+## 3.ch El precio sale de la FACTURA: último precio facturado por cliente (v15.87) — 2026-09-11
+
+**Thomas**: *"Ya tendrías que tener los precios de todo lo que te falta, porque ya tenés
+parseadas las facturas. Revisá una factura anterior de Cencosud, que en la NP 44617 está
+pidiendo el código 106E. No puede ser que te falte el precio si ya se lo ha facturado."*
+
+Tenía razón. Los esquemas **`isis_lk`** e **`isis_ch`** tienen las facturas de ISIS parseadas
+**con detalle por ítem** — `documento_items` (código, cantidad, `precio_unit`, `dto_1`,
+`dto_2`, `importe`): **314.529 líneas** sobre 40.083 documentos, desde 2019. Nadie las estaba
+usando para valorizar: `vista_cruce_facturacion` sólo miraba el **total** del documento.
+
+### Dos cosas que hay que saber para leer esa tabla
+
+1. **Cencosud factura con la L.** Sus facturas dicen `102EL`, `106EL`, `123L` (artículo de
+   Loeke vendido por Chef, regla v13.71), mientras que el mismo pedido en `Entregas_Virgilio`
+   viene **sin** la L (`102E`, `106E`, `123`). Hay que pelarla de **los dos lados**.
+2. **`precio_unit` no es confiable: en 64.622 de 252.300 líneas (25,6 %) no cuadra con el
+   importe.** El caso típico es que traiga el precio **por caja** (ratio exacto ×12): la
+   FC-A-0005-00000389 trae 29.700 para el 102EL cuando el unitario es 2.475. Y la
+   `descripcion` viene corrida (el código del renglón anterior pegado adelante: *"106EL Abr
+   Mariposa Loke"* en la fila del 102EL). **El precio se despeja del importe**, que sí cierra
+   siempre:
+
+   `precio = importe / (cantidad × (1 − dto_1/100) × (1 − dto_2/100))`
+
+   Verificado: 468 × 2.475 × 0,84 = **972.972** = el importe exacto de la factura.
+
+### Objetos
+
+| Objeto | Qué es |
+|---|---|
+| `gv_precio_facturado_cliente` | vista: por (empresa, cod_cliente, cod_canon) el **último** precio facturado. `precio_neto` = importe/cantidad (lo realmente cobrado); `precio_bruto` = antes de descuentos. 78.845 combinaciones, **2.765 ms** → no se usa en vivo |
+| `GV_Precio_Facturado_Cache` | la misma tabla materializada (78.845 filas). Es lo que leen las vistas. RLS prendida, revocada de `anon` |
+| `gv_refrescar_precio_facturado()` | la rellena. Cron **`gv-precio-facturado-diario`** (jobid 82, 09:25 UTC = 06:25 ART) |
+
+### La cascada de precios, completa
+
+1. lista de **súper** (`cobranzas_precios_super`)
+2. **`GV_Precios_Cliente`** (precio pactado a mano)
+3. lista de la **empresa** de la NP (`precios_venta_chef`)
+4. lista de **LK** (`precios_venta`)
+5. **`GV_Precio_Facturado_Cache`** ← el nuevo, último antes de "sin precio"
+
+Va **último a propósito**: así no mueve ni un número de lo que hoy ya se valoriza, sólo rellena
+huecos. Usa `precio_neto`, o sea **sin `dto_vol` y sin el 2 %** (es lo que la factura cobró),
+igual que un `es_final`. **Si algún día se quiere que la factura MANDE sobre las listas** —tiene
+sentido, es lo que realmente se le cobró a ese cliente— alcanza con subir este escalón arriba
+del 3; eso sí movería números ya en pantalla, así que es decisión del dueño.
+
+### Medido
+
+| Vista | sin precio antes | **ahora** |
+|---|---|---|
+| `vista_facturacion_neto_items` | 85 | **7** |
+| `vista_facturable_anticipado` | 12 | **0** |
+| `vista_plata_perdida` | 14 | **5** |
+
+**Ninguna línea que ya tenía precio se movió** (0 de LK contra el snapshot). Las 7 que quedan
+son clientes/artículos que nunca se facturaron (838E a 1474 y 2447 con 0 cajas, 574 a 4170).
+
+**Caso testigo, NP 44617 (Cencosud)**: el 106E salía sin precio; ahora va a **$1.806** y la NP
+cierra en **$3.106.008** con 0 códigos sin precio. Cencosud queda con **102E $2.079 · 106E
+$1.806 · 123 $1.062,60** (netos, el 16 % ya aplicado), sin necesidad de importar su hoja de
+Excel. `facturacion_neto_lote` de 3 NP: **601 ms**.
+
+### Rollback
+
+```sql
+drop view public.gv_precio_facturado_cliente cascade;
+drop table public."GV_Precio_Facturado_Cache" cascade;
+drop function public.gv_refrescar_precio_facturado();
+select cron.unschedule('gv-precio-facturado-diario');
+```
+más recrear las tres vistas con `sql/gv_precios_cliente_v1582.sql`. No toca objetos de Producción.
 ## §3.cj.2 — v15.86 (2026-09-11): cada NP salía DOS veces en Corregir códigos
 
 Thomas, con el panel abierto: *"¿Puede ser que acá figure dos veces y que eso signifique que el

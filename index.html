@@ -7781,7 +7781,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v15.86";
+const APP_VERSION = "v15.88";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -9455,7 +9455,7 @@ async function showPickingList(tanda, legajo, opts) {
     // 438E pedido por una NP 98… y otra 44… da DOS renglones ("438E LK" y
     // "438E CH"), cada uno con el sector de su empresa. Los códigos que no están
     // partidos siguen sumando igual que siempre.
-    // v15.72 — La empresa deja de perderse. `pkCodEmpresa` la calcula bien (la NP dice
+    // v15.85 — La empresa deja de perderse. `pkCodEmpresa` la calcula bien (la NP dice
     // si el pedido es de Loeke o de Chef) y después la TIRA si Planimetria no tiene una
     // celda llamada "438E LK" — y esas celdas existen para 4 códigos de 351. Por eso
     // todo lo pickeado se anotaba como "Mixto". Ahora se guarda aparte, en `aggEmp`,
@@ -9528,7 +9528,7 @@ async function showPickingList(tanda, legajo, opts) {
     const items = Object.keys(agg)
       .sort((a, b) => (gOrden(a) - gOrden(b)) || (numKey(a) - numKey(b)) || (a < b ? -1 : a > b ? 1 : 0))
       .map(art => { const e = gOf(art); const eq = equivLookup(art); return { art: art, key: art, esp: agg[art], sector: (e && e[0]) ? e[0] : "—", dual: dualOf(art), real: eq ? eq.real : null, realNota: eq ? eq.nota : null,
-                      emp: empDeClave(art) }; });   // v15.72: la empresa viaja con el renglón
+                      emp: empDeClave(art) }; });   // v15.85: la empresa viaja con el renglón
     if (!items.length) {
       _pk = null;
       m.querySelector(".tanda-modal-body").innerHTML =
@@ -9556,7 +9556,7 @@ async function showPickingList(tanda, legajo, opts) {
         it.sector = dual.loeke.sector;
       }
     });
-    // v15.72 — SECTOR POR EMPRESA, sin la muleta del sufijo. Hasta ahora la celda
+    // v15.85 — SECTOR POR EMPRESA, sin la muleta del sufijo. Hasta ahora la celda
     // del operario salía de window.GONDOLA buscando una clave "438E LK", y esas claves
     // existen para 4 códigos de 351 (8 filas de 360 en Planimetria): para todo el
     // resto la empresa se descartaba y quedaba la celda del código pelado — que puede
@@ -10408,7 +10408,7 @@ function pkTotalesArt(rec) {
     real += Number(r) || 0;
     if (x.isExc) exc += Number(r) || 0;
   }
-  // v15.72 — la empresa de los pasos de este artículo. Si los pasos no coinciden
+  // v15.85 — la empresa de los pasos de este artículo. Si los pasos no coinciden
   // (no debería pasar: el de excedente la hereda del de góndola) se devuelve "" y el
   // evento sale sin el campo, que es lo mismo que hacía antes.
   let emp = null, empOk = true;
@@ -10426,7 +10426,7 @@ function pkTotalesArt(rec) {
 
    v15.41 — texto = TANDA|ART|esp|real|excedente. El 5º campo dice cuántas de las
    `real` cajas salieron del EXCEDENTE (el resto salió de góndola).
-   v15.72 — 6º campo = EMPRESA (LK/CH): de qué góndola salió la mercadería. Antes el
+   v15.85 — 6º campo = EMPRESA (LK/CH): de qué góndola salió la mercadería. Antes el
    backend la forzaba a 'Mixto' para todo lo que no fuera dual, así que la cuenta de
    cada empresa se desbalanceaba sola (la góndola se llenaba con una etiqueta y se
    vaciaba con otra). Va vacío si la tanda mezcla las dos empresas para ese código
@@ -10442,7 +10442,7 @@ function pkSendDetail(art, esp, real) {
   const tot = pkTotalesArt(art);
   const espT  = tot.esp > 0 ? tot.esp : esp;   // red de seguridad: nunca mandar esp 0
   const realT = tot.real;
-  // v15.72 — 6º campo: la EMPRESA de la que salió la mercadería (LK/CH). Va vacío
+  // v15.85 — 6º campo: la EMPRESA de la que salió la mercadería (LK/CH). Va vacío
   // cuando la tanda mezcla las dos para ese código; ahí el backend reparte como
   // siempre. Como el texto es posicional, si hay empresa pero no hay depósito el 5º
   // campo va vacío para no correr la empresa al lugar del excedente.
@@ -16775,7 +16775,7 @@ function pedImpCargarPedidoHecho() {
 function pedHechoCerrar() { var ov = document.getElementById("pedHechoOv"); if (ov) ov.classList.remove("show"); _pedHecho = null; }
 function pedHechoSetProv(v) { if (!_pedHecho) return; _pedHecho.prov = v || ""; _pedHechoRender(); }
 function pedHechoSetFecha(v) { if (!_pedHecho) return; _pedHecho.fecha = String(v || ""); }
-/* v15.72 — el PI agrupa las líneas como UN pedido en la solapa 🚢 En curso, y el embarque es el
+/* v15.85 — el PI agrupa las líneas como UN pedido en la solapa 🚢 En curso, y el embarque es el
    día que sale de China (la fecha de entrega de arriba es la de llegada). */
 function pedHechoSetRef(v) { if (!_pedHecho) return; _pedHecho.ref = String(v == null ? "" : v).trim(); }
 function pedHechoSetEmbarque(v) { if (!_pedHecho) return; _pedHecho.embarque = String(v || ""); }
@@ -17389,7 +17389,7 @@ function _impBachesRender() {
     var f = r.fecha_reingreso ? _isoToDdMmAa(String(r.fecha_reingreso).slice(0, 10)) : '<span style="color:#94a3b8">sin fecha</span>';
     var enc = r.estado === "en_curso";
     var lleg = (Number(r.unidades_llegadas) || 0) > 0 ? (' <span style="color:#64748b;font-size:11px">(llegó ' + _impBachesFmt(r.unidades_llegadas) + ')</span>') : "";
-    // v15.72 — de qué PEDIDO (PI) es el bache y cuándo embarca. Las dos fechas del pedido entero
+    // v15.85 — de qué PEDIDO (PI) es el bache y cuándo embarca. Las dos fechas del pedido entero
     // se editan en la solapa 🚢 En curso; acá se muestran para saber a cuál pertenece cada bache.
     var pi = r.pedido_ref ? escapeHtml(r.pedido_ref) : '<span style="color:#94a3b8">—</span>';
     var emb = r.fecha_embarque ? _isoToDdMmAa(String(r.fecha_embarque).slice(0, 10)) : '<span style="color:#94a3b8">—</span>';
@@ -17423,7 +17423,7 @@ async function pedImpBacheAdd() {
   if (uv === null) return;
   var uni = parseInt(String(uv).replace(/[^\d]/g, ""), 10);
   if (!(uni > 0)) { try { alert("Unidades inválidas."); } catch (_e) {} return; }
-  // v15.72 — el bache va atado a un PEDIDO (el PI). Sin eso queda suelto en la solapa 🚢 En curso.
+  // v15.85 — el bache va atado a un PEDIDO (el PI). Sin eso queda suelto en la solapa 🚢 En curso.
   var refPre = ""; try { (_impBaches.rows || []).some(function (x) { if (x.estado === "en_curso" && x.pedido_ref) { refPre = x.pedido_ref; return true; } return false; }); } catch (_e) {}
   var rv; try { rv = prompt("Número de PI / referencia del pedido (agrupa las líneas en 🚢 En curso).\nVacío = queda suelto:", refPre); } catch (_e) { rv = null; }
   if (rv === null) return;
@@ -17477,7 +17477,7 @@ async function pedImpBacheBorrar(bacheId) {
   catch (e) { try { alert("No se pudo anular: " + (e.message || e)); } catch (_e) {} return; }
   await _impBachesReload();
 }
-/* v15.72 — "🚢 En curso": los pedidos de importación YA HECHOS, separados del generador.
+/* v15.85 — "🚢 En curso": los pedidos de importación YA HECHOS, separados del generador.
    Pedido del dueño (11/09): "quiero ver cuáles son los pedidos en curso por separado de si genera
    o no genera pedido… qué día llegan y qué día es la fecha de embarque".
    Una fila por PEDIDO (el PI), no por artículo: sale de gv_importados_pedidos_curso (baches
@@ -32728,10 +32728,30 @@ function _pppComputeErrors(peds, entSet) {
     const nR = Object.keys(rutas).length, nF = Object.keys(fechas).length;
     if (nR > 1 || nF > 1) { tandasMal.push({ tanda: t, rutas: nR, fechas: nF, porRuta: rutas, porFecha: fechas }); for (const p of ps) if (p._err.indexOf("tandamal") < 0) p._err.push("tandamal"); }
   }
-  return { sacar: sacar, sinZona: sinZona, zonaDif: zonaDif, tandasMal: tandasMal };
+  // v15.85 (Thomas: "más que 8 hs por día no se puede programar") — camiones que no entran en la
+  // jornada: viaje óptimo + 15' por parada. Se agrupa por DÍA y por camión con la misma función
+  // que usa la vista (_pppCamiones); Retira no viaja y queda afuera.
+  const jornada = [];
+  try {
+    const porDia = {};
+    for (const p of peds) {
+      if (!p.programmed) continue;
+      const fe = _pppS(p.fecha_entrega); if (!fe) continue;
+      (porDia[fe] = porDia[fe] || []).push(p);
+    }
+    for (const fe of Object.keys(porDia)) {
+      for (const cam of _pppCamiones(porDia[fe])) {
+        if (cam.ruta === "ret") continue;
+        const j = _pppJornadaCam(cam);
+        if (j.excede) jornada.push({ fecha: fe, cam: cam, j: j });
+      }
+    }
+    jornada.sort(function (a, b) { return b.j.horas - a.j.horas; });
+  } catch (_e) {}
+  return { sacar: sacar, sinZona: sinZona, zonaDif: zonaDif, tandasMal: tandasMal, jornada: jornada };
 }
 function pppErroresHtml(e) {
-  const n = e.sacar.length + e.sinZona.length + e.zonaDif.length + e.tandasMal.length;
+  const n = e.sacar.length + e.sinZona.length + e.zonaDif.length + e.tandasMal.length + ((e.jornada || []).length);
   if (!n) return "";   // v13.12: sin errores no se muestra nada (dueño: "sacá esas 2 alertas")
   const np = function (p) { const s = escapeHtml(String(p.np)); return '<a class="ppp-go" onclick="pppGoToRow(\'' + s + '\')" title="Ir a la fila del pedido">' + s + '</a>'; };
   const cli = function (p) { const r = (p.razon_social || "").trim(); return r ? " " + escapeHtml(r.slice(0, 20)) : ""; };
@@ -32739,6 +32759,27 @@ function pppErroresHtml(e) {
   if (e.sacar.length)     h += '<div class="ppp-ei bad">🚮 <b>Ya entregados — SACAR (' + e.sacar.length + '):</b> ' + e.sacar.map(function (p) { return np(p) + cli(p); }).join(" · ") + '</div>';
   if (e.sinZona.length)   h += '<div class="ppp-ei warn">⚠ <b>Sin zona (' + e.sinZona.length + '):</b> ' + e.sinZona.map(function (p) { return np(p) + " — " + escapeHtml(pppLocDisp(p.localidad) || "?"); }).join(" · ") + '</div>';
   if (e.zonaDif.length)   h += '<div class="ppp-ei warn">⚠ <b>Zona no coincide (' + e.zonaDif.length + '):</b> ' + e.zonaDif.map(function (p) { return np(p) + " [" + escapeHtml(pppLocDisp(p.localidad) || "?") + ": Excel=" + escapeHtml(p.zona || "—") + " / barrio=" + escapeHtml(pppZonaDeBarrio(p.localidad) || "—") + "]"; }).join(" · ") + '</div>';
+  // v15.85 — la jornada del camión. Es lo primero porque obliga a mover pedidos de día, no a
+  // corregir un tipeo: dice cuánto se pasa, de qué se compone y qué parada lo estira.
+  if ((e.jornada || []).length) {
+    const h1 = function (x) { return (Math.round(x * 10) / 10).toString().replace(".", ","); };
+    h += '<div class="ppp-ei bad">🕗 <b>Camión de más de ' + _pppJorCfg.horasMax + ' h (' + e.jornada.length + '):</b><div class="ppp-ei-det">' +
+      e.jornada.map(function (x) {
+        const c = x.cam, j = x.j;
+        const lejos = (function () {                       // la parada que más estira el recorrido
+          try {
+            const geo = _pppGeo || {}, dep = geo[RT_DEPOT_KEY]; if (!dep) return "";
+            let bp = null, bd = -1;
+            for (const p of c.ped) { const g = _pppGeoDe(p); if (!g) continue; const d = _rtHav(dep, g); if (d > bd) { bd = d; bp = p; } }
+            return (bp && bd > 25) ? ' · lo estira <b>' + escapeHtml(pppLocDisp(bp.localidad) || bp.razon_social || "?") + '</b> (a ' + Math.round(bd) + ' km)' : "";
+          } catch (_e2) { return ""; }
+        })();
+        return '<div><b>' + escapeHtml(String(x.fecha).replace(/\/\d{4}$/, "")) + '</b> · ' +
+               escapeHtml(c.num ? ("Camión " + c.num) : "Camión") + ' ' + escapeHtml(c.zona || "") +
+               ' → <b>' + h1(j.horas) + ' h</b> (viaje ' + h1(j.hViaje) + ' h + ' + j.paradas + ' paradas × ' + _pppJorCfg.minParada + '′) · ' +
+               Math.round(j.km) + ' km' + (j.sinUbic ? ' · <b>' + j.sinUbic + '</b> sin ubicación (los km quedan cortos)' : '') + lejos + '</div>';
+      }).join("") + '</div></div>';
+  }
   if (e.tandasMal.length) {
     // v15.57 — cada tanda dice el día programado y QUÉ va con qué: por ruta (NP · cliente · barrio)
     // y, si son varias fechas, quién cae en cada una. Antes decía sólo "D68G (rutas mezcladas)".
@@ -32807,7 +32848,70 @@ async function pppRefreshValor() {
     if (typeof pppRenderProg === "function") pppRenderProg();
   } catch (_e) { if (!_pppValor) _pppValor = new Map(); }
 }
+/* v15.85 — LÍMITE DE JORNADA DEL CAMIÓN. Thomas (11/09): *"al tiempo de viaje entre paradas (máx
+   8 hs en un día) hay que considerar que hay tiempo parado para descargar cada pedido. Considerá
+   por ahora sólo 15' por parada x cliente. Más que 8 hs por día no se puede programar"*.
+   Los cuatro números viven en `PPP_Web_Config` (se cambian por SQL, sin tocar código):
+     jornada_horas_max = 8      · el tope
+     jornada_min_parada = 15    · lo que tarda bajar un pedido
+     jornada_km_h = 28          · velocidad de MARCHA de un camión en AMBA (lo parado va aparte)
+     jornada_factor_ruta = 1.35 · el recorrido por calle es ~1,35× la distancia en línea recta
+   Los dos últimos son una estimación: se recalibran con las horas reales de la hoja de ruta
+   (`GV_Viaje_Horas`, §3.bx) cuando empiecen a cargarse. Acá quedan los defaults por si la
+   config no cargó (sin red la PPP tiene que seguir andando). */
+let _pppJorCfg = { horasMax: 8, minParada: 15, kmH: 28, factor: 1.35 };
+let _pppJorCfgOk = false;
+async function pppRefreshJornadaCfg() {
+  if (_pppJorCfgOk) return;
+  try {
+    const r = await fetch(SUPABASE_URL + "/rest/v1/PPP_Web_Config?clave=like.jornada*&select=clave,valor&limit=20",
+      { headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY }, cache: "no-store" });
+    if (!r.ok) return;
+    const map = {}; (await r.json()).forEach(function (x) { map[x.clave] = parseFloat(String(x.valor).replace(",", ".")); });
+    const n = function (v, def) { return (isFinite(v) && v > 0) ? v : def; };
+    _pppJorCfg = {
+      horasMax:  n(map.jornada_horas_max,   _pppJorCfg.horasMax),
+      minParada: n(map.jornada_min_parada,  _pppJorCfg.minParada),
+      kmH:       n(map.jornada_km_h,        _pppJorCfg.kmH),
+      factor:    n(map.jornada_factor_ruta, _pppJorCfg.factor)
+    };
+    _pppJorCfgOk = true;
+  } catch (_e) {}
+}
+/* Horas de un camión: recorrido óptimo (el mismo `_rtOptimize` de la hoja de ruta) + 15' por
+   PARADA. Una parada = una DIRECCIÓN (cód + dirección), igual que la hoja de ruta: las 4 NP de
+   Dapelo en Almagro son una sola bajada, pero Almagro / Colegiales / Villa Crespo son tres.
+   Los pedidos sin ubicación cuentan su parada (hay que ir igual) pero no suman km: el número
+   queda CORTO, nunca largo — por eso `sinUbic` viaja en el resultado. */
+function _pppJornadaCam(cam) {
+  const cfg = _pppJorCfg;
+  const geo = _pppGeo || {};
+  const depot = geo[RT_DEPOT_KEY] || null;
+  const vistas = {}, pts = []; let sinUbic = 0;
+  for (const p of (cam && cam.ped) || []) {
+    const k = String((p && p.cod) || "") + "|" + _rtDirKey(p.direccion, p.localidad || p.barrio);
+    if (vistas[k]) continue;
+    vistas[k] = 1;
+    const c = _pppGeoDe(p);
+    if (c) pts.push({ lat: c.lat, lng: c.lng }); else sinUbic++;
+  }
+  const paradas = Object.keys(vistas).length;
+  let km = 0;
+  if (depot && pts.length) {
+    const ord = _rtOptimize(depot, pts);
+    let cur = depot;
+    for (const s of ord) { km += _rtHav(cur, s); cur = s; }
+    km += _rtHav(cur, depot);
+  }
+  const kmReal = km * cfg.factor;
+  const hViaje = cfg.kmH > 0 ? (kmReal / cfg.kmH) : 0;
+  const hDesc  = paradas * cfg.minParada / 60;
+  const horas  = hViaje + hDesc;
+  return { paradas: paradas, sinUbic: sinUbic, km: kmReal, hViaje: hViaje, hDesc: hDesc,
+           horas: horas, excede: horas > cfg.horasMax, max: cfg.horasMax };
+}
 async function pppRefreshGeo() {
+  pppRefreshJornadaCfg();   // best-effort, en paralelo: si falla quedan los defaults
   if (_pppGeo) return;
   try { _pppGeo = await _rtCacheAll(); } catch (_e) { _pppGeo = {}; }
   // v13.40: además de PPP_Geo (por dirección), la ubicación POR CÓD DE CLIENTE. Es el paracaídas
