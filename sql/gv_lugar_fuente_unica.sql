@@ -119,3 +119,43 @@ where l.activo;
 
 comment on view public.gv_ocupacion_lugar is
   'Ocupación DERIVADA de Movimientos_Stock: nunca se escribe. saldo_cod es por CÓDIGO (Movimientos_Stock.ubicacion no es confiable para repartir por sector), así que en un código con varios lugares el saldo se repite por fila y el % va contra la capacidad total del código. v1 2026-09-11.';
+
+-- ════════════════════════════════════════════════════════════════════
+-- v3 (2026-09-11) — el código de lugar se guarda SIEMPRE con el cero.
+-- Pedido de Luis: algunas tablas actuales tienen J1; en las definitivas va J01.
+--
+-- Medido sobre los 946 sectores distintos de las 6 tablas actuales:
+--   826  ya venían LETRAS+2 dígitos (J01, AA03, Ñ53)  → quedan igual
+--    92  vienen con 1 dígito (J1, A5, AD6)            → se padean a J01, A05, AD06
+--    28  son racks de INSUMOS con otro esquema         → R1AD, V9 AD, MEDIO
+-- Normalizados quedan 873 lugares distintos (112 grafías se unifican).
+--
+-- Los 28 salen sólo de Insumos_Ubicaciones y Stock_Ubicaciones: racks de
+-- insumos con sufijo AD/AT (adelante/atrás). Mismo criterio: R1AD → R01AD,
+-- 'V9 AD' → V09AD (además se come el espacio).
+--
+-- ⚠ 'MEDIO' es el único que no entra en el formato: no tiene número. Son 2
+--   filas de Insumos_Ubicaciones (insumos A1 y H1, las dos con cantidad 0).
+--   Hay que decidir cómo se llama ese lugar antes de cargarlo.
+--
+-- ⚠ N y Ñ son lugares DISTINTOS, no un error de tipeo. Los N (N04, N10, N12,
+--   N3..N8) salen de Racks_Planimetria con códigos 501, 504, 505, 546, 315;
+--   los Ñ salen de Capacidad_Sector con 104 y 106E. N = racks, Ñ = góndola.
+--   Fusionarlos mezclaría un rack con una góndola.
+-- ════════════════════════════════════════════════════════════════════
+
+create or replace function public.gv_norm_sector(p text)
+returns text language sql immutable as $$
+  select case when m is null then upper(btrim(p))
+              else m[1] || lpad(m[2], 2, '0') || coalesce(m[3], '') end
+  from (select regexp_match(upper(btrim(p)), '^([A-ZÑ]{1,2})0*([0-9]+)\s*(AD|AT)?$') m) x;
+$$;
+comment on function public.gv_norm_sector(text) is
+  'Normaliza un código de lugar al formato canónico LETRAS + 2 dígitos (+ AD/AT opcional para racks de insumos): J1->J01, AD6->AD06, ''V9 AD''->V09AD. Lo que no matchea vuelve en mayúsculas sin espacios de borde. v3 2026-09-11.';
+
+alter table public."GV_Lugar" drop constraint if exists gv_lugar_sector_fmt;
+alter table public."GV_Lugar" add constraint gv_lugar_sector_fmt
+  check (sector ~ '^[A-ZÑ]{1,2}[0-9]{2,}(AD|AT)?$');
+
+comment on column public."GV_Lugar".sector is
+  'Código de lugar en formato canónico: LETRAS + 2 dígitos, SIEMPRE con el cero (J01, nunca J1). Los racks de insumos admiten sufijo AD/AT (R01AD). Lo garantiza el check gv_lugar_sector_fmt; para normalizar una entrada usar gv_norm_sector(). N y Ñ son lugares distintos (N = racks, Ñ = góndola): no unificarlos.';
