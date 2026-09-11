@@ -12,7 +12,7 @@
 > única**; no se replica. Ante la duda entre parche rápido y fix de raíz → **fix
 > de raíz**.
 >
-> Última actualización: 2026-09-11 (viernes) · Versión app al documentar: **v15.60**
+> Última actualización: 2026-09-11 (viernes) · Versión app al documentar: **v15.61**
 >
 > Nota **v15.40 (2026-09-11) — HANDOFF de planimetría / Acacia: `docs/HANDOFF-PLANIMETRIA-Y-ACACIA.md`.**
 > Thomas sigue este tema en otra sesión. Ahí está todo junto: los **13 artículos activos del catálogo LK
@@ -11158,6 +11158,14 @@ distinta, empresa distinta.
 >   (umbral ≈ 3× su período; dedup un aviso por sync por día). **No se creó tabla
 >   `Sync_Estado`**: `cron.job_run_details` ya tiene la verdad. DDL en
 >   `sql/watchdog_syncs_externos.sql`.
+
+> Nota **2026-09-11 (v15.61) - Verificada la corrida real del fix de Cuarentena. Y BP Import salio porque PAGO.**
+> La corrida del cron de las 13:15:13 cerro sola las 6 tareas que le quedaban abiertas a Viviana (CH 217 - 218 - 225,
+> LK 1349 - 1354 - 1384): con cero pendientes en cuarentena el sync manda lista vacia y eso es lo que las cierra.
+> Edge Function en **v25**. **Correccion de un dato mio:** la septima, LK 1346 BP Import, NO la cerro el fix - salio
+> a las 12:43:46 porque el reporte de deuda de las 12:43:28 le bajo el saldo de $836.136,98 a **$0,01** (pago), por
+> debajo del umbral de $1.000. O sea que BP Import no es un cliente con deuda y pedido ya armado: se lo quito de la
+> descripcion del problema en `github_repo_problemas`. §3.ci.1 de `docs/SUPABASE-GESTION-VIRGILIO.md`.
 
 > Nota **2026-09-11 (v15.59) — Auditado: el automático NUNCA sacó un pedido de Cuarentena solo. Y el candado pasa a ser por BLOQUE.**
 > Vivi preguntó si el sistema mandó a Programación pedidos que estaban en Cuarentena sin que nadie los liberara.
