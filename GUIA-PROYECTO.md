@@ -12,17 +12,57 @@
 > única**; no se replica. Ante la duda entre parche rápido y fix de raíz → **fix
 > de raíz**.
 >
-> Última actualización: 2026-09-11 (viernes) · Versión app al documentar: **v15.34**
+> Última actualización: 2026-09-11 (viernes) · Versión app al documentar: **v15.35**
+>
+> Nota **v15.35 (2026-09-11, Thomas) — ACACIA (989E + 99xE): lo que no se pide en la 2da Becky NO debería existir.**
+> Regla del dueño: *"todos los 99xE que no se pidan en la 2da Becky son artículos que no deberían estar en
+> todo Gestión Virgilio ni en `pagina-LK-copia`"*, y **989E entra en la misma lógica** (es de la misma
+> familia Acacia aunque el código no arranque con 99).
+>
+> **La familia es 989E + 990E…999E**, y la referencia es el **2° pedido de importación de Becky**
+> (`GV_Importados_Baches.creado_por = 'PI B260601-2'`, reingreso **2026-11-15**, 26 líneas / 48.056 uni;
+> el 1° es `PI B260601`, reingreso 29/09):
+>
+> · **Se piden → quedan (7):** `989E` (576) · `990E` (576) · `992E` (576) · `993E` (1.152) · `996E` (576)
+>   · `997E` (576) · `998E` (576).
+> · **NO se piden → no deberían existir (4):** `991E` (Espátula Corta Torta) · `994E` (Pelador) ·
+>   `995E` (Rallador) · `999E` (Pica Ajo). `994E` y `999E` **tenían** línea en la 2da Becky pero quedó
+>   **`anulado`** (`backfill_20260911`); `991E` y `995E` **ni siquiera tienen ficha** en `Importados`.
+>
+> **Dónde siguen apareciendo hoy** (barrido de todas las columnas `cod*`/`articulo`/`codigo` de los dos
+> proyectos, `query_to_xml` sobre `information_schema`):
+>
+> | | 991E | 994E | 995E | 999E |
+> |---|---|---|---|---|
+> | GV `Importados` (ficha) | — | 1 | — | 1 |
+> | GV `GV_Importados_Baches` | — | 1 anulado | — | 1 anulado |
+> | GV `Importados_Mov_Stock` | — | 1 | — | 1 |
+> | GV `Importados_Volumen` | — | 1 | — | 1 |
+> | GV `PPP_Web_Base` | 1 (NP LK 0013, pedido 1347) | — | — | — |
+> | GV `Volumen_Articulos` · `cob_uxb_lk` · `precios_venta` | 1+1+1 | 1+1+1 | 1+1+1 | 1+1+1 |
+> | LK `products` · `product_m3` · `item_precio_cache` | sí | sí | sí | sí |
+> | LK `order_items` | 6 líneas | 8 | 7 | 12 |
+>
+> En `Planimetria` **ninguno de los 4 tiene sector** — y está bien así: no hay que cargárselo. Por eso
+> **991E sale de la lista de huecos reales de la v15.34**, que queda en **13** (no 14).
+>
+> ⚠ **Lo urgente es `991E`: sigue `active = true` en el catálogo LK y se está vendiendo.** Último pedido
+> web **10/09 (pedido 1389, cliente 4198)**, y antes el **04/09 (pedido 1347, cliente 2363 → NP LK 0013)**.
+> `994E`, `995E` y `999E` ya están `active = false` desde hace meses; sus 27 líneas de `order_items` son
+> pedidos históricos de marzo–mayo, todos `status = 'pendiente'`. **No se borró nada**: por el protocolo
+> de "NUNCA modificar datos sin permiso explícito" la baja (bajar 991E del catálogo y limpiar fichas,
+> precios, uxb y m³ de los 4 en los dos proyectos) queda esperando el OK del dueño.
 >
 > Nota **v15.34 (2026-09-11, Thomas) — PLANIMETRÍA: qué alertas "sin lugar" son reales y cuáles son ruido.**
 > Relevamiento de artículos sin sector en `Planimetria` (360 códigos cargados sobre 685 sectores de
 > `Capacidad_Sector`). Salieron tres grupos, y **sólo el primero es un hueco de verdad**:
 >
-> · **(1) Huecos reales — 14 códigos activos del catálogo LK sin sector**: `231` / `232` / `233`
+> · **(1) Huecos reales — 13 códigos activos del catálogo LK sin sector** (eran 14; `991E` salió por la
+>   v15.35: no se pide en la 2da Becky, así que no debería existir): `231` / `232` / `233`
 >   (Palos de Amasar 30/40/50cm), `368E` (Rallador Hexagonal Inox 25cm), `537` (Pela y Pica ajo),
->   `567` (Corta Palta) y **toda la línea Acacia** `989E` `990E` `991E` `992E` `993E` `996E` `997E`
+>   `567` (Corta Palta) y **la línea Acacia que sí sigue** `989E` `990E` `992E` `993E` `996E` `997E`
 >   `998E`. De ésos, **11 ya se pickearon** (PKC real, tandas D50C…D67C/E10A entre el 01 y el 10/09);
->   `368E`, `990E` y `991E` sólo se pidieron por la web, todavía sin pickear. Ninguno tiene saldo en
+>   `368E` y `990E` sólo se pidieron por la web, todavía sin pickear. Ninguno tiene saldo en
 >   `Movimientos_Stock deposito='gondola'`. Consulta para regenerar la lista: catálogo activo de LK
 >   (`products.active` en `kwkclwhmoygunqmlegrg`) menos `norm_cod(Planimetria.cod)`.
 > · **(2) Códigos de 5 dígitos (`55215`, `55219`, `55289`…) — NO llevan planimetría, es ruido esperado.**
