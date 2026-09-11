@@ -224,3 +224,68 @@ with parsed as (
 )
 update public."GV_Lugar" l set orden = r.rn, updated_at = now()
 from ranked r where r.sector = l.sector;
+
+-- ─────────────────────────────────────────────────────────────────────
+-- 2026-09-11 · La empresa de los RACKS se deriva del código que guardan
+--
+-- Por qué: el relevamiento del depósito preguntó QUÉ HAY en cada lugar
+-- (columna "¿QUÉ HAY REALMENTE? (completar)"), no DE QUIÉN ES. La columna
+-- Empresa del Excel viajó pre-llenada de las tablas viejas, de sólo lectura.
+-- En los racks eso quedó 108 LK / 5 CH / 17 sin dato / 3 en conflicto
+-- ("CH ⚠ LK") — una proporción imposible al lado de las góndolas (524/164).
+--
+-- Criterio (Luis, 11/09): el rack es DESBORDE de la góndola, así que la
+-- empresa del rack es la de la góndola del código que tiene adentro. Sólo
+-- se toca cuando el código resuelve a UNA sola empresa; si el rack está
+-- vacío, o su código no está en ninguna góndola, o hay más de una empresa,
+-- NO se toca.
+--
+-- Medido antes de escribir, sobre 133 racks (los 51 de insumos 'IN' quedan
+-- afuera): 81 ya coincidían · 5 a corregir · 0 ambiguos · 47 sin derivar
+-- (racks vacíos o con códigos que no están en góndola).
+--
+-- Backup: GV_Backup_lugar_empresa_20260911 (872 filas).
+-- Rollback:
+--   update public."GV_Lugar" l set empresa = b.empresa, notas = b.notas
+--     from public."GV_Backup_lugar_empresa_20260911" b where b.sector = l.sector;
+-- ─────────────────────────────────────────────────────────────────────
+create table if not exists public."GV_Backup_lugar_empresa_20260911" as
+select sector, tipo, empresa, notas, now() as respaldado_at from public."GV_Lugar";
+
+with cod_emp as (   -- empresa de cada código según SU góndola
+  select regexp_replace(upper(btrim(i.cod)),'^0+(?=.)','') cod,
+         count(distinct l.empresa) n_emp, max(l.empresa) emp
+    from public."GV_Lugar_Item" i join public."GV_Lugar" l on l.sector = i.sector
+   where i.clase='articulo' and i.activo and l.tipo='gondola' and l.empresa in ('LK','CH')
+   group by 1),
+der as (
+  select l.sector, max(c.emp) emp
+    from public."GV_Lugar" l
+    join public."GV_Lugar_Item" i on i.sector = l.sector and i.activo and i.clase='articulo'
+    join cod_emp c on c.cod = regexp_replace(upper(btrim(i.cod)),'^0+(?=.)','') and c.n_emp = 1
+   where l.tipo='rack' and coalesce(l.empresa,'') <> 'IN'
+   group by 1 having count(distinct c.emp) = 1)
+update public."GV_Lugar" l
+   set empresa = d.emp,
+       notas = coalesce(l.notas || ' · ', '') ||
+               'empresa derivada de la gondola del codigo que guarda (Luis 11/09); antes ' ||
+               coalesce(l.empresa,'sin dato'),
+       updated_at = now()
+  from der d
+ where d.sector = l.sector and d.emp <> coalesce(l.empresa,'');
+-- Corrigió 5: X01, X06, X26, Y01, Y02 → CH (guardan 702E, 798E y 725E, que
+-- son de Chef). Y01 venía marcado "CH ⚠ LK" en el relevamiento y estaba en LK
+-- por la decisión provisoria "poneles LK de momento y listo".
+
+-- Verificación: ningún código queda con góndola de una empresa y rack de la otra.
+--   with x as (select regexp_replace(upper(btrim(i.cod)),'^0+(?=.)','') cod,
+--                     max(l.empresa) filter (where l.tipo='gondola') g,
+--                     count(distinct l.empresa) filter (where l.tipo='gondola') ng,
+--                     max(l.empresa) filter (where l.tipo='rack') r
+--                from public."GV_Lugar_Item" i join public."GV_Lugar" l on l.sector=i.sector
+--               where i.clase='articulo' and i.activo and l.empresa in ('LK','CH') group by 1)
+--   select count(*) filter (where ng=1 and r is not null and r<>g) from x;   -- → 0 ✓
+--
+-- Quedan 4 códigos en DOS góndolas: 437E, 438E, 809E (duales de verdad) y 396
+-- (A65 LK / P39 CH; Luis dice que es LK — la fila de P39 es residuo de
+-- Capacidad_Sector y hay que sacarla, pendiente de su confirmación).
