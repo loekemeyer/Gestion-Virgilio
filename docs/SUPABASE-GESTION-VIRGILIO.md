@@ -5680,7 +5680,7 @@ automático no vuelve a mirar un pedido que ya tiene tanda, así que nadie los r
 NP a mano no chequea si el cliente queda partido**: ése es el agujero que queda abierto, y por
 ahora lo tapa la alerta (que avisa después, no en el momento).
 
-## §3.cg — Corregir códigos: el stock del secundario se reparte entre las NP que lo piden (v15.51, 2026-09-11)
+## §3.cj — Corregir códigos: el stock del secundario se reparte entre las NP que lo piden (v15.66, 2026-09-11)
 
 Thomas, con el panel **Corregir códigos (secundario → principal)** abierto en 565 → 607E: *"acá tenés mal la
 lógica. Mirá el 565 primero: el stock y sus pedidos"*.
@@ -5692,7 +5692,7 @@ marcaba urgente con el secundario en 0 (`_corrItemUrgente`, v10.28). Con 565 = 2
 (8 cajas), las 7 salían en verde "alcanza — mandalo tal cual, sin tocar NP". El badge del panel supervisor
 (`corrLoadBadge`) y el chip de Facturación (`_urgN`) usaban el mismo criterio por ítem.
 
-| NP | Tanda | Sale | Estado | Cajas 565 | Antes (v15.50) | Ahora (v15.51) |
+| NP | Tanda | Sale | Estado | Cajas 565 | Antes (v15.50) | Ahora (v15.66) |
 |---|---|---|---|---:|---|---|
 | 98662 | D67A | 10/09 | pickeado | 2 | verde | **verde** (1.ª de la cola, le quedan 2) |
 | 98671 | D67E | 10/09 | pickeado | 1 | verde | **rojo** → cambiar NP a 607E |
@@ -5707,7 +5707,7 @@ en 7 NP. El otro caso del panel (338 → 941E, 98532, 1 caja, stock 23) queda ve
 
 ### Qué se hizo — la regla vive en la vista
 
-`vista_correcciones_pedido_rich` (`sql/vista_correcciones_pedido_rich_v1551_reparto_sec.sql`, migración
+`vista_correcciones_pedido_rich` (`sql/vista_correcciones_pedido_rich_v1566_reparto_sec.sql`, migración
 `gv_corr_sec_reparto_v1551`) arma una **cola por código secundario** — fecha de salida → estado (a facturar >
 pickeado > en picking > sin pickear) → NP — y acumula las cajas. Seis columnas nuevas **al final** (las 14 de
 antes no cambian de nombre, tipo ni orden): `sec_pedido_total`, `sec_np_total`, `sec_orden`,
@@ -5737,6 +5737,6 @@ no le cambia nada.
 
 ### Rollback
 
-Bloque comentado al final de `sql/vista_correcciones_pedido_rich_v1551_reparto_sec.sql` (definición
-anterior, `pg_get_viewdef` del 11/09). El front v15.51 sigue andando con la vista vieja (cae al criterio por
+Bloque comentado al final de `sql/vista_correcciones_pedido_rich_v1566_reparto_sec.sql` (definición
+anterior, `pg_get_viewdef` del 11/09). El front v15.66 sigue andando con la vista vieja (cae al criterio por
 ítem). `docs/ROLLBACK-PRODUCCION.md` tiene la entrada.

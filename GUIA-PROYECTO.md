@@ -12,7 +12,7 @@
 > única**; no se replica. Ante la duda entre parche rápido y fix de raíz → **fix
 > de raíz**.
 >
-> Última actualización: 2026-09-11 (viernes) · Versión app al documentar: **v15.51**
+> Última actualización: 2026-09-11 (viernes) · Versión app al documentar: **v15.66**
 >
 > Nota **v15.40 (2026-09-11) — HANDOFF de planimetría / Acacia: `docs/HANDOFF-PLANIMETRIA-Y-ACACIA.md`.**
 > Thomas sigue este tema en otra sesión. Ahí está todo junto: los **13 artículos activos del catálogo LK
@@ -11159,7 +11159,7 @@ distinta, empresa distinta.
 >   `Sync_Estado`**: `cron.job_run_details` ya tiene la verdad. DDL en
 >   `sql/watchdog_syncs_externos.sql`.
 
-> Nota **2026-09-11 (v15.51) — Corregir códigos: el stock del SECUNDARIO se reparte entre TODAS las NP que lo piden.**
+> Nota **2026-09-11 (v15.66) — Corregir códigos: el stock del SECUNDARIO se reparte entre TODAS las NP que lo piden.**
 > Dueño, con el panel abierto en 565 → 607E: *"acá tenés mal la lógica. Mirá el 565 primero: el stock y
 > sus pedidos"*. Cada NP se comparaba **sola** contra el stock total del secundario (`stkSec >= cajas`) y
 > sólo era urgente con el secundario en 0 (v10.28): 565 = 2 en góndola salía "alcanza — mandalo tal cual"
@@ -11174,9 +11174,9 @@ distinta, empresa distinta.
 > de 60 s porque el tick corre cada 5 s) leen la MISMA columna → un solo número en los tres lugares. Si
 > la vista no trae `sec_cubre` (rollback) el front cae al criterio viejo. `_corrStk` y `_facCorrSecStk`
 > (cruces por ítem contra `vista_saldos_stock`) se fueron. Ojo: las 3 NP "pickeado" pickearon 607E, no
-> 565 (PKC); la vista no mira PKC. `sql/vista_correcciones_pedido_rich_v1551_reparto_sec.sql` (con
-> rollback) · `docs/SUPABASE-GESTION-VIRGILIO.md` §3.cg · test `tests/corr-reparto-sec.cjs`. Bump
-> `APP_VERSION` + `SW_VERSION` `v15.51`.
+> 565 (PKC); la vista no mira PKC. `sql/vista_correcciones_pedido_rich_v1566_reparto_sec.sql` (con
+> rollback) · `docs/SUPABASE-GESTION-VIRGILIO.md` §3.cj · test `tests/corr-reparto-sec.cjs`. Bump
+> `APP_VERSION` + `SW_VERSION` `v15.66`.
 
 > Nota **2026-09-11 (v15.50) — La columna Fecha de la PPP mostraba DOS formatos mezclados.**
 > En el Resumen convivían `2026-09-09` y `10/09/2026` en la misma columna. No es un tema de

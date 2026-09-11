@@ -363,5 +363,5 @@ PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node te
 echo "== remito-np-web (v15.46: el remito impreso trae cliente y fecha también en las NP de la página) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/remito-np-web.cjs
 
-echo "== corr-reparto-sec (v15.51: Corregir códigos — el stock del secundario se reparte entre TODAS las NP que lo piden; sec_cubre de la vista en panel, badge y chip) =="
+echo "== corr-reparto-sec (v15.66: Corregir códigos — el stock del secundario se reparte entre TODAS las NP que lo piden; sec_cubre de la vista en panel, badge y chip) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/corr-reparto-sec.cjs

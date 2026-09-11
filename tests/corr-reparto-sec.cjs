@@ -1,4 +1,4 @@
-/* Regresión v15.51 — Corregir códigos: el stock del SECUNDARIO se reparte entre TODAS las NP que lo
+/* Regresión v15.66 — Corregir códigos: el stock del SECUNDARIO se reparte entre TODAS las NP que lo
    piden (dueño, 11/09: "mirá el 565 primero: el stock y sus pedidos"). Antes cada NP se comparaba sola
    contra el stock total (565 = 2 salía "alcanza" para 7 NP / 8 cajas). La regla vive en
    vista_correcciones_pedido_rich.sec_cubre; el front la lee y la usa en panel, badge y chip.

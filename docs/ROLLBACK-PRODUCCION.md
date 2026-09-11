@@ -494,9 +494,9 @@ Sólo lo lee Gestión. Rollback en `sql/gv_importados_stock_insumos_v1527.sql` /
 Tabla nueva `GV_Importados_Alias` (RLS, lectura anon/authenticated); alta 323ES en `Importados` (id 167) y
 `Importados_Volumen`; un bache movido de 323E a 323ES (backup `GV_Importados_Baches_bkp_323ES_20260911`). §3.bm.21.
 
-## Corregir códigos: reparto del stock del secundario — v15.51 (2026-09-11)
+## Corregir códigos: reparto del stock del secundario — v15.66 (2026-09-11)
 
 `create or replace view vista_correcciones_pedido_rich` (objeto de Producción, v10.10): agrega 6 columnas al
 final (`sec_pedido_total`, `sec_np_total`, `sec_orden`, `sec_acum_antes`, `sec_disp`, `sec_cubre`); las 14
 existentes no cambian de nombre, tipo ni orden. Producción la lee con las 14 viejas → sin impacto. Rollback:
-bloque comentado al final de `sql/vista_correcciones_pedido_rich_v1551_reparto_sec.sql`. §3.cg.
+bloque comentado al final de `sql/vista_correcciones_pedido_rich_v1566_reparto_sec.sql`. §3.cj.

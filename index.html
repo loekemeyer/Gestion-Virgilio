@@ -7664,7 +7664,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v15.51";
+const APP_VERSION = "v15.66";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -33260,7 +33260,7 @@ function supSetBadge(id, count) {
 }
 /* v9.38 — dos badges: ROJO = NPs que hay que corregir SÍ o SÍ, VERDE = NPs que el secundario cubre →
    se pueden mandar tal cual, corregir es opcional.
-   v15.51 — el criterio es el MISMO del panel y vive en la vista (vista_correcciones_pedido_rich.sec_cubre:
+   v15.66 — el criterio es el MISMO del panel y vive en la vista (vista_correcciones_pedido_rich.sec_cubre:
    el stock del secundario repartido entre todas las NP que lo piden). Antes cruzaba vista_saldos_stock
    por ítem y sólo era rojo con el secundario en 0. */
 async function corrLoadBadge() {
@@ -40344,14 +40344,14 @@ function _corrEstado(e){
   return M[e] || M.sinpickear;
 }
 /* v10.28 — ¿este ítem obliga a cambiar la NP? Urgente = hay que pasar la NP al principal SÍ o SÍ.
-   v15.51 (dueño, 11/09: "mirá el 565 primero: el stock y sus pedidos") — el stock del SECUNDARIO se
+   v15.66 (dueño, 11/09: "mirá el 565 primero: el stock y sus pedidos") — el stock del SECUNDARIO se
    reparte entre TODAS las NP que lo piden (vista_correcciones_pedido_rich.sec_cubre: cola por código,
    fecha de salida → estado → NP). Antes cada NP se comparaba sola contra el stock total y 565 = 2
    salía "alcanza" para 7 NP (8 cajas). El stock del principal no cambia el criterio. */
 function _corrItemUrgente(p){ return !(p && p.secCubre); }
-/* v15.51 — cuántas NP distintas tienen al menos una línea urgente (mismo número en badge y chip). */
+/* v15.66 — cuántas NP distintas tienen al menos una línea urgente (mismo número en badge y chip). */
 function _corrNpsUrgentes(rows){ const s = {}; (rows || []).forEach(function(p){ if (_corrItemUrgente(p)) s[p.np] = 1; }); return Object.keys(s).length; }
-/* v15.51 — veredicto de una línea del panel: verde = el secundario cubre esta NP (mandala tal cual),
+/* v15.66 — veredicto de una línea del panel: verde = el secundario cubre esta NP (mandala tal cual),
    rojo = no llega (contando las NP anteriores en la cola) → cambiar la NP al principal. */
 function _corrVeredicto(p){
   const sec = escapeHtml(p.sec), ppal = escapeHtml(p.ppal), stk = Math.round(p.stkSec), cajas = Math.round(p.cajas);
@@ -40369,7 +40369,7 @@ function _corrFecha(s){
 }
 /* v7.94 — enriquece el panel: razón social, stock (sec/ppal), lo que puso el operario
    (Entregas_Virgilio) y el estado (CORE events EP/TP/AP/TAP + Facturacion_NP). */
-/* v15.51 — caché corta de la vista rica para el chip de Facturación: facTick corre cada 5 s
+/* v15.66 — caché corta de la vista rica para el chip de Facturación: facTick corre cada 5 s
    (FAC_REFRESH_MS) y la vista cuesta ~350 ms de servidor (casi todo vista_saldos_stock), así que el
    tick la refresca como mucho cada 60 s. El panel y el badge la piden fresca (facCorreccDataRich),
    y cada pedido fresco deja la caché al día. */
@@ -40390,7 +40390,7 @@ async function facCorreccDataRich(){
     return { np: r.np, sec: r.sec, ppal: r.ppal, desc: r.descripcion||"", cajas: Number(r.cajas)||0,
              rs: r.razon_social||"", tanda: r.tanda||"", fecha: r.fecha||"",
              stkSec: Number(r.stk_sec)||0, stkPpal: Number(r.stk_ppal)||0,
-             // v15.51 — reparto del stock del SECUNDARIO entre TODAS las NP que lo piden. Lo calcula la vista
+             // v15.66 — reparto del stock del SECUNDARIO entre TODAS las NP que lo piden. Lo calcula la vista
              // (cola por código: fecha de salida → estado → NP). secCubre = a esta NP le alcanza lo que queda
              // después de las anteriores. Si la vista no trae sec_cubre (rollback), cae al criterio viejo.
              secTot: Number(r.sec_pedido_total)||0, secNps: Number(r.sec_np_total)||0, secOrden: Number(r.sec_orden)||0,
@@ -40398,10 +40398,10 @@ async function facCorreccDataRich(){
              secCubre: (r.sec_cubre == null) ? ((Number(r.stk_sec)||0) >= (Number(r.cajas)||0)) : (r.sec_cubre === true || r.sec_cubre === "true"),
              oper: oper, estado: r.estado||"sinpickear", pkcReal: 0, pkcHay: false };
   });
-  _facCorrRichCache = out; _facCorrRichTs = Date.now();   // v15.51
+  _facCorrRichCache = out; _facCorrRichTs = Date.now();   // v15.66
   return out;
 }
-/* v15.51 — pinta el chip "🔀 Corregir códigos" con filas de la vista rica: mismo criterio que el panel
+/* v15.66 — pinta el chip "🔀 Corregir códigos" con filas de la vista rica: mismo criterio que el panel
    y el badge (NP distintas con alguna línea que el secundario NO cubre, v8.44: NP, no ítems). Antes
    facCorreccRefreshCount contaba TODAS las NP pendientes y pisaba el número de urgentes de facTick (v10.51). */
 function facCorreccChipSet(rows){
@@ -40446,8 +40446,8 @@ function facCorreccRender(){
   const body = document.getElementById("facCorreccBody"); if (!body) return;
   const allRows = _facCorrRows;
   if (allRows === null){ body.innerHTML = '<div style="text-align:center;color:#64748b;padding:20px;">Cargando…</div>'; return; }
-  facCorreccChipSet(allRows);   // v15.51 — el chip sale de las filas que ya tenemos, sin volver a pedir la vista
-  // v10.49 — switch Urgentes / Ver todos. Urgente = el secundario NO cubre esta NP (v15.51: contando las NP
+  facCorreccChipSet(allRows);   // v15.66 — el chip sale de las filas que ya tenemos, sin volver a pedir la vista
+  // v10.49 — switch Urgentes / Ver todos. Urgente = el secundario NO cubre esta NP (v15.66: contando las NP
   // que están antes en la cola de ese código) → hay que cambiar la NP SÍ o SÍ; el resto se manda tal cual.
   const urgRows = allRows.filter(function(p){ return _corrItemUrgente(p); });
   const rows = _facCorrSoloUrg ? urgRows : allRows;
@@ -40493,7 +40493,7 @@ function facCorreccRender(){
             return '<div style="margin-top:6px;' + (items.length>1?'padding-top:6px;border-top:1px dashed #eef2f7;':'') + '">'
               + '<div style="font-size:13px;"><span style="color:#b91c1c;font-weight:800;">' + escapeHtml(p.sec) + '</span> → <span style="color:#16a34a;font-weight:800;">' + escapeHtml(p.ppal) + '</span> <span style="color:#64748b;">· ' + escapeHtml(p.desc) + ' · ' + p.cajas + ' cajas</span></div>'
               + '<div style="font-size:12px;color:#475569;">📦 Stock: <b>' + escapeHtml(p.sec) + '</b>=' + Math.round(p.stkSec) + (p.secNps > 1 ? ' <span title="Todas las NP pendientes que piden ' + escapeHtml(p.sec) + '">(pedidas ' + Math.round(p.secTot) + ' en ' + p.secNps + ' NP)</span>' : '') + ' · <b>' + escapeHtml(p.ppal) + '</b>=' + Math.round(p.stkPpal) + ' · 👷 ' + _operTxt(p) + '</div>'
-              + _corrVeredicto(p)   // v15.51 — verde/rojo según el reparto del secundario entre las NP que lo piden
+              + _corrVeredicto(p)   // v15.66 — verde/rojo según el reparto del secundario entre las NP que lo piden
               + '</div>';
           }).join('')
       + '</div>'
@@ -41450,7 +41450,7 @@ async function facTick(){
       facCorreccData().catch(function(){ return []; }),                // v7.92: pedidos en secundario por NP → columna "Cambiar cód" + chip
       facFetchNcChef().catch(function(){ return _facNcPend; }),         // v9.21: NCs Loeke→Chef pendientes → filas ✓ "NC hecha"
       facFetchArmadosEventos().catch(function(){ return _facArmEv; }),  // v12.18: NPs con TAL/TAP recientes → fallback del filtro v12.01 (ver facEstaArmada)
-      facCorreccRichCached().catch(function(){ return []; })            // v15.51: reparto del secundario (sec_cubre) → el chip cuenta las NP urgentes de verdad (caché 60 s)
+      facCorreccRichCached().catch(function(){ return []; })            // v15.66: reparto del secundario (sec_cubre) → el chip cuenta las NP urgentes de verdad (caché 60 s)
     ]);
     const fcKeys = _facPar[0] || new Set();
     try { const _sal = _facPar[8] || {}; _facSaldosN = {}; Object.keys(_sal).forEach(function(k){ _facSaldosN[_cpNorm(k)] = _sal[k]; }); } catch(_e){ _facSaldosN = {}; }
@@ -41463,9 +41463,11 @@ async function facTick(){
       const chip = document.getElementById("facChipCorr"), nEl = document.getElementById("facCntCorr");
       // v10.51 — el número del chip cuenta SOLO los urgentes. El chip sigue visible si hay cualquier
       // corrección (los no-urgentes se ven con "Ver todos" en el modal).
-      // v15.51 — urgente = el secundario NO cubre esa NP contando las NP anteriores en la cola de ese
+      // v15.66 — urgente = el secundario NO cubre esa NP contando las NP anteriores en la cola de ese
       // código (vista_correcciones_pedido_rich.sec_cubre), no "secundario en 0". Cuenta NP distintas.
-      const _urgN = _corrNpsUrgentes(_facPar[13] || []);
+      // Se lee de la caché (facCorreccRichCached la deja fresca dentro del Promise.all), sin depender
+      // del índice en _facPar: si alguien agrega otra entrada al Promise.all no se corre nada.
+      const _urgN = _corrNpsUrgentes(_facCorrRichCache || []);
       if (nEl) nEl.textContent = _urgN;
       if (chip) chip.style.display = _sec.length ? "" : "none";
     } catch(_e){ _facSecByNp = new Map(); }

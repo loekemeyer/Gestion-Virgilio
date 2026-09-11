@@ -1,4 +1,4 @@
--- v15.51 (2026-09-11) — Corregir códigos: el stock del SECUNDARIO se reparte entre TODAS las NP que lo piden.
+-- v15.66 (2026-09-11) — Corregir códigos: el stock del SECUNDARIO se reparte entre TODAS las NP que lo piden.
 -- Dueño, 11/09 (pantalla con 565 → 607E): "acá tenés mal la lógica. Mirá el 565 primero: el stock y sus pedidos".
 -- Antes cada NP se comparaba sola contra el stock total del secundario: 565 = 2 en góndola salía "alcanza"
 -- para las 7 NP que lo pedían (8 cajas). Ahora la vista arma una COLA por código secundario (fecha de salida →
@@ -97,7 +97,7 @@ with pending as (
     left join fact f on f.np = p.np
     left join tanda_status ts on ts.tanda = nullif(btrim(coalesce(ppp.tanda, f.tanda)), ''::text)
 ), cola as (
-  -- v15.51 — cola por código SECUNDARIO: primero la que sale antes; a igual fecha, la más avanzada
+  -- v15.66 — cola por código SECUNDARIO: primero la que sale antes; a igual fecha, la más avanzada
   -- (a facturar > pickeado > en picking > sin pickear); a igual estado, la NP más baja.
   select b.*,
     sum(b.cajas) over (partition by norm_cod(b.sec)) as sec_pedido_total,
@@ -126,8 +126,8 @@ order by norm_cod(sec), sec_orden;
 --   338 stk 23, 1 NP (98532, 1 caja) → sec_cubre TRUE.
 
 -- ============================================================================================
--- ROLLBACK — definición anterior (pg_get_viewdef del 2026-09-11 antes de la v15.51). Las 14 columnas
--- viejas quedan iguales; sólo se pierden las 6 nuevas (el front v15.51 cae al criterio viejo
+-- ROLLBACK — definición anterior (pg_get_viewdef del 2026-09-11 antes de la v15.66). Las 14 columnas
+-- viejas quedan iguales; sólo se pierden las 6 nuevas (el front v15.66 cae al criterio viejo
 -- stk_sec >= cajas si sec_cubre no viene).
 -- ============================================================================================
 /*
