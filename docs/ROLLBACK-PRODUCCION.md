@@ -308,6 +308,36 @@ función devuelve lo mismo para el llamador legítimo (verificado: `ventas_mensu
 
 ---
 
+### 1.x — idea 4259 (2026-09-11): completar desde "a guardar" en el picking (evento PKA)
+
+**Qué toca de compartido:** la tabla `public."Movimientos_Stock"` (agrega filas nuevas con
+`tipo='aguardar'` y un índice parcial nuevo) y agrega objetos nuevos con prefijo `gv_`. **No**
+modifica filas/objetos existentes de Producción. Producción Virgilio no emite eventos `PKA`, así
+que nada de esto se dispara para su app.
+
+**Objetos nuevos:**
+- índice `mov_stock_aguardar_dedup` (parcial, `WHERE tipo='aguardar'`) en `Movimientos_Stock`.
+- función `public.gv_reconciliar_aguardar()` (SECURITY DEFINER, revocada a anon/authenticated).
+- cron `gv-reconciliar-aguardar` (jobid 81, `*/2 * * * *`).
+- evento nuevo `opcion='PKA'` en `Registros_Produccion_Virgilio` (texto `TANDA|ART|N`).
+- filas nuevas en `Movimientos_Stock` con `tipo='aguardar'` (deps `a_guardar` −N / `separar_pedidos` +N).
+
+**Rollback exacto:**
+```sql
+select cron.unschedule('gv-reconciliar-aguardar');
+drop function if exists public.gv_reconciliar_aguardar();
+-- deshacer los movimientos que ya escribió (vuelve a_guardar/separar_pedidos a como estaban):
+delete from public."Movimientos_Stock" where tipo='aguardar';
+drop index if exists public.mov_stock_aguardar_dedup;
+-- (opcional) borrar los eventos PKA:
+-- delete from public."Registros_Produccion_Virgilio" where opcion='PKA';
+```
+Del lado del front (repo Gestión, `index.html` v15.38): se reactiva el pop-up viejo cambiando
+`if (false && enDeposito.length)` por `if (enDeposito.length)` y se quita el paso nuevo
+(`pkAGuardarCardHtml()` del cierre del picking). Detalle en SUPABASE-GESTION §3.
+
+---
+
 ## 2. Backups vigentes (para restore puntual)
 
 | backup | qué guarda | fecha |
