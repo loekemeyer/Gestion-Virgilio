@@ -12,9 +12,9 @@
 > única**; no se replica. Ante la duda entre parche rápido y fix de raíz → **fix
 > de raíz**.
 >
-> Última actualización: 2026-09-11 (viernes) · Versión app al documentar: **v15.38**
+> Última actualización: 2026-09-11 (viernes) · Versión app al documentar: **v15.39**
 >
-> Nota **v15.38 (2026-09-11, Thomas) — RECEPCIÓN: dar de alta un artículo nuevo le AVISA a Thomas por WhatsApp (no traba nada).**
+> Nota **v15.39 (2026-09-11, Thomas) — RECEPCIÓN: dar de alta un artículo nuevo le AVISA a Thomas por WhatsApp (no traba nada).**
 > Pedido del dueño: *"si en la recepción están por recibir un artículo nuevo que no figuraba en la
 > planimetría, me mandan un mensaje directo a WhatsApp, a mi teléfono, 'hola Thomy, estoy creando un
 > artículo nuevo, que es el tanto, ¿me confirmás que está bien?'"*.
@@ -22,7 +22,7 @@
 > ⚠ **Corrección del mismo día, y es la regla que manda:** *"no quiero que quede bloqueado a que yo les
 > conteste, porque capaz les contesto una hora después. Quiero que quede asentado el mensaje y que una vez
 > que lo mandan, ellos sí puedan seguir dando la recepción"*. La **v15.36 trababa el `Enviar`** hasta la
-> respuesta; **la v15.38 lo sacó**. Hoy: se manda el WhatsApp, queda la fila, y el operario sigue de largo.
+> respuesta; **la v15.39 lo sacó**. Hoy: se manda el WhatsApp, queda la fila, y el operario sigue de largo.
 > La respuesta de Thomas se guarda igual, pero **es información, no un permiso**.
 >
 > **De dónde sale.** Remito **38087** (02/09, Log/Fabr, legajo 277): se cargaron **599, 943 y 948**, que no

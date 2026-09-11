@@ -1,7 +1,7 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 
 /* =============================================================================
-   gv-alta-articulo — v15.38
+   gv-alta-articulo — v15.39
    Recepción: cuando un operario va a dar de alta un artículo NUEVO que no figura
    en la planimetría, acá se le avisa a Thomas por WhatsApp y queda el asiento.
 

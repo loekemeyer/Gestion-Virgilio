@@ -46,7 +46,7 @@ const MOVS = [
     out.not600 = !has(f, "600");
     out.not700 = !has(f, "700");
     out.not800 = !has(f, "800");
-    out.rag800 = rag.length > 0 && rag[0].some(function (x) { return String(x.art) === "800"; });
+    out.ragOff = rag.length === 0;   // idea 4259: el aviso RAG (racks/a_guardar) se desactivó → racks ya no dispara nada
     out.noSsg = ssg.length === 0;   // ninguno pickeó MÁS de lo disponible
     return out;
   }, { MOVS: MOVS, PKC: PKC });
@@ -57,7 +57,7 @@ const MOVS = [
     ["FGU NO dispara 600 (góndola corta)", r.not600],
     ["FGU NO dispara 700 (sin faltante)", r.not700],
     ["FGU NO dispara 800 (góndola corta, stock en racks)", r.not800],
-    ["800 va por RAG (racks), no por FGU", r.rag800],
+    ["RAG desactivado — racks ya no dispara aviso (idea 4259)", r.ragOff],
     ["ningún SSG (no pickearon de más)", r.noSsg],
   ];
   const pass = checks.every((c) => c[1]) && errs.length === 0;

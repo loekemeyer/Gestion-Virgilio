@@ -1,11 +1,11 @@
-/* Test de regresión (v15.38) — RECEPCIÓN: dar de alta un artículo NUEVO que no está
+/* Test de regresión (v15.39) — RECEPCIÓN: dar de alta un artículo NUEVO que no está
    en la planimetría le AVISA a Thomas por WhatsApp y deja el asiento, pero NO traba
    la recepción.
 
    Pedido del dueño (2026-09-11), con su corrección del mismo día: *"no quiero que
    quede bloqueado a que yo les conteste, porque capaz les contesto una hora después.
    Quiero que quede asentado el mensaje y que una vez que lo mandan ellos sí puedan
-   seguir dando la recepción"*. La v15.36 trababa el envío; la v15.38 no.
+   seguir dando la recepción"*. La v15.36 trababa el envío; la v15.39 no.
 
    Viene del remito 38087 (02/09): con el botón "+" de Log/Fabr el operario dio de
    alta 599, 943 y 948 — los códigos reales son 599E, 943E y 948E. El "+" no

@@ -2997,6 +2997,20 @@ tr.ppp-err-zona > td{ background:#fffbeb !important; }
 .pk-conteo-inp{ flex:1; min-width:0; height:48px; box-sizing:border-box; text-align:center; font-size:22px; font-weight:800; border:2px solid #fcd34d; border-radius:10px; padding:0 8px; -moz-appearance:textfield; }
 .pk-conteo-inp::-webkit-outer-spin-button,.pk-conteo-inp::-webkit-inner-spin-button{ -webkit-appearance:none; margin:0; }
 .pk-conteo-btn{ width:auto !important; flex:0 0 auto; padding:0 20px !important; font-size:16px !important; background:#b45309; }
+/* idea 4259 — completar desde "a guardar" al cerrar el picking */
+.pk-ag{ width:100%; box-sizing:border-box; background:#fff7ed; border:1.5px solid #fdba74; border-radius:13px; padding:12px 13px; text-align:left; margin-bottom:10px; }
+.pk-ag.loading{ color:#9a3412; font-weight:700; text-align:center; }
+.pk-ag-title{ font-size:14.5px; font-weight:800; color:#9a3412; margin-bottom:8px; }
+.pk-ag-row{ border-top:1px dashed #fdba74; padding-top:9px; margin-top:9px; }
+.pk-ag-row:first-of-type{ border-top:none; padding-top:0; margin-top:0; }
+.pk-ag-row.done{ color:#166534; font-weight:700; }
+.pk-ag-h{ font-size:15px; font-weight:800; color:#7c2d12; }
+.pk-ag-s{ font-size:13px; color:#78350f; margin-top:3px; line-height:1.4; }
+.pk-ag-inrow{ display:flex; gap:8px; margin-top:9px; }
+.pk-ag-inp{ flex:1; min-width:0; height:46px; box-sizing:border-box; text-align:center; font-size:21px; font-weight:800; border:2px solid #fdba74; border-radius:10px; padding:0 8px; -moz-appearance:textfield; }
+.pk-ag-inp::-webkit-outer-spin-button,.pk-ag-inp::-webkit-inner-spin-button{ -webkit-appearance:none; margin:0; }
+.pk-ag-btn{ width:auto !important; flex:0 0 auto; padding:0 20px !important; font-size:16px !important; background:#16a34a; }
+.pk-ag-no{ width:100%; margin-top:8px; padding:9px; border:1px solid #fca5a5; border-radius:9px; background:#fff; color:#b91c1c; font-weight:700; font-size:13px; cursor:pointer; }
 /* idea 3798 — banner de conteos de góndola en el detalle del artículo */
 .stk-cg{ background:#f0fdf4; border:1px solid #86efac; border-radius:10px; padding:9px 11px; margin-bottom:10px; }
 .stk-cg-h{ font-size:12px; font-weight:800; color:#166534; text-transform:uppercase; letter-spacing:.02em; margin-bottom:4px; }
@@ -4575,7 +4589,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=15.38"></script>
+<script type="module" src="recepcion.js?v=15.39"></script>
 <!-- Config del módulo de fichada (compartido con fichada.html). El secret
      hmacSecret tiene que ser el mismo acá y allá; cargándolo desde un solo
      archivo evitamos que se desincronicen. -->
@@ -7646,7 +7660,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v15.38";
+const APP_VERSION = "v15.39";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -9443,6 +9457,119 @@ async function pkFetchExcedente(arts) {
   } catch (_e) { return {}; }
 }
 
+/* idea 4259 (2026-09-11): saldo de "A GUARDAR" por artículo (para el paso de
+   completar-desde-a_guardar al cerrar el picking). Mismo patrón que
+   pkFetchExcedente pero deposito=a_guardar. Devuelve { ART:{cajas, ubics:[]} }
+   solo para los que tienen saldo > 0. Best-effort. */
+async function pkFetchAGuardar(arts) {
+  try {
+    if (!arts || !arts.length) return {};
+    const H = { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY };
+    const inList = arts.map(function (a) { return encodeURIComponent(String(a).toUpperCase()); }).join(",");
+    const _ctrl = (typeof AbortController !== "undefined") ? new AbortController() : null;
+    const _to = _ctrl ? setTimeout(function () { try { _ctrl.abort(); } catch (_e) {} }, 7000) : null;
+    let r;
+    try {
+      r = await fetch(SUPABASE_STOCK_ENDPOINT + "?deposito=eq.a_guardar&cod_art=in.(" + inList + ")&select=cod_art,delta,ubicacion&limit=8000", { headers: H, cache: "no-store", signal: _ctrl ? _ctrl.signal : undefined });
+    } finally { if (_to) clearTimeout(_to); }
+    if (!r.ok) return {};
+    const rows = await r.json();
+    const m = {};
+    rows.forEach(function (mv) {
+      const k = String(mv.cod_art).toUpperCase();
+      if (!m[k]) m[k] = { cajas: 0, ubics: [] };
+      m[k].cajas += Number(mv.delta || 0);
+      const u = String(mv.ubicacion || "").trim();
+      if (Number(mv.delta) > 0 && u && m[k].ubics.indexOf(u) < 0) m[k].ubics.push(u);
+    });
+    const out = {};
+    Object.keys(m).forEach(function (k) { if (Math.round(m[k].cajas * 1000) / 1000 > 0) out[k] = m[k]; });
+    return out;
+  } catch (_e) { return {}; }
+}
+/* idea 4259: al terminar de agarrar TODOS los ítems del picking, mirar qué FALTÓ
+   (pedido > puesto) que tenga stock SOLO en "a guardar" (racks NO; el excedente ya
+   se usó en la fase 1) y ofrecer completar desde ahí. Cuando el operario marca
+   cuántas agarró -> evento PKA -> el backend (gv_reconciliar_aguardar) descuenta
+   de a_guardar y lo suma a Pickeados (separar_pedidos), sin tocar góndola. */
+async function pkPrepAGuardar() {
+  if (!_pk || _pk.ag) return;
+  _pk.ag = { loading: true, items: [] };
+  try {
+    const falt = {};
+    for (const it of _pk.items) {
+      if (it.skip || it.isExc) continue;
+      const r = _pk.results[it.key];
+      const put = (r == null) ? it.esp : r;
+      const f = (Number(it.esp) || 0) - (Number(put) || 0);
+      if (f > 0) { const k = String(it.art).toUpperCase(); falt[k] = (falt[k] || 0) + f; }
+    }
+    const arts = Object.keys(falt);
+    if (!arts.length) { _pk.ag = { loading: false, items: [] }; return; }
+    const agMap = await pkFetchAGuardar(arts);
+    const items = [];
+    arts.forEach(function (k) {
+      const disp = agMap[k] ? agMap[k].cajas : 0;
+      if (disp > 0) items.push({ art: k, falta: falt[k], aguardar: disp, ubic: (agMap[k].ubics || []).join(" · "), max: Math.min(falt[k], disp), grabbed: null, done: false });
+    });
+    _pk.ag = { loading: false, items: items };
+  } catch (_e) { _pk.ag = { loading: false, items: [] }; }
+}
+function pkAGuardarCardHtml() {
+  if (!_pk) return "";
+  const ag = _pk.ag;
+  if (ag === undefined || (ag && ag.loading)) return '<div class="pk-ag loading">🔎 Revisando si lo que faltó está en <b>a guardar</b>…</div>';
+  if (!ag.items || !ag.items.length) return "";
+  const rows = ag.items.map(function (it, i) {
+    if (it.done) return '<div class="pk-ag-row done">✓ ' + (it.grabbed > 0 ? 'Agarraste <b>' + pkFmt(it.grabbed) + '</b> de <b>' + escapeHtml(it.art) + '</b> de a guardar.' : 'Marcaste que <b>no</b> agarraste ' + escapeHtml(it.art) + '.') + '</div>';
+    return '<div class="pk-ag-row">' +
+      '<div class="pk-ag-h">Faltaron <b>' + pkFmt(it.falta) + '</b> de <b>' + escapeHtml(it.art) + '</b></div>' +
+      '<div class="pk-ag-s">Hay <b>' + pkFmt(it.aguardar) + '</b> en <b>a guardar</b>' + (it.ubic ? ' (' + escapeHtml(it.ubic.replace(/-/g, "")) + ')' : '') + '. Andá a buscarlas y agarrá lo que falta.</div>' +
+      '<div class="pk-ag-inrow"><input id="pkAgInp' + i + '" type="number" inputmode="numeric" min="0" max="' + it.max + '" class="pk-ag-inp" placeholder="0" value="' + it.max + '"><button class="pk-btn pk-ok pk-ag-btn" onclick="pkAGuardarConfirm(' + i + ')">✓ Agarré</button></div>' +
+      '<button class="pk-ag-no" onclick="pkAGuardarSkip(' + i + ')">No las encontré</button>' +
+      '</div>';
+  }).join("");
+  return '<div class="pk-ag"><div class="pk-ag-title">📦 Faltó en góndola — hay en “a guardar”</div>' + rows + '</div>';
+}
+function pkAGuardarConfirm(i) {
+  if (!_pk || !_pk.ag || !_pk.ag.items[i] || _pk.ag.items[i].done) return;
+  const it = _pk.ag.items[i];
+  const inp = document.getElementById("pkAgInp" + i);
+  let v = inp ? parseInt(inp.value, 10) : NaN;
+  if (isNaN(v) || v < 0) v = 0;
+  if (v > it.max) v = it.max;
+  it.grabbed = v; it.done = true;
+  pkEmitAGuardar(it.art, v);
+  pkRender();
+}
+function pkAGuardarSkip(i) {
+  if (!_pk || !_pk.ag || !_pk.ag.items[i] || _pk.ag.items[i].done) return;
+  _pk.ag.items[i].grabbed = 0; _pk.ag.items[i].done = true;
+  pkEmitAGuardar(_pk.ag.items[i].art, 0);
+  pkRender();
+}
+/* Evento PKA: se completó (o no) desde "a guardar" en el picking.
+   texto = "TANDA|ART|N" (N = total agarrado de a_guardar para ese art en la tanda).
+   El backend gv_reconciliar_aguardar (cron gv-reconciliar-aguardar, cada 2') descuenta
+   a_guardar -N y suma separar_pedidos +N (Pickeados); NO toca góndola. El legajo de
+   PRUEBA no persiste (lo frena enqueueReport). id con timestamp: cada marca es una
+   fila; el reconciliador toma la ÚLTIMA por tanda|art = total absoluto. */
+function pkEmitAGuardar(art, n) {
+  const leg = String((_pk && _pk.legajo) || "").trim();
+  const tanda = String((_pk && _pk.tanda) || "").trim().toUpperCase();
+  if (!tanda || !art) return;
+  const payload = {
+    legajo: leg, opcion: "PKA", descripcion: "Completar desde a guardar",
+    texto: (tanda + "|" + String(art).toUpperCase() + "|" + (Number(n) || 0)),
+    ts: Date.now(),
+    id: ("pka_" + leg + "_" + tanda + "_" + String(art).toUpperCase() + "_" + Date.now()).replace(/[^a-zA-Z0-9_\-]/g, ""),
+    ts_inicio_iso: null
+  };
+  enqueueReport(payload);
+  if (typeof trySendOneReport === "function") trySendOneReport(payload).then(function (r) { if (r && r.ok) removeFromQueue(payload.id); }).catch(function () {});
+  try { updatePendingIndicator(); } catch (_e) {}
+}
+
 function pkCount() { return _pk ? Object.keys(_pk.results).length : 0; }
 
 function pkRender() {
@@ -9589,10 +9716,13 @@ function pkRenderDone(body, N, nav) {
     </div></div>`;
     return;
   }
+  // idea 4259: al llegar al cierre, revisar qué faltó que esté en "a guardar".
+  if (_pk.ag === undefined) { pkPrepAGuardar().then(function () { try { pkRender(); } catch (_e) {} }); }
   body.innerHTML = `<div class="pk-flow">${nav || ""}<div class="pk-doneflow">
     <div class="pk-done-ico">✓</div>
     <div class="pk-done-t">Picking completo</div>
     <div class="pk-done-s">${conf} de ${N} confirmados${falt ? ` · <b style="color:#d97706">${falt} con faltante</b>` : ""}</div>
+    ${pkAGuardarCardHtml()}
     ${pkConteoCardHtml()}
     <button class="pk-btn pk-ok" onclick="pkFinishPicking()">✓ Terminé el picking</button>
     <button class="pk-btn pk-cancel" onclick="pkClose()">Cerrar (sigo después)</button>
@@ -10228,6 +10358,28 @@ async function faltantesDeTanda(tanda) {
       // "438E LK"), pero se devuelve PELADO porque el faltante se cruza contra el pedido.
       seen.add(art); out.push({ art: codBase(art), esp, real, falta: esp - real });    // desc → 1er PKC = el más reciente
     }
+    // idea 4259: restar lo que se completó desde "a guardar" (evento PKA) — así el
+    // faltante que ve el armado / FAL / facturación es el NETO. PKA texto=tanda|art|N,
+    // se toma el ÚLTIMO por art (total absoluto). Familia-aware (codBase).
+    try {
+      const rp = await fetch(SUPABASE_TABLE_ENDPOINT + "?opcion=eq.PKA&texto=ilike." +
+        encodeURIComponent(t + "|") + "*&ts_cliente=gte." + since +
+        "&select=texto&order=ts_cliente.desc&limit=4000",
+        { headers: { "apikey": SUPABASE_KEY, "Authorization": "Bearer " + SUPABASE_KEY }, cache: "no-store" });
+      if (rp.ok) {
+        const pk = await rp.json(); const seenA = new Set(); const comp = {};
+        for (const ev of pk) {
+          const p = String(ev.texto || "").split("|");
+          if ((p[0] || "").trim().toUpperCase() !== t) continue;
+          const a = codBase((p[1] || "").trim()); if (!a || seenA.has(a)) continue;
+          seenA.add(a); comp[a] = parseFloat(String(p[2]).replace(",", ".")) || 0;   // desc → 1ero = el más reciente
+        }
+        for (let i = out.length - 1; i >= 0; i--) {
+          const c = comp[out[i].art] || 0;
+          if (c > 0) { out[i].falta = Math.max(0, out[i].falta - c); out[i].real = out[i].esp - out[i].falta; if (out[i].falta <= 0) out.splice(i, 1); }
+        }
+      }
+    } catch (_e) { /* si falla, queda el faltante bruto */ }
     return out;
   } catch (_e) { return []; }
 }
@@ -24639,7 +24791,12 @@ async function stockBajaPicking(tanda, legajo) {
       const enR = Math.round(f.racks || 0), enA = Math.round(f.aguardar || 0);
       if (enR > 0 || enA > 0) enDeposito.push({ art: art, falto: Math.round(falto), racks: enR, aguardar: enA });
     });
-    if (enDeposito.length) {
+    // idea 4259 (2026-09-11): el aviso viejo de "faltó pero hay en racks/a_guardar"
+    // (RAG, informativo, racks+a_guardar) se REEMPLAZÓ por el paso de completar-desde-
+    // a_guardar integrado en el cierre del picking (pkPrepAGuardar / pkAGuardarCardHtml),
+    // que además DESCUENTA de a_guardar (evento PKA). Racks queda fuera de este flujo por
+    // pedido del dueño. Se dejan las funciones definidas por si se reactivan.
+    if (false && enDeposito.length) {
       try { stockEmitRacksAguardar(t, legajo, enDeposito); } catch (_e) {}
       try { showRacksAguardarPopup(t, enDeposito); } catch (_e) {}
     }

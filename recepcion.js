@@ -1200,7 +1200,7 @@ async function arSaveCodeRemote(cod) {
    con "27" y no se dupliquen artículos. */
 function _ocgNorm(c) { return String(c == null ? "" : c).toUpperCase().trim().replace(/^0+(?=.)/, ""); }
 
-/* ============== v15.38 — alta de artículo nuevo: AVISO a Thomas por WhatsApp =========
+/* ============== v15.39 — alta de artículo nuevo: AVISO a Thomas por WhatsApp =========
    Pedido del dueño (2026-09-11): *"si están por recibir un artículo nuevo que no
    figuraba en la planimetría, me mandan un mensaje directo a WhatsApp a mi teléfono,
    'hola Thomy, estoy creando un artículo nuevo, que es el tanto, ¿me confirmás que
@@ -1305,7 +1305,7 @@ async function arAddCode() {
   cod = _ocgNorm(cod);
   if (!cod) return;
 
-  // v15.38 — si el código NO está en la planimetría es un alta de verdad: se le avisa a
+  // v15.39 — si el código NO está en la planimetría es un alta de verdad: se le avisa a
   // Thomas por WhatsApp y queda el asiento. NO se espera la respuesta: el operario sigue.
   if (!altaEnPlanimetria(cod)) {
     const ya = altaPendGet()[cod];
@@ -1377,7 +1377,7 @@ function renderResumen() {
   tot.textContent = "Total: " + items.length + " código(s) · " + totalCajas + " cajas";
   opBody.appendChild(tot);
 
-  // v15.38 — altas nuevas avisadas a Thomy. Es información: NO traba el envío.
+  // v15.39 — altas nuevas avisadas a Thomy. Es información: NO traba el envío.
   const _sinResp = altaSinRespuesta();
   if (_sinResp.length) {
     const av = document.createElement("div");

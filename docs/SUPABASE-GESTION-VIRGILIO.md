@@ -5338,7 +5338,7 @@ Dueño: *"todos los datos que tengas que corregir, dale"*. Barrido sobre `v_impo
 
 ### §3.bn — Recepción: dar de alta un artículo nuevo avisa a Thomas por WhatsApp (v15.36, 2026-09-11)
 
-> ⚠ **Leer también §3.bn.1 (v15.38): el bloqueo que describe esta sección se SACÓ el mismo día.** Lo que
+> ⚠ **Leer también §3.bn.1 (v15.39): el bloqueo que describe esta sección se SACÓ el mismo día.** Lo que
 > sigue vigente es la tabla, la Edge Function, el WhatsApp y el asiento; lo que ya NO es cierto es que
 > "no puedan cerrar la recepción".
 
@@ -5398,14 +5398,14 @@ drop table public."GV_Alta_Articulo_Aprobacion";
 y en el front revertir `arAddCode` / el guard de `opEnviar` (commit de la v15.36). La Edge Function se
 puede dejar: sin llamadas no hace nada.
 
-### §3.bn.1 — El aviso de alta de artículo NO traba la recepción (v15.38, 2026-09-11)
+### §3.bn.1 — El aviso de alta de artículo NO traba la recepción (v15.39, 2026-09-11)
 
 Corrección del dueño el mismo día, sobre la v15.36: *"no quiero que quede bloqueado a que yo les
 conteste, pero yo capaz les contesto una hora después. Sí quiero que quede asentado el mensaje y que
 una vez que mandan el mensaje ellos sí puedan seguir dando la recepción, pero no que queden esperando
 mi respuesta"*.
 
-**Qué se sacó** (v15.36 → v15.38):
+**Qué se sacó** (v15.36 → v15.39):
 
 - El guard de `opEnviar` que frenaba el envío si había un alta sin `ok`. **Eliminado**: el envío no
   mira más el estado del alta.
@@ -5431,3 +5431,49 @@ no revierte nada**. Queda el asiento, y la próxima vez que alguien escriba ese 
 **Sin cambios en la base.** Nada que migrar ni que revertir en Supabase respecto de §3.bn; el rollback
 de ahí sigue valiendo. Regresión actualizada: `tests/rcp-alta-ok.cjs` (16 chequeos, ahora verifica que
 **no** trabe: `noTraba`, `envia`, `rechazadoIgualEnvia`, `offlineEntraIgual`).
+
+---
+
+## §3.cc — Completar desde "a guardar" en el picking (idea 4259, v15.38, 2026-09-11)
+
+**Problema.** El picking descuenta SIEMPRE de góndola (reconciliación de PKC: separar_pedidos +N /
+terminado −N). Si el operario agarra una caja que físicamente está en "a guardar" (recepción no
+bajada a góndola), el sistema igual descuenta góndola → góndola negativa y a_guardar inflado.
+Caso testigo: art **395**, NP **98613**, tanda **D68F** (2026-09-10): pickeó 1 con góndola 0 → −1,
+mientras los 67 recibidos ese día estaban en a_guardar.
+
+**Modelo (pedido del dueño).** Fase 1 (picking item por item): excedente primero, después góndola;
+el operario carga cantidad. Fase 2 (al terminar de agarrar todo, ANTES de "Terminé el picking"): si
+un faltante (pedido > puesto) tiene saldo **SOLO en "a guardar"** (racks NO), un paso lo manda a
+buscarlo y le deja marcar cuántas agarró. Movimiento:
+
+```
+a_guardar        −N
+separar_pedidos  +N   (Pickeados → sigue el pipeline normal: armado TAP → a_facturar → facturado)
+```
+Góndola **no se toca**.
+
+**Backend (nuevo, sin tocar la reconciliación de picking):**
+- Evento `opcion='PKA'`, `texto='TANDA|ART|N'` (N = total absoluto agarrado de a_guardar).
+- `public.gv_reconciliar_aguardar()` (SECURITY DEFINER, revocada anon/authenticated): lee el último
+  PKA por tanda|art, hace UPSERT `a_guardar −q / separar_pedidos +q` con `tipo='aguardar'`, clamp por
+  art al a_guardar disponible (excluyendo sus propias filas) con ventana por tanda → nunca deja
+  a_guardar negativo. Idempotente (DO UPDATE). `sql/gv_reconciliar_aguardar.sql`.
+- Índice `mov_stock_aguardar_dedup` (parcial `WHERE tipo='aguardar'`). Cron `gv-reconciliar-aguardar`
+  (jobid **81**, `*/2 * * * *`).
+- `tipo='aguardar'` (no `'picking'`) a propósito: la rama B.3 de `reconciliar_pipeline_stock_etapa1`
+  recalcula `terminado` mirando SOLO `tipo='picking'`, así que estas filas NO vuelven a descontar
+  góndola.
+
+**Front (`index.html` v15.38):** `pkFetchAGuardar` (saldo a_guardar), `pkPrepAGuardar` +
+`pkAGuardarCardHtml` + `pkAGuardarConfirm`/`pkAGuardarSkip` (paso en el cierre del picking),
+`pkEmitAGuardar` (evento PKA; el legajo de PRUEBA no persiste). `faltantesDeTanda` ahora **resta**
+lo completado por PKA → el armado (FAL) y facturación ven el faltante NETO. Se **reemplazó** el
+pop-up RAG viejo (racks+a_guardar, sólo aviso): en `stockBajaPicking` el bloque quedó en
+`if (false && enDeposito.length)`.
+
+**Prueba (2026-09-11, con rollback).** PKA `ZZTEST2|321|3` → `gv_reconciliar_aguardar()` bajó
+321 de a_guardar 50→47 y separar_pedidos 0→3. Re-correr = idempotente (47/3). Clamp probado con
+395 (a_guardar 0 → q=0, no negativo). Todo el rastro de prueba borrado; 321 volvió a 50/0.
+
+**Rollback:** `docs/ROLLBACK-PRODUCCION.md` §1.x. SQL: `sql/gv_reconciliar_aguardar.sql`.
