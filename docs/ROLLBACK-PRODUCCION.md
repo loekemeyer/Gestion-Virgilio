@@ -628,3 +628,36 @@ pasa a `sum(...) … group by 1` sobre `vista_saldos_stock`, que desde la v15.71
 tipos → Producción, que la lee con las 14 viejas, sólo ve el saldo correcto (total del código) y una
 fila por NP en vez de dos. Rollback: re-correr el `create or replace view` de
 `sql/vista_correcciones_pedido_rich_v1567_orden_sin_pickear.sql`. §3.cj.2.
+
+## `gondola_return_check` y `aceptar_conteo`: leían `vista_saldos_stock` sin agrupar — v15.91 (2026-09-11)
+
+**Objetos COMPARTIDOS tocados** (los dos con `CREATE OR REPLACE`, **misma firma**):
+`public.gondola_return_check(jsonb)` y `public.aceptar_conteo(bigint, text)`. Único cambio: el
+saldo se lee con `sum(...)` / `group by` porque `vista_saldos_stock` devuelve una fila por
+(cod_art, empresa) desde la v15.71 (292 códigos con dos filas). Mismo tipo de retorno, mismas
+columnas: para Producción sólo cambia que el número que ve es el **total** del código y que
+`gondola_return_check` devuelve una fila por código en vez de dos.
+
+**Rollback exacto:** correr `sql/backups/funciones_vista_saldos_stock_20260911_pre_v1589.sql`
+(trae las dos definiciones tal cual estaban). **Definición nueva:** `sql/gv_saldos_group_by_funciones_v1589.sql`. §3.cj.3.
+
+## v15.92 (2026-09-11) — `entregas_virgilio_dedup()`: la clave de dedup deja de mirar la TANDA
+
+**Objeto compartido tocado:** `public.entregas_virgilio_dedup()` (trigger BEFORE INSERT de
+`public."Entregas_Virgilio"`, tabla que también escribía Producción).
+
+**Por qué:** un pedido reprogramado a otra tanda y vuelto a armar se grababa entero de nuevo y
+movía el stock dos veces. La clave `np|tanda|cod_art` no lo veía porque la tanda era otra.
+4 NP afectadas (98532, 98533, 98490, 98583), 43 filas, 57 cajas contadas por dos.
+
+**Qué cambia:** clave `np|cod_art` (las tres cantidades siguen en el `EXISTS`). Un rearmado
+idéntico en otra tanda se descarta; un agregado con otra cantidad sigue entrando.
+
+**Impacto medido:** `select count(*) from public."Entregas_Virgilio"` no cambia por el trigger
+(sólo filtra inserts futuros). Antes/después del fix, ninguna NP queda con Entregas en dos
+tandas nombradas distintas.
+
+**Rollback exacto:** `sql/entregas_virgilio_dedup_v1592.sql` (sección ROLLBACK al principio del
+archivo): volver a `np|tanda|cod_art` + `and coalesce(e.tanda,'') = coalesce(new.tanda,'')`.
+Datos: `insert into public."Entregas_Virgilio" select * from public."GV_Backup_Entregas_Dup_20260911";`
+y `delete from public."Movimientos_Stock" where tipo='ajuste' and ref like 'reversa armado duplicado%';`

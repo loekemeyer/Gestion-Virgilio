@@ -293,7 +293,7 @@ acumulados del circuito (depositado / girado / recuperado / comisiones), los **r
 (u$s 42.908: Hugo Wong CH37 21.952 y Ownland 20.956, los directos) y el **extracto navegable**, con
 fichas por empresa y por proveedor y un "ver más" que pagina. Test `tests/imp-ntl.cjs`.
 
-## 6. Cargas, conciliación y alias (v15.91)
+## 6. Cargas, conciliación y alias (v15.93)
 
 Tres cosas más que se pudieron derivar **sin** los datos que faltan de Thomas. La solapa 💱 NTL pasa
 a tener **tres vistas**: 📄 Extracto · 📦 Cargas · 🔗 Conciliación.

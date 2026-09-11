@@ -11238,7 +11238,7 @@ distinta, empresa distinta.
 > **Marcado sin tocar**: Frontier FOB 14.400 vs 14.000 del motor y su llegada (04/11) que no cierra con el
 > embarque 26/10; Becky 2ª con el 30% pagado el 02/jun y 112 días hasta embarcar.
 
-> Nota **2026-09-11 (v15.91) — NTL: cargas, conciliación y alias de proveedor.**
+> Nota **2026-09-11 (v15.93) — NTL: cargas, conciliación y alias de proveedor.**
 > La solapa 💱 NTL pasa a tener **tres vistas**: 📄 Extracto · 📦 **Cargas** (las del Excel —`CQ-9154`, `China 2`…—
 > con lo girado, el FOB y el saldo, más el pedido que le calza) · 🔗 **Conciliación** (cada giro cargado buscado
 > en el Excel: **4 de 6 aparecen**; Frontier y Zhixin exactos, Fujian con la fecha real 04/08, y Becky y Hugo

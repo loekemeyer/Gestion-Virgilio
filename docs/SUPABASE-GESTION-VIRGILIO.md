@@ -7549,8 +7549,19 @@ escrito para que la PPP lo muestre. Es exactamente lo que tenía que pasar.
 1316). La fecha de entrega viaja por `sheets_payload->>'fecha_entrega'`, que es de donde la
 lee esa vista (`fecha_entrega_txt`), y el importador la carga del mail de Krikos.
 
+**El filtro del espejo, probado** (en LK, con `BEGIN … ROLLBACK`): marcando a mano una OC
+como `parcial` y otra como `ok`, `sync_krikos_oc_virgilio()` devolvió **5** — las 4
+pendientes **más la `parcial`**, y la `ok` **no viajó**. Después del rollback Virgilio
+volvió solo a 6 filas / 0 parciales (el `postgres_fdw` propaga el rollback).
+
 **Para apagarlo:** `select cron.alter_job(43, active := false);` en LK. Nada más depende de
 él: las OC vuelven a cargarse a mano desde el panel.
+
+### Qué se ve hoy en A Programar
+
+Las 6 OC viejas quedaron en el bloque naranja con el motivo *"fecha de entrega vencida
+(dd/mm/aaaa) — se carga a mano si todavía va"*. Se van de ahí solas cuando alguien las
+descarta desde la Bandeja del panel, o si se cargan a mano.
 
 ### Rollback
 
@@ -7563,3 +7574,107 @@ alter table public."GV_Krikos_OC" drop column if exists auto_estado,
   drop column if exists auto_aviso, drop column if exists auto_at, drop column if exists order_id;
 ```
 Sin cron, todo esto queda inerte: las OC siguen cargándose a mano desde el panel, como hasta ahora.
+
+## §3.cj.3 — v15.91 (2026-09-11): barrido de TODO lo que leía `vista_saldos_stock` sin agrupar
+
+Después del bug de Corregir códigos (§3.cj.2) se revisó **quién más** quedó atrás del cambio de
+grano de la **v15.71** (`vista_saldos_stock` pasó de una fila por código a **una por (cod_art,
+empresa)**; hoy **292 códigos tienen dos filas**).
+
+| Dónde | Estado | |
+|---|---|---|
+| `index.html` (5 lugares) y `recepcion.js` (2) | ✅ ya corregidos en la v15.71 | acumulan ("SUMAR, no pisar") |
+| `vista_stock_vs_pedidos`, `vista_faltante_catalogo`, `vista_generador_oc`, `vista_importados_partes`, `vista_facturable_anticipado` | ✅ | filas = claves distintas (310 / 505 / 349 / 5 / 724) |
+| `vista_correcciones_pedido_rich` | ❌ → arreglada en §3.cj.2 | |
+| **`gondola_return_check(jsonb)`** | ❌ → **arreglada acá** | CTE `gond` sin `group by` |
+| **`aceptar_conteo(bigint,text)`** | ❌ → **arreglada acá** | `SELECT … INTO` sin agregado |
+| `oc_backfill_valores`, `notificar_conteo_gondola_telegram` | ✅ | ya sumaban y agrupaban |
+| `check_stock_anomalias`, `generar_reporte_agentes` | sin tocar | miran fila por fila; hoy **0 negativos**, y ahí el corte por empresa es información, no ruido |
+| `actualizar_saldo_trigger` | sin tocar | sólo la nombra en un comentario |
+
+**`gondola_return_check`** es el chequeo de *"¿devolver a góndola?"* de Recepción: duplicaba las
+filas del resultado y tomaba el `terminado` de **una** empresa (muchas veces 0) en vez del total →
+**el aviso de exceso de góndola no saltaba**. Ahora `sum(...) group by`.
+
+**`aceptar_conteo`** es más delicado: cuando `Conteo_Stock.stock_sistema` viene null, el fallback
+leía una fila cualquiera y con ese número calcula el delta del ajuste que **escribe** en
+`Movimientos_Stock`. Ahora `SUM(...)`. **Sin daño histórico**: los 2 conteos aceptados hasta hoy
+tenían `stock_sistema` cargado (el front manda el snapshot, que ya sumaba bien).
+
+**Prueba:** `select * from gondola_return_check('[{"cod":"505","cajas":5000},{"cod":"513","cajas":5000}]')`
+→ **1 fila por código** (antes 2), con `gond` = 2719 y 2162, que es el total. Antes una de las dos
+filas de cada código traía `gond = 0`.
+
+**Archivo:** `sql/gv_saldos_group_by_funciones_v1589.sql` · migración `gv_saldos_group_by_funciones_v1589`
+· backup de las definiciones previas en `sql/backups/funciones_vista_saldos_stock_20260911_pre_v1589.sql`.
+
+## v15.92 (2026-09-11) — armado duplicado por reprogramación de tanda: fix + limpieza
+
+**Síntoma.** 4 NP con las filas de `Entregas_Virgilio` por duplicado, cada juego en una tanda
+distinta: 98532 y 98533 (D60E 09/09 → E10A 11/09), 98490 (D47C 27/08 → D54C 02/09) y 98583
+(D50C 31/08 → D50D 01/09). 43 filas, 57 cajas contadas dos veces.
+
+**Causa raíz.** El pedido se reprogramó de tanda (para 98532/98533 lo movió el propio override
+`GV_PPP_Prog_Override`, v14.09) y se volvió a armar. Los dos candados miran la **tanda**, no la
+**NP**: `_compTandaYaArmada()` en el front y la clave `np|tanda|cod_art` del trigger
+`entregas_virgilio_dedup`. Con tanda nueva, los dos dejan pasar.
+
+**Efecto en stock (medido).** El armado emite `separado`: `separar_pedidos −n` / `a_facturar +n`
+por artículo. El segundo armado lo volvió a emitir → `separar_pedidos` quedó 57 cajas más
+negativo y `a_facturar` 57 infladas. Borrar las filas de `Entregas_Virgilio` **no** revierte eso:
+no hay trigger `AFTER DELETE`.
+
+**Qué se hizo.**
+1. Backup: `public."GV_Backup_Entregas_Dup_20260911"` (43 filas, el armado viejo de cada NP).
+2. `delete` de esas 43 filas de `Entregas_Virgilio`.
+3. Compensación en `Movimientos_Stock` (libro event-sourced: no se borra, se compensa): 80 filas
+   `tipo='ajuste'`, `ref='reversa armado duplicado NP <np> tanda <tanda> (backup …)'`,
+   `+57` a `separar_pedidos` y `−57` a `a_facturar`. **No** se revirtió el `terminado +1` del
+   941E de D60E: ese devuelto al depósito ocurrió una sola vez y es legítimo.
+4. Backend: `entregas_virgilio_dedup()` pasa a clave `np|cod_art`
+   (`sql/entregas_virgilio_dedup_v1592.sql`, anotado en `docs/ROLLBACK-PRODUCCION.md`).
+5. Front: `_compNpsYaArmadas(nps)` nuevo + chequeo en `compTerminar()` — corta el armado y
+   nombra las NP ya armadas, aunque sea en otra tanda.
+
+**Chequeo (debe dar 0 filas):**
+```sql
+select np from (
+  select btrim(np::text) np, upper(btrim(tanda)) t from public."Entregas_Virgilio"
+   where nullif(btrim(tanda),'') is not null group by 1,2
+) z group by np having count(*) > 1;
+```
+
+**Pendiente aparte (no tocado).** 22 filas de `Entregas_Virgilio` con `tanda` NULL y
+`fecha_salida` NULL, creadas del 10 al 14/08 en 20 NP; 19 son del artículo **574E**, el resto
+838E, 809E, 943E, 948E y 580. No tienen evento `TAL` que las respalde ni movieron stock
+(no hay `Movimientos_Stock` en esa ventana para esos códigos): parecen una carga manual o una
+migración puntual. En 14 de ellas el mismo artículo ya existe en la fila con tanda de esa NP,
+con las mismas cajas. Queda como problema abierto en `github_repo_problemas`.
+### §3.cn.1 — v15.92: el cartel de vencidos prometía algo que la v15.85 apagó
+
+Al sacar de En Salida lo que no tiene Carga Camión quedó un texto viejo mintiendo en la lista de
+**vencidos** de Programación:
+
+> *"N pedidos salieron con la tanda armada y nadie marcó el remito. **A las 36 h del armado pasan
+> solos a En Salida**, donde se cierran con Controlado."*
+
+Eso era la v15.55 (`armada_sin_carga`), que la v15.85 desactivó: **ya no pasan solos**. La
+operadora iba a esperar un pase automático que no va a ocurrir. Ahora dice lo que corresponde:
+
+> *"N pedidos salieron con la tanda armada y **nadie registró la Carga Camión**. Mientras no se
+> registre, el pedido queda acá: no entra a En Salida y no se puede cerrar. El que lo cargó tiene
+> que marcarlo en **Carga Camión** — de ahí pasa a En Salida y se cierra con **Recepción Remitos**.
+> Si la mercadería nunca salió, 📅 Reprogramar o 🚫 Cancelar."*
+
+Es el flujo que ya existe, no uno nuevo: **el que cargó el camión es el que marca la carga**. Por
+eso no se agregó ningún botón de "dar por cargado" desde el escritorio — escribiría un CCN sin
+legajo real de quien cargó, y la vista justamente descarta los CCN de legajo de prueba.
+
+También se ajustaron dos etiquetas que decían lo mismo viejo: la celda de la fila
+(`salió · marcar remito` → **`salió · falta la Carga Camión`**) y el cartel de Resumen
+(`… y el remito sin marcar` → **`… y la Carga Camión sin registrar`**).
+
+**Estado al cerrar (11/09):** quedan **15** pedidos en esa lista, todos de ISIS y todos con la
+tanda armada (TAP), esperando decisión de Thomas — 6 sin fecha de entrega (98585..98590, D56D,
+armadas 03/09, facturadas 04/09, **con CCR**: control de remitos hecho y carga sin registrar) y 9
+vencidas (44612..44617 Cencosud D72B/D72C, 98480/98481 D47B armadas el **27/08**, 98530 D60C).
