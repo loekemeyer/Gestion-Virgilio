@@ -5834,4 +5834,50 @@ delete from public."Stock_Config" where clave = 'pkc_empresa_desde';
 
 Verificación: `select empresa, count(*) from "Movimientos_Stock" where tipo='picking' and ts >= now() - interval '1 day' group by 1;`
 
+### ⚠ Antes de prender el corte hay que reclasificar el saldo que vive en `Mixto`
+
+El corte evita el doble descuento, pero queda otro problema: **la góndola hoy tiene su saldo
+en el balde `Mixto`**, así que si el picking empieza a descontar de `LK` encuentra un balde
+casi vacío y lo deja en negativo al primer pedido.
+
+| depósito | Mixto | LK | CH |
+|:--|--:|--:|--:|
+| terminado | 26.484 | 182 | 144 |
+| racks | 14.752 | 279 | 336 |
+| a_facturar | 1.968 | 4 | 43 |
+| excedente | 1.122 | 0 | 0 |
+| separar_pedidos | 229 | 2 | 0 |
+| a_guardar | 72 | **2.500** | 72 |
+
+(`a_guardar` ya se migró el 11/09; el resto no.)
+
+La solución es la misma que usó aquel backfill: **la empresa la da el lugar**. Cobertura
+medida, y es total:
+
+| depósito | cods | resuelve | dual | sin lugar | cajas |
+|:--|--:|--:|--:|--:|--:|
+| terminado | 272 | **272** | 0 | 0 | 26.484 |
+| a_facturar | 173 | **173** | 0 | 0 | 1.968 |
+| excedente | 34 | **34** | 0 | 0 | 1.122 |
+| separar_pedidos | 56 | **56** | 0 | 0 | 229 |
+
+No se reescribe la historia: **una transferencia balanceada** por (código, depósito) que saca
+el saldo de `Mixto` y lo pone en su empresa. Neta cero y se deshace con un `delete ... where
+ref = 'gv_empresa_backfill'`. `racks` queda afuera (47 racks vacíos todavía sin empresa, la
+derivan solos al guardar) e `insumos` también (no tienen empresa: viven en los racks `IN`).
+
+### El cron 13 no hay que tocarlo
+
+`check_stock_anomalias` (jobid **13**, 08:00 ART) lee `vista_saldos_stock` **fila por fila, o
+sea por (código, empresa)**, y avisa por Telegram de cualquier saldo negativo. Eso **está
+bien**: con la empresa viajando, una góndola de LK en negativo *es* un problema real y hay que
+saberlo. Hoy da **0 filas negativas**.
+
+Lo que lo haría gritar no es su lógica sino el desbalance de arriba — por eso el backfill va
+**antes** de prender el corte, no después. Con el backfill hecho, el cron queda como está y
+pasa a ser más útil que antes, porque distingue de qué empresa es el faltante.
+
+(El otro alarma, `trg_stock_negativo_telegram`, **no** se ve afectado: suma sin empresa y
+además saltea `picking` + `terminado`.)
+
 **SQL:** `sql/gv_empresa_picking.sql` (con el mismo cartel de ⛔ no aplicar hasta el merge).

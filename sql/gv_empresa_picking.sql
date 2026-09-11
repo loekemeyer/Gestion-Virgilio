@@ -357,3 +357,82 @@ begin
 
 end;
 $function$;
+
+-- ─────────────────────────────────────────────────────────────────────
+-- 3) ⚠ ANTES DE PRENDER EL CORTE: reclasificar el SALDO que hoy vive en 'Mixto'
+--
+-- El corte `pkc_empresa_desde` evita el doble descuento, pero NO alcanza. El
+-- problema que queda es otro: la góndola HOY tiene su saldo en el balde 'Mixto',
+-- y si el picking empieza a descontar de 'LK' encuentra un balde casi vacío.
+--
+--   depósito           Mixto      LK     CH
+--   terminado         26.484     182    144
+--   racks             14.752     279    336
+--   a_facturar         1.968       4     43
+--   excedente          1.122       0      0
+--   separar_pedidos      229       2      0
+--   a_guardar             72   2.500     72   ← éste ya se migró el 11/09
+--
+-- O sea que sin esto, el primer picking de cada código deja 'LK' en negativo y el
+-- cron 13 (check-stock-anomalias, 08:00 ART) manda un Telegram por cada uno: lee
+-- vista_saldos_stock FILA POR FILA, y cada fila es una (código, empresa).
+-- Medido el 11/09: 20 códigos en negativo en 7 días, 61 en 30.
+--
+-- La solución es la misma que usó el backfill de A Guardar: la empresa la da el
+-- LUGAR. Cobertura medida el 11/09 — **272 de 272 códigos con saldo en Mixto en
+-- góndola resuelven a UNA empresa**, y lo mismo en los otros tres depósitos:
+--
+--   depósito          cods  resuelve  dual  sin lugar   cajas
+--   terminado          272       272     0          0  26.484
+--   a_facturar         173       173     0          0   1.968
+--   excedente           34        34     0          0   1.122
+--   separar_pedidos     56        56     0          0     229
+--
+-- No se reescribe la historia: se hace UNA TRANSFERENCIA BALANCEADA por (código,
+-- depósito) — saca el saldo de 'Mixto' y lo pone en su empresa. Neta cero, es
+-- reversible y las filas viejas quedan como estaban.
+--
+-- `racks` queda AFUERA a propósito: 47 racks todavía no tienen empresa (los que
+-- están vacíos; la derivan solos cuando se guarde algo). `insumos` también: no
+-- tienen empresa, viven en los racks 'IN'.
+-- ─────────────────────────────────────────────────────────────────────
+create table if not exists public."GV_Backup_mixto_saldos_20260911" as
+select m.deposito, m.cod_art, m.empresa, m.delta, m.tipo, m.ts, m.ref
+  from public."Movimientos_Stock" m where coalesce(m.empresa,'') = 'Mixto';
+
+with g as (select valor::timestamptz c from public."Stock_Config" where clave='cutoff_ts'),
+mix as (
+  select regexp_replace(upper(btrim(m.cod_art)),'^0+(?=.)','') cod, m.deposito, sum(m.delta) saldo
+    from public."Movimientos_Stock" m, g
+   where coalesce(m.empresa,'') = 'Mixto' and (m.tipo = 'inicial' or m.ts >= g.c)
+     and m.deposito in ('terminado','excedente','separar_pedidos','a_facturar')
+   group by 1,2 having sum(m.delta) <> 0),
+lug as (
+  select regexp_replace(upper(btrim(i.cod)),'^0+(?=.)','') cod, max(l.empresa) emp
+    from public."GV_Lugar_Item" i join public."GV_Lugar" l on l.sector = i.sector
+   where i.clase='articulo' and i.activo and l.empresa in ('LK','CH')
+   group by 1 having count(distinct l.empresa) = 1)   -- duales afuera: ya viajan bien
+insert into public."Movimientos_Stock"(cod_art, deposito, delta, tipo, ref, legajo, empresa)
+select m.cod, m.deposito, -m.saldo, 'ajuste', 'gv_empresa_backfill', 'pipeline', 'Mixto'
+  from mix m join lug l on l.cod = m.cod
+union all
+select m.cod, m.deposito,  m.saldo, 'ajuste', 'gv_empresa_backfill', 'pipeline', l.emp
+  from mix m join lug l on l.cod = m.cod;
+
+-- Verificación (las tres tienen que dar lo esperado):
+--   -- (a) no quedó saldo en Mixto en esos depósitos
+--   select deposito, round(sum(delta)) from "Movimientos_Stock"
+--    where coalesce(empresa,'')='Mixto'
+--      and deposito in ('terminado','excedente','separar_pedidos','a_facturar')
+--    group by 1;                                        -- → 0 en las cuatro
+--   -- (b) el total por código NO se movió
+--   select count(*) from (
+--     select cod_art, sum(delta) s from "Movimientos_Stock" group by 1) x
+--    where s is null;                                    -- → 0
+--   -- (c) ninguna fila negativa (lo que mira el cron 13)
+--   select count(*) from vista_saldos_stock
+--    where terminado<0 or excedente<0 or a_guardar<0 or racks<0
+--       or separar_pedidos<0 or a_facturar<0;            -- → 0
+--
+-- Rollback: delete from public."Movimientos_Stock" where ref = 'gv_empresa_backfill';
+-- (es una transferencia que neta cero, así que borrarla devuelve todo a 'Mixto').
