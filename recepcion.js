@@ -1114,9 +1114,11 @@ function drawArticulosGrid() {
     let altaHtml = "";
     const _alta = (opState.altaNuevos || {})[_ocgNorm(a.Cod_Art)];
     if (_alta && _alta.estado === "pendiente") {
-      altaHtml = '<span class="ocq" title="Esperando el OK de Thomas por WhatsApp">⏳ OK</span>';
+      altaHtml = '<span class="ocq" title="Alta nueva: le avisamos a Thomy, todavía no contestó (no traba nada)">🆕</span>';
+    } else if (_alta && _alta.estado === "ok") {
+      altaHtml = '<span class="ocq" title="Alta nueva: Thomy la aprobó">🆕 ✅</span>';
     } else if (_alta && _alta.estado === "rechazado") {
-      altaHtml = '<span class="ocq" title="Thomas rechazó el alta de este código">⛔</span>';
+      altaHtml = '<span class="ocq" title="Alta nueva: Thomy dijo que NO">🆕 ⛔</span>';
     }
     b.innerHTML = '<span>' + a.Cod_Art + '</span>' + ocHtml + altaHtml +
       (cajas > 0 ? '<span class="cnt">' + cajas + ' caja' + (cajas === 1 ? '' : 's') + (exc ? ' ⚠' : '') + '</span>' : '');
@@ -1198,25 +1200,31 @@ async function arSaveCodeRemote(cod) {
    con "27" y no se dupliquen artículos. */
 function _ocgNorm(c) { return String(c == null ? "" : c).toUpperCase().trim().replace(/^0+(?=.)/, ""); }
 
-/* ============== v15.36 — alta de artículo nuevo: OK de Thomas por WhatsApp ==========
+/* ============== v15.38 — alta de artículo nuevo: AVISO a Thomas por WhatsApp =========
    Pedido del dueño (2026-09-11): *"si están por recibir un artículo nuevo que no
    figuraba en la planimetría, me mandan un mensaje directo a WhatsApp a mi teléfono,
-   para que antes de dejarlos cargar me tengan que decir 'hola Thomy, estoy creando un
-   artículo nuevo, que es el tanto, ¿me confirmás que está bien?' y que no puedan
-   terminar de cerrar la recepción sin que yo dé ese ok"*.
+   'hola Thomy, estoy creando un artículo nuevo, que es el tanto, ¿me confirmás que
+   está bien?'"*.
+
+   ⚠ **NO traba la recepción** (corrección del dueño, mismo día): *"no quiero que quede
+   bloqueado a que yo les conteste, porque capaz les contesto una hora después. Quiero
+   que quede asentado el mensaje y que una vez que lo mandan ellos sí puedan seguir
+   dando la recepción"*. O sea: se manda el WhatsApp, queda la fila, y el operario
+   sigue de largo. La v15.36 trababa el `Enviar` hasta la respuesta — eso se sacó.
 
    Esto nació del remito 38087 (02/09): el operario cargó 599, 943 y 948 con el botón
    "+", sin la E — los códigos reales son 599E, 943E y 948E. El "+" daba de alta
    cualquier cosa sin validar ni avisarle a nadie.
 
-   La FUENTE DE VERDAD es la tabla `GV_Alta_Articulo_Aprobacion`: con la anon key sólo
-   se puede LEER, así que desde el celular no se puede auto-aprobar. Quien escribe es
-   la Edge Function `gv-alta-articulo` (service_role), que además manda el WhatsApp.
-   El front sólo obedece lo que dice esa tabla. */
+   La fila de `GV_Alta_Articulo_Aprobacion` es el asiento: queda quién lo creó, cuándo,
+   en qué remito, si el WhatsApp salió, y después la respuesta de Thomas. Con la anon
+   key sólo se puede LEER; escribe la Edge Function `gv-alta-articulo` (service_role),
+   que es la que manda el WhatsApp. La respuesta de Thomas es información (se ve en el
+   botón), no un permiso. */
 const ALTA_FN_URL = SUPABASE_URL + "/functions/v1/gv-alta-articulo";
 
-/* Códigos dados de alta con el "+" en esta recepción que todavía no tienen el OK.
-   Vive en el borrador para que sobreviva a un refresh o a cerrar la app. */
+/* Altas del "+" de esta recepción y el estado del aviso. Vive en el borrador para que
+   sobreviva a un refresh o a cerrar la app. NO condiciona el envío: es informativo. */
 function altaPendGet() {
   return (opState.altaNuevos && typeof opState.altaNuevos === "object") ? opState.altaNuevos : (opState.altaNuevos = {});
 }
@@ -1225,8 +1233,9 @@ function altaEnPlanimetria(cod) {
   if (!G) return true;   // sin planimetría cargada no trabamos a nadie
   return !!G[_ocgNorm(cod)];
 }
-/* Pide el OK a Thomas. Devuelve el estado ('pendiente' | 'ok' | 'rechazado' | null). */
-async function altaPedirOk(cod) {
+/* Avisa a Thomas y deja el asiento. Devuelve el estado ('pendiente' | 'ok' |
+   'rechazado') o null si no se pudo avisar. El operario sigue igual en los dos casos. */
+async function altaAvisar(cod) {
   try {
     const res = await fetch(ALTA_FN_URL, {
       method: "POST",
@@ -1260,23 +1269,21 @@ async function altaRefrescar() {
       if (pend[c] && pend[c].estado !== r.estado) {
         pend[c].estado = r.estado;
         cambio = true;
-        // Recién con el OK el artículo se da de alta fijo para todos los dispositivos.
-        // Mientras está pendiente vive sólo en la grilla de esta recepción.
-        if (r.estado === "ok") arSaveCodeRemote(c);
       }
     });
   } catch (_e) { /* sin red: sigue pendiente */ }
   if (cambio) rcpDraftSave();
   return cambio;
 }
-/* Guard del envío: ningún código dado de alta acá se manda sin el OK. */
-function altaBloqueados() {
+/* Altas de esta recepción todavía sin respuesta de Thomas. Se usa SÓLO para mostrar
+   (el badge del botón y una línea en el resumen): no traba nada. */
+function altaSinRespuesta() {
   const pend = altaPendGet();
   const cargas = opState.cargas || {};
   return Object.keys(cargas)
     .filter(c => cargas[c] > 0)
     .map(_ocgNorm)
-    .filter(c => pend[c] && pend[c].estado !== "ok")
+    .filter(c => pend[c] && pend[c].estado === "pendiente")
     .map(c => ({ cod: c, estado: pend[c].estado }));
 }
 /* Mientras haya pendientes, repregunta cada 8 s y repinta cuando Thomas contesta. */
@@ -1298,45 +1305,37 @@ async function arAddCode() {
   cod = _ocgNorm(cod);
   if (!cod) return;
 
-  // v15.36 — si el código NO está en la planimetría es un alta de verdad: se le
-  // pide el OK a Thomas ANTES de dejarlo cargar, y la recepción queda trabada.
+  // v15.38 — si el código NO está en la planimetría es un alta de verdad: se le avisa a
+  // Thomas por WhatsApp y queda el asiento. NO se espera la respuesta: el operario sigue.
   if (!altaEnPlanimetria(cod)) {
-    const yaOk = altaPendGet()[cod] && altaPendGet()[cod].estado === "ok";
-    if (!yaOk) {
-      const estado = await altaPedirOk(cod);
+    const ya = altaPendGet()[cod];
+    if (!ya) {
+      const estado = await altaAvisar(cod);
       if (estado === null) {
-        alert("No se pudo avisarle a Thomas (sin conexión).\n\n" +
-              "El código " + cod + " NO se puede cargar hasta que él lo apruebe.\nProbá de nuevo.");
-        return;
-      }
-      if (estado === "rechazado") {
-        alert("❌ Thomas ya rechazó el alta de " + cod + ".\nNo lo cargues.");
-        return;
-      }
-      if (estado === "pendiente") {
+        // Sin red no frenamos la recepción: se avisa que el mensaje no salió. El aviso
+        // igual no se pierde — al enviar sale el evento RSP, que dispara su Telegram.
+        alert("⚠ No se pudo avisarle a Thomy (sin conexión).\n\n" +
+              "Podés seguir con la recepción igual, pero decile vos que estás creando el " + cod + ".");
+      } else {
         const w = altaPendGet()[cod];
-        alert("📲 Le mandé el WhatsApp a Thomas:\n\n" +
+        alert("📲 Listo, le mandé el WhatsApp a Thomy:\n\n" +
               "\"Hola Thomy, estoy creando un artículo nuevo, que es el " + cod + ".\n" +
               "¿Me confirmás que está bien?\"\n\n" +
               (w && w.wa_ok === false ? "⚠ El WhatsApp falló, le llegó por Telegram.\n\n" : "") +
-              "Podés ir cargando las cajas, pero NO vas a poder cerrar la recepción\n" +
-              "hasta que él conteste.");
+              "Seguí con la recepción normal. No hace falta esperar la respuesta.");
         altaPollStart();
       }
+    } else if (ya.estado === "rechazado") {
+      // Ya contestó que no: se avisa, pero la decisión de cargarlo es del operario.
+      alert("⚠ Ojo: Thomy ya había dicho que NO al alta de " + cod + ".");
     }
   }
-
-  // Si está esperando el OK, el código vive SÓLO en la grilla de esta recepción: no se
-  // guarda fijo hasta que Thomas apruebe (lo hace altaRefrescar al ver el 'ok'). Así un
-  // alta rechazada no queda ensuciando la lista de Log/Fabr para siempre.
-  const _a = altaPendGet()[cod];
-  const esperando = !!_a && _a.estado !== "ok";
 
   if (!opState.articulos) opState.articulos = [];
   const existe = opState.articulos.some(a => _ocgNorm(a.Cod_Art) === cod);
   if (!existe) {
     opState.articulos.push({ Cod_Art: cod, Desc: "" });   // mostrar al instante
-    if (!esperando) arSaveCodeRemote(cod);                // guardar fijo (compartido)
+    arSaveCodeRemote(cod);                                  // guardar fijo (compartido)
   }
   drawArticulosGrid();
   openCajas(cod);                                // que le cargue las cajas ya mismo
@@ -1377,6 +1376,18 @@ function renderResumen() {
   const totalCajas = items.reduce((s, i) => s + i.cajas, 0);
   tot.textContent = "Total: " + items.length + " código(s) · " + totalCajas + " cajas";
   opBody.appendChild(tot);
+
+  // v15.38 — altas nuevas avisadas a Thomy. Es información: NO traba el envío.
+  const _sinResp = altaSinRespuesta();
+  if (_sinResp.length) {
+    const av = document.createElement("div");
+    av.className = "resTotal";
+    av.style.fontSize = "13px";
+    av.style.opacity = ".85";
+    av.textContent = "🆕 Artículo nuevo avisado a Thomy: " +
+      _sinResp.map(x => x.cod).join(", ") + " — podés enviar igual.";
+    opBody.appendChild(av);
+  }
 
   // v11.xx — Foto obligatoria de la mercadería (se sube al confirmar)
   const fotoSec = document.createElement("div");
@@ -1708,28 +1719,6 @@ async function opEnviar() {
     .filter(([, n]) => n > 0)
     .map(([cod, n]) => ({ cod, cajas: n, desc: descPorCod[cod] || "" }));
   if (items.length === 0) { alert("Cargá al menos un código con cajas."); return; }
-
-  // v15.36 — NO se cierra la recepción con un alta sin el OK de Thomas.
-  // Se relee el estado del backend antes de decidir (no se confía en lo local).
-  await altaRefrescar();
-  const trabados = altaBloqueados();
-  if (trabados.length) {
-    const rech = trabados.filter(t => t.estado === "rechazado");
-    const esp = trabados.filter(t => t.estado !== "rechazado");
-    let msg = "⛔ No se puede cerrar la recepción todavía.\n\n";
-    if (esp.length) {
-      msg += "Esperando el OK de Thomas por WhatsApp para:\n" +
-             esp.map(t => "• " + t.cod).join("\n") + "\n\n";
-    }
-    if (rech.length) {
-      msg += "Thomas RECHAZÓ el alta de:\n" + rech.map(t => "• " + t.cod).join("\n") +
-             "\nSacá ese código de la carga (dejalo en 0 cajas).\n\n";
-    }
-    if (esp.length) msg += "Apenas conteste se destraba solo. Si tarda, llamalo.";
-    alert(msg);
-    altaPollStart();
-    return;
-  }
 
   const totalCajas = items.reduce((s, i) => s + i.cajas, 0);
 

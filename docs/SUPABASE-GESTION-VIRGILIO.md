@@ -5336,7 +5336,11 @@ Dueño: *"todos los datos que tengas que corregir, dale"*. Barrido sobre `v_impo
   601E La Anónima 40 caj (83 %), 584E Osa 20 caj.
 - Mismo artefacto (versión 3) y copia en `docs/INFORME-FALTANTES-IMPORTADOS-20260911.html`. Sin cambios en la base.
 
-### §3.bn — Recepción: dar de alta un artículo nuevo pide el OK de Thomas por WhatsApp (v15.36, 2026-09-11)
+### §3.bn — Recepción: dar de alta un artículo nuevo avisa a Thomas por WhatsApp (v15.36, 2026-09-11)
+
+> ⚠ **Leer también §3.bn.1 (v15.38): el bloqueo que describe esta sección se SACÓ el mismo día.** Lo que
+> sigue vigente es la tabla, la Edge Function, el WhatsApp y el asiento; lo que ya NO es cierto es que
+> "no puedan cerrar la recepción".
 
 Pedido del dueño: *"si en la recepción están por recibir un artículo nuevo que no figuraba en la
 planimetría, me mandan un mensaje directo a WhatsApp, a mi teléfono, para que antes de dejarlos
@@ -5393,3 +5397,37 @@ drop table public."GV_Alta_Articulo_Aprobacion";
 ```
 y en el front revertir `arAddCode` / el guard de `opEnviar` (commit de la v15.36). La Edge Function se
 puede dejar: sin llamadas no hace nada.
+
+### §3.bn.1 — El aviso de alta de artículo NO traba la recepción (v15.38, 2026-09-11)
+
+Corrección del dueño el mismo día, sobre la v15.36: *"no quiero que quede bloqueado a que yo les
+conteste, pero yo capaz les contesto una hora después. Sí quiero que quede asentado el mensaje y que
+una vez que mandan el mensaje ellos sí puedan seguir dando la recepción, pero no que queden esperando
+mi respuesta"*.
+
+**Qué se sacó** (v15.36 → v15.38):
+
+- El guard de `opEnviar` que frenaba el envío si había un alta sin `ok`. **Eliminado**: el envío no
+  mira más el estado del alta.
+- `altaBloqueados()` pasó a llamarse **`altaSinRespuesta()`** y ya no decide nada — alimenta el badge
+  del botón y una línea en el resumen ("🆕 Artículo nuevo avisado a Thomy: 599 — podés enviar igual").
+- `arAddCode` ya no corta: ni con la respuesta `rechazado`, ni cuando **no hay red**. Sin conexión
+  avisa *"no se pudo avisarle a Thomy, seguí igual"* y el código entra. El aviso no se pierde del
+  todo: al enviar sale igual el evento **RSP**, que ya tenía su propio Telegram.
+- El artículo **vuelve a guardarse fijo en el acto** en `Articulos Virgilio X Tallerista` (en la v15.36
+  esperaba el `ok`). Como la recepción sigue de largo, el código tiene que existir igual.
+- Badge: ⏳/⛔ pasó a **🆕** (pendiente), **🆕 ✅** (aprobado) y **🆕 ⛔** (rechazado). Informativo.
+
+**Qué quedó igual:** la tabla `GV_Alta_Articulo_Aprobacion` (mismo esquema y misma RLS: anon sólo
+SELECT), la Edge Function `gv-alta-articulo`, el WhatsApp a 5491162521635, el doble paso del link
+(`&c=1`) y el respaldo por Telegram. Sólo cambiaron los textos: el WhatsApp cierra con *"No te apures:
+siguen con la recepción igual. Tu respuesta queda asentada"* en vez de *"hasta que contestes no pueden
+cerrar la recepción"*, y la página del ❌ aclara que la recepción no se frena sola.
+
+**Consecuencia asumida:** si Thomas contesta que **no** cuando la recepción ya se cerró, **el sistema
+no revierte nada**. Queda el asiento, y la próxima vez que alguien escriba ese código el "+" avisa
+*"Thomy ya había dicho que NO"*. Revertir es decisión suya, a mano.
+
+**Sin cambios en la base.** Nada que migrar ni que revertir en Supabase respecto de §3.bn; el rollback
+de ahí sigue valiendo. Regresión actualizada: `tests/rcp-alta-ok.cjs` (16 chequeos, ahora verifica que
+**no** trabe: `noTraba`, `envia`, `rechazadoIgualEnvia`, `offlineEntraIgual`).

@@ -12,13 +12,18 @@
 > única**; no se replica. Ante la duda entre parche rápido y fix de raíz → **fix
 > de raíz**.
 >
-> Última actualización: 2026-09-11 (viernes) · Versión app al documentar: **v15.36**
+> Última actualización: 2026-09-11 (viernes) · Versión app al documentar: **v15.38**
 >
-> Nota **v15.36 (2026-09-11, Thomas) — RECEPCIÓN: dar de alta un artículo nuevo pide el OK de Thomas por WhatsApp.**
+> Nota **v15.38 (2026-09-11, Thomas) — RECEPCIÓN: dar de alta un artículo nuevo le AVISA a Thomas por WhatsApp (no traba nada).**
 > Pedido del dueño: *"si en la recepción están por recibir un artículo nuevo que no figuraba en la
-> planimetría, me mandan un mensaje directo a WhatsApp, a mi teléfono, para que antes de dejarlos cargar me
-> tengan que decir 'hola Thomy, estoy creando un artículo nuevo, que es el tanto, ¿me confirmás que está
-> bien?', y que no puedan terminar de cerrar la recepción sin que yo dé ese ok"*.
+> planimetría, me mandan un mensaje directo a WhatsApp, a mi teléfono, 'hola Thomy, estoy creando un
+> artículo nuevo, que es el tanto, ¿me confirmás que está bien?'"*.
+>
+> ⚠ **Corrección del mismo día, y es la regla que manda:** *"no quiero que quede bloqueado a que yo les
+> conteste, porque capaz les contesto una hora después. Quiero que quede asentado el mensaje y que una vez
+> que lo mandan, ellos sí puedan seguir dando la recepción"*. La **v15.36 trababa el `Enviar`** hasta la
+> respuesta; **la v15.38 lo sacó**. Hoy: se manda el WhatsApp, queda la fila, y el operario sigue de largo.
+> La respuesta de Thomas se guarda igual, pero **es información, no un permiso**.
 >
 > **De dónde sale.** Remito **38087** (02/09, Log/Fabr, legajo 277): se cargaron **599, 943 y 948**, que no
 > existen — son **599E** (J44), **943E** (I08) y **948E** (I11). El botón **"+"** (`arAddCode`, sólo visible
@@ -26,22 +31,25 @@
 > avisarle a nadie**. No hubo operadora en el medio; ese flujo no tiene ningún paso de aprobación.
 >
 > **Cómo quedó.** Al escribir un código en el "+": si **está** en la planimetría, todo sigue igual. Si **no
-> está**, antes de dejarlo cargar sale un WhatsApp al teléfono de Thomas (5491162521635) con el código, el
-> remito, el tallerista, la línea y el legajo, y dos links: **✅ Sí, que lo cree** / **❌ No**. El operario
-> puede ir cargando las cajas, pero **`Enviar` no funciona** hasta que Thomas conteste: el botón del código
-> queda con ⏳ (o ⛔ si lo rechazó) y el envío avisa qué falta. Se repregunta cada 8 s y se destraba solo.
-> El estado sobrevive a cerrar la app (vive en el borrador de la recepción).
+> está**, sale un WhatsApp al teléfono de Thomas (5491162521635) con el código, el remito, el tallerista, la
+> línea y el legajo, y dos links (**✅ Sí** / **❌ No**). El operario ve *"Listo, le mandé el WhatsApp.
+> Seguí con la recepción normal"* y **puede cerrar la recepción cuando quiera**. El botón del código queda
+> con 🆕 (más ✅ o ⛔ cuando Thomas conteste) y el resumen lista los avisados con un *"podés enviar igual"*.
 >
 > **Detalles que importan:**
-> · La **fuente de verdad** es la tabla `GV_Alta_Articulo_Aprobacion`: con la anon key **sólo se puede leer**,
->   así que desde el celular no se puede auto-aprobar. Escribe la Edge Function `gv-alta-articulo`
->   (`service_role`), que es también la que manda el WhatsApp vía `send-whatsapp` (`plantilla:"_texto_libre"`).
+> · El **asiento** es la fila de `GV_Alta_Articulo_Aprobacion`: quién, cuándo, qué remito, si el WhatsApp
+>   salió (`wa_ok` / `wa_error`) y la respuesta. Con la anon key **sólo se puede leer**; escribe la Edge
+>   Function `gv-alta-articulo` (`service_role`), que manda el WhatsApp vía `send-whatsapp`
+>   (`plantilla:"_texto_libre"`).
 > · El link del WhatsApp **no resuelve en el primer click**: muestra una página con un botón y recién ése
->   confirma. Si resolviera de una, **el preview del link de WhatsApp aprobaría solo**.
-> · El artículo **no se guarda fijo** en `Articulos Virgilio X Tallerista` mientras está pendiente — recién
->   con el `ok`. Así un alta rechazada no queda en la lista de Log/Fabr para siempre.
+>   confirma. Si resolviera de una, **el preview del link de WhatsApp contestaría solo**.
+> · **Sin conexión tampoco traba**: avisa que el mensaje no salió y deja seguir. El aviso no se pierde del
+>   todo — al enviar la recepción sale igual el evento **RSP**, que dispara su propio Telegram.
 > · **Respaldo por Telegram**: WhatsApp sólo deja texto libre dentro de la ventana de 24 h de Meta. Si Meta
 >   rechaza, el aviso llega igual por Telegram con los mismos links, y queda `wa_ok=false` en la fila.
+> · Si Thomas contesta que **no**, el sistema **no da marcha atrás solo** (la recepción ya siguió): la
+>   próxima vez que alguien escriba ese código el "+" le avisa *"Thomy ya había dicho que NO"*, y él ve en
+>   la pantalla de confirmación que tiene que avisar si hay que revertir.
 > · Regresión `tests/rcp-alta-ok.cjs` (16 chequeos) en `tests/run.sh`. ⚠ **La prueba de punta a punta (que
 >   el WhatsApp llegue de verdad) no se pudo correr desde el entorno de Claude** (no tiene salida a
 >   `*.supabase.co`): hay que probarlo desde el celular. Tarea Planify **3107**.

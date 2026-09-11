@@ -1,10 +1,14 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 
 /* =============================================================================
-   gv-alta-articulo — v15.37
+   gv-alta-articulo — v15.38
    Recepción: cuando un operario va a dar de alta un artículo NUEVO que no figura
-   en la planimetría, acá se pide el OK de Thomas por WhatsApp y la recepción
-   queda trabada hasta que él confirme.
+   en la planimetría, acá se le avisa a Thomas por WhatsApp y queda el asiento.
+
+   ⚠ NO traba la recepción (corrección del dueño, 2026-09-11): "no quiero que quede
+   bloqueado a que yo les conteste, porque capaz les contesto una hora después;
+   quiero que quede asentado el mensaje y que ellos puedan seguir". La respuesta de
+   Thomas se guarda igual, pero es información, no un permiso.
 
    Pedido del dueño (2026-09-11): "si están por recibir un artículo nuevo que no
    figuraba en la planimetría, me mandan un mensaje directo a WhatsApp a mi
@@ -187,10 +191,11 @@ Deno.serve(async (req: Request) => {
     return estado === "ok"
       ? html(`<h1>Listo</h1><div class="cod">${fila.cod}</div>
               <p class="ok">✅ Aprobado</p>
-              <p>Ya pueden terminar la recepción.</p>`)
+              <p>Queda asentado.</p>`)
       : html(`<h1>Listo</h1><div class="cod">${fila.cod}</div>
               <p class="bad">❌ Rechazado</p>
-              <p>No van a poder cargar ese código.</p>`);
+              <p>Queda asentado. Ojo: la recepción no se frena sola,
+                 avisales vos si hay que dar marcha atrás.</p>`);
   }
 
   /* ---------- POST: la recepción pide el OK ---------- */
@@ -242,7 +247,7 @@ Deno.serve(async (req: Request) => {
     `Legajo ${legajo || "—"}\n\n` +
     `✅ Sí, que lo cree:\n${linkOk}\n\n` +
     `❌ No:\n${linkNo}\n\n` +
-    `(Hasta que contestes no pueden cerrar la recepción.)`;
+    `(No te apures: siguen con la recepción igual. Tu respuesta queda asentada.)`;
 
   const wa = await mandarWhatsapp(texto);
   await rest(`${TABLA}?token=eq.${token}`, {
