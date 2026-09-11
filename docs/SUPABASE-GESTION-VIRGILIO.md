@@ -7275,3 +7275,44 @@ la llave.
 `sql/backups/gv_ppp_en_salida_20260911_pre_v1585.sql`.
 **No toca Producción:** la vista es nuestra (`gv_`), sólo lee, `security_invoker = true`.
 **Tests:** `tests/ppp-en-salida.cjs`, `tests/ppp-ensalida-estado.cjs`, `tests/version-sync.cjs` → OK.
+
+## §3.cj.2 — v15.86 (2026-09-11): cada NP salía DOS veces en Corregir códigos
+
+Thomas, con el panel abierto: *"¿Puede ser que acá figure dos veces y que eso signifique que el
+pedido está duplicado, el 98678?"*. **No**: el pedido está bien — `gv_np_items` muestra el **565 una
+sola vez** en la 98678 (1 caja). Lo que estaba duplicado era **la vista**.
+
+**Causa.** El CTE `stk` de `vista_correcciones_pedido_rich` era
+
+```sql
+select norm_cod(cod_art) as cod, <suma de columnas> as total from vista_saldos_stock   -- sin group by
+```
+
+Desde la **v15.71** (§3.cl, *"la empresa es un atributo del LUGAR"*) `vista_saldos_stock` devuelve
+**una fila por (cod_art, empresa)**: el 565 tiene fila **LK = 0** y fila **Mixto = 2**. Con eso
+`left join stk s_sec on s_sec.cod = norm_cod(p.sec)` **duplicaba cada fila base**. Regresión del
+mismo día: la vista de stock cambió de grano y este consumidor no se enteró.
+
+**Qué rompía, además de verse feo.** La cola por secundario de la v15.66/67 contaba
+`sec_pedido_total = 12` / `sec_np_total = 12` cuando son **6 cajas en 6 NP**; cada NP ocupaba **dos**
+lugares de la cola y se comía stock fantasma, así que NP que tenían que salir **verdes** salían
+**rojas** ("cambiá la NP al principal"). Y `stk_sec` mostraba el saldo de **una empresa** (0 ó 2) en
+vez del total (2) — por eso las dos líneas de la misma NP decían `565=0` y `565=2`.
+
+**Fix:** `sum(...) … group by 1` en `stk`. Nada más: mismas 20 columnas, mismo orden, mismo front.
+
+| | antes | después |
+|---|---|---|
+| filas de la vista | 13 | **7** (una por NP+artículo) |
+| 565 | 12 cajas en 12 NP | **6 en 6** |
+| 98664 / 98678 | dos filas c/u, una roja | **verde** (orden 1 y 2, disp 2 y 1) |
+| 98688 / 98621 / 98674 / 98671 | rojas (duplicadas) | rojas (orden 3 a 6, disp 0) |
+
+Los otros consumidores de `vista_saldos_stock` **no tenían el problema** (chequeado: filas =
+claves distintas en `vista_stock_vs_pedidos` 310, `vista_faltante_catalogo` 505,
+`vista_generador_oc` 349, `vista_importados_partes` 5, `vista_facturable_anticipado` 724).
+
+**Archivo:** `sql/vista_correcciones_pedido_rich_v1586_stk_group_by.sql` · migración
+`gv_corr_stk_group_by_v1586`.
+**Rollback:** correr el `create or replace view` de
+`sql/vista_correcciones_pedido_rich_v1567_orden_sin_pickear.sql` (vuelve el duplicado).

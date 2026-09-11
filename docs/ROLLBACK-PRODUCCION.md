@@ -619,3 +619,12 @@ respalda la entrada de la v15.41. Y `drop view public.gv_lugar_articulo;`.
 **Definición nueva:** `sql/gv_empresa_picking.sql`.
 **Front:** `aggEmp` / `empDeClave` / `items[].emp` / el bloque de sector por `gv_lugar_articulo`
 / `pkTotalesArt` / `pkSendDetail` en `index.html`.
+
+## Corregir códigos: `stk` con `group by` (cada NP salía dos veces) — v15.86 (2026-09-11)
+
+`create or replace view vista_correcciones_pedido_rich` (objeto de Producción, v10.10): el CTE `stk`
+pasa a `sum(...) … group by 1` sobre `vista_saldos_stock`, que desde la v15.71 devuelve una fila por
+(cod_art, empresa) y sin agrupar duplicaba toda la vista. **Mismas 20 columnas**, mismo orden, mismos
+tipos → Producción, que la lee con las 14 viejas, sólo ve el saldo correcto (total del código) y una
+fila por NP en vez de dos. Rollback: re-correr el `create or replace view` de
+`sql/vista_correcciones_pedido_rich_v1567_orden_sin_pickear.sql`. §3.cj.2.
