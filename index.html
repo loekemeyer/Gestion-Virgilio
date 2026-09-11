@@ -7664,7 +7664,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v15.51";
+const APP_VERSION = "v15.52";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -15511,6 +15511,11 @@ var STK_POP_CSS =
   ".proyv-chart{display:flex;flex-direction:column;gap:6px;}" +
   ".proyv-row{display:flex;align-items:center;gap:9px;}" +
   ".proyv-mes{flex:0 0 52px;font-size:12px;font-weight:800;color:#475569;text-transform:capitalize;}" +
+  // v15.52 — cajas ENTREGADAS por el proveedor, entre el mes y la barra (gv_entregas_mensuales_cod).
+  ".proyv-ent{flex:0 0 46px;text-align:right;font-size:12.5px;font-weight:800;color:#047857;font-variant-numeric:tabular-nums;}" +
+  ".proyv-ent.sd{color:#cbd5e1;font-weight:700;}" +
+  ".proyv-head{font-size:10px;font-weight:800;color:#94a3b8;text-transform:uppercase;letter-spacing:.03em;margin-bottom:-2px;}" +
+  ".proyv-head .proyv-ent,.proyv-head .proyv-val{font-size:10px;font-weight:800;color:#94a3b8;}" +
   ".proyv-track{flex:1 1 auto;height:20px;background:#f1f5f9;border-radius:6px;overflow:hidden;position:relative;}" +
   ".proyv-bar{display:block;height:100%;background:linear-gradient(90deg,#8b5cf6,#6d28d9);border-radius:6px;}" +
   ".proyv-val{flex:0 0 auto;min-width:42px;text-align:right;font-size:12.5px;font-weight:800;color:#4c1d95;font-variant-numeric:tabular-nums;}" +
@@ -15616,15 +15621,28 @@ async function stkShowProyVentas(codEnc, proy) {
   var nombre = artNombre(cod, "") || "";
   var fc = function (n) { n = Number(n) || 0; return String(Math.round(n * 10) / 10); };
   body.innerHTML = '<div class="stkpop-empty">Cargando ventas facturadas de los últimos 12 meses' + (emp ? ' (' + emp + ')' : ' (LK + Chef)') + '…</div>';
-  var rows = [];
+  var rows = [], ent = {};
+  var _H = { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY, "Content-Type": "application/json" };
   try {
-    var r = await fetch(SUPABASE_URL + "/rest/v1/rpc/ventas_mensuales_cod", {
-      method: "POST",
-      headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY, "Content-Type": "application/json" },
-      // v15.23 — la barra de ventas se filtra por la empresa de la fila (LK / CH); sin sufijo = LK+Chef
-      body: JSON.stringify({ p_cod: codB, p_meses: 12, p_empresa: (emp === "CH" ? "chef" : (emp === "LK" ? "lk" : null)) }), cache: "no-store"
+    // v15.52 — las dos series salen juntas: lo FACTURADO (ventas, motor de PáginaLK) y lo
+    // ENTREGADO por el proveedor (gv_entregas_mensuales_cod: talleristas + prov AT).
+    var _par = await Promise.all([
+      fetch(SUPABASE_URL + "/rest/v1/rpc/ventas_mensuales_cod", {
+        method: "POST", headers: _H,
+        // v15.23 — la barra de ventas se filtra por la empresa de la fila (LK / CH); sin sufijo = LK+Chef
+        body: JSON.stringify({ p_cod: codB, p_meses: 12, p_empresa: (emp === "CH" ? "chef" : (emp === "LK" ? "lk" : null)) }), cache: "no-store"
+      }).then(function (r) { return r.ok ? r.json() : []; }).catch(function () { return []; }),
+      fetch(SUPABASE_URL + "/rest/v1/rpc/gv_entregas_mensuales_cod", {
+        method: "POST", headers: _H,
+        body: JSON.stringify({ p_cod: codB, p_meses: 12 }), cache: "no-store"
+      }).then(function (r) { return r.ok ? r.json() : []; }).catch(function () { return []; })
+    ]);
+    rows = _par[0];
+    // `cubierto` = ese mes el circuito del artículo YA se registraba. false ⇒ "s/d", NO un cero:
+    // la recepción de proveedores AT arranca en 06/2026 y la de talleristas en 12/2025.
+    (Array.isArray(_par[1]) ? _par[1] : []).forEach(function (x) {
+      ent[String(x.mes || "")] = { cajas: Number(x.cajas) || 0, cub: x.cubierto !== false };
     });
-    if (r.ok) rows = await r.json();
   } catch (_e) {}
   rows = (Array.isArray(rows) ? rows : []).map(function (x) { return { mes: String(x.mes || ""), cajas: Number(x.cajas) || 0 }; });
   var proyN = Number(proy) || 0;
@@ -15642,20 +15660,36 @@ async function stkShowProyVentas(codEnc, proy) {
   h += _stkProyTrendSvg(rows, proyN, prom);
   // ── Barras de la ventana (6 meses) con la marca de la proyección ──
   var mx = Math.max(proyN, win.reduce(function (s, x) { return Math.max(s, x.cajas); }, 0)) || 1;
-  h += '<div class="stkpop-grp"><div style="font-size:12px;font-weight:800;color:#334155;margin-bottom:8px;">🧾 Cajas facturadas — ventana de proyección (' + win.length + ' meses)</div>';
+  // v15.52 — la columna de entregadas sólo aparece si hay algo que mostrar: si de este código
+  // no hay UN solo mes con registro de entregas, no se agrega una columna de "s/d" al pepe.
+  var hayEnt = win.some(function (x) { var e = ent[x.mes]; return e && (e.cub || e.cajas > 0); });
+  var totEnt = win.reduce(function (s, x) { var e = ent[x.mes]; return s + (e && e.cub ? e.cajas : 0); }, 0);
+  h += '<div class="stkpop-grp"><div style="font-size:12px;font-weight:800;color:#334155;margin-bottom:8px;">🧾 ' +
+       (hayEnt ? 'Entregado y facturado' : 'Cajas facturadas') + ' — ventana de proyección (' + win.length + ' meses)</div>';
   h += '<div class="proyv-chart">';
+  if (hayEnt) {
+    h += '<div class="proyv-row proyv-head"><span class="proyv-mes">mes</span>' +
+         '<span class="proyv-ent">entreg.</span><span class="proyv-track" style="background:none"></span>' +
+         '<span class="proyv-val">factur.</span></div>';
+  }
   win.forEach(function (x) {
     var pct = Math.max(2, Math.round(x.cajas / mx * 100));
     var bajo = proyN > 0.05 && x.cajas < proyN;
+    var e = ent[x.mes];
     h += '<div class="proyv-row">' +
          '<span class="proyv-mes">' + escapeHtml(_stkFmtMes(x.mes)) + '</span>' +
+         (hayEnt ? (e && e.cub
+            ? '<span class="proyv-ent" title="Cajas entregadas por el proveedor">' + fc(e.cajas) + '</span>'
+            : '<span class="proyv-ent sd" title="Ese mes las entregas todavía no se registraban en la app — no es un cero">s/d</span>') : '') +
          '<span class="proyv-track"><span class="proyv-bar' + (bajo ? ' bajo' : '') + '" style="width:' + pct + '%"></span>' +
          (proyN > 0.05 ? '<span class="proyv-mark" style="left:' + Math.round(proyN / mx * 100) + '%"></span>' : '') + '</span>' +
          '<span class="proyv-val"' + (bajo ? ' style="color:#b91c1c"' : '') + '>' + fc(x.cajas) + '</span></div>';
   });
   h += '</div>';
   var piso = proyN > 0.05 && prom > 0 && (proyN - prom) / prom > 0.005;   // actuó el piso del 4.º mejor mes
-  h += '<div class="proyv-foot">Total 6m: <b>' + fc(tot) + '</b> cajas · Promedio: <b>' + fc(Math.round(prom)) + '</b> caj/mes' +
+  h += '<div class="proyv-foot">Total 6m: <b>' + fc(tot) + '</b> cajas' +
+       (hayEnt ? ' · Entregado: <b style="color:#047857">' + fc(totEnt) + '</b> cajas' : '') +
+       ' · Promedio: <b>' + fc(Math.round(prom)) + '</b> caj/mes' +
        (proyN > 0.05 ? ' · Proyección: <b style="color:#6d28d9">' + fc(proyN) + '</b>' + (piso ? ' <small style="color:#6d28d9">(piso: 4.º mejor mes)</small>' : '') +
                        ' · <b>' + arriba + ' de ' + win.length + '</b> meses por encima' : '') + '</div>';
   h += '</div>';

@@ -12,7 +12,7 @@
 > única**; no se replica. Ante la duda entre parche rápido y fix de raíz → **fix
 > de raíz**.
 >
-> Última actualización: 2026-09-11 (viernes) · Versión app al documentar: **v15.50**
+> Última actualización: 2026-09-11 (viernes) · Versión app al documentar: **v15.52**
 >
 > Nota **v15.40 (2026-09-11) — HANDOFF de planimetría / Acacia: `docs/HANDOFF-PLANIMETRIA-Y-ACACIA.md`.**
 > Thomas sigue este tema en otra sesión. Ahí está todo junto: los **13 artículos activos del catálogo LK
@@ -11158,6 +11158,25 @@ distinta, empresa distinta.
 >   (umbral ≈ 3× su período; dedup un aviso por sync por día). **No se creó tabla
 >   `Sync_Estado`**: `cron.job_run_details` ya tiene la verdad. DDL en
 >   `sql/watchdog_syncs_externos.sql`.
+
+> Nota **2026-09-11 (v15.52) — Popup de Proyección: cajas ENTREGADAS por el proveedor, entre el mes y la barra.**
+> Pedido del dueño mirando el 321 (Rallador cilíndrico, Carriero): *"a la derecha del mes, poné las
+> cajas entregadas, y después el gráfico de barra"*. En `stkShowProyVentas` (Stocks → Proy. caj/mes)
+> cada fila de la ventana de 6 meses ahora es **mes → entregadas → barra → facturadas**: lo que el
+> proveedor ENTREGÓ ese mes al lado de lo que se FACTURÓ, para ver de un vistazo si abastece lo que
+> se vende. Cabecera `entreg. / factur.`, pie con **Entregado 6m**.
+> - **Dato (backend):** RPC nueva **`gv_entregas_mensuales_cod(p_cod, p_meses)`** →
+>   `(mes, cajas, cubierto)`, SECURITY INVOKER, anon EXECUTE. Lee `vista_historial_entregas`
+>   (talleristas + prov AT) y parsea ahí los tres formatos de `fecha` (`YYYY-MM-DD`, `DD/MM/YY`,
+>   basura). Gemela de `ventas_mensuales_cod`; las dos se piden con `Promise.all`.
+>   `sql/gv_entregas_mensuales_cod_v1552.sql`, §3.bs de `docs/SUPABASE-GESTION-VIRGILIO.md`.
+> - **`cubierto=false` ⇒ "s/d", nunca 0.** La recepción de **Prov AT** recién se registra desde el
+>   **04/06/2026** y la de **talleristas** desde **12/2025**: un mes anterior a eso no es "entregó 0",
+>   es "no había registro". El circuito del artículo sale de sus propias entregas (o del padrón si
+>   nunca entregó). Ej.: 321 → mar/abr/may `s/d`, jun 506, jul 500, ago 382.
+> - Si el código no tiene **ningún** mes con registro, la columna **no aparece** (no se deja una
+>   columna de "s/d"); el título vuelve a "Cajas facturadas".
+> - Test: `tests/proy-entregadas.cjs` (orden de celdas, s/d vs número, pie, sin columna).
 
 > Nota **2026-09-11 (v15.50) — La columna Fecha de la PPP mostraba DOS formatos mezclados.**
 > En el Resumen convivían `2026-09-09` y `10/09/2026` en la misma columna. No es un tema de

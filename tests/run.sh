@@ -362,3 +362,6 @@ PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node te
 
 echo "== remito-np-web (v15.46: el remito impreso trae cliente y fecha también en las NP de la página) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/remito-np-web.cjs
+
+echo "== proy-entregadas (v15.52: popup Proyección — cajas ENTREGADAS por el proveedor entre el mes y la barra; s/d si ese mes no había registro) =="
+PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/proy-entregadas.cjs

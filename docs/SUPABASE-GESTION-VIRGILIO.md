@@ -5707,3 +5707,47 @@ pelearía con él. Lo que se escape por ahí lo muestra la alerta `gv_ppp_client
 movió sola. La base quedó igual que antes (las dos en D69D, 16/09).
 
 **Rollback:** `sql/gv_web_cliente_un_solo_dia_v1551.sql`.
+## 3.bs `gv_entregas_mensuales_cod` — cajas ENTREGADAS por mes, al lado de las facturadas (v15.52) — 2026-09-11
+
+**Pedido del dueño**, mirando el popup de Proyección del 321 (Rallador cilíndrico, Carriero):
+*"a la derecha del mes, poné las cajas entregadas, y después el gráfico de barra"*. Venía de
+preguntar cuánto entrega ese proveedor por mes (321 + 840): la respuesta estaba en
+`Entregas Prov AT`, pero el popup sólo mostraba lo **facturado** (ventas, motor de PáginaLK).
+
+**Qué se creó.** RPC **`public.gv_entregas_mensuales_cod(p_cod text, p_meses int default 12)`**
+→ `(mes 'YYYY-MM', cajas numeric, cubierto boolean)`, una fila por mes de la serie (termina en el
+mes actual AR). `LANGUAGE sql STABLE SECURITY INVOKER`, `GRANT EXECUTE` a anon/authenticated.
+Objeto nuevo con prefijo `gv_`: **no toca nada de Producción**. Fuente:
+`vista_historial_entregas` (UNION de `Entregas Tallerista Virgilio` + `Entregas Prov AT`), cuyo
+`fecha` es TEXT con tres formatos (`YYYY-MM-DD`, `DD/MM/YY`, basura `|||`): se parsea **una vez,
+acá**, no en el front. Código normalizado como `_ocgNorm` (upper, sin ceros a la izquierda).
+
+**`cubierto`** — lo importante. Un mes con `cubierto=false` **no es un cero**: es un mes en que el
+circuito de ese artículo todavía no se registraba en la app. Medido:
+
+| Circuito (`fuente`) | Primer mes con registro | Filas mar/abr/may 2026 |
+|---|---|---:|
+| `tallerista` | 2025-12 | 161 / 150 / 125 |
+| `prov_at` | **2026-06** (04/06) | 0 / 0 / 0 |
+
+El circuito del artículo se toma de sus propias entregas (la fuente con más filas); si nunca
+entregó, del padrón (`Articulos x Prov AT` → `prov_at`, `Articulos Virgilio X Tallerista` →
+`tallerista`). El front pinta `s/d` y no lo suma al pie.
+
+**Comprobación:**
+```sql
+select * from public.gv_entregas_mensuales_cod('321', 12);
+-- 2025-10..2026-05 → 0 / false · 2026-06 506 · 2026-07 500 · 2026-08 382 · 2026-09 150 (todos true)
+select * from public.gv_entregas_mensuales_cod('031', 10);   -- tallerista: cubierto desde 2025-12, mar 863 / abr 620 / may 723
+```
+Cruce: las recepciones de `Movimientos_Stock` (tipo `recepcion`) dan idéntico a la RPC para 321 en
+jul/ago/sep (500/382/150); junio no cuadra (90 vs 506) porque el stock event-sourced arranca el
+26/06 — la madre del dato de entregas es la vista, no el stock.
+
+**Front (v15.52):** `stkShowProyVentas` pide `ventas_mensuales_cod` y esta RPC con `Promise.all`;
+fila = `mes → entregadas → barra → facturadas`, cabecera `entreg./factur.`, pie con "Entregado 6m".
+Si ningún mes está cubierto, la columna no se dibuja. Test `tests/proy-entregadas.cjs`.
+
+**Rollback:** `drop function public.gv_entregas_mensuales_cod(text, integer);` — el front lo
+tolera (fetch falla → `ent = {}` → columna ausente, popup igual que en v15.51).
+`sql/gv_entregas_mensuales_cod_v1552.sql`.
