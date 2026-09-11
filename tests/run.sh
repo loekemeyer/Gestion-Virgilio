@@ -380,3 +380,9 @@ PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node te
 
 echo "== cc-orden-camionero (v15.70: Carga Camión — el tilde es el orden de carga 1°,2°,3° y el camionero es obligatorio) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/cc-orden-camionero.cjs
+
+echo "== pedimp-hecho (v15.72: Cargar pedido ya hecho — un bache por línea, con PI y fecha de embarque) =="
+PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/pedimp-hecho.cjs
+
+echo "== imp-encurso (v15.72: solapa 🚢 En curso — un renglón por pedido, embarque + llegada, días que faltan) =="
+PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/imp-encurso.cjs

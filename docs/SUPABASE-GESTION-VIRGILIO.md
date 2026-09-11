@@ -6326,3 +6326,91 @@ Test `tests/cc-orden-camionero.cjs`. **Falta** (tarea Planify abierta): RR filtr
 horas de la hoja de ruta y la alerta en la PPP.
 
 `sql/gv_viaje_camionero_v1570.sql` · migración `gv_viaje_camionero_v1`.
+
+## 3.by Pedidos de importación EN CURSO, separados del generador: embarque y llegada (v15.72) — 2026-09-11
+
+**Pedido de Thomas**: *"en el módulo de importación, quiero ver cuáles son los pedidos en curso por
+separado de si genera o no genera pedido. Haceme un botón donde pueda ver qué día llegan y qué día
+es la fecha de embarque"*.
+
+Hasta acá el módulo mezclaba las dos cosas en la misma tabla: el *en curso* era una columna más al
+lado de "a pedir", y las fechas se editaban artículo por artículo. Peor: **no existía la fecha de
+embarque** en ningún lado — la única fecha del circuito era `fecha_reingreso`, que es la de llegada.
+Y el pedido en sí (el PI del proveedor) no era un dato: se venía escribiendo en `creado_por`, el
+campo del que cargó, por convención de los `.sql` de las v15.06–v15.21.
+
+### Backend — `sql/gv_importados_pedidos_curso_v1572.sql`
+
+`GV_Importados_Baches` (tabla nuestra, no compartida con Producción) suma **dos columnas nullable**,
+sin default ni backfill destructivo:
+
+| Columna | Qué es |
+|---|---|
+| `pedido_ref` | el **PI/CI** al que pertenece el bache. Es lo que agrupa la pantalla. |
+| `fecha_embarque` | el día que **sale de China**. La llegada sigue siendo `fecha_reingreso`. |
+
+**Backfill de `pedido_ref`** (131 filas de backup en `GV_Importados_Baches_bkp_encurso_20260911`):
+lo que ya tenía `creado_por` con forma de PI/CI pasa tal cual; las **5 líneas de Fujian** que Becky
+cargó el 10/09 desde "Cargar pedido ya hecho" (quedaron con su mail) van a `PI HT26-06-600-R1`; la
+única de Frontier a `Frontier 505C` (no hay PI cargado todavía) y la del dueño a `323ES suelto`.
+**Chequeo**: los totales por PI dan exactamente los de cada proforma — Fujian 106.488 u, Hugo Wong
+88.832, Ownland 98.376, Zhixin 42.258, Becky 41.944 y 48.056.
+
+Objetos nuevos, todos con prefijo nuestro:
+
+| Objeto | Qué hace |
+|---|---|
+| `gv_importados_pedidos_curso` (vista, `security_invoker = true`) | **una fila por pedido en curso**: líneas, unidades pendientes, u$s FOB, m³, las dos fechas y los días que faltan |
+| `gv_importados_pedidos_curso()` (RPC) | la vista para el front (la tabla tiene RLS sin policy para `anon`, igual que el resto del módulo) |
+| `gv_importado_pedido_lineas(ref, prov)` | el detalle por artículo de un pedido |
+| `gv_importado_pedido_fechas(ref, prov, embarque, llegada, set_embarque, set_llegada)` | escribe una fecha en **todas** las líneas del pedido de una; si tocó la llegada, corre `gv_importados_resync` (así `Importados.reingreso_est` —lo que ve el portal LK— queda con la más cercana) |
+| `gv_importado_pedido_ref(ref, prov, nuevo)` | renombrar / reasignar el PI de un pedido |
+| `gv_importado_bache_embarque(bache_id, fecha)` | el embarque de un bache suelto |
+
+`gv_importado_baches` ahora devuelve además `pedido_ref` y `fecha_embarque`, y
+`gv_importado_bache_add` acepta `p_ref` y `p_embarque` (**se dropeó la firma de 4 argumentos**: con
+las dos nuevas por default, convivir daba llamada ambigua en PostgREST). Todo `SECURITY DEFINER` con
+`grant execute` a `anon`/`authenticated`, igual que las RPC de la v14.94.
+
+**No toca ningún objeto de Producción**: `Importados` e `Importados_Volumen` se leen, no se escriben,
+así que no hay entrada en `ROLLBACK-PRODUCCION.md`.
+
+### Front (v15.72)
+
+Solapa nueva **🚢 En curso** en la barra del módulo (`_impTabsHtml`, al lado de 📦 Pedidos y
+🏭 Proveedores) → `openImpEnCurso()`. Un renglón por pedido con proveedor + importador, el PI, líneas,
+unidades por llegar, u$s, m³, y las **dos fechas editables en dd/mm/aa** con los días que faltan
+debajo. La columna Estado dice en qué está el viaje: *falta la fecha de embarque* · *embarca en N d* ·
+*🚢 embarcado hace N d* · *llegada vencida hace N d*. Arriba, cuatro totales y una banda ámbar con
+cuántos pedidos no tienen embarque. Tocando el PI se abre el detalle por artículo; el ✏️ PI lo renombra.
+
+Editar una fecha guarda **el pedido entero** (una sola RPC), no línea por línea. "Cargar pedido ya
+hecho" ahora pide también **Pedido (PI)** y **🚢 Embarque**, y el gestor de 📦 Baches muestra de qué PI
+es cada bache y su embarque. Tests `tests/imp-encurso.cjs` (nuevo) y `tests/pedimp-hecho.cjs`
+(estaba **desactualizado desde la v14.94**: seguía esperando `importados_set_curso` + PATCH a
+`Importados`, cuando esa carga hace un bache por línea desde entonces; como `run.sh` corta en el
+primer error, venía tapando toda la suite en CI).
+
+### Estado al aplicar: **los 8 pedidos en curso, ninguno con fecha de embarque**
+
+| Pedido | Proveedor | Líneas | Unidades | u$s | Llega |
+|---|---|---|---|---|---|
+| `323ES suelto` | Hugo Wong | 1 | 3.000 | 675 | 22/09 |
+| `PI B260601` | Becky | 19 | 41.944 | 23.622 | 29/09 |
+| `PI HT26-06-600-R1` | Fujian | 11 | 106.488 | 32.388 | 01/11 |
+| `PI NY26-031438` | Hugo Wong | 11 | 88.832 | 38.640 | 03/11 |
+| `Frontier 505C` | Frontier | 1 | 200.000 | 14.000 | 04/11 |
+| `PI B260601-2` | Becky | 26 | 48.056 | 31.614 | 15/11 |
+| `PI BX260722D` | Zhixin | 5 | 42.258 | 10.273 | 29/11 |
+| `PI OL-10139` | Ownland | 13 | 98.376 | 46.626 | 18/12 |
+
+**Ojo con Ownland**: el PI OL-10139 dice **u$s 13.988** (§3.bm.5) y la suma de FOB × unidades da
+**46.626**. El grueso es `1546903` (47.088 u de la parte "cheese cutter without handle") con `fob_uni`
+0,79 del maestro viejo. Queda **reportado, sin tocar**: es un dato del PI que hay que cargar.
+
+### Rollback
+
+Todo en el `.sql`: dropear la vista y las 7 funciones, recrear `gv_importado_baches` y
+`gv_importado_bache_add` con las firmas de `sql/gv_importados_baches_v1494.sql`, y
+`alter table "GV_Importados_Baches" drop column pedido_ref, drop column fecha_embarque`. Los datos
+viejos están en `GV_Importados_Baches_bkp_encurso_20260911`.
