@@ -5307,7 +5307,6 @@ Dueño: *"todos los datos que tengas que corregir, dale"*. Barrido sobre `v_impo
   insumos + terminados) no llega a la fecha de llegada, más los sin pedido en curso; faltante = consumo × meses hasta la
   llegada − stock. 48 artículos, 25 ya en cero, ≈ 26.400 u faltantes hasta la llegada; los más pesados 026 (5.231 u),
   583E (4.637), 590E (2.527), 525E (2.287), 582E (1.776), 566E (1.562).
-- **727E·CH → 106E** como sustituto de contingencia (106E tiene 14.280 u = 36 meses): anotado en `Importados.notas` del
-  727E (id 78 no: es 727E CH; ver `select id from "Importados" where cod_art='727E'`). Sin lógica nueva en el módulo: es
-  una decisión comercial puntual, no una familia.
+- **727E·CH → 106E** como sustituto de contingencia (106E tiene 14.280 u = 36 meses): anotado en `Importados.notas` de la fila
+  727E·CH. Sin lógica nueva en el módulo: es una decisión comercial puntual, no una familia.
 - Las marcas "fabricable acá" del reporte viven en el navegador del que lo mira (localStorage), no en la base.
