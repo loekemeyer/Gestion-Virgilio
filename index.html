@@ -804,6 +804,11 @@ button {
 .pn-reprog-btn{ margin-left:8px; background:#b91c1c; color:#fff; border:none; border-radius:7px; padding:3px 9px; font-size:11.5px; font-weight:800; cursor:pointer; width:auto; }
 .pn-cancel-btn{ background:#fee2e2 !important; color:#991b1b !important; border-color:#fca5a5 !important; }
 .pn-reprog-btn:hover{ background:#991b1b; }
+/* v15.65 — acciones por pedido dentro de la fila del día. Van DEBAJO de la NP, en la columna que
+   ya existe: una columna nueva dejaría un hueco vacío en todas las filas sin acción. */
+.pn-acc{ display:flex; gap:6px; margin-top:4px; }
+.pn-acc-b{ background:#fff; color:#991b1b; border:1px solid #fca5a5; border-radius:6px; padding:2px 7px; font-size:11px; font-weight:700; cursor:pointer; width:auto; line-height:1.5; }
+.pn-acc-b:hover{ background:#fee2e2; }
 .pn-carga .t.rep{ color:#b91c1c; font-weight:800; }
 .ppp-res-note.rep{ background:#fef2f2; border-color:#fca5a5; color:#991b1b; }
 .apr-q{ width:100%; box-sizing:border-box; padding:7px 10px; border:1px solid #cbd5e1; border-radius:8px; font-size:13px; margin-bottom:8px; }
@@ -7691,7 +7696,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v15.64";
+const APP_VERSION = "v15.65";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -29991,6 +29996,18 @@ async function pppMovElegir(iso) {
    gv_ppp_np_cancelar: ISIS → NP_Canceladas + oculta en la PPP (GV_PPP_Prog_Override.oculto); web →
    GV_Web_Cancelados + sale de la PPP, y gv_pedidos_web_excluidos ya no la deja volver a entrar. */
 function _pppEsNpWeb(np) { return /^(LK|CH)\s*\d+/i.test(String(np || "")); }
+/* v15.65 — ¿el operario tipeó el mismo pedido que el del botón? Ignora espacios, mayúsculas y
+   ceros a la izquierda: "LK 0053", "lk53" y "53" son el mismo. Lo usa la 2da confirmación de
+   cancelar. OJO: NO llamarla _pppNpNorm — ese nombre ya es de la normalización que clasifica
+   entregados, y redefinirlo saca las NP web de "entregados" en silencio (lo cazó pweb-entregados). */
+function _pppNpMismo(a, b) {
+  const f = function (np) {
+    const s = String(np || "").toUpperCase().replace(/\s+/g, "");
+    const m = s.match(/^(LK|CH)?0*(\d+)$/);
+    return m ? (m[1] || "") + m[2] : s;
+  };
+  return f(a) === f(b);
+}
 async function pppVencVolver(np) {
   const n = String(np || "").trim(); if (!n) return;
   if (!confirm("¿Devolver " + n + " a A Programar?\n\nSale de su tanda y queda pendiente: lo toma el automático (zonas 1-3 / camión ya previsto) o lo programás a mano.")) return;
@@ -30012,6 +30029,16 @@ async function pppVencCancelar(np) {
   try { motivo = prompt("Cancelar " + n + " — ¿por qué NO va?\n(" + _STK_NP_MOTIVOS.join(" · ") + ")", _STK_NP_MOTIVOS[0]) || ""; } catch (_e) {}
   motivo = motivo.trim(); if (!motivo) return;
   if (!confirm("¿Cancelar el pedido " + n + "?\n\nMotivo: " + motivo + "\n\nSale de la PPP y no vuelve a entrar. Si hay que hacerlo igual, habrá que cargarlo de nuevo.")) return;
+  // v15.65 (dueño: "que pida 2da confirmación antes de eliminar o cancelar"): un confirm de sí/no
+  // se aprieta de memoria. Éste obliga a TIPEAR el número del pedido, así cancelar el que no era
+  // exige haberlo leído.
+  let _tec = "";
+  try { _tec = prompt("ÚLTIMA CONFIRMACIÓN — esto no se deshace.\n\nEscribí el número del pedido para cancelarlo:\n\n" + n, "") || ""; } catch (_e) {}
+  if (!_tec.trim()) return;
+  if (!_pppNpMismo(_tec, n)) {
+    try { alert("No cancelé nada.\n\nEscribiste \"" + _tec.trim() + "\" y el pedido es \"" + n + "\"."); } catch (_e) {}
+    return;
+  }
   pppSetStatus("Cancelando " + n + "…", true);
   try {
     const r = await aprRpc("gv_ppp_np_cancelar", { p_np: n, p_motivo: motivo, p_por: await aprQuien() });
@@ -32328,6 +32355,11 @@ function _pppPlanDiaHtml(programados, key, opts) {
     h += '<div class="pn-thead' + _sinUlt + '"><span>Tanda</span><span>Cliente · N° pedido</span><span>Localidad</span><span class="num">m³</span><span class="num">Valor</span><span>Picking · Armado</span>' + (_ult ? '<span>' + _ult + '</span>' : '') + '</div>';
     for (const p of rows) {
       const e = _pppEstadoPed(p), E = _PN_EST[e];
+      // v15.65 (pedido del chat: "un cliente tenía un pedido pendiente e hizo uno nuevo más grande
+      // y no tengo de dónde eliminar el más chico"): hasta la v15.64 el 🚫 Cancelar existía SÓLO en
+      // Atrasados, así que un pedido con fecha futura no se daba de baja desde ningún lado. Acá va
+      // en la fila, y sólo mientras la tanda esté SIN EMPEZAR: una vez que alguien pickeó,
+      // gv_ppp_np_cancelar lo rechaza igual y ofrecerlo sería mentir.
       const pick = (e === "armado" || e === "armando" || e === "picking") ? "done" : (e === "pickeando" ? "on" : "");
       const arm = e === "armado" ? "done" : (e === "armando" ? "on" : "");
       const v = _pppValorPed(p);
@@ -32345,12 +32377,21 @@ function _pppPlanDiaHtml(programados, key, opts) {
         else if (e === "armado") carga = '<div class="pn-carga"><span class="n ok">' + n + 'º</span><span class="t">armado ✓<br>espera su turno</span></div>';
         else carga = '<div class="pn-carga"><span class="n">' + n + 'º</span><span class="t">falta armar</span></div>';
       }
+      const _npS = escapeHtml(String(np));
+      const _accPed = (!esVenc && (window.__isSupervisor || !PPP_READONLY) && e === "sin")
+        ? '<div class="pn-acc">' +
+            (_pppEsNpWeb(np)
+              ? '<button class="pn-acc-b" onclick="event.stopPropagation();pppVencVolver(\'' + _npS + '\')" title="Sacarlo de esta tanda y devolverlo a A Programar (pendiente)">↩ A Programar</button>'
+              : '') +
+            '<button class="pn-acc-b pn-cancel-btn" onclick="event.stopPropagation();pppVencCancelar(\'' + _npS + '\')" title="El pedido NO va: sale de la PPP y no vuelve a entrar. Pide confirmar dos veces.">🚫 Cancelar</button>' +
+          '</div>'
+        : '';
       h += '<div class="pn-ped' + _sinUlt + (p._err && p._err.length ? ' err' : '') + '"><span class="tanda ' + c.ruta + '">' + escapeHtml(String(p.tanda || "—").toUpperCase()) + '</span>' +
         // v14.06 (dueño: "si no salieron, que figuren en la PPP con su fecha de entrega; mañana lo mira la
         // administrativa"): en ATRASADOS conviven pedidos de varios días, así que sin la fecha en la fila no
         // se sabe de cuándo es cada uno. En la vista de un día no hace falta: el día es el del encabezado.
         '<div><div class="rs">' + (p._err && p._err.length ? '⚠️ ' : '') + escapeHtml(p.razon_social || p.cod || "—") + '</div><div class="np">' + escapeHtml(String(np)) + (p.cod ? ' · cód ' + escapeHtml(String(p.cod)) : '') +
-          (esVenc && p.fecha_entrega ? ' <span class="pn-fe" title="Fecha de entrega que tenía">📅 ' + escapeHtml(String(p.fecha_entrega)) + '</span>' : '') + '</div></div>' +   // v13.65: sin chip WEB/ISIS
+          (esVenc && p.fecha_entrega ? ' <span class="pn-fe" title="Fecha de entrega que tenía">📅 ' + escapeHtml(String(p.fecha_entrega)) + '</span>' : '') + '</div>' + _accPed + '</div>' +   // v13.65: sin chip WEB/ISIS
         '<div class="loc">' + escapeHtml(p.localidad || p.barrio || "—") + '</div>' +
         '<div class="m">' + _pppFmtM3(p.m3) + '</div>' +
         '<div class="pp">' + (v == null ? '<small>s/valor</small>' : _pppFmtPesos(v)) + '</div>' +
