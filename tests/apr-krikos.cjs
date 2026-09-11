@@ -1,4 +1,4 @@
-/* Regresión v15.85 — las OC de súper de Krikos se ven en "A Programar".
+/* Regresión v15.85 / v15.90 — las OC de súper de Krikos en "A Programar".
 
    Pedido del dueño (2026-09-11): *"yo quiero que se vea acá"* — en A Programar, no sólo en
    la Bandeja del panel de LK.
@@ -15,7 +15,10 @@
    - una OC con fecha de entrega ya pasada se marca como vencida;
    - una OC sin PDF se marca;
    - el bloque NO genera tarjetas de pedido ni checkboxes (no es tildable);
-   - el 🔄 de la pantalla vuelve a pedir las OC.
+   - el 🔄 de la pantalla vuelve a pedir las OC;
+   - v15.90 (importador automático): una OC que ENTRÓ pero con algo que no dio sale en un
+     bloque ROJO aparte, con el pedido que se creó y el motivo escrito grande; una que no
+     pudo entrar muestra su motivo; y el pie ya no dice que el importador no existe.
    Sale 1 si falla. */
 const path = require("path");
 let chromium;
@@ -56,7 +59,7 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
     const _t = d.querySelector(".apr-krikos-t").textContent.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
     out.cuentaEnTitulo = /3 ordenes de compra de super/.test(_t);
     out.diceQueNoImporto = /NO se pudo importar sola a la PPP/.test(_t);
-    out.diceQueNoHayImportador = /importador automatico todavia no existe/i.test(
+    out.pieDiceQueCorreSolo = /corre cada 10 minutos/i.test(
       d.querySelector(".apr-krikos-pie").textContent.normalize("NFD").replace(/[\u0300-\u036f]/g, ""));
 
     // ---- 3) la cadena se acorta ----
@@ -78,6 +81,27 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
     out.noEsPedido = d.querySelectorAll(".apr-card").length === 0 &&
                      d.querySelectorAll("input[type=checkbox]").length === 0 &&
                      d.querySelectorAll("[draggable=true]").length === 0;
+
+    // ---- 6b) v15.90: la que entró con problema va en su propio bloque rojo ----
+    // REGLA DEL DUEÑO: si el importe no da, se carga igual y se aclara MUY GRANDE en la PPP.
+    _apr.krikos = [
+      { inbox_id: 30, cadena: "COTO", sucursal: "CD", nro_documento: "21881017093",
+        fecha_entrega: "20/09/2026", fecha_entrega_d: dia(6), link: "", tiene_pdf: true,
+        auto_estado: "parcial", auto_aviso: "2 de 14 renglones NO entraron (codigo sin match: 198E x 70 caj)",
+        order_id: 1402 },
+      { inbox_id: 31, cadena: "DIARCO", sucursal: "CD", nro_documento: "99", fecha_entrega: "21/09/2026",
+        fecha_entrega_d: dia(7), link: "", tiene_pdf: true, auto_estado: "no",
+        auto_aviso: "no se reconocio la cadena en el PDF" }
+    ];
+    const d2 = box(aprKrikosHtml());
+    const bloques = [...d2.querySelectorAll(".apr-krikos")];
+    out.dosBloques = bloques.length === 2 && bloques[0].classList.contains("mal");
+    const t2 = bloques[0].querySelector(".apr-krikos-t").textContent.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+    out.gritaQueNoDio = /1 pedido de super entro/.test(t2) && /NO DIO/.test(t2);
+    out.muestraElPedido = /pedido 1402/.test(bloques[0].textContent);
+    out.muestraElMotivo = /198E/.test(bloques[0].textContent) &&
+                          /no se reconocio la cadena/.test(bloques[1].textContent.normalize("NFD").replace(/[\u0300-\u036f]/g, ""));
+    out.laQueEntroNoEstaAbajo = !/21881017093/.test(bloques[1].textContent);
 
     // ---- 7) el 🔄 vuelve a pedirlas ----
     _apr.krikos = [{ inbox_id: 1 }];
