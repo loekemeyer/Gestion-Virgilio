@@ -96,3 +96,24 @@ where cod in ('809E-PIZZA','809E-QUESO','522S','523C','592E','PEDIDOS','CAJAS','
 
 -- (las 143 filas de insumo / sin_resolver se insertaron en GV_Lugar_Pendiente
 --  desde el relevamiento; ver el chat de la sesión para el detalle)
+
+-- ── Decisiones de Luis, 2026-09-11 (cierre de la carga) ──────────────
+-- Ñ53: es de LOKE y está LIBRE. El 439E que traían las tablas viejas no
+--      está fisicamente ahi. (Ñ54, al lado, sí tiene 439E y es LOKE.)
+-- AD06 / X05 / Y01: racks con artículo real que ninguna tabla vieja tenía
+--      asignados a una empresa. Se les pone LK.
+-- A62: confirmado que son DOS códigos, 355 y 066 (cargados 355 y 66, sin
+--      el cero de adelante). Excel los habia colapsado en el decimal 355,066.
+
+update public."GV_Lugar" set empresa='LOKE',
+  notas=coalesce(notas||' · ','')||'Luis 11/09: LOKE y libre; el 439E que decian las tablas viejas no esta',
+  updated_at=now() where sector='Ñ53';
+delete from public."GV_Lugar_Item" where sector='Ñ53';
+
+update public."GV_Lugar" set empresa='LK',
+  notas=coalesce(notas||' · ','')||'empresa asignada por Luis 11/09 (las tablas viejas no la traian)',
+  updated_at=now() where sector in ('AD06','X05','Y01');
+
+-- Estado final: 872 lugares · 780 asignaciones de articulo · 148 filas
+-- estacionadas · 51 lugares sin empresa (TODOS racks de insumos, ninguno
+-- con articulo) · 76 lugares realmente libres.
