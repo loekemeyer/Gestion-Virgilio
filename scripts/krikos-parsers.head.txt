@@ -1,0 +1,26 @@
+// =============================================================================
+// krikos-parsers.js — parsers de OC de supermercado, COPIADOS TEXTUALMENTE de
+// admin/admin-supercot.js (el panel de LK). NO editar a mano.
+// =============================================================================
+// Lo genera scripts/gen-krikos-parsers.sh, que copia tal cual estos rangos del
+// original:
+//   349-401    parseNum y helpers numéricos
+//   444-1660   detectSuper, splitLines, findFirstMatch, los 11 parsers por
+//              cadena, extractPdfTotal y el mapa PARSERS
+//   1826-1874  codVariants / findInPool (match de código con variantes)
+//
+// QUIÉN LO USA: la Edge Function `krikos-auto-import` del proyecto Supabase de
+// LK lo importa por HTTPS desde el GitHub Pages de este repo. Es el importador
+// automático de las OC de súper que llegan por Krikos: baja el PDF, lo parsea
+// con ESTE código —el mismo que el panel— y carga el pedido solo.
+//
+// Queda AFUERA a propósito extractPdfText() (líneas 402-443 del original): usa
+// pdf.js del navegador. El equivalente para Deno vive en la Edge Function,
+// calcado línea por línea (mismo agrupado por Y con tolerancia de 1px, ordenado
+// por X), y ya está probado contra OC reales.
+//
+// Verificación del parseo contra OC reales (11/09): Coto 9/9, Carrefour 14/14,
+// Diarco 10/10 idénticos al pedido cargado a mano; La Anónima 17 de 18 (el 198E
+// no está en el maestro de productos — problema 26 de github_repo_problemas).
+// =============================================================================
+

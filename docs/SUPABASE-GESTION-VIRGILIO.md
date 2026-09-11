@@ -7438,3 +7438,128 @@ claves distintas en `vista_stock_vs_pedidos` 310, `vista_faltante_catalogo` 505,
 `gv_corr_stk_group_by_v1586`.
 **Rollback:** correr el `create or replace view` de
 `sql/vista_correcciones_pedido_rich_v1567_orden_sin_pickear.sql` (vuelve el duplicado).
+
+## §3.cp — Las OC de súper de Krikos se importan SOLAS a la PPP (v15.90) — 2026-09-11
+
+**Regla del dueño, textual:** *"Siempre quiero que se cargue directo a PPP y si la lógica
+del importe (ya explicado y hecho en paginaLK) NO DA, QUE LO ACLARE MUY GRANDE EN PPP"*,
+después de *"la idea no es que vayan ahí [al panel de LK], es que vayan directo a PPP"*.
+Es la primera mitad de la idea **2234**; la segunda (el cartel en A Programar) ya estaba
+desde la v15.85.
+
+### Cómo funciona ahora, de punta a punta
+
+1. **`krikos-ingest`** (cron 26 de LK, cada 10′) lee `ventas@`, baja el PDF al bucket
+   `krikos-oc` y deja la fila en `krikos_oc_inbox`. *(Ya existía.)*
+2. **`krikos-auto-import`** (Edge Function nueva, LK) agarra lo pendiente, baja el PDF,
+   **lo parsea con los MISMOS parsers del panel**, matchea los códigos contra el catálogo
+   y crea el pedido en `orders` + `order_items`.
+3. **`sync_pedidos_match_virgilio`** (cron 24, cada 15′) lo trae como cualquier pedido web
+   → aparece en la PPP. Un súper queda en **A Programar** (no se mezcla con clientes).
+4. **`sync_krikos_oc_virgilio`** (cron 42) sigue espejando a `GV_Krikos_OC`, ahora también
+   el **resultado** del intento: la PPP puede decir qué pasó con cada OC.
+
+### Dónde vive el código (y por qué ahí)
+
+| Archivo | Repo | Qué es |
+|---|---|---|
+| `admin/krikos-parsers.js` | Gestión Virgilio | Los 11 parsers, **copiados textualmente** de `admin-supercot.js` por `scripts/gen-krikos-parsers.sh`. No se edita a mano. |
+| `admin/krikos-auto-import.js` | Gestión Virgilio | La lógica del importador (baja, parsea, matchea, arma el aviso, llama a la RPC). |
+| `supabase/functions/krikos-auto-import/index.ts` | pagina-lk-copia | Entrypoint de 3 líneas: importa los dos de arriba **clavados al commit** y sirve. |
+| `sql/krikos_auto_import.sql` | pagina-lk-copia | Columnas `auto_*` + las 4 RPC `krikos_auto_*`. |
+
+El import va por **esm.sh** (`esm.sh/gh/loekemeyer/Gestion-Virgilio@<sha>/...`) porque el
+bundler de Supabase **sólo acepta hosts conocidos** — con `loekemeyer.github.io` el deploy
+falla con *"Cannot import from loekemeyer.github.io:443"*. El sha fijo además evita que un
+push cambie el importador sin que nadie se entere: **al tocar un parser hay que regenerar,
+pushear y redeployar con el sha nuevo**.
+
+Que los parsers sean **los mismos bytes** que usa el panel es el punto: si mañana alguien
+arregla el parser de Diarco en `admin-supercot.js`, se corre el script y el importador
+automático queda arreglado también. No hay dos verdades.
+
+### "Si el importe no da, que lo aclare MUY GRANDE en PPP"
+
+Cada OC queda con `auto_estado` + `auto_aviso` (en `krikos_oc_inbox`, espejados a
+`GV_Krikos_OC`):
+
+| `auto_estado` | Qué pasó | Qué hace la PPP |
+|---|---|---|
+| `ok` | entró completa y el total cierra | nada: es un pedido normal en la PPP |
+| `parcial` | **entró igual**, pero hay renglones sin match o el total no cierra | **bloque rojo arriba de A Programar**, con el nº de pedido y el motivo |
+| `no` | no se pudo cargar (cadena desconocida, sin ítems, sin cliente, cadena de Chef) | bloque naranja, con el motivo |
+| `salteada` | la fecha de entrega ya venció | bloque naranja, con el motivo |
+
+La decisión de **cargar igual lo que entra incompleto** es la regla del dueño aplicada al
+pie de la letra: el pedido entra y el cartel grita lo que falta, en vez de quedarse afuera
+en silencio. Los `parcial` viajan a Virgilio **7 días** desde el intento; los `ok` no
+viajan (ya son un pedido).
+
+### Los guardas (por qué no se va a mandar una macana)
+
+- **Idempotencia en la base**: `krikos_auto_crear_pedido` toma `for update` la fila de la
+  OC y **corta si ya tiene `order_id`**. Aunque el cron corra dos veces, el pedido del
+  súper no se duplica.
+- **Vencidas**: una OC con fecha de entrega anterior a hoy **no se carga sola** (queda
+  `salteada`). Al día de hoy 5 de las 6 pendientes son de junio/julio: ésas no entran.
+- **Chef**: las cadenas con `empresa='chef'` (Dorinka, Cencosud) **no** se importan solas
+  —el pedido iría a otro proyecto Supabase— y lo dicen en el aviso.
+- **Todo aditivo**: columnas nuevas, funciones nuevas con prefijo. `submit_order_fast` no
+  se tocó (no servía: exige `auth.uid()`, y la función corre con service_role).
+
+### Medido (2026-09-11)
+
+- **Parseo**: OC real de Coto **21881017093** (la que el dueño dejó abierta para probar):
+  9 de 9 renglones, y el total calculado da **exacto** el del PDF: `$ 9.420.060`.
+  Códigos `504, 557, 544, 102, 207, 026, 870E, 513, 280` → **9 de 9 matchean** (8 en
+  `products`, el `102` en `loke_products` como `102E`).
+- **Alta del pedido**: probada con `BEGIN … ROLLBACK`: crea la orden con `web_discount 0`
+  y el admin como dueño, 2 ítems (1 Loke) con su precio, el `order_number` en el
+  `sheets_payload`, y deja la OC en `cargado | ok | <aviso>`. Nada quedó escrito.
+- **Espejo**: `select public.sync_krikos_oc_virgilio();` → **6** (las 6 pendientes).
+- Antes ya se había verificado el parseo contra 4 OC reales cargadas a mano: Coto 9/9,
+  Carrefour 14/14, Diarco 10/10 idénticos; La Anónima 17 de 18 (el `198E` no está en el
+  maestro — problema 26 de `github_repo_problemas`, sigue abierto).
+
+### PRENDIDO (2026-09-11, 18:28 ART)
+
+La función está **deployada** y el cron es el **jobid 43** de LK,
+`krikos-auto-import-10min`, `3-59/10 * * * *`: corre 3′ después del ingest (26) y 2′ antes
+del espejo a Virgilio (42). Así una OC que entra a las 10:00 está en la PPP a las 10:05.
+
+**Dry-run contra las 6 OC pendientes reales** (`{"dry_run": true, "force": true}`, no
+escribe nada): **5 entrarían limpias y el total calculado dio EXACTO el del PDF en las 5** —
+Coto 21881017093 (9 renglones, $ 9.420.060), La Anónima 22824280 (12, $ 2.946.900),
+22824281 (13, $ 27.860.460), 22870732 (16, $ 19.779.720) y Carrefour 0958095800240533
+(16, $ 18.956.790). La sexta, La Anónima **22908256**, sale `parcial` con el aviso que
+pidió el dueño, palabra por palabra:
+
+> *1 de 14 renglones NO entraron (código sin match en el catálogo: 198E × 70 caj) · el
+> total no cierra: calculado $ 16.695.240 vs PDF $ 17.627.640 (5.3% de diferencia)*
+
+Ese 5,3% **es** el renglón que falta: el aviso se explica solo. (Es el problema 26 de
+`github_repo_problemas`: el `198E` no existe en `products` ni en `loke_products`.)
+
+**Corrida real** (sin `force`): las 6 quedaron `salteada` — todas tienen la fecha de
+entrega vencida (5 son de junio/julio) — **sin crear ni un pedido**, y con el motivo
+escrito para que la PPP lo muestre. Es exactamente lo que tenía que pasar.
+
+**Y llega a la PPP**: verificado que los pedidos de Krikos cargados por el panel viajan por
+`v_pedidos_match` → `lk_pedidos_match` con sus ítems y sucursal (1156, 1157, 1292, 1293,
+1316). La fecha de entrega viaja por `sheets_payload->>'fecha_entrega'`, que es de donde la
+lee esa vista (`fecha_entrega_txt`), y el importador la carga del mail de Krikos.
+
+**Para apagarlo:** `select cron.alter_job(43, active := false);` en LK. Nada más depende de
+él: las OC vuelven a cargarse a mano desde el panel.
+
+### Rollback
+
+```sql
+-- en LK
+select cron.unschedule('krikos-auto-import-10min');
+-- y, si hace falta desarmar todo, el bloque ROLLBACK de sql/krikos_auto_import.sql
+-- en VIRGILIO (opcional: las columnas no molestan a nadie)
+alter table public."GV_Krikos_OC" drop column if exists auto_estado,
+  drop column if exists auto_aviso, drop column if exists auto_at, drop column if exists order_id;
+```
+Sin cron, todo esto queda inerte: las OC siguen cargándose a mano desde el panel, como hasta ahora.
