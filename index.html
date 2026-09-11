@@ -7622,7 +7622,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v15.28";
+const APP_VERSION = "v15.29";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -13014,6 +13014,13 @@ async function ocgFetchImportados() {
   // v10.38 — alias de códigos que se piden JUNTOS (misma master caja / mismo pedido al chino):
   // 865ED se suma dentro de 865E (pedido del usuario). Agregar acá futuros pares si hacen falta.
   const IMP_ALIAS = { "865ED": "865E" };
+  // v15.29 — los alias viven en la base (tabla GV_Importados_Alias: cod → canon); el mapa de arriba queda
+  // como fallback. Caso: 323E (LK) y 838E (CH) se compran SUELTOS como 323ES y se envasan acá → un solo
+  // ítem 323ES con la proyección, el stock y el en curso de los tres (dueño 11/09).
+  try {
+    const al = await supaFetchAllSafe(SUPABASE_URL + "/rest/v1/GV_Importados_Alias", "select=cod,canon");
+    (al || []).forEach(function (a) { if (a.cod && a.canon) IMP_ALIAS[String(a.cod).toUpperCase().trim()] = String(a.canon).trim(); });
+  } catch (_e) {}
   const by = {};
   let meses = 10;
   (rows || []).forEach(function (r) {
@@ -13022,6 +13029,7 @@ async function ocgFetchImportados() {
     const k = cod.toUpperCase();
     if (!by[k]) by[k] = { cod: cod, desc: r.descripcion || "", prov: String(r.proveedor || "").trim() || "(sin proveedor)", uxc: 0, fob: 0, proyUni: 0, stockUni: 0, stockIns: 0, enCurso: 0, det: [] };
     const o = by[k];
+    if (codRaw.toUpperCase() === k && r.descripcion) o.desc = r.descripcion;   // la fila canónica manda la descripción
     o.proyUni += Number(r.est_madre_eff) || 0;
     o.stockUni += (r.stock_total != null) ? (Number(r.stock_total) || 0) : (Number(r.stock_actual) || 0);   // v15.27: incluye insumos
     o.stockIns += Number(r.stock_insumos) || 0;

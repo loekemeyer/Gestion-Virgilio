@@ -5282,3 +5282,18 @@ Dueño: *"todos los datos que tengas que corregir, dale"*. Barrido sobre `v_impo
   **323ES → 323E**: cuando se reciba como insumo suelto, cuenta como stock del 323E (mismo patrón que 522ES).
 - Rollback: `delete from "GV_Importados_Baches" where importado_id = 79 and creado_por like 'dueño 11/09: 323ES%'; select
   gv_importados_resync(79); delete from "GV_Importados_Insumo_Map" where insumo_cod = '323ES';`
+
+### §3.bm.21 — 323ES es el pool de 323E (LK) y 838E (CH); alias en la base (v15.29, 2026-09-11)
+
+- Dueño: *"323ES sirve para 323E y 838E"*. El rallador 4 lados mini se compra **suelto** (323ES, Hugo Wong) y se envasa
+  acá como 323E (LK, ×12) o 838E (CH, ×24). Deshace el mapa 323ES → 323E de §3.bm.20.
+- `Importados`: alta **323ES (id 167)**, LK, Hugo Wong, FOB 0,225, sin uni×caja; `Importados_Volumen` 323ES copiado
+  de 323E (144/master). El bache de 3.000 u del 22/09 se **movió** del 323E (id 79) al 323ES (backup
+  `GV_Importados_Baches_bkp_323ES_20260911`, resync de los dos). El insumo 323ES ahora enlaza por código igual.
+- Tabla nueva **`GV_Importados_Alias`** (`cod → canon`): 865ED → 865E (antes hardcodeado en `IMP_ALIAS`), **323E → 323ES**,
+  **838E → 323ES**. `ocgFetchImportados` la carga y suma bajo el canónico proyección, stock y en curso; la fila
+  canónica manda la descripción. Resultado: un ítem 323ES con 1.106 u/mes (414 + 692), stock 0, en curso 8.472
+  (3.000 el 22/09 + 4.464 y 1.008 el 03/11) → a pedir 2.588 u. Las filas 323E/838E siguen existiendo para stock.
+- Rollback: `delete from "GV_Importados_Alias" where canon = '323ES'; update "GV_Importados_Baches" set importado_id = 79
+  where importado_id = 167; select gv_importados_resync(79), gv_importados_resync(167); delete from "Importados" where
+  id = 167; delete from "Importados_Volumen" where cod = '323ES';` (y volver a cargar el mapa 323ES → 323E si se quiere).

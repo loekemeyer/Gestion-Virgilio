@@ -458,3 +458,8 @@ Gestión (`ocgFetchImportados`). Rollback en `sql/gv_importados_partes_stock_ter
 Tabla nueva `GV_Importados_Insumo_Map`, vista nueva `gv_importados_stock_insumos` y `v_importados_ordenes` recreada
 (+ `stock_insumos`, `es_parte`, `stock_total`; el resto idéntico). Def anterior en `GV_bkp_def_v_importados_ordenes_20260911`.
 Sólo lo lee Gestión. Rollback en `sql/gv_importados_stock_insumos_v1527.sql` / §3.bm.19.
+
+## 323ES pool + GV_Importados_Alias — v15.29 (2026-09-11)
+
+Tabla nueva `GV_Importados_Alias` (RLS, lectura anon/authenticated); alta 323ES en `Importados` (id 167) y
+`Importados_Volumen`; un bache movido de 323E a 323ES (backup `GV_Importados_Baches_bkp_323ES_20260911`). §3.bm.21.
