@@ -7794,7 +7794,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v15.91";
+const APP_VERSION = "v15.92";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -11736,6 +11736,29 @@ async function _compTandaYaArmada(tanda) {
     return Array.isArray(rows) && rows.length > 0;
   } catch (_e) { return false; }
 }
+/* v15.92 — candado anti doble-armado POR NP (el de arriba es por TANDA y no alcanza).
+   Si un pedido se REPROGRAMA a otra tanda y se vuelve a armar, `_compTandaYaArmada`
+   mira la tanda nueva, no encuentra nada y deja grabar todo de nuevo: quedan las
+   filas de Entregas_Virgilio por duplicado y el stock se mueve dos veces
+   (separar_pedidos → a_facturar). Pasó con 98532/98533 (D60E → E10A), 98490
+   (D47C → D54C) y 98583 (D50C → D50D): 57 cajas contadas por dos.
+   Devuelve la lista de NP que YA tienen Entregas, sea en la tanda que sea.
+   Ante error de red devuelve [] (no trabar el laburo por una caída puntual). */
+async function _compNpsYaArmadas(nps) {
+  const lista = (nps || []).map(function (n) { return String(n == null ? "" : n).trim(); }).filter(Boolean);
+  if (!lista.length) return [];
+  try {
+    const inList = "(" + lista.map(function (n) { return '"' + n.replace(/"/g, "") + '"'; }).join(",") + ")";
+    const url = SUPABASE_ENTREGAS_ENDPOINT + "?select=np&np=in." + encodeURIComponent(inList) + "&limit=2000";
+    const r = await fetch(url, { headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY }, cache: "no-store" });
+    if (!r.ok) return [];
+    const rows = await r.json();
+    if (!Array.isArray(rows)) return [];
+    const set = new Set();
+    rows.forEach(function (x) { const v = String(x.np == null ? "" : x.np).trim(); if (v) set.add(v); });
+    return lista.filter(function (n) { return set.has(n); });
+  } catch (_e) { return []; }
+}
 // v7.74 — tandas cuyo armado se COMPLETÓ en el asistente (con Entregas grabadas) en esta sesión.
 // Fast-path para el gate del TAP en send(): evita el race de leer las Entregas recién posteadas.
 const _armadoRegistrado = new Set();
@@ -11777,6 +11800,17 @@ async function compTerminar() {
   if (_yaArmada) {
     _comp._terminando = false;
     try { alert("⚠ La tanda " + tanda + " YA fue armada.\n\nNo se puede armar de nuevo (duplicaría el pedido). Si hay que corregir algo, avisá para hacerlo a mano."); } catch (_e) {}
+    return;
+  }
+  // v15.92 — mismo candado pero POR NP: si el pedido se reprogramó a otra tanda y ya
+  // se armó en la anterior, la tanda nueva pasa el chequeo de arriba pero el pedido
+  // se duplicaría igual. Acá se corta.
+  let _npsArmadas = [];
+  try { _npsArmadas = await _compNpsYaArmadas((_comp.nps || []).map(function (n) { return n.np; })); } catch (_e) { _npsArmadas = []; }
+  if (!_comp) return;                       // cerraron el modal mientras chequeaba
+  if (_npsArmadas.length) {
+    _comp._terminando = false;
+    try { alert("⚠ Ya está armado el pedido NP " + _npsArmadas.join(", ") + " (en otra tanda).\n\nNo se puede armar de nuevo: duplicaría el pedido y el stock. Si se reprogramó y hay que rearmarlo, avisá para darlo de baja a mano primero."); } catch (_e) {}
     return;
   }
   _comp.nps.forEach(function (n) { liosSend(legajo, n.np, n.liosArr.length, tanda, _compLiosResumen(n), n.clase || ""); });   // líos (TAL) + resumen + clase (lio/etiqueta/nada)
