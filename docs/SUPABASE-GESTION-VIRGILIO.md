@@ -5154,3 +5154,38 @@ Dueño: *"todos los datos que tengas que corregir, dale"*. Barrido sobre `v_impo
   `Importados_Mov_Stock` (marca LK) o vía `vista_importados_stock_parte` según cómo se resuelva el stock de partes.
 - Idea a evaluar: leer el stock de las partes de Cervantes directo desde GP2 (mismo proyecto Supabase) en vez de cargarlo
   a mano. Sin implementar.
+
+### §3.bm.15 — Pedidos Importación: proyección POR EMPRESA (LK ≠ Chef) (v15.23, 2026-09-11)
+
+- **Problema** (dueño: *"la proyección no va a ser igual en Loeke y Chef, tenés errores ahí"*): la fila LK usaba
+  `proyeccion_madre`, que en LK suma ventas **LK + Chef** (`_fn_proy_window`), y la fila CH un seed a mano. Casos:
+  437EL·LK 99,5 caj/mes cuando LK vende ~20 (la diferencia era Chef, sobre todo una factura del 20/03 al cliente Chef
+  1434: 453 cajas de 437E y 366 de 438E); 438EL·LK 116 vs ~38 reales; 809E·LK 113 (corta pizza, LK real ~15) porque
+  el corta queso de Chef pesa ahí; 438E·CH seed 150 caj/mes contra 4–50 reales.
+- **LK** (`kwkclwhmoygunqmlegrg`): `_fn_proy_window_emp(p_meses, p_emp)` (misma regla: promedio 6 meses, meses sin
+  venta = 0, piso 4.º mejor mes; fallback 12 meses) filtrando `sales_lines.empresa`; `fn_proyeccion_importados_emp()`
+  devuelve (cod, empresa, proy_cajas_mes) para lk y chef; `sync_proyeccion_emp_virgilio()` empuja por el FDW
+  `virgilio_db` (foreign table `virgilio."GV_Proyeccion_Emp"`) con reemplazo total y abort si el motor devuelve 0;
+  cron **`sync-proyeccion-emp-virgilio`** miércoles 09:25 UTC (5 min después del de `proyeccion_madre`). Primera corrida:
+  **614 filas**. `fn_ventas_mensuales_virgilio` pasó a 3 argumentos (`p_empresa` opcional, null = LK+Chef como antes;
+  se dropeó la firma de 2 para que PostgREST no tenga ambigüedad). Las funciones nuevas revocadas a anon/authenticated.
+  **`proyeccion_madre` NO cambia**: sigue siendo LK+Chef para las OC de producción (regla del 2/9, "una sola
+  estadística madre"); esto es otra proyección, sólo para importados.
+- **Virgilio**: tabla **`GV_Proyeccion_Emp`** (cod, empresa, proy_cajas_mes, actualizado; PK cod+empresa; RLS con
+  lectura anon/authenticated y `gv_proy_emp_writer` para `lk_ppp_reader`, calcada de `proyeccion_madre`).
+  `v_importados_ordenes`: `est_madre_live` = proy de la empresa de la fila (LK/Loke → `lk`, CH → `chef`) **en cajas ×
+  `uni_x_caja` de la fila**; `est_madre_eff = coalesce(override, live, seed, 0)`; ya no lee `proyeccion_madre`.
+  `ventas_mensuales_cod(p_cod, p_meses, p_empresa)` (una sola firma) pasa la empresa al feed de LK; el popup
+  📈 Proyección del front manda `chef`/`lk` según el sufijo de la fila (sin sufijo = LK+Chef).
+- **Resultado** (proy caj/mes antes → ahora): 437EL 99,5 → **20,2** (a pedir 16.800 → 0); 438EL 116 → **38,5** (17.920
+  → 0); 437E·CH 7 → 79,3; 438E·CH 150 → 77,7; 809E·CH 140 → 70; 824·CH 160 → 66; 825·CH 194 → 29.
+- **Lo que sigue torcido es dato, no motor**: en LK las ventas de Chef terminan el 30/06 y julio/agosto se cargaron
+  como LK (anomalía grupo A, documentada en el CLAUDE.md de LK). Mientras no se re-marquen: la fila LK de los códigos
+  compartidos queda alta (809E·LK 57,7 caj/mes) y la CH baja (809E·CH 70 con dos meses en 0). Se corrige sola en el
+  siguiente sync cuando LK arregle `sales_lines.empresa`. La factura Chef 1434 del 20/03 sigue inflando 437E/438E·CH.
+- Pendiente aparte: `vista_stock_procesada` (pantalla Stock) sigue con `proyeccion_madre` y para las filas con sufijo
+  (`809E CH`, `809E LK`) da 0; podría usar `GV_Proyeccion_Emp`. No se tocó.
+- Rollback: vista anterior en `sql/gv_importados_stock_sync_v1511.sql` (§3.bm.3); recrear `ventas_mensuales_cod` de
+  2 args (idéntica sin `p_empresa`); en LK `cron.unschedule('sync-proyeccion-emp-virgilio')`, drop de las 3 funciones +
+  foreign table, y recrear `fn_ventas_mensuales_virgilio(text,integer)`; `drop table "GV_Proyeccion_Emp"`.
+  SQL: `sql/gv_proyeccion_emp_v1523.sql`.

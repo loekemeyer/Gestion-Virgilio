@@ -434,3 +434,9 @@ Detalle y rollback §3.bm.12.
 (945E/994E/999E), 3 nuevos (404E, 601E, 989E). `Importados`: alta 989E; FOB de 9 filas y `uni_x_caja` de 7 al PI.
 `Importados_Mov_Stock`: +1 `inicial` 0 (989E). Backups `GV_Importados_Baches_bkp_becky2_20260911`,
 `GV_Importados_bkp_becky2_20260911`. Detalle y rollback §3.bm.13.
+
+## Proyección por empresa para Importados — v15.23 (2026-09-11)
+
+Virgilio: tabla nueva `GV_Proyeccion_Emp`; `v_importados_ordenes` recreada (ya no lee `proyeccion_madre`);
+`ventas_mensuales_cod` pasa a 3 args. LK: 3 funciones nuevas + `fn_ventas_mensuales_virgilio` a 3 args + foreign table +
+cron `sync-proyeccion-emp-virgilio`. `proyeccion_madre` intacta. Rollback en §3.bm.15.
