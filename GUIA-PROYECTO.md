@@ -11238,6 +11238,17 @@ distinta, empresa distinta.
 > **Marcado sin tocar**: Frontier FOB 14.400 vs 14.000 del motor y su llegada (04/11) que no cierra con el
 > embarque 26/10; Becky 2ª con el 30% pagado el 02/jun y 112 días hasta embarcar.
 
+> Nota **2026-09-11 (v15.91) — NTL: cargas, conciliación y alias de proveedor.**
+> La solapa 💱 NTL pasa a tener **tres vistas**: 📄 Extracto · 📦 **Cargas** (las del Excel —`CQ-9154`, `China 2`…—
+> con lo girado, el FOB y el saldo, más el pedido que le calza) · 🔗 **Conciliación** (cada giro cargado buscado
+> en el Excel: **4 de 6 aparecen**; Frontier y Zhixin exactos, Fujian con la fecha real 04/08, y Becky y Hugo
+> **sin match**). Los nombres del extracto se traducen en `GV_Imp_Prov_Alias` **sin tocar el dato importado**
+> (`Fuyian`→Fujian, `Xihin`→Zhixin, `Becky Chen`→Becky; `Chef` y `Tierra` marcados como empresa). Quedan **5 sin
+> decidir** y la pantalla los avisa. **Hallazgo**: el adelanto de 14.000 de Ownland figura *a través de `CQ-9553`,
+> fue a `CQ-9694`* — la mecánica de pagar un pedido con la factura de otra carga, tal cual. Y el FOB de `CQ-9694`
+> es **34.956** contra los 46.626 del sistema: la diferencia, **11.670**, es clavada el "Falta" de la planilla de
+> deudas. Sin tocar. §6 de `docs/IMPORTACIONES-PAGOS-ARGENTINA.md`.
+
 > Nota **2026-09-11 (v15.90) — La cuenta de NTL andando en la app: solapa 💱 NTL.**
 > Cuarta solapa del módulo de importación, con el **extracto navegable** del forwarder de Hong Kong: saldo de
 > hoy (**u$s 230,43**), saldo por empresa (**D** 129.601 · **TN** −76.857 · **CH** −52.513), los acumulados del
