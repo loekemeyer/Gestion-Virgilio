@@ -4760,9 +4760,11 @@ no bloquear**; umbral **$1.000**; mostrar **total + fecha de carga**; **LK y Che
   sólo `authenticated`). Front `pagina-LK-copia`: `cargarDeudaCliente()` la llama 1x por sesión al cargar
   el perfil, cachea en `_deudaCliente`, y `renderDeudaAviso()` pinta el aviso `#deudaAviso` en el carrito
   (no lo muestra a admin/vendedor). Best-effort: si la RPC/FDW falla, no molesta.
-- **Chef (FRONT hecho, BACKEND pendiente del dueño)**: el front `paginach` es el espejo del de LK
-  (`get_mi_deuda`, filtra `empresa='chef'`). **El backend NO se pudo aplicar desde la sesión** (el proyecto
-  Supabase de Chef `nkhzocgdpwtgrmwleihr` no es alcanzable por el MCP). Setup listo para correr a mano en
-  **`sql/gv_deuda_feed_chef_setup.sql`**: PART A (rol `chef_gv_reader` + grant en Virgilio) y PART B (server
-  FDW + foreign table + RPC `get_mi_deuda` en Chef), con placeholder de password. Hasta que se corra, el
-  front de Chef no muestra nada (la RPC no existe → best-effort silencioso).
+- **Chef (HECHO, 2026-09-11)**: front `paginach` espejo del de LK (`get_mi_deuda`, filtra `empresa='chef'`).
+  Backend: Chef **ya tenía** FDW a Virgilio (server `virgilio_db`, user mapping para `postgres` que conecta
+  como el rol **`ch_ppp_reader`**), así que NO hizo falta rol ni mapping nuevo — sólo `grant select on
+  gv_deuda_feed to ch_ppp_reader` en Virgilio + foreign table `virgilio.gv_deuda_feed` y RPC `get_mi_deuda`
+  en Chef (`sql/gv_deuda_feed_chef_setup.sql`). Verificado: el FDW trae las 40 filas chef. **Trampa que costó
+  el rato**: mi setup creaba un rol nuevo `chef_gv_reader`, pero el user mapping preexistente apuntaba a
+  `ch_ppp_reader`; el `create user mapping if not exists` respetó el viejo y el SELECT se denegaba. Se borró
+  `chef_gv_reader` y se le dio el grant al rol que Chef ya usa.
