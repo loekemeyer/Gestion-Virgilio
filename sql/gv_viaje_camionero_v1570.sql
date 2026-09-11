@@ -1,4 +1,5 @@
--- v15.70 (2026-09-11) — EL VIAJE DEL CAMIONERO. Pedido de Thomas:
+-- v15.70/71 (2026-09-11) — EL VIAJE DEL FLETERO (Thomas: "que desde ahora en adelante sea con
+-- fletero"; la columna se llamaba `camionero` en la v15.70 y se renombro en la v15.71). Pedido de Thomas:
 --   CC: "a medida que den click en lo que cargan, en lugar de un simple tilde, que diga 1°, 2°, 3°…
 --        una vez que ya terminó de cargar el camión, que le pregunte el nombre del camionero".
 --   RR: "primero lo deja elegir una NP igual que ahora (podemos entregar más de un camión por día);
@@ -24,11 +25,14 @@
 --   drop view public.gv_viajes_sin_controlar, public.gv_viaje, public.gv_viaje_np;
 --   drop table public."GV_Viaje_Horas";
 --   (y en el front, volver ccSendDetail a 3 campos)
--- Migración aplicada: gv_viaje_camionero_v1
+-- Migraciones aplicadas: gv_viaje_camionero_v1 (v15.70) + gv_viaje_camionero_a_fletero_v1571
+-- (v15.71: drop + create de las 3 vistas y `alter table GV_Viaje_Horas rename column camionero to
+--  fletero`; `create or replace view` no puede renombrar una columna). NO se tocó la tabla
+--  `Camioneros` (la lee la app para autocompletar) ni el 3er campo del evento CCN.
 
 create table if not exists public."GV_Viaje_Horas" (
   fecha       date        not null,
-  camionero   text        not null,
+  fletero     text        not null,
   vuelta      smallint    not null default 1,
   horas       numeric     not null check (horas > 0 and horas <= 24),
   legajo      text,
@@ -40,11 +44,11 @@ alter table public."GV_Viaje_Horas" enable row level security;
 drop policy if exists gvvh_all on public."GV_Viaje_Horas";
 create policy gvvh_all on public."GV_Viaje_Horas" for all to anon, authenticated using (true) with check (true);
 
--- gv_viaje_np      → una fila por NP cargada, con viaje (fecha+camionero+vuelta), orden y control
+-- gv_viaje_np      → una fila por NP cargada, con viaje (fecha+fletero+vuelta), orden y control
 -- gv_viaje         → el viaje resumido + horas de hoja de ruta + ritmo m³/hora (sin súper)
 -- gv_viajes_sin_controlar → LA ALERTA: viaje empezado a controlar con NP sin controlar
 -- El cuerpo de las tres vistas está en la migración gv_viaje_camionero_v1; se reproduce con
 --   select pg_get_viewdef('public.gv_viaje_np'::regclass, true);
 -- PRUEBA:
---   select fecha, camionero, vuelta, nps, controladas, paradas, m3, m3_por_hora from public.gv_viaje order by fecha desc limit 5;
+--   select fecha, fletero, vuelta, nps, controladas, paradas, m3, m3_por_hora from public.gv_viaje order by fecha desc limit 5;
 --   select * from public.gv_viajes_sin_controlar;     -- vacía = ningún viaje quedó a medio controlar

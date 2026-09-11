@@ -12,7 +12,7 @@
 > única**; no se replica. Ante la duda entre parche rápido y fix de raíz → **fix
 > de raíz**.
 >
-> Última actualización: 2026-09-11 (viernes) · Versión app al documentar: **v15.81**
+> Última actualización: 2026-09-11 (viernes) · Versión app al documentar: **v15.71**
 >
 > Nota **v15.40 (2026-09-11) — HANDOFF de planimetría / Acacia: `docs/HANDOFF-PLANIMETRIA-Y-ACACIA.md`.**
 > Thomas sigue este tema en otra sesión. Ahí está todo junto: los **13 artículos activos del catálogo LK
@@ -11256,11 +11256,12 @@ distinta, empresa distinta.
 > 323ES suelto 22/09 · Becky `PI B260601` 29/09 · Fujian 01/11 · Hugo Wong 03/11 · Frontier 505C 04/11 ·
 > Becky `PI B260601-2` 15/11 · Zhixin 29/11 · Ownland 18/12. §3.by de `docs/SUPABASE-GESTION-VIRGILIO.md`.
 
-> Nota **2026-09-11 (v15.70) — Carga Camión: el tilde pasa a ser el ORDEN de carga (1°, 2°, 3°…) y el camionero es obligatorio.**
+> Nota **2026-09-11 (v15.70/71) — Carga Camión: el tilde pasa a ser el ORDEN de carga (1°, 2°, 3°…) y el FLETERO es obligatorio.**
 > Primera parte del **viaje del camionero** que pidió Thomas. El orden de clic viaja en el CCN como 4.º campo
 > (`NP|TANDA|CAMIONERO|ORDEN`) y con eso `gv_viaje_np` / `gv_viaje` arman el viaje sin tabla nueva; la 2.ª vuelta se
-> detecta porque el orden vuelve a 1. El camionero era opcional y se salteaba (33 cargas sin camionero el 10 y 11/09):
-> ahora no deja terminar sin él. Retira sigue con ✓ y sin camionero. §3.bx de `docs/SUPABASE-GESTION-VIRGILIO.md`.
+> detecta porque el orden vuelve a 1. El fletero era opcional y se salteaba (33 cargas sin fletero el 10 y 11/09):
+> ahora no deja terminar sin él. Retira sigue con ✓ y sin fletero. **v15.71 (Thomas): en pantalla se llama FLETERO**, y la
+> columna `camionero` de lo creado hoy pasó a `fletero` (la tabla `Camioneros` y el evento CCN no se tocan). §3.bx de `docs/SUPABASE-GESTION-VIRGILIO.md`.
 > **Falta**: RR filtrando por viaje, las horas de la hoja de ruta y la alerta en la PPP.
 
 > Nota **2026-09-11 (v15.68) — Datos: los dos clientes que OpenStreetMap no conoce, cargados con el pin de Thomas.**

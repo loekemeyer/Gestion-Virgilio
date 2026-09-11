@@ -1,5 +1,5 @@
-/* Regresión v15.70 — CARGA CAMIÓN: el tilde pasa a ser el ORDEN en que el operario fue cargando
-   (1°, 2°, 3°…) y el camionero deja de ser opcional.
+/* Regresión v15.71 — CARGA CAMIÓN: el tilde pasa a ser el ORDEN en que el operario fue cargando
+   (1°, 2°, 3°…) y el fletero deja de ser opcional.
 
    Thomas (11/09/2026): *"quiero que los operarios que usen CC, una vez que cargaron los pedidos al
    camión, a medida que den click en lo que cargan, en lugar de un simple tilde, que diga 1°, 2°,
@@ -7,16 +7,16 @@
    antes de cerrar el popup."*
 
    Por qué obligatorio: el campo existe desde la v11.47 pero se saltea. Medido el 11/09: el 10 y el
-   11/09 salieron 33 cargas SIN camionero, el 08/09 otras 10. Sin ese dato Recepción Remitos no
+   11/09 salieron 33 cargas SIN fletero, el 08/09 otras 10. Sin ese dato Recepción Remitos no
    puede juntar "las NP que entregó Guillermo el 11/09" ni se puede medir el ritmo del viaje.
 
    Chequea, sin red:
    1) el número que se muestra es el orden de CLIC, no el de la lista (se tilda 3º, 1º, 2º),
    2) destildar y volver a tildar manda esa NP al final,
    3) el orden sobrevive a cerrar y reabrir el modal (localStorage),
-   4) sin camionero NO termina la carga (y no manda ningún CCN),
-   5) con camionero, el CCN lleva 'NP|TANDA|CAMIONERO|ORDEN' en el orden de carga,
-   6) en RETIRA sigue el tilde ✓ y no se pide camionero.
+   4) sin fletero NO termina la carga (y no manda ningún CCN),
+   5) con fletero, el CCN lleva 'NP|TANDA|FLETERO|ORDEN' en el orden de carga,
+   6) en RETIRA sigue el tilde ✓ y no se pide fletero.
    Sale 1 si falla. */
 const path = require("path");
 let chromium;
@@ -83,14 +83,14 @@ catch (_e) {
     out.orden3 = chips().map(c => c.np + ":" + c.chk).join(" ");
     out.persiste = out.orden3 === out.orden2;
 
-    // --- (4) sin camionero no termina --- (ccFinish relee el INPUT, no la variable)
+    // --- (4) sin fletero no termina --- (ccFinish relee el INPUT, no la variable)
     const camInp = () => document.getElementById("ccCamioneroInput");
     camInp().value = "";
     ccFinish();
-    out.bloqueaSinCamionero = leerCola().length === 0 && out.alerts.some(a => /camionero/i.test(a));
+    out.bloqueaSinFletero = leerCola().length === 0 && out.alerts.some(a => /fletero/i.test(a));
     out.siguiAbierto = !!_cc;
 
-    // --- (5) con camionero: CCN con orden de carga ---
+    // --- (5) con fletero: CCN con orden de carga ---
     camInp().value = "Guillermo";
     ccFinish();
     out.enviados = leerCola();
@@ -99,7 +99,7 @@ catch (_e) {
       out.enviados[1] === "98602|D70A|Guillermo|2" &&
       out.enviados[2] === "98601|D70A|Guillermo|3";
 
-    // --- (6) retira: tilde ✓ y sin camionero ---
+    // --- (6) retira: tilde ✓ y sin fletero ---
     limpiarCola();
     window.fetchCCData = async function () { return [{ np: "98700", tanda: "D70C", rs: "Retira Uno", lios: 1, esRetira: true }]; };
     await showCargaCamion("104", "retira");
@@ -114,7 +114,7 @@ catch (_e) {
   const pass =
     r.orden1 === "98601:2° 98602:3° 98603:1°" &&
     r.orden2 === "98601:3° 98602:2° 98603:1°" &&
-    r.persiste && r.bloqueaSinCamionero && r.siguiAbierto && r.ccnOk &&
+    r.persiste && r.bloqueaSinFletero && r.siguiAbierto && r.ccnOk &&
     r.retiraChk === "✓" && r.retiraSinInput && /^98700\|D70C\|\|$/.test(r.retiraEnvio) &&
     errs.length === 0;
   const { alerts, ...vis } = r;

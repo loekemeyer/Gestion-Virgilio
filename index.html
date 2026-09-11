@@ -7757,7 +7757,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v15.82";
+const APP_VERSION = "v15.71";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -26333,8 +26333,8 @@ async function _ccAttachUbicYOrden(items) {
 }
 
 /* v11.47 — al tocar CC, primero se elige RETIRA o CAMIÓN. Camión = todos los pedidos
-   salvo los retira, con nombre de camionero (autocompletado). Retira = solo los retira,
-   contados en cajas, sin camionero. */
+   salvo los retira, con nombre de fletero (autocompletado). Retira = solo los retira,
+   contados en cajas, sin fletero. */
 async function showCargaCamion(legajo, mode) {
   const m = document.getElementById("tandaModal"); if (!m) return;
   const leg = String(legajo || "").trim();
@@ -26390,11 +26390,13 @@ function ccRender() {
   let html = `<div class="cc-sub">${esRetira ? "Pedidos <b>retira</b> — tocá los que <b>entregaste</b> (se cuentan en <b>cajas</b>)." : "NP del <b>reparto</b> — tocá los que <b>cargaste al camión</b>."}` +
              (!esRetira && hasOrden ? ` Están en <b>orden de carga</b>: el <b>último destino</b> de cada camión se carga <b>primero</b> (el círculo verde 1 = primero en subir).` : ``) +
              (!esRetira ? ` Al tocarlos queda el <b>orden en que los cargaste</b> (1°, 2°, 3°…).` : ``) + `</div>`;
-  // v11.47 — camión: nombre del camionero con autocompletado (maestro Camioneros).
+  // v11.47 — camión: nombre del fletero con autocompletado (maestro Camioneros).
+  // v15.71 (Thomas) — en pantalla se llama FLETERO. La tabla Camioneros y la columna `camionero`
+  // del evento no se renombran: es el mismo dato, sólo cambia cómo se lo nombra al operario.
   if (!esRetira) {
     const opts = (_cc.camioneros || []).map(function (n) { return `<option value="${escapeHtml(n)}"></option>`; }).join("");
-    html += `<div class="cc-camionero-wrap"><label class="cc-camionero-lbl">🧑‍✈️ Camionero</label>` +
-            `<input id="ccCamioneroInput" class="cc-camionero-inp" list="ccCamioneroList" autocomplete="off" placeholder="Nombre del camionero…" value="${escapeHtml(_cc.camionero || "")}" oninput="_cc && (_cc.camionero = this.value)" />` +
+    html += `<div class="cc-camionero-wrap"><label class="cc-camionero-lbl">🚚 Fletero</label>` +
+            `<input id="ccCamioneroInput" class="cc-camionero-inp" list="ccCamioneroList" autocomplete="off" placeholder="Nombre del fletero…" value="${escapeHtml(_cc.camionero || "")}" oninput="_cc && (_cc.camionero = this.value)" />` +
             `<datalist id="ccCamioneroList">${opts}</datalist></div>`;
   }
   // v15.70 (Thomas) — "a medida que den click en lo que cargan, en lugar de un simple tilde, que
@@ -26462,20 +26464,20 @@ function ccFinish() {
   if (!esRetira) {
     try { const inp = document.getElementById("ccCamioneroInput"); if (inp) _cc.camionero = inp.value; } catch (_e) {}
     camionero = String(_cc.camionero || "").trim();
-    // v15.70 (Thomas) — el camionero pasa a ser OBLIGATORIO. Era un aviso que se podía saltear y
-    // se salteaba: el 10 y el 11/09 salieron 33 cargas sin camionero, el 08/09 otras 10. Sin ese
+    // v15.70 (Thomas) — el fletero pasa a ser OBLIGATORIO. Era un aviso que se podía saltear y
+    // se salteaba: el 10 y el 11/09 salieron 33 cargas sin fletero, el 08/09 otras 10. Sin ese
     // dato Recepción Remitos no puede mostrar "las NP que entregó Guillermo el 11/09" ni se puede
-    // medir el ritmo del viaje. Retira no lleva camionero (se entrega en el depósito).
+    // medir el ritmo del viaje. Retira no lleva fletero (se entrega en el depósito).
     if (!camionero) {
       try {
-        alert("Falta el nombre del camionero.\n\nEs el que después junta las NP de este camión en Recepción Remitos: sin él no se puede controlar el viaje.");
+        alert("Falta el nombre del fletero.\n\nEs el que después junta las NP de este camión en Recepción Remitos: sin él no se puede controlar el viaje.");
         const inp = document.getElementById("ccCamioneroInput"); if (inp) inp.focus();
       } catch (_e) {}
       return;
     }
   }
   // v15.70 — en el ORDEN EN QUE SE CARGARON (el del Set, no el de la lista en pantalla): ese
-  // número es el que se manda con cada CCN y arma el recorrido del camionero.
+  // número es el que se manda con cada CCN y arma el recorrido del fletero.
   const _byNp = {}; _cc.items.forEach(function (it) { _byNp[it.np] = it; });
   const sel = Array.from(_cc.checked).map(function (np) { return _byNp[np]; }).filter(Boolean);
   // v15.33 — a diferencia de Recepción Remitos (crFinish), tocar "Terminé" sin tildar ningún NP
@@ -26487,7 +26489,7 @@ function ccFinish() {
   ccSendClose(legajo);                                          // cierre CC
   ccClearChecked(legajo);
   _cc = null; ccReleaseWakeLock(); closeTandaModal();
-  try { alert((esRetira ? "🚶 Retira terminado. " : "🚛 Carga Camión terminada. ") + sel.length + (esRetira ? " retira(s) entregados." : " NP cargadas.") + (camionero ? "\nCamionero: " + camionero : "")); } catch (_e) {}
+  try { alert((esRetira ? "🚶 Retira terminado. " : "🚛 Carga Camión terminada. ") + sel.length + (esRetira ? " retira(s) entregados." : " NP cargadas.") + (camionero ? "\nFletero: " + camionero : "")); } catch (_e) {}
 }
 function ccSendClose(legajo) {
   const st = getLegajoState(legajo);
@@ -26504,7 +26506,7 @@ function ccSendDetail(legajo, np, tanda, camionero, orden) {
   // v11.47 — CCN texto: NP|TANDA|CAMIONERO. El camionero solo va en camión (en retira queda vacío).
   // Las vistas leen split_part [1]=np, [2]=tanda → el 3er campo no las afecta.
   // v15.70 — se agrega un 4º campo con el ORDEN DE CARGA (1, 2, 3…). Con eso `gv_viaje_np` arma
-  // el viaje del camionero y detecta la 2ª vuelta (el orden vuelve a empezar en 1). Mismo criterio
+  // el viaje del fletero y detecta la 2ª vuelta (el orden vuelve a empezar en 1). Mismo criterio
   // que el 3er campo: los lectores viejos toman [1] y [2] y no se enteran.
   const cam = String(camionero || "").trim();
   const ord = (orden == null || !isFinite(orden)) ? "" : String(orden);

@@ -6321,7 +6321,7 @@ protegido sin tocar ese código. Si algún día se agrega al payload, (a0) no ca
 `v_pedidos_web_np` anterior, y hay que borrar el cron `sync-diferido-virgilio` (jobid 41) y el trigger
 `marcar_pedido_diferido` de `orders`. Nada de esto toca objetos de Producción.
 
-## 3.bx El viaje del camionero: CC numera, RR controla por viaje (v15.70) — 2026-09-11
+## 3.bx El viaje del FLETERO: CC numera, RR controla por viaje (v15.70/71) — 2026-09-11
 
 **Pedido de Thomas**, en dos partes. CC: *"a medida que den click en lo que cargan, en lugar de un
 simple tilde, que diga 1°, 2°, 3°… una vez que ya terminó de cargar el camión, que le pregunte el
@@ -6360,7 +6360,14 @@ modal; los CCN se emiten en ese orden. Retira sigue con ✓ y sin camionero.
 Test `tests/cc-orden-camionero.cjs`. **Falta** (tarea Planify abierta): RR filtrando por viaje, las
 horas de la hoja de ruta y la alerta en la PPP.
 
-`sql/gv_viaje_camionero_v1570.sql` · migración `gv_viaje_camionero_v1`.
+**v15.71 — se llama FLETERO, no camionero.** Thomas: *"hacé que desde ahora en adelante sea con
+fletero, para la próxima CC, el lunes"*. En la app el operario ve **🚚 Fletero** (etiqueta,
+placeholder, el aviso de obligatorio y el resumen final), y la columna `camionero` de lo creado hoy
+pasó a `fletero` en `GV_Viaje_Horas` y en las tres vistas — tenían horas de vida y ningún lector,
+así que renombrar salía gratis. **No** se tocó la tabla `Camioneros` (existe desde agosto, la lee la
+app para autocompletar) ni el 3.er campo del evento CCN: es el mismo dato, sólo cambia el nombre.
+
+`sql/gv_viaje_camionero_v1570.sql` · migraciones `gv_viaje_camionero_v1` + `gv_viaje_camionero_a_fletero_v1571`.
 
 ## 3.by Pedidos de importación EN CURSO, separados del generador: embarque y llegada (v15.72) — 2026-09-11
 
