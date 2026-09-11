@@ -1,0 +1,182 @@
+-- ════════════════════════════════════════════════════════════════════
+-- PLANIMETRÍA DE INSUMOS — los datos, no sólo la referencia  (2026-09-11)
+--
+-- Pedido de Luis: "fijate de que no se pierda el dato de la planimetría de los
+-- insumos que dejé aparte".
+--
+-- ⚠ POR QUÉ EXISTE ESTE ARCHIVO. `gv_lugar_carga_inicial.sql` decía, textual:
+--     "(las 143 filas de insumo / sin_resolver se insertaron en GV_Lugar_Pendiente
+--       desde el relevamiento; ver el chat de la sesión para el detalle)"
+-- O sea que el dato vivía SÓLO en la base y el respaldo era una conversación.
+-- Acá quedan las 148 filas completas, en el repo, para poder recrear la tabla desde
+-- cero sin depender de nada más.
+--
+-- QUÉ SON. Lo que el relevamiento del depósito (11/09) encontró en cada lugar y
+-- que NO es un artículo de venta:
+--   · `insumo`         — materia prima y repuestos (PP 2630, NY VIRGEN, ABS, los
+--                        códigos letra+número tipo C15/B13, los moldes N°xx…).
+--   · `sin_resolver`   — grafías distintas del mismo dato en los racks de moldes
+--                        ("92" y "N°92", "DISC1" y "DISC.1"): hay que unificarlas
+--                        cuando se trabaje el módulo de insumos.
+--   · `no_es_articulo` — 809E-PIZZA / 809E-QUESO (sufijo manual sobre un dual: el
+--                        lugar ya dice la empresa) y 522S / 523C / 592E, que no
+--                        existen en Volumen_Articulos ni en precios_venta.
+--
+-- NO se conectan a nada todavía. Los 51 racks de insumos están en `GV_Lugar` con
+-- empresa `IN` (no LK ni CH, decisión de Luis del 11/09).
+-- ════════════════════════════════════════════════════════════════════
+
+insert into public."GV_Lugar_Pendiente"(sector, cod, motivo, nota) values
+  ('A01','C15','insumo',null),
+  ('A02','B13','insumo',null),
+  ('A03','B13','insumo',null),
+  ('A05','C6','insumo',null),
+  ('A06','C6','insumo',null),
+  ('AC03','584E','insumo',null),
+  ('AC06','584E','insumo',null),
+  ('AD02','522ES','insumo',null),
+  ('AD02','522S','no_es_articulo','no existe en Volumen_Articulos ni en precios_venta'),
+  ('AD04','H201PART','insumo',null),
+  ('AD05','809E-QUESO','no_es_articulo','sufijo manual sobre un dual; el lugar ya dice la empresa. Luis 11/09: probablemente sea un insumo o un codigo que se usaba para insumo'),
+  ('AE11','809E-PIZZA','no_es_articulo','sufijo manual sobre un dual; el lugar ya dice la empresa. Luis 11/09: probablemente sea un insumo o un codigo que se usaba para insumo'),
+  ('AF01','PP 2630','insumo',null),
+  ('AF03','ABS','insumo',null),
+  ('AF05','NY VIRGEN','insumo',null),
+  ('AF10','PE POLIE','insumo',null),
+  ('AF11','NY C/CARGA 25%','insumo',null),
+  ('AF13','PS PE','insumo',null),
+  ('AF14','AI','insumo',null),
+  ('AF20','NY RECUP','insumo',null),
+  ('B01','A4','insumo',null),
+  ('B02','A4','insumo',null),
+  ('B03','A7','insumo',null),
+  ('B04','A9','insumo',null),
+  ('B05','C5','insumo',null),
+  ('B06','C6','insumo',null),
+  ('C01','DISC.1','sin_resolver',null),
+  ('C01','DISC1','sin_resolver',null),
+  ('C02','DISC.1','sin_resolver',null),
+  ('C02','DISC1','sin_resolver',null),
+  ('C05','C15','insumo',null),
+  ('C06','B9','insumo',null),
+  ('D01','DISC5','insumo',null),
+  ('D03','C1','insumo',null),
+  ('D04','D4','insumo',null),
+  ('D05','DISC2','insumo',null),
+  ('D06','DISC3','insumo',null),
+  ('E01','A15','insumo',null),
+  ('E02','A15','insumo',null),
+  ('E05','C9','insumo',null),
+  ('E06','A10','insumo',null),
+  ('F01','GRJ9','insumo',null),
+  ('F02','GRJ9','insumo',null),
+  ('F06','D14','insumo',null),
+  ('G01','Z33','insumo',null),
+  ('G02','G10','insumo',null),
+  ('G03','Z26','insumo',null),
+  ('G04','H15','insumo',null),
+  ('G05','DISC. 4','sin_resolver',null),
+  ('G05','DISC4','sin_resolver',null),
+  ('G06','DISC. 4','sin_resolver',null),
+  ('G06','DISC4','sin_resolver',null),
+  ('H01','A9','insumo',null),
+  ('H02','N7','insumo',null),
+  ('H03','N7','insumo',null),
+  ('H04','N7','insumo',null),
+  ('H05','I11','insumo',null),
+  ('H06','I11','insumo',null),
+  ('H07','I11','insumo',null),
+  ('H60','592E','no_es_articulo','no existe en Volumen_Articulos ni en precios_venta'),
+  ('I04','Z39','insumo',null),
+  ('J01','G11','insumo',null),
+  ('J02','G11','insumo',null),
+  ('J03','G11','insumo',null),
+  ('J04','G13','insumo',null),
+  ('J06','Z2B','insumo',null),
+  ('K04','G11','insumo',null),
+  ('K05','Z39','insumo',null),
+  ('K06','Z37','insumo',null),
+  ('L01','DISC.1','sin_resolver',null),
+  ('L01','DISC1','sin_resolver',null),
+  ('L02','DISC.1','sin_resolver',null),
+  ('L02','DISC1','sin_resolver',null),
+  ('L03','DISC.1','sin_resolver',null),
+  ('L03','DISC1','sin_resolver',null),
+  ('L04','DISC.1','sin_resolver',null),
+  ('L04','DISC1','sin_resolver',null),
+  ('L06','Z37','insumo',null),
+  ('N07','CB01','insumo',null),
+  ('O01','H201LEVER','insumo',null),
+  ('Q34','EBA','insumo',null),
+  ('R02AT','92','sin_resolver',null),
+  ('R02AT','N°92','sin_resolver',null),
+  ('R06AD','72','sin_resolver',null),
+  ('R06AD','N°72','sin_resolver',null),
+  ('R06AT','19','sin_resolver',null),
+  ('R06AT','N°19','sin_resolver',null),
+  ('R07AT','74','sin_resolver',null),
+  ('R07AT','N°74','sin_resolver',null),
+  ('R08AD','64','sin_resolver',null),
+  ('R08AD','N°64','sin_resolver',null),
+  ('R08AT','--','sin_resolver',null),
+  ('R08AT','2565','sin_resolver',null),
+  ('R08AT','N°36','sin_resolver',null),
+  ('R09AD','93','sin_resolver',null),
+  ('R09AD','N°93','sin_resolver',null),
+  ('R09AT','56','sin_resolver',null),
+  ('R09AT','N°56','sin_resolver',null),
+  ('R11AD','63','sin_resolver',null),
+  ('R11AD','81','sin_resolver',null),
+  ('R11AD','N°63','sin_resolver',null),
+  ('R11AD','N°81','sin_resolver',null),
+  ('R11AT','-','sin_resolver',null),
+  ('R11AT','1645','sin_resolver',null),
+  ('R11AT','N°35','sin_resolver',null),
+  ('R12AD','46B','sin_resolver',null),
+  ('R12AD','N°46B','sin_resolver',null),
+  ('R13AD','2','sin_resolver',null),
+  ('R13AD','N°2','sin_resolver',null),
+  ('R13AT','44','sin_resolver',null),
+  ('R13AT','N°44','sin_resolver',null),
+  ('R14AD','45','sin_resolver',null),
+  ('R14AD','N°45','sin_resolver',null),
+  ('R14AT','17','sin_resolver',null),
+  ('R14AT','N°17','sin_resolver',null),
+  ('R15','90','sin_resolver',null),
+  ('R15','N°90','sin_resolver',null),
+  ('V02AD','22','sin_resolver',null),
+  ('V02AD','N°22','sin_resolver',null),
+  ('V09AD','20','sin_resolver',null),
+  ('V09AD','N°20','sin_resolver',null),
+  ('V09AT','---','sin_resolver',null),
+  ('V09AT','2615','sin_resolver',null),
+  ('V09AT','4','sin_resolver',null),
+  ('V09AT','N°18','sin_resolver',null),
+  ('V10AD','24','sin_resolver',null),
+  ('V10AD','N°24','sin_resolver',null),
+  ('V10AT','----','sin_resolver',null),
+  ('V10AT','2745','sin_resolver',null),
+  ('V10AT','N°37','sin_resolver',null),
+  ('V11AD','69','sin_resolver',null),
+  ('V11AD','N°69','sin_resolver',null),
+  ('V12AD','7','sin_resolver',null),
+  ('V12AD','N°7','sin_resolver',null),
+  ('V14AD','13','sin_resolver',null),
+  ('V14AD','N°13','sin_resolver',null),
+  ('W01','523C','no_es_articulo','no existe en Volumen_Articulos ni en precios_venta'),
+  ('W04','522S','no_es_articulo','no existe en Volumen_Articulos ni en precios_venta'),
+  ('X09','440E','insumo',null),
+  ('X20','505C','insumo',null),
+  ('X21','440E','insumo',null),
+  ('X22','439E','insumo',null),
+  ('X23','440E','insumo',null),
+  ('X24','439E','insumo',null),
+  ('Y04','H201PART','insumo',null),
+  ('Z02','337P','insumo',null),
+  ('Z02','7','insumo',null),
+  ('Z10','584E','insumo',null)
+on conflict (sector, cod) do nothing;
+
+-- Verificación: select count(*) from public."GV_Lugar_Pendiente";   -- → 148
+-- Por motivo:
+--   select motivo, count(*) from public."GV_Lugar_Pendiente" group by 1 order by 2 desc;

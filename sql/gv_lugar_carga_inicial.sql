@@ -94,8 +94,10 @@ on conflict (sector,cod) do nothing;
 delete from public."GV_Lugar_Item"
 where cod in ('809E-PIZZA','809E-QUESO','522S','523C','592E','PEDIDOS','CAJAS','VASTIDOR');
 
--- (las 143 filas de insumo / sin_resolver se insertaron en GV_Lugar_Pendiente
---  desde el relevamiento; ver el chat de la sesión para el detalle)
+-- Las filas de insumo / sin_resolver del relevamiento van a GV_Lugar_Pendiente.
+-- ⚠ Los DATOS (las 148 filas completas) están en `sql/gv_lugar_insumos_pendientes.sql`.
+-- Acá decía "ver el chat de la sesión para el detalle", que no es un respaldo: el
+-- dato vivía sólo en la base. Se materializó el 11/09 a pedido de Luis.
 
 -- ── Decisiones de Luis, 2026-09-11 (cierre de la carga) ──────────────
 -- Ñ53: es de LOKE y está LIBRE. El 439E que traían las tablas viejas no
