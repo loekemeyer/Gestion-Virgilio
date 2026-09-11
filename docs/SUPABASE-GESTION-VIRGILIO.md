@@ -6020,7 +6020,19 @@ Di Leo Rossi $2,6 M en E01D, Ierakuin $2,1 M en E03B del 15/09, Gifel $2,0 M en 
 Clapera $4,9 M en E12G del 17/09). Retirar mercadería ya armada es una decisión comercial: queda
 registrado como problema **abierto** en `github_repo_problemas`, sin tocar la PPP.
 
-**El candado, ahora por BLOQUE.** La v15.58 dejaba fuera de la evaluación al pedido entero si **un**
+
+**Verificado en la corrida real (mismo día).** La Edge Function quedó en **v25** (13:22 ART; la v23,
+13:00, ya traía el filtro y la v25 agrega el candado por bloque). La corrida del cron de las **13:15:13**
+cerró sola las **6** tareas que le quedaban abiertas a Viviana (CH 217 · 218 · 225, LK 1349 · 1354 ·
+1384): con cero pedidos pendientes en cuarentena el sync manda lista vacía y eso es lo que las cierra.
+
+La séptima, **LK 1346 BP Import, no la cerró el fix: salió sola a las 12:43:46 porque el cliente pagó.**
+El reporte de deuda subido a las 12:43:28 le bajó el saldo de **$836.136,98 a $0,01**, debajo del umbral
+de $1.000, y `gv_cuarentena_marcar` dejó de marcarlo. Es el mecanismo funcionando como tiene que
+funcionar. ⚠ Por eso BP Import **no** cuenta como cliente con deuda y pedido ya armado: se lo sacó del
+registro de auditoría, que en su primera versión lo incluía.
+
+\n**El candado, ahora por BLOQUE.** La v15.58 dejaba fuera de la evaluación al pedido entero si **un**
 bloque tenía tanda; un bloque todavía pendiente de un cliente con deuda se habría podido programar
 solo. Se verificó que hoy **no existe ningún pedido partido** (0 filas con bloques con y sin tanda a
 la vez), pero el armado no puede depender de eso: `pedidosYaTomados(emp, filas)` ahora compara
