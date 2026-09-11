@@ -3061,6 +3061,9 @@ tr.ppp-err-zona > td{ background:#fffbeb !important; }
 .cc-np.cc-on{ background: #ecfdf5; border-color: #16a34a; }
 .cc-chk{ width: 24px; height: 24px; border-radius: 6px; border: 2px solid #cbd5e1; display: inline-flex; align-items: center; justify-content: center; color: #fff; font-weight: bold; flex: 0 0 auto; }
 .cc-np.cc-on .cc-chk{ border-color: #16a34a; background: #16a34a; }
+/* v15.70 — el tilde pasa a ser el ORDEN en que se cargó (1°, 2°, 3°…): número chico para que
+   entren dos dígitos en el mismo cuadrado de 24 px. */
+.cc-chk.cc-ord{ font-size: 12px; letter-spacing: -.5px; }
 .cc-npnum{ font-size: 18px; font-weight: bold; color: #0f172a; }
 .cc-rs{ font-size: 13px; color: #64748b; margin-left: auto; text-align: right; }
 .cc-lios{ flex: 0 0 auto; font-size: 14px; font-weight: 800; color: #b45309; white-space: nowrap; }
@@ -7698,7 +7701,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v15.69";
+const APP_VERSION = "v15.70";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -25366,7 +25369,12 @@ async function showCargaCamion(legajo, mode) {
       return;
     }
     const saved = ccLoadChecked(leg);
-    _cc = { legajo: leg, mode: mode, camionero: "", camioneros: camioneros, items: items, checked: new Set(items.filter(it => saved.has(it.np)).map(it => it.np)) };
+    // v15.70 — el Set conserva el ORDEN DE CLIC (= orden real de carga) y así se guarda y se
+    // relee. Antes se reconstruía recorriendo `items`, que están en orden de ruta: al reabrir el
+    // modal el orden en que el operario los fue tocando se perdía.
+    const _vivos = new Set(items.map(it => it.np));
+    _cc = { legajo: leg, mode: mode, camionero: "", camioneros: camioneros, items: items,
+            checked: new Set(Array.from(saved).filter(np => _vivos.has(np))) };
     ccRender();
   } catch (e) {
     _cc = null; ccReleaseWakeLock();
@@ -25392,7 +25400,8 @@ function ccRender() {
   // Las NP sin ubicación en ruta caen en una sección aparte, ordenadas por tanda.
   const hasOrden = _cc.items.some(function (it) { return isFinite(it.loadIdx); });
   let html = `<div class="cc-sub">${esRetira ? "Pedidos <b>retira</b> — tocá los que <b>entregaste</b> (se cuentan en <b>cajas</b>)." : "NP del <b>reparto</b> — tocá los que <b>cargaste al camión</b>."}` +
-             (!esRetira && hasOrden ? ` Están en <b>orden de carga</b>: el <b>último destino</b> de cada camión se carga <b>primero</b> (1 = primero en subir).` : ``) + `</div>`;
+             (!esRetira && hasOrden ? ` Están en <b>orden de carga</b>: el <b>último destino</b> de cada camión se carga <b>primero</b> (el círculo verde 1 = primero en subir).` : ``) +
+             (!esRetira ? ` Al tocarlos queda el <b>orden en que los cargaste</b> (1°, 2°, 3°…).` : ``) + `</div>`;
   // v11.47 — camión: nombre del camionero con autocompletado (maestro Camioneros).
   if (!esRetira) {
     const opts = (_cc.camioneros || []).map(function (n) { return `<option value="${escapeHtml(n)}"></option>`; }).join("");
@@ -25400,6 +25409,11 @@ function ccRender() {
             `<input id="ccCamioneroInput" class="cc-camionero-inp" list="ccCamioneroList" autocomplete="off" placeholder="Nombre del camionero…" value="${escapeHtml(_cc.camionero || "")}" oninput="_cc && (_cc.camionero = this.value)" />` +
             `<datalist id="ccCamioneroList">${opts}</datalist></div>`;
   }
+  // v15.70 (Thomas) — "a medida que den click en lo que cargan, en lugar de un simple tilde, que
+  // diga 1°, 2°, 3°". Ése es el ORDEN REAL de carga (distinto del sugerido por ruta, el círculo
+  // verde de la izquierda) y es el que viaja al CCN para armar el viaje del camionero.
+  const _ordClic = {};
+  Array.from(_cc.checked).forEach(function (np, i) { _ordClic[np] = i + 1; });
   let curSec = null;
   let pos = 0;
   for (const it of _cc.items) {
@@ -25419,7 +25433,7 @@ function ccRender() {
     const ubic = it.ubic ? `<span class="cc-ubic" title="dónde quedó armado">📌 ${escapeHtml(it.ubic)}</span>` : "";
     html += `<div class="cc-np${on ? " cc-on" : ""}" onclick="ccToggle('${String(it.np).replace(/[^0-9A-Za-z]/g, "")}')">` +
             (!esRetira && enRuta ? `<span class="cc-pos">${pos}</span>` : "") +
-            `<span class="cc-chk">${on ? "✓" : ""}</span>` +
+            `<span class="cc-chk${on && !esRetira ? " cc-ord" : ""}"${on && !esRetira ? ' title="orden en que lo cargaste"' : ""}>${on ? (esRetira ? "✓" : _ordClic[it.np] + "°") : ""}</span>` +
             `<span class="cc-npnum">${escapeHtml(it.np)}</span>` +
             ubic +
             `<span class="cc-rs">${escapeHtml(it.rs)}</span>` +
@@ -25460,16 +25474,27 @@ function ccFinish() {
   if (!esRetira) {
     try { const inp = document.getElementById("ccCamioneroInput"); if (inp) _cc.camionero = inp.value; } catch (_e) {}
     camionero = String(_cc.camionero || "").trim();
+    // v15.70 (Thomas) — el camionero pasa a ser OBLIGATORIO. Era un aviso que se podía saltear y
+    // se salteaba: el 10 y el 11/09 salieron 33 cargas sin camionero, el 08/09 otras 10. Sin ese
+    // dato Recepción Remitos no puede mostrar "las NP que entregó Guillermo el 11/09" ni se puede
+    // medir el ritmo del viaje. Retira no lleva camionero (se entrega en el depósito).
     if (!camionero) {
-      try { if (!confirm("No pusiste el nombre del camionero.\n¿Terminar igual sin camionero?")) return; } catch (_e) {}
+      try {
+        alert("Falta el nombre del camionero.\n\nEs el que después junta las NP de este camión en Recepción Remitos: sin él no se puede controlar el viaje.");
+        const inp = document.getElementById("ccCamioneroInput"); if (inp) inp.focus();
+      } catch (_e) {}
+      return;
     }
   }
-  const sel = _cc.items.filter(it => _cc.checked.has(it.np));
+  // v15.70 — en el ORDEN EN QUE SE CARGARON (el del Set, no el de la lista en pantalla): ese
+  // número es el que se manda con cada CCN y arma el recorrido del camionero.
+  const _byNp = {}; _cc.items.forEach(function (it) { _byNp[it.np] = it; });
+  const sel = Array.from(_cc.checked).map(function (np) { return _byNp[np]; }).filter(Boolean);
   // v15.33 — a diferencia de Recepción Remitos (crFinish), tocar "Terminé" sin tildar ningún NP
   // cerraba el toggle CC igual, sin avisar: quedaba tiempo de CC registrado sin ningún NP cargado
   // (auditoría revisor-logica 2026-09-11).
   if (!sel.length) { try { alert("Tildá al menos un NP " + (esRetira ? "entregado" : "cargado") + ", o tocá «Cerrar» para salir."); } catch (_e) {} return; }
-  for (const it of sel) ccSendDetail(legajo, it.np, it.tanda, camionero);   // CCN por cada NP cargada (con camionero)
+  sel.forEach(function (it, i) { ccSendDetail(legajo, it.np, it.tanda, camionero, esRetira ? null : i + 1); });   // CCN por NP, con camionero y orden de carga
   if (camionero) ccUpsertCamionero(camionero);                  // guarda el nombre en el maestro Camioneros
   ccSendClose(legajo);                                          // cierre CC
   ccClearChecked(legajo);
@@ -25486,16 +25511,20 @@ function ccSendClose(legajo) {
   try { enqueueReport(payload); if (typeof trySendOneReport === "function") trySendOneReport(payload).then(r => { if (r && r.ok) removeFromQueue(payload.id); }).catch(() => {}); } catch (_e) {}
   try { updatePendingIndicator(); updateCoreButtonsState(); } catch (_e) {}
 }
-function ccSendDetail(legajo, np, tanda, camionero) {
+function ccSendDetail(legajo, np, tanda, camionero, orden) {
   const nowMs = Date.now();
   // v11.47 — CCN texto: NP|TANDA|CAMIONERO. El camionero solo va en camión (en retira queda vacío).
   // Las vistas leen split_part [1]=np, [2]=tanda → el 3er campo no las afecta.
+  // v15.70 — se agrega un 4º campo con el ORDEN DE CARGA (1, 2, 3…). Con eso `gv_viaje_np` arma
+  // el viaje del camionero y detecta la 2ª vuelta (el orden vuelve a empezar en 1). Mismo criterio
+  // que el 3er campo: los lectores viejos toman [1] y [2] y no se enteran.
   const cam = String(camionero || "").trim();
+  const ord = (orden == null || !isFinite(orden)) ? "" : String(orden);
   // v15.33 — "—" es el placeholder de PANTALLA cuando Facturacion_NP.tanda viene vacío; no debe
   // persistirse literal en Registros_Produccion_Virgilio (otros lectores esperan un código real
   // tipo C03A o nada, no el carácter "—" — auditoría revisor-logica 2026-09-11).
   const tandaPersist = (String(tanda || "").trim() === "—") ? "" : tanda;
-  const texto = (String(np) + "|" + String(tandaPersist)).toUpperCase() + "|" + cam;
+  const texto = (String(np) + "|" + String(tandaPersist)).toUpperCase() + "|" + cam + "|" + ord;
   const payload = {
     legajo: legajo, opcion: "CCN", descripcion: "Carga Camión NP",
     texto: texto,

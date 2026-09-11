@@ -6285,3 +6285,44 @@ protegido sin tocar ese código. Si algún día se agrega al payload, (a0) no ca
 `def`. Después `drop table public."GV_PPP_Web_Diferido"`. Del lado LK: `gv_backup_vistas` tiene la
 `v_pedidos_web_np` anterior, y hay que borrar el cron `sync-diferido-virgilio` (jobid 41) y el trigger
 `marcar_pedido_diferido` de `orders`. Nada de esto toca objetos de Producción.
+
+## 3.bx El viaje del camionero: CC numera, RR controla por viaje (v15.70) — 2026-09-11
+
+**Pedido de Thomas**, en dos partes. CC: *"a medida que den click en lo que cargan, en lugar de un
+simple tilde, que diga 1°, 2°, 3°… una vez que ya terminó de cargar el camión, que le pregunte el
+nombre del camionero"*. RR: *"primero lo deja elegir una NP igual que ahora… una vez elegida, ya
+tenés el dato de qué camionero corresponde → que muestre las NP que entregó Guille el 11/9"*, más
+la alerta de lo que quedó sin controlar y las horas de la hoja de ruta para calcular el ritmo.
+Excepciones suyas: **Retira** no tiene camionero (se controla y guarda en el momento) y el **súper**
+no se compara contra los clientes (*"se demora mucho más para entregar un supermercado"*).
+
+**No hay tabla de viajes.** El camionero ya viajaba en el evento **CCN** desde la v11.47
+(`texto = 'NP|TANDA|CAMIONERO'`); la v15.70 agrega un 4.º campo con el **orden de carga real**:
+`'NP|TANDA|CAMIONERO|ORDEN'`. Los lectores viejos toman `split_part` [1] y [2] y no se enteran.
+La **vuelta** no se pregunta: la 2.ª se detecta sola porque el orden vuelve a empezar en 1 dentro
+del mismo camionero + día (Thomas: *"son 2, pero no hacen dos vueltas casi nunca"*).
+
+| Objeto | Qué es |
+|---|---|
+| `gv_viaje_np` | una fila por NP cargada: viaje (fecha + camionero + vuelta), orden, m³, si es súper o retira, y si ya se controló el remito (CRN) |
+| `gv_viaje` | el viaje resumido: NP, controladas, paradas, m³ + las horas de la hoja de ruta + **m³/hora** (en blanco si el viaje lleva súper) |
+| `gv_viajes_sin_controlar` | **la alerta de la PPP**: viajes con al menos un remito controlado y NP sin controlar |
+| `GV_Viaje_Horas` | lo único que no se deriva de un evento: las horas que declara la hoja de ruta |
+
+**Medido al aplicar, sin tocar un dato:** 8 viajes históricos reconstruidos (Guillermo 03/09: 29 NP,
+16 paradas, 5,28 m³ · Edgardo 09/09: un súper de 2,99 m³, que queda sin ritmo a propósito) y
+`gv_viajes_sin_controlar` vacía.
+
+**El agujero que destapó:** **773 NP cargadas sin camionero**. El campo era opcional y se salteaba —
+el 10 y el 11/09 salieron **33 cargas sin camionero**, el 08/09 otras 10, el 27 y el 24/08 todas.
+Sin ese dato no hay viaje que controlar ni ritmo que medir, así que en la v15.70 **pasa a ser
+obligatorio** en la app (antes era un aviso que se podía saltear con "Terminar igual").
+
+**Front (v15.70, sólo CC):** el cuadrito del tilde muestra **1°, 2°, 3°…** en el orden en que el
+operario los fue tocando (el círculo verde de la izquierda sigue siendo el orden *sugerido* por
+ruta, que es otra cosa); ese orden se guarda en `localStorage` y sobrevive a cerrar y reabrir el
+modal; los CCN se emiten en ese orden. Retira sigue con ✓ y sin camionero.
+Test `tests/cc-orden-camionero.cjs`. **Falta** (tarea Planify abierta): RR filtrando por viaje, las
+horas de la hoja de ruta y la alerta en la PPP.
+
+`sql/gv_viaje_camionero_v1570.sql` · migración `gv_viaje_camionero_v1`.

@@ -377,3 +377,6 @@ PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node te
 
 echo "== corr-reparto-sec (v15.66: Corregir códigos — el stock del secundario se reparte entre TODAS las NP que lo piden; sec_cubre de la vista en panel, badge y chip) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/corr-reparto-sec.cjs
+
+echo "== cc-orden-camionero (v15.70: Carga Camión — el tilde es el orden de carga 1°,2°,3° y el camionero es obligatorio) =="
+PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/cc-orden-camionero.cjs
