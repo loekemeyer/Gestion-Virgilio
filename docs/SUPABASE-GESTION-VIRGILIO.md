@@ -5189,3 +5189,29 @@ Dueño: *"todos los datos que tengas que corregir, dale"*. Barrido sobre `v_impo
   2 args (idéntica sin `p_empresa`); en LK `cron.unschedule('sync-proyeccion-emp-virgilio')`, drop de las 3 funciones +
   foreign table, y recrear `fn_ventas_mensuales_virgilio(text,integer)`; `drop table "GV_Proyeccion_Emp"`.
   SQL: `sql/gv_proyeccion_emp_v1523.sql`.
+
+### §3.bm.16 — Proyección: variantes L se SUMAN, familias nacional→importado y pantalla Stock por empresa (v15.24, 2026-09-11)
+
+- Dueño: *"por las dudas 580/580E, 574E/574; revisá si hay más"*. Revisión de los ~150 códigos de Importados contra
+  `sales_lines` de LK (6 meses), `sales_item_remap` de LK y `Equivalencias_Familia` de Virgilio:
+  1. **Variantes `…L` / `…EL`** (artículo LK vendido por la página de Chef): `GV_Proyeccion_Emp` las trae como ítems
+     separados (102EL, 106EL, 439EL, 960EL, 404EL…). El CTE `pe` de `v_importados_ordenes` tomaba `max()` al colapsarlas
+     con `gv_cod_stock` → perdía la variante. Ahora **suma**: 106E 5,7 → **32,8** caj/mes, 102E 151,5 → 183,3, 404E 49 → 52,5,
+     437EL 20,2 → 33,2, 960E 41 → 54,7.
+  2. **Familias nacional → importado** (`Equivalencias_Familia`, las mismas que usa el generador de OC): la proyección
+     del secundario suma al principal por empresa. 574 → 574E (LK además remapea 574E → 574 en `sales_item_remap`, así
+     que 574E caía a seed): 574E seed 54 → **live 88,7**. 565 → 607E: 31 → 75,2. 323 → 323E: 25 → 34,5. 33x → 94xE:
+     941E 7 → 12,5, 943E 12 → 19, 945E 7 → 12,8, 948E 9 → 11,3. 548 → 590E: 99 → 100,7. 580E → **580** (principal el
+     nacional): coherente con la baja de 580E de §3.bm.11 (580 vende ~58 caj/mes, 580E 4).
+  3. **`vista_stock_procesada`** (materializada, cron 55 cada 2 min, `Stock_Saldos` depende de ella): el CTE `proy`
+     ahora une `proyeccion_madre` (filas sin sufijo, LK+Chef) con `GV_Proyeccion_Emp` para las filas con sufijo
+     (`"809E CH"`, `"809E LK"`, `"437E LK"`…), que antes daban 0 (y el popup mostraba 1,3). Se recreó con
+     `drop … cascade` + misma definición + índice único `cod` + `grant all` a anon/authenticated/service_role (relacl
+     idéntico al anterior, guardado en `GV_bkp_relacl_vista_stock_procesada_20260911` junto con las dos definiciones)
+     + `Stock_Saldos` recreada igual. Muestra: 437E LK 20,17 · 438E LK 38,50 · 809E CH 70 · 809E LK 57,67.
+- **Sin familia, a decisión del dueño** (no se tocó): **512 → 512E** (512 nacional vende 136 caj/mes; 512E Ownland sin
+  ventas ni familia: si 512E reemplaza al 512, falta la fila en `Equivalencias_Familia`); **816/817** (Chef vende
+  "816"/"817" sin E: 23 y 55 caj/mes; ¿son los mismos que 816E/817E de Ownland?); **56x** (560–569 son artículos
+  distintos, no familia de 056E).
+- Rollback: vista `v_importados_ordenes` de §3.bm.15 (CTE `pe` con `max` y sin `fam`); `vista_stock_procesada` y
+  `Stock_Saldos` desde `GV_bkp_relacl_vista_stock_procesada_20260911.def` (drop cascade + create + índice + grants).

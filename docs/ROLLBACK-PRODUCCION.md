@@ -440,3 +440,9 @@ Detalle y rollback §3.bm.12.
 Virgilio: tabla nueva `GV_Proyeccion_Emp`; `v_importados_ordenes` recreada (ya no lee `proyeccion_madre`);
 `ventas_mensuales_cod` pasa a 3 args. LK: 3 funciones nuevas + `fn_ventas_mensuales_virgilio` a 3 args + foreign table +
 cron `sync-proyeccion-emp-virgilio`. `proyeccion_madre` intacta. Rollback en §3.bm.15.
+
+## Proyección: variantes L + familias; vista_stock_procesada por empresa — v15.24 (2026-09-11)
+
+`v_importados_ordenes` recreada (CTE `pe`: sum + `Equivalencias_Familia`). `vista_stock_procesada` (materializada) y
+`Stock_Saldos` dropeadas y recreadas con el CTE `proy` ampliado; grants idénticos. Backup de definiciones y relacl en
+`GV_bkp_relacl_vista_stock_procesada_20260911`. Detalle y rollback §3.bm.16.
