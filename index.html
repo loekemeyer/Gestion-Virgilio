@@ -7598,7 +7598,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v14.97";
+const APP_VERSION = "v14.98";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -15229,7 +15229,10 @@ var STK_POP_CSS =
   ".mva-tbl.wide th:first-child,.mva-tbl.wide td:first-child{position:sticky;left:0;z-index:1;background:#fff;box-shadow:1px 0 0 #e2e8f0;}" +
   ".mva-tbl.wide thead th:first-child{z-index:3;background:#f8fafc;}" +
   ".mva-tbl.wide tbody tr:hover td:first-child{background:#f9fbff;}" +
-  ".stkpop-card.wide{max-width:min(1340px,98vw);}" +
+  // v14.98 — la tabla mide 1366px (colgroup) + padding: con 1340px SIEMPRE había barra horizontal
+  // aunque sobrara pantalla (dueño: "hay espacio, no pongas barras de scroll"). Ahora el popup
+  // usa el ancho disponible; el scroll horizontal queda sólo para pantallas angostas.
+  ".stkpop-card.wide{max-width:min(1760px,98vw);}" +
   ".mva-tbl .mva-pos{color:#15803d;}.mva-tbl .mva-neg{color:#b91c1c;}" +
   // v6.68 — celda MOVIMIENTO como flex: slot fijo para el toggle (vacío en guardado) →
   // 'recepcion' y 'guardado' arrancan alineados; cuerpo con chips que fluyen prolijo.
