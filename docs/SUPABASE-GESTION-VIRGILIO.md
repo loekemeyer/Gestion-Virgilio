@@ -7549,8 +7549,19 @@ escrito para que la PPP lo muestre. Es exactamente lo que tenía que pasar.
 1316). La fecha de entrega viaja por `sheets_payload->>'fecha_entrega'`, que es de donde la
 lee esa vista (`fecha_entrega_txt`), y el importador la carga del mail de Krikos.
 
+**El filtro del espejo, probado** (en LK, con `BEGIN … ROLLBACK`): marcando a mano una OC
+como `parcial` y otra como `ok`, `sync_krikos_oc_virgilio()` devolvió **5** — las 4
+pendientes **más la `parcial`**, y la `ok` **no viajó**. Después del rollback Virgilio
+volvió solo a 6 filas / 0 parciales (el `postgres_fdw` propaga el rollback).
+
 **Para apagarlo:** `select cron.alter_job(43, active := false);` en LK. Nada más depende de
 él: las OC vuelven a cargarse a mano desde el panel.
+
+### Qué se ve hoy en A Programar
+
+Las 6 OC viejas quedaron en el bloque naranja con el motivo *"fecha de entrega vencida
+(dd/mm/aaaa) — se carga a mano si todavía va"*. Se van de ahí solas cuando alguien las
+descarta desde la Bandeja del panel, o si se cargan a mano.
 
 ### Rollback
 
@@ -7597,6 +7608,48 @@ filas de cada código traía `gond = 0`.
 **Archivo:** `sql/gv_saldos_group_by_funciones_v1589.sql` · migración `gv_saldos_group_by_funciones_v1589`
 · backup de las definiciones previas en `sql/backups/funciones_vista_saldos_stock_20260911_pre_v1589.sql`.
 
+## v15.92 (2026-09-11) — armado duplicado por reprogramación de tanda: fix + limpieza
+
+**Síntoma.** 4 NP con las filas de `Entregas_Virgilio` por duplicado, cada juego en una tanda
+distinta: 98532 y 98533 (D60E 09/09 → E10A 11/09), 98490 (D47C 27/08 → D54C 02/09) y 98583
+(D50C 31/08 → D50D 01/09). 43 filas, 57 cajas contadas dos veces.
+
+**Causa raíz.** El pedido se reprogramó de tanda (para 98532/98533 lo movió el propio override
+`GV_PPP_Prog_Override`, v14.09) y se volvió a armar. Los dos candados miran la **tanda**, no la
+**NP**: `_compTandaYaArmada()` en el front y la clave `np|tanda|cod_art` del trigger
+`entregas_virgilio_dedup`. Con tanda nueva, los dos dejan pasar.
+
+**Efecto en stock (medido).** El armado emite `separado`: `separar_pedidos −n` / `a_facturar +n`
+por artículo. El segundo armado lo volvió a emitir → `separar_pedidos` quedó 57 cajas más
+negativo y `a_facturar` 57 infladas. Borrar las filas de `Entregas_Virgilio` **no** revierte eso:
+no hay trigger `AFTER DELETE`.
+
+**Qué se hizo.**
+1. Backup: `public."GV_Backup_Entregas_Dup_20260911"` (43 filas, el armado viejo de cada NP).
+2. `delete` de esas 43 filas de `Entregas_Virgilio`.
+3. Compensación en `Movimientos_Stock` (libro event-sourced: no se borra, se compensa): 80 filas
+   `tipo='ajuste'`, `ref='reversa armado duplicado NP <np> tanda <tanda> (backup …)'`,
+   `+57` a `separar_pedidos` y `−57` a `a_facturar`. **No** se revirtió el `terminado +1` del
+   941E de D60E: ese devuelto al depósito ocurrió una sola vez y es legítimo.
+4. Backend: `entregas_virgilio_dedup()` pasa a clave `np|cod_art`
+   (`sql/entregas_virgilio_dedup_v1592.sql`, anotado en `docs/ROLLBACK-PRODUCCION.md`).
+5. Front: `_compNpsYaArmadas(nps)` nuevo + chequeo en `compTerminar()` — corta el armado y
+   nombra las NP ya armadas, aunque sea en otra tanda.
+
+**Chequeo (debe dar 0 filas):**
+```sql
+select np from (
+  select btrim(np::text) np, upper(btrim(tanda)) t from public."Entregas_Virgilio"
+   where nullif(btrim(tanda),'') is not null group by 1,2
+) z group by np having count(*) > 1;
+```
+
+**Pendiente aparte (no tocado).** 22 filas de `Entregas_Virgilio` con `tanda` NULL y
+`fecha_salida` NULL, creadas del 10 al 14/08 en 20 NP; 19 son del artículo **574E**, el resto
+838E, 809E, 943E, 948E y 580. No tienen evento `TAL` que las respalde ni movieron stock
+(no hay `Movimientos_Stock` en esa ventana para esos códigos): parecen una carga manual o una
+migración puntual. En 14 de ellas el mismo artículo ya existe en la fila con tanda de esa NP,
+con las mismas cajas. Queda como problema abierto en `github_repo_problemas`.
 ### §3.cn.1 — v15.92: el cartel de vencidos prometía algo que la v15.85 apagó
 
 Al sacar de En Salida lo que no tiene Carga Camión quedó un texto viejo mintiendo en la lista de
