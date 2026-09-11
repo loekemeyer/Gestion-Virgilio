@@ -5679,3 +5679,31 @@ el **10/09 a las 12:10** LK 0002 se movió a mano al 16/09 y dejó a LK 0053 sol
 automático no vuelve a mirar un pedido que ya tiene tanda, así que nadie los reagrupó. **Mover una
 NP a mano no chequea si el cliente queda partido**: ése es el agujero que queda abierto, y por
 ahora lo tapa la alerta (que avisa después, no en el momento).
+
+### §3.cf.2 — Candado: mismo cliente = mismo día, salvo los súper (v15.51, 2026-09-11)
+
+Thomas, al ver el caso Orfali: ***"nunca si hay +1 pedido de un cliente puede ir separado en la
+PPP"*** y enseguida ***"salvo los super"***. Eso ya no es una alerta, es una regla dura.
+
+**Dónde se rompía:** al **mover una NP a mano**. El armado automático ya junta por cliente
+(bloques (a1)/(a2) de `gv_ppp_web_armar_pendientes`); lo que separó a Orfali fue un movimiento
+manual el 10/09 a las 12:10 que el automático nunca volvió a mirar.
+
+**Trigger `gv_web_cliente_un_solo_dia`** sobre `PPP_Web_Programacion` (tabla nuestra, no
+compartida — el trigger está permitido), `AFTER UPDATE OF fecha_entrega, tanda`, sólo cuando la
+fecha cambia:
+
+| Situación | Qué hace |
+|---|---|
+| Se mueve una NP y el cliente tiene otras con tanda, futuras, en otro día | Las **arrastra** al mismo día y a la tanda web abierta del cliente (si no hay, a la de la NP movida) |
+| Alguna de las otras está en una tanda que un operario **ya empezó** (`gv_ppp_tanda_tocada`: EP/TP/AP/TAP) | **Corta con error** y no mueve nada: *"No se puede: <cliente> ya tiene otro pedido en la tanda X del DD/MM y esa tanda ya se empezó a trabajar…"* |
+| Zona Súper / Retira / Expo, o cliente en `cobranzas_cliente_cadena` | **No interviene** (un súper entrega a sucursales distintas en días distintos a propósito) |
+
+No dispara en INSERT a propósito: el armado en cascada inserta por días con cupo y el trigger
+pelearía con él. Lo que se escape por ahí lo muestra la alerta `gv_ppp_cliente_dos_dias`.
+
+**Pruebas (con rollback, sobre Orfali):** mover LK 0002 al 17/09 → LK 0053 la siguió · con un
+`TP` simulado sobre D69D, mover LK 0053 → cortó y nada cambió · las dos como Súper → LK 0002 se
+movió sola. La base quedó igual que antes (las dos en D69D, 16/09).
+
+**Rollback:** `sql/gv_web_cliente_un_solo_dia_v1551.sql`.
