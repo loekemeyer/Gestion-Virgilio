@@ -12,7 +12,7 @@
 > única**; no se replica. Ante la duda entre parche rápido y fix de raíz → **fix
 > de raíz**.
 >
-> Última actualización: 2026-09-11 (viernes) · Versión app al documentar: **v15.66**
+> Última actualización: 2026-09-11 (viernes) · Versión app al documentar: **v15.67**
 >
 > Nota **v15.40 (2026-09-11) — HANDOFF de planimetría / Acacia: `docs/HANDOFF-PLANIMETRIA-Y-ACACIA.md`.**
 > Thomas sigue este tema en otra sesión. Ahí está todo junto: los **13 artículos activos del catálogo LK
@@ -11288,6 +11288,14 @@ distinta, empresa distinta.
 > - Si el código no tiene **ningún** mes con registro, la columna **no aparece** (no se deja una
 >   columna de "s/d"); el título vuelve a "Cajas facturadas".
 > - Test: `tests/proy-entregadas.cjs` (orden de celdas, s/d vs número, pie, sin columna).
+
+> Nota **2026-09-11 (v15.67) — Corregir códigos: la cola del secundario pone PRIMERO las NP sin pickear.**
+> Dueño: *"1 claro"* a la pregunta de la v15.66. Las NP ya pickeadas se llevaron el principal (PKC: 607E), así
+> que no pueden usar el 565 que sigue en góndola: la ventana de `vista_correcciones_pedido_rich` ordena ahora
+> por estado (sin pickear → en picking → pickeado → a facturar → facturado), después fecha de salida y NP.
+> Con 565 = 2: verdes 98664 y 98678 (sin pickear), rojas las otras 5, incluida 98662 que en la v15.66 era la
+> verde. Mismas columnas; el front sólo cambia la leyenda. `sql/vista_correcciones_pedido_rich_v1567_orden_sin_pickear.sql`
+> · §3.cj.1. Bump `APP_VERSION` + `SW_VERSION` `v15.67`.
 
 > Nota **2026-09-11 (v15.66) — Corregir códigos: el stock del SECUNDARIO se reparte entre TODAS las NP que lo piden.**
 > Dueño, con el panel abierto en 565 → 607E: *"acá tenés mal la lógica. Mirá el 565 primero: el stock y

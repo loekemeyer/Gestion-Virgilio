@@ -7696,7 +7696,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v15.66";
+const APP_VERSION = "v15.67";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -40535,8 +40535,9 @@ function _corrEstado(e){
 }
 /* v10.28 — ¿este ítem obliga a cambiar la NP? Urgente = hay que pasar la NP al principal SÍ o SÍ.
    v15.66 (dueño, 11/09: "mirá el 565 primero: el stock y sus pedidos") — el stock del SECUNDARIO se
-   reparte entre TODAS las NP que lo piden (vista_correcciones_pedido_rich.sec_cubre: cola por código,
-   fecha de salida → estado → NP). Antes cada NP se comparaba sola contra el stock total y 565 = 2
+   reparte entre TODAS las NP que lo piden (vista_correcciones_pedido_rich.sec_cubre: cola por código;
+   v15.67, dueño: PRIMERO las NP sin pickear —las pickeadas ya se llevaron el principal—, después fecha
+   de salida y NP). Antes cada NP se comparaba sola contra el stock total y 565 = 2
    salía "alcanza" para 7 NP (8 cajas). El stock del principal no cambia el criterio. */
 function _corrItemUrgente(p){ return !(p && p.secCubre); }
 /* v15.66 — cuántas NP distintas tienen al menos una línea urgente (mismo número en badge y chip). */
@@ -40581,7 +40582,7 @@ async function facCorreccDataRich(){
              rs: r.razon_social||"", tanda: r.tanda||"", fecha: r.fecha||"",
              stkSec: Number(r.stk_sec)||0, stkPpal: Number(r.stk_ppal)||0,
              // v15.66 — reparto del stock del SECUNDARIO entre TODAS las NP que lo piden. Lo calcula la vista
-             // (cola por código: fecha de salida → estado → NP). secCubre = a esta NP le alcanza lo que queda
+             // (cola por código: v15.67 sin pickear primero, después fecha de salida y NP). secCubre = le alcanza lo que queda
              // después de las anteriores. Si la vista no trae sec_cubre (rollback), cae al criterio viejo.
              secTot: Number(r.sec_pedido_total)||0, secNps: Number(r.sec_np_total)||0, secOrden: Number(r.sec_orden)||0,
              secAntes: Number(r.sec_acum_antes)||0, secDisp: Number(r.sec_disp)||0,
@@ -40659,7 +40660,7 @@ function facCorreccRender(){
   if (!rows.length){ body.innerHTML = h + '<div style="text-align:center;color:#16a34a;padding:24px;font-weight:700;">' + (_facCorrSoloUrg ? '✅ No hay cambios urgentes. Tocá <b>Ver todos</b> para los que el secundario cubre.' : 'No hay pedidos en código secundario.') + '</div>'; return; }
   const pend = _facCorrFiltro === "todo" ? rows : rows.filter(function(p){ return p.estado === _facCorrFiltro; });
   h += '<div style="font-size:12.5px;color:#64748b;margin-bottom:10px;">' + (_facCorrSoloUrg
-      ? '🔴 <b>Solo urgentes</b>: el stock del código secundario, repartido entre todas las NP que lo piden (por fecha de salida), <b>no llega</b> a esta NP → hay que cambiar la NP al principal SÍ o SÍ.'
+      ? '🔴 <b>Solo urgentes</b>: el stock del código secundario, repartido entre todas las NP que lo piden (primero las que todavía no se pickearon, después por fecha de salida), <b>no llega</b> a esta NP → hay que cambiar la NP al principal SÍ o SÍ.'
       : '📋 <b>Todos</b>: en <span style="color:#166534;font-weight:800;">verde</span> los que el secundario cubre (mandalos tal cual, sin tocar NP) y en <span style="color:#991b1b;font-weight:800;">rojo</span> los urgentes (el stock del secundario, repartido entre todas las NP que lo piden, no llega a ésta).') + '</div>';
   if (!pend.length){ body.innerHTML = h + '<div style="text-align:center;color:#94a3b8;padding:20px;">No hay ' + (_facCorrSoloUrg ? 'urgentes' : 'pedidos') + ' en este estado.</div>'; return; }
   // Agrupar por NP: 1 cambio → botón directo; varios → un solo botón que abre pop-up con checkboxes.
