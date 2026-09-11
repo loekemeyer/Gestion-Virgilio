@@ -427,3 +427,10 @@ FOB al PI. `Importados_Volumen` 727E master 144 + inner; 539E/540E inner. Backup
 `GV_Importados_Baches`: 19 del backfill editados (unidades − CI, fecha 29/09) + 19 nuevos (`creado_por='CI B260601'`, 15/11).
 `Importados`: FOB de 12 filas al CI. Backups `GV_Importados_Baches_bkp_becky_20260911`, `GV_Importados_bkp_becky_fob_20260911`.
 Detalle y rollback §3.bm.12.
+
+## Becky: baches = PI B260601 y PI B260601-2 — v15.21 (2026-09-11)
+
+`GV_Importados_Baches` (Becky): 19 del 1.º ajustados al PI + 19 duplicados anulados; 26 del 2.º ajustados al PI, 3 anulados
+(945E/994E/999E), 3 nuevos (404E, 601E, 989E). `Importados`: alta 989E; FOB de 9 filas y `uni_x_caja` de 7 al PI.
+`Importados_Mov_Stock`: +1 `inicial` 0 (989E). Backups `GV_Importados_Baches_bkp_becky2_20260911`,
+`GV_Importados_bkp_becky2_20260911`. Detalle y rollback §3.bm.13.

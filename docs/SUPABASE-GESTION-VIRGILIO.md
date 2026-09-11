@@ -5120,3 +5120,27 @@ Dueño: *"todos los datos que tengas que corregir, dale"*. Barrido sobre `v_impo
 - Backup `GV_Importados_Baches_bkp_becky_20260911` (todos los baches de Becky antes de partir). Rollback: `delete from
   "GV_Importados_Baches" where creado_por = 'CI B260601'`; restaurar `unidades` de los 19 baches del backfill desde el
   backup por `id`; FOB desde el backup; resync.
+
+### §3.bm.13 — Becky: los dos pedidos quedan como sus PI (B260601 y B260601-2); se deshace la partición de v15.20 (v15.21, 2026-09-11)
+
+- El dueño subió los dos PI de Becky (Yangjiang Jiaheng): **PI B260601** (04/07/2026, 19 líneas, **41.944 u**, u$s 23.622,
+  depósito 6.920,86, "35-40 días después del depósito") y **PI B260601-2** (14/07/2026, 26 líneas, **48.056 u**,
+  u$s 31.614, depósito 7.358,90, "90 días después del depósito"). El CI B260601 del 12/08 (v15.20) es el **mismo**
+  pedido que el PI B260601, no un segundo pedido: el backfill de v14.94 tenía esas 19 líneas **duplicadas** (84.784 u) por
+  un error de carga de julio, no por dos pedidos. La partición de v15.20 se deshace.
+- **1.º pedido (29/09, `creado_por = 'PI B260601'`)**: los 19 baches del backfill quedan con las cantidades del PI (sólo
+  cambió 404E: 1.824 → 928); los 19 baches `'CI B260601'` de v15.20 se **anularon** (`gv_importado_bache_borrar`).
+- **2.º pedido (15/11, `creado_por = 'PI B260601-2'`; fecha del dueño, el PI daría ~21/11)**: los 26 baches del backfill
+  se ajustaron al PI (198E 1.800 → 4.320, 798E 1.200 → 6.336, 948E 1.440 → 2.304, 960E 1.872 → 2.736, 970E 1.008 → 1.872,
+  993E 576 → 1.152); se **anularon** 945E, 994E y 999E (no están en el PI); se agregaron **404E 896, 601E 3.600** (el que
+  preocupaba al dueño: sí está pedido) y **989E 576** (alta: Rallador cítricos acacia, FOB 0,56, 12/144, id nuevo con un
+  `inicial` de 0 en `Importados_Mov_Stock`).
+- **FOB según PI-2**: 941E/942E/943E/946E/948E 0,66 → 0,65; 944E 0,66 → 0,63; 982E 0,98 → 0,90; 981E 1,30 → 1,25; 601E
+  0,735 → 0,66. `uni_x_caja` = 12 (inner del PI) en 602E, 990E, 992E, 993E, 996E, 997E, 998E que estaban en null.
+- Chequeo: `sum(unidades - unidades_llegadas)` por `creado_por` = 41.944 y 48.056, iguales a los PI.
+- Backups `GV_Importados_Baches_bkp_becky2_20260911`, `GV_Importados_bkp_becky2_20260911`. Rollback: restaurar
+  `unidades / fecha_reingreso / estado / creado_por` de los baches de Becky desde el backup por `id`, borrar los baches
+  nuevos (404E 896, 601E 3.600, 989E 576) y la fila 989E de `Importados` (+ volumen + `inicial`), FOB y `uni_x_caja` desde el
+  backup, `gv_importados_resync` por importado.
+- **Impos en curso**: Becky 29/09 (41.944) y 15/11 (48.056) · Fujian 01/11 · Hugo Wong 03/11 · Frontier 04/11 · Zhixin
+  29/11 · Ownland 18/12.
