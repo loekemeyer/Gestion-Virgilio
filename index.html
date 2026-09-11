@@ -7660,7 +7660,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v15.72";
+const APP_VERSION = "v15.73";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -9279,14 +9279,39 @@ async function showPickingList(tanda, legajo, opts) {
     // 438E pedido por una NP 98… y otra 44… da DOS renglones ("438E LK" y
     // "438E CH"), cada uno con el sector de su empresa. Los códigos que no están
     // partidos siguen sumando igual que siempre.
+    // v15.72 — La empresa deja de perderse. `pkCodEmpresa` la calcula bien (la NP dice
+    // si el pedido es de Loeke o de Chef) y después la TIRA si Planimetria no tiene una
+    // celda llamada "438E LK" — y esas celdas existen para 4 códigos de 351. Por eso
+    // todo lo pickeado se anotaba como "Mixto". Ahora se guarda aparte, en `aggEmp`,
+    // SIN tocar la clave `a[k]`: la clave sigue siendo la de siempre (con sufijo para
+    // los duales, pelada para el resto), así no se mueve nada del picking, el orden ni
+    // los sectores. La empresa viaja como dato propio, que es lo que tenía que pasar.
+    const aggEmp = {};
     const aggFrom = (base) => {
       const a = {};
       // v7.91 — si la operadora confirmó la corrección de esa NP (secundario→principal),
       // el picking levanta el PRINCIPAL (corrArt) antes de partir por empresa.
-      for (const np of nps) for (const it of (base.get(np) || [])) { const k = pkCodEmpresa(corrArt(pkStripL(it.art), np, corrMap), np, pkEmpresaArt(it.art, np)); a[k] = (a[k] || 0) + it.cajas; }
+      for (const np of nps) for (const it of (base.get(np) || [])) {
+        const emp = pkEmpresaArt(it.art, np) || empresaDeNp(np) || "";
+        const k = pkCodEmpresa(corrArt(pkStripL(it.art), np, corrMap), np, emp);
+        a[k] = (a[k] || 0) + it.cajas;
+        if (emp === "LK" || emp === "CH") {
+          const d = aggEmp[k] || (aggEmp[k] = { LK: 0, CH: 0 });
+          d[emp] += it.cajas;
+        }
+      }
       return a;
     };
     let agg = aggFrom(pickBase);
+    /* Empresa de una clave del picking: "LK" / "CH" si todas las cajas vinieron de la
+       misma, "" si la tanda mezcla las dos para ese código (2,34 % de las tandas según
+       la historia: 28 de 1.197). En el caso mezclado no se inventa nada — se deja vacío
+       y el backend reparte como hasta ahora. */
+    const empDeClave = (k) => {
+      const d = aggEmp[k]; if (!d) return "";
+      if (d.LK > 0 && d.CH > 0) return "";
+      return d.LK > 0 ? "LK" : (d.CH > 0 ? "CH" : "");
+    };
     // v5.34: la base sale 100% de Supabase (PPP_Base_Pedidos). Ya no hay backfill
     // desde Google Sheets; si un NP todavía no sincronizó en Supabase, queda sin filas
     // hasta que la macro lo cargue.
@@ -9312,7 +9337,8 @@ async function showPickingList(tanda, legajo, opts) {
     };
     const items = Object.keys(agg)
       .sort((a, b) => (gOrden(a) - gOrden(b)) || (numKey(a) - numKey(b)) || (a < b ? -1 : a > b ? 1 : 0))
-      .map(art => { const e = gOf(art); const eq = equivLookup(art); return { art: art, key: art, esp: agg[art], sector: (e && e[0]) ? e[0] : "—", dual: dualOf(art), real: eq ? eq.real : null, realNota: eq ? eq.nota : null }; });
+      .map(art => { const e = gOf(art); const eq = equivLookup(art); return { art: art, key: art, esp: agg[art], sector: (e && e[0]) ? e[0] : "—", dual: dualOf(art), real: eq ? eq.real : null, realNota: eq ? eq.nota : null,
+                      emp: empDeClave(art) }; });   // v15.72: la empresa viaja con el renglón
     if (!items.length) {
       _pk = null;
       m.querySelector(".tanda-modal-body").innerHTML =
@@ -9340,6 +9366,35 @@ async function showPickingList(tanda, legajo, opts) {
         it.sector = dual.loeke.sector;
       }
     });
+    // v15.72 — SECTOR POR EMPRESA, sin la muleta del sufijo. Hasta ahora la celda
+    // del operario salía de window.GONDOLA buscando una clave "438E LK", y esas claves
+    // existen para 4 códigos de 351 (8 filas de 360 en Planimetria): para todo el
+    // resto la empresa se descartaba y quedaba la celda del código pelado — que puede
+    // ser la góndola de la OTRA empresa. Eso es lo que mandaba al pickeador de Loeke a
+    // M13 (Chef) a buscar un 809E. Ahora el sector sale de GV_Lugar por (código,
+    // empresa), que es una tabla con la empresa en una COLUMNA.
+    // Best-effort: si la vista no está, no se toca nada y queda el comportamiento viejo.
+    try {
+      const _emps = {};
+      items.forEach(function (it) { if (it.emp) _emps[it.emp] = 1; });
+      if (Object.keys(_emps).length) {
+        const _cods = items.map(function (it) { return codBase(it.art).replace(/^0+(?=.)/, ""); });
+        const _uniq = _cods.filter(function (c, i) { return c && _cods.indexOf(c) === i; });
+        const rows = await supaFetchAllSafe(SUPABASE_URL + "/rest/v1/gv_lugar_articulo",
+          "select=cod,empresa,tipo,sector,orden&tipo=eq.gondola&cod=in.(" +
+          _uniq.map(encodeURIComponent).join(",") + ")&order=orden.asc");
+        const porCodEmp = {};
+        (rows || []).forEach(function (r) {
+          const k = String(r.cod).toUpperCase() + "|" + String(r.empresa).toUpperCase();
+          (porCodEmp[k] || (porCodEmp[k] = [])).push(r.sector);
+        });
+        items.forEach(function (it) {
+          if (!it.emp) return;
+          const secs = porCodEmp[codBase(it.art).replace(/^0+(?=.)/, "").toUpperCase() + "|" + it.emp];
+          if (secs && secs.length) { it.sector = secs.join(" · "); it.sectorDe = "GV_Lugar"; }
+        });
+      }
+    } catch (_e) { /* sin la vista: queda la planimetría de siempre */ }
     // v4.26: adjuntar el excedente (cajas + ubicación) a cada artículo.
     // v15.41: excOk = la consulta de excedente ANDUVO. Si falla (sin red), el PKC sale
     // SIN el campo de depósito y el backend vuelve a repartir por saldos, como antes.
@@ -9362,7 +9417,7 @@ async function showPickingList(tanda, legajo, opts) {
         const gondNeeded = it.esp - excUsed;           // el resto, de góndola
         if (gondNeeded > 0) { it.esp = gondNeeded; it.excHint = excUsed; }   // góndola pide solo el resto
         else { it.skip = true; }                                              // excedente cubre todo → saltear góndola
-        excSteps.push({ art: it.art, key: it.art + "·EXC", esp: excUsed, sector: it.excUbic || "—", excUbic: it.excUbic, exc: it.exc, isExc: true, dual: null });
+        excSteps.push({ art: it.art, key: it.art + "·EXC", esp: excUsed, sector: it.excUbic || "—", excUbic: it.excUbic, exc: it.exc, isExc: true, dual: null, emp: it.emp || "" });
       }
     });
     // v15.41 (pedido de Luis): los pasos de EXCEDENTE van PRIMERO, no al final.
@@ -10127,14 +10182,29 @@ function pkTotalesArt(rec) {
     real += Number(r) || 0;
     if (x.isExc) exc += Number(r) || 0;
   }
-  return { esp: esp, real: real, exc: exc };
+  // v15.72 — la empresa de los pasos de este artículo. Si los pasos no coinciden
+  // (no debería pasar: el de excedente la hereda del de góndola) se devuelve "" y el
+  // evento sale sin el campo, que es lo mismo que hacía antes.
+  let emp = null, empOk = true;
+  for (const x of (_pk.items || [])) {
+    const xr = String((x.dual && x.pick) ? x.pick : x.art).toUpperCase();
+    if (xr !== R || x.skip) continue;
+    const e = x.emp || "";
+    if (emp === null) emp = e; else if (emp !== e) empOk = false;
+  }
+  return { esp: esp, real: real, exc: exc, emp: (empOk && emp) ? emp : "" };
 }
 
 /* Emite el evento PKC (detalle de picking de un artículo) por la cola offline.
    Un evento por artículo confirmado; el SW lo reenvía si no hay red.
 
    v15.41 — texto = TANDA|ART|esp|real|excedente. El 5º campo dice cuántas de las
-   `real` cajas salieron del EXCEDENTE (el resto salió de góndola). Antes el backend
+   `real` cajas salieron del EXCEDENTE (el resto salió de góndola).
+   v15.72 — 6º campo = EMPRESA (LK/CH): de qué góndola salió la mercadería. Antes el
+   backend la forzaba a 'Mixto' para todo lo que no fuera dual, así que la cuenta de
+   cada empresa se desbalanceaba sola (la góndola se llenaba con una etiqueta y se
+   vaciaba con otra). Va vacío si la tanda mezcla las dos empresas para ese código
+   (2,34 % de las tandas) — ahí el backend reparte como siempre. Antes el backend
    lo ADIVINABA repartiendo por saldos vivos al reconciliar; ahora se lo decimos.
    Va como UN SOLO evento por (tanda, artículo) —con los totales de los dos pasos—
    a propósito: el client_id es el mismo para los dos y hay 12 objetos en la base que
@@ -10146,12 +10216,18 @@ function pkSendDetail(art, esp, real) {
   const tot = pkTotalesArt(art);
   const espT  = tot.esp > 0 ? tot.esp : esp;   // red de seguridad: nunca mandar esp 0
   const realT = tot.real;
-  const dep   = _pk.excOk ? ("|" + tot.exc) : "";
+  // v15.72 — 6º campo: la EMPRESA de la que salió la mercadería (LK/CH). Va vacío
+  // cuando la tanda mezcla las dos para ese código; ahí el backend reparte como
+  // siempre. Como el texto es posicional, si hay empresa pero no hay depósito el 5º
+  // campo va vacío para no correr la empresa al lugar del excedente.
+  const emp   = tot.emp || "";
+  const dep   = _pk.excOk ? ("|" + tot.exc) : (emp ? "|" : "");
+  const empF  = emp ? ("|" + emp) : "";
   const payload = {
     legajo: _pk.legajo,
     opcion: "PKC",
     descripcion: "Picking artículo",
-    texto: (_pk.tanda + "|" + art + "|" + espT + "|" + realT + dep).toUpperCase(),
+    texto: (_pk.tanda + "|" + art + "|" + espT + "|" + realT + dep + empF).toUpperCase(),
     ts: nowMs,
     // client_id determinístico → reenviar/corregir el mismo artículo hace UPSERT
     // (merge-duplicates) en vez de duplicar. Por eso se puede ir y volver.

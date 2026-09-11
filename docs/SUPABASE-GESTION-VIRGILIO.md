@@ -5746,3 +5746,92 @@ El archivo lleva el mismo cartel arriba de todo.
 **Rollback:** `docs/ROLLBACK-PRODUCCION.md` (entrada v15.71). SQL:
 `sql/gv_lugar_fuente_unica.sql`, `sql/gv_lugar_carga_inicial.sql`,
 `sql/gv_empresa_recepcion_mg.sql`.
+
+---
+
+## §3.«PICK-EMP» — La empresa sobrevive al picking (v15.73, 2026-09-11, pedido de Luis)
+
+> ⚠ **Letra al mergear, no antes** (igual que `§3.«PKC-DEP»` y `§3.«LUGAR-EMP»`).
+> Buscar `«PICK-EMP»` en el repo al asignarla.
+
+**Luis:** *"la empresa tiene que acompañar al código a lo largo de toda esta pipeline"*.
+Con `§3.«LUGAR-EMP»` la mercadería **entra** con la empresa puesta. Faltaba que **salga**
+con la empresa puesta.
+
+### El problema: la empresa se calculaba bien y se tiraba
+
+`pkCodEmpresa` resuelve la empresa desde la NP —que es donde el dato es inequívoco— y
+después hace:
+
+```js
+const cand = a + " " + emp;
+return G[cand] ? cand : a;     // G = window.GONDOLA (Planimetria)
+```
+
+O sea: la conserva **sólo si Planimetria tiene una celda que se llame `"438E LK"`**. Hay
+**8 filas con sufijo de 360, que cubren 4 códigos**, contra 351 códigos pelados. Para el
+98,9 % restante la empresa se descartaba y el código caía a la celda del código pelado,
+que puede ser la góndola de la **otra** empresa. Eso es lo que mandaba al pickeador de
+Loekemeyer a **M13** (góndola de Chef) a buscar un `809E`.
+
+Consecuencia aguas abajo: la reconciliación escribía todo con `empresa = 'Mixto'`. Con la
+recepción guardando LK/CH, la góndola pasaría a **llenarse con una etiqueta y vaciarse con
+otra**. Medido el 11/09:
+
+| | |
+|:--|--:|
+| Códigos afectados | 142 |
+| Cajas en el balde `Mixto` | 19.383 |
+| Cajas pickeadas por día | 519,7 |
+| Códigos en negativo en 7 días | 20 |
+| Ídem en 30 días | 61 |
+| El agregado, en | ~37 días |
+
+Y eso hace gritar al cron 13 (`check-stock-anomalias`, 08:00 ART), que lee
+`vista_saldos_stock` **fila por fila, o sea por empresa**.
+
+### De dónde sale la empresa: de la NP, NUNCA de la tanda
+
+**La tanda no sirve como clave.** Sobre 1.197 tandas-día de historia, **28 mezclan LK y CH
+(2,34 %)**, la última el **01/09**. (Sin cruzar por fecha daban 35: 7 eran el mismo código
+de tanda reusado meses después. Hay que contar por `(tanda, fecha)`.)
+
+La **NP** sí es inequívoca por construcción: las web llevan la empresa en la etiqueta
+(`LK 0057`) y `PPP_Web_NP` la tiene en la PK; las de ISIS son 9xxxx = LK / 4xxxx = CH.
+
+El front ya partía por NP (idea 9020) — sólo había que dejar de tirar el resultado.
+
+### Cómo quedó
+
+| Pieza | Qué hace |
+|:--|:--|
+| `aggFrom` / `aggEmp` | guarda de qué empresa vino cada caja, **sin tocar la clave** `a[k]` — el picking, el orden y los sectores no se mueven |
+| `empDeClave(k)` | `LK`/`CH` si todas las cajas son de una; `""` si la tanda mezcla las dos para ese código |
+| `items[].emp` | la empresa viaja con el renglón; los pasos de excedente la heredan |
+| sector | sale de **`gv_lugar_articulo`** por (código pelado, empresa) — la vista nueva reemplaza la muleta del sufijo |
+| `pkSendDetail` | 6.º campo del PKC: `TANDA\|ART\|esp\|real\|excedente\|EMPRESA` |
+| las 2 funciones de reconciliación | leen el 6.º campo y lo escriben en la columna `empresa` |
+
+**Nunca se inventa una empresa:** si la tanda mezcla, el campo va vacío y el backend
+reparte como hasta ahora.
+
+### ⚠ El corte por fecha no es opcional
+
+`Stock_Config.pkc_empresa_desde` (default `infinity` = apagado). Las filas ya escritas
+tienen `empresa = 'Mixto'` y el índice único lleva `coalesce(empresa,'')`, así que una fila
+nueva con `'LK'` **no choca con la vieja**: quedarían las dos y el stock se descontaría
+**dos veces**. Con el corte, cada tanda vive entera de un solo lado.
+
+Prender **después** de que el front v15.73 esté publicado:
+```sql
+insert into public."Stock_Config"(clave, valor) values ('pkc_empresa_desde', now()::text)
+  on conflict (clave) do update set valor = now()::text;
+```
+Apagar (vuelve todo a `'Mixto'`, sin rollback de código):
+```sql
+delete from public."Stock_Config" where clave = 'pkc_empresa_desde';
+```
+
+Verificación: `select empresa, count(*) from "Movimientos_Stock" where tipo='picking' and ts >= now() - interval '1 day' group by 1;`
+
+**SQL:** `sql/gv_empresa_picking.sql` (con el mismo cartel de ⛔ no aplicar hasta el merge).

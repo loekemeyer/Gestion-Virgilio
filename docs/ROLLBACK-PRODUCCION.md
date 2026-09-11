@@ -566,3 +566,44 @@ input de ubicación deja de validar, no traba el guardado).
 
 **Front:** `stockFetchSaldos`, `pkFetchExcedente`, `_stkGondolaSaldoVivo`, `gvFetchLugares`,
 `gvNormSector`, `showMGModal`, `mgConfirmar` en `index.html`.
+
+---
+
+## La empresa sobrevive al picking — v15.73 (2026-09-11)
+
+**Objetos COMPARTIDOS tocados** (los dos con `CREATE OR REPLACE`, misma firma, partiendo
+de las definiciones vivas de la v15.41): `public.reconciliar_pipeline_stock_etapa1()`
+(cron **jobid 68**, cada 10 min) y `public.reconciliar_stock_articulo_rt(text,text)`
+(trigger `trg_pkc_reconciliar_rt` en cada INSERT de PKC).
+
+**Objeto NUEVO:** la vista `public.gv_lugar_articulo` (sector de cada artículo por
+empresa, `security_invoker = true`). No la lee nada viejo.
+
+**Qué cambió.** El PKC puede traer un 6.º campo con la **empresa**
+(`TANDA|ART|esp|real|excedente|EMPRESA`). Cuando viene, las dos funciones la escriben en
+la columna `empresa` en vez de dejar que caiga al `DEFAULT 'Mixto'`. Sólo cambia la rama
+**B (forward)**; la rama A (histórico) queda intacta, igual que en la v15.41.
+
+**⚠ El interruptor es un CORTE POR FECHA, no un booleano.** Las filas ya escritas tienen
+`empresa = 'Mixto'` y el índice único lleva `coalesce(empresa,'')`: una fila nueva con
+`'LK'` **no choca con la vieja** y quedarían las dos → **stock descontado dos veces**. Con
+`Stock_Config.pkc_empresa_desde` cada tanda vive entera de un solo lado.
+
+```sql
+-- prender (DESPUÉS de publicar el front v15.73)
+insert into public."Stock_Config"(clave, valor) values ('pkc_empresa_desde', now()::text)
+  on conflict (clave) do update set valor = now()::text;
+-- apagar: vuelve todo a 'Mixto' sin tocar código
+delete from public."Stock_Config" where clave = 'pkc_empresa_desde';
+```
+
+Mientras la fila no exista, el valor es `infinity` y **el comportamiento es idéntico al de
+hoy**: se puede desplegar el SQL sin cambiar nada, y prenderlo cuando se quiera.
+
+**Rollback real** (volver a las definiciones previas): correr entero
+`sql/backups/reconciliar_pkc_pre_v1541_20260911.sql` — son las mismas dos funciones que ya
+respalda la entrada de la v15.41. Y `drop view public.gv_lugar_articulo;`.
+
+**Definición nueva:** `sql/gv_empresa_picking.sql`.
+**Front:** `aggEmp` / `empDeClave` / `items[].emp` / el bloque de sector por `gv_lugar_articulo`
+/ `pkTotalesArt` / `pkSendDetail` en `index.html`.
