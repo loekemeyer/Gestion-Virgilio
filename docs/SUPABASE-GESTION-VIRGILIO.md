@@ -6030,3 +6030,38 @@ candidato; nada con tanda → candidato; en borrador → fuera).
 
 **Rollback:** redeployar la v23 (commit `e62fdc0`) o la v22 (commit anterior) de
 `supabase/functions/gv-ppp-web-tandas-diarias/index.ts`.
+
+## 3.bu Z5 del 15/09 unificado al Norte del 16/09 · Veronesi fuera de D68G · 11 correcciones de geo (v15.60) — 2026-09-11
+
+**Disparador.** Thomas, mirando el Resumen: *"¿tiene sentido ir 3 veces en 3 días a Z5? ¿no unificarías?"*
+y *"revisá la distancia entre barrios y distancia recorrida por día"*. Medido con `GV_Geo_Cliente`
+(haversine, depósito Virgilio 2788 = `PPP_Geo.__deposito_virgilio_2788__`):
+
+| Día | Z5 m³ | Iba con | km camión Norte |
+|---|---:|---|---:|
+| 15/09 | 1,60 (D68E Morón · D68G Padua/Ituzaingó/Ciudadela · E11A Luján) | nadie: camión propio | 117 |
+| 16/09 | 0,16 (D69B Hurlingham) | Z6 2,07 + Z7 0,77 | 53 (sin Pilar, sin geo) |
+| **Unificado 16/09** | 1,76 | 4,60 m³ < cupo 6 | **138** |
+
+Además D68G mezclaba **98694 Veronesi (La Boca, Sur)** con Padua/Ituzaingó (Norte): depósito→La Boca
+15 km + La Boca→Padua 31 km = **+29 km** por un pedido de 0,16 m³. Thomas: *"1 sí, 2 sí, 3 dale"*.
+
+**Qué se cambió (backup `GV_Backup_Z5_20260911`, rollback en `sql/backups/z5_unificacion_20260911.sql`):**
+- `PPP_Web_Programacion` LK 0018/0028/0032: **D68G → D69F, 15 → 16/09** (el camión Norte del 16 es D69; v13.60 "camión = LETRA+NN por día").
+- `GV_PPP_Prog_Override` 98608/98609/98610 (G-Seller): **D68E → D69G, 15 → 16/09**. 98651 (Luján): **E11A al 16/09** (ese override decía "camión propio el 15 porque estiraba el D69 a 55 km"; ahora el D69 del 16 mide 138 km con Luján adentro y ahorra un camión entero).
+- `GV_PPP_Prog_Override` 98694 (Veronesi): **tanda propia D68J** en el camión Sur del 15/09. No se metió en E01B/E03B/E03E porque son tandas web y la regla v14.12 no mezcla ISIS con web en una tanda.
+- Ninguna de las tandas tenía eventos de operario (`Registros_Produccion_Virgilio` sin filas `D68E%|D68G%|E11A%`).
+
+**Impacto medido después:** `gv_ppp_super_mezclado` = 0 · `gv_ppp_cliente_dos_dias` = vacía · 15/09 sin Z5 ·
+16/09 Z5 1,76 (D69B/D69F/D69G/E11A) + Z6 2,07 + Z7 0,77. Cada cliente movido tenía TODAS sus NP en la misma tanda.
+
+**Geocodificación (problema registrado en `github_repo_problemas`: "GV_Geo_Cliente: clientes de Pilar, San Martín,
+Luján y Bella Vista geocodificados en CABA; Pilar del 16/09 sin lat/lng").** Causa: "San Martin", "Pilar", "Lujan" como
+barrio ambiguo → Nominatim devolvía la calle homónima de CABA y `centroBarrio()` resolvía el mismo lugar, así que el
+chequeo de 20 km pasaba. Hecho: **11 filas en `GV_Geo_Correccion`** (nota `v15.58 11/09 Thomas…`) con el **partido**
+como `barrio_ok` (General San Martín, Luján, Pilar, Villa Rosa, Bella Vista/San Miguel); **10 ubicaciones falsas
+borradas** de `GV_Geo_Cliente` (backup `GV_Backup_Geo_20260911`); 4281 sacado de `GV_Geo_Fallidas` para que reintente
+con la corrección; corrida manual de `gv-geocodificar` (request 20111). Los 10 borrados NO son habituales
+(`gv_clientes_habituales` = con entregas en 2026): no entran en `gv_geo_faltantes_padron`, se geocodifican bien el día
+que vuelvan a pedir. **Queda:** 4198 Benítez *"Panamericana 54,5 - Pilar"* (LK 0068/0069, 16/09) no tiene calle y
+altura — necesita el pin de Thomas.

@@ -12,7 +12,7 @@
 > única**; no se replica. Ante la duda entre parche rápido y fix de raíz → **fix
 > de raíz**.
 >
-> Última actualización: 2026-09-11 (viernes) · Versión app al documentar: **v15.59**
+> Última actualización: 2026-09-11 (viernes) · Versión app al documentar: **v15.60**
 >
 > Nota **v15.40 (2026-09-11) — HANDOFF de planimetría / Acacia: `docs/HANDOFF-PLANIMETRIA-Y-ACACIA.md`.**
 > Thomas sigue este tema en otra sesión. Ahí está todo junto: los **13 artículos activos del catálogo LK
@@ -11225,6 +11225,10 @@ distinta, empresa distinta.
 >   sus puntitos: eso cambiaría lo que se ve, no el ancho, y no se pidió.
 > - **Regresión nueva `tests/ppp-resumen-angosto.cjs`** (falla con el CSS de antes): compara el ancho
 >   de cada columna contra el de su contenido más ancho y exige ≤ 40 px de sobra.
+> Nota **2026-09-11 (v15.60) — Datos: Z5 del 15/09 unificado al Norte del 16/09, Veronesi fuera de D68G, 11 correcciones de geo.**
+> Sin cambio de código: sólo datos, con backup y rollback. Detalle, medición (117 + 53 km → 138 km, un camión menos) y
+> SQL en §3.bu de `docs/SUPABASE-GESTION-VIRGILIO.md` y `sql/backups/z5_unificacion_20260911.sql`.
+
 > Nota **2026-09-11 (v15.57) — Resumen de la PPP: fecha dd/mm pegada al día · tocar la NP abre su contenido · la alerta de tandas inconsistentes dice el día y qué mezcla.**
 > Tres pedidos del dueño en la misma tarde, todos sobre la solapa **Resumen**:
 > 1. *"elimina ese espacio entre fecha dd/mm/yy, también que sea solo dd/mm"* → en la tabla Fecha × zonas
