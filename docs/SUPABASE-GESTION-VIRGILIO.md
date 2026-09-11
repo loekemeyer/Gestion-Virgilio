@@ -5324,3 +5324,14 @@ Dueño: *"todos los datos que tengas que corregir, dale"*. Barrido sobre `v_impo
   marcados en el reporte. Sin lógica nueva en el módulo.
 - Concentraciones que más pesan: 582E salero Coto 63 % · 198E La Anónima 100 % · 601E La Anónima 47 % · 960E Relca 41 % ·
   026 La Anónima + Coto 44 % · 970E/971E Cencosud + Relca ~70 % · 727E Dorinka 52 %.
+
+### §3.bm.24 — Reporte de faltantes: entregas de septiembre en "quién lo compra" (v15.32, 2026-09-11)
+
+- Dueño: *"solo consideraste sales_lines; desde el 1 de septiembre hay entregas que no están"*. Cierto: `sales_lines` de LK
+  llega al 31/08 (Chef al 30/06). Se sumó un segundo bloque por artículo con las **entregas de Gestión del 01 al
+  10/09** (`Entregas_Virgilio`: `cod_cliente`, `cod_art`, `cajas_entregadas`, `gv_empresa`; razón social por
+  `gv_ppp_programacion_diaria` / `gv_ppp_entregados_meta`), y el pill **"nuevo"** cuando el cliente de septiembre no
+  estaba entre los 3 mayores de lo facturado. Caso que lo justifica: **198E** — facturado mar–ago era 100 % La Anónima,
+  pero en 10 días de septiembre Osa se llevó 138 cajas (66 %). Otros: 583E Sauer 80 caj (51 %), 582E Coto 70 caj (88 %),
+  601E La Anónima 40 caj (83 %), 584E Osa 20 caj.
+- Mismo artefacto (versión 3) y copia en `docs/INFORME-FALTANTES-IMPORTADOS-20260911.html`. Sin cambios en la base.

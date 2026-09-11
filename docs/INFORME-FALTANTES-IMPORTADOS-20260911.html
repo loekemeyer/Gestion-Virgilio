@@ -61,6 +61,9 @@
   td.nota b { color: var(--ink); font-weight: 500; }
   td.buy { min-width: 250px; font-size: 12px; }
   td.buy .bh { color: var(--muted); margin-bottom: 3px; white-space: nowrap; }
+  td.buy .bh b { color: var(--ink); font-weight: 500; }
+  td.buy .bh.sep { margin-top: 6px; padding-top: 5px; border-top: 1px dashed var(--line); }
+  .pill.nuevo { color: var(--accent-ink); background: var(--accent); }
   td.buy .bl { margin: 0; padding-left: 16px; display: grid; gap: 1px; }
   td.buy .bl b { font-weight: 500; }
   .muted { color: var(--muted); }
@@ -100,7 +103,7 @@
   <section>
     <div class="sec-head"><h2>Con pedido en curso, pero quiebran antes de que llegue</h2><p>Ordenados por unidades faltantes hasta la llegada. Faltante = consumo mensual × meses hasta la llegada − stock de hoy.</p></div>
     <div class="tblwrap"><table id="t1">
-      <thead><tr><th>Código</th><th>Descripción</th><th>Prov.</th><th class="num">Consumo u/mes</th><th class="num">Stock u</th><th>Quiebre est.</th><th>Llega</th><th class="num">Faltante hasta llegada</th><th>Quién lo compra (6 meses)</th><th>Contingencia / nota</th><th>Fabricable acá</th></tr></thead>
+      <thead><tr><th>Código</th><th>Descripción</th><th>Prov.</th><th class="num">Consumo u/mes</th><th class="num">Stock u</th><th>Quiebre est.</th><th>Llega</th><th class="num">Faltante hasta llegada</th><th>Quién lo compra (mar–ago facturado · 1–10/09 entregado)</th><th>Contingencia / nota</th><th>Fabricable acá</th></tr></thead>
       <tbody></tbody>
     </table></div>
   </section>
@@ -108,7 +111,7 @@
   <section>
     <div class="sec-head"><h2>Sin pedido en curso</h2><p>No hay fecha de llegada: el faltante se calcula a 3 meses como referencia de un lote de contingencia.</p></div>
     <div class="tblwrap"><table id="t2">
-      <thead><tr><th>Código</th><th>Descripción</th><th>Prov.</th><th class="num">Consumo u/mes</th><th class="num">Stock u</th><th>Quiebre est.</th><th>Llega</th><th class="num">Faltante a 3 meses</th><th>Quién lo compra (6 meses)</th><th>Contingencia / nota</th><th>Fabricable acá</th></tr></thead>
+      <thead><tr><th>Código</th><th>Descripción</th><th>Prov.</th><th class="num">Consumo u/mes</th><th class="num">Stock u</th><th>Quiebre est.</th><th>Llega</th><th class="num">Faltante a 3 meses</th><th>Quién lo compra (mar–ago facturado · 1–10/09 entregado)</th><th>Contingencia / nota</th><th>Fabricable acá</th></tr></thead>
       <tbody></tbody>
     </table></div>
   </section>
@@ -118,7 +121,7 @@
     <p><b>Ojo con Chef.</b> Las proyecciones CH (438E, 727E, 877E, 729E, 865E) pueden seguir infladas por las ventas de Chef de julio y agosto que en LK están marcadas como Loekemeyer (tarea de Vivi #3091).</p>
     <p><b>Becky 1ª llega el 29/09.</b> Los seis de la línea bambú/nylon están en cero pero el hueco es de 18 días: no justifican fabricar.</p>
     <p><b>733E, 692E y 814E</b> se empezaron a vender ahora: el consumo es el estimado de julio, no ventas reales. <b>360E</b> es el rallador 4 lados que no vino en la última de Kangli.</p>
-    <p><b>Quién lo compra.</b> Cajas facturadas en los últimos 6 meses (LK y Chef), los 3 clientes que más llevan. El pill "top 3" dice qué parte del total se llevan esos tres: cuando pasa de 50 % (naranja), racionar a uno o dos clientes estira el stock de verdad. En Chef, <b>1434 Loekemeyer Hnos</b> es la factura intercompañía (no un cliente final) y <b>2686 Dorinka</b> aparece dos veces porque julio/agosto se cargaron como LK. Cencosud (2444 Chef) y Relca (2444 LK) son clientes distintos con el mismo número.</p>
+    <p><b>Quién lo compra.</b> Dos bloques: lo <b>facturado de marzo a agosto</b> (LK y Chef, hasta donde llega la carga de facturas) y lo <b>entregado del 1 al 10 de septiembre</b> según Gestión Virgilio, que todavía no está facturado en la base de LK. El pill "nuevo" marca un cliente de septiembre que no estaba entre los 3 mayores de lo facturado: ahí es donde cambia el reparto (ej. 198E: Osa se llevó 138 cajas en 10 días y en lo facturado no aparecía). Los 3 clientes que más llevan. El pill "top 3" dice qué parte del total se llevan esos tres: cuando pasa de 50 % (naranja), racionar a uno o dos clientes estira el stock de verdad. En Chef, <b>1434 Loekemeyer Hnos</b> es la factura intercompañía (no un cliente final) y <b>2686 Dorinka</b> aparece dos veces porque julio/agosto se cargaron como LK. Cencosud (2444 Chef) y Relca (2444 LK) son clientes distintos con el mismo número.</p>
     <p><b>Fabricables acá (dueño 11/09):</b> colador 16 cm (437E, hoy cubierto por los 2.592 u en insumos), colador 20 cm (438E y 113) y sacacorcho cabo de madera 525E. Vienen marcados en la última columna.</p>
   </div>
 </div>
@@ -218,16 +221,54 @@
   };
   // Fabricables acá según el dueño (11/09): coladores 16 y 20 (437E / 438E / 113) y sacacorcho cabo de madera 525E.
   const FAB = { "438E": "Colador 20 cm: fabricable nacional (dueño 11/09).", "113": "Colador 20 cm: fabricable nacional (dueño 11/09).", "525E": "Fabricable nacional (dueño 11/09)." };
+  // Septiembre: ENTREGAS de Gestión Virgilio del 01/09 al 10/09 (Entregas_Virgilio), todavía no facturadas en LK.
+  // cod → [cajas sep, clientes, [[cod cliente, razón social, empresa, cajas, %], …]]
+  const SEP = {
+    "198E":[208,2,[["2533","Osa Distribuidora","LK",138,66],["771","La Anónima","LK",70,34]]],
+    "583E":[157,16,[["2305","Sauer Ignacio José","LK",80,51],["2533","Osa Distribuidora","LK",20,13],["2151","(sin razón social)","LK",10,6],["4234","Pro Tatiana","LK",10,6]]],
+    "582E":[80,7,[["801","Coto","LK",70,88],["2151","(sin razón social)","LK",2,3],["4275","Zhang Qikuan","LK",2,3]]],
+    "584E":[61,16,[["2533","Osa Distribuidora","LK",20,33],["1573","Messina Hnos","LK",10,16],["4234","Pro Tatiana","LK",8,13],["1883","Sabra","LK",5,8]]],
+    "601E":[48,7,[["771","La Anónima","LK",40,83],["4278","Cormorán","LK",3,6]]],
+    "026":[42,10,[["771","La Anónima","LK",20,48],["2104","O y L Variedades","LK",6,14],["4058","Rodrigues Magdalena","LK",4,10],["4278","Cormorán","LK",3,7]]],
+    "439EL":[33,7,[["2686","Dorinka","CH",24,73],["4058","Rodrigues Magdalena","LK",3,9]]],
+    "438E":[32,8,[["2686","Dorinka","CH",18,56],["2610","Multibazar","CH",5,16],["1618","Oriental Party","LK",3,9],["3972","Supermercado Remo","LK",2,6]]],
+    "566E":[30,11,[["1883","Sabra","LK",5,17],["2305","Sauer Ignacio José","LK",5,17],["4234","Pro Tatiana","LK",5,17]]],
+    "027":[22,10,[["4224","Martinelli Mariano","LK",5,23],["4058","Rodrigues Magdalena","LK",4,18],["3972","Supermercado Remo","LK",3,14],["2104","O y L Variedades","LK",3,14]]],
+    "960E":[21,9,[["1573","Messina Hnos","LK",10,48],["2301","Stagnoli Juan Pablo","LK",2,10],["4254","Vargas Ariel","LK",2,10]]],
+    "877E":[16,1,[["2686","Dorinka","CH",16,100]]],
+    "727E":[16,1,[["2686","Dorinka","CH",16,100]]],
+    "865E":[13,1,[["2686","Dorinka (865ED)","CH",13,100]]],
+    "590E":[13,6,[["1883","Sabra","LK",4,31],["1562","Rebagliati Adrián","LK",4,31],["4234","Pro Tatiana","LK",2,15]]],
+    "525E":[12,6,[["4224","Martinelli Mariano","LK",3,25],["2455","Multishop","LK",3,25],["4058","Rodrigues Magdalena","LK",3,25]]],
+    "982E":[8,8,[["2301","Stagnoli Juan Pablo","LK",1,13],["2151","(sin razón social)","LK",1,13]]],
+    "948E":[7,3,[["4058","Rodrigues Magdalena","LK",3,43],["4278","Cormorán","LK",3,43]]],
+    "943E":[7,3,[["4058","Rodrigues Magdalena","LK",3,43],["4278","Cormorán","LK",3,43]]],
+    "981E":[5,5,[["4275","Zhang Qikuan","LK",1,20],["641","La Agrícola Regional","LK",1,20]]],
+    "945E":[4,2,[["4278","Cormorán","LK",3,75],["2301","Stagnoli Juan Pablo","LK",1,25]]],
+    "970E":[2,2,[["2301","Stagnoli Juan Pablo","LK",1,50]]],
+    "953E":[1,1,[["2301","Stagnoli Juan Pablo","LK",1,100]]],
+    "944E":[1,1,[["2301","Stagnoli Juan Pablo","LK",1,100]]]
+  };
   const fmt = n => (n == null) ? "—" : Math.round(n).toLocaleString("es-AR");
   const fmt1 = n => Number(n).toLocaleString("es-AR", { minimumFractionDigits: 1, maximumFractionDigits: 1 });
   function buyersHtml(cod) {
     const b = BUYERS[cod];
-    if (!b) return '<span class="muted">sin ventas facturadas en 6 meses</span>';
-    const [tot, n, top3, top] = b;
-    const conc = top3 >= 50;
-    const head = '<div class="bh">' + n + (n === 1 ? " cliente" : " clientes") + ' · ' + fmt(tot) + ' caj en 6 m · <span class="pill ' + (conc ? "warn" : "ok") + '" title="Qué parte de las cajas se llevan los 3 que más compran">top 3 = ' + top3 + '%</span></div>';
-    const list = '<ol class="bl">' + top.map(([c, rs, emp, cm, pct]) => '<li><b>' + rs + '</b> <span class="muted">' + c + ' ' + emp + '</span> · ' + fmt1(cm) + ' caj/mes · ' + pct + '%</li>').join("") + '</ol>';
-    return head + list;
+    let h = "";
+    if (!b) h = '<div class="bh">sin ventas facturadas mar–ago</div>';
+    else {
+      const [tot, n, top3, top] = b;
+      const conc = top3 >= 50;
+      h += '<div class="bh"><b>Facturado mar–ago</b> · ' + n + (n === 1 ? " cliente" : " clientes") + ' · ' + fmt(tot) + ' caj · <span class="pill ' + (conc ? "warn" : "ok") + '" title="Qué parte de las cajas se llevan los 3 que más compran">top 3 = ' + top3 + '%</span></div>';
+      h += '<ol class="bl">' + top.map(([c, rs, emp, cm, pct]) => '<li><b>' + rs + '</b> <span class="muted">' + c + ' ' + emp + '</span> · ' + fmt1(cm) + ' caj/mes · ' + pct + '%</li>').join("") + '</ol>';
+    }
+    const s = SEP[cod];
+    if (s) {
+      const [tot, n, top] = s;
+      const conocidos = new Set((b ? b[3] : []).map(t => t[0] + t[2]));
+      h += '<div class="bh sep"><b>Entregado 1–10/09</b> · ' + n + (n === 1 ? " cliente" : " clientes") + ' · ' + fmt(tot) + ' caj</div>';
+      h += '<ol class="bl">' + top.map(([c, rs, emp, caj, pct]) => '<li><b>' + rs + '</b> <span class="muted">' + c + ' ' + emp + '</span> · ' + fmt(caj) + ' caj · ' + pct + '%' + (conocidos.has(c + emp) ? "" : ' <span class="pill nuevo" title="No estaba entre los 3 mayores de lo facturado">nuevo</span>') + '</li>').join("") + '</ol>';
+    } else if (b) h += '<div class="bh sep">Sin entregas del 1 al 10/09</div>';
+    return h;
   }
   const KEY = "faltantes_imp_fab_20260911";
   let marcas = {}; try { marcas = JSON.parse(localStorage.getItem(KEY) || "{}") || {}; } catch (_e) { marcas = {}; }
