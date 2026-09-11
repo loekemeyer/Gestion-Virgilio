@@ -53,6 +53,9 @@ const fail = (m) => { console.error("✗ " + m); process.exitCode = 1; };
     window.confirm = () => true; window.alert = (m) => { out.alert = m; };
     window.fetch = async (u, o) => { calls.push({ u: String(u), m: (o && o.method) || "GET", b: o && o.body }); return { ok: true, status: 200, json: async () => null, text: async () => "" }; };
     _pedHecho.fecha = "2026-11-20";
+    pedHechoSetRef("PI TEST-1");
+    pedHechoSetEmbarque("2026-10-05");
+    out.refYEmb = [_pedHecho.ref, _pedHecho.embarque];
     await pedHechoGuardar();
     out.calls = calls.map((c) => ({ u: c.u.split("/rest/v1/")[1], m: c.m, b: c.b }));
     out.cerro = !document.getElementById("pedHechoOv").classList.contains("show");
@@ -70,12 +73,20 @@ const fail = (m) => { console.error("✗ " + m); process.exitCode = 1; };
   if (!/⚠/.test(r.mcRaro)) fail("1500/1000 debería avisar que no entra justo: " + r.mcRaro);
   if (r.prev.length !== 3 || !/no está en importados/.test(r.prev[2])) fail("preview del texto mal: " + JSON.stringify(r.prev));
   if (!/2 artículo/.test(r.pieTxt) || !/9.200/.test(r.pieTxt)) fail("pie del modo texto mal: " + r.pieTxt);
-  const rpc = r.calls.filter((c) => c.u.indexOf("rpc/importados_set_curso") === 0);
-  const pat = r.calls.filter((c) => c.m === "PATCH");
-  if (rpc.length !== 2) fail("deberían ser 2 set_curso: " + JSON.stringify(r.calls));
-  if (JSON.parse(rpc[0].b).p_uni !== 8100) fail("505C: 100 en curso + 8000 = 8100, vino " + rpc[0].b);
-  if (JSON.parse(rpc[1].b).p_uni !== 1200) fail("584E debería quedar en 1200, vino " + rpc[1].b);
-  if (pat.length !== 2 || !/2026-11-20/.test(pat[0].b)) fail("la fecha de entrega no se guardó: " + JSON.stringify(pat));
+  // v14.94: cada carga es UN BACHE nuevo (no se pisa el "en curso" con importados_set_curso), y la
+  // fecha viaja en el propio bache — ya no hay PATCH a Importados.reingreso_est.
+  // v15.72: además van el PI del pedido (p_ref) y la fecha de embarque (p_embarque).
+  const rpc = r.calls.filter((c) => c.u.indexOf("rpc/gv_importado_bache_add") === 0);
+  if (rpc.length !== 2) fail("deberían ser 2 altas de bache: " + JSON.stringify(r.calls));
+  else {
+    const b0 = JSON.parse(rpc[0].b), b1 = JSON.parse(rpc[1].b);
+    if (b0.p_unidades !== 8000) fail("505C: el bache es de 8000 u (no acumula el en curso), vino " + rpc[0].b);
+    if (b1.p_unidades !== 1200) fail("584E: el bache es de 1200 u, vino " + rpc[1].b);
+    if (b0.p_fecha !== "2026-11-20") fail("la fecha de llegada no viaja en el bache: " + rpc[0].b);
+    if (b0.p_ref !== "PI TEST-1") fail("el PI del pedido no viaja: " + rpc[0].b);
+    if (b0.p_embarque !== "2026-10-05") fail("la fecha de embarque no viaja: " + rpc[0].b);
+  }
+  if (r.calls.some((c) => c.m === "PATCH")) fail("ya no debería haber PATCH a Importados: " + JSON.stringify(r.calls));
   if (!r.cerro) fail("no cerró el pop-up al guardar");
   if (errs.length) fail("errores de página: " + errs.join(" | "));
   await b.close();

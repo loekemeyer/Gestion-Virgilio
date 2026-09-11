@@ -12,7 +12,7 @@
 > única**; no se replica. Ante la duda entre parche rápido y fix de raíz → **fix
 > de raíz**.
 >
-> Última actualización: 2026-09-11 (viernes) · Versión app al documentar: **v15.70**
+> Última actualización: 2026-09-11 (viernes) · Versión app al documentar: **v15.72**
 >
 > Nota **v15.40 (2026-09-11) — HANDOFF de planimetría / Acacia: `docs/HANDOFF-PLANIMETRIA-Y-ACACIA.md`.**
 > Thomas sigue este tema en otra sesión. Ahí está todo junto: los **13 artículos activos del catálogo LK
@@ -11158,6 +11158,19 @@ distinta, empresa distinta.
 >   (umbral ≈ 3× su período; dedup un aviso por sync por día). **No se creó tabla
 >   `Sync_Estado`**: `cron.job_run_details` ya tiene la verdad. DDL en
 >   `sql/watchdog_syncs_externos.sql`.
+
+> Nota **2026-09-11 (v15.72) — Importación: los pedidos EN CURSO tienen pantalla propia, con fecha de embarque.**
+> Pedido de Thomas: *"quiero ver cuáles son los pedidos en curso por separado de si genera o no genera pedido…
+> qué día llegan y qué día es la fecha de embarque"*. Solapa **🚢 En curso** en el módulo de importación (al lado
+> de 📦 Pedidos y 🏭 Proveedores): **un renglón por PEDIDO** (el PI del proveedor), no por artículo, con unidades por
+> llegar, u$s FOB, m³, **🚢 embarque** y **🛬 llegada** editables en dd/mm/aa, los días que faltan y el estado del viaje.
+> La fecha de embarque **no existía** en el circuito: es la columna nueva `GV_Importados_Baches.fecha_embarque`
+> (la llegada sigue siendo `fecha_reingreso`, que es la que ve el portal LK como "Reingreso Est"). El PI también
+> pasó a ser un dato propio (`pedido_ref`; antes se escribía en `creado_por`) y es lo que agrupa la pantalla.
+> Editar una fecha la escribe en **todas las líneas del pedido** de una sola vez.
+> **Al 11/09 hay 8 pedidos en curso y NINGUNO tiene fecha de embarque cargada** (las llegadas sí están):
+> 323ES suelto 22/09 · Becky `PI B260601` 29/09 · Fujian 01/11 · Hugo Wong 03/11 · Frontier 505C 04/11 ·
+> Becky `PI B260601-2` 15/11 · Zhixin 29/11 · Ownland 18/12. §3.by de `docs/SUPABASE-GESTION-VIRGILIO.md`.
 
 > Nota **2026-09-11 (v15.70) — Carga Camión: el tilde pasa a ser el ORDEN de carga (1°, 2°, 3°…) y el camionero es obligatorio.**
 > Primera parte del **viaje del camionero** que pidió Thomas. El orden de clic viaja en el CCN como 4.º campo
