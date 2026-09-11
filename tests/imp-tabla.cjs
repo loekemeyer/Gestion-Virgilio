@@ -8,7 +8,9 @@
 
    Chequea, con un _stkPop de laboratorio (sin red), renderizando de verdad en
    el navegador y midiendo el layout:
-   - la tabla usa el modificador `.wide` + `<colgroup>` (14 columnas);
+   - la tabla usa el modificador `.wide` y tiene UN `<col>` por columna (v15.40: se
+     compara colgroup contra el thead en vez de clavar 14, que es lo que dejó el test
+     rojo al sumarse la columna Reingreso; el bug original era el colgroup desfasado);
    - NINGUNA celda tiene el contenido más ancho que su columna (= texto pisado),
      salvo la Descripción, que recorta a propósito con «…» y tiene el nombre
      completo en el `title`;
@@ -48,6 +50,7 @@ const ITEMS = [
       if (!tbl) return { sinTabla: true };
       const wrap = tbl.closest(".mva-tblwrap");
       const cols = tbl.querySelectorAll("colgroup col").length;
+      const ths = tbl.querySelectorAll("thead th").length;
       // celdas con el contenido más ancho que la columna = texto pisado (col 1 = Descripción, recorta a propósito)
       const pisadas = [...tbl.querySelectorAll("th,td")]
         .filter((c) => c.cellIndex !== 1 && c.scrollWidth > c.clientWidth + 1)
@@ -58,13 +61,14 @@ const ITEMS = [
       const codSticky = getComputedStyle(tbl.querySelector("tbody td:first-child")).position === "sticky";
       return {
         cols: cols,
+        ths: ths,
         pisadas: pisadas,
         tablaW: Math.round(tbl.getBoundingClientRect().width),
         wrapW: Math.round(wrap.clientWidth),
         scrollX: wrap.scrollWidth - wrap.clientWidth,
         accVisible: accVisible,
         codSticky: codSticky,
-        tieneBotones: /pedImpSetCurso/.test(tbl.innerHTML) && /pedImpLlego/.test(tbl.innerHTML),
+        tieneBotones: /pedImpBaches/.test(tbl.innerHTML) && /pedImpSetReingreso/.test(tbl.innerHTML),
         paginaScrollX: document.documentElement.scrollWidth > document.documentElement.clientWidth
       };
     }, ITEMS);
@@ -73,8 +77,9 @@ const ITEMS = [
   }
   const A = out.ancho || {}, C = out.cel || {};
   const pass =
-    A.cols === 14 && A.pisadas && A.pisadas.length === 0 &&   // nada pisado en monitor
-    A.scrollX === 0 && A.accVisible && A.tieneBotones &&      // entra entera, con los botones ✏️/📥
+    A.cols >= 14 && A.cols === A.ths &&                       // un <col> por columna (el bug era el colgroup desfasado)
+    A.pisadas && A.pisadas.length === 0 &&                    // nada pisado en monitor
+    A.scrollX === 0 && A.accVisible && A.tieneBotones &&      // entra entera, con la columna Acciones usable
     C.pisadas && C.pisadas.length === 0 &&                    // ni en celular
     C.scrollX > 0 && C.codSticky &&                           // en celular se desliza, con Código fijo
     C.tablaW >= 1200 &&                                       // no se achica hasta pisarse

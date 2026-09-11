@@ -5070,11 +5070,11 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
       <div class="label-send-row">
         <div id="inputLabel" class="label"></div>
         <input id="textInput" class="text-input">
-        <button id="sendBtnInline" class="primary-btn primary-btn-inline send-btn-shared" onclick="send()">Enviar</button>
+        <button id="sendBtnInline" class="primary-btn primary-btn-inline send-btn-shared" onclick="sendTap()">Enviar</button>
       </div>
     </div>
 
-    <button id="sendBtn" class="primary-btn send-btn-shared" onclick="send()">Enviar</button>
+    <button id="sendBtn" class="primary-btn send-btn-shared" onclick="sendTap()">Enviar</button>
     <div id="error" class="error"></div>
 
   </div>
@@ -7660,7 +7660,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v15.39";
+const APP_VERSION = "v15.40";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -8010,17 +8010,31 @@ function emitArmadoUbic(np, ubic, legajo) {
   if (typeof trySendOneReport === "function") trySendOneReport(payload).then(function (r) { if (r && r.ok) removeFromQueue(payload.id); }).catch(function () {});
   try { updatePendingIndicator(); } catch (_e) {}
 }
-let _sendLastCallMs = 0;
+/* v15.33/v15.40 — doble-tap del botón "Enviar". El único disabled=true llega recién después
+   de varios await (getActivityStatus, fetchMonitorSheet, tandaReservar…), así que dos toques
+   seguidos ejecutan send() DOS VECES EN PARALELO: cada llamada arma un payload con id aleatorio
+   distinto y las dos quedan encoladas sin dedupe posible (auditoría revisor-logica 2026-09-11).
+   v15.33 lo frenó por TIEMPO (800 ms desde la llamada ANTERIOR, cualquiera fuera) y así se comía
+   eventos legítimos DISTINTOS: AP sobre una tanda ya abierta (que no encola, reabre el asistente)
+   seguido de AP de OTRA tanda perdía el armado nuevo EN SILENCIO, y el cierre de un picking desde
+   el asistente (pkFinishPicking → send("TP")) podía caer en la misma ventana. Dejó rojas dos
+   regresiones desde la v15.33 (ap-resume, ep-ppp-warn).
+   v15.40 — el guard es del BOTÓN, no de la función, y mira CONCURRENCIA (que es el bug real):
+   `sendTap()` es lo que cuelga del onclick y descarta el toque que llega mientras el anterior
+   todavía corre; cuando terminó, el siguiente pasa. La bandera se limpia en `finally`, así que
+   ningún `return` temprano de validación la deja trabada, y caduca a los 15 s por si un await
+   queda colgado (p. ej. un modal abierto). Los llamados internos (pkFinishPicking, arFinish)
+   siguen entrando por send() directo: no son toques, no hay nada que debouncear. */
+let _sendBusy = false;
+let _sendBusyTs = 0;
+async function sendTap() {
+  if (_sendBusy && Date.now() - _sendBusyTs < 15000) return;
+  _sendBusy = true;
+  _sendBusyTs = Date.now();
+  try { return await send(); }
+  finally { _sendBusy = false; }
+}
 async function send() {
-  // v15.33 — el único disabled=true del botón "Enviar" llega recién después de varios await
-  // (getActivityStatus, fetchMonitorSheet, tandaReservar…). Un doble-tap antes de eso ejecuta
-  // send() dos veces en paralelo: cada llamada arma un payload con id aleatorio distinto, así
-  // que las dos quedan encoladas sin dedupe posible (auditoría revisor-logica 2026-09-11).
-  // Guard por tiempo (no por bandera true/false): send() tiene varios `return` tempranos de
-  // validación, y una bandera habría quedado trabada para siempre en cualquiera de esos casos.
-  const _nowCall = Date.now();
-  if (_nowCall - _sendLastCallMs < 800) return;
-  _sendLastCallMs = _nowCall;
   const legajoStr   = String(legajoInput.value || "").trim();
   const opcion      = selected;
   const descripcion = desc[selected] || "";
