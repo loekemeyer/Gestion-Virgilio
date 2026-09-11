@@ -5916,3 +5916,55 @@ Test `tests/ppp-res-np-fecha.cjs`; `tests/ppp-chk-gondola.cjs` stubbea también 
 
 **Rollback:** `drop view public.gv_np_items;` — el front no rompe, vuelve a "No encontré artículos".
 `sql/gv_np_items_v1557.sql`.
+
+## §3.ci — Cuarentena: sólo lo PENDIENTE. Lo ya programado no le abre tarea a Viviana (v15.58, 2026-09-11)
+
+Vivi: *"tengo estos mensajes de cuarentena pero no los veo en A Programar"*. Tenía 7 tareas abiertas en
+Planify (creadas por el sync a las 11:45), **todas de pedidos que ya estaban programados** con tanda, dos
+de ellos ya entregados:
+
+| Tarea | NP | Tanda | Entrega | Motivo que decía |
+|---|---|---|---|---|
+| Cuarentena LK 1354 · Osa Distribuidora | LK 0024 | E09B | 09/09 | Deuda $20.168.551,52 |
+| Cuarentena CH 225 · Clapera | CH 0014 / 0015 | E12G | 17/09 | Deuda $4.894.986,39 |
+| Cuarentena CH 218 · Ierakuin | CH 0004 | E03B | 15/09 | Deuda $2.062.528,58 |
+| Cuarentena CH 217 · Gifel | CH 0003 | D69E | 16/09 | Deuda $1.955.317,80 |
+| Cuarentena LK 1349 · Bazar Monica | LK 0018 | D68G | 15/09 | Deuda $1.080.583,02 |
+| Cuarentena LK 1346 · BP Import | LK 0011 | E01D | 08/09 | Deuda $836.136,98 |
+| Cuarentena LK 1384 · Bazar Mandarin | LK 0060 / 0061 | E12D | 17/09 | Supera el límite por $361.544,46 |
+
+**Causa.** A Programar sólo lista lo pendiente: `aprCargar` saca del feed lo que ya tiene tanda en
+`PPP_Web_Programacion` y lo que está en un borrador (`PPP_Web_Tanda_Items`), y `cuarMarcarPedidos`
+evalúa la cuarentena sobre esa lista. La Edge Function `gv-ppp-web-tandas-diarias` (v22) no:
+`soloPendientes` le pasaba a `pedidosEnCuarentena` —y de ahí a `gv_cuarentena_planify_sync`— **todo el
+feed menos `gv_pedidos_web_excluidos`**, que no conoce `PPP_Web_Programacion`. Resultado: tarea a
+Viviana por pedidos que ya iban en un camión, imposibles de encontrar en el sector Cuarentena porque
+no están pendientes. Efecto colateral: `gv_cuarentena_limite` arranca el greedy con la **base** de
+armados no facturados (que ya incluye al programado) y lo sumaba **otra vez** como pendiente, así que
+LK 1384 "superaba" un límite que no supera. En las corridas del mediodía del 11/09 el log contaba
+`excluidos.cuarentena` = 3 en LK y 3 en Chef, todos programados.
+
+**Fix (Edge Function v23).**
+- `pedidosYaTomados(emp)`: lee los `order_id` con tanda de `PPP_Web_Programacion` y los de
+  `PPP_Web_Tanda_Items` de la empresa y los saca de los candidatos **por pedido entero**, igual que el
+  front (la cuarentena retiene todas las NP de un pedido juntas). Lo programado **sigue** en `filas`:
+  el resync y la foto de `PPP_Web_Base` lo necesitan. Si la lectura falla se evalúa todo como antes
+  (peor una tarea de más que un pedido con deuda armado solo).
+- `pedidosEnCuarentena` ya no corta antes del sync cuando no hay candidatos: la lista vacía es
+  justamente lo que le dice a `gv_cuarentena_planify_sync` que cierre las tareas abiertas de esa
+  empresa. Antes, con el feed sin pendientes, las tareas viejas quedaban abiertas para siempre.
+- Las RPC (`gv_cuarentena_marcar`, `gv_cuarentena_limite`, `gv_cuarentena_planify_sync`) **no cambiaron**.
+
+**Las 7 tareas** se cerraron a mano (`done = true`, nota "Falsa alarma: la NP ya estaba programada…")
+y con `GV_Cuarentena_Planify.cerrada_at`, para que el sync no las vuelva a tocar. Lo que sí queda en
+cuarentena de verdad (pendiente + deuda / suspendido / límite) sigue abriendo tarea como en la v15.47.
+Si una de esas NP vuelve a A Programar (↩ desprogramar, §3.cg), vuelve a ser candidata y, con deuda,
+le abre una tarea nueva: eso es correcto.
+
+**Verificación:** la corrida siguiente en `GV_Tandas_Auto_Log` tiene que salir con
+`excluidos.cuarentena` ausente o sólo con pedidos pendientes, y sin tareas nuevas de Viviana en
+`planify.tasks` para NP con tanda.
+
+**Rollback:** redeployar la v22 (commit anterior de `supabase/functions/gv-ppp-web-tandas-diarias/index.ts`).
+Auditoría: `github_repo_problemas`, "Cuarentena abre tareas en Planify (Viviana) para pedidos que ya
+estan programados con tanda".

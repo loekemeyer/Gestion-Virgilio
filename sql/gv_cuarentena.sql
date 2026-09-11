@@ -259,3 +259,14 @@ $function$;
 -- ROLLBACK: las definiciones previas están en
 -- sql/backups/cuarentena_20260911_marcar_limite_pre_v1504.sql
 -- ════════════════════════════════════════════════════════════════════════════
+
+-- ============================================================================
+-- v15.58 (2026-09-11) — la cuarentena es de lo PENDIENTE (Edge Function v23)
+-- Vivi: "tengo estos mensajes de cuarentena pero no los veo en A Programar". La Edge Function
+-- gv-ppp-web-tandas-diarias evaluaba gv_cuarentena_marcar / gv_cuarentena_limite y sincronizaba
+-- Planify sobre todo el feed menos gv_pedidos_web_excluidos, sin sacar lo que ya tiene tanda en
+-- PPP_Web_Programacion ni lo que está en un borrador (PPP_Web_Tanda_Items). Abría tareas a Viviana
+-- por NP ya programadas y contaba dos veces al programado en el greedy del límite (base + pendiente).
+-- Ahora `pedidosYaTomados` los saca antes de evaluar, igual que hace A Programar. Las RPC de acá NO
+-- cambiaron. §3.ch de docs/SUPABASE-GESTION-VIRGILIO.md.
+-- ============================================================================

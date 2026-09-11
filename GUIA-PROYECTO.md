@@ -12,7 +12,7 @@
 > única**; no se replica. Ante la duda entre parche rápido y fix de raíz → **fix
 > de raíz**.
 >
-> Última actualización: 2026-09-11 (viernes) · Versión app al documentar: **v15.57**
+> Última actualización: 2026-09-11 (viernes) · Versión app al documentar: **v15.58**
 >
 > Nota **v15.40 (2026-09-11) — HANDOFF de planimetría / Acacia: `docs/HANDOFF-PLANIMETRIA-Y-ACACIA.md`.**
 > Thomas sigue este tema en otra sesión. Ahí está todo junto: los **13 artículos activos del catálogo LK
@@ -11158,6 +11158,17 @@ distinta, empresa distinta.
 >   (umbral ≈ 3× su período; dedup un aviso por sync por día). **No se creó tabla
 >   `Sync_Estado`**: `cron.job_run_details` ya tiene la verdad. DDL en
 >   `sql/watchdog_syncs_externos.sql`.
+
+> Nota **2026-09-11 (v15.58) — Cuarentena: sólo lo PENDIENTE. Lo que ya tiene tanda no le abre tarea a Viviana.**
+> Vivi: *"tengo estos mensajes de cuarentena pero no los veo en A Programar"*. Las 7 tareas abiertas (LK 1354 ·
+> 1384 · 1346 · 1349, CH 217 · 218 · 225) eran de pedidos **ya programados** (E09B, E12D, E01D, D68G, D69E, E03B,
+> E12G), dos ya entregados. A Programar no los lista —saca lo que tiene tanda y lo que está en un borrador— pero la
+> Edge Function `gv-ppp-web-tandas-diarias` evaluaba la cuarentena sobre todo el feed menos `gv_pedidos_web_excluidos`,
+> que no conoce `PPP_Web_Programacion`. Ahora (`pedidosYaTomados`, Edge Function v23) sólo evalúa —y sincroniza con
+> Planify— lo mismo que ve el sector Cuarentena; y con cero candidatos el sync corre igual con la lista vacía, que es lo
+> que cierra las tareas viejas. De paso deja de contar dos veces al programado en `gv_cuarentena_limite` (base de armados
+> no facturados + pendiente: LK 1384 "superaba el límite por $361.544" sin superarlo). Las 7 tareas se cerraron a mano
+> con la nota "falsa alarma". §3.ch de `docs/SUPABASE-GESTION-VIRGILIO.md`.
 
 > Nota **2026-09-11 (v15.56) — La Demora del Resumen salía vacía en los pedidos de la página.**
 > Thomas: *"si los pedidos se cargaron por pipeline desde paginalk, no calcula demora de pedidos"*.
