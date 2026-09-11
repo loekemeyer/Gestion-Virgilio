@@ -7701,7 +7701,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v15.75";
+const APP_VERSION = "v15.76";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -34572,7 +34572,12 @@ var _pp = null;
 function _ppMoney(n) { return '$' + Math.round(n || 0).toLocaleString('es-AR'); }
 function _ppFecha10(s) { var m = String(s || "").match(/(\d{4})-(\d{2})-(\d{2})/); return m ? (m[1] + "-" + m[2] + "-" + m[3]) : ""; }
 function _ppPrice(codN) { return (_pp.precio[codN] || _pp.precio[codN.replace(/(LK|CH)$/, "")] || null); }
-function _ppPlata(r) { var p = _ppPrice(r.codN); return (p && p.ok) ? r.cajas * p.pu * p.uxb : 0; }
+/* v15.76 — el precio sale de la PROPIA fila: la vista ya lo resuelve por empresa
+   (NP ^9 = lista LK, resto = lista Chef; "L" al final = artículo de Loeke → lista LK).
+   El mapa por código quedaba mezclando las dos empresas: el mismo código vale distinto
+   en LK y en Chef, y ganaba el primero que entraba. Se conserva como fallback. */
+function _ppPlata(r) { if (r.ok && r.pu > 0) return r.cajas * r.pu * r.uxb;
+  var p = _ppPrice(r.codN); return (p && p.ok) ? r.cajas * p.pu * p.uxb : 0; }
 async function openPlataPerdida() {
   try { if (typeof requireSupervisor === "function" && !requireSupervisor()) return; } catch (_e) {}
   if (!document.getElementById("ppCss")) {
@@ -34594,14 +34599,22 @@ async function _ppFallbackLoad() {
     supaFetchAllSafe(SUPABASE_URL + "/rest/v1/Entregas_Virgilio", "select=np,cod_art,cajas_falto,cajas_pedidas,cajas_entregadas,fecha_salida,cod_cliente&cajas_falto=gt.0"),
     supaFetchAllSafe(SUPABASE_URL + "/rest/v1/precios_venta", "select=cod,precio_unit,uxb,descripcion"),
     supaFetchAllSafe(SUPABASE_URL + "/rest/v1/clientes_vendedor", "select=cod_cliente,vend"),
-    supaFetchAllSafe(SUPABASE_URL + "/rest/v1/Facturacion_NP", "select=np,razon_social")
+    supaFetchAllSafe(SUPABASE_URL + "/rest/v1/Facturacion_NP", "select=np,razon_social"),
+    // v15.76 — la lista de CHEF: una NP que no empieza con 9 es de Chef y se valoriza con ella.
+    supaFetchAllSafe(SUPABASE_URL + "/rest/v1/precios_venta_chef", "select=cod,precio_unit,uxb,descripcion")
   ]);
-  var ent = r[0] || [], pv = {}, cv = {}, fnp = {};
+  var ent = r[0] || [], pv = {}, pvc = {}, cv = {}, fnp = {};
   (r[1] || []).forEach(function (p) { var c = _ppNormCod(p.cod); if (c) pv[c] = p; });
   (r[2] || []).forEach(function (c) { var k = (c.cod_cliente || "").trim(); if (k) cv[k] = (c.vend || "").trim(); });
   (r[3] || []).forEach(function (f) { var k = (f.np || "").trim(); if (k) fnp[k] = f.razon_social || ""; });
+  (r[4] || []).forEach(function (p) { var c = _ppNormCod(p.cod); if (c) pvc[c] = p; });
   return ent.map(function (e) {
-    var cod = _ppNormCod(e.cod_art), p = pv[cod] || {}, cli = (e.cod_cliente || "").trim(), np = (e.np || "").trim();
+    var cli = (e.cod_cliente || "").trim(), np = (e.np || "").trim();
+    // "L" al final = artículo de Loeke vendido por Chef → lista de LK por el código pelado (v13.71).
+    var raw = String(e.cod_art || "").trim().toUpperCase(), esL = /[0-9E]L$/.test(raw);
+    var cod = _ppNormCod(e.cod_art), codP = esL ? _ppNormCod(raw.replace(/L$/, "")) : cod;
+    var esChef = !esL && !/^9/.test(np.replace(/\.0+$/, ""));
+    var p = (esChef ? (pvc[codP] || pv[codP]) : pv[codP]) || {};
     var pu = Number(p.precio_unit) || 0, uxb = Number(p.uxb) || 1;
     return { np: e.np, cod: cod, cod_raw: (e.cod_art || "").trim(), cajas: Number(e.cajas_falto) || 0,
       ped: Number(e.cajas_pedidas) || 0, ent: Number(e.cajas_entregadas) || 0,
@@ -34637,7 +34650,7 @@ async function ppLoad() {
     var np = pickNormNp(r.np);
     if (np && r.razon_social && !rsDe[np]) rsDe[np] = r.razon_social;
   });
-  _pp.rows = data.map(function (r) { return { codN: r.cod || "", cod: r.cod_raw || "", cajas: Number(r.cajas) || 0, ped: Number(r.ped) || 0, ent: Number(r.ent) || 0, fecha: r.fecha || "", cli: r.cod_cliente || "", np: pickNormNp(r.np) }; }).filter(function (r) { return r.cajas > 0; });
+  _pp.rows = data.map(function (r) { return { codN: r.cod || "", cod: r.cod_raw || "", cajas: Number(r.cajas) || 0, ped: Number(r.ped) || 0, ent: Number(r.ent) || 0, fecha: r.fecha || "", cli: r.cod_cliente || "", np: pickNormNp(r.np), pu: Number(r.precio_unit) || 0, uxb: Number(r.uxb) || 1, ok: !!r.precio_ok }; }).filter(function (r) { return r.cajas > 0; });
   _pp.precio = precio; _pp.vendDe = vendDe; _pp.rsDe = rsDe;
   // años CON DATOS (para el dropdown); por defecto el año actual si tiene datos, si no el más reciente.
   var ys = {}; _pp.rows.forEach(function (r) { var y = r.fecha ? r.fecha.slice(0, 4) : ""; if (/^\d{4}$/.test(y)) ys[y] = 1; });

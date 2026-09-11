@@ -6555,3 +6555,81 @@ que en vez de quedar colgados de la regla automática **pasan al mapa**, con la 
 `delete from "GV_Importados_Insumo_Map" where insumo_cod in ('437E','439E')` + recrear la vista con
 la definición guardada en **`GV_bkp_def_gv_importados_stock_insumos_20260911`** (es la de
 `sql/gv_importados_stock_insumos_v1527.sql`, sin el join a `partes`). No toca objetos de Producción.
+
+---
+
+## 3.cc Las NP de Chef se valorizan con la lista de CHEF (v15.76) — 2026-09-11
+
+**Reportado por Thomas**: el modal **💵 Neto a facturar — desglose** de la **NP 44607**
+(cliente 2393, Miguel Addoumie SRL, Chef) salía entero en rojo *"sin precio"*, con
+**NETO a facturar $0,00** y los 15 códigos del pedido listados abajo en *"SIN PRECIO ·
+NO ENTRAN"* (043, 609, 700, 701, 713, 727E, 731, 760, 798E, 802, 824, 825, 836, 840, 911).
+Los 15 tienen precio cargado en `precios_venta_chef`.
+
+### Causa
+
+`vista_facturacion_neto_items` **sí** deriva la empresa de la NP (`^9` = lk, resto = chef) —
+la usa para el `dto_vol` y para la cadena de súper— pero después joinea **una sola** lista de
+precios: `public.precios_venta`, que es **la de Loekemeyer**. `public.precios_venta_chef`
+(101 códigos, misma estructura, la sincroniza el mismo cron) no la miraba nadie en Facturación.
+Mismo hueco, por copiar el mismo join, en `vista_facturable_anticipado` y `vista_plata_perdida`.
+
+No es que "falten precios de Chef": **la lista de Chef estaba cargada y al día** (última sync
+11/09 16:45). Lo que faltaba era mirarla.
+
+### Medido ANTES (11/09)
+
+| | líneas | sin precio | |
+|---|---|---|---|
+| NP de **LK** | 9.020 | 37 | 0,4 % |
+| NP de **Chef** | 1.568 | **1.141** | **72,8 %** |
+
+Y peor que el $0,00: de las **187** líneas de Chef que **sí** se valorizaban, **61 usaban un
+precio de LK distinto del de Chef** — números mal en pantalla, sin ningún aviso. Ejemplos:
+`809E` (LK 4.060 vs Chef 3.005, Chef se sobrevaluaba) y `438E` (LK 6.615 vs Chef 7.320, se
+subvaluaba). El `uxb` nunca estuvo mal: **0 diferencias** de unidades por caja entre las dos listas.
+
+### El arreglo (las tres vistas, misma regla) — `sql/gv_precio_chef_v1576.sql`
+
+1. NP de Chef → `precios_venta_chef` por código canónico.
+2. Artículo con **"L" al final** (505L, 438EL) = artículo de **Loeke vendido por Chef**
+   (regla del dueño v13.71, ya implementada en `gv_ppp_np_valor`): lista de **LK**, pelando la L.
+3. **Fallback**: NP de Chef con un código que no está en la lista de Chef → lista de LK. Cubre el
+   caso inverso ya documentado (Cencosud/Chef 2444, artículos de Loeke **sin** la L) y garantiza
+   que ninguna línea que hoy tiene precio lo pierda.
+4. Las NP de **LK no cambian**: siguen leyendo sólo `precios_venta` (no hay fallback a Chef).
+5. La lista de súper (`cobranzas_precios_super`) sigue teniendo prioridad sobre las dos.
+
+También en el front (`index.html`): el módulo **💸 Plata perdida** valorizaba desde un mapa
+**por código**, sin empresa — el mismo código vale distinto en LK y en Chef y ganaba el primero
+que entraba. Ahora la plata sale del precio de **la propia fila**, que la vista ya resuelve por
+empresa (el mapa queda sólo de fallback), y el cargador de respaldo baja también la lista de Chef.
+
+### Medido DESPUÉS
+
+| vista | filas | sin precio antes | **sin precio ahora** |
+|---|---|---|---|
+| `vista_facturacion_neto_items` (chef) | 1.568 | 1.141 | **52** |
+| `vista_facturacion_neto_items` (lk) | 9.020 | 37 | 37 (igual) |
+| `vista_facturable_anticipado` | 869 | 67 | **12** |
+| `vista_plata_perdida` | 900 | 154 | **14** |
+
+**Ninguna línea de LK se movió**: 0 filas con distinto `importe_ent`/`precio_lista`/`uxb`/`cod`
+en las tres vistas (comparado fila a fila contra el snapshot). Las 3 líneas con sufijo L
+(438EL, 439EL) pasaron de sin precio a valorizadas con la lista de LK.
+
+La **NP 44607** queda con los 15 ítems valorizados, dto 12 %, y el faltante (727E ×1, 836 ×3)
+ya muestra cuánta plata se dejó de facturar en vez de "sin precio".
+
+### Lo que QUEDA sin precio (ya no es un bug de código, es carga de datos)
+
+11 códigos que no están **en ninguna de las dos listas** y aparecen en NP de Chef:
+`123`, `102E`, `106E`, `702EN`, `838E`, `809`, `877E`, `865ED`, `727EN`, `830`, `828`
+(52 líneas, ~1.200 cajas). Hay que darlos de alta en la lista de precios de Chef.
+
+### Rollback
+
+`sql/backups/vistas_precio_lk_20260911_pre_v1576.sql` (definiciones exactas previas).
+Snapshots de datos del "antes": `gv_bkp_facneto_items_20260911` (10.588 filas),
+`gv_bkp_facturable_ant_20260911` (869), `gv_bkp_plata_perdida_20260911` (900).
+No toca objetos de Producción.
