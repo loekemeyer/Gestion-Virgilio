@@ -7660,7 +7660,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v15.73";
+const APP_VERSION = "v15.74";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -9309,7 +9309,21 @@ async function showPickingList(tanda, legajo, opts) {
        y el backend reparte como hasta ahora. */
     const empDeClave = (k) => {
       const d = aggEmp[k]; if (!d) return "";
-      if (d.LK > 0 && d.CH > 0) return "";
+      // v15.73 — "MIX" en vez de vacío cuando las DOS empresas piden el mismo código en
+      // la misma tanda. El backend sólo acepta LK/CH, así que MIX se comporta igual que
+      // vacío (reparte como hasta ahora, no inventa nada) — pero queda ASENTADO en el
+      // evento, que es la diferencia: si algún día pasa, nos enteramos en vez de que se
+      // vaya en silencio al balde 'Mixto'. Medido el 11/09 sobre los movimientos reales:
+      // 375 tandas, 5.872 pares (tanda, artículo), 3 tandas que mezclan empresas y CERO
+      // pares pedidos por las dos — en las 3 mezcladas los catálogos son disjuntos
+      // (Loeke 5xx/8xx/9xx, Chef 7xx). O sea que esto no pasó nunca todavía.
+      // Para buscarlos:
+      //   select * from "Registros_Produccion_Virgilio"
+      //    where opcion='PKC' and split_part(texto,'|',6)='MIX';
+      if (d.LK > 0 && d.CH > 0) {
+        try { console.warn("[picking] " + k + ": lo piden LK y CH en la misma tanda (LK " + d.LK + " / CH " + d.CH + ") — el PKC sale como MIX"); } catch (_e) {}
+        return "MIX";
+      }
       return d.LK > 0 ? "LK" : (d.CH > 0 ? "CH" : "");
     };
     // v5.34: la base sale 100% de Supabase (PPP_Base_Pedidos). Ya no hay backfill
@@ -9376,7 +9390,7 @@ async function showPickingList(tanda, legajo, opts) {
     // Best-effort: si la vista no está, no se toca nada y queda el comportamiento viejo.
     try {
       const _emps = {};
-      items.forEach(function (it) { if (it.emp) _emps[it.emp] = 1; });
+      items.forEach(function (it) { if (it.emp === "LK" || it.emp === "CH") _emps[it.emp] = 1; });
       if (Object.keys(_emps).length) {
         const _cods = items.map(function (it) { return codBase(it.art).replace(/^0+(?=.)/, ""); });
         const _uniq = _cods.filter(function (c, i) { return c && _cods.indexOf(c) === i; });
@@ -9389,7 +9403,7 @@ async function showPickingList(tanda, legajo, opts) {
           (porCodEmp[k] || (porCodEmp[k] = [])).push(r.sector);
         });
         items.forEach(function (it) {
-          if (!it.emp) return;
+          if (it.emp !== "LK" && it.emp !== "CH") return;   // MIX: se deja la planimetría de siempre
           const secs = porCodEmp[codBase(it.art).replace(/^0+(?=.)/, "").toUpperCase() + "|" + it.emp];
           if (secs && secs.length) { it.sector = secs.join(" · "); it.sectorDe = "GV_Lugar"; }
         });

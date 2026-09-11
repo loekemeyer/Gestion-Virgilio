@@ -33,8 +33,12 @@
 --
 -- NO se deriva de la tanda: 28 de 1.197 tandas-día de la historia mezclan LK y
 -- CH (2,34 %, la última el 01/09), así que la tanda no sirve como clave. Cuando
--- la tanda mezcla las dos para un código, el front manda el campo VACÍO y acá se
--- reparte como hasta ahora — nunca se inventa una empresa.
+-- la tanda mezcla las dos para un código, el front manda "MIX" y acá se reparte como
+-- hasta ahora — nunca se inventa una empresa. Sólo se aceptan 'LK' y 'CH'; cualquier
+-- otro valor (MIX incluido) cuenta como no declarada. "MIX" no es un tercer balde:
+-- existe para que el caso quede ASENTADO en el evento y se pueda buscar
+--   select * from "Registros_Produccion_Virgilio" where opcion='PKC' and split_part(texto,'|',6)='MIX';
+-- en vez de irse en silencio. Al 11/09 no ocurrió nunca: 0 de 5.872 pares (tanda, art).
 --
 -- Interruptor: update "Stock_Config" set valor='0' where clave='pkc_empresa_activo';
 -- ⚠ OBJETO COMPARTIDO → anotar en docs/ROLLBACK-PRODUCCION.md.
@@ -177,7 +181,7 @@ begin
            -- viene vacío o discrepa, queda null y se reparte como siempre.
            case when bool_and(r.ts_cliente >= v_emp_desde)
                  and count(distinct nullif(upper(btrim(split_part(r.texto,'|',6))),'')) = 1
-                 and bool_and(nullif(upper(btrim(split_part(r.texto,'|',6))),'') is not null)
+                 and bool_and(upper(btrim(split_part(r.texto,'|',6))) in ('LK','CH'))
                 then max(nullif(upper(btrim(split_part(r.texto,'|',6))),''))
            end as emp,
            (array_agg(r.legajo::text ORDER BY r.ts_cliente DESC NULLS LAST))[1] AS leg
@@ -304,7 +308,7 @@ begin
            -- v15.72: EMPRESA declarada (6º campo), misma regla que en el cron.
            case when bool_and(r.ts_cliente >= v_emp_desde)
                  and count(distinct nullif(upper(btrim(split_part(r.texto,'|',6))),'')) = 1
-                 and bool_and(nullif(upper(btrim(split_part(r.texto,'|',6))),'') is not null)
+                 and bool_and(upper(btrim(split_part(r.texto,'|',6))) in ('LK','CH'))
                 then max(nullif(upper(btrim(split_part(r.texto,'|',6))),''))
            end as emp
     from "Registros_Produccion_Virgilio" r
