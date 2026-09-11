@@ -289,3 +289,39 @@ update public."GV_Lugar" l
 -- Quedan 4 códigos en DOS góndolas: 437E, 438E, 809E (duales de verdad) y 396
 -- (A65 LK / P39 CH; Luis dice que es LK — la fila de P39 es residuo de
 -- Capacidad_Sector y hay que sacarla, pendiente de su confirmación).
+
+-- ─────────────────────────────────────────────────────────────────────
+-- 2026-09-11 · El 396 es de LK: se saca la asignación de P39
+--
+-- El 396 figuraba en DOS góndolas: A65 (LK) y P39 (CH). Ninguna de las dos salió
+-- del relevamiento del depósito — A65 venía de `Planimetria` y P39 de
+-- `Capacidad_Sector`. El reporte no lo marcó como conflicto porque comparaba las
+-- fuentes ENTRE SÍ PARA UN MISMO LUGAR, y cada lugar coincidía consigo mismo;
+-- nunca comparó el mismo código entre lugares distintos.
+-- Luis (11/09): "396 es LK" → queda A65 y se borra la fila de P39.
+--
+-- Backup: GV_Backup_lugar_item_20260911 (783 filas).
+-- Rollback:
+--   insert into public."GV_Lugar_Item" select * from public."GV_Backup_lugar_item_20260911" b
+--    where b.sector='P39' and b.clase='articulo'
+--      and regexp_replace(upper(btrim(b.cod)),'^0+(?=.)','')='396';
+-- ─────────────────────────────────────────────────────────────────────
+create table if not exists public."GV_Backup_lugar_item_20260911" as
+select * from public."GV_Lugar_Item";
+
+delete from public."GV_Lugar_Item"
+ where sector = 'P39' and clase = 'articulo'
+   and regexp_replace(upper(btrim(cod)),'^0+(?=.)','') = '396';
+
+-- Verificado: el 396 queda sólo en A65 (LK, góndola), y los códigos que viven en
+-- DOS góndolas pasan a ser exactamente los duales de verdad: 437E, 438E, 809E.
+--
+-- ⚠ CHEQUEO QUE EL RELEVAMIENTO NO HACÍA — correrlo cada vez que se toque la
+-- planimetría. Compara el MISMO CÓDIGO ENTRE LUGARES, que es el cruce que faltaba:
+--   select regexp_replace(upper(btrim(i.cod)),'^0+(?=.)','') cod,
+--          string_agg(distinct l.empresa||':'||i.sector, ' ') lugares
+--     from public."GV_Lugar_Item" i join public."GV_Lugar" l on l.sector=i.sector
+--    where i.clase='articulo' and i.activo and l.tipo='gondola' and l.empresa in ('LK','CH')
+--    group by 1 having count(distinct l.empresa) > 1;
+-- Lo esperable son SÓLO los duales. Cualquier otro código que aparezca es un
+-- residuo de las tablas viejas, como fue el 396.
