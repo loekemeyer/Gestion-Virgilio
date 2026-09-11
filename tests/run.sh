@@ -359,3 +359,6 @@ PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node te
 
 echo "== pk-deposito-pkc (v15.41: el PKC dice de qué depósito salió cada caja; un evento por (tanda,art)) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/pk-deposito-pkc.cjs
+
+echo "== lugar-editor (v15.76: editor de LUGARES — GV_Lugar/GV_Lugar_Item, un código en varios lugares) =="
+PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/lugar-editor.cjs

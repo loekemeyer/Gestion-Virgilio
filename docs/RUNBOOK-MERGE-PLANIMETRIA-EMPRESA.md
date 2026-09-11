@@ -56,7 +56,8 @@ Backups vivos: `GV_Backup_aguardar_empresa_20260911`, `GV_Backup_lugar_empresa_2
 | 2 | `sql/gv_empresa_picking.sql` §1 | vista `gv_lugar_articulo` (sector por código+empresa) | no, es nueva |
 | 3 | `sql/gv_empresa_picking.sql` §2 | las 2 funciones de reconciliación leen el 6.º campo del PKC | **sí** — `reconciliar_pipeline_stock_etapa1` y `..._articulo_rt` |
 | 4 | `sql/gv_empresa_picking.sql` §3 | **backfill**: reclasifica el saldo que hoy vive en `Mixto` | **sí** — escribe en `Movimientos_Stock` |
-| 5 | *(un SQL)* | **prender el corte** `pkc_empresa_desde` | switch |
+| 5 | `sql/gv_lugar_editor.sql` | permisos de escritura del editor nuevo (policy `ALL` para `authenticated`) | no, son tablas nuevas |
+| 6 | *(un SQL)* | **prender el corte** `pkc_empresa_desde` | switch |
 
 ⚠ **El orden 4 → 5 no es negociable.** Sin el backfill, el picking descuenta de un balde `LK`
 casi vacío (la góndola tiene **26.484 cajas en `Mixto` contra 326 con empresa**) y lo deja en
@@ -173,7 +174,39 @@ código ni datos. Si algo se ve raro el primer día, se apaga eso y se mira con 
 
 ## 6. Lo que falta construir antes de poder ejecutar esto
 
-- [ ] **El editor fundido** (§2.c). Es la pieza grande que queda.
+- [x] **El editor fundido** — hecho en la **v15.76**. Ver abajo.
 - [ ] **Enrutar `window.GONDOLA`** a `gv_lugar_articulo` (§2.d).
 - [ ] **Regenerar `planimetria.js`** desde las tablas nuevas.
-- [ ] Tests del editor nuevo, para que entre en la suite.
+- [x] Test del editor (`tests/lugar-editor.cjs`, 18 chequeos, ya en `tests/run.sh`).
+
+### El editor nuevo (v15.76) — qué quedó
+
+Pantalla **📍 Lugares del depósito** en el panel supervisor, al lado de la vieja (que
+**queda**, regla 1). Dos pestañas:
+
+| pestaña | pregunta que contesta |
+|:--|:--|
+| **Por lugar** | *"¿qué hay en F13?"* — lista los lugares con sus códigos como chips, la empresa y el orden de recorrido. Buscar por **código** filtra lugares: tipear `438E` trae los 4 donde está |
+| **Por código** | *"¿dónde está el 438E?"* — todos sus lugares, ordenados por el recorrido. **Esto la tabla vieja no lo podía contestar**: su clave era `cod`, un código vivía en un solo lugar |
+
+Lo que cambia respecto del viejo, y que el test protege:
+
+- **La empresa NO se tipea.** El POST manda `sector` + `cod` + `clase` y nada más: la
+  empresa la da el lugar. (`out.NOmandaEmpresa`)
+- **`clase` separa artículo de insumo** en el mismo lugar y con el mismo código — son
+  cosas distintas y por eso está en la PK. Los chips de insumo van en ámbar.
+- **Borrar saca el código DE ESE LUGAR**, no del depósito. El confirm dice si le quedan
+  otros lugares o si es el único, porque en el editor viejo borrar lo sacaba de todos
+  lados (sólo podía estar en uno).
+- **`cajas_max` vive acá** — es lo que hace innecesaria a `Capacidad_Sector`.
+- Sin los permisos de escritura el editor **lo dice y nombra el SQL que falta**
+  (`sql/gv_lugar_editor.sql`) en vez de fallar mudo.
+
+⚠ **Falta un SQL más en la secuencia:** `sql/gv_lugar_editor.sql` (policy `ALL` para
+`authenticated` sobre `GV_Lugar` y `GV_Lugar_Item`). Las tablas nacieron con RLS y **sólo
+policy de SELECT**, así que sin eso el editor lee pero no guarda. Va con los otros, mismo
+patrón que `planim_write` / `cap_write`.
+
+⚠ **`stkCapImport` no se replicó** a propósito: hace `DELETE ?id=gt.0` y recarga de un
+Excel. Sobre `GV_Lugar_Item` eso borra la planimetría entera. Si se quiere importador, va
+por `upsert` por `(sector, cod, clase)`.

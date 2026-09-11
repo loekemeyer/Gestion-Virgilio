@@ -2295,6 +2295,28 @@ button.pk-anular small{ display:block; font-size:12px; font-weight:700; opacity:
 .tall-art-uxb{ width:74px; flex:0 0 auto; text-align:center; }
 .planim-status{ font-size: 13px; color: #475569; min-height: 18px; text-align: center; }
 .planim-empty{ color: #94a3b8; padding: 10px; text-align: center; }
+/* Editor de LUGARES (v15.76) — reusa .planim-* donde puede; sólo lo propio del
+   modelo nuevo lleva clases .lug-*. La tarjeta se para en el LUGAR y los códigos
+   que tiene adentro son chips, porque un lugar puede tener varios y un código
+   puede estar en varios lugares. Móvil: todo envuelve, nada de ancho fijo. */
+.lug-tabs{ display:flex; gap:6px; margin-bottom:8px; }
+.lug-tab{ flex:0 1 auto; padding:6px 14px; border:1px solid #cbd5e1; background:#f8fafc; color:#475569; border-radius:999px; font-size:13px; font-weight:700; cursor:pointer; }
+.lug-tab-on{ background:#0f172a; border-color:#0f172a; color:#fff; }
+.lug-row{ background:#fff; border:1px solid #e2e8f0; border-radius:10px; padding:8px 12px; margin-bottom:6px; }
+.lug-row-h{ display:flex; gap:10px; align-items:baseline; flex-wrap:wrap; }
+.lug-sec{ font-size:17px; font-weight:800; color:#0f172a; }
+.lug-meta{ font-size:12px; color:#64748b; }
+.lug-chips{ display:flex; gap:6px; flex-wrap:wrap; margin:6px 0; }
+.lug-chip{ display:inline-flex; align-items:center; gap:4px; background:#eff6ff; border:1px solid #bfdbfe; color:#1e3a8a; border-radius:999px; padding:3px 8px; font-size:13px; }
+.lug-chip-ins{ background:#fef3c7; border-color:#fcd34d; color:#92400e; }
+.lug-chip b{ font-weight:800; }
+.lug-x{ border:0; background:transparent; color:#64748b; cursor:pointer; font-size:13px; line-height:1; padding:0 2px; }
+.lug-x:hover{ color:#b42318; }
+.lug-libre{ font-size:13px; color:#94a3b8; font-style:italic; }
+.lug-add{ display:flex; gap:6px; flex-wrap:wrap; align-items:center; }
+.lug-inp-cod{ flex:0 1 120px; min-width:90px; }
+.lug-inp-cls{ flex:0 1 110px; min-width:90px; }
+.lug-inp-cap{ flex:0 0 100px; }
 /* Módulo PPP (placeholder/scaffolding) */
 .ppp-warn{ background:#fffbeb; border:1px solid #f59e0b; color:#92400e; border-radius:8px; padding:10px 12px; font-size:13px; margin-bottom:14px; }
 .ppp-imp-btn{ flex:1 1 220px; width:auto; margin:0; min-height:84px; display:flex; align-items:center; justify-content:center; gap:10px; padding:16px; font-size:17px; font-weight:bold; background:#1e6bd6; color:#fff; border:none; border-radius:12px; cursor:pointer; }
@@ -4831,6 +4853,39 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
     </div>
   </div>
 
+  <!-- Overlay: editor de LUGARES (v15.76, solo supervisores). Edita GV_Lugar /
+       GV_Lugar_Item, que reemplazan a Planimetria + Capacidad_Sector.
+       ⚠ El editor viejo (#planimEditorOverlay) queda andando a propósito: no se
+       borra nada hasta que éste esté rodando (regla de Luis, 11/09). -->
+  <div id="lugarEditorOverlay" class="recp-admin-overlay">
+    <div class="recp-admin-bar">
+      <span class="recp-admin-title">📍 Lugares del depósito</span>
+      <button class="recp-admin-close" onclick="closeLugarEditor()">Cerrar</button>
+    </div>
+    <div class="planim-body">
+      <div class="lug-tabs">
+        <button id="lugTabLugar" class="lug-tab lug-tab-on" onclick="lugSetTab('lugar')">Por lugar</button>
+        <button id="lugTabCod" class="lug-tab" onclick="lugSetTab('cod')">Por código</button>
+      </div>
+
+      <div id="lugPaneLugar">
+        <input id="lugSearch" class="planim-inp planim-search" type="text"
+               placeholder="🔍 Buscar lugar (J01, F13…) o el código que guarda…"
+               oninput="lugRender(this.value)">
+        <div id="lugList" class="planim-list"></div>
+      </div>
+
+      <div id="lugPaneCod" hidden>
+        <input id="lugCodSearch" class="planim-inp planim-search" type="text"
+               placeholder="🔍 Código (438E, 505…) — te muestro TODOS sus lugares"
+               oninput="lugRenderCod(this.value)">
+        <div id="lugCodList" class="planim-list"></div>
+      </div>
+
+      <div id="lugStatus" class="planim-status"></div>
+    </div>
+  </div>
+
   <!-- Módulo PPP (supervisor) — placeholder; el contenido se define después. -->
   <div id="pppOverlay" class="recp-admin-overlay">
     <div class="recp-admin-bar">
@@ -4906,6 +4961,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
         <button class="sup-action-btn" onclick="cfgGo(openPrintStation)"><span class="sup-ico">🖨️</span><span>Cola de impresión</span></button>
         <button class="sup-action-btn" onclick="cfgGo(openMailsEditor)"><span class="sup-ico">✉️</span><span>Mails autorizados</span></button>
         <button class="sup-action-btn" onclick="cfgGo(openPlanimEditor)"><span class="sup-ico">🗺️</span><span>Editar Planimetría</span></button>
+        <button class="sup-action-btn" onclick="cfgGo(openLugarEditor)"><span class="sup-ico">📍</span><span>Lugares del depósito</span></button>
         <button class="sup-action-btn" onclick="cfgGo(openTallEditor)"><span class="sup-ico">👷</span><span>Talleristas de Recepción</span></button>
         <!-- v13.25: venían de la barra de la PPP (dueño: "llevalo a configuración, sacalo de acá") -->
         <button class="sup-action-btn" onclick="cfgGo(openPppSupers)" title="Agregar/quitar clientes súper (salen en camión propio)"><span class="sup-ico">🛒</span><span>Clientes súper</span></button>
@@ -7660,7 +7716,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v15.75";
+const APP_VERSION = "v15.76";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -34460,6 +34516,208 @@ function planimRender(filter) {
       '<button class="planim-btn-del" onclick="planimDeleteRow(\'' + kE + '\')">Borrar</button>' +
     '</div>';
   }).join("") + (keys.length > CAP ? '<div class="planim-empty">Mostrando ' + CAP + ' de ' + keys.length + ' — afiná la búsqueda.</div>' : "");
+}
+/* ═══════════════════════════════════════════════════════════════════
+   EDITOR DE LUGARES — v15.76 (pedido de Luis, 2026-09-11: "rehacemos el editor")
+
+   Reemplaza a DOS editores que escribían a DOS tablas que ahora son una:
+     · Editor de Planimetría (planimUpsert / planimDeleteRow) → "Planimetria"
+     · Capacidad por sector  (dpSaveCap / stkCapImport)       → "Capacidad_Sector"
+   Los dos siguen andando a propósito (regla de Luis: nada se borra hasta que el
+   reemplazo esté rodando). Éste escribe a GV_Lugar / GV_Lugar_Item.
+
+   ⚠ NO es el editor viejo apuntando a otra tabla: cambió el MODELO.
+     Planimetria      clave `cod`                 → un código, UN lugar
+     GV_Lugar_Item    clave (sector, cod, clase)  → un código en VARIOS lugares
+   El 437E está en F09, F10, F11 y F12 — eso la tabla vieja no lo podía decir.
+   Por eso la pantalla se para en el LUGAR ("qué hay acá") y no en el código, con
+   una segunda pestaña para el camino inverso ("dónde está este código").
+
+   Además: la EMPRESA no se tipea, la da el lugar; `clase` separa artículo de
+   insumo (hay códigos que son las dos cosas); y `cajas_max` vive acá, que es lo
+   que hacía falta para que Capacidad_Sector desaparezca.
+
+   Permisos: sql/gv_lugar_editor.sql (policy ALL para `authenticated`, mismo
+   patrón que planim_write / cap_write). Sin eso guarda 401 y avisa. */
+const SUPABASE_GVLUGAR_ENDPOINT     = SUPABASE_URL + "/rest/v1/GV_Lugar";
+const SUPABASE_GVLUGARITEM_ENDPOINT = SUPABASE_URL + "/rest/v1/GV_Lugar_Item";
+let _lug = null;   // { lugares:[{sector,tipo,empresa,orden,uso,activo}], items:[{sector,cod,clase,cajas_max,unidad,activo}] }
+let _lugTab = "lugar";
+
+function lugSetStatus(msg, ok) {
+  const el = document.getElementById("lugStatus");
+  if (el) { el.textContent = msg || ""; el.style.color = (ok === false) ? "#b42318" : "#166534"; }
+}
+function lugSetTab(t) {
+  _lugTab = t;
+  const a = document.getElementById("lugPaneLugar"), b = document.getElementById("lugPaneCod");
+  const ta = document.getElementById("lugTabLugar"), tb = document.getElementById("lugTabCod");
+  if (a) a.hidden = (t !== "lugar");
+  if (b) b.hidden = (t !== "cod");
+  if (ta) ta.classList.toggle("lug-tab-on", t === "lugar");
+  if (tb) tb.classList.toggle("lug-tab-on", t === "cod");
+}
+/* Baja las dos tablas. Best-effort: si no están (o no hay red) el editor avisa y
+   no rompe nada — igual que el editor viejo sin Supabase. */
+async function lugFetch(force) {
+  if (_lug && !force) return _lug;
+  const [lugares, items] = await Promise.all([
+    supaFetchAllSafe(SUPABASE_GVLUGAR_ENDPOINT, "select=sector,tipo,empresa,orden,uso,activo&order=orden.asc"),
+    supaFetchAllSafe(SUPABASE_GVLUGARITEM_ENDPOINT, "select=sector,cod,clase,cajas_max,unidad,activo&order=sector.asc")
+  ]);
+  _lug = { lugares: lugares || [], items: items || [] };
+  return _lug;
+}
+function lugItemsDe(sector) {
+  const s = String(sector || "").toUpperCase();
+  return (_lug ? _lug.items : []).filter(function (i) { return String(i.sector).toUpperCase() === s; });
+}
+async function openLugarEditor() {
+  if (!requireSupervisor()) return;
+  const ov = document.getElementById("lugarEditorOverlay");
+  if (ov) ov.classList.add("show");
+  lugSetStatus("Cargando…", true);
+  try {
+    await lugFetch(true);
+    lugSetStatus(_lug.lugares.length + " lugares · " + _lug.items.length + " asignaciones", true);
+  } catch (_e) { lugSetStatus("No pude leer los lugares (sin conexión).", false); }
+  lugSetTab("lugar");
+  const s = document.getElementById("lugSearch");
+  lugRender(s ? s.value : "");
+}
+function closeLugarEditor() {
+  const ov = document.getElementById("lugarEditorOverlay");
+  if (ov) ov.classList.remove("show");
+}
+/* Lista de LUGARES. El filtro busca por sector Y por el código que guarda, así que
+   tipear "438E" trae los cuatro lugares donde está — que es la pregunta que la
+   tabla vieja no podía contestar. Orden = el del recorrido, no alfabético. */
+function lugRender(filter) {
+  const list = document.getElementById("lugList");
+  if (!list) return;
+  if (!_lug) { list.innerHTML = '<div class="planim-empty">Cargando…</div>'; return; }
+  const f = String(filter || "").trim().toUpperCase();
+  const porSector = {};
+  _lug.items.forEach(function (i) {
+    const k = String(i.sector).toUpperCase();
+    (porSector[k] || (porSector[k] = [])).push(i);
+  });
+  const rows = _lug.lugares.filter(function (l) {
+    if (!f) return true;
+    if (String(l.sector).toUpperCase().indexOf(f) >= 0) return true;
+    return (porSector[String(l.sector).toUpperCase()] || []).some(function (i) {
+      return String(i.cod).toUpperCase().indexOf(f) >= 0;
+    });
+  });
+  if (!rows.length) {
+    list.innerHTML = '<div class="planim-empty">' + (f ? 'Ningún lugar coincide con "' + escapeHtml(filter) + '".' : 'No hay lugares cargados.') + '</div>';
+    return;
+  }
+  const CAP = 300;
+  list.innerHTML = rows.slice(0, CAP).map(function (l) {
+    const s = String(l.sector).toUpperCase(), sE = escapeHtml(s);
+    const its = porSector[s] || [];
+    const emp = l.empresa || "—";
+    const chips = its.length
+      ? its.map(function (i) {
+          return '<span class="lug-chip' + (i.clase === "insumo" ? " lug-chip-ins" : "") + '">' +
+                 escapeHtml(String(i.cod)) +
+                 (i.cajas_max != null ? ' <b>' + Number(i.cajas_max) + '</b>' : '') +
+                 ' <button class="lug-x" title="Sacar de ' + sE + '" onclick="lugDelItem(\'' + sE + '\',\'' + escapeHtml(String(i.cod)) + '\',\'' + escapeHtml(String(i.clase)) + '\')">✕</button></span>';
+        }).join("")
+      : '<span class="lug-libre">libre</span>';
+  return '<div class="lug-row">' +
+      '<div class="lug-row-h">' +
+        '<span class="lug-sec">' + sE + '</span>' +
+        '<span class="lug-meta">' + escapeHtml(String(l.tipo || "")) + ' · <b>' + escapeHtml(emp) + '</b>' +
+          (l.uso ? ' · ' + escapeHtml(String(l.uso)) : '') +
+          ' · orden ' + (l.orden != null ? Number(l.orden) : "—") + '</span>' +
+      '</div>' +
+      '<div class="lug-chips">' + chips + '</div>' +
+      '<div class="lug-add">' +
+        '<input class="planim-inp lug-inp-cod" id="lugCod_' + sE + '" type="text" placeholder="Código" oninput="this.value=this.value.toUpperCase()">' +
+        '<select class="planim-inp lug-inp-cls" id="lugCls_' + sE + '"><option value="articulo">artículo</option><option value="insumo">insumo</option></select>' +
+        '<input class="planim-inp planim-inp-num lug-inp-cap" id="lugCap_' + sE + '" type="number" inputmode="numeric" placeholder="cajas máx">' +
+        '<button class="planim-btn-save" onclick="lugAddItem(\'' + sE + '\')">Agregar acá</button>' +
+      '</div>' +
+    '</div>';
+  }).join("") + (rows.length > CAP ? '<div class="planim-empty">Mostrando ' + CAP + ' de ' + rows.length + ' — afiná la búsqueda.</div>' : "");
+}
+/* Camino inverso: un código → TODOS sus lugares. Es lo que la tabla vieja no podía
+   contestar (clave `cod`, un solo lugar por código). */
+function lugRenderCod(filter) {
+  const list = document.getElementById("lugCodList");
+  if (!list) return;
+  if (!_lug) { list.innerHTML = '<div class="planim-empty">Cargando…</div>'; return; }
+  const f = String(filter || "").trim().toUpperCase();
+  if (!f) { list.innerHTML = '<div class="planim-empty">Escribí un código.</div>'; return; }
+  const empDe = {};
+  _lug.lugares.forEach(function (l) { empDe[String(l.sector).toUpperCase()] = l; });
+  const hits = _lug.items.filter(function (i) { return String(i.cod).toUpperCase().indexOf(f) >= 0; });
+  if (!hits.length) { list.innerHTML = '<div class="planim-empty">Ningún lugar tiene "' + escapeHtml(filter) + '".</div>'; return; }
+  const porCod = {};
+  hits.forEach(function (i) { (porCod[String(i.cod).toUpperCase()] || (porCod[String(i.cod).toUpperCase()] = [])).push(i); });
+  list.innerHTML = Object.keys(porCod).sort().map(function (c) {
+    const its = porCod[c].slice().sort(function (a, b) {
+      const oa = (empDe[String(a.sector).toUpperCase()] || {}).orden, ob = (empDe[String(b.sector).toUpperCase()] || {}).orden;
+      return (oa == null ? 1e9 : oa) - (ob == null ? 1e9 : ob);
+    });
+    return '<div class="lug-row"><div class="lug-row-h"><span class="lug-sec">' + escapeHtml(c) + '</span>' +
+      '<span class="lug-meta">' + its.length + ' lugar' + (its.length > 1 ? 'es' : '') + '</span></div>' +
+      '<div class="lug-chips">' + its.map(function (i) {
+        const l = empDe[String(i.sector).toUpperCase()] || {};
+        return '<span class="lug-chip' + (i.clase === "insumo" ? " lug-chip-ins" : "") + '">' +
+               escapeHtml(String(i.sector)) + ' · ' + escapeHtml(String(l.empresa || "—")) +
+               (i.cajas_max != null ? ' · <b>' + Number(i.cajas_max) + '</b>' : '') + '</span>';
+      }).join("") + '</div></div>';
+  }).join("");
+}
+/* Agrega un código A ESTE LUGAR. La empresa NO se pide: la da el lugar — que es
+   todo el punto del modelo nuevo. */
+async function lugAddItem(sector) {
+  const s = String(sector).toUpperCase();
+  const codEl = document.getElementById("lugCod_" + s);
+  const clsEl = document.getElementById("lugCls_" + s);
+  const capEl = document.getElementById("lugCap_" + s);
+  const cod = codEl ? codEl.value.trim().toUpperCase() : "";
+  if (!cod) { lugSetStatus("Falta el código.", false); return; }
+  const clase = clsEl ? clsEl.value : "articulo";
+  const capRaw = capEl ? capEl.value.trim() : "";
+  const cajas_max = capRaw === "" ? null : (Number(capRaw) || 0);
+  const headers = await facAuthWriteHeaders({ "Prefer": "resolution=merge-duplicates,return=minimal" });
+  if (!headers) { lugSetStatus(authNoSesionMsg("Iniciá sesión con Google para editar."), false); return; }
+  try {
+    const r = await fetch(SUPABASE_GVLUGARITEM_ENDPOINT + "?on_conflict=sector,cod,clase", {
+      method: "POST", headers: headers,
+      body: JSON.stringify({ sector: s, cod: cod, clase: clase, cajas_max: cajas_max, activo: true })
+    });
+    if (!r.ok) { lugSetStatus("No se guardó: HTTP " + r.status + (r.status === 401 || r.status === 403 ? " (faltan los permisos de escritura — sql/gv_lugar_editor.sql)" : ""), false); return; }
+    await lugFetch(true);
+    lugSetStatus("✓ " + cod + " agregado a " + s + ".", true);
+    if (codEl) codEl.value = ""; if (capEl) capEl.value = "";
+    lugRender((document.getElementById("lugSearch") || {}).value || "");
+  } catch (_e) { lugSetStatus("Sin conexión: no se guardó.", false); }
+}
+/* Saca un código DE ESTE LUGAR — no borra el código del depósito. Es la diferencia
+   con el editor viejo, donde borrar el código lo sacaba de todos lados porque sólo
+   podía estar en uno. */
+async function lugDelItem(sector, cod, clase) {
+  const s = String(sector).toUpperCase(), c = String(cod).toUpperCase(), cl = String(clase || "articulo");
+  const otros = (_lug ? _lug.items : []).filter(function (i) {
+    return String(i.cod).toUpperCase() === c && String(i.sector).toUpperCase() !== s;
+  }).length;
+  if (!confirm("¿Sacar " + c + " de " + s + "?\n\n" +
+      (otros ? "Le quedan otros " + otros + " lugar(es)." : "⚠ Es su ÚNICO lugar: queda sin planimetría."))) return;
+  const headers = await facAuthWriteHeaders({ "Prefer": "return=minimal" });
+  if (!headers) { lugSetStatus(authNoSesionMsg("Iniciá sesión con Google para editar."), false); return; }
+  try {
+    const q = "?sector=eq." + encodeURIComponent(s) + "&cod=eq." + encodeURIComponent(c) + "&clase=eq." + encodeURIComponent(cl);
+    const r = await fetch(SUPABASE_GVLUGARITEM_ENDPOINT + q, { method: "DELETE", headers: headers });
+    if (!r.ok) { lugSetStatus("No se borró: HTTP " + r.status + (r.status === 401 || r.status === 403 ? " (faltan los permisos — sql/gv_lugar_editor.sql)" : ""), false); return; }
+    await lugFetch(true);
+    lugSetStatus("✓ " + c + " sacado de " + s + ".", true);
+    lugRender((document.getElementById("lugSearch") || {}).value || "");
+  } catch (_e) { lugSetStatus("Sin conexión: no se borró.", false); }
 }
 /* v11.13 — Sugerencia de N° de orden para un sector, MISMA lógica que el trigger
    backend planimetria_autoorden (sql/planimetria_autoorden.sql). Lee window.GONDOLA.
