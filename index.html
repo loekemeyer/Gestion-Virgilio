@@ -7701,7 +7701,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v15.70";
+const APP_VERSION = "v15.71";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -9494,10 +9494,17 @@ async function pkFetchExcedente(arts) {
     if (!rs.ok) return {};
     const saldos = await rs.json();
     const out = {};
+    // v15.71 — SUMAR las filas del mismo código (ver stockFetchSaldos): la vista agrupa
+    // por (código, empresa) y desde el backfill de A Guardar un código pelado vuelve en
+    // más de una fila. Con el `=` el excedente que veía el picking era el de la ÚLTIMA
+    // fila, no el total.
+    const acum = {};
     (Array.isArray(saldos) ? saldos : []).forEach(function (x) {
       const k = String(x.cod_art).toUpperCase();
-      const cajas = Number(x.excedente || 0);
-      if (Math.round(cajas * 1000) / 1000 > 0) out[k] = { cajas: cajas, ubics: [] };
+      acum[k] = (acum[k] || 0) + (Number(x.excedente) || 0);
+    });
+    Object.keys(acum).forEach(function (k) {
+      if (Math.round(acum[k] * 1000) / 1000 > 0) out[k] = { cajas: acum[k], ubics: [] };
     });
     if (ru && ru.ok) {
       const rows = await ru.json();
@@ -11608,7 +11615,10 @@ async function _stkGondolaSaldoVivo(cod) {
     if (!r.ok) return null;
     const a = await r.json();
     if (!a || !a.length) return 0;   // sin fila = sin saldo = 0
-    return Number(a[0].terminado) || 0;
+    // v15.71 — SUMAR: la vista agrupa por (código, empresa), así que un código pelado
+    // puede volver en varias filas. `a[0]` era una de ellas, no el saldo.
+    let s = 0; a.forEach(function (r) { s += Number(r.terminado) || 0; });
+    return s;
   } catch (_e) { return null; }
 }
 function stockFlushPend() {
@@ -11702,12 +11712,23 @@ async function stockFetchSaldos() {
   let rows = [];
   try { rows = await supaFetchAll(SUPABASE_URL + "/rest/v1/vista_saldos_stock", "select=*"); } catch (_e) { rows = []; }
   const m = {};
+  const DEPS = ["terminado", "excedente", "separar_pedidos", "a_facturar", "a_guardar", "racks", "insumos", "para_envasar", "racks_ch"];
   rows.forEach(function (x) {
     const k = String(x.cod_art);
     // v12.98 (idea 9017): para_envasar y racks_ch ya venían en la vista (idea 7263) pero acá se
     // perdían → "Bajar de racks", MG guardado, catálogo de Insumos y CP los veían en 0 aunque
     // hubiera stock real (712E racks_ch=444, 584E para_envasar=424).
-    m[k] = { cod: k, desc: x.descripcion || "", terminado: Number(x.terminado) || 0, excedente: Number(x.excedente) || 0, separar_pedidos: Number(x.separar_pedidos) || 0, a_facturar: Number(x.a_facturar) || 0, a_guardar: Number(x.a_guardar) || 0, racks: Number(x.racks) || 0, insumos: Number(x.insumos) || 0, para_envasar: Number(x.para_envasar) || 0, racks_ch: Number(x.racks_ch) || 0 };
+    // v15.71 — ACUMULA, no pisa. `vista_saldos_stock` agrupa por (código, EMPRESA) y
+    // emite el sufijo (437E LK) SÓLO para los duales: para todo el resto emite el código
+    // PELADO una vez por empresa. Mientras la recepción marcaba todo 'Mixto' había una
+    // sola fila por código y el `=` daba igual. Desde el backfill de A Guardar del
+    // 11/09 hay 173 códigos que vuelven en DOS filas (505: LK a_guardar 200 / Mixto
+    // góndola 2.719) y el `=` se comía una: el MG mostraba góndola 0 o A Guardar 0
+    // según cuál llegara última.
+    if (!m[k]) m[k] = { cod: k, desc: "", terminado: 0, excedente: 0, separar_pedidos: 0, a_facturar: 0, a_guardar: 0, racks: 0, insumos: 0, para_envasar: 0, racks_ch: 0 };
+    const a = m[k];
+    if (!a.desc) a.desc = x.descripcion || "";
+    DEPS.forEach(function (d) { a[d] += Number(x[d]) || 0; });
   });
   return m;
 }

@@ -998,7 +998,10 @@ async function gondReturnCheck(items) {
     ]);
     const cap = {}, gond = {}, proy = {};
     ((res[0] && res[0].data) || []).forEach(function (r) { const k = _ocgNorm(r.cod); if (k) cap[k] = (cap[k] || 0) + (Number(r.cajas_max) || 0); });
-    ((res[1] && res[1].data) || []).forEach(function (r) { gond[_ocgNorm(r.cod_art)] = Number(r.terminado) || 0; });
+    // v15.71 — ACUMULA (ver stockFetchSaldos de index.html): vista_saldos_stock agrupa por
+    // (código, empresa) y un código pelado puede volver en varias filas; con el `=` el aviso
+    // de exceso de góndola comparaba contra el saldo de UNA de ellas.
+    ((res[1] && res[1].data) || []).forEach(function (r) { const kk = _ocgNorm(r.cod_art); if (kk) gond[kk] = (gond[kk] || 0) + (Number(r.terminado) || 0); });
     ((res[2] && res[2].data) || []).forEach(function (r) { const k = _ocgNorm(r.cod); if (k) proy[k] = Number(r.proy_cajas_mes) || 0; });
     const flag = [];
     (items || []).forEach(function (it) {
