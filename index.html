@@ -802,6 +802,7 @@ button {
 .pn-reprog .l span small{ font-weight:600; color:#b91c1c; opacity:.85; }
 .pn-reprog .h{ font-size:12px; color:#7f1d1d; opacity:.9; }
 .pn-reprog-btn{ margin-left:8px; background:#b91c1c; color:#fff; border:none; border-radius:7px; padding:3px 9px; font-size:11.5px; font-weight:800; cursor:pointer; width:auto; }
+.pn-cancel-btn{ background:#fee2e2 !important; color:#991b1b !important; border-color:#fca5a5 !important; }
 .pn-reprog-btn:hover{ background:#991b1b; }
 .pn-carga .t.rep{ color:#b91c1c; font-weight:800; }
 .ppp-res-note.rep{ background:#fef2f2; border-color:#fca5a5; color:#991b1b; }
@@ -7686,7 +7687,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v15.54";
+const APP_VERSION = "v15.55";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -28496,7 +28497,7 @@ let _pppEnSalida = null;   // Map np(normalizada) → fila de gv_ppp_en_salida
 async function pppRefreshEnSalida() {
   try {
     const rows = await supaFetchAllSafe(SUPABASE_URL + "/rest/v1/gv_ppp_en_salida",
-      "select=np,empresa,es_web,tanda,cod_cliente,razon_social,m3,fecha_entrega,zona,barrio,fecha_carga,cargado_at,facturada,armada,armado_at,cargada,control_previo,facturada_el,estado,dias_sin_controlar&order=cargado_at.desc");
+      "select=np,empresa,es_web,tanda,cod_cliente,razon_social,m3,fecha_entrega,zona,barrio,fecha_carga,cargado_at,facturada,armada,armado_at,cargada,control_previo,facturada_el,estado,dias_sin_controlar,horas_desde_armado,salida_presunta&order=cargado_at.desc");
     const m = new Map();
     (rows || []).forEach(function (r) { const np = _pppNpNorm(r.np); if (np) m.set(np, r); });
     _pppEnSalida = m;
@@ -28668,6 +28669,10 @@ function _pppEsRow(p) { return (p && p._es) ? p._es : {}; }
 function _pppEsChips(p) {
   const r = _pppEsRow(p), out = [];
   if (r.estado === "cargada") out.push('<span class="ppp-es-chip ok">🚚 Cargado al camión</span>');
+  // v15.55 (dueño: "si ya salieron hace más de 36hs y no se controló, tiene que aparecer allá la alerta, y
+  // aparecer en En Salida"): la tanda se armó hace más de `salida_presunta_horas` (36) y nadie la cargó ni
+  // la facturó. Seguro salió; falta el papel. Viene de gv_ppp_en_salida con estado 'armada_sin_carga'.
+  else if (r.estado === "armada_sin_carga") out.push('<span class="ppp-es-chip bad" title="La tanda se armó hace ' + (r.horas_desde_armado || "?") + ' h y nadie registró la carga al camión (CCN) ni la facturó. Pasado el plazo se da por salida. Cerrala con Controlado, o ↩ si la mercadería volvió.">🚨 Salió hace ' + (r.horas_desde_armado || "?") + ' h sin registro de carga · falta el remito</span>');
   else out.push('<span class="ppp-es-chip warn" title="Está facturada pero nadie registró la carga al camión (evento CCN). Se muestra igual para que se pueda cerrar desde acá.">⚠ Sin registro de carga</span>');
   if (r.armada) out.push('<span class="ppp-es-chip">🧰 Armada</span>');
   else out.push('<span class="ppp-es-chip warn" title="No hay evento TAL: la NP no pasó por armado en la app.">Sin armar</span>');
@@ -28708,7 +28713,7 @@ function _pppEnViajeHtml() {
     byDay[k].push(p);
   }
   keys.sort(); keys.reverse();
-  let html = '<div class="ppp-ent-note">🚚 <b>En salida</b> — facturadas y <b>todavía sin control de remito</b>. Con el control pasan a Pedidos Entregados. ' +
+  let html = '<div class="ppp-ent-note">🚚 <b>En salida</b> — cargadas o facturadas <b>sin control de remito</b>, y las armadas hace más de 36 h que nadie cargó (se dan por salidas). Con el control pasan a Pedidos Entregados. ' +
     '<b>' + list.length + '</b> pedido(s) · <b>' + totM3.toFixed(2).replace('.', ',') + '</b> m³ · ' +
     '<b>' + nCarg + '</b> cargada(s) al camión · <b>' + nSin + '</b> sin registro de carga.' +
     (nVenc ? ' <span style="color:#b91c1c;font-weight:800;">· 🚨 ' + nVenc + ' pasado el plazo</span>' : '') + '</div>';
@@ -29172,6 +29177,7 @@ function _pppEntregado(p) { return !!(_pppEntregadoCC && _pppEntregadoCC.has(Str
 /* CARGADO (CCN) pero NO controlado (CRN ni manual) y con el plazo de control VENCIDO
    (crVencido = 30 hs; viernes→lunes 12 hs). Es la alarma "rojo grande y molesto". */
 function _pppCargaVencida(p) {
+  if (p && p._es && p._es.estado === "armada_sin_carga") return true;   // v15.55: salida presunta = ya pasó el plazo
   const np = String(p.np);
   if (!_pppEntregadoCC || !_pppEntregadoCC.has(np)) return false;          // no se cargó
   if (_pppControladoCR && _pppControladoCR.has(np)) return false;          // ya controlado (CRN)
@@ -29976,6 +29982,45 @@ async function pppMovElegir(iso) {
   const ok = await pppTandaMover(t, iso);
   if (ok) pppMovCerrar(); else pppMovCargar();
 }
+/* v15.55 — Los que NO salieron: volver a A Programar (web) o cancelar (web e ISIS). Todo en el backend:
+   gv_ppp_web_desprogramar saca la NP web de su tanda (queda pendiente en A Programar);
+   gv_ppp_np_cancelar: ISIS → NP_Canceladas + oculta en la PPP (GV_PPP_Prog_Override.oculto); web →
+   GV_Web_Cancelados + sale de la PPP, y gv_pedidos_web_excluidos ya no la deja volver a entrar. */
+function _pppEsNpWeb(np) { return /^(LK|CH)\s*\d+/i.test(String(np || "")); }
+async function pppVencVolver(np) {
+  const n = String(np || "").trim(); if (!n) return;
+  if (!confirm("¿Devolver " + n + " a A Programar?\n\nSale de su tanda y queda pendiente: lo toma el automático (zonas 1-3 / camión ya previsto) o lo programás a mano.")) return;
+  pppSetStatus("Devolviendo " + n + " a A Programar…", true);
+  try {
+    const r = await aprRpc("gv_ppp_web_desprogramar", { p_np: n, p_por: await aprQuien() });
+    const x = (r && r[0]) || {};
+    pppSetStatus("✓ " + n + " volvió a A Programar (" + (x.np_sacadas || 0) + " NP del pedido).", true);
+    await pppLoadProgFromSupabase();
+  } catch (e) {
+    const msg = (e && e.message) ? e.message : String(e);
+    pppSetStatus("⚠ No se pudo: " + msg, false);
+    try { alert("No se pudo devolver " + n + " a A Programar:\n\n" + msg); } catch (_e) {}
+  }
+}
+async function pppVencCancelar(np) {
+  const n = String(np || "").trim(); if (!n) return;
+  let motivo = "";
+  try { motivo = prompt("Cancelar " + n + " — ¿por qué NO va?\n(" + _STK_NP_MOTIVOS.join(" · ") + ")", _STK_NP_MOTIVOS[0]) || ""; } catch (_e) {}
+  motivo = motivo.trim(); if (!motivo) return;
+  if (!confirm("¿Cancelar el pedido " + n + "?\n\nMotivo: " + motivo + "\n\nSale de la PPP y no vuelve a entrar. Si hay que hacerlo igual, habrá que cargarlo de nuevo.")) return;
+  pppSetStatus("Cancelando " + n + "…", true);
+  try {
+    const r = await aprRpc("gv_ppp_np_cancelar", { p_np: n, p_motivo: motivo, p_por: await aprQuien() });
+    const x = (r && r[0]) || {};
+    pppSetStatus("🚫 " + n + " cancelada · " + (x.detalle || ""), true);
+    await pppLoadProgFromSupabase();
+  } catch (e) {
+    const msg = (e && e.message) ? e.message : String(e);
+    pppSetStatus("⚠ No se pudo cancelar: " + msg, false);
+    try { alert("No se pudo cancelar " + n + ":\n\n" + msg); } catch (_e) {}
+  }
+}
+window.pppVencVolver = pppVencVolver; window.pppVencCancelar = pppVencCancelar;
 /* v14.36 — Reprogramar un pedido de ISIS que NO salió (tanda sin armar) a un día nuevo, POR SU NÚMERO.
    Reusa el mismo pop-up de días de mover tandas (gv_ppp_web_calendario). Al elegir el día llama a
    gv_ppp_isis_programar, que escribe GV_PPP_Prog_Override (no toca la tabla que comparte Producción ni
@@ -32197,12 +32242,21 @@ function _pppPlanDiaHtml(programados, key, opts) {
       const _puedeReprog = (window.__isSupervisor || !PPP_READONLY);
       h += '<div class="pn-reprog"><b>⚠ ' + reprog.length + ' pedido' + (reprog.length === 1 ? '' : 's') + ' NO ' + (reprog.length === 1 ? 'salió' : 'salieron') + ' — hay que reprogramar' + (reprog.length === 1 ? 'lo' : 'los') + '</b>' +
         '<div class="l">' + reprog.map(function (p) {
-          const btn = _puedeReprog ? ' <button class="pn-reprog-btn" onclick="event.stopPropagation();pppReprogAbrir(\'' + escapeHtml(String(p.np)) + '\')" title="Reprogramar este pedido a un día nuevo">📅 Reprogramar</button>' : '';
+          // v15.55 (dueño: "si no salieron, volver a programación o cancelar pedido"): una NP de ISIS se
+          // reprograma por su número (📅); una NP web vuelve a A Programar (↩) y de ahí la toma el automático
+          // o el supervisor. Las dos se pueden cancelar (🚫): salen de la PPP y no vuelven a entrar.
+          const npS = escapeHtml(String(p.np));
+          const btn = _puedeReprog
+            ? (_pppEsNpWeb(p.np)
+                ? ' <button class="pn-reprog-btn" onclick="event.stopPropagation();pppVencVolver(\'' + npS + '\')" title="Sacarlo de esta tanda y devolverlo a A Programar (pendiente)">↩ A Programar</button>'
+                : ' <button class="pn-reprog-btn" onclick="event.stopPropagation();pppReprogAbrir(\'' + npS + '\')" title="Reprogramar este pedido a un día nuevo">📅 Reprogramar</button>') +
+              ' <button class="pn-reprog-btn pn-cancel-btn" onclick="event.stopPropagation();pppVencCancelar(\'' + npS + '\')" title="El pedido NO va: sale de la PPP y no vuelve a entrar">🚫 Cancelar</button>'
+            : '';
           return '<span>' + escapeHtml(String(p.np)) + ' · ' + escapeHtml(p.razon_social || p.cod || "—") + ' <small>' + escapeHtml(String(p.tanda || "—").toUpperCase()) + ' · ' + escapeHtml(p.fecha_entrega || "") + '</small>' + btn + '</span>';
         }).join('') + '</div>' +
-        '<div class="h">La tanda nunca se armó, así que el pedido no subió a ningún camión. ' + (_puedeReprog ? 'Reprogramalo a un día con <b>📅 Reprogramar</b>, ' : 'Ponele fecha nueva (✏️ Editar en su tanda, abajo) ') + 'o sacalo de ISIS.</div></div>';
+        '<div class="h">La tanda nunca se armó, así que el pedido no subió a ningún camión. ' + (_puedeReprog ? 'Volvelo a programar (<b>📅 Reprogramar</b> / <b>↩ A Programar</b>) o dalo de baja con <b>🚫 Cancelar</b>.' : 'Ponele fecha nueva (✏️ Editar en su tanda, abajo) o sacalo de ISIS.') + '</div></div>';
     }
-    h += '<div class="pn-note"><b>' + sinRem + '</b> ' + (sinRem === 1 ? 'pedido salió' : 'pedidos salieron') + ' con la tanda armada y nadie marcó el remito: en <b>Recepción Remitos → Controlado</b> pasan a entregados y desaparecen de acá.</div>';
+    h += '<div class="pn-note"><b>' + sinRem + '</b> ' + (sinRem === 1 ? 'pedido salió' : 'pedidos salieron') + ' con la tanda armada y nadie marcó el remito. A las <b>36 h</b> del armado pasan solos a <b>En Salida</b>, donde se cierran con <b>Controlado</b> (o ↩ si la mercadería volvió).</div>';
   }
   const dk = esVenc ? "venc" : key;
   for (const c of cams) {

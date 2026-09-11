@@ -5781,3 +5781,41 @@ la suelta antes pero D69D empezada → junta al 16/09 (empezada) · dos empezada
 Pasada real al crearla: **nada que juntar**.
 
 **Rollback:** `sql/gv_ppp_web_juntar_clientes_v1553.sql`.
+
+## §3.cg — Vencidos: a las 36 h sin remito pasan a En Salida; los que no salieron se vuelven o se cancelan (v15.55, 2026-09-11)
+
+Thomas, con los **8 pedidos vencidos** de la PPP en pantalla: *"si ya salieron hace más de 36hs y
+no se controló, tiene que aparecer allá la alerta, y aparecer en En Salida. si no salieron, volver a
+programación o cancelar pedido"*.
+
+**Qué eran los 8** (ninguno tenía Carga Camión ni Control de Remitos):
+
+| NP | Cliente | Armada (TAL) | Horas | Caso |
+|---|---|---|---|---|
+| 98530 | Shopping Domino | 09/09 13:04 | 48 | salida presunta |
+| 44612 · 44613 · 44614 | Cencosud | 10/09 16:04 | 21 | todavía no (umbral 36) |
+| 44615 · 44616 · 44617 | Cencosud | — | — | no salió |
+| LK 0024 | Osa | — | — | no salió |
+
+**A) Salida presunta.** `PPP_Web_Config.salida_presunta_horas = 36`. `gv_ppp_en_salida` suma a su
+base las NP **armadas hace más de ese umbral, sin CCN ni factura, con fecha de entrega vencida**:
+estado `armada_sin_carga`, columnas nuevas `horas_desde_armado` y `salida_presunta`. Como el front
+ya excluye de Programación lo que está en esa vista, **salen solas de los vencidos y entran a En
+Salida**, con chip rojo *"🚨 Salió hace X h sin registro de carga · falta el remito"*, cuentan como
+"pasado el plazo" y se cierran desde ahí con **Controlado** (CRN) o **↩** (FSS). El módulo RR de los
+operarios no cambia: sigue mostrando sólo lo cargado (CCN). Medido: 98530 entra; los 3 Cencosud de
+21 h, no.
+
+**B) Los que no salieron.** En la lista de vencidos, por pedido:
+
+| Botón | NP | Backend |
+|---|---|---|
+| ↩ A Programar | web | `gv_ppp_web_desprogramar` — tanda y fecha en null en todas las NP del pedido; queda pendiente en A Programar. Corta si una tanda ya se empezó |
+| 📅 Reprogramar | ISIS | ya existía (`gv_ppp_isis_programar`) |
+| 🚫 Cancelar | las dos | `gv_ppp_np_cancelar` — ISIS: `NP_Canceladas` + `GV_PPP_Prog_Override.oculto = true`; web: **`GV_Web_Cancelados`** (tabla nueva) + fuera de la PPP, y `gv_pedidos_web_excluidos` devuelve `cancelado` para que el feed no lo traiga de vuelta |
+
+**Pruebas (con rollback):** cancelar LK 0024 → `GV_Web_Cancelados` + fila sin tanda + excluidos
+`cancelado` · cancelar 44615 → `NP_Canceladas` + override oculto → 0 filas en
+`gv_ppp_programacion_diaria` · desprogramar LK 0024 → 1 NP sin tanda.
+
+**Rollback:** `sql/gv_en_salida_presunta_y_cancelar_v1555.sql`.
