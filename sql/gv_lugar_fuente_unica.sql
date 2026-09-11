@@ -131,12 +131,21 @@ comment on view public.gv_ocupacion_lugar is
 -- Normalizados quedan 873 lugares distintos (112 grafías se unifican).
 --
 -- Los 28 salen sólo de Insumos_Ubicaciones y Stock_Ubicaciones: racks de
--- insumos con sufijo AD/AT (adelante/atrás). Mismo criterio: R1AD → R01AD,
--- 'V9 AD' → V09AD (además se come el espacio).
+-- insumos con sufijo AD/AT = ADELANTE / ATRÁS (confirmado por Luis, 11/09).
+-- Mismo criterio: R1AD → R01AD, 'V9 AD' → V09AD (además se come el espacio).
 --
--- ⚠ 'MEDIO' es el único que no entra en el formato: no tiene número. Son 2
---   filas de Insumos_Ubicaciones (insumos A1 y H1, las dos con cantidad 0).
---   Hay que decidir cómo se llama ese lugar antes de cargarlo.
+-- 'MEDIO' es el único que no entra en el formato: no tiene número.
+-- DECISIÓN (Luis, 11/09): se DESCARTA, no se carga en GV_Lugar. Verificado
+-- antes de descartarlo: las 2 filas se crearon el 2026-08-11, tienen
+-- cantidad 0 y capacidad null, su updated_at == created_at (nunca se
+-- tocaron desde el alta) y hay 0 movimientos en Movimientos_Stock con esa
+-- ubicación.
+-- ⚠ Consecuencia a tener presente al cargar: 'MEDIO' es el ÚNICO lugar que
+--   tienen los insumos A1 (Mgo Plano 501 Pint., parte_procesado) y H1
+--   (Manija Redonda p/cromar, partes_crudo) — no figuran en ningún otro
+--   sector. Al descartarlo esos dos insumos quedan sin ubicación asignada.
+--   Si alguna vez se les da lugar físico, hay que darlos de alta en
+--   GV_Lugar_Item con clase='insumo'.
 --
 -- ⚠ N y Ñ son lugares DISTINTOS, no un error de tipeo. Los N (N04, N10, N12,
 --   N3..N8) salen de Racks_Planimetria con códigos 501, 504, 505, 546, 315;
