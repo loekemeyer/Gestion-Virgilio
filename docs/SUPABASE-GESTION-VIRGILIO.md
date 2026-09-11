@@ -5102,3 +5102,21 @@ Dueño: *"todos los datos que tengas que corregir, dale"*. Barrido sobre `v_impo
 - **360E** (Kangli): **no vino en la llegada del 31/08** — `Movimientos_Stock` no tiene ningún `ingreso` de 360E desde
   junio (sólo el seed inicial de 42 cajas, 45 facturadas y ajustes chicos); depósito 0, 1 NP pendiente. Los 8 códigos
   que sí entraron el 31/08 son 328E/361E/363E/366E/367E/368E/810E/870E.
+
+### §3.bm.12 — Becky: el 2.º pedido (CI B260601) separado del 1.º (v15.20, 2026-09-11)
+
+- El dueño subió el Excel del *"2nd order"* de Becky: **CI B260601** (Yangjiang Jiaheng, 12/08/2026, Shenzhen, 19 líneas,
+  **41.944 u**, u$s 23.622). Son exactamente los 19 códigos del bache "Becky 1.ª" (29/09) y el backfill de v14.94 tenía
+  **el doble** de cada cantidad (931E 5.184 = 2 × 2.592 … 957E 9.504 = 2 × 4.752; 404E 2.752 = 1.824 + 928): el
+  `pedido_curso` viejo sumaba los dos pedidos.
+- **Partición** (total sin cambios, 84.784 u): cada bache del backfill se editó a `backfill − CI` con fecha **29/09**
+  (1.º pedido, 42.840 u) y se agregó un bache nuevo con la cantidad del CI, fecha **15/11**, `creado_por = 'CI
+  B260601'` (2.º pedido, 41.944 u). Hecho con `gv_importado_bache_editar` + `gv_importado_bache_add` + resync.
+- **FOB según el CI** (backup `GV_Importados_bkp_becky_fob_20260911`): 931E–936E 0,53 → 0,52; 951E–956E 0,49 → 0,48;
+  957E 0,31 → 0,30; 958E 0,42 → 0,40; 606E 0,56 → 0,55; 404E 5,20 → 5,10. 937E/938E/607E ya coincidían.
+- **Pendiente del dueño**: las otras **26 líneas** con fecha 15/11 (198E, 602E, 798E, 941E–999E, 36.912 u, del backfill)
+  NO están en este CI. Se les puso 15/11 por su *"la segunda de Becky llega 15/11"* de esta misma noche, pero el 2.º
+  pedido resultó ser el CI de arriba; falta saber si son un 3.º pedido (y su fecha) o si sobran.
+- Backup `GV_Importados_Baches_bkp_becky_20260911` (todos los baches de Becky antes de partir). Rollback: `delete from
+  "GV_Importados_Baches" where creado_por = 'CI B260601'`; restaurar `unidades` de los 19 baches del backfill desde el
+  backup por `id`; FOB desde el backup; resync.

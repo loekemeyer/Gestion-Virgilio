@@ -421,3 +421,9 @@ FOB al PI. `Importados_Volumen` 727E master 144 + inner; 539E/540E inner. Backup
 `GV_Importados_Baches`: +5 (`creado_por='PI BX260722D'`, fecha 2026-11-29). `Importados` ids 156–160 FOB al PI.
 `Importados_Volumen` 566E/582E/583E/584E/590E al PI. Backups `GV_Importados_bkp_zhixin_20260911`,
 `GV_Importados_Volumen_bkp_zhixin_20260911`. Detalle y rollback §3.bm.9.
+
+## Becky 2.º pedido CI B260601 — v15.20 (2026-09-11)
+
+`GV_Importados_Baches`: 19 del backfill editados (unidades − CI, fecha 29/09) + 19 nuevos (`creado_por='CI B260601'`, 15/11).
+`Importados`: FOB de 12 filas al CI. Backups `GV_Importados_Baches_bkp_becky_20260911`, `GV_Importados_bkp_becky_fob_20260911`.
+Detalle y rollback §3.bm.12.
