@@ -3,8 +3,28 @@
 -- Pedido de Luis: "cuando el operario recibe y marca si es LK o CH, esa info
 -- debería seguir a todos los códigos que ingresan".
 --
--- ⚠ TODAVÍA NO APLICADO. Se deja escrito acá para aplicarlo junto con los
--- cambios del front, cuando se conecte todo de una vez.
+-- ╔══════════════════════════════════════════════════════════════════╗
+-- ║  ⛔ NO APLICAR TODAVÍA — DECISIÓN DE LUIS, 2026-09-11             ║
+-- ║                                                                  ║
+-- ║  Este SQL se corre EN EL MISMO MOMENTO en que la rama            ║
+-- ║  `claude/trusting-cerf-1w5v54` se mergea a `main`, NO ANTES.      ║
+-- ║                                                                  ║
+-- ║  Por qué: la base Supabase es la MISMA que usa la app en vivo.    ║
+-- ║  Aplicar esto NO espera a ningún push — cambia el comportamiento  ║
+-- ║  de la recepción en el instante en que se corre, con los          ║
+-- ║  operarios pickeando. El front que lo acompaña viaja en la rama.  ║
+-- ║                                                                  ║
+-- ║  Orden al mergear:                                               ║
+-- ║    1. traer `main` a la rama y correr la suite                   ║
+-- ║    2. mergear la rama a `main` (el front sale por Pages)          ║
+-- ║    3. recién ahí correr ESTE archivo en hrxfctzncixxqmpfhskv      ║
+-- ║    4. verificar:                                                 ║
+-- ║       select empresa, count(*) from "Movimientos_Stock"           ║
+-- ║        where deposito='a_guardar' group by 1;                     ║
+-- ║       select * from gv_saldos_stock_emp limit 5;                  ║
+-- ║                                                                  ║
+-- ║  Rollback: docs/ROLLBACK-PRODUCCION.md, entrada v15.71.           ║
+-- ╚══════════════════════════════════════════════════════════════════╝
 --
 -- ── El problema ──────────────────────────────────────────────────────
 -- El operario elige la línea (LK/CH) en la recepción y el front la manda en

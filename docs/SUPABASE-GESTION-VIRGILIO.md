@@ -5733,6 +5733,13 @@ se implemente. Al mergear:
 4. **`gv_saldos_stock_emp` todavía NO está aplicada** en la base: `stockFetchSaldos` la
    consulta best-effort y sin ella el front se comporta como siempre (sin `_emp`).
 
+**⛔ El SQL se corre AL MERGEAR, no antes (decisión de Luis, 11/09).** La base es la misma
+que usa la app en vivo: correr `sql/gv_empresa_recepcion_mg.sql` **no espera a ningún push**,
+cambia la recepción en el instante, con los operarios pickeando. El orden es: traer `main` a
+la rama → suite → mergear a `main` → **recién ahí** correr el SQL → verificar con
+`select empresa, count(*) from "Movimientos_Stock" where deposito='a_guardar' group by 1;`.
+El archivo lleva el mismo cartel arriba de todo.
+
 **Chequeo de que el arreglo sigue puesto:**
 `grep -c 'v15.71 — ACUMULA\|v15.71 — SUMAR' index.html` → tiene que dar **3**.
 
