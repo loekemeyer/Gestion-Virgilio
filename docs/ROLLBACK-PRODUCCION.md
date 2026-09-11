@@ -415,3 +415,9 @@ Rollback: restaurar fecha/estado/unidades_llegadas desde el backup por `id` + `g
 `GV_Importados_Baches`: +11 (`creado_por='PI NY26-031438'`), 7 del backfill → `llegado` sin stock. `Importados` ids 81/123
 FOB al PI. `Importados_Volumen` 727E master 144 + inner; 539E/540E inner. Backups `GV_Importados_Baches_bkp_hugowong_20260911`,
 `GV_Importados_bkp_hugowong_20260911`, `GV_Importados_Volumen_bkp_hugowong_20260911`. Detalle y rollback §3.bm.7.
+
+## PI Zhixin BX260722D — v15.17 (2026-09-11)
+
+`GV_Importados_Baches`: +5 (`creado_por='PI BX260722D'`, fecha 2026-11-29). `Importados` ids 156–160 FOB al PI.
+`Importados_Volumen` 566E/582E/583E/584E/590E al PI. Backups `GV_Importados_bkp_zhixin_20260911`,
+`GV_Importados_Volumen_bkp_zhixin_20260911`. Detalle y rollback §3.bm.9.

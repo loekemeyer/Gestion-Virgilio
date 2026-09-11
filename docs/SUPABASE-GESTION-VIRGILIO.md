@@ -5062,3 +5062,20 @@ Dueño: *"todos los datos que tengas que corregir, dale"*. Barrido sobre `v_impo
 - Rollback: `update "GV_Importados_Baches" set fecha_reingreso = null where creado_por = 'PI NY26-031438'` + resync.
 - **Impos en curso, todas con fecha**: Becky 29/09 · Fujian 01/11 · Hugo Wong 03/11 · Frontier 04/11 · Becky 2.ª 15/11 ·
   Ownland 18/12.
+
+### §3.bm.9 — PI Zhixin BX260722D cargado; FOB y packing al PI (v15.17, 2026-09-11)
+
+- **PI BX260722D** (Ningbo Zhixin, 04/09/2026, FOB Lianyungang, u$s 10.272,95, 18,5 CBM, *"delivery 30 days around
+  after payment"*). Dueño: *"40 d + 45 d desde 5/9"* → **29/11/2026**. 5 baches `creado_por = 'PI BX260722D'`:
+  566E 3.600, 590E 9.000, 584E 3.600, 583E 8.010, 582E 18.048 = **42.258 u** (chequeo: `sum(unidades -
+  unidades_llegadas)` = 42.258). 5 filas de `Importados` con `reingreso_est = 2026-11-29`. Zhixin no tenía ningún bache
+  (ni del backfill): es la primera impo cargada del proveedor.
+- **FOB según PI** (los 5 cambiaron): 566E 0,33 → **0,462**; 582E 0,1519 → **0,161**; 583E 0,258 → **0,282**; 584E
+  0,638 → **0,752**; 590E 0,0446 → **0,082**. 590ES (suelto, 0,446) y 890E (Chef, 0,045) no vienen en el PI: sin tocar.
+- **Packing según PI** (`Importados_Volumen`, `fuente = 'PI BX260722D'`): 566E 48/ctn 51×36×21,5 (0,0395); 582E 192/ctn
+  37×27×44 (0,0440); 583E **120 → 90**/ctn 33×27×38 (0,0339); 584E 48/ctn 58×40×44,5 (0,1032); 590E 600/ctn
+  38,5×31,5×21 (0,0255). Cierra con el CBM del PI (3 + 4,2 + 3,1 + 7,8 + 0,4 = 18,5).
+- Backups `GV_Importados_bkp_zhixin_20260911`, `GV_Importados_Volumen_bkp_zhixin_20260911`. Rollback: `delete from
+  "GV_Importados_Baches" where creado_por = 'PI BX260722D'` + resync; FOB y volumen desde los backups.
+- **Impos en curso, todas con fecha**: Becky 29/09 · Fujian 01/11 · Hugo Wong 03/11 · Frontier 04/11 · Becky 2.ª 15/11 ·
+  Zhixin 29/11 · Ownland 18/12. Kangli: sin pedido (llegó el 31/08).
