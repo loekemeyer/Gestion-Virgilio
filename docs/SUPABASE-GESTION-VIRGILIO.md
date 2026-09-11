@@ -5542,5 +5542,31 @@ que se estaba pickeando en vivo). (2) Tanda falsa `ZZDEP1|207|10|10|3` (art 207,
 a excedente 27 / góndola 133. (5) Suite completa: 119 bloques, 0 fallas, con el test nuevo
 `tests/pk-deposito-pkc.cjs`.
 
+**Orden del recorrido: el EXCEDENTE va PRIMERO** (dueño vía Luis, 2026-09-11). Antes los
+pasos `art·EXC` se encolaban al final (`items.concat(excSteps)`); ahora al principio
+(`excSteps.concat(items)`). **No cambia de dónde se descuenta**: el reparto `excUsed` /
+`gondNeeded` ya quedó decidido al abrir la tanda, antes de que el operario dé un paso. Lo que
+cambia es la **recuperación del error**: si el excedente miente (el saldo dice 10 y hay 6),
+yendo primero se entera al principio y levanta las 4 que faltan de góndola **en la misma
+pasada**; al final se enteraba con el paso de góndola ya cerrado pidiendo sólo el resto, y
+tenía que volver. El excedente marcado **a mano** (`pkMarkExcedente`) sigue yendo al final: se
+descubre parado en la góndola, cuando la zona del excedente ya quedó atrás.
+
+**Lo que NO se hizo, y por qué.** Se evaluó partir el PKC en **una fila por paso** (góndola y
+excedente por separado). Se descartó: no arregla nada que la fila única no arregle ya —las
+cajas perdidas las arregla el total, el depósito lo arregla el 5.º campo, y del lado del stock
+la separación **ya existe** (el picking escribe `terminado` / `excedente` / `separar_pedidos`,
+con `deposito` en la clave única). Lo único que sumaba era trazabilidad por paso, y costaba
+arreglar `vista_faltante_real` (usa `row_number() … rn = 1`, se quedaría con una sola fila),
+`faltantesDeTanda` y `pkFetchServerMarks` en el front, más dos renglones duplicados en
+`notificar_faltante_telegram` y `generar_reporte_agentes`. Si algún día hace falta la traza por
+paso, va **otro campo en el texto**, no otra fila.
+
+**Nota sobre `Movimientos_Stock.empresa`:** el picking **no la escribe** (no está en el `INSERT`),
+la llenan el `DEFAULT 'Mixto'` y el trigger `zz_normalizar_empresa`. Sí se **lee**: es parte de la
+clave del UPSERT. Pero informa poco — `codigos_duales` tiene 4 códigos (`437E, 438E, 439E, 809E`) y
+el trigger fuerza `'Mixto'` para todo el resto: de las 23.341 filas de picking, **22.867 son
+`'Mixto'`** (309 artículos), 344 `LK` y 130 `CH` (4 artículos cada uno).
+
 **Rollback:** `docs/ROLLBACK-PRODUCCION.md` (entrada v15.41) y
 `sql/backups/reconciliar_pkc_pre_v1541_20260911.sql`. SQL nuevo: `sql/gv_pkc_deposito_v1541.sql`.

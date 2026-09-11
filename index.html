@@ -9351,11 +9351,10 @@ async function showPickingList(tanda, legajo, opts) {
       items.forEach(function (it) { const e = excMap[String(it.art).toUpperCase()]; if (e) { it.exc = e.cajas; it.excUbic = e.ubics.join(" · "); } });
       excOk = true;
     } catch (_e) { excOk = false; }
-    // Excedente: se agarra PRIMERO del excedente (al final) y, si no alcanza, el
-    // RESTO de góndola. Ej: piden 15, hay 10 en excedente → góndola pide 5 (en su
-    // orden normal) + 10 en el excedente (paso al final). Si el excedente cubre
-    // todo, la góndola se SALTEA. El paso de excedente lleva key propia (art·EXC)
-    // para que cuente aparte del de góndola.
+    // Excedente: se agarra PRIMERO del excedente y, si no alcanza, el RESTO de
+    // góndola. Ej: piden 15, hay 10 en excedente → 10 en el excedente + góndola
+    // pide 5. Si el excedente cubre todo, la góndola se SALTEA. El paso de
+    // excedente lleva key propia (art·EXC) para que cuente aparte del de góndola.
     const excSteps = [];
     items.forEach(function (it) {
       if (it.exc > 0) {
@@ -9366,7 +9365,16 @@ async function showPickingList(tanda, legajo, opts) {
         excSteps.push({ art: it.art, key: it.art + "·EXC", esp: excUsed, sector: it.excUbic || "—", excUbic: it.excUbic, exc: it.exc, isExc: true, dual: null });
       }
     });
-    const allItems = items.concat(excSteps);
+    // v15.41 (pedido de Luis): los pasos de EXCEDENTE van PRIMERO, no al final.
+    // No cambia de dónde se descuenta —el reparto excUsed/gondNeeded ya quedó
+    // decidido arriba, antes de que el operario dé un paso—: cambia la RECUPERACIÓN
+    // del error. Si el excedente miente (el saldo dice 10 y hay 6), yendo primero se
+    // entera al principio y levanta las 4 que faltan de góndola EN LA MISMA PASADA,
+    // porque todavía no pasó por ahí. Al final se enteraba cuando el paso de góndola
+    // ya estaba cerrado pidiendo sólo el resto, y tenía que volver.
+    // (El excedente marcado A MANO —pkMarkExcedente— sigue yendo al final: se
+    // descubre parado en la góndola, ya pasó la zona del excedente.)
+    const allItems = excSteps.concat(items);
     _pk = { tanda: tNorm, legajo: String(legajo || (typeof legajoInput !== "undefined" && legajoInput.value) || "").trim(), items: allItems, idx: 0, results: {}, mode: "item", excOk: excOk,
             // Si el cliente le agregó algo a un pedido de esta tanda cuando ya
             // estaba en la mesa, el operario lo tiene que ver en CADA paso del
