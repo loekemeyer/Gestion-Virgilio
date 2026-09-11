@@ -5310,3 +5310,17 @@ Dueño: *"todos los datos que tengas que corregir, dale"*. Barrido sobre `v_impo
 - **727E·CH → 106E** como sustituto de contingencia (106E tiene 14.280 u = 36 meses): anotado en `Importados.notas` de la fila
   727E·CH. Sin lógica nueva en el módulo: es una decisión comercial puntual, no una familia.
 - Las marcas "fabricable acá" del reporte viven en el navegador del que lo mira (localStorage), no en la base.
+
+### §3.bm.23 — Reporte de faltantes: quién compra cada uno + fabricables acá (v15.31, 2026-09-11)
+
+- Dueño: *"colador 16 y colador 20 se pueden fabricar nacionalmente, sacacorcho de madera 525E también; agregá quiénes
+  compran los importados esos para racionar a los que compran mucha cantidad y estirar el stock"*.
+- Reporte (mismo artefacto, versión 2; copia en `docs/INFORME-FALTANTES-IMPORTADOS-20260911.html`): columna **"Quién lo
+  compra (6 meses)"** = cajas facturadas en `sales_lines` de LK (LK + Chef, `invoice_date` ≥ 6 meses, `boxes > 0`,
+  variantes L incluidas), clientes distintos, % del top 3 (≥ 50 % en naranja = candidato a racionar) y los 3 mayores
+  con caj/mes. Tile nuevo con la cuenta de concentrados. Trampas anotadas: 1434 Loekemeyer Hnos [CH] es la factura
+  intercompañía; 2686 Dorinka sale doble por julio/agosto cargados como LK; 2444 es Cencosud en Chef y Relca en LK.
+- **Fabricables acá** en `Importados.notas` (437E·CH, 438E·CH, 113, 525E: "Fabricable nacional (dueño 11/09)") y
+  marcados en el reporte. Sin lógica nueva en el módulo.
+- Concentraciones que más pesan: 582E salero Coto 63 % · 198E La Anónima 100 % · 601E La Anónima 47 % · 960E Relca 41 % ·
+  026 La Anónima + Coto 44 % · 970E/971E Cencosud + Relca ~70 % · 727E Dorinka 52 %.

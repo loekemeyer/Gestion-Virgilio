@@ -42,7 +42,7 @@
   .sec-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 14px; }
   .sec-head p { margin: 0; color: var(--muted); font-size: 13px; }
   .tblwrap { overflow-x: auto; background: var(--surface); border: 1px solid var(--line); border-radius: 6px; }
-  table { border-collapse: collapse; width: 100%; min-width: 980px; font-size: 13px; }
+  table { border-collapse: collapse; width: 100%; min-width: 1240px; font-size: 13px; }
   th, td { padding: 7px 10px; border-bottom: 1px solid var(--line); vertical-align: top; text-align: left; }
   thead th { background: var(--surface-2); font: 500 11px/1.3 "IBM Plex Mono", monospace; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); position: sticky; top: 0; }
   tbody tr:nth-child(even) td { background: var(--zebra); }
@@ -59,6 +59,12 @@
   td.falt small { display: block; font-weight: 400; color: var(--muted); }
   td.nota { color: var(--muted); font-size: 12.5px; min-width: 180px; }
   td.nota b { color: var(--ink); font-weight: 500; }
+  td.buy { min-width: 250px; font-size: 12px; }
+  td.buy .bh { color: var(--muted); margin-bottom: 3px; white-space: nowrap; }
+  td.buy .bl { margin: 0; padding-left: 16px; display: grid; gap: 1px; }
+  td.buy .bl b { font-weight: 500; }
+  .muted { color: var(--muted); }
+  tr.fab td.cod { box-shadow: inset 3px 0 0 var(--ok); }
   td.chk { text-align: center; white-space: nowrap; }
   td.chk input { width: 16px; height: 16px; accent-color: var(--accent); cursor: pointer; }
   td.chk input:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
@@ -94,7 +100,7 @@
   <section>
     <div class="sec-head"><h2>Con pedido en curso, pero quiebran antes de que llegue</h2><p>Ordenados por unidades faltantes hasta la llegada. Faltante = consumo mensual × meses hasta la llegada − stock de hoy.</p></div>
     <div class="tblwrap"><table id="t1">
-      <thead><tr><th>Código</th><th>Descripción</th><th>Prov.</th><th class="num">Consumo u/mes</th><th class="num">Stock u</th><th>Quiebre est.</th><th>Llega</th><th class="num">Faltante hasta llegada</th><th>Contingencia / nota</th><th>Fabricable acá</th></tr></thead>
+      <thead><tr><th>Código</th><th>Descripción</th><th>Prov.</th><th class="num">Consumo u/mes</th><th class="num">Stock u</th><th>Quiebre est.</th><th>Llega</th><th class="num">Faltante hasta llegada</th><th>Quién lo compra (6 meses)</th><th>Contingencia / nota</th><th>Fabricable acá</th></tr></thead>
       <tbody></tbody>
     </table></div>
   </section>
@@ -102,7 +108,7 @@
   <section>
     <div class="sec-head"><h2>Sin pedido en curso</h2><p>No hay fecha de llegada: el faltante se calcula a 3 meses como referencia de un lote de contingencia.</p></div>
     <div class="tblwrap"><table id="t2">
-      <thead><tr><th>Código</th><th>Descripción</th><th>Prov.</th><th class="num">Consumo u/mes</th><th class="num">Stock u</th><th>Quiebre est.</th><th>Llega</th><th class="num">Faltante a 3 meses</th><th>Contingencia / nota</th><th>Fabricable acá</th></tr></thead>
+      <thead><tr><th>Código</th><th>Descripción</th><th>Prov.</th><th class="num">Consumo u/mes</th><th class="num">Stock u</th><th>Quiebre est.</th><th>Llega</th><th class="num">Faltante a 3 meses</th><th>Quién lo compra (6 meses)</th><th>Contingencia / nota</th><th>Fabricable acá</th></tr></thead>
       <tbody></tbody>
     </table></div>
   </section>
@@ -112,6 +118,8 @@
     <p><b>Ojo con Chef.</b> Las proyecciones CH (438E, 727E, 877E, 729E, 865E) pueden seguir infladas por las ventas de Chef de julio y agosto que en LK están marcadas como Loekemeyer (tarea de Vivi #3091).</p>
     <p><b>Becky 1ª llega el 29/09.</b> Los seis de la línea bambú/nylon están en cero pero el hueco es de 18 días: no justifican fabricar.</p>
     <p><b>733E, 692E y 814E</b> se empezaron a vender ahora: el consumo es el estimado de julio, no ventas reales. <b>360E</b> es el rallador 4 lados que no vino en la última de Kangli.</p>
+    <p><b>Quién lo compra.</b> Cajas facturadas en los últimos 6 meses (LK y Chef), los 3 clientes que más llevan. El pill "top 3" dice qué parte del total se llevan esos tres: cuando pasa de 50 % (naranja), racionar a uno o dos clientes estira el stock de verdad. En Chef, <b>1434 Loekemeyer Hnos</b> es la factura intercompañía (no un cliente final) y <b>2686 Dorinka</b> aparece dos veces porque julio/agosto se cargaron como LK. Cencosud (2444 Chef) y Relca (2444 LK) son clientes distintos con el mismo número.</p>
+    <p><b>Fabricables acá (dueño 11/09):</b> colador 16 cm (437E, hoy cubierto por los 2.592 u en insumos), colador 20 cm (438E y 113) y sacacorcho cabo de madera 525E. Vienen marcados en la última columna.</p>
   </div>
 </div>
 <script>
@@ -169,7 +177,58 @@
     ["814E","","Mariposa manopla magnética","Ownland",36,1,0,"hoy",null,null,108,"Se empezó a vender ahora."],
     ["890E","CH","Pincel silicona 11 g (Chef)","Zhixin",34,12,84,"25/11",null,null,18,"Mismo artículo que 590E."]
   ];
+  // Quién lo compra: cajas FACTURADAS en los últimos 6 meses (LK + Chef, sales_lines de LK), top 3 por cliente.
+  // cod → [cajas 6 m, clientes distintos, % del top 3, [[cod cliente, razón social, empresa, caj/mes, %], …]]
+  const BUYERS = {
+    "026":[1140,120,52,[["771","La Anónima (S.A. Imp. y Exp. de la Patagonia)","LK",41.0,22],["801","Coto","LK",41.0,22],["4080","Distribuidora GM","LK",16.7,9]]],
+    "583E":[895,101,38,[["2305","Sauer Ignacio José","LK",37.3,25],["4073","Totalmix","LK",10.7,7],["2533","Osa Distribuidora","LK",9.0,6]]],
+    "027":[823,133,41,[["4080","Distribuidora GM","LK",33.3,24],["862","Muller y Muller","LK",13.3,10],["1615","Yuriti","LK",9.2,7]]],
+    "582E":[721,78,74,[["801","Coto","LK",76.0,63],["4073","Totalmix","LK",6.7,6],["4098","Acosta Argañaraz","LK",5.8,5]]],
+    "438E":[693,112,66,[["1434","Loekemeyer Hnos (intercompañía Chef→Loeke)","CH",61.0,53],["2686","Dorinka","CH",9.7,8],["2686","Dorinka (mal cargada como LK)","LK",5.8,5]]],
+    "566E":[633,77,44,[["2533","Osa Distribuidora","LK",21.7,21],["3905","Andser Química","LK",16.7,16],["2305","Sauer Ignacio José","LK",8.3,8]]],
+    "590E":[610,82,28,[["862","Muller y Muller","LK",10.0,10],["4073","Totalmix","LK",10.0,10],["4150","Primer Precio","LK",8.8,9]]],
+    "584E":[566,103,26,[["1573","Messina Hnos","LK",9.7,10],["4073","Totalmix","LK",9.3,10],["4210","Garbarino Franco","LK",5.5,6]]],
+    "960E":[406,79,50,[["2444","Relca","LK",27.7,41],["1573","Messina Hnos","LK",4.2,6],["1587","Línea Ge","LK",2.2,3]]],
+    "525E":[329,86,24,[["862","Muller y Muller","LK",7.5,14],["4188","Orfali Alfredo","LK",3.5,6],["288","Torres y Liva","LK",2.3,4]]],
+    "601E":[292,71,56,[["771","La Anónima","LK",22.8,47],["288","Torres y Liva","LK",3.0,6],["4098","Acosta Argañaraz","LK",1.5,3]]],
+    "727E":[225,12,84,[["2686","Dorinka","CH",19.7,52],["961","Super Imperio","CH",6.7,18],["2715","Gifel","CH",5.0,13]]],
+    "198E":[211,1,100,[["771","La Anónima","LK",35.2,100]]],
+    "323ES":[369,56,45,[["2686","Dorinka (838E)","CH",20.8,34],["2686","Dorinka (838E, mal cargada como LK)","LK",13.3,22],["288","Torres y Liva (323E)","LK",4.2,7]]],
+    "970E":[198,26,78,[["2444","Cencosud","CH",13.2,40],["2444","Relca","LK",11.5,35],["521","Grandes Bazares del Norte","LK",1.0,3]]],
+    "971E":[192,33,70,[["2444","Cencosud","CH",13.2,41],["2444","Relca","LK",7.7,24],["2128","Bio Lim","LK",1.7,5]]],
+    "439EL":[161,39,66,[["2686","Dorinka","CH",10.0,37],["2686","Dorinka (mal cargada como LK)","LK",6.3,24],["4255","Chen Zhimei","LK",1.3,5]]],
+    "360E":[156,57,38,[["2128","Bio Lim","LK",6.7,26],["1279","Dimacol","LK",2.0,8],["4157","MRG Soluciones","LK",1.2,4]]],
+    "953E":[135,33,58,[["2444","Cencosud","CH",6.2,27],["2444","Relca","LK",3.5,16],["3905","Andser Química","LK",3.3,15]]],
+    "110":[94,1,100,[["4112","Día (Autoservicio Mayorista)","LK",15.7,100]]],
+    "958E":[93,33,52,[["2444","Cencosud","CH",3.5,23],["2444","Relca","LK",2.7,17],["4243","Superimperio","LK",1.8,12]]],
+    "951E":[91,20,77,[["2444","Cencosud","CH",6.7,44],["2444","Relca","LK",3.3,22],["4243","Superimperio","LK",1.7,11]]],
+    "865E":[118,5,99,[["2686","Dorinka","CH",14.5,74],["2686","Dorinka (865ED, mal cargada como LK)","LK",4.5,23]]],
+    "952E":[86,23,63,[["2444","Cencosud","CH",6.7,47],["4243","Superimperio","LK",1.7,12],["2460","Supermercados Malambo","LK",0.7,5]]],
+    "957E":[85,20,69,[["2444","Cencosud","CH",5.7,40],["3905","Andser Química","LK",2.5,18],["4243","Superimperio","LK",1.7,12]]],
+    "982E":[84,21,70,[["2444","Relca","LK",5.8,42],["4243","Superimperio","LK",2.5,18],["4210","Garbarino Franco","LK",1.5,11]]],
+    "943E":[72,24,53,[["2533","Osa Distribuidora","LK",4.2,35],["4243","Superimperio","LK",1.5,13],["4098","Acosta Argañaraz","LK",0.7,6]]],
+    "981E":[64,18,72,[["2444","Relca","LK",5.8,55],["4210","Garbarino Franco","LK",1.5,14],["3872","A L S.A.","LK",0.3,3]]],
+    "934E":[64,14,80,[["2533","Osa Distribuidora","LK",5.8,55],["2444","Cencosud","CH",2.3,22],["4255","Chen Zhimei","LK",0.3,3]]],
+    "877E":[63,2,100,[["2686","Dorinka","CH",6.8,65],["2686","Dorinka (mal cargada como LK)","LK",3.7,35]]],
+    "948E":[54,18,59,[["2533","Osa Distribuidora","LK",4.3,48],["2539","Trópico Sur","LK",0.7,7],["2375","El Gran Bazar","LK",0.3,4]]],
+    "890E":[39,10,59,[["2335","Gastroeuropa","LK",2.5,38],["1938","Pergamino","CH",0.7,10],["2384","Borgobello Javier","CH",0.7,10]]],
+    "945E":[39,8,85,[["2533","Osa Distribuidora","LK",3.5,54],["4243","Superimperio","LK",1.7,26],["4123","Ramírez Santiago","LK",0.3,5]]],
+    "729E":[39,15,36,[["2701","P & M Bazar","CH",1.0,15],["1125","Anglet","CH",0.7,10],["1463","Serpa Alejandra","CH",0.7,10]]],
+    "944E":[37,8,86,[["2533","Osa Distribuidora","LK",3.3,54],["4243","Superimperio","LK",1.7,27],["3997","Piovan Liliana","LK",0.3,5]]]
+  };
+  // Fabricables acá según el dueño (11/09): coladores 16 y 20 (437E / 438E / 113) y sacacorcho cabo de madera 525E.
+  const FAB = { "438E": "Colador 20 cm: fabricable nacional (dueño 11/09).", "113": "Colador 20 cm: fabricable nacional (dueño 11/09).", "525E": "Fabricable nacional (dueño 11/09)." };
   const fmt = n => (n == null) ? "—" : Math.round(n).toLocaleString("es-AR");
+  const fmt1 = n => Number(n).toLocaleString("es-AR", { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+  function buyersHtml(cod) {
+    const b = BUYERS[cod];
+    if (!b) return '<span class="muted">sin ventas facturadas en 6 meses</span>';
+    const [tot, n, top3, top] = b;
+    const conc = top3 >= 50;
+    const head = '<div class="bh">' + n + (n === 1 ? " cliente" : " clientes") + ' · ' + fmt(tot) + ' caj en 6 m · <span class="pill ' + (conc ? "warn" : "ok") + '" title="Qué parte de las cajas se llevan los 3 que más compran">top 3 = ' + top3 + '%</span></div>';
+    const list = '<ol class="bl">' + top.map(([c, rs, emp, cm, pct]) => '<li><b>' + rs + '</b> <span class="muted">' + c + ' ' + emp + '</span> · ' + fmt1(cm) + ' caj/mes · ' + pct + '%</li>').join("") + '</ol>';
+    return head + list;
+  }
   const KEY = "faltantes_imp_fab_20260911";
   let marcas = {}; try { marcas = JSON.parse(localStorage.getItem(KEY) || "{}") || {}; } catch (_e) { marcas = {}; }
   function pillMeses(stock, proy) {
@@ -184,7 +243,10 @@
       const cajProy = uxc ? " <small>" + (proy / uxc).toFixed(1).replace(".", ",") + " caj</small>" : "";
       const faltCaj = (uxc && falt) ? "<small>≈ " + Math.ceil(falt / uxc) + " cajas</small>" : "";
       const id2 = id + "_" + cod;
-      return "<tr>" +
+      const fab = FAB[cod];
+      const notaFull = (fab ? '<span class="pill ok">fabricable acá</span> ' + fab + (nota ? " " : "") : "") + (nota || "");
+      if (fab && marcas[id2] === undefined) marcas[id2] = true;
+      return "<tr" + (fab ? ' class="fab"' : "") + ">" +
         '<td class="cod">' + cod + (filas ? "<small>" + filas + "</small>" : "") + "</td>" +
         '<td class="desc">' + desc + "</td>" +
         "<td>" + prov + "</td>" +
@@ -193,7 +255,8 @@
         "<td>" + (quiebre === "hoy" ? '<span class="pill crit">ya sin stock</span>' : quiebre) + "</td>" +
         "<td>" + (llega ? '<span style="font-family:IBM Plex Mono,monospace">' + llega + "</span> · " + fmt(uniLlegan) + " u" : '<span class="pill crit">sin pedido</span>') + "</td>" +
         '<td class="falt">' + fmt(falt) + " u" + faltCaj + "</td>" +
-        '<td class="nota">' + (nota || "") + "</td>" +
+        '<td class="buy">' + buyersHtml(cod) + "</td>" +
+        '<td class="nota">' + notaFull + "</td>" +
         '<td class="chk"><input type="checkbox" id="' + id2 + '" data-k="' + id2 + '"' + (marcas[id2] ? " checked" : "") + ' aria-label="Fabricable acá: ' + cod + '"></td>' +
         "</tr>";
     }).join("");
@@ -208,6 +271,7 @@
     ['<span class="n">' + (CON.length + SIN.length) + '</span><span class="l">artículos que quiebran antes de la llegada</span>', "crit"],
     ['<span class="n">' + yaCero + '</span><span class="l">ya sin stock hoy</span>', "crit"],
     ['<span class="n">' + fmt(totFalt) + '</span><span class="l">unidades faltantes hasta la llegada (los que tienen pedido)</span>', ""],
-    ['<span class="n">' + SIN.length + '</span><span class="l">sin ningún pedido en curso</span>', ""]
+    ['<span class="n">' + SIN.length + '</span><span class="l">sin ningún pedido en curso</span>', ""],
+    ['<span class="n">' + [...CON, ...SIN].filter(r => BUYERS[r[0]] && BUYERS[r[0]][2] >= 50).length + '</span><span class="l">con el 50 % o más en 3 clientes: candidatos a racionar</span>', ""]
   ].map(([h, c]) => '<div class="tile ' + c + '">' + h + "</div>").join("");
 </script>
