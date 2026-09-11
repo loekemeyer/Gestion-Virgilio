@@ -7598,7 +7598,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v14.94";
+const APP_VERSION = "v14.95";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -21136,6 +21136,9 @@ function askInsUbicacion(mode) {
   ov.innerHTML = '<div style="background:#f8fafc;max-width:420px;width:100%;border-radius:16px;padding:20px;box-shadow:0 24px 70px rgba(0,0,0,.5);box-sizing:border-box;">' +
     '<div style="font-size:18px;font-weight:800;margin-bottom:3px;">' + (isIn ? "📥 Recepción" : "📤 Entrega") + '</div>' +
     '<div style="font-size:13px;color:#64748b;margin-bottom:16px;">' + titulo + '</div>' +
+    // v14.95 — bolsas plásticas: los inyectores (EI) / las OC de material de GP2 (RI) como botones,
+    // arriba del texto libre. Se llenan async; si GP2 no responde queda el texto libre de siempre.
+    '<div id="insUbicGp2"></div>' +
     '<input type="text" id="insUbicInput" placeholder="' + hint + ' (ej: Cervantes, Centro, Proveedor X)" ' +
       'style="width:100%;box-sizing:border-box;height:48px;border:2px solid #cbd5e1;border-radius:12px;padding:0 12px;font-size:16px;margin-bottom:12px;" />' +
     '<div style="display:flex;gap:10px;">' +
@@ -21144,6 +21147,8 @@ function askInsUbicacion(mode) {
     '</div>' +
     '</div>';
   ov.style.display = "flex";
+  window._insGp2 = null;
+  _insGp2Opciones(mode);
 
   // Auto-focus en el input
   setTimeout(() => {
@@ -21155,12 +21160,19 @@ function insUbicCancel() {
   const ov = document.getElementById("insUbicModal");
   if (ov) ov.style.display = "none";
 }
-function insUbicOk(mode) {
-  const inp = document.getElementById("insUbicInput");
-  const ubicacion = (inp && inp.value) ? String(inp.value).trim() : "";
-  if (!ubicacion) {
-    alert("Completá la ubicación");
-    return;
+function insUbicOk(mode, _gp2) {
+  let ubicacion = "";
+  if (_gp2) {
+    ubicacion = _gp2.modo === "EI" ? _gp2.inyector : (_gp2.oc.proveedor || ("OC " + _gp2.oc.numero));
+    window._insGp2 = _gp2;
+  } else {
+    const inp = document.getElementById("insUbicInput");
+    ubicacion = (inp && inp.value) ? String(inp.value).trim() : "";
+    if (!ubicacion) {
+      alert("Completá la ubicación");
+      return;
+    }
+    window._insGp2 = null;
   }
   insUbicCancel();
   // Guardar la ubicación en el toggle data
@@ -21260,6 +21272,127 @@ function insDocCancel() {
   if (ov) ov.style.display = "none";
   window._insDocState = null;
 }
+/* ===== v14.95 — BOLSAS PLÁSTICAS ↔ GESTIÓN PRODUCTIVA 2.0 (schema GP2, mismo proyecto) =====
+   La materia prima plástica (PP, ABS, AI, NV, NR, N25, PE, PS: bolsas de 25 kg) la COMPRA GP2 y
+   se guarda acá, en Virgilio. GP2 es el que manda (stock por inyector, OC, reposición); el ledger
+   de Virgilio (Movimientos_Stock deposito='insumos') se sigue escribiendo igual que siempre.
+   Lo que se agrega, SÓLO cuando el insumo es una bolsa (su cod está en GP2.componente.codigo_virgilio):
+     EI (entregar): el destino es UN INYECTOR (lista cerrada que da GP2, con cuántas bolsas le
+        faltan para sus OC) → rpc GP2.enviar_material_virgilio(cod_virgilio, bolsas, inyector, legajo).
+     RI (recibir): se elige la OC de material de GP2 que llegó (rpc GP2.oc_pendientes_virgilio) y
+        las bolsas se reciben CONTRA esa OC → rpc GP2.recibir_oc_virgilio(oc, [{cod_virgilio, bolsas}], remito, legajo).
+   Si GP2 no responde al abrir, queda el texto libre de siempre (sin GP2). Si GP2 rechaza al
+   confirmar, se avisa y se pregunta si registrar igual sólo en Virgilio (los dos ledgers tienen
+   que decir lo mismo; la excepción la decide el operario a la vista). Spec: INTEGRACION_GESTION_VIRGILIO.md (repo GP2). */
+async function insGp2Rpc(name, args) {
+  const r = await fetch(SUPABASE_URL + "/rest/v1/rpc/" + name, {
+    method: "POST",
+    headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY, "Content-Type": "application/json", "Content-Profile": "GP2" },
+    body: JSON.stringify(args || {})
+  });
+  const t = await r.text();
+  let j = null;
+  try { j = t ? JSON.parse(t) : null; } catch (_e) { j = t; }
+  if (!r.ok) throw new Error((j && j.message) || ("HTTP " + r.status));
+  return j;
+}
+/* Llena #insUbicGp2 con los botones de GP2: inyectores (EI) u OC de material pendientes (RI). */
+async function _insGp2Opciones(mode) {
+  const box = document.getElementById("insUbicGp2");
+  if (!box) return;
+  const isIn = mode === "RI";
+  const btn = "width:100%;margin-bottom:8px;padding:12px 14px;border:2px solid " + (isIn ? "#a5b4fc" : "#5eead4") + ";border-radius:12px;background:" + (isIn ? "#eef2ff" : "#f0fdfa") + ";color:#0f172a;font-size:15px;font-weight:800;cursor:pointer;text-align:left;";
+  const sub = "display:block;font-size:12px;font-weight:700;color:#475569;margin-top:2px;";
+  try {
+    if (isIn) {
+      const ocs = await insGp2Rpc("oc_pendientes_virgilio", {});
+      window._insGp2Cache = { ocs: ocs || [] };
+      if (!ocs || !ocs.length) return;
+      box.innerHTML = '<div style="font-size:12.5px;font-weight:800;color:#3730a3;margin-bottom:6px;">🧪 Bolsas plásticas — ¿llegó una OC de Gestión Productiva?</div>' +
+        ocs.map(function (o, i) {
+          const its = (o.items || []).map(function (it) { return (it.cod_virgilio || it.codigo) + " " + _insNum(Number(it.pendiente_bolsas) || 0) + " bolsas"; }).join(" · ");
+          return '<button onclick="insUbicGp2Ok(\'RI\',' + i + ')" style="' + btn + '">OC N° ' + escapeHtml(String(o.numero)) + ' · ' + escapeHtml(o.proveedor || "") +
+            '<span style="' + sub + '">' + escapeHtml(its) + (o.fecha_entrega_estimada ? ' · est. ' + escapeHtml(o.fecha_entrega_estimada) : "") + '</span></button>';
+        }).join("") +
+        '<div style="font-size:12px;color:#64748b;margin:2px 0 10px;">— o escribí de dónde recibís (otro insumo) —</div>';
+    } else {
+      const mv = await insGp2Rpc("material_virgilio_bundle", {});
+      window._insGp2Cache = { mv: mv || null };
+      if (!mv || !mv.inyectores || !mv.inyectores.length) return;
+      box.innerHTML = '<div style="font-size:12.5px;font-weight:800;color:#115e59;margin-bottom:6px;">🧪 Bolsas plásticas — ¿van a un inyector?</div>' +
+        mv.inyectores.map(function (nom, i) {
+          const falta = (mv.materiales || []).map(function (m) {
+            const x = (m.inyectores || []).filter(function (y) { return y.proveedor === nom; })[0];
+            return (x && Number(x.bolsas_a_enviar) > 0) ? (m.codigo_virgilio || m.codigo) + " " + x.bolsas_a_enviar : "";
+          }).filter(Boolean).join(" · ");
+          return '<button onclick="insUbicGp2Ok(\'EI\',' + i + ')" style="' + btn + '">🏭 ' + escapeHtml(nom) +
+            '<span style="' + sub + '">' + (falta ? "le faltan: " + escapeHtml(falta) : "al día con sus OC") + '</span></button>';
+        }).join("") +
+        '<div style="font-size:12px;color:#64748b;margin:2px 0 10px;">— o escribí a dónde lo enviás (otro destino) —</div>';
+    }
+  } catch (_e) { /* sin GP2: queda el texto libre */ }
+}
+function insUbicGp2Ok(mode, i) {
+  const c = window._insGp2Cache || {};
+  if (mode === "RI") {
+    const oc = (c.ocs || [])[i]; if (!oc) return;
+    insUbicOk("RI", { modo: "RI", oc: oc });
+  } else {
+    const mv = c.mv; const nom = mv && mv.inyectores ? mv.inyectores[i] : null; if (!nom) return;
+    insUbicOk("EI", { modo: "EI", inyector: nom, mv: mv });
+  }
+}
+/* Material GP2 (del bundle) del insumo, por codigo_virgilio == cod de Virgilio. null si no es bolsa. */
+function _insGp2Mat(gp2, it) {
+  if (!gp2 || !it || !it.cod) return null;
+  const k = _insK(it.cod);
+  if (gp2.modo === "EI" && gp2.mv) return (gp2.mv.materiales || []).filter(function (m) { return _insK(m.codigo_virgilio) === k; })[0] || null;
+  if (gp2.modo === "RI" && gp2.oc) return (gp2.oc.items || []).filter(function (m) { return _insK(m.cod_virgilio) === k; })[0] || null;
+  return null;
+}
+/* Cuántas bolsas le faltan al inyector elegido de este material (EI), o cuántas quedan por recibir de la OC (RI). */
+function _insGp2Falta(it) {
+  const gp2 = _ins && _ins.gp2; const m = _insGp2Mat(gp2, it);
+  if (!m) return null;
+  if (gp2.modo === "EI") { const x = (m.inyectores || []).filter(function (y) { return y.proveedor === gp2.inyector; })[0]; return x ? Number(x.bolsas_a_enviar) || 0 : 0; }
+  return Number(m.pendiente_bolsas) || 0;
+}
+function _insGp2Banner() {
+  const gp2 = _ins && _ins.gp2; if (!gp2) return "";
+  return '<div class="ins-depw" style="background:#f0fdfa;border-color:#5eead4;color:#115e59;">' +
+    (gp2.modo === "EI" ? '🏭 Entrega a <b>' + escapeHtml(gp2.inyector) + '</b>: las bolsas plásticas se descuentan también en Gestión Productiva.'
+                        : '📦 Recepción de la <b>OC N° ' + escapeHtml(String(gp2.oc.numero)) + '</b> (' + escapeHtml(gp2.oc.proveedor || "") + '): las bolsas se reciben contra esa OC en Gestión Productiva.') +
+    '</div>';
+}
+/* Qty del ítem en BOLSAS para GP2 (Bolsas tal cual; Kg ÷ kg_x_bolsa). null si la unidad no se puede traducir. */
+function _insGp2Bolsas(gp2, it) {
+  const u = String(it.unidad || "").trim().toLowerCase();
+  if (u === "bolsas" || u === "bolsa") return it.qty;
+  const kgb = Number(gp2 && gp2.mv && gp2.mv.kg_x_bolsa) || 25;
+  if (u === "kg") return Math.round(it.qty / kgb * 1000) / 1000;
+  return null;
+}
+/* Avisa a GP2. Devuelve {ok, msg} — nunca tira: el llamador decide qué hacer con el fallo. */
+async function _insGp2Enviar(gp2, sel, legajo, remito) {
+  const rows = sel.map(function (it) { const m = _insGp2Mat(gp2, it); if (!m) return null; const b = _insGp2Bolsas(gp2, it); return { it: it, cod: m.codigo_virgilio || m.cod_virgilio, bolsas: b }; }).filter(Boolean);
+  if (!rows.length) return { ok: true, msg: "" };
+  const sinUni = rows.filter(function (r) { return r.bolsas == null || !(r.bolsas > 0); });
+  if (sinUni.length) return { ok: false, msg: "GP2 sólo entiende Bolsas o Kg: " + sinUni.map(function (r) { return r.it.cod + " en " + (r.it.unidad || "?"); }).join(", ") };
+  try {
+    if (gp2.modo === "EI") {
+      const out = [];
+      for (let i = 0; i < rows.length; i++) {
+        const r = await insGp2Rpc("enviar_material_virgilio", { p_cod_virgilio: rows[i].cod, p_bolsas: rows[i].bolsas, p_inyector: gp2.inyector, p_legajo: legajo || null, p_nota: null });
+        out.push(rows[i].cod + " " + rows[i].bolsas + " bolsas" + (r && r.virgilio_negativo ? " ⚠ GP2 quedó en negativo (" + _insNum(Number(r.virgilio_despues)) + " kg)" : ""));
+      }
+      return { ok: true, msg: "GP2 · " + gp2.inyector + ": " + out.join(" · ") };
+    }
+    const r = await insGp2Rpc("recibir_oc_virgilio", { p_oc_id: gp2.oc.oc_id, p_items: rows.map(function (x) { return { cod_virgilio: x.cod, bolsas: x.bolsas }; }), p_remito: remito || null, p_legajo: legajo || null });
+    return { ok: true, msg: "GP2 · OC N° " + gp2.oc.numero + (r && r.estado === "recibida" ? " completa ✓" : " (parcial)") };
+  } catch (e) {
+    return { ok: false, msg: (e && e.message) || String(e) };
+  }
+}
 /* El CSS del modal de insumos lo usa también la solapa "Insumos" de Stock y Compras
    (chips de categoría), así que la inyección va aparte. */
 function insEnsureCss() {
@@ -21302,6 +21435,21 @@ async function showInsumoModal(mode, legajo, _resume) {
     Object.keys(saldos).forEach(function (k) { const sd = saldos[k], xu = xUni[k] || null; if (((sd.insumos || 0) !== 0 || (xu && xu.length)) && !items.some(function (it) { return it.cod === k; })) items.push({ cod: k, nombre: sd.desc || "", sector: "", ubic: "", cat: "", noCode: String(k).indexOf("·") >= 0, stock: Number(sd.insumos || 0), stockByUni: xu, qty: 0, unidad: _defUni(xu, "") }); });
     items.sort(_insSortCod);
     _ins = { mode: mode, legajo: String(legajo || "").trim(), items: items, filtro: "", cat: "", qty: null, nuevo: null };
+    // v14.95 — bolsas ↔ GP2: si en la ubicación se eligió un inyector / una OC de GP2, queda en la
+    // sesión (viaja con el borrador). RI con OC: precarga las bolsas pendientes de cada material.
+    const gp2 = window._insGp2 || null; window._insGp2 = null;
+    if (gp2) {
+      _ins.gp2 = gp2;
+      if (gp2.modo === "RI" && gp2.oc) {
+        (gp2.oc.items || []).forEach(function (oi) {
+          const it = items.filter(function (x) { return _insK(x.cod) === _insK(oi.cod_virgilio); })[0];
+          if (!it) return;
+          const b = Math.round(Number(oi.pendiente_bolsas) || 0);
+          if (b > 0) { it.qty = b; it.unidad = "Bolsas"; }
+        });
+      }
+      if (items.some(function (x) { return insCatOf(x) === "plastico"; })) _ins.cat = "plastico";
+    }
     insRender();
   } catch (e) { const b = document.getElementById("insBody"); if (b) b.innerHTML = '<div class="ins-loading">Error: ' + escapeHtml(e.message || String(e)) + '</div>'; }
 }
@@ -21457,6 +21605,7 @@ function insRender() {
     _renderKeepFocus(body, _insNuevoHtml(isIn));
     return;
   }
+  h += _insGp2Banner();   // v14.95 — inyector / OC de GP2 elegido en la ubicación
   if (!cat && !f) {
     // ---------- PANTALLA 1: categorías ----------
     h += '<div class="ins-hint">' + (isIn ? "Cuánto <b>entró</b> de cada insumo." : "Cuánto <b>salió</b> de cada insumo.") + ' Entrá a la <b>categoría</b> o buscá por código.</div>';
@@ -21501,6 +21650,7 @@ function insRender() {
           '<span class="ins-itcod">' + escapeHtml(_insBtnCod(it)) + '</span>' +
           (it.nombre ? '<span class="ins-itnom">' + escapeHtml(it.nombre) + '</span>' : "") +
           (it.ubic ? '<span class="ins-itubi">📍 ' + escapeHtml(it.ubic) + '</span>' : "") +
+          (function () { const f = _insGp2Falta(it); return f == null ? "" : '<span class="ins-itubi" style="color:#b45309;">' + (isIn ? "📦 pendiente " : "🏭 faltan ") + _insNum(f) + ' bolsas</span>'; })() +
           (it.qty > 0 ? '<span class="ins-itq' + (it.unidad ? "" : " falta") + '">' + it.qty + " " + escapeHtml(it.unidad || "¿unidad?") + '</span>' : "") +
           '</button>';
       }).join("") +
@@ -21686,7 +21836,7 @@ function insBack() { if (!_ins) return; _ins.cat = ""; _ins.filtro = ""; _ins.nu
 function insSetCat(k) { if (!_ins) return; _ins.cat = (_ins.cat === k) ? "" : k; _ins.filtro = ""; _ins.nuevo = null; _ins.qty = null; insRender(); }
 function insChg(i, d) { if (!_ins) return; const it = _ins.items[i]; if (!it) return; it.qty = Math.max(0, it.qty + d); insRender(); }
 function insSet(i, v) { if (!_ins) return; const it = _ins.items[i]; if (!it) return; it.qty = Math.max(0, parseInt(v, 10) || 0); insRender(); }
-function insConfirmar() {
+async function insConfirmar() {
   if (!_ins) return;
   const isIn = _ins.mode === "RI";
   const sel = _ins.items.filter(function (it) { return it.qty > 0; });
@@ -21728,6 +21878,19 @@ function insConfirmar() {
     return { cod_art: it.cod, descripcion: it.nombre || null, deposito: "insumos", delta: isIn ? qty : -qty, tipo: isIn ? "recepcion_insumo" : "entrega_insumo", ref: ubic, legajo: _ins.legajo || null, unidad: uni, ubicacion: it.ubic || it.sector || null };
   });
   const tot = sel.reduce(function (s, it) { return s + it.qty; }, 0);
+  // v14.95 — bolsas plásticas ↔ GP2: PRIMERO GP2 (es el que manda). Si rechaza, el operario decide
+  // si registra igual sólo en Virgilio (queda a la vista que los dos ledgers difieren).
+  let gp2Msg = "";
+  if (_ins.gp2) {
+    const g = await _insGp2Enviar(_ins.gp2, sel, _ins.legajo, (window._insDocState && window._insDocState.nroRemito) || "");
+    if (!_ins) return;   // se cerró mientras esperaba
+    if (!g.ok) {
+      let sigue = false;
+      try { sigue = confirm("⚠ Gestión Productiva NO aceptó el movimiento:\n\n" + g.msg + "\n\n¿Registrar igual SÓLO en Virgilio?\n(GP2 va a quedar desfasado hasta que alguien lo corrija.)"); } catch (_e) {}
+      if (!sigue) return;
+      gp2Msg = "\n⚠ GP2 no registrado: " + g.msg;
+    } else if (g.msg) gp2Msg = "\n" + g.msg;
+  }
   try { opDraftClear(_ins && _ins.legajo); } catch (_e) {}
   closeIns();
   window._insUbicacion = null;  // limpiar
@@ -21754,7 +21917,7 @@ function insConfirmar() {
     } catch (_e) { /* no-op si el módulo no está cargado */ }
   }
 
-  try { alert("✓ " + (isIn ? "Entrada" : "Salida") + " registrada: " + sel.length + " insumo(s)." + (ubic ? "\n" + (isIn ? "Origen" : "Destino") + ": " + ubic : "")); } catch (_e) {}
+  try { alert("✓ " + (isIn ? "Entrada" : "Salida") + " registrada: " + sel.length + " insumo(s)." + (ubic ? "\n" + (isIn ? "Origen" : "Destino") + ": " + ubic : "") + gp2Msg); } catch (_e) {}
 }
 function insHasProgress() { return !!(_ins && _ins.items && _ins.items.some(function (it) { return (it.qty > 0); })); }
 /* ===== v7.13 — ANULAR la sesión de insumos =====

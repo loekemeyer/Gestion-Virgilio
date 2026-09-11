@@ -25,6 +25,7 @@ catch (_e) {
       "pppSugerirInline", "pppSugInlineClose", "_pppEsCiudadela",
       "stkBodyProceso", "ocBodyEntregas", "ocgEnter", "insRender", "mgRender", "mgConfirmar", "pkRender", "stockBajaPicking",
       "stockSepararAFacturar", "stockSalidaFacturado", "stockMove", "_stockNormRows",
+      "insGp2Rpc", "_insGp2Opciones", "insUbicGp2Ok", "_insGp2Mat", "_insGp2Falta", "_insGp2Bolsas", "_insGp2Enviar",   // v14.95 bolsas ↔ GP2
       "esLegajoPrueba", "esOperadorPrueba", "enqueueReport", "facFetchCajas", "facToggleSoloFalt",
       "faltPoll", "faltPollStart", "faltDecidePopup", "faltAsignarme", "faltCompletar", "faltYaListo", "faltSoltar",
       "faltSnoozeId", "faltMaybeCompletar", "faltHtmlPend", "faltHtmlMine", "faltHtmlTaken", "showFaltAvisar", "faltCrear",

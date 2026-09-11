@@ -12,7 +12,32 @@
 > única**; no se replica. Ante la duda entre parche rápido y fix de raíz → **fix
 > de raíz**.
 >
-> Última actualización: 2026-09-10 (jueves) · Versión app al documentar: **v14.93**
+> Última actualización: 2026-09-11 (viernes) · Versión app al documentar: **v14.95**
+>
+> Nota **v14.95 (2026-09-11, Thomas) — INSUMOS: las bolsas plásticas hablan con Gestión Productiva 2.0 (schema `GP2`).**
+> La materia prima plástica (PP, ABS, AI, NV, NR, N25, PE, PS — bolsas de 25 kg) la **compra GP2** y se
+> guarda en Virgilio; GP2 lleva el stock por inyector, las OC y la reposición. El ledger de Virgilio
+> (`Movimientos_Stock deposito='insumos'`) **se sigue escribiendo igual** (decisión: "que vivan en GV,
+> más adelante se unifica todo"); lo nuevo es que, **sólo si el insumo es una bolsa** (su `cod` coincide
+> con `GP2.componente.codigo_virgilio`), además se avisa a GP2 por RPC (`fetch /rest/v1/rpc/…` con header
+> `Content-Profile: GP2`, helper `insGp2Rpc`):
+> · **EI Entregar insumos** → en "¿A dónde lo enviás?" aparecen los **inyectores** como botones
+>   (`GP2.material_virgilio_bundle`: Pat Bet Plast, Pettofrezza, Kollplast, JL Matricería, con "le faltan:
+>   PP 4 · ABS 1" según sus OC abiertas). Elegido uno, la grilla de Plásticos muestra "🏭 faltan N bolsas"
+>   por material y al confirmar se llama `GP2.enviar_material_virgilio(cod, bolsas, inyector, legajo)` por
+>   cada bolsa (Bolsas tal cual; Kg ÷ 25). Texto libre = otro destino, sin GP2 (como antes).
+> · **RI Recibir insumos** → en "¿De dónde recibís?" aparecen las **OC de material pendientes** de GP2
+>   (`GP2.oc_pendientes_virgilio`: N°, proveedor, bolsas pendientes por material). Elegida una, el
+>   proveedor queda como origen, la documentación se pide igual (remito/factura → Pasaje de Papeles) y las
+>   bolsas pendientes vienen **precargadas**; al confirmar `GP2.recibir_oc_virgilio(oc, [{cod_virgilio,
+>   bolsas}], remito, legajo)` (GP2 cruza la OC y la marca recibida sola). El Master Bach (Arcolor / Julio
+>   García) se entrega en Cervantes: sus OC no aparecen acá.
+> · **GP2 va PRIMERO** al confirmar: si rechaza (código que no es bolsa, inyector inexistente, OC ya
+>   recibida…), se muestra el error y se pregunta "¿Registrar igual SÓLO en Virgilio?" — si el operario
+>   dice que sí, queda en el alert que GP2 no se registró. Si GP2 no responde al abrir la ubicación, queda
+>   el texto libre de siempre. La elección (inyector / OC) viaja en `_ins.gp2` (sobrevive al borrador).
+> · Smoke: las 7 funciones nuevas en `tests/smoke.cjs`. Spec y contratos del lado GP2:
+>   `INTEGRACION_GESTION_VIRGILIO.md` y `GP2_MAPA.md` en el repo de GP2. Tarea Planify 3050 (Tomás B., "Th").
 >
 > Nota **v14.93 (2026-09-10) — PICKING: fix "manda al excedente pero no hay excedente" (546/587/502).** (Iba como v14.92; se renumeró porque otra sesión usó ese número para la idea 6064.)
 > Lo reportaron los operarios. Causa: `pkFetchExcedente` (la que decide si un artículo se levanta del
