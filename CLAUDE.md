@@ -39,13 +39,14 @@ update planify.tasks set done = true, updated_at = now() where id = <id>;
 Avisar en el chat el `id` al crearla y al cerrarla. No crear tareas para preguntas o consultas
 que se responden en el momento; sólo para pedidos que implican hacer algo.
 
-4. **Cierre por criterio propio, no sólo por "listo".** Claude evalúa si el objetivo del
-   pedido se cumplió (lo entregado funciona, está commiteado/aplicado, y no quedó ninguna
-   parte del pedido sin hacer). Cuando lo considere cumplido, pregunta **"¿Falta algo más
-   para dar por cerrada la tarea?"** — si la persona dice que no (o no pide nada más
-   dentro de esa tarea), `done=true`. Si dice "listo" antes, también se cierra. Lo que se
-   pidió y quedó a medias NO se cierra: se deja abierta con la nota actualizada
-   ("queda pendiente: …").
+4. **Cierre por criterio propio y SIN preguntar** (dueño, 2026-09-11: *"las que ya están
+   cerradas, cerradas"*). Claude evalúa **solo** si el objetivo del pedido se cumplió (lo
+   entregado funciona, está commiteado/pusheado/aplicado, y no quedó ninguna parte del
+   pedido sin hacer). Si se cumplió: `done=true` y lo avisa en el chat. **NO** se pregunta
+   "¿falta algo más para dar por cerrada la tarea?" — esa pregunta queda prohibida. Lo que
+   se pidió y quedó a medias NO se cierra: queda abierta con la nota actualizada ("queda
+   pendiente: …") y en el chat se dice qué falta y por qué. Si después la persona pide algo
+   más sobre esa tarea, se reabre (`done=false`) o se crea una nueva.
 
 5. **Alerta de inactividad (1 hora).** Si hay tareas abiertas de esta sesión y pasa una
    hora sin mensajes, Claude escribe: *"Te estoy registrando estas tareas pendientes:
@@ -61,6 +62,32 @@ que se responden en el momento; sólo para pedidos que implican hacer algo.
    se lo crea, o se le hace un cambio), copiarle este bloque entero (creando el `CLAUDE.md`
    si no existe) y commitearlo en ese repo, avisando en el chat. Así el dueño no tiene que
    pedirlo cada vez. Fuente canónica del bloque: `CLAUDE.md` de `loekemeyer/pagina-LK-copia`.
+
+
+## ⚠ REGLA: NO preguntar — razonar primero y resolver
+
+**Dueño (2026-09-11): *"no me tenés que preguntar, tenés que razonar primero"*.** Vale para
+TODOS los repos (LK, Chef, Gestión Virgilio, Planify y cualquiera nuevo: copiar este bloque
+al `CLAUDE.md` del repo nuevo, igual que el de Planify).
+
+Antes de escribirle una pregunta al dueño, **resolverla**: leer el código, consultar la base,
+mirar la doc del repo (`GUIA-PROYECTO.md`, `docs/SUPABASE-GESTION-VIRGILIO.md`, los `CLAUDE.md`),
+probar. Preguntar es el último recurso, no el primero.
+
+- **Nunca** preguntar algo averiguable: qué tabla es, qué versión corre, si algo ya está hecho,
+  qué significa un dato, si el cron lo pisa. Se averigua y se sigue.
+- **Nunca** preguntar "¿lo hago?" / "¿querés que…?" sobre lo que ya pidió. Si el pedido se
+  entiende, se hace completo.
+- **Dos caminos razonables** → elegir el más seguro y reversible (con backup si toca datos),
+  hacerlo, y avisar en UNA línea el criterio usado. No se frena la tarea esperando respuesta.
+- **Un pedido ambiguo** se interpreta como lo haría alguien que conoce el negocio, mirando las
+  reglas del dueño ya escritas en estos archivos. Si quedan dos lecturas con consecuencias muy
+  distintas, se hace la reversible y se avisa cuál se tomó.
+- **Sí se pregunta y se espera** sólo en tres casos: (a) la acción es destructiva o irreversible
+  sobre datos reales (borrar, pisar, mandar algo afuera: mail, WhatsApp, ISIS); (b) dos reglas
+  del dueño se contradicen y hay que elegir; (c) falta un dato que no existe en ningún lado
+  porque es una decisión comercial suya (un precio, a quién se le vende, una fecha pactada).
+- El cierre de tareas de Planify **no se pregunta**: punto 4 del bloque de arriba.
 
 ## 🪨 Modo Caveman (SIEMPRE activo)
 
@@ -184,15 +211,21 @@ porque quedaba a 31,5 km— y se revirtió el mismo día.
 **Chequeo:** `select * from public.gv_ppp_super_mezclado;` — vacía = todo bien. Mirarla después
 de tocar tandas a mano. `sql/gv_ppp_super_mezclado_v1423.sql`.
 
-## ⚠ PROTOCOLO OBLIGATORIO: Backend vs Front-end — preguntar ANTES de implementar
+## ⚠ PROTOCOLO: Backend vs Front-end — decidir y avisar (ya NO se pregunta)
 
-**Cuando alguien pide cambiar lógica** (normalización de códigos, cálculos,
-filtros, agregaciones, reglas de negocio, etc.), **SIEMPRE preguntar si quiere
-que se aplique en el backend (vista/función/RPC de Supabase) o en el front-end
-antes de implementar.** No asumir. Muchas veces se piden cambios que deberían
-ir al backend y terminan implementados en el front.
+**Cuando alguien pide cambiar lógica** (normalización de códigos, cálculos, filtros,
+agregaciones, reglas de negocio, etc.) hay que definir si va en el **backend**
+(vista/función/RPC de Supabase) o en el **front-end**. Antes esto se preguntaba; desde
+el **2026-09-11** ya no (regla "NO preguntar — razonar primero"): **se decide, se hace y
+se avisa en una línea dónde se puso y por qué.**
 
-Aplica a **todos los chats** (nuevos y vigentes) sobre este repo.
+El criterio ya está escrito y no hace falta consultarlo cada vez: **si el cambio afecta
+datos persistidos o una regla de negocio, va al backend** (protocolo de abajo), y el front
+sólo lo duplica como optimización de UX. Va al front únicamente lo que es **puramente
+visual** (cómo se muestra, ordena o pinta algo que ya viene resuelto del backend).
+
+La única pregunta que sobrevive es cuando las dos opciones cambian el resultado del
+negocio y no hay regla previa que lo resuelva. Aplica a **todos los chats** sobre este repo.
 
 ## ⚠ PROTOCOLO OBLIGATORIO: Lógica de negocio SIEMPRE en el backend
 
