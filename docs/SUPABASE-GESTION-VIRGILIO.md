@@ -6101,3 +6101,24 @@ NP por CRN, `gv_ppp_entregados_meta` o FSS; el 🚫 Cancelar de la v15.55 estaba
 nunca se probó contra una facturada. Migración `gv_ppp_en_salida_excluye_canceladas_v1563`: el WHERE final excluye
 `NP_Canceladas` y `GV_Web_Cancelados` (`sql/gv_ppp_en_salida_excluye_canceladas_v1563.sql`). Medido: 98050 fuera,
 En Salida pasa de 31 a 30 filas.
+
+## 3.bw ✅ El geocodificador pela el " - <localidad>" que pega la página (v15.64) — 2026-09-11
+
+**Problema** (registrado: *"Geocodificación: las direcciones de la página traen ' - <localidad>' pegado a la
+altura y el normalizador no lo pela"*). `PPP_Web_Programacion.direccion` llega como *"Caamaño 1315 - Villa Rosa"*,
+*"Donofrio 20 - Ciudadela"*, *"Julio Godoy 4656 - Villa Lynch"*, y truncada a 30: *"Pacífic Rodri 6137 - Villa Bal"*,
+*"Ayacucho 56 - San Antonio de P"*. Nominatim no encuentra eso; Ciudadela acumuló **13 intentos** en `GV_Geo_Fallidas`
+y hoy se venían tapando de a una en `GV_Geo_Correccion` (4 en esta sesión). Thomas: *"2 sí"*.
+
+**Fix (migración `gv_dir_geo_normalizar_sufijo_localidad_v1564`, `sql/gv_dir_geo_normalizar_sufijo_localidad_v1564.sql`):**
+la función de dos argumentos `gv_dir_geo_normalizar(dir, barrio)` (v14.28, que ya sacaba el barrio repetido tras una
+coma) ahora también saca *" - <cola>"* cuando viene después de un número y la cola es el barrio, un prefijo de 3+
+letras del barrio (truncada) o el barrio es prefijo de la cola. Sin número antes del guion, o sin espacios alrededor
+(*"5463-V. Urquiza"*), no se toca. `dir_key` no cambia.
+
+**Medido:** 12 casos de prueba OK (en el .sql) · 25 direcciones de `PPP_Web_Programacion` cambian (todas las que
+tienen el patrón) · 1 del padrón · `gv_geo_faltantes` 8 → 8. Corrida posterior: **4024 Ciudadela y 3927 Villa
+Ballester ubicados**. Se reabrieron en `GV_Geo_Fallidas` 4080 (J. M. Pérez 977, Luján) y 4189 (Valimar) para que
+reintenten con la dirección limpia.
+
+**Pendiente del mismo tema:** la página trunca la dirección a 30 caracteres — eso se arregla en `pagina-LK-copia`, no acá.

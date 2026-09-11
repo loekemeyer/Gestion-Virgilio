@@ -12,7 +12,7 @@
 > única**; no se replica. Ante la duda entre parche rápido y fix de raíz → **fix
 > de raíz**.
 >
-> Última actualización: 2026-09-11 (viernes) · Versión app al documentar: **v15.63**
+> Última actualización: 2026-09-11 (viernes) · Versión app al documentar: **v15.64**
 >
 > Nota **v15.40 (2026-09-11) — HANDOFF de planimetría / Acacia: `docs/HANDOFF-PLANIMETRIA-Y-ACACIA.md`.**
 > Thomas sigue este tema en otra sesión. Ahí está todo junto: los **13 artículos activos del catálogo LK
@@ -11158,6 +11158,10 @@ distinta, empresa distinta.
 >   (umbral ≈ 3× su período; dedup un aviso por sync por día). **No se creó tabla
 >   `Sync_Estado`**: `cron.job_run_details` ya tiene la verdad. DDL en
 >   `sql/watchdog_syncs_externos.sql`.
+
+> Nota **2026-09-11 (v15.64) — El geocodificador pela el " - <localidad>" que la página pega después de la altura.**
+> `gv_dir_geo_normalizar(dir, barrio)` saca la cola cuando es el barrio o un prefijo truncado de él; 25 direcciones web
+> se limpian solas, sin corregir de a una. §3.bw de `docs/SUPABASE-GESTION-VIRGILIO.md`.
 
 > Nota **2026-09-11 (v15.61) - Verificada la corrida real del fix de Cuarentena. Y BP Import salio porque PAGO.**
 > La corrida del cron de las 13:15:13 cerro sola las 6 tareas que le quedaban abiertas a Viviana (CH 217 - 218 - 225,
