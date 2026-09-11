@@ -4899,3 +4899,16 @@ ningún otro código tiene entregas con L. `Importados_Mov_Stock` no tiene códi
 **Pendiente (reportado, no tocado):** filas **duplicadas con la misma marca** en `Importados`:
 360E/361E/366E (LK·Kangli ×2), 585E/811E/812E/813E/816E/817E/819E (LK·Ownland ×2), 809E ×3 —
 suman doble el en curso y el backfill de baches les creó 2–3 baches.
+
+### §3.bm.1 — Limpieza `Importados`: 809E corta queso → CH; 11 copias exactas borradas (v15.02, 2026-09-11)
+
+- **809E**: id 129 "CORTA QUESO x 12" estaba como LK con `principal=false` (invisible) y **4.032 u en curso**.
+  Dueño: *"809E es corta pizza para Loeke (la próxima impo viene con código nuevo, 820E) y 809E es corta
+  queso para Chef"* → id 129 pasa a **marca CH, principal=true**. **820E todavía no se da de alta.**
+  Backup `GV_Importados_bkp_809E_20260911`. Ojo: 809E·LK queda con stock **−2.004** (entregas > ingresos), sin
+  resolver.
+- **Copias exactas** (`principal=false` con una fila principal idéntica en cod/marca/prov/desc/FOB/seed):
+  360E, 361E, 366E, 585E, 809E#128, 811E, 812E, 813E, 816E, 817E, 819E — **11 filas borradas** + 2 baches
+  huérfanos (361E, 366E). No se veían (el módulo carga sólo `principal=true`), así que **cero efecto en
+  pantalla**. Backups `GV_Importados_bkp_copias_20260911` y `GV_Importados_Baches_bkp_copias_20260911`.
+  Rollback: `insert into "Importados" select <cols> from "GV_Importados_bkp_copias_20260911";` (idem baches).
