@@ -147,3 +147,27 @@ where cod_pedido='438EL';
 update public."Equivalencias_Codigos"
 set nota='439EL = pedido de CHEF que se pickea de la gondola de LOEKEMEYER (439E LK). La L no es otro producto: dice de que gondola se levanta. Nota corregida 11/09 por Luis; antes decia "= 439E CH", que era al reves.'
 where cod_pedido='439EL';
+
+-- ── Los 4 codigos que faltaban, resueltos en el deposito (Luis, 11/09) ──
+-- A62 era 335 (Cuchara Calada), NO 355: Excel habia leido "335, 066" como
+-- el decimal 355,066 y de ahi salio el 355 fantasma. Se saca el 355.
+delete from public."GV_Lugar_Item" where sector='A62' and cod='355';
+
+insert into public."GV_Lugar_Item"(sector,cod,clase,notas) values
+  ('A62','335','articulo','Luis 11/09: A62 era 335, no 355 (Excel habia leido "335, 066" como decimal)'),
+  ('G05','569','articulo','Luis 11/09: lugar del Pelanaranjas'),
+  ('L08','828','articulo','Luis 11/09: lugar del Colador 16cm de Chef')
+on conflict (sector,cod,clase) do nothing;
+
+-- 537 (Pela y Pica ajo) tenia stock 0 y 7 cajas pedidas sin ficha de compra.
+-- Se le crea la ficha con el unico dato que dio Luis: proveedor Log/ Fabr.
+-- max_cajas queda en 0 y uni_x_caja en null: los completa compras.
+insert into public."OC_Maximos"(cod, descripcion, linea, proveedor, max_cajas, activo)
+select '537','Pela y Pica ajo','LK','Log/ Fabr', 0, true
+where not exists (select 1 from public."OC_Maximos" where public.norm_cod(cod)='537');
+
+-- 599E y 581T NO se dan de alta (decision de Luis). Los 4 Acacia sin ficha
+-- (989E, 992E, 997E, 998E) tampoco: son importados y esta bien que no esten
+-- en OC_Maximos, que es compra nacional.
+--
+-- RESULTADO: de los 289 articulos con stock, CERO quedan sin lugar.
