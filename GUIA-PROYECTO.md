@@ -12,7 +12,17 @@
 > única**; no se replica. Ante la duda entre parche rápido y fix de raíz → **fix
 > de raíz**.
 >
-> Última actualización: 2026-09-11 (viernes) · Versión app al documentar: **v15.39**
+> Última actualización: 2026-09-11 (viernes) · Versión app al documentar: **v15.40**
+>
+> Nota **v15.40 (2026-09-11) — HANDOFF de planimetría / Acacia: `docs/HANDOFF-PLANIMETRIA-Y-ACACIA.md`.**
+> Thomas sigue este tema en otra sesión. Ahí está todo junto: los **13 artículos activos del catálogo LK
+> sin sector** (+ 578 y el caso 517/991E), las tres reglas de qué alertas de planimetría son ruido
+> (5 dígitos, 599/943/948 sin la E, PSP se dispara al abrir la tanda), el análisis de la **línea Acacia
+> contra el 2.º pedido de Becky** con el barrido de dónde siguen apareciendo 991E/994E/995E/999E en los
+> dos proyectos, por qué el remito 38087 salió mal, el estado del aviso de alta por WhatsApp (v15.39), las
+> tareas Planify **3105** (Luis) y **3107** (Tomás B.), y las trampas del entorno. **La decisión abierta
+> es si 991E se baja o se queda.**
+>
 >
 > Nota **v15.39 (2026-09-11, Thomas) — RECEPCIÓN: dar de alta un artículo nuevo le AVISA a Thomas por WhatsApp (no traba nada).**
 > Pedido del dueño: *"si en la recepción están por recibir un artículo nuevo que no figuraba en la
