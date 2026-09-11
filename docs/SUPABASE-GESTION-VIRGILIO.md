@@ -7275,3 +7275,52 @@ la llave.
 `sql/backups/gv_ppp_en_salida_20260911_pre_v1585.sql`.
 **No toca Producción:** la vista es nuestra (`gv_`), sólo lee, `security_invoker = true`.
 **Tests:** `tests/ppp-en-salida.cjs`, `tests/ppp-ensalida-estado.cjs`, `tests/version-sync.cjs` → OK.
+
+---
+
+## §3.co El camión no puede pasar de 8 h: viaje + 15′ por parada (v15.86) — 2026-09-11
+
+**Thomas:** *"también hay que considerar que al tiempo de viaje entre paradas (máx 8 hs en un día)
+hay que considerar que hay tiempo parado para descargar cada pedido. Considerá por ahora sólo 15'
+por parada x cliente. Más que 8 hs por día no se puede programar"*. Sobre los otros dos números:
+*"lo lógico para un camión, definí vos"*.
+
+**Los cuatro parámetros, en `PPP_Web_Config`** (se cambian por SQL, sin tocar código):
+
+| Clave | Valor | De dónde sale |
+|---|---:|---|
+| `jornada_horas_max` | 8 | Thomas |
+| `jornada_min_parada` | 15 | Thomas |
+| `jornada_km_h` | 28 | definido acá: velocidad de **marcha** de un camión en AMBA — no la comercial (22-25), porque el tiempo parado ya se cuenta aparte |
+| `jornada_factor_ruta` | 1,35 | definido acá: el recorrido por calle contra la línea recta (en ciudad en grilla, 1,27-1,40) |
+
+Los dos definidos acá **son una estimación** y se recalibran con las horas reales de la hoja de ruta
+(`GV_Viaje_Horas`, §3.bx) cuando empiecen a cargarse. Hasta entonces el número sirve para comparar
+camiones entre sí, no como promesa a un cliente.
+
+**Dónde vive el cálculo.** En el front (`_pppJornadaCam` en `index.html`), no en SQL, **a propósito**:
+el recorrido óptimo ya lo resuelve `_rtOptimize` (nearest-neighbour + 2-opt, v4.84) con las
+coordenadas que la PPP tiene cargadas; reescribir un TSP en plpgsql para el mismo resultado sería
+peor. Lo que sí vive en el backend es **la regla** — los cuatro números —, que es lo que se cambia.
+Una parada = una **dirección** (cód + dirección normalizada), igual que la hoja de ruta: las 4 NP de
+Dapelo en Almagro son una sola bajada, pero Almagro / Colegiales / Villa Crespo son tres.
+
+**Qué se ve.** En el panel de avisos de la PPP, primero de todo (obliga a mover pedidos de día, no a
+corregir un tipeo): *"🕗 Camión de más de 8 h (1): **16/09** · Camión 1 Zona 5 → **10,6 h** (viaje
+7,4 h + 13 paradas × 15′) · 207 km · lo estira **Luján** (a 56 km)"*. Retira nunca cuenta (no viaja).
+Si hay pedidos sin ubicación, lo dice: esos suman parada pero no km, así que el total queda **corto,
+nunca largo**.
+
+**Medido el 11/09 sobre lo ya programado** — tres de los cinco días se pasan:
+
+| Día | Ruta | Paradas | km | Horas | |
+|---|---|---:|---:|---:|---|
+| 16/09 | Norte | 13 | 207 | **10,6** | se pasa (sin Luján: 8,5 — sigue pasado) |
+| 15/09 | Sur/Centro/Oeste | 18 | 148 | **9,8** | se pasa |
+| 14/09 | Sur/Centro/Oeste | 16 | 135 | **8,8** | se pasa |
+| 17/09 | Sur/Centro/Oeste | 16 | 57 | 6,0 | entra |
+| 18/09 | Sur/Centro/Oeste | 4 | 51 | 2,8 | entra |
+
+Por ahora **avisa, no bloquea**: bloquear el armado automático con tres días ya programados por
+encima del tope dejaría pedidos sin fecha. `sql/gv_jornada_camion_v1586.sql` · test
+`tests/ppp-jornada-camion.cjs`.

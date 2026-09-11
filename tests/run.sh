@@ -400,3 +400,6 @@ PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node te
 
 echo "== pk-ubic-empresa (v15.81: la ubicación del excedente se limpia; la empresa va aparte del código) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/pk-ubic-empresa.cjs
+
+echo "== ppp-jornada-camion (v15.86: la PPP avisa el camión de más de 8 h — viaje óptimo + 15 min por parada) =="
+PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/ppp-jornada-camion.cjs
