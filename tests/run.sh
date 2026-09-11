@@ -15,6 +15,9 @@ node tests/version-sync.cjs
 echo "== smoke (Playwright headless) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/smoke.cjs
 
+echo "== rcp-alta-ok (regresión: alta de artículo nuevo en recepción pide OK de Thomas y traba el cierre) =="
+PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/rcp-alta-ok.cjs
+
 echo "== ocg-norm (regresión: cruce de códigos del generador de OCs) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/ocg-norm.cjs
 

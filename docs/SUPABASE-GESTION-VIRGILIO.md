@@ -5335,3 +5335,61 @@ Dueño: *"todos los datos que tengas que corregir, dale"*. Barrido sobre `v_impo
   pero en 10 días de septiembre Osa se llevó 138 cajas (66 %). Otros: 583E Sauer 80 caj (51 %), 582E Coto 70 caj (88 %),
   601E La Anónima 40 caj (83 %), 584E Osa 20 caj.
 - Mismo artefacto (versión 3) y copia en `docs/INFORME-FALTANTES-IMPORTADOS-20260911.html`. Sin cambios en la base.
+
+### §3.bn — Recepción: dar de alta un artículo nuevo pide el OK de Thomas por WhatsApp (v15.36, 2026-09-11)
+
+Pedido del dueño: *"si en la recepción están por recibir un artículo nuevo que no figuraba en la
+planimetría, me mandan un mensaje directo a WhatsApp, a mi teléfono, para que antes de dejarlos
+cargar me tengan que decir 'hola Tommy, estoy creando un artículo nuevo, que es el tanto, ¿me
+confirmás que está bien?', y que no puedan terminar de cerrar la recepción sin que yo dé ese ok"*.
+
+**Por qué.** Remito **38087** (02/09, Log/Fabr, legajo 277): el operario cargó **599, 943 y 948** con
+el botón **"+"** de la pantalla de recepción. Esos códigos no existen — los reales son 599E (J44),
+943E (I08) y 948E (I11). El "+" (`arAddCode`) abría un `prompt` y daba de alta **cualquier cosa**:
+no validaba contra nada, no pedía autorización y no avisaba a nadie. No hubo operadora en el medio;
+en ese flujo no existe ningún paso de aprobación.
+
+**Qué se agregó (todo NUEVO, no toca nada compartido):**
+
+- **Tabla `GV_Alta_Articulo_Aprobacion`** (`token` único, `cod`, `remito`, `legajo`, `tallerista`,
+  `linea`, `estado` ∈ pendiente/ok/rechazado, `wa_ok`, `wa_error`, `pedido_at`, `resuelto_at`,
+  `resuelto_por`). RLS **ON** con **una sola policy: `gvaa_sel` (SELECT para anon/authenticated)**.
+  Sin policy de insert/update ⇒ con la anon key **sólo se puede leer**: desde el celular no se puede
+  auto-aprobar. Índice único parcial `(cod) where estado='pendiente'` → un solo pedido abierto por
+  código, aunque dos dispositivos lo intenten a la vez.
+- **Edge Function `gv-alta-articulo`** (`verify_jwt=false`, fuente en
+  `supabase/functions/gv-alta-articulo/index.ts`). `POST {cod, remito, legajo, tall, linea}` crea o
+  reusa el pedido y manda el WhatsApp a **5491162521635** (Thomas, `planify.employees` id 3) usando la
+  Edge Function `send-whatsapp` que ya existía, con `plantilla:"_texto_libre"`. `GET ?token=…&r=ok|no`
+  muestra una página con un botón y **`&c=1` recién ahí resuelve** — el doble paso es a propósito:
+  WhatsApp pega un GET para el preview del link y, si el primer GET resolviera, **el preview aprobaría
+  solo**. Escribe con `service_role`.
+- **Respaldo por Telegram** (`tg_enqueue`): WhatsApp por API sólo deja mandar texto libre dentro de la
+  ventana de 24 h de Meta. Si Meta rechaza, el pedido igual llega por Telegram con los mismos dos
+  links, y la fila queda con `wa_ok=false` y el error en `wa_error`.
+- **Front (`recepcion.js`, `?v=15.36`)**: `arAddCode` mira `window.GONDOLA`; si el código **no está en
+  la planimetría** pide el OK antes de dejar cargar. El artículo **no** se guarda fijo en
+  `Articulos Virgilio X Tallerista` mientras está pendiente (así un alta rechazada no ensucia la lista
+  para siempre): `arSaveCodeRemote` se llama recién cuando el estado pasa a `ok`. El botón del código
+  muestra ⏳ / ⛔, se repregunta cada 8 s, y `opEnviar` **relee el backend** y no manda nada si hay un
+  alta sin `ok`. El estado vive en el borrador (`opState.altaNuevos`), así que sobrevive a un refresh.
+
+**La fuente de verdad es la tabla, no el front** (protocolo de lógica en el backend): el front sólo
+obedece lo que ella dice, y no puede escribirla.
+
+**Medición.** `select cod, estado, wa_ok, wa_error, pedido_at, resuelto_at from public."GV_Alta_Articulo_Aprobacion" order by pedido_at desc;`
+— vacía al desplegar. Regresión: `tests/rcp-alta-ok.cjs` (16 chequeos, en `tests/run.sh`).
+⚠ La prueba de punta a punta (que el WhatsApp **llegue** y que el link destrabe) **no se pudo correr
+desde acá**: el entorno no tiene salida a `*.supabase.co`. Queda como tarea Planify **3107**.
+
+**Rollback.** Nada que revertir en objetos compartidos. Para apagarlo:
+
+```sql
+-- 1) volver al comportamiento viejo: que nada quede pendiente
+update public."GV_Alta_Articulo_Aprobacion" set estado = 'ok', nota = 'apagado manual'
+ where estado = 'pendiente';
+-- 2) si se quiere borrar del todo
+drop table public."GV_Alta_Articulo_Aprobacion";
+```
+y en el front revertir `arAddCode` / el guard de `opEnviar` (commit de la v15.36). La Edge Function se
+puede dejar: sin llamadas no hace nada.

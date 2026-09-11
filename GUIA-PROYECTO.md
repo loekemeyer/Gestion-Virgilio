@@ -12,7 +12,40 @@
 > única**; no se replica. Ante la duda entre parche rápido y fix de raíz → **fix
 > de raíz**.
 >
-> Última actualización: 2026-09-11 (viernes) · Versión app al documentar: **v15.35**
+> Última actualización: 2026-09-11 (viernes) · Versión app al documentar: **v15.36**
+>
+> Nota **v15.36 (2026-09-11, Thomas) — RECEPCIÓN: dar de alta un artículo nuevo pide el OK de Thomas por WhatsApp.**
+> Pedido del dueño: *"si en la recepción están por recibir un artículo nuevo que no figuraba en la
+> planimetría, me mandan un mensaje directo a WhatsApp, a mi teléfono, para que antes de dejarlos cargar me
+> tengan que decir 'hola Tommy, estoy creando un artículo nuevo, que es el tanto, ¿me confirmás que está
+> bien?', y que no puedan terminar de cerrar la recepción sin que yo dé ese ok"*.
+>
+> **De dónde sale.** Remito **38087** (02/09, Log/Fabr, legajo 277): se cargaron **599, 943 y 948**, que no
+> existen — son **599E** (J44), **943E** (I08) y **948E** (I11). El botón **"+"** (`arAddCode`, sólo visible
+> en Log/Fabr) abría un `prompt` y daba de alta cualquier código: **sin validar, sin autorización y sin
+> avisarle a nadie**. No hubo operadora en el medio; ese flujo no tiene ningún paso de aprobación.
+>
+> **Cómo quedó.** Al escribir un código en el "+": si **está** en la planimetría, todo sigue igual. Si **no
+> está**, antes de dejarlo cargar sale un WhatsApp al teléfono de Thomas (5491162521635) con el código, el
+> remito, el tallerista, la línea y el legajo, y dos links: **✅ Sí, que lo cree** / **❌ No**. El operario
+> puede ir cargando las cajas, pero **`Enviar` no funciona** hasta que Thomas conteste: el botón del código
+> queda con ⏳ (o ⛔ si lo rechazó) y el envío avisa qué falta. Se repregunta cada 8 s y se destraba solo.
+> El estado sobrevive a cerrar la app (vive en el borrador de la recepción).
+>
+> **Detalles que importan:**
+> · La **fuente de verdad** es la tabla `GV_Alta_Articulo_Aprobacion`: con la anon key **sólo se puede leer**,
+>   así que desde el celular no se puede auto-aprobar. Escribe la Edge Function `gv-alta-articulo`
+>   (`service_role`), que es también la que manda el WhatsApp vía `send-whatsapp` (`plantilla:"_texto_libre"`).
+> · El link del WhatsApp **no resuelve en el primer click**: muestra una página con un botón y recién ése
+>   confirma. Si resolviera de una, **el preview del link de WhatsApp aprobaría solo**.
+> · El artículo **no se guarda fijo** en `Articulos Virgilio X Tallerista` mientras está pendiente — recién
+>   con el `ok`. Así un alta rechazada no queda en la lista de Log/Fabr para siempre.
+> · **Respaldo por Telegram**: WhatsApp sólo deja texto libre dentro de la ventana de 24 h de Meta. Si Meta
+>   rechaza, el aviso llega igual por Telegram con los mismos links, y queda `wa_ok=false` en la fila.
+> · Regresión `tests/rcp-alta-ok.cjs` (16 chequeos) en `tests/run.sh`. ⚠ **La prueba de punta a punta (que
+>   el WhatsApp llegue de verdad) no se pudo correr desde el entorno de Claude** (no tiene salida a
+>   `*.supabase.co`): hay que probarlo desde el celular. Tarea Planify **3107**.
+> · Detalle, medición y rollback: §3.bn de `docs/SUPABASE-GESTION-VIRGILIO.md`.
 >
 > Nota **v15.35 (2026-09-11, Thomas) — ACACIA (989E + 99xE): lo que no se pide en la 2da Becky NO debería existir.**
 > Regla del dueño: *"todos los 99xE que no se pidan en la 2da Becky son artículos que no deberían estar en
