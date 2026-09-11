@@ -1,14 +1,14 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 
 /* =============================================================================
-   gv-alta-articulo — v15.36
+   gv-alta-articulo — v15.37
    Recepción: cuando un operario va a dar de alta un artículo NUEVO que no figura
    en la planimetría, acá se pide el OK de Thomas por WhatsApp y la recepción
    queda trabada hasta que él confirme.
 
    Pedido del dueño (2026-09-11): "si están por recibir un artículo nuevo que no
    figuraba en la planimetría, me mandan un mensaje directo a WhatsApp a mi
-   teléfono, para que antes de dejarlos cargar me tengan que decir 'hola Tommy,
+   teléfono, para que antes de dejarlos cargar me tengan que decir 'hola Thomy,
    estoy creando un artículo nuevo, que es el tanto, ¿me confirmás que está bien?'
    y que no puedan cerrar la recepción sin que yo dé ese ok".
 
@@ -235,7 +235,7 @@ Deno.serve(async (req: Request) => {
   const linkOk = `${FN_BASE}?token=${token}&r=ok`;
   const linkNo = `${FN_BASE}?token=${token}&r=no`;
   const texto =
-    `Hola Tommy 👋\n` +
+    `Hola Thomy 👋\n` +
     `Estoy creando un artículo NUEVO, que es el *${cod}*, y no figura en la planimetría.\n` +
     `¿Me confirmás que está bien?\n\n` +
     `Remito ${remito || "—"} · ${tall || "—"} · línea ${linea || "—"}\n` +

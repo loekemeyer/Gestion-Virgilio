@@ -5340,7 +5340,7 @@ Dueño: *"todos los datos que tengas que corregir, dale"*. Barrido sobre `v_impo
 
 Pedido del dueño: *"si en la recepción están por recibir un artículo nuevo que no figuraba en la
 planimetría, me mandan un mensaje directo a WhatsApp, a mi teléfono, para que antes de dejarlos
-cargar me tengan que decir 'hola Tommy, estoy creando un artículo nuevo, que es el tanto, ¿me
+cargar me tengan que decir 'hola Thomy, estoy creando un artículo nuevo, que es el tanto, ¿me
 confirmás que está bien?', y que no puedan terminar de cerrar la recepción sin que yo dé ese ok"*.
 
 **Por qué.** Remito **38087** (02/09, Log/Fabr, legajo 277): el operario cargó **599, 943 y 948** con

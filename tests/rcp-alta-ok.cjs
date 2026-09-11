@@ -118,7 +118,7 @@ if (!/GV_Alta_Articulo_Aprobacion/.test(src)) { console.error("rcp-alta-ok: rece
     out.quedaPendiente = S.altaNuevos["599"] && S.altaNuevos["599"].estado === "pendiente";
     // pendiente = NO se guarda fijo en "Articulos Virgilio X Tallerista" todavía
     out.pendienteNoGuardaFijo = !window.__ins.some(i => i.table === "Articulos Virgilio X Tallerista");
-    out.avisaAlOperario = window.__alerts.some(m => /Tommy/.test(m) && /599/.test(m));
+    out.avisaAlOperario = window.__alerts.some(m => /Thomy/.test(m) && /599/.test(m));
 
     // ---- 3) el botón del código muestra ⏳ ----
     S.cargas["599"] = 16;

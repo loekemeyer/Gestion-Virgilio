@@ -1201,7 +1201,7 @@ function _ocgNorm(c) { return String(c == null ? "" : c).toUpperCase().trim().re
 /* ============== v15.36 — alta de artículo nuevo: OK de Thomas por WhatsApp ==========
    Pedido del dueño (2026-09-11): *"si están por recibir un artículo nuevo que no
    figuraba en la planimetría, me mandan un mensaje directo a WhatsApp a mi teléfono,
-   para que antes de dejarlos cargar me tengan que decir 'hola Tommy, estoy creando un
+   para que antes de dejarlos cargar me tengan que decir 'hola Thomy, estoy creando un
    artículo nuevo, que es el tanto, ¿me confirmás que está bien?' y que no puedan
    terminar de cerrar la recepción sin que yo dé ese ok"*.
 
@@ -1316,7 +1316,7 @@ async function arAddCode() {
       if (estado === "pendiente") {
         const w = altaPendGet()[cod];
         alert("📲 Le mandé el WhatsApp a Thomas:\n\n" +
-              "\"Hola Tommy, estoy creando un artículo nuevo, que es el " + cod + ".\n" +
+              "\"Hola Thomy, estoy creando un artículo nuevo, que es el " + cod + ".\n" +
               "¿Me confirmás que está bien?\"\n\n" +
               (w && w.wa_ok === false ? "⚠ El WhatsApp falló, le llegó por Telegram.\n\n" : "") +
               "Podés ir cargando las cajas, pero NO vas a poder cerrar la recepción\n" +
