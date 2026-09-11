@@ -12,7 +12,7 @@
 > única**; no se replica. Ante la duda entre parche rápido y fix de raíz → **fix
 > de raíz**.
 >
-> Última actualización: 2026-09-11 (viernes) · Versión app al documentar: **v15.53**
+> Última actualización: 2026-09-11 (viernes) · Versión app al documentar: **v15.54**
 >
 > Nota **v15.40 (2026-09-11) — HANDOFF de planimetría / Acacia: `docs/HANDOFF-PLANIMETRIA-Y-ACACIA.md`.**
 > Thomas sigue este tema en otra sesión. Ahí está todo junto: los **13 artículos activos del catálogo LK
@@ -11158,6 +11158,14 @@ distinta, empresa distinta.
 >   (umbral ≈ 3× su período; dedup un aviso por sync por día). **No se creó tabla
 >   `Sync_Estado`**: `cron.job_run_details` ya tiene la verdad. DDL en
 >   `sql/watchdog_syncs_externos.sql`.
+
+> Nota **2026-09-11 (v15.54) — Resumen de la PPP: el Total m³ pasó al lado del Día, antes del desglose.**
+> Dueño: *"el dato de total m3 que esté a la derecha del día, y después el desglose"*. El orden ahora es
+> **Fecha · Día · Total m³ │ Z1…Z7 · Retira · Súper · Cam. · Demora**: primero el número que se mira,
+> después de qué se compone. Una línea vertical (`td.tot { border-right }`) marca el corte.
+> `Cam.` y `Demora` **no se movieron**: no son desglose de m³, son otra medida del día.
+> El total sigue siendo clickeable (abre el pop-up con todas las NP del día) y la fila TOTAL acompaña
+> el mismo orden.
 
 > Nota **2026-09-11 (v15.53) — El Resumen de la PPP: columnas al ancho del contenido, no al de la pantalla.**
 > Dueño, con la captura: *"columnas siempre lo más angostas posibles, ancho determinado por la info

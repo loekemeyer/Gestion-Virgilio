@@ -2949,7 +2949,11 @@ tr.ppp-err-zona > td{ background:#fffbeb !important; }
 .pppchk-note{ padding:9px 16px; font-size:11.5px; color:#64748b; background:#f8fafc; border-top:1px solid #e2e8f0; }
 .ppp-restbl td.num{ text-align:right; font-variant-numeric:tabular-nums; }
 .ppp-restbl td.z0{ color:#cbd5e1; }
-.ppp-restbl td.tot{ font-weight:800; background:#f1f5f9; }
+/* v15.54 — el Total queda entre el Día y el desglose: una línea lo separa de las zonas
+   para que se lea "este es el número, esto es de qué se compone". */
+.ppp-restbl td.tot{ font-weight:800; background:#f1f5f9; border-right:2px solid #cbd5e1; }
+.ppp-restbl th.tot{ border-right:2px solid #475569; }
+.ppp-restbl tr.totrow td.tot{ border-right:2px solid #475569; }
 .ppp-restbl td.cam{ font-weight:700; }
 .ppp-restbl td.z1{ background:rgba(14,165,233,.10); } .ppp-restbl td.z2{ background:rgba(99,102,241,.10); } .ppp-restbl td.z3{ background:rgba(139,92,246,.10); }
 .ppp-restbl td.z4{ background:rgba(236,72,153,.10); } .ppp-restbl td.z5{ background:rgba(245,158,11,.13); } .ppp-restbl td.z6{ background:rgba(16,185,129,.13); }
@@ -31024,21 +31028,25 @@ function pppResumenHtml(prog) {
     const demP = dn ? dem / dn : null;
     const dt = _pppFechaDate(d.fecha), dia = dt ? DOW[dt.getDay()] : "";
     Zc.forEach(function (z) { T[z[0]] += Z[z[0]]; }); Ttot += total; Tcam += nCam; Tdem += dem; TdemN += dn;
+    // v15.54 (dueño): el TOTAL del día va pegado al Día y ANTES del desglose por zona —
+    // primero el número que se mira, después de qué se compone.
     rows += '<tr><td class="f">' + escapeHtml(d.fecha) + '</td><td class="d">' + dia + '</td>' +
+      '<td class="num tot zc" onclick="pppResTgl(\'' + dk + '\',\'__tot__\')" title="Ver todas las NPs del día">' + f2(total) + '</td>' +
       Zc.map(function (z) {
         const m = Z[z[0]];
         if (m > 0.0001) return '<td class="num zc ' + z[1] + '" onclick="pppResTgl(\'' + dk + '\',\'' + encodeURIComponent(z[0]) + '\')" title="Ver de qué NPs se compone">' + f2(m) + '</td>';
         return '<td class="num z0 ' + z[1] + '">·</td>';
       }).join("") +
-      '<td class="num tot zc" onclick="pppResTgl(\'' + dk + '\',\'__tot__\')" title="Ver todas las NPs del día">' + f2(total) + '</td><td class="num cam">' + nCam + '</td><td class="num">' + (demP != null ? (Math.round(demP * 10) / 10) : "·") + '</td></tr>';
+      '<td class="num cam">' + nCam + '</td><td class="num">' + (demP != null ? (Math.round(demP * 10) / 10) : "·") + '</td></tr>';
   }
   const demT = TdemN ? (Math.round(Tdem / TdemN * 10) / 10) : null;
-  const totRow = '<tr class="totrow"><td class="f">TOTAL</td><td></td>' + Zc.map(function (z) { return tcell(T[z[0]]); }).join("") +
-    '<td class="num">' + f2(Ttot) + '</td><td class="num">' + Tcam + '</td><td class="num">' + (demT != null ? demT : "·") + '</td></tr>';
+  const totRow = '<tr class="totrow"><td class="f">TOTAL</td><td></td>' +
+    '<td class="num tot">' + f2(Ttot) + '</td>' + Zc.map(function (z) { return tcell(T[z[0]]); }).join("") +
+    '<td class="num">' + Tcam + '</td><td class="num">' + (demT != null ? demT : "·") + '</td></tr>';
   return head +
     '<div class="ppp-res-leg">🚚 Camiones por ruta: <b>Z1·Z2·Z3·Z4</b> Sur/Centro/Oeste · <b>Z5·Z6·Z7</b> Norte · Súper (1 por cliente) · Retira sin camión. Tope <b>' + CAP + ' m³/día</b>.</div>' +
     '<div class="ppp-restbl-wrap"><table class="ppp-restbl"><thead><tr>' +
-      '<th>Fecha</th><th>Día</th><th>Z1<br>Sur</th><th>Z2<br>Centro</th><th>Z3<br>Oeste</th><th>Z4<br>GBA<br>Sur</th><th>Z5<br>GBA<br>Oeste</th><th>Z6<br>GBA<br>Norte</th><th>Z7<br>GBA<br>Lejos</th><th>Retira</th><th>Súper</th><th>Total<br>m³</th><th>Cam.</th><th>Demora<br>(d)</th>' +
+      '<th>Fecha</th><th>Día</th><th class="tot">Total<br>m³</th><th>Z1<br>Sur</th><th>Z2<br>Centro</th><th>Z3<br>Oeste</th><th>Z4<br>GBA<br>Sur</th><th>Z5<br>GBA<br>Oeste</th><th>Z6<br>GBA<br>Norte</th><th>Z7<br>GBA<br>Lejos</th><th>Retira</th><th>Súper</th><th>Cam.</th><th>Demora<br>(d)</th>' +
     '</tr></thead><tbody>' + rows + totRow + '</tbody></table></div>';
 }
 
