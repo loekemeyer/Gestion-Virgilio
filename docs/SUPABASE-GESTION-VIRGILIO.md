@@ -5477,3 +5477,43 @@ pop-up RAG viejo (racks+a_guardar, sólo aviso): en `stockBajaPicking` el bloque
 395 (a_guardar 0 → q=0, no negativo). Todo el rastro de prueba borrado; 321 volvió a 50/0.
 
 **Rollback:** `docs/ROLLBACK-PRODUCCION.md` §1.x. SQL: `sql/gv_reconciliar_aguardar.sql`.
+
+## §3.cd — RR y Cola de Impresión: las NP web del formato nuevo salían sin cliente (v15.42, 2026-09-11)
+
+**Síntoma (dueño, 11/09):** en **Recepción Remitos (RR)** las filas `LK 0003` y `LK 0001`
+mostraban `—` en **Cod Cliente** y **Razón Social**; los líos (17 y 1) sí salían.
+
+**Causa.** Los eventos de operario guardan la NP como la etiqueta web (`texto = 'LK 0003|E01D|'`),
+pero `vista_control_remitos` busca el cliente sólo en `PPP_Programacion_Diaria` y
+`PPP_Entregados_Meta`, las **dos de ISIS**. Las NP web viven en `PPP_Web_Programacion`
+(`empresa` + `np` + `np_idx`), y la etiqueta la arma `gv_ppp_web_np_label(empresa, np, np_idx)`.
+Sin ese join, el `COALESCE` cae a `''`.
+
+**Arreglo (aditivo, las vistas viejas no se tocan).** `sql/gv_vistas_np_web_v1542.sql`:
+
+| Vista nueva (`security_invoker = true`) | Encima de | Completa |
+|---|---|---|
+| `gv_vista_control_remitos` | `vista_control_remitos` | `cod_cliente`, `rs` |
+| `gv_vista_cola_impresion` | `vista_cola_impresion` | `razon_social` |
+
+Las dos hacen `left join lateral` contra `PPP_Web_Programacion` por
+`gv_ppp_web_np_label(...) = btrim(np)` y sólo rellenan **cuando el valor viejo viene vacío**: para
+las NP de ISIS el resultado es idéntico. Front (`index.html` v15.42): `fetchCRData` y el badge de
+RR pasan a `gv_vista_control_remitos`; la cola de impresión, a `gv_vista_cola_impresion`.
+
+**Medición.**
+
+| NP | cod_cliente antes | cod_cliente después | rs después |
+|---|---|---|---|
+| LK 0001 | (vacío) | 4210 | Garbarino Franco Tomas |
+| LK 0003 | (vacío) | 4109 | Di Leo Rossi Echarri Pedro SH |
+| 98633 … 98683 (16 NP de ISIS) | igual | igual | igual |
+
+**Lo que NO estaba roto:** Carga Camión (`fetchCCData`) y Control Remitos (`fetchCCRData`) sacan la
+razón social de `Facturacion_NP`, que sí tiene las NP web (`LK 0001`, `LK 0003`, `LK 0011`).
+
+**Caso aparte que sigue vacío:** `98665` (D50E) — NP de ISIS sin fila en `PPP_Programacion_Diaria`;
+no es del formato nuevo y no se tocó.
+
+**Rollback:** apuntar el front a `vista_control_remitos` / `vista_cola_impresion` y
+`drop view public.gv_vista_control_remitos, public.gv_vista_cola_impresion;`
