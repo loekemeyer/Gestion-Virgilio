@@ -168,3 +168,27 @@ alter table public."GV_Lugar" add constraint gv_lugar_sector_fmt
 
 comment on column public."GV_Lugar".sector is
   'Código de lugar en formato canónico: LETRAS + 2 dígitos, SIEMPRE con el cero (J01, nunca J1). Los racks de insumos admiten sufijo AD/AT (R01AD). Lo garantiza el check gv_lugar_sector_fmt; para normalizar una entrada usar gv_norm_sector(). N y Ñ son lugares distintos (N = racks, Ñ = góndola): no unificarlos.';
+
+
+-- ════════════════════════════════════════════════════════════════════
+-- v5 (2026-09-11) — LOKE deja de ser una empresa: es LK.
+-- Pedido de Luis. Loke es una LÍNEA de Loekemeyer, no una empresa: la vista
+-- de stock ya trae sus artículos con linea='LK', así que tener LOKE acá
+-- hacía que el cruce stock<->lugar diera 24 falsos positivos (el pasillo Ñ
+-- entero: el 186, el 123, el 124E... figuraban "sin lugar de su empresa").
+-- Son 57 lugares, todos góndola de Ñ01..Ñ55 y Ñ58..Ñ60.
+-- Reversible: los 57 quedan marcados en `notas`.
+-- ════════════════════════════════════════════════════════════════════
+
+update public."GV_Lugar"
+set empresa = 'LK',
+    notas = coalesce(notas || ' · ', '') || 'era LOKE hasta el 11/09; Luis: Loke es linea de LK, no empresa aparte',
+    updated_at = now()
+where empresa = 'LOKE';
+
+alter table public."GV_Lugar" drop constraint if exists "GV_Lugar_empresa_check";
+alter table public."GV_Lugar" add constraint "GV_Lugar_empresa_check"
+  check (empresa is null or empresa in ('LK','CH'));
+
+comment on column public."GV_Lugar".empresa is
+  'LK / CH. Es del LUGAR, no del artículo. LOKE NO es un valor válido: Loke es una línea de Loekemeyer, no una empresa (los 57 lugares del pasillo Ñ pasaron a LK el 11/09). v5 2026-09-11.';
