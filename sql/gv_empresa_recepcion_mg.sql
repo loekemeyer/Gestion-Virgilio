@@ -129,3 +129,63 @@ comment on view public.gv_saldos_stock_emp is
 --   and exists (select 1 from public.codigos_duales d
 --               where regexp_replace(upper(btrim(d.cod)),'^0+(?=.)','')
 --                   = regexp_replace(upper(btrim(m.cod_art)),'^0+(?=.)',''));
+
+-- ════════════════════════════════════════════════════════════════════
+-- BACKFILL de A Guardar — VERSIÓN POR CATÁLOGO (mejor que la de por remito)
+-- 2026-09-11. Idea de Luis: "si no hay ninguno dual, se les asigna el
+-- correspondiente que ya tenemos".
+--
+-- Es correcto y cubre mucho más que cruzar por remito: para un código que NO
+-- es dual, la empresa NO depende de quién lo trajo — el código pertenece a
+-- una sola empresa, punto. Así que se deriva del catálogo, sin necesidad de
+-- que exista el remito.
+--
+-- Se cruza contra DOS fuentes independientes y sólo se usa un código si la
+-- fuente es inequívoca (una sola empresa):
+--   1. GV_Lugar   — la empresa del LUGAR donde va el artículo
+--   2. OC_Maximos — la línea del artículo
+-- Cuando las dos opinan, coinciden; se prioriza el lugar.
+--
+-- MEDIDO el 11/09 sobre las 1.389 filas de a_guardar en 'Mixto':
+--   1.385 se pueden derivar  (1.102 a LK · 283 a CH)
+--       4 no                 (códigos 582 y 583, sin ficha en ningún lado)
+--       0 duales             (ningún dual quedó en Mixto en a_guardar)
+-- Los 4 que no resuelven tienen saldo 0: no afectan las 2.572 cajas vivas.
+--
+-- Esto incluye las 1.722 cajas del 29/06 que NO tenían remito real (su `ref`
+-- dice "carga manual a guardar 29/06"): son 505, 513, 504, 321, 594 y 312,
+-- ninguno dual, y los seis dan LK por las dos fuentes.
+--
+-- ⚠ NO EJECUTAR sin decisión explícita: reescribe `empresa` en filas
+--   históricas de una tabla COMPARTIDA. Backup obligatorio antes, y anotarlo
+--   en docs/ROLLBACK-PRODUCCION.md.
+--
+-- BACKUP:
+--   create table public."GV_Backup_aguardar_empresa_20260911" as
+--   select id, cod_art, empresa, deposito, delta, ts, ref
+--     from public."Movimientos_Stock" where deposito='a_guardar' and empresa='Mixto';
+-- ROLLBACK:
+--   update public."Movimientos_Stock" m set empresa='Mixto'
+--   from public."GV_Backup_aguardar_empresa_20260911" b where b.id = m.id;
+--
+-- with emp_cod as (   -- empresa por LUGAR, sólo si es inequívoca
+--   select public.norm_cod(i.cod) c, min(l.empresa) e
+--   from public."GV_Lugar_Item" i join public."GV_Lugar" l on l.sector = i.sector
+--   where l.empresa in ('LK','CH')
+--   group by 1 having count(distinct l.empresa) = 1
+-- ), oc_cod as (      -- empresa por OC_Maximos, sólo si es inequívoca
+--   select public.norm_cod(cod) c, min(btrim(linea)) e from public."OC_Maximos"
+--   where btrim(linea) in ('LK','CH') group by 1 having count(distinct btrim(linea)) = 1
+-- )
+-- update public."Movimientos_Stock" m
+-- set empresa = coalesce(e.e, o.e)
+-- from (select 1) _
+-- left join emp_cod e on true left join oc_cod o on true
+-- where m.deposito = 'a_guardar' and m.empresa = 'Mixto'
+--   and e.c = public.norm_cod(m.cod_art) and o.c = public.norm_cod(m.cod_art)
+--   and coalesce(e.e, o.e) in ('LK','CH')
+--   and not exists (select 1 from public.codigos_duales d
+--                   where public.norm_cod(d.cod) = public.norm_cod(m.cod_art));
+--
+-- (la forma correcta del UPDATE, con los LEFT JOIN bien atados, se arma al
+--  momento de ejecutarlo; lo de arriba documenta el CRITERIO, no la sintaxis final)
