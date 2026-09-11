@@ -89,22 +89,80 @@ Por eso no alcanza con "cuánto le debo a Becky". Hay **tres ejes que no coincid
 Un mismo giro puede pagar legalmente la factura del embarque de julio y cubrir comercialmente
 parte del `PI B260601-2` que llega el 15/11. Y al revés: un PI se puede cubrir con varios giros.
 
-### Forma que va a tener la cuenta corriente (borrador, a confirmar con el Excel)
+## 3. El Excel de Thomas y la cuenta corriente del sistema (v15.74, 11/09/2026)
 
-- **`GV_Imp_Facturas`** — la factura comercial: emisor (¿el proveedor o NTL?), número, fecha,
-  monto, a qué embarque/despacho corresponde. Es la **pata legal**.
-- **`GV_Imp_Pagos`** — el giro: fecha, USD, beneficiario (NTL), contra qué factura se cursó,
-  cotización si hace falta. Es la **pata financiera**.
-- **`GV_Imp_Pagos_Imputacion`** — a qué **PI** se aplica cada giro (uno a varios, parcial). Es la
-  **pata comercial**, y es la que da el saldo por pedido y por proveedor.
+Thomas mandó la foto de su planilla — *"este es mi estado actual de deudas al exterior"*:
+`docs/img/excel-deudas-exterior-20260911.jpg`.
 
-Saldo del PI = total del PI − imputado. Saldo del proveedor = suma de sus PI.
-El PI ya existe como `pedido_ref` en `GV_Importados_Baches` (v15.72), así que la cuenta corriente
-se cuelga de ahí sin duplicar nada.
+| A nombre de | Proveedor | FOB | Pago | Pend Giro Directo | Falta | Embarque | | Fecha Pago 30% | Fecha Recup |
+|---|---|---|---|---|---|---|---|---|---|
+| NTL | Frontier | 14.400 | 4.320 | | 10.080 | 26-oct | | 25-ago | 30-oct |
+| NTL | Fujian | 32.388 | 10.000 | | 22.388 | 19-sept | | 05-ago | 25-sept |
+| NTL | Zhixin | 10.273 | 3.100 | | 7.173 | 14-oct | | 04-sept | 20-oct |
+| Ownland | Ownland | 46.626 | 14.000 | 20.956 | 11.670 | 08-nov | | 09-sept | |
+| Becky | Becky | 31.614 | 7.359 | 22.441 | 1.813 | 22-sept | | 02-jun | |
+| Hugo | Hugo | 38.640 | 14.041 | 21.952 | 2.647 | 19-sept | | 30-jul | |
 
-**Nada de esto está construido**: falta el Excel con el que Thomas lo lleva hoy, para copiar el
-modelo real (cómo anota el anticipo del 30%, si un pago se parte entre varios PI, si hay algo en
-pesos, cómo trata las diferencias de cambio y los gastos de NTL) en vez de inventarlo.
+**Las reglas que salen de la planilla:**
+
+1. **`Falta = FOB − Pago − Pend Giro Directo`**. Verificado fila por fila.
+2. **`Embarque = Fecha Pago 30% + lead time del PI`**. La celda `G3` es literalmente **`=+I3+45`**.
+   Los lead times que quedan: Zhixin **+40**, Fujian **+45**, Hugo **+51**, Ownland **+60**
+   (coincide con el *"60 days when deposit received"* del PI OL-10139), Frontier **+62**,
+   Becky **+112**. La **llegada** es el embarque + los días de viaje (~40–46; Hugo 45).
+3. **"A nombre de"** = quién **emite la factura y cobra**: **NTL** (el forwarder de Hong Kong) o el
+   proveedor. **Sólo las filas a nombre del proveedor tienen "Pend Giro Directo"** — lo que va
+   girado derecho a la fábrica en vez de por NTL. **"Fecha Recup"** sólo aparece en las de NTL.
+4. El **"Pago"** es el anticipo ya girado, en general el **30%** (Frontier 30,0 % exacto; Fujian
+   30,9 %; Zhixin 30,2 %; Ownland 30,0 %). **Becky 23,3 % y Hugo 36,3 % no dan 30 %** — puede ser
+   más de un giro; queda marcado en la nota del seed.
+5. Los pedidos **sin deuda no están en la planilla**: por eso no figura `PI B260601` (la 1.ª de
+   Becky, la que ya pagó y es la factura con la que ahora paga la 2.ª) ni el `323ES suelto`.
+
+### Cómo quedó en el sistema
+
+`sql/gv_imp_cuenta_corriente_v1574.sql`. Dos tablas nuevas, colgadas del `pedido_ref` que ya
+existía en `GV_Importados_Baches` (v15.72) — no se duplica ningún pedido:
+
+| Objeto | Qué es |
+|---|---|
+| **`GV_Imp_Pedido_CC`** | la cabecera de plata de cada pedido: `a_nombre_de`, `fob_total`, `pend_giro_directo`, `fecha_pago_30`, `fecha_recup`. Una fila por (`pedido_ref`, `proveedor`) |
+| **`GV_Imp_Pagos`** | **cada giro**: fecha, USD, beneficiario, tipo (`anticipo30` / `saldo` / `giro_directo`) y la **pata legal** (`factura_ref`, `despacho_ref`) |
+| **`gv_imp_cuenta_corriente`** (vista, `security_invoker`) | junta las dos con el pedido en curso: FOB, **pagado = suma de los giros**, pend. giro directo, **falta**, saldo, días de viaje y días de producción |
+| RPC | `gv_imp_cc_lista`, `gv_imp_cc_set`, `gv_imp_pagos`, `gv_imp_pago_add`, `gv_imp_pago_borrar` (SECURITY DEFINER, anon) |
+
+La diferencia con el Excel es que **"Pago" no es un número tipeado: es la suma de los giros
+cargados**. El seed dejó un giro por pedido con el monto y la fecha del 30 %; cuando Thomas cargue
+los giros reales se borran esos y quedan los de verdad.
+
+**Front (v15.74)**: la solapa 🚢 En curso tiene ahora dos vistas — **📦 Logística** (unidades, m³,
+embarque, llegada) y **💵 Plata**, que es la planilla: A nombre de · FOB · Pagado · Pend. giro
+directo · Falta · 💰 Pago 30% · 🚢 Embarque · ♻️ Recupero, todo editable, con los cuatro totales
+arriba siguiendo el filtro de proveedor/pedido. El botón **💵 Giros** de cada fila abre el libro de
+giros de ese pedido (listar, cargar, borrar). Test `tests/imp-cuenta-corriente.cjs`.
+
+**Chequeo al sembrar**: el `falta` de la vista da exactamente el del Excel — Frontier 10.080 ·
+Fujian 22.388 · Zhixin 7.173 · Ownland 11.670 · Becky 1.814 · Hugo 2.647.
+
+### Lo que quedó marcado, sin tocar
+
+- **Frontier**: el Excel dice FOB **14.400** y el motor calcula **14.000** (505C, 200.000 u ×
+  `fob_uni` 0,07 → el PI daría 0,072). La vista lo avisa con `fob_difiere`.
+- **Frontier, la llegada no cierra**: embarque **26-oct** + ~40 días de viaje daría principios de
+  diciembre, pero en el sistema la llegada está en **04-nov** (cargada antes del Excel). Una de las
+  dos está mal.
+- **Becky `PI B260601-2`**: el 30 % figura pagado el **02-jun** y el PI está fechado el 14/07 en
+  §3.bm.13. Y son **112 días** hasta el embarque contra los *"90 días después del depósito"* del PI.
+- **Ownland**: el Excel confirma **u$s 46.626**, así que el *"u$s 13.988"* que §3.bm.5 leyó del
+  PI OL-10139 es lo que está mal, no el cálculo del motor.
+
+### Lo que todavía no está
+
+- **Imputación cruzada**: hoy cada giro se carga contra **un** pedido. La operatoria real es que la
+  plata sale contra la factura de una carga vieja y cubre el PI siguiente — eso se anota en
+  `factura_ref` como texto, pero **no hay todavía un vínculo formal factura ↔ despacho ↔ PI**. Si
+  hace falta el detalle legal (para SEPAIMPO), se agrega `GV_Imp_Facturas` sin tocar lo hecho.
+- Diferencias de cambio, gastos de NTL y pagos en pesos: no están modelados.
 
 ## Fuentes
 

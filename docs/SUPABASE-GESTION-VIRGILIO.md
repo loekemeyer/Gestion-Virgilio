@@ -6442,3 +6442,62 @@ de filas y que la plata del KPI sea la del pedido elegido y no la de todos).
 tener que armar una cuenta corriente… después te paso el archivo actual que lo manejo por Excel"*.
 Sin empezar hasta ver ese Excel — el modelo (anticipo/saldo por PI, moneda, tipo de cambio, qué es
 un pago a cuenta) sale de cómo lo lleva hoy. Tarea Planify abierta.
+
+## 3.ca Cuenta corriente con los chinos + las fechas de EMBARQUE del Excel (v15.74) — 2026-09-11
+
+**Pedido de Thomas**: mandó la foto de su Excel — *"este es mi estado actual de deudas al exterior.
+Fijate para incorporar esto"*.
+
+La lectura de la planilla, las fórmulas que tiene adentro (`Falta = FOB − Pago − Pend Giro Directo`;
+`Embarque = Fecha Pago 30% + lead time`, la celda G3 es literalmente `=+I3+45`) y todo el marco de
+por qué la plata sale como sale están en **`docs/IMPORTACIONES-PAGOS-ARGENTINA.md`**, que es el
+archivo de referencia de este módulo. Acá queda sólo lo de Supabase.
+
+### Las 6 fechas de embarque, cargadas
+
+`GV_Importados_Baches.fecha_embarque` (la columna que se creó vacía en la v15.72) queda con los
+valores del Excel: Frontier 505C **26/10** · Fujian `PI HT26-06-600-R1` **19/09** · Zhixin
+`PI BX260722D` **14/10** · Ownland `PI OL-10139` **08/11** · Becky `PI B260601-2` **22/09** ·
+Hugo Wong `PI NY26-031438` **19/09**. `PI B260601` y `323ES suelto` no están en la planilla (no
+tienen deuda). Backup `GV_Importados_Baches_bkp_cc_20260911` (tabla entera).
+
+Los **días de viaje** que quedan medidos (llegada − embarque): Ownland 40, Fujian 43, Hugo 45,
+Zhixin 46, Becky 54 y **Frontier 9, que no cierra** — la llegada 04/11 se había cargado antes del
+Excel y con embarque 26/10 daría principios de diciembre. Marcado, sin tocar.
+
+### Objetos nuevos
+
+| Objeto | Qué hace |
+|---|---|
+| `GV_Imp_Pedido_CC` | cabecera de plata por (`pedido_ref`, `proveedor`): `a_nombre_de` (NTL o el proveedor), `fob_total`, `pend_giro_directo`, `fecha_pago_30`, `fecha_recup`, `nota`. RLS on, sin policy anon |
+| `GV_Imp_Pagos` | **cada giro**: fecha, `monto_usd`, `beneficiario`, `tipo` (`anticipo30`/`saldo`/`giro_directo`), `factura_ref`, `despacho_ref`. RLS on, sin policy anon |
+| `gv_imp_cuenta_corriente` (vista, `security_invoker = true`) | pedido en curso + cabecera + **pagado = suma de los giros**; devuelve `falta`, `saldo`, `dias_viaje`, `dias_produccion` y `fob_difiere` |
+| `gv_imp_cc_lista()` · `gv_imp_cc_set(...)` · `gv_imp_pagos(ref, prov)` · `gv_imp_pago_add(...)` · `gv_imp_pago_borrar(id)` | SECURITY DEFINER, `grant execute` a anon/authenticated, mismo patrón que las RPC de baches |
+
+`gv_imp_cc_set` usa un `p_set_<campo>` por campo para distinguir *"no tocar"* de *"poner en
+null/0"*, y hace `insert … on conflict do nothing` antes del `update`, así la fila se crea sola la
+primera vez que se edita un pedido.
+
+**Seed con el Excel** (6 filas de cabecera + 6 giros del 30 %, `creado_por = 'seed_excel_20260911'`).
+**Chequeo**: el `falta` de la vista da exactamente el de la planilla — 10.080 · 22.388 · 7.173 ·
+11.670 · 1.814 · 2.647.
+
+`fob_difiere` sólo avisa cuando la diferencia es **plata de verdad (> u$s 1)**: con el umbral en 0
+lloraban las 4 filas por el redondeo del FOB unitario. Queda una sola: **Frontier, 14.400 del PI
+contra 14.000 del motor**.
+
+**No toca ningún objeto de Producción** (todo `GV_*` / `gv_*`; `Importados` ni se lee acá), así que
+no va a `ROLLBACK-PRODUCCION.md`.
+
+### Front
+
+Solapa 🚢 En curso con dos vistas: **📦 Logística** (la de la v15.72) y **💵 Plata**, que es la
+planilla de Thomas — A nombre de · FOB · Pagado · Pend. giro directo · Falta · 💰 Pago 30% ·
+🚢 Embarque · ♻️ Recupero, editable, con los cuatro totales arriba respetando las fichas de
+proveedor/pedido. **💵 Giros** por fila abre el libro de giros del pedido (listar, cargar con
+fecha/monto/beneficiario/tipo/factura, borrar). Test `tests/imp-cuenta-corriente.cjs`.
+
+### Rollback
+
+En el `.sql`: drop de la vista, las 5 funciones y las 2 tablas, y `fecha_embarque` de vuelta desde
+`GV_Importados_Baches_bkp_cc_20260911`.

@@ -7701,7 +7701,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v15.73";
+const APP_VERSION = "v15.74";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -17062,13 +17062,20 @@ async function openImpEnCurso() {
   _stkPopShell("🚢 Pedidos de importación en curso", "stkPopBody", true);
   const body = document.getElementById("stkPopBody"); if (!body) return;
   body.innerHTML = '<div class="stkpop-empty">Cargando pedidos en curso…</div>';
-  _stkPop = { kind: "impCurso", rows: [], abierto: "", lineas: {}, provFiltro: "", refFiltro: "" };
+  _stkPop = { kind: "impCurso", rows: [], abierto: "", lineas: {}, provFiltro: "", refFiltro: "", cc: {}, vistaPlata: false };
   await impCursoReload();
 }
 async function impCursoReload() {
   if (!_stkPop || _stkPop.kind !== "impCurso") return;
   try { _stkPop.rows = (await _pedImpRpc("gv_importados_pedidos_curso", {})) || []; }
   catch (e) { _stkPop.rows = []; _stkPop.err = (e.message || String(e)); }
+  // v15.74 — la cuenta corriente (plata) va en la misma lectura: si falla, la vista Plata se cae
+  // al FOB del motor y 0 pagado, pero la logística sigue andando.
+  try {
+    const cc = (await _pedImpRpc("gv_imp_cc_lista", {})) || [];
+    const m = {}; cc.forEach(function (x) { m[String(x.pedido_ref) + "\u00a7" + String(x.proveedor)] = x; });
+    _stkPop.cc = m;
+  } catch (_e) { if (!_stkPop.cc) _stkPop.cc = {}; }
   _impCursoRender();
 }
 function _impCursoKey(r) { return String(r.pedido_ref) + "§" + String(r.proveedor); }
@@ -17165,7 +17172,30 @@ function _impCursoRender() {
       ".imcu-kpi .v{font-size:21px;font-weight:800}" +
       ".imcu-fila{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:10px}" +
       ".imcu-lbl{font-size:12px;font-weight:800;color:#64748b;text-transform:uppercase;letter-spacing:.4px}" +
-      ".imcu-b{border:0;border-radius:7px;padding:4px 9px;font-size:11.5px;font-weight:800;cursor:pointer;margin:0;width:auto;background:#e2e8f0;color:#0f172a}";
+      ".imcu-b{border:0;border-radius:7px;padding:4px 9px;font-size:11.5px;font-weight:800;cursor:pointer;margin:0;width:auto;background:#e2e8f0;color:#0f172a}" +
+      /* v15.74 — vista Plata (cuenta corriente): las mismas columnas del Excel de Thomas. */
+      ".imcu-money{width:92px;text-align:right;padding:5px 6px;border:1.5px solid #cbd5e1;border-radius:8px;font-size:13px;font-weight:700;font-variant-numeric:tabular-nums;margin:0;box-sizing:border-box;background:#fff}" +
+      ".imcu-money:focus{border-color:#0f766e;outline:none}" +
+      ".imcu-money.pago{border-color:#a7f3d0;background:#f0fdf4}" +
+      ".imcu-falta{font-weight:800;font-variant-numeric:tabular-nums}" +
+      ".imcu-falta.cero{color:#16a34a}.imcu-falta.debe{color:#b45309}" +
+      ".imcu-nom{width:104px;padding:5px 6px;border:1.5px solid #cbd5e1;border-radius:8px;font-size:12.5px;font-weight:700;margin:0;box-sizing:border-box;background:#fff}" +
+      ".imcu-ntl{background:#eef2ff;border-color:#c7d2fe}" +
+      "#impPagosOv{display:none;position:fixed;inset:0;z-index:1330;background:rgba(2,6,23,.78);overflow:auto;padding:14px}" +
+      "#impPagosOv.show{display:block}" +
+      ".ipg-card{background:#f8fafc;max-width:min(700px,96vw);margin:0 auto;border-radius:16px;overflow:hidden;box-shadow:0 24px 70px rgba(0,0,0,.55)}" +
+      ".ipg-head{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:12px 15px;background:linear-gradient(90deg,#065f46,#059669);color:#fff}" +
+      ".ipg-head b{font-size:16px;font-weight:800}" +
+      ".ipg-x{background:rgba(255,255,255,.22);color:#fff;border:none;border-radius:8px;padding:6px 12px;font-size:13px;font-weight:800;cursor:pointer;width:auto;margin:0}" +
+      ".ipg-body{padding:12px 14px}" +
+      ".ipg-tbl{width:100%;border-collapse:collapse;background:#fff;border:1px solid #e2e8f0;border-radius:10px;overflow:hidden}" +
+      ".ipg-tbl th{font-size:10.5px;text-transform:uppercase;color:#64748b;font-weight:800;padding:7px 6px;border-bottom:2px solid #e2e8f0;text-align:left}" +
+      ".ipg-tbl td{padding:6px;border-bottom:1px solid #f1f5f9;font-size:13px;color:#0f172a}" +
+      ".ipg-tbl td.num,.ipg-tbl th.num{text-align:right;font-variant-numeric:tabular-nums}" +
+      ".ipg-tipo{font-size:10.5px;font-weight:800;padding:2px 7px;border-radius:999px;white-space:nowrap}" +
+      ".ipg-tipo.a30{background:#eef2ff;color:#4338ca}.ipg-tipo.sal{background:#f0fdf4;color:#166534}.ipg-tipo.dir{background:#fff7ed;color:#b45309}" +
+      ".ipg-foot{padding:11px 14px;background:#fff;border-top:1px solid #e2e8f0;display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}" +
+      ".ipg-empty{padding:16px;text-align:center;color:#64748b;font-size:13px}";
     document.head.appendChild(st);
   }
   const rows = _stkPop.rows || [];
@@ -17200,6 +17230,13 @@ function _impCursoRender() {
         return '<button style="' + _fb(refFiltro === r.pedido_ref) + '" onclick="impCursoSetRef(\'' + _impCursoEnc(r.pedido_ref) + '\')" title="' + escapeHtml(r.proveedor) + ' · ' + _impCursoNum(r.pendiente) + ' u · u$s ' + _impCursoNum(Math.round(Number(r.usd) || 0)) + '">' + escapeHtml(r.pedido_ref) + '</button>';
       }).join('') + '</div>';
   }
+  // v15.74 — dos vistas del mismo listado: la logística (unidades, m³, fechas) y la de PLATA
+  // (la cuenta corriente: las mismas columnas del Excel con el que Thomas lleva la deuda).
+  const plata = !!_stkPop.vistaPlata;
+  h += '<div class="imcu-fila"><span class="imcu-lbl">Ver:</span>' +
+    '<button style="' + _fb(!plata) + '" onclick="impCursoSetVista(false)">📦 Logística</button>' +
+    '<button style="' + _fb(plata) + '" onclick="impCursoSetVista(true)" title="Cuenta corriente: FOB, pagado, pendiente de giro directo y lo que falta">💵 Plata</button>' +
+    '</div>';
   h += '<div class="imcu-fila">' +
     '<button class="mva-clear" style="background:#166534;color:#fff;border-color:#166534" onclick="impCursoExportExcel()" title="Bajar a Excel lo que se está viendo, con el detalle por artículo de cada pedido">📥 Excel</button>' +
     ((provFiltro || refFiltro) ? '<button class="mva-clear" onclick="impCursoSetProv(\'\')" title="Sacar los filtros">✕ Ver todo</button>' : '') +
@@ -17213,6 +17250,25 @@ function _impCursoRender() {
   const sinEmb = vista.filter(function (r) { return !r.fecha_embarque; }).length;
   const foco = refFiltro ? ('📄 ' + refFiltro) : (provFiltro ? ('🏭 ' + provFiltro) : "");
   const kTit = refFiltro ? "Este pedido" : (provFiltro ? "Pedidos de " + provFiltro : "Pedidos en curso");
+  if (plata) {
+    // los mismos cuatro números del Excel, sobre lo filtrado
+    let tFob = 0, tPag = 0, tGiro = 0, tFalta = 0;
+    vista.forEach(function (r) {
+      const c = _impCursoCc(r);
+      tFob += Number(c.fob) || 0; tPag += Number(c.pagado) || 0;
+      tGiro += Number(c.pend_giro_directo) || 0; tFalta += Number(c.falta) || 0;
+    });
+    h += '<div class="imcu-kpi">' +
+      '<div style="background:#f8fafc;border:1px solid #e2e8f0"><div class="k" style="color:#475569">FOB ' + escapeHtml(refFiltro ? "del pedido" : "total") + '</div><div class="v" style="color:#0f172a">u$s ' + _impCursoNum(Math.round(tFob)) + '</div>' + (foco ? '<div style="font-size:10.5px;color:#64748b;font-weight:700">' + escapeHtml(foco) + '</div>' : '') + '</div>' +
+      '<div style="background:#ecfdf5;border:1px solid #a7f3d0"><div class="k" style="color:#047857">Pagado</div><div class="v" style="color:#065f46">u$s ' + _impCursoNum(Math.round(tPag)) + '</div></div>' +
+      '<div style="background:#fff7ed;border:1px solid #fed7aa"><div class="k" style="color:#b45309">Pend. giro directo</div><div class="v" style="color:#92400e">u$s ' + _impCursoNum(Math.round(tGiro)) + '</div></div>' +
+      '<div style="background:#fef2f2;border:1px solid #fecaca"><div class="k" style="color:#b91c1c">Falta</div><div class="v" style="color:#991b1b">u$s ' + _impCursoNum(Math.round(tFalta)) + '</div></div>' +
+      '</div>';
+    h += '<div class="stkpop-hint">Cuenta corriente con los chinos, igual que el Excel: <b>Falta = FOB − Pagado − Pend. giro directo</b>. <b>A nombre de</b> es quién factura y cobra (<b>NTL</b>, el forwarder de Hong Kong, o el proveedor); sólo las que van a nombre del proveedor tienen giro directo. <b>💵</b> abre los giros de ese pedido para cargar uno nuevo. La plata que sale viaja pegada a una importación ya nacionalizada aunque financie el pedido siguiente — está explicado en <code>docs/IMPORTACIONES-PAGOS-ARGENTINA.md</code>.</div>';
+    h += _impCursoTablaPlata(vista);
+    body.innerHTML = h;
+    return;
+  }
   h += '<div class="imcu-kpi">' +
     '<div style="background:#eef2ff;border:1px solid #c7d2fe"><div class="k" style="color:#4338ca">' + escapeHtml(kTit) + '</div><div class="v" style="color:#3730a3">' + vista.length + '</div>' + (foco ? '<div style="font-size:10.5px;color:#6366f1;font-weight:700">' + escapeHtml(foco) + '</div>' : '') + '</div>' +
     '<div style="background:#fff7ed;border:1px solid #fed7aa"><div class="k" style="color:#b45309">Unidades por llegar</div><div class="v" style="color:#92400e">' + _impCursoNum(tUni) + '</div></div>' +
@@ -17291,6 +17347,176 @@ async function impCursoExportExcel() {
     document.body.appendChild(a); a.click();
     setTimeout(function () { try { document.body.removeChild(a); URL.revokeObjectURL(url); } catch (_e) {} }, 1500);
   } catch (e) { try { alert("No se pudo generar el Excel: " + (e.message || e)); } catch (_e) {} }
+}
+/* v15.74 — VISTA PLATA: la cuenta corriente con los chinos, calcada del Excel con el que Thomas
+   la lleva ("estado actual de deudas al exterior"): A nombre de · FOB · Pago · Pend Giro Directo ·
+   Falta · Embarque · Fecha Pago 30% · Fecha Recup.
+     · Falta  = FOB − Pagado − Pend. giro directo   (la fórmula de su planilla)
+     · Pagado = la SUMA de los giros cargados (GV_Imp_Pagos), no un número tipeado
+     · "A nombre de" = quién factura y cobra: NTL (forwarder de Hong Kong) o el proveedor
+   Por qué la plata sale pegada a una importación ya nacionalizada aunque financie el pedido
+   siguiente: docs/IMPORTACIONES-PAGOS-ARGENTINA.md. Backend: sql/gv_imp_cuenta_corriente_v1574.sql */
+function impCursoSetVista(plata) {
+  if (!_stkPop || _stkPop.kind !== "impCurso") return;
+  _stkPop.vistaPlata = !!plata; _impCursoRender();
+}
+/* La fila de cuenta corriente del pedido. Si todavía no se leyó, se cae a lo que sabe el motor
+   (FOB calculado, nada pagado) para que la tabla igual muestre algo coherente. */
+function _impCursoCc(r) {
+  const m = (_stkPop && _stkPop.cc) || {};
+  const c = m[_impCursoKey(r)];
+  if (c) return c;
+  const fob = Number(r.usd) || 0;
+  return { fob: fob, pagado: 0, pend_giro_directo: 0, falta: fob, saldo: fob, n_pagos: 0,
+           a_nombre_de: "", fecha_pago_30: null, fecha_recup: null, fob_difiere: false, fob_calculado: fob };
+}
+function _impCursoMoneyInput(r, campo, val, extra) {
+  const enc = _impCursoEnc(r.pedido_ref) + "','" + _impCursoEnc(r.proveedor);
+  return '<input type="number" step="1" min="0" class="imcu-money' + (extra || "") + '" value="' + (Number(val) ? Math.round(Number(val)) : "") +
+    '" placeholder="0" onchange="impCursoCcSet(\'' + enc + '\',\'' + campo + '\',this.value)">';
+}
+function _impCursoTablaPlata(vista) {
+  let h = '<div class="mva-tblwrap wide"><table class="imcu-tbl">' +
+    '<thead><tr><th>Proveedor</th><th>Pedido (PI)</th><th title="Quién emite la factura y cobra: NTL o el proveedor">A nombre de</th>' +
+    '<th class="num">FOB</th><th class="num" title="Suma de los giros cargados. Tocá 💵 para verlos o agregar uno.">Pagado</th>' +
+    '<th class="num" title="Del saldo, lo que va girado derecho al proveedor (no por NTL)">Pend. giro directo</th>' +
+    '<th class="num" title="FOB − Pagado − Pend. giro directo">Falta</th>' +
+    '<th title="El anticipo/depósito. De acá sale la fecha de embarque (depósito + lead time del PI)">💰 Pago 30%</th>' +
+    '<th>🚢 Embarque</th><th title="Cuándo se recupera (las filas a nombre de NTL)">♻️ Recupero</th><th></th></tr></thead><tbody>';
+  vista.forEach(function (r) {
+    const c = _impCursoCc(r);
+    const refEnc = _impCursoEnc(r.pedido_ref), provEnc = _impCursoEnc(r.proveedor);
+    const enc = refEnc + "','" + provEnc;
+    const imp = _IMPORTADOR_DE[r.proveedor] || "";
+    const nom = String(c.a_nombre_de || "");
+    const falta = Number(c.falta) || 0;
+    const pagado = Number(c.pagado) || 0;
+    const fob = Number(c.fob) || 0;
+    const pct = fob > 0 ? Math.round((pagado / fob) * 100) : 0;
+    h += '<tr>' +
+      '<td><span class="imcu-prov">' + escapeHtml(r.proveedor) + '</span>' + (imp ? '<div class="imcu-imp">' + escapeHtml(imp) + '</div>' : '') + '</td>' +
+      '<td><span class="imcu-pi" onclick="impCursoSetRef(\'' + refEnc + '\')" title="Ver sólo este pedido">' + escapeHtml(r.pedido_ref) + '</span></td>' +
+      '<td><input type="text" class="imcu-nom' + (nom.toUpperCase() === "NTL" ? " imcu-ntl" : "") + '" value="' + escapeHtml(nom) + '" placeholder="NTL / ' + escapeHtml(r.proveedor) + '" title="Quién emite la factura y cobra" onchange="impCursoCcSet(\'' + enc + '\',\'nombre\',this.value)"></td>' +
+      '<td class="num">' + _impCursoMoneyInput(r, "fob", c.fob) +
+        (c.fob_difiere ? '<div class="imcu-sub falta" title="El FOB del PI no coincide con el que sale de FOB unitario × unidades del módulo">⚠ motor: ' + _impCursoNum(Math.round(c.fob_calculado)) + '</div>' : '') + '</td>' +
+      '<td class="num"><b style="color:#065f46">' + _impCursoNum(Math.round(pagado)) + '</b>' +
+        '<div class="imcu-sub">' + (c.n_pagos ? (c.n_pagos + ' giro' + (c.n_pagos > 1 ? 's' : '') + ' · ' + pct + '%') : 'sin giros') + '</div></td>' +
+      '<td class="num">' + _impCursoMoneyInput(r, "pendgiro", c.pend_giro_directo) + '</td>' +
+      '<td class="num"><span class="imcu-falta ' + (Math.abs(falta) < 1 ? "cero" : "debe") + '">' + _impCursoNum(Math.round(falta)) + '</span></td>' +
+      '<td>' + _pedImpFechaInputHtml(c.fecha_pago_30 || "", "impCursoCcSet('" + enc + "','pago30',v)", 'title="Fecha del anticipo/depósito" style="width:82px;padding:5px 6px;border:1.5px solid #cbd5e1;border-radius:8px;font-size:12.5px;background:#fff"') +
+        (c.dias_produccion != null ? '<div class="imcu-sub">+' + c.dias_produccion + ' d al embarque</div>' : '') + '</td>' +
+      '<td>' + _impCursoFechaCell(r, "emb") + '</td>' +
+      '<td>' + _pedImpFechaInputHtml(c.fecha_recup || "", "impCursoCcSet('" + enc + "','recup',v)", 'title="Fecha de recupero" style="width:82px;padding:5px 6px;border:1.5px solid #cbd5e1;border-radius:8px;font-size:12.5px;background:#fff"') + '</td>' +
+      '<td><button class="imcu-b" style="background:#065f46;color:#fff" onclick="impCursoPagos(\'' + enc + '\')" title="Ver y cargar los giros de este pedido">💵 Giros</button></td>' +
+      '</tr>';
+  });
+  return h + '</tbody></table></div>';
+}
+/* Un solo setter para toda la cabecera: cada campo manda su p_set_* para distinguir
+   "no tocar" de "poner en null/0" (la RPC gv_imp_cc_set). */
+async function impCursoCcSet(refEnc, provEnc, campo, valor) {
+  if (!_stkPop || _stkPop.kind !== "impCurso") return;
+  const ref = decodeURIComponent(refEnc), prov = decodeURIComponent(provEnc);
+  const body = { p_pedido_ref: ref, p_proveedor: prov };
+  const num = function (v) { const n = Number(String(v == null ? "" : v).replace(/[^\d.\-]/g, "")); return isFinite(n) ? n : 0; };
+  if (campo === "nombre") { body.p_a_nombre_de = String(valor || "").trim() || null; body.p_set_a_nombre_de = true; }
+  else if (campo === "fob") { const n = num(valor); body.p_fob = n > 0 ? n : null; body.p_set_fob = true; }
+  else if (campo === "pendgiro") { body.p_pend_giro = num(valor); body.p_set_pend_giro = true; }
+  else if (campo === "pago30") { body.p_pago_30 = String(valor || "").slice(0, 10) || null; body.p_set_pago_30 = true; }
+  else if (campo === "recup") { body.p_recup = String(valor || "").slice(0, 10) || null; body.p_set_recup = true; }
+  else return;
+  try { await _pedImpRpc("gv_imp_cc_set", body); }
+  catch (e) { try { alert("No se pudo guardar: " + (e.message || e)); } catch (_e) {} }
+  await impCursoReload();
+}
+/* ---- Giros de UN pedido (el libro de la cuenta corriente) ---- */
+var _impPagos = null;
+function _impPagosTipoTxt(t) {
+  if (t === "anticipo30") return '<span class="ipg-tipo a30">anticipo 30%</span>';
+  if (t === "giro_directo") return '<span class="ipg-tipo dir">giro directo</span>';
+  return '<span class="ipg-tipo sal">saldo</span>';
+}
+async function impCursoPagos(refEnc, provEnc) {
+  const ref = decodeURIComponent(refEnc), prov = decodeURIComponent(provEnc);
+  const r = ((_stkPop && _stkPop.rows) || []).find(function (x) { return x.pedido_ref === ref && x.proveedor === prov; });
+  _impPagos = { ref: ref, prov: prov, rows: [], cc: r ? _impCursoCc(r) : null };
+  let ov = document.getElementById("impPagosOv");
+  if (!ov) { ov = document.createElement("div"); ov.id = "impPagosOv"; document.body.appendChild(ov); }
+  ov.classList.add("show");
+  await _impPagosReload();
+}
+function impPagosCerrar() {
+  const ov = document.getElementById("impPagosOv"); if (ov) ov.classList.remove("show");
+  const d = _impPagos && _impPagos.dirty; _impPagos = null;
+  if (d) { try { impCursoReload(); } catch (_e) {} }
+}
+async function _impPagosReload() {
+  if (!_impPagos) return;
+  try { _impPagos.rows = (await _pedImpRpc("gv_imp_pagos", { p_pedido_ref: _impPagos.ref, p_proveedor: _impPagos.prov })) || []; }
+  catch (e) { _impPagos.rows = []; try { alert("No se pudieron leer los giros: " + (e.message || e)); } catch (_e) {} }
+  _impPagosRender();
+}
+function _impPagosRender() {
+  const ov = document.getElementById("impPagosOv"); if (!ov || !_impPagos) return;
+  const rows = _impPagos.rows || [];
+  const tot = rows.reduce(function (a, x) { return a + (Number(x.monto_usd) || 0); }, 0);
+  const cc = _impPagos.cc || {};
+  const fob = Number(cc.fob) || 0;
+  const falta = fob - tot - (Number(cc.pend_giro_directo) || 0);
+  const body = rows.map(function (x) {
+    return "<tr>" +
+      "<td>" + (x.fecha ? _isoToDdMmAa(String(x.fecha).slice(0, 10)) : "—") + "</td>" +
+      '<td class="num"><b>' + _impCursoNum(Math.round(Number(x.monto_usd) || 0)) + "</b></td>" +
+      "<td>" + escapeHtml(x.beneficiario || "—") + "</td>" +
+      "<td>" + _impPagosTipoTxt(x.tipo) + "</td>" +
+      '<td style="font-size:11.5px;color:#64748b">' + escapeHtml(x.factura_ref || "") + (x.nota ? '<div style="font-size:10.5px;color:#94a3b8">' + escapeHtml(x.nota) + '</div>' : '') + "</td>" +
+      '<td><button class="imcu-b" style="background:#fee2e2;color:#b91c1c" onclick="impPagoBorrar(' + x.id + ')" title="Borrar este giro">🗑</button></td></tr>';
+  }).join("");
+  ov.innerHTML =
+    '<div class="ipg-card"><div class="ipg-head"><b>💵 Giros — ' + escapeHtml(_impPagos.ref) + ' · ' + escapeHtml(_impPagos.prov) + '</b>' +
+      '<button class="ipg-x" onclick="impPagosCerrar()">Cerrar</button></div>' +
+    '<div class="ipg-body">' +
+      (rows.length
+        ? '<table class="ipg-tbl"><thead><tr><th>Fecha</th><th class="num">u$s</th><th>A quién</th><th>Tipo</th><th>Factura / nota</th><th></th></tr></thead><tbody>' + body + "</tbody></table>"
+        : '<div class="ipg-empty">Todavía no hay giros cargados para este pedido.</div>') +
+    "</div>" +
+    '<div class="ipg-foot"><div style="font-size:13px;color:#334155">FOB <b>u$s ' + _impCursoNum(Math.round(fob)) + '</b> · girado <b style="color:#065f46">u$s ' + _impCursoNum(Math.round(tot)) +
+      '</b> · falta <b style="color:' + (Math.abs(falta) < 1 ? "#16a34a" : "#b45309") + '">u$s ' + _impCursoNum(Math.round(falta)) + '</b></div>' +
+      '<button class="imcu-b" style="background:#065f46;color:#fff;padding:8px 14px" onclick="impPagoAdd()">➕ Cargar giro</button></div></div>';
+}
+async function impPagoAdd() {
+  if (!_impPagos) return;
+  let mv; try { mv = prompt("Monto del giro en u$s:", ""); } catch (_e) { return; }
+  if (mv === null) return;
+  const monto = Number(String(mv).replace(/[^\d.]/g, ""));
+  if (!(monto > 0)) { try { alert("Monto inválido."); } catch (_e) {} return; }
+  let fv; try { fv = prompt("Fecha del giro (dd/mm/aa).\nVacío = hoy:", ""); } catch (_e) { return; }
+  if (fv === null) return;
+  let iso = null;
+  if (String(fv).trim() !== "") { iso = _pedImpParseFechaISO(fv); if (iso === null) { try { alert("Fecha inválida (usá dd/mm/aa)."); } catch (_e) {} return; } }
+  const nomDef = (_impPagos.cc && _impPagos.cc.a_nombre_de) || "NTL";
+  let bv; try { bv = prompt("¿A quién se le giró? (NTL o el proveedor):", nomDef); } catch (_e) { return; }
+  if (bv === null) return;
+  let tv; try { tv = prompt("Tipo de giro:\n  1 = anticipo 30%\n  2 = saldo\n  3 = giro directo", "2"); } catch (_e) { return; }
+  if (tv === null) return;
+  const tipo = String(tv).trim() === "1" ? "anticipo30" : (String(tv).trim() === "3" ? "giro_directo" : "saldo");
+  let facv; try { facv = prompt("Factura / despacho contra el que se cursó (opcional — es la pata legal del giro):", ""); } catch (_e) { facv = ""; }
+  let leg = ""; try { leg = String(window.__authEmail || ""); } catch (_e) {}
+  try {
+    await _pedImpRpc("gv_imp_pago_add", { p_pedido_ref: _impPagos.ref, p_proveedor: _impPagos.prov,
+      p_fecha: iso, p_monto: monto, p_beneficiario: String(bv || "").trim() || null, p_tipo: tipo,
+      p_factura: String(facv || "").trim() || null, p_legajo: leg });
+    _impPagos.dirty = true;
+  } catch (e) { try { alert("No se pudo cargar el giro: " + (e.message || e)); } catch (_e) {} return; }
+  await _impPagosReload();
+}
+async function impPagoBorrar(pagoId) {
+  if (!_impPagos) return;
+  let ok = false; try { ok = confirm("¿Borrar este giro? El 'Pagado' del pedido baja."); } catch (_e) { ok = false; }
+  if (!ok) return;
+  try { await _pedImpRpc("gv_imp_pago_borrar", { p_pago_id: pagoId }); _impPagos.dirty = true; }
+  catch (e) { try { alert("No se pudo borrar: " + (e.message || e)); } catch (_e) {} return; }
+  await _impPagosReload();
 }
 function _impCursoLineasHtml(ls) {
   if (!ls.length) return '<div style="padding:10px 14px;color:#64748b;font-size:12.5px">Este pedido no tiene líneas en curso.</div>';

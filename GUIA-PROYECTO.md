@@ -12,7 +12,7 @@
 > única**; no se replica. Ante la duda entre parche rápido y fix de raíz → **fix
 > de raíz**.
 >
-> Última actualización: 2026-09-11 (viernes) · Versión app al documentar: **v15.73**
+> Última actualización: 2026-09-11 (viernes) · Versión app al documentar: **v15.74**
 >
 > Nota **v15.40 (2026-09-11) — HANDOFF de planimetría / Acacia: `docs/HANDOFF-PLANIMETRIA-Y-ACACIA.md`.**
 > Thomas sigue este tema en otra sesión. Ahí está todo junto: los **13 artículos activos del catálogo LK
@@ -11158,6 +11158,19 @@ distinta, empresa distinta.
 >   (umbral ≈ 3× su período; dedup un aviso por sync por día). **No se creó tabla
 >   `Sync_Estado`**: `cron.job_run_details` ya tiene la verdad. DDL en
 >   `sql/watchdog_syncs_externos.sql`.
+
+> Nota **2026-09-11 (v15.74) — Cuenta corriente con los chinos + las fechas de embarque, del Excel de Thomas.**
+> Mandó la foto de su planilla de deudas al exterior y se incorporó entera. **Las 6 fechas de EMBARQUE ya están
+> cargadas** (Frontier 26/10 · Fujian 19/09 · Zhixin 14/10 · Ownland 08/11 · Becky 2ª 22/09 · Hugo 19/09). La
+> solapa 🚢 En curso tiene ahora **dos vistas**: 📦 Logística y **💵 Plata**, que es la planilla — A nombre de ·
+> FOB · Pagado · Pend. giro directo · **Falta = FOB − Pagado − Pend. giro** · Pago 30% · Embarque · Recupero,
+> editable, y un **💵 Giros** por fila para cargar cada pago. "Pagado" no se tipea: es la suma de los giros
+> (`GV_Imp_Pagos`). Reglas que salen del Excel: **Embarque = Fecha Pago 30% + lead time del PI** (Zhixin +40,
+> Fujian +45, Hugo +51, Ownland +60, Frontier +62, Becky +112) y **"A nombre de"** = quién factura y cobra (NTL
+> o el proveedor; sólo las del proveedor tienen giro directo). Todo en
+> **`docs/IMPORTACIONES-PAGOS-ARGENTINA.md`** + §3.ca de `docs/SUPABASE-GESTION-VIRGILIO.md`.
+> **Marcado sin tocar**: Frontier FOB 14.400 vs 14.000 del motor y su llegada (04/11) que no cierra con el
+> embarque 26/10; Becky 2ª con el 30% pagado el 02/jun y 112 días hasta embarcar.
 
 > Nota **2026-09-11 — Cómo se pagan las importaciones (marco para la cuenta corriente).**
 > Thomas explicó la operatoria: se le gira a **NTL**, un freight forwarder de Hong Kong, y **la salida de
