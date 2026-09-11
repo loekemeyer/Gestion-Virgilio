@@ -5679,3 +5679,64 @@ el **10/09 a las 12:10** LK 0002 se movió a mano al 16/09 y dejó a LK 0053 sol
 automático no vuelve a mirar un pedido que ya tiene tanda, así que nadie los reagrupó. **Mover una
 NP a mano no chequea si el cliente queda partido**: ése es el agujero que queda abierto, y por
 ahora lo tapa la alerta (que avisa después, no en el momento).
+
+## §3.cg — Corregir códigos: el stock del secundario se reparte entre las NP que lo piden (v15.51, 2026-09-11)
+
+Thomas, con el panel **Corregir códigos (secundario → principal)** abierto en 565 → 607E: *"acá tenés mal la
+lógica. Mirá el 565 primero: el stock y sus pedidos"*.
+
+### Qué estaba mal
+
+El panel comparaba **cada NP sola** contra el stock total del secundario (`p.stkSec >= p.cajas`) y sólo la
+marcaba urgente con el secundario en 0 (`_corrItemUrgente`, v10.28). Con 565 = 2 en góndola y 7 NP pidiéndolo
+(8 cajas), las 7 salían en verde "alcanza — mandalo tal cual, sin tocar NP". El badge del panel supervisor
+(`corrLoadBadge`) y el chip de Facturación (`_urgN`) usaban el mismo criterio por ítem.
+
+| NP | Tanda | Sale | Estado | Cajas 565 | Antes (v15.50) | Ahora (v15.51) |
+|---|---|---|---|---:|---|---|
+| 98662 | D67A | 10/09 | pickeado | 2 | verde | **verde** (1.ª de la cola, le quedan 2) |
+| 98671 | D67E | 10/09 | pickeado | 1 | verde | **rojo** → cambiar NP a 607E |
+| 98674 | D67F | 10/09 | pickeado | 1 | verde | rojo |
+| 98664 | D67I | 10/09 | sin pickear | 1 | verde | rojo |
+| 98678 | D67G | 10/09 | sin pickear | 1 | verde | rojo |
+| 98688 | D67L | 10/09 | sin pickear | 1 | verde | rojo |
+| 98621 | D69B | 14/09 | sin pickear | 1 | verde | rojo |
+
+Stock al 11/09: 565 = 2 en góndola; 607E = 80 góndola + 216 racks + 6 en separar. Pedido total de 565: 8 cajas
+en 7 NP. El otro caso del panel (338 → 941E, 98532, 1 caja, stock 23) queda verde igual que antes.
+
+### Qué se hizo — la regla vive en la vista
+
+`vista_correcciones_pedido_rich` (`sql/vista_correcciones_pedido_rich_v1551_reparto_sec.sql`, migración
+`gv_corr_sec_reparto_v1551`) arma una **cola por código secundario** — fecha de salida → estado (a facturar >
+pickeado > en picking > sin pickear) → NP — y acumula las cajas. Seis columnas nuevas **al final** (las 14 de
+antes no cambian de nombre, tipo ni orden): `sec_pedido_total`, `sec_np_total`, `sec_orden`,
+`sec_acum_antes`, `sec_disp` (= max(stk_sec − acumulado anterior, 0)) y **`sec_cubre`** (true = le alcanza →
+"mandalo tal cual"; false = urgente, cambiar la NP al principal).
+
+Front (`index.html`): `facCorreccDataRich` lee las columnas; `_corrItemUrgente = !secCubre`;
+`_corrVeredicto` arma el verde/rojo con la cola ("pedidas 8 en 7 NP, ésta es la 4.ª → a ésta le quedan 0 de
+1 — cambiá NP a 607E"); `corrLoadBadge`, `facCorreccRefreshCount` y el chip de Facturación
+(`_corrNpsUrgentes`, la vista entra al `Promise.all` de `facTick`) leen la misma vista, así el número es el
+mismo en los tres lugares. Si la vista no trae `sec_cubre` (rollback), el front cae al criterio viejo
+`stk_sec >= cajas`. `_corrStk` y `_facCorrSecStk` (cruces por ítem contra `vista_saldos_stock`) se sacaron.
+
+### Medición
+
+`explain analyze` de la vista: 349 ms, casi todo `vista_saldos_stock` (igual que antes; la ventana sobre 8
+filas no suma nada medible). Producción Virgilio la lee desde su `index.html` con las 14 columnas viejas:
+no le cambia nada.
+
+### Lo que NO se tocó
+
+- Las tres NP "pickeado" (D67A, D67E, D67F) pickearon **607E**, no 565 (`PKC D67A|607E|4|4`, `D67E|607E|1|1`,
+  `D67F|607E|1|1`): la góndola del 565 sigue en 2. La vista no mira PKC (no lo trae desde v10.10) y la cola
+  le da el 565 a 98662 por ser la primera en salir. Si la operadora prefiere que el 565 se lo queden las NP
+  todavía sin pickear, es cambiar el orden de `window w` en la vista, nada más.
+- La vista sigue **sin `security_invoker`** (así estaba): corre como `postgres`. Queda anotado, no se cambió acá.
+
+### Rollback
+
+Bloque comentado al final de `sql/vista_correcciones_pedido_rich_v1551_reparto_sec.sql` (definición
+anterior, `pg_get_viewdef` del 11/09). El front v15.51 sigue andando con la vista vieja (cae al criterio por
+ítem). `docs/ROLLBACK-PRODUCCION.md` tiene la entrada.
