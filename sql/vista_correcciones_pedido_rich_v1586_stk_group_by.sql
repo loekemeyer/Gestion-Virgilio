@@ -1,4 +1,6 @@
--- v15.86 (2026-09-11) — Corregir códigos: cada NP salía DOS veces y la cola contaba el doble.
+-- v15.88 (2026-09-11) — Corregir códigos: cada NP salía DOS veces y la cola contaba el doble.
+-- (migración `gv_corr_stk_group_by_v1586`; el nº de app saltó a v15.88 porque otra sesión tomó
+--  la v15.86 y la v15.87 el mismo día.)
 -- Thomas, mirando el panel: *"¿Puede ser que acá figure dos veces y que eso signifique que el pedido
 -- está duplicado, el 98678?"*. No: el pedido está bien (la NP 98678 pide el 565 una sola vez).
 --
@@ -34,7 +36,7 @@ with pending as (
   where ("PPP_Programacion_Diaria".np in (select pending.np from pending))
   order by "PPP_Programacion_Diaria".np
 ), stk as (
-  -- v15.86: UNA fila por código. `vista_saldos_stock` devuelve una fila por (cod_art, empresa)
+  -- v15.88: UNA fila por código. `vista_saldos_stock` devuelve una fila por (cod_art, empresa)
   -- desde la v15.71 (§3.cl), así que sin este group by el left join duplicaba TODA la vista.
   select norm_cod(vista_saldos_stock.cod_art) as cod,
     sum(coalesce(vista_saldos_stock.terminado, 0::numeric) + coalesce(vista_saldos_stock.excedente, 0::numeric)

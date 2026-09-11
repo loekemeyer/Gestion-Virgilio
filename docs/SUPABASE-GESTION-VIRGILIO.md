@@ -7398,7 +7398,7 @@ drop function public.gv_refrescar_precio_facturado();
 select cron.unschedule('gv-precio-facturado-diario');
 ```
 más recrear las tres vistas con `sql/gv_precios_cliente_v1582.sql`. No toca objetos de Producción.
-## §3.cj.2 — v15.86 (2026-09-11): cada NP salía DOS veces en Corregir códigos
+## §3.cj.2 — v15.88 (2026-09-11): cada NP salía DOS veces en Corregir códigos
 
 Thomas, con el panel abierto: *"¿Puede ser que acá figure dos veces y que eso signifique que el
 pedido está duplicado, el 98678?"*. **No**: el pedido está bien — `gv_np_items` muestra el **565 una
