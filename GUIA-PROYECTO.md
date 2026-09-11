@@ -12,7 +12,7 @@
 > única**; no se replica. Ante la duda entre parche rápido y fix de raíz → **fix
 > de raíz**.
 >
-> Última actualización: 2026-09-11 (viernes) · Versión app al documentar: **v15.75**
+> Última actualización: 2026-09-11 (viernes) · Versión app al documentar: **v15.78**
 >
 > Nota **v15.40 (2026-09-11) — HANDOFF de planimetría / Acacia: `docs/HANDOFF-PLANIMETRIA-Y-ACACIA.md`.**
 > Thomas sigue este tema en otra sesión. Ahí está todo junto: los **13 artículos activos del catálogo LK
@@ -11158,6 +11158,31 @@ distinta, empresa distinta.
 >   (umbral ≈ 3× su período; dedup un aviso por sync por día). **No se creó tabla
 >   `Sync_Estado`**: `cron.job_run_details` ya tiene la verdad. DDL en
 >   `sql/watchdog_syncs_externos.sql`.
+
+> Nota **2026-09-11 (v15.78) — El "+" de Log/Fabr en Recepción es un BUSCADOR de códigos activos.**
+> Pedido del dueño: *"si están por recibir un artículo, si no lo tienen en su listado activo, en lugar de
+> que ellos escriban y nada más, que escriban sobre un buscador de códigos activos. Si no encuentra ninguno
+> con lo que ellos tipean, que los deje cargarlos pero con la misma pauta de recepción de mercadería sin OC:
+> que me manden un WhatsApp a mí"*. Antes el "+" era un `prompt()` libre y entraba cualquier cosa — de ahí
+> salieron los **599 / 943 / 948 sin la E** del remito 38087 (02/09). Ahora abre un modal con buscador que
+> filtra por **código o descripción** (sin acentos, con la normalización canónica: `0071` cruza con `71`).
+> Tocar un resultado lo agrega **sin WhatsApp**; si nada coincide aparece **"Cargar igual: XXX"**, que lo deja
+> entrar pero dispara `altaAvisar` (el WhatsApp a Thomas de la v15.39). El catálogo sale de **`OC_Maximos`
+> (`activo = true`, 306 filas)**, la lista curada que la base ya usa como canónica (trigger `fn_canon_cod_art`).
+> **Si vuelve vacío o falla, NO se toma por bueno**: se cae a la regla vieja (planimetría), para no mandar un
+> WhatsApp por cada alta cuando el problema es de red o de RLS. `arAddCode` abre el modal; el alta vive en
+> `arAddCodeAplicar(cod, fueraDeLista)`. Test `tests/rcp-alta-ok.cjs`: 16 → **27 chequeos**.
+>
+> Nota **2026-09-11 — Krikos YA INGESTA (la doc decía que no).** El cron **26 `krikos-ingest-10min`** del
+> proyecto LK (`kwkclwhmoygunqmlegrg`) está **activo** y `krikos_oc_inbox` tiene **10 filas**, todas con
+> `fecha_entrega`, cargadas el 11/09 11:51 UTC. O sea que **`KRIKOS_IMAP_PASS` ya está en el Vault** y la
+> Edge Function `krikos-ingest` corre: las notas de la v14.17 y de `docs/PENDIENTES-PIPELINE-GESTION.md`
+> que dicen "0 filas / falta cargar el secreto" quedaron **viejas**. Lo que sí falta medir: **7 de las 10
+> filas bajaron el PDF al bucket `krikos-oc` y 3 no** (`"el link no devolvió un PDF (text/html, 9845 bytes)"`)
+> — son las 3 **más viejas** (28/07, 03/08, 18/08), así que el token de Planexware del link parece vencer.
+> Y en los 7 pedidos ya matcheados **`orders.sheets_payload->>'fecha_entrega'` sigue en NULL**: esas OC se
+> cargaron en agosto, antes de que existiera la Bandeja, y el match se hizo retroactivo el 11/09 — hay que
+> probar una carga NUEVA desde la Bandeja para saber si la fecha viaja.
 
 > Nota **2026-09-11 (v15.75) — El depósito INSUMOS ya no infla el stock de los importados terminados.**
 > Lo encontró Thomas: 584E mostraba **1.290** (90 del módulo + 1.200 de insumos) contra **19 cajas** de la
