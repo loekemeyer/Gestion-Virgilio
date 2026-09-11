@@ -7757,7 +7757,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v15.81";
+const APP_VERSION = "v15.82";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -41474,6 +41474,13 @@ window.facNetoDetalle = async function(np){
         var q = (f.cajas != null) ? ' ' + f.cajas + (f.uxb ? '×' + f.uxb : '') : '';
         return '<span class="facneto-falt-item">' + escapeHtml(f.cod) + q + '</span>';
       }).join(" ") + '</div>';
+    /* v15.82 — los códigos 1xx son LÍNEA LOKE y no tienen lista general: los compran dos
+       clientes y un par de supermercados, cada uno con su precio. Que salgan "sin precio"
+       no es un error del sistema: falta el precio pactado con ESE cliente. */
+    if (sinPrecio.some(function(f){ return /^0*1/.test(String(f.cod)); })){
+      h += '<div class="facneto-faltantes" style="opacity:.85;">Los <b>1xx</b> son <b>línea Loke</b>: no hay lista general, ' +
+        'el precio es el pactado con cada cliente. Si falta, hay que cargarlo (los súper van por su lista de cadena).</div>';
+    }
   }
   body.innerHTML = h;
 };
