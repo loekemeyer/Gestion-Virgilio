@@ -345,7 +345,32 @@ Los dos sin match son los mismos que ya venían marcados por no dar el 30 % exac
 es el que destapó el mapa: **el adelanto de 14.000 fue a `CQ-9694`, pagado a través de `CQ-9553`** —
 que es, textual, la mecánica de pagar un pedido con la factura de otra carga.
 
+## 7. El mapa carga ↔ pedido se carga desde la pantalla (v15.94)
+
+En vez de esperar que Thomas conteste por chat qué carga es qué pedido, la pantalla se lo pregunta
+y lo guarda. **El sistema sugiere; él confirma.**
+
+| Objeto | Qué es |
+|---|---|
+| **`GV_Imp_Carga_Pedido`** | el mapa: (proveedor, carga) → `pedido_ref`. `pedido_ref` en null significa **"esta carga no es ninguno de los pedidos en curso"**, que también es una respuesta |
+| **`GV_Imp_Pagos.carga_origen` / `.carga_destino`** | por giro: con qué carga se cursó (*a través de*) y cuál queda cubierta (*fue a*) |
+| `gv_imp_carga_pedido_set()` · `gv_imp_pago_cargas_set()` | lo que escriben los botones |
+
+**En 📦 Cargas**: cada fila tiene **🔗 Asignar**. Abre la lista de pedidos en curso de ese proveedor
+numerada (se elige por número, `0` = ninguno, o se escribe el PI a mano). Lo confirmado se muestra
+en verde con ✓; lo que todavía no, como *sugerido*.
+
+**En 💵 Giros**: columna nueva **"Cargas (a través de → fue a)"**. Si el giro no las tiene cargadas
+pero **el Excel de Thomas lo dice**, aparece la sugerencia con un botón **✓ usar** que la acepta de
+una. Ejemplo real: el giro de 14.000 de Ownland trae *"según el Excel: CQ-9553 → CQ-9694"* (hoja
+Ownland, fila 22).
+
+Con eso, las preguntas que quedaban abiertas dejan de necesitar una respuesta por chat: se contestan
+tocando un botón, y quedan guardadas.
+
 ### Lo que sigue
 
-Con el mapa carga ↔ PI confirmado, `a_traves_de` / `fue_a` pasan de las hojas a `GV_Imp_Pagos` y el
-circuito queda atado de punta a punta. Es lo único que falta.
+Que Thomas pase por 📦 Cargas y asigne las 9 cargas, y por 💵 Giros y acepte o corrija las cargas de
+cada giro. Ahí el circuito queda atado de punta a punta. Lo único que **no** se puede resolver desde
+la pantalla es lo que no está en ningún lado: el anticipo de la 1.ª Becky, qué es la empresa `D`, y
+la hoja de Hugo Wong que no vino en el Excel.

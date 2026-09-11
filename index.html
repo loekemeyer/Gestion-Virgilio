@@ -7794,7 +7794,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v15.93";
+const APP_VERSION = "v15.94";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -18015,6 +18015,7 @@ function _impPagosRender() {
       '<td class="num"><b>' + _impCursoNum(Math.round(Number(x.monto_usd) || 0)) + "</b></td>" +
       "<td>" + escapeHtml(x.beneficiario || "—") + "</td>" +
       "<td>" + _impPagosTipoTxt(x.tipo) + "</td>" +
+      "<td>" + _impPagoCargasCell(x) + "</td>" +
       '<td style="font-size:11.5px;color:#64748b">' + escapeHtml(x.factura_ref || "") + (x.nota ? '<div style="font-size:10.5px;color:#94a3b8">' + escapeHtml(x.nota) + '</div>' : '') + "</td>" +
       '<td><button class="imcu-b" style="background:#fee2e2;color:#b91c1c" onclick="impPagoBorrar(' + x.id + ')" title="Borrar este giro">🗑</button></td></tr>';
   }).join("");
@@ -18023,7 +18024,7 @@ function _impPagosRender() {
       '<button class="ipg-x" onclick="impPagosCerrar()">Cerrar</button></div>' +
     '<div class="ipg-body">' +
       (rows.length
-        ? '<table class="ipg-tbl"><thead><tr><th>Fecha</th><th class="num">u$s</th><th>A quién</th><th>Tipo</th><th>Factura / nota</th><th></th></tr></thead><tbody>' + body + "</tbody></table>"
+        ? '<table class="ipg-tbl"><thead><tr><th>Fecha</th><th class="num">u$s</th><th>A quién</th><th>Tipo</th><th title="Con qué carga se cursó el giro → qué carga queda cubierta. Es la imputación cruzada.">Cargas (a través de → fue a)</th><th>Factura / nota</th><th></th></tr></thead><tbody>' + body + "</tbody></table>"
         : '<div class="ipg-empty">Todavía no hay giros cargados para este pedido.</div>') +
     "</div>" +
     '<div class="ipg-foot"><div style="font-size:13px;color:#334155">FOB <b>u$s ' + _impCursoNum(Math.round(fob)) + '</b> · girado <b style="color:#065f46">u$s ' + _impCursoNum(Math.round(tot)) +
@@ -18225,6 +18226,8 @@ function _impNtlCargasHtml() {
   rows.forEach(function (r) {
     const sal = Number(r.saldo) || 0;
     const igual = String(r.sugerencia || "").indexOf("igual") >= 0;
+    const pEnc = encodeURIComponent(r.prov).replace(/'/g, "%27");
+    const cEnc = encodeURIComponent(r.carga).replace(/'/g, "%27");
     h += '<tr>' +
       '<td style="font-weight:800">' + escapeHtml(r.prov) + '</td>' +
       '<td style="font-family:Consolas,Menlo,monospace;font-weight:800;font-size:12px">' + escapeHtml(r.carga) + '</td>' +
@@ -18232,9 +18235,13 @@ function _impNtlCargasHtml() {
       '<td class="num">' + (Number(r.fob_carga) > 0 ? _impNtlNum(r.fob_carga) : '—') + '</td>' +
       '<td class="num"><b style="color:' + (Math.abs(sal) < 1 ? '#16a34a' : '#b45309') + '">' + _impNtlNum(sal) + '</b></td>' +
       '<td style="font-size:11.5px;color:#64748b;white-space:nowrap">' + (r.desde ? _isoToDdMmAa(String(r.desde).slice(0, 10)) : '—') + ' → ' + (r.hasta ? _isoToDdMmAa(String(r.hasta).slice(0, 10)) : '—') + '</td>' +
-      '<td style="font-size:12px">' + (r.pedido_sugerido
-        ? escapeHtml(r.pedido_sugerido) + ' ' + _impNtlChip(r.sugerencia || '', igual ? 'ing' : 'otr')
-        : '<span style="color:#94a3b8">—</span>') + '</td></tr>';
+      '<td style="font-size:12px">' + (r.pedido_asignado
+        ? '<b style="color:#065f46">✓ ' + escapeHtml(r.pedido_asignado) + '</b>'
+        : (r.pedido_sugerido
+            ? '<span style="color:#94a3b8">sugerido:</span> ' + escapeHtml(r.pedido_sugerido) + ' ' + _impNtlChip(r.sugerencia || '', igual ? 'ing' : 'otr')
+            : '<span style="color:#94a3b8">—</span>')) +
+        ' <button class="imcu-b" onclick="impCargaAsignar(\'' + pEnc + '\',\'' + cEnc + '\')" title="Decir a qué pedido corresponde esta carga">🔗 Asignar</button>' +
+        '</td></tr>';
   });
   return h + '</tbody></table></div>';
 }
@@ -18271,6 +18278,82 @@ function _impNtlAliasHtml() {
     '<b>⚠ ' + sinDecidir.length + ' nombre(s) del extracto sin definir:</b> ' +
     sinDecidir.map(function (r) { return '<b>' + escapeHtml(r.alias) + '</b> (' + r.movimientos + ' mov.)'; }).join(' · ') +
     '. No están en <code>Importados</code>: hay que decir a qué proveedor corresponden o si son otra cosa.</div>';
+}
+/* v15.94 — El mapa CARGA ↔ PEDIDO se carga desde la pantalla, no por chat.
+   · En 📦 Cargas: 🔗 Asignar elige a qué pedido corresponde esa carga (o la marca como "ninguno").
+   · En 💵 Giros: cada giro puede decir con qué carga se cursó ("a través de") y cuál cubre
+     ("fue a"); si están vacías y el Excel de Thomas lo dice, aparece la sugerencia con un ✓ para
+     aceptarla de una. Backend: GV_Imp_Carga_Pedido + GV_Imp_Pagos.carga_origen/carga_destino. */
+async function impCargaAsignar(provEnc, cargaEnc) {
+  const prov = decodeURIComponent(provEnc), carga = decodeURIComponent(cargaEnc);
+  const fila = ((_impNtl && _impNtl.cargas) || []).find(function (r) { return r.prov === prov && r.carga === carga; }) || {};
+  // los pedidos en curso de ese proveedor, para elegir por número
+  let opciones = [];
+  try {
+    opciones = ((_stkPop && _stkPop.ccAll) || []).filter(function (c) { return c.proveedor === prov; });
+  } catch (_e) {}
+  if (!opciones.length) {
+    try { opciones = (await _pedImpRpc("gv_imp_cc_lista", {}) || []).filter(function (c) { return c.proveedor === prov; }); }
+    catch (_e) { opciones = []; }
+  }
+  const lista = opciones.map(function (c, i) { return "  " + (i + 1) + " = " + c.pedido_ref + " (FOB " + _impNtlNum(c.fob) + ")"; }).join("\n");
+  const actual = fila.pedido_asignado || "";
+  let v;
+  try {
+    v = prompt("¿A qué pedido corresponde la carga " + carga + " de " + prov + "?\n" +
+      (lista ? lista + "\n" : "") +
+      "  0 = no es ninguno de los pedidos en curso\n" +
+      "(o escribí el PI a mano)", actual);
+  } catch (_e) { return; }
+  if (v === null) return;
+  const txt = String(v).trim();
+  let ref = txt;
+  if (txt === "0") ref = "";
+  else if (/^\d+$/.test(txt) && opciones[parseInt(txt, 10) - 1]) ref = opciones[parseInt(txt, 10) - 1].pedido_ref;
+  let leg = ""; try { leg = String(window.__authEmail || ""); } catch (_e) {}
+  try { await _pedImpRpc("gv_imp_carga_pedido_set", { p_proveedor: prov, p_carga: carga, p_pedido_ref: ref || null, p_legajo: leg }); }
+  catch (e) { try { alert("No se pudo guardar: " + (e.message || e)); } catch (_e) {} return; }
+  await impNtlReload();
+}
+/* Las dos cargas de un giro. Un solo prompt para las dos, que es como se leen. */
+async function impPagoCargas(pagoId, sugO, sugD) {
+  if (!_impPagos) return;
+  const r = (_impPagos.rows || []).find(function (x) { return x.id === pagoId; }) || {};
+  let v1;
+  try { v1 = prompt("¿Con qué carga / factura se cursó este giro? (el \"a través de\" del Excel)\nVacío = sin dato:", r.carga_origen || sugO || ""); }
+  catch (_e) { return; }
+  if (v1 === null) return;
+  let v2;
+  try { v2 = prompt("¿Qué carga queda cubierta con este giro? (el \"fue a\")\nVacío = sin dato:", r.carga_destino || sugD || ""); }
+  catch (_e) { return; }
+  if (v2 === null) return;
+  try { await _pedImpRpc("gv_imp_pago_cargas_set", { p_pago_id: pagoId, p_origen: String(v1).trim() || null, p_destino: String(v2).trim() || null }); _impPagos.dirty = true; }
+  catch (e) { try { alert("No se pudo guardar: " + (e.message || e)); } catch (_e) {} return; }
+  await _impPagosReload();
+}
+/* Aceptar de una lo que dice el Excel. */
+async function impPagoCargasAceptar(pagoId, oEnc, dEnc) {
+  if (!_impPagos) return;
+  try { await _pedImpRpc("gv_imp_pago_cargas_set", { p_pago_id: pagoId, p_origen: decodeURIComponent(oEnc || "") || null, p_destino: decodeURIComponent(dEnc || "") || null }); _impPagos.dirty = true; }
+  catch (e) { try { alert("No se pudo guardar: " + (e.message || e)); } catch (_e) {} return; }
+  await _impPagosReload();
+}
+/* Celda de cargas de un giro: lo cargado, o la sugerencia del Excel con el ✓ para aceptarla. */
+function _impPagoCargasCell(x) {
+  // Los valores se codifican ANTES: llamar una función local adentro del string del onclick
+  // deja un "enc(" dentro del atributo y el escáner de botones muertos lo lee como handler.
+  const oEnc = encodeURIComponent(String(x.sug_origen == null ? "" : x.sug_origen)).replace(/'/g, "%27");
+  const dEnc = encodeURIComponent(String(x.sug_destino == null ? "" : x.sug_destino)).replace(/'/g, "%27");
+  const tiene = x.carga_origen || x.carga_destino;
+  if (tiene) {
+    return '<span style="font-family:Consolas,Menlo,monospace;font-size:11.5px;cursor:pointer" onclick="impPagoCargas(' + x.id + ')" title="Tocá para corregir">' +
+      escapeHtml(x.carga_origen || '—') + ' <span style="color:#94a3b8">→</span> ' + escapeHtml(x.carga_destino || '—') + '</span>';
+  }
+  if (x.sug_origen || x.sug_destino) {
+    return '<span style="font-size:11px;color:#b45309">según el Excel: <b>' + escapeHtml(x.sug_origen || '—') + ' → ' + escapeHtml(x.sug_destino || '—') + '</b></span> ' +
+      '<button class="imcu-b" style="background:#166534;color:#fff" title="' + escapeHtml(x.sug_fuente || '') + '" onclick="impPagoCargasAceptar(' + x.id + ',\'' + oEnc + '\',\'' + dEnc + '\')">✓ usar</button>';
+  }
+  return '<button class="imcu-b" onclick="impPagoCargas(' + x.id + ')">+ cargas</button>';
 }
 function _impCursoLineasHtml(ls) {
   if (!ls.length) return '<div style="padding:10px 14px;color:#64748b;font-size:12.5px">Este pedido no tiene líneas en curso.</div>';

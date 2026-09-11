@@ -11238,6 +11238,14 @@ distinta, empresa distinta.
 > **Marcado sin tocar**: Frontier FOB 14.400 vs 14.000 del motor y su llegada (04/11) que no cierra con el
 > embarque 26/10; Becky 2ª con el 30% pagado el 02/jun y 112 días hasta embarcar.
 
+> Nota **2026-09-11 (v15.94) — El mapa carga ↔ pedido se carga desde la pantalla, no por chat.**
+> En vez de esperar que Thomas conteste qué carga es qué pedido, la pantalla se lo pregunta y lo guarda:
+> **🔗 Asignar** en cada fila de 📦 Cargas (elige de la lista de pedidos en curso del proveedor, o `0` = ninguno,
+> que también es una respuesta válida), y en 💵 **Giros** una columna nueva *"Cargas (a través de → fue a)"* que,
+> si el Excel lo dice, muestra la sugerencia con un **✓ usar** para aceptarla de una — el giro de 14.000 de
+> Ownland ya trae *"según el Excel: CQ-9553 → CQ-9694"*. Backend: `GV_Imp_Carga_Pedido` +
+> `GV_Imp_Pagos.carga_origen/carga_destino`. §7 de `docs/IMPORTACIONES-PAGOS-ARGENTINA.md`.
+
 > Nota **2026-09-11 (v15.93) — NTL: cargas, conciliación y alias de proveedor.**
 > La solapa 💱 NTL pasa a tener **tres vistas**: 📄 Extracto · 📦 **Cargas** (las del Excel —`CQ-9154`, `China 2`…—
 > con lo girado, el FOB y el saldo, más el pedido que le calza) · 🔗 **Conciliación** (cada giro cargado buscado

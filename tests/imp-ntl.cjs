@@ -44,10 +44,10 @@ const fail = (m) => { console.error("✗ " + m); process.exitCode = 1; };
     const CARGAS = [
       { prov: "Ownland", carga: "CQ-9694", girado: "34990.00", fob_carga: "34956.00", saldo: "-34.00",
         movs: 3, desde: "2026-03-13", hasta: "2026-06-03", pedido_sugerido: "PI OL-10139",
-        fob_pedido: "46626.00", sugerencia: "FOB difiere 11670" },
+        fob_pedido: "46626.00", sugerencia: "FOB difiere 11670", pedido_asignado: null, nota_asignacion: null },
       { prov: "Frontier", carga: "China 2", girado: "14400.00", fob_carga: "14400.00", saldo: "0.00",
         movs: 4, desde: "2025-07-17", hasta: "2026-02-15", pedido_sugerido: "Frontier 505C",
-        fob_pedido: "14400.00", sugerencia: "FOB igual" }
+        fob_pedido: "14400.00", sugerencia: "FOB igual", pedido_asignado: "Frontier 505C", nota_asignacion: null }
     ];
     const CONC = [
       { pago_id: 1, pedido_ref: "Frontier 505C", proveedor: "Frontier", fecha: "2026-08-25",
@@ -72,6 +72,8 @@ const fail = (m) => { console.error("✗ " + m); process.exitCode = 1; };
       else if (url.indexOf("gv_imp_cargas") >= 0) data = CARGAS;
       else if (url.indexOf("gv_imp_conciliacion") >= 0) data = CONC;
       else if (url.indexOf("gv_imp_prov_alias") >= 0) data = ALIAS;
+      else if (url.indexOf("gv_imp_carga_pedido_set") >= 0) data = { ok: true };
+      else if (url.indexOf("gv_imp_cc_lista") >= 0) data = [{ pedido_ref: "PI OL-10139", proveedor: "Ownland", fob: "46626.00" }];
       return { ok: true, status: 200, json: async () => data, text: async () => "" };
     };
 
@@ -92,6 +94,13 @@ const fail = (m) => { console.error("✗ " + m); process.exitCode = 1; };
     const tc = body().innerText.replace(/\s+/g, " ");
     out.cargasTxt = tc;
     out.cargasFilas = [...body().querySelector(".intl-tbl").tBodies[0].rows].length;
+    out.asignado = /✓ Frontier 505C/.test(tc);     // la que ya tiene pedido confirmado
+    out.sugerido = /sugerido:/.test(tc);           // la que sólo tiene sugerencia
+    // asignar una carga a un pedido desde la pantalla
+    calls.length = 0;
+    window.prompt = () => "1";
+    await impCargaAsignar(encodeURIComponent("Ownland"), encodeURIComponent("CQ-9694"));
+    out.callAsig = calls.filter((c) => c.u.indexOf("rpc/gv_imp_carga_pedido_set") === 0).map((c) => JSON.parse(c.b));
     // ---- vista CONCILIACIÓN ----
     await impNtlSetVista("conc");
     const tk = body().innerText.replace(/\s+/g, " ");
@@ -125,11 +134,21 @@ const fail = (m) => { console.error("✗ " + m); process.exitCode = 1; };
   if (r.callProv.length !== 1 || r.callProv[0].p_proveedor !== "Hugo Wong") fail("el filtro de proveedor no viaja: " + JSON.stringify(r.callProv));
   // v15.91 — las otras dos vistas
   if (r.cargasFilas !== 2) fail("la vista Cargas debería listar 2 cargas, listó " + r.cargasFilas);
-  if (!/CQ-9694/.test(r.cargasTxt) || !/FOB igual/i.test(r.cargasTxt)) fail("la vista Cargas no muestra la carga ni la sugerencia: " + (r.cargasTxt || "").slice(0, 250));
+  // la fila con pedido ya confirmado muestra el asignado; la otra, la sugerencia
+  if (!/CQ-9694/.test(r.cargasTxt) || !/FOB difiere/i.test(r.cargasTxt)) fail("la vista Cargas no muestra la carga ni la sugerencia: " + (r.cargasTxt || "").slice(0, 250));
   if (r.concFilas !== 2) fail("la conciliación debería listar 2 giros, listó " + r.concFilas);
   if (!/exacto/i.test(r.concTxt) || !/sin match/i.test(r.concTxt)) fail("la conciliación no distingue el que matchea del que no: " + (r.concTxt || "").slice(0, 250));
   if (!/1 de 2/.test(r.concTxt)) fail("la conciliación no cuenta cuántos aparecen: " + (r.concTxt || "").slice(0, 250));
   if (!r.avisoAlias) fail("no avisa los nombres del extracto sin definir (Cestos)");
+  // v15.94 — el mapa carga ↔ pedido se carga desde la pantalla
+  if (!r.asignado) fail("no distingue la carga que ya tiene pedido asignado: " + (r.cargasTxt || "").slice(0, 250));
+  if (!r.sugerido) fail("no marca como 'sugerido' la que todavía no se confirmó");
+  if (r.callAsig.length !== 1) fail("Asignar no llamó a la RPC: " + JSON.stringify(r.callAsig));
+  else {
+    const a = r.callAsig[0];
+    if (a.p_proveedor !== "Ownland" || a.p_carga !== "CQ-9694" || a.p_pedido_ref !== "PI OL-10139")
+      fail("Asignar mandó mal los datos (eligiendo la opción 1): " + JSON.stringify(a));
+  }
   if (errs.length) fail("errores de página: " + errs.join(" | "));
   await b.close();
   if (!process.exitCode) console.log("✓ imp-ntl OK");
