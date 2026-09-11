@@ -409,3 +409,9 @@ Rollback: restaurar fecha/estado/unidades_llegadas desde el backup por `id` + `g
 (119E), id 129 `fob_uni 0.7→0.47`. `Importados_Volumen`: alta 119E; 729E y 877E al PI. `Importados_Mov_Stock`: +1 `inicial` 0
 (119E). Backups `GV_Importados_Baches_bkp_ownland_20260911`, `GV_Importados_bkp_ownland_20260911`,
 `GV_Importados_Volumen_bkp_ownland_20260911`. Detalle y rollback §3.bm.5.
+
+## PI Hugo Wong NY26-031438 + embarque de julio cerrado — v15.15 (2026-09-11)
+
+`GV_Importados_Baches`: +11 (`creado_por='PI NY26-031438'`), 7 del backfill → `llegado` sin stock. `Importados` ids 81/123
+FOB al PI. `Importados_Volumen` 727E master 144 + inner; 539E/540E inner. Backups `GV_Importados_Baches_bkp_hugowong_20260911`,
+`GV_Importados_bkp_hugowong_20260911`, `GV_Importados_Volumen_bkp_hugowong_20260911`. Detalle y rollback §3.bm.7.

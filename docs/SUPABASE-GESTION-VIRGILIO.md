@@ -5031,3 +5031,25 @@ Dueño: *"todos los datos que tengas que corregir, dale"*. Barrido sobre `v_impo
 - Regla útil para los próximos PI: **fecha = depósito + lead time del PI + 40 días de viaje**. (Fujian decía "30-45
   días después del depósito"; sus baches tienen 01/11 cargado por Becky, no se recalculó.)
 - Rollback: `update "GV_Importados_Baches" set fecha_reingreso = null where creado_por = 'PI OL-10139'` + resync.
+
+### §3.bm.7 — PI Hugo Wong NY26-031438 cargado; el embarque de julio cerrado como llegado (v15.15, 2026-09-11)
+
+- El dueño subió el PDF como "el de Ownland", pero es de **Hugo Wong** (Yangjiang Nanyuan, Ref NY26-031438, 01/08/2026,
+  FOB Shenzhen, 88.832 u, u$s 38.640, depósito 30 % = u$s 11.592, **producción 55 días**). Ownland ya estaba cargado
+  (§3.bm.5). 11 baches `en_curso`, `creado_por = 'PI NY26-031438'`, **sin fecha**: regla del dueño *"plazo del PI +
+  40"* → `fecha = depósito + 55 + 40`; avisa cuándo pagó el 30 %. Líneas: 838E·CH 1.008, 323E 4.464, 102E·Loke 24.048,
+  522E 6.000, 529E 14.400, 727E·CH 2.448, 540E 1.296, 539E 1.296, 536E 1.872, 1000900 20.000 (parte), 523C 12.000
+  (parte). Chequeo: `sum(unidades - unidades_llegadas)` Hugo Wong `en_curso` = **88.832**.
+- **Los 7 baches del backfill** (1000900 80.000, 102E 9.360, 323E 2.000, 522E 4.040, 523C 14.400, 529E 20.736,
+  599ES 1.800) eran el **embarque del 23/07** (`Movimientos_Stock` ingreso 23/07: 102E 780 cajas = 9.360 u exacto,
+  523C 240 cajas = 14.400, 522E 170, 529E 1.620; 323E recepciones 24–28/07; 1000900 y 599ES sin registro por ser
+  parte / suelto). Pasan a `llegado` sin movimiento de stock (módulo sincronizado con el depósito en v15.11).
+- **Datos corregidos según el PI**: FOB 522E **1,40 → 1,29** (id 81), 727E **0,59 → 0,465** (id 123); `Importados_Volumen`
+  727E `uni_master 192 → 144` e inner 12 (el PI no trae medidas de cartón: el m³ 0,0398 queda **sin verificar**,
+  `fuente` lo dice); 539E/540E `uni_inner` null → 12. El resto (FOB, master) ya coincidía.
+- Backups `GV_Importados_Baches_bkp_hugowong_20260911`, `GV_Importados_bkp_hugowong_20260911`,
+  `GV_Importados_Volumen_bkp_hugowong_20260911`. Rollback: `delete from "GV_Importados_Baches" where creado_por =
+  'PI NY26-031438'`; estado/unidades_llegadas de los 7 viejos desde el backup; FOB y volumen desde los backups;
+  `gv_importados_resync` por importado.
+- **Impos en curso**: Becky 29/09 y 15/11 · Fujian 01/11 · Frontier 04/11 · Ownland 18/12 · Hugo Wong sin fecha
+  (falta la fecha del depósito).
