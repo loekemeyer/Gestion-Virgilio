@@ -293,10 +293,59 @@ acumulados del circuito (depositado / girado / recuperado / comisiones), los **r
 (u$s 42.908: Hugo Wong CH37 21.952 y Ownland 20.956, los directos) y el **extracto navegable**, con
 fichas por empresa y por proveedor y un "ver más" que pagina. Test `tests/imp-ntl.cjs`.
 
+## 6. Cargas, conciliación y alias (v15.93)
+
+Tres cosas más que se pudieron derivar **sin** los datos que faltan de Thomas. La solapa 💱 NTL pasa
+a tener **tres vistas**: 📄 Extracto · 📦 Cargas · 🔗 Conciliación.
+
+### Alias de proveedor — `GV_Imp_Prov_Alias`
+
+El import es fiel, así que el nombre original **no se toca**: se traduce en una tabla aparte, con la
+función `gv_imp_prov_canon()` que usan todas las vistas. Cargados los tres que son certeza
+tipográfica — **`Fuyian` → Fujian**, **`Xihin` → Zhixin**, **`Becky Chen` → Becky` — y marcados como
+**empresa mal tipeada** `Chef` y `Tierra`, que no son proveedores.
+
+**Quedan 5 sin decidir** (`Cestos`, `Jason`, `Stephen Jiang`, `Qi Qiao`, `Wenxinda`): no están en
+`Importados` y la pantalla los avisa arriba. `gv_imp_prov_alias_set()` los define.
+
+### `gv_imp_cargas` — las cargas del Excel con su saldo
+
+Una fila por **carga** (`CQ-9154`, `China 2`, …) con lo **girado**, el **FOB** y el **saldo**, más el
+pedido en curso que más se le parece por proveedor y monto. **La sugerencia no se guarda**: el mapa
+carga ↔ PI lo tiene que confirmar Thomas.
+
+Lo que salió, y que apunta al FOB de Ownland:
+
+| Proveedor | Carga | Girado | FOB | Saldo | Pedido que le calza |
+|---|---|---|---|---|---|
+| Frontier | `China 2` | 14.400 | 14.400 | **0** | `Frontier 505C` — **FOB igual** |
+| Ownland | `CQ-9694` (la última, 13/03→03/06/2026) | 34.990 | **34.956** | −34 | `PI OL-10139` — FOB difiere **11.670** |
+
+**Los 11.670 no son casualidad**: son exactamente el "Falta" de Ownland en la planilla de deudas
+(46.626 − 14.000 − 20.956). Y 46.626 − 34.956 = **11.670** también. O bien el FOB de la carga es
+34.956 y los 46.626 del sistema traen 11.670 de más, o bien `CQ-9694` y `PI OL-10139` son **dos
+cargas distintas** — sus fechas (marzo-junio 2026 contra un PI del 02/09 que embarca el 08/11) hacen
+pensar lo segundo. **No se tocó: lo define Thomas.**
+
+### `gv_imp_conciliacion` — los giros cargados contra el Excel
+
+Busca cada giro de `GV_Imp_Pagos` en las **dos** fuentes (el extracto de NTL y las hojas por
+proveedor), por proveedor canónico + monto (±1) + la fecha más cercana. **4 de 6 aparecen**:
+
+| Pedido | u$s | Resultado |
+|---|---|---|
+| `Frontier 505C` | 4.320 | ✅ **exacto** — extracto NTL fila 175, 25/08 |
+| `PI BX260722D` Zhixin | 3.100 | ✅ **exacto** — fila 184, 04/09 (lo encontró vía el alias `Xihin`) |
+| `PI HT26-06-600-R1` Fujian | 10.000 | ✅ monto ok, el extracto dice **04/08** y no 05/08 |
+| `PI OL-10139` Ownland | 14.000 | ⚠ está en la **hoja Ownland**, pero del **13/03/2026**, *a través de `CQ-9553`, fue a `CQ-9694`* |
+| `PI B260601-2` Becky | 7.359 | ❌ **sin match** |
+| `PI NY26-031438` Hugo Wong | 14.041 | ❌ **sin match** |
+
+Los dos sin match son los mismos que ya venían marcados por no dar el 30 % exacto. Y el de Ownland
+es el que destapó el mapa: **el adelanto de 14.000 fue a `CQ-9694`, pagado a través de `CQ-9553`** —
+que es, textual, la mecánica de pagar un pedido con la factura de otra carga.
+
 ### Lo que sigue
 
-Atar cada movimiento del extracto al `pedido_ref` del módulo y llevar `a_traves_de` / `fue_a` a
-`GV_Imp_Pagos`, que hoy sólo tiene `factura_ref` como texto libre. Para eso hace falta el mapa entre
-las **cargas** del Excel (`CQ-9154`, `China 43`, `CH 44`…) y los PI, que sólo lo tiene Thomas.
-Ojo también con los nombres del extracto: `Fuyian` y `Fujian` son el mismo, y `Xihin` es `Zhixin`
-(se importaron tal cual).
+Con el mapa carga ↔ PI confirmado, `a_traves_de` / `fue_a` pasan de las hojas a `GV_Imp_Pagos` y el
+circuito queda atado de punta a punta. Es lo único que falta.

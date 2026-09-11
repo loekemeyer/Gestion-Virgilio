@@ -7794,7 +7794,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v15.93";
+const APP_VERSION = "v15.96";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -18075,7 +18075,7 @@ async function openImpNtl() {
   const body = document.getElementById("stkPopBody"); if (!body) return;
   body.innerHTML = '<div class="stkpop-empty">Cargando la cuenta de NTL…</div>';
   _stkPop = { kind: "impNtl" };
-  _impNtl = { resumen: [], movs: [], pend: [], empresa: "", prov: "", n: 60 };
+  _impNtl = { resumen: [], movs: [], pend: [], cargas: [], conc: [], alias: [], empresa: "", prov: "", n: 60, vista: "extracto" };
   await impNtlReload();
 }
 async function impNtlReload() {
@@ -18085,6 +18085,9 @@ async function impNtlReload() {
     _impNtl.pend    = (await _pedImpRpc("gv_imp_ntl_pendientes", {})) || [];
     _impNtl.movs    = (await _pedImpRpc("gv_imp_ntl_mov", { p_limit: _impNtl.n,
                         p_empresa: _impNtl.empresa || null, p_proveedor: _impNtl.prov || null })) || [];
+    _impNtl.cargas  = (await _pedImpRpc("gv_imp_cargas", {})) || [];
+    _impNtl.conc    = (await _pedImpRpc("gv_imp_conciliacion", {})) || [];
+    _impNtl.alias   = (await _pedImpRpc("gv_imp_prov_alias", {})) || [];
   } catch (e) { _impNtl.err = (e.message || String(e)); }
   _impNtlRender();
 }
@@ -18158,8 +18161,18 @@ function _impNtlRender() {
     '<span style="background:#fef2f2;border:1px solid #fecaca;border-radius:8px;padding:5px 10px">Comisiones + gastos <b>' + _impNtlNum(suma('comisiones') + suma('gastos_bancarios')) + '</b></span>' +
     '</div>';
 
-  // filtros
   const _fb = function (on) { return 'width:auto;margin:0;flex:0 0 auto;padding:6px 12px;border-radius:999px;border:1px solid ' + (on ? '#0f766e' : '#cbd5e1') + ';background:' + (on ? '#0f766e' : '#fff') + ';color:' + (on ? '#fff' : '#334155') + ';font-size:12.5px;font-weight:800;cursor:pointer'; };
+  // v15.91 — tres vistas de la misma cuenta
+  const vista = st.vista || "extracto";
+  h += '<div class="imcu-fila"><span class="imcu-lbl">Ver:</span>' +
+    '<button style="' + _fb(vista === 'extracto') + '" onclick="impNtlSetVista(\'extracto\')">📄 Extracto</button>' +
+    '<button style="' + _fb(vista === 'cargas') + '" onclick="impNtlSetVista(\'cargas\')" title="Las cargas del Excel con su saldo y el pedido que le calza">📦 Cargas</button>' +
+    '<button style="' + _fb(vista === 'conc') + '" onclick="impNtlSetVista(\'conc\')" title="Los giros cargados contra el Excel: cuál aparece y cuál no">🔗 Conciliación</button>' +
+    '</div>';
+  h += _impNtlAliasHtml();
+  if (vista === 'cargas') { body.innerHTML = h + _impNtlCargasHtml(); return; }
+  if (vista === 'conc')   { body.innerHTML = h + _impNtlConcHtml(); return; }
+  // filtros (sólo en el extracto)
   h += '<div class="imcu-fila"><span class="imcu-lbl">Empresa:</span>' +
     '<button style="' + _fb(!st.empresa) + '" onclick="impNtlSetEmpresa(\'\')">Todas</button>' +
     ['D', 'TN', 'CH'].map(function (e) { return '<button style="' + _fb(st.empresa === e) + '" onclick="impNtlSetEmpresa(\'' + e + '\')">' + escapeHtml(_impNtlEmpNom(e)) + '</button>'; }).join('') +
@@ -18192,6 +18205,72 @@ function _impNtlRender() {
   h += '</tbody></table></div>';
   if ((st.movs || []).length >= (st.n || 60)) h += '<button class="apr-mas" onclick="impNtlMas()">Ver más movimientos</button>';
   body.innerHTML = h;
+}
+/* v15.91 — La solapa 💱 NTL pasa a tener tres vistas:
+     📄 Extracto      · el movimiento a movimiento (lo de la v15.90)
+     📦 Cargas        · las cargas del Excel (CQ-9154, China 2…) con su saldo y el pedido que le calza
+     🔗 Conciliación  · cada giro cargado contra el Excel: cuál matchea y cuál no
+   Las sugerencias NO se guardan: son para que Thomas confirme el mapa carga ↔ PI, que es lo único
+   que falta para atar el extracto a los pedidos. */
+function impNtlSetVista(v) { if (!_impNtl) return; _impNtl.vista = v || "extracto"; return impNtlReload(); }
+function _impNtlChip(txt, tipo) { return '<span class="intl-c ' + tipo + '">' + escapeHtml(txt) + '</span>'; }
+/* Cargas del Excel: una fila por carga, con lo girado, el FOB y el saldo. */
+function _impNtlCargasHtml() {
+  const rows = (_impNtl && _impNtl.cargas) || [];
+  if (!rows.length) return '<div class="stkpop-empty">No hay cargas cargadas.</div>';
+  let h = '<div class="stkpop-hint">Las <b>cargas</b> del Excel de Thomas (las hojas por proveedor). <b>Girado</b> es lo que salió para esa carga y <b>FOB</b> lo que vale; saldo 0 = cerrada. El <b>pedido sugerido</b> es el que más se le parece por proveedor y monto — <b>es una sugerencia, no está guardada</b>: el mapa carga ↔ PI lo tiene que confirmar Thomas.</div>';
+  h += '<div class="mva-tblwrap wide"><table class="intl-tbl"><thead><tr><th>Proveedor</th><th>Carga</th>' +
+    '<th class="num">Girado</th><th class="num">FOB</th><th class="num">Saldo</th><th>Período</th>' +
+    '<th>Pedido que le calza</th></tr></thead><tbody>';
+  rows.forEach(function (r) {
+    const sal = Number(r.saldo) || 0;
+    const igual = String(r.sugerencia || "").indexOf("igual") >= 0;
+    h += '<tr>' +
+      '<td style="font-weight:800">' + escapeHtml(r.prov) + '</td>' +
+      '<td style="font-family:Consolas,Menlo,monospace;font-weight:800;font-size:12px">' + escapeHtml(r.carga) + '</td>' +
+      '<td class="num">' + _impNtlNum(r.girado) + '</td>' +
+      '<td class="num">' + (Number(r.fob_carga) > 0 ? _impNtlNum(r.fob_carga) : '—') + '</td>' +
+      '<td class="num"><b style="color:' + (Math.abs(sal) < 1 ? '#16a34a' : '#b45309') + '">' + _impNtlNum(sal) + '</b></td>' +
+      '<td style="font-size:11.5px;color:#64748b;white-space:nowrap">' + (r.desde ? _isoToDdMmAa(String(r.desde).slice(0, 10)) : '—') + ' → ' + (r.hasta ? _isoToDdMmAa(String(r.hasta).slice(0, 10)) : '—') + '</td>' +
+      '<td style="font-size:12px">' + (r.pedido_sugerido
+        ? escapeHtml(r.pedido_sugerido) + ' ' + _impNtlChip(r.sugerencia || '', igual ? 'ing' : 'otr')
+        : '<span style="color:#94a3b8">—</span>') + '</td></tr>';
+  });
+  return h + '</tbody></table></div>';
+}
+/* Conciliación: los giros cargados contra el Excel. */
+function _impNtlConcHtml() {
+  const rows = (_impNtl && _impNtl.conc) || [];
+  if (!rows.length) return '<div class="stkpop-empty">No hay giros cargados para conciliar.</div>';
+  const ok = rows.filter(function (r) { return r.match !== "SIN MATCH"; }).length;
+  let h = '<div class="stkpop-hint">Cada <b>giro</b> cargado en la cuenta corriente, buscado en el Excel de Thomas — en el extracto de NTL y en las hojas por proveedor. <b>' + ok + ' de ' + rows.length + '</b> aparecen. Los que dicen <b>SIN MATCH</b> no están en el Excel con ese monto: o el monto está mal, o el giro salió por un camino que no está en estas hojas.</div>';
+  h += '<div class="mva-tblwrap wide"><table class="intl-tbl"><thead><tr><th>Pedido</th><th>Proveedor</th>' +
+    '<th>Fecha cargada</th><th class="num">u$s</th><th>Estado</th><th>Dónde aparece en el Excel</th></tr></thead><tbody>';
+  rows.forEach(function (r) {
+    const sinMatch = r.match === "SIN MATCH";
+    const exacto = r.match === "exacto";
+    h += '<tr>' +
+      '<td style="font-family:Consolas,Menlo,monospace;font-weight:800;font-size:12px">' + escapeHtml(r.pedido_ref) + '</td>' +
+      '<td>' + escapeHtml(r.proveedor) + '</td>' +
+      '<td style="white-space:nowrap">' + (r.fecha ? _isoToDdMmAa(String(r.fecha).slice(0, 10)) : '—') + '</td>' +
+      '<td class="num"><b>' + _impNtlNum(r.monto_usd) + '</b></td>' +
+      '<td>' + _impNtlChip(sinMatch ? '⚠ sin match' : (exacto ? '✓ exacto' : r.match), sinMatch ? 'com' : (exacto ? 'ing' : 'gir')) + '</td>' +
+      '<td style="font-size:12px;color:#475569">' + (r.fuente
+        ? '<b>' + escapeHtml(r.fuente) + '</b> · fila ' + r.fila_excel + ' · ' + (r.fecha_excel ? _isoToDdMmAa(String(r.fecha_excel).slice(0, 10)) : '—') +
+          (r.detalle ? '<div style="font-size:10.5px;color:#94a3b8">' + escapeHtml(String(r.detalle).slice(0, 80)) + '</div>' : '')
+        : '<span style="color:#b45309">no aparece</span>') + '</td></tr>';
+  });
+  return h + '</tbody></table></div>';
+}
+/* Alias: los nombres del extracto que hay que traducir. Los que quedan sin decidir los define Thomas. */
+function _impNtlAliasHtml() {
+  const rows = (_impNtl && _impNtl.alias) || [];
+  const sinDecidir = rows.filter(function (r) { return !r.canonico && !r.es_empresa; });
+  if (!sinDecidir.length) return "";
+  return '<div style="margin-bottom:10px;padding:9px 13px;background:#fffbeb;border:1px solid #fde68a;border-radius:10px;font-size:12.5px;color:#92400e">' +
+    '<b>⚠ ' + sinDecidir.length + ' nombre(s) del extracto sin definir:</b> ' +
+    sinDecidir.map(function (r) { return '<b>' + escapeHtml(r.alias) + '</b> (' + r.movimientos + ' mov.)'; }).join(' · ') +
+    '. No están en <code>Importados</code>: hay que decir a qué proveedor corresponden o si son otra cosa.</div>';
 }
 function _impCursoLineasHtml(ls) {
   if (!ls.length) return '<div style="padding:10px 14px;color:#64748b;font-size:12.5px">Este pedido no tiene líneas en curso.</div>';

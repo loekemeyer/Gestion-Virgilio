@@ -7679,6 +7679,107 @@ tanda armada (TAP), esperando decisión de Thomas — 6 sin fecha de entrega (98
 armadas 03/09, facturadas 04/09, **con CCR**: control de remitos hecho y carga sin registrar) y 9
 vencidas (44612..44617 Cencosud D72B/D72C, 98480/98481 D47B armadas el **27/08**, 98530 D60C).
 
+---
+
+## 3.ci Los 10 artículos que se venden y no están en el maestro (v15.94) — 2026-09-11
+
+Repasando **uno por uno** los 7 huecos que quedaban, los dos artículos reales resultaron ser
+el mismo problema, y de fondo:
+
+| Cód | Artículo | Quién | Situación |
+|---|---|---|---|
+| `574` | Corta Queso Blandos Mango Alambre | **4170 Ichariba Chode SRL**, 3 NP × 1 cj, entregadas | se le factura a **72 clientes desde 2023**, siempre a **$2.770** bruto |
+| `838E` | Rallador Cilíndrico Mini | 1474 Celestino (1 cj) y 2447 Clapera (3 cj) | **faltante puro**, 0 entregado |
+
+Las otras 2 filas eran las mismas NP repetidas con **`cod_cliente` vacío** en
+`Entregas_Virgilio` — basura, no artículos (engancha con el problema abierto de las filas sin
+tanda que duplican cajas).
+
+### La causa
+
+`precios_venta` —el espejo que Virgilio usa para valorizar— se arma **sólo de `products` de
+LK**. Los precios cargados a mano en **`item_precios`** nunca viajaban. Son **10 códigos**:
+
+`120` Filtros de Café · `193` Tostador Enlozado · `198E` Pelador Dentado · `55215` Palo de
+Amasar · `574` Corta Queso · `599EZ` Pelador Mad Verde · `727EN` Sacacorcho Doble Imp. ·
+`809` Corta Queso · `838E` Rallador Mini · `865ED` Rallador Plano
+
+Son **justo** los que venían apareciendo "sin precio" toda la tarde. No era casualidad.
+
+### Lo que NO se trajo, y por qué
+
+La idea original era que el sync leyera `v_item_precio` entero. Mirándolo de cerca, **eso
+rompía dos cosas**:
+
+- **`chef_products` (98 códigos)** → reintroduce el bug que arregló la v14.44: el `809E` de
+  Chef a $3.005 pisando el de LK a $4.060 en una NP de Loekemeyer.
+- **`variante_L` (78) + `loke_products` (16)** → es la **línea Loke**, que por regla del dueño
+  **no tiene lista general**: el precio es el pactado con cada cliente.
+
+Así que se traen **sólo los `origen = 'manual'`**, y **`products` manda**: si un código está en
+el maestro, el manual no lo pisa.
+
+### Medido
+
+`sync-precios-venta` v9: `precios_venta` 223 → **233** filas, `precios_lk_manuales: 10`,
+`cob_uxb_lk` 295. **0 precios existentes modificados** (comparado fila a fila contra
+`gv_bkp_precios_venta_20260911_pre_manuales`).
+
+| Vista | antes de hoy | tras el precio facturado | **ahora** |
+|---|---|---|---|
+| `vista_facturacion_neto_items` | 1.178 | 7 | **0** |
+| `vista_facturable_anticipado` | 67 | 0 | **0** |
+| `vista_plata_perdida` | 154 | 5 | **1** |
+
+La única que queda es el artículo **`597`** a Clapera (LK 2394), 8 cajas faltantes del 20/08:
+no está en ninguna lista y **nunca se facturó**, así que no hay de dónde sacarlo. Ése sí es
+un alta de artículo pendiente.
+
+### Lo que este arreglo NO toca
+
+La card de OC de súper de LK matchea contra `products` + `loke_products`, **no** contra
+`precios_venta` de Virgilio. Por eso **sigue abierto** que una OC de La Anónima entrara con
+**17 de 18 renglones**: el `198E` no está en ese catálogo y la línea se cae **sin aviso** —
+aunque a La Anónima se le viene facturando el 198E desde junio ($1.110 bruto, 19% de dto,
+última el **08/09**). Es el mismo agujero, del otro lado, y es un fix de LK.
+
+### Rollback
+
+Redeployar `sync-precios-venta` sin el bloque `1b` (la versión previa está en el historial de
+`supabase/functions/sync-precios-venta/index.ts`) y restaurar desde
+`gv_bkp_precios_venta_20260911_pre_manuales`.
+
+### §3.cp.1 — El 198E existía en todos lados menos en el maestro (v15.95) — 2026-09-11
+
+El primer caso real que dejó el importador automático: la OC de La Anónima **22908256**
+entraba `parcial` porque el **198E** (Pelador Negro Dentado Loke) no estaba en `products`
+ni en `loke_products` de LK. Pero se vende hace rato — 25 movimientos de stock en Virgilio
+(último 09/09), m³ 0,0033, lista de Coto $1.100, lista de La Anónima $1.110 y facturas
+reales: 771 el 08/09 por 840 u a $1.110 bruto (19% dto → $899,10 neto) y Osa el 09/09 por
+1.656 u. Vivía sólo en `item_precios`, la tabla de precios manuales de LK, que **no** es lo
+que mira el match por código: por eso el renglón se caía en silencio (y por eso la
+valorización lo calculaba por unidad, sin `uxb` — §3.cf).
+
+**Alta (pedido de Thomas):** `loke_products` ← `198E`, "Pelador Negro Dentado Loke",
+categoría Peladores, **lista $1.110, uxb 12, activo**. Es el precio que `v_item_precio` ya
+servía, así que **no cambió ningún precio**, sólo la fuente:
+
+| Quién | Qué paga el 198E | De dónde sale |
+|---|---|---|
+| Coto (801) | $1.100 | lista de súper (`precios_super`) |
+| La Anónima (771) | $1.110 | lista de súper |
+| Osa (2533) | $660 | precio pactado con Fede, `GV_Precios_Cliente` con `es_final` — le gana a la lista |
+| Extralimp (4114) | $1.110 | la lista: compra la línea Loke entera con **dto 0**, verificado contra sus facturas (102E 1100=1100, 103 465=465, 121 1420=1420, 123 790=790 el 17/06) |
+
+**Medido:** la misma OC pasa de `parcial` (13 de 14 renglones, $16.695.240 vs $17.627.640
+del PDF) a **`importada` con 14 de 14 y el total exacto**. Backup de las 23 filas previas en
+`sql/backups/loke_products_20260911_pre_198E.sql` de `pagina-lk-copia`; deshacer es
+`delete from public.loke_products where cod = '198E';`. Problema **26** de
+`github_repo_problemas`, cerrado.
+
+**Ojo:** el alta lo hace aparecer en el catálogo Loke del portal (23 → 24 productos, a
+$1.110). Si no se quiere que se vea en la web, `active = false` lo saca sin romper nada: el
+importador matchea igual porque no filtra por `active`.
 ## §3.cn.2 — "Sin programar" para una NP de ISIS: las 8 viejas sin Carga Camión (v15.93, 2026-09-11)
 
 Thomas, sobre los 15 que quedaron en la lista de vencidos después de la v15.85:

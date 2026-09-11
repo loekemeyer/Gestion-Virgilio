@@ -1,11 +1,21 @@
 // sync-precios-venta — refresca precios_venta (LK), precios_venta_chef (Chef) y
 // cob_uxb_lk desde:
-//   1. LK products + loke_products (WEB_SERVICE_KEY) → precios_venta + cob_uxb_lk
+//   1. LK products + item_precios(origen=manual) (WEB_SERVICE_KEY) → precios_venta
 //   2. Chef products (CHEF_KEY — publishable key, lectura pública) → precios_venta_chef
+//   3. LK products ∪ loke_products ∪ item_precios(manual) → cob_uxb_lk
 // v14.44: listas SEPARADAS por empresa (antes merge con "Chef gana", ensuciaba LK).
 // v14.47: RECONCILIA — borra de cada mirror lo que ya no está en su catálogo de origen,
 //         así precios_venta = catálogo LK exacto y precios_venta_chef = catálogo Chef exacto
 //         (antes el upsert sin delete dejaba filas viejas que ensuciaban gv_articulo_empresa).
+// 2026-09-11 (app v15.94): precios_venta suma los 10 códigos de item_precios con origen='manual'.
+//         Son artículos que SE VENDEN y NO están en el maestro de LK (574 Corta Queso, que se
+//         le factura a 72 clientes desde 2023; 838E Rallador Mini; 809, 865ED, 727EN, 55215,
+//         599EZ, 120, 193, 198E). Para Virgilio no existían: sus líneas salían "sin precio" en
+//         Facturación. NO se traen las otras fuentes de v_item_precio a propósito:
+//         `chef_products` (98) reintroduciría el bug que arregló la v14.44 —el 809E de Chef a
+//         3.005 pisando el de LK a 4.060— y `variante_L` (78) + `loke_products` (16) son la
+//         línea Loke, que por regla del dueño NO tiene lista general (el precio es por cliente).
+//         `products` MANDA: si un código está en el maestro, el manual no lo pisa.
 // Idempotente. Lo dispara pg_cron (job sync-precios-venta).
 // Secrets (ya existentes, los usa arca-wsfe y sync-clientes-dto):
 //   WEB_SERVICE_KEY    = service_role de LK
@@ -30,11 +40,12 @@ function json(b: unknown, s = 200): Response {
 
 interface Product { cod: string; list_price: number | null; uxb: number | null; description: string | null }
 
-async function fetchAll(baseUrl: string, key: string, table: string, select: string): Promise<Product[]> {
+// `extra` = filtros PostgREST extra (p.ej. "&origen=eq.manual"). 2026-09-11.
+async function fetchAll(baseUrl: string, key: string, table: string, select: string, extra = ""): Promise<Product[]> {
   const all: Product[] = [];
   let offset = 0;
   while (true) {
-    const url = `${baseUrl}/rest/v1/${table}?select=${select}&order=cod.asc&limit=${PAGE}&offset=${offset}`;
+    const url = `${baseUrl}/rest/v1/${table}?select=${select}${extra}&order=cod.asc&limit=${PAGE}&offset=${offset}`;
     const r = await fetch(url, { headers: { apikey: key, Authorization: `Bearer ${key}` } });
     if (!r.ok) throw new Error(`REST ${table}@${baseUrl.split("//")[1]?.slice(0,12)} ${r.status}: ${(await r.text()).slice(0, 300)}`);
     const page: Product[] = await r.json();
@@ -88,6 +99,17 @@ Deno.serve(async (_req: Request): Promise<Response> => {
     // ── 1) LK products ──
     const lkProducts = await fetchAll(LK_URL, LK_KEY, "products", "cod,list_price,uxb,description");
 
+    // ── 1b) LK item_precios con origen='manual' (2026-09-11) ──
+    // Artículos que se venden y no están en el maestro. Si el pull falla, seguir sin ellos:
+    // es un agregado, no puede tirar abajo el sync entero.
+    let lkManuales: Product[] = [];
+    let manualError = "";
+    try {
+      lkManuales = await fetchAll(LK_URL, LK_KEY, "item_precios", "cod,list_price,uxb,description", "&origen=eq.manual");
+    } catch (e) {
+      manualError = String((e as Error)?.message || e).slice(0, 200);
+    }
+
     // ── 2) Chef products (catálogo separado, códigos distintos) ──
     let chefProducts: Product[] = [];
     let chefError = "";
@@ -100,7 +122,7 @@ Deno.serve(async (_req: Request): Promise<Response> => {
       }
     }
 
-    // ── 3) precios_venta = SÓLO LK · precios_venta_chef = SÓLO Chef ──
+    // ── 3) precios_venta = LK products + manuales · precios_venta_chef = SÓLO Chef ──
     // v14.44 (2026-09-08): LK y Chef son DOS listas separadas. Antes se mergeaban
     // en precios_venta con "si coinciden, Chef gana" → una NP de LK con un código
     // compartido (809E, 437E, 438E) tomaba el precio de Chef (809E 3005 en vez de
@@ -121,7 +143,10 @@ Deno.serve(async (_req: Request): Promise<Response> => {
         cod, precio_unit: v.precio_unit, uxb: v.uxb, descripcion: v.descripcion, actualizado: nowIso,
       }));
     };
-    const preciosRows = mapProductos(lkProducts);
+    // products PRIMERO: al recorrer en orden, un manual con el mismo cod no pisa al maestro
+    // (el Map se llena con products y después el manual lo sobrescribiría) → por eso el
+    // manual va ANTES en el arreglo y products DESPUÉS, que es el que debe quedar.
+    const preciosRows = mapProductos([...lkManuales, ...lkProducts]);
     const nPrecios = await upsert("precios_venta", "cod", preciosRows);
     // Reconciliar: sacar de precios_venta lo que ya no está en el catálogo de LK
     // (guarda: sólo si el pull trajo filas, para no vaciar la tabla si LK falla).
@@ -132,10 +157,10 @@ Deno.serve(async (_req: Request): Promise<Response> => {
     const nPreciosChef = preciosChefRows.length ? await upsert("precios_venta_chef", "cod", preciosChefRows) : 0;
     if (preciosChefRows.length) await reconcileStale("precios_venta_chef", nowIso);
 
-    // ── 4) cob_uxb_lk — uxb de LK products ∪ loke_products ──
+    // ── 4) cob_uxb_lk — uxb de LK products ∪ loke_products ∪ manuales ──
     const lokeProducts = await fetchAll(LK_URL, LK_KEY, "loke_products", "cod,list_price,uxb,description");
     const uxbMap = new Map<string, number>();
-    for (const p of [...lkProducts, ...lokeProducts]) {
+    for (const p of [...lkProducts, ...lokeProducts, ...lkManuales]) {
       const cod = (p.cod || "").trim();
       if (!cod || !p.uxb) continue;
       uxbMap.set(cod, p.uxb);
@@ -148,8 +173,10 @@ Deno.serve(async (_req: Request): Promise<Response> => {
       precios_venta: nPrecios,
       precios_venta_chef: nPreciosChef,
       precios_lk: lkProducts.filter(p => (p.cod || "").trim() && p.list_price && p.list_price > 0).length,
+      precios_lk_manuales: lkManuales.filter(p => (p.cod || "").trim() && p.list_price && p.list_price > 0).length,
       precios_chef: chefProducts.filter(p => (p.cod || "").trim() && p.list_price && p.list_price > 0).length,
       chef_error: chefError || undefined,
+      manual_error: manualError || undefined,
       cob_uxb_lk: nUxb,
       ts: nowIso,
     });
