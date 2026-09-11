@@ -6633,3 +6633,47 @@ ya muestra cuánta plata se dejó de facturar en vez de "sin precio".
 Snapshots de datos del "antes": `gv_bkp_facneto_items_20260911` (10.588 filas),
 `gv_bkp_facturable_ant_20260911` (869), `gv_bkp_plata_perdida_20260911` (900).
 No toca objetos de Producción.
+
+## 3.cd `lk_reingresos_feed` devuelve TODOS los importados activos, con fecha o sin ella (v15.77) — 2026-09-11
+
+**Qué se rompía.** En el catálogo mayorista de LK, la ficha de un artículo mostraba el cartel
+`Reingreso Est dd/mm` sólo cuando se cumplían DOS condiciones a la vez: estar sin stock **y**
+tener `reingreso_est` cargado en `Importados`. Como el cartel era la única señal de stock, su
+ausencia agrupaba dos respuestas opuestas: "hay mercadería" y "no tenemos el dato". Medido sobre
+los 107 artículos con código `E` del catálogo: 16 con cartel, 45 con stock sin cartel y **46 sin
+cartel por falta de dato**. El dueño lo planteó así: *"no queda claro si los que no tienen cartel
+significa que tengo mercadería o que no tengo mercadería"*.
+
+**Causa.** El filtro `and reingreso_est is not null` del CTE `imp` mezclaba dos preguntas
+distintas: *¿hay stock?* (se sabe casi siempre, sale de `vista_stock_vs_pedidos` + el stock de
+parte) y *¿cuándo llega?* (se sabe a veces, la carga compras a mano). Al filtrar por la segunda,
+los artículos sin fecha no llegaban al feed y del otro lado quedaban indistinguibles de los que
+sí tienen mercadería.
+
+**Cambio.** Se sacó ese filtro. La función sigue devolviendo `(cod, reingreso_est, sin_stock)`
+con la misma firma y el mismo cálculo de `sin_stock`; lo único que cambia es que ahora entran
+también los importados activos sin fecha, con `reingreso_est` en `null`.
+
+**Medición.** El feed pasó de **74 a 133 filas**. De los 46 artículos que antes no tenían señal,
+**45 resultaron tener stock** y **1 quedó sin stock y sin fecha**. Total sin stock: 17 (16 con
+fecha + 1 sin). Quedan **9 códigos `E` del catálogo de LK sin ficha en `Importados`**
+(405E, 435E, 442E, 444E, 446E, 502E, 580E, 991E, 995E): no llegan al feed y del lado de LK se
+muestran como "En stock" por defecto. Darlos de alta es lo único pendiente.
+
+**Del lado de LK** (`kwkclwhmoygunqmlegrg`, repo `pagina-LK-copia`, v2.3.370): `get_reingresos()`
+dejó de filtrar `fecha_reingreso is not null` y ahora devuelve todo lo que está sin stock, con
+`fecha` nullable. El contrato con el front pasó a ser **estar en el resultado = no hay stock**;
+`fecha` vacía significa que todavía no se sabe cuándo llega. El catálogo muestra siempre uno de
+los dos estados: verde `En stock` o naranja `Ingresa dd/mm` / `Ingresa — fecha a confirmar`.
+
+**Rollback.** `sql/backups/lk_reingresos_feed_pre_enstock_20260911.sql` tiene la definición
+anterior; se ejecuta tal cual. Del lado de LK hay que volver a poner el `where sin_stock and
+fecha_reingreso is not null` en `get_reingresos()`.
+
+**Chequeo.**
+```sql
+-- Virgilio
+select count(*) filter (where sin_stock) as sin_stock, count(*) as total from lk_reingresos_feed();
+-- LK, después de correr sync_reingresos_virgilio()
+select count(*) from get_reingresos();
+```
