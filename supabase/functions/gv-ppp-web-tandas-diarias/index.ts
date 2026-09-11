@@ -75,7 +75,7 @@ const VIRGILIO_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const LK_URL = Deno.env.get("GV_LK_URL") ?? "https://kwkclwhmoygunqmlegrg.supabase.co";
 const LK_KEY = Deno.env.get("GV_LK_SERVICE_KEY") ?? "";
 const LK_ANON = Deno.env.get("GV_LK_ANON") ??
-  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imt3a2Nsd2htb3lndW5xbWxlZ3JnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njk1MjA2NzUsImV4cCI6MjA4NTA5NjY3NX0.soqPY5hfA3RkAJ9jmIms8UtEGUc4WpZztpEbmDijOgU";
+  "sb_publishable_mVX5MnjwM770cNjgiL6yLw_LDNl9pML";
 
 const TZ = "America/Argentina/Buenos_Aires";
 

@@ -21,7 +21,7 @@
    escritas — y ademas el archivo sirve dentro de un service worker (importScripts).
    ========================================================= */
 self.SUPABASE_URL = "https://hrxfctzncixxqmpfhskv.supabase.co";
-self.SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhyeGZjdHpuY2l4eHFtcGZoc2t2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzI3MjQyNjEsImV4cCI6MjA4ODMwMDI2MX0.4L6wguch8UZGhC2VpzrWcCjJGUV-IkYsl9JoCWrOLUs";
+self.SUPABASE_KEY = "sb_publishable_BqpAgZH6ty-9wft10_YMhw_0rcIPuWT";
 
 // Alias: los mismos valores con los otros nombres que ya existian en el codigo.
 self.SUPABASE_ANON_KEY = self.SUPABASE_KEY;
