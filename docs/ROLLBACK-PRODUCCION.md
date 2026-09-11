@@ -389,3 +389,10 @@ Rollback: `update "Importados" set fob_uni = 0.5 where id = 76`. Detalle §3.bm.
 Rollback: `update "Importados_Volumen" v set (uni_inner,uni_master,largo_cm,ancho_cm,alto_cm,m3_master,fuente) =
 (b.uni_inner,b.uni_master,b.largo_cm,b.ancho_cm,b.alto_cm,b.m3_master,b.fuente) from
 "GV_Importados_Volumen_bkp_pi_fujian_20260911" b where b.cod = v.cod`. Detalle §3.bm.2.
+
+## Stock de Importados sincronizado + ventas por empresa — v15.11 (2026-09-11)
+
+`v_importados_ordenes` recreada (ventas por `gv_empresa`; sin Cervantes). `Importados_Mov_Stock`: +98 filas
+`ref like 'sync stock depósito 2026-09-11%'`. `Importados` ids 78/144/154: `uni_x_caja` al maestro. Backups
+`GV_Importados_Mov_Stock_bkp_20260911`, `GV_Importados_bkp_uxc_20260911`. Rollback: borrar las 98 filas por `ref`,
+vista de `sql/gv_importados_lk_ch_separados_v1501.sql`, uni×caja desde el backup. Detalle §3.bm.3.

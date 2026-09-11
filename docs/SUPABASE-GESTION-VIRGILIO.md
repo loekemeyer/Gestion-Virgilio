@@ -4949,3 +4949,35 @@ suman doble el en curso y el backfill de baches les creó 2–3 baches.
   `select gv_importados_resync(id)` para 63, 65, 66, 67, 68, 164; `delete from "Importados" where id = 164`;
   `update "Importados" set cod_art='439E' where id=68`; `delete from "Importados_Volumen" where cod='439EL'`.
   SQL: `sql/gv_importados_pi_fujian_v1506.sql`.
+
+### §3.bm.3 — Barrido de datos de Pedidos Importación: ventas por empresa + stock sincronizado con el depósito (v15.11, 2026-09-11)
+
+Dueño: *"todos los datos que tengas que corregir, dale"*. Barrido sobre `v_importados_ordenes` (153 filas
+`principal` + `activo`): **28 con stock negativo**, 91 distintas al depósito, ~36 sin uni×caja, ~25 sin m³/master,
+6 sin FOB.
+
+- **Causa raíz del stock**: `Importados_Mov_Stock` sólo tenía el seed `inicial` del 16/07 (Excel QUIEBRE, 149 filas)
+  y **ninguna llegada** desde entonces (los baches de v14.94 recién existen desde el 10/09), así que el módulo restaba
+  dos meses de entregas a un stock de julio. Encima la vista restaba **todas** las `Entregas_Virgilio` a la fila LK
+  (`plant = 'Loeke'` fijo) y a la fila CH sólo "Entregas Tallerista Cervantes", que es producción y aporta **0** a los
+  códigos CH importados. Caso testigo 809E·LK = −2.004: le restaban 191 cajas de corta queso de Chef + 70 de LK.
+- **Vista** (`create or replace view v_importados_ordenes`, sin `security_invoker`, como estaba): el CTE `arm` toma
+  `Entregas_Virgilio` con `plant` por **`gv_empresa`** (`chef` → Chef, resto → Loeke; desde el 16/07: 7.608 filas lk /
+  1.047 chef, 0 nulas) y se saca la unión con Cervantes. El resto de la vista es idéntico a v15.01.
+- **Sincronización con el depósito**: por cada fila (menos las 5 **partes** —`Importados_Partes_Map`— y las que no
+  tienen uni×caja) se insertó UN movimiento en `Importados_Mov_Stock` con `ref = 'sync stock depósito 2026-09-11
+  (vista_saldos_stock)'`: `tipo='ajuste'` si la fila ya tenía seed, `tipo='inicial'` (ts = ahora) si no (439E·CH,
+  599E…), así las entregas futuras le restan. Objetivo = `vista_saldos_stock` por `empresa` (LK / CH) en cajas ×
+  `uni_x_caja`; el bucket **`Mixto`** va a la fila única del código, o a la LK si hay LK y CH (en los 4 compartidos
+  —437E/438E/439E/809E— Mixto es 0). **98 movimientos, delta neto +122.177 u; 0 filas negativas** (antes 28).
+  Verificación: las 8 filas compartidas quedan iguales al depósito (809E·LK 336 = 28 cajas; 809E·CH 5.868 = 489).
+  Lo que sigue "distinto" son las partes (stock en `vista_importados_stock_parte`) y 36 filas sin uni×caja, todas con
+  0 en módulo y 0 en depósito: no hay nada que ajustar. Backup `GV_Importados_Mov_Stock_bkp_20260911` (tabla entera).
+- **uni×caja**: 3 filas difería del maestro (`vista_uni_x_caja`, fuente `maestro`), que es lo que usa el depósito para
+  convertir cajas: **838E·CH 12 → 24, 877E·CH 12 → 24, 590ES 12 → 50**. Backup `GV_Importados_bkp_uxc_20260911`. Las
+  36 sin uni×caja tampoco están en el maestro (artículos nuevos de Becky 6xxE/9xxE, Kangli 36xE, Ownland…): no hay
+  de dónde sacarlo. Idem **FOB** (603E/604E/605E/608E/930E/939E) y **m³/master** de ~25 filas: son datos del
+  proveedor / comerciales, no se inventan.
+- **Rollback**: `delete from "Importados_Mov_Stock" where ref like 'sync stock depósito 2026-09-11%'` (98 filas; o
+  restaurar desde el backup); vista anterior en `sql/gv_importados_lk_ch_separados_v1501.sql`; uni×caja desde
+  `GV_Importados_bkp_uxc_20260911`. SQL: `sql/gv_importados_stock_sync_v1511.sql`.
