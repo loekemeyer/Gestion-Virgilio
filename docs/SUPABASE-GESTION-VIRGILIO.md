@@ -5273,3 +5273,12 @@ Dueño: *"todos los datos que tengas que corregir, dale"*. Barrido sobre `v_impo
   035E 1.056 → 528, 584E 1.584 → 384. Total ≈ u$s 53.500 → **≈ 46.300** (Ownland 13.735 → 9.320, Hugo Wong 7.190 →
   6.778, Fujian 9.437 → 7.673, Zhixin 6.844 → 5.942, Frontier 1.000 → 1.280 por 1 MC de 505C).
 - Rollback: en el `.sql`.
+
+### §3.bm.20 — 323ES suelto: 3.000 u llegan el 22/09 (v15.28, 2026-09-11)
+
+- Dueño: *"el 22/9 ingresa 323ES (suelto, después se envasan) 3.000 uni"*. No existe fila 323ES en `Importados`: se cargó
+  como bache **en curso del 323E (id 79, Hugo Wong)** con `gv_importado_bache_add(79, 3000, '2026-09-22', …)`; el 323E
+  queda con 7.464 u en curso (3.000 el 22/09 + 4.464 el 03/11 de la PI NY26-031438). Además `GV_Importados_Insumo_Map`
+  **323ES → 323E**: cuando se reciba como insumo suelto, cuenta como stock del 323E (mismo patrón que 522ES).
+- Rollback: `delete from "GV_Importados_Baches" where importado_id = 79 and creado_por like 'dueño 11/09: 323ES%'; select
+  gv_importados_resync(79); delete from "GV_Importados_Insumo_Map" where insumo_cod = '323ES';`
