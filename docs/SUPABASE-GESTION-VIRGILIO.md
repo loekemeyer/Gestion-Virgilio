@@ -5089,3 +5089,16 @@ Dueño: *"todos los datos que tengas que corregir, dale"*. Barrido sobre `v_impo
   dd/mm/aa, dd/mm/aaaa, dd/mm y yyyy-mm-dd), se normaliza lo que se ve y se manda el ISO al mismo setter de antes
   (`pedHechoSetFecha`, `pedImpSetEntregaGlobal`, `pedImpSetReingreso`). Fecha inválida → aviso y vuelve al valor
   anterior. El gestor de baches muestra y pide dd/mm/aa. Sin cambios en la base: se sigue guardando `YYYY-MM-DD`.
+
+### §3.bm.11 — Baja de 580E y 123E en Importados; 601E y 360E revisados (v15.19, 2026-09-11)
+
+- Dueño: *"580E no se compra más"* → id 125 `activo = false`. *"123E está mal codificado, es 589E el que se le compra
+  a Ownland"* → id 147 (123E·Loke, proy seed 480) `activo = false`; 589E (id 138, proy live 860, 9.768 u) queda como
+  la fila válida. Nota en `notas` con el motivo. Backup `GV_Importados_bkp_baja_580E_123E_20260911`; rollback
+  `update "Importados" set activo = true where id in (125,147)`.
+- **601E** (Becky): 348 u = 29 cajas en depósito, 3 NP pendientes, **172 cajas facturadas desde julio** (~86/mes ≈
+  1.030 u/mes, más que la proyección de 576) y **no está en ninguno de los dos PI de Becky** (29/09 ni 15/11).
+  Reportado, sin acción.
+- **360E** (Kangli): **no vino en la llegada del 31/08** — `Movimientos_Stock` no tiene ningún `ingreso` de 360E desde
+  junio (sólo el seed inicial de 42 cajas, 45 facturadas y ajustes chicos); depósito 0, 1 NP pendiente. Los 8 códigos
+  que sí entraron el 31/08 son 328E/361E/363E/366E/367E/368E/810E/870E.
