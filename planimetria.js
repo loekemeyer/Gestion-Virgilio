@@ -23,9 +23,16 @@
      el picking cae al pelado, que para el 809E es la góndola de CHEF y el operario
      trae un Corta Queso en vez de un Corta Pizza. Se dejan de generar en el paso 2
      de docs/PLAN-SACAR-SUFIJO-EMPRESA.md.
-   · alias con cero adelante (regla v3.70-3.72): la base trae los códigos numéricos
-     con cero (026, 035E) y acá van sin él, así que se genera el par. Se paddea el
-     PREFIJO NUMÉRICO a 3: 66→066, 57→057, 35E→035E.
+   · alias SIN cero adelante. ⚠ OJO CUÁL ES EL CANÓNICO: es el que LLEVA el cero.
+     El maestro `OC_Maximos` dice `066`, `026`, `035E` — **no existe un código "66"**.
+     `fn_canon_cod_art` (el trigger de Movimientos_Stock) lo confirma: busca el código
+     en OC_Maximos y usa esa grafía; si no lo encuentra y es numérico, lo rellena a 3
+     con ceros. Y `vista_saldos_stock` arma su `ckey` igual. La forma pelada (`66`) es
+     una clave INTERMEDIA de normalización, no un código.
+     Se genera igual el par `066`/`66` porque por el pipeline circulan las dos grafías
+     y el picking puede recibir cualquiera; pero el que manda es `066`.
+     (Corregido el 11/09 por Luis: la carga de GV_Lugar_Item había guardado la forma
+     pelada en 19 códigos y se pasaron al canónico.)
 
    ── Diferencias contra la generación anterior (342 claves → 352) ────────────────
    SE FUERON 9, ninguna es una pérdida:

@@ -4600,7 +4600,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
 <!-- Librería qrcode-generator (Kazuhiko Arase, MIT) — hosteada local para
      que ande sin internet en el depósito. -->
 <script src="qrcode.js"></script>
-<script src="planimetria.js?v=15.78"></script>
+<script src="planimetria.js?v=15.79"></script>
 <script src="pasaje-papeles.js?v=5.2"></script>
 <!-- Modo OP de Recepción de Mercadería (se abre al tocar RT). Módulo aislado bajo
      #rcpRoot, con su propio cliente Supabase (login anónimo). Portado de la app
@@ -7716,7 +7716,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v15.78";
+const APP_VERSION = "v15.79";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -8606,6 +8606,12 @@ async function _gondolaDesdeGvLugar() {
       // rows viene ordenado por `orden`, así que el primero que toca cada clave es
       // el de menor orden: sólo se escribe si no estaba.
       if (!window.GONDOLA[c]) window.GONDOLA[c] = [sec, ord];
+      // v15.79 — alias SIN el cero adelante. El código canónico lleva el cero (el
+      // maestro OC_Maximos dice "066", y fn_canon_cod_art rellena a 3 lo que no
+      // encuentra ahí: no existe un código "66"). Pero por el pipeline circulan las
+      // dos grafías, así que se deja el par — igual que hace planimetria.js.
+      const pel = c.replace(/^0+(?=.)/, "");
+      if (pel !== c && !window.GONDOLA[pel]) window.GONDOLA[pel] = [sec, ord];
       if (Object.keys(empresasDe[c] || {}).length > 1) {
         const k = c + " " + String(x.empresa || "").toUpperCase();
         if (!window.GONDOLA[k]) window.GONDOLA[k] = [sec, ord];

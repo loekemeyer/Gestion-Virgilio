@@ -327,3 +327,47 @@ delete from public."GV_Lugar_Item"
 --    group by 1 having count(distinct l.empresa) > 1;
 -- Lo esperable son SÓLO los duales. Cualquier otro código que aparezca es un
 -- residuo de las tablas viejas, como fue el 396.
+
+-- ─────────────────────────────────────────────────────────────────────
+-- 2026-09-11 · Los códigos pasan a su forma CANÓNICA (066, no 66)
+--
+-- Luis: "no existe realmente cod 66, debería ser siempre 066".
+--
+-- Tenía razón y la carga inicial estaba mal: normalizó con
+-- `regexp_replace(cod,'^0+(?=.)','')`, que es la clave intermedia de comparación,
+-- y guardó ESO. El canónico es el otro, y la base ya lo dice en dos lugares:
+--
+--   · `OC_Maximos` (el maestro) escribe `066`, `026`, `035E`, `056E`…
+--   · `fn_canon_cod_art` (trigger de Movimientos_Stock) busca el código en
+--     OC_Maximos y usa ESA grafía; si no lo encuentra y es numérico, hace
+--     `case when length(k) >= 3 then k else lpad(k,3,'0') end`.
+--   · `vista_saldos_stock` arma su `ckey` con la misma regla.
+--
+-- 19 códigos afectados, 46 filas:
+--   26 27 31 34 35E 43 52 53 54 55 56E 57 58 59 66 67 70 97 99  →  con su cero
+--
+-- Backup: GV_Backup_lugar_item_canon_20260911.
+-- Rollback:
+--   update public."GV_Lugar_Item" t set cod = b.cod
+--     from public."GV_Backup_lugar_item_canon_20260911" b
+--    where b.sector = t.sector and b.clase = t.clase
+--      and regexp_replace(b.cod,'^0+(?=.)','') = regexp_replace(t.cod,'^0+(?=.)','');
+-- ─────────────────────────────────────────────────────────────────────
+create table if not exists public."GV_Backup_lugar_item_canon_20260911" as
+select * from public."GV_Lugar_Item";
+
+with canon as (
+  select i.sector, i.cod, i.clase,
+         coalesce(
+           (select o.cod from public."OC_Maximos" o
+             where o.activo and regexp_replace(upper(btrim(o.cod)),'^0+(?=.)','')
+                 = regexp_replace(upper(btrim(i.cod)),'^0+(?=.)','') limit 1),
+           case when i.cod ~ '^[0-9]+$' and length(regexp_replace(i.cod,'^0+(?=.)','')) < 3
+                then lpad(regexp_replace(i.cod,'^0+(?=.)',''),3,'0') else i.cod end
+         ) nuevo
+    from public."GV_Lugar_Item" i where i.clase='articulo')
+update public."GV_Lugar_Item" t set cod = c.nuevo, updated_at = now()
+  from canon c
+ where c.sector = t.sector and c.cod = t.cod and c.clase = t.clase and c.nuevo <> c.cod;
+
+-- Verificación: 0 códigos fuera del canónico (corrido el 11/09 → 330 códigos, 0 mal).
