@@ -156,6 +156,26 @@ Fujian 22.388 · Zhixin 7.173 · Ownland 11.670 · Becky 1.814 · Hugo 2.647.
 - **Ownland**: el Excel confirma **u$s 46.626**, así que el *"u$s 13.988"* que §3.bm.5 leyó del
   PI OL-10139 es lo que está mal, no el cálculo del motor.
 
+### NTL no es el único canal: hay casos y casos (dueño, 11/09)
+
+Aclaración del dueño al quedar de pasar los Excel: ***"no a todos los proveedores lo llevamos con NTL
+y tampoco lo llevamos aparte. Hay casos y casos"***. Va a pasar **dos cosas**:
+
+1. el **Excel de la cuenta de NTL** (la cuenta de Hong Kong), y
+2. las **cuentas individuales** con cada proveedor que se lleva **por fuera** de NTL.
+
+Lo que eso implica para el modelo:
+
+- **El canal es por GIRO, no por proveedor.** Un mismo proveedor puede tener plata girada por NTL y
+  plata girada derecho. Eso **ya está soportado**: `GV_Imp_Pagos.beneficiario` y `tipo`
+  (`giro_directo`) van fila por fila; el `a_nombre_de` de `GV_Imp_Pedido_CC` es la etiqueta del
+  pedido (quién factura), no una restricción de por dónde se paga.
+- **Falta lo nuevo: NTL es una cuenta corriente en sí misma.** Hasta acá NTL se trata como
+  beneficiario de un giro. Pero si hay un extracto de NTL, NTL tiene **saldo propio**: entra lo que
+  se le gira y sale lo que le paga a cada fábrica, y las dos patas no coinciden en el tiempo. Eso es
+  una tabla aparte (movimientos de la cuenta NTL) que se concilia contra los giros ya cargados — no
+  se puede derivar de lo que hay hoy. **Se define cuando llegue el Excel.**
+
 ### Lo que todavía no está
 
 - **Imputación cruzada**: hoy cada giro se carga contra **un** pedido. La operatoria real es que la
