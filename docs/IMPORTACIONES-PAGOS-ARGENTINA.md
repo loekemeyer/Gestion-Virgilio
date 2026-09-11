@@ -147,9 +147,9 @@ Fujian 22.388 · Zhixin 7.173 · Ownland 11.670 · Becky 1.814 · Hugo 2.647.
 
 ### Lo que quedó marcado, sin tocar
 
-- ~~**Frontier**: el Excel dice FOB 14.400 y el motor calcula 14.000~~ → **cerrado (v15.76)**: manda el
+- ~~**Frontier**: el Excel dice FOB 14.400 y el motor calcula 14.000~~ → **cerrado (v15.84)**: manda el
   PI, `fob_uni` de 505C pasó a **0,072**. Ya no queda ninguna fila con `fob_difiere`.
-- ~~**Frontier, la llegada no cierra**~~ → **cerrado (v15.76)**: *"embarca el 26 de octubre y llega 45
+- ~~**Frontier, la llegada no cierra**~~ → **cerrado (v15.84)**: *"embarca el 26 de octubre y llega 45
   días después"* → **10/12/2026**. La que estaba mal era la llegada (04/11), que daba 9 días de viaje.
 - **Becky `PI B260601-2`**: el 30 % figura pagado el **02-jun** y el PI está fechado el 14/07 en
   §3.bm.13. Y son **112 días** hasta el embarque contra los *"90 días después del depósito"* del PI.

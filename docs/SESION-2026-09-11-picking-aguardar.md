@@ -96,9 +96,17 @@ Decisiones tomadas (regla "no preguntar, razonar"):
 - **Backend, aislado con rollback:** evento PKA de prueba `ZZTEST2|321|3` → `gv_reconciliar_aguardar()`
   bajó 321 de a_guardar 50→47 y separar_pedidos 0→3. Re-correr = idempotente (47/3). Clamp probado
   con 395 (a_guardar 0 → q=0, no negativo). Todo el rastro de prueba borrado; 321 volvió a 50/0.
-- **Suite de tests** (`tests/run.sh`): **126/128 verde**. Las 2 fallas (`fac-excel-isis`,
-  `imp-tabla`) **ya existían antes** del cambio (se verificó contra el index.html previo) y son
-  ajenas (Excel ISIS y layout de Importación).
+- **Suite de tests** (`tests/run.sh`): al escribir esto daba **126/128**. Las 2 fallas
+  (`fac-excel-isis`, `imp-tabla`) **ya existían antes** del cambio y eran ajenas.
+  **⚠ Ya están arregladas — v15.40, commit `aae24d4`, otra sesión.** No eran bugs de la app:
+  eran los dos tests que habían quedado desactualizados. `imp-tabla` clavaba 14 columnas cuando
+  Importados ya tiene 15 (sumó Reingreso) y buscaba botones que hoy son "Baches"; ahora compara
+  el `colgroup` contra el `thead`, que es el bug que de verdad quería cazar. `fac-excel-isis`
+  exigía la leyenda "2% Descuento Web" en el Excel a ISIS, pero desde la v14.57 esa columna sale
+  **sólo** si la condición de pago (col J) es 8-13 o 18, y ninguna NP del fixture tenía condición;
+  se le agregó una NP web (LK 0001, condición 8) y ahora chequea las dos mitades de la regla.
+  **Estado al 11/09 (revisado por Luis): suite completa en verde, 118 bloques, 0 fallas, y CI de
+  `main` en verde desde el run 404.**
 - Se **actualizaron 2 tests** que probaban el pop-up viejo: `pk-racks-aguardar.cjs` (reescrito al
   flujo nuevo) y `fgu-faltante-gondola.cjs` (la verificación de racks→RAG ahora comprueba que RAG
   está desactivado).
@@ -154,8 +162,9 @@ y sacar `pkAGuardarCardHtml()` del cierre del picking.
   cantidad en el paso normal (porque encontró la caja cerca de la góndola), sigue descontando
   góndola. El fix de fondo real sería que la recepción se **baje a góndola** (evento guardado), que
   es un tema operativo, no de la app.
-- Las 2 fallas de tests preexistentes (`fac-excel-isis` "falta columna pctDto", `imp-tabla` layout)
-  siguen ahí — ajenas a esto, pero conviene mirarlas alguna vez.
+- ~~Las 2 fallas de tests preexistentes (`fac-excel-isis`, `imp-tabla`)~~ → ✅ **cerrado**:
+  arregladas en la v15.40 (`aae24d4`) y verificado el 11/09 (suite entera verde, CI de `main`
+  verde). Detalle en §4. **No quedan tests rotos.**
 
 ---
 

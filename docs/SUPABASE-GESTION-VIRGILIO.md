@@ -3651,6 +3651,41 @@ Detalle completo, con los pasos en orden, en `docs/PENDIENTES-PIPELINE-GESTION.m
 
 ---
 
+## 4.c `gv_venta_mensual_cliente` — quién compró, por artículo y mes (v15.81, 2026-09-11)
+
+Pedido del dueño: *"desde stock y compras, poder tocar en 1 mes y ver quién me compró (solo los
+primeros 5 clientes de cada mes y un sexto con Resto)"*, en **cajas**.
+
+`vista_venta_mensual` agrupa por `(cod, mes)` y pierde el **quién**. La vista nueva es su hermana
+abierta por cliente. **Objeto nuevo con prefijo `gv_`: no se tocó nada existente.**
+
+- `security_invoker = true`, `grant select` a `anon` y `authenticated`.
+- `Entregas_Virgilio` sólo guarda `cod_cliente`, así que la razón social se resuelve en cascada:
+  `PPP_Entregados_Meta.rs` (la más reciente por cod) → `PPP_Programacion_Diaria.razon_social` →
+  `GV_Clientes_Direcciones.razon_social` (el padrón) → el cod pelado. **Sin el 3er paso quedaban 8
+  clientes sin nombre**; con él, 0.
+- DDL versionado en `sql/gv_venta_mensual_cliente_v1581.sql`.
+
+**Impacto medido** (la consulta que lo prueba, no "no debería afectar"):
+
+```sql
+select (select count(*) from public.vista_venta_mensual) pares_viejo,
+       (select count(*) from (select distinct cod, mes from public.gv_venta_mensual_cliente) x) pares_nuevo,
+       (select count(*) from public.gv_venta_mensual_cliente) filas,
+       (select count(*) from public.gv_venta_mensual_cliente where razon_social ~ '^\d+$') sin_nombre,
+       (select count(*) from (
+          select v.cod from public.vista_venta_mensual v
+          join (select cod, mes, sum(cajas) cajas from public.gv_venta_mensual_cliente group by 1,2) c
+            on c.cod = v.cod and c.mes = v.mes where v.cajas <> c.cajas) d) difs;
+```
+
+→ `pares_viejo 845 · pares_nuevo 845 · filas 8.866 · sin_nombre 0 · difs 0`.
+
+**Rollback:** `drop view public.gv_venta_mensual_cliente;` — no la lee nadie más que el detalle de
+Abastecimiento, y Producción no la conoce.
+
+---
+
 ## 5. Pendientes
 
 > 📌 La lista **de negocio** de lo que falta para cerrar el pipeline —la nota que dejó el
@@ -6286,7 +6321,7 @@ protegido sin tocar ese código. Si algún día se agrega al payload, (a0) no ca
 `v_pedidos_web_np` anterior, y hay que borrar el cron `sync-diferido-virgilio` (jobid 41) y el trigger
 `marcar_pedido_diferido` de `orders`. Nada de esto toca objetos de Producción.
 
-## 3.bx El viaje del camionero: CC numera, RR controla por viaje (v15.70) — 2026-09-11
+## 3.bx El viaje del FLETERO: CC numera, RR controla por viaje (v15.70/71) — 2026-09-11
 
 **Pedido de Thomas**, en dos partes. CC: *"a medida que den click en lo que cargan, en lugar de un
 simple tilde, que diga 1°, 2°, 3°… una vez que ya terminó de cargar el camión, que le pregunte el
@@ -6325,7 +6360,14 @@ modal; los CCN se emiten en ese orden. Retira sigue con ✓ y sin camionero.
 Test `tests/cc-orden-camionero.cjs`. **Falta** (tarea Planify abierta): RR filtrando por viaje, las
 horas de la hoja de ruta y la alerta en la PPP.
 
-`sql/gv_viaje_camionero_v1570.sql` · migración `gv_viaje_camionero_v1`.
+**v15.71 — se llama FLETERO, no camionero.** Thomas: *"hacé que desde ahora en adelante sea con
+fletero, para la próxima CC, el lunes"*. En la app el operario ve **🚚 Fletero** (etiqueta,
+placeholder, el aviso de obligatorio y el resumen final), y la columna `camionero` de lo creado hoy
+pasó a `fletero` en `GV_Viaje_Horas` y en las tres vistas — tenían horas de vida y ningún lector,
+así que renombrar salía gratis. **No** se tocó la tabla `Camioneros` (existe desde agosto, la lee la
+app para autocompletar) ni el 3.er campo del evento CCN: es el mismo dato, sólo cambia el nombre.
+
+`sql/gv_viaje_camionero_v1570.sql` · migraciones `gv_viaje_camionero_v1` + `gv_viaje_camionero_a_fletero_v1571`.
 
 ## 3.by Pedidos de importación EN CURSO, separados del generador: embarque y llegada (v15.72) — 2026-09-11
 
@@ -6556,7 +6598,605 @@ que en vez de quedar colgados de la regla automática **pasan al mapa**, con la 
 la definición guardada en **`GV_bkp_def_gv_importados_stock_insumos_20260911`** (es la de
 `sql/gv_importados_stock_insumos_v1527.sql`, sin el join a `partes`). No toca objetos de Producción.
 
-## 3.cc Los 3 datos que faltaban de la cuenta corriente, cerrados por Thomas (v15.76) — 2026-09-11
+---
+
+## 3.cc Las NP de Chef se valorizan con la lista de CHEF (v15.76) — 2026-09-11
+
+**Reportado por Thomas**: el modal **💵 Neto a facturar — desglose** de la **NP 44607**
+(cliente 2393, Miguel Addoumie SRL, Chef) salía entero en rojo *"sin precio"*, con
+**NETO a facturar $0,00** y los 15 códigos del pedido listados abajo en *"SIN PRECIO ·
+NO ENTRAN"* (043, 609, 700, 701, 713, 727E, 731, 760, 798E, 802, 824, 825, 836, 840, 911).
+Los 15 tienen precio cargado en `precios_venta_chef`.
+
+### Causa
+
+`vista_facturacion_neto_items` **sí** deriva la empresa de la NP (`^9` = lk, resto = chef) —
+la usa para el `dto_vol` y para la cadena de súper— pero después joinea **una sola** lista de
+precios: `public.precios_venta`, que es **la de Loekemeyer**. `public.precios_venta_chef`
+(101 códigos, misma estructura, la sincroniza el mismo cron) no la miraba nadie en Facturación.
+Mismo hueco, por copiar el mismo join, en `vista_facturable_anticipado` y `vista_plata_perdida`.
+
+No es que "falten precios de Chef": **la lista de Chef estaba cargada y al día** (última sync
+11/09 16:45). Lo que faltaba era mirarla.
+
+### Medido ANTES (11/09)
+
+| | líneas | sin precio | |
+|---|---|---|---|
+| NP de **LK** | 9.020 | 37 | 0,4 % |
+| NP de **Chef** | 1.568 | **1.141** | **72,8 %** |
+
+Y peor que el $0,00: de las **187** líneas de Chef que **sí** se valorizaban, **61 usaban un
+precio de LK distinto del de Chef** — números mal en pantalla, sin ningún aviso. Ejemplos:
+`809E` (LK 4.060 vs Chef 3.005, Chef se sobrevaluaba) y `438E` (LK 6.615 vs Chef 7.320, se
+subvaluaba). El `uxb` nunca estuvo mal: **0 diferencias** de unidades por caja entre las dos listas.
+
+### El arreglo (las tres vistas, misma regla) — `sql/gv_precio_chef_v1576.sql`
+
+1. NP de Chef → `precios_venta_chef` por código canónico.
+2. Artículo con **"L" al final** (505L, 438EL) = artículo de **Loeke vendido por Chef**
+   (regla del dueño v13.71, ya implementada en `gv_ppp_np_valor`): lista de **LK**, pelando la L.
+3. **Fallback**: NP de Chef con un código que no está en la lista de Chef → lista de LK. Cubre el
+   caso inverso ya documentado (Cencosud/Chef 2444, artículos de Loeke **sin** la L) y garantiza
+   que ninguna línea que hoy tiene precio lo pierda.
+4. Las NP de **LK no cambian**: siguen leyendo sólo `precios_venta` (no hay fallback a Chef).
+5. La lista de súper (`cobranzas_precios_super`) sigue teniendo prioridad sobre las dos.
+
+También en el front (`index.html`): el módulo **💸 Plata perdida** valorizaba desde un mapa
+**por código**, sin empresa — el mismo código vale distinto en LK y en Chef y ganaba el primero
+que entraba. Ahora la plata sale del precio de **la propia fila**, que la vista ya resuelve por
+empresa (el mapa queda sólo de fallback), y el cargador de respaldo baja también la lista de Chef.
+
+### Medido DESPUÉS
+
+| vista | filas | sin precio antes | **sin precio ahora** |
+|---|---|---|---|
+| `vista_facturacion_neto_items` (chef) | 1.568 | 1.141 | **52** |
+| `vista_facturacion_neto_items` (lk) | 9.020 | 37 | 37 (igual) |
+| `vista_facturable_anticipado` | 869 | 67 | **12** |
+| `vista_plata_perdida` | 900 | 154 | **14** |
+
+**Ninguna línea de LK se movió**: 0 filas con distinto `importe_ent`/`precio_lista`/`uxb`/`cod`
+en las tres vistas (comparado fila a fila contra el snapshot). Las 3 líneas con sufijo L
+(438EL, 439EL) pasaron de sin precio a valorizadas con la lista de LK.
+
+La **NP 44607** queda con los 15 ítems valorizados, dto 12 %, y el faltante (727E ×1, 836 ×3)
+ya muestra cuánta plata se dejó de facturar en vez de "sin precio".
+
+### Lo que QUEDA sin precio (ya no es un bug de código, es carga de datos)
+
+11 códigos que no están **en ninguna de las dos listas** y aparecen en NP de Chef:
+`123`, `102E`, `106E`, `702EN`, `838E`, `809`, `877E`, `865ED`, `727EN`, `830`, `828`
+(52 líneas, ~1.200 cajas). Hay que darlos de alta en la lista de precios de Chef.
+
+### Rollback
+
+`sql/backups/vistas_precio_lk_20260911_pre_v1576.sql` (definiciones exactas previas).
+Snapshots de datos del "antes": `gv_bkp_facneto_items_20260911` (10.588 filas),
+`gv_bkp_facturable_ant_20260911` (869), `gv_bkp_plata_perdida_20260911` (900).
+No toca objetos de Producción.
+
+## 3.cd `lk_reingresos_feed` devuelve TODOS los importados activos, con fecha o sin ella (v15.77) — 2026-09-11
+
+**Qué se rompía.** En el catálogo mayorista de LK, la ficha de un artículo mostraba el cartel
+`Reingreso Est dd/mm` sólo cuando se cumplían DOS condiciones a la vez: estar sin stock **y**
+tener `reingreso_est` cargado en `Importados`. Como el cartel era la única señal de stock, su
+ausencia agrupaba dos respuestas opuestas: "hay mercadería" y "no tenemos el dato". Medido sobre
+los 107 artículos con código `E` del catálogo: 16 con cartel, 45 con stock sin cartel y **46 sin
+cartel por falta de dato**. El dueño lo planteó así: *"no queda claro si los que no tienen cartel
+significa que tengo mercadería o que no tengo mercadería"*.
+
+**Causa.** El filtro `and reingreso_est is not null` del CTE `imp` mezclaba dos preguntas
+distintas: *¿hay stock?* (se sabe casi siempre, sale de `vista_stock_vs_pedidos` + el stock de
+parte) y *¿cuándo llega?* (se sabe a veces, la carga compras a mano). Al filtrar por la segunda,
+los artículos sin fecha no llegaban al feed y del otro lado quedaban indistinguibles de los que
+sí tienen mercadería.
+
+**Cambio.** Se sacó ese filtro. La función sigue devolviendo `(cod, reingreso_est, sin_stock)`
+con la misma firma y el mismo cálculo de `sin_stock`; lo único que cambia es que ahora entran
+también los importados activos sin fecha, con `reingreso_est` en `null`.
+
+**Medición.** El feed pasó de **74 a 133 filas**. De los 46 artículos que antes no tenían señal,
+**45 resultaron tener stock** y **1 quedó sin stock y sin fecha**. Total sin stock: 17 (16 con
+fecha + 1 sin). Quedan **9 códigos `E` del catálogo de LK sin ficha en `Importados`**
+(405E, 435E, 442E, 444E, 446E, 502E, 580E, 991E, 995E): no llegan al feed y del lado de LK se
+muestran como "En stock" por defecto. Darlos de alta es lo único pendiente.
+
+**Del lado de LK** (`kwkclwhmoygunqmlegrg`, repo `pagina-LK-copia`, v2.3.370): `get_reingresos()`
+dejó de filtrar `fecha_reingreso is not null` y ahora devuelve todo lo que está sin stock, con
+`fecha` nullable. El contrato con el front pasó a ser **estar en el resultado = no hay stock**;
+`fecha` vacía significa que todavía no se sabe cuándo llega. El catálogo muestra siempre uno de
+los dos estados: verde `En stock` o naranja `Ingresa dd/mm` / `Ingresa — fecha a confirmar`.
+
+**Rollback.** `sql/backups/lk_reingresos_feed_pre_enstock_20260911.sql` tiene la definición
+anterior; se ejecuta tal cual. Del lado de LK hay que volver a poner el `where sin_stock and
+fecha_reingreso is not null` en `get_reingresos()`.
+
+**Chequeo.**
+```sql
+-- Virgilio
+select count(*) filter (where sin_stock) as sin_stock, count(*) as total from lk_reingresos_feed();
+-- LK, después de correr sync_reingresos_virgilio()
+select count(*) from get_reingresos();
+```
+---
+
+## §3.ck — El PKC dice DE DÓNDE salió cada caja (v15.41, 2026-09-11, pedido de Luis)
+
+> ⚠ **La letra de esta sección se asigna AL MERGEAR, no antes.** `main` se mueve muy rápido
+> (32 commits y 19 versiones en una hora el 11/09) y cada sesión que escribe acá toma la
+> letra siguiente: esta sección nació como §3.cd, tuvo que pasar a §3.ce, y para cuando se
+> mergee `main` ya va por §3.ci. Mientras viva en una rama se llama **`§3.ck`**, que
+> es único y no choca con nadie. Al mergear: reemplazar por la letra libre que siga y
+> buscar `ck` en el repo para actualizar las referencias de una sola pasada.
+
+**El problema.** El picking le dice al operario dónde ir: parte el artículo en **dos pasos**
+cuando hay excedente — uno de góndola con su sector y otro `art·EXC` con la ubicación del
+excedente (`index.html`, bloque `excSteps`) — y después **tiraba ese dato**. El evento era
+`TANDA|ART|esp|real`, sin depósito, y el backend **re-derivaba** el reparto al reconciliar,
+con los saldos vivos de ese momento:
+
+```
+from_exc = least(picked, excedente_disponible − lo_ya_tomado_por_otras_tandas)
+```
+
+O sea, adivinaba a las 09:17 algo que el operario tenía en la mano a las 09:15.
+
+**Y encima se perdían cajas.** Los dos pasos comparten `client_id`
+(`pkc_<legajo>_<tanda>_<ART>_<día>`) y el POST va con `on_conflict=client_id` +
+`resolution=merge-duplicates`. Los pasos de excedente se encolan **al final**
+(`allItems = items.concat(excSteps)`), así que **el PKC del excedente pisaba al de góndola**
+y las cajas de góndola desaparecían del registro. Huella medida: de **815** pickings con
+excedente en 60 días, **802 (98,4 %)** figuraban como 100 % excedente y 0 de góndola.
+
+**Cómo quedó.** Un **único** evento por `(tanda, artículo)` con los **totales de los dos
+pasos** y un 5.º campo:
+
+```
+TANDA|ART|esp|real|excedente     ← "de las `real` cajas, tantas salieron del excedente"
+```
+
+Un solo evento **a propósito**: hay **12 objetos** en la base que leen PKC asumiendo una fila
+por `(tanda, artículo)` — `vista_faltante_real`, `vista_faltantes_sin_completar`,
+`notificar_faltante_telegram`, `reporte_agentes_faltante_articulo`, `anular_picking_virgilio`,
+`generar_reporte_agentes`, `gv_ppp_tanda_mover`, `gv_ppp_web_pickers_tipicos`,
+`ppp_web_armar_tandas`, `trg_pkc_reconciliar_rt` y las dos de abajo. Partirlo en dos filas los
+rompía a todos en silencio. Con una sola, ninguno se entera: sólo ven que `esp`/`real` ahora
+traen el total correcto en vez del pedazo del excedente.
+
+**Front** (`index.html`): `pkTotalesArt(rec)` suma los pasos del mismo código —salteando el
+`esp` del paso de excedente marcado **a mano** (`manualExc`), que repite el del de góndola—;
+`pkSendDetail` arma el texto con esos totales. `_pk.excOk` marca si la consulta de excedente
+**anduvo**: si falló (sin red), el 5.º campo **no se manda** y el backend vuelve a repartir por
+saldos — un fetch caído no se confunde con "no hay excedente".
+
+**Backend**: `reconciliar_pipeline_stock_etapa1()` (cron 68) y `reconciliar_stock_articulo_rt()`
+(trigger `trg_pkc_reconciliar_rt`). Las **dos**, si no el trigger escribe la adivinanza en cada
+PKC y el cron la corrige 10 min después (flip-flop). En la rama B, `want_exc` = lo declarado si
+el evento lo trae, si no `picked` (la adivinanza vieja). El **clamp** contra el excedente
+disponible y la **ventana por tanda** se mantienen → el excedente nunca queda negativo (fix
+v11.73 intacto). La rama A (histórico) no se toca: esos eventos son todos viejos.
+
+**Compatibilidad.** PKC de 4 campos → `tiene_dep = false` → idéntico a antes.
+
+**Interruptor:** `Stock_Config.pkc_deposito_activo = '0'` → vuelve a adivinar, sin tocar
+código. Sin la fila = prendido.
+
+**Prueba (2026-09-11).** (1) Con el código nuevo y sólo PKC viejos, la función no movió
+ninguna de las 23.311 filas `tipo='picking'` (los 30 renglones nuevos eran la tanda D67E,
+que se estaba pickeando en vivo). (2) Tanda falsa `ZZDEP1|207|10|10|3` (art 207, excedente
+27) → **excedente −3 / góndola −7 / separar_pedidos +10**; la lógica vieja daba **−10 / 0**.
+(3) Con el interruptor en `'0'` volvió a −10/0. (4) Rastro de prueba borrado; art 207 volvió
+a excedente 27 / góndola 133. (5) Suite completa: 119 bloques, 0 fallas, con el test nuevo
+`tests/pk-deposito-pkc.cjs`.
+
+**Orden del recorrido: el EXCEDENTE va PRIMERO** (dueño vía Luis, 2026-09-11). Antes los
+pasos `art·EXC` se encolaban al final (`items.concat(excSteps)`); ahora al principio
+(`excSteps.concat(items)`). **No cambia de dónde se descuenta**: el reparto `excUsed` /
+`gondNeeded` ya quedó decidido al abrir la tanda, antes de que el operario dé un paso. Lo que
+cambia es la **recuperación del error**: si el excedente miente (el saldo dice 10 y hay 6),
+yendo primero se entera al principio y levanta las 4 que faltan de góndola **en la misma
+pasada**; al final se enteraba con el paso de góndola ya cerrado pidiendo sólo el resto, y
+tenía que volver. El excedente marcado **a mano** (`pkMarkExcedente`) sigue yendo al final: se
+descubre parado en la góndola, cuando la zona del excedente ya quedó atrás.
+
+**Lo que NO se hizo, y por qué.** Se evaluó partir el PKC en **una fila por paso** (góndola y
+excedente por separado). Se descartó: no arregla nada que la fila única no arregle ya —las
+cajas perdidas las arregla el total, el depósito lo arregla el 5.º campo, y del lado del stock
+la separación **ya existe** (el picking escribe `terminado` / `excedente` / `separar_pedidos`,
+con `deposito` en la clave única). Lo único que sumaba era trazabilidad por paso, y costaba
+arreglar `vista_faltante_real` (usa `row_number() … rn = 1`, se quedaría con una sola fila),
+`faltantesDeTanda` y `pkFetchServerMarks` en el front, más dos renglones duplicados en
+`notificar_faltante_telegram` y `generar_reporte_agentes`. Si algún día hace falta la traza por
+paso, va **otro campo en el texto**, no otra fila.
+
+**Nota sobre `Movimientos_Stock.empresa`:** el picking **no la escribe** (no está en el `INSERT`),
+la llenan el `DEFAULT 'Mixto'` y el trigger `zz_normalizar_empresa`. Sí se **lee**: es parte de la
+clave del UPSERT. Pero informa poco — `codigos_duales` tiene 4 códigos (`437E, 438E, 439E, 809E`) y
+el trigger fuerza `'Mixto'` para todo el resto: de las 23.341 filas de picking, **22.867 son
+`'Mixto'`** (309 artículos), 344 `LK` y 130 `CH` (4 artículos cada uno).
+
+**Rollback:** `docs/ROLLBACK-PRODUCCION.md` (entrada v15.41) y
+`sql/backups/reconciliar_pkc_pre_v1541_20260911.sql`. SQL nuevo: `sql/gv_pkc_deposito_v1541.sql`.
+
+---
+
+## §3.cl — La empresa es un atributo del LUGAR, y viaja de la recepción a la góndola (v15.71, 2026-09-11, pedido de Luis)
+
+> ⚠ **La letra se asigna AL MERGEAR, no antes** (misma regla que `§3.ck`, y por el
+> mismo motivo: `main` se mueve a 19 versiones por hora y cada sesión toma la letra siguiente).
+> Mientras viva en rama se llama **`§3.cl`**. Al mergear: reemplazar por la letra
+> libre que siga y buscar `cl` en el repo.
+
+**El problema.** El sistema no tenía dónde guardar *de qué empresa es esta mercadería*, así
+que la gente lo metió adentro del **nombre del código**, y cada módulo eligió su propia
+grafía: `437E LK` (`Planimetria`), `437E-` (`planimetria.js`), `437EL` (Importados) y la
+columna `empresa` (`Movimientos_Stock`). Cuatro convenciones para un solo dato.
+
+El costo real lo pagó el **809E**, que es **dos productos distintos** (CH = Corta Queso,
+LK = Corta Pizza) y **nunca recibió sufijo en ninguna de las cuatro**: siempre caía al
+fallback, que mandaba al pickeador de LK a **M13** —la góndola de Chef— a buscar un Corta
+Pizza y encontrar un Corta Queso.
+
+**La observación que lo cierra.** La empresa no es un atributo del código: es un atributo del
+**lugar**. **684 de los 685 sectores** tienen una sola empresa. Con eso, `809E` vive en
+J13/J14 (LK) y M13/M14/M15 (CH) **sin sufijo ninguno**.
+
+### Las tablas nuevas (objetos NUEVOS, prefijo `GV_`; no pisan nada)
+
+| Objeto | Qué es | Filas |
+|---|---|---|
+| `GV_Lugar` | un lugar físico. PK `sector` (canónico `LETRAS+2 dígitos`, `J1`→`J01`), `tipo` (góndola/rack), `empresa` (`LK`/`CH`/`IN`), `orden` del recorrido, `uso` | 872 |
+| `GV_Lugar_Item` | qué hay en cada lugar. PK **`(sector, cod, clase)`** | 786 |
+| `GV_Lugar_Pendiente` | los insumos, estacionados hasta que se los trabaje aparte | 148 |
+| `gv_ocupacion_lugar` | vista derivada de `Movimientos_Stock`; **nunca se escribe** | — |
+
+**`clase` va en la PK y no es cosmético:** hay **9 códigos que existen como artículo y como
+insumo a la vez** y son cosas distintas. Con PK `(sector, cod)` el mismo lugar no podía tener
+el artículo 437E y el insumo 437E — justo el caso que motivó la tabla.
+
+**La `clase` sale del CONTEXTO del relevamiento, no del padrón `Insumos`.** 437E y 438E
+figuran en `Insumos` y son artículos: clasificar por el padrón los mandaba a la tabla
+equivocada.
+
+### La empresa viaja: recepción → A Guardar → góndola
+
+`Movimientos_Stock.empresa` tiene `DEFAULT 'Mixto'` y el trigger de recepción lo forzaba
+**incondicionalmente** para todo lo que no fuera dual — o sea que la empresa que el operario
+elegía del remito se **perdía** en el mismo INSERT. El cambio es una línea
+(`sql/gv_empresa_recepcion_mg.sql`): si vino explícita `LK`/`CH`, se respeta.
+
+El código sigue **pelado** (`438E`, nunca `438E LK`) y la empresa viaja en **su columna**.
+Vista nueva `gv_saldos_stock_emp` = saldos por (código pelado, empresa).
+
+**Backfill de A Guardar** (2026-09-11): empresa derivada del lugar (`GV_Lugar`) con fallback a
+`OC_Maximos.linea`, sólo cuando es inequívoca, excluyendo los duales; 582 y 583 a `LK` por
+decisión de Luis. Resultado: **0 filas en `Mixto`** — 1.118 `LK` (2.500 cajas) + 283 `CH`
+(72 cajas) = 2.572 ✓. Backup: `GV_Backup_aguardar_empresa_20260911` (1.389 filas).
+
+### ⚠ Lo que esto rompía en el front, y por qué se arregló acá
+
+`vista_saldos_stock` **ya agrupaba por `(código, empresa)`**, pero emite el código **con
+sufijo sólo para los duales**: para todo el resto emite el **código pelado, una vez por
+empresa**. Mientras la recepción marcaba todo `Mixto` había una sola fila por código y nadie
+lo notó. Desde que la recepción guarda `LK`/`CH`, el mismo `505` vuelve en **dos filas** (la
+góndola en `LK`, el descuento del picking en `Mixto`, porque las funciones de reconciliación
+insertan sin `empresa` y toman el default).
+
+Tres lugares del front tomaban **una** de esas filas en vez de sumarlas, y los tres se
+corrigieron en la v15.71:
+
+| Función | Qué hacía | Qué muestra mal |
+|---|---|---|
+| `stockFetchSaldos` | `m[k] = {…}` pisaba | MG, Bajar de racks, Insumos y CP: saldo de la última fila, no el total |
+| `pkFetchExcedente` | `out[k] = {cajas}` pisaba | desde la v15.41 el picking va **primero al excedente**: un número corto manda al operario a buscar de menos |
+| `_stkGondolaSaldoVivo` | `a[0].terminado` | la regla de "picking difiere" devolvía a góndola con un saldo parcial |
+
+`_pkConteoSistema` y `_pppChkBuildMaps` ya acumulaban: quedaron como estaban.
+
+**Chequeo:** `select cod_art, count(*) from vista_saldos_stock group by 1 having count(*) > 1;`
+— cada código que aparezca ahí tiene que estar sumado en el front, no pisado.
+
+### ⚠ PENDIENTE al implementar esta rama — no perder el arreglo del saldo
+
+El arreglo de las cuatro funciones **ya salió a `main` solo** (v15.71, commit `49c0fc6`,
+11/09): el backfill de A Guardar rompió el MG **en vivo** y no podía esperar a la rama.
+O sea que **la forma que hay hoy en `main` es la que tiene que quedar** cuando esta rama
+se implemente. Al mergear:
+
+1. **No revertir** `stockFetchSaldos`, `pkFetchExcedente` ni `_stkGondolaSaldoVivo` a la
+   forma vieja (`m[k] = …`, `out[k] = …`, `a[0].terminado`). Si el merge los deja como
+   estaban, el MG vuelve a mostrar góndola 0 o A Guardar 0.
+2. **`recepcion.js`** (aviso de exceso de góndola) lleva el mismo arreglo y **sólo está en
+   `main`**: esta rama no toca ese archivo, así que viene solo al traer `main`. Verificarlo
+   igual.
+3. **Re-bumpear la versión.** `main` se llevó la v15.71, así que esta rama pasó a **v15.72**;
+   al mergear hay que subirla otra vez a lo que siga de `main`.
+4. **`gv_saldos_stock_emp` todavía NO está aplicada** en la base: `stockFetchSaldos` la
+   consulta best-effort y sin ella el front se comporta como siempre (sin `_emp`).
+
+**⛔ El SQL se corre AL MERGEAR, no antes (decisión de Luis, 11/09).** La base es la misma
+que usa la app en vivo: correr `sql/gv_empresa_recepcion_mg.sql` **no espera a ningún push**,
+cambia la recepción en el instante, con los operarios pickeando. El orden es: traer `main` a
+la rama → suite → mergear a `main` → **recién ahí** correr el SQL → verificar con
+`select empresa, count(*) from "Movimientos_Stock" where deposito='a_guardar' group by 1;`.
+El archivo lleva el mismo cartel arriba de todo.
+
+**Chequeo de que el arreglo sigue puesto:**
+`grep -c 'v15.71 — ACUMULA\|v15.71 — SUMAR' index.html` → tiene que dar **3**.
+
+**Rollback:** `docs/ROLLBACK-PRODUCCION.md` (entrada v15.71). SQL:
+`sql/gv_lugar_fuente_unica.sql`, `sql/gv_lugar_carga_inicial.sql`,
+`sql/gv_empresa_recepcion_mg.sql`.
+
+---
+
+## §3.cm — La empresa sobrevive al picking (v15.73, 2026-09-11, pedido de Luis)
+
+> ⚠ **Letra al mergear, no antes** (igual que `§3.ck` y `§3.cl`).
+> Buscar `cm` en el repo al asignarla.
+
+**Luis:** *"la empresa tiene que acompañar al código a lo largo de toda esta pipeline"*.
+Con `§3.cl` la mercadería **entra** con la empresa puesta. Faltaba que **salga**
+con la empresa puesta.
+
+### El problema: la empresa se calculaba bien y se tiraba
+
+`pkCodEmpresa` resuelve la empresa desde la NP —que es donde el dato es inequívoco— y
+después hace:
+
+```js
+const cand = a + " " + emp;
+return G[cand] ? cand : a;     // G = window.GONDOLA (Planimetria)
+```
+
+O sea: la conserva **sólo si Planimetria tiene una celda que se llame `"438E LK"`**. Hay
+**8 filas con sufijo de 360, que cubren 4 códigos**, contra 351 códigos pelados. Para el
+98,9 % restante la empresa se descartaba y el código caía a la celda del código pelado,
+que puede ser la góndola de la **otra** empresa. Eso es lo que mandaba al pickeador de
+Loekemeyer a **M13** (góndola de Chef) a buscar un `809E`.
+
+Consecuencia aguas abajo: la reconciliación escribía todo con `empresa = 'Mixto'`. Con la
+recepción guardando LK/CH, la góndola pasaría a **llenarse con una etiqueta y vaciarse con
+otra**. Medido el 11/09:
+
+| | |
+|:--|--:|
+| Códigos afectados | 142 |
+| Cajas en el balde `Mixto` | 19.383 |
+| Cajas pickeadas por día | 519,7 |
+| Códigos en negativo en 7 días | 20 |
+| Ídem en 30 días | 61 |
+| El agregado, en | ~37 días |
+
+Y eso hace gritar al cron 13 (`check-stock-anomalias`, 08:00 ART), que lee
+`vista_saldos_stock` **fila por fila, o sea por empresa**.
+
+### De dónde sale la empresa: de la NP, NUNCA de la tanda
+
+**La tanda no sirve como clave.** Sobre 1.197 tandas-día de historia, **28 mezclan LK y CH
+(2,34 %)**, la última el **01/09**. (Sin cruzar por fecha daban 35: 7 eran el mismo código
+de tanda reusado meses después. Hay que contar por `(tanda, fecha)`.)
+
+La **NP** sí es inequívoca por construcción: las web llevan la empresa en la etiqueta
+(`LK 0057`) y `PPP_Web_NP` la tiene en la PK; las de ISIS son 9xxxx = LK / 4xxxx = CH.
+
+El front ya partía por NP (idea 9020) — sólo había que dejar de tirar el resultado.
+
+### Cómo quedó
+
+| Pieza | Qué hace |
+|:--|:--|
+| `aggFrom` / `aggEmp` | guarda de qué empresa vino cada caja, **sin tocar la clave** `a[k]` — el picking, el orden y los sectores no se mueven |
+| `empDeClave(k)` | `LK`/`CH` si todas las cajas son de una; `""` si la tanda mezcla las dos para ese código |
+| `items[].emp` | la empresa viaja con el renglón; los pasos de excedente la heredan |
+| sector | sale de **`gv_lugar_articulo`** por (código pelado, empresa) — la vista nueva reemplaza la muleta del sufijo |
+| `pkSendDetail` | 6.º campo del PKC: `TANDA\|ART\|esp\|real\|excedente\|EMPRESA` |
+| las 2 funciones de reconciliación | leen el 6.º campo y lo escriben en la columna `empresa` |
+
+**Nunca se inventa una empresa:** si la tanda mezcla, el campo va vacío y el backend
+reparte como hasta ahora.
+
+### ⚠ El corte por fecha no es opcional
+
+`Stock_Config.pkc_empresa_desde` (default `infinity` = apagado). Las filas ya escritas
+tienen `empresa = 'Mixto'` y el índice único lleva `coalesce(empresa,'')`, así que una fila
+nueva con `'LK'` **no choca con la vieja**: quedarían las dos y el stock se descontaría
+**dos veces**. Con el corte, cada tanda vive entera de un solo lado.
+
+Prender **después** de que el front v15.73 esté publicado:
+```sql
+insert into public."Stock_Config"(clave, valor) values ('pkc_empresa_desde', now()::text)
+  on conflict (clave) do update set valor = now()::text;
+```
+Apagar (vuelve todo a `'Mixto'`, sin rollback de código):
+```sql
+delete from public."Stock_Config" where clave = 'pkc_empresa_desde';
+```
+
+Verificación: `select empresa, count(*) from "Movimientos_Stock" where tipo='picking' and ts >= now() - interval '1 day' group by 1;`
+
+### ⚠ Antes de prender el corte hay que reclasificar el saldo que vive en `Mixto`
+
+El corte evita el doble descuento, pero queda otro problema: **la góndola hoy tiene su saldo
+en el balde `Mixto`**, así que si el picking empieza a descontar de `LK` encuentra un balde
+casi vacío y lo deja en negativo al primer pedido.
+
+| depósito | Mixto | LK | CH |
+|:--|--:|--:|--:|
+| terminado | 26.484 | 182 | 144 |
+| racks | 14.752 | 279 | 336 |
+| a_facturar | 1.968 | 4 | 43 |
+| excedente | 1.122 | 0 | 0 |
+| separar_pedidos | 229 | 2 | 0 |
+| a_guardar | 72 | **2.500** | 72 |
+
+(`a_guardar` ya se migró el 11/09; el resto no.)
+
+La solución es la misma que usó aquel backfill: **la empresa la da el lugar**. Cobertura
+medida, y es total:
+
+| depósito | cods | resuelve | dual | sin lugar | cajas |
+|:--|--:|--:|--:|--:|--:|
+| terminado | 272 | **272** | 0 | 0 | 26.484 |
+| a_facturar | 173 | **173** | 0 | 0 | 1.968 |
+| excedente | 34 | **34** | 0 | 0 | 1.122 |
+| separar_pedidos | 56 | **56** | 0 | 0 | 229 |
+
+No se reescribe la historia: **una transferencia balanceada** por (código, depósito) que saca
+el saldo de `Mixto` y lo pone en su empresa. Neta cero y se deshace con un `delete ... where
+ref = 'gv_empresa_backfill'`. `racks` queda afuera (47 racks vacíos todavía sin empresa, la
+derivan solos al guardar) e `insumos` también (no tienen empresa: viven en los racks `IN`).
+
+### El cron 13 no hay que tocarlo
+
+`check_stock_anomalias` (jobid **13**, 08:00 ART) lee `vista_saldos_stock` **fila por fila, o
+sea por (código, empresa)**, y avisa por Telegram de cualquier saldo negativo. Eso **está
+bien**: con la empresa viajando, una góndola de LK en negativo *es* un problema real y hay que
+saberlo. Hoy da **0 filas negativas**.
+
+Lo que lo haría gritar no es su lógica sino el desbalance de arriba — por eso el backfill va
+**antes** de prender el corte, no después. Con el backfill hecho, el cron queda como está y
+pasa a ser más útil que antes, porque distingue de qué empresa es el faltante.
+
+(El otro alarma, `trg_stock_negativo_telegram`, **no** se ve afectado: suma sin empresa y
+además saltea `picking` + `terminado`.)
+
+**SQL:** `sql/gv_empresa_picking.sql` (con el mismo cartel de ⛔ no aplicar hasta el merge).
+---
+
+## 3.ce La línea LOKE (1xx) no tiene lista: precio POR CLIENTE (v15.82) — 2026-09-11
+
+**Dueño, corrigiendo el informe de la v15.76**: *"Los artículos que empiezan con uno son
+línea Loke, y no hay una lista definida por Loke. Hay solo dos clientes y un par de
+supermercados que la compran y cada uno tiene su precio cada uno."*
+
+O sea que los `1xx` que quedaban "sin precio" **no son una lista desactualizada: no existe
+lista general de Loke**. Verificado: `precios_venta` tiene **0 códigos 1xx**. El `uxb` sí
+está, en `cob_uxb_lk` (products ∪ loke_products de LK).
+
+### Quién compra Loke, y qué le pasa a cada uno
+
+| Quién | Cód. | Cómo se valoriza | Estado |
+|---|---|---|---|
+| Diarco · Coto · La Anónima · Chango Más · Carrefour | súper | su **lista de cadena** (`cobranzas_precios_super`: 12 · 4 · 2 · 16 · 11 códigos 1xx) | ✅ sale bien |
+| **Cencosud** (Chef **2444**) | súper | cadena declarada con lista propia (hoja *"Jumbo Krea T"*) pero **la lista está VACÍA** | ❌ 24 líneas · 840 cajas (102E, 106E, 123) |
+| **Osa Distribuidora** (LK **2533**) | cliente | no había **dónde** poner el precio pactado | ❌ 4 líneas · 774 cajas (102E, 103, 106E, 198E) |
+
+Lo de Cencosud **no es código**: hay que importar esa hoja desde el admin de LK
+(PDF Krikos → listas de súper). Ídem **Dorinka/Walmart** (Chef 2686, hoja *"WMart Chef"*),
+que también está declarada y vacía.
+
+### Lo que se agregó: `GV_Precios_Cliente`
+
+Precio negociado por **(empresa, cod_cliente, cod)** — `sql/gv_precios_cliente_v1582.sql`.
+
+- **`es_final = true`** (default): el precio **es el final acordado** → no se le aplica el
+  `dto_vol` del cliente ni el 2% web. Es la lectura de *"cada uno tiene su precio"*.
+- `es_final = false`: se trata como precio de lista de ese cliente y se le aplican los dos.
+  Queda por fila para no tener que adivinar cuál de las dos cosas es.
+- `uxb` NULL → sale de la lista que corresponda o de `cob_uxb_lk` (para los Loke, de ahí).
+- `precio_unit` es **por unidad**, no por caja (igual que `precios_venta`).
+
+### Prioridad de precio, ya completa (las tres vistas)
+
+1. lista de **súper** (`cobranzas_precios_super`)
+2. **`GV_Precios_Cliente`** (precio pactado con ese cliente)
+3. lista de la **empresa** de la NP (`precios_venta_chef` para Chef)
+4. lista de **LK** (`precios_venta`) — fallback, y la única para las NP de LK
+
+El `uxb` suma un escalón final: `cob_uxb_lk`. La lista de súper va **primera a propósito**:
+es la que se mantiene sola desde el Excel, así una fila cargada a mano no le pisa en
+silencio la lista a una cadena.
+
+### Medido
+
+Con la tabla **vacía**, **cero impacto**: 0 filas con `importe`/`dto`/`factor_web` distinto
+contra el estado post-v15.76. El `uxb` nuevo aparece en 29 líneas, **todas sin precio**
+(importe null), así que no mueve plata. Prueba en vivo (cargada y borrada): Osa 2533 · 102E
+a $1.000 → 200 cajas × 12 × 1.000 = **$2.400.000**, dto 0, factor 1, `sin_precio = false`;
+el `uxb` 12 lo puso `cob_uxb_lk`.
+
+En el modal **Neto a facturar**, cuando queda algún `1xx` sin precio ahora aclara que son
+línea Loke y que el precio es el pactado con ese cliente — antes parecía una falla del sistema.
+
+### Falta (es dato, no código)
+
+- **Precio de Osa (LK 2533)** para 102E, 103, 106E, 198E → cargar en `GV_Precios_Cliente`.
+- **El segundo cliente** de Loke: no aparece comprando en lo que hay cargado en Facturación.
+- **Lista de Cencosud** (y Dorinka): importar la hoja en el admin de LK.
+
+### Rollback
+
+`drop table public."GV_Precios_Cliente" cascade;` + recrear las tres vistas con
+`sql/gv_precio_chef_v1576.sql`. No toca objetos de Producción.
+
+---
+
+## 3.cf Cargados los precios Loke de Fede (Osa 2533) — primer uso de `GV_Precios_Cliente` (v15.83) — 2026-09-11
+
+Thomas pasó la lista de Fede (Federico Chemello) textual: *"los que no te estoy pasando es el
+mismo precio que tenés en Loekemeyer (por todos tus dtos) y ya no podemos ir más abajo…
+Estos precios ya incluyen todos los dtos que tenés en LK y son netos +IVA"*.
+
+| Cód | Artículo | Precio (por unidad) |
+|---|---|---|
+| 102E | Abrelata Mariposa | **$1.260** |
+| 106E | Sacacorcho Doble Impulso | **$1.610** |
+| 103 | Abrelata Uña Inox | **$520** |
+| 198E | Pelador Dentado | **$660** |
+
+Cargados en `GV_Precios_Cliente` con **`es_final = true`** — el precio ya trae los descuentos,
+así que no se le aplica el `dto_vol` de Osa (16 %) ni el 2 % web. Es neto; el IVA va aparte y
+el sistema trabaja sin IVA. `sql/seed_precios_cliente_osa_20260911.sql`.
+
+**Quién es el cliente.** "Fede" = **Federico Chemello**. En el padrón de LK hay dos códigos de
+la misma familia: **2533** Osa Distribuidora SRL (osadistri@, dto 0,16) y **1431** Chemello
+Federico Agustín (osabazar@, dto 0,12), los dos con vendedor 7. Se cargó el **2533**, que es el
+que tenía las líneas sin valorizar y justo esos cuatro códigos. El 1431 es, casi seguro, **el
+segundo cliente de Loke** que faltaba identificar; si lleva la misma lista, el insert para
+replicarla está comentado al final del seed.
+
+**Trampa del `uxb`.** 102E, 103 y 106E lo toman solos de `cob_uxb_lk` (12). **198E no**: ese
+código no está en `products` ni en `loke_products` de LK (vive sólo en `item_precios`), así que
+nunca llega a `cob_uxb_lk` y la línea se valorizaba **por unidad en vez de por caja**
+($91.080 en lugar de $1.092.960). Se le escribió `uxb = 12` en la fila. **Es el caso que
+justifica la columna `uxb` de la tabla**: cuando un código no está en ninguna lista, el precio
+por cliente tiene que traer también las unidades por caja.
+
+### Medido (NP 98650, Osa)
+
+| Cód | Cajas | Cuenta | Importe |
+|---|---|---|---|
+| 102E | 200 | 200 × 12 × 1.260 | $3.024.000 |
+| 103 | 236 (faltaron 64) | 236 × 12 × 520 | $1.472.640 · faltó $399.360 |
+| 106E | 200 | 200 × 12 × 1.610 | $3.864.000 |
+| 198E | 138 (faltaron 362) | 138 × 12 × 660 | $1.092.960 · faltó $2.867.040 |
+
+`facturacion_neto_lote('98650')` → **$9.453.600**, **0 códigos sin precio** (antes la NP salía
+con esos cuatro en rojo). Total sin precio en Facturación: 89 → **85** líneas; de Loke quedan
+sólo las **24 de Cencosud**, que esperan la importación de su hoja.
+
+### ⚠ El catálogo de LK está lejos de estos precios
+
+Lo que le cotizaría **hoy el portal** a Osa (lista × 0,84 × 0,98) contra lo pactado:
+
+| Cód | Portal hoy | Pactado | Dif |
+|---|---|---|---|
+| 102E | $905,52 | $1.260 | **+39 %** |
+| 103 | $382,79 | $520 | **+36 %** |
+| 106E | $1.078,39 | $1.610 | **+49 %** |
+| 198E | $913,75 | $660 | **−28 %** |
+
+O sea que si Fede pide por la web ve números distintos de los que se le van a facturar.
+Actualizar la lista de Loke en LK es decisión del dueño; Facturación ya usa el pactado.
+
+### Aparte: el badge de versión había quedado en v15.71
+
+El commit `c869e53` (otro chat, mismo día) escribió `APP_VERSION = "v15.71"` sobre la v15.82:
+el badge mostraba una versión **11 números para atrás** de lo que corría, que es justo lo que el
+dueño mira para saber qué llegó. Corregido acá subiendo a **v15.83**.
+## 3.cg Los 3 datos que faltaban de la cuenta corriente, cerrados por Thomas (v15.84) — 2026-09-11
 
 Las tres preguntas abiertas de §3.ca (tarea Planify 3186) las contestó el dueño el 11/09:
 

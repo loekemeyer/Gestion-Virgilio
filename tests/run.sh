@@ -378,7 +378,7 @@ PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node te
 echo "== corr-reparto-sec (v15.66: Corregir códigos — el stock del secundario se reparte entre TODAS las NP que lo piden; sec_cubre de la vista en panel, badge y chip) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/corr-reparto-sec.cjs
 
-echo "== cc-orden-camionero (v15.70: Carga Camión — el tilde es el orden de carga 1°,2°,3° y el camionero es obligatorio) =="
+echo "== cc-orden-camionero (v15.71: Carga Camión — el tilde es el orden de carga 1°,2°,3° y el fletero es obligatorio) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/cc-orden-camionero.cjs
 
 echo "== pedimp-hecho (v15.72: Cargar pedido ya hecho — un bache por línea, con PI y fecha de embarque) =="
@@ -389,3 +389,11 @@ PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node te
 
 echo "== imp-cuenta-corriente (v15.74: vista 💵 Plata — FOB/pagado/pend giro/falta del Excel + libro de giros) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/imp-cuenta-corriente.cjs
+echo "== pk-deposito-pkc (v15.41: el PKC dice de qué depósito salió cada caja; un evento por (tanda,art)) =="
+PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/pk-deposito-pkc.cjs
+
+echo "== lugar-editor (v15.76: editor de LUGARES — GV_Lugar/GV_Lugar_Item, un código en varios lugares) =="
+PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/lugar-editor.cjs
+
+echo "== gondola-gv-lugar (v15.77: window.GONDOLA sale de GV_Lugar, no de Planimetria) =="
+PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/gondola-gv-lugar.cjs

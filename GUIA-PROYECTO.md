@@ -12,7 +12,7 @@
 > única**; no se replica. Ante la duda entre parche rápido y fix de raíz → **fix
 > de raíz**.
 >
-> Última actualización: 2026-09-11 (viernes) · Versión app al documentar: **v15.76**
+> Última actualización: 2026-09-11 (viernes) · Versión app al documentar: **v15.84**
 >
 > Nota **v15.40 (2026-09-11) — HANDOFF de planimetría / Acacia: `docs/HANDOFF-PLANIMETRIA-Y-ACACIA.md`.**
 > Thomas sigue este tema en otra sesión. Ahí está todo junto: los **13 artículos activos del catálogo LK
@@ -11159,13 +11159,53 @@ distinta, empresa distinta.
 >   `Sync_Estado`**: `cron.job_run_details` ya tiene la verdad. DDL en
 >   `sql/watchdog_syncs_externos.sql`.
 
-> Nota **2026-09-11 (v15.76) — Cerrados los 3 datos que faltaban de la cuenta corriente (Thomas).**
+> Nota **2026-09-11 (v15.84) — Cerrados los 3 datos que faltaban de la cuenta corriente (Thomas).**
 > (1) **FOB de Frontier = u$s 14.400**, manda el PI: `fob_uni` de **505C** 0,07 → **0,072** (14.400/200.000 u).
 > (2) **Frontier llega el 10/12** — *"embarca el 26 de octubre y llega 45 días después"*; la llegada cargada
 > (04/11) era la que estaba mal: daba **9 días de viaje** y ahora da **45**, en línea con el resto.
 > (3) El **30% es un parámetro, no una regla**: Becky (23,3%) y Hugo (36,3%) son **un solo giro cada uno**,
 > *"se pagó eso y me lo aceptaron los dos proveedores"*. Con esto ya no queda ninguna fila con `fob_difiere`
-> y el `falta` sigue dando el del Excel. §3.cc de `docs/SUPABASE-GESTION-VIRGILIO.md`.
+> y el `falta` sigue dando el del Excel. §3.cg de `docs/SUPABASE-GESTION-VIRGILIO.md`.
+> Nota **2026-09-11 (v15.81) — "¿Quién me compró este mes?" en Stock y Compras.**
+> Pedido del dueño: *"desde stock y compras, poder tocar en 1 mes y ver quién me compró (solo los primeros
+> 5 clientes de cada mes y un sexto con Resto)"* · unidad **cajas** (*"3 cajas"*), la misma de esa tabla.
+> En el detalle de **Abastecimiento**, la celda **Vend.** de cada mes ahora se toca y despliega el
+> **top 5 por cajas + un 6º renglón "Resto (N clientes)"**, con **%** sobre el total del mes, **NP** y una
+> fila **TOTAL**. Con 5 clientes o menos no aparece el renglón Resto. Si el detalle por cliente **no cuadra**
+> con la columna Vend., se avisa en amarillo — no se esconde.
+> **Backend** (protocolo: la lógica va al servidor): vista nueva **`gv_venta_mensual_cliente`**
+> (`sql/gv_venta_mensual_cliente_v1581.sql`), hermana por cliente de `vista_venta_mensual`. `security_invoker`,
+> `select` a `anon`/`authenticated`, prefijo `gv_` y **ningún objeto existente tocado**. La razón social se
+> resuelve en cascada `PPP_Entregados_Meta.rs` → `PPP_Programacion_Diaria.razon_social` →
+> `GV_Clientes_Direcciones.razon_social` → el cod pelado (sin el 3er paso quedaban **8 clientes sin nombre**).
+> **Medido, no supuesto:** 845 pares `(cod, mes)` en las dos vistas, **0 diferencias de suma**, 8.866 filas de
+> detalle, **0 sin nombre**. Front: `abastToggleMes` / `abastClientesHtml`, test `tests/abast-clientes.cjs`
+> (**17 chequeos**). Rollback: `drop view public.gv_venta_mensual_cliente;`.
+>
+> Nota **2026-09-11 (v15.78) — El "+" de Log/Fabr en Recepción es un BUSCADOR de códigos activos.**
+> Pedido del dueño: *"si están por recibir un artículo, si no lo tienen en su listado activo, en lugar de
+> que ellos escriban y nada más, que escriban sobre un buscador de códigos activos. Si no encuentra ninguno
+> con lo que ellos tipean, que los deje cargarlos pero con la misma pauta de recepción de mercadería sin OC:
+> que me manden un WhatsApp a mí"*. Antes el "+" era un `prompt()` libre y entraba cualquier cosa — de ahí
+> salieron los **599 / 943 / 948 sin la E** del remito 38087 (02/09). Ahora abre un modal con buscador que
+> filtra por **código o descripción** (sin acentos, con la normalización canónica: `0071` cruza con `71`).
+> Tocar un resultado lo agrega **sin WhatsApp**; si nada coincide aparece **"Cargar igual: XXX"**, que lo deja
+> entrar pero dispara `altaAvisar` (el WhatsApp a Thomas de la v15.39). El catálogo sale de **`OC_Maximos`
+> (`activo = true`, 306 filas)**, la lista curada que la base ya usa como canónica (trigger `fn_canon_cod_art`).
+> **Si vuelve vacío o falla, NO se toma por bueno**: se cae a la regla vieja (planimetría), para no mandar un
+> WhatsApp por cada alta cuando el problema es de red o de RLS. `arAddCode` abre el modal; el alta vive en
+> `arAddCodeAplicar(cod, fueraDeLista)`. Test `tests/rcp-alta-ok.cjs`: 16 → **27 chequeos**.
+>
+> Nota **2026-09-11 — Krikos YA INGESTA (la doc decía que no).** El cron **26 `krikos-ingest-10min`** del
+> proyecto LK (`kwkclwhmoygunqmlegrg`) está **activo** y `krikos_oc_inbox` tiene **10 filas**, todas con
+> `fecha_entrega`, cargadas el 11/09 11:51 UTC. O sea que **`KRIKOS_IMAP_PASS` ya está en el Vault** y la
+> Edge Function `krikos-ingest` corre: las notas de la v14.17 y de `docs/PENDIENTES-PIPELINE-GESTION.md`
+> que dicen "0 filas / falta cargar el secreto" quedaron **viejas**. Lo que sí falta medir: **7 de las 10
+> filas bajaron el PDF al bucket `krikos-oc` y 3 no** (`"el link no devolvió un PDF (text/html, 9845 bytes)"`)
+> — son las 3 **más viejas** (28/07, 03/08, 18/08), así que el token de Planexware del link parece vencer.
+> Y en los 7 pedidos ya matcheados **`orders.sheets_payload->>'fecha_entrega'` sigue en NULL**: esas OC se
+> cargaron en agosto, antes de que existiera la Bandeja, y el match se hizo retroactivo el 11/09 — hay que
+> probar una carga NUEVA desde la Bandeja para saber si la fecha viaja.
 
 > Nota **2026-09-11 (v15.75) — El depósito INSUMOS ya no infla el stock de los importados terminados.**
 > Lo encontró Thomas: 584E mostraba **1.290** (90 del módulo + 1.200 de insumos) contra **19 cajas** de la
@@ -11223,11 +11263,12 @@ distinta, empresa distinta.
 > 323ES suelto 22/09 · Becky `PI B260601` 29/09 · Fujian 01/11 · Hugo Wong 03/11 · Frontier 505C 04/11 ·
 > Becky `PI B260601-2` 15/11 · Zhixin 29/11 · Ownland 18/12. §3.by de `docs/SUPABASE-GESTION-VIRGILIO.md`.
 
-> Nota **2026-09-11 (v15.70) — Carga Camión: el tilde pasa a ser el ORDEN de carga (1°, 2°, 3°…) y el camionero es obligatorio.**
+> Nota **2026-09-11 (v15.70/71) — Carga Camión: el tilde pasa a ser el ORDEN de carga (1°, 2°, 3°…) y el FLETERO es obligatorio.**
 > Primera parte del **viaje del camionero** que pidió Thomas. El orden de clic viaja en el CCN como 4.º campo
 > (`NP|TANDA|CAMIONERO|ORDEN`) y con eso `gv_viaje_np` / `gv_viaje` arman el viaje sin tabla nueva; la 2.ª vuelta se
-> detecta porque el orden vuelve a 1. El camionero era opcional y se salteaba (33 cargas sin camionero el 10 y 11/09):
-> ahora no deja terminar sin él. Retira sigue con ✓ y sin camionero. §3.bx de `docs/SUPABASE-GESTION-VIRGILIO.md`.
+> detecta porque el orden vuelve a 1. El fletero era opcional y se salteaba (33 cargas sin fletero el 10 y 11/09):
+> ahora no deja terminar sin él. Retira sigue con ✓ y sin fletero. **v15.71 (Thomas): en pantalla se llama FLETERO**, y la
+> columna `camionero` de lo creado hoy pasó a `fletero` (la tabla `Camioneros` y el evento CCN no se tocan). §3.bx de `docs/SUPABASE-GESTION-VIRGILIO.md`.
 > **Falta**: RR filtrando por viaje, las horas de la hoja de ruta y la alerta en la PPP.
 
 > Nota **2026-09-11 (v15.68) — Datos: los dos clientes que OpenStreetMap no conoce, cargados con el pin de Thomas.**

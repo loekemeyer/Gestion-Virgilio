@@ -2316,6 +2316,28 @@ button.pk-anular small{ display:block; font-size:12px; font-weight:700; opacity:
 .tall-art-uxb{ width:74px; flex:0 0 auto; text-align:center; }
 .planim-status{ font-size: 13px; color: #475569; min-height: 18px; text-align: center; }
 .planim-empty{ color: #94a3b8; padding: 10px; text-align: center; }
+/* Editor de LUGARES (v15.76) — reusa .planim-* donde puede; sólo lo propio del
+   modelo nuevo lleva clases .lug-*. La tarjeta se para en el LUGAR y los códigos
+   que tiene adentro son chips, porque un lugar puede tener varios y un código
+   puede estar en varios lugares. Móvil: todo envuelve, nada de ancho fijo. */
+.lug-tabs{ display:flex; gap:6px; margin-bottom:8px; }
+.lug-tab{ flex:0 1 auto; padding:6px 14px; border:1px solid #cbd5e1; background:#f8fafc; color:#475569; border-radius:999px; font-size:13px; font-weight:700; cursor:pointer; }
+.lug-tab-on{ background:#0f172a; border-color:#0f172a; color:#fff; }
+.lug-row{ background:#fff; border:1px solid #e2e8f0; border-radius:10px; padding:8px 12px; margin-bottom:6px; }
+.lug-row-h{ display:flex; gap:10px; align-items:baseline; flex-wrap:wrap; }
+.lug-sec{ font-size:17px; font-weight:800; color:#0f172a; }
+.lug-meta{ font-size:12px; color:#64748b; }
+.lug-chips{ display:flex; gap:6px; flex-wrap:wrap; margin:6px 0; }
+.lug-chip{ display:inline-flex; align-items:center; gap:4px; background:#eff6ff; border:1px solid #bfdbfe; color:#1e3a8a; border-radius:999px; padding:3px 8px; font-size:13px; }
+.lug-chip-ins{ background:#fef3c7; border-color:#fcd34d; color:#92400e; }
+.lug-chip b{ font-weight:800; }
+.lug-x{ border:0; background:transparent; color:#64748b; cursor:pointer; font-size:13px; line-height:1; padding:0 2px; }
+.lug-x:hover{ color:#b42318; }
+.lug-libre{ font-size:13px; color:#94a3b8; font-style:italic; }
+.lug-add{ display:flex; gap:6px; flex-wrap:wrap; align-items:center; }
+.lug-inp-cod{ flex:0 1 120px; min-width:90px; }
+.lug-inp-cls{ flex:0 1 110px; min-width:90px; }
+.lug-inp-cap{ flex:0 0 100px; }
 /* Módulo PPP (placeholder/scaffolding) */
 .ppp-warn{ background:#fffbeb; border:1px solid #f59e0b; color:#92400e; border-radius:8px; padding:10px 12px; font-size:13px; margin-bottom:14px; }
 .ppp-imp-btn{ flex:1 1 220px; width:auto; margin:0; min-height:84px; display:flex; align-items:center; justify-content:center; gap:10px; padding:16px; font-size:17px; font-weight:bold; background:#1e6bd6; color:#fff; border:none; border-radius:12px; cursor:pointer; }
@@ -4619,7 +4641,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
 <!-- Librería qrcode-generator (Kazuhiko Arase, MIT) — hosteada local para
      que ande sin internet en el depósito. -->
 <script src="qrcode.js"></script>
-<script src="planimetria.js?v=3.73"></script>
+<script src="planimetria.js?v=15.79"></script>
 <script src="pasaje-papeles.js?v=5.2"></script>
 <!-- Modo OP de Recepción de Mercadería (se abre al tocar RT). Módulo aislado bajo
      #rcpRoot, con su propio cliente Supabase (login anónimo). Portado de la app
@@ -4872,6 +4894,39 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
     </div>
   </div>
 
+  <!-- Overlay: editor de LUGARES (v15.76, solo supervisores). Edita GV_Lugar /
+       GV_Lugar_Item, que reemplazan a Planimetria + Capacidad_Sector.
+       ⚠ El editor viejo (#planimEditorOverlay) queda andando a propósito: no se
+       borra nada hasta que éste esté rodando (regla de Luis, 11/09). -->
+  <div id="lugarEditorOverlay" class="recp-admin-overlay">
+    <div class="recp-admin-bar">
+      <span class="recp-admin-title">📍 Lugares del depósito</span>
+      <button class="recp-admin-close" onclick="closeLugarEditor()">Cerrar</button>
+    </div>
+    <div class="planim-body">
+      <div class="lug-tabs">
+        <button id="lugTabLugar" class="lug-tab lug-tab-on" onclick="lugSetTab('lugar')">Por lugar</button>
+        <button id="lugTabCod" class="lug-tab" onclick="lugSetTab('cod')">Por código</button>
+      </div>
+
+      <div id="lugPaneLugar">
+        <input id="lugSearch" class="planim-inp planim-search" type="text"
+               placeholder="🔍 Buscar lugar (J01, F13…) o el código que guarda…"
+               oninput="lugRender(this.value)">
+        <div id="lugList" class="planim-list"></div>
+      </div>
+
+      <div id="lugPaneCod" hidden>
+        <input id="lugCodSearch" class="planim-inp planim-search" type="text"
+               placeholder="🔍 Código (438E, 505…) — te muestro TODOS sus lugares"
+               oninput="lugRenderCod(this.value)">
+        <div id="lugCodList" class="planim-list"></div>
+      </div>
+
+      <div id="lugStatus" class="planim-status"></div>
+    </div>
+  </div>
+
   <!-- Módulo PPP (supervisor) — placeholder; el contenido se define después. -->
   <div id="pppOverlay" class="recp-admin-overlay">
     <div class="recp-admin-bar">
@@ -4947,6 +5002,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
         <button class="sup-action-btn" onclick="cfgGo(openPrintStation)"><span class="sup-ico">🖨️</span><span>Cola de impresión</span></button>
         <button class="sup-action-btn" onclick="cfgGo(openMailsEditor)"><span class="sup-ico">✉️</span><span>Mails autorizados</span></button>
         <button class="sup-action-btn" onclick="cfgGo(openPlanimEditor)"><span class="sup-ico">🗺️</span><span>Editar Planimetría</span></button>
+        <button class="sup-action-btn" onclick="cfgGo(openLugarEditor)"><span class="sup-ico">📍</span><span>Lugares del depósito</span></button>
         <button class="sup-action-btn" onclick="cfgGo(openTallEditor)"><span class="sup-ico">👷</span><span>Talleristas de Recepción</span></button>
         <!-- v13.25: venían de la barra de la PPP (dueño: "llevalo a configuración, sacalo de acá") -->
         <button class="sup-action-btn" onclick="cfgGo(openPppSupers)" title="Agregar/quitar clientes súper (salen en camión propio)"><span class="sup-ico">🛒</span><span>Clientes súper</span></button>
@@ -7701,7 +7757,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v15.76";
+const APP_VERSION = "v15.84";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -8535,6 +8591,10 @@ document.getElementById("btnHistDias").addEventListener("click", openHistoryModa
    pisa/agrega a la estática. Si la tabla no existe o no hay red, no rompe nada:
    queda la planimetría estática. v2.78. */
 async function loadPlanimetriaRemote() {
+  // v15.77 — la fuente pasa a ser GV_Lugar (vía gv_lugar_articulo). Si no está o
+  // viene vacía, cae a "Planimetria" como siempre. Ninguno de los 25 consumidores
+  // de window.GONDOLA se entera: la FORMA no cambia.
+  if (await _gondolaDesdeGvLugar()) return;
   try {
     // OJO: sin `&_=`+Date.now() acá. PostgREST lo interpreta como filtro de una
     // columna inexistente y devuelve 400. El anti-caché lo da `cache:"no-store"`.
@@ -8549,6 +8609,57 @@ async function loadPlanimetriaRemote() {
       if (cod) window.GONDOLA[cod] = [String(row.sector || ""), (row.orden != null ? Number(row.orden) : 0)];
     });
   } catch (_e) { /* offline / sin tabla: queda la planimetría estática */ }
+}
+
+/* v15.77 — Llena window.GONDOLA desde GV_Lugar / GV_Lugar_Item (vista
+   gv_lugar_articulo) en vez de la tabla "Planimetria". Devuelve true si pudo.
+
+   ⚠ Mantiene la MISMA forma y las MISMAS claves, a propósito:
+
+   · `cod` pelado → el PRIMER lugar del recorrido de ese código. La tabla vieja
+     guardaba un solo sector por código; acá un código puede estar en varios
+     (el 437E está en F09-F12), así que se toma el de menor `orden`, que es al que
+     el operario llega primero.
+   · `cod + " " + empresa` (437E LK) → se sigue generando para los códigos que
+     viven en las DOS empresas. No es que nos guste: es que `pkCodEmpresa` todavía
+     lo busca, y si desaparece de golpe el picking cae al código pelado — que para
+     el 809E es la góndola de CHEF (M13) y ahí el operario trae un Corta Queso en
+     vez de un Corta Pizza. Esas claves se dejan de generar en el paso 2 del
+     `docs/PLAN-SACAR-SUFIJO-EMPRESA.md`, cuando los lectores ya no las usen.
+
+   O sea: misma salida, otra fuente. El cambio es dónde se lee, nada más. */
+async function _gondolaDesdeGvLugar() {
+  try {
+    const r = await fetch(SUPABASE_URL + "/rest/v1/gv_lugar_articulo?select=cod,empresa,sector,orden&tipo=eq.gondola&order=orden.asc&limit=5000",
+      { headers: { "apikey": SUPABASE_KEY, "Authorization": "Bearer " + SUPABASE_KEY }, cache: "no-store" });
+    if (!r.ok) return false;
+    const rows = await r.json();
+    if (!Array.isArray(rows) || !rows.length) return false;   // sin datos → que siga Planimetria
+    if (!window.GONDOLA) window.GONDOLA = {};
+    const empresasDe = {};
+    rows.forEach(function (x) {
+      const c = String(x.cod || "").trim().toUpperCase(); if (!c) return;
+      (empresasDe[c] || (empresasDe[c] = {}))[String(x.empresa || "").toUpperCase()] = 1;
+    });
+    rows.forEach(function (x) {
+      const c = String(x.cod || "").trim().toUpperCase(); if (!c) return;
+      const sec = String(x.sector || ""), ord = (x.orden != null ? Number(x.orden) : 0);
+      // rows viene ordenado por `orden`, así que el primero que toca cada clave es
+      // el de menor orden: sólo se escribe si no estaba.
+      if (!window.GONDOLA[c]) window.GONDOLA[c] = [sec, ord];
+      // v15.81 — alias SIN el cero adelante. El código canónico lleva el cero (el
+      // maestro OC_Maximos dice "066", y fn_canon_cod_art rellena a 3 lo que no
+      // encuentra ahí: no existe un código "66"). Pero por el pipeline circulan las
+      // dos grafías, así que se deja el par — igual que hace planimetria.js.
+      const pel = c.replace(/^0+(?=.)/, "");
+      if (pel !== c && !window.GONDOLA[pel]) window.GONDOLA[pel] = [sec, ord];
+      if (Object.keys(empresasDe[c] || {}).length > 1) {
+        const k = c + " " + String(x.empresa || "").toUpperCase();
+        if (!window.GONDOLA[k]) window.GONDOLA[k] = [sec, ord];
+      }
+    });
+    return true;
+  } catch (_e) { return false; }   // sin red / sin vista → cae a Planimetria
 }
 loadPlanimetriaRemote();   // al arrancar (para que el picking tenga la planimetría fresca)
 
@@ -9320,14 +9431,53 @@ async function showPickingList(tanda, legajo, opts) {
     // 438E pedido por una NP 98… y otra 44… da DOS renglones ("438E LK" y
     // "438E CH"), cada uno con el sector de su empresa. Los códigos que no están
     // partidos siguen sumando igual que siempre.
+    // v15.72 — La empresa deja de perderse. `pkCodEmpresa` la calcula bien (la NP dice
+    // si el pedido es de Loeke o de Chef) y después la TIRA si Planimetria no tiene una
+    // celda llamada "438E LK" — y esas celdas existen para 4 códigos de 351. Por eso
+    // todo lo pickeado se anotaba como "Mixto". Ahora se guarda aparte, en `aggEmp`,
+    // SIN tocar la clave `a[k]`: la clave sigue siendo la de siempre (con sufijo para
+    // los duales, pelada para el resto), así no se mueve nada del picking, el orden ni
+    // los sectores. La empresa viaja como dato propio, que es lo que tenía que pasar.
+    const aggEmp = {};
     const aggFrom = (base) => {
       const a = {};
       // v7.91 — si la operadora confirmó la corrección de esa NP (secundario→principal),
       // el picking levanta el PRINCIPAL (corrArt) antes de partir por empresa.
-      for (const np of nps) for (const it of (base.get(np) || [])) { const k = pkCodEmpresa(corrArt(pkStripL(it.art), np, corrMap), np, pkEmpresaArt(it.art, np)); a[k] = (a[k] || 0) + it.cajas; }
+      for (const np of nps) for (const it of (base.get(np) || [])) {
+        const emp = pkEmpresaArt(it.art, np) || empresaDeNp(np) || "";
+        const k = pkCodEmpresa(corrArt(pkStripL(it.art), np, corrMap), np, emp);
+        a[k] = (a[k] || 0) + it.cajas;
+        if (emp === "LK" || emp === "CH") {
+          const d = aggEmp[k] || (aggEmp[k] = { LK: 0, CH: 0 });
+          d[emp] += it.cajas;
+        }
+      }
       return a;
     };
     let agg = aggFrom(pickBase);
+    /* Empresa de una clave del picking: "LK" / "CH" si todas las cajas vinieron de la
+       misma, "" si la tanda mezcla las dos para ese código (2,34 % de las tandas según
+       la historia: 28 de 1.197). En el caso mezclado no se inventa nada — se deja vacío
+       y el backend reparte como hasta ahora. */
+    const empDeClave = (k) => {
+      const d = aggEmp[k]; if (!d) return "";
+      // v15.73 — "MIX" en vez de vacío cuando las DOS empresas piden el mismo código en
+      // la misma tanda. El backend sólo acepta LK/CH, así que MIX se comporta igual que
+      // vacío (reparte como hasta ahora, no inventa nada) — pero queda ASENTADO en el
+      // evento, que es la diferencia: si algún día pasa, nos enteramos en vez de que se
+      // vaya en silencio al balde 'Mixto'. Medido el 11/09 sobre los movimientos reales:
+      // 375 tandas, 5.872 pares (tanda, artículo), 3 tandas que mezclan empresas y CERO
+      // pares pedidos por las dos — en las 3 mezcladas los catálogos son disjuntos
+      // (Loeke 5xx/8xx/9xx, Chef 7xx). O sea que esto no pasó nunca todavía.
+      // Para buscarlos:
+      //   select * from "Registros_Produccion_Virgilio"
+      //    where opcion='PKC' and split_part(texto,'|',6)='MIX';
+      if (d.LK > 0 && d.CH > 0) {
+        try { console.warn("[picking] " + k + ": lo piden LK y CH en la misma tanda (LK " + d.LK + " / CH " + d.CH + ") — el PKC sale como MIX"); } catch (_e) {}
+        return "MIX";
+      }
+      return d.LK > 0 ? "LK" : (d.CH > 0 ? "CH" : "");
+    };
     // v5.34: la base sale 100% de Supabase (PPP_Base_Pedidos). Ya no hay backfill
     // desde Google Sheets; si un NP todavía no sincronizó en Supabase, queda sin filas
     // hasta que la macro lo cargue.
@@ -9353,7 +9503,8 @@ async function showPickingList(tanda, legajo, opts) {
     };
     const items = Object.keys(agg)
       .sort((a, b) => (gOrden(a) - gOrden(b)) || (numKey(a) - numKey(b)) || (a < b ? -1 : a > b ? 1 : 0))
-      .map(art => { const e = gOf(art); const eq = equivLookup(art); return { art: art, key: art, esp: agg[art], sector: (e && e[0]) ? e[0] : "—", dual: dualOf(art), real: eq ? eq.real : null, realNota: eq ? eq.nota : null }; });
+      .map(art => { const e = gOf(art); const eq = equivLookup(art); return { art: art, key: art, esp: agg[art], sector: (e && e[0]) ? e[0] : "—", dual: dualOf(art), real: eq ? eq.real : null, realNota: eq ? eq.nota : null,
+                      emp: empDeClave(art) }; });   // v15.72: la empresa viaja con el renglón
     if (!items.length) {
       _pk = null;
       m.querySelector(".tanda-modal-body").innerHTML =
@@ -9381,16 +9532,50 @@ async function showPickingList(tanda, legajo, opts) {
         it.sector = dual.loeke.sector;
       }
     });
+    // v15.72 — SECTOR POR EMPRESA, sin la muleta del sufijo. Hasta ahora la celda
+    // del operario salía de window.GONDOLA buscando una clave "438E LK", y esas claves
+    // existen para 4 códigos de 351 (8 filas de 360 en Planimetria): para todo el
+    // resto la empresa se descartaba y quedaba la celda del código pelado — que puede
+    // ser la góndola de la OTRA empresa. Eso es lo que mandaba al pickeador de Loeke a
+    // M13 (Chef) a buscar un 809E. Ahora el sector sale de GV_Lugar por (código,
+    // empresa), que es una tabla con la empresa en una COLUMNA.
+    // Best-effort: si la vista no está, no se toca nada y queda el comportamiento viejo.
+    try {
+      const _emps = {};
+      items.forEach(function (it) { if (it.emp === "LK" || it.emp === "CH") _emps[it.emp] = 1; });
+      if (Object.keys(_emps).length) {
+        const _cods = items.map(function (it) { return codBase(it.art).replace(/^0+(?=.)/, ""); });
+        const _uniq = _cods.filter(function (c, i) { return c && _cods.indexOf(c) === i; });
+        const rows = await supaFetchAllSafe(SUPABASE_URL + "/rest/v1/gv_lugar_articulo",
+          "select=cod,empresa,tipo,sector,orden&tipo=eq.gondola&cod=in.(" +
+          _uniq.map(encodeURIComponent).join(",") + ")&order=orden.asc");
+        const porCodEmp = {};
+        (rows || []).forEach(function (r) {
+          const k = String(r.cod).toUpperCase() + "|" + String(r.empresa).toUpperCase();
+          (porCodEmp[k] || (porCodEmp[k] = [])).push(r.sector);
+        });
+        items.forEach(function (it) {
+          if (it.emp !== "LK" && it.emp !== "CH") return;   // MIX: se deja la planimetría de siempre
+          const secs = porCodEmp[codBase(it.art).replace(/^0+(?=.)/, "").toUpperCase() + "|" + it.emp];
+          if (secs && secs.length) { it.sector = secs.join(" · "); it.sectorDe = "GV_Lugar"; }
+        });
+      }
+    } catch (_e) { /* sin la vista: queda la planimetría de siempre */ }
     // v4.26: adjuntar el excedente (cajas + ubicación) a cada artículo.
+    // v15.41: excOk = la consulta de excedente ANDUVO. Si falla (sin red), el PKC sale
+    // SIN el campo de depósito y el backend vuelve a repartir por saldos, como antes.
+    // Sin esto, un fetch caído se vería igual que "no hay excedente" y la góndola
+    // se comería todo el descuento.
+    let excOk = false;
     try {
       const excMap = await pkFetchExcedente(Object.keys(agg));
       items.forEach(function (it) { const e = excMap[String(it.art).toUpperCase()]; if (e) { it.exc = e.cajas; it.excUbic = e.ubics.join(" · "); } });
-    } catch (_e) {}
-    // Excedente: se agarra PRIMERO del excedente (al final) y, si no alcanza, el
-    // RESTO de góndola. Ej: piden 15, hay 10 en excedente → góndola pide 5 (en su
-    // orden normal) + 10 en el excedente (paso al final). Si el excedente cubre
-    // todo, la góndola se SALTEA. El paso de excedente lleva key propia (art·EXC)
-    // para que cuente aparte del de góndola.
+      excOk = true;
+    } catch (_e) { excOk = false; }
+    // Excedente: se agarra PRIMERO del excedente y, si no alcanza, el RESTO de
+    // góndola. Ej: piden 15, hay 10 en excedente → 10 en el excedente + góndola
+    // pide 5. Si el excedente cubre todo, la góndola se SALTEA. El paso de
+    // excedente lleva key propia (art·EXC) para que cuente aparte del de góndola.
     const excSteps = [];
     items.forEach(function (it) {
       if (it.exc > 0) {
@@ -9398,11 +9583,20 @@ async function showPickingList(tanda, legajo, opts) {
         const gondNeeded = it.esp - excUsed;           // el resto, de góndola
         if (gondNeeded > 0) { it.esp = gondNeeded; it.excHint = excUsed; }   // góndola pide solo el resto
         else { it.skip = true; }                                              // excedente cubre todo → saltear góndola
-        excSteps.push({ art: it.art, key: it.art + "·EXC", esp: excUsed, sector: it.excUbic || "—", excUbic: it.excUbic, exc: it.exc, isExc: true, dual: null });
+        excSteps.push({ art: it.art, key: it.art + "·EXC", esp: excUsed, sector: it.excUbic || "—", excUbic: it.excUbic, exc: it.exc, isExc: true, dual: null, emp: it.emp || "" });
       }
     });
-    const allItems = items.concat(excSteps);
-    _pk = { tanda: tNorm, legajo: String(legajo || (typeof legajoInput !== "undefined" && legajoInput.value) || "").trim(), items: allItems, idx: 0, results: {}, mode: "item",
+    // v15.41 (pedido de Luis): los pasos de EXCEDENTE van PRIMERO, no al final.
+    // No cambia de dónde se descuenta —el reparto excUsed/gondNeeded ya quedó
+    // decidido arriba, antes de que el operario dé un paso—: cambia la RECUPERACIÓN
+    // del error. Si el excedente miente (el saldo dice 10 y hay 6), yendo primero se
+    // entera al principio y levanta las 4 que faltan de góndola EN LA MISMA PASADA,
+    // porque todavía no pasó por ahí. Al final se enteraba cuando el paso de góndola
+    // ya estaba cerrado pidiendo sólo el resto, y tenía que volver.
+    // (El excedente marcado A MANO —pkMarkExcedente— sigue yendo al final: se
+    // descubre parado en la góndola, ya pasó la zona del excedente.)
+    const allItems = excSteps.concat(items);
+    _pk = { tanda: tNorm, legajo: String(legajo || (typeof legajoInput !== "undefined" && legajoInput.value) || "").trim(), items: allItems, idx: 0, results: {}, mode: "item", excOk: excOk,
             // Si el cliente le agregó algo a un pedido de esta tanda cuando ya
             // estaba en la mesa, el operario lo tiene que ver en CADA paso del
             // picking, no una sola vez al abrir.
@@ -10134,16 +10328,71 @@ function pkFinishPicking() {
   } catch (e) { console.warn("pkFinishPicking:", e); }
 }
 
+/* v15.41 — TOTALES de un artículo sumando SUS pasos: el de góndola y el de excedente
+   (art·EXC). Devuelve { esp, real, exc } donde `exc` son las cajas que salieron del
+   EXCEDENTE. Existe porque el picking parte un artículo en dos pasos cuando hay
+   excedente, y los dos comparten el mismo código: el evento PKC tiene que llevar el
+   total, no el último paso marcado. */
+function pkTotalesArt(rec) {
+  const R = String(rec || "").toUpperCase();
+  let esp = 0, real = 0, exc = 0;
+  for (const x of (_pk.items || [])) {
+    const xr = String((x.dual && x.pick) ? x.pick : x.art).toUpperCase();
+    if (xr !== R) continue;
+    // El paso de excedente marcado A MANO (pkMarkExcedente) repite el `esp` del de
+    // góndola — sumarlo duplicaría lo pedido. El automático sí parte el esp en dos.
+    if (!x.skip && !x.manualExc) esp += Number(x.esp) || 0;
+    const r = _pk.results ? _pk.results[x.key] : null;
+    if (r == null) continue;
+    real += Number(r) || 0;
+    if (x.isExc) exc += Number(r) || 0;
+  }
+  // v15.72 — la empresa de los pasos de este artículo. Si los pasos no coinciden
+  // (no debería pasar: el de excedente la hereda del de góndola) se devuelve "" y el
+  // evento sale sin el campo, que es lo mismo que hacía antes.
+  let emp = null, empOk = true;
+  for (const x of (_pk.items || [])) {
+    const xr = String((x.dual && x.pick) ? x.pick : x.art).toUpperCase();
+    if (xr !== R || x.skip) continue;
+    const e = x.emp || "";
+    if (emp === null) emp = e; else if (emp !== e) empOk = false;
+  }
+  return { esp: esp, real: real, exc: exc, emp: (empOk && emp) ? emp : "" };
+}
+
 /* Emite el evento PKC (detalle de picking de un artículo) por la cola offline.
-   Un evento por artículo confirmado; el SW lo reenvía si no hay red. */
+   Un evento por artículo confirmado; el SW lo reenvía si no hay red.
+
+   v15.41 — texto = TANDA|ART|esp|real|excedente. El 5º campo dice cuántas de las
+   `real` cajas salieron del EXCEDENTE (el resto salió de góndola).
+   v15.72 — 6º campo = EMPRESA (LK/CH): de qué góndola salió la mercadería. Antes el
+   backend la forzaba a 'Mixto' para todo lo que no fuera dual, así que la cuenta de
+   cada empresa se desbalanceaba sola (la góndola se llenaba con una etiqueta y se
+   vaciaba con otra). Va vacío si la tanda mezcla las dos empresas para ese código
+   (2,34 % de las tandas) — ahí el backend reparte como siempre. Antes el backend
+   lo ADIVINABA repartiendo por saldos vivos al reconciliar; ahora se lo decimos.
+   Va como UN SOLO evento por (tanda, artículo) —con los totales de los dos pasos—
+   a propósito: el client_id es el mismo para los dos y hay 12 objetos en la base que
+   leen PKC asumiendo una fila por (tanda, artículo). Si la consulta de excedente
+   falló (_pk.excOk = false) el 5º campo NO se manda y el backend vuelve a adivinar. */
 function pkSendDetail(art, esp, real) {
   if (!_pk) return;
   const nowMs = Date.now();
+  const tot = pkTotalesArt(art);
+  const espT  = tot.esp > 0 ? tot.esp : esp;   // red de seguridad: nunca mandar esp 0
+  const realT = tot.real;
+  // v15.72 — 6º campo: la EMPRESA de la que salió la mercadería (LK/CH). Va vacío
+  // cuando la tanda mezcla las dos para ese código; ahí el backend reparte como
+  // siempre. Como el texto es posicional, si hay empresa pero no hay depósito el 5º
+  // campo va vacío para no correr la empresa al lugar del excedente.
+  const emp   = tot.emp || "";
+  const dep   = _pk.excOk ? ("|" + tot.exc) : (emp ? "|" : "");
+  const empF  = emp ? ("|" + emp) : "";
   const payload = {
     legajo: _pk.legajo,
     opcion: "PKC",
     descripcion: "Picking artículo",
-    texto: (_pk.tanda + "|" + art + "|" + esp + "|" + real).toUpperCase(),
+    texto: (_pk.tanda + "|" + art + "|" + espT + "|" + realT + dep + empF).toUpperCase(),
     ts: nowMs,
     // client_id determinístico → reenviar/corregir el mismo artículo hace UPSERT
     // (merge-duplicates) en vez de duplicar. Por eso se puede ir y volver.
@@ -11730,7 +11979,54 @@ async function stockFetchSaldos() {
     if (!a.desc) a.desc = x.descripcion || "";
     DEPS.forEach(function (d) { a[d] += Number(x[d]) || 0; });
   });
+  // v15.40 — detalle POR EMPRESA colgado en `_emp`, SIN cambiar la forma de `m`:
+  // m[cod] sigue siendo el total (lo usan MG, Bajar de racks, Insumos y CP), y
+  // m[cod]._emp = { LK:{…}, CH:{…}, Mixto:{…} } es el desglose para quien lo
+  // necesite. Best-effort: si la vista todavía no existe, queda sin _emp y todo
+  // sigue funcionando como hasta ahora.
+  try {
+    const er = await supaFetchAll(SUPABASE_URL + "/rest/v1/gv_saldos_stock_emp", "select=*");
+    (er || []).forEach(function (x) {
+      const k = String(x.cod), e = String(x.empresa || "Mixto");
+      if (!m[k]) m[k] = { cod: k, desc: x.descripcion || "", terminado: 0, excedente: 0, separar_pedidos: 0, a_facturar: 0, a_guardar: 0, racks: 0, insumos: 0, para_envasar: 0, racks_ch: 0 };
+      (m[k]._emp || (m[k]._emp = {}))[e] = {
+        terminado: Number(x.terminado) || 0, excedente: Number(x.excedente) || 0,
+        separar_pedidos: Number(x.separar_pedidos) || 0, a_facturar: Number(x.a_facturar) || 0,
+        a_guardar: Number(x.a_guardar) || 0, racks: Number(x.racks) || 0,
+        insumos: Number(x.insumos) || 0, para_envasar: Number(x.para_envasar) || 0,
+        racks_ch: Number(x.racks_ch) || 0
+      };
+    });
+  } catch (_e) { /* vista nueva no disponible: se sigue con el total de siempre */ }
   return m;
+}
+
+/* v15.40 — LUGARES VÁLIDOS del depósito (GV_Lugar) para el input de ubicación
+   del excedente. Hasta ahora el operario tipeaba libre y por eso en
+   Movimientos_Stock.ubicacion conviven "P5", "L7", "F09-F11" y hasta números
+   de NP. Devuelve { lista:[…], set:Set, libres:Set } ya normalizado.
+   Best-effort: si la tabla no está, devuelve vacío y el input NO valida
+   (se comporta como antes) para no trabar el guardado. */
+let _gvLugares = null;
+async function gvFetchLugares() {
+  if (_gvLugares) return _gvLugares;
+  const out = { lista: [], set: new Set(), libres: new Set(), emp: {} };
+  try {
+    const rows = await supaFetchAllSafe(SUPABASE_URL + "/rest/v1/GV_Lugar", "select=sector,tipo,empresa,orden,uso,activo&activo=is.true&order=orden.asc");
+    (rows || []).forEach(function (r) {
+      const sec = String(r.sector || "").trim().toUpperCase(); if (!sec) return;
+      out.lista.push(sec); out.set.add(sec); out.emp[sec] = r.empresa || "";
+    });
+  } catch (_e) { /* sin tabla: no se valida */ }
+  _gvLugares = out; return out;
+}
+/* Normaliza lo que tipea el operario al formato canónico del lugar: LETRAS +
+   2 dígitos (J1 -> J01), con sufijo AD/AT opcional para los racks de insumos.
+   Es el mismo criterio que gv_norm_sector() del backend. */
+function gvNormSector(v) {
+  const s = String(v == null ? "" : v).trim().toUpperCase().replace(/\s+/g, "");
+  const m = /^([A-ZÑ]{1,2})0*(\d+)(AD|AT)?$/.exec(s);
+  return m ? (m[1] + String(m[2]).padStart(2, "0") + (m[3] || "")) : s;
 }
 /* Normaliza un timestamp a ISO parseable en TODOS los browsers. Stock_Config.cutoff_ts a veces
    quedó cargado a mano como "2026-06-26 00:01:00-03" (espacio en vez de T, offset sin ":00") →
@@ -14460,7 +14756,7 @@ function abastCompute(recep, venta, sp) {
 async function openAbastecimiento() {
   if (!document.getElementById("abastCss")) {
     const s = document.createElement("style"); s.id = "abastCss";
-    s.textContent = "#abastOverlay{display:none;position:fixed;inset:0;z-index:1280;background:rgba(2,6,23,.74);overflow:auto;padding:14px;}#abastOverlay.show{display:block;}.abast-card{background:#f8fafc;max-width:min(1200px,98vw);margin:0 auto;border-radius:16px;overflow:hidden;box-shadow:0 24px 70px rgba(0,0,0,.5);}.abast-head{display:flex;align-items:center;justify-content:space-between;padding:13px 16px;background:linear-gradient(90deg,#7c3aed,#4c1d95);color:#fff;}.abast-title{font-size:19px;font-weight:800;}.abast-close{background:#dc2626;color:#fff;border:none;border-radius:8px;padding:6px 14px;font-weight:800;cursor:pointer;width:auto;}.abast-body{padding:14px 16px;}.abast-loading{padding:24px;text-align:center;color:#64748b;}.abast-tbl th.grp{text-align:center;background:#ede9fe;color:#5b21b6;font-size:10.5px;letter-spacing:.2px;}.abast-tbl th.sep,.abast-tbl td.sep{border-left:2px solid #c4b5fd;}.abast-det-grid{display:flex;gap:14px;flex-wrap:wrap;}.abast-det-grid>div{flex:1;min-width:280px;}.abast-intro{background:#f5f3ff;border:1px solid #ddd6fe;color:#4c1d95;border-radius:10px;padding:9px 12px;font-size:12.5px;margin-bottom:10px;}.abast-headline{font-size:14px;font-weight:800;margin:6px 0 10px;}.abast-headline .bad{color:#b91c1c;}.abast-headline .ok{color:#15803d;}.abast-filtro{width:100%;height:38px;border:1px solid #cbd5e1;border-radius:9px;padding:0 11px;font-size:14px;margin-bottom:10px;box-sizing:border-box;}.abast-tblwrap{overflow:auto;max-height:64vh;border:1px solid #e9d5ff;border-radius:12px;box-shadow:0 2px 10px rgba(109,40,217,.06);}.abast-tbl{width:100%;border-collapse:separate;border-spacing:0;font-size:13px;}.abast-tbl th{background:#f1f5f9;color:#475569;text-align:right;padding:7px 8px;font-size:10.5px;text-transform:uppercase;border-bottom:1px solid #cbd5e1;white-space:nowrap;vertical-align:bottom;position:sticky;z-index:3;}.abast-tbl thead tr:first-child th{top:0;}.abast-tbl thead tr:nth-child(2) th{top:27px;}.abast-tbl th.l{text-align:left;}.abast-tbl td{padding:7px 8px;text-align:right;border-bottom:1px solid #eef2f7;font-variant-numeric:tabular-nums;white-space:nowrap;}.abast-tbl td.l{text-align:left;white-space:normal;}.abast-row{cursor:pointer;}.abast-tbl tbody tr.abast-row.odd td{background:#faf8ff;}#abastOverlay .abast-row:hover td{background:#f3e8ff;}#abastOverlay .abast-row.open td{background:#ede9fe;}.abast-cod{font-family:Consolas,Menlo,monospace;font-weight:800;color:#6d28d9;background:#f3e8ff;border:1px solid #e9d5ff;border-radius:6px;padding:2px 7px;display:inline-block;}.abast-chev{color:#7c3aed;font-weight:800;}.abast-mesbtn{margin-top:7px;background:#ede9fe;border:none;border-radius:8px;padding:5px 13px;font-size:11.5px;font-weight:800;color:#6d28d9;cursor:pointer;width:auto;}.abast-mesbtn:hover{background:#ddd6fe;}.abast-desc{color:#475569;max-width:200px;overflow:hidden;text-overflow:ellipsis;}.abast-neg{color:#b91c1c;font-weight:800;}.abast-pos{color:#15803d;font-weight:700;}.abast-chip{display:inline-block;border-radius:999px;padding:1px 8px;font-size:11px;font-weight:800;}.abast-chip.bad{background:#fef2f2;color:#b91c1c;border:1px solid #fecaca;}.abast-chip.warn{background:#fffbeb;color:#b45309;border:1px solid #fde68a;}.abast-chip.ok{background:#f0fdf4;color:#15803d;border:1px solid #bbf7d0;}.abast-chip.mut{background:#f1f5f9;color:#64748b;border:1px solid #e2e8f0;}.abast-prov{font-size:11px;color:#64748b;}.abast-det td{background:#faf5ff;}.abast-det table{width:auto;border-collapse:collapse;font-size:12px;margin:2px 0;}.abast-det th,.abast-det td{border:1px solid #e9d5ff;padding:3px 8px;text-align:right;}.abast-det th{background:#f5f3ff;color:#6d28d9;}";
+    s.textContent = "#abastOverlay{display:none;position:fixed;inset:0;z-index:1280;background:rgba(2,6,23,.74);overflow:auto;padding:14px;}#abastOverlay.show{display:block;}.abast-card{background:#f8fafc;max-width:min(1200px,98vw);margin:0 auto;border-radius:16px;overflow:hidden;box-shadow:0 24px 70px rgba(0,0,0,.5);}.abast-head{display:flex;align-items:center;justify-content:space-between;padding:13px 16px;background:linear-gradient(90deg,#7c3aed,#4c1d95);color:#fff;}.abast-title{font-size:19px;font-weight:800;}.abast-close{background:#dc2626;color:#fff;border:none;border-radius:8px;padding:6px 14px;font-weight:800;cursor:pointer;width:auto;}.abast-body{padding:14px 16px;}.abast-loading{padding:24px;text-align:center;color:#64748b;}.abast-tbl th.grp{text-align:center;background:#ede9fe;color:#5b21b6;font-size:10.5px;letter-spacing:.2px;}.abast-tbl th.sep,.abast-tbl td.sep{border-left:2px solid #c4b5fd;}.abast-det-grid{display:flex;gap:14px;flex-wrap:wrap;}.abast-det-grid>div{flex:1;min-width:280px;}.abast-intro{background:#f5f3ff;border:1px solid #ddd6fe;color:#4c1d95;border-radius:10px;padding:9px 12px;font-size:12.5px;margin-bottom:10px;}.abast-headline{font-size:14px;font-weight:800;margin:6px 0 10px;}.abast-headline .bad{color:#b91c1c;}.abast-headline .ok{color:#15803d;}.abast-filtro{width:100%;height:38px;border:1px solid #cbd5e1;border-radius:9px;padding:0 11px;font-size:14px;margin-bottom:10px;box-sizing:border-box;}.abast-tblwrap{overflow:auto;max-height:64vh;border:1px solid #e9d5ff;border-radius:12px;box-shadow:0 2px 10px rgba(109,40,217,.06);}.abast-tbl{width:100%;border-collapse:separate;border-spacing:0;font-size:13px;}.abast-tbl th{background:#f1f5f9;color:#475569;text-align:right;padding:7px 8px;font-size:10.5px;text-transform:uppercase;border-bottom:1px solid #cbd5e1;white-space:nowrap;vertical-align:bottom;position:sticky;z-index:3;}.abast-tbl thead tr:first-child th{top:0;}.abast-tbl thead tr:nth-child(2) th{top:27px;}.abast-tbl th.l{text-align:left;}.abast-tbl td{padding:7px 8px;text-align:right;border-bottom:1px solid #eef2f7;font-variant-numeric:tabular-nums;white-space:nowrap;}.abast-tbl td.l{text-align:left;white-space:normal;}.abast-row{cursor:pointer;}.abast-tbl tbody tr.abast-row.odd td{background:#faf8ff;}#abastOverlay .abast-row:hover td{background:#f3e8ff;}#abastOverlay .abast-row.open td{background:#ede9fe;}.abast-cod{font-family:Consolas,Menlo,monospace;font-weight:800;color:#6d28d9;background:#f3e8ff;border:1px solid #e9d5ff;border-radius:6px;padding:2px 7px;display:inline-block;}.abast-chev{color:#7c3aed;font-weight:800;}.abast-mesbtn{margin-top:7px;background:#ede9fe;border:none;border-radius:8px;padding:5px 13px;font-size:11.5px;font-weight:800;color:#6d28d9;cursor:pointer;width:auto;}.abast-mesbtn:hover{background:#ddd6fe;}.abast-desc{color:#475569;max-width:200px;overflow:hidden;text-overflow:ellipsis;}.abast-neg{color:#b91c1c;font-weight:800;}.abast-pos{color:#15803d;font-weight:700;}.abast-chip{display:inline-block;border-radius:999px;padding:1px 8px;font-size:11px;font-weight:800;}.abast-chip.bad{background:#fef2f2;color:#b91c1c;border:1px solid #fecaca;}.abast-chip.warn{background:#fffbeb;color:#b45309;border:1px solid #fde68a;}.abast-chip.ok{background:#f0fdf4;color:#15803d;border:1px solid #bbf7d0;}.abast-chip.mut{background:#f1f5f9;color:#64748b;border:1px solid #e2e8f0;}.abast-prov{font-size:11px;color:#64748b;}.abast-det td{background:#faf5ff;}.abast-det table{width:auto;border-collapse:collapse;font-size:12px;margin:2px 0;}.abast-det th,.abast-det td{border:1px solid #e9d5ff;padding:3px 8px;text-align:right;}.abast-det th{background:#f5f3ff;color:#6d28d9;}.abast-vend{cursor:pointer;color:#6d28d9;font-weight:800;text-decoration:underline dotted;text-underline-offset:2px;}.abast-vend.on{background:#ede9fe;}.abast-cli th,.abast-cli td{border:none;border-bottom:1px solid #f1e8ff;}.abast-cli td.n{text-align:left;white-space:normal;max-width:230px;}.abast-cli td.resto{color:#64748b;font-style:italic;}.abast-cli tr.tot td{border-top:1px solid #c4b5fd;font-weight:800;background:#f5f3ff;}.abast-clih{font-size:11.5px;color:#6d28d9;font-weight:800;padding:6px 0 3px;}";
     document.head.appendChild(s);
   }
   let ov = document.getElementById("abastOverlay");
@@ -14566,7 +14862,13 @@ function abastRender() {
       meses.forEach(function (mm) {
         const rec = a.recepMes[mm] || 0, ven = a.ventaMes[mm] || 0, bal = rec - ven;
         const pv = a.provMes[mm] ? Object.keys(a.provMes[mm]).map(function (p) { return escapeHtml(p) + " " + _abastN(a.provMes[mm][p]); }).join(" · ") : "—";
-        dl += '<tr><td>' + escapeHtml(mm) + (mm === _abast.cur && mm !== _abast.ultimo ? ' <span class="abast-prov">(en curso)</span>' : '') + '</td><td>' + _abastN(rec) + '</td><td>' + _abastN(ven) + '</td><td style="' + (bal < 0 ? "color:#b91c1c;font-weight:800" : "color:#15803d") + '">' + (bal >= 0 ? "+" : "") + _abastN(bal) + '</td><td style="text-align:left;color:#475569">' + pv + '</td></tr>';
+        // v15.81 — la celda Vend. abre "quién me compró ese mes" (top 5 + Resto, en cajas).
+        const abierto = _abast.openMes === mm;
+        const vendCel = (ven > 0)
+          ? '<td class="abast-vend' + (abierto ? ' on' : '') + '" title="Ver quién compró en ' + escapeHtml(mm) + '" onclick="event.stopPropagation();abastToggleMes(\'' + escapeHtml(mm) + '\')">' + _abastN(ven) + (abierto ? ' ▴' : ' ▾') + '</td>'
+          : '<td>' + _abastN(ven) + '</td>';
+        dl += '<tr><td>' + escapeHtml(mm) + (mm === _abast.cur && mm !== _abast.ultimo ? ' <span class="abast-prov">(en curso)</span>' : '') + '</td><td>' + _abastN(rec) + '</td>' + vendCel + '<td style="' + (bal < 0 ? "color:#b91c1c;font-weight:800" : "color:#15803d") + '">' + (bal >= 0 ? "+" : "") + _abastN(bal) + '</td><td style="text-align:left;color:#475569">' + pv + '</td></tr>';
+        if (abierto) dl += '<tr><td colspan="5" style="text-align:left;padding:0 8px 8px">' + abastClientesHtml(a, mm, ven) + '</td></tr>';
       });
       dl += '</tbody></table>';
       if (mesesAll.length > 6) dl += '<button class="abast-mesbtn" onclick="event.stopPropagation();abastToggleMeses()">' + (_abast.mesesAll ? '▴ ver menos' : '▾ ver los ' + mesesAll.length + ' meses') + '</button>';
@@ -14592,6 +14894,7 @@ function abastToggle(codEnc) {
   if (!_abast) return;
   const cod = decodeURIComponent(codEnc);
   _abast.openCod = (_abast.openCod === cod) ? null : cod;
+  _abast.openMes = null;                       // v15.81: cambiar de artículo cierra el mes abierto
   if (_abast.openCod == null) { _abast.mesesAll = false; abastRender(); return; }
   /* v10.10 — lazy-load detalle mensual para el artículo expandido (evita los 120k rows iniciales).
      _a null = todavía sin cargar → fetch on-demand de vista_recepcion_mensual + vista_venta_mensual
@@ -14603,19 +14906,81 @@ function abastToggle(codEnc) {
     var H = { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY };
     Promise.all([
       fetch(SUPABASE_URL + "/rest/v1/vista_recepcion_mensual?cod=eq." + encodeURIComponent(cod) + "&select=mes,proveedor,cajas&limit=5000", { headers: H, cache: "no-store" }).then(function (r) { return r.ok ? r.json() : []; }),
-      fetch(SUPABASE_URL + "/rest/v1/vista_venta_mensual?cod=eq." + encodeURIComponent(cod) + "&select=mes,cajas&limit=5000", { headers: H, cache: "no-store" }).then(function (r) { return r.ok ? r.json() : []; })
+      fetch(SUPABASE_URL + "/rest/v1/vista_venta_mensual?cod=eq." + encodeURIComponent(cod) + "&select=mes,cajas&limit=5000", { headers: H, cache: "no-store" }).then(function (r) { return r.ok ? r.json() : []; }),
+      /* v15.81 — quién compró, por mes (cajas). Vista gv_venta_mensual_cliente: mismo total
+         que vista_venta_mensual, abierto por cliente. El corte a 5 + "Resto" lo hace el front. */
+      fetch(SUPABASE_URL + "/rest/v1/gv_venta_mensual_cliente?cod=eq." + encodeURIComponent(cod) + "&select=mes,cod_cliente,razon_social,cajas,nps&limit=20000", { headers: H, cache: "no-store" }).then(function (r) { return r.ok ? r.json() : []; })
     ]).then(function (res) {
-      var recepMes = {}, ventaMes = {}, provMes = {}, mesesSet = {};
+      var recepMes = {}, ventaMes = {}, provMes = {}, mesesSet = {}, cliMes = {};
       (res[0] || []).forEach(function (r) { var m = r.mes, q = Number(r.cajas) || 0; recepMes[m] = (recepMes[m] || 0) + q; mesesSet[m] = 1; if (!provMes[m]) provMes[m] = {}; var pv = r.proveedor || "(s/nombre)"; provMes[m][pv] = (provMes[m][pv] || 0) + q; });
       (res[1] || []).forEach(function (r) { var m = r.mes; ventaMes[m] = (ventaMes[m] || 0) + (Number(r.cajas) || 0); mesesSet[m] = 1; });
-      row._a = { recepMes: recepMes, ventaMes: ventaMes, provMes: provMes, mesesSet: mesesSet };
+      (res[2] || []).forEach(function (r) {
+        var m = r.mes; if (!m) return;
+        if (!cliMes[m]) cliMes[m] = [];
+        cliMes[m].push({ cod: r.cod_cliente || "", rs: r.razon_social || r.cod_cliente || "(s/nombre)", cajas: Number(r.cajas) || 0, nps: Number(r.nps) || 0 });
+      });
+      Object.keys(cliMes).forEach(function (m) { cliMes[m].sort(function (a, b) { return b.cajas - a.cajas; }); });
+      row._a = { recepMes: recepMes, ventaMes: ventaMes, provMes: provMes, mesesSet: mesesSet, cliMes: cliMes };
       if (_abast && _abast.openCod === cod) abastRender();
-    }).catch(function () { row._a = { recepMes: {}, ventaMes: {}, provMes: {}, mesesSet: {} }; if (_abast && _abast.openCod === cod) abastRender(); });
+    }).catch(function () { row._a = { recepMes: {}, ventaMes: {}, provMes: {}, mesesSet: {}, cliMes: {} }; if (_abast && _abast.openCod === cod) abastRender(); });
     return;
   }
   abastRender();
 }
 function abastToggleMeses() { if (!_abast) return; _abast.mesesAll = !_abast.mesesAll; abastRender(); }
+
+/* ===== v15.81 — "¿quién me compró este mes?" =========================================
+   Pedido del dueño (2026-09-11): *"desde stock y compras, poder tocar en 1 mes y ver
+   quién me compró (solo los primeros 5 clientes de cada mes y un sexto con Resto)"* ·
+   *"3 cajas"* → la unidad es CAJAS, la misma de la tabla mes a mes.
+
+   Se toca la celda Vend. de un mes y se despliega el top 5 por cajas + un 6º renglón
+   "Resto (N clientes)". Los datos salen de gv_venta_mensual_cliente (backend), que da el
+   MISMO total que vista_venta_mensual abierto por cliente — chequeado: 845 pares (cod,mes)
+   en las dos, 0 diferencias de suma. Acá sólo se corta y se dibuja. */
+const ABAST_TOP_CLI = 5;
+function abastToggleMes(mes) {
+  if (!_abast) return;
+  _abast.openMes = (_abast.openMes === mes) ? null : mes;
+  abastRender();
+}
+function abastClientesHtml(a, mes, venTotal) {
+  const lista = (a && a.cliMes && a.cliMes[mes]) ? a.cliMes[mes] : [];
+  if (!lista.length) {
+    return '<div class="abast-clih">👥 Quién compró en ' + escapeHtml(mes) + '</div>' +
+           '<div class="abast-prov">Sin detalle de clientes para ese mes.</div>';
+  }
+  const top = lista.slice(0, ABAST_TOP_CLI);
+  const resto = lista.slice(ABAST_TOP_CLI);
+  const restoCajas = resto.reduce(function (t, c) { return t + c.cajas; }, 0);
+  const restoNps = resto.reduce(function (t, c) { return t + c.nps; }, 0);
+  const total = lista.reduce(function (t, c) { return t + c.cajas; }, 0);
+  const pct = function (n) { return total > 0 ? Math.round(1000 * n / total) / 10 : 0; };
+
+  let h = '<div class="abast-clih">👥 Quién compró en ' + escapeHtml(mes) + ' — ' +
+          _abastN(total) + ' cajas entre ' + lista.length + ' cliente' + (lista.length === 1 ? '' : 's') + '</div>';
+  h += '<table class="abast-cli"><thead><tr>' +
+       '<th style="text-align:left">Cliente</th><th>Cajas</th><th>%</th><th>NP</th>' +
+       '</tr></thead><tbody>';
+  top.forEach(function (c, i) {
+    h += '<tr><td class="n">' + (i + 1) + '. ' + escapeHtml(c.rs) +
+         ' <span class="abast-prov">' + escapeHtml(c.cod) + '</span></td>' +
+         '<td>' + _abastN(c.cajas) + '</td><td>' + pct(c.cajas) + '%</td><td>' + c.nps + '</td></tr>';
+  });
+  if (resto.length) {
+    h += '<tr><td class="n resto">Resto (' + resto.length + ' cliente' + (resto.length === 1 ? '' : 's') + ')</td>' +
+         '<td class="resto">' + _abastN(restoCajas) + '</td><td class="resto">' + pct(restoCajas) + '%</td>' +
+         '<td class="resto">' + restoNps + '</td></tr>';
+  }
+  h += '<tr class="tot"><td class="n">TOTAL</td><td>' + _abastN(total) + '</td><td>100%</td><td></td></tr>';
+  h += '</tbody></table>';
+  // Si el total por cliente no cierra con la columna Vend., se dice — no se esconde.
+  if (venTotal != null && Math.abs(total - venTotal) > 0.001) {
+    h += '<div class="abast-prov" style="color:#b45309">⚠ El detalle por cliente suma ' + _abastN(total) +
+         ' y la columna Vend. dice ' + _abastN(venTotal) + '.</div>';
+  }
+  return h;
+}
 
 function prodEnsureCss() {
   if (!document.getElementById("prodCss")) {
@@ -23055,7 +23420,7 @@ let _mg = null;
 async function showMGModal(legajo, _resume) {
   if (!document.getElementById("mgCss")) {
     const s = document.createElement("style"); s.id = "mgCss";
-    s.textContent = "#mgModal{display:none;position:fixed;inset:0;z-index:1290;background:rgba(2,6,23,.74);overflow:auto;padding:12px;}#mgModal.show{display:block;}.mg-card{background:#f8fafc;max-width:460px;margin:0 auto;border-radius:16px;overflow:hidden;box-shadow:0 24px 70px rgba(0,0,0,.5);}.mg-head{display:flex;align-items:center;justify-content:space-between;padding:13px 15px;background:linear-gradient(90deg,#16a34a,#15803d);color:#fff;}.mg-title{font-size:18px;font-weight:800;}.mg-close{background:rgba(255,255,255,.2);color:#fff;border:none;border-radius:8px;padding:6px 12px;font-weight:800;cursor:pointer;width:auto;}.mg-body{padding:13px 14px;}.mg-loading,.mg-empty{padding:26px;text-align:center;color:#64748b;font-size:15px;}.mg-hint{font-size:12.5px;color:#64748b;margin-bottom:10px;}.mg-row{display:flex;flex-direction:column;gap:9px;border:1px solid #e2e8f0;border-radius:13px;padding:11px 12px;margin-bottom:9px;background:#fff;}.mg-headline{display:flex;align-items:baseline;justify-content:space-between;gap:8px;}.mg-agu{font-size:11.5px;color:#64748b;white-space:nowrap;}.mg-agu b{color:#0f172a;font-size:14px;}.mg-box{font-size:19px;line-height:1;}.mg-info{flex:1 1 110px;min-width:0;}.mg-def{display:flex;gap:10px;align-items:stretch;}.mg-gond-box{flex:1.7;display:flex;flex-direction:column;align-items:center;gap:8px;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:12px;padding:11px 8px;}.mg-exc-q{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-start;gap:8px;background:#fffbeb;border:1.5px dashed #f59e0b;border-radius:12px;padding:11px 8px;color:#92400e;font-weight:800;font-size:12.5px;text-align:center;cursor:pointer;line-height:1.15;}.mg-exc-q-b{height:50px;display:flex;align-items:center;justify-content:center;}.mg-exc-q .mg-box{font-size:30px;}.mg-exp{display:flex;gap:10px;align-items:stretch;}.mg-col{flex:1;display:flex;flex-direction:column;align-items:center;gap:7px;border-radius:12px;padding:9px 6px;}.mg-col.g{background:#f0fdf4;border:1px solid #bbf7d0;}.mg-col.e{background:#fff;border:1px solid #e2e8f0;}.mg-exc-hdr{background:none;border:none;color:#b45309;font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.03em;cursor:pointer;padding:0;width:auto;}.mg-foot{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:2px;min-height:22px;}.mg-foot .mg-faltan{font-size:13px;white-space:nowrap;}.mg-foot .mg-faltan.ok{color:#15803d;}.mg-stp.big .mg-inp{width:62px;height:50px;font-size:23px;}.mg-stp.big .mg-sb{width:44px;height:50px;font-size:25px;}.mg-cod{font-size:16px;font-weight:800;font-family:Consolas,Menlo,monospace;}.mg-desc{font-size:12px;color:#475569;}.mg-faltan{font-size:11.5px;font-weight:800;color:#b45309;margin-top:1px;}.mg-faltan.ok{color:#15803d;}.mg-stp{display:flex;align-items:center;gap:5px;}.mg-sb{display:flex;align-items:center;justify-content:center;line-height:1;padding:0;margin:0;width:36px;height:40px;border:none;border-radius:9px;font-size:22px;font-weight:800;cursor:pointer;background:#e2e8f0;color:#475569;}.mg-inp{width:48px;height:40px;box-sizing:border-box;margin:0;text-align:center;font-size:18px;font-weight:800;border:2px solid #cbd5e1;border-radius:9px;padding:0;-moz-appearance:textfield;}.mg-inp::-webkit-outer-spin-button,.mg-inp::-webkit-inner-spin-button{-webkit-appearance:none;margin:0;}.mg-fin{width:100%;margin-top:10px;padding:14px;border:none;border-radius:12px;background:#16a34a;color:#fff;font-size:17px;font-weight:800;cursor:pointer;}.mg-fin:disabled{background:#cbd5e1;color:#64748b;cursor:not-allowed;}.mg-lbl{font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.03em;color:#64748b;}.mg-lbl.gond{color:#15803d;}.mg-lbl.exc{color:#b45309;}.mg-search{width:100%;height:44px;border:2px solid #cbd5e1;border-radius:11px;padding:0 13px;font-size:16px;font-weight:700;margin-bottom:10px;box-sizing:border-box;}.mg-addrow{background:#fffbeb;border:1px solid #fcd34d;border-radius:11px;padding:11px 12px;margin-bottom:10px;font-size:13px;color:#92400e;}.mg-add-btn{margin-left:6px;background:#16a34a;color:#fff;border:none;border-radius:9px;padding:8px 13px;font-weight:800;cursor:pointer;width:auto;}.mg-add-note{font-size:11.5px;color:#b45309;margin-top:7px;}.mg-disp-x{color:#b45309;font-weight:800;}.mg-ubic{flex-basis:100%;display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:9px;padding-top:9px;border-top:1px dashed #fcd34d;font-size:12.5px;color:#92400e;}.mg-ubic-lbl{font-weight:800;}.mg-ubic-lbl small{font-weight:700;opacity:.8;}.mg-ubic-inp{width:84px;height:40px;border:2px solid #f59e0b;border-radius:9px;padding:0;font-size:20px;font-weight:800;text-align:center;letter-spacing:4px;text-transform:uppercase;box-sizing:border-box;}.mg-gfill{display:inline-block;margin-top:4px;font-size:11px;font-weight:800;padding:1px 8px;border-radius:8px;}.mg-gfill.lo{background:#fee2e2;color:#b91c1c;}.mg-gfill.mid{background:#fef3c7;color:#92400e;}.mg-gfill.hi{background:#dcfce7;color:#15803d;}.mg-gfill.unk{background:#f1f5f9;color:#64748b;}.mg-gfill.loc{display:block;background:#e0f2fe;color:#075985;margin-top:5px;}.mg-gfill.loc b{color:#0c4a6e;}.mg-prio{display:inline-block;margin-right:6px;font-size:10px;font-weight:900;color:#fff;background:#b91c1c;border-radius:6px;padding:1px 6px;vertical-align:middle;}.mg-mchint-row{margin-top:-2px;}.mg-mchint{font-size:11.5px;color:#1d4ed8;background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;padding:3px 8px;display:inline-block;}";
+    s.textContent = "#mgModal{display:none;position:fixed;inset:0;z-index:1290;background:rgba(2,6,23,.74);overflow:auto;padding:12px;}#mgModal.show{display:block;}.mg-card{background:#f8fafc;max-width:460px;margin:0 auto;border-radius:16px;overflow:hidden;box-shadow:0 24px 70px rgba(0,0,0,.5);}.mg-head{display:flex;align-items:center;justify-content:space-between;padding:13px 15px;background:linear-gradient(90deg,#16a34a,#15803d);color:#fff;}.mg-title{font-size:18px;font-weight:800;}.mg-close{background:rgba(255,255,255,.2);color:#fff;border:none;border-radius:8px;padding:6px 12px;font-weight:800;cursor:pointer;width:auto;}.mg-body{padding:13px 14px;}.mg-loading,.mg-empty{padding:26px;text-align:center;color:#64748b;font-size:15px;}.mg-hint{font-size:12.5px;color:#64748b;margin-bottom:10px;}.mg-row{display:flex;flex-direction:column;gap:9px;border:1px solid #e2e8f0;border-radius:13px;padding:11px 12px;margin-bottom:9px;background:#fff;}.mg-headline{display:flex;align-items:baseline;justify-content:space-between;gap:8px;}.mg-agu{font-size:11.5px;color:#64748b;white-space:nowrap;}.mg-agu b{color:#0f172a;font-size:14px;}.mg-box{font-size:19px;line-height:1;}.mg-info{flex:1 1 110px;min-width:0;}.mg-def{display:flex;gap:10px;align-items:stretch;}.mg-gond-box{flex:1.7;display:flex;flex-direction:column;align-items:center;gap:8px;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:12px;padding:11px 8px;}.mg-exc-q{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-start;gap:8px;background:#fffbeb;border:1.5px dashed #f59e0b;border-radius:12px;padding:11px 8px;color:#92400e;font-weight:800;font-size:12.5px;text-align:center;cursor:pointer;line-height:1.15;}.mg-exc-q-b{height:50px;display:flex;align-items:center;justify-content:center;}.mg-exc-q .mg-box{font-size:30px;}.mg-exp{display:flex;gap:10px;align-items:stretch;}.mg-col{flex:1;display:flex;flex-direction:column;align-items:center;gap:7px;border-radius:12px;padding:9px 6px;}.mg-col.g{background:#f0fdf4;border:1px solid #bbf7d0;}.mg-col.e{background:#fff;border:1px solid #e2e8f0;}.mg-exc-hdr{background:none;border:none;color:#b45309;font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.03em;cursor:pointer;padding:0;width:auto;}.mg-foot{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:2px;min-height:22px;}.mg-foot .mg-faltan{font-size:13px;white-space:nowrap;}.mg-foot .mg-faltan.ok{color:#15803d;}.mg-stp.big .mg-inp{width:62px;height:50px;font-size:23px;}.mg-stp.big .mg-sb{width:44px;height:50px;font-size:25px;}.mg-cod{font-size:16px;font-weight:800;font-family:Consolas,Menlo,monospace;}.mg-desc{font-size:12px;color:#475569;}.mg-faltan{font-size:11.5px;font-weight:800;color:#b45309;margin-top:1px;}.mg-faltan.ok{color:#15803d;}.mg-stp{display:flex;align-items:center;gap:5px;}.mg-sb{display:flex;align-items:center;justify-content:center;line-height:1;padding:0;margin:0;width:36px;height:40px;border:none;border-radius:9px;font-size:22px;font-weight:800;cursor:pointer;background:#e2e8f0;color:#475569;}.mg-inp{width:48px;height:40px;box-sizing:border-box;margin:0;text-align:center;font-size:18px;font-weight:800;border:2px solid #cbd5e1;border-radius:9px;padding:0;-moz-appearance:textfield;}.mg-inp::-webkit-outer-spin-button,.mg-inp::-webkit-inner-spin-button{-webkit-appearance:none;margin:0;}.mg-fin{width:100%;margin-top:10px;padding:14px;border:none;border-radius:12px;background:#16a34a;color:#fff;font-size:17px;font-weight:800;cursor:pointer;}.mg-fin:disabled{background:#cbd5e1;color:#64748b;cursor:not-allowed;}.mg-lbl{font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.03em;color:#64748b;}.mg-lbl.gond{color:#15803d;}.mg-lbl.exc{color:#b45309;}.mg-search{width:100%;height:44px;border:2px solid #cbd5e1;border-radius:11px;padding:0 13px;font-size:16px;font-weight:700;margin-bottom:10px;box-sizing:border-box;}.mg-addrow{background:#fffbeb;border:1px solid #fcd34d;border-radius:11px;padding:11px 12px;margin-bottom:10px;font-size:13px;color:#92400e;}.mg-add-btn{margin-left:6px;background:#16a34a;color:#fff;border:none;border-radius:9px;padding:8px 13px;font-weight:800;cursor:pointer;width:auto;}.mg-add-note{font-size:11.5px;color:#b45309;margin-top:7px;}.mg-disp-x{color:#b45309;font-weight:800;}.mg-ubic{flex-basis:100%;display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:9px;padding-top:9px;border-top:1px dashed #fcd34d;font-size:12.5px;color:#92400e;}.mg-ubic-lbl{font-weight:800;}.mg-ubic-lbl small{font-weight:700;opacity:.8;}.mg-ubic-inp{width:84px;height:40px;border:2px solid #f59e0b;border-radius:9px;padding:0;font-size:20px;font-weight:800;text-align:center;letter-spacing:4px;text-transform:uppercase;box-sizing:border-box;}.mg-gfill{display:inline-block;margin-top:4px;font-size:11px;font-weight:800;padding:1px 8px;border-radius:8px;}.mg-gfill.lo{background:#fee2e2;color:#b91c1c;}.mg-gfill.mid{background:#fef3c7;color:#92400e;}.mg-gfill.hi{background:#dcfce7;color:#15803d;}.mg-gfill.unk{background:#f1f5f9;color:#64748b;}.mg-gfill.loc{display:block;background:#e0f2fe;color:#075985;margin-top:5px;}.mg-gfill.loc b{color:#0c4a6e;}.mg-prio{display:inline-block;margin-right:6px;font-size:10px;font-weight:900;color:#fff;background:#b91c1c;border-radius:6px;padding:1px 6px;vertical-align:middle;}.mg-mchint-row{margin-top:-2px;}.mg-mchint{font-size:11.5px;color:#1d4ed8;background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;padding:3px 8px;display:inline-block;}.mg-emp{display:inline-block;margin-right:6px;font-size:10.5px;font-weight:900;color:#fff;border-radius:6px;padding:2px 7px;vertical-align:middle;letter-spacing:.04em;}.mg-emp.lk{background:#1d4ed8;}.mg-emp.ch{background:#b45309;}.mg-ubic-inp.bad{border-color:#dc2626;background:#fef2f2;color:#b91c1c;}";
     document.head.appendChild(s);
   }
   let ov = document.getElementById("mgModal");
@@ -23067,7 +23432,8 @@ async function showMGModal(legajo, _resume) {
     const res = await Promise.all([stockFetchSaldos(), loadArtNombres(), ocgFetchCapacidad(), ocgFetchCeldas(),
       // v12.14 (idea 4926) — demanda del día y cajas×MC, best-effort: si fallan no bloquean el guardado.
       (async function () { try { return await ocgDemanda(true); } catch (_e) { return {}; } })(),
-      (async function () { try { return (await rkbFetchCxM()).cxm || {}; } catch (_e) { return {}; } })()]);
+      (async function () { try { return (await rkbFetchCxM()).cxm || {}; } catch (_e) { return {}; } })(),
+      (async function () { try { return await gvFetchLugares(); } catch (_e) { return null; } })()]);
     const saldos = res[0] || {};
     const capMap = res[2] || {};
     const celdasMap = res[3] || {};   // v10.08 — cod → [celdas de góndola]
@@ -23078,17 +23444,41 @@ async function showMGModal(legajo, _resume) {
     // lleno pero con muchos pedidos hoy también es urgente. Así el operario baja primero lo más
     // urgente para no quedarse sin en el picking.
     // Sin capacidad cargada → al final (no se puede priorizar). Empate → por código.
-    const items = Object.keys(saldos).map(function (k) { return saldos[k]; }).filter(function (a) { return a.a_guardar > 0; }).map(function (a) {
+    // v15.40 — un renglón por (código, EMPRESA). Hasta ahora stockFetchSaldos
+    // agrupaba sólo por código, así que si un dual tenía saldo LK y CH en "a
+    // guardar" los dos se fundían en un renglón y el operario no sabía cuál
+    // estaba bajando. Con `_emp` cargado se abre; sin él (vista nueva todavía
+    // no desplegada) se comporta exactamente como antes.
+    const _filas = [];
+    Object.keys(saldos).forEach(function (k) {
+      const a = saldos[k], det = a._emp;
+      if (det) {
+        Object.keys(det).forEach(function (e) {
+          const d = det[e];
+          if ((Number(d.a_guardar) || 0) > 0) _filas.push({ cod: a.cod, desc: a.desc, emp: e, a_guardar: Number(d.a_guardar) || 0, terminado: Number(d.terminado) || 0 });
+        });
+      } else if ((Number(a.a_guardar) || 0) > 0) {
+        _filas.push({ cod: a.cod, desc: a.desc, emp: "", a_guardar: Number(a.a_guardar) || 0, terminado: Number(a.terminado) || 0 });
+      }
+    });
+    const items = _filas.map(function (a) {
       const kk = _ocgNorm(a.cod);
       const cap = capMap[kk] || 0;
       const gond = Number(a.terminado) || 0;
       const ped = Number(demMap[kk]) || 0;
       const cxm = Number(cxmMap[kk]) || 0;
-      const celdas = celdasMap[kk] || [];   // v10.08 — dónde va en góndola
+      // v15.40 — si la fila tiene empresa, sólo muestra las celdas DE ESA empresa:
+      // un 809E de LK va a J13/J14 y uno de CH a M13/M15; mostrarle las cuatro al
+      // operario es justo el error que se quiere evitar.
+      let celdas = celdasMap[kk] || [];   // v10.08 — dónde va en góndola
+      if (a.emp && _gvLugares && _gvLugares.emp) {
+        const _f = celdas.filter(function (c) { const e = _gvLugares.emp[gvNormSector(c)]; return !e || e === a.emp; });
+        if (_f.length) celdas = _f;
+      }
       // v12.14 (idea 4926) — máximo de MCs que entran sin rebalsar la góndola (informativo,
       // NO limita el input: el tope real sigue siendo lo disponible en "a guardar").
       const maxMC = (cap > 0 && cxm > 0) ? Math.max(0, Math.floor((cap - gond) / cxm)) : null;
-      return { cod: a.cod, desc: artNombre(a.cod, a.desc), disponible: a.a_guardar, gond: gond, cap: cap, celdas: celdas, prio: (cap > 0 ? (gond - ped) / cap : Infinity), _maxMC: maxMC, _cxm: cxm || null, cargar: 0, exc: 0, ubic: "", excOn: false };
+      return { cod: a.cod, emp: a.emp || "", desc: artNombre(a.cod, a.desc), disponible: a.a_guardar, gond: gond, cap: cap, celdas: celdas, prio: (cap > 0 ? (gond - ped) / cap : Infinity), _maxMC: maxMC, _cxm: cxm || null, cargar: 0, exc: 0, ubic: "", excOn: false };
     }).sort(function (a, b) {
       if (a.prio !== b.prio) return a.prio - b.prio;   // góndola más vacía primero
       return (parseInt(a.cod, 10) || 0) - (parseInt(b.cod, 10) || 0);
@@ -23101,7 +23491,13 @@ function mgRender() {
   if (!_mg) return; const body = document.getElementById("mgBody"); if (!body) return;
   // NO cortamos cuando la lista está vacía: el buscador tiene que estar igual para
   // poder guardar un código fuera de lista (avisa Telegram).
-  let h = '<div class="mg-hint">Ordenado por <b>prioridad</b>: primero lo que tiene la <b>góndola más vacía</b> (stock ÷ capacidad). Marcá cuántas cajas van a <b>Góndola</b>; si está <b>llena</b>, tocá <b>“¿Hay Excedente?”</b> (avisa al supervisor).</div>';
+  // v15.40 — lista de lugares válidos para el autocompletado de la ubicación del
+  // excedente. Se prioriza lo que está LIBRE, que es donde suele ir un excedente.
+  let h = '';
+  if (_gvLugares && _gvLugares.lista.length) {
+    h += '<datalist id="mgLugaresDL">' + _gvLugares.lista.map(function (sec) { return '<option value="' + escapeHtml(sec) + '">'; }).join("") + '</datalist>';
+  }
+  h += '<div class="mg-hint">Ordenado por <b>prioridad</b>: primero lo que tiene la <b>góndola más vacía</b> (stock ÷ capacidad). Marcá cuántas cajas van a <b>Góndola</b>; si está <b>llena</b>, tocá <b>“¿Hay Excedente?”</b> (avisa al supervisor).</div>';
   h += '<input id="mgSearch" class="mg-search" type="search" inputmode="numeric" autocomplete="off" placeholder="🔎 Buscar código…" value="' + escapeHtml(_mg.filtro || "") + '" oninput="mgSearchInput(this.value)">';
   const fq = String(_mg.filtro || "").trim(), fLo = fq.toLowerCase(), fUp = fq.toUpperCase();
   const shown = fq ? _mg.items.filter(function (it) { return String(it.cod).toLowerCase().indexOf(fLo) >= 0; }) : _mg.items;
@@ -23118,6 +23514,10 @@ function mgRender() {
     const head = it.manual
       ? '<span class="mg-agu mg-disp-x">⚠ fuera de lista</span>'
       : '<span class="mg-agu">a guardar <b>' + it.disponible + '</b></span>';
+    // v15.40 — chip de EMPRESA: sólo aparece si el renglón la tiene (LK/CH). Es
+    // lo que distingue dos renglones del mismo código.
+    const empChip = (it.emp && it.emp !== "Mixto")
+      ? '<span class="mg-emp ' + (it.emp === "CH" ? "ch" : "lk") + '">' + escapeHtml(it.emp) + '</span>' : '';
     // v8.40 — chip góndola vs capacidad: el operario ve qué tan vacía está la góndola (prioridad).
     let gfill = "";
     if (!it.manual) {
@@ -23140,14 +23540,18 @@ function mgRender() {
     }
     const gondStp = function (big) { return '<div class="mg-stp' + (big ? ' big' : '') + '"><button class="mg-sb" onclick="mgChg(' + i + ',-1)">–</button><input class="mg-inp" type="text" min="0" max="' + maxG + '" inputmode="numeric" value="' + it.cargar + '" oninput="mgSet(' + i + ',this.value)"><button class="mg-sb" onclick="mgChg(' + i + ',1)">+</button></div>'; };
     const excStp = '<div class="mg-stp"><button class="mg-sb" onclick="mgChgExc(' + i + ',-1)">–</button><input class="mg-inp" type="text" min="0" max="' + maxE + '" inputmode="numeric" value="' + it.exc + '" oninput="mgSetExc(' + i + ',this.value)"><button class="mg-sb" onclick="mgChgExc(' + i + ',1)">+</button></div>';
-    const ubicInp = '<input class="mg-ubic-inp" type="text" maxlength="6" autocomplete="off" placeholder="A12" value="' + escapeHtml(it.ubic || "") + '" oninput="this.value=this.value.toUpperCase().replace(/[^A-Za-z0-9]/g,\'\').slice(0,6);mgSetUbic(' + i + ',this.value)">';
+    // v15.40 — el lugar se ELIGE, no se inventa. En el celular el operario tipea
+    // y el <datalist> le va sugiriendo lugares reales; si igual escribe algo que
+    // no existe, el borde se pone rojo y mgConfirmar() no lo deja pasar.
+    const _ubicOk = !_gvLugares || !_gvLugares.set.size || !String(it.ubic || "").trim() || _gvLugares.set.has(gvNormSector(it.ubic));
+    const ubicInp = '<input class="mg-ubic-inp' + (_ubicOk ? '' : ' bad') + '" type="text" list="mgLugaresDL" maxlength="7" autocomplete="off" enterkeyhint="done" placeholder="A12" value="' + escapeHtml(it.ubic || "") + '" oninput="this.value=this.value.toUpperCase().replace(/[^A-ZÑ0-9]/g,\'\').slice(0,7);mgSetUbic(' + i + ',this.value)">';
     const faltTxt = it.manual ? '' : '<span class="mg-faltan' + (faltan <= 0 ? ' ok' : '') + '">' + (faltan <= 0 ? '✓ Listo' : 'Faltan ' + faltan) + '</span>';
     // v12.14 (idea 4926) — máximo de MCs que entran en góndola sin rebalsar (informativo,
     // NO limita el input — el tope real sigue siendo lo disponible en "a guardar").
     const mcHint = (!it.manual && it._maxMC != null && it._cxm)
       ? '<div class="mg-mchint-row"><span class="mg-mchint">📐 Máx sin rebalsar: <b>' + it._maxMC + ' MC</b> (' + (it._maxMC * it._cxm) + ' cajas)</span></div>' : '';
     return '<div class="mg-row">' +
-      '<div class="mg-headline"><div class="mg-info"><span class="mg-cod">' + escapeHtml(codCanonSuf(it.cod)) + '</span> <span class="mg-desc">' + escapeHtml(it.desc || "") + '</span>' + gfill + '</div>' + head + '</div>' + mcHint +
+      '<div class="mg-headline"><div class="mg-info">' + empChip + '<span class="mg-cod">' + escapeHtml(codCanonSuf(it.cod)) + '</span> <span class="mg-desc">' + escapeHtml(it.desc || "") + '</span>' + gfill + '</div>' + head + '</div>' + mcHint +
       (it.excOn
         ? '<div class="mg-exp"><div class="mg-col g"><div class="mg-lbl gond">Góndola</div>' + gondStp(false) + '</div>' +
             '<div class="mg-col e"><button class="mg-exc-hdr" onclick="mgToggleExc(' + i + ')">☑ Excedente</button>' + excStp + '</div></div>' +
@@ -23188,7 +23592,14 @@ function mgToggleExc(i) { if (!_mg) return; const it = _mg.items[i]; if (!it) re
 function mgSetExc(i, v) { if (!_mg) return; const it = _mg.items[i]; if (!it) return; let n = Math.max(0, parseInt(v, 10) || 0); const mx = it.disponible - it.cargar; if (n > mx) n = mx; it.exc = n; mgRender(); }
 // Ubicación del excedente: 1 letra + 2 letras (3 letras, mayúsculas). Solo guarda
 // (no re-render → no pierde foco mientras tipean).
-function mgSetUbic(i, v) { if (!_mg) return; const it = _mg.items[i]; if (!it) return; it.ubic = String(v == null ? "" : v).toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 6); }
+function mgSetUbic(i, v) {
+  if (!_mg) return; const it = _mg.items[i]; if (!it) return;
+  // v15.40 — acepta Ñ (pasillo Ñ) y 7 caracteres (racks de insumos: R01AD).
+  // NO re-renderiza: eso perdería el foco mientras tipean en el celular; el
+  // borde rojo se actualiza en el próximo render y el guard de mgConfirmar()
+  // es el que realmente impide un lugar inexistente.
+  it.ubic = String(v == null ? "" : v).toUpperCase().replace(/[^A-ZÑ0-9]/g, "").slice(0, 7);
+}
 async function mgConfirmar() {
   if (!_mg) return;
   const sel = _mg.items.filter(function (it) { return (it.cargar > 0) || (it.exc > 0); });
@@ -23197,6 +23608,17 @@ async function mgConfirmar() {
   // de dato (la usa el picking).
   const sinUbic = sel.find(function (it) { return (it.exc || 0) > 0 && String(it.ubic || "").trim().length < 1; });
   if (sinUbic) { try { alert("📍 Falta la ubicación del excedente de " + sinUbic.cod + ".\nEscribí dónde lo pusiste (letras y números, ej. A12) — el excedente no tiene lugar fijo, hay que anotarla para el picking."); } catch (_e) {} return; }
+  // v15.40 — la ubicación tiene que ser un LUGAR QUE EXISTE. Antes se aceptaba
+  // cualquier cosa y por eso en Movimientos_Stock.ubicacion conviven "P5",
+  // "L7", "F09-F11" y hasta números de NP. Si GV_Lugar no cargó, no se valida
+  // (no se traba el guardado por una tabla que no respondió).
+  if (_gvLugares && _gvLugares.set && _gvLugares.set.size) {
+    const malUbic = sel.find(function (it) { return (it.exc || 0) > 0 && !_gvLugares.set.has(gvNormSector(it.ubic)); });
+    if (malUbic) {
+      try { alert("📍 “" + String(malUbic.ubic || "") + "” no es un lugar del depósito.\nEmpezá a escribir y elegí uno de los que aparecen (ej. A12, J01, M13)."); } catch (_e) {}
+      return;
+    }
+  }
   // v10.11 — SACADA la "Verificación de Góndola" (código 4 dígitos) del guardado a góndola:
   // el código sólo va en RECEPCIÓN (una vez, al terminar de recibir). Acá se confirma directo.
   const rows = [];
@@ -23205,10 +23627,15 @@ async function mgConfirmar() {
     if (tot <= 0) return;
     // Item normal: sale de "a guardar". Item manual (fuera de lista): NO toca
     // a_guardar (no estaba) → solo entra a góndola/excedente + alerta Telegram.
-    if (!it.manual) rows.push({ cod_art: it.cod, descripcion: it.desc || null, deposito: "a_guardar", delta: -tot, tipo: "guardado", ref: null, legajo: _mg.legajo || null });
+    // v15.40 — la EMPRESA viaja con el movimiento. Hasta ahora el MG escribía sin
+    // `empresa` y el trigger la resolvía de cero, así que un artículo recibido
+    // como LK volvía a salir "Mixto" al guardarlo y el saldo del mismo código
+    // quedaba partido por depósito. `it.emp` sale del renglón (código+empresa).
+    const _emp = it.emp || null;
+    if (!it.manual) rows.push({ cod_art: it.cod, descripcion: it.desc || null, deposito: "a_guardar", delta: -tot, tipo: "guardado", ref: null, legajo: _mg.legajo || null, empresa: _emp });
     const tp = it.manual ? "guardado_fuera_lista" : "guardado";
-    if (it.cargar > 0) rows.push({ cod_art: it.cod, descripcion: it.desc || null, deposito: "terminado", delta: it.cargar, tipo: tp, ref: null, legajo: _mg.legajo || null });
-    if (it.exc > 0)    rows.push({ cod_art: it.cod, descripcion: it.desc || null, deposito: "excedente", delta: it.exc, tipo: tp, ref: null, legajo: _mg.legajo || null, ubicacion: String(it.ubic || "").trim() || null });
+    if (it.cargar > 0) rows.push({ cod_art: it.cod, descripcion: it.desc || null, deposito: "terminado", delta: it.cargar, tipo: tp, ref: null, legajo: _mg.legajo || null, empresa: _emp });
+    if (it.exc > 0)    rows.push({ cod_art: it.cod, descripcion: it.desc || null, deposito: "excedente", delta: it.exc, tipo: tp, ref: null, legajo: _mg.legajo || null, empresa: _emp, ubicacion: gvNormSector(it.ubic) || null });
   });
   // Alerta Telegram por cada código guardado fuera de lista (evento MGX).
   sel.filter(function (it) { return it.manual && (it.cargar + (it.exc || 0)) > 0; }).forEach(function (it) {
@@ -25906,8 +26333,8 @@ async function _ccAttachUbicYOrden(items) {
 }
 
 /* v11.47 — al tocar CC, primero se elige RETIRA o CAMIÓN. Camión = todos los pedidos
-   salvo los retira, con nombre de camionero (autocompletado). Retira = solo los retira,
-   contados en cajas, sin camionero. */
+   salvo los retira, con nombre de fletero (autocompletado). Retira = solo los retira,
+   contados en cajas, sin fletero. */
 async function showCargaCamion(legajo, mode) {
   const m = document.getElementById("tandaModal"); if (!m) return;
   const leg = String(legajo || "").trim();
@@ -25963,11 +26390,13 @@ function ccRender() {
   let html = `<div class="cc-sub">${esRetira ? "Pedidos <b>retira</b> — tocá los que <b>entregaste</b> (se cuentan en <b>cajas</b>)." : "NP del <b>reparto</b> — tocá los que <b>cargaste al camión</b>."}` +
              (!esRetira && hasOrden ? ` Están en <b>orden de carga</b>: el <b>último destino</b> de cada camión se carga <b>primero</b> (el círculo verde 1 = primero en subir).` : ``) +
              (!esRetira ? ` Al tocarlos queda el <b>orden en que los cargaste</b> (1°, 2°, 3°…).` : ``) + `</div>`;
-  // v11.47 — camión: nombre del camionero con autocompletado (maestro Camioneros).
+  // v11.47 — camión: nombre del fletero con autocompletado (maestro Camioneros).
+  // v15.71 (Thomas) — en pantalla se llama FLETERO. La tabla Camioneros y la columna `camionero`
+  // del evento no se renombran: es el mismo dato, sólo cambia cómo se lo nombra al operario.
   if (!esRetira) {
     const opts = (_cc.camioneros || []).map(function (n) { return `<option value="${escapeHtml(n)}"></option>`; }).join("");
-    html += `<div class="cc-camionero-wrap"><label class="cc-camionero-lbl">🧑‍✈️ Camionero</label>` +
-            `<input id="ccCamioneroInput" class="cc-camionero-inp" list="ccCamioneroList" autocomplete="off" placeholder="Nombre del camionero…" value="${escapeHtml(_cc.camionero || "")}" oninput="_cc && (_cc.camionero = this.value)" />` +
+    html += `<div class="cc-camionero-wrap"><label class="cc-camionero-lbl">🚚 Fletero</label>` +
+            `<input id="ccCamioneroInput" class="cc-camionero-inp" list="ccCamioneroList" autocomplete="off" placeholder="Nombre del fletero…" value="${escapeHtml(_cc.camionero || "")}" oninput="_cc && (_cc.camionero = this.value)" />` +
             `<datalist id="ccCamioneroList">${opts}</datalist></div>`;
   }
   // v15.70 (Thomas) — "a medida que den click en lo que cargan, en lugar de un simple tilde, que
@@ -26035,20 +26464,20 @@ function ccFinish() {
   if (!esRetira) {
     try { const inp = document.getElementById("ccCamioneroInput"); if (inp) _cc.camionero = inp.value; } catch (_e) {}
     camionero = String(_cc.camionero || "").trim();
-    // v15.70 (Thomas) — el camionero pasa a ser OBLIGATORIO. Era un aviso que se podía saltear y
-    // se salteaba: el 10 y el 11/09 salieron 33 cargas sin camionero, el 08/09 otras 10. Sin ese
+    // v15.70 (Thomas) — el fletero pasa a ser OBLIGATORIO. Era un aviso que se podía saltear y
+    // se salteaba: el 10 y el 11/09 salieron 33 cargas sin fletero, el 08/09 otras 10. Sin ese
     // dato Recepción Remitos no puede mostrar "las NP que entregó Guillermo el 11/09" ni se puede
-    // medir el ritmo del viaje. Retira no lleva camionero (se entrega en el depósito).
+    // medir el ritmo del viaje. Retira no lleva fletero (se entrega en el depósito).
     if (!camionero) {
       try {
-        alert("Falta el nombre del camionero.\n\nEs el que después junta las NP de este camión en Recepción Remitos: sin él no se puede controlar el viaje.");
+        alert("Falta el nombre del fletero.\n\nEs el que después junta las NP de este camión en Recepción Remitos: sin él no se puede controlar el viaje.");
         const inp = document.getElementById("ccCamioneroInput"); if (inp) inp.focus();
       } catch (_e) {}
       return;
     }
   }
   // v15.70 — en el ORDEN EN QUE SE CARGARON (el del Set, no el de la lista en pantalla): ese
-  // número es el que se manda con cada CCN y arma el recorrido del camionero.
+  // número es el que se manda con cada CCN y arma el recorrido del fletero.
   const _byNp = {}; _cc.items.forEach(function (it) { _byNp[it.np] = it; });
   const sel = Array.from(_cc.checked).map(function (np) { return _byNp[np]; }).filter(Boolean);
   // v15.33 — a diferencia de Recepción Remitos (crFinish), tocar "Terminé" sin tildar ningún NP
@@ -26060,7 +26489,7 @@ function ccFinish() {
   ccSendClose(legajo);                                          // cierre CC
   ccClearChecked(legajo);
   _cc = null; ccReleaseWakeLock(); closeTandaModal();
-  try { alert((esRetira ? "🚶 Retira terminado. " : "🚛 Carga Camión terminada. ") + sel.length + (esRetira ? " retira(s) entregados." : " NP cargadas.") + (camionero ? "\nCamionero: " + camionero : "")); } catch (_e) {}
+  try { alert((esRetira ? "🚶 Retira terminado. " : "🚛 Carga Camión terminada. ") + sel.length + (esRetira ? " retira(s) entregados." : " NP cargadas.") + (camionero ? "\nFletero: " + camionero : "")); } catch (_e) {}
 }
 function ccSendClose(legajo) {
   const st = getLegajoState(legajo);
@@ -26077,7 +26506,7 @@ function ccSendDetail(legajo, np, tanda, camionero, orden) {
   // v11.47 — CCN texto: NP|TANDA|CAMIONERO. El camionero solo va en camión (en retira queda vacío).
   // Las vistas leen split_part [1]=np, [2]=tanda → el 3er campo no las afecta.
   // v15.70 — se agrega un 4º campo con el ORDEN DE CARGA (1, 2, 3…). Con eso `gv_viaje_np` arma
-  // el viaje del camionero y detecta la 2ª vuelta (el orden vuelve a empezar en 1). Mismo criterio
+  // el viaje del fletero y detecta la 2ª vuelta (el orden vuelve a empezar en 1). Mismo criterio
   // que el 3er campo: los lectores viejos toman [1] y [2] y no se enteran.
   const cam = String(camionero || "").trim();
   const ord = (orden == null || !isFinite(orden)) ? "" : String(orden);
@@ -34572,7 +35001,12 @@ var _pp = null;
 function _ppMoney(n) { return '$' + Math.round(n || 0).toLocaleString('es-AR'); }
 function _ppFecha10(s) { var m = String(s || "").match(/(\d{4})-(\d{2})-(\d{2})/); return m ? (m[1] + "-" + m[2] + "-" + m[3]) : ""; }
 function _ppPrice(codN) { return (_pp.precio[codN] || _pp.precio[codN.replace(/(LK|CH)$/, "")] || null); }
-function _ppPlata(r) { var p = _ppPrice(r.codN); return (p && p.ok) ? r.cajas * p.pu * p.uxb : 0; }
+/* v15.76 — el precio sale de la PROPIA fila: la vista ya lo resuelve por empresa
+   (NP ^9 = lista LK, resto = lista Chef; "L" al final = artículo de Loeke → lista LK).
+   El mapa por código quedaba mezclando las dos empresas: el mismo código vale distinto
+   en LK y en Chef, y ganaba el primero que entraba. Se conserva como fallback. */
+function _ppPlata(r) { if (r.ok && r.pu > 0) return r.cajas * r.pu * r.uxb;
+  var p = _ppPrice(r.codN); return (p && p.ok) ? r.cajas * p.pu * p.uxb : 0; }
 async function openPlataPerdida() {
   try { if (typeof requireSupervisor === "function" && !requireSupervisor()) return; } catch (_e) {}
   if (!document.getElementById("ppCss")) {
@@ -34594,14 +35028,22 @@ async function _ppFallbackLoad() {
     supaFetchAllSafe(SUPABASE_URL + "/rest/v1/Entregas_Virgilio", "select=np,cod_art,cajas_falto,cajas_pedidas,cajas_entregadas,fecha_salida,cod_cliente&cajas_falto=gt.0"),
     supaFetchAllSafe(SUPABASE_URL + "/rest/v1/precios_venta", "select=cod,precio_unit,uxb,descripcion"),
     supaFetchAllSafe(SUPABASE_URL + "/rest/v1/clientes_vendedor", "select=cod_cliente,vend"),
-    supaFetchAllSafe(SUPABASE_URL + "/rest/v1/Facturacion_NP", "select=np,razon_social")
+    supaFetchAllSafe(SUPABASE_URL + "/rest/v1/Facturacion_NP", "select=np,razon_social"),
+    // v15.76 — la lista de CHEF: una NP que no empieza con 9 es de Chef y se valoriza con ella.
+    supaFetchAllSafe(SUPABASE_URL + "/rest/v1/precios_venta_chef", "select=cod,precio_unit,uxb,descripcion")
   ]);
-  var ent = r[0] || [], pv = {}, cv = {}, fnp = {};
+  var ent = r[0] || [], pv = {}, pvc = {}, cv = {}, fnp = {};
   (r[1] || []).forEach(function (p) { var c = _ppNormCod(p.cod); if (c) pv[c] = p; });
   (r[2] || []).forEach(function (c) { var k = (c.cod_cliente || "").trim(); if (k) cv[k] = (c.vend || "").trim(); });
   (r[3] || []).forEach(function (f) { var k = (f.np || "").trim(); if (k) fnp[k] = f.razon_social || ""; });
+  (r[4] || []).forEach(function (p) { var c = _ppNormCod(p.cod); if (c) pvc[c] = p; });
   return ent.map(function (e) {
-    var cod = _ppNormCod(e.cod_art), p = pv[cod] || {}, cli = (e.cod_cliente || "").trim(), np = (e.np || "").trim();
+    var cli = (e.cod_cliente || "").trim(), np = (e.np || "").trim();
+    // "L" al final = artículo de Loeke vendido por Chef → lista de LK por el código pelado (v13.71).
+    var raw = String(e.cod_art || "").trim().toUpperCase(), esL = /[0-9E]L$/.test(raw);
+    var cod = _ppNormCod(e.cod_art), codP = esL ? _ppNormCod(raw.replace(/L$/, "")) : cod;
+    var esChef = !esL && !/^9/.test(np.replace(/\.0+$/, ""));
+    var p = (esChef ? (pvc[codP] || pv[codP]) : pv[codP]) || {};
     var pu = Number(p.precio_unit) || 0, uxb = Number(p.uxb) || 1;
     return { np: e.np, cod: cod, cod_raw: (e.cod_art || "").trim(), cajas: Number(e.cajas_falto) || 0,
       ped: Number(e.cajas_pedidas) || 0, ent: Number(e.cajas_entregadas) || 0,
@@ -34637,7 +35079,7 @@ async function ppLoad() {
     var np = pickNormNp(r.np);
     if (np && r.razon_social && !rsDe[np]) rsDe[np] = r.razon_social;
   });
-  _pp.rows = data.map(function (r) { return { codN: r.cod || "", cod: r.cod_raw || "", cajas: Number(r.cajas) || 0, ped: Number(r.ped) || 0, ent: Number(r.ent) || 0, fecha: r.fecha || "", cli: r.cod_cliente || "", np: pickNormNp(r.np) }; }).filter(function (r) { return r.cajas > 0; });
+  _pp.rows = data.map(function (r) { return { codN: r.cod || "", cod: r.cod_raw || "", cajas: Number(r.cajas) || 0, ped: Number(r.ped) || 0, ent: Number(r.ent) || 0, fecha: r.fecha || "", cli: r.cod_cliente || "", np: pickNormNp(r.np), pu: Number(r.precio_unit) || 0, uxb: Number(r.uxb) || 1, ok: !!r.precio_ok }; }).filter(function (r) { return r.cajas > 0; });
   _pp.precio = precio; _pp.vendDe = vendDe; _pp.rsDe = rsDe;
   // años CON DATOS (para el dropdown); por defecto el año actual si tiene datos, si no el más reciente.
   var ys = {}; _pp.rows.forEach(function (r) { var y = r.fecha ? r.fecha.slice(0, 4) : ""; if (/^\d{4}$/.test(y)) ys[y] = 1; });
@@ -34981,6 +35423,208 @@ function planimRender(filter) {
       '<button class="planim-btn-del" onclick="planimDeleteRow(\'' + kE + '\')">Borrar</button>' +
     '</div>';
   }).join("") + (keys.length > CAP ? '<div class="planim-empty">Mostrando ' + CAP + ' de ' + keys.length + ' — afiná la búsqueda.</div>' : "");
+}
+/* ═══════════════════════════════════════════════════════════════════
+   EDITOR DE LUGARES — v15.76 (pedido de Luis, 2026-09-11: "rehacemos el editor")
+
+   Reemplaza a DOS editores que escribían a DOS tablas que ahora son una:
+     · Editor de Planimetría (planimUpsert / planimDeleteRow) → "Planimetria"
+     · Capacidad por sector  (dpSaveCap / stkCapImport)       → "Capacidad_Sector"
+   Los dos siguen andando a propósito (regla de Luis: nada se borra hasta que el
+   reemplazo esté rodando). Éste escribe a GV_Lugar / GV_Lugar_Item.
+
+   ⚠ NO es el editor viejo apuntando a otra tabla: cambió el MODELO.
+     Planimetria      clave `cod`                 → un código, UN lugar
+     GV_Lugar_Item    clave (sector, cod, clase)  → un código en VARIOS lugares
+   El 437E está en F09, F10, F11 y F12 — eso la tabla vieja no lo podía decir.
+   Por eso la pantalla se para en el LUGAR ("qué hay acá") y no en el código, con
+   una segunda pestaña para el camino inverso ("dónde está este código").
+
+   Además: la EMPRESA no se tipea, la da el lugar; `clase` separa artículo de
+   insumo (hay códigos que son las dos cosas); y `cajas_max` vive acá, que es lo
+   que hacía falta para que Capacidad_Sector desaparezca.
+
+   Permisos: sql/gv_lugar_editor.sql (policy ALL para `authenticated`, mismo
+   patrón que planim_write / cap_write). Sin eso guarda 401 y avisa. */
+const SUPABASE_GVLUGAR_ENDPOINT     = SUPABASE_URL + "/rest/v1/GV_Lugar";
+const SUPABASE_GVLUGARITEM_ENDPOINT = SUPABASE_URL + "/rest/v1/GV_Lugar_Item";
+let _lug = null;   // { lugares:[{sector,tipo,empresa,orden,uso,activo}], items:[{sector,cod,clase,cajas_max,unidad,activo}] }
+let _lugTab = "lugar";
+
+function lugSetStatus(msg, ok) {
+  const el = document.getElementById("lugStatus");
+  if (el) { el.textContent = msg || ""; el.style.color = (ok === false) ? "#b42318" : "#166534"; }
+}
+function lugSetTab(t) {
+  _lugTab = t;
+  const a = document.getElementById("lugPaneLugar"), b = document.getElementById("lugPaneCod");
+  const ta = document.getElementById("lugTabLugar"), tb = document.getElementById("lugTabCod");
+  if (a) a.hidden = (t !== "lugar");
+  if (b) b.hidden = (t !== "cod");
+  if (ta) ta.classList.toggle("lug-tab-on", t === "lugar");
+  if (tb) tb.classList.toggle("lug-tab-on", t === "cod");
+}
+/* Baja las dos tablas. Best-effort: si no están (o no hay red) el editor avisa y
+   no rompe nada — igual que el editor viejo sin Supabase. */
+async function lugFetch(force) {
+  if (_lug && !force) return _lug;
+  const [lugares, items] = await Promise.all([
+    supaFetchAllSafe(SUPABASE_GVLUGAR_ENDPOINT, "select=sector,tipo,empresa,orden,uso,activo&order=orden.asc"),
+    supaFetchAllSafe(SUPABASE_GVLUGARITEM_ENDPOINT, "select=sector,cod,clase,cajas_max,unidad,activo&order=sector.asc")
+  ]);
+  _lug = { lugares: lugares || [], items: items || [] };
+  return _lug;
+}
+function lugItemsDe(sector) {
+  const s = String(sector || "").toUpperCase();
+  return (_lug ? _lug.items : []).filter(function (i) { return String(i.sector).toUpperCase() === s; });
+}
+async function openLugarEditor() {
+  if (!requireSupervisor()) return;
+  const ov = document.getElementById("lugarEditorOverlay");
+  if (ov) ov.classList.add("show");
+  lugSetStatus("Cargando…", true);
+  try {
+    await lugFetch(true);
+    lugSetStatus(_lug.lugares.length + " lugares · " + _lug.items.length + " asignaciones", true);
+  } catch (_e) { lugSetStatus("No pude leer los lugares (sin conexión).", false); }
+  lugSetTab("lugar");
+  const s = document.getElementById("lugSearch");
+  lugRender(s ? s.value : "");
+}
+function closeLugarEditor() {
+  const ov = document.getElementById("lugarEditorOverlay");
+  if (ov) ov.classList.remove("show");
+}
+/* Lista de LUGARES. El filtro busca por sector Y por el código que guarda, así que
+   tipear "438E" trae los cuatro lugares donde está — que es la pregunta que la
+   tabla vieja no podía contestar. Orden = el del recorrido, no alfabético. */
+function lugRender(filter) {
+  const list = document.getElementById("lugList");
+  if (!list) return;
+  if (!_lug) { list.innerHTML = '<div class="planim-empty">Cargando…</div>'; return; }
+  const f = String(filter || "").trim().toUpperCase();
+  const porSector = {};
+  _lug.items.forEach(function (i) {
+    const k = String(i.sector).toUpperCase();
+    (porSector[k] || (porSector[k] = [])).push(i);
+  });
+  const rows = _lug.lugares.filter(function (l) {
+    if (!f) return true;
+    if (String(l.sector).toUpperCase().indexOf(f) >= 0) return true;
+    return (porSector[String(l.sector).toUpperCase()] || []).some(function (i) {
+      return String(i.cod).toUpperCase().indexOf(f) >= 0;
+    });
+  });
+  if (!rows.length) {
+    list.innerHTML = '<div class="planim-empty">' + (f ? 'Ningún lugar coincide con "' + escapeHtml(filter) + '".' : 'No hay lugares cargados.') + '</div>';
+    return;
+  }
+  const CAP = 300;
+  list.innerHTML = rows.slice(0, CAP).map(function (l) {
+    const s = String(l.sector).toUpperCase(), sE = escapeHtml(s);
+    const its = porSector[s] || [];
+    const emp = l.empresa || "—";
+    const chips = its.length
+      ? its.map(function (i) {
+          return '<span class="lug-chip' + (i.clase === "insumo" ? " lug-chip-ins" : "") + '">' +
+                 escapeHtml(String(i.cod)) +
+                 (i.cajas_max != null ? ' <b>' + Number(i.cajas_max) + '</b>' : '') +
+                 ' <button class="lug-x" title="Sacar de ' + sE + '" onclick="lugDelItem(\'' + sE + '\',\'' + escapeHtml(String(i.cod)) + '\',\'' + escapeHtml(String(i.clase)) + '\')">✕</button></span>';
+        }).join("")
+      : '<span class="lug-libre">libre</span>';
+  return '<div class="lug-row">' +
+      '<div class="lug-row-h">' +
+        '<span class="lug-sec">' + sE + '</span>' +
+        '<span class="lug-meta">' + escapeHtml(String(l.tipo || "")) + ' · <b>' + escapeHtml(emp) + '</b>' +
+          (l.uso ? ' · ' + escapeHtml(String(l.uso)) : '') +
+          ' · orden ' + (l.orden != null ? Number(l.orden) : "—") + '</span>' +
+      '</div>' +
+      '<div class="lug-chips">' + chips + '</div>' +
+      '<div class="lug-add">' +
+        '<input class="planim-inp lug-inp-cod" id="lugCod_' + sE + '" type="text" placeholder="Código" oninput="this.value=this.value.toUpperCase()">' +
+        '<select class="planim-inp lug-inp-cls" id="lugCls_' + sE + '"><option value="articulo">artículo</option><option value="insumo">insumo</option></select>' +
+        '<input class="planim-inp planim-inp-num lug-inp-cap" id="lugCap_' + sE + '" type="number" inputmode="numeric" placeholder="cajas máx">' +
+        '<button class="planim-btn-save" onclick="lugAddItem(\'' + sE + '\')">Agregar acá</button>' +
+      '</div>' +
+    '</div>';
+  }).join("") + (rows.length > CAP ? '<div class="planim-empty">Mostrando ' + CAP + ' de ' + rows.length + ' — afiná la búsqueda.</div>' : "");
+}
+/* Camino inverso: un código → TODOS sus lugares. Es lo que la tabla vieja no podía
+   contestar (clave `cod`, un solo lugar por código). */
+function lugRenderCod(filter) {
+  const list = document.getElementById("lugCodList");
+  if (!list) return;
+  if (!_lug) { list.innerHTML = '<div class="planim-empty">Cargando…</div>'; return; }
+  const f = String(filter || "").trim().toUpperCase();
+  if (!f) { list.innerHTML = '<div class="planim-empty">Escribí un código.</div>'; return; }
+  const empDe = {};
+  _lug.lugares.forEach(function (l) { empDe[String(l.sector).toUpperCase()] = l; });
+  const hits = _lug.items.filter(function (i) { return String(i.cod).toUpperCase().indexOf(f) >= 0; });
+  if (!hits.length) { list.innerHTML = '<div class="planim-empty">Ningún lugar tiene "' + escapeHtml(filter) + '".</div>'; return; }
+  const porCod = {};
+  hits.forEach(function (i) { (porCod[String(i.cod).toUpperCase()] || (porCod[String(i.cod).toUpperCase()] = [])).push(i); });
+  list.innerHTML = Object.keys(porCod).sort().map(function (c) {
+    const its = porCod[c].slice().sort(function (a, b) {
+      const oa = (empDe[String(a.sector).toUpperCase()] || {}).orden, ob = (empDe[String(b.sector).toUpperCase()] || {}).orden;
+      return (oa == null ? 1e9 : oa) - (ob == null ? 1e9 : ob);
+    });
+    return '<div class="lug-row"><div class="lug-row-h"><span class="lug-sec">' + escapeHtml(c) + '</span>' +
+      '<span class="lug-meta">' + its.length + ' lugar' + (its.length > 1 ? 'es' : '') + '</span></div>' +
+      '<div class="lug-chips">' + its.map(function (i) {
+        const l = empDe[String(i.sector).toUpperCase()] || {};
+        return '<span class="lug-chip' + (i.clase === "insumo" ? " lug-chip-ins" : "") + '">' +
+               escapeHtml(String(i.sector)) + ' · ' + escapeHtml(String(l.empresa || "—")) +
+               (i.cajas_max != null ? ' · <b>' + Number(i.cajas_max) + '</b>' : '') + '</span>';
+      }).join("") + '</div></div>';
+  }).join("");
+}
+/* Agrega un código A ESTE LUGAR. La empresa NO se pide: la da el lugar — que es
+   todo el punto del modelo nuevo. */
+async function lugAddItem(sector) {
+  const s = String(sector).toUpperCase();
+  const codEl = document.getElementById("lugCod_" + s);
+  const clsEl = document.getElementById("lugCls_" + s);
+  const capEl = document.getElementById("lugCap_" + s);
+  const cod = codEl ? codEl.value.trim().toUpperCase() : "";
+  if (!cod) { lugSetStatus("Falta el código.", false); return; }
+  const clase = clsEl ? clsEl.value : "articulo";
+  const capRaw = capEl ? capEl.value.trim() : "";
+  const cajas_max = capRaw === "" ? null : (Number(capRaw) || 0);
+  const headers = await facAuthWriteHeaders({ "Prefer": "resolution=merge-duplicates,return=minimal" });
+  if (!headers) { lugSetStatus(authNoSesionMsg("Iniciá sesión con Google para editar."), false); return; }
+  try {
+    const r = await fetch(SUPABASE_GVLUGARITEM_ENDPOINT + "?on_conflict=sector,cod,clase", {
+      method: "POST", headers: headers,
+      body: JSON.stringify({ sector: s, cod: cod, clase: clase, cajas_max: cajas_max, activo: true })
+    });
+    if (!r.ok) { lugSetStatus("No se guardó: HTTP " + r.status + (r.status === 401 || r.status === 403 ? " (faltan los permisos de escritura — sql/gv_lugar_editor.sql)" : ""), false); return; }
+    await lugFetch(true);
+    lugSetStatus("✓ " + cod + " agregado a " + s + ".", true);
+    if (codEl) codEl.value = ""; if (capEl) capEl.value = "";
+    lugRender((document.getElementById("lugSearch") || {}).value || "");
+  } catch (_e) { lugSetStatus("Sin conexión: no se guardó.", false); }
+}
+/* Saca un código DE ESTE LUGAR — no borra el código del depósito. Es la diferencia
+   con el editor viejo, donde borrar el código lo sacaba de todos lados porque sólo
+   podía estar en uno. */
+async function lugDelItem(sector, cod, clase) {
+  const s = String(sector).toUpperCase(), c = String(cod).toUpperCase(), cl = String(clase || "articulo");
+  const otros = (_lug ? _lug.items : []).filter(function (i) {
+    return String(i.cod).toUpperCase() === c && String(i.sector).toUpperCase() !== s;
+  }).length;
+  if (!confirm("¿Sacar " + c + " de " + s + "?\n\n" +
+      (otros ? "Le quedan otros " + otros + " lugar(es)." : "⚠ Es su ÚNICO lugar: queda sin planimetría."))) return;
+  const headers = await facAuthWriteHeaders({ "Prefer": "return=minimal" });
+  if (!headers) { lugSetStatus(authNoSesionMsg("Iniciá sesión con Google para editar."), false); return; }
+  try {
+    const q = "?sector=eq." + encodeURIComponent(s) + "&cod=eq." + encodeURIComponent(c) + "&clase=eq." + encodeURIComponent(cl);
+    const r = await fetch(SUPABASE_GVLUGARITEM_ENDPOINT + q, { method: "DELETE", headers: headers });
+    if (!r.ok) { lugSetStatus("No se borró: HTTP " + r.status + (r.status === 401 || r.status === 403 ? " (faltan los permisos — sql/gv_lugar_editor.sql)" : ""), false); return; }
+    await lugFetch(true);
+    lugSetStatus("✓ " + c + " sacado de " + s + ".", true);
+    lugRender((document.getElementById("lugSearch") || {}).value || "");
+  } catch (_e) { lugSetStatus("Sin conexión: no se borró.", false); }
 }
 /* v11.13 — Sugerencia de N° de orden para un sector, MISMA lógica que el trigger
    backend planimetria_autoorden (sql/planimetria_autoorden.sql). Lee window.GONDOLA.
@@ -40832,6 +41476,13 @@ window.facNetoDetalle = async function(np){
         var q = (f.cajas != null) ? ' ' + f.cajas + (f.uxb ? '×' + f.uxb : '') : '';
         return '<span class="facneto-falt-item">' + escapeHtml(f.cod) + q + '</span>';
       }).join(" ") + '</div>';
+    /* v15.82 — los códigos 1xx son LÍNEA LOKE y no tienen lista general: los compran dos
+       clientes y un par de supermercados, cada uno con su precio. Que salgan "sin precio"
+       no es un error del sistema: falta el precio pactado con ESE cliente. */
+    if (sinPrecio.some(function(f){ return /^0*1/.test(String(f.cod)); })){
+      h += '<div class="facneto-faltantes" style="opacity:.85;">Los <b>1xx</b> son <b>línea Loke</b>: no hay lista general, ' +
+        'el precio es el pactado con cada cliente. Si falta, hay que cargarlo (los súper van por su lista de cadena).</div>';
+    }
   }
   body.innerHTML = h;
 };

@@ -208,6 +208,14 @@ const RCP_CSS = `
 #rcpRoot .modalCard{ background:#fff; border-radius:14px; padding:20px; width:100%; max-width:360px; max-height:90vh; display:flex; flex-direction:column; }
 #rcpRoot .modalHeader{ display:flex; align-items:center; justify-content:space-between; margin-bottom:14px; }
 #rcpRoot .modalTitle{ font-size:22px; font-weight:900; }
+#rcpRoot .arBusInput{ width:100%; height:48px; font-size:18px; text-align:left; letter-spacing:normal; border-radius:10px; border:2px solid var(--border); padding:0 12px; box-sizing:border-box; }
+#rcpRoot .arBusList{ margin-top:12px; overflow-y:auto; flex:1 1 auto; min-height:120px; }
+#rcpRoot .arBusRow{ display:flex; align-items:center; gap:10px; width:100%; text-align:left; background:#fff; border:1px solid var(--border); border-radius:10px; padding:10px 12px; margin-bottom:8px; cursor:pointer; font:inherit; }
+#rcpRoot .arBusRow:active{ background:#f1f5f9; }
+#rcpRoot .arBusCod{ font-weight:900; font-size:17px; flex:0 0 auto; }
+#rcpRoot .arBusDesc{ color:#555; font-size:14px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+#rcpRoot .arBusNada{ padding:12px 0; color:#666; font-size:15px; }
+#rcpRoot .arBusIgual{ width:100%; margin-top:10px; padding:14px; border-radius:10px; border:2px solid #b45309; background:#fffbeb; color:#7c2d12; font-weight:800; font-size:16px; cursor:pointer; }
 #rcpRoot .modalClose{ background:#fff; border:1px solid var(--border); width:32px; height:32px; border-radius:50%; cursor:pointer; font-size:14px; font-weight:900; }
 #rcpRoot .btnCancel{ padding:10px 16px; border-radius:10px; border:1px solid var(--border); background:#fff; font-weight:900; cursor:pointer; }
 #rcpRoot .btnSend{ padding:10px 16px; border-radius:10px; border:0; background:#111; color:#fff; font-weight:900; cursor:pointer; }
@@ -328,6 +336,17 @@ const RCP_HTML = `
     <div id="opAnularBar" class="opAnularBar"></div>
   </div>
 </div>
+<div id="arBusModal" class="modal" role="dialog" aria-modal="true">
+  <div class="modalCard">
+    <div class="modalHeader">
+      <div class="modalTitle">Agregar artículo</div>
+      <button id="arBusClose" class="modalClose" aria-label="Cerrar">×</button>
+    </div>
+    <input id="arBusInput" class="arBusInput" type="text" inputmode="text" autocomplete="off"
+           placeholder="Código o nombre del artículo…" />
+    <div id="arBusList" class="arBusList"></div>
+  </div>
+</div>
 <div id="opCajasModal" class="modal" role="dialog" aria-modal="true">
   <div class="modalCard">
     <div class="modalHeader">
@@ -372,6 +391,10 @@ const opCajasDelete = document.getElementById("opCajasDelete");
 const opCajasClose = document.getElementById("opCajasClose");
 const opCajasOc = document.getElementById("opCajasOc");
 const opAnularBar = document.getElementById("opAnularBar");
+const arBusModal = document.getElementById("arBusModal");
+const arBusInput = document.getElementById("arBusInput");
+const arBusList = document.getElementById("arBusList");
+const arBusClose = document.getElementById("arBusClose");
 
 const opState = {
   step: null,
@@ -1302,15 +1325,142 @@ function altaPollStart() {
 }
 function altaPollStop() { if (_altaTimer) { clearInterval(_altaTimer); _altaTimer = null; } }
 
-async function arAddCode() {
-  let cod = prompt("Código del artículo nuevo para Log/Fabr:");
-  if (cod == null) return;                       // canceló
+/* ============== v15.76 — el "+" de Log/Fabr es un BUSCADOR de códigos activos =======
+   Pedido del dueño (2026-09-11): *"si están por recibir un artículo, si no lo tienen en
+   su listado activo, en lugar de que ellos escriban y nada más, que escriban sobre un
+   buscador de códigos activos. Si no encuentra ninguno con lo que ellos tipean, que los
+   deje cargarlos pero con la misma pauta de recepción de mercadería sin OC: que me
+   manden un WhatsApp a mí"*.
+
+   Antes el "+" era un `prompt()` libre: el operario tipeaba cualquier cosa y entraba.
+   De ahí salieron los 599 / 943 / 948 sin la E del remito 38087 (02/09). Ahora:
+
+   1. Tipea → filtra el catálogo de ACTIVOS por código o por descripción.
+   2. Toca un resultado → se agrega, SIN WhatsApp (es un código que ya existe).
+   3. Nada coincide → aparece "Cargar igual: XXX", que lo deja entrar PERO dispara el
+      aviso a Thomas (`altaAvisar`, v15.39), igual que antes.
+
+   El catálogo de activos sale de `OC_Maximos` (activo = true), que es la lista curada
+   que la base ya usa como canónica para el código (trigger `fn_canon_cod_art`).
+   Si no se puede cargar (sin red), NO se traba a nadie: el buscador deja escribir
+   libre y el aviso vuelve a decidirse por la planimetría, como en la v15.39. */
+let _arCatalogo = null;      // [{cod, desc, codNorm, busq}] · null = sin cargar
+let _arCatalogoProm = null;  // promesa en vuelo (que dos toques no pidan dos veces)
+
+function arCatalogoCargar() {
+  if (_arCatalogo) return Promise.resolve(_arCatalogo);
+  if (_arCatalogoProm) return _arCatalogoProm;
+  _arCatalogoProm = (async function () {
+    try {
+      const res = await supabase.from("OC_Maximos")
+        .select("cod,descripcion").eq("activo", true);
+      if (res.error || !res.data) return null;
+      const vistos = {};
+      const out = [];
+      res.data.forEach(function (r) {
+        const cn = _ocgNorm(r.cod);
+        if (!cn || vistos[cn]) return;
+        vistos[cn] = 1;
+        const desc = String(r.descripcion || "").trim();
+        out.push({ cod: cn, desc: desc, busq: opNorm(cn + " " + desc) });
+      });
+      out.sort(function (a, b) { return a.cod < b.cod ? -1 : a.cod > b.cod ? 1 : 0; });
+      // Catálogo VACÍO = no lo tomamos por bueno. Si RLS o la red lo dejan en cero, dar
+      // por "fuera de lista" a TODOS los códigos mandaría un WhatsApp por cada alta.
+      // Con null se cae a la regla vieja (planimetría), que es la de la v15.39.
+      if (!out.length) return null;
+      _arCatalogo = out;
+      return out;
+    } catch (_e) { return null; }
+    finally { _arCatalogoProm = null; }
+  })();
+  return _arCatalogoProm;
+}
+/* ¿El código está en el listado de activos? true / false / null (catálogo sin cargar). */
+function arCatalogoTiene(cod) {
+  if (!_arCatalogo) return null;
+  const cn = _ocgNorm(cod);
+  return _arCatalogo.some(function (a) { return a.cod === cn; });
+}
+/* Códigos activos que matchean lo tipeado (por código o por descripción). */
+function arCatalogoBuscar(txt) {
+  if (!_arCatalogo) return [];
+  const q = opNorm(String(txt || "").trim());
+  if (!q) return _arCatalogo.slice(0, 60);
+  return _arCatalogo.filter(function (a) { return a.busq.indexOf(q) >= 0; }).slice(0, 60);
+}
+
+function arBusCerrar() {
+  arBusModal.classList.remove("open");
+  arBusInput.value = "";
+  arBusList.innerHTML = "";
+}
+function arBusDibujar() {
+  const txt = arBusInput.value;
+  const cod = _ocgNorm(txt);
+  arBusList.innerHTML = "";
+
+  if (!_arCatalogo) {
+    // Sin catálogo (sin red o falló la consulta): no se traba: se deja cargar a mano.
+    const av = document.createElement("div");
+    av.className = "arBusNada";
+    av.textContent = "No se pudo traer la lista de códigos activos. Podés escribirlo igual.";
+    arBusList.appendChild(av);
+    if (cod) arBusList.appendChild(arBusBotonIgual(cod));
+    return;
+  }
+
+  const res = arCatalogoBuscar(txt);
+  res.forEach(function (a) {
+    const b = document.createElement("button");
+    b.type = "button";
+    b.className = "arBusRow";
+    b.innerHTML = '<span class="arBusCod">' + escapeHtmlRcp(a.cod) + '</span>' +
+                  '<span class="arBusDesc">' + escapeHtmlRcp(a.desc) + '</span>';
+    b.onclick = function () { arBusCerrar(); arAddCodeAplicar(a.cod, false); };
+    arBusList.appendChild(b);
+  });
+
+  if (!res.length) {
+    const nada = document.createElement("div");
+    nada.className = "arBusNada";
+    nada.textContent = cod
+      ? "Ningún artículo activo coincide con “" + cod + "”."
+      : "Escribí el código o el nombre del artículo.";
+    arBusList.appendChild(nada);
+    if (cod) arBusList.appendChild(arBusBotonIgual(cod));
+  }
+}
+/* Botón de escape: lo deja cargar aunque no esté en la lista, avisándole a Thomas. */
+function arBusBotonIgual(cod) {
+  const b = document.createElement("button");
+  b.type = "button";
+  b.className = "arBusIgual";
+  b.textContent = "➕ Cargar igual: " + cod + " (le avisamos a Thomy)";
+  b.onclick = function () { arBusCerrar(); arAddCodeAplicar(cod, true); };
+  return b;
+}
+function arAddCode() {
+  arBusInput.value = "";
+  arBusList.innerHTML = '<div class="arBusNada">Cargando códigos activos…</div>';
+  arBusModal.classList.add("open");
+  try { arBusInput.focus(); } catch (_e) {}
+  arCatalogoCargar().then(function () {
+    if (arBusModal.classList.contains("open")) arBusDibujar();
+  });
+}
+
+/* Agrega el código a la recepción. `fueraDeLista` = lo tipeó y no matcheó ningún activo
+   → se le avisa a Thomas. Si el catálogo no se pudo cargar, cae a la regla vieja
+   (planimetría), para no mandar WhatsApp de más ni de menos por una falla de red. */
+async function arAddCodeAplicar(cod, fueraDeLista) {
   cod = _ocgNorm(cod);
   if (!cod) return;
 
-  // v15.39 — si el código NO está en la planimetría es un alta de verdad: se le avisa a
-  // Thomas por WhatsApp y queda el asiento. NO se espera la respuesta: el operario sigue.
-  if (!altaEnPlanimetria(cod)) {
+  const enActivos = arCatalogoTiene(cod);          // true | false | null
+  const avisar = (enActivos === null) ? !altaEnPlanimetria(cod) : (enActivos === false);
+
+  if (avisar) {
     const ya = altaPendGet()[cod];
     if (!ya) {
       const estado = await altaAvisar(cod);
@@ -1568,6 +1718,11 @@ opCajasInput.addEventListener("keydown", e => {
   if (e.key === "Enter") { e.preventDefault(); opCajasNext.click(); }
 });
 opCajasClose.onclick = closeCajas;
+/* v15.76 — buscador de códigos activos del "+" de Log/Fabr. */
+arBusClose.onclick = arBusCerrar;
+arBusModal.onclick = function (e) { if (e.target === arBusModal) arBusCerrar(); };
+arBusInput.oninput = arBusDibujar;
+arBusInput.onkeydown = function (e) { if (e.key === "Escape") arBusCerrar(); };
 // Antes: tocar el fondo oscuro cerraba el pop-up. Lo sacamos para que NO se cierre
 // solo si el empleado tarda en cargar / toca fuera sin querer — solo se cierra con
 // la ✕ o al cargar el número. (Pedido: "que se mantenga".)
