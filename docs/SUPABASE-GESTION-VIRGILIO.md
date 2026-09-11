@@ -5478,9 +5478,68 @@ pop-up RAG viejo (racks+a_guardar, sólo aviso): en `stockBajaPicking` el bloque
 
 **Rollback:** `docs/ROLLBACK-PRODUCCION.md` §1.x. SQL: `sql/gv_reconciliar_aguardar.sql`.
 
+## §3.cd — RR y Cola de Impresión: las NP web del formato nuevo salían sin cliente (v15.42, 2026-09-11)
+
+**Síntoma (dueño, 11/09):** en **Recepción Remitos (RR)** las filas `LK 0003` y `LK 0001`
+mostraban `—` en **Cod Cliente** y **Razón Social**; los líos (17 y 1) sí salían.
+
+**Causa.** Los eventos de operario guardan la NP como la etiqueta web (`texto = 'LK 0003|E01D|'`),
+pero `vista_control_remitos` busca el cliente sólo en `PPP_Programacion_Diaria` y
+`PPP_Entregados_Meta`, las **dos de ISIS**. Las NP web viven en `PPP_Web_Programacion`
+(`empresa` + `np` + `np_idx`), y la etiqueta la arma `gv_ppp_web_np_label(empresa, np, np_idx)`.
+Sin ese join, el `COALESCE` cae a `''`.
+
+**Arreglo (aditivo, las vistas viejas no se tocan).** `sql/gv_vistas_np_web_v1542.sql`:
+
+| Vista nueva (`security_invoker = true`) | Encima de | Completa |
+|---|---|---|
+| `gv_vista_control_remitos` | `vista_control_remitos` | `cod_cliente`, `rs` |
+| `gv_vista_cola_impresion` | `vista_cola_impresion` | `razon_social` |
+
+Las dos hacen `left join lateral` contra `PPP_Web_Programacion` por
+`gv_ppp_web_np_label(...) = btrim(np)` y sólo rellenan **cuando el valor viejo viene vacío**: para
+las NP de ISIS el resultado es idéntico. Front (`index.html` v15.42): `fetchCRData` y el badge de
+RR pasan a `gv_vista_control_remitos`; la cola de impresión, a `gv_vista_cola_impresion`.
+
+**Medición.**
+
+| NP | cod_cliente antes | cod_cliente después | rs después |
+|---|---|---|---|
+| LK 0001 | (vacío) | 4210 | Garbarino Franco Tomas |
+| LK 0003 | (vacío) | 4109 | Di Leo Rossi Echarri Pedro SH |
+| 98633 … 98683 (16 NP de ISIS) | igual | igual | igual |
+
+**Lo que NO estaba roto:** Carga Camión (`fetchCCData`) y Control Remitos (`fetchCCRData`) sacan la
+razón social de `Facturacion_NP`, que sí tiene las NP web (`LK 0001`, `LK 0003`, `LK 0011`).
+
+### §3.cd.1 — 98665: las NP de ISIS que ya salieron de la Programación también se completan (v15.44, 2026-09-11)
+
+Thomas pidió revisar la única fila que seguía vacía. **No era un dato perdido:** `98665` es
+**Merajver Marcelo Fabian (cod 2193)**, tanda **D50E**, facturada el **02/09** y con salida el 02/09
+— pero el operario le hizo CCR el 08/09 y CCN el **10/09**, así que volvió a caer en RR. Para
+entonces ISIS ya la había sacado de `PPP_Programacion_Diaria` (hay hueco entre 98664 y 98666) y
+nunca llegó a `PPP_Entregados_Meta`, así que las dos fuentes de la vista vieja estaban vacías.
+
+El dato sí existe en otras dos tablas: **`Facturacion_NP`** (razón social) y **`Entregas_Virgilio`**
+(`cod_cliente`). `gv_vista_control_remitos` suma las dos como último fallback, después del valor
+original y de `PPP_Web_Programacion`:
+
+| Fuente, en orden | Completa | Para qué NP |
+|---|---|---|
+| `vista_control_remitos` (ISIS) | cod + rs | las normales |
+| `PPP_Web_Programacion` | cod + rs | web (`LK 0003`) |
+| `Facturacion_NP` | rs | ISIS ya facturada y fuera de Programación |
+| `Entregas_Virgilio` | cod | ídem |
+
+**Medición:** las **18** filas de RR quedan con cliente; `98665` → `2193 · Merajver Marcelo Fabian`.
+Las 16 NP de ISIS normales, sin cambio (el fallback sólo entra cuando el valor viejo viene vacío).
+
+**Rollback:** apuntar el front a `vista_control_remitos` / `vista_cola_impresion` y
+`drop view public.gv_vista_control_remitos, public.gv_vista_cola_impresion;`
+
 ---
 
-## §3.cd — El PKC dice DE DÓNDE salió cada caja (v15.41, 2026-09-11, pedido de Luis)
+## §3.ce — El PKC dice DE DÓNDE salió cada caja (v15.41, 2026-09-11, pedido de Luis)
 
 **El problema.** El picking le dice al operario dónde ir: parte el artículo en **dos pasos**
 cuando hay excedente — uno de góndola con su sector y otro `art·EXC` con la ubicación del
