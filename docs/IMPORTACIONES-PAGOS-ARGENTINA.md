@@ -260,8 +260,43 @@ Excel (`fila`) para poder volver al original.
 4. **Cuatro fechas con el año cambiado** en el Excel (filas 35, 37, 43 de la hoja NTL y 28, 30, 32 de
    la CH: dicen 2025/2026 donde por la secuencia del saldo van 2024/2025). **Se importaron tal cual.**
 
+## 5. La cuenta de NTL, andando en la app (v15.90)
+
+`sql/` — vistas `gv_imp_ntl_cuenta` (el extracto con el **saldo corrido recalculado** y cada
+movimiento clasificado) y `gv_imp_ntl_resumen` (por empresa), más las RPC `gv_imp_ntl_resumen()`,
+`gv_imp_ntl_mov(limit, empresa, proveedor)` y `gv_imp_ntl_pendientes()`.
+
+**Prueba de integridad**: el saldo corrido que calcula la vista se comparó **fila por fila** con el
+que trae el Excel — **177 filas, 0 diferencias**, saldo final **u$s 230,43** en los dos.
+
+La **clase** de cada movimiento sale de lo que dice el propio Excel, no se inventa: `ingreso`
+(Efectivo/Transferencia Recibido), `recupero`, `giro` (Advance/Balance a la fábrica), `comision`,
+`gasto_bancario` (los que dicen "Gtos Bancarios") y `devolucion`.
+
+### Saldo por empresa
+
+| Empresa | Ingresos | Recuperos | Girado a fábricas | Comisiones | Gastos banc. | **Saldo** |
+|---|---|---|---|---|---|---|
+| **D** (depósitos sin asignar) | 133.300 | — | — | 3.699 | — | **129.601** |
+| **TN** Tierra Nativa | 13.445 | 83.912 | 180.498 | 4.712 | 317 | **−76.857** |
+| **CH** Chef | 7.000 | 157.109 | 208.338 | 7.708 | 576 | **−52.513** |
+| | | | | | | **230,43** |
+
+**El bloque resumen del Excel tiene dos números viejos**: da `CH = −48.186` (contra −52.513) y un
+"Saldo Final" de **12.335,33**, que es el saldo de la **fila 140, del 05/01/2026** — quedó pegado.
+La partición de acá suma exactamente el saldo real del extracto (230,43); la del Excel, no.
+
+### Solapa 💱 NTL
+
+Cuarta solapa del módulo de importación. Muestra el **saldo de hoy** y el de cada empresa, los
+acumulados del circuito (depositado / girado / recuperado / comisiones), los **recuperos pendientes**
+(u$s 42.908: Hugo Wong CH37 21.952 y Ownland 20.956, los directos) y el **extracto navegable**, con
+fichas por empresa y por proveedor y un "ver más" que pagina. Test `tests/imp-ntl.cjs`.
+
 ### Lo que sigue
 
-La cuenta de NTL como **saldo propio** (entra lo que se le gira, sale lo que le paga a cada fábrica)
-ya tiene los datos para calcularse. Falta atar cada movimiento al `pedido_ref` del módulo y llevar
-`a_traves_de` / `fue_a` a `GV_Imp_Pagos`, que hoy sólo tiene `factura_ref` como texto libre.
+Atar cada movimiento del extracto al `pedido_ref` del módulo y llevar `a_traves_de` / `fue_a` a
+`GV_Imp_Pagos`, que hoy sólo tiene `factura_ref` como texto libre. Para eso hace falta el mapa entre
+las **cargas** del Excel (`CQ-9154`, `China 43`, `CH 44`…) y los PI, que sólo lo tiene Thomas.
+Ojo también con los nombres del extracto: `Fuyian` y `Fujian` son el mismo, y `Xihin` es `Zhixin`
+(se importaron tal cual).

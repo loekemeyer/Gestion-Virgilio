@@ -7574,3 +7574,36 @@ alter table public."GV_Krikos_OC" drop column if exists auto_estado,
   drop column if exists auto_aviso, drop column if exists auto_at, drop column if exists order_id;
 ```
 Sin cron, todo esto queda inerte: las OC siguen cargándose a mano desde el panel, como hasta ahora.
+
+## §3.cj.3 — v15.91 (2026-09-11): barrido de TODO lo que leía `vista_saldos_stock` sin agrupar
+
+Después del bug de Corregir códigos (§3.cj.2) se revisó **quién más** quedó atrás del cambio de
+grano de la **v15.71** (`vista_saldos_stock` pasó de una fila por código a **una por (cod_art,
+empresa)**; hoy **292 códigos tienen dos filas**).
+
+| Dónde | Estado | |
+|---|---|---|
+| `index.html` (5 lugares) y `recepcion.js` (2) | ✅ ya corregidos en la v15.71 | acumulan ("SUMAR, no pisar") |
+| `vista_stock_vs_pedidos`, `vista_faltante_catalogo`, `vista_generador_oc`, `vista_importados_partes`, `vista_facturable_anticipado` | ✅ | filas = claves distintas (310 / 505 / 349 / 5 / 724) |
+| `vista_correcciones_pedido_rich` | ❌ → arreglada en §3.cj.2 | |
+| **`gondola_return_check(jsonb)`** | ❌ → **arreglada acá** | CTE `gond` sin `group by` |
+| **`aceptar_conteo(bigint,text)`** | ❌ → **arreglada acá** | `SELECT … INTO` sin agregado |
+| `oc_backfill_valores`, `notificar_conteo_gondola_telegram` | ✅ | ya sumaban y agrupaban |
+| `check_stock_anomalias`, `generar_reporte_agentes` | sin tocar | miran fila por fila; hoy **0 negativos**, y ahí el corte por empresa es información, no ruido |
+| `actualizar_saldo_trigger` | sin tocar | sólo la nombra en un comentario |
+
+**`gondola_return_check`** es el chequeo de *"¿devolver a góndola?"* de Recepción: duplicaba las
+filas del resultado y tomaba el `terminado` de **una** empresa (muchas veces 0) en vez del total →
+**el aviso de exceso de góndola no saltaba**. Ahora `sum(...) group by`.
+
+**`aceptar_conteo`** es más delicado: cuando `Conteo_Stock.stock_sistema` viene null, el fallback
+leía una fila cualquiera y con ese número calcula el delta del ajuste que **escribe** en
+`Movimientos_Stock`. Ahora `SUM(...)`. **Sin daño histórico**: los 2 conteos aceptados hasta hoy
+tenían `stock_sistema` cargado (el front manda el snapshot, que ya sumaba bien).
+
+**Prueba:** `select * from gondola_return_check('[{"cod":"505","cajas":5000},{"cod":"513","cajas":5000}]')`
+→ **1 fila por código** (antes 2), con `gond` = 2719 y 2162, que es el total. Antes una de las dos
+filas de cada código traía `gond = 0`.
+
+**Archivo:** `sql/gv_saldos_group_by_funciones_v1589.sql` · migración `gv_saldos_group_by_funciones_v1589`
+· backup de las definiciones previas en `sql/backups/funciones_vista_saldos_stock_20260911_pre_v1589.sql`.

@@ -628,3 +628,15 @@ pasa a `sum(...) … group by 1` sobre `vista_saldos_stock`, que desde la v15.71
 tipos → Producción, que la lee con las 14 viejas, sólo ve el saldo correcto (total del código) y una
 fila por NP en vez de dos. Rollback: re-correr el `create or replace view` de
 `sql/vista_correcciones_pedido_rich_v1567_orden_sin_pickear.sql`. §3.cj.2.
+
+## `gondola_return_check` y `aceptar_conteo`: leían `vista_saldos_stock` sin agrupar — v15.91 (2026-09-11)
+
+**Objetos COMPARTIDOS tocados** (los dos con `CREATE OR REPLACE`, **misma firma**):
+`public.gondola_return_check(jsonb)` y `public.aceptar_conteo(bigint, text)`. Único cambio: el
+saldo se lee con `sum(...)` / `group by` porque `vista_saldos_stock` devuelve una fila por
+(cod_art, empresa) desde la v15.71 (292 códigos con dos filas). Mismo tipo de retorno, mismas
+columnas: para Producción sólo cambia que el número que ve es el **total** del código y que
+`gondola_return_check` devuelve una fila por código en vez de dos.
+
+**Rollback exacto:** correr `sql/backups/funciones_vista_saldos_stock_20260911_pre_v1589.sql`
+(trae las dos definiciones tal cual estaban). **Definición nueva:** `sql/gv_saldos_group_by_funciones_v1589.sql`. §3.cj.3.

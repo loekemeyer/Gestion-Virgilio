@@ -389,6 +389,9 @@ PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node te
 
 echo "== imp-cuenta-corriente (v15.74: vista 💵 Plata — FOB/pagado/pend giro/falta del Excel + libro de giros) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/imp-cuenta-corriente.cjs
+
+echo "== imp-ntl (v15.90: solapa 💱 NTL — extracto del forwarder de Hong Kong, saldo por empresa y recuperos) =="
+PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/imp-ntl.cjs
 echo "== pk-deposito-pkc (v15.41: el PKC dice de qué depósito salió cada caja; un evento por (tanda,art)) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/pk-deposito-pkc.cjs
 
