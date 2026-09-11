@@ -259,3 +259,27 @@ $function$;
 -- ROLLBACK: las definiciones previas están en
 -- sql/backups/cuarentena_20260911_marcar_limite_pre_v1504.sql
 -- ════════════════════════════════════════════════════════════════════════════
+
+-- ============================================================================
+-- v15.58 (2026-09-11) — la cuarentena es de lo PENDIENTE (Edge Function v23)
+-- Vivi: "tengo estos mensajes de cuarentena pero no los veo en A Programar". La Edge Function
+-- gv-ppp-web-tandas-diarias evaluaba gv_cuarentena_marcar / gv_cuarentena_limite y sincronizaba
+-- Planify sobre todo el feed menos gv_pedidos_web_excluidos, sin sacar lo que ya tiene tanda en
+-- PPP_Web_Programacion ni lo que está en un borrador (PPP_Web_Tanda_Items). Abría tareas a Viviana
+-- por NP ya programadas y contaba dos veces al programado en el greedy del límite (base + pendiente).
+-- Ahora `pedidosYaTomados` los saca antes de evaluar, igual que hace A Programar. Las RPC de acá NO
+-- cambiaron. §3.ch de docs/SUPABASE-GESTION-VIRGILIO.md.
+-- ============================================================================
+\n
+-- ============================================================================
+-- v15.59 (2026-09-11) — auditoría de Vivi + el candado por BLOQUE
+-- Pregunta: "¿el programa mandó a Programación pedidos que estaban en cuarentena sin que nadie
+-- los saque a mano?" Respuesta auditada: NO. Las 7 NP de sus tareas se programaron entre el 06/09
+-- y el 10/09 15:30, y GV_Cuarentena_Fuente se cargó el 10/09 17:36-18:00 (deuda reemplazada el
+-- 11/09 12:43). Los 3 programados después (LK 1369, 1380, 1388) estaban en GV_Cuarentena_Liberados,
+-- liberados a mano por loekemeyer.n8n@gmail.com a las 12:15:52 / 12:16:01 / 12:16:02.
+-- Cambio: pedidosYaTomados compara order_id|np_idx (antes el pedido entero), así un bloque pendiente
+-- de un pedido con otro bloque armado no se escapa de la cuarentena. Las RPC de acá NO cambiaron.
+-- ABIERTO (decisión del dueño): un pedido YA programado al que después le aparece deuda no se retira
+-- solo. §3.ci.1 de docs/SUPABASE-GESTION-VIRGILIO.md.
+-- ============================================================================

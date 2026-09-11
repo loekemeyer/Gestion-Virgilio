@@ -330,6 +330,9 @@ PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node te
 echo "== ppp-fecha-formato (regresión v15.50: una sola fecha dd/mm/aaaa en la PPP; a la base va ISO) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/ppp-fecha-formato.cjs
 
+echo "== ppp-resumen-angosto (regresión v15.53: la tabla del Resumen no se estira; columnas al ancho del contenido) =="
+PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/ppp-resumen-angosto.cjs
+
 echo "== ppp-atrasados (v14.06: los atrasados se ven sin rebotar de solapa — banda en Programación + lista adentro de Resumen) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/ppp-atrasados.cjs
 
@@ -362,6 +365,15 @@ PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node te
 
 echo "== remito-np-web (v15.46: el remito impreso trae cliente y fecha también en las NP de la página) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/remito-np-web.cjs
+
+echo "== proy-entregadas (v15.52: popup Proyección — cajas ENTREGADAS por el proveedor entre el mes y la barra; s/d si ese mes no había registro) =="
+PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/proy-entregadas.cjs
+
+echo "== ppp-res-np-fecha (v15.57: Resumen PPP — fecha dd/mm pegada al día; tocar la NP abre su contenido, también NP web via gv_np_items) =="
+PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/ppp-res-np-fecha.cjs
+
+echo "== ppp-errores-detalle (v15.57: alerta Tandas inconsistentes dice el día y qué ruta/fecha mezcla, NP por NP) =="
+PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/ppp-errores-detalle.cjs
 
 echo "== corr-reparto-sec (v15.66: Corregir códigos — el stock del secundario se reparte entre TODAS las NP que lo piden; sec_cubre de la vista en panel, badge y chip) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/corr-reparto-sec.cjs

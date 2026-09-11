@@ -75,7 +75,7 @@ const VIRGILIO_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const LK_URL = Deno.env.get("GV_LK_URL") ?? "https://kwkclwhmoygunqmlegrg.supabase.co";
 const LK_KEY = Deno.env.get("GV_LK_SERVICE_KEY") ?? "";
 const LK_ANON = Deno.env.get("GV_LK_ANON") ??
-  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imt3a2Nsd2htb3lndW5xbWxlZ3JnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njk1MjA2NzUsImV4cCI6MjA4NTA5NjY3NX0.soqPY5hfA3RkAJ9jmIms8UtEGUc4WpZztpEbmDijOgU";
+  "sb_publishable_mVX5MnjwM770cNjgiL6yLw_LDNl9pML";
 
 const TZ = "America/Argentina/Buenos_Aires";
 
@@ -176,7 +176,9 @@ function pesos(n: number | null | undefined): string {
  *  pedido a Viviana (employee_id 4) y se la cierra sola cuando el pedido sale. Va acá y no en el
  *  front porque ésta es la única parte del sistema que conoce los pedidos web sin que nadie tenga
  *  la pantalla abierta. Si el sync falla, el armado sigue igual: la tarea es un aviso, no un
- *  bloqueo. Con `sync=false` (modo dry) no escribe ninguna tarea. */
+ *  bloqueo. Con `sync=false` (modo dry) no escribe ninguna tarea.
+ *  v15.58: recibe SÓLO lo pendiente (ver `pedidosYaTomados`); una lista vacía le dice al sync que
+ *  cierre todas las tareas abiertas de la empresa, así que hay que llamarla siempre que se leyó bien. */
 async function pedidosEnCuarentena(emp: "lk" | "chef", filas: Fila[], sync = true): Promise<Set<string>> {
   const porPed = new Map<string, { order_id: unknown; empresa: string; cod: string; fecha_recep: unknown; cond: string; items: { art: string; cajas: number }[] }>();
   for (const n of filas) {
@@ -189,31 +191,34 @@ async function pedidosEnCuarentena(emp: "lk" | "chef", filas: Fila[], sync = tru
     for (const it of (n.items as { art: string; cajas: number }[] ?? [])) p.items.push({ art: it.art, cajas: it.cajas });
   }
   const arr = [...porPed.values()];
-  if (!arr.length) return new Set();
   const out = new Set<string>();
-  const [marc, lim] = await Promise.all([
-    vgRpc<{ order_id: number | string; motivos: string[] | null; deuda: number | null; estado: string | null }[]>(
-      "gv_cuarentena_marcar",
-      { p_pedidos: arr.map((p) => ({ order_id: p.order_id, empresa: p.empresa, cod: p.cod })) }),
-    vgRpc<{ order_id: number | string; exceso: number | null; limite: number | null }[]>(
-      "gv_cuarentena_limite", { p_pendientes: arr }),
-  ]);
   // motivo en castellano, el mismo que ve el supervisor en la ficha
   const motivo = new Map<string, string[]>();
   const sumar = (id: string, txt: string) => { motivo.set(id, [...(motivo.get(id) ?? []), txt]); };
-  for (const r of (marc ?? [])) {
-    const id = String(r.order_id);
-    out.add(id);
-    for (const m of (r.motivos ?? [])) {
-      if (m === "deuda") sumar(id, "Deuda " + pesos(r.deuda));
-      else if (m === "sin_cta_cte") sumar(id, "Sin Cta.Cte.");
-      else sumar(id, "Suspendido" + (r.estado ? " (" + r.estado + ")" : ""));
+  // v15.58: sin candidatos no se consulta nada, pero el sync de abajo corre igual con la lista
+  // vacía — es lo que cierra las tareas de Viviana que quedaron abiertas (antes se cortaba acá).
+  if (arr.length) {
+    const [marc, lim] = await Promise.all([
+      vgRpc<{ order_id: number | string; motivos: string[] | null; deuda: number | null; estado: string | null }[]>(
+        "gv_cuarentena_marcar",
+        { p_pedidos: arr.map((p) => ({ order_id: p.order_id, empresa: p.empresa, cod: p.cod })) }),
+      vgRpc<{ order_id: number | string; exceso: number | null; limite: number | null }[]>(
+        "gv_cuarentena_limite", { p_pendientes: arr }),
+    ]);
+    for (const r of (marc ?? [])) {
+      const id = String(r.order_id);
+      out.add(id);
+      for (const m of (r.motivos ?? [])) {
+        if (m === "deuda") sumar(id, "Deuda " + pesos(r.deuda));
+        else if (m === "sin_cta_cte") sumar(id, "Sin Cta.Cte.");
+        else sumar(id, "Suspendido" + (r.estado ? " (" + r.estado + ")" : ""));
+      }
     }
-  }
-  for (const r of (lim ?? [])) {
-    const id = String(r.order_id);
-    out.add(id);
-    sumar(id, "Supera el limite de credito" + (r.exceso != null ? " por " + pesos(r.exceso) : ""));
+    for (const r of (lim ?? [])) {
+      const id = String(r.order_id);
+      out.add(id);
+      sumar(id, "Supera el limite de credito" + (r.exceso != null ? " por " + pesos(r.exceso) : ""));
+    }
   }
   if (sync) {
     try {
@@ -235,6 +240,53 @@ async function pedidosEnCuarentena(emp: "lk" | "chef", filas: Fila[], sync = tru
       });
     } catch (_e) { /* la tarea de Planify es un aviso: nunca frena el armado */ }
   }
+  return out;
+}
+
+/** v15.58 (Vivi, 2026-09-11: *"tengo estos mensajes de cuarentena pero no los veo en A Programar"*):
+ *  un pedido que YA está tomado —TODOS sus bloques con tanda en `PPP_Web_Programacion`, o el pedido
+ *  entero en un borrador (`PPP_Web_Tanda_Items`)— NO es candidato a Cuarentena. A Programar no lo
+ *  lista (set `fuera` de `aprCargar`), así que evaluarlo acá abría tareas a Viviana por NP que ya iban
+ *  en un camión (LK 1346 E01D del 08/09, LK 1354 E09B del 09/09, CH 217 D69E…) y encima contaba DOS
+ *  veces al programado en `gv_cuarentena_limite` —en la base de armados no facturados y otra vez como
+ *  pendiente— y daba un "supera el límite" falso (LK 1384, $361.544).
+ *
+ *  ⚠ v15.59: se mira BLOQUE por BLOQUE (order_id|np_idx), no el pedido entero. La v15.58 alcanzaba
+ *  con que UN bloque tuviera tanda para dejar al pedido entero fuera de la evaluación, y entonces un
+ *  bloque todavía pendiente de un cliente con deuda se habría podido programar solo. Hoy no hay ningún
+ *  pedido partido (verificado 11/09: 0 filas con bloques con y sin tanda a la vez), pero el armado no
+ *  puede depender de eso. Un pedido con AL MENOS un bloque pendiente sigue siendo candidato y la
+ *  cuarentena lo retiene entero, que es la semántica de siempre.
+ *
+ *  Si la lectura falla devuelve vacío y se evalúa todo, como hasta la v15.57: peor una tarea de más
+ *  que un pedido con deuda armado solo. */
+async function pedidosYaTomados(emp: "lk" | "chef", filas: Fila[]): Promise<Set<string>> {
+  const out = new Set<string>();
+  try {
+    const [rProg, rItems] = await Promise.all([
+      vg(`/rest/v1/PPP_Web_Programacion?select=order_id,np_idx&empresa=eq.${emp}&tanda=not.is.null&limit=20000`),
+      vg(`/rest/v1/PPP_Web_Tanda_Items?select=order_id&empresa=eq.${emp}&limit=20000`),
+    ]);
+    const conTanda = new Set<string>();
+    if (rProg.ok) {
+      for (const x of await rProg.json() as { order_id: number | string; np_idx: number }[]) {
+        conTanda.add(`${x.order_id}|${x.np_idx}`);
+      }
+    }
+    const enBorrador = new Set<string>();
+    if (rItems.ok) {
+      for (const x of await rItems.json() as { order_id: number | string }[]) enBorrador.add(String(x.order_id));
+    }
+    // pendiente = el pedido tiene al menos un bloque del feed sin tanda y sin borrador
+    const pendiente = new Set<string>(), vistos = new Set<string>();
+    for (const n of filas) {
+      const id = String(n.order_id);
+      vistos.add(id);
+      if (enBorrador.has(id)) continue;
+      if (!conTanda.has(`${n.order_id}|${n.np_idx}`)) pendiente.add(id);
+    }
+    for (const id of vistos) if (!pendiente.has(id)) out.add(id);
+  } catch (_e) { /* sin lectura se evalúa todo, como hasta la v15.57 */ }
   return out;
 }
 
@@ -292,8 +344,13 @@ async function soloPendientes(
   for (const x of ex) excluidos[x.motivo] = (excluidos[x.motivo] ?? 0) + 1;
   // v14.86 — y además, sacar los que van a CUARENTENA (no se programan solos).
   const vivos = filas.filter((n) => !fuera.has(String(n.order_id)));
+  // v15.58/59: la cuarentena es de lo PENDIENTE. El pedido con TODOS sus bloques ya con tanda (o en un
+  // borrador) sigue en `vivos` —el resync y la foto de artículos lo necesitan— pero no se evalúa ni le
+  // abre tarea a Viviana. Si le queda un bloque pendiente se evalúa igual y la cuarentena lo retiene.
+  const tomados = await pedidosYaTomados(emp, vivos);
+  const candidatos = tomados.size ? vivos.filter((n) => !tomados.has(String(n.order_id))) : vivos;
   let cuar = new Set<string>();
-  try { cuar = await pedidosEnCuarentena(emp, vivos, sync); } catch (_e) { /* no bloquea el armado */ }
+  try { cuar = await pedidosEnCuarentena(emp, candidatos, sync); } catch (_e) { /* no bloquea el armado */ }
   if (cuar.size) excluidos["cuarentena"] = cuar.size;
   return {
     filas: vivos.filter((n) => !cuar.has(String(n.order_id))),

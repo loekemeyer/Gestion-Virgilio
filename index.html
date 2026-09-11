@@ -802,7 +802,13 @@ button {
 .pn-reprog .l span small{ font-weight:600; color:#b91c1c; opacity:.85; }
 .pn-reprog .h{ font-size:12px; color:#7f1d1d; opacity:.9; }
 .pn-reprog-btn{ margin-left:8px; background:#b91c1c; color:#fff; border:none; border-radius:7px; padding:3px 9px; font-size:11.5px; font-weight:800; cursor:pointer; width:auto; }
+.pn-cancel-btn{ background:#fee2e2 !important; color:#991b1b !important; border-color:#fca5a5 !important; }
 .pn-reprog-btn:hover{ background:#991b1b; }
+/* v15.65 — acciones por pedido dentro de la fila del día. Van DEBAJO de la NP, en la columna que
+   ya existe: una columna nueva dejaría un hueco vacío en todas las filas sin acción. */
+.pn-acc{ display:flex; gap:6px; margin-top:4px; }
+.pn-acc-b{ background:#fff; color:#991b1b; border:1px solid #fca5a5; border-radius:6px; padding:2px 7px; font-size:11px; font-weight:700; cursor:pointer; width:auto; line-height:1.5; }
+.pn-acc-b:hover{ background:#fee2e2; }
 .pn-carga .t.rep{ color:#b91c1c; font-weight:800; }
 .ppp-res-note.rep{ background:#fef2f2; border-color:#fca5a5; color:#991b1b; }
 .apr-q{ width:100%; box-sizing:border-box; padding:7px 10px; border:1px solid #cbd5e1; border-radius:8px; font-size:13px; margin-bottom:8px; }
@@ -1087,6 +1093,15 @@ body.apr-dnd-tanda .apr-col-nps, body.apr-dnd-tanda .apr-dia-cerrado{ opacity:.4
 .apr-sel-chip small{ font-weight:600; color:#3b82f6; }
 .apr-listo{ background:#dcfce7; border:1px solid #86efac; color:#14532d; border-radius:12px; padding:18px 16px; text-align:center; font-size:17px; }
 .apr-listo b{ color:#15803d; }
+/* v15.54 — estado de CARGA de A Programar, a propósito distinto del "Listo" verde: ámbar, punteado y
+   con el reloj pulsando. Se ve mientras controla LK + Chef (o arma) y desaparece al terminar. */
+.apr-cargando{ background:#fef3c7; border:1.5px dashed #f59e0b; color:#78350f; border-radius:12px; padding:18px 16px; text-align:center; font-size:17px; }
+.apr-cargando b{ color:#b45309; }
+.apr-cargando-ic{ display:block; font-size:26px; line-height:1; margin-bottom:6px; animation:aprPulse 1.2s ease-in-out infinite; }
+.apr-cargando-sub{ font-size:12.5px; color:#92400e; margin-top:6px; font-weight:400; line-height:1.4; }
+.apr-cargando-cuar{ font-size:14px; padding:12px 10px; }
+.apr-col-cargando .apr-col-t b{ color:#b45309; }
+@keyframes aprPulse{ 0%,100%{ opacity:1; } 50%{ opacity:.3; } }
 .apr-listo-sub{ margin-top:6px; font-size:13.5px; color:#166534; font-weight:600; }
 .apr-dia:not(.apr-dia-cerrado){ cursor:pointer; }
 .apr-dia.apr-dia-sel{ border-color:#16a34a; border-top-color:#16a34a; background:#f0fdf4; box-shadow:0 0 0 3px rgba(22,163,74,.22); }
@@ -2575,6 +2590,7 @@ button.pk-anular small{ display:block; font-size:12px; font-weight:700; opacity:
 .ppp-errpanel{ background:#fff7ed; border:1.5px solid #fdba74; border-radius:10px; padding:10px 12px; margin:8px 0 6px; }
 .ppp-errpanel-h{ font-weight:800; color:#9a3412; margin-bottom:6px; }
 .ppp-ei{ font-size:13px; line-height:1.5; padding:3px 0; border-top:1px dashed #fed7aa; word-break:break-word; }
+.ppp-ei-det{ margin-top:2px; } .ppp-ei-det>div{ padding:1px 0 1px 12px; } .ppp-ei-det u{ text-decoration:none; font-weight:700; color:#9a3412; }   /* v15.57 */
 .ppp-ei.bad{ color:#b42318; } .ppp-ei.warn{ color:#92400e; }
 .ppp-eb{ display:inline-block; font-size:11px; font-weight:800; padding:1px 6px; border-radius:6px; margin-left:4px; vertical-align:middle; }
 .ppp-eb.bad{ background:#fee2e2; color:#b42318; border:1px solid #fecaca; }
@@ -2874,14 +2890,24 @@ tr.ppp-err-zona > td{ background:#fffbeb !important; }
 .ppp-tool-inp{ width:84px; height:34px; font-size:14px; border:1px solid #cbd5e1; border-radius:8px; padding:0 8px; }
 .ppp-tool-n{ width:64px; font-family:Consolas,Menlo,monospace; }
 .ppp-tool-clear{ margin-left:auto; padding:7px 12px; font-size:12px; font-weight:700; border:1px solid #fecaca; border-radius:8px; background:#fff; color:#b42318; cursor:pointer; }
-.ppp-res-note{ font-size:13px; color:#92400e; background:#fffbeb; border:1px solid #fde68a; border-radius:8px; padding:8px 12px; margin-bottom:8px; }
-.ppp-res-leg{ font-size:12px; color:#475569; background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; padding:7px 10px; margin-bottom:8px; }
-.ppp-restbl-wrap{ overflow-x:auto; border:1px solid #e2e8f0; border-radius:10px; }
-.ppp-restbl{ width:100%; border-collapse:collapse; font-size:12px; }
-.ppp-restbl th{ background:#0f172a; color:#fff; padding:6px 9px; text-align:center; font-size:11px; font-weight:700; white-space:nowrap; line-height:1.15; }
-.ppp-restbl td{ padding:5px 9px; border-bottom:1px solid #eef2f7; text-align:center; white-space:nowrap; }
-.ppp-restbl td.f{ font-weight:700; color:#0f172a; text-align:left; }
-.ppp-restbl td.d{ color:#64748b; }
+/* v15.53 — los dos carteles del Resumen tampoco se estiran al ancho del contenedor: el marco
+   termina donde termina el texto (`display:table` = shrink-to-fit y sigue ocupando su renglón). */
+.ppp-res-note{ font-size:13px; color:#92400e; background:#fffbeb; border:1px solid #fde68a; border-radius:8px; padding:8px 12px; margin-bottom:8px; display:table; max-width:100%; }
+.ppp-res-leg{ font-size:12px; color:#475569; background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; padding:7px 10px; margin-bottom:8px; display:table; max-width:100%; }
+/* v15.53 (dueño: "columnas siempre lo más angostas posibles, ancho determinado por la info
+   más ancha de la columna"): la tabla NO se estira al ancho del contenedor. Con `width:100%`
+   el navegador repartía los ~700 px sobrantes entre las 14 columnas y cada celda quedaba con
+   aire adentro (la de Fecha medía 171 px para un "09/09/2026" de ~62 px). Con `width:auto` +
+   `table-layout:auto` cada columna mide lo que mide su contenido más ancho, y el marco
+   (inline-block) se ajusta a la tabla en vez de dibujar un rectángulo vacío hasta el borde. */
+.ppp-restbl-wrap{ overflow-x:auto; border:1px solid #e2e8f0; border-radius:10px;
+  display:table; max-width:100%; }
+.ppp-restbl{ width:auto; table-layout:auto; border-collapse:collapse; font-size:12px; }
+.ppp-restbl th{ background:#0f172a; color:#fff; padding:4px 6px; text-align:center; font-size:11px; font-weight:700; white-space:nowrap; line-height:1.1; }
+.ppp-restbl td{ padding:3px 6px; border-bottom:1px solid #eef2f7; text-align:center; white-space:nowrap; }
+/* v15.57 (dueño: "elimina ese espacio entre fecha y día"): Fecha y Día pegados. */
+.ppp-restbl td.f{ font-weight:700; color:#0f172a; text-align:left; padding-right:3px; }
+.ppp-restbl td.d{ color:#64748b; text-align:left; padding-left:3px; }
 /* v6.57/v6.58: celdas del Resumen clickeables → pop-up con de qué NPs se compone el número */
 .ppp-restbl td.zc{ cursor:pointer; }
 .ppp-restbl td.zc:hover{ outline:2px solid #94a3b8; outline-offset:-2px; }
@@ -2899,6 +2925,8 @@ tr.ppp-err-zona > td{ background:#fffbeb !important; }
 .pppres-tbl td{ padding:7px 12px; border-bottom:1px solid #eef2f7; }
 .pppres-tbl td.num, .pppres-tbl th.num{ text-align:right; font-variant-numeric:tabular-nums; }
 .pppres-tbl td.np{ font-family:Consolas,Menlo,monospace; font-weight:800; color:#0f766e; white-space:nowrap; }
+.pppres-tbl td.np.npc{ cursor:pointer; text-decoration:underline dotted; text-underline-offset:3px; }
+.pppres-tbl td.np.npc:hover{ background:#ecfeff; }
 .pppres-tbl tfoot td{ font-weight:800; background:#f8fafc; }
 /* Chequeo de góndola (v7.16): modal del botón 📦 de cada pedido / tanda. Reusa
    .pppres-ov/.pppres-card; la tabla es propia porque tiene que entrar en el celu. */
@@ -2931,7 +2959,11 @@ tr.ppp-err-zona > td{ background:#fffbeb !important; }
 .pppchk-note{ padding:9px 16px; font-size:11.5px; color:#64748b; background:#f8fafc; border-top:1px solid #e2e8f0; }
 .ppp-restbl td.num{ text-align:right; font-variant-numeric:tabular-nums; }
 .ppp-restbl td.z0{ color:#cbd5e1; }
-.ppp-restbl td.tot{ font-weight:800; background:#f1f5f9; }
+/* v15.54 — el Total queda entre el Día y el desglose: una línea lo separa de las zonas
+   para que se lea "este es el número, esto es de qué se compone". */
+.ppp-restbl td.tot{ font-weight:800; background:#f1f5f9; border-right:2px solid #cbd5e1; }
+.ppp-restbl th.tot{ border-right:2px solid #475569; }
+.ppp-restbl tr.totrow td.tot{ border-right:2px solid #475569; }
 .ppp-restbl td.cam{ font-weight:700; }
 .ppp-restbl td.z1{ background:rgba(14,165,233,.10); } .ppp-restbl td.z2{ background:rgba(99,102,241,.10); } .ppp-restbl td.z3{ background:rgba(139,92,246,.10); }
 .ppp-restbl td.z4{ background:rgba(236,72,153,.10); } .ppp-restbl td.z5{ background:rgba(245,158,11,.13); } .ppp-restbl td.z6{ background:rgba(16,185,129,.13); }
@@ -15511,6 +15543,11 @@ var STK_POP_CSS =
   ".proyv-chart{display:flex;flex-direction:column;gap:6px;}" +
   ".proyv-row{display:flex;align-items:center;gap:9px;}" +
   ".proyv-mes{flex:0 0 52px;font-size:12px;font-weight:800;color:#475569;text-transform:capitalize;}" +
+  // v15.52 — cajas ENTREGADAS por el proveedor, entre el mes y la barra (gv_entregas_mensuales_cod).
+  ".proyv-ent{flex:0 0 46px;text-align:right;font-size:12.5px;font-weight:800;color:#047857;font-variant-numeric:tabular-nums;}" +
+  ".proyv-ent.sd{color:#cbd5e1;font-weight:700;}" +
+  ".proyv-head{font-size:10px;font-weight:800;color:#94a3b8;text-transform:uppercase;letter-spacing:.03em;margin-bottom:-2px;}" +
+  ".proyv-head .proyv-ent,.proyv-head .proyv-val{font-size:10px;font-weight:800;color:#94a3b8;}" +
   ".proyv-track{flex:1 1 auto;height:20px;background:#f1f5f9;border-radius:6px;overflow:hidden;position:relative;}" +
   ".proyv-bar{display:block;height:100%;background:linear-gradient(90deg,#8b5cf6,#6d28d9);border-radius:6px;}" +
   ".proyv-val{flex:0 0 auto;min-width:42px;text-align:right;font-size:12.5px;font-weight:800;color:#4c1d95;font-variant-numeric:tabular-nums;}" +
@@ -15616,15 +15653,28 @@ async function stkShowProyVentas(codEnc, proy) {
   var nombre = artNombre(cod, "") || "";
   var fc = function (n) { n = Number(n) || 0; return String(Math.round(n * 10) / 10); };
   body.innerHTML = '<div class="stkpop-empty">Cargando ventas facturadas de los últimos 12 meses' + (emp ? ' (' + emp + ')' : ' (LK + Chef)') + '…</div>';
-  var rows = [];
+  var rows = [], ent = {};
+  var _H = { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY, "Content-Type": "application/json" };
   try {
-    var r = await fetch(SUPABASE_URL + "/rest/v1/rpc/ventas_mensuales_cod", {
-      method: "POST",
-      headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY, "Content-Type": "application/json" },
-      // v15.23 — la barra de ventas se filtra por la empresa de la fila (LK / CH); sin sufijo = LK+Chef
-      body: JSON.stringify({ p_cod: codB, p_meses: 12, p_empresa: (emp === "CH" ? "chef" : (emp === "LK" ? "lk" : null)) }), cache: "no-store"
+    // v15.52 — las dos series salen juntas: lo FACTURADO (ventas, motor de PáginaLK) y lo
+    // ENTREGADO por el proveedor (gv_entregas_mensuales_cod: talleristas + prov AT).
+    var _par = await Promise.all([
+      fetch(SUPABASE_URL + "/rest/v1/rpc/ventas_mensuales_cod", {
+        method: "POST", headers: _H,
+        // v15.23 — la barra de ventas se filtra por la empresa de la fila (LK / CH); sin sufijo = LK+Chef
+        body: JSON.stringify({ p_cod: codB, p_meses: 12, p_empresa: (emp === "CH" ? "chef" : (emp === "LK" ? "lk" : null)) }), cache: "no-store"
+      }).then(function (r) { return r.ok ? r.json() : []; }).catch(function () { return []; }),
+      fetch(SUPABASE_URL + "/rest/v1/rpc/gv_entregas_mensuales_cod", {
+        method: "POST", headers: _H,
+        body: JSON.stringify({ p_cod: codB, p_meses: 12 }), cache: "no-store"
+      }).then(function (r) { return r.ok ? r.json() : []; }).catch(function () { return []; })
+    ]);
+    rows = _par[0];
+    // `cubierto` = ese mes el circuito del artículo YA se registraba. false ⇒ "s/d", NO un cero:
+    // la recepción de proveedores AT arranca en 06/2026 y la de talleristas en 12/2025.
+    (Array.isArray(_par[1]) ? _par[1] : []).forEach(function (x) {
+      ent[String(x.mes || "")] = { cajas: Number(x.cajas) || 0, cub: x.cubierto !== false };
     });
-    if (r.ok) rows = await r.json();
   } catch (_e) {}
   rows = (Array.isArray(rows) ? rows : []).map(function (x) { return { mes: String(x.mes || ""), cajas: Number(x.cajas) || 0 }; });
   var proyN = Number(proy) || 0;
@@ -15642,20 +15692,36 @@ async function stkShowProyVentas(codEnc, proy) {
   h += _stkProyTrendSvg(rows, proyN, prom);
   // ── Barras de la ventana (6 meses) con la marca de la proyección ──
   var mx = Math.max(proyN, win.reduce(function (s, x) { return Math.max(s, x.cajas); }, 0)) || 1;
-  h += '<div class="stkpop-grp"><div style="font-size:12px;font-weight:800;color:#334155;margin-bottom:8px;">🧾 Cajas facturadas — ventana de proyección (' + win.length + ' meses)</div>';
+  // v15.52 — la columna de entregadas sólo aparece si hay algo que mostrar: si de este código
+  // no hay UN solo mes con registro de entregas, no se agrega una columna de "s/d" al pepe.
+  var hayEnt = win.some(function (x) { var e = ent[x.mes]; return e && (e.cub || e.cajas > 0); });
+  var totEnt = win.reduce(function (s, x) { var e = ent[x.mes]; return s + (e && e.cub ? e.cajas : 0); }, 0);
+  h += '<div class="stkpop-grp"><div style="font-size:12px;font-weight:800;color:#334155;margin-bottom:8px;">🧾 ' +
+       (hayEnt ? 'Entregado y facturado' : 'Cajas facturadas') + ' — ventana de proyección (' + win.length + ' meses)</div>';
   h += '<div class="proyv-chart">';
+  if (hayEnt) {
+    h += '<div class="proyv-row proyv-head"><span class="proyv-mes">mes</span>' +
+         '<span class="proyv-ent">entreg.</span><span class="proyv-track" style="background:none"></span>' +
+         '<span class="proyv-val">factur.</span></div>';
+  }
   win.forEach(function (x) {
     var pct = Math.max(2, Math.round(x.cajas / mx * 100));
     var bajo = proyN > 0.05 && x.cajas < proyN;
+    var e = ent[x.mes];
     h += '<div class="proyv-row">' +
          '<span class="proyv-mes">' + escapeHtml(_stkFmtMes(x.mes)) + '</span>' +
+         (hayEnt ? (e && e.cub
+            ? '<span class="proyv-ent" title="Cajas entregadas por el proveedor">' + fc(e.cajas) + '</span>'
+            : '<span class="proyv-ent sd" title="Ese mes las entregas todavía no se registraban en la app — no es un cero">s/d</span>') : '') +
          '<span class="proyv-track"><span class="proyv-bar' + (bajo ? ' bajo' : '') + '" style="width:' + pct + '%"></span>' +
          (proyN > 0.05 ? '<span class="proyv-mark" style="left:' + Math.round(proyN / mx * 100) + '%"></span>' : '') + '</span>' +
          '<span class="proyv-val"' + (bajo ? ' style="color:#b91c1c"' : '') + '>' + fc(x.cajas) + '</span></div>';
   });
   h += '</div>';
   var piso = proyN > 0.05 && prom > 0 && (proyN - prom) / prom > 0.005;   // actuó el piso del 4.º mejor mes
-  h += '<div class="proyv-foot">Total 6m: <b>' + fc(tot) + '</b> cajas · Promedio: <b>' + fc(Math.round(prom)) + '</b> caj/mes' +
+  h += '<div class="proyv-foot">Total 6m: <b>' + fc(tot) + '</b> cajas' +
+       (hayEnt ? ' · Entregado: <b style="color:#047857">' + fc(totEnt) + '</b> cajas' : '') +
+       ' · Promedio: <b>' + fc(Math.round(prom)) + '</b> caj/mes' +
        (proyN > 0.05 ? ' · Proyección: <b style="color:#6d28d9">' + fc(proyN) + '</b>' + (piso ? ' <small style="color:#6d28d9">(piso: 4.º mejor mes)</small>' : '') +
                        ' · <b>' + arriba + ' de ' + win.length + '</b> meses por encima' : '') + '</div>';
   h += '</div>';
@@ -27369,7 +27435,7 @@ function closePPP() {
    `Volumen_Articulos` de esta base. De los 230 artículos que alguna vez se
    pidieron por web, los 230 lo tienen cargado. */
 const PWEB_LK_URL  = "https://kwkclwhmoygunqmlegrg.supabase.co";
-const PWEB_LK_ANON = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imt3a2Nsd2htb3lndW5xbWxlZ3JnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njk1MjA2NzUsImV4cCI6MjA4NTA5NjY3NX0.soqPY5hfA3RkAJ9jmIms8UtEGUc4WpZztpEbmDijOgU";
+const PWEB_LK_ANON = "sb_publishable_mVX5MnjwM770cNjgiL6yLw_LDNl9pML";
 
 let _pwebTok = null, _pwebTokExp = 0;
 // v13.11 — el token de LK dura 1 h: guardado en sessionStorage se ahorra el puente
@@ -28440,7 +28506,7 @@ let _pppEnSalida = null;   // Map np(normalizada) → fila de gv_ppp_en_salida
 async function pppRefreshEnSalida() {
   try {
     const rows = await supaFetchAllSafe(SUPABASE_URL + "/rest/v1/gv_ppp_en_salida",
-      "select=np,empresa,es_web,tanda,cod_cliente,razon_social,m3,fecha_entrega,zona,barrio,fecha_carga,cargado_at,facturada,armada,armado_at,cargada,control_previo,facturada_el,estado,dias_sin_controlar&order=cargado_at.desc");
+      "select=np,empresa,es_web,tanda,cod_cliente,razon_social,m3,fecha_entrega,zona,barrio,fecha_carga,cargado_at,facturada,armada,armado_at,cargada,control_previo,facturada_el,estado,dias_sin_controlar,horas_desde_armado,salida_presunta&order=cargado_at.desc");
     const m = new Map();
     (rows || []).forEach(function (r) { const np = _pppNpNorm(r.np); if (np) m.set(np, r); });
     _pppEnSalida = m;
@@ -28612,6 +28678,10 @@ function _pppEsRow(p) { return (p && p._es) ? p._es : {}; }
 function _pppEsChips(p) {
   const r = _pppEsRow(p), out = [];
   if (r.estado === "cargada") out.push('<span class="ppp-es-chip ok">🚚 Cargado al camión</span>');
+  // v15.55 (dueño: "si ya salieron hace más de 36hs y no se controló, tiene que aparecer allá la alerta, y
+  // aparecer en En Salida"): la tanda se armó hace más de `salida_presunta_horas` (36) y nadie la cargó ni
+  // la facturó. Seguro salió; falta el papel. Viene de gv_ppp_en_salida con estado 'armada_sin_carga'.
+  else if (r.estado === "armada_sin_carga") out.push('<span class="ppp-es-chip bad" title="La tanda se armó hace ' + (r.horas_desde_armado || "?") + ' h y nadie registró la carga al camión (CCN) ni la facturó. Pasado el plazo se da por salida. Cerrala con Controlado, o ↩ si la mercadería volvió.">🚨 Salió hace ' + (r.horas_desde_armado || "?") + ' h sin registro de carga · falta el remito</span>');
   else out.push('<span class="ppp-es-chip warn" title="Está facturada pero nadie registró la carga al camión (evento CCN). Se muestra igual para que se pueda cerrar desde acá.">⚠ Sin registro de carga</span>');
   if (r.armada) out.push('<span class="ppp-es-chip">🧰 Armada</span>');
   else out.push('<span class="ppp-es-chip warn" title="No hay evento TAL: la NP no pasó por armado en la app.">Sin armar</span>');
@@ -28652,7 +28722,7 @@ function _pppEnViajeHtml() {
     byDay[k].push(p);
   }
   keys.sort(); keys.reverse();
-  let html = '<div class="ppp-ent-note">🚚 <b>En salida</b> — facturadas y <b>todavía sin control de remito</b>. Con el control pasan a Pedidos Entregados. ' +
+  let html = '<div class="ppp-ent-note">🚚 <b>En salida</b> — cargadas o facturadas <b>sin control de remito</b>, y las armadas hace más de 36 h que nadie cargó (se dan por salidas). Con el control pasan a Pedidos Entregados. ' +
     '<b>' + list.length + '</b> pedido(s) · <b>' + totM3.toFixed(2).replace('.', ',') + '</b> m³ · ' +
     '<b>' + nCarg + '</b> cargada(s) al camión · <b>' + nSin + '</b> sin registro de carga.' +
     (nVenc ? ' <span style="color:#b91c1c;font-weight:800;">· 🚨 ' + nVenc + ' pasado el plazo</span>' : '') + '</div>';
@@ -29116,6 +29186,7 @@ function _pppEntregado(p) { return !!(_pppEntregadoCC && _pppEntregadoCC.has(Str
 /* CARGADO (CCN) pero NO controlado (CRN ni manual) y con el plazo de control VENCIDO
    (crVencido = 30 hs; viernes→lunes 12 hs). Es la alarma "rojo grande y molesto". */
 function _pppCargaVencida(p) {
+  if (p && p._es && p._es.estado === "armada_sin_carga") return true;   // v15.55: salida presunta = ya pasó el plazo
   const np = String(p.np);
   if (!_pppEntregadoCC || !_pppEntregadoCC.has(np)) return false;          // no se cargó
   if (_pppControladoCR && _pppControladoCR.has(np)) return false;          // ya controlado (CRN)
@@ -29920,6 +29991,67 @@ async function pppMovElegir(iso) {
   const ok = await pppTandaMover(t, iso);
   if (ok) pppMovCerrar(); else pppMovCargar();
 }
+/* v15.55 — Los que NO salieron: volver a A Programar (web) o cancelar (web e ISIS). Todo en el backend:
+   gv_ppp_web_desprogramar saca la NP web de su tanda (queda pendiente en A Programar);
+   gv_ppp_np_cancelar: ISIS → NP_Canceladas + oculta en la PPP (GV_PPP_Prog_Override.oculto); web →
+   GV_Web_Cancelados + sale de la PPP, y gv_pedidos_web_excluidos ya no la deja volver a entrar. */
+function _pppEsNpWeb(np) { return /^(LK|CH)\s*\d+/i.test(String(np || "")); }
+/* v15.65 — ¿el operario tipeó el mismo pedido que el del botón? Ignora espacios, mayúsculas y
+   ceros a la izquierda: "LK 0053", "lk53" y "53" son el mismo. Lo usa la 2da confirmación de
+   cancelar. OJO: NO llamarla _pppNpNorm — ese nombre ya es de la normalización que clasifica
+   entregados, y redefinirlo saca las NP web de "entregados" en silencio (lo cazó pweb-entregados). */
+function _pppNpMismo(a, b) {
+  const f = function (np) {
+    const s = String(np || "").toUpperCase().replace(/\s+/g, "");
+    const m = s.match(/^(LK|CH)?0*(\d+)$/);
+    return m ? (m[1] || "") + m[2] : s;
+  };
+  return f(a) === f(b);
+}
+async function pppVencVolver(np) {
+  const n = String(np || "").trim(); if (!n) return;
+  if (!confirm("¿Devolver " + n + " a A Programar?\n\nSale de su tanda y queda pendiente: lo toma el automático (zonas 1-3 / camión ya previsto) o lo programás a mano.")) return;
+  pppSetStatus("Devolviendo " + n + " a A Programar…", true);
+  try {
+    const r = await aprRpc("gv_ppp_web_desprogramar", { p_np: n, p_por: await aprQuien() });
+    const x = (r && r[0]) || {};
+    pppSetStatus("✓ " + n + " volvió a A Programar (" + (x.np_sacadas || 0) + " NP del pedido).", true);
+    await pppLoadProgFromSupabase();
+  } catch (e) {
+    const msg = (e && e.message) ? e.message : String(e);
+    pppSetStatus("⚠ No se pudo: " + msg, false);
+    try { alert("No se pudo devolver " + n + " a A Programar:\n\n" + msg); } catch (_e) {}
+  }
+}
+async function pppVencCancelar(np) {
+  const n = String(np || "").trim(); if (!n) return;
+  let motivo = "";
+  try { motivo = prompt("Cancelar " + n + " — ¿por qué NO va?\n(" + _STK_NP_MOTIVOS.join(" · ") + ")", _STK_NP_MOTIVOS[0]) || ""; } catch (_e) {}
+  motivo = motivo.trim(); if (!motivo) return;
+  if (!confirm("¿Cancelar el pedido " + n + "?\n\nMotivo: " + motivo + "\n\nSale de la PPP y no vuelve a entrar. Si hay que hacerlo igual, habrá que cargarlo de nuevo.")) return;
+  // v15.65 (dueño: "que pida 2da confirmación antes de eliminar o cancelar"): un confirm de sí/no
+  // se aprieta de memoria. Éste obliga a TIPEAR el número del pedido, así cancelar el que no era
+  // exige haberlo leído.
+  let _tec = "";
+  try { _tec = prompt("ÚLTIMA CONFIRMACIÓN — esto no se deshace.\n\nEscribí el número del pedido para cancelarlo:\n\n" + n, "") || ""; } catch (_e) {}
+  if (!_tec.trim()) return;
+  if (!_pppNpMismo(_tec, n)) {
+    try { alert("No cancelé nada.\n\nEscribiste \"" + _tec.trim() + "\" y el pedido es \"" + n + "\"."); } catch (_e) {}
+    return;
+  }
+  pppSetStatus("Cancelando " + n + "…", true);
+  try {
+    const r = await aprRpc("gv_ppp_np_cancelar", { p_np: n, p_motivo: motivo, p_por: await aprQuien() });
+    const x = (r && r[0]) || {};
+    pppSetStatus("🚫 " + n + " cancelada · " + (x.detalle || ""), true);
+    await pppLoadProgFromSupabase();
+  } catch (e) {
+    const msg = (e && e.message) ? e.message : String(e);
+    pppSetStatus("⚠ No se pudo cancelar: " + msg, false);
+    try { alert("No se pudo cancelar " + n + ":\n\n" + msg); } catch (_e) {}
+  }
+}
+window.pppVencVolver = pppVencVolver; window.pppVencCancelar = pppVencCancelar;
 /* v14.36 — Reprogramar un pedido de ISIS que NO salió (tanda sin armar) a un día nuevo, POR SU NÚMERO.
    Reusa el mismo pop-up de días de mover tandas (gv_ppp_web_calendario). Al elegir el día llama a
    gv_ppp_isis_programar, que escribe GV_PPP_Prog_Override (no toca la tabla que comparte Producción ni
@@ -30615,8 +30747,11 @@ async function pppChequeoNp(npsCsv, titulo, tanda) {
   ov.classList.add("show");
   try {
     const H = { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY };
-    const url = SUPABASE_PPP_BASE_ENDPOINT + "?pedido=in.(" + nps.map(encodeURIComponent).join(",") +
-      ")&select=pedido,articulo,cajas&limit=20000";
+    // v15.57 — gv_np_items en vez de gv_ppp_base_pedidos: resuelve TAMBIÉN las NP web ("LK 0024",
+    // que viven en PPP_Web_Base y no en la base de ISIS). Las NP van entre comillas porque las
+    // web llevan espacio; `pedido:np` deja el nombre de campo que ya usa pppChkCompute.
+    const url = SUPABASE_URL + "/rest/v1/gv_np_items?np=in.(" + nps.map(function (n) { return encodeURIComponent('"' + String(n).replace(/"/g, "") + '"'); }).join(",") +
+      ")&select=pedido:np,articulo,cajas&limit=20000";
     const [lineas, saldos, pend] = await Promise.all([
       fetch(url, { headers: H, cache: "no-store" }).then(function (r) { return r.ok ? r.json() : []; }).catch(function () { return []; }),
       _pppChkFetchSaldos(),
@@ -30899,7 +31034,11 @@ function pppResTgl(dk, zkeyEnc) {
   merged.forEach(function (r) { r.nps.sort(function (a, b) { return (parseInt(a, 10) || 0) - (parseInt(b, 10) || 0); }); });
   let filas = "";
   merged.forEach(function (r) {
-    filas += '<tr><td class="np">' + escapeHtml(_pppNpsCompact(r.nps)) + '</td><td>' + escapeHtml(r.tandas.join("/") || "—") + '</td><td>' + escapeHtml(r.rs || "—") + '</td><td style="color:#64748b">' + escapeHtml(r.locs.join(" / ") || "—") + '</td><td class="num"><b>' + f2(r.m3) + '</b></td></tr>';
+    // v15.57 (dueño: "si toco en el nro de NP quiero ver qué contenía esa NP, cod y cajas") →
+    // la celda abre el mismo modal del ✓ de Programación (una sola puerta): artículo · cajas
+    // pedidas · góndola. Si la fila junta varias NP del cliente, las abre todas.
+    const npCsv = r.nps.map(function (x) { return String(x).replace(/"/g, ""); }).filter(Boolean).join(",");
+    filas += '<tr><td class="np npc" onclick="pppChequeoNp(\'' + _pppArg(npCsv) + '\',\'' + _pppArg(r.rs || "") + '\',\'' + _pppArg(r.tandas[0] || "") + '\')" title="Ver qué contiene (código y cajas)">' + escapeHtml(_pppNpsCompact(r.nps)) + '</td><td>' + escapeHtml(r.tandas.join("/") || "—") + '</td><td>' + escapeHtml(r.rs || "—") + '</td><td style="color:#64748b">' + escapeHtml(r.locs.join(" / ") || "—") + '</td><td class="num"><b>' + f2(r.m3) + '</b></td></tr>';
   });
   if (!filas) filas = '<tr><td colspan="5" style="text-align:center;color:#94a3b8">— sin NPs —</td></tr>';
   ov.innerHTML = '<div class="pppres-card">' +
@@ -30972,21 +31111,26 @@ function pppResumenHtml(prog) {
     const demP = dn ? dem / dn : null;
     const dt = _pppFechaDate(d.fecha), dia = dt ? DOW[dt.getDay()] : "";
     Zc.forEach(function (z) { T[z[0]] += Z[z[0]]; }); Ttot += total; Tcam += nCam; Tdem += dem; TdemN += dn;
-    rows += '<tr><td class="f">' + escapeHtml(d.fecha) + '</td><td class="d">' + dia + '</td>' +
+    // v15.54 (dueño): el TOTAL del día va pegado al Día y ANTES del desglose por zona —
+    // primero el número que se mira, después de qué se compone.
+    // v15.57 (dueño): en esta tabla la fecha va "dd/mm", sin el año, pegada al día.
+    rows += '<tr><td class="f">' + escapeHtml(String(d.fecha).replace(/\/\d{4}$/, "")) + '</td><td class="d">' + dia + '</td>' +
+      '<td class="num tot zc" onclick="pppResTgl(\'' + dk + '\',\'__tot__\')" title="Ver todas las NPs del día">' + f2(total) + '</td>' +
       Zc.map(function (z) {
         const m = Z[z[0]];
         if (m > 0.0001) return '<td class="num zc ' + z[1] + '" onclick="pppResTgl(\'' + dk + '\',\'' + encodeURIComponent(z[0]) + '\')" title="Ver de qué NPs se compone">' + f2(m) + '</td>';
         return '<td class="num z0 ' + z[1] + '">·</td>';
       }).join("") +
-      '<td class="num tot zc" onclick="pppResTgl(\'' + dk + '\',\'__tot__\')" title="Ver todas las NPs del día">' + f2(total) + '</td><td class="num cam">' + nCam + '</td><td class="num">' + (demP != null ? (Math.round(demP * 10) / 10) : "·") + '</td></tr>';
+      '<td class="num cam">' + nCam + '</td><td class="num">' + (demP != null ? (Math.round(demP * 10) / 10) : "·") + '</td></tr>';
   }
   const demT = TdemN ? (Math.round(Tdem / TdemN * 10) / 10) : null;
-  const totRow = '<tr class="totrow"><td class="f">TOTAL</td><td></td>' + Zc.map(function (z) { return tcell(T[z[0]]); }).join("") +
-    '<td class="num">' + f2(Ttot) + '</td><td class="num">' + Tcam + '</td><td class="num">' + (demT != null ? demT : "·") + '</td></tr>';
+  const totRow = '<tr class="totrow"><td class="f">TOTAL</td><td></td>' +
+    '<td class="num tot">' + f2(Ttot) + '</td>' + Zc.map(function (z) { return tcell(T[z[0]]); }).join("") +
+    '<td class="num">' + Tcam + '</td><td class="num">' + (demT != null ? demT : "·") + '</td></tr>';
   return head +
     '<div class="ppp-res-leg">🚚 Camiones por ruta: <b>Z1·Z2·Z3·Z4</b> Sur/Centro/Oeste · <b>Z5·Z6·Z7</b> Norte · Súper (1 por cliente) · Retira sin camión. Tope <b>' + CAP + ' m³/día</b>.</div>' +
     '<div class="ppp-restbl-wrap"><table class="ppp-restbl"><thead><tr>' +
-      '<th>Fecha</th><th>Día</th><th>Z1<br>Sur</th><th>Z2<br>Centro</th><th>Z3<br>Oeste</th><th>Z4<br>GBA&nbsp;S</th><th>Z5<br>GBA&nbsp;O</th><th>Z6<br>GBA&nbsp;N</th><th>Z7<br>Lejos</th><th>Retira</th><th>Súper</th><th>Total<br>m³</th><th>Cam.</th><th>Demora<br>(d)</th>' +
+      '<th>Fecha</th><th>Día</th><th class="tot">Total<br>m³</th><th>Z1<br>Sur</th><th>Z2<br>Centro</th><th>Z3<br>Oeste</th><th>Z4<br>GBA<br>Sur</th><th>Z5<br>GBA<br>Oeste</th><th>Z6<br>GBA<br>Norte</th><th>Z7<br>GBA<br>Lejos</th><th>Retira</th><th>Súper</th><th>Cam.</th><th>Demora<br>(d)</th>' +
     '</tr></thead><tbody>' + rows + totRow + '</tbody></table></div>';
 }
 
@@ -31488,9 +31632,11 @@ function _pppComputeErrors(peds, entSet) {
     const ps = byT[t], rutas = {}, fechas = {};
     // Ciudadela (GBA Oeste) queda pegada a la fábrica (Villarreal) camino a Zona 1 por la
     // autopista → NO cuenta como ruta aparte (no marca "tanda mezclada"). Pedido del dueño.
-    for (const p of ps) { if (!pppEsSuper(p) && !_pppEsCiudadela(p.localidad)) { const r = _pppRuta([p]); if (r) rutas[r] = 1; } const fe = _pppS(p.fecha_entrega); if (fe) fechas[fe] = 1; }
+    // v15.57 (dueño: "necesito más datos para que me sea útil: qué día se programó, qué está
+    // mezclado con qué") → se guarda QUIÉN cae en cada ruta y en cada fecha, no sólo cuántas.
+    for (const p of ps) { if (!pppEsSuper(p) && !_pppEsCiudadela(p.localidad)) { const r = _pppRuta([p]); if (r) (rutas[r] = rutas[r] || []).push(p); } const fe = _pppS(p.fecha_entrega); if (fe) (fechas[fe] = fechas[fe] || []).push(p); }
     const nR = Object.keys(rutas).length, nF = Object.keys(fechas).length;
-    if (nR > 1 || nF > 1) { tandasMal.push({ tanda: t, rutas: nR, fechas: nF }); for (const p of ps) if (p._err.indexOf("tandamal") < 0) p._err.push("tandamal"); }
+    if (nR > 1 || nF > 1) { tandasMal.push({ tanda: t, rutas: nR, fechas: nF, porRuta: rutas, porFecha: fechas }); for (const p of ps) if (p._err.indexOf("tandamal") < 0) p._err.push("tandamal"); }
   }
   return { sacar: sacar, sinZona: sinZona, zonaDif: zonaDif, tandasMal: tandasMal };
 }
@@ -31503,7 +31649,20 @@ function pppErroresHtml(e) {
   if (e.sacar.length)     h += '<div class="ppp-ei bad">🚮 <b>Ya entregados — SACAR (' + e.sacar.length + '):</b> ' + e.sacar.map(function (p) { return np(p) + cli(p); }).join(" · ") + '</div>';
   if (e.sinZona.length)   h += '<div class="ppp-ei warn">⚠ <b>Sin zona (' + e.sinZona.length + '):</b> ' + e.sinZona.map(function (p) { return np(p) + " — " + escapeHtml(pppLocDisp(p.localidad) || "?"); }).join(" · ") + '</div>';
   if (e.zonaDif.length)   h += '<div class="ppp-ei warn">⚠ <b>Zona no coincide (' + e.zonaDif.length + '):</b> ' + e.zonaDif.map(function (p) { return np(p) + " [" + escapeHtml(pppLocDisp(p.localidad) || "?") + ": Excel=" + escapeHtml(p.zona || "—") + " / barrio=" + escapeHtml(pppZonaDeBarrio(p.localidad) || "—") + "]"; }).join(" · ") + '</div>';
-  if (e.tandasMal.length) h += '<div class="ppp-ei warn">⚠ <b>Tandas inconsistentes (' + e.tandasMal.length + '):</b> ' + e.tandasMal.map(function (t) { return escapeHtml(t.tanda) + (t.rutas > 1 ? " (rutas mezcladas)" : "") + (t.fechas > 1 ? " (varias fechas)" : ""); }).join(" · ") + '</div>';
+  if (e.tandasMal.length) {
+    // v15.57 — cada tanda dice el día programado y QUÉ va con qué: por ruta (NP · cliente · barrio)
+    // y, si son varias fechas, quién cae en cada una. Antes decía sólo "D68G (rutas mezcladas)".
+    const RUTA_LBL = { so: "Sur/Centro/Oeste", n: "Norte", ret: "Retira" };
+    const ddmm = function (f) { return escapeHtml(String(f || "").replace(/\/\d{4}$/, "")); };
+    const npb = function (p) { return np(p) + cli(p) + ' [' + escapeHtml(pppLocDisp(p.localidad) || "?") + ']'; };
+    h += '<div class="ppp-ei warn">⚠ <b>Tandas inconsistentes (' + e.tandasMal.length + '):</b><div class="ppp-ei-det">' + e.tandasMal.map(function (t) {
+      const fes = Object.keys(t.porFecha || {});
+      let s = '<b>' + escapeHtml(t.tanda) + '</b>' + (fes.length === 1 ? ' · ' + ddmm(fes[0]) : '');
+      if (t.rutas > 1) s += ' · rutas mezcladas → ' + Object.keys(t.porRuta || {}).map(function (k) { return '<u>' + (RUTA_LBL[k] || k) + '</u>: ' + t.porRuta[k].map(npb).join(", "); }).join(' &nbsp;/&nbsp; ');
+      if (t.fechas > 1) s += ' · varias fechas → ' + fes.map(function (f) { return '<u>' + ddmm(f) + '</u>: ' + t.porFecha[f].map(function (p) { return np(p) + cli(p); }).join(", "); }).join(' &nbsp;/&nbsp; ');
+      return '<div>' + s + '</div>';
+    }).join("") + '</div></div>';
+  }
   h += '</div>';
   return h;
 }
@@ -32137,12 +32296,21 @@ function _pppPlanDiaHtml(programados, key, opts) {
       const _puedeReprog = (window.__isSupervisor || !PPP_READONLY);
       h += '<div class="pn-reprog"><b>⚠ ' + reprog.length + ' pedido' + (reprog.length === 1 ? '' : 's') + ' NO ' + (reprog.length === 1 ? 'salió' : 'salieron') + ' — hay que reprogramar' + (reprog.length === 1 ? 'lo' : 'los') + '</b>' +
         '<div class="l">' + reprog.map(function (p) {
-          const btn = _puedeReprog ? ' <button class="pn-reprog-btn" onclick="event.stopPropagation();pppReprogAbrir(\'' + escapeHtml(String(p.np)) + '\')" title="Reprogramar este pedido a un día nuevo">📅 Reprogramar</button>' : '';
+          // v15.55 (dueño: "si no salieron, volver a programación o cancelar pedido"): una NP de ISIS se
+          // reprograma por su número (📅); una NP web vuelve a A Programar (↩) y de ahí la toma el automático
+          // o el supervisor. Las dos se pueden cancelar (🚫): salen de la PPP y no vuelven a entrar.
+          const npS = escapeHtml(String(p.np));
+          const btn = _puedeReprog
+            ? (_pppEsNpWeb(p.np)
+                ? ' <button class="pn-reprog-btn" onclick="event.stopPropagation();pppVencVolver(\'' + npS + '\')" title="Sacarlo de esta tanda y devolverlo a A Programar (pendiente)">↩ A Programar</button>'
+                : ' <button class="pn-reprog-btn" onclick="event.stopPropagation();pppReprogAbrir(\'' + npS + '\')" title="Reprogramar este pedido a un día nuevo">📅 Reprogramar</button>') +
+              ' <button class="pn-reprog-btn pn-cancel-btn" onclick="event.stopPropagation();pppVencCancelar(\'' + npS + '\')" title="El pedido NO va: sale de la PPP y no vuelve a entrar">🚫 Cancelar</button>'
+            : '';
           return '<span>' + escapeHtml(String(p.np)) + ' · ' + escapeHtml(p.razon_social || p.cod || "—") + ' <small>' + escapeHtml(String(p.tanda || "—").toUpperCase()) + ' · ' + escapeHtml(p.fecha_entrega || "") + '</small>' + btn + '</span>';
         }).join('') + '</div>' +
-        '<div class="h">La tanda nunca se armó, así que el pedido no subió a ningún camión. ' + (_puedeReprog ? 'Reprogramalo a un día con <b>📅 Reprogramar</b>, ' : 'Ponele fecha nueva (✏️ Editar en su tanda, abajo) ') + 'o sacalo de ISIS.</div></div>';
+        '<div class="h">La tanda nunca se armó, así que el pedido no subió a ningún camión. ' + (_puedeReprog ? 'Volvelo a programar (<b>📅 Reprogramar</b> / <b>↩ A Programar</b>) o dalo de baja con <b>🚫 Cancelar</b>.' : 'Ponele fecha nueva (✏️ Editar en su tanda, abajo) o sacalo de ISIS.') + '</div></div>';
     }
-    h += '<div class="pn-note"><b>' + sinRem + '</b> ' + (sinRem === 1 ? 'pedido salió' : 'pedidos salieron') + ' con la tanda armada y nadie marcó el remito: en <b>Recepción Remitos → Controlado</b> pasan a entregados y desaparecen de acá.</div>';
+    h += '<div class="pn-note"><b>' + sinRem + '</b> ' + (sinRem === 1 ? 'pedido salió' : 'pedidos salieron') + ' con la tanda armada y nadie marcó el remito. A las <b>36 h</b> del armado pasan solos a <b>En Salida</b>, donde se cierran con <b>Controlado</b> (o ↩ si la mercadería volvió).</div>';
   }
   const dk = esVenc ? "venc" : key;
   for (const c of cams) {
@@ -32187,6 +32355,11 @@ function _pppPlanDiaHtml(programados, key, opts) {
     h += '<div class="pn-thead' + _sinUlt + '"><span>Tanda</span><span>Cliente · N° pedido</span><span>Localidad</span><span class="num">m³</span><span class="num">Valor</span><span>Picking · Armado</span>' + (_ult ? '<span>' + _ult + '</span>' : '') + '</div>';
     for (const p of rows) {
       const e = _pppEstadoPed(p), E = _PN_EST[e];
+      // v15.65 (pedido del chat: "un cliente tenía un pedido pendiente e hizo uno nuevo más grande
+      // y no tengo de dónde eliminar el más chico"): hasta la v15.64 el 🚫 Cancelar existía SÓLO en
+      // Atrasados, así que un pedido con fecha futura no se daba de baja desde ningún lado. Acá va
+      // en la fila, y sólo mientras la tanda esté SIN EMPEZAR: una vez que alguien pickeó,
+      // gv_ppp_np_cancelar lo rechaza igual y ofrecerlo sería mentir.
       const pick = (e === "armado" || e === "armando" || e === "picking") ? "done" : (e === "pickeando" ? "on" : "");
       const arm = e === "armado" ? "done" : (e === "armando" ? "on" : "");
       const v = _pppValorPed(p);
@@ -32204,12 +32377,21 @@ function _pppPlanDiaHtml(programados, key, opts) {
         else if (e === "armado") carga = '<div class="pn-carga"><span class="n ok">' + n + 'º</span><span class="t">armado ✓<br>espera su turno</span></div>';
         else carga = '<div class="pn-carga"><span class="n">' + n + 'º</span><span class="t">falta armar</span></div>';
       }
+      const _npS = escapeHtml(String(np));
+      const _accPed = (!esVenc && (window.__isSupervisor || !PPP_READONLY) && e === "sin")
+        ? '<div class="pn-acc">' +
+            (_pppEsNpWeb(np)
+              ? '<button class="pn-acc-b" onclick="event.stopPropagation();pppVencVolver(\'' + _npS + '\')" title="Sacarlo de esta tanda y devolverlo a A Programar (pendiente)">↩ A Programar</button>'
+              : '') +
+            '<button class="pn-acc-b pn-cancel-btn" onclick="event.stopPropagation();pppVencCancelar(\'' + _npS + '\')" title="El pedido NO va: sale de la PPP y no vuelve a entrar. Pide confirmar dos veces.">🚫 Cancelar</button>' +
+          '</div>'
+        : '';
       h += '<div class="pn-ped' + _sinUlt + (p._err && p._err.length ? ' err' : '') + '"><span class="tanda ' + c.ruta + '">' + escapeHtml(String(p.tanda || "—").toUpperCase()) + '</span>' +
         // v14.06 (dueño: "si no salieron, que figuren en la PPP con su fecha de entrega; mañana lo mira la
         // administrativa"): en ATRASADOS conviven pedidos de varios días, así que sin la fecha en la fila no
         // se sabe de cuándo es cada uno. En la vista de un día no hace falta: el día es el del encabezado.
         '<div><div class="rs">' + (p._err && p._err.length ? '⚠️ ' : '') + escapeHtml(p.razon_social || p.cod || "—") + '</div><div class="np">' + escapeHtml(String(np)) + (p.cod ? ' · cód ' + escapeHtml(String(p.cod)) : '') +
-          (esVenc && p.fecha_entrega ? ' <span class="pn-fe" title="Fecha de entrega que tenía">📅 ' + escapeHtml(String(p.fecha_entrega)) + '</span>' : '') + '</div></div>' +   // v13.65: sin chip WEB/ISIS
+          (esVenc && p.fecha_entrega ? ' <span class="pn-fe" title="Fecha de entrega que tenía">📅 ' + escapeHtml(String(p.fecha_entrega)) + '</span>' : '') + '</div>' + _accPed + '</div>' +   // v13.65: sin chip WEB/ISIS
         '<div class="loc">' + escapeHtml(p.localidad || p.barrio || "—") + '</div>' +
         '<div class="m">' + _pppFmtM3(p.m3) + '</div>' +
         '<div class="pp">' + (v == null ? '<small>s/valor</small>' : _pppFmtPesos(v)) + '</div>' +
@@ -35847,8 +36029,12 @@ function aprColPedidos() {
   // v13.85: el más viejo, arriba de todo (la lista ya viene ordenada por fecha de recepción)
   let viejo = null;
   for (const p of lista) { const n = aprDiasEspera(p.fecha_recep); if (n !== null && (viejo === null || n > viejo)) viejo = n; }
-  let h = '<div class="apr-col apr-col-nps">' +
-    '<div class="apr-col-t">📋 Pedidos a programar <b>(' + lista.length + ')</b>' +
+  // v15.54 (dueño: "hasta que piensa y encuentra si hay algo o no, que la visual no sea la misma que
+  // cuando ya procesó el control"): mientras controla LK + Chef (o arma), el contador va en "…" y el
+  // vacío es una caja ámbar que pulsa — nada que se parezca al "Listo" verde de cuando terminó.
+  const _cargando = !_apr.listo || aprCargandoAlgo();
+  let h = '<div class="apr-col apr-col-nps' + (_cargando ? ' apr-col-cargando' : '') + '">' +
+    '<div class="apr-col-t">📋 Pedidos a programar <b>(' + (_cargando ? '…' : lista.length) + ')</b>' +
       (viejo !== null && viejo >= 2 ? ' <span class="apr-chip apr-chip-esp' + (viejo >= 4 ? ' viejo' : ' medio') + '" title="El pedido más viejo de la lista">⏱ el más viejo, hace ' + viejo + ' días</span>' : '') +
     '</div>' +
     aprPorQueHtml(lista) +
@@ -35861,7 +36047,8 @@ function aprColPedidos() {
     h += (_apr.listo && !aprCargandoAlgo())
       ? (q ? '<div class="apr-vacio">Ningún pedido coincide con «' + escapeHtml(q) + '».</div>'
            : '<div class="apr-listo">✅ <b>Listo: no queda nada por programar.</b><div class="apr-listo-sub">Todo lo que entró ya tiene tanda y día. Si llega un pedido nuevo aparece acá solo.</div></div>')
-      : '<div class="apr-vacio">⏳ Controlando en Supabase si hay pedidos nuevos…</div>';
+      : '<div class="apr-cargando"><span class="apr-cargando-ic">⏳</span><b>Todavía controlando…</b>' +
+        '<div class="apr-cargando-sub">Estoy leyendo LK y Chef en Supabase. Hasta que termine no sé si hay pedidos para programar.</div></div>';
   }
   for (const p of lista) {
     const id = "p" + p.order_id, ab = !!_apr.exp[id];
@@ -35992,13 +36179,16 @@ function aprColCuarentena() {
   // v14.90: cargar (una vez) los contactos WhatsApp de los retenidos reales
   if (_apr.cuarContacto === null && !_apr.cuarContactoLoading && lista.some(function (p) { return !p._demo; })) cuarContactoCargar();
   if (_apr.cuarDemo) lista = [cuarDemoPedido()].concat(lista);   // v14.84: pedido de ejemplo
-  let h = '<div class="apr-col apr-col-cuar">' +
-    '<div class="apr-col-t">🚧 Cuarentena <b>(' + lista.length + ')</b>' +
+  const _cuarCargando = !_apr.listo || aprCargandoAlgo();   // v15.54: mismo criterio que la columna de pedidos
+  let h = '<div class="apr-col apr-col-cuar' + (_cuarCargando ? ' apr-col-cargando' : '') + '">' +
+    '<div class="apr-col-t">🚧 Cuarentena <b>(' + (_cuarCargando ? '…' : lista.length) + ')</b>' +
       '<span class="apr-cuar-help" title="Pedidos de clientes con deuda, suspendidos o que superan su límite de crédito. No se programan (ni a mano ni por el automático): hay que liberarlos primero.">ⓘ</span>' +
     '</div>' +
     cuarDemoRowHtml();   // v14.88: los 4 botones de importación se movieron a "Config. Cuarentena"
   if (!lista.length) {
-    h += '<div class="apr-vacio">Sin pedidos retenidos. Acá caen los de clientes con <b>deuda</b>, <b>suspendidos</b> o que <b>superan su límite de crédito</b>: no se programan solos.</div>';
+    h += _cuarCargando
+      ? '<div class="apr-cargando apr-cargando-cuar"><span class="apr-cargando-ic">⏳</span><b>Todavía controlando…</b></div>'
+      : '<div class="apr-vacio">Sin pedidos retenidos. Acá caen los de clientes con <b>deuda</b>, <b>suspendidos</b> o que <b>superan su límite de crédito</b>: no se programan solos.</div>';
     return h + '</div>';
   }
   h += '<div class="apr-scroll">';

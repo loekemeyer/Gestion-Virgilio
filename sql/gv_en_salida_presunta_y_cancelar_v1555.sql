@@ -1,0 +1,44 @@
+-- v15.55 (2026-09-11) — Thomas, mirando los 8 pedidos VENCIDOS de la PPP (D60C Shopping Domino,
+-- E09B Osa, D72B/D72C Cencosud):
+--   "si ya salieron hace más de 36hs y no se controló, tiene que aparecer allá la alerta, y
+--    aparecer en En Salida. si no salieron, volver a programación o cancelar pedido"
+--
+-- Diagnóstico de los 8 (11/09 ~12:30 ART): ninguno tenía Carga Camión (CCN) ni Control (CCR/CRN).
+--   98530 Shopping Domino  armada (TAL) 09/09 13:04 → 48 h   ← salida presunta
+--   44612/13/14 Cencosud   armadas 10/09 16:04      → 21 h   ← todavía no (umbral 36)
+--   44615/16/17 Cencosud, LK 0024 Osa   sin armar            ← "no salió": volver o cancelar
+--
+-- ── A) salida presunta → En Salida ─────────────────────────────────────────
+-- PPP_Web_Config.salida_presunta_horas = 36 (nuevo). gv_ppp_en_salida suma a su base las NP
+-- ARMADAS hace más de ese umbral, sin CCN ni factura, cuya fecha de entrega ya pasó:
+--   estado = 'armada_sin_carga' · columnas nuevas horas_desde_armado, salida_presunta.
+-- Consecuencias: salen solas de Programación (vencidos) porque el front ya excluye lo que está en
+-- gv_ppp_en_salida, y entran a En Salida con chip rojo "🚨 Salió hace X h sin registro de carga ·
+-- falta el remito", cuentan como "pasado el plazo" (_pppCargaVencida) y se cierran desde ahí con
+-- Controlado (CRN) o ↩ s/salida (FSS). Definición completa de la vista en la base.
+-- Medido al crearla: 98530 (48 h) entra; 44612/13/14 (21 h) no.
+--
+-- ── B) los que NO salieron ─────────────────────────────────────────────────
+-- Botones en la lista de vencidos (front, pppVencVolver / pppVencCancelar):
+--   · NP web  → "↩ A Programar"  = gv_ppp_web_desprogramar(p_np, p_por): tanda y fecha en null en
+--               todas las NP del pedido → queda pendiente en A Programar (lo toma el automático o el
+--               supervisor). Corta si alguna tanda ya se empezó a trabajar.
+--   · NP ISIS → "📅 Reprogramar" (ya existía, gv_ppp_isis_programar).
+--   · las dos → "🚫 Cancelar" = gv_ppp_np_cancelar(p_np, p_motivo, p_por):
+--               ISIS → NP_Canceladas (deja de contar como demanda) + GV_PPP_Prog_Override.oculto = true
+--                      (desaparece de la PPP sin tocar la tabla compartida);
+--               web  → GV_Web_Cancelados (tabla nueva, RLS sin policies) + tanda/fecha en null, y
+--                      gv_pedidos_web_excluidos devuelve motivo 'cancelado' para que el feed no lo
+--                      vuelva a traer como pendiente.
+--
+-- PRUEBAS (con rollback):
+--   cancelar LK 0024   → GV_Web_Cancelados + fila sin tanda + excluidos = 'cancelado'
+--   cancelar 44615     → NP_Canceladas + override oculto → 0 filas en gv_ppp_programacion_diaria
+--   desprogramar LK 0024 → 1 NP sin tanda/fecha; GV_Web_Cancelados sigue vacía
+--
+-- ROLLBACK:
+--   volver gv_ppp_en_salida a la v13.02/v13.68 (sin el tercer UNION de `base` ni las 2 columnas);
+--   drop function public.gv_ppp_np_cancelar(text,text,text);
+--   drop function public.gv_ppp_web_desprogramar(text,text);
+--   sacar el UNION 'cancelado' de gv_pedidos_web_excluidos; drop table public."GV_Web_Cancelados";
+--   delete from public."PPP_Web_Config" where clave = 'salida_presunta_horas';

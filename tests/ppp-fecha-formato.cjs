@@ -67,7 +67,9 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
   const dmy = /^\d{2}\/\d{2}\/\d{4}$/;
   const ok = dmy.test(r.fecha) && r.fecha === "10/09/2026"
     && dmy.test(r.fechaEntrega) && r.fechaEntrega === "29/09/2026"
-    && r.fechas.length === 2 && r.fechas.every(s => dmy.test(s))
+    // v15.57 (dueño): en la tabla Fecha × zonas del Resumen la fecha se PINTA "dd/mm" (sin año);
+    // el dato de la fila sigue siendo dd/mm/aaaa (r.fecha / r.fechaEntrega, arriba) y a la base va ISO.
+    && r.fechas.length === 2 && r.fechas.every(s => /^\d{2}\/\d{2}$/.test(s))
     && r.isoEnPantalla.length === 0
     && r.cabFe === "2026-09-29" && r.cabFr === "2026-09-10"
     && errs.length === 0;

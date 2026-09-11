@@ -11159,6 +11159,136 @@ distinta, empresa distinta.
 >   `Sync_Estado`**: `cron.job_run_details` ya tiene la verdad. DDL en
 >   `sql/watchdog_syncs_externos.sql`.
 
+> Nota **2026-09-11 (v15.64) — El geocodificador pela el " - <localidad>" que la página pega después de la altura.**
+> `gv_dir_geo_normalizar(dir, barrio)` saca la cola cuando es el barrio o un prefijo truncado de él; 25 direcciones web
+> se limpian solas, sin corregir de a una. §3.bw de `docs/SUPABASE-GESTION-VIRGILIO.md`.
+
+> Nota **2026-09-11 (v15.61) - Verificada la corrida real del fix de Cuarentena. Y BP Import salio porque PAGO.**
+> La corrida del cron de las 13:15:13 cerro sola las 6 tareas que le quedaban abiertas a Viviana (CH 217 - 218 - 225,
+> LK 1349 - 1354 - 1384): con cero pendientes en cuarentena el sync manda lista vacia y eso es lo que las cierra.
+> Edge Function en **v25**. **Correccion de un dato mio:** la septima, LK 1346 BP Import, NO la cerro el fix - salio
+> a las 12:43:46 porque el reporte de deuda de las 12:43:28 le bajo el saldo de $836.136,98 a **$0,01** (pago), por
+> debajo del umbral de $1.000. O sea que BP Import no es un cliente con deuda y pedido ya armado: se lo quito de la
+> descripcion del problema en `github_repo_problemas`. §3.ci.1 de `docs/SUPABASE-GESTION-VIRGILIO.md`.
+
+> Nota **2026-09-11 (v15.59) — Auditado: el automático NUNCA sacó un pedido de Cuarentena solo. Y el candado pasa a ser por BLOQUE.**
+> Vivi preguntó si el sistema mandó a Programación pedidos que estaban en Cuarentena sin que nadie los liberara.
+> **No.** Las 7 NP de sus tareas recibieron tanda entre el 06/09 y el 10/09 15:30, y los datos de Cuarentena
+> (límite/suspendido y deuda) se cargaron recién el 10/09 entre las 17:36 y las 18:00: el sistema no tenía con qué
+> chequear. Los únicos 3 que se programaron después (El Gran Bazar, Villar, Pérez Zárate) figuran liberados **a mano**
+> en `GV_Cuarentena_Liberados` a las 12:15:52, 12:16:01 y 12:16:02 por `loekemeyer.n8n@gmail.com`, y recién ahí el cron
+> los tomó. El filtro además funcionó: la corrida de las 00:01 retuvo 7 NP de LK y 3 de Chef.
+> **Queda abierto, y es decisión del dueño:** la Cuarentena frena lo que todavía no tiene tanda; un pedido **ya
+> programado** al que después le aparece deuda no se retira solo (Osa $20,1 M, Torres y Liva $32,2 M, Clapera $4,9 M…).
+> Anotado en la auditoría sin tocar la PPP. **Y el candado de la v15.58 se endureció**: miraba el pedido entero, así que
+> un bloque pendiente de un pedido con otro bloque ya armado podía escaparse; ahora compara `order_id|np_idx`. Hoy no
+> había ningún pedido partido. §3.ci.1 de `docs/SUPABASE-GESTION-VIRGILIO.md`.
+
+> Nota **2026-09-11 (v15.58) — Cuarentena: sólo lo PENDIENTE. Lo que ya tiene tanda no le abre tarea a Viviana.**
+> Vivi: *"tengo estos mensajes de cuarentena pero no los veo en A Programar"*. Las 7 tareas abiertas (LK 1354 ·
+> 1384 · 1346 · 1349, CH 217 · 218 · 225) eran de pedidos **ya programados** (E09B, E12D, E01D, D68G, D69E, E03B,
+> E12G), dos ya entregados. A Programar no los lista —saca lo que tiene tanda y lo que está en un borrador— pero la
+> Edge Function `gv-ppp-web-tandas-diarias` evaluaba la cuarentena sobre todo el feed menos `gv_pedidos_web_excluidos`,
+> que no conoce `PPP_Web_Programacion`. Ahora (`pedidosYaTomados`, Edge Function v23) sólo evalúa —y sincroniza con
+> Planify— lo mismo que ve el sector Cuarentena; y con cero candidatos el sync corre igual con la lista vacía, que es lo
+> que cierra las tareas viejas. De paso deja de contar dos veces al programado en `gv_cuarentena_limite` (base de armados
+> no facturados + pendiente: LK 1384 "superaba el límite por $361.544" sin superarlo). Las 7 tareas se cerraron a mano
+> con la nota "falsa alarma". §3.ch de `docs/SUPABASE-GESTION-VIRGILIO.md`.
+
+> Nota **2026-09-11 (v15.56) — La Demora del Resumen salía vacía en los pedidos de la página.**
+> Thomas: *"si los pedidos se cargaron por pipeline desde paginalk, no calcula demora de pedidos"*.
+> La Demora es el promedio de `fecha_entrega − fecha de recepción`, y las dos funciones que
+> programan solas (`ppp_web_armar_tandas`, `gv_ppp_web_armar_pendientes`) escribían
+> `PPP_Web_Programacion` **sin la columna `fecha_recep`** — la primera hasta la calcula en su CTE
+> para ordenar por antigüedad, pero no la pone en el `INSERT`. Medido: **75 de 84** filas en NULL;
+> las 9 con dato eran las que guardó el front. **Arreglo en el backend con un trigger**
+> (`gv_ppp_web_fecha_recep`, BEFORE INSERT OR UPDATE) que la resuelve contra
+> `lk_pedidos_match.fecha_pedido`: cubre las dos funciones, el front y lo que venga, sin tocar
+> 24 kB de plpgsql que corren en los crons 71/73. Después del backfill: **0 de 84 sin fecha**,
+> y 17/09 = **8,3 días**, 18/09 = **10,0 días**. Backup, medición y rollback en §3.ch de
+> `docs/SUPABASE-GESTION-VIRGILIO.md` y `sql/gv_ppp_web_fecha_recep_v1556.sql`.
+
+> Nota **2026-09-11 (v15.54) — Resumen de la PPP: el Total m³ pasó al lado del Día, antes del desglose.**
+> Dueño: *"el dato de total m3 que esté a la derecha del día, y después el desglose"*. El orden ahora es
+> **Fecha · Día · Total m³ │ Z1…Z7 · Retira · Súper · Cam. · Demora**: primero el número que se mira,
+> después de qué se compone. Una línea vertical (`td.tot { border-right }`) marca el corte.
+> `Cam.` y `Demora` **no se movieron**: no son desglose de m³, son otra medida del día.
+> El total sigue siendo clickeable (abre el pop-up con todas las NP del día) y la fila TOTAL acompaña
+> el mismo orden.
+
+> Nota **2026-09-11 (v15.53) — El Resumen de la PPP: columnas al ancho del contenido, no al de la pantalla.**
+> Dueño, con la captura: *"columnas siempre lo más angostas posibles, ancho determinado por la info
+> más ancha de la columna"*. La culpa era de **`.ppp-restbl{ width:100% }`**: con eso el navegador
+> reparte el sobrante entre las 14 columnas, así que el aire no está entre las celdas sino **adentro**
+> de cada una. Medido en un viewport de 1.600: la tabla ocupaba **1.558 px** y la columna Fecha **171 px**
+> para un `09/09/2026` de ~62 px.
+> - `width:auto` + `table-layout:auto`, padding de `6px 9px` / `5px 9px` a `4px 6px` / `3px 6px`, y el
+>   marco (`.ppp-restbl-wrap`) en `display:table` para que termine donde termina la tabla en vez de
+>   dibujar un rectángulo hasta el borde. Mismo `display:table` para los dos carteles de arriba
+>   (`.ppp-res-note`, `.ppp-res-leg`), que también se estiraban.
+> - Encabezados de las zonas de GBA a **tres filas** (`Z4 / GBA / Sur`): así el piso de la columna deja
+>   de ser `GBA S` y pasa a ser el dato.
+> - Resultado medido: **1.558 → 606 px (−61 %)** y el alto **338 → 297 px** (el padding vertical menor
+>   compensa la tercera fila del encabezado). Sobrante máximo por columna: **12 px**, que son
+>   exactamente los 6+6 del padding — o sea, cero espacio muerto.
+> - **No baja del piso de zoom**: `pppFitPantalla` sólo ACHICA (arranca en `z = 1` y nunca agranda),
+>   así que una tabla más angosta le da más margen, no la re-estira.
+> - **No se ocultó ninguna columna.** Una zona sin un solo m³ en todo el período sigue mostrándose con
+>   sus puntitos: eso cambiaría lo que se ve, no el ancho, y no se pidió.
+> - **Regresión nueva `tests/ppp-resumen-angosto.cjs`** (falla con el CSS de antes): compara el ancho
+>   de cada columna contra el de su contenido más ancho y exige ≤ 40 px de sobra.
+> Nota **2026-09-11 (v15.62) — Cancelar una NP de ISIS fallaba (`gv_ppp_np_cancelar`, 42702 "np is ambiguous").**
+> Bug de la v15.55: el parámetro de salida `np` pisaba la columna en el `on conflict (np)`. Fix con
+> `#variable_conflict use_column`. Además se cerraron a mano 98569/98474/98509 (CRN con fecha real) y se canceló
+> 98050. §3.bv de `docs/SUPABASE-GESTION-VIRGILIO.md`.
+> **v15.63:** `gv_ppp_en_salida` ahora excluye `NP_Canceladas` / `GV_Web_Cancelados` — una NP cancelada después de
+> facturada quedaba en En Salida para siempre (98050, 44 días).
+
+> Nota **2026-09-11 (v15.60) — Datos: Z5 del 15/09 unificado al Norte del 16/09, Veronesi fuera de D68G, 11 correcciones de geo.**
+> Sin cambio de código: sólo datos, con backup y rollback. Detalle, medición (117 + 53 km → 138 km, un camión menos) y
+> SQL en §3.bu de `docs/SUPABASE-GESTION-VIRGILIO.md` y `sql/backups/z5_unificacion_20260911.sql`.
+
+> Nota **2026-09-11 (v15.57) — Resumen de la PPP: fecha dd/mm pegada al día · tocar la NP abre su contenido · la alerta de tandas inconsistentes dice el día y qué mezcla.**
+> Tres pedidos del dueño en la misma tarde, todos sobre la solapa **Resumen**:
+> 1. *"elimina ese espacio entre fecha dd/mm/yy, también que sea solo dd/mm"* → en la tabla Fecha × zonas
+>    (`ppp-restbl`) la fecha se muestra **`dd/mm`** (el dato sigue siendo dd/mm/aaaa; se pela sólo al pintar)
+>    y la tabla dejó de estirarse al 100% (`width:auto`, el borde abraza la tabla) con Fecha y Día pegados.
+> 2. *"si toco en el nro de NP quiero ver qué contenía esa NP (cod y cjas)"* → en el detalle de una celda
+>    (`pppResTgl`) la celda **NP es clickeable** y abre **el mismo modal del ✓** de Programación
+>    (`pppChequeoNp`: artículo · cajas pedidas · góndola). Una sola puerta, no un popup nuevo. Para que
+>    funcione con las **NP web** (`LK 0024`) el modal pasó a leer la vista nueva **`gv_np_items`** (ISIS sin
+>    `.0` + `PPP_Web_Base.np_label`, `sql/gv_np_items_v1557.sql`, §3.bt de `docs/SUPABASE-GESTION-VIRGILIO.md`);
+>    antes `gv_ppp_base_pedidos` no las tenía y decía "No encontré artículos". Las NP viajan entrecomilladas
+>    en el `in()` (llevan espacio). El semáforo del ✓ (carga masiva) sigue leyendo `gv_ppp_base_pedidos`.
+> 3. *"acá ese dato no me sirve… qué día se programó, qué está mezclado con qué"* (sobre "D68G (rutas
+>    mezcladas)") → `tandasMal` guarda `porRuta` y `porFecha` (los pedidos, no sólo cuántos) y
+>    `pppErroresHtml` escribe **tanda · dd/mm · ruta: NP cliente [barrio], … / ruta: …** y, si son varias
+>    fechas, quién cae en cada una. Ciudadela sigue exenta y no se lista. Caso real: **D68G · 15/09 ·
+>    Sur/Centro/Oeste: 98694 Veronesi [La Boca] / Norte: LK 0018 Bazar Mónica [Padua], LK 0028 Laza
+>    [Ituzaingó]** — un camión de ISIS (D68) al que el reúso por día (v13.60) le colgó pedidos web de la
+>    otra punta.
+> - Tests: `tests/ppp-res-np-fecha.cjs` (1 y 2) y `tests/ppp-errores-detalle.cjs` (3); `ppp-chk-gondola`
+>   stubbea también `gv_np_items`.
+
+> Nota **2026-09-11 (v15.52) — Popup de Proyección: cajas ENTREGADAS por el proveedor, entre el mes y la barra.**
+> Pedido del dueño mirando el 321 (Rallador cilíndrico, Carriero): *"a la derecha del mes, poné las
+> cajas entregadas, y después el gráfico de barra"*. En `stkShowProyVentas` (Stocks → Proy. caj/mes)
+> cada fila de la ventana de 6 meses ahora es **mes → entregadas → barra → facturadas**: lo que el
+> proveedor ENTREGÓ ese mes al lado de lo que se FACTURÓ, para ver de un vistazo si abastece lo que
+> se vende. Cabecera `entreg. / factur.`, pie con **Entregado 6m**.
+> - **Dato (backend):** RPC nueva **`gv_entregas_mensuales_cod(p_cod, p_meses)`** →
+>   `(mes, cajas, cubierto)`, SECURITY INVOKER, anon EXECUTE. Lee `vista_historial_entregas`
+>   (talleristas + prov AT) y parsea ahí los tres formatos de `fecha` (`YYYY-MM-DD`, `DD/MM/YY`,
+>   basura). Gemela de `ventas_mensuales_cod`; las dos se piden con `Promise.all`.
+>   `sql/gv_entregas_mensuales_cod_v1552.sql`, §3.bs de `docs/SUPABASE-GESTION-VIRGILIO.md`.
+> - **`cubierto=false` ⇒ "s/d", nunca 0.** La recepción de **Prov AT** recién se registra desde el
+>   **04/06/2026** y la de **talleristas** desde **12/2025**: un mes anterior a eso no es "entregó 0",
+>   es "no había registro". El circuito del artículo sale de sus propias entregas (o del padrón si
+>   nunca entregó). Ej.: 321 → mar/abr/may `s/d`, jun 506, jul 500, ago 382.
+> - Si el código no tiene **ningún** mes con registro, la columna **no aparece** (no se deja una
+>   columna de "s/d"); el título vuelve a "Cajas facturadas".
+> - Test: `tests/proy-entregadas.cjs` (orden de celdas, s/d vs número, pie, sin columna).
+
 > Nota **2026-09-11 (v15.66) — Corregir códigos: el stock del SECUNDARIO se reparte entre TODAS las NP que lo piden.**
 > Dueño, con el panel abierto en 565 → 607E: *"acá tenés mal la lógica. Mirá el 565 primero: el stock y
 > sus pedidos"*. Cada NP se comparaba **sola** contra el stock total del secundario (`stkSec >= cajas`) y
