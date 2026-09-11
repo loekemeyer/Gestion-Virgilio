@@ -1536,6 +1536,16 @@
       findDateNearLabel_(lines, /Fecha\s*de\s*cancelaci[óÛo]n/i, { window: 5, preferAfter: true })
     );
 
+    // Fecha de TURNO de entrega: SOLO INC la trae en la OC. El rótulo es "Fecha entrega:"
+    // (sin "de"; el valor cae unas líneas después, en el bloque de valores de Planexware).
+    // Es la que Gestión usa para programar el pedido DIRECTO al día del turno (súper aparte
+    // de clientes). Ojo: NO es "Fecha de cancelación" (vencimiento) ni "Fecha OC" (emisión)
+    // ni "Hora de entrega". El regex exige "Fecha" delante de "entrega", así que "Hora de
+    // entrega" y el "ENTREGA:" de la sucursal no matchean.
+    var fechaTurno = normalizeDueDate_(
+      findDateNearLabel_(lines, /Fecha\s*(?:de\s*)?entrega\s*:/i, { window: 8, preferAfter: true })
+    );
+
     return {
       items: items,
       orderNumber: orderNumber,
@@ -1543,6 +1553,7 @@
       branchName: branchName,
       paymentTermRaw: paymentTermRaw,
       dueDate: dueDate,
+      fechaTurno: fechaTurno,
     };
   }
 
@@ -2476,6 +2487,7 @@
       branchName: "",
       paymentTermRaw: "",
       paymentTermEdited: "",
+      fechaTurno: "",   // sólo INC: fecha de turno de la OC → programación directa
       customer: null,
       mappingExisted: false,
       deliveryAddress: null,
@@ -2613,15 +2625,19 @@
       state.paymentTermRaw = parsed.paymentTermRaw || "";
       state.paymentTermEdited = state.paymentTermRaw;
       state.dueDate = parsed.dueDate || "";
-      // Fecha de entrega: el mail de Krikos (estructurado) manda; si no vino
-      // de la bandeja, lo que saco el parser de la cadena; si no, el generico.
+      // Sólo INC trae fecha de turno; el resto queda "" → Gestión los deja en A Programar.
+      state.fechaTurno = parsed.fechaTurno || "";
+      // Fecha de entrega: si la OC entró por la BANDEJA DE KRIKOS, esa fecha manda (el mail
+      // es estructurado, es la fuente más confiable); si no, la fecha de turno del PDF, que
+      // hoy sólo trae INC. NO se usa el detector genérico del PDF a propósito: el resto de
+      // las cadenas tiene que seguir quedando en "" para que Gestión las deje en A Programar
+      // (regla de la v14.13). Si mañana se quiere, findDeliveryDateGeneric_ ya está.
       if (state.krikosDeliveryDate) {
         state.deliveryDate = state.krikosDeliveryDate;
         state.deliveryDateSrc = "Krikos";
       } else {
-        var pdfDelivery = parsed.deliveryDate || findDeliveryDateGeneric_(splitLines(text)) || "";
-        state.deliveryDate = pdfDelivery;
-        state.deliveryDateSrc = pdfDelivery ? "PDF" : "";
+        state.deliveryDate = state.fechaTurno;
+        state.deliveryDateSrc = state.fechaTurno ? "PDF" : "";
       }
       state.pdfTotal = extractPdfTotal(text, key);
 
@@ -3575,6 +3591,10 @@
         payment_term: state.customer.payment_term == null ? null : Number(state.customer.payment_term),
         credit_limit: state.customer.credit_limit == null ? null : Number(state.customer.credit_limit),
         due_date: String(state.dueDate || ""),
+        // Fecha de entrega (DD/MM/YYYY). Campo canónico `fecha_entrega` que usa el panel de
+        // Gestión (v14.13); viaja a Virgilio por v_pedidos_match → lk_pedidos_match y decide
+        // si se programa directo o queda en A Programar. Manda la del mail de Krikos cuando la
+        // OC entró por la bandeja; si no, la fecha de turno del PDF (hoy sólo INC, cod 1651).
         fecha_entrega: String(state.deliveryDate || ""),
         fecha_entrega_origen: String(state.deliveryDateSrc || ""),
         source: "Krikos",
