@@ -6183,3 +6183,63 @@ no le cambia nada.
 Bloque comentado al final de `sql/vista_correcciones_pedido_rich_v1566_reparto_sec.sql` (definición
 anterior, `pg_get_viewdef` del 11/09). El front v15.66 sigue andando con la vista vieja (cae al criterio por
 ítem). `docs/ROLLBACK-PRODUCCION.md` tiene la entrada.
+
+---
+
+## v15.67 — El pedido web se parte: lo disponible por un lado, lo que espera mercadería por el otro (2026-09-11)
+
+**Regla del dueño (Thomas, 11/09):** *"si un cliente igualmente me pide un item que no voy a tener hasta
+xx/xx, quiero separar el pedido de ese cliente: 1) lo que va normal, con las condiciones normales de
+programación; 2) lo que se programa para entregar recién a partir de que llega esa mercadería"*.
+
+### Quién hace qué
+
+| Dónde | Objeto | Qué hace |
+|---|---|---|
+| LK | `pedido_diferido` (tabla) | Al recibirse el pedido, congela qué líneas no tenían stock. Trigger `marcar_pedido_diferido` sobre `orders` (after update of `sheets_payload`) |
+| LK | `reingreso_piso(art, congelada)` | El piso de fecha **en vivo** contra `reingreso_cache`. `security definer` porque esa tabla tiene RLS sin policies |
+| LK | `v_pedidos_web_np` | Corta **primero** por disponible/diferido y después de a 18 (15 Chef). Columnas nuevas al final: `diferido`, `no_antes_de` |
+| LK | `gv_pedidos_web_np_lk` | Devuelve las dos columnas nuevas (se recreó: cambia el tipo de retorno) |
+| LK | `sync_diferido_virgilio()` + cron 41 (`*/10`) | Empuja el piso a Gestión por el FDW, igual que `lk_pedidos_match` |
+| GV | `GV_PPP_Web_Diferido` | Qué NP espera mercadería y hasta cuándo. La escribe `lk_ppp_reader` |
+| GV | `gv_ppp_web_armar_pendientes` (a0) | Saca esas NP de los pases normales |
+| GV | `gv_ppp_web_armar_pendientes` (b2) | Las programa: primer día hábil **con cupo** desde el piso, nunca antes, con tandas propias |
+| GV | `gv_ppp_web_juntar_clientes` | El candado v15.52 las deja afuera (tres `where`, uno por consulta) |
+| GV | `index.html` | Chip ⏳ "espera dd/mm" en A Programar y aviso al programar un día anterior al piso |
+
+### Por qué el corte se CONGELA y la fecha no
+
+`reingreso_cache.sin_stock` cambia todos los días. Si el corte dependiera de eso, la identidad de una NP
+—`(order_id, np_idx)`, que es la PK de `PPP_Web_Programacion`— se movería sola al llegar la mercadería.
+Medido el 11/09: **83 de 212** pedidos de los últimos 30 días (39%) tienen hoy alguna línea de un artículo
+sin stock, casi todos ya entregados; mirar el estado en vivo los partiría a todos, hacia atrás. Por eso
+`pedido_diferido` congela el corte al recibir el pedido y sólo la FECHA se lee en vivo: si la mercadería se
+adelanta, el bloque se programa antes, pero sigue siendo un bloque aparte.
+
+### Choca con el candado v15.52, y gana esto
+
+El mismo 11/09, a la mañana, el dueño pidió *"nunca si hay +1 pedido de un cliente puede ir separado en la
+PPP… salvo los súper"*. No se contradicen: el candado existe para que no parta a un cliente **el armado**
+(cupo, cascada); acá se parte porque la mercadería no está. La excepción es **sólo** la NP diferida.
+
+### Por qué el piso se empuja por FDW y no viaja en el payload del cron
+
+La Edge Function `gv-ppp-web-tandas-diarias` arma `filasTanda` y podría mandar `no_antes_de`, pero eso
+obligaba a redeployarla (45 kB re-tipeados = el riesgo de la v15.44). Empujando la tabla, el armado queda
+protegido sin tocar ese código. Si algún día se agrega al payload, (a0) no cambia: manda la tabla.
+
+### Medición
+
+- El corte de lo ya existente **no se movió**: 1.475 NP y `md5 e1218e13…` antes y después (foto en
+  `gv_np_antes_diferido`, LK).
+- Prueba en caliente sobre el pedido 1206 (19 líneas, 2 sin stock): queda **17 + 2**, el segundo bloque con
+  piso 29/11. La marca se borró al terminar.
+- `gv_ppp_web_armar_pendientes('lk', null, '[]', '[]')` corre limpio después del parche.
+- Chef **no parte todavía**: sus pedidos viven en el proyecto de Chef y no tienen `pedido_diferido`.
+
+### Rollback
+
+`GV_Backup_Funciones` (motivo `pre v15.61 diferido`) tiene las dos funciones anteriores: `execute` la columna
+`def`. Después `drop table public."GV_PPP_Web_Diferido"`. Del lado LK: `gv_backup_vistas` tiene la
+`v_pedidos_web_np` anterior, y hay que borrar el cron `sync-diferido-virgilio` (jobid 41) y el trigger
+`marcar_pedido_diferido` de `orders`. Nada de esto toca objetos de Producción.

@@ -957,6 +957,8 @@ button {
 .apr-chip-esp{ background:#f1f5f9; color:#475569; font-weight:800; }
 .apr-chip-esp.medio{ background:#fef3c7; color:#92400e; }
 .apr-chip-esp.viejo{ background:#fee2e2; color:#991b1b; }
+/* v15.67 — bloque que espera un reingreso de importado */
+.apr-chip-dif{ background:#fff7ed; color:#b45309; font-weight:800; }
 .apr-chip-m3{ background:#f1f5f9; color:#334155; } /* idea 7999: es un dato, no una alerta */
 .apr-chip-np{ background:#ede9fe; color:#5b21b6; }
 .apr-card-body{ margin-top:7px; border-top:1px dashed #e2e8f0; padding-top:6px; }
@@ -7696,7 +7698,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v15.66";
+const APP_VERSION = "v15.67";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -27620,7 +27622,7 @@ async function pppTraerPedidosWeb(empresa) {
   } else {
     const desde = new Date(Date.now() - PWEB_VENTANA_DIAS * 86400000).toISOString().slice(0, 10);
     const r = await fetch(PWEB_LK_URL + "/rest/v1/v_pedidos_web_np"
-      + "?select=empresa,order_id,np_idx,cod,razon_social,fecha_recep,hora_recep,direccion,v,lineas,cajas,items,enviado_a_compras,localidad,zona_expreso,nombre_expreso,direccion_expreso,m3,m3_parcial"
+      + "?select=empresa,order_id,np_idx,cod,razon_social,fecha_recep,hora_recep,direccion,v,lineas,cajas,items,enviado_a_compras,localidad,zona_expreso,nombre_expreso,direccion_expreso,m3,m3_parcial,diferido,no_antes_de"
       + "&fecha_recep=gte." + desde + "&order=order_id.asc,np_idx.asc&limit=5000",
       { headers: { apikey: PWEB_LK_ANON, Authorization: "Bearer " + tok } });
     if (!r.ok) throw new Error("LK respondió " + r.status);
@@ -27654,7 +27656,9 @@ async function pppTraerPedidosWeb(empresa) {
       // Lo necesario para guardar después, sin volver a pedirle nada a LK.
       _web: true, _wEmp: n.empresa || emp, _wOrder: n.order_id, _wIdx: n.np_idx,
       _wNum: num || null, _wItems: n.items || [], _wLineas: n.lineas, _wCajas: n.cajas,
-      _wM3Parcial: parcial, _wDir: pwebDireccion(n), _wIsis: !!n.enviado_a_compras
+      _wM3Parcial: parcial, _wDir: pwebDireccion(n), _wIsis: !!n.enviado_a_compras,
+      // v15.67 — bloque que espera un reingreso de importado (LK lo corta como NP aparte)
+      _wDif: !!n.diferido, _wNoAntes: n.no_antes_de || null
     };
   });
 }
@@ -35195,6 +35199,10 @@ async function aprConfirmar() {
         nuevos.map(function (c) { return c.camion; }).join(", ") + ". ¿Seguro que vas a usar un segundo camión?");
     }
   } catch (_e) {}
+  // v15.67: el bloque que espera un reingreso no puede salir antes de que entre.
+  const dif = r.peds.filter(function (p) { return p.no_antes_de && String(p.no_antes_de).slice(0, 10) > fecha; });
+  if (dif.length) avisos.push("Hay " + dif.length + " pedido(s) con artículos sin stock hasta el " +
+    aprDiaCorto(String(dif[0].no_antes_de).slice(0, 10)) + ": el " + aprDiaCorto(fecha) + " la mercadería todavía no está en el depósito.");
   if (avisos.length && !confirm("⚠ " + avisos.join("\n⚠ ") + "\n\n¿Programo igual " + r.n + " pedido" + (r.n === 1 ? "" : "s") + " para el " + aprDiaCorto(fecha) + "?")) return;
   await aprGenerarTanda(fecha, keys, { sinConfirm: true });   // arma + programa; si falla, descarta (ninguna tanda sin fecha)
   if (!_apr.msgErr) { _apr.sel = {}; _apr.diaSel = null; _apr.paso = 1; }
@@ -35306,7 +35314,7 @@ async function aprTraerPedidos(e) {
   } else {
     const desde = new Date(Date.now() - PWEB_VENTANA_DIAS * 86400000).toISOString().slice(0, 10);
     const r = await fetch(PWEB_LK_URL + "/rest/v1/v_pedidos_web_np"
-      + "?select=empresa,order_id,np_idx,cod,razon_social,fecha_recep,direccion,lineas,cajas,items,m3,m3_parcial,localidad,zona_expreso,nombre_expreso,direccion_expreso,enviado_a_compras,condicion_pago_code"
+      + "?select=empresa,order_id,np_idx,cod,razon_social,fecha_recep,direccion,lineas,cajas,items,m3,m3_parcial,localidad,zona_expreso,nombre_expreso,direccion_expreso,enviado_a_compras,condicion_pago_code,diferido,no_antes_de"
       + "&fecha_recep=gte." + desde + "&order=order_id.asc,np_idx.asc&limit=5000",
       { headers: { apikey: PWEB_LK_ANON, Authorization: "Bearer " + tok } });
     if (!r.ok) throw new Error("LK respondió " + r.status);
@@ -35482,6 +35490,19 @@ function aprEsperaChip(p) {
   const txt = n === 0 ? "hoy" : (n === 1 ? "ayer" : "hace " + n + " días");
   const cls = n >= 4 ? " viejo" : (n >= 2 ? " medio" : "");
   return '<span class="apr-chip apr-chip-esp' + cls + '" title="' + escapeHtml("Llegó el " + String(p.fecha_recep || "").slice(0, 10) + ". Lleva " + n + " día" + (n === 1 ? "" : "s") + " sin programarse.") + '">⏱ ' + txt + '</span>';
+}
+/* v15.67 — el bloque que espera mercadería. LK lo manda como NP aparte
+   (v_pedidos_web_np.diferido) con la fecha estimada de reingreso; acá sólo se
+   muestra, para que nadie lo programe antes sin darse cuenta. */
+function aprDiferidoChip(p) {
+  if (!p || !p.no_antes_de) return "";
+  const q = String(p.no_antes_de).slice(0, 10).split("-");
+  if (q.length !== 3) return "";
+  const f = q[2] + "/" + q[1];
+  return '<span class="apr-chip apr-chip-dif" title="' + escapeHtml(
+    "Este bloque tiene artículos sin stock: entra al depósito el " + f +
+    ". Se programa recién a partir de esa fecha; el resto del pedido va por su cuenta.") +
+    '">⏳ espera ' + f + '</span>';
 }
 function aprSalidaChip(p) {
   // v14.35: la NP de ISIS no la toca el armado automático (no es un pedido de la página) — la programa una persona.
@@ -36063,6 +36084,7 @@ function aprColPedidos() {
       '</div>' +
       '<div class="apr-card-d">' +
         aprEsperaChip(p) +   // v13.85: hace cuánto llegó
+        aprDiferidoChip(p) + // v15.67: espera un reingreso
         '<span class="apr-chip apr-chip-z">' + escapeHtml(p.zona || "sin zona") + '</span>' +
         // v13.70: el pedido de la página como referencia (la NP la da el contador al programar)
         '<span class="apr-chip apr-chip-ped" title="' + (p._isis ? 'Ya tiene número de ISIS: se programa con ESE número, no se renumera.' : 'Número de pedido de la página; la NP (LK 0001…) se asigna al programar') + '">' + escapeHtml(aprPedLabel(p)) + '</span>' +
