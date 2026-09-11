@@ -7660,7 +7660,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v15.45";
+const APP_VERSION = "v15.46";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -38683,6 +38683,9 @@ function _psUpdatePollInfo(){ const el = document.getElementById("psPollInfo"); 
    con items. Lo reusa la estación de impresión (psPrintBatch) y la Cola de impresión NP. */
 async function _armadoRemitoDataForItems(items){
   const npIn = items.map(function (x){ return encodeURIComponent(x.np); }).join(",");
+  // v15.46 — el MISMO listado pero ENTRECOMILLADO, para las NP de la página, que llevan un
+  // espacio ("CH 0005"): sin comillas PostgREST no resuelve el in() (lección de la v12.67).
+  const npInQ = items.map(function (x){ return encodeURIComponent('"' + String(x.np).replace(/"/g, "") + '"'); }).join(",");
   const tandas = items.map(function (x){ return String(x.tanda || "").toUpperCase(); }).filter(function (t, i, a){ return t && a.indexOf(t) === i; });
   const tIn = tandas.map(function (t){ return encodeURIComponent(t); }).join(",");
   const ppMap = {}, faltMap = {}, pickByTanda = {};
@@ -38693,9 +38696,18 @@ async function _armadoRemitoDataForItems(items){
       fetch(SUPABASE_PPP_PROG_ENDPOINT + "?select=np,cod,razon_social,fecha_entrega,tanda&np=in.(" + npIn + ")&limit=5000", { headers: psH(), cache: "no-store" }).then(function (r){ return r.ok ? r.json() : []; }).catch(function(){ return []; }),
       fetch(SUPABASE_ENTREGAS_ENDPOINT + "?select=np,cod_art,cajas_falto&np=in.(" + npIn + ")&cajas_falto=gt.0&limit=5000", { headers: psH(), cache: "no-store" }).then(function (r){ return r.ok ? r.json() : []; }).catch(function(){ return []; }),
       (tIn ? fetch(SUPABASE_TABLE_ENDPOINT + "?select=texto,legajo&opcion=eq.TP&texto=in.(" + tIn + ")&order=ts_cliente.desc&limit=2000", { headers: psH(), cache: "no-store" }).then(function (r){ return r.ok ? r.json() : []; }).catch(function(){ return []; }) : Promise.resolve([])),
-      (typeof getEmpleadosNombres === "function" ? getEmpleadosNombres().catch(function(){ return null; }) : Promise.resolve(null))
+      (typeof getEmpleadosNombres === "function" ? getEmpleadosNombres().catch(function(){ return null; }) : Promise.resolve(null)),
+      // v15.46 — el REMITO IMPRESO de una NP de la página salía con "Cliente —" y "Fecha Entrega —"
+      // (caso real: NP CH 0005, tanda E12B, impreso el 11/09 11:18). Acá la cabecera se resolvía
+      // SOLO contra gv_ppp_programacion_diaria, que es el espejo de ISIS y no tiene las NP web
+      // ("LK 0057", "CH 0005"). La v14.36 ya lo había tapado en Composición a líos y la v15.42 en
+      // Recepción Remitos y en la lista de la Cola de impresión — faltaba la HOJA que se imprime,
+      // que es la que mira el operario. Las web salen de gv_ppp_web_estado (np_label + cod_cliente
+      // + razón social + fecha de entrega), la misma fuente que usan las otras dos pantallas.
+      fetch(SUPABASE_URL + "/rest/v1/gv_ppp_web_estado?select=np_label,cod_cliente,razon_social,fecha_entrega,tanda&np_label=in.(" + npInQ + ")&limit=5000", { headers: psH(), cache: "no-store" }).then(function (r){ return r.ok ? r.json() : []; }).catch(function(){ return []; })
     ]);
     (res[0] || []).forEach(function (x){ const np = String(x.np || "").trim().replace(/\.0+$/, ""); if (np && !ppMap[np]) ppMap[np] = { cod: String(x.cod || "").trim(), rs: String(x.razon_social || "").trim(), fecha: String(x.fecha_entrega || "").slice(0, 10), tanda: String(x.tanda || "").trim().toUpperCase() }; });
+    (res[4] || []).forEach(function (x){ const np = String(x.np_label || "").trim(); if (np && !ppMap[np]) ppMap[np] = { cod: String(x.cod_cliente || "").trim(), rs: String(x.razon_social || "").trim(), fecha: String(x.fecha_entrega || "").slice(0, 10), tanda: String(x.tanda || "").trim().toUpperCase() }; });
     (res[1] || []).forEach(function (x){ const np = String(x.np || "").trim().replace(/\.0+$/, ""); const fl = Number(x.cajas_falto) || 0; if (np && fl > 0){ (faltMap[np] = faltMap[np] || []).push({ cod: String(x.cod_art || "").trim(), cajas: fl }); } });
     (res[2] || []).forEach(function (x){ const t = String(x.texto || "").trim().toUpperCase(); if (t && !pickByTanda[t]) pickByTanda[t] = String(x.legajo || ""); });   // order desc → el último TP gana
   } catch (_e){}

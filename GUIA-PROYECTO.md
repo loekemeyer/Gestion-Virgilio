@@ -12,7 +12,7 @@
 > única**; no se replica. Ante la duda entre parche rápido y fix de raíz → **fix
 > de raíz**.
 >
-> Última actualización: 2026-09-11 (viernes) · Versión app al documentar: **v15.40**
+> Última actualización: 2026-09-11 (viernes) · Versión app al documentar: **v15.46**
 >
 > Nota **v15.40 (2026-09-11) — HANDOFF de planimetría / Acacia: `docs/HANDOFF-PLANIMETRIA-Y-ACACIA.md`.**
 > Thomas sigue este tema en otra sesión. Ahí está todo junto: los **13 artículos activos del catálogo LK
@@ -11158,6 +11158,26 @@ distinta, empresa distinta.
 >   (umbral ≈ 3× su período; dedup un aviso por sync por día). **No se creó tabla
 >   `Sync_Estado`**: `cron.job_run_details` ya tiene la verdad. DDL en
 >   `sql/watchdog_syncs_externos.sql`.
+
+> Nota **2026-09-11 (v15.46) — El REMITO IMPRESO de las NP de la página salía sin cliente ni fecha.**
+> Thomas, con la hoja en la mano: **NP CH 0005** (tanda E12B, impresa el 11/09 11:18) con
+> **"Cliente —"** y **"Fecha Entrega —"**. Es el MISMO agujero por tercera vez: la cabecera se
+> resolvía sólo contra el **espejo de ISIS** (`gv_ppp_programacion_diaria`), donde las NP de la
+> página no existen — viven en `PPP_Web_Programacion` y se leen por `gv_ppp_web_estado`
+> (`np_label`). Ya se había tapado en **Composición a líos (v14.36)** y en **Recepción Remitos +
+> la lista de la Cola de impresión (v15.42)**; faltaba **la hoja que se imprime**, que es la que
+> mira el operario.
+> - `_armadoRemitoDataForItems` —la que usan la **estación de auto-impresión** y la **Cola de
+>   impresión**— ahora consulta también `gv_ppp_web_estado`. Las NP web llevan un espacio
+>   ("CH 0005"), así que van **entrecomilladas** en el `in()` o PostgREST no las resuelve (misma
+>   lección que la v12.67 en `_facXlsArmar`).
+> - Verificado contra el caso real: CH 0005 → **328 · Fernandez Sonia Blanca Guadalu · 11/09**.
+>   Ese día había 6 NP web más armadas (CH 0006-0009, LK 0057) que salían igual de mudas.
+> - **Regresión nueva `tests/remito-np-web.cjs`** (falla con el código de antes, pasa con el de
+>   ahora) para que no vuelva por cuarta vez en otra pantalla.
+> - Backend: **no se tocó nada**. Se probó agregar la fuente web a `vista_cola_impresion` y se
+>   **revirtió** al ver que otra sesión ya había resuelto esa parte con `gv_vista_cola_impresion`
+>   (create-or-replace de la vista base restaurado, la `gv_` recreada idéntica, 9 columnas las dos).
 
 > Nota **2026-09-11 (v15.40) — El guard de doble-tap de la v15.33 se comía eventos buenos; CI en verde.**
 > El guard que agregó la v15.33 dentro de `send()` era por TIEMPO (800 ms desde la llamada
