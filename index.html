@@ -7598,7 +7598,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v14.98";
+const APP_VERSION = "v14.99";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -16141,8 +16141,18 @@ function _pedImpRender() {
   const data = _stkPop.data || { items: [], meses: 10 };
   if (!_stkPop.mcOverride) _stkPop.mcOverride = {};
   const soloPedir = _stkPop.soloPedir !== false;   // default: Solo Pedido
-  let items = (data.items || []);
-  if (soloPedir) items = items.filter(function (it) { return _pedImpMcOf(it) > 0; });
+  const allItems = (data.items || []);
+  // v14.99 — las fichas de proveedor salen de TODOS los ítems (no sólo de los que generan
+  // pedido), así un chino sin nada a pedir sigue apareciendo y se puede elegir.
+  const provAll = [];
+  allItems.forEach(function (it) { const p = it.prov || "(sin proveedor)"; if (provAll.indexOf(p) < 0) provAll.push(p); });
+  provAll.sort(function (a, b) { const ia = _IMPORTADOR_DE[a] || "zz", ib = _IMPORTADOR_DE[b] || "zz"; return String(ia).localeCompare(String(ib)) || String(a).localeCompare(String(b)); });
+  const provFiltro = (_stkPop.provFiltro && provAll.indexOf(_stkPop.provFiltro) >= 0) ? _stkPop.provFiltro : "";
+  let items = allItems;
+  // v14.99 — parado en UN proveedor se ven todos sus ítems aunque no generen pedido
+  // (dueño: "si me paro en un solo prov, mostrame todos los items"). "Solo Pedido"
+  // filtra únicamente en la vista Todos.
+  if (soloPedir && !provFiltro) items = items.filter(function (it) { return _pedImpMcOf(it) > 0; });
   // ventanas POR PROVEEDOR (cada proveedor = una tarjeta con su tabla, subtotal y botón PDF).
   const byProv = {}, provOrder = [];
   items.forEach(function (it) { const prov = it.prov || "(sin proveedor)"; if (!byProv[prov]) { byProv[prov] = []; provOrder.push(prov); } byProv[prov].push(it); });
@@ -16163,13 +16173,14 @@ function _pedImpRender() {
     '<button style="' + _fbtn(!soloPedir) + '" onclick="pedImpSetFiltro(false)">Ver Todo</button>' +
     '<button class="mva-clear" style="background:#166534;color:#fff;border-color:#166534" onclick="pedImpExportExcel()" title="Bajar a Excel lo que se está viendo">📥 Excel</button>' +
     '<button class="mva-clear" style="background:#b45309;color:#fff;border-color:#b45309" onclick="pedImpCargarPedidoHecho()" title="Registrar un pedido ya hecho por fuera (unidades en curso + fecha estimada de entrega)">➕ Cargar pedido ya hecho</button></div>';
-  // Filtro por proveedor chino: "Todos" (todas las tarjetas) o una sola.
-  const provFiltro = (_stkPop.provFiltro && provOrder.indexOf(_stkPop.provFiltro) >= 0) ? _stkPop.provFiltro : "";
-  if (provOrder.length > 1) {
+  // Filtro por proveedor chino: "Todos" (todas las tarjetas) o una sola. Las fichas salen de
+  // provAll (todos los proveedores con importados), no de los que tienen algo a pedir.
+  if (provAll.length > 1) {
     h += '<div style="margin-bottom:12px;display:flex;gap:8px;flex-wrap:wrap;align-items:center">' +
       '<span style="font-size:12px;font-weight:800;color:#64748b;text-transform:uppercase;letter-spacing:.4px">🏭 Proveedor:</span>' +
       '<button style="' + _fbtn(!provFiltro) + '" onclick="pedImpSetProv(\'\')">Todos</button>' +
-      provOrder.map(function (p) { return '<button style="' + _fbtn(provFiltro === p) + '" onclick="pedImpSetProv(\'' + encodeURIComponent(p) + '\')">' + escapeHtml(p) + '</button>'; }).join('') +
+      provAll.map(function (p) { return '<button style="' + _fbtn(provFiltro === p) + '" onclick="pedImpSetProv(\'' + encodeURIComponent(p) + '\')">' + escapeHtml(p) + '</button>'; }).join('') +
+      (provFiltro ? '<span style="font-size:11.5px;color:#64748b">· se muestran <b>todos</b> los artículos de ' + escapeHtml(provFiltro) + ', pidan o no</span>' : '') +
       '</div>';
   }
   // totales (respetan el MC editado y el proveedor elegido)
