@@ -4912,3 +4912,30 @@ suman doble el en curso y el backfill de baches les creó 2–3 baches.
   huérfanos (361E, 366E). No se veían (el módulo carga sólo `principal=true`), así que **cero efecto en
   pantalla**. Backups `GV_Importados_bkp_copias_20260911` y `GV_Importados_Baches_bkp_copias_20260911`.
   Rollback: `insert into "Importados" select <cols> from "GV_Importados_bkp_copias_20260911";` (idem baches).
+
+### §3.bm.2 — PI Fujian HT26-06-600-R1 cargado como pedido en curso; 439EL·LK / 439E·CH separados (v15.06, 2026-09-11)
+
+- **Qué**: la proforma `PI_26066002` de Fujian (106.488 u, u$s 32.388, entrega "30-45 días después del
+  depósito", Ningbo) queda cargada como baches `en_curso` en `GV_Importados_Baches` con
+  `fecha_reingreso = 2026-11-01` (la misma que ya tenían las 5 líneas que Becky cargó el 10/09 desde
+  "Cargar pedido ya hecho": 026·LK 49.536, 027·LK 27.792, 110·Loke 3.312, 824·CH 7.200, 825·CH 7.344).
+  Se agregaron las 6 que faltaban, `creado_por = 'PI HT26-06-600-R1'`: 438E·CH 1.224, 438EL·LK 6.912,
+  439E·CH 48, 439EL·LK 720, 440E·LK 1.200, 035E·LK 1.200. 436/437 vienen en 0 en el PI: nada.
+  **Chequeo**: `select sum(unidades) from "GV_Importados_Baches" where proveedor='Fujian' and estado='en_curso'`
+  → **106.488 = total del PI**.
+- **439E**: el PI trae 439E (48) y 439EL (720). Misma regla del dueño que 437/438 (§3.bm): **EL = LK, E = CH**.
+  La fila 439E·LK (id 68) pasa a **`439EL`** (+ `Importados_Volumen` 439EL copiado de 439E) y se da de alta
+  **439E·CH** (id 164, FOB 2,30, 6 u/caja, "Colador de Pastas ac. inox."). `gv_cod_stock` pela la L, así que
+  439EL hereda proy/stock LK de 439E (proy live 122, stock 234). Backups `GV_Importados_bkp_439_20260911`,
+  `GV_Importados_Volumen_bkp_439_20260911`. No hay mapa de partes para 439E (`Importados_Partes_Map` es
+  parte→terminado; no aplica).
+- **Efecto en la página LK**: `lk_reingresos_feed()` ya devuelve 01/11 para 26, 27, 110, 35E, 438E, 439E y
+  440E; hoy todos con `sin_stock=false` (el stock físico cubre lo pedido), así que la leyenda "Reingreso Est"
+  no se ve hasta que alguno se quede sin stock. El cron 39 de LK lo espeja cada 30 min.
+- **Diferencias PI vs. ficha, NO tocadas (decisión del dueño)**: 825·CH FOB 0,50 en ficha vs **0,25** en el PI;
+  uni/master 824 y 825 = 96 en ficha vs **144** en el PI; 440E = 12 vs **24**. Si se corrigen, también hay que
+  revisar el m³ master (`Importados_Volumen`), que va atado al master.
+- **Rollback**: `delete from "GV_Importados_Baches" where creado_por = 'PI HT26-06-600-R1'` (6 filas) +
+  `select gv_importados_resync(id)` para 63, 65, 66, 67, 68, 164; `delete from "Importados" where id = 164`;
+  `update "Importados" set cod_art='439E' where id=68`; `delete from "Importados_Volumen" where cod='439EL'`.
+  SQL: `sql/gv_importados_pi_fujian_v1506.sql`.

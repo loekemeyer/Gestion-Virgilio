@@ -368,3 +368,11 @@ vista/feed a `ltrim(upper(btrim(x)),'0')` sin filtros).
 Backups: `GV_Importados_bkp_809E_20260911`, `GV_Importados_bkp_copias_20260911`,
 `GV_Importados_Baches_bkp_copias_20260911`. Rollback = reinsertar desde los backups (mismas columnas,
 sin `_bkp_at`) y `update "Importados" set marca='LK', principal=false where id=129`. Detalle §3.bm.1.
+
+## PI Fujian cargado + 439EL/439E — v15.06 (2026-09-11)
+
+`GV_Importados_Baches`: 6 baches nuevos (`creado_por = 'PI HT26-06-600-R1'`, fecha 2026-11-01). `Importados`:
+id 68 `cod_art 439E→439EL`; alta id 164 (439E·CH). `Importados_Volumen`: alta 439EL (copia de 439E).
+Backups `GV_Importados_bkp_439_20260911`, `GV_Importados_Volumen_bkp_439_20260911`. Rollback: borrar los 6
+baches + `gv_importados_resync` de 63/65/66/67/68/164, `delete "Importados" id=164`, `update id=68 cod_art='439E'`,
+`delete "Importados_Volumen" cod='439EL'`. Detalle §3.bm.2.
