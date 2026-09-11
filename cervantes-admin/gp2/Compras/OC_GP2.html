@@ -1,0 +1,1313 @@
+<!doctype html>
+<html lang="es">
+<head>
+<!-- v1.21.0 (2026-09-08) — EL GATILLO DE REPOSICION: EL MINIMO DISPARA, EL MAXIMO DIMENSIONA
+     (idea 7273). Hasta aca la pantalla proponia llenar el techo de TODO lo que estuviera un peso
+     abajo del maximo: una corrida completa de sugeridos daban ~ARS 367,6 M en 201 lineas, con
+     techos de 6 meses en carton y fleje que se reciben todas las semanas. El punto de pedido YA
+     estaba en la base (inventario.minimo, 1.079 de 1.085 filas) y YA viajaba en oc_bundle: lo
+     unico que faltaba era mirarlo. No se creo ningun campo ni se toco SQL.
+     (a) estadoRepo(i): 'pedir' (stock <= minimo), 'viaje' (todavia no hace falta) y
+         'sin-gatillo' (sin minimo, sin stock, o minimo >= maximo = config rota). cargarSugeridos()
+         llena solo 'pedir' y 'sin-gatillo'. El fail-safe es a proposito: ante la duda NO se
+         esconde algo que hace falta, se comporta como antes.
+     (b) "Aprovechar el viaje (N)": boton que suma los 'viaje' de una. Hace falta porque el
+         carton necesita completar el multiplo de la familia aunque un codigo no este bajo minimo.
+     (c) AVISO "ya lo pediste": la fila con pendiente_oc > 0 muestra cuanto viene en camino y NO
+         se carga sola. Es AVISO, no resta -- la resta se saco en su momento porque rompia la
+         cuenta a la vista [usuario 2026-09-04: "por ahora borralo"]. "Usar sugeridos" es la orden
+         explicita del usuario y pisa las dos cosas: carga todo lo visible.
+     OJO, HONESTO: hoy el gatillo casi no recorta, porque 205 de los 236 insumos que pide la OC
+     tienen stock 0 (86,9%) y casi todo cae en 'pedir'. Empieza a servir cuando se cargue el
+     stock (que contar y en que orden: STOCK_A_CONTAR_2026-09-08.md). Ademas hay 53 lineas con
+     minimo >= maximo: 52 son ubicacion.meses_minimo mal en 4 sectores (Plastico 4 vs 4 -> 31,
+     Remache 4 vs 4 -> 15, Bombilla 4 vs 3 -> 4, Procesado 2 vs 1 -> 2; Carton y Fleje, 4 vs 6,
+     estan sanos) y la 53a es A9 cargada a mano. Lo corrige el usuario en la base, no la pantalla.
+     v1.20.1 (2026-09-08) — LA FECHA DE ENTREGA VUELVE A LA TARJETA Y A LA HOJA (idea 7271). La
+     pantalla leia o.fecha_entrega y oc_bundle emite fecha_entrega_estimada (asi se llama la
+     columna): el badge quedaba vacio y la hoja del proveedor salia con la linea en blanco, aunque
+     la fecha estuviera guardada bien. Ahora hay un lector tolerante vFechaEnt(o) que entiende los
+     dos nombres, en la misma linea que vStock/vConsumo/vMaximo. Es la SEGUNDA vez que esta fecha
+     se pierde: en v1.18.0 (c) se perdia al ESCRIBIR (el insert no llenaba la columna) y ahora se
+     perdia al LEER. test_oc_print.js la verifica en la tarjeta y en la hoja para que no haya una
+     tercera.
+     OJO, la otra mitad sigue abierta: proveedor_insumo.dias_entrega esta NULL en los 40
+     proveedores, asi que proponerFecha() nunca propone y hay que ponerla a mano.
+     v1.20.0 (2026-09-05) — CHARCAS EN KG Y OC GEMELA GENERICA (auditoria, ciclos 9-10): el kg por
+     paquete de Charcas llega del bundle (parametro charcas_kg_x_paquete, antes 10 escrito aca);
+     la pantalla sigue mandando paquetes con unidad 'paq' y crear_oc guarda la OC en kg (asi la
+     recepcion cruza kg contra kg y la gemela a Altrak suma kg de verdad: antes sumaba los
+     paquetes como si fueran kg). La respuesta trae oc_gemela {proveedor, componente, kg} para
+     cualquier PS hibrido (Charcas -> Altrak, Eclipse -> Aperam) y el mensaje se arma con eso.
+     v1.19.1 (2026-09-04) — crear_oc se llama con un solo parametro (p); la overload con p_fecha_entrega se borro (auditoria).
+     v1.19.0 (2026-09-04) — SE LLAMA SECTOR, NO RUBRO, Y SIN ELEGIR NO HAY LISTA [usuario
+     2026-09-04: "no pongas rubro, sector quiero que pongas" + "si no pongo el sector y no
+     pongo el proveedor, que no me aparezca la lista"].
+     (a) La etiqueta de la botonera dice SECTOR (y tambien la hoja impresa de la OC). Es un
+         ROTULO: el campo de la base se sigue llamando GP2.orden_compra.rubro y el JS sigue
+         usando rubroSel/rubroDe -- no se renombra media pantalla por un texto.
+     (b) haySeleccion(): sin sector NI proveedor, filtradas() devuelve [] y toda la zona de
+         armar la OC (buscador, leyenda, tabla, barras y Crear OC) queda oculta detras de
+         #zonaLista; en su lugar se ve #elegiSector. Efecto de fondo importante: la pantalla
+         ya NO arranca con los ~600 insumos de la fabrica con cantidad puesta -- el sugerido
+         se carga recien cuando elegis donde estas comprando.
+
+     <!-- v1.18.0 (2026-09-04) — TAMBIEN SE VAN PRECIO Y SUBTOTAL, EL "MIN" DEBAJO DEL STOCK, Y LA
+     OC ANULADA DESAPARECE DE LA LISTA [usuario 2026-09-04: "precio se va y subtotal tambien"
+     + "lo que dice abajo de stock actual... mínimo. Eso no lo quiero ver" + "si anula una
+     orden de compra, no quiero que me siga apareciendo en ordenes"].
+     (a) La tabla de pedir queda en 5 columnas y en lo FISICO: Insumo · Proveedor · Stock
+         actual · Máximo · Pedir. La plata se mira en la barra de abajo (total de la OC, US$ y
+         $ separados + equivalente en pesos) y en la OC ya creada.
+         El precio SIGUE EN EL CIRCUITO: sale de precio_proveedor (bundle), valoriza el total
+         de la barra, viaja a crear_oc y es el que sale impreso. Lo unico que se pierde es
+         PISARLO desde esta pantalla (v1.8.0). Se fueron con la columna: celdaPrecio(), los
+         handlers de .precio-in / .mon-btn y fmtPrecio/precioPisado/simboloMon.
+     (b) Se saco el "mín N" debajo del Stock actual. El minimo sigue en la base y sigue
+         pintando el stock en ROJO cuando esta abajo: lo que se fue es el numero.
+     (c) pintarOcs() filtra estado='anulada'. Se esconde de la PANTALLA nada mas: la fila
+         sigue en GP2.orden_compra (historial, y explica una numeracion con huecos).
+     (d) 390px: la columna Proveedor se esconde y el proveedor pasa a leerse debajo del
+         codigo (.prov-mini). Con 5 columnas de ancho fijo "Pedir" -el campo que se usa-
+         quedaba fuera de pantalla; asi la tabla entra entera (328px) y no scrollea.
+
+     v1.17.0 (2026-09-04) — SE VAN CONSUMO/MES Y SUGERIDO: EL SUGERIDO YA VIENE CARGADO EN
+     "PEDIR" Y EL CARTEL LO ACLARA [usuario 2026-09-04: "que me aparezca insumo proveedor,
+     stock actual maximo... que me aparezca el sugerido directamente en pedir" + la aclaracion
+     del alcance en el mismo momento: "en resumen, tendrias que eliminar consumo mes. Y
+     sugerido... y que me aclare que es el sugerido"]. La tabla queda en 7 columnas:
+     Insumo · Proveedor · Stock actual · Maximo · Precio · Pedir · Subtotal.
+     (a) Ya no hay que tocar el numero naranja: cada fila visible llega con el sugerido puesto
+         en Pedir (cargarSugeridos(), solo filas VISIBLES, y redondea el carton a su familia).
+     (b) Debajo del campo queda notaSugerido(): "sugerido 3.562 · max 3.922 - stock 360". Dice
+         QUE es y DE DONDE sale, y sigue estando si la cantidad se pisa a mano (para ver contra
+         que se esta cambiando).
+     (c) Vaciar el campo = "este no lo pido": queda en SIN_PEDIDO y el render no lo vuelve a
+         llenar. "Usar sugeridos" borra esas marcas y repone todo; "Limpiar" hace lo contrario.
+     (d) El PRECIO SE QUEDA (se llego a sacar y el usuario aclaro el alcance): se sigue
+         pudiendo pisar, con su moneda tocable, igual que en v1.8.0.
+     (e) Se fue el detalle de consumo tocable de esta pantalla (era la celda Consumo/mes):
+         consumo-detalle.js ya no se carga aca. Sigue vivo en Pintores y OrdenProduccion.
+
+     v1.16.0 (2026-09-04) — LAS REGLAS DE RUBRO BAJAN A LA BASE [usuario 2026-09-04: "baja el
+     mapeo a datos"]. Nuevas columnas GP2.sector.oc_rubro_id (a que rubro sube el sector en la
+     OC) y GP2.sector.oc_pide (si se compra por OC), migracion sector_reglas_de_rubro_oc:
+     Alambre(13).oc_rubro_id=5 (Fleje) y Procesado(2).oc_pide=false. cargarReglasRubro() las
+     lee en boot(); el RUBRO_MAP/RUBRO_OCULTO hardcodeado queda SOLO como fallback.
+     NO se movio el sector fisico de ningun componente: el sector es la ZONA FISICA y moverlo
+     corrompe el stock. Se probo mover PA10/PEP3 a Plastico y se REVIRTIO el mismo dia
+     [usuario: "perdon, me confundi lo de los plasticos. Dejalo en sector procesado, pero no
+     va en orden de compra, porque eso serian plasticos que se mandan a serigrafear"]: son
+     plastico que sale a SERIGRAFIAR (un servicio), por eso viven en Procesado y por eso
+     ocultar Procesado en la OC es la regla correcta. La evidencia: PEP3 es "c/Serig" y en la
+     tabla vieja existe PA10B "S/Serig".
+     Ademas el sugerido YA NO RESTA lo pendiente de OC (migracion oc_sugerido_sin_pendiente_oc,
+     backend): la columna se habia sacado de pantalla en v1.15.0 y ahora la cuenta coincide.
+
+     v1.15.0 (2026-09-04) — GENERAR OC EMPIEZA POR EL RUBRO: LOS PROVEEDORES NO SE MUESTRAN
+     HASTA TOCAR UN RUBRO [usuario 2026-09-04: "separado por rubro, que no aparezcan los
+     proveedores, y cuando toco el rubro que aparezcan los proveedores"]. Al soltar el rubro
+     (o al arrancar) la botonera de proveedor y su cartel quedan ocultos (.hidden) y el
+     proveedor elegido se limpia. Ademas, dos reglas de PANTALLA sobre el rubro: el Sector
+     Alambre (13) se muestra DENTRO de Fleje (5) —el alambre es MP del fleje— y el Sector
+     Procesado (2) NO aparece en OC (Eclipse es proveedor de SERVICIO, no de insumo). Es
+     mapeo de pantalla via RUBRO_MAP/RUBRO_OCULTO + rubroDe()/ocultoRubro(): NO toca la base;
+     cuando el usuario confirme se baja a datos (mover rubro en proveedor_insumo / Eclipse a PS).
+     rubrosDistintos/provsDistintos/filtradas/itemsPedidos ahora agrupan por rubroDe(i).
+     Ademas se SACO la columna "Pend. OC" de la tabla y de la leyenda/cuenta [usuario
+     2026-09-04: "por ahora borralo"]. El backend (oc_bundle) TAMPOCO resta pendiente_oc
+     (migracion oc_sugerido_sin_pendiente_oc, 2026-09-04): sugerido = max(0, maximo - stock).
+     El dia que haya OC abiertas, lo que ya viene en camino se vuelve a pedir; si eso molesta,
+     la resta vuelve a oc_bundle (una linea).
+
+     v1.14.1 (2026-09-04) — EL "SUGERIDO" Y EL "CONSUMO/MES" SE TOCABAN CON EL DEDO Y MEDIAN
+     28x19 Y 42x19. Los dos son controles, no texto: tocando el sugerido pasa a "Pedir" y
+     tocando el consumo se abre el detalle. Ahora van con caja de 44px como el resto de los
+     botones de la casa. Lo midio el gate de UI a 390px; test_oc.js lo vigila de ahora en mas.
+
+     v1.14.0 (2026-09-03) — PEDIDO MINIMO POR FAMILIA: LAS BOLSAS, 20.000 [usuario
+     2026-09-03: "ponele veinte mil y mañana lo chequeo" — SIN CONFIRMAR].
+     Es un concepto DISTINTO del multiplo y por eso es una columna nueva
+     (carton_formato.pedido_minimo): el MULTIPLO dice de a cuanto sube el total (12.000,
+     24.000, 36.000...), el MINIMO dice cuanto hay que juntar para que el proveedor tome
+     el pedido. La Bolsa no tiene multiplo (va de a 1) pero si tiene piso, asi que con la
+     maquinaria vieja no se podia expresar.
+     "Usar sugeridos" sube la familia al piso, y bajarla a mano por debajo avisa.
+     POR QUE NO SE AFLOJA SOLO [usuario]: "ya me ha pasado que el proveedor acepta pedidos
+     mas chicos, como de diez mil, pero con un precio mas caro, entonces no quiero asumir
+     eso si no tengo la necesidad, sobre todo para el 031". O sea que pedir por debajo del
+     minimo NO es gratis: cambia el precio. Si algun dia se habilita, tiene que venir con
+     su propia lista, no bajando este numero.
+     Las bolsas ya estaban bien en lo demas: son de Envases Vihal, que ya es su propio
+     proveedor en la OC, no de Pol.
+     v1.13.0 (2026-09-03) — EL MINIMO POR CODIGO ES FIJO, NO ESCALA [usuario 2026-09-03:
+     "el formato LOKE o CHEF, acepto que el paquete viene a mil, considera que se puede
+     recibir a mil" + "los codigos de resto no siempre se piden, solamente se pide lo que
+     se necesita"].
+     REGLAS_OC_INSUMOS.md decia que el minimo por codigo ESCALA con el multiplo (pido
+     12.000 -> 1.000 de cada uno; pido 24.000 -> 2.000 de cada uno). Con esa regla, una
+     familia con muchos codigos NO TENIA NINGUN PEDIDO VALIDO: los 26 codigos de LOKE CHEF
+     x 1.000 ya se pasan de los 16.000 del multiplo, y subir al multiplo siguiente subia
+     tambien el minimo, asi que nunca cerraba. Igual C LOEKE Resto (15 codigos x 1.000
+     contra 12.000) y el Huevo con 13 codigos.
+     El minimo es el PAQUETE en que viene el carton, y es fijo. Con eso el multiplo sube y
+     entra: los 26 de LOKE CHEF cierran en 80.000. Se saco tambien la guardia de "esta
+     familia no entra", que era correcta para la regla vieja y ya no tiene caso.
+     VERIFICADO sobre los sugeridos de hoy: las 11 familias cierran (antes 3 eran
+     imposibles). El minimo sigue avisando cuando un codigo se queda corto — se ve en el
+     Huevo, el unico donde el minimo (2.000) es mayor que el paso (1.000).
+     v1.12.0 (2026-09-03) — EL PLIEGO SE PIDE DE A 100, Y EL CARTON DEL 104 ES LOKE
+     [usuario 2026-09-03: "los pliegos del quinientos, quinientos seis y bombillas se
+     tienen en paquetes de 100 pliegos" + "104 es formato Loke" + "deja recibir/pedir
+     1000 entonces" (confirma el paso de 1.000 por codigo en el Huevo)].
+     (a) EL PLIEGO ES OTRO PRODUCTO, no un carton de su formato. Los 24 pliegos llevan
+         carton_formato porque el formato dice sus POSICIONES —que es para lo que se usa
+         en el COSTO— pero la regla de PEDIDO es otra: van de a 100 pliegos. Antes el
+         Pliego 500/506 arrastraba el multiplo de 12.000 del carton C, o sea que para
+         pedir 250 pliegos la pantalla te empujaba a 12.000. Ahora reglaDe(it) mira
+         es_pliego primero y devuelve 100/100/100, y famKey los aparta en su propia
+         familia ("Pliegos LOEKE" / "Pliegos CHEF"). El 100 vive en
+         GP2.parametro.pliego_uni_x_paquete y llega por el bundle.
+     (b) K5D (Carton 104) pasa de formato C a LOKE. Su MARCA sigue en null a proposito:
+         es el unico de los 110 sin marca y no se deduce (todo apunta a CHEF —el 104 es
+         el gemelo del 581, que es LOEKE, y el patron 5xx/7xx = LOEKE/CHEF se confirma en
+         los pliegos— pero lo tiene que decir el usuario). Mientras siga null queda en
+         familia propia y no se mezcla con nadie.
+     v1.11.0 (2026-09-03) — EL HUEVO: PLIEGO DE 25.000 CON MINIMO 2.000 POR CODIGO
+     [usuario 2026-09-03: "los paquetes del carton huevo vienen de multiplos de dos mil,
+     pero el pliego viene de veinticinco mil. Entonces la realidad es que yo necesito
+     pedir un minimo de dos mil por cada una y los de veinticinco mil"].
+     OJO: LOS DOS NUMEROS NO CIERRAN ENTRE SI. Si cada codigo tuviera que ir en multiplos
+     de 2.000 la suma nunca podria dar 25.000 (25.000/2.000 = 12,5). La unica lectura
+     donde las dos frases conviven es que el 2.000 es el MINIMO por codigo y el paso
+     sigue siendo 1.000 como en C/LOKE/8 — asi quedo cargado, y esta anotado para que el
+     usuario lo confirme.
+     Consecuencia que aparece sola: con minimo 2.000 entran como mucho 12 codigos en un
+     pedido de 25.000 (13 x 2.000 = 26.000). Hoy no molesta porque la marca separa los 13
+     huevos en 11 LOEKE + 2 CHEF, pero la pantalla ahora AVISA cuando una familia no entra
+     ("N codigos x minimo se pasan del multiplo") en vez de inflar el pedido al multiplo
+     siguiente, que subiria el minimo y volveria a pasarse — un lazo infinito de plata.
+     v1.10.0 (2026-09-03) — LAS FAMILIAS DE VERDAD: MARCA + CATEGORIA, Y EL SACACORCHOS
+     ES COMODIN [usuario 2026-09-03: "dentro de C las familias son pela papas, saca corchos
+     —que sacacorcho se puede mezclar con cualquiera— y abre latas. Despues todo el resto de
+     los que son C son la misma familia y se pueden mezclar todos con todos" + "dentro del
+     formato LOKE tenes que tener clara la separacion de los articulos que se venden por
+     Loekemeyer y los que se venden por Chef ... una marca va con un pliego y la otra con
+     el otro"].
+     (a) La familia pasa a ser FORMATO + MARCA + CATEGORIA. La marca ya estaba cargada en
+         los 110 cartones, asi que el formato LOKE se parte solo en dos pedidos que ya no
+         se suman entre si. (Al dia siguiente el usuario aclaro que esos 7 "LOEKE" son en
+         realidad la SUBMARCA LOKE: hoy la familia es LOKE+LOKE con 8 codigos —los 7 mas
+         el K5D del 104— contra los 28 de CHEF. Ver CONOCIMIENTO 4g.)
+     (b) La CATEGORIA del tipo C se cargo cruzando con GP2.articulo.familia, que ya la tenia:
+         Peladores -> Pelapapas (4), Sacacorchos (7), Abrelatas (6) y todo el resto -> Resto
+         (16). No se invento ninguna clasificacion. Migracion carton_categoria_familias_tipo_c.
+     (c) EL COMODIN: carton_categoria.mezcla_libre queda prendido SOLO en Sacacorchos (antes
+         estaba en Resto, que no es lo mismo: que dentro de Resto se mezclen todos con todos
+         es ser una familia, no poder sumarse a Pelapapas). gruposCarton() no le da familia
+         propia: lo suma a la familia de su mismo formato y marca a la que MAS le falta para
+         llegar al multiplo. Si en el pedido no hay otra familia, va solo.
+     (d) Los 4 pliegos del 500/506 tienen formato C porque son 12 POSICIONES (que es para lo
+         que carton_formato se usa en el costo) pero NO son cartones: quedan sin categoria y
+         por lo tanto en su propia familia. PENDIENTE preguntarle al usuario como se piden.
+     v1.9.0 (2026-09-03) — EL CARTON SE PIDE POR FAMILIA, Y EL SUGERIDO YA SALE REDONDEADO
+     [usuario 2026-09-03, tres respuestas: el multiplo de pedido es 12.000 C / 16.000 LOKE /
+     30.000 "8"; el tipo C agrupa por categoria de pliego y la clasificacion la pasa el
+     usuario; y el sugerido tiene que redondear PARA ARRIBA solo].
+     (a) MULTIPLOS CORREGIDOS EN LA BASE: GP2.carton_formato tenia cargado el tamaño de la
+         BOLSA (pliegos_multiplo == uni_x_bolsa en las 6 filas: C 1.000, LOKE 1.000, 8
+         3.000), no el multiplo de pedido a Grafica Pol. Migracion
+         oc_carton_multiplos_familia_y_categoria. Huevo queda SIN CONFIRMAR (hoy 2.000).
+     (b) LA FAMILIA ES FORMATO + CATEGORIA: la validacion agrupaba solo por formato. Ahora
+         la clave es famKey() = carton_formato + carton_categoria, y oc_bundle devuelve la
+         categoria. Mientras carton_categoria siga VACIA en los 110 cartones (dato pendiente
+         del usuario), cada formato es una sola familia — o sea, se comporta igual que antes
+         y el dia que llegue la clasificacion empieza a agrupar sin tocar codigo.
+     (c) "Usar sugeridos" deja el carton YA VALIDO: ajustarFamilia() lleva cada codigo al
+         multiplo de codigo, aplica el piso por codigo (que escala con el multiplo) y
+         reparte lo que falta hasta el multiplo de familia, de a 1.000, empezando por el que
+         mas pidio. Siempre hacia arriba: nunca deja corto lo que hace falta. Y si se rompe
+         la regla escribiendo a mano, el cartel rojo ahora trae el boton "Ajustar al
+         multiplo" que hace la misma cuenta.
+     v1.8.0 (2026-09-03) — EL PRECIO SE PUEDE PISAR, Y LA FECHA DE ENTREGA SE GUARDA
+     [usuario 2026-09-03: "que se genere el pedido de manera automatica por el cruce
+     entre el stock que tengo y el maximo que deberia tener ... pero que si quiero
+     modificar el importe o la cantidad a pedir, pueda pedirlo"].
+     (a) La columna Precio pasa de texto a CAMPO: arranca con el de la lista
+         (precio_proveedor) y lo que se escriba pisa SOLO esta OC — el campo queda en
+         ambar y debajo se ve el de lista para no perder la referencia. Vaciarlo vuelve
+         al de lista. Al lado, un boton de moneda US$/$ (hace falta: hay insumos con
+         sugerido y SIN precio de lista, hoy BOM10, CV13 y CV18D). Subtotales y totales
+         de la barra siguen el precio pisado. NO se toca precio_proveedor: la lista
+         oficial se sigue cargando por su lado.
+     (b) crear_oc ahora RESPETA ese precio (antes lo pisaba siempre con el de la lista,
+         mandaras lo que mandaras) — migracion oc_precio_editable_y_fecha_entrega.
+     (c) BUG: la fecha de entrega estimada se elegia en pantalla, viajaba a la RPC y se
+         PERDIA. La columna orden_compra.fecha_entrega_estimada existia pero el insert
+         nunca la escribia. Ahora se guarda, en la OC y en sus gemelas (Altrak/Aperam).
+     v1.7.1 — MODULO COMPLETO DE OC POR PROVEEDOR (usuario 2026-09-03: "desarrolla el
+     modulo completo para la generacion de OCs de los insumos de todos los proveedores.
+     Con el maximo que hablamos. Tiene que funcionar contra el stock actual y el maximo.
+     Y la orden debe generarse prolija con un lugar para poner la fecha de entrega
+     estimada x prov"):
+     (1) TODOS LOS PROVEEDORES: la botonera de proveedor se muestra SIEMPRE (antes solo
+         aparecia con un rubro elegido y 2+ proveedores, asi que habia proveedores a los
+         que no se les podia armar la OC). El proveedor es la eleccion principal — la OC
+         sale con SUS insumos — y el rubro quedo como filtro de arriba: al cambiarlo el
+         proveedor solo se limpia si ese proveedor no vende nada del rubro nuevo.
+     (2) CONTRA EL MAXIMO: columna Maximo (con su origen EM/fisico/5 caj) al lado de
+         Stock y Pend. OC, y debajo del sugerido la cuenta que lo explica
+         ("max - stock"). El numero lo calcula el backend (oc_bundle):
+         sugerido = max(0, maximo - stock)  [sin pendiente_oc desde 2026-09-04].
+     (3) FECHA DE ENTREGA ESTIMADA por OC: se propone sola con los dias_entrega del
+         proveedor (hoy + dias), se puede pisar a mano y viaja a crear_oc como
+         p_fecha_entrega (ademas de p.fecha_entrega). Se ve en la tarjeta de la OC.
+     (4) HOJA IMPRESA PROLIJA: membrete, bloque de datos con la entrega estimada
+         destacada, tabla con cebra y totales por moneda, y pie de firmas.
+     v1.6.0 — esCharcasIt() detecta por proveedor solo (ya no filtra por sector 12).
+     Motivo: migracion f90(_v2) y f90b (2026-09-02) movieron F90 (id 372) y F90B
+     (id 373) al sector 5 (Fleje) con unidad='kg'. La OC a Charcas sigue pidiendo
+     en paquetes de 10 kg y disparando OC gemela a Altrak por kg de ALAM_FILTRO.
+     v1.5.0 — OC A ECLIPSE TAMBIÉN DISPARA OC GEMELA A APERAM (Fase 4 modelo Aperam->Eclipse->Cervantes, usuario 2026-09-01: "con altrak y charcas sucede lo mismo con aperam y Eclipse"). crear_oc en Supabase agrega el caso: si proveedor='Eclipse', suma kg_chapa = Σ (uni × kg_x_uni) por item, aplica desperdicio (parametro eclipse_desperdicio_pct=0 default) y crea OC gemela a 'Aperam' con esos kg de CHAPA430. Frontend muestra el N° de la gemela y sus kg en el success box. oc_bundle ya trae 1686 (sector 14 esta en _es_sector_insumo). v1.4.0 — OC A CHARCAS DISPARA OC GEMELA A ALTRAK (Fase 4 modelo Altrak->Charcas->Cervantes, usuario 2026-09-01: "a la par que se emite la orden a charcas se tiene que emitir la orden al track, porque en realidad charcas lo unico que hace es transforma el material del track"). oc_bundle amplia el where con OR proveedor='Resortes Charcas' para que 031/034 aparezcan en el listado; su stock online se busca en Virgilio (ubic 33). Nuevo helper JS esCharcasIt(i)+uniPorPaqCharcas(i): cuando el proveedor es Charcas, el sugerido se convierte de uni a paquetes de 10 kg (round up); el input queda en paquetes con "= N uni" al lado; el submit manda unidad='paq'. La RPC crear_oc detecta proveedor='Resortes Charcas' y crea automaticamente una segunda OC a 'Altrak' con Σ (paquetes × 10 × (1+desperdicio/100)) kg de ALAM_FILTRO, y enlaza las dos por numero en la nota. Success muestra el N° de la gemela y sus kg. v1.3.0 — la OC sale VALORIZADA: precio vigente y subtotal por insumo (precio_proveedor,
+     hoy regulacion 1 USD / $1000 cajas), total de lo pedido en la barra (US$ y $ separados,
+     + equivalente en pesos con el dolar del cron), precios y total en la hoja de impresion,
+     y cada OC guarda la foto historica del precio al crearla (crear_oc). v1.2.0 — la celda de consumo es TOCABLE: abre el sustento por articulo
+     (consumo-detalle.js, RPC consumo_detalle). El bundle ademas ya sale de
+     v_consumo_componente / v_consumo_fleje_kg (atribucion por articulo; hasta el 2026-09-05 se llamaba _v2).
+     v1.1.1 — fix: "Pedir" acepta decimales es-AR (12,5 ya no se convertía en 125) y la OC solo lleva los items del rubro/proveedor seleccionado. v1.1.0 — Ordenes de Compra de insumos: sugerido = consumo Est Madre x meses - stock - pendiente OC; imprimir OC -->
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Órdenes de Compra · GP2</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="../gp2-numero.js?v=20260905m"></script>
+<script src="../supabase-config.js?v=20260905k"></script>
+<script src="../gp2-ui.js?v=20260905a"></script>
+<link rel="stylesheet" href="../gp2-modulo.css?v=20260903b"/>
+<link rel="icon" type="image/png" href="../GP2_favicon.png">
+<link rel="apple-touch-icon" href="../GP2_favicon.png">
+<style>
+  .tabs{display:flex;gap:8px;margin:10px 0}
+  .tab-btn{min-height:44px;padding:10px 18px;border-radius:10px;border:2px solid #d0d7de;background:#fff;font-weight:800;font-size:17px;cursor:pointer;color:#111}
+  .tab-btn.active{background:#111;color:#fff;border-color:#111}
+  .chips{display:flex;gap:8px;flex-wrap:wrap;margin:8px 0}
+  .chip{padding:11px 16px;border-radius:22px;border:2px solid #d0d7de;background:#fff;font-weight:700;font-size:16px;cursor:pointer;color:#111;min-height:44px}
+  .chip.active{background:#0b3b73;color:#fff;border-color:#0b3b73}
+  td.num{text-align:right;font-variant-numeric:tabular-nums}
+  /* Sin Consumo/mes ni Sugerido, la tabla estirada al 100% dejaba huecos entre las
+     columnas de números. Van con ancho fijo y el sobrante se lo queda Insumo, que es
+     el que tiene texto largo: nada de espacio vacío solo para llenar la pantalla. */
+  .t-insumos th:nth-child(2),.t-insumos td:nth-child(2){width:170px}
+  .t-insumos th:nth-child(3),.t-insumos td:nth-child(3){width:120px}
+  .t-insumos th:nth-child(4),.t-insumos td:nth-child(4){width:110px}
+  .t-insumos th:nth-child(5),.t-insumos td:nth-child(5){width:230px}
+  /* Pedir es el campo principal de la pantalla: llega con el sugerido puesto. */
+  .pedir-in{width:120px;padding:10px 8px;font-size:20px;font-weight:700;text-align:right;border:2px solid #d0d7de;border-radius:8px}
+  .pedir-in.err{border-color:#eacdcd;background:#ffebee}
+  tr.con-pedido td{background:#eef7ee}
+  .paq-eq{font-size:12px;color:#0b3b73;display:block}
+  /* El proveedor dentro de la celda del insumo: solo se ve en pantalla chica. */
+  .prov-mini{display:none}
+  .barra{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin:12px 0;padding:12px;background:#f6f8fa;border-radius:10px}
+  .barra .tot{font-size:17px;font-weight:800}
+  .barra input[type=text]{padding:10px;min-height:44px;font-size:18px;border:2px solid #d0d7de;border-radius:8px;flex:1;min-width:160px}
+  .btn-crear{padding:12px 22px;font-size:18px;font-weight:800;border-radius:8px;border:2px solid #111;background:#111;color:#fff;cursor:pointer}
+  .btn-crear:disabled{opacity:.4;cursor:default}
+  .btn-sug{padding:11px 14px;min-height:44px;font-size:16px;font-weight:700;border-radius:8px;border:2px solid #ead9cd;background:#fff;color:#b45309;cursor:pointer}
+  .btn-limpiar{padding:11px 14px;min-height:44px;font-size:16px;font-weight:700;border-radius:8px;border:2px solid #d0d7de;background:#fff;cursor:pointer}
+  .regla-carton{border:2px solid #eae0cd;background:#fff8e1;color:#7a5b00;border-radius:10px;padding:8px 12px;font-size:14px;margin:8px 0}
+  .regla-carton.mal{border-color:#eacdcd;background:#ffebee;color:#b71c1c}
+  .oc-card{border:2px solid #d0d7de;border-radius:12px;padding:14px;margin:10px 0;background:#fff}
+  .oc-head{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+  .oc-head .num-oc{font-size:20px;font-weight:800}
+  .badge{padding:4px 12px;border-radius:14px;font-size:13px;font-weight:800}
+  .badge.borrador{background:#f6f8fa;color:#555;border:1px solid #d0d7de}
+  .badge.enviada{background:#e3f2fd;color:#0b3b73}
+  .badge.recibida{background:#e8f5e9;color:#0a7a2f}
+  .badge.anulada{background:#ffebee;color:#b71c1c}
+  .oc-acts{margin-left:auto;display:flex;gap:8px}
+  .oc-acts button{padding:8px 12px;font-size:14px;font-weight:700;border-radius:8px;border:2px solid #d0d7de;background:#fff;cursor:pointer}
+  .oc-acts button.env{border-color:#cddaea;color:#0b3b73}
+  .oc-acts button.rec{border-color:#cdead6;color:#0a7a2f}
+  .oc-acts button.anu{border-color:#eacdcd;color:#c62828}
+  /* Filtros: el proveedor es la eleccion principal (la OC sale con SUS insumos),
+     el rubro es un filtro de arriba. Etiqueta visible al lado de cada botonera. */
+  .filtro{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:6px 0}
+  .filtro-lb{font-size:14px;font-weight:800;color:#555;text-transform:uppercase;letter-spacing:.5px;min-width:86px}
+  .filtro .chips{margin:0;flex:1}
+  .prov-info{background:#f6f8fa;border:2px solid #e6ebf0;border-radius:10px;padding:9px 12px;font-size:15px;color:#333;margin:8px 0}
+  .leyenda{font-size:14px;color:#555;margin:8px 0 4px}
+  .sub-nota{display:block;font-size:12px;color:#777;font-weight:400}
+  .sug-calc{display:block;font-size:12px;color:#8a6d3b;font-weight:600;white-space:nowrap}
+  /* Debajo del campo: la palabra "sugerido" con el número, para que se entienda de
+     dónde salió lo que ya viene cargado (y siga estando si se pisa a mano). */
+  .sug-lb{color:#b45309;font-weight:800}
+  .rep-tag{display:block;font-size:12px;font-weight:700;white-space:nowrap}
+  .rep-pedir{color:#b71c1c}
+  .rep-viaje{color:#2e7d32}
+  .rep-pend{color:#0b3b73}
+  td.bajo-min b, td.bajo-min{color:#b71c1c}
+  .campo{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+  .campo label{font-size:16px;font-weight:800;color:#333}
+  .campo-nota{flex:1;min-width:230px}
+  .campo-nota input{flex:1;min-width:170px}
+  .barra input[type=date]{padding:9px;font-size:19px;font-weight:700;min-height:44px;border:2px solid #d0d7de;border-radius:8px;color:#111;background:#fff}
+  .ayuda{font-size:13px;color:#0b3b73}
+  .badge.entrega{background:#fff3e0;color:#8a4b00;border:1px solid #f0d9b5}
+  /* 390px: nada de scroll horizontal en la pagina (las tablas scrollean en .table-wrap) */
+  @media(max-width:430px){
+    /* En el celular los anchos fijos empujaban "Pedir" fuera de la pantalla, que es
+       justo el campo que se usa. Se sueltan los anchos, la fila se aprieta y el
+       cartel del sugerido puede cortar en dos lineas: asi entran las 5 columnas. */
+    .t-insumos th,.t-insumos td{width:auto;padding:8px 4px;font-size:14px}
+    /* La columna Proveedor se esconde en el celular: sola se comia 100px y dejaba
+       "Pedir" fuera de pantalla. El proveedor pasa a leerse abajo del insumo. */
+    .t-insumos th:nth-child(2),.t-insumos td:nth-child(2){display:none}
+    .prov-mini{display:inline}
+    .pedir-in{width:84px;font-size:19px;padding:9px 5px}
+    .sug-calc{white-space:normal}
+    .rep-tag{white-space:normal}
+    .filtro{flex-direction:column;align-items:flex-start;gap:4px}
+    .filtro-lb{min-width:0}
+    .campo,.campo-nota{width:100%}
+    .campo-nota input,.barra input[type=date]{width:100%}
+    .barra .btn-crear,.barra .btn-sug,.barra .btn-limpiar{flex:1;min-width:140px}
+  }
+</style>
+</head>
+<body>
+
+<div class="card">
+  <div class="header">
+    <h1>Órdenes de Compra · Insumos</h1>
+    <div class="hbtns"><a href="../GP2_MODULOS.html">Atrás</a></div>
+  </div>
+
+  <div class="steps">
+    <div class="tabs">
+      <button type="button" class="tab-btn active" id="tabGen">Generar OC</button>
+      <button type="button" class="tab-btn" id="tabOcs">Órdenes <span id="ocsN"></span></button>
+    </div>
+
+    <div id="panGen">
+      <div class="filtro"><span class="filtro-lb">Sector</span><div class="chips" id="rubros"></div></div>
+      <div class="filtro hidden" id="filtroProv"><span class="filtro-lb">Proveedor</span><div class="chips" id="provs"></div></div>
+      <div class="prov-info hidden" id="provInfo"></div>
+      <div class="regla-carton hidden" id="reglaCarton"></div>
+      <!-- Sin sector ni proveedor elegido no se muestra NADA de la lista [usuario
+           2026-09-04: "si no pongo el sector y no pongo el proveedor, que no me aparezca
+           la lista"]: la pantalla arranca en los botones de sector y nada mas. -->
+      <div id="zonaLista" class="hidden">
+      <div class="search-box"><input type="text" id="q" placeholder="Buscar insumo…"></div>
+      <div class="leyenda"><b>“Pedir” ya viene cargado con el sugerido</b> (<b>Máximo</b> − <b>Stock</b>): debajo de cada campo dice cuánto es el sugerido y de dónde sale. Cambiá la cantidad o <b>dejá el campo vacío</b> para no pedir ese insumo. Lo que quede en pantalla es lo que sale en la OC; <b>el total en plata está acá abajo</b>.</div>
+      <div class="table-wrap">
+        <table class="t t-insumos">
+          <thead><tr>
+            <th>Insumo</th><th>Proveedor</th>
+            <th class="num">Stock<br>actual</th><th class="num">Máximo</th>
+            <th class="num">Pedir</th>
+          </tr></thead>
+          <tbody id="tbody"></tbody>
+        </table>
+      </div>
+      <div id="tblEmpty" class="empty hidden">Sin insumos en este sector.</div>
+
+      <div class="barra">
+        <button type="button" class="btn-sug" id="btnSug">Usar sugeridos</button>
+        <button type="button" class="btn-sug hidden" id="btnViaje">Aprovechar el viaje</button>
+        <button type="button" class="btn-limpiar" id="btnLimpiar">Limpiar</button>
+        <span class="tot" id="tot">0 ítems</span>
+      </div>
+
+      <div class="barra">
+        <div class="campo">
+          <label for="fechaEnt">Entrega estimada</label>
+          <input type="date" id="fechaEnt">
+          <span class="ayuda" id="fechaAyuda"></span>
+        </div>
+        <div class="campo campo-nota">
+          <label for="nota">Nota</label>
+          <input type="text" id="nota" placeholder="Opcional: dónde entregar, contacto…">
+        </div>
+        <button type="button" class="btn-crear" id="btnCrear" disabled>Crear OC</button>
+      </div>
+      </div>
+      <div id="elegiSector" class="empty">Elegí un <b>sector</b> arriba para ver los insumos y armar la orden.</div>
+    </div>
+
+    <div id="panOcs" class="hidden">
+      <div id="ocsList"></div>
+      <div id="ocsEmpty" class="empty hidden">Todavía no hay órdenes de compra.</div>
+    </div>
+
+    <div id="status" class="status">Cargando…</div>
+  </div>
+</div>
+
+<script>
+var SB = GP2_SB();
+var $ = GP2UI.$;
+var esc = GP2UI.esc;   /* helper de la casa, gp2-ui.js (2026-09-05) */
+function fmt(n,d){ return GP2N.fmt(n, d==null?0:d, '—'); }   /* la regla de numero de la casa; '—' sin valor */
+// es-AR: punto = miles, coma = decimal ("12,5" -> 12.5; antes parseInt borraba la coma y daba 125)
+/* La regla de numero es la de la casa y vive en gp2-numero.js (idea 7217).
+   Esta pantalla ya la aplicaba bien; ahora la comparte en vez de repetirla. */
+function parseNum(s){ var x=GP2N.num(s); return x<0?0:x; }
+// total mixto: nunca inventar tipo de cambio propio — solo mostrar el del cron si vino.
+function fmtTotalMon(usd, ars){
+  var partes=[];
+  if(usd>0) partes.push('US$ '+fmt(usd,2));
+  if(ars>0) partes.push('$ '+fmt(ars,2));
+  return partes.length?partes.join(' + '):'—';
+}
+
+// Fechas: el <input type=date> trabaja en ISO (aaaa-mm-dd) y en pantalla va dd/mm/aaaa.
+// Se arma en hora LOCAL a proposito (toISOString correria un dia con el huso de AR).
+function isoLocal(d){
+  var m=String(d.getMonth()+1), dd=String(d.getDate());
+  return d.getFullYear()+'-'+(m.length<2?'0':'')+m+'-'+(dd.length<2?'0':'')+dd;
+}
+function hoyMas(dias){ var d=new Date(); d.setDate(d.getDate()+(Number(dias)||0)); return isoLocal(d); }
+function fmtFecha(iso){
+  if(!iso) return '';
+  var p=String(iso).slice(0,10).split('-');
+  return p.length===3 ? (p[2]+'/'+p[1]+'/'+p[0]) : String(iso);
+}
+// Lectura tolerante del bundle: el contrato nuevo manda stock / consumo_uni_mes / maximo,
+// el viejo mandaba online / consumo. La pantalla entiende los dos y no se rompe si falta.
+function vStock(i){ return i.stock!=null ? Number(i.stock) : (i.online!=null?Number(i.online):null); }
+function vConsumo(i){ return i.consumo_uni_mes!=null ? Number(i.consumo_uni_mes) : (i.consumo!=null?Number(i.consumo):null); }
+function vMaximo(i){ return i.maximo!=null ? Number(i.maximo) : null; }
+function vPend(i){ return Number(i.pendiente_oc)||0; }
+function vMinimo(i){ return i.minimo!=null ? Number(i.minimo) : null; }
+/* EL GATILLO DE REPOSICION: el MINIMO dispara, el MAXIMO dimensiona.
+   Hasta v1.20.1 la pantalla proponia llenar el techo de TODO lo que estuviera un peso
+   abajo del maximo: una corrida completa daban ~ARS 367 M en 201 lineas, con techos de
+   6 meses en carton y fleje que se reciben todas las semanas. El punto de pedido ya
+   existe en la base (inventario.minimo, cargado en 1.079 de 1.085 filas) y viaja en el
+   bundle; lo unico que faltaba era mirarlo. No se crea ningun campo nuevo.
+     'pedir'       stock <= minimo  -> hay que pedirlo, y se pide hasta el maximo.
+     'viaje'       stock  > minimo  -> todavia no hace falta. No se carga solo; se puede
+                                       sumar a mano o con "Aprovechar el viaje" (el carton
+                                       lo necesita para llegar al multiplo de la familia).
+     'sin-gatillo' no hay con que decidir (sin minimo, sin stock, o minimo >= maximo, que
+                   es config rota) -> se comporta como antes y se carga solo. Es a
+                   proposito: ante la duda, que NO se esconda algo que hace falta. */
+function estadoRepo(i){
+  var st=vStock(i), mn=vMinimo(i), mx=vMaximo(i);
+  if(st==null || mn==null) return 'sin-gatillo';
+  if(mx!=null && mn>=mx) return 'sin-gatillo';
+  return st<=mn ? 'pedir' : 'viaje';
+}
+// La OC guarda la fecha en orden_compra.fecha_entrega_estimada y asi la emite oc_bundle;
+// el payload que se MANDA a crear_oc la llama fecha_entrega. Se leen las dos: la fecha ya se
+// perdio una vez por esta diferencia de nombre (ver changelog v1.18.0) y no se pierde de nuevo.
+function vFechaEnt(o){ return o.fecha_entrega_estimada || o.fecha_entrega || ''; }
+// De donde viene el maximo (CONOCIMIENTO_GP2 §2e-bis): est_madre = derivado del consumo,
+// fisico / cinco_cajones = lo que entra fisicamente en el lugar.
+function tagOrigen(o){
+  o=String(o||'');
+  if(o==='est_madre') return 'EM';
+  if(o==='cinco_cajones') return '5 caj';
+  if(o==='fisico') return 'físico';
+  return o;
+}
+// La cuenta que explica el sugerido, debajo del numero: que nadie tenga que adivinarlo.
+function explicaSug(i){
+  // La columna "Pend. OC" se sacó de la pantalla [usuario 2026-09-04: "por ahora borralo"],
+  // así que la cuenta tampoco la menciona.
+  var mx=vMaximo(i), st=vStock(i);
+  if(mx!=null) return 'máx '+fmt(mx)+' − stock '+fmt(st==null?0:st);
+  var c=vConsumo(i);
+  if(c!=null && i.meses!=null) return 'cons '+fmt(c,1)+' × '+i.meses+' m − stock '+fmt(st==null?0:st);
+  return '';
+}
+
+var D={}, PAQ=250, PAQ_PLIEGO=100, rubroSel=null, provSel=null;
+var PEDIDO={}; // comp_id -> cantidad
+/* Insumos que el usuario DEJO VACIOS a proposito. Como el sugerido ahora se carga
+   solo en "Pedir", sin esta marca cada render volveria a llenar lo que el acaba de
+   borrar. Se limpia con "Usar sugeridos". */
+var SIN_PEDIDO={}; // comp_id -> true
+/* Precio y Subtotal SALIERON DE LA TABLA en v1.18.0 [usuario 2026-09-04: "precio se va
+   y subtotal tambien"]. La pantalla de pedir quedo en lo fisico (que hay, cuanto entra,
+   cuanto pido) y la plata se mira en la barra de abajo y en la OC ya creada.
+   El precio NO desaparecio del circuito: precioDe/monedaDe siguen leyendo el de
+   precio_proveedor (que llega en el bundle), valorizan el total de la barra, viajan a
+   crear_oc y son los que salen en la hoja impresa. Lo unico que ya no se puede es
+   PISARLO desde esta pantalla. Estos dos objetos son el canal: si vuelve a hacer falta
+   pisarlo, se repone la celda y funciona. */
+var PRECIO={};   // comp_id -> precio pisado
+var MONEDA={};   // comp_id -> 'USD' | 'ARS' pisada
+function precioDe(i){ return PRECIO[i.comp_id]!=null ? PRECIO[i.comp_id] : (i.precio!=null?Number(i.precio):null); }
+function monedaDe(i){ return MONEDA[i.comp_id] || i.moneda || 'ARS'; }
+// Fecha de entrega: se propone sola (hoy + dias_entrega del proveedor). Si el usuario la
+// pisa a mano, se respeta mientras siga en el mismo proveedor.
+var fechaTocada=false, fechaTocadaProv=null;
+
+async function boot(){
+  var r=await SB.rpc('oc_bundle');
+  if(r.error){ $('status').textContent='Error: '+r.error.message; return; }
+  D=r.data||{};
+  PAQ=Number(D.paq)||250;
+  await cargarReglasRubro();
+  pintarRubros();
+  proponerFecha();
+  pintarOcs();
+  $('status').textContent='';
+}
+
+/* Pliegos por paquete: el pliego se pide y se recibe de a 100 [usuario 2026-09-03:
+   "los pliegos del quinientos, quinientos seis y bombillas se tienen en paquetes de
+   100 pliegos"]. Vive en GP2.parametro y llega en el bundle; el 100 de aca es solo
+   el default por si el parametro no esta. */
+function paqPliego(){ return Number(D.pliego_uni_x_paquete)||PAQ_PLIEGO; }
+
+/* El RUBRO de la OC es el SECTOR del componente, con dos reglas de PANTALLA
+   [usuario 2026-09-04]: el Alambre (13) se muestra dentro de Fleje (5) —el alambre es
+   materia prima del fleje— y el Procesado (2) NO se pide por OC (Eclipse es proveedor de
+   SERVICIO, no de insumo). Es mapeo de pantalla: NO toca la base. Si algún día se baja a
+   datos, se saca de acá. */
+/* Desde el 2026-09-04 la regla VIVE EN LA BASE: GP2.sector.oc_rubro_id (a que rubro sube
+   este sector) y GP2.sector.oc_pide (si se compra por OC). Lo de aca abajo es solo el
+   FALLBACK por si la consulta falla, para que la pantalla nunca quede sin agrupar.
+   No se movio el sector fisico de ningun componente a proposito: el sector es la ZONA
+   FISICA y moverlo corrompe el stock. */
+var RUBRO_MAP={13:5};          // alambre -> fleje
+var RUBRO_OCULTO={2:true};     // procesado (serigrafia = servicio) no se compra por OC
+async function cargarReglasRubro(){
+  try{
+    var r=await SB.from('sector').select('id,oc_rubro_id,oc_pide');
+    if(r.error || !r.data || !r.data.length) return;   // se queda con el fallback
+    var map={}, ocu={};
+    r.data.forEach(function(s){
+      var id=Number(s.id);
+      if(s.oc_rubro_id!=null && Number(s.oc_rubro_id)!==id) map[id]=Number(s.oc_rubro_id);
+      if(s.oc_pide===false) ocu[id]=true;
+    });
+    RUBRO_MAP=map; RUBRO_OCULTO=ocu;
+  }catch(e){ /* sin conexion a la tabla: fallback */ }
+}
+function rubroDe(i){ var s=Number(i.sector_id); return RUBRO_MAP[s]||s; }
+function ocultoRubro(i){ return !!RUBRO_OCULTO[Number(i.sector_id)]; }
+// Nombre del rubro: prioriza el sector canónico (5 = "Fleje"), no el del alambre mapeado.
+function nombreRubro(id){
+  var xs=(D.insumos||[]);
+  var it=xs.filter(function(x){ return Number(x.sector_id)===id; })[0]
+       || xs.filter(function(x){ return rubroDe(x)===id; })[0];
+  return it ? String(it.sector).replace(/^Sector\s+/i,'') : String(id);
+}
+function rubrosDistintos(){
+  var seen={}, out=[];
+  (D.insumos||[]).forEach(function(i){
+    if(ocultoRubro(i)) return;
+    var id=rubroDe(i);
+    if(!seen[id]){ seen[id]=true; out.push({id:id, nombre:nombreRubro(id)}); }
+  });
+  return out;
+}
+
+function pintarRubros(){
+  var g=$('rubros'); g.innerHTML='';
+  rubrosDistintos().forEach(function(rb){
+    var b=document.createElement('button'); b.type='button'; b.className='chip'+(rubroSel===rb.id?' active':''); b.textContent=rb.nombre;
+    b.addEventListener('click',function(){
+      rubroSel=(rubroSel===rb.id?null:rb.id);
+      // El proveedor NO se limpia siempre: solo si ya no vende nada de este rubro. Asi se
+      // puede elegir primero el proveedor (que es como se arma la OC) y despues afinar.
+      if(provSel!=null && provsDistintos().indexOf(provSel)<0) provSel=null;
+      pintarRubros();
+      proponerFecha();
+    });
+    g.appendChild(b);
+  });
+  pintarProvs();
+  render();
+}
+
+// Todos los proveedores que tienen insumos en el rubro elegido (o TODOS si no hay rubro).
+// Antes esta lista solo aparecia con un rubro elegido y 2+ proveedores: a un proveedor
+// solitario o de varios rubros no se le podia armar la OC.
+function provsDistintos(){
+  var seen={}, out=[];
+  (D.insumos||[]).forEach(function(i){
+    if(ocultoRubro(i)) return;
+    if(rubroSel!=null && rubroDe(i)!==rubroSel) return;
+    var p=i.proveedor||'(sin proveedor)';
+    if(!seen[p]){ seen[p]=true; out.push(p); }
+  });
+  out.sort(function(a,b){ return String(a).localeCompare(String(b),'es'); });
+  return out;
+}
+
+function pintarProvs(){
+  var g=$('provs'), wrap=$('filtroProv'), info=$('provInfo');
+  g.innerHTML='';
+  // Los proveedores NO se muestran hasta tocar un rubro [usuario 2026-09-04:
+  // "que no me aparezcan los proveedores, y cuando toco el rubro que aparezcan"].
+  if(rubroSel==null){
+    if(provSel!=null) provSel=null;
+    if(wrap) wrap.classList.add('hidden');
+    if(info) info.classList.add('hidden');
+    return;
+  }
+  if(wrap) wrap.classList.remove('hidden');
+  if(info) info.classList.remove('hidden');
+  provsDistintos().forEach(function(p){
+    var b=document.createElement('button'); b.type='button'; b.className='chip'+(provSel===p?' active':''); b.textContent=p;
+    b.addEventListener('click',function(){
+      provSel=(provSel===p?null:p);
+      pintarProvs(); proponerFecha(); render();
+    });
+    g.appendChild(b);
+  });
+  pintarProvInfo();
+}
+
+// Datos del proveedor tal como los manda oc_bundle (lista proveedores con dias_entrega).
+function nombreProv(p){ return String((p&&(p.nombre||p.proveedor||p.prov))||''); }
+function provInfo(nom){
+  if(!nom) return null;
+  var k=String(nom).trim().toLowerCase(), ps=D.proveedores||[];
+  for(var x=0;x<ps.length;x++) if(nombreProv(ps[x]).trim().toLowerCase()===k) return ps[x];
+  return null;
+}
+function diasEntregaProv(nom){
+  var p=provInfo(nom), d=p?Number(p.dias_entrega):NaN;
+  if(!(isFinite(d)&&d>0)){
+    // por si el plazo viaja en la fila del insumo en vez de la lista de proveedores
+    var it=(D.insumos||[]).filter(function(i){ return (i.proveedor||'')===nom && i.dias_entrega!=null; })[0];
+    d = it?Number(it.dias_entrega):NaN;
+  }
+  return (isFinite(d)&&d>0)?d:null;
+}
+
+function pintarProvInfo(){
+  var el=$('provInfo');
+  if(!el) return;
+  if(provSel==null){
+    el.innerHTML='<b>Elegí un proveedor</b> — la orden sale sólo con SUS insumos, y con las partes del sector que elegiste arriba.';
+    return;
+  }
+  var xs=(D.insumos||[]).filter(function(i){
+    return (i.proveedor||'(sin proveedor)')===provSel && (rubroSel==null || i.sector_id===rubroSel);
+  });
+  var conSug=xs.filter(function(i){ return i.sugerido>0; }).length;
+  var d=diasEntregaProv(provSel);
+  el.innerHTML='<b>'+esc(provSel)+'</b> · '+xs.length+' insumo'+(xs.length===1?'':'s')+
+    ' · '+conSug+' con sugerido'+(d!=null?(' · entrega en '+d+' día'+(d===1?'':'s')):' · sin plazo de entrega cargado');
+}
+
+// Propone hoy + dias_entrega del proveedor. No pisa lo que el usuario escribio a mano
+// mientras siga parado en el mismo proveedor.
+function proponerFecha(){
+  var inp=$('fechaEnt');
+  if(!inp) return;
+  if(!(fechaTocada && fechaTocadaProv===provSel)){
+    var d=(provSel!=null)?diasEntregaProv(provSel):null;
+    inp.value = (d!=null) ? hoyMas(d) : '';
+    fechaTocada=false; fechaTocadaProv=null;
+  }
+  pintarAyudaFecha();
+}
+function pintarAyudaFecha(){
+  var ay=$('fechaAyuda');
+  if(!ay) return;
+  if(provSel==null){ ay.textContent='Elegí el proveedor y se propone sola.'; return; }
+  var d=diasEntregaProv(provSel);
+  if(fechaTocada) ay.textContent='Puesta a mano para '+provSel+'.';
+  else if(d!=null) ay.textContent='Hoy + '+d+' día'+(d===1?'':'s')+' ('+provSel+').';
+  else ay.textContent=provSel+' no tiene plazo cargado: ponela a mano.';
+}
+
+/* Sin sector NI proveedor elegido no hay lista [usuario 2026-09-04: "si no pongo el
+   sector y no pongo el proveedor, que no me aparezca la lista"]. Devolver [] de una
+   tiene un efecto de fondo: cargarSugeridos() tampoco carga nada, asi que la pantalla
+   ya no arranca con TODOS los insumos de la fabrica con cantidad puesta. */
+function haySeleccion(){ return rubroSel!=null || provSel!=null; }
+function filtradas(){
+  if(!haySeleccion()) return [];
+  var q=($('q').value||'').trim().toLowerCase();
+  return (D.insumos||[]).filter(function(i){
+    if(ocultoRubro(i)) return false;
+    if(rubroSel!=null && rubroDe(i)!==rubroSel) return false;
+    if(provSel!=null && (i.proveedor||'(sin proveedor)')!==provSel) return false;
+    if(q && !(((i.codigo||'')+' '+(i.descripcion||'')+' '+(i.proveedor||'')).toLowerCase().includes(q))) return false;
+    return true;
+  });
+}
+
+function esCharcasIt(i){
+  // Cualquier componente cuyo proveedor sea Resortes Charcas se pide en paquetes
+  // de 10 kg. Antes filtraba tambien por sector_id=12; desde la migracion
+  // f90_alambre_filtro_cafe_y_cod_prov_charcas_v2 (2026-09-02) los flejes F90/F90B
+  // viven en sector 5 (Fleje). uniPorPaqCharcas() sigue valido: 10 / kg_x_uni.
+  return i && String(i.proveedor||'').trim().toLowerCase()==='resortes charcas';
+}
+// Kg de producto por paquete de Charcas: vive en GP2.parametro (charcas_kg_x_paquete) y llega
+// en el bundle; el 10 de aca es solo el default por si el parametro no esta. crear_oc usa el
+// mismo parametro para guardar la OC en kg (la pantalla manda paquetes con unidad 'paq').
+function kgPorPaqCharcas(){ return Number(D.charcas_kg_x_paquete)||10; }
+// Uni por paquete de Charcas: kg del paquete / kg_x_uni.
+function uniPorPaqCharcas(i){ return i && i.kg_x_uni>0 ? Math.round(kgPorPaqCharcas() / Number(i.kg_x_uni)) : 0; }
+
+// Cuanto se carga en "Pedir" cuando se toma el sugerido. Charcas viene en uni y se
+// pide en paquetes de 10 kg: se convierte y se redondea PARA ARRIBA (no quedar corto).
+function valorSugerido(i){
+  if(!(i && i.sugerido>0)) return 0;
+  if(esCharcasIt(i)){
+    var uxp=uniPorPaqCharcas(i);
+    if(uxp>0) return Math.max(1, Math.ceil(i.sugerido/uxp));
+  }
+  return i.sugerido;
+}
+
+/* El sugerido se carga SOLO en "Pedir" [usuario 2026-09-04: "que me aparezca el
+   sugerido directamente en pedir"]. Ya no hay columna Sugerido para tocar: la fila
+   llega con la cantidad puesta y el que quiera cambiarla la pisa, y el que no quiera
+   pedir ese insumo VACIA el campo (queda en SIN_PEDIDO y no se vuelve a llenar).
+   Solo se llenan las filas VISIBLES: lo de otro rubro/proveedor no se toca. */
+function cargarSugeridos(){
+  var toco=false;
+  filtradas().forEach(function(i){
+    if(PEDIDO[i.comp_id]!=null || SIN_PEDIDO[i.comp_id]) return;
+    // El gatillo (v1.21.0): lo que todavia esta arriba del minimo NO se carga solo.
+    if(estadoRepo(i)==='viaje') return;
+    // Y lo que YA se pidio y viene en camino tampoco: se avisa en la fila y decide el
+    // usuario. Es AVISO, no resta -- la resta se saco en v1.19.x porque rompia la cuenta
+    // a la vista [usuario 2026-09-04: "por ahora borralo"].
+    if(vPend(i)>0) return;
+    var v=valorSugerido(i);
+    if(v>0){ PEDIDO[i.comp_id]=v; toco=true; }
+  });
+  // El carton se pide por familia: si entro un sugerido nuevo, se redondea al
+  // multiplo para que la OC no nazca invalida (misma logica que "Usar sugeridos").
+  if(toco) ajustarPedidoCarton();
+}
+
+/* El cartelito debajo del campo Pedir: DICE que ese numero es el sugerido y de donde
+   sale [usuario 2026-09-04: "que me aclare que es el sugerido"]. Se muestra siempre,
+   tambien si la cantidad se piso a mano — asi se ve contra que se esta cambiando. */
+function notaSugerido(i){
+  var v=valorSugerido(i);
+  if(!(v>0)) return '';
+  var calc=explicaSug(i);
+  return '<span class="sug-calc"><span class="sug-lb">sugerido '+fmt(v)+'</span>'+
+    (calc?(' · '+esc(calc)):'')+'</span>';
+}
+
+/* El cartelito de POR QUE esa fila esta (o no esta) cargada: el estado del gatillo y,
+   si corresponde, el aviso de lo que ya viene en camino. */
+function notaRepo(i){
+  var out='', e=estadoRepo(i), mn=vMinimo(i);
+  if(e==='pedir') out+='<span class="rep-tag rep-pedir">hay que pedir · stock ≤ mín '+fmt(mn)+'</span>';
+  else if(e==='viaje') out+='<span class="rep-tag rep-viaje">no hace falta · mín '+fmt(mn)+'</span>';
+  var pe=vPend(i);
+  if(pe>0) out+='<span class="rep-tag rep-pend">ya pediste '+fmt(pe)+' '+esc(i.unidad||'')+' (en camino)</span>';
+  return out;
+}
+
+function render(){
+  cargarSugeridos();
+  var fs=filtradas();
+  $('tbody').innerHTML=fs.map(function(i){
+    var ped=PEDIDO[i.comp_id]||'';
+    var esCarton=i.sector_id===10;
+    var esChar=esCharcasIt(i);
+    var uxpChar=esChar ? uniPorPaqCharcas(i) : 0;
+    var st=vStock(i), mx=vMaximo(i), pe=vPend(i);
+    var bajoMin=(i.minimo!=null && st!=null && st<Number(i.minimo));
+    // Charcas: input en PAQUETES; el sugerido se convierte a paq (round up).
+    // La equivalencia "= N uni" se muestra al lado del input.
+    var paqEq=(esCarton && ped>0)?('<span class="paq-eq">= '+fmt(ped/PAQ,1)+' paq de '+PAQ+'</span>')
+             :(esChar && ped>0 && uxpChar>0)?('<span class="paq-eq">= '+fmt(ped*uxpChar)+' uni</span>'):'';
+    return '<tr data-id="'+i.comp_id+'"'+(ped>0?' class="con-pedido"':'')+'>'+
+      '<td><b>'+esc(i.codigo||'—')+'</b><br><small style="color:#777">'+esc(i.descripcion||'')+
+        (i.carton_formato?(' · Formato '+esc(i.carton_formato)):'')+
+        // En el celular la columna Proveedor se esconde (no entraba y dejaba "Pedir"
+        // fuera de pantalla) y el proveedor se lee acá mismo. Nada se pierde.
+        '<span class="prov-mini"> · '+esc(i.proveedor||'—')+'</span></small></td>'+
+      '<td>'+esc(i.proveedor||'—')+'</td>'+
+      // El "mín N" debajo del stock se saco [usuario 2026-09-04: "eso no lo quiero ver"].
+      // El minimo sigue vivo en la base y sigue pintando el stock en rojo cuando esta abajo.
+      '<td class="num'+(bajoMin?' bajo-min':'')+'">'+(st==null?'—':(fmt(st)+' '+esc(i.unidad)))+'</td>'+
+      '<td class="num">'+(mx==null?'—':fmt(mx))+
+        (mx!=null&&i.maximo_origen?('<span class="sub-nota">'+esc(tagOrigen(i.maximo_origen))+'</span>'):'')+'</td>'+
+      '<td class="num"><input class="pedir-in" data-in="'+i.comp_id+'" inputmode="decimal" value="'+(ped?String(ped).replace('.',','):'')+'" placeholder="'+i.unidad+'">'+paqEq+
+        notaSugerido(i)+notaRepo(i)+'</td>'+
+    '</tr>';
+  }).join('');
+  // Toda la zona de armar la OC (buscador, leyenda, tabla y barras) aparece recien
+  // cuando hay sector o proveedor elegido; hasta entonces solo se ve el cartel.
+  $('zonaLista').classList.toggle('hidden', !haySeleccion());
+  $('elegiSector').classList.toggle('hidden', haySeleccion());
+  $('tblEmpty').classList.toggle('hidden', fs.length>0);
+  // "Aprovechar el viaje": los que todavia no hacen falta, para sumarlos a esta OC de
+  // una (el carton lo necesita para completar el multiplo de la familia). Aparece solo
+  // si hay alguno sin cargar.
+  var nViaje=fs.filter(function(i){ return estadoRepo(i)==='viaje' && PEDIDO[i.comp_id]==null && valorSugerido(i)>0; }).length;
+  var bv=$('btnViaje');
+  bv.classList.toggle('hidden', nViaje===0);
+  bv.textContent='Aprovechar el viaje ('+nViaje+')';
+
+  document.querySelectorAll('.pedir-in').forEach(function(inp){
+    inp.addEventListener('change',function(){
+      var v=parseNum(inp.value);
+      var id=Number(inp.dataset.in);
+      // Vaciar el campo = "este no lo pido": queda anotado en SIN_PEDIDO para que el
+      // sugerido NO se vuelva a cargar solo en el proximo render.
+      if(v>0){ PEDIDO[id]=v; delete SIN_PEDIDO[id]; }
+      else { delete PEDIDO[id]; SIN_PEDIDO[id]=true; }
+      render(); barra();
+    });
+  });
+  barra();
+}
+
+/* Solo los pedidos del rubro/proveedor seleccionado: lo cargado en otros chips
+   queda guardado para su propia OC, no se mezcla en la OC de este rubro. */
+function itemsPedidos(){
+  return (D.insumos||[]).filter(function(i){
+    if(!(PEDIDO[i.comp_id]>0)) return false;
+    if(ocultoRubro(i)) return false;
+    if(rubroSel!=null && rubroDe(i)!==rubroSel) return false;
+    if(provSel!=null && (i.proveedor||'(sin proveedor)')!==provSel) return false;
+    return true;
+  }).map(function(i){
+    // Charcas: el PEDIDO viene ya en paquetes; unidad='paq' para la RPC
+    // (crear_oc se encarga de la OC gemela a Altrak).
+    var u = esCharcasIt(i) ? 'paq' : i.unidad;
+    return {comp_id:i.comp_id, cantidad:PEDIDO[i.comp_id], unidad:u,
+            precio:precioDe(i), moneda:monedaDe(i), it:i};
+  });
+}
+
+/* ===== Cartones: como se pide cada familia (REGLAS_OC_INSUMOS.md) =====
+   El carton NO se pide codigo por codigo: se pide por FAMILIA. El total de la
+   familia va en multiplos de pliegos_multiplo (C 12.000 · LOKE 16.000 · "8"
+   30.000 · Huevo 25.000, confirmado por el usuario 2026-09-03), cada codigo de a
+   codigo_multiplo (1.000) y con un MINIMO POR CODIGO FIJO — el paquete en que
+   viene el carton [usuario 2026-09-03: "el paquete viene a mil, se puede recibir
+   a mil"]. NO escala con el multiplo, aunque REGLAS_OC_INSUMOS.md decia que si:
+   con el minimo escalado, una familia con muchos codigos no tenia NINGUN pedido
+   valido (26 codigos LOKE CHEF x 1.000 ya se pasan de 16.000, y subir al multiplo
+   siguiente subia tambien el minimo, asi que nunca cerraba). Con el minimo fijo
+   sube el multiplo y entra. Ademas [usuario]: "los codigos de resto no siempre se
+   piden, solamente se pide lo que se necesita" — el minimo corre para los codigos
+   QUE ENTRAN en el pedido, no para todos los de la familia.
+   La familia es formato + categoria de pliego: el tipo C agrupa por categoria
+   (Pisapapas, Pelapapas, Sacacorchos, Abrelatas, Resto) y solo en Resto se puede
+   mezclar cualquier codigo. Mientras carton_categoria siga vacia en la base cada
+   formato es una sola familia, que es como venia funcionando. */
+/* La familia de pedido es FORMATO + MARCA + CATEGORIA:
+     - marca: el formato LOKE lo usan las dos marcas y NO se piden juntas [usuario
+       2026-09-03: "los dos usan formato LOKE, pero una marca va con un pliego y la
+       otra con el otro"]. Vale para todos los formatos: el pliego es de una marca.
+     - categoria: solo el tipo C la tiene (Pelapapas, Sacacorchos, Abrelatas, Resto). */
+function famKey(it){
+  // El pliego no comparte familia con los cartones de su formato: es otro producto.
+  if(it.es_pliego) return 'PLIEGO|'+String(it.marca||'(sin marca)')+'|';
+  return String(it.carton_formato||'')+'|'+String(it.marca||'(sin marca)')+'|'+String(it.carton_categoria||'');
+}
+/* Base = formato + marca, sin la categoria: es el universo dentro del cual el comodin
+   se puede mover (un sacacorchos LOEKE no completa un pedido CHEF). */
+function famBase(it){
+  if(it.es_pliego) return 'PLIEGO|'+String(it.marca||'(sin marca)');
+  return String(it.carton_formato||'')+'|'+String(it.marca||'(sin marca)');
+}
+function famLabel(it){
+  if(it.es_pliego) return 'Pliegos'+(it.marca?(' '+it.marca):'');
+  return 'Formato '+String(it.carton_formato||'')+
+         (it.marca?(' '+it.marca):'')+
+         (it.carton_categoria?(' · '+it.carton_categoria):'');
+}
+/* Reglas de pedido de UN item. El PLIEGO es el caso aparte: lleva carton_formato
+   porque el formato dice sus POSICIONES (para el costo), pero no se pide por la
+   familia de ese formato — se pide de a 100 pliegos, y punto [usuario 2026-09-03].
+   Por eso el pliego del 500 (formato C) no arrastra el multiplo de 12.000. */
+function reglaDe(it){
+  if(!it || it.sector_id!==10) return null;
+  if(it.es_pliego){
+    var q=paqPliego();
+    return {pliegos_multiplo:q, codigo_multiplo:q, min_codigo_x_multiplo:q, pedido_minimo:0, pliego:true};
+  }
+  if(!(it.pliegos_multiplo>0)) return null;
+  return {pliegos_multiplo:Number(it.pliegos_multiplo),
+          codigo_multiplo:Number(it.codigo_multiplo)||1,
+          min_codigo_x_multiplo:Number(it.min_codigo_x_multiplo)||0,
+          // PEDIDO MINIMO de la familia: cosa distinta del multiplo. El multiplo dice de
+          // a cuanto sube el total; el minimo, cuanto hay que juntar para que el proveedor
+          // lo tome. Hoy solo lo tiene la Bolsa (20.000, Envases Vihal).
+          pedido_minimo:Number(it.pedido_minimo)||0, pliego:false};
+}
+function esCartonRegla(it){ return !!reglaDe(it); }
+function techo(n,m){ m=Number(m)||0; return m>0 ? Math.ceil(n/m)*m : n; }
+
+/* Arma las familias del pedido. El COMODIN (categoria con mezcla_libre; hoy solo
+   Sacacorchos) no forma familia propia: se suma a la familia de su mismo formato y
+   marca a la que MAS le falta para llegar al multiplo, que es exactamente para lo
+   que sirve [usuario 2026-09-03: "sacacorcho se puede mezclar con cualquiera"]. Si
+   en el pedido no hay ninguna otra familia, entonces si va sola.
+   Recibe [{cantidad, it}] y devuelve [{cf, lbl, xs:[...]}]. */
+function gruposCarton(items){
+  var g={};
+  items.forEach(function(x){
+    if(!esCartonRegla(x.it)) return;
+    var k=famKey(x.it);
+    if(!g[k]) g[k]={cf:x.it, xs:[], comodin:!!x.it.mezcla_libre};
+    g[k].xs.push(x);
+  });
+  var fijas={}, libres={};
+  Object.keys(g).forEach(function(k){
+    if(g[k].comodin) (libres[famBase(g[k].cf)]=libres[famBase(g[k].cf)]||[]).push(g[k]);
+    else fijas[k]=g[k];
+  });
+  Object.keys(libres).forEach(function(base){
+    var cand=Object.keys(fijas).filter(function(k){ return famBase(fijas[k].cf)===base; });
+    if(!cand.length){ libres[base].forEach(function(grp,n){ fijas[base+'|comodin'+n]=grp; }); return; }
+    var elegida=cand.map(function(k){
+      var pm=(reglaDe(fijas[k].cf)||{}).pliegos_multiplo||1;
+      var t=fijas[k].xs.reduce(function(a,x){return a+x.cantidad;},0);
+      return {k:k, falta:Math.ceil(t/pm)*pm-t};
+    }).sort(function(a,b){ return b.falta-a.falta; })[0].k;
+    libres[base].forEach(function(grp){
+      fijas[elegida].xs=fijas[elegida].xs.concat(grp.xs);
+      fijas[elegida].conComodin=true;
+    });
+  });
+  return Object.keys(fijas).map(function(k){
+    var grp=fijas[k];
+    return {cf:grp.cf, xs:grp.xs,
+            lbl:famLabel(grp.cf)+(grp.conComodin?' (+ sacacorchos)':'')};
+  });
+}
+
+function validarCarton(items){
+  var errores=[];
+  gruposCarton(items).forEach(function(grupo){
+    var xs=grupo.xs, cf=reglaDe(grupo.cf), lbl=grupo.lbl;
+    var total=xs.reduce(function(a,x){return a+x.cantidad;},0);
+    if(cf.pedido_minimo > 0 && total < cf.pedido_minimo){
+      errores.push(lbl+': el pedido mínimo es '+fmt(cf.pedido_minimo)+' y hay '+fmt(total)+'.');
+      return;
+    }
+    if(total % cf.pliegos_multiplo !== 0){
+      errores.push(lbl+': el total ('+fmt(total)+') debe ser múltiplo de '+fmt(cf.pliegos_multiplo)+'.');
+      return;
+    }
+    // El minimo por codigo es FIJO: es el PAQUETE en que viene el carton, no una cuota
+    // que crezca con el pedido [usuario 2026-09-03: "el paquete viene a mil, se puede
+    // recibir a mil"]. Ver el comentario de arriba: la doc vieja decia que escalaba.
+    var minCod=cf.min_codigo_x_multiplo;
+    xs.forEach(function(x){
+      if(x.cantidad % cf.codigo_multiplo !== 0)
+        errores.push(lbl+' · '+x.it.codigo+': '+fmt(x.cantidad)+' no es múltiplo de '+fmt(cf.codigo_multiplo)+'.');
+      else if(x.cantidad < minCod)
+        errores.push(lbl+' · '+x.it.codigo+': mínimo '+fmt(minCod)+' por código.');
+    });
+  });
+  return errores;
+}
+
+/* Lleva una familia a un pedido valido, SIEMPRE para arriba (nunca deja corto lo
+   que hace falta): cada codigo al multiplo de codigo, el piso por codigo, y lo
+   que falte hasta el multiplo de familia repartido de a codigo_multiplo
+   empezando por el que mas pidio. Devuelve {comp_id: cantidad} o null si la
+   familia no tiene regla. */
+function ajustarFamilia(xs){
+  var cf=xs[0];
+  var pm=Number(cf.pliegos_multiplo)||0, cm=Number(cf.codigo_multiplo)||1, mc=Number(cf.min_codigo_x_multiplo)||0;
+  var pmin=Number(cf.pedido_minimo)||0;
+  if(!(pm>0)) return null;
+  var q={};
+  xs.forEach(function(x){ q[x.comp_id]=techo(Math.max(0,Number(x.cant)||0), cm); });
+  var ids=Object.keys(q);
+  if(!ids.length) return null;
+  for(var iter=0; iter<25; iter++){
+    var total=ids.reduce(function(a,k){ return a+q[k]; },0);
+    var mult=Math.max(1, Math.ceil(total/pm));
+    // El piso de la familia manda sobre el multiplo: si 20.000 es el minimo, el pedido
+    // arranca ahi aunque el consumo pida menos.
+    if(pmin>0 && mult*pm < pmin) mult=Math.ceil(techo(pmin,pm)/pm);
+    var minCod=mc;   // FIJO: el paquete, no una cuota que crezca con el pedido
+    var subio=false;
+    ids.forEach(function(k){ if(q[k]<minCod){ q[k]=techo(minCod,cm); subio=true; } });
+    // Subir el piso puede empujar el total al multiplo siguiente: se recalcula.
+    if(subio) continue;
+    var falta=mult*pm-total;
+    if(falta<=0) return q;
+    var orden=ids.slice().sort(function(a,b){ return q[b]-q[a]; });
+    var i=0;
+    while(falta>0){ var d=Math.min(cm,falta); q[orden[i%orden.length]]+=d; falta-=d; i++; }
+    return q;
+  }
+  return q;
+}
+
+/* Aplica el ajuste a lo que hay cargado en PEDIDO, familia por familia. Solo toca
+   los codigos que YA tienen pedido: no agrega codigos que nadie pidio. */
+function ajustarPedidoCarton(){
+  var cargados=[];
+  filtradas().forEach(function(i){
+    var c=Number(PEDIDO[i.comp_id])||0;
+    if(c>0) cargados.push({comp_id:i.comp_id, cantidad:c, it:i});
+  });
+  var toco=false;
+  gruposCarton(cargados).forEach(function(grupo){
+    var rg=reglaDe(grupo.cf);
+    var q=ajustarFamilia(grupo.xs.map(function(x){
+      return {comp_id:x.comp_id, cant:x.cantidad,
+              pliegos_multiplo:rg.pliegos_multiplo, codigo_multiplo:rg.codigo_multiplo,
+              min_codigo_x_multiplo:rg.min_codigo_x_multiplo, pedido_minimo:rg.pedido_minimo};
+    }));
+    if(!q) return;
+    Object.keys(q).forEach(function(id){
+      if(PEDIDO[Number(id)]!==q[id]){ PEDIDO[Number(id)]=q[id]; toco=true; }
+    });
+  });
+  return toco;
+}
+
+function barra(){
+  var items=itemsPedidos();
+  var errs=validarCarton(items);
+  var rc=$('reglaCarton');
+  if(errs.length){
+    rc.classList.remove('hidden'); rc.classList.add('mal');
+    rc.innerHTML=errs.map(esc).join('<br>')+
+      '<br><button type="button" id="btnAjustarCart" class="btn-sug" style="margin-top:8px">Ajustar al múltiplo</button>';
+    var ba=$('btnAjustarCart');
+    if(ba) ba.addEventListener('click',function(){ ajustarPedidoCarton(); render(); });
+  }
+  else rc.classList.add('hidden');
+  var tUsd=0, tArs=0;
+  items.forEach(function(x){
+    if(x.precio==null) return;
+    if(x.moneda==='ARS') tArs+=x.cantidad*x.precio; else tUsd+=x.cantidad*x.precio;
+  });
+  var tot=items.length+' ítems';
+  if(tUsd>0||tArs>0){
+    tot+=' · '+fmtTotalMon(tUsd,tArs);
+    if(D.tc && tUsd>0) tot+=' (≈ $ '+fmt(tUsd*Number(D.tc)+tArs,0)+')';
+  }
+  $('tot').textContent=tot;
+  $('btnCrear').disabled = items.length===0 || errs.length>0;
+}
+
+/* Suma los que el gatillo dejo afuera por no hacer falta todavia. Es la valvula de
+   escape del gatillo: si igual va el camion, se aprovecha. */
+$('btnViaje').addEventListener('click',function(){
+  filtradas().forEach(function(i){
+    if(estadoRepo(i)!=='viaje') return;
+    delete SIN_PEDIDO[i.comp_id];
+    var v=valorSugerido(i); if(v>0) PEDIDO[i.comp_id]=v;
+  });
+  ajustarPedidoCarton();
+  render();
+});
+// Vuelve a poner los sugeridos: borra las marcas de "este no lo pido" de lo que se ve.
+// Es la ORDEN EXPLICITA del usuario, asi que pisa el gatillo y el aviso de "en camino":
+// carga TODO lo visible que tenga sugerido.
+$('btnSug').addEventListener('click',function(){
+  filtradas().forEach(function(i){
+    delete SIN_PEDIDO[i.comp_id];
+    var v=valorSugerido(i); if(v>0) PEDIDO[i.comp_id]=v;
+  });
+  // Los cartones salen ya redondeados a su familia [usuario 2026-09-03: "si,
+  // redondea para arriba"], asi la OC queda valida sin corregirla a mano.
+  ajustarPedidoCarton();
+  render();
+});
+// Limpiar deja la pantalla en cero: marca lo visible como "no pedir" para que el
+// sugerido no se vuelva a cargar solo apenas se repinta.
+$('btnLimpiar').addEventListener('click',function(){
+  filtradas().forEach(function(i){ SIN_PEDIDO[i.comp_id]=true; });
+  PEDIDO={}; PRECIO={}; MONEDA={}; render();
+});
+$('fechaEnt').addEventListener('change',function(){
+  fechaTocada=!!$('fechaEnt').value; fechaTocadaProv=provSel; pintarAyudaFecha();
+});
+
+$('btnCrear').addEventListener('click', async function(){
+  var items=itemsPedidos();
+  if(!items.length) return;
+  $('btnCrear').disabled=true;
+  try{
+    var rubro = rubroSel!=null ? (rubrosDistintos().filter(function(r){return r.id===rubroSel;})[0]||{}).nombre : null;
+    // Fecha de entrega estimada: viaja dentro de p (crear_oc la lee de p.fecha_entrega).
+    // La overload crear_oc(p, p_fecha_entrega) se borro el 2026-09-04: era un wrapper que
+    // repetia un dato que ya viajaba en p.
+    var fEnt = ($('fechaEnt').value||'').trim() || null;
+    var r=await SB.rpc('crear_oc',{ p:{
+      proveedor: provSel && provSel!=='(sin proveedor)' ? provSel : null,
+      rubro: rubro, nota: ($('nota').value||'').trim() || null, usuario: null,
+      fecha_entrega: fEnt,
+      // precio/moneda viajan SIEMPRE: si no se toco nada son los de la lista, y si
+      // se pisaron, crear_oc guarda estos y no los de precio_proveedor.
+      items: items.map(function(x){ return {comp_id:x.comp_id, cantidad:x.cantidad, unidad:x.unidad,
+                                            precio:x.precio, moneda:x.moneda}; })
+    } });
+    if(r.error) throw r.error;
+    PEDIDO={}; PRECIO={}; MONEDA={}; SIN_PEDIDO={}; $('nota').value='';
+    fechaTocada=false; fechaTocadaProv=null;
+    await boot();
+    mostrarTab('ocs');
+    // OC gemela al proveedor de la materia prima de un PS hibrido (Charcas -> Altrak, Eclipse ->
+    // Aperam, o el que se configure en proveedor_servicio): crear_oc la crea y la devuelve.
+    var gem = r.data && r.data.oc_gemela;
+    $('status').className='status ok';
+    $('status').innerHTML='✓ OC N° '+r.data.numero+' creada con '+r.data.items+' ítems (borrador).' +
+      (fEnt?(' Entrega estimada: '+fmtFecha(fEnt)+'.'):'') +
+      (gem ? ('<br><b style="color:#0b3b73">✓ OC gemela N° '+gem.numero+' a '+esc(gem.proveedor)+' con '+fmt(gem.kg,1)+' kg de '+esc(gem.componente)+'.</b>') : '');
+    setTimeout(function(){ $('status').innerHTML=''; $('status').className='status'; }, gem ? 12000 : 6000);
+  }catch(e){ $('status').className='status bad'; $('status').textContent='Error: '+(e.message||e); }
+  finally{ $('btnCrear').disabled=false; }
+});
+
+function pintarOcs(){
+  /* La OC ANULADA no se muestra mas [usuario 2026-09-04: "si anula una orden de compra,
+     no quiero que me siga apareciendo en ordenes"]. Se esconde de la PANTALLA nada mas:
+     la fila sigue en GP2.orden_compra (es el historial y lo que explica una numeracion
+     con huecos). Anular una OC ya no descuenta ni suma nada, asi que esconderla no
+     cambia ningun numero. */
+  var ocs=(D.ocs||[]).filter(function(o){ return String(o.estado||'')!=='anulada'; });
+  $('ocsN').textContent=ocs.length?('('+ocs.length+')'):'';
+  $('ocsEmpty').classList.toggle('hidden', ocs.length>0);
+  $('ocsList').innerHTML=ocs.map(function(o){
+    var acts='<button type="button" class="imp" data-imp="'+o.id+'">🖨 Imprimir</button>';
+    if(o.estado==='borrador') acts+='<button type="button" class="env" data-oc="'+o.id+'" data-est="enviada">Marcar enviada</button>'+
+      '<button type="button" class="anu" data-oc="'+o.id+'" data-est="anulada">Anular</button>';
+    else if(o.estado==='enviada') acts+='<button type="button" class="rec" data-oc="'+o.id+'" data-est="recibida">Marcar recibida</button>'+
+      '<button type="button" class="anu" data-oc="'+o.id+'" data-est="anulada">Anular</button>';
+    return '<div class="oc-card">'+
+      '<div class="oc-head"><span class="num-oc">OC N° '+o.numero+'</span>'+
+      '<span class="badge '+o.estado+'">'+o.estado+'</span>'+
+      (o.proveedor?('<span>'+esc(o.proveedor)+'</span>'):'')+
+      (o.rubro?('<span style="color:#777">'+esc(o.rubro)+'</span>'):'')+
+      '<span style="color:#777">'+new Date(o.creado_en).toLocaleDateString('es-AR')+'</span>'+
+      (vFechaEnt(o)?('<span class="badge entrega">Entrega '+fmtFecha(vFechaEnt(o))+'</span>'):'')+
+      ((o.total_usd>0||o.total_ars>0)?('<span style="font-weight:800">'+fmtTotalMon(Number(o.total_usd)||0,Number(o.total_ars)||0)+'</span>'):'')+
+      '<div class="oc-acts">'+acts+'</div></div>'+
+      (o.nota?('<div style="color:#555;font-size:14px;margin-top:4px">'+esc(o.nota)+'</div>'):'')+
+      '<div class="table-wrap" style="margin-top:8px"><table class="t"><thead><tr>'+
+      '<th>Insumo</th><th class="num">Pedido</th><th class="num">Precio</th><th class="num">Subtotal</th><th class="num">Recibido</th></tr></thead><tbody>'+
+      (o.items||[]).map(function(it){
+        return '<tr><td><b>'+esc(it.codigo)+'</b> <small style="color:#777">'+esc(it.descripcion||'')+'</small></td>'+
+          '<td class="num">'+fmt(it.cantidad)+' '+esc(it.unidad)+'</td>'+
+          '<td class="num">'+(it.precio_uni==null?'—':((it.moneda==='ARS'?'$ ':'US$ ')+fmt(it.precio_uni,2)))+'</td>'+
+          '<td class="num">'+(it.subtotal==null?'—':((it.moneda==='ARS'?'$ ':'US$ ')+fmt(it.subtotal,2)))+'</td>'+
+          '<td class="num">'+(it.recibido>0?fmt(it.recibido):'—')+'</td></tr>';
+      }).join('')+
+      '</tbody></table></div></div>';
+  }).join('');
+
+  document.querySelectorAll('.oc-acts button.imp').forEach(function(b){
+    b.addEventListener('click', function(){ imprimirOC(Number(b.dataset.imp)); });
+  });
+  document.querySelectorAll('.oc-acts button:not(.imp)').forEach(function(b){
+    b.addEventListener('click', async function(){
+      var est=b.dataset.est;
+      if(est==='anulada' && !confirm('¿Anular la OC?')) return;
+      b.disabled=true;
+      try{
+        var r=await SB.rpc('oc_marcar',{ p_oc_id:Number(b.dataset.oc), p_estado:est });
+        if(r.error) throw r.error;
+        await boot(); mostrarTab('ocs');
+      }catch(e){ $('status').className='status bad'; $('status').textContent='Error: '+(e.message||e); b.disabled=false; }
+    });
+  });
+}
+
+// Hoja limpia para mandar/imprimir la OC al proveedor.
+// Membrete + bloque de datos (con la ENTREGA ESTIMADA destacada) + tabla + total + firmas.
+function imprimirOC(ocId){
+  var o=(D.ocs||[]).filter(function(x){ return x.id===ocId; })[0];
+  if(!o) return;
+  var w=window.open('','_blank');
+  if(!w){ alert('El navegador bloqueó la ventana de impresión.'); return; }
+  var entrega = vFechaEnt(o) ? fmtFecha(vFechaEnt(o)) : '';
+  var emision = new Date(o.creado_en).toLocaleDateString('es-AR');
+  var totLinea = (o.total_usd>0||o.total_ars>0) ? fmtTotalMon(Number(o.total_usd)||0,Number(o.total_ars)||0) : '';
+  var css=
+    '@page{size:A4;margin:14mm}'+
+    '*{box-sizing:border-box}'+
+    'body{font-family:Arial,Helvetica,sans-serif;color:#111;margin:0;padding:26px;font-size:14px;background:#fff}'+
+    '.hoja{max-width:840px;margin:0 auto}'+
+    '.top{display:flex;justify-content:space-between;align-items:flex-start;gap:20px;border-bottom:3px solid #111;padding-bottom:10px}'+
+    '.emp{font-size:23px;font-weight:800;letter-spacing:.5px;line-height:1.1}'+
+    '.emp span{display:block;font-size:12px;font-weight:400;color:#555;letter-spacing:0;margin-top:3px}'+
+    '.oc-n{text-align:right}'+
+    '.oc-n .n{font-size:21px;font-weight:800;white-space:nowrap}'+
+    '.oc-n .e{font-size:12px;color:#555;margin-top:4px}'+
+    '.datos{display:flex;gap:10px;margin:16px 0 8px;flex-wrap:wrap}'+
+    '.dato{flex:1;min-width:150px;border:1px solid #bbb;border-radius:6px;padding:8px 10px}'+
+    '.dato .lb{font-size:10px;text-transform:uppercase;color:#666;letter-spacing:.7px}'+
+    '.dato .vl{font-size:16px;font-weight:700;margin-top:3px}'+
+    '.dato.entrega{border:2px solid #111;background:#f0f0f0}'+
+    '.dato.entrega .lb{color:#111;font-weight:800}'+
+    '.dato.entrega .vl{font-size:19px}'+
+    'table{width:100%;border-collapse:collapse;font-size:14px;margin-top:10px}'+
+    'th{background:#ececec;text-align:left;padding:8px;border:1px solid #999;font-size:11px;text-transform:uppercase;letter-spacing:.5px}'+
+    'td{padding:8px;border:1px solid #bbb;vertical-align:top}'+
+    'tbody tr:nth-child(even) td{background:#fafafa}'+
+    'td.num,th.num{text-align:right;white-space:nowrap}'+
+    '.cod{font-weight:800}'+
+    '.tot{margin-top:12px;text-align:right;font-size:18px;font-weight:800}'+
+    '.tot small{display:block;font-size:11px;font-weight:400;color:#666;margin-top:2px}'+
+    '.nota{margin-top:14px;border-left:4px solid #999;padding:6px 12px;color:#333;font-size:13px}'+
+    '.firmas{display:flex;gap:44px;margin-top:52px}'+
+    '.firma{flex:1;border-top:1px solid #111;padding-top:6px;font-size:11px;color:#555;text-align:center}'+
+    '.pie{margin-top:26px;border-top:1px solid #ddd;padding-top:8px;color:#888;font-size:11px;display:flex;justify-content:space-between;gap:10px}'+
+    '@media print{body{padding:0}tbody tr{page-break-inside:avoid}thead{display:table-header-group}}';
+  var filas=(o.items||[]).map(function(it){
+    var mon=it.moneda==='ARS'?'$ ':'US$ ';
+    return '<tr><td class="cod">'+esc(it.codigo)+'</td><td>'+esc(it.descripcion||'')+'</td>'+
+      '<td class="num">'+fmt(it.cantidad)+' '+esc(it.unidad)+'</td>'+
+      '<td class="num">'+(it.precio_uni==null?'—':mon+fmt(it.precio_uni,2))+'</td>'+
+      '<td class="num">'+(it.subtotal==null?'—':mon+fmt(it.subtotal,2))+'</td></tr>';
+  }).join('');
+  var html='<!doctype html><html lang="es"><head><meta charset="utf-8">'+
+    '<title>OC N° '+o.numero+(o.proveedor?(' · '+esc(o.proveedor)):'')+'</title><style>'+css+'</style></head><body><div class="hoja">'+
+    '<div class="top">'+
+      '<div class="emp">LOEKEMEYER<span>Gestión Productiva 2.0 · Compras</span></div>'+
+      '<div class="oc-n"><div class="n">Orden de Compra N° '+o.numero+'</div>'+
+      '<div class="e">Emitida el '+emision+(o.estado?(' · '+esc(o.estado)):'')+'</div></div>'+
+    '</div>'+
+    '<div class="datos">'+
+      '<div class="dato"><div class="lb">Proveedor</div><div class="vl">'+esc(o.proveedor||'—')+'</div></div>'+
+      // La etiqueta que se lee es "Sector" [usuario 2026-09-04]; el campo de la base
+      // se sigue llamando rubro (GP2.orden_compra.rubro), no se toca por un rotulo.
+      '<div class="dato"><div class="lb">Sector</div><div class="vl">'+esc(o.rubro||'—')+'</div></div>'+
+      '<div class="dato entrega"><div class="lb">Fecha de entrega estimada</div>'+
+        '<div class="vl">'+(entrega||'____ / ____ / ________')+'</div></div>'+
+    '</div>'+
+    '<table><thead><tr><th>Código</th><th>Descripción</th><th class="num">Cantidad</th>'+
+    '<th class="num">Precio unit.</th><th class="num">Subtotal</th></tr></thead><tbody>'+
+    (filas||'<tr><td colspan="5">Sin ítems.</td></tr>')+
+    '</tbody></table>'+
+    (totLinea?('<div class="tot">Total: '+totLinea+'<small>Precios sin IVA</small></div>'):'')+
+    (o.nota?('<div class="nota"><b>Nota:</b> '+esc(o.nota)+'</div>'):'')+
+    '<div class="firmas"><div class="firma">Firma y aclaración · Loekemeyer</div>'+
+    '<div class="firma">Recibido por · '+esc(o.proveedor||'proveedor')+'</div></div>'+
+    '<div class="pie"><span>Loekemeyer · Gestión Productiva 2.0</span>'+
+    '<span>Impreso el '+new Date().toLocaleDateString('es-AR')+'</span></div>'+
+    '</div></body></html>';
+  w.document.write(html);
+  w.document.close();
+  w.focus();
+  setTimeout(function(){ w.print(); }, 250);
+}
+
+function mostrarTab(t){
+  $('panGen').classList.toggle('hidden', t==='ocs');
+  $('panOcs').classList.toggle('hidden', t!=='ocs');
+  $('tabGen').classList.toggle('active', t!=='ocs');
+  $('tabOcs').classList.toggle('active', t==='ocs');
+}
+$('tabGen').addEventListener('click',function(){ mostrarTab('gen'); });
+$('tabOcs').addEventListener('click',function(){ mostrarTab('ocs'); });
+
+$('q').addEventListener('input', render);
+boot();
+</script>
+</body>
+</html>

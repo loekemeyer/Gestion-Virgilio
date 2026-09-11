@@ -1,0 +1,263 @@
+<!doctype html>
+<html lang="es">
+<head>
+<!-- v1.0.0 — Valorización de stock y pedidos (2026-08-30). Muestra cuánto vale el stock
+     y cuánto cuesta llenar cada ubicación al máximo, con el costo unitario DESGLOSADO
+     por componente: material (fleje al kg de la pieza / precio del insumo) + servicios
+     de PS (pintado, cromado...) + mano de obra (segundos de matriz x $/seg).
+     Monedas SIEMPRE separadas (US$ material/servicios, $ mano de obra y cajas) +
+     total combinado en pesos con el dólar oficial del cron (parametro
+     tipo_cambio_usd_pesos). Motor en la BD: v_costo_componente y la RPC valorizacion_bundle
+     (v_valor_stock / v_valor_pedido se borraron el 2026-09-04: el bundle es la unica puerta y
+     EXCLUYE terminados, asi que no es comparable con los totales anteriores al 04/09).
+     HOY corre con precios de REGULACIÓN:
+     todo insumo 1 USD (cajas $1.000) hasta cargar las listas reales. -->
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Valorización · GP2</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="../supabase-config.js?v=20260905k"></script>
+<script src="../gp2-ui.js?v=20260905a"></script>
+<script src="../gp2-numero.js?v=20260905m"></script>
+<link rel="stylesheet" href="../gp2-modulo.css?v=20260903b"/>
+<link rel="icon" type="image/png" href="../GP2_favicon.png">
+<link rel="apple-touch-icon" href="../GP2_favicon.png">
+<style>
+  .tcbar{display:flex;gap:14px;flex-wrap:wrap;align-items:center;background:#f6f8fa;border-radius:10px;padding:10px 14px;margin:10px 0;font-size:16px}
+  .tcbar b{font-size:18px}
+  .aviso-reg{border:2px solid #eae0cd;background:#fff8e1;color:#7a5b00;border-radius:10px;padding:8px 12px;font-size:15px;margin:8px 0}
+  .kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:10px;margin:12px 0}
+  .kpi{border:2px solid #d0d7de;border-radius:12px;padding:12px 14px;background:#fff}
+  .kpi .lbl{font-size:15px;color:#555;font-weight:700;text-transform:uppercase;letter-spacing:.4px}
+  .kpi .monedas{font-size:20px;font-weight:800;margin-top:4px}
+  .kpi .conv{font-size:17px;color:#0b3b73;font-weight:800;margin-top:2px}
+  .chips{display:flex;gap:8px;flex-wrap:wrap;margin:8px 0}
+  .chip{padding:8px 14px;border-radius:20px;border:2px solid #d0d7de;background:#fff;font-weight:700;font-size:15px;cursor:pointer;color:#111}
+  .chip.active{background:#e7eff8;color:#fff;border-color:#cddaea}
+  td.num{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+  .desg{font-size:13px;color:#555;display:block;white-space:nowrap}
+  .flag{color:#b45309;font-weight:800;font-size:13px;display:block}
+  tfoot td{font-weight:800;background:#f6f8fa;font-size:17px}
+  .t td{font-size:16px}
+  .t td b{font-size:17px}
+</style>
+</head>
+<body>
+
+<div class="card">
+  <div class="header">
+    <h1>Valorización · Stock y Pedidos</h1>
+    <div class="hbtns"><a href="../GP2_MODULOS.html">Atrás</a></div>
+  </div>
+
+  <div class="steps">
+    <div class="tcbar" id="tcbar"></div>
+    <div class="aviso-reg" id="avisoReg" hidden></div>
+
+    <div class="kpis">
+      <div class="kpi"><div class="lbl">Stock valorizado (todo)</div>
+        <div class="monedas" id="kStock">—</div><div class="conv" id="kStockConv"></div></div>
+      <div class="kpi"><div class="lbl">Máximo por sector</div>
+        <div class="monedas" id="kPedido">—</div><div class="conv" id="kPedidoConv"></div></div>
+    </div>
+
+    <h2 style="font-size:19px;margin:14px 0 6px">Por sector</h2>
+    <div class="table-wrap">
+      <table class="t">
+        <thead><tr><th>Sector</th>
+          <th class="num">Stock US$</th><th class="num">Stock $</th><th class="num">Stock total $</th>
+          <th class="num">Pedido US$</th><th class="num">Pedido $</th><th class="num">Pedido total $</th>
+        </tr></thead>
+        <tbody id="tbodySect"></tbody>
+        <tfoot><tr id="footSect"></tr></tfoot>
+      </table>
+    </div>
+
+    <h2 style="font-size:19px;margin:18px 0 6px">Por componente</h2>
+    <div class="chips" id="sectores"></div>
+    <div class="search-box"><input type="text" id="q" placeholder="Buscar componente…"></div>
+    <div class="table-wrap">
+      <table class="t">
+        <thead><tr>
+          <th>Componente</th>
+          <th class="num">Costo unitario<br><small>material + servicios + m.obra</small></th>
+          <th class="num">Stock</th><th class="num">Valor stock $</th>
+          <th class="num">Pedido<br>a máx.</th><th class="num">Valor pedido $</th>
+        </tr></thead>
+        <tbody id="tbody"></tbody>
+      </table>
+    </div>
+    <div id="tblEmpty" class="empty hidden">Sin componentes para este filtro.</div>
+
+    <div id="status" class="status">Cargando…</div>
+  </div>
+</div>
+
+<script>
+var SB = GP2_SB();
+var $ = GP2UI.$;
+var esc = GP2UI.esc;   /* helper de la casa, gp2-ui.js (2026-09-05) */
+function fmt(n,d){ return GP2N.fmt(n, d==null?0:d, '—'); }   /* la regla de numero de la casa (gp2-numero.js) */
+// monedas SIEMPRE separadas; el combinado usa solo el dólar del cron (D.tc), nunca uno inventado
+function fmtMon(usd, ars, d){
+  var p=[];
+  if(usd>0.004) p.push('US$ '+fmt(usd, d==null?2:d));
+  if(ars>0.004) p.push('$ '+fmt(ars, d==null?2:d));
+  return p.length?p.join(' + '):'—';
+}
+
+var D={}, COMPS=[], sectSel=null;
+
+function n(x){ return Number(x)||0; }
+
+async function boot(){
+  var r=await SB.rpc('valorizacion_bundle');
+  if(r.error){ $('status').textContent='Error: '+r.error.message; return; }
+  D=r.data||{};
+  COMPS=(D.comps||[]).map(function(c){
+    var usd=n(c.material_usd)+n(c.servicios_usd);
+    var ars=n(c.material_pesos)+n(c.servicios_pesos)+n(c.mano_obra_pesos);
+    c._usd=usd; c._ars=ars;
+    c._stock_usd=n(c.stock)*usd;   c._stock_ars=n(c.stock)*ars;   c._stock_tot=n(c.stock)*n(c.total_pesos);
+    c._ped_usd=n(c.pedido)*usd;    c._ped_ars=n(c.pedido)*ars;    c._ped_tot=n(c.pedido)*n(c.total_pesos);
+    return c;
+  });
+  pintarTc();
+  pintarAviso();
+  pintarKpis();
+  pintarSectores();
+  $('status').textContent='';
+}
+
+function pintarTc(){
+  var i=D.tc_info||{};
+  var f=i.fecha?new Date(i.fecha+'T12:00:00').toLocaleDateString('es-AR'):'';
+  $('tcbar').innerHTML=
+    'Dólar oficial: <b>$ '+fmt(D.tc)+'</b>'+(f?(' <span style="color:#777">('+esc(f)+(i.fuente?(' · '+esc(i.fuente)):'')+')</span>'):'')+
+    ' &nbsp;·&nbsp; Mano de obra: <b>$ '+fmt(D.costo_seg)+'/seg</b> de matriz';
+}
+
+// El aviso sale de los datos, no de un texto fijo: mientras queden componentes sin
+// precio (o sin kg / sin tiempo de matriz) el numero de arriba esta incompleto.
+function pintarAviso(){
+  var sinPrecio=0, sinKg=0, sinTiempo=0;
+  COMPS.forEach(function(c){
+    if(n(c.faltan_precios)>0) sinPrecio++;
+    if(n(c.faltan_kg)>0)      sinKg++;
+    if(n(c.faltan_tiempos)>0) sinTiempo++;
+  });
+  var partes=[];
+  if(sinPrecio) partes.push('<b>'+sinPrecio+'</b> sin precio');
+  if(sinKg)     partes.push('<b>'+sinKg+'</b> sin kg cargado');
+  if(sinTiempo) partes.push('<b>'+sinTiempo+'</b> sin tiempo de matriz');
+  var el=$('avisoReg');
+  if(!partes.length){ el.hidden=true; return; }
+  el.hidden=false;
+  el.innerHTML='Faltan datos: '+partes.join(' · ')+'. Esos componentes valen de menos, '+
+    'asi que el total es un piso, no el numero final.';
+}
+
+function pintarKpis(){
+  var s={usd:0,ars:0,tot:0}, p={usd:0,ars:0,tot:0};
+  COMPS.forEach(function(c){
+    s.usd+=c._stock_usd; s.ars+=c._stock_ars; s.tot+=c._stock_tot;
+    p.usd+=c._ped_usd;   p.ars+=c._ped_ars;   p.tot+=c._ped_tot;
+  });
+  $('kStock').textContent=fmtMon(s.usd,s.ars,0);
+  $('kStockConv').textContent=D.tc?('≈ $ '+fmt(s.tot,0)+' al dólar de hoy'):'';
+  $('kPedido').textContent=fmtMon(p.usd,p.ars,0);
+  $('kPedidoConv').textContent=D.tc?('≈ $ '+fmt(p.tot,0)+' al dólar de hoy'):'';
+}
+
+function sectoresDistintos(){
+  var seen={}, out=[];
+  COMPS.forEach(function(c){
+    if(!seen[c.sector_id]){ seen[c.sector_id]=true; out.push({id:c.sector_id, nombre:String(c.sector||'').replace(/^Sector\s+/i,'')}); }
+  });
+  return out;
+}
+
+function pintarSectores(){
+  // tabla resumen por sector
+  var agg={};
+  COMPS.forEach(function(c){
+    var a=agg[c.sector_id]=agg[c.sector_id]||{nombre:String(c.sector||'').replace(/^Sector\s+/i,''),su:0,sa:0,st:0,pu:0,pa:0,pt:0};
+    a.su+=c._stock_usd; a.sa+=c._stock_ars; a.st+=c._stock_tot;
+    a.pu+=c._ped_usd;   a.pa+=c._ped_ars;   a.pt+=c._ped_tot;
+  });
+  var tot={su:0,sa:0,st:0,pu:0,pa:0,pt:0};
+  $('tbodySect').innerHTML=sectoresDistintos().map(function(sc){
+    var a=agg[sc.id];
+    tot.su+=a.su; tot.sa+=a.sa; tot.st+=a.st; tot.pu+=a.pu; tot.pa+=a.pa; tot.pt+=a.pt;
+    return '<tr><td><b>'+esc(a.nombre)+'</b></td>'+
+      '<td class="num">'+(a.su>0.004?'US$ '+fmt(a.su,0):'—')+'</td>'+
+      '<td class="num">'+(a.sa>0.004?'$ '+fmt(a.sa,0):'—')+'</td>'+
+      '<td class="num">'+(a.st>0.004?'$ '+fmt(a.st,0):'—')+'</td>'+
+      '<td class="num">'+(a.pu>0.004?'US$ '+fmt(a.pu,0):'—')+'</td>'+
+      '<td class="num">'+(a.pa>0.004?'$ '+fmt(a.pa,0):'—')+'</td>'+
+      '<td class="num">'+(a.pt>0.004?'$ '+fmt(a.pt,0):'—')+'</td></tr>';
+  }).join('');
+  $('footSect').innerHTML='<td>TOTAL</td>'+
+    '<td class="num">US$ '+fmt(tot.su,0)+'</td><td class="num">$ '+fmt(tot.sa,0)+'</td><td class="num">$ '+fmt(tot.st,0)+'</td>'+
+    '<td class="num">US$ '+fmt(tot.pu,0)+'</td><td class="num">$ '+fmt(tot.pa,0)+'</td><td class="num">$ '+fmt(tot.pt,0)+'</td>';
+
+  // chips
+  var g=$('sectores'); g.innerHTML='';
+  sectoresDistintos().forEach(function(sc){
+    var b=document.createElement('button'); b.type='button';
+    b.className='chip'+(sectSel===sc.id?' active':''); b.textContent=sc.nombre;
+    b.addEventListener('click',function(){ sectSel=(sectSel===sc.id?null:sc.id); pintarSectores(); });
+    g.appendChild(b);
+  });
+  render();
+}
+
+function filtradas(){
+  var q=($('q').value||'').trim().toLowerCase();
+  return COMPS.filter(function(c){
+    if(sectSel!=null && c.sector_id!==sectSel) return false;
+    if(q && !(((c.codigo||'')+' '+(c.descripcion||'')).toLowerCase().includes(q))) return false;
+    return true;
+  });
+}
+
+function desglose(c){
+  var partes=[];
+  var matU=n(c.material_usd), matA=n(c.material_pesos), srvU=n(c.servicios_usd), srvA=n(c.servicios_pesos);
+  if(matU>0) partes.push('Mat US$ '+fmt(matU,3));
+  if(matA>0) partes.push('Mat $ '+fmt(matA,2));
+  if(srvU>0) partes.push('Serv US$ '+fmt(srvU,2));
+  if(srvA>0) partes.push('Serv $ '+fmt(srvA,2));
+  if(n(c.mano_obra_pesos)>0) partes.push('MO $ '+fmt(n(c.mano_obra_pesos),2)+' ('+fmt(n(c.segundos_matriz),1)+'s)');
+  return partes.join(' · ');
+}
+
+function render(){
+  var fs=filtradas();
+  $('tbody').innerHTML=fs.map(function(c){
+    var flags=[];
+    if(n(c.faltan_precios)>0) flags.push(c.faltan_precios+' sin precio');
+    if(n(c.faltan_kg)>0) flags.push(c.faltan_kg+' sin kg');
+    if(n(c.faltan_tiempos)>0) flags.push(c.faltan_tiempos+' sin tiempo');
+    return '<tr>'+
+      '<td><b>'+esc(c.codigo||'—')+'</b> <small style="color:#777">'+esc(c.descripcion||'')+'</small>'+
+        (flags.length?('<span class="flag">⚠ '+flags.join(' · ')+'</span>'):'')+'</td>'+
+      '<td class="num">'+fmtMon(c._usd,c._ars)+
+        (n(c.total_pesos)>0?('<span class="desg">= $ '+fmt(n(c.total_pesos),2)+'</span>'):'')+
+        '<span class="desg">'+desglose(c)+'</span></td>'+
+      '<td class="num">'+(n(c.stock)?fmt(c.stock,1):'—')+'</td>'+
+      '<td class="num">'+(c._stock_tot>0.004?'$ '+fmt(c._stock_tot,0):'—')+
+        (c._stock_usd>0.004?('<span class="desg">'+fmtMon(c._stock_usd,c._stock_ars,0)+'</span>'):'')+'</td>'+
+      '<td class="num">'+(n(c.pedido)?fmt(c.pedido):'—')+'</td>'+
+      '<td class="num">'+(c._ped_tot>0.004?'$ '+fmt(c._ped_tot,0):'—')+
+        (c._ped_usd>0.004?('<span class="desg">'+fmtMon(c._ped_usd,c._ped_ars,0)+'</span>'):'')+'</td>'+
+    '</tr>';
+  }).join('');
+  $('tblEmpty').classList.toggle('hidden', fs.length>0);
+}
+
+$('q').addEventListener('input', render);
+boot();
+</script>
+</body>
+</html>

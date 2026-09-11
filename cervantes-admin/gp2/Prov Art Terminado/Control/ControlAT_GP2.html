@@ -1,0 +1,526 @@
+<!doctype html>
+<html lang="es">
+<head>
+<script src="../../auth-guard.js?v=20260904t"></script>
+<script src="../../gp2-ui.js?v=20260905a"></script>
+<script src="../../gp2-numero.js?v=20260905m"></script>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Control Stocks Prov. Art. Terminado · GP2</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="../../supabase-config.js?v=20260905k"></script>
+<link rel="stylesheet" href="../../gp2-modulo.css?v=20260903b"/>
+<link rel="icon" type="image/png" href="../../GP2_favicon.png">
+<link rel="apple-touch-icon" href="../../GP2_favicon.png">
+<style>
+  .bloque-tit{
+    font-size:15px; font-weight:800; margin:22px 0 8px;
+    padding-bottom:6px; border-bottom:2px solid #e3e7ec;
+  }
+  .bloque-tit .sub-nota{ font-weight:400; font-size:12px; color:#6b7683; margin-left:8px; }
+  .prov-btn .pb-sub{ display:block; font-size:11px; color:#6b7683; margin-top:3px; font-weight:400; }
+  td.fecha{ white-space:nowrap; }
+  .sin-dato{ color:#98a1ab; font-style:italic; }
+</style>
+</head>
+<body>
+
+<div class="card">
+  <div class="header">
+    <h1>Control Stocks · Prov. Art. Terminado</h1>
+    <div class="hbtns">
+      <button class="hlink hidden" id="btnVolver" type="button">← Cambiar proveedor</button>
+      <button class="hlink hidden" id="btnCSV" type="button">⬇ Exportar CSV</button>
+      <button class="hlink hidden" id="btnImprimir" type="button">🖨 Imprimir</button>
+      <a href="../Envios/EnviosAT_GP2.html">Envío Cartón/Cajas</a>
+      <a href="../../Control Envios y Entregas/ControlEnvios_GP2.html?origen=provat">Historial x Fecha</a>
+      <a href="../../GP2_MODULOS.html">Atrás</a>
+    </div>
+  </div>
+
+  <div class="steps">
+
+    <!-- FASE 0 — elegir proveedor -->
+    <div id="fase0">
+      <div class="row"><label class="lbl">Proveedor de Artículo Terminado</label></div>
+      <div class="provs-grid" id="provGrid"></div>
+      <div id="status" class="status">Cargando…</div>
+    </div>
+
+    <!-- FASE 1 — control del proveedor -->
+    <div id="fase1" class="hidden">
+      <div class="row"><label class="lbl" id="fase1Title">Proveedor</label></div>
+
+      <div class="aviso" id="aviso"></div>
+
+      <div class="kpis" id="kpis"></div>
+
+      <div class="search-box no-print">
+        <input type="text" id="q" placeholder="Buscar por código o descripción…">
+      </div>
+
+      <div class="bloque-tit">
+        Artículos del proveedor
+        <span class="sub-nota">lo que nos entregó, en cajas y en unidades</span>
+      </div>
+      <div class="table-wrap">
+        <table class="t">
+          <thead>
+            <tr>
+              <th>Código</th>
+              <th>Descripción</th>
+              <th class="num sep">N° Caja</th>
+              <th class="num">Uni x caja</th>
+              <th class="num sep">Entregado (cajas)</th>
+              <th class="num">Unidades</th>
+              <th class="sep">Última entrega</th>
+            </tr>
+          </thead>
+          <tbody id="tbodyArt"></tbody>
+          <tfoot id="tfootArt"></tfoot>
+        </table>
+      </div>
+      <div id="artEmpty" class="empty hidden">Este proveedor no tiene artículos cargados en «Articulos x Prov AT».</div>
+
+      <div class="bloque-tit">
+        Cartón y cajas en poder del proveedor
+        <span class="sub-nota">lo que le mandamos y todavía tiene</span>
+      </div>
+      <div class="table-wrap">
+        <table class="t">
+          <thead>
+            <tr>
+              <th>Código</th>
+              <th>Descripción</th>
+              <th class="num sep">Enviado</th>
+              <th class="num">Saldo</th>
+            </tr>
+          </thead>
+          <tbody id="tbodyIns"></tbody>
+        </table>
+      </div>
+      <div id="insEmpty" class="empty hidden">Todavía no hay ningún envío de cartón o cajas cargado para este proveedor.</div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+"use strict";
+
+/* =====================================================================
+   Control Stocks · Proveedores de Articulo Terminado (Prov AT)
+
+   Que muestra
+   -----------
+   Por proveedor: que le enviamos (carton y cajas), que nos entrego
+   (articulo terminado) y que le queda.
+
+   De donde sale cada dato (TODO local GP2, 2026-08-31)
+   ----------------------------------------------------
+   GP2.movimiento tipo_mov='envio_prov_at'  -> enviado (carton/cajas)
+   GP2.inventario en ubicacion proveedor_at -> saldo que todavia tiene
+   GP2.entrega_prov_at                      -> entregado, EN CAJAS
+   GP2.articulo_prov_at                     -> catalogo por proveedor (FK)
+   GP2.uni_x_articulo_x_caja                -> unidades por caja
+
+   Migracion 2026-08-31: se dejo de leer del vecino public. Las 3 tablas
+   viejas ("Articulos x Prov AT", "Entregas Prov AT", "Uni_x_Articulo_x_Caja")
+   se copiaron a GP2 con FK a proveedor_at, y "Envios Prov AT" (vieja tabla
+   sin uso) se saco del bundle porque los envios ahora son GP2.movimiento.
+
+   OJO CON LA UNIDAD
+   -----------------
+   entrega_prov_at.cantidad_cajas esta en CAJAS (nombre explicito ahora,
+   antes se llamaba "Cantidad" y despistaba). Regla del usuario 2026-08-30:
+   todas las entregas se cuentan en cajas; las unidades se DERIVAN (cajas
+   x uni_x_caja).
+   ===================================================================== */
+
+
+var SB   = GP2_SB();
+
+/* ===== DOM ===== */
+var elStatus = document.getElementById("status");
+var elGrid   = document.getElementById("provGrid");
+var elFase0  = document.getElementById("fase0");
+var elFase1  = document.getElementById("fase1");
+var elTitle  = document.getElementById("fase1Title");
+var elAviso  = document.getElementById("aviso");
+var elKpis   = document.getElementById("kpis");
+var elQ      = document.getElementById("q");
+var elArt    = document.getElementById("tbodyArt");
+var elArtFoot= document.getElementById("tfootArt");
+var elArtEmpty = document.getElementById("artEmpty");
+var elIns    = document.getElementById("tbodyIns");
+var elInsEmpty = document.getElementById("insEmpty");
+
+/* ===== ESTADO ===== */
+var D = null;      // datos crudos ya indexados
+var provSel = null;
+
+/* ===== HELPERS ===== */
+var esc = GP2UI.esc;   /* helper de la casa, gp2-ui.js (2026-09-05) */
+function norm(s){
+  return String(s == null ? "" : s).toLowerCase()
+    .normalize("NFD").replace(/[\u0300-\u036f]/g,"").trim();
+}
+function n(v){ return GP2N.num(v); }   /* la regla de numero de la casa (gp2-numero.js) */
+function fmt(v, dec){ return GP2N.fmt(v, dec || 0, null, true); }   /* decimales fijos, columnas alineadas */
+function fecha(s){
+  if (!s) return "";
+  var m = String(s).match(/^(\d{4})-(\d{2})-(\d{2})/);
+  return m ? (m[3] + "/" + m[2] + "/" + m[1]) : String(s);
+}
+
+// Supabase corta en 1000 filas: hay que paginar siempre.
+async function todas(cli, tabla, cols){
+  var PAGE = 1000, from = 0, out = [];
+  for(;;){
+    var r = await cli.from(tabla).select(cols).range(from, from + PAGE - 1);
+    if (r.error) throw new Error(tabla + ": " + r.error.message);
+    var rows = r.data || [];
+    out = out.concat(rows);
+    if (rows.length < PAGE) break;
+    from += PAGE;
+  }
+  return out;
+}
+
+/* ===== CARGA ===== */
+async function cargar(){
+  try{
+    elStatus.textContent = "Cargando…";
+
+    var res = await Promise.all([
+      todas(SB, "proveedor_at", "id,cod_prov,nombre,activo"),
+      todas(SB, "ubicacion", "id,tipo,ref_id,nombre"),
+      todas(SB, "componente", "id,codigo,descripcion,sector_id,unidad_medida"),
+      todas(SB, "inventario", "componente_id,ubicacion_id,cantidad"),
+      todas(SB, "movimiento", "tipo_mov,comp_id,ubic_destino_id,cantidad,_delta_dest,fecha"),
+      todas(SB, "articulo_prov_at", "proveedor_at_id,cod_art,descripcion,activo,n_caja,marca"),
+      todas(SB, "entrega_prov_at", "proveedor_at_id,cod_art,descripcion,cantidad_cajas,remito,fecha_rto,dia_mes"),
+      todas(SB, "uni_x_articulo_x_caja", "cod_art,uni_x_caja,n_caja,empresa")
+    ]);
+
+    D = indexar({
+      provs: res[0], ubics: res[1], comps: res[2], inv: res[3], movs: res[4],
+      artsProv: res[5], entregas: res[6], uxc: res[7]
+    });
+
+    renderGrid();
+    elStatus.textContent = "";
+  }catch(e){
+    elStatus.textContent = "Error cargando datos: " + e.message;
+    elStatus.classList.add("neg");
+  }
+}
+
+function indexar(r){
+  var compPorId = new Map();
+  r.comps.forEach(function(c){ compPorId.set(c.id, c); });
+
+  // Una ubicacion por proveedor AT.
+  var ubicPorProv = new Map();
+  r.ubics.forEach(function(u){
+    if (u.tipo === "proveedor_at") ubicPorProv.set(u.ref_id, u.id);
+  });
+
+  // Enviado por (prov, componente). _delta_dest es la cantidad canonica
+  // que el ledger sumo en destino; si falta, se cae a cantidad.
+  var provPorUbic = new Map();
+  ubicPorProv.forEach(function(ubicId, provId){ provPorUbic.set(ubicId, provId); });
+
+  var enviado = new Map();   // "provId|compId" -> uni
+  r.movs.forEach(function(m){
+    if (m.tipo_mov !== "envio_prov_at") return;
+    var provId = provPorUbic.get(m.ubic_destino_id);
+    if (provId == null) return;
+    var k = provId + "|" + m.comp_id;
+    enviado.set(k, (enviado.get(k) || 0) + (m._delta_dest != null ? n(m._delta_dest) : n(m.cantidad)));
+  });
+
+  // Saldo actual en la ubicacion del proveedor.
+  var saldo = new Map();
+  r.inv.forEach(function(i){
+    var provId = provPorUbic.get(i.ubicacion_id);
+    if (provId == null) return;
+    saldo.set(provId + "|" + i.componente_id, n(i.cantidad));
+  });
+
+  // Unidades por caja, por codigo de articulo.
+  // OJO: hay codigos cargados con DOS valores distintos (901 y 911 figuran
+  // con 12 y con 36 uni por caja, en cajas distintas). Elegir el primero
+  // seria inventar un numero y las cajas equivalentes darian 3 veces mal,
+  // asi que se guardan todos los valores y el que tiene mas de uno se
+  // muestra como ambiguo, sin calcular cajas.
+  var uniXCajaVals = new Map();
+  r.uxc.forEach(function(u){
+    var cod = String(u.cod_art || "").trim();
+    var v = n(u.uni_x_caja);
+    if (!cod || v <= 0) return;
+    if (!uniXCajaVals.has(cod)) uniXCajaVals.set(cod, new Set());
+    uniXCajaVals.get(cod).add(v);
+  });
+  var uniXCaja = new Map();
+  uniXCajaVals.forEach(function(set, cod){
+    var vals = Array.from(set).sort(function(a,b){ return a - b; });
+    uniXCaja.set(cod, { valores: vals, unico: vals.length === 1 ? vals[0] : null });
+  });
+
+  // Nombre de proveedor por id (para las tablas que ya vienen con FK numerica).
+  var provNombrePorId = new Map();
+  r.provs.forEach(function(p){ provNombrePorId.set(p.id, p.nombre); });
+
+  // Entregas acumuladas por (proveedor, articulo). Todo GP2.entrega_prov_at:
+  // cantidad_cajas en CAJAS (nombre explicito), FK proveedor_at_id.
+  var entregas = new Map();
+  r.entregas.forEach(function(e){
+    var prov = provNombrePorId.get(e.proveedor_at_id) || "";
+    var cod  = String(e.cod_art || "").trim();
+    if (!prov || !cod) return;
+    var k = prov + "|" + cod;
+    var acc = entregas.get(k);
+    if (!acc) { acc = { cajas:0, ultima:null, remitos:0, desc:"" }; entregas.set(k, acc); }
+    acc.cajas += n(e.cantidad_cajas);
+    acc.remitos += 1;
+    if (!acc.desc && e.descripcion) acc.desc = e.descripcion;
+    var f = e.fecha_rto || null;
+    if (f && (!acc.ultima || f > acc.ultima)) acc.ultima = f;
+  });
+
+  // Catalogo de articulos por proveedor. GP2.articulo_prov_at con FK.
+  var artsPorProv = new Map();
+  r.artsProv.forEach(function(a){
+    if (a.activo === false) return;
+    var prov = provNombrePorId.get(a.proveedor_at_id) || "";
+    if (!prov) return;
+    if (!artsPorProv.has(prov)) artsPorProv.set(prov, []);
+    artsPorProv.get(prov).push({
+      cod: String(a.cod_art || "").trim(),
+      desc: a.descripcion || "",
+      nCaja: a.n_caja,
+      marca: a.marca || ""
+    });
+  });
+
+  return {
+    provs: r.provs.filter(function(p){ return p.activo !== false; })
+                  .sort(function(a,b){ return String(a.nombre).localeCompare(String(b.nombre),"es"); }),
+    ubicPorProv: ubicPorProv, compPorId: compPorId,
+    enviado: enviado, saldo: saldo, uniXCaja: uniXCaja,
+    entregas: entregas, artsPorProv: artsPorProv
+  };
+}
+
+/* ===== FILAS DE UN PROVEEDOR ===== */
+// El catalogo manda, pero si hay entregas de un articulo que no figura
+// en el catalogo igual tiene que aparecer: si no, se pierde plata de vista.
+function filasArticulos(prov){
+  var nombre = prov.nombre;
+  var base = (D.artsPorProv.get(nombre) || []).slice();
+  var vistos = new Set(base.map(function(a){ return a.cod; }));
+
+  D.entregas.forEach(function(acc, k){
+    var partes = k.split("|");
+    if (partes[0] !== nombre) return;
+    if (vistos.has(partes[1])) return;
+    base.push({ cod: partes[1], desc: acc.desc, nCaja: null, marca: "", fueraCatalogo: true });
+  });
+
+  return base.map(function(a){
+    var acc = D.entregas.get(nombre + "|" + a.cod) || { cajas:0, ultima:null, remitos:0 };
+    var info = D.uniXCaja.get(a.cod) || null;
+    var uxc = info ? info.unico : null;
+    return {
+      cod: a.cod, desc: a.desc || acc.desc || "", nCaja: a.nCaja,
+      uxc: uxc, uxcVals: info ? info.valores : [],
+      entregado: acc.cajas,                                   // cajas
+      unidades: (uxc && uxc > 0) ? acc.cajas * uxc : null,     // derivadas
+      ultima: acc.ultima, remitos: acc.remitos,
+      fueraCatalogo: !!a.fueraCatalogo
+    };
+  }).sort(function(x,y){
+    if (y.entregado !== x.entregado) return y.entregado - x.entregado;
+    return String(x.cod).localeCompare(String(y.cod), "es", {numeric:true});
+  });
+}
+
+function filasInsumos(prov){
+  var out = [];
+  var claves = new Set();
+  D.enviado.forEach(function(v,k){ if (k.split("|")[0] === String(prov.id)) claves.add(k); });
+  D.saldo.forEach(function(v,k){ if (k.split("|")[0] === String(prov.id)) claves.add(k); });
+
+  claves.forEach(function(k){
+    var compId = Number(k.split("|")[1]);
+    var c = D.compPorId.get(compId);
+    out.push({
+      cod: c ? c.codigo : ("#" + compId),
+      desc: c ? c.descripcion : "",
+      enviado: D.enviado.get(k) || 0,
+      saldo: D.saldo.get(k) || 0
+    });
+  });
+  return out.sort(function(a,b){ return String(a.cod).localeCompare(String(b.cod),"es",{numeric:true}); });
+}
+
+/* ===== RENDER ===== */
+function renderGrid(){
+  elGrid.innerHTML = D.provs.map(function(p){
+    var arts = (D.artsPorProv.get(p.nombre) || []).length;
+    var cajas = 0, conEnt = 0;
+    D.entregas.forEach(function(acc, k){
+      if (k.split("|")[0] === p.nombre) { cajas += acc.cajas; conEnt += 1; }
+    });
+    var sub = arts + " art." + (cajas ? " · " + fmt(cajas) + " cajas entregadas" : " · sin entregas");
+    return '<button class="prov-btn" data-id="' + p.id + '">' +
+             esc(p.nombre) +
+             '<span class="pb-sub">' + esc(sub) + '</span>' +
+           '</button>';
+  }).join("");
+
+  Array.prototype.forEach.call(elGrid.querySelectorAll(".prov-btn"), function(b){
+    b.addEventListener("click", function(){ elegir(Number(b.dataset.id)); });
+  });
+}
+
+function elegir(provId){
+  provSel = D.provs.find(function(p){ return p.id === provId; });
+  if (!provSel) return;
+  elFase0.classList.add("hidden");
+  elFase1.classList.remove("hidden");
+  document.getElementById("btnVolver").classList.remove("hidden");
+  document.getElementById("btnCSV").classList.remove("hidden");
+  document.getElementById("btnImprimir").classList.remove("hidden");
+  elTitle.textContent = provSel.nombre;
+  elQ.value = "";
+  render();
+}
+
+function volver(){
+  elFase1.classList.add("hidden");
+  elFase0.classList.remove("hidden");
+  document.getElementById("btnVolver").classList.add("hidden");
+  document.getElementById("btnCSV").classList.add("hidden");
+  document.getElementById("btnImprimir").classList.add("hidden");
+  provSel = null;
+}
+
+function render(){
+  var arts = filasArticulos(provSel);
+  var ins  = filasInsumos(provSel);
+
+  var q = norm(elQ.value);
+  var artsVis = q ? arts.filter(function(a){
+    return norm(a.cod).indexOf(q) >= 0 || norm(a.desc).indexOf(q) >= 0;
+  }) : arts;
+
+  // --- aviso segun el estado real de los datos ---
+  var hayEnvios = ins.some(function(i){ return i.enviado > 0; });
+  var avisos = [];
+  if (!hayEnvios){
+    avisos.push("⚠ <b>Todavía no hay ningún envío de cartón o cajas cargado</b> para este proveedor. " +
+      "El envío se registra en «Envío Cartón/Cajas» y recién ahí se puede saber qué le queda. " +
+      "Por ahora solo se ve lo que entregó.");
+  }
+  avisos.push("Las entregas se cuentan en <b>cajas</b> (es como las carga «Entrega Prov AT»); " +
+    "las unidades salen de multiplicar por las uni x caja. Los artículos cargados con más de un " +
+    "valor de uni x caja quedan sin unidades, porque no se puede saber cuál corresponde.");
+  elAviso.innerHTML = avisos.join("<br>");
+
+  // --- KPIs ---
+  var totCaj = arts.reduce(function(s,a){ return s + a.entregado; }, 0);
+  var totUni = arts.reduce(function(s,a){ return s + (a.unidades || 0); }, 0);
+  var conEnt = arts.filter(function(a){ return a.entregado > 0; }).length;
+  var sinUxc = arts.filter(function(a){ return a.entregado > 0 && !a.uxc && a.uxcVals.length === 0; }).length;
+  var ambiguos = arts.filter(function(a){ return a.entregado > 0 && !a.uxc && a.uxcVals.length > 1; }).length;
+
+  elKpis.innerHTML =
+    kpi("Artículos", fmt(arts.length)) +
+    kpi("Con entregas", fmt(conEnt)) +
+    kpi("Entregado (cajas)", fmt(totCaj)) +
+    kpi("Unidades", fmt(totUni)) +
+    kpi("Enviado (cartón/cajas)", hayEnvios ? fmt(ins.reduce(function(s,i){ return s+i.enviado; },0)) : "0") +
+    (sinUxc ? kpi("Sin uni x caja", fmt(sinUxc)) : "") +
+    (ambiguos ? kpi("Uni x caja ambiguo", fmt(ambiguos)) : "");
+
+  // --- tabla articulos ---
+  elArtEmpty.classList.toggle("hidden", artsVis.length > 0);
+  elArt.innerHTML = artsVis.map(function(a){
+    return "<tr>" +
+      '<td class="cod">' + esc(a.cod) + (a.fueraCatalogo ? ' <span class="sin-dato">(fuera de catálogo)</span>' : "") + "</td>" +
+      "<td>" + esc(a.desc) + "</td>" +
+      '<td class="num sep">' + (a.nCaja == null ? '<span class="sin-dato">—</span>' : esc(a.nCaja)) + "</td>" +
+      '<td class="num">' + (a.uxc ? fmt(a.uxc)
+            : (a.uxcVals.length > 1
+                ? '<span class="sin-dato" title="Cargado con mas de un valor">' + a.uxcVals.join(" / ") + '</span>'
+                : '<span class="sin-dato">falta</span>')) + "</td>" +
+      '<td class="num sep">' + (a.entregado ? fmt(a.entregado) : '<span class="sin-dato">0</span>') + "</td>" +
+      '<td class="num">' + (a.unidades == null ? '<span class="sin-dato">—</span>' : fmt(a.unidades)) + "</td>" +
+      '<td class="fecha sep">' + (a.ultima ? esc(fecha(a.ultima)) : '<span class="sin-dato">—</span>') + "</td>" +
+    "</tr>";
+  }).join("");
+
+  var vCaj = artsVis.reduce(function(s,a){ return s + a.entregado; }, 0);
+  var vUni = artsVis.reduce(function(s,a){ return s + (a.unidades || 0); }, 0);
+  elArtFoot.innerHTML = artsVis.length
+    ? '<tr><th colspan="4">Total (' + artsVis.length + ')</th>' +
+      '<th class="num sep">' + fmt(vCaj) + "</th>" +
+      '<th class="num">' + fmt(vUni) + '</th><th class="sep"></th></tr>'
+    : "";
+
+  // --- tabla insumos ---
+  elInsEmpty.classList.toggle("hidden", ins.length > 0);
+  elIns.innerHTML = ins.map(function(i){
+    var cls = i.saldo > 0 ? "pos" : (i.saldo < 0 ? "neg" : "cero");
+    return "<tr>" +
+      '<td class="cod">' + esc(i.cod) + "</td>" +
+      "<td>" + esc(i.desc) + "</td>" +
+      '<td class="num sep">' + fmt(i.enviado) + "</td>" +
+      '<td class="num ' + cls + '">' + fmt(i.saldo) + "</td>" +
+    "</tr>";
+  }).join("");
+}
+
+function kpi(lbl, val){
+  return '<div class="kpi"><span class="sub">' + esc(lbl) + "</span><b>" + esc(val) + "</b></div>";
+}
+
+/* ===== CSV ===== */
+function exportarCSV(){
+  var arts = filasArticulos(provSel);
+  var sep = ";";
+  var lineas = ["sep=" + sep];
+  lineas.push(["Codigo","Descripcion","N Caja","Uni x caja","Entregado cajas","Unidades","Ultima entrega","Remitos"].join(sep));
+  arts.forEach(function(a){
+    lineas.push([
+      a.cod,
+      String(a.desc).replace(new RegExp(sep,"g")," "),
+      a.nCaja == null ? "" : a.nCaja,
+      a.uxc || (a.uxcVals.length > 1 ? a.uxcVals.join(" / ") : ""),
+      a.entregado,
+      a.unidades == null ? "" : a.unidades,
+      a.ultima ? fecha(a.ultima) : "",
+      a.remitos
+    ].join(sep));
+  });
+  var blob = new Blob(["﻿" + lineas.join("\r\n")], {type:"text/csv;charset=utf-8;"});
+  var url = URL.createObjectURL(blob);
+  var a = document.createElement("a");
+  a.href = url;
+  a.download = "control_prov_at_" + norm(provSel.nombre).replace(/\s+/g,"_") + ".csv";
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+/* ===== INIT ===== */
+document.getElementById("btnVolver").addEventListener("click", volver);
+document.getElementById("btnCSV").addEventListener("click", exportarCSV);
+document.getElementById("btnImprimir").addEventListener("click", function(){ window.print(); });
+elQ.addEventListener("input", function(){ if (provSel) render(); });
+
+cargar();
+</script>
+</body>
+</html>

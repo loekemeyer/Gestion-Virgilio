@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <script src="../../auth-guard.js"></script>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Envío a Proveedores de Servicios</title>
+  <link rel="stylesheet" href="EnviosPS.css?v=20260803f" />
+  <link rel="stylesheet" href="../../tandas-popup.css?v=20260617a" />
+  <link rel="stylesheet" href="../../cajones-popup.css?v=20260528a" />
+</head>
+<body>
+
+  <div class="card">
+    <!-- HEADER -->
+    <div class="header-top">
+      <button id="btnVolver" class="btn-volver hidden" type="button">← Atras</button>
+      <button onclick="gpHome()" class="btn-home" type="button">← Inicio</button>
+    </div>
+    <h1 class="page-title">Envío a Proveedores de Servicios</h1>
+    <script>
+      function gpHome(){
+        try { localStorage.removeItem('enviosPS_pendientes'); } catch(e){}
+        var r = sessionStorage.getItem('gp_role') || 'admin';
+        window.location.href = (r === 'envios') ? '../../envios-only.html' : '../../Inicio/index.html';
+      }
+    </script>
+
+    <!-- FASE 0: SELECCIONAR PROVEEDOR -->
+    <div id="fase0" class="fase-container">
+      <div id="psGridWrap" class="ps-grid-wrap">
+        <div id="psGrid" class="ps-grid"></div>
+      </div>
+      <div id="status" class="status"></div>
+    </div>
+
+    <!-- FASE 1: CARGAR CAJONES + KG NETO (unificado) -->
+    <div id="fase1" class="fase-container hidden">
+      <div class="fase-header">
+        <h2 id="fase1Title">Proveedor</h2>
+        <div style="display:flex;gap:8px;align-items:center;">
+          <label for="fechaEnvio" style="font-weight:800;font-size:14px">Fecha:</label>
+          <input type="date" id="fechaEnvio" style="height:38px;border-radius:10px;border:2px solid #d0d7de;padding:0 10px;font-size:14px">
+          <button id="btnLimpiar" class="btn-volver-fases" type="button" title="Vaciar todo lo cargado">🗑 Limpiar</button>
+          <button id="btnEnviar" class="btn-enviar disabled" type="button" disabled>Enviar</button>
+        </div>
+      </div>
+      <div class="table-wrap">
+        <table class="table">
+          <thead id="fase1TableHead">
+            <tr>
+              <th>SC</th>
+              <th class="right col-cajenv col-caj-only">Cajón<br>envío</th>
+              <th class="right" id="fase1HdrCantidad">Cajón<br>Envío</th>
+              <th class="right col-caj-only" id="fase1HdrKg">Cajón envío<br>KG Neto</th>
+              <th class="center col-caj-only" title="Cargar por tandas">T</th>
+              <th class="col-caj-only">F</th>
+              <th class="sep col-caj-only"></th>
+              <th>Parte</th>
+              <th class="right col-caj-only">Online PS<br>Cajón</th>
+              <th class="right col-caj-only">Online SP<br>Cajón</th>
+              <th class="right col-caj-only">Max<br>Cajón</th>
+            </tr>
+          </thead>
+          <tbody id="fase1TableBody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- FASE 3: CONFIRMACIÓN -->
+    <div id="fase3" class="fase-container hidden">
+      <div class="fase-header success-header">
+        <h2>✓ Envío registrado</h2>
+      </div>
+      <div id="successBox" class="success-box">
+        <div class="success-msg">Tu código de envío:</div>
+        <div id="successCode" class="success-code">—</div>
+      </div>
+      <div class="footer-actions">
+        <button id="btnVolverPS" class="btn-enviar" type="button">← Cambiar proveedor</button>
+      </div>
+    </div>
+
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+  <script src="../../cajones-popup.js?v=20260528a"></script>
+  <script src="../../tandas-popup.js?v=20260604a"></script>
+  <script src="EnviosPS.js?v=20260825a"></script>
+</body>
+</html>

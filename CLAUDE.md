@@ -1,5 +1,258 @@
 # CLAUDE.md — Producción Virgilio
 
+## ⚠ REGLA: preguntar QUIÉN habla y dejar cada pedido como tarea en su Planify
+
+**Vale para TODOS los repos** (LK, Gestión Virgilio, Planify y cualquiera nuevo: copiar este
+bloque al `CLAUDE.md` del repo nuevo). Objetivo del dueño: que ninguna tarea quede a medio
+hacer sin figurar en la agenda de alguien.
+
+1. **Al empezar la sesión, preguntar quién está hablando** (antes de hacer nada):
+   *"¿Quién sos? (Thomas, Marianela, Luis, Gastón, …)"*. Si el mensaje ya lo dice, no repreguntar.
+2. **Cada pedido de trabajo se registra como tarea en el Planify de esa persona**, apenas se
+   empieza, con nombre MUY resumido (≤ 60 caracteres). Queda `done=false` hasta que se cierre
+   (punto 4). Si la sesión termina sin cerrar, la tarea queda en la agenda: ése es el objetivo.
+
+   **La nota (comentario) lleva SIEMPRE estas tres cosas, en este orden y conciso** (dueño,
+   2026-09-11: *"en comentarios tiene que explicar conciso qué es lo que falta y quién le creó
+   la tarea y desde qué sesión de Claude"*):
+   1. **Qué falta**: qué hay que hacer, concreto y accionable — no el historial de lo ya hecho.
+      Si algo ya se hizo, va en una línea aparte al final ("Ya hecho: …").
+   2. **Quién la pidió**: el nombre de la persona que lo pidió en el chat (Thomas, Marianela, …).
+   3. **De qué sesión salió**: la URL de esta sesión de Claude, para poder ir a leer la charla.
+
+   Formato:
+   `Falta: <qué hay que hacer>. Pedido de <Nombre> · cargada por Claude, sesión <url>`
+
+   Ejemplo real: `Falta: cargar el secreto KRIKOS_IMAP_PASS en el Vault de Supabase LK
+   (kwkclwhmoygunqmlegrg); sin eso krikos-ingest no lee la casilla y la Bandeja de OC queda
+   vacía. Pedido de Thomas · cargada por Claude, sesión https://claude.ai/code/session_XXXX`
+
+   **Al cerrar o actualizar la tarea, la nota se reescribe con lo que quedó pendiente**, no se
+   le agrega texto encima: quien la lee tiene que ver de un vistazo qué falta hoy.
+3. **Excepción del dueño:** Thomas Loekemeyer NO usa Planify. Sus pedidos se cargan en el
+   Planify de **Tomás Beviglia (employee_id 20)** con el nombre antepuesto por **`Th `**
+   (ej. `Th Fecha estimada de entrega por zona`).
+
+**Dónde:** proyecto Supabase de Gestión Virgilio `hrxfctzncixxqmpfhskv`, schema `planify`.
+Empleados activos con Planify (`planify.employees`): Marianela Becker **38**, Luis Rial Otero
+**52**, Gastón Dalponte **61**, Tomás Beviglia **20**, Gonzalez Tomas 16, Elías Irace 1,
+Nazareno Rodríguez 27, Angely Asuaje 22, Viviana Gauna 4, Alan Gonzalez 5, Diego Mollo 44,
+Nora Heredia 33, Juan Cruz Karaygan 51, Pablo Martos 6, Martín Cornejo 34, Martín Pregelj 15,
+Romina Maturano 55, Iván Meta 58, Jhonny Cartaya 46. Si el nombre no está, buscar:
+`select id, nombre from planify.employees where activo and nombre ilike '%<apellido>%'`.
+
+```sql
+-- alta (al empezar el pedido)
+insert into planify.tasks (name, type, prio, time, date, note, rec, done, assignment_type,
+  employee_id, department_id, system_generated, broadcast, created_at, updated_at)
+values ('<resumen ≤60>', 'tarea', 'normal', '09:00', to_char(now() at time zone
+  'America/Argentina/Buenos_Aires', 'YYYY-MM-DD'),
+  'Falta: <qué hay que hacer, concreto>. Pedido de <Nombre> · cargada por Claude, sesión
+  <url de ESTA sesión>', 'none', false, 'employee', <employee_id>, null, false, false, now(), now())
+returning id;
+-- cierre (cuando la persona la da por terminada)
+update planify.tasks set done = true, updated_at = now() where id = <id>;
+```
+
+Avisar en el chat el `id` al crearla y al cerrarla. No crear tareas para preguntas o consultas
+que se responden en el momento; sólo para pedidos que implican hacer algo.
+
+4. **Cierre por criterio propio y SIN preguntar** (dueño, 2026-09-11: *"las que ya están
+   cerradas, cerradas"*). Claude evalúa **solo** si el objetivo del pedido se cumplió (lo
+   entregado funciona, está commiteado/pusheado/aplicado, y no quedó ninguna parte del
+   pedido sin hacer). Si se cumplió: `done=true` y lo avisa en el chat. **NO** se pregunta
+   "¿falta algo más para dar por cerrada la tarea?" — esa pregunta queda prohibida. Lo que
+   se pidió y quedó a medias NO se cierra: queda abierta con la nota actualizada ("queda
+   pendiente: …") y en el chat se dice qué falta y por qué. Si después la persona pide algo
+   más sobre esa tarea, se reabre (`done=false`) o se crea una nueva.
+
+5. **Alerta de inactividad (1 hora).** Si hay tareas abiertas de esta sesión y pasa una
+   hora sin mensajes, Claude escribe: *"Te estoy registrando estas tareas pendientes:
+   … ¿Querés continuar alguna o damos por cerrada la charla?"* Cómo: al terminar un turno
+   con tareas abiertas, si la sesión tiene `send_later` (Claude Code web/remoto) o
+   `ScheduleWakeup`, armar UN recordatorio a 60 min (borrar el anterior si existía); al
+   dispararse, si sigue habiendo tareas abiertas, mandar la alerta; si no, no decir nada.
+   En una sesión local sin esas herramientas no hay forma de despertarse sola: en ese
+   caso, al cerrar cada turno con tareas abiertas, dejar la lista escrita en el chat.
+
+6. **Propagar la regla a todo repo nuevo.** Si en una charla se agrega o se toca por
+   primera vez un repo que NO tiene este bloque en su `CLAUDE.md` (se lo trae de referencia,
+   se lo crea, o se le hace un cambio), copiarle este bloque entero (creando el `CLAUDE.md`
+   si no existe) y commitearlo en ese repo, avisando en el chat. Así el dueño no tiene que
+   pedirlo cada vez. Fuente canónica del bloque: `CLAUDE.md` de `loekemeyer/pagina-LK-copia`.
+
+
+## ⚠ REGLA: NO preguntar — razonar primero y resolver
+
+**Dueño (2026-09-11): *"no me tenés que preguntar, tenés que razonar primero"*.** Vale para
+TODOS los repos (LK, Chef, Gestión Virgilio, Planify y cualquiera nuevo: copiar este bloque
+al `CLAUDE.md` del repo nuevo, igual que el de Planify).
+
+Antes de escribirle una pregunta al dueño, **resolverla**: leer el código, consultar la base,
+mirar la doc del repo (`GUIA-PROYECTO.md`, `docs/SUPABASE-GESTION-VIRGILIO.md`, los `CLAUDE.md`),
+probar. Preguntar es el último recurso, no el primero.
+
+- **Nunca** preguntar algo averiguable: qué tabla es, qué versión corre, si algo ya está hecho,
+  qué significa un dato, si el cron lo pisa. Se averigua y se sigue.
+- **Nunca** preguntar "¿lo hago?" / "¿querés que…?" sobre lo que ya pidió. Si el pedido se
+  entiende, se hace completo.
+- **Dos caminos razonables** → elegir el más seguro y reversible (con backup si toca datos),
+  hacerlo, y avisar en UNA línea el criterio usado. No se frena la tarea esperando respuesta.
+- **Un pedido ambiguo** se interpreta como lo haría alguien que conoce el negocio, mirando las
+  reglas del dueño ya escritas en estos archivos. Si quedan dos lecturas con consecuencias muy
+  distintas, se hace la reversible y se avisa cuál se tomó.
+- **Sí se pregunta y se espera** sólo en tres casos: (a) la acción es destructiva o irreversible
+  sobre datos reales (borrar, pisar, mandar algo afuera: mail, WhatsApp, ISIS); (b) dos reglas
+  del dueño se contradicen y hay que elegir; (c) falta un dato que no existe en ningún lado
+  porque es una decisión comercial suya (un precio, a quién se le vende, una fecha pactada).
+- El cierre de tareas de Planify **no se pregunta**: punto 4 del bloque de arriba.
+
+## REGLA: auditar en Supabase cada problema del repo y su solucion
+
+**Vale para TODOS los repos** (igual que la regla de Planify: copiar este bloque al `CLAUDE.md`
+de cualquier repo nuevo). Objetivo: que cada error que tuvo un repositorio quede con su causa,
+su correccion y el/los commits donde se arreglo, para no volver a pisar el mismo pozo.
+
+**Donde:** proyecto Supabase `hrxfctzncixxqmpfhskv`, schema `github_repo_problemas`.
+Se escribe con el MCP de Supabase (`execute_sql`), no con la anon key.
+
+### Que se audita y que NO
+
+Regla corta: **si ya estaba pusheado y andaba mal, se audita.** Si es trabajo nuevo, no.
+
+| Se registra | NO se registra |
+|---|---|
+| Bug en codigo ya pusheado que llego al usuario | Feature nueva o pedido de cambio |
+| Dato corrupto o mal migrado en la base | Refactor pedido por el usuario |
+| Config o credencial rota o filtrada | Bug que introducis y arreglas antes de pushear |
+| Performance degradada, query que no escala | Duda o consulta que se responde en el momento |
+| Tabla derivada desincronizada de su madre | Ajuste de estilo o texto |
+
+### Cuando
+
+1. **Al detectar el problema** (antes de tocar nada): `registrar_problema` devuelve el id.
+2. **Al pushear el fix**: `cerrar_problema` con el sha del commit.
+3. **Si el fix necesita mas commits**: `agregar_commit` por cada uno. Un problema puede tener N
+   commits; NO abrir un problema nuevo por el segundo pase del mismo fix.
+4. Una sesion de Claude puede abarcar **varios** problemas: `sesion_id` no es unico.
+
+### SQL
+
+```sql
+-- 1) al detectar
+select github_repo_problemas.registrar_problema(
+  p_repo          => 'owner/repo',            -- en minuscula
+  p_titulo        => '<sintoma en <=120 chars>',
+  p_descripcion   => '<que se rompio y como se manifesto>',
+  p_categoria     => 'bug',                   -- bug|datos|seguridad|performance|config|ux|deuda_tecnica|documentacion
+  p_severidad     => 'alto',                  -- critico|alto|medio|bajo
+  p_modulo        => 'Carpeta/Modulo',
+  p_archivos      => array['ruta/relativa.html'],
+  p_sesion_id     => '<id de la sesion de Claude>',
+  p_detectado_por => '<usuario> (claude-remote)',
+  p_detectado_en  => now()                    -- fecha REAL si es carga historica
+);
+
+-- 2) al pushear el fix
+select github_repo_problemas.cerrar_problema(
+  p_id            => <id>,
+  p_correccion    => '<que se cambio>',
+  p_commit_sha    => '<sha corto>',
+  p_branch        => '<branch>',
+  p_commit_url    => 'https://github.com/owner/repo/commit/<sha>',
+  p_causa_raiz    => '<por que paso, no que paso>',
+  p_corregido_por => '<usuario> (claude-remote)',
+  p_mensaje       => '<subject del commit>'
+);
+
+-- 3) commits extra del mismo problema
+select github_repo_problemas.agregar_commit(<id>, '<sha>', '<branch>', '<url>', '<mensaje>', '<autor>');
+
+-- lectura
+select * from github_repo_problemas.v_problemas order by detectado_en desc;
+```
+
+**Avisar en el chat el titulo del problema** al registrarlo y al cerrarlo, no el numero de id
+(mismo criterio que Planify).
+
+**Si el problema se detecta pero NO se arregla, queda en `estado='abierto'`.** Ese es el punto:
+que quede anotado. Estados: `abierto` | `en_curso` | `corregido` | `no_corregible` | `descartado`.
+Para pasar a `corregido` la base exige `correccion` y `corregido_en` cargados (constraint).
+
+**La auditoria no se borra.** El rol `anon` tiene SELECT/INSERT/UPDATE pero NO DELETE ni
+TRUNCATE en las tres tablas. Si una fila esta mal, se corrige o se pasa a `descartado`.
+
+## REGLA: claves de Supabase - migrar a las nuevas, NO apagar las legacy todavia
+
+Estado al 2026-09-11. Supabase cambio el sistema de claves. Conviven dos juegos y **los dos
+funcionan a la vez**, asi que se migra cliente por cliente sin downtime.
+
+| Sistema | Claves | Se rota de a una |
+|---|---|---|
+| Nuevo | `sb_publishable_...` (frontend) + `sb_secret_...` (backend) | si |
+| Legacy (JWT) | `anon` + `service_role` | NO: las dos derivan del JWT secret del proyecto |
+
+Doc: `supabase.com/docs/guides/getting-started/migrating-to-new-api-keys`. Textual: *"The
+legacy anon and service_role keys are based on your project's JWT secret, which makes them
+hard to rotate without downtime."* **No existe boton "Roll" para las legacy.**
+
+### 1. Lo filtrado vive en el HISTORIAL de git, y el historial no se arregla
+
+Una `service_role` legacy quedo expuesta en el historial de un repo publico (ver `LOCKS.txt`
+de `GestionProductivaEntero`, entrada 2026-09-04). El arbol de trabajo ya esta limpio, pero
+eso no alcanza: lo que estuvo en un repo publico pudo clonarlo cualquiera y reescribir el
+historial NO lo des-filtra. **El unico arreglo real es invalidar la clave.**
+
+Precision importante: lo que se filtro es la **`service_role` key** (un JWT firmado con el
+secret), NO el JWT secret. De un HS256 no se deriva la clave, asi que **apagar las legacy
+alcanza** para matar lo filtrado. Rotar el JWT secret es un paso extra, no el obligatorio.
+
+### 2. Como se invalida (y por que todavia no)
+
+Dashboard -> Settings -> API Keys -> pestana **"Legacy anon, service_role API keys"** ->
+boton **`Disable JWT-based API keys`**. Apaga `anon` y `service_role` de una sola vez. Es
+reversible. Es lo que la doc pide para este caso: *"Make sure you also switch to publishable
+and secret API keys and disable the anon and service_role keys."*
+
+**NO apretarlo todavia:** apaga TAMBIEN la `anon`, que es la que usa el frontend. Hoy eso
+tira abajo la app entera.
+
+### Orden obligatorio
+
+1. Contar donde esta escrita la clave legacy en este repo:
+   ```
+   grep -rl 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9' . --exclude-dir=.git | wc -l
+   ```
+   (Referencia: `GestionProductivaEntero` tenia 66 archivos y 0 con la clave nueva.)
+2. Reemplazar esa cadena por la `sb_publishable_...` del proyecto Supabase de ESTE repo
+   (cada proyecto tiene la suya; no mezclar).
+3. Migrar todo backend que use `service_role` (Edge Functions, n8n, scripts) a `sb_secret_...`.
+4. Recien con 1-3 hechos en TODOS los repos que peguen contra ese proyecto:
+   `Disable JWT-based API keys`.
+
+### Paso opcional: rotar el JWT secret
+
+Sirve si ademas se sospecha del secret en si. Va en **Settings -> JWT Keys**
+(`/dashboard/project/_/settings/jwt`), NO en la pagina de API Keys:
+
+1. `Migrate JWT secret` - importa el secret viejo y crea una clave asimetrica standby. Sin downtime.
+2. `Rotate keys` - la standby firma los JWT nuevos. NO desloguea a nadie: los tokens no
+   vencidos se siguen aceptando.
+3. Revocar el secret legacy, que queda en *Previously used*.
+
+Dos avisos de la doc antes del paso 2:
+- *"Make sure your app does not directly rely on the legacy JWT secret. If it's verifying every
+  JWT against the legacy JWT secret (using a library like jose, jsonwebtoken or similar),
+  continuing with the rotation might break those components."*
+- *"If you're using Edge Functions that have the Verify JWT setting, continuing with the
+  rotation might break your app. You will need to turn off this setting."*
+
+Cuando revocar: esperar el tiempo de expiracion del access token + 15 min (1 h 15 min si es de
+1 h) para no desloguear a nadie; en un incidente activo, revocar de inmediato.
+
+**Al tocar cualquier archivo con una clave de Supabase, dejarlo en el sistema nuevo. Nunca
+escribir codigo nuevo con la clave legacy.**
+
 ## 🪨 Modo Caveman (SIEMPRE activo)
 
 **Cada conversación abre con caveman activo por defecto.** Responder en modo **caveman**:
@@ -8,6 +261,22 @@ código, comentarios ni mensajes de commit).
 
 - **`desactiva caveman`** = responder solo el **próximo mensaje** normal/completo, y después **volver solo** a caveman.
 - **`caveman desactivacion total`** = apagar caveman por completo (queda desactivado hasta que se reactive).
+
+---
+
+## ⚠ REGLA: borrar un pedido = borrarlo de TODOS lados (todos los repos/proyectos)
+
+Cuando el usuario pida **borrar un pedido**, borrarlo de **todos los lugares donde ese pedido
+interviene**, no de uno solo. Un pedido web vive en varios proyectos a la vez:
+
+1. **Página de la empresa** (su propio proyecto Supabase): `orders` + `order_items`
+   — LK = `kwkclwhmoygunqmlegrg` (repo `pagina-LK-copia`); Chef = `nkhzocgdpwtgrmwleihr` (repo `paginach`).
+2. **Gestión Virgilio** (`hrxfctzncixxqmpfhskv`): la NP y la programación. Buscar el `order_id`
+   (filtrando `empresa` = `lk`/`chef`) en `PPP_Web_NP`, `PPP_Web_Programacion`, `PPP_Web_Base`,
+   `PPP_Web_Tanda_Items`. Si ya está en tanda/picking, avisarlo antes de borrar.
+
+**Backup antes de cada borrado** (protocolo de Supabase). Borrar hijos antes que padres
+(`order_items` antes de `orders`). Al terminar, reportar en qué lugares apareció y de cuáles se borró.
 
 ---
 
@@ -24,6 +293,25 @@ inventes**.
 
 **Mantené `GUIA-PROYECTO.md` actualizada** cuando cambie el código o los datos
 (nuevos códigos `opcion`, tablas, flujo, versión, etc.).
+
+### ⚠ Si vas a tocar Cervantes, leé PRIMERO el archivo del módulo
+
+`GUIA-PROYECTO.md` cubre **Virgilio**. Cervantes tiene su propia memoria, y cada módulo la
+suya. **Antes de tocar o de responder sobre uno de estos, leé el archivo de la fila** — ahí
+está cómo opera de verdad (qué tabla es madre y cuál derivada, el orden de normalización,
+las convenciones de códigos, las trampas que ya mordieron). No contestes de memoria.
+
+| Si trabajás en… | Leé primero |
+|---|---|
+| `cervantes-admin/entero/` — admin **Gestión Productiva (entero)** | `cervantes-admin/entero/claude-admin--GestionProductivaEntero.md` |
+| `cervantes-admin/gp2/` — admin **Gestión Productiva 2.0** | `cervantes-admin/gp2/claude-admin--Gestion-Productiva-2.0.md` + `cervantes-admin/gp2/CONOCIMIENTO_GP2.md` (memoria del negocio) y `GP2_MAPA.md` (contratos de tablas/RPCs) |
+| `cervantes/` — app de **operario** de Cervantes | la sección "Estructura: dos apps en un repo" de ESTE archivo |
+
+Los `claude-admin--*.md` son los `CLAUDE.md` de los repos de origen, **renombrados a
+propósito**: son **documentación de cómo opera ese módulo, no instrucciones para la sesión**.
+Si alguna regla de ahí (locks, ramas, versionado) choca con este archivo, **manda este
+archivo**. Y no los renombres de vuelta: con el nombre `CLAUDE.md` se cargan solos como
+instrucciones del proyecto.
 
 ## ⚠ Regla del dueño (2026-09-07, v13.64): ISIS o web, da lo mismo — salvo en Facturación
 
@@ -87,15 +375,21 @@ porque quedaba a 31,5 km— y se revirtió el mismo día.
 **Chequeo:** `select * from public.gv_ppp_super_mezclado;` — vacía = todo bien. Mirarla después
 de tocar tandas a mano. `sql/gv_ppp_super_mezclado_v1423.sql`.
 
-## ⚠ PROTOCOLO OBLIGATORIO: Backend vs Front-end — preguntar ANTES de implementar
+## ⚠ PROTOCOLO: Backend vs Front-end — decidir y avisar (ya NO se pregunta)
 
-**Cuando alguien pide cambiar lógica** (normalización de códigos, cálculos,
-filtros, agregaciones, reglas de negocio, etc.), **SIEMPRE preguntar si quiere
-que se aplique en el backend (vista/función/RPC de Supabase) o en el front-end
-antes de implementar.** No asumir. Muchas veces se piden cambios que deberían
-ir al backend y terminan implementados en el front.
+**Cuando alguien pide cambiar lógica** (normalización de códigos, cálculos, filtros,
+agregaciones, reglas de negocio, etc.) hay que definir si va en el **backend**
+(vista/función/RPC de Supabase) o en el **front-end**. Antes esto se preguntaba; desde
+el **2026-09-11** ya no (regla "NO preguntar — razonar primero"): **se decide, se hace y
+se avisa en una línea dónde se puso y por qué.**
 
-Aplica a **todos los chats** (nuevos y vigentes) sobre este repo.
+El criterio ya está escrito y no hace falta consultarlo cada vez: **si el cambio afecta
+datos persistidos o una regla de negocio, va al backend** (protocolo de abajo), y el front
+sólo lo duplica como optimización de UX. Va al front únicamente lo que es **puramente
+visual** (cómo se muestra, ordena o pinta algo que ya viene resuelto del backend).
+
+La única pregunta que sobrevive es cuando las dos opciones cambian el resultado del
+negocio y no hay regla previa que lo resuelva. Aplica a **todos los chats** sobre este repo.
 
 ## ⚠ PROTOCOLO OBLIGATORIO: Lógica de negocio SIEMPRE en el backend
 
@@ -304,7 +598,16 @@ ALTER TABLE Capacidad_Sector ADD COLUMN nueva_col TEXT;
 -- Si falla: restore ejecutando los INSERTs guardados
 ```
 
-**Historial de incidentes:** 2026-08-07 — TRUNCATE accidental de Capacidad_Sector (730 registros perdidos). Lección aprendida → este protocolo existe.
+**Historial de incidentes:** 2026-08-07 — TRUNCATE accidental de Capacidad_Sector (730 registros
+perdidos). Lección aprendida → este protocolo existe.
+
+**2026-09-11 (v15.44) — `index.html` y `sw.js` pusheados VACÍOS a `main`: la app quedó en blanco
+con los operarios pickeando.** Causa: un script de edición que abría el archivo en modo `w` dentro
+de la misma expresión que lo leía (`open(p,"w").write(open(p).read()...)`); Python evalúa el `open`
+de escritura primero, así que trunca antes de leer. Se restauró por hotfix (`0995684`) y se repusieron
+los cambios en la v15.45. **Regla: al editar un archivo por script, leer a una variable, verificar el
+largo del resultado, y recién entonces escribir. Y antes de `git commit`, mirar `git diff --stat`: un
+archivo con miles de líneas borradas no es un cambio, es un error.**
 
 ## ⚠ PROTOCOLO OBLIGATORIO: NUNCA modificar datos sin permiso explícito
 
@@ -340,7 +643,8 @@ Este repo junta **las dos plantas** (reemplaza al viejo repo `App-Produccion`, q
 borró). Layout:
 
 - **Raíz** → app **Virgilio** (sin cambios; la usa también la app de Play Store/TWA).
-- **`/cervantes/`** → **copia** de la app Cervantes (repo fuente `Registro-Produccion-2.0`).
+- **`/cervantes/`** → app **Cervantes** (desde 2026-09-10 **el fuente vive acá**; el repo
+  `Registro-Produccion-2.0` quedó congelado — ver más abajo).
 - **`/selector/`** → pantalla **"¿Dónde vas a trabajar hoy?"** que linkea a ambas:
   Virgilio `../` y Cervantes `../cervantes/`. Recuerda la última planta usada
   (`localStorage` `appprod_ultima_planta`, marca "Última vez"), **no redirige solo**.
@@ -352,10 +656,84 @@ borró). Layout:
 - **Entrada por defecto = Virgilio (raíz)**, no el selector (para no romper la URL
   actual ni la app de Play Store). Si se quisiera el selector como entrada, mover el
   selector a la raíz y Virgilio a `/virgilio/` (revisar TWA).
-- ⚠ **`/cervantes/` es una copia**: si Cervantes cambia en `Registro-Produccion-2.0`,
-  hay que **re-traer** los archivos (`app.js`, `index.html`, `manifest.json`,
-  `styles.css`, `sw.js`) y volver a poner el botón "Cambiar planta". Último sync desde
-  commit `d2d6a59` (2026-06-04).
+- ✅ **`/cervantes/` YA NO es una copia: es el fuente** (decisión del dueño, 2026-09-10).
+  La integración se hizo **para que los operarios de Registro Producción pasen a Gestión
+  Virgilio**, así que el código de Cervantes **se mantiene acá**, en `cervantes/`. El repo
+  `Registro-Produccion-2.0` quedó **congelado** en `68eec03` (app **v1.9.0**): no se toca,
+  no se re-sincroniza desde ahí, y el dueño **lo va a borrar** cuando termine la mudanza.
+  Su URL se deja andando mientras tanto **a propósito** — sin cartel ni redirect.
+  Nada se pierde al mudarse: es el **mismo origin** de GitHub Pages, así que la cola de
+  eventos pendientes (IndexedDB `registro-prod` + localStorage) y la sesión son las mismas
+  en las dos URLs.
+- **Login de Cervantes = el global de la raíz** (gate en el `<head>` de `cervantes/index.html`,
+  v1.9.0). Con sesión (Google autorizada, o sesión por legajo del día en `vir_legajo_auth`)
+  **no se vuelve a pedir el legajo**: lo precarga, esconde el input y saluda por nombre. Los
+  supervisores de la lista tipean el legajo. Sin sesión: bajo `/cervantes/` vuelve a `../`;
+  en la URL suelta cae a la pantalla de legajo (el gate detecta dónde corre).
+  **Un operario puede trabajar en las dos plantas** (regla del dueño, 2026-09-10: *"se tiene
+  que poder, porque pueden ir entre Cervantes y Virgilio"*) → Cervantes **NO** filtra por
+  `Empleados.Sede`; un legajo de sede V entra igual. Por eso el saludo lleva al lado
+  **"¿No sos vos? Cambiar operario"** (v1.9.1): en un equipo compartido borra la sesión del
+  anterior y devuelve el campo de legajo, que si no quedaba escondido y el que agarraba la
+  tablet tomaba producción con el legajo del otro. Una sesión **de otro día** no se usa
+  (se valida `day` contra hoy AR) y desde v1.9.2 **se borra ahí mismo**, sin esperar a que
+  la limpie la raíz. Ojo: eso es la sesión de LOGIN; el **estado de trabajo** es otra cosa
+  y no se toca — vive en `prod_state_Cervantes_v2_supa::<día>::<legajo>` y su guard diario
+  retiene 14 días calendario (para no perder una matriz abierta el sábado).
+- **Al tocar Cervantes**: subir `LOCAL_VERSION` (`cervantes/app.js`), `CACHE_VERSION`
+  (`cervantes/sw.js`) y los `?v=` + el badge de `cervantes/index.html` **al mismo número**.
+  Si se desalinean, el celular se queda con el JS viejo cacheado — pasó, y por eso los
+  operarios corrieron 5 versiones atrás sin que nadie lo notara.
+
+### Admin de Cervantes — dos pantallas, COPIADAS acá (`cervantes-admin/`)
+
+- **El supervisor que elige Cervantes en el selector de planta NO va a la pantalla de
+  operario: va al admin** (`chooseCervantes` → `showCervAdmin`, v14.73). El operario sigue
+  derecho a `./cervantes/`. La distinción es `__identity.type === "supervisor"`.
+- **Los admin de Cervantes son DOS y están COPIADOS acá** (decisión del dueño, 2026-09-10:
+  *"copia, no link… ya que esto es una integración"*): `cervantes-admin/entero/` (repo
+  `GestionProductivaEntero`) y `cervantes-admin/gp2/` (repo `Gestion-Productiva-2.0`). La
+  pantalla `#cervAdmin` muestra las dos tarjetas. **Todo Cervantes vive en este repo**: la
+  app de operario en `cervantes/` y los dos admin acá.
+- **De la copia se dejaron afuera** los archivos de repo, no de app: `.git`, `.claude`,
+  `.vscode`, `.mcp.json`, `.planning`, `LOCKS.txt` y los `.bat`.
+- **Los `CLAUDE.md` de los dos admin SÍ están, pero RENOMBRADOS** (v14.75):
+  `cervantes-admin/entero/claude-admin--GestionProductivaEntero.md` y
+  `cervantes-admin/gp2/claude-admin--Gestion-Productiva-2.0.md`. Ahí está cómo opera cada
+  admin (tablas madre vs derivadas, orden de normalización, "casa del vecino", convenciones,
+  trampas conocidas) y no está repetido en ningún otro `.md`. **Nunca renombrarlos de vuelta
+  a `CLAUDE.md`**: con ese nombre se cargan como instrucciones del proyecto y una sesión de
+  Gestión Virgilio pasa a obedecer las reglas de otro repo. Cada uno abre con un banner que
+  lo aclara. Las reglas que mandan acá son las de ESTE archivo.
+- **Los 5 agentes de GP2** quedaron archivados en `cervantes-admin/gp2/agentes/` (fuera de
+  `.claude/`, con su README): se conserva el trabajo si aquel repo se apaga, sin que una
+  sesión de acá los cargue sola. Para usarlos hay que copiarlos a `.claude/agents/` a mano.
+- **Parches propios de estas copias** (no revertirlos al re-sincronizar):
+  1. **Ningún rechazo de whitelist hace `signOut()`** (`entero/login.html`, `gp2/login.html`).
+     La sesión de Google es **compartida** con Gestión (mismo origin, mismo proyecto): cerrarla
+     ahí echaba al supervisor de Gestión entera sólo por no estar en `usuarios_permitidos`
+     (que hoy tiene **2 mails**: `loekemeyer.n8n@` admin y `loekemeyer.logistica@` envíos).
+     Ahora sólo se limpia el `sessionStorage` de esa app.
+  2. **`entero/Inicio/index.html`**: el botón "Cerrar sesión" pasó a **"← Volver a Gestión"**
+     (`../../../`) — hacía `signOut` + borraba las claves `sb-*`, o sea te echaba de todo.
+  3. **`gp2/GP2_MODULOS.html`**: link **"← Volver a Gestión"** en el header (`../../`).
+- **`.nojekyll` en la raíz**: sin eso, Pages corre Jekyll y **no publica** lo que empieza con
+  `_` — y las copias traen varios (`_backup_relevamiento_*`, `_export`, `_archivo`).
+- El botón **🏭 Admin Cervantes (GP2)** del panel supervisor abre **esa misma pantalla**
+  (`openAdminCervantes` → `showCervAdmin`): una sola puerta, no dos criterios.
+- ⚠ **Ojo, deuda heredada**: cada admin trae adentro su propio `Produccion/RegistroApp/`, o
+  sea que en el repo ahora hay **más de una copia** de la app de registro además de
+  `cervantes/`. No se tocó; si algún día se unifica, es ahí donde hay que mirar.
+- **No hace falta puente de sesión** (a diferencia de `/admin/` de LK, que necesita
+  `lk_bridge_vjwt` porque es OTRO proyecto Supabase): GP2 usa el **mismo proyecto**
+  `hrxfctzncixxqmpfhskv` y el **mismo origin**, con el `storageKey` default, así que la
+  sesión de Google del supervisor ya se ve del otro lado y el login de GP2 entra solo
+  (`getSession()` → `procesarSesion` → whitelist `GP2.get_role_for_email`).
+- ⚠ **Hoy el login de GP2 está APAGADO**: `GP2_AUTH_ON = false` en su `auth-guard.js`
+  (lo apagó el usuario el 2026-08-29: *"la página ya está privada y va a costar que
+  accedan, por ahora prefiero que esté suelto"*). O sea que ese botón hoy entra **sin
+  pedir nada**. Para volver a prenderlo hay que tocar el OTRO repo: `true` ahí y bumpear
+  el `?v=` de `auth-guard.js` en sus HTML.
 
 ## Panel Web LK bajo `/admin/`
 

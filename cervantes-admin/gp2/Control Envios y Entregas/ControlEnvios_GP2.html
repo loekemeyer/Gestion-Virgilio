@@ -1,0 +1,217 @@
+<!doctype html>
+<html lang="es">
+<head>
+<!-- v1.1.1 — refactor: helpers compartidos en gp2-envios-common.js -->
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Control Envíos y Entregas · GP2</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="../supabase-config.js?v=20260905k"></script>
+<script src="../gp2-ui.js?v=20260905a"></script>
+<script src="../gp2-numero.js?v=20260905m"></script>
+<script src="../gp2-envios-common.js?v=20260905c"></script>
+<link rel="stylesheet" href="../gp2-modulo.css?v=20260903b"/>
+<link rel="icon" type="image/png" href="../GP2_favicon.png">
+<link rel="apple-touch-icon" href="../GP2_favicon.png">
+<style>
+  .chips{display:flex;gap:8px;flex-wrap:wrap;margin:8px 0;align-items:center}
+  .chips .lbl{font-weight:800;font-size:15px;min-width:70px}
+  /* 44px = minimo tactil de la casa (2026-09-03). */
+  .chip{padding:10px 16px;min-height:44px;border-radius:20px;border:2px solid #d0d7de;background:#fff;font-weight:700;font-size:16px;cursor:pointer;color:#111}
+  .chip.active{background:#e7eff8;color:#fff;border-color:#cddaea}
+  input[type=month]{padding:10px;min-height:44px;border:2px solid #d0d7de;border-radius:8px;font-size:18px}
+  td.num,th.num{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+  table.t td.tot,table.t th.tot{background:#f0f4f8;font-weight:800}
+  .t tbody tr:hover td{background:#f6faff}
+</style>
+</head>
+<body>
+
+<div class="card">
+  <div class="header">
+    <h1>Control Envíos y Entregas</h1>
+    <div class="hbtns">
+      <button class="hlink" id="btnCSV" type="button">⬇ Exportar CSV</button>
+      <a href="../GP2_MODULOS.html">Atrás</a>
+    </div>
+  </div>
+
+  <div class="steps">
+    <div class="chips"><span class="lbl">Origen:</span><span id="origChips"></span></div>
+    <div class="chips"><span class="lbl">Tipo:</span><span id="tipoChips"></span></div>
+    <div class="chips">
+      <span class="lbl">Mes:</span><input type="month" id="mes">
+      <span class="lbl" style="margin-left:14px">Medida:</span><span id="medChips"></span>
+    </div>
+
+    <div class="search-box"><input type="text" id="q" placeholder="Buscar parte o nombre…"></div>
+
+    <div class="table-wrap"><table class="t">
+      <thead id="thead"></thead>
+      <tbody id="tbody"></tbody>
+    </table></div>
+    <div id="tblEmpty" class="empty hidden">Sin movimientos para esa selección.</div>
+    <div id="status" class="status">Elegí origen y tipo.</div>
+  </div>
+</div>
+
+<script>
+var SB = GP2EE.sb();
+var $ = GP2UI.$, esc = GP2UI.esc, fmt = GP2EE.fmt0;
+
+// tipos de movimiento del ledger por vista; contraparte: envio_* y compra miran el
+// destino (compra viene con origen null), el resto el origen del movimiento
+var VISTAS = {
+  ps:      { nombre:'Prov. Servicio', tipos:{ 'Envíos':['envio_ps'], 'Entregas':['entrega_ps'] } },
+  tall:    { nombre:'Talleristas',    tipos:{ 'Envíos':['envio_tallerista'], 'Entregas':['entrega_tallerista','recepcion_virgilio'], 'Devoluciones':['devolucion_tallerista'] } },
+  provat:  { nombre:'Prov. AT',       tipos:{ 'Envíos':['envio_prov_at'] } },
+  insumos: { nombre:'Insumos',        tipos:{ 'Recepciones':['compra'] } },
+};
+var MEDIDAS = { auto:'Kg/Uni', kg:'Kg', cajas:'Cajas' };
+
+var FILAS=[], origSel=null, tipoSel=null, medSel='auto';
+
+var mesAR = GP2EE.mesAR;
+
+function chips(cont, obj, sel, onpick){
+  var g=$(cont); g.innerHTML='';
+  Object.keys(obj).forEach(function(k){
+    var b=document.createElement('button'); b.type='button';
+    b.className='chip'+(sel===k?' active':''); b.textContent=(typeof obj[k]==='string')?obj[k]:obj[k].nombre||k;
+    b.addEventListener('click',function(){ onpick(k); });
+    g.appendChild(b);
+  });
+}
+
+function pintarChips(){
+  chips('origChips', VISTAS, origSel, function(k){
+    origSel=k;
+    var tipos=Object.keys(VISTAS[k].tipos);
+    tipoSel=tipos.length===1?tipos[0]:(VISTAS[k].tipos[tipoSel]?tipoSel:tipos[0]);
+    pintarChips(); cargar();
+  });
+  var tiposObj={};
+  if(origSel) Object.keys(VISTAS[origSel].tipos).forEach(function(k){ tiposObj[k]=k; });
+  chips('tipoChips', tiposObj, tipoSel, function(k){ tipoSel=k; pintarChips(); render(); });
+  chips('medChips', MEDIDAS, medSel, function(k){ medSel=k; pintarChips(); render(); });
+}
+
+var CARGA_SEQ=0;
+async function cargar(){
+  var miCarga=++CARGA_SEQ;
+  var mes=$('mes').value || mesAR();
+  var desde=mes+'-01';
+  var fin=new Date(Number(mes.slice(0,4)), Number(mes.slice(5,7)), 0).getDate();
+  var hasta=mes+'-'+String(fin).padStart(2,'0');
+  $('status').textContent='Cargando…';
+  var r=await SB.rpc('control_envios_bundle',{ p_desde:desde, p_hasta:hasta });
+  if(miCarga!==CARGA_SEQ) return; // llegó tarde: ya se pidió otro mes
+  if(r.error){ $('status').textContent='Error: '+r.error.message; return; }
+  FILAS=(r.data&&r.data.filas)||[];
+  render();
+}
+
+function contraparteDe(f){
+  return (f.tipo.indexOf('envio')===0 || f.tipo==='compra') ? (f.dest||'—') : (f.orig||'—');
+}
+
+function valorDe(f){
+  var canon=Math.abs(Number(f.canon)||0);
+  var esKg=f.um==='kg';
+  if(medSel==='cajas') return f.uni_x_cajon ? canon/f.uni_x_cajon : null;
+  if(medSel==='kg') return esKg ? canon : (f.kg_x_uni ? canon*f.kg_x_uni : null);
+  return canon; // auto: kg si el comp es kg, uni si no
+}
+function unidadFila(f){
+  if(medSel==='cajas') return 'caj';
+  if(medSel==='kg') return 'kg';
+  return f.um==='kg'?'kg':'uni';
+}
+
+function filtradas(){
+  if(!origSel||!tipoSel) return [];
+  var tipos=VISTAS[origSel].tipos[tipoSel]||[];
+  var q=($('q').value||'').trim().toLowerCase();
+  return FILAS.filter(function(f){
+    if(tipos.indexOf(f.tipo)<0) return false;
+    if(q && !(((f.codigo||'')+' '+(f.descripcion||'')+' '+contraparteDe(f)).toLowerCase().includes(q))) return false;
+    return true;
+  });
+}
+
+function pivotear(fs){
+  var dias={}, filasMap={};
+  fs.forEach(function(f){
+    var dia=Number(f.fecha.slice(8,10));
+    var v=valorDe(f);
+    if(v==null) return;
+    dias[dia]=true;
+    var key=f.comp_id+'|'+contraparteDe(f);
+    var row=filasMap[key];
+    if(!row){
+      row=filasMap[key]={ codigo:f.codigo, descripcion:f.descripcion, contraparte:contraparteDe(f),
+        unidad:unidadFila(f), celdas:{}, total:0 };
+    }
+    row.celdas[dia]=(row.celdas[dia]||0)+v;
+    row.total+=v;
+  });
+  var cols=Object.keys(dias).map(Number).sort(function(a,b){return a-b;});
+  var rows=Object.values(filasMap).sort(function(a,b){ return (a.codigo||'').localeCompare(b.codigo||''); });
+  return { cols:cols, rows:rows };
+}
+
+function render(){
+  pintarChips();
+  var fs=filtradas();
+  var p=pivotear(fs);
+  var dec = medSel==='cajas'?1:(medSel==='kg'?1:0);
+  $('thead').innerHTML='<tr><th>Parte</th><th>'+(origSel==='insumos'?'Sector':'Nombre')+'</th><th>Un.</th>'+
+    p.cols.map(function(d){ return '<th class="num">'+d+'</th>'; }).join('')+
+    '<th class="num tot">Total</th></tr>';
+  // en medida auto puede haber filas en kg y filas en uni: el total mezclaría unidades
+  var mixto = medSel==='auto' && p.rows.some(function(r){ return r.unidad!==p.rows[0].unidad; });
+  var totCols={}, totGral=0;
+  $('tbody').innerHTML=p.rows.map(function(r){
+    totGral+=r.total;
+    return '<tr><td><b>'+esc(r.codigo)+'</b><br><small style="color:#777">'+esc(r.descripcion||'')+'</small></td>'+
+      '<td>'+esc(r.contraparte)+'</td><td>'+r.unidad+'</td>'+
+      p.cols.map(function(d){
+        var v=r.celdas[d];
+        if(v!=null) totCols[d]=(totCols[d]||0)+v;
+        return '<td class="num">'+(v==null?'':fmt(v,dec))+'</td>';
+      }).join('')+
+      '<td class="num tot">'+fmt(r.total,dec)+'</td></tr>';
+  }).join('') + (p.rows.length ? ('<tr><td class="tot" colspan="3">Total</td>'+
+      p.cols.map(function(d){ return '<td class="num tot">'+(mixto?'—':fmt(totCols[d]||0,dec))+'</td>'; }).join('')+
+      '<td class="num tot">'+(mixto?'—':fmt(totGral,dec))+'</td></tr>') : '');
+  $('tblEmpty').classList.toggle('hidden', p.rows.length>0 || !origSel);
+  $('status').textContent = origSel ? (p.rows.length+' filas · '+fs.length+' movimientos') : 'Elegí origen y tipo.';
+}
+
+$('btnCSV').addEventListener('click',function(){
+  /* el armado del CSV (;, BOM, coma decimal) es el de la casa: GP2UI.exportarCSV */
+  var p=pivotear(filtradas());
+  var filas=[['Parte','Descripcion','Nombre','Unidad'].concat(p.cols.map(String)).concat(['Total'])];
+  p.rows.forEach(function(r){
+    filas.push([r.codigo,r.descripcion||'',r.contraparte,r.unidad]
+      .concat(p.cols.map(function(d){ return r.celdas[d]!=null?Math.round(r.celdas[d]*100)/100:''; }))
+      .concat([Math.round(r.total*100)/100]));
+  });
+  GP2UI.exportarCSV('control_'+(origSel||'')+'_'+(tipoSel||'')+'_'+($('mes').value||''), filas);
+});
+
+$('q').addEventListener('input', render);
+$('mes').addEventListener('change', cargar);
+$('mes').value=mesAR();
+/* Vista inicial. Se puede entrar directo a una con ?origen=tall|ps|provat|insumos:
+   el menu tiene un boton en el grupo Tallerista y otro en el de PS, cada uno
+   apuntando a su vista. Sin parametro (o con uno que no existe) arranca en PS,
+   como siempre. Los chips siguen ahi: desde cualquiera se pasa a las otras. */
+origSel = (new URLSearchParams(location.search).get('origen') || '').toLowerCase();
+if (!VISTAS[origSel]) origSel = 'ps';
+tipoSel = Object.keys(VISTAS[origSel].tipos)[0];
+pintarChips();
+cargar();
+</script>
+</body>
+</html>

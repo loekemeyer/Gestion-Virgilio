@@ -1,0 +1,358 @@
+<!doctype html>
+<html lang="es">
+<head>
+<!-- v1.2.1 — contraste: la opcion marcada tenia letra blanca sobre fondo claro (casi invisible); ahora texto oscuro legible sobre cada fondo. v1.2.0 — botones "Se fabrica" y "Discontinuo": lo que no se compra deja de figurar como faltante y sale de la OC. v1.1.0 — celular: encabezado, rubros y resumen compactados a una linea, botonera en grilla de 2 columnas con alto de dedo (44px); nota plegable. v1.0.0 — Quien fabrica cada parte: botonera por proveedor. Lo que se asigne aca es lo que despues separa la OC (cada proveedor recibe SOLO lo suyo). -->
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Inyectores · Quién hace cada parte · GP2</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="../supabase-config.js?v=20260905k"></script>
+<script src="../gp2-ui.js?v=20260905a"></script>
+<script src="../gp2-numero.js?v=20260905m"></script>
+<link rel="stylesheet" href="../gp2-modulo.css?v=20260903b"/>
+<link rel="icon" type="image/png" href="../GP2_favicon.png">
+<link rel="apple-touch-icon" href="../GP2_favicon.png">
+<style>
+  .chips{display:flex;gap:8px;flex-wrap:wrap;margin:8px 0;align-items:center}
+  .chip{padding:8px 14px;border-radius:20px;border:2px solid #d0d7de;background:#fff;font-weight:700;font-size:15px;cursor:pointer;color:#111}
+  .chip.active{background:#dbe7f6;color:#0b3b73;border-color:#9dbbdd}
+  .chip .badge{display:inline-block;margin-left:6px;padding:1px 7px;border-radius:10px;background:#fde68a;color:#7c2d12;font-size:12px;font-weight:800}
+  .chip.active .badge{background:#fff;color:#0b3b73}
+
+  .parte{display:flex;gap:14px;align-items:center;padding:11px 12px;border-bottom:1px solid #e6eaee;flex-wrap:wrap}
+  .parte:hover{background:#f6faff}
+  .parte.sin{background:#fffbeb}
+  .parte.sin:hover{background:#fef6da}
+  .p-izq{flex:1;min-width:230px}
+  .p-cod{font-weight:800;font-size:18px;color:#0066cc}
+  .p-desc{font-size:15px;color:#333;overflow-wrap:anywhere}
+  .p-meta{font-size:12px;color:#777;margin-top:2px}
+  .p-meta b{color:#b45309}
+  .p-der{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end}
+
+  .pbtn{padding:10px 16px;border-radius:10px;border:2px solid #d0d7de;background:#fff;
+        font-weight:800;font-size:15px;cursor:pointer;color:#111;white-space:nowrap}
+  .pbtn:hover{border-color:#111}
+  .pbtn.on{background:#d8f0e2;color:#166534;border-color:#8fccaa}
+  .pbtn.clear{font-weight:700;color:#777}
+  .pbtn.clear.on{background:#eef1f5;color:#334155;border-color:#c2ccd8}
+  .pbtn:disabled{opacity:.45;cursor:wait}
+  /* no se compra: se fabrica adentro o esta discontinuado */
+  .pbtn.est{font-weight:700;color:#5b21b6;border-color:#ddd6fe}
+  .pbtn.est.on{background:#e5daf6;color:#5b21b6;border-color:#c3aee6}
+  .parte.nocompra{background:#faf5ff}
+  .parte.nocompra:hover{background:#f3e8ff}
+
+  .resumen{display:flex;gap:10px;flex-wrap:wrap;margin:10px 0}
+  .rcard{background:#f6f8fa;border-radius:10px;padding:9px 14px;font-size:15px;font-weight:700}
+  .rcard b{font-size:19px;display:block}
+  .rcard.warn{background:#fffbeb;color:#7c2d12}
+  .nota{background:#eef4fb;border-left:4px solid #cddaea;padding:10px 12px;border-radius:6px;font-size:14px;margin:10px 0}
+  .nota summary{cursor:pointer;font-weight:700;list-style:none}
+  .nota summary::-webkit-details-marker{display:none}
+  .nota summary::after{content:" ▾";color:#0b3b73}
+  .nota[open] summary::after{content:" ▴"}
+  .lista{border:1px solid #e6eaee;border-radius:10px;overflow:hidden}
+
+  /* ── celular: que se llegue a los botones sin scrollear medio metro ──
+     El encabezado (nota + chips de rubro + resumen) se comprime a una linea
+     cada uno, y los botones de proveedor pasan a una grilla de 2 columnas
+     con alto de dedo (44px) en vez de envolverse en 3 filas. */
+  @media (max-width:640px){
+    .card{border-radius:0}
+    /* el encabezado compartido se comia media pantalla: titulo mas chico y los
+       3 botones en una sola fila (solo en esta pantalla, no toca gp2-modulo.css) */
+    .header{padding:10px 12px}
+    .header h1{font-size:19px;line-height:1.15}
+    .header .hbtns{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
+    .header .hbtns a,.header .hbtns .hlink{font-size:13px;padding:7px 11px}
+    .steps{padding-top:6px}
+    .nota{font-size:13px;padding:8px 10px;margin:6px 0}
+
+    /* rubros y resumen: una sola linea que se desliza al costado */
+    .chips,.resumen{flex-wrap:nowrap;overflow-x:auto;-webkit-overflow-scrolling:touch;
+                    scrollbar-width:none;margin:6px 0;padding-bottom:2px}
+    .chips::-webkit-scrollbar,.resumen::-webkit-scrollbar{display:none}
+    .chip{flex:0 0 auto;font-size:14px;padding:7px 12px}
+    .chip .badge{font-size:11px;padding:1px 6px}
+    .rcard{flex:0 0 auto;font-size:12px;padding:5px 10px;line-height:1.15}
+    .rcard b{font-size:15px}
+    .search-box{margin:6px 0}
+
+    /* la parte: titulo compacto arriba, botonera a lo ancho abajo */
+    .parte{padding:9px 10px;gap:7px}
+    .p-izq{min-width:100%;flex:none}
+    .p-cod{font-size:16px}
+    .p-desc{font-size:14px}
+    .p-meta{font-size:11px}
+    .p-der{width:100%;display:grid;grid-template-columns:1fr 1fr;gap:7px;justify-content:stretch}
+    .pbtn{width:100%;min-height:44px;padding:10px 8px;font-size:14px;white-space:normal}
+    /* "sin asignar" ocupa el ancho entero: es la salida, no una opcion mas */
+    .pbtn.clear{grid-column:1 / -1;min-height:38px}
+  }
+</style>
+</head>
+<body>
+
+<div class="card">
+  <div class="header">
+    <h1>Inyectores · Quién hace cada parte</h1>
+    <div class="hbtns">
+      <button class="hlink" id="btnNuevo" type="button">+ Proveedor</button>
+      <a href="../GP2_MODULOS.html">Atrás</a>
+    </div>
+  </div>
+
+  <div class="steps">
+    <details class="nota">
+      <summary>Tocá el botón del proveedor que fabrica cada parte. Se guarda al instante.</summary>
+      <div style="margin-top:6px">
+        Lo que quede asignado acá es lo que <b>separa la Orden de Compra</b>: en OC elegís el
+        proveedor y la orden sale sólo con <b>sus</b> partes. Si mañana cambia el inyector,
+        se cambia desde acá y la OC lo sigue solo.
+      </div>
+    </details>
+
+    <div class="chips" id="secChips"></div>
+    <div class="resumen" id="resumen"></div>
+    <div class="search-box"><input type="text" id="q" placeholder="Buscar por código o descripción…"></div>
+
+    <div class="lista" id="lista"></div>
+    <div id="vacio" class="empty hidden">No hay partes para esa búsqueda.</div>
+    <div id="status" class="status">Cargando…</div>
+  </div>
+</div>
+
+<script>
+"use strict";
+
+var SB = GP2_SB();
+
+var $ = GP2UI.$;
+var esc = GP2UI.esc;   /* helper de la casa, gp2-ui.js (2026-09-05) */
+function fmt(n,d){ return GP2N.fmt(n, d==null?0:d); }   /* la regla de numero de la casa (gp2-numero.js) */
+
+// Partes que NO se compran: no cuentan como faltantes y quedan fuera de la OC.
+var ESTADOS = { fabricacion:"Se fabrica", discontinuo:"Discontinuo" };
+
+var D = { sectores:[], proveedores:[], partes:[], sector:null };
+var secSel = null;   // id de sector elegido (null = el default del bundle: Plásticos)
+var CARGA = 0;       // token: una respuesta vieja no pisa la pantalla nueva
+
+async function cargar(){
+  var mia = ++CARGA;
+  $("status").className = "status";
+  $("status").textContent = "Cargando…";
+  var args = secSel == null ? {} : { p_sector_id: secSel };
+  var r = await SB.rpc("inyectores_bundle", args);
+  if (mia !== CARGA) return;
+  if (r.error){ $("status").className="status bad"; $("status").textContent = "Error: " + r.error.message; return; }
+  D = r.data || { sectores:[], proveedores:[], partes:[] };
+  if (D.sector) secSel = D.sector.id;
+  pintarChips();
+  render();
+}
+
+function pintarChips(){
+  var g = $("secChips"); g.innerHTML = "";
+  var lbl = document.createElement("span");
+  lbl.style.cssText = "font-weight:800;font-size:15px;margin-right:4px";
+  lbl.textContent = "Rubro:";
+  g.appendChild(lbl);
+  (D.sectores||[]).forEach(function(s){
+    var b = document.createElement("button");
+    b.type = "button";
+    b.className = "chip" + (Number(s.id) === Number(secSel) ? " active" : "");
+    b.innerHTML = esc(s.nombre.replace(/^Sector /, "")) +
+      (Number(s.sin_prov) > 0 ? ('<span class="badge">' + fmt(s.sin_prov) + " sin asignar</span>") : "");
+    b.addEventListener("click", function(){ secSel = Number(s.id); $("q").value=""; cargar(); });
+    g.appendChild(b);
+    // en el celular los rubros van en una linea que se desliza: si el elegido
+    // quedo fuera de pantalla no se ve cual esta activo
+    if (Number(s.id) === Number(secSel) && b.scrollIntoView) {
+      setTimeout(function(){ b.scrollIntoView({ block:"nearest", inline:"center" }); }, 0);
+    }
+  });
+}
+
+/* Falta asignar = no tiene proveedor Y se compra. Lo que se fabrica o esta
+   discontinuado no es un pendiente: es una decision ya tomada. */
+function falta(p){ return !p.proveedor && !p.estado_compra; }
+function pendientes(){ return (D.partes||[]).filter(falta).length; }
+function clasesDe(p){ return p.estado_compra ? " nocompra" : (falta(p) ? " sin" : ""); }
+
+function filtradas(){
+  var q = String($("q").value||"").trim().toLowerCase();
+  if (!q) return (D.partes||[]).slice();
+  return (D.partes||[]).filter(function(p){
+    return ((p.codigo||"") + " " + (p.descripcion||"") + " " + (p.proveedor||"")).toLowerCase().indexOf(q) >= 0;
+  });
+}
+
+function render(){
+  var arr = filtradas(), cont = $("lista");
+  cont.innerHTML = "";
+  $("vacio").classList.toggle("hidden", arr.length > 0);
+
+  arr.forEach(function(p){
+    var fila = document.createElement("div");
+    fila.className = "parte" + clasesDe(p);
+    fila.dataset.cid = p.comp_id;
+
+    var izq = document.createElement("div");
+    izq.className = "p-izq";
+    var meta = [];
+    if (p.estado_compra) meta.push("<b>" + esc(ESTADOS[p.estado_compra] || p.estado_compra) + "</b>");
+    // Si lo fabrica un tallerista no se compra: avisar antes de que le asignen proveedor
+    if (p.lo_produce) meta.push("<b>lo fabrica " + esc(p.lo_produce) + "</b> (no se compra)");
+    if (Number(p.en_recetas) === 0) meta.push("no está en ninguna receta");
+    meta.push("stock " + fmt(p.stock) + " " + (p.um === "kg" ? "kg" : "uni"));
+    izq.innerHTML = '<span class="p-cod">' + esc(p.codigo || "—") + "</span> " +
+                    '<span class="p-desc">' + esc(p.descripcion || "") + "</span>" +
+                    '<div class="p-meta">' + meta.join(" · ") + "</div>";
+
+    var der = document.createElement("div");
+    der.className = "p-der";
+    (D.proveedores||[]).forEach(function(pr){
+      var b = document.createElement("button");
+      b.type = "button";
+      b.className = "pbtn" + (p.proveedor === pr.nombre ? " on" : "");
+      b.textContent = pr.nombre;
+      b.addEventListener("click", function(){ asignar(fila, p, pr.nombre, b); });
+      der.appendChild(b);
+    });
+    // No se compra: se hace adentro o ya no se usa. Marcarlo saca la parte de la lista
+    // de faltantes y de la Orden de Compra.
+    Object.keys(ESTADOS).forEach(function(e){
+      var b = document.createElement("button");
+      b.type = "button";
+      b.className = "pbtn est" + (p.estado_compra === e ? " on" : "");
+      b.textContent = ESTADOS[e];
+      b.title = e === "fabricacion" ? "Se hace adentro, no se compra"
+                                    : "Ya no se usa: no se compra mas";
+      b.addEventListener("click", function(){ marcarEstado(fila, p, e, b); });
+      der.appendChild(b);
+    });
+
+    var bc = document.createElement("button");
+    bc.type = "button";
+    bc.className = "pbtn clear" + (!p.proveedor && !p.estado_compra ? " on" : "");
+    bc.textContent = "— sin asignar";
+    bc.title = "Dejarla pendiente de definir";
+    bc.addEventListener("click", function(){ asignar(fila, p, null, bc); });
+    der.appendChild(bc);
+
+    fila.appendChild(izq);
+    fila.appendChild(der);
+    cont.appendChild(fila);
+  });
+
+  pintarResumen();
+  var sinAsig = pendientes();
+  $("status").className = "status";
+  $("status").textContent = arr.length + " de " + (D.partes||[]).length + " partes" +
+    (sinAsig ? (" · " + sinAsig + " sin asignar") : " · todas asignadas ✓");
+}
+
+function pintarResumen(){
+  var porProv = {};
+  (D.partes||[]).forEach(function(p){
+    // lo que no se compra se cuenta por su estado: no es un pendiente
+    var k = p.estado_compra ? (ESTADOS[p.estado_compra] || p.estado_compra)
+                            : (p.proveedor || "(sin asignar)");
+    porProv[k] = (porProv[k] || 0) + 1;
+  });
+  var claves = Object.keys(porProv).sort(function(a,b){
+    if (a === "(sin asignar)") return 1;
+    if (b === "(sin asignar)") return -1;
+    return porProv[b] - porProv[a];
+  });
+  $("resumen").innerHTML = claves.map(function(k){
+    return '<div class="rcard' + (k === "(sin asignar)" ? " warn" : "") + '">' +
+           "<b>" + fmt(porProv[k]) + "</b>" + esc(k) + "</div>";
+  }).join("");
+}
+
+/* Guarda al toque. Si el server rechaza, se revierte lo pintado. */
+async function asignar(fila, parte, prov, btn){
+  var antes = parte.proveedor || null;
+  if (antes === prov) return;                       // ya estaba así
+  var botones = fila.querySelectorAll(".pbtn");
+  botones.forEach(function(b){ b.disabled = true; });
+  try{
+    var r = await SB.rpc("asignar_proveedor_parte", { p_comp_id: parte.comp_id, p_proveedor: prov });
+    if (r.error) throw r.error;
+    parte.proveedor = prov;
+    if (prov) parte.estado_compra = null;   // el server los hace excluyentes
+    botones.forEach(function(b){ b.classList.toggle("on", b === btn); });
+    fila.className = "parte" + clasesDe(parte);
+    pintarResumen();
+    // el contador del chip del rubro cambia con cada asignación
+    var s = (D.sectores||[]).filter(function(x){ return Number(x.id) === Number(secSel); })[0];
+    if (s) { s.sin_prov = pendientes(); pintarChips(); }
+    var sinAsig = pendientes();
+    $("status").className = "status ok";
+    $("status").textContent = "✓ " + parte.codigo + " → " + (prov || "sin asignar") +
+      (sinAsig ? (" · quedan " + sinAsig + " sin asignar") : " · todas asignadas ✓");
+  }catch(e){
+    $("status").className = "status bad";
+    $("status").textContent = "No se pudo guardar " + parte.codigo + ": " + (e.message || e);
+  }finally{
+    botones.forEach(function(b){ b.disabled = false; });
+  }
+}
+
+/* Marcar que la parte NO se compra (se fabrica adentro o esta discontinuada).
+   Volver a tocar el mismo boton la saca del estado y vuelve a quedar pendiente. */
+async function marcarEstado(fila, parte, estado, btn){
+  var nuevo = (parte.estado_compra === estado) ? null : estado;
+  var botones = fila.querySelectorAll(".pbtn");
+  botones.forEach(function(b){ b.disabled = true; });
+  try{
+    var r = await SB.rpc("marcar_estado_compra", { p_comp_id: parte.comp_id, p_estado: nuevo });
+    if (r.error) throw r.error;
+    parte.estado_compra = nuevo;
+    if (nuevo) parte.proveedor = null;      // el server los hace excluyentes
+    botones.forEach(function(b){ b.classList.toggle("on", nuevo && b === btn); });
+    fila.className = "parte" + clasesDe(parte);
+    // el contador del chip del rubro cambia con cada marca
+    var s = (D.sectores||[]).filter(function(x){ return Number(x.id) === Number(secSel); })[0];
+    if (s) { s.sin_prov = pendientes(); pintarChips(); }
+    // el texto de la izquierda cambia: se rehace la fila entera
+    render();
+    var sinAsig = pendientes();
+    $("status").className = "status ok";
+    $("status").textContent = "✓ " + parte.codigo + " → " +
+      (nuevo ? ESTADOS[nuevo] + " (fuera de la OC)" : "vuelve a comprarse") +
+      (sinAsig ? (" · quedan " + sinAsig + " sin asignar") : " · todas asignadas ✓");
+  }catch(e){
+    $("status").className = "status bad";
+    $("status").textContent = "No se pudo guardar " + parte.codigo + ": " + (e.message || e);
+    botones.forEach(function(b){ b.disabled = false; });
+  }
+}
+
+$("btnNuevo").addEventListener("click", async function(){
+  var nom = prompt("Nombre del proveedor nuevo (se agrega a la botonera de " +
+                   ((D.sector && D.sector.nombre) || "este rubro") + "):");
+  if (nom == null) return;                          // cancelo
+  nom = String(nom).trim();
+  if (!nom) return;
+  try{
+    var r = await SB.rpc("alta_proveedor_insumo", {
+      p_nombre: nom, p_rubro: (D.sector && D.sector.nombre) || null, p_modo_control: "ninguno" });
+    if (r.error) throw r.error;
+    await cargar();
+    $("status").className = "status ok";
+    $("status").textContent = '✓ Proveedor "' + nom + '" agregado a la botonera.';
+  }catch(e){
+    $("status").className = "status bad";
+    $("status").textContent = "Error al dar de alta: " + (e.message || e);
+  }
+});
+
+$("q").addEventListener("input", render);
+cargar();
+</script>
+</body>
+</html>

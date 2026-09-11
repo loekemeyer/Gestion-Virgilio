@@ -1,0 +1,560 @@
+<!doctype html>
+<html lang="es">
+<head>
+<script src="../auth-guard.js?v=20260904t"></script>
+<script src="../gp2-ui.js?v=20260905a"></script>
+<script src="../gp2-numero.js?v=20260905m"></script>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Stock Flejes · GP2</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="../supabase-config.js?v=20260905k"></script>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:Arial,sans-serif;background:#f5f6f8;padding:12px;color:#111}
+  .card{max-width:960px;margin:auto;background:#fff;border-radius:12px;box-shadow:0 2px 12px rgba(0,0,0,.08);overflow:hidden}
+  .header{background:#ffffff;color:#fff;padding:14px 18px;display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}
+  .header h1{font-size:24px;font-weight:700;letter-spacing:.3px}
+  .header .hbtns{display:flex;gap:8px}
+  .header button,.header a{background:#fff;color:#111;border:none;padding:8px 14px;border-radius:6px;font-weight:700;cursor:pointer;font-size:18px;text-decoration:none}
+
+  .steps{padding:14px 18px}
+  .row{display:flex;gap:10px;flex-wrap:wrap;margin:10px 0;align-items:center}
+  label.lbl{font-weight:800;font-size:20px;min-width:80px}
+  input[type="text"]{height:40px;border:2px solid #d0d7de;border-radius:8px;padding:0 10px;font-size:20px;width:280px}
+
+  .btn{padding:10px 16px;border-radius:8px;border:none;font-weight:800;cursor:pointer;font-size:20px}
+  .btn-primary{background:#111;color:#fff}
+  .btn-secondary{background:#fff;border:2px solid #d0d7de;color:#111}
+
+  .status{margin:8px 0;font-size:18px;color:#555;min-height:10px}
+
+  .provs-grid{display:flex;flex-wrap:wrap;gap:8px;margin:8px 0}
+  .prov-btn{padding:8px 14px;border-radius:8px;border:2px solid #d0d7de;background:#fff;font-weight:700;cursor:pointer;font-size:19px;color:#111}
+  .prov-btn.active{background:#111;color:#fff;border-color:#111}
+
+  .seg{display:flex;gap:6px;flex-wrap:wrap}
+  .seg .prov-btn{font-size:16px;padding:6px 12px}
+
+  .items-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:12px;margin:12px 0}
+  .item-btn{padding:14px 10px;background:#fff;border:2px solid #d0d7de;border-radius:10px;cursor:pointer;text-align:center;transition:all .15s;overflow:hidden;position:relative}
+  .item-btn:hover{border-color:#111;background:#f6f8fa}
+  .item-btn .code{display:block;font-size:26px;font-weight:900;color:#0066cc}
+  .item-btn .desc{display:block;font-size:17px;color:#111;margin-top:6px;font-weight:700;line-height:1.2;white-space:normal;overflow-wrap:anywhere}
+  .item-btn .med{display:block;font-size:16px;color:#0b3b73;margin-top:6px;font-weight:700}
+  .item-btn .stk{display:block;font-size:19px;margin-top:10px;font-weight:900}
+  .item-btn .stk.ok{color:#0a7a2f}
+  .item-btn .stk.low{color:#b45309}
+  .item-btn .stk.zero{color:#475569}
+  .item-btn .mn{display:block;font-size:14px;color:#667085;margin-top:4px}
+  .item-btn .ped{color:#b42318;font-weight:800}
+  .item-btn .ed{position:absolute;top:6px;right:8px;font-size:14px;color:#1d4ed8;border:1px solid #cbd5e1;border-radius:6px;padding:1px 6px;background:#fff}
+  .empty{color:#888;padding:16px;text-align:center;font-style:italic;font-size:18px}
+
+  /* modal edición */
+  .modal-bg{position:fixed;inset:0;background:rgba(0,0,0,.5);display:none;align-items:center;justify-content:center;z-index:200;padding:16px}
+  .modal-bg.on{display:flex}
+  .modal{background:#fff;border-radius:14px;padding:26px;max-width:480px;width:100%;box-shadow:0 12px 40px rgba(0,0,0,.3)}
+  .modal h3{margin:0 0 4px;font-size:24px;color:#111}
+  .modal .sub{color:#667085;font-size:15px;margin-bottom:14px}
+  .modal .fr{margin-bottom:11px}
+  .modal .fr label{display:block;font-size:14px;color:#475569;margin-bottom:4px;font-weight:700}
+  .modal .fr input{width:100%;background:#fff;color:#111;border:2px solid #d0d7de;border-radius:8px;padding:10px 12px;font-size:18px}
+  .actions{display:flex;gap:10px;justify-content:flex-end;margin-top:16px}
+  #toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:#e7f8ed;color:#fff;padding:12px 20px;border-radius:8px;font-size:17px;font-weight:700;z-index:300;opacity:0;transition:opacity .2s;pointer-events:none}
+  #toast.on{opacity:1} #toast.err{background:#f8e8e7}
+
+  /* ── tabs de submódulo ── */
+  .tabs{display:flex;gap:6px;padding:10px 18px 0;background:#fff;border-bottom:1px solid #e3e7ec}
+  .tab-btn{padding:10px 20px;border:2px solid #d0d7de;border-bottom:none;border-radius:10px 10px 0 0;
+           background:#f6f8fa;font-weight:800;font-size:19px;cursor:pointer;color:#555;margin-bottom:-1px}
+  .tab-btn.active{background:#fff;color:#111;border-color:#111;border-bottom:2px solid #fff}
+  .hidden{display:none!important}
+
+  /* ── submódulo Rollos (todo scopeado a #tabRollos para no pisar Flejes) ── */
+  #tabRollos .chips{display:flex;flex-wrap:wrap;gap:8px;margin:8px 0}
+  #tabRollos .chip{padding:8px 14px;border-radius:8px;border:2px solid #d0d7de;background:#fff;font-weight:700;cursor:pointer;font-size:19px}
+  #tabRollos .chip.active{background:#111;color:#fff;border-color:#111}
+  #tabRollos .saldos{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:12px;margin:12px 0}
+  #tabRollos .saldo-card{border:2px solid #d0d7de;border-radius:10px;padding:14px;text-align:center;background:#fff}
+  #tabRollos .saldo-card .cod{font-size:22px;font-weight:800;color:#0066cc}
+  #tabRollos .saldo-card .peso{font-size:18px;color:#444;margin-top:2px}
+  #tabRollos .saldo-card .n{font-size:40px;font-weight:900;margin:6px 0}
+  #tabRollos .saldo-card .n.neg{color:#b42318}
+  #tabRollos .saldo-card .kg{font-size:16px;color:#666}
+  #tabRollos .saldo-card.total{border-color:#111;background:#f6f8fa}
+  #tabRollos table{width:100%;border-collapse:collapse;font-size:17px;margin-top:8px}
+  #tabRollos th,#tabRollos td{padding:8px 10px;text-align:left;border-bottom:1px solid #e3e7ec;white-space:nowrap}
+  #tabRollos th{background:#f6f8fa;color:#555;font-size:13px;text-transform:uppercase;letter-spacing:.4px}
+  #tabRollos td.num{text-align:right;font-variant-numeric:tabular-nums}
+  #tabRollos .pos{color:#0a7a2f;font-weight:800} #tabRollos .neg{color:#b42318;font-weight:800}
+  #tabRollos .okc{color:#0a7a2f}
+  #tabRollos .motivo{font-size:14px;padding:2px 9px;border-radius:10px;border:1px solid #d0d7de;background:#f6f8fa}
+  #tabRollos h2{font-size:20px;margin:18px 0 4px;color:#0b3b73}
+  #tabRollos .tscroll{overflow-x:auto}
+  #tabRollos select{height:40px;border:2px solid #d0d7de;border-radius:8px;padding:0 10px;font-size:19px;background:#fff}
+  #tabRollos .bad{color:#b42318}
+
+  /* detalle del fleje */
+  .det-h2{font-size:17px;font-weight:800;color:#0b3b73;margin:14px 0 6px}
+  .det-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px}
+  .det-roll{border:2px solid #d0d7de;border-radius:10px;padding:10px;text-align:center;background:#fafbfc}
+  .det-roll .peso{font-size:16px;color:#444;font-weight:700}
+  .det-roll .n{font-size:30px;font-weight:900}
+  .det-roll .n.neg{color:#b42318}
+  .det-uso{border:2px solid #ead9cd;background:#fff8e5;border-radius:10px;padding:10px 12px;margin-bottom:6px;font-size:16px}
+  .det-tabla{width:100%;border-collapse:collapse;font-size:15px}
+  .det-tabla th{background:#f6f8fa;color:#555;font-size:12px;text-transform:uppercase;text-align:left;padding:6px 8px;border-bottom:2px solid #e5e9ee}
+  .det-tabla td{padding:6px 8px;border-bottom:1px solid #eef1f4;white-space:nowrap}
+  .det-tabla td.num{text-align:right;font-variant-numeric:tabular-nums}
+  .det-tabla .pos{color:#0a7a2f;font-weight:800}.det-tabla .neg{color:#b42318;font-weight:800}
+
+  /* popup de ajuste de rollos */
+  .popup{position:fixed;inset:0;background:rgba(0,0,0,.5);display:none;align-items:center;justify-content:center;z-index:100;padding:16px}
+  .popup.open{display:flex}
+  .pmodal{background:#fff;border-radius:14px;padding:26px;width:96%;max-width:520px}
+  .pmodal h3{font-size:24px;margin-bottom:14px}
+  .pmodal label{display:block;font-size:16px;font-weight:700;margin:10px 0 4px}
+  .pmodal select,.pmodal input{width:100%;height:40px;border:2px solid #d0d7de;border-radius:8px;padding:0 10px;font-size:19px;background:#fff}
+  .pmodal .acts{display:flex;gap:10px;margin-top:18px}
+  .pmodal .acts button{flex:1;padding:12px;font-size:20px;font-weight:800;border:none;border-radius:8px;cursor:pointer}
+</style>
+<link rel="icon" type="image/png" href="../GP2_favicon.png">
+<link rel="apple-touch-icon" href="../GP2_favicon.png">
+</head>
+<body>
+
+<div class="card">
+  <div class="header">
+    <h1>Stock Flejes</h1>
+    <div class="hbtns">
+      <button id="btnAjuste" class="hidden" style="background:#f0c040">± Inicial / Ajuste</button>
+      <a href="../Stocks General/StockGeneral_GP2.html">Ver stock</a>
+      <a href="../GP2_MODULOS.html">Atrás</a>
+    </div>
+  </div>
+
+  <!-- Submódulos: el stock por fleje y el stock de rollos de esos mismos flejes -->
+  <div class="tabs">
+    <button class="tab-btn active" id="tbFlejes" data-tab="flejes">Flejes</button>
+    <button class="tab-btn" id="tbRollos" data-tab="rollos">🧻 Rollos</button>
+  </div>
+
+  <div class="steps" id="tabFlejes">
+    <div class="row"><label class="lbl">Proveedor</label></div>
+    <div class="provs-grid" id="provGrid"></div>
+
+    <div class="row" style="margin-top:4px">
+      <input type="text" id="q" placeholder="Buscar N°, código, parte o medida…" oninput="render()">
+      <div class="seg" id="segStock">
+        <button class="prov-btn active" data-st="todos">Todos</button>
+        <button class="prov-btn" data-st="con">Con stock</button>
+        <button class="prov-btn" data-st="sin">Sin stock</button>
+        <button class="prov-btn" data-st="bajo">Bajo el máximo</button>
+      </div>
+    </div>
+
+    <div class="status" id="status">Cargando…</div>
+    <div class="items-grid" id="itemsGrid"></div>
+    <div id="itemsEmpty" class="empty" style="display:none">Sin flejes que coincidan.</div>
+  </div>
+
+  <div class="steps hidden" id="tabRollos">
+    <div class="chips" id="chips"></div>
+    <div class="saldos" id="saldos"></div>
+
+    <h2>Evolución (ingresos / egresos con saldo)</h2>
+    <div class="row">
+      <select id="fPeso"><option value="">Todos los pesos</option></select>
+      <span style="font-size:15px;color:#666">El saldo arranca del estado inicial y acumula cada movimiento.</span>
+    </div>
+    <div class="tscroll"><table id="tEvo"><thead><tr>
+      <th>Fecha</th><th>Fleje</th><th>Peso</th><th>Mov.</th><th>Motivo</th><th>Quién</th><th style="text-align:right">Saldo</th>
+    </tr></thead><tbody></tbody></table></div>
+    <div id="evoEmpty" class="empty" style="display:none">Sin movimientos todavía. Cargá el estado inicial con el botón de arriba.</div>
+
+    <h2>Rollos usados por los operarios</h2>
+    <div class="tscroll"><table id="tUsos"><thead><tr>
+      <th>Inicio</th><th>Operario</th><th>Fleje</th><th>Peso</th><th>Matriz</th><th>¿Quedó resto?</th>
+      <th style="text-align:right">Unidades</th><th style="text-align:right">Esperadas</th><th></th>
+    </tr></thead><tbody></tbody></table></div>
+    <div id="usosEmpty" class="empty" style="display:none">Todavía nadie registró uso de rollos.</div>
+
+    <div id="statusMsg" class="status"></div>
+  </div>
+</div>
+
+<div class="popup" id="popAjuste">
+  <div class="pmodal">
+    <h3>Estado inicial / Ajuste de rollos</h3>
+    <label>Fleje</label>
+    <select id="ajFleje"></select>
+    <label>Peso por rollo (kg)</label>
+    <input id="ajPeso" inputmode="decimal" placeholder="50">
+    <label>Cantidad de rollos (positivo suma, negativo resta)</label>
+    <input id="ajCant" inputmode="numeric" placeholder="10">
+    <label>Motivo</label>
+    <select id="ajMotivo">
+      <option value="inicial">Estado inicial</option>
+      <option value="ajuste">Ajuste / corrección</option>
+      <option value="devolucion">Devolución</option>
+    </select>
+    <label>Nota (opcional)</label>
+    <input id="ajNota" placeholder="Conteo físico, etc.">
+    <div class="acts">
+      <button style="background:#eee" id="ajCancel">Cancelar</button>
+      <button style="background:#111;color:#fff" id="ajOk">Guardar</button>
+    </div>
+    <div id="ajMsg" class="status"></div>
+  </div>
+</div>
+
+<!-- Detalle del fleje: rollos por kilaje, en uso ahora, saldo de movimientos.
+     "Editar datos" (los atributos a mano) vive adentro, como accion secundaria. -->
+<div class="modal-bg" id="detBg">
+  <div class="modal" style="max-width:640px;max-height:88vh;overflow:auto">
+    <h3 id="detTit">Fleje</h3>
+    <div class="sub" id="detSub"></div>
+    <div id="detBody"><div class="empty">Cargando…</div></div>
+    <div class="actions">
+      <button class="btn btn-secondary" id="detEditar">✎ Editar datos</button>
+      <button class="btn btn-primary" id="detCerrar">Cerrar</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-bg" id="modalBg">
+  <div class="modal">
+    <h3 id="mTit">Editar fleje</h3>
+    <div class="sub" id="mSub"></div>
+    <div class="fr"><label>Parte que produce</label><input id="mParte" placeholder="ej. Mgo Plano Manija"></div>
+    <div class="fr"><label>Proveedor</label><input id="mProv"></div>
+    <div class="fr"><label>Medida mm</label><input id="mMed" placeholder="ej. 19 x 2,1"></div>
+    <div class="fr"><label>Consumo mensual (kg)</label><input inputmode="decimal" id="mCons" type="number" step="0.01"></div>
+    <div class="fr"><label>Kg × cajón</label><input inputmode="decimal" id="mKgc" type="number" step="0.0001"></div>
+    <div class="fr"><label>Kg/uni (con desperdicio)</label><input inputmode="decimal" id="mKgud" type="number" step="0.00000001"></div>
+    <div class="fr"><label>Cód. ISIS</label><input id="mIsis"></div>
+    <div class="actions">
+      <button class="btn btn-secondary" onclick="cerrar()">Cancelar</button>
+      <button class="btn btn-primary" id="mSave" onclick="guardar()">Guardar</button>
+    </div>
+  </div>
+</div>
+<div id="toast"></div>
+
+<script>
+const SB=GP2_SB();
+var $ = GP2UI.$;
+let FL=[], provSel="", stSel="todos";
+const SIN="(sin proveedor)";
+function fmt(n){ return GP2N.fmt(n, 2); }   /* la regla de numero de la casa (gp2-numero.js) */
+var esc = GP2UI.esc;   /* helper de la casa, gp2-ui.js (2026-09-05) */
+function provOf(f){return f.proveedor && String(f.proveedor).trim() ? f.proveedor : SIN;}
+
+// ---- Chips de proveedor (desde datos GP2) ----
+function pintarProvs(){
+  var map={}; FL.forEach(f=>{var p=provOf(f);map[p]=(map[p]||0)+1;});
+  var provs=Object.keys(map).sort((a,b)=>{ if(a===SIN)return 1; if(b===SIN)return -1; return map[b]-map[a]||a.localeCompare(b); });
+  var g=$('provGrid'); g.innerHTML='';
+  provs.forEach(p=>{
+    var b=document.createElement('button'); b.className='prov-btn'+(p===provSel?' active':'');
+    b.innerHTML=esc(p)+' <span style="opacity:.6;font-weight:600">('+map[p]+')</span>';
+    b.addEventListener('click',()=>{
+      provSel = (provSel===p)?"":p;
+      g.querySelectorAll('.prov-btn').forEach(x=>x.classList.remove('active'));
+      if(provSel) b.classList.add('active');
+      render();
+    });
+    g.appendChild(b);
+  });
+}
+// segmento stock
+$('segStock').querySelectorAll('.prov-btn').forEach(b=>{
+  b.addEventListener('click',()=>{
+    stSel=b.dataset.st;
+    $('segStock').querySelectorAll('.prov-btn').forEach(x=>x.classList.remove('active'));
+    b.classList.add('active'); render();
+  });
+});
+
+function render(){
+  var q=($('q').value||'').trim().toLowerCase();
+  var rows=FL.filter(f=>{
+    if(provSel && provOf(f)!==provSel)return false;
+    var stock=Number(f.stock)||0, min=Number(f.minimo)||0;
+    if(stSel==='con' && !(stock>0))return false;
+    if(stSel==='sin' && stock>0)return false;
+    if(stSel==='bajo' && !(min>0 && stock<min))return false;
+    if(q){var s=((f.n_fleje||'')+' '+(f.codigo||'')+' '+(f.descripcion||'')+' '+(f.parte||'')+' '+(f.medida||'')+' '+(f.cod_isis||'')).toLowerCase();if(s.indexOf(q)<0)return false;}
+    return true;
+  });
+  var g=$('itemsGrid'); g.innerHTML='';
+  $('itemsEmpty').style.display = rows.length? 'none':'block';
+  rows.forEach(f=>{
+    var stock=Number(f.stock)||0, min=Number(f.minimo)||0, ped=Math.max(0,min-stock);
+    var cls=stock<=0?'zero':(min>0&&stock<min?'low':'ok');
+    var b=document.createElement('button'); b.className='item-btn';
+    b.innerHTML=
+      '<span class="ed" title="editar" data-ed="'+f.comp_id+'">✎</span>'+
+      '<span class="code">'+esc(f.n_fleje||f.codigo||'')+'</span>'+
+      '<span class="desc">'+esc(f.parte||f.descripcion||'')+'</span>'+
+      (f.medida?'<span class="med">'+esc(f.medida)+' mm</span>':'')+
+      '<span class="stk '+cls+'">'+fmt(stock)+' kg</span>'+
+      '<span class="mn">'+(min?('mín '+fmt(min)):'sin mínimo')+(ped>0?(' · <span class="ped">pedir '+fmt(ped)+'</span>'):'')+'</span>';
+    b.addEventListener('click',(ev)=>{
+      // ✎ = editar datos directo; el resto de la tarjeta abre el DETALLE
+      if(ev.target && ev.target.getAttribute('data-ed')){ editar(f.comp_id); return; }
+      abrirDetalle(f.comp_id);
+    });
+    g.appendChild(b);
+  });
+}
+
+/* ============================================================
+   DETALLE DEL FLEJE: rollos por kilaje (nutridos de la recepcion),
+   rollo en uso ahora (operario + matriz), y el saldo de movimientos
+   (ingresos de recepcion, descuentos por produccion).
+   "Editar datos" quedo como accion secundaria adentro.
+   ============================================================ */
+let DET=null;
+function ffechaD(x){return String(x||'').replace('T',' ').slice(0,16);}
+const MOTIVOS_D={inicial:'Estado inicial',recepcion:'Recepción',toma_operario:'Tomó operario',ajuste:'Ajuste',devolucion:'Devolución'};
+
+async function abrirDetalle(cid){
+  var f=FL.find(x=>x.comp_id===cid); if(!f) return;
+  DET=f;
+  $('detTit').textContent=(f.n_fleje?('Fleje '+f.n_fleje):f.codigo)+' · '+(f.parte||f.descripcion||'');
+  $('detSub').textContent=(f.medida?(f.medida+' mm · '):'')+(f.proveedor||'sin proveedor')+' · stock '+fmt(f.stock)+' kg';
+  $('detBody').innerHTML='<div class="empty">Cargando rollos…</div>';
+  $('detBg').classList.add('on');
+
+  var R;
+  try{ R=await window.GP2Rollos.get(); }
+  catch(e){ $('detBody').innerHTML='<div class="empty">Error cargando rollos: '+esc(e.message||e)+'</div>'; return; }
+  if(DET!==f) return;   // abrieron otro mientras cargaba
+
+  var cod=f.codigo;
+  var saldos=(R.saldos||[]).filter(s=>s.codigo===cod);
+  var enUso=(R.usos||[]).filter(u=>u.codigo===cod && u.ts_fin==null);
+  var evs=(R.eventos||[]).filter(e=>e.codigo===cod).slice(0,25);
+
+  var h='';
+  // rollos por kilaje
+  h+='<div class="det-h2">🧻 Rollos en stock (por kilaje)</div>';
+  h+= saldos.length
+    ? '<div class="det-grid">'+saldos.map(s=>
+        '<div class="det-roll"><div class="peso">rollos de '+fmt(s.kg_por_rollo)+' kg</div>'+
+        '<div class="n'+(s.rollos<0?' neg':'')+'">'+fmt(s.rollos)+'</div>'+
+        '<div style="font-size:13px;color:#666">'+fmt(s.kg_total)+' kg</div></div>').join('')+'</div>'
+    : '<div class="empty">Sin rollos en stock. Entran solos con el pesaje de la recepción.</div>';
+
+  // en uso ahora
+  h+='<div class="det-h2">⚙️ En uso ahora</div>';
+  h+= enUso.length
+    ? enUso.map(u=>'<div class="det-uso">Rollo de <b>'+fmt(u.kg_por_rollo)+' kg</b> — operario <b>'+
+        esc(u.operario||u.legajo||'?')+'</b>'+(u.matriz_raw?(' en matriz <b>'+esc(u.matriz_raw)+'</b>'):'')+
+        ' <span style="color:#666;font-size:14px">(desde '+ffechaD(u.ts_inicio)+')</span></div>').join('')
+    : '<div class="empty">Nadie está usando un rollo de este fleje ahora.</div>';
+
+  // movimientos con saldo
+  h+='<div class="det-h2">📜 Movimientos (saldo acumulado)</div>';
+  h+= evs.length
+    ? '<div style="overflow-x:auto"><table class="det-tabla"><thead><tr>'+
+      '<th>Fecha</th><th>Peso</th><th>Mov.</th><th>Motivo</th><th>Quién</th><th style="text-align:right">Saldo</th>'+
+      '</tr></thead><tbody>'+evs.map(e=>
+        '<tr><td>'+ffechaD(e.fecha)+'</td><td class="num">'+fmt(e.kg_por_rollo)+' kg</td>'+
+        '<td class="num '+(e.delta>0?'pos':'neg')+'">'+(e.delta>0?'+':'')+fmt(e.delta)+'</td>'+
+        '<td>'+esc(MOTIVOS_D[e.motivo]||e.motivo)+'</td>'+
+        '<td>'+esc(e.operario||e.legajo||'')+'</td>'+
+        '<td class="num"><b>'+fmt(e.saldo)+'</b></td></tr>').join('')+
+      '</tbody></table></div>'
+    : '<div class="empty">Sin movimientos de rollos todavía.</div>';
+
+  $('detBody').innerHTML=h;
+}
+function cerrarDetalle(){ $('detBg').classList.remove('on'); DET=null; }
+
+let EDIT=null;
+function editar(cid){
+  var f=FL.find(x=>x.comp_id===cid);if(!f)return;EDIT=f;
+  $('mTit').textContent='Editar '+(f.n_fleje||f.codigo||'')+' · '+(f.parte||f.descripcion||'');
+  $('mSub').textContent='Atributos propios de GP2 (se cargan a mano).';
+  $('mParte').value=f.parte||'';$('mProv').value=f.proveedor||'';$('mMed').value=f.medida||'';
+  $('mCons').value=f.cons_mensual!=null?f.cons_mensual:'';$('mKgc').value=f.kg_x_cajon!=null?f.kg_x_cajon:'';
+  $('mKgud').value=f.kg_uni_desp!=null?f.kg_uni_desp:'';$('mIsis').value=f.cod_isis||'';
+  $('modalBg').classList.add('on');
+}
+function cerrar(){$('modalBg').classList.remove('on');EDIT=null;}
+async function guardar(){
+  if(!EDIT)return;$('mSave').disabled=true;
+  try{
+    var res=await SB.rpc('fleje_detalle_upsert',{
+      p_comp_id:EDIT.comp_id, p_proveedor:$('mProv').value||null, p_medida:$('mMed').value||null,
+      p_cons:$('mCons').value?GP2N.num($('mCons').value):null, p_kgcaj:$('mKgc').value?GP2N.num($('mKgc').value):null,
+      p_cod_isis:$('mIsis').value||null, p_kg_uni_desp:$('mKgud').value?GP2N.num($('mKgud').value):null, p_parte:$('mParte').value||null});
+    if(res.error) throw res.error;
+    cerrar(); await cargar(); toast('✔ Guardado');
+  }catch(e){ toast('Error: '+(e.message||e), true); }
+  finally{ $('mSave').disabled=false; }
+}
+let _t=null;
+function toast(m,err){var el=$('toast');el.textContent=m;el.className='on'+(err?' err':'');clearTimeout(_t);_t=setTimeout(()=>el.className='',err?5000:2500);}
+
+async function cargar(){
+  $('status').textContent='Cargando…';
+  var res=await SB.rpc('flejes_bundle');
+  if(res.error){$('status').textContent='Error: '+res.error.message;return;}
+  FL=res.data||[];
+  var con=FL.filter(f=>Number(f.stock)>0).length;
+  $('status').textContent='GP2 · '+FL.length+' flejes · '+con+' con stock · elegí un proveedor o buscá';
+  pintarProvs(); render();
+}
+$('detCerrar').addEventListener('click',cerrarDetalle);
+$('detBg').addEventListener('click',e=>{ if(e.target===$('detBg')) cerrarDetalle(); });
+$('detEditar').addEventListener('click',()=>{ var f=DET; cerrarDetalle(); if(f) editar(f.comp_id); });
+
+cargar();
+
+/* ============================================================
+   Submódulo ROLLOS (antes StockFlejes/Rollos_GP2.html).
+   Va dentro de un IIFE a propósito: define su propio fmt() con otra
+   firma que el de Flejes y su propio cargar(). Si quedaran globales
+   se pisarían entre sí.
+   Los datos se piden la primera vez que se abre la solapa.
+   ============================================================ */
+(function(){
+  var $R = function(id){ return document.getElementById(id); };
+  function escR(s){ return (s==null?'':String(s)).replace(/[&<>"]/g,function(c){
+    return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]; }); }
+  function fmtR(n,d){ return GP2N.fmt(n, d==null?2:d, '—'); }   /* la regla de numero de la casa (gp2-numero.js) */
+  function ffecha(x){ return String(x||'').replace('T',' ').slice(0,16); }
+  var MOTIVOS={inicial:'Estado inicial',recepcion:'Recepción',toma_operario:'Tomó operario',
+               ajuste:'Ajuste',devolucion:'Devolución'};
+
+  var DR={saldos:[],eventos:[],usos:[],flejes:[]};
+  var flejeSel='';
+  var cargado=false;
+
+  function pintar(){
+    var cods=Object.keys(DR.saldos.map(function(s){return s.codigo;})
+      .concat(DR.eventos.map(function(e){return e.codigo;}))
+      .reduce(function(a,c){a[c]=1;return a;},{})).sort();
+    $R('chips').innerHTML='<span class="chip'+(flejeSel===''?' active':'')+'" data-c="">Todos</span>'+
+      cods.map(function(c){ return '<span class="chip'+(flejeSel===c?' active':'')+'" data-c="'+escR(c)+'">'+escR(c)+'</span>'; }).join('');
+    document.querySelectorAll('#chips .chip').forEach(function(el){
+      el.onclick=function(){ flejeSel=el.dataset.c; pintar(); }; });
+
+    var saldos=DR.saldos.filter(function(s){ return !flejeSel||s.codigo===flejeSel; });
+    var totalRollos=0,totalKg=0;
+    $R('saldos').innerHTML=saldos.map(function(s){
+      totalRollos+=Number(s.rollos)||0; totalKg+=Number(s.kg_total)||0;
+      return '<div class="saldo-card"><div class="cod">'+escR(s.codigo)+'</div>'+
+        '<div class="peso">rollos de '+fmtR(s.kg_por_rollo)+' kg</div>'+
+        '<div class="n'+(s.rollos<0?' neg':'')+'">'+fmtR(s.rollos,0)+'</div>'+
+        '<div class="kg">'+fmtR(s.kg_total)+' kg · ↑'+fmtR(s.ingresos||0,0)+' ↓'+fmtR(s.egresos||0,0)+'</div></div>';
+    }).join('')+
+    (saldos.length?'<div class="saldo-card total"><div class="cod">TOTAL</div><div class="peso">'+
+      escR(flejeSel||'todos los flejes')+'</div><div class="n">'+fmtR(totalRollos,0)+'</div><div class="kg">'+
+      fmtR(totalKg)+' kg</div></div>':'');
+    if(!saldos.length) $R('saldos').innerHTML='<div class="empty" style="grid-column:1/-1">Sin stock de rollos'+
+      (flejeSel?(' para '+escR(flejeSel)):'')+'. Cargá el estado inicial.</div>';
+
+    var pesos=Object.keys(DR.eventos.filter(function(e){ return !flejeSel||e.codigo===flejeSel; })
+      .map(function(e){ return String(e.kg_por_rollo); })
+      .reduce(function(a,c){a[c]=1;return a;},{})).sort(function(a,b){ return a-b; });
+    var pesoSel=$R('fPeso').value;
+    $R('fPeso').innerHTML='<option value="">Todos los pesos</option>'+
+      pesos.map(function(p){ return '<option value="'+escR(p)+'"'+(p===pesoSel?' selected':'')+'>'+fmtR(p)+' kg</option>'; }).join('');
+
+    var evs=DR.eventos.filter(function(e){
+      return (!flejeSel||e.codigo===flejeSel) && (!$R('fPeso').value||String(e.kg_por_rollo)===$R('fPeso').value); });
+    $R('tEvo').querySelector('tbody').innerHTML=evs.map(function(e){
+      return '<tr><td>'+ffecha(e.fecha)+'</td><td><b style="color:#0066cc">'+escR(e.codigo)+'</b></td>'+
+        '<td class="num">'+fmtR(e.kg_por_rollo)+' kg</td>'+
+        '<td class="num '+(e.delta>0?'pos':'neg')+'">'+(e.delta>0?'+':'')+fmtR(e.delta,0)+'</td>'+
+        '<td><span class="motivo">'+escR(MOTIVOS[e.motivo]||e.motivo)+'</span>'+
+          (e.nota?(' <span style="color:#888;font-size:14px">'+escR(e.nota)+'</span>'):'')+'</td>'+
+        '<td>'+escR(e.operario||e.legajo||'')+'</td>'+
+        '<td class="num"><b>'+fmtR(e.saldo,0)+'</b></td></tr>'; }).join('');
+    $R('evoEmpty').style.display=evs.length?'none':'block';
+
+    var usos=DR.usos.filter(function(u){ return !flejeSel||u.codigo===flejeSel; });
+    $R('tUsos').querySelector('tbody').innerHTML=usos.map(function(u){
+      var desvio = (u.uni_esperadas>0 && u.uni_producidas!=null && u.quedo_resto===false)
+        ? u.uni_producidas/u.uni_esperadas : null;
+      var flag = desvio==null?'' : desvio<0.6?'⚠ muy por debajo' : desvio>1.4?'⚠ muy por encima':'✓';
+      return '<tr><td>'+ffecha(u.ts_inicio)+'</td><td>'+escR(u.legajo)+'</td>'+
+        '<td><b style="color:#0066cc">'+escR(u.codigo)+'</b></td>'+
+        '<td class="num">'+fmtR(u.kg_por_rollo)+' kg</td>'+
+        '<td>'+escR(u.matriz_raw||'')+'</td>'+
+        '<td>'+(u.ts_fin==null?'<i>en uso</i>':(u.quedo_resto?'Sí, quedó':'No, se terminó'))+'</td>'+
+        '<td class="num">'+fmtR(u.uni_producidas,0)+'</td>'+
+        '<td class="num">'+fmtR(u.uni_esperadas,0)+'</td>'+
+        '<td class="'+(flag.indexOf('⚠')===0?'neg':'okc')+'">'+flag+'</td></tr>'; }).join('');
+    $R('usosEmpty').style.display=usos.length?'none':'block';
+  }
+
+  var ultErr='';
+  async function cargarRollos(){
+    $R('statusMsg').textContent='Cargando…';
+    var r=await SB.rpc('rollos_bundle');
+    if(r.error){ ultErr=r.error.message; $R('statusMsg').className='status bad'; $R('statusMsg').textContent='Error: '+r.error.message; return false; }
+    DR=r.data||DR; ultErr=''; $R('statusMsg').className='status'; $R('statusMsg').textContent='';
+    cargado=true;
+    pintar();
+    return true;
+  }
+
+  /* Puente para el detalle de fleje de la otra solapa: entrega los datos de
+     rollos cargandolos una sola vez (misma carga diferida que la solapa).
+     Si la carga falla, TIRA error (que el detalle no muestre "sin rollos" por un fallo de red). */
+  window.GP2Rollos = { get: async function(){ if(!cargado && !(await cargarRollos())) throw new Error(ultErr||'no se pudieron cargar los rollos'); return DR; } };
+
+  $R('fPeso').addEventListener('change',pintar);
+
+  /* ---- ajuste / estado inicial ---- */
+  $R('btnAjuste').onclick=function(){
+    var armaSel=function(){ $R('ajFleje').innerHTML=(DR.flejes||[]).map(function(f){
+      return '<option value="'+f.comp_id+'">'+escR(f.codigo)+' — '+escR(f.descripcion||'')+'</option>'; }).join(''); };
+    armaSel();
+    // si el bundle todavia no cargo (o fallo), reintentar y refrescar el select con el popup abierto
+    if(!cargado) cargarRollos().then(function(ok){ if(ok && $R('popAjuste').classList.contains('open')) armaSel(); });
+    $R('ajPeso').value=''; $R('ajCant').value=''; $R('ajNota').value=''; $R('ajMsg').textContent='';
+    $R('popAjuste').classList.add('open');
+  };
+  $R('ajCancel').onclick=function(){ $R('popAjuste').classList.remove('open'); };
+  $R('ajOk').onclick=async function(){
+    var m=$R('ajMsg'); m.className='status'; m.textContent='';
+    var peso=GP2N.num($R('ajPeso').value);   // la regla de numero de la casa: punto de miles, coma decimal
+    var cant=GP2N.num($R('ajCant').value);
+    var cid=GP2N.entero($R('ajFleje').value);
+    if(!cid){ m.className='status bad'; m.textContent='Elegí el fleje (si la lista está vacía, esperá que termine de cargar).'; return; }
+    if(!peso||peso<=0){ m.className='status bad'; m.textContent='Poné el peso del rollo.'; return; }
+    if(!cant||!Number.isInteger(cant)){ m.className='status bad'; m.textContent='Poné cuántos rollos (entero ≠ 0, sin decimales).'; return; }
+    try{
+      var r=await SB.rpc('ajustar_rollos',{p_comp_id:cid,p_kg_por_rollo:peso,
+        p_delta:cant,p_motivo:$R('ajMotivo').value,p_nota:$R('ajNota').value||null});
+      if(r.error) throw r.error;
+      $R('popAjuste').classList.remove('open');
+      await cargarRollos();
+    }catch(e){ m.className='status bad'; m.textContent='Error: '+(e.message||e); }
+  };
+
+  /* ---- solapas ---- */
+  function irA(tab){
+    var esRollos = tab==='rollos';
+    $R('tabFlejes').classList.toggle('hidden', esRollos);
+    $R('tabRollos').classList.toggle('hidden', !esRollos);
+    $R('tbFlejes').classList.toggle('active', !esRollos);
+    $R('tbRollos').classList.toggle('active', esRollos);
+    $R('btnAjuste').classList.toggle('hidden', !esRollos);   // el ajuste es solo de rollos
+    if (esRollos && !cargado) cargarRollos();
+  }
+  $R('tbFlejes').addEventListener('click',function(){ irA('flejes'); });
+  $R('tbRollos').addEventListener('click',function(){ irA('rollos'); });
+
+  // permite entrar directo a la solapa de rollos con ...Flejes_GP2.html#rollos
+  if ((location.hash||'').toLowerCase()==='#rollos') irA('rollos');
+})();
+</script>
+</body></html>

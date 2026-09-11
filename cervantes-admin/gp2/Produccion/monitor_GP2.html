@@ -1,0 +1,249 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <script src="../auth-guard.js?v=20260904t"></script>
+<script src="../gp2-ui.js?v=20260905a"></script>
+<script src="../gp2-numero.js?v=20260905m"></script>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Monitor en Vivo · Operarios · GP2</title>
+  <link rel="icon" type="image/png" href="../GP2_favicon.png">
+  <link rel="apple-touch-icon" href="../GP2_favicon.png">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="../supabase-config.js?v=20260905k"></script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'Inter', sans-serif; background: #d9d9de; padding: 20px; min-height: 100vh; }
+    .top-bar { max-width: 1400px; margin: 0 auto 16px; display: flex; align-items: center; gap: 14px; }
+    .btn-volver { height: 44px; padding: 0 22px; border-radius: 999px; border: 2px solid #b9b9b9; background: #f7f7f7; font-size: 16px; cursor: pointer; font-weight: 700; font-family: inherit; }
+    .btn-volver:hover { background: #e5e5e5; border-color: #e2e8f0; }
+    .top-bar h1 { font-size: 22px; flex: 1; color: #1e293b; }
+    .main-card { max-width: 1400px; margin: 0 auto 20px; background: #fff; border: 1px solid #cfcfcf; border-radius: 14px; overflow: hidden; }
+    .card-header { background: #111; color: #fff; padding: 14px 22px; display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+    .card-header h2 { font-size: 17px; color: #fff; margin: 0; }
+    .live { display: inline-flex; align-items: center; gap: 8px; font-size: 12px; font-weight: 700; color: #385475; }
+    .live-dot { width: 9px; height: 9px; border-radius: 50%; background: #e7f8ed; animation: pulse 1.6s infinite; }
+    @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: .25; } }
+    .card-body { padding: 16px 22px 22px; }
+    .controls-row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-bottom: 14px; }
+    .ctrl-group { display: flex; align-items: center; gap: 6px; }
+    .ctrl-group label { font-size: 15px; font-weight: 700; color: #475569; }
+    /* Los .ctrl-* estaban en 13px con 36px de alto: por debajo del piso de la casa
+       (campos 18px, tactil 44px). Estas pantallas no cargan gp2-modulo.css ni
+       gp2-claro.css, asi que nada las levantaba (corregido 2026-09-03). */
+    .ctrl-input { height: 44px; padding: 0 10px; border: 1.5px solid #cbd5e1; border-radius: 10px; font-size: 19px; font-family: inherit; background: #fff; }
+    .btn-act { height: 44px; padding: 0 18px; border-radius: 10px; border: 1.5px solid #111; background: #111; color: #fff; font-size: 16px; font-weight: 700; cursor: pointer; font-family: inherit; }
+    .btn-act:hover { background: #333; }
+    .btn-act.ghost { background: #f8fafc; color: #475569; border-color: #cbd5e1; }
+    .push { margin-left: auto; }
+    .stats-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; margin-bottom: 16px; }
+    .stat-card { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 10px; padding: 10px 14px; }
+    .stat-label { font-size: 11px; color: #64748b; font-weight: 700; text-transform: uppercase; letter-spacing: .3px; }
+    .stat-value { font-size: 20px; color: #111; font-weight: 800; font-variant-numeric: tabular-nums; }
+    .stat-card.green .stat-value { color: #16a34a; }
+    .stat-card.orange .stat-value { color: #ea580c; }
+    .stat-card.red .stat-value { color: #dc2626; }
+    .ops-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(270px, 1fr)); gap: 12px; }
+    .op-card { background: #fff; border: 1px solid #e2e8f0; border-left: 5px solid #cbd5e1; border-radius: 12px; padding: 14px 16px; box-shadow: 0 1px 3px rgba(0,0,0,.05); }
+    .op-card.produccion { border-left-color: #16a34a; }
+    .op-card.tm        { border-left-color: #ea580c; }
+    .op-card.issue     { border-left-color: #dc2626; }
+    .op-card.idle      { border-left-color: #385475; opacity: .75; }
+    .op-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; margin-bottom: 8px; }
+    .op-nombre { font-size: 15px; font-weight: 800; color: #1e293b; }
+    .op-legajo { font-size: 11px; color: #475569; font-weight: 700; }
+    .badge { font-size: 10px; font-weight: 800; padding: 3px 9px; border-radius: 999px; text-transform: uppercase; letter-spacing: .4px; white-space: nowrap; }
+    .badge-produccion { background: #dcfce7; color: #15803d; }
+    .badge-tm         { background: #ffedd5; color: #9a3412; }
+    .badge-issue      { background: #fee2e2; color: #991b1b; animation: pulse 1.6s infinite; }
+    .badge-idle       { background: #f1f5f9; color: #64748b; }
+    .op-line { font-size: 13px; color: #334155; margin-top: 3px; }
+    .op-line b { color: #1e40af; }
+    .op-meta { font-size: 11px; color: #475569; margin-top: 6px; font-variant-numeric: tabular-nums; }
+    .op-kpis { display: flex; gap: 14px; margin-top: 8px; padding-top: 8px; border-top: 1px solid #f1f5f9; }
+    .op-kpi { font-size: 11px; color: #64748b; font-weight: 700; }
+    .op-kpi span { display: block; font-size: 16px; color: #111; font-weight: 800; font-variant-numeric: tabular-nums; }
+    .msg { padding: 30px; text-align: center; color: #64748b; font-size: 14px; grid-column: 1 / -1; }
+    .msg.err { color: #dc2626; font-weight: 600; }
+    .note { font-size: 12px; color: #64748b; margin-top: 14px; }
+  </style>
+</head>
+<body>
+
+<div id="gp2-logobar" style="position:relative;background:#e8edf7;text-align:center;padding:6px 0;border-bottom:1px solid #d0dae7"><a href="../GP2_MODULOS.html" style="position:absolute;left:10px;top:50%;transform:translateY(-50%);color:#385475;text-decoration:none;font-weight:700;font-size:15px;padding:5px 10px;border:1px solid #d1d9e5;border-radius:8px;background:#e9eef7">← Atrás</a><a href="../GP2_MODULOS.html" style="text-decoration:none"><img src="../GP2_logo.png" alt="GP2 · Gestión Productiva" style="height:40px;vertical-align:middle"></a></div>
+
+<div class="top-bar">
+  <button class="btn-volver" onclick="location.href='../GP2_MODULOS.html'">&larr; Atrás</button>
+  <h1>Monitor en Vivo · Operarios</h1>
+</div>
+
+<div class="main-card">
+  <div class="card-header">
+    <h2>Estado de los operarios</h2>
+    <span class="live"><span class="live-dot"></span><span id="liveTxt">en vivo</span></span>
+  </div>
+  <div class="card-body">
+    <div class="controls-row">
+      <div class="ctrl-group"><label>Día</label><input type="date" id="fDia" class="ctrl-input"></div>
+      <label class="ctrl-group" style="font-size:12px;font-weight:700;color:#475569">
+        <input type="checkbox" id="soloActivos" checked style="width:16px;height:16px"> Solo con movimiento hoy
+      </label>
+      <button class="btn-act push" id="btnRefrescar">Refrescar</button>
+      <button class="btn-act ghost" id="btnAuto">Auto: ON</button>
+    </div>
+
+    <div class="stats-row" id="stats"></div>
+    <div class="ops-grid" id="grid"><div class="msg">Cargando...</div></div>
+
+    <div class="note">Lee <b>GP2.produccion</b> del día elegido. El estado sale del último evento de cada operario: unidades &gt; 0 = produciendo, código de tiempo muerto = parado, RM/PM/RD = problema con la matriz. Refresco automático cada 30 segundos.</div>
+  </div>
+</div>
+
+<script>
+(function () {
+  "use strict";
+  var sb = GP2_SB();
+
+  var $ = GP2UI.$;
+  var TM_DESC = {
+    PB: 'Paré Baño', BC: 'Busqué Cajón', MOV: 'Movimiento', LIMP: 'Limpieza', Perm: 'Permiso',
+    AL: 'Ayuda Logística', PR: 'Paré Carga Rollo', PC: 'Paré Comida', 'MOV P': 'Movimiento Piedra',
+    CM: 'Cambiar Matriz', REM: 'Reparando Matriz', Ausencia: 'Ausencia',
+    LT: 'Llegada Tarde', FJ: 'Fin Jornada'
+  };
+  var ISSUE = { RM: 'Rotura Matriz', PM: 'Paré Matriz', RD: 'Rollo Fleje Doblado' };
+  var EMP = {}, timer = null, auto = true;
+
+  var esc = GP2UI.esc;   /* helper de la casa, gp2-ui.js (2026-09-05) */
+  function n0(v) { return GP2N.fmt(v, 0); }   /* la regla de numero de la casa (gp2-numero.js) */
+  function hoy() { return new Intl.DateTimeFormat('sv-SE', { timeZone: 'America/Argentina/Buenos_Aires' }).format(new Date()); }
+  function horaAR(iso) {
+    try {
+      return new Intl.DateTimeFormat('es-AR', { timeZone: 'America/Argentina/Buenos_Aires', hour: '2-digit', minute: '2-digit', hour12: false }).format(new Date(iso));
+    } catch (e) { return ''; }
+  }
+  function haceCuanto(iso) {
+    var min = Math.round((Date.now() - new Date(iso).getTime()) / 60000);
+    if (min < 1) return 'recién';
+    if (min < 60) return 'hace ' + min + ' min';
+    return 'hace ' + Math.floor(min / 60) + ' h ' + (min % 60) + ' min';
+  }
+
+  async function cargarEmpleados() {
+    var r = await sb.from('empleado').select('legajo,nombre,activo');
+    if (r.error) { console.warn('empleado:', r.error); return; }
+    (r.data || []).forEach(function (e) { EMP[String(e.legajo)] = e; });
+  }
+
+  function estadoDe(ev) {
+    var code = String(ev.matriz_raw || '').trim();
+    if (Number(ev.uni) > 0) return { k: 'produccion', label: 'Produciendo' };
+    if (ISSUE[code]) return { k: 'issue', label: ISSUE[code] };
+    if (TM_DESC[code]) return { k: code === 'FJ' ? 'idle' : 'tm', label: TM_DESC[code] };
+    return { k: 'produccion', label: 'En matriz ' + code };
+  }
+
+  async function cargar() {
+    var dia = $('fDia').value || hoy();
+    var r = await sb.from('produccion')
+      .select('legajo,nombre_empleado,matriz_raw,nombre_matriz,uni,fecha,eliminar')
+      .gte('fecha', dia + 'T00:00:00-03:00')
+      .lte('fecha', dia + 'T23:59:59-03:00')
+      .order('fecha', { ascending: true })
+      .limit(10000);
+
+    var grid = $('grid');
+    if (r.error) { grid.innerHTML = '<div class="msg err">Error: ' + esc(r.error.message) + '</div>'; return; }
+
+    var porLegajo = {};
+    (r.data || []).forEach(function (p) {
+      if (String(p.eliminar || '').toUpperCase() === 'S') return;
+      var leg = String(p.legajo || '').trim();
+      if (!leg) return;
+      if (!porLegajo[leg]) porLegajo[leg] = { legajo: leg, nombre: p.nombre_empleado || '', eventos: 0, uni: 0, ultimo: null };
+      var o = porLegajo[leg];
+      o.eventos++;
+      o.uni += Number(p.uni) || 0;
+      o.ultimo = p;
+      if (!o.nombre && p.nombre_empleado) o.nombre = p.nombre_empleado;
+    });
+
+    var lista = Object.keys(porLegajo).map(function (k) { return porLegajo[k]; });
+
+    if (!$('soloActivos').checked) {
+      Object.keys(EMP).forEach(function (leg) {
+        if (!porLegajo[leg] && EMP[leg].activo !== false) {
+          lista.push({ legajo: leg, nombre: EMP[leg].nombre, eventos: 0, uni: 0, ultimo: null });
+        }
+      });
+    }
+
+    lista.forEach(function (o) {
+      if (!o.nombre && EMP[o.legajo]) o.nombre = EMP[o.legajo].nombre;
+      o.estado = o.ultimo ? estadoDe(o.ultimo) : { k: 'idle', label: 'Sin movimiento' };
+    });
+    var orden = { produccion: 0, issue: 1, tm: 2, idle: 3 };
+    lista.sort(function (a, b) {
+      var d = orden[a.estado.k] - orden[b.estado.k];
+      return d !== 0 ? d : String(a.nombre).localeCompare(String(b.nombre));
+    });
+
+    var c = { produccion: 0, tm: 0, issue: 0, idle: 0 }, totUni = 0;
+    lista.forEach(function (o) { c[o.estado.k]++; totUni += o.uni; });
+
+    $('stats').innerHTML =
+      card('Operarios', n0(lista.length)) +
+      card('Produciendo', n0(c.produccion), 'green') +
+      card('Tiempo muerto', n0(c.tm), 'orange') +
+      card('Problema matriz', n0(c.issue), 'red') +
+      card('Unidades del día', n0(totUni));
+
+    if (!lista.length) { grid.innerHTML = '<div class="msg">Sin movimiento registrado para ese día.</div>'; return; }
+
+    grid.innerHTML = lista.map(function (o) {
+      var u = o.ultimo;
+      return '<div class="op-card ' + o.estado.k + '">' +
+        '<div class="op-head">' +
+          '<div><div class="op-nombre">' + esc(o.nombre || '(sin nombre)') + '</div>' +
+          '<div class="op-legajo">Legajo ' + esc(o.legajo) + '</div></div>' +
+          '<span class="badge badge-' + o.estado.k + '">' + esc(o.estado.label) + '</span>' +
+        '</div>' +
+        (u ? '<div class="op-line">Matriz <b>' + esc(u.matriz_raw || '—') + '</b>' + (u.nombre_matriz ? ' · ' + esc(u.nombre_matriz) : '') + '</div>' +
+             '<div class="op-meta">Último evento ' + horaAR(u.fecha) + ' · ' + haceCuanto(u.fecha) + '</div>'
+           : '<div class="op-line" style="color:#475569">Sin eventos hoy</div>') +
+        '<div class="op-kpis">' +
+          '<div class="op-kpi">Eventos<span>' + n0(o.eventos) + '</span></div>' +
+          '<div class="op-kpi">Unidades<span>' + n0(o.uni) + '</span></div>' +
+        '</div>' +
+      '</div>';
+    }).join('');
+
+    $('liveTxt').textContent = 'actualizado ' + horaAR(new Date().toISOString());
+  }
+
+  function card(label, value, cls) {
+    return '<div class="stat-card ' + (cls || '') + '"><div class="stat-label">' + label + '</div><div class="stat-value">' + value + '</div></div>';
+  }
+
+  function setAuto(on) {
+    auto = on;
+    $('btnAuto').textContent = 'Auto: ' + (on ? 'ON' : 'OFF');
+    if (timer) { clearInterval(timer); timer = null; }
+    if (on) timer = setInterval(cargar, 30000);
+  }
+
+  document.addEventListener('DOMContentLoaded', async function () {
+    $('fDia').value = hoy();
+    $('btnRefrescar').addEventListener('click', cargar);
+    $('btnAuto').addEventListener('click', function () { setAuto(!auto); });
+    $('fDia').addEventListener('change', cargar);
+    $('soloActivos').addEventListener('change', cargar);
+    await cargarEmpleados();
+    await cargar();
+    setAuto(true);
+  });
+})();
+</script>
+</body>
+</html>

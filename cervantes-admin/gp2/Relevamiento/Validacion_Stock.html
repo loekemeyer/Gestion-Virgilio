@@ -1,0 +1,288 @@
+<!doctype html>
+<html lang="es">
+<head>
+<!-- v1.0.0 (2026-09-04) — VALIDACION DE STOCK. Modulo aparte del Relevamiento
+     [usuario 2026-09-04: "necesito que me aparezca dentro de modulo relevamiento otro modulo
+     que sea validacion de stock ... pero no quiero que me aparezca despues de hacer el
+     relevamiento en el mismo modulo, porque eso lo van a hacer los operarios, y el operador
+     de aca del sistema va a hacer el chequeo"].
+
+     SON DOS ROLES, POR ESO SON DOS PANTALLAS:
+       Relevamiento_GP2.html  -> el OPERARIO cuenta y cierra. Ahi termina su trabajo.
+       Validacion_Stock.html  -> el OPERADOR DEL SISTEMA compara conteo vs programa, elige
+                                 cual vale y recien ahi toca el stock.
+
+     El operario NUNCA ve esta pantalla ni decide sobre el stock. Contar y decidir son cosas
+     distintas y las hace gente distinta.
+
+     Por DEFAULT gana el CONTEO. Lo que no se conto queda con el programa y no se toca:
+     contar es afirmar, no contar no significa "hay cero". -->
+<script src="../auth-guard.js?v=20260904t"></script>
+<script src="../gp2-ui.js?v=20260905a"></script>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Validación de Stock · GP2</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="../gp2-numero.js?v=20260905m"></script>
+<script src="../supabase-config.js?v=20260905k"></script>
+<link rel="stylesheet" href="../gp2-modulo.css?v=20260903b"/>
+<link rel="icon" type="image/png" href="../GP2_favicon.png">
+<link rel="apple-touch-icon" href="../GP2_favicon.png">
+<style>
+  .wrap{max-width:1080px;margin:0 auto}
+
+  /* ---- Lista de conteos esperando validacion ---- */
+  .lista{display:flex;flex-direction:column;gap:10px}
+  .li{display:flex;align-items:center;gap:14px;flex-wrap:wrap;
+      padding:12px 14px;border:2px solid #d0d7de;border-radius:12px;background:#fff}
+  .li.espera{border-color:#e6cf9a;background:#fffbf0}
+  .li-sector{font-size:20px;font-weight:800;min-width:150px}
+  .li-fecha{font-size:16px;font-weight:700;min-width:110px}
+  .li-info{font-size:15px;color:#475569}
+  .li-acts{margin-left:auto;display:flex;gap:8px;flex-wrap:wrap}
+  .pill{font-size:15px;font-weight:800;padding:6px 12px;border-radius:20px;white-space:nowrap}
+  .pill.dif{background:#fbe0e0;color:#c00}
+  .pill.igual{background:#dff3e6;color:#0a7a2f}
+  .pill.ok{background:#eef2f6;color:#3a4653}
+
+  .b{min-height:48px;padding:12px 20px;border-radius:10px;border:2px solid #d0d7de;
+     background:#fff;font-size:17px;font-weight:800;cursor:pointer;color:#111}
+  .b.pri{background:#111;color:#fff;border-color:#111}
+  .b.ok{background:#0a7a2f;color:#fff;border-color:#0a7a2f}
+  .b.del{border-color:#eacdcd;color:#c00;background:#fff}
+  .b:disabled{opacity:.45;cursor:not-allowed}
+  .b.sm{min-height:44px;padding:9px 14px;font-size:15px}
+
+  .barra{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin:12px 0;
+         padding:12px;background:#f6f8fa;border-radius:10px}
+  .barra .info{font-size:17px;font-weight:800}
+
+  td.num{text-align:right;font-variant-numeric:tabular-nums}
+  .dif{font-weight:800;font-variant-numeric:tabular-nums;font-size:18px}
+  .dif.mas{color:#0a7a2f}
+  .dif.menos{color:#c00}
+  tr.igual td{background:#f6f8fa;color:#5a6672}
+  .cod{font-weight:800;font-size:17px}
+  .desc{color:#5a6672;font-size:14px}
+  /* Elegir quien vale: dos botones, no un select (se toca con el dedo) */
+  .pick{display:inline-flex;border:2px solid #d0d7de;border-radius:9px;overflow:hidden}
+  .pick button{min-height:44px;padding:0 14px;font-size:15px;font-weight:800;
+               border:none;background:#fff;cursor:pointer;color:#3a4653}
+  .pick button.act{background:#0b3b73;color:#fff}
+  .pick button:disabled{opacity:.4;cursor:not-allowed}
+  .leyenda{font-size:15px;color:#475569;margin:8px 0}
+  .sec-tit{font-size:16px;font-weight:800;color:#3a4653;margin:18px 0 6px}
+  .hidden{display:none!important}
+
+  @media(max-width:430px){
+    .li-acts{margin-left:0;width:100%}
+    .li-sector,.li-fecha{min-width:0}
+    .barra .b{flex:1;min-width:140px}
+  }
+</style>
+</head>
+<body>
+
+<div class="wrap">
+<div class="card">
+  <div class="header">
+    <h1>✅ Validación de Stock</h1>
+    <div class="hbtns"><a href="../GP2_MODULOS.html">Atrás</a></div>
+  </div>
+
+  <div class="steps">
+
+    <!-- ====== LISTA ====== -->
+    <div id="panLista">
+      <div class="leyenda">Conteos que los operarios ya terminaron. Entrá para comparar lo que
+        dice el <b>programa</b> contra lo que dice el <b>conteo</b> y decidir cuál vale.</div>
+      <div class="lista" id="pendientes"></div>
+      <div id="wrapAplicados" class="hidden">
+        <div class="sec-tit">Ya validados</div>
+        <div class="lista" id="aplicados"></div>
+      </div>
+    </div>
+
+    <!-- ====== COMPARACION ====== -->
+    <div id="panComp" class="hidden">
+      <div class="barra">
+        <button type="button" class="b sm" id="btnVolver">← Volver</button>
+        <span class="info" id="compTitulo"></span>
+      </div>
+      <div class="leyenda">Elegí cuál vale en cada fila. <b>Por default gana el conteo.</b>
+        Lo que <b>no se contó</b> queda con el programa y no se toca.</div>
+      <div class="table-wrap">
+        <table class="t">
+          <thead><tr>
+            <th>Insumo</th>
+            <th class="num">Programa</th>
+            <th class="num">Conteo</th>
+            <th class="num">Diferencia</th>
+            <th>¿Cuál vale?</th>
+          </tr></thead>
+          <tbody id="compBody"></tbody>
+        </table>
+      </div>
+      <div class="barra">
+        <span class="info" id="compResumen"></span>
+        <button type="button" class="b del" id="btnEliminar">Eliminar conteo</button>
+        <button type="button" class="b ok" id="btnAplicar">Aplicar al stock</button>
+      </div>
+    </div>
+
+    <div id="status" class="status">Cargando…</div>
+  </div>
+</div>
+</div>
+
+<script>
+var SB = GP2_SB();
+var $ = GP2UI.$;
+var esc = GP2UI.esc;   /* helper de la casa, gp2-ui.js (2026-09-05) */
+function fmt(n,d){ return GP2N.fmt(n, d==null?0:d, '—'); }   /* la regla de numero de la casa; '—' sin valor */
+function fmtFecha(iso){
+  if(!iso) return '';
+  var p=String(iso).slice(0,10).split('-');
+  return p.length===3 ? (p[2]+'/'+p[1]+'/'+p[0]) : String(iso);
+}
+function msg(t, malo){
+  $('status').className = 'status' + (malo?' bad':(t?' ok':''));
+  $('status').textContent = t||'';
+  if(t) setTimeout(function(){ if($('status').textContent===t){ $('status').textContent=''; $('status').className='status'; } }, 6000);
+}
+
+var D={}, REL=null, COMP=[];
+
+async function boot(){
+  var r = await SB.rpc('validacion_bundle');
+  if(r.error){ msg('Error: '+r.error.message, true); return; }
+  D = r.data || {};
+  pintarLista();
+  $('status').textContent='';
+}
+
+function pintarLista(){
+  var pend = D.pendientes || [];
+  $('pendientes').innerHTML = pend.length ? pend.map(function(p){
+    var dif = Number(p.difieren)||0;
+    return '<div class="li espera">'+
+      '<span class="li-sector">'+esc(p.sector)+'</span>'+
+      '<span class="li-fecha">'+fmtFecha(p.fecha)+'</span>'+
+      '<span class="li-info">'+fmt(p.contados)+' de '+fmt(p.items)+' contados'+
+        (p.encargado?(' · '+esc(p.encargado)):'')+'</span>'+
+      '<span class="pill '+(dif>0?'dif':'igual')+'">'+
+        (dif>0 ? (fmt(dif)+(dif===1?' diferencia':' diferencias')) : 'sin diferencias')+'</span>'+
+      '<span class="li-acts"><button type="button" class="b sm pri" data-ver="'+p.id+'">Revisar →</button></span>'+
+    '</div>';
+  }).join('') : '<div class="empty">No hay conteos esperando validación.</div>';
+
+  var apl = D.aplicados || [];
+  $('wrapAplicados').classList.toggle('hidden', apl.length===0);
+  $('aplicados').innerHTML = apl.map(function(a){
+    return '<div class="li">'+
+      '<span class="li-sector">'+esc(a.sector)+'</span>'+
+      '<span class="li-fecha">'+fmtFecha(a.fecha)+'</span>'+
+      '<span class="li-info">'+fmt(a.contados)+' contados</span>'+
+      '<span class="pill ok">✓ Aplicado</span>'+
+    '</div>';
+  }).join('');
+
+  document.querySelectorAll('[data-ver]').forEach(function(b){
+    b.addEventListener('click', function(){ verComparacion(Number(b.dataset.ver)); });
+  });
+}
+
+async function verComparacion(relId){
+  var r = await SB.rpc('relevamiento_comparar', { p_id: relId });
+  if(r.error){ msg('Error: '+r.error.message, true); return; }
+  REL = r.data.relevamiento;
+  COMP = r.data.items || [];
+  pintarComp();
+  mostrar('comp');
+  $('status').textContent='';
+}
+
+function pintarComp(){
+  $('compTitulo').textContent = REL.sector + ' · ' + fmtFecha(REL.fecha);
+  $('compBody').innerHTML = COMP.map(function(x){
+    var d = Number(x.diferencia)||0;
+    var igual = x.contado && d===0;
+    var puedeConteo = x.contado && x.conteo!=null;
+    var dcls = d>0 ? 'mas' : (d<0 ? 'menos' : '');
+    return '<tr'+(igual?' class="igual"':'')+'>'+
+      '<td><span class="cod">'+esc(x.codigo)+'</span><br><span class="desc">'+esc(x.descripcion||'')+'</span></td>'+
+      '<td class="num">'+fmt(x.programa)+'</td>'+
+      '<td class="num">'+(x.contado?fmt(x.conteo):'<span class="desc">sin contar</span>')+'</td>'+
+      '<td class="num"><span class="dif '+dcls+'">'+(x.contado?((d>0?'+':'')+fmt(d)):'—')+'</span></td>'+
+      '<td><span class="pick">'+
+        '<button type="button" data-pick="conteo" data-it="'+x.item_id+'"'+
+          (x.decision==='conteo'?' class="act"':'')+(puedeConteo?'':' disabled')+'>Conteo</button>'+
+        '<button type="button" data-pick="programa" data-it="'+x.item_id+'"'+
+          (x.decision==='programa'?' class="act"':'')+'>Programa</button>'+
+      '</span></td>'+
+    '</tr>';
+  }).join('');
+
+  document.querySelectorAll('[data-pick]').forEach(function(b){
+    b.addEventListener('click', function(){
+      var it = Number(b.dataset.it), q = b.dataset.pick;
+      var x = COMP.filter(function(y){ return y.item_id===it; })[0];
+      if(!x) return;
+      if(q==='conteo' && !(x.contado && x.conteo!=null)) return;
+      x.decision = q;
+      pintarComp();
+    });
+  });
+  resumenComp();
+}
+
+function resumenComp(){
+  var gana = COMP.filter(function(x){ return x.decision==='conteo'; });
+  var cambian = gana.filter(function(x){ return Number(x.diferencia)!==0; }).length;
+  $('compResumen').textContent = cambian===0
+    ? 'Nada que ajustar: el conteo coincide con el programa.'
+    : (cambian + (cambian===1?' insumo cambia':' insumos cambian') + ' de stock');
+  $('btnAplicar').disabled = (REL.estado === 'aplicado');
+  if(REL.estado === 'aplicado') $('compResumen').textContent = '✓ Ya aplicado al stock.';
+}
+
+$('btnAplicar').addEventListener('click', async function(){
+  var gana = COMP.filter(function(x){ return x.decision==='conteo' && Number(x.diferencia)!==0; });
+  if(gana.length && !confirm('Se van a ajustar '+gana.length+' insumo(s) para que el stock quede igual al conteo.\n\n¿Aplicar?')) return;
+  $('btnAplicar').disabled = true;
+  try{
+    var d = await SB.rpc('relevamiento_decidir', {
+      p_id: REL.id,
+      p_items: COMP.map(function(x){ return { item_id:x.item_id, decision:x.decision }; })
+    });
+    if(d.error) throw d.error;
+    var r = await SB.rpc('relevamiento_aplicar', { p_id: REL.id });
+    if(r.error) throw r.error;
+    msg('✓ Stock actualizado — '+(r.data.ajustes||0)+' ajuste(s).');
+    REL=null; COMP=[];
+    await boot();
+    mostrar('lista');
+  }catch(e){ msg('Error: '+(e.message||e), true); $('btnAplicar').disabled=false; }
+});
+
+$('btnEliminar').addEventListener('click', async function(){
+  if(!REL || !REL.id) return;
+  if(!confirm('Se borra el conteo entero y el sector queda para contarlo de nuevo.\n\n¿Eliminar?')) return;
+  var r = await SB.rpc('relevamiento_eliminar', { p_id: REL.id });
+  if(r.error){ msg('No se pudo eliminar: '+r.error.message, true); return; }
+  msg('✓ Conteo eliminado');
+  REL=null; COMP=[];
+  await boot();
+  mostrar('lista');
+});
+
+function mostrar(p){
+  $('panLista').classList.toggle('hidden', p!=='lista');
+  $('panComp').classList.toggle('hidden', p!=='comp');
+}
+$('btnVolver').addEventListener('click', async function(){ REL=null; COMP=[]; await boot(); mostrar('lista'); });
+
+boot();
+</script>
+</body>
+</html>

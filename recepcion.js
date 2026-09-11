@@ -87,7 +87,8 @@ function rcpDraftSave() {
       tipo: opState.tipo, tallCod: opState.tallCod, tallNombre: opState.tallNombre,
       tallCods: opState.tallCods, articulosManual: opState.articulosManual,
       linea: opState.linea, fecha: opState.fecha, remito: opState.remito,
-      articulos: opState.articulos, cargas: cargas
+      articulos: opState.articulos, cargas: cargas,
+      altaNuevos: opState.altaNuevos || {}
     }));
   } catch (_e) { /* localStorage lleno / modo privado: no rompe la carga */ }
   rcpDraftNotify();
@@ -449,6 +450,7 @@ function opResetState() {
   opState.articulosManual = null;
   opState.linea = null; opState.fecha = opTodayStr();
   opState.remito = ""; opState.articulos = null; opState.cargas = {};
+  opState.altaNuevos = {};      // v15.36: altas del "+" esperando el OK de Thomas
   opState.ocPorCod = null;
   opState.fotoFile = null;
   if (opState.fotoPreviewUrl) { try { URL.revokeObjectURL(opState.fotoPreviewUrl); } catch(_e){} }
@@ -483,6 +485,8 @@ window.reanudarRecepcionOp = function (legajo, dayKey) {
   opState.remito = d.remito || "";
   opState.articulos = d.articulos || null;
   opState.cargas = d.cargas || {};
+  opState.altaNuevos = d.altaNuevos || {};   // v15.36: altas pendientes de OK
+  if (Object.keys(opState.altaNuevos).some(function (c) { return opState.altaNuevos[c].estado === "pendiente"; })) altaPollStart();
   opPage.classList.remove("pendWide");
   opPage.classList.add("open");
   opAnularBarRender(true);
@@ -1106,7 +1110,17 @@ function drawArticulosGrid() {
         (oc.rec > 0 ? ", " + oc.rec + " ya recibida(s) → faltan " + oc.pend : "");
       ocHtml = '<span class="ocq" title="' + escapeHtmlRcp(title) + '">OC ' + escapeHtmlRcp(txt) + '</span>';
     }
-    b.innerHTML = '<span>' + a.Cod_Art + '</span>' + ocHtml +
+    // v15.36 — alta nueva esperando (o sin) el OK de Thomas: se marca en el botón.
+    let altaHtml = "";
+    const _alta = (opState.altaNuevos || {})[_ocgNorm(a.Cod_Art)];
+    if (_alta && _alta.estado === "pendiente") {
+      altaHtml = '<span class="ocq" title="Alta nueva: le avisamos a Thomy, todavía no contestó (no traba nada)">🆕</span>';
+    } else if (_alta && _alta.estado === "ok") {
+      altaHtml = '<span class="ocq" title="Alta nueva: Thomy la aprobó">🆕 ✅</span>';
+    } else if (_alta && _alta.estado === "rechazado") {
+      altaHtml = '<span class="ocq" title="Alta nueva: Thomy dijo que NO">🆕 ⛔</span>';
+    }
+    b.innerHTML = '<span>' + a.Cod_Art + '</span>' + ocHtml + altaHtml +
       (cajas > 0 ? '<span class="cnt">' + cajas + ' caja' + (cajas === 1 ? '' : 's') + (exc ? ' ⚠' : '') + '</span>' : '');
     b.onclick = () => openCajas(a.Cod_Art);
     grid.appendChild(b);
@@ -1186,11 +1200,137 @@ async function arSaveCodeRemote(cod) {
    con "27" y no se dupliquen artículos. */
 function _ocgNorm(c) { return String(c == null ? "" : c).toUpperCase().trim().replace(/^0+(?=.)/, ""); }
 
-function arAddCode() {
+/* ============== v15.39 — alta de artículo nuevo: AVISO a Thomas por WhatsApp =========
+   Pedido del dueño (2026-09-11): *"si están por recibir un artículo nuevo que no
+   figuraba en la planimetría, me mandan un mensaje directo a WhatsApp a mi teléfono,
+   'hola Thomy, estoy creando un artículo nuevo, que es el tanto, ¿me confirmás que
+   está bien?'"*.
+
+   ⚠ **NO traba la recepción** (corrección del dueño, mismo día): *"no quiero que quede
+   bloqueado a que yo les conteste, porque capaz les contesto una hora después. Quiero
+   que quede asentado el mensaje y que una vez que lo mandan ellos sí puedan seguir
+   dando la recepción"*. O sea: se manda el WhatsApp, queda la fila, y el operario
+   sigue de largo. La v15.36 trababa el `Enviar` hasta la respuesta — eso se sacó.
+
+   Esto nació del remito 38087 (02/09): el operario cargó 599, 943 y 948 con el botón
+   "+", sin la E — los códigos reales son 599E, 943E y 948E. El "+" daba de alta
+   cualquier cosa sin validar ni avisarle a nadie.
+
+   La fila de `GV_Alta_Articulo_Aprobacion` es el asiento: queda quién lo creó, cuándo,
+   en qué remito, si el WhatsApp salió, y después la respuesta de Thomas. Con la anon
+   key sólo se puede LEER; escribe la Edge Function `gv-alta-articulo` (service_role),
+   que es la que manda el WhatsApp. La respuesta de Thomas es información (se ve en el
+   botón), no un permiso. */
+const ALTA_FN_URL = SUPABASE_URL + "/functions/v1/gv-alta-articulo";
+
+/* Altas del "+" de esta recepción y el estado del aviso. Vive en el borrador para que
+   sobreviva a un refresh o a cerrar la app. NO condiciona el envío: es informativo. */
+function altaPendGet() {
+  return (opState.altaNuevos && typeof opState.altaNuevos === "object") ? opState.altaNuevos : (opState.altaNuevos = {});
+}
+function altaEnPlanimetria(cod) {
+  const G = (typeof window !== "undefined" && window.GONDOLA) ? window.GONDOLA : null;
+  if (!G) return true;   // sin planimetría cargada no trabamos a nadie
+  return !!G[_ocgNorm(cod)];
+}
+/* Avisa a Thomas y deja el asiento. Devuelve el estado ('pendiente' | 'ok' |
+   'rechazado') o null si no se pudo avisar. El operario sigue igual en los dos casos. */
+async function altaAvisar(cod) {
+  try {
+    const res = await fetch(ALTA_FN_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        cod: cod,
+        remito: opState.remito || "",
+        legajo: String(RECP.legajo || ""),
+        tall: opState.tallNombre || "",
+        linea: opState.linea || ""
+      })
+    });
+    const d = await res.json();
+    if (!res.ok || !d || !d.token) return null;
+    altaPendGet()[cod] = { token: d.token, estado: d.estado || "pendiente", wa_ok: d.wa_ok !== false };
+    rcpDraftSave();
+    return d.estado || "pendiente";
+  } catch (_e) { return null; }
+}
+/* Relee los estados desde la tabla (anon sólo lee). Devuelve true si cambió algo. */
+async function altaRefrescar() {
+  const pend = altaPendGet();
+  const cods = Object.keys(pend).filter(c => pend[c].estado === "pendiente");
+  if (!cods.length) return false;
+  let cambio = false;
+  try {
+    const res = await supabase.from("GV_Alta_Articulo_Aprobacion")
+      .select("cod,estado,token").in("cod", cods);
+    ((res && res.data) || []).forEach(function (r) {
+      const c = _ocgNorm(r.cod);
+      if (pend[c] && pend[c].estado !== r.estado) {
+        pend[c].estado = r.estado;
+        cambio = true;
+      }
+    });
+  } catch (_e) { /* sin red: sigue pendiente */ }
+  if (cambio) rcpDraftSave();
+  return cambio;
+}
+/* Altas de esta recepción todavía sin respuesta de Thomas. Se usa SÓLO para mostrar
+   (el badge del botón y una línea en el resumen): no traba nada. */
+function altaSinRespuesta() {
+  const pend = altaPendGet();
+  const cargas = opState.cargas || {};
+  return Object.keys(cargas)
+    .filter(c => cargas[c] > 0)
+    .map(_ocgNorm)
+    .filter(c => pend[c] && pend[c].estado === "pendiente")
+    .map(c => ({ cod: c, estado: pend[c].estado }));
+}
+/* Mientras haya pendientes, repregunta cada 8 s y repinta cuando Thomas contesta. */
+let _altaTimer = null;
+function altaPollStart() {
+  altaPollStop();
+  _altaTimer = setInterval(async function () {
+    const hay = Object.keys(altaPendGet()).some(c => altaPendGet()[c].estado === "pendiente");
+    if (!hay) { altaPollStop(); return; }
+    const cambio = await altaRefrescar();
+    if (cambio && opState.step === "articulos") drawArticulosGrid();
+  }, 8000);
+}
+function altaPollStop() { if (_altaTimer) { clearInterval(_altaTimer); _altaTimer = null; } }
+
+async function arAddCode() {
   let cod = prompt("Código del artículo nuevo para Log/Fabr:");
   if (cod == null) return;                       // canceló
   cod = _ocgNorm(cod);
   if (!cod) return;
+
+  // v15.39 — si el código NO está en la planimetría es un alta de verdad: se le avisa a
+  // Thomas por WhatsApp y queda el asiento. NO se espera la respuesta: el operario sigue.
+  if (!altaEnPlanimetria(cod)) {
+    const ya = altaPendGet()[cod];
+    if (!ya) {
+      const estado = await altaAvisar(cod);
+      if (estado === null) {
+        // Sin red no frenamos la recepción: se avisa que el mensaje no salió. El aviso
+        // igual no se pierde — al enviar sale el evento RSP, que dispara su Telegram.
+        alert("⚠ No se pudo avisarle a Thomy (sin conexión).\n\n" +
+              "Podés seguir con la recepción igual, pero decile vos que estás creando el " + cod + ".");
+      } else {
+        const w = altaPendGet()[cod];
+        alert("📲 Listo, le mandé el WhatsApp a Thomy:\n\n" +
+              "\"Hola Thomy, estoy creando un artículo nuevo, que es el " + cod + ".\n" +
+              "¿Me confirmás que está bien?\"\n\n" +
+              (w && w.wa_ok === false ? "⚠ El WhatsApp falló, le llegó por Telegram.\n\n" : "") +
+              "Seguí con la recepción normal. No hace falta esperar la respuesta.");
+        altaPollStart();
+      }
+    } else if (ya.estado === "rechazado") {
+      // Ya contestó que no: se avisa, pero la decisión de cargarlo es del operario.
+      alert("⚠ Ojo: Thomy ya había dicho que NO al alta de " + cod + ".");
+    }
+  }
+
   if (!opState.articulos) opState.articulos = [];
   const existe = opState.articulos.some(a => _ocgNorm(a.Cod_Art) === cod);
   if (!existe) {
@@ -1236,6 +1376,18 @@ function renderResumen() {
   const totalCajas = items.reduce((s, i) => s + i.cajas, 0);
   tot.textContent = "Total: " + items.length + " código(s) · " + totalCajas + " cajas";
   opBody.appendChild(tot);
+
+  // v15.39 — altas nuevas avisadas a Thomy. Es información: NO traba el envío.
+  const _sinResp = altaSinRespuesta();
+  if (_sinResp.length) {
+    const av = document.createElement("div");
+    av.className = "resTotal";
+    av.style.fontSize = "13px";
+    av.style.opacity = ".85";
+    av.textContent = "🆕 Artículo nuevo avisado a Thomy: " +
+      _sinResp.map(x => x.cod).join(", ") + " — podés enviar igual.";
+    opBody.appendChild(av);
+  }
 
   // v11.xx — Foto obligatoria de la mercadería (se sube al confirmar)
   const fotoSec = document.createElement("div");
@@ -1300,6 +1452,10 @@ function openCajas(cod) {
   // v7.07: recordatorio de la OC vigente mientras carga las cajas.
   const oc = ocDeCod(cod);
   opState.cajasOc = oc || null;   // v8.60 — guardado para el aviso de exceso en vivo
+  // v14.61 — si hay OC, precargo stock/capacidad de góndola de este código para el mensaje a
+  // Thomas (así el botón arma el WhatsApp sincrónico, sin esperar la red al tocarlo).
+  opState.cajasGond = null;
+  if (oc) { try { _opPrefetchGond(cod); } catch (_e) {} }
   if (opCajasOc) {
     if (oc) {
       opCajasOc.style.display = "";
@@ -1329,11 +1485,69 @@ function _opCajasExceso() {
   const n = _esCodDecimal(opState.cajasCod) ? (parseFloat(opCajasInput.value) || 0) : (parseInt(opCajasInput.value, 10) || 0);
   if (n > oc.pend) {
     opCajasOc.style.background = "#fef2f2"; opCajasOc.style.borderColor = "#fca5a5";
-    opCajasOc.innerHTML = _opCajasOcBase(oc) + '<br><b style="color:#b91c1c;">⚠ Cargás ' + n + ' pero por OC faltan ' + oc.pend + '. Revisá que no sea un error de tipeo.</b>';
+    // v14.61 — aviso claro + botón para escribirle a Thomas por WhatsApp con el mensaje prearmado
+    // (proveedor, pedido, por recibir, pendiente, excedente, stock góndola y si entra). El dueño
+    // decide con todos los datos si el excedente entra o se devuelve.
+    opCajasOc.innerHTML = _opCajasOcBase(oc) +
+      '<br><b style="color:#b91c1c;">⚠ Estás recibiendo más mercadería que la que tenés habilitada: cargás ' + n +
+      ' y por OC faltan ' + oc.pend + '.</b>' +
+      '<br><button type="button" class="waThomasBtn" style="margin-top:8px;padding:8px 12px;border:0;border-radius:8px;background:#25d366;color:#fff;font-weight:700;font-size:14px;cursor:pointer;">📲 Escribirle a Thomas</button>';
+    const b = opCajasOc.querySelector(".waThomasBtn");
+    if (b) b.onclick = function () { opWhatsExceso(n); };
   } else {
     opCajasOc.style.background = ""; opCajasOc.style.borderColor = "";
     opCajasOc.innerHTML = _opCajasOcBase(oc);
   }
+}
+/* v14.61 — precarga stock de góndola (vista_saldos_stock.terminado) y capacidad
+   (Capacidad_Sector.cajas_max) del código, para el mensaje a Thomas. Best-effort: si no hay
+   dato, el mensaje dice "s/dato". */
+async function _opPrefetchGond(cod) {
+  const k = String(cod || "").trim();
+  if (!k) return;
+  try {
+    await sessionReady;
+    const res = await Promise.all([
+      supabase.from("Capacidad_Sector").select("cajas_max").eq("cod", k),
+      supabase.from("vista_saldos_stock").select("terminado").eq("cod_art", k)
+    ]);
+    let cap = 0, hasCap = false;
+    ((res[0] && res[0].data) || []).forEach(function (r) { hasCap = true; cap += Number(r.cajas_max) || 0; });
+    let gond = 0, hasG = false;
+    ((res[1] && res[1].data) || []).forEach(function (r) { hasG = true; gond += Number(r.terminado) || 0; });
+    if (opState.cajasCod === k) opState.cajasGond = { cap: hasCap ? cap : null, gond: hasG ? gond : null };
+  } catch (_e) { /* best-effort: queda null → "s/dato" */ }
+}
+/* v14.61 — WhatsApp a Thomas (dueño) con el resumen del exceso, mensaje prearmado. */
+const WA_THOMAS = "5491162521635";
+function opWhatsExceso(n) {
+  const oc = opState.cajasOc || {};
+  const prov = opState.tallNombre || "?";
+  const cod = opState.cajasCod || "?";
+  const ped = oc.ped || 0, pend = oc.pend || 0;
+  const exced = Math.max(0, n - pend);
+  const g = opState.cajasGond || {};
+  const gond = (g.gond != null) ? g.gond : null;
+  const cap = (g.cap != null) ? g.cap : null;
+  const libre = (cap != null && gond != null) ? (cap - gond) : null;
+  const entra = (libre != null)
+    ? (libre >= exced ? ("SÍ (" + libre + " libres en góndola)") : ("NO (solo " + libre + " libres en góndola)"))
+    : "s/dato de capacidad";
+  const L = [
+    "Hola Thomas, exceso al recibir mercadería:",
+    "Proveedor: " + prov,
+    "Código: " + cod,
+    "OC pide: " + ped,
+    "Estoy por recibir: " + n,
+    "Pendiente de recibir: " + pend,
+    "Excedente sobre lo habilitado: " + exced,
+    "Stock actual en góndola: " + (gond != null ? gond : "s/dato"),
+    "¿Entra el excedente en góndola?: " + entra,
+    "",
+    "¿Lo recibo?"
+  ];
+  const url = "https://wa.me/" + WA_THOMAS + "?text=" + encodeURIComponent(L.join("\n"));
+  try { window.open(url, "_blank"); } catch (_e) { location.href = url; }
 }
 function closeCajas() { opCajasModal.classList.remove("open"); opState.cajasCod = null; }
 // v11.78: códigos con decimales permitidos (cajas fraccionarias)
@@ -1505,6 +1719,7 @@ async function opEnviar() {
     .filter(([, n]) => n > 0)
     .map(([cod, n]) => ({ cod, cajas: n, desc: descPorCod[cod] || "" }));
   if (items.length === 0) { alert("Cargá al menos un código con cajas."); return; }
+
   const totalCajas = items.reduce((s, i) => s + i.cajas, 0);
 
   const btn = document.getElementById("opConfirmar");
@@ -1552,20 +1767,70 @@ async function opEnviar() {
     }));
   }
 
-  // idea 9047: dedup de remito. Reenviar el mismo remito (timeout ambiguo / recarga con
-  // mala señal de depósito) duplicaba cajas en Movimientos_Stock y filas de Entregas. Antes
-  // de insertar chequeamos si ese remito ya está cargado para este proveedor/tallerista y
-  // pedimos confirmación. Falla ABIERTO: si el chequeo no se puede hacer (red), no bloquea.
+  // idea 9047 + v14.57: dedup de remito. Reenviar el mismo remito (timeout ambiguo /
+  // recarga con mala señal de depósito) duplicaba cajas en Movimientos_Stock y filas de
+  // Entregas. Antes de insertar avisamos si ese remito ya está cargado. Dos chequeos, UN
+  // solo aviso blando (deja seguir si confirma):
+  //  (a) HOY en Control_Modo_OP por remito + línea → es lo que el supervisor ve repetido
+  //      en Pendientes; mostramos el código ya asignado y la hora de la carga previa.
+  //  (b) histórico en la tabla de Entregas por remito + tallerista/proveedor (idea 9047).
+  // Falla ABIERTO: si el chequeo no se puede hacer (red), no bloquea la carga.
   if (String(opState.remito || "").trim()) {
+    let aviso = null;
+    // (a) mismo remito + línea, cargado hoy (Control_Modo_OP → Pendientes). Comparamos
+    //     ARTÍCULOS: repetir un código que ya se cargó hoy DUPLICA stock (aviso fuerte);
+    //     cargar SOLO códigos nuevos del mismo remito es un complemento legítimo —ej.: un
+    //     artículo fuera de la OC que el dueño recién habilita y se carga aparte una vez
+    //     autorizado— así que ahí el aviso es informativo, no de duplicado.
     try {
-      let q = supabase.from(tabla).select("Remito").eq("Remito", opState.remito).limit(1);
-      q = (opState.tipo === 'prov_at') ? q.eq("Proveedor", opState.tallNombre) : q.eq("Codigo_Tall", opState.tallCod);
-      const { data: yaHay } = await q;
-      if (yaHay && yaHay.length) {
-        const ok = confirm("⚠ El remito " + opState.remito + " ya figura cargado para " + opState.tallNombre + ".\n\nSi lo reenviás se DUPLICAN las cajas y el stock.\n\n¿Cargarlo igual?");
-        if (!ok) { btn.disabled = false; btn.textContent = prev; return; }
+      const desde = opTodayStr() + "T00:00:00-03:00";
+      let qc = supabase.from("Control_Modo_OP")
+        .select("codigo,created_at,detalle")
+        .eq("remito", opState.remito)
+        .neq("estado", "anulado")
+        .gte("created_at", desde)
+        .order("created_at", { ascending: true });
+      if (opState.linea) qc = qc.eq("linea", opState.linea);
+      const { data: cmo } = await qc;
+      if (cmo && cmo.length) {
+        // Códigos ya cargados hoy para este remito+línea (parse del `detalle`: "COD → N · COD → N").
+        const yaCods = new Set();
+        cmo.forEach(function (r) {
+          String(r.detalle || "").split("·").forEach(function (p) {
+            const cod = p.split("→")[0].trim();
+            if (cod) yaCods.add(cod);
+          });
+        });
+        const repetidos = items.filter(function (i) { return yaCods.has(String(i.cod).trim()); }).map(function (i) { return i.cod; });
+        const nuevos = items.filter(function (i) { return !yaCods.has(String(i.cod).trim()); }).map(function (i) { return i.cod; });
+        const primera = cmo[0];
+        let hh = "";
+        try { if (primera.created_at) hh = new Date(primera.created_at).toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit", timeZone: "America/Argentina/Buenos_Aires" }); } catch (_e) {}
+        const ref = "remito " + opState.remito + (opState.linea ? " (" + opState.linea + ")" : "") +
+          " ya se cargó hoy" + (hh ? " a las " + hh : "") + (primera.codigo ? " · código " + primera.codigo : "");
+        if (repetidos.length) {
+          aviso = "⚠ El " + ref + ". Esa carga YA incluía: " + repetidos.join(", ") + "." +
+            (nuevos.length ? "\nNuevos en esta carga: " + nuevos.join(", ") + "." : "") +
+            "\n\nSi cargás los repetidos se DUPLICAN las cajas y el stock.";
+        } else {
+          aviso = "ℹ El " + ref + ", con otros artículos.\nAhora vas a AGREGAR: " + nuevos.join(", ") +
+            ".\n\nSon códigos distintos: no duplica. (Normal si completás un remito que quedó a medias, ej.: artículos habilitados después.)";
+        }
       }
     } catch (_e) { /* chequeo falla abierto: no bloquea la carga */ }
+    // (b) histórico por remito + tallerista/proveedor en la tabla de Entregas (idea 9047)
+    if (!aviso) {
+      try {
+        let q = supabase.from(tabla).select("Remito").eq("Remito", opState.remito).limit(1);
+        q = (opState.tipo === 'prov_at') ? q.eq("Proveedor", opState.tallNombre) : q.eq("Codigo_Tall", opState.tallCod);
+        const { data: yaHay } = await q;
+        if (yaHay && yaHay.length) aviso = "⚠ El remito " + opState.remito + " ya figura cargado para " + opState.tallNombre + ".\n\nSi lo reenviás se DUPLICAN las cajas y el stock.";
+      } catch (_e) { /* chequeo falla abierto: no bloquea la carga */ }
+    }
+    if (aviso) {
+      const ok = confirm(aviso + "\n\n¿Cargar igual?");
+      if (!ok) { btn.disabled = false; btn.textContent = prev; return; }
+    }
   }
 
   const { error } = await supabase.from(tabla).insert(rows);
@@ -1585,6 +1850,16 @@ async function opEnviar() {
 
   // Suma al acumulador del día para que Producción cierre RT con esta cantidad.
   recpAddCajas(totalCajas);
+  // v14.59 — descuenta la OC vigente del proveedor al recibir (backend gv_oc_aplicar_recepcion,
+  // en cascada, sin negativos). Así las cantidades a recibir BAJAN y la OC deja de figurar/
+  // imprimirse cuando se completa — antes cantidad_recibida no se tocaba nunca. Best-effort:
+  // si falla, no bloquea la recepción; la OC simplemente no se descuenta esta vez.
+  try {
+    supabase.rpc("gv_oc_aplicar_recepcion", {
+      nombre_ent: opState.tallNombre,
+      items: items.map(function (i) { return { cod: i.cod, cajas: i.cajas }; })
+    }).then(function () {}, function () {});
+  } catch (_e) {}
   // v11.98: cierra el toggle RT automáticamente (el operario ya no tiene que volver
   // a la botonera para terminar el inicio→fin de Recepción Mercadería).
   try { if (typeof window.autoCloseRT === "function") window.autoCloseRT(RECP.legajo); } catch (_e) {}
@@ -2439,7 +2714,9 @@ function pendFotoRow(id) {
   btn.className = "fotoViewBtn" + (_pendRows[id].foto_vista ? " viewed" : "");
   btn.textContent = _pendRows[id].foto_vista ? "✓ Foto vista" : "👁 Ver foto";
   btn.onclick = function () {
-    if (_pendRows[id].sent) return;
+    /* v14.56 — la foto SIEMPRE se puede volver a ver, aunque ya se haya enviado
+       todo (antes `if (_pendRows[id].sent) return;` mataba el botón). Ver la foto
+       no cambia nada persistido; solo marca foto_vista la primera vez. */
     const ov = document.createElement("div"); ov.className = "fotoOverlay";
     const box = document.createElement("div"); box.className = "fotoOverlayBox";
     const imgWrap = document.createElement("div"); imgWrap.className = "fotoOverlayImg";

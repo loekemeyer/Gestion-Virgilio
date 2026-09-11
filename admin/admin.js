@@ -2,7 +2,7 @@
 
 var SUPABASE_URL = "https://kwkclwhmoygunqmlegrg.supabase.co";
 var SUPABASE_ANON_KEY =
-  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imt3a2Nsd2htb3lndW5xbWxlZ3JnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njk1MjA2NzUsImV4cCI6MjA4NTA5NjY3NX0.soqPY5hfA3RkAJ9jmIms8UtEGUc4WpZztpEbmDijOgU";
+  "sb_publishable_mVX5MnjwM770cNjgiL6yLw_LDNl9pML";
 var TABLE_CUSTOMERS = "customers";
 var TABLE_ADDRESSES = "customer_delivery_addresses";
 
@@ -707,6 +707,12 @@ document.querySelectorAll(".nav-item").forEach(function (btn) {
       cargarOrigenPedidos();
     }
     if (
+      btn.dataset.page === "pedidos-sin-cot" &&
+      typeof cargarPedidosSinCot === "function"
+    ) {
+      cargarPedidosSinCot();
+    }
+    if (
       btn.dataset.page === "uso-modulos" &&
       typeof cargarUsoModulos === "function"
     ) {
@@ -715,6 +721,12 @@ document.querySelectorAll(".nav-item").forEach(function (btn) {
         setRangoMesActualUsoModulos();
       }
       cargarUsoModulos();
+    }
+    if (
+      btn.dataset.page === "ficha-cliente" &&
+      typeof initFichaCliente === "function"
+    ) {
+      initFichaCliente();
     }
   });
 });
@@ -4261,7 +4273,7 @@ function cpCardProcessFileData(card, buf) {
     if (isGM) {
       // Formato Lista GM (cliente 4080): precios del Excel, sin descuentos
       items = cpParseItemsGM(raw);
-      payment = { text: "Lista GM", discount: 0, code: 0 };
+      payment = { text: "Lista GM", discount: 0, code: 1 };
       delivery = cpParseDeliveryFromRaw(raw);
       excelTotal = null; // No comparamos con total del Excel en este formato
     } else {
@@ -13562,6 +13574,384 @@ function _gvQ(v) {
   return "'" + String(v).replace(/\\/g, "\\\\").replace(/'/g, "\\'").replace(/"/g, "&quot;") + "'";
 }
 
+// =====================================================================
+// FICHA DE CLIENTE (vista 360) — data-page="ficha-cliente"
+// Buscador -> buscar_cliente_ficha ; ficha completa -> get_ficha_cliente.
+// La matriz articulo x mes muestra 6 meses por defecto y expande a 12.
+// =====================================================================
+var _fcWired = false;
+var _fcData = null; // ultima ficha cargada (JSON de get_ficha_cliente)
+var _fcMesesExpandido = false; // false = 6 meses, true = 12
+var _fcBuscarTimer = null;
+var FC_MESES_DEFAULT = 6;
+var FC_MES_NOMBRES = [
+  "ene", "feb", "mar", "abr", "may", "jun",
+  "jul", "ago", "sep", "oct", "nov", "dic",
+];
+
+function fcMesLabel(ym) {
+  // 'YYYY-MM' -> 'sep-26'
+  var p = String(ym || "").split("-");
+  if (p.length < 2) return ym || "";
+  var mi = parseInt(p[1], 10) - 1;
+  var nom = FC_MES_NOMBRES[mi] || p[1];
+  return nom + "-" + p[0].slice(2);
+}
+
+function initFichaCliente() {
+  if (_fcWired) return;
+  _fcWired = true;
+  var input = document.getElementById("fcBuscar");
+  var sug = document.getElementById("fcSugerencias");
+  if (!input) return;
+
+  input.addEventListener("input", function () {
+    var q = input.value.trim();
+    if (_fcBuscarTimer) clearTimeout(_fcBuscarTimer);
+    if (q.length < 2) {
+      fcCerrarSugerencias();
+      return;
+    }
+    _fcBuscarTimer = setTimeout(function () {
+      fcBuscar(q);
+    }, 220);
+  });
+
+  input.addEventListener("keydown", function (e) {
+    if (e.key === "Escape") fcCerrarSugerencias();
+  });
+
+  // Cerrar el desplegable al hacer click afuera
+  document.addEventListener("click", function (e) {
+    if (!sug || sug.hidden) return;
+    if (e.target === input || sug.contains(e.target)) return;
+    fcCerrarSugerencias();
+  });
+
+  setTimeout(function () {
+    try {
+      input.focus();
+    } catch (_) {}
+  }, 50);
+}
+
+function fcCerrarSugerencias() {
+  var sug = document.getElementById("fcSugerencias");
+  if (sug) {
+    sug.hidden = true;
+    sug.innerHTML = "";
+  }
+}
+
+async function fcBuscar(q) {
+  var sug = document.getElementById("fcSugerencias");
+  if (!sug) return;
+  try {
+    var r = await sb.rpc("buscar_cliente_ficha", { p_q: q });
+    if (r.error) throw r.error;
+    var rows = r.data || [];
+    if (!rows.length) {
+      sug.innerHTML =
+        '<div class="fc-sug-empty">Sin resultados para "' +
+        escapeHtml(q) +
+        '"</div>';
+      sug.hidden = false;
+      return;
+    }
+    var html = rows
+      .map(function (c) {
+        var motivos = Array.isArray(c.motivos) ? c.motivos.join(" · ") : "";
+        return (
+          '<button type="button" class="fc-sug-item" data-cod="' +
+          escapeHtml(c.cod_cliente) +
+          '">' +
+          '<span class="fc-sug-cod">' +
+          escapeHtml(c.cod_cliente) +
+          "</span>" +
+          '<span class="fc-sug-nom">' +
+          escapeHtml(c.business_name || "(sin razón social)") +
+          "</span>" +
+          '<span class="fc-sug-meta">' +
+          escapeHtml(c.localidad || "") +
+          (motivos ? ' · <em>' + escapeHtml(motivos) + "</em>" : "") +
+          "</span>" +
+          "</button>"
+        );
+      })
+      .join("");
+    sug.innerHTML = html;
+    sug.hidden = false;
+    sug.querySelectorAll(".fc-sug-item").forEach(function (b) {
+      b.addEventListener("click", function () {
+        fcElegir(b.dataset.cod, b.querySelector(".fc-sug-nom").textContent);
+      });
+    });
+  } catch (err) {
+    sug.innerHTML =
+      '<div class="fc-sug-empty">Error: ' +
+      escapeHtml(err.message || err) +
+      "</div>";
+    sug.hidden = false;
+  }
+}
+
+function fcElegir(cod, nombre) {
+  var input = document.getElementById("fcBuscar");
+  if (input) input.value = (nombre ? nombre + " " : "") + "(" + cod + ")";
+  fcCerrarSugerencias();
+  cargarFichaCliente(cod);
+}
+
+async function cargarFichaCliente(cod) {
+  var status = document.getElementById("fcStatus");
+  var cont = document.getElementById("fcContenido");
+  if (status) status.textContent = "Cargando ficha del cliente " + cod + "…";
+  if (cont) cont.innerHTML = "";
+  try {
+    var r = await sb.rpc("get_ficha_cliente", { p_cod: String(cod) });
+    if (r.error) throw r.error;
+    _fcData = r.data;
+    _fcMesesExpandido = false;
+    if (status) status.textContent = "";
+    fcRender();
+  } catch (err) {
+    if (status)
+      status.textContent = "Error al cargar la ficha: " + (err.message || err);
+  }
+}
+
+function fcToggleMeses() {
+  _fcMesesExpandido = !_fcMesesExpandido;
+  fcRender();
+}
+
+function fcRender() {
+  var cont = document.getElementById("fcContenido");
+  if (!cont || !_fcData) return;
+  var f = _fcData;
+  var d = f.datos || {};
+  var html = "";
+
+  // ---- Encabezado del cliente ----
+  var chefCods = Array.isArray(d.chef_cods) ? d.chef_cods : [];
+  html +=
+    '<div class="fc-cabecera">' +
+    '<div class="fc-cab-nom">' +
+    escapeHtml(d.business_name || "(sin razón social)") +
+    "</div>" +
+    '<div class="fc-cab-cod">Código LK <strong>' +
+    escapeHtml(d.cod_cliente != null ? d.cod_cliente : f.cod) +
+    "</strong>" +
+    (chefCods.length
+      ? ' · Chef ' + escapeHtml(chefCods.join(", "))
+      : "") +
+    "</div>" +
+    "</div>";
+
+  // ---- Grilla de datos ----
+  function dato(lbl, val) {
+    return (
+      '<div class="fc-dato"><span class="fc-dato-lbl">' +
+      escapeHtml(lbl) +
+      '</span><span class="fc-dato-val">' +
+      (val === "" || val == null ? "—" : escapeHtml(val)) +
+      "</span></div>"
+    );
+  }
+  var dtoPct =
+    d.dto_vol != null ? (Number(d.dto_vol) * 100).toFixed(1) + "%" : "—";
+  html +=
+    '<div class="fc-card"><div class="fc-card-tit">Datos</div>' +
+    '<div class="fc-datos-grid">' +
+    dato("CUIT", d.cuit) +
+    dato("Localidad", d.localidad) +
+    dato("Vendedor", d.vendedor || d.vend) +
+    dato("Dto. volumen", dtoPct) +
+    dato("Cond. pago", d.payment_term) +
+    dato("Deuda", d.debt != null ? "$ " + formatMoney(d.debt) : "—") +
+    dato(
+      "Límite crédito",
+      d.credit_limit != null ? "$ " + formatMoney(d.credit_limit) : "—",
+    ) +
+    dato("Mail", d.mail) +
+    dato("WhatsApp", d.whatsapp) +
+    "</div></div>";
+
+  // ---- Direcciones de entrega ----
+  var dirs = Array.isArray(f.direcciones) ? f.direcciones : [];
+  if (dirs.length) {
+    html +=
+      '<div class="fc-card"><div class="fc-card-tit">Direcciones de entrega (' +
+      dirs.length +
+      ")</div><ul class=\"fc-dirs\">";
+    dirs.forEach(function (a) {
+      html +=
+        "<li><strong>" +
+        escapeHtml(a.label || "s/etiqueta") +
+        "</strong> — " +
+        escapeHtml(a.localidad || "") +
+        (a.provincia ? ", " + escapeHtml(a.provincia) : "") +
+        (a.zona_expreso ? ' <em>(' + escapeHtml(a.zona_expreso) + ")</em>" : "") +
+        "</li>";
+    });
+    html += "</ul></div>";
+  }
+
+  // ---- Facturación por año ----
+  var fact = Array.isArray(f.facturacion_anio) ? f.facturacion_anio : [];
+  if (fact.length) {
+    html +=
+      '<div class="fc-card"><div class="fc-card-tit">Facturación por año (neto)</div>' +
+      '<div class="fc-tabla-wrap"><table class="fc-tabla"><thead><tr>' +
+      "<th>Año</th><th>LK</th><th>Chef</th><th>Total</th><th>Compras</th><th>Cajas</th>" +
+      "</tr></thead><tbody>";
+    fact.forEach(function (y) {
+      var vacio = Number(y.total) === 0 && Number(y.cajas) === 0;
+      html +=
+        '<tr class="' +
+        (vacio ? "fc-row-vacia" : "") +
+        '"><td>' +
+        escapeHtml(y.anio) +
+        '</td><td class="fc-num">' +
+        (Number(y.lk) ? "$ " + formatMoney(y.lk) : "—") +
+        '</td><td class="fc-num">' +
+        (Number(y.chef) ? "$ " + formatMoney(y.chef) : "—") +
+        '</td><td class="fc-num"><strong>' +
+        (Number(y.total) ? "$ " + formatMoney(y.total) : "—") +
+        '</strong></td><td class="fc-num">' +
+        (Number(y.compras) || 0) +
+        '</td><td class="fc-num">' +
+        (Number(y.cajas) || 0) +
+        "</td></tr>";
+    });
+    html += "</tbody></table></div></div>";
+  }
+
+  // ---- Pedidos web (último mes / trimestre) ----
+  var pm = Array.isArray(f.pedidos_mes) ? f.pedidos_mes : [];
+  var pt = Array.isArray(f.pedidos_trimestre) ? f.pedidos_trimestre : [];
+  html +=
+    '<div class="fc-card"><div class="fc-card-tit">Pedidos por el portal</div>' +
+    '<div class="fc-pedidos-kpis">' +
+    '<div class="fc-kpi"><span class="fc-kpi-num">' +
+    pm.length +
+    '</span><span class="fc-kpi-lbl">último mes</span></div>' +
+    '<div class="fc-kpi"><span class="fc-kpi-num">' +
+    pt.length +
+    '</span><span class="fc-kpi-lbl">último trimestre</span></div>' +
+    "</div>";
+  if (pt.length) {
+    html +=
+      '<div class="fc-tabla-wrap"><table class="fc-tabla"><thead><tr>' +
+      "<th>Fecha</th><th>Estado</th><th>Total</th><th>Pago</th><th>Origen</th><th>Ítems</th>" +
+      "</tr></thead><tbody>";
+    pt.forEach(function (o) {
+      var fecha = String(o.created_at || "").slice(0, 10);
+      html +=
+        "<tr><td>" +
+        escapeHtml(fecha) +
+        "</td><td>" +
+        escapeHtml(o.status || "") +
+        '</td><td class="fc-num">' +
+        (o.total != null ? "$ " + formatMoney(o.total) : "—") +
+        "</td><td>" +
+        escapeHtml(o.payment_method || "—") +
+        "</td><td>" +
+        escapeHtml(o.origen || "—") +
+        '</td><td class="fc-num">' +
+        (o.items || 0) +
+        "</td></tr>";
+    });
+    html += "</tbody></table></div>";
+  }
+  html += "</div>";
+
+  // ---- Resumen artículos ----
+  var res = f.resumen_articulos || {};
+  html +=
+    '<div class="fc-card"><div class="fc-card-tit">Artículos</div>' +
+    '<div class="fc-pedidos-kpis">' +
+    '<div class="fc-kpi"><span class="fc-kpi-num">' +
+    (res.total_distintos || 0) +
+    '</span><span class="fc-kpi-lbl">distintos (histórico)</span></div>' +
+    '<div class="fc-kpi"><span class="fc-kpi-num">' +
+    (res.activos_count || 0) +
+    '</span><span class="fc-kpi-lbl">activos (12m)</span></div>' +
+    "</div>";
+
+  // ---- Matriz artículo x mes ----
+  var meses = Array.isArray(f.meses) ? f.meses : [];
+  var arts = Array.isArray(f.articulos) ? f.articulos : [];
+  var nShow = _fcMesesExpandido
+    ? meses.length
+    : Math.min(FC_MESES_DEFAULT, meses.length);
+  var mesesShow = meses.slice(0, nShow);
+
+  html +=
+    '<div class="fc-matriz-head">' +
+    '<span class="fc-matriz-tit">Compras por mes (cajas)</span>';
+  if (meses.length > FC_MESES_DEFAULT) {
+    html +=
+      '<button type="button" class="fc-vermas" onclick="fcToggleMeses()">' +
+      (_fcMesesExpandido
+        ? "Ver menos"
+        : "Ver más meses (" + meses.length + ")") +
+      "</button>";
+  }
+  html += "</div>";
+
+  if (!arts.length) {
+    html += '<p class="fc-sin">Sin artículos facturados.</p>';
+  } else {
+    html += '<div class="fc-tabla-wrap"><table class="fc-tabla fc-matriz"><thead><tr>';
+    html += "<th>Cód</th><th>Descripción</th>";
+    mesesShow.forEach(function (m) {
+      html += '<th class="fc-num">' + escapeHtml(fcMesLabel(m)) + "</th>";
+    });
+    html += '<th class="fc-num">Cajas 12m</th><th class="fc-num">$ neto</th></tr></thead><tbody>';
+    arts.forEach(function (a) {
+      var mm = a.mm || {};
+      var esChef = a.empresa === "chef";
+      html +=
+        '<tr><td class="fc-cod">' +
+        escapeHtml(a.cod) +
+        (esChef ? ' <span class="fc-badge-chef">CH</span>' : "") +
+        '</td><td class="fc-desc" title="' +
+        escapeHtml(a.descripcion || "") +
+        '">' +
+        escapeHtml(a.descripcion || "(sin descripción)") +
+        "</td>";
+      mesesShow.forEach(function (m) {
+        var v = mm[m];
+        html +=
+          '<td class="fc-num' +
+          (v ? "" : " fc-cero") +
+          '">' +
+          (v ? v : "·") +
+          "</td>";
+      });
+      html +=
+        '<td class="fc-num"><strong>' +
+        (Number(a.cajas) || 0) +
+        '</strong></td><td class="fc-num">' +
+        (Number(a.neto) ? "$ " + formatMoney(a.neto) : "—") +
+        "</td></tr>";
+    });
+    html += "</tbody></table></div>";
+    if (arts.length >= 80) {
+      html +=
+        '<p class="fc-sin">Se muestran los 80 artículos de mayor facturación.</p>';
+    }
+  }
+  html += "</div>"; // cierra card articulos
+
+  cont.innerHTML = html;
+}
+
+window.initFichaCliente = initFichaCliente;
+window.cargarFichaCliente = cargarFichaCliente;
+window.fcToggleMeses = fcToggleMeses;
+
 // ===== Login por OTP (código de 6 dígitos al mail) — agregado para servir el
 // admin desde Producción Virgilio, donde no venimos con sesión de mayorista.html.
 // Paso 1: signInWithOtp manda el código al mail; con shouldCreateUser:false
@@ -14133,3 +14523,814 @@ function _gvTopInit() {
     return r;
   };
 })();
+
+// =====================================================
+// ---- PEDIDOS SIN COTIZADOR --------------------------
+// Carga manual de un pedido (cliente + cod/cajas). Se envia por el MISMO
+// pipeline que el Cotizador (submit_order_fast + sheets-proxy + entregas-proxy).
+// Condicion de pago FIJA: "Sin Cotizador" (condicion_pago_code = 1).
+// Precio: SOLO LISTA (list_price x uxb, sin dto_vol ni web_discount).
+// PSC_LSUFFIX = true -> sugiere ademas el codigo con "L" al final (regla Chef).
+// =====================================================
+var PSC_DEFAULT_ROWS = 10;
+var PSC_LSUFFIX = false;
+var pscState = {
+  customer: null,
+  deliveryAddresses: [],
+  rows: [], // { product: <obj|null>, cajas: <number|null>, codText: <string> }
+  submitting: false,
+  wired: false,
+};
+
+async function cargarPedidosSinCot() {
+  if (!cpAllProducts || !cpAllProducts.length) {
+    try {
+      await cpLoadProducts();
+    } catch (e) {
+      console.error("psc load products:", e);
+      toast("No se pudieron cargar los artículos", "error");
+    }
+  }
+  if (!pscState.wired) {
+    pscWire();
+    pscState.wired = true;
+  }
+  if (!pscState.rows.length) pscReset();
+}
+
+function pscReset() {
+  pscState.customer = null;
+  pscState.deliveryAddresses = [];
+  pscState.rows = [];
+  for (var i = 0; i < PSC_DEFAULT_ROWS; i++)
+    pscState.rows.push({ product: null, cajas: null, codText: "" });
+  var search = document.getElementById("pscSearch");
+  if (search) search.value = "";
+  pscHideSuggest();
+  var cust = document.getElementById("pscCustomer");
+  if (cust) {
+    cust.style.display = "none";
+    cust.innerHTML = "";
+  }
+  var delF = document.getElementById("pscDeliveryField");
+  if (delF) {
+    delF.style.display = "none";
+    delF.innerHTML = "";
+  }
+  var itemsW = document.getElementById("pscItemsWrap");
+  if (itemsW) itemsW.style.display = "none";
+  pscRenderRows();
+  pscUpdateTotal();
+  pscUpdateSubmitState();
+}
+
+var _pscCustTimer = null;
+function pscWire() {
+  var search = document.getElementById("pscSearch");
+  if (search) {
+    search.addEventListener("input", function () {
+      var q = search.value;
+      clearTimeout(_pscCustTimer);
+      _pscCustTimer = setTimeout(function () {
+        pscSuggestCustomers(q);
+      }, 180);
+    });
+    search.addEventListener("blur", function () {
+      setTimeout(pscHideSuggest, 150);
+    });
+  }
+  var addBtn = document.getElementById("pscAddRow");
+  if (addBtn)
+    addBtn.addEventListener("click", function () {
+      pscState.rows.push({ product: null, cajas: null, codText: "" });
+      pscRenderRows();
+    });
+  var submitBtn = document.getElementById("pscSubmit");
+  if (submitBtn) submitBtn.addEventListener("click", pscSubmit);
+}
+
+function pscHideSuggest() {
+  var box = document.getElementById("pscSuggest");
+  if (box) {
+    box.style.display = "none";
+    box.innerHTML = "";
+  }
+}
+
+async function pscSuggestCustomers(q) {
+  q = String(q || "").trim();
+  var box = document.getElementById("pscSuggest");
+  if (!box) return;
+  if (q.length < 2) {
+    pscHideSuggest();
+    return;
+  }
+  var isNum = /^\d+$/.test(q);
+  try {
+    var promises = [
+      sb
+        .from("customers")
+        .select(
+          "id,cod_cliente,business_name,dto_vol,vend,debt,payment_term,credit_limit",
+        )
+        .ilike("business_name", "%" + q + "%")
+        .order("business_name", { ascending: true })
+        .limit(8),
+    ];
+    if (isNum) {
+      promises.push(
+        sb
+          .from("customers")
+          .select(
+            "id,cod_cliente,business_name,dto_vol,vend,debt,payment_term,credit_limit",
+          )
+          .eq("cod_cliente", q)
+          .limit(3),
+      );
+    }
+    var results = await Promise.all(promises);
+    var seen = {},
+      merged = [];
+    results.forEach(function (r) {
+      if (r.error || !r.data) return;
+      r.data.forEach(function (c) {
+        if (seen[c.id]) return;
+        seen[c.id] = true;
+        merged.push(c);
+      });
+    });
+    if (isNum) {
+      merged.sort(function (a, b) {
+        return (
+          (String(a.cod_cliente) === q ? 0 : 1) -
+          (String(b.cod_cliente) === q ? 0 : 1)
+        );
+      });
+    }
+    if (!merged.length) {
+      box.innerHTML = '<div class="cp-suggest-empty">Sin resultados</div>';
+      box.style.display = "block";
+      return;
+    }
+    box.innerHTML = merged
+      .slice(0, 10)
+      .map(function (c) {
+        return (
+          '<div class="cp-suggest-row" data-id="' +
+          c.id +
+          '"><span class="cp-suggest-cod">' +
+          cpEscHTML(c.cod_cliente || "") +
+          '</span><span class="cp-suggest-name">' +
+          cpEscHTML(c.business_name || "") +
+          "</span></div>"
+        );
+      })
+      .join("");
+    box.style.display = "block";
+    box.querySelectorAll(".cp-suggest-row").forEach(function (row) {
+      row.addEventListener("mousedown", function (e) {
+        e.preventDefault();
+        var c = merged.find(function (x) {
+          return String(x.id) === row.dataset.id;
+        });
+        if (c) pscSelectCustomer(c);
+      });
+    });
+  } catch (e) {
+    console.error("psc suggest customers:", e);
+  }
+}
+
+async function pscSelectCustomer(c) {
+  pscState.customer = c;
+  var search = document.getElementById("pscSearch");
+  if (search)
+    search.value = (c.cod_cliente || "") + " — " + (c.business_name || "");
+  pscHideSuggest();
+  var cust = document.getElementById("pscCustomer");
+  if (cust) {
+    cust.innerHTML =
+      '<div class="psc-c-name">' +
+      cpEscHTML(c.cod_cliente || "") +
+      " — " +
+      cpEscHTML(c.business_name || "") +
+      "</div>";
+    cust.style.display = "block";
+  }
+  // Sucursales de entrega
+  var addrs = [];
+  try {
+    var r = await sb
+      .from("customer_delivery_addresses")
+      .select("slot,label,direccion_entrega,zona_expreso")
+      .eq("customer_id", c.id)
+      .order("slot", { ascending: true });
+    if (!r.error) addrs = r.data || [];
+  } catch (e) {
+    console.error("psc delivery addrs:", e);
+  }
+  pscState.deliveryAddresses = addrs;
+  pscRenderDelivery(addrs.length ? 0 : null);
+  var itemsW = document.getElementById("pscItemsWrap");
+  if (itemsW) itemsW.style.display = "";
+  pscRenderRows();
+  pscUpdateSubmitState();
+}
+
+// Muestra las sucursales YA cargadas del cliente; si no tiene (o no es la
+// deseada) permite crear una nueva (label + direccion + zona) en el momento.
+function pscRenderDelivery(selIdx) {
+  var delF = document.getElementById("pscDeliveryField");
+  if (!delF) return;
+  var addrs = pscState.deliveryAddresses || [];
+  var hasAddrs = addrs.length > 0;
+  var optsHtml = addrs
+    .map(function (a, i) {
+      var lbl =
+        a.label ||
+        a.direccion_entrega ||
+        "Sucursal " + (a.slot != null ? a.slot : i + 1);
+      return (
+        '<option value="' +
+        i +
+        '"' +
+        (selIdx === i ? " selected" : "") +
+        ">" +
+        cpEscHTML(lbl) +
+        "</option>"
+      );
+    })
+    .join("");
+  delF.innerHTML =
+    '<label class="field-label">Sucursal de entrega</label>' +
+    (hasAddrs
+      ? '<select id="pscDeliverySelect" class="field-input">' +
+        optsHtml +
+        "</select>"
+      : '<div class="psc-suc-none">Este cliente no tiene sucursales cargadas. Creá una para continuar.</div>') +
+    '<button type="button" id="pscNewSucToggle" class="psc-newsuc-toggle">+ Nueva sucursal</button>' +
+    '<div id="pscNewSucForm" class="psc-newsuc-form" style="display:none">' +
+    '<input type="text" id="pscNewSucLabel" class="field-input" placeholder="Nombre / label (ej: Sucursal Centro)" />' +
+    '<input type="text" id="pscNewSucDir" class="field-input" placeholder="Dirección real de entrega" />' +
+    '<input type="text" id="pscNewSucZona" class="field-input" placeholder="Zona expreso" />' +
+    '<div class="psc-newsuc-actions">' +
+    '<button type="button" id="pscNewSucCancel" class="btn-ghost">Cancelar</button>' +
+    '<button type="button" id="pscNewSucSave" class="btn-primary">Guardar sucursal</button>' +
+    "</div>" +
+    '<div id="pscNewSucErr" class="psc-newsuc-err" style="display:none"></div>' +
+    "</div>";
+  delF.style.display = "";
+  var sel = document.getElementById("pscDeliverySelect");
+  if (sel) sel.addEventListener("change", pscUpdateSubmitState);
+  var tog = document.getElementById("pscNewSucToggle");
+  if (tog) tog.addEventListener("click", function () { pscShowNewSuc(true); });
+  var can = document.getElementById("pscNewSucCancel");
+  if (can) can.addEventListener("click", function () { pscShowNewSuc(false); });
+  var sav = document.getElementById("pscNewSucSave");
+  if (sav) sav.addEventListener("click", pscSaveNewSuc);
+  // Sin sucursales: abrir el form directamente.
+  if (!hasAddrs) pscShowNewSuc(true);
+}
+
+function pscShowNewSuc(show) {
+  var form = document.getElementById("pscNewSucForm");
+  var tog = document.getElementById("pscNewSucToggle");
+  if (!form) return;
+  form.style.display = show ? "" : "none";
+  if (tog) tog.style.display = show ? "none" : "";
+  if (show) {
+    var l = document.getElementById("pscNewSucLabel");
+    if (l) l.focus();
+  } else {
+    ["pscNewSucLabel", "pscNewSucDir", "pscNewSucZona"].forEach(function (id) {
+      var el = document.getElementById(id);
+      if (el) el.value = "";
+    });
+    var err = document.getElementById("pscNewSucErr");
+    if (err) err.style.display = "none";
+  }
+}
+
+async function pscSaveNewSuc() {
+  if (!pscState.customer) return;
+  var err = document.getElementById("pscNewSucErr");
+  function showErr(msg) {
+    if (err) {
+      err.textContent = msg;
+      err.style.display = "block";
+    }
+  }
+  var label = (document.getElementById("pscNewSucLabel") || {}).value || "";
+  var dir = (document.getElementById("pscNewSucDir") || {}).value || "";
+  var zona = (document.getElementById("pscNewSucZona") || {}).value || "";
+  label = label.trim();
+  dir = dir.trim();
+  zona = zona.trim();
+  if (err) err.style.display = "none";
+  if (!label) return showErr("Ingresá el nombre / label.");
+  if (!dir) return showErr("Ingresá la dirección real de entrega.");
+  if (!zona) return showErr("Ingresá la zona expreso.");
+  var existing = pscState.deliveryAddresses || [];
+  var dupNorm = label.toLowerCase();
+  if (
+    existing.some(function (d) {
+      return String(d.label || "").trim().toLowerCase() === dupNorm;
+    })
+  )
+    return showErr("Ya existe una sucursal con ese label.");
+  var nextSlot =
+    existing.reduce(function (m, d) {
+      return Math.max(m, Number(d.slot || 0));
+    }, 0) + 1;
+  var saveBtn = document.getElementById("pscNewSucSave");
+  if (saveBtn) {
+    saveBtn.disabled = true;
+    saveBtn.textContent = "Guardando...";
+  }
+  try {
+    var r = await sb
+      .from("customer_delivery_addresses")
+      .insert({
+        customer_id: pscState.customer.id,
+        slot: nextSlot,
+        label: label,
+        direccion_entrega: dir,
+        zona_expreso: zona,
+      })
+      .select()
+      .single();
+    if (r.error) throw new Error(r.error.message || "Error al insertar sucursal");
+    pscState.deliveryAddresses = existing
+      .concat([r.data])
+      .sort(function (a, b) {
+        return Number(a.slot) - Number(b.slot);
+      });
+    var newIdx = pscState.deliveryAddresses.findIndex(function (d) {
+      return d.slot === r.data.slot;
+    });
+    pscRenderDelivery(newIdx >= 0 ? newIdx : 0);
+    toast("Sucursal creada", "success");
+    pscUpdateSubmitState();
+  } catch (e) {
+    console.error("psc save sucursal:", e);
+    showErr("Error: " + (e.message || e));
+    if (saveBtn) {
+      saveBtn.disabled = false;
+      saveBtn.textContent = "Guardar sucursal";
+    }
+  }
+}
+
+function pscSelectedAddr() {
+  var sel = document.getElementById("pscDeliverySelect");
+  if (!sel || sel.value === "") return null;
+  return pscState.deliveryAddresses[Number(sel.value)] || null;
+}
+
+function pscRenderRows() {
+  var tbody = document.getElementById("pscTableBody");
+  if (!tbody) return;
+  tbody.innerHTML = pscState.rows
+    .map(function (row, i) {
+      var p = row.product;
+      var codVal = p ? cpEscHTML(p.cod || "") : cpEscHTML(row.codText || "");
+      var desc = p ? cpEscHTML(p.description || "") : "";
+      var cajas = row.cajas != null ? row.cajas : "";
+      return (
+        '<tr data-i="' +
+        i +
+        '">' +
+        '<td class="psc-td-cod"><input type="text" class="field-input psc-cod" data-i="' +
+        i +
+        '" autocomplete="off" value="' +
+        codVal +
+        '" placeholder="Cód" /><div class="cp-suggest psc-prod-suggest" data-i="' +
+        i +
+        '" style="display:none"></div></td>' +
+        '<td class="psc-td-desc' +
+        (p ? "" : " psc-desc-empty") +
+        '">' +
+        (desc || "—") +
+        "</td>" +
+        '<td class="psc-td-cajas"><input type="number" min="1" step="1" class="field-input psc-cajas" data-i="' +
+        i +
+        '" value="' +
+        cajas +
+        '" ' +
+        (p ? "" : "disabled") +
+        ' placeholder="Cajas" /></td>' +
+        '<td class="psc-td-x"><button type="button" class="psc-row-x" data-i="' +
+        i +
+        '" title="Quitar fila">×</button></td>' +
+        "</tr>"
+      );
+    })
+    .join("");
+  pscWireRows();
+}
+
+var _pscProdTimer = null;
+function pscWireRows() {
+  var tbody = document.getElementById("pscTableBody");
+  if (!tbody) return;
+  tbody.querySelectorAll(".psc-cod").forEach(function (inp) {
+    inp.addEventListener("input", function () {
+      var i = Number(inp.dataset.i);
+      pscState.rows[i].product = null;
+      pscState.rows[i].codText = inp.value;
+      var caj = tbody.querySelector('.psc-cajas[data-i="' + i + '"]');
+      if (caj) caj.disabled = true;
+      var tr = inp.closest("tr");
+      var descTd = tr ? tr.querySelector(".psc-td-desc") : null;
+      if (descTd) {
+        descTd.textContent = "—";
+        descTd.classList.add("psc-desc-empty");
+      }
+      clearTimeout(_pscProdTimer);
+      _pscProdTimer = setTimeout(function () {
+        pscSuggestProducts(i, inp.value);
+      }, 120);
+      pscUpdateTotal();
+      pscUpdateSubmitState();
+    });
+    inp.addEventListener("blur", function () {
+      var i = Number(inp.dataset.i);
+      setTimeout(function () {
+        pscHideProdSuggest(i);
+        pscFinalizeCod(i, inp.value);
+      }, 150);
+    });
+  });
+  tbody.querySelectorAll(".psc-cajas").forEach(function (inp) {
+    inp.addEventListener("input", function () {
+      var i = Number(inp.dataset.i);
+      var v = parseInt(inp.value, 10);
+      pscState.rows[i].cajas = isNaN(v) || v <= 0 ? null : v;
+      pscUpdateTotal();
+      pscUpdateSubmitState();
+    });
+  });
+  tbody.querySelectorAll(".psc-row-x").forEach(function (btn) {
+    btn.addEventListener("click", function () {
+      var i = Number(btn.dataset.i);
+      pscState.rows.splice(i, 1);
+      if (!pscState.rows.length)
+        pscState.rows.push({ product: null, cajas: null, codText: "" });
+      pscRenderRows();
+      pscUpdateTotal();
+      pscUpdateSubmitState();
+    });
+  });
+}
+
+function pscSuggestProducts(i, q) {
+  q = String(q || "")
+    .trim()
+    .toUpperCase();
+  var box = document.querySelector('.psc-prod-suggest[data-i="' + i + '"]');
+  if (!box) return;
+  if (q.length < 1) {
+    box.style.display = "none";
+    box.innerHTML = "";
+    return;
+  }
+  var matches = [];
+  for (var k = 0; k < cpAllProducts.length; k++) {
+    var p = cpAllProducts[k];
+    var cod = String(p.cod || "").toUpperCase();
+    var desc = String(p.description || "").toUpperCase();
+    if (cod.indexOf(q) > -1 || desc.indexOf(q) > -1) matches.push(p);
+    if (matches.length >= 40) break;
+  }
+  matches.sort(function (a, b) {
+    var ac = String(a.cod || "").toUpperCase().indexOf(q) === 0 ? 0 : 1;
+    var bc = String(b.cod || "").toUpperCase().indexOf(q) === 0 ? 0 : 1;
+    return ac - bc;
+  });
+  if (!matches.length) {
+    box.innerHTML = '<div class="cp-suggest-empty">Sin artículos</div>';
+    box.style.display = "block";
+    return;
+  }
+  // Cada artículo puede rendir 1 fila (base) o 2 (base + "L") si PSC_LSUFFIX.
+  var rowsHtml = [];
+  matches.slice(0, 12).forEach(function (p) {
+    var base = String(p.cod || "");
+    rowsHtml.push(
+      '<div class="cp-suggest-row" data-cod="' +
+        cpEscHTML(base) +
+        '" data-l="0"><span class="cp-suggest-cod">' +
+        cpEscHTML(base) +
+        '</span><span class="cp-suggest-name">' +
+        cpEscHTML(p.description || "") +
+        "</span></div>",
+    );
+    if (PSC_LSUFFIX) {
+      rowsHtml.push(
+        '<div class="cp-suggest-row" data-cod="' +
+          cpEscHTML(base) +
+          '" data-l="1"><span class="cp-suggest-cod">' +
+          cpEscHTML(base + "L") +
+          '</span><span class="cp-suggest-name">' +
+          cpEscHTML(p.description || "") +
+          " · art. Loeke por Chef</span></div>",
+      );
+    }
+  });
+  box.innerHTML = rowsHtml.join("");
+  box.style.display = "block";
+  box.querySelectorAll(".cp-suggest-row").forEach(function (row) {
+    row.addEventListener("mousedown", function (e) {
+      e.preventDefault();
+      pscChooseProduct(i, row.dataset.cod, row.dataset.l === "1");
+    });
+  });
+}
+
+function pscHideProdSuggest(i) {
+  var box = document.querySelector('.psc-prod-suggest[data-i="' + i + '"]');
+  if (box) {
+    box.style.display = "none";
+    box.innerHTML = "";
+  }
+}
+
+function pscChooseProduct(i, cod, isL) {
+  var base = cpFindProduct(cod);
+  if (!base) return;
+  var effCod = isL ? String(base.cod) + "L" : String(base.cod);
+  var chosen = isL
+    ? { id: base.id, cod: effCod, description: base.description, list_price: base.list_price, uxb: base.uxb, _isL: true }
+    : base;
+  var dup = pscState.rows.some(function (r, idx) {
+    return idx !== i && r.product && String(r.product.cod) === String(effCod);
+  });
+  if (dup) toast("El artículo " + effCod + " ya está en otra fila", "warning");
+  pscState.rows[i].product = chosen;
+  pscState.rows[i].codText = effCod;
+  pscHideProdSuggest(i);
+  pscRenderRows();
+  var caj = document.querySelector('.psc-cajas[data-i="' + i + '"]');
+  if (caj) caj.focus();
+  pscUpdateTotal();
+  pscUpdateSubmitState();
+}
+
+function pscFinalizeCod(i, value) {
+  value = String(value || "").trim();
+  if (!value) return;
+  if (pscState.rows[i] && pscState.rows[i].product) return;
+  var p = cpFindProduct(value);
+  if (p) {
+    pscChooseProduct(i, p.cod, false);
+    return;
+  }
+  // PSC_LSUFFIX: si tipearon "438EL" y "438E" es válido, tomarlo como variante L.
+  if (PSC_LSUFFIX && /L$/i.test(value)) {
+    var base = value.slice(0, -1);
+    if (cpFindProduct(base)) {
+      pscChooseProduct(i, base, true);
+      return;
+    }
+  }
+  pscUpdateSubmitState();
+}
+
+function pscUpdateTotal() {
+  var total = 0,
+    n = 0;
+  pscState.rows.forEach(function (r) {
+    if (r.product && r.cajas > 0) {
+      total +=
+        Number(r.product.list_price || 0) *
+        Number(r.product.uxb || 0) *
+        Number(r.cajas);
+      n++;
+    }
+  });
+  var el = document.getElementById("pscTotal");
+  if (el)
+    el.textContent = n
+      ? n +
+        " artículo" +
+        (n !== 1 ? "s" : "") +
+        " · Total lista: $" +
+        formatMoney(total)
+      : "";
+}
+
+function pscUpdateSubmitState() {
+  var btn = document.getElementById("pscSubmit");
+  if (!btn) return;
+  var hasLine = pscState.rows.some(function (r) {
+    return r.product && r.cajas > 0;
+  });
+  btn.disabled = !(
+    pscState.customer &&
+    hasLine &&
+    pscSelectedAddr() &&
+    !pscState.submitting
+  );
+}
+
+async function pscSubmit() {
+  if (pscState.submitting) return;
+  if (!pscState.customer) {
+    toast("Elegí un cliente", "warning");
+    return;
+  }
+  var lines = pscState.rows.filter(function (r) {
+    return r.product && r.cajas > 0;
+  });
+  if (!lines.length) {
+    toast("Agregá al menos un artículo con cajas", "warning");
+    return;
+  }
+  var addr = pscSelectedAddr();
+  if (!addr) {
+    toast("Elegí o creá una sucursal de entrega", "warning");
+    return;
+  }
+  var finalDelivery = addr.label || addr.direccion_entrega || "";
+  var finalDelDir = addr.direccion_entrega || "";
+  var finalDelZona = addr.zona_expreso || "";
+
+  var confirmMsg =
+    "Enviar pedido de " +
+    pscState.customer.cod_cliente +
+    " — " +
+    pscState.customer.business_name +
+    "\n" +
+    lines.length +
+    " artículo(s) → " +
+    finalDelivery +
+    "\nCondición de pago: Sin Cotizador";
+  if (!confirm(confirmMsg)) return;
+
+  pscState.submitting = true;
+  pscUpdateSubmitState();
+  var btn = document.getElementById("pscSubmit");
+  var oldTxt = btn ? btn.textContent : "Enviar Pedido";
+  if (btn) btn.textContent = "Enviando...";
+
+  try {
+    var sessRes = await sb.auth.getSession();
+    if (sessRes.error || !sessRes.data || !sessRes.data.session)
+      throw new Error("Sesión expirada. Recargá la página.");
+    var session = sessRes.data.session;
+    var token = session.access_token;
+
+    var itemsPayload = lines
+      .map(function (r) {
+        var p = r.product;
+        var uxb = Number(p.uxb || 0);
+        var cajas = Number(r.cajas || 0);
+        var unidades = cajas * uxb;
+        var unitPrice = Number(p.list_price || 0); // SOLO LISTA
+        return {
+          product_id: p.id,
+          cod_art: String(p.cod || "").trim(),
+          cajas: cajas,
+          uxb: uxb,
+          unidades: unidades,
+          unit_price: unitPrice,
+          list_price: Number(p.list_price || 0),
+          description: String(p.description || ""),
+          is_loke: false,
+        };
+      })
+      .sort(function (a, b) {
+        return String(a.cod_art || "").localeCompare(
+          String(b.cod_art || ""),
+          undefined,
+          { numeric: true },
+        );
+      });
+
+    var subtotal = 0;
+    itemsPayload.forEach(function (it) {
+      subtotal += Number(it.unit_price || 0) * Number(it.unidades || 0);
+    });
+    var finalTotal = subtotal; // sin descuentos
+
+    var rpcItems = itemsPayload.map(function (it) {
+      return {
+        product_id: it.product_id,
+        cajas: it.cajas,
+        uxb: it.uxb,
+        is_loke: false,
+      };
+    });
+
+    var rpcResult = await cpWithTimeout(
+      sb.rpc("submit_order_fast", {
+        p_auth_user_id: session.user.id,
+        p_customer_id: pscState.customer.id,
+        p_status: "pendiente",
+        p_payment_method: "Sin Cotizador",
+        p_payment_discount: 0,
+        p_web_discount: 0,
+        p_subtotal: subtotal,
+        p_total: finalTotal,
+        p_items: rpcItems,
+      }),
+      15000,
+      "submit_order_fast",
+    );
+    if (rpcResult.error || !rpcResult.data)
+      throw new Error(
+        (rpcResult.error &&
+          (rpcResult.error.message || rpcResult.error.details)) ||
+          "RPC falló",
+      );
+    var orderId = rpcResult.data;
+
+    var sheetsPayload = {
+      order_number: String(orderId || "").trim(),
+      cod_cliente: String(pscState.customer.cod_cliente || "").trim(),
+      vend: String(pscState.customer.vend || "").trim(),
+      condicion_pago: "Sin Cotizador",
+      condicion_pago_code: 1,
+      sucursal_entrega: finalDelivery || "",
+      cliente_nuevo: "",
+      is_promo: false,
+      is_chef: false,
+      target_sheet: "Pedidos Web",
+      empresa: "LK",
+      extra_discount: 0,
+      deuda: Number(pscState.customer.debt || 0),
+      payment_term:
+        pscState.customer.payment_term == null
+          ? null
+          : Number(pscState.customer.payment_term),
+      credit_limit:
+        pscState.customer.credit_limit == null
+          ? null
+          : Number(pscState.customer.credit_limit),
+      source: "Sin Cotizador",
+      items: itemsPayload.map(function (it) {
+        return {
+          cod_art: it.cod_art,
+          cod_original: null,
+          cajas: it.cajas,
+          uxb: it.uxb,
+        };
+      }),
+    };
+
+    sb.from("orders")
+      .update({
+        sheets_payload: sheetsPayload,
+        is_promo: false,
+        extra_discount: 0,
+        placed_by_auth_user_id: session.user.id,
+      })
+      .eq("id", orderId)
+      .then(function () {});
+
+    cpSendToSheetsWithRetry(sheetsPayload, token, 3)
+      .then(function () {
+        sb.from("orders")
+          .update({ sheets_sent: true })
+          .eq("id", orderId)
+          .then(function () {});
+      })
+      .catch(function (e) {
+        console.warn("psc sheets error (order " + orderId + "):", e);
+      });
+
+    var entregasPayload = {
+      order_number: orderId,
+      fecha: new Date().toLocaleDateString("es-AR"),
+      cod_cliente: pscState.customer.cod_cliente,
+      cliente: pscState.customer.business_name,
+      vendedor: pscState.customer.vend || "",
+      direccion_entrega: finalDelDir || finalDelivery || "",
+      barrio_entrega: finalDelZona || "",
+      empresa: "LK",
+      is_promo: false,
+      extra_discount: 0,
+      items: itemsPayload.map(function (it) {
+        return {
+          cod_art: it.cod_art,
+          description: it.description || "",
+          cajas: it.cajas,
+          uxb: it.uxb,
+        };
+      }),
+    };
+    cpSendToEntregas(entregasPayload, token);
+
+    toast("Pedido " + orderId + " enviado (Sin Cotizador)", "success");
+    pscReset();
+  } catch (e) {
+    console.error("psc submit error:", e);
+    toast("Error enviando pedido: " + (e.message || e), "error");
+    if (btn) btn.textContent = oldTxt;
+  } finally {
+    pscState.submitting = false;
+    pscUpdateSubmitState();
+    var b = document.getElementById("pscSubmit");
+    if (b && b.textContent === "Enviando...") b.textContent = "Enviar Pedido";
+  }
+}

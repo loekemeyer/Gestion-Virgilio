@@ -1,0 +1,168 @@
+/* ============================================================
+   GP2 · Tema CLARO global para módulos
+   Fondo blanco + letra más grande. Se incluye DESPUÉS de los
+   estilos propios de cada página para pisar la paleta oscura.
+   Mantiene las barras de título con gradiente (texto blanco).
+   ============================================================ */
+
+/* ---- Base: fondo blanco, texto oscuro, letra más grande ---- */
+html, body { background: #ffffff !important; color: #1e293b !important; }
+body { font-size: 15.5px !important; }
+body, input, select, button, textarea, table, td, th, p, div, span, label, li, a, option {
+  font-size: inherit;
+}
+/* Piso de accesibilidad (regla usuario 2026-08-30): el inherit de arriba hacia
+   que un campo adentro de un contenedor chico quedara de 12px aunque la pagina
+   pidiera 18. Los CAMPOS de carga nunca bajan de 18 y los botones de 17. */
+input:not([type=checkbox]):not([type=radio]), select, textarea { font-size: 18px !important; }
+button { font-size: 17px !important; }
+h1 { font-size: 23px !important; }
+h2 { font-size: 19px !important; }
+h3 { font-size: 17px !important; }
+.sub, .hint, .mini, .miss, .empty, #status, .header-sub, .foot { font-size: 13.5px !important; }
+
+/* ---- Barras de logo (eran oscuras) -> blancas ---- */
+.logobar, #gp2-logobar, .hero, .gp2-logo-bar {
+  background: #ffffff !important; border-bottom: 1px solid #e2e8f0 !important;
+}
+
+/* ---- Barra de título con gradiente: se mantiene (texto blanco legible) ---- */
+.top { color: #ffffff !important; }
+.top h1, .top .btn-sm, .top #status, .top a { color: #ffffff !important; }
+.top .btn-sm { background: rgba(255,255,255,.15) !important; border-color: rgba(255,255,255,.5) !important; }
+
+/* ---- Tarjetas / paneles / contenedores oscuros -> claros ---- */
+.card, .movs, .modal, .autoinfo, .grp, .sub-card, .panel, .box, .canvas > .card,
+.grp > .gb, .sub, .modal-bg .modal {
+  background: #ffffff !important; color: #1e293b !important; border-color: #e2e8f0 !important;
+}
+.autoinfo { background: #eef4fb !important; border-color: #bcd6f0 !important; color: #1e3a5f !important; }
+.autoinfo b { color: #0f2f52 !important; }
+
+/* ---- Inputs / selects / textarea ---- */
+input, select, textarea {
+  background: #ffffff !important; color: #1e293b !important; border: 1px solid #cbd5e1 !important;
+}
+input:focus, select:focus, textarea:focus { border-color: #2f6fb0 !important; }
+label { color: #475569 !important; }
+
+/* ---- Botones primarios: mantienen color; secundarios claros ---- */
+.btn, .btn.primary, .btn-generar { color: #ffffff !important; }
+.btn-sm { background: #eef4fb !important; color: #1e3a5f !important; border: 1px solid #bcd6f0 !important; }
+.btn-sm:hover { border-color: #2f6fb0 !important; }
+.edit { color: #1d4ed8 !important; border-color: #cbd5e1 !important; }
+.edit:hover { background: #eef4fb !important; }
+
+/* ---- Tablas (celdas SIEMPRE blancas: evita que un contenedor oscuro se transparente) ---- */
+table, thead, tbody, tr, td { background: #ffffff !important; }
+table { color: #1e293b !important; }
+th { background: #f1f5f9 !important; color: #475569 !important; border-color: #e2e8f0 !important; }
+td { color: #1e293b !important; border-color: #e5e7eb !important; }
+tbody tr:hover td, tr:hover td { background: #f1f5f9 !important; }
+.empty, .mini, .miss, .hint, .sub, #status, .muted, .lb, .note { color: #64748b !important; }
+
+/* ---- Contenedores/paneles oscuros comunes (otras paginas) -> claros ---- */
+.table-wrap, .filters, .kpi, .content, .panel, .box, .toolbar, .wrap, .canvas,
+.kpis, .section, .sec, .list, .lista, .contenedor, .container, .main, main {
+  background: #ffffff !important; color: #1e293b !important; border-color: #e2e8f0 !important;
+}
+.kpi { background: #f8fafc !important; }
+.note { background: #fffbeb !important; border-color: #fde68a !important; }
+/* filas resaltadas (bajo minimo / negativos) legibles en claro */
+tr.bajo td, tr.bajo td.qty { background: #fff7ed !important; }
+tr.neg td.qty, td.qneg, .qneg { color: #dc2626 !important; }
+
+/* ---- Acordeones de Stock (grupos/subgrupos) ---- */
+.grp > .gh, .sub > .sh { color: #1e293b !important; }
+.grp > .gh:hover, .sub > .sh:hover { background: #f1f5f9 !important; }
+.gh .nm, .sh .nm { color: #1e293b !important; }
+.gh .badge, .sh .badge { background: #f1f5f9 !important; color: #475569 !important; border-color: #e2e8f0 !important; }
+.gh .badge.hot, .sh .badge.hot { color: #15803d !important; border-color: #bbf7d0 !important; background: #dcfce7 !important; }
+
+/* ---- Tarjetas-botón (menús tipo grilla) -> claras ---- */
+.btn-card { background: #f8fafc !important; border-color: #e2e8f0 !important; color: #1e293b !important; }
+.btn-card .sub { color: #64748b !important; }
+
+/* ---- Estados de color (se conservan pero legibles en claro) ---- */
+.msg.ok, tr.stock td.st { color: #15803d !important; }
+.msg.err, tr.neg td.num, .ped { color: #dc2626 !important; }
+.msg.warn, tr.bajo td.st { color: #b45309 !important; }
+.tag { filter: none; }
+
+/* ============================================================
+   NEO · look de "la casa del vecino" (recepcion.html) aplicado
+   a TODOS los modulos: header negro, chips, botones primarios
+   negros, letra mas grande, tarjetas redondeadas. Va al final
+   para pisar las reglas de arriba. No toca la logica.
+   ============================================================ */
+
+/* -- Header / barras superiores: negras como el vecino -- */
+.top, .logobar, #gp2-logobar, .gp2-logo-bar, .hero {
+  background: #1a1a1a !important; border-bottom: none !important;
+}
+.top h1, .top h2, .top a, .top span, .top label, .top .sel, .top #status {
+  color: #ffffff !important;
+}
+/* Boton "Atras"/acciones del header: blanco solido (estilo vecino) */
+.top .btn-sm, .top .btn.secondary, .top a.btn-sm {
+  background: #ffffff !important; color: #111111 !important; border: none !important;
+  border-radius: 6px !important; font-weight: 700 !important;
+}
+.top .btn-sm:hover { background: #eef2f6 !important; }
+
+/* -- Letra un poco mas grande (tipo Word) -- */
+body { font-size: 16px !important; }
+h1 { font-size: 25px !important; }
+h2 { font-size: 20px !important; }
+
+/* -- Chips (rubro/proveedor/tabs/segmentos): blanco -> negro activo -- */
+.prov-btn, .tab-btn, .chip, .seg-btn, .pill-btn, .filtro-btn, .tallerista-btn {
+  border: 2px solid #d0d7de !important; background: #ffffff !important; color: #111111 !important;
+  border-radius: 8px !important; font-weight: 700 !important; cursor: pointer;
+}
+.prov-btn.active, .tab-btn.active, .chip.active, .seg-btn.active, .pill-btn.active,
+.filtro-btn.active, .tab.active, .tab-btn[aria-selected="true"], .tallerista-btn.active {
+  background: #111111 !important; color: #ffffff !important; border-color: #111111 !important;
+}
+.tallerista-btn .prov-meta { color: #64748b !important; }
+.tallerista-btn.active .prov-meta { color: #cbd5e1 !important; }
+
+/* -- Tarjetas de reportes agrupados por tallerista/proveedor: claras -- */
+.tall-card { background: #ffffff !important; border-color: #e2e8f0 !important; }
+.tall-head { background: #eef4fb !important; border-bottom: 1px solid #e2e8f0 !important; }
+.tall-head .nm, .tall-head .cod { color: #1e293b !important; }
+.tall-head .cod { color: #64748b !important; }
+
+/* -- Botones primarios: negros (vecino). Secundarios claros. -- */
+.btn, .btn.primary, .btn-primary, .btn-generar, button.primary {
+  background: #111111 !important; color: #ffffff !important; border: none !important;
+  border-radius: 8px !important; font-weight: 800 !important;
+}
+.btn:hover, .btn.primary:hover, .btn-primary:hover { background: #333333 !important; }
+.btn.secondary, .btn-secondary, .btn-cancel {
+  background: #ffffff !important; color: #111111 !important; border: 2px solid #d0d7de !important;
+}
+
+/* -- Tarjetas redondeadas con sombra suave -- */
+.card, .movs, .panel, .box, .tall-card, .grp, .sub-card {
+  border-radius: 12px !important; box-shadow: 0 2px 10px rgba(0,0,0,.06) !important;
+}
+
+/* -- Tarjetas-boton de menu (grillas): estilo chip claro -- */
+.btn-card, .btn-opcion {
+  background: #ffffff !important; border: 2px solid #d0d7de !important; color: #111111 !important;
+  border-radius: 10px !important;
+}
+.btn-card:hover, .btn-opcion:hover { border-color: #111111 !important; background: #f6f8fa !important; }
+
+/* == LETRA +1 (agrandar tipografia) — pedido usuario 2026-08-31 == */
+html, body { font-size: 17px !important; }
+h1 { font-size: 26px !important; } h2 { font-size: 22px !important; } h3 { font-size: 19px !important; }
+/* OJO: este bloque va DESPUES del piso de accesibilidad de arriba y con la misma
+   especificidad, asi que lo PISA. Escrito como "input, select, textarea, button"
+   a 17px, bajaba los campos de carga de 18 a 17 en las 13 pantallas que cargan
+   este CSS (corregido 2026-09-03). Si se vuelve a tocar la tipografia, los campos
+   suben, nunca bajan: el piso son 18px (regla usuario 2026-08-30). */
+input:not([type=checkbox]):not([type=radio]), select, textarea { font-size: 19px !important; }
+button { font-size: 18px !important; }
+th { font-size: 12.5px !important; } td { font-size: 15.5px !important; }

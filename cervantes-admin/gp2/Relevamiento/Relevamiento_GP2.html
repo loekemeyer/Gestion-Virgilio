@@ -1,0 +1,448 @@
+<!doctype html>
+<html lang="es">
+<head>
+<!-- v1.3.0 (2026-09-04) — ELIMINAR VUELVE AFUERA, Y SIN FACTOR SE CUENTA SUELTO
+     [usuario 2026-09-04]. (a) "que no me aparezca el eliminar cuando estoy haciendo el conteo
+     adentro de la pagina ... porque no tiene sentido poder ir para atras, sino que me
+     aparezca afuera": el boton sale de la barra de carga y vuelve a la linea del cronograma
+     (en "Seguir cargando" y en "Contado"). Mientras se cuenta no se ofrece tirar todo por la
+     borda. En "Hecho" no va: ese ya toco el stock.
+     (b) "con respecto a todos los que falta factor, dejame cargar uni sueltas y elimina el
+     boton, ya sea bolsa, cajon, lo que fuere": cuando no hay factor ya no se muestra el campo
+     de envase deshabilitado con el cartel rojo -- era un callejon, pedia un dato que no esta.
+     Ahora dice "solo sueltas" y se cuenta directo en unidades. Son 15 componentes.
+
+     v1.2.0 (2026-09-04) — LA COMPARACION SE VA A OTRO MODULO, Y EL ELIMINAR SALE DEL
+     CRONOGRAMA [usuario 2026-09-04: "que no me aparezca aca el eliminar, solo adentro" +
+     "no quiero que me aparezca despues de hacer el relevamiento en el mismo modulo, porque
+     eso lo van a hacer los operarios, y el operador de aca del sistema va a hacer el
+     chequeo"]. Esta pantalla queda SOLO para el OPERARIO: contar y cerrar. Al completar el
+     conteo vuelve al cronograma con el tilde; la comparacion conteo-vs-programa vive ahora
+     en Relevamiento/Validacion_Stock.html. Eliminar quedo ADENTRO de la pantalla de carga.
+     Ademas, un componente puede marcarse relev_solo_sueltas (hoy GRJ13 Bowls 330ml): no se
+     cuenta por envase, solo por unidades sueltas. Es DISTINTO de "falta el factor" -- ahi el
+     dato existe y no lo tenemos; aca el envase no aplica -- por eso se ve distinto y no en rojo.
+
+     v1.1.0 (2026-09-04) — TILDE AL TERMINAR, NO SE DEJA RASTRO SI SE ENTRA A MIRAR, Y
+     SIN "Bolsa Plast" [usuario 2026-09-04]. (a) Al tocar Volver, si NO se cargo nada el
+     conteo se DESCARTA (relevamiento_descartar_si_vacio): entrar a mirar no es empezar a
+     contar, y ya no aparece "Seguir cargando" por una prueba. Si hay aunque sea un dato se
+     guarda y queda para seguir. (b) Terminado = TILDE: "Contado" o "Hecho" en verde.
+     (c) Los tipos sin sector no se listan (Bolsa Plast). (d) El modulo viejo salio del menu.
+
+     v1.0.0 (2026-09-04) — RELEVAMIENTO GP2 NATIVO.
+     Pantalla nueva. NO reemplaza a Relevamiento/relevamiento.html todavia: ese lee del
+     schema VIEJO (relevamiento_cervantes via public.rc_*) y esta armado sobre "plantas"
+     (Cervantes/Virgilio). Este esta armado sobre SECTOR + ubicacion de GP2. Se miro la
+     LOGICA del vecino (como cuenta cada tipo, envases + sueltas), no se copio su casa.
+
+     SOLO CERVANTES [usuario 2026-09-04: "todo lo que es relevamiento de virgilio por ahora
+     no, solo cervantes"]. Sale gratis: el backend filtra ubicacion.tipo='sector' y esos son
+     los 11 sectores fisicos de Cervantes; Virgilio es otro tipo (ubicacion.tipo='virgilio',
+     una sola fila "Virgilio (Distribucion)"). Nunca se lo toca.
+
+     TRES PASOS [usuario 2026-09-04]:
+       1) Cronograma: el proximo conteo POR SECTOR, solo fechas futuras.
+       2) Cargar: TODOS los componentes del sector, para completar.
+       3) Comparar: lo que dice el programa vs lo que dice el conteo; se elige cual gana,
+          y por DEFAULT gana el conteo. Al aplicar, el stock queda igual al conteo.
+
+     El total NO se calcula aca: lo calcula la base (GP2.relev_total_uni). El JS solo
+     muestra. Los numeros se formatean con GP2N (gp2-numero.js), nunca a mano. -->
+<script src="../auth-guard.js?v=20260904t"></script>
+<script src="../gp2-ui.js?v=20260905a"></script>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Relevamiento · GP2</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="../gp2-numero.js?v=20260905m"></script>
+<script src="../supabase-config.js?v=20260905k"></script>
+<link rel="stylesheet" href="../gp2-modulo.css?v=20260903b"/>
+<link rel="icon" type="image/png" href="../GP2_favicon.png">
+<link rel="apple-touch-icon" href="../GP2_favicon.png">
+<style>
+  /* El contenido no se estira a lo ancho porque si: se centra con un ancho legible.
+     (regla del usuario: no ocupar el 100% sin necesidad, sin huecos vacios) */
+  .wrap{max-width:1080px;margin:0 auto}
+
+  /* ---- Cronograma: una linea por sector, no una tabla ---- */
+  .crono{display:flex;flex-direction:column;gap:10px}
+  .cl{display:flex;align-items:center;gap:14px;flex-wrap:wrap;
+      padding:12px 14px;border:2px solid #d0d7de;border-radius:12px;background:#fff}
+  .cl-tipo{font-size:20px;font-weight:800;min-width:130px}
+  .cl-fecha{display:flex;flex-direction:column;line-height:1.1;min-width:120px}
+  .cl-fecha .d{font-size:20px;font-weight:800}
+  .cl-fecha .lb{font-size:11px;font-weight:700;color:#5a6672;text-transform:uppercase;letter-spacing:.04em}
+  .cl-comp{font-size:15px;color:#475569;min-width:120px}
+  .cl-acts{margin-left:auto;display:flex;gap:8px;flex-wrap:wrap}
+  /* Cuanto falta: verde lejos, amarillo cerca, naranja ya casi, rojo vencido. */
+  .dias{font-size:15px;font-weight:800;padding:6px 12px;border-radius:20px;white-space:nowrap}
+  .dias.lejos{background:#eef2f6;color:#3a4653}
+  .dias.cerca{background:#fdf1cc;color:#8a6a00}
+  .dias.ya{background:#ffe6cc;color:#c65a00}
+  .dias.vencido{background:#fbe0e0;color:#c00}
+  /* Terminado: verde y con tilde, para que se vea de un golpe cuál ya está. */
+  .cl.hecho{border-color:#bfe3cd;background:#f2faf5}
+  .tilde{font-size:18px;font-weight:800;color:#0a7a2f;background:#dff3e6;
+         border-radius:20px;padding:8px 16px;white-space:nowrap}
+
+  /* ---- Botones ---- */
+  .b{min-height:48px;padding:12px 20px;border-radius:10px;border:2px solid #d0d7de;
+     background:#fff;font-size:17px;font-weight:800;cursor:pointer;color:#111}
+  .b.pri{background:#111;color:#fff;border-color:#111}
+  .b.ok{background:#0a7a2f;color:#fff;border-color:#0a7a2f}
+  /* Borrar es destructivo: se ve distinto, pero sin gritar (no es la accion principal). */
+  .b.del{border-color:#eacdcd;color:#c00;background:#fff}
+  .b:disabled{opacity:.45;cursor:not-allowed}
+  .b.sm{min-height:44px;padding:9px 14px;font-size:15px}
+
+  /* ---- Carga ---- */
+  .barra{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin:12px 0;
+         padding:12px;background:#f6f8fa;border-radius:10px}
+  .barra .info{font-size:17px;font-weight:800}
+  /* Campos GRANDES: quien ve mal tiene que poder cargar sin equivocarse (regla de la casa). */
+  .in-num{width:104px;height:50px;border:2px solid #b4bcc4;border-radius:8px;
+          text-align:right;font-size:20px;font-weight:700;padding:0 10px}
+  .in-num:focus{outline:none;border-color:#111}
+  td.tot{font-size:20px;font-weight:800;font-variant-numeric:tabular-nums}
+  td.num{text-align:right;font-variant-numeric:tabular-nums}
+  /* NO es un error: esta pieza no se cuenta por envase. Por eso no va en rojo. */
+  .solo-sueltas{font-size:14px;color:#5a6672;font-style:italic}
+  tr.cargado td{background:#f2faf5}
+  .cod{font-weight:800;font-size:17px}
+  .desc{color:#5a6672;font-size:14px}
+
+  /* ---- Comparacion ---- */
+  .dif{font-weight:800;font-variant-numeric:tabular-nums}
+  .dif.mas{color:#0a7a2f}
+  .dif.menos{color:#c00}
+  tr.igual td{background:#f6f8fa;color:#5a6672}
+  /* Elegir quien gana: dos botones, no un select (se toca con el dedo) */
+  .pick{display:inline-flex;border:2px solid #d0d7de;border-radius:9px;overflow:hidden}
+  .pick button{min-height:44px;padding:0 14px;font-size:15px;font-weight:800;
+               border:none;background:#fff;cursor:pointer;color:#3a4653}
+  .pick button.act{background:#0b3b73;color:#fff}
+  .pick button:disabled{opacity:.4;cursor:not-allowed}
+  .leyenda{font-size:15px;color:#475569;margin:8px 0}
+  .hidden{display:none!important}
+
+  @media(max-width:430px){
+    .cl-acts{margin-left:0;width:100%}
+    .cl-tipo,.cl-fecha,.cl-comp{min-width:0}
+    .barra .b{flex:1;min-width:140px}
+  }
+</style>
+</head>
+<body>
+
+<div class="wrap">
+<div class="card">
+  <div class="header">
+    <h1>📋 Relevamiento</h1>
+    <div class="hbtns"><a href="../GP2_MODULOS.html">Atrás</a></div>
+  </div>
+
+  <div class="steps">
+
+    <!-- ============ PASO 1: CRONOGRAMA ============ -->
+    <div id="panCrono">
+      <div class="leyenda">Próximo conteo de cada sector. Tocá <b>Contar</b> y se abre la
+        planilla con <b>todos los componentes</b> de ese sector.</div>
+      <div class="crono" id="crono"></div>
+    </div>
+
+    <!-- ============ PASO 2: CARGA ============ -->
+    <div id="panCarga" class="hidden">
+      <div class="barra">
+        <button type="button" class="b sm" id="btnVolver">← Volver</button>
+        <span class="info" id="cargaTitulo"></span>
+        <span class="info" id="cargaProg"></span>
+      </div>
+      <div class="leyenda" id="cargaAyuda"></div>
+      <div class="table-wrap">
+        <table class="t">
+          <thead><tr id="cargaHead"></tr></thead>
+          <tbody id="cargaBody"></tbody>
+        </table>
+      </div>
+      <div class="barra">
+        <button type="button" class="b" id="btnGuardar">Guardar</button>
+        <button type="button" class="b pri" id="btnCompletar">Completar conteo →</button>
+      </div>
+    </div>
+
+    <div id="status" class="status">Cargando…</div>
+  </div>
+</div>
+</div>
+
+<script>
+var SB = GP2_SB();
+var $ = GP2UI.$;
+var esc = GP2UI.esc;   /* helper de la casa, gp2-ui.js (2026-09-05) */
+/* Formato de numero: la regla es una sola y vive en gp2-numero.js. Nunca uno propio. */
+function fmt(n,d){ return GP2N.fmt(n, d==null?0:d, '—'); }   /* la regla de numero de la casa; '—' sin valor */
+function num(s){ return GP2N.num(s); }
+function fmtFecha(iso){
+  if(!iso) return '';
+  var p=String(iso).slice(0,10).split('-');
+  return p.length===3 ? (p[2]+'/'+p[1]+'/'+p[0]) : String(iso);
+}
+function msg(t, malo){
+  $('status').className = 'status' + (malo?' bad':(t?' ok':''));
+  $('status').textContent = t||'';
+  if(t) setTimeout(function(){ if($('status').textContent===t){ $('status').textContent=''; $('status').className='status'; } }, 6000);
+}
+
+var CRONO=[], REL=null, ITEMS=[];
+
+/* ---------------- PASO 1: cronograma ---------------- */
+async function boot(){
+  var r = await SB.rpc('relevamiento_bundle');
+  if(r.error){ msg('Error: '+r.error.message, true); return; }
+  CRONO = (r.data && r.data.cronograma) || [];
+  pintarCrono();
+  $('status').textContent='';
+}
+
+// Cuanto falta, en palabras. El color acompaña: cuanto mas cerca, mas fuerte.
+function claseDias(d){
+  if(d < 0)  return 'vencido';
+  if(d <= 3) return 'ya';
+  if(d <= 10) return 'cerca';
+  return 'lejos';
+}
+function textoDias(d){
+  if(d < 0)  return 'Vencido hace '+Math.abs(d)+(Math.abs(d)===1?' día':' días');
+  if(d === 0) return 'Es hoy';
+  if(d === 1) return 'Falta 1 día';
+  return 'Faltan '+d+' días';
+}
+
+function pintarCrono(){
+  $('crono').innerHTML = CRONO.map(function(c){
+    var rel = c.relevamiento;
+    var estado = rel ? rel.estado : null;
+    var acts, hecho = false;
+    /* Eliminar va AFUERA, en el cronograma, NO adentro de la carga [usuario 2026-09-04:
+       "que no me aparezca el eliminar cuando estoy haciendo el conteo adentro de la pagina
+       ... porque no tiene sentido poder ir para atras, sino que me aparezca afuera"].
+       Mientras se cuenta no se ofrece tirar todo por la borda; se decide desde la lista.
+       La comparacion no esta aca: vive en Validacion de Stock, que lo maneja el operador
+       del sistema, no el operario. */
+    var btnDel = rel ? ('<button type="button" class="b sm del" data-del="'+rel.id+
+                        '" title="Borrar el conteo y volver a empezar">Eliminar</button>') : '';
+    if(estado === 'aplicado'){
+      hecho = true;
+      acts = '<span class="tilde">✓ Hecho</span>';   // ya toco el stock: no se borra
+    } else if(estado === 'contado'){
+      // El operario ya termino: tilde y listo. La validacion no es cosa suya.
+      hecho = true;
+      acts = '<span class="tilde">✓ Contado</span>' + btnDel;
+    } else if(estado === 'en_curso' && rel.contados > 0){
+      // Solo se ofrece seguir si HAY algo cargado. Un conteo abierto y vacio se descarta
+      // al salir (ver salirDeCarga), asi que este caso no aparece por haber entrado a mirar.
+      acts = '<button type="button" class="b sm pri" data-abrir="'+c.sector_id+'" data-crono="'+c.crono_id+'">'+
+             'Seguir cargando ('+rel.contados+'/'+rel.items+')</button>' + btnDel;
+    } else {
+      acts = '<button type="button" class="b sm pri" data-abrir="'+c.sector_id+'" data-crono="'+c.crono_id+'">Contar</button>';
+    }
+    return '<div class="cl'+(hecho?' hecho':'')+'">'+
+      '<span class="cl-tipo">'+esc(c.tipo)+'</span>'+
+      '<span class="cl-fecha"><span class="lb">Próximo</span><span class="d">'+fmtFecha(c.fecha)+'</span></span>'+
+      '<span class="dias '+claseDias(c.dias)+'">'+textoDias(c.dias)+'</span>'+
+      '<span class="cl-comp">'+fmt(c.componentes)+' componentes</span>'+
+      '<span class="cl-acts">'+acts+'</span>'+
+    '</div>';
+  }).join('') || '<div class="empty">No hay conteos programados.</div>';
+
+  document.querySelectorAll('[data-abrir]').forEach(function(b){
+    b.addEventListener('click', function(){ abrir(Number(b.dataset.abrir), Number(b.dataset.crono)); });
+  });
+  document.querySelectorAll('[data-del]').forEach(function(b){
+    b.addEventListener('click', function(){ eliminar(Number(b.dataset.del)); });
+  });
+}
+
+/* Borrar un conteo y volver a empezar. Solo se puede mientras el stock NO se toco
+   (en_curso o contado); si ya se aplico, la base lo rechaza y se avisa. */
+async function eliminar(relId){
+  if(!confirm('Se borra el conteo entero y el sector vuelve a quedar como antes, para contarlo de nuevo.\n\n¿Eliminar?')) return;
+  var r = await SB.rpc('relevamiento_eliminar', { p_id: relId });
+  if(r.error){ msg('No se pudo eliminar: '+r.error.message, true); return; }
+  msg('✓ Conteo eliminado');
+  await boot();
+  mostrar('crono');
+}
+
+/* ---------------- PASO 2: carga ---------------- */
+async function abrir(sectorId, cronoId){
+  msg('Abriendo…');
+  var r = await SB.rpc('relevamiento_abrir', { p_sector_id:sectorId, p_crono_id:cronoId, p_encargado:null });
+  if(r.error){ msg('Error: '+r.error.message, true); return; }
+  await cargarDetalle(Number(r.data));
+}
+
+async function cargarDetalle(relId){
+  var r = await SB.rpc('relevamiento_detalle', { p_id: relId });
+  if(r.error){ msg('Error: '+r.error.message, true); return; }
+  REL = r.data.relevamiento; REL.sector = r.data.sector;
+  ITEMS = r.data.items || [];
+  pintarCarga();
+  mostrar('carga');
+  $('status').textContent='';
+}
+
+// El fleje se cuenta en KILOS; el resto en envases + sueltas. El encabezado cambia solo.
+function cuentaKg(){ return ITEMS.length>0 && ITEMS[0].cuenta_kg; }
+function nombreEnvase(){ return (ITEMS[0] && ITEMS[0].envase) || 'Envases'; }
+
+function pintarCarga(){
+  $('cargaTitulo').textContent = REL.sector + ' · ' + fmtFecha(REL.fecha);
+  $('cargaAyuda').innerHTML = cuentaKg()
+    ? 'Cargá el <b>total de kilos</b> de cada fleje.'
+    : 'Cargá <b>'+esc(nombreEnvase().toLowerCase())+'</b> y las <b>unidades sueltas</b>. El total lo calcula el sistema.';
+
+  $('cargaHead').innerHTML = cuentaKg()
+    ? '<th>Insumo</th><th class="num">Total Kg</th><th class="num">Total</th>'
+    : '<th>Insumo</th><th class="num">'+esc(nombreEnvase())+'</th><th class="num">Sueltas</th><th class="num">Total</th>';
+
+  $('cargaBody').innerHTML = ITEMS.map(function(i){
+    var cargado = (i.envases!=null || i.sueltas!=null || i.kg!=null);
+    var celdas;
+    if(i.cuenta_kg){
+      celdas = '<td class="num"><input class="in-num" inputmode="decimal" data-k="kg" data-id="'+i.item_id+'" value="'+(i.kg!=null?String(i.kg).replace('.',','):'')+'"></td>';
+    } else {
+      /* No se pide envase en dos casos, y en los dos se carga DIRECTO en uni sueltas
+         [usuario 2026-09-04: "con respecto a todos los que falta factor, dejame cargar uni
+         sueltas y elimina el boton, ya sea bolsa, cajon, lo que fuere"]:
+           - envase NULL -> la pieza no se cuenta por envase (ej. GRJ13 Bowls 330ml)
+           - factor NULL -> no sabemos cuantas unidades entran en el envase
+         Antes el campo quedaba deshabilitado con un cartel rojo, y era un callejon: pedia
+         un dato que no esta. Ahora simplemente no aparece y se cuenta suelto. */
+      var sinEnvase = (i.envase==null) || (i.factor==null);
+      celdas =
+        '<td class="num">'+
+          (sinEnvase
+            ? '<span class="solo-sueltas">solo sueltas</span>'
+            : '<input class="in-num" inputmode="numeric" data-k="envases" data-id="'+i.item_id+'"'+
+              ' value="'+(i.envases!=null?i.envases:'')+'">')+
+        '</td>'+
+        '<td class="num"><input class="in-num" inputmode="numeric" data-k="sueltas" data-id="'+i.item_id+'" value="'+(i.sueltas!=null?i.sueltas:'')+'"></td>';
+    }
+    return '<tr'+(cargado?' class="cargado"':'')+' data-row="'+i.item_id+'">'+
+      '<td><span class="cod">'+esc(i.codigo)+'</span><br><span class="desc">'+esc(i.descripcion||'')+'</span></td>'+
+      celdas+
+      '<td class="tot num" data-tot="'+i.item_id+'">'+fmt(i.total_uni)+'</td>'+
+    '</tr>';
+  }).join('');
+
+  document.querySelectorAll('.in-num').forEach(function(inp){
+    inp.addEventListener('input', function(){ recalcularFila(Number(inp.dataset.id)); });
+  });
+  progreso();
+}
+
+function itemDe(id){ return ITEMS.filter(function(x){ return x.item_id===id; })[0]; }
+function valorDe(id, k){
+  var el = document.querySelector('.in-num[data-id="'+id+'"][data-k="'+k+'"]');
+  if(!el || el.value.trim()==='') return null;
+  return num(el.value);
+}
+
+/* Espejo del calculo de la base (GP2.relev_total_uni), SOLO para que el numero se vea al
+   instante mientras se tipea. La verdad la sigue diciendo la base al guardar. */
+function recalcularFila(id){
+  var i = itemDe(id); if(!i) return;
+  var t = null;
+  if(i.cuenta_kg){
+    var kg = valorDe(id,'kg');
+    if(kg!=null) t = (i.unidad==='kg') ? kg : (i.kg_x_uni>0 ? Math.round(kg/Number(i.kg_x_uni)) : null);
+  } else if(i.envase==null || i.factor==null){
+    t = valorDe(id,'sueltas');            // sin envase: el total ES lo suelto
+  } else {
+    var e = valorDe(id,'envases'), s = valorDe(id,'sueltas');
+    if(e==null && s==null) t = null;
+    else if(!e) t = s||0;
+    else t = (i.factor!=null) ? (e*Number(i.factor) + (s||0)) : null;
+  }
+  var td = document.querySelector('[data-tot="'+id+'"]');
+  if(td) td.textContent = fmt(t);
+  var tr = document.querySelector('[data-row="'+id+'"]');
+  if(tr) tr.classList.toggle('cargado', t!=null || valorDe(id,'sueltas')!=null);
+  progreso();
+}
+
+function filasCargadas(){
+  return ITEMS.filter(function(i){
+    return valorDe(i.item_id,'envases')!=null || valorDe(i.item_id,'sueltas')!=null || valorDe(i.item_id,'kg')!=null;
+  }).length;
+}
+function progreso(){
+  $('cargaProg').textContent = filasCargadas()+' de '+ITEMS.length+' cargados';
+}
+
+function payloadCarga(){
+  return ITEMS.map(function(i){
+    return { item_id:i.item_id,
+             envases: i.cuenta_kg ? null : valorDe(i.item_id,'envases'),
+             sueltas: i.cuenta_kg ? null : valorDe(i.item_id,'sueltas'),
+             kg:      i.cuenta_kg ? valorDe(i.item_id,'kg') : null };
+  });
+}
+
+async function guardar(silencioso){
+  var r = await SB.rpc('relevamiento_guardar', { p_id: REL.id, p_items: payloadCarga() });
+  if(r.error){ msg('Error al guardar: '+r.error.message, true); return false; }
+  if(!silencioso) msg('✓ Guardado');
+  return true;
+}
+
+$('btnGuardar').addEventListener('click', function(){ guardar(false); });
+
+$('btnCompletar').addEventListener('click', async function(){
+  var n = filasCargadas();
+  if(n === 0){ msg('No cargaste ningún conteo todavía.', true); return; }
+  if(n < ITEMS.length &&
+     !confirm('Cargaste '+n+' de '+ITEMS.length+'.\n\nLo que no contaste NO se toca: queda con el stock del programa.\n\n¿Completar el conteo?')) return;
+  $('btnCompletar').disabled = true;
+  try{
+    if(!(await guardar(true))) return;
+    var r = await SB.rpc('relevamiento_cerrar', { p_id: REL.id });
+    if(r.error) throw r.error;
+    // El operario termina aca. La comparacion la hace el operador del sistema en
+    // "Validacion de Stock" [usuario 2026-09-04].
+    msg('✓ Conteo completado. Queda para validar.');
+    REL=null; ITEMS=[];
+    await boot();
+    mostrar('crono');
+  }catch(e){ msg('Error: '+(e.message||e), true); }
+  finally{ $('btnCompletar').disabled = false; }
+});
+
+/* ---------------- navegacion ---------------- */
+function mostrar(p){
+  $('panCrono').classList.toggle('hidden', p!=='crono');
+  $('panCarga').classList.toggle('hidden', p!=='carga');
+}
+/* Salir de la carga. Si se entro y no se cargo NADA, el conteo se descarta: entrar a mirar
+   no es empezar a contar [usuario 2026-09-04: "que si salgo, despues de haber puesto contar,
+   no me aparezca seguir cargando, porque lo estoy usando como prueba"].
+   Si hay aunque sea un dato, se guarda y queda para seguir: eso NO se pierde. */
+async function salirDeCarga(){
+  try{
+    if(REL && REL.id){
+      if(filasCargadas() > 0) await guardar(true);
+      else await SB.rpc('relevamiento_descartar_si_vacio', { p_id: REL.id });
+    }
+  }catch(e){ /* si falla, igual se vuelve al cronograma */ }
+  REL = null; ITEMS = [];
+  await boot();
+  mostrar('crono');
+}
+$('btnVolver').addEventListener('click', salirDeCarga);
+
+boot();
+</script>
+</body>
+</html>

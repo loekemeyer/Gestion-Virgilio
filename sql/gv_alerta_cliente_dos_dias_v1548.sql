@@ -1,0 +1,50 @@
+-- v15.48 (2026-09-11) — dos pedidos de Thomas mirando la PPP del 15 y 16/09:
+--   (1) "porque está programado Orfali para 2 días diferentes. no podría pasar y tendría que
+--        salir como alerta"
+--   (2) "hoy no tenés habilitado la programación automática para z6 y z7, pero si ya hay
+--        programado algo para x día para esa zona, hay que agregarlo ahí"
+
+-- ── (2) el piso del bloque (c) de gv_ppp_web_armar_pendientes ──────────────
+-- Antes: gv_ppp_web_dia_camion(zona, v_min) con v_min = gv_ppp_web_dia_minimo() = hoy + 4 días
+-- hábiles (17/09). Los camiones de zona 6 y 7 ya armados para el 15 y el 16 quedaban FUERA de
+-- la ventana → la función devolvía null → el pedido se quedaba en "sin camión previsto".
+-- Ahora: gv_ppp_web_dia_camion(zona, current_date + 1). La anticipación mínima es para ELEGIR
+-- un día nuevo; un día que ya existe no hay que elegirlo.
+--
+--   medición (2026-09-11):
+--     dia_minimo = 2026-09-17
+--     zona 6 desde el piso → (ninguno)   ·  desde mañana → 2026-09-15
+--     zona 7 desde el piso → (ninguno)   ·  desde mañana → 2026-09-16
+--
+-- El resto de la función queda igual. Definición completa en la base.
+--
+-- ⚠ Con eso NO alcanzaba: el guard del armado INTRADÍA vive en la Edge Function
+-- (`pendienteAutomatico` → `gv_ppp_web_dia_camion(z, diaMin)`) y, si no encuentra camión ni llega
+-- al umbral, corta ANTES de llamar a `gv_ppp_web_armar_pendientes` ("intradia_sin_umbral"). Por eso
+-- el piso se corrigió también DENTRO de `gv_ppp_web_dia_camion`:
+--
+--   piso efectivo = least(coalesce(p_desde, current_date + 1), current_date + 1)
+--
+-- Así los dos consumidores quedan bien sin redeployar la Edge Function. El único otro uso de la
+-- función es el bloque (c); `gv_ppp_web_dia_cliente` sólo la nombra en un comentario.
+-- Comprobado después del cambio, pasándole el piso VIEJO (17/09):
+--   zona 6 → 2026-09-15 · zona 7 → 2026-09-16 · zona 1 (control) → 2026-09-14
+--
+-- Rollback: volver esa línea a `public.gv_ppp_web_dia_camion(x->>'zona', v_min)` y sacar el
+-- `piso` de la función (volver a `w.fecha_entrega >= p_desde`).
+
+-- ── (1) la alerta ─────────────────────────────────────────────────────────
+-- Vista completa en la base. Idea: juntar las NP de la página (PPP_Web_Programacion) con las de
+-- ISIS (gv_ppp_programacion_diaria), cruzar por razón social normalizada —el cod no sirve para
+-- cruzar LK con Chef y el espejo de ISIS no trae empresa— y quedarse con los clientes que tienen
+-- entregas en dos días SEPARADOS POR 7 DÍAS O MENOS. Más lejos que eso son dos pedidos distintos
+-- con fecha pactada (caso Matiz SA: 16/09, 07/10 y 28/10), no un error de armado. Súper, Retira y
+-- Expo quedan afuera: entregan varios días a propósito.
+--
+--   select * from public.gv_ppp_cliente_dos_dias;   -- vacía = todo bien
+--
+-- Al 2026-09-11 devuelve exactamente el caso que marcó Thomas:
+--   Orfali Alfredo Luciano (4188) · LK 0053 (E13A, 15/09) y LK 0002 (D69D, 16/09)
+--
+-- El front la pinta arriba de A Programar (`aprDosDiasCargar` / `aprDosDiasHtml`, index.html).
+-- Rollback: drop view public.gv_ppp_cliente_dos_dias; y sacar esas dos funciones del front.

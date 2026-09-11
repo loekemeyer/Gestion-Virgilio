@@ -1,0 +1,232 @@
+<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Proporciones · GP2</title>
+<style>
+ *{box-sizing:border-box}
+ body{margin:0;background:#ebeff4;color:#385475;font:13px/1.4 -apple-system,Segoe UI,Roboto,sans-serif}
+ .top{background:linear-gradient(90deg,#e7f0f8,#e7f0f8);padding:10px 16px;display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;position:sticky;top:0;z-index:10}
+ .top h1{margin:0;font-size:16px}
+ .top .sel{display:flex;gap:8px;align-items:center;font-size:12px;flex-wrap:wrap}
+ select,input,button{background:#eaeff6;color:#385475;border:1px solid #cddaea;border-radius:6px;padding:6px 10px;font-size:18px;font-family:inherit}
+ input{width:230px}
+ button{cursor:pointer}
+ button:hover{background:#e8eef7}
+ .canvas{padding:14px;min-height:calc(100vh - 50px)}
+ .note{background:#f5eeea;border:1px solid #eadbcd;color:#8e4c20;border-radius:8px;padding:8px 12px;margin-bottom:12px;font-size:12px}
+ .kpis{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px}
+ .kpi{background:#ebf0f5;border:1px solid #d1dae6;border-radius:8px;padding:6px 12px;font-size:11px;color:#475569}
+ .kpi b{color:#166398;font-size:15px;margin-right:4px}
+ .seg{display:flex;gap:6px;margin-bottom:12px}
+ .seg button{border-radius:8px}
+ .seg button.on{background:#e7f0f8;border-color:#cddbea;color:#fff}
+ .tall-card{background:#ebf0f5;border:1px solid #d1dae6;border-radius:10px;margin-bottom:12px;overflow:hidden}
+ .tall-head{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;padding:10px 14px;background:#e8eef7}
+ .tall-head .nm{font-size:14px;font-weight:800;color:#385775}
+ .tall-head .cod{font-size:11px;color:#475569;font-weight:400;margin-left:6px}
+ .tall-head .tot{display:flex;gap:6px;flex-wrap:wrap}
+ .pill{padding:2px 10px;border-radius:10px;font-weight:700;font-size:12px;background:#eaeff5}
+ .pill.art{color:#166398}
+ .pill.sh{color:#8e4c20;background:#f5eeea}
+ .tbl-wrap{overflow-x:auto}
+ table{width:100%;border-collapse:collapse;font-size:12px}
+ th,td{padding:6px 10px;text-align:left;border-bottom:1px solid #d0dae7;white-space:nowrap;vertical-align:top}
+ th{background:#eaeff6;color:#475569;text-transform:uppercase;font-size:10px;letter-spacing:.4px}
+ td.cod{font-family:ui-monospace,SF Mono,monospace;color:#165d98;font-weight:600}
+ td.fam{color:#475569}
+ td.partes{color:#385775;white-space:normal;max-width:420px}
+ .tag{display:inline-block;background:#e9f0f7;border:1px solid #cddcea;border-radius:5px;padding:1px 7px;margin:1px 3px 1px 0;font-size:11px}
+ .tag .pc{color:#165d98;font-family:ui-monospace,monospace}
+ .badge{font-size:10px;font-weight:700;padding:1px 7px;border-radius:8px}
+ .badge.sh{color:#8e4c20;background:#f5eeea;border:1px solid #eadbcd}
+ .badge.own{color:#258858;background:#eaf5ef}
+ .prop{color:#8e4c20;font-weight:700;font-size:11px}
+ .prop.pend{color:#83512b}
+ .empty{padding:30px;text-align:center;color:#475569}
+</style><link rel="icon" type="image/png" href="../../GP2_favicon.png">
+<link rel="apple-touch-icon" href="../../GP2_favicon.png">
+<link rel="stylesheet" href="../../gp2-claro.css?v=20260903b">
+</head>
+<body>
+<div id="gp2-logobar" style="position:relative;background:#e8edf7;text-align:center;padding:6px 0;border-bottom:1px solid #d0dae7"><a href="../../GP2_MODULOS.html" style="position:absolute;left:10px;top:50%;transform:translateY(-50%);color:#385475;text-decoration:none;font-weight:700;font-size:15px;padding:5px 10px;border:1px solid #d1d9e5;border-radius:8px;background:#e9eef7">← Atrás</a><a href="../../GP2_MODULOS.html" style="text-decoration:none"><img src="../../GP2_logo.png" alt="GP2 · Gestión Productiva" style="height:40px;vertical-align:middle"></a></div>
+
+<div class="top">
+ <h1>📊 Proporciones <span style="font-size:11px;color:#2a5783;font-weight:400">· GP2</span></h1>
+ <div class="sel">
+  Tallerista <select id="fTall"><option value="">Todos</option></select>
+  <input id="fBuscar" type="text" placeholder="Buscar código, familia, parte, tallerista…">
+  <button id="btnCsv">⬇ Exportar CSV</button>
+ </div>
+</div>
+<div class="canvas" id="canvas"><div class="empty">Cargando…</div></div>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="../../supabase-config.js?v=20260905k"></script>
+<script src="../../gp2-ui.js?v=20260905a"></script>
+<script>var D={};
+var SB=GP2_SB();
+
+var esc = GP2UI.esc;   /* helper de la casa, gp2-ui.js (2026-09-05) */
+function norm(s){return String(s||"").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g,"");}
+
+var VISTA="tall"; // "tall" = por tallerista, "art" = articulos compartidos
+
+function partesTxt(partes){
+ return (partes||[]).map(function(p){return (p.cod||"")+" "+(p.desc||"");}).join(" ");
+}
+function partesHtml(partes){
+ if(!partes||!partes.length)return '<span class="fam">(sin parte registrada)</span>';
+ return partes.map(function(p){
+  return '<span class="tag"><span class="pc">'+esc(p.cod)+'</span> '+esc(p.desc||"")+'</span>';
+ }).join("");
+}
+
+function artMatch(a,q){
+ if(!q)return true;
+ return norm(a.art_codigo).indexOf(q)>=0||norm(a.familia).indexOf(q)>=0||norm(partesTxt(a.partes)).indexOf(q)>=0;
+}
+function artCompMatch(a,q){
+ if(!q)return true;
+ if(norm(a.art_codigo).indexOf(q)>=0||norm(a.familia).indexOf(q)>=0)return true;
+ return (a.talleristas||[]).some(function(t){
+  return norm(t.tallerista).indexOf(q)>=0||norm(partesTxt(t.partes)).indexOf(q)>=0;
+ });
+}
+
+function renderPorTallerista(lista,q){
+ var vistos=0,totArt=0,totSh=0,H="";
+ lista.forEach(function(t){
+  var arts=(t.articulos||[]).filter(function(a){return artMatch(a,q);});
+  if(!arts.length)return;
+  vistos++;
+  var sh=arts.filter(function(a){return a.compartido;}).length;
+  totArt+=arts.length;totSh+=sh;
+  var rows=arts.map(function(a){
+   return "<tr>"+
+     '<td class="cod">'+esc(a.art_codigo)+"</td>"+
+     '<td class="fam">'+esc(a.familia||"")+"</td>"+
+     '<td class="partes">'+partesHtml(a.partes)+"</td>"+
+     "<td>"+(a.compartido
+        ?'<span class="badge sh">Compartido · '+a.num_talleristas+' tall.</span>'
+        :'<span class="badge own">Exclusivo</span>')+"</td>"+
+     '<td class="prop pend">'+(a.compartido?"PENDIENTE":"—")+"</td>"+
+   "</tr>";
+  }).join("");
+  H+='<div class="tall-card"><div class="tall-head">'+
+     '<div><span class="nm">'+esc(t.nombre)+'</span>'+(t.cod_prov?'<span class="cod">'+esc(t.cod_prov)+'</span>':'')+'</div>'+
+     '<div class="tot"><span class="pill art">'+arts.length+' artículos</span>'+
+       (sh?'<span class="pill sh">'+sh+' compartidos</span>':'')+'</div>'+
+     '</div><div class="tbl-wrap"><table><thead><tr>'+
+       '<th>Código</th><th>Familia</th><th>Partes que hace (comp. salida)</th><th>Situación</th><th>Proporción %</th>'+
+     '</tr></thead><tbody>'+rows+'</tbody></table></div></div>';
+ });
+ var kpi='<div class="kpis">'+
+   '<div class="kpi"><b>'+vistos+'</b>talleristas</div>'+
+   '<div class="kpi"><b>'+totArt+'</b>relaciones art×tall</div>'+
+   '<div class="kpi"><b>'+totSh+'</b>en artículos compartidos</div>'+
+ '</div>';
+ return kpi+(H||'<div class="empty">Sin resultados para el filtro.</div>');
+}
+
+function renderCompartidos(arts,q){
+ var lista=arts.filter(function(a){return artCompMatch(a,q);});
+ if(!lista.length)return '<div class="kpis"><div class="kpi"><b>0</b>artículos compartidos</div></div><div class="empty">Sin resultados para el filtro.</div>';
+ var rows=lista.map(function(a){
+  var tr=(a.talleristas||[]).map(function(t){
+   return "<tr>"+
+     '<td class="cod">'+esc(a.art_codigo)+"</td>"+
+     '<td class="fam">'+esc(a.familia||"")+"</td>"+
+     "<td><b>"+esc(t.tallerista)+"</b></td>"+
+     '<td class="partes">'+partesHtml(t.partes)+"</td>"+
+     '<td class="prop pend">PENDIENTE</td>'+
+   "</tr>";
+  }).join("");
+  return tr;
+ }).join("");
+ var kpi='<div class="kpis"><div class="kpi"><b>'+lista.length+'</b>artículos compartidos (≥2 talleristas)</div></div>';
+ return kpi+'<div class="tall-card"><div class="tbl-wrap"><table><thead><tr>'+
+   '<th>Código</th><th>Familia</th><th>Tallerista</th><th>Partes que hace</th><th>Proporción %</th>'+
+   '</tr></thead><tbody>'+rows+'</tbody></table></div></div>';
+}
+
+function __run(){
+ var canvas=document.getElementById("canvas");
+ var fTall=document.getElementById("fTall");
+ var fBuscar=document.getElementById("fBuscar");
+
+ (D.talleristas||[]).slice().sort(function(a,b){return String(a.nombre).localeCompare(b.nombre);}).forEach(function(t){
+  var o=document.createElement("option");o.value=String(t.id);o.textContent=t.nombre;fTall.appendChild(o);
+ });
+
+ function render(){
+  var tallSel=fTall.value;
+  var q=norm(fBuscar.value.trim());
+  var note='<div class="note">⚠ La <b>proporción exacta (% de volumen por tallerista)</b> no existe en GP2: '+
+    'la tabla vieja <code>Proporcion_Articulo_Tallerista</code> estaba vacía y <code>ruta_paso</code> no registra reparto de volumen. '+
+    'Se muestra la <b>relación tallerista → artículos/partes</b> derivada de <code>ruta_paso</code>; '+
+    'la columna Proporción queda marcada <b>PENDIENTE</b> para los artículos compartidos (≥2 talleristas). No se inventan valores.</div>';
+  var seg='<div class="seg">'+
+    '<button id="vTall" class="'+(VISTA==="tall"?"on":"")+'">Por tallerista</button>'+
+    '<button id="vArt" class="'+(VISTA==="art"?"on":"")+'">Artículos compartidos</button>'+
+  '</div>';
+  var body;
+  if(VISTA==="tall"){
+   var lista=(D.talleristas||[]).filter(function(t){return !tallSel||String(t.id)===tallSel;});
+   body=renderPorTallerista(lista,q);
+  }else{
+   var arts=(D.articulos_compartidos||[]);
+   if(tallSel){arts=arts.filter(function(a){return (a.talleristas||[]).some(function(t){return String(t.tall_id)===tallSel;});});}
+   body=renderCompartidos(arts,q);
+  }
+  canvas.innerHTML=note+seg+body;
+  document.getElementById("vTall").addEventListener("click",function(){VISTA="tall";render();});
+  document.getElementById("vArt").addEventListener("click",function(){VISTA="art";render();});
+ }
+
+ fTall.addEventListener("change",render);
+ fBuscar.addEventListener("input",render);
+
+ document.getElementById("btnCsv").addEventListener("click",function(){
+  var tallSel=fTall.value;
+  var q=norm(fBuscar.value.trim());
+  var out;
+  if(VISTA==="tall"){
+   out=[["Tallerista","Cod_Prov","Art_Codigo","Familia","Partes","Compartido","Num_Talleristas","Proporcion_pct"]];
+   (D.talleristas||[]).filter(function(t){return !tallSel||String(t.id)===tallSel;}).forEach(function(t){
+    (t.articulos||[]).filter(function(a){return artMatch(a,q);}).forEach(function(a){
+     out.push([t.nombre,t.cod_prov||"",a.art_codigo,a.familia||"",partesTxt(a.partes).trim(),
+       a.compartido?"SI":"",a.num_talleristas,a.compartido?"PENDIENTE":""]);
+    });
+   });
+  }else{
+   out=[["Art_Codigo","Familia","Num_Talleristas","Tallerista","Partes","Proporcion_pct"]];
+   var arts=(D.articulos_compartidos||[]);
+   if(tallSel){arts=arts.filter(function(a){return (a.talleristas||[]).some(function(t){return String(t.tall_id)===tallSel;});});}
+   arts.filter(function(a){return artCompMatch(a,q);}).forEach(function(a){
+    (a.talleristas||[]).forEach(function(t){
+     out.push([a.art_codigo,a.familia||"",a.num_talleristas,t.tallerista,partesTxt(t.partes).trim(),"PENDIENTE"]);
+    });
+   });
+  }
+  var csv=out.map(function(r){return r.map(function(c){var s=String(c==null?"":c);return /[",;\n]/.test(s)?'"'+s.replace(/"/g,'""')+'"':s;}).join(";");}).join("\r\n");
+  var blob=new Blob(["﻿"+csv],{type:"text/csv;charset=utf-8;"});
+  var a=document.createElement("a");a.href=URL.createObjectURL(blob);
+  a.download="proporciones_"+VISTA+"_"+GP2UI.hoyAR()+".csv";
+  document.body.appendChild(a);a.click();document.body.removeChild(a);URL.revokeObjectURL(a.href);
+ });
+
+ render();
+}
+
+async function __boot(){
+ try{
+  document.body.style.cursor="progress";
+  var r=await SB.rpc("proporciones_bundle");
+  if(r.error)throw r.error;
+  Object.assign(D,r.data);
+  __run();
+ }catch(e){
+  document.getElementById("canvas").innerHTML='<div class="empty" style="color:#982e16">Error cargando datos de Supabase: '+esc(e.message||e)+'</div>';
+  console.error(e);
+ }finally{document.body.style.cursor="";}
+}
+__boot();
+</script>
+</body></html>

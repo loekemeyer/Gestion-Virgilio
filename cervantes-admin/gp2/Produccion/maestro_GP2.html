@@ -1,0 +1,452 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <script src="../auth-guard.js?v=20260904t"></script>
+<script src="../gp2-ui.js?v=20260905a"></script>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Maestro Produccion (GP2)</title>
+  <link rel="icon" href="data:," />
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="../supabase-config.js?v=20260905k"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'Inter', Arial, sans-serif; background: #d9d9de; margin: 0; padding: 16px; color: #222; }
+    .hidden { display: none !important; }
+
+    .top-bar { display: flex; align-items: center; gap: 16px; margin-bottom: 16px; }
+    .btn-back { background: #f5f5f5; border: 2px solid #ccc; border-radius: 999px; padding: 8px 18px; font-size: 14px; color: #555; cursor: pointer; text-decoration: none; font-weight: 600; }
+    .btn-back:hover { border-color: #888; }
+    .top-bar h1 { font-size: 22px; color: #111; }
+    .top-bar .tag { background: #111; color: #fff; font-size: 11px; font-weight: 700; padding: 3px 10px; border-radius: 999px; letter-spacing: .5px; }
+
+    .card { background: #fff; border: 1px solid #cfcfcf; border-radius: 14px; overflow: hidden; margin-bottom: 16px; max-width: 1300px; }
+    .card-header { background: #111; color: #fff; padding: 16px 22px; font-size: 15px; font-weight: 700; }
+    .card-body { padding: 18px 22px; }
+
+    .filters-grid { display: flex; flex-wrap: wrap; gap: 14px; align-items: flex-end; }
+    .field { display: flex; flex-direction: column; gap: 4px; }
+    .field label { font-size: 12px; font-weight: 700; color: #555; }
+    .field select, .field input[type="date"] { height: 44px; border: 1px solid #c9d1d9; border-radius: 10px; padding: 0 12px; font-size: 19px; outline: none; background: #fff; min-width: 180px; max-width: 260px; }
+    .field select:focus, .field input[type="date"]:focus { border-color: #cdd7ea; }
+
+    .btn { background: #111; color: #fff; border: none; border-radius: 10px; padding: 10px 24px; font-size: 16px; font-weight: 700; cursor: pointer; height: 44px; display: inline-flex; align-items: center; justify-content: center; }
+    .btn:hover { opacity: 0.85; }
+    .btn:disabled { opacity: 0.4; cursor: not-allowed; }
+    .btn-csv { background: #e7f8ef; }
+
+    .table-wrap { overflow-x: auto; overflow-y: auto; max-height: 70vh; width: fit-content; max-width: 100%; }
+    .row-count { font-size: 13px; color: #666; padding: 10px 0 6px; display: flex; gap: 18px; flex-wrap: wrap; align-items: center; }
+    .row-count strong { color: #111; }
+    table { width: auto; border-collapse: collapse; font-size: 13px; table-layout: fixed; }
+    table col.col-fecha { width: 90px; }
+    table col.col-leg   { width: 60px; }
+    table col.col-oper  { width: 150px; }
+    table col.col-mat   { width: 60px; }
+    table col.col-nom   { width: 170px; }
+    table col.col-uni   { width: 70px; }
+    table col.col-hi    { width: 82px; }
+    table col.col-hf    { width: 82px; }
+    table col.col-seg   { width: 95px; }
+    table col.col-tm    { width: 80px; }
+    table col.col-pje   { width: 75px; }
+    table col.col-tt    { width: 75px; }
+    table col.col-th    { width: 82px; }
+    thead th { background: #f5f5f7; border-bottom: 2px solid #ddd; padding: 10px 10px; text-align: left; font-weight: 700; white-space: nowrap; position: sticky; top: 0; z-index: 2; border-right: 1px solid #e5e5e5; }
+    thead th:last-child { border-right: none; }
+    thead th.r { text-align: right; }
+    tbody td { padding: 8px 10px; border-bottom: 1px solid #eee; border-right: 1px solid #f3f3f3; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    tbody td:last-child { border-right: none; }
+    thead th.col-uni-h { background: #e8f0fe; }
+    tbody td.col-uni-c { background: #f7faff; font-weight: 700; }
+    thead th:first-child, tbody td:first-child { padding-left: 12px; }
+    thead th:last-child, tbody td:last-child { padding-right: 12px; }
+    tbody td.r { text-align: right; }
+    tbody tr { cursor: pointer; }
+    tbody tr:nth-child(even) { background: #fafafa; }
+    tbody tr:hover { background: #eef2ff; }
+    tbody tr.tm-row { background: #fffde7 !important; }
+    tbody tr.tm-row:hover { background: #fff9c4 !important; }
+    .badge-tm { display: inline-block; background: #f9a825; color: #3a2c00; font-size: 11px; font-weight: 700; border-radius: 6px; padding: 1px 6px; }
+
+    .loading-msg { text-align: center; padding: 30px; color: #888; font-size: 14px; }
+
+    /* detail modal */
+    .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 200; display: flex; align-items: center; justify-content: center; }
+    .modal-box { background: #fff; border-radius: 18px; width: 460px; max-width: 94vw; box-shadow: 0 12px 40px rgba(0,0,0,0.25); overflow: hidden; }
+    .modal-header { background: #111; color: #fff; padding: 16px 22px; font-weight: 700; font-size: 16px; display: flex; justify-content: space-between; align-items: center; }
+    .modal-header .x { cursor: pointer; font-size: 20px; line-height: 1; opacity: .8; }
+    .modal-header .x:hover { opacity: 1; }
+    .modal-body { padding: 18px 22px; display: grid; grid-template-columns: max-content 1fr; gap: 8px 16px; font-size: 14px; }
+    .modal-body .k { color: #666; font-weight: 700; }
+    .modal-body .v { color: #111; word-break: break-word; }
+
+    @media (max-width: 700px) {
+      .filters-grid { flex-direction: column; }
+      .field select, .field input[type="date"] { min-width: 100%; }
+    }
+  </style>
+<link rel="icon" type="image/png" href="../GP2_favicon.png">
+<link rel="apple-touch-icon" href="../GP2_favicon.png">
+<link rel="stylesheet" href="../gp2-claro.css?v=20260903b">
+</head>
+<body>
+<div id="gp2-logobar" style="position:relative;background:#e8edf7;text-align:center;padding:6px 0;border-bottom:1px solid #d0dae7"><a href="../GP2_MODULOS.html" style="position:absolute;left:10px;top:50%;transform:translateY(-50%);color:#385475;text-decoration:none;font-weight:700;font-size:15px;padding:5px 10px;border:1px solid #d1d9e5;border-radius:8px;background:#e9eef7">← Atrás</a><a href="../GP2_MODULOS.html" style="text-decoration:none"><img src="../GP2_logo.png" alt="GP2 · Gestión Productiva" style="height:40px;vertical-align:middle"></a></div>
+
+
+  <div class="top-bar">
+    <a href="../Inicio/" class="btn-back">&#8592; Volver</a>
+    <h1>Maestro Produccion</h1>
+    <span class="tag">GP2 · solo lectura</span>
+  </div>
+
+  <div class="card">
+    <div class="card-header">Filtros de busqueda</div>
+    <div class="card-body">
+      <div class="filters-grid">
+        <div class="field">
+          <label>Operario</label>
+          <select id="selOperario"><option value="">Todos</option></select>
+        </div>
+        <div class="field">
+          <label>Fecha desde</label>
+          <input type="date" id="fechaDesde" />
+        </div>
+        <div class="field">
+          <label>Fecha hasta</label>
+          <input type="date" id="fechaHasta" />
+        </div>
+        <div class="field">
+          <label>Matriz</label>
+          <select id="selMatriz"><option value="">Todas</option></select>
+        </div>
+        <div class="field">
+          <label>Tiempo Muerto</label>
+          <select id="selTM"><option value="">Todos</option></select>
+        </div>
+        <div class="field">
+          <label>Orden</label>
+          <select id="selOrden">
+            <option value="desc">Mas nuevo primero</option>
+            <option value="asc">Mas viejo primero</option>
+          </select>
+        </div>
+        <div class="field" style="justify-content:flex-end;">
+          <button class="btn" id="btnBuscar">Buscar</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-header">Resultados</div>
+    <div class="card-body">
+      <div class="row-count" id="rowCount"></div>
+      <div class="table-wrap">
+        <table>
+          <colgroup>
+            <col class="col-fecha"><col class="col-leg"><col class="col-oper"><col class="col-mat">
+            <col class="col-nom"><col class="col-uni"><col class="col-hi"><col class="col-hf">
+            <col class="col-seg"><col class="col-tm"><col class="col-pje"><col class="col-tt"><col class="col-th">
+          </colgroup>
+          <thead>
+            <tr>
+              <th>Fecha</th>
+              <th>Legajo</th>
+              <th>Operario</th>
+              <th>Matriz</th>
+              <th>Nombre Matriz</th>
+              <th class="col-uni-h">Uni</th>
+              <th>Hora Inicio</th>
+              <th>Hora Fin</th>
+              <th class="r">Seg. Trabajados</th>
+              <th class="r">Seg. TM</th>
+              <th class="r">Puntaje</th>
+              <th class="r">T. Toma</th>
+              <th class="r">T. Historico</th>
+            </tr>
+          </thead>
+          <tbody id="tBody"></tbody>
+        </table>
+      </div>
+      <div id="loadingMsg" class="loading-msg hidden">Cargando...</div>
+      <div id="emptyMsg" class="loading-msg hidden">Sin resultados</div>
+    </div>
+  </div>
+
+  <div class="modal-overlay hidden" id="detailModal">
+    <div class="modal-box">
+      <div class="modal-header"><span id="detailTitle">Detalle</span><span class="x" id="detailClose">&times;</span></div>
+      <div class="modal-body" id="detailBody"></div>
+    </div>
+  </div>
+
+<script>
+(function () {
+  'use strict';
+
+  // MIGRADO a schema GP2. Todo sale del RPC "GP2".produccion_maestro_bundle(desde, hasta),
+  // espejo de la produccion vieja en "GP2".produccion. SOLO LECTURA (sin edicion/carga).
+  var sb = GP2_SB();
+
+  // Codigos de Tiempo Muerto (uni=0). El codigo se guarda en matriz_raw.
+  var TM_DESC = {
+    PB: 'Pare Bano', BC: 'Busque Cajon', MOV: 'Movimiento', LIMP: 'Limpieza',
+    Perm: 'Permiso', AL: 'Ayuda Logistica', PR: 'Pare Carga Rollo', PC: 'Pare Comida',
+    CM: 'Cambiar Matriz', 'MOV P': 'Movimiento Piedra', RD: 'Rollo Fleje Doblado',
+    PM: 'Pare Matriz', RM: 'Rotura Matriz', REM: 'Reparando Matriz',
+    LT: 'Limpieza Terminal', Ausencia: 'Ausencia'
+  };
+  var TM_OPTS = ['PB','BC','MOV','LIMP','Perm','AL','PR','PC','CM','MOV P','RD','PM','RM','REM','LT','Ausencia'];
+  var TM_SET = {}; TM_OPTS.forEach(function (c) { TM_SET[c.toUpperCase()] = true; });
+
+  var empleadosMap = {};   // legajo -> nombre
+  var currentRows = [];
+
+  var selOperario = document.getElementById('selOperario');
+  var fechaDesde  = document.getElementById('fechaDesde');
+  var fechaHasta  = document.getElementById('fechaHasta');
+  var selMatriz   = document.getElementById('selMatriz');
+  var selTM       = document.getElementById('selTM');
+  var selOrden    = document.getElementById('selOrden');
+  var btnBuscar   = document.getElementById('btnBuscar');
+  var tBody       = document.getElementById('tBody');
+  var rowCount    = document.getElementById('rowCount');
+  var loadingMsg  = document.getElementById('loadingMsg');
+  var emptyMsg    = document.getElementById('emptyMsg');
+  var detailModal = document.getElementById('detailModal');
+  var detailTitle = document.getElementById('detailTitle');
+  var detailBody  = document.getElementById('detailBody');
+
+  var esc = GP2UI.esc;   /* helper de la casa, gp2-ui.js (2026-09-05) */
+  function num(v) { return (v == null || v === '' || isNaN(Number(v))) ? '' : Number(v); }
+  function fmt(v) { var n = num(v); return n === '' ? '' : n.toFixed(2); }
+  function isTM(r) { return Number(r.uni || 0) === 0 || TM_SET[String(r.matriz || '').toUpperCase()]; }
+  function fmtDia(r) {
+    if (!r.fecha) return '';
+    var p = String(r.fecha).substring(0, 10).split('-');
+    if (p.length < 3) return String(r.fecha);
+    return p[2] + '-' + p[1] + '-' + (p[0] || '').substring(2);
+  }
+
+  // ---------- INIT ----------
+  (function init() {
+    var today = new Date();
+    var iso = today.getFullYear() + '-' + String(today.getMonth() + 1).padStart(2, '0') + '-' + String(today.getDate()).padStart(2, '0');
+    fechaDesde.value = iso;
+    fechaHasta.value = iso;
+
+    TM_OPTS.forEach(function (code) {
+      var opt = document.createElement('option');
+      opt.value = code;
+      opt.textContent = code + ' - ' + (TM_DESC[code] || '');
+      selTM.appendChild(opt);
+    });
+
+    btnBuscar.addEventListener('click', buscar);
+    detailModal.addEventListener('click', function (e) { if (e.target === detailModal) closeDetail(); });
+    document.getElementById('detailClose').addEventListener('click', closeDetail);
+
+    buscar();
+  })();
+
+  // ---------- SEARCH ----------
+  function buscar() {
+    tBody.innerHTML = '';
+    rowCount.textContent = '';
+    emptyMsg.classList.add('hidden');
+    loadingMsg.classList.remove('hidden');
+    btnBuscar.disabled = true;
+
+    var desde = fechaDesde.value || null;
+    var hasta = fechaHasta.value || null;
+
+    sb.rpc('produccion_maestro_bundle', { p_desde: desde, p_hasta: hasta })
+      .then(function (res) {
+        loadingMsg.classList.add('hidden');
+        btnBuscar.disabled = false;
+        if (res.error) { alert('Error: ' + res.error.message); return; }
+        var bundle = res.data || {};
+
+        // poblar filtros la primera vez (matrices + operarios)
+        var emp = bundle.empleados || {};
+        if (!Object.keys(empleadosMap).length && Object.keys(emp).length) {
+          empleadosMap = emp;
+          buildOperarioSelect(emp);
+          buildMatrizSelect(bundle.matrices || []);
+        }
+
+        currentRows = (bundle.rows || []).slice();
+        applyFiltersAndRender();
+      });
+  }
+
+  function buildOperarioSelect(emp) {
+    var legajos = Object.keys(emp).sort(function (a, b) {
+      var na = parseInt(String(a).replace(/\D/g, ''), 10), nb = parseInt(String(b).replace(/\D/g, ''), 10);
+      if (!isNaN(na) && !isNaN(nb) && na !== nb) return na - nb;
+      return String(a).localeCompare(String(b), 'es');
+    });
+    legajos.forEach(function (leg) {
+      var opt = document.createElement('option');
+      opt.value = leg;
+      opt.textContent = leg + ' - ' + (emp[leg] || '');
+      selOperario.appendChild(opt);
+    });
+  }
+
+  function buildMatrizSelect(matrices) {
+    matrices.slice().sort(function (a, b) {
+      var an = String(a.n_matriz), bn = String(b.n_matriz);
+      var ax = an.match(/^(\d+)(.*)$/), bx = bn.match(/^(\d+)(.*)$/);
+      if (ax && bx) {
+        var na = parseInt(ax[1], 10), nb = parseInt(bx[1], 10);
+        if (na !== nb) return na - nb;
+        return ax[2].localeCompare(bx[2], 'es');
+      }
+      return an.localeCompare(bn, 'es');
+    }).forEach(function (m) {
+      var opt = document.createElement('option');
+      opt.value = m.n_matriz;
+      opt.textContent = m.n_matriz + (m.nombre ? ' - ' + m.nombre : '');
+      selMatriz.appendChild(opt);
+    });
+  }
+
+  // Filtros que no dependen de la fecha se aplican en cliente sobre lo traido por el RPC.
+  function applyFiltersAndRender() {
+    var op = selOperario.value;
+    var mat = selMatriz.value;
+    var tm = selTM.value;
+    var asc = selOrden.value === 'asc';
+
+    var rows = currentRows.filter(function (r) {
+      if (op && String(r.legajo) !== String(op)) return false;
+      if (mat && String(r.matriz) !== String(mat)) return false;
+      if (tm && String(r.matriz || '').toUpperCase() !== String(tm).toUpperCase()) return false;
+      return true;
+    });
+
+    rows.sort(function (a, b) {
+      var ka = String(a.fecha || '') + (a.hora_inicio || '');
+      var kb = String(b.fecha || '') + (b.hora_inicio || '');
+      return asc ? ka.localeCompare(kb) : kb.localeCompare(ka);
+    });
+
+    renderTable(rows);
+  }
+
+  function renderTable(rows) {
+    tBody.innerHTML = '';
+    window.__lastRendered = rows;
+    if (!rows.length) {
+      emptyMsg.classList.remove('hidden');
+      rowCount.textContent = '';
+      return;
+    }
+    emptyMsg.classList.add('hidden');
+
+    var cajones = 0, sumUni = 0, tms = 0;
+    rows.forEach(function (r) {
+      if (isTM(r)) { tms++; }
+      else { cajones++; sumUni += Number(r.uni || 0); }
+    });
+    rowCount.innerHTML =
+      '<span><strong>' + rows.length + '</strong> registros</span>' +
+      '<span>Cajones: <strong>' + cajones + '</strong></span>' +
+      '<span>Tiempos muertos: <strong>' + tms + '</strong></span>' +
+      '<span>Total Uni: <strong>' + sumUni.toLocaleString('es-AR') + '</strong></span>';
+
+    var frag = document.createDocumentFragment();
+    rows.forEach(function (r, idx) {
+      var tr = document.createElement('tr');
+      if (isTM(r)) tr.classList.add('tm-row');
+      var matHtml = isTM(r)
+        ? '<span class="badge-tm">' + esc(r.matriz) + '</span>'
+        : esc(r.matriz);
+      tr.innerHTML =
+        '<td>' + fmtDia(r) + '</td>' +
+        '<td>' + esc(r.legajo) + '</td>' +
+        '<td>' + esc(r.nombre_empleado || empleadosMap[r.legajo] || '') + '</td>' +
+        '<td>' + matHtml + '</td>' +
+        '<td>' + esc(r.nombre_matriz) + '</td>' +
+        '<td class="r col-uni-c">' + (isTM(r) ? '' : esc(r.uni)) + '</td>' +
+        '<td>' + esc(r.hora_inicio) + '</td>' +
+        '<td>' + esc(r.hora_fin) + '</td>' +
+        '<td class="r">' + esc(r.segundos_trabajados) + '</td>' +
+        '<td class="r">' + esc(r.segundos_tiempo_muerto) + '</td>' +
+        '<td class="r">' + (isTM(r) ? '' : fmt(r.premio)) + '</td>' +
+        '<td class="r">' + (isTM(r) ? '' : fmt(r.tiempo_toma)) + '</td>' +
+        '<td class="r">' + (isTM(r) ? '' : fmt(r.tiempo_historico)) + '</td>';
+      tr.addEventListener('click', function () { openDetail(r); });
+      frag.appendChild(tr);
+    });
+    tBody.appendChild(frag);
+  }
+
+  // ---------- DETAIL (read-only) ----------
+  function openDetail(r) {
+    detailTitle.textContent = (isTM(r) ? 'Tiempo muerto' : 'Cajon') + ' #' + esc(r.id);
+    var pairs = [
+      ['Fecha', r.fecha], ['Legajo', r.legajo], ['Operario', r.nombre_empleado],
+      ['Matriz', r.matriz], ['Nombre matriz', r.nombre_matriz], ['Uni', r.uni],
+      ['Hora inicio', r.hora_inicio], ['Hora fin', r.hora_fin],
+      ['Seg. trabajados', r.segundos_trabajados], ['Seg. tiempo muerto', r.segundos_tiempo_muerto],
+      ['Puntaje (premio)', r.premio], ['Tiempo toma', r.tiempo_toma],
+      ['Tiempo historico', r.tiempo_historico], ['Revisado', r.revisado ? 'Si' : 'No']
+    ];
+    detailBody.innerHTML = pairs.map(function (p) {
+      return '<div class="k">' + esc(p[0]) + '</div><div class="v">' + esc(p[1] == null ? '' : p[1]) + '</div>';
+    }).join('');
+    detailModal.classList.remove('hidden');
+  }
+  function closeDetail() { detailModal.classList.add('hidden'); }
+
+  // ---------- CSV EXPORT ----------
+  function exportCSV() {
+    var rows = window.__lastRendered || [];
+    if (!rows.length) { alert('No hay registros para exportar. Busca primero.'); return; }
+    var cols = [
+      ['fecha', 'Fecha'], ['legajo', 'Legajo'], ['nombre_empleado', 'Operario'],
+      ['matriz', 'Matriz'], ['nombre_matriz', 'Nombre Matriz'], ['uni', 'Uni'],
+      ['hora_inicio', 'Hora Inicio'], ['hora_fin', 'Hora Fin'],
+      ['segundos_trabajados', 'Seg Trabajados'], ['segundos_tiempo_muerto', 'Seg TM'],
+      ['premio', 'Puntaje'], ['tiempo_toma', 'T Toma'], ['tiempo_historico', 'T Historico']
+    ];
+    function cell(v) {
+      var s = v == null ? '' : String(v);
+      if (/[";\n]/.test(s)) s = '"' + s.replace(/"/g, '""') + '"';
+      return s;
+    }
+    var lines = [cols.map(function (c) { return cell(c[1]); }).join(';')];
+    rows.forEach(function (r) {
+      lines.push(cols.map(function (c) { return cell(r[c[0]]); }).join(';'));
+    });
+    var csv = '﻿' + lines.join('\r\n'); // BOM para Excel + acentos
+    var blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement('a');
+    a.href = url;
+    a.download = 'maestro_produccion_' + (fechaDesde.value || 'x') + '_a_' + (fechaHasta.value || 'x') + '.csv';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
+  }
+
+  // wiring de filtros en cliente (no re-consultan el RPC salvo fecha)
+  selOperario.addEventListener('change', applyFiltersAndRender);
+  selMatriz.addEventListener('change', applyFiltersAndRender);
+  selTM.addEventListener('change', applyFiltersAndRender);
+  selOrden.addEventListener('change', applyFiltersAndRender);
+
+  // boton CSV al lado de Buscar
+  var btnCsv = document.createElement('button');
+  btnCsv.className = 'btn btn-csv';
+  btnCsv.textContent = 'Exportar CSV';
+  btnCsv.addEventListener('click', exportCSV);
+  btnBuscar.parentNode.appendChild(btnCsv);
+})();
+</script>
+</body>
+</html>

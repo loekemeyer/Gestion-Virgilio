@@ -1,0 +1,262 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <script src="../auth-guard.js?v=20260904t"></script>
+<script src="../gp2-ui.js?v=20260905a"></script>
+<script src="../gp2-numero.js?v=20260905m"></script>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Tiempos Matrices · GP2</title>
+  <link rel="icon" type="image/png" href="../GP2_favicon.png">
+  <link rel="apple-touch-icon" href="../GP2_favicon.png">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="../supabase-config.js?v=20260905k"></script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'Inter', sans-serif; background: #d9d9de; padding: 20px; min-height: 100vh; }
+    .top-bar { max-width: 1400px; margin: 0 auto 16px; display: flex; align-items: center; gap: 14px; }
+    .btn-volver { height: 44px; padding: 0 22px; border-radius: 999px; border: 2px solid #b9b9b9; background: #f7f7f7; font-size: 16px; cursor: pointer; font-weight: 700; font-family: inherit; }
+    .btn-volver:hover { background: #e5e5e5; border-color: #e2e8f0; }
+    .top-bar h1 { font-size: 22px; flex: 1; color: #1e293b; }
+    .main-card { max-width: 1400px; margin: 0 auto 20px; background: #fff; border: 1px solid #cfcfcf; border-radius: 14px; overflow: hidden; }
+    .card-header { background: #111; color: #fff; padding: 14px 22px; display: flex; justify-content: space-between; align-items: center; }
+    .card-header h2 { font-size: 17px; color: #fff; margin: 0; }
+    .gran-pill { background: #ebeef5; color: #345779; padding: 4px 10px; border-radius: 999px; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .5px; }
+    .card-body { padding: 16px 22px 22px; }
+    .controls-row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-bottom: 14px; }
+    .ctrl-group { display: flex; align-items: center; gap: 6px; }
+    .ctrl-group label { font-size: 15px; font-weight: 700; color: #475569; }
+    /* Los .ctrl-* estaban en 13px con 36px de alto: por debajo del piso de la casa
+       (campos 18px, tactil 44px). Estas pantallas no cargan gp2-modulo.css ni
+       gp2-claro.css, asi que nada las levantaba (corregido 2026-09-03). */
+    .ctrl-input, .ctrl-select { height: 44px; padding: 0 10px; border: 1.5px solid #cbd5e1; border-radius: 10px; font-size: 19px; font-family: inherit; background: #fff; min-width: 140px; }
+    .ctrl-input:focus, .ctrl-select:focus { border-color: #cdd8ea; outline: none; }
+    .btn-act { height: 44px; padding: 0 18px; border-radius: 10px; border: 1.5px solid #111; background: #111; color: #fff; font-size: 16px; font-weight: 700; cursor: pointer; font-family: inherit; }
+    .btn-act:hover { background: #333; }
+    .btn-act.ghost { background: #f8fafc; color: #475569; border-color: #cbd5e1; }
+    .btn-act.ghost:hover { background: #e2e8f0; }
+    .controls-row .push { margin-left: auto; }
+    .stats-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 10px; margin-bottom: 14px; }
+    .stat-card { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 10px; padding: 10px 14px; }
+    .stat-label { font-size: 11px; color: #64748b; font-weight: 700; text-transform: uppercase; letter-spacing: .3px; }
+    .stat-value { font-size: 18px; color: #111; font-weight: 800; font-variant-numeric: tabular-nums; }
+    .stat-card.green .stat-value { color: #16a34a; }
+    .stat-card.red .stat-value { color: #dc2626; }
+    .stat-card.blue .stat-value { color: #163e98; }
+    .table-wrap { overflow-x: auto; border: 1px solid #e2e8f0; border-radius: 10px; }
+    table { width: 100%; border-collapse: collapse; font-size: 13px; background: #fff; }
+    thead th { background: #f1f5f9; color: #334155; font-weight: 700; font-size: 11px; text-transform: uppercase; letter-spacing: .3px; padding: 10px 12px; text-align: left; border-bottom: 2px solid #e2e8f0; white-space: nowrap; cursor: pointer; user-select: none; }
+    thead th:hover { background: #e2e8f0; }
+    tbody td { padding: 9px 12px; border-bottom: 1px solid #f1f5f9; color: #334155; font-variant-numeric: tabular-nums; }
+    tbody tr:hover { background: #f8fafc; }
+    td.num, th.num { text-align: right; }
+    .desv-good { color: #16a34a; font-weight: 700; }
+    .desv-bad  { color: #dc2626; font-weight: 700; }
+    .desv-na   { color: #475569; }
+    .mz-tag { font-weight: 800; color: #1e40af; }
+    .msg { padding: 30px; text-align: center; color: #64748b; font-size: 14px; }
+    .msg.err { color: #dc2626; font-weight: 600; }
+    .note { font-size: 12px; color: #64748b; margin-top: 10px; }
+  </style>
+</head>
+<body>
+
+<div id="gp2-logobar" style="position:relative;background:#e8edf7;text-align:center;padding:6px 0;border-bottom:1px solid #d0dae7"><a href="../GP2_MODULOS.html" style="position:absolute;left:10px;top:50%;transform:translateY(-50%);color:#385475;text-decoration:none;font-weight:700;font-size:15px;padding:5px 10px;border:1px solid #d1d9e5;border-radius:8px;background:#e9eef7">← Atrás</a><a href="../GP2_MODULOS.html" style="text-decoration:none"><img src="../GP2_logo.png" alt="GP2 · Gestión Productiva" style="height:40px;vertical-align:middle"></a></div>
+
+<div class="top-bar">
+  <button class="btn-volver" onclick="location.href='../GP2_MODULOS.html'">&larr; Atrás</button>
+  <h1>Tiempos Matrices</h1>
+</div>
+
+<div class="main-card">
+  <div class="card-header">
+    <h2>Tiempo real vs tiempo histórico por matriz</h2>
+    <span class="gran-pill">GP2</span>
+  </div>
+  <div class="card-body">
+    <div class="controls-row">
+      <div class="ctrl-group"><label>Desde</label><input type="date" id="fDesde" class="ctrl-input"></div>
+      <div class="ctrl-group"><label>Hasta</label><input type="date" id="fHasta" class="ctrl-input"></div>
+      <div class="ctrl-group"><label>Operario</label><select id="fOperario" class="ctrl-select"><option value="">Todos</option></select></div>
+      <input type="text" id="fBuscar" class="ctrl-input" placeholder="Buscar matriz o nombre..." style="min-width:220px">
+      <button class="btn-act push" id="btnCargar">Cargar</button>
+      <button class="btn-act ghost" id="btnCSV">Exportar CSV</button>
+    </div>
+
+    <div class="stats-row" id="stats"></div>
+
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th data-k="matriz">Matriz</th>
+            <th data-k="nombre">Nombre</th>
+            <th class="num" data-k="prods">Prod.</th>
+            <th class="num" data-k="uni">Unidades</th>
+            <th class="num" data-k="segs">Seg. trabajados</th>
+            <th class="num" data-k="segUni">Seg/uni real</th>
+            <th class="num" data-k="segUniHist">Seg/uni hist.</th>
+            <th class="num" data-k="desvio">Desvío</th>
+          </tr>
+        </thead>
+        <tbody id="tbody"><tr><td colspan="8" class="msg">Elegí el rango y tocá Cargar.</td></tr></tbody>
+      </table>
+    </div>
+    <div class="note">Lee <b>GP2.produccion</b> (filas con unidades &gt; 0, sin las marcadas como eliminadas). El seg/uni histórico sale de <code>segundos_historico</code>; el desvío es real contra histórico (negativo = más rápido que el histórico).</div>
+  </div>
+</div>
+
+<script>
+(function () {
+  "use strict";
+  var sb = GP2_SB();
+
+  var $ = GP2UI.$;
+  var ROWS = [], SORT = { k: 'uni', dir: -1 };
+
+  var esc = GP2UI.esc;   /* helper de la casa, gp2-ui.js (2026-09-05) */
+  function n2(v) { return GP2N.fmt(v, 2, '—'); }
+  function n0(v) { return GP2N.fmt(v, 0, '—'); }   /* la regla de numero de la casa (gp2-numero.js) */
+
+  /* fechas en Argentina (gp2-ui.js): antes toISOString corria el dia despues de las 21:00 */
+  function primerDiaMes() { return GP2UI.hoyAR().slice(0, 8) + '01'; }
+  function hoy() { return GP2UI.hoyAR(); }
+
+  async function cargarOperarios() {
+    var r = await sb.from('empleado').select('legajo,nombre,activo').order('nombre');
+    if (r.error) { console.warn('empleado:', r.error); return; }
+    var sel = $('fOperario');
+    (r.data || []).forEach(function (e) {
+      var o = document.createElement('option');
+      o.value = e.legajo;
+      o.textContent = e.nombre + ' (' + e.legajo + ')' + (e.activo === false ? ' · inactivo' : '');
+      sel.appendChild(o);
+    });
+  }
+
+  async function cargar() {
+    var tb = $('tbody');
+    tb.innerHTML = '<tr><td colspan="8" class="msg">Cargando...</td></tr>';
+    var q = sb.from('produccion')
+      .select('matriz_raw,nombre_matriz,uni,segundos_trabajados,segundos_historico,legajo,fecha,eliminar')
+      .gt('uni', 0)
+      .gte('fecha', $('fDesde').value + 'T00:00:00-03:00')
+      .lte('fecha', $('fHasta').value + 'T23:59:59-03:00')
+      .limit(20000);
+    if ($('fOperario').value) q = q.eq('legajo', $('fOperario').value);
+
+    var r = await q;
+    if (r.error) { tb.innerHTML = '<tr><td colspan="8" class="msg err">Error: ' + esc(r.error.message) + '</td></tr>'; return; }
+
+    var acc = {};
+    (r.data || []).forEach(function (p) {
+      if (String(p.eliminar || '').toUpperCase() === 'S') return;
+      var k = String(p.matriz_raw || '').trim();
+      if (!k) return;
+      if (!acc[k]) acc[k] = { matriz: k, nombre: p.nombre_matriz || '', prods: 0, uni: 0, segs: 0, segsHist: 0 };
+      var a = acc[k];
+      a.prods++;
+      a.uni += Number(p.uni) || 0;
+      a.segs += Number(p.segundos_trabajados) || 0;
+      a.segsHist += Number(p.segundos_historico) || 0;
+      if (!a.nombre && p.nombre_matriz) a.nombre = p.nombre_matriz;
+    });
+
+    ROWS = Object.keys(acc).map(function (k) {
+      var a = acc[k];
+      a.segUni = a.uni > 0 && a.segs > 0 ? a.segs / a.uni : null;
+      a.segUniHist = a.uni > 0 && a.segsHist > 0 ? a.segsHist / a.uni : null;
+      a.desvio = (a.segUni != null && a.segUniHist > 0) ? ((a.segUni - a.segUniHist) / a.segUniHist) * 100 : null;
+      return a;
+    });
+    render();
+  }
+
+  function filtradas() {
+    var q = $('fBuscar').value.trim().toLowerCase();
+    var out = q ? ROWS.filter(function (r) {
+      return r.matriz.toLowerCase().indexOf(q) >= 0 || String(r.nombre).toLowerCase().indexOf(q) >= 0;
+    }) : ROWS.slice();
+    out.sort(function (a, b) {
+      var x = a[SORT.k], y = b[SORT.k];
+      if (x == null) return 1;
+      if (y == null) return -1;
+      if (typeof x === 'string') return x.localeCompare(y) * SORT.dir;
+      return (x - y) * SORT.dir;
+    });
+    return out;
+  }
+
+  function render() {
+    var rows = filtradas(), tb = $('tbody');
+    var tUni = 0, tSegs = 0, tProds = 0, conHist = 0, sumDesv = 0;
+    rows.forEach(function (r) {
+      tUni += r.uni; tSegs += r.segs; tProds += r.prods;
+      if (r.desvio != null) { conHist++; sumDesv += r.desvio; }
+    });
+    var desvProm = conHist ? sumDesv / conHist : null;
+
+    $('stats').innerHTML =
+      card('Matrices', n0(rows.length)) +
+      card('Producciones', n0(tProds)) +
+      card('Unidades', n0(tUni), 'blue') +
+      card('Horas trabajadas', n2(tSegs / 3600)) +
+      card('Desvío promedio', desvProm == null ? '—' : (desvProm > 0 ? '+' : '') + n2(desvProm) + '%', desvProm == null ? '' : (desvProm > 0 ? 'red' : 'green'));
+
+    if (!rows.length) { tb.innerHTML = '<tr><td colspan="8" class="msg">Sin datos en el rango elegido.</td></tr>'; return; }
+
+    tb.innerHTML = rows.map(function (r) {
+      var cls = r.desvio == null ? 'desv-na' : (r.desvio > 0 ? 'desv-bad' : 'desv-good');
+      var txt = r.desvio == null ? '—' : (r.desvio > 0 ? '+' : '') + n2(r.desvio) + '%';
+      return '<tr>' +
+        '<td class="mz-tag">' + esc(r.matriz) + '</td>' +
+        '<td>' + esc(r.nombre) + '</td>' +
+        '<td class="num">' + n0(r.prods) + '</td>' +
+        '<td class="num">' + n0(r.uni) + '</td>' +
+        '<td class="num">' + n0(r.segs) + '</td>' +
+        '<td class="num">' + n2(r.segUni) + '</td>' +
+        '<td class="num">' + n2(r.segUniHist) + '</td>' +
+        '<td class="num ' + cls + '">' + txt + '</td>' +
+        '</tr>';
+    }).join('');
+  }
+
+  function card(label, value, cls) {
+    return '<div class="stat-card ' + (cls || '') + '"><div class="stat-label">' + label + '</div><div class="stat-value">' + value + '</div></div>';
+  }
+
+  function csv() {
+    /* el armado del CSV (;, BOM, coma decimal) es el de la casa: GP2UI.exportarCSV */
+    var filas = [['Matriz', 'Nombre', 'Producciones', 'Unidades', 'Seg trabajados', 'Seg/uni real', 'Seg/uni historico', 'Desvio %']];
+    filtradas().forEach(function (r) {
+      filas.push([r.matriz, r.nombre, r.prods, r.uni, r.segs,
+        r.segUni == null ? '' : Number(r.segUni.toFixed(3)),
+        r.segUniHist == null ? '' : Number(r.segUniHist.toFixed(3)),
+        r.desvio == null ? '' : Number(r.desvio.toFixed(2))]);
+    });
+    GP2UI.exportarCSV('tiempos_matrices_GP2', filas);
+  }
+
+  document.addEventListener('DOMContentLoaded', function () {
+    $('fDesde').value = primerDiaMes();
+    $('fHasta').value = hoy();
+    $('btnCargar').addEventListener('click', cargar);
+    $('btnCSV').addEventListener('click', csv);
+    $('fBuscar').addEventListener('input', render);
+    $('fOperario').addEventListener('change', cargar);
+    document.querySelectorAll('thead th').forEach(function (th) {
+      th.addEventListener('click', function () {
+        var k = th.dataset.k;
+        SORT.dir = (SORT.k === k) ? -SORT.dir : -1;
+        SORT.k = k;
+        render();
+      });
+    });
+    cargarOperarios();
+    cargar();
+  });
+})();
+</script>
+</body>
+</html>

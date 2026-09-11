@@ -1,0 +1,150 @@
+<!doctype html>
+<html lang="es">
+<head>
+<!-- v1.1.2 — filtros de 15px a 17px (regla de letra grande; eran los unicos campos chicos que quedaban en las pantallas GP2). v1.1.0 — eventos Rotura/Pare Matriz de GP2.produccion con uni acumuladas entre roturas + golpes -->
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Problemas con Matrices · GP2</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="../../supabase-config.js?v=20260905k"></script>
+<script src="../../gp2-ui.js?v=20260905a"></script>
+<script src="../../gp2-numero.js?v=20260905m"></script>
+<link rel="stylesheet" href="../../gp2-modulo.css?v=20260903b"/>
+<link rel="icon" type="image/png" href="../../GP2_favicon.png">
+<link rel="apple-touch-icon" href="../../GP2_favicon.png">
+<style>
+  .filtros{display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end;margin:10px 0}
+  .filtros .f{display:flex;flex-direction:column;gap:4px}
+  .filtros label{font-size:15px;font-weight:800;color:#555}
+  .filtros input,.filtros select{padding:10px;min-height:44px;border:2px solid #d0d7de;border-radius:8px;font-size:18px}
+  .kpis{display:flex;gap:12px;flex-wrap:wrap;margin:10px 0}
+  .kpi{flex:1;min-width:130px;background:#fff;border:2px solid #d0d7de;border-radius:12px;padding:12px 16px}
+  .kpi .l{font-size:12px;font-weight:800;color:#666;text-transform:uppercase}
+  .kpi .v{font-size:28px;font-weight:900}
+  .kpi.rm{border-left:6px solid #b42318}
+  .kpi.pm{border-left:6px solid #d97706}
+  td.num{text-align:right;font-variant-numeric:tabular-nums}
+  .badge{display:inline-block;font-weight:800;font-size:12px;padding:3px 10px;border-radius:999px;color:#fff}
+  .badge.rm{background:#b42318}
+  .badge.pm{background:#d97706}
+</style>
+</head>
+<body>
+
+<div class="card">
+  <div class="header">
+    <h1>Problemas con Matrices</h1>
+    <div class="hbtns">
+      <button class="hlink" id="btnCSV" type="button">⬇ Exportar CSV</button>
+      <a href="../../GP2_MODULOS.html">Atrás</a>
+    </div>
+  </div>
+
+  <div class="steps">
+    <div class="filtros">
+      <div class="f"><label>Desde</label><input type="date" id="desde"></div>
+      <div class="f"><label>Hasta</label><input type="date" id="hasta"></div>
+      <div class="f"><label>Tipo</label><select id="tipo">
+        <option value="">Todos (RM + PM)</option>
+        <option value="RM">Solo Roturas (RM)</option>
+        <option value="PM">Solo Pares (PM)</option>
+      </select></div>
+      <div class="f"><label>Operario</label><select id="oper"><option value="">Todos</option></select></div>
+      <div class="f"><label>Matriz</label><input type="text" id="mat" inputmode="numeric" data-miles="no" placeholder="N°" style="width:90px"></div>
+    </div>
+
+    <div class="kpis">
+      <div class="kpi rm"><div class="l">Roturas (RM)</div><div class="v" id="kRM">0</div></div>
+      <div class="kpi pm"><div class="l">Pares (PM)</div><div class="v" id="kPM">0</div></div>
+      <div class="kpi"><div class="l">Total eventos</div><div class="v" id="kTot">0</div></div>
+    </div>
+
+    <div class="table-wrap"><table class="t">
+      <thead><tr><th>Fecha</th><th>Inicio</th><th>Fin</th><th>Tipo</th><th>Legajo</th><th>Operario</th>
+        <th>Matriz</th><th>Descripción</th><th class="num">Duración</th>
+        <th class="num" title="Unidades producidas por esa matriz desde la última rotura">Uni desde<br>últ. rotura</th>
+        <th class="num" title="Uni acumuladas / unidades por golpe de la matriz">Golpes</th></tr></thead>
+      <tbody id="tbody"></tbody>
+    </table></div>
+    <div id="tblEmpty" class="empty hidden">Sin eventos en el rango.</div>
+    <div id="status" class="status">Cargando…</div>
+  </div>
+</div>
+
+<script>
+var SB = GP2_SB();
+var $ = GP2UI.$;
+var esc = GP2UI.esc;   /* helper de la casa, gp2-ui.js (2026-09-05) */
+function fmt(n){ return GP2N.fmt(n, 0); }   /* la regla de numero de la casa (gp2-numero.js) */
+var hoyAR = GP2UI.hoyAR;   /* helper de la casa, gp2-ui.js (2026-09-05): hoyAR(-30) = hace 30 dias, igual que la copia que habia */
+function dur(seg){
+  seg=Math.round(Number(seg)||0);
+  if(!seg) return '—';
+  var h=Math.floor(seg/3600), m=Math.floor((seg%3600)/60), s=seg%60;
+  if(h>0) return h+'h '+String(m).padStart(2,'0')+'m';
+  if(m>0) return m+'m '+String(s).padStart(2,'0')+'s';
+  return s+'s';
+}
+function hora(t){ return t?String(t).slice(0,5):'—'; }
+
+var D={};
+
+async function cargar(){
+  $('status').textContent='Cargando…';
+  var r=await SB.rpc('problemas_matrices_bundle',{ p_desde:$('desde').value, p_hasta:$('hasta').value });
+  if(r.error){ $('status').textContent='Error: '+r.error.message; return; }
+  D=r.data||{};
+  var sel=$('oper'), val=sel.value;
+  sel.innerHTML='<option value="">Todos</option>'+(D.empleados||[]).map(function(e){
+    return '<option value="'+esc(e.legajo)+'">'+esc(e.legajo)+' - '+esc(e.nombre)+'</option>';
+  }).join('');
+  sel.value=val;
+  render();
+}
+
+function filtrados(){
+  var t=$('tipo').value, o=$('oper').value, m=($('mat').value||'').trim();
+  return (D.eventos||[]).filter(function(e){
+    if(t && e.tipo!==t) return false;
+    if(o && String(e.legajo)!==o) return false;
+    if(m && String(e.matriz)!==m) return false;
+    return true;
+  });
+}
+
+function render(){
+  var fs=filtrados(), rm=0, pm=0;
+  $('tbody').innerHTML=fs.map(function(e){
+    if(e.tipo==='RM') rm++; else pm++;
+    var f=e.fecha.split('-');
+    return '<tr><td>'+f[2]+'/'+f[1]+'/'+f[0]+'</td><td>'+hora(e.hora_inicio)+'</td><td>'+hora(e.hora_fin)+'</td>'+
+      '<td><span class="badge '+e.tipo.toLowerCase()+'">'+e.tipo+'</span></td>'+
+      '<td>'+esc(e.legajo)+'</td><td>'+esc(e.empleado||'')+'</td>'+
+      '<td><b>'+esc(e.matriz)+'</b></td><td>'+esc(e.nombre_matriz||'')+'</td>'+
+      '<td class="num">'+dur(e.segundos)+'</td>'+
+      '<td class="num"><b>'+fmt(e.uni_acum)+'</b></td>'+
+      '<td class="num">'+(e.golpes==null?'—':('<b>'+fmt(e.golpes)+'</b>'))+'</td></tr>';
+  }).join('');
+  $('kRM').textContent=fmt(rm); $('kPM').textContent=fmt(pm); $('kTot').textContent=fmt(fs.length);
+  $('tblEmpty').classList.toggle('hidden', fs.length>0);
+  $('status').textContent=fs.length+' eventos';
+}
+
+$('btnCSV').addEventListener('click',function(){
+  /* el armado del CSV (;, BOM, coma decimal) es el de la casa: GP2UI.exportarCSV */
+  var filas=[['Fecha','Inicio','Fin','Tipo','Legajo','Operario','Matriz','Descripcion','Segundos','Uni desde ult rotura','Golpes']];
+  filtrados().forEach(function(e){
+    filas.push([e.fecha,e.hora_inicio||'',e.hora_fin||'',e.tipo,e.legajo,e.empleado||'',e.matriz,e.nombre_matriz||'',
+      Math.round(e.segundos||0),e.uni_acum,e.golpes==null?'':e.golpes]);
+  });
+  GP2UI.exportarCSV('problemas_matrices', filas);
+});
+
+['tipo','oper','mat'].forEach(function(id){ $(id).addEventListener('input', render); });
+['desde','hasta'].forEach(function(id){ $(id).addEventListener('change', cargar); });
+$('desde').value=hoyAR(-30);
+$('hasta').value=hoyAR(0);
+cargar();
+</script>
+</body>
+</html>

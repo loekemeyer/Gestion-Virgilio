@@ -15,6 +15,9 @@ node tests/version-sync.cjs
 echo "== smoke (Playwright headless) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/smoke.cjs
 
+echo "== rcp-alta-ok (regresión: alta de artículo nuevo avisa a Thomas por WhatsApp y NO traba la recepción) =="
+PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/rcp-alta-ok.cjs
+
 echo "== ocg-norm (regresión: cruce de códigos del generador de OCs) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/ocg-norm.cjs
 
@@ -44,6 +47,12 @@ PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node te
 
 echo "== ssg-switch (regresión: switch admin del aviso 'picking sin stock') =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/ssg-switch.cjs
+
+echo "== gv-app-tag (regresión: el sello gv_app viaja en cada evento; NULL = Producción) =="
+PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/gv-app-tag.cjs
+
+echo "== entrevista-legajo600 (regresión: legajo 600 persiste + sella gv_nombre_prueba; 0/1 no) =="
+PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/entrevista-legajo600.cjs
 
 echo "== fac-npc (regresión: aviso faltantes en Facturación + consulta NP/Líos) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/fac-npc.cjs
@@ -318,6 +327,12 @@ PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node te
 echo "== ppp-movil (v14.25: la fila de la PPP en un teléfono de 390 px — el importe entero, sin scroll horizontal) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/ppp-movil.cjs
 
+echo "== ppp-fecha-formato (regresión v15.50: una sola fecha dd/mm/aaaa en la PPP; a la base va ISO) =="
+PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/ppp-fecha-formato.cjs
+
+echo "== ppp-resumen-angosto (regresión v15.53: la tabla del Resumen no se estira; columnas al ancho del contenido) =="
+PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/ppp-resumen-angosto.cjs
+
 echo "== ppp-atrasados (v14.06: los atrasados se ven sin rebotar de solapa — banda en Programación + lista adentro de Resumen) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/ppp-atrasados.cjs
 
@@ -339,5 +354,23 @@ PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node te
 echo "== apr-isis-sin-tanda (v14.35: las NP de ISIS sin tanda entran a A Programar y se programan con su número) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/apr-isis-sin-tanda.cjs
 
+echo "== apr-cuarentena (v14.81: submódulo Cuarentena — pedidos retenidos por deuda/suspendido/crédito, con badge, fuera del auto) =="
+PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/apr-cuarentena.cjs
+
 echo "== fac-descargas (v14.36: col A fecha de descarga · col J condición de pago · solapa Descargas · razón social de la NP web) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/fac-descargas.cjs
+
+echo "== pk-excedente-vista (v14.93: pkFetchExcedente lee cajas de vista_saldos_stock, no suma movimientos truncados a 1000) =="
+PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/pk-excedente-vista.cjs
+
+echo "== remito-np-web (v15.46: el remito impreso trae cliente y fecha también en las NP de la página) =="
+PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/remito-np-web.cjs
+
+echo "== proy-entregadas (v15.52: popup Proyección — cajas ENTREGADAS por el proveedor entre el mes y la barra; s/d si ese mes no había registro) =="
+PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/proy-entregadas.cjs
+
+echo "== ppp-res-np-fecha (v15.57: Resumen PPP — fecha dd/mm pegada al día; tocar la NP abre su contenido, también NP web via gv_np_items) =="
+PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/ppp-res-np-fecha.cjs
+
+echo "== ppp-errores-detalle (v15.57: alerta Tandas inconsistentes dice el día y qué ruta/fecha mezcla, NP por NP) =="
+PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/ppp-errores-detalle.cjs

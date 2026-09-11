@@ -1,33 +1,35 @@
-// isis-api — API de salida hacia el ERP ISIS (idea 5547 · ticket 1159666).
+// isis-api — API de salida hacia el ERP ISIS (idea 5547 · ticket TkT115966).
 //
-// Qué hace: expone los PEDIDOS TERMINADOS de Producción Virgilio (las NP que la
-// operadora tildó en Facturación) para que ISIS los baje y los facture solo.
-// ISIS consulta esta API (request SALIENTE desde su LAN) → del lado del depósito
-// no hace falta Windows Server, IIS, IP pública ni abrir puertos.
+// v2.0 (2026-09-08, reunión 04/09): el pedido viaja como JSON y la clave es la
+// REFERENCIA (la etiqueta de la NP, "LK 0011"), NO una NP numérica. La NP la pone
+// ISIS al facturar. Sin acuse (el vínculo factura↔pedido lo resuelve nuestro parseo).
+// ISIS consulta esta API (request SALIENTE desde su LAN) → del lado del depósito no
+// hace falta Windows Server, IIS, IP pública ni abrir puertos.
 //
 // Endpoints (base: https://<proj>.supabase.co/functions/v1/isis-api):
-//   GET  /ping                      → healthcheck
-//   GET  /pedidos                   → cabeceras por estado (?estado=&empresa=&desde=&limit=)
-//   GET  /pedidos/{np}              → JSON completo del pedido (lo pasa a "entregado")
-//   POST /pedidos/{np}/acuse        → ISIS confirma qué hizo con el pedido
-//   POST /acuse                     → idem, con la NP en el body
-// Todas aceptan también el prefijo /v1 (…/isis-api/v1/pedidos).
+//   GET  /ping                       → healthcheck
+//   GET  /pedidos                    → cabeceras por estado (?estado=&empresa=&desde=&limit=)
+//   GET  /pedidos/{referencia}       → JSON completo del pedido (lo pasa a "entregado")
+// Todas aceptan también el prefijo /v1 y /v2 (…/isis-api/v2/pedidos).
+//
+// Sólo se ofrecen los pedidos WEB (referencias LK/CH ####): los NP numéricos ya están
+// cargados en ISIS y no se le devuelven (evita doble carga). Estados: pendiente /
+// entregado / anulado.
 //
 // Auth: header `X-API-Key: <token>` (o `Authorization: Bearer <token>`).
 // En la base se guarda SOLO el SHA-256 del token (tabla isis_api_tokens).
-//
 // verify_jwt = OFF: la función implementa su propia autenticación por token.
-// DDL y RPCs: sql/isis_api.sql. Especificación para ISIS: docs/ISIS-API-ESPECIFICACION.md
+// DDL y RPCs v2.0: sql/gv_isis_api_v2.sql. Especificación: docs/ISIS-API-ESPECIFICACION.md
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 
 const SB_URL = Deno.env.get("SUPABASE_URL") || "";
 const SB_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
-const VERSION = "1.0";
+const VERSION = "2.0";
 
 const CORS = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-api-key, content-type, apikey",
-  "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+  "Access-Control-Allow-Methods": "GET, OPTIONS",
 };
 
 function json(body: unknown, status = 200): Response {
@@ -68,15 +70,18 @@ function tokenDeRequest(req: Request): string {
   return m ? m[1].trim() : "";
 }
 
-// /functions/v1/isis-api/v1/pedidos/44604 → ["pedidos","44604"]
+// /functions/v1/isis-api/v2/pedidos/LK%200011 → ["pedidos","LK 0011"]
 function segmentos(pathname: string): string[] {
-  const p = pathname.split("/").filter(Boolean);
+  const p = pathname.split("/").filter(Boolean).map((s) => {
+    try { return decodeURIComponent(s); } catch { return s; }
+  });
   const i = p.indexOf("isis-api");
   const resto = i >= 0 ? p.slice(i + 1) : p;
-  return resto[0] === "v1" ? resto.slice(1) : resto;
+  return (resto[0] === "v1" || resto[0] === "v2") ? resto.slice(1) : resto;
 }
 
-const NP_RE = /^\d{1,12}$/;
+// Referencia: "LK 0011" / "CH 7" (con o sin espacio), opcionalmente "-bloque".
+const REF_RE = /^(LK|CH)\s?\d{1,6}(-\d+)?$/i;
 
 Deno.serve(async (req: Request) => {
   const t0 = Date.now();
@@ -101,10 +106,10 @@ Deno.serve(async (req: Request) => {
   }
   if (!auth) return fail(401, "token_invalido", "Token inválido o dado de baja.");
 
-  const log = (status: number, np?: string, detalle?: unknown) =>
+  const log = (status: number, ref?: string, detalle?: unknown) =>
     rpc("isis_api_log_write", {
       p_token_id: auth!.id, p_nombre: auth!.nombre, p_metodo: req.method,
-      p_ruta: ruta, p_np: np ?? null, p_status: status, p_ms: Date.now() - t0,
+      p_ruta: ruta, p_np: ref ?? null, p_status: status, p_ms: Date.now() - t0,
       p_ip: ip, p_detalle: detalle ?? null,
     }).catch(() => {});
 
@@ -114,7 +119,7 @@ Deno.serve(async (req: Request) => {
       await log(200);
       return json({
         ok: true,
-        servicio: "Producción Virgilio — API pedidos terminados",
+        servicio: "Producción Virgilio — API pedidos armados (v2.0)",
         version: VERSION,
         cliente: auth.nombre,
         hora: new Date().toISOString(),
@@ -127,71 +132,40 @@ Deno.serve(async (req: Request) => {
       const empresa = url.searchParams.get("empresa");
       const desde = url.searchParams.get("desde");
       const limit = parseInt(url.searchParams.get("limit") || "100", 10);
-      const ESTADOS = ["pendiente", "entregado", "procesado", "error", "anulado"];
+      const ESTADOS = ["pendiente", "entregado", "anulado"];
       if (!ESTADOS.includes(estado)) {
         await log(400);
         return fail(400, "estado_invalido", `estado debe ser uno de: ${ESTADOS.join(", ")}`);
       }
-      const pedidos = await rpc<unknown[]>("isis_api_pendientes", {
+      const pedidos = await rpc<unknown[]>("gv_isis_pedidos_lista", {
         p_estado: estado,
         p_empresa: empresa || null,
         p_desde: desde || null,
         p_limit: Number.isFinite(limit) ? limit : 100,
       });
-      await log(200, undefined, { estado, total: pedidos.length });
-      return json({ ok: true, estado, total: pedidos.length, pedidos });
+      const total = Array.isArray(pedidos) ? pedidos.length : 0;
+      await log(200, undefined, { estado, total });
+      return json({ ok: true, estado, total, pedidos });
     }
 
-    // ── GET /pedidos/{np} ──────────────────────────────────────────────
+    // ── GET /pedidos/{referencia} ──────────────────────────────────────
     if (req.method === "GET" && seg[0] === "pedidos" && seg.length === 2) {
-      const np = seg[1];
-      if (!NP_RE.test(np)) {
-        await log(400, np);
-        return fail(400, "np_invalida", "La NP debe ser numérica.");
+      const ref = seg[1];
+      if (!REF_RE.test(ref)) {
+        await log(400, ref);
+        return fail(400, "referencia_invalida", "La referencia debe ser tipo 'LK 0011' o 'CH 0007'.");
       }
       const marcar = url.searchParams.get("marcar") !== "false";
-      const pedido = await rpc<unknown>("isis_api_pedido", { p_np: np, p_marcar: marcar });
+      const pedido = await rpc<unknown>("gv_isis_pedido_json", { p_ref: ref });
       if (!pedido) {
-        await log(404, np);
-        return fail(404, "no_encontrado", `La NP ${np} no está publicada como pedido terminado.`);
+        await log(404, ref);
+        return fail(404, "no_encontrado", `La referencia ${ref} no está publicada como pedido armado.`);
       }
-      await log(200, np, { marcar });
+      if (marcar) {
+        try { await rpc("gv_isis_pedido_marcar_entregado", { p_ref: ref }); } catch (_e) { /* no romper la entrega */ }
+      }
+      await log(200, ref, { marcar });
       return json({ ok: true, pedido });
-    }
-
-    // ── POST /pedidos/{np}/acuse  |  POST /acuse ───────────────────────
-    const esAcuseRuta = seg[0] === "pedidos" && seg.length === 3 && seg[2] === "acuse";
-    if (req.method === "POST" && (esAcuseRuta || seg[0] === "acuse")) {
-      let body: Record<string, unknown> = {};
-      try {
-        body = await req.json();
-      } catch {
-        await log(400);
-        return fail(400, "json_invalido", "El cuerpo debe ser JSON.");
-      }
-      const np = String(esAcuseRuta ? seg[1] : (body.np ?? "")).trim();
-      if (!NP_RE.test(np)) {
-        await log(400, np);
-        return fail(400, "np_invalida", "Falta la NP o no es numérica.");
-      }
-      const resultado = String(body.resultado ?? "").toLowerCase();
-      if (resultado !== "ok" && resultado !== "error") {
-        await log(400, np);
-        return fail(400, "resultado_invalido", 'El campo "resultado" debe ser "ok" o "error".');
-      }
-      const r = await rpc<{ ok: boolean; error?: string; duplicado?: boolean }>("isis_api_acuse", {
-        p_np: np,
-        p_resultado: resultado,
-        p_nro: body.nro_comprobante ? String(body.nro_comprobante) : null,
-        p_cae: body.cae ? String(body.cae) : null,
-        p_error: body.error_detalle ? String(body.error_detalle) : null,
-      });
-      if (!r?.ok) {
-        await log(404, np, r);
-        return fail(404, "no_encontrado", r?.error || "No se pudo registrar el acuse.");
-      }
-      await log(200, np, r);
-      return json(r);
     }
 
     await log(404);

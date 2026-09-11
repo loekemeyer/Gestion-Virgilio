@@ -1,0 +1,291 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <script src="../auth-guard.js?v=20260904t"></script>
+<script src="../gp2-ui.js?v=20260905a"></script>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Alertas (GP2)</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: Arial, sans-serif; background: #d9d9de; padding: 20px; }
+
+    .top-bar { max-width: 960px; margin: 0 auto 20px; display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+    .btn-volver { height: 44px; padding: 0 20px; border-radius: 999px; border: 2px solid #b9b9b9; background: #f7f7f7; font-size: 16px; cursor: pointer; font-weight: 700; }
+    .btn-volver:hover { background: #e5e5e5; border-color: #e2e8f0; }
+    .top-bar h1 { font-size: 22px; flex: 1; }
+    .btn-refrescar { height: 44px; padding: 0 18px; border-radius: 999px; border: 2px solid #cdd7ea; background: #fff; color: #164298; font-weight: 700; font-size: 16px; cursor: pointer; }
+    .btn-refrescar:hover { background: #eef4ff; }
+    .status-dot { width: 12px; height: 12px; border-radius: 50%; background: #e7f8ed; animation: pulse 2s infinite; }
+    .status-dot.offline { background: #ef4444; animation: none; }
+    @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.4} }
+    .status-label { font-size: 13px; color: #555; }
+
+    .config-panel { max-width: 960px; margin: 0 auto 20px; background: #fff; border: 1px solid #cfcfcf; border-radius: 14px; padding: 18px 22px; }
+    .config-panel summary { cursor: pointer; font-weight: 700; font-size: 15px; color: #333; }
+    .config-grid { display: grid; grid-template-columns: 1fr; gap: 10px 14px; margin-top: 16px; }
+    .config-buttons { display: flex; gap: 10px; justify-content: flex-end; margin-top: 8px; }
+    .btn-test { height: 44px; padding: 0 16px; border: 2px solid #cdead8; border-radius: 10px; background: #fff; color: #25d366; font-weight: 700; font-size: 16px; cursor: pointer; }
+    .btn-test:hover { background: #f0fdf4; }
+    .config-hint { font-size: 12px; color: #888; margin-top: 4px; line-height: 1.5; }
+
+    .alerts-wrap { max-width: 960px; margin: 0 auto 20px; background: #fff; border: 1px solid #cfcfcf; border-radius: 14px; overflow: hidden; }
+    /* Las tablas de alertas miden ~540px: dentro del overflow:hidden de arriba,
+       a 390px las dos ultimas columnas (Matriz y Nombre Matriz) se cortaban y no
+       habia forma de llegar a ellas. Ahora scrollean solas (2026-09-03). */
+    .table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+    .table-wrap table { min-width: 100%; }
+    .alerts-header { color: #fff; padding: 16px 22px; display: flex; justify-content: space-between; align-items: center; }
+    .alerts-header h2 { font-size: 17px; color: #fff; }
+    .alert-badge { color: #fff; font-weight: 900; font-size: 13px; padding: 3px 12px; border-radius: 999px; }
+    .bg-dark { background: #111; } .bg-red { background: #f8e8e7; } .bg-orange { background: #f8f0e7; } .bg-gray { background: #ffffff; }
+    .badge-red { background: #ef4444; } .badge-red.ok { background: #e7f8ed; }
+
+    table { width: 100%; border-collapse: collapse; }
+    th { background: #f3f4f6; text-align: left; padding: 12px 18px; font-size: 13px; color: #555; border-bottom: 1px solid #e5e7eb; }
+    td { padding: 12px 18px; font-size: 14px; border-bottom: 1px solid #f0f0f0; }
+    tr:last-child td { border-bottom: none; }
+    tr:hover td { background: #fafafa; }
+    .tag-alerta { display: inline-block; font-weight: 700; font-size: 12px; padding: 3px 10px; border-radius: 999px; border: 1px solid; }
+    .tag-sin-tiempo { background: #fef2f2; color: #b42318; border-color: #fecaca; }
+    .empty-msg { text-align: center; padding: 30px 20px; color: #999; font-size: 14px; }
+    .last-check { font-size: 12px; color: #888; text-align: right; padding: 10px 18px; }
+    .pend-body { padding: 16px 22px; }
+    .pend-item { background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 10px; padding: 14px 16px; }
+    .pend-item h3 { font-size: 14px; color: #374151; margin-bottom: 6px; }
+    .pend-item p { font-size: 13px; color: #6b7280; line-height: 1.5; }
+
+    .toast-container { position: fixed; top: 20px; right: 20px; z-index: 9999; display: flex; flex-direction: column; gap: 10px; }
+    .toast { background: #111; color: #fff; padding: 14px 22px; border-radius: 12px; font-size: 14px; box-shadow: 0 4px 20px rgba(0,0,0,.25); animation: slideIn .3s ease-out; max-width: 360px; }
+    .toast.warn { background: #f8e8e7; } .toast.success { background: #e7f8ed; }
+    @keyframes slideIn { from{transform:translateX(100%);opacity:0} to{transform:translateX(0);opacity:1} }
+  </style>
+<link rel="icon" type="image/png" href="../GP2_favicon.png">
+<link rel="apple-touch-icon" href="../GP2_favicon.png">
+<link rel="stylesheet" href="../gp2-claro.css?v=20260903b">
+</head>
+
+<body>
+<div id="gp2-logobar" style="position:relative;background:#e8edf7;text-align:center;padding:6px 0;border-bottom:1px solid #d0dae7"><a href="../GP2_MODULOS.html" style="position:absolute;left:10px;top:50%;transform:translateY(-50%);color:#385475;text-decoration:none;font-weight:700;font-size:15px;padding:5px 10px;border:1px solid #d1d9e5;border-radius:8px;background:#e9eef7">← Atrás</a><a href="../GP2_MODULOS.html" style="text-decoration:none"><img src="../GP2_logo.png" alt="GP2 · Gestión Productiva" style="height:40px;vertical-align:middle"></a></div>
+
+
+  <div class="top-bar">
+    <button class="btn-volver" onclick="location.href='../GP2_MODULOS.html'">&larr; Volver</button>
+    <h1>Alertas Produccion (GP2)</h1>
+    <button class="btn-refrescar" id="btnRefrescar">&#8635; Refrescar</button>
+    <div class="status-dot" id="statusDot"></div>
+    <span class="status-label" id="statusLabel">Conectando...</span>
+  </div>
+
+  <details class="config-panel">
+    <summary>&#9742; Configurar WhatsApp Business API</summary>
+    <div class="config-grid">
+      <p class="config-hint">
+        Plantillas aprobadas en Meta (asignacion automatica):<br>
+        <strong>Reducido</strong> (problemas_en_matriz_reducido): Problema, Matriz, Descripcion, Hs Evento<br>
+        <strong>Completo</strong> (problema_en_matriz_completo): Problema, Matriz, Descripcion, Operario, Hs Evento<br><br>
+        Conexion y credenciales fijas, no modificables.<br>
+        Destinatarios: <strong>5491131181594</strong>, <strong>5491131181027</strong>, <strong>5491162521635</strong>
+      </p>
+      <div class="config-buttons">
+        <button class="btn-test" id="btnTestWA">Enviar prueba</button>
+      </div>
+    </div>
+  </details>
+
+  <!-- ALERTA 1: MATRIZ SIN TIEMPO -->
+  <div class="alerts-wrap">
+    <div class="alerts-header bg-dark">
+      <h2>Alerta Matriz sin Tiempo</h2>
+      <span class="alert-badge badge-red" id="badgeSinTiempo">...</span>
+    </div>
+    <div class="alerts-body" id="bodySinTiempo"><p class="empty-msg">Cargando...</p></div>
+    <div class="last-check" id="checkSinTiempo"></div>
+  </div>
+
+  <!-- ALERTA 2: ROMPI MATRIZ -->
+  <div class="alerts-wrap">
+    <div class="alerts-header bg-red">
+      <h2>Alerta Rompi Matriz (RM) &mdash; ultimos 30 dias</h2>
+      <span class="alert-badge badge-red" id="badgeRM">...</span>
+    </div>
+    <div class="alerts-body" id="bodyRM"><p class="empty-msg">Cargando...</p></div>
+    <div class="last-check" id="checkRM"></div>
+  </div>
+
+  <!-- ALERTA 3: PARE MATRIZ -->
+  <div class="alerts-wrap">
+    <div class="alerts-header bg-orange">
+      <h2>Alerta Pare Matriz (PM) &mdash; ultimos 30 dias</h2>
+      <span class="alert-badge badge-red" id="badgePM">...</span>
+    </div>
+    <div class="alerts-body" id="bodyPM"><p class="empty-msg">Cargando...</p></div>
+    <div class="last-check" id="checkPM"></div>
+  </div>
+
+  <!-- PENDIENTES (dato no migrado) -->
+  <div class="alerts-wrap">
+    <div class="alerts-header bg-gray">
+      <h2>Alertas pendientes (dato no migrado)</h2>
+      <span class="alert-badge" id="badgePend" style="background:#edeff3">...</span>
+    </div>
+    <div class="pend-body" id="bodyPend"><p class="empty-msg">Cargando...</p></div>
+  </div>
+
+  <div class="toast-container" id="toastContainer"></div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="../supabase-config.js?v=20260905k"></script>
+  <script>
+  document.addEventListener("DOMContentLoaded", () => {
+    "use strict";
+
+    /* ================= SUPABASE (schema GP2) ================= */
+    // MIGRADO a schema GP2: todas las alertas salen de un unico RPC "GP2".alertas_bundle()
+    // (se apoya en GP2.produccion, espejo de db_n8n_espejo).
+    const sb = GP2_SB();
+    const EDGE_FN_URL = SUPABASE_URL + "/functions/v1/send-whatsapp";
+
+    /* ================= DOM ================= */
+    const statusDot   = document.getElementById("statusDot");
+    const statusLabel = document.getElementById("statusLabel");
+    const toastContainer = document.getElementById("toastContainer");
+    const btnRefrescar   = document.getElementById("btnRefrescar");
+    const btnTestWA      = document.getElementById("btnTestWA");
+
+    const badgeSinTiempo = document.getElementById("badgeSinTiempo");
+    const bodySinTiempo  = document.getElementById("bodySinTiempo");
+    const checkSinTiempo = document.getElementById("checkSinTiempo");
+    const badgeRM = document.getElementById("badgeRM");
+    const bodyRM  = document.getElementById("bodyRM");
+    const checkRM = document.getElementById("checkRM");
+    const badgePM = document.getElementById("badgePM");
+    const bodyPM  = document.getElementById("bodyPM");
+    const checkPM = document.getElementById("checkPM");
+    const badgePend = document.getElementById("badgePend");
+    const bodyPend  = document.getElementById("bodyPend");
+
+    /* ================= HELPERS ================= */
+    function showToast(msg, type) {
+      const el = document.createElement("div");
+      el.className = "toast " + (type || "");
+      el.textContent = msg;
+      toastContainer.appendChild(el);
+      setTimeout(() => { el.style.opacity = "0"; setTimeout(() => el.remove(), 300); }, 5000);
+    }
+    var esc = GP2UI.esc;   /* helper de la casa, gp2-ui.js (2026-09-05) */
+    function formatNow() { return new Date().toLocaleString("es-AR", { timeZone: "America/Argentina/Buenos_Aires" }); }
+    function setStatus(ok) {
+      statusDot.className = "status-dot" + (ok ? "" : " offline");
+      statusLabel.textContent = ok ? "Datos actualizados" : "Desconectado";
+    }
+
+    if ("Notification" in window && Notification.permission === "default") {
+      Notification.requestPermission();
+    }
+
+    /* ================= WHATSAPP (edge function, sin cambios) ================= */
+    async function sendWhatsAppToAll(plantilla, datos, { test = false } = {}) {
+      let parametros;
+      if (plantilla === "problema_en_matriz_completo") {
+        parametros = [datos.problema || "", datos.matriz || "", datos.descripcion || "", datos.operario || "", datos.horaEvento || ""];
+      } else {
+        parametros = [datos.problema || "", datos.matriz || "", datos.descripcion || "", datos.horaEvento || ""];
+      }
+      try {
+        const resp = await fetch(EDGE_FN_URL, {
+          method: "POST",
+          headers: { "Authorization": "Bearer " + SUPABASE_KEY, "Content-Type": "application/json" },
+          body: JSON.stringify({ parametros, plantilla, idioma: "es_AR", test })
+        });
+        if (!resp.ok) throw new Error("HTTP " + resp.status);
+        return true;
+      } catch (err) { console.error("Error edge function:", err); return false; }
+    }
+
+    /* ================= RENDER ================= */
+    function badge(el, count) {
+      el.textContent = count;
+      el.className = "alert-badge badge-red" + (count === 0 ? " ok" : "");
+    }
+
+    function renderSinTiempo(block) {
+      const items = block.items || [];
+      badge(badgeSinTiempo, block.total || 0);
+      checkSinTiempo.textContent = "Ultima verificacion: " + formatNow();
+      if (!items.length) {
+        bodySinTiempo.innerHTML = '<p class="empty-msg">Todas las matrices tienen tiempo asignado.</p>';
+        return;
+      }
+      let html = "<div class=\"table-wrap\"><table><thead><tr><th>N° Matriz</th><th>Nombre</th><th>Tiempo</th><th>Estado</th></tr></thead><tbody>";
+      for (const m of items) {
+        html += `<tr><td><strong>${esc(m.N_Matriz)}</strong></td><td>${esc(m.Nombre_Matriz)}</td><td>${m.Tiempo_Historico ?? 0}</td><td><span class="tag-alerta tag-sin-tiempo">Sin Tiempo</span></td></tr>`;
+      }
+      html += "</tbody></table></div>";
+      bodySinTiempo.innerHTML = html;
+    }
+
+    function renderEventos(bodyEl, badgeEl, checkEl, block) {
+      const rows = block.items || [];
+      badge(badgeEl, block.total || 0);
+      checkEl.textContent = "Ultima verificacion: " + formatNow();
+      if (!rows.length) {
+        bodyEl.innerHTML = `<p class="empty-msg">Sin eventos en los ultimos 30 dias.</p>`;
+        return;
+      }
+      let html = "<div class=\"table-wrap\"><table><thead><tr><th>Fecha</th><th>Hora</th><th>Legajo</th><th>Empleado</th><th>Matriz</th><th>Nombre Matriz</th></tr></thead><tbody>";
+      for (const r of rows) {
+        html += `<tr><td>${esc(r.Fecha)}</td><td>${esc(r.Hora)}</td><td>${esc(r.Legajo)}</td><td>${esc(r.Empleado)}</td><td><strong>${esc(r.Matriz)}</strong></td><td>${esc(r.Nombre_Matriz)}</td></tr>`;
+      }
+      html += "</tbody></table></div>";
+      bodyEl.innerHTML = html;
+    }
+
+    function renderPendientes(items) {
+      badgePend.textContent = (items || []).length;
+      if (!items || !items.length) {
+        bodyPend.innerHTML = '<p class="empty-msg">No hay alertas pendientes.</p>';
+        return;
+      }
+      bodyPend.innerHTML = items.map(p =>
+        `<div class="pend-item"><h3>&#9203; ${esc(p.titulo || p.clave)}</h3><p>${esc(p.motivo)}</p></div>`
+      ).join("");
+    }
+
+    /* ================= FETCH ================= */
+    async function cargarAlertas() {
+      const { data, error } = await sb.rpc("alertas_bundle");
+      if (error) {
+        console.error(error);
+        setStatus(false);
+        showToast("Error cargando alertas: " + (error.message || error), "warn");
+        return;
+      }
+      setStatus(true);
+      renderSinTiempo(data.matriz_sin_tiempo || { total: 0, items: [] });
+      renderEventos(bodyRM, badgeRM, checkRM, data.rm || { total: 0, items: [] });
+      renderEventos(bodyPM, badgePM, checkPM, data.pm || { total: 0, items: [] });
+      renderPendientes(data.pendientes || []);
+    }
+
+    /* ================= EVENTS ================= */
+    btnRefrescar.addEventListener("click", cargarAlertas);
+    btnTestWA.addEventListener("click", async () => {
+      const ok = await sendWhatsAppToAll("problemas_en_matriz_reducido", {
+        problema: "Prueba", matriz: "000",
+        descripcion: "Mensaje de prueba desde Alertas", horaEvento: formatNow()
+      }, { test: true });
+      if (ok) showToast("Prueba enviada (plantilla reducido)", "success");
+      else showToast("No se pudo enviar la prueba (ver consola)", "warn");
+    });
+
+    /* ================= INIT + auto-refresh cada 60s ================= */
+    // GP2.produccion es un espejo que se sincroniza por lotes (no INSERT en vivo),
+    // por eso se refresca por polling en vez de realtime como en la version vieja.
+    cargarAlertas();
+    setInterval(cargarAlertas, 60000);
+  });
+  </script>
+
+</body>
+</html>

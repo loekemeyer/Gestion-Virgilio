@@ -12,7 +12,341 @@
 > única**; no se replica. Ante la duda entre parche rápido y fix de raíz → **fix
 > de raíz**.
 >
-> Última actualización: 2026-09-08 (martes) · Versión app al documentar: **v14.41**
+> Última actualización: 2026-09-11 (viernes) · Versión app al documentar: **v15.64**
+>
+> Nota **v15.40 (2026-09-11) — HANDOFF de planimetría / Acacia: `docs/HANDOFF-PLANIMETRIA-Y-ACACIA.md`.**
+> Thomas sigue este tema en otra sesión. Ahí está todo junto: los **13 artículos activos del catálogo LK
+> sin sector** (+ 578 y el caso 517/991E), las tres reglas de qué alertas de planimetría son ruido
+> (5 dígitos, 599/943/948 sin la E, PSP se dispara al abrir la tanda), el análisis de la **línea Acacia
+> contra el 2.º pedido de Becky** con el barrido de dónde siguen apareciendo 991E/994E/995E/999E en los
+> dos proyectos, por qué el remito 38087 salió mal, el estado del aviso de alta por WhatsApp (v15.39), las
+> tareas Planify **3105** (Luis) y **3107** (Tomás B.), y las trampas del entorno. **La decisión abierta
+> es si 991E se baja o se queda.**
+>
+>
+> Nota **v15.39 (2026-09-11, Thomas) — RECEPCIÓN: dar de alta un artículo nuevo le AVISA a Thomas por WhatsApp (no traba nada).**
+> Pedido del dueño: *"si en la recepción están por recibir un artículo nuevo que no figuraba en la
+> planimetría, me mandan un mensaje directo a WhatsApp, a mi teléfono, 'hola Thomy, estoy creando un
+> artículo nuevo, que es el tanto, ¿me confirmás que está bien?'"*.
+>
+> ⚠ **Corrección del mismo día, y es la regla que manda:** *"no quiero que quede bloqueado a que yo les
+> conteste, porque capaz les contesto una hora después. Quiero que quede asentado el mensaje y que una vez
+> que lo mandan, ellos sí puedan seguir dando la recepción"*. La **v15.36 trababa el `Enviar`** hasta la
+> respuesta; **la v15.39 lo sacó**. Hoy: se manda el WhatsApp, queda la fila, y el operario sigue de largo.
+> La respuesta de Thomas se guarda igual, pero **es información, no un permiso**.
+>
+> **De dónde sale.** Remito **38087** (02/09, Log/Fabr, legajo 277): se cargaron **599, 943 y 948**, que no
+> existen — son **599E** (J44), **943E** (I08) y **948E** (I11). El botón **"+"** (`arAddCode`, sólo visible
+> en Log/Fabr) abría un `prompt` y daba de alta cualquier código: **sin validar, sin autorización y sin
+> avisarle a nadie**. No hubo operadora en el medio; ese flujo no tiene ningún paso de aprobación.
+>
+> **Cómo quedó.** Al escribir un código en el "+": si **está** en la planimetría, todo sigue igual. Si **no
+> está**, sale un WhatsApp al teléfono de Thomas (5491162521635) con el código, el remito, el tallerista, la
+> línea y el legajo, y dos links (**✅ Sí** / **❌ No**). El operario ve *"Listo, le mandé el WhatsApp.
+> Seguí con la recepción normal"* y **puede cerrar la recepción cuando quiera**. El botón del código queda
+> con 🆕 (más ✅ o ⛔ cuando Thomas conteste) y el resumen lista los avisados con un *"podés enviar igual"*.
+>
+> **Detalles que importan:**
+> · El **asiento** es la fila de `GV_Alta_Articulo_Aprobacion`: quién, cuándo, qué remito, si el WhatsApp
+>   salió (`wa_ok` / `wa_error`) y la respuesta. Con la anon key **sólo se puede leer**; escribe la Edge
+>   Function `gv-alta-articulo` (`service_role`), que manda el WhatsApp vía `send-whatsapp`
+>   (`plantilla:"_texto_libre"`).
+> · El link del WhatsApp **no resuelve en el primer click**: muestra una página con un botón y recién ése
+>   confirma. Si resolviera de una, **el preview del link de WhatsApp contestaría solo**.
+> · **Sin conexión tampoco traba**: avisa que el mensaje no salió y deja seguir. El aviso no se pierde del
+>   todo — al enviar la recepción sale igual el evento **RSP**, que dispara su propio Telegram.
+> · **Respaldo por Telegram**: WhatsApp sólo deja texto libre dentro de la ventana de 24 h de Meta. Si Meta
+>   rechaza, el aviso llega igual por Telegram con los mismos links, y queda `wa_ok=false` en la fila.
+> · Si Thomas contesta que **no**, el sistema **no da marcha atrás solo** (la recepción ya siguió): la
+>   próxima vez que alguien escriba ese código el "+" le avisa *"Thomy ya había dicho que NO"*, y él ve en
+>   la pantalla de confirmación que tiene que avisar si hay que revertir.
+> · Regresión `tests/rcp-alta-ok.cjs` (16 chequeos) en `tests/run.sh`. ⚠ **La prueba de punta a punta (que
+>   el WhatsApp llegue de verdad) no se pudo correr desde el entorno de Claude** (no tiene salida a
+>   `*.supabase.co`): hay que probarlo desde el celular. Tarea Planify **3107**.
+> · Detalle, medición y rollback: §3.bn de `docs/SUPABASE-GESTION-VIRGILIO.md`.
+>
+> Nota **v15.35 (2026-09-11, Thomas) — ACACIA (989E + 99xE): lo que no se pide en la 2da Becky NO debería existir.**
+> Regla del dueño: *"todos los 99xE que no se pidan en la 2da Becky son artículos que no deberían estar en
+> todo Gestión Virgilio ni en `pagina-LK-copia`"*, y **989E entra en la misma lógica** (es de la misma
+> familia Acacia aunque el código no arranque con 99).
+>
+> **La familia es 989E + 990E…999E**, y la referencia es el **2° pedido de importación de Becky**
+> (`GV_Importados_Baches.creado_por = 'PI B260601-2'`, reingreso **2026-11-15**, 26 líneas / 48.056 uni;
+> el 1° es `PI B260601`, reingreso 29/09):
+>
+> · **Se piden → quedan (7):** `989E` (576) · `990E` (576) · `992E` (576) · `993E` (1.152) · `996E` (576)
+>   · `997E` (576) · `998E` (576).
+> · **NO se piden → no deberían existir (4):** `991E` (Espátula Corta Torta) · `994E` (Pelador) ·
+>   `995E` (Rallador) · `999E` (Pica Ajo). `994E` y `999E` **tenían** línea en la 2da Becky pero quedó
+>   **`anulado`** (`backfill_20260911`); `991E` y `995E` **ni siquiera tienen ficha** en `Importados`.
+>
+> **Dónde siguen apareciendo hoy** (barrido de todas las columnas `cod*`/`articulo`/`codigo` de los dos
+> proyectos, `query_to_xml` sobre `information_schema`):
+>
+> | | 991E | 994E | 995E | 999E |
+> |---|---|---|---|---|
+> | GV `Importados` (ficha) | — | 1 | — | 1 |
+> | GV `GV_Importados_Baches` | — | 1 anulado | — | 1 anulado |
+> | GV `Importados_Mov_Stock` | — | 1 | — | 1 |
+> | GV `Importados_Volumen` | — | 1 | — | 1 |
+> | GV `PPP_Web_Base` | 1 (NP LK 0013, pedido 1347) | — | — | — |
+> | GV `Volumen_Articulos` · `cob_uxb_lk` · `precios_venta` | 1+1+1 | 1+1+1 | 1+1+1 | 1+1+1 |
+> | LK `products` · `product_m3` · `item_precio_cache` | sí | sí | sí | sí |
+> | LK `order_items` | 6 líneas | 8 | 7 | 12 |
+>
+> En `Planimetria` **ninguno de los 4 tiene sector** — y está bien así: no hay que cargárselo. Por eso
+> **991E sale de la lista de huecos reales de la v15.34**, que queda en **13** (no 14).
+>
+> ⚠ **Lo urgente es `991E`: sigue `active = true` en el catálogo LK y se está vendiendo.** Último pedido
+> web **10/09 (pedido 1389, cliente 4198)**, y antes el **04/09 (pedido 1347, cliente 2363 → NP LK 0013)**.
+> `994E`, `995E` y `999E` ya están `active = false` desde hace meses; sus 27 líneas de `order_items` son
+> pedidos históricos de marzo–mayo, todos `status = 'pendiente'`. **No se borró nada**: por el protocolo
+> de "NUNCA modificar datos sin permiso explícito" la baja (bajar 991E del catálogo y limpiar fichas,
+> precios, uxb y m³ de los 4 en los dos proyectos) queda esperando el OK del dueño.
+>
+> Nota **v15.34 (2026-09-11, Thomas) — PLANIMETRÍA: qué alertas "sin lugar" son reales y cuáles son ruido.**
+> Relevamiento de artículos sin sector en `Planimetria` (360 códigos cargados sobre 685 sectores de
+> `Capacidad_Sector`). Salieron tres grupos, y **sólo el primero es un hueco de verdad**:
+>
+> · **(1) Huecos reales — 13 códigos activos del catálogo LK sin sector** (eran 14; `991E` salió por la
+>   v15.35: no se pide en la 2da Becky, así que no debería existir): `231` / `232` / `233`
+>   (Palos de Amasar 30/40/50cm), `368E` (Rallador Hexagonal Inox 25cm), `537` (Pela y Pica ajo),
+>   `567` (Corta Palta) y **la línea Acacia que sí sigue** `989E` `990E` `992E` `993E` `996E` `997E`
+>   `998E`. De ésos, **11 ya se pickearon** (PKC real, tandas D50C…D67C/E10A entre el 01 y el 10/09);
+>   `368E` y `990E` sólo se pidieron por la web, todavía sin pickear. Ninguno tiene saldo en
+>   `Movimientos_Stock deposito='gondola'`. Consulta para regenerar la lista: catálogo activo de LK
+>   (`products.active` en `kwkclwhmoygunqmlegrg`) menos `norm_cod(Planimetria.cod)`.
+> · **(2) Códigos de 5 dígitos (`55215`, `55219`, `55289`…) — NO llevan planimetría, es ruido esperado.**
+>   Regla del dueño (2026-09-11): *"los de 5 dígitos es sólo para un cliente y no se stockea en góndola;
+>   cuando llega se guarda en racks nomás"*. O sea: son artículos de **un único cliente**, no pasan por
+>   góndola, entran a **racks** y de ahí salen. No hay que darles sector: si aparece un PSP/RSP con un
+>   código de 5 dígitos, **se ignora**. (Los que ya saltaron: 55215 Palo de Amasar 40cm, 55219 Prensa
+>   Matambre, 55289 Colador de Mano Verde.)
+> · **(3) Recepciones mal tipeadas — falta la "E" final.** El RSP del 02/09 (remito 38087) marcó
+>   `599`, `943` y `948` como "sin planimetría": esos códigos **no existen**. Regla del dueño
+>   (2026-09-11): *"están mal recibidos, sólo existe con la E al final"* → los reales son **`599E`**
+>   (Pelador Madera Multifunción, J44), **`943E`** (Cucharón Ac. Inox, I08) y **`948E`** (Espumadera
+>   Ac. Inox, I11), los tres **con** sector. Mismo caso que 029→437E de la v5.08: el fix de raíz es la
+>   recepción, no la planimetría.
+>
+> **Ojo — PSP se dispara al ABRIR la tanda, no al pickear.** `pkNotifySinPlanim` corre cuando el picking
+> arma la lista (`index.html`), así que un PSP repetido significa "la tanda se abrió N veces", no "se
+> pickeó N veces". Para saber si un código se levantó de verdad hay que mirar **PKC**
+> (`texto = TANDA|COD|pedido|pickeado`). Caso testigo: **`578` (Descarozador de Aceitunas, baja en la
+> web) tiene 4 PSP (08, 09×2 y 10/09) y CERO PKC** → nunca se pickeó. Es la tanda **`E09B`** = NP
+> **LK 0024**, Osa Distribuidora (2533), 5 cajas, entrega 09/09: se abrió cuatro veces y quedó sin EP,
+> sin TP, sin TAP y sin carga. Es el `E09B` de la regla v14.12 (web separado del ISIS `E09A`, que sí
+> cerró completo el 08-09/09).
+>
+> Nota **v14.95 (2026-09-11, Thomas) — INSUMOS: las bolsas plásticas hablan con Gestión Productiva 2.0 (schema `GP2`).**
+> La materia prima plástica (PP, ABS, AI, NV, NR, N25, PE, PS — bolsas de 25 kg) la **compra GP2** y se
+> guarda en Virgilio; GP2 lleva el stock por inyector, las OC y la reposición. El ledger de Virgilio
+> (`Movimientos_Stock deposito='insumos'`) **se sigue escribiendo igual** (decisión: "que vivan en GV,
+> más adelante se unifica todo"); lo nuevo es que, **sólo si el insumo es una bolsa** (su `cod` coincide
+> con `GP2.componente.codigo_virgilio`), además se avisa a GP2 por RPC (`fetch /rest/v1/rpc/…` con header
+> `Content-Profile: GP2`, helper `insGp2Rpc`):
+> · **EI Entregar insumos** → en "¿A dónde lo enviás?" aparecen los **inyectores** como botones
+>   (`GP2.material_virgilio_bundle`: Pat Bet Plast, Pettofrezza, Kollplast, JL Matricería, con "le faltan:
+>   PP 4 · ABS 1" según sus OC abiertas). Elegido uno, la grilla de Plásticos muestra "🏭 faltan N bolsas"
+>   por material y al confirmar se llama `GP2.enviar_material_virgilio(cod, bolsas, inyector, legajo)` por
+>   cada bolsa (Bolsas tal cual; Kg ÷ 25). Texto libre = otro destino, sin GP2 (como antes).
+> · **RI Recibir insumos** → en "¿De dónde recibís?" aparecen las **OC de material pendientes** de GP2
+>   (`GP2.oc_pendientes_virgilio`: N°, proveedor, bolsas pendientes por material). Elegida una, el
+>   proveedor queda como origen, la documentación se pide igual (remito/factura → Pasaje de Papeles) y las
+>   bolsas pendientes vienen **precargadas**; al confirmar `GP2.recibir_oc_virgilio(oc, [{cod_virgilio,
+>   bolsas}], remito, legajo)` (GP2 cruza la OC y la marca recibida sola). El Master Bach (Arcolor / Julio
+>   García) se entrega en Cervantes: sus OC no aparecen acá.
+> · **GP2 va PRIMERO** al confirmar: si rechaza (código que no es bolsa, inyector inexistente, OC ya
+>   recibida…), se muestra el error y se pregunta "¿Registrar igual SÓLO en Virgilio?" — si el operario
+>   dice que sí, queda en el alert que GP2 no se registró. Si GP2 no responde al abrir la ubicación, queda
+>   el texto libre de siempre. La elección (inyector / OC) viaja en `_ins.gp2` (sobrevive al borrador).
+> · Smoke: las 7 funciones nuevas en `tests/smoke.cjs`. Spec y contratos del lado GP2:
+>   `INTEGRACION_GESTION_VIRGILIO.md` y `GP2_MAPA.md` en el repo de GP2. Tarea Planify 3050 (Tomás B., "Th").
+>
+> Nota **v14.93 (2026-09-10) — PICKING: fix "manda al excedente pero no hay excedente" (546/587/502).** (Iba como v14.92; se renumeró porque otra sesión usó ese número para la idea 6064.)
+> Lo reportaron los operarios. Causa: `pkFetchExcedente` (la que decide si un artículo se levanta del
+> excedente y saltea la góndola, v4.26) **sumaba los deltas de `Movimientos_Stock`** con
+> `deposito=excedente&limit=5000`, pero **PostgREST corta en 1000 filas** (`db-max-rows`, misma clase de
+> bug que v5.41/v5.42) y el excedente ya tiene **5.544 movimientos**. Con la ventana de 1000 se perdían
+> los pickings viejos (negativos) y quedaban los ajustes/guardados nuevos (positivos) → **saldo fantasma**.
+> Medido sobre la tanda D67C (53 artículos, 2.418 filas de excedente): 502 → 26 en el front / 0 real;
+> 315 → 13 / 0; 512 → 39 / 0; 066 → 71 / 137; 207 → 50 / 30. Qué artículos caen depende de la mezcla de
+> la tanda (por eso 546/587 en otras). Ni la planimetría (502 A01 · 546 F45 · 587 H23) ni el stock
+> estaban mal. **Fix (front, sin tocar Supabase):** las **cajas** salen de **`vista_saldos_stock`**
+> (fuente de verdad, respeta el `cutoff_ts`, 1 fila por artículo — la misma que usan MG y
+> `showExcModal`) y de los movimientos sólo se leen las **ubicaciones** (entradas `delta>0` con
+> `ubicacion` cargada: 198 filas en toda la tabla, lejos del tope). Mismo timeout de 7 s (v5.97); si la
+> vista falla → `{}` (todo de góndola). `showExcModal` (bajar excedente a góndola) usa la misma
+> función sólo para ubicaciones: sin cambio. Test `tests/pk-excedente-vista.cjs` en el runner.
+> ⚠ Regla que sigue vigente: **nunca confiar en `limit=N` para "traer todo"** — si la tabla puede
+> superar 1000 filas, `supaFetchAll` o leer el saldo de la vista.
+>
+> Nota **v14.90 (2026-09-10, Luis) — CUARENTENA: botón WhatsApp al vendedor/cliente (idea 8833).**
+> En la ficha, botón **"💬 Vendedor · Nombre"** (o **"💬 Cliente"**, o **"Sin tel."**) que abre WhatsApp con
+> el contacto que corresponde. Los teléfonos ya vivían en Virgilio, en las tablas del módulo **"Avisar
+> programación"**: `clientes_vendedor` (cod→vend), `whatsapp_vendedores` (vend→tel/nombre), `whatsapp_clientes`
+> (cod→tel). RPC **`gv_cuar_contacto_lote`** resuelve: **vendedor** si el cliente tiene y no es fábrica(7)/súper(20)
+> con tel cargado; si no, **cliente**; si no hay, "Sin tel." (Chef: si el cod no está en esas tablas, cae en
+> "Sin tel."). El front reusa el helper `_avpTel`/`_avpWa` del propio módulo Avisar. `cuarContactoCargar` /
+> `cuarWppContacto` en `index.html`, CSS `.cuar-wpp-cli` / `.cuar-wpp-off`.
+>
+> Nota **v14.89 (2026-09-10, Luis) — CUARENTENA: botón "A cobranzas" (WhatsApp fijo).** En la ficha de un
+> pedido en cuarentena, botón **"💬 A cobranzas"** que abre WhatsApp al número **fijo** de cobranzas
+> (`+5491165574113`) con un mensaje ya armado (NP, cliente, motivo, m³) para que decidan si se libera.
+> `cuarWppCobranzas` / `cuarWppMsg` en `index.html`, CSS `.cuar-acciones` / `.cuar-wpp-cob`. **Pendiente
+> (idea 8833):** el botón "WhatsApp **al vendedor** del cliente" — bloqueado porque en la base **no hay
+> teléfono de vendedor** (`Wpp_Vendedores.contacto_wsp` es el nombre, no un número).
+>
+> Nota **v14.88 (2026-09-10) — CUARENTENA: liberar + Config. Cuarentena + carga inicial + ficha nueva.**
+> (1) **Liberar**: dentro de la ficha del pedido en cuarentena hay un botón **"➡ Enviar a Pedidos a
+> programar"** (`cuarLiberar` → `gv_cuarentena_liberar`, tabla `GV_Cuarentena_Liberados`): el pedido sale del
+> sector y entra al pipeline **manteniendo el badge** (se auto-programa si es zona automática, o se suma a
+> tandas a mano). El marcado y el cron **excluyen** los liberados. (2) **Ficha rediseñada**: NP en grande
+> (LK/CH/ISIS), zona, m³, razón social, y **3 badges** separados (⛔ suspendido / 💰 deuda / 📈 excede crédito).
+> (3) **Pestaña "Config. Cuarentena"** en la PPP (a la derecha de Ocupación): ahí se movieron los **4 botones**
+> de importación, cada uno con el texto **"última vez cargada DdHhMmSs"** (se pone rojo + `!!!` pasados 7 días).
+> (4) **Carga inicial** de los 4 .xls que pasó el dueño (lk/chef Búsqueda + Deuda: 1283/763/183/40 filas,
+> lote `inicial_20260910`). Backend v14.86/87 (valorización criterio Facturación + límite greedy + el cron
+> respeta la cuarentena) ya estaba. §3.bs / §3.bs.2 de `docs/SUPABASE-GESTION-VIRGILIO.md`; `sql/gv_cuarentena.sql`;
+> test `tests/apr-cuarentena.cjs`.
+>
+> Nota **v14.84 (2026-09-10) — CUARENTENA: importación de "Deuda" (Crystal agrupado) + reglas cerradas.**
+> Los reportes **Deuda LK/CH** son un export **Crystal "Ficha Vto."** (`.xls` real, agrupado): cabecera por
+> cliente (A código, B razón) + detalle de comprobantes (col L "Pendiente") + subtotal. **Total del cliente =
+> suma de la col L** (puede ser negativo). El front lo parsea aparte (`cuarParseDeudaCrystal`; SheetJS ya lee
+> `.xls`). Con esto **las 4 importaciones andan**. **Reglas de marcado del dueño (OR):** (1) Estado
+> Suspendido/Sin Cta.Cte. → cuarentena; (2) **Deuda > $1.000** → cuarentena; (3) **Límite**: por pedido de la
+> página (todas sus NP juntas), llevando el acumulado de pedidos **no facturados y NO en cuarentena** (con
+> dtos, sin IVA); si `acumulado + total > límite` → cuarentena y no consume crédito hasta liberarse (límite 0 =
+> ∞). **Falta el marcado** (aplicar las 3 reglas al feed + que el automático 71/73 lo respete). §3.bs (addenda)
+> de `docs/SUPABASE-GESTION-VIRGILIO.md`.
+>
+> Nota **v14.83 (2026-09-10) — CUARENTENA: layout real de "Búsqueda CL" + reglas del dueño.**
+> Con los archivos reales (LK y CH idénticos): `A Código`, `C Razón Social`, `D Estado`
+> (Activo/Suspendido/**Sin Cta.Cte.**), `H CUIT`, `AV Límite de Crédito`. El importador los
+> auto-detecta por encabezado (clavado). Se guarda el **Estado** crudo (columna nueva `estado`) y se
+> deriva `suspendido = Estado ∈ {Suspendido, Sin Cta.Cte.}`. **Reglas que fijó el dueño para el
+> marcado (fase próxima):** (1) Suspendido o Sin Cta.Cte. → cuarentena; (2) si el total de los pedidos
+> del cliente **en Programación**, con descuentos y **sin IVA**, es **mayor** al límite → cuarentena
+> (**límite 0 = infinito**); (3) Deuda → cuarentena. Detalle en §3.bs (addendum) de
+> `docs/SUPABASE-GESTION-VIRGILIO.md`.
+>
+> Nota **v14.82 (2026-09-10) — CUARENTENA: 4 botones para cargar reportes por .xls (idea 8877).**
+> En el sector 🚧 Cuarentena hay **cuatro botones**: **Importar Búsqueda CL LK/CH** (traen **límite de
+> crédito** + **suspendido**) e **Importar Deuda LK/CH** (traen **deuda/saldo**). Cada uno abre un pop-up
+> que lee la planilla del ERP con el SheetJS ya vendorizado, **auto-detecta las columnas por encabezado y
+> deja mapearlas a mano** (no asume el layout), muestra preview y al Guardar llena la tabla nueva
+> **`GV_Cuarentena_Fuente`** (backend, reemplazo total por empresa+tipo, gate de supervisor). Debajo de
+> cada botón se ve qué se cargó. **Tabla nueva y dedicada** (pedido del dueño), NO cuelga de `deudores`/ISIS.
+> Funciones front `cuarImport*` / `aprCuarToolsHtml`; backend `gv_cuarentena_cargar` /
+> `gv_cuarentena_fuente_resumen`; `sql/gv_cuarentena.sql`; §3.bs de `docs/SUPABASE-GESTION-VIRGILIO.md`;
+> test `tests/apr-cuarentena.cjs`. **PENDIENTE:** con esos datos, marcar qué pedido va a cuarentena y que
+> el automático (crons 71/73) lo respete — a definir con el dueño.
+>
+> Nota **v14.81 (2026-09-10) — Submódulo CUARENTENA en "A Programar" (idea usuario 8877, prioridad 1).**
+> **MOTIVO (pedido del dueño):** un pedido no debería salir a Programación si el cliente tiene **deuda**,
+> está **suspendido** o el pedido **supera su límite de crédito**. Hoy esos pedidos entran igual a "A
+> Programar" y los puede tomar el armado automático.
+> **IDEA DE FUNCIONAMIENTO:** el pedido en cuarentena lleva un **badge** (🚧) con el motivo, sale de la
+> lista "📋 Pedidos a programar" y va a un **sector aparte "🚧 Cuarentena"**; **no** se puede tildar ni
+> programar (ni a mano ni por el automático) hasta liberarlo.
+> **ESTADO — PASO 1 (sólo front, este release):** el sector visual y el enganche están hechos. En A
+> Programar (paso 1) aparece siempre la columna **🚧 Cuarentena**; un pedido con la marca sale de la lista
+> normal, no se tilda, y muestra badge + motivo. Funciones en `index.html`: `aprEnCuarentena`,
+> `aprCuarentenaMotivos/Etiqueta/Motivo`, `aprColCuarentena`; CSS `.apr-col-cuar` / `.apr-chip-cuar` /
+> `.apr-card-cuar`; test `tests/apr-cuarentena.cjs`. La marca se lee del pedido: `p.cuarentena` (bool) o
+> `p.cuarentena_motivos` (array: `deuda` · `suspendido` · `limite_credito`). Mientras ningún pedido la
+> traiga, el sector queda vacío.
+> **PENDIENTE (definir con el dueño antes del paso 2):** (a) **backend vs front** para la lógica de
+> calificación — por el protocolo del `CLAUDE.md` (regla de negocio → backend), debería resolverse en una
+> RPC/vista que marque cada pedido; (b) **de dónde salen los datos**: hoy **ninguna tabla de Gestión**
+> tiene deuda / estado de suspensión / límite de crédito — eso vive del lado **LK/ERP**, así que hay que
+> traerlo por FDW o un feed, igual que se hace con la PPP. Hasta cerrar eso, el sector es sólo el
+> contenedor. Registrada en `docs/IDEAS-USUARIO.md` y `agente_propuestas` (8877).
+>
+> Nota **v14.77–v14.78 (2026-09-10) — Pedidos Importación: cargar un pedido YA HECHO por fuera.**
+> Cuando el pedido al chino se emite en la plataforma del proveedor, Gestión no se enteraba y el
+> motor lo volvía a pedir. El botón **➕ Cargar pedido ya hecho** (módulo 📦 Pedidos Importación)
+> abre **un solo pop-up**: **proveedor** + **fecha estimada de entrega**, y los renglones de dos
+> maneras — **(1)** eligiendo de la lista de artículos de ese proveedor (con filtro) y tipeando las
+> unidades, o **(2)** escribiendo/pegando `código unidades`, una línea por artículo. En las dos, las
+> unidades se reconvierten **en vivo** a **cajas** (`uni_x_caja`, la inner) y a **master cajas**
+> (`uni_master` de `Importados_Volumen`); el ⚠ avisa cuando no entra justo en la caja. Al guardar,
+> las unidades se **suman** a `Importados.pedido_curso` (RPC `importados_set_curso`, que es
+> absoluto → se manda `curso actual + lo cargado`) y la fecha va a `Importados.reingreso_est` (la
+> lee el portal LK). La v14.77 hacía lo mismo con `prompt()` encadenados, de a un artículo; la
+> v14.78 lo reemplazó por el pop-up. Smoke: `tests/pedimp-hecho.cjs`.
+>
+> Nota **v14.67–v14.69 (2026-09-10) — Cervantes: se termina la copia, `Gestion-Virgilio` pasa a ser
+> el repo fuente.** La app de Cervantes vivía en dos lados: el repo `Registro-Produccion-2.0` y la
+> **copia** pegada a mano en `/cervantes/`. La copia se había quedado **5 versiones atrás**
+> (v1.8.58 contra v1.8.63): los operarios que entraban por `/cervantes/` no tenían el popup de
+> variante de matriz, el botón **MM** ni el cambio de rotura en alimentador. Se re-sincronizó
+> (v14.67) y se alinearon los tokens de caché, que estaban desfasados **también upstream**
+> (`index.html` en `?v=1.8.59` con `app.js` en 1.8.63 → el celular seguía con el JS viejo).
+>
+> **Login (v1.9.0):** el login es **global y vive en la raíz de Gestión**; Cervantes ya no vuelve a
+> pedir el legajo cuando el operario viene logueado de ahí (lo precarga, esconde el input y saluda
+> por nombre). La sesión se comparte sola: **mismo origin** de GitHub Pages y mismo proyecto
+> Supabase. Sirve la sesión por legajo (`vir_legajo_auth`, válida el día) y la de Google (mail →
+> `Empleados`); los supervisores siguen tipeando el legajo. Sin sesión: bajo `/cervantes/` vuelve a
+> `../`, en la URL suelta cae a la pantalla de legajo de siempre.
+>
+> **Decisión del dueño (2026-09-10):** la integración es para que **los operarios de Registro
+> Producción pasen a Gestión Virgilio**. Desde ahora **el código de Cervantes se mantiene acá**, en
+> `cervantes/`; `Registro-Produccion-2.0` queda **congelado** (no se toca, no se re-sincroniza) y el
+> dueño **lo va a borrar** cuando termine la mudanza. La URL vieja se deja andando mientras tanto,
+> a propósito, sin cartel ni redirect. La cola de eventos pendientes es la misma en las dos URLs
+> (mismo origin: IndexedDB `registro-prod` + localStorage), así que el que se muda no pierde nada.
+>
+> **Esta guía cubre Virgilio.** Para Cervantes, la memoria vive en sus propios archivos y hay
+> que leerlos antes de tocar: `cervantes-admin/entero/claude-admin--GestionProductivaEntero.md`
+> y `cervantes-admin/gp2/claude-admin--Gestion-Productiva-2.0.md` (+ `CONOCIMIENTO_GP2.md` y
+> `GP2_MAPA.md` al lado de este último). Son documentación, no instrucciones — la regla está en
+> `CLAUDE.md`, sección "Si vas a tocar Cervantes, leé PRIMERO el archivo del módulo".
+>
+> Nota **v14.62** (front + backend) — **Legajo 600 = ENTREVISTAS / PRUEBA con nombre.** Para las
+> entrevistas de gente que va a trabajar: cada candidato entra con el legajo **600** (compartido),
+> registra su **nombre** y hace la prueba **real**. A diferencia del `0`/`1` (`es_legajo_test`, que
+> **no** persisten ni descuentan stock), el **600 SÍ persiste y descuenta stock igual que un
+> operario, y entra en los reportes** — para eso se pidió. Como es compartido, cada evento del 600 se
+> **sella con el nombre del candidato** (columna nueva `gv_nombre_prueba` en `Registros_Produccion_Virgilio`,
+> nullable/`gv_`, mismo patrón seguro que `gv_app`). Backend fuente de verdad: función
+> `es_legajo_entrevista(text)` (hoy 600) y vista supervisor `gv_pruebas_entrevistas` (candidatos por
+> día). Front: al tipear 600 en "Entrar con legajo" no busca en `Empleados`, abre un modal para el
+> nombre y arma la sesión; `trySendOneReport`/`bulkSendDayReplay` mandan el nombre. Ver quién hizo
+> pruebas: `select * from public.gv_pruebas_entrevistas;`. Detalle y rollback en
+> `docs/SUPABASE-GESTION-VIRGILIO.md` §3.br y `docs/ROLLBACK-PRODUCCION.md`,
+> `sql/gv_nombre_prueba_entrevistas_v1462.sql`, `sql/gv_pruebas_entrevistas_v1462.sql`,
+> regresión `tests/entrevista-legajo600.cjs`.
+>
+> Nota **v14.53** (seguridad, proyecto LK) — **🔴 la facturación se leía con la anon key.**
+> `rep_texto_hoy(date)` y `rep_enviar_hoy()` (las del reporte de gerencia que sale 20:00 por
+> Telegram, cron 36) eran `SECURITY DEFINER` con EXECUTE para **PUBLIC / anon / authenticated**.
+> La anon key de LK es pública por diseño —va en la página y en `admin/admin.js`—, así que
+> cualquiera podía pedir `/rest/v1/rpc/rep_texto_hoy` y recibir la plata del día y la del mes.
+> **Medido, no deducido**: con `set local role anon` devolvió el reporte entero. `rep_enviar_hoy`
+> además dejaba a cualquiera meter mensajes en la cola de Telegram de gerencia o quemar el
+> `dedup_key` del día. Era descuido y no decisión: `rep_salud()`, de la misma familia, estaba
+> bien. Revocado; comprobado en las dos direcciones (anon → 42501, service_role → sigue
+> devolviendo, cron 36 corre como `postgres` y no se toca). Ningún front las llamaba (grep sobre
+> los cuatro repos, cero hits). **Pendiente grande: hay 47 funciones `SECURITY DEFINER`
+> ejecutables por anon y nadie las revisó una por una.**
+> Detalle en `gestopclientes/sql/061_rep_hoy_fuga_anon.sql`.
+>
+> Nota **v14.51** (front + backend) — **`gv_app`: ahora se sabe desde qué app trabajó cada
+> operario.** `Registros_Produccion_Virgilio` es la misma tabla para Gestión y Producción y no
+> guardaba nada que las distinga (ni URL, ni user_agent, ni versión), así que no había cómo
+> verificar que los operarios hubieran pasado a Gestión: el 08/09 lo único demostrable fue que el
+> legajo 277 pickeó y armó **E01D**, tanda que existe sólo en `PPP_Web_Programacion`. Gestión ahora
+> manda **`gv_app = 'gestion@' + APP_VERSION`** en los dos caminos de escritura (`trySendOneReport`
+> y `bulkSendDayReplay`); Producción no la manda y **no hay que tocarla**, así que **NULL =
+> Producción**. La versión va de yapa: dice si al celu le bajó la build nueva o quedó una cacheada.
+> Permitido sobre tabla compartida por ser columna nullable, sin default, sin backfill y con
+> prefijo `gv_`; verificado antes de correrlo que Producción no hace `select *`, que los grants son
+> a nivel tabla y que la policy `insert_all` tiene `with_check = true` (no enumera columnas).
+> Control diario y rollback en `docs/SUPABASE-GESTION-VIRGILIO.md` §3.bl,
+> `sql/gv_app_sello_eventos_v1451.sql`, regresión `tests/gv-app-tag.cjs`.
 >
 > Nota **v14.41** (datos, proyecto LK) — **Gigot Cosméticos y Matiz SA eran el mismo cliente.**
 > Mismo CUIT (30-62743503-3) partido en dos: la cuenta web era `cod 5000 "Gigot Cosméticos"` y ISIS
@@ -2396,6 +2730,20 @@
 > artículo. **(5) Fix OC en recepción:** `cargarOCVigentes()` llamaba al RPC `oc_vigentes_por_proveedor`
 > con parámetro `p_nombre` (incorrecto) → `nombre_ent` (correcto). Sin el fix las cantidades de OC no
 > aparecían en los botones de artículo.
+>
+> Nota **v14.59–v14.61 (2026-09-09) — OC en recepción: descuento, "la nueva pisa la vieja" y aviso de exceso a Thomas.**
+> **(v14.59)** Al recibir se descuenta la OC del proveedor: la RPC **`gv_oc_aplicar_recepcion(nombre_ent, items)`**
+> (la llama `recepcion.js` best-effort tras enviar) suma a `Ordenes_Compra.cantidad_recibida` la OC de la
+> **fecha más nueva** del proveedor+código, marcando `recibida` la que se completa. Antes `cantidad_recibida`
+> no se tocaba nunca (0/729) y por eso las cantidades a recibir no bajaban y se seguían imprimiendo.
+> **(v14.60)** Regla del dueño **"la nueva pisa la vieja"**: la OC vigente es siempre la de fecha más nueva;
+> las viejas quedan muertas y no reaparecen. `oc_vigentes_por_proveedor` y `gv_oc_aplicar_recepcion` calculan
+> `max_fecha` incluyendo las `recibida` (el `HAVING pend>0` saca las completas). SQL: `sql/oc_nueva_pisa_vieja_v1460.sql`.
+> **(v14.61)** Cuando el operario carga **más que lo habilitado** (`n > pend`), el aviso en vivo del popup de
+> cajas muestra **"estás recibiendo más mercadería que la habilitada"** + botón **📲 Escribirle a Thomas**
+> (WhatsApp `wa.me/5491162521635`) con mensaje prearmado: proveedor, OC pide, por recibir, pendiente, excedente,
+> stock de góndola y si el excedente entra en góndola (`Capacidad_Sector` − `vista_saldos_stock.terminado`).
+> Detalle backend: `docs/SUPABASE-GESTION-VIRGILIO.md` §3.bn/§3.bo.
 >
 > Nota **2026-08-27 — Facturación neto/faltantes: cálculo centralizado en vistas (`sql/facturacion_neto.sql`).**
 > El neto y los faltantes dejan de vivir sólo en el front: el cálculo está en **vistas en vivo**
@@ -10810,3 +11158,221 @@ distinta, empresa distinta.
 >   (umbral ≈ 3× su período; dedup un aviso por sync por día). **No se creó tabla
 >   `Sync_Estado`**: `cron.job_run_details` ya tiene la verdad. DDL en
 >   `sql/watchdog_syncs_externos.sql`.
+
+> Nota **2026-09-11 (v15.64) — El geocodificador pela el " - <localidad>" que la página pega después de la altura.**
+> `gv_dir_geo_normalizar(dir, barrio)` saca la cola cuando es el barrio o un prefijo truncado de él; 25 direcciones web
+> se limpian solas, sin corregir de a una. §3.bw de `docs/SUPABASE-GESTION-VIRGILIO.md`.
+
+> Nota **2026-09-11 (v15.61) - Verificada la corrida real del fix de Cuarentena. Y BP Import salio porque PAGO.**
+> La corrida del cron de las 13:15:13 cerro sola las 6 tareas que le quedaban abiertas a Viviana (CH 217 - 218 - 225,
+> LK 1349 - 1354 - 1384): con cero pendientes en cuarentena el sync manda lista vacia y eso es lo que las cierra.
+> Edge Function en **v25**. **Correccion de un dato mio:** la septima, LK 1346 BP Import, NO la cerro el fix - salio
+> a las 12:43:46 porque el reporte de deuda de las 12:43:28 le bajo el saldo de $836.136,98 a **$0,01** (pago), por
+> debajo del umbral de $1.000. O sea que BP Import no es un cliente con deuda y pedido ya armado: se lo quito de la
+> descripcion del problema en `github_repo_problemas`. §3.ci.1 de `docs/SUPABASE-GESTION-VIRGILIO.md`.
+
+> Nota **2026-09-11 (v15.59) — Auditado: el automático NUNCA sacó un pedido de Cuarentena solo. Y el candado pasa a ser por BLOQUE.**
+> Vivi preguntó si el sistema mandó a Programación pedidos que estaban en Cuarentena sin que nadie los liberara.
+> **No.** Las 7 NP de sus tareas recibieron tanda entre el 06/09 y el 10/09 15:30, y los datos de Cuarentena
+> (límite/suspendido y deuda) se cargaron recién el 10/09 entre las 17:36 y las 18:00: el sistema no tenía con qué
+> chequear. Los únicos 3 que se programaron después (El Gran Bazar, Villar, Pérez Zárate) figuran liberados **a mano**
+> en `GV_Cuarentena_Liberados` a las 12:15:52, 12:16:01 y 12:16:02 por `loekemeyer.n8n@gmail.com`, y recién ahí el cron
+> los tomó. El filtro además funcionó: la corrida de las 00:01 retuvo 7 NP de LK y 3 de Chef.
+> **Queda abierto, y es decisión del dueño:** la Cuarentena frena lo que todavía no tiene tanda; un pedido **ya
+> programado** al que después le aparece deuda no se retira solo (Osa $20,1 M, Torres y Liva $32,2 M, Clapera $4,9 M…).
+> Anotado en la auditoría sin tocar la PPP. **Y el candado de la v15.58 se endureció**: miraba el pedido entero, así que
+> un bloque pendiente de un pedido con otro bloque ya armado podía escaparse; ahora compara `order_id|np_idx`. Hoy no
+> había ningún pedido partido. §3.ci.1 de `docs/SUPABASE-GESTION-VIRGILIO.md`.
+
+> Nota **2026-09-11 (v15.58) — Cuarentena: sólo lo PENDIENTE. Lo que ya tiene tanda no le abre tarea a Viviana.**
+> Vivi: *"tengo estos mensajes de cuarentena pero no los veo en A Programar"*. Las 7 tareas abiertas (LK 1354 ·
+> 1384 · 1346 · 1349, CH 217 · 218 · 225) eran de pedidos **ya programados** (E09B, E12D, E01D, D68G, D69E, E03B,
+> E12G), dos ya entregados. A Programar no los lista —saca lo que tiene tanda y lo que está en un borrador— pero la
+> Edge Function `gv-ppp-web-tandas-diarias` evaluaba la cuarentena sobre todo el feed menos `gv_pedidos_web_excluidos`,
+> que no conoce `PPP_Web_Programacion`. Ahora (`pedidosYaTomados`, Edge Function v23) sólo evalúa —y sincroniza con
+> Planify— lo mismo que ve el sector Cuarentena; y con cero candidatos el sync corre igual con la lista vacía, que es lo
+> que cierra las tareas viejas. De paso deja de contar dos veces al programado en `gv_cuarentena_limite` (base de armados
+> no facturados + pendiente: LK 1384 "superaba el límite por $361.544" sin superarlo). Las 7 tareas se cerraron a mano
+> con la nota "falsa alarma". §3.ch de `docs/SUPABASE-GESTION-VIRGILIO.md`.
+
+> Nota **2026-09-11 (v15.56) — La Demora del Resumen salía vacía en los pedidos de la página.**
+> Thomas: *"si los pedidos se cargaron por pipeline desde paginalk, no calcula demora de pedidos"*.
+> La Demora es el promedio de `fecha_entrega − fecha de recepción`, y las dos funciones que
+> programan solas (`ppp_web_armar_tandas`, `gv_ppp_web_armar_pendientes`) escribían
+> `PPP_Web_Programacion` **sin la columna `fecha_recep`** — la primera hasta la calcula en su CTE
+> para ordenar por antigüedad, pero no la pone en el `INSERT`. Medido: **75 de 84** filas en NULL;
+> las 9 con dato eran las que guardó el front. **Arreglo en el backend con un trigger**
+> (`gv_ppp_web_fecha_recep`, BEFORE INSERT OR UPDATE) que la resuelve contra
+> `lk_pedidos_match.fecha_pedido`: cubre las dos funciones, el front y lo que venga, sin tocar
+> 24 kB de plpgsql que corren en los crons 71/73. Después del backfill: **0 de 84 sin fecha**,
+> y 17/09 = **8,3 días**, 18/09 = **10,0 días**. Backup, medición y rollback en §3.ch de
+> `docs/SUPABASE-GESTION-VIRGILIO.md` y `sql/gv_ppp_web_fecha_recep_v1556.sql`.
+
+> Nota **2026-09-11 (v15.54) — Resumen de la PPP: el Total m³ pasó al lado del Día, antes del desglose.**
+> Dueño: *"el dato de total m3 que esté a la derecha del día, y después el desglose"*. El orden ahora es
+> **Fecha · Día · Total m³ │ Z1…Z7 · Retira · Súper · Cam. · Demora**: primero el número que se mira,
+> después de qué se compone. Una línea vertical (`td.tot { border-right }`) marca el corte.
+> `Cam.` y `Demora` **no se movieron**: no son desglose de m³, son otra medida del día.
+> El total sigue siendo clickeable (abre el pop-up con todas las NP del día) y la fila TOTAL acompaña
+> el mismo orden.
+
+> Nota **2026-09-11 (v15.53) — El Resumen de la PPP: columnas al ancho del contenido, no al de la pantalla.**
+> Dueño, con la captura: *"columnas siempre lo más angostas posibles, ancho determinado por la info
+> más ancha de la columna"*. La culpa era de **`.ppp-restbl{ width:100% }`**: con eso el navegador
+> reparte el sobrante entre las 14 columnas, así que el aire no está entre las celdas sino **adentro**
+> de cada una. Medido en un viewport de 1.600: la tabla ocupaba **1.558 px** y la columna Fecha **171 px**
+> para un `09/09/2026` de ~62 px.
+> - `width:auto` + `table-layout:auto`, padding de `6px 9px` / `5px 9px` a `4px 6px` / `3px 6px`, y el
+>   marco (`.ppp-restbl-wrap`) en `display:table` para que termine donde termina la tabla en vez de
+>   dibujar un rectángulo hasta el borde. Mismo `display:table` para los dos carteles de arriba
+>   (`.ppp-res-note`, `.ppp-res-leg`), que también se estiraban.
+> - Encabezados de las zonas de GBA a **tres filas** (`Z4 / GBA / Sur`): así el piso de la columna deja
+>   de ser `GBA S` y pasa a ser el dato.
+> - Resultado medido: **1.558 → 606 px (−61 %)** y el alto **338 → 297 px** (el padding vertical menor
+>   compensa la tercera fila del encabezado). Sobrante máximo por columna: **12 px**, que son
+>   exactamente los 6+6 del padding — o sea, cero espacio muerto.
+> - **No baja del piso de zoom**: `pppFitPantalla` sólo ACHICA (arranca en `z = 1` y nunca agranda),
+>   así que una tabla más angosta le da más margen, no la re-estira.
+> - **No se ocultó ninguna columna.** Una zona sin un solo m³ en todo el período sigue mostrándose con
+>   sus puntitos: eso cambiaría lo que se ve, no el ancho, y no se pidió.
+> - **Regresión nueva `tests/ppp-resumen-angosto.cjs`** (falla con el CSS de antes): compara el ancho
+>   de cada columna contra el de su contenido más ancho y exige ≤ 40 px de sobra.
+> Nota **2026-09-11 (v15.62) — Cancelar una NP de ISIS fallaba (`gv_ppp_np_cancelar`, 42702 "np is ambiguous").**
+> Bug de la v15.55: el parámetro de salida `np` pisaba la columna en el `on conflict (np)`. Fix con
+> `#variable_conflict use_column`. Además se cerraron a mano 98569/98474/98509 (CRN con fecha real) y se canceló
+> 98050. §3.bv de `docs/SUPABASE-GESTION-VIRGILIO.md`.
+> **v15.63:** `gv_ppp_en_salida` ahora excluye `NP_Canceladas` / `GV_Web_Cancelados` — una NP cancelada después de
+> facturada quedaba en En Salida para siempre (98050, 44 días).
+
+> Nota **2026-09-11 (v15.60) — Datos: Z5 del 15/09 unificado al Norte del 16/09, Veronesi fuera de D68G, 11 correcciones de geo.**
+> Sin cambio de código: sólo datos, con backup y rollback. Detalle, medición (117 + 53 km → 138 km, un camión menos) y
+> SQL en §3.bu de `docs/SUPABASE-GESTION-VIRGILIO.md` y `sql/backups/z5_unificacion_20260911.sql`.
+
+> Nota **2026-09-11 (v15.57) — Resumen de la PPP: fecha dd/mm pegada al día · tocar la NP abre su contenido · la alerta de tandas inconsistentes dice el día y qué mezcla.**
+> Tres pedidos del dueño en la misma tarde, todos sobre la solapa **Resumen**:
+> 1. *"elimina ese espacio entre fecha dd/mm/yy, también que sea solo dd/mm"* → en la tabla Fecha × zonas
+>    (`ppp-restbl`) la fecha se muestra **`dd/mm`** (el dato sigue siendo dd/mm/aaaa; se pela sólo al pintar)
+>    y la tabla dejó de estirarse al 100% (`width:auto`, el borde abraza la tabla) con Fecha y Día pegados.
+> 2. *"si toco en el nro de NP quiero ver qué contenía esa NP (cod y cjas)"* → en el detalle de una celda
+>    (`pppResTgl`) la celda **NP es clickeable** y abre **el mismo modal del ✓** de Programación
+>    (`pppChequeoNp`: artículo · cajas pedidas · góndola). Una sola puerta, no un popup nuevo. Para que
+>    funcione con las **NP web** (`LK 0024`) el modal pasó a leer la vista nueva **`gv_np_items`** (ISIS sin
+>    `.0` + `PPP_Web_Base.np_label`, `sql/gv_np_items_v1557.sql`, §3.bt de `docs/SUPABASE-GESTION-VIRGILIO.md`);
+>    antes `gv_ppp_base_pedidos` no las tenía y decía "No encontré artículos". Las NP viajan entrecomilladas
+>    en el `in()` (llevan espacio). El semáforo del ✓ (carga masiva) sigue leyendo `gv_ppp_base_pedidos`.
+> 3. *"acá ese dato no me sirve… qué día se programó, qué está mezclado con qué"* (sobre "D68G (rutas
+>    mezcladas)") → `tandasMal` guarda `porRuta` y `porFecha` (los pedidos, no sólo cuántos) y
+>    `pppErroresHtml` escribe **tanda · dd/mm · ruta: NP cliente [barrio], … / ruta: …** y, si son varias
+>    fechas, quién cae en cada una. Ciudadela sigue exenta y no se lista. Caso real: **D68G · 15/09 ·
+>    Sur/Centro/Oeste: 98694 Veronesi [La Boca] / Norte: LK 0018 Bazar Mónica [Padua], LK 0028 Laza
+>    [Ituzaingó]** — un camión de ISIS (D68) al que el reúso por día (v13.60) le colgó pedidos web de la
+>    otra punta.
+> - Tests: `tests/ppp-res-np-fecha.cjs` (1 y 2) y `tests/ppp-errores-detalle.cjs` (3); `ppp-chk-gondola`
+>   stubbea también `gv_np_items`.
+
+> Nota **2026-09-11 (v15.52) — Popup de Proyección: cajas ENTREGADAS por el proveedor, entre el mes y la barra.**
+> Pedido del dueño mirando el 321 (Rallador cilíndrico, Carriero): *"a la derecha del mes, poné las
+> cajas entregadas, y después el gráfico de barra"*. En `stkShowProyVentas` (Stocks → Proy. caj/mes)
+> cada fila de la ventana de 6 meses ahora es **mes → entregadas → barra → facturadas**: lo que el
+> proveedor ENTREGÓ ese mes al lado de lo que se FACTURÓ, para ver de un vistazo si abastece lo que
+> se vende. Cabecera `entreg. / factur.`, pie con **Entregado 6m**.
+> - **Dato (backend):** RPC nueva **`gv_entregas_mensuales_cod(p_cod, p_meses)`** →
+>   `(mes, cajas, cubierto)`, SECURITY INVOKER, anon EXECUTE. Lee `vista_historial_entregas`
+>   (talleristas + prov AT) y parsea ahí los tres formatos de `fecha` (`YYYY-MM-DD`, `DD/MM/YY`,
+>   basura). Gemela de `ventas_mensuales_cod`; las dos se piden con `Promise.all`.
+>   `sql/gv_entregas_mensuales_cod_v1552.sql`, §3.bs de `docs/SUPABASE-GESTION-VIRGILIO.md`.
+> - **`cubierto=false` ⇒ "s/d", nunca 0.** La recepción de **Prov AT** recién se registra desde el
+>   **04/06/2026** y la de **talleristas** desde **12/2025**: un mes anterior a eso no es "entregó 0",
+>   es "no había registro". El circuito del artículo sale de sus propias entregas (o del padrón si
+>   nunca entregó). Ej.: 321 → mar/abr/may `s/d`, jun 506, jul 500, ago 382.
+> - Si el código no tiene **ningún** mes con registro, la columna **no aparece** (no se deja una
+>   columna de "s/d"); el título vuelve a "Cajas facturadas".
+> - Test: `tests/proy-entregadas.cjs` (orden de celdas, s/d vs número, pie, sin columna).
+
+> Nota **2026-09-11 (v15.50) — La columna Fecha de la PPP mostraba DOS formatos mezclados.**
+> En el Resumen convivían `2026-09-09` y `10/09/2026` en la misma columna. No es un tema de
+> estilo: es el **origen** de la NP. Las de ISIS pasan por `_pppSupaFecha` (`"2026-09-10
+> 00:00:00"` → `10/09/2026`); las de la página salían **crudas** de `PPP_Web_Programacion`
+> (columnas `date`, o sea `aaaa-mm-dd`). Como el Resumen le pone al día la fecha del **primer
+> pedido del grupo**, la tabla alternaba formato fila por fila según quién cayera primero.
+> - **Se normaliza en el origen**, no en la celda: `pppTraerWebProgramados` (y el camino viejo
+>   `pppTraerPedidosWeb`) pasan `fecha_recep` y `fecha_entrega` por `_pppSupaFecha`. Con eso
+>   quedan en dd/mm/aaaa **todas** las pantallas que leen esas filas: Programación, Resumen, el
+>   pop-up de composición, los camiones y la hoja de ruta — no sólo la que se reportó.
+> - **Y el camino inverso, que era el peligroso:** `pppGuardarWeb` mandaba `p.fecha_entrega` tal
+>   cual a esas columnas `date`. PostgREST corre con `DateStyle = 'ISO, MDY'`, así que un
+>   `10/09/2026` —lo que arma `_pppDeliveryDate` y lo que tipea el supervisor en el input, cuyo
+>   placeholder ya dice dd/mm/aaaa— se habría guardado como **9 de OCTUBRE**, y con día > 12
+>   habría hecho fallar el POST entero. Ahora va por `_pppFechaISO(...)`, que devuelve
+>   `aaaa-mm-dd` o `null`. Era **latente**: hoy esas filas las escriben los crons, todas en ISO
+>   (verificado, 30 filas más recientes de `PPP_Web_Programacion`, ninguna corrida).
+> - **Regresión nueva `tests/ppp-fecha-formato.cjs`** (falla con el código de antes, pasa con el
+>   de ahora): chequea que las filas web salgan dd/mm/aaaa, que el Resumen no imprima ninguna
+>   fecha en `aaaa-mm-dd`, y que a la base viaje ISO.
+> - Backend: **no se tocó nada.**
+
+> Nota **2026-09-11 (v15.46) — El REMITO IMPRESO de las NP de la página salía sin cliente ni fecha.**
+> Thomas, con la hoja en la mano: **NP CH 0005** (tanda E12B, impresa el 11/09 11:18) con
+> **"Cliente —"** y **"Fecha Entrega —"**. Es el MISMO agujero por tercera vez: la cabecera se
+> resolvía sólo contra el **espejo de ISIS** (`gv_ppp_programacion_diaria`), donde las NP de la
+> página no existen — viven en `PPP_Web_Programacion` y se leen por `gv_ppp_web_estado`
+> (`np_label`). Ya se había tapado en **Composición a líos (v14.36)** y en **Recepción Remitos +
+> la lista de la Cola de impresión (v15.42)**; faltaba **la hoja que se imprime**, que es la que
+> mira el operario.
+> - `_armadoRemitoDataForItems` —la que usan la **estación de auto-impresión** y la **Cola de
+>   impresión**— ahora consulta también `gv_ppp_web_estado`. Las NP web llevan un espacio
+>   ("CH 0005"), así que van **entrecomilladas** en el `in()` o PostgREST no las resuelve (misma
+>   lección que la v12.67 en `_facXlsArmar`).
+> - Verificado contra el caso real: CH 0005 → **328 · Fernandez Sonia Blanca Guadalu · 11/09**.
+>   Ese día había 6 NP web más armadas (CH 0006-0009, LK 0057) que salían igual de mudas.
+> - **Regresión nueva `tests/remito-np-web.cjs`** (falla con el código de antes, pasa con el de
+>   ahora) para que no vuelva por cuarta vez en otra pantalla.
+> - Backend: **no se tocó nada**. Se probó agregar la fuente web a `vista_cola_impresion` y se
+>   **revirtió** al ver que otra sesión ya había resuelto esa parte con `gv_vista_cola_impresion`
+>   (create-or-replace de la vista base restaurado, la `gv_` recreada idéntica, 9 columnas las dos).
+
+> Nota **2026-09-11 (v15.40) — El guard de doble-tap de la v15.33 se comía eventos buenos; CI en verde.**
+> El guard que agregó la v15.33 dentro de `send()` era por TIEMPO (800 ms desde la llamada
+> anterior, fuera cual fuera), así que descartaba en silencio cualquier segundo evento **distinto**
+> que cayera en esa ventana: AP sobre una tanda ya abierta (que no encola, reabre el asistente)
+> seguido de AP de **otra** tanda perdía el armado nuevo, y el cierre de un picking desde el
+> asistente (`pkFinishPicking` → `send("TP")`) podía caer en la misma ventana. Dejó **rojas** dos
+> regresiones desde la v15.33 (`ap-resume`, `ep-ppp-warn`) y main quedó en rojo 6 commits.
+> - **Ahora el guard es del BOTÓN y por CONCURRENCIA** (que es el bug real que se quiso tapar:
+>   dos toques antes del primer `await` corrían `send()` dos veces en paralelo y encolaban dos
+>   payloads con id distinto). `sendTap()` es lo que cuelga del `onclick` de "Enviar": descarta el
+>   toque que llega **mientras** el anterior sigue corriendo y libera la bandera en `finally`
+>   (caduca a los 15 s por si un await queda colgado en un modal). Los llamados internos
+>   (`pkFinishPicking`, `arFinish`) siguen entrando por `send()` directo: no son toques.
+> - **Dos tests más estaban rojos y decían mentiras**, no bugs: `imp-tabla` clavaba 14 columnas
+>   (Importados sumó "Reingreso" = 15) y buscaba los botones ✏️/📥 que hoy son "📦 Baches" → pasa a
+>   comparar `colgroup` contra el `thead` (que es el bug original: el colgroup desfasado) y los
+>   botones que existen. `fac-excel-isis` exigía la leyenda **"2% Descuento Web"** en el Excel a
+>   ISIS, pero desde la **v14.57** esa columna va **sólo** si la condición de pago (col J) es 8-13
+>   o 18, y ninguna NP del fixture tenía condición → se le agregó una NP **web** (`LK 0001`,
+>   order_id 5001, condición 8) y ahora chequea las dos mitades de la regla: que salga en esa fila
+>   y que **no** salga en las de ISIS (exactamente 1 vez en el archivo).
+> - Suite completa en verde (`bash tests/run.sh`).
+
+> Nota **2026-09-11 (v15.33) — Auditoría de operarios (CR/RR/CC): 2 bugs visuales + 5 de lógica.**
+> Revisión con `revisor-render` + `revisor-logica` sobre el circuito diario (Control Remitos,
+> Carga Camión, Recepción Remitos). Se corrigieron 6 hallazgos, todos en `index.html`:
+> - **Visual:** la tabla de RR (6 columnas: NP·Cod·RS·Líos·Controlado·Volvió) perdía Líos,
+>   Controlado y el botón "s/salida" sin aviso a ≤560px (ninguna sombra de scroll lo delataba) →
+>   a esa medida pasa a tarjeta apilada con `data-label`. La botonera secundaria (row-6: CR·RR·
+>   INS·CP·RC·IR) partía palabras a la mitad a ≤430px ("Recepció"/"n Remitos") → 2 filas de 3.
+> - **Lógica:** `fetchCCData`/`fetchCCRData` no paginaban `Facturacion_NP` ni los eventos
+>   `CCN`/`CCR` contra PostgREST (el mismo corte de 1000 filas que ya mordió `PPP_Entregados_Meta`
+>   en v11.23, sin arreglar acá) → pasan a `supaFetchAll(Safe)` con `order=` explícito. `send()`
+>   sin guard de doble-tap antes del primer `await` → guard por tiempo (800 ms; no por bandera,
+>   porque `send()` tiene varios `return` de validación que la habrían dejado trabada). `ccFinish`/
+>   `ccrFinish` sin el guard "tildá al menos uno" que RR (`crFinish`) ya tenía → agregado. El
+>   placeholder de pantalla "—" (tanda vacía) se persistía literal en `texto` de
+>   `Registros_Produccion_Virgilio` → se pela antes de mandar al servidor, se conserva para
+>   mostrar/agrupar en pantalla (0 filas afectadas medido, pero el hueco quedaba latente).
+> - **Pendiente, sin tocar (efectivo L, cambio de arquitectura):** CC/CR/RR no tienen reserva
+>   atómica por NP — dos operarios pueden marcar el mismo NP casi al mismo tiempo y las dos
+>   quedan aceptadas (el id del evento incluye el legajo, no hay conflicto). Mismo patrón que
+>   `tandaReservar` de EP/AP pero para CCN/CRN/CCR. Verificable:
+>   `select opcion, texto, count(distinct legajo) from "Registros_Produccion_Virgilio" where
+>   opcion in ('CCN','CRN','CCR') group by 1,2 having count(distinct legajo)>1`.

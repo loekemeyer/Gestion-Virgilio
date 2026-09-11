@@ -1,0 +1,124 @@
+<!doctype html>
+<html lang="es">
+<head>
+<!-- v1.0.0 — partes entre DOS PS encadenados (la salida de un PS que es entrada del siguiente) -->
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Stock Tránsito PS · GP2</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="../supabase-config.js?v=20260905k"></script>
+<script src="../gp2-ui.js?v=20260905a"></script>
+<script src="../gp2-numero.js?v=20260905m"></script>
+<link rel="stylesheet" href="../gp2-modulo.css?v=20260903b"/>
+<link rel="icon" type="image/png" href="../GP2_favicon.png">
+<link rel="apple-touch-icon" href="../GP2_favicon.png">
+<style>
+  td.num{text-align:right;font-variant-numeric:tabular-nums}
+  td.stk-cell{cursor:pointer;text-decoration:underline dotted}
+  td.stk-cell:hover{background:#eef4fb}
+  .aviso{border:2px solid #f0c36d;background:#fff8e1;color:#7a5b00;border-radius:10px;padding:10px 14px;font-size:15px;margin:10px 0}
+</style>
+</head>
+<body>
+
+<div class="card">
+  <div class="header">
+    <h1>Stock Tránsito PS</h1>
+    <div class="hbtns">
+      <button class="hlink" id="btnCSV" type="button">⬇ Exportar CSV</button>
+      <a href="../Prov Serv/Control/ControlPS_GP2.html">Control PS</a>
+      <a href="../GP2_MODULOS.html">Atrás</a>
+    </div>
+  </div>
+
+  <div class="steps">
+    <div class="aviso">Partes que van de un PS a OTRO PS: lo que el <b>PS de origen</b> ya
+    entregó y espera en su sector hasta mandarse al <b>PS siguiente</b>
+    (ej. FAAT templa y Guazzaroni niquela). Tocá el Online para ver la composición.</div>
+
+    <div class="search-box"><input type="text" id="q" placeholder="Buscar por parte, SC o proveedor…"></div>
+
+    <div class="table-wrap">
+      <table class="t">
+        <thead><tr>
+          <th>Parte</th><th>SC</th><th>PS Origen</th><th>PS Siguiente</th>
+          <th class="num">Online<br>Uni</th><th class="num">Online<br>Kg</th><th class="num">Online<br>Caj</th>
+          <th class="num">Entrega<br>PS Origen</th><th class="num">Envío<br>PS Siguiente</th>
+        </tr></thead>
+        <tbody id="tbody"></tbody>
+      </table>
+    </div>
+    <div id="tblEmpty" class="empty hidden">Sin resultados.</div>
+    <div id="status" class="status">Cargando…</div>
+  </div>
+</div>
+
+<script>
+window.SB_CLIENT = GP2_SB();
+var SB = window.SB_CLIENT;
+/* helpers de la casa (gp2-ui.js / gp2-numero.js, 2026-09-04); unidades enteras, "—" sin valor */
+var $ = GP2UI.$, esc = GP2UI.esc;
+function uni(n){ return GP2N.fmt(n, 0, '—'); }
+function caj(n){ return GP2N.fmt(n, 1, '—'); }
+
+var FILAS=[];
+
+async function boot(){
+  var r = await SB.rpc('stock_transito_ps_bundle');
+  if(r.error){ $('status').textContent='Error: '+r.error.message; return; }
+  FILAS = (r.data && r.data.filas) || [];
+  render();
+}
+
+function filtradas(){
+  var q=($('q').value||'').trim().toLowerCase();
+  if(!q) return FILAS;
+  return FILAS.filter(function(x){
+    return ((x.codigo||'')+' '+(x.descripcion||'')+' '+(x.sc_cod||'')+' '+(x.ps1_nombre||'')+' '+(x.ps2_nombre||'')).toLowerCase().includes(q);
+  });
+}
+
+function render(){
+  var fs=filtradas();
+  $('tbody').innerHTML = fs.map(function(x,i){
+    var kg  = (x.online!=null && x.kg_x_uni) ? x.online*x.kg_x_uni : null;
+    var cj  = (x.online!=null && x.uni_x_cajon) ? x.online/x.uni_x_cajon : null;
+    return '<tr>'+
+      '<td><b>'+esc(x.codigo)+'</b><br><small style="color:#777">'+esc(x.descripcion||'')+'</small></td>'+
+      '<td>'+esc(x.sc_cod||'—')+'</td>'+
+      '<td>'+esc(x.ps1_nombre)+'<br><small style="color:#777">'+esc(x.ps1_proceso||'')+'</small></td>'+
+      '<td>'+esc(x.ps2_nombre)+'<br><small style="color:#777">'+esc(x.ps2_proceso||'')+'</small></td>'+
+      '<td class="num stk-cell" data-i="'+i+'"><b>'+uni(x.online)+'</b></td>'+
+      '<td class="num">'+(kg==null?'—':uni(kg))+'</td>'+
+      '<td class="num">'+(cj==null?'—':caj(cj))+'</td>'+
+      '<td class="num">'+uni(x.entregado_origen)+'</td>'+
+      '<td class="num">'+uni(x.enviado_siguiente)+'</td>'+
+    '</tr>';
+  }).join('');
+  $('tblEmpty').classList.toggle('hidden', fs.length>0);
+  $('status').textContent = fs.length+' partes en tránsito entre PS';
+
+  document.querySelectorAll('td.stk-cell').forEach(function(td){
+    td.addEventListener('click', function(){
+      var x=filtradas()[Number(td.dataset.i)];
+      if(x && window.GP2Composicion) GP2Composicion.abrir({
+        SB: SB, comp_id: x.comp_id, ubic_tipo: 'sector', ref_id: x.sector_id,
+        cod: x.codigo, desc: x.descripcion, kg_x_uni: x.kg_x_uni, uni_x_cajon: x.uni_x_cajon });
+    });
+  });
+}
+
+$('q').addEventListener('input', render);
+$('btnCSV').addEventListener('click', function(){
+  /* el armado del CSV (;, BOM, coma decimal) es el de la casa: GP2UI.exportarCSV */
+  var filas=[['Parte','Descripcion','SC','PS Origen','PS Siguiente','Online Uni','Entrega PS Origen','Envio PS Siguiente']];
+  filtradas().forEach(function(x){ filas.push([x.codigo,x.descripcion||'',x.sc_cod||'',x.ps1_nombre,x.ps2_nombre,
+    Number(x.online||0),Number(x.entregado_origen||0),Number(x.enviado_siguiente||0)]); });
+  GP2UI.exportarCSV('stock_transito_ps', filas);
+});
+
+boot();
+</script>
+<script src="../gp2-composicion.js?v=20260905d"></script>
+</body>
+</html>

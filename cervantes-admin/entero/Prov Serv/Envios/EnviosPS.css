@@ -1,0 +1,688 @@
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: Arial, sans-serif;
+  background: #d9d9de;
+  padding: 20px;
+  color: #111;
+}
+
+.card {
+  max-width: 1250px;
+  margin: 0 auto;
+  background: #ececec;
+  border: 1px solid #cfcfcf;
+  border-radius: 18px;
+  padding: 22px 20px 28px;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.7);
+}
+
+.header-top {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+/* Inicio siempre a la derecha; Atras queda a la izquierda */
+.header-top .btn-home { margin-left: auto; }
+
+.page-title {
+  margin: 0 0 16px;
+  font-size: 34px;
+  font-weight: 800;
+  text-align: center;
+}
+
+.btn-home,
+.btn-volver {
+  padding: 16px 26px;
+  border-radius: 12px;
+  border: 1px solid #c7c7c7;
+  background: #f7f7f7;
+  font-size: 24px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: 0.15s ease;
+}
+
+.btn-home:hover,
+.btn-volver:hover {
+  background: #e5e5e5;
+  border-color: #999;
+}
+
+.btn-volver-fases {
+  padding: 10px 14px;
+  border-radius: 12px;
+  border: 1px solid #c7c7c7;
+  background: #f7f7f7;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: 0.15s ease;
+}
+
+.btn-volver-fases:hover {
+  background: #e5e5e5;
+  border-color: #999;
+}
+
+.fase-container {
+  background: #efefef;
+  border: 1px solid #d0d0d0;
+  border-radius: 18px;
+  padding: 18px;
+}
+
+.fase-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  margin-bottom: 16px;
+}
+
+.fase-header h2 {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 700;
+  color: #333;
+}
+
+.fase-header.success-header {
+  background: #f3fbf6;
+  border: 2px solid #c7e8d1;
+  border-radius: 12px;
+  padding: 16px;
+  margin-bottom: 16px;
+}
+
+.fase-header.success-header h2 {
+  color: #0a7a2f;
+  margin: 0;
+}
+
+.ps-grid-wrap {
+  background: transparent;
+  border: none;
+  border-radius: 0;
+  padding: 0;
+}
+
+/* Fase 0 (selección de proceso/PS): sin caja interna, usa la card directo */
+#fase0.fase-container {
+  background: transparent;
+  border: none;
+  padding: 0;
+}
+
+.ps-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 14px;
+}
+
+/* Botón "← Procesos" / "← Proveedores" — full width arriba de la grid */
+.back-bar{
+  grid-column: 1 / -1;
+  height: 54px;
+  padding: 0 22px;
+  border-radius: 12px;
+  border: 2px solid #d0d7de;
+  background: #fff;
+  color: #111;
+  font-weight: 800;
+  font-size: 18px;
+  cursor: pointer;
+  text-align: left;
+}
+.back-bar:hover{ border-color: #111; background: #f6f8fa; }
+
+.ps-pill {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  min-height: 110px;
+  padding: 28px 18px;
+  border: none;
+  border-radius: 18px;
+  font-family: inherit;
+  font-size: 22px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: #fff;
+  cursor: pointer;
+  background: linear-gradient(135deg, #6366f1, #4338ca);
+  transition: transform .08s, opacity .15s;
+  text-align: center;
+}
+.ps-pill:hover { opacity: .92; }
+.ps-pill:active { transform: scale(.985); }
+.ps-pill.active {
+  outline: 3px solid #fbbf24;
+  outline-offset: 2px;
+}
+/* Estilo "atrás" para volver a procesos */
+.ps-pill[id^="psBackTo"]{
+  background: #fff !important;
+  color: #111 !important;
+  border: 2px solid #d0d7de !important;
+  min-height: 44px;
+  padding: 10px 16px;
+  font-size: 14px;
+  letter-spacing: .5px;
+}
+
+.status {
+  margin: 14px 0;
+  font-size: 14px;
+  color: #444;
+  text-align: center;
+}
+
+.status.ok {
+  color: #0a7a2f;
+  font-weight: 700;
+}
+
+.status.bad {
+  color: #b42318;
+  font-weight: 700;
+}
+
+.table-wrap {
+  overflow-x: auto;
+  margin-bottom: 16px;
+}
+
+.table {
+  width: auto;
+  margin: 0 auto;
+  border-collapse: collapse;
+  background: #fff;
+  border-radius: 12px;
+  overflow: hidden;
+  table-layout: fixed;
+}
+
+.table thead th,
+.table tbody td {
+  border: 1px solid #d0d0d0;
+  padding: 7px 8px;
+  font-size: 14px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.table thead th {
+  background: #f5f5f5;
+  font-weight: 700;
+  text-align: center;
+}
+
+/* ===== FASE 1 (nuevo orden): SC | Cajón envío | KG Neto | (espacio) | Parte | Online PS | Max | Online SP | Caj | T | F ===== */
+#fase1 .table thead th:nth-child(1),
+#fase1 .table tbody td:nth-child(1) { width: 6ch; text-align: center; }               /* SC */
+#fase1 .table thead th:nth-child(2),
+#fase1 .table tbody td:nth-child(2) { width: 8ch; text-align: center; white-space: normal; }  /* Cajón envío (sug) */
+#fase1 .table thead th:nth-child(3),
+#fase1 .table tbody td:nth-child(3) { width: 8ch; text-align: center; white-space: normal; }  /* Cajón Envío (input) */
+#fase1 .table thead th:nth-child(4),
+#fase1 .table tbody td:nth-child(4) { width: 9ch; text-align: center; white-space: normal; }  /* Cajón envío KG Neto */
+#fase1 .table thead th:nth-child(5),
+#fase1 .table tbody td:nth-child(5) { width: 5ch; text-align: center; }               /* T */
+#fase1 .table thead th:nth-child(6),
+#fase1 .table tbody td:nth-child(6) { width: 5ch; text-align: center; }               /* F */
+#fase1 .table thead th:nth-child(7),
+#fase1 .table tbody td:nth-child(7) { width: 2ch; padding: 0; }                       /* separador */
+#fase1 .table thead th:nth-child(8),
+#fase1 .table tbody td:nth-child(8) { width: 30ch; text-align: center; }              /* Parte */
+#fase1 .table thead th:nth-child(9),
+#fase1 .table tbody td:nth-child(9) { width: 9ch; text-align: center; white-space: normal; }  /* Online PS Cajón */
+#fase1 .table thead th:nth-child(10),
+#fase1 .table tbody td:nth-child(10) { width: 9ch; text-align: center; white-space: normal; } /* Online SP Cajón */
+#fase1 .table thead th:nth-child(11),
+#fase1 .table tbody td:nth-child(11) { width: 8ch; text-align: center; white-space: normal; } /* Max Cajón */
+/* Columna "espacio" separadora */
+#fase1 .table .sep { background: #eef1f4; border-left: 2px solid #cbd3da; border-right: 2px solid #cbd3da; }
+
+/* ===== Popup: setear stock inicial (ajuste Online PS) ===== */
+.ajuste-box { background: #f0f7ff; border: 1px solid #b6d4f2; border-radius: 10px; padding: 10px 12px; margin-bottom: 6px; }
+.ajuste-title { font-weight: 800; font-size: 14px; margin-bottom: 6px; color: #123; }
+.ajuste-info { font-size: 13px; color: #334; margin: 2px 0; }
+.ajuste-row { display: flex; gap: 8px; margin-top: 8px; }
+.ajuste-input { flex: 1; height: 40px; border: 2px solid #b6d4f2; border-radius: 8px; padding: 0 10px; font-size: 15px; text-align: center; }
+.ajuste-btn { height: 40px; border: 0; border-radius: 8px; background: #1769aa; color: #fff; font-weight: 800; font-size: 14px; padding: 0 14px; cursor: pointer; white-space: nowrap; }
+.ajuste-btn:disabled { opacity: .6; cursor: default; }
+.ajuste-hint { font-size: 11.5px; color: #567; margin-top: 6px; line-height: 1.35; }
+.ajuste-msg { font-size: 13px; font-weight: 700; margin-top: 6px; min-height: 16px; }
+.ajuste-msg.ok { color: #137333; }
+.ajuste-msg.err { color: #b91c1c; }
+.popup-sep { height: 1px; background: #dde3ea; margin: 4px 0 10px; }
+
+/* Online SP en rojo cuando es negativo (data quality flag) */
+#fase1 .neg-online b { color: #b91c1c; }
+
+/* Fila con Max=0 — recuadro rojo (Max no cargado en SP Kg, sugerencia no confiable) */
+#fase1 .row-max-zero td {
+  background: #fef2f2;
+  box-shadow: inset 0 0 0 1px #dc2626;
+}
+#fase1 .row-max-zero td:first-child { border-left: 3px solid #dc2626; }
+#fase1 .row-max-zero td:last-child { border-right: 3px solid #dc2626; }
+
+/* Cell-combo: número + botón + adentro de una celda */
+#fase1 .cell-combo {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+}
+#fase1 .mini-popup-btn {
+  width: 18px;
+  height: 18px;
+  border: 1px solid #888;
+  border-radius: 4px;
+  background: #f5f5f5;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0;
+}
+#fase1 .mini-popup-btn:hover {
+  background: #e5e5e5;
+  border-color: #555;
+}
+
+/* Popup overlay */
+.popup-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+}
+.popup-overlay.hidden { display: none; }
+.popup-box {
+  background: #fff;
+  border-radius: 12px;
+  min-width: 320px;
+  max-width: 500px;
+  max-height: 80vh;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 8px 24px rgba(0,0,0,.25);
+}
+.popup-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  border-bottom: 1px solid #e5e5e5;
+}
+.popup-title {
+  font-weight: 700;
+  font-size: 15px;
+}
+.popup-close {
+  background: none;
+  border: 0;
+  font-size: 18px;
+  cursor: pointer;
+  padding: 4px 8px;
+}
+.popup-body {
+  padding: 12px 16px;
+  overflow-y: auto;
+  font-size: 14px;
+}
+.popup-line {
+  padding: 4px 0;
+  border-bottom: 1px solid #f0f0f0;
+}
+.popup-line:last-child { border-bottom: 0; }
+.popup-total {
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 2px solid #111;
+  border-bottom: 0;
+}
+
+/* ===== Popup de envío por grupo de código (Pedernera) ===== */
+.popup-grupo {
+  max-width: 940px !important;
+  width: 96vw;
+  max-height: 92vh;
+}
+.popup-grupo-fecha {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 16px 0;
+  font-weight: 800;
+  font-size: 15px;
+}
+.popup-grupo-fecha input {
+  height: 40px;
+  border-radius: 10px;
+  border: 2px solid #d0d7de;
+  padding: 0 12px;
+  font-size: 16px;
+}
+.pg-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 16px;
+}
+.pg-table th,
+.pg-table td {
+  border: 1px solid #d0d7de;
+  padding: 8px 6px;
+  text-align: center;
+  vertical-align: middle;
+}
+.pg-table th {
+  background: #f3f5f8;
+  font-size: 14px;
+  line-height: 1.1;
+}
+.pg-table .pg-desc { text-align: left; }
+.pg-table .pg-neg { color: #b42318; }
+.pg-table .pg-sep {
+  border: none !important;
+  background: transparent !important;
+  width: 16px;
+  padding: 0;
+}
+.pg-caj, .pg-kg {
+  width: 70px;
+  height: 38px;
+  border: 1px solid #8f8f8f;
+  border-radius: 6px;
+  font-size: 16px;
+  text-align: center;
+  box-sizing: border-box;
+}
+.pg-kg { width: 84px; }
+.popup-grupo-actions {
+  display: flex;
+  justify-content: flex-end;
+  padding: 14px 16px;
+  border-top: 1px solid #e5e5e5;
+}
+.popup-grupo-actions .btn-enviar {
+  min-height: 52px;
+  padding: 0 30px;
+  font-size: 20px;
+}
+
+/* Botones de grupo por código: rojo por default, verde si se abrió al menos una vez */
+.grupo-cod-pill {
+  min-height: 150px;
+  font-size: 34px;
+  font-weight: 800;
+  letter-spacing: .5px;
+  line-height: 1.35;
+  background: linear-gradient(135deg, #ef4444, #b91c1c) !important;
+}
+.grupo-cod-pill.abierto {
+  background: linear-gradient(135deg, #10b981, #059669) !important;
+}
+
+/* Barra de acciones global (fecha + Enviar) debajo de los grupos */
+.grupo-acciones {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 10px;
+  flex-wrap: wrap;
+}
+.grupo-acciones label { font-weight: 800; font-size: 18px; }
+.grupo-acciones input {
+  height: 46px;
+  border-radius: 10px;
+  border: 2px solid #d0d7de;
+  padding: 0 12px;
+  font-size: 16px;
+}
+.grupo-acciones .btn-enviar {
+  margin-left: auto;
+  min-height: 62px;
+  padding: 0 40px;
+  font-size: 22px;
+}
+
+/* Faltante box (clic toggle, auto si cargado < sugerido) */
+#fase1 .faltante-box {
+  width: 22px;
+  height: 22px;
+  border: 2px solid #111;
+  border-radius: 3px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 14px;
+  cursor: pointer;
+  margin: auto;
+  user-select: none;
+  background: #fff;
+}
+#fase1 .faltante-box.active {
+  background: #e8fbe8;
+  border-color: #16a34a;
+  color: #16a34a;
+}
+
+/* ===== FASE 2: Parte | Proceso | SC | Caj | Kg Bruto | Kg Neto ===== */
+#fase2 .table thead th:nth-child(1),
+#fase2 .table tbody td:nth-child(1) { width: 26ch; text-align: center; }
+#fase2 .table thead th:nth-child(2),
+#fase2 .table tbody td:nth-child(2) { width: 8ch; text-align: center; }
+#fase2 .table thead th:nth-child(3),
+#fase2 .table tbody td:nth-child(3) { width: 4ch; text-align: center; }
+#fase2 .table thead th:nth-child(4),
+#fase2 .table tbody td:nth-child(4) { width: 7ch; text-align: center; }
+#fase2 .table thead th:nth-child(5),
+#fase2 .table tbody td:nth-child(5) { width: 8ch; text-align: center; }
+#fase2 .table thead th:nth-child(6),
+#fase2 .table tbody td:nth-child(6) { width: 8ch; text-align: center; }
+
+#fase2 .kg-caj { font-size: 11px; color: #777; }
+#fase2 .kg-neto-cell b { color: #15803d; }
+
+.table tbody td.right {
+  text-align: right;
+}
+
+.cell-input,
+.input-caj,
+.input-kg-fase2 {
+  width: 100%;
+  min-width: 50px;
+  height: 32px;
+  border: 1px solid #bdbdbd;
+  border-radius: 4px;
+  padding: 0 6px;
+  font-size: 14px;
+  text-align: center;
+  background: #fafafa;
+}
+
+.cell-input:focus,
+.input-caj:focus,
+.input-kg-fase2:focus {
+  outline: none;
+  border-color: #3b82f6;
+  background: #fff;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+.cell-input-small {
+  width: auto;
+  min-width: 60px;
+}
+
+.footer-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  margin-top: 16px;
+  flex-wrap: wrap;
+}
+
+.btn-enviar {
+  padding: 12px 18px;
+  border-radius: 14px;
+  border: 0;
+  background: #111;
+  color: #fff;
+  font-size: 15px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: 0.15s ease;
+}
+
+.btn-enviar:hover:not(:disabled) {
+  background: #333;
+}
+
+.btn-enviar:disabled,
+.btn-enviar.disabled {
+  opacity: 0.45;
+  pointer-events: none;
+}
+
+.success-box {
+  margin-top: 16px;
+  border: 2px solid #c7e8d1;
+  background: #f3fbf6;
+  border-radius: 12px;
+  padding: 20px;
+  text-align: center;
+}
+
+.success-msg {
+  font-size: 16px;
+  color: #0a7a2f;
+  margin-bottom: 8px;
+}
+
+.success-code {
+  font-size: 32px;
+  font-weight: 900;
+  letter-spacing: 4px;
+  color: #111;
+  margin: 12px 0;
+}
+
+.hidden {
+  display: none !important;
+}
+
+@media (max-width: 900px) {
+  .ps-grid {
+    justify-content: center;
+  }
+
+  .ps-pill {
+    min-width: 140px;
+  }
+
+  .footer-actions {
+    justify-content: center;
+  }
+}
+
+@media (max-width: 640px) {
+  body {
+    padding: 12px;
+  }
+
+  .card {
+    padding: 16px;
+    border-radius: 14px;
+  }
+
+  .page-title {
+    font-size: 30px;
+  }
+
+  .ps-pill {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .footer-actions {
+    width: 100%;
+  }
+
+  .btn-enviar,
+  .btn-volver-fases {
+    width: 100%;
+  }
+}
+
+/* Ocultar columnas de cajones cuando PS no usa cajones (Charcas, AJ Adhesivos) */
+.table.hide-caj-cols .col-caj-only{
+  display: none !important;
+}
+
+/* Agrupacion de PSs por proceso principal */
+.ps-grupo-header{
+  width: 100%;
+  font-weight: 800;
+  font-size: 14px;
+  color: #555;
+  text-transform: uppercase;
+  letter-spacing: .8px;
+  margin: 16px 0 6px;
+  padding: 4px 8px;
+  border-bottom: 2px solid #111;
+}
+.ps-grupo-wrap{
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+/* Botones de proceso (paso 1 del 2-pasos) — estilo Logística (verde envíos) */
+.proceso-pill{
+  background: linear-gradient(135deg, #10b981, #059669) !important;
+  min-height: 120px;
+  font-size: 22px;
+  font-weight: 800;
+  letter-spacing: .5px;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  text-align: center;
+  gap: 8px;
+  line-height: 1.15;
+}
+.proceso-pill span{ display:block; width:100%; text-align:center; font-size: 20px !important; font-weight: 700 !important; opacity: .95 !important; }
+.proceso-pill br{ display:block; content:""; }
+
+/* Botones de familia (Pelador / Sacacorchos / Abrelatas / Otros) */
+.familia-pill{
+  background: linear-gradient(135deg, #6366f1, #4338ca) !important;
+  min-height: 120px;
+  font-size: 19px;
+  letter-spacing: 0;
+  padding: 12px 8px;
+  white-space: normal;
+  line-height: 1.15;
+  word-break: break-word;
+}
