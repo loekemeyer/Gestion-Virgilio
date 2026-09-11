@@ -5715,6 +5715,27 @@ corrigieron en la v15.71:
 **Chequeo:** `select cod_art, count(*) from vista_saldos_stock group by 1 having count(*) > 1;`
 — cada código que aparezca ahí tiene que estar sumado en el front, no pisado.
 
+### ⚠ PENDIENTE al implementar esta rama — no perder el arreglo del saldo
+
+El arreglo de las cuatro funciones **ya salió a `main` solo** (v15.71, commit `49c0fc6`,
+11/09): el backfill de A Guardar rompió el MG **en vivo** y no podía esperar a la rama.
+O sea que **la forma que hay hoy en `main` es la que tiene que quedar** cuando esta rama
+se implemente. Al mergear:
+
+1. **No revertir** `stockFetchSaldos`, `pkFetchExcedente` ni `_stkGondolaSaldoVivo` a la
+   forma vieja (`m[k] = …`, `out[k] = …`, `a[0].terminado`). Si el merge los deja como
+   estaban, el MG vuelve a mostrar góndola 0 o A Guardar 0.
+2. **`recepcion.js`** (aviso de exceso de góndola) lleva el mismo arreglo y **sólo está en
+   `main`**: esta rama no toca ese archivo, así que viene solo al traer `main`. Verificarlo
+   igual.
+3. **Re-bumpear la versión.** `main` se llevó la v15.71, así que esta rama pasó a **v15.72**;
+   al mergear hay que subirla otra vez a lo que siga de `main`.
+4. **`gv_saldos_stock_emp` todavía NO está aplicada** en la base: `stockFetchSaldos` la
+   consulta best-effort y sin ella el front se comporta como siempre (sin `_emp`).
+
+**Chequeo de que el arreglo sigue puesto:**
+`grep -c 'v15.71 — ACUMULA\|v15.71 — SUMAR' index.html` → tiene que dar **3**.
+
 **Rollback:** `docs/ROLLBACK-PRODUCCION.md` (entrada v15.71). SQL:
 `sql/gv_lugar_fuente_unica.sql`, `sql/gv_lugar_carga_inicial.sql`,
 `sql/gv_empresa_recepcion_mg.sql`.
