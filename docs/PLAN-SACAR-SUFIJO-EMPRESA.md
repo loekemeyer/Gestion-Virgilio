@@ -109,3 +109,86 @@ antes de retirar nada, o el supervisor edita una tabla que ya no manda.
 6. Limpiar los 67 `codBase` que quedaron no-op.
 
 Cada paso es reversible solo y se puede parar en cualquiera de ellos.
+
+---
+
+# Parte 2 — Enrutar TODO lo que toca las tablas viejas a las nuevas
+
+> **Pedido de Luis (2026-09-11):** *"fijate todo lo que toque las tablas que estoy buscando
+> reemplazar y planeá el enrutamiento a las nuevas (que el editor pueda editar la nueva por
+> ejemplo)"*.
+
+## Las cuatro tablas viejas y quién las toca
+
+| tabla vieja | la reemplaza | lecturas | **escrituras (lo crítico)** |
+|:--|:--|--:|:--|
+| `Planimetria` | `GV_Lugar_Item` + `GV_Lugar.orden` | 2 | `planimUpsert` (L34510, POST) · `planimDeleteRow` (L34550, DELETE) — **el editor del supervisor** |
+| `Capacidad_Sector` | `GV_Lugar_Item.cajas_max` | 8 | `dpSaveCap` (L34400, POST) · `stkCapImport` (L19280, POST + **DELETE masivo**) |
+| `Racks_Planimetria` | `GV_Lugar` (`tipo='rack'`) + `GV_Lugar_Item` | 9 | `stkInsAlta` (L20712, POST) |
+| `planimetria.js` (estático, 7 kB) | cache offline de `GV_Lugar_Item` | baseline de `window.GONDOLA` | se **regenera**, no se edita |
+
+`Ubicaciones_Articulos` y `Stock_Ubicaciones` **no se leen desde el front**: fueron fuentes de
+la carga inicial y nada más. Se retiran sin tocar código.
+
+## La bisagra es `window.GONDOLA`, y por eso esto sale barato
+
+`window.GONDOLA` tiene forma `{ cod: [sector, orden] }` y se usa en **25 lugares**. Hoy lo
+llena `planimetria.js` (baseline offline) y encima lo mergea `loadPlanimetriaRemote` (L8500)
+con `Planimetria`.
+
+**Si se mantiene la forma y sólo se cambia de dónde se llena, los 25 consumidores no se tocan.**
+La consulta equivalente contra las tablas nuevas es directa:
+
+```sql
+select cod, sector, orden from public.gv_lugar_articulo where tipo = 'gondola' order by orden;
+```
+
+Y para lo que necesita empresa ya está resuelto: el picking usa `gv_lugar_articulo` por
+`(código, empresa)` desde la **v15.73**. O sea que `GONDOLA` queda como **fallback offline**
+y la vista como fuente viva — que es justo el reparto que ya tiene hoy con `planimetria.js`.
+
+## El editor: que edite la tabla nueva
+
+`planimUpsert(cod, sector, orden)` y `planimDeleteRow(cod)` escriben a `Planimetria`, cuya
+clave es **`cod`** — o sea **un código, un lugar**. Las tablas nuevas invierten eso: la clave
+es `(sector, cod, clase)`, así que **un código puede estar en varios lugares** (que es la
+realidad: el 437E está en F09-F12). El editor hay que rehacerlo, no re-apuntarlo:
+
+| hoy | queda |
+|:--|:--|
+| una fila por código, con su sector | una fila por **lugar**, con lo que tiene adentro |
+| `orden` se edita por código | `orden` es del **lugar** (`GV_Lugar.orden`) |
+| borrar = borrar el código | borrar = sacar el código **de ese lugar** |
+| no distingue artículo de insumo | `clase` obliga a elegir |
+| no tiene empresa | la empresa la da el lugar, no se tipea |
+| no tiene capacidad | `cajas_max` entra acá y `Capacidad_Sector` desaparece |
+
+**El editor nuevo es el de `Capacidad_Sector` y el de `Planimetria` fundidos en uno**, porque
+las dos tablas se fusionaron en `GV_Lugar_Item`. Pantalla: elegir lugar → ver qué tiene →
+agregar/sacar códigos con su `cajas_max`.
+
+⚠ `stkCapImport` (L19280) hace un **`DELETE` masivo** (`?id=gt.0`) y recarga de un Excel. Ese
+patrón **no se replica**: sobre `GV_Lugar_Item` sería borrar la planimetría entera. El
+importador nuevo tiene que ser `upsert` por `(sector, cod, clase)` y, si hace falta borrar,
+que sea explícito y acotado al lugar.
+
+## Orden de enrutamiento (después del merge, ver Parte 1)
+
+1. **Lecturas primero, que son inofensivas.** Repuntar `loadPlanimetriaRemote` (L8500) y las 8
+   de `Capacidad_Sector` a `gv_lugar_articulo` / `GV_Lugar_Item`, manteniendo la forma de
+   `window.GONDOLA`. Los 25 consumidores no se enteran. Verificable comparando el `GONDOLA`
+   viejo contra el nuevo: tienen que dar el mismo mapa salvo los 28 casos ya documentados
+   (19 sin stock + 9 que el relevamiento reubicó).
+2. **Regenerar `planimetria.js`** desde `GV_Lugar_Item` para que el baseline offline coincida
+   con la fuente viva. Hoy se generó de un Excel en 2026-08-28 y ya quedó viejo.
+3. **Racks:** repuntar las 9 lecturas y `stkInsAlta` a `GV_Lugar` (`tipo='rack'`).
+4. **El editor fundido** (Planimetría + Capacidad en uno) escribiendo a `GV_Lugar_Item`.
+   Hasta que exista, **dejar el viejo andando**: un supervisor sin editor es peor que un
+   editor que escribe a una tabla que ya nadie lee.
+5. **Recién ahí** retirar `Planimetria`, `Capacidad_Sector`, `Racks_Planimetria`,
+   `Ubicaciones_Articulos` y `Stock_Ubicaciones`. Con backup y entrada en
+   `docs/ROLLBACK-PRODUCCION.md`: son tablas compartidas.
+
+**Regla de todo el tramo:** ninguna tabla vieja se borra hasta que su reemplazo esté
+escribiendo Y leyendo en producción. Entre medio conviven — cuesta un poco de ruido y evita
+quedarse sin editor un lunes a la mañana.
