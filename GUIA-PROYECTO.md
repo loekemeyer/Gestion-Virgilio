@@ -11034,3 +11034,26 @@ distinta, empresa distinta.
 >   (umbral ≈ 3× su período; dedup un aviso por sync por día). **No se creó tabla
 >   `Sync_Estado`**: `cron.job_run_details` ya tiene la verdad. DDL en
 >   `sql/watchdog_syncs_externos.sql`.
+
+> Nota **2026-09-11 (v15.33) — Auditoría de operarios (CR/RR/CC): 2 bugs visuales + 5 de lógica.**
+> Revisión con `revisor-render` + `revisor-logica` sobre el circuito diario (Control Remitos,
+> Carga Camión, Recepción Remitos). Se corrigieron 6 hallazgos, todos en `index.html`:
+> - **Visual:** la tabla de RR (6 columnas: NP·Cod·RS·Líos·Controlado·Volvió) perdía Líos,
+>   Controlado y el botón "s/salida" sin aviso a ≤560px (ninguna sombra de scroll lo delataba) →
+>   a esa medida pasa a tarjeta apilada con `data-label`. La botonera secundaria (row-6: CR·RR·
+>   INS·CP·RC·IR) partía palabras a la mitad a ≤430px ("Recepció"/"n Remitos") → 2 filas de 3.
+> - **Lógica:** `fetchCCData`/`fetchCCRData` no paginaban `Facturacion_NP` ni los eventos
+>   `CCN`/`CCR` contra PostgREST (el mismo corte de 1000 filas que ya mordió `PPP_Entregados_Meta`
+>   en v11.23, sin arreglar acá) → pasan a `supaFetchAll(Safe)` con `order=` explícito. `send()`
+>   sin guard de doble-tap antes del primer `await` → guard por tiempo (800 ms; no por bandera,
+>   porque `send()` tiene varios `return` de validación que la habrían dejado trabada). `ccFinish`/
+>   `ccrFinish` sin el guard "tildá al menos uno" que RR (`crFinish`) ya tenía → agregado. El
+>   placeholder de pantalla "—" (tanda vacía) se persistía literal en `texto` de
+>   `Registros_Produccion_Virgilio` → se pela antes de mandar al servidor, se conserva para
+>   mostrar/agrupar en pantalla (0 filas afectadas medido, pero el hueco quedaba latente).
+> - **Pendiente, sin tocar (efectivo L, cambio de arquitectura):** CC/CR/RR no tienen reserva
+>   atómica por NP — dos operarios pueden marcar el mismo NP casi al mismo tiempo y las dos
+>   quedan aceptadas (el id del evento incluye el legajo, no hay conflicto). Mismo patrón que
+>   `tandaReservar` de EP/AP pero para CCN/CRN/CCR. Verificable:
+>   `select opcion, texto, count(distinct legajo) from "Registros_Produccion_Virgilio" where
+>   opcion in ('CCN','CRN','CCR') group by 1,2 having count(distinct legajo)>1`.
