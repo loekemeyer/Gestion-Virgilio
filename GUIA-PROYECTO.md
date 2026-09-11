@@ -12,7 +12,7 @@
 > única**; no se replica. Ante la duda entre parche rápido y fix de raíz → **fix
 > de raíz**.
 >
-> Última actualización: 2026-09-11 (viernes) · Versión app al documentar: **v15.54**
+> Última actualización: 2026-09-11 (viernes) · Versión app al documentar: **v15.56**
 >
 > Nota **v15.40 (2026-09-11) — HANDOFF de planimetría / Acacia: `docs/HANDOFF-PLANIMETRIA-Y-ACACIA.md`.**
 > Thomas sigue este tema en otra sesión. Ahí está todo junto: los **13 artículos activos del catálogo LK
@@ -11158,6 +11158,19 @@ distinta, empresa distinta.
 >   (umbral ≈ 3× su período; dedup un aviso por sync por día). **No se creó tabla
 >   `Sync_Estado`**: `cron.job_run_details` ya tiene la verdad. DDL en
 >   `sql/watchdog_syncs_externos.sql`.
+
+> Nota **2026-09-11 (v15.56) — La Demora del Resumen salía vacía en los pedidos de la página.**
+> Thomas: *"si los pedidos se cargaron por pipeline desde paginalk, no calcula demora de pedidos"*.
+> La Demora es el promedio de `fecha_entrega − fecha de recepción`, y las dos funciones que
+> programan solas (`ppp_web_armar_tandas`, `gv_ppp_web_armar_pendientes`) escribían
+> `PPP_Web_Programacion` **sin la columna `fecha_recep`** — la primera hasta la calcula en su CTE
+> para ordenar por antigüedad, pero no la pone en el `INSERT`. Medido: **75 de 84** filas en NULL;
+> las 9 con dato eran las que guardó el front. **Arreglo en el backend con un trigger**
+> (`gv_ppp_web_fecha_recep`, BEFORE INSERT OR UPDATE) que la resuelve contra
+> `lk_pedidos_match.fecha_pedido`: cubre las dos funciones, el front y lo que venga, sin tocar
+> 24 kB de plpgsql que corren en los crons 71/73. Después del backfill: **0 de 84 sin fecha**,
+> y 17/09 = **8,3 días**, 18/09 = **10,0 días**. Backup, medición y rollback en §3.ch de
+> `docs/SUPABASE-GESTION-VIRGILIO.md` y `sql/gv_ppp_web_fecha_recep_v1556.sql`.
 
 > Nota **2026-09-11 (v15.54) — Resumen de la PPP: el Total m³ pasó al lado del Día, antes del desglose.**
 > Dueño: *"el dato de total m3 que esté a la derecha del día, y después el desglose"*. El orden ahora es

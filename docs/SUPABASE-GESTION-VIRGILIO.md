@@ -5819,3 +5819,71 @@ operarios no cambia: sigue mostrando sólo lo cargado (CCN). Medido: 98530 entra
 `gv_ppp_programacion_diaria` · desprogramar LK 0024 → 1 NP sin tanda.
 
 **Rollback:** `sql/gv_en_salida_presunta_y_cancelar_v1555.sql`.
+## §3.ch — La Demora del Resumen salía vacía en los pedidos de la página (v15.56, 2026-09-11)
+
+Thomas, con la captura de los días 17/09 y 18/09: ***"si los pedidos se cargaron por pipeline
+desde paginalk, no calcula demora de pedidos"***. La Demora del Resumen es el promedio de
+`fecha_entrega − fecha de recepción`, así que sin fecha de recepción no hay nada que promediar
+y la celda queda en `·`.
+
+**Causa: las dos funciones que programan solas escriben `PPP_Web_Programacion` sin esa columna.**
+
+| Función | Qué hace con `fecha_recep` |
+|---|---|
+| `ppp_web_armar_tandas` | La **calcula** en su CTE `_sin_tanda` (la usa para ordenar por antigüedad) pero **no la incluye** en la lista de columnas del `INSERT` |
+| `gv_ppp_web_armar_pendientes` (bloque a1) | Ni la menciona |
+| `pppGuardarWeb` (el front) | Sí la manda |
+
+Medido antes del fix: **75 de 84** filas con `fecha_recep` NULL; las 9 con dato son justamente
+las que guardó el front. Los días **17/09 (26 NP)** y **18/09 (7 NP)** estaban 100 % sin fecha.
+
+**Arreglo: un trigger, no un parche a las dos funciones.** Son 24 kB de plpgsql que corren en
+los crons **71** (`1 3 * * 1-5`) y **73** (`*/15 9-23 * * *`); un `create or replace` de
+cualquiera de las dos para agregar una columna es mucho más riesgo que un `BEFORE` de tres
+líneas — y el trigger cubre **todas** las vías de escritura de una vez, incluidas las que vengan.
+La tabla es de Gestión (`PPP_Web_*`), Producción no la usa, y ya lleva dos triggers propios
+(`trg_ppp_web_prog_touch`, `gv_web_cliente_un_solo_dia`): no aplica la prohibición de triggers
+sobre tablas compartidas.
+
+```sql
+-- BEFORE INSERT OR UPDATE: sólo RELLENA, nunca pisa una fecha ya cargada
+create trigger gv_ppp_web_fecha_recep before insert or update
+  on public."PPP_Web_Programacion" for each row
+  execute function public.gv_ppp_web_fecha_recep();
+```
+
+**De dónde sale el dato:** `lk_pedidos_match.fecha_pedido`, que LK empuja por FDW cada 15 min
+(`sync_pedidos_match_virgilio`). Resuelve **75 de 75** por `(empresa, order_id)` — cobertura
+100 %, ni una sin fuente.
+
+**Medición después (backfill + trigger):**
+
+| | Antes | Después |
+|---|---:|---:|
+| Filas sin `fecha_recep` | 75 de 84 | **0 de 84** |
+| Demora del 17/09 | — (vacía) | **8,3 días** |
+| Demora del 18/09 | — (vacía) | **10,0 días** |
+
+Demoras que quedaron a la vista: 11/09 2,0 · 14/09 8,3 · 15/09 9,1 · 16/09 7,9 · 17/09 8,3 ·
+18/09 10,0 · 29/09 19,0.
+
+**Prueba del trigger** (dentro de `begin … rollback`, no quedó nada): un `insert` sin
+`fecha_recep` para el `order_id` 1350 salió con `2026-09-05`, que es el `fecha_pedido` de ese
+pedido. Verificado después: 84 filas, ninguna de prueba.
+
+**Riesgo conocido:** si el cron de Gestión programa un pedido **antes** de que
+`sync_pedidos_match_virgilio` lo haya traído de LK (los dos corren cada 15 min), esa fila puede
+nacer con `fecha_recep` NULL y el trigger no tiene de dónde sacarla. Hoy no pasó nunca (75/75
+resolubles). Si aparece, la salida es un repaso periódico de las NULL, no tocar las funciones.
+
+**Backup y rollback:** `sql/gv_ppp_web_fecha_recep_v1556.sql`. La columna respaldada fila por
+fila en `public."GV_Backup_FechaRecep_20260911"` (84 filas, 75 con `fecha_recep_old` NULL).
+
+```sql
+drop trigger if exists gv_ppp_web_fecha_recep on public."PPP_Web_Programacion";
+drop function if exists public.gv_ppp_web_fecha_recep();
+update public."PPP_Web_Programacion" set fecha_recep = null
+ where (empresa, order_id, np_idx) in (select empresa, order_id, np_idx
+                                         from public."GV_Backup_FechaRecep_20260911"
+                                        where fecha_recep_old is null);
+```
