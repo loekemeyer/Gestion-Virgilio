@@ -5053,3 +5053,12 @@ Dueño: *"todos los datos que tengas que corregir, dale"*. Barrido sobre `v_impo
   `gv_importados_resync` por importado.
 - **Impos en curso**: Becky 29/09 y 15/11 · Fujian 01/11 · Frontier 04/11 · Ownland 18/12 · Hugo Wong sin fecha
   (falta la fecha del depósito).
+
+### §3.bm.8 — Fecha del PI Hugo Wong: 19/09 + 45 días (v15.16, 2026-09-11)
+
+- Dueño: *"19 de septiembre + 45 d llega Hugo"* → **03/11/2026** en los 11 baches `creado_por = 'PI NY26-031438'`
+  (+ `gv_importados_resync`: 11 filas de `Importados` con `reingreso_est = 2026-11-03`). Es el dato del dueño, no la
+  fórmula depósito + 55 + 40 de §3.bm.7.
+- Rollback: `update "GV_Importados_Baches" set fecha_reingreso = null where creado_por = 'PI NY26-031438'` + resync.
+- **Impos en curso, todas con fecha**: Becky 29/09 · Fujian 01/11 · Hugo Wong 03/11 · Frontier 04/11 · Becky 2.ª 15/11 ·
+  Ownland 18/12.
