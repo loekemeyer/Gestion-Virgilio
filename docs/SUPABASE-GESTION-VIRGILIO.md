@@ -4935,8 +4935,16 @@ suman doble el en curso y el backfill de baches les creó 2–3 baches.
 - **FOB corregido según el PI (v15.07, dueño: *"corregí FOB considerando lo de ese Excel"*)**: se cruzó
   `fob_uni` de las 13 filas Fujian contra el PI; la única diferencia era **825·CH 0,50 → 0,25** (id 76, backup
   `GV_Importados_bkp_fob825_20260911`). El resto ya coincidía. 111/112/113 (Loke) no vienen en el PI: sin tocar.
-- **Diferencias de uni/master NO tocadas**: 824 y 825 = 96 en ficha vs **144** en el PI; 440E = 12 vs **24**. Si se
-  corrigen, también hay que revisar el m³ master (`Importados_Volumen`), que va atado al master.
+- **uni × master corregido según el PI (v15.08, dueño: *"corregí uni x master"*)**: `Importados_Volumen` de las
+  13 filas Fujian pasa al **cartón real del embarque** (inner, master, medidas y m³ del "out carton" del PI; el CBM
+  total del PI, 32,52 m³, cierra con esos cartones). Se alinea todo el packing y no sólo el número porque el m³ va
+  atado al master. Cambios de master: 026/110/824/027/825 **96 → 144**, 440E **12 → 24**; el resto (437, 438, 439,
+  035E) mantiene el master pero cambia medidas/m³ (438: 0,0685 → 0,0464; 439: 0,0561 → 0,0715; 035E: 0,0645 →
+  0,0770; 437: 0,0518 → 0,0616). `fuente = 'PI HT26-06-600-R1'` (antes "QUIEBRE Todos 11-08"). `uni_x_caja` de
+  `Importados` (caja de venta) no se toca. Backup `GV_Importados_Volumen_bkp_pi_fujian_20260911`; rollback =
+  `update "Importados_Volumen" v set (uni_inner,uni_master,largo_cm,ancho_cm,alto_cm,m3_master,fuente) =
+  (b.uni_inner,b.uni_master,b.largo_cm,b.ancho_cm,b.alto_cm,b.m3_master,b.fuente) from
+  "GV_Importados_Volumen_bkp_pi_fujian_20260911" b where b.cod = v.cod`.
 - **Rollback**: `delete from "GV_Importados_Baches" where creado_por = 'PI HT26-06-600-R1'` (6 filas) +
   `select gv_importados_resync(id)` para 63, 65, 66, 67, 68, 164; `delete from "Importados" where id = 164`;
   `update "Importados" set cod_art='439E' where id=68`; `delete from "Importados_Volumen" where cod='439EL'`.

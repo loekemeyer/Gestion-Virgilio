@@ -381,3 +381,11 @@ baches + `gv_importados_resync` de 63/65/66/67/68/164, `delete "Importados" id=1
 
 `Importados` id 76 (825·CH): `fob_uni 0.5 → 0.25`. Backup `GV_Importados_bkp_fob825_20260911`.
 Rollback: `update "Importados" set fob_uni = 0.5 where id = 76`. Detalle §3.bm.2.
+
+## uni × master según PI Fujian — v15.08 (2026-09-11)
+
+`Importados_Volumen`: 13 filas Fujian (026, 027, 035E, 110, 437E, 437EL, 438E, 438EL, 439E, 439EL, 440E, 824,
+825) con inner/master/medidas/m³/fuente del PI. Backup `GV_Importados_Volumen_bkp_pi_fujian_20260911`.
+Rollback: `update "Importados_Volumen" v set (uni_inner,uni_master,largo_cm,ancho_cm,alto_cm,m3_master,fuente) =
+(b.uni_inner,b.uni_master,b.largo_cm,b.ancho_cm,b.alto_cm,b.m3_master,b.fuente) from
+"GV_Importados_Volumen_bkp_pi_fujian_20260911" b where b.cod = v.cod`. Detalle §3.bm.2.
