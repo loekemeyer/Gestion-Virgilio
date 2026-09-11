@@ -5538,7 +5538,7 @@ Las 16 NP de ISIS normales, sin cambio (el fallback sólo entra cuando el valor 
 `drop view public.gv_vista_control_remitos, public.gv_vista_cola_impresion;`
 
 
-## §3.ce — Cuarentena: "Ya pagó" y la tarea de Viviana en Planify (v15.46, 2026-09-11)
+## §3.ce — Cuarentena: "Ya pagó" y la tarea de Viviana en Planify (v15.47, 2026-09-11)
 
 Dos pedidos de Thomas del 11/09: *"si hay uno en cuarentena, que le aparezca a Viviana Gauna en
 Planify"* y *"agregame un botón en cada box que diga **Ya pagó**, para que Viviana los pueda
