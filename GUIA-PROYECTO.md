@@ -12,7 +12,7 @@
 > única**; no se replica. Ante la duda entre parche rápido y fix de raíz → **fix
 > de raíz**.
 >
-> Última actualización: 2026-09-11 (viernes) · Versión app al documentar: **v15.58**
+> Última actualización: 2026-09-11 (viernes) · Versión app al documentar: **v15.59**
 >
 > Nota **v15.40 (2026-09-11) — HANDOFF de planimetría / Acacia: `docs/HANDOFF-PLANIMETRIA-Y-ACACIA.md`.**
 > Thomas sigue este tema en otra sesión. Ahí está todo junto: los **13 artículos activos del catálogo LK
@@ -11158,6 +11158,19 @@ distinta, empresa distinta.
 >   (umbral ≈ 3× su período; dedup un aviso por sync por día). **No se creó tabla
 >   `Sync_Estado`**: `cron.job_run_details` ya tiene la verdad. DDL en
 >   `sql/watchdog_syncs_externos.sql`.
+
+> Nota **2026-09-11 (v15.59) — Auditado: el automático NUNCA sacó un pedido de Cuarentena solo. Y el candado pasa a ser por BLOQUE.**
+> Vivi preguntó si el sistema mandó a Programación pedidos que estaban en Cuarentena sin que nadie los liberara.
+> **No.** Las 7 NP de sus tareas recibieron tanda entre el 06/09 y el 10/09 15:30, y los datos de Cuarentena
+> (límite/suspendido y deuda) se cargaron recién el 10/09 entre las 17:36 y las 18:00: el sistema no tenía con qué
+> chequear. Los únicos 3 que se programaron después (El Gran Bazar, Villar, Pérez Zárate) figuran liberados **a mano**
+> en `GV_Cuarentena_Liberados` a las 12:15:52, 12:16:01 y 12:16:02 por `loekemeyer.n8n@gmail.com`, y recién ahí el cron
+> los tomó. El filtro además funcionó: la corrida de las 00:01 retuvo 7 NP de LK y 3 de Chef.
+> **Queda abierto, y es decisión del dueño:** la Cuarentena frena lo que todavía no tiene tanda; un pedido **ya
+> programado** al que después le aparece deuda no se retira solo (Osa $20,1 M, Torres y Liva $32,2 M, Clapera $4,9 M…).
+> Anotado en la auditoría sin tocar la PPP. **Y el candado de la v15.58 se endureció**: miraba el pedido entero, así que
+> un bloque pendiente de un pedido con otro bloque ya armado podía escaparse; ahora compara `order_id|np_idx`. Hoy no
+> había ningún pedido partido. §3.ci.1 de `docs/SUPABASE-GESTION-VIRGILIO.md`.
 
 > Nota **2026-09-11 (v15.58) — Cuarentena: sólo lo PENDIENTE. Lo que ya tiene tanda no le abre tarea a Viviana.**
 > Vivi: *"tengo estos mensajes de cuarentena pero no los veo en A Programar"*. Las 7 tareas abiertas (LK 1354 ·

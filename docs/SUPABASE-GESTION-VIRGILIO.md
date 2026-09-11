@@ -5968,3 +5968,65 @@ le abre una tarea nueva: eso es correcto.
 **Rollback:** redeployar la v22 (commit anterior de `supabase/functions/gv-ppp-web-tandas-diarias/index.ts`).
 Auditoría: `github_repo_problemas`, "Cuarentena abre tareas en Planify (Viviana) para pedidos que ya
 estan programados con tanda".
+\n
+
+### §3.ci.1 — v15.59 (2026-09-11): ¿el automático sacó algo de Cuarentena solo? NO. Y el candado, por bloque
+
+Vivi, al leer el arreglo anterior: ***"¿me estás diciendo que el programa mandó los pedidos que estaban
+en cuarentena a la programación por su cuenta, sin que nadie los saque de cuarentena manualmente? Si
+fue así, es un problema gigante"***. La pregunta se auditó entera contra la base.
+
+**Respuesta: no. Ningún pedido pasó de Cuarentena a Programación sin que una persona lo liberara.**
+
+El orden de los hechos lo prueba. Los datos de Cuarentena no existían cuando se armaron esos camiones:
+
+| Fuente | Cargada |
+|---|---|
+| `busqueda` Chef (límite + suspendido) | 10/09 17:36 |
+| `busqueda` LK | 10/09 17:46 |
+| `deuda` LK y Chef (carga inicial) | 10/09 ~17:36 – 18:00 |
+| `deuda` LK y Chef (reemplazo vigente) | 11/09 12:43 |
+
+Las 7 NP de las tareas de Vivi recibieron tanda **antes** de esa carga, o sea con el sistema sin nada
+contra qué chequear la deuda:
+
+| NP | Cliente | Tanda | Programada | Por |
+|---|---|---|---|---|
+| LK 1346 | BP Import | E01D | 06/09 00:20 | sistema |
+| LK 1349 | Bazar Monica | D68G | 06/09 16:15 | sistema |
+| CH 217 | Gifel | D69E | 06/09 16:15 | sistema |
+| CH 218 | Ierakuin | E03B | 07/09 09:30 | sistema |
+| LK 1354 | Osa Distribuidora | E09B | 07/09 09:45 | sistema |
+| LK 1384 | Bazar Mandarin | E12D | 10/09 11:45 | sistema |
+| CH 225 | Clapera | E12G | 10/09 15:30 | sistema |
+
+Los **tres únicos** pedidos que recibieron tanda después de la carga fueron liberados **a mano** antes,
+con nombre y hora en `GV_Cuarentena_Liberados`:
+
+| NP | Liberado | Por | Programado |
+|---|---|---|---|
+| LK 1369 El Gran Bazar | 12:15:52 | loekemeyer.n8n@gmail.com | 12:16:41, cron, E12D |
+| LK 1388 Villar | 12:16:01 | loekemeyer.n8n@gmail.com | 12:16:17, **a mano**, E19A |
+| LK 1380 Pérez Zárate | 12:16:02 | loekemeyer.n8n@gmail.com | 12:16:41, cron, E12D |
+
+O sea: alguien apretó "Enviar a Pedidos a programar" y el cron los tomó 39 segundos después. Es
+exactamente lo que tiene que pasar al liberar. El filtro, además, **funcionó**: la corrida del 11/09
+00:01 (log id 278) retuvo 7 NP de LK y 3 de Chef con `excluidos.cuarentena`.
+
+**Lo que SÍ queda abierto (decisión del dueño, no se tocó nada):** la Cuarentena frena lo que todavía
+**no** tiene tanda. Un pedido ya programado al que después le aparece deuda **no se retira solo**, y
+hoy hay clientes en esa situación (Osa $20,1 M en E09B ya entregada, Torres y Liva $32,2 M en E01A,
+Di Leo Rossi $2,6 M en E01D, Ierakuin $2,1 M en E03B del 15/09, Gifel $2,0 M en D69E del 16/09,
+Clapera $4,9 M en E12G del 17/09). Retirar mercadería ya armada es una decisión comercial: queda
+registrado como problema **abierto** en `github_repo_problemas`, sin tocar la PPP.
+
+**El candado, ahora por BLOQUE.** La v15.58 dejaba fuera de la evaluación al pedido entero si **un**
+bloque tenía tanda; un bloque todavía pendiente de un cliente con deuda se habría podido programar
+solo. Se verificó que hoy **no existe ningún pedido partido** (0 filas con bloques con y sin tanda a
+la vez), pero el armado no puede depender de eso: `pedidosYaTomados(emp, filas)` ahora compara
+`order_id|np_idx` y un pedido con al menos un bloque pendiente **sigue siendo candidato**, y la
+cuarentena lo retiene entero. Probado con las cuatro combinaciones (todo con tanda → fuera; partido →
+candidato; nada con tanda → candidato; en borrador → fuera).
+
+**Rollback:** redeployar la v23 (commit `e62fdc0`) o la v22 (commit anterior) de
+`supabase/functions/gv-ppp-web-tandas-diarias/index.ts`.

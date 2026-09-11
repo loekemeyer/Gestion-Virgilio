@@ -244,23 +244,48 @@ async function pedidosEnCuarentena(emp: "lk" | "chef", filas: Fila[], sync = tru
 }
 
 /** v15.58 (Vivi, 2026-09-11: *"tengo estos mensajes de cuarentena pero no los veo en A Programar"*):
- *  los pedidos que YA están tomados —con tanda en `PPP_Web_Programacion` o en un borrador
- *  (`PPP_Web_Tanda_Items`)— NO son candidatos a Cuarentena. A Programar no los lista (set `fuera` de
- *  `aprCargar`), así que evaluarlos acá abría tareas a Viviana por NP que ya iban en un camión (LK 1346
- *  E01D del 08/09, LK 1354 E09B del 09/09, CH 217 D69E…) y encima contaba DOS veces al programado en
- *  `gv_cuarentena_limite` —en la base de armados no facturados y otra vez como pendiente— y daba un
- *  "supera el límite" falso (LK 1384, $361.544). Es por PEDIDO (order_id), igual que el front: la
- *  cuarentena retiene todas las NP de un pedido juntas. Si la lectura falla devuelve vacío y se evalúa
- *  todo, como hasta la v15.57: peor una tarea de más que un pedido con deuda armado solo. */
-async function pedidosYaTomados(emp: "lk" | "chef"): Promise<Set<string>> {
+ *  un pedido que YA está tomado —TODOS sus bloques con tanda en `PPP_Web_Programacion`, o el pedido
+ *  entero en un borrador (`PPP_Web_Tanda_Items`)— NO es candidato a Cuarentena. A Programar no lo
+ *  lista (set `fuera` de `aprCargar`), así que evaluarlo acá abría tareas a Viviana por NP que ya iban
+ *  en un camión (LK 1346 E01D del 08/09, LK 1354 E09B del 09/09, CH 217 D69E…) y encima contaba DOS
+ *  veces al programado en `gv_cuarentena_limite` —en la base de armados no facturados y otra vez como
+ *  pendiente— y daba un "supera el límite" falso (LK 1384, $361.544).
+ *
+ *  ⚠ v15.59: se mira BLOQUE por BLOQUE (order_id|np_idx), no el pedido entero. La v15.58 alcanzaba
+ *  con que UN bloque tuviera tanda para dejar al pedido entero fuera de la evaluación, y entonces un
+ *  bloque todavía pendiente de un cliente con deuda se habría podido programar solo. Hoy no hay ningún
+ *  pedido partido (verificado 11/09: 0 filas con bloques con y sin tanda a la vez), pero el armado no
+ *  puede depender de eso. Un pedido con AL MENOS un bloque pendiente sigue siendo candidato y la
+ *  cuarentena lo retiene entero, que es la semántica de siempre.
+ *
+ *  Si la lectura falla devuelve vacío y se evalúa todo, como hasta la v15.57: peor una tarea de más
+ *  que un pedido con deuda armado solo. */
+async function pedidosYaTomados(emp: "lk" | "chef", filas: Fila[]): Promise<Set<string>> {
   const out = new Set<string>();
   try {
     const [rProg, rItems] = await Promise.all([
-      vg(`/rest/v1/PPP_Web_Programacion?select=order_id&empresa=eq.${emp}&tanda=not.is.null&limit=20000`),
+      vg(`/rest/v1/PPP_Web_Programacion?select=order_id,np_idx&empresa=eq.${emp}&tanda=not.is.null&limit=20000`),
       vg(`/rest/v1/PPP_Web_Tanda_Items?select=order_id&empresa=eq.${emp}&limit=20000`),
     ]);
-    if (rProg.ok) for (const x of await rProg.json() as { order_id: number | string }[]) out.add(String(x.order_id));
-    if (rItems.ok) for (const x of await rItems.json() as { order_id: number | string }[]) out.add(String(x.order_id));
+    const conTanda = new Set<string>();
+    if (rProg.ok) {
+      for (const x of await rProg.json() as { order_id: number | string; np_idx: number }[]) {
+        conTanda.add(`${x.order_id}|${x.np_idx}`);
+      }
+    }
+    const enBorrador = new Set<string>();
+    if (rItems.ok) {
+      for (const x of await rItems.json() as { order_id: number | string }[]) enBorrador.add(String(x.order_id));
+    }
+    // pendiente = el pedido tiene al menos un bloque del feed sin tanda y sin borrador
+    const pendiente = new Set<string>(), vistos = new Set<string>();
+    for (const n of filas) {
+      const id = String(n.order_id);
+      vistos.add(id);
+      if (enBorrador.has(id)) continue;
+      if (!conTanda.has(`${n.order_id}|${n.np_idx}`)) pendiente.add(id);
+    }
+    for (const id of vistos) if (!pendiente.has(id)) out.add(id);
   } catch (_e) { /* sin lectura se evalúa todo, como hasta la v15.57 */ }
   return out;
 }
@@ -319,9 +344,10 @@ async function soloPendientes(
   for (const x of ex) excluidos[x.motivo] = (excluidos[x.motivo] ?? 0) + 1;
   // v14.86 — y además, sacar los que van a CUARENTENA (no se programan solos).
   const vivos = filas.filter((n) => !fuera.has(String(n.order_id)));
-  // v15.58: la cuarentena es de lo PENDIENTE. Lo que ya tiene tanda (o está en un borrador) sigue en
-  // `vivos` —el resync y la foto de artículos lo necesitan— pero no se evalúa ni le abre tarea a Viviana.
-  const tomados = await pedidosYaTomados(emp);
+  // v15.58/59: la cuarentena es de lo PENDIENTE. El pedido con TODOS sus bloques ya con tanda (o en un
+  // borrador) sigue en `vivos` —el resync y la foto de artículos lo necesitan— pero no se evalúa ni le
+  // abre tarea a Viviana. Si le queda un bloque pendiente se evalúa igual y la cuarentena lo retiene.
+  const tomados = await pedidosYaTomados(emp, vivos);
   const candidatos = tomados.size ? vivos.filter((n) => !tomados.has(String(n.order_id))) : vivos;
   let cuar = new Set<string>();
   try { cuar = await pedidosEnCuarentena(emp, candidatos, sync); } catch (_e) { /* no bloquea el armado */ }
