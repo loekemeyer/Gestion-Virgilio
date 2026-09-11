@@ -816,7 +816,7 @@ button {
 .apr-col-cuar .apr-vacio{ color:#b45309; }
 .apr-col-cuar .apr-vacio b{ color:#9a3412; }
 .apr-chip-cuar{ background:#c2410c; color:#fff; font-weight:800; }
-.apr-card.apr-card-cuar{ border-left-color:#c2410c; background:#fffbf5; cursor:default; display:flex; flex-direction:column; align-items:stretch; gap:0; padding:9px 10px 10px; }
+.apr-card-cuar{ border-left-color:#c2410c; background:#fffbf5; cursor:default; display:flex; flex-direction:column; align-items:stretch; gap:0; padding:9px 10px 10px; }
 /* v15.41 — la ficha va apilada: datos arriba, barra de acciones abajo separada
    por una línea. Antes (v15.02) iban a la derecha con margin-left:auto y en la
    ficha angosta el botón verde quedaba nowrap contra el borde: se cortaba. */
@@ -7660,7 +7660,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v15.43";
+const APP_VERSION = "v15.71";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -9341,15 +9341,20 @@ async function showPickingList(tanda, legajo, opts) {
       }
     });
     // v4.26: adjuntar el excedente (cajas + ubicación) a cada artículo.
+    // v15.41: excOk = la consulta de excedente ANDUVO. Si falla (sin red), el PKC sale
+    // SIN el campo de depósito y el backend vuelve a repartir por saldos, como antes.
+    // Sin esto, un fetch caído se vería igual que "no hay excedente" y la góndola
+    // se comería todo el descuento.
+    let excOk = false;
     try {
       const excMap = await pkFetchExcedente(Object.keys(agg));
       items.forEach(function (it) { const e = excMap[String(it.art).toUpperCase()]; if (e) { it.exc = e.cajas; it.excUbic = e.ubics.join(" · "); } });
-    } catch (_e) {}
-    // Excedente: se agarra PRIMERO del excedente (al final) y, si no alcanza, el
-    // RESTO de góndola. Ej: piden 15, hay 10 en excedente → góndola pide 5 (en su
-    // orden normal) + 10 en el excedente (paso al final). Si el excedente cubre
-    // todo, la góndola se SALTEA. El paso de excedente lleva key propia (art·EXC)
-    // para que cuente aparte del de góndola.
+      excOk = true;
+    } catch (_e) { excOk = false; }
+    // Excedente: se agarra PRIMERO del excedente y, si no alcanza, el RESTO de
+    // góndola. Ej: piden 15, hay 10 en excedente → 10 en el excedente + góndola
+    // pide 5. Si el excedente cubre todo, la góndola se SALTEA. El paso de
+    // excedente lleva key propia (art·EXC) para que cuente aparte del de góndola.
     const excSteps = [];
     items.forEach(function (it) {
       if (it.exc > 0) {
@@ -9360,8 +9365,17 @@ async function showPickingList(tanda, legajo, opts) {
         excSteps.push({ art: it.art, key: it.art + "·EXC", esp: excUsed, sector: it.excUbic || "—", excUbic: it.excUbic, exc: it.exc, isExc: true, dual: null });
       }
     });
-    const allItems = items.concat(excSteps);
-    _pk = { tanda: tNorm, legajo: String(legajo || (typeof legajoInput !== "undefined" && legajoInput.value) || "").trim(), items: allItems, idx: 0, results: {}, mode: "item",
+    // v15.41 (pedido de Luis): los pasos de EXCEDENTE van PRIMERO, no al final.
+    // No cambia de dónde se descuenta —el reparto excUsed/gondNeeded ya quedó
+    // decidido arriba, antes de que el operario dé un paso—: cambia la RECUPERACIÓN
+    // del error. Si el excedente miente (el saldo dice 10 y hay 6), yendo primero se
+    // entera al principio y levanta las 4 que faltan de góndola EN LA MISMA PASADA,
+    // porque todavía no pasó por ahí. Al final se enteraba cuando el paso de góndola
+    // ya estaba cerrado pidiendo sólo el resto, y tenía que volver.
+    // (El excedente marcado A MANO —pkMarkExcedente— sigue yendo al final: se
+    // descubre parado en la góndola, ya pasó la zona del excedente.)
+    const allItems = excSteps.concat(items);
+    _pk = { tanda: tNorm, legajo: String(legajo || (typeof legajoInput !== "undefined" && legajoInput.value) || "").trim(), items: allItems, idx: 0, results: {}, mode: "item", excOk: excOk,
             // Si el cliente le agregó algo a un pedido de esta tanda cuando ya
             // estaba en la mesa, el operario lo tiene que ver en CADA paso del
             // picking, no una sola vez al abrir.
@@ -9453,10 +9467,18 @@ async function pkFetchExcedente(arts) {
     if (!rs.ok) return {};
     const saldos = await rs.json();
     const out = {};
+    // v15.71 — SUMAR las filas del mismo código: la vista agrupa por (código, empresa) y
+    // desde que la recepción guarda LK/CH un código pelado vuelve en más de una fila. Con el
+    // `=` de antes, el excedente que veía el picking era el de la ÚLTIMA fila, no el total;
+    // y desde la v15.41 el picking va PRIMERO al excedente, así que un número corto manda al
+    // operario a buscar menos cajas de las que hay y el resto se lo come la góndola.
+    const acum = {};
     (Array.isArray(saldos) ? saldos : []).forEach(function (x) {
       const k = String(x.cod_art).toUpperCase();
-      const cajas = Number(x.excedente || 0);
-      if (Math.round(cajas * 1000) / 1000 > 0) out[k] = { cajas: cajas, ubics: [] };
+      acum[k] = (acum[k] || 0) + (Number(x.excedente) || 0);
+    });
+    Object.keys(acum).forEach(function (k) {
+      if (Math.round(acum[k] * 1000) / 1000 > 0) out[k] = { cajas: acum[k], ubics: [] };
     });
     if (ru && ru.ok) {
       const rows = await ru.json();
@@ -10086,16 +10108,50 @@ function pkFinishPicking() {
   } catch (e) { console.warn("pkFinishPicking:", e); }
 }
 
+/* v15.41 — TOTALES de un artículo sumando SUS pasos: el de góndola y el de excedente
+   (art·EXC). Devuelve { esp, real, exc } donde `exc` son las cajas que salieron del
+   EXCEDENTE. Existe porque el picking parte un artículo en dos pasos cuando hay
+   excedente, y los dos comparten el mismo código: el evento PKC tiene que llevar el
+   total, no el último paso marcado. */
+function pkTotalesArt(rec) {
+  const R = String(rec || "").toUpperCase();
+  let esp = 0, real = 0, exc = 0;
+  for (const x of (_pk.items || [])) {
+    const xr = String((x.dual && x.pick) ? x.pick : x.art).toUpperCase();
+    if (xr !== R) continue;
+    // El paso de excedente marcado A MANO (pkMarkExcedente) repite el `esp` del de
+    // góndola — sumarlo duplicaría lo pedido. El automático sí parte el esp en dos.
+    if (!x.skip && !x.manualExc) esp += Number(x.esp) || 0;
+    const r = _pk.results ? _pk.results[x.key] : null;
+    if (r == null) continue;
+    real += Number(r) || 0;
+    if (x.isExc) exc += Number(r) || 0;
+  }
+  return { esp: esp, real: real, exc: exc };
+}
+
 /* Emite el evento PKC (detalle de picking de un artículo) por la cola offline.
-   Un evento por artículo confirmado; el SW lo reenvía si no hay red. */
+   Un evento por artículo confirmado; el SW lo reenvía si no hay red.
+
+   v15.41 — texto = TANDA|ART|esp|real|excedente. El 5º campo dice cuántas de las
+   `real` cajas salieron del EXCEDENTE (el resto salió de góndola). Antes el backend
+   lo ADIVINABA repartiendo por saldos vivos al reconciliar; ahora se lo decimos.
+   Va como UN SOLO evento por (tanda, artículo) —con los totales de los dos pasos—
+   a propósito: el client_id es el mismo para los dos y hay 12 objetos en la base que
+   leen PKC asumiendo una fila por (tanda, artículo). Si la consulta de excedente
+   falló (_pk.excOk = false) el 5º campo NO se manda y el backend vuelve a adivinar. */
 function pkSendDetail(art, esp, real) {
   if (!_pk) return;
   const nowMs = Date.now();
+  const tot = pkTotalesArt(art);
+  const espT  = tot.esp > 0 ? tot.esp : esp;   // red de seguridad: nunca mandar esp 0
+  const realT = tot.real;
+  const dep   = _pk.excOk ? ("|" + tot.exc) : "";
   const payload = {
     legajo: _pk.legajo,
     opcion: "PKC",
     descripcion: "Picking artículo",
-    texto: (_pk.tanda + "|" + art + "|" + esp + "|" + real).toUpperCase(),
+    texto: (_pk.tanda + "|" + art + "|" + espT + "|" + realT + dep).toUpperCase(),
     ts: nowMs,
     // client_id determinístico → reenviar/corregir el mismo artículo hace UPSERT
     // (merge-duplicates) en vez de duplicar. Por eso se puede ir y volver.
@@ -11567,7 +11623,10 @@ async function _stkGondolaSaldoVivo(cod) {
     if (!r.ok) return null;
     const a = await r.json();
     if (!a || !a.length) return 0;   // sin fila = sin saldo = 0
-    return Number(a[0].terminado) || 0;
+    // v15.71 — SUMAR: la vista agrupa por (código, empresa), así que un código pelado puede
+    // volver en varias filas (LK, CH, Mixto). `a[0]` era una de ellas, no el saldo.
+    let s = 0; a.forEach(function (r) { s += Number(r.terminado) || 0; });
+    return s;
   } catch (_e) { return null; }
 }
 function stockFlushPend() {
@@ -11661,12 +11720,24 @@ async function stockFetchSaldos() {
   let rows = [];
   try { rows = await supaFetchAll(SUPABASE_URL + "/rest/v1/vista_saldos_stock", "select=*"); } catch (_e) { rows = []; }
   const m = {};
+  const DEPS = ["terminado", "excedente", "separar_pedidos", "a_facturar", "a_guardar", "racks", "insumos", "para_envasar", "racks_ch"];
   rows.forEach(function (x) {
     const k = String(x.cod_art);
     // v12.98 (idea 9017): para_envasar y racks_ch ya venían en la vista (idea 7263) pero acá se
     // perdían → "Bajar de racks", MG guardado, catálogo de Insumos y CP los veían en 0 aunque
     // hubiera stock real (712E racks_ch=444, 584E para_envasar=424).
-    m[k] = { cod: k, desc: x.descripcion || "", terminado: Number(x.terminado) || 0, excedente: Number(x.excedente) || 0, separar_pedidos: Number(x.separar_pedidos) || 0, a_facturar: Number(x.a_facturar) || 0, a_guardar: Number(x.a_guardar) || 0, racks: Number(x.racks) || 0, insumos: Number(x.insumos) || 0, para_envasar: Number(x.para_envasar) || 0, racks_ch: Number(x.racks_ch) || 0 };
+    //
+    // v15.71 — ACUMULA, no pisa. `vista_saldos_stock` agrupa por (código, EMPRESA), así que
+    // un mismo `cod_art` puede volver en VARIAS filas: emite el código con sufijo (437E LK)
+    // sólo para los duales, y para todo el resto emite el código pelado una vez por empresa.
+    // Mientras la recepción marcaba todo 'Mixto' había una sola fila por código y pisar daba
+    // igual; desde que la recepción guarda LK/CH (v15.71) el mismo 505 vuelve como LK y como
+    // Mixto, y el `=` se comía una de las dos — la góndola en LK contra el picking en Mixto
+    // habría mostrado saldo de menos o de más según cuál llegara última.
+    if (!m[k]) m[k] = { cod: k, desc: "", terminado: 0, excedente: 0, separar_pedidos: 0, a_facturar: 0, a_guardar: 0, racks: 0, insumos: 0, para_envasar: 0, racks_ch: 0 };
+    const a = m[k];
+    if (!a.desc) a.desc = x.descripcion || "";
+    DEPS.forEach(function (d) { a[d] += Number(x[d]) || 0; });
   });
   // v15.40 — detalle POR EMPRESA colgado en `_emp`, SIN cambiar la forma de `m`:
   // m[cod] sigue siendo el total (lo usan MG, Bajar de racks, Insumos y CP), y

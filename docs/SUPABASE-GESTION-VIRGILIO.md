@@ -5536,3 +5536,185 @@ Las 16 NP de ISIS normales, sin cambio (el fallback sólo entra cuando el valor 
 
 **Rollback:** apuntar el front a `vista_control_remitos` / `vista_cola_impresion` y
 `drop view public.gv_vista_control_remitos, public.gv_vista_cola_impresion;`
+
+---
+
+## §3.«PKC-DEP» — El PKC dice DE DÓNDE salió cada caja (v15.41, 2026-09-11, pedido de Luis)
+
+> ⚠ **La letra de esta sección se asigna AL MERGEAR, no antes.** `main` se mueve muy rápido
+> (32 commits y 19 versiones en una hora el 11/09) y cada sesión que escribe acá toma la
+> letra siguiente: esta sección nació como §3.cd, tuvo que pasar a §3.ce, y para cuando se
+> mergee `main` ya va por §3.ci. Mientras viva en una rama se llama **`§3.«PKC-DEP»`**, que
+> es único y no choca con nadie. Al mergear: reemplazar por la letra libre que siga y
+> buscar `«PKC-DEP»` en el repo para actualizar las referencias de una sola pasada.
+
+**El problema.** El picking le dice al operario dónde ir: parte el artículo en **dos pasos**
+cuando hay excedente — uno de góndola con su sector y otro `art·EXC` con la ubicación del
+excedente (`index.html`, bloque `excSteps`) — y después **tiraba ese dato**. El evento era
+`TANDA|ART|esp|real`, sin depósito, y el backend **re-derivaba** el reparto al reconciliar,
+con los saldos vivos de ese momento:
+
+```
+from_exc = least(picked, excedente_disponible − lo_ya_tomado_por_otras_tandas)
+```
+
+O sea, adivinaba a las 09:17 algo que el operario tenía en la mano a las 09:15.
+
+**Y encima se perdían cajas.** Los dos pasos comparten `client_id`
+(`pkc_<legajo>_<tanda>_<ART>_<día>`) y el POST va con `on_conflict=client_id` +
+`resolution=merge-duplicates`. Los pasos de excedente se encolan **al final**
+(`allItems = items.concat(excSteps)`), así que **el PKC del excedente pisaba al de góndola**
+y las cajas de góndola desaparecían del registro. Huella medida: de **815** pickings con
+excedente en 60 días, **802 (98,4 %)** figuraban como 100 % excedente y 0 de góndola.
+
+**Cómo quedó.** Un **único** evento por `(tanda, artículo)` con los **totales de los dos
+pasos** y un 5.º campo:
+
+```
+TANDA|ART|esp|real|excedente     ← "de las `real` cajas, tantas salieron del excedente"
+```
+
+Un solo evento **a propósito**: hay **12 objetos** en la base que leen PKC asumiendo una fila
+por `(tanda, artículo)` — `vista_faltante_real`, `vista_faltantes_sin_completar`,
+`notificar_faltante_telegram`, `reporte_agentes_faltante_articulo`, `anular_picking_virgilio`,
+`generar_reporte_agentes`, `gv_ppp_tanda_mover`, `gv_ppp_web_pickers_tipicos`,
+`ppp_web_armar_tandas`, `trg_pkc_reconciliar_rt` y las dos de abajo. Partirlo en dos filas los
+rompía a todos en silencio. Con una sola, ninguno se entera: sólo ven que `esp`/`real` ahora
+traen el total correcto en vez del pedazo del excedente.
+
+**Front** (`index.html`): `pkTotalesArt(rec)` suma los pasos del mismo código —salteando el
+`esp` del paso de excedente marcado **a mano** (`manualExc`), que repite el del de góndola—;
+`pkSendDetail` arma el texto con esos totales. `_pk.excOk` marca si la consulta de excedente
+**anduvo**: si falló (sin red), el 5.º campo **no se manda** y el backend vuelve a repartir por
+saldos — un fetch caído no se confunde con "no hay excedente".
+
+**Backend**: `reconciliar_pipeline_stock_etapa1()` (cron 68) y `reconciliar_stock_articulo_rt()`
+(trigger `trg_pkc_reconciliar_rt`). Las **dos**, si no el trigger escribe la adivinanza en cada
+PKC y el cron la corrige 10 min después (flip-flop). En la rama B, `want_exc` = lo declarado si
+el evento lo trae, si no `picked` (la adivinanza vieja). El **clamp** contra el excedente
+disponible y la **ventana por tanda** se mantienen → el excedente nunca queda negativo (fix
+v11.73 intacto). La rama A (histórico) no se toca: esos eventos son todos viejos.
+
+**Compatibilidad.** PKC de 4 campos → `tiene_dep = false` → idéntico a antes.
+
+**Interruptor:** `Stock_Config.pkc_deposito_activo = '0'` → vuelve a adivinar, sin tocar
+código. Sin la fila = prendido.
+
+**Prueba (2026-09-11).** (1) Con el código nuevo y sólo PKC viejos, la función no movió
+ninguna de las 23.311 filas `tipo='picking'` (los 30 renglones nuevos eran la tanda D67E,
+que se estaba pickeando en vivo). (2) Tanda falsa `ZZDEP1|207|10|10|3` (art 207, excedente
+27) → **excedente −3 / góndola −7 / separar_pedidos +10**; la lógica vieja daba **−10 / 0**.
+(3) Con el interruptor en `'0'` volvió a −10/0. (4) Rastro de prueba borrado; art 207 volvió
+a excedente 27 / góndola 133. (5) Suite completa: 119 bloques, 0 fallas, con el test nuevo
+`tests/pk-deposito-pkc.cjs`.
+
+**Orden del recorrido: el EXCEDENTE va PRIMERO** (dueño vía Luis, 2026-09-11). Antes los
+pasos `art·EXC` se encolaban al final (`items.concat(excSteps)`); ahora al principio
+(`excSteps.concat(items)`). **No cambia de dónde se descuenta**: el reparto `excUsed` /
+`gondNeeded` ya quedó decidido al abrir la tanda, antes de que el operario dé un paso. Lo que
+cambia es la **recuperación del error**: si el excedente miente (el saldo dice 10 y hay 6),
+yendo primero se entera al principio y levanta las 4 que faltan de góndola **en la misma
+pasada**; al final se enteraba con el paso de góndola ya cerrado pidiendo sólo el resto, y
+tenía que volver. El excedente marcado **a mano** (`pkMarkExcedente`) sigue yendo al final: se
+descubre parado en la góndola, cuando la zona del excedente ya quedó atrás.
+
+**Lo que NO se hizo, y por qué.** Se evaluó partir el PKC en **una fila por paso** (góndola y
+excedente por separado). Se descartó: no arregla nada que la fila única no arregle ya —las
+cajas perdidas las arregla el total, el depósito lo arregla el 5.º campo, y del lado del stock
+la separación **ya existe** (el picking escribe `terminado` / `excedente` / `separar_pedidos`,
+con `deposito` en la clave única). Lo único que sumaba era trazabilidad por paso, y costaba
+arreglar `vista_faltante_real` (usa `row_number() … rn = 1`, se quedaría con una sola fila),
+`faltantesDeTanda` y `pkFetchServerMarks` en el front, más dos renglones duplicados en
+`notificar_faltante_telegram` y `generar_reporte_agentes`. Si algún día hace falta la traza por
+paso, va **otro campo en el texto**, no otra fila.
+
+**Nota sobre `Movimientos_Stock.empresa`:** el picking **no la escribe** (no está en el `INSERT`),
+la llenan el `DEFAULT 'Mixto'` y el trigger `zz_normalizar_empresa`. Sí se **lee**: es parte de la
+clave del UPSERT. Pero informa poco — `codigos_duales` tiene 4 códigos (`437E, 438E, 439E, 809E`) y
+el trigger fuerza `'Mixto'` para todo el resto: de las 23.341 filas de picking, **22.867 son
+`'Mixto'`** (309 artículos), 344 `LK` y 130 `CH` (4 artículos cada uno).
+
+**Rollback:** `docs/ROLLBACK-PRODUCCION.md` (entrada v15.41) y
+`sql/backups/reconciliar_pkc_pre_v1541_20260911.sql`. SQL nuevo: `sql/gv_pkc_deposito_v1541.sql`.
+
+---
+
+## §3.«LUGAR-EMP» — La empresa es un atributo del LUGAR, y viaja de la recepción a la góndola (v15.71, 2026-09-11, pedido de Luis)
+
+> ⚠ **La letra se asigna AL MERGEAR, no antes** (misma regla que `§3.«PKC-DEP»`, y por el
+> mismo motivo: `main` se mueve a 19 versiones por hora y cada sesión toma la letra siguiente).
+> Mientras viva en rama se llama **`§3.«LUGAR-EMP»`**. Al mergear: reemplazar por la letra
+> libre que siga y buscar `«LUGAR-EMP»` en el repo.
+
+**El problema.** El sistema no tenía dónde guardar *de qué empresa es esta mercadería*, así
+que la gente lo metió adentro del **nombre del código**, y cada módulo eligió su propia
+grafía: `437E LK` (`Planimetria`), `437E-` (`planimetria.js`), `437EL` (Importados) y la
+columna `empresa` (`Movimientos_Stock`). Cuatro convenciones para un solo dato.
+
+El costo real lo pagó el **809E**, que es **dos productos distintos** (CH = Corta Queso,
+LK = Corta Pizza) y **nunca recibió sufijo en ninguna de las cuatro**: siempre caía al
+fallback, que mandaba al pickeador de LK a **M13** —la góndola de Chef— a buscar un Corta
+Pizza y encontrar un Corta Queso.
+
+**La observación que lo cierra.** La empresa no es un atributo del código: es un atributo del
+**lugar**. **684 de los 685 sectores** tienen una sola empresa. Con eso, `809E` vive en
+J13/J14 (LK) y M13/M14/M15 (CH) **sin sufijo ninguno**.
+
+### Las tablas nuevas (objetos NUEVOS, prefijo `GV_`; no pisan nada)
+
+| Objeto | Qué es | Filas |
+|---|---|---|
+| `GV_Lugar` | un lugar físico. PK `sector` (canónico `LETRAS+2 dígitos`, `J1`→`J01`), `tipo` (góndola/rack), `empresa` (`LK`/`CH`/`IN`), `orden` del recorrido, `uso` | 872 |
+| `GV_Lugar_Item` | qué hay en cada lugar. PK **`(sector, cod, clase)`** | 786 |
+| `GV_Lugar_Pendiente` | los insumos, estacionados hasta que se los trabaje aparte | 148 |
+| `gv_ocupacion_lugar` | vista derivada de `Movimientos_Stock`; **nunca se escribe** | — |
+
+**`clase` va en la PK y no es cosmético:** hay **9 códigos que existen como artículo y como
+insumo a la vez** y son cosas distintas. Con PK `(sector, cod)` el mismo lugar no podía tener
+el artículo 437E y el insumo 437E — justo el caso que motivó la tabla.
+
+**La `clase` sale del CONTEXTO del relevamiento, no del padrón `Insumos`.** 437E y 438E
+figuran en `Insumos` y son artículos: clasificar por el padrón los mandaba a la tabla
+equivocada.
+
+### La empresa viaja: recepción → A Guardar → góndola
+
+`Movimientos_Stock.empresa` tiene `DEFAULT 'Mixto'` y el trigger de recepción lo forzaba
+**incondicionalmente** para todo lo que no fuera dual — o sea que la empresa que el operario
+elegía del remito se **perdía** en el mismo INSERT. El cambio es una línea
+(`sql/gv_empresa_recepcion_mg.sql`): si vino explícita `LK`/`CH`, se respeta.
+
+El código sigue **pelado** (`438E`, nunca `438E LK`) y la empresa viaja en **su columna**.
+Vista nueva `gv_saldos_stock_emp` = saldos por (código pelado, empresa).
+
+**Backfill de A Guardar** (2026-09-11): empresa derivada del lugar (`GV_Lugar`) con fallback a
+`OC_Maximos.linea`, sólo cuando es inequívoca, excluyendo los duales; 582 y 583 a `LK` por
+decisión de Luis. Resultado: **0 filas en `Mixto`** — 1.118 `LK` (2.500 cajas) + 283 `CH`
+(72 cajas) = 2.572 ✓. Backup: `GV_Backup_aguardar_empresa_20260911` (1.389 filas).
+
+### ⚠ Lo que esto rompía en el front, y por qué se arregló acá
+
+`vista_saldos_stock` **ya agrupaba por `(código, empresa)`**, pero emite el código **con
+sufijo sólo para los duales**: para todo el resto emite el **código pelado, una vez por
+empresa**. Mientras la recepción marcaba todo `Mixto` había una sola fila por código y nadie
+lo notó. Desde que la recepción guarda `LK`/`CH`, el mismo `505` vuelve en **dos filas** (la
+góndola en `LK`, el descuento del picking en `Mixto`, porque las funciones de reconciliación
+insertan sin `empresa` y toman el default).
+
+Tres lugares del front tomaban **una** de esas filas en vez de sumarlas, y los tres se
+corrigieron en la v15.71:
+
+| Función | Qué hacía | Qué muestra mal |
+|---|---|---|
+| `stockFetchSaldos` | `m[k] = {…}` pisaba | MG, Bajar de racks, Insumos y CP: saldo de la última fila, no el total |
+| `pkFetchExcedente` | `out[k] = {cajas}` pisaba | desde la v15.41 el picking va **primero al excedente**: un número corto manda al operario a buscar de menos |
+| `_stkGondolaSaldoVivo` | `a[0].terminado` | la regla de "picking difiere" devolvía a góndola con un saldo parcial |
+
+`_pkConteoSistema` y `_pppChkBuildMaps` ya acumulaban: quedaron como estaban.
+
+**Chequeo:** `select cod_art, count(*) from vista_saldos_stock group by 1 having count(*) > 1;`
+— cada código que aparezca ahí tiene que estar sumado en el front, no pisado.
+
+**Rollback:** `docs/ROLLBACK-PRODUCCION.md` (entrada v15.71). SQL:
+`sql/gv_lugar_fuente_unica.sql`, `sql/gv_lugar_carga_inicial.sql`,
+`sql/gv_empresa_recepcion_mg.sql`.
