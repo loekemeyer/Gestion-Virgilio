@@ -7794,7 +7794,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v15.98";
+const APP_VERSION = "v15.99";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -18276,8 +18276,31 @@ function _impNtlAliasHtml() {
   if (!sinDecidir.length) return "";
   return '<div style="margin-bottom:10px;padding:9px 13px;background:#fffbeb;border:1px solid #fde68a;border-radius:10px;font-size:12.5px;color:#92400e">' +
     '<b>⚠ ' + sinDecidir.length + ' nombre(s) del extracto sin definir:</b> ' +
-    sinDecidir.map(function (r) { return '<b>' + escapeHtml(r.alias) + '</b> (' + r.movimientos + ' mov.)'; }).join(' · ') +
+    sinDecidir.map(function (r) {
+      const aEnc = encodeURIComponent(r.alias).replace(/'/g, "%27");
+      return '<b>' + escapeHtml(r.alias) + '</b> (' + r.movimientos + ' mov.) ' +
+        '<button class="imcu-b" onclick="impAliasDefinir(\'' + aEnc + '\')" title="Decir a qué proveedor corresponde">✏️</button>';
+    }).join(' · ') +
     '. No están en <code>Importados</code>: hay que decir a qué proveedor corresponden o si son otra cosa.</div>';
+}
+/* Definir a qué proveedor corresponde un nombre del extracto (o marcarlo como empresa). */
+async function impAliasDefinir(aliasEnc) {
+  const alias = decodeURIComponent(aliasEnc || "");
+  let v;
+  try {
+    v = prompt("\"" + alias + "\" en el extracto de NTL, ¿a qué proveedor corresponde?\n" +
+      "  · escribí el nombre del proveedor como figura en el módulo\n" +
+      "  · o EMPRESA si no es un proveedor sino la empresa\n" +
+      "  · vacío = dejarlo sin definir", "");
+  } catch (_e) { return; }
+  if (v === null) return;
+  const txt = String(v).trim();
+  const esEmpresa = txt.toUpperCase() === "EMPRESA";
+  try {
+    await _pedImpRpc("gv_imp_prov_alias_set", { p_alias: alias,
+      p_canonico: esEmpresa ? null : (txt || null), p_es_empresa: esEmpresa });
+  } catch (e) { try { alert("No se pudo guardar: " + (e.message || e)); } catch (_e) {} return; }
+  await impNtlReload();
 }
 /* v15.94 — El mapa CARGA ↔ PEDIDO se carga desde la pantalla, no por chat.
    · En 📦 Cargas: 🔗 Asignar elige a qué pedido corresponde esa carga (o la marca como "ninguno").

@@ -306,7 +306,8 @@ tipográfica — **`Fuyian` → Fujian**, **`Xihin` → Zhixin**, **`Becky Chen`
 **empresa mal tipeada** `Chef` y `Tierra`, que no son proveedores.
 
 **Quedan 5 sin decidir** (`Cestos`, `Jason`, `Stephen Jiang`, `Qi Qiao`, `Wenxinda`): no están en
-`Importados` y la pantalla los avisa arriba. `gv_imp_prov_alias_set()` los define.
+`Importados`. La pantalla los avisa arriba **con un ✏️ al lado de cada uno** (v15.99) para decir a
+qué proveedor corresponden — o escribir `EMPRESA` si no son un proveedor.
 
 ### `gv_imp_cargas` — las cargas del Excel con su saldo
 

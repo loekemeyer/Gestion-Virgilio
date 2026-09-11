@@ -73,6 +73,7 @@ const fail = (m) => { console.error("✗ " + m); process.exitCode = 1; };
       else if (url.indexOf("gv_imp_conciliacion") >= 0) data = CONC;
       else if (url.indexOf("gv_imp_prov_alias") >= 0) data = ALIAS;
       else if (url.indexOf("gv_imp_carga_pedido_set") >= 0) data = { ok: true };
+      else if (url.indexOf("gv_imp_prov_alias_set") >= 0) data = { ok: true };
       else if (url.indexOf("gv_imp_cc_lista") >= 0) data = [{ pedido_ref: "PI OL-10139", proveedor: "Ownland", fob: "46626.00" }];
       return { ok: true, status: 200, json: async () => data, text: async () => "" };
     };
@@ -101,6 +102,11 @@ const fail = (m) => { console.error("✗ " + m); process.exitCode = 1; };
     window.prompt = () => "1";
     await impCargaAsignar(encodeURIComponent("Ownland"), encodeURIComponent("CQ-9694"));
     out.callAsig = calls.filter((c) => c.u.indexOf("rpc/gv_imp_carga_pedido_set") === 0).map((c) => JSON.parse(c.b));
+    // definir uno de los nombres sin decidir (Cestos) desde el aviso
+    calls.length = 0;
+    window.prompt = () => "Becky";
+    await impAliasDefinir(encodeURIComponent("Cestos"));
+    out.callAlias = calls.filter((c) => c.u.indexOf("rpc/gv_imp_prov_alias_set") === 0).map((c) => JSON.parse(c.b));
     // ---- vista CONCILIACIÓN ----
     await impNtlSetVista("conc");
     const tk = body().innerText.replace(/\s+/g, " ");
@@ -143,6 +149,8 @@ const fail = (m) => { console.error("✗ " + m); process.exitCode = 1; };
   // v15.94 — el mapa carga ↔ pedido se carga desde la pantalla
   if (!r.asignado) fail("no distingue la carga que ya tiene pedido asignado: " + (r.cargasTxt || "").slice(0, 250));
   if (!r.sugerido) fail("no marca como 'sugerido' la que todavía no se confirmó");
+  if (r.callAlias.length !== 1 || r.callAlias[0].p_alias !== "Cestos" || r.callAlias[0].p_canonico !== "Becky"
+      || r.callAlias[0].p_es_empresa !== false) fail("definir el alias no manda bien los datos: " + JSON.stringify(r.callAlias));
   if (r.callAsig.length !== 1) fail("Asignar no llamó a la RPC: " + JSON.stringify(r.callAsig));
   else {
     const a = r.callAsig[0];

@@ -11244,7 +11244,9 @@ distinta, empresa distinta.
 > que también es una respuesta válida), y en 💵 **Giros** una columna nueva *"Cargas (a través de → fue a)"* que,
 > si el Excel lo dice, muestra la sugerencia con un **✓ usar** para aceptarla de una — el giro de 14.000 de
 > Ownland ya trae *"según el Excel: CQ-9553 → CQ-9694"*. Backend: `GV_Imp_Carga_Pedido` +
-> `GV_Imp_Pagos.carga_origen/carga_destino`. §7 de `docs/IMPORTACIONES-PAGOS-ARGENTINA.md`.
+> `GV_Imp_Pagos.carga_origen/carga_destino`. **v15.99**: el aviso de los 5 nombres del extracto sin definir
+> también tiene su **✏️** para resolverlos ahí mismo (o escribir `EMPRESA` si no son un proveedor).
+> §7 de `docs/IMPORTACIONES-PAGOS-ARGENTINA.md`.
 
 > Nota **2026-09-11 (v15.93) — NTL: cargas, conciliación y alias de proveedor.**
 > La solapa 💱 NTL pasa a tener **tres vistas**: 📄 Extracto · 📦 **Cargas** (las del Excel —`CQ-9154`, `China 2`…—
