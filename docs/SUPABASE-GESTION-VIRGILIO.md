@@ -6272,7 +6272,12 @@ protegido sin tocar ese código. Si algún día se agrega al payload, (a0) no ca
 - Prueba en caliente sobre el pedido 1206 (19 líneas, 2 sin stock): queda **17 + 2**, el segundo bloque con
   piso 29/11. La marca se borró al terminar.
 - `gv_ppp_web_armar_pendientes('lk', null, '[]', '[]')` corre limpio después del parche.
-- Chef **no parte todavía**: sus pedidos viven en el proyecto de Chef y no tienen `pedido_diferido`.
+- **Chef también parte** (mismo día): sus pedidos se leen desde LK por el FDW `chef_db`, así que el corte
+  vive en `gv_pedidos_web_np_chef` y no hubo que tocar el proyecto de Chef. `pedido_diferido` lleva `empresa`
+  en la PK y `marcar_diferidos_chef` hace de trigger desde el cron 41 (Chef no puede tener uno), marcando
+  **sólo pedidos del 11/09 en adelante**. `reingreso_piso` pela el sufijo **L** (un artículo de Loeke vendido
+  por Chef viaja como `505L`, regla v13.71, y `reingreso_cache` guarda el código base). Verificado: 69 NP de
+  Chef y md5 idéntico antes y después.
 
 ### Rollback
 
