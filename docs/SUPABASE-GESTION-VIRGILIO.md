@@ -7521,13 +7521,36 @@ viajan (ya son un pedido).
   Carrefour 14/14, Diarco 10/10 idénticos; La Anónima 17 de 18 (el `198E` no está en el
   maestro — problema 26 de `github_repo_problemas`, sigue abierto).
 
-### Lo que FALTA (lo tiene que apretar el dueño)
+### PRENDIDO (2026-09-11, 18:28 ART)
 
-1. **Deployar** `krikos-auto-import` en el Supabase de LK (el código ya está commiteado).
-2. **Prender el cron** (el `cron.schedule` está comentado en `sql/krikos_auto_import.sql`,
-   3-59/10: corre 3′ después del ingest y 2′ antes del espejo).
-3. Antes de prenderlo conviene una corrida con `{"dry_run": true}`: no escribe nada y
-   devuelve, OC por OC, qué haría y qué aviso dejaría.
+La función está **deployada** y el cron es el **jobid 43** de LK,
+`krikos-auto-import-10min`, `3-59/10 * * * *`: corre 3′ después del ingest (26) y 2′ antes
+del espejo a Virgilio (42). Así una OC que entra a las 10:00 está en la PPP a las 10:05.
+
+**Dry-run contra las 6 OC pendientes reales** (`{"dry_run": true, "force": true}`, no
+escribe nada): **5 entrarían limpias y el total calculado dio EXACTO el del PDF en las 5** —
+Coto 21881017093 (9 renglones, $ 9.420.060), La Anónima 22824280 (12, $ 2.946.900),
+22824281 (13, $ 27.860.460), 22870732 (16, $ 19.779.720) y Carrefour 0958095800240533
+(16, $ 18.956.790). La sexta, La Anónima **22908256**, sale `parcial` con el aviso que
+pidió el dueño, palabra por palabra:
+
+> *1 de 14 renglones NO entraron (código sin match en el catálogo: 198E × 70 caj) · el
+> total no cierra: calculado $ 16.695.240 vs PDF $ 17.627.640 (5.3% de diferencia)*
+
+Ese 5,3% **es** el renglón que falta: el aviso se explica solo. (Es el problema 26 de
+`github_repo_problemas`: el `198E` no existe en `products` ni en `loke_products`.)
+
+**Corrida real** (sin `force`): las 6 quedaron `salteada` — todas tienen la fecha de
+entrega vencida (5 son de junio/julio) — **sin crear ni un pedido**, y con el motivo
+escrito para que la PPP lo muestre. Es exactamente lo que tenía que pasar.
+
+**Y llega a la PPP**: verificado que los pedidos de Krikos cargados por el panel viajan por
+`v_pedidos_match` → `lk_pedidos_match` con sus ítems y sucursal (1156, 1157, 1292, 1293,
+1316). La fecha de entrega viaja por `sheets_payload->>'fecha_entrega'`, que es de donde la
+lee esa vista (`fecha_entrega_txt`), y el importador la carga del mail de Krikos.
+
+**Para apagarlo:** `select cron.alter_job(43, active := false);` en LK. Nada más depende de
+él: las OC vuelven a cargarse a mano desde el panel.
 
 ### Rollback
 

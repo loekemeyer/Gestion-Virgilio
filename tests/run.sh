@@ -403,3 +403,9 @@ PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node te
 
 echo "== ppp-jornada-camion (v15.86: la PPP avisa el camión de más de 8 h — viaje óptimo + 15 min por parada) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/ppp-jornada-camion.cjs
+
+echo "== krikos-parsers (v15.90: el módulo de parsers del importador automático, sincronizado con el panel) =="
+node tests/krikos-parsers.cjs
+
+echo "== apr-krikos (v15.90: las OC de súper en A Programar — las que entraron mal gritan, las que no entraron dicen por qué) =="
+PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/apr-krikos.cjs
