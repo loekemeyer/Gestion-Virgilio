@@ -6123,6 +6123,18 @@ reintenten con la dirección limpia.
 
 **Pendiente del mismo tema:** la página trunca la dirección a 30 caracteres — eso se arregla en `pagina-LK-copia`, no acá.
 
+**Los dos que OSM no tiene, cargados con el pin de Thomas (v15.68).** `GV_Geo_Cliente` con `manual = true` y
+`precision = 'manual'` (el cron no los pisa), en las dos claves: la cruda de la página y la limpia que ahora
+produce el normalizador.
+
+| Cód | Cliente | Dirección | Pin | Por qué no salía |
+|---|---|---|---|---|
+| 4198 | Benítez Andrea (LK 0068/0069) | Panamericana 54,5 - Pilar | -34,449868 / -58,916581 | dirección en km: no hay calle ni altura que geocodificar. El pin es el centro de Pilar (Thomas mandó "Pilar, B1630"), no el Paseo Champagnat; a 7,9 km del otro cliente de Pilar, no cambia el orden del camión |
+| 4189 | Distribuidora Valimar (LK 0070) | Julio Godoy 4656 - Villa Lynch | -34,588412 / -58,537311 | la calle no está en OpenStreetMap |
+
+Con eso **el camión Norte del 16/09 queda entero ubicado: 13 paradas, 153 km**. Del día siguen sin ubicar sólo
+Cencosud Tortuguitas (súper, camión aparte) y Matiz Burzaco (zona Sur).
+
 ## §3.cj — Corregir códigos: el stock del secundario se reparte entre las NP que lo piden (v15.66, 2026-09-11)
 
 Thomas, con el panel **Corregir códigos (secundario → principal)** abierto en 565 → 607E: *"acá tenés mal la

@@ -12,7 +12,7 @@
 > única**; no se replica. Ante la duda entre parche rápido y fix de raíz → **fix
 > de raíz**.
 >
-> Última actualización: 2026-09-11 (viernes) · Versión app al documentar: **v15.67**
+> Última actualización: 2026-09-11 (viernes) · Versión app al documentar: **v15.68**
 >
 > Nota **v15.40 (2026-09-11) — HANDOFF de planimetría / Acacia: `docs/HANDOFF-PLANIMETRIA-Y-ACACIA.md`.**
 > Thomas sigue este tema en otra sesión. Ahí está todo junto: los **13 artículos activos del catálogo LK
@@ -11158,6 +11158,10 @@ distinta, empresa distinta.
 >   (umbral ≈ 3× su período; dedup un aviso por sync por día). **No se creó tabla
 >   `Sync_Estado`**: `cron.job_run_details` ya tiene la verdad. DDL en
 >   `sql/watchdog_syncs_externos.sql`.
+
+> Nota **2026-09-11 (v15.68) — Datos: los dos clientes que OpenStreetMap no conoce, cargados con el pin de Thomas.**
+> 4198 Benítez (Panamericana km 54,5, Pilar) y 4189 Valimar (Julio Godoy 4656, Villa Lynch) en `GV_Geo_Cliente` con
+> `manual = true` — el cron no los pisa. El camión Norte del 16/09 queda entero ubicado: 13 paradas, 153 km. §3.bw.
 
 > Nota **2026-09-11 (v15.64) — El geocodificador pela el " - <localidad>" que la página pega después de la altura.**
 > `gv_dir_geo_normalizar(dir, barrio)` saca la cola cuando es el barrio o un prefijo truncado de él; 25 direcciones web
