@@ -7220,3 +7220,58 @@ Las tres preguntas abiertas de §3.ca (tarea Planify 3186) las contestó el due�
 **Rollback**: `update "Importados" i set fob_uni = b.fob_uni from "GV_Importados_bkp_frontier_20260911" b
 where b.id = i.id` y lo mismo para `fecha_reingreso` desde `GV_Importados_Baches_bkp_frontier_20260911`
 (+ `gv_importados_resync`).
+
+## §3.cn — En Salida: SÓLO lo cargado al camión y con fecha (v15.85, 2026-09-11)
+
+**Pedido de Thomas**, mirando la solapa: *"Todos los pedidos que están acá tienen que volver a A
+Programar o a Programación. Acá en En Salida no puede haber ningún pedido sin fecha, ni pedidos
+que no se hayan cargado a un camión."*
+
+Lo que se veía (11/09, 41 NP): **19 cargadas** al camión + **22 sin ninguna carga** — 3 con fecha
+de entrega vencida (98480/98481 D47B, 98530 D60C) y **6 sin fecha de entrega** (98585..98590,
+tanda D56D, con CCR y sin CCN: la anomalía que ya había anotado la §3.m). Esas 6 quedaban
+agrupadas bajo *"Sin fecha"* y no salían nunca de ahí: Programación las esconde justo porque
+están en `gv_ppp_en_salida`.
+
+**Qué se cambió (backend, que es la fuente de verdad):** `gv_ppp_en_salida` suma al WHERE
+
+```sql
+and (cfg.solo_cargadas = 0 or (c.np is not null and c.fecha_carga is not null))
+```
+
+con `cfg.solo_cargadas` = `PPP_Web_Config.en_salida_solo_cargadas` (nueva, **1**). La base de la
+vista no se tocó, así que **apagar la regla es un UPDATE**, sin DDL:
+
+```sql
+update public."PPP_Web_Config" set valor = 0 where clave = 'en_salida_solo_cargadas';
+```
+
+**Qué reglas del dueño desactiva** (las dos son suyas y anteriores; ésta es posterior y explícita):
+
+| Regla | Qué hacía | Ahora |
+|---|---|---|
+| v13.62 (06/09) | toda NP **facturada** sin CRN entraba a En Salida (`facturada_sin_cargar`) | no entra |
+| v15.55 (11/09 AM) | la **armada** hace +36 h sin CCN ni factura entraba como `armada_sin_carga` | no entra |
+
+No se pierde nada: Programación esconde **exactamente** lo que está en esta vista (`_fuera()` de
+`pppRenderProg`), así que al salir de acá **vuelven solas** a Programación, y las de fecha vencida
+o sin fecha caen en la lista de **vencidos**, con sus botones `↩ A Programar` / `📅 Reprogramar` /
+`🚫 Cancelar` (§3.cg). Verificado NP por NP: las 22 están en `gv_ppp_programacion_diaria`.
+
+**Medición (11/09, después de aplicar):**
+
+```
+select estado, count(*), count(*) filter (where fecha_carga is null) from gv_ppp_en_salida group by 1;
+-- cargada | 19 | 0      (antes: cargada 19 + facturada_sin_cargar 22 = 41)
+```
+
+**Front (v15.85, sólo texto):** la nota de la solapa pasa a *"sólo lo que se cargó al camión (con su
+fecha de carga) y todavía no tiene control de remito… lo que no se cargó vuelve a Programación / A
+Programar"*, y el vacío dice "nada cargado al camión sin controlar". Los chips de
+`facturada_sin_cargar` / `armada_sin_carga` **quedan en el código**: son los que se ven si se apaga
+la llave.
+
+**Archivos:** `sql/gv_ppp_en_salida_solo_cargadas_v1585.sql` · backup de la definición anterior en
+`sql/backups/gv_ppp_en_salida_20260911_pre_v1585.sql`.
+**No toca Producción:** la vista es nuestra (`gv_`), sólo lee, `security_invoker = true`.
+**Tests:** `tests/ppp-en-salida.cjs`, `tests/ppp-ensalida-estado.cjs`, `tests/version-sync.cjs` → OK.

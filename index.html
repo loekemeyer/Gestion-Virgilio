@@ -29585,7 +29585,13 @@ let _pppLoadMs = null;   // NP -> ms de la PRIMERA carga (CCN), para el plazo de
    que salir de la Programación y pasar a En Salida, y no verse más en Programación". La fuente
    durable es la vista gv_ppp_en_salida (sql/gv_ppp_en_salida.sql): toda NP con CCN, sin CRN y
    sin un FSS posterior. Programación la esconde; En Salida la lista; con el CRN pasa sola a
-   Pedidos Entregados (gv_ppp_entregados, v12.95). */
+   Pedidos Entregados (gv_ppp_entregados, v12.95).
+   v15.85 (dueño: "acá en En Salida no puede haber ningún pedido sin fecha, ni pedidos que no se
+   hayan cargado a un camión; todos tienen que volver a A Programar o a Programación") → la vista
+   filtra por CCN + fecha de carga (PPP_Web_Config.en_salida_solo_cargadas = 1). Como Programación
+   esconde justo lo que está acá, lo facturado-sin-cargar y lo "salido presunto" (v13.62 / v15.55)
+   vuelven solos a Programación / vencidos, donde se reprograma, desprograma o cancela.
+   Para volver atrás: poner esa llave en 0 (sql/gv_ppp_en_salida_solo_cargadas_v1585.sql). */
 let _pppEnSalida = null;   // Map np(normalizada) → fila de gv_ppp_en_salida
 async function pppRefreshEnSalida() {
   try {
@@ -29787,7 +29793,7 @@ function _pppEsFechaCarga(p) {
 function _pppEnViajeHtml() {
   if (_pppDelivered == null || _pppMetaEntSet == null || _pppEnSalida == null) return '<div class="planim-empty">Cargando pedidos en salida…</div>';
   const list = _pppEntFilter(_pppSplitDelivered().enViaje);
-  if (!list.length) return '<div class="ppp-ent-note">' + (_pppSearch ? "Sin coincidencias." : "No hay pedidos en salida: nada facturado sin controlar.") + '</div>';
+  if (!list.length) return '<div class="ppp-ent-note">' + (_pppSearch ? "Sin coincidencias." : "No hay pedidos en salida: nada cargado al camión sin controlar.") + '</div>';
   const sup = _pppEsEsSupervisor();
   let totM3 = 0, nVenc = 0, nCarg = 0, nSin = 0;
   for (const p of list) {
@@ -29806,7 +29812,7 @@ function _pppEnViajeHtml() {
     byDay[k].push(p);
   }
   keys.sort(); keys.reverse();
-  let html = '<div class="ppp-ent-note">🚚 <b>En salida</b> — cargadas o facturadas <b>sin control de remito</b>, y las armadas hace más de 36 h que nadie cargó (se dan por salidas). Con el control pasan a Pedidos Entregados. ' +
+  let html = '<div class="ppp-ent-note">🚚 <b>En salida</b> — sólo lo que se <b>cargó al camión</b> (con su fecha de carga) y todavía no tiene <b>control de remito</b>. Con el control pasan a Pedidos Entregados. Lo que no se cargó vuelve a <b>Programación</b> / <b>A Programar</b>. ' +
     '<b>' + list.length + '</b> pedido(s) · <b>' + totM3.toFixed(2).replace('.', ',') + '</b> m³ · ' +
     '<b>' + nCarg + '</b> cargada(s) al camión · <b>' + nSin + '</b> sin registro de carga.' +
     (nVenc ? ' <span style="color:#b91c1c;font-weight:800;">· 🚨 ' + nVenc + ' pasado el plazo</span>' : '') + '</div>';
