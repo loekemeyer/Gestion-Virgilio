@@ -7622,7 +7622,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v15.25";
+const APP_VERSION = "v15.26";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -13036,8 +13036,10 @@ async function ocgFetchImportados() {
   // que la usan (tabla Importados_Partes_Map → vista_importados_partes). Se pisa proyUni.
   const parteProy = {};
   try {
-    const pr = await supaFetchAllSafe(SUPABASE_URL + "/rest/v1/vista_importados_partes", "select=cod,proy_uni_mes,detalle");
-    (pr || []).forEach(function (r) { parteProy[String(r.cod).toUpperCase().trim()] = { proy: Number(r.proy_uni_mes) || 0, detalle: r.detalle || null }; });
+    // v15.26 — además trae stock_term_uni: stock de los TERMINADOS que usan la parte (depósito
+    // Virgilio, todos los estadios, en unidades) — cuenta como stock de la parte (1 parte = 1 u).
+    const pr = await supaFetchAllSafe(SUPABASE_URL + "/rest/v1/vista_importados_partes", "select=cod,proy_uni_mes,detalle,stock_term_uni");
+    (pr || []).forEach(function (r) { parteProy[String(r.cod).toUpperCase().trim()] = { proy: Number(r.proy_uni_mes) || 0, detalle: r.detalle || null, stockTerm: Number(r.stock_term_uni) || 0 }; });
   } catch (_e) {}
   // v9.24 — STOCK DE PARTE: para ciertos importados el stock de su PARTE cuenta como stock del
   // terminado (ej. 94xP arma 94xE vía Log/Fabr, en unidades). Se SUMA al stock antes de calcular
@@ -13070,7 +13072,11 @@ async function ocgFetchImportados() {
     const proyUni = esParte ? pp.proy : o.proyUni;
     const sp = stockParte[kk];
     const stockParteU = sp ? sp.u : 0;
-    const stockTot = o.stockUni + stockParteU;   // el stock de la parte cuenta como stock del terminado
+    // v15.26 — y al revés: para una PARTE, el stock de sus TERMINADOS en Virgilio (góndola, racks,
+    // a guardar…) cuenta como stock de la parte (regla del dueño 11/09: "en los insumos hay que
+    // considerar el stock de las partes" → 1546903 ve el 546 terminado, 505C las cuchillas ya armadas).
+    const stockTermU = esParte ? (pp.stockTerm || 0) : 0;
+    const stockTot = o.stockUni + stockParteU + stockTermU;   // el stock de la parte cuenta como stock del terminado, y el del terminado como stock de la parte
     const objetivoUni = Math.round(proyUni * meses);
     const aPedirUni = Math.max(0, Math.ceil(objetivoUni - stockTot - o.enCurso));
     // v10.07 — MASTER CAJAS: el divisor correcto es uni_master (del Excel/Importados_Volumen), NO
@@ -13086,7 +13092,7 @@ async function ocgFetchImportados() {
     // v10.06 — cotización USD = unidades a pedir × FOB unitario (por ítem; el total se suma en el render)
     const fobUni = o.fob || 0;
     const usdTotal = (fobUni > 0) ? (aPedirUni * fobUni) : 0;
-    items.push({ cod: o.cod, desc: o.desc, prov: o.prov, proyUni: Math.round(proyUni), meses: meses, objetivoUni: objetivoUni, stockUni: Math.round(stockTot), stockPropio: Math.round(o.stockUni), stockParteU: Math.round(stockParteU), stockParteCods: (sp ? sp.partes : ""), enCurso: Math.round(o.enCurso), aPedirUni: aPedirUni, uxc: o.uxc, uniMaster: uniMaster, cajasEsMaster: cajasEsMaster, aPedirCajas: aPedirCajas, fobUni: fobUni, usdTotal: usdTotal, m3Master: m3Master, m3Dims: vm ? { l: vm.l, a: vm.a, h: vm.h } : null, m3Total: m3Total, esParte: esParte, parteDet: (pp ? pp.detalle : null), reingresoEst: (reingresoEst[kk] || ""), det: o.det || [] });
+    items.push({ cod: o.cod, desc: o.desc, prov: o.prov, proyUni: Math.round(proyUni), meses: meses, objetivoUni: objetivoUni, stockUni: Math.round(stockTot), stockPropio: Math.round(o.stockUni), stockParteU: Math.round(stockParteU), stockParteCods: (sp ? sp.partes : ""), stockTermU: Math.round(stockTermU), enCurso: Math.round(o.enCurso), aPedirUni: aPedirUni, uxc: o.uxc, uniMaster: uniMaster, cajasEsMaster: cajasEsMaster, aPedirCajas: aPedirCajas, fobUni: fobUni, usdTotal: usdTotal, m3Master: m3Master, m3Dims: vm ? { l: vm.l, a: vm.a, h: vm.h } : null, m3Total: m3Total, esParte: esParte, parteDet: (pp ? pp.detalle : null), reingresoEst: (reingresoEst[kk] || ""), det: o.det || [] });
   });
   return { items: items, meses: meses };
 }
@@ -13253,8 +13259,8 @@ function ocBodyGenImportados() {
       var parteBadge = "";
       if (it.esParte) {
         var detTxt = "";
-        try { if (it.parteDet && it.parteDet.length) detTxt = it.parteDet.map(function (d) { return d.cod + ": " + d.proy; }).join("  ·  "); } catch (_e) {}
-        parteBadge = ' <span style="color:#7c3aed;font-weight:800;cursor:help" title="Parte: la proyección es la SUMA de los terminados que la usan → ' + escapeHtml(detTxt) + '">🧩</span>';
+        try { if (it.parteDet && it.parteDet.length) detTxt = it.parteDet.map(function (d) { return d.cod + ": " + d.proy + (d.stock_uni != null ? " (stock " + d.stock_uni + " u)" : ""); }).join("  ·  "); } catch (_e) {}
+        parteBadge = ' <span style="color:#7c3aed;font-weight:800;cursor:help" title="Parte: la proyección es la SUMA de los terminados que la usan, y su stock terminado (' + (it.stockTermU || 0) + ' u) cuenta como stock de la parte → ' + escapeHtml(detTxt) + '">🧩</span>';
       }
       h += '<tr><td class="oc-cod">' + escapeHtml(codCanon(it.cod)) + parteBadge + '</td><td>' + escapeHtml(artNombre(it.cod, it.desc)) + '</td><td class="num">' + it.proyUni + '</td><td class="num">' + it.meses + '</td><td class="num">' + it.objetivoUni + '</td><td class="num">' + it.stockUni + '</td><td class="num">' + it.enCurso + '</td><td class="num oc-falt">' + it.aPedirUni + '</td><td class="num">' + cajTxt + '</td></tr>';
     });
@@ -16282,9 +16288,15 @@ function _pedImpRender() {
     arr.sort(function (a, b) { return _pedImpUniOf(b) - _pedImpUniOf(a) || (b.aPedirUni - a.aPedirUni); }).forEach(function (it) {
       const badge = it.esParte ? ' <span style="color:#7c3aed" title="Parte">🧩</span>' : '';
       const _stkShow = Math.max(0, Number(it.stockUni) || 0);
-      const stockTxt = (it.stockParteU > 0)
+      var stockTxt = (it.stockParteU > 0)
         ? _stkShow + ' <span style="color:#7c3aed;font-weight:700;font-size:11px" title="Incluye ' + it.stockParteU + ' u de la parte ' + escapeHtml(it.stockParteCods || '') + '">🔧+' + it.stockParteU + '</span>'
         : String(_stkShow);
+      // v15.26 — parte: el stock incluye los TERMINADOS que la usan (góndola/racks/a guardar de Virgilio)
+      if (it.stockTermU > 0) {
+        var _termDet = "";
+        try { if (it.parteDet && it.parteDet.length) _termDet = it.parteDet.map(function (d) { return d.cod + ": " + (d.stock_uni != null ? d.stock_uni : "?") + " u"; }).join("  ·  "); } catch (_e) {}
+        stockTxt += ' <span style="color:#7c3aed;font-weight:700;font-size:11px" title="Incluye ' + it.stockTermU + ' u de terminados armados con esta parte → ' + escapeHtml(_termDet) + '">🧩+' + it.stockTermU + '</span>';
+      }
       const _codEncV = encodeURIComponent(it.cod);
       const actHtml = (it.det || []).map(function (d) {
         const multi = (it.det || []).length > 1;

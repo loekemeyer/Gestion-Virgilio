@@ -446,3 +446,9 @@ cron `sync-proyeccion-emp-virgilio`. `proyeccion_madre` intacta. Rollback en §3
 `v_importados_ordenes` recreada (CTE `pe`: sum + `Equivalencias_Familia`). `vista_stock_procesada` (materializada) y
 `Stock_Saldos` dropeadas y recreadas con el CTE `proy` ampliado; grants idénticos. Backup de definiciones y relacl en
 `GV_bkp_relacl_vista_stock_procesada_20260911`. Detalle y rollback §3.bm.16.
+
+## Partes: stock de terminados en vista_importados_partes — v15.26 (2026-09-11)
+
+`vista_importados_partes` recreada (`create or replace`, + columna `stock_term_uni`, security_invoker repuesto) y una
+fila nueva en `Importados_Partes_Map` (505C → 114; backup `GV_Importados_Partes_Map_bkp_20260911`). Sólo la lee
+Gestión (`ocgFetchImportados`). Rollback en `sql/gv_importados_partes_stock_terminados_v1526.sql` / §3.bm.18.

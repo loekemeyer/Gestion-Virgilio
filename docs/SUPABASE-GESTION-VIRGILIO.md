@@ -5225,3 +5225,24 @@ Dueño: *"todos los datos que tengas que corregir, dale"*. Barrido sobre `v_impo
   con la nota del motivo. Resultado: a pedir 1.056 y 4.008 u. Backup `GV_Importados_bkp_override_437_438CH_20260911`.
 - Es un parche hasta que LK re-marque Chef julio/agosto; cuando la proyección por empresa quede limpia, sacar el
   override (`update "Importados" set est_madre_override = null where id in (71,63)`) y vuelve a "live".
+
+### §3.bm.18 — Partes: el stock de los terminados cuenta como stock de la parte (v15.26, 2026-09-11)
+
+- Dueño: *"no se está considerando el stock del artículo terminado… en los insumos hay que considerar el stock de las
+  partes"*. El módulo pedía 1546903 (parte corta queso) por 29.952 u / u$s 12.580 mirando sólo la parte (stock 0), cuando
+  el 546 tiene **1.627 cajas** terminadas en Virgilio (terminado 349 + a facturar 13 + a guardar 655 + racks 587 + …).
+- `vista_importados_partes` (`sql/gv_importados_partes_stock_terminados_v1526.sql`): nueva columna **`stock_term_uni`** =
+  Σ por terminado de (todos los estadios de `vista_saldos_stock`, todas las empresas, menos `insumos`) × `uni_x_caja`
+  de `vista_uni_x_caja`; el `detalle` suma `stock_cajas`/`uxc`/`stock_uni` por terminado. Supuesto: **1 parte por
+  unidad** (el mapa no tiene cantidad). Mismas columnas viejas → el front anterior sigue andando. `create or replace`
+  **perdió `security_invoker`**: se volvió a poner con `alter view`.
+- Mapa: **505C → 114** agregado (dueño: "cuchillas del 505 → 586, 713, 186, 123, 114"). Backup
+  `GV_Importados_Partes_Map_bkp_20260911`. Los demás ya estaban (espirales 1000900 → 520/521/530/531/581/730/731/735
+  + 104/067; 523C → 523/723; 587C → 587).
+- Front (`ocgFetchImportados`, index.html): `stockTot = stock propio + stock de parte (94xP) + stock de terminados`;
+  badge 🧩+N en la columna Stock con el detalle por terminado.
+- Medido: 1546903 stock terminados **19.524 u** → a pedir 10.512 u (u$s 4.415, antes 12.580); 505C 61.122 u;
+  1000900 25.560; 523C 3.420 (Hugo Wong 523C 4.320 → 720 u); 587C 5.400 (Frontier 24.000 → 20.000 u).
+  Ownland total u$s 25.125 → **13.735**; lo que queda grande ahí son seeds sin ventas ni stock (733E·CH 792 u/mes,
+  692E·CH 240, 814E 36: sin fila en `GV_Proyeccion_Emp` ni en `vista_saldos_stock` → u$s 6.036 de pedido fantasma).
+- Rollback: en el `.sql`.
