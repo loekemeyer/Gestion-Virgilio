@@ -5246,3 +5246,30 @@ Dueño: *"todos los datos que tengas que corregir, dale"*. Barrido sobre `v_impo
   Ownland total u$s 25.125 → **13.735**; lo que queda grande ahí son seeds sin ventas ni stock (733E·CH 792 u/mes,
   692E·CH 240, 814E 36: sin fila en `GV_Proyeccion_Emp` ni en `vista_saldos_stock` → u$s 6.036 de pedido fantasma).
 - Rollback: en el `.sql`.
+
+### §3.bm.19 — El depósito INSUMOS cuenta como stock del módulo de importados (v15.27, 2026-09-11)
+
+- Dueño: *"ojo con lo que está en insumos de importados; revisá uno por uno"*. Hasta acá el módulo **nunca** miraba el
+  depósito `insumos`: el sync v15.11 lo excluyó y las partes quedaron con el **seed del Excel QUIEBRE del 16/07**
+  (505C 262.400, 1000900 68.000, 523C/1546903 0). Además `vista_saldos_stock.insumos` **suma crudo** unidades
+  distintas (MC + Uni): 505C decía 141.997 y son 142.000 Uni − 3 MC×4.000 = **130.000**; 590E decía 2.396 y es **0**
+  (2.400 Uni − 4 MC×600, ya fueron a Cervantes).
+- Reglas cerradas con el dueño (una por una): **1000900** = insumos `H201Part` "Espiral TN" (104.000 u) + `007`
+  "Espiral (Chef)" (3.500) — *"ambos son espirales, todo el stock cuenta para repedir a Hugo Wong"*; **546P** bastidor
+  = parte 1546903; **522ES** suelto = 522E sin caja; `H201Lever` y `CB01` = partes **sin uso todavía** (fuera);
+  `Mgo Pelador 505` / `Ergonómico` = **inyectadas nacionales** (fuera); `337P` arma el **337** (no está en
+  `Importados`: falta proveedor/FOB → decisión del dueño); **733E / 692E / 814E** se empezaron a vender ahora →
+  se piden con el seed, no se tocan.
+- Objetos (`sql/gv_importados_stock_insumos_v1527.sql`): tabla **`GV_Importados_Insumo_Map`** (insumo → importado,
+  sólo los renombrados; los códigos iguales se enlazan solos), vista **`gv_importados_stock_insumos`** (saldo por
+  unidad de `vista_saldos_insumos_x_unidad` × `Insumos_Factores`; sin factor cae a `Importados_Volumen.uni_master`;
+  `sin_factor` avisa), y **`v_importados_ordenes`** con `stock_insumos`, `es_parte` y **`stock_total`** (parte con
+  insumo → el insumo REEMPLAZA al seed; resto → `stock_actual + stock_insumos`). El insumo va a la fila **CH** si el
+  código tiene una (Paquete A: en Chef el 437E/439E arranca como insumo) y si no a la LK. `stock_actual` no cambia
+  (la pantalla de stock sigue igual). Def anterior en `GV_bkp_def_v_importados_ordenes_20260911`.
+- Front: `ocgFetchImportados` usa `stock_total` (cae a `stock_actual` si no viene) y muestra 🧰N en Stock.
+- Medido: 505C 130.000 · 1000900 107.500 · 1546903 16.848 · 523C 6.000 · 437E·CH 2.976 · 439E·CH 480 · 522E 4.604 ·
+  584E 1.314 · 035E 1.128. Pedido: 1546903 10.512 → **0**, 523C 720 → **0**, 437E·CH 1.080 → **0**, 439E·CH 456 → 72,
+  035E 1.056 → 528, 584E 1.584 → 384. Total ≈ u$s 53.500 → **≈ 46.300** (Ownland 13.735 → 9.320, Hugo Wong 7.190 →
+  6.778, Fujian 9.437 → 7.673, Zhixin 6.844 → 5.942, Frontier 1.000 → 1.280 por 1 MC de 505C).
+- Rollback: en el `.sql`.

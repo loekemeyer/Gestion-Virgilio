@@ -7622,7 +7622,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v15.26";
+const APP_VERSION = "v15.27";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -13007,7 +13007,9 @@ const SUPABASE_IMPORTADOS_OC_ENDPOINT = SUPABASE_URL + "/rest/v1/v_importados_or
 async function ocgFetchImportados() {
   let rows = [];
   try {
-    rows = await supaFetchAllSafe(SUPABASE_IMPORTADOS_OC_ENDPOINT, "select=id,cod_art,marca,proveedor,descripcion,uni_x_caja,fob_uni,est_madre_eff,meses_objetivo,stock_actual,pedido_curso,principal,activo&principal=eq.true&activo=eq.true");
+    // v15.27 — stock_total = stock del módulo + depósito insumos (gv_importados_stock_insumos: partes y
+    // reenvasados, convertido con Insumos_Factores); para una PARTE el insumo REEMPLAZA al seed del Excel.
+    rows = await supaFetchAllSafe(SUPABASE_IMPORTADOS_OC_ENDPOINT, "select=id,cod_art,marca,proveedor,descripcion,uni_x_caja,fob_uni,est_madre_eff,meses_objetivo,stock_actual,stock_insumos,stock_total,pedido_curso,principal,activo&principal=eq.true&activo=eq.true");
   } catch (_e) { return { items: [], meses: 10 }; }
   // v10.38 — alias de códigos que se piden JUNTOS (misma master caja / mismo pedido al chino):
   // 865ED se suma dentro de 865E (pedido del usuario). Agregar acá futuros pares si hacen falta.
@@ -13018,10 +13020,11 @@ async function ocgFetchImportados() {
     const codRaw = String(r.cod_art || "").trim(); if (!codRaw) return;
     const cod = IMP_ALIAS[codRaw.toUpperCase()] || codRaw;   // canónico (865ED → 865E)
     const k = cod.toUpperCase();
-    if (!by[k]) by[k] = { cod: cod, desc: r.descripcion || "", prov: String(r.proveedor || "").trim() || "(sin proveedor)", uxc: 0, fob: 0, proyUni: 0, stockUni: 0, enCurso: 0, det: [] };
+    if (!by[k]) by[k] = { cod: cod, desc: r.descripcion || "", prov: String(r.proveedor || "").trim() || "(sin proveedor)", uxc: 0, fob: 0, proyUni: 0, stockUni: 0, stockIns: 0, enCurso: 0, det: [] };
     const o = by[k];
     o.proyUni += Number(r.est_madre_eff) || 0;
-    o.stockUni += Number(r.stock_actual) || 0;
+    o.stockUni += (r.stock_total != null) ? (Number(r.stock_total) || 0) : (Number(r.stock_actual) || 0);   // v15.27: incluye insumos
+    o.stockIns += Number(r.stock_insumos) || 0;
     o.enCurso += Number(r.pedido_curso) || 0;
     const fb = Number(r.fob_uni) || 0; if (fb > 0 && !o.fob) o.fob = fb;   // v10.06 — FOB USD/unidad (del maestro Importados)
     // filas subyacentes (por marca/planta) para poder editar "en curso" y marcar llegada por Importados.id
@@ -13092,7 +13095,7 @@ async function ocgFetchImportados() {
     // v10.06 — cotización USD = unidades a pedir × FOB unitario (por ítem; el total se suma en el render)
     const fobUni = o.fob || 0;
     const usdTotal = (fobUni > 0) ? (aPedirUni * fobUni) : 0;
-    items.push({ cod: o.cod, desc: o.desc, prov: o.prov, proyUni: Math.round(proyUni), meses: meses, objetivoUni: objetivoUni, stockUni: Math.round(stockTot), stockPropio: Math.round(o.stockUni), stockParteU: Math.round(stockParteU), stockParteCods: (sp ? sp.partes : ""), stockTermU: Math.round(stockTermU), enCurso: Math.round(o.enCurso), aPedirUni: aPedirUni, uxc: o.uxc, uniMaster: uniMaster, cajasEsMaster: cajasEsMaster, aPedirCajas: aPedirCajas, fobUni: fobUni, usdTotal: usdTotal, m3Master: m3Master, m3Dims: vm ? { l: vm.l, a: vm.a, h: vm.h } : null, m3Total: m3Total, esParte: esParte, parteDet: (pp ? pp.detalle : null), reingresoEst: (reingresoEst[kk] || ""), det: o.det || [] });
+    items.push({ cod: o.cod, desc: o.desc, prov: o.prov, proyUni: Math.round(proyUni), meses: meses, objetivoUni: objetivoUni, stockUni: Math.round(stockTot), stockPropio: Math.round(o.stockUni), stockParteU: Math.round(stockParteU), stockParteCods: (sp ? sp.partes : ""), stockTermU: Math.round(stockTermU), stockInsU: Math.round(o.stockIns), enCurso: Math.round(o.enCurso), aPedirUni: aPedirUni, uxc: o.uxc, uniMaster: uniMaster, cajasEsMaster: cajasEsMaster, aPedirCajas: aPedirCajas, fobUni: fobUni, usdTotal: usdTotal, m3Master: m3Master, m3Dims: vm ? { l: vm.l, a: vm.a, h: vm.h } : null, m3Total: m3Total, esParte: esParte, parteDet: (pp ? pp.detalle : null), reingresoEst: (reingresoEst[kk] || ""), det: o.det || [] });
   });
   return { items: items, meses: meses };
 }
@@ -16297,6 +16300,8 @@ function _pedImpRender() {
         try { if (it.parteDet && it.parteDet.length) _termDet = it.parteDet.map(function (d) { return d.cod + ": " + (d.stock_uni != null ? d.stock_uni : "?") + " u"; }).join("  ·  "); } catch (_e) {}
         stockTxt += ' <span style="color:#7c3aed;font-weight:700;font-size:11px" title="Incluye ' + it.stockTermU + ' u de terminados armados con esta parte → ' + escapeHtml(_termDet) + '">🧩+' + it.stockTermU + '</span>';
       }
+      // v15.27 — depósito insumos (parte suelta o importado sin reenvasar), convertido a unidades
+      if (it.stockInsU > 0) stockTxt += ' <span style="color:#0369a1;font-weight:700;font-size:11px" title="Incluye ' + it.stockInsU + ' u del depósito insumos (Movimientos_Stock, convertido con Insumos_Factores). En una parte, este stock reemplaza al seed del Excel.">🧰' + it.stockInsU + '</span>';
       const _codEncV = encodeURIComponent(it.cod);
       const actHtml = (it.det || []).map(function (d) {
         const multi = (it.det || []).length > 1;

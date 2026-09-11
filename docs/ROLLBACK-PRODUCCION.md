@@ -452,3 +452,9 @@ cron `sync-proyeccion-emp-virgilio`. `proyeccion_madre` intacta. Rollback en §3
 `vista_importados_partes` recreada (`create or replace`, + columna `stock_term_uni`, security_invoker repuesto) y una
 fila nueva en `Importados_Partes_Map` (505C → 114; backup `GV_Importados_Partes_Map_bkp_20260911`). Sólo la lee
 Gestión (`ocgFetchImportados`). Rollback en `sql/gv_importados_partes_stock_terminados_v1526.sql` / §3.bm.18.
+
+## Insumos como stock del módulo de importados — v15.27 (2026-09-11)
+
+Tabla nueva `GV_Importados_Insumo_Map`, vista nueva `gv_importados_stock_insumos` y `v_importados_ordenes` recreada
+(+ `stock_insumos`, `es_parte`, `stock_total`; el resto idéntico). Def anterior en `GV_bkp_def_v_importados_ordenes_20260911`.
+Sólo lo lee Gestión. Rollback en `sql/gv_importados_stock_insumos_v1527.sql` / §3.bm.19.
