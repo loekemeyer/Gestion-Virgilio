@@ -171,3 +171,56 @@ where not exists (select 1 from public."OC_Maximos" where public.norm_cod(cod)='
 -- en OC_Maximos, que es compra nacional.
 --
 -- RESULTADO: de los 289 articulos con stock, CERO quedan sin lugar.
+
+-- ── Orden de recorrido del picking (2026-09-11) ──────────────────────
+-- GV_Lugar.orden estaba en null en las 872 filas. `Planimetria.orden` es lo
+-- que ordena el recorrido del operario, y al unificar sobre Capacidad_Sector
+-- (que tiene TODAS las celdas pero no el orden) se habia quedado afuera.
+--
+-- OJO con la diferencia entre las dos fuentes viejas, que NO es una
+-- contradiccion sino dos propositos distintos:
+--   · Planimetria      = UNA celda por codigo (los 343 tienen exactamente 1)
+--                        + el `orden` del recorrido
+--   · Capacidad_Sector = TODAS las celdas del codigo + su capacidad
+-- Ej: el 513 esta en F17..F44 segun Capacidad_Sector y en F13 segun
+-- Planimetria (F13 es en realidad la celda del 438E: ese si era un error,
+-- y lo resolvio el relevamiento).
+--
+-- Derivacion: cada sector que tiene orden en Planimetria es un ANCLA. Los
+-- demas se insertan junto al ancla del MISMO pasillo con el numero mas
+-- cercano (dentro de un pasillo, numeros correlativos son celdas contiguas).
+-- Los pasillos sin ninguna ancla (racks, insumos) van al final. Despues se
+-- renumera denso 1..872 para que no queden huecos.
+--
+-- VERIFICADO: sobre los 287 sectores que tenian orden, la correlacion de
+-- rangos viejo/nuevo da 1,0000 y hay 0 desvios de mas de 20 puestos. El
+-- recorrido no cambia; solo se completan las celdas que faltaban.
+--
+-- ROLLBACK: update public."GV_Lugar" set orden = null;
+
+with parsed as (
+  select sector, (regexp_match(sector,'^([A-ZÑ]+)'))[1] pas,
+         coalesce(((regexp_match(sector,'([0-9]+)'))[1])::int, 0) num
+  from public."GV_Lugar"
+), anc as (
+  select public.gv_norm_sector(sector) sec, min(orden) ord
+  from public."Planimetria"
+  where orden is not null and cod <> 'LIBRE' and coalesce(btrim(sector),'') <> ''
+  group by 1
+), anc_p as (
+  select a.sec, a.ord, (regexp_match(a.sec,'^([A-ZÑ]+)'))[1] pas,
+         coalesce(((regexp_match(a.sec,'([0-9]+)'))[1])::int,0) num
+  from anc a
+), calc as (
+  select p.sector, p.pas, p.num,
+    coalesce(
+      (select a.ord*1000 from anc_p a where a.sec = p.sector limit 1),
+      (select a.ord*1000 + (p.num - a.num) from anc_p a where a.pas = p.pas
+         order by abs(a.num - p.num), a.num limit 1)
+    ) k
+  from parsed p
+), ranked as (
+  select sector, row_number() over (order by k nulls last, pas, num) rn from calc
+)
+update public."GV_Lugar" l set orden = r.rn, updated_at = now()
+from ranked r where r.sector = l.sector;
