@@ -12,7 +12,7 @@
 > única**; no se replica. Ante la duda entre parche rápido y fix de raíz → **fix
 > de raíz**.
 >
-> Última actualización: 2026-09-11 (viernes) · Versión app al documentar: **v15.84**
+> Última actualización: 2026-09-11 (viernes) · Versión app al documentar: **v15.86**
 >
 > Nota **v15.40 (2026-09-11) — HANDOFF de planimetría / Acacia: `docs/HANDOFF-PLANIMETRIA-Y-ACACIA.md`.**
 > Thomas sigue este tema en otra sesión. Ahí está todo junto: los **13 artículos activos del catálogo LK
@@ -11159,6 +11159,12 @@ distinta, empresa distinta.
 >   `Sync_Estado`**: `cron.job_run_details` ya tiene la verdad. DDL en
 >   `sql/watchdog_syncs_externos.sql`.
 
+> Nota **2026-09-11 (v15.86) — La PPP avisa el camión que no entra en la jornada: viaje + 15′ por parada > 8 h.**
+> Pedido de Thomas; los dos parámetros que faltaban (28 km/h de marcha, recorrido 1,35× la línea recta) los definí acá y
+> viven en `PPP_Web_Config` para recalibrarlos con las horas reales de la hoja de ruta. El cálculo reusa el optimizador
+> de ruta que ya existe (`_rtOptimize`). **Medido: 14, 15 y 16/09 se pasan** (8,8 · 9,8 · 10,6 h). Avisa, no bloquea.
+> §3.co de `docs/SUPABASE-GESTION-VIRGILIO.md`.
+
 > Nota **2026-09-11 (v15.84) — Cerrados los 3 datos que faltaban de la cuenta corriente (Thomas).**
 > (1) **FOB de Frontier = u$s 14.400**, manda el PI: `fob_uni` de **505C** 0,07 → **0,072** (14.400/200.000 u).
 > (2) **Frontier llega el 10/12** — *"embarca el 26 de octubre y llega 45 días después"*; la llegada cargada
@@ -11166,6 +11172,7 @@ distinta, empresa distinta.
 > (3) El **30% es un parámetro, no una regla**: Becky (23,3%) y Hugo (36,3%) son **un solo giro cada uno**,
 > *"se pagó eso y me lo aceptaron los dos proveedores"*. Con esto ya no queda ninguna fila con `fob_difiere`
 > y el `falta` sigue dando el del Excel. §3.cg de `docs/SUPABASE-GESTION-VIRGILIO.md`.
+
 > Nota **2026-09-11 (v15.81) — "¿Quién me compró este mes?" en Stock y Compras.**
 > Pedido del dueño: *"desde stock y compras, poder tocar en 1 mes y ver quién me compró (solo los primeros
 > 5 clientes de cada mes y un sexto con Resto)"* · unidad **cajas** (*"3 cajas"*), la misma de esa tabla.
@@ -11230,6 +11237,18 @@ distinta, empresa distinta.
 > **`docs/IMPORTACIONES-PAGOS-ARGENTINA.md`** + §3.ca de `docs/SUPABASE-GESTION-VIRGILIO.md`.
 > **Marcado sin tocar**: Frontier FOB 14.400 vs 14.000 del motor y su llegada (04/11) que no cierra con el
 > embarque 26/10; Becky 2ª con el 30% pagado el 02/jun y 112 días hasta embarcar.
+
+> Nota **2026-09-11 (v15.89) — Importado el Excel de la cuenta corriente de NTL (6 hojas, 280 movimientos).**
+> Ahora está entendido el circuito completo: entra **efectivo** a NTL (u$s 140.300, con 3% de comisión por
+> subida) → NTL **gira** a la fábrica el Advance 30% y después el Balance 70% (u$s 385.462, con gastos
+> bancarios) → cuando la carga se nacionaliza entra el **RECUPERO** (u$s 241.021), que es la plata que
+> vuelve porque recién ahí se puede girar desde Argentina, y ahí NTL cobra su **5% s/FC**. Comisiones y
+> gastos acumulados: u$s 20.389. La columna `Empresa` reparte en **D** (efectivo sin asignar), **TN** y **CH**.
+> **Hallazgo**: la imputación cruzada que faltaba modelar **ya estaba en sus hojas por proveedor** —
+> `Salido por` (NTL o Bco), `A través de` (la carga con la que se pagó) y `Fue a` (la que queda cubierta).
+> Importado FIEL a `GV_Imp_NTL_Mov` (252) y `GV_Imp_Prov_Mov` (28); los totales cierran con los del Excel.
+> Detalle y lo que no cierra (el FOB de Ownland, el anticipo de la 1.ª Becky) en
+> **`docs/IMPORTACIONES-PAGOS-ARGENTINA.md` §4**.
 
 > Nota **2026-09-11 — Cómo se pagan las importaciones (marco para la cuenta corriente).**
 > Thomas explicó la operatoria: se le gira a **NTL**, un freight forwarder de Hong Kong, y **la salida de
@@ -11519,3 +11538,16 @@ distinta, empresa distinta.
 >   `tandaReservar` de EP/AP pero para CCN/CRN/CCR. Verificable:
 >   `select opcion, texto, count(distinct legajo) from "Registros_Produccion_Virgilio" where
 >   opcion in ('CCN','CRN','CCR') group by 1,2 having count(distinct legajo)>1`.
+
+> Nota **v15.85** — **En Salida = SÓLO lo cargado al camión, y con fecha** (dueño, 11/09:
+> *"Todos los pedidos que están acá tienen que volver a A Programar o a Programación. Acá en En
+> Salida no puede haber ningún pedido sin fecha, ni pedidos que no se hayan cargado a un camión"*).
+> `gv_ppp_en_salida` exige ahora **CCN + `fecha_carga`**; queda sin efecto lo de v13.62 ("toda NP
+> facturada sin CRN entra") y lo de v15.55 (`armada_sin_carga`, salida presunta a las 36 h). Las
+> **22** NP que estaban sin carga —98480/98481 y 98530 vencidas, 98585..98590 sin fecha (CCR sin
+> CCN), y las de 11/09 y 14/09— **vuelven solas a Programación**, porque Programación esconde
+> exactamente lo que está en esa vista; las vencidas y las sin fecha caen en la lista de
+> **vencidos**, con `↩ A Programar` / `📅 Reprogramar` / `🚫 Cancelar`. En Salida: 41 → **19**, todas
+> con fecha de carga. Llave de apagado (vuelve la regla vieja, sin DDL):
+> `update "PPP_Web_Config" set valor = 0 where clave = 'en_salida_solo_cargadas'`.
+> Detalle §3.cn de `docs/SUPABASE-GESTION-VIRGILIO.md` · `sql/gv_ppp_en_salida_solo_cargadas_v1585.sql`.
