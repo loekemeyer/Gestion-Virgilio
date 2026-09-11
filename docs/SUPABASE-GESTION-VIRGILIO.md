@@ -7130,3 +7130,69 @@ línea Loke y que el precio es el pactado con ese cliente — antes parecía una
 
 `drop table public."GV_Precios_Cliente" cascade;` + recrear las tres vistas con
 `sql/gv_precio_chef_v1576.sql`. No toca objetos de Producción.
+
+---
+
+## 3.cf Cargados los precios Loke de Fede (Osa 2533) — primer uso de `GV_Precios_Cliente` (v15.83) — 2026-09-11
+
+Thomas pasó la lista de Fede (Federico Chemello) textual: *"los que no te estoy pasando es el
+mismo precio que tenés en Loekemeyer (por todos tus dtos) y ya no podemos ir más abajo…
+Estos precios ya incluyen todos los dtos que tenés en LK y son netos +IVA"*.
+
+| Cód | Artículo | Precio (por unidad) |
+|---|---|---|
+| 102E | Abrelata Mariposa | **$1.260** |
+| 106E | Sacacorcho Doble Impulso | **$1.610** |
+| 103 | Abrelata Uña Inox | **$520** |
+| 198E | Pelador Dentado | **$660** |
+
+Cargados en `GV_Precios_Cliente` con **`es_final = true`** — el precio ya trae los descuentos,
+así que no se le aplica el `dto_vol` de Osa (16 %) ni el 2 % web. Es neto; el IVA va aparte y
+el sistema trabaja sin IVA. `sql/seed_precios_cliente_osa_20260911.sql`.
+
+**Quién es el cliente.** "Fede" = **Federico Chemello**. En el padrón de LK hay dos códigos de
+la misma familia: **2533** Osa Distribuidora SRL (osadistri@, dto 0,16) y **1431** Chemello
+Federico Agustín (osabazar@, dto 0,12), los dos con vendedor 7. Se cargó el **2533**, que es el
+que tenía las líneas sin valorizar y justo esos cuatro códigos. El 1431 es, casi seguro, **el
+segundo cliente de Loke** que faltaba identificar; si lleva la misma lista, el insert para
+replicarla está comentado al final del seed.
+
+**Trampa del `uxb`.** 102E, 103 y 106E lo toman solos de `cob_uxb_lk` (12). **198E no**: ese
+código no está en `products` ni en `loke_products` de LK (vive sólo en `item_precios`), así que
+nunca llega a `cob_uxb_lk` y la línea se valorizaba **por unidad en vez de por caja**
+($91.080 en lugar de $1.092.960). Se le escribió `uxb = 12` en la fila. **Es el caso que
+justifica la columna `uxb` de la tabla**: cuando un código no está en ninguna lista, el precio
+por cliente tiene que traer también las unidades por caja.
+
+### Medido (NP 98650, Osa)
+
+| Cód | Cajas | Cuenta | Importe |
+|---|---|---|---|
+| 102E | 200 | 200 × 12 × 1.260 | $3.024.000 |
+| 103 | 236 (faltaron 64) | 236 × 12 × 520 | $1.472.640 · faltó $399.360 |
+| 106E | 200 | 200 × 12 × 1.610 | $3.864.000 |
+| 198E | 138 (faltaron 362) | 138 × 12 × 660 | $1.092.960 · faltó $2.867.040 |
+
+`facturacion_neto_lote('98650')` → **$9.453.600**, **0 códigos sin precio** (antes la NP salía
+con esos cuatro en rojo). Total sin precio en Facturación: 89 → **85** líneas; de Loke quedan
+sólo las **24 de Cencosud**, que esperan la importación de su hoja.
+
+### ⚠ El catálogo de LK está lejos de estos precios
+
+Lo que le cotizaría **hoy el portal** a Osa (lista × 0,84 × 0,98) contra lo pactado:
+
+| Cód | Portal hoy | Pactado | Dif |
+|---|---|---|---|
+| 102E | $905,52 | $1.260 | **+39 %** |
+| 103 | $382,79 | $520 | **+36 %** |
+| 106E | $1.078,39 | $1.610 | **+49 %** |
+| 198E | $913,75 | $660 | **−28 %** |
+
+O sea que si Fede pide por la web ve números distintos de los que se le van a facturar.
+Actualizar la lista de Loke en LK es decisión del dueño; Facturación ya usa el pactado.
+
+### Aparte: el badge de versión había quedado en v15.71
+
+El commit `c869e53` (otro chat, mismo día) escribió `APP_VERSION = "v15.71"` sobre la v15.82:
+el badge mostraba una versión **11 números para atrás** de lo que corría, que es justo lo que el
+dueño mira para saber qué llegó. Corregido acá subiendo a **v15.83**.
