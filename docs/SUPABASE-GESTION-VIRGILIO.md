@@ -5215,3 +5215,13 @@ Dueño: *"todos los datos que tengas que corregir, dale"*. Barrido sobre `v_impo
   distintos, no familia de 056E).
 - Rollback: vista `v_importados_ordenes` de §3.bm.15 (CTE `pe` con `max` y sin `fam`); `vista_stock_procesada` y
   `Stock_Saldos` desde `GV_bkp_relacl_vista_stock_procesada_20260911.def` (drop cascade + create + índice + grants).
+
+### §3.bm.17 — Override de proyección en 437E·CH y 438E·CH (v15.25, 2026-09-11)
+
+- La proyección "live" de Chef para 437E/438E (79 y 78 caj/mes) sigue inflada por la factura del 20/03 al cliente Chef
+  1434 (453 y 366 cajas); sin ese mes Chef vende ~5–7 y ~20–30 caj/mes, y las entregas del depósito (Chef, jun–sep:
+  437E 3/1/10, 438E 23/18/23) lo confirman. Con eso el módulo pedía 18.656 y 17.368 u.
+- `Importados.est_madre_override`: **437E·CH (id 71) = 144 u/mes (6 caj)**, **438E·CH (id 63) = 528 u/mes (22 caj)**,
+  con la nota del motivo. Resultado: a pedir 1.056 y 4.008 u. Backup `GV_Importados_bkp_override_437_438CH_20260911`.
+- Es un parche hasta que LK re-marque Chef julio/agosto; cuando la proyección por empresa quede limpia, sacar el
+  override (`update "Importados" set est_madre_override = null where id in (71,63)`) y vuelve a "live".
