@@ -6555,3 +6555,28 @@ que en vez de quedar colgados de la regla automática **pasan al mapa**, con la 
 `delete from "GV_Importados_Insumo_Map" where insumo_cod in ('437E','439E')` + recrear la vista con
 la definición guardada en **`GV_bkp_def_gv_importados_stock_insumos_20260911`** (es la de
 `sql/gv_importados_stock_insumos_v1527.sql`, sin el join a `partes`). No toca objetos de Producción.
+
+## 3.cc Los 3 datos que faltaban de la cuenta corriente, cerrados por Thomas (v15.76) — 2026-09-11
+
+Las tres preguntas abiertas de §3.ca (tarea Planify 3186) las contestó el dueño el 11/09:
+
+1. **FOB de Frontier: u$s 14.400** — manda el PI, no el motor. 14.400 / 200.000 u = **0,072**, así que
+   `Importados.fob_uni` de **505C** (id 161) pasa de **0,07 → 0,072**. Con eso `fob_difiere` se apaga en
+   **todas** las filas de la cuenta corriente. Backup `GV_Importados_bkp_frontier_20260911`.
+   Ojo: el FOB unitario también entra en el u$s que calcula el generador para esa parte (+2,9%).
+2. **Frontier llega el 10/12/2026** — *"va a embarcar el 26 de octubre y va a llegar, a partir de ahí,
+   45 días después"*. El bache de `Frontier 505C` pasa de `fecha_reingreso` **04/11 → 10/12** (26/10 + 45)
+   + `gv_importados_resync`. Era la fecha que no cerraba: daba **9 días de viaje** y ahora da **45**, en
+   línea con el resto (Ownland 40, Fujian 43, Hugo 45, Zhixin 46, Becky 54).
+   Backup `GV_Importados_Baches_bkp_frontier_20260911`.
+3. **El 30% es un parámetro, no una regla** — *"el treinta por ciento es el parámetro general, pero se
+   pagó eso y me lo aceptaron los dos proveedores"*. O sea que Becky (7.359 = 23,3%) y Hugo
+   (14.041 = 36,3%) son **un solo giro cada uno**, no dos mal cargados. Se reescribió la nota de esos
+   dos seeds en `GV_Imp_Pagos`; no se partió nada.
+
+**Chequeo**: el `falta` de `gv_imp_cuenta_corriente` sigue dando el del Excel (10.080 · 22.388 · 7.173 ·
+11.670 · 1.814 · 2.647) y ya no queda ninguna fila con `fob_difiere`.
+
+**Rollback**: `update "Importados" i set fob_uni = b.fob_uni from "GV_Importados_bkp_frontier_20260911" b
+where b.id = i.id` y lo mismo para `fecha_reingreso` desde `GV_Importados_Baches_bkp_frontier_20260911`
+(+ `gv_importados_resync`).
