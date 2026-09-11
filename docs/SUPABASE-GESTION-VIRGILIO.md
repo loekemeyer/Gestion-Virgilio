@@ -5477,3 +5477,70 @@ pop-up RAG viejo (racks+a_guardar, sólo aviso): en `stockBajaPicking` el bloque
 395 (a_guardar 0 → q=0, no negativo). Todo el rastro de prueba borrado; 321 volvió a 50/0.
 
 **Rollback:** `docs/ROLLBACK-PRODUCCION.md` §1.x. SQL: `sql/gv_reconciliar_aguardar.sql`.
+
+---
+
+## §3.cd — El PKC dice DE DÓNDE salió cada caja (v15.41, 2026-09-11, pedido de Luis)
+
+**El problema.** El picking le dice al operario dónde ir: parte el artículo en **dos pasos**
+cuando hay excedente — uno de góndola con su sector y otro `art·EXC` con la ubicación del
+excedente (`index.html`, bloque `excSteps`) — y después **tiraba ese dato**. El evento era
+`TANDA|ART|esp|real`, sin depósito, y el backend **re-derivaba** el reparto al reconciliar,
+con los saldos vivos de ese momento:
+
+```
+from_exc = least(picked, excedente_disponible − lo_ya_tomado_por_otras_tandas)
+```
+
+O sea, adivinaba a las 09:17 algo que el operario tenía en la mano a las 09:15.
+
+**Y encima se perdían cajas.** Los dos pasos comparten `client_id`
+(`pkc_<legajo>_<tanda>_<ART>_<día>`) y el POST va con `on_conflict=client_id` +
+`resolution=merge-duplicates`. Los pasos de excedente se encolan **al final**
+(`allItems = items.concat(excSteps)`), así que **el PKC del excedente pisaba al de góndola**
+y las cajas de góndola desaparecían del registro. Huella medida: de **815** pickings con
+excedente en 60 días, **802 (98,4 %)** figuraban como 100 % excedente y 0 de góndola.
+
+**Cómo quedó.** Un **único** evento por `(tanda, artículo)` con los **totales de los dos
+pasos** y un 5.º campo:
+
+```
+TANDA|ART|esp|real|excedente     ← "de las `real` cajas, tantas salieron del excedente"
+```
+
+Un solo evento **a propósito**: hay **12 objetos** en la base que leen PKC asumiendo una fila
+por `(tanda, artículo)` — `vista_faltante_real`, `vista_faltantes_sin_completar`,
+`notificar_faltante_telegram`, `reporte_agentes_faltante_articulo`, `anular_picking_virgilio`,
+`generar_reporte_agentes`, `gv_ppp_tanda_mover`, `gv_ppp_web_pickers_tipicos`,
+`ppp_web_armar_tandas`, `trg_pkc_reconciliar_rt` y las dos de abajo. Partirlo en dos filas los
+rompía a todos en silencio. Con una sola, ninguno se entera: sólo ven que `esp`/`real` ahora
+traen el total correcto en vez del pedazo del excedente.
+
+**Front** (`index.html`): `pkTotalesArt(rec)` suma los pasos del mismo código —salteando el
+`esp` del paso de excedente marcado **a mano** (`manualExc`), que repite el del de góndola—;
+`pkSendDetail` arma el texto con esos totales. `_pk.excOk` marca si la consulta de excedente
+**anduvo**: si falló (sin red), el 5.º campo **no se manda** y el backend vuelve a repartir por
+saldos — un fetch caído no se confunde con "no hay excedente".
+
+**Backend**: `reconciliar_pipeline_stock_etapa1()` (cron 68) y `reconciliar_stock_articulo_rt()`
+(trigger `trg_pkc_reconciliar_rt`). Las **dos**, si no el trigger escribe la adivinanza en cada
+PKC y el cron la corrige 10 min después (flip-flop). En la rama B, `want_exc` = lo declarado si
+el evento lo trae, si no `picked` (la adivinanza vieja). El **clamp** contra el excedente
+disponible y la **ventana por tanda** se mantienen → el excedente nunca queda negativo (fix
+v11.73 intacto). La rama A (histórico) no se toca: esos eventos son todos viejos.
+
+**Compatibilidad.** PKC de 4 campos → `tiene_dep = false` → idéntico a antes.
+
+**Interruptor:** `Stock_Config.pkc_deposito_activo = '0'` → vuelve a adivinar, sin tocar
+código. Sin la fila = prendido.
+
+**Prueba (2026-09-11).** (1) Con el código nuevo y sólo PKC viejos, la función no movió
+ninguna de las 23.311 filas `tipo='picking'` (los 30 renglones nuevos eran la tanda D67E,
+que se estaba pickeando en vivo). (2) Tanda falsa `ZZDEP1|207|10|10|3` (art 207, excedente
+27) → **excedente −3 / góndola −7 / separar_pedidos +10**; la lógica vieja daba **−10 / 0**.
+(3) Con el interruptor en `'0'` volvió a −10/0. (4) Rastro de prueba borrado; art 207 volvió
+a excedente 27 / góndola 133. (5) Suite completa: 119 bloques, 0 fallas, con el test nuevo
+`tests/pk-deposito-pkc.cjs`.
+
+**Rollback:** `docs/ROLLBACK-PRODUCCION.md` (entrada v15.41) y
+`sql/backups/reconciliar_pkc_pre_v1541_20260911.sql`. SQL nuevo: `sql/gv_pkc_deposito_v1541.sql`.

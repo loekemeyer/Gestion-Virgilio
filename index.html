@@ -7660,7 +7660,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v15.40";
+const APP_VERSION = "v15.41";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -9341,10 +9341,16 @@ async function showPickingList(tanda, legajo, opts) {
       }
     });
     // v4.26: adjuntar el excedente (cajas + ubicación) a cada artículo.
+    // v15.41: excOk = la consulta de excedente ANDUVO. Si falla (sin red), el PKC sale
+    // SIN el campo de depósito y el backend vuelve a repartir por saldos, como antes.
+    // Sin esto, un fetch caído se vería igual que "no hay excedente" y la góndola
+    // se comería todo el descuento.
+    let excOk = false;
     try {
       const excMap = await pkFetchExcedente(Object.keys(agg));
       items.forEach(function (it) { const e = excMap[String(it.art).toUpperCase()]; if (e) { it.exc = e.cajas; it.excUbic = e.ubics.join(" · "); } });
-    } catch (_e) {}
+      excOk = true;
+    } catch (_e) { excOk = false; }
     // Excedente: se agarra PRIMERO del excedente (al final) y, si no alcanza, el
     // RESTO de góndola. Ej: piden 15, hay 10 en excedente → góndola pide 5 (en su
     // orden normal) + 10 en el excedente (paso al final). Si el excedente cubre
@@ -9361,7 +9367,7 @@ async function showPickingList(tanda, legajo, opts) {
       }
     });
     const allItems = items.concat(excSteps);
-    _pk = { tanda: tNorm, legajo: String(legajo || (typeof legajoInput !== "undefined" && legajoInput.value) || "").trim(), items: allItems, idx: 0, results: {}, mode: "item",
+    _pk = { tanda: tNorm, legajo: String(legajo || (typeof legajoInput !== "undefined" && legajoInput.value) || "").trim(), items: allItems, idx: 0, results: {}, mode: "item", excOk: excOk,
             // Si el cliente le agregó algo a un pedido de esta tanda cuando ya
             // estaba en la mesa, el operario lo tiene que ver en CADA paso del
             // picking, no una sola vez al abrir.
@@ -10086,16 +10092,50 @@ function pkFinishPicking() {
   } catch (e) { console.warn("pkFinishPicking:", e); }
 }
 
+/* v15.41 — TOTALES de un artículo sumando SUS pasos: el de góndola y el de excedente
+   (art·EXC). Devuelve { esp, real, exc } donde `exc` son las cajas que salieron del
+   EXCEDENTE. Existe porque el picking parte un artículo en dos pasos cuando hay
+   excedente, y los dos comparten el mismo código: el evento PKC tiene que llevar el
+   total, no el último paso marcado. */
+function pkTotalesArt(rec) {
+  const R = String(rec || "").toUpperCase();
+  let esp = 0, real = 0, exc = 0;
+  for (const x of (_pk.items || [])) {
+    const xr = String((x.dual && x.pick) ? x.pick : x.art).toUpperCase();
+    if (xr !== R) continue;
+    // El paso de excedente marcado A MANO (pkMarkExcedente) repite el `esp` del de
+    // góndola — sumarlo duplicaría lo pedido. El automático sí parte el esp en dos.
+    if (!x.skip && !x.manualExc) esp += Number(x.esp) || 0;
+    const r = _pk.results ? _pk.results[x.key] : null;
+    if (r == null) continue;
+    real += Number(r) || 0;
+    if (x.isExc) exc += Number(r) || 0;
+  }
+  return { esp: esp, real: real, exc: exc };
+}
+
 /* Emite el evento PKC (detalle de picking de un artículo) por la cola offline.
-   Un evento por artículo confirmado; el SW lo reenvía si no hay red. */
+   Un evento por artículo confirmado; el SW lo reenvía si no hay red.
+
+   v15.41 — texto = TANDA|ART|esp|real|excedente. El 5º campo dice cuántas de las
+   `real` cajas salieron del EXCEDENTE (el resto salió de góndola). Antes el backend
+   lo ADIVINABA repartiendo por saldos vivos al reconciliar; ahora se lo decimos.
+   Va como UN SOLO evento por (tanda, artículo) —con los totales de los dos pasos—
+   a propósito: el client_id es el mismo para los dos y hay 12 objetos en la base que
+   leen PKC asumiendo una fila por (tanda, artículo). Si la consulta de excedente
+   falló (_pk.excOk = false) el 5º campo NO se manda y el backend vuelve a adivinar. */
 function pkSendDetail(art, esp, real) {
   if (!_pk) return;
   const nowMs = Date.now();
+  const tot = pkTotalesArt(art);
+  const espT  = tot.esp > 0 ? tot.esp : esp;   // red de seguridad: nunca mandar esp 0
+  const realT = tot.real;
+  const dep   = _pk.excOk ? ("|" + tot.exc) : "";
   const payload = {
     legajo: _pk.legajo,
     opcion: "PKC",
     descripcion: "Picking artículo",
-    texto: (_pk.tanda + "|" + art + "|" + esp + "|" + real).toUpperCase(),
+    texto: (_pk.tanda + "|" + art + "|" + espT + "|" + realT + dep).toUpperCase(),
     ts: nowMs,
     // client_id determinístico → reenviar/corregir el mismo artículo hace UPSERT
     // (merge-duplicates) en vez de duplicar. Por eso se puede ir y volver.

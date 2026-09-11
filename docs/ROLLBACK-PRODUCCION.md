@@ -493,3 +493,38 @@ Sólo lo lee Gestión. Rollback en `sql/gv_importados_stock_insumos_v1527.sql` /
 
 Tabla nueva `GV_Importados_Alias` (RLS, lectura anon/authenticated); alta 323ES en `Importados` (id 167) y
 `Importados_Volumen`; un bache movido de 323E a 323ES (backup `GV_Importados_Baches_bkp_323ES_20260911`). §3.bm.21.
+
+## PKC con depósito declarado — v15.41 (2026-09-11)
+
+**Objetos COMPARTIDOS tocados** (los dos con `CREATE OR REPLACE`, misma firma):
+`public.reconciliar_pipeline_stock_etapa1()` (la corre el cron **jobid 68**, cada 10 min)
+y `public.reconciliar_stock_articulo_rt(text,text)` (la dispara el trigger
+`trg_pkc_reconciliar_rt` en cada INSERT de PKC). Las dos, porque si sólo se cambia una el
+trigger escribe la adivinanza en cada evento y el cron la corrige 10 min después: flip-flop.
+
+**Qué cambió.** El evento PKC del picking ahora puede traer un 5.º campo
+(`TANDA|ART|esp|real|excedente` = cuántas de las `real` cajas salieron del **excedente**).
+Cuando viene, las dos funciones **usan ese número**; antes re-derivaban el reparto
+góndola/excedente por saldos vivos al reconciliar. Sólo cambió la rama **B (forward)**;
+la rama A (histórico, gated por `Stock_Config.etapa1_pkc_desde`) quedó intacta.
+
+**Impacto medido (2026-09-11).** Con los PKC de 4 campos que hay hoy, `tiene_dep = false`
+→ `want_exc = picked` → el cálculo es **idéntico al anterior**: se corrió la función con el
+código nuevo y las 23.311 filas `tipo='picking'` no se movieron (los 30 renglones nuevos
+eran la tanda D67E que se estaba pickeando en vivo). Prueba del camino nuevo con tanda
+falsa `ZZDEP1|207|10|10|3` (art 207: excedente 27): dio **excedente −3 / góndola −7 /
+separar_pedidos +10**; la lógica vieja daba **excedente −10 / góndola 0**. Con el
+interruptor apagado volvió a −10/0. Todo el rastro de prueba borrado y el art 207 volvió a
+su saldo original (excedente 27, góndola 133).
+
+**Interruptor (no hace falta rollback para volver atrás):**
+```sql
+insert into public."Stock_Config"(clave, valor) values ('pkc_deposito_activo','0')
+  on conflict (clave) do update set valor='0';   -- vuelve a repartir por saldos
+delete from public."Stock_Config" where clave='pkc_deposito_activo';   -- default = prendido
+```
+
+**Rollback real** (volver a las definiciones previas): correr entero
+`sql/backups/reconciliar_pkc_pre_v1541_20260911.sql`.
+Definición nueva: `sql/gv_pkc_deposito_v1541.sql`. Front: `pkTotalesArt` / `pkSendDetail` /
+`_pk.excOk` en `index.html`, test `tests/pk-deposito-pkc.cjs`.
