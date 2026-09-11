@@ -5297,3 +5297,17 @@ Dueño: *"todos los datos que tengas que corregir, dale"*. Barrido sobre `v_impo
 - Rollback: `delete from "GV_Importados_Alias" where canon = '323ES'; update "GV_Importados_Baches" set importado_id = 79
   where importado_id = 167; select gv_importados_resync(79), gv_importados_resync(167); delete from "Importados" where
   id = 167; delete from "Importados_Volumen" where cod = '323ES';` (y volver a cargar el mapa 323ES → 323E si se quiere).
+
+### §3.bm.22 — Reporte de faltantes de importados para contingencia; 727E → 106E (v15.30, 2026-09-11)
+
+- Dueño: *"727E se puede rellenar con 106E. Preparamos un reporte de todos los faltantes para ver si alguno lo puedo
+  fabricar acá hasta que lleguen los importados"*. Reporte publicado como artefacto
+  (https://claude.ai/code/artifact/95e62327-bc21-4e96-9206-8a1f434ac60e) y copia en
+  `docs/INFORME-FALTANTES-IMPORTADOS-20260911.html`. Criterio: artículo con pedido en curso cuyo stock (módulo +
+  insumos + terminados) no llega a la fecha de llegada, más los sin pedido en curso; faltante = consumo × meses hasta la
+  llegada − stock. 48 artículos, 25 ya en cero, ≈ 26.400 u faltantes hasta la llegada; los más pesados 026 (5.231 u),
+  583E (4.637), 590E (2.527), 525E (2.287), 582E (1.776), 566E (1.562).
+- **727E·CH → 106E** como sustituto de contingencia (106E tiene 14.280 u = 36 meses): anotado en `Importados.notas` del
+  727E (id 78 no: es 727E CH; ver `select id from "Importados" where cod_art='727E'`). Sin lógica nueva en el módulo: es
+  una decisión comercial puntual, no una familia.
+- Las marcas "fabricable acá" del reporte viven en el navegador del que lo mira (localStorage), no en la base.
