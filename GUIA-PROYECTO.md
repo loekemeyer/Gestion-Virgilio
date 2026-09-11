@@ -11519,3 +11519,16 @@ distinta, empresa distinta.
 >   `tandaReservar` de EP/AP pero para CCN/CRN/CCR. Verificable:
 >   `select opcion, texto, count(distinct legajo) from "Registros_Produccion_Virgilio" where
 >   opcion in ('CCN','CRN','CCR') group by 1,2 having count(distinct legajo)>1`.
+
+> Nota **v15.85** — **En Salida = SÓLO lo cargado al camión, y con fecha** (dueño, 11/09:
+> *"Todos los pedidos que están acá tienen que volver a A Programar o a Programación. Acá en En
+> Salida no puede haber ningún pedido sin fecha, ni pedidos que no se hayan cargado a un camión"*).
+> `gv_ppp_en_salida` exige ahora **CCN + `fecha_carga`**; queda sin efecto lo de v13.62 ("toda NP
+> facturada sin CRN entra") y lo de v15.55 (`armada_sin_carga`, salida presunta a las 36 h). Las
+> **22** NP que estaban sin carga —98480/98481 y 98530 vencidas, 98585..98590 sin fecha (CCR sin
+> CCN), y las de 11/09 y 14/09— **vuelven solas a Programación**, porque Programación esconde
+> exactamente lo que está en esa vista; las vencidas y las sin fecha caen en la lista de
+> **vencidos**, con `↩ A Programar` / `📅 Reprogramar` / `🚫 Cancelar`. En Salida: 41 → **19**, todas
+> con fecha de carga. Llave de apagado (vuelve la regla vieja, sin DDL):
+> `update "PPP_Web_Config" set valor = 0 where clave = 'en_salida_solo_cargadas'`.
+> Detalle §3.cn de `docs/SUPABASE-GESTION-VIRGILIO.md` · `sql/gv_ppp_en_salida_solo_cargadas_v1585.sql`.
