@@ -123,3 +123,27 @@ update public."GV_Lugar" set empresa='LK',
 insert into public."GV_Lugar_Item"(sector,cod,clase,notas)
 values ('L57','865ED','articulo','Luis 11/09: va en el mismo lugar que el 865E')
 on conflict (sector,cod,clase) do nothing;
+
+-- 759 (Bomb. Pico de Loro) es de CHEF: Ñ58 y Ñ59 pasan de LK a CH. Quedan
+-- coherentes con Ñ56 y Ñ57, que ya eran CH: el final del pasillo Ñ es Chef.
+update public."GV_Lugar" set empresa='CH',
+  notas=coalesce(notas||' · ','')||'Luis 11/09: el 759 es de Chef, el lugar va CH (venia del pasillo Ñ que era LOKE)',
+  updated_at=now() where sector in ('Ñ58','Ñ59');
+
+-- ── OC_Maximos y Equivalencias_Codigos (tablas de PRODUCCIÓN) ────────
+-- Backup previo en sql/backups/backup_oc_maximos_equiv_20260911.sql
+--
+-- 580 (Batidor Mini) tenía linea = '' (vacía) → LK.
+update public."OC_Maximos" set linea='LK' where cod='580';
+
+-- Las notas de 438EL/439EL decían lo contrario de lo que hace el mapeo.
+-- La regla (ya estaba en el CLAUDE.md y en index.html v12.37): un código
+-- terminado en L es un pedido de CHEF cuyo producto se levanta de la
+-- góndola de LOEKEMEYER. No es otro producto: dice de qué góndola sale.
+-- El mapeo 438EL -> 438E LK estaba BIEN; el texto de la nota estaba al revés.
+update public."Equivalencias_Codigos"
+set nota='438EL = pedido de CHEF que se pickea de la gondola de LOEKEMEYER (438E LK). La L no es otro producto: dice de que gondola se levanta. Nota corregida 11/09 por Luis; antes decia "= 438E CH", que era al reves.'
+where cod_pedido='438EL';
+update public."Equivalencias_Codigos"
+set nota='439EL = pedido de CHEF que se pickea de la gondola de LOEKEMEYER (439E LK). La L no es otro producto: dice de que gondola se levanta. Nota corregida 11/09 por Luis; antes decia "= 439E CH", que era al reves.'
+where cod_pedido='439EL';
