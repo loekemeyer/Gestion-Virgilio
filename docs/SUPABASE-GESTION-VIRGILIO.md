@@ -5887,3 +5887,32 @@ update public."PPP_Web_Programacion" set fecha_recep = null
                                          from public."GV_Backup_FechaRecep_20260911"
                                         where fecha_recep_old is null);
 ```
+## 3.bt `gv_np_items` — las líneas de una NP por su clave visible, ISIS y web juntas (v15.57) — 2026-09-11
+
+**Pedido del dueño** en el Resumen de la PPP: *"si toco en el nro de NP quiero ver qué contenía esa
+NP (cod y cajas)"*. El modal que ya existía para eso (`pppChequeoNp`, el del ✓ de Programación)
+leía `gv_ppp_base_pedidos`, que es el espejo de ISIS: para una NP web (`LK 0024`) devolvía vacío y
+el modal decía "No encontré artículos".
+
+**Qué se creó.** Vista **`public.gv_np_items`** (`security_invoker = true`, `GRANT SELECT` a
+anon/authenticated) → `(np text, articulo text, cajas numeric, origen 'isis'|'web')`:
+- ISIS: `gv_ppp_base_pedidos` con `pedido` sin el `.0` del espejo (`98532`, no `98532.0`).
+- Web: `PPP_Web_Base` por `np_label` (`LK 0024`), que ya está desnormalizado en esa tabla.
+
+No se tocó `gv_ppp_base_pedidos` (lo siguen leyendo el stock, la carga masiva del semáforo ✓ y las
+OCs) ni `PPP_Web_Base`. Objeto nuevo con prefijo `gv_`.
+
+**Comprobación:**
+```sql
+select np, origen, count(*) lineas, sum(cajas) cajas from public.gv_np_items
+ where np in ('LK 0024','98532') group by 1,2;
+-- LK 0024 · web · 1 línea · 5 cajas      98532 · isis · 18 líneas · 23 cajas
+```
+
+**Front (v15.57):** `pppChequeoNp` pide `gv_np_items?np=in.("LK 0024","98532")&select=pedido:np,articulo,cajas`
+(comillas porque las NP web llevan espacio; el alias `pedido:np` mantiene el campo que usa
+`pppChkCompute`). La celda NP del detalle del Resumen (`pppResTgl`) llama a ese modal.
+Test `tests/ppp-res-np-fecha.cjs`; `tests/ppp-chk-gondola.cjs` stubbea también esta vista.
+
+**Rollback:** `drop view public.gv_np_items;` — el front no rompe, vuelve a "No encontré artículos".
+`sql/gv_np_items_v1557.sql`.

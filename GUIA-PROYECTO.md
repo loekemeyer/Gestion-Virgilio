@@ -12,7 +12,7 @@
 > única**; no se replica. Ante la duda entre parche rápido y fix de raíz → **fix
 > de raíz**.
 >
-> Última actualización: 2026-09-11 (viernes) · Versión app al documentar: **v15.56**
+> Última actualización: 2026-09-11 (viernes) · Versión app al documentar: **v15.57**
 >
 > Nota **v15.40 (2026-09-11) — HANDOFF de planimetría / Acacia: `docs/HANDOFF-PLANIMETRIA-Y-ACACIA.md`.**
 > Thomas sigue este tema en otra sesión. Ahí está todo junto: los **13 artículos activos del catálogo LK
@@ -11201,6 +11201,27 @@ distinta, empresa distinta.
 >   sus puntitos: eso cambiaría lo que se ve, no el ancho, y no se pidió.
 > - **Regresión nueva `tests/ppp-resumen-angosto.cjs`** (falla con el CSS de antes): compara el ancho
 >   de cada columna contra el de su contenido más ancho y exige ≤ 40 px de sobra.
+> Nota **2026-09-11 (v15.57) — Resumen de la PPP: fecha dd/mm pegada al día · tocar la NP abre su contenido · la alerta de tandas inconsistentes dice el día y qué mezcla.**
+> Tres pedidos del dueño en la misma tarde, todos sobre la solapa **Resumen**:
+> 1. *"elimina ese espacio entre fecha dd/mm/yy, también que sea solo dd/mm"* → en la tabla Fecha × zonas
+>    (`ppp-restbl`) la fecha se muestra **`dd/mm`** (el dato sigue siendo dd/mm/aaaa; se pela sólo al pintar)
+>    y la tabla dejó de estirarse al 100% (`width:auto`, el borde abraza la tabla) con Fecha y Día pegados.
+> 2. *"si toco en el nro de NP quiero ver qué contenía esa NP (cod y cjas)"* → en el detalle de una celda
+>    (`pppResTgl`) la celda **NP es clickeable** y abre **el mismo modal del ✓** de Programación
+>    (`pppChequeoNp`: artículo · cajas pedidas · góndola). Una sola puerta, no un popup nuevo. Para que
+>    funcione con las **NP web** (`LK 0024`) el modal pasó a leer la vista nueva **`gv_np_items`** (ISIS sin
+>    `.0` + `PPP_Web_Base.np_label`, `sql/gv_np_items_v1557.sql`, §3.bt de `docs/SUPABASE-GESTION-VIRGILIO.md`);
+>    antes `gv_ppp_base_pedidos` no las tenía y decía "No encontré artículos". Las NP viajan entrecomilladas
+>    en el `in()` (llevan espacio). El semáforo del ✓ (carga masiva) sigue leyendo `gv_ppp_base_pedidos`.
+> 3. *"acá ese dato no me sirve… qué día se programó, qué está mezclado con qué"* (sobre "D68G (rutas
+>    mezcladas)") → `tandasMal` guarda `porRuta` y `porFecha` (los pedidos, no sólo cuántos) y
+>    `pppErroresHtml` escribe **tanda · dd/mm · ruta: NP cliente [barrio], … / ruta: …** y, si son varias
+>    fechas, quién cae en cada una. Ciudadela sigue exenta y no se lista. Caso real: **D68G · 15/09 ·
+>    Sur/Centro/Oeste: 98694 Veronesi [La Boca] / Norte: LK 0018 Bazar Mónica [Padua], LK 0028 Laza
+>    [Ituzaingó]** — un camión de ISIS (D68) al que el reúso por día (v13.60) le colgó pedidos web de la
+>    otra punta.
+> - Tests: `tests/ppp-res-np-fecha.cjs` (1 y 2) y `tests/ppp-errores-detalle.cjs` (3); `ppp-chk-gondola`
+>   stubbea también `gv_np_items`.
 
 > Nota **2026-09-11 (v15.52) — Popup de Proyección: cajas ENTREGADAS por el proveedor, entre el mes y la barra.**
 > Pedido del dueño mirando el 321 (Rallador cilíndrico, Carriero): *"a la derecha del mes, poné las

@@ -368,3 +368,9 @@ PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node te
 
 echo "== proy-entregadas (v15.52: popup Proyección — cajas ENTREGADAS por el proveedor entre el mes y la barra; s/d si ese mes no había registro) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/proy-entregadas.cjs
+
+echo "== ppp-res-np-fecha (v15.57: Resumen PPP — fecha dd/mm pegada al día; tocar la NP abre su contenido, también NP web via gv_np_items) =="
+PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/ppp-res-np-fecha.cjs
+
+echo "== ppp-errores-detalle (v15.57: alerta Tandas inconsistentes dice el día y qué ruta/fecha mezcla, NP por NP) =="
+PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/ppp-errores-detalle.cjs

@@ -2585,6 +2585,7 @@ button.pk-anular small{ display:block; font-size:12px; font-weight:700; opacity:
 .ppp-errpanel{ background:#fff7ed; border:1.5px solid #fdba74; border-radius:10px; padding:10px 12px; margin:8px 0 6px; }
 .ppp-errpanel-h{ font-weight:800; color:#9a3412; margin-bottom:6px; }
 .ppp-ei{ font-size:13px; line-height:1.5; padding:3px 0; border-top:1px dashed #fed7aa; word-break:break-word; }
+.ppp-ei-det{ margin-top:2px; } .ppp-ei-det>div{ padding:1px 0 1px 12px; } .ppp-ei-det u{ text-decoration:none; font-weight:700; color:#9a3412; }   /* v15.57 */
 .ppp-ei.bad{ color:#b42318; } .ppp-ei.warn{ color:#92400e; }
 .ppp-eb{ display:inline-block; font-size:11px; font-weight:800; padding:1px 6px; border-radius:6px; margin-left:4px; vertical-align:middle; }
 .ppp-eb.bad{ background:#fee2e2; color:#b42318; border:1px solid #fecaca; }
@@ -2899,8 +2900,9 @@ tr.ppp-err-zona > td{ background:#fffbeb !important; }
 .ppp-restbl{ width:auto; table-layout:auto; border-collapse:collapse; font-size:12px; }
 .ppp-restbl th{ background:#0f172a; color:#fff; padding:4px 6px; text-align:center; font-size:11px; font-weight:700; white-space:nowrap; line-height:1.1; }
 .ppp-restbl td{ padding:3px 6px; border-bottom:1px solid #eef2f7; text-align:center; white-space:nowrap; }
-.ppp-restbl td.f{ font-weight:700; color:#0f172a; text-align:left; }
-.ppp-restbl td.d{ color:#64748b; }
+/* v15.57 (dueño: "elimina ese espacio entre fecha y día"): Fecha y Día pegados. */
+.ppp-restbl td.f{ font-weight:700; color:#0f172a; text-align:left; padding-right:3px; }
+.ppp-restbl td.d{ color:#64748b; text-align:left; padding-left:3px; }
 /* v6.57/v6.58: celdas del Resumen clickeables → pop-up con de qué NPs se compone el número */
 .ppp-restbl td.zc{ cursor:pointer; }
 .ppp-restbl td.zc:hover{ outline:2px solid #94a3b8; outline-offset:-2px; }
@@ -2918,6 +2920,8 @@ tr.ppp-err-zona > td{ background:#fffbeb !important; }
 .pppres-tbl td{ padding:7px 12px; border-bottom:1px solid #eef2f7; }
 .pppres-tbl td.num, .pppres-tbl th.num{ text-align:right; font-variant-numeric:tabular-nums; }
 .pppres-tbl td.np{ font-family:Consolas,Menlo,monospace; font-weight:800; color:#0f766e; white-space:nowrap; }
+.pppres-tbl td.np.npc{ cursor:pointer; text-decoration:underline dotted; text-underline-offset:3px; }
+.pppres-tbl td.np.npc:hover{ background:#ecfeff; }
 .pppres-tbl tfoot td{ font-weight:800; background:#f8fafc; }
 /* Chequeo de góndola (v7.16): modal del botón 📦 de cada pedido / tanda. Reusa
    .pppres-ov/.pppres-card; la tabla es propia porque tiene que entrar en el celu. */
@@ -7687,7 +7691,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v15.56";
+const APP_VERSION = "v15.57";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -30716,8 +30720,11 @@ async function pppChequeoNp(npsCsv, titulo, tanda) {
   ov.classList.add("show");
   try {
     const H = { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY };
-    const url = SUPABASE_PPP_BASE_ENDPOINT + "?pedido=in.(" + nps.map(encodeURIComponent).join(",") +
-      ")&select=pedido,articulo,cajas&limit=20000";
+    // v15.57 — gv_np_items en vez de gv_ppp_base_pedidos: resuelve TAMBIÉN las NP web ("LK 0024",
+    // que viven en PPP_Web_Base y no en la base de ISIS). Las NP van entre comillas porque las
+    // web llevan espacio; `pedido:np` deja el nombre de campo que ya usa pppChkCompute.
+    const url = SUPABASE_URL + "/rest/v1/gv_np_items?np=in.(" + nps.map(function (n) { return encodeURIComponent('"' + String(n).replace(/"/g, "") + '"'); }).join(",") +
+      ")&select=pedido:np,articulo,cajas&limit=20000";
     const [lineas, saldos, pend] = await Promise.all([
       fetch(url, { headers: H, cache: "no-store" }).then(function (r) { return r.ok ? r.json() : []; }).catch(function () { return []; }),
       _pppChkFetchSaldos(),
@@ -31000,7 +31007,11 @@ function pppResTgl(dk, zkeyEnc) {
   merged.forEach(function (r) { r.nps.sort(function (a, b) { return (parseInt(a, 10) || 0) - (parseInt(b, 10) || 0); }); });
   let filas = "";
   merged.forEach(function (r) {
-    filas += '<tr><td class="np">' + escapeHtml(_pppNpsCompact(r.nps)) + '</td><td>' + escapeHtml(r.tandas.join("/") || "—") + '</td><td>' + escapeHtml(r.rs || "—") + '</td><td style="color:#64748b">' + escapeHtml(r.locs.join(" / ") || "—") + '</td><td class="num"><b>' + f2(r.m3) + '</b></td></tr>';
+    // v15.57 (dueño: "si toco en el nro de NP quiero ver qué contenía esa NP, cod y cajas") →
+    // la celda abre el mismo modal del ✓ de Programación (una sola puerta): artículo · cajas
+    // pedidas · góndola. Si la fila junta varias NP del cliente, las abre todas.
+    const npCsv = r.nps.map(function (x) { return String(x).replace(/"/g, ""); }).filter(Boolean).join(",");
+    filas += '<tr><td class="np npc" onclick="pppChequeoNp(\'' + _pppArg(npCsv) + '\',\'' + _pppArg(r.rs || "") + '\',\'' + _pppArg(r.tandas[0] || "") + '\')" title="Ver qué contiene (código y cajas)">' + escapeHtml(_pppNpsCompact(r.nps)) + '</td><td>' + escapeHtml(r.tandas.join("/") || "—") + '</td><td>' + escapeHtml(r.rs || "—") + '</td><td style="color:#64748b">' + escapeHtml(r.locs.join(" / ") || "—") + '</td><td class="num"><b>' + f2(r.m3) + '</b></td></tr>';
   });
   if (!filas) filas = '<tr><td colspan="5" style="text-align:center;color:#94a3b8">— sin NPs —</td></tr>';
   ov.innerHTML = '<div class="pppres-card">' +
@@ -31075,7 +31086,8 @@ function pppResumenHtml(prog) {
     Zc.forEach(function (z) { T[z[0]] += Z[z[0]]; }); Ttot += total; Tcam += nCam; Tdem += dem; TdemN += dn;
     // v15.54 (dueño): el TOTAL del día va pegado al Día y ANTES del desglose por zona —
     // primero el número que se mira, después de qué se compone.
-    rows += '<tr><td class="f">' + escapeHtml(d.fecha) + '</td><td class="d">' + dia + '</td>' +
+    // v15.57 (dueño): en esta tabla la fecha va "dd/mm", sin el año, pegada al día.
+    rows += '<tr><td class="f">' + escapeHtml(String(d.fecha).replace(/\/\d{4}$/, "")) + '</td><td class="d">' + dia + '</td>' +
       '<td class="num tot zc" onclick="pppResTgl(\'' + dk + '\',\'__tot__\')" title="Ver todas las NPs del día">' + f2(total) + '</td>' +
       Zc.map(function (z) {
         const m = Z[z[0]];
@@ -31593,9 +31605,11 @@ function _pppComputeErrors(peds, entSet) {
     const ps = byT[t], rutas = {}, fechas = {};
     // Ciudadela (GBA Oeste) queda pegada a la fábrica (Villarreal) camino a Zona 1 por la
     // autopista → NO cuenta como ruta aparte (no marca "tanda mezclada"). Pedido del dueño.
-    for (const p of ps) { if (!pppEsSuper(p) && !_pppEsCiudadela(p.localidad)) { const r = _pppRuta([p]); if (r) rutas[r] = 1; } const fe = _pppS(p.fecha_entrega); if (fe) fechas[fe] = 1; }
+    // v15.57 (dueño: "necesito más datos para que me sea útil: qué día se programó, qué está
+    // mezclado con qué") → se guarda QUIÉN cae en cada ruta y en cada fecha, no sólo cuántas.
+    for (const p of ps) { if (!pppEsSuper(p) && !_pppEsCiudadela(p.localidad)) { const r = _pppRuta([p]); if (r) (rutas[r] = rutas[r] || []).push(p); } const fe = _pppS(p.fecha_entrega); if (fe) (fechas[fe] = fechas[fe] || []).push(p); }
     const nR = Object.keys(rutas).length, nF = Object.keys(fechas).length;
-    if (nR > 1 || nF > 1) { tandasMal.push({ tanda: t, rutas: nR, fechas: nF }); for (const p of ps) if (p._err.indexOf("tandamal") < 0) p._err.push("tandamal"); }
+    if (nR > 1 || nF > 1) { tandasMal.push({ tanda: t, rutas: nR, fechas: nF, porRuta: rutas, porFecha: fechas }); for (const p of ps) if (p._err.indexOf("tandamal") < 0) p._err.push("tandamal"); }
   }
   return { sacar: sacar, sinZona: sinZona, zonaDif: zonaDif, tandasMal: tandasMal };
 }
@@ -31608,7 +31622,20 @@ function pppErroresHtml(e) {
   if (e.sacar.length)     h += '<div class="ppp-ei bad">🚮 <b>Ya entregados — SACAR (' + e.sacar.length + '):</b> ' + e.sacar.map(function (p) { return np(p) + cli(p); }).join(" · ") + '</div>';
   if (e.sinZona.length)   h += '<div class="ppp-ei warn">⚠ <b>Sin zona (' + e.sinZona.length + '):</b> ' + e.sinZona.map(function (p) { return np(p) + " — " + escapeHtml(pppLocDisp(p.localidad) || "?"); }).join(" · ") + '</div>';
   if (e.zonaDif.length)   h += '<div class="ppp-ei warn">⚠ <b>Zona no coincide (' + e.zonaDif.length + '):</b> ' + e.zonaDif.map(function (p) { return np(p) + " [" + escapeHtml(pppLocDisp(p.localidad) || "?") + ": Excel=" + escapeHtml(p.zona || "—") + " / barrio=" + escapeHtml(pppZonaDeBarrio(p.localidad) || "—") + "]"; }).join(" · ") + '</div>';
-  if (e.tandasMal.length) h += '<div class="ppp-ei warn">⚠ <b>Tandas inconsistentes (' + e.tandasMal.length + '):</b> ' + e.tandasMal.map(function (t) { return escapeHtml(t.tanda) + (t.rutas > 1 ? " (rutas mezcladas)" : "") + (t.fechas > 1 ? " (varias fechas)" : ""); }).join(" · ") + '</div>';
+  if (e.tandasMal.length) {
+    // v15.57 — cada tanda dice el día programado y QUÉ va con qué: por ruta (NP · cliente · barrio)
+    // y, si son varias fechas, quién cae en cada una. Antes decía sólo "D68G (rutas mezcladas)".
+    const RUTA_LBL = { so: "Sur/Centro/Oeste", n: "Norte", ret: "Retira" };
+    const ddmm = function (f) { return escapeHtml(String(f || "").replace(/\/\d{4}$/, "")); };
+    const npb = function (p) { return np(p) + cli(p) + ' [' + escapeHtml(pppLocDisp(p.localidad) || "?") + ']'; };
+    h += '<div class="ppp-ei warn">⚠ <b>Tandas inconsistentes (' + e.tandasMal.length + '):</b><div class="ppp-ei-det">' + e.tandasMal.map(function (t) {
+      const fes = Object.keys(t.porFecha || {});
+      let s = '<b>' + escapeHtml(t.tanda) + '</b>' + (fes.length === 1 ? ' · ' + ddmm(fes[0]) : '');
+      if (t.rutas > 1) s += ' · rutas mezcladas → ' + Object.keys(t.porRuta || {}).map(function (k) { return '<u>' + (RUTA_LBL[k] || k) + '</u>: ' + t.porRuta[k].map(npb).join(", "); }).join(' &nbsp;/&nbsp; ');
+      if (t.fechas > 1) s += ' · varias fechas → ' + fes.map(function (f) { return '<u>' + ddmm(f) + '</u>: ' + t.porFecha[f].map(function (p) { return np(p) + cli(p); }).join(", "); }).join(' &nbsp;/&nbsp; ');
+      return '<div>' + s + '</div>';
+    }).join("") + '</div></div>';
+  }
   h += '</div>';
   return h;
 }
