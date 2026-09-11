@@ -1,0 +1,131 @@
+-- ════════════════════════════════════════════════════════════════════
+-- LA EMPRESA VIAJA DESDE LA RECEPCIÓN HASTA LA GÓNDOLA  (2026-09-11)
+-- Pedido de Luis: "cuando el operario recibe y marca si es LK o CH, esa info
+-- debería seguir a todos los códigos que ingresan".
+--
+-- ⚠ TODAVÍA NO APLICADO. Se deja escrito acá para aplicarlo junto con los
+-- cambios del front, cuando se conecte todo de una vez.
+--
+-- ── El problema ──────────────────────────────────────────────────────
+-- El operario elige la línea (LK/CH) en la recepción y el front la manda en
+-- `empresa` (recepcion.js:1898). Pero el trigger trg_normalizar_empresa_stock
+-- la PISA: si el código no está en `codigos_duales` (4 filas), hace
+-- `NEW.empresa := 'Mixto'` sin mirar lo que vino.
+-- Medido el 11/09: de 651 recepciones, 645 quedaron en Mixto, 6 en LK y 0 en
+-- CH. De las 2.572 cajas que hoy esperan en A Guardar, el sistema no sabe de
+-- qué empresa es ninguna.
+--
+-- ── Los tres eslabones (los tres o ninguno) ──────────────────────────
+--  1. RECEPCIÓN  → el trigger deja de pisar la empresa explícita (este archivo)
+--  2. MG LEER    → stockFetchSaldos agrupa por código y funde los saldos de
+--                  las dos empresas en un renglón (index.html)
+--  3. MG ESCRIBIR→ mgConfirmar() no manda `empresa` (index.html)
+-- Tocar sólo (1) deja el artículo LK en A Guardar y Mixto en góndola: el saldo
+-- del mismo código queda partido por depósito y no concilia.
+--
+-- ⚠ Movimientos_Stock es TABLA COMPARTIDA. Al aplicar esto, anotarlo en
+--   docs/ROLLBACK-PRODUCCION.md con el impacto medido.
+-- ════════════════════════════════════════════════════════════════════
+
+-- ── 1) Trigger: respetar la empresa que manda el front ───────────────
+-- ÚNICO cambio respecto de la versión vigente: donde antes decía
+--   IF NOT COALESCE(v_dual,false) THEN NEW.empresa := 'Mixto';
+-- ahora sólo cae a 'Mixto' si NO vino una empresa explícita. Todo el resto
+-- (pelado de sufijos, la L de Chef, derivar del NP, el drain de facturado)
+-- queda igual.
+create or replace function public.trg_normalizar_empresa_stock()
+returns trigger language plpgsql as $fn$
+DECLARE v_base text; v_dual boolean; v_np text; v_emp2 text; v_explicita boolean;
+BEGIN
+  IF NEW.deposito = 'insumos' THEN
+    NEW.cod_art := regexp_replace(NEW.cod_art,'\s+(LK|CH|LOKE)$','');
+    RETURN NEW;
+  END IF;
+
+  -- ¿el que inserta mandó una empresa REAL? ('Mixto' es el default de la
+  -- columna, así que no cuenta como elección del operario)
+  v_explicita := NEW.empresa IS NOT NULL AND NEW.empresa IN ('LK','CH');
+
+  IF NEW.cod_art ~ '\s+(LK|LOKE)$' THEN NEW.empresa:='LK'; NEW.cod_art:=regexp_replace(NEW.cod_art,'\s+(LK|LOKE)$','');
+  ELSIF NEW.cod_art ~ '\s+CH$' THEN NEW.empresa:='CH'; NEW.cod_art:=regexp_replace(NEW.cod_art,'\s+CH$',''); END IF;
+  IF NEW.cod_art ~ '[0-9E]L$' THEN
+    -- código terminado en L: pedido de CHEF que se pickea de la góndola de
+    -- LOEKEMEYER. No es otro producto: dice de qué góndola se levanta.
+    NEW.empresa := 'LK';
+    NEW.cod_art := regexp_replace(NEW.cod_art,'([0-9E])L$','\1');
+    v_explicita := true;
+  END IF;
+
+  v_base := regexp_replace(upper(btrim(NEW.cod_art)),'^0+(?=.)','');
+  SELECT true INTO v_dual FROM public.codigos_duales WHERE regexp_replace(upper(btrim(cod)),'^0+(?=.)','')=v_base LIMIT 1;
+
+  IF NOT COALESCE(v_dual,false) THEN
+    -- ⬇ EL CAMBIO: antes esto era `NEW.empresa := 'Mixto'` sin condición.
+    IF NOT v_explicita THEN NEW.empresa := 'Mixto'; END IF;
+  ELSE
+    IF NEW.empresa IS NULL OR NEW.empresa = 'Mixto' THEN
+      v_np := nullif(regexp_replace(split_part(coalesce(NEW.ref,''),'|',2),'\D','','g'),'');
+      IF v_np IS NOT NULL THEN NEW.empresa := public.empresa_de_np(v_np); END IF;
+      IF (NEW.empresa IS NULL OR NEW.empresa = '' OR NEW.empresa = 'Mixto')
+         AND NEW.deposito = 'a_facturar' AND NEW.tipo = 'facturado' THEN
+        SELECT CASE WHEN count(DISTINCT m.empresa)=1 THEN max(m.empresa) END
+          INTO v_emp2
+          FROM public."Movimientos_Stock" m
+         WHERE m.deposito='a_facturar' AND m.tipo='separado'
+           AND regexp_replace(upper(btrim(m.cod_art)),'^0+(?=.)','') = v_base
+           AND upper(btrim(split_part(m.ref,'|',1))) = upper(btrim(split_part(coalesce(NEW.ref,''),'|',1)))
+           AND m.empresa IN ('LK','CH');
+        IF v_emp2 IS NOT NULL THEN NEW.empresa := v_emp2; END IF;
+      END IF;
+      IF NEW.empresa IS NULL OR NEW.empresa = '' THEN NEW.empresa := 'Mixto'; END IF;
+    END IF;
+  END IF;
+  RETURN NEW;
+END;
+$fn$;
+
+-- ── 2) Vista de saldos ABIERTA POR EMPRESA ───────────────────────────
+-- `vista_saldos_stock` devuelve una fila por CÓDIGO (487 filas / 487 códigos)
+-- y separa los duales inventando códigos sufijados ("437E LK"). Esta vista
+-- nueva usa el código PELADO + la empresa en su propia columna, que es el
+-- modelo al que vamos. Objeto nuevo: no toca la vieja ni a sus lectores.
+create or replace view public.gv_saldos_stock_emp
+with (security_invoker = true) as
+with cfg as (select (select valor from public."Stock_Config" where clave='cutoff_ts' limit 1) cutoff)
+select regexp_replace(upper(btrim(m.cod_art)),'^0+(?=.)','') cod,
+       coalesce(nullif(m.empresa,''),'Mixto') empresa,
+       max(m.descripcion) descripcion,
+       sum(m.delta) filter (where m.deposito='terminado')       terminado,
+       sum(m.delta) filter (where m.deposito='a_guardar')       a_guardar,
+       sum(m.delta) filter (where m.deposito='excedente')       excedente,
+       sum(m.delta) filter (where m.deposito='separar_pedidos') separar_pedidos,
+       sum(m.delta) filter (where m.deposito='a_facturar')      a_facturar,
+       sum(m.delta) filter (where m.deposito='racks')           racks,
+       sum(m.delta) filter (where m.deposito='racks_ch')        racks_ch,
+       sum(m.delta) filter (where m.deposito='para_envasar')    para_envasar,
+       sum(m.delta) filter (where m.deposito='insumos')         insumos
+from public."Movimientos_Stock" m, cfg
+where cfg.cutoff is null or m.ts >= (replace(cfg.cutoff,' ','T'))::timestamptz
+group by 1,2;
+
+comment on view public.gv_saldos_stock_emp is
+  'Saldos por (código PELADO, empresa). Reemplaza el artificio de vista_saldos_stock, que separa los duales inventando códigos sufijados ("437E LK"). Respeta el cutoff de Stock_Config. v1 2026-09-11, todavía sin lectores.';
+
+-- ── 3) Backfill de lo que ya está en A Guardar ───────────────────────
+-- Las 2.572 cajas que hoy esperan se pueden reasignar cruzando el remito
+-- (Movimientos_Stock.ref) contra Control_Modo_OP, que guarda remito + linea.
+-- MEDIDO el 11/09: resuelven 210 de 216 movimientos = 22.381 de 24.103 cajas
+-- (93%). Los 6 que no resuelven quedan en Mixto.
+--
+-- ⚠ NO EJECUTAR sin decisión explícita: reescribe empresa en filas históricas
+--   de una tabla compartida. Backup obligatorio antes.
+--
+-- update public."Movimientos_Stock" m
+-- set empresa = c.linea
+-- from public."Control_Modo_OP" c
+-- where btrim(c.remito) = btrim(m.ref)
+--   and m.deposito = 'a_guardar' and m.tipo = 'recepcion'
+--   and m.empresa = 'Mixto' and c.linea in ('LK','CH')
+--   and exists (select 1 from public.codigos_duales d
+--               where regexp_replace(upper(btrim(d.cod)),'^0+(?=.)','')
+--                   = regexp_replace(upper(btrim(m.cod_art)),'^0+(?=.)',''));
