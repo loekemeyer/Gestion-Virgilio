@@ -500,3 +500,9 @@ Tabla nueva `GV_Importados_Alias` (RLS, lectura anon/authenticated); alta 323ES 
 final (`sec_pedido_total`, `sec_np_total`, `sec_orden`, `sec_acum_antes`, `sec_disp`, `sec_cubre`); las 14
 existentes no cambian de nombre, tipo ni orden. Producción la lee con las 14 viejas → sin impacto. Rollback:
 bloque comentado al final de `sql/vista_correcciones_pedido_rich_v1566_reparto_sec.sql`. §3.cj.
+
+## Corregir códigos: la cola pone primero las NP sin pickear — v15.67 (2026-09-11)
+
+`create or replace view vista_correcciones_pedido_rich`: sólo cambia el orden de la ventana (estado → fecha → NP);
+mismas 20 columnas. Rollback: re-correr el `create or replace view` de
+`sql/vista_correcciones_pedido_rich_v1566_reparto_sec.sql`. §3.cj.1.

@@ -12,7 +12,7 @@
 > única**; no se replica. Ante la duda entre parche rápido y fix de raíz → **fix
 > de raíz**.
 >
-> Última actualización: 2026-09-11 (viernes) · Versión app al documentar: **v15.66**
+> Última actualización: 2026-09-11 (viernes) · Versión app al documentar: **v15.68**
 >
 > Nota **v15.40 (2026-09-11) — HANDOFF de planimetría / Acacia: `docs/HANDOFF-PLANIMETRIA-Y-ACACIA.md`.**
 > Thomas sigue este tema en otra sesión. Ahí está todo junto: los **13 artículos activos del catálogo LK
@@ -11159,6 +11159,10 @@ distinta, empresa distinta.
 >   `Sync_Estado`**: `cron.job_run_details` ya tiene la verdad. DDL en
 >   `sql/watchdog_syncs_externos.sql`.
 
+> Nota **2026-09-11 (v15.68) — Datos: los dos clientes que OpenStreetMap no conoce, cargados con el pin de Thomas.**
+> 4198 Benítez (Panamericana km 54,5, Pilar) y 4189 Valimar (Julio Godoy 4656, Villa Lynch) en `GV_Geo_Cliente` con
+> `manual = true` — el cron no los pisa. El camión Norte del 16/09 queda entero ubicado: 13 paradas, 153 km. §3.bw.
+
 > Nota **2026-09-11 (v15.64) — El geocodificador pela el " - <localidad>" que la página pega después de la altura.**
 > `gv_dir_geo_normalizar(dir, barrio)` saca la cola cuando es el barrio o un prefijo truncado de él; 25 direcciones web
 > se limpian solas, sin corregir de a una. §3.bw de `docs/SUPABASE-GESTION-VIRGILIO.md`.
@@ -11288,6 +11292,14 @@ distinta, empresa distinta.
 > - Si el código no tiene **ningún** mes con registro, la columna **no aparece** (no se deja una
 >   columna de "s/d"); el título vuelve a "Cajas facturadas".
 > - Test: `tests/proy-entregadas.cjs` (orden de celdas, s/d vs número, pie, sin columna).
+
+> Nota **2026-09-11 (v15.67) — Corregir códigos: la cola del secundario pone PRIMERO las NP sin pickear.**
+> Dueño: *"1 claro"* a la pregunta de la v15.66. Las NP ya pickeadas se llevaron el principal (PKC: 607E), así
+> que no pueden usar el 565 que sigue en góndola: la ventana de `vista_correcciones_pedido_rich` ordena ahora
+> por estado (sin pickear → en picking → pickeado → a facturar → facturado), después fecha de salida y NP.
+> Con 565 = 2: verdes 98664 y 98678 (sin pickear), rojas las otras 5, incluida 98662 que en la v15.66 era la
+> verde. Mismas columnas; el front sólo cambia la leyenda. `sql/vista_correcciones_pedido_rich_v1567_orden_sin_pickear.sql`
+> · §3.cj.1. Bump `APP_VERSION` + `SW_VERSION` `v15.67`.
 
 > Nota **2026-09-11 (v15.66) — Corregir códigos: el stock del SECUNDARIO se reparte entre TODAS las NP que lo piden.**
 > Dueño, con el panel abierto en 565 → 607E: *"acá tenés mal la lógica. Mirá el 565 primero: el stock y

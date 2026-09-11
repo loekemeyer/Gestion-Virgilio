@@ -6123,6 +6123,18 @@ reintenten con la dirección limpia.
 
 **Pendiente del mismo tema:** la página trunca la dirección a 30 caracteres — eso se arregla en `pagina-LK-copia`, no acá.
 
+**Los dos que OSM no tiene, cargados con el pin de Thomas (v15.68).** `GV_Geo_Cliente` con `manual = true` y
+`precision = 'manual'` (el cron no los pisa), en las dos claves: la cruda de la página y la limpia que ahora
+produce el normalizador.
+
+| Cód | Cliente | Dirección | Pin | Por qué no salía |
+|---|---|---|---|---|
+| 4198 | Benítez Andrea (LK 0068/0069) | Panamericana 54,5 - Pilar | -34,449868 / -58,916581 | dirección en km: no hay calle ni altura que geocodificar. El pin es el centro de Pilar (Thomas mandó "Pilar, B1630"), no el Paseo Champagnat; a 7,9 km del otro cliente de Pilar, no cambia el orden del camión |
+| 4189 | Distribuidora Valimar (LK 0070) | Julio Godoy 4656 - Villa Lynch | -34,588412 / -58,537311 | la calle no está en OpenStreetMap |
+
+Con eso **el camión Norte del 16/09 queda entero ubicado: 13 paradas, 153 km**. Del día siguen sin ubicar sólo
+Cencosud Tortuguitas (súper, camión aparte) y Matiz Burzaco (zona Sur).
+
 ## §3.cj — Corregir códigos: el stock del secundario se reparte entre las NP que lo piden (v15.66, 2026-09-11)
 
 Thomas, con el panel **Corregir códigos (secundario → principal)** abierto en 565 → 607E: *"acá tenés mal la
@@ -6184,9 +6196,34 @@ Bloque comentado al final de `sql/vista_correcciones_pedido_rich_v1566_reparto_s
 anterior, `pg_get_viewdef` del 11/09). El front v15.66 sigue andando con la vista vieja (cae al criterio por
 ítem). `docs/ROLLBACK-PRODUCCION.md` tiene la entrada.
 
+### §3.cj.1 — v15.67 (2026-09-11): la cola pone PRIMERO las NP sin pickear
+
+Thomas: *"1 claro"* a la pregunta de si el 565 lo tienen que tomar las NP que todavía no se pickearon.
+Las tres NP "pickeado" (D67A, D67E, D67F) ya se llevaron 607E: no pueden usar los 2 de 565 que siguen en
+góndola. La ventana de `vista_correcciones_pedido_rich` ordena ahora por **estado** (sin pickear → en
+picking → pickeado → a facturar → facturado) y recién después por fecha de salida y NP. Migración
+`gv_corr_sec_orden_v1567`, `sql/vista_correcciones_pedido_rich_v1567_orden_sin_pickear.sql`. Mismas 20
+columnas: el front sólo cambia la leyenda del panel.
+
+| NP | Estado | Sale | Cajas | v15.66 | v15.67 |
+|---|---|---|---:|---|---|
+| 98664 | sin pickear | 10/09 | 1 | rojo | **verde** (1.ª, le quedan 2) |
+| 98678 | sin pickear | 10/09 | 1 | rojo | **verde** (2.ª, le queda 1) |
+| 98688 | sin pickear | 10/09 | 1 | rojo | rojo (3.ª, le quedan 0) |
+| 98621 | sin pickear | 14/09 | 1 | rojo | rojo |
+| 98662 | pickeado | 10/09 | 2 | **verde** | rojo → cambiar NP a 607E (ya lleva 607E) |
+| 98671 | pickeado | 10/09 | 1 | rojo | rojo |
+| 98674 | pickeado | 10/09 | 1 | rojo | rojo |
+
+Rollback: volver a correr el `create or replace view` de `sql/vista_correcciones_pedido_rich_v1566_reparto_sec.sql`
+(orden fecha → estado → NP). Sin cambio de columnas: el front no se entera.
+
 ---
 
-## v15.67 — El pedido web se parte: lo disponible por un lado, lo que espera mercadería por el otro (2026-09-11)
+## v15.69 — El pedido web se parte: lo disponible por un lado, lo que espera mercadería por el otro (2026-09-11)
+
+> El número saltó a **v15.69**: otra sesión tomó v15.67 y v15.68 el mismo día. En los
+> comentarios del SQL aplicado y en `sql/gv_ppp_web_diferido.sql` puede quedar escrito "v15.67".
 
 **Regla del dueño (Thomas, 11/09):** *"si un cliente igualmente me pide un item que no voy a tener hasta
 xx/xx, quiero separar el pedido de ese cliente: 1) lo que va normal, con las condiciones normales de
