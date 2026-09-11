@@ -1,0 +1,72 @@
+-- 2026-09-11 — Se PRENDIÓ la RLS en las 48 tablas de BACKUP de public que la tenían apagada.
+-- Por qué: sin RLS y con los grants por defecto de Supabase, la anon key (que es pública: está
+-- embebida en index.html y el sitio se sirve por GitHub Pages) las podía LEER. Verificado con
+-- `set local role anon`: clientes_dto_bkp_20260908 devolvía 2.035 filas (descuentos por cliente),
+-- gv_bkp_precios_venta_20260908 337 precios y los GV_Importados_bkp_* el FOB por artículo.
+-- Ninguna de estas tablas la lee la app: son respaldos de los cambios del 07 al 11/09.
+-- Regla del repo (CLAUDE.md): "RLS prendida por defecto en cada tabla nueva".
+--
+-- Sin policies, RLS prendida = sólo postgres / service_role. Los restores se corren desde el
+-- SQL editor (rol postgres), así que siguen andando igual.
+--
+-- ROLLBACK (deja todo como estaba):
+--   (una línea por tabla; son las 48 que estaban sin RLS al 2026-09-11 12:40 ART)
+-- alter table public."GV_Backup_439E_LK_exc_20260910" disable row level security;
+-- alter table public."GV_Backup_439_20260910" disable row level security;
+-- alter table public."GV_Backup_E09A_20260909" disable row level security;
+-- alter table public."GV_Backup_Entregados_Meta_20260907" disable row level security;
+-- alter table public."GV_Backup_Func_20260907_tanda_abierta" disable row level security;
+-- alter table public."GV_Backup_Merge_943_948_20260909" disable row level security;
+-- alter table public."GV_Backup_OC_dup_20260909" disable row level security;
+-- alter table public."GV_Backup_Override_20260907_d60e" disable row level security;
+-- alter table public."GV_Backup_Override_20260907_d66b" disable row level security;
+-- alter table public."GV_Backup_Override_20260907_lujan" disable row level security;
+-- alter table public."GV_Backup_WebProg_20260907_osa" disable row level security;
+-- alter table public."GV_Backup_whatsapp_clientes_20260908" disable row level security;
+-- alter table public."GV_Importados_Baches_bkp_323ES_20260911" disable row level security;
+-- alter table public."GV_Importados_Baches_bkp_becky2_20260911" disable row level security;
+-- alter table public."GV_Importados_Baches_bkp_becky_20260911" disable row level security;
+-- alter table public."GV_Importados_Baches_bkp_copias_20260911" disable row level security;
+-- alter table public."GV_Importados_Baches_bkp_fechas_20260911" disable row level security;
+-- alter table public."GV_Importados_Baches_bkp_hugowong_20260911" disable row level security;
+-- alter table public."GV_Importados_Baches_bkp_ownland_20260911" disable row level security;
+-- alter table public."GV_Importados_Mov_Stock_bkp_20260911" disable row level security;
+-- alter table public."GV_Importados_Partes_Map_bkp_20260911" disable row level security;
+-- alter table public."GV_Importados_Volumen_bkp_437_438_20260911" disable row level security;
+-- alter table public."GV_Importados_Volumen_bkp_439_20260911" disable row level security;
+-- alter table public."GV_Importados_Volumen_bkp_hugowong_20260911" disable row level security;
+-- alter table public."GV_Importados_Volumen_bkp_ownland_20260911" disable row level security;
+-- alter table public."GV_Importados_Volumen_bkp_pi_fujian_20260911" disable row level security;
+-- alter table public."GV_Importados_Volumen_bkp_zhixin_20260911" disable row level security;
+-- alter table public."GV_Importados_bkp_437_438_20260911" disable row level security;
+-- alter table public."GV_Importados_bkp_439_20260911" disable row level security;
+-- alter table public."GV_Importados_bkp_809E_20260911" disable row level security;
+-- alter table public."GV_Importados_bkp_baja_580E_123E_20260911" disable row level security;
+-- alter table public."GV_Importados_bkp_becky2_20260911" disable row level security;
+-- alter table public."GV_Importados_bkp_becky_fob_20260911" disable row level security;
+-- alter table public."GV_Importados_bkp_copias_20260911" disable row level security;
+-- alter table public."GV_Importados_bkp_fob825_20260911" disable row level security;
+-- alter table public."GV_Importados_bkp_hugowong_20260911" disable row level security;
+-- alter table public."GV_Importados_bkp_override_437_438CH_20260911" disable row level security;
+-- alter table public."GV_Importados_bkp_ownland_20260911" disable row level security;
+-- alter table public."GV_Importados_bkp_uxc_20260911" disable row level security;
+-- alter table public."GV_Importados_bkp_zhixin_20260911" disable row level security;
+-- alter table public."GV_Importados_curso_bkp_20260911" disable row level security;
+-- alter table public."GV_bkp_def_v_importados_ordenes_20260911" disable row level security;
+-- alter table public."GV_bkp_relacl_vista_stock_procesada_20260911" disable row level security;
+-- alter table public.clientes_dto_bkp_20260908 disable row level security;
+-- alter table public.gv_bkp_precios_venta_20260908 disable row level security;
+-- alter table public.gv_bkp_precios_venta_20260908_pre_reconcile disable row level security;
+-- alter table public.gv_bkp_precios_venta_chef_20260908 disable row level security;
+-- alter table public.gv_bkp_precios_venta_chef_20260908_pre_reconcile disable row level security;
+--
+-- Lo aplicado (mismo efecto, sin listar a mano):
+--   do $$ declare r record; begin
+--     for r in select c.relname from pg_class c join pg_namespace nsp on nsp.oid=c.relnamespace
+--              where nsp.nspname='public' and c.relkind='r' and c.relrowsecurity = false
+--     loop execute format('alter table public.%I enable row level security', r.relname); end loop;
+--   end $$;
+--
+-- Medición: antes, con `set local role anon`, clientes_dto_bkp_20260908 = 2.035 filas /
+-- gv_bkp_precios_venta_20260908 = 337 / GV_Importados_bkp_becky_fob_20260911 = 19.
+-- Después: 0 / 0 / 0 como anon, y 2.035 / 337 / 19 como postgres (los datos siguen ahí).
