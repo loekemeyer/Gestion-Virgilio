@@ -7598,7 +7598,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v14.96";
+const APP_VERSION = "v14.97";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -16199,7 +16199,7 @@ function _pedImpRender() {
     // las 14 columnas se pisaban entre sí. Bloque diagnóstico (proy→a pedir) | bloque pedido (MC→m³).
     h += '<div class="mva-tblwrap wide"><table class="mva-tbl wide">' +
       '<colgroup><col style="width:104px"><col><col style="width:68px"><col style="width:78px"><col style="width:96px"><col style="width:68px"><col style="width:72px"><col style="width:98px"><col style="width:98px"><col style="width:80px"><col style="width:78px"><col style="width:92px"><col style="width:58px"><col style="width:120px"><col style="width:96px"></colgroup>' +
-      '<thead><tr><th>Código</th><th>Descripción</th><th class="num">Proy u/mes</th><th class="num">Objetivo</th><th class="num">Stock</th><th class="num">En curso</th><th class="num">A pedir u</th><th class="num" title="Unidades por master caja (del Excel de quiebres / Importados_Volumen). Tocá el ✏ para editar el volumen.">uni/master</th><th class="num" title="Master cajas a pedir (editable). Poné 0 para no pedir. Vacío = vuelve al calculado.">MC pedido</th><th class="num" title="Unidades = MC × uni/master (master cajas redondas)">Unidades</th><th class="num" title="FOB unitario (USD)">FOB u$s/u</th><th class="num" title="u$s = unidades × FOB">u$s</th><th class="num" title="m³ = MC × m³/master">m³</th><th class="num" title="Fecha estimada de reingreso del importado. Se muestra en el portal LK (Reingreso Est dd/mm) cuando el artículo está sin stock. Vacío = no se muestra.">Reingreso</th><th>Acciones</th></tr></thead><tbody>';
+      '<thead><tr><th>Código</th><th>Descripción</th><th class="num">Proy u/mes</th><th class="num">Objetivo</th><th class="num">Stock</th><th class="num">En curso</th><th class="num">A pedir u</th><th class="num" title="Unidades por master caja (del Excel de quiebres / Importados_Volumen).">uni/master</th><th class="num" title="Master cajas a pedir (editable). Poné 0 para no pedir. Vacío = vuelve al calculado.">MC pedido</th><th class="num" title="Unidades = MC × uni/master (master cajas redondas)">Unidades</th><th class="num" title="FOB unitario (USD)">FOB u$s/u</th><th class="num" title="u$s = unidades × FOB">u$s</th><th class="num" title="m³ = MC × m³/master">m³</th><th class="num" title="Fecha estimada de reingreso del importado. Se muestra en el portal LK (Reingreso Est dd/mm) cuando el artículo está sin stock. Vacío = no se muestra.">Reingreso</th><th>Acciones</th></tr></thead><tbody>';
     arr.sort(function (a, b) { return _pedImpUniOf(b) - _pedImpUniOf(a) || (b.aPedirUni - a.aPedirUni); }).forEach(function (it) {
       const badge = it.esParte ? ' <span style="color:#7c3aed" title="Parte">🧩</span>' : '';
       const _stkShow = Math.max(0, Number(it.stockUni) || 0);
@@ -16216,8 +16216,10 @@ function _pedImpRender() {
       }).join('');
       const _m3m = Number(it.m3Master) || 0;
       const _dimTip = it.m3Dims && it.m3Dims.l ? (it.m3Dims.l + '×' + it.m3Dims.a + '×' + it.m3Dims.h + ' cm') : '';
+      // v14.97 — uni/master NO se edita desde la tabla (dueño: "al pedo editarlo desde ahí").
+      // Con valor: texto plano. Sin valor: se deja el ⚠ clickeable, es el único lugar para cargarlo.
       const umTxt = (it.uniMaster > 0)
-        ? '<span style="cursor:pointer" title="' + (_dimTip ? escapeHtml(_dimTip) + ' — ' : '') + 'tocá para editar el volumen/uni por master" onclick="pedImpEditVol(\'' + _codEncV + '\')">' + it.uniMaster + ' <span style="color:#94a3b8;font-size:11px">✏️</span></span>'
+        ? '<span title="' + (_dimTip ? escapeHtml(_dimTip) : 'Unidades por master caja') + '">' + it.uniMaster + '</span>'
         : '<span style="cursor:pointer;color:#f59e0b" title="Falta uni por master (cargá el volumen). Sin esto no se puede redondear a master caja." onclick="pedImpEditVol(\'' + _codEncV + '\')">⚠ ✏️</span>';
       const mc = _pedImpMcOf(it);
       const mcInput = '<input type="number" inputmode="numeric" min="0" value="' + mc + '" onchange="pedImpSetMC(\'' + _codEncV + '\',this.value)" onclick="event.stopPropagation()" style="width:64px;text-align:center;padding:5px 4px;border:2px solid ' + (mc > 0 ? '#0f766e' : '#cbd5e1') + ';border-radius:8px;font-size:14px;font-weight:800;color:#0f172a;background:' + (mc > 0 ? '#f0fdfa' : '#fff') + '">';
