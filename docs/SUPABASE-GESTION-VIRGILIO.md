@@ -5637,5 +5637,19 @@ a su zona ya sale. El piso pasa a `current_date + 1`: la anticipación mínima e
 día nuevo; un día que ya existe no hay que elegirlo. El cupo del día se sigue ignorando en este
 bloque, que es la regla del dueño ("si ya va un camión a esa zona, sumalo ahí").
 
-**Rollback:** `sql/gv_alerta_cliente_dos_dias_v1548.sql` (volver esa línea a `v_min` y
-`drop view public.gv_ppp_cliente_dos_dias`).
+⚠ **Cambiar el bloque (c) no alcanzaba** (v15.49). El guard del armado **intradía** vive en la
+Edge Function: `pendienteAutomatico` pregunta `gv_ppp_web_dia_camion(z, diaMin)` y, si no encuentra
+camión ni se llega al umbral, corta con `intradia_sin_umbral` **antes** de llamar a
+`gv_ppp_web_armar_pendientes`. Por eso el piso se corrigió **dentro de `gv_ppp_web_dia_camion`**:
+
+```sql
+piso efectivo = least(coalesce(p_desde, current_date + 1), current_date + 1)
+```
+
+Así quedan bien los dos consumidores sin redeployar la Edge Function. El único otro uso de la
+función es ese bloque (c); `gv_ppp_web_dia_cliente` sólo la nombra en un comentario. Comprobado
+pasándole el piso **viejo** (17/09): zona 6 → **15/09**, zona 7 → **16/09**, zona 1 (control) →
+14/09.
+
+**Rollback:** `sql/gv_alerta_cliente_dos_dias_v1548.sql` (volver esa línea a `v_min`, sacar el
+`piso` de `gv_ppp_web_dia_camion` y `drop view public.gv_ppp_cliente_dos_dias`).

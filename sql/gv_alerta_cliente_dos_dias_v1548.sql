@@ -17,7 +17,21 @@
 --     zona 7 desde el piso → (ninguno)   ·  desde mañana → 2026-09-16
 --
 -- El resto de la función queda igual. Definición completa en la base.
--- Rollback: volver esa línea a `public.gv_ppp_web_dia_camion(x->>'zona', v_min)`.
+--
+-- ⚠ Con eso NO alcanzaba: el guard del armado INTRADÍA vive en la Edge Function
+-- (`pendienteAutomatico` → `gv_ppp_web_dia_camion(z, diaMin)`) y, si no encuentra camión ni llega
+-- al umbral, corta ANTES de llamar a `gv_ppp_web_armar_pendientes` ("intradia_sin_umbral"). Por eso
+-- el piso se corrigió también DENTRO de `gv_ppp_web_dia_camion`:
+--
+--   piso efectivo = least(coalesce(p_desde, current_date + 1), current_date + 1)
+--
+-- Así los dos consumidores quedan bien sin redeployar la Edge Function. El único otro uso de la
+-- función es el bloque (c); `gv_ppp_web_dia_cliente` sólo la nombra en un comentario.
+-- Comprobado después del cambio, pasándole el piso VIEJO (17/09):
+--   zona 6 → 2026-09-15 · zona 7 → 2026-09-16 · zona 1 (control) → 2026-09-14
+--
+-- Rollback: volver esa línea a `public.gv_ppp_web_dia_camion(x->>'zona', v_min)` y sacar el
+-- `piso` de la función (volver a `w.fecha_entrega >= p_desde`).
 
 -- ── (1) la alerta ─────────────────────────────────────────────────────────
 -- Vista completa en la base. Idea: juntar las NP de la página (PPP_Web_Programacion) con las de
