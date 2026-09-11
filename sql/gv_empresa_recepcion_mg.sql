@@ -125,7 +125,13 @@ select regexp_replace(upper(btrim(m.cod_art)),'^0+(?=.)','') cod,
        sum(m.delta) filter (where m.deposito='para_envasar')    para_envasar,
        sum(m.delta) filter (where m.deposito='insumos')         insumos
 from public."Movimientos_Stock" m, cfg
-where cfg.cutoff is null or m.ts >= (replace(cfg.cutoff,' ','T'))::timestamptz
+-- ⚠ la excepción de `inicial` NO es opcional: es la misma que tiene
+-- `vista_saldos_stock`. Los conteos de apertura son el saldo de arranque y si el
+-- cutoff los dejara afuera esta vista daría menos que la otra. Hoy no cambia nada
+-- (0 filas `inicial` anteriores al cutoff, medido el 11/09), pero basta con que
+-- alguien retrodate un conteo para que las dos vistas empiecen a discrepar.
+where cfg.cutoff is null or m.tipo = 'inicial'
+   or m.ts >= (replace(cfg.cutoff,' ','T'))::timestamptz
 group by 1,2;
 
 comment on view public.gv_saldos_stock_emp is

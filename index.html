@@ -3030,9 +3030,16 @@ tr.ppp-err-zona > td{ background:#fffbeb !important; }
 .pk-orig.mix{ background:#fef2f2; border:1px solid #fca5a5; color:#b91c1c; }
 .pk-big-row{ display:flex; align-items:flex-start; justify-content:space-between; gap:12px; }
 .pk-big-col{ display:flex; flex-direction:column; gap:2px; min-width:0; }
-.pk-big-right{ align-items:flex-end; text-align:right; }
+.pk-big-right{ align-items:flex-end; text-align:right; flex:0 0 auto; }
+/* v15.82 — la columna del sector cede y envuelve; la del código nunca se achica.
+   Antes las dos crecían y el texto largo del excedente se metía abajo del código. */
+.pk-big-row .pk-big-col:first-child{ flex:1 1 auto; min-width:0; overflow-wrap:anywhere; }
 .pk-sector-big{ font-weight:800; color:#1e6bd6; line-height:1; }
 .pk-sector-big.exc{ color:#b45309; }
+/* v15.82 — los OTROS lugares del excedente, en chico debajo del principal. Sin esto,
+   un artículo con 6 ubicaciones desbordaba la tipografía grande y se encimaba con el
+   código. */
+.pk-sector-mas{ display:block; font-size:13px; font-weight:700; color:#b45309; opacity:.85; line-height:1.35; margin-top:4px; word-break:break-word; }
 .pk-big-row .pk-cod-big, .pk-big-row .pk-sector-big{ font-size:clamp(40px,13vw,54px); }
 .pk2{ display:flex; gap:10px; }
 .pk2 .pk-btn{ width:auto; flex:1; padding:18px 4px; font-size:17px; line-height:1.1; }
@@ -7781,7 +7788,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v15.85";
+const APP_VERSION = "v15.87";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -9692,6 +9699,55 @@ function pkFmt(n) { const r = Math.round(n * 100) / 100; return (r === Math.roun
    (fuente de verdad, respeta el cutoff, 1 fila por artículo) y de los movimientos sólo
    se leen las UBICACIONES (entradas con delta>0 y ubicación cargada: ~200 filas en toda
    la tabla, lejos del tope). */
+/* v15.87 — Formato legible de una lista de sectores (pedido de Luis: "limpiá el
+   formato, visualmente es horrible cuando lista varias góndolas").
+
+   Un artículo ocupa varias celdas seguidas: el 809E de Chef está en M13, M14 y M15.
+   Mostrarlo como "M13 · M14 · M15" ocupa el triple, envuelve a dos líneas y se pega
+   al código. Los operarios ya conocían la forma corta —el aviso viejo decía "buscá
+   en M13 a M15"— así que se vuelve a ella:
+
+     M13 · M14 · M15        →  M13 a M15
+     J13 · J14              →  J13 y J14
+     F12 · F09 · F10 · F11  →  F09 a F12      (se ordena antes de agrupar)
+     A65 · P39              →  A65 · P39      (no son seguidas: quedan como están)
+
+   Agrupa por pasillo (las letras) y junta las corridas de números consecutivos.
+   Tres o más seguidas → "a"; exactamente dos → "y"; sueltas → separadas por "·". */
+function pkSectoresFmt(v) {
+  const crudo = String(v == null ? "" : v).trim();
+  if (!crudo) return "";
+  const partes = crudo.split(/\s*·\s*/).map(function (x) { return x.trim().toUpperCase(); }).filter(Boolean);
+  if (partes.length < 2) return crudo;
+  const pasillos = [];   // conserva el orden en que aparecen
+  const porPasillo = {};
+  let sueltos = [];      // lo que no tiene forma LETRAS+NÚMERO se deja tal cual
+  partes.forEach(function (s) {
+    const m = /^([A-ZÑ]+)([0-9]+)([A-Z]*)$/.exec(s);
+    if (!m) { sueltos.push(s); return; }
+    const k = m[1] + "|" + m[3];
+    if (!porPasillo[k]) { porPasillo[k] = { pre: m[1], suf: m[3], nums: [], anchos: {} }; pasillos.push(k); }
+    porPasillo[k].nums.push(parseInt(m[2], 10));
+    porPasillo[k].anchos[parseInt(m[2], 10)] = m[2].length;
+  });
+  const out = [];
+  pasillos.forEach(function (k) {
+    const g = porPasillo[k];
+    const ns = g.nums.filter(function (n, i) { return g.nums.indexOf(n) === i; }).sort(function (a, b) { return a - b; });
+    const eti = function (n) { return g.pre + String(n).padStart(g.anchos[n] || 2, "0") + g.suf; };
+    let i = 0;
+    while (i < ns.length) {
+      let j = i;
+      while (j + 1 < ns.length && ns[j + 1] === ns[j] + 1) j++;
+      const largo = j - i + 1;
+      if (largo >= 3)      out.push(eti(ns[i]) + " a " + eti(ns[j]));
+      else if (largo === 2) out.push(eti(ns[i]) + " y " + eti(ns[j]));
+      else                  out.push(eti(ns[i]));
+      i = j + 1;
+    }
+  });
+  return out.concat(sueltos).join(" · ");
+}
 /* v15.81 — LIMPIA la ubicación del excedente antes de mostrarla.
 
    Hasta la v15.43 el operario tipeaba libre, así que en Movimientos_Stock.ubicacion
@@ -9922,8 +9978,27 @@ function pkRender() {
   // SECTOR (sin guion) a la IZQUIERDA y CÓDIGO a la DERECHA, ambos grandes. Mismo
   // bloque para el paso normal y para la pantalla de "Faltan". En el paso de excedente
   // el "sector" es la ubicación del excedente (no la góndola).
-  const sectorTxt = String(it.isExc ? (it.excUbic || it.sector || "—") : (it.sector || "—")).replace(/-/g, "");
-  const sectorBig = `<span class="pk-sector-big${it.isExc ? " exc" : ""}">${escapeHtml(sectorTxt)}</span>`;
+  // v15.82 — El excedente de un artículo puede estar en VARIOS lugares (el 731 está
+  // en 6). Meterlos todos en la tipografía grande no entra —se desborda y se encima
+  // con el código, como lo vio Luis— y encima no sirve: el operario necesita UN lugar
+  // al que ir. Va el primero grande y el resto abajo en chico, como referencia por si
+  // no alcanza. El orden es el de los movimientos (ts desc), o sea el lugar donde se
+  // guardó más recientemente: el que más probablemente tenga cajas.
+  let sectorTxt = String(it.isExc ? (it.excUbic || it.sector || "—") : (it.sector || "—")).replace(/-/g, "");
+  let sectorResto = "";
+  if (it.isExc) {
+    // El excedente está DESPARRAMADO (el 731 en 6 lugares que no son seguidos): va el
+    // primero grande y el resto abajo en chico, porque el operario necesita UN lugar
+    // al que ir. El orden es el de los movimientos, o sea dónde se guardó último.
+    const _ls = sectorTxt.split(" · ").map(function (x) { return x.trim(); }).filter(Boolean);
+    if (_ls.length > 1) { sectorTxt = _ls[0]; sectorResto = pkSectoresFmt(_ls.slice(1).join(" · ")); }
+  } else {
+    // La góndola es al revés: son celdas SEGUIDAS del mismo artículo (M13, M14, M15),
+    // así que se agrupan en "M13 a M15" y entran en un renglón.
+    sectorTxt = pkSectoresFmt(sectorTxt) || sectorTxt;
+  }
+  const sectorBig = `<span class="pk-sector-big${it.isExc ? " exc" : ""}">${escapeHtml(sectorTxt)}</span>` +
+    (sectorResto ? `<span class="pk-sector-mas">y si no, en ${escapeHtml(sectorResto)}</span>` : "");
   // v15.81 — el operario ve el código PELADO y la empresa como etiqueta aparte. Antes
   // salía "809E CH" de una, que es la convención vieja (la empresa metida en el nombre)
   // y encima confunde: parece otro código. El sector ya lo lleva a la góndola correcta,
@@ -10209,7 +10284,11 @@ function pkNextHtml() {
   if (!up.length) return "";
   let h = '<div class="pk-next"><div class="pk-next-h">📍 Próximas ubicaciones</div>';
   up.forEach(function (x) {
-    const sec = String(x.isExc ? (x.excUbic || x.sector || "—") : (x.sector || "—")).replace(/-/g, "");
+    // v15.82/87 — la columna es angosta y corta con ellipsis: del EXCEDENTE va sólo el
+    // primer lugar (están desparramados) y de la GÓNDOLA la forma corta ("M13 a M15"),
+    // que entra. El detalle completo se ve al llegar al paso.
+    const _sraw = String(x.isExc ? (x.excUbic || x.sector || "—") : (x.sector || "—")).replace(/-/g, "");
+    const sec = x.isExc ? _sraw.split(" · ")[0] : (pkSectoresFmt(_sraw) || _sraw);
     // v15.81 — el código va PELADO y la empresa como etiqueta, igual que arriba.
     const nCod = codBase(x.art);
     const nm = /\s+(LK|CH|LOKE)$/.exec(String(x.art).toUpperCase());
