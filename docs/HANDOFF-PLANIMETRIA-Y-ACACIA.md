@@ -2,30 +2,46 @@
 
 > **Para la sesión que siga esto.** Escrito el **2026-09-11** (viernes) por Claude, sesión
 > `https://claude.ai/code/session_01APFvJScy9GAzAR6xUTYe8t`, hablando con **Thomas**.
-> App en **v15.39** al cerrar.
+> App en **v15.40** al cerrar. **Revisado el 11/09 13:20 UTC** tras el cierre de la tarea 3105 (§1).
 >
 > Antes de tocar nada leé `CLAUDE.md` y `GUIA-PROYECTO.md` (notas **v15.34**, **v15.35** y
 > **v15.39**) y `docs/SUPABASE-GESTION-VIRGILIO.md` **§3.bn** y **§3.bn.1**.
 
 ---
 
-## 1. Lo que hay que decidir (lo único abierto)
+## 1. Estado al cierre de la sesión
 
-**Thomas todavía no contestó esto:**
+### ✅ RESUELTO — 991E se baja
 
-> ¿**991E** (Espátula Corta Torta Mgo Acacia) se baja o se queda?
->
-> - **Se baja** → Acacia queda en **7** activos y esos 7 necesitan sector. La tarea Planify
->   **3105** (Luis) sigue como está, con los 4 códigos.
-> - **Se queda** → son **8** los Acacia que necesitan sector, y hay que sacar 991E de la 3105
->   (quedarían sólo 994E, 995E, 999E).
+La pregunta que quedó abierta durante la charla era si **991E** (Espátula Corta Torta Mgo Acacia) se
+bajaba o se quedaba. **Se bajó.** Chequeado el 11/09 a las 13:20 UTC contra la base:
+**`products.active = false`** para los 4 (991E, 994E, 995E, 999E) en el proyecto de LK. Hay backup en
+`sql/backups/backup_products_acacia_20260911.sql`.
 
-Lo último que dijo fue *"en paginalk [son] 8 ahora"*, confirmando que en la web ve 8 Acacia
-activos (los 7 + 991E). No dijo si lo baja.
+Lo hizo **Luis** (tarea Planify 3105, que él cerró). ⚠ **Pero la baja quedó a medias**: sólo se
+desactivaron en el catálogo de la web. Las fichas siguen en Gestión:
 
-**Lo otro sin resolver:** la **NP LK 0024 / tanda E09B** (Osa Distribuidora 2533, 5 cajas de 578,
-entrega 09/09) está **colgada**: la tanda se abrió 4 veces y nunca se pickeó. Se lo reporté, no
-dijo qué hacer.
+| | Cuántas filas siguen |
+|---|---|
+| GV `Importados` | 2 (994E y 999E) |
+| GV `Volumen_Articulos` | 4 |
+| GV `precios_venta` | 4 |
+| GV `cob_uxb_lk` | 4 |
+| LK `products` | 4 (desactivadas, no borradas) |
+
+Falta también `product_m3` e `item_precio_cache` en LK, y `Importados_Volumen` /
+`Importados_Mov_Stock` en Gestión (ver §4). **Thomas no vio este chequeo** — la sesión se cerró antes.
+Si le importa cerrar la limpieza, hay que reabrir la 3105 o crear una nueva.
+
+**Consecuencia para §2: la línea Acacia queda en 7 activos**, y 991E sale definitivamente de la lista
+de huecos de planimetría.
+
+### Sigue abierto
+
+- **Tarea Planify 3107** (Tomás B.): probar desde el celular que llegue el WhatsApp del alta de
+  artículo nuevo en recepción. Nunca se probó de punta a punta (ver §6 y §8).
+- **NP LK 0024 / tanda E09B** (Osa Distribuidora 2533, 5 cajas de 578, entrega 09/09) está
+  **colgada**: la tanda se abrió 4 veces y nunca se pickeó. Se lo reporté a Thomas, no dijo qué hacer.
 
 ---
 
@@ -34,11 +50,11 @@ dijo qué hacer.
 Verificado el 11/09. `Planimetria` tiene **360 códigos** sobre **685 sectores** de
 `Capacidad_Sector`, así que lugar sobra.
 
-La consulta cruda devuelve **15**. Thomas sacó dos a mano:
+La consulta cruda devolvía **15** durante la charla. Salen dos:
 
-- **517** (Pinza Acero Inox 25cm) — lo sacó él, sin explicar por qué. **No insistir.**
-- **991E** — sale por su regla de la Acacia (§4), pero **sigue activo en la web**. Es la
-  decisión abierta de §1.
+- **517** (Pinza Acero Inox 25cm) — lo sacó Thomas a mano, sin explicar por qué. **No insistir.**
+- **991E** — **ya no aparece**: se desactivó en el catálogo (§1), así que la consulta de abajo, corrida
+  hoy, devuelve directamente **13**.
 
 **Quedan 13:**
 
@@ -143,15 +159,14 @@ lógica** (misma familia, aunque el código no arranque con 99).
 
 **Ninguno de los 4 tiene sector en `Planimetria`** — y está bien así, no hay que cargárselo.
 
-🔴 **991E sigue `active = true` en el catálogo LK y se está vendiendo.** Último pedido web
-**10/09** (pedido 1389, cliente 4198), antes el **04/09** (pedido 1347, cliente 2363 → NP LK 0013).
-994E, 995E y 999E ya están inactivos desde mayo; sus 27 líneas de `order_items` son pedidos
-históricos de marzo–mayo, todos `status='pendiente'`.
+✅ **Los 4 ya están `active = false` en el catálogo LK** (hecho el 11/09 por Luis; backup en
+`sql/backups/backup_products_acacia_20260911.sql`). 991E era el urgente: hasta ese día seguía activo y
+se había vendido el **10/09** (pedido 1389, cliente 4198) y el **04/09** (pedido 1347, cliente 2363 →
+NP LK 0013). Los otros 3 ya estaban inactivos desde mayo.
 
-**NO SE BORRÓ NADA.** Por el protocolo de "NUNCA modificar datos sin permiso explícito", la baja
-quedó esperando. Está en la tarea Planify **3105** (Luis). Cuando se ejecute: **backup antes de
-cada borrado**, y **los `order_items` viejos NO se tocan** (son historia de pedidos; borrarlos
-rompe los totales).
+⚠ **La limpieza NO está terminada.** Sólo se desactivó el catálogo; las fichas de la tabla de arriba
+siguen todas ahí (ver el resumen de §1). Si se retoma: **backup antes de cada borrado**, y **los
+`order_items` viejos NO se tocan** (son historia de pedidos; borrarlos rompe los totales).
 
 ### Cómo regenerar el barrido
 
@@ -244,8 +259,8 @@ dicho que NO"*. Revertir es a mano.
 
 | id | Nombre | Asignada a | Estado |
 |---|---|---|---|
-| **3105** | Bajar Acacia 991E/994E/995E/999E de GV y web LK | **Luis Rial Otero (52)** | abierta — espera el OK de Thomas |
-| **3107** | Th Recepcion: alta de articulo nuevo pide OK por WhatsApp | Tomás Beviglia (20) | abierta — falta probar desde el celular |
+| **3105** | Bajar Acacia 991E/994E/995E/999E de GV y web LK | Luis Rial Otero (52) | **cerrada** por Luis el 11/09 — pero sólo hizo el `active=false` del catálogo; las fichas de Gestión siguen (§1) |
+| **3107** | Th Recepcion: alta de articulo nuevo pide OK por WhatsApp | Tomás Beviglia (20) | **abierta** — falta probar desde el celular |
 
 ```sql
 select id, name, employee_id, done, note from planify.tasks where id in (3105, 3107);
