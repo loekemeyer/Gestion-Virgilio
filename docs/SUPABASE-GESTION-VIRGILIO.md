@@ -5653,3 +5653,29 @@ pasándole el piso **viejo** (17/09): zona 6 → **15/09**, zona 7 → **16/09**
 
 **Rollback:** `sql/gv_alerta_cliente_dos_dias_v1548.sql` (volver esa línea a `v_min`, sacar el
 `piso` de `gv_ppp_web_dia_camion` y `drop view public.gv_ppp_cliente_dos_dias`).
+
+
+### §3.cf.1 — Los dos pedidos de Orfali, juntos (2026-09-11)
+
+Thomas, al ver el caso: ***"los dos pedidos de orfali tienen que salir si o si juntos"***. Lo que
+había era peor que un cliente repetido — era un **camión entero a GBA Norte por una caja**:
+
+| NP | Tanda | Día | Líneas | Cajas | m³ |
+|---|---|---|---|---|---|
+| LK 0053 | E13A | 15/09 | 1 | 1 (art. 321) | 0,019 |
+| LK 0002 | D69D | 16/09 | — | 358 | 1,184 |
+
+El m³ no estaba mal: el 321 mide 0,0185 m³ por caja en `vista_volumen_articulo_resuelto`.
+
+**Hecho:** `LK 0053` pasó a `D69D` / 16-09, la tanda donde ya estaba `LK 0002`. Ninguna de las dos
+tandas tenía eventos de operario ni filas en `PPP_Web_Tanda_Items`, así que no se rompió ningún
+picking. Backup previo: `sql/backups/orfali_20260911_pre_junta.sql` (trae el UPDATE de restore).
+
+**Después:** `gv_ppp_cliente_dos_dias` **vacía**, y el 15/09 ya no tiene nada de zona 6 — queda un
+solo día, 16/09, con 1,374 m³ de zona 6 y 0,221 de zona 7.
+
+**Cómo se había partido:** LK 0053 se enganchó el 09/09 al día que Orfali ya tenía (bloque (a2));
+el **10/09 a las 12:10** LK 0002 se movió a mano al 16/09 y dejó a LK 0053 sola. El armado
+automático no vuelve a mirar un pedido que ya tiene tanda, así que nadie los reagrupó. **Mover una
+NP a mano no chequea si el cliente queda partido**: ése es el agujero que queda abierto, y por
+ahora lo tapa la alerta (que avisa después, no en el momento).
