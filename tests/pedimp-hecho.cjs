@@ -3,7 +3,15 @@
    la reconversión de unidades a cajas y master cajas en vivo. Se verifica el render, la
    conversión, el parseo del texto y lo que se manda a Supabase al guardar. */
 const path = require("path");
-const { chromium } = require("/opt/node22/lib/node_modules/playwright");
+let chromium;
+try { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
+catch (_e) {
+  // v15.40: sin este fallback el test muere en CI (el runner instala playwright con npm,
+  // no tiene /opt/node22) y, como run.sh corta en el primero que falla, todo lo que venía
+  // después NUNCA se corrió en GitHub. Mismo patrón que ya tenían los demás tests.
+  try { ({ chromium } = require("playwright")); }
+  catch (_e2) { console.error("Playwright no encontrado."); process.exit(2); }
+}
 const fail = (m) => { console.error("✗ " + m); process.exitCode = 1; };
 (async () => {
   const b = await chromium.launch();

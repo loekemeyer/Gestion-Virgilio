@@ -3,7 +3,15 @@
    falla, la tanda se descarta (dueño: "no puede haber tanda armada sin fecha"). Estado inyectado; las RPC se
    interceptan para ver el orden de llamadas. */
 const path = require("path");
-const { chromium } = require("/opt/node22/lib/node_modules/playwright");
+let chromium;
+try { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
+catch (_e) {
+  // v15.40: sin este fallback el test muere en CI (el runner instala playwright con npm,
+  // no tiene /opt/node22) y, como run.sh corta en el primero que falla, todo lo que venía
+  // después NUNCA se corrió en GitHub. Mismo patrón que ya tenían los demás tests.
+  try { ({ chromium } = require("playwright")); }
+  catch (_e2) { console.error("Playwright no encontrado."); process.exit(2); }
+}
 (async () => {
   const b = await chromium.launch();
   const p = await b.newPage({ viewport: { width: 1400, height: 800 } });

@@ -11159,6 +11159,29 @@ distinta, empresa distinta.
 >   `Sync_Estado`**: `cron.job_run_details` ya tiene la verdad. DDL en
 >   `sql/watchdog_syncs_externos.sql`.
 
+> Nota **2026-09-11 (v15.40) — El guard de doble-tap de la v15.33 se comía eventos buenos; CI en verde.**
+> El guard que agregó la v15.33 dentro de `send()` era por TIEMPO (800 ms desde la llamada
+> anterior, fuera cual fuera), así que descartaba en silencio cualquier segundo evento **distinto**
+> que cayera en esa ventana: AP sobre una tanda ya abierta (que no encola, reabre el asistente)
+> seguido de AP de **otra** tanda perdía el armado nuevo, y el cierre de un picking desde el
+> asistente (`pkFinishPicking` → `send("TP")`) podía caer en la misma ventana. Dejó **rojas** dos
+> regresiones desde la v15.33 (`ap-resume`, `ep-ppp-warn`) y main quedó en rojo 6 commits.
+> - **Ahora el guard es del BOTÓN y por CONCURRENCIA** (que es el bug real que se quiso tapar:
+>   dos toques antes del primer `await` corrían `send()` dos veces en paralelo y encolaban dos
+>   payloads con id distinto). `sendTap()` es lo que cuelga del `onclick` de "Enviar": descarta el
+>   toque que llega **mientras** el anterior sigue corriendo y libera la bandera en `finally`
+>   (caduca a los 15 s por si un await queda colgado en un modal). Los llamados internos
+>   (`pkFinishPicking`, `arFinish`) siguen entrando por `send()` directo: no son toques.
+> - **Dos tests más estaban rojos y decían mentiras**, no bugs: `imp-tabla` clavaba 14 columnas
+>   (Importados sumó "Reingreso" = 15) y buscaba los botones ✏️/📥 que hoy son "📦 Baches" → pasa a
+>   comparar `colgroup` contra el `thead` (que es el bug original: el colgroup desfasado) y los
+>   botones que existen. `fac-excel-isis` exigía la leyenda **"2% Descuento Web"** en el Excel a
+>   ISIS, pero desde la **v14.57** esa columna va **sólo** si la condición de pago (col J) es 8-13
+>   o 18, y ninguna NP del fixture tenía condición → se le agregó una NP **web** (`LK 0001`,
+>   order_id 5001, condición 8) y ahora chequea las dos mitades de la regla: que salga en esa fila
+>   y que **no** salga en las de ISIS (exactamente 1 vez en el archivo).
+> - Suite completa en verde (`bash tests/run.sh`).
+
 > Nota **2026-09-11 (v15.33) — Auditoría de operarios (CR/RR/CC): 2 bugs visuales + 5 de lógica.**
 > Revisión con `revisor-render` + `revisor-logica` sobre el circuito diario (Control Remitos,
 > Carga Camión, Recepción Remitos). Se corrigieron 6 hallazgos, todos en `index.html`:

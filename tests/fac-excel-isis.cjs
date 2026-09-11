@@ -49,10 +49,24 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
     ent.push({ id: 501, np: "98002", cod_art: "29",  cajas_pedidas: 5, cajas_entregadas: 1 });
     ent.push({ id: 502, np: "98002", cod_art: "438E CH", cajas_pedidas: 1, cajas_entregadas: 1 });
     ent.push({ id: 503, np: "98002", cod_art: "300", cajas_pedidas: 2, cajas_entregadas: 0 });
+    // v15.40 — una NP WEB (LK 0001, order_id 5001) con condición de pago 8. Es la única fila que
+    // tiene que llevar la col K "2% Descuento Web": desde la v14.57 la leyenda va por CÓDIGO de
+    // condición (8-13 y 18), no en todas las filas como antes. Las NP de ISIS de arriba no tienen
+    // condición, así que la columna les queda vacía — y eso también se chequea (F4b).
+    ent.push({ id: 600, np: "LK 0001", cod_art: "700", cajas_pedidas: 1, cajas_entregadas: 1 });
 
+    window.pwebLkToken = async function () { return "tok-test"; };
     window.fetch = function (url) {
       url = String(url);
       if (url.indexOf("Entregas_Virgilio") >= 0) return J(ent);
+      if (url.indexOf("PPP_Web_Programacion") >= 0) return J([
+        { np: 1, np_idx: 1, empresa: "lk", order_id: 5001, fecha_recep: "2026-08-28" }
+      ]);
+      // Dos llamadas distintas a la misma vista: la de Tierra del Fuego (isis_empresa=eq.chef) y
+      // la de la condición de pago. Sólo la segunda devuelve algo.
+      if (url.indexOf("v_pedidos_web_np") >= 0) {
+        return J(url.indexOf("isis_empresa=eq.chef") >= 0 ? [] : [{ order_id: 5001, condicion_pago_code: 8 }]);
+      }
       if (url.indexOf("ppp_base_pedidos") >= 0) return J([
         { pedido: "98001", fecha: "2026-08-25" }, { pedido: "98002", fecha: "2026-08-26" }, { pedido: "44001", fecha: "2026-08-27" }
       ]);
@@ -69,11 +83,12 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
     _facLastTandas = [{ tanda: "D60A", pedidos: [
       { np: "98001", cod: "111", razonSocial: "Cliente LK" },
       { np: "98002", cod: "222", razonSocial: "Cliente Mix" },
-      { np: "44001", cod: "333", razonSocial: "Cliente CH" }
+      { np: "44001", cod: "333", razonSocial: "Cliente CH" },
+      { np: "LK 0001", cod: "444", razonSocial: "Cliente Web" }
     ] }];
 
     // F6: marcar como lo haría la operadora desde la lista
-    facXlsToggle("98001"); facXlsToggle("98002"); facXlsToggle("44001");
+    facXlsToggle("98001"); facXlsToggle("98002"); facXlsToggle("44001"); facXlsToggle("LK 0001");
     out.f6_seleccionadas = _facXlsSel.size;
     facXlsToggle("98002"); facXlsToggle("98002");          // destildar y volver a tildar
     out.f6_trasToggle = _facXlsSel.size;
@@ -131,8 +146,8 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
   const fails = [];
   const ck = (ok, msg) => { if (!ok) fails.push(msg); };
 
-  ck(r.f6_seleccionadas === 3, "F6: se marcaron " + r.f6_seleccionadas + " NP (esperaba 3)");
-  ck(r.f6_trasToggle === 3, "F6: destildar y volver a tildar dejó " + r.f6_trasToggle + " (esperaba 3)");
+  ck(r.f6_seleccionadas === 4, "F6: se marcaron " + r.f6_seleccionadas + " NP (esperaba 4)");
+  ck(r.f6_trasToggle === 4, "F6: destildar y volver a tildar dejó " + r.f6_trasToggle + " (esperaba 4)");
   ck(r.f1_veces505 === 1, "F1 dedup: el artículo 505 aparece " + r.f1_veces505 + " veces (esperaba 1)");
   ck(r.f1_cajas505 === 2, "F1 dedup: 505 con " + r.f1_cajas505 + " cajas (esperaba 2, no la suma 4)");
   ck(r.f1_excede === true, "F1: la NP con entregado > pedido no quedó marcada");
@@ -148,6 +163,10 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
   ck(xml.indexOf('ss:Name="Resumen"') >= 0, "F4: falta la hoja Resumen");
   ck(xml.indexOf("PEDIDOS WEB DE GESTION VIRGILIO — IMPORTAR EN ISIS") >= 0, "F4: la hoja Resumen no lleva la leyenda de importar");
   ck(xml.indexOf("2% Descuento Web") >= 0, "F4: falta la columna pctDto");
+  // v14.57: la leyenda va SOLO en las filas cuya condición de pago (col J) es 8-13 o 18.
+  // Acá la única con condición es la NP web LK 0001 (código 8), de una sola línea.
+  ck((xml.match(/2% Descuento Web/g) || []).length === 1,
+     "F4b: la leyenda del 2% salió en " + (xml.match(/2% Descuento Web/g) || []).length + " filas (esperaba 1: sólo la de condición 8)");
   ck(xml.indexOf("<Cell/>") >= 0, "F4: las celdas vacías no salieron como <Cell/>");
   // 20 (98001) + 3 (98002) + 16 (44001) = 39 filas de datos
   ck((xml.match(/<Row>/g) || []).length >= 39, "F4: filas insuficientes (" + (xml.match(/<Row>/g) || []).length + ")");

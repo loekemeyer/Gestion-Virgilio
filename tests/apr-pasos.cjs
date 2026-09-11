@@ -7,7 +7,15 @@
    (d) aprCargar muestra LK apenas llega y Chef después (cargandoChef), sin las llamadas por CUIT de v13.76.
    RPC y feeds interceptados por fetch. Sale 1 si falla. */
 const path = require("path");
-const { chromium } = require("/opt/node22/lib/node_modules/playwright");
+let chromium;
+try { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
+catch (_e) {
+  // v15.40: sin este fallback el test muere en CI (el runner instala playwright con npm,
+  // no tiene /opt/node22) y, como run.sh corta en el primero que falla, todo lo que venía
+  // después NUNCA se corrió en GitHub. Mismo patrón que ya tenían los demás tests.
+  try { ({ chromium } = require("playwright")); }
+  catch (_e2) { console.error("Playwright no encontrado."); process.exit(2); }
+}
 (async () => {
   const b = await chromium.launch();
   const p = await b.newPage({ viewport: { width: 430, height: 930 } });
