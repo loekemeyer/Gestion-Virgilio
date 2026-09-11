@@ -327,6 +327,12 @@ PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node te
 echo "== ppp-movil (v14.25: la fila de la PPP en un teléfono de 390 px — el importe entero, sin scroll horizontal) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/ppp-movil.cjs
 
+echo "== ppp-fecha-formato (regresión v15.50: una sola fecha dd/mm/aaaa en la PPP; a la base va ISO) =="
+PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/ppp-fecha-formato.cjs
+
+echo "== ppp-resumen-angosto (regresión v15.53: la tabla del Resumen no se estira; columnas al ancho del contenido) =="
+PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/ppp-resumen-angosto.cjs
+
 echo "== ppp-atrasados (v14.06: los atrasados se ven sin rebotar de solapa — banda en Programación + lista adentro de Resumen) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/ppp-atrasados.cjs
 
@@ -357,6 +363,32 @@ PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node te
 echo "== pk-excedente-vista (v14.93: pkFetchExcedente lee cajas de vista_saldos_stock, no suma movimientos truncados a 1000) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/pk-excedente-vista.cjs
 
+echo "== remito-np-web (v15.46: el remito impreso trae cliente y fecha también en las NP de la página) =="
+PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/remito-np-web.cjs
+
+echo "== proy-entregadas (v15.52: popup Proyección — cajas ENTREGADAS por el proveedor entre el mes y la barra; s/d si ese mes no había registro) =="
+PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/proy-entregadas.cjs
+
+echo "== ppp-res-np-fecha (v15.57: Resumen PPP — fecha dd/mm pegada al día; tocar la NP abre su contenido, también NP web via gv_np_items) =="
+PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/ppp-res-np-fecha.cjs
+
+echo "== ppp-errores-detalle (v15.57: alerta Tandas inconsistentes dice el día y qué ruta/fecha mezcla, NP por NP) =="
+PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/ppp-errores-detalle.cjs
+
+echo "== corr-reparto-sec (v15.66: Corregir códigos — el stock del secundario se reparte entre TODAS las NP que lo piden; sec_cubre de la vista en panel, badge y chip) =="
+PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/corr-reparto-sec.cjs
+
+echo "== cc-orden-camionero (v15.70: Carga Camión — el tilde es el orden de carga 1°,2°,3° y el camionero es obligatorio) =="
+PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/cc-orden-camionero.cjs
+
+echo "== pedimp-hecho (v15.72: Cargar pedido ya hecho — un bache por línea, con PI y fecha de embarque) =="
+PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/pedimp-hecho.cjs
+
+echo "== imp-encurso (v15.72: solapa 🚢 En curso — un renglón por pedido, embarque + llegada, días que faltan) =="
+PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/imp-encurso.cjs
+
+echo "== imp-cuenta-corriente (v15.74: vista 💵 Plata — FOB/pagado/pend giro/falta del Excel + libro de giros) =="
+PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/imp-cuenta-corriente.cjs
 echo "== pk-deposito-pkc (v15.41: el PKC dice de qué depósito salió cada caja; un evento por (tanda,art)) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/pk-deposito-pkc.cjs
 

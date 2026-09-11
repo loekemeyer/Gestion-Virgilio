@@ -5537,16 +5537,1156 @@ Las 16 NP de ISIS normales, sin cambio (el fallback sólo entra cuando el valor 
 **Rollback:** apuntar el front a `vista_control_remitos` / `vista_cola_impresion` y
 `drop view public.gv_vista_control_remitos, public.gv_vista_cola_impresion;`
 
+
+## §3.ce — Cuarentena: "Ya pagó" y la tarea de Viviana en Planify (v15.47, 2026-09-11)
+
+Dos pedidos de Thomas del 11/09: *"si hay uno en cuarentena, que le aparezca a Viviana Gauna en
+Planify"* y *"agregame un botón en cada box que diga **Ya pagó**, para que Viviana los pueda
+habilitar y que salgan de cuarentena"*.
+
+### Ya pagó — es del CLIENTE, no del pedido
+
+| Objeto | Qué hace |
+|---|---|
+| `GV_Cuarentena_Pagados` (empresa, cod, pagado_at, pagado_por, fuente_at, deuda_al_pagar) | qué cliente marcó cobranzas como pagado. RLS prendida, sin policies: sólo por RPC |
+| `gv_cuarentena_pago(p_empresa, p_cod)` | SECURITY DEFINER, gate de supervisor. Registra el pago con la fecha del reporte de deuda vigente |
+| `gv_cuarentena_marcar` (v15.46) | ya no marca `deuda` si hay un pago **posterior** a `GV_Cuarentena_Fuente.cargado_at` |
+| `cuarYaPago` / `.cuar-pago` (index.html) | botón **💚 Ya pagó**, sólo si el motivo incluye deuda; pide confirmación porque libera todos los pedidos de ese cliente |
+
+El pago vale **contra el reporte de deuda que estaba cargado**: si después se sube uno más nuevo y
+el cliente sigue debiendo, vuelve solo a Cuarentena. No levanta *suspendido* ni *excede crédito* —
+con esos motivos el pedido sigue retenido y el front lo avisa en el mensaje.
+
+**Prueba (con rollback), cliente 2375 El Gran Bazar, deuda $2.519,21:**
+
+| Momento | `gv_cuarentena_marcar` |
+|---|---|
+| sin pago | 1 fila (motivo `deuda`) |
+| pago posterior al reporte | 0 filas — sale |
+| pago anterior a un reporte nuevo | 1 fila — vuelve |
+
+### La tarea de Viviana
+
+`gv_cuarentena_planify_sync(p_empresa, p_pedidos)` (sólo `service_role`) abre **una tarea por
+pedido retenido** en el Planify de **Viviana Gauna (employee_id 4)** y la cierra (`done = true`)
+cuando el pedido deja de estar en cuarentena. `GV_Cuarentena_Planify` (empresa, order_id, task_id,
+cerrada_at) es el registro que la hace idempotente.
+
+La dispara la **Edge Function `gv-ppp-web-tandas-diarias` v22** (crons 71 y 73, cada 15 min), no el
+front: es la única parte del sistema que conoce los pedidos web sin que nadie tenga la pantalla
+abierta. Si el sync falla, el armado sigue igual — la tarea es un aviso, no un bloqueo. En modo
+`dry` no escribe ninguna tarea (`soloPendientes(emp, crudas, false)`).
+
+Una lista vacía significa "no queda ninguno retenido" y **cierra todas las abiertas**: la Edge
+Function sólo llama al sync después de haber leído los pedidos y corrido `gv_cuarentena_marcar`,
+así que una corrida fallida no llega a cerrar nada.
+
+**Prueba (con rollback):** alta → 1 tarea; segunda corrida igual → 0 altas (idempotente); lista
+vacía → 1 cierre.
+
+**Incidente del mismo día:** la v21 de la Edge Function se deployó con un `PLACEHOLDER` en vez del
+código (error al llamar la herramienta de deploy) y quedó rota hasta que se redeployó el fuente
+real en la **v22**. El fuente versionado es
+`supabase/functions/gv-ppp-web-tandas-diarias/index.ts` — deployar siempre ESE contenido.
+
+**Rollback:** `drop function public.gv_cuarentena_pago(text,text);`,
+`drop function public.gv_cuarentena_planify_sync(text,jsonb);`,
+`drop table public."GV_Cuarentena_Pagados", public."GV_Cuarentena_Planify";`, volver
+`gv_cuarentena_marcar` a la v15.04 (sin el `not exists` de Pagados) y sacar del front `cuarYaPago`.
+
+
+## §3.cf — Mismo cliente en dos días + zona manual con día ya abierto (v15.48, 2026-09-11)
+
+Thomas, mirando la PPP del 15 y 16/09, marcó dos cosas.
+
+### 1. Orfali programado dos veces — ahora sale como alerta
+
+| NP | Tanda | Día | m³ |
+|---|---|---|---|
+| LK 0053 | E13A | 15/09 | 0,019 |
+| LK 0002 | D69D | 16/09 | 1,184 |
+
+Mismo cliente (Orfali Alfredo Luciano, 4188), misma zona, dos camiones. La vista
+**`gv_ppp_cliente_dos_dias`** lo detecta: junta las NP de la página con las de ISIS, cruza por
+**razón social normalizada** (el cod no sirve para cruzar LK con Chef y el espejo de ISIS no trae
+empresa) y se queda con los clientes que tienen entregas en **dos días separados por 7 días o
+menos**. Más lejos son dos pedidos con fecha pactada, no un error: el corte de 7 días saca a Matiz
+SA (16/09, 07/10 y 28/10), que la primera versión marcaba como falso positivo. Súper, Retira y Expo
+quedan afuera — entregan varios días a propósito.
+
+El front la pinta arriba de **A Programar** (`aprDosDiasCargar` / `aprDosDiasHtml`). Al 11/09 la
+vista devuelve exactamente el caso de Orfali y nada más.
+
+**Esto detecta, no impide.** El armado automático ya manda el pedido al día que el cliente tiene
+abierto (bloques (a1) y (a2) de `gv_ppp_web_armar_pendientes`, v14.05/v13.93); lo que se escapa es
+lo que se mueve **a mano** después, y para eso está la alerta.
+
+### 2. El piso mataba el enganche de las zonas manuales
+
+El bloque **(c)** (zonas no automáticas que ya tienen camión a la zona) preguntaba
+`gv_ppp_web_dia_camion(zona, v_min)` con `v_min = gv_ppp_web_dia_minimo()`, o sea **hoy + 4 días
+hábiles**. Los camiones ya armados para el 15 y el 16 caían antes de ese piso:
+
+| | desde el piso (17/09) | desde mañana |
+|---|---|---|
+| Zona 6 - GBA Norte | (ninguno) | **2026-09-15** |
+| Zona 7 - GBA Norte Lejos | (ninguno) | **2026-09-16** |
+
+Por eso LK 1389 (zona 7) y LK 1390 (zona 6) quedaban en **"sin camión previsto"** aunque el camión
+a su zona ya sale. El piso pasa a `current_date + 1`: la anticipación mínima es para **elegir** un
+día nuevo; un día que ya existe no hay que elegirlo. El cupo del día se sigue ignorando en este
+bloque, que es la regla del dueño ("si ya va un camión a esa zona, sumalo ahí").
+
+⚠ **Cambiar el bloque (c) no alcanzaba** (v15.49). El guard del armado **intradía** vive en la
+Edge Function: `pendienteAutomatico` pregunta `gv_ppp_web_dia_camion(z, diaMin)` y, si no encuentra
+camión ni se llega al umbral, corta con `intradia_sin_umbral` **antes** de llamar a
+`gv_ppp_web_armar_pendientes`. Por eso el piso se corrigió **dentro de `gv_ppp_web_dia_camion`**:
+
+```sql
+piso efectivo = least(coalesce(p_desde, current_date + 1), current_date + 1)
+```
+
+Así quedan bien los dos consumidores sin redeployar la Edge Function. El único otro uso de la
+función es ese bloque (c); `gv_ppp_web_dia_cliente` sólo la nombra en un comentario. Comprobado
+pasándole el piso **viejo** (17/09): zona 6 → **15/09**, zona 7 → **16/09**, zona 1 (control) →
+14/09.
+
+**Rollback:** `sql/gv_alerta_cliente_dos_dias_v1548.sql` (volver esa línea a `v_min`, sacar el
+`piso` de `gv_ppp_web_dia_camion` y `drop view public.gv_ppp_cliente_dos_dias`).
+
+
+### §3.cf.1 — Los dos pedidos de Orfali, juntos (2026-09-11)
+
+Thomas, al ver el caso: ***"los dos pedidos de orfali tienen que salir si o si juntos"***. Lo que
+había era peor que un cliente repetido — era un **camión entero a GBA Norte por una caja**:
+
+| NP | Tanda | Día | Líneas | Cajas | m³ |
+|---|---|---|---|---|---|
+| LK 0053 | E13A | 15/09 | 1 | 1 (art. 321) | 0,019 |
+| LK 0002 | D69D | 16/09 | — | 358 | 1,184 |
+
+El m³ no estaba mal: el 321 mide 0,0185 m³ por caja en `vista_volumen_articulo_resuelto`.
+
+**Hecho:** `LK 0053` pasó a `D69D` / 16-09, la tanda donde ya estaba `LK 0002`. Ninguna de las dos
+tandas tenía eventos de operario ni filas en `PPP_Web_Tanda_Items`, así que no se rompió ningún
+picking. Backup previo: `sql/backups/orfali_20260911_pre_junta.sql` (trae el UPDATE de restore).
+
+**Después:** `gv_ppp_cliente_dos_dias` **vacía**, y el 15/09 ya no tiene nada de zona 6 — queda un
+solo día, 16/09, con 1,374 m³ de zona 6 y 0,221 de zona 7.
+
+**Cómo se había partido:** LK 0053 se enganchó el 09/09 al día que Orfali ya tenía (bloque (a2));
+el **10/09 a las 12:10** LK 0002 se movió a mano al 16/09 y dejó a LK 0053 sola. El armado
+automático no vuelve a mirar un pedido que ya tiene tanda, así que nadie los reagrupó. **Mover una
+NP a mano no chequea si el cliente queda partido**: ése es el agujero que queda abierto, y por
+ahora lo tapa la alerta (que avisa después, no en el momento).
+
+### §3.cf.2 — Candado: mismo cliente = mismo día, salvo los súper (v15.51, 2026-09-11)
+
+Thomas, al ver el caso Orfali: ***"nunca si hay +1 pedido de un cliente puede ir separado en la
+PPP"*** y enseguida ***"salvo los super"***. Eso ya no es una alerta, es una regla dura.
+
+**Dónde se rompía:** al **mover una NP a mano**. El armado automático ya junta por cliente
+(bloques (a1)/(a2) de `gv_ppp_web_armar_pendientes`); lo que separó a Orfali fue un movimiento
+manual el 10/09 a las 12:10 que el automático nunca volvió a mirar.
+
+**Trigger `gv_web_cliente_un_solo_dia`** sobre `PPP_Web_Programacion` (tabla nuestra, no
+compartida — el trigger está permitido), `AFTER UPDATE OF fecha_entrega, tanda`, sólo cuando la
+fecha cambia:
+
+| Situación | Qué hace |
+|---|---|
+| Se mueve una NP y el cliente tiene otras con tanda, futuras, en otro día | Las **arrastra** al mismo día y a la tanda web abierta del cliente (si no hay, a la de la NP movida) |
+| Alguna de las otras está en una tanda que un operario **ya empezó** (`gv_ppp_tanda_tocada`: EP/TP/AP/TAP) | **Corta con error** y no mueve nada: *"No se puede: <cliente> ya tiene otro pedido en la tanda X del DD/MM y esa tanda ya se empezó a trabajar…"* |
+| Zona Súper / Retira / Expo, o cliente en `cobranzas_cliente_cadena` | **No interviene** (un súper entrega a sucursales distintas en días distintos a propósito) |
+
+No dispara en INSERT a propósito: el armado en cascada inserta por días con cupo y el trigger
+pelearía con él. Lo que se escape por ahí lo muestra la alerta `gv_ppp_cliente_dos_dias`.
+
+**Pruebas (con rollback, sobre Orfali):** mover LK 0002 al 17/09 → LK 0053 la siguió · con un
+`TP` simulado sobre D69D, mover LK 0053 → cortó y nada cambió · las dos como Súper → LK 0002 se
+movió sola. La base quedó igual que antes (las dos en D69D, 16/09).
+
+**Rollback:** `sql/gv_web_cliente_un_solo_dia_v1551.sql`.
+## 3.bs `gv_entregas_mensuales_cod` — cajas ENTREGADAS por mes, al lado de las facturadas (v15.52) — 2026-09-11
+
+**Pedido del dueño**, mirando el popup de Proyección del 321 (Rallador cilíndrico, Carriero):
+*"a la derecha del mes, poné las cajas entregadas, y después el gráfico de barra"*. Venía de
+preguntar cuánto entrega ese proveedor por mes (321 + 840): la respuesta estaba en
+`Entregas Prov AT`, pero el popup sólo mostraba lo **facturado** (ventas, motor de PáginaLK).
+
+**Qué se creó.** RPC **`public.gv_entregas_mensuales_cod(p_cod text, p_meses int default 12)`**
+→ `(mes 'YYYY-MM', cajas numeric, cubierto boolean)`, una fila por mes de la serie (termina en el
+mes actual AR). `LANGUAGE sql STABLE SECURITY INVOKER`, `GRANT EXECUTE` a anon/authenticated.
+Objeto nuevo con prefijo `gv_`: **no toca nada de Producción**. Fuente:
+`vista_historial_entregas` (UNION de `Entregas Tallerista Virgilio` + `Entregas Prov AT`), cuyo
+`fecha` es TEXT con tres formatos (`YYYY-MM-DD`, `DD/MM/YY`, basura `|||`): se parsea **una vez,
+acá**, no en el front. Código normalizado como `_ocgNorm` (upper, sin ceros a la izquierda).
+
+**`cubierto`** — lo importante. Un mes con `cubierto=false` **no es un cero**: es un mes en que el
+circuito de ese artículo todavía no se registraba en la app. Medido:
+
+| Circuito (`fuente`) | Primer mes con registro | Filas mar/abr/may 2026 |
+|---|---|---:|
+| `tallerista` | 2025-12 | 161 / 150 / 125 |
+| `prov_at` | **2026-06** (04/06) | 0 / 0 / 0 |
+
+El circuito del artículo se toma de sus propias entregas (la fuente con más filas); si nunca
+entregó, del padrón (`Articulos x Prov AT` → `prov_at`, `Articulos Virgilio X Tallerista` →
+`tallerista`). El front pinta `s/d` y no lo suma al pie.
+
+**Comprobación:**
+```sql
+select * from public.gv_entregas_mensuales_cod('321', 12);
+-- 2025-10..2026-05 → 0 / false · 2026-06 506 · 2026-07 500 · 2026-08 382 · 2026-09 150 (todos true)
+select * from public.gv_entregas_mensuales_cod('031', 10);   -- tallerista: cubierto desde 2025-12, mar 863 / abr 620 / may 723
+```
+Cruce: las recepciones de `Movimientos_Stock` (tipo `recepcion`) dan idéntico a la RPC para 321 en
+jul/ago/sep (500/382/150); junio no cuadra (90 vs 506) porque el stock event-sourced arranca el
+26/06 — la madre del dato de entregas es la vista, no el stock.
+
+**Front (v15.52):** `stkShowProyVentas` pide `ventas_mensuales_cod` y esta RPC con `Promise.all`;
+fila = `mes → entregadas → barra → facturadas`, cabecera `entreg./factur.`, pie con "Entregado 6m".
+Si ningún mes está cubierto, la columna no se dibuja. Test `tests/proy-entregadas.cjs`.
+
+**Rollback:** `drop function public.gv_entregas_mensuales_cod(text, integer);` — el front lo
+tolera (fetch falla → `ent = {}` → columna ausente, popup igual que en v15.51).
+`sql/gv_entregas_mensuales_cod_v1552.sql`.
+
+### §3.cf.3 — El candado también en el armado automático (v15.53, 2026-09-11)
+
+Thomas, a la pregunta de si el candado iba también sobre el armado: ***"si claro"***. Y LK 0002
+(358 cajas en 1,184 m³) se revisó a pedido suyo: los 15 artículos tienen volumen y la suma da
+exactamente 1,184 — el 505 son 150 cajas de 0,0024 m³, eso baja el promedio. Nada que corregir.
+
+**Por dónde se podía partir un cliente en el armado:** la cascada (b) reparte por cupo entre
+días, y (a1)/(a2) sólo miran hacia atrás (mañana … `v_techo − 1`): un cliente con día ya asignado
+**más adelante** no se encuentra y el pedido nuevo cae antes.
+
+**`gv_ppp_web_juntar_clientes(p_empresa)`** — bloque **(d)**, al final de
+`gv_ppp_web_armar_pendientes`, en cada corrida de los crons 71/73:
+
+| Caso | Día que gana |
+|---|---|
+| Una de sus tandas ya la empezó un operario | Ese día (la empezada no se mueve) |
+| Ninguna empezada | El **más temprano** — "buscar para atrás, no para adelante" |
+| Dos días distintos ya empezados | No toca; lo informa y lo muestra la alerta |
+
+Las NP van a la tanda web abierta del cliente ese día, o a la de la NP que ya está ahí. Súper /
+Retira / Expo y el padrón de cadenas quedan afuera. Sólo mira lo web: un cliente partido entre
+una NP de ISIS y una web sigue siendo cosa de `gv_ppp_cliente_dos_dias`. Va dentro de
+`begin … exception` — si falla, el armado no se cae.
+
+**Pruebas (con rollback, Orfali):** partido sin tandas empezadas → junta al 16/09 (más temprano) ·
+la suelta antes pero D69D empezada → junta al 16/09 (empezada) · dos empezadas → 0 NP, informa.
+Pasada real al crearla: **nada que juntar**.
+
+**Rollback:** `sql/gv_ppp_web_juntar_clientes_v1553.sql`.
+
+## §3.cg — Vencidos: a las 36 h sin remito pasan a En Salida; los que no salieron se vuelven o se cancelan (v15.55, 2026-09-11)
+
+Thomas, con los **8 pedidos vencidos** de la PPP en pantalla: *"si ya salieron hace más de 36hs y
+no se controló, tiene que aparecer allá la alerta, y aparecer en En Salida. si no salieron, volver a
+programación o cancelar pedido"*.
+
+**Qué eran los 8** (ninguno tenía Carga Camión ni Control de Remitos):
+
+| NP | Cliente | Armada (TAL) | Horas | Caso |
+|---|---|---|---|---|
+| 98530 | Shopping Domino | 09/09 13:04 | 48 | salida presunta |
+| 44612 · 44613 · 44614 | Cencosud | 10/09 16:04 | 21 | todavía no (umbral 36) |
+| 44615 · 44616 · 44617 | Cencosud | — | — | no salió |
+| LK 0024 | Osa | — | — | no salió |
+
+**A) Salida presunta.** `PPP_Web_Config.salida_presunta_horas = 36`. `gv_ppp_en_salida` suma a su
+base las NP **armadas hace más de ese umbral, sin CCN ni factura, con fecha de entrega vencida**:
+estado `armada_sin_carga`, columnas nuevas `horas_desde_armado` y `salida_presunta`. Como el front
+ya excluye de Programación lo que está en esa vista, **salen solas de los vencidos y entran a En
+Salida**, con chip rojo *"🚨 Salió hace X h sin registro de carga · falta el remito"*, cuentan como
+"pasado el plazo" y se cierran desde ahí con **Controlado** (CRN) o **↩** (FSS). El módulo RR de los
+operarios no cambia: sigue mostrando sólo lo cargado (CCN). Medido: 98530 entra; los 3 Cencosud de
+21 h, no.
+
+**B) Los que no salieron.** En la lista de vencidos, por pedido:
+
+| Botón | NP | Backend |
+|---|---|---|
+| ↩ A Programar | web | `gv_ppp_web_desprogramar` — tanda y fecha en null en todas las NP del pedido; queda pendiente en A Programar. Corta si una tanda ya se empezó |
+| 📅 Reprogramar | ISIS | ya existía (`gv_ppp_isis_programar`) |
+| 🚫 Cancelar | las dos | `gv_ppp_np_cancelar` — ISIS: `NP_Canceladas` + `GV_PPP_Prog_Override.oculto = true`; web: **`GV_Web_Cancelados`** (tabla nueva) + fuera de la PPP, y `gv_pedidos_web_excluidos` devuelve `cancelado` para que el feed no lo traiga de vuelta |
+
+**Pruebas (con rollback):** cancelar LK 0024 → `GV_Web_Cancelados` + fila sin tanda + excluidos
+`cancelado` · cancelar 44615 → `NP_Canceladas` + override oculto → 0 filas en
+`gv_ppp_programacion_diaria` · desprogramar LK 0024 → 1 NP sin tanda.
+
+**Rollback:** `sql/gv_en_salida_presunta_y_cancelar_v1555.sql`.
+## §3.ch — La Demora del Resumen salía vacía en los pedidos de la página (v15.56, 2026-09-11)
+
+Thomas, con la captura de los días 17/09 y 18/09: ***"si los pedidos se cargaron por pipeline
+desde paginalk, no calcula demora de pedidos"***. La Demora del Resumen es el promedio de
+`fecha_entrega − fecha de recepción`, así que sin fecha de recepción no hay nada que promediar
+y la celda queda en `·`.
+
+**Causa: las dos funciones que programan solas escriben `PPP_Web_Programacion` sin esa columna.**
+
+| Función | Qué hace con `fecha_recep` |
+|---|---|
+| `ppp_web_armar_tandas` | La **calcula** en su CTE `_sin_tanda` (la usa para ordenar por antigüedad) pero **no la incluye** en la lista de columnas del `INSERT` |
+| `gv_ppp_web_armar_pendientes` (bloque a1) | Ni la menciona |
+| `pppGuardarWeb` (el front) | Sí la manda |
+
+Medido antes del fix: **75 de 84** filas con `fecha_recep` NULL; las 9 con dato son justamente
+las que guardó el front. Los días **17/09 (26 NP)** y **18/09 (7 NP)** estaban 100 % sin fecha.
+
+**Arreglo: un trigger, no un parche a las dos funciones.** Son 24 kB de plpgsql que corren en
+los crons **71** (`1 3 * * 1-5`) y **73** (`*/15 9-23 * * *`); un `create or replace` de
+cualquiera de las dos para agregar una columna es mucho más riesgo que un `BEFORE` de tres
+líneas — y el trigger cubre **todas** las vías de escritura de una vez, incluidas las que vengan.
+La tabla es de Gestión (`PPP_Web_*`), Producción no la usa, y ya lleva dos triggers propios
+(`trg_ppp_web_prog_touch`, `gv_web_cliente_un_solo_dia`): no aplica la prohibición de triggers
+sobre tablas compartidas.
+
+```sql
+-- BEFORE INSERT OR UPDATE: sólo RELLENA, nunca pisa una fecha ya cargada
+create trigger gv_ppp_web_fecha_recep before insert or update
+  on public."PPP_Web_Programacion" for each row
+  execute function public.gv_ppp_web_fecha_recep();
+```
+
+**De dónde sale el dato:** `lk_pedidos_match.fecha_pedido`, que LK empuja por FDW cada 15 min
+(`sync_pedidos_match_virgilio`). Resuelve **75 de 75** por `(empresa, order_id)` — cobertura
+100 %, ni una sin fuente.
+
+**Medición después (backfill + trigger):**
+
+| | Antes | Después |
+|---|---:|---:|
+| Filas sin `fecha_recep` | 75 de 84 | **0 de 84** |
+| Demora del 17/09 | — (vacía) | **8,3 días** |
+| Demora del 18/09 | — (vacía) | **10,0 días** |
+
+Demoras que quedaron a la vista: 11/09 2,0 · 14/09 8,3 · 15/09 9,1 · 16/09 7,9 · 17/09 8,3 ·
+18/09 10,0 · 29/09 19,0.
+
+**Prueba del trigger** (dentro de `begin … rollback`, no quedó nada): un `insert` sin
+`fecha_recep` para el `order_id` 1350 salió con `2026-09-05`, que es el `fecha_pedido` de ese
+pedido. Verificado después: 84 filas, ninguna de prueba.
+
+**Riesgo conocido:** si el cron de Gestión programa un pedido **antes** de que
+`sync_pedidos_match_virgilio` lo haya traído de LK (los dos corren cada 15 min), esa fila puede
+nacer con `fecha_recep` NULL y el trigger no tiene de dónde sacarla. Hoy no pasó nunca (75/75
+resolubles). Si aparece, la salida es un repaso periódico de las NULL, no tocar las funciones.
+
+**Backup y rollback:** `sql/gv_ppp_web_fecha_recep_v1556.sql`. La columna respaldada fila por
+fila en `public."GV_Backup_FechaRecep_20260911"` (84 filas, 75 con `fecha_recep_old` NULL).
+
+```sql
+drop trigger if exists gv_ppp_web_fecha_recep on public."PPP_Web_Programacion";
+drop function if exists public.gv_ppp_web_fecha_recep();
+update public."PPP_Web_Programacion" set fecha_recep = null
+ where (empresa, order_id, np_idx) in (select empresa, order_id, np_idx
+                                         from public."GV_Backup_FechaRecep_20260911"
+                                        where fecha_recep_old is null);
+```
+## 3.bt `gv_np_items` — las líneas de una NP por su clave visible, ISIS y web juntas (v15.57) — 2026-09-11
+
+**Pedido del dueño** en el Resumen de la PPP: *"si toco en el nro de NP quiero ver qué contenía esa
+NP (cod y cajas)"*. El modal que ya existía para eso (`pppChequeoNp`, el del ✓ de Programación)
+leía `gv_ppp_base_pedidos`, que es el espejo de ISIS: para una NP web (`LK 0024`) devolvía vacío y
+el modal decía "No encontré artículos".
+
+**Qué se creó.** Vista **`public.gv_np_items`** (`security_invoker = true`, `GRANT SELECT` a
+anon/authenticated) → `(np text, articulo text, cajas numeric, origen 'isis'|'web')`:
+- ISIS: `gv_ppp_base_pedidos` con `pedido` sin el `.0` del espejo (`98532`, no `98532.0`).
+- Web: `PPP_Web_Base` por `np_label` (`LK 0024`), que ya está desnormalizado en esa tabla.
+
+No se tocó `gv_ppp_base_pedidos` (lo siguen leyendo el stock, la carga masiva del semáforo ✓ y las
+OCs) ni `PPP_Web_Base`. Objeto nuevo con prefijo `gv_`.
+
+**Comprobación:**
+```sql
+select np, origen, count(*) lineas, sum(cajas) cajas from public.gv_np_items
+ where np in ('LK 0024','98532') group by 1,2;
+-- LK 0024 · web · 1 línea · 5 cajas      98532 · isis · 18 líneas · 23 cajas
+```
+
+**Front (v15.57):** `pppChequeoNp` pide `gv_np_items?np=in.("LK 0024","98532")&select=pedido:np,articulo,cajas`
+(comillas porque las NP web llevan espacio; el alias `pedido:np` mantiene el campo que usa
+`pppChkCompute`). La celda NP del detalle del Resumen (`pppResTgl`) llama a ese modal.
+Test `tests/ppp-res-np-fecha.cjs`; `tests/ppp-chk-gondola.cjs` stubbea también esta vista.
+
+**Rollback:** `drop view public.gv_np_items;` — el front no rompe, vuelve a "No encontré artículos".
+`sql/gv_np_items_v1557.sql`.
+
+## §3.ci — Cuarentena: sólo lo PENDIENTE. Lo ya programado no le abre tarea a Viviana (v15.58, 2026-09-11)
+
+Vivi: *"tengo estos mensajes de cuarentena pero no los veo en A Programar"*. Tenía 7 tareas abiertas en
+Planify (creadas por el sync a las 11:45), **todas de pedidos que ya estaban programados** con tanda, dos
+de ellos ya entregados:
+
+| Tarea | NP | Tanda | Entrega | Motivo que decía |
+|---|---|---|---|---|
+| Cuarentena LK 1354 · Osa Distribuidora | LK 0024 | E09B | 09/09 | Deuda $20.168.551,52 |
+| Cuarentena CH 225 · Clapera | CH 0014 / 0015 | E12G | 17/09 | Deuda $4.894.986,39 |
+| Cuarentena CH 218 · Ierakuin | CH 0004 | E03B | 15/09 | Deuda $2.062.528,58 |
+| Cuarentena CH 217 · Gifel | CH 0003 | D69E | 16/09 | Deuda $1.955.317,80 |
+| Cuarentena LK 1349 · Bazar Monica | LK 0018 | D68G | 15/09 | Deuda $1.080.583,02 |
+| Cuarentena LK 1346 · BP Import | LK 0011 | E01D | 08/09 | Deuda $836.136,98 |
+| Cuarentena LK 1384 · Bazar Mandarin | LK 0060 / 0061 | E12D | 17/09 | Supera el límite por $361.544,46 |
+
+**Causa.** A Programar sólo lista lo pendiente: `aprCargar` saca del feed lo que ya tiene tanda en
+`PPP_Web_Programacion` y lo que está en un borrador (`PPP_Web_Tanda_Items`), y `cuarMarcarPedidos`
+evalúa la cuarentena sobre esa lista. La Edge Function `gv-ppp-web-tandas-diarias` (v22) no:
+`soloPendientes` le pasaba a `pedidosEnCuarentena` —y de ahí a `gv_cuarentena_planify_sync`— **todo el
+feed menos `gv_pedidos_web_excluidos`**, que no conoce `PPP_Web_Programacion`. Resultado: tarea a
+Viviana por pedidos que ya iban en un camión, imposibles de encontrar en el sector Cuarentena porque
+no están pendientes. Efecto colateral: `gv_cuarentena_limite` arranca el greedy con la **base** de
+armados no facturados (que ya incluye al programado) y lo sumaba **otra vez** como pendiente, así que
+LK 1384 "superaba" un límite que no supera. En las corridas del mediodía del 11/09 el log contaba
+`excluidos.cuarentena` = 3 en LK y 3 en Chef, todos programados.
+
+**Fix (Edge Function v23).**
+- `pedidosYaTomados(emp)`: lee los `order_id` con tanda de `PPP_Web_Programacion` y los de
+  `PPP_Web_Tanda_Items` de la empresa y los saca de los candidatos **por pedido entero**, igual que el
+  front (la cuarentena retiene todas las NP de un pedido juntas). Lo programado **sigue** en `filas`:
+  el resync y la foto de `PPP_Web_Base` lo necesitan. Si la lectura falla se evalúa todo como antes
+  (peor una tarea de más que un pedido con deuda armado solo).
+- `pedidosEnCuarentena` ya no corta antes del sync cuando no hay candidatos: la lista vacía es
+  justamente lo que le dice a `gv_cuarentena_planify_sync` que cierre las tareas abiertas de esa
+  empresa. Antes, con el feed sin pendientes, las tareas viejas quedaban abiertas para siempre.
+- Las RPC (`gv_cuarentena_marcar`, `gv_cuarentena_limite`, `gv_cuarentena_planify_sync`) **no cambiaron**.
+
+**Las 7 tareas** se cerraron a mano (`done = true`, nota "Falsa alarma: la NP ya estaba programada…")
+y con `GV_Cuarentena_Planify.cerrada_at`, para que el sync no las vuelva a tocar. Lo que sí queda en
+cuarentena de verdad (pendiente + deuda / suspendido / límite) sigue abriendo tarea como en la v15.47.
+Si una de esas NP vuelve a A Programar (↩ desprogramar, §3.cg), vuelve a ser candidata y, con deuda,
+le abre una tarea nueva: eso es correcto.
+
+**Verificación:** la corrida siguiente en `GV_Tandas_Auto_Log` tiene que salir con
+`excluidos.cuarentena` ausente o sólo con pedidos pendientes, y sin tareas nuevas de Viviana en
+`planify.tasks` para NP con tanda.
+
+**Rollback:** redeployar la v22 (commit anterior de `supabase/functions/gv-ppp-web-tandas-diarias/index.ts`).
+Auditoría: `github_repo_problemas`, "Cuarentena abre tareas en Planify (Viviana) para pedidos que ya
+estan programados con tanda".
+\n
+
+### §3.ci.1 — v15.59 (2026-09-11): ¿el automático sacó algo de Cuarentena solo? NO. Y el candado, por bloque
+
+Vivi, al leer el arreglo anterior: ***"¿me estás diciendo que el programa mandó los pedidos que estaban
+en cuarentena a la programación por su cuenta, sin que nadie los saque de cuarentena manualmente? Si
+fue así, es un problema gigante"***. La pregunta se auditó entera contra la base.
+
+**Respuesta: no. Ningún pedido pasó de Cuarentena a Programación sin que una persona lo liberara.**
+
+El orden de los hechos lo prueba. Los datos de Cuarentena no existían cuando se armaron esos camiones:
+
+| Fuente | Cargada |
+|---|---|
+| `busqueda` Chef (límite + suspendido) | 10/09 17:36 |
+| `busqueda` LK | 10/09 17:46 |
+| `deuda` LK y Chef (carga inicial) | 10/09 ~17:36 – 18:00 |
+| `deuda` LK y Chef (reemplazo vigente) | 11/09 12:43 |
+
+Las 7 NP de las tareas de Vivi recibieron tanda **antes** de esa carga, o sea con el sistema sin nada
+contra qué chequear la deuda:
+
+| NP | Cliente | Tanda | Programada | Por |
+|---|---|---|---|---|
+| LK 1346 | BP Import | E01D | 06/09 00:20 | sistema |
+| LK 1349 | Bazar Monica | D68G | 06/09 16:15 | sistema |
+| CH 217 | Gifel | D69E | 06/09 16:15 | sistema |
+| CH 218 | Ierakuin | E03B | 07/09 09:30 | sistema |
+| LK 1354 | Osa Distribuidora | E09B | 07/09 09:45 | sistema |
+| LK 1384 | Bazar Mandarin | E12D | 10/09 11:45 | sistema |
+| CH 225 | Clapera | E12G | 10/09 15:30 | sistema |
+
+Los **tres únicos** pedidos que recibieron tanda después de la carga fueron liberados **a mano** antes,
+con nombre y hora en `GV_Cuarentena_Liberados`:
+
+| NP | Liberado | Por | Programado |
+|---|---|---|---|
+| LK 1369 El Gran Bazar | 12:15:52 | loekemeyer.n8n@gmail.com | 12:16:41, cron, E12D |
+| LK 1388 Villar | 12:16:01 | loekemeyer.n8n@gmail.com | 12:16:17, **a mano**, E19A |
+| LK 1380 Pérez Zárate | 12:16:02 | loekemeyer.n8n@gmail.com | 12:16:41, cron, E12D |
+
+O sea: alguien apretó "Enviar a Pedidos a programar" y el cron los tomó 39 segundos después. Es
+exactamente lo que tiene que pasar al liberar. El filtro, además, **funcionó**: la corrida del 11/09
+00:01 (log id 278) retuvo 7 NP de LK y 3 de Chef con `excluidos.cuarentena`.
+
+**Lo que SÍ queda abierto (decisión del dueño, no se tocó nada):** la Cuarentena frena lo que todavía
+**no** tiene tanda. Un pedido ya programado al que después le aparece deuda **no se retira solo**, y
+hoy hay clientes en esa situación (Osa $20,1 M en E09B ya entregada, Torres y Liva $32,2 M en E01A,
+Di Leo Rossi $2,6 M en E01D, Ierakuin $2,1 M en E03B del 15/09, Gifel $2,0 M en D69E del 16/09,
+Clapera $4,9 M en E12G del 17/09). Retirar mercadería ya armada es una decisión comercial: queda
+registrado como problema **abierto** en `github_repo_problemas`, sin tocar la PPP.
+
+
+**Verificado en la corrida real (mismo día).** La Edge Function quedó en **v25** (13:22 ART; la v23,
+13:00, ya traía el filtro y la v25 agrega el candado por bloque). La corrida del cron de las **13:15:13**
+cerró sola las **6** tareas que le quedaban abiertas a Viviana (CH 217 · 218 · 225, LK 1349 · 1354 ·
+1384): con cero pedidos pendientes en cuarentena el sync manda lista vacía y eso es lo que las cierra.
+
+La séptima, **LK 1346 BP Import, no la cerró el fix: salió sola a las 12:43:46 porque el cliente pagó.**
+El reporte de deuda subido a las 12:43:28 le bajó el saldo de **$836.136,98 a $0,01**, debajo del umbral
+de $1.000, y `gv_cuarentena_marcar` dejó de marcarlo. Es el mecanismo funcionando como tiene que
+funcionar. ⚠ Por eso BP Import **no** cuenta como cliente con deuda y pedido ya armado: se lo sacó del
+registro de auditoría, que en su primera versión lo incluía.
+
+\n**El candado, ahora por BLOQUE.** La v15.58 dejaba fuera de la evaluación al pedido entero si **un**
+bloque tenía tanda; un bloque todavía pendiente de un cliente con deuda se habría podido programar
+solo. Se verificó que hoy **no existe ningún pedido partido** (0 filas con bloques con y sin tanda a
+la vez), pero el armado no puede depender de eso: `pedidosYaTomados(emp, filas)` ahora compara
+`order_id|np_idx` y un pedido con al menos un bloque pendiente **sigue siendo candidato**, y la
+cuarentena lo retiene entero. Probado con las cuatro combinaciones (todo con tanda → fuera; partido →
+candidato; nada con tanda → candidato; en borrador → fuera).
+
+**Rollback:** redeployar la v23 (commit `e62fdc0`) o la v22 (commit anterior) de
+`supabase/functions/gv-ppp-web-tandas-diarias/index.ts`.
+
+## 3.bu Z5 del 15/09 unificado al Norte del 16/09 · Veronesi fuera de D68G · 11 correcciones de geo (v15.60) — 2026-09-11
+
+**Disparador.** Thomas, mirando el Resumen: *"¿tiene sentido ir 3 veces en 3 días a Z5? ¿no unificarías?"*
+y *"revisá la distancia entre barrios y distancia recorrida por día"*. Medido con `GV_Geo_Cliente`
+(haversine, depósito Virgilio 2788 = `PPP_Geo.__deposito_virgilio_2788__`):
+
+| Día | Z5 m³ | Iba con | km camión Norte |
+|---|---:|---|---:|
+| 15/09 | 1,60 (D68E Morón · D68G Padua/Ituzaingó/Ciudadela · E11A Luján) | nadie: camión propio | 117 |
+| 16/09 | 0,16 (D69B Hurlingham) | Z6 2,07 + Z7 0,77 | 53 (sin Pilar, sin geo) |
+| **Unificado 16/09** | 1,76 | 4,60 m³ < cupo 6 | **138** |
+
+Además D68G mezclaba **98694 Veronesi (La Boca, Sur)** con Padua/Ituzaingó (Norte): depósito→La Boca
+15 km + La Boca→Padua 31 km = **+29 km** por un pedido de 0,16 m³. Thomas: *"1 sí, 2 sí, 3 dale"*.
+
+**Qué se cambió (backup `GV_Backup_Z5_20260911`, rollback en `sql/backups/z5_unificacion_20260911.sql`):**
+- `PPP_Web_Programacion` LK 0018/0028/0032: **D68G → D69F, 15 → 16/09** (el camión Norte del 16 es D69; v13.60 "camión = LETRA+NN por día").
+- `GV_PPP_Prog_Override` 98608/98609/98610 (G-Seller): **D68E → D69G, 15 → 16/09**. 98651 (Luján): **E11A al 16/09** (ese override decía "camión propio el 15 porque estiraba el D69 a 55 km"; ahora el D69 del 16 mide 138 km con Luján adentro y ahorra un camión entero).
+- `GV_PPP_Prog_Override` 98694 (Veronesi): **tanda propia D68J** en el camión Sur del 15/09. No se metió en E01B/E03B/E03E porque son tandas web y la regla v14.12 no mezcla ISIS con web en una tanda.
+- Ninguna de las tandas tenía eventos de operario (`Registros_Produccion_Virgilio` sin filas `D68E%|D68G%|E11A%`).
+
+**Impacto medido después:** `gv_ppp_super_mezclado` = 0 · `gv_ppp_cliente_dos_dias` = vacía · 15/09 sin Z5 ·
+16/09 Z5 1,76 (D69B/D69F/D69G/E11A) + Z6 2,07 + Z7 0,77. Cada cliente movido tenía TODAS sus NP en la misma tanda.
+
+**Geocodificación (problema registrado en `github_repo_problemas`: "GV_Geo_Cliente: clientes de Pilar, San Martín,
+Luján y Bella Vista geocodificados en CABA; Pilar del 16/09 sin lat/lng").** Causa: "San Martin", "Pilar", "Lujan" como
+barrio ambiguo → Nominatim devolvía la calle homónima de CABA y `centroBarrio()` resolvía el mismo lugar, así que el
+chequeo de 20 km pasaba. Hecho: **11 filas en `GV_Geo_Correccion`** (nota `v15.58 11/09 Thomas…`) con el **partido**
+como `barrio_ok` (General San Martín, Luján, Pilar, Villa Rosa, Bella Vista/San Miguel); **10 ubicaciones falsas
+borradas** de `GV_Geo_Cliente` (backup `GV_Backup_Geo_20260911`); 4281 sacado de `GV_Geo_Fallidas` para que reintente
+con la corrección; corrida manual de `gv-geocodificar` (request 20111). Los 10 borrados NO son habituales
+(`gv_clientes_habituales` = con entregas en 2026): no entran en `gv_geo_faltantes_padron`, se geocodifican bien el día
+que vuelvan a pedir. **Queda:** 4198 Benítez *"Panamericana 54,5 - Pilar"* (LK 0068/0069, 16/09) no tiene calle y
+altura — necesita el pin de Thomas.
+
+## 3.bv ✅ `gv_ppp_np_cancelar` no cancelaba ninguna NP de ISIS (v15.62) — 2026-09-11
+
+**Síntoma.** Thomas: *"98050 Pedido Cancelado por el cliente… ejecutá"*. `select gv_ppp_np_cancelar('98050', …)` →
+`ERROR 42702: column reference "np" is ambiguous`. En la rama ISIS de la función (v15.55, §3.cg) el
+`insert into NP_Canceladas … on conflict (np)` choca con el parámetro de salida `np` del `RETURNS TABLE`.
+La rama web no lo usa sin calificar y andaba: **el botón 🚫 Cancelar sólo fallaba con NP de ISIS**, y desde el
+10/09 nadie lo había usado con una.
+
+**Fix (migración `gv_ppp_np_cancelar_fix_np_ambiguo_v1561`, `sql/gv_ppp_np_cancelar_fix_np_ambiguo_v1562.sql`):**
+`#variable_conflict use_column` al inicio del cuerpo; nada más cambia. Probado con 98050: `NP_Canceladas` +
+`GV_PPP_Prog_Override.oculto = true`, y la NP sale de `gv_ppp_en_salida`.
+
+**Mismo pedido, datos:** 98569 (D55A), 98474 (D46E) y 98509 (D55D) estaban en En Salida como *facturada sin
+cargar* aunque se entregaron el 03 y 04/09 (Thomas). Se cargaron los 3 eventos **CRN** (Recepción Remitos)
+con `ts_cliente` en la fecha real de entrega, legajo 104, `descripcion` "cargada a pedido de Thomas 11/09".
+98321 ya estaba en Pedidos Entregados (CRN del 20/08). Problema registrado y cerrado:
+*"gv_ppp_np_cancelar falla para NP de ISIS"*.
+
+**Segundo agujero, mismo caso (v15.63).** Cancelada, 98050 **seguía en En Salida**: `gv_ppp_en_salida` sólo suelta una
+NP por CRN, `gv_ppp_entregados_meta` o FSS; el 🚫 Cancelar de la v15.55 estaba pensado para lo que *no salió* y
+nunca se probó contra una facturada. Migración `gv_ppp_en_salida_excluye_canceladas_v1563`: el WHERE final excluye
+`NP_Canceladas` y `GV_Web_Cancelados` (`sql/gv_ppp_en_salida_excluye_canceladas_v1563.sql`). Medido: 98050 fuera,
+En Salida pasa de 31 a 30 filas.
+
+## 3.bw ✅ El geocodificador pela el " - <localidad>" que pega la página (v15.64) — 2026-09-11
+
+**Problema** (registrado: *"Geocodificación: las direcciones de la página traen ' - <localidad>' pegado a la
+altura y el normalizador no lo pela"*). `PPP_Web_Programacion.direccion` llega como *"Caamaño 1315 - Villa Rosa"*,
+*"Donofrio 20 - Ciudadela"*, *"Julio Godoy 4656 - Villa Lynch"*, y truncada a 30: *"Pacífic Rodri 6137 - Villa Bal"*,
+*"Ayacucho 56 - San Antonio de P"*. Nominatim no encuentra eso; Ciudadela acumuló **13 intentos** en `GV_Geo_Fallidas`
+y hoy se venían tapando de a una en `GV_Geo_Correccion` (4 en esta sesión). Thomas: *"2 sí"*.
+
+**Fix (migración `gv_dir_geo_normalizar_sufijo_localidad_v1564`, `sql/gv_dir_geo_normalizar_sufijo_localidad_v1564.sql`):**
+la función de dos argumentos `gv_dir_geo_normalizar(dir, barrio)` (v14.28, que ya sacaba el barrio repetido tras una
+coma) ahora también saca *" - <cola>"* cuando viene después de un número y la cola es el barrio, un prefijo de 3+
+letras del barrio (truncada) o el barrio es prefijo de la cola. Sin número antes del guion, o sin espacios alrededor
+(*"5463-V. Urquiza"*), no se toca. `dir_key` no cambia.
+
+**Medido:** 12 casos de prueba OK (en el .sql) · 25 direcciones de `PPP_Web_Programacion` cambian (todas las que
+tienen el patrón) · 1 del padrón · `gv_geo_faltantes` 8 → 8. Corrida posterior: **4024 Ciudadela y 3927 Villa
+Ballester ubicados**. Se reabrieron en `GV_Geo_Fallidas` 4080 (J. M. Pérez 977, Luján) y 4189 (Valimar) para que
+reintenten con la dirección limpia.
+
+**Pendiente del mismo tema:** la página trunca la dirección a 30 caracteres — eso se arregla en `pagina-LK-copia`, no acá.
+
+**Los dos que OSM no tiene, cargados con el pin de Thomas (v15.68).** `GV_Geo_Cliente` con `manual = true` y
+`precision = 'manual'` (el cron no los pisa), en las dos claves: la cruda de la página y la limpia que ahora
+produce el normalizador.
+
+| Cód | Cliente | Dirección | Pin | Por qué no salía |
+|---|---|---|---|---|
+| 4198 | Benítez Andrea (LK 0068/0069) | Panamericana 54,5 - Pilar | -34,449868 / -58,916581 | dirección en km: no hay calle ni altura que geocodificar. El pin es el centro de Pilar (Thomas mandó "Pilar, B1630"), no el Paseo Champagnat; a 7,9 km del otro cliente de Pilar, no cambia el orden del camión |
+| 4189 | Distribuidora Valimar (LK 0070) | Julio Godoy 4656 - Villa Lynch | -34,588412 / -58,537311 | la calle no está en OpenStreetMap |
+
+Con eso **el camión Norte del 16/09 queda entero ubicado: 13 paradas, 153 km**. Del día siguen sin ubicar sólo
+Cencosud Tortuguitas (súper, camión aparte) y Matiz Burzaco (zona Sur).
+
+## §3.cj — Corregir códigos: el stock del secundario se reparte entre las NP que lo piden (v15.66, 2026-09-11)
+
+Thomas, con el panel **Corregir códigos (secundario → principal)** abierto en 565 → 607E: *"acá tenés mal la
+lógica. Mirá el 565 primero: el stock y sus pedidos"*.
+
+### Qué estaba mal
+
+El panel comparaba **cada NP sola** contra el stock total del secundario (`p.stkSec >= p.cajas`) y sólo la
+marcaba urgente con el secundario en 0 (`_corrItemUrgente`, v10.28). Con 565 = 2 en góndola y 7 NP pidiéndolo
+(8 cajas), las 7 salían en verde "alcanza — mandalo tal cual, sin tocar NP". El badge del panel supervisor
+(`corrLoadBadge`) y el chip de Facturación (`_urgN`) usaban el mismo criterio por ítem.
+
+| NP | Tanda | Sale | Estado | Cajas 565 | Antes (v15.50) | Ahora (v15.66) |
+|---|---|---|---|---:|---|---|
+| 98662 | D67A | 10/09 | pickeado | 2 | verde | **verde** (1.ª de la cola, le quedan 2) |
+| 98671 | D67E | 10/09 | pickeado | 1 | verde | **rojo** → cambiar NP a 607E |
+| 98674 | D67F | 10/09 | pickeado | 1 | verde | rojo |
+| 98664 | D67I | 10/09 | sin pickear | 1 | verde | rojo |
+| 98678 | D67G | 10/09 | sin pickear | 1 | verde | rojo |
+| 98688 | D67L | 10/09 | sin pickear | 1 | verde | rojo |
+| 98621 | D69B | 14/09 | sin pickear | 1 | verde | rojo |
+
+Stock al 11/09: 565 = 2 en góndola; 607E = 80 góndola + 216 racks + 6 en separar. Pedido total de 565: 8 cajas
+en 7 NP. El otro caso del panel (338 → 941E, 98532, 1 caja, stock 23) queda verde igual que antes.
+
+### Qué se hizo — la regla vive en la vista
+
+`vista_correcciones_pedido_rich` (`sql/vista_correcciones_pedido_rich_v1566_reparto_sec.sql`, migración
+`gv_corr_sec_reparto_v1551`) arma una **cola por código secundario** — fecha de salida → estado (a facturar >
+pickeado > en picking > sin pickear) → NP — y acumula las cajas. Seis columnas nuevas **al final** (las 14 de
+antes no cambian de nombre, tipo ni orden): `sec_pedido_total`, `sec_np_total`, `sec_orden`,
+`sec_acum_antes`, `sec_disp` (= max(stk_sec − acumulado anterior, 0)) y **`sec_cubre`** (true = le alcanza →
+"mandalo tal cual"; false = urgente, cambiar la NP al principal).
+
+Front (`index.html`): `facCorreccDataRich` lee las columnas; `_corrItemUrgente = !secCubre`;
+`_corrVeredicto` arma el verde/rojo con la cola ("pedidas 8 en 7 NP, ésta es la 4.ª → a ésta le quedan 0 de
+1 — cambiá NP a 607E"); `corrLoadBadge`, `facCorreccRefreshCount` y el chip de Facturación
+(`_corrNpsUrgentes`, la vista entra al `Promise.all` de `facTick`) leen la misma vista, así el número es el
+mismo en los tres lugares. Si la vista no trae `sec_cubre` (rollback), el front cae al criterio viejo
+`stk_sec >= cajas`. `_corrStk` y `_facCorrSecStk` (cruces por ítem contra `vista_saldos_stock`) se sacaron.
+
+### Medición
+
+`explain analyze` de la vista: 349 ms, casi todo `vista_saldos_stock` (igual que antes; la ventana sobre 8
+filas no suma nada medible). Producción Virgilio la lee desde su `index.html` con las 14 columnas viejas:
+no le cambia nada.
+
+### Lo que NO se tocó
+
+- Las tres NP "pickeado" (D67A, D67E, D67F) pickearon **607E**, no 565 (`PKC D67A|607E|4|4`, `D67E|607E|1|1`,
+  `D67F|607E|1|1`): la góndola del 565 sigue en 2. La vista no mira PKC (no lo trae desde v10.10) y la cola
+  le da el 565 a 98662 por ser la primera en salir. Si la operadora prefiere que el 565 se lo queden las NP
+  todavía sin pickear, es cambiar el orden de `window w` en la vista, nada más.
+- La vista sigue **sin `security_invoker`** (así estaba): corre como `postgres`. Queda anotado, no se cambió acá.
+
+### Rollback
+
+Bloque comentado al final de `sql/vista_correcciones_pedido_rich_v1566_reparto_sec.sql` (definición
+anterior, `pg_get_viewdef` del 11/09). El front v15.66 sigue andando con la vista vieja (cae al criterio por
+ítem). `docs/ROLLBACK-PRODUCCION.md` tiene la entrada.
+
+### §3.cj.1 — v15.67 (2026-09-11): la cola pone PRIMERO las NP sin pickear
+
+Thomas: *"1 claro"* a la pregunta de si el 565 lo tienen que tomar las NP que todavía no se pickearon.
+Las tres NP "pickeado" (D67A, D67E, D67F) ya se llevaron 607E: no pueden usar los 2 de 565 que siguen en
+góndola. La ventana de `vista_correcciones_pedido_rich` ordena ahora por **estado** (sin pickear → en
+picking → pickeado → a facturar → facturado) y recién después por fecha de salida y NP. Migración
+`gv_corr_sec_orden_v1567`, `sql/vista_correcciones_pedido_rich_v1567_orden_sin_pickear.sql`. Mismas 20
+columnas: el front sólo cambia la leyenda del panel.
+
+| NP | Estado | Sale | Cajas | v15.66 | v15.67 |
+|---|---|---|---:|---|---|
+| 98664 | sin pickear | 10/09 | 1 | rojo | **verde** (1.ª, le quedan 2) |
+| 98678 | sin pickear | 10/09 | 1 | rojo | **verde** (2.ª, le queda 1) |
+| 98688 | sin pickear | 10/09 | 1 | rojo | rojo (3.ª, le quedan 0) |
+| 98621 | sin pickear | 14/09 | 1 | rojo | rojo |
+| 98662 | pickeado | 10/09 | 2 | **verde** | rojo → cambiar NP a 607E (ya lleva 607E) |
+| 98671 | pickeado | 10/09 | 1 | rojo | rojo |
+| 98674 | pickeado | 10/09 | 1 | rojo | rojo |
+
+Rollback: volver a correr el `create or replace view` de `sql/vista_correcciones_pedido_rich_v1566_reparto_sec.sql`
+(orden fecha → estado → NP). Sin cambio de columnas: el front no se entera.
+
 ---
 
-## §3.«PKC-DEP» — El PKC dice DE DÓNDE salió cada caja (v15.41, 2026-09-11, pedido de Luis)
+## v15.69 — El pedido web se parte: lo disponible por un lado, lo que espera mercadería por el otro (2026-09-11)
+
+> El número saltó a **v15.69**: otra sesión tomó v15.67 y v15.68 el mismo día. En los
+> comentarios del SQL aplicado y en `sql/gv_ppp_web_diferido.sql` puede quedar escrito "v15.67".
+
+**Regla del dueño (Thomas, 11/09):** *"si un cliente igualmente me pide un item que no voy a tener hasta
+xx/xx, quiero separar el pedido de ese cliente: 1) lo que va normal, con las condiciones normales de
+programación; 2) lo que se programa para entregar recién a partir de que llega esa mercadería"*.
+
+### Quién hace qué
+
+| Dónde | Objeto | Qué hace |
+|---|---|---|
+| LK | `pedido_diferido` (tabla) | Al recibirse el pedido, congela qué líneas no tenían stock. Trigger `marcar_pedido_diferido` sobre `orders` (after update of `sheets_payload`) |
+| LK | `reingreso_piso(art, congelada)` | El piso de fecha **en vivo** contra `reingreso_cache`. `security definer` porque esa tabla tiene RLS sin policies |
+| LK | `v_pedidos_web_np` | Corta **primero** por disponible/diferido y después de a 18 (15 Chef). Columnas nuevas al final: `diferido`, `no_antes_de` |
+| LK | `gv_pedidos_web_np_lk` | Devuelve las dos columnas nuevas (se recreó: cambia el tipo de retorno) |
+| LK | `sync_diferido_virgilio()` + cron 41 (`*/10`) | Empuja el piso a Gestión por el FDW, igual que `lk_pedidos_match` |
+| GV | `GV_PPP_Web_Diferido` | Qué NP espera mercadería y hasta cuándo. La escribe `lk_ppp_reader` |
+| GV | `gv_ppp_web_armar_pendientes` (a0) | Saca esas NP de los pases normales |
+| GV | `gv_ppp_web_armar_pendientes` (b2) | Las programa: primer día hábil **con cupo** desde el piso, nunca antes, con tandas propias |
+| GV | `gv_ppp_web_juntar_clientes` | El candado v15.52 las deja afuera (tres `where`, uno por consulta) |
+| GV | `index.html` | Chip ⏳ "espera dd/mm" en A Programar y aviso al programar un día anterior al piso |
+
+### Por qué el corte se CONGELA y la fecha no
+
+`reingreso_cache.sin_stock` cambia todos los días. Si el corte dependiera de eso, la identidad de una NP
+—`(order_id, np_idx)`, que es la PK de `PPP_Web_Programacion`— se movería sola al llegar la mercadería.
+Medido el 11/09: **83 de 212** pedidos de los últimos 30 días (39%) tienen hoy alguna línea de un artículo
+sin stock, casi todos ya entregados; mirar el estado en vivo los partiría a todos, hacia atrás. Por eso
+`pedido_diferido` congela el corte al recibir el pedido y sólo la FECHA se lee en vivo: si la mercadería se
+adelanta, el bloque se programa antes, pero sigue siendo un bloque aparte.
+
+### Choca con el candado v15.52, y gana esto
+
+El mismo 11/09, a la mañana, el dueño pidió *"nunca si hay +1 pedido de un cliente puede ir separado en la
+PPP… salvo los súper"*. No se contradicen: el candado existe para que no parta a un cliente **el armado**
+(cupo, cascada); acá se parte porque la mercadería no está. La excepción es **sólo** la NP diferida.
+
+### Por qué el piso se empuja por FDW y no viaja en el payload del cron
+
+La Edge Function `gv-ppp-web-tandas-diarias` arma `filasTanda` y podría mandar `no_antes_de`, pero eso
+obligaba a redeployarla (45 kB re-tipeados = el riesgo de la v15.44). Empujando la tabla, el armado queda
+protegido sin tocar ese código. Si algún día se agrega al payload, (a0) no cambia: manda la tabla.
+
+### Medición
+
+- El corte de lo ya existente **no se movió**: 1.475 NP y `md5 e1218e13…` antes y después (foto en
+  `gv_np_antes_diferido`, LK).
+- Prueba en caliente sobre el pedido 1206 (19 líneas, 2 sin stock): queda **17 + 2**, el segundo bloque con
+  piso 29/11. La marca se borró al terminar.
+- `gv_ppp_web_armar_pendientes('lk', null, '[]', '[]')` corre limpio después del parche.
+- **Chef también parte** (mismo día): sus pedidos se leen desde LK por el FDW `chef_db`, así que el corte
+  vive en `gv_pedidos_web_np_chef` y no hubo que tocar el proyecto de Chef. `pedido_diferido` lleva `empresa`
+  en la PK y `marcar_diferidos_chef` hace de trigger desde el cron 41 (Chef no puede tener uno), marcando
+  **sólo pedidos del 11/09 en adelante**. `reingreso_piso` pela el sufijo **L** (un artículo de Loeke vendido
+  por Chef viaja como `505L`, regla v13.71, y `reingreso_cache` guarda el código base). Verificado: 69 NP de
+  Chef y md5 idéntico antes y después.
+
+### Rollback
+
+`GV_Backup_Funciones` (motivo `pre v15.61 diferido`) tiene las dos funciones anteriores: `execute` la columna
+`def`. Después `drop table public."GV_PPP_Web_Diferido"`. Del lado LK: `gv_backup_vistas` tiene la
+`v_pedidos_web_np` anterior, y hay que borrar el cron `sync-diferido-virgilio` (jobid 41) y el trigger
+`marcar_pedido_diferido` de `orders`. Nada de esto toca objetos de Producción.
+
+## 3.bx El viaje del camionero: CC numera, RR controla por viaje (v15.70) — 2026-09-11
+
+**Pedido de Thomas**, en dos partes. CC: *"a medida que den click en lo que cargan, en lugar de un
+simple tilde, que diga 1°, 2°, 3°… una vez que ya terminó de cargar el camión, que le pregunte el
+nombre del camionero"*. RR: *"primero lo deja elegir una NP igual que ahora… una vez elegida, ya
+tenés el dato de qué camionero corresponde → que muestre las NP que entregó Guille el 11/9"*, más
+la alerta de lo que quedó sin controlar y las horas de la hoja de ruta para calcular el ritmo.
+Excepciones suyas: **Retira** no tiene camionero (se controla y guarda en el momento) y el **súper**
+no se compara contra los clientes (*"se demora mucho más para entregar un supermercado"*).
+
+**No hay tabla de viajes.** El camionero ya viajaba en el evento **CCN** desde la v11.47
+(`texto = 'NP|TANDA|CAMIONERO'`); la v15.70 agrega un 4.º campo con el **orden de carga real**:
+`'NP|TANDA|CAMIONERO|ORDEN'`. Los lectores viejos toman `split_part` [1] y [2] y no se enteran.
+La **vuelta** no se pregunta: la 2.ª se detecta sola porque el orden vuelve a empezar en 1 dentro
+del mismo camionero + día (Thomas: *"son 2, pero no hacen dos vueltas casi nunca"*).
+
+| Objeto | Qué es |
+|---|---|
+| `gv_viaje_np` | una fila por NP cargada: viaje (fecha + camionero + vuelta), orden, m³, si es súper o retira, y si ya se controló el remito (CRN) |
+| `gv_viaje` | el viaje resumido: NP, controladas, paradas, m³ + las horas de la hoja de ruta + **m³/hora** (en blanco si el viaje lleva súper) |
+| `gv_viajes_sin_controlar` | **la alerta de la PPP**: viajes con al menos un remito controlado y NP sin controlar |
+| `GV_Viaje_Horas` | lo único que no se deriva de un evento: las horas que declara la hoja de ruta |
+
+**Medido al aplicar, sin tocar un dato:** 8 viajes históricos reconstruidos (Guillermo 03/09: 29 NP,
+16 paradas, 5,28 m³ · Edgardo 09/09: un súper de 2,99 m³, que queda sin ritmo a propósito) y
+`gv_viajes_sin_controlar` vacía.
+
+**El agujero que destapó:** **773 NP cargadas sin camionero**. El campo era opcional y se salteaba —
+el 10 y el 11/09 salieron **33 cargas sin camionero**, el 08/09 otras 10, el 27 y el 24/08 todas.
+Sin ese dato no hay viaje que controlar ni ritmo que medir, así que en la v15.70 **pasa a ser
+obligatorio** en la app (antes era un aviso que se podía saltear con "Terminar igual").
+
+**Front (v15.70, sólo CC):** el cuadrito del tilde muestra **1°, 2°, 3°…** en el orden en que el
+operario los fue tocando (el círculo verde de la izquierda sigue siendo el orden *sugerido* por
+ruta, que es otra cosa); ese orden se guarda en `localStorage` y sobrevive a cerrar y reabrir el
+modal; los CCN se emiten en ese orden. Retira sigue con ✓ y sin camionero.
+Test `tests/cc-orden-camionero.cjs`. **Falta** (tarea Planify abierta): RR filtrando por viaje, las
+horas de la hoja de ruta y la alerta en la PPP.
+
+`sql/gv_viaje_camionero_v1570.sql` · migración `gv_viaje_camionero_v1`.
+
+## 3.by Pedidos de importación EN CURSO, separados del generador: embarque y llegada (v15.72) — 2026-09-11
+
+**Pedido de Thomas**: *"en el módulo de importación, quiero ver cuáles son los pedidos en curso por
+separado de si genera o no genera pedido. Haceme un botón donde pueda ver qué día llegan y qué día
+es la fecha de embarque"*.
+
+Hasta acá el módulo mezclaba las dos cosas en la misma tabla: el *en curso* era una columna más al
+lado de "a pedir", y las fechas se editaban artículo por artículo. Peor: **no existía la fecha de
+embarque** en ningún lado — la única fecha del circuito era `fecha_reingreso`, que es la de llegada.
+Y el pedido en sí (el PI del proveedor) no era un dato: se venía escribiendo en `creado_por`, el
+campo del que cargó, por convención de los `.sql` de las v15.06–v15.21.
+
+### Backend — `sql/gv_importados_pedidos_curso_v1572.sql`
+
+`GV_Importados_Baches` (tabla nuestra, no compartida con Producción) suma **dos columnas nullable**,
+sin default ni backfill destructivo:
+
+| Columna | Qué es |
+|---|---|
+| `pedido_ref` | el **PI/CI** al que pertenece el bache. Es lo que agrupa la pantalla. |
+| `fecha_embarque` | el día que **sale de China**. La llegada sigue siendo `fecha_reingreso`. |
+
+**Backfill de `pedido_ref`** (131 filas de backup en `GV_Importados_Baches_bkp_encurso_20260911`):
+lo que ya tenía `creado_por` con forma de PI/CI pasa tal cual; las **5 líneas de Fujian** que Becky
+cargó el 10/09 desde "Cargar pedido ya hecho" (quedaron con su mail) van a `PI HT26-06-600-R1`; la
+única de Frontier a `Frontier 505C` (no hay PI cargado todavía) y la del dueño a `323ES suelto`.
+**Chequeo**: los totales por PI dan exactamente los de cada proforma — Fujian 106.488 u, Hugo Wong
+88.832, Ownland 98.376, Zhixin 42.258, Becky 41.944 y 48.056.
+
+Objetos nuevos, todos con prefijo nuestro:
+
+| Objeto | Qué hace |
+|---|---|
+| `gv_importados_pedidos_curso` (vista, `security_invoker = true`) | **una fila por pedido en curso**: líneas, unidades pendientes, u$s FOB, m³, las dos fechas y los días que faltan |
+| `gv_importados_pedidos_curso()` (RPC) | la vista para el front (la tabla tiene RLS sin policy para `anon`, igual que el resto del módulo) |
+| `gv_importado_pedido_lineas(ref, prov)` | el detalle por artículo de un pedido |
+| `gv_importado_pedido_fechas(ref, prov, embarque, llegada, set_embarque, set_llegada)` | escribe una fecha en **todas** las líneas del pedido de una; si tocó la llegada, corre `gv_importados_resync` (así `Importados.reingreso_est` —lo que ve el portal LK— queda con la más cercana) |
+| `gv_importado_pedido_ref(ref, prov, nuevo)` | renombrar / reasignar el PI de un pedido |
+| `gv_importado_bache_embarque(bache_id, fecha)` | el embarque de un bache suelto |
+
+`gv_importado_baches` ahora devuelve además `pedido_ref` y `fecha_embarque`, y
+`gv_importado_bache_add` acepta `p_ref` y `p_embarque` (**se dropeó la firma de 4 argumentos**: con
+las dos nuevas por default, convivir daba llamada ambigua en PostgREST). Todo `SECURITY DEFINER` con
+`grant execute` a `anon`/`authenticated`, igual que las RPC de la v14.94.
+
+**No toca ningún objeto de Producción**: `Importados` e `Importados_Volumen` se leen, no se escriben,
+así que no hay entrada en `ROLLBACK-PRODUCCION.md`.
+
+### Front (v15.72)
+
+Solapa nueva **🚢 En curso** en la barra del módulo (`_impTabsHtml`, al lado de 📦 Pedidos y
+🏭 Proveedores) → `openImpEnCurso()`. Un renglón por pedido con proveedor + importador, el PI, líneas,
+unidades por llegar, u$s, m³, y las **dos fechas editables en dd/mm/aa** con los días que faltan
+debajo. La columna Estado dice en qué está el viaje: *falta la fecha de embarque* · *embarca en N d* ·
+*🚢 embarcado hace N d* · *llegada vencida hace N d*. Arriba, cuatro totales y una banda ámbar con
+cuántos pedidos no tienen embarque. Tocando el PI se abre el detalle por artículo; el ✏️ PI lo renombra.
+
+Editar una fecha guarda **el pedido entero** (una sola RPC), no línea por línea. "Cargar pedido ya
+hecho" ahora pide también **Pedido (PI)** y **🚢 Embarque**, y el gestor de 📦 Baches muestra de qué PI
+es cada bache y su embarque. Tests `tests/imp-encurso.cjs` (nuevo) y `tests/pedimp-hecho.cjs`
+(estaba **desactualizado desde la v14.94**: seguía esperando `importados_set_curso` + PATCH a
+`Importados`, cuando esa carga hace un bache por línea desde entonces; como `run.sh` corta en el
+primer error, venía tapando toda la suite en CI).
+
+### Estado al aplicar: **los 8 pedidos en curso, ninguno con fecha de embarque**
+
+| Pedido | Proveedor | Líneas | Unidades | u$s | Llega |
+|---|---|---|---|---|---|
+| `323ES suelto` | Hugo Wong | 1 | 3.000 | 675 | 22/09 |
+| `PI B260601` | Becky | 19 | 41.944 | 23.622 | 29/09 |
+| `PI HT26-06-600-R1` | Fujian | 11 | 106.488 | 32.388 | 01/11 |
+| `PI NY26-031438` | Hugo Wong | 11 | 88.832 | 38.640 | 03/11 |
+| `Frontier 505C` | Frontier | 1 | 200.000 | 14.000 | 04/11 |
+| `PI B260601-2` | Becky | 26 | 48.056 | 31.614 | 15/11 |
+| `PI BX260722D` | Zhixin | 5 | 42.258 | 10.273 | 29/11 |
+| `PI OL-10139` | Ownland | 13 | 98.376 | 46.626 | 18/12 |
+
+**Ojo con Ownland**: el PI OL-10139 dice **u$s 13.988** (§3.bm.5) y la suma de FOB × unidades da
+**46.626**. El grueso es `1546903` (47.088 u de la parte "cheese cutter without handle") con `fob_uni`
+0,79 del maestro viejo. Queda **reportado, sin tocar**: es un dato del PI que hay que cargar.
+
+### Rollback
+
+Todo en el `.sql`: dropear la vista y las 7 funciones, recrear `gv_importado_baches` y
+`gv_importado_bache_add` con las firmas de `sql/gv_importados_baches_v1494.sql`, y
+`alter table "GV_Importados_Baches" drop column pedido_ref, drop column fecha_embarque`. Los datos
+viejos están en `GV_Importados_Baches_bkp_encurso_20260911`.
+
+## 3.bz En curso: fichas de proveedor y de pedido, y la plata de UN pedido (v15.73) — 2026-09-11
+
+**Pedido de Thomas**: *"cuando estoy en el módulo de en curso, poneme los mismos botones que en la
+solapa de pedidos para que pueda ver solo un pedido. Cuánta plata es y todo"*.
+
+Sólo front, sin tocar la base. La pantalla 🚢 En curso suma las mismas fichas redondeadas que ya
+tiene 📦 Pedidos:
+
+- **🏭 Proveedor**: `Todos` + una ficha por chino (con el número de pedidos entre paréntesis si
+  tiene más de uno). Ordenadas por importador, igual que la otra solapa.
+- **📄 Pedido**: `Todos` + una ficha por PI de lo que quede a la vista. Cambiar de proveedor limpia
+  el pedido elegido. Cada fila tiene además un **🔎 solo éste** que hace lo mismo desde la tabla.
+- **Los cuatro totales de arriba se recalculan con lo filtrado**: parado en un pedido el cartel
+  verde dice *"Plata de este pedido (FOB)"* y son los u$s de ESE PI (lo que pidió). Parado en un
+  proveedor, los de ese proveedor.
+- Parado en UN pedido, el **detalle por artículo se abre solo** (es lo que se va a mirar).
+- **📥 Excel** de lo que se está viendo: una tabla con los pedidos y otra con el detalle por
+  artículo (pide las líneas que falten antes de bajar). Respeta las dos fichas.
+
+`_impCursoVista()` es la única fuente de "lo que se está viendo": la usan los totales, la tabla y el
+Excel, así que no pueden desincronizarse. Test `tests/imp-encurso.cjs` (cubre las fichas, el conteo
+de filas y que la plata del KPI sea la del pedido elegido y no la de todos).
+
+**Lo que viene** (dueño, misma charla): *"a estos proveedores yo les voy pagando, así que vamos a
+tener que armar una cuenta corriente… después te paso el archivo actual que lo manejo por Excel"*.
+Sin empezar hasta ver ese Excel — el modelo (anticipo/saldo por PI, moneda, tipo de cambio, qué es
+un pago a cuenta) sale de cómo lo lleva hoy. Tarea Planify abierta.
+
+## 3.ca Cuenta corriente con los chinos + las fechas de EMBARQUE del Excel (v15.74) — 2026-09-11
+
+**Pedido de Thomas**: mandó la foto de su Excel — *"este es mi estado actual de deudas al exterior.
+Fijate para incorporar esto"*.
+
+La lectura de la planilla, las fórmulas que tiene adentro (`Falta = FOB − Pago − Pend Giro Directo`;
+`Embarque = Fecha Pago 30% + lead time`, la celda G3 es literalmente `=+I3+45`) y todo el marco de
+por qué la plata sale como sale están en **`docs/IMPORTACIONES-PAGOS-ARGENTINA.md`**, que es el
+archivo de referencia de este módulo. Acá queda sólo lo de Supabase.
+
+### Las 6 fechas de embarque, cargadas
+
+`GV_Importados_Baches.fecha_embarque` (la columna que se creó vacía en la v15.72) queda con los
+valores del Excel: Frontier 505C **26/10** · Fujian `PI HT26-06-600-R1` **19/09** · Zhixin
+`PI BX260722D` **14/10** · Ownland `PI OL-10139` **08/11** · Becky `PI B260601-2` **22/09** ·
+Hugo Wong `PI NY26-031438` **19/09**. `PI B260601` y `323ES suelto` no están en la planilla (no
+tienen deuda). Backup `GV_Importados_Baches_bkp_cc_20260911` (tabla entera).
+
+Los **días de viaje** que quedan medidos (llegada − embarque): Ownland 40, Fujian 43, Hugo 45,
+Zhixin 46, Becky 54 y **Frontier 9, que no cierra** — la llegada 04/11 se había cargado antes del
+Excel y con embarque 26/10 daría principios de diciembre. Marcado, sin tocar.
+
+### Objetos nuevos
+
+| Objeto | Qué hace |
+|---|---|
+| `GV_Imp_Pedido_CC` | cabecera de plata por (`pedido_ref`, `proveedor`): `a_nombre_de` (NTL o el proveedor), `fob_total`, `pend_giro_directo`, `fecha_pago_30`, `fecha_recup`, `nota`. RLS on, sin policy anon |
+| `GV_Imp_Pagos` | **cada giro**: fecha, `monto_usd`, `beneficiario`, `tipo` (`anticipo30`/`saldo`/`giro_directo`), `factura_ref`, `despacho_ref`. RLS on, sin policy anon |
+| `gv_imp_cuenta_corriente` (vista, `security_invoker = true`) | pedido en curso + cabecera + **pagado = suma de los giros**; devuelve `falta`, `saldo`, `dias_viaje`, `dias_produccion` y `fob_difiere` |
+| `gv_imp_cc_lista()` · `gv_imp_cc_set(...)` · `gv_imp_pagos(ref, prov)` · `gv_imp_pago_add(...)` · `gv_imp_pago_borrar(id)` | SECURITY DEFINER, `grant execute` a anon/authenticated, mismo patrón que las RPC de baches |
+
+`gv_imp_cc_set` usa un `p_set_<campo>` por campo para distinguir *"no tocar"* de *"poner en
+null/0"*, y hace `insert … on conflict do nothing` antes del `update`, así la fila se crea sola la
+primera vez que se edita un pedido.
+
+**Seed con el Excel** (6 filas de cabecera + 6 giros del 30 %, `creado_por = 'seed_excel_20260911'`).
+**Chequeo**: el `falta` de la vista da exactamente el de la planilla — 10.080 · 22.388 · 7.173 ·
+11.670 · 1.814 · 2.647.
+
+`fob_difiere` sólo avisa cuando la diferencia es **plata de verdad (> u$s 1)**: con el umbral en 0
+lloraban las 4 filas por el redondeo del FOB unitario. Queda una sola: **Frontier, 14.400 del PI
+contra 14.000 del motor**.
+
+**No toca ningún objeto de Producción** (todo `GV_*` / `gv_*`; `Importados` ni se lee acá), así que
+no va a `ROLLBACK-PRODUCCION.md`.
+
+### Front
+
+Solapa 🚢 En curso con dos vistas: **📦 Logística** (la de la v15.72) y **💵 Plata**, que es la
+planilla de Thomas — A nombre de · FOB · Pagado · Pend. giro directo · Falta · 💰 Pago 30% ·
+🚢 Embarque · ♻️ Recupero, editable, con los cuatro totales arriba respetando las fichas de
+proveedor/pedido. **💵 Giros** por fila abre el libro de giros del pedido (listar, cargar con
+fecha/monto/beneficiario/tipo/factura, borrar). Test `tests/imp-cuenta-corriente.cjs`.
+
+### Rollback
+
+En el `.sql`: drop de la vista, las 5 funciones y las 2 tablas, y `fecha_embarque` de vuelta desde
+`GV_Importados_Baches_bkp_cc_20260911`.
+
+## 3.cb El depósito INSUMOS deja de sumar al stock de los terminados que nadie revisó (v15.75) — 2026-09-11
+
+**Lo encontró Thomas** mirando Pedidos Importación: *"acá veo 1290 stock total hoy (1200+90) pero en
+stock veo 10 cajas de stock (19-9 pedidas) o sea 60 uni"*. Problema `github_repo_problemas` **#29**.
+
+### Causa raíz
+
+La v15.27 (§3.bm.19) engancha insumo → importado por **dos vías**: la tabla
+`GV_Importados_Insumo_Map` —los que el dueño revisó uno por uno— y una regla **automática por
+código igual**. Esa segunda vía estaba pensada para partes y sueltos pero **no lo verificaba**, así
+que se engancharon solos **5 artículos terminados**: 584E, 035E, 440E y 437E/439E·CH. El stock
+inflado **apaga el repedido**.
+
+Caso testigo **584E** (Aceitera 400 Ml): el módulo mostraba **1.290** = 90 del módulo + **1.200 del
+depósito insumos**, contra **19 cajas** de la pantalla de Stock (15 terminado + 4 a facturar = 114 u,
+9 cajas ya pedidas). El 1.200 sale de `Movimientos_Stock` depósito `insumos`: ajuste **+2.400 Uni**
+del 10/08, **−8** a Cervantes el 04/09 y ajuste **−1.192** el 04/09. **La cuenta cierra** (todo en
+Uni, no es el bug de mezclar MC con Uni de §3.bm.19), así que la pregunta era física.
+
+### Las dos respuestas del dueño (11/09)
+
+1. *"1200 uni hay en insumos"* → el saldo **es correcto**. **No se tocó ningún dato.**
+2. *"sí"* → esas unidades **no cuentan como stock del artículo terminado**.
+
+### El arreglo
+
+`sql/gv_importados_insumos_solo_partes_v1575.sql`. La vía automática por código igual queda **sólo
+para PARTES** (las de `Importados_Partes_Map`: 505C, 523C, 587C, 1000900, 1546903) — un join más en
+el CTE `link` de `gv_importados_stock_insumos`. **Cualquier terminado que tenga que contar el
+depósito insumos hay que escribirlo en `GV_Importados_Insumo_Map`**, que es donde vive lo decidido.
+Así el próximo código igual que aparezca en insumos no se engancha solo.
+
+**437E y 439E·CH sí son intencionales** (§3.bm.19: *"en Chef el 437E/439E arranca como insumo"*), así
+que en vez de quedar colgados de la regla automática **pasan al mapa**, con la nota del motivo.
+
+### Medido
+
+`gv_importados_stock_insumos` queda con 7 filas: las partes (505C 130.000 · 523C 6.000 ·
+1000900 107.500 · 1546903 16.848) y las del mapa (522E 2.000 · 437E 2.592 · 439E 384).
+**Salieron** 584E (1.200), 035E (528), 440E (192), 102E (0) y 590E (0).
+
+| Código | stock antes | stock ahora | a pedir antes | **a pedir ahora** |
+|---|---|---|---|---|
+| **584E** Aceitera 400 | 1.290 | **90** | 380 | **1.580** |
+| **035E** Cernidor | 1.116 | **588** | 524 | **1.052** |
+| **440E** Colador Ext. | 348 | **156** | 0 | 0 |
+| 437E·CH · 439E·CH · 522E · partes | — | sin cambio | — | sin cambio |
+
+### Rollback
+
+`delete from "GV_Importados_Insumo_Map" where insumo_cod in ('437E','439E')` + recrear la vista con
+la definición guardada en **`GV_bkp_def_gv_importados_stock_insumos_20260911`** (es la de
+`sql/gv_importados_stock_insumos_v1527.sql`, sin el join a `partes`). No toca objetos de Producción.
+
+---
+
+## 3.cc Las NP de Chef se valorizan con la lista de CHEF (v15.76) — 2026-09-11
+
+**Reportado por Thomas**: el modal **💵 Neto a facturar — desglose** de la **NP 44607**
+(cliente 2393, Miguel Addoumie SRL, Chef) salía entero en rojo *"sin precio"*, con
+**NETO a facturar $0,00** y los 15 códigos del pedido listados abajo en *"SIN PRECIO ·
+NO ENTRAN"* (043, 609, 700, 701, 713, 727E, 731, 760, 798E, 802, 824, 825, 836, 840, 911).
+Los 15 tienen precio cargado en `precios_venta_chef`.
+
+### Causa
+
+`vista_facturacion_neto_items` **sí** deriva la empresa de la NP (`^9` = lk, resto = chef) —
+la usa para el `dto_vol` y para la cadena de súper— pero después joinea **una sola** lista de
+precios: `public.precios_venta`, que es **la de Loekemeyer**. `public.precios_venta_chef`
+(101 códigos, misma estructura, la sincroniza el mismo cron) no la miraba nadie en Facturación.
+Mismo hueco, por copiar el mismo join, en `vista_facturable_anticipado` y `vista_plata_perdida`.
+
+No es que "falten precios de Chef": **la lista de Chef estaba cargada y al día** (última sync
+11/09 16:45). Lo que faltaba era mirarla.
+
+### Medido ANTES (11/09)
+
+| | líneas | sin precio | |
+|---|---|---|---|
+| NP de **LK** | 9.020 | 37 | 0,4 % |
+| NP de **Chef** | 1.568 | **1.141** | **72,8 %** |
+
+Y peor que el $0,00: de las **187** líneas de Chef que **sí** se valorizaban, **61 usaban un
+precio de LK distinto del de Chef** — números mal en pantalla, sin ningún aviso. Ejemplos:
+`809E` (LK 4.060 vs Chef 3.005, Chef se sobrevaluaba) y `438E` (LK 6.615 vs Chef 7.320, se
+subvaluaba). El `uxb` nunca estuvo mal: **0 diferencias** de unidades por caja entre las dos listas.
+
+### El arreglo (las tres vistas, misma regla) — `sql/gv_precio_chef_v1576.sql`
+
+1. NP de Chef → `precios_venta_chef` por código canónico.
+2. Artículo con **"L" al final** (505L, 438EL) = artículo de **Loeke vendido por Chef**
+   (regla del dueño v13.71, ya implementada en `gv_ppp_np_valor`): lista de **LK**, pelando la L.
+3. **Fallback**: NP de Chef con un código que no está en la lista de Chef → lista de LK. Cubre el
+   caso inverso ya documentado (Cencosud/Chef 2444, artículos de Loeke **sin** la L) y garantiza
+   que ninguna línea que hoy tiene precio lo pierda.
+4. Las NP de **LK no cambian**: siguen leyendo sólo `precios_venta` (no hay fallback a Chef).
+5. La lista de súper (`cobranzas_precios_super`) sigue teniendo prioridad sobre las dos.
+
+También en el front (`index.html`): el módulo **💸 Plata perdida** valorizaba desde un mapa
+**por código**, sin empresa — el mismo código vale distinto en LK y en Chef y ganaba el primero
+que entraba. Ahora la plata sale del precio de **la propia fila**, que la vista ya resuelve por
+empresa (el mapa queda sólo de fallback), y el cargador de respaldo baja también la lista de Chef.
+
+### Medido DESPUÉS
+
+| vista | filas | sin precio antes | **sin precio ahora** |
+|---|---|---|---|
+| `vista_facturacion_neto_items` (chef) | 1.568 | 1.141 | **52** |
+| `vista_facturacion_neto_items` (lk) | 9.020 | 37 | 37 (igual) |
+| `vista_facturable_anticipado` | 869 | 67 | **12** |
+| `vista_plata_perdida` | 900 | 154 | **14** |
+
+**Ninguna línea de LK se movió**: 0 filas con distinto `importe_ent`/`precio_lista`/`uxb`/`cod`
+en las tres vistas (comparado fila a fila contra el snapshot). Las 3 líneas con sufijo L
+(438EL, 439EL) pasaron de sin precio a valorizadas con la lista de LK.
+
+La **NP 44607** queda con los 15 ítems valorizados, dto 12 %, y el faltante (727E ×1, 836 ×3)
+ya muestra cuánta plata se dejó de facturar en vez de "sin precio".
+
+### Lo que QUEDA sin precio (ya no es un bug de código, es carga de datos)
+
+11 códigos que no están **en ninguna de las dos listas** y aparecen en NP de Chef:
+`123`, `102E`, `106E`, `702EN`, `838E`, `809`, `877E`, `865ED`, `727EN`, `830`, `828`
+(52 líneas, ~1.200 cajas). Hay que darlos de alta en la lista de precios de Chef.
+
+### Rollback
+
+`sql/backups/vistas_precio_lk_20260911_pre_v1576.sql` (definiciones exactas previas).
+Snapshots de datos del "antes": `gv_bkp_facneto_items_20260911` (10.588 filas),
+`gv_bkp_facturable_ant_20260911` (869), `gv_bkp_plata_perdida_20260911` (900).
+No toca objetos de Producción.
+
+## 3.cd `lk_reingresos_feed` devuelve TODOS los importados activos, con fecha o sin ella (v15.77) — 2026-09-11
+
+**Qué se rompía.** En el catálogo mayorista de LK, la ficha de un artículo mostraba el cartel
+`Reingreso Est dd/mm` sólo cuando se cumplían DOS condiciones a la vez: estar sin stock **y**
+tener `reingreso_est` cargado en `Importados`. Como el cartel era la única señal de stock, su
+ausencia agrupaba dos respuestas opuestas: "hay mercadería" y "no tenemos el dato". Medido sobre
+los 107 artículos con código `E` del catálogo: 16 con cartel, 45 con stock sin cartel y **46 sin
+cartel por falta de dato**. El dueño lo planteó así: *"no queda claro si los que no tienen cartel
+significa que tengo mercadería o que no tengo mercadería"*.
+
+**Causa.** El filtro `and reingreso_est is not null` del CTE `imp` mezclaba dos preguntas
+distintas: *¿hay stock?* (se sabe casi siempre, sale de `vista_stock_vs_pedidos` + el stock de
+parte) y *¿cuándo llega?* (se sabe a veces, la carga compras a mano). Al filtrar por la segunda,
+los artículos sin fecha no llegaban al feed y del otro lado quedaban indistinguibles de los que
+sí tienen mercadería.
+
+**Cambio.** Se sacó ese filtro. La función sigue devolviendo `(cod, reingreso_est, sin_stock)`
+con la misma firma y el mismo cálculo de `sin_stock`; lo único que cambia es que ahora entran
+también los importados activos sin fecha, con `reingreso_est` en `null`.
+
+**Medición.** El feed pasó de **74 a 133 filas**. De los 46 artículos que antes no tenían señal,
+**45 resultaron tener stock** y **1 quedó sin stock y sin fecha**. Total sin stock: 17 (16 con
+fecha + 1 sin). Quedan **9 códigos `E` del catálogo de LK sin ficha en `Importados`**
+(405E, 435E, 442E, 444E, 446E, 502E, 580E, 991E, 995E): no llegan al feed y del lado de LK se
+muestran como "En stock" por defecto. Darlos de alta es lo único pendiente.
+
+**Del lado de LK** (`kwkclwhmoygunqmlegrg`, repo `pagina-LK-copia`, v2.3.370): `get_reingresos()`
+dejó de filtrar `fecha_reingreso is not null` y ahora devuelve todo lo que está sin stock, con
+`fecha` nullable. El contrato con el front pasó a ser **estar en el resultado = no hay stock**;
+`fecha` vacía significa que todavía no se sabe cuándo llega. El catálogo muestra siempre uno de
+los dos estados: verde `En stock` o naranja `Ingresa dd/mm` / `Ingresa — fecha a confirmar`.
+
+**Rollback.** `sql/backups/lk_reingresos_feed_pre_enstock_20260911.sql` tiene la definición
+anterior; se ejecuta tal cual. Del lado de LK hay que volver a poner el `where sin_stock and
+fecha_reingreso is not null` en `get_reingresos()`.
+
+**Chequeo.**
+```sql
+-- Virgilio
+select count(*) filter (where sin_stock) as sin_stock, count(*) as total from lk_reingresos_feed();
+-- LK, después de correr sync_reingresos_virgilio()
+select count(*) from get_reingresos();
+```
+---
+
+## §3.ck — El PKC dice DE DÓNDE salió cada caja (v15.41, 2026-09-11, pedido de Luis)
 
 > ⚠ **La letra de esta sección se asigna AL MERGEAR, no antes.** `main` se mueve muy rápido
 > (32 commits y 19 versiones en una hora el 11/09) y cada sesión que escribe acá toma la
 > letra siguiente: esta sección nació como §3.cd, tuvo que pasar a §3.ce, y para cuando se
-> mergee `main` ya va por §3.ci. Mientras viva en una rama se llama **`§3.«PKC-DEP»`**, que
+> mergee `main` ya va por §3.ci. Mientras viva en una rama se llama **`§3.ck`**, que
 > es único y no choca con nadie. Al mergear: reemplazar por la letra libre que siga y
-> buscar `«PKC-DEP»` en el repo para actualizar las referencias de una sola pasada.
+> buscar `ck` en el repo para actualizar las referencias de una sola pasada.
 
 **El problema.** El picking le dice al operario dónde ir: parte el artículo en **dos pasos**
 cuando hay excedente — uno de góndola con su sector y otro `art·EXC` con la ubicación del
@@ -5639,12 +6779,12 @@ el trigger fuerza `'Mixto'` para todo el resto: de las 23.341 filas de picking, 
 
 ---
 
-## §3.«LUGAR-EMP» — La empresa es un atributo del LUGAR, y viaja de la recepción a la góndola (v15.71, 2026-09-11, pedido de Luis)
+## §3.cl — La empresa es un atributo del LUGAR, y viaja de la recepción a la góndola (v15.71, 2026-09-11, pedido de Luis)
 
-> ⚠ **La letra se asigna AL MERGEAR, no antes** (misma regla que `§3.«PKC-DEP»`, y por el
+> ⚠ **La letra se asigna AL MERGEAR, no antes** (misma regla que `§3.ck`, y por el
 > mismo motivo: `main` se mueve a 19 versiones por hora y cada sesión toma la letra siguiente).
-> Mientras viva en rama se llama **`§3.«LUGAR-EMP»`**. Al mergear: reemplazar por la letra
-> libre que siga y buscar `«LUGAR-EMP»` en el repo.
+> Mientras viva en rama se llama **`§3.cl`**. Al mergear: reemplazar por la letra
+> libre que siga y buscar `cl` en el repo.
 
 **El problema.** El sistema no tenía dónde guardar *de qué empresa es esta mercadería*, así
 que la gente lo metió adentro del **nombre del código**, y cada módulo eligió su propia
@@ -5749,13 +6889,13 @@ El archivo lleva el mismo cartel arriba de todo.
 
 ---
 
-## §3.«PICK-EMP» — La empresa sobrevive al picking (v15.73, 2026-09-11, pedido de Luis)
+## §3.cm — La empresa sobrevive al picking (v15.73, 2026-09-11, pedido de Luis)
 
-> ⚠ **Letra al mergear, no antes** (igual que `§3.«PKC-DEP»` y `§3.«LUGAR-EMP»`).
-> Buscar `«PICK-EMP»` en el repo al asignarla.
+> ⚠ **Letra al mergear, no antes** (igual que `§3.ck` y `§3.cl`).
+> Buscar `cm` en el repo al asignarla.
 
 **Luis:** *"la empresa tiene que acompañar al código a lo largo de toda esta pipeline"*.
-Con `§3.«LUGAR-EMP»` la mercadería **entra** con la empresa puesta. Faltaba que **salga**
+Con `§3.cl` la mercadería **entra** con la empresa puesta. Faltaba que **salga**
 con la empresa puesta.
 
 ### El problema: la empresa se calculaba bien y se tiraba

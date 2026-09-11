@@ -802,7 +802,13 @@ button {
 .pn-reprog .l span small{ font-weight:600; color:#b91c1c; opacity:.85; }
 .pn-reprog .h{ font-size:12px; color:#7f1d1d; opacity:.9; }
 .pn-reprog-btn{ margin-left:8px; background:#b91c1c; color:#fff; border:none; border-radius:7px; padding:3px 9px; font-size:11.5px; font-weight:800; cursor:pointer; width:auto; }
+.pn-cancel-btn{ background:#fee2e2 !important; color:#991b1b !important; border-color:#fca5a5 !important; }
 .pn-reprog-btn:hover{ background:#991b1b; }
+/* v15.65 — acciones por pedido dentro de la fila del día. Van DEBAJO de la NP, en la columna que
+   ya existe: una columna nueva dejaría un hueco vacío en todas las filas sin acción. */
+.pn-acc{ display:flex; gap:6px; margin-top:4px; }
+.pn-acc-b{ background:#fff; color:#991b1b; border:1px solid #fca5a5; border-radius:6px; padding:2px 7px; font-size:11px; font-weight:700; cursor:pointer; width:auto; line-height:1.5; }
+.pn-acc-b:hover{ background:#fee2e2; }
 .pn-carga .t.rep{ color:#b91c1c; font-weight:800; }
 .ppp-res-note.rep{ background:#fef2f2; border-color:#fca5a5; color:#991b1b; }
 .apr-q{ width:100%; box-sizing:border-box; padding:7px 10px; border:1px solid #cbd5e1; border-radius:8px; font-size:13px; margin-bottom:8px; }
@@ -888,6 +894,10 @@ button {
    CTA verde abajo ocupando el ancho de la ficha (nunca desborda). */
 .cuar-enviar{ grid-column:1 / -1; width:100%; margin-top:0; background:#166534; color:#fff; border:none; border-radius:8px; padding:8px 10px; font-size:12.5px; font-weight:800; cursor:pointer; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; box-shadow:0 1px 2px rgba(22,101,52,.25); }
 .cuar-enviar:hover{ background:#14532d; box-shadow:0 2px 5px rgba(22,101,52,.3); }
+/* v15.46 — "Ya pagó" (cobranzas). Sólo aparece cuando el motivo incluye deuda. Va en su propia
+   fila, arriba del CTA y al ancho de la ficha: compartiendo fila, el texto del CTA se cortaba. */
+.cuar-pago{ grid-column:1 / -1; width:100%; margin-top:0; background:#fff; color:#166534; border:1.5px solid #86c79a; border-radius:8px; padding:7px 10px; font-size:12.5px; font-weight:800; cursor:pointer; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.cuar-pago:hover{ background:#f0faf2; border-color:#4f9d68; }
 /* v15.41 — fila de acciones: grilla 2 columnas, el botón Enviar abajo a todo
    el ancho. min-width:0 en los hijos para que el texto largo elipse en vez de
    estirar la grilla y salirse de la ficha. */
@@ -947,6 +957,8 @@ button {
 .apr-chip-esp{ background:#f1f5f9; color:#475569; font-weight:800; }
 .apr-chip-esp.medio{ background:#fef3c7; color:#92400e; }
 .apr-chip-esp.viejo{ background:#fee2e2; color:#991b1b; }
+/* v15.67 — bloque que espera un reingreso de importado */
+.apr-chip-dif{ background:#fff7ed; color:#b45309; font-weight:800; }
 .apr-chip-m3{ background:#f1f5f9; color:#334155; } /* idea 7999: es un dato, no una alerta */
 .apr-chip-np{ background:#ede9fe; color:#5b21b6; }
 .apr-card-body{ margin-top:7px; border-top:1px dashed #e2e8f0; padding-top:6px; }
@@ -1083,6 +1095,15 @@ body.apr-dnd-tanda .apr-col-nps, body.apr-dnd-tanda .apr-dia-cerrado{ opacity:.4
 .apr-sel-chip small{ font-weight:600; color:#3b82f6; }
 .apr-listo{ background:#dcfce7; border:1px solid #86efac; color:#14532d; border-radius:12px; padding:18px 16px; text-align:center; font-size:17px; }
 .apr-listo b{ color:#15803d; }
+/* v15.54 — estado de CARGA de A Programar, a propósito distinto del "Listo" verde: ámbar, punteado y
+   con el reloj pulsando. Se ve mientras controla LK + Chef (o arma) y desaparece al terminar. */
+.apr-cargando{ background:#fef3c7; border:1.5px dashed #f59e0b; color:#78350f; border-radius:12px; padding:18px 16px; text-align:center; font-size:17px; }
+.apr-cargando b{ color:#b45309; }
+.apr-cargando-ic{ display:block; font-size:26px; line-height:1; margin-bottom:6px; animation:aprPulse 1.2s ease-in-out infinite; }
+.apr-cargando-sub{ font-size:12.5px; color:#92400e; margin-top:6px; font-weight:400; line-height:1.4; }
+.apr-cargando-cuar{ font-size:14px; padding:12px 10px; }
+.apr-col-cargando .apr-col-t b{ color:#b45309; }
+@keyframes aprPulse{ 0%,100%{ opacity:1; } 50%{ opacity:.3; } }
 .apr-listo-sub{ margin-top:6px; font-size:13.5px; color:#166534; font-weight:600; }
 .apr-dia:not(.apr-dia-cerrado){ cursor:pointer; }
 .apr-dia.apr-dia-sel{ border-color:#16a34a; border-top-color:#16a34a; background:#f0fdf4; box-shadow:0 0 0 3px rgba(22,163,74,.22); }
@@ -2593,6 +2614,7 @@ button.pk-anular small{ display:block; font-size:12px; font-weight:700; opacity:
 .ppp-errpanel{ background:#fff7ed; border:1.5px solid #fdba74; border-radius:10px; padding:10px 12px; margin:8px 0 6px; }
 .ppp-errpanel-h{ font-weight:800; color:#9a3412; margin-bottom:6px; }
 .ppp-ei{ font-size:13px; line-height:1.5; padding:3px 0; border-top:1px dashed #fed7aa; word-break:break-word; }
+.ppp-ei-det{ margin-top:2px; } .ppp-ei-det>div{ padding:1px 0 1px 12px; } .ppp-ei-det u{ text-decoration:none; font-weight:700; color:#9a3412; }   /* v15.57 */
 .ppp-ei.bad{ color:#b42318; } .ppp-ei.warn{ color:#92400e; }
 .ppp-eb{ display:inline-block; font-size:11px; font-weight:800; padding:1px 6px; border-radius:6px; margin-left:4px; vertical-align:middle; }
 .ppp-eb.bad{ background:#fee2e2; color:#b42318; border:1px solid #fecaca; }
@@ -2892,14 +2914,24 @@ tr.ppp-err-zona > td{ background:#fffbeb !important; }
 .ppp-tool-inp{ width:84px; height:34px; font-size:14px; border:1px solid #cbd5e1; border-radius:8px; padding:0 8px; }
 .ppp-tool-n{ width:64px; font-family:Consolas,Menlo,monospace; }
 .ppp-tool-clear{ margin-left:auto; padding:7px 12px; font-size:12px; font-weight:700; border:1px solid #fecaca; border-radius:8px; background:#fff; color:#b42318; cursor:pointer; }
-.ppp-res-note{ font-size:13px; color:#92400e; background:#fffbeb; border:1px solid #fde68a; border-radius:8px; padding:8px 12px; margin-bottom:8px; }
-.ppp-res-leg{ font-size:12px; color:#475569; background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; padding:7px 10px; margin-bottom:8px; }
-.ppp-restbl-wrap{ overflow-x:auto; border:1px solid #e2e8f0; border-radius:10px; }
-.ppp-restbl{ width:100%; border-collapse:collapse; font-size:12px; }
-.ppp-restbl th{ background:#0f172a; color:#fff; padding:6px 9px; text-align:center; font-size:11px; font-weight:700; white-space:nowrap; line-height:1.15; }
-.ppp-restbl td{ padding:5px 9px; border-bottom:1px solid #eef2f7; text-align:center; white-space:nowrap; }
-.ppp-restbl td.f{ font-weight:700; color:#0f172a; text-align:left; }
-.ppp-restbl td.d{ color:#64748b; }
+/* v15.53 — los dos carteles del Resumen tampoco se estiran al ancho del contenedor: el marco
+   termina donde termina el texto (`display:table` = shrink-to-fit y sigue ocupando su renglón). */
+.ppp-res-note{ font-size:13px; color:#92400e; background:#fffbeb; border:1px solid #fde68a; border-radius:8px; padding:8px 12px; margin-bottom:8px; display:table; max-width:100%; }
+.ppp-res-leg{ font-size:12px; color:#475569; background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; padding:7px 10px; margin-bottom:8px; display:table; max-width:100%; }
+/* v15.53 (dueño: "columnas siempre lo más angostas posibles, ancho determinado por la info
+   más ancha de la columna"): la tabla NO se estira al ancho del contenedor. Con `width:100%`
+   el navegador repartía los ~700 px sobrantes entre las 14 columnas y cada celda quedaba con
+   aire adentro (la de Fecha medía 171 px para un "09/09/2026" de ~62 px). Con `width:auto` +
+   `table-layout:auto` cada columna mide lo que mide su contenido más ancho, y el marco
+   (inline-block) se ajusta a la tabla en vez de dibujar un rectángulo vacío hasta el borde. */
+.ppp-restbl-wrap{ overflow-x:auto; border:1px solid #e2e8f0; border-radius:10px;
+  display:table; max-width:100%; }
+.ppp-restbl{ width:auto; table-layout:auto; border-collapse:collapse; font-size:12px; }
+.ppp-restbl th{ background:#0f172a; color:#fff; padding:4px 6px; text-align:center; font-size:11px; font-weight:700; white-space:nowrap; line-height:1.1; }
+.ppp-restbl td{ padding:3px 6px; border-bottom:1px solid #eef2f7; text-align:center; white-space:nowrap; }
+/* v15.57 (dueño: "elimina ese espacio entre fecha y día"): Fecha y Día pegados. */
+.ppp-restbl td.f{ font-weight:700; color:#0f172a; text-align:left; padding-right:3px; }
+.ppp-restbl td.d{ color:#64748b; text-align:left; padding-left:3px; }
 /* v6.57/v6.58: celdas del Resumen clickeables → pop-up con de qué NPs se compone el número */
 .ppp-restbl td.zc{ cursor:pointer; }
 .ppp-restbl td.zc:hover{ outline:2px solid #94a3b8; outline-offset:-2px; }
@@ -2917,6 +2949,8 @@ tr.ppp-err-zona > td{ background:#fffbeb !important; }
 .pppres-tbl td{ padding:7px 12px; border-bottom:1px solid #eef2f7; }
 .pppres-tbl td.num, .pppres-tbl th.num{ text-align:right; font-variant-numeric:tabular-nums; }
 .pppres-tbl td.np{ font-family:Consolas,Menlo,monospace; font-weight:800; color:#0f766e; white-space:nowrap; }
+.pppres-tbl td.np.npc{ cursor:pointer; text-decoration:underline dotted; text-underline-offset:3px; }
+.pppres-tbl td.np.npc:hover{ background:#ecfeff; }
 .pppres-tbl tfoot td{ font-weight:800; background:#f8fafc; }
 /* Chequeo de góndola (v7.16): modal del botón 📦 de cada pedido / tanda. Reusa
    .pppres-ov/.pppres-card; la tabla es propia porque tiene que entrar en el celu. */
@@ -2949,7 +2983,11 @@ tr.ppp-err-zona > td{ background:#fffbeb !important; }
 .pppchk-note{ padding:9px 16px; font-size:11.5px; color:#64748b; background:#f8fafc; border-top:1px solid #e2e8f0; }
 .ppp-restbl td.num{ text-align:right; font-variant-numeric:tabular-nums; }
 .ppp-restbl td.z0{ color:#cbd5e1; }
-.ppp-restbl td.tot{ font-weight:800; background:#f1f5f9; }
+/* v15.54 — el Total queda entre el Día y el desglose: una línea lo separa de las zonas
+   para que se lea "este es el número, esto es de qué se compone". */
+.ppp-restbl td.tot{ font-weight:800; background:#f1f5f9; border-right:2px solid #cbd5e1; }
+.ppp-restbl th.tot{ border-right:2px solid #475569; }
+.ppp-restbl tr.totrow td.tot{ border-right:2px solid #475569; }
 .ppp-restbl td.cam{ font-weight:700; }
 .ppp-restbl td.z1{ background:rgba(14,165,233,.10); } .ppp-restbl td.z2{ background:rgba(99,102,241,.10); } .ppp-restbl td.z3{ background:rgba(139,92,246,.10); }
 .ppp-restbl td.z4{ background:rgba(236,72,153,.10); } .ppp-restbl td.z5{ background:rgba(245,158,11,.13); } .ppp-restbl td.z6{ background:rgba(16,185,129,.13); }
@@ -3045,6 +3083,9 @@ tr.ppp-err-zona > td{ background:#fffbeb !important; }
 .cc-np.cc-on{ background: #ecfdf5; border-color: #16a34a; }
 .cc-chk{ width: 24px; height: 24px; border-radius: 6px; border: 2px solid #cbd5e1; display: inline-flex; align-items: center; justify-content: center; color: #fff; font-weight: bold; flex: 0 0 auto; }
 .cc-np.cc-on .cc-chk{ border-color: #16a34a; background: #16a34a; }
+/* v15.70 — el tilde pasa a ser el ORDEN en que se cargó (1°, 2°, 3°…): número chico para que
+   entren dos dígitos en el mismo cuadrado de 24 px. */
+.cc-chk.cc-ord{ font-size: 12px; letter-spacing: -.5px; }
 .cc-npnum{ font-size: 18px; font-weight: bold; color: #0f172a; }
 .cc-rs{ font-size: 13px; color: #64748b; margin-left: auto; text-align: right; }
 .cc-lios{ flex: 0 0 auto; font-size: 14px; font-weight: 800; color: #b45309; white-space: nowrap; }
@@ -7716,7 +7757,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v15.79";
+const APP_VERSION = "v15.80";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -9647,11 +9688,10 @@ async function pkFetchExcedente(arts) {
     if (!rs.ok) return {};
     const saldos = await rs.json();
     const out = {};
-    // v15.71 — SUMAR las filas del mismo código: la vista agrupa por (código, empresa) y
-    // desde que la recepción guarda LK/CH un código pelado vuelve en más de una fila. Con el
-    // `=` de antes, el excedente que veía el picking era el de la ÚLTIMA fila, no el total;
-    // y desde la v15.41 el picking va PRIMERO al excedente, así que un número corto manda al
-    // operario a buscar menos cajas de las que hay y el resto se lo come la góndola.
+    // v15.71 — SUMAR las filas del mismo código (ver stockFetchSaldos): la vista agrupa
+    // por (código, empresa) y desde el backfill de A Guardar un código pelado vuelve en
+    // más de una fila. Con el `=` el excedente que veía el picking era el de la ÚLTIMA
+    // fila, no el total.
     const acum = {};
     (Array.isArray(saldos) ? saldos : []).forEach(function (x) {
       const k = String(x.cod_art).toUpperCase();
@@ -11824,8 +11864,8 @@ async function _stkGondolaSaldoVivo(cod) {
     if (!r.ok) return null;
     const a = await r.json();
     if (!a || !a.length) return 0;   // sin fila = sin saldo = 0
-    // v15.71 — SUMAR: la vista agrupa por (código, empresa), así que un código pelado puede
-    // volver en varias filas (LK, CH, Mixto). `a[0]` era una de ellas, no el saldo.
+    // v15.71 — SUMAR: la vista agrupa por (código, empresa), así que un código pelado
+    // puede volver en varias filas. `a[0]` era una de ellas, no el saldo.
     let s = 0; a.forEach(function (r) { s += Number(r.terminado) || 0; });
     return s;
   } catch (_e) { return null; }
@@ -11927,14 +11967,13 @@ async function stockFetchSaldos() {
     // v12.98 (idea 9017): para_envasar y racks_ch ya venían en la vista (idea 7263) pero acá se
     // perdían → "Bajar de racks", MG guardado, catálogo de Insumos y CP los veían en 0 aunque
     // hubiera stock real (712E racks_ch=444, 584E para_envasar=424).
-    //
-    // v15.71 — ACUMULA, no pisa. `vista_saldos_stock` agrupa por (código, EMPRESA), así que
-    // un mismo `cod_art` puede volver en VARIAS filas: emite el código con sufijo (437E LK)
-    // sólo para los duales, y para todo el resto emite el código pelado una vez por empresa.
-    // Mientras la recepción marcaba todo 'Mixto' había una sola fila por código y pisar daba
-    // igual; desde que la recepción guarda LK/CH (v15.71) el mismo 505 vuelve como LK y como
-    // Mixto, y el `=` se comía una de las dos — la góndola en LK contra el picking en Mixto
-    // habría mostrado saldo de menos o de más según cuál llegara última.
+    // v15.71 — ACUMULA, no pisa. `vista_saldos_stock` agrupa por (código, EMPRESA) y
+    // emite el sufijo (437E LK) SÓLO para los duales: para todo el resto emite el código
+    // PELADO una vez por empresa. Mientras la recepción marcaba todo 'Mixto' había una
+    // sola fila por código y el `=` daba igual. Desde el backfill de A Guardar del
+    // 11/09 hay 173 códigos que vuelven en DOS filas (505: LK a_guardar 200 / Mixto
+    // góndola 2.719) y el `=` se comía una: el MG mostraba góndola 0 o A Guardar 0
+    // según cuál llegara última.
     if (!m[k]) m[k] = { cod: k, desc: "", terminado: 0, excedente: 0, separar_pedidos: 0, a_facturar: 0, a_guardar: 0, racks: 0, insumos: 0, para_envasar: 0, racks_ch: 0 };
     const a = m[k];
     if (!a.desc) a.desc = x.descripcion || "";
@@ -15826,6 +15865,11 @@ var STK_POP_CSS =
   ".proyv-chart{display:flex;flex-direction:column;gap:6px;}" +
   ".proyv-row{display:flex;align-items:center;gap:9px;}" +
   ".proyv-mes{flex:0 0 52px;font-size:12px;font-weight:800;color:#475569;text-transform:capitalize;}" +
+  // v15.52 — cajas ENTREGADAS por el proveedor, entre el mes y la barra (gv_entregas_mensuales_cod).
+  ".proyv-ent{flex:0 0 46px;text-align:right;font-size:12.5px;font-weight:800;color:#047857;font-variant-numeric:tabular-nums;}" +
+  ".proyv-ent.sd{color:#cbd5e1;font-weight:700;}" +
+  ".proyv-head{font-size:10px;font-weight:800;color:#94a3b8;text-transform:uppercase;letter-spacing:.03em;margin-bottom:-2px;}" +
+  ".proyv-head .proyv-ent,.proyv-head .proyv-val{font-size:10px;font-weight:800;color:#94a3b8;}" +
   ".proyv-track{flex:1 1 auto;height:20px;background:#f1f5f9;border-radius:6px;overflow:hidden;position:relative;}" +
   ".proyv-bar{display:block;height:100%;background:linear-gradient(90deg,#8b5cf6,#6d28d9);border-radius:6px;}" +
   ".proyv-val{flex:0 0 auto;min-width:42px;text-align:right;font-size:12.5px;font-weight:800;color:#4c1d95;font-variant-numeric:tabular-nums;}" +
@@ -15931,15 +15975,28 @@ async function stkShowProyVentas(codEnc, proy) {
   var nombre = artNombre(cod, "") || "";
   var fc = function (n) { n = Number(n) || 0; return String(Math.round(n * 10) / 10); };
   body.innerHTML = '<div class="stkpop-empty">Cargando ventas facturadas de los últimos 12 meses' + (emp ? ' (' + emp + ')' : ' (LK + Chef)') + '…</div>';
-  var rows = [];
+  var rows = [], ent = {};
+  var _H = { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY, "Content-Type": "application/json" };
   try {
-    var r = await fetch(SUPABASE_URL + "/rest/v1/rpc/ventas_mensuales_cod", {
-      method: "POST",
-      headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY, "Content-Type": "application/json" },
-      // v15.23 — la barra de ventas se filtra por la empresa de la fila (LK / CH); sin sufijo = LK+Chef
-      body: JSON.stringify({ p_cod: codB, p_meses: 12, p_empresa: (emp === "CH" ? "chef" : (emp === "LK" ? "lk" : null)) }), cache: "no-store"
+    // v15.52 — las dos series salen juntas: lo FACTURADO (ventas, motor de PáginaLK) y lo
+    // ENTREGADO por el proveedor (gv_entregas_mensuales_cod: talleristas + prov AT).
+    var _par = await Promise.all([
+      fetch(SUPABASE_URL + "/rest/v1/rpc/ventas_mensuales_cod", {
+        method: "POST", headers: _H,
+        // v15.23 — la barra de ventas se filtra por la empresa de la fila (LK / CH); sin sufijo = LK+Chef
+        body: JSON.stringify({ p_cod: codB, p_meses: 12, p_empresa: (emp === "CH" ? "chef" : (emp === "LK" ? "lk" : null)) }), cache: "no-store"
+      }).then(function (r) { return r.ok ? r.json() : []; }).catch(function () { return []; }),
+      fetch(SUPABASE_URL + "/rest/v1/rpc/gv_entregas_mensuales_cod", {
+        method: "POST", headers: _H,
+        body: JSON.stringify({ p_cod: codB, p_meses: 12 }), cache: "no-store"
+      }).then(function (r) { return r.ok ? r.json() : []; }).catch(function () { return []; })
+    ]);
+    rows = _par[0];
+    // `cubierto` = ese mes el circuito del artículo YA se registraba. false ⇒ "s/d", NO un cero:
+    // la recepción de proveedores AT arranca en 06/2026 y la de talleristas en 12/2025.
+    (Array.isArray(_par[1]) ? _par[1] : []).forEach(function (x) {
+      ent[String(x.mes || "")] = { cajas: Number(x.cajas) || 0, cub: x.cubierto !== false };
     });
-    if (r.ok) rows = await r.json();
   } catch (_e) {}
   rows = (Array.isArray(rows) ? rows : []).map(function (x) { return { mes: String(x.mes || ""), cajas: Number(x.cajas) || 0 }; });
   var proyN = Number(proy) || 0;
@@ -15957,20 +16014,36 @@ async function stkShowProyVentas(codEnc, proy) {
   h += _stkProyTrendSvg(rows, proyN, prom);
   // ── Barras de la ventana (6 meses) con la marca de la proyección ──
   var mx = Math.max(proyN, win.reduce(function (s, x) { return Math.max(s, x.cajas); }, 0)) || 1;
-  h += '<div class="stkpop-grp"><div style="font-size:12px;font-weight:800;color:#334155;margin-bottom:8px;">🧾 Cajas facturadas — ventana de proyección (' + win.length + ' meses)</div>';
+  // v15.52 — la columna de entregadas sólo aparece si hay algo que mostrar: si de este código
+  // no hay UN solo mes con registro de entregas, no se agrega una columna de "s/d" al pepe.
+  var hayEnt = win.some(function (x) { var e = ent[x.mes]; return e && (e.cub || e.cajas > 0); });
+  var totEnt = win.reduce(function (s, x) { var e = ent[x.mes]; return s + (e && e.cub ? e.cajas : 0); }, 0);
+  h += '<div class="stkpop-grp"><div style="font-size:12px;font-weight:800;color:#334155;margin-bottom:8px;">🧾 ' +
+       (hayEnt ? 'Entregado y facturado' : 'Cajas facturadas') + ' — ventana de proyección (' + win.length + ' meses)</div>';
   h += '<div class="proyv-chart">';
+  if (hayEnt) {
+    h += '<div class="proyv-row proyv-head"><span class="proyv-mes">mes</span>' +
+         '<span class="proyv-ent">entreg.</span><span class="proyv-track" style="background:none"></span>' +
+         '<span class="proyv-val">factur.</span></div>';
+  }
   win.forEach(function (x) {
     var pct = Math.max(2, Math.round(x.cajas / mx * 100));
     var bajo = proyN > 0.05 && x.cajas < proyN;
+    var e = ent[x.mes];
     h += '<div class="proyv-row">' +
          '<span class="proyv-mes">' + escapeHtml(_stkFmtMes(x.mes)) + '</span>' +
+         (hayEnt ? (e && e.cub
+            ? '<span class="proyv-ent" title="Cajas entregadas por el proveedor">' + fc(e.cajas) + '</span>'
+            : '<span class="proyv-ent sd" title="Ese mes las entregas todavía no se registraban en la app — no es un cero">s/d</span>') : '') +
          '<span class="proyv-track"><span class="proyv-bar' + (bajo ? ' bajo' : '') + '" style="width:' + pct + '%"></span>' +
          (proyN > 0.05 ? '<span class="proyv-mark" style="left:' + Math.round(proyN / mx * 100) + '%"></span>' : '') + '</span>' +
          '<span class="proyv-val"' + (bajo ? ' style="color:#b91c1c"' : '') + '>' + fc(x.cajas) + '</span></div>';
   });
   h += '</div>';
   var piso = proyN > 0.05 && prom > 0 && (proyN - prom) / prom > 0.005;   // actuó el piso del 4.º mejor mes
-  h += '<div class="proyv-foot">Total 6m: <b>' + fc(tot) + '</b> cajas · Promedio: <b>' + fc(Math.round(prom)) + '</b> caj/mes' +
+  h += '<div class="proyv-foot">Total 6m: <b>' + fc(tot) + '</b> cajas' +
+       (hayEnt ? ' · Entregado: <b style="color:#047857">' + fc(totEnt) + '</b> cajas' : '') +
+       ' · Promedio: <b>' + fc(Math.round(prom)) + '</b> caj/mes' +
        (proyN > 0.05 ? ' · Proyección: <b style="color:#6d28d9">' + fc(proyN) + '</b>' + (piso ? ' <small style="color:#6d28d9">(piso: 4.º mejor mes)</small>' : '') +
                        ' · <b>' + arriba + ' de ' + win.length + '</b> meses por encima' : '') + '</div>';
   h += '</div>';
@@ -16331,6 +16404,7 @@ function _impTabsHtml(cur) {
   const t = function (on) { return 'width:auto;margin:0;flex:0 0 auto;padding:7px 14px;border-radius:999px;border:1px solid ' + (on ? '#1d4ed8' : '#cbd5e1') + ';background:' + (on ? '#1d4ed8' : '#fff') + ';color:' + (on ? '#fff' : '#334155') + ';font-size:13px;font-weight:800;cursor:pointer'; };
   return '<div style="display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap">' +
     '<button style="' + t(cur === 'ped') + '" onclick="openPedidosImportacion()">📦 Pedidos</button>' +
+    '<button style="' + t(cur === 'curso') + '" onclick="openImpEnCurso()" title="Los pedidos YA HECHOS que vienen en camino: qué día embarcan y qué día llegan. No mira lo que hay que pedir.">🚢 En curso</button>' +
     '<button style="' + t(cur === 'prov') + '" onclick="stkOpenProvImp()">🏭 Proveedores</button></div>';
 }
 async function stkOpenProvImp() {
@@ -16561,7 +16635,7 @@ function pedImpCargarPedidoHecho() {
   (data.items || []).forEach(function (it) { var p = it.prov || "(sin proveedor)"; if (provs.indexOf(p) < 0) provs.push(p); });
   provs.sort(function (a, b) { return String(a).localeCompare(String(b)); });
   var pre = (_stkPop && _stkPop.provFiltro && provs.indexOf(_stkPop.provFiltro) >= 0) ? _stkPop.provFiltro : "";
-  _pedHecho = { provs: provs, prov: pre, fecha: (data.entregaGlobal || ""), modo: "lista", sel: {}, texto: "", q: "", guardando: false };
+  _pedHecho = { provs: provs, prov: pre, fecha: (data.entregaGlobal || ""), ref: "", embarque: "", modo: "lista", sel: {}, texto: "", q: "", guardando: false };
   if (!document.getElementById("pedHechoCss")) { var st = document.createElement("style"); st.id = "pedHechoCss"; st.textContent = PED_HECHO_CSS; document.head.appendChild(st); }
   var ov = document.getElementById("pedHechoOv");
   if (!ov) { ov = document.createElement("div"); ov.id = "pedHechoOv"; document.body.appendChild(ov); }
@@ -16571,6 +16645,10 @@ function pedImpCargarPedidoHecho() {
 function pedHechoCerrar() { var ov = document.getElementById("pedHechoOv"); if (ov) ov.classList.remove("show"); _pedHecho = null; }
 function pedHechoSetProv(v) { if (!_pedHecho) return; _pedHecho.prov = v || ""; _pedHechoRender(); }
 function pedHechoSetFecha(v) { if (!_pedHecho) return; _pedHecho.fecha = String(v || ""); }
+/* v15.72 — el PI agrupa las líneas como UN pedido en la solapa 🚢 En curso, y el embarque es el
+   día que sale de China (la fecha de entrega de arriba es la de llegada). */
+function pedHechoSetRef(v) { if (!_pedHecho) return; _pedHecho.ref = String(v == null ? "" : v).trim(); }
+function pedHechoSetEmbarque(v) { if (!_pedHecho) return; _pedHecho.embarque = String(v || ""); }
 function pedHechoSetModo(m) { if (!_pedHecho) return; _pedHecho.modo = m; _pedHechoRender(); }
 function pedHechoBuscar(v) { if (!_pedHecho) return; _pedHecho.q = String(v || ""); _pedHechoRenderCuerpo(true); }
 /* Tipeo de unidades en el modo LISTA: NO re-renderiza (perdería el foco); actualiza sólo las
@@ -16606,7 +16684,9 @@ function _pedHechoRender() {
     '<div class="phc-body">' +
       '<div class="phc-row">' +
         '<div class="phc-f" style="flex:1 1 240px"><label>🏭 Proveedor</label><select onchange="pedHechoSetProv(this.value)">' + opts + '</select></div>' +
-        '<div class="phc-f" style="flex:0 0 auto"><label>📅 Fecha de entrega</label>' + _pedImpFechaInputHtml(st.fecha, "pedHechoSetFecha(v)", 'style="width:96px"') + '</div>' +
+        '<div class="phc-f" style="flex:1 1 160px"><label>📄 Pedido (PI)</label><input type="text" placeholder="PI B260601" value="' + escapeHtml(st.ref || "") + '" onchange="pedHechoSetRef(this.value)" title="Número de proforma. Agrupa estas líneas como UN pedido en la solapa 🚢 En curso."></div>' +
+        '<div class="phc-f" style="flex:0 0 auto"><label>🚢 Embarque</label>' + _pedImpFechaInputHtml(st.embarque, "pedHechoSetEmbarque(v)", 'title="Día que sale de China. Opcional." style="width:96px"') + '</div>' +
+        '<div class="phc-f" style="flex:0 0 auto"><label>🛬 Llegada</label>' + _pedImpFechaInputHtml(st.fecha, "pedHechoSetFecha(v)", 'title="Día que llega. Es el reingreso que ve la página LK." style="width:96px"') + '</div>' +
       '</div>' +
       '<div class="phc-tabs">' +
         '<button class="phc-tab' + (st.modo === "lista" ? " on" : "") + '" onclick="pedHechoSetModo(\'lista\')">1 · Elegir de la lista</button>' +
@@ -16702,7 +16782,8 @@ async function pedHechoGuardar() {
     // Cada carga = UN bache nuevo (unidades + su fecha). No pisa lo anterior:
     // el "en curso" queda como suma de baches y el reingreso = fecha más cercana.
     try {
-      await _pedImpRpc("gv_importado_bache_add", { p_importado_id: d.id, p_unidades: l.uni, p_fecha: iso || null, p_legajo: _leg });
+      await _pedImpRpc("gv_importado_bache_add", { p_importado_id: d.id, p_unidades: l.uni, p_fecha: iso || null, p_legajo: _leg,
+        p_ref: (st.ref || null), p_embarque: (String(st.embarque || "").slice(0, 10) || null) });
       okN++;
     } catch (e) { errs.push(l.it.cod + ": " + (e.message || e)); continue; }
   }
@@ -17178,9 +17259,15 @@ function _impBachesRender() {
     var f = r.fecha_reingreso ? _isoToDdMmAa(String(r.fecha_reingreso).slice(0, 10)) : '<span style="color:#94a3b8">sin fecha</span>';
     var enc = r.estado === "en_curso";
     var lleg = (Number(r.unidades_llegadas) || 0) > 0 ? (' <span style="color:#64748b;font-size:11px">(llegó ' + _impBachesFmt(r.unidades_llegadas) + ')</span>') : "";
+    // v15.72 — de qué PEDIDO (PI) es el bache y cuándo embarca. Las dos fechas del pedido entero
+    // se editan en la solapa 🚢 En curso; acá se muestran para saber a cuál pertenece cada bache.
+    var pi = r.pedido_ref ? escapeHtml(r.pedido_ref) : '<span style="color:#94a3b8">—</span>';
+    var emb = r.fecha_embarque ? _isoToDdMmAa(String(r.fecha_embarque).slice(0, 10)) : '<span style="color:#94a3b8">—</span>';
     return "<tr>" +
+      '<td style="font-family:Consolas,Menlo,monospace;font-size:11.5px;font-weight:700">' + pi + "</td>" +
       '<td class="num">' + _impBachesFmt(r.unidades) + lleg + "</td>" +
       '<td class="num">' + _impBachesFmt(r.pendiente) + "</td>" +
+      "<td>" + emb + "</td>" +
       "<td>" + f + "</td>" +
       '<td><span class="ibc-tag ' + (enc ? "en" : "ll") + '">' + (enc ? "en curso" : "llegado") + "</span></td>" +
       '<td style="white-space:nowrap">' +
@@ -17194,7 +17281,7 @@ function _impBachesRender() {
       '<button class="ibc-x" onclick="pedImpBachesCerrar()">Cerrar</button></div>' +
     '<div class="ibc-body">' +
       (rows.length
-        ? '<table class="ibc-tbl"><thead><tr><th class="num">Unidades</th><th class="num">Pendiente</th><th>Reingreso</th><th>Estado</th><th>Acciones</th></tr></thead><tbody>' + body + "</tbody></table>"
+        ? '<table class="ibc-tbl"><thead><tr><th>Pedido</th><th class="num">Unidades</th><th class="num">Pendiente</th><th title="Día que embarca (sale de China). Se edita por pedido en la solapa 🚢 En curso.">Embarque</th><th>Reingreso</th><th>Estado</th><th>Acciones</th></tr></thead><tbody>' + body + "</tbody></table>"
         : '<div class="ibc-empty">Sin baches todavía. Agregá el primero.</div>') +
     "</div>" +
     '<div class="ibc-foot"><div style="font-size:13px;color:#334155">En curso pendiente: <b>' + _impBachesFmt(totalPend) + '</b> u · el reingreso que ve la página es la fecha <b>más cercana</b></div>' +
@@ -17206,11 +17293,19 @@ async function pedImpBacheAdd() {
   if (uv === null) return;
   var uni = parseInt(String(uv).replace(/[^\d]/g, ""), 10);
   if (!(uni > 0)) { try { alert("Unidades inválidas."); } catch (_e) {} return; }
+  // v15.72 — el bache va atado a un PEDIDO (el PI). Sin eso queda suelto en la solapa 🚢 En curso.
+  var refPre = ""; try { (_impBaches.rows || []).some(function (x) { if (x.estado === "en_curso" && x.pedido_ref) { refPre = x.pedido_ref; return true; } return false; }); } catch (_e) {}
+  var rv; try { rv = prompt("Número de PI / referencia del pedido (agrupa las líneas en 🚢 En curso).\nVacío = queda suelto:", refPre); } catch (_e) { rv = null; }
+  if (rv === null) return;
+  var ref = String(rv).trim();
   var fv; try { fv = prompt("Fecha estimada de reingreso (dd/mm/aa).\nVacío = sin fecha:", ""); } catch (_e) { fv = null; }
   var iso = null;
   if (fv !== null && String(fv).trim() !== "") { iso = _pedImpParseFechaISO(fv); if (iso === null) { try { alert("Fecha inválida (usá dd/mm/aa)."); } catch (_e) {} return; } }
+  var ev; try { ev = prompt("Fecha de EMBARQUE (dd/mm/aa) — el día que sale de China.\nVacío = sin fecha:", ""); } catch (_e) { ev = null; }
+  var isoEmb = null;
+  if (ev !== null && String(ev).trim() !== "") { isoEmb = _pedImpParseFechaISO(ev); if (isoEmb === null) { try { alert("Fecha de embarque inválida (usá dd/mm/aa)."); } catch (_e) {} return; } }
   var leg = ""; try { leg = String(window.__authEmail || ""); } catch (_e) {}
-  try { await _pedImpRpc("gv_importado_bache_add", { p_importado_id: _impBaches.id, p_unidades: uni, p_fecha: iso, p_legajo: leg }); _impBaches.dirty = true; }
+  try { await _pedImpRpc("gv_importado_bache_add", { p_importado_id: _impBaches.id, p_unidades: uni, p_fecha: iso, p_legajo: leg, p_ref: ref || null, p_embarque: isoEmb }); _impBaches.dirty = true; }
   catch (e) { try { alert("No se pudo agregar: " + (e.message || e)); } catch (_e) {} return; }
   await _impBachesReload();
 }
@@ -17251,6 +17346,524 @@ async function pedImpBacheBorrar(bacheId) {
   try { await _pedImpRpc("gv_importado_bache_borrar", { p_bache_id: bacheId }); _impBaches.dirty = true; }
   catch (e) { try { alert("No se pudo anular: " + (e.message || e)); } catch (_e) {} return; }
   await _impBachesReload();
+}
+/* v15.72 — "🚢 En curso": los pedidos de importación YA HECHOS, separados del generador.
+   Pedido del dueño (11/09): "quiero ver cuáles son los pedidos en curso por separado de si genera
+   o no genera pedido… qué día llegan y qué día es la fecha de embarque".
+   Una fila por PEDIDO (el PI), no por artículo: sale de gv_importados_pedidos_curso (baches
+   en_curso agrupados por pedido_ref + proveedor). Las dos fechas se editan acá y se escriben en
+   TODAS las líneas del pedido de una (RPC gv_importado_pedido_fechas); la de llegada además
+   re-sincroniza Importados.reingreso_est (es la que ve el portal LK). */
+async function openImpEnCurso() {
+  _stkPopShell("🚢 Pedidos de importación en curso", "stkPopBody", true);
+  const body = document.getElementById("stkPopBody"); if (!body) return;
+  body.innerHTML = '<div class="stkpop-empty">Cargando pedidos en curso…</div>';
+  _stkPop = { kind: "impCurso", rows: [], abierto: "", lineas: {}, provFiltro: "", refFiltro: "", cc: {}, vistaPlata: false };
+  await impCursoReload();
+}
+async function impCursoReload() {
+  if (!_stkPop || _stkPop.kind !== "impCurso") return;
+  try { _stkPop.rows = (await _pedImpRpc("gv_importados_pedidos_curso", {})) || []; }
+  catch (e) { _stkPop.rows = []; _stkPop.err = (e.message || String(e)); }
+  // v15.74 — la cuenta corriente (plata) va en la misma lectura: si falla, la vista Plata se cae
+  // al FOB del motor y 0 pagado, pero la logística sigue andando.
+  try {
+    const cc = (await _pedImpRpc("gv_imp_cc_lista", {})) || [];
+    const m = {}; cc.forEach(function (x) { m[String(x.pedido_ref) + "\u00a7" + String(x.proveedor)] = x; });
+    _stkPop.cc = m;
+  } catch (_e) { if (!_stkPop.cc) _stkPop.cc = {}; }
+  _impCursoRender();
+}
+function _impCursoKey(r) { return String(r.pedido_ref) + "§" + String(r.proveedor); }
+/* encodeURIComponent NO escapa la comilla simple, y estos valores viajan dentro de un
+   onclick="…('<valor>')": una comilla en el PI rompía el handler. */
+function _impCursoEnc(s) { return encodeURIComponent(String(s == null ? "" : s)).replace(/'/g, "%27"); }
+function _impCursoHoy() {
+  try { return new Date().toLocaleDateString("en-CA", { timeZone: "America/Argentina/Buenos_Aires" }); }
+  catch (_e) { return new Date().toISOString().slice(0, 10); }
+}
+/* Días entre hoy (ART) y una fecha ISO. Negativo = ya pasó. */
+function _impCursoDias(iso) {
+  if (!iso) return null;
+  const a = Date.parse(String(iso).slice(0, 10) + "T00:00:00Z"), b = Date.parse(_impCursoHoy() + "T00:00:00Z");
+  if (isNaN(a) || isNaN(b)) return null;
+  return Math.round((a - b) / 86400000);
+}
+function _impCursoNum(n) { return Number(n || 0).toLocaleString("es-AR"); }
+/* Texto del estado del viaje: sin embarcar / embarcado / llegando / atrasado. */
+function _impCursoEstado(r) {
+  const dl = _impCursoDias(r.fecha_llegada), de = _impCursoDias(r.fecha_embarque);
+  if (dl != null && dl < 0) return '<span class="imcu-tag atras">⚠ llegada vencida hace ' + Math.abs(dl) + ' d</span>';
+  if (de == null) return '<span class="imcu-tag falta">⚠ falta la fecha de embarque</span>';
+  if (de > 0) return '<span class="imcu-tag espera">embarca en ' + de + ' d</span>';
+  return '<span class="imcu-tag viaje">🚢 embarcado hace ' + Math.abs(de) + ' d</span>';
+}
+function _impCursoFechaCell(r, campo) {
+  const iso = (campo === "emb" ? r.fecha_embarque : r.fecha_llegada) || "";
+  const dias = _impCursoDias(iso);
+  const enc = _impCursoEnc(r.pedido_ref) + "','" + _impCursoEnc(r.proveedor);
+  const fn = (campo === "emb" ? "impCursoSetEmbarque" : "impCursoSetLlegada") + "('" + enc + "',v)";
+  const borde = iso ? (campo === "emb" ? "#0369a1" : "#b45309") : "#f59e0b";
+  const fondo = iso ? (campo === "emb" ? "#f0f9ff" : "#fff7ed") : "#fffbeb";
+  const tip = campo === "emb"
+    ? "Día que embarca (sale de China). Se guarda en las " + r.n_lineas + " línea(s) del pedido."
+    : "Día que llega. Se guarda en las " + r.n_lineas + " línea(s) y es el reingreso que ve la página LK.";
+  return _pedImpFechaInputHtml(iso, fn, 'title="' + tip + '" style="width:86px;padding:5px 6px;border:1.5px solid ' + borde + ';border-radius:8px;font-size:13px;font-weight:700;background:' + fondo + '"') +
+    (dias != null ? '<div class="imcu-sub">' + (dias >= 0 ? "faltan " + dias + " d" : "hace " + Math.abs(dias) + " d") + '</div>'
+                  : '<div class="imcu-sub falta">sin cargar</div>');
+}
+/* v15.73 — filtros de la pantalla: fichas de PROVEEDOR y de PEDIDO (mismo criterio que la solapa
+   📦 Pedidos, dueño 11/09: "poneme los mismos botones… para que pueda ver solo un pedido, cuánta
+   plata es y todo"). Los totales de arriba (unidades, u$s, m³) se recalculan con lo filtrado, así
+   parado en un pedido el cartel verde dice exactamente cuánta plata es ESE pedido. */
+function impCursoSetProv(provEnc) {
+  if (!_stkPop || _stkPop.kind !== "impCurso") return;
+  _stkPop.provFiltro = decodeURIComponent(provEnc || "");
+  _stkPop.refFiltro = "";               // cambiar de proveedor limpia el pedido elegido
+  _impCursoRender();
+}
+function impCursoSetRef(refEnc) {
+  if (!_stkPop || _stkPop.kind !== "impCurso") return;
+  _stkPop.refFiltro = decodeURIComponent(refEnc || "");
+  _impCursoRender();
+  // parado en UN pedido, el detalle por artículo se abre solo (es lo que se va a mirar)
+  if (_stkPop.refFiltro) {
+    const r = (_stkPop.rows || []).find(function (x) { return x.pedido_ref === _stkPop.refFiltro; });
+    if (r && _stkPop.abierto !== _impCursoKey(r)) impCursoToggle(_impCursoEnc(r.pedido_ref), _impCursoEnc(r.proveedor));
+  }
+}
+/* Las filas que se están viendo según las dos fichas. */
+function _impCursoVista() {
+  const st = _stkPop || {};
+  return (st.rows || []).filter(function (r) {
+    if (st.provFiltro && r.proveedor !== st.provFiltro) return false;
+    if (st.refFiltro && r.pedido_ref !== st.refFiltro) return false;
+    return true;
+  });
+}
+function _impCursoRender() {
+  const body = document.getElementById("stkPopBody"); if (!body || !_stkPop || _stkPop.kind !== "impCurso") return;
+  if (!document.getElementById("impCursoCss")) {
+    const st = document.createElement("style"); st.id = "impCursoCss";
+    st.textContent =
+      ".imcu-tbl{width:100%;border-collapse:collapse;background:#fff;border:1px solid #e2e8f0;border-radius:12px;overflow:hidden}" +
+      ".imcu-tbl th{font-size:10.5px;text-transform:uppercase;letter-spacing:.3px;color:#64748b;font-weight:800;padding:8px 7px;border-bottom:2px solid #e2e8f0;text-align:left;white-space:nowrap}" +
+      ".imcu-tbl td{padding:8px 7px;border-bottom:1px solid #f1f5f9;font-size:13px;color:#0f172a;vertical-align:middle}" +
+      ".imcu-tbl td.num,.imcu-tbl th.num{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}" +
+      ".imcu-tbl tr.imcu-open > td{background:#f8fafc}" +
+      ".imcu-pi{font-weight:800;font-family:Consolas,Menlo,monospace;font-size:12.5px;cursor:pointer}" +
+      ".imcu-prov{font-weight:800}.imcu-imp{font-size:10.5px;color:#94a3b8;font-weight:700}" +
+      ".imcu-sub{font-size:10.5px;color:#64748b;margin-top:2px;font-weight:700}" +
+      ".imcu-sub.falta{color:#b45309}" +
+      ".imcu-tag{font-size:11px;font-weight:800;padding:3px 8px;border-radius:999px;white-space:nowrap;display:inline-block}" +
+      ".imcu-tag.falta{background:#fffbeb;color:#b45309}.imcu-tag.espera{background:#eff6ff;color:#1d4ed8}" +
+      ".imcu-tag.viaje{background:#f0fdf4;color:#166534}.imcu-tag.atras{background:#fef2f2;color:#b91c1c}" +
+      ".imcu-det{background:#f8fafc!important;padding:0!important}" +
+      ".imcu-det table{width:100%;border-collapse:collapse;margin:0}" +
+      ".imcu-det th{font-size:10px;color:#94a3b8;padding:5px 7px;border-bottom:1px solid #e2e8f0}" +
+      ".imcu-det td{font-size:12.5px;padding:4px 7px;border-bottom:1px solid #eef2f7}" +
+      ".imcu-kpi{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:12px}" +
+      ".imcu-kpi>div{flex:1;min-width:132px;border-radius:10px;padding:9px 13px}" +
+      ".imcu-kpi .k{font-size:10.5px;font-weight:800;text-transform:uppercase;letter-spacing:.4px}" +
+      ".imcu-kpi .v{font-size:21px;font-weight:800}" +
+      ".imcu-fila{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:10px}" +
+      ".imcu-lbl{font-size:12px;font-weight:800;color:#64748b;text-transform:uppercase;letter-spacing:.4px}" +
+      ".imcu-b{border:0;border-radius:7px;padding:4px 9px;font-size:11.5px;font-weight:800;cursor:pointer;margin:0;width:auto;background:#e2e8f0;color:#0f172a}" +
+      /* v15.74 — vista Plata (cuenta corriente): las mismas columnas del Excel de Thomas. */
+      ".imcu-money{width:92px;text-align:right;padding:5px 6px;border:1.5px solid #cbd5e1;border-radius:8px;font-size:13px;font-weight:700;font-variant-numeric:tabular-nums;margin:0;box-sizing:border-box;background:#fff}" +
+      ".imcu-money:focus{border-color:#0f766e;outline:none}" +
+      ".imcu-money.pago{border-color:#a7f3d0;background:#f0fdf4}" +
+      ".imcu-falta{font-weight:800;font-variant-numeric:tabular-nums}" +
+      ".imcu-falta.cero{color:#16a34a}.imcu-falta.debe{color:#b45309}" +
+      ".imcu-nom{width:104px;padding:5px 6px;border:1.5px solid #cbd5e1;border-radius:8px;font-size:12.5px;font-weight:700;margin:0;box-sizing:border-box;background:#fff}" +
+      ".imcu-ntl{background:#eef2ff;border-color:#c7d2fe}" +
+      "#impPagosOv{display:none;position:fixed;inset:0;z-index:1330;background:rgba(2,6,23,.78);overflow:auto;padding:14px}" +
+      "#impPagosOv.show{display:block}" +
+      ".ipg-card{background:#f8fafc;max-width:min(700px,96vw);margin:0 auto;border-radius:16px;overflow:hidden;box-shadow:0 24px 70px rgba(0,0,0,.55)}" +
+      ".ipg-head{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:12px 15px;background:linear-gradient(90deg,#065f46,#059669);color:#fff}" +
+      ".ipg-head b{font-size:16px;font-weight:800}" +
+      ".ipg-x{background:rgba(255,255,255,.22);color:#fff;border:none;border-radius:8px;padding:6px 12px;font-size:13px;font-weight:800;cursor:pointer;width:auto;margin:0}" +
+      ".ipg-body{padding:12px 14px}" +
+      ".ipg-tbl{width:100%;border-collapse:collapse;background:#fff;border:1px solid #e2e8f0;border-radius:10px;overflow:hidden}" +
+      ".ipg-tbl th{font-size:10.5px;text-transform:uppercase;color:#64748b;font-weight:800;padding:7px 6px;border-bottom:2px solid #e2e8f0;text-align:left}" +
+      ".ipg-tbl td{padding:6px;border-bottom:1px solid #f1f5f9;font-size:13px;color:#0f172a}" +
+      ".ipg-tbl td.num,.ipg-tbl th.num{text-align:right;font-variant-numeric:tabular-nums}" +
+      ".ipg-tipo{font-size:10.5px;font-weight:800;padding:2px 7px;border-radius:999px;white-space:nowrap}" +
+      ".ipg-tipo.a30{background:#eef2ff;color:#4338ca}.ipg-tipo.sal{background:#f0fdf4;color:#166534}.ipg-tipo.dir{background:#fff7ed;color:#b45309}" +
+      ".ipg-foot{padding:11px 14px;background:#fff;border-top:1px solid #e2e8f0;display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}" +
+      ".ipg-empty{padding:16px;text-align:center;color:#64748b;font-size:13px}";
+    document.head.appendChild(st);
+  }
+  const rows = _stkPop.rows || [];
+  let h = _impTabsHtml('curso');
+  h += '<div class="stkpop-hint">Lo que <b>ya está pedido y viene en camino</b>, un renglón por <b>pedido</b> (el PI del proveedor). Esta pantalla <b>no</b> mira lo que el módulo sugiere pedir: sólo los baches <code>en curso</code>. Tocá una fecha para corregirla — se guarda en <b>todas las líneas del pedido</b> de una, y la de <b>llegada</b> es la que la página LK muestra como "Reingreso Est". Tocá el <b>PI</b> para abrir el detalle por artículo. Las <b>fichas</b> de arriba filtran por <b>proveedor</b> o por <b>pedido</b>: parado en uno, los totales (unidades, <b>u$s</b>, m³) son los de ESE pedido.</div>';
+  if (_stkPop.err) h += '<div class="stkpop-empty" style="color:#b91c1c">No se pudo leer: ' + escapeHtml(_stkPop.err) + '</div>';
+  if (!rows.length) { body.innerHTML = h + '<div class="stkpop-empty">No hay pedidos de importación en curso.</div>'; return; }
+
+  // ---- fichas de filtro (mismo botón redondeado que la solapa 📦 Pedidos) ----
+  const _fb = function (on) { return 'width:auto;margin:0;flex:0 0 auto;padding:7px 13px;border-radius:999px;border:1px solid ' + (on ? '#0f766e' : '#cbd5e1') + ';background:' + (on ? '#0f766e' : '#fff') + ';color:' + (on ? '#fff' : '#334155') + ';font-size:13px;font-weight:800;cursor:pointer'; };
+  const provs = [];
+  rows.forEach(function (r) { if (provs.indexOf(r.proveedor) < 0) provs.push(r.proveedor); });
+  provs.sort(function (a, b) { const ia = _IMPORTADOR_DE[a] || "zz", ib = _IMPORTADOR_DE[b] || "zz"; return String(ia).localeCompare(String(ib)) || String(a).localeCompare(String(b)); });
+  const provFiltro = (_stkPop.provFiltro && provs.indexOf(_stkPop.provFiltro) >= 0) ? _stkPop.provFiltro : "";
+  _stkPop.provFiltro = provFiltro;
+  if (provs.length > 1) {
+    h += '<div class="imcu-fila"><span class="imcu-lbl">🏭 Proveedor:</span>' +
+      '<button style="' + _fb(!provFiltro) + '" onclick="impCursoSetProv(\'\')">Todos</button>' +
+      provs.map(function (p) {
+        const n = rows.filter(function (r) { return r.proveedor === p; }).length;
+        return '<button style="' + _fb(provFiltro === p) + '" onclick="impCursoSetProv(\'' + _impCursoEnc(p) + '\')">' + escapeHtml(p) + (n > 1 ? ' <span style="opacity:.7">(' + n + ')</span>' : '') + '</button>';
+      }).join('') + '</div>';
+  }
+  // fichas de PEDIDO: las del proveedor elegido (o todas si está en "Todos")
+  const refsBase = rows.filter(function (r) { return !provFiltro || r.proveedor === provFiltro; });
+  const refFiltro = (_stkPop.refFiltro && refsBase.some(function (r) { return r.pedido_ref === _stkPop.refFiltro; })) ? _stkPop.refFiltro : "";
+  _stkPop.refFiltro = refFiltro;
+  if (refsBase.length > 1) {
+    h += '<div class="imcu-fila"><span class="imcu-lbl">📄 Pedido:</span>' +
+      '<button style="' + _fb(!refFiltro) + '" onclick="impCursoSetRef(\'\')">Todos</button>' +
+      refsBase.map(function (r) {
+        return '<button style="' + _fb(refFiltro === r.pedido_ref) + '" onclick="impCursoSetRef(\'' + _impCursoEnc(r.pedido_ref) + '\')" title="' + escapeHtml(r.proveedor) + ' · ' + _impCursoNum(r.pendiente) + ' u · u$s ' + _impCursoNum(Math.round(Number(r.usd) || 0)) + '">' + escapeHtml(r.pedido_ref) + '</button>';
+      }).join('') + '</div>';
+  }
+  // v15.74 — dos vistas del mismo listado: la logística (unidades, m³, fechas) y la de PLATA
+  // (la cuenta corriente: las mismas columnas del Excel con el que Thomas lleva la deuda).
+  const plata = !!_stkPop.vistaPlata;
+  h += '<div class="imcu-fila"><span class="imcu-lbl">Ver:</span>' +
+    '<button style="' + _fb(!plata) + '" onclick="impCursoSetVista(false)">📦 Logística</button>' +
+    '<button style="' + _fb(plata) + '" onclick="impCursoSetVista(true)" title="Cuenta corriente: FOB, pagado, pendiente de giro directo y lo que falta">💵 Plata</button>' +
+    '</div>';
+  h += '<div class="imcu-fila">' +
+    '<button class="mva-clear" style="background:#166534;color:#fff;border-color:#166534" onclick="impCursoExportExcel()" title="Bajar a Excel lo que se está viendo, con el detalle por artículo de cada pedido">📥 Excel</button>' +
+    ((provFiltro || refFiltro) ? '<button class="mva-clear" onclick="impCursoSetProv(\'\')" title="Sacar los filtros">✕ Ver todo</button>' : '') +
+    '</div>';
+
+  // ---- totales de LO QUE SE ESTÁ VIENDO ----
+  const vista = _impCursoVista();
+  const tUni = vista.reduce(function (s, r) { return s + (Number(r.pendiente) || 0); }, 0);
+  const tUsd = vista.reduce(function (s, r) { return s + (Number(r.usd) || 0); }, 0);
+  const tM3 = vista.reduce(function (s, r) { return s + (Number(r.m3) || 0); }, 0);
+  const sinEmb = vista.filter(function (r) { return !r.fecha_embarque; }).length;
+  const foco = refFiltro ? ('📄 ' + refFiltro) : (provFiltro ? ('🏭 ' + provFiltro) : "");
+  const kTit = refFiltro ? "Este pedido" : (provFiltro ? "Pedidos de " + provFiltro : "Pedidos en curso");
+  if (plata) {
+    // los mismos cuatro números del Excel, sobre lo filtrado
+    let tFob = 0, tPag = 0, tGiro = 0, tFalta = 0;
+    vista.forEach(function (r) {
+      const c = _impCursoCc(r);
+      tFob += Number(c.fob) || 0; tPag += Number(c.pagado) || 0;
+      tGiro += Number(c.pend_giro_directo) || 0; tFalta += Number(c.falta) || 0;
+    });
+    h += '<div class="imcu-kpi">' +
+      '<div style="background:#f8fafc;border:1px solid #e2e8f0"><div class="k" style="color:#475569">FOB ' + escapeHtml(refFiltro ? "del pedido" : "total") + '</div><div class="v" style="color:#0f172a">u$s ' + _impCursoNum(Math.round(tFob)) + '</div>' + (foco ? '<div style="font-size:10.5px;color:#64748b;font-weight:700">' + escapeHtml(foco) + '</div>' : '') + '</div>' +
+      '<div style="background:#ecfdf5;border:1px solid #a7f3d0"><div class="k" style="color:#047857">Pagado</div><div class="v" style="color:#065f46">u$s ' + _impCursoNum(Math.round(tPag)) + '</div></div>' +
+      '<div style="background:#fff7ed;border:1px solid #fed7aa"><div class="k" style="color:#b45309">Pend. giro directo</div><div class="v" style="color:#92400e">u$s ' + _impCursoNum(Math.round(tGiro)) + '</div></div>' +
+      '<div style="background:#fef2f2;border:1px solid #fecaca"><div class="k" style="color:#b91c1c">Falta</div><div class="v" style="color:#991b1b">u$s ' + _impCursoNum(Math.round(tFalta)) + '</div></div>' +
+      '</div>';
+    h += '<div class="stkpop-hint">Cuenta corriente con los chinos, igual que el Excel: <b>Falta = FOB − Pagado − Pend. giro directo</b>. <b>A nombre de</b> es quién factura y cobra (<b>NTL</b>, el forwarder de Hong Kong, o el proveedor); sólo las que van a nombre del proveedor tienen giro directo. <b>💵</b> abre los giros de ese pedido para cargar uno nuevo. La plata que sale viaja pegada a una importación ya nacionalizada aunque financie el pedido siguiente — está explicado en <code>docs/IMPORTACIONES-PAGOS-ARGENTINA.md</code>.</div>';
+    h += _impCursoTablaPlata(vista);
+    body.innerHTML = h;
+    return;
+  }
+  h += '<div class="imcu-kpi">' +
+    '<div style="background:#eef2ff;border:1px solid #c7d2fe"><div class="k" style="color:#4338ca">' + escapeHtml(kTit) + '</div><div class="v" style="color:#3730a3">' + vista.length + '</div>' + (foco ? '<div style="font-size:10.5px;color:#6366f1;font-weight:700">' + escapeHtml(foco) + '</div>' : '') + '</div>' +
+    '<div style="background:#fff7ed;border:1px solid #fed7aa"><div class="k" style="color:#b45309">Unidades por llegar</div><div class="v" style="color:#92400e">' + _impCursoNum(tUni) + '</div></div>' +
+    '<div style="background:#ecfdf5;border:1px solid #a7f3d0"><div class="k" style="color:#047857">' + (refFiltro ? "Plata de este pedido (FOB)" : "FOB en camino") + '</div><div class="v" style="color:#065f46">u$s ' + _impCursoNum(Math.round(tUsd)) + '</div></div>' +
+    '<div style="background:#eff6ff;border:1px solid #bfdbfe"><div class="k" style="color:#1d4ed8">Volumen</div><div class="v" style="color:#1e3a8a">' + (Math.round(tM3 * 10) / 10).toLocaleString("es-AR") + ' m³</div></div>' +
+    '</div>';
+  if (sinEmb) h += '<div style="margin-bottom:10px;padding:9px 13px;background:#fffbeb;border:1px solid #fde68a;border-radius:10px;font-size:12.5px;color:#92400e"><b>⚠ ' + sinEmb + ' pedido(s) sin fecha de embarque.</b> Cargala en la columna 🚢 (dd/mm/aa) y queda guardada en todas sus líneas.</div>';
+  if (!vista.length) { body.innerHTML = h + '<div class="stkpop-empty">Nada con ese filtro.</div>'; return; }
+  h += '<div class="mva-tblwrap wide"><table class="imcu-tbl">' +
+    '<thead><tr><th>Proveedor</th><th>Pedido (PI)</th><th class="num">Líneas</th><th class="num">Unidades</th><th class="num">u$s</th><th class="num">m³</th><th>🚢 Embarque</th><th>🛬 Llegada</th><th>Estado</th></tr></thead><tbody>';
+  vista.forEach(function (r) {
+    const key = _impCursoKey(r);
+    const abierto = _stkPop.abierto === key;
+    const refEnc = _impCursoEnc(r.pedido_ref), provEnc = _impCursoEnc(r.proveedor);
+    const imp = _IMPORTADOR_DE[r.proveedor] || "";
+    h += '<tr' + (abierto ? ' class="imcu-open"' : '') + '>' +
+      '<td><span class="imcu-prov">' + escapeHtml(r.proveedor) + '</span>' + (imp ? '<div class="imcu-imp">' + escapeHtml(imp) + '</div>' : '') + '</td>' +
+      '<td><span class="imcu-pi" onclick="impCursoToggle(\'' + refEnc + '\',\'' + provEnc + '\')" title="Ver los artículos de este pedido">' + (abierto ? '▾ ' : '▸ ') + escapeHtml(r.pedido_ref) + '</span>' +
+        '<div class="imcu-sub"><span class="imcu-b" onclick="impCursoSetRef(\'' + refEnc + '\')" title="Ver SÓLO este pedido (y cuánta plata es)">🔎 solo éste</span> <span class="imcu-b" onclick="impCursoRenombrar(\'' + refEnc + '\',\'' + provEnc + '\')" title="Cambiar el número de PI de este pedido">✏️ PI</span></div></td>' +
+      '<td class="num">' + r.n_lineas + '</td>' +
+      '<td class="num"><b>' + _impCursoNum(r.pendiente) + '</b></td>' +
+      '<td class="num" style="color:#065f46;font-weight:700">' + (Number(r.usd) > 0 ? _impCursoNum(Math.round(r.usd)) : '—') + '</td>' +
+      '<td class="num" style="color:#0369a1;font-weight:700">' + (Number(r.m3) > 0 ? (Math.round(r.m3 * 10) / 10).toLocaleString("es-AR") : '—') + '</td>' +
+      '<td>' + _impCursoFechaCell(r, "emb") + '</td>' +
+      '<td>' + _impCursoFechaCell(r, "lleg") + '</td>' +
+      '<td>' + _impCursoEstado(r) + '</td></tr>';
+    if (abierto) {
+      const ls = _stkPop.lineas[key];
+      h += '<tr><td class="imcu-det" colspan="9">' + (ls ? _impCursoLineasHtml(ls) : '<div style="padding:10px 14px;color:#64748b;font-size:12.5px">Cargando artículos…</div>') + '</td></tr>';
+    }
+  });
+  h += '</tbody></table></div>';
+  body.innerHTML = h;
+}
+/* Excel de lo que se está viendo: una hoja con los pedidos y, debajo, el detalle por artículo de
+   cada uno (se piden las líneas que falten). Sin librería: .xls = tabla HTML, igual que el resto. */
+async function impCursoExportExcel() {
+  if (!_stkPop || _stkPop.kind !== "impCurso") return;
+  const vista = _impCursoVista();
+  if (!vista.length) { try { alert("No hay pedidos para exportar."); } catch (_e) {} return; }
+  for (let i = 0; i < vista.length; i++) {
+    const r = vista[i], key = _impCursoKey(r);
+    if (!_stkPop.lineas[key]) {
+      try { _stkPop.lineas[key] = (await _pedImpRpc("gv_importado_pedido_lineas", { p_pedido_ref: r.pedido_ref, p_proveedor: r.proveedor })) || []; }
+      catch (_e) { _stkPop.lineas[key] = []; }
+    }
+  }
+  const esc = function (s) { return String(s == null ? "" : s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;"); };
+  const fecha = _impCursoHoy();
+  const dm = function (iso) { return iso ? _isoToDdMmAa(String(iso).slice(0, 10)) : ""; };
+  let html = '<html xmlns:x="urn:schemas-microsoft-com:office:excel"><head><meta charset="utf-8"><style>td,th{border:1px solid #ccc;padding:3px 7px;font-family:Calibri,Arial,sans-serif;} th{background:#0f766e;color:#fff;text-align:left;}</style></head><body>';
+  html += '<h3>Pedidos de importación EN CURSO — ' + esc(fecha) + (_stkPop.provFiltro ? ' — ' + esc(_stkPop.provFiltro) : '') + (_stkPop.refFiltro ? ' — ' + esc(_stkPop.refFiltro) : '') + '</h3>';
+  html += '<table><tr><th>Importador</th><th>Proveedor</th><th>Pedido (PI)</th><th>Lineas</th><th>Unidades</th><th>u$s FOB</th><th>m3</th><th>Embarque</th><th>Llegada</th></tr>';
+  let tU = 0, tD = 0, tM = 0;
+  vista.forEach(function (r) {
+    tU += Number(r.pendiente) || 0; tD += Number(r.usd) || 0; tM += Number(r.m3) || 0;
+    html += '<tr><td>' + esc(_IMPORTADOR_DE[r.proveedor] || "") + '</td><td>' + esc(r.proveedor) + '</td><td>' + esc(r.pedido_ref) + '</td><td>' + r.n_lineas +
+      '</td><td>' + (Number(r.pendiente) || 0) + '</td><td>' + Math.round(Number(r.usd) || 0) + '</td><td>' + (Math.round((Number(r.m3) || 0) * 100) / 100) +
+      '</td><td>' + esc(dm(r.fecha_embarque)) + '</td><td>' + esc(dm(r.fecha_llegada)) + '</td></tr>';
+  });
+  html += '<tr><td colspan="4"><b>TOTAL</b></td><td><b>' + tU + '</b></td><td><b>' + Math.round(tD) + '</b></td><td><b>' + (Math.round(tM * 100) / 100) + '</b></td><td></td><td></td></tr></table>';
+  html += '<h3>Detalle por artículo</h3><table><tr><th>Pedido (PI)</th><th>Proveedor</th><th>Codigo</th><th>Marca</th><th>Descripcion</th><th>Unidades</th><th>FOB u$s/u</th><th>u$s</th><th>m3</th><th>Llegada</th></tr>';
+  vista.forEach(function (r) {
+    (_stkPop.lineas[_impCursoKey(r)] || []).forEach(function (l) {
+      html += '<tr><td>' + esc(r.pedido_ref) + '</td><td>' + esc(r.proveedor) + '</td><td>' + esc(codCanon(l.cod_art)) + '</td><td>' + esc(l.marca || "") +
+        '</td><td>' + esc(l.descripcion || "") + '</td><td>' + (Number(l.pendiente) || 0) + '</td><td>' + (Number(l.fob_uni) || "") + '</td><td>' + Math.round(Number(l.usd) || 0) +
+        '</td><td>' + (l.m3 == null ? "" : l.m3) + '</td><td>' + esc(dm(l.fecha_reingreso)) + '</td></tr>';
+    });
+  });
+  html += '</table></body></html>';
+  try {
+    const blob = new Blob(["﻿" + html], { type: "application/vnd.ms-excel" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a"); a.href = url;
+    a.download = "Importacion_En_Curso_" + fecha + ".xls";
+    document.body.appendChild(a); a.click();
+    setTimeout(function () { try { document.body.removeChild(a); URL.revokeObjectURL(url); } catch (_e) {} }, 1500);
+  } catch (e) { try { alert("No se pudo generar el Excel: " + (e.message || e)); } catch (_e) {} }
+}
+/* v15.74 — VISTA PLATA: la cuenta corriente con los chinos, calcada del Excel con el que Thomas
+   la lleva ("estado actual de deudas al exterior"): A nombre de · FOB · Pago · Pend Giro Directo ·
+   Falta · Embarque · Fecha Pago 30% · Fecha Recup.
+     · Falta  = FOB − Pagado − Pend. giro directo   (la fórmula de su planilla)
+     · Pagado = la SUMA de los giros cargados (GV_Imp_Pagos), no un número tipeado
+     · "A nombre de" = quién factura y cobra: NTL (forwarder de Hong Kong) o el proveedor
+   Por qué la plata sale pegada a una importación ya nacionalizada aunque financie el pedido
+   siguiente: docs/IMPORTACIONES-PAGOS-ARGENTINA.md. Backend: sql/gv_imp_cuenta_corriente_v1574.sql */
+function impCursoSetVista(plata) {
+  if (!_stkPop || _stkPop.kind !== "impCurso") return;
+  _stkPop.vistaPlata = !!plata; _impCursoRender();
+}
+/* La fila de cuenta corriente del pedido. Si todavía no se leyó, se cae a lo que sabe el motor
+   (FOB calculado, nada pagado) para que la tabla igual muestre algo coherente. */
+function _impCursoCc(r) {
+  const m = (_stkPop && _stkPop.cc) || {};
+  const c = m[_impCursoKey(r)];
+  if (c) return c;
+  const fob = Number(r.usd) || 0;
+  return { fob: fob, pagado: 0, pend_giro_directo: 0, falta: fob, saldo: fob, n_pagos: 0,
+           a_nombre_de: "", fecha_pago_30: null, fecha_recup: null, fob_difiere: false, fob_calculado: fob };
+}
+function _impCursoMoneyInput(r, campo, val, extra) {
+  const enc = _impCursoEnc(r.pedido_ref) + "','" + _impCursoEnc(r.proveedor);
+  return '<input type="number" step="1" min="0" class="imcu-money' + (extra || "") + '" value="' + (Number(val) ? Math.round(Number(val)) : "") +
+    '" placeholder="0" onchange="impCursoCcSet(\'' + enc + '\',\'' + campo + '\',this.value)">';
+}
+function _impCursoTablaPlata(vista) {
+  let h = '<div class="mva-tblwrap wide"><table class="imcu-tbl">' +
+    '<thead><tr><th>Proveedor</th><th>Pedido (PI)</th><th title="Quién emite la factura y cobra: NTL o el proveedor">A nombre de</th>' +
+    '<th class="num">FOB</th><th class="num" title="Suma de los giros cargados. Tocá 💵 para verlos o agregar uno.">Pagado</th>' +
+    '<th class="num" title="Del saldo, lo que va girado derecho al proveedor (no por NTL)">Pend. giro directo</th>' +
+    '<th class="num" title="FOB − Pagado − Pend. giro directo">Falta</th>' +
+    '<th title="El anticipo/depósito. De acá sale la fecha de embarque (depósito + lead time del PI)">💰 Pago 30%</th>' +
+    '<th>🚢 Embarque</th><th title="Cuándo se recupera (las filas a nombre de NTL)">♻️ Recupero</th><th></th></tr></thead><tbody>';
+  vista.forEach(function (r) {
+    const c = _impCursoCc(r);
+    const refEnc = _impCursoEnc(r.pedido_ref), provEnc = _impCursoEnc(r.proveedor);
+    const enc = refEnc + "','" + provEnc;
+    const imp = _IMPORTADOR_DE[r.proveedor] || "";
+    const nom = String(c.a_nombre_de || "");
+    const falta = Number(c.falta) || 0;
+    const pagado = Number(c.pagado) || 0;
+    const fob = Number(c.fob) || 0;
+    const pct = fob > 0 ? Math.round((pagado / fob) * 100) : 0;
+    h += '<tr>' +
+      '<td><span class="imcu-prov">' + escapeHtml(r.proveedor) + '</span>' + (imp ? '<div class="imcu-imp">' + escapeHtml(imp) + '</div>' : '') + '</td>' +
+      '<td><span class="imcu-pi" onclick="impCursoSetRef(\'' + refEnc + '\')" title="Ver sólo este pedido">' + escapeHtml(r.pedido_ref) + '</span></td>' +
+      '<td><input type="text" class="imcu-nom' + (nom.toUpperCase() === "NTL" ? " imcu-ntl" : "") + '" value="' + escapeHtml(nom) + '" placeholder="NTL / ' + escapeHtml(r.proveedor) + '" title="Quién emite la factura y cobra" onchange="impCursoCcSet(\'' + enc + '\',\'nombre\',this.value)"></td>' +
+      '<td class="num">' + _impCursoMoneyInput(r, "fob", c.fob) +
+        (c.fob_difiere ? '<div class="imcu-sub falta" title="El FOB del PI no coincide con el que sale de FOB unitario × unidades del módulo">⚠ motor: ' + _impCursoNum(Math.round(c.fob_calculado)) + '</div>' : '') + '</td>' +
+      '<td class="num"><b style="color:#065f46">' + _impCursoNum(Math.round(pagado)) + '</b>' +
+        '<div class="imcu-sub">' + (c.n_pagos ? (c.n_pagos + ' giro' + (c.n_pagos > 1 ? 's' : '') + ' · ' + pct + '%') : 'sin giros') + '</div></td>' +
+      '<td class="num">' + _impCursoMoneyInput(r, "pendgiro", c.pend_giro_directo) + '</td>' +
+      '<td class="num"><span class="imcu-falta ' + (Math.abs(falta) < 1 ? "cero" : "debe") + '">' + _impCursoNum(Math.round(falta)) + '</span></td>' +
+      '<td>' + _pedImpFechaInputHtml(c.fecha_pago_30 || "", "impCursoCcSet('" + enc + "','pago30',v)", 'title="Fecha del anticipo/depósito" style="width:82px;padding:5px 6px;border:1.5px solid #cbd5e1;border-radius:8px;font-size:12.5px;background:#fff"') +
+        (c.dias_produccion != null ? '<div class="imcu-sub">+' + c.dias_produccion + ' d al embarque</div>' : '') + '</td>' +
+      '<td>' + _impCursoFechaCell(r, "emb") + '</td>' +
+      '<td>' + _pedImpFechaInputHtml(c.fecha_recup || "", "impCursoCcSet('" + enc + "','recup',v)", 'title="Fecha de recupero" style="width:82px;padding:5px 6px;border:1.5px solid #cbd5e1;border-radius:8px;font-size:12.5px;background:#fff"') + '</td>' +
+      '<td><button class="imcu-b" style="background:#065f46;color:#fff" onclick="impCursoPagos(\'' + enc + '\')" title="Ver y cargar los giros de este pedido">💵 Giros</button></td>' +
+      '</tr>';
+  });
+  return h + '</tbody></table></div>';
+}
+/* Un solo setter para toda la cabecera: cada campo manda su p_set_* para distinguir
+   "no tocar" de "poner en null/0" (la RPC gv_imp_cc_set). */
+async function impCursoCcSet(refEnc, provEnc, campo, valor) {
+  if (!_stkPop || _stkPop.kind !== "impCurso") return;
+  const ref = decodeURIComponent(refEnc), prov = decodeURIComponent(provEnc);
+  const body = { p_pedido_ref: ref, p_proveedor: prov };
+  const num = function (v) { const n = Number(String(v == null ? "" : v).replace(/[^\d.\-]/g, "")); return isFinite(n) ? n : 0; };
+  if (campo === "nombre") { body.p_a_nombre_de = String(valor || "").trim() || null; body.p_set_a_nombre_de = true; }
+  else if (campo === "fob") { const n = num(valor); body.p_fob = n > 0 ? n : null; body.p_set_fob = true; }
+  else if (campo === "pendgiro") { body.p_pend_giro = num(valor); body.p_set_pend_giro = true; }
+  else if (campo === "pago30") { body.p_pago_30 = String(valor || "").slice(0, 10) || null; body.p_set_pago_30 = true; }
+  else if (campo === "recup") { body.p_recup = String(valor || "").slice(0, 10) || null; body.p_set_recup = true; }
+  else return;
+  try { await _pedImpRpc("gv_imp_cc_set", body); }
+  catch (e) { try { alert("No se pudo guardar: " + (e.message || e)); } catch (_e) {} }
+  await impCursoReload();
+}
+/* ---- Giros de UN pedido (el libro de la cuenta corriente) ---- */
+var _impPagos = null;
+function _impPagosTipoTxt(t) {
+  if (t === "anticipo30") return '<span class="ipg-tipo a30">anticipo 30%</span>';
+  if (t === "giro_directo") return '<span class="ipg-tipo dir">giro directo</span>';
+  return '<span class="ipg-tipo sal">saldo</span>';
+}
+async function impCursoPagos(refEnc, provEnc) {
+  const ref = decodeURIComponent(refEnc), prov = decodeURIComponent(provEnc);
+  const r = ((_stkPop && _stkPop.rows) || []).find(function (x) { return x.pedido_ref === ref && x.proveedor === prov; });
+  _impPagos = { ref: ref, prov: prov, rows: [], cc: r ? _impCursoCc(r) : null };
+  let ov = document.getElementById("impPagosOv");
+  if (!ov) { ov = document.createElement("div"); ov.id = "impPagosOv"; document.body.appendChild(ov); }
+  ov.classList.add("show");
+  await _impPagosReload();
+}
+function impPagosCerrar() {
+  const ov = document.getElementById("impPagosOv"); if (ov) ov.classList.remove("show");
+  const d = _impPagos && _impPagos.dirty; _impPagos = null;
+  if (d) { try { impCursoReload(); } catch (_e) {} }
+}
+async function _impPagosReload() {
+  if (!_impPagos) return;
+  try { _impPagos.rows = (await _pedImpRpc("gv_imp_pagos", { p_pedido_ref: _impPagos.ref, p_proveedor: _impPagos.prov })) || []; }
+  catch (e) { _impPagos.rows = []; try { alert("No se pudieron leer los giros: " + (e.message || e)); } catch (_e) {} }
+  _impPagosRender();
+}
+function _impPagosRender() {
+  const ov = document.getElementById("impPagosOv"); if (!ov || !_impPagos) return;
+  const rows = _impPagos.rows || [];
+  const tot = rows.reduce(function (a, x) { return a + (Number(x.monto_usd) || 0); }, 0);
+  const cc = _impPagos.cc || {};
+  const fob = Number(cc.fob) || 0;
+  const falta = fob - tot - (Number(cc.pend_giro_directo) || 0);
+  const body = rows.map(function (x) {
+    return "<tr>" +
+      "<td>" + (x.fecha ? _isoToDdMmAa(String(x.fecha).slice(0, 10)) : "—") + "</td>" +
+      '<td class="num"><b>' + _impCursoNum(Math.round(Number(x.monto_usd) || 0)) + "</b></td>" +
+      "<td>" + escapeHtml(x.beneficiario || "—") + "</td>" +
+      "<td>" + _impPagosTipoTxt(x.tipo) + "</td>" +
+      '<td style="font-size:11.5px;color:#64748b">' + escapeHtml(x.factura_ref || "") + (x.nota ? '<div style="font-size:10.5px;color:#94a3b8">' + escapeHtml(x.nota) + '</div>' : '') + "</td>" +
+      '<td><button class="imcu-b" style="background:#fee2e2;color:#b91c1c" onclick="impPagoBorrar(' + x.id + ')" title="Borrar este giro">🗑</button></td></tr>';
+  }).join("");
+  ov.innerHTML =
+    '<div class="ipg-card"><div class="ipg-head"><b>💵 Giros — ' + escapeHtml(_impPagos.ref) + ' · ' + escapeHtml(_impPagos.prov) + '</b>' +
+      '<button class="ipg-x" onclick="impPagosCerrar()">Cerrar</button></div>' +
+    '<div class="ipg-body">' +
+      (rows.length
+        ? '<table class="ipg-tbl"><thead><tr><th>Fecha</th><th class="num">u$s</th><th>A quién</th><th>Tipo</th><th>Factura / nota</th><th></th></tr></thead><tbody>' + body + "</tbody></table>"
+        : '<div class="ipg-empty">Todavía no hay giros cargados para este pedido.</div>') +
+    "</div>" +
+    '<div class="ipg-foot"><div style="font-size:13px;color:#334155">FOB <b>u$s ' + _impCursoNum(Math.round(fob)) + '</b> · girado <b style="color:#065f46">u$s ' + _impCursoNum(Math.round(tot)) +
+      '</b> · falta <b style="color:' + (Math.abs(falta) < 1 ? "#16a34a" : "#b45309") + '">u$s ' + _impCursoNum(Math.round(falta)) + '</b></div>' +
+      '<button class="imcu-b" style="background:#065f46;color:#fff;padding:8px 14px" onclick="impPagoAdd()">➕ Cargar giro</button></div></div>';
+}
+async function impPagoAdd() {
+  if (!_impPagos) return;
+  let mv; try { mv = prompt("Monto del giro en u$s:", ""); } catch (_e) { return; }
+  if (mv === null) return;
+  const monto = Number(String(mv).replace(/[^\d.]/g, ""));
+  if (!(monto > 0)) { try { alert("Monto inválido."); } catch (_e) {} return; }
+  let fv; try { fv = prompt("Fecha del giro (dd/mm/aa).\nVacío = hoy:", ""); } catch (_e) { return; }
+  if (fv === null) return;
+  let iso = null;
+  if (String(fv).trim() !== "") { iso = _pedImpParseFechaISO(fv); if (iso === null) { try { alert("Fecha inválida (usá dd/mm/aa)."); } catch (_e) {} return; } }
+  const nomDef = (_impPagos.cc && _impPagos.cc.a_nombre_de) || "NTL";
+  let bv; try { bv = prompt("¿A quién se le giró? (NTL o el proveedor):", nomDef); } catch (_e) { return; }
+  if (bv === null) return;
+  let tv; try { tv = prompt("Tipo de giro:\n  1 = anticipo 30%\n  2 = saldo\n  3 = giro directo", "2"); } catch (_e) { return; }
+  if (tv === null) return;
+  const tipo = String(tv).trim() === "1" ? "anticipo30" : (String(tv).trim() === "3" ? "giro_directo" : "saldo");
+  let facv; try { facv = prompt("Factura / despacho contra el que se cursó (opcional — es la pata legal del giro):", ""); } catch (_e) { facv = ""; }
+  let leg = ""; try { leg = String(window.__authEmail || ""); } catch (_e) {}
+  try {
+    await _pedImpRpc("gv_imp_pago_add", { p_pedido_ref: _impPagos.ref, p_proveedor: _impPagos.prov,
+      p_fecha: iso, p_monto: monto, p_beneficiario: String(bv || "").trim() || null, p_tipo: tipo,
+      p_factura: String(facv || "").trim() || null, p_legajo: leg });
+    _impPagos.dirty = true;
+  } catch (e) { try { alert("No se pudo cargar el giro: " + (e.message || e)); } catch (_e) {} return; }
+  await _impPagosReload();
+}
+async function impPagoBorrar(pagoId) {
+  if (!_impPagos) return;
+  let ok = false; try { ok = confirm("¿Borrar este giro? El 'Pagado' del pedido baja."); } catch (_e) { ok = false; }
+  if (!ok) return;
+  try { await _pedImpRpc("gv_imp_pago_borrar", { p_pago_id: pagoId }); _impPagos.dirty = true; }
+  catch (e) { try { alert("No se pudo borrar: " + (e.message || e)); } catch (_e) {} return; }
+  await _impPagosReload();
+}
+function _impCursoLineasHtml(ls) {
+  if (!ls.length) return '<div style="padding:10px 14px;color:#64748b;font-size:12.5px">Este pedido no tiene líneas en curso.</div>';
+  return '<table><thead><tr><th style="text-align:left">Código</th><th style="text-align:left">Descripción</th><th style="text-align:right">Unidades</th><th style="text-align:right">u$s</th><th style="text-align:right">m³</th><th style="text-align:left">Llegada</th></tr></thead><tbody>' +
+    ls.map(function (l) {
+      return '<tr><td style="font-weight:800;font-family:Consolas,Menlo,monospace">' + escapeHtml(codCanon(l.cod_art)) + (l.marca ? ' <span style="font-size:10px;color:#64748b">' + escapeHtml(l.marca) + '</span>' : '') + '</td>' +
+        '<td style="color:#475569">' + escapeHtml(String(l.descripcion || "").slice(0, 40)) + '</td>' +
+        '<td style="text-align:right;font-variant-numeric:tabular-nums">' + _impCursoNum(l.pendiente) + '</td>' +
+        '<td style="text-align:right;color:#065f46">' + (Number(l.usd) > 0 ? _impCursoNum(Math.round(l.usd)) : '—') + '</td>' +
+        '<td style="text-align:right;color:#0369a1">' + (Number(l.m3) > 0 ? (Math.round(l.m3 * 100) / 100).toLocaleString("es-AR") : '—') + '</td>' +
+        '<td>' + (l.fecha_reingreso ? _isoToDdMmAa(String(l.fecha_reingreso).slice(0, 10)) : '<span style="color:#b45309">sin fecha</span>') + '</td></tr>';
+    }).join("") + '</tbody></table>';
+}
+async function impCursoToggle(refEnc, provEnc) {
+  if (!_stkPop || _stkPop.kind !== "impCurso") return;
+  const ref = decodeURIComponent(refEnc), prov = decodeURIComponent(provEnc);
+  const key = ref + "§" + prov;
+  if (_stkPop.abierto === key) { _stkPop.abierto = ""; _impCursoRender(); return; }
+  _stkPop.abierto = key; _impCursoRender();
+  if (!_stkPop.lineas[key]) {
+    let ls = [];
+    try { ls = (await _pedImpRpc("gv_importado_pedido_lineas", { p_pedido_ref: ref, p_proveedor: prov })) || []; } catch (_e) { ls = []; }
+    if (_stkPop && _stkPop.kind === "impCurso") { _stkPop.lineas[key] = ls; _impCursoRender(); }
+  }
+}
+/* Las dos fechas del pedido. Se escriben en TODAS sus líneas en curso (una sola RPC). */
+async function _impCursoSetFecha(refEnc, provEnc, iso, campo) {
+  if (!_stkPop || _stkPop.kind !== "impCurso") return;
+  const ref = decodeURIComponent(refEnc), prov = decodeURIComponent(provEnc);
+  const body = { p_pedido_ref: ref, p_proveedor: prov };
+  if (campo === "emb") { body.p_embarque = iso || null; body.p_set_embarque = true; }
+  else { body.p_llegada = iso || null; body.p_set_llegada = true; }
+  try { await _pedImpRpc("gv_importado_pedido_fechas", body); }
+  catch (e) { try { alert("No se pudo guardar la fecha: " + (e.message || e)); } catch (_e) {} }
+  if (_stkPop && _stkPop.kind === "impCurso") _stkPop.lineas = {};
+  await impCursoReload();
+}
+function impCursoSetEmbarque(refEnc, provEnc, iso) { _impCursoSetFecha(refEnc, provEnc, iso, "emb"); }
+function impCursoSetLlegada(refEnc, provEnc, iso) { _impCursoSetFecha(refEnc, provEnc, iso, "lleg"); }
+/* Cambiar el número de PI de un pedido (los baches viejos quedaron con el mail del que cargó). */
+async function impCursoRenombrar(refEnc, provEnc) {
+  const ref = decodeURIComponent(refEnc), prov = decodeURIComponent(provEnc);
+  let v; try { v = prompt("Número de PI / referencia de este pedido de " + prov + ":", ref === "(sin pedido)" ? "" : ref); } catch (_e) { return; }
+  if (v === null) return;
+  const nuevo = String(v).trim();
+  if (!nuevo) { try { alert("La referencia no puede quedar vacía."); } catch (_e) {} return; }
+  if (nuevo === ref) return;
+  try { await _pedImpRpc("gv_importado_pedido_ref", { p_pedido_ref: ref, p_proveedor: prov, p_nuevo_ref: nuevo }); }
+  catch (e) { try { alert("No se pudo renombrar: " + (e.message || e)); } catch (_e) {} return; }
+  if (_stkPop && _stkPop.kind === "impCurso") { _stkPop.abierto = ""; _stkPop.lineas = {}; }
+  await impCursoReload();
 }
 function _stkWin(mv, exemptInicial) {
   const cut = _stk.cutoff ? new Date(_stk.cutoff).getTime() : 0;
@@ -25675,7 +26288,12 @@ async function showCargaCamion(legajo, mode) {
       return;
     }
     const saved = ccLoadChecked(leg);
-    _cc = { legajo: leg, mode: mode, camionero: "", camioneros: camioneros, items: items, checked: new Set(items.filter(it => saved.has(it.np)).map(it => it.np)) };
+    // v15.70 — el Set conserva el ORDEN DE CLIC (= orden real de carga) y así se guarda y se
+    // relee. Antes se reconstruía recorriendo `items`, que están en orden de ruta: al reabrir el
+    // modal el orden en que el operario los fue tocando se perdía.
+    const _vivos = new Set(items.map(it => it.np));
+    _cc = { legajo: leg, mode: mode, camionero: "", camioneros: camioneros, items: items,
+            checked: new Set(Array.from(saved).filter(np => _vivos.has(np))) };
     ccRender();
   } catch (e) {
     _cc = null; ccReleaseWakeLock();
@@ -25701,7 +26319,8 @@ function ccRender() {
   // Las NP sin ubicación en ruta caen en una sección aparte, ordenadas por tanda.
   const hasOrden = _cc.items.some(function (it) { return isFinite(it.loadIdx); });
   let html = `<div class="cc-sub">${esRetira ? "Pedidos <b>retira</b> — tocá los que <b>entregaste</b> (se cuentan en <b>cajas</b>)." : "NP del <b>reparto</b> — tocá los que <b>cargaste al camión</b>."}` +
-             (!esRetira && hasOrden ? ` Están en <b>orden de carga</b>: el <b>último destino</b> de cada camión se carga <b>primero</b> (1 = primero en subir).` : ``) + `</div>`;
+             (!esRetira && hasOrden ? ` Están en <b>orden de carga</b>: el <b>último destino</b> de cada camión se carga <b>primero</b> (el círculo verde 1 = primero en subir).` : ``) +
+             (!esRetira ? ` Al tocarlos queda el <b>orden en que los cargaste</b> (1°, 2°, 3°…).` : ``) + `</div>`;
   // v11.47 — camión: nombre del camionero con autocompletado (maestro Camioneros).
   if (!esRetira) {
     const opts = (_cc.camioneros || []).map(function (n) { return `<option value="${escapeHtml(n)}"></option>`; }).join("");
@@ -25709,6 +26328,11 @@ function ccRender() {
             `<input id="ccCamioneroInput" class="cc-camionero-inp" list="ccCamioneroList" autocomplete="off" placeholder="Nombre del camionero…" value="${escapeHtml(_cc.camionero || "")}" oninput="_cc && (_cc.camionero = this.value)" />` +
             `<datalist id="ccCamioneroList">${opts}</datalist></div>`;
   }
+  // v15.70 (Thomas) — "a medida que den click en lo que cargan, en lugar de un simple tilde, que
+  // diga 1°, 2°, 3°". Ése es el ORDEN REAL de carga (distinto del sugerido por ruta, el círculo
+  // verde de la izquierda) y es el que viaja al CCN para armar el viaje del camionero.
+  const _ordClic = {};
+  Array.from(_cc.checked).forEach(function (np, i) { _ordClic[np] = i + 1; });
   let curSec = null;
   let pos = 0;
   for (const it of _cc.items) {
@@ -25728,7 +26352,7 @@ function ccRender() {
     const ubic = it.ubic ? `<span class="cc-ubic" title="dónde quedó armado">📌 ${escapeHtml(it.ubic)}</span>` : "";
     html += `<div class="cc-np${on ? " cc-on" : ""}" onclick="ccToggle('${String(it.np).replace(/[^0-9A-Za-z]/g, "")}')">` +
             (!esRetira && enRuta ? `<span class="cc-pos">${pos}</span>` : "") +
-            `<span class="cc-chk">${on ? "✓" : ""}</span>` +
+            `<span class="cc-chk${on && !esRetira ? " cc-ord" : ""}"${on && !esRetira ? ' title="orden en que lo cargaste"' : ""}>${on ? (esRetira ? "✓" : _ordClic[it.np] + "°") : ""}</span>` +
             `<span class="cc-npnum">${escapeHtml(it.np)}</span>` +
             ubic +
             `<span class="cc-rs">${escapeHtml(it.rs)}</span>` +
@@ -25769,16 +26393,27 @@ function ccFinish() {
   if (!esRetira) {
     try { const inp = document.getElementById("ccCamioneroInput"); if (inp) _cc.camionero = inp.value; } catch (_e) {}
     camionero = String(_cc.camionero || "").trim();
+    // v15.70 (Thomas) — el camionero pasa a ser OBLIGATORIO. Era un aviso que se podía saltear y
+    // se salteaba: el 10 y el 11/09 salieron 33 cargas sin camionero, el 08/09 otras 10. Sin ese
+    // dato Recepción Remitos no puede mostrar "las NP que entregó Guillermo el 11/09" ni se puede
+    // medir el ritmo del viaje. Retira no lleva camionero (se entrega en el depósito).
     if (!camionero) {
-      try { if (!confirm("No pusiste el nombre del camionero.\n¿Terminar igual sin camionero?")) return; } catch (_e) {}
+      try {
+        alert("Falta el nombre del camionero.\n\nEs el que después junta las NP de este camión en Recepción Remitos: sin él no se puede controlar el viaje.");
+        const inp = document.getElementById("ccCamioneroInput"); if (inp) inp.focus();
+      } catch (_e) {}
+      return;
     }
   }
-  const sel = _cc.items.filter(it => _cc.checked.has(it.np));
+  // v15.70 — en el ORDEN EN QUE SE CARGARON (el del Set, no el de la lista en pantalla): ese
+  // número es el que se manda con cada CCN y arma el recorrido del camionero.
+  const _byNp = {}; _cc.items.forEach(function (it) { _byNp[it.np] = it; });
+  const sel = Array.from(_cc.checked).map(function (np) { return _byNp[np]; }).filter(Boolean);
   // v15.33 — a diferencia de Recepción Remitos (crFinish), tocar "Terminé" sin tildar ningún NP
   // cerraba el toggle CC igual, sin avisar: quedaba tiempo de CC registrado sin ningún NP cargado
   // (auditoría revisor-logica 2026-09-11).
   if (!sel.length) { try { alert("Tildá al menos un NP " + (esRetira ? "entregado" : "cargado") + ", o tocá «Cerrar» para salir."); } catch (_e) {} return; }
-  for (const it of sel) ccSendDetail(legajo, it.np, it.tanda, camionero);   // CCN por cada NP cargada (con camionero)
+  sel.forEach(function (it, i) { ccSendDetail(legajo, it.np, it.tanda, camionero, esRetira ? null : i + 1); });   // CCN por NP, con camionero y orden de carga
   if (camionero) ccUpsertCamionero(camionero);                  // guarda el nombre en el maestro Camioneros
   ccSendClose(legajo);                                          // cierre CC
   ccClearChecked(legajo);
@@ -25795,16 +26430,20 @@ function ccSendClose(legajo) {
   try { enqueueReport(payload); if (typeof trySendOneReport === "function") trySendOneReport(payload).then(r => { if (r && r.ok) removeFromQueue(payload.id); }).catch(() => {}); } catch (_e) {}
   try { updatePendingIndicator(); updateCoreButtonsState(); } catch (_e) {}
 }
-function ccSendDetail(legajo, np, tanda, camionero) {
+function ccSendDetail(legajo, np, tanda, camionero, orden) {
   const nowMs = Date.now();
   // v11.47 — CCN texto: NP|TANDA|CAMIONERO. El camionero solo va en camión (en retira queda vacío).
   // Las vistas leen split_part [1]=np, [2]=tanda → el 3er campo no las afecta.
+  // v15.70 — se agrega un 4º campo con el ORDEN DE CARGA (1, 2, 3…). Con eso `gv_viaje_np` arma
+  // el viaje del camionero y detecta la 2ª vuelta (el orden vuelve a empezar en 1). Mismo criterio
+  // que el 3er campo: los lectores viejos toman [1] y [2] y no se enteran.
   const cam = String(camionero || "").trim();
+  const ord = (orden == null || !isFinite(orden)) ? "" : String(orden);
   // v15.33 — "—" es el placeholder de PANTALLA cuando Facturacion_NP.tanda viene vacío; no debe
   // persistirse literal en Registros_Produccion_Virgilio (otros lectores esperan un código real
   // tipo C03A o nada, no el carácter "—" — auditoría revisor-logica 2026-09-11).
   const tandaPersist = (String(tanda || "").trim() === "—") ? "" : tanda;
-  const texto = (String(np) + "|" + String(tandaPersist)).toUpperCase() + "|" + cam;
+  const texto = (String(np) + "|" + String(tandaPersist)).toUpperCase() + "|" + cam + "|" + ord;
   const payload = {
     legajo: legajo, opcion: "CCN", descripcion: "Carga Camión NP",
     texto: texto,
@@ -27746,7 +28385,7 @@ function closePPP() {
    `Volumen_Articulos` de esta base. De los 230 artículos que alguna vez se
    pidieron por web, los 230 lo tienen cargado. */
 const PWEB_LK_URL  = "https://kwkclwhmoygunqmlegrg.supabase.co";
-const PWEB_LK_ANON = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imt3a2Nsd2htb3lndW5xbWxlZ3JnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njk1MjA2NzUsImV4cCI6MjA4NTA5NjY3NX0.soqPY5hfA3RkAJ9jmIms8UtEGUc4WpZztpEbmDijOgU";
+const PWEB_LK_ANON = "sb_publishable_mVX5MnjwM770cNjgiL6yLw_LDNl9pML";
 
 let _pwebTok = null, _pwebTokExp = 0;
 // v13.11 — el token de LK dura 1 h: guardado en sessionStorage se ahorra el puente
@@ -27894,11 +28533,11 @@ async function pppTraerWebProgramados() {
       // v12.92 — la NP es el número de pedido de la página: si `np` viniera vacío se
       // arma igual desde order_id (es el mismo número). El bloque va en la etiqueta.
       np: (r.np == null) ? pwebPedidoLabel(r.empresa, r.order_id) : pwebNpLabel(r.empresa, r.np),   // v13.70
-      tanda: r.tanda || "—", tipo: "", fecha: r.fecha_recep || "",
+      tanda: r.tanda || "—", tipo: "", fecha: _pppSupaFecha(r.fecha_recep),
       cod: r.cod_cliente || "", razon_social: r.razon_social || "",
       m3: Number(r.m3) || 0,
       localidad: r.barrio || "",
-      fecha_entrega: r.fecha_entrega || "",
+      fecha_entrega: _pppSupaFecha(r.fecha_entrega),
       zona: r.zona || "",
       programmed: true,
       _web: true, _wEmp: r.empresa, _wOrder: r.order_id, _wIdx: r.np_idx,
@@ -27931,7 +28570,7 @@ async function pppTraerPedidosWeb(empresa) {
   } else {
     const desde = new Date(Date.now() - PWEB_VENTANA_DIAS * 86400000).toISOString().slice(0, 10);
     const r = await fetch(PWEB_LK_URL + "/rest/v1/v_pedidos_web_np"
-      + "?select=empresa,order_id,np_idx,cod,razon_social,fecha_recep,hora_recep,direccion,v,lineas,cajas,items,enviado_a_compras,localidad,zona_expreso,nombre_expreso,direccion_expreso,m3,m3_parcial"
+      + "?select=empresa,order_id,np_idx,cod,razon_social,fecha_recep,hora_recep,direccion,v,lineas,cajas,items,enviado_a_compras,localidad,zona_expreso,nombre_expreso,direccion_expreso,m3,m3_parcial,diferido,no_antes_de"
       + "&fecha_recep=gte." + desde + "&order=order_id.asc,np_idx.asc&limit=5000",
       { headers: { apikey: PWEB_LK_ANON, Authorization: "Bearer " + tok } });
     if (!r.ok) throw new Error("LK respondió " + r.status);
@@ -27955,17 +28594,19 @@ async function pppTraerPedidosWeb(empresa) {
     const tanda = g.tanda || "";
     return {
       np: num ? pwebNpLabel(n.empresa || emp, num) : pwebPedidoLabel(n.empresa || emp, n.order_id),   // v13.70
-      tanda: tanda || "—", tipo: "", fecha: n.fecha_recep || "",
+      tanda: tanda || "—", tipo: "", fecha: _pppSupaFecha(n.fecha_recep),
       cod: n.cod || "", razon_social: n.razon_social || "",
       m3: Number(m3.toFixed(3)),
       localidad: pwebLocalidad(n),
-      fecha_entrega: g.fecha_entrega || "",
+      fecha_entrega: _pppSupaFecha(g.fecha_entrega),
       zona: g.zona || pwebZonaSugerida(n),
       programmed: !!tanda,
       // Lo necesario para guardar después, sin volver a pedirle nada a LK.
       _web: true, _wEmp: n.empresa || emp, _wOrder: n.order_id, _wIdx: n.np_idx,
       _wNum: num || null, _wItems: n.items || [], _wLineas: n.lineas, _wCajas: n.cajas,
-      _wM3Parcial: parcial, _wDir: pwebDireccion(n), _wIsis: !!n.enviado_a_compras
+      _wM3Parcial: parcial, _wDir: pwebDireccion(n), _wIsis: !!n.enviado_a_compras,
+      // v15.67 — bloque que espera un reingreso de importado (LK lo corta como NP aparte)
+      _wDif: !!n.diferido, _wNoAntes: n.no_antes_de || null
     };
   });
 }
@@ -28105,8 +28746,8 @@ async function pppGuardarWeb(filas) {
     return {
       empresa: p._wEmp, order_id: p._wOrder, np_idx: p._wIdx, np: p._wNum,
       cod_cliente: p.cod, razon_social: p.razon_social, direccion: p._wDir,
-      barrio: p.localidad, fecha_recep: p.fecha || null,
-      tanda: p.tanda, zona: p.zona || null, fecha_entrega: p.fecha_entrega || null,
+      barrio: p.localidad, fecha_recep: _pppFechaISO(p.fecha),
+      tanda: p.tanda, zona: p.zona || null, fecha_entrega: _pppFechaISO(p.fecha_entrega),
       m3: p.m3, m3_parcial: !!p._wM3Parcial, lineas: p._wLineas, cajas: p._wCajas
     };
   });
@@ -28623,6 +29264,18 @@ function pppMergePedidos(nuevos) {
    de imports. */
 let _pppSupaNps = null;
 function _pppSupaFecha(s) { s = _pppS(s); if (!s) return ""; const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(s); return m ? (m[3] + "/" + m[2] + "/" + m[1]) : s; }
+/* v15.50 — inverso de _pppSupaFecha: "dd/mm/aaaa" (lo que se muestra y lo que tipea el
+   supervisor) → "aaaa-mm-dd", que es lo que esperan las columnas `date` de
+   PPP_Web_Programacion. Sin esto un "10/09/2026" viajaba crudo a PostgREST, que corre con
+   DateStyle 'ISO, MDY' y lo habría guardado como 9 de OCTUBRE (y con día > 12 habría
+   fallado el guardado entero). Devuelve null si no hay fecha, para escribir NULL. */
+function _pppFechaISO(s) {
+  s = _pppS(s); if (!s) return null;
+  let m = /^(\d{4})-(\d{2})-(\d{2})/.exec(s); if (m) return m[1] + "-" + m[2] + "-" + m[3];
+  m = /^(\d{1,2})\/(\d{1,2})\/(\d{2,4})/.exec(s); if (!m) return null;
+  let y = m[3]; if (y.length === 2) y = "20" + y;
+  return y + "-" + String(m[2]).padStart(2, "0") + "-" + String(m[1]).padStart(2, "0");
+}
 function _pppRowFromSupa(r) {
   const tanda = _pppS(r.tanda), fe = _pppSupaFecha(r.fecha_entrega);
   return {
@@ -28805,7 +29458,7 @@ let _pppEnSalida = null;   // Map np(normalizada) → fila de gv_ppp_en_salida
 async function pppRefreshEnSalida() {
   try {
     const rows = await supaFetchAllSafe(SUPABASE_URL + "/rest/v1/gv_ppp_en_salida",
-      "select=np,empresa,es_web,tanda,cod_cliente,razon_social,m3,fecha_entrega,zona,barrio,fecha_carga,cargado_at,facturada,armada,armado_at,cargada,control_previo,facturada_el,estado,dias_sin_controlar&order=cargado_at.desc");
+      "select=np,empresa,es_web,tanda,cod_cliente,razon_social,m3,fecha_entrega,zona,barrio,fecha_carga,cargado_at,facturada,armada,armado_at,cargada,control_previo,facturada_el,estado,dias_sin_controlar,horas_desde_armado,salida_presunta&order=cargado_at.desc");
     const m = new Map();
     (rows || []).forEach(function (r) { const np = _pppNpNorm(r.np); if (np) m.set(np, r); });
     _pppEnSalida = m;
@@ -28977,6 +29630,10 @@ function _pppEsRow(p) { return (p && p._es) ? p._es : {}; }
 function _pppEsChips(p) {
   const r = _pppEsRow(p), out = [];
   if (r.estado === "cargada") out.push('<span class="ppp-es-chip ok">🚚 Cargado al camión</span>');
+  // v15.55 (dueño: "si ya salieron hace más de 36hs y no se controló, tiene que aparecer allá la alerta, y
+  // aparecer en En Salida"): la tanda se armó hace más de `salida_presunta_horas` (36) y nadie la cargó ni
+  // la facturó. Seguro salió; falta el papel. Viene de gv_ppp_en_salida con estado 'armada_sin_carga'.
+  else if (r.estado === "armada_sin_carga") out.push('<span class="ppp-es-chip bad" title="La tanda se armó hace ' + (r.horas_desde_armado || "?") + ' h y nadie registró la carga al camión (CCN) ni la facturó. Pasado el plazo se da por salida. Cerrala con Controlado, o ↩ si la mercadería volvió.">🚨 Salió hace ' + (r.horas_desde_armado || "?") + ' h sin registro de carga · falta el remito</span>');
   else out.push('<span class="ppp-es-chip warn" title="Está facturada pero nadie registró la carga al camión (evento CCN). Se muestra igual para que se pueda cerrar desde acá.">⚠ Sin registro de carga</span>');
   if (r.armada) out.push('<span class="ppp-es-chip">🧰 Armada</span>');
   else out.push('<span class="ppp-es-chip warn" title="No hay evento TAL: la NP no pasó por armado en la app.">Sin armar</span>');
@@ -29017,7 +29674,7 @@ function _pppEnViajeHtml() {
     byDay[k].push(p);
   }
   keys.sort(); keys.reverse();
-  let html = '<div class="ppp-ent-note">🚚 <b>En salida</b> — facturadas y <b>todavía sin control de remito</b>. Con el control pasan a Pedidos Entregados. ' +
+  let html = '<div class="ppp-ent-note">🚚 <b>En salida</b> — cargadas o facturadas <b>sin control de remito</b>, y las armadas hace más de 36 h que nadie cargó (se dan por salidas). Con el control pasan a Pedidos Entregados. ' +
     '<b>' + list.length + '</b> pedido(s) · <b>' + totM3.toFixed(2).replace('.', ',') + '</b> m³ · ' +
     '<b>' + nCarg + '</b> cargada(s) al camión · <b>' + nSin + '</b> sin registro de carga.' +
     (nVenc ? ' <span style="color:#b91c1c;font-weight:800;">· 🚨 ' + nVenc + ' pasado el plazo</span>' : '') + '</div>';
@@ -29481,6 +30138,7 @@ function _pppEntregado(p) { return !!(_pppEntregadoCC && _pppEntregadoCC.has(Str
 /* CARGADO (CCN) pero NO controlado (CRN ni manual) y con el plazo de control VENCIDO
    (crVencido = 30 hs; viernes→lunes 12 hs). Es la alarma "rojo grande y molesto". */
 function _pppCargaVencida(p) {
+  if (p && p._es && p._es.estado === "armada_sin_carga") return true;   // v15.55: salida presunta = ya pasó el plazo
   const np = String(p.np);
   if (!_pppEntregadoCC || !_pppEntregadoCC.has(np)) return false;          // no se cargó
   if (_pppControladoCR && _pppControladoCR.has(np)) return false;          // ya controlado (CRN)
@@ -30285,6 +30943,67 @@ async function pppMovElegir(iso) {
   const ok = await pppTandaMover(t, iso);
   if (ok) pppMovCerrar(); else pppMovCargar();
 }
+/* v15.55 — Los que NO salieron: volver a A Programar (web) o cancelar (web e ISIS). Todo en el backend:
+   gv_ppp_web_desprogramar saca la NP web de su tanda (queda pendiente en A Programar);
+   gv_ppp_np_cancelar: ISIS → NP_Canceladas + oculta en la PPP (GV_PPP_Prog_Override.oculto); web →
+   GV_Web_Cancelados + sale de la PPP, y gv_pedidos_web_excluidos ya no la deja volver a entrar. */
+function _pppEsNpWeb(np) { return /^(LK|CH)\s*\d+/i.test(String(np || "")); }
+/* v15.65 — ¿el operario tipeó el mismo pedido que el del botón? Ignora espacios, mayúsculas y
+   ceros a la izquierda: "LK 0053", "lk53" y "53" son el mismo. Lo usa la 2da confirmación de
+   cancelar. OJO: NO llamarla _pppNpNorm — ese nombre ya es de la normalización que clasifica
+   entregados, y redefinirlo saca las NP web de "entregados" en silencio (lo cazó pweb-entregados). */
+function _pppNpMismo(a, b) {
+  const f = function (np) {
+    const s = String(np || "").toUpperCase().replace(/\s+/g, "");
+    const m = s.match(/^(LK|CH)?0*(\d+)$/);
+    return m ? (m[1] || "") + m[2] : s;
+  };
+  return f(a) === f(b);
+}
+async function pppVencVolver(np) {
+  const n = String(np || "").trim(); if (!n) return;
+  if (!confirm("¿Devolver " + n + " a A Programar?\n\nSale de su tanda y queda pendiente: lo toma el automático (zonas 1-3 / camión ya previsto) o lo programás a mano.")) return;
+  pppSetStatus("Devolviendo " + n + " a A Programar…", true);
+  try {
+    const r = await aprRpc("gv_ppp_web_desprogramar", { p_np: n, p_por: await aprQuien() });
+    const x = (r && r[0]) || {};
+    pppSetStatus("✓ " + n + " volvió a A Programar (" + (x.np_sacadas || 0) + " NP del pedido).", true);
+    await pppLoadProgFromSupabase();
+  } catch (e) {
+    const msg = (e && e.message) ? e.message : String(e);
+    pppSetStatus("⚠ No se pudo: " + msg, false);
+    try { alert("No se pudo devolver " + n + " a A Programar:\n\n" + msg); } catch (_e) {}
+  }
+}
+async function pppVencCancelar(np) {
+  const n = String(np || "").trim(); if (!n) return;
+  let motivo = "";
+  try { motivo = prompt("Cancelar " + n + " — ¿por qué NO va?\n(" + _STK_NP_MOTIVOS.join(" · ") + ")", _STK_NP_MOTIVOS[0]) || ""; } catch (_e) {}
+  motivo = motivo.trim(); if (!motivo) return;
+  if (!confirm("¿Cancelar el pedido " + n + "?\n\nMotivo: " + motivo + "\n\nSale de la PPP y no vuelve a entrar. Si hay que hacerlo igual, habrá que cargarlo de nuevo.")) return;
+  // v15.65 (dueño: "que pida 2da confirmación antes de eliminar o cancelar"): un confirm de sí/no
+  // se aprieta de memoria. Éste obliga a TIPEAR el número del pedido, así cancelar el que no era
+  // exige haberlo leído.
+  let _tec = "";
+  try { _tec = prompt("ÚLTIMA CONFIRMACIÓN — esto no se deshace.\n\nEscribí el número del pedido para cancelarlo:\n\n" + n, "") || ""; } catch (_e) {}
+  if (!_tec.trim()) return;
+  if (!_pppNpMismo(_tec, n)) {
+    try { alert("No cancelé nada.\n\nEscribiste \"" + _tec.trim() + "\" y el pedido es \"" + n + "\"."); } catch (_e) {}
+    return;
+  }
+  pppSetStatus("Cancelando " + n + "…", true);
+  try {
+    const r = await aprRpc("gv_ppp_np_cancelar", { p_np: n, p_motivo: motivo, p_por: await aprQuien() });
+    const x = (r && r[0]) || {};
+    pppSetStatus("🚫 " + n + " cancelada · " + (x.detalle || ""), true);
+    await pppLoadProgFromSupabase();
+  } catch (e) {
+    const msg = (e && e.message) ? e.message : String(e);
+    pppSetStatus("⚠ No se pudo cancelar: " + msg, false);
+    try { alert("No se pudo cancelar " + n + ":\n\n" + msg); } catch (_e) {}
+  }
+}
+window.pppVencVolver = pppVencVolver; window.pppVencCancelar = pppVencCancelar;
 /* v14.36 — Reprogramar un pedido de ISIS que NO salió (tanda sin armar) a un día nuevo, POR SU NÚMERO.
    Reusa el mismo pop-up de días de mover tandas (gv_ppp_web_calendario). Al elegir el día llama a
    gv_ppp_isis_programar, que escribe GV_PPP_Prog_Override (no toca la tabla que comparte Producción ni
@@ -30980,8 +31699,11 @@ async function pppChequeoNp(npsCsv, titulo, tanda) {
   ov.classList.add("show");
   try {
     const H = { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY };
-    const url = SUPABASE_PPP_BASE_ENDPOINT + "?pedido=in.(" + nps.map(encodeURIComponent).join(",") +
-      ")&select=pedido,articulo,cajas&limit=20000";
+    // v15.57 — gv_np_items en vez de gv_ppp_base_pedidos: resuelve TAMBIÉN las NP web ("LK 0024",
+    // que viven en PPP_Web_Base y no en la base de ISIS). Las NP van entre comillas porque las
+    // web llevan espacio; `pedido:np` deja el nombre de campo que ya usa pppChkCompute.
+    const url = SUPABASE_URL + "/rest/v1/gv_np_items?np=in.(" + nps.map(function (n) { return encodeURIComponent('"' + String(n).replace(/"/g, "") + '"'); }).join(",") +
+      ")&select=pedido:np,articulo,cajas&limit=20000";
     const [lineas, saldos, pend] = await Promise.all([
       fetch(url, { headers: H, cache: "no-store" }).then(function (r) { return r.ok ? r.json() : []; }).catch(function () { return []; }),
       _pppChkFetchSaldos(),
@@ -31264,7 +31986,11 @@ function pppResTgl(dk, zkeyEnc) {
   merged.forEach(function (r) { r.nps.sort(function (a, b) { return (parseInt(a, 10) || 0) - (parseInt(b, 10) || 0); }); });
   let filas = "";
   merged.forEach(function (r) {
-    filas += '<tr><td class="np">' + escapeHtml(_pppNpsCompact(r.nps)) + '</td><td>' + escapeHtml(r.tandas.join("/") || "—") + '</td><td>' + escapeHtml(r.rs || "—") + '</td><td style="color:#64748b">' + escapeHtml(r.locs.join(" / ") || "—") + '</td><td class="num"><b>' + f2(r.m3) + '</b></td></tr>';
+    // v15.57 (dueño: "si toco en el nro de NP quiero ver qué contenía esa NP, cod y cajas") →
+    // la celda abre el mismo modal del ✓ de Programación (una sola puerta): artículo · cajas
+    // pedidas · góndola. Si la fila junta varias NP del cliente, las abre todas.
+    const npCsv = r.nps.map(function (x) { return String(x).replace(/"/g, ""); }).filter(Boolean).join(",");
+    filas += '<tr><td class="np npc" onclick="pppChequeoNp(\'' + _pppArg(npCsv) + '\',\'' + _pppArg(r.rs || "") + '\',\'' + _pppArg(r.tandas[0] || "") + '\')" title="Ver qué contiene (código y cajas)">' + escapeHtml(_pppNpsCompact(r.nps)) + '</td><td>' + escapeHtml(r.tandas.join("/") || "—") + '</td><td>' + escapeHtml(r.rs || "—") + '</td><td style="color:#64748b">' + escapeHtml(r.locs.join(" / ") || "—") + '</td><td class="num"><b>' + f2(r.m3) + '</b></td></tr>';
   });
   if (!filas) filas = '<tr><td colspan="5" style="text-align:center;color:#94a3b8">— sin NPs —</td></tr>';
   ov.innerHTML = '<div class="pppres-card">' +
@@ -31337,21 +32063,26 @@ function pppResumenHtml(prog) {
     const demP = dn ? dem / dn : null;
     const dt = _pppFechaDate(d.fecha), dia = dt ? DOW[dt.getDay()] : "";
     Zc.forEach(function (z) { T[z[0]] += Z[z[0]]; }); Ttot += total; Tcam += nCam; Tdem += dem; TdemN += dn;
-    rows += '<tr><td class="f">' + escapeHtml(d.fecha) + '</td><td class="d">' + dia + '</td>' +
+    // v15.54 (dueño): el TOTAL del día va pegado al Día y ANTES del desglose por zona —
+    // primero el número que se mira, después de qué se compone.
+    // v15.57 (dueño): en esta tabla la fecha va "dd/mm", sin el año, pegada al día.
+    rows += '<tr><td class="f">' + escapeHtml(String(d.fecha).replace(/\/\d{4}$/, "")) + '</td><td class="d">' + dia + '</td>' +
+      '<td class="num tot zc" onclick="pppResTgl(\'' + dk + '\',\'__tot__\')" title="Ver todas las NPs del día">' + f2(total) + '</td>' +
       Zc.map(function (z) {
         const m = Z[z[0]];
         if (m > 0.0001) return '<td class="num zc ' + z[1] + '" onclick="pppResTgl(\'' + dk + '\',\'' + encodeURIComponent(z[0]) + '\')" title="Ver de qué NPs se compone">' + f2(m) + '</td>';
         return '<td class="num z0 ' + z[1] + '">·</td>';
       }).join("") +
-      '<td class="num tot zc" onclick="pppResTgl(\'' + dk + '\',\'__tot__\')" title="Ver todas las NPs del día">' + f2(total) + '</td><td class="num cam">' + nCam + '</td><td class="num">' + (demP != null ? (Math.round(demP * 10) / 10) : "·") + '</td></tr>';
+      '<td class="num cam">' + nCam + '</td><td class="num">' + (demP != null ? (Math.round(demP * 10) / 10) : "·") + '</td></tr>';
   }
   const demT = TdemN ? (Math.round(Tdem / TdemN * 10) / 10) : null;
-  const totRow = '<tr class="totrow"><td class="f">TOTAL</td><td></td>' + Zc.map(function (z) { return tcell(T[z[0]]); }).join("") +
-    '<td class="num">' + f2(Ttot) + '</td><td class="num">' + Tcam + '</td><td class="num">' + (demT != null ? demT : "·") + '</td></tr>';
+  const totRow = '<tr class="totrow"><td class="f">TOTAL</td><td></td>' +
+    '<td class="num tot">' + f2(Ttot) + '</td>' + Zc.map(function (z) { return tcell(T[z[0]]); }).join("") +
+    '<td class="num">' + Tcam + '</td><td class="num">' + (demT != null ? demT : "·") + '</td></tr>';
   return head +
     '<div class="ppp-res-leg">🚚 Camiones por ruta: <b>Z1·Z2·Z3·Z4</b> Sur/Centro/Oeste · <b>Z5·Z6·Z7</b> Norte · Súper (1 por cliente) · Retira sin camión. Tope <b>' + CAP + ' m³/día</b>.</div>' +
     '<div class="ppp-restbl-wrap"><table class="ppp-restbl"><thead><tr>' +
-      '<th>Fecha</th><th>Día</th><th>Z1<br>Sur</th><th>Z2<br>Centro</th><th>Z3<br>Oeste</th><th>Z4<br>GBA&nbsp;S</th><th>Z5<br>GBA&nbsp;O</th><th>Z6<br>GBA&nbsp;N</th><th>Z7<br>Lejos</th><th>Retira</th><th>Súper</th><th>Total<br>m³</th><th>Cam.</th><th>Demora<br>(d)</th>' +
+      '<th>Fecha</th><th>Día</th><th class="tot">Total<br>m³</th><th>Z1<br>Sur</th><th>Z2<br>Centro</th><th>Z3<br>Oeste</th><th>Z4<br>GBA<br>Sur</th><th>Z5<br>GBA<br>Oeste</th><th>Z6<br>GBA<br>Norte</th><th>Z7<br>GBA<br>Lejos</th><th>Retira</th><th>Súper</th><th>Cam.</th><th>Demora<br>(d)</th>' +
     '</tr></thead><tbody>' + rows + totRow + '</tbody></table></div>';
 }
 
@@ -31853,9 +32584,11 @@ function _pppComputeErrors(peds, entSet) {
     const ps = byT[t], rutas = {}, fechas = {};
     // Ciudadela (GBA Oeste) queda pegada a la fábrica (Villarreal) camino a Zona 1 por la
     // autopista → NO cuenta como ruta aparte (no marca "tanda mezclada"). Pedido del dueño.
-    for (const p of ps) { if (!pppEsSuper(p) && !_pppEsCiudadela(p.localidad)) { const r = _pppRuta([p]); if (r) rutas[r] = 1; } const fe = _pppS(p.fecha_entrega); if (fe) fechas[fe] = 1; }
+    // v15.57 (dueño: "necesito más datos para que me sea útil: qué día se programó, qué está
+    // mezclado con qué") → se guarda QUIÉN cae en cada ruta y en cada fecha, no sólo cuántas.
+    for (const p of ps) { if (!pppEsSuper(p) && !_pppEsCiudadela(p.localidad)) { const r = _pppRuta([p]); if (r) (rutas[r] = rutas[r] || []).push(p); } const fe = _pppS(p.fecha_entrega); if (fe) (fechas[fe] = fechas[fe] || []).push(p); }
     const nR = Object.keys(rutas).length, nF = Object.keys(fechas).length;
-    if (nR > 1 || nF > 1) { tandasMal.push({ tanda: t, rutas: nR, fechas: nF }); for (const p of ps) if (p._err.indexOf("tandamal") < 0) p._err.push("tandamal"); }
+    if (nR > 1 || nF > 1) { tandasMal.push({ tanda: t, rutas: nR, fechas: nF, porRuta: rutas, porFecha: fechas }); for (const p of ps) if (p._err.indexOf("tandamal") < 0) p._err.push("tandamal"); }
   }
   return { sacar: sacar, sinZona: sinZona, zonaDif: zonaDif, tandasMal: tandasMal };
 }
@@ -31868,7 +32601,20 @@ function pppErroresHtml(e) {
   if (e.sacar.length)     h += '<div class="ppp-ei bad">🚮 <b>Ya entregados — SACAR (' + e.sacar.length + '):</b> ' + e.sacar.map(function (p) { return np(p) + cli(p); }).join(" · ") + '</div>';
   if (e.sinZona.length)   h += '<div class="ppp-ei warn">⚠ <b>Sin zona (' + e.sinZona.length + '):</b> ' + e.sinZona.map(function (p) { return np(p) + " — " + escapeHtml(pppLocDisp(p.localidad) || "?"); }).join(" · ") + '</div>';
   if (e.zonaDif.length)   h += '<div class="ppp-ei warn">⚠ <b>Zona no coincide (' + e.zonaDif.length + '):</b> ' + e.zonaDif.map(function (p) { return np(p) + " [" + escapeHtml(pppLocDisp(p.localidad) || "?") + ": Excel=" + escapeHtml(p.zona || "—") + " / barrio=" + escapeHtml(pppZonaDeBarrio(p.localidad) || "—") + "]"; }).join(" · ") + '</div>';
-  if (e.tandasMal.length) h += '<div class="ppp-ei warn">⚠ <b>Tandas inconsistentes (' + e.tandasMal.length + '):</b> ' + e.tandasMal.map(function (t) { return escapeHtml(t.tanda) + (t.rutas > 1 ? " (rutas mezcladas)" : "") + (t.fechas > 1 ? " (varias fechas)" : ""); }).join(" · ") + '</div>';
+  if (e.tandasMal.length) {
+    // v15.57 — cada tanda dice el día programado y QUÉ va con qué: por ruta (NP · cliente · barrio)
+    // y, si son varias fechas, quién cae en cada una. Antes decía sólo "D68G (rutas mezcladas)".
+    const RUTA_LBL = { so: "Sur/Centro/Oeste", n: "Norte", ret: "Retira" };
+    const ddmm = function (f) { return escapeHtml(String(f || "").replace(/\/\d{4}$/, "")); };
+    const npb = function (p) { return np(p) + cli(p) + ' [' + escapeHtml(pppLocDisp(p.localidad) || "?") + ']'; };
+    h += '<div class="ppp-ei warn">⚠ <b>Tandas inconsistentes (' + e.tandasMal.length + '):</b><div class="ppp-ei-det">' + e.tandasMal.map(function (t) {
+      const fes = Object.keys(t.porFecha || {});
+      let s = '<b>' + escapeHtml(t.tanda) + '</b>' + (fes.length === 1 ? ' · ' + ddmm(fes[0]) : '');
+      if (t.rutas > 1) s += ' · rutas mezcladas → ' + Object.keys(t.porRuta || {}).map(function (k) { return '<u>' + (RUTA_LBL[k] || k) + '</u>: ' + t.porRuta[k].map(npb).join(", "); }).join(' &nbsp;/&nbsp; ');
+      if (t.fechas > 1) s += ' · varias fechas → ' + fes.map(function (f) { return '<u>' + ddmm(f) + '</u>: ' + t.porFecha[f].map(function (p) { return np(p) + cli(p); }).join(", "); }).join(' &nbsp;/&nbsp; ');
+      return '<div>' + s + '</div>';
+    }).join("") + '</div></div>';
+  }
   h += '</div>';
   return h;
 }
@@ -32502,12 +33248,21 @@ function _pppPlanDiaHtml(programados, key, opts) {
       const _puedeReprog = (window.__isSupervisor || !PPP_READONLY);
       h += '<div class="pn-reprog"><b>⚠ ' + reprog.length + ' pedido' + (reprog.length === 1 ? '' : 's') + ' NO ' + (reprog.length === 1 ? 'salió' : 'salieron') + ' — hay que reprogramar' + (reprog.length === 1 ? 'lo' : 'los') + '</b>' +
         '<div class="l">' + reprog.map(function (p) {
-          const btn = _puedeReprog ? ' <button class="pn-reprog-btn" onclick="event.stopPropagation();pppReprogAbrir(\'' + escapeHtml(String(p.np)) + '\')" title="Reprogramar este pedido a un día nuevo">📅 Reprogramar</button>' : '';
+          // v15.55 (dueño: "si no salieron, volver a programación o cancelar pedido"): una NP de ISIS se
+          // reprograma por su número (📅); una NP web vuelve a A Programar (↩) y de ahí la toma el automático
+          // o el supervisor. Las dos se pueden cancelar (🚫): salen de la PPP y no vuelven a entrar.
+          const npS = escapeHtml(String(p.np));
+          const btn = _puedeReprog
+            ? (_pppEsNpWeb(p.np)
+                ? ' <button class="pn-reprog-btn" onclick="event.stopPropagation();pppVencVolver(\'' + npS + '\')" title="Sacarlo de esta tanda y devolverlo a A Programar (pendiente)">↩ A Programar</button>'
+                : ' <button class="pn-reprog-btn" onclick="event.stopPropagation();pppReprogAbrir(\'' + npS + '\')" title="Reprogramar este pedido a un día nuevo">📅 Reprogramar</button>') +
+              ' <button class="pn-reprog-btn pn-cancel-btn" onclick="event.stopPropagation();pppVencCancelar(\'' + npS + '\')" title="El pedido NO va: sale de la PPP y no vuelve a entrar">🚫 Cancelar</button>'
+            : '';
           return '<span>' + escapeHtml(String(p.np)) + ' · ' + escapeHtml(p.razon_social || p.cod || "—") + ' <small>' + escapeHtml(String(p.tanda || "—").toUpperCase()) + ' · ' + escapeHtml(p.fecha_entrega || "") + '</small>' + btn + '</span>';
         }).join('') + '</div>' +
-        '<div class="h">La tanda nunca se armó, así que el pedido no subió a ningún camión. ' + (_puedeReprog ? 'Reprogramalo a un día con <b>📅 Reprogramar</b>, ' : 'Ponele fecha nueva (✏️ Editar en su tanda, abajo) ') + 'o sacalo de ISIS.</div></div>';
+        '<div class="h">La tanda nunca se armó, así que el pedido no subió a ningún camión. ' + (_puedeReprog ? 'Volvelo a programar (<b>📅 Reprogramar</b> / <b>↩ A Programar</b>) o dalo de baja con <b>🚫 Cancelar</b>.' : 'Ponele fecha nueva (✏️ Editar en su tanda, abajo) o sacalo de ISIS.') + '</div></div>';
     }
-    h += '<div class="pn-note"><b>' + sinRem + '</b> ' + (sinRem === 1 ? 'pedido salió' : 'pedidos salieron') + ' con la tanda armada y nadie marcó el remito: en <b>Recepción Remitos → Controlado</b> pasan a entregados y desaparecen de acá.</div>';
+    h += '<div class="pn-note"><b>' + sinRem + '</b> ' + (sinRem === 1 ? 'pedido salió' : 'pedidos salieron') + ' con la tanda armada y nadie marcó el remito. A las <b>36 h</b> del armado pasan solos a <b>En Salida</b>, donde se cierran con <b>Controlado</b> (o ↩ si la mercadería volvió).</div>';
   }
   const dk = esVenc ? "venc" : key;
   for (const c of cams) {
@@ -32552,6 +33307,11 @@ function _pppPlanDiaHtml(programados, key, opts) {
     h += '<div class="pn-thead' + _sinUlt + '"><span>Tanda</span><span>Cliente · N° pedido</span><span>Localidad</span><span class="num">m³</span><span class="num">Valor</span><span>Picking · Armado</span>' + (_ult ? '<span>' + _ult + '</span>' : '') + '</div>';
     for (const p of rows) {
       const e = _pppEstadoPed(p), E = _PN_EST[e];
+      // v15.65 (pedido del chat: "un cliente tenía un pedido pendiente e hizo uno nuevo más grande
+      // y no tengo de dónde eliminar el más chico"): hasta la v15.64 el 🚫 Cancelar existía SÓLO en
+      // Atrasados, así que un pedido con fecha futura no se daba de baja desde ningún lado. Acá va
+      // en la fila, y sólo mientras la tanda esté SIN EMPEZAR: una vez que alguien pickeó,
+      // gv_ppp_np_cancelar lo rechaza igual y ofrecerlo sería mentir.
       const pick = (e === "armado" || e === "armando" || e === "picking") ? "done" : (e === "pickeando" ? "on" : "");
       const arm = e === "armado" ? "done" : (e === "armando" ? "on" : "");
       const v = _pppValorPed(p);
@@ -32569,12 +33329,21 @@ function _pppPlanDiaHtml(programados, key, opts) {
         else if (e === "armado") carga = '<div class="pn-carga"><span class="n ok">' + n + 'º</span><span class="t">armado ✓<br>espera su turno</span></div>';
         else carga = '<div class="pn-carga"><span class="n">' + n + 'º</span><span class="t">falta armar</span></div>';
       }
+      const _npS = escapeHtml(String(np));
+      const _accPed = (!esVenc && (window.__isSupervisor || !PPP_READONLY) && e === "sin")
+        ? '<div class="pn-acc">' +
+            (_pppEsNpWeb(np)
+              ? '<button class="pn-acc-b" onclick="event.stopPropagation();pppVencVolver(\'' + _npS + '\')" title="Sacarlo de esta tanda y devolverlo a A Programar (pendiente)">↩ A Programar</button>'
+              : '') +
+            '<button class="pn-acc-b pn-cancel-btn" onclick="event.stopPropagation();pppVencCancelar(\'' + _npS + '\')" title="El pedido NO va: sale de la PPP y no vuelve a entrar. Pide confirmar dos veces.">🚫 Cancelar</button>' +
+          '</div>'
+        : '';
       h += '<div class="pn-ped' + _sinUlt + (p._err && p._err.length ? ' err' : '') + '"><span class="tanda ' + c.ruta + '">' + escapeHtml(String(p.tanda || "—").toUpperCase()) + '</span>' +
         // v14.06 (dueño: "si no salieron, que figuren en la PPP con su fecha de entrega; mañana lo mira la
         // administrativa"): en ATRASADOS conviven pedidos de varios días, así que sin la fecha en la fila no
         // se sabe de cuándo es cada uno. En la vista de un día no hace falta: el día es el del encabezado.
         '<div><div class="rs">' + (p._err && p._err.length ? '⚠️ ' : '') + escapeHtml(p.razon_social || p.cod || "—") + '</div><div class="np">' + escapeHtml(String(np)) + (p.cod ? ' · cód ' + escapeHtml(String(p.cod)) : '') +
-          (esVenc && p.fecha_entrega ? ' <span class="pn-fe" title="Fecha de entrega que tenía">📅 ' + escapeHtml(String(p.fecha_entrega)) + '</span>' : '') + '</div></div>' +   // v13.65: sin chip WEB/ISIS
+          (esVenc && p.fecha_entrega ? ' <span class="pn-fe" title="Fecha de entrega que tenía">📅 ' + escapeHtml(String(p.fecha_entrega)) + '</span>' : '') + '</div>' + _accPed + '</div>' +   // v13.65: sin chip WEB/ISIS
         '<div class="loc">' + escapeHtml(p.localidad || p.barrio || "—") + '</div>' +
         '<div class="m">' + _pppFmtM3(p.m3) + '</div>' +
         '<div class="pp">' + (v == null ? '<small>s/valor</small>' : _pppFmtPesos(v)) + '</div>' +
@@ -33623,18 +34392,17 @@ function supSetBadge(id, count) {
   if (count > 0) { b.textContent = String(count); b.style.display = ""; b.className = "dp-badge"; }
   else { b.textContent = "✓"; b.style.display = ""; b.className = "dp-badge ok"; }
 }
-/* v9.38 — dos badges: ROJO = NPs que hay que corregir SÍ o SÍ (el secundario no tiene stock),
-   VERDE = NPs donde el secundario TIENE stock → se puede mandar tal cual, corregir es opcional. */
+/* v9.38 — dos badges: ROJO = NPs que hay que corregir SÍ o SÍ, VERDE = NPs que el secundario cubre →
+   se pueden mandar tal cual, corregir es opcional.
+   v15.66 — el criterio es el MISMO del panel y vive en la vista (vista_correcciones_pedido_rich.sec_cubre:
+   el stock del secundario repartido entre todas las NP que lo piden). Antes cruzaba vista_saldos_stock
+   por ítem y sólo era rojo con el secundario en 0. */
 async function corrLoadBadge() {
   try {
-    var pend = await facCorreccData();
-    if (!pend.length) { corrSetRed(0); corrSetGreen(0); return; }
-    var cods = Array.from(new Set(pend.map(function (p) { return p.sec; }))).map(encodeURIComponent).join(",");
-    var H = { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY };
-    var saldos = await fetch(SUPABASE_URL + "/rest/v1/vista_saldos_stock?cod_art=in.(" + cods + ")&select=cod_art,terminado,excedente,a_guardar,racks,racks_ch,para_envasar", { headers: H, cache: "no-store" }).then(function (r) { return r.ok ? r.json() : []; }).catch(function () { return []; });
-    var stk = {}; saldos.forEach(function (r) { stk[_ocgNorm(r.cod_art)] = _corrStk(r); });
-    var byNp = {};   // np → true si ALGÚN item de esa NP tiene secundario SIN stock (obligatorio)
-    pend.forEach(function (p) { var s = stk[_ocgNorm(p.sec)] || 0; if (!(p.np in byNp)) byNp[p.np] = false; if (s <= 0) byNp[p.np] = true; });
+    var rows = await facCorreccDataRich();
+    if (!rows.length) { corrSetRed(0); corrSetGreen(0); return; }
+    var byNp = {};   // np → true si ALGÚN item de esa NP NO queda cubierto por el secundario (obligatorio)
+    rows.forEach(function (p) { if (!(p.np in byNp)) byNp[p.np] = false; if (_corrItemUrgente(p)) byNp[p.np] = true; });
     var must = 0, opt = 0;
     Object.keys(byNp).forEach(function (np) { if (byNp[np]) must++; else opt++; });
     corrSetRed(must); corrSetGreen(opt);
@@ -34162,7 +34930,12 @@ var _pp = null;
 function _ppMoney(n) { return '$' + Math.round(n || 0).toLocaleString('es-AR'); }
 function _ppFecha10(s) { var m = String(s || "").match(/(\d{4})-(\d{2})-(\d{2})/); return m ? (m[1] + "-" + m[2] + "-" + m[3]) : ""; }
 function _ppPrice(codN) { return (_pp.precio[codN] || _pp.precio[codN.replace(/(LK|CH)$/, "")] || null); }
-function _ppPlata(r) { var p = _ppPrice(r.codN); return (p && p.ok) ? r.cajas * p.pu * p.uxb : 0; }
+/* v15.76 — el precio sale de la PROPIA fila: la vista ya lo resuelve por empresa
+   (NP ^9 = lista LK, resto = lista Chef; "L" al final = artículo de Loeke → lista LK).
+   El mapa por código quedaba mezclando las dos empresas: el mismo código vale distinto
+   en LK y en Chef, y ganaba el primero que entraba. Se conserva como fallback. */
+function _ppPlata(r) { if (r.ok && r.pu > 0) return r.cajas * r.pu * r.uxb;
+  var p = _ppPrice(r.codN); return (p && p.ok) ? r.cajas * p.pu * p.uxb : 0; }
 async function openPlataPerdida() {
   try { if (typeof requireSupervisor === "function" && !requireSupervisor()) return; } catch (_e) {}
   if (!document.getElementById("ppCss")) {
@@ -34184,14 +34957,22 @@ async function _ppFallbackLoad() {
     supaFetchAllSafe(SUPABASE_URL + "/rest/v1/Entregas_Virgilio", "select=np,cod_art,cajas_falto,cajas_pedidas,cajas_entregadas,fecha_salida,cod_cliente&cajas_falto=gt.0"),
     supaFetchAllSafe(SUPABASE_URL + "/rest/v1/precios_venta", "select=cod,precio_unit,uxb,descripcion"),
     supaFetchAllSafe(SUPABASE_URL + "/rest/v1/clientes_vendedor", "select=cod_cliente,vend"),
-    supaFetchAllSafe(SUPABASE_URL + "/rest/v1/Facturacion_NP", "select=np,razon_social")
+    supaFetchAllSafe(SUPABASE_URL + "/rest/v1/Facturacion_NP", "select=np,razon_social"),
+    // v15.76 — la lista de CHEF: una NP que no empieza con 9 es de Chef y se valoriza con ella.
+    supaFetchAllSafe(SUPABASE_URL + "/rest/v1/precios_venta_chef", "select=cod,precio_unit,uxb,descripcion")
   ]);
-  var ent = r[0] || [], pv = {}, cv = {}, fnp = {};
+  var ent = r[0] || [], pv = {}, pvc = {}, cv = {}, fnp = {};
   (r[1] || []).forEach(function (p) { var c = _ppNormCod(p.cod); if (c) pv[c] = p; });
   (r[2] || []).forEach(function (c) { var k = (c.cod_cliente || "").trim(); if (k) cv[k] = (c.vend || "").trim(); });
   (r[3] || []).forEach(function (f) { var k = (f.np || "").trim(); if (k) fnp[k] = f.razon_social || ""; });
+  (r[4] || []).forEach(function (p) { var c = _ppNormCod(p.cod); if (c) pvc[c] = p; });
   return ent.map(function (e) {
-    var cod = _ppNormCod(e.cod_art), p = pv[cod] || {}, cli = (e.cod_cliente || "").trim(), np = (e.np || "").trim();
+    var cli = (e.cod_cliente || "").trim(), np = (e.np || "").trim();
+    // "L" al final = artículo de Loeke vendido por Chef → lista de LK por el código pelado (v13.71).
+    var raw = String(e.cod_art || "").trim().toUpperCase(), esL = /[0-9E]L$/.test(raw);
+    var cod = _ppNormCod(e.cod_art), codP = esL ? _ppNormCod(raw.replace(/L$/, "")) : cod;
+    var esChef = !esL && !/^9/.test(np.replace(/\.0+$/, ""));
+    var p = (esChef ? (pvc[codP] || pv[codP]) : pv[codP]) || {};
     var pu = Number(p.precio_unit) || 0, uxb = Number(p.uxb) || 1;
     return { np: e.np, cod: cod, cod_raw: (e.cod_art || "").trim(), cajas: Number(e.cajas_falto) || 0,
       ped: Number(e.cajas_pedidas) || 0, ent: Number(e.cajas_entregadas) || 0,
@@ -34227,7 +35008,7 @@ async function ppLoad() {
     var np = pickNormNp(r.np);
     if (np && r.razon_social && !rsDe[np]) rsDe[np] = r.razon_social;
   });
-  _pp.rows = data.map(function (r) { return { codN: r.cod || "", cod: r.cod_raw || "", cajas: Number(r.cajas) || 0, ped: Number(r.ped) || 0, ent: Number(r.ent) || 0, fecha: r.fecha || "", cli: r.cod_cliente || "", np: pickNormNp(r.np) }; }).filter(function (r) { return r.cajas > 0; });
+  _pp.rows = data.map(function (r) { return { codN: r.cod || "", cod: r.cod_raw || "", cajas: Number(r.cajas) || 0, ped: Number(r.ped) || 0, ent: Number(r.ent) || 0, fecha: r.fecha || "", cli: r.cod_cliente || "", np: pickNormNp(r.np), pu: Number(r.precio_unit) || 0, uxb: Number(r.uxb) || 1, ok: !!r.precio_ok }; }).filter(function (r) { return r.cajas > 0; });
   _pp.precio = precio; _pp.vendDe = vendDe; _pp.rsDe = rsDe;
   // años CON DATOS (para el dropdown); por defecto el año actual si tiene datos, si no el más reciente.
   var ys = {}; _pp.rows.forEach(function (r) { var y = r.fecha ? r.fecha.slice(0, 4) : ""; if (/^\d{4}$/.test(y)) ys[y] = 1; });
@@ -35581,6 +36362,10 @@ async function aprConfirmar() {
         nuevos.map(function (c) { return c.camion; }).join(", ") + ". ¿Seguro que vas a usar un segundo camión?");
     }
   } catch (_e) {}
+  // v15.67: el bloque que espera un reingreso no puede salir antes de que entre.
+  const dif = r.peds.filter(function (p) { return p.no_antes_de && String(p.no_antes_de).slice(0, 10) > fecha; });
+  if (dif.length) avisos.push("Hay " + dif.length + " pedido(s) con artículos sin stock hasta el " +
+    aprDiaCorto(String(dif[0].no_antes_de).slice(0, 10)) + ": el " + aprDiaCorto(fecha) + " la mercadería todavía no está en el depósito.");
   if (avisos.length && !confirm("⚠ " + avisos.join("\n⚠ ") + "\n\n¿Programo igual " + r.n + " pedido" + (r.n === 1 ? "" : "s") + " para el " + aprDiaCorto(fecha) + "?")) return;
   await aprGenerarTanda(fecha, keys, { sinConfirm: true });   // arma + programa; si falla, descarta (ninguna tanda sin fecha)
   if (!_apr.msgErr) { _apr.sel = {}; _apr.diaSel = null; _apr.paso = 1; }
@@ -35692,7 +36477,7 @@ async function aprTraerPedidos(e) {
   } else {
     const desde = new Date(Date.now() - PWEB_VENTANA_DIAS * 86400000).toISOString().slice(0, 10);
     const r = await fetch(PWEB_LK_URL + "/rest/v1/v_pedidos_web_np"
-      + "?select=empresa,order_id,np_idx,cod,razon_social,fecha_recep,direccion,lineas,cajas,items,m3,m3_parcial,localidad,zona_expreso,nombre_expreso,direccion_expreso,enviado_a_compras,condicion_pago_code"
+      + "?select=empresa,order_id,np_idx,cod,razon_social,fecha_recep,direccion,lineas,cajas,items,m3,m3_parcial,localidad,zona_expreso,nombre_expreso,direccion_expreso,enviado_a_compras,condicion_pago_code,diferido,no_antes_de"
       + "&fecha_recep=gte." + desde + "&order=order_id.asc,np_idx.asc&limit=5000",
       { headers: { apikey: PWEB_LK_ANON, Authorization: "Bearer " + tok } });
     if (!r.ok) throw new Error("LK respondió " + r.status);
@@ -35868,6 +36653,19 @@ function aprEsperaChip(p) {
   const txt = n === 0 ? "hoy" : (n === 1 ? "ayer" : "hace " + n + " días");
   const cls = n >= 4 ? " viejo" : (n >= 2 ? " medio" : "");
   return '<span class="apr-chip apr-chip-esp' + cls + '" title="' + escapeHtml("Llegó el " + String(p.fecha_recep || "").slice(0, 10) + ". Lleva " + n + " día" + (n === 1 ? "" : "s") + " sin programarse.") + '">⏱ ' + txt + '</span>';
+}
+/* v15.67 — el bloque que espera mercadería. LK lo manda como NP aparte
+   (v_pedidos_web_np.diferido) con la fecha estimada de reingreso; acá sólo se
+   muestra, para que nadie lo programe antes sin darse cuenta. */
+function aprDiferidoChip(p) {
+  if (!p || !p.no_antes_de) return "";
+  const q = String(p.no_antes_de).slice(0, 10).split("-");
+  if (q.length !== 3) return "";
+  const f = q[2] + "/" + q[1];
+  return '<span class="apr-chip apr-chip-dif" title="' + escapeHtml(
+    "Este bloque tiene artículos sin stock: entra al depósito el " + f +
+    ". Se programa recién a partir de esa fecha; el resto del pedido va por su cuenta.") +
+    '">⏳ espera ' + f + '</span>';
 }
 function aprSalidaChip(p) {
   // v14.35: la NP de ISIS no la toca el armado automático (no es un pedido de la página) — la programa una persona.
@@ -36314,6 +37112,8 @@ function aprRender() {
   pppPaintTabs();
   // v14.82: resumen de los reportes de cuarentena (una sola vez; se refresca al importar)
   if (_apr.cuarResumen === null && !_apr.cuarResumenLoading) cuarResumenCargar();
+  // v15.48: alerta de mismo cliente en dos días de la misma semana
+  if (_apr.dosDias === undefined && !_apr.dosDiasLoading) aprDosDiasCargar();
   let h = "";
 
   // v13.58: sin selector Loekemeyer/Chef — se ven las dos empresas juntas.
@@ -36350,6 +37150,7 @@ function aprRender() {
     escapeHtml(_dobHoy.map(_dobTxt).join(" · ")) + '. Si el de ISIS LK está mal, anulalo ahí y recargá.</div>';
   if (_dobFc.length) h += '<div class="apr-err">🧾 ' + _dobFc.length + ' pedido(s) de Chef son de clientes a los que LK les factura artículos de Loeke (FC Electr. en ISIS LK en los últimos ' + (_apr.dobleDias || 180) + ' días): NO se programan, los tipea compras en ISIS LK: ' +
     escapeHtml(_dobFc.map(_dobTxt).join(" · ")) + '.</div>';
+  h += aprDosDiasHtml();   // v15.48 — mismo cliente en dos días de la misma semana
   if (_apr.msg) h += '<div class="' + (_apr.msgErr ? "apr-err" : "apr-msg") + '">' + escapeHtml(_apr.msg) + '</div>';
   h += aprLogHtml();   // idea 2048
 
@@ -36412,8 +37213,12 @@ function aprColPedidos() {
   // v13.85: el más viejo, arriba de todo (la lista ya viene ordenada por fecha de recepción)
   let viejo = null;
   for (const p of lista) { const n = aprDiasEspera(p.fecha_recep); if (n !== null && (viejo === null || n > viejo)) viejo = n; }
-  let h = '<div class="apr-col apr-col-nps">' +
-    '<div class="apr-col-t">📋 Pedidos a programar <b>(' + lista.length + ')</b>' +
+  // v15.54 (dueño: "hasta que piensa y encuentra si hay algo o no, que la visual no sea la misma que
+  // cuando ya procesó el control"): mientras controla LK + Chef (o arma), el contador va en "…" y el
+  // vacío es una caja ámbar que pulsa — nada que se parezca al "Listo" verde de cuando terminó.
+  const _cargando = !_apr.listo || aprCargandoAlgo();
+  let h = '<div class="apr-col apr-col-nps' + (_cargando ? ' apr-col-cargando' : '') + '">' +
+    '<div class="apr-col-t">📋 Pedidos a programar <b>(' + (_cargando ? '…' : lista.length) + ')</b>' +
       (viejo !== null && viejo >= 2 ? ' <span class="apr-chip apr-chip-esp' + (viejo >= 4 ? ' viejo' : ' medio') + '" title="El pedido más viejo de la lista">⏱ el más viejo, hace ' + viejo + ' días</span>' : '') +
     '</div>' +
     aprPorQueHtml(lista) +
@@ -36426,7 +37231,8 @@ function aprColPedidos() {
     h += (_apr.listo && !aprCargandoAlgo())
       ? (q ? '<div class="apr-vacio">Ningún pedido coincide con «' + escapeHtml(q) + '».</div>'
            : '<div class="apr-listo">✅ <b>Listo: no queda nada por programar.</b><div class="apr-listo-sub">Todo lo que entró ya tiene tanda y día. Si llega un pedido nuevo aparece acá solo.</div></div>')
-      : '<div class="apr-vacio">⏳ Controlando en Supabase si hay pedidos nuevos…</div>';
+      : '<div class="apr-cargando"><span class="apr-cargando-ic">⏳</span><b>Todavía controlando…</b>' +
+        '<div class="apr-cargando-sub">Estoy leyendo LK y Chef en Supabase. Hasta que termine no sé si hay pedidos para programar.</div></div>';
   }
   for (const p of lista) {
     const id = "p" + p.order_id, ab = !!_apr.exp[id];
@@ -36441,6 +37247,7 @@ function aprColPedidos() {
       '</div>' +
       '<div class="apr-card-d">' +
         aprEsperaChip(p) +   // v13.85: hace cuánto llegó
+        aprDiferidoChip(p) + // v15.67: espera un reingreso
         '<span class="apr-chip apr-chip-z">' + escapeHtml(p.zona || "sin zona") + '</span>' +
         // v13.70: el pedido de la página como referencia (la NP la da el contador al programar)
         '<span class="apr-chip apr-chip-ped" title="' + (p._isis ? 'Ya tiene número de ISIS: se programa con ESE número, no se renumera.' : 'Número de pedido de la página; la NP (LK 0001…) se asigna al programar') + '">' + escapeHtml(aprPedLabel(p)) + '</span>' +
@@ -36557,13 +37364,16 @@ function aprColCuarentena() {
   // v14.90: cargar (una vez) los contactos WhatsApp de los retenidos reales
   if (_apr.cuarContacto === null && !_apr.cuarContactoLoading && lista.some(function (p) { return !p._demo; })) cuarContactoCargar();
   if (_apr.cuarDemo) lista = [cuarDemoPedido()].concat(lista);   // v14.84: pedido de ejemplo
-  let h = '<div class="apr-col apr-col-cuar">' +
-    '<div class="apr-col-t">🚧 Cuarentena <b>(' + lista.length + ')</b>' +
+  const _cuarCargando = !_apr.listo || aprCargandoAlgo();   // v15.54: mismo criterio que la columna de pedidos
+  let h = '<div class="apr-col apr-col-cuar' + (_cuarCargando ? ' apr-col-cargando' : '') + '">' +
+    '<div class="apr-col-t">🚧 Cuarentena <b>(' + (_cuarCargando ? '…' : lista.length) + ')</b>' +
       '<span class="apr-cuar-help" title="Pedidos de clientes con deuda, suspendidos o que superan su límite de crédito. No se programan (ni a mano ni por el automático): hay que liberarlos primero.">ⓘ</span>' +
     '</div>' +
     cuarDemoRowHtml();   // v14.88: los 4 botones de importación se movieron a "Config. Cuarentena"
   if (!lista.length) {
-    h += '<div class="apr-vacio">Sin pedidos retenidos. Acá caen los de clientes con <b>deuda</b>, <b>suspendidos</b> o que <b>superan su límite de crédito</b>: no se programan solos.</div>';
+    h += _cuarCargando
+      ? '<div class="apr-cargando apr-cargando-cuar"><span class="apr-cargando-ic">⏳</span><b>Todavía controlando…</b></div>'
+      : '<div class="apr-vacio">Sin pedidos retenidos. Acá caen los de clientes con <b>deuda</b>, <b>suspendidos</b> o que <b>superan su límite de crédito</b>: no se programan solos.</div>';
     return h + '</div>';
   }
   h += '<div class="apr-scroll">';
@@ -36580,15 +37390,49 @@ function aprColCuarentena() {
         '<div class="cuar-card-zona">📍 ' + escapeHtml(p.zona || "sin zona") + '</div>' +
         aprCuarBadgesHtml(p) +
       '</div>' +
-      '<div class="cuar-acciones">' +
+      '<div class="cuar-acciones' + (cuarTieneDeuda(p) ? ' cuar-acciones-pago' : '') + '">' +
         cuarWppContactoBtn(p) +
         '<button class="cuar-wpp cuar-wpp-cob" onclick="cuarWppCobranzas(\'' + (p.empresa || "lk") + '\',\'' + escapeHtml(String(p.order_id)) + '\')" title="Escribir a Vivi (cobranzas) por WhatsApp (+54 9 11 6557-4113) para que chequee este pedido">💬 A cobranzas (Vivi)</button>' +
+        cuarYaPagoBtn(p) +
         '<button class="cuar-enviar" onclick="cuarLiberar(\'' + (p.empresa || "lk") + '\',\'' + escapeHtml(String(p.order_id)) + '\')">➡ Enviar a Pedidos a programar</button>' +
       '</div>' +
     '</div>';
   }
   return h + '</div></div>';
 }
+/* v15.46 — Botón "Ya pagó" (dueño, 2026-09-11: "para que Viviana los pueda habilitar y que salgan
+   de cuarentena"). Es del CLIENTE, no del pedido: se registra el pago en `GV_Cuarentena_Pagados`
+   (RPC `gv_cuarentena_pago`) y desde ahí `gv_cuarentena_marcar` deja de marcarlo por deuda — o sea
+   salen TODOS los pedidos de ese cliente, no sólo éste. El pago vale contra el reporte de deuda
+   vigente: si mañana se sube uno más nuevo y el cliente sigue debiendo, vuelve solo a Cuarentena.
+   NO levanta "suspendido" ni "excede crédito": con esos motivos el pedido sigue retenido y se avisa. */
+function cuarTieneDeuda(p) { return (aprCuarentenaMotivos(p) || []).indexOf("deuda") >= 0; }
+function cuarYaPagoBtn(p) {
+  if (!cuarTieneDeuda(p)) return "";
+  const cod = String((p && p.cod) || "").trim();
+  if (!cod) return "";
+  return '<button class="cuar-pago" onclick="cuarYaPago(\'' + (p.empresa || "lk") + '\',\'' + escapeHtml(String(p.order_id)) + '\')"' +
+    ' title="El cliente pagó: sale de Cuarentena por deuda (todos sus pedidos). Si además está suspendido o excede el crédito, sigue retenido.">💚 Ya pagó</button>';
+}
+async function cuarYaPago(empresa, orderId) {
+  const key = String(empresa) + ":" + String(orderId);
+  const p = (_apr.pedidosTodos || []).find(function (x) { return aprKey(x.empresa, x.order_id) === key; });
+  if ((p && p._demo) || String(orderId) === "EJEMPLO") { _apr.cuarDemo = false; aprRender(); return; }
+  const cod = String((p && p.cod) || "").trim();
+  const cli = (p && (p.razon_social || p.cod)) || ("#" + orderId);
+  if (!cod) { _apr.msg = "Ese pedido no tiene código de cliente: no se puede marcar el pago."; _apr.msgErr = true; aprRender(); return; }
+  if (!confirm("¿" + cli + " ya pagó?\n\nSalen de Cuarentena TODOS los pedidos de ese cliente que estaban retenidos por deuda.\nSi al subir el próximo reporte sigue debiendo, vuelven solos.")) return;
+  try {
+    const r = await aprRpc("gv_cuarentena_pago", { p_empresa: empresa || "lk", p_cod: cod });
+    const otros = (aprCuarentenaMotivos(p) || []).filter(function (m) { return m !== "deuda"; });
+    _apr.msg = "💚 " + cli + " marcado como pagado" + ((r && r[0] && r[0].deuda_al_pagar != null) ? " (deuda $" + aprNum(r[0].deuda_al_pagar) + ")" : "") + "." +
+      (otros.length ? " Ojo: el pedido sigue retenido por " + otros.map(function (m) { return m === "limite_credito" ? "límite de crédito" : m === "sin_cta_cte" ? "Sin Cta.Cte." : m; }).join(" y ") + "." : "");
+    _apr.msgErr = false;
+    aprRender();
+    aprCargar();
+  } catch (e) { _apr.msg = String((e && e.message) || e); _apr.msgErr = true; aprRender(); }
+}
+
 /* Liberar: mandar el pedido a "Pedidos a programar" (mantiene el badge). Se auto-programa si es
    zona automática; si no, queda en la lista de arriba y se puede agregar a tandas. */
 async function cuarLiberar(empresa, orderId) {
@@ -36765,6 +37609,38 @@ function cuarDemoRowHtml() {
     '<button class="cuar-demo-btn" onclick="cuarDemoToggle()">' +
     (_apr.cuarDemo ? "✕ Quitar ejemplo" : "👁 Ver ejemplo") + '</button></div>';
 }
+/* v15.48 (dueño, 2026-09-11: *"porque está programado Orfali para 2 días diferentes. no podría
+   pasar y tendría que salir como alerta"*) — mismo cliente con entregas en dos días separados por
+   una semana o menos, juntando las NP de la página y las de ISIS. La cuenta la hace el backend
+   (vista `gv_ppp_cliente_dos_dias`, que cruza por razón social normalizada y deja afuera Súper,
+   Retira y Expo); acá sólo se pinta. */
+async function aprDosDiasCargar() {
+  if (_apr.dosDiasLoading) return;
+  _apr.dosDiasLoading = true;
+  try {
+    const H = { "apikey": SUPABASE_KEY, "Authorization": "Bearer " + SUPABASE_KEY };
+    const r = await fetch(SUPABASE_URL + "/rest/v1/gv_ppp_cliente_dos_dias?select=cliente_key,razon_social,cod,np,tanda,dia,zona,m3&limit=500",
+      { headers: H, cache: "no-store" });
+    _apr.dosDias = r.ok ? (await r.json()) : [];
+  } catch (_e) { _apr.dosDias = _apr.dosDias || []; }
+  _apr.dosDiasLoading = false;
+  if (_pppTab === "prog") aprRender();
+}
+function aprDosDiasHtml() {
+  const filas = _apr.dosDias || [];
+  if (!filas.length) return "";
+  const porCli = {};
+  filas.forEach(function (f) { (porCli[f.cliente_key] = porCli[f.cliente_key] || []).push(f); });
+  const claves = Object.keys(porCli);
+  const txt = claves.map(function (k) {
+    const g = porCli[k].slice().sort(function (a, b) { return String(a.dia).localeCompare(String(b.dia)); });
+    return (g[0].razon_social || g[0].cod) + ": " +
+      g.map(function (f) { return f.np + " (" + f.tanda + ", " + aprDiaCorto(f.dia) + ")"; }).join(" y ");
+  }).join(" · ");
+  return '<div class="apr-err">⚠ ' + claves.length + ' cliente(s) con entregas en <b>días distintos de la misma semana</b> — tendrían que ir juntos: ' +
+    escapeHtml(txt) + '. Movelo a mano al día que corresponda.</div>';
+}
+
 async function cuarResumenCargar() {
   if (_apr.cuarResumenLoading) return;
   _apr.cuarResumenLoading = true;
@@ -39266,6 +40142,9 @@ function _psUpdatePollInfo(){ const el = document.getElementById("psPollInfo"); 
    con items. Lo reusa la estación de impresión (psPrintBatch) y la Cola de impresión NP. */
 async function _armadoRemitoDataForItems(items){
   const npIn = items.map(function (x){ return encodeURIComponent(x.np); }).join(",");
+  // v15.46 — el MISMO listado pero ENTRECOMILLADO, para las NP de la página, que llevan un
+  // espacio ("CH 0005"): sin comillas PostgREST no resuelve el in() (lección de la v12.67).
+  const npInQ = items.map(function (x){ return encodeURIComponent('"' + String(x.np).replace(/"/g, "") + '"'); }).join(",");
   const tandas = items.map(function (x){ return String(x.tanda || "").toUpperCase(); }).filter(function (t, i, a){ return t && a.indexOf(t) === i; });
   const tIn = tandas.map(function (t){ return encodeURIComponent(t); }).join(",");
   const ppMap = {}, faltMap = {}, pickByTanda = {};
@@ -39276,9 +40155,18 @@ async function _armadoRemitoDataForItems(items){
       fetch(SUPABASE_PPP_PROG_ENDPOINT + "?select=np,cod,razon_social,fecha_entrega,tanda&np=in.(" + npIn + ")&limit=5000", { headers: psH(), cache: "no-store" }).then(function (r){ return r.ok ? r.json() : []; }).catch(function(){ return []; }),
       fetch(SUPABASE_ENTREGAS_ENDPOINT + "?select=np,cod_art,cajas_falto&np=in.(" + npIn + ")&cajas_falto=gt.0&limit=5000", { headers: psH(), cache: "no-store" }).then(function (r){ return r.ok ? r.json() : []; }).catch(function(){ return []; }),
       (tIn ? fetch(SUPABASE_TABLE_ENDPOINT + "?select=texto,legajo&opcion=eq.TP&texto=in.(" + tIn + ")&order=ts_cliente.desc&limit=2000", { headers: psH(), cache: "no-store" }).then(function (r){ return r.ok ? r.json() : []; }).catch(function(){ return []; }) : Promise.resolve([])),
-      (typeof getEmpleadosNombres === "function" ? getEmpleadosNombres().catch(function(){ return null; }) : Promise.resolve(null))
+      (typeof getEmpleadosNombres === "function" ? getEmpleadosNombres().catch(function(){ return null; }) : Promise.resolve(null)),
+      // v15.46 — el REMITO IMPRESO de una NP de la página salía con "Cliente —" y "Fecha Entrega —"
+      // (caso real: NP CH 0005, tanda E12B, impreso el 11/09 11:18). Acá la cabecera se resolvía
+      // SOLO contra gv_ppp_programacion_diaria, que es el espejo de ISIS y no tiene las NP web
+      // ("LK 0057", "CH 0005"). La v14.36 ya lo había tapado en Composición a líos y la v15.42 en
+      // Recepción Remitos y en la lista de la Cola de impresión — faltaba la HOJA que se imprime,
+      // que es la que mira el operario. Las web salen de gv_ppp_web_estado (np_label + cod_cliente
+      // + razón social + fecha de entrega), la misma fuente que usan las otras dos pantallas.
+      fetch(SUPABASE_URL + "/rest/v1/gv_ppp_web_estado?select=np_label,cod_cliente,razon_social,fecha_entrega,tanda&np_label=in.(" + npInQ + ")&limit=5000", { headers: psH(), cache: "no-store" }).then(function (r){ return r.ok ? r.json() : []; }).catch(function(){ return []; })
     ]);
     (res[0] || []).forEach(function (x){ const np = String(x.np || "").trim().replace(/\.0+$/, ""); if (np && !ppMap[np]) ppMap[np] = { cod: String(x.cod || "").trim(), rs: String(x.razon_social || "").trim(), fecha: String(x.fecha_entrega || "").slice(0, 10), tanda: String(x.tanda || "").trim().toUpperCase() }; });
+    (res[4] || []).forEach(function (x){ const np = String(x.np_label || "").trim(); if (np && !ppMap[np]) ppMap[np] = { cod: String(x.cod_cliente || "").trim(), rs: String(x.razon_social || "").trim(), fecha: String(x.fecha_entrega || "").slice(0, 10), tanda: String(x.tanda || "").trim().toUpperCase() }; });
     (res[1] || []).forEach(function (x){ const np = String(x.np || "").trim().replace(/\.0+$/, ""); const fl = Number(x.cajas_falto) || 0; if (np && fl > 0){ (faltMap[np] = faltMap[np] || []).push({ cod: String(x.cod_art || "").trim(), cajas: fl }); } });
     (res[2] || []).forEach(function (x){ const t = String(x.texto || "").trim().toUpperCase(); if (t && !pickByTanda[t]) pickByTanda[t] = String(x.legajo || ""); });   // order desc → el último TP gana
   } catch (_e){}
@@ -40766,13 +41654,6 @@ function facFaltAgregDist(np){
    (de vista_pedidos_secundarios, sin los ya confirmados). Se arma en facTick a
    _facSecByNp. Muestra "secundario → principal". */
 let _facSecByNp = new Map();
-/* v10.51 — stock FÍSICO del código secundario (desde _facSaldosN, por depósito). Sirve para
-   saber si el cambio es URGENTE (secundario en 0 → cambiar SÍ o SÍ) o si el secundario cubre
-   el pedido (se manda tal cual, sin tocar la NP). */
-function _facCorrSecStk(cod){
-  const s = _facSaldosN[_cpNorm(cod)] || {};
-  return (Number(s.terminado)||0)+(Number(s.excedente)||0)+(Number(s.separar_pedidos)||0)+(Number(s.a_facturar)||0)+(Number(s.a_guardar)||0)+(Number(s.racks)||0);
-}
 function facCambioCod(np){
   const npN = String(np).trim().replace(/\.0+$/, "");
   const list = _facSecByNp.get(npN);
@@ -40832,17 +41713,29 @@ async function facCorreccData(){
   pend.sort(function(a,b){ return (a.sec < b.sec ? -1 : a.sec > b.sec ? 1 : 0) || (a.np < b.np ? -1 : 1); });
   return pend;
 }
-/* v7.94 — stock físico total de una fila de vista_saldos_stock. */
-function _corrStk(r){ return (Number(r.terminado)||0)+(Number(r.excedente)||0)+(Number(r.a_guardar)||0)+(Number(r.racks)||0)+(Number(r.racks_ch)||0)+(Number(r.para_envasar)||0); }
 /* v7.94 — etiqueta/estado [label, color, fondo]. */
 function _corrEstado(e){
   const M = { sinpickear:["Sin pickear","#64748b","#f1f5f9"], enpicking:["En picking","#1e40af","#eff6ff"], pickeado:["Pickeado","#b45309","#fffbeb"], afacturar:["A facturar","#166534","#f0fdf4"], facturado:["Facturado","#065f46","#d1fae5"] };
   return M[e] || M.sinpickear;
 }
-/* v10.28 — ¿este ítem obliga a cambiar la NP? SÍ o SÍ solo si el código SECUNDARIO está
-   en 0 (sin stock): ahí hay que pasar la NP al principal. Si el secundario tiene ALGO de
-   stock se manda tal cual (no urgente), sin importar el stock del principal. */
-function _corrItemUrgente(p){ return (Number(p && p.stkSec)||0) <= 0; }
+/* v10.28 — ¿este ítem obliga a cambiar la NP? Urgente = hay que pasar la NP al principal SÍ o SÍ.
+   v15.66 (dueño, 11/09: "mirá el 565 primero: el stock y sus pedidos") — el stock del SECUNDARIO se
+   reparte entre TODAS las NP que lo piden (vista_correcciones_pedido_rich.sec_cubre: cola por código;
+   v15.67, dueño: PRIMERO las NP sin pickear —las pickeadas ya se llevaron el principal—, después fecha
+   de salida y NP). Antes cada NP se comparaba sola contra el stock total y 565 = 2
+   salía "alcanza" para 7 NP (8 cajas). El stock del principal no cambia el criterio. */
+function _corrItemUrgente(p){ return !(p && p.secCubre); }
+/* v15.66 — cuántas NP distintas tienen al menos una línea urgente (mismo número en badge y chip). */
+function _corrNpsUrgentes(rows){ const s = {}; (rows || []).forEach(function(p){ if (_corrItemUrgente(p)) s[p.np] = 1; }); return Object.keys(s).length; }
+/* v15.66 — veredicto de una línea del panel: verde = el secundario cubre esta NP (mandala tal cual),
+   rojo = no llega (contando las NP anteriores en la cola) → cambiar la NP al principal. */
+function _corrVeredicto(p){
+  const sec = escapeHtml(p.sec), ppal = escapeHtml(p.ppal), stk = Math.round(p.stkSec), cajas = Math.round(p.cajas);
+  const cola = (p.secNps > 1) ? (' · pedidas ' + Math.round(p.secTot) + ' en ' + p.secNps + ' NP, ésta es la ' + p.secOrden + '.ª') : '';
+  if (!_corrItemUrgente(p)) return '<div style="font-size:12px;font-weight:800;color:#166534;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:6px;padding:3px 8px;margin-top:3px;">✔ Sec. ' + sec + ' = ' + stk + cola + ' → le alcanza — <b>mandalo tal cual</b>, sin tocar NP.</div>';
+  const motivo = stk <= 0 ? ('Sec. ' + sec + ' en <b>0</b>') : ('Sec. ' + sec + ' = ' + stk + cola + ' → a ésta le quedan <b>' + Math.round(p.secDisp) + '</b> de ' + cajas);
+  return '<div style="font-size:12px;font-weight:800;color:#991b1b;background:#fef2f2;border:1px solid #fecaca;border-radius:6px;padding:3px 8px;margin-top:3px;">⚠️ ' + motivo + ' — <b>cambiá NP a ' + ppal + '</b> (' + Math.round(p.stkPpal) + ').</div>';
+}
 /* v8.06 — fecha de salida (PPP fecha_entrega / Entregas fecha_salida) → "DD/MM". */
 function _corrFecha(s){
   s = String(s || "").trim(); if (!s) return "";
@@ -40852,29 +41745,48 @@ function _corrFecha(s){
 }
 /* v7.94 — enriquece el panel: razón social, stock (sec/ppal), lo que puso el operario
    (Entregas_Virgilio) y el estado (CORE events EP/TP/AP/TAP + Facturacion_NP). */
+/* v15.66 — caché corta de la vista rica para el chip de Facturación: facTick corre cada 5 s
+   (FAC_REFRESH_MS) y la vista cuesta ~350 ms de servidor (casi todo vista_saldos_stock), así que el
+   tick la refresca como mucho cada 60 s. El panel y el badge la piden fresca (facCorreccDataRich),
+   y cada pedido fresco deja la caché al día. */
+let _facCorrRichCache = null, _facCorrRichTs = 0;
+const FAC_CORR_RICH_TTL_MS = 60000;
+async function facCorreccRichCached(){
+  if (_facCorrRichCache && (Date.now() - _facCorrRichTs) < FAC_CORR_RICH_TTL_MS) return _facCorrRichCache;
+  return facCorreccDataRich();
+}
 async function facCorreccDataRich(){
   /* v10.10 — reemplaza 5+ fetches secuenciales por 1 fetch de vista_correcciones_pedido_rich.
      La vista ya resuelve PPP/stock/entregas/facturación/estado de tanda en el server.
      PKC (detalle picking por artículo) no está en la vista — se muestra 0/false para esos campos. */
   const H = { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY };
-  const rows = await fetch(SUPABASE_URL + "/rest/v1/vista_correcciones_pedido_rich?select=np,sec,ppal,descripcion,cajas,razon_social,tanda,fecha,stk_sec,stk_ppal,ent_ped,ent_entr,ent_falto,estado&limit=10000", { headers: H, cache: "no-store" }).then(function(r){ return r.ok ? r.json() : []; });
-  return (rows || []).map(function(r){
+  const rows = await fetch(SUPABASE_URL + "/rest/v1/vista_correcciones_pedido_rich?select=np,sec,ppal,descripcion,cajas,razon_social,tanda,fecha,stk_sec,stk_ppal,ent_ped,ent_entr,ent_falto,estado,sec_pedido_total,sec_np_total,sec_orden,sec_acum_antes,sec_disp,sec_cubre&limit=10000", { headers: H, cache: "no-store" }).then(function(r){ return r.ok ? r.json() : []; });
+  const out = (rows || []).map(function(r){
     var oper = (r.ent_ped != null || r.ent_entr != null) ? { ped: Number(r.ent_ped)||0, entr: Number(r.ent_entr)||0, falto: Number(r.ent_falto)||0 } : null;
     return { np: r.np, sec: r.sec, ppal: r.ppal, desc: r.descripcion||"", cajas: Number(r.cajas)||0,
              rs: r.razon_social||"", tanda: r.tanda||"", fecha: r.fecha||"",
              stkSec: Number(r.stk_sec)||0, stkPpal: Number(r.stk_ppal)||0,
+             // v15.66 — reparto del stock del SECUNDARIO entre TODAS las NP que lo piden. Lo calcula la vista
+             // (cola por código: v15.67 sin pickear primero, después fecha de salida y NP). secCubre = le alcanza lo que queda
+             // después de las anteriores. Si la vista no trae sec_cubre (rollback), cae al criterio viejo.
+             secTot: Number(r.sec_pedido_total)||0, secNps: Number(r.sec_np_total)||0, secOrden: Number(r.sec_orden)||0,
+             secAntes: Number(r.sec_acum_antes)||0, secDisp: Number(r.sec_disp)||0,
+             secCubre: (r.sec_cubre == null) ? ((Number(r.stk_sec)||0) >= (Number(r.cajas)||0)) : (r.sec_cubre === true || r.sec_cubre === "true"),
              oper: oper, estado: r.estado||"sinpickear", pkcReal: 0, pkcHay: false };
   });
+  _facCorrRichCache = out; _facCorrRichTs = Date.now();   // v15.66
+  return out;
+}
+/* v15.66 — pinta el chip "🔀 Corregir códigos" con filas de la vista rica: mismo criterio que el panel
+   y el badge (NP distintas con alguna línea que el secundario NO cubre, v8.44: NP, no ítems). Antes
+   facCorreccRefreshCount contaba TODAS las NP pendientes y pisaba el número de urgentes de facTick (v10.51). */
+function facCorreccChipSet(rows){
+  const chip = document.getElementById("facChipCorr"), n = document.getElementById("facCntCorr");
+  if (n) n.textContent = _corrNpsUrgentes(rows);
+  if (chip) chip.style.display = (rows && rows.length) ? "" : "none";
 }
 async function facCorreccRefreshCount(){
-  try {
-    const pend = await facCorreccData();
-    const chip = document.getElementById("facChipCorr"), n = document.getElementById("facCntCorr");
-    // v8.44 — contar NPs distintas (unidad de acción), no ítems.
-    const nNps = Object.keys(pend.reduce(function(a,p){ a[p.np]=1; return a; }, {})).length;
-    if (n) n.textContent = nNps;
-    if (chip) chip.style.display = pend.length ? "" : "none";
-  } catch(_e){}
+  try { facCorreccChipSet(await facCorreccDataRich()); } catch(_e){}
 }
 /* v7.93 — entrada directa desde Administración (sin pasar por Facturación). */
 function openCorreccPanel(){
@@ -40910,9 +41822,9 @@ function facCorreccRender(){
   const body = document.getElementById("facCorreccBody"); if (!body) return;
   const allRows = _facCorrRows;
   if (allRows === null){ body.innerHTML = '<div style="text-align:center;color:#64748b;padding:20px;">Cargando…</div>'; return; }
-  facCorreccRefreshCount();
-  // v10.49 — switch Urgentes / Ver todos. Urgente = secundario en 0 (hay que cambiar la NP SÍ o SÍ);
-  // el resto el secundario lo cubre y se manda tal cual, pero ahora se pueden ver si el usuario quiere.
+  facCorreccChipSet(allRows);   // v15.66 — el chip sale de las filas que ya tenemos, sin volver a pedir la vista
+  // v10.49 — switch Urgentes / Ver todos. Urgente = el secundario NO cubre esta NP (v15.66: contando las NP
+  // que están antes en la cola de ese código) → hay que cambiar la NP SÍ o SÍ; el resto se manda tal cual.
   const urgRows = allRows.filter(function(p){ return _corrItemUrgente(p); });
   const rows = _facCorrSoloUrg ? urgRows : allRows;
   const _npsN = function(arr){ const s = {}; arr.forEach(function(p){ s[p.np] = 1; }); return Object.keys(s).length; };
@@ -40933,8 +41845,8 @@ function facCorreccRender(){
   if (!rows.length){ body.innerHTML = h + '<div style="text-align:center;color:#16a34a;padding:24px;font-weight:700;">' + (_facCorrSoloUrg ? '✅ No hay cambios urgentes. Tocá <b>Ver todos</b> para los que el secundario cubre.' : 'No hay pedidos en código secundario.') + '</div>'; return; }
   const pend = _facCorrFiltro === "todo" ? rows : rows.filter(function(p){ return p.estado === _facCorrFiltro; });
   h += '<div style="font-size:12.5px;color:#64748b;margin-bottom:10px;">' + (_facCorrSoloUrg
-      ? '🔴 <b>Solo urgentes</b>: el código secundario está en <b>0</b> → hay que cambiar la NP al principal SÍ o SÍ.'
-      : '📋 <b>Todos</b>: en <span style="color:#166534;font-weight:800;">verde</span> los que el secundario cubre (mandalos tal cual, sin tocar NP) y en <span style="color:#991b1b;font-weight:800;">rojo</span> los urgentes (secundario en 0).') + '</div>';
+      ? '🔴 <b>Solo urgentes</b>: el stock del código secundario, repartido entre todas las NP que lo piden (primero las que todavía no se pickearon, después por fecha de salida), <b>no llega</b> a esta NP → hay que cambiar la NP al principal SÍ o SÍ.'
+      : '📋 <b>Todos</b>: en <span style="color:#166534;font-weight:800;">verde</span> los que el secundario cubre (mandalos tal cual, sin tocar NP) y en <span style="color:#991b1b;font-weight:800;">rojo</span> los urgentes (el stock del secundario, repartido entre todas las NP que lo piden, no llega a ésta).') + '</div>';
   if (!pend.length){ body.innerHTML = h + '<div style="text-align:center;color:#94a3b8;padding:20px;">No hay ' + (_facCorrSoloUrg ? 'urgentes' : 'pedidos') + ' en este estado.</div>'; return; }
   // Agrupar por NP: 1 cambio → botón directo; varios → un solo botón que abre pop-up con checkboxes.
   const BTN = 'width:auto;flex:0 0 auto;background:#16a34a;color:#fff;border:none;border-radius:9px;padding:9px 13px;font-size:13px;font-weight:800;cursor:pointer;white-space:nowrap;';
@@ -40956,10 +41868,8 @@ function facCorreccRender(){
         + items.map(function(p){
             return '<div style="margin-top:6px;' + (items.length>1?'padding-top:6px;border-top:1px dashed #eef2f7;':'') + '">'
               + '<div style="font-size:13px;"><span style="color:#b91c1c;font-weight:800;">' + escapeHtml(p.sec) + '</span> → <span style="color:#16a34a;font-weight:800;">' + escapeHtml(p.ppal) + '</span> <span style="color:#64748b;">· ' + escapeHtml(p.desc) + ' · ' + p.cajas + ' cajas</span></div>'
-              + '<div style="font-size:12px;color:#475569;">📦 Stock: <b>' + escapeHtml(p.sec) + '</b>=' + Math.round(p.stkSec) + ' · <b>' + escapeHtml(p.ppal) + '</b>=' + Math.round(p.stkPpal) + ' · 👷 ' + _operTxt(p) + '</div>'
-              + (p.stkSec > 0
-                  ? '<div style="font-size:12px;font-weight:800;color:#166534;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:6px;padding:3px 8px;margin-top:3px;">✔ Sec. ' + escapeHtml(p.sec) + ' = ' + Math.round(p.stkSec) + (p.stkSec >= p.cajas ? ' (alcanza) — <b>mandalo tal cual</b>, sin tocar NP.' : ' — no alcanza p/' + p.cajas + '.') + '</div>'
-                  : '<div style="font-size:12px;font-weight:800;color:#991b1b;background:#fef2f2;border:1px solid #fecaca;border-radius:6px;padding:3px 8px;margin-top:3px;">⚠️ Sec. ' + escapeHtml(p.sec) + ' en <b>0</b> — <b>cambiá NP a ' + escapeHtml(p.ppal) + '</b> (' + Math.round(p.stkPpal) + ').</div>')
+              + '<div style="font-size:12px;color:#475569;">📦 Stock: <b>' + escapeHtml(p.sec) + '</b>=' + Math.round(p.stkSec) + (p.secNps > 1 ? ' <span title="Todas las NP pendientes que piden ' + escapeHtml(p.sec) + '">(pedidas ' + Math.round(p.secTot) + ' en ' + p.secNps + ' NP)</span>' : '') + ' · <b>' + escapeHtml(p.ppal) + '</b>=' + Math.round(p.stkPpal) + ' · 👷 ' + _operTxt(p) + '</div>'
+              + _corrVeredicto(p)   // v15.66 — verde/rojo según el reparto del secundario entre las NP que lo piden
               + '</div>';
           }).join('')
       + '</div>'
@@ -41915,7 +42825,8 @@ async function facTick(){
       cpLoadGuardadoHoy().catch(function(){ return new Set(); }),      // v6.18: guardados hoy → el ⏳ también aplica a lo guardado hoy
       facCorreccData().catch(function(){ return []; }),                // v7.92: pedidos en secundario por NP → columna "Cambiar cód" + chip
       facFetchNcChef().catch(function(){ return _facNcPend; }),         // v9.21: NCs Loeke→Chef pendientes → filas ✓ "NC hecha"
-      facFetchArmadosEventos().catch(function(){ return _facArmEv; })   // v12.18: NPs con TAL/TAP recientes → fallback del filtro v12.01 (ver facEstaArmada)
+      facFetchArmadosEventos().catch(function(){ return _facArmEv; }),  // v12.18: NPs con TAL/TAP recientes → fallback del filtro v12.01 (ver facEstaArmada)
+      facCorreccRichCached().catch(function(){ return []; })            // v15.66: reparto del secundario (sec_cubre) → el chip cuenta las NP urgentes de verdad (caché 60 s)
     ]);
     const fcKeys = _facPar[0] || new Set();
     try { const _sal = _facPar[8] || {}; _facSaldosN = {}; Object.keys(_sal).forEach(function(k){ _facSaldosN[_cpNorm(k)] = _sal[k]; }); } catch(_e){ _facSaldosN = {}; }
@@ -41926,9 +42837,13 @@ async function facTick(){
       const _sec = _facPar[10] || [];
       _sec.forEach(function(p){ const k = String(p.np).trim().replace(/\.0+$/, ""); if (!_facSecByNp.has(k)) _facSecByNp.set(k, []); _facSecByNp.get(k).push({ sec: p.sec, ppal: p.ppal, cajas: p.cajas }); });
       const chip = document.getElementById("facChipCorr"), nEl = document.getElementById("facCntCorr");
-      // v10.51 — el número del chip cuenta SOLO los urgentes (secundario en 0). El chip sigue
-      // visible si hay cualquier corrección (los no-urgentes se ven con "Ver todos" en el modal).
-      const _urgN = _sec.filter(function(x){ return _facCorrSecStk(x.sec) <= 0; }).length;
+      // v10.51 — el número del chip cuenta SOLO los urgentes. El chip sigue visible si hay cualquier
+      // corrección (los no-urgentes se ven con "Ver todos" en el modal).
+      // v15.66 — urgente = el secundario NO cubre esa NP contando las NP anteriores en la cola de ese
+      // código (vista_correcciones_pedido_rich.sec_cubre), no "secundario en 0". Cuenta NP distintas.
+      // Se lee de la caché (facCorreccRichCached la deja fresca dentro del Promise.all), sin depender
+      // del índice en _facPar: si alguien agrega otra entrada al Promise.all no se corre nada.
+      const _urgN = _corrNpsUrgentes(_facCorrRichCache || []);
       if (nEl) nEl.textContent = _urgN;
       if (chip) chip.style.display = _sec.length ? "" : "none";
     } catch(_e){ _facSecByNp = new Map(); }

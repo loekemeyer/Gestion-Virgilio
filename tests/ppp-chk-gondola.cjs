@@ -76,7 +76,7 @@ const PEND = { "840": 8 };
       return [];
     };
     window.fetch = function (url) {
-      const rows = /ppp_base_pedidos/.test(String(url)) ? fx.LINEAS.slice() : [];
+      const rows = /ppp_base_pedidos|gv_np_items/.test(String(url)) ? fx.LINEAS.slice() : [];   // v15.57: el modal lee gv_np_items
       return Promise.resolve({ ok: true, json: function () { return Promise.resolve(rows); } });
     };
     window.loadArtNombres = async function () { return {}; };

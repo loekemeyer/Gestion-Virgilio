@@ -101,7 +101,7 @@ antes de retirar nada, o el supervisor edita una tabla que ya no manda.
 
 ## Orden final
 
-1. Mergear la rama y prender la empresa (ver `§3.«LUGAR-EMP»` y `§3.«PICK-EMP»`). **Dejar correr unos días.**
+1. Mergear la rama y prender la empresa (ver `§3.cl` y `§3.cm`). **Dejar correr unos días.**
 2. Migrar los lectores del front a `(código, empresa)` — paso 2.
 3. Cambiar `vista_saldos_stock` — paso 1.
 4. Borrar las 6 filas de sufijo de `Equivalencias_Codigos` — paso 3.

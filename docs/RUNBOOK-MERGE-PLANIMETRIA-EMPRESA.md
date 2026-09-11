@@ -110,7 +110,7 @@ Se regenera además `planimetria.js` (el baseline offline, hoy de un Excel del 2
 |--:|:--|:--|:--|
 | 1 | `git fetch` + traer `main` a la rama | Claude | 5 conflictos triviales esperados (versión + secciones al final) |
 | 2 | Re-bumpear versión por encima de la de `main` | Claude | `APP_VERSION` == `SW_VERSION` |
-| 3 | Asignar las letras a `§3.«LUGAR-EMP»`, `§3.«PKC-DEP»`, `§3.«PICK-EMP»` | Claude | `grep -c '«'` → 0 |
+| 3 | Asignar las letras a `§3.cl`, `§3.ck`, `§3.cm` | Claude | `grep -c '«'` → 0 |
 | 4 | **Suite completa** | Claude | 119+ bloques, 0 fallos |
 | 5 | ⚠ **`index.html` y `sw.js` NO vacíos** | Claude | `wc -c` > 3.000.000 y > 8.000 |
 | 6 | Merge a `main` + push | Claude | Pages publica en 30 s–2 min |

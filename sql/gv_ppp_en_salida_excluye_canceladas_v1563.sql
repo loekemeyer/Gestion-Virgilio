@@ -1,0 +1,14 @@
+-- 2026-09-11 — En Salida no soltaba una NP CANCELADA: 98050 (facturada 28/07, Carga Camión 11/08,
+-- cancelada por el cliente) seguía como "facturada sin cargar" después de gv_ppp_np_cancelar, porque
+-- gv_ppp_en_salida sólo cierra por CRN (Recepción Remitos), gv_ppp_entregados_meta o FSS.
+-- Fix: dos exclusiones más en el WHERE final — NP_Canceladas (ISIS) y GV_Web_Cancelados (web).
+-- La migración (gv_ppp_en_salida_excluye_canceladas_v1563) reescribe la vista desde su propia
+-- definición (pg_get_viewdef) y conserva las reloptions; acá queda el predicado agregado:
+--
+--   AND NOT EXISTS (SELECT 1 FROM public."NP_Canceladas" nc
+--                   WHERE regexp_replace(btrim(nc.np::text), '\.0+$', '') = b.np)
+--   AND NOT EXISTS (SELECT 1 FROM public."GV_Web_Cancelados" wc
+--                   WHERE upper(btrim(wc.np_label)) = upper(b.np))
+--
+-- Prueba: select np from gv_ppp_en_salida where np = '98050';  → 0 filas (antes: facturada_sin_cargar, 44 días)
+-- Rollback: recrear la vista con sql/gv_en_salida_presunta_y_cancelar_v1555.sql (vuelve a mostrar canceladas).

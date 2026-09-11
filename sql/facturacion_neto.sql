@@ -140,3 +140,8 @@ AS $$
   ORDER BY cod_canon
 $$;
 GRANT EXECUTE ON FUNCTION public.facturacion_neto_detalle(text) TO anon, authenticated;
+
+-- ⚠ v15.76 (2026-09-11): esta definición YA NO es la vigente. Las NP de Chef pasaron a
+-- valorizarse con public.precios_venta_chef (antes TODO salía de la lista de LK y el 72,8%
+-- de las líneas de Chef quedaba "sin precio"). La definición vigente está en
+-- sql/gv_precio_chef_v1576.sql; el detalle y lo medido, en docs/SUPABASE-GESTION-VIRGILIO.md §3.cc.

@@ -1,0 +1,38 @@
+-- v15.53 (2026-09-11) — (en la base el bloque (d) y el comment dicen "v15.52": otra sesion tomo ese numero mientras esto estaba en curso) — el candado "mismo cliente = mismo día, salvo súper" también en el ARMADO
+-- AUTOMÁTICO. Thomas: "nunca si hay +1 pedido de un cliente puede ir separado en la PPP" →
+-- "salvo los super" → (¿también sobre el armado?) "si claro".
+--
+-- Por dónde se podía partir un cliente en el armado (gv_ppp_web_armar_pendientes):
+--   · la cascada (b) reparte por cupo entre días → dos pedidos del mismo cliente pueden caer
+--     en días distintos;
+--   · (a1)/(a2) sólo miran "hacia atrás" (mañana .. v_techo − 1): un cliente con día ya
+--     asignado MÁS ADELANTE no se encuentra, y el pedido nuevo cae antes.
+--
+-- Solución: pasada de consolidación `gv_ppp_web_juntar_clientes(p_empresa)` al final de cada
+-- armado (bloque (d)). Por cliente con NP web en más de un día futuro (zona numérica, no súper,
+-- no cadena):
+--   1) si UNA de sus tandas ya la empezó un operario (gv_ppp_tanda_tocada) → todas a ese día;
+--   2) si ninguna → todas al día MÁS TEMPRANO ("buscar para atrás, no para adelante");
+--   3) si DOS días distintos ya están empezados → no toca e informa (lo muestra la alerta).
+-- Las NP se suman a la tanda web abierta del cliente ese día; si no hay, a la de la NP que ya
+-- está ahí. Sólo mira lo web: un cliente partido entre ISIS y web queda para gv_ppp_cliente_dos_dias.
+-- Idempotente. El trigger gv_web_cliente_un_solo_dia dispara con sus UPDATE y no molesta: cuando
+-- llega, ya no queda nada en otro día.
+--
+-- Definición completa de la función y del bloque (d) en la base. Cierre de la función:
+--
+--   begin
+--     perform public.gv_ppp_web_juntar_clientes(p_empresa);
+--   exception when others then
+--     raise notice 'gv_ppp_web_juntar_clientes fallo (%): el armado sigue igual', sqlerrm;
+--   end;
+--
+-- PRUEBAS (2026-09-11, con rollback, Orfali 4188 = LK 0002 + LK 0053 en D69D/16-09; para
+-- separarlo sin que el trigger lo impida: set local session_replication_role = replica):
+--   1. LK 0053 al 17/09 (ZZT9), nada empezado        → 4188 -> 16/09 (1 NP, al dia mas temprano)
+--   2. LK 0053 al 15/09 (ZZT9) + TP simulado en D69D → 4188 -> 16/09 (1 NP, al dia ya empezado)
+--   3. ídem + TP simulado en ZZT9 (dos empezadas)    → 0 NP, "dos dias ya empezados: no se puede juntar"
+--   Pasada real después de crearla: (nada que juntar) — la alerta estaba vacía.
+--
+-- ROLLBACK: sacar el bloque (d) de gv_ppp_web_armar_pendientes y
+--   drop function public.gv_ppp_web_juntar_clientes(text);
