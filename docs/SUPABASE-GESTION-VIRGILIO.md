@@ -6077,3 +6077,21 @@ con la corrección; corrida manual de `gv-geocodificar` (request 20111). Los 10 
 (`gv_clientes_habituales` = con entregas en 2026): no entran en `gv_geo_faltantes_padron`, se geocodifican bien el día
 que vuelvan a pedir. **Queda:** 4198 Benítez *"Panamericana 54,5 - Pilar"* (LK 0068/0069, 16/09) no tiene calle y
 altura — necesita el pin de Thomas.
+
+## 3.bv ✅ `gv_ppp_np_cancelar` no cancelaba ninguna NP de ISIS (v15.62) — 2026-09-11
+
+**Síntoma.** Thomas: *"98050 Pedido Cancelado por el cliente… ejecutá"*. `select gv_ppp_np_cancelar('98050', …)` →
+`ERROR 42702: column reference "np" is ambiguous`. En la rama ISIS de la función (v15.55, §3.cg) el
+`insert into NP_Canceladas … on conflict (np)` choca con el parámetro de salida `np` del `RETURNS TABLE`.
+La rama web no lo usa sin calificar y andaba: **el botón 🚫 Cancelar sólo fallaba con NP de ISIS**, y desde el
+10/09 nadie lo había usado con una.
+
+**Fix (migración `gv_ppp_np_cancelar_fix_np_ambiguo_v1561`, `sql/gv_ppp_np_cancelar_fix_np_ambiguo_v1562.sql`):**
+`#variable_conflict use_column` al inicio del cuerpo; nada más cambia. Probado con 98050: `NP_Canceladas` +
+`GV_PPP_Prog_Override.oculto = true`, y la NP sale de `gv_ppp_en_salida`.
+
+**Mismo pedido, datos:** 98569 (D55A), 98474 (D46E) y 98509 (D55D) estaban en En Salida como *facturada sin
+cargar* aunque se entregaron el 03 y 04/09 (Thomas). Se cargaron los 3 eventos **CRN** (Recepción Remitos)
+con `ts_cliente` en la fecha real de entrega, legajo 104, `descripcion` "cargada a pedido de Thomas 11/09".
+98321 ya estaba en Pedidos Entregados (CRN del 20/08). Problema registrado y cerrado:
+*"gv_ppp_np_cancelar falla para NP de ISIS"*.
