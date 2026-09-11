@@ -5751,3 +5751,33 @@ Si ningún mes está cubierto, la columna no se dibuja. Test `tests/proy-entrega
 **Rollback:** `drop function public.gv_entregas_mensuales_cod(text, integer);` — el front lo
 tolera (fetch falla → `ent = {}` → columna ausente, popup igual que en v15.51).
 `sql/gv_entregas_mensuales_cod_v1552.sql`.
+
+### §3.cf.3 — El candado también en el armado automático (v15.53, 2026-09-11)
+
+Thomas, a la pregunta de si el candado iba también sobre el armado: ***"si claro"***. Y LK 0002
+(358 cajas en 1,184 m³) se revisó a pedido suyo: los 15 artículos tienen volumen y la suma da
+exactamente 1,184 — el 505 son 150 cajas de 0,0024 m³, eso baja el promedio. Nada que corregir.
+
+**Por dónde se podía partir un cliente en el armado:** la cascada (b) reparte por cupo entre
+días, y (a1)/(a2) sólo miran hacia atrás (mañana … `v_techo − 1`): un cliente con día ya asignado
+**más adelante** no se encuentra y el pedido nuevo cae antes.
+
+**`gv_ppp_web_juntar_clientes(p_empresa)`** — bloque **(d)**, al final de
+`gv_ppp_web_armar_pendientes`, en cada corrida de los crons 71/73:
+
+| Caso | Día que gana |
+|---|---|
+| Una de sus tandas ya la empezó un operario | Ese día (la empezada no se mueve) |
+| Ninguna empezada | El **más temprano** — "buscar para atrás, no para adelante" |
+| Dos días distintos ya empezados | No toca; lo informa y lo muestra la alerta |
+
+Las NP van a la tanda web abierta del cliente ese día, o a la de la NP que ya está ahí. Súper /
+Retira / Expo y el padrón de cadenas quedan afuera. Sólo mira lo web: un cliente partido entre
+una NP de ISIS y una web sigue siendo cosa de `gv_ppp_cliente_dos_dias`. Va dentro de
+`begin … exception` — si falla, el armado no se cae.
+
+**Pruebas (con rollback, Orfali):** partido sin tandas empezadas → junta al 16/09 (más temprano) ·
+la suelta antes pero D69D empezada → junta al 16/09 (empezada) · dos empezadas → 0 NP, informa.
+Pasada real al crearla: **nada que juntar**.
+
+**Rollback:** `sql/gv_ppp_web_juntar_clientes_v1553.sql`.
