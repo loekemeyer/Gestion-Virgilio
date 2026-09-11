@@ -176,7 +176,7 @@ código ni datos. Si algo se ve raro el primer día, se apaga eso y se mira con 
 
 - [x] **El editor fundido** — hecho en la **v15.76**. Ver abajo.
 - [x] **Enrutar `window.GONDOLA`** a `gv_lugar_articulo` — hecho en la **v15.77**. Ver abajo.
-- [ ] **Regenerar `planimetria.js`** desde las tablas nuevas.
+- [x] **Regenerar `planimetria.js`** — hecho en la **v15.78**. Ver abajo.
 - [x] Test del editor (`tests/lugar-editor.cjs`, 18 chequeos, ya en `tests/run.sh`).
 
 ### El editor nuevo (v15.76) — qué quedó
@@ -246,3 +246,27 @@ pelado — que para el 809E es la góndola de Chef. Se dejan de generar en el pa
 `PLAN-SACAR-SUFIJO-EMPRESA.md`.
 
 **Test:** `tests/gondola-gv-lugar.cjs` (10 chequeos, en la suite).
+
+
+### `planimetria.js` regenerado (v15.78)
+
+Es el baseline offline: lo que la app carga **antes de tener red**. Estaba generado de un
+Excel el **28/08** y ya no coincidía con el relevamiento del 11/09 — un operario sin señal
+veía la planimetría de agosto mientras el resto del sistema usaba la nueva.
+
+Ahora sale de `gv_lugar_articulo`, **con las mismas reglas que `_gondolaDesdeGvLugar`**, así
+el baseline y el dato vivo no se contradicen. **342 claves → 352.**
+
+| | |
+|:--|:--|
+| **Se fueron 9** | `437E-` y `438E-` (la tercera convención, **verificado que no la lee nadie**), `LIBRE` (no es un código), y `071 124 580E 592E 702 724` — los seis en **cero cajas**. Siguen en la tabla `Planimetria`, que no se borra |
+| **Llegaron 19** | las 6 con sufijo + 13 del relevamiento (`120 124E 554 563 574E 599E 809 828 838E 865ED 877E 35E 56E`) |
+| **28 cambian de sector** | el pelado apunta al primer lugar del recorrido (`437E` F09→F12), o el depósito lo reubicó (`513` F13→F30) |
+
+⚠ **Trampa del cero adelante.** `035E` iba a quedar como `35E` y esa clave desaparecía: la
+base trae los códigos numéricos con cero. La regla vieja sólo paddeaba códigos de 2 dígitos
+puros. Se corrigió para paddear el **prefijo numérico** (`66→066`, `57→057`, `35E→035E`), así
+conviven los dos.
+
+El `?v=` del `<script>` pasó de `3.73` a `15.78` para que el celular no se quede con el
+archivo cacheado.
