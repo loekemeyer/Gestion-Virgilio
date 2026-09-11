@@ -7607,3 +7607,35 @@ filas de cada código traía `gond = 0`.
 
 **Archivo:** `sql/gv_saldos_group_by_funciones_v1589.sql` · migración `gv_saldos_group_by_funciones_v1589`
 · backup de las definiciones previas en `sql/backups/funciones_vista_saldos_stock_20260911_pre_v1589.sql`.
+
+### §3.cp.1 — El 198E existía en todos lados menos en el maestro (v15.92) — 2026-09-11
+
+El primer caso real que dejó el importador automático: la OC de La Anónima **22908256**
+entraba `parcial` porque el **198E** (Pelador Negro Dentado Loke) no estaba en `products`
+ni en `loke_products` de LK. Pero se vende hace rato — 25 movimientos de stock en Virgilio
+(último 09/09), m³ 0,0033, lista de Coto $1.100, lista de La Anónima $1.110 y facturas
+reales: 771 el 08/09 por 840 u a $1.110 bruto (19% dto → $899,10 neto) y Osa el 09/09 por
+1.656 u. Vivía sólo en `item_precios`, la tabla de precios manuales de LK, que **no** es lo
+que mira el match por código: por eso el renglón se caía en silencio (y por eso la
+valorización lo calculaba por unidad, sin `uxb` — §3.cf).
+
+**Alta (pedido de Thomas):** `loke_products` ← `198E`, "Pelador Negro Dentado Loke",
+categoría Peladores, **lista $1.110, uxb 12, activo**. Es el precio que `v_item_precio` ya
+servía, así que **no cambió ningún precio**, sólo la fuente:
+
+| Quién | Qué paga el 198E | De dónde sale |
+|---|---|---|
+| Coto (801) | $1.100 | lista de súper (`precios_super`) |
+| La Anónima (771) | $1.110 | lista de súper |
+| Osa (2533) | $660 | precio pactado con Fede, `GV_Precios_Cliente` con `es_final` — le gana a la lista |
+| Extralimp (4114) | $1.110 | la lista: compra la línea Loke entera con **dto 0**, verificado contra sus facturas (102E 1100=1100, 103 465=465, 121 1420=1420, 123 790=790 el 17/06) |
+
+**Medido:** la misma OC pasa de `parcial` (13 de 14 renglones, $16.695.240 vs $17.627.640
+del PDF) a **`importada` con 14 de 14 y el total exacto**. Backup de las 23 filas previas en
+`sql/backups/loke_products_20260911_pre_198E.sql` de `pagina-lk-copia`; deshacer es
+`delete from public.loke_products where cod = '198E';`. Problema **26** de
+`github_repo_problemas`, cerrado.
+
+**Ojo:** el alta lo hace aparecer en el catálogo Loke del portal (23 → 24 productos, a
+$1.110). Si no se quiere que se vea en la web, `active = false` lo saca sin romper nada: el
+importador matchea igual porque no filtra por `active`.
