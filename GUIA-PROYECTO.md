@@ -11159,6 +11159,16 @@ distinta, empresa distinta.
 >   `Sync_Estado`**: `cron.job_run_details` ya tiene la verdad. DDL en
 >   `sql/watchdog_syncs_externos.sql`.
 
+> Nota **2026-09-11 — Cómo se pagan las importaciones (marco para la cuenta corriente).**
+> Thomas explicó la operatoria: se le gira a **NTL**, un freight forwarder de Hong Kong, y **la salida de
+> dólares viaja siempre pegada a una importación YA NACIONALIZADA** (desde la Com. "A" 8226 del BCRA,
+> 14/04/2025, eso se paga a la vista, 0 días, sin abrir el reloj de 90 días de un anticipo ni riesgo de
+> incumplido en SEPAIMPO) **aunque comercialmente esa plata financie el pedido siguiente, el que todavía
+> no embarcó**. O sea: la factura que se paga ≠ el pedido que se financia ≠ quien cobra. Por eso la cuenta
+> corriente son **tres ejes** (factura/despacho · giro a NTL · imputación al PI), no una sola columna de
+> saldo. Todo el marco, con las normas y la forma que va a tener el modelo, en
+> **`docs/IMPORTACIONES-PAGOS-ARGENTINA.md`**. **Sin construir**: falta el Excel con el que lo lleva hoy.
+
 > Nota **2026-09-11 (v15.73) — En curso: fichas para ver UN solo pedido y cuánta plata es.**
 > Pedido de Thomas. La solapa 🚢 En curso suma las mismas fichas que 📦 Pedidos: **🏭 Proveedor** y **📄 Pedido**
 > (más un **🔎 solo éste** en cada fila). Los cuatro totales de arriba se recalculan con lo filtrado, así parado en
