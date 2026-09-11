@@ -12,7 +12,7 @@
 > única**; no se replica. Ante la duda entre parche rápido y fix de raíz → **fix
 > de raíz**.
 >
-> Última actualización: 2026-09-11 (viernes) · Versión app al documentar: **v15.62**
+> Última actualización: 2026-09-11 (viernes) · Versión app al documentar: **v15.63**
 >
 > Nota **v15.40 (2026-09-11) — HANDOFF de planimetría / Acacia: `docs/HANDOFF-PLANIMETRIA-Y-ACACIA.md`.**
 > Thomas sigue este tema en otra sesión. Ahí está todo junto: los **13 artículos activos del catálogo LK
@@ -11237,6 +11237,8 @@ distinta, empresa distinta.
 > Bug de la v15.55: el parámetro de salida `np` pisaba la columna en el `on conflict (np)`. Fix con
 > `#variable_conflict use_column`. Además se cerraron a mano 98569/98474/98509 (CRN con fecha real) y se canceló
 > 98050. §3.bv de `docs/SUPABASE-GESTION-VIRGILIO.md`.
+> **v15.63:** `gv_ppp_en_salida` ahora excluye `NP_Canceladas` / `GV_Web_Cancelados` — una NP cancelada después de
+> facturada quedaba en En Salida para siempre (98050, 44 días).
 
 > Nota **2026-09-11 (v15.60) — Datos: Z5 del 15/09 unificado al Norte del 16/09, Veronesi fuera de D68G, 11 correcciones de geo.**
 > Sin cambio de código: sólo datos, con backup y rollback. Detalle, medición (117 + 53 km → 138 km, un camión menos) y

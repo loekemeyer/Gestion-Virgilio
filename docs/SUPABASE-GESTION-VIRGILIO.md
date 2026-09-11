@@ -6095,3 +6095,9 @@ cargar* aunque se entregaron el 03 y 04/09 (Thomas). Se cargaron los 3 eventos *
 con `ts_cliente` en la fecha real de entrega, legajo 104, `descripcion` "cargada a pedido de Thomas 11/09".
 98321 ya estaba en Pedidos Entregados (CRN del 20/08). Problema registrado y cerrado:
 *"gv_ppp_np_cancelar falla para NP de ISIS"*.
+
+**Segundo agujero, mismo caso (v15.63).** Cancelada, 98050 **seguía en En Salida**: `gv_ppp_en_salida` sólo suelta una
+NP por CRN, `gv_ppp_entregados_meta` o FSS; el 🚫 Cancelar de la v15.55 estaba pensado para lo que *no salió* y
+nunca se probó contra una facturada. Migración `gv_ppp_en_salida_excluye_canceladas_v1563`: el WHERE final excluye
+`NP_Canceladas` y `GV_Web_Cancelados` (`sql/gv_ppp_en_salida_excluye_canceladas_v1563.sql`). Medido: 98050 fuera,
+En Salida pasa de 31 a 30 filas.
