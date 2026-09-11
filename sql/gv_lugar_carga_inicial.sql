@@ -117,3 +117,9 @@ update public."GV_Lugar" set empresa='LK',
 -- Estado final: 872 lugares · 780 asignaciones de articulo · 148 filas
 -- estacionadas · 51 lugares sin empresa (TODOS racks de insumos, ninguno
 -- con articulo) · 76 lugares realmente libres.
+
+-- ── Más decisiones de Luis, 2026-09-11 ───────────────────────────────
+-- 865ED va en L57, el MISMO lugar que el 865E (L57 es góndola de CH).
+insert into public."GV_Lugar_Item"(sector,cod,clase,notas)
+values ('L57','865ED','articulo','Luis 11/09: va en el mismo lugar que el 865E')
+on conflict (sector,cod,clase) do nothing;

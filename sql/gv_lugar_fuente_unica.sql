@@ -192,3 +192,27 @@ alter table public."GV_Lugar" add constraint "GV_Lugar_empresa_check"
 
 comment on column public."GV_Lugar".empresa is
   'LK / CH. Es del LUGAR, no del artículo. LOKE NO es un valor válido: Loke es una línea de Loekemeyer, no una empresa (los 57 lugares del pasillo Ñ pasaron a LK el 11/09). v5 2026-09-11.';
+
+
+-- ════════════════════════════════════════════════════════════════════
+-- v6 (2026-09-11) — empresa 'IN' para los racks de insumos.
+-- Pedido de Luis: "los racks de insumo no deberían ir ni con CH ni con LK.
+-- Si querés poneles de empresa IN (de insumo)". Un insumo es de la planta,
+-- no de una empresa comercial. Con esto los 51 lugares que quedaban en null
+-- dicen explícitamente qué son, y `null` vuelve a significar "falta el dato"
+-- en vez de "es de insumos".
+-- ════════════════════════════════════════════════════════════════════
+
+alter table public."GV_Lugar" drop constraint if exists "GV_Lugar_empresa_check";
+alter table public."GV_Lugar" add constraint "GV_Lugar_empresa_check"
+  check (empresa is null or empresa in ('LK','CH','IN'));
+
+update public."GV_Lugar" l
+set empresa = 'IN',
+    notas = coalesce(l.notas || ' · ', '') || 'rack de insumos (Luis 11/09: empresa IN)',
+    updated_at = now()
+where l.empresa is null
+  and not exists (select 1 from public."GV_Lugar_Item" i where i.sector = l.sector);
+
+comment on column public."GV_Lugar".empresa is
+  'LK / CH / IN. Es del LUGAR, no del artículo. IN = rack de insumos: un insumo es de la planta, no de una empresa comercial. LOKE no es válido (es una línea de LK). null = falta el dato. v6 2026-09-11.';
