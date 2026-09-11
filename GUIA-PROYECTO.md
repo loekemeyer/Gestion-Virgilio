@@ -12,7 +12,7 @@
 > única**; no se replica. Ante la duda entre parche rápido y fix de raíz → **fix
 > de raíz**.
 >
-> Última actualización: 2026-09-11 (viernes) · Versión app al documentar: **v15.71**
+> Última actualización: 2026-09-11 (viernes) · Versión app al documentar: **v15.84**
 >
 > Nota **v15.40 (2026-09-11) — HANDOFF de planimetría / Acacia: `docs/HANDOFF-PLANIMETRIA-Y-ACACIA.md`.**
 > Thomas sigue este tema en otra sesión. Ahí está todo junto: los **13 artículos activos del catálogo LK
@@ -11159,6 +11159,13 @@ distinta, empresa distinta.
 >   `Sync_Estado`**: `cron.job_run_details` ya tiene la verdad. DDL en
 >   `sql/watchdog_syncs_externos.sql`.
 
+> Nota **2026-09-11 (v15.84) — Cerrados los 3 datos que faltaban de la cuenta corriente (Thomas).**
+> (1) **FOB de Frontier = u$s 14.400**, manda el PI: `fob_uni` de **505C** 0,07 → **0,072** (14.400/200.000 u).
+> (2) **Frontier llega el 10/12** — *"embarca el 26 de octubre y llega 45 días después"*; la llegada cargada
+> (04/11) era la que estaba mal: daba **9 días de viaje** y ahora da **45**, en línea con el resto.
+> (3) El **30% es un parámetro, no una regla**: Becky (23,3%) y Hugo (36,3%) son **un solo giro cada uno**,
+> *"se pagó eso y me lo aceptaron los dos proveedores"*. Con esto ya no queda ninguna fila con `fob_difiere`
+> y el `falta` sigue dando el del Excel. §3.cg de `docs/SUPABASE-GESTION-VIRGILIO.md`.
 > Nota **2026-09-11 (v15.81) — "¿Quién me compró este mes?" en Stock y Compras.**
 > Pedido del dueño: *"desde stock y compras, poder tocar en 1 mes y ver quién me compró (solo los primeros
 > 5 clientes de cada mes y un sexto con Resto)"* · unidad **cajas** (*"3 cajas"*), la misma de esa tabla.
