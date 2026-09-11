@@ -397,3 +397,6 @@ PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node te
 
 echo "== gondola-gv-lugar (v15.77: window.GONDOLA sale de GV_Lugar, no de Planimetria) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/gondola-gv-lugar.cjs
+
+echo "== pk-ubic-empresa (v15.81: la ubicación del excedente se limpia; la empresa va aparte del código) =="
+PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/pk-ubic-empresa.cjs

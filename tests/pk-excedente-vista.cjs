@@ -43,7 +43,10 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
     const m = await pkFetchExcedente(["502", "066", "315", "546"]);
     out.sinFantasma502 = !m["502"];
     out.cajasDeVista066 = !!m["066"] && m["066"].cajas === 137;
-    out.ubics066 = !!m["066"] && JSON.stringify(m["066"].ubics) === JSON.stringify(["P3", "AD2"]);
+    // v15.81 — las ubicaciones salen NORMALIZADAS (P3 → P03, AD2 → AD02), que es el
+    // formato canónico de GV_Lugar. Antes pasaban crudas y "P3" y "P03" contaban como
+    // dos lugares distintos siendo el mismo — el operario veía la lista repetida.
+    out.ubics066 = !!m["066"] && JSON.stringify(m["066"].ubics) === JSON.stringify(["P03", "AD02"]);
     out.ubicsVacias315 = !!m["315"] && m["315"].cajas === 4 && m["315"].ubics.length === 0;
     out.noPedido546 = !m["546"];
     const uv = urls.find(u => u.indexOf("vista_saldos_stock") >= 0) || "";

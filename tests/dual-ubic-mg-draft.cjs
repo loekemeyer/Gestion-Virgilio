@@ -50,7 +50,14 @@ catch (_e) {
         if (!cod) break;
         const sec = document.querySelector("#tandaModal .pk-sector-big");
         const orig = document.querySelector("#tandaModal .pk-orig");
-        acc[cod.textContent.trim()] = { sector: sec ? sec.textContent.trim() : null, orig: orig ? orig.textContent.replace(/\s+/g, " ").trim() : null };
+        // v15.81 — el código se muestra PELADO y la empresa en una etiqueta aparte
+        // (.pk-cod-emp), así que se juntan los dos para poder seguir chequeando ambos.
+        const empEl = document.querySelector("#tandaModal .pk-cod-emp");
+        acc[cod.textContent.trim()] = {
+          sector: sec ? sec.textContent.trim() : null,
+          orig: orig ? orig.textContent.replace(/\s+/g, " ").trim() : null,
+          emp: empEl ? empEl.textContent.trim() : null
+        };
         const adelante = document.querySelector("#tandaModal .pk-navbtn:last-child");
         if (!adelante || adelante.disabled) break;
         pkNext();
@@ -129,11 +136,19 @@ catch (_e) {
                   C["437E"] && C["437E"].sector === "L7" &&
                   C["438E"] && C["438E"].sector === "L5" && /L5 y L6/.test(C["438E"].orig || "");
   // Camino nuevo: el renglón viene partido por empresa y el sector sale de la
-  // planimetría, no de PICK_UBIC_DUAL. Sin nota de origen: ya lo dice la clave.
-  const okEmpresa = E["809E LK"] && E["809E LK"].sector === "J13" &&
-                    E["437E LK"] && E["437E LK"].sector === "F09" &&
-                    E["438E LK"] && E["438E LK"].sector === "F13" &&
-                    !E["809E"] && !E["437E"];
+  // planimetría, no de PICK_UBIC_DUAL. Sin nota de origen: ya lo dice la etiqueta.
+  //
+  // ⚠ v15.81 — ESTA ASSERTION CAMBIÓ A PROPÓSITO. Antes exigía que en pantalla se
+  // leyera "809E LK" y que el pelado NO apareciera, o sea que asertaba la convención
+  // vieja: la empresa metida adentro del nombre del código. Luis (11/09), viendo la
+  // tanda E01F: "¿por qué aparece código '809E CH'?". Ahora el operario ve el código
+  // PELADO y la empresa como etiqueta aparte — lo que NO cambió es el ruteo: cada
+  // renglón sigue saliendo con el sector de SU empresa, que es lo que evita mandar al
+  // pickeador de Loeke a M13. La clave interna del paso sigue con el sufijo.
+  const okEmpresa = E["809E"] && E["809E"].sector === "J13" && E["809E"].emp === "LK" &&
+                    E["437E"] && E["437E"].sector === "F09" && E["437E"].emp === "LK" &&
+                    E["438E"] && E["438E"].sector === "F13" && E["438E"].emp === "LK" &&
+                    !E["809E LK"] && !E["437E LK"];
   const okMg = r.draftAntes === false && r.draftDespues === true && r.draftOp === "MG" && r.draftCargar === 5;
   const pass = okLoeke && okChef && okEmpresa && okMg && errs.length === 0;
 

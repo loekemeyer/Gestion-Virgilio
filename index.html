@@ -3025,6 +3025,13 @@ tr.ppp-err-zona > td{ background:#fffbeb !important; }
 .pk-next-row{ display:flex; align-items:center; gap:12px; padding:7px 4px; border-bottom:1px solid #f1f5f9; }
 .pk-next-sec{ font-size:22px; font-weight:800; color:#1e6bd6; width:84px; flex:0 0 auto; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .pk-next-sec.exc{ color:#b45309; }
+/* v15.81 — la EMPRESA como etiqueta aparte del código, nunca pegada al nombre.
+   El operario veía "809E CH" de una y parece otro código; el sector ya lo lleva a la
+   góndola correcta, así que la empresa es sólo información. */
+.pk-cod-emp{ display:inline-block; margin-left:6px; padding:1px 7px; border-radius:999px; font-size:.55em; font-weight:800; vertical-align:middle; letter-spacing:.03em; }
+.pk-cod-emp-lk{ background:#dbeafe; color:#1e40af; }
+.pk-cod-emp-ch{ background:#fef3c7; color:#92400e; }
+.pk-next-cod .pk-cod-emp{ font-size:11px; margin-left:5px; }
 .pk-next-cod{ flex:1; font-size:16px; font-weight:700; color:#0f172a; font-family:Consolas,Menlo,monospace; }
 .pk-next-tag{ font-size:11px; font-weight:800; color:#b45309; background:#fff7ed; border-radius:6px; padding:1px 6px; font-family:inherit; }
 .pk-next-q{ font-size:14px; color:#64748b; white-space:nowrap; }
@@ -7757,7 +7764,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v15.80";
+const APP_VERSION = "v15.81";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -9668,6 +9675,27 @@ function pkFmt(n) { const r = Math.round(n * 100) / 100; return (r === Math.roun
    (fuente de verdad, respeta el cutoff, 1 fila por artículo) y de los movimientos sólo
    se leen las UBICACIONES (entradas con delta>0 y ubicación cargada: ~200 filas en toda
    la tabla, lejos del tope). */
+/* v15.81 — LIMPIA la ubicación del excedente antes de mostrarla.
+
+   Hasta la v15.43 el operario tipeaba libre, así que en Movimientos_Stock.ubicacion
+   quedó de todo. Medido el 11/09 sobre 78 ubicaciones distintas: **34 llevan el
+   separador " · " ADENTRO con la empresa pegada** — "P12 · CH", "P15 · LOKE",
+   "P8 · LK". No era un invento: el lugar y su empresa anotados juntos, redundante
+   (los P01-P40 son TODOS de Chef, el lugar ya dice la empresa). Después
+   `ubics.join(" · ")` los volvía a unir y al operario le salía
+   "P13 · P4 · CH · P3 · CH · P03 · P4 · P25 · P3 · P16 · P8".
+
+   Acá se queda sólo el LUGAR: se corta en el separador, se normaliza (P4 → P04, que
+   es el mismo lugar que P04 y así dejan de contarse dos veces) y se descarta lo que
+   no tenga forma de sector. El guard del MG (v15.43) evita que entre basura nueva;
+   esto ordena la vieja, que no se borra. */
+function pkUbicLimpia(v) {
+  const s = String(v == null ? "" : v).trim();
+  if (!s) return "";
+  const sec = s.split(/[·|/,]/)[0].trim().toUpperCase();          // "P12 · CH" → "P12"
+  if (!/^[A-ZÑ]{1,2}[0-9]{1,3}(AD|AT)?$/.test(sec)) return "";     // "CH" y demás afuera
+  return (typeof gvNormSector === "function") ? (gvNormSector(sec) || sec) : sec;
+}
 async function pkFetchExcedente(arts) {
   try {
     if (!arts || !arts.length) return {};
@@ -9705,7 +9733,7 @@ async function pkFetchExcedente(arts) {
       (Array.isArray(rows) ? rows : []).forEach(function (mv) {
         const k = String(mv.cod_art).toUpperCase();
         if (!out[k]) return;
-        const u = String(mv.ubicacion || "").trim();
+        const u = pkUbicLimpia(mv.ubicacion);
         if (u && out[k].ubics.indexOf(u) < 0) out[k].ubics.push(u);   // ubicaciones de las entradas, recientes primero
       });
     }
@@ -9879,6 +9907,18 @@ function pkRender() {
   // el "sector" es la ubicación del excedente (no la góndola).
   const sectorTxt = String(it.isExc ? (it.excUbic || it.sector || "—") : (it.sector || "—")).replace(/-/g, "");
   const sectorBig = `<span class="pk-sector-big${it.isExc ? " exc" : ""}">${escapeHtml(sectorTxt)}</span>`;
+  // v15.81 — el operario ve el código PELADO y la empresa como etiqueta aparte. Antes
+  // salía "809E CH" de una, que es la convención vieja (la empresa metida en el nombre)
+  // y encima confunde: parece otro código. El sector ya lo lleva a la góndola correcta,
+  // así que la empresa es sólo información. `rec` NO se toca — lo usan las búsquedas de
+  // equivalencias y el evento; esto es sólo lo que se muestra.
+  const recCod = codBase(rec);
+  const recEmp = (function () {
+    const m = /\s+(LK|CH|LOKE)$/.exec(String(rec).toUpperCase());
+    return m ? (m[1] === "LOKE" ? "LK" : m[1]) : (it.emp === "LK" || it.emp === "CH" ? it.emp : "");
+  })();
+  const codBig = `<span class="pk-cod-big">${escapeHtml(recCod)}</span>` +
+    (recEmp ? `<span class="pk-cod-emp pk-cod-emp-${recEmp.toLowerCase()}">${recEmp}</span>` : "");
   const equivHint = it.real
     ? `<div style="background:#fff7ed;border:1px solid #fdba74;color:#9a3412;border-radius:10px;padding:9px 11px;margin-top:8px;font-size:14px;font-weight:800;text-align:center;line-height:1.25;">👉 Levantá el <b>${escapeHtml(it.real)}</b>${it.realNota ? " — " + escapeHtml(it.realNota) : ""}<br><small style="font-weight:700;opacity:.85;">(el cliente lo pidió como ${escapeHtml(it.art)})</small></div>`
     : ``;
@@ -9897,7 +9937,7 @@ function pkRender() {
   }
   const bigRow = `<div class="pk-big-row">
       <div class="pk-big-col"><span class="pk-cod-lbl">${it.isExc ? "📦 UBICACIÓN" : "SECTOR"}</span>${sectorBig}</div>
-      <div class="pk-big-col pk-big-right"><span class="pk-cod-lbl">${it.isExc ? "EXCEDENTE" : "CÓDIGO"}</span><span class="pk-cod-big">${escapeHtml(rec)}</span></div>
+      <div class="pk-big-col pk-big-right"><span class="pk-cod-lbl">${it.isExc ? "EXCEDENTE" : "CÓDIGO"}</span>${codBig}</div>
     </div>${equivHint}${famWarn}`;
   // v11.78: códigos con decimales permitidos (cajas fraccionarias)
   const _PK_CODS_DEC = ["55215","55219","55289"];
@@ -10153,7 +10193,11 @@ function pkNextHtml() {
   let h = '<div class="pk-next"><div class="pk-next-h">📍 Próximas ubicaciones</div>';
   up.forEach(function (x) {
     const sec = String(x.isExc ? (x.excUbic || x.sector || "—") : (x.sector || "—")).replace(/-/g, "");
-    h += '<div class="pk-next-row"><span class="pk-next-sec' + (x.isExc ? " exc" : "") + '">' + escapeHtml(sec) + '</span><span class="pk-next-cod">' + escapeHtml(x.art) + (x.isExc ? ' <span class="pk-next-tag">excedente</span>' : "") + '</span><span class="pk-next-q">' + pkFmt(x.esp) + ' caj</span></div>';
+    // v15.81 — el código va PELADO y la empresa como etiqueta, igual que arriba.
+    const nCod = codBase(x.art);
+    const nm = /\s+(LK|CH|LOKE)$/.exec(String(x.art).toUpperCase());
+    const nEmp = nm ? (nm[1] === "LOKE" ? "LK" : nm[1]) : ((x.emp === "LK" || x.emp === "CH") ? x.emp : "");
+    h += '<div class="pk-next-row"><span class="pk-next-sec' + (x.isExc ? " exc" : "") + '">' + escapeHtml(sec) + '</span><span class="pk-next-cod">' + escapeHtml(nCod) + (nEmp ? ' <span class="pk-cod-emp pk-cod-emp-' + nEmp.toLowerCase() + '">' + nEmp + '</span>' : "") + (x.isExc ? ' <span class="pk-next-tag">excedente</span>' : "") + '</span><span class="pk-next-q">' + pkFmt(x.esp) + ' caj</span></div>';
   });
   return h + "</div>";
 }
