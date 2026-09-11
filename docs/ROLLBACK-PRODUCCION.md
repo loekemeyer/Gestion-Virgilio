@@ -640,3 +640,24 @@ columnas: para Producción sólo cambia que el número que ve es el **total** de
 
 **Rollback exacto:** correr `sql/backups/funciones_vista_saldos_stock_20260911_pre_v1589.sql`
 (trae las dos definiciones tal cual estaban). **Definición nueva:** `sql/gv_saldos_group_by_funciones_v1589.sql`. §3.cj.3.
+
+## v15.92 (2026-09-11) — `entregas_virgilio_dedup()`: la clave de dedup deja de mirar la TANDA
+
+**Objeto compartido tocado:** `public.entregas_virgilio_dedup()` (trigger BEFORE INSERT de
+`public."Entregas_Virgilio"`, tabla que también escribía Producción).
+
+**Por qué:** un pedido reprogramado a otra tanda y vuelto a armar se grababa entero de nuevo y
+movía el stock dos veces. La clave `np|tanda|cod_art` no lo veía porque la tanda era otra.
+4 NP afectadas (98532, 98533, 98490, 98583), 43 filas, 57 cajas contadas por dos.
+
+**Qué cambia:** clave `np|cod_art` (las tres cantidades siguen en el `EXISTS`). Un rearmado
+idéntico en otra tanda se descarta; un agregado con otra cantidad sigue entrando.
+
+**Impacto medido:** `select count(*) from public."Entregas_Virgilio"` no cambia por el trigger
+(sólo filtra inserts futuros). Antes/después del fix, ninguna NP queda con Entregas en dos
+tandas nombradas distintas.
+
+**Rollback exacto:** `sql/entregas_virgilio_dedup_v1592.sql` (sección ROLLBACK al principio del
+archivo): volver a `np|tanda|cod_art` + `and coalesce(e.tanda,'') = coalesce(new.tanda,'')`.
+Datos: `insert into public."Entregas_Virgilio" select * from public."GV_Backup_Entregas_Dup_20260911";`
+y `delete from public."Movimientos_Stock" where tipo='ajuste' and ref like 'reversa armado duplicado%';`

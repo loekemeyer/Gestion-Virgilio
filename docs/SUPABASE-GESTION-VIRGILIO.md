@@ -7608,7 +7608,148 @@ filas de cada código traía `gond = 0`.
 **Archivo:** `sql/gv_saldos_group_by_funciones_v1589.sql` · migración `gv_saldos_group_by_funciones_v1589`
 · backup de las definiciones previas en `sql/backups/funciones_vista_saldos_stock_20260911_pre_v1589.sql`.
 
-### §3.cp.1 — El 198E existía en todos lados menos en el maestro (v15.92) — 2026-09-11
+## v15.92 (2026-09-11) — armado duplicado por reprogramación de tanda: fix + limpieza
+
+**Síntoma.** 4 NP con las filas de `Entregas_Virgilio` por duplicado, cada juego en una tanda
+distinta: 98532 y 98533 (D60E 09/09 → E10A 11/09), 98490 (D47C 27/08 → D54C 02/09) y 98583
+(D50C 31/08 → D50D 01/09). 43 filas, 57 cajas contadas dos veces.
+
+**Causa raíz.** El pedido se reprogramó de tanda (para 98532/98533 lo movió el propio override
+`GV_PPP_Prog_Override`, v14.09) y se volvió a armar. Los dos candados miran la **tanda**, no la
+**NP**: `_compTandaYaArmada()` en el front y la clave `np|tanda|cod_art` del trigger
+`entregas_virgilio_dedup`. Con tanda nueva, los dos dejan pasar.
+
+**Efecto en stock (medido).** El armado emite `separado`: `separar_pedidos −n` / `a_facturar +n`
+por artículo. El segundo armado lo volvió a emitir → `separar_pedidos` quedó 57 cajas más
+negativo y `a_facturar` 57 infladas. Borrar las filas de `Entregas_Virgilio` **no** revierte eso:
+no hay trigger `AFTER DELETE`.
+
+**Qué se hizo.**
+1. Backup: `public."GV_Backup_Entregas_Dup_20260911"` (43 filas, el armado viejo de cada NP).
+2. `delete` de esas 43 filas de `Entregas_Virgilio`.
+3. Compensación en `Movimientos_Stock` (libro event-sourced: no se borra, se compensa): 80 filas
+   `tipo='ajuste'`, `ref='reversa armado duplicado NP <np> tanda <tanda> (backup …)'`,
+   `+57` a `separar_pedidos` y `−57` a `a_facturar`. **No** se revirtió el `terminado +1` del
+   941E de D60E: ese devuelto al depósito ocurrió una sola vez y es legítimo.
+4. Backend: `entregas_virgilio_dedup()` pasa a clave `np|cod_art`
+   (`sql/entregas_virgilio_dedup_v1592.sql`, anotado en `docs/ROLLBACK-PRODUCCION.md`).
+5. Front: `_compNpsYaArmadas(nps)` nuevo + chequeo en `compTerminar()` — corta el armado y
+   nombra las NP ya armadas, aunque sea en otra tanda.
+
+**Chequeo (debe dar 0 filas):**
+```sql
+select np from (
+  select btrim(np::text) np, upper(btrim(tanda)) t from public."Entregas_Virgilio"
+   where nullif(btrim(tanda),'') is not null group by 1,2
+) z group by np having count(*) > 1;
+```
+
+**Pendiente aparte (no tocado).** 22 filas de `Entregas_Virgilio` con `tanda` NULL y
+`fecha_salida` NULL, creadas del 10 al 14/08 en 20 NP; 19 son del artículo **574E**, el resto
+838E, 809E, 943E, 948E y 580. No tienen evento `TAL` que las respalde ni movieron stock
+(no hay `Movimientos_Stock` en esa ventana para esos códigos): parecen una carga manual o una
+migración puntual. En 14 de ellas el mismo artículo ya existe en la fila con tanda de esa NP,
+con las mismas cajas. Queda como problema abierto en `github_repo_problemas`.
+### §3.cn.1 — v15.92: el cartel de vencidos prometía algo que la v15.85 apagó
+
+Al sacar de En Salida lo que no tiene Carga Camión quedó un texto viejo mintiendo en la lista de
+**vencidos** de Programación:
+
+> *"N pedidos salieron con la tanda armada y nadie marcó el remito. **A las 36 h del armado pasan
+> solos a En Salida**, donde se cierran con Controlado."*
+
+Eso era la v15.55 (`armada_sin_carga`), que la v15.85 desactivó: **ya no pasan solos**. La
+operadora iba a esperar un pase automático que no va a ocurrir. Ahora dice lo que corresponde:
+
+> *"N pedidos salieron con la tanda armada y **nadie registró la Carga Camión**. Mientras no se
+> registre, el pedido queda acá: no entra a En Salida y no se puede cerrar. El que lo cargó tiene
+> que marcarlo en **Carga Camión** — de ahí pasa a En Salida y se cierra con **Recepción Remitos**.
+> Si la mercadería nunca salió, 📅 Reprogramar o 🚫 Cancelar."*
+
+Es el flujo que ya existe, no uno nuevo: **el que cargó el camión es el que marca la carga**. Por
+eso no se agregó ningún botón de "dar por cargado" desde el escritorio — escribiría un CCN sin
+legajo real de quien cargó, y la vista justamente descarta los CCN de legajo de prueba.
+
+También se ajustaron dos etiquetas que decían lo mismo viejo: la celda de la fila
+(`salió · marcar remito` → **`salió · falta la Carga Camión`**) y el cartel de Resumen
+(`… y el remito sin marcar` → **`… y la Carga Camión sin registrar`**).
+
+**Estado al cerrar (11/09):** quedan **15** pedidos en esa lista, todos de ISIS y todos con la
+tanda armada (TAP), esperando decisión de Thomas — 6 sin fecha de entrega (98585..98590, D56D,
+armadas 03/09, facturadas 04/09, **con CCR**: control de remitos hecho y carga sin registrar) y 9
+vencidas (44612..44617 Cencosud D72B/D72C, 98480/98481 D47B armadas el **27/08**, 98530 D60C).
+
+---
+
+## 3.ci Los 10 artículos que se venden y no están en el maestro (v15.94) — 2026-09-11
+
+Repasando **uno por uno** los 7 huecos que quedaban, los dos artículos reales resultaron ser
+el mismo problema, y de fondo:
+
+| Cód | Artículo | Quién | Situación |
+|---|---|---|---|
+| `574` | Corta Queso Blandos Mango Alambre | **4170 Ichariba Chode SRL**, 3 NP × 1 cj, entregadas | se le factura a **72 clientes desde 2023**, siempre a **$2.770** bruto |
+| `838E` | Rallador Cilíndrico Mini | 1474 Celestino (1 cj) y 2447 Clapera (3 cj) | **faltante puro**, 0 entregado |
+
+Las otras 2 filas eran las mismas NP repetidas con **`cod_cliente` vacío** en
+`Entregas_Virgilio` — basura, no artículos (engancha con el problema abierto de las filas sin
+tanda que duplican cajas).
+
+### La causa
+
+`precios_venta` —el espejo que Virgilio usa para valorizar— se arma **sólo de `products` de
+LK**. Los precios cargados a mano en **`item_precios`** nunca viajaban. Son **10 códigos**:
+
+`120` Filtros de Café · `193` Tostador Enlozado · `198E` Pelador Dentado · `55215` Palo de
+Amasar · `574` Corta Queso · `599EZ` Pelador Mad Verde · `727EN` Sacacorcho Doble Imp. ·
+`809` Corta Queso · `838E` Rallador Mini · `865ED` Rallador Plano
+
+Son **justo** los que venían apareciendo "sin precio" toda la tarde. No era casualidad.
+
+### Lo que NO se trajo, y por qué
+
+La idea original era que el sync leyera `v_item_precio` entero. Mirándolo de cerca, **eso
+rompía dos cosas**:
+
+- **`chef_products` (98 códigos)** → reintroduce el bug que arregló la v14.44: el `809E` de
+  Chef a $3.005 pisando el de LK a $4.060 en una NP de Loekemeyer.
+- **`variante_L` (78) + `loke_products` (16)** → es la **línea Loke**, que por regla del dueño
+  **no tiene lista general**: el precio es el pactado con cada cliente.
+
+Así que se traen **sólo los `origen = 'manual'`**, y **`products` manda**: si un código está en
+el maestro, el manual no lo pisa.
+
+### Medido
+
+`sync-precios-venta` v9: `precios_venta` 223 → **233** filas, `precios_lk_manuales: 10`,
+`cob_uxb_lk` 295. **0 precios existentes modificados** (comparado fila a fila contra
+`gv_bkp_precios_venta_20260911_pre_manuales`).
+
+| Vista | antes de hoy | tras el precio facturado | **ahora** |
+|---|---|---|---|
+| `vista_facturacion_neto_items` | 1.178 | 7 | **0** |
+| `vista_facturable_anticipado` | 67 | 0 | **0** |
+| `vista_plata_perdida` | 154 | 5 | **1** |
+
+La única que queda es el artículo **`597`** a Clapera (LK 2394), 8 cajas faltantes del 20/08:
+no está en ninguna lista y **nunca se facturó**, así que no hay de dónde sacarlo. Ése sí es
+un alta de artículo pendiente.
+
+### Lo que este arreglo NO toca
+
+La card de OC de súper de LK matchea contra `products` + `loke_products`, **no** contra
+`precios_venta` de Virgilio. Por eso **sigue abierto** que una OC de La Anónima entrara con
+**17 de 18 renglones**: el `198E` no está en ese catálogo y la línea se cae **sin aviso** —
+aunque a La Anónima se le viene facturando el 198E desde junio ($1.110 bruto, 19% de dto,
+última el **08/09**). Es el mismo agujero, del otro lado, y es un fix de LK.
+
+### Rollback
+
+Redeployar `sync-precios-venta` sin el bloque `1b` (la versión previa está en el historial de
+`supabase/functions/sync-precios-venta/index.ts`) y restaurar desde
+`gv_bkp_precios_venta_20260911_pre_manuales`.
+
+### §3.cp.1 — El 198E existía en todos lados menos en el maestro (v15.95) — 2026-09-11
 
 El primer caso real que dejó el importador automático: la OC de La Anónima **22908256**
 entraba `parcial` porque el **198E** (Pelador Negro Dentado Loke) no estaba en `products`
