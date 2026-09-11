@@ -4832,3 +4832,32 @@ RPCs `importados_set_curso`/`importados_marcar_llegada` quedaron **sin uso** (no
 **Backup:** `GV_Importados_curso_bkp_20260911`. **SQL:** `sql/gv_importados_baches_v1494.sql`.
 **Prueba:** 934E con 2 baches (200@20/09 + 5760@29/09) → mirror curso 5960, reingreso 20/09 (la más
 cercana); anular el de prueba restauró 5760 / 29/09.
+
+## §3.bm — 437EL / 438EL (LK) separados de 437E / 438E (CH) en Pedidos Importación (v15.01, 2026-09-11)
+
+**Dueño:** *"se piden por separado, LK y CH. 438EL es para LK (para la impo, después se vende como
+438E y descuenta el de LK) y 438E para CH. No en conjunto."*
+
+**Qué había:** `Importados` tenía dos filas por código (marca LK y CH). La vista `v_importados_ordenes`
+ya calculaba proyección y stock por fila, pero el front agrupa por `cod_art` y los sumaba en una sola
+línea; el reingreso (por `cod_art`) quedaba compartido.
+
+**Qué se hizo:**
+1. `Importados`: fila LK de 437E/438E → `cod_art = 437EL / 438EL` (ids 69 y 65). CH queda `437E/438E`.
+   `Importados_Volumen` copiado para los `…EL`. Baches re-etiquetados.
+2. `v_importados_ordenes`: normaliza con **`gv_cod_stock()`** (pela la L) en movimientos, entregas y
+   proyección → `438EL` hereda la proy LK y el stock góndola LK de `438E`. La proyección toma **sólo
+   códigos base** de `proyeccion_madre` (una fila `574EL = 0` pisaba el seed de 574E con `max()`).
+3. `lk_reingresos_feed()`: sólo filas **no CH** (antes mezclaba y tomaba la fecha mayor).
+
+**Impacto medido:** proyección cambia sólo en 437EL (null→2388 live) y 438EL (null→2788 live); el
+resto idéntico (query de diff vieja-vs-nueva normalización: 0 filas más). Stock: las entregas cargadas
+como `…EL` ahora descuentan LK — **438EL 4512→4128 (16 cajas × 24)** y **439E 420→234 (31 cajas × 6)**;
+ningún otro código tiene entregas con L. `Importados_Mov_Stock` no tiene códigos con L. Feed LK: 23 filas.
+
+**Backups:** `GV_Importados_bkp_437_438_20260911`, `GV_Importados_Volumen_bkp_437_438_20260911`.
+**SQL + rollback:** `sql/gv_importados_lk_ch_separados_v1501.sql`.
+
+**Pendiente (reportado, no tocado):** filas **duplicadas con la misma marca** en `Importados`:
+360E/361E/366E (LK·Kangli ×2), 585E/811E/812E/813E/816E/817E/819E (LK·Ownland ×2), 809E ×3 —
+suman doble el en curso y el backfill de baches les creó 2–3 baches.

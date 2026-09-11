@@ -347,3 +347,16 @@ drop function if exists public.gv_importados_resync(bigint);
 drop table if exists public."GV_Importados_Baches";
 ```
 Y revertir `index.html` (el "Cargar pedido ya hecho" volvía a `importados_set_curso` + PATCH `reingreso_est`).
+
+## 437EL / 438EL separados — v15.01 (2026-09-11)
+
+**Objetos compartidos tocados:** `Importados` (2 filas: `cod_art` 437E→437EL id 69, 438E→438EL id 65),
+`Importados_Volumen` (+2 filas), vista `v_importados_ordenes` (replace: normalización `gv_cod_stock`,
+proy sólo códigos base), función `lk_reingresos_feed` (replace: sólo marca ≠ CH).
+
+**Impacto medido:** ver `docs/SUPABASE-GESTION-VIRGILIO.md` §3.bm (proy: sólo 437EL/438EL; stock:
+438EL −384 u, 439E −186 u por entregas `…EL`).
+
+**Rollback exacto:** bloque ROLLBACK al final de `sql/gv_importados_lk_ch_separados_v1501.sql`
+(restaurar `cod_art` desde `GV_Importados_bkp_437_438_20260911`, borrar volumen `…EL`, y volver la
+vista/feed a `ltrim(upper(btrim(x)),'0')` sin filtros).
