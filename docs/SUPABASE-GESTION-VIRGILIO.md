@@ -5022,3 +5022,12 @@ Dueño: *"todos los datos que tengas que corregir, dale"*. Barrido sobre `v_impo
   'PI OL-10139'`; restaurar estado/unidades_llegadas de los 7 viejos desde el backup; `delete from "Importados" where
   id = 165` (+ su volumen y su `inicial`); FOB y volumen desde los backups; `gv_importados_resync` de cada importado.
 - **Impos en curso ahora**: Becky 29/09 y 15/11, Fujian 01/11, Frontier 04/11, Ownland sin fecha, Hugo Wong sin fecha.
+
+### §3.bm.6 — Fecha del PI Ownland: depósito 9/9 + lead time del PI + 40 días de viaje (v15.14, 2026-09-11)
+
+- Dueño: *"buscá el delay estipulado por el PI, y desde el 9/9 agregá el delay más 40 días de viaje a Argentina"*.
+  PI OL-10139: *"The lead time: 60 days when deposit received"* → **9/9 + 60 + 40 = 18/12/2026** en los 13 baches
+  (`creado_por = 'PI OL-10139'`) + `gv_importados_resync` → 13 filas de `Importados` con `reingreso_est = 2026-12-18`.
+- Regla útil para los próximos PI: **fecha = depósito + lead time del PI + 40 días de viaje**. (Fujian decía "30-45
+  días después del depósito"; sus baches tienen 01/11 cargado por Becky, no se recalculó.)
+- Rollback: `update "GV_Importados_Baches" set fecha_reingreso = null where creado_por = 'PI OL-10139'` + resync.
