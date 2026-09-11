@@ -7678,3 +7678,52 @@ También se ajustaron dos etiquetas que decían lo mismo viejo: la celda de la f
 tanda armada (TAP), esperando decisión de Thomas — 6 sin fecha de entrega (98585..98590, D56D,
 armadas 03/09, facturadas 04/09, **con CCR**: control de remitos hecho y carga sin registrar) y 9
 vencidas (44612..44617 Cencosud D72B/D72C, 98480/98481 D47B armadas el **27/08**, 98530 D60C).
+
+## §3.cn.2 — "Sin programar" para una NP de ISIS: las 8 viejas sin Carga Camión (v15.93, 2026-09-11)
+
+Thomas, sobre los 15 que quedaron en la lista de vencidos después de la v15.85:
+
+> *"No lo sé, por las dudas, ponelos todos sin programar para que los revise, los que no se
+> cargaron el camión nunca, y son claramente viejos."*
+
+### El agujero que había
+
+`GV_PPP_Prog_Override` sabía **pisar** tanda/fecha y **ocultar** una NP de ISIS, pero no
+**vaciarla**: la vista hace `coalesce(nullif(btrim(o.tanda),''), p.tanda)`, así que un `''` caía
+al valor de ISIS. Para las web existía `gv_ppp_web_desprogramar`; para ISIS sólo había
+**📅 Reprogramar** (a un día nuevo) o **🚫 Cancelar** (que la saca para siempre). No existía el
+punto medio, que es justo lo que pidió: *sacarlo de la programación para revisarlo*.
+
+### Lo que se agregó
+
+1. `GV_PPP_Prog_Override.desprogramada` boolean not null default false (**aditivo**).
+2. `gv_ppp_programacion_diaria`: con la marca, devuelve `tanda = ''` y `fecha_entrega = ''` → el
+   front lo cuenta como **no programado** (`_pppRowFromSupa`) y cae en **📥 A Programar**.
+   `PPP_Programacion_Diaria` (compartida) **no se toca**.
+3. **`gv_ppp_isis_desprogramar(p_nps, p_motivo, p_por)`** — sólo supervisor. **Guarda:** corta si
+   alguna NP ya tiene **CCN** o **CRN**. Si salió de verdad no se saca de la programación: se
+   cierra con el remito.
+4. `gv_ppp_isis_sin_tanda`: una NP desprogramada entra **aunque esté facturada**. Sin esto las 8
+   (todas facturadas) quedaban invisibles en A Programar y `gv_ppp_isis_programar` las rechazaba
+   con *"ya no están sin tanda"* — o sea, sin camino de vuelta. Cancelada sigue afuera siempre.
+5. `gv_ppp_isis_programar`: al volver a programarla, `desprogramada = false` (si no, la vista le
+   vaciaría la tanda recién asignada).
+6. **Front**: en la lista de **vencidos**, el pedido con la tanda armada pasa a tener acción —
+   antes su fila sólo decía un texto. Botón **↩ Sin programar** (`pppVencSinProgramar`), supervisor.
+
+### A quiénes se aplicó (criterio: sin Carga Camión **y** armado hace ≥ 3 días)
+
+| NP | Tanda | Armado | Facturado | |
+|---|---|---|---|---|
+| 98585..98590 | D56D | 03/09 | 04/09 | tienen **CCR** (control de remitos) y nunca CCN |
+| 98480 · 98481 | D47B | **27/08** | 28/08 | 15 días |
+
+**NO se tocaron** — son de esta semana, no entran en "claramente viejos": 98530 (D60C, armada
+09/09), 44612/13/14 (D72B, armadas 10/09) y 44615/16/17 (D72C, armadas **hoy** 11/09 14:11).
+
+**Medición:** las 8 quedan sin tanda y sin fecha; `gv_ppp_isis_sin_tanda` pasa de 0 a **8** (leído
+también como `anon`); `gv_ppp_programacion_diaria` sigue en **123** filas — no se perdió ninguna.
+
+**Backup:** `public."GV_PPP_Prog_Override_bkp_20260911_v1593"` (105 filas), tomado antes de escribir.
+**Rollback rápido:** `update public."GV_PPP_Prog_Override" set desprogramada = false where desprogramada;`
+**Archivo:** `sql/gv_ppp_isis_desprogramar_v1593.sql`. Objetos todos nuestros (`GV_*` / `gv_*`).
