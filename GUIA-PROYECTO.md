@@ -12,7 +12,7 @@
 > única**; no se replica. Ante la duda entre parche rápido y fix de raíz → **fix
 > de raíz**.
 >
-> Última actualización: 2026-09-11 (viernes) · Versión app al documentar: **v15.78**
+> Última actualización: 2026-09-11 (viernes) · Versión app al documentar: **v15.81**
 >
 > Nota **v15.40 (2026-09-11) — HANDOFF de planimetría / Acacia: `docs/HANDOFF-PLANIMETRIA-Y-ACACIA.md`.**
 > Thomas sigue este tema en otra sesión. Ahí está todo junto: los **13 artículos activos del catálogo LK
@@ -11159,6 +11159,22 @@ distinta, empresa distinta.
 >   `Sync_Estado`**: `cron.job_run_details` ya tiene la verdad. DDL en
 >   `sql/watchdog_syncs_externos.sql`.
 
+> Nota **2026-09-11 (v15.81) — "¿Quién me compró este mes?" en Stock y Compras.**
+> Pedido del dueño: *"desde stock y compras, poder tocar en 1 mes y ver quién me compró (solo los primeros
+> 5 clientes de cada mes y un sexto con Resto)"* · unidad **cajas** (*"3 cajas"*), la misma de esa tabla.
+> En el detalle de **Abastecimiento**, la celda **Vend.** de cada mes ahora se toca y despliega el
+> **top 5 por cajas + un 6º renglón "Resto (N clientes)"**, con **%** sobre el total del mes, **NP** y una
+> fila **TOTAL**. Con 5 clientes o menos no aparece el renglón Resto. Si el detalle por cliente **no cuadra**
+> con la columna Vend., se avisa en amarillo — no se esconde.
+> **Backend** (protocolo: la lógica va al servidor): vista nueva **`gv_venta_mensual_cliente`**
+> (`sql/gv_venta_mensual_cliente_v1581.sql`), hermana por cliente de `vista_venta_mensual`. `security_invoker`,
+> `select` a `anon`/`authenticated`, prefijo `gv_` y **ningún objeto existente tocado**. La razón social se
+> resuelve en cascada `PPP_Entregados_Meta.rs` → `PPP_Programacion_Diaria.razon_social` →
+> `GV_Clientes_Direcciones.razon_social` → el cod pelado (sin el 3er paso quedaban **8 clientes sin nombre**).
+> **Medido, no supuesto:** 845 pares `(cod, mes)` en las dos vistas, **0 diferencias de suma**, 8.866 filas de
+> detalle, **0 sin nombre**. Front: `abastToggleMes` / `abastClientesHtml`, test `tests/abast-clientes.cjs`
+> (**17 chequeos**). Rollback: `drop view public.gv_venta_mensual_cliente;`.
+>
 > Nota **2026-09-11 (v15.78) — El "+" de Log/Fabr en Recepción es un BUSCADOR de códigos activos.**
 > Pedido del dueño: *"si están por recibir un artículo, si no lo tienen en su listado activo, en lugar de
 > que ellos escriban y nada más, que escriban sobre un buscador de códigos activos. Si no encuentra ninguno

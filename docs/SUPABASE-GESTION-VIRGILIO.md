@@ -3651,6 +3651,41 @@ Detalle completo, con los pasos en orden, en `docs/PENDIENTES-PIPELINE-GESTION.m
 
 ---
 
+## 4.c `gv_venta_mensual_cliente` — quién compró, por artículo y mes (v15.81, 2026-09-11)
+
+Pedido del dueño: *"desde stock y compras, poder tocar en 1 mes y ver quién me compró (solo los
+primeros 5 clientes de cada mes y un sexto con Resto)"*, en **cajas**.
+
+`vista_venta_mensual` agrupa por `(cod, mes)` y pierde el **quién**. La vista nueva es su hermana
+abierta por cliente. **Objeto nuevo con prefijo `gv_`: no se tocó nada existente.**
+
+- `security_invoker = true`, `grant select` a `anon` y `authenticated`.
+- `Entregas_Virgilio` sólo guarda `cod_cliente`, así que la razón social se resuelve en cascada:
+  `PPP_Entregados_Meta.rs` (la más reciente por cod) → `PPP_Programacion_Diaria.razon_social` →
+  `GV_Clientes_Direcciones.razon_social` (el padrón) → el cod pelado. **Sin el 3er paso quedaban 8
+  clientes sin nombre**; con él, 0.
+- DDL versionado en `sql/gv_venta_mensual_cliente_v1581.sql`.
+
+**Impacto medido** (la consulta que lo prueba, no "no debería afectar"):
+
+```sql
+select (select count(*) from public.vista_venta_mensual) pares_viejo,
+       (select count(*) from (select distinct cod, mes from public.gv_venta_mensual_cliente) x) pares_nuevo,
+       (select count(*) from public.gv_venta_mensual_cliente) filas,
+       (select count(*) from public.gv_venta_mensual_cliente where razon_social ~ '^\d+$') sin_nombre,
+       (select count(*) from (
+          select v.cod from public.vista_venta_mensual v
+          join (select cod, mes, sum(cajas) cajas from public.gv_venta_mensual_cliente group by 1,2) c
+            on c.cod = v.cod and c.mes = v.mes where v.cajas <> c.cajas) d) difs;
+```
+
+→ `pares_viejo 845 · pares_nuevo 845 · filas 8.866 · sin_nombre 0 · difs 0`.
+
+**Rollback:** `drop view public.gv_venta_mensual_cliente;` — no la lee nadie más que el detalle de
+Abastecimiento, y Producción no la conoce.
+
+---
+
 ## 5. Pendientes
 
 > 📌 La lista **de negocio** de lo que falta para cerrar el pipeline —la nota que dejó el
@@ -7021,3 +7056,70 @@ pasa a ser más útil que antes, porque distingue de qué empresa es el faltante
 además saltea `picking` + `terminado`.)
 
 **SQL:** `sql/gv_empresa_picking.sql` (con el mismo cartel de ⛔ no aplicar hasta el merge).
+---
+
+## 3.ce La línea LOKE (1xx) no tiene lista: precio POR CLIENTE (v15.82) — 2026-09-11
+
+**Dueño, corrigiendo el informe de la v15.76**: *"Los artículos que empiezan con uno son
+línea Loke, y no hay una lista definida por Loke. Hay solo dos clientes y un par de
+supermercados que la compran y cada uno tiene su precio cada uno."*
+
+O sea que los `1xx` que quedaban "sin precio" **no son una lista desactualizada: no existe
+lista general de Loke**. Verificado: `precios_venta` tiene **0 códigos 1xx**. El `uxb` sí
+está, en `cob_uxb_lk` (products ∪ loke_products de LK).
+
+### Quién compra Loke, y qué le pasa a cada uno
+
+| Quién | Cód. | Cómo se valoriza | Estado |
+|---|---|---|---|
+| Diarco · Coto · La Anónima · Chango Más · Carrefour | súper | su **lista de cadena** (`cobranzas_precios_super`: 12 · 4 · 2 · 16 · 11 códigos 1xx) | ✅ sale bien |
+| **Cencosud** (Chef **2444**) | súper | cadena declarada con lista propia (hoja *"Jumbo Krea T"*) pero **la lista está VACÍA** | ❌ 24 líneas · 840 cajas (102E, 106E, 123) |
+| **Osa Distribuidora** (LK **2533**) | cliente | no había **dónde** poner el precio pactado | ❌ 4 líneas · 774 cajas (102E, 103, 106E, 198E) |
+
+Lo de Cencosud **no es código**: hay que importar esa hoja desde el admin de LK
+(PDF Krikos → listas de súper). Ídem **Dorinka/Walmart** (Chef 2686, hoja *"WMart Chef"*),
+que también está declarada y vacía.
+
+### Lo que se agregó: `GV_Precios_Cliente`
+
+Precio negociado por **(empresa, cod_cliente, cod)** — `sql/gv_precios_cliente_v1582.sql`.
+
+- **`es_final = true`** (default): el precio **es el final acordado** → no se le aplica el
+  `dto_vol` del cliente ni el 2% web. Es la lectura de *"cada uno tiene su precio"*.
+- `es_final = false`: se trata como precio de lista de ese cliente y se le aplican los dos.
+  Queda por fila para no tener que adivinar cuál de las dos cosas es.
+- `uxb` NULL → sale de la lista que corresponda o de `cob_uxb_lk` (para los Loke, de ahí).
+- `precio_unit` es **por unidad**, no por caja (igual que `precios_venta`).
+
+### Prioridad de precio, ya completa (las tres vistas)
+
+1. lista de **súper** (`cobranzas_precios_super`)
+2. **`GV_Precios_Cliente`** (precio pactado con ese cliente)
+3. lista de la **empresa** de la NP (`precios_venta_chef` para Chef)
+4. lista de **LK** (`precios_venta`) — fallback, y la única para las NP de LK
+
+El `uxb` suma un escalón final: `cob_uxb_lk`. La lista de súper va **primera a propósito**:
+es la que se mantiene sola desde el Excel, así una fila cargada a mano no le pisa en
+silencio la lista a una cadena.
+
+### Medido
+
+Con la tabla **vacía**, **cero impacto**: 0 filas con `importe`/`dto`/`factor_web` distinto
+contra el estado post-v15.76. El `uxb` nuevo aparece en 29 líneas, **todas sin precio**
+(importe null), así que no mueve plata. Prueba en vivo (cargada y borrada): Osa 2533 · 102E
+a $1.000 → 200 cajas × 12 × 1.000 = **$2.400.000**, dto 0, factor 1, `sin_precio = false`;
+el `uxb` 12 lo puso `cob_uxb_lk`.
+
+En el modal **Neto a facturar**, cuando queda algún `1xx` sin precio ahora aclara que son
+línea Loke y que el precio es el pactado con ese cliente — antes parecía una falla del sistema.
+
+### Falta (es dato, no código)
+
+- **Precio de Osa (LK 2533)** para 102E, 103, 106E, 198E → cargar en `GV_Precios_Cliente`.
+- **El segundo cliente** de Loke: no aparece comprando en lo que hay cargado en Facturación.
+- **Lista de Cencosud** (y Dorinka): importar la hoja en el admin de LK.
+
+### Rollback
+
+`drop table public."GV_Precios_Cliente" cascade;` + recrear las tres vistas con
+`sql/gv_precio_chef_v1576.sql`. No toca objetos de Producción.

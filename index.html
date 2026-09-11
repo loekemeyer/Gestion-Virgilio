@@ -7764,7 +7764,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v15.81";
+const APP_VERSION = "v15.83";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -8654,7 +8654,7 @@ async function _gondolaDesdeGvLugar() {
       // rows viene ordenado por `orden`, así que el primero que toca cada clave es
       // el de menor orden: sólo se escribe si no estaba.
       if (!window.GONDOLA[c]) window.GONDOLA[c] = [sec, ord];
-      // v15.79 — alias SIN el cero adelante. El código canónico lleva el cero (el
+      // v15.81 — alias SIN el cero adelante. El código canónico lleva el cero (el
       // maestro OC_Maximos dice "066", y fn_canon_cod_art rellena a 3 lo que no
       // encuentra ahí: no existe un código "66"). Pero por el pipeline circulan las
       // dos grafías, así que se deja el par — igual que hace planimetria.js.
@@ -14800,7 +14800,7 @@ function abastCompute(recep, venta, sp) {
 async function openAbastecimiento() {
   if (!document.getElementById("abastCss")) {
     const s = document.createElement("style"); s.id = "abastCss";
-    s.textContent = "#abastOverlay{display:none;position:fixed;inset:0;z-index:1280;background:rgba(2,6,23,.74);overflow:auto;padding:14px;}#abastOverlay.show{display:block;}.abast-card{background:#f8fafc;max-width:min(1200px,98vw);margin:0 auto;border-radius:16px;overflow:hidden;box-shadow:0 24px 70px rgba(0,0,0,.5);}.abast-head{display:flex;align-items:center;justify-content:space-between;padding:13px 16px;background:linear-gradient(90deg,#7c3aed,#4c1d95);color:#fff;}.abast-title{font-size:19px;font-weight:800;}.abast-close{background:#dc2626;color:#fff;border:none;border-radius:8px;padding:6px 14px;font-weight:800;cursor:pointer;width:auto;}.abast-body{padding:14px 16px;}.abast-loading{padding:24px;text-align:center;color:#64748b;}.abast-tbl th.grp{text-align:center;background:#ede9fe;color:#5b21b6;font-size:10.5px;letter-spacing:.2px;}.abast-tbl th.sep,.abast-tbl td.sep{border-left:2px solid #c4b5fd;}.abast-det-grid{display:flex;gap:14px;flex-wrap:wrap;}.abast-det-grid>div{flex:1;min-width:280px;}.abast-intro{background:#f5f3ff;border:1px solid #ddd6fe;color:#4c1d95;border-radius:10px;padding:9px 12px;font-size:12.5px;margin-bottom:10px;}.abast-headline{font-size:14px;font-weight:800;margin:6px 0 10px;}.abast-headline .bad{color:#b91c1c;}.abast-headline .ok{color:#15803d;}.abast-filtro{width:100%;height:38px;border:1px solid #cbd5e1;border-radius:9px;padding:0 11px;font-size:14px;margin-bottom:10px;box-sizing:border-box;}.abast-tblwrap{overflow:auto;max-height:64vh;border:1px solid #e9d5ff;border-radius:12px;box-shadow:0 2px 10px rgba(109,40,217,.06);}.abast-tbl{width:100%;border-collapse:separate;border-spacing:0;font-size:13px;}.abast-tbl th{background:#f1f5f9;color:#475569;text-align:right;padding:7px 8px;font-size:10.5px;text-transform:uppercase;border-bottom:1px solid #cbd5e1;white-space:nowrap;vertical-align:bottom;position:sticky;z-index:3;}.abast-tbl thead tr:first-child th{top:0;}.abast-tbl thead tr:nth-child(2) th{top:27px;}.abast-tbl th.l{text-align:left;}.abast-tbl td{padding:7px 8px;text-align:right;border-bottom:1px solid #eef2f7;font-variant-numeric:tabular-nums;white-space:nowrap;}.abast-tbl td.l{text-align:left;white-space:normal;}.abast-row{cursor:pointer;}.abast-tbl tbody tr.abast-row.odd td{background:#faf8ff;}#abastOverlay .abast-row:hover td{background:#f3e8ff;}#abastOverlay .abast-row.open td{background:#ede9fe;}.abast-cod{font-family:Consolas,Menlo,monospace;font-weight:800;color:#6d28d9;background:#f3e8ff;border:1px solid #e9d5ff;border-radius:6px;padding:2px 7px;display:inline-block;}.abast-chev{color:#7c3aed;font-weight:800;}.abast-mesbtn{margin-top:7px;background:#ede9fe;border:none;border-radius:8px;padding:5px 13px;font-size:11.5px;font-weight:800;color:#6d28d9;cursor:pointer;width:auto;}.abast-mesbtn:hover{background:#ddd6fe;}.abast-desc{color:#475569;max-width:200px;overflow:hidden;text-overflow:ellipsis;}.abast-neg{color:#b91c1c;font-weight:800;}.abast-pos{color:#15803d;font-weight:700;}.abast-chip{display:inline-block;border-radius:999px;padding:1px 8px;font-size:11px;font-weight:800;}.abast-chip.bad{background:#fef2f2;color:#b91c1c;border:1px solid #fecaca;}.abast-chip.warn{background:#fffbeb;color:#b45309;border:1px solid #fde68a;}.abast-chip.ok{background:#f0fdf4;color:#15803d;border:1px solid #bbf7d0;}.abast-chip.mut{background:#f1f5f9;color:#64748b;border:1px solid #e2e8f0;}.abast-prov{font-size:11px;color:#64748b;}.abast-det td{background:#faf5ff;}.abast-det table{width:auto;border-collapse:collapse;font-size:12px;margin:2px 0;}.abast-det th,.abast-det td{border:1px solid #e9d5ff;padding:3px 8px;text-align:right;}.abast-det th{background:#f5f3ff;color:#6d28d9;}";
+    s.textContent = "#abastOverlay{display:none;position:fixed;inset:0;z-index:1280;background:rgba(2,6,23,.74);overflow:auto;padding:14px;}#abastOverlay.show{display:block;}.abast-card{background:#f8fafc;max-width:min(1200px,98vw);margin:0 auto;border-radius:16px;overflow:hidden;box-shadow:0 24px 70px rgba(0,0,0,.5);}.abast-head{display:flex;align-items:center;justify-content:space-between;padding:13px 16px;background:linear-gradient(90deg,#7c3aed,#4c1d95);color:#fff;}.abast-title{font-size:19px;font-weight:800;}.abast-close{background:#dc2626;color:#fff;border:none;border-radius:8px;padding:6px 14px;font-weight:800;cursor:pointer;width:auto;}.abast-body{padding:14px 16px;}.abast-loading{padding:24px;text-align:center;color:#64748b;}.abast-tbl th.grp{text-align:center;background:#ede9fe;color:#5b21b6;font-size:10.5px;letter-spacing:.2px;}.abast-tbl th.sep,.abast-tbl td.sep{border-left:2px solid #c4b5fd;}.abast-det-grid{display:flex;gap:14px;flex-wrap:wrap;}.abast-det-grid>div{flex:1;min-width:280px;}.abast-intro{background:#f5f3ff;border:1px solid #ddd6fe;color:#4c1d95;border-radius:10px;padding:9px 12px;font-size:12.5px;margin-bottom:10px;}.abast-headline{font-size:14px;font-weight:800;margin:6px 0 10px;}.abast-headline .bad{color:#b91c1c;}.abast-headline .ok{color:#15803d;}.abast-filtro{width:100%;height:38px;border:1px solid #cbd5e1;border-radius:9px;padding:0 11px;font-size:14px;margin-bottom:10px;box-sizing:border-box;}.abast-tblwrap{overflow:auto;max-height:64vh;border:1px solid #e9d5ff;border-radius:12px;box-shadow:0 2px 10px rgba(109,40,217,.06);}.abast-tbl{width:100%;border-collapse:separate;border-spacing:0;font-size:13px;}.abast-tbl th{background:#f1f5f9;color:#475569;text-align:right;padding:7px 8px;font-size:10.5px;text-transform:uppercase;border-bottom:1px solid #cbd5e1;white-space:nowrap;vertical-align:bottom;position:sticky;z-index:3;}.abast-tbl thead tr:first-child th{top:0;}.abast-tbl thead tr:nth-child(2) th{top:27px;}.abast-tbl th.l{text-align:left;}.abast-tbl td{padding:7px 8px;text-align:right;border-bottom:1px solid #eef2f7;font-variant-numeric:tabular-nums;white-space:nowrap;}.abast-tbl td.l{text-align:left;white-space:normal;}.abast-row{cursor:pointer;}.abast-tbl tbody tr.abast-row.odd td{background:#faf8ff;}#abastOverlay .abast-row:hover td{background:#f3e8ff;}#abastOverlay .abast-row.open td{background:#ede9fe;}.abast-cod{font-family:Consolas,Menlo,monospace;font-weight:800;color:#6d28d9;background:#f3e8ff;border:1px solid #e9d5ff;border-radius:6px;padding:2px 7px;display:inline-block;}.abast-chev{color:#7c3aed;font-weight:800;}.abast-mesbtn{margin-top:7px;background:#ede9fe;border:none;border-radius:8px;padding:5px 13px;font-size:11.5px;font-weight:800;color:#6d28d9;cursor:pointer;width:auto;}.abast-mesbtn:hover{background:#ddd6fe;}.abast-desc{color:#475569;max-width:200px;overflow:hidden;text-overflow:ellipsis;}.abast-neg{color:#b91c1c;font-weight:800;}.abast-pos{color:#15803d;font-weight:700;}.abast-chip{display:inline-block;border-radius:999px;padding:1px 8px;font-size:11px;font-weight:800;}.abast-chip.bad{background:#fef2f2;color:#b91c1c;border:1px solid #fecaca;}.abast-chip.warn{background:#fffbeb;color:#b45309;border:1px solid #fde68a;}.abast-chip.ok{background:#f0fdf4;color:#15803d;border:1px solid #bbf7d0;}.abast-chip.mut{background:#f1f5f9;color:#64748b;border:1px solid #e2e8f0;}.abast-prov{font-size:11px;color:#64748b;}.abast-det td{background:#faf5ff;}.abast-det table{width:auto;border-collapse:collapse;font-size:12px;margin:2px 0;}.abast-det th,.abast-det td{border:1px solid #e9d5ff;padding:3px 8px;text-align:right;}.abast-det th{background:#f5f3ff;color:#6d28d9;}.abast-vend{cursor:pointer;color:#6d28d9;font-weight:800;text-decoration:underline dotted;text-underline-offset:2px;}.abast-vend.on{background:#ede9fe;}.abast-cli th,.abast-cli td{border:none;border-bottom:1px solid #f1e8ff;}.abast-cli td.n{text-align:left;white-space:normal;max-width:230px;}.abast-cli td.resto{color:#64748b;font-style:italic;}.abast-cli tr.tot td{border-top:1px solid #c4b5fd;font-weight:800;background:#f5f3ff;}.abast-clih{font-size:11.5px;color:#6d28d9;font-weight:800;padding:6px 0 3px;}";
     document.head.appendChild(s);
   }
   let ov = document.getElementById("abastOverlay");
@@ -14906,7 +14906,13 @@ function abastRender() {
       meses.forEach(function (mm) {
         const rec = a.recepMes[mm] || 0, ven = a.ventaMes[mm] || 0, bal = rec - ven;
         const pv = a.provMes[mm] ? Object.keys(a.provMes[mm]).map(function (p) { return escapeHtml(p) + " " + _abastN(a.provMes[mm][p]); }).join(" · ") : "—";
-        dl += '<tr><td>' + escapeHtml(mm) + (mm === _abast.cur && mm !== _abast.ultimo ? ' <span class="abast-prov">(en curso)</span>' : '') + '</td><td>' + _abastN(rec) + '</td><td>' + _abastN(ven) + '</td><td style="' + (bal < 0 ? "color:#b91c1c;font-weight:800" : "color:#15803d") + '">' + (bal >= 0 ? "+" : "") + _abastN(bal) + '</td><td style="text-align:left;color:#475569">' + pv + '</td></tr>';
+        // v15.81 — la celda Vend. abre "quién me compró ese mes" (top 5 + Resto, en cajas).
+        const abierto = _abast.openMes === mm;
+        const vendCel = (ven > 0)
+          ? '<td class="abast-vend' + (abierto ? ' on' : '') + '" title="Ver quién compró en ' + escapeHtml(mm) + '" onclick="event.stopPropagation();abastToggleMes(\'' + escapeHtml(mm) + '\')">' + _abastN(ven) + (abierto ? ' ▴' : ' ▾') + '</td>'
+          : '<td>' + _abastN(ven) + '</td>';
+        dl += '<tr><td>' + escapeHtml(mm) + (mm === _abast.cur && mm !== _abast.ultimo ? ' <span class="abast-prov">(en curso)</span>' : '') + '</td><td>' + _abastN(rec) + '</td>' + vendCel + '<td style="' + (bal < 0 ? "color:#b91c1c;font-weight:800" : "color:#15803d") + '">' + (bal >= 0 ? "+" : "") + _abastN(bal) + '</td><td style="text-align:left;color:#475569">' + pv + '</td></tr>';
+        if (abierto) dl += '<tr><td colspan="5" style="text-align:left;padding:0 8px 8px">' + abastClientesHtml(a, mm, ven) + '</td></tr>';
       });
       dl += '</tbody></table>';
       if (mesesAll.length > 6) dl += '<button class="abast-mesbtn" onclick="event.stopPropagation();abastToggleMeses()">' + (_abast.mesesAll ? '▴ ver menos' : '▾ ver los ' + mesesAll.length + ' meses') + '</button>';
@@ -14932,6 +14938,7 @@ function abastToggle(codEnc) {
   if (!_abast) return;
   const cod = decodeURIComponent(codEnc);
   _abast.openCod = (_abast.openCod === cod) ? null : cod;
+  _abast.openMes = null;                       // v15.81: cambiar de artículo cierra el mes abierto
   if (_abast.openCod == null) { _abast.mesesAll = false; abastRender(); return; }
   /* v10.10 — lazy-load detalle mensual para el artículo expandido (evita los 120k rows iniciales).
      _a null = todavía sin cargar → fetch on-demand de vista_recepcion_mensual + vista_venta_mensual
@@ -14943,19 +14950,81 @@ function abastToggle(codEnc) {
     var H = { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY };
     Promise.all([
       fetch(SUPABASE_URL + "/rest/v1/vista_recepcion_mensual?cod=eq." + encodeURIComponent(cod) + "&select=mes,proveedor,cajas&limit=5000", { headers: H, cache: "no-store" }).then(function (r) { return r.ok ? r.json() : []; }),
-      fetch(SUPABASE_URL + "/rest/v1/vista_venta_mensual?cod=eq." + encodeURIComponent(cod) + "&select=mes,cajas&limit=5000", { headers: H, cache: "no-store" }).then(function (r) { return r.ok ? r.json() : []; })
+      fetch(SUPABASE_URL + "/rest/v1/vista_venta_mensual?cod=eq." + encodeURIComponent(cod) + "&select=mes,cajas&limit=5000", { headers: H, cache: "no-store" }).then(function (r) { return r.ok ? r.json() : []; }),
+      /* v15.81 — quién compró, por mes (cajas). Vista gv_venta_mensual_cliente: mismo total
+         que vista_venta_mensual, abierto por cliente. El corte a 5 + "Resto" lo hace el front. */
+      fetch(SUPABASE_URL + "/rest/v1/gv_venta_mensual_cliente?cod=eq." + encodeURIComponent(cod) + "&select=mes,cod_cliente,razon_social,cajas,nps&limit=20000", { headers: H, cache: "no-store" }).then(function (r) { return r.ok ? r.json() : []; })
     ]).then(function (res) {
-      var recepMes = {}, ventaMes = {}, provMes = {}, mesesSet = {};
+      var recepMes = {}, ventaMes = {}, provMes = {}, mesesSet = {}, cliMes = {};
       (res[0] || []).forEach(function (r) { var m = r.mes, q = Number(r.cajas) || 0; recepMes[m] = (recepMes[m] || 0) + q; mesesSet[m] = 1; if (!provMes[m]) provMes[m] = {}; var pv = r.proveedor || "(s/nombre)"; provMes[m][pv] = (provMes[m][pv] || 0) + q; });
       (res[1] || []).forEach(function (r) { var m = r.mes; ventaMes[m] = (ventaMes[m] || 0) + (Number(r.cajas) || 0); mesesSet[m] = 1; });
-      row._a = { recepMes: recepMes, ventaMes: ventaMes, provMes: provMes, mesesSet: mesesSet };
+      (res[2] || []).forEach(function (r) {
+        var m = r.mes; if (!m) return;
+        if (!cliMes[m]) cliMes[m] = [];
+        cliMes[m].push({ cod: r.cod_cliente || "", rs: r.razon_social || r.cod_cliente || "(s/nombre)", cajas: Number(r.cajas) || 0, nps: Number(r.nps) || 0 });
+      });
+      Object.keys(cliMes).forEach(function (m) { cliMes[m].sort(function (a, b) { return b.cajas - a.cajas; }); });
+      row._a = { recepMes: recepMes, ventaMes: ventaMes, provMes: provMes, mesesSet: mesesSet, cliMes: cliMes };
       if (_abast && _abast.openCod === cod) abastRender();
-    }).catch(function () { row._a = { recepMes: {}, ventaMes: {}, provMes: {}, mesesSet: {} }; if (_abast && _abast.openCod === cod) abastRender(); });
+    }).catch(function () { row._a = { recepMes: {}, ventaMes: {}, provMes: {}, mesesSet: {}, cliMes: {} }; if (_abast && _abast.openCod === cod) abastRender(); });
     return;
   }
   abastRender();
 }
 function abastToggleMeses() { if (!_abast) return; _abast.mesesAll = !_abast.mesesAll; abastRender(); }
+
+/* ===== v15.81 — "¿quién me compró este mes?" =========================================
+   Pedido del dueño (2026-09-11): *"desde stock y compras, poder tocar en 1 mes y ver
+   quién me compró (solo los primeros 5 clientes de cada mes y un sexto con Resto)"* ·
+   *"3 cajas"* → la unidad es CAJAS, la misma de la tabla mes a mes.
+
+   Se toca la celda Vend. de un mes y se despliega el top 5 por cajas + un 6º renglón
+   "Resto (N clientes)". Los datos salen de gv_venta_mensual_cliente (backend), que da el
+   MISMO total que vista_venta_mensual abierto por cliente — chequeado: 845 pares (cod,mes)
+   en las dos, 0 diferencias de suma. Acá sólo se corta y se dibuja. */
+const ABAST_TOP_CLI = 5;
+function abastToggleMes(mes) {
+  if (!_abast) return;
+  _abast.openMes = (_abast.openMes === mes) ? null : mes;
+  abastRender();
+}
+function abastClientesHtml(a, mes, venTotal) {
+  const lista = (a && a.cliMes && a.cliMes[mes]) ? a.cliMes[mes] : [];
+  if (!lista.length) {
+    return '<div class="abast-clih">👥 Quién compró en ' + escapeHtml(mes) + '</div>' +
+           '<div class="abast-prov">Sin detalle de clientes para ese mes.</div>';
+  }
+  const top = lista.slice(0, ABAST_TOP_CLI);
+  const resto = lista.slice(ABAST_TOP_CLI);
+  const restoCajas = resto.reduce(function (t, c) { return t + c.cajas; }, 0);
+  const restoNps = resto.reduce(function (t, c) { return t + c.nps; }, 0);
+  const total = lista.reduce(function (t, c) { return t + c.cajas; }, 0);
+  const pct = function (n) { return total > 0 ? Math.round(1000 * n / total) / 10 : 0; };
+
+  let h = '<div class="abast-clih">👥 Quién compró en ' + escapeHtml(mes) + ' — ' +
+          _abastN(total) + ' cajas entre ' + lista.length + ' cliente' + (lista.length === 1 ? '' : 's') + '</div>';
+  h += '<table class="abast-cli"><thead><tr>' +
+       '<th style="text-align:left">Cliente</th><th>Cajas</th><th>%</th><th>NP</th>' +
+       '</tr></thead><tbody>';
+  top.forEach(function (c, i) {
+    h += '<tr><td class="n">' + (i + 1) + '. ' + escapeHtml(c.rs) +
+         ' <span class="abast-prov">' + escapeHtml(c.cod) + '</span></td>' +
+         '<td>' + _abastN(c.cajas) + '</td><td>' + pct(c.cajas) + '%</td><td>' + c.nps + '</td></tr>';
+  });
+  if (resto.length) {
+    h += '<tr><td class="n resto">Resto (' + resto.length + ' cliente' + (resto.length === 1 ? '' : 's') + ')</td>' +
+         '<td class="resto">' + _abastN(restoCajas) + '</td><td class="resto">' + pct(restoCajas) + '%</td>' +
+         '<td class="resto">' + restoNps + '</td></tr>';
+  }
+  h += '<tr class="tot"><td class="n">TOTAL</td><td>' + _abastN(total) + '</td><td>100%</td><td></td></tr>';
+  h += '</tbody></table>';
+  // Si el total por cliente no cierra con la columna Vend., se dice — no se esconde.
+  if (venTotal != null && Math.abs(total - venTotal) > 0.001) {
+    h += '<div class="abast-prov" style="color:#b45309">⚠ El detalle por cliente suma ' + _abastN(total) +
+         ' y la columna Vend. dice ' + _abastN(venTotal) + '.</div>';
+  }
+  return h;
+}
 
 function prodEnsureCss() {
   if (!document.getElementById("prodCss")) {
@@ -41449,6 +41518,13 @@ window.facNetoDetalle = async function(np){
         var q = (f.cajas != null) ? ' ' + f.cajas + (f.uxb ? '×' + f.uxb : '') : '';
         return '<span class="facneto-falt-item">' + escapeHtml(f.cod) + q + '</span>';
       }).join(" ") + '</div>';
+    /* v15.82 — los códigos 1xx son LÍNEA LOKE y no tienen lista general: los compran dos
+       clientes y un par de supermercados, cada uno con su precio. Que salgan "sin precio"
+       no es un error del sistema: falta el precio pactado con ESE cliente. */
+    if (sinPrecio.some(function(f){ return /^0*1/.test(String(f.cod)); })){
+      h += '<div class="facneto-faltantes" style="opacity:.85;">Los <b>1xx</b> son <b>línea Loke</b>: no hay lista general, ' +
+        'el precio es el pactado con cada cliente. Si falta, hay que cargarlo (los súper van por su lista de cadena).</div>';
+    }
   }
   body.innerHTML = h;
 };
