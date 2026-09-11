@@ -452,7 +452,16 @@ ALTER TABLE Capacidad_Sector ADD COLUMN nueva_col TEXT;
 -- Si falla: restore ejecutando los INSERTs guardados
 ```
 
-**Historial de incidentes:** 2026-08-07 — TRUNCATE accidental de Capacidad_Sector (730 registros perdidos). Lección aprendida → este protocolo existe.
+**Historial de incidentes:** 2026-08-07 — TRUNCATE accidental de Capacidad_Sector (730 registros
+perdidos). Lección aprendida → este protocolo existe.
+
+**2026-09-11 (v15.44) — `index.html` y `sw.js` pusheados VACÍOS a `main`: la app quedó en blanco
+con los operarios pickeando.** Causa: un script de edición que abría el archivo en modo `w` dentro
+de la misma expresión que lo leía (`open(p,"w").write(open(p).read()...)`); Python evalúa el `open`
+de escritura primero, así que trunca antes de leer. Se restauró por hotfix (`0995684`) y se repusieron
+los cambios en la v15.45. **Regla: al editar un archivo por script, leer a una variable, verificar el
+largo del resultado, y recién entonces escribir. Y antes de `git commit`, mirar `git diff --stat`: un
+archivo con miles de líneas borradas no es un cambio, es un error.**
 
 ## ⚠ PROTOCOLO OBLIGATORIO: NUNCA modificar datos sin permiso explícito
 
