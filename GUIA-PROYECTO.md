@@ -12,7 +12,7 @@
 > única**; no se replica. Ante la duda entre parche rápido y fix de raíz → **fix
 > de raíz**.
 >
-> Última actualización: 2026-09-11 (viernes) · Versión app al documentar: **v15.72**
+> Última actualización: 2026-09-11 (viernes) · Versión app al documentar: **v15.73**
 >
 > Nota **v15.40 (2026-09-11) — HANDOFF de planimetría / Acacia: `docs/HANDOFF-PLANIMETRIA-Y-ACACIA.md`.**
 > Thomas sigue este tema en otra sesión. Ahí está todo junto: los **13 artículos activos del catálogo LK
@@ -11158,6 +11158,15 @@ distinta, empresa distinta.
 >   (umbral ≈ 3× su período; dedup un aviso por sync por día). **No se creó tabla
 >   `Sync_Estado`**: `cron.job_run_details` ya tiene la verdad. DDL en
 >   `sql/watchdog_syncs_externos.sql`.
+
+> Nota **2026-09-11 (v15.73) — En curso: fichas para ver UN solo pedido y cuánta plata es.**
+> Pedido de Thomas. La solapa 🚢 En curso suma las mismas fichas que 📦 Pedidos: **🏭 Proveedor** y **📄 Pedido**
+> (más un **🔎 solo éste** en cada fila). Los cuatro totales de arriba se recalculan con lo filtrado, así parado en
+> un PI el cartel verde dice *"Plata de este pedido (FOB)"* y son los u$s de ese pedido; parado en un proveedor,
+> los de ese proveedor. Parado en un pedido, el detalle por artículo se abre solo. **📥 Excel** de lo que se ve
+> (pedidos + detalle por artículo). Sólo front. §3.bz de `docs/SUPABASE-GESTION-VIRGILIO.md`.
+> **Lo que viene**: cuenta corriente con los proveedores chinos (*"yo les voy pagando"*) — **esperando el Excel**
+> con el que lo maneja hoy para copiar el modelo, no se empezó nada.
 
 > Nota **2026-09-11 (v15.72) — Importación: los pedidos EN CURSO tienen pantalla propia, con fecha de embarque.**
 > Pedido de Thomas: *"quiero ver cuáles son los pedidos en curso por separado de si genera o no genera pedido…

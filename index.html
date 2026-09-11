@@ -7701,7 +7701,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v15.72";
+const APP_VERSION = "v15.73";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -17062,7 +17062,7 @@ async function openImpEnCurso() {
   _stkPopShell("🚢 Pedidos de importación en curso", "stkPopBody", true);
   const body = document.getElementById("stkPopBody"); if (!body) return;
   body.innerHTML = '<div class="stkpop-empty">Cargando pedidos en curso…</div>';
-  _stkPop = { kind: "impCurso", rows: [], abierto: "", lineas: {} };
+  _stkPop = { kind: "impCurso", rows: [], abierto: "", lineas: {}, provFiltro: "", refFiltro: "" };
   await impCursoReload();
 }
 async function impCursoReload() {
@@ -17109,6 +17109,35 @@ function _impCursoFechaCell(r, campo) {
     (dias != null ? '<div class="imcu-sub">' + (dias >= 0 ? "faltan " + dias + " d" : "hace " + Math.abs(dias) + " d") + '</div>'
                   : '<div class="imcu-sub falta">sin cargar</div>');
 }
+/* v15.73 — filtros de la pantalla: fichas de PROVEEDOR y de PEDIDO (mismo criterio que la solapa
+   📦 Pedidos, dueño 11/09: "poneme los mismos botones… para que pueda ver solo un pedido, cuánta
+   plata es y todo"). Los totales de arriba (unidades, u$s, m³) se recalculan con lo filtrado, así
+   parado en un pedido el cartel verde dice exactamente cuánta plata es ESE pedido. */
+function impCursoSetProv(provEnc) {
+  if (!_stkPop || _stkPop.kind !== "impCurso") return;
+  _stkPop.provFiltro = decodeURIComponent(provEnc || "");
+  _stkPop.refFiltro = "";               // cambiar de proveedor limpia el pedido elegido
+  _impCursoRender();
+}
+function impCursoSetRef(refEnc) {
+  if (!_stkPop || _stkPop.kind !== "impCurso") return;
+  _stkPop.refFiltro = decodeURIComponent(refEnc || "");
+  _impCursoRender();
+  // parado en UN pedido, el detalle por artículo se abre solo (es lo que se va a mirar)
+  if (_stkPop.refFiltro) {
+    const r = (_stkPop.rows || []).find(function (x) { return x.pedido_ref === _stkPop.refFiltro; });
+    if (r && _stkPop.abierto !== _impCursoKey(r)) impCursoToggle(_impCursoEnc(r.pedido_ref), _impCursoEnc(r.proveedor));
+  }
+}
+/* Las filas que se están viendo según las dos fichas. */
+function _impCursoVista() {
+  const st = _stkPop || {};
+  return (st.rows || []).filter(function (r) {
+    if (st.provFiltro && r.proveedor !== st.provFiltro) return false;
+    if (st.refFiltro && r.pedido_ref !== st.refFiltro) return false;
+    return true;
+  });
+}
 function _impCursoRender() {
   const body = document.getElementById("stkPopBody"); if (!body || !_stkPop || _stkPop.kind !== "impCurso") return;
   if (!document.getElementById("impCursoCss")) {
@@ -17134,28 +17163,67 @@ function _impCursoRender() {
       ".imcu-kpi>div{flex:1;min-width:132px;border-radius:10px;padding:9px 13px}" +
       ".imcu-kpi .k{font-size:10.5px;font-weight:800;text-transform:uppercase;letter-spacing:.4px}" +
       ".imcu-kpi .v{font-size:21px;font-weight:800}" +
+      ".imcu-fila{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:10px}" +
+      ".imcu-lbl{font-size:12px;font-weight:800;color:#64748b;text-transform:uppercase;letter-spacing:.4px}" +
       ".imcu-b{border:0;border-radius:7px;padding:4px 9px;font-size:11.5px;font-weight:800;cursor:pointer;margin:0;width:auto;background:#e2e8f0;color:#0f172a}";
     document.head.appendChild(st);
   }
   const rows = _stkPop.rows || [];
   let h = _impTabsHtml('curso');
-  h += '<div class="stkpop-hint">Lo que <b>ya está pedido y viene en camino</b>, un renglón por <b>pedido</b> (el PI del proveedor). Esta pantalla <b>no</b> mira lo que el módulo sugiere pedir: sólo los baches <code>en curso</code>. Tocá una fecha para corregirla — se guarda en <b>todas las líneas del pedido</b> de una, y la de <b>llegada</b> es la que la página LK muestra como "Reingreso Est". Tocá el <b>PI</b> para abrir el detalle por artículo.</div>';
+  h += '<div class="stkpop-hint">Lo que <b>ya está pedido y viene en camino</b>, un renglón por <b>pedido</b> (el PI del proveedor). Esta pantalla <b>no</b> mira lo que el módulo sugiere pedir: sólo los baches <code>en curso</code>. Tocá una fecha para corregirla — se guarda en <b>todas las líneas del pedido</b> de una, y la de <b>llegada</b> es la que la página LK muestra como "Reingreso Est". Tocá el <b>PI</b> para abrir el detalle por artículo. Las <b>fichas</b> de arriba filtran por <b>proveedor</b> o por <b>pedido</b>: parado en uno, los totales (unidades, <b>u$s</b>, m³) son los de ESE pedido.</div>';
   if (_stkPop.err) h += '<div class="stkpop-empty" style="color:#b91c1c">No se pudo leer: ' + escapeHtml(_stkPop.err) + '</div>';
   if (!rows.length) { body.innerHTML = h + '<div class="stkpop-empty">No hay pedidos de importación en curso.</div>'; return; }
-  const tUni = rows.reduce(function (s, r) { return s + (Number(r.pendiente) || 0); }, 0);
-  const tUsd = rows.reduce(function (s, r) { return s + (Number(r.usd) || 0); }, 0);
-  const tM3 = rows.reduce(function (s, r) { return s + (Number(r.m3) || 0); }, 0);
-  const sinEmb = rows.filter(function (r) { return !r.fecha_embarque; }).length;
+
+  // ---- fichas de filtro (mismo botón redondeado que la solapa 📦 Pedidos) ----
+  const _fb = function (on) { return 'width:auto;margin:0;flex:0 0 auto;padding:7px 13px;border-radius:999px;border:1px solid ' + (on ? '#0f766e' : '#cbd5e1') + ';background:' + (on ? '#0f766e' : '#fff') + ';color:' + (on ? '#fff' : '#334155') + ';font-size:13px;font-weight:800;cursor:pointer'; };
+  const provs = [];
+  rows.forEach(function (r) { if (provs.indexOf(r.proveedor) < 0) provs.push(r.proveedor); });
+  provs.sort(function (a, b) { const ia = _IMPORTADOR_DE[a] || "zz", ib = _IMPORTADOR_DE[b] || "zz"; return String(ia).localeCompare(String(ib)) || String(a).localeCompare(String(b)); });
+  const provFiltro = (_stkPop.provFiltro && provs.indexOf(_stkPop.provFiltro) >= 0) ? _stkPop.provFiltro : "";
+  _stkPop.provFiltro = provFiltro;
+  if (provs.length > 1) {
+    h += '<div class="imcu-fila"><span class="imcu-lbl">🏭 Proveedor:</span>' +
+      '<button style="' + _fb(!provFiltro) + '" onclick="impCursoSetProv(\'\')">Todos</button>' +
+      provs.map(function (p) {
+        const n = rows.filter(function (r) { return r.proveedor === p; }).length;
+        return '<button style="' + _fb(provFiltro === p) + '" onclick="impCursoSetProv(\'' + _impCursoEnc(p) + '\')">' + escapeHtml(p) + (n > 1 ? ' <span style="opacity:.7">(' + n + ')</span>' : '') + '</button>';
+      }).join('') + '</div>';
+  }
+  // fichas de PEDIDO: las del proveedor elegido (o todas si está en "Todos")
+  const refsBase = rows.filter(function (r) { return !provFiltro || r.proveedor === provFiltro; });
+  const refFiltro = (_stkPop.refFiltro && refsBase.some(function (r) { return r.pedido_ref === _stkPop.refFiltro; })) ? _stkPop.refFiltro : "";
+  _stkPop.refFiltro = refFiltro;
+  if (refsBase.length > 1) {
+    h += '<div class="imcu-fila"><span class="imcu-lbl">📄 Pedido:</span>' +
+      '<button style="' + _fb(!refFiltro) + '" onclick="impCursoSetRef(\'\')">Todos</button>' +
+      refsBase.map(function (r) {
+        return '<button style="' + _fb(refFiltro === r.pedido_ref) + '" onclick="impCursoSetRef(\'' + _impCursoEnc(r.pedido_ref) + '\')" title="' + escapeHtml(r.proveedor) + ' · ' + _impCursoNum(r.pendiente) + ' u · u$s ' + _impCursoNum(Math.round(Number(r.usd) || 0)) + '">' + escapeHtml(r.pedido_ref) + '</button>';
+      }).join('') + '</div>';
+  }
+  h += '<div class="imcu-fila">' +
+    '<button class="mva-clear" style="background:#166534;color:#fff;border-color:#166534" onclick="impCursoExportExcel()" title="Bajar a Excel lo que se está viendo, con el detalle por artículo de cada pedido">📥 Excel</button>' +
+    ((provFiltro || refFiltro) ? '<button class="mva-clear" onclick="impCursoSetProv(\'\')" title="Sacar los filtros">✕ Ver todo</button>' : '') +
+    '</div>';
+
+  // ---- totales de LO QUE SE ESTÁ VIENDO ----
+  const vista = _impCursoVista();
+  const tUni = vista.reduce(function (s, r) { return s + (Number(r.pendiente) || 0); }, 0);
+  const tUsd = vista.reduce(function (s, r) { return s + (Number(r.usd) || 0); }, 0);
+  const tM3 = vista.reduce(function (s, r) { return s + (Number(r.m3) || 0); }, 0);
+  const sinEmb = vista.filter(function (r) { return !r.fecha_embarque; }).length;
+  const foco = refFiltro ? ('📄 ' + refFiltro) : (provFiltro ? ('🏭 ' + provFiltro) : "");
+  const kTit = refFiltro ? "Este pedido" : (provFiltro ? "Pedidos de " + provFiltro : "Pedidos en curso");
   h += '<div class="imcu-kpi">' +
-    '<div style="background:#eef2ff;border:1px solid #c7d2fe"><div class="k" style="color:#4338ca">Pedidos en curso</div><div class="v" style="color:#3730a3">' + rows.length + '</div></div>' +
+    '<div style="background:#eef2ff;border:1px solid #c7d2fe"><div class="k" style="color:#4338ca">' + escapeHtml(kTit) + '</div><div class="v" style="color:#3730a3">' + vista.length + '</div>' + (foco ? '<div style="font-size:10.5px;color:#6366f1;font-weight:700">' + escapeHtml(foco) + '</div>' : '') + '</div>' +
     '<div style="background:#fff7ed;border:1px solid #fed7aa"><div class="k" style="color:#b45309">Unidades por llegar</div><div class="v" style="color:#92400e">' + _impCursoNum(tUni) + '</div></div>' +
-    '<div style="background:#ecfdf5;border:1px solid #a7f3d0"><div class="k" style="color:#047857">FOB en camino</div><div class="v" style="color:#065f46">u$s ' + _impCursoNum(Math.round(tUsd)) + '</div></div>' +
+    '<div style="background:#ecfdf5;border:1px solid #a7f3d0"><div class="k" style="color:#047857">' + (refFiltro ? "Plata de este pedido (FOB)" : "FOB en camino") + '</div><div class="v" style="color:#065f46">u$s ' + _impCursoNum(Math.round(tUsd)) + '</div></div>' +
     '<div style="background:#eff6ff;border:1px solid #bfdbfe"><div class="k" style="color:#1d4ed8">Volumen</div><div class="v" style="color:#1e3a8a">' + (Math.round(tM3 * 10) / 10).toLocaleString("es-AR") + ' m³</div></div>' +
     '</div>';
   if (sinEmb) h += '<div style="margin-bottom:10px;padding:9px 13px;background:#fffbeb;border:1px solid #fde68a;border-radius:10px;font-size:12.5px;color:#92400e"><b>⚠ ' + sinEmb + ' pedido(s) sin fecha de embarque.</b> Cargala en la columna 🚢 (dd/mm/aa) y queda guardada en todas sus líneas.</div>';
+  if (!vista.length) { body.innerHTML = h + '<div class="stkpop-empty">Nada con ese filtro.</div>'; return; }
   h += '<div class="mva-tblwrap wide"><table class="imcu-tbl">' +
     '<thead><tr><th>Proveedor</th><th>Pedido (PI)</th><th class="num">Líneas</th><th class="num">Unidades</th><th class="num">u$s</th><th class="num">m³</th><th>🚢 Embarque</th><th>🛬 Llegada</th><th>Estado</th></tr></thead><tbody>';
-  rows.forEach(function (r) {
+  vista.forEach(function (r) {
     const key = _impCursoKey(r);
     const abierto = _stkPop.abierto === key;
     const refEnc = _impCursoEnc(r.pedido_ref), provEnc = _impCursoEnc(r.proveedor);
@@ -17163,7 +17231,7 @@ function _impCursoRender() {
     h += '<tr' + (abierto ? ' class="imcu-open"' : '') + '>' +
       '<td><span class="imcu-prov">' + escapeHtml(r.proveedor) + '</span>' + (imp ? '<div class="imcu-imp">' + escapeHtml(imp) + '</div>' : '') + '</td>' +
       '<td><span class="imcu-pi" onclick="impCursoToggle(\'' + refEnc + '\',\'' + provEnc + '\')" title="Ver los artículos de este pedido">' + (abierto ? '▾ ' : '▸ ') + escapeHtml(r.pedido_ref) + '</span>' +
-        '<div class="imcu-sub"><span class="imcu-b" onclick="impCursoRenombrar(\'' + refEnc + '\',\'' + provEnc + '\')" title="Cambiar el número de PI de este pedido">✏️ PI</span></div></td>' +
+        '<div class="imcu-sub"><span class="imcu-b" onclick="impCursoSetRef(\'' + refEnc + '\')" title="Ver SÓLO este pedido (y cuánta plata es)">🔎 solo éste</span> <span class="imcu-b" onclick="impCursoRenombrar(\'' + refEnc + '\',\'' + provEnc + '\')" title="Cambiar el número de PI de este pedido">✏️ PI</span></div></td>' +
       '<td class="num">' + r.n_lineas + '</td>' +
       '<td class="num"><b>' + _impCursoNum(r.pendiente) + '</b></td>' +
       '<td class="num" style="color:#065f46;font-weight:700">' + (Number(r.usd) > 0 ? _impCursoNum(Math.round(r.usd)) : '—') + '</td>' +
@@ -17178,6 +17246,51 @@ function _impCursoRender() {
   });
   h += '</tbody></table></div>';
   body.innerHTML = h;
+}
+/* Excel de lo que se está viendo: una hoja con los pedidos y, debajo, el detalle por artículo de
+   cada uno (se piden las líneas que falten). Sin librería: .xls = tabla HTML, igual que el resto. */
+async function impCursoExportExcel() {
+  if (!_stkPop || _stkPop.kind !== "impCurso") return;
+  const vista = _impCursoVista();
+  if (!vista.length) { try { alert("No hay pedidos para exportar."); } catch (_e) {} return; }
+  for (let i = 0; i < vista.length; i++) {
+    const r = vista[i], key = _impCursoKey(r);
+    if (!_stkPop.lineas[key]) {
+      try { _stkPop.lineas[key] = (await _pedImpRpc("gv_importado_pedido_lineas", { p_pedido_ref: r.pedido_ref, p_proveedor: r.proveedor })) || []; }
+      catch (_e) { _stkPop.lineas[key] = []; }
+    }
+  }
+  const esc = function (s) { return String(s == null ? "" : s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;"); };
+  const fecha = _impCursoHoy();
+  const dm = function (iso) { return iso ? _isoToDdMmAa(String(iso).slice(0, 10)) : ""; };
+  let html = '<html xmlns:x="urn:schemas-microsoft-com:office:excel"><head><meta charset="utf-8"><style>td,th{border:1px solid #ccc;padding:3px 7px;font-family:Calibri,Arial,sans-serif;} th{background:#0f766e;color:#fff;text-align:left;}</style></head><body>';
+  html += '<h3>Pedidos de importación EN CURSO — ' + esc(fecha) + (_stkPop.provFiltro ? ' — ' + esc(_stkPop.provFiltro) : '') + (_stkPop.refFiltro ? ' — ' + esc(_stkPop.refFiltro) : '') + '</h3>';
+  html += '<table><tr><th>Importador</th><th>Proveedor</th><th>Pedido (PI)</th><th>Lineas</th><th>Unidades</th><th>u$s FOB</th><th>m3</th><th>Embarque</th><th>Llegada</th></tr>';
+  let tU = 0, tD = 0, tM = 0;
+  vista.forEach(function (r) {
+    tU += Number(r.pendiente) || 0; tD += Number(r.usd) || 0; tM += Number(r.m3) || 0;
+    html += '<tr><td>' + esc(_IMPORTADOR_DE[r.proveedor] || "") + '</td><td>' + esc(r.proveedor) + '</td><td>' + esc(r.pedido_ref) + '</td><td>' + r.n_lineas +
+      '</td><td>' + (Number(r.pendiente) || 0) + '</td><td>' + Math.round(Number(r.usd) || 0) + '</td><td>' + (Math.round((Number(r.m3) || 0) * 100) / 100) +
+      '</td><td>' + esc(dm(r.fecha_embarque)) + '</td><td>' + esc(dm(r.fecha_llegada)) + '</td></tr>';
+  });
+  html += '<tr><td colspan="4"><b>TOTAL</b></td><td><b>' + tU + '</b></td><td><b>' + Math.round(tD) + '</b></td><td><b>' + (Math.round(tM * 100) / 100) + '</b></td><td></td><td></td></tr></table>';
+  html += '<h3>Detalle por artículo</h3><table><tr><th>Pedido (PI)</th><th>Proveedor</th><th>Codigo</th><th>Marca</th><th>Descripcion</th><th>Unidades</th><th>FOB u$s/u</th><th>u$s</th><th>m3</th><th>Llegada</th></tr>';
+  vista.forEach(function (r) {
+    (_stkPop.lineas[_impCursoKey(r)] || []).forEach(function (l) {
+      html += '<tr><td>' + esc(r.pedido_ref) + '</td><td>' + esc(r.proveedor) + '</td><td>' + esc(codCanon(l.cod_art)) + '</td><td>' + esc(l.marca || "") +
+        '</td><td>' + esc(l.descripcion || "") + '</td><td>' + (Number(l.pendiente) || 0) + '</td><td>' + (Number(l.fob_uni) || "") + '</td><td>' + Math.round(Number(l.usd) || 0) +
+        '</td><td>' + (l.m3 == null ? "" : l.m3) + '</td><td>' + esc(dm(l.fecha_reingreso)) + '</td></tr>';
+    });
+  });
+  html += '</table></body></html>';
+  try {
+    const blob = new Blob(["﻿" + html], { type: "application/vnd.ms-excel" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a"); a.href = url;
+    a.download = "Importacion_En_Curso_" + fecha + ".xls";
+    document.body.appendChild(a); a.click();
+    setTimeout(function () { try { document.body.removeChild(a); URL.revokeObjectURL(url); } catch (_e) {} }, 1500);
+  } catch (e) { try { alert("No se pudo generar el Excel: " + (e.message || e)); } catch (_e) {} }
 }
 function _impCursoLineasHtml(ls) {
   if (!ls.length) return '<div style="padding:10px 14px;color:#64748b;font-size:12.5px">Este pedido no tiene líneas en curso.</div>';

@@ -56,7 +56,14 @@ const fail = (m) => { console.error("✗ " + m); process.exitCode = 1; };
     out.txt = body.innerText.replace(/\s+/g, " ");
 
     // (2) una fila por pedido, con las dos fechas visibles
-    const trs = [...body.querySelectorAll(".imcu-tbl tbody tr")];
+    // OJO: ".imcu-tbl tbody tr" también matchea las filas de la tabla de detalle anidada.
+    // Se cuentan sólo las filas propias del tbody externo, sacando la del detalle.
+    const filasPedido = () => {
+      const t = document.getElementById("stkPopBody").querySelector(".imcu-tbl");
+      return t ? [...t.tBodies[0].rows].filter((tr) => !tr.querySelector(".imcu-det")) : [];
+    };
+    window.__filasPedido = filasPedido;
+    const trs = filasPedido();
     out.filas = trs.length;
     out.fila0 = trs[0].innerText.replace(/\s+/g, " ").trim();
     out.inputs0 = [...trs[0].querySelectorAll("input")].map((i) => i.value);
@@ -83,7 +90,23 @@ const fail = (m) => { console.error("✗ " + m); process.exitCode = 1; };
     await impCursoSetLlegada(encodeURIComponent("PI B260601"), encodeURIComponent("Becky"), "2026-10-02");
     out.callLleg = calls.filter((c) => c.u.indexOf("rpc/gv_importado_pedido_fechas") === 0).map((c) => JSON.parse(c.b));
 
-    // (6) abrir el detalle del pedido pide las líneas
+    // (6) fichas de filtro: proveedor y pedido, con los totales recalculados (v15.73)
+    out.chipsProv = [...body.querySelectorAll(".imcu-fila")].length ? [...body.querySelectorAll("button")].map((b) => b.innerText.trim()) : [];
+    impCursoSetProv(encodeURIComponent("Becky"));
+    out.trasProv = filasPedido().length;
+    out.kpiProv = document.getElementById("stkPopBody").innerText.replace(/\s+/g, " ");
+    impCursoSetProv("");
+    impCursoSetRef(encodeURIComponent("PI OL-10139"));
+    await new Promise((res) => setTimeout(res, 60));
+    const b2 = document.getElementById("stkPopBody");
+    out.trasRef = filasPedido().length;
+    out.kpiRef = b2.innerText.replace(/\s+/g, " ");
+    out.refAbre = !!b2.querySelector(".imcu-det");
+    out.dbg = { prov: _stkPop.provFiltro, ref: _stkPop.refFiltro, vista: _impCursoVista().length, abierto: _stkPop.abierto, nrows: (_stkPop.rows || []).length };   // parado en un pedido, el detalle se abre solo
+    impCursoSetRef("");
+    out.trasLimpiar = filasPedido().length;
+
+    // (7) abrir el detalle del pedido pide las líneas
     calls.length = 0;
     await impCursoToggle(encodeURIComponent("PI B260601"), encodeURIComponent("Becky"));
     await new Promise((res) => setTimeout(res, 60));
@@ -117,6 +140,16 @@ const fail = (m) => { console.error("✗ " + m); process.exitCode = 1; };
       || r.callLleg[0].p_set_embarque) fail("la llegada no se guarda bien: " + JSON.stringify(r.callLleg));
   if (r.callLin.length !== 1 || r.callLin[0].p_pedido_ref !== "PI B260601") fail("el detalle no pide las líneas del pedido: " + JSON.stringify(r.callLin));
   if (!/601E/.test(r.det)) fail("el detalle no muestra los artículos: " + r.det);
+  // filtros (v15.73)
+  if (!r.chipsProv.some((t) => /^Becky/.test(t)) || !r.chipsProv.some((t) => /^PI OL-10139$/.test(t)))
+    fail("faltan las fichas de proveedor y de pedido: " + JSON.stringify(r.chipsProv));
+  if (r.trasProv !== 1) fail("filtrando por Becky debería quedar 1 pedido, quedaron " + r.trasProv);
+  if (!/23\.622/.test(r.kpiProv) || /46\.626/.test(r.kpiProv)) fail("los totales no se recalculan con el proveedor: " + r.kpiProv.slice(0, 300));
+  if (r.trasRef !== 1) fail("parado en un pedido debería quedar 1 fila, quedaron " + r.trasRef);
+  if (!/este pedido/i.test(r.kpiRef) || !/46\.626/.test(r.kpiRef) || /23\.622/.test(r.kpiRef))
+    fail("parado en un pedido la plata debería ser sólo la de ese pedido: " + r.kpiRef.slice(0, 300));
+  if (!r.refAbre) fail("parado en un pedido el detalle por artículo debería abrirse solo");
+  if (r.trasLimpiar !== 3) fail("al sacar el filtro deberían volver los 3 pedidos, quedaron " + r.trasLimpiar);
   if (errs.length) fail("errores de página: " + errs.join(" | "));
   await b.close();
   if (!process.exitCode) console.log("✓ imp-encurso OK");

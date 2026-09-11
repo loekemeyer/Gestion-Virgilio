@@ -6414,3 +6414,31 @@ Todo en el `.sql`: dropear la vista y las 7 funciones, recrear `gv_importado_bac
 `gv_importado_bache_add` con las firmas de `sql/gv_importados_baches_v1494.sql`, y
 `alter table "GV_Importados_Baches" drop column pedido_ref, drop column fecha_embarque`. Los datos
 viejos están en `GV_Importados_Baches_bkp_encurso_20260911`.
+
+## 3.bz En curso: fichas de proveedor y de pedido, y la plata de UN pedido (v15.73) — 2026-09-11
+
+**Pedido de Thomas**: *"cuando estoy en el módulo de en curso, poneme los mismos botones que en la
+solapa de pedidos para que pueda ver solo un pedido. Cuánta plata es y todo"*.
+
+Sólo front, sin tocar la base. La pantalla 🚢 En curso suma las mismas fichas redondeadas que ya
+tiene 📦 Pedidos:
+
+- **🏭 Proveedor**: `Todos` + una ficha por chino (con el número de pedidos entre paréntesis si
+  tiene más de uno). Ordenadas por importador, igual que la otra solapa.
+- **📄 Pedido**: `Todos` + una ficha por PI de lo que quede a la vista. Cambiar de proveedor limpia
+  el pedido elegido. Cada fila tiene además un **🔎 solo éste** que hace lo mismo desde la tabla.
+- **Los cuatro totales de arriba se recalculan con lo filtrado**: parado en un pedido el cartel
+  verde dice *"Plata de este pedido (FOB)"* y son los u$s de ESE PI (lo que pidió). Parado en un
+  proveedor, los de ese proveedor.
+- Parado en UN pedido, el **detalle por artículo se abre solo** (es lo que se va a mirar).
+- **📥 Excel** de lo que se está viendo: una tabla con los pedidos y otra con el detalle por
+  artículo (pide las líneas que falten antes de bajar). Respeta las dos fichas.
+
+`_impCursoVista()` es la única fuente de "lo que se está viendo": la usan los totales, la tabla y el
+Excel, así que no pueden desincronizarse. Test `tests/imp-encurso.cjs` (cubre las fichas, el conteo
+de filas y que la plata del KPI sea la del pedido elegido y no la de todos).
+
+**Lo que viene** (dueño, misma charla): *"a estos proveedores yo les voy pagando, así que vamos a
+tener que armar una cuenta corriente… después te paso el archivo actual que lo manejo por Excel"*.
+Sin empezar hasta ver ese Excel — el modelo (anticipo/saldo por PI, moneda, tipo de cambio, qué es
+un pago a cuenta) sale de cómo lo lleva hoy. Tarea Planify abierta.
