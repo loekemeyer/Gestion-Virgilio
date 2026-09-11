@@ -39,6 +39,7 @@ const FAKE = `
 window.__ins = [];          // inserts que intentó hacer el front
 window.__fetches = [];      // llamadas a la Edge Function
 window.__altaRows = [];     // lo que "tiene" GV_Alta_Articulo_Aprobacion
+window.__ocMax = [];        // catálogo de códigos ACTIVOS (OC_Maximos)
 window.__alerts = [];
 window.alert = function (m) { window.__alerts.push(String(m)); };
 window.__fetchResp = { token: "tok1", estado: "pendiente", wa_ok: true };
@@ -54,7 +55,9 @@ function __q(table) {
     .forEach(function (m) { o[m] = function () { return o; }; });
   o.insert = function (rows) { window.__ins.push({ table: table, rows: rows }); return o; };
   o.then = function (res, rej) {
-    const data = (table === "GV_Alta_Articulo_Aprobacion") ? window.__altaRows : [];
+    let data = [];
+    if (table === "GV_Alta_Articulo_Aprobacion") data = window.__altaRows;
+    else if (table === "OC_Maximos") data = window.__ocMax;
     return Promise.resolve({ data: data, error: null }).then(res, rej);
   };
   return o;
@@ -77,10 +80,13 @@ window.GONDOLA = { "599E": { sector: "J44" }, "505": { sector: "A01" } };
 
 const patched = src + `
 window.__rcp = { opState: opState, RECP: RECP,
-  arAddCode: arAddCode, altaSinRespuesta: altaSinRespuesta, altaRefrescar: altaRefrescar,
+  arAddCode: arAddCode, arAddCodeAplicar: arAddCodeAplicar,
+  arCatalogoCargar: arCatalogoCargar, arCatalogoBuscar: arCatalogoBuscar, arCatalogoTiene: arCatalogoTiene,
+  arBusDibujar: arBusDibujar, arBusCerrar: arBusCerrar,
+  altaSinRespuesta: altaSinRespuesta, altaRefrescar: altaRefrescar,
   altaEnPlanimetria: altaEnPlanimetria, altaPollStop: altaPollStop,
   drawArticulosGrid: drawArticulosGrid, opEnviar: opEnviar,
-  el: { body: opBody } };
+  el: { body: opBody, busModal: arBusModal, busInput: arBusInput, busList: arBusList } };
 `;
 
 if (!/window\.supabase/.test(src)) { console.error("rcp-alta-ok: recepcion.js ya no toma createClient de window.supabase."); process.exit(1); }
@@ -104,8 +110,7 @@ if (!/GV_Alta_Articulo_Aprobacion/.test(src)) { console.error("rcp-alta-ok: rece
 
     // ---- 1) código QUE SÍ está en planimetría: no se molesta a nadie ----
     window.__fetches = [];
-    window.prompt = function () { return "599E"; };
-    await R.arAddCode();
+    await R.arAddCodeAplicar("599E", false);
     out.conPlanimetriaNoPide = window.__fetches.length === 0;
     out.conPlanimetriaEntra = S.articulos.some(a => a.Cod_Art === "599E");
 
@@ -113,8 +118,7 @@ if (!/GV_Alta_Articulo_Aprobacion/.test(src)) { console.error("rcp-alta-ok: rece
     await new Promise(r => setTimeout(r, 30));   // que caiga el alta del paso 1
     window.__fetches = []; window.__alerts = []; window.__ins = [];
     window.__fetchResp = { token: "tok1", estado: "pendiente", wa_ok: true };
-    window.prompt = function () { return "599"; };
-    await R.arAddCode();
+    await R.arAddCodeAplicar("599", true);
     const f = window.__fetches[0];
     out.pideOk = window.__fetches.length === 1 && /gv-alta-articulo/.test(f.url);
     out.mandaDatos = !!f && f.body.cod === "599" && f.body.remito === "38087"
@@ -159,8 +163,7 @@ if (!/GV_Alta_Articulo_Aprobacion/.test(src)) { console.error("rcp-alta-ok: rece
 
     // ---- 7) un código ya avisado no vuelve a mandar el WhatsApp ----
     window.__fetches = [];
-    window.prompt = function () { return "599"; };
-    await R.arAddCode();
+    await R.arAddCodeAplicar("599", true);
     out.noRepiteAviso = window.__fetches.length === 0;
 
     // ---- 8) sin conexión: avisa que no salió, pero NO traba ----
@@ -168,11 +171,50 @@ if (!/GV_Alta_Articulo_Aprobacion/.test(src)) { console.error("rcp-alta-ok: rece
     const _f = window.fetch;
     window.fetch = function () { return Promise.reject(new Error("offline")); };
     window.__alerts = [];
-    window.prompt = function () { return "943"; };
-    await R.arAddCode();
+    await R.arAddCodeAplicar("943", true);
     window.fetch = _f;
     out.offlineAvisa = window.__alerts.some(m => /sin conexión/i.test(m) && /943/.test(m));
     out.offlineEntraIgual = S.articulos.some(a => a.Cod_Art === "943");
+
+    // ---- 9) v15.76 — el "+" es un BUSCADOR de códigos activos ----
+    // Catálogo VACÍO = no se toma por bueno (si no, mandaría un WhatsApp por cada alta).
+    out.catVacioNoCuenta = R.arCatalogoTiene("599") === null;
+
+    window.__ocMax = [
+      { cod: "590E",  descripcion: "Pincel Silicona 11 Gms" },
+      { cod: "590ES", descripcion: "Pincel Silicona 11 Gms Suelto" },
+      { cod: "941E",  descripcion: "Espatula Lisa Ac. Inox" },
+      { cod: "0071",  descripcion: "Bowl Multi Uso 330ml" }
+    ];
+    await R.arCatalogoCargar();
+    out.catCarga = R.arCatalogoTiene("590ES") === true && R.arCatalogoTiene("599") === false;
+    out.catNormaliza = R.arCatalogoTiene("71") === true;          // 0071 → 71
+    out.buscaPorCodigo = R.arCatalogoBuscar("590").map(x => x.cod).join(",") === "590E,590ES";
+    out.buscaPorDesc = R.arCatalogoBuscar("espatula").map(x => x.cod).join(",") === "941E";
+    out.buscaSinAcento = R.arCatalogoBuscar("espátula").map(x => x.cod).join(",") === "941E";
+
+    // Elegir uno de la lista NO manda WhatsApp; lo que no matchea, SÍ.
+    S.altaNuevos = {}; S.cargas = {}; S.articulos = [];
+    window.__fetches = []; window.__alerts = [];
+    await R.arAddCodeAplicar("590ES", false);
+    out.activoNoAvisa = window.__fetches.length === 0 && S.articulos.some(a => a.Cod_Art === "590ES");
+
+    window.__fetches = []; window.__alerts = [];
+    window.__fetchResp = { token: "tok9", estado: "pendiente", wa_ok: true };
+    await R.arAddCodeAplicar("9999", true);
+    out.fueraDeListaAvisa = window.__fetches.length === 1 && window.__fetches[0].body.cod === "9999";
+    out.fueraDeListaEntraIgual = S.articulos.some(a => a.Cod_Art === "9999");
+
+    // La lista del modal se dibuja y ofrece "Cargar igual" sólo cuando nada coincide.
+    R.el.busInput.value = "590";
+    R.arBusDibujar();
+    out.modalLista = R.el.busList.querySelectorAll(".arBusRow").length === 2 &&
+                     R.el.busList.querySelectorAll(".arBusIgual").length === 0;
+    R.el.busInput.value = "ZZZZ1";
+    R.arBusDibujar();
+    out.modalEscape = R.el.busList.querySelectorAll(".arBusRow").length === 0 &&
+                      R.el.busList.querySelectorAll(".arBusIgual").length === 1;
+    R.arBusCerrar();
 
     R.altaPollStop();
     return out;
