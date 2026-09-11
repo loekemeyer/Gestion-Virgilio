@@ -810,7 +810,10 @@ button {
 .apr-col-cuar .apr-vacio{ color:#b45309; }
 .apr-col-cuar .apr-vacio b{ color:#9a3412; }
 .apr-chip-cuar{ background:#c2410c; color:#fff; font-weight:800; }
-.apr-card-cuar{ border-left-color:#c2410c; background:#fffbf5; cursor:default; }
+.apr-card-cuar{ border-left-color:#c2410c; background:#fffbf5; cursor:default; display:flex; flex-wrap:wrap; align-items:center; column-gap:14px; row-gap:8px; }
+/* v15.02 — la ficha se parte en dos: datos a la izquierda, acciones a la derecha.
+   Con flex-wrap, en una columna angosta se apilan solas como antes. */
+.cuar-info{ flex:1 1 230px; min-width:0; }
 .apr-cuar-motivo{ font-size:12px; color:#9a3412; margin-top:5px; font-weight:600; line-height:1.4; }
 /* v14.82 — 4 botones de importación de reportes en el sector Cuarentena */
 .cuar-tools{ display:grid; grid-template-columns:1fr 1fr; gap:6px; margin-bottom:9px; }
@@ -819,8 +822,11 @@ button {
 .cuar-tool .cuar-btn:hover{ background:#7c2d12; }
 .cuar-stat{ font-size:10.5px; color:#9a3412; text-align:center; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 .cuar-stat-vacio{ color:#c2a08c; font-style:italic; }
-.cuar-demo-row{ text-align:center; margin:-4px 0 8px; }
-.cuar-demo-btn{ background:transparent; border:1px dashed #c2410c; color:#9a3412; border-radius:7px; padding:3px 10px; font-size:11.5px; font-weight:700; cursor:pointer; width:auto; margin-top:0; }
+/* v15.02 — barrita discreta: el botón y la ayuda en UNA línea, alineados a la
+   derecha (antes iban centrados, uno abajo del otro, y pesaban más que la ficha). */
+.cuar-demo-row{ display:flex; align-items:center; justify-content:flex-end; flex-wrap:wrap; gap:8px; margin:-4px 0 8px; }
+.cuar-demo-hint{ font-size:11px; color:#b07a5a; margin-right:auto; }
+.cuar-demo-btn{ background:transparent; border:1px solid #e8cdb8; color:#9a3412; border-radius:7px; padding:3px 10px; font-size:11.5px; font-weight:700; cursor:pointer; width:auto; margin-top:0; }
 .cuar-demo-btn:hover{ background:#fff1e7; }
 .cuar-demo-tag{ background:#fde68a; color:#92400e; font-size:10px; font-weight:800; border-radius:5px; padding:1px 6px; margin-left:auto; letter-spacing:.5px; flex:0 0 auto; }
 .apr-card-demo{ border-style:dashed; }
@@ -852,7 +858,10 @@ button {
 /* v14.88 — ficha de pedido en Cuarentena: énfasis en la NP, luego zona/m³/razón, 3 badges y botón */
 .cuar-card-top{ display:flex; align-items:baseline; gap:8px; }
 .cuar-card-np{ font-size:16px; font-weight:900; color:#7c2d12; letter-spacing:.3px; }
-.cuar-card-m3{ margin-left:auto; font-size:12px; font-weight:800; color:#9a3412; white-space:nowrap; }
+/* v15.02 — el m³ va pegado a la NP (antes con margin-left:auto se iba al otro
+   extremo: en una ficha ancha quedaba flotando lejos del número de pedido). */
+.cuar-card-m3{ font-size:12px; font-weight:800; color:#9a3412; white-space:nowrap; }
+.cuar-card-m3::before{ content:"·"; margin:0 6px 0 2px; color:#d9a988; }
 .apr-card-cuar .cuar-card-cli{ font-weight:800; font-size:13px; color:#0f172a; margin-top:3px; overflow-wrap:anywhere; }
 .cuar-card-zona{ font-size:12px; color:#7c2d12; margin-top:2px; }
 .cuar-badges{ display:flex; flex-wrap:wrap; gap:5px; margin-top:7px; }
@@ -860,16 +869,23 @@ button {
 .cuar-badge.b-deuda{ background:#fee2e2; color:#991b1b; border:1px solid #fca5a5; }
 .cuar-badge.b-limite{ background:#fef3c7; color:#92400e; border:1px solid #fcd34d; }
 .cuar-badge.b-susp{ background:#e0e7ff; color:#3730a3; border:1px solid #c7d2fe; }
-.cuar-enviar{ width:100%; margin-top:8px; background:#166534; color:#fff; border:none; border-radius:8px; padding:7px 8px; font-size:12px; font-weight:800; cursor:pointer; }
+/* v15.02 — botones compactos: una sola acción sólida (Enviar) y las dos de
+   WhatsApp como secundarias de contorno. Antes eran 3 franjas verdes a ancho
+   completo, una abajo de la otra, y se comían la ficha entera. */
+.cuar-enviar{ width:auto; margin-top:0; background:#166534; color:#fff; border:none; border-radius:7px; padding:6px 11px; font-size:12px; font-weight:800; cursor:pointer; white-space:nowrap; }
 .cuar-enviar:hover{ background:#14532d; }
 /* v14.89 — fila de acciones de la ficha (A cobranzas + Enviar) */
-.cuar-acciones{ display:flex; flex-direction:column; gap:6px; margin-top:8px; }
+/* flex:0 1 auto + min-width:0 = en la columna angosta los botones se acomodan
+   solos en varias filas en vez de desbordar la ficha. */
+.cuar-acciones{ display:flex; flex-wrap:wrap; align-items:center; gap:6px; margin-top:0; margin-left:auto; flex:0 1 auto; min-width:0; }
 .cuar-acciones .cuar-enviar{ margin-top:0; }
-.cuar-wpp{ width:100%; border:none; border-radius:8px; padding:7px 8px; font-size:12px; font-weight:800; cursor:pointer; }
-.cuar-wpp-cob{ background:#128c7e; color:#fff; }
-.cuar-wpp-cob:hover{ background:#0e7568; }
-.cuar-wpp-cli{ background:#25863f; color:#fff; }
-.cuar-wpp-cli:hover{ background:#1e6e33; }
+.cuar-wpp{ width:auto; margin-top:0; background:#fff; border-radius:7px; padding:6px 11px; font-size:12px; font-weight:700; cursor:pointer; white-space:nowrap; max-width:190px; overflow:hidden; text-overflow:ellipsis; }
+.cuar-wpp-cob{ color:#0e7568; border:1px solid #9ad2ca; }
+.cuar-wpp-cob:hover{ background:#effbf8; }
+.cuar-wpp-cli{ color:#1e6e33; border:1px solid #a9d8b6; }
+.cuar-wpp-cli:hover{ background:#f0faf2; }
+.cuar-wpp-off, .cuar-wpp[disabled]{ color:#94a3b8; border:1px solid #e2e8f0; cursor:default; }
+.cuar-wpp[disabled]:hover{ background:#fff; }
 .cuar-wpp-off{ background:#e2e8f0; color:#94a3b8; cursor:default; }
 .cuar-liberado-nota{ font-size:11px; font-weight:800; color:#166534; margin-top:5px; }
 .cuar-demo-hint{ display:block; font-size:10.5px; color:#b45309; margin-top:3px; }
@@ -7598,7 +7614,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v15.01";
+const APP_VERSION = "v15.02";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -35669,14 +35685,16 @@ function aprColCuarentena() {
   for (const p of lista) {
     const np = p._demo ? "web LK 9999" : aprPedLabel(p);
     h += '<div class="apr-card apr-card-cuar' + (p._demo ? ' apr-card-demo' : '') + '" title="' + escapeHtml(aprCuarentenaMotivo(p)) + '">' +
-      '<div class="cuar-card-top">' +
-        '<span class="cuar-card-np">' + escapeHtml(np) + '</span>' +
-        (p._demo ? '<span class="cuar-demo-tag">EJEMPLO</span>' : '') +
-        '<span class="cuar-card-m3">' + aprNum(p.m3) + ' m³</span>' +
+      '<div class="cuar-info">' +
+        '<div class="cuar-card-top">' +
+          '<span class="cuar-card-np">' + escapeHtml(np) + '</span>' +
+          (p._demo ? '<span class="cuar-demo-tag">EJEMPLO</span>' : '') +
+          '<span class="cuar-card-m3">' + aprNum(p.m3) + ' m³</span>' +
+        '</div>' +
+        '<div class="cuar-card-cli">' + escapeHtml(p.razon_social || p.cod || ("#" + p.order_id)) + '</div>' +
+        '<div class="cuar-card-zona">📍 ' + escapeHtml(p.zona || "sin zona") + '</div>' +
+        aprCuarBadgesHtml(p) +
       '</div>' +
-      '<div class="cuar-card-cli">' + escapeHtml(p.razon_social || p.cod || ("#" + p.order_id)) + '</div>' +
-      '<div class="cuar-card-zona">📍 ' + escapeHtml(p.zona || "sin zona") + '</div>' +
-      aprCuarBadgesHtml(p) +
       '<div class="cuar-acciones">' +
         cuarWppContactoBtn(p) +
         '<button class="cuar-wpp cuar-wpp-cob" onclick="cuarWppCobranzas(\'' + (p.empresa || "lk") + '\',\'' + escapeHtml(String(p.order_id)) + '\')" title="Escribir a Vivi (cobranzas) por WhatsApp (+54 9 11 6557-4113) para que chequee este pedido">💬 A cobranzas (Vivi)</button>' +
@@ -35856,9 +35874,11 @@ function cuarConfigHtml() {
 }
 /* Fila "Ver ejemplo" — vive en el sector Cuarentena (no en Config). */
 function cuarDemoRowHtml() {
-  return '<div class="cuar-demo-row"><button class="cuar-demo-btn" onclick="cuarDemoToggle()">' +
-    (_apr.cuarDemo ? "✕ Quitar ejemplo" : "👁 Ver ejemplo") + '</button>' +
-    '<span class="cuar-demo-hint">Los reportes se importan en <b>🚧 Config. Cuarentena</b>.</span></div>';
+  // v15.02: la ayuda primero (izquierda) y el botón al final (derecha), en una sola línea.
+  return '<div class="cuar-demo-row">' +
+    '<span class="cuar-demo-hint">Los reportes se importan en <b>🚧 Config. Cuarentena</b>.</span>' +
+    '<button class="cuar-demo-btn" onclick="cuarDemoToggle()">' +
+    (_apr.cuarDemo ? "✕ Quitar ejemplo" : "👁 Ver ejemplo") + '</button></div>';
 }
 async function cuarResumenCargar() {
   if (_apr.cuarResumenLoading) return;
