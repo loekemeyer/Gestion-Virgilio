@@ -9000,3 +9000,51 @@ sea que esas llamadas de GP2/Cervantes dan 404), más `Despiece` y `PPP_Pedidos_
 no existen con ninguna grafía.
 
 Archivo: `sql/gv_importados_ordenes_recreada_v1626.sql`.
+
+### §3.de — v16.27: las 133 tablas de backup salen de `public` — 2026-09-12
+
+Thomas: *"Si los backups no tienen uso ninguno para ningún repo, dale"*. La condición era la
+verificación, así que se hizo entera **antes** de tocar nada.
+
+**El tamaño del problema.** `public` tenía **388 tablas y 133 eran backups** — un tercio.
+121.521 filas, 14 MB. Y no lo hizo nadie en particular: **lo hizo el protocolo**, que decía
+crear cada backup en `public`. Por eso, además de mover las que había, se cambió el `CLAUDE.md`
+para que las próximas nazcan en `zz_backups`.
+
+**La verificación, las dos mitades en cero**
+
+| en la base, ninguna de las 133 tiene… | |
+|---|--:|
+| vista o matview que la lea | 0 |
+| función que la nombre (todas, todos los esquemas) | 0 |
+| cron que la use | 0 |
+| foreign key, ni hacia ni desde | 0 |
+| trigger propio | 0 |
+
+| en el código, buscadas por nombre exacto | archivos | apariciones |
+|---|--:|--:|
+| `loekemeyer/gestion-virgilio` (incluye admin LK, GP2 y los dos de Cervantes) | 583 | **0** |
+| `loekemeyer/produccion-virgilio` | 157 | **0** |
+| `loekemeyer/planify` | 40 | **0** |
+
+Se buscó en `.js .html .ts .tsx .py .cjs .mjs .json .yml .gs`, y se excluyeron `.md` y `.sql`
+a propósito: ahí sólo se documentan, no se usan. `pagina-LK-copia` y `paginach` no entran
+porque pegan contra **otros** proyectos Supabase — no pueden leer una tabla de éste.
+
+**Por qué se movieron y no se dropearon.** El objetivo era sacar el desorden de `public`, y
+mover lo consigue igual: **388 → 256**. Pero un `alter … set schema` se deshace con otro
+`alter`, y un `drop` de 121.521 filas no se deshace con nada. Ante dos caminos que dan el
+mismo resultado, el reversible. Para el borrado definitivo, cuando se quiera:
+`drop schema zz_backups cascade;`
+
+El esquema nace con el acceso revocado para `anon` y `authenticated`, así que **una tabla
+creada ahí ya no queda abierta aunque uno se olvide del `revoke`** — que es exactamente lo que
+venía pasando en `public` y costó las 27 tablas abiertas del barrido anterior.
+
+Índice de lo que se movió, con filas y peso: `public."GV_Backups_Indice"`.
+
+**Medido después:** 0 vistas rotas · 0 endpoints rotos · los 5 centinelas en cero ·
+facturación $1.395.224.315,83 igual · `vista_saldos_stock` 488 · `vista_stock_procesada` 363 ·
+`Registros_Produccion_Virgilio` 30.936. Nada se movió.
+
+Archivo: `sql/gv_backups_a_esquema_propio_v1627.sql`.

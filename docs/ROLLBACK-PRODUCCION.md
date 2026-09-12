@@ -1,5 +1,13 @@
 # Rollback — todo lo que Gestión hizo que afecta a Producción Virgilio
 
+> ⚠ **2026-09-12 — las tablas de backup se mudaron al esquema `zz_backups`.**
+> Todos los `public."GV_Backup_…"` / `public."…_bkp_…"` que este archivo cita ahora viven en
+> `zz_backups`. Los comandos de rollback de más abajo funcionan igual cambiando el prefijo:
+> `public."X"` → `zz_backups."X"`. El índice de lo que se movió está en
+> `public."GV_Backups_Indice"`; para volver una a public,
+> `alter table zz_backups."X" set schema public;`.
+
+
 > **Decisión del dueño (2026-09-08):** Producción Virgilio **ya no se usa** (todo migró a
 > Gestión). De acá en adelante **no** se condiciona ningún cambio de Gestión por "no romper
 > Producción". A cambio, **todo cambio que toque un objeto compartido / de Producción se anota

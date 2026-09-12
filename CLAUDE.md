@@ -628,13 +628,27 @@ y `sql/gv_tandas_diarias.sql`.
    app** — se consultan a mano por el MCP, que entra como `postgres` y saltea la RLS — así
    que cerrarlas no rompe nada:
 
+   ⚠⚠ **Y desde el 2026-09-12 el backup NO se crea en `public`: va al esquema `zz_backups`.**
+   Ese día `public` tenía **388 tablas y 133 eran backups** — un tercio. El desorden no lo
+   hizo nadie en particular: lo hizo el protocolo, que decía crearlos ahí. Se movieron todas
+   (public quedó en 256) después de comprobar que no las usa **nadie**: 0 vistas, 0 funciones,
+   0 crons, 0 FK, 0 triggers, y 0 apariciones en el código de `gestion-virgilio`,
+   `produccion-virgilio` y `planify` (780 archivos). El índice de lo que se movió está en
+   `public."GV_Backups_Indice"`.
+
    ```sql
-   create table public."GV_Backup_<lo_que_sea>_<YYYYMMDD>" as select … ;
+   create table zz_backups."GV_Backup_<lo_que_sea>_<YYYYMMDD>" as select … ;
    -- ⬇ las dos líneas que NO hay que olvidarse
-   alter table public."GV_Backup_<lo_que_sea>_<YYYYMMDD>" enable row level security;
-   revoke insert, update, delete, truncate on public."GV_Backup_<lo_que_sea>_<YYYYMMDD>"
+   alter table zz_backups."GV_Backup_<lo_que_sea>_<YYYYMMDD>" enable row level security;
+   revoke insert, update, delete, truncate on zz_backups."GV_Backup_<lo_que_sea>_<YYYYMMDD>"
      from anon, authenticated;
    ```
+
+   El esquema `zz_backups` ya tiene revocado el acceso para `anon` y `authenticated`, así que
+   una tabla creada ahí **nace cerrada** aunque uno se olvide de las dos líneas. Igual van:
+   son gratis y no dependen de que nadie se acuerde. Para volver un backup a `public`:
+   `alter table zz_backups.X set schema public;`. Para borrarlos todos de verdad:
+   `drop schema zz_backups cascade;`.
 
    Sin policies, con la RLS prendida `anon` ve **0 filas** (no da error, simplemente no ve
    nada), que es lo que se quiere. Chequeo de que no quedó ninguna suelta:
