@@ -802,6 +802,9 @@ button {
 .apr-krikos.mal .apr-krikos-sub{ color:#991b1b; }
 .apr-krikos-ped{ background:#e0e7ff; color:#3730a3; border-radius:999px; padding:0 7px; font-size:11px; font-weight:800; }
 .apr-krikos-aviso{ flex-basis:100%; color:#b91c1c; font-weight:800; font-size:12.5px; line-height:1.3; }
+/* v16.04 — motivo dicho UNA vez cuando todas comparten el mismo: con 6 OC salteadas por
+   lo mismo, el renglón por renglón repetía seis veces la misma frase a ancho completo. */
+.apr-krikos-motivo{ color:#b91c1c; font-size:12.5px; margin:0 0 8px; background:#fef2f2; border:1px solid #fecaca; border-radius:6px; padding:5px 9px; }
 .apr-msg{ background:#ecfdf5; border-left:5px solid #059669; color:#065f46; padding:8px 10px; border-radius:6px; margin:6px 2px; font-weight:600; }
 
 /* v13.74 (dueño: "completamente feo e ilegible; hacé boxes que ocupen el ANCHO de la pantalla, no el alto"):
@@ -7813,7 +7816,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v16.06";
+const APP_VERSION = "v16.07";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -38465,6 +38468,31 @@ function aprKrikosCadena(c) {
   if (t.indexOf("CHANGO") >= 0) return "Chango Más";
   return String(c || "Súper").replace(/\s*\(.*$/, "").trim() || "Súper";
 }
+/* Un renglón de OC. `motivoComun` = el aviso ya se dijo una vez arriba, así que acá NO se
+   repite (regla del dueño: no ocupar de más ni repetir sin sentido — con 6 OC salteadas por
+   lo mismo, el cartel decía seis veces la misma frase y llenaba la pantalla). */
+function aprKrikosFila(f, hoy, motivoComun) {
+  const d = f.fecha_entrega_d || "";
+  const vencida = d && d < hoy;
+  return '<div class="apr-krikos-r' + (vencida ? ' vencida' : '') + '">' +
+    '<span class="apr-krikos-cad">' + escapeHtml(aprKrikosCadena(f.cadena)) + '</span>' +
+    '<span class="apr-krikos-nro">' + escapeHtml(f.nro_documento || "") + '</span>' +
+    '<span class="apr-krikos-suc">' + escapeHtml(f.sucursal || "") + '</span>' +
+    (f.order_id ? '<span class="apr-krikos-ped">pedido ' + escapeHtml(String(f.order_id)) + '</span>' : '') +
+    '<span class="apr-krikos-fe" title="Fecha de entrega que pide el súper">' +
+      (d ? (vencida ? '⚠ venció ' : '📅 ') + aprDiaCorto(d) : '—') + '</span>' +
+    (f.tiene_pdf === false ? '<span class="apr-krikos-nopdf" title="El link de Krikos no devolvió el PDF: sin el PDF no hay nada que importar">sin PDF</span>' : '') +
+    (f.link ? '<a class="apr-krikos-btn" href="' + escapeHtml(f.link) + '" target="_blank" rel="noopener">Ver OC</a>' : '') +
+    (!motivoComun && f.auto_aviso ? '<span class="apr-krikos-aviso">' + escapeHtml(f.auto_aviso) + '</span>' : '') +
+    '</div>';
+}
+/* Si TODAS comparten el mismo motivo, se devuelve ése para decirlo una sola vez arriba.
+   Con motivos distintos devuelve "" y cada renglón se explica solo. */
+function aprKrikosMotivoComun(filas) {
+  const avisos = filas.map(function (f) { return String(f.auto_aviso || "").trim(); });
+  if (!avisos.length || !avisos[0]) return "";
+  return avisos.every(function (a) { return a === avisos[0]; }) ? avisos[0] : "";
+}
 function aprKrikosHtml() {
   const filas = _apr.krikos || [];
   if (!filas.length) return "";
@@ -38482,51 +38510,30 @@ function aprKrikosHtml() {
   let h = "";
 
   if (malas.length) {
+    const mc = aprKrikosMotivoComun(malas);
     h += '<div class="apr-krikos mal">' +
       '<div class="apr-krikos-t">⚠ ' + malas.length + ' pedido' + (malas.length === 1 ? '' : 's') +
         ' de súper entró <u>con algo que NO DIO</u> — revisalo antes de armarlo</div>' +
       '<div class="apr-krikos-sub">Se cargaron solos a la PPP (por eso ya no están acá abajo), pero el importador ' +
         'encontró diferencias contra la OC. Lo que falta hay que agregarlo a mano desde el panel de LK.</div>' +
-      '<div class="apr-krikos-list">';
-    malas.forEach(function (f) {
-      const d = f.fecha_entrega_d || "";
-      h += '<div class="apr-krikos-r vencida">' +
-        '<span class="apr-krikos-cad">' + escapeHtml(aprKrikosCadena(f.cadena)) + '</span>' +
-        '<span class="apr-krikos-nro">' + escapeHtml(f.nro_documento || "") + '</span>' +
-        '<span class="apr-krikos-suc">' + escapeHtml(f.sucursal || "") + '</span>' +
-        (f.order_id ? '<span class="apr-krikos-ped">pedido ' + escapeHtml(String(f.order_id)) + '</span>' : '') +
-        '<span class="apr-krikos-fe" title="Fecha de entrega que pide el súper">' +
-          (d ? (d < hoy ? '⚠ venció ' : '📅 ') + aprDiaCorto(d) : '—') + '</span>' +
-        (f.link ? '<a class="apr-krikos-btn" href="' + escapeHtml(f.link) + '" target="_blank" rel="noopener">Ver OC</a>' : '') +
-        '<span class="apr-krikos-aviso">' + escapeHtml(f.auto_aviso || "el importe no dio") + '</span>' +
-        '</div>';
-    });
-    h += '</div></div>';
+      (mc ? '<div class="apr-krikos-motivo">Todos por lo mismo: <b>' + escapeHtml(mc) + '</b></div>' : '') +
+      '<div class="apr-krikos-list">' +
+      malas.map(function (f) { return aprKrikosFila(f, hoy, mc); }).join("") +
+      '</div></div>';
   }
 
   if (esperando.length) {
+    const mc = aprKrikosMotivoComun(esperando);
     h += '<div class="apr-krikos">' +
       '<div class="apr-krikos-t">🛒 ' + esperando.length + ' orden' + (esperando.length === 1 ? '' : 'es') +
         ' de compra de súper <u>NO se pudo importar sola a la PPP</u></div>' +
       '<div class="apr-krikos-sub">Llegaron por Krikos y están esperando. Todavía no son pedidos: no tienen NP ni m³, ' +
         'así que <b>no se pueden tildar ni meter en una tanda</b>. Hay que cargarlas a mano o no salen.</div>' +
-      '<div class="apr-krikos-list">';
-    esperando.forEach(function (f) {
-      const d = f.fecha_entrega_d || "";
-      const vencida = d && d < hoy;
-      h += '<div class="apr-krikos-r' + (vencida ? ' vencida' : '') + '">' +
-        '<span class="apr-krikos-cad">' + escapeHtml(aprKrikosCadena(f.cadena)) + '</span>' +
-        '<span class="apr-krikos-nro">' + escapeHtml(f.nro_documento || "") + '</span>' +
-        '<span class="apr-krikos-suc">' + escapeHtml(f.sucursal || "") + '</span>' +
-        '<span class="apr-krikos-fe" title="Fecha de entrega que pide el súper">' +
-          (d ? (vencida ? '⚠ venció ' : '📅 ') + aprDiaCorto(d) : '—') + '</span>' +
-        (f.tiene_pdf ? '' : '<span class="apr-krikos-nopdf" title="El link de Krikos no devolvió el PDF: sin el PDF no hay nada que importar">sin PDF</span>') +
-        (f.link ? '<a class="apr-krikos-btn" href="' + escapeHtml(f.link) + '" target="_blank" rel="noopener">Ver OC</a>' : '') +
-        (f.auto_aviso ? '<span class="apr-krikos-aviso">' + escapeHtml(f.auto_aviso) + '</span>' : '') +
-        '</div>';
-    });
-    h += '</div><div class="apr-krikos-pie">El importador automático corre <b>cada 10 minutos</b>: baja la OC, ' +
-      'la lee y carga el pedido solo. Lo que queda acá es lo que no pudo — el motivo está en cada renglón. ' +
+      (mc ? '<div class="apr-krikos-motivo">Todas por lo mismo: <b>' + escapeHtml(mc) + '</b></div>' : '') +
+      '<div class="apr-krikos-list">' +
+      esperando.map(function (f) { return aprKrikosFila(f, hoy, mc); }).join("") +
+      '</div><div class="apr-krikos-pie">El importador automático corre <b>cada 10 minutos</b>: baja la OC, ' +
+      'la lee y carga el pedido solo. Lo que queda acá es lo que no pudo. ' +
       'Se carga a mano desde <b>🌐 Panel Web LK → PDF Krikos → Bandeja Krikos</b> y desaparece de acá solo.</div></div>';
   }
   return h;
