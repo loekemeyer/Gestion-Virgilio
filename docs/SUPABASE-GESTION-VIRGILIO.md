@@ -8912,3 +8912,91 @@ suite local es más permisiva que la de GitHub. De los 152 tests, **60 no interc
 garantiza un CI verde: **hay que mirar el run de GitHub después de cada push.**
 
 Archivo: `tests/comp-terminar-unificado.cjs`.
+
+### §3.dd — v16.26: el módulo de Importados estaba CAÍDO, y el inventario de tablas — 2026-09-12
+
+Thomas pidió el inventario de qué tablas toca cada app antes de separar por esquemas. Haciéndolo
+apareció que **`gv_importados_ordenes` no existía**: la pantalla de Importados venía devolviendo
+404 y quedando vacía.
+
+**Qué pasó.** La v16.20 (otro chat) hizo `DROP` + `CREATE` de la matview `vista_stock_procesada`,
+porque una matview no admite `create or replace`. Recreó las vistas que le colgaban —`Stock_Saldos`
+y `gv_importados_stock_dep`— pero **`gv_importados_ordenes` colgaba de `gv_importados_stock_dep`**
+y no se recreó: el CASCADE se la llevó. El front la pide desde la v16.04.
+
+**Por qué el repo no alcanzaba para restaurarla.** `sql/gv_stock_vivo_menos_pedidos_v1608.sql`
+documenta el cambio pero dice *"la definición completa está aplicada en la base"* en vez de traer
+el `CREATE`. O sea que **la única copia de la última versión vivía en el objeto que se borró.**
+Se reconstruyó desde la v16.04 del repo más los cambios que la v16.08 describe, y se verificó
+contra los números que esa misma versión dejó anotados:
+
+| | v16.08 anotó | tras recrear |
+|---|--:|--:|
+| filas principal+activo | 154 | **154** |
+| cajas brutas | 18.173 | **18.173** |
+| pedidas | 1.351 | **1.351** |
+| disponibles | 17.130 | **17.130** |
+| 584E (testigo del dueño) | 15 − 5 = 10 cajas / 60 u | **igual** |
+
+Idéntico, así que la restauración es fiel. `anon` lee las 156 filas, que es como entra el front.
+
+**Centinela nuevo** — un objeto que el front pide y no existe da 404 sin error visible:
+
+```sql
+select * from public.gv_endpoints_rotos;   -- 0 filas = todos existen
+```
+
+**Regla que deja esto:** el `CREATE` completo de cada objeto va **en el repo**, no "aplicado en la
+base". Si el repo no lo tiene, no existe.
+
+#### El inventario que se pidió
+
+| | proyecto Supabase | tablas | de esas, backups | vistas |
+|---|---|--:|--:|--:|
+| **Gestión Virgilio** (`public`) | `hrxfctzncixxqmpfhskv` | **388** | **133** | 132 |
+| **GP2** (esquema `GP2`) | el mismo | 51 | 0 | 18 |
+| **Página LK** (`public`) | `kwkclwhmoygunqmlegrg` | 224 | 18 | 21 |
+
+Qué toca cada app, contando sobre su propio código en este repo:
+
+| app | objetos que usa | en `public` | en esquema propio |
+|---|--:|--:|--:|
+| Gestión Virgilio | 131 | 128 | 0 |
+| GP2 admin | 69 | **60** | 9 |
+| Cervantes entero | 67 | 67 | 0 |
+| Panel Web LK | 26 | — (otro proyecto) | — |
+| Cervantes operario | 6 | 6 | 0 |
+
+**Dos cosas corrigen lo que se suponía:**
+
+1. **GP2 NO está unificada.** Tiene su esquema y su cliente fija `db: { schema: "GP2" }`
+   (`cervantes-admin/gp2/supabase-config.js:37`), pero el admin propio —sin contar la copia de
+   RegistroApp que trae adentro— lee **54 objetos de `public`** y sólo 7 del esquema GP2.
+2. **Gestión Virgilio y Página LK no se pisan.** Son **proyectos Supabase distintos**: no
+   comparten ni una tabla. Ahí no hay nada que separar.
+
+El solapamiento real dentro del proyecto de Virgilio son **5 tablas**: `Articulos_Cajas`,
+`Articulos Virgilio X Tallerista`, `Empleados`, `Ordenes_Compra` y `Registros_Produccion_Virgilio`.
+
+**Entonces el orden correcto no es separar esquemas primero.** Es:
+1. **133 tablas de backup** en `public` — un tercio del total.
+2. **10 tablas huérfanas de verdad**: ni la base ni el código las nombran —
+   `partes_plasticas_stock_planta` (77 filas), `pe_resultados` (64), `Flejes_KG_Desp_x_Uni` (53),
+   `pe_eventos` (37), `cajas_stock_planta` (14), `prod_capacidad_config` (1), y con 0 filas
+   `Precios_Historico`, `Proveedores_Stock_Config`, `hist_envios_entregas_ps_tall_insum`,
+   `Catalogo Tall Cervantes`.
+3. **19 que sólo aparecen en docs o SQL viejo**, ninguna app las usa: `Ubicaciones_Articulos`
+   (872 filas), `snap_costo_nombres_0903` (574), `GV_Clientes_Whatsapp` (358),
+   `db_n8n_espejo_historico_20260419` (327), `Stock_Ubicaciones` (266),
+   `Insumos_Ubicaciones_Unificadas` (160), `GV_Lugar_Pendiente` (148), `GV_Geo_Log` (85),
+   `flejes_stock_planta` (54) y 10 más.
+4. Recién después, los esquemas.
+
+**Duplicación encontrada:** sólo 2 pares por mayúsculas —`Codigos_Duales` (4 cols) vs
+`codigos_duales` (3 cols), y `Proveedores` (19 cols) vs `proveedores` (5 cols), las dos con 0
+filas—. Y **5 nombres que el código llama y no existen**: `Cajas_Stock_Planta`,
+`Partes_Plasticas_Stock_Planta` y `Flejes_Stock_Planta` (las tablas reales son en minúscula, o
+sea que esas llamadas de GP2/Cervantes dan 404), más `Despiece` y `PPP_Pedidos_Entregados`, que
+no existen con ninguna grafía.
+
+Archivo: `sql/gv_importados_ordenes_recreada_v1626.sql`.
