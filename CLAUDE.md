@@ -661,6 +661,26 @@ y `sql/gv_tandas_diarias.sql`.
         or has_table_privilege('anon', c.oid, 'DELETE'));
    -- vacío = todo bien
    ```
+   ⚠⚠ **El backup se guarda con la CLAVE PRIMARIA de la tabla.** El 2026-09-12, al corregir
+   `Despiece x Articulo`, el backup se guardó por `COD` — que NO es único (754 filas, 238
+   códigos). Para los 49 códigos que tenían filas con valores distintos entre sí, ese backup
+   sólo permite restaurar **a nivel código, no fila por fila**. Si no se sabe cuál es la clave,
+   se averigua ANTES de escribir:
+
+   ```sql
+   select column_name from information_schema.columns
+    where table_schema='public' and table_name='<tabla>' order by ordinal_position;
+   -- y confirmar que es única:  select count(*), count(distinct <clave>) from public."<tabla>";
+   ```
+
+   ⚠ **Y ojo con los JOIN por una columna que no es única: multiplican.** En esa misma tabla, el
+   primer intento de contar las filas a tocar dio **1320 de una tabla de 754** — imposible, y por
+   eso no se ejecutó. Si un conteo da más filas que la tabla, el join está mal, no los datos.
+
+   ⚠ **Medir con la MISMA granularidad con la que se va a escribir.** Una medición agrupada con
+   `max()` por código dijo "67 códigos mal"; fila por fila eran **23 con valor distinto y 55
+   vacíos**. Un `UPDATE` va fila por fila, así que la medición también.
+
 3. **Ejecuta tu cambio** (ALTER, TRUNCATE, DELETE, INSERT).
 4. **Si algo falla o se rompe:** Restore inmediato ejecutando el SQL guardado.
 

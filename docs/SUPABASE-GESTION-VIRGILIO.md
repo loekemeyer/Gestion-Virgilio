@@ -9602,3 +9602,47 @@ Lo que se cierra es el acceso **anónimo**, el de cualquiera que lea la anon key
 **Verificación:** las 4 dan `permission denied` leídas como `anon`; la RPC llamada como `anon`
 devuelve 3 filas y $66.028.932,60 — el camino legítimo intacto. **Vistas de `public` sin
 `security_invoker` que `anon` pueda leer: 0** (eran 45).
+
+---
+
+### §3.dq — v16.42: corregido el UxB de `Despiece x Articulo` (235 filas) — 2026-09-12
+
+Con el OK del dueño. Cierra el problema 102. Detalle en `sql/gv_despiece_uxb_corregido_v1642.sql`.
+
+Alimenta `cajasUsadas = ceil(eMadre / uniXCaja)`, el consumo mensual de cajas de **cartón** en
+los admin de Cervantes.
+
+**⚠ El número que le di al dueño estaba mal.** Le dije *"67 códigos, casi todos ×2 o ÷2"*. Ese
+número salió de una medición agrupada por código con `max()`, y mezcló dos casos distintos. Fila
+por fila:
+
+| | filas | códigos |
+|---|--:|--:|
+| **A)** tenían un valor **distinto** → corregido | 103 | 23 |
+| **B)** estaban **vacías** → rellenadas | 132 | 55 |
+| | **235** | **77** |
+
+O sea que **los que de verdad tenían un valor mal eran 23, no 67**. Se aplicaron las dos: tienen
+idéntica evidencia (la columna vieja `Uni x Cja` de la propia tabla coincide con `GV_UxB`) y
+rellenar un vacío es más seguro que pisar un valor.
+
+**Efecto de (B) que conviene avisarle a Compras:** esos 55 códigos dividían por NULL, o sea no
+calculaban consumo de cartón; ahora sí, así que **van a empezar a aparecer en las alertas de
+compra**. Es lo correcto, pero es un cambio visible.
+
+**Medición:** previsto 235 filas / 77 códigos → ejecutado **235** ✓ · códigos alineados con
+`GV_UxB` **82 → 151** · columna vieja `Uni x Cja` **0 filas cambiadas** · corroboradas sin
+arreglar **0** · 754 filas totales sin cambio. Los 85 que siguen distintos son exactamente los
+que **no** se tocaron por falta de segunda fuente.
+
+**⚠ Y un error mío en el backup, que ya quedó como regla en `CLAUDE.md`:** se guardó por `COD`,
+que **no es único** (754 filas, 238 códigos). La clave es `id` (uuid). Para los 49 códigos con
+filas de distinto valor, ese backup restaura **a nivel código, no fila por fila** — no es un
+rollback exacto y no hay que decir que lo es. Se tomó una foto con clave del estado post-fix
+(`zz_backups."GV_Despiece_uxc_postfix_20260912"`, 754/754 ids únicos); de acá en adelante sí es
+exacto.
+
+**La trampa del join, que mordió dos veces:** como `COD` no es único, cualquier join por `COD`
+multiplica. El primer intento de contar las filas a tocar dio **1320 de una tabla de 754** —
+imposible, y por eso no se ejecutó. El mapa bueno es `GV_tmp_despiece_map2`, con `distinct` e
+índice único. **Si un conteo da más filas que la tabla, el join está mal, no los datos.**
