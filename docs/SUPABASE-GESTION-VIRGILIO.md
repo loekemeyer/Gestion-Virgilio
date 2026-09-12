@@ -8651,3 +8651,75 @@ vieja a mano, o el **cron 66 `sync-precios-venta`** (cada 15 min, trae de LK) me
 hoy coinciden.
 
 Archivo: `sql/gv_uxb_sync_todas_v1618.sql`.
+
+### §3.cz — v16.21: se borra `cob_uxb_lk`, y aparece el bug que escondía — 2026-09-12
+
+Pedido de Thomas: *"Ahora quiero que empieces a eliminar tablas, primero redirigiendo el codigo
+que las usa a una sola."*
+
+**Lo primero que apareció al ir a borrarla: `cob_uxb_lk` no era una tabla muerta.** La reescribía
+entera, en cada corrida del cron 66, la Edge Function `sync-precios-venta`, copiando el `uxb` del
+catálogo de LK (`products` ∪ `loke_products` ∪ `item_precios` manual). O sea que el alineado de la
+v16.18 sobre esa tabla **se hubiera revertido solo** en la corrida siguiente, sin que nadie se
+enterara. Por eso el §3.cy decía que era una de las dos que "un cron puede volver a desalinear".
+
+**Y el cron traía un dato falso.** En el catálogo de LK, `uxb = 1` es el placeholder de "no sé".
+Viajaba tal cual a `cob_uxb_lk` y de ahí a Facturación, que terminaba cobrando **unidades donde
+iban cajas**:
+
+| | antes | ahora |
+|---|---|---|
+| 029 Colador Ø16, 5 cajas a $7.790 | 5 × **1** × 7.790 | 5 × **24** × 7.790 |
+
+24 códigos estaban así (029, 030, 250, 253, 254, 322, 324, 524, 525, 526, 552, 553, 563, 592, 593,
+655, 657, 028 y los que quedaron sin dato). Al corregirlo **`vista_facturacion_neto_items` sube
+$2.685.467** (1.382.133.599 → 1.384.819.066, +0,19 %). No es un cambio de criterio: es plata que se
+estaba facturando de menos.
+
+**Cómo quedó armado**
+
+`GV_UxB (empresa, cod)` es la **única** tabla de UxB. El `cod` se guarda siempre normalizado con
+`gv_cod_stock`, así el `029` que manda el sync de LK y el `29` del listado de Thomas caen en la
+**misma fila** en vez de duplicarse (antes de normalizar había 6 pares así: `31L`/`031`, `34L`/`034`,
+`35EL`/`035E`, `58L`/`058`, `59L`/`059`, `66L`/`066`, los seis con la misma UxB en las dos grafías).
+
+| Objeto | Para qué |
+|---|---|
+| `gv_uxb_lk` (vista) | `(cod, uxb)` sobre `GV_UxB` empresa `LK`. Reemplaza a la tabla **con el mismo contrato**, así las 4 vistas de negocio no se tocaron por dentro |
+| `GV_UxB.curado` | `true` = lo decidió Thomas o una resolución manual (307 filas) |
+| trigger `gv_uxb_protege_curado` | el sync (`origen = 'sync_lk'`) **no pisa** una fila curada |
+| trigger `gv_uxb_normaliza_cod` | normaliza el `cod` en cada insert/update |
+| `GV_UxB.uxb` **nullable** | "no tengo el dato" ya no se escribe como `1` |
+| `gv_uxb_sin_dato` (vista) | los 21 códigos que quedaron sin UxB real |
+| `GV_Cod_Dos_Productos` | 12 códigos que son **dos productos distintos** según la empresa (26, 29, 34, 36, 37, 42, 43, 51, 655, 658, 659, 724) |
+
+**La Edge Function también cambió** (`sync-precios-venta` v10): escribe en `GV_UxB` con
+`on_conflict=empresa,cod` y `origen='sync_lk'`, y **descarta `uxb <= 1`** en los dos destinos —
+`GV_UxB` y `precios_venta`— porque sin dato es mejor que un dato falso.
+
+**Cómo se repuntaron los consumidores sin romper nada:** `create or replace view` sobre los 7,
+reemplazando el texto `cob_uxb_lk` → `gv_uxb_lk` en `pg_get_viewdef`. Sin `drop`, así los tipos de
+columna quedan idénticos. Medición antes/después:
+
+| Vista | Filas antes | Filas después | Importe antes | Importe después |
+|---|---|---|---|---|
+| `vista_facturacion_neto_items` | 10.604 | 10.604 | 1.382.133.599,36 | **1.384.819.066,43** |
+| `vista_plata_perdida` | 902 | 902 | 114.804.139,00 | 114.804.139,00 |
+| `vista_facturable_anticipado` | 724 | 724 | 77.398.271,37 | 77.398.271,37 |
+| `cobranzas_precios_super` | 522 | 522 | — | — |
+
+El único importe que se movió es el de Facturación, y es el arreglo de arriba.
+
+**Centinela**
+
+```sql
+select count(*) from public.gv_uxb_desalineado;   -- 0
+select * from public.gv_uxb_sin_dato;             -- 21 códigos sin UxB real
+```
+
+Al 12/09 el centinela da **4 filas, todas del cod 067** (Sacacorcho Tipo Mozo Suelto): el catálogo de
+LK y `precios_venta` dicen **50**, y `Articulos_Cajas` / `OC_Maximos` / el maestro dicen **60**. Está
+**sin resolver a propósito**, esperando que Thomas diga cuál es. No se curó ninguno de los dos valores
+para que el centinela lo siga mostrando.
+
+Archivo: `sql/gv_uxb_redireccion_v1621.sql`. Rollback en `docs/ROLLBACK-PRODUCCION.md`.

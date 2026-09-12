@@ -1,8 +1,9 @@
 // sync-precios-venta — refresca precios_venta (LK), precios_venta_chef (Chef) y
-// cob_uxb_lk desde:
+// GV_UxB (empresa=LK) desde:
 //   1. LK products + item_precios(origen=manual) (WEB_SERVICE_KEY) → precios_venta
 //   2. Chef products (CHEF_KEY — publishable key, lectura pública) → precios_venta_chef
-//   3. LK products ∪ loke_products ∪ item_precios(manual) → cob_uxb_lk
+//   3. LK products ∪ loke_products ∪ item_precios(manual) → GV_UxB (empresa=LK)
+// v16.21 (2026-09-12): el destino 3 pasó de la tabla cob_uxb_lk a GV_UxB, la única de UxB.
 // v14.44: listas SEPARADAS por empresa (antes merge con "Chef gana", ensuciaba LK).
 // v14.47: RECONCILIA — borra de cada mirror lo que ya no está en su catálogo de origen,
 //         así precios_venta = catálogo LK exacto y precios_venta_chef = catálogo Chef exacto
@@ -135,7 +136,9 @@ Deno.serve(async (_req: Request): Promise<Response> => {
         if (!cod || !p.list_price || p.list_price <= 0) continue;
         m.set(cod, {
           precio_unit: p.list_price,
-          uxb: p.uxb ?? null,
+          // v16.21: uxb <= 1 es el placeholder de "no sé" del catálogo; guardarlo como null.
+          // Con el 1 adentro, Facturación cobraba unidades donde iban cajas.
+          uxb: p.uxb && p.uxb > 1 ? p.uxb : null,
           descripcion: (p.description || "").slice(0, 200),
         });
       }
@@ -157,16 +160,24 @@ Deno.serve(async (_req: Request): Promise<Response> => {
     const nPreciosChef = preciosChefRows.length ? await upsert("precios_venta_chef", "cod", preciosChefRows) : 0;
     if (preciosChefRows.length) await reconcileStale("precios_venta_chef", nowIso);
 
-    // ── 4) cob_uxb_lk — uxb de LK products ∪ loke_products ∪ manuales ──
+    // ── 4) GV_UxB (empresa='LK') — uxb de LK products ∪ loke_products ∪ manuales ──
+    // v16.21: dos guardas nuevas.
+    //   a) uxb <= 1 NO se escribe: en el catálogo de LK el 1 es un placeholder de "no sé" y
+    //      viajaba tal cual, así que Facturación cobraba 5 unidades donde iban 5 cajas de 24
+    //      (029 Colador Ø16). Sin dato es mejor que un dato falso.
+    //   b) las filas curadas a mano (listado de Thomas) las protege el trigger
+    //      gv_uxb_protege_curado de GV_UxB: este sync no las pisa.
     const lokeProducts = await fetchAll(LK_URL, LK_KEY, "loke_products", "cod,list_price,uxb,description");
     const uxbMap = new Map<string, number>();
     for (const p of [...lkProducts, ...lokeProducts, ...lkManuales]) {
       const cod = (p.cod || "").trim();
-      if (!cod || !p.uxb) continue;
+      if (!cod || !p.uxb || p.uxb <= 1) continue;
       uxbMap.set(cod, p.uxb);
     }
-    const uxbRows = Array.from(uxbMap, ([cod, uxb]) => ({ cod, uxb }));
-    const nUxb = await upsert("cob_uxb_lk", "cod", uxbRows);
+    const uxbRows = Array.from(uxbMap, ([cod, uxb]) => ({
+      empresa: "LK", cod, uxb, origen: "sync_lk", actualizado: nowIso,
+    }));
+    const nUxb = await upsert("GV_UxB", "empresa,cod", uxbRows);
 
     return json({
       ok: true,
@@ -177,7 +188,7 @@ Deno.serve(async (_req: Request): Promise<Response> => {
       precios_chef: chefProducts.filter(p => (p.cod || "").trim() && p.list_price && p.list_price > 0).length,
       chef_error: chefError || undefined,
       manual_error: manualError || undefined,
-      cob_uxb_lk: nUxb,
+      gv_uxb: nUxb,
       ts: nowIso,
     });
   } catch (e) {

@@ -821,6 +821,23 @@ los lectores antes de pelar `cod_art`.
 
 **Backup de la definición previa:** tabla `public."GV_Backup_vista_saldos_def_20260912"`
 (columna `definicion`, RLS prendida).
+## v16.21 (2026-09-12) — se borró la tabla `cob_uxb_lk`; `GV_UxB` es la única de UxB
+
+**Objetos compartidos tocados:** las vistas `vista_plata_perdida`, `vista_facturacion_neto_items`,
+`vista_facturable_anticipado`, `cobranzas_precios_super`, `gv_articulo_empresa` (sólo se les cambió
+la fuente `cob_uxb_lk` → `gv_uxb_lk`, nada más de la definición), las tablas `proyeccion_madre`,
+`OC_Maximos`, `precios_venta` (se les corrigió el UxB placeholder), y la Edge Function
+`sync-precios-venta` (v10). Se borró `public.cob_uxb_lk`.
+
+**Impacto medido:** `vista_facturacion_neto_items` pasa de $1.382.133.599,36 a $1.384.819.066,43
+(+$2.685.467, +0,19 %) con las **mismas 10.604 filas**. Es el arreglo de un bug real: el catálogo de
+LK manda `uxb = 1` como "no sé" y Facturación cobraba unidades en vez de cajas (029 Colador Ø16:
+5 cajas × 24 u se facturaban como 5 × 1). Las otras tres vistas de negocio no se movieron ni una fila
+ni un peso.
+
+**Backups:** `GV_Redir_bkp_20260912` (cob_uxb_lk + las otras 3 tablas, antes), 
+`GV_UxB_bkp_prenorm_20260912`, `GV_UxB_pre_sync_20260912`, `GV_Viewdefs_bkp_20260912b`
+(definición + grants de las 7 vistas), `GV_Baseline_20260912` (filas e importes de antes).
 
 **Rollback exacto:**
 
@@ -892,3 +909,37 @@ select id, objeto, definicion from public."GV_Backup_vista_saldos_def_20260912" 
 
 ⚠ Rollear la vista obliga a rollear la app a **v16.15 o anterior** (desde la v16.16 el front
 pide `clave`). Notas: `sql/gv_vista_saldos_pelar_cod_art_v1620.sql`.
+-- 1) volver la tabla con su contenido original
+create table public.cob_uxb_lk as
+  select cod, uxb::int uxb from public."GV_Redir_bkp_20260912" where tabla = 'cob_uxb_lk';
+alter table public.cob_uxb_lk add primary key (cod);
+grant select, insert, update, delete on public.cob_uxb_lk to anon, authenticated, service_role;
+
+-- 2) volver las 7 vistas a su definición previa
+do $$
+declare r record;
+begin
+  for r in select nombre, def, grants from public."GV_Viewdefs_bkp_20260912b" loop
+    execute format('create or replace view public.%I as %s', r.nombre, r.def);
+    if r.grants is not null then execute r.grants; end if;
+  end loop;
+end $$;
+drop view if exists public.gv_uxb_lk;
+
+-- 3) volver el UxB de las 3 tablas
+update public.proyeccion_madre m set uxb = b.uxb::int
+  from public."GV_Redir_bkp_20260912" b where b.tabla='proyeccion_madre' and b.cod = m.cod;
+update public."OC_Maximos" o set uni_x_caja = b.uxb
+  from public."GV_Redir_bkp_20260912" b where b.tabla='OC_Maximos' and b.cod = o.cod;
+update public.precios_venta p set uxb = b.uxb::int
+  from public."GV_Redir_bkp_20260912" b where b.tabla='precios_venta' and b.cod = p.cod;
+
+-- 4) sacar los triggers y volver GV_UxB a como estaba
+drop trigger if exists gv_uxb_protege_curado_trg on public."GV_UxB";
+drop trigger if exists gv_uxb_normaliza_cod_trg on public."GV_UxB";
+truncate public."GV_UxB";
+insert into public."GV_UxB" select * from public."GV_UxB_bkp_prenorm_20260912";
+
+-- 5) la Edge Function: redeployar la v9 (el diff está en el commit de la v16.21,
+--    supabase/functions/sync-precios-venta/index.ts)
+```
