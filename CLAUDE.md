@@ -682,6 +682,37 @@ ALTER TABLE Capacidad_Sector ADD COLUMN nueva_col TEXT;
 **Historial de incidentes:** 2026-08-07 — TRUNCATE accidental de Capacidad_Sector (730 registros
 perdidos). Lección aprendida → este protocolo existe.
 
+⚠⚠ **`DROP ... CASCADE`: contar los dependientes TRANSITIVOS, no los directos.** Un
+`create or replace` no existe para matviews, así que tocar `vista_stock_procesada` obliga a
+DROP + CREATE. Las dos veces que se hizo (v16.20 y v16.33) el CASCADE se llevó
+`gv_importados_ordenes` —que cuelga en **segundo** nivel, vía `gv_importados_stock_dep`— y la
+pantalla de Importados quedó en 404. La segunda vez fue con una consulta de dependencias ya
+hecha: devolvía sólo las directas. Antes de cualquier DROP CASCADE:
+
+```sql
+with recursive dep as (
+  select c.oid, c.relname, c.relkind, 1 lvl
+    from pg_class c where c.oid = 'public.<el objeto>'::regclass
+  union
+  select c.oid, c.relname, c.relkind, dep.lvl + 1
+    from dep
+    join pg_depend d  on d.refobjid = dep.oid
+    join pg_rewrite r on r.oid = d.objid
+    join pg_class c   on c.oid = r.ev_class and c.oid <> dep.oid
+)
+select lvl, relkind, relname from dep where lvl > 1 order by lvl, relname;
+```
+
+Respaldar la definición + opciones + grants de **todas** las que salgan, recrearlas en la misma
+transacción, y después mirar `select * from public.gv_endpoints_rotos;` — es el centinela que
+cazó las dos veces.
+
+⚠ **Y el CREATE completo de cada vista va EN EL REPO, no "aplicado en la base".** Lo que hizo
+cara la recuperación no fue el CASCADE: fue que la v16.30 se había aplicado como reemplazo de
+texto sobre `pg_get_viewdef`, así que el repo no tenía la definición viva y hubo que
+reconstruirla juntando un archivo viejo con instrucciones en prosa. Si se parchea una vista con
+`replace()` sobre su propia definición, **guardar después el `CREATE` resultante completo**.
+
 **2026-09-11 (v15.44) — `index.html` y `sw.js` pusheados VACÍOS a `main`: la app quedó en blanco
 con los operarios pickeando.** Causa: un script de edición que abría el archivo en modo `w` dentro
 de la misma expresión que lo leía (`open(p,"w").write(open(p).read()...)`); Python evalúa el `open`

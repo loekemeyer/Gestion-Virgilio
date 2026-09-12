@@ -9296,3 +9296,41 @@ select * from public.gv_stock_procesada_dup;
 ```
 
 Facturación neto **$1.395.224.315,83 sin moverse** · centinelas en 0.
+
+---
+
+### §3.dj — v16.34: el CASCADE de la v16.33 se llevó `gv_importados_ordenes` (segunda vez) — 2026-09-12
+
+**Pisé la misma piedra que la v16.20.** El `DROP MATERIALIZED VIEW vista_stock_procesada CASCADE`
+de la v16.33 se llevó `gv_importados_ordenes` y la pantalla de **Importados** quedó en 404 unos
+20 minutos, hasta que el centinela lo cantó.
+
+**Por qué se repitió, habiendo mirado las dependencias:** la consulta que corrí antes del DROP
+devolvía las dependientes **directas** (`Stock_Saldos`, `gv_importados_stock_dep`), que respaldé y
+recreé bien. Pero `gv_importados_ordenes` cuelga de `gv_importados_stock_dep`, o sea **segundo
+nivel**, y CASCADE baja hasta el fondo. Mirar un nivel es peor que no mirar ninguno: da la
+sensación de haber chequeado.
+
+**Lo cazó `gv_endpoints_rotos`**, que pasó de 0 a 1 en la corrida de salud siguiente. Ese
+centinela ya salvó las dos veces; vale correrlo **después de cada DDL**, no sólo al abrir sesión.
+
+**La regla, ahora en `CLAUDE.md`:** antes de un DROP CASCADE, listar los dependientes
+**transitivos** con un `with recursive` sobre `pg_depend`/`pg_rewrite` (la consulta está escrita
+ahí y en `sql/gv_stock_procesada_dup_v1633.sql`), respaldar def + opciones + grants de todas, y
+después mirar el centinela.
+
+**Y la segunda lección, la que hizo cara la recuperación.** No hubo backup de la definición viva
+porque la v16.30 se había aplicado como **reemplazo de texto sobre `pg_get_viewdef`**: el repo
+tenía el CREATE de la v16.26 y, aparte, las sustituciones descritas *en prosa*. Reconstruirla fue
+juntar las dos cosas a mano. Ahora `sql/gv_importados_ordenes_completa_v1634.sql` tiene la
+definición **entera**, con el CTE `gux` incorporado. La regla del repo —*el CREATE completo de
+cada objeto va en el repo, no "aplicado en la base"*— existe exactamente para esto: si se parchea
+una vista con `replace()` sobre su propia definición, hay que guardar después el CREATE completo.
+
+**Verificación de la restauración** — idéntica a los números que la v16.26 dejó anotados:
+
+```
+156 filas · 18.173 cajas brutas · 1.351 pedidas · 17.130 disponibles
+584E (el testigo del dueño): 6 u/caja · 15 − 5 = 10 cajas · 60 unidades
+anon lee las 156 · gv_endpoints_rotos de vuelta en 0
+```

@@ -28,6 +28,30 @@
 --   migración las respalda y las vuelve a crear con sus opciones y sus grants, todo en UNA
 --   transacción.
 --
+-- ⚠⚠ Y NO ALCANZA CON MIRAR UN NIVEL. Acá me equivoqué: la consulta de dependencias que corrí
+--   antes del DROP devolvía sólo las DIRECTAS, y `gv_importados_ordenes` cuelga de
+--   `gv_importados_stock_dep`, o sea segundo nivel. CASCADE baja hasta el fondo, así que se la
+--   llevó y la pantalla de Importados quedó en 404 hasta que la recreé
+--   (`sql/gv_importados_ordenes_completa_v1634.sql`). **Es la segunda vez que pasa**: el mismo
+--   CASCADE se la había llevado en la v16.20. La cazó el centinela `gv_endpoints_rotos`, que
+--   pasó de 0 a 1.
+--
+--   Antes de un DROP CASCADE, listar los dependientes TRANSITIVOS:
+--
+--     with recursive dep as (
+--       select c.oid, c.relname, c.relkind, 1 lvl
+--         from pg_class c where c.oid = 'public.<el objeto>'::regclass
+--       union
+--       select c.oid, c.relname, c.relkind, dep.lvl + 1
+--         from dep
+--         join pg_depend d  on d.refobjid = dep.oid
+--         join pg_rewrite r on r.oid = d.objid
+--         join pg_class c   on c.oid = r.ev_class and c.oid <> dep.oid
+--     )
+--     select lvl, relkind, relname from dep where lvl > 1 order by lvl, relname;
+--
+--   Y DESPUÉS del CREATE, mirar `select * from public.gv_endpoints_rotos;` — para eso está.
+--
 -- MEDICIÓN antes/después — idéntica, o sea que sobre los datos de hoy el cambio es un no-op
 -- comprobado, y lo único que hace es que no pueda volver a fallar:
 --
