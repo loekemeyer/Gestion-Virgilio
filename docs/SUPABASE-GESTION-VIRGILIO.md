@@ -9064,3 +9064,78 @@ facturación $1.395.224.315,83 igual · `vista_saldos_stock` 488 · `vista_stock
 `Registros_Produccion_Virgilio` 30.936. Nada se movió.
 
 Archivo: `sql/gv_backups_a_esquema_propio_v1627.sql`.
+
+### §3.df — v16.28: GV_UxB pasa a ser la única fuente, se elimina la cascada — 2026-09-12
+
+Thomas: *"Primero limpia las uxb. Que solo haya una y que todos los lugares que usan esas
+tablas usen solo 1 lugar."*
+
+**Lo que mantenía vivas las 8 columnas era la cascada de fallback.** Los tres resolvedores
+consultaban `GV_UxB` y, si no encontraban el código, bajaban por `Articulos_Cajas` →
+`OC_Maximos` → maestro → `precios_venta` → `proyeccion_madre`. Mientras esa cascada existiera,
+**ninguna columna se podía sacar**: cualquiera podía ser la que respondiera.
+
+De 960 filas resueltas, **300 no salían de `GV_UxB`**:
+
+| fuente | filas |
+|---|--:|
+| `OC_Maximos` | 217 |
+| `gv_uxb_lk` | 36 |
+| `precios_venta` | 21 |
+| maestro | 19 |
+| `Articulos_Cajas` | 4 |
+| `proyeccion_madre` | 2 |
+
+**¿Había que decidir algo? No: las 5 fuentes coinciden en las 300. Cero conflictos.** Se
+absorbieron tal cual, sin inventar ningún valor. Los 36 de `gv_uxb_lk` no eran otra fuente:
+eran códigos que están en `GV_UxB` como LK y el resolvedor caía a ese valor para CH — correcto
+salvo para los 12 duales, que ya tienen sus dos lados. Ahora quedan explícitos.
+
+#### `Despiece x Articulo` no se absorbió, y conviene saber por qué
+
+Tiene **dos** columnas de UxB, `Uni x Cja` (vieja) y `Uni_x_Caja` (nueva), y difiere en 21
+códigos. Al mirarlos, **la vieja coincide con lo resuelto en 18 de 21 y la nueva no**:
+
+| cod | nueva | vieja | resuelto |
+|---|--:|--:|--:|
+| 101 Abrelata a Manija | 12 | **6** | 6 |
+| 307 Cepillo Limp Vaso | 100 | **24** | 24 |
+| 390-394 Nylon 1 Pza | 12 | **24** | 24 |
+| 859/862/863/908 | 24 | **12** | 12 |
+
+Los otros 3 (500, 508, 708) discrepan en las dos, y ahí lo resuelto coincide con lo que Thomas
+ya había decidido (*"508 x6"*, *"708 x6"*). O sea: **`Despiece x Articulo.Uni_x_Caja` está mal
+cargada y no es fuente confiable.** Queda anotada como columna a limpiar.
+
+`GRJ10` se sacó de `GV_UxB`: no es un artículo, son **4 partes distintas del batidor pera** bajo
+un mismo código de despiece. No le corresponde un UxB único.
+
+#### El contrato de salida no cambió — y casi se rompe
+
+Al reescribir `vista_uni_x_caja` leyendo sólo `GV_UxB`, pasó de 599 a **523** filas: se perdían
+las **75 grafías `NNNL`** (505L, 438EL — el artículo de Loeke vendido por Chef), porque
+`gv_cod_stock` las colapsa al código base y sus consumidores joinean por la grafía cruda. Hoy
+ninguno pedía una con L, así que no se rompió nada visible — **pero era un pozo esperando**. La
+vista final emite **las dos grafías**, cada una resolviendo contra la fuente única.
+
+**Medido después:** `vista_uni_x_caja` 598 (era 599, falta sólo `GRJ10`) · `vista_uxb_articulo`
+523 (igual) · `vista_stock_procesada` 363 con **0 filas sin uxb** tras el refresh ·
+`vista_generador_oc` 349 con los mismos 8 en cero que ya tenía (`LIBRE`, `(no existe)`, `505C`
+y otras partes: no son artículos) · `vista_importados_partes` 5 · facturación
+**$1.395.224.315,83 sin moverse** · centinelas en 0.
+
+#### Lo que falta para poder DROPEAR las columnas
+
+Los lectores **directos**, que leen la columna sin pasar por los resolvedores:
+
+| columna | quién la lee todavía |
+|---|---|
+| `Articulos_Cajas.Uni_x_Caja` | **nadie** → lista para dropear |
+| `OC_Maximos.uni_x_caja` | `vista_generador_oc`, `vista_stock_procesada` |
+| `proyeccion_madre.uxb` | `vista_generador_oc` |
+| maestro `.Uni_x_Caja` | `v_piezas_por_tallerista`, `vista_racks_bajadas_pendientes` |
+| `Importados.uni_x_caja` | `gv_importados_ordenes`, `vista_importados_partes` |
+| `precios_venta(.chef).uxb` | las vistas de valuación |
+| `Despiece x Articulo.Uni_x_Caja` | `v_piezas_por_tallerista` (y está mal cargada) |
+
+Archivo: `sql/gv_uxb_fuente_unica_v1628.sql`.
