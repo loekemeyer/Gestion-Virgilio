@@ -9372,3 +9372,54 @@ tocan ni con el OK.
 códigos). El primer intento de medir dio 3.821 filas por multiplicar. Hay que agrupar por código
 antes de comparar. Y los joins con `gv_cod_stock()` sobre la tabla cruda tumbaron la conexión:
 van materializados con índice (`zz_backups."GV_tmp_despiece_map"` y `"GV_tmp_gvuxb_map"`).
+
+---
+
+### §3.dl — v16.36: `GV_UxB` queda como la ÚNICA fuente genérica de UxB — 2026-09-12
+
+Último tramo de lo que pidió el dueño (*"que solo haya una y que todos los lugares que usan esas
+tablas usen solo 1 lugar"*). Detalle, mediciones y rollback en
+`sql/gv_uxb_fuente_unica_facturacion_v1636.sql`.
+
+**Por qué urgía:** la Edge Function `sync-precios-venta` dejó de escribir el UxB en
+`precios_venta` (v16.22) **y en `precios_venta_chef`** — verificado en el fuente, hoy sólo
+escribe `GV_UxB`. Esas dos columnas quedaron **congeladas** y seguían siendo el fallback de la
+facturación: mientras `GV_UxB` tuviera todos los códigos no pasaba nada, pero el día que faltara
+uno se facturaba con un número que ya nadie actualiza, callado.
+
+**Cinco vistas repuntadas**, todas medidas como no-op:
+
+| vista | cambio | medición |
+|---|---|---|
+| `vista_facturacion_neto_items` | `COALESCE(ps, pcl, uxe, pv, ux)` → `COALESCE(ps, pcl, uxe)` | **0 filas de diferencia** fila a fila |
+| `vista_facturable_anticipado` ×2 | saca `pv`, `ux` | 724 filas · $77.843.819,56 |
+| `vista_plata_perdida` ×2 | saca `pv`, `ux` | **0 filas de diferencia** fila a fila |
+| `gv_ppp_np_valor` | sólo `gv_uxb_emp` | 909 NP · $1.395.961.659,00 |
+| `cobranzas_precios` | `precios_venta(_chef).uxb` → lookup a `GV_UxB` | 327 filas, **1 cambia** |
+
+`pcl` (`GV_Precios_Cliente`) y `ps` (`cobranzas_precios_super`) **no se tocan**: van antes que
+`GV_UxB` a propósito, son el UxB pactado por cliente y por súper.
+
+⚠ **La trampa, y por poco no la veo.** Sacar `pv.uxb` (4º de la cadena) y `ux.uxb` (5º) **no
+alcanzaba**: `ps` —el PRIMERO, el de mayor prioridad— es `cobranzas_precios_super`, que cuelga de
+`cobranzas_precios`, que tomaba su `uxb` de `precios_venta.uxb`. La columna congelada seguía
+entrando **por la puerta de adelante**. Lección: en una cadena de `COALESCE`, seguir cada eslabón
+hasta su tabla real antes de dar por cerrado el reemplazo.
+
+**El caso 824.** `cobranzas_precios` decía 12 y `GV_UxB` dice 36; gana `GV_UxB`, que tiene esa
+fila con `curado = true` y `origen = 'Thomas 12/09/2026 (corrige el listado)'`. El 12 venía de la
+lista congelada de Chef. Hoy no mueve un peso —las 36 líneas facturadas con 824 ($9.371.221,20)
+ya resuelven en 36 porque ninguna tiene `super_key`— pero la próxima línea de súper con ese
+código se habría facturado a un tercio. Es el mismo 824 del bug de +$6.072.000 de esta sesión.
+
+**Dónde quedó `precios_venta.uxb`:** un `drop column` de prueba (en `begin/rollback`) pasó de ser
+rechazado por **6 vistas / 16 objetos** a serlo por **2**, y ninguna es de producción:
+`gv_bkp_facneto_items_v1604` (vista de backup que corresponde mover a `zz_backups`) y
+`gv_uxb_desalineado` (el centinela, cuya rama de `precios_venta` muere junto con la columna).
+**No se dropeó**: es el paso irreversible y va en una pasada propia.
+
+**Hallazgo aparte, registrado en la auditoría:** de las 135 vistas de `public`, **50 no tienen
+`security_invoker` y 45 de ésas las lee `anon`** — corren como `postgres` y saltean la RLS. Mismo
+agujero que costó una filtración el 2026-09-04. No se arregló en bloque porque prender el invoker
+puede dejar una vista en 0 filas si la RLS de alguna tabla base no le da acceso a `anon`: va vista
+por vista, comprobando antes, como se hizo con `vista_ppp_pedidos_entregados`.

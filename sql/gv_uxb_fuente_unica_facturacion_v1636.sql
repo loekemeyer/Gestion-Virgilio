@@ -1,0 +1,77 @@
+-- gv_uxb_fuente_unica_facturacion_v1636.sql — APLICADO 2026-09-12.
+--
+-- ÚLTIMO TRAMO de "que todos los lugares usen un solo lugar": sacar `precios_venta.uxb` y el
+-- shim `gv_uxb_lk` de las cadenas de resolución de UxB, para que **`GV_UxB` sea la única fuente
+-- genérica**. `precios_venta` queda como lo que es: la lista de PRECIOS.
+--
+-- POR QUÉ URGÍA. La Edge Function `sync-precios-venta` dejó de escribir el UxB en
+-- `precios_venta` (v16.22) y en `precios_venta_chef` — verificado en el fuente: hoy sólo escribe
+-- `GV_UxB`. O sea que esas dos columnas están **congeladas**, y seguían siendo el fallback de la
+-- facturación. Mientras `GV_UxB` tuviera todos los códigos no pasaba nada; el día que faltara
+-- uno, se facturaba con un número que ya nadie actualiza, en silencio.
+--
+-- ── LO QUE SE TOCÓ (5 vistas) ────────────────────────────────────────────────────────────
+--
+-- | vista | antes | ahora |
+-- |---|---|---|
+-- | `vista_facturacion_neto_items` | `COALESCE(ps, pcl, uxe, pv, ux)` | `COALESCE(ps, pcl, uxe)` |
+-- | `vista_facturable_anticipado` (×2) | `COALESCE(pcl, uxe, pv, ux)` | `COALESCE(pcl, uxe)` |
+-- | `vista_plata_perdida` (×2) | `COALESCE(pcl, uxe, pv, ux, 1)` | `COALESCE(pcl, uxe, 1)` |
+-- | `gv_ppp_np_valor` | `COALESCE(gv_uxb_emp, CASE chef→pc.uxb ELSE pv.uxb END)` | sólo `gv_uxb_emp` |
+-- | `cobranzas_precios` | `precios_venta.uxb` / `precios_venta_chef.uxb` | lookup a `GV_UxB` por empresa |
+--
+-- `pcl` = `GV_Precios_Cliente` y `ps` = `cobranzas_precios_super`: **no se tocan**, van antes que
+-- `GV_UxB` a propósito porque son el UxB pactado por cliente y por súper.
+--
+-- ⚠ LA TRAMPA, y por poco no la veo: sacar `pv.uxb` (4º de la cadena) y `ux.uxb` (5º) NO
+--   alcanzaba. `ps` —el PRIMERO, o sea el de mayor prioridad— es `cobranzas_precios_super`, que
+--   cuelga de `cobranzas_precios`, que tomaba su `uxb` de… `precios_venta.uxb`. La columna
+--   congelada seguía entrando por la puerta de adelante. Por eso `cobranzas_precios` también
+--   se repuntó.
+--
+-- ── MEDICIÓN, vista por vista (no-op comprobado en las cinco) ─────────────────────────────
+--
+--   vista_facturacion_neto_items : $1.395.224.315,83 ent · $1.501.262.225,09 ped · 10.604
+--     líneas · 0 sin uxb — y **0 filas de diferencia** comparando fila a fila (np, cod, uxb,
+--     importe_ent, importe_ped) contra la versión vieja, no sólo los totales.
+--   vista_facturable_anticipado  : 724 filas · $77.843.819,56 · 0 sin uxb
+--   vista_plata_perdida          : **0 filas de diferencia** (comparación fila a fila completa)
+--   gv_ppp_np_valor              : 909 NP · $1.395.961.659,00 · 10.629 líneas · 347 sin precio
+--   cobranzas_precios            : 327 filas, **una sola cambia** — CH `824`, de 12 a 36.
+--
+-- ── EL CASO 824, que vale leer ───────────────────────────────────────────────────────────
+-- `cobranzas_precios` decía 12 y `GV_UxB` dice 36. Gana `GV_UxB`: esa fila está
+-- `curado = true` con `origen = 'Thomas 12/09/2026 (corrige el listado)'`, o sea el dueño la
+-- corrigió a mano por encima de su propio listado. El 12 venía de `precios_venta_chef`, la lista
+-- congelada. **Hoy no mueve un peso**: las 36 líneas facturadas con el código 824
+-- ($9.371.221,20) ya resuelven en 36 vía `GV_UxB`, porque ninguna tiene `super_key` y por lo
+-- tanto no pasan por `ps`. Pero la próxima línea de súper con 824 se habría facturado a un
+-- tercio.
+--
+-- Y no es casualidad que sea 824: es el mismo código del bug de facturación de esta misma
+-- sesión (33 NP valuadas con la lista congelada de Chef, +$6.072.000).
+--
+-- ── DÓNDE QUEDÓ `precios_venta.uxb` ──────────────────────────────────────────────────────
+-- Antes del cambio, un `alter table … drop column uxb` dentro de un `begin/rollback` era
+-- rechazado por **6 vistas** que cascadeaban a **16 objetos**. Ahora quedan **2**, y ninguna es
+-- de producción:
+--
+--   · `gv_bkp_facneto_items_v1604` — vista de backup que quedó en `public`; corresponde moverla
+--     a `zz_backups` (política de backups).
+--   · `gv_uxb_desalineado` — el centinela que compara `GV_UxB` contra las copias. Su rama de
+--     `precios_venta` pierde sentido cuando la columna muera; se saca junto con el `drop`.
+--
+-- Con esas dos resueltas, la columna se puede dropear. **No se dropeó todavía**: es el paso
+-- irreversible y conviene dejarlo para una pasada propia.
+--
+-- BACKUP de las 5 definiciones: `zz_backups."GV_Backup_viewdefs_uxb_chain_20260912"`
+-- (obj, def, opts). ROLLBACK de cualquiera:
+--
+--   do $$ begin execute 'create or replace view public.<vista> as '
+--     || (select def from zz_backups."GV_Backup_viewdefs_uxb_chain_20260912"
+--          where obj = '<vista>'); end $$;
+--
+-- ⚠ ANOTADO APARTE: las 5 tienen `reloptions` en null, o sea **ninguna tiene
+--   `security_invoker`** — corren como `postgres` y saltean la RLS. Es el mismo hallazgo que
+--   `vista_ppp_pedidos_entregados` (v16.33). No se tocó acá para no mezclar dos cambios en una
+--   misma pasada, pero **hay que barrer todas las vistas de `public` buscando lo mismo**.
