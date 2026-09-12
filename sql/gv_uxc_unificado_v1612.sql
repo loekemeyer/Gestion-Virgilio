@@ -1,0 +1,57 @@
+-- ============================================================================
+-- v16.12 (2026-09-12) — uni_x_caja: los 16 códigos que Thomas resolvió, y 7
+-- discontinuados. Sigue del v16.11 (coladores). Problema 69.
+--
+-- Backup: public."GV_UxC_bkp2_20260912" (51 filas de las 4 tablas tocadas).
+--
+-- Valores del dueño (12/09), aplicados en Articulos_Cajas, OC_Maximos,
+-- "Articulos Virgilio X Tallerista" e Importados:
+--   255 Mate Inox Térmico ........ 8     508 Sacafuentes Articulado ... 6
+--   256 Mate Madera Cerámica ..... 8     589E Pelador Mgo Plástico ... 24
+--   55215 Palo de Amasar 40 cm .. 24     590ES Pincel Silicona suelto  50
+--   657 Cucharón Nylon Verde .... 12     658 Bombilla Básica Larga ... 24
+--   101 Abr Manija Loke .......... 6     708 Sacafuente ............... 6
+--   280 Manga Repostera ......... 12     838E Rallador Cilíndrico ... 12
+--   034 Filtro de Café Gastr. ... 24     858 Pala de Canelones ...... 12
+--                                        870E Mandolina 3 Grosores ... 4
+--                                        877E Corta Pizza Ergonómico  12
+--
+-- DISCONTINUADOS (van a Articulos_Discontinuados, no se les fija uxc):
+--   631, 632, 633, 634, 635, 636 — la familia de acero inox con mango de Chef,
+--     "no se reponen más".
+--   724 Sacacorcho Espumante — "es discontinuo".
+--
+-- NO SE TOCARON: 026 y 043 (dos productos bajo el mismo código, ver abajo) y los
+-- DISPLAY 801 / 901 / 910 / 911, que siguen con compra 12 contra factura 36.
+--
+-- RESULTADO: los conflictos entre vista_uni_x_caja (COMPRA) y vista_uxb_articulo
+-- (FACTURA) bajaron de 33 a 4 (los DISPLAY).
+--
+-- ROLLBACK: public."GV_UxC_bkp2_20260912" tiene tabla/cod/marca/descripcion/uxc
+-- previos de cada fila; y `delete from public."Articulos_Discontinuados"
+-- where motivo like '%dueno 12/09/2026%';`
+--
+-- ---------------------------------------------------------------------------
+-- ⚠ HALLAZGO GRAVE: `vista_uxb_articulo` es NO DETERMINISTA
+-- ---------------------------------------------------------------------------
+-- Sus tres CTE usan
+--     SELECT DISTINCT ON (norm_cod(cod)) ... ORDER BY (norm_cod(cod))
+-- o sea DISTINCT ON **sin desempate**. Cuando un código tiene DOS filas en
+-- `Articulos_Cajas` (hay 21, 18 con Uni_x_Caja distinto), cuál gana lo decide el
+-- plan de ejecución y **puede cambiar entre corridas sin que nadie toque nada**.
+--
+-- Comprobado en vivo el 12/09 con el 026: en una consulta devolvió 12 y minutos
+-- después, sin ningún cambio en esa fila, devolvió 36. El 026 es COLADOR N°8 en LK
+-- (36) y PINZA DE FIDEOS AC INOX VERDE en Chef (12); el 043 es COLADOR 10 CM en LK
+-- (24) y TRES EN UNO en Chef (12) — el dueño confirmó que 043 "no es colador, es
+-- tres en uno en chef".
+--
+-- O sea que el Excel de ISIS puede salir con un uxb distinto de una vez a la otra.
+-- Arreglarlo NO es cambiar un número: la vista tiene que mirar la EMPRESA, o esos
+-- códigos tienen que separarse. Queda abierto en el problema 69.
+--
+-- Chequeo:
+--   select regexp_replace(upper(btrim("Cod_Art")),'^0+(?=.)','') cod, count(*),
+--          string_agg("Marca"||' '||"Descripcion"||' = '||"Uni_x_Caja", ' | ')
+--     from public."Articulos_Cajas" group by 1 having count(distinct "Uni_x_Caja") > 1;
+-- ============================================================================

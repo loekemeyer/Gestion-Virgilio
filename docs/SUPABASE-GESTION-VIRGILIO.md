@@ -8340,3 +8340,62 @@ select regexp_replace(upper(btrim("Cod_Art")),'^0+(?=.)','') cod, count(*) filas
 ```
 
 Archivo: `sql/gv_uxc_coladores_v1611.sql`.
+
+## §3.cv — `uni_x_caja`: 16 códigos resueltos por el dueño, 7 discontinuados, y una vista NO DETERMINISTA (v16.12) — 2026-09-12
+
+Sigue de la §3.cu (coladores). Thomas fue código por código sobre los 28 que quedaban en conflicto
+entre **`vista_uni_x_caja` (COMPRA)** y **`vista_uxb_articulo` (FACTURA)**.
+
+**Aplicado en las 4 tablas** (`Articulos_Cajas`, `OC_Maximos`, `Articulos Virgilio X Tallerista`,
+`Importados`), backup en `public."GV_UxC_bkp2_20260912"`:
+
+| Cód | | Cód | |
+|---|---|---|---|
+| 255 Mate Inox Térmico | **8** | 508 Sacafuentes Articulado | **6** |
+| 256 Mate Madera Cerámica | **8** | 589E Pelador Mgo Plástico | **24** |
+| 55215 Palo de Amasar 40 cm | **24** | 590ES Pincel Silicona **suelto** | **50** |
+| 657 Cucharón Nylon Verde | **12** | 658 Bombilla Básica Larga | **24** |
+| 101 Abr Manija Loke | **6** | 708 Sacafuente | **6** |
+| 280 Manga Repostera + 4 boq. | **12** | 838E Rallador Cilíndrico Mini | **12** |
+| 034 Filtro de Café Gastr. | **24** | 858 Pala de Canelones | **12** |
+| | | 870E Mandolina 3 Grosores | **4** |
+| | | 877E Corta Pizza Ergonómico | **12** |
+
+**Discontinuados** (van a `Articulos_Discontinuados`, no se les fija uxc): **631, 632, 633, 634,
+635, 636** — la familia de acero inox con mango de Chef, *"no se reponen más"* — y **724**
+Sacacorcho Espumante, *"es discontinuo"*.
+
+**Los conflictos COMPRA vs FACTURA bajaron de 33 a 4**: quedan los DISPLAY **801, 901, 910, 911**
+(compra 12, factura 36), que el dueño todavía no resolvió.
+
+### ⚠ Lo grave: `vista_uxb_articulo` es NO DETERMINISTA
+
+Sus tres CTE hacen `SELECT DISTINCT ON (norm_cod(cod)) … ORDER BY (norm_cod(cod))` — **`DISTINCT ON`
+sin desempate**. Cuando un código tiene **dos filas** en `Articulos_Cajas` (hay **21**, **18** con
+`Uni_x_Caja` distinto), cuál gana lo decide el plan de ejecución y **puede cambiar entre corridas
+sin que nadie toque nada**.
+
+**Comprobado en vivo el 12/09 con el 026**: una consulta devolvió **12** y minutos después, sin
+ningún cambio en esa fila, devolvió **36**.
+
+```
+026  LK  COLADOR N°8                     36
+026  CH  PINZA DE FIDEOS AC INOX VERDE   12
+043  LK  COLADOR 10 CM                   24
+043  CH  TRES EN UNO                     12
+```
+
+El dueño confirmó que el **043 "no es colador, es tres en uno en chef"**. O sea: son **dos productos
+bajo el mismo número, uno por empresa**, y la vista no mira la empresa.
+
+Consecuencia: **el Excel de ISIS puede salir con un `uxb` distinto de una vez a la otra**. No se
+arregla cambiando un número — la vista tiene que mirar la empresa, o esos códigos tienen que
+separarse. **Queda abierto** en el problema 69.
+
+```sql
+select regexp_replace(upper(btrim("Cod_Art")),'^0+(?=.)','') cod, count(*),
+       string_agg("Marca"||' '||"Descripcion"||' = '||"Uni_x_Caja", ' | ')
+  from public."Articulos_Cajas" group by 1 having count(distinct "Uni_x_Caja") > 1;
+```
+
+Archivo: `sql/gv_uxc_unificado_v1612.sql`.
