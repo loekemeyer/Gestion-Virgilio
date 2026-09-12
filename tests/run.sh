@@ -36,6 +36,9 @@ PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node te
 echo "== dead-handlers (regresión: ningún onclick/oninput llama a una función inexistente = botón muerto) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/dead-handlers.cjs
 
+echo "== cod-cero-adelante (regla del dueño: no existe 26, sólo 026 — y el buscador encuentra igual) =="
+PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/cod-cero-adelante.cjs
+
 echo "== ap-resume (regresión: 'Seguir armado' retoma sin re-mandar AP) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/ap-resume.cjs
 

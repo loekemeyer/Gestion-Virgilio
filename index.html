@@ -7816,7 +7816,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v16.22";
+const APP_VERSION = "v16.23";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -12393,7 +12393,12 @@ function codEmpSplit(cod, np) {
 let _codCanon = null;
 function _padCod(cod) {
   const s = String(cod == null ? "" : cod).toUpperCase().trim();
-  return /^[0-9]+$/.test(s) ? s.padStart(3, "0") : s;
+  // v16.23 — regla del dueño (12/09/2026): "No existe 26. Solo 026". El cero adelante va
+  // SIEMPRE, también cuando el código sigue con letra: 35E → 035E, 56E → 056E. Antes sólo
+  // se rellenaba el código puramente numérico, así que un 35E que no estuviera en el mapa
+  // de OC_Maximos salía pelado. Espejo de public.gv_cod_mostrar() en Supabase.
+  const m = s.match(/^([0-9]+)(.*)$/);
+  return m ? m[1].padStart(3, "0") + m[2] : s;
 }
 async function loadCodCanon() {
   if (_codCanon) return _codCanon;
@@ -35015,7 +35020,9 @@ async function tallArtSave(el) {
 }
 async function tallArtAdd() {
   const codEl = document.getElementById("tallArtNewCod");
-  const cod = codEl ? codEl.value.trim().toUpperCase() : "";
+  // v16.23 — se guarda con el cero adelante (codCanon), no lo que se tipeó: si alguien
+  // escribía "26" quedaba "26" en la base, y ese código no existe — es el 026.
+  const cod = codEl ? codCanon(codEl.value.trim().toUpperCase()) : "";
   if (!cod) { tallArtsSetStatus("Falta el código del artículo.", false); return; }
   if ((_tallArts.rows || []).some(function (a) { return String(a.Cod_Art).toUpperCase() === cod; })) { tallArtsSetStatus("Ese código ya está en la lista.", false); return; }
   let desc = ((document.getElementById("tallArtNewDesc") || {}).value || "").trim();
@@ -36321,7 +36328,7 @@ async function lugAddItem(sector) {
   const codEl = document.getElementById("lugCod_" + s);
   const clsEl = document.getElementById("lugCls_" + s);
   const capEl = document.getElementById("lugCap_" + s);
-  const cod = codEl ? codEl.value.trim().toUpperCase() : "";
+  const cod = codEl ? codCanon(codEl.value.trim().toUpperCase()) : "";   // v16.23 — con el cero adelante
   if (!cod) { lugSetStatus("Falta el código.", false); return; }
   const clase = clsEl ? clsEl.value : "articulo";
   const capRaw = capEl ? capEl.value.trim() : "";
@@ -36434,7 +36441,7 @@ async function planimAdd() {
   const codEl = document.getElementById("planimNewCod");
   const secEl = document.getElementById("planimNewSec");
   const ordEl = document.getElementById("planimNewOrd");
-  const cod = codEl ? codEl.value.trim().toUpperCase() : "";
+  const cod = codEl ? codCanon(codEl.value.trim().toUpperCase()) : "";   // v16.23 — con el cero adelante
   if (!cod) { planimSetStatus("Falta el código.", false); return; }
   const sector = secEl ? secEl.value.trim() : "";
   const orden = ordEl ? (parseInt(ordEl.value, 10) || 0) : 0;

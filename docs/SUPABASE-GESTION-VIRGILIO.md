@@ -8806,3 +8806,65 @@ tienen la misma UxB (29 y 34 son 24 en las dos; 658 y 659 son 24 en las dos).
 **Centinela:** `select count(*) from public.gv_uxb_desalineado;` → **0**.
 
 Archivo: `sql/gv_uxb_por_empresa_v1622.sql`. Rollback en `docs/ROLLBACK-PRODUCCION.md`.
+
+### §3.db — v16.23: el código se ESCRIBE con el cero adelante — 2026-09-12
+
+Regla del dueño, textual: *"No existe 26. Solo 026. No te equivoques mas com eso. Revisa
+buscadores y cada vez que se escriba, siempre sea con 0 adelante."*
+
+**Qué estaba mal — y fue mío.** En la v16.21 normalicé el `cod` de `GV_UxB` con `gv_cod_stock()`
+para que el `029` que manda el sync de LK y el `29` del listado cayeran en la misma fila.
+Funcionó como clave, pero `gv_cod_stock` **pela** el cero, así que la tabla quedó guardando
+`26`, `67`, `35E` — grafías que no existen. El maestro `Articulos_Cajas` siempre usó 3 dígitos
+con ceros adelante (`001`, `026`, `067`) y ésa es la forma del negocio.
+
+**La distinción que faltaba, ahora explícita:**
+
+| | funciones | qué hacen con el cero |
+|---|---|---|
+| **Comparar** (buscar, joinear) | `gv_cod_stock`, `canon_cod`, `norm_cod` | lo **pelan** — **no se tocan** |
+| **Escribir** (guardar, mostrar) | `gv_cod_mostrar` (base) · `codCanon`/`_padCod` (front) | lo **ponen** |
+
+Que los normalizadores pelen es justamente lo que hace que **tipear `26` encuentre el `026`**
+y al revés. Si un día se "arreglaran" para no pelar, los buscadores dejarían de encontrar.
+
+`gv_cod_mostrar` rellena la parte numérica a 3 dígitos, también cuando sigue con letra
+(`35E` → `035E`). Los de 4+ dígitos (`1063`, `55215`) y los que no arrancan con número
+(`GRJ10`, `A10`, `M5`) quedan como están.
+
+**Qué se corrigió**
+
+| Dónde | Estaba | Quedó |
+|---|---|---|
+| `GV_UxB.cod` (681 filas) | `26`, `67`, `35E` | `026`, `067`, `035E` |
+| `GV_Cod_Dos_Productos.cod` | `26, 29, 34, 36, 37, 42, 43, 51…` | `026, 029, 034, 036, 037, 042, 043, 051…` |
+| `gv_uxb_resuelto.cod` | 105 pelados | 0 |
+| trigger `gv_uxb_normaliza_cod` | guardaba `gv_cod_stock(cod)` | guarda `gv_cod_mostrar(gv_cod_stock(cod))` |
+
+**Del lado del front** la regla ya existía — `codCanon()` está documentada desde la v12.45 como
+*"la forma ÚNICA de MOSTRAR un código en toda la app"* — pero tenía dos agujeros:
+
+1. **`_padCod()` sólo rellenaba el código puramente numérico** (`/^[0-9]+$/`). Un `35E` que no
+   estuviera en el mapa de `OC_Maximos` salía **pelado**. Ahora rellena la parte numérica de
+   cualquier código.
+2. **`tallArtAdd()`, `lugAddItem()` y `planimAdd()` guardaban el código tal cual lo tipeaba el
+   usuario.** Si alguien escribía `26`, quedaba `26` en la base. Ahora pasan por `codCanon`.
+
+Los 14 normalizadores del front que pelan el cero se dejaron como estaban (son de comparación),
+y también el alias de `window.GONDOLA`, que guarda **las dos grafías a propósito** para que el
+picking encuentre igual.
+
+**Centinela nuevo**
+
+```sql
+select count(*) from public.gv_cod_sin_cero where cod <> public.gv_cod_mostrar(cod);   -- 0
+```
+
+**Test:** `tests/cod-cero-adelante.cjs` (registrado en `tests/run.sh`). Cubre las dos mitades:
+que el código se escriba con cero, y que los buscadores sigan encontrando con las dos grafías.
+Se verificó que **falla** con el `_padCod` viejo (`_padCod(35E) = 35E, esperaba 035E`).
+
+**Nada de esto movió un peso:** `vista_facturacion_neto_items` sigue en $1.395.224.315,83,
+porque los joins usan los normalizadores que pelan y ésos no se tocaron.
+
+Archivo: `sql/gv_cod_cero_adelante_v1623.sql`. Backup: `GV_UxB_bkp_prepad_20260912`.
