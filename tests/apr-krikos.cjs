@@ -113,6 +113,31 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
     window.aprArmarAhora = _ar; window.aprCargar = _ac;
     _apr.krikos = [];
 
+    // ---- SEGURIDAD (v16.04) — sin sesión NO se pide nada y el bloque no se dibuja ----
+    // Regresión del problema "las OC de Krikos se leían con la anon key pública": el cartel
+    // aparecía aunque la PPP Web dijera "Iniciá sesión", y el `link` de cada OC es la URL de
+    // Planexware cuyo token abre el PDF sin credenciales.
+    const _fetch = window.fetch, pedidos = [];
+    window.fetch = function (u) { pedidos.push(String(u)); return Promise.resolve({ ok: true, json: () => Promise.resolve([]) }); };
+    const _sb = window.sbAuth;
+
+    window.sbAuth = { getAccessToken: async () => null };          // sin sesión
+    _apr.krikos = undefined; _apr.krikosLoading = false;
+    await aprKrikosCargar();
+    // Se cuentan SOLO las de GV_Krikos_OC: al terminar, aprKrikosCargar llama a aprRender()
+    // y eso dispara los fetches del resto de la pantalla, que acá no importan.
+    const krikosPedidas = () => pedidos.filter(u => /GV_Krikos_OC/.test(u)).length;
+    out.sinSesionNoPide = krikosPedidas() === 0;
+    out.sinSesionSinCartel = aprKrikosHtml() === "";
+    out.sinSesionNoSeTrabaSolo = _apr.krikosLoading === false;     // si no, no reintenta al loguearse
+
+    window.sbAuth = { getAccessToken: async () => "tok-abc" };     // con sesión
+    _apr.krikos = undefined; _apr.krikosLoading = false;
+    await aprKrikosCargar();
+    out.conSesionPide = krikosPedidas() === 1;
+
+    window.fetch = _fetch; window.sbAuth = _sb; _apr.krikos = [];
+
     return out;
   });
 
