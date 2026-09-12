@@ -8167,3 +8167,53 @@ unidades se descontaron, y el `title` de la cabecera aclara que nunca es negativ
 `tests/imp-stock-real.cjs`.
 
 Archivo: `sql/gv_stock_vivo_menos_pedidos_v1608.sql`.
+
+## §3.cs — El trigger de `stocks_carga_rapida` sumaba los insumos al stock, y un centinela nuevo (v16.09) — 2026-09-12
+
+Salió del barrido de tablas duplicadas que pidió Thomas el 12/09.
+
+`stocks_carga_rapida` la escriben **dos mecanismos que no se ponían de acuerdo**: el cron 57
+(`refresh_stocks_carga_rapida`, cada 5 min) copia los valores de `vista_stock_procesada`, y el
+trigger `trigger_actualizar_saldo_stock` sobre `Movimientos_Stock` los recalcula solo en cada
+movimiento. El trigger los calculaba mal:
+
+| | `vista_stock_procesada` (bien) | `actualizar_saldo_trigger()` (mal) |
+|---|---|---|
+| `stock_total` | los 8 depósitos, **sin** insumos | `SUM(delta)` de **todos** → **con** insumos |
+| `insumos_dep` | `deposito = 'insumos'` | `deposito = 'insumos_dep'` ← **ese valor no existe** |
+
+Los depósitos reales son `a_facturar, a_guardar, excedente, insumos, para_envasar, racks,
+racks_ch, separar_pedidos, terminado`. No hay ningún `insumos_dep`.
+
+**Por qué nadie lo vio:** el cron pisa la tabla cada 5 minutos, así que el error del trigger duraba
+minutos. Quedó a la vista recién cuando el cron estuvo caído 7 h el 11/09 (§3.cr).
+
+**Medido** (con el cron caído, y recalculado después del fix — los 4 cuadran ahora con la matview):
+
+| cod | antes | ahora | insumos que se comía |
+|---|---|---|---|
+| 590E Pincel Silicona 11 Gms | **2.447** | **51** | 2.396 (**48×**) |
+| 584E Aceitera 400 Ml | 1.215 | **15** | 1.200 |
+| 35E Cernidor Harina | 577 | **49** | 528 |
+| 440E Colador Extensible | 231 | **39** | 192 |
+
+Con 590E en 2.447 cajas cuando hay 51, el generador de OC decide **no comprar**.
+
+⚠ Es un trigger sobre una tabla **compartida**: corre también para Producción. Anotado en
+`docs/ROLLBACK-PRODUCCION.md` con el rollback exacto; la definición vieja está guardada en
+`public."GV_Backup_Viewdefs_20260912"`.
+
+### Centinela nuevo: `gv_stock_cod_duplicado`
+
+Lo que dejó §3.cr es que el índice único de `vista_stock_procesada` es el **único** control de que
+`vista_saldos_stock` no repita un `cod_art`, y avisa **rompiendo el refresh en silencio**. Ahora
+hay una vista para mirarlo de frente:
+
+```sql
+select * from public.gv_stock_cod_duplicado;   -- 0 filas = todo bien
+```
+
+Si devuelve algo, el refresh del cron 55 va a fallar y la pantalla de Stock se va a congelar en el
+último snapshot que zafó. Al 12/09 devuelve **0 filas**.
+
+Archivo: `sql/gv_trigger_stock_total_v1609.sql`.

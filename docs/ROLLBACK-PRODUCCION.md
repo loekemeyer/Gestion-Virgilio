@@ -732,3 +732,42 @@ select definicion from public."GV_Backup_Viewdefs_20260912"
 ```
 ⚠ Volver atrás **reinstala la falla del refresh**: el duplicado vuelve y la pantalla de Stock se
 vuelve a congelar. Notas: `sql/gv_stock_vivo_menos_pedidos_v1608.sql`.
+
+## v16.09 (2026-09-12) — `actualizar_saldo_trigger()`: el stock_total se comía el depósito insumos
+
+**Objeto compartido tocado:** `public.actualizar_saldo_trigger()`, la función del trigger
+`trigger_actualizar_saldo_stock` sobre `Movimientos_Stock`. **Corre también para Producción.**
+Backup de la definición anterior en `public."GV_Backup_Viewdefs_20260912"`
+(`objeto = 'public.actualizar_saldo_trigger()'`).
+
+**Los dos errores:**
+
+1. `total_saldo := SUM(delta)` sobre **todos** los depósitos → sumaba `insumos` dentro del
+   `stock_total`. La definición buena es la de `vista_stock_procesada` (de donde copia el cron 57):
+   terminado + excedente + separar_pedidos + a_facturar + a_guardar + racks + racks_ch +
+   para_envasar, **sin** insumos.
+2. `ins_saldo` filtraba `deposito = 'insumos_dep'`, un valor que **no existe** en
+   `Movimientos_Stock` (el depósito se llama `insumos`), así que la columna `insumos_dep` de
+   `stocks_carga_rapida` quedaba **siempre en 0**.
+
+**Por qué no se veía:** el cron 57 pisa la tabla cada 5 minutos con los valores de la matview, así
+que el error del trigger duraba minutos — hasta que el cron se cayó 7 h el 11/09 y quedó a la vista.
+
+**Impacto medido** (11/09 con el cron caído, y recalculado después del fix):
+
+| cod | antes | ahora | matview | insumos que se comía |
+|---|---|---|---|---|
+| 590E | 2.447 | **51** | 51 | 2.396 (**48×** de más) |
+| 584E | 1.215 | **15** | 15 | 1.200 |
+| 35E | 577 | **49** | 49 | 528 |
+| 440E | 231 | **39** | 39 | 192 |
+
+Los 4 cuadran exacto con la matview después del cambio.
+
+**Rollback exacto:**
+```sql
+select definicion from public."GV_Backup_Viewdefs_20260912"
+ where objeto = 'public.actualizar_saldo_trigger()';
+-- ejecutar ese texto
+```
+Notas: `sql/gv_trigger_stock_total_v1609.sql`.

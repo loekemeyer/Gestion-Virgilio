@@ -1,0 +1,49 @@
+-- ============================================================================
+-- v16.09 (2026-09-12) — el trigger de `stocks_carga_rapida` se comía el depósito
+-- insumos dentro del stock_total, y nunca llenaba `insumos_dep`
+--
+-- OBJETO COMPARTIDO: `public.actualizar_saldo_trigger()`, el trigger
+-- `trigger_actualizar_saldo_stock` sobre `Movimientos_Stock`. Corre también para
+-- Producción. Backup de la definición anterior en
+-- public."GV_Backup_Viewdefs_20260912" (objeto = 'public.actualizar_saldo_trigger()').
+--
+-- LOS DOS ERRORES
+--   1) `total_saldo := SUM(delta)` sobre TODOS los depósitos → sumaba `insumos`.
+--      La definición buena es la de `vista_stock_procesada` (y del cron 57, que
+--      copia de ella): terminado + excedente + separar_pedidos + a_facturar +
+--      a_guardar + racks + racks_ch + para_envasar, SIN insumos.
+--   2) `ins_saldo` filtraba `deposito = 'insumos_dep'`. Ese valor NO EXISTE en
+--      `Movimientos_Stock` (el depósito se llama `insumos`), así que la columna
+--      `insumos_dep` de `stocks_carga_rapida` quedaba SIEMPRE en 0.
+--
+-- POR QUÉ NO SE VEÍA: el cron 57 (`refresh_stocks_carga_rapida`, cada 5 min) pisa
+-- la tabla con los valores de la matview, así que el error del trigger duraba
+-- minutos... hasta que el cron se cayó. El 11/09 estuvo caído 7 h y ahí quedó a
+-- la vista.
+--
+-- MEDIDO (11/09 con el cron caído, y recalculado después del fix):
+--   cod    antes    ahora   matview   insumos que se comía
+--   590E   2.447      51       51       2.396   (48x de más)
+--   584E   1.215      15       15       1.200
+--   35E      577      49       49         528
+--   440E     231      39       39         192
+--   Los 4 cuadran exacto con la matview después del cambio.
+--
+-- ROLLBACK:
+--   select definicion from public."GV_Backup_Viewdefs_20260912"
+--    where objeto = 'public.actualizar_saldo_trigger()';
+--   (ejecutar ese texto)
+--
+-- ---------------------------------------------------------------------------
+-- CENTINELA nuevo: gv_stock_cod_duplicado
+-- ---------------------------------------------------------------------------
+-- Tiene que dar SIEMPRE 0 filas. Si devuelve algo, `vista_saldos_stock` está
+-- emitiendo el mismo `cod_art` dos veces y el REFRESH CONCURRENTLY de
+-- `vista_stock_procesada` (cron 55) falla EN SILENCIO: la pantalla de Stock se
+-- congela en el último snapshot que zafó. Eso pasó el 11/09 (código 547) y dejó la
+-- pantalla 10 horas con datos viejos sin que saltara ninguna alarma.
+--
+--   select * from public.gv_stock_cod_duplicado;   -- 0 filas = todo bien
+--
+-- La definición completa de las dos cosas está aplicada en la base.
+-- ============================================================================
