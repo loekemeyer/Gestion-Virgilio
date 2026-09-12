@@ -251,3 +251,59 @@ Los tres que ya se arreglaron están en `corregido` con su commit.
 select * from github_repo_problemas.v_problemas
  where estado = 'abierto' order by severidad, detectado_en desc;
 ```
+
+---
+
+## Mapa de LECTORES del UxB en el FRONT (grep, 2026-09-12, v16.32)
+
+Contado a mano sobre los 4 repos clonados (`Gestion-Virgilio`, `loekemeyer/produccion-virgilio`,
+`loekemeyer/gestion-productiva-2.0`, `loekemeyer/planify`), sólo `.js` / `.html` / `.ts` —
+sin `sql/`, sin `docs/`. Es lo que **falta tocar** para que `GV_UxB` quede como fuente única.
+Regla aprendida el 12/09: *ninguna columna se toca sin contar lectores del FRONT en los 4 repos*
+(casi se dropea `Articulos_Cajas.Uni_x_Caja` "sin lectores" cuando tenía 7).
+
+### `precios_venta.uxb` — **0 lectores vivos** ✅
+
+- La Edge Function `sync-precios-venta` **ya no la escribe** (v16.22).
+- Único lector del front: `loekemeyer/produccion-virgilio/index.html:30221` ("Plata perdida"),
+  y esa app **está retirada desde el 2026-09-08**.
+- Gestión Virgilio **no lee `precios_venta` directo en ningún lado**: la única mención en su
+  `index.html` (línea 12349) es un comentario.
+- → Es la primera candidata a `drop column`, una vez confirmado en la base que ninguna
+  vista/función la siga leyendo.
+
+### `OC_Maximos.uni_x_caja` — **1 lector real** (no 13)
+
+Los 13 archivos que mencionaban `OC_Maximos` casi todos leen otras columnas. Del `uni_x_caja`:
+
+| Lugar | Qué hace | Estado |
+|---|---|---|
+| `index.html:13498` (`ocgFetchMaximos`) → `index.html:12938` | columna **Uni/Caja** de la tabla "① Config (OC_Maximos)" en la Ficha del artículo | **único consumidor real**; es un diagnóstico de lo que tiene la config, no la fuente de verdad |
+| `index.html:14116` / `:14125` / `:14170` | la grilla de Config de compras | **ya sale de `GV_UxB`**: leen `vista_generador_oc`, repuntada en v16.29 ✅ |
+| `index.html:13906` (generador de OCs) | lo a pedir en cajas | **ya sale de `GV_UxB`** (v16.29) ✅ |
+| `modulo_talleristas_edit.js` 140 · 148 · 240 · 300 · 363 | muestra "(N u/caja)" al lado del código asignado a un tallerista | display; repuntable a `GV_UxB` |
+
+### `Articulos_Cajas.Uni_x_Caja` — **7 lectores, todos del mismo módulo**
+
+Y **no es el mismo dato**: es el empaque del **despiece de Cervantes** (talleristas / partes),
+no el UxB de venta de LK/Chef. Por eso conviene **documentarlo como dominio aparte** y no
+absorberlo en `GV_UxB`.
+
+- `cervantes-admin/entero/Despiece x Articulo/app.js:82` y `app-inverso.js:82`
+- `cervantes-admin/gp2/Despiece x Articulo/app.js:79` y `app-inverso.js:79`
+- `loekemeyer/gestion-productiva-2.0/Despiece x Articulo/app.js:79` y `app-inverso.js:79` (repo origen)
+- `loekemeyer/produccion-virgilio/index.html:29555` (app retirada)
+
+Los otros 6 archivos que la traen hacen `select("*")` y **nunca usan el campo** — verificado con
+grep dentro de cada uno (`ControlAT.js`, `EnviosTall.js`, `ControlTall.js`, en las 3 copias).
+El único que la nombra, `ControlTall.js:1418`, es un comentario que aclara que ahí **no** aplica.
+
+### `Articulos Virgilio X Tallerista.Uni_x_Caja` (el "maestro") — 3 lectores
+
+- `index.html:22434` / `:22693` — factores para pasar unidades ↔ cajas ↔ master en Stock
+- `recepcion.js:2632` / `:2674` — lo mismo para Racks
+- `modulo_talleristas_arts.js:180` · `193` · `229` · `240` · `476` — alta de artículos a un tallerista
+  (y **escribe** `Uni_x_Caja` en la línea 476)
+
+Es el único de los cuatro que además **se escribe desde el front**, así que repuntarlo a `GV_UxB`
+pide tocar el alta, no sólo la lectura.
