@@ -8587,3 +8587,67 @@ Sin stock 4 · Nuevo · Liquidación 1. Se agregó `GV_UxB.estado` y se cargó �
 Los 7 con **"Reingreso est. 29/09"** (952E, 955E, 953E, 951E, 957E, 958E, 934E) **ya tenían**
 `Importados.reingreso_est = 2026-09-29`: el Excel y la base coinciden, no hubo nada que corregir.
 5 de los 7 están además en stock 0, que es justo cuando el portal de LK muestra el reingreso.
+
+## §3.cy — Las 7 tablas de UxB con exactamente el mismo dato (v16.18) — 2026-09-12
+
+Thomas: ***"primero quiero que todas las tablas de supa tengan exactamente la misma info, sin
+errores"***. Se alinearon las 7 contra `GV_UxB`. Backup fila por fila, con el valor de antes y el de
+después, en `public."GV_UxB_Sync_bkp_20260912"`.
+
+| Tabla | Antes (sobre los códigos del listado) | Después |
+|---|---|---|
+| `proyeccion_madre` | **167 en NULL**, 0 en conflicto | 0 |
+| `Articulos_Cajas` | 21 en conflicto | 0 |
+| `OC_Maximos` | 6 NULL + 3 en conflicto | 0 |
+| maestro (`Articulos Virgilio X Tallerista`) | 6 en conflicto | 0 |
+| `Importados` | 2 en conflicto | 0 |
+| `cob_uxb_lk` · `precios_venta` | 0, ya estaban bien | 0 |
+
+**205 filas tocadas. Las 7 tablas quedaron en 0 diferencias.**
+
+### ⚠ El cruce se hace por (empresa, código), no por código
+
+`Articulos_Cajas` e `Importados` tienen marca, así que se cruzan **por empresa**. Cruzar sólo por
+código habría roto el caso de los dos productos:
+
+```
+026 LK "COLADOR N°8"                   = 36   ← está en el listado de Loeke
+026 CH "PINZA DE FIDEOS AC INOX VERDE" = 12   ← NO está en el de Chef
+```
+
+Un update por código le habría puesto **36 a la pinza de fideos**. Con el cruce por empresa esa fila
+queda intacta. Fue el único caso: las 22 candidatas bajaron a 21.
+
+Las tablas sin marca se cruzan por código, y es seguro porque **ningún código tiene UxB distinto
+entre LK y CH** en el listado (§3.cx).
+
+### Los cambios que vale la pena mirar
+
+La mayoría ya estaban en la §3.cx. Los nuevos, todos de Chef y todos hacia 12, salen del listado y
+conviene confirmarlos:
+
+| | Era | Es |
+|---|---|---|
+| 909 Noquera Madera **suelta** | 60 | 12 |
+| 920 / 922 / 901 / 911 Cuchara Madera **suelta** | 36 | 12 |
+| 910 Bate Bife | 36 | 12 |
+| 801 Pinza Grande **display** | 36 | 12 |
+| 802 Batidor Pera | 24 | 12 |
+| 830 Colador 20 cm | 36 | 24 (regla del dueño) |
+| 557 / 558 Bombillas Resorte | 12 y 4 | 24 |
+
+Son los artículos **"SUELTO"** y **"DISPLAY"**: si alguno se compra a granel en otro pack, hay que
+corregir el listado, no la tabla.
+
+### Centinela nuevo
+
+```sql
+select * from public.gv_uxb_desalineado;   -- 0 filas = todas coinciden
+```
+
+Lista cualquier tabla cuyo UxB no coincida con `GV_UxB`. Si aparece algo: o alguien editó una tabla
+vieja a mano, o el **cron 66 `sync-precios-venta`** (cada 15 min, trae de LK) metió otro valor en
+`precios_venta` / `cob_uxb_lk`. Esas dos son **las únicas que un cron puede volver a desalinear**;
+hoy coinciden.
+
+Archivo: `sql/gv_uxb_sync_todas_v1618.sql`.
