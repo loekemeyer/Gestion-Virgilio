@@ -2306,6 +2306,12 @@ button.pk-anular small{ display:block; font-size:12px; font-weight:700; opacity:
 .planim-ord-sug{ background: #ecfdf5 !important; border-color: #6ee7b7 !important; }
 .planim-search{ width: 100%; }
 .planim-hint{ font-size: 12px; color: #64748b; margin-top: 8px; }
+/* v15.91 — aviso de que este editor ya no manda (ver #lugarEditorOverlay). */
+.planim-obsoleto{ background:#fef3c7; border:1px solid #f59e0b; border-radius:10px;
+  padding:10px 12px; margin:0 0 12px; font-size:13px; line-height:1.45; color:#78350f; }
+.planim-obsoleto b{ color:#7c2d12; }
+.planim-obsoleto button{ margin-top:8px; background:#f59e0b; color:#fff; border:0;
+  border-radius:8px; padding:8px 14px; font-size:13px; font-weight:600; cursor:pointer; }
 .planim-btn-save{ width: auto; margin: 0; padding: 0 16px; height: 42px; background: #16a34a; color: #fff; border: 0; border-radius: 8px; font-weight: bold; cursor: pointer; transition: background .12s; }
 .planim-btn-save:hover{ background: #15803d; }
 .planim-btn-del{ width: auto; margin: 0; padding: 0 14px; height: 42px; background: #fff; color: #b42318; border: 1px solid #fecaca; border-radius: 8px; font-weight: bold; cursor: pointer; transition: background .12s; }
@@ -4915,6 +4921,16 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
       <button class="recp-admin-close" onclick="closePlanimEditor()">Cerrar</button>
     </div>
     <div class="planim-body">
+      <!-- v15.91 — desde la v15.77 window.GONDOLA se llena de gv_lugar_articulo
+           (GV_Lugar / GV_Lugar_Item) y sólo cae a "Planimetria" si esa vista falla.
+           O sea que lo que se edite acá NO cambia la ubicación que ve el picking.
+           El editor NO se borra (regla de Luis, 11/09: nada se borra hasta que el
+           reemplazo esté rodando) — pero tiene que decirlo en la cara. -->
+      <div class="planim-obsoleto">
+        ⚠ <b>Este editor ya no manda.</b> Las ubicaciones que usa el picking salen de
+        <b>Lugares del depósito</b>. Lo que cambies acá no se va a ver en la app.
+        <br><button onclick="closePlanimEditor(); openLugarEditor();">📍 Ir a Lugares del depósito</button>
+      </div>
       <div class="planim-add">
         <div class="planim-add-t">Agregar / actualizar ubicación</div>
         <div class="planim-add-row">
