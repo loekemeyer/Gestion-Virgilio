@@ -1,0 +1,79 @@
+-- 2026-09-12 — Le saca DELETE al rol `anon` en las 289 tablas donde la APP NO BORRA.
+--
+-- POR QUÉ
+-- `anon` tenía DELETE (grant + policy permisiva `using (true)`) en 300 tablas de `public`,
+-- pero el código de la app sólo borra en **11**. En las otras 289 el permiso no servía para
+-- nada y dejaba abierto el borrado **fila por fila** con la anon key, que es pública. La RLS
+-- no tapaba nada porque la policy dice `true`.
+--
+-- La primera de la lista era **`Registros_Produccion_Virgilio`**, la tabla CENTRAL de eventos
+-- (30.936 filas): con la anon key se podía borrar el log de picking y armado. También
+-- `Empleados`, `Ordenes_Compra`, `Entregas Tallerista Virgilio`, `Matrices_audit` y 285 más.
+-- **121.152 filas** en total.
+--
+-- Distinto del TRUNCATE (ver sql/revoke_truncate_anon_20260912.sql): aquél vaciaba la tabla
+-- entera; éste permite borrados selectivos, que son mucho más difíciles de notar.
+--
+-- CÓMO SE DECIDIÓ QUÉ TOCAR — verificación de CÓDIGO, no de permisos
+--   1. Barrido de todos los .js/.html del repo buscando `.delete()` de supabase-js y
+--      `method:"DELETE"` contra `rest/v1`, resolviendo el `.from(...)` de cada uno.
+--   2. Se resolvieron también los `.from(CONSTANTE)` (`.from(TABLA_DESTINO)`), que un grep
+--      simple no ve.
+--   3. Se descartaron **29 falsos positivos de OpenCV** (`c.delete()` sobre Mats, en el OCR
+--      de recepción de Cervantes).
+--   4. Se verificó que ninguna función **SECURITY INVOKER** que `anon` pueda ejecutar haga
+--      `delete from`: las que borran son todas SECURITY DEFINER, que saltean RLS y no
+--      necesitan este grant.
+--
+-- ⚠ LO QUE EL GREP NO PODÍA VER, y lo cazó la prueba real
+-- Borrar en una tabla puede tocar OTRAS por FK en CASCADE o por un trigger que **no** es
+-- SECURITY DEFINER (corre con los permisos de anon). `delete from "Envios a Talleristas"`
+-- falló con *"permission denied for table Partes x Tallerista"*. Cascadas medidas:
+--   Articulos Virgilio X Tallerista → CASCADE  → Partes x Tallerista
+--   Despiece x Articulo             → CASCADE  → Partes x Tallerista
+--   Matrices                        → SET NULL → Balancines  (es UPDATE; anon lo conserva)
+--   + el trigger `trg_recalcular_stock_online_cajon_total` (no-definer) de
+--     "Envios a Talleristas" y "Entregas PS" termina tocando Partes x Tallerista.
+-- Por eso `Partes x Tallerista` conserva el DELETE aunque el código no la borre directo.
+--
+-- ⚠ NOMBRES PARECIDOS: `Registros Produccion Cervantes` (con ESPACIOS) sí se borra desde el
+-- admin de Cervantes; `Registros_Produccion_Virgilio` (con GUIONES BAJOS) no se borra desde
+-- ningún lado. No confundirlas.
+--
+-- Se revoca el GRANT, no se tocan las policies: una policy con polcmd='*' cubre ALL y habría
+-- que recrearla entera. Sin el grant la policy queda pero no habilita nada.
+--
+-- BACKUP: public."GV_Backup_Delete_Revocado_20260912" (una fila por tabla, con su
+-- `rollback_sql`) + public."GV_Backup_Grants_Anon_20260912" (estado previo completo).
+
+-- (El do-loop que lo aplicó está en la migración `revoke_delete_anon_donde_la_app_no_borra_20260912`.)
+-- Las 11 que la app SÍ borra y quedaron intactas:
+--   Registros Produccion Cervantes · db_n8n_espejo · Envios a Talleristas · Despiece x Articulo
+--   Matrices · Articulos Virgilio X Tallerista · Entregas PS · Proporcion_Articulo_Tallerista
+--   Rutas_Problemas · Rutas_Confirmadas · Pendientes        (+ Partes x Tallerista, por cascada)
+
+-- ---------------------------------------------------------------------------
+-- MEDICIÓN (probado corriendo COMO anon, con `delete ... where 1=0`, que no borra
+-- nada pero igual pasa por permisos, FKs y triggers)
+-- ---------------------------------------------------------------------------
+--   Las 11 de la app ............................ las 11 siguen pudiendo borrar ✅
+--   Registros_Produccion_Virgilio (30.936) ...... permission denied ✅
+--   Empleados / Ordenes_Compra / Matrices_audit . permission denied ✅
+--   Entregas Tallerista Virgilio / Envios a PS .. permission denied ✅
+--   Lectura de la tabla central (la app) ........ sigue andando ✅
+--
+-- ⚠ Trampa al verificar: `set local role anon` dentro de una función persiste hasta el
+-- commit de la transacción. Si después se hace un `select` en el mismo batch, se lee COMO
+-- ANON y una tabla con RLS sin policies devuelve 0 filas — parece que se borró todo y no
+-- pasó nada. Poner `reset role` antes de leer.
+--
+-- ---------------------------------------------------------------------------
+-- ROLLBACK
+-- ---------------------------------------------------------------------------
+-- do $r$ declare s text; begin
+--   for s in select rollback_sql from public."GV_Backup_Delete_Revocado_20260912"
+--   loop execute s; end loop;
+-- end $r$;
+--
+-- Si alguna pantalla empieza a dar 403 al borrar, es una tabla que el barrido no vio:
+-- devolverle el grant a ESA sola (`grant delete on public."<tabla>" to anon;`) y anotarla.
