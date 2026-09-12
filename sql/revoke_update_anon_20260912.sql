@@ -1,0 +1,64 @@
+-- 2026-09-12 — Le saca UPDATE al rol `anon` en 156 tablas: las 62 operativas que el código
+-- no nombra NUNCA + las 94 de backup.
+--
+-- Tercer tramo del mismo agujero de grants por defecto:
+--   sql/revoke_truncate_anon_20260912.sql   (vaciar la tabla entera)
+--   sql/revoke_delete_anon_20260912.sql     (borrar fila por fila)
+--   ESTE                                    (modificar fila por fila)
+--
+-- CRITERIO CONSERVADOR — distinto del que se usó para DELETE, a propósito.
+-- Con UPDATE el riesgo de romper algo es mucho mayor: además de `.update()`, el **upsert**
+-- necesita UPDATE, y esta app upsertea en todos lados (ids determinísticos +
+-- `Prefer: resolution=merge-duplicates`), muchas veces por `fetch` contra PostgREST y no por
+-- supabase-js. Intentar localizar "qué tabla actualiza cada PATCH" con una ventana de texto
+-- da falsos positivos Y falsos negativos, y un falso negativo acá rompe el registro de
+-- producción con los operarios trabajando.
+--
+-- Así que NO se intenta adivinar cuál se actualiza: se le saca UPDATE **sólo a las que el
+-- código no nombra en absoluto**, en ninguno de los 385 .js/.html del repo. Si el nombre
+-- aparece en algún lado, se deja como está. Prefiere quedarse corto antes que romper.
+--
+-- QUÉ SE CERRÓ, de lo que no debería ser escribible desde el navegador de nadie:
+--   usuarios_permitidos ........ la whitelist de acceso al admin
+--   PPP_Web_NP / _NP_Seed ...... el contador de NP, que escriben las RPC con lock
+--   Comprobantes_ARCA / _NC / _NC_Items
+--   precios_super_lk · precios_venta · Matrices_audit · GV_Clientes_Direcciones
+--
+-- BACKUP: public."GV_Backup_Update_Revocado_20260912" (una fila por tabla, con `motivo` y
+-- `rollback_sql`) + public."GV_Backup_Grants_Anon_20260912" (estado previo completo).
+--
+-- (El do-loop que lo aplicó está en la migración `revoke_update_anon_no_mencionadas_20260912`.)
+--
+-- ---------------------------------------------------------------------------
+-- MEDICIÓN (probado corriendo COMO anon, con `update T set col = col where false`:
+-- no toca un solo dato pero igual pasa por permisos, RLS, FKs y triggers)
+-- ---------------------------------------------------------------------------
+--   49 tablas que la app SÍ escribe ........ todas siguen pudiendo ✅
+--   usuarios_permitidos .................... permission denied ✅
+--   PPP_Web_NP_Seed / PPP_Web_NP ........... permission denied ✅
+--   Comprobantes_ARCA / precios_super_lk ... permission denied ✅
+--   Matrices_audit / GV_Clientes_Direcciones permission denied ✅
+--
+-- ⚠ DOS TRAMPAS AL VERIFICAR, las dos me mordieron:
+--   1. `update T set <primera columna> = <misma columna>` falla con *"column id can only be
+--      updated to DEFAULT"* si esa columna es IDENTITY o GENERATED — y parece un problema de
+--      permisos cuando no lo es. Hay que elegir una columna con
+--      `attidentity = '' and attgenerated = ''`.
+--   2. `set local role anon` dentro de una función PERSISTE hasta el commit de la
+--      transacción. Un `select` posterior en el mismo batch se lee COMO ANON, y una tabla
+--      con RLS sin policies devuelve 0 filas: parece que se borró todo. `reset role` antes.
+--
+-- ⚠ Movimientos_Stock y Entregas_Virgilio dan permission denied, pero NO se tocaron acá:
+-- ya estaban sin UPDATE desde la v6.43, a propósito (sólo INSERT+SELECT, que es lo correcto
+-- para un log event-sourced).
+--
+-- ---------------------------------------------------------------------------
+-- ROLLBACK
+-- ---------------------------------------------------------------------------
+-- do $r$ declare s text; begin
+--   for s in select rollback_sql from public."GV_Backup_Update_Revocado_20260912"
+--   loop execute s; end loop;
+-- end $r$;
+--
+-- Si una pantalla empieza a dar 403 al guardar, es una tabla que el barrido no vio:
+-- devolverle el grant a ESA sola (`grant update on public."<tabla>" to anon;`) y anotarla.
