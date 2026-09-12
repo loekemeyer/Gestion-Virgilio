@@ -123,8 +123,28 @@
     });
   }
 
+  /* ---- kg <-> unidades: la MISMA regla que "GP2".to_canonical ----
+     La base corta con excepcion cuando falta kg_x_uni; el JS lo copiaba en 8 pantallas y cada
+     una hacia algo distinto con el dato faltante — dos devolvian 0, que es lo peor que puede
+     pasar: la pantalla dice "1 uni = 0 kg" y el operario carga cualquier cosa (es el bug que
+     hizo imposible recibir CV18D, V18D y V20 hasta el 2026-09-03). Regla unica:
+     SIN factor no hay conversion, y eso se dice con null, nunca con 0. */
+  function _factor(kg_x_uni) {
+    var f = Number(kg_x_uni);
+    return isFinite(f) && f > 0 ? f : null;
+  }
+  function aKg(kg_x_uni, uni) {
+    var f = _factor(kg_x_uni); if (f === null) return null;
+    var q = num(uni); return q === null || q === undefined ? null : q * f;
+  }
+  function aUni(kg_x_uni, kg) {
+    var f = _factor(kg_x_uni); if (f === null) return null;
+    var q = num(kg); return q === null || q === undefined ? null : q / f;
+  }
+
   global.GP2N = {
     num: num, entero: entero, conMiles: conMiles, fmt: fmt,
-    autoMiles: autoMiles, autoMilesEn: autoMilesEn
+    autoMiles: autoMiles, autoMilesEn: autoMilesEn,
+    aKg: aKg, aUni: aUni
   };
 })(typeof window !== "undefined" ? window : this);

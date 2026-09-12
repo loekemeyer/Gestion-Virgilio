@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
 <script src="../../auth-guard.js?v=20260904t"></script>
-<script src="../../gp2-ui.js?v=20260905a"></script>
+<script src="../../gp2-ui.js?v=20260912a"></script>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Registro Producción · GP2</title>
 <link rel="icon" type="image/png" href="../../GP2_favicon.png">
@@ -101,7 +101,11 @@
 const SB=GP2_SB();
 var $ = GP2UI.$;
 let D=null, matSel=null, matKeys=[];
-function hoy(){const d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');}
+/* HOY es el de ARGENTINA (GP2UI.hoyAR), no el del aparato. Tenia su propio hoy() con
+   getFullYear/getMonth/getDate, que lee la zona del dispositivo: en una tablet o un celular en
+   UTC, despues de las 21:00 de Argentina devolvia el DIA SIGUIENTE, y con eso se precarga la
+   fecha del registro de produccion. [2026-09-12, hallazgo 14c del informe de logica duplicada] */
+var hoy = GP2UI.hoyAR;
 var esc = GP2UI.esc;   /* helper de la casa, gp2-ui.js (2026-09-05) */
 function norm(s){return String(s||"").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g,"");}
 function cById(cid){return (D&&D.comp[String(cid)])||{cod:'?',d:''};}

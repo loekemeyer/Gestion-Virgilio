@@ -33,8 +33,10 @@ const BUNDLE = {
   ],
 };
 
-/* La recepcion pide su propio bundle y, aparte, los factores kg/uni + el flag
-   recibe_en_cajas con un select directo a componente. */
+/* La recepcion pide su propio bundle, y desde el 2026-09-11 los factores kg/uni y
+   el flag recibe_en_cajas VIENEN AHI, con cada insumo: antes eran un select suelto
+   a componente y por lo tanto una segunda lista que se podia desfasar de la que
+   dibuja la pantalla. COMPS queda vacio a proposito (ver test_recepcion_uni). */
 const RECEP = {
   tara: { tara_pallet: '20', tol_ctrl_peso_pct: '5', carton_uni_x_paquete: '250' },
   sectores: [{ id: 6, nombre: 'Sector Plástico' }, { id: 7, nombre: 'Sector Bombilla' }],
@@ -42,13 +44,14 @@ const RECEP = {
   recepciones: [], pallets: [], rollos: [],
   insumos: [
     { comp_id: 256, codigo: 'PCP3', descripcion: 'Clavo 505', sector: 'Sector Plástico', sector_id: 6,
-      um: 'unidad', proveedor: 'Trefilados Industriales', ultima: null, oc_pend: null },
+      um: 'unidad', proveedor: 'Trefilados Industriales', kg_x_uni: 0.00653, recibe_en_cajas: true,
+      ultima: null, oc_pend: null },
     { comp_id: 539, codigo: 'BOM8', descripcion: 'Resorte para Bombilla', sector: 'Sector Bombilla',
-      sector_id: 7, um: 'unidad', proveedor: 'Trefilados Industriales', ultima: null, oc_pend: null },
+      sector_id: 7, um: 'unidad', proveedor: 'Trefilados Industriales', kg_x_uni: 0.0046,
+      recibe_en_cajas: false, ultima: null, oc_pend: null },
   ],
 };
-const COMPS = [{ id: 256, kg_x_uni: 0.00653, recibe_en_cajas: true },
-               { id: 539, kg_x_uni: 0.0046, recibe_en_cajas: false }];
+const COMPS = [];
 
 const STUB = 'window.supabase={createClient:function(){return{'
   + 'rpc:async function(n,a){ if(n==="control_recepcion_bundle") return {data:' + JSON.stringify(BUNDLE) + ',error:null};'

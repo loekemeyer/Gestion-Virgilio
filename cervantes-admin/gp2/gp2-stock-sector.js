@@ -31,7 +31,9 @@
      links       botones del header entre "Exportar CSV" y "Atras":
                  [rotulo, href, "destacado"?] — "destacado" = fondo azul (los Control)
      columnas    columnas de Movimientos (Uni): k, label, tipos de movimiento, lado
-                 (ent = suma entradas, sal = suma salidas, neto = ent - sal)
+                 (ent = suma entradas, sal = suma salidas, neto = ent - sal); o campo =
+                 un valor de la fila del bundle tal cual (en_virgilio: lo que hay en el
+                 deposito de Virgilio de ese sector, 2026-09-11; el detalle son los traslados)
      sin_csv     sin boton "Exportar CSV"
      sin_min_max sin Maximo/Capacidad, sin KPI "Bajo minimo", sin filtro "Bajo el
                  maximo" y sin aviso de factores
@@ -42,12 +44,23 @@
 
 /* Insumos: entran por compra y salen por consumo de producción o
    por envío a un proveedor / tallerista. */
+/* Los tipos de cada columna tienen que ser palabras del vocabulario real (GP2.tipo_movimiento,
+   antes el CHECK de movimiento.tipo_mov): un token inventado nunca matchea y la columna miente
+   por defecto. Hasta el 2026-09-11 habia cinco colados ("produccion", "envio_prov", "envio_tall",
+   "recepcion_prov", "recepcion_tall") y faltaban envio_prov_at, consumo_virgilio y traslado. */
 var COLS_INSUMO = [
   { k:"compras", label:"Compras", tipos:["compra"],                                   lado:"ent" },
-  { k:"consumo", label:"Consumo", tipos:["consumo_prod","consumo_tall","produccion","fabricacion"], lado:"sal" },
-  { k:"envios",  label:"Envíos",  tipos:["envio_ps","envio_tallerista"],               lado:"sal" }
+  { k:"consumo", label:"Consumo", tipos:["consumo_prod","consumo_tall","consumo_virgilio","consumo","fabricacion"], lado:"sal" },
+  { k:"envios",  label:"Envíos",  tipos:["envio_ps","envio_tallerista","envio_prov_at","envio_inyector"], lado:"sal" }
 ];
 var LINK_RECEPCION = ["Recepción", "../StockFlejes/RecepcionInsumos_GP2.html"];
+/* Materia prima plastica (sector 14, 2026-09-10): bolsas de 25 kg que viven en Virgilio. Entran
+   por compra (Recepcion) y salen en bolsas hacia los INYECTORES (envio_inyector, desde Inyectores).
+   El consumo (consumo_inyector) pasa en la ubicacion del inyector, no aca. */
+var COLS_MP = [
+  { k:"compras", label:"Compras",            tipos:["compra"],          lado:"ent" },
+  { k:"envios",  label:"Envíos a inyector",  tipos:["envio_inyector"],  lado:"sal" }
+];
 
 var SECTORES = {
   /* Mismas columnas de movimiento que Stock SC del programa viejo:
@@ -55,18 +68,22 @@ var SECTORES = {
   1: { titulo:"Stock SC", sector_nom:"Sector Crudo",
        links:[["Stock SP", "?sector=2"]],
        columnas:[
-         { k:"fabricacion", label:"Fabricación", tipos:["fabricacion","produccion","armado_fabrica"], lado:"neto" },
-         { k:"envios",      label:"Envíos",      tipos:["envio_ps","envio_prov","envio_tallerista","envio_tall"], lado:"sal"  }
+         { k:"fabricacion", label:"Fabricación", tipos:["fabricacion","armado_fabrica"], lado:"neto" },
+         { k:"envios",      label:"Envíos",      tipos:["envio_ps","envio_prov_at","envio_tallerista"], lado:"sal"  },
+         { k:"a_virgilio",  label:"A Virgilio",  tipos:["recepcion_virgilio","consumo_virgilio"], lado:"sal" },
+         { k:"virgilio",    label:"En Virgilio", tipos:["traslado"], campo:"en_virgilio" }
        ] },
   /* Mismas columnas de movimiento que Stock SP del programa viejo:
      lo que devuelve el PS, lo que se fabrica y lo que sale al tallerista. */
   2: { titulo:"Stock SP", sector_nom:"Sector Procesado",
        links:[["Stock SC", "?sector=1"]],
        columnas:[
-         { k:"entregas_ps", label:"Entregas PS",      tipos:["entrega_ps","recepcion_prov"],             lado:"ent"  },
-         { k:"fabricacion", label:"Fabricación",      tipos:["fabricacion","produccion","armado_fabrica"], lado:"neto" },
-         { k:"envios_tall", label:"Envíos Tallerista", tipos:["envio_tallerista","envio_tall"],           lado:"sal"  },
-         { k:"recep_tall",  label:"Recep. Tallerista", tipos:["recepcion_tall","entrega_tallerista"],     lado:"ent"  }
+         { k:"entregas_ps", label:"Entregas PS",      tipos:["entrega_ps"],                              lado:"ent"  },
+         { k:"fabricacion", label:"Fabricación",      tipos:["fabricacion","armado_fabrica"],            lado:"neto" },
+         { k:"envios_tall", label:"Envíos Tallerista", tipos:["envio_tallerista"],                       lado:"sal"  },
+         { k:"recep_tall",  label:"Recep. Tallerista", tipos:["entrega_tallerista"],                     lado:"ent"  },
+         { k:"a_virgilio",  label:"A Virgilio",        tipos:["recepcion_virgilio","consumo_virgilio"],  lado:"sal"  },
+         { k:"virgilio",    label:"En Virgilio",       tipos:["traslado"], campo:"en_virgilio" }
        ] },
   /* Sector Movimiento (3): las piezas intermedias entre matrices ("tras M#").
      Fabricado = entradas por produccion/fabricacion (la matriz que las hace).
@@ -78,8 +95,8 @@ var SECTORES = {
        sin_min_max:true, sin_csv:true, links:[],
        buscar:"Buscar por código, matriz o descripción…",
        columnas:[
-         { k:"fabricado", label:"Fabricado", tipos:["fabricacion","produccion"], lado:"ent" },
-         { k:"consumido", label:"Consumido", tipos:["fabricacion","produccion","consumo_prod"], lado:"sal" }
+         { k:"fabricado", label:"Fabricado", tipos:["fabricacion"], lado:"ent" },
+         { k:"consumido", label:"Consumido", tipos:["fabricacion","consumo_prod"], lado:"sal" }
        ] },
   6:  { titulo:"Partes Plásticas", sector_nom:"Sector Plástico", links:[LINK_RECEPCION], columnas:COLS_INSUMO },
   7:  { titulo:"Bombillas",        sector_nom:"Sector Bombilla", links:[LINK_RECEPCION], columnas:COLS_INSUMO },
@@ -90,7 +107,10 @@ var SECTORES = {
   10: { titulo:"Cartones",         sector_nom:"Sector Cartón",   links:[LINK_RECEPCION], columnas:COLS_INSUMO },
   11: { titulo:"Cajas",            sector_nom:"Sector Caja",
         links:[LINK_RECEPCION, ["Control Cajas", "../StockFlejes/control-cajas.html", "destacado"]],
-        columnas:COLS_INSUMO }
+        columnas:COLS_INSUMO },
+  14: { titulo:"Materia Prima Plástica", sector_nom:"Sector Materia Prima Plástica (Virgilio)",
+        links:[LINK_RECEPCION, ["Inyectores · Material", "../Compras/Inyectores_GP2.html", "destacado"]],
+        columnas:COLS_MP }
 };
 
 /* config de un sector del mapa (null si no existe) */
@@ -151,14 +171,21 @@ var filtro = "todos";
 /* ---------- helpers (gp2-ui.js / gp2-numero.js) ---------- */
 var esc = GP2UI.esc, clsNum = GP2UI.cls;
 function fmt(n,d){ return GP2N.fmt(n, d==null?1:d); }   // esta pantalla muestra hasta 1 decimal
-function fmtFecha(f){ if(!f) return ""; try{ return new Date(f).toLocaleDateString("es-AR"); }catch(e){ return f; } }
+/* La fecha de un movimiento sale de GP2UI.fechaTsAR: se decide en ARGENTINA. Antes era un
+   new Date(f).toLocaleDateString("es-AR") propio, que resuelve en la zona del APARATO -- un
+   movimiento sellado a las 23:30 AR se veia del dia siguiente en una tablet en UTC. */
+var fmtFecha = GP2UI.fechaTsAR;
 
 /* uni es la unidad canonica de las piezas; kg y cajones son derivados */
-function kgDe(x){ return x.kg_x_uni ? Number(x.online||0)*Number(x.kg_x_uni) : null; }
+/* kg <-> uni: la regla de la casa (GP2N.aKg, misma que "GP2".to_canonical). Devuelve null
+   cuando falta kg_x_uni; nunca 0, que es lo que hace creer al operario que la pieza no pesa. */
+function kgDe(x){ return GP2N.aKg(x.kg_x_uni, x.online || 0); }
 function cajDe(x){ return x.uni_x_cajon ? Number(x.online||0)/Number(x.uni_x_cajon) : null; }
 
 /* valor de una columna de movimientos segun su config */
 function valorCol(x, col){
+  // columna que muestra un campo de la fila tal cual (p.ej. en_virgilio), no una suma de movimientos
+  if (col.campo) return x[col.campo] == null ? null : Number(x[col.campo]);
   var tot = 0, hubo = false;
   (col.tipos||[]).forEach(function(t){
     var m = (x.mov||{})[t];

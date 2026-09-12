@@ -31,20 +31,23 @@ const BUNDLE = {
   recepciones: [], pallets: [], rollos: [],
   insumos: [
     { comp_id: 1, codigo: 'PEP5', descripcion: 'Mango Madera', sector: 'Sector Plástico', sector_id: 6,
-      um: 'unidad', proveedor: 'Eduardo Pintos', kg_x_uni: 0.0063, stock: 100, ultima: null, oc_pend: null },
+      um: 'unidad', proveedor: 'Eduardo Pintos', kg_x_uni: 0.0063, recibe_en_cajas: false,
+      stock: 100, ultima: null, oc_pend: null },
     { comp_id: 2, codigo: 'PCP3', descripcion: 'Clavo 505', sector: 'Sector Plástico', sector_id: 6,
-      um: 'unidad', proveedor: 'Trefilados Industriales', kg_x_uni: 0.00653, stock: 0, ultima: null, oc_pend: null },
+      um: 'unidad', proveedor: 'Trefilados Industriales', kg_x_uni: 0.00653, recibe_en_cajas: true,
+      stock: 0, ultima: null, oc_pend: null },   // el clavo: viene en cajas y se pesa
     { comp_id: 3, codigo: 'CV18D', descripcion: 'Tornillo Sacafuente p/Niquelar', sector: 'Sector Remache',
-      sector_id: 8, um: 'unidad', proveedor: 'Tornillos Suipacha', kg_x_uni: null, stock: 0, ultima: null, oc_pend: null },
+      sector_id: 8, um: 'unidad', proveedor: 'Tornillos Suipacha', kg_x_uni: null, recibe_en_cajas: false,
+      stock: 0, ultima: null, oc_pend: null },
   ],
 };
 
-/* Los kg_x_uni NO vienen en el bundle: la pantalla los pide aparte con
-   from('componente').select('id,kg_x_uni').in('sector_id',[...]). Sin esa
-   respuesta el stub no probaria nada (la conversion no se intentaria siquiera). */
-const KX = [{ id: 1, kg_x_uni: 0.0063, recibe_en_cajas: false },
-            { id: 2, kg_x_uni: 0.00653, recibe_en_cajas: true },   // el clavo: viene en cajas y se pesa
-            { id: 3, kg_x_uni: null, recibe_en_cajas: false }];
+/* kg_x_uni y recibe_en_cajas vienen en el BUNDLE, con los insumos (2026-09-11).
+   Hasta ese dia la pantalla los pedia aparte con from('componente') y este stub
+   tenia que contestar esa segunda consulta; ahora `from` devuelve vacio a
+   proposito: si alguien vuelve a meter la consulta suelta, la conversion se
+   queda sin factor y los checks de abajo lo cantan. */
+const KX = [];
 
 /* El stub reporta cada RPC a Node por un binding (window.__log) en vez de a una
    variable del window: al terminar el remito la pantalla NAVEGA sola al control,

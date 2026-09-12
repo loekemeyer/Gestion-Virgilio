@@ -18,12 +18,12 @@
      Por DEFAULT gana el CONTEO. Lo que no se conto queda con el programa y no se toca:
      contar es afirmar, no contar no significa "hay cero". -->
 <script src="../auth-guard.js?v=20260904t"></script>
-<script src="../gp2-ui.js?v=20260905a"></script>
+<script src="../gp2-ui.js?v=20260912a"></script>
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1"/>
 <title>Validación de Stock · GP2</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="../gp2-numero.js?v=20260905m"></script>
+<script src="../gp2-numero.js?v=20260911o"></script>
 <script src="../supabase-config.js?v=20260905k"></script>
 <link rel="stylesheet" href="../gp2-modulo.css?v=20260903b"/>
 <link rel="icon" type="image/png" href="../GP2_favicon.png">
@@ -140,11 +140,9 @@ var SB = GP2_SB();
 var $ = GP2UI.$;
 var esc = GP2UI.esc;   /* helper de la casa, gp2-ui.js (2026-09-05) */
 function fmt(n,d){ return GP2N.fmt(n, d==null?0:d, '—'); }   /* la regla de numero de la casa; '—' sin valor */
-function fmtFecha(iso){
-  if(!iso) return '';
-  var p=String(iso).slice(0,10).split('-');
-  return p.length===3 ? (p[2]+'/'+p[1]+'/'+p[0]) : String(iso);
-}
+/* La fecha en dd/mm/aaaa es la de la casa: GP2UI.fechaAR (gp2-ui.js). Esta pantalla tenia
+   su propia copia, identica, como otras dos. Se deja el nombre local para no tocar las llamadas. */
+var fmtFecha = GP2UI.fechaAR;
 function msg(t, malo){
   $('status').className = 'status' + (malo?' bad':(t?' ok':''));
   $('status').textContent = t||'';

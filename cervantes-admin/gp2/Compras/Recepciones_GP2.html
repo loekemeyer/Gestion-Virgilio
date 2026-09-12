@@ -10,8 +10,8 @@
 <title>Recepciones · Checklist Pagos · GP2</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="../supabase-config.js?v=20260905k"></script>
-<script src="../gp2-ui.js?v=20260905a"></script>
-<script src="../gp2-numero.js?v=20260905m"></script>
+<script src="../gp2-ui.js?v=20260912a"></script>
+<script src="../gp2-numero.js?v=20260911o"></script>
 <link rel="stylesheet" href="../gp2-modulo.css?v=20260903b"/>
 <link rel="icon" type="image/png" href="../GP2_favicon.png">
 <link rel="apple-touch-icon" href="../GP2_favicon.png">
@@ -110,11 +110,10 @@
 
   var esc = GP2UI.esc;   /* helper de la casa, gp2-ui.js (2026-09-05) */
   function fmtNum(n){ return GP2N.fmt(n, 2); }   /* la regla de numero de la casa (gp2-numero.js) */
-  function fmtFecha(s){
-    if (!s) return '';
-    try { return new Date(s).toLocaleDateString('es-AR', {day:'2-digit', month:'2-digit', year:'numeric'}); }
-    catch(e){ return String(s).slice(0,10); }
-  }
+  /* GP2UI.fechaAR (gp2-ui.js), la regla de la casa. Antes esta pantalla hacia
+     new Date(s).toLocaleDateString(): una fecha sin hora ("2026-09-11") se parsea como UTC y en
+     Argentina se mostraba el dia ANTERIOR. */
+  var fmtFecha = GP2UI.fechaAR;
 
   function pinta(){
     const q = filt.q.trim().toLowerCase();

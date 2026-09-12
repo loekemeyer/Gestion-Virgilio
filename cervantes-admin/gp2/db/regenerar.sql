@@ -82,7 +82,7 @@ stats as (
          (select count(*) from pg_policies p where p.schemaname = 'GP2') n_pol
 )
 select '-- =====================================================================' || E'\n'
-    || '-- TABLAS del schema GP2 (DDL reconstruido de pg_catalog: columnas, identity, defaults, constraints, comentarios) — export automatico 2026-09-05 desde Supabase (hrxfctzncixxqmpfhskv)' || E'\n'
+    || '-- TABLAS del schema GP2 (DDL reconstruido de pg_catalog: columnas, identity, defaults, constraints, comentarios) — export automatico <FECHA> desde Supabase (hrxfctzncixxqmpfhskv)' || E'\n'
     || '-- Respaldo/referencia. La fuente de verdad es la base; regenerar al cambiar el schema.' || E'\n'
     || '-- ' || stats.n_t || ' tablas, ' || stats.n_c || ' constraints, ' || stats.n_i || ' indices sueltos, ' || stats.n_tg || ' triggers, RLS en ' || stats.n_rls || ' tablas, ' || stats.n_pol || ' policies.' || E'\n'
     || '-- =====================================================================' || E'\n\n'

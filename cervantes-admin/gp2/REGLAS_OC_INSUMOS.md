@@ -237,8 +237,57 @@ Faltan proveedor: 8 plásticos (ver abajo), bombillas/resortes 8, remaches 8, fl
   (triggers en est_madre / recetas / rutas, función `recalcular_maximos_insumos`). Los
   máximos FÍSICOS ya relevados (cajas, 11 remaches del vecino) tienen origen `fisico`
   y nunca se pisan. En Punto de Stock los derivados se ven con el tag **EM**.
-- Virgilio: NO interesa analizar su entrada/salida — existe solo para medir a los
-  talleristas (decisión usuario 2026-08-29). No se construye módulo de despacho/venta.
+- Virgilio como DISTRIBUCIÓN de terminados: NO interesa analizar su entrada/salida — existe solo
+  para medir a los talleristas (decisión usuario 2026-08-29). No se construye módulo de
+  despacho/venta. **OJO (2026-09-10): eso es la distribución. La MATERIA PRIMA PLÁSTICA también
+  se guarda físicamente en Virgilio y ESA sí se gestiona** — sector 14 «Materia Prima Plástica»,
+  ver abajo.
+- **Materia prima plástica (2026-09-10)**: bolsas de 25 kg (PP 2630, ABS, Alto Impacto, Nylon
+  Virgen/Recuperado/c-Carga, PE, PS HF555 + Master Bach) → sector 14. Tres proveedores cotizan
+  (**Indarnyl 202, Beta Plásticos 3527, Santa Rosa Plásticos 837**; Master Bach: Arcolor / Julio
+  Garcia) y **cada material se le compra AL MÁS BARATO** [usuario 2026-09-10: "al que sea más
+  barato por material, la OC tiene que considerar eso"]: `v_material_precio_proveedor` lleva el
+  precio de cada proveedor a pesos al dólar oficial del día y `recalcular_proveedor_material()`
+  pone `componente.proveedor` = el de orden 1 — corre solo por trigger cuando entra/cambia un
+  precio y desde el cron del dólar (`actualizar_dolar_oficial`). La OC (`oc_bundle` / `crear_oc`)
+  cotiza con el precio del proveedor ASIGNADO al componente. Rubro propio en OC y en Recepción
+  («Mat. Plástica», en kg). **La OC de un material va a UN solo proveedor (el más barato), nunca
+  repartida; entregan en ~5 días (`dias_entrega`)**; se imprime con la hoja «O.C.» del usuario
+  (membrete Loekemeyer/Chef, entrega en Virgilio 2788, renglones LK 85 % / CH 15 % con
+  `codigo_isis_ch`) y **se emite sola al generarla** [usuario 2026-09-11]. **Sin código de Chef
+  no hay renglón CH**: el material va 100 % LK (Nylon Virgen / Recuperado, PE, Master Bach)
+  [usuario 2026-09-11: "si no lo usa"]. **ENTREGA EN = `proveedor_insumo.entrega_en`**: null =
+  Virgilio 2788; **Master Bach (Arcolor, Julio Garcia) = Cervantes 2868, se stockea en Cervantes
+  por ahora** [usuario 2026-09-11]. Gestión Virgilio ve las OC que le llegan con
+  `oc_pendientes_virgilio()` y las recibe con `recibir_oc_virgilio` (ver
+  `INTEGRACION_GESTION_VIRGILIO.md`). **Máximo = 2,5 meses de consumo en bolsas enteras** (`maximo_origen='fisico'`).
+  **Desde el 2026-09-11 es una regla viva** [usuario: "elegí uno y vamos" → recalcular con el consumo
+  GP2]: `recalcular_maximo_material()` = ceil(`ubicacion.meses_stock` 2,5 × consumo GP2 kg/mes con
+  desperdicio ÷ 25) × 25, con el consumo de `v_consumo_componente` (Est Madre = `proyeccion_madre`);
+  corre a diario desde `actualizar_dolar_oficial`. **El Master Bach sale por fórmula: 2 % del plástico**
+  (regla del Excel del usuario; como GP2 todavía no sabe el color de cada pieza, el 2 % va sobre el total
+  y se reparte entre los 4 colores con la proporción cargada, en bolsas enteras —
+  `maximo_origen='mb_2pct_del_plastico'`).
+- **Pedido mínimo del proveedor de resina** (`proveedor_insumo.pedido_minimo_kg`, del Excel, hoja «Relev y
+  OP Bolsas Plast»): **Indarnyl 400 kg**, Beta Plásticos 25, Santa Rosa 25, masterbatch 5. Viaja en
+  `oc_bundle.proveedores[]`; la pantalla suma los kg de la OC por proveedor y **no deja crearla si no llega
+  al piso** (dice cuántos kg faltan). No se infla sola: sumar kg es una decisión de compra.
+- **Pedido mínimo POR PIEZA** (`componente.pedido_minimo_uni`, del Excel, hoja «Pedido 31-08», columna
+  `Pedi Min Uni`): el inyector no hace una tirada de menos de N piezas (1 a 36.000 según el molde), **47
+  componentes cargados**. Viaja en `oc_bundle.insumos[].pedido_minimo_uni`. **NO bloquea**: hoy 24 de los
+  47 sugeridos quedan por debajo (el Pirolo Blanco sugiere 2.248 contra un mínimo de 36.000 = 64 meses de
+  consumo), y bloquear dejaría la OC imposible. Es un aviso amarillo con botón **«Subir al mínimo»** —
+  comprar 16 veces el consumo es una decisión del comprador, no de la pantalla. Sólo se carga sobre lo
+  que se compra (los `estado_compra='fabricacion'` quedan afuera: el mínimo es del que inyecta). Hasta ese día los máximos eran los del workbook del usuario (PP ~909 kg/mes); OJO: hay 34
+  artículos del Excel sin despiece en GP2 (~70 kg/mes de PP/ABS reales), así que el máximo de PP
+  queda corto hasta que se den de alta (archivo `Articulos_Excel_sin_despiece_GP2.xlsx`, chat 2026-09-11).
+  Tope físico: 20 pallets × 15 bolsas en Virgilio. Las bolsas **se le mandan a los inyectores**
+  (`enviar_material_inyector`, desde Inyectores) y **el inyector tiene que tener lo que necesita
+  para su OC** [usuario]: `v_material_inyector` = OC abiertas × kg_x_uni × 1,04 − lo que ya tiene.
+  Al recepcionar la pieza inyectada, `crear_recepcion_insumo` descuenta sola el material de la
+  ubicación del inyector. Pendientes: precio de PE / Nylon Virgen / Nylon Recuperado (Santa Rosa
+  no los lista en la planilla), stock inicial de Master Bach (0, sin conteo), y PC12 / PC16 sin
+  material asignado (el workbook no los trae).
 - ~~Flejes, cartones, plásticos y bombillas sin máximo~~ RESUELTO 2026-08-29: sus máximos
   se derivan de la Est Madre (ver regla arriba), ya no requieren relevamiento.
 - Cartones: el formato (C/LOKE/8) de cada cartón se va a identificar POR PRECIO —

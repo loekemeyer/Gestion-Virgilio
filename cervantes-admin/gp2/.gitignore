@@ -27,3 +27,5 @@ temp/
 
 # Permitir estructura Excel de referencia si existe
 !Tablas_Madre_y_Dependencias.xls
+# La planilla madre de costos SI va al repo (2026-09-10): el usuario la subia en cada sesion
+!db/A_Costos_VIGENTES.xlsx

@@ -2,8 +2,8 @@
 <html lang="es">
 <head>
   <script src="../auth-guard.js?v=20260904t"></script>
-<script src="../gp2-ui.js?v=20260905a"></script>
-<script src="../gp2-numero.js?v=20260905m"></script>
+<script src="../gp2-ui.js?v=20260912a"></script>
+<script src="../gp2-numero.js?v=20260911o"></script>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>Tiempos Matrices · GP2</title>
@@ -121,7 +121,7 @@
 
   /* fechas en Argentina (gp2-ui.js): antes toISOString corria el dia despues de las 21:00 */
   function primerDiaMes() { return GP2UI.hoyAR().slice(0, 8) + '01'; }
-  function hoy() { return GP2UI.hoyAR(); }
+  var hoy = GP2UI.hoyAR;   /* era un envoltorio: una linea menos que mantener */
 
   async function cargarOperarios() {
     var r = await sb.from('empleado').select('legajo,nombre,activo').order('nombre');

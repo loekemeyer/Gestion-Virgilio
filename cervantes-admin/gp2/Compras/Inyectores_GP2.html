@@ -1,14 +1,20 @@
 <!doctype html>
 <html lang="es">
 <head>
-<!-- v1.2.1 — contraste: la opcion marcada tenia letra blanca sobre fondo claro (casi invisible); ahora texto oscuro legible sobre cada fondo. v1.2.0 — botones "Se fabrica" y "Discontinuo": lo que no se compra deja de figurar como faltante y sale de la OC. v1.1.0 — celular: encabezado, rubros y resumen compactados a una linea, botonera en grilla de 2 columnas con alto de dedo (44px); nota plegable. v1.0.0 — Quien fabrica cada parte: botonera por proveedor. Lo que se asigne aca es lo que despues separa la OC (cada proveedor recibe SOLO lo suyo). -->
+<!-- v1.3.0 (2026-09-10) — MATERIAL PLASTICO POR INYECTOR: panel "Material" con lo que cada inyector
+     necesita para sus OC abiertas (kg de las piezas pendientes x 1,04 de desperdicio), lo que ya tiene
+     en su poder y las BOLSAS a enviarle; boton Enviar -> enviar_material_inyector (Virgilio -> inyector).
+     Envio manual (inyector + material + bolsas) para mandar sin OC. Cada parte muestra su material.
+     El descuento al recepcionar la pieza lo hace la base sola (crear_recepcion_insumo) [usuario 2026-09-10:
+     "que gasten material cuando me van entregando... tienen que tener lo que necesite para su OC"].
+     v1.2.1 — contraste: la opcion marcada tenia letra blanca sobre fondo claro (casi invisible); ahora texto oscuro legible sobre cada fondo. v1.2.0 — botones "Se fabrica" y "Discontinuo": lo que no se compra deja de figurar como faltante y sale de la OC. v1.1.0 — celular: encabezado, rubros y resumen compactados a una linea, botonera en grilla de 2 columnas con alto de dedo (44px); nota plegable. v1.0.0 — Quien fabrica cada parte: botonera por proveedor. Lo que se asigne aca es lo que despues separa la OC (cada proveedor recibe SOLO lo suyo). -->
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1"/>
 <title>Inyectores · Quién hace cada parte · GP2</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="../supabase-config.js?v=20260905k"></script>
-<script src="../gp2-ui.js?v=20260905a"></script>
-<script src="../gp2-numero.js?v=20260905m"></script>
+<script src="../gp2-ui.js?v=20260912a"></script>
+<script src="../gp2-numero.js?v=20260911o"></script>
 <link rel="stylesheet" href="../gp2-modulo.css?v=20260903b"/>
 <link rel="icon" type="image/png" href="../GP2_favicon.png">
 <link rel="apple-touch-icon" href="../GP2_favicon.png">
@@ -53,6 +59,29 @@
   .nota summary::after{content:" ▾";color:#0b3b73}
   .nota[open] summary::after{content:" ▴"}
   .lista{border:1px solid #e6eaee;border-radius:10px;overflow:hidden}
+
+  /* ── material plastico por inyector (2026-09-10) ── */
+  #matPanel{border:1px solid #cddaea;border-radius:10px;padding:10px 12px;margin:10px 0;background:#f8fbff}
+  .mat-titulo{font-weight:800;font-size:17px;color:#0b3b73;margin-bottom:6px}
+  .mat-virgilio{font-size:15px;color:#333;margin-bottom:8px;line-height:1.5}
+  .mat-tabla{border-collapse:collapse;width:100%;font-size:15px;min-width:640px}
+  .mat-tabla th{text-align:left;font-size:13px;color:#555;padding:6px 8px;border-bottom:2px solid #d0d7de;white-space:nowrap}
+  .mat-tabla td{padding:6px 8px;border-bottom:1px solid #e6eaee;vertical-align:middle}
+  .mat-tabla td.num{text-align:right;white-space:nowrap}
+  .mat-tabla td.num.falta{color:#b45309;font-weight:800}
+  .mat-tabla td.vacio{color:#777;font-size:14px}
+  .mat-bolsas,#matBolsas{width:84px;font-size:20px;font-weight:800;text-align:right;padding:8px 10px;
+        border:2px solid #d0d7de;border-radius:8px;min-height:44px}
+  .mat-btn,#matEnviar{padding:10px 16px;border-radius:10px;border:2px solid #0b5cad;background:#0b5cad;color:#fff;
+        font-weight:800;font-size:15px;cursor:pointer;min-height:44px;white-space:nowrap}
+  .mat-btn:disabled,#matEnviar:disabled{opacity:.45;cursor:wait}
+  .mat-manual{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-top:10px;font-size:15px}
+  .mat-manual label{display:flex;gap:6px;align-items:center;font-weight:700}
+  .mat-manual select{font-size:18px;padding:8px;border:2px solid #d0d7de;border-radius:8px;min-height:44px;max-width:100%}
+  @media (max-width:640px){
+    .mat-manual{gap:7px}
+    .mat-manual select{flex:1 1 100%}
+  }
 
   /* ── celular: que se llegue a los botones sin scrollear medio metro ──
      El encabezado (nota + chips de rubro + resumen) se comprime a una linea
@@ -115,6 +144,30 @@
 
     <div class="chips" id="secChips"></div>
     <div class="resumen" id="resumen"></div>
+
+    <!-- Materia prima plastica: lo que cada inyector necesita para sus OC abiertas vs lo que tiene.
+         Solo aparece cuando el bundle trae materiales (rubro Plasticos). -->
+    <div id="matPanel" class="hidden">
+      <div class="mat-titulo">Material plástico en poder de cada inyector</div>
+      <div class="mat-virgilio" id="matVirgilio"></div>
+      <div class="table-wrap">
+        <table class="mat-tabla" id="matTabla">
+          <thead><tr>
+            <th>Inyector</th><th>Material</th><th>Necesita p/ OC</th><th>Tiene</th><th>Le falta</th><th>Bolsas</th><th></th>
+          </tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+      <div class="mat-manual">
+        <span style="font-weight:800">Envío manual:</span>
+        <select id="matIny" aria-label="Inyector"></select>
+        <select id="matMat" aria-label="Material"></select>
+        <label for="matBolsas">Bolsas <input type="text" inputmode="numeric" id="matBolsas" value="1"></label>
+        <button type="button" id="matEnviar">Enviar</button>
+      </div>
+      <div id="matStatus" class="status"></div>
+    </div>
+
     <div class="search-box"><input type="text" id="q" placeholder="Buscar por código o descripción…"></div>
 
     <div class="lista" id="lista"></div>
@@ -151,6 +204,72 @@ async function cargar(){
   if (D.sector) secSel = D.sector.id;
   pintarChips();
   render();
+  pintarMaterial();
+}
+
+/* ── Materia prima plastica por inyector (2026-09-10) ──
+   D.materiales = las bolsas (sector 14) con su stock en Virgilio; D.material = por inyector x material
+   lo que necesita para sus OC abiertas, lo que tiene y lo que hay que enviarle (kg y bolsas).
+   El descuento por consumo NO se hace aca: lo hace crear_recepcion_insumo al recepcionar la pieza. */
+function pintarMaterial(){
+  var pnl = $("matPanel");
+  var mats = D.materiales || [], rows = D.material || [];
+  if (!mats.length){ pnl.classList.add("hidden"); return; }
+  pnl.classList.remove("hidden");
+  var kgB = Number(D.kg_x_bolsa || 25);
+  $("matVirgilio").innerHTML = "<b>En Virgilio:</b> " + mats.map(function(m){
+    var kg = Number(m.kg_virgilio || 0);
+    return esc(m.codigo) + " " + esc(m.descripcion) + " <b>" + fmt(kg) + " kg</b> (" + fmt(Math.floor(kg / kgB)) + " bolsas)";
+  }).join(" · ");
+
+  var tb = $("matTabla").querySelector("tbody");
+  tb.innerHTML = "";
+  if (!rows.length){
+    tb.innerHTML = '<tr><td colspan="7" class="vacio">Ningún inyector tiene OC abierta con material ni material en su poder.</td></tr>';
+  }
+  rows.forEach(function(r){
+    var tr = document.createElement("tr");
+    var falta = Number(r.kg_a_enviar || 0) > 0;
+    tr.innerHTML =
+      "<td>" + esc(r.proveedor) + "</td>" +
+      "<td>" + esc(r.material_codigo) + " " + esc(r.material || "") + "</td>" +
+      '<td class="num">' + fmt(r.kg_requerido_oc, 1) + " kg</td>" +
+      '<td class="num">' + fmt(r.kg_en_inyector, 1) + " kg</td>" +
+      '<td class="num' + (falta ? " falta" : "") + '">' + fmt(r.kg_a_enviar, 1) + " kg</td>" +
+      '<td><input type="text" inputmode="numeric" class="mat-bolsas" aria-label="Bolsas a enviar" value="' + esc(String(r.bolsas_a_enviar || 0)) + '"></td>' +
+      '<td><button type="button" class="mat-btn">Enviar</button></td>';
+    tr.querySelector(".mat-btn").addEventListener("click", function(){
+      enviarMaterial(r.proveedor, r.material_id, GP2N.entero(tr.querySelector(".mat-bolsas").value), this);
+    });
+    tb.appendChild(tr);
+  });
+
+  var iny = (D.proveedores || []).filter(function(p){ return p.es_inyector; });
+  $("matIny").innerHTML = iny.map(function(p){ return '<option value="' + esc(p.nombre) + '">' + esc(p.nombre) + "</option>"; }).join("");
+  $("matMat").innerHTML = mats.map(function(m){ return '<option value="' + m.comp_id + '">' + esc(m.codigo) + " " + esc(m.descripcion) + "</option>"; }).join("");
+}
+
+/* Manda N bolsas de un material de Virgilio al inyector (RPC enviar_material_inyector, en kg). */
+async function enviarMaterial(prov, compId, bolsas, btn){
+  var kgB = Number(D.kg_x_bolsa || 25);
+  var st = $("matStatus");
+  if (!prov || !compId){ st.className = "status bad"; st.textContent = "Elegí inyector y material."; return; }
+  if (!(bolsas > 0)){ st.className = "status bad"; st.textContent = "Poné cuántas bolsas mandás (más de 0)."; return; }
+  if (btn) btn.disabled = true;
+  try{
+    var r = await SB.rpc("enviar_material_inyector", { p_proveedor: prov, p_comp_id: Number(compId), p_kg: bolsas * kgB });
+    if (r.error) throw r.error;
+    var d = r.data || {};
+    st.className = "status ok";
+    st.textContent = "✓ " + fmt(bolsas) + " bolsas (" + fmt(bolsas * kgB) + " kg) de " + (d.codigo || "") + " → " + prov +
+      (d.virgilio_negativo ? " · OJO: Virgilio quedó en negativo, revisá el conteo" : "");
+    await cargar();
+  }catch(e){
+    st.className = "status bad";
+    st.textContent = "No se pudo enviar: " + (e.message || e);
+  }finally{
+    if (btn) btn.disabled = false;
+  }
 }
 
 function pintarChips(){
@@ -207,6 +326,8 @@ function render(){
     if (p.lo_produce) meta.push("<b>lo fabrica " + esc(p.lo_produce) + "</b> (no se compra)");
     if (Number(p.en_recetas) === 0) meta.push("no está en ninguna receta");
     meta.push("stock " + fmt(p.stock) + " " + (p.um === "kg" ? "kg" : "uni"));
+    // de que bolsa esta hecha: es lo que se descuenta del inyector al recepcionarla
+    if (p.material) meta.push("material " + esc(p.material) + (p.kg_x_uni ? " (" + fmt(Number(p.kg_x_uni) * 1000, 1) + " g)" : ""));
     izq.innerHTML = '<span class="p-cod">' + esc(p.codigo || "—") + "</span> " +
                     '<span class="p-desc">' + esc(p.descripcion || "") + "</span>" +
                     '<div class="p-meta">' + meta.join(" · ") + "</div>";
@@ -352,6 +473,9 @@ $("btnNuevo").addEventListener("click", async function(){
 });
 
 $("q").addEventListener("input", render);
+$("matEnviar").addEventListener("click", function(){
+  enviarMaterial($("matIny").value, $("matMat").value, GP2N.entero($("matBolsas").value), this);
+});
 cargar();
 </script>
 </body>

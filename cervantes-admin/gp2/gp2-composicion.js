@@ -44,8 +44,20 @@ window.GP2Composicion = (function () {
     consumo_tall: "Consumo de tallerista", devolucion_tallerista: "Devolución de tallerista",
     envio_prov_at: "Envío a prov. art. terminado",
     recepcion_virgilio: "Entrega en Virgilio", consumo_virgilio: "Consumo en Virgilio",
+    envio_inyector: "Envío de material al inyector", consumo_inyector: "Material consumido por el inyector",
+    traslado: "Traslado a/desde Virgilio",
     stock_inicial: "Stock inicial", ajuste: "Ajuste"
   };
+  /* La fuente real del vocabulario es GP2.tipo_movimiento, que movimientos_bundle sirve en
+     `tipos_mov`: una pantalla que ya tiene el bundle lo pasa por acá y un tipo nuevo aparece
+     con su nombre sin tocar este archivo. El mapa de arriba queda como respaldo. */
+  function setVocabulario(dict) {
+    if (!dict) return;
+    Object.keys(dict).forEach(function (k) {
+      var v = dict[k];
+      if (v && v.lbl) TIPOS[k] = v.lbl;
+    });
+  }
   function nombreTipo(t) { return TIPOS[t] || String(t || "").replace(/_/g, " "); }
 
   /* clave del dia en hora LOCAL: con toISOString un movimiento de las 22h (-03:00)
@@ -201,7 +213,10 @@ window.GP2Composicion = (function () {
 
     /* ---- bloque de HOY ---- */
     var extra = [];
-    if (kgU) extra.push(fmt(online * kgU, 0) + " kg");
+    // kg <-> uni por la regla de la casa (GP2N.aKg): null cuando no hay factor, y entonces
+    // directamente no se muestra la linea de kg en vez de mostrar un 0 que no significa nada
+    var enKg = GP2N.aKg(kgU, online);
+    if (enKg !== null) extra.push(fmt(enKg, 0) + " kg");
     if (uxc) extra.push(fmt(online / uxc, 1) + " caj");
     var act = d.actualizado_en ? dt(d.actualizado_en) : null;
     document.getElementById("cpHoy").innerHTML =
@@ -270,6 +285,6 @@ window.GP2Composicion = (function () {
       "</tr></thead><tbody>" + filas.join("") + "</tbody></table>";
   }
 
-  return { abrir: abrir, cerrar: cerrar };
+  return { abrir: abrir, cerrar: cerrar, setVocabulario: setVocabulario };
 
 })();

@@ -29,6 +29,14 @@ select 'A_contrapartes_sin_ubicacion' regla, count(*) n from (
     union all select id from "GP2".proveedor_at p where p.activo and "GP2".ubic_de('proveedor_at', p.id) is null
     union all select id from "GP2".sector s where s.es_insumo and "GP2".ubic_de('sector', s.id) is null) x
 union all
+-- A2) Todo proveedor que entrega piezas con material asignado es un INYECTOR con ubicacion propia
+--     (si no, crear_recepcion_insumo recibe la pieza pero NO descuenta la materia prima y el stock
+--     de Virgilio queda inflado sin que nadie avise). 2026-09-10.
+select 'A2_inyector_con_material_sin_ubicacion', count(*) from (
+    select distinct c.proveedor from "GP2".componente c
+     where c.material_id is not null and c.estado_compra is null and c.proveedor is not null
+       and "GP2".ubic_de('inyector', (select pi.id from "GP2".proveedor_insumo pi where pi.nombre = c.proveedor)) is null) x
+union all
 -- B) El inventario es exactamente la suma del libro (el motor vive en los triggers).
 select 'B_inventario_distinto_del_ledger', count(*)
   from ledger s full join "GP2".inventario i on i.componente_id = s.comp and i.ubicacion_id = s.ubic
@@ -40,7 +48,13 @@ select 'C_funciones_internas_con_execute_anon', count(*) from pg_proc p
    and (p.prorettype = 'trigger'::regtype or p.proname like '\_%' or p.proname like 'fn\_%'
         or p.proname like 'relev\_%' or p.proname like 'recalcular\_%'
         or p.proname in ('to_canonical', 'inv_delta', 'ubic_de', 'ubic_de_componente', 'recepcion_tara',
-                         'recepcion_virgilio', 'actualizar_dolar_oficial', 'crear_recepcion_insumo'))
+                         'recepcion_virgilio', 'actualizar_dolar_oficial', 'crear_recepcion_insumo',
+                         -- mantenimiento: se corren desde una sesion con SQL, nunca desde una pantalla
+                         'planilla_snapshot_nuevo', 'planilla_cargar', 'reprocesar_espejo_virgilio',
+                         -- no es el motor de la entrega de tallerista (ese es gp2-motor.js), idea 7316
+                         'crear_entrega_tallerista',
+                         -- puerta unica interna: la llaman recepcion_virgilio y movimientos_bundle, no una pantalla
+                         'comp_terminado_de'))
 union all
 -- D) Toda tabla tiene RLS y una policy; ninguna policy es de escritura (la escritura va por RPC).
 select 'D_tablas_sin_rls_o_sin_policy', count(*) from pg_class c
@@ -86,7 +100,13 @@ select 'M_rpc_de_pantalla_sin_execute_anon', count(*) from pg_proc p
    and not (p.prorettype = 'trigger'::regtype or p.proname like '\_%' or p.proname like 'fn\_%'
         or p.proname like 'relev\_%' or p.proname like 'recalcular\_%'
         or p.proname in ('to_canonical', 'inv_delta', 'ubic_de', 'ubic_de_componente', 'recepcion_tara',
-                         'recepcion_virgilio', 'actualizar_dolar_oficial', 'crear_recepcion_insumo'))
+                         'recepcion_virgilio', 'actualizar_dolar_oficial', 'crear_recepcion_insumo',
+                         -- mantenimiento: se corren desde una sesion con SQL, nunca desde una pantalla
+                         'planilla_snapshot_nuevo', 'planilla_cargar', 'reprocesar_espejo_virgilio',
+                         -- no es el motor de la entrega de tallerista (ese es gp2-motor.js), idea 7316
+                         'crear_entrega_tallerista',
+                         -- puerta unica interna: la llaman recepcion_virgilio y movimientos_bundle, no una pantalla
+                         'comp_terminado_de'))
 union all
 -- N) Ninguna funcion GP2 resuelve nombres en public (search_path = GP2 solo), salvo las dos que
 --    lo necesitan a proposito (get_role_for_email delega en public; actualizar_dolar_oficial usa http).
@@ -135,20 +155,69 @@ union all
 select 'Z_parametro_que_lee_el_codigo_faltante', count(*) from unnest(array[
     'caja_uni_x_paquete', 'carton_uni_x_paquete', 'charcas_kg_x_paquete', 'costo_segundo_pesos',
     'faltante_cajones_umbral', 'max_cajones_x_ubicacion', 'pliego_uni_x_paquete', 'registro_en_golpes',
-    'tara_pallet_max', 'tara_pallet_min', 'tipo_cambio_usd_pesos', 'tol_ctrl_peso_pct']) k
+    'tara_pallet_max', 'tara_pallet_min', 'tipo_cambio_usd_pesos', 'tol_ctrl_peso_pct',
+    'inyeccion_desperdicio_pct', 'material_plastico_kg_x_bolsa', 'oc_facturar_pct_loeke']) k
  where not exists (select 1 from "GP2".parametro p where p.clave = k)
 union all
 select 'Z2_parametro_que_nadie_lee', count(*) from "GP2".parametro p
  where p.clave not in (
     'caja_uni_x_paquete', 'carton_uni_x_paquete', 'charcas_kg_x_paquete', 'costo_segundo_pesos',
     'faltante_cajones_umbral', 'max_cajones_x_ubicacion', 'pliego_uni_x_paquete', 'registro_en_golpes',
-    'tara_pallet_max', 'tara_pallet_min', 'tipo_cambio_usd_pesos', 'tol_ctrl_peso_pct')
+    'tara_pallet_max', 'tara_pallet_min', 'tipo_cambio_usd_pesos', 'tol_ctrl_peso_pct',
+    'inyeccion_desperdicio_pct', 'material_plastico_kg_x_bolsa', 'oc_facturar_pct_loeke')
 union all
 -- Z3) Un PS híbrido tiene una materia prima con proveedor de insumo: si no, crear_oc no puede
 --     armar la OC gemela (Charcas → Altrak, Eclipse → Aperam).
 select 'Z3_ps_hibrido_mp_sin_proveedor', count(*) from "GP2".proveedor_servicio ps
   join "GP2".componente c on c.id = ps.mp_componente_id
  where ps.hibrido and (c.proveedor is null or not exists (select 1 from "GP2".proveedor_insumo pi where pi.nombre = c.proveedor))
+union all
+-- AA) La cantidad de un paso de ingreso/insumo es la misma que dice la RECETA del articulo.
+--     ruta_paso.cantidad duplica articulo_componente.cantidad y los dos ya divergieron una vez:
+--     58 pasos habian quedado con cantidad 1 (las cajas piden 1/articulos_por_caja, los flejes
+--     kilos por unidad, y en 4 casos la receta pedia 2). 2026-09-11.
+select 'AA_paso_de_insumo_contradice_la_receta' regla, count(*) n
+  from "GP2".ruta_paso p
+  join "GP2".ruta r on r.id = p.ruta_id
+  join "GP2".articulo_componente ac on ac.articulo_id = r.articulo_id and ac.componente_id = p.comp_entrada_id
+ where p.tipo_paso in ('insumo','ingreso') and abs(p.cantidad - ac.cantidad) > 0.0001
+union all
+-- AB) Toda ruta arranca en algo que se PUEDE comprar o que otra ruta produce. Si un componente
+--     entra como insumo, no es comprable y nadie lo fabrica, la cadena arranca en el aire y el
+--     circuito del articulo no puede ni empezar (paso 1 y 2 del recorrido productivo).
+--     Paso el 2026-09-11 con las 4 piezas importadas del Sector Procesado (C13, D1, Z23A, Z23B):
+--     17 rutas de 16 articulos bloqueadas.
+select 'AB_ruta_que_arranca_en_el_aire', count(*) from (
+    select distinct p.comp_entrada_id cid
+      from "GP2".ruta_paso p
+     where p.tipo_paso in ('insumo','ingreso')
+       and not "GP2"._es_comprable(p.comp_entrada_id)
+       and not exists (select 1 from "GP2".ruta_paso q
+                        where q.comp_salida_id = p.comp_entrada_id
+                          and q.comp_salida_id is distinct from q.comp_entrada_id)
+       and not exists (select 1 from "GP2".componente_bom b where b.componente_padre_id = p.comp_entrada_id)) x
+union all
+-- AC) El vocabulario de movimiento es una tabla y movimiento.tipo_mov es FK contra ella: ningun
+--     tipo_mov puede quedar fuera del catalogo (antes era un CHECK de literales copiado en el JS).
+select 'AC_tipo_mov_fuera_del_catalogo', count(*) from "GP2".movimiento m
+ where not exists (select 1 from "GP2".tipo_movimiento t where t.clave = m.tipo_mov)
+union all
+-- AD) Todo articulo resuelve su componente terminado por la unica puerta (comp_terminado_de).
+--     Si da null, el circuito no cierra: recepcion_virgilio explota al entregarlo y
+--     movimientos_bundle no sabe a que articulo pertenece lo que entra a Virgilio.
+select 'AD_articulo_sin_componente_terminado', count(*) from "GP2".articulo a
+ where "GP2".comp_terminado_de(a.id) is null
+union all
+-- AE) Y los dos criterios que antes convivian (el paso 'virgilio' de la ruta y el codigo en el
+--     sector 12) siguen dando LO MISMO. Si se separan, la puerta unica elige la ruta y el que
+--     mire por codigo (una pantalla, un informe) va a ver otro componente. Idea 7322.
+select 'AE_paso_virgilio_y_codigo_dan_distinto', count(*) from "GP2".articulo a
+ where (select rp.comp_entrada_id from "GP2".ruta r join "GP2".ruta_paso rp on rp.ruta_id = r.id
+         where r.articulo_id = a.id and rp.tipo_paso = 'virgilio' and rp.comp_entrada_id is not null
+         order by rp.ruta_id limit 1)
+   is distinct from
+       (select c.id from "GP2".componente c where c.sector_id = 12 and c.codigo = a.codigo
+         order by c.id limit 1)
 ) chequeos
 order by regla;
 
@@ -156,7 +225,37 @@ order by regla;
 -- INFORMATIVAS (no son invariantes: dan > 0 por datos que faltan o decisiones pendientes del
 -- usuario; sirven para ver si crecen). Cada una dice a qué pregunta/idea pertenece.
 -- =====================================================================
--- select 'stock_negativo' que, count(*) n, '(pregunta 8.3: stock inicial de talleristas no cargado)' ref from "GP2".inventario where cantidad < -0.0005
+-- RECETA vs RUTA (2026-09-11). Sale de la prueba de conservacion de "GP2".__sim_articulo: se
+-- simulan las 189 producciones enteras y se mira que no quede nada colgado en una contraparte.
+-- Da 13 pares hoy y NINGUNO se puede arreglar sin el usuario, por eso es informativa:
+--   * 6 son del tallerista "Fábrica" (507, 570, 707, 858): no se manda nada a uno mismo, es correcto.
+--   * 508/518/708 listan D13 (virola) en la receta, pero la ruta dice que Maspoli SRL se la lleva y
+--     devuelve PC12 con la virola adentro -- o la receta cobra la virola dos veces, o Martin recibe
+--     las dos cosas. Lo tiene que decir el usuario.
+--   * 103 (caja A11), 120 (caja A9) y 564 (mango PC12) no tienen NINGUN paso de ruta para esa parte.
+--   * 547 tiene DOS A4 en la receta: la Caja N°10 (bien) y el "Mgo Plano 501 Serig" del Sector
+--     Procesado con cantidad de caja (1/12) -- el clasico codigo repetido en dos sectores.
+-- select 'receta_sin_rama_que_la_lleve' que, count(*) n, '(13; ver el informe de la sesion)' ref from (
+--   with final as (select distinct ru.articulo_id aid,
+--            case when rp.proveedor_at_id is not null then 'proveedor_at' else 'tallerista' end tipo,
+--            coalesce(rp.proveedor_at_id, rp.tallerista_id) ref
+--       from "GP2".ruta_paso rp join "GP2".ruta ru on ru.id = rp.ruta_id
+--       join "GP2".componente c on c.id = rp.comp_salida_id
+--      where c.sector_id = 12 and rp.tipo_paso in ('tallerista','proveedor_at')),
+--   entregado as (select distinct ru.articulo_id aid, rp.comp_entrada_id cid,
+--            case when rp.proveedor_at_id is not null then 'proveedor_at' else 'tallerista' end tipo,
+--            coalesce(rp.proveedor_at_id, rp.tallerista_id) ref
+--       from "GP2".ruta_paso rp join "GP2".ruta ru on ru.id = rp.ruta_id
+--      where rp.tipo_paso in ('tallerista','proveedor_at') and rp.comp_entrada_id is not null)
+--   select ac.articulo_id, ac.componente_id from "GP2".articulo_componente ac join final f on f.aid = ac.articulo_id
+--    where not exists (select 1 from entregado e where e.aid=ac.articulo_id and e.cid=ac.componente_id
+--                        and e.tipo=f.tipo and e.ref=f.ref)) z
+-- union all select 'hijo_de_bom_que_entra_solo_al_mismo_destino' que, count(*) n, '(idea 7298: se cobra dos veces, por la caminata y por la receta. Hoy 1 par, C12 <- BOM10 hacia 515 y 615, y BOM10 no tiene precio asi que no hay plata en juego)' ref from "GP2".componente_bom b join (select distinct rp.comp_entrada_id ent, rp.comp_salida_id sal from "GP2".ruta_paso rp where rp.comp_entrada_id is not null and rp.comp_salida_id is not null and rp.comp_entrada_id <> rp.comp_salida_id and rp.tipo_paso in ('matriz','proveedor_servicio','tallerista')) eh on eh.ent = b.componente_hijo_id join (select distinct rp.comp_entrada_id ent, rp.comp_salida_id sal from "GP2".ruta_paso rp where rp.comp_entrada_id is not null and rp.comp_salida_id is not null and rp.comp_entrada_id <> rp.comp_salida_id and rp.tipo_paso in ('matriz','proveedor_servicio','tallerista')) ep on ep.ent = b.componente_padre_id and ep.sal = eh.sal
+-- union all select 'proveedor_servicio_proceso_fuera_del_catalogo' que, count(*) n, '(14 de 15: la columna es un ROTULO libre en Title Case y la relacion real PS<->proceso, que es 1:N, vive en tarifa_servicio; pintores_bundle ya no depende de como este escrito)' ref from "GP2".proveedor_servicio ps where ps.proceso is not null and not exists (select 1 from "GP2".proceso p where p.nombre = ps.proceso)
+-- union all select 'uni_x_caja_LK_contradice_articulo' que, count(*) n, '(idea 7330: el 508 Sacafuentes Articulado dice 6 en articulo y 12 en uni_x_articulo_x_caja; lo tiene que decir el usuario)' ref from "GP2".uni_x_articulo_x_caja u join "GP2".articulo a on a.codigo = u.cod_art where u.empresa = 'LK' and a.articulos_por_caja is not null and a.articulos_por_caja <> u.uni_x_caja
+-- union all select 'catalogo_prov_at_sin_descripcion' que, count(*) n, '(1: el cod_art 193 de Kuffo no es un articulo de GP2 todavia)' ref from "GP2".articulo_prov_at where nullif(btrim(coalesce(descripcion,'')),'') is null
+-- union all select 'espejo_virgilio_sin_reprocesar', count(*), '(entregas de Virgilio que no cruzaron; reprocesar_espejo_virgilio(null, true) dice cuales ya se pueden)' from "GP2".virgilio_espejo_pend where resuelto_en is null
+-- union all select 'stock_negativo' que, count(*) n, '(pregunta 8.3: stock inicial de talleristas no cargado)' ref from "GP2".inventario where cantidad < -0.0005
 -- union all select 'minimo_mayor_que_maximo', count(*), '(pregunta 27: 56 legítimas de 5 cajones + parámetros meses de 3 ubicaciones)' from "GP2".inventario where minimo is not null and maximo is not null and minimo > maximo
 -- union all select 'espejo_virgilio_pendiente_datos', count(*), '(pregunta 8.17: artículos de Virgilio sin equivalente en GP2)' from "GP2".virgilio_espejo_pend where motivo not like 'error%'
 -- union all select 'est_madre_sin_articulo_gp2', count(*), '(idea 7244: familias que GP2 no modela)' from "GP2".est_madre em where not exists (select 1 from "GP2".articulo a where regexp_replace(a.codigo,'^0+','') = regexp_replace(em.cod,'^0+',''))

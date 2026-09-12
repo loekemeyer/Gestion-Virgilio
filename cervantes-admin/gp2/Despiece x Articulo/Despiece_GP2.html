@@ -161,7 +161,7 @@
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="../supabase-config.js?v=20260905k"></script>
-<script src="../gp2-ui.js?v=20260905a"></script>
+<script src="../gp2-ui.js?v=20260912a"></script>
 <script>var D={};</script>
 <script>
 var SB=GP2_SB();
@@ -448,7 +448,14 @@ function prepFaltantes(){
     if(c.um==='kg'){
       base=(flejeKg[aid+':'+cid]||0)*u.meses;
     }else{
-      base=a.est*qty*u.meses;
+      /* Las unidades por mes que este articulo consume del componente las calcula la base
+         (v_consumo_demanda, que el bundle sirve en `aporte`): explota receta + sub-BOM + los
+         intermedios de la ruta. Antes esto se reimplementaba aca y a todo componente que
+         aparecia solo en la ruta se le ponia cantidad 1 — en 59 pares la base decia otra cosa
+         (IF2 en el articulo 504 son 8,067 por unidad, no 1) y el prorrateo del faltante salia
+         mal. `compsArt` sigue decidiendo QUE componentes toca el articulo; la CANTIDAD ya no. */
+      var uniMes=(FD.aporte||{})[aid+':'+cid];
+      base=(uniMes!=null?Number(uniMes):a.est*qty)*u.meses;
     }
     if(u.tipo==='tallerista'){
       var tf=tallsFinalArt[aid]||{};

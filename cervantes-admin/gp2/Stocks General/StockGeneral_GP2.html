@@ -1,9 +1,11 @@
 <!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <script src="../auth-guard.js?v=20260904t"></script>
-<script src="../gp2-ui.js?v=20260905a"></script>
-<script src="../gp2-numero.js?v=20260905m"></script>
+<script src="../gp2-ui.js?v=20260912a"></script>
+<script src="../gp2-numero.js?v=20260911o"></script>
 <title>Stock por ubicación · GP2</title>
-<!-- v1.1.2 (2026-09-04) - la tabla de rotulos de los ultimos movimientos pasa al vocabulario REAL del ledger
+<!-- v1.1.3 (2026-09-10) - rotulos para los dos tipos nuevos del ledger: envio_inyector (bolsas de materia prima
+     plastica de Virgilio al inyector) y consumo_inyector (material descontado al recepcionar la pieza inyectada).
+     v1.1.2 (2026-09-04) - la tabla de rotulos de los ultimos movimientos pasa al vocabulario REAL del ledger
      (envio_ps/entrega_ps/envio_tallerista/entrega_tallerista/fabricacion...): tenia los nombres del programa viejo y
      casi todo salia con el codigo crudo (auditoria de arquitectura).
      v1.1.1 - la pantalla hereda lo unico propio de Movimientos/Registrar_Movimiento.html
@@ -236,6 +238,7 @@ async function reload(){
   $('tree').innerHTML='<p class="empty">No se pudo cargar: '+esc(msg)+'</p>';
   return;
  }
+ aplicarVocabulario();
  var n=Object.keys(D.inv||{}).length;
  var con=Object.values(D.inv||{}).filter(v=>Number(v.cant)!==0).length;
  $('status').textContent='GP2 · '+n+' posiciones · '+con+' con stock';
@@ -322,10 +325,24 @@ var TIPOS={
  consumo_tall:{lbl:'Consumo tall',cls:'t-recep'}, devolucion_tallerista:{lbl:'Devolución tall',cls:'t-recep'},
  envio_prov_at:{lbl:'Env prov AT',cls:'t-envio'},
  recepcion_virgilio:{lbl:'Rec Virgilio',cls:'t-virgilio'}, consumo_virgilio:{lbl:'Consumo Virgilio',cls:'t-virgilio'},
+ envio_inyector:{lbl:'Env inyector',cls:'t-envio'}, consumo_inyector:{lbl:'Consumo inyector',cls:'t-recep'},
+ traslado:{lbl:'Traslado Virgilio',cls:'t-virgilio'},
  stock_inicial:{lbl:'Stock inicial',cls:'t-ajuste'}, ajuste:{lbl:'Ajuste',cls:'t-ajuste'}
 };
-function fmtNum(n){if(n==null)return '';var x=Number(n);return Number.isInteger(x)?String(x):x.toFixed(2);}
-function fmtFecha(f){if(!f)return '';try{return new Date(f).toLocaleDateString('es-AR');}catch(e){return f;}}
+/* La lista de arriba es el respaldo: la fuente real es GP2.tipo_movimiento, que movimientos_bundle
+   sirve en `tipos_mov`. Al cargar el bundle se pisa lo que la base diga, asi un tipo nuevo aparece
+   con su nombre sin tocar esta pantalla (2026-09-11). */
+function aplicarVocabulario(){
+  var v = (D && D.tipos_mov) || null; if(!v) return;
+  Object.keys(v).forEach(function(k){ if(v[k] && v[k].lbl) TIPOS[k] = {lbl:v[k].lbl, cls:(v[k].cls||(TIPOS[k]&&TIPOS[k].cls)||'')}; });
+  if (window.GP2Composicion && GP2Composicion.setVocabulario) GP2Composicion.setVocabulario(v);
+}
+/* La regla de numero de la casa (gp2-numero.js), que esta pantalla YA carga. Antes habia dos
+   formateadores en el mismo archivo: fmt() con GP2N (linea 155) y este con toFixed, que ademas
+   no ponia separador de miles. */
+function fmtNum(n){ return GP2N.fmt(n, 2, ''); }
+/* Se decide en ARGENTINA, no en la zona del aparato (ver gp2-ui.js fechaTsAR). */
+var fmtFecha = GP2UI.fechaTsAR;
 function cNom(cid){var c=(D&&D.comp[String(cid)])||null;return c?c.cod:(cid==null?'':String(cid));}
 function uNom(uid){return uid?(((D&&D.ubic[String(uid)])||{nom:'?'}).nom):'';}
 async function renderMovs(){

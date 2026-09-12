@@ -7,8 +7,8 @@
 <title>Control Envíos y Entregas · GP2</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="../supabase-config.js?v=20260905k"></script>
-<script src="../gp2-ui.js?v=20260905a"></script>
-<script src="../gp2-numero.js?v=20260905m"></script>
+<script src="../gp2-ui.js?v=20260912a"></script>
+<script src="../gp2-numero.js?v=20260911o"></script>
 <script src="../gp2-envios-common.js?v=20260905c"></script>
 <link rel="stylesheet" href="../gp2-modulo.css?v=20260903b"/>
 <link rel="icon" type="image/png" href="../GP2_favicon.png">
@@ -64,7 +64,9 @@ var $ = GP2UI.$, esc = GP2UI.esc, fmt = GP2EE.fmt0;
 var VISTAS = {
   ps:      { nombre:'Prov. Servicio', tipos:{ 'Envíos':['envio_ps'], 'Entregas':['entrega_ps'] } },
   tall:    { nombre:'Talleristas',    tipos:{ 'Envíos':['envio_tallerista'], 'Entregas':['entrega_tallerista','recepcion_virgilio'], 'Devoluciones':['devolucion_tallerista'] } },
-  provat:  { nombre:'Prov. AT',       tipos:{ 'Envíos':['envio_prov_at'] } },
+  // Desde el 2026-09-11 la entrega del Prov AT tambien mueve stock (crear_entrega_prov_at delega
+  // en recepcion_virgilio), asi que el Prov AT ya tiene su columna de Entregas como los demas.
+  provat:  { nombre:'Prov. AT',       tipos:{ 'Envíos':['envio_prov_at'], 'Entregas':['recepcion_virgilio'] } },
   insumos: { nombre:'Insumos',        tipos:{ 'Recepciones':['compra'] } },
 };
 var MEDIDAS = { auto:'Kg/Uni', kg:'Kg', cajas:'Cajas' };

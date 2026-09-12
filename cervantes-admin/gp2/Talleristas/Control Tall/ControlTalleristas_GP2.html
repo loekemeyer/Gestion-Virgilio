@@ -6,9 +6,9 @@
 <title>Control Partes Tallerista · GP2</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="../../supabase-config.js?v=20260905k"></script>
-<script src="../../gp2-ui.js?v=20260905a"></script>
-<script src="../../gp2-numero.js?v=20260905m"></script>
-<script src="../../gp2-composicion.js?v=20260905d"></script>
+<script src="../../gp2-ui.js?v=20260912a"></script>
+<script src="../../gp2-numero.js?v=20260911o"></script>
+<script src="../../gp2-composicion.js?v=20260911p"></script>
 <script src="../../gp2-envios-common.js?v=20260905c"></script>
 <link rel="stylesheet" href="../../gp2-modulo.css?v=20260903b"/>
 <link rel="icon" type="image/png" href="../../GP2_favicon.png">
@@ -209,7 +209,7 @@ function render(){
   arr.forEach(function(x){
     // online_tall viene en la unidad canonica del componente (uni para piezas)
     var uni = Number(x.online_tall||0);
-    var kg  = x.kg_x_uni ? uni*Number(x.kg_x_uni) : null;
+    var kg  = GP2N.aKg(x.kg_x_uni, uni);   // regla de la casa: null si no hay factor, nunca 0
     var caj = x.uni_x_cajon ? uni/Number(x.uni_x_cajon) : null;
 
     totUni += uni; totKg += (kg||0);
@@ -258,7 +258,7 @@ function exportarCSV(){
 
   arr.forEach(function(x){
     var uni = Number(x.online_tall||0);
-    var kg  = x.kg_x_uni ? uni*Number(x.kg_x_uni) : "";
+    var kg  = GP2N.aKg(x.kg_x_uni, uni); if (kg === null) kg = "";   // CSV: celda vacia, no un 0
     var caj = x.uni_x_cajon ? uni/Number(x.uni_x_cajon) : "";
     filas.push((selT ? [] : [x._tall||""]).concat([
       x.sector||"", x.cod||"", x["desc"]||"", kg, caj, uni,

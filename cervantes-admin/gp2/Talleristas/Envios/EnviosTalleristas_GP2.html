@@ -98,8 +98,8 @@
 </div>
 
 <script src="../../tandas-popup.js?v=20260905i"></script>
-<script src="../../gp2-ui.js?v=20260905a"></script>
-<script src="../../gp2-numero.js?v=20260905m"></script>
+<script src="../../gp2-ui.js?v=20260912a"></script>
+<script src="../../gp2-numero.js?v=20260911o"></script>
 <script src="../../gp2-envios-common.js?v=20260905c"></script>
 <script>
 "use strict";
@@ -127,8 +127,10 @@ function partesDe(tid){
 /* Uni a partir de lo cargado: si hay kg y factor, uni = kg / kg_x_uni. */
 function uniDe(x, it){
   var kg=num(it.kg);
-  if (kg>0 && x.kg_x_uni) return kg/Number(x.kg_x_uni);
-  return 0;
+  if (!(kg>0)) return 0;
+  // regla de la casa (GP2N.aUni): sin kg_x_uni no hay conversion posible
+  var uni = GP2N.aUni(x.kg_x_uni, kg);
+  return uni === null ? 0 : uni;
 }
 
 async function cargar(){

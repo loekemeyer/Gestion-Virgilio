@@ -1,6 +1,38 @@
 <!doctype html>
 <html lang="es">
 <head>
+<!-- v1.25.0 (2026-09-11) — EL PEDIDO MINIMO POR PIEZA (uni). Segunda mitad del motor de pedido que
+     estaba en el Excel del usuario (hoja "Pedido 31-08", columna "Pedi Min Uni"): el inyector no hace
+     una tirada de menos de N piezas. 47 componentes lo tienen cargado en componente.pedido_minimo_uni
+     y viaja en oc_bundle.insumos[].pedido_minimo_uni. A DIFERENCIA del piso en kg del proveedor de
+     resina, este NO bloquea: hoy 24 de los 47 sugeridos quedan por debajo (el pirolo blanco sugiere
+     2.248 y el minimo es 36.000 = 64 meses de consumo), asi que bloquear dejaria la OC imposible.
+     Es un AVISO amarillo aparte, con boton "Subir al minimo" para las lineas que el comprador decida
+     llevar al piso. La decision de comprar 16 veces el consumo es del comprador, no de la pantalla. -->
+<!-- v1.24.0 (2026-09-11) — EL PEDIDO MINIMO DEL PROVEEDOR DE RESINA (kg). Estaba en el Excel del usuario
+     (hoja "Relev y OP Bolsas Plast", columna "Pedi Minimo KG") y GP2 no lo miraba: Indarnyl no vende menos
+     de 400 kg, Beta Plasticos y Santa Rosa 25, el masterbatch (Arcolor / Julio Garcia) 5. Viaja en
+     oc_bundle.proveedores[].pedido_minimo_kg; validarMinimoProveedor() suma los kg de la OC por proveedor
+     (solo items del sector 14) y si no llega al piso NO deja crear la orden y dice cuanto falta. A
+     proposito no se infla solo: que falten kg lo resuelve el comprador (sumar otro material del mismo
+     proveedor o esperar), no un redondeo automatico. -->
+<!-- v1.23.0 (2026-09-11) — HOJA DE MATERIAL: SIN RENGLON CH CUANDO NO HAY CODIGO CHEF, Y ENTREGA EN SEGUN PROVEEDOR.
+     (a) Un material sin codigo_isis_ch (Nylon Virgen, Nylon Recuperado, PE, Master Bach) va en UN solo
+         renglon LK con el 100% de los kg: Chef no lo usa, no se le factura nada [usuario 2026-09-11:
+         "si no lo usa"]. El 85/15 sigue para los que tienen codigo de las dos empresas.
+     (b) ENTREGA EN sale de proveedor_insumo.entrega_en (viaja en oc_bundle.ocs[].entrega_en): null =
+         Virgilio 2788 (las bolsas viven en Virgilio); Arcolor y Julio Garcia = Cervantes 2868 porque el
+         Master Bach "se stockea en Cervantes por ahora" [usuario 2026-09-11]. -->
+<!-- v1.22.0 (2026-09-11) — OC DE MATERIA PRIMA PLASTICA CON EL FORMATO DEL USUARIO Y EMISION AUTOMATICA.
+     Una OC cuyos items son todos del sector 14 (bolsas de PP/ABS/nylon...) se imprime con la hoja "O.C."
+     del workbook del usuario: membrete doble (Loekemeyer Hnos S.R.L. / Chef SRL con CUIT y direccion),
+     RAZON SOCIAL + COD PROV, ENTREGA EN Virgilio 2788, "FACTURAR Loekemeyer 85% Chef 15%" (parametro
+     oc_facturar_pct_loeke, viaja en el bundle), "ESTE PEDIDO ANULA CUALQUIER PEDIDO ANTERIOR", y cada
+     material en DOS renglones: LK (Cod ISIS, kg x 85%) y CH (Cod ISIS de Chef = componente.codigo_isis_ch,
+     kg x 15%), con Fecha Pos Ent = entrega estimada (proveedor_insumo.dias_entrega = 5) y columnas en
+     blanco para anotar las entregas. Se EMITE SOLA al generar la OC (se abre la hoja para imprimir/mandar).
+     La OC va a UN solo proveedor, el mas barato del material (componente.proveedor lo elige la base), nunca
+     repartida entre los tres [usuario 2026-09-11]. Las demas OC siguen con la hoja de siempre. -->
 <!-- v1.21.0 (2026-09-08) — EL GATILLO DE REPOSICION: EL MINIMO DISPARA, EL MAXIMO DIMENSIONA
      (idea 7273). Hasta aca la pantalla proponia llenar el techo de TODO lo que estuviera un peso
      abajo del maximo: una corrida completa de sugeridos daban ~ARS 367,6 M en 201 lineas, con
@@ -279,9 +311,9 @@
 <meta name="viewport" content="width=device-width,initial-scale=1"/>
 <title>Órdenes de Compra · GP2</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="../gp2-numero.js?v=20260905m"></script>
+<script src="../gp2-numero.js?v=20260911o"></script>
 <script src="../supabase-config.js?v=20260905k"></script>
-<script src="../gp2-ui.js?v=20260905a"></script>
+<script src="../gp2-ui.js?v=20260912a"></script>
 <link rel="stylesheet" href="../gp2-modulo.css?v=20260903b"/>
 <link rel="icon" type="image/png" href="../GP2_favicon.png">
 <link rel="apple-touch-icon" href="../GP2_favicon.png">
@@ -393,6 +425,8 @@
       <div class="filtro hidden" id="filtroProv"><span class="filtro-lb">Proveedor</span><div class="chips" id="provs"></div></div>
       <div class="prov-info hidden" id="provInfo"></div>
       <div class="regla-carton hidden" id="reglaCarton"></div>
+      <!-- Aviso (no bloquea): lineas por debajo del pedido minimo de la pieza. -->
+      <div class="regla-carton hidden" id="avisoMinUni"></div>
       <!-- Sin sector ni proveedor elegido no se muestra NADA de la lista [usuario
            2026-09-04: "si no pongo el sector y no pongo el proveedor, que no me aparezca
            la lista"]: la pantalla arranca en los botones de sector y nada mas. -->
@@ -467,11 +501,9 @@ function isoLocal(d){
   return d.getFullYear()+'-'+(m.length<2?'0':'')+m+'-'+(dd.length<2?'0':'')+dd;
 }
 function hoyMas(dias){ var d=new Date(); d.setDate(d.getDate()+(Number(dias)||0)); return isoLocal(d); }
-function fmtFecha(iso){
-  if(!iso) return '';
-  var p=String(iso).slice(0,10).split('-');
-  return p.length===3 ? (p[2]+'/'+p[1]+'/'+p[0]) : String(iso);
-}
+/* La fecha en dd/mm/aaaa es la de la casa: GP2UI.fechaAR (gp2-ui.js). Esta pantalla tenia
+   su propia copia, identica, como otras dos. Se deja el nombre local para no tocar las llamadas. */
+var fmtFecha = GP2UI.fechaAR;
 // Lectura tolerante del bundle: el contrato nuevo manda stock / consumo_uni_mes / maximo,
 // el viejo mandaba online / consumo. La pantalla entiende los dos y no se rompe si falta.
 function vStock(i){ return i.stock!=null ? Number(i.stock) : (i.online!=null?Number(i.online):null); }
@@ -747,8 +779,13 @@ function esCharcasIt(i){
 // en el bundle; el 10 de aca es solo el default por si el parametro no esta. crear_oc usa el
 // mismo parametro para guardar la OC en kg (la pantalla manda paquetes con unidad 'paq').
 function kgPorPaqCharcas(){ return Number(D.charcas_kg_x_paquete)||10; }
-// Uni por paquete de Charcas: kg del paquete / kg_x_uni.
-function uniPorPaqCharcas(i){ return i && i.kg_x_uni>0 ? Math.round(kgPorPaqCharcas() / Number(i.kg_x_uni)) : 0; }
+// Uni por paquete de Charcas: kg del paquete / kg_x_uni. Sin el factor NO hay conversion
+// (regla unica GP2N.aUni, la misma que "GP2".to_canonical): devuelve 0 y quien llama ya
+// contempla ese caso (valorSugerido cae al sugerido en unidades).
+function uniPorPaqCharcas(i){
+  var u = GP2N.aUni(i && i.kg_x_uni, kgPorPaqCharcas());
+  return u === null ? 0 : Math.round(u);
+}
 
 // Cuanto se carga en "Pedir" cuando se toma el sugerido. Charcas viene en uni y se
 // pide en paquetes de 10 kg: se convierte y se redondea PARA ARRIBA (no quedar corto).
@@ -1067,14 +1104,74 @@ function ajustarPedidoCarton(){
   return toco;
 }
 
+/* v1.24.0 — PEDIDO MINIMO DEL PROVEEDOR (kg). Del Excel del usuario (hoja "Relev y OP Bolsas Plast",
+   columna `Pedi Minimo KG`): Indarnyl no vende menos de 400 kg, Beta y Santa Rosa 25, el masterbatch 5.
+   Vale para la materia prima plastica, que se pide en kg: si la OC de ese proveedor no llega al piso,
+   NO se deja crear y se dice cuanto falta. No se infla solo — que falten kg es una decision de compra
+   (sumar otro material del mismo proveedor o esperar), no algo para resolver redondeando. */
+function validarMinimoProveedor(items){
+  if(!items.length) return [];
+  var mats=items.filter(function(x){ return Number(x.it.sector_id)===SECTOR_MATERIA_PRIMA; });
+  if(!mats.length) return [];
+  var porProv={};
+  mats.forEach(function(x){
+    var p=x.it.proveedor||'(sin proveedor)';
+    porProv[p]=(porProv[p]||0)+(Number(x.cantidad)||0);
+  });
+  var errs=[];
+  Object.keys(porProv).forEach(function(p){
+    var prov=(D.proveedores||[]).filter(function(v){ return v.nombre===p; })[0];
+    var min=prov?Number(prov.pedido_minimo_kg)||0:0;
+    if(min>0 && porProv[p]<min)
+      errs.push(p+': el pedido mínimo es '+fmt(min)+' kg y hay '+fmt(porProv[p])+' kg (faltan '+fmt(min-porProv[p])+').');
+  });
+  return errs;
+}
+
+/* PEDIDO MINIMO POR PIEZA (componente.pedido_minimo_uni, del Excel del usuario hoja "Pedido 31-08",
+   columna `Pedi Min Uni`): el inyector no hace una tirada de menos de N piezas. NO bloquea la OC:
+   hoy 24 de los 47 sugeridos quedan por debajo del piso (el pirolo blanco sugiere 2.248 contra un
+   minimo de 36.000 = 64 meses de consumo), y bloquear volveria la OC imposible de crear. Es un aviso:
+   o se sube al piso (boton) o se saca la linea y se espera a juntar consumo. La decision de comprar
+   16 veces el consumo es del comprador. */
+function lineasBajoMinimoUni(items){
+  return items.filter(function(x){
+    var m=Number(x.it.pedido_minimo_uni)||0;
+    return m>0 && Number(x.cantidad)>0 && Number(x.cantidad)<m;
+  });
+}
+function subirAlMinimoUni(){
+  lineasBajoMinimoUni(itemsPedidos()).forEach(function(x){
+    PEDIDO[x.it.comp_id]=Number(x.it.pedido_minimo_uni);
+  });
+}
+
 function barra(){
   var items=itemsPedidos();
-  var errs=validarCarton(items);
+  var bajos=lineasBajoMinimoUni(items);
+  var am=$('avisoMinUni');
+  if(bajos.length){
+    am.classList.remove('hidden');
+    am.innerHTML='<b>Pedido mínimo de la pieza</b> — '+bajos.length+
+      (bajos.length===1?' línea queda':' líneas quedan')+' por debajo de lo que el proveedor fabrica de una:<br>'+
+      bajos.map(function(x){
+        return esc(x.it.codigo+' '+x.it.descripcion)+': pedís '+fmt(x.cantidad)+
+               ' y el mínimo es '+fmt(Number(x.it.pedido_minimo_uni))+'.';
+      }).join('<br>')+
+      '<br><button type="button" id="btnSubirMinUni" class="btn-sug" style="margin-top:8px">Subir al mínimo</button>';
+    var bm=$('btnSubirMinUni');
+    if(bm) bm.addEventListener('click',function(){ subirAlMinimoUni(); render(); });
+  }
+  else am.classList.add('hidden');
+  var errsCart=validarCarton(items);
+  var errs=errsCart.concat(validarMinimoProveedor(items));
   var rc=$('reglaCarton');
   if(errs.length){
     rc.classList.remove('hidden'); rc.classList.add('mal');
+    // El boton de ajustar es del CARTON (redondea al multiplo de la familia): si lo que falla es el
+    // piso en kg del proveedor de resina no hay nada que redondear, lo resuelve el comprador.
     rc.innerHTML=errs.map(esc).join('<br>')+
-      '<br><button type="button" id="btnAjustarCart" class="btn-sug" style="margin-top:8px">Ajustar al múltiplo</button>';
+      (errsCart.length ? '<br><button type="button" id="btnAjustarCart" class="btn-sug" style="margin-top:8px">Ajustar al múltiplo</button>' : '');
     var ba=$('btnAjustarCart');
     if(ba) ba.addEventListener('click',function(){ ajustarPedidoCarton(); render(); });
   }
@@ -1151,6 +1248,11 @@ $('btnCrear').addEventListener('click', async function(){
     fechaTocada=false; fechaTocadaProv=null;
     await boot();
     mostrarTab('ocs');
+    // Materia prima plastica: la OC se EMITE sola al generarla (se abre la hoja con el formato del
+    // usuario para imprimir / mandar al proveedor) [usuario 2026-09-11: "que se emita automaticamente
+    // desde gestion productiva cuando genero el pedido"].
+    var creada = (D.ocs||[]).filter(function(x){ return x.id===r.data.oc_id; })[0];
+    if (creada && esOcMaterial(creada)) imprimirOC(creada.id);
     // OC gemela al proveedor de la materia prima de un PS hibrido (Charcas -> Altrak, Eclipse ->
     // Aperam, o el que se configure en proveedor_servicio): crear_oc la crea y la devuelve.
     var gem = r.data && r.data.oc_gemela;
@@ -1217,6 +1319,73 @@ function pintarOcs(){
   });
 }
 
+/* ── OC de MATERIA PRIMA PLASTICA: el formato del usuario (hojas "O.C." del workbook) ──
+   Una OC es "de material" cuando todos sus items son del sector 14. Se imprime con membrete doble
+   (las dos empresas facturan: Loekemeyer 85 % / Chef 15 %, parametro oc_facturar_pct_loeke), entrega
+   en Virgilio 2788 (ahi vive el material), y cada material en dos renglones LK / CH con su Cod ISIS
+   de cada empresa. Los datos de las empresas son fijos de la casa (los mismos de la hoja). */
+var SECTOR_MATERIA_PRIMA = 14;
+var EMPRESAS = {
+  LK: { nombre:'Loekemeyer Hnos. S.R.L', cuit:'30-51584245-0', dir:'Cervantes 2868', loc:'Villa Devoto, CABA' },
+  CH: { nombre:'Chef SRL',               cuit:'30-68575625-7', dir:'Virgilio 2788',  loc:'Villa Real, CABA' }
+};
+function esOcMaterial(o){
+  var its = o && o.items || [];
+  return its.length > 0 && its.every(function(it){ return Number(it.sector_id) === SECTOR_MATERIA_PRIMA; });
+}
+function hojaOCMaterial(o){
+  var pctLK = Number(D.facturar_pct_loeke != null ? D.facturar_pct_loeke : 85);
+  var pctCH = 100 - pctLK;
+  var fPed = new Date(o.creado_en).toLocaleDateString('es-AR');
+  var fEnt = vFechaEnt(o) ? fmtFecha(vFechaEnt(o)) : '';
+  var css =
+    '@page{size:A4 landscape;margin:10mm}*{box-sizing:border-box}'+
+    'body{font-family:Arial,Helvetica,sans-serif;color:#111;margin:0;padding:18px;font-size:13px;background:#fff}'+
+    '.hoja{max-width:1080px;margin:0 auto}'+
+    '.tit{display:flex;justify-content:space-between;align-items:baseline;border-bottom:3px solid #111;padding-bottom:6px}'+
+    '.tit h1{margin:0;font-size:22px;letter-spacing:1px}.tit .fp{font-size:14px;font-weight:700}'+
+    '.emps{display:flex;gap:24px;margin:12px 0}.emp{flex:1;border:1px solid #bbb;border-radius:6px;padding:8px 10px}'+
+    '.emp b{display:block;font-size:15px;margin-bottom:4px}.emp div{font-size:12px;line-height:1.5}'+
+    '.prov{display:flex;gap:24px;flex-wrap:wrap;margin:6px 0;font-size:14px}.prov span b{margin-right:6px}'+
+    '.avisos{display:flex;justify-content:space-between;gap:20px;margin:10px 0;font-weight:800;font-size:13px}'+
+    'table{width:100%;border-collapse:collapse;font-size:12px;margin-top:8px}'+
+    'th{background:#ececec;text-align:left;padding:6px;border:1px solid #999;font-size:10px;text-transform:uppercase}'+
+    'td{padding:6px;border:1px solid #bbb;vertical-align:middle;height:30px}'+
+    'td.num{text-align:right;white-space:nowrap}td.emp{font-weight:800;text-align:center;width:44px}'+
+    'tr.ch td{background:#fafafa;color:#333}td.cod{font-weight:800}'+
+    '.pie{margin-top:18px;border-top:1px solid #ddd;padding-top:6px;color:#888;font-size:11px;display:flex;justify-content:space-between}'+
+    '@media print{body{padding:0}tr{page-break-inside:avoid}thead{display:table-header-group}}';
+  var n = 0;
+  var filas = (o.items||[]).map(function(it){
+    n++;
+    var kg = Number(it.cantidad)||0;
+    // Sin codigo de Chef no hay renglon CH: ese material lo usa solo Loekemeyer y va 100% LK.
+    var conCH = !!it.codigo_isis_ch;
+    var kgLK = conCH ? Math.round(kg * pctLK / 100 * 100) / 100 : kg, kgCH = Math.round((kg - kgLK) * 100) / 100;
+    var vacias = '<td></td><td></td><td></td><td></td><td></td><td></td>';   // Fecha Ent / Kg Ent x3: se anotan a mano
+    return '<tr class="lk"><td class="emp">LK</td><td class="cod">'+esc(it.codigo)+'</td><td class="num">'+n+'</td>'+
+             '<td>'+esc(it.descripcion||'')+'</td><td class="num">'+fmt(kg,2)+'</td><td class="emp">LK</td>'+
+             '<td class="num">'+fmt(kgLK,2)+'</td><td>'+esc(fEnt)+'</td>'+vacias+'</tr>'+
+           (conCH ? '<tr class="ch"><td class="emp">CH</td><td class="cod">'+esc(it.codigo_isis_ch)+'</td><td></td>'+
+             '<td></td><td></td><td class="emp">CH</td><td class="num">'+fmt(kgCH,2)+'</td><td></td>'+vacias+'</tr>' : '');
+  }).join('');
+  var emp = function(e){ return '<div class="emp"><b>'+esc(e.nombre)+'</b><div>CUIT: '+esc(e.cuit)+'<br>DIRECCION: '+esc(e.dir)+'<br>LOCALIDAD: '+esc(e.loc)+'</div></div>'; };
+  return '<!doctype html><html lang="es"><head><meta charset="utf-8"><title>OC N° '+o.numero+' · '+esc(o.proveedor||'')+'</title><style>'+css+'</style></head><body><div class="hoja">'+
+    '<div class="tit"><h1>ORDEN DE COMPRA N° '+o.numero+'</h1><div class="fp">FECHA PEDIDO: '+fPed+'</div></div>'+
+    '<div class="emps">'+emp(EMPRESAS.LK)+emp(EMPRESAS.CH)+'</div>'+
+    '<div class="prov"><span><b>RAZON SOCIAL:</b>'+esc(String(o.proveedor||'').toUpperCase())+'</span>'+
+      '<span><b>COD PROV:</b>'+esc(o.cod_prov||'—')+'</span>'+
+      '<span><b>ENTREGA EN:</b>'+esc(o.entrega_en || EMPRESAS.CH.dir)+'</span>'+
+      (fEnt?('<span><b>ENTREGA ESTIMADA:</b>'+esc(fEnt)+'</span>'):'')+'</div>'+
+    '<div class="avisos"><span>FACTURAR Loekemeyer '+fmt(pctLK)+'% · Chef '+fmt(pctCH)+'%</span><span>ESTE PEDIDO ANULA CUALQUIER PEDIDO ANTERIOR</span></div>'+
+    '<table><thead><tr><th>Empresa</th><th>Cód ISIS</th><th>N° Ord</th><th>Descripción Material</th><th>Pedido KG</th><th>Emp</th><th>KG a FC</th>'+
+    '<th>Fecha Pos Ent</th><th>Fecha Ent</th><th>Kg Ent</th><th>Fecha Ent</th><th>Kg Ent</th><th>Fecha Ent</th><th>Kg Ent</th></tr></thead><tbody>'+
+    (filas||'<tr><td colspan="14">Sin ítems.</td></tr>')+'</tbody></table>'+
+    (o.nota?('<div style="margin-top:10px;font-size:12px"><b>Nota:</b> '+esc(o.nota)+'</div>'):'')+
+    '<div class="pie"><span>Loekemeyer · Gestión Productiva 2.0 · Materia prima plástica</span><span>Impreso el '+new Date().toLocaleDateString('es-AR')+'</span></div>'+
+    '</div></body></html>';
+}
+
 // Hoja limpia para mandar/imprimir la OC al proveedor.
 // Membrete + bloque de datos (con la ENTREGA ESTIMADA destacada) + tabla + total + firmas.
 function imprimirOC(ocId){
@@ -1224,6 +1393,12 @@ function imprimirOC(ocId){
   if(!o) return;
   var w=window.open('','_blank');
   if(!w){ alert('El navegador bloqueó la ventana de impresión.'); return; }
+  if(esOcMaterial(o)){
+    w.document.write(hojaOCMaterial(o));
+    w.document.close(); w.focus();
+    setTimeout(function(){ w.print(); }, 250);
+    return;
+  }
   var entrega = vFechaEnt(o) ? fmtFecha(vFechaEnt(o)) : '';
   var emision = new Date(o.creado_en).toLocaleDateString('es-AR');
   var totLinea = (o.total_usd>0||o.total_ars>0) ? fmtTotalMon(Number(o.total_usd)||0,Number(o.total_ars)||0) : '';

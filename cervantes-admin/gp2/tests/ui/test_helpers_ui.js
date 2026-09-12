@@ -40,6 +40,14 @@ ok(UI.hoyAR(new Date('2026-09-05T02:30:00Z')) === '2026-09-04', 'hoyAR(Date): a 
 ok(UI.fechaAR('2026-09-04') === '04/09/2026' && UI.fechaAR('2026-09-04T12:00:00') === '04/09/2026'
    && UI.fechaAR('') === '' && UI.fechaAR(null) === '' && UI.fechaAR('ayer') === 'ayer',
    'fechaAR(): ISO -> dd/mm/aaaa; vacio -> vacio; lo que no es ISO vuelve igual');
+// 2026-09-12: fechaTsAR es la fecha DE UN TIMESTAMP decidida en Argentina. Habia dos copias que
+// hacian new Date(f).toLocaleDateString('es-AR'), que resuelve en la zona del APARATO: un
+// movimiento sellado a las 23:30 AR se veia del dia siguiente en una tablet en UTC.
+ok(UI.fechaTsAR('2026-09-05T02:30:00Z') === '04/09/2026',
+   'fechaTsAR(): 02:30 UTC son las 23:30 del 4 en Argentina, no el 5');
+ok(UI.fechaTsAR('2026-09-04T23:30:00-03:00') === '04/09/2026', 'fechaTsAR(): con offset explicito tambien');
+ok(UI.fechaTsAR('') === '' && UI.fechaTsAR(null) === '' && UI.fechaTsAR('ayer') === 'ayer',
+   'fechaTsAR(): vacio -> vacio; lo que no es fecha vuelve igual');
 ok(typeof UI.exportarCSV === 'function', 'exportarCSV existe');
 
 // ── 2) orden de carga y 3) copias en las paginas ────────────────────────
@@ -81,6 +89,11 @@ for (const p of html) {
     [/toISOString\(\)\.slice\(0,\s*10\)/, 'fecha "hoy" en UTC con toISOString (usar GP2UI.hoyAR)'],
     // 2026-09-05: cuatro pantallas conservaban un hoyAR() byte a byte igual al de la casa
     [/function\s+hoyAR\s*\(/, 'function hoyAR() propia (usar var hoyAR = GP2UI.hoyAR)'],
+    // 2026-09-12: dos pantallas tenian un hoy() con getFullYear/getMonth/getDate, que lee la zona
+    // del APARATO y despues de las 21:00 AR devuelve el dia siguiente -- una la usaba para sellar
+    // la recepcion y la otra para la fecha del registro de produccion. Otras dos lo tenian como
+    // envoltorio de GP2UI.hoyAR, que es una linea de mas. Ninguna de las dos formas va.
+    [/function\s+hoy\s*\(/, 'function hoy() propia (usar var hoy = GP2UI.hoyAR)'],
   ];
   for (const [re, que] of COPIAS) {
     const m = re.exec(txt);

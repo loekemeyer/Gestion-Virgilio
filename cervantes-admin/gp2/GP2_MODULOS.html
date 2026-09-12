@@ -1,4 +1,12 @@
 <!doctype html><html lang="es"><head><meta charset="utf-8">
+<!-- Anti-cache (2026-09-11): ESTA es la pantalla que muestra el cartel "Version vX.Y.Z", y era
+     la unica de las tres que lo muestran sin estos meta. Como el menu se navega directo, sin
+     ?v= propio, el navegador servia la copia vieja del HTML, que seguia pidiendo el
+     version.js con el token viejo: el usuario pulleaba el repo y la pantalla le seguia diciendo la
+     version anterior. Sin esto, el esquema de tokens ?v= queda anulado en la pagina de entrada. -->
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="0">
 <script src="auth-guard.js?v=20260904t"></script>
 <!-- v1.21.0 (2026-09-04) - las 9 pantallas de stock por sector (Stock SP, Stock SC, Stock en Movimiento, Cajas, Cartones, Partes Plasticas, Remaches, Bombillas y Garage) eran 9 HTML casi iguales que solo cambiaban su STOCK_CFG: pasan a UNA sola, StockSector/StockSector_GP2.html?sector=N (mismos rotulos, mismo orden, mismo aspecto y botones), con la config de cada sector en el mapa SECTORES de gp2-stock-sector.js; los 9 HTML viejos se borran del repo. v1.20.0 (2026-09-04) - se saca "Compra Aperam -> Eclipse (Pagos)": la chapa 430 de Aperam ahora se recibe desde Recepcion Insumos -> Flejes tocando el item CHAPA430 (misma forma que Altrak, panel propio kg+remito -> cargar_compra_aperam_chapa, stock a Eclipse ubic 48). AperamEclipse_GP2.html queda legacy sin link. v1.19.0 (2026-09-04) - se saca "Charcas y Eclipse" del grupo PS: la MP de Altrak entra por Recepcion Insumos -> Flejes -> Altrak, y las ENTREGAS de Charcas (corto/largo) y Eclipse (1686) ahora se cargan en Entrega Prov Serv (paneles propios). El modulo separado CharcasEclipse queda jubilado (archivo legacy sin link). v1.18.0 (2026-09-04) - se saca "Compra Altrak -> Charcas (Pagos)": la entrega de Altrak ahora se carga desde Recepcion Insumos -> Flejes -> Altrak (opcion B, flujo propio kg + % corto/largo). Aperam -> Eclipse queda por ahora. v1.17.0 - entra "Charcas y Eclipse" al grupo PS (Prov. Servicio). Pantalla nueva
      para los prov servicio "hibridos" que NO reciben Envio desde Cervantes (la MP
@@ -21,7 +29,7 @@
 body{background:#ffffff;color:#1e293b;font-family:-apple-system,Segoe UI,Roboto,Helvetica,sans-serif;min-height:100vh}
 
 /* ── header ── */
-.header{background:#ffffff;border-bottom:1px solid #e2e8f0;padding:20px 0 16px;text-align:center;position:relative}
+.header{background:#ffffff;border-bottom:1px solid #e2e8f0;padding:20px 0 16px;text-align:center}
 .header img{width:90%;max-width:400px;height:auto;border-radius:8px}
 .header-sub{color:#64748b;font-size:14px;margin-top:10px;letter-spacing:.3px}
 .header-sub b{color:#163e98}
@@ -187,7 +195,7 @@ span.op.lock .lk{font-size:14px;margin-left:auto;opacity:.7}
     (GP2_AUTH_ON=false) no hay sesion que cerrar: el link se oculta solo -->
     <span id="kpiResumen"></span><span id="sesion" hidden>&nbsp;·&nbsp; <a href="login.html?logout=1" onclick="try{sessionStorage.clear();}catch(e){}"
     style="color:#b42318;text-decoration:none;font-weight:700">⎋ Cerrar sesión</a></span></div>
-  <script src="version.js?v=20260909a"></script>
+  <script src="version.js?v=20260912a"></script>
   <script>if (window.GP2_AUTH_ON !== false) document.getElementById('sesion').hidden = false;</script>
 </div>
 
@@ -268,6 +276,7 @@ const MENU = [
    ["Remaches", "StockSector/StockSector_GP2.html?sector=8"],
    ["Bombillas", "StockSector/StockSector_GP2.html?sector=7"],
    ["Garage", "StockSector/StockSector_GP2.html?sector=9"],
+   ["Materia Prima Plástica", "StockSector/StockSector_GP2.html?sector=14"],
    ["Valorización · Cuánto vale el stock", "Compras/Valorizacion_GP2.html", "secundario"],
    ["Inyectores · Quién hace cada parte", "Compras/Inyectores_GP2.html", "secundario"],
    ["Pintores · Quién pinta cada parte", "Prov%20Serv/Pintores/Pintores_GP2.html", "secundario"],

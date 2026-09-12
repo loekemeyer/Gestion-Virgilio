@@ -777,7 +777,17 @@ borró). Layout:
   pantalla `#cervAdmin` muestra las dos tarjetas. **Todo Cervantes vive en este repo**: la
   app de operario en `cervantes/` y los dos admin acá.
 - **De la copia se dejaron afuera** los archivos de repo, no de app: `.git`, `.claude`,
-  `.vscode`, `.mcp.json`, `.planning`, `LOCKS.txt` y los `.bat`.
+  `.vscode`, `.mcp.json`, `.planning`, `LOCKS.txt` y los `.bat`. **Y desde el 2026-09-12
+  tampoco entra `db/A_Costos_VIGENTES.xlsx`**: es la planilla madre de costos, o sea datos, y
+  este repo se sirve por GitHub Pages. Que el `.gitignore` del origen la deje pasar allá no
+  significa que tenga que viajar acá.
+- **Re-sincronizada el 2026-09-12 (v16.32)**, con 92 diferencias acumuladas. Cómo se hace, para
+  la próxima: copiar `gestion-productiva-2.0` entero salvo lo de arriba, **re-aplicar a mano los
+  parches de la copia** (los de abajo) y **verificarlos uno por uno antes de commitear** — el
+  del `signOut` es el que importa: si se pierde, un supervisor que no esté en la whitelist de
+  GP2 queda echado de Gestión entera. El `CLAUDE.md` del origen se copia **renombrado**, con el
+  banner de "esto es documentación" pegado adelante. Chequeo de que no quedó ninguno suelto:
+  `find cervantes-admin -name CLAUDE.md` tiene que dar vacío.
 - **Los `CLAUDE.md` de los dos admin SÍ están, pero RENOMBRADOS** (v14.75):
   `cervantes-admin/entero/claude-admin--GestionProductivaEntero.md` y
   `cervantes-admin/gp2/claude-admin--Gestion-Productiva-2.0.md`. Ahí está cómo opera cada

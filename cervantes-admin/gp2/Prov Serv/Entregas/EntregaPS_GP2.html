@@ -94,7 +94,7 @@
             <th>SC</th>
             <th>SP</th>
             <th class="num">Caj</th>
-            <th class="num">Kg<br>Neto</th>
+            <th class="num" title="Kg netos; en las piezas que se cuentan (sin peso por unidad) va en unidades">Kg Neto<br>o Uni</th>
             <th class="ctr" title="Cargar por tandas">T</th>
             <th class="ctr" title="Marcar faltante">F</th>
             <th class="num">En PS<br>Cajón</th>
@@ -197,8 +197,8 @@
 </div>
 
 <script src="../../tandas-popup.js?v=20260905i"></script>
-<script src="../../gp2-ui.js?v=20260905a"></script>
-<script src="../../gp2-numero.js?v=20260905m"></script>
+<script src="../../gp2-ui.js?v=20260912a"></script>
+<script src="../../gp2-numero.js?v=20260911o"></script>
 <script src="../../gp2-envios-common.js?v=20260905c"></script>
 <script>
 "use strict";
@@ -325,10 +325,17 @@ function irCharcas(p){
 function chRefresh(){
   var prod=chProdSel(), uni=num($("chUni").value), kg=num($("chKg").value);
   if(prod && uni>0 && kg>0){
-    var uniCalc = prod.kg_x_uni ? Math.round(kg/prod.kg_x_uni) : 0;
-    var diff = uni>0 ? Math.round(Math.abs(uni-uniCalc)/uni*10000)/100 : 0;
-    $("chVerif").innerHTML = "≈ <b>"+fmt(uniCalc)+" uni</b> por balanza vs "+fmt(uni)+" del remito · dif "+fmt(diff)+"% "+
-      (diff<=5 ? '<span style="color:#0a7c2f;font-weight:800">✓ OK</span>' : '<span style="color:#b42318;font-weight:800">⚠ fuera de 5%</span>');
+    // Sin kg_x_uni no hay conversion posible: se dice, no se muestra 0 (regla unica GP2N.aUni)
+    var uniCalc = GP2N.aUni(prod.kg_x_uni, kg);
+    if (uniCalc === null){
+      $("chVerif").innerHTML = '<span style="color:#b42318;font-weight:800">'+esc(prod.codigo)+
+        ' no tiene kg por unidad cargado: no se puede verificar la balanza contra el remito.</span>';
+    } else {
+      uniCalc = Math.round(uniCalc);
+      var diff = uni>0 ? Math.round(Math.abs(uni-uniCalc)/uni*10000)/100 : 0;
+      $("chVerif").innerHTML = "≈ <b>"+fmt(uniCalc)+" uni</b> por balanza vs "+fmt(uni)+" del remito · dif "+fmt(diff)+"% "+
+        (diff<=5 ? '<span style="color:#0a7c2f;font-weight:800">✓ OK</span>' : '<span style="color:#b42318;font-weight:800">⚠ fuera de 5%</span>');
+    }
   } else { $("chVerif").textContent=""; }
   $("chGuardar").disabled = !(prod && uni>0 && kg>0 && $("chFecha").value);
 }
@@ -431,6 +438,16 @@ $("ecGuardar").addEventListener("click", async function(){
 });
 
 /* la entrega es SC -> SP: las filas sin SP no se listan */
+/* Hay piezas que el proveedor NO devuelve pesadas sino contadas: los 11 "Pliego Ad" que
+   adhesiva AJ Adhesivos, C12 y V18D. No tienen kg_x_uni, asi que no hay forma de pasar kilos a
+   unidades y hasta el 2026-09-11 la entrega era IMPOSIBLE (crear_entrega_ps solo aceptaba kg y
+   to_canonical cortaba con "sin kg_x_uni valido"). Ahora la RPC recibe p_unidad y esta funcion
+   decide cual va por fila. */
+function seCuenta(m){
+  return String((m&&m.sp_um)||"unidad").toLowerCase() !== "kg" && !(Number(m&&m.sp_kgxuni) > 0);
+}
+function unidadDe(m){ return seCuenta(m) ? "uni" : "kg"; }
+
 function partesFiltradas(){
   var arr = ((D.partes||{})[selPS.id]||[]).filter(function(x){ return x.sp_id; });
   return E.filtrar(arr, $("q").value, function(x){
@@ -459,9 +476,10 @@ function renderTabla(){
       '<td>'+esc(x.sc_desc||x.sp_desc||"")+'</td>'+
       '<td class="proc">'+esc(x.proceso||"—")+'</td>'+
       '<td><span class="cod">'+esc(x.sc_cod)+'</span></td>'+
-      '<td><span class="cod">'+esc(x.sp_cod||"—")+'</span><br><small style="color:#777">'+esc(x.sp_desc||"")+'</small></td>'+
+      '<td><span class="cod">'+esc(x.sp_cod||"—")+'</span><br><small style="color:#777">'+esc(x.sp_desc||"")+'</small>'+
+        (seCuenta(x)?'<br><small style="color:#0b5cad;font-weight:700">se cuenta: cargar UNIDADES</small>':'')+'</td>'+
       E.tdInput("caj", vCaj, t.hayT)+
-      E.tdInput("kg",  vKg,  t.hayT, null, "decimal")+
+      E.tdInput("kg",  vKg,  t.hayT, null, seCuenta(x)?"numeric":"decimal")+
       E.tdTanda(it)+
       E.tdFalt(it)+
       '<td class="num">'+(enPS==null?"—":fmt(enPS))+'</td>';
@@ -529,20 +547,21 @@ $("btnEnviar").addEventListener("click", async function(){
   var arr = (D.partes||{})[selPS.id]||[], metaPorK = {};
   arr.forEach(function(x){ metaPorK[keyDe(x)] = x; });
 
-  // la entrega se registra por kg: avisar si hay cajones cargados sin kg
-  // (antes se ignoraban en silencio y se perdian al limpiar el buffer)
+  // la entrega se registra por kg (o por unidades si la pieza se cuenta): avisar si hay
+  // cajones cargados sin cantidad (antes se ignoraban en silencio y se perdian al limpiar el buffer)
   var b0 = BUF.de(selPS.id);
   var faltanKg = Object.keys(b0).filter(function(k){
         var it = b0[k]; return num(it.caj)>0 && !(num(it.kg)>0); })
       .map(function(k){ var m = metaPorK[k]||{}; return m.sp_cod||m.sc_cod||k; });
   if (faltanKg.length){
-    alert("Falta cargar Kg neto para: "+faltanKg.join(", "));
+    alert("Falta cargar la cantidad entregada (Kg neto o unidades) para: "+faltanKg.join(", "));
     return;
   }
 
   var resumen = items.map(function(o){
     var m = metaPorK[o.k]||{};
-    return (m.sc_cod||"?")+" → "+(m.sp_cod||"?")+": "+fmt(num(o.it.caj),1)+" caj / "+fmt(num(o.it.kg),0)+" kg";
+    return (m.sc_cod||"?")+" → "+(m.sp_cod||"?")+": "+fmt(num(o.it.caj),1)+" caj / "+
+           fmt(num(o.it.kg),0)+" "+unidadDe(m);
   }).join("\n");
   if (!confirm("Registrar entrega de "+selPS.nombre+":\n\n"+resumen)) return;
 
@@ -561,7 +580,8 @@ $("btnEnviar").addEventListener("click", async function(){
         p_kg: num(o.it.kg),
         p_fecha: fecha,
         p_cajones: num(o.it.caj)||null,
-        p_faltante: !!o.it.falt
+        p_faltante: !!o.it.falt,
+        p_unidad: unidadDe(m)
       });
     },
     // ya registrada en la BD: fuera del buffer YA (un reintento no la duplica)

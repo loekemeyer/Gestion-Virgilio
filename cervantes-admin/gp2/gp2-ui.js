@@ -52,6 +52,17 @@
     return m ? (m[3] + "/" + m[2] + "/" + m[1]) : String(f);
   }
 
+  /* La FECHA de un timestamp, en dd/mm/aaaa y decidida en ARGENTINA.
+     Distinto de fechaAR, que recorta un "YYYY-MM-DD" que ya viene resuelto: esto convierte de
+     verdad. Habia dos copias que hacian new Date(f).toLocaleDateString("es-AR"), que resuelve
+     en la zona del APARATO: un movimiento sellado a las 23:30 de Argentina se veia del dia
+     siguiente en una tablet en UTC. [2026-09-12, hallazgo 14b del informe de logica duplicada] */
+  function fechaTsAR(ts) {
+    if (!ts) return "";
+    var d = new Date(ts);
+    return isNaN(d.getTime()) ? String(ts) : fechaAR(hoyAR(d));
+  }
+
   function exportarCSV(nombre, filas) {
     var celda = function (v) {
       if (v == null) v = "";
@@ -69,5 +80,6 @@
     setTimeout(function () { URL.revokeObjectURL(a.href); }, 1000);
   }
 
-  global.GP2UI = { esc: esc, $: $, cls: cls, hoyAR: hoyAR, fechaAR: fechaAR, exportarCSV: exportarCSV };
+  global.GP2UI = { esc: esc, $: $, cls: cls, hoyAR: hoyAR, fechaAR: fechaAR,
+                   fechaTsAR: fechaTsAR, exportarCSV: exportarCSV };
 })(typeof window !== "undefined" ? window : this);

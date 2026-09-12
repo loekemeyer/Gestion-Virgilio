@@ -2,8 +2,8 @@
 <html lang="es">
 <head>
 <script src="../../auth-guard.js?v=20260904t"></script>
-<script src="../../gp2-ui.js?v=20260905a"></script>
-<script src="../../gp2-numero.js?v=20260905m"></script>
+<script src="../../gp2-ui.js?v=20260912a"></script>
+<script src="../../gp2-numero.js?v=20260911o"></script>
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1"/>
 <title>Control Stocks Prov. Art. Terminado · GP2</title>
@@ -200,12 +200,13 @@ async function cargar(){
       todas(SB, "movimiento", "tipo_mov,comp_id,ubic_destino_id,cantidad,_delta_dest,fecha"),
       todas(SB, "articulo_prov_at", "proveedor_at_id,cod_art,descripcion,activo,n_caja,marca"),
       todas(SB, "entrega_prov_at", "proveedor_at_id,cod_art,descripcion,cantidad_cajas,remito,fecha_rto,dia_mes"),
-      todas(SB, "uni_x_articulo_x_caja", "cod_art,uni_x_caja,n_caja,empresa")
+      todas(SB, "uni_x_articulo_x_caja", "cod_art,uni_x_caja,n_caja,empresa"),
+      todas(SB, "articulo", "codigo,marca")
     ]);
 
     D = indexar({
       provs: res[0], ubics: res[1], comps: res[2], inv: res[3], movs: res[4],
-      artsProv: res[5], entregas: res[6], uxc: res[7]
+      artsProv: res[5], entregas: res[6], uxc: res[7], arts: res[8]
     });
 
     renderGrid();
@@ -254,19 +255,44 @@ function indexar(r){
   // seria inventar un numero y las cajas equivalentes darian 3 veces mal,
   // asi que se guardan todos los valores y el que tiene mas de uno se
   // muestra como ambiguo, sin calcular cajas.
-  var uniXCajaVals = new Map();
+  // La clave de la tabla es (empresa, cod_art), no el codigo solo: el mismo numero es un
+  // articulo de Chef y otro de Loeke, con cajas distintas. Indexar solo por codigo mezclaba
+  // las dos empresas y dejaba 18 codigos como ambiguos cuando de verdad son 9 (2026-09-11).
+  // La empresa del articulo sale de articulo.marca (LOEKE/LOKE -> LK, CHEF -> CH).
+  var empresaDeCod = new Map();
+  (r.arts || []).forEach(function(a){
+    var m = String(a.marca || "").trim().toUpperCase();
+    var emp = (m === "CHEF") ? "CH" : ((m === "LOEKE" || m === "LOKE") ? "LK" : "");
+    if (emp) empresaDeCod.set(String(a.codigo || "").trim(), emp);
+  });
+  var uniXCajaVals = new Map();   // 'EMP|cod' -> Set de valores
+  var uniXCajaTodos = new Map();  // 'cod'     -> Set de valores (respaldo: articulo que GP2 no tiene)
   r.uxc.forEach(function(u){
     var cod = String(u.cod_art || "").trim();
+    var emp = String(u.empresa || "").trim().toUpperCase();
     var v = n(u.uni_x_caja);
     if (!cod || v <= 0) return;
-    if (!uniXCajaVals.has(cod)) uniXCajaVals.set(cod, new Set());
-    uniXCajaVals.get(cod).add(v);
+    var k = emp + "|" + cod;
+    if (!uniXCajaVals.has(k)) uniXCajaVals.set(k, new Set());
+    uniXCajaVals.get(k).add(v);
+    if (!uniXCajaTodos.has(cod)) uniXCajaTodos.set(cod, new Set());
+    uniXCajaTodos.get(cod).add(v);
   });
-  var uniXCaja = new Map();
-  uniXCajaVals.forEach(function(set, cod){
+  function _info(set){
     var vals = Array.from(set).sort(function(a,b){ return a - b; });
-    uniXCaja.set(cod, { valores: vals, unico: vals.length === 1 ? vals[0] : null });
-  });
+    return { valores: vals, unico: vals.length === 1 ? vals[0] : null };
+  }
+  var uniXCaja = new Map();
+  uniXCajaVals.forEach(function(set, k){ uniXCaja.set(k, _info(set)); });
+  var uniXCajaPorCod = new Map();
+  uniXCajaTodos.forEach(function(set, cod){ uniXCajaPorCod.set(cod, _info(set)); });
+  // Busqueda: primero por (empresa del articulo, codigo); si GP2 no sabe de que empresa es,
+  // cae a todos los valores de ese codigo, que es lo que hacia antes.
+  function infoUniXCaja(cod){
+    var emp = empresaDeCod.get(cod);
+    if (emp && uniXCaja.has(emp + "|" + cod)) return uniXCaja.get(emp + "|" + cod);
+    return uniXCajaPorCod.get(cod) || null;
+  }
 
   // Nombre de proveedor por id (para las tablas que ya vienen con FK numerica).
   var provNombrePorId = new Map();
@@ -308,7 +334,7 @@ function indexar(r){
     provs: r.provs.filter(function(p){ return p.activo !== false; })
                   .sort(function(a,b){ return String(a.nombre).localeCompare(String(b.nombre),"es"); }),
     ubicPorProv: ubicPorProv, compPorId: compPorId,
-    enviado: enviado, saldo: saldo, uniXCaja: uniXCaja,
+    enviado: enviado, saldo: saldo, uniXCaja: uniXCaja, infoUniXCaja: infoUniXCaja,
     entregas: entregas, artsPorProv: artsPorProv
   };
 }
@@ -330,7 +356,7 @@ function filasArticulos(prov){
 
   return base.map(function(a){
     var acc = D.entregas.get(nombre + "|" + a.cod) || { cajas:0, ultima:null, remitos:0 };
-    var info = D.uniXCaja.get(a.cod) || null;
+    var info = D.infoUniXCaja(a.cod);
     var uxc = info ? info.unico : null;
     return {
       cod: a.cod, desc: a.desc || acc.desc || "", nCaja: a.nCaja,

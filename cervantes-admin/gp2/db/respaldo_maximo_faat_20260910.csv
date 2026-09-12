@@ -1,0 +1,11 @@
+codigo;descripcion;sector;inv_id;kg_x_uni;uni_x_cajon;minimo;minimo_origen;maximo_antes;maximo_origen_antes;maximo_despues;maximo_origen_despues;estado
+I14;Cuchilla Abrelata p/Templar;Sector Crudo;19;0,00878;3417;32302;consumo;17085;cinco_cajones;35719;faat_reserva_lote;APLICADO (min 2m + 30kg)
+K11;Arandela grande Afila p/cementar y zincar;Sector Crudo;33;0,004933333;6081;1110;consumo;30405;cinco_cajones;7191;faat_reserva_lote;APLICADO (min 2m + 30kg)
+L13;Uñas p/Zincar;Sector Crudo;43;0,003626667;8272;55936;consumo;41360;cinco_cajones;64208;faat_reserva_lote;APLICADO (min 2m + 30kg)
+X4;Cuchilla Pelapapa Cerrada;Sector Crudo;70;0,00492;4004;87892;consumo;20020;cinco_cajones;93990;faat_reserva_lote;APLICADO (min 2m + 30kg)
+W1;Buje Abrelata p/Niquelar;Sector Crudo;64;0,001216667;1644;14562;consumo;8220;cinco_cajones;8220;cinco_cajones;PENDIENTE (cajon 2kg != 30kg, decidir lote)
+W2;Engranaje Grande p/Templar;Sector Crudo;65;0,002883333;694;14562;consumo;3470;cinco_cajones;3470;cinco_cajones;PENDIENTE (cajon 2kg != 30kg, decidir lote)
+W7;Engranaje Chico p/Templar;Sector Crudo;67;0,002096667;954;17740;consumo;4770;cinco_cajones;4770;cinco_cajones;PENDIENTE (cajon 2kg != 30kg, decidir lote)
+RULETA;Ruleta;Sector Crudo;77;0,00552;5435;0;;27175;cinco_cajones;27175;cinco_cajones;PENDIENTE (sin consumo, no hay reserva)
+I2;Resorte U p/Templar;Sector Bombilla;253;0,01196;2090;3256;consumo;2442;est_madre;2442;est_madre;FUERA (no es Sector Crudo)
+I3;Resorte 520 p/Templar;Sector Bombilla;254;0,005003333;5996;37592;consumo;28194;est_madre;28194;est_madre;FUERA (no es Sector Crudo)
