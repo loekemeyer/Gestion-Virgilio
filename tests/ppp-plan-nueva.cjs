@@ -106,7 +106,11 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
     // sin orden de carga en esta vista; la columna dice qué hacer.
     out.venc = /Atrasados/.test(html) && /Vencida Uno/.test(html) && /Vencida Dos/.test(html) && !/Astorga/.test(html) &&
       /pn-reprog/.test(html) && /⚠ 2 pedidos NO salieron — hay que reprogramarlos/.test(html) && (html.match(/NO SALIÓ/g) || []).length === 2 &&
-      !/Orden de carga/.test(html) && /<span>Qué hacer<\/span>/.test(html) && /<b>0<\/b> pedidos salieron con la tanda armada/.test(html);
+      !/Orden de carga/.test(html) && /<span>Qué hacer<\/span>/.test(html) &&
+      // v15.92 — el cartel "N pedidos con la tanda ARMADA y nadie registró la Carga Camión"
+      // ahora sale SÓLO si N > 0 (antes se imprimía igual con 0, que era ruido). Las 2 vencidas
+      // del fixture nunca se armaron → N = 0 → el cartel NO tiene que estar.
+      !/pn-note/.test(html);
     // vista clásica y vuelta
     pppPlanClasica(true);
     html = document.getElementById("pppPreview").innerHTML;
