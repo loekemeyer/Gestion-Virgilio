@@ -617,6 +617,36 @@ y `sql/gv_tandas_diarias.sql`.
    -- Copiar resultado → archivo SQL con CREATE + INSERTs
    ```
 2. **Guarda el backup** como `backup_table_YYYYMMDD_hhmmss.sql` en un lugar seguro (comentario/notas).
+
+   ⚠ **Si el backup es una TABLA (`create table ... as select`), CERRALA en el mismo paso.**
+   `create table as` la crea **sin RLS** y con los **grants por defecto** del esquema `public`,
+   así que nace con `anon` pudiendo `INSERT` / `UPDATE` / `DELETE` — y un backup es una copia
+   de datos reales, o sea la **puerta de atrás** a lo que la tabla madre sí protege. El
+   2026-09-12 había **27 tablas de backup abiertas** así (una con 54.143 filas de saldos y
+   otra con 23.647 de picking), y encima se podían borrar con la anon key: justo lo que tiene
+   que estar íntegro el día que haya que restaurar. Las tablas de backup **no las lee ninguna
+   app** — se consultan a mano por el MCP, que entra como `postgres` y saltea la RLS — así
+   que cerrarlas no rompe nada:
+
+   ```sql
+   create table public."GV_Backup_<lo_que_sea>_<YYYYMMDD>" as select … ;
+   -- ⬇ las dos líneas que NO hay que olvidarse
+   alter table public."GV_Backup_<lo_que_sea>_<YYYYMMDD>" enable row level security;
+   revoke insert, update, delete, truncate on public."GV_Backup_<lo_que_sea>_<YYYYMMDD>"
+     from anon, authenticated;
+   ```
+
+   Sin policies, con la RLS prendida `anon` ve **0 filas** (no da error, simplemente no ve
+   nada), que es lo que se quiere. Chequeo de que no quedó ninguna suelta:
+
+   ```sql
+   select c.relname from pg_class c join pg_namespace n on n.oid = c.relnamespace
+    where n.nspname = 'public' and c.relkind = 'r' and not c.relrowsecurity
+      and (has_table_privilege('anon', c.oid, 'INSERT')
+        or has_table_privilege('anon', c.oid, 'UPDATE')
+        or has_table_privilege('anon', c.oid, 'DELETE'));
+   -- vacío = todo bien
+   ```
 3. **Ejecuta tu cambio** (ALTER, TRUNCATE, DELETE, INSERT).
 4. **Si algo falla o se rompe:** Restore inmediato ejecutando el SQL guardado.
 
