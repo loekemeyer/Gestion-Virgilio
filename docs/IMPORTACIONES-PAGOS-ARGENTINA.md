@@ -260,8 +260,163 @@ Excel (`fila`) para poder volver al original.
 4. **Cuatro fechas con el año cambiado** en el Excel (filas 35, 37, 43 de la hoja NTL y 28, 30, 32 de
    la CH: dicen 2025/2026 donde por la secuencia del saldo van 2024/2025). **Se importaron tal cual.**
 
+## 5. La cuenta de NTL, andando en la app (v15.90)
+
+`sql/` — vistas `gv_imp_ntl_cuenta` (el extracto con el **saldo corrido recalculado** y cada
+movimiento clasificado) y `gv_imp_ntl_resumen` (por empresa), más las RPC `gv_imp_ntl_resumen()`,
+`gv_imp_ntl_mov(limit, empresa, proveedor)` y `gv_imp_ntl_pendientes()`.
+
+**Prueba de integridad**: el saldo corrido que calcula la vista se comparó **fila por fila** con el
+que trae el Excel — **177 filas, 0 diferencias**, saldo final **u$s 230,43** en los dos.
+
+La **clase** de cada movimiento sale de lo que dice el propio Excel, no se inventa: `ingreso`
+(Efectivo/Transferencia Recibido), `recupero`, `giro` (Advance/Balance a la fábrica), `comision`,
+`gasto_bancario` (los que dicen "Gtos Bancarios") y `devolucion`.
+
+### Saldo por empresa
+
+| Empresa | Ingresos | Recuperos | Girado a fábricas | Comisiones | Gastos banc. | **Saldo** |
+|---|---|---|---|---|---|---|
+| **D** (depósitos sin asignar) | 133.300 | — | — | 3.699 | — | **129.601** |
+| **TN** Tierra Nativa | 13.445 | 83.912 | 180.498 | 4.712 | 317 | **−76.857** |
+| **CH** Chef | 7.000 | 157.109 | 208.338 | 7.708 | 576 | **−52.513** |
+| | | | | | | **230,43** |
+
+**El bloque resumen del Excel tiene dos números viejos**: da `CH = −48.186` (contra −52.513) y un
+"Saldo Final" de **12.335,33**, que es el saldo de la **fila 140, del 05/01/2026** — quedó pegado.
+La partición de acá suma exactamente el saldo real del extracto (230,43); la del Excel, no.
+
+### Solapa 💱 NTL
+
+Cuarta solapa del módulo de importación. Muestra el **saldo de hoy** y el de cada empresa, los
+acumulados del circuito (depositado / girado / recuperado / comisiones), los **recuperos pendientes**
+(u$s 42.908: Hugo Wong CH37 21.952 y Ownland 20.956, los directos) y el **extracto navegable**, con
+fichas por empresa y por proveedor y un "ver más" que pagina. Test `tests/imp-ntl.cjs`.
+
+## 6. Cargas, conciliación y alias (v15.93)
+
+Tres cosas más que se pudieron derivar **sin** los datos que faltan de Thomas. La solapa 💱 NTL pasa
+a tener **tres vistas**: 📄 Extracto · 📦 Cargas · 🔗 Conciliación.
+
+### Alias de proveedor — `GV_Imp_Prov_Alias`
+
+El import es fiel, así que el nombre original **no se toca**: se traduce en una tabla aparte, con la
+función `gv_imp_prov_canon()` que usan todas las vistas. Cargados los tres que son certeza
+tipográfica — **`Fuyian` → Fujian**, **`Xihin` → Zhixin**, **`Becky Chen` → Becky` — y marcados como
+**empresa mal tipeada** `Chef` y `Tierra`, que no son proveedores.
+
+**Quedan 5 sin decidir** (`Cestos`, `Jason`, `Stephen Jiang`, `Qi Qiao`, `Wenxinda`): no están en
+`Importados`. La pantalla los avisa arriba **con un ✏️ al lado de cada uno** (v15.99) para decir a
+qué proveedor corresponden — o escribir `EMPRESA` si no son un proveedor.
+
+### `gv_imp_cargas` — las cargas del Excel con su saldo
+
+Una fila por **carga** (`CQ-9154`, `China 2`, …) con lo **girado**, el **FOB** y el **saldo**, más el
+pedido en curso que más se le parece por proveedor y monto. **La sugerencia no se guarda**: el mapa
+carga ↔ PI lo tiene que confirmar Thomas.
+
+Lo que salió, y que apunta al FOB de Ownland:
+
+| Proveedor | Carga | Girado | FOB | Saldo | Pedido que le calza |
+|---|---|---|---|---|---|
+| Frontier | `China 2` | 14.400 | 14.400 | **0** | `Frontier 505C` — **FOB igual** |
+| Ownland | `CQ-9694` (la última, 13/03→03/06/2026) | 34.990 | **34.956** | −34 | `PI OL-10139` — FOB difiere **11.670** |
+
+**Los 11.670 no son casualidad**: son exactamente el "Falta" de Ownland en la planilla de deudas
+(46.626 − 14.000 − 20.956). Y 46.626 − 34.956 = **11.670** también. O bien el FOB de la carga es
+34.956 y los 46.626 del sistema traen 11.670 de más, o bien `CQ-9694` y `PI OL-10139` son **dos
+cargas distintas** — sus fechas (marzo-junio 2026 contra un PI del 02/09 que embarca el 08/11) hacen
+pensar lo segundo. **No se tocó: lo define Thomas.**
+
+### `gv_imp_conciliacion` — los giros cargados contra el Excel
+
+Busca cada giro de `GV_Imp_Pagos` en las **dos** fuentes (el extracto de NTL y las hojas por
+proveedor), por proveedor canónico + monto (±1) + la fecha más cercana. **4 de 6 aparecen**:
+
+| Pedido | u$s | Resultado |
+|---|---|---|
+| `Frontier 505C` | 4.320 | ✅ **exacto** — extracto NTL fila 175, 25/08 |
+| `PI BX260722D` Zhixin | 3.100 | ✅ **exacto** — fila 184, 04/09 (lo encontró vía el alias `Xihin`) |
+| `PI HT26-06-600-R1` Fujian | 10.000 | ✅ monto ok, el extracto dice **04/08** y no 05/08 |
+| `PI OL-10139` Ownland | 14.000 | ⚠ está en la **hoja Ownland**, pero del **13/03/2026**, *a través de `CQ-9553`, fue a `CQ-9694`* |
+| `PI B260601-2` Becky | 7.359 | ❌ **sin match** |
+| `PI NY26-031438` Hugo Wong | 14.041 | ❌ **sin match** |
+
+Los dos sin match son los mismos que ya venían marcados por no dar el 30 % exacto. Y el de Ownland
+es el que destapó el mapa: **el adelanto de 14.000 fue a `CQ-9694`, pagado a través de `CQ-9553`** —
+que es, textual, la mecánica de pagar un pedido con la factura de otra carga.
+
+## 7. El mapa carga ↔ pedido se carga desde la pantalla (v15.98)
+
+En vez de esperar que Thomas conteste por chat qué carga es qué pedido, la pantalla se lo pregunta
+y lo guarda. **El sistema sugiere; él confirma.**
+
+| Objeto | Qué es |
+|---|---|
+| **`GV_Imp_Carga_Pedido`** | el mapa: (proveedor, carga) → `pedido_ref`. `pedido_ref` en null significa **"esta carga no es ninguno de los pedidos en curso"**, que también es una respuesta |
+| **`GV_Imp_Pagos.carga_origen` / `.carga_destino`** | por giro: con qué carga se cursó (*a través de*) y cuál queda cubierta (*fue a*) |
+| `gv_imp_carga_pedido_set()` · `gv_imp_pago_cargas_set()` | lo que escriben los botones |
+
+**En 📦 Cargas**: cada fila tiene **🔗 Asignar**. Abre la lista de pedidos en curso de ese proveedor
+numerada (se elige por número, `0` = ninguno, o se escribe el PI a mano). Lo confirmado se muestra
+en verde con ✓; lo que todavía no, como *sugerido*.
+
+**En 💵 Giros**: columna nueva **"Cargas (a través de → fue a)"**. Si el giro no las tiene cargadas
+pero **el Excel de Thomas lo dice**, aparece la sugerencia con un botón **✓ usar** que la acepta de
+una. Ejemplo real: el giro de 14.000 de Ownland trae *"según el Excel: CQ-9553 → CQ-9694"* (hoja
+Ownland, fila 22).
+
+Con eso, las preguntas que quedaban abiertas dejan de necesitar una respuesta por chat: se contestan
+tocando un botón, y quedan guardadas.
+
 ### Lo que sigue
 
-La cuenta de NTL como **saldo propio** (entra lo que se le gira, sale lo que le paga a cada fábrica)
-ya tiene los datos para calcularse. Falta atar cada movimiento al `pedido_ref` del módulo y llevar
-`a_traves_de` / `fue_a` a `GV_Imp_Pagos`, que hoy sólo tiene `factura_ref` como texto libre.
+Que Thomas pase por 📦 Cargas y asigne las 9 cargas, y por 💵 Giros y acepte o corrija las cargas de
+cada giro. Ahí el circuito queda atado de punta a punta. Lo único que **no** se puede resolver desde
+la pantalla es lo que no está en ningún lado: el anticipo de la 1.ª Becky, qué es la empresa `D`, y
+la hoja de Hugo Wong que no vino en el Excel.
+
+## 8. El 323ES suelto vale 0,20, no 0,225 (v16.00, 12/09/2026)
+
+Dueño, 12/09: ***"me cobra 0.225 el 323E, si viene suelto (323ES), es 0.2"***. Hugo Wong cobra el
+rallador **envasado** a u$s 0,225 y **suelto** (a granel, para envasar acá como 323E LK o 838E CH)
+a u$s **0,20**.
+
+Estaban mal dos cosas, las dos por copiar el precio del envasado:
+
+1. `Importados.323ES.fob_uni` = 0,225 → **0,20**.
+2. La única línea del pedido **`323ES suelto`** estaba codificada **`323E`**, así que tomaba 0,225.
+   → pasa a `323ES`.
+
+Resultado: el pedido `323ES suelto` pasa de **675** a **600** (3.000 u × 0,20). El
+**`PI NY26-031438` no se toca**: ahí el 323E (4.464 u) y el 838E (1.008 u) van envasados a 0,225, y
+el FOB calculado sigue dando **38.639,84** contra los 38.640 del Excel. Por eso la cuenta de Hugo
+cerraba igual: el suelto es un pedido aparte, no entra en el PI.
+
+SQL y rollback: `sql/gv_imp_323es_fob_v1600.sql`. Backups `GV_Importados_bkp_323ES_20260912` y
+`GV_Baches_bkp_323ES_20260912`.
+
+## 9. El giro de 3.000 de Hugo Wong (v16.01, 12/09/2026)
+
+Dueño, 12/09: ***"el giro de 3000usd mas reciente ... 2400usd fue para el pedido de barco y 600
+para el pedido de 323ES"***. **No estaba cargado** — y tampoco está en el extracto de NTL, que
+termina el **04/09/2026** (fila 184). O es posterior al Excel que mandó, o salió por fuera de NTL.
+Se cargó como dos giros, uno por pedido.
+
+| Pedido | FOB | Pagado | Pend. giro directo | Falta |
+|---|---|---|---|---|
+| `323ES suelto` | 600 | **600** (el giro nuevo) | — | **0** |
+| `PI NY26-031438` | 38.640 | **16.441** (14.041 + 2.400) | 21.952 | **247** |
+
+Los 600 **cierran exacto** el 323ES suelto una vez puesto el FOB de 0,20 (§8): 3.000 u × 0,20 = 600.
+Eso confirma el precio del suelto por partida doble.
+
+**Criterio tomado** (queda marcado porque se puede leer de dos maneras): los 2.400 se **suman a
+"pagado" y no se descuentan del "pend. giro directo"** — es el cambio más chico y reversible. Si
+esos 2.400 salían de los 21.952 que estaban pendientes de girar derecho, hay que bajar el pend. giro
+directo a **19.552** y la falta vuelve a **2.647**.
+
+**Y falta la fecha**: quedó en 12/09 como provisoria. Se corrige desde 🚢 En curso → 💵 Plata →
+💵 Giros.
+
+SQL y rollback: `sql/gv_imp_hugo_giro3000_v1601.sql`. Backup `GV_Imp_Pagos_bkp_20260912`.

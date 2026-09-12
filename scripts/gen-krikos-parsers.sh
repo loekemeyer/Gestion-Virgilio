@@ -12,7 +12,7 @@
 # la copia vieja en cache.
 set -euo pipefail
 SRC="admin/admin-supercot.js"
-OUT="admin/krikos-parsers.js"
+OUT="${1:-admin/krikos-parsers.js}"   # con argumento escribe en otro lado (lo usa el test)
 R1="349,401"     # parseNum y helpers numéricos
 R2="444,1660"    # detectSuper, splitLines, findFirstMatch, los 11 parsers, extractPdfTotal, PARSERS
 R3="1826,1874"   # codVariants + findInPool (match de código con variantes)

@@ -628,3 +628,70 @@ pasa a `sum(...) … group by 1` sobre `vista_saldos_stock`, que desde la v15.71
 tipos → Producción, que la lee con las 14 viejas, sólo ve el saldo correcto (total del código) y una
 fila por NP en vez de dos. Rollback: re-correr el `create or replace view` de
 `sql/vista_correcciones_pedido_rich_v1567_orden_sin_pickear.sql`. §3.cj.2.
+
+## `gondola_return_check` y `aceptar_conteo`: leían `vista_saldos_stock` sin agrupar — v15.91 (2026-09-11)
+
+**Objetos COMPARTIDOS tocados** (los dos con `CREATE OR REPLACE`, **misma firma**):
+`public.gondola_return_check(jsonb)` y `public.aceptar_conteo(bigint, text)`. Único cambio: el
+saldo se lee con `sum(...)` / `group by` porque `vista_saldos_stock` devuelve una fila por
+(cod_art, empresa) desde la v15.71 (292 códigos con dos filas). Mismo tipo de retorno, mismas
+columnas: para Producción sólo cambia que el número que ve es el **total** del código y que
+`gondola_return_check` devuelve una fila por código en vez de dos.
+
+**Rollback exacto:** correr `sql/backups/funciones_vista_saldos_stock_20260911_pre_v1589.sql`
+(trae las dos definiciones tal cual estaban). **Definición nueva:** `sql/gv_saldos_group_by_funciones_v1589.sql`. §3.cj.3.
+
+## v15.92 (2026-09-11) — `entregas_virgilio_dedup()`: la clave de dedup deja de mirar la TANDA
+
+**Objeto compartido tocado:** `public.entregas_virgilio_dedup()` (trigger BEFORE INSERT de
+`public."Entregas_Virgilio"`, tabla que también escribía Producción).
+
+**Por qué:** un pedido reprogramado a otra tanda y vuelto a armar se grababa entero de nuevo y
+movía el stock dos veces. La clave `np|tanda|cod_art` no lo veía porque la tanda era otra.
+4 NP afectadas (98532, 98533, 98490, 98583), 43 filas, 57 cajas contadas por dos.
+
+**Qué cambia:** clave `np|cod_art` (las tres cantidades siguen en el `EXISTS`). Un rearmado
+idéntico en otra tanda se descarta; un agregado con otra cantidad sigue entrando.
+
+**Impacto medido:** `select count(*) from public."Entregas_Virgilio"` no cambia por el trigger
+(sólo filtra inserts futuros). Antes/después del fix, ninguna NP queda con Entregas en dos
+tandas nombradas distintas.
+
+**Rollback exacto:** `sql/entregas_virgilio_dedup_v1592.sql` (sección ROLLBACK al principio del
+archivo): volver a `np|tanda|cod_art` + `and coalesce(e.tanda,'') = coalesce(new.tanda,'')`.
+Datos: `insert into public."Entregas_Virgilio" select * from public."GV_Backup_Entregas_Dup_20260911";`
+y `delete from public."Movimientos_Stock" where tipo='ajuste' and ref like 'reversa armado duplicado%';`
+
+## v16.04 (2026-09-12) — el módulo de importados pasa a leer el STOCK REAL (sin tocar `v_importados_ordenes`)
+
+**Objeto compartido tocado:** NINGUNO. Se anota igual porque el cambio nace de un objeto que
+**sí** usa Producción y por eso NO se tocó.
+
+**Qué usa Producción:** `v_importados_ordenes` se lee por REST con la anon key desde
+`index.html:12022` del repo `loekemeyer/Produccion-Virgilio`, e `Importados_Mov_Stock` recibe
+inserts vía la RPC `importados_marcar_llegada` (`sql/importados_pedidos_rpc.sql:56`). Las dos
+**quedan exactamente como estaban**.
+
+**Qué se agregó (objetos nuevos, prefijo `gv_`, `security_invoker = true`):**
+
+- `public.gv_importados_stock_dep` — stock real del depósito por código normalizado
+  (`gv_cod_stock`) y empresa, en cajas. Misma suma de depósitos que
+  `vista_stock_procesada.stock_total` (terminado + excedente + separar_pedidos + a_facturar +
+  a_guardar + racks + racks_ch + para_envasar).
+- `public.gv_importados_ordenes` — copia de `v_importados_ordenes` con `stock_actual` sacado de
+  esa vista en lugar del libro propio `Importados_Mov_Stock`. Agrega `stock_cajas`.
+
+Gestión (`index.html`, `SUPABASE_IMPORTADOS_OC_ENDPOINT`) apunta a la vista nueva; Producción
+sigue leyendo la vieja.
+
+**Impacto medido (12/09/2026, 154 filas `principal and activo`):** 122 sin cambio, 32 cambiaron.
+Las dos grandes son PARTES y **no cambian el resultado**: 505C `stock_actual` 262.400 → 0 y
+1000900 68.000 → 0, pero su `stock_total` sigue siendo el del depósito de insumos (130.000 y
+107.500) porque para una parte manda el insumo. 026 +2.520 u y 027 +1.272 u (antes no cruzaban
+contra el depósito). Las otras 28 son de 8 a 192 unidades.
+
+**Rollback exacto:** en `index.html`, volver
+`SUPABASE_IMPORTADOS_OC_ENDPOINT` a `/rest/v1/v_importados_ordenes`. Opcional:
+`drop view if exists public.gv_importados_ordenes;` y
+`drop view if exists public.gv_importados_stock_dep;`. SQL completo en
+`sql/gv_importados_stock_real_v1604.sql`.

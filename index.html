@@ -796,6 +796,12 @@ button {
 .apr-krikos-nopdf{ background:#fee2e2; color:#b91c1c; border-radius:999px; padding:0 7px; font-size:10.5px; font-weight:800; }
 .apr-krikos-btn{ margin-left:auto; background:#ea580c; color:#fff; border-radius:6px; padding:2px 10px; font-size:11.5px; font-weight:800; text-decoration:none; white-space:nowrap; }
 .apr-krikos-pie{ font-size:12px; color:#7c2d12; margin-top:8px; background:#ffedd5; border-radius:6px; padding:6px 9px; }
+.apr-krikos.mal{ background:#fef2f2; border-color:#dc2626; border-left-color:#dc2626; }
+.apr-krikos.mal .apr-krikos-t{ color:#7f1d1d; }
+.apr-krikos.mal .apr-krikos-t u{ text-decoration-color:#dc2626; }
+.apr-krikos.mal .apr-krikos-sub{ color:#991b1b; }
+.apr-krikos-ped{ background:#e0e7ff; color:#3730a3; border-radius:999px; padding:0 7px; font-size:11px; font-weight:800; }
+.apr-krikos-aviso{ flex-basis:100%; color:#b91c1c; font-weight:800; font-size:12.5px; line-height:1.3; }
 .apr-msg{ background:#ecfdf5; border-left:5px solid #059669; color:#065f46; padding:8px 10px; border-radius:6px; margin:6px 2px; font-weight:600; }
 
 /* v13.74 (dueño: "completamente feo e ilegible; hacé boxes que ocupen el ANCHO de la pantalla, no el alto"):
@@ -948,6 +954,9 @@ button {
 .apr-card-d{ display:flex; flex-wrap:wrap; gap:5px; margin-top:5px; }
 .apr-chip{ font-size:11.5px; background:#f1f5f9; color:#475569; border-radius:999px; padding:2px 8px; font-weight:600; }
 .apr-chip-ped{ background:#f1f5f9; color:#475569; font-family:monospace; }
+/* v16.03 — el pedido ya se pickeó y se armó en una tanda anterior: rojo, para que nadie lo mande
+   a pickear de nuevo. Al programarlo vuelve a ESA tanda, no a una nueva. */
+.apr-chip-hecho{ background:#fee2e2; color:#991b1b; font-weight:800; border:1px solid #fca5a5; }
 .apr-chip-z{ background:#e0edff; color:#1e40af; }
 /* idea 2048: última corrida del armado automático */
 .apr-log{ margin:0 0 8px; padding:7px 12px; border-radius:10px; font-size:12.5px; font-weight:700; background:#dcfce7; color:#166534; border:1px solid #bbf7d0; }
@@ -7804,7 +7813,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v15.91";
+const APP_VERSION = "v16.05";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -11746,6 +11755,29 @@ async function _compTandaYaArmada(tanda) {
     return Array.isArray(rows) && rows.length > 0;
   } catch (_e) { return false; }
 }
+/* v15.92 — candado anti doble-armado POR NP (el de arriba es por TANDA y no alcanza).
+   Si un pedido se REPROGRAMA a otra tanda y se vuelve a armar, `_compTandaYaArmada`
+   mira la tanda nueva, no encuentra nada y deja grabar todo de nuevo: quedan las
+   filas de Entregas_Virgilio por duplicado y el stock se mueve dos veces
+   (separar_pedidos → a_facturar). Pasó con 98532/98533 (D60E → E10A), 98490
+   (D47C → D54C) y 98583 (D50C → D50D): 57 cajas contadas por dos.
+   Devuelve la lista de NP que YA tienen Entregas, sea en la tanda que sea.
+   Ante error de red devuelve [] (no trabar el laburo por una caída puntual). */
+async function _compNpsYaArmadas(nps) {
+  const lista = (nps || []).map(function (n) { return String(n == null ? "" : n).trim(); }).filter(Boolean);
+  if (!lista.length) return [];
+  try {
+    const inList = "(" + lista.map(function (n) { return '"' + n.replace(/"/g, "") + '"'; }).join(",") + ")";
+    const url = SUPABASE_ENTREGAS_ENDPOINT + "?select=np&np=in." + encodeURIComponent(inList) + "&limit=2000";
+    const r = await fetch(url, { headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY }, cache: "no-store" });
+    if (!r.ok) return [];
+    const rows = await r.json();
+    if (!Array.isArray(rows)) return [];
+    const set = new Set();
+    rows.forEach(function (x) { const v = String(x.np == null ? "" : x.np).trim(); if (v) set.add(v); });
+    return lista.filter(function (n) { return set.has(n); });
+  } catch (_e) { return []; }
+}
 // v7.74 — tandas cuyo armado se COMPLETÓ en el asistente (con Entregas grabadas) en esta sesión.
 // Fast-path para el gate del TAP en send(): evita el race de leer las Entregas recién posteadas.
 const _armadoRegistrado = new Set();
@@ -11787,6 +11819,17 @@ async function compTerminar() {
   if (_yaArmada) {
     _comp._terminando = false;
     try { alert("⚠ La tanda " + tanda + " YA fue armada.\n\nNo se puede armar de nuevo (duplicaría el pedido). Si hay que corregir algo, avisá para hacerlo a mano."); } catch (_e) {}
+    return;
+  }
+  // v15.92 — mismo candado pero POR NP: si el pedido se reprogramó a otra tanda y ya
+  // se armó en la anterior, la tanda nueva pasa el chequeo de arriba pero el pedido
+  // se duplicaría igual. Acá se corta.
+  let _npsArmadas = [];
+  try { _npsArmadas = await _compNpsYaArmadas((_comp.nps || []).map(function (n) { return n.np; })); } catch (_e) { _npsArmadas = []; }
+  if (!_comp) return;                       // cerraron el modal mientras chequeaba
+  if (_npsArmadas.length) {
+    _comp._terminando = false;
+    try { alert("⚠ Ya está armado el pedido NP " + _npsArmadas.join(", ") + " (en otra tanda).\n\nNo se puede armar de nuevo: duplicaría el pedido y el stock. Si se reprogramó y hay que rearmarlo, avisá para darlo de baja a mano primero."); } catch (_e) {}
     return;
   }
   _comp.nps.forEach(function (n) { liosSend(legajo, n.np, n.liosArr.length, tanda, _compLiosResumen(n), n.clase || ""); });   // líos (TAL) + resumen + clase (lio/etiqueta/nada)
@@ -13712,18 +13755,18 @@ function _ocgAutoEnTxt() { const n = _ocgNextAuto(); return "se genera automáti
 let _ocgCdTimer = null;
 function ocgStartCountdown() { if (_ocgCdTimer) return; _ocgCdTimer = setInterval(function () { const el = document.getElementById("ocgCountdown"); if (!el) { clearInterval(_ocgCdTimer); _ocgCdTimer = null; return; } el.textContent = _ocgAutoEnTxt(); }, 30000); }
 /* v9.12 — OC de IMPORTADOS (circuito propio, aparte del generador nacional). Lee la vista
-   `v_importados_ordenes` (motor de importados: stock en UNIDADES event-sourced, proyección madre
+   `gv_importados_ordenes` (motor de importados: stock en UNIDADES sacado del DEPÓSITO REAL, proyección madre
    en unidades/mes y meses objetivo = 10 de Importados_Config). Agrega por cod_art sumando las
    marcas/plantas (principal=true), y calcula lo a pedir en unidades y en cajas (÷ uni_x_caja).
    Se muestra como sección dentro de "Generar OCs", agrupado por PROVEEDOR CHINO. La fórmula fina
    (stock por todos los estadios, partes, etc.) se sigue afinando. */
-const SUPABASE_IMPORTADOS_OC_ENDPOINT = SUPABASE_URL + "/rest/v1/v_importados_ordenes";
+const SUPABASE_IMPORTADOS_OC_ENDPOINT = SUPABASE_URL + "/rest/v1/gv_importados_ordenes";
 async function ocgFetchImportados() {
   let rows = [];
   try {
     // v15.27 — stock_total = stock del módulo + depósito insumos (gv_importados_stock_insumos: partes y
     // reenvasados, convertido con Insumos_Factores); para una PARTE el insumo REEMPLAZA al seed del Excel.
-    rows = await supaFetchAllSafe(SUPABASE_IMPORTADOS_OC_ENDPOINT, "select=id,cod_art,marca,proveedor,descripcion,uni_x_caja,fob_uni,est_madre_eff,meses_objetivo,stock_actual,stock_insumos,stock_total,pedido_curso,principal,activo&principal=eq.true&activo=eq.true");
+    rows = await supaFetchAllSafe(SUPABASE_IMPORTADOS_OC_ENDPOINT, "select=id,cod_art,marca,proveedor,descripcion,uni_x_caja,fob_uni,est_madre_eff,meses_objetivo,stock_actual,stock_cajas,stock_insumos,stock_total,pedido_curso,principal,activo&principal=eq.true&activo=eq.true");
   } catch (_e) { return { items: [], meses: 10 }; }
   // v10.38 — alias de códigos que se piden JUNTOS (misma master caja / mismo pedido al chino):
   // 865ED se suma dentro de 865E (pedido del usuario). Agregar acá futuros pares si hacen falta.
@@ -13966,7 +14009,7 @@ function ocBodyGenImportados() {
   if (!gen.imp) return '<div class="oc-meta" style="margin-top:16px;color:#94a3b8">🌎 Importados: calculando…</div>';
   const items = (gen.imp.items || []).filter(function (it) { return it.aPedirUni > 0; });
   const gf = (_oc.genFiltro || "").toLowerCase().trim();
-  let h = '<div class="oc-meta" style="margin-top:18px;border-top:2px solid #e2e8f0;padding-top:12px"><b>🌎 Importados — OC por proveedor chino</b> · índice <b>' + (gen.imp.meses || 10) + ' meses</b> · <small style="color:#94a3b8">stock y proyección en unidades (motor <code>v_importados_ordenes</code>). Vista previa — la emisión se afina con más análisis.</small></div>';
+  let h = '<div class="oc-meta" style="margin-top:18px;border-top:2px solid #e2e8f0;padding-top:12px"><b>🌎 Importados — OC por proveedor chino</b> · índice <b>' + (gen.imp.meses || 10) + ' meses</b> · <small style="color:#94a3b8">stock y proyección en unidades (motor <code>gv_importados_ordenes</code>, stock real del depósito). Vista previa — la emisión se afina con más análisis.</small></div>';
   if (!items.length) { h += '<div class="oc-empty" style="margin-top:6px">No hay importados para pedir (todo en o sobre el objetivo).</div>'; return h; }
   const g = {};
   items.forEach(function (it) { const k = it.prov || "(sin proveedor)"; if (!g[k]) g[k] = []; g[k].push(it); });
@@ -16630,6 +16673,7 @@ function _impTabsHtml(cur) {
   return '<div style="display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap">' +
     '<button style="' + t(cur === 'ped') + '" onclick="openPedidosImportacion()">📦 Pedidos</button>' +
     '<button style="' + t(cur === 'curso') + '" onclick="openImpEnCurso()" title="Los pedidos YA HECHOS que vienen en camino: qué día embarcan y qué día llegan. No mira lo que hay que pedir.">🚢 En curso</button>' +
+    '<button style="' + t(cur === 'ntl') + '" onclick="openImpNtl()" title="La cuenta corriente de NTL, el forwarder de Hong Kong: depósitos, giros a las fábricas, recuperos y comisiones.">💱 NTL</button>' +
     '<button style="' + t(cur === 'prov') + '" onclick="stkOpenProvImp()">🏭 Proveedores</button></div>';
 }
 async function stkOpenProvImp() {
@@ -17990,6 +18034,7 @@ function _impPagosRender() {
       '<td class="num"><b>' + _impCursoNum(Math.round(Number(x.monto_usd) || 0)) + "</b></td>" +
       "<td>" + escapeHtml(x.beneficiario || "—") + "</td>" +
       "<td>" + _impPagosTipoTxt(x.tipo) + "</td>" +
+      "<td>" + _impPagoCargasCell(x) + "</td>" +
       '<td style="font-size:11.5px;color:#64748b">' + escapeHtml(x.factura_ref || "") + (x.nota ? '<div style="font-size:10.5px;color:#94a3b8">' + escapeHtml(x.nota) + '</div>' : '') + "</td>" +
       '<td><button class="imcu-b" style="background:#fee2e2;color:#b91c1c" onclick="impPagoBorrar(' + x.id + ')" title="Borrar este giro">🗑</button></td></tr>';
   }).join("");
@@ -17998,7 +18043,7 @@ function _impPagosRender() {
       '<button class="ipg-x" onclick="impPagosCerrar()">Cerrar</button></div>' +
     '<div class="ipg-body">' +
       (rows.length
-        ? '<table class="ipg-tbl"><thead><tr><th>Fecha</th><th class="num">u$s</th><th>A quién</th><th>Tipo</th><th>Factura / nota</th><th></th></tr></thead><tbody>' + body + "</tbody></table>"
+        ? '<table class="ipg-tbl"><thead><tr><th>Fecha</th><th class="num">u$s</th><th>A quién</th><th>Tipo</th><th title="Con qué carga se cursó el giro → qué carga queda cubierta. Es la imputación cruzada.">Cargas (a través de → fue a)</th><th>Factura / nota</th><th></th></tr></thead><tbody>' + body + "</tbody></table>"
         : '<div class="ipg-empty">Todavía no hay giros cargados para este pedido.</div>') +
     "</div>" +
     '<div class="ipg-foot"><div style="font-size:13px;color:#334155">FOB <b>u$s ' + _impCursoNum(Math.round(fob)) + '</b> · girado <b style="color:#065f46">u$s ' + _impCursoNum(Math.round(tot)) +
@@ -18038,6 +18083,319 @@ async function impPagoBorrar(pagoId) {
   try { await _pedImpRpc("gv_imp_pago_borrar", { p_pago_id: pagoId }); _impPagos.dirty = true; }
   catch (e) { try { alert("No se pudo borrar: " + (e.message || e)); } catch (_e) {} return; }
   await _impPagosReload();
+}
+/* v15.90 — Solapa 💱 NTL: la cuenta corriente del forwarder de Hong Kong, que hasta ahora vivía
+   sólo en el Excel de Thomas. El circuito (efectivo → advance/balance a la fábrica → recupero
+   cuando se nacionaliza, con el 3% de subida y el 5% de NTL sobre la FC) está en
+   docs/IMPORTACIONES-PAGOS-ARGENTINA.md §4. Backend: gv_imp_ntl_resumen / _mov / _pendientes
+   sobre GV_Imp_NTL_Mov (importación fiel del Excel, saldo verificado fila por fila). */
+var _impNtl = null;
+async function openImpNtl() {
+  _stkPopShell("💱 Cuenta corriente NTL (Hong Kong)", "stkPopBody", true);
+  const body = document.getElementById("stkPopBody"); if (!body) return;
+  body.innerHTML = '<div class="stkpop-empty">Cargando la cuenta de NTL…</div>';
+  _stkPop = { kind: "impNtl" };
+  _impNtl = { resumen: [], movs: [], pend: [], cargas: [], conc: [], alias: [], empresa: "", prov: "", n: 60, vista: "extracto" };
+  await impNtlReload();
+}
+async function impNtlReload() {
+  if (!_impNtl) return;
+  try {
+    _impNtl.resumen = (await _pedImpRpc("gv_imp_ntl_resumen", {})) || [];
+    _impNtl.pend    = (await _pedImpRpc("gv_imp_ntl_pendientes", {})) || [];
+    _impNtl.movs    = (await _pedImpRpc("gv_imp_ntl_mov", { p_limit: _impNtl.n,
+                        p_empresa: _impNtl.empresa || null, p_proveedor: _impNtl.prov || null })) || [];
+    _impNtl.cargas  = (await _pedImpRpc("gv_imp_cargas", {})) || [];
+    _impNtl.conc    = (await _pedImpRpc("gv_imp_conciliacion", {})) || [];
+    _impNtl.alias   = (await _pedImpRpc("gv_imp_prov_alias", {})) || [];
+  } catch (e) { _impNtl.err = (e.message || String(e)); }
+  _impNtlRender();
+}
+/* devuelven la promesa del reload: el extracto se vuelve a pedir al backend con el filtro puesto */
+function impNtlSetEmpresa(v) { if (!_impNtl) return; _impNtl.empresa = v || ""; return impNtlReload(); }
+function impNtlSetProv(enc) { if (!_impNtl) return; _impNtl.prov = decodeURIComponent(enc || ""); return impNtlReload(); }
+function impNtlMas() { if (!_impNtl) return; _impNtl.n = Math.min(500, (_impNtl.n || 60) + 100); return impNtlReload(); }
+/* Nombre legible de cada empresa del extracto. D = el efectivo depositado que todavía no se
+   repartió entre los dos importadores (lectura de los movimientos, a confirmar con Thomas). */
+function _impNtlEmpNom(e) {
+  if (e === "TN") return "Tierra Nativa";
+  if (e === "CH") return "Chef";
+  if (e === "D") return "Depósitos sin asignar";
+  return e || "—";
+}
+function _impNtlClaseChip(c) {
+  const m = { ingreso: ["ing", "💵 ingreso"], recupero: ["rec", "♻️ recupero"], giro: ["gir", "🏭 giro"],
+              comision: ["com", "comisión"], gasto_bancario: ["gas", "gasto banc."], devolucion: ["dev", "devolución"] };
+  const x = m[c] || ["otr", c || "—"];
+  return '<span class="intl-c ' + x[0] + '">' + x[1] + '</span>';
+}
+function _impNtlNum(n, dec) {
+  const v = Number(n) || 0;
+  return v.toLocaleString("es-AR", { minimumFractionDigits: dec || 0, maximumFractionDigits: dec || 0 });
+}
+function _impNtlRender() {
+  const body = document.getElementById("stkPopBody"); if (!body || !_stkPop || _stkPop.kind !== "impNtl") return;
+  if (!document.getElementById("impNtlCss")) {
+    const st = document.createElement("style"); st.id = "impNtlCss";
+    st.textContent =
+      ".intl-tbl{width:100%;border-collapse:collapse;background:#fff;border:1px solid #e2e8f0;border-radius:12px;overflow:hidden}" +
+      ".intl-tbl th{font-size:10.5px;text-transform:uppercase;letter-spacing:.3px;color:#64748b;font-weight:800;padding:8px 7px;border-bottom:2px solid #e2e8f0;text-align:left;white-space:nowrap}" +
+      ".intl-tbl td{padding:6px 7px;border-bottom:1px solid #f1f5f9;font-size:12.5px;color:#0f172a;vertical-align:middle}" +
+      ".intl-tbl td.num,.intl-tbl th.num{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}" +
+      ".intl-c{font-size:10.5px;font-weight:800;padding:2px 7px;border-radius:999px;white-space:nowrap}" +
+      ".intl-c.ing{background:#ecfdf5;color:#047857}.intl-c.rec{background:#eff6ff;color:#1d4ed8}" +
+      ".intl-c.gir{background:#fff7ed;color:#b45309}.intl-c.com{background:#fef2f2;color:#b91c1c}" +
+      ".intl-c.gas{background:#f8fafc;color:#64748b}.intl-c.dev{background:#faf5ff;color:#7c3aed}" +
+      ".intl-c.otr{background:#f1f5f9;color:#475569}" +
+      ".intl-neg{color:#b91c1c;font-weight:800}.intl-pos{color:#065f46;font-weight:800}";
+    document.head.appendChild(st);
+  }
+  const st = _impNtl;
+  let h = _impTabsHtml('ntl');
+  h += '<div class="stkpop-hint">La cuenta del <b>forwarder de Hong Kong</b>, importada del Excel de Thomas (saldo verificado <b>fila por fila</b> contra el original). El circuito: entra <b>efectivo</b> (3% de comisión por subida) → NTL le <b>gira</b> a la fábrica el Advance 30% y el Balance 70% → cuando la carga se nacionaliza entra el <b>recupero</b> y NTL cobra su <b>5% s/FC</b>. <code>D</code> = depósitos todavía sin repartir entre Tierra Nativa y Chef.</div>';
+  if (st.err) h += '<div class="stkpop-empty" style="color:#b91c1c">No se pudo leer: ' + escapeHtml(st.err) + '</div>';
+
+  const total = (st.resumen || []).reduce(function (a, r) { return a + (Number(r.saldo) || 0); }, 0);
+  const pend = (st.pend || []).reduce(function (a, r) { return a + (Number(r.monto) || 0); }, 0);
+  h += '<div class="imcu-kpi">' +
+    '<div style="background:#eef2ff;border:1px solid #c7d2fe"><div class="k" style="color:#4338ca">Saldo en NTL hoy</div><div class="v" style="color:#3730a3">u$s ' + _impNtlNum(total) + '</div></div>' +
+    (st.resumen || []).map(function (r) {
+      const s = Number(r.saldo) || 0;
+      return '<div style="background:#f8fafc;border:1px solid #e2e8f0"><div class="k" style="color:#475569">' + escapeHtml(_impNtlEmpNom(r.empresa)) + '</div>' +
+        '<div class="v" style="color:' + (s < 0 ? "#b91c1c" : "#065f46") + '">u$s ' + _impNtlNum(s) + '</div>' +
+        '<div style="font-size:10.5px;color:#94a3b8;font-weight:700">' + r.movimientos + ' mov.</div></div>';
+    }).join('') +
+    '</div>';
+  if (pend > 0) {
+    h += '<div style="margin-bottom:10px;padding:9px 13px;background:#eff6ff;border:1px solid #bfdbfe;border-radius:10px;font-size:12.5px;color:#1e3a8a">' +
+      '<b>♻️ Recuperos pendientes: u$s ' + _impNtlNum(pend) + '</b> — ' +
+      (st.pend || []).map(function (r) { return escapeHtml(r.concepto || '') + ' <b>' + _impNtlNum(r.monto) + '</b>' + (r.empresa ? ' <span style="opacity:.7">(' + escapeHtml(r.empresa) + ')</span>' : ''); }).join(' · ') +
+      '. Son los <b>directos</b>, sin pasar por NTL.</div>';
+  }
+  // acumulados del circuito
+  const suma = function (campo) { return (st.resumen || []).reduce(function (a, r) { return a + (Number(r[campo]) || 0); }, 0); };
+  h += '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;font-size:12px;color:#475569">' +
+    '<span style="background:#ecfdf5;border:1px solid #a7f3d0;border-radius:8px;padding:5px 10px">💵 Depositado <b>' + _impNtlNum(suma('ingresos')) + '</b></span>' +
+    '<span style="background:#fff7ed;border:1px solid #fed7aa;border-radius:8px;padding:5px 10px">🏭 Girado a fábricas <b>' + _impNtlNum(suma('girado_a_fabricas')) + '</b></span>' +
+    '<span style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;padding:5px 10px">♻️ Recuperado <b>' + _impNtlNum(suma('recuperos')) + '</b></span>' +
+    '<span style="background:#fef2f2;border:1px solid #fecaca;border-radius:8px;padding:5px 10px">Comisiones + gastos <b>' + _impNtlNum(suma('comisiones') + suma('gastos_bancarios')) + '</b></span>' +
+    '</div>';
+
+  const _fb = function (on) { return 'width:auto;margin:0;flex:0 0 auto;padding:6px 12px;border-radius:999px;border:1px solid ' + (on ? '#0f766e' : '#cbd5e1') + ';background:' + (on ? '#0f766e' : '#fff') + ';color:' + (on ? '#fff' : '#334155') + ';font-size:12.5px;font-weight:800;cursor:pointer'; };
+  // v15.91 — tres vistas de la misma cuenta
+  const vista = st.vista || "extracto";
+  h += '<div class="imcu-fila"><span class="imcu-lbl">Ver:</span>' +
+    '<button style="' + _fb(vista === 'extracto') + '" onclick="impNtlSetVista(\'extracto\')">📄 Extracto</button>' +
+    '<button style="' + _fb(vista === 'cargas') + '" onclick="impNtlSetVista(\'cargas\')" title="Las cargas del Excel con su saldo y el pedido que le calza">📦 Cargas</button>' +
+    '<button style="' + _fb(vista === 'conc') + '" onclick="impNtlSetVista(\'conc\')" title="Los giros cargados contra el Excel: cuál aparece y cuál no">🔗 Conciliación</button>' +
+    '</div>';
+  h += _impNtlAliasHtml();
+  if (vista === 'cargas') { body.innerHTML = h + _impNtlCargasHtml(); return; }
+  if (vista === 'conc')   { body.innerHTML = h + _impNtlConcHtml(); return; }
+  // filtros (sólo en el extracto)
+  h += '<div class="imcu-fila"><span class="imcu-lbl">Empresa:</span>' +
+    '<button style="' + _fb(!st.empresa) + '" onclick="impNtlSetEmpresa(\'\')">Todas</button>' +
+    ['D', 'TN', 'CH'].map(function (e) { return '<button style="' + _fb(st.empresa === e) + '" onclick="impNtlSetEmpresa(\'' + e + '\')">' + escapeHtml(_impNtlEmpNom(e)) + '</button>'; }).join('') +
+    '</div>';
+  const provs = [];
+  (st.movs || []).forEach(function (m) { if (m.proveedor && provs.indexOf(m.proveedor) < 0) provs.push(m.proveedor); });
+  provs.sort();
+  if (st.prov && provs.indexOf(st.prov) < 0) provs.unshift(st.prov);
+  if (provs.length > 1) {
+    h += '<div class="imcu-fila"><span class="imcu-lbl">🏭 Proveedor:</span>' +
+      '<button style="' + _fb(!st.prov) + '" onclick="impNtlSetProv(\'\')">Todos</button>' +
+      provs.map(function (p) { return '<button style="' + _fb(st.prov === p) + '" onclick="impNtlSetProv(\'' + encodeURIComponent(p).replace(/'/g, "%27") + '\')">' + escapeHtml(p) + '</button>'; }).join('') +
+      '</div>';
+  }
+
+  h += '<div class="mva-tblwrap wide"><table class="intl-tbl">' +
+    '<thead><tr><th>Fecha</th><th>Movimiento</th><th>Tipo</th><th>Proveedor</th><th>Empresa</th><th class="num">Débito</th><th class="num">Crédito</th><th class="num">Saldo</th></tr></thead><tbody>';
+  (st.movs || []).forEach(function (m) {
+    const sal = Number(m.saldo) || 0;
+    h += '<tr>' +
+      '<td style="white-space:nowrap">' + (m.fecha ? _isoToDdMmAa(String(m.fecha).slice(0, 10)) : '<span style="color:#94a3b8">—</span>') + '</td>' +
+      '<td>' + escapeHtml(m.descripcion || '—') + (m.origen_destino ? '<div style="font-size:10.5px;color:#94a3b8">' + escapeHtml(String(m.origen_destino).slice(0, 70)) + '</div>' : '') + '</td>' +
+      '<td>' + _impNtlClaseChip(m.clase) + '</td>' +
+      '<td style="font-size:12px">' + escapeHtml(m.proveedor || '—') + '</td>' +
+      '<td style="font-size:11.5px;color:#64748b">' + escapeHtml(m.empresa || '—') + '</td>' +
+      '<td class="num">' + (Number(m.debito) > 0 ? '<span class="intl-neg">' + _impNtlNum(m.debito, 2) + '</span>' : '') + '</td>' +
+      '<td class="num">' + (Number(m.credito) > 0 ? '<span class="intl-pos">' + _impNtlNum(m.credito, 2) + '</span>' : '') + '</td>' +
+      '<td class="num" style="font-weight:800;color:' + (sal < 0 ? '#b91c1c' : '#0f172a') + '">' + _impNtlNum(sal) + '</td></tr>';
+  });
+  h += '</tbody></table></div>';
+  if ((st.movs || []).length >= (st.n || 60)) h += '<button class="apr-mas" onclick="impNtlMas()">Ver más movimientos</button>';
+  body.innerHTML = h;
+}
+/* v15.91 — La solapa 💱 NTL pasa a tener tres vistas:
+     📄 Extracto      · el movimiento a movimiento (lo de la v15.90)
+     📦 Cargas        · las cargas del Excel (CQ-9154, China 2…) con su saldo y el pedido que le calza
+     🔗 Conciliación  · cada giro cargado contra el Excel: cuál matchea y cuál no
+   Las sugerencias NO se guardan: son para que Thomas confirme el mapa carga ↔ PI, que es lo único
+   que falta para atar el extracto a los pedidos. */
+function impNtlSetVista(v) { if (!_impNtl) return; _impNtl.vista = v || "extracto"; return impNtlReload(); }
+function _impNtlChip(txt, tipo) { return '<span class="intl-c ' + tipo + '">' + escapeHtml(txt) + '</span>'; }
+/* Cargas del Excel: una fila por carga, con lo girado, el FOB y el saldo. */
+function _impNtlCargasHtml() {
+  const rows = (_impNtl && _impNtl.cargas) || [];
+  if (!rows.length) return '<div class="stkpop-empty">No hay cargas cargadas.</div>';
+  let h = '<div class="stkpop-hint">Las <b>cargas</b> del Excel de Thomas (las hojas por proveedor). <b>Girado</b> es lo que salió para esa carga y <b>FOB</b> lo que vale; saldo 0 = cerrada. El <b>pedido sugerido</b> es el que más se le parece por proveedor y monto — <b>es una sugerencia, no está guardada</b>: el mapa carga ↔ PI lo tiene que confirmar Thomas.</div>';
+  h += '<div class="mva-tblwrap wide"><table class="intl-tbl"><thead><tr><th>Proveedor</th><th>Carga</th>' +
+    '<th class="num">Girado</th><th class="num">FOB</th><th class="num">Saldo</th><th>Período</th>' +
+    '<th>Pedido que le calza</th></tr></thead><tbody>';
+  rows.forEach(function (r) {
+    const sal = Number(r.saldo) || 0;
+    const igual = String(r.sugerencia || "").indexOf("igual") >= 0;
+    const pEnc = encodeURIComponent(r.prov).replace(/'/g, "%27");
+    const cEnc = encodeURIComponent(r.carga).replace(/'/g, "%27");
+    h += '<tr>' +
+      '<td style="font-weight:800">' + escapeHtml(r.prov) + '</td>' +
+      '<td style="font-family:Consolas,Menlo,monospace;font-weight:800;font-size:12px">' + escapeHtml(r.carga) + '</td>' +
+      '<td class="num">' + _impNtlNum(r.girado) + '</td>' +
+      '<td class="num">' + (Number(r.fob_carga) > 0 ? _impNtlNum(r.fob_carga) : '—') + '</td>' +
+      '<td class="num"><b style="color:' + (Math.abs(sal) < 1 ? '#16a34a' : '#b45309') + '">' + _impNtlNum(sal) + '</b></td>' +
+      '<td style="font-size:11.5px;color:#64748b;white-space:nowrap">' + (r.desde ? _isoToDdMmAa(String(r.desde).slice(0, 10)) : '—') + ' → ' + (r.hasta ? _isoToDdMmAa(String(r.hasta).slice(0, 10)) : '—') + '</td>' +
+      '<td style="font-size:12px">' + (r.pedido_asignado
+        ? '<b style="color:#065f46">✓ ' + escapeHtml(r.pedido_asignado) + '</b>'
+        : (r.pedido_sugerido
+            ? '<span style="color:#94a3b8">sugerido:</span> ' + escapeHtml(r.pedido_sugerido) + ' ' + _impNtlChip(r.sugerencia || '', igual ? 'ing' : 'otr')
+            : '<span style="color:#94a3b8">—</span>')) +
+        ' <button class="imcu-b" onclick="impCargaAsignar(\'' + pEnc + '\',\'' + cEnc + '\')" title="Decir a qué pedido corresponde esta carga">🔗 Asignar</button>' +
+        '</td></tr>';
+  });
+  return h + '</tbody></table></div>';
+}
+/* Conciliación: los giros cargados contra el Excel. */
+function _impNtlConcHtml() {
+  const rows = (_impNtl && _impNtl.conc) || [];
+  if (!rows.length) return '<div class="stkpop-empty">No hay giros cargados para conciliar.</div>';
+  const ok = rows.filter(function (r) { return r.match !== "SIN MATCH"; }).length;
+  let h = '<div class="stkpop-hint">Cada <b>giro</b> cargado en la cuenta corriente, buscado en el Excel de Thomas — en el extracto de NTL y en las hojas por proveedor. <b>' + ok + ' de ' + rows.length + '</b> aparecen. Los que dicen <b>SIN MATCH</b> no están en el Excel con ese monto: o el monto está mal, o el giro salió por un camino que no está en estas hojas.</div>';
+  h += '<div class="mva-tblwrap wide"><table class="intl-tbl"><thead><tr><th>Pedido</th><th>Proveedor</th>' +
+    '<th>Fecha cargada</th><th class="num">u$s</th><th>Estado</th><th>Dónde aparece en el Excel</th></tr></thead><tbody>';
+  rows.forEach(function (r) {
+    const sinMatch = r.match === "SIN MATCH";
+    const exacto = r.match === "exacto";
+    h += '<tr>' +
+      '<td style="font-family:Consolas,Menlo,monospace;font-weight:800;font-size:12px">' + escapeHtml(r.pedido_ref) + '</td>' +
+      '<td>' + escapeHtml(r.proveedor) + '</td>' +
+      '<td style="white-space:nowrap">' + (r.fecha ? _isoToDdMmAa(String(r.fecha).slice(0, 10)) : '—') + '</td>' +
+      '<td class="num"><b>' + _impNtlNum(r.monto_usd) + '</b></td>' +
+      '<td>' + _impNtlChip(sinMatch ? '⚠ sin match' : (exacto ? '✓ exacto' : r.match), sinMatch ? 'com' : (exacto ? 'ing' : 'gir')) + '</td>' +
+      '<td style="font-size:12px;color:#475569">' + (r.fuente
+        ? '<b>' + escapeHtml(r.fuente) + '</b> · fila ' + r.fila_excel + ' · ' + (r.fecha_excel ? _isoToDdMmAa(String(r.fecha_excel).slice(0, 10)) : '—') +
+          (r.detalle ? '<div style="font-size:10.5px;color:#94a3b8">' + escapeHtml(String(r.detalle).slice(0, 80)) + '</div>' : '')
+        : '<span style="color:#b45309">no aparece</span>') + '</td></tr>';
+  });
+  return h + '</tbody></table></div>';
+}
+/* Alias: los nombres del extracto que hay que traducir. Los que quedan sin decidir los define Thomas. */
+function _impNtlAliasHtml() {
+  const rows = (_impNtl && _impNtl.alias) || [];
+  const sinDecidir = rows.filter(function (r) { return !r.canonico && !r.es_empresa; });
+  if (!sinDecidir.length) return "";
+  return '<div style="margin-bottom:10px;padding:9px 13px;background:#fffbeb;border:1px solid #fde68a;border-radius:10px;font-size:12.5px;color:#92400e">' +
+    '<b>⚠ ' + sinDecidir.length + ' nombre(s) del extracto sin definir:</b> ' +
+    sinDecidir.map(function (r) {
+      const aEnc = encodeURIComponent(r.alias).replace(/'/g, "%27");
+      return '<b>' + escapeHtml(r.alias) + '</b> (' + r.movimientos + ' mov.) ' +
+        '<button class="imcu-b" onclick="impAliasDefinir(\'' + aEnc + '\')" title="Decir a qué proveedor corresponde">✏️</button>';
+    }).join(' · ') +
+    '. No están en <code>Importados</code>: hay que decir a qué proveedor corresponden o si son otra cosa.</div>';
+}
+/* Definir a qué proveedor corresponde un nombre del extracto (o marcarlo como empresa). */
+async function impAliasDefinir(aliasEnc) {
+  const alias = decodeURIComponent(aliasEnc || "");
+  let v;
+  try {
+    v = prompt("\"" + alias + "\" en el extracto de NTL, ¿a qué proveedor corresponde?\n" +
+      "  · escribí el nombre del proveedor como figura en el módulo\n" +
+      "  · o EMPRESA si no es un proveedor sino la empresa\n" +
+      "  · vacío = dejarlo sin definir", "");
+  } catch (_e) { return; }
+  if (v === null) return;
+  const txt = String(v).trim();
+  const esEmpresa = txt.toUpperCase() === "EMPRESA";
+  try {
+    await _pedImpRpc("gv_imp_prov_alias_set", { p_alias: alias,
+      p_canonico: esEmpresa ? null : (txt || null), p_es_empresa: esEmpresa });
+  } catch (e) { try { alert("No se pudo guardar: " + (e.message || e)); } catch (_e) {} return; }
+  await impNtlReload();
+}
+/* v15.94 — El mapa CARGA ↔ PEDIDO se carga desde la pantalla, no por chat.
+   · En 📦 Cargas: 🔗 Asignar elige a qué pedido corresponde esa carga (o la marca como "ninguno").
+   · En 💵 Giros: cada giro puede decir con qué carga se cursó ("a través de") y cuál cubre
+     ("fue a"); si están vacías y el Excel de Thomas lo dice, aparece la sugerencia con un ✓ para
+     aceptarla de una. Backend: GV_Imp_Carga_Pedido + GV_Imp_Pagos.carga_origen/carga_destino. */
+async function impCargaAsignar(provEnc, cargaEnc) {
+  const prov = decodeURIComponent(provEnc), carga = decodeURIComponent(cargaEnc);
+  const fila = ((_impNtl && _impNtl.cargas) || []).find(function (r) { return r.prov === prov && r.carga === carga; }) || {};
+  // los pedidos en curso de ese proveedor, para elegir por número
+  let opciones = [];
+  try {
+    opciones = ((_stkPop && _stkPop.ccAll) || []).filter(function (c) { return c.proveedor === prov; });
+  } catch (_e) {}
+  if (!opciones.length) {
+    try { opciones = (await _pedImpRpc("gv_imp_cc_lista", {}) || []).filter(function (c) { return c.proveedor === prov; }); }
+    catch (_e) { opciones = []; }
+  }
+  const lista = opciones.map(function (c, i) { return "  " + (i + 1) + " = " + c.pedido_ref + " (FOB " + _impNtlNum(c.fob) + ")"; }).join("\n");
+  const actual = fila.pedido_asignado || "";
+  let v;
+  try {
+    v = prompt("¿A qué pedido corresponde la carga " + carga + " de " + prov + "?\n" +
+      (lista ? lista + "\n" : "") +
+      "  0 = no es ninguno de los pedidos en curso\n" +
+      "(o escribí el PI a mano)", actual);
+  } catch (_e) { return; }
+  if (v === null) return;
+  const txt = String(v).trim();
+  let ref = txt;
+  if (txt === "0") ref = "";
+  else if (/^\d+$/.test(txt) && opciones[parseInt(txt, 10) - 1]) ref = opciones[parseInt(txt, 10) - 1].pedido_ref;
+  let leg = ""; try { leg = String(window.__authEmail || ""); } catch (_e) {}
+  try { await _pedImpRpc("gv_imp_carga_pedido_set", { p_proveedor: prov, p_carga: carga, p_pedido_ref: ref || null, p_legajo: leg }); }
+  catch (e) { try { alert("No se pudo guardar: " + (e.message || e)); } catch (_e) {} return; }
+  await impNtlReload();
+}
+/* Las dos cargas de un giro. Un solo prompt para las dos, que es como se leen. */
+async function impPagoCargas(pagoId, sugO, sugD) {
+  if (!_impPagos) return;
+  const r = (_impPagos.rows || []).find(function (x) { return x.id === pagoId; }) || {};
+  let v1;
+  try { v1 = prompt("¿Con qué carga / factura se cursó este giro? (el \"a través de\" del Excel)\nVacío = sin dato:", r.carga_origen || sugO || ""); }
+  catch (_e) { return; }
+  if (v1 === null) return;
+  let v2;
+  try { v2 = prompt("¿Qué carga queda cubierta con este giro? (el \"fue a\")\nVacío = sin dato:", r.carga_destino || sugD || ""); }
+  catch (_e) { return; }
+  if (v2 === null) return;
+  try { await _pedImpRpc("gv_imp_pago_cargas_set", { p_pago_id: pagoId, p_origen: String(v1).trim() || null, p_destino: String(v2).trim() || null }); _impPagos.dirty = true; }
+  catch (e) { try { alert("No se pudo guardar: " + (e.message || e)); } catch (_e) {} return; }
+  await _impPagosReload();
+}
+/* Aceptar de una lo que dice el Excel. */
+async function impPagoCargasAceptar(pagoId, oEnc, dEnc) {
+  if (!_impPagos) return;
+  try { await _pedImpRpc("gv_imp_pago_cargas_set", { p_pago_id: pagoId, p_origen: decodeURIComponent(oEnc || "") || null, p_destino: decodeURIComponent(dEnc || "") || null }); _impPagos.dirty = true; }
+  catch (e) { try { alert("No se pudo guardar: " + (e.message || e)); } catch (_e) {} return; }
+  await _impPagosReload();
+}
+/* Celda de cargas de un giro: lo cargado, o la sugerencia del Excel con el ✓ para aceptarla. */
+function _impPagoCargasCell(x) {
+  // Los valores se codifican ANTES: llamar una función local adentro del string del onclick
+  // deja un "enc(" dentro del atributo y el escáner de botones muertos lo lee como handler.
+  const oEnc = encodeURIComponent(String(x.sug_origen == null ? "" : x.sug_origen)).replace(/'/g, "%27");
+  const dEnc = encodeURIComponent(String(x.sug_destino == null ? "" : x.sug_destino)).replace(/'/g, "%27");
+  const tiene = x.carga_origen || x.carga_destino;
+  if (tiene) {
+    return '<span style="font-family:Consolas,Menlo,monospace;font-size:11.5px;cursor:pointer" onclick="impPagoCargas(' + x.id + ')" title="Tocá para corregir">' +
+      escapeHtml(x.carga_origen || '—') + ' <span style="color:#94a3b8">→</span> ' + escapeHtml(x.carga_destino || '—') + '</span>';
+  }
+  if (x.sug_origen || x.sug_destino) {
+    return '<span style="font-size:11px;color:#b45309">según el Excel: <b>' + escapeHtml(x.sug_origen || '—') + ' → ' + escapeHtml(x.sug_destino || '—') + '</b></span> ' +
+      '<button class="imcu-b" style="background:#166534;color:#fff" title="' + escapeHtml(x.sug_fuente || '') + '" onclick="impPagoCargasAceptar(' + x.id + ',\'' + oEnc + '\',\'' + dEnc + '\')">✓ usar</button>';
+  }
+  return '<button class="imcu-b" onclick="impPagoCargas(' + x.id + ')">+ cargas</button>';
 }
 function _impCursoLineasHtml(ls) {
   if (!ls.length) return '<div style="padding:10px 14px;color:#64748b;font-size:12.5px">Este pedido no tiene líneas en curso.</div>';
@@ -29863,12 +30221,18 @@ function _pppEsRow(p) { return (p && p._es) ? p._es : {}; }
 function _pppEsChips(p) {
   const r = _pppEsRow(p), out = [];
   if (r.estado === "cargada") out.push('<span class="ppp-es-chip ok">🚚 Cargado al camión</span>');
+  // v15.97 (dueño, sobre la 98530: "el otro, dejalo en en salida"): un supervisor la dio por salida
+  // a mano. No hay CCN — y no se inventa uno: la marca vive en GV_PPP_Prog_Override.en_salida_manual
+  // con su fecha, y la nota dice quién y cuándo. Se cierra igual que las demás, con Recepción Remitos.
+  else if (r.estado === "salida_manual") out.push('<span class="ppp-es-chip warn" title="La dio por salida un supervisor: no hay evento de Carga Camión. La fecha es la que se le puso al marcarla.">📝 Dada por salida a mano</span>');
   // v15.55 (dueño: "si ya salieron hace más de 36hs y no se controló, tiene que aparecer allá la alerta, y
   // aparecer en En Salida"): la tanda se armó hace más de `salida_presunta_horas` (36) y nadie la cargó ni
   // la facturó. Seguro salió; falta el papel. Viene de gv_ppp_en_salida con estado 'armada_sin_carga'.
   else if (r.estado === "armada_sin_carga") out.push('<span class="ppp-es-chip bad" title="La tanda se armó hace ' + (r.horas_desde_armado || "?") + ' h y nadie registró la carga al camión (CCN) ni la facturó. Pasado el plazo se da por salida. Cerrala con Controlado, o ↩ si la mercadería volvió.">🚨 Salió hace ' + (r.horas_desde_armado || "?") + ' h sin registro de carga · falta el remito</span>');
   else out.push('<span class="ppp-es-chip warn" title="Está facturada pero nadie registró la carga al camión (evento CCN). Se muestra igual para que se pueda cerrar desde acá.">⚠ Sin registro de carga</span>');
-  if (r.armada) out.push('<span class="ppp-es-chip">🧰 Armada</span>');
+  // v16.01 — el chip dice que la NP pasó por armado (evento TAL), NADA más. Que haya salido lo
+  // dice el chip de al lado (🚚 Cargado al camión / 📝 Dada por salida a mano), no éste.
+  if (r.armada) out.push('<span class="ppp-es-chip" title="Pasó por armado (evento TAL). Armado no quiere decir que salió: eso lo dice el chip de la carga.">🧰 Armada (no es que salió)</span>');
   else out.push('<span class="ppp-es-chip warn" title="No hay evento TAL: la NP no pasó por armado en la app.">Sin armar</span>');
   if (r.facturada) out.push('<span class="ppp-es-chip">🧾 Facturada</span>');
   // v13.68 (dueño: "el orden real es Control Remitos → Carga Camión → Recepción Remitos; el control se puede saltear
@@ -29907,7 +30271,7 @@ function _pppEnViajeHtml() {
     byDay[k].push(p);
   }
   keys.sort(); keys.reverse();
-  let html = '<div class="ppp-ent-note">🚚 <b>En salida</b> — sólo lo que se <b>cargó al camión</b> (con su fecha de carga) y todavía no tiene <b>control de remito</b>. Con el control pasan a Pedidos Entregados. Lo que no se cargó vuelve a <b>Programación</b> / <b>A Programar</b>. ' +
+  let html = '<div class="ppp-ent-note">🚚 <b>En salida</b> — sólo lo que se <b>cargó al camión</b> (con su fecha de carga) o lo que un supervisor <b>dio por salido</b>, y todavía no tiene <b>control de remito</b>. Con el control pasan a Pedidos Entregados. Lo que no se cargó vuelve a <b>Programación</b> / <b>A Programar</b>. ' +
     '<b>' + list.length + '</b> pedido(s) · <b>' + totM3.toFixed(2).replace('.', ',') + '</b> m³ · ' +
     '<b>' + nCarg + '</b> cargada(s) al camión · <b>' + nSin + '</b> sin registro de carga.' +
     (nVenc ? ' <span style="color:#b91c1c;font-weight:800;">· 🚨 ' + nVenc + ' pasado el plazo</span>' : '') + '</div>';
@@ -31236,7 +31600,61 @@ async function pppVencCancelar(np) {
     try { alert("No se pudo cancelar " + n + ":\n\n" + msg); } catch (_e) {}
   }
 }
-window.pppVencVolver = pppVencVolver; window.pppVencCancelar = pppVencCancelar;
+/* v15.93 — SACAR DE LA PROGRAMACIÓN una NP de ISIS (Thomas, 11/09: "por las dudas, ponelos todos
+   sin programar para que los revise, los que no se cargaron el camión nunca, y son claramente
+   viejos"). Queda sin tanda y sin fecha → aparece en 📥 A Programar, que es donde se revisa y se
+   vuelve a programar. NO toca `PPP_Programacion_Diaria` (tabla compartida): la marca vive en
+   `GV_PPP_Prog_Override.desprogramada` y la respetan `gv_ppp_programacion_diaria` y
+   `gv_ppp_isis_sin_tanda`. El backend corta si la NP ya tiene Carga Camión o Recepción Remitos
+   (si salió, no se saca de la programación: se cierra con el remito). */
+async function pppVencSinProgramar(np) {
+  const n = String(np || "").trim(); if (!n) return;
+  if (_pppEsNpWeb(n)) return pppVencVolver(n);   // las web ya tenían su camino (↩ A Programar)
+  if (!confirm("¿Sacar " + n + " de la programación?\n\nQueda SIN tanda y SIN fecha, en «📥 A Programar», para revisarlo.\nNo se toca nada de ISIS y se puede volver a programar cuando quieras.\n\nSi la tanda ya se pickeó o se armó, queda anotado: en A Programar figura en rojo y al programarlo vuelve a ESA tanda, no a una nueva.")) return;
+  let motivo = "";
+  try { motivo = prompt("¿Por qué lo sacás? (queda en la nota del pedido)", "nunca se registró la carga al camión") || ""; } catch (_e) {}
+  pppSetStatus("Sacando " + n + " de la programación…", true);
+  try {
+    const r = await aprRpc("gv_ppp_isis_desprogramar", { p_nps: [n], p_motivo: (motivo.trim() || null), p_por: await aprQuien() });
+    const x = (r && r[0]) || {};
+    pppSetStatus("↩ " + n + " quedó SIN programar (" + (x.np_sacadas || 0) + " NP). Está en 📥 A Programar.", true);
+    await pppLoadProgFromSupabase();
+  } catch (e) {
+    const msg = (e && e.message) ? e.message : String(e);
+    pppSetStatus("⚠ No se pudo: " + msg, false);
+    try { alert("No pude sacar " + n + " de la programación:\n\n" + msg); } catch (_e) {}
+  }
+}
+/* v15.97 — DAR POR SALIDO un pedido que salió sin que nadie registrara la Carga Camión
+   (dueño, 11/09: "el otro, dejalo en en salida"). No escribe un CCN falso: marca
+   `GV_PPP_Prog_Override.en_salida_manual` con su FECHA (en En Salida no puede haber un pedido sin
+   fecha, v15.85) y queda la nota de quién y cuándo. El pedido sale de Programación y entra a En
+   Salida con el chip "📝 Dada por salida a mano"; se cierra con Recepción Remitos como el resto. */
+async function pppVencDarPorSalido(np) {
+  const n = String(np || "").trim(); if (!n) return;
+  let p = null;
+  try { p = (_pppParsed.prog || []).find(function (x) { return String(x.np) === n; }) || null; } catch (_e) {}
+  const feDef = (p && p.fecha_entrega) ? String(p.fecha_entrega) : "";
+  let f = "";
+  try { f = prompt("¿Qué día salió " + n + "?\n\nFormato dd/mm/aaaa. Es la fecha con la que va a figurar en En Salida.", feDef) || ""; } catch (_e) {}
+  f = f.trim(); if (!f) return;
+  const iso = _pppFechaISO(f);
+  if (!iso) { try { alert("No entendí la fecha \"" + f + "\". Poné dd/mm/aaaa."); } catch (_e) {} return; }
+  if (!confirm("¿Dar por SALIDO el pedido " + n + " el " + f + "?\n\nNadie registró la Carga Camión, así que queda anotado que lo diste por salido vos.\nPasa a «En Salida» y se cierra con Recepción Remitos.")) return;
+  pppSetStatus("Dando por salido " + n + "…", true);
+  try {
+    const r = await aprRpc("gv_ppp_en_salida_marcar", { p_nps: [n], p_fecha: iso, p_motivo: "dado por salido desde la lista de vencidos", p_por: await aprQuien() });
+    const x = (r && r[0]) || {};
+    pppSetStatus("🚚 " + n + " quedó en En Salida (" + (x.np_marcadas || 0) + " NP), con fecha " + f + ".", true);
+    await pppLoadProgFromSupabase();
+    if (typeof pppRefreshEnSalida === "function") await pppRefreshEnSalida();
+  } catch (e) {
+    const msg = (e && e.message) ? e.message : String(e);
+    pppSetStatus("⚠ No se pudo: " + msg, false);
+    try { alert("No pude dar por salido " + n + ":\n\n" + msg); } catch (_e) {}
+  }
+}
+window.pppVencVolver = pppVencVolver; window.pppVencSinProgramar = pppVencSinProgramar; window.pppVencCancelar = pppVencCancelar; window.pppVencDarPorSalido = pppVencDarPorSalido;
 /* v14.36 — Reprogramar un pedido de ISIS que NO salió (tanda sin armar) a un día nuevo, POR SU NÚMERO.
    Reusa el mismo pop-up de días de mover tandas (gv_ppp_web_calendario). Al elegir el día llama a
    gv_ppp_isis_programar, que escribe GV_PPP_Prog_Override (no toca la tabla que comparte Producción ni
@@ -32250,7 +32668,7 @@ function pppResumenHtml(prog) {
     const _rep = _venc.filter(function (p) { return _pppEstadoPed(p) !== "armado"; }).length;
     head += '<div class="ppp-res-note' + (_rep ? ' rep' : '') + '">⏰ <b>' + _nVenc + '</b> pedido(s) con fecha de entrega vencida: ' +
       (_rep ? '<b>' + _rep + ' sin salir → hay que reprogramar</b>' + (_nVenc - _rep ? ' · ' : '') : '') +
-      (_nVenc - _rep ? (_nVenc - _rep) + ' con la tanda armada y el remito sin marcar' : '') + '. ' +
+      (_nVenc - _rep ? (_nVenc - _rep) + ' con la tanda ARMADA y la Carga Camión sin registrar (armado no es que salió)' : '') + '. ' +
       // v13.94 (dueño: "tengo que entrar a Resumen para que me aparezca el botón que me lleve de
       // nuevo a Programación, una locura"): antes esto hacía pppTab('plan') + pppPlanAbrir('venc'),
       // o sea te sacaba de la solapa. Ahora la lista se abre ACÁ, debajo del cartel.
@@ -33599,7 +34017,12 @@ function _pppPlanDiaHtml(programados, key, opts) {
         }).join('') + '</div>' +
         '<div class="h">La tanda nunca se armó, así que el pedido no subió a ningún camión. ' + (_puedeReprog ? 'Volvelo a programar (<b>📅 Reprogramar</b> / <b>↩ A Programar</b>) o dalo de baja con <b>🚫 Cancelar</b>.' : 'Ponele fecha nueva (✏️ Editar en su tanda, abajo) o sacalo de ISIS.') + '</div></div>';
     }
-    h += '<div class="pn-note"><b>' + sinRem + '</b> ' + (sinRem === 1 ? 'pedido salió' : 'pedidos salieron') + ' con la tanda armada y nadie marcó el remito. A las <b>36 h</b> del armado pasan solos a <b>En Salida</b>, donde se cierran con <b>Controlado</b> (o ↩ si la mercadería volvió).</div>';
+    // v15.92 — el texto decía que "a las 36 h pasan solos a En Salida". Desde la v15.85 NO: a En Salida
+    // entra sólo lo que tiene Carga Camión (CCN) y fecha de carga (dueño: "acá no puede haber ningún pedido
+    // sin fecha, ni pedidos que no se hayan cargado a un camión"). El camino real es registrar la carga
+    // desde Carga Camión, que es lo que faltó: ahí el pedido pasa a En Salida y se cierra con Recepción
+    // Remitos. Dejar el texto viejo mandaba a la operadora a esperar algo que ya no pasa.
+    if (sinRem) h += '<div class="pn-note"><b>' + sinRem + '</b> ' + (sinRem === 1 ? 'pedido con la tanda ARMADA' : 'pedidos con la tanda ARMADA') + ' y <b>nadie registró la Carga Camión</b>. <b>Armado no quiere decir que salió</b>: sin ese registro no consta que haya subido a un camión. Mientras no se registre, el pedido queda acá: no entra a <b>En Salida</b> y no se puede cerrar. El que lo cargó tiene que marcarlo en <b>Carga Camión</b> — de ahí pasa a En Salida y se cierra con <b>Recepción Remitos</b>. Si ya salió y nadie lo marcó, <b>🚚 Ya salió</b> lo pasa a En Salida con su fecha. Si no sabés, <b>↩ Sin programar</b> lo manda a <b>📥 A Programar</b>: allá figura en rojo como <b>ya pickeado y armado</b> con su tanda, y al programarlo <b>vuelve a esa misma tanda</b> — no se pickea de nuevo.</div>';
   }
   const dk = esVenc ? "venc" : key;
   for (const c of cams) {
@@ -33656,7 +34079,10 @@ function _pppPlanDiaHtml(programados, key, opts) {
       let carga = "";
       if (esVenc) {
         carga = e === "armado"
-          ? '<div class="pn-carga"><span class="t">salió · <b>marcar remito</b></span></div>'
+          // v16.01 (dueño: aclarar "ya armado"): ARMADO no quiere decir que salió. Lo único que
+          // consta es el armado de la tanda (TAP); sin Carga Camión (CCN) nadie registró que subiera
+          // a un camión. Antes acá decía "salió", que era una afirmación sin respaldo.
+          ? '<div class="pn-carga"><span class="t" title="Sólo consta el ARMADO (TAP). Sin Carga Camión no hay registro de que haya salido del depósito.">ARMADO<br><b>¿salió? sin registro</b></span></div>'
           : '<div class="pn-carga"><span class="t rep">⚠ NO SALIÓ<br>reprogramar</span></div>';
       } else if (oc) {
         const esPrimero = primero && p === primero;
@@ -33667,7 +34093,23 @@ function _pppPlanDiaHtml(programados, key, opts) {
         else carga = '<div class="pn-carga"><span class="n">' + n + 'º</span><span class="t">falta armar</span></div>';
       }
       const _npS = escapeHtml(String(np));
-      const _accPed = (!esVenc && (window.__isSupervisor || !PPP_READONLY) && e === "sin")
+      const _puedeAcc = (window.__isSupervisor || !PPP_READONLY);
+      // v15.93 (Thomas): en VENCIDOS, el pedido con la tanda armada y sin Carga Camión no tenía
+      // ninguna acción — la fila sólo decía "salió · marcar remito". Ahora se puede sacar de la
+      // programación: queda sin tanda ni fecha, en A Programar, para revisarlo. El backend corta
+      // si la NP ya tiene CCN o CRN (si salió de verdad, se cierra con el remito, no se saca).
+      const _accPed = !_puedeAcc ? ''
+        : (esVenc && e === "armado")
+        // v16.03 (Thomas, después de que le avisara del riesgo: "No. Que vayan a programar"): el
+        // pedido armado puede volver a A Programar. El riesgo de re-pickear lo cubre el backend:
+        // `gv_ppp_isis_desprogramar` guarda la tanda en `tanda_previa`, A Programar la muestra en
+        // rojo ("⚠ ya pickeada y armada · D56D") y `gv_ppp_isis_programar` REUSA esa tanda al
+        // reprogramarlo, así que no se genera una tanda nueva ni se pickea de nuevo.
+        ? '<div class="pn-acc">' +
+            '<button class="pn-acc-b" onclick="event.stopPropagation();pppVencDarPorSalido(\'' + _npS + '\')" title="Salió igual, pero nadie registró la Carga Camión: dalo por salido con su fecha y pasa a En Salida">🚚 Ya salió</button>' +
+            '<button class="pn-acc-b" onclick="event.stopPropagation();pppVencSinProgramar(\'' + _npS + '\')" title="Sacalo de la programación y revisalo en A Programar. Queda marcado como ya pickeado y armado, y al programarlo vuelve a su misma tanda (no se pickea de nuevo)">↩ Sin programar</button>' +
+          '</div>'
+        : (!esVenc && e === "sin")
         ? '<div class="pn-acc">' +
             (_pppEsNpWeb(np)
               ? '<button class="pn-acc-b" onclick="event.stopPropagation();pppVencVolver(\'' + _npS + '\')" title="Sacarlo de esta tanda y devolverlo a A Programar (pendiente)">↩ A Programar</button>'
@@ -36921,7 +37363,7 @@ async function aprTraerPedidos(e) {
 async function aprTraerIsis() {
   let rows;
   try {
-    rows = await aprGet("gv_ppp_isis_sin_tanda?select=np,cod,razon_social,tipo,fecha_recep,fecha_entrega,zona,barrio,direccion,m3,lineas,cajas,es_super,empresa&order=np.asc&limit=5000");
+    rows = await aprGet("gv_ppp_isis_sin_tanda?select=np,cod,razon_social,tipo,fecha_recep,fecha_entrega,zona,barrio,direccion,m3,lineas,cajas,es_super,empresa,tanda_previa,ya_armada,ya_pickeada&order=np.asc&limit=5000");
   } catch (_e) { return []; }   // si falla, la solapa sigue mostrando los pedidos de la página
   return (rows || []).map(function (r) {
     return {
@@ -36932,12 +37374,17 @@ async function aprTraerIsis() {
       fecha_entrega: r.fecha_entrega ? String(r.fecha_entrega).slice(0, 10) : "",
       m3: Number(r.m3) || 0, m3_parcial: false,
       lineas: Number(r.lineas) || 0, cajas: Number(r.cajas) || 0,
-      es_super: !!r.es_super, np_total: 1, bloques: []
+      es_super: !!r.es_super, np_total: 1, bloques: [],
+      // v16.03 — de dónde viene si alguien la sacó de la programación, y si el trabajo ya está hecho.
+      // Sin esto la tarjeta no distingue un pedido nuevo de uno que ya se pickeó y se armó.
+      tanda_previa: r.tanda_previa || "", ya_armada: !!r.ya_armada, ya_pickeada: !!r.ya_pickeada
     };
   });
 }
 /* Etiqueta de la tarjeta: la NP real si viene de ISIS, el pedido de la página si es web. */
 function aprPedLabel(p) { return p && p._isis ? ("NP " + p.np) : pwebPedidoLabel(p.empresa, p.order_id); }
+/* v16.03 — ¿este pedido ya tiene el trabajo hecho (picking/armado) en una tanda anterior? */
+function _aprYaHecho(p) { return !!(p && p.tanda_previa && (p.ya_pickeada || p.ya_armada)); }
 
 /* v13.84 — el m³ mínimo deseable de una tanda lo dice el backend (PPP_Web_Config.tanda_m3_min, 0,60): el front
    sólo pregunta. Si no se puede leer, se usa 0,60. */
@@ -37592,6 +38039,10 @@ function aprColPedidos() {
         '<span class="apr-chip apr-chip-z">' + escapeHtml(p.zona || "sin zona") + '</span>' +
         // v13.70: el pedido de la página como referencia (la NP la da el contador al programar)
         '<span class="apr-chip apr-chip-ped" title="' + (p._isis ? 'Ya tiene número de ISIS: se programa con ESE número, no se renumera.' : 'Número de pedido de la página; la NP (LK 0001…) se asigna al programar') + '">' + escapeHtml(aprPedLabel(p)) + '</span>' +
+        // v16.03 — el pedido estuvo en una tanda y esa tanda YA se pickeó y se armó (la mercadería
+        // está en un pallet). Va acá en rojo para que nadie lo mande a pickear de nuevo: al
+        // programarlo vuelve a ESA tanda (gv_ppp_isis_programar reusa tanda_previa), no a una nueva.
+        (_aprYaHecho(p) ? '<span class="apr-chip apr-chip-hecho" title="Ya se pickeó y se armó en la tanda ' + escapeHtml(p.tanda_previa) + '. Al programarla vuelve a esa misma tanda: NO se pickea de nuevo.">⚠ ya ' + (p.ya_pickeada ? 'pickeada' : '') + (p.ya_pickeada && p.ya_armada ? ' y ' : '') + (p.ya_armada ? 'armada' : '') + ' · ' + escapeHtml(p.tanda_previa) + '</span>' : '') +
         // v13.21 (dueño): qué día va a poder salir, no la fecha en que llegó (queda en el title)
         aprSalidaChip(p) +
         '<span class="apr-chip apr-chip-m3"' +
@@ -37985,7 +38436,7 @@ async function aprKrikosCargar() {
   _apr.krikosLoading = true;
   try {
     const H = { "apikey": SUPABASE_KEY, "Authorization": "Bearer " + SUPABASE_KEY };
-    const r = await fetch(SUPABASE_URL + "/rest/v1/GV_Krikos_OC?select=inbox_id,cadena,sucursal,nro_documento,fecha_entrega,fecha_entrega_d,link,tiene_pdf&order=fecha_entrega_d.asc&limit=200",
+    const r = await fetch(SUPABASE_URL + "/rest/v1/GV_Krikos_OC?select=inbox_id,cadena,sucursal,nro_documento,fecha_entrega,fecha_entrega_d,link,tiene_pdf,auto_estado,auto_aviso,order_id&order=fecha_entrega_d.asc&limit=200",
       { headers: H, cache: "no-store" });
     _apr.krikos = r.ok ? (await r.json()) : [];
   } catch (_e) { _apr.krikos = _apr.krikos || []; }
@@ -38010,31 +38461,64 @@ function aprKrikosHtml() {
   const hoy = getTodayKey();
   // REGLA DEL DUEÑO (2026-09-11): *"Siempre quiero que se cargue directo a PPP y si la
   // lógica del importe (ya explicado y hecho en paginaLK) NO DA, QUE LO ACLARE MUY GRANDE
-  // EN PPP"*. Hoy NINGUNA se importa sola —el parser de PDF por cadena vive en
-  // admin-supercot.js y corre a mano en el panel de LK—, así que TODAS caen en el "no dio"
-  // y el cartel tiene que decirlo fuerte, no ser una listita al costado.
-  let h = '<div class="apr-krikos">' +
-    '<div class="apr-krikos-t">🛒 ' + filas.length + ' orden' + (filas.length === 1 ? '' : 'es') +
-      ' de compra de súper <u>NO se pudo importar sola a la PPP</u></div>' +
-    '<div class="apr-krikos-sub">Llegaron por Krikos y están esperando. Todavía no son pedidos: no tienen NP ni m³, ' +
-      'así que <b>no se pueden tildar ni meter en una tanda</b>. Hay que cargarlas a mano o no salen.</div>' +
-    '<div class="apr-krikos-list">';
-  filas.forEach(function (f) {
-    const d = f.fecha_entrega_d || "";
-    const vencida = d && d < hoy;
-    h += '<div class="apr-krikos-r' + (vencida ? ' vencida' : '') + '">' +
-      '<span class="apr-krikos-cad">' + escapeHtml(aprKrikosCadena(f.cadena)) + '</span>' +
-      '<span class="apr-krikos-nro">' + escapeHtml(f.nro_documento || "") + '</span>' +
-      '<span class="apr-krikos-suc">' + escapeHtml(f.sucursal || "") + '</span>' +
-      '<span class="apr-krikos-fe" title="Fecha de entrega que pide el súper">' +
-        (d ? (vencida ? '⚠ venció ' : '📅 ') + aprDiaCorto(d) : '—') + '</span>' +
-      (f.tiene_pdf ? '' : '<span class="apr-krikos-nopdf" title="El link de Krikos no devolvió el PDF: sin el PDF no hay nada que importar">sin PDF</span>') +
-      (f.link ? '<a class="apr-krikos-btn" href="' + escapeHtml(f.link) + '" target="_blank" rel="noopener">Ver OC</a>' : '') +
-      '</div>';
-  });
-  h += '</div><div class="apr-krikos-pie">⚠ <b>El importador automático todavía no existe.</b> ' +
-    'Hasta que esté, se cargan a mano desde <b>🌐 Panel Web LK → PDF Krikos → Bandeja Krikos</b>. ' +
-    'Al cargarlas desaparecen de acá solas.</div></div>';
+  // EN PPP"*. Desde la v15.90 el importador automático existe (Edge Function
+  // `krikos-auto-import` en el Supabase de LK, cron cada 10 min), así que acá quedan
+  // sólo dos cosas, y las dos tienen que gritar:
+  //   1. las que ENTRARON pero con algo que no dio (renglones sin match, total que no
+  //      cierra) — ya son un pedido en la PPP, pero hay que revisarlas;
+  //   2. las que NO pudieron entrar, con el motivo escrito.
+  const malas = filas.filter(function (f) { return f.auto_estado === "parcial"; });
+  const esperando = filas.filter(function (f) { return f.auto_estado !== "parcial"; });
+  let h = "";
+
+  if (malas.length) {
+    h += '<div class="apr-krikos mal">' +
+      '<div class="apr-krikos-t">⚠ ' + malas.length + ' pedido' + (malas.length === 1 ? '' : 's') +
+        ' de súper entró <u>con algo que NO DIO</u> — revisalo antes de armarlo</div>' +
+      '<div class="apr-krikos-sub">Se cargaron solos a la PPP (por eso ya no están acá abajo), pero el importador ' +
+        'encontró diferencias contra la OC. Lo que falta hay que agregarlo a mano desde el panel de LK.</div>' +
+      '<div class="apr-krikos-list">';
+    malas.forEach(function (f) {
+      const d = f.fecha_entrega_d || "";
+      h += '<div class="apr-krikos-r vencida">' +
+        '<span class="apr-krikos-cad">' + escapeHtml(aprKrikosCadena(f.cadena)) + '</span>' +
+        '<span class="apr-krikos-nro">' + escapeHtml(f.nro_documento || "") + '</span>' +
+        '<span class="apr-krikos-suc">' + escapeHtml(f.sucursal || "") + '</span>' +
+        (f.order_id ? '<span class="apr-krikos-ped">pedido ' + escapeHtml(String(f.order_id)) + '</span>' : '') +
+        '<span class="apr-krikos-fe" title="Fecha de entrega que pide el súper">' +
+          (d ? (d < hoy ? '⚠ venció ' : '📅 ') + aprDiaCorto(d) : '—') + '</span>' +
+        (f.link ? '<a class="apr-krikos-btn" href="' + escapeHtml(f.link) + '" target="_blank" rel="noopener">Ver OC</a>' : '') +
+        '<span class="apr-krikos-aviso">' + escapeHtml(f.auto_aviso || "el importe no dio") + '</span>' +
+        '</div>';
+    });
+    h += '</div></div>';
+  }
+
+  if (esperando.length) {
+    h += '<div class="apr-krikos">' +
+      '<div class="apr-krikos-t">🛒 ' + esperando.length + ' orden' + (esperando.length === 1 ? '' : 'es') +
+        ' de compra de súper <u>NO se pudo importar sola a la PPP</u></div>' +
+      '<div class="apr-krikos-sub">Llegaron por Krikos y están esperando. Todavía no son pedidos: no tienen NP ni m³, ' +
+        'así que <b>no se pueden tildar ni meter en una tanda</b>. Hay que cargarlas a mano o no salen.</div>' +
+      '<div class="apr-krikos-list">';
+    esperando.forEach(function (f) {
+      const d = f.fecha_entrega_d || "";
+      const vencida = d && d < hoy;
+      h += '<div class="apr-krikos-r' + (vencida ? ' vencida' : '') + '">' +
+        '<span class="apr-krikos-cad">' + escapeHtml(aprKrikosCadena(f.cadena)) + '</span>' +
+        '<span class="apr-krikos-nro">' + escapeHtml(f.nro_documento || "") + '</span>' +
+        '<span class="apr-krikos-suc">' + escapeHtml(f.sucursal || "") + '</span>' +
+        '<span class="apr-krikos-fe" title="Fecha de entrega que pide el súper">' +
+          (d ? (vencida ? '⚠ venció ' : '📅 ') + aprDiaCorto(d) : '—') + '</span>' +
+        (f.tiene_pdf ? '' : '<span class="apr-krikos-nopdf" title="El link de Krikos no devolvió el PDF: sin el PDF no hay nada que importar">sin PDF</span>') +
+        (f.link ? '<a class="apr-krikos-btn" href="' + escapeHtml(f.link) + '" target="_blank" rel="noopener">Ver OC</a>' : '') +
+        (f.auto_aviso ? '<span class="apr-krikos-aviso">' + escapeHtml(f.auto_aviso) + '</span>' : '') +
+        '</div>';
+    });
+    h += '</div><div class="apr-krikos-pie">El importador automático corre <b>cada 10 minutos</b>: baja la OC, ' +
+      'la lee y carga el pedido solo. Lo que queda acá es lo que no pudo — el motivo está en cada renglón. ' +
+      'Se carga a mano desde <b>🌐 Panel Web LK → PDF Krikos → Bandeja Krikos</b> y desaparece de acá solo.</div></div>';
+  }
   return h;
 }
 function aprDosDiasHtml() {

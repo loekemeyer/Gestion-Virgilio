@@ -7438,3 +7438,600 @@ claves distintas en `vista_stock_vs_pedidos` 310, `vista_faltante_catalogo` 505,
 `gv_corr_stk_group_by_v1586`.
 **Rollback:** correr el `create or replace view` de
 `sql/vista_correcciones_pedido_rich_v1567_orden_sin_pickear.sql` (vuelve el duplicado).
+
+## §3.cp — Las OC de súper de Krikos se importan SOLAS a la PPP (v15.90) — 2026-09-11
+
+**Regla del dueño, textual:** *"Siempre quiero que se cargue directo a PPP y si la lógica
+del importe (ya explicado y hecho en paginaLK) NO DA, QUE LO ACLARE MUY GRANDE EN PPP"*,
+después de *"la idea no es que vayan ahí [al panel de LK], es que vayan directo a PPP"*.
+Es la primera mitad de la idea **2234**; la segunda (el cartel en A Programar) ya estaba
+desde la v15.85.
+
+### Cómo funciona ahora, de punta a punta
+
+1. **`krikos-ingest`** (cron 26 de LK, cada 10′) lee `ventas@`, baja el PDF al bucket
+   `krikos-oc` y deja la fila en `krikos_oc_inbox`. *(Ya existía.)*
+2. **`krikos-auto-import`** (Edge Function nueva, LK) agarra lo pendiente, baja el PDF,
+   **lo parsea con los MISMOS parsers del panel**, matchea los códigos contra el catálogo
+   y crea el pedido en `orders` + `order_items`.
+3. **`sync_pedidos_match_virgilio`** (cron 24, cada 15′) lo trae como cualquier pedido web
+   → aparece en la PPP. Un súper queda en **A Programar** (no se mezcla con clientes).
+4. **`sync_krikos_oc_virgilio`** (cron 42) sigue espejando a `GV_Krikos_OC`, ahora también
+   el **resultado** del intento: la PPP puede decir qué pasó con cada OC.
+
+### Dónde vive el código (y por qué ahí)
+
+| Archivo | Repo | Qué es |
+|---|---|---|
+| `admin/krikos-parsers.js` | Gestión Virgilio | Los 11 parsers, **copiados textualmente** de `admin-supercot.js` por `scripts/gen-krikos-parsers.sh`. No se edita a mano. |
+| `admin/krikos-auto-import.js` | Gestión Virgilio | La lógica del importador (baja, parsea, matchea, arma el aviso, llama a la RPC). |
+| `supabase/functions/krikos-auto-import/index.ts` | pagina-lk-copia | Entrypoint de 3 líneas: importa los dos de arriba **clavados al commit** y sirve. |
+| `sql/krikos_auto_import.sql` | pagina-lk-copia | Columnas `auto_*` + las 4 RPC `krikos_auto_*`. |
+
+El import va por **esm.sh** (`esm.sh/gh/loekemeyer/Gestion-Virgilio@<sha>/...`) porque el
+bundler de Supabase **sólo acepta hosts conocidos** — con `loekemeyer.github.io` el deploy
+falla con *"Cannot import from loekemeyer.github.io:443"*. El sha fijo además evita que un
+push cambie el importador sin que nadie se entere: **al tocar un parser hay que regenerar,
+pushear y redeployar con el sha nuevo**.
+
+Que los parsers sean **los mismos bytes** que usa el panel es el punto: si mañana alguien
+arregla el parser de Diarco en `admin-supercot.js`, se corre el script y el importador
+automático queda arreglado también. No hay dos verdades.
+
+### "Si el importe no da, que lo aclare MUY GRANDE en PPP"
+
+Cada OC queda con `auto_estado` + `auto_aviso` (en `krikos_oc_inbox`, espejados a
+`GV_Krikos_OC`):
+
+| `auto_estado` | Qué pasó | Qué hace la PPP |
+|---|---|---|
+| `ok` | entró completa y el total cierra | nada: es un pedido normal en la PPP |
+| `parcial` | **entró igual**, pero hay renglones sin match o el total no cierra | **bloque rojo arriba de A Programar**, con el nº de pedido y el motivo |
+| `no` | no se pudo cargar (cadena desconocida, sin ítems, sin cliente, cadena de Chef) | bloque naranja, con el motivo |
+| `salteada` | la fecha de entrega ya venció | bloque naranja, con el motivo |
+
+La decisión de **cargar igual lo que entra incompleto** es la regla del dueño aplicada al
+pie de la letra: el pedido entra y el cartel grita lo que falta, en vez de quedarse afuera
+en silencio. Los `parcial` viajan a Virgilio **7 días** desde el intento; los `ok` no
+viajan (ya son un pedido).
+
+### Los guardas (por qué no se va a mandar una macana)
+
+- **Idempotencia en la base**: `krikos_auto_crear_pedido` toma `for update` la fila de la
+  OC y **corta si ya tiene `order_id`**. Aunque el cron corra dos veces, el pedido del
+  súper no se duplica.
+- **Vencidas**: una OC con fecha de entrega anterior a hoy **no se carga sola** (queda
+  `salteada`). Al día de hoy 5 de las 6 pendientes son de junio/julio: ésas no entran.
+- **Chef**: las cadenas con `empresa='chef'` (Dorinka, Cencosud) **no** se importan solas
+  —el pedido iría a otro proyecto Supabase— y lo dicen en el aviso.
+- **Todo aditivo**: columnas nuevas, funciones nuevas con prefijo. `submit_order_fast` no
+  se tocó (no servía: exige `auth.uid()`, y la función corre con service_role).
+
+### Medido (2026-09-11)
+
+- **Parseo**: OC real de Coto **21881017093** (la que el dueño dejó abierta para probar):
+  9 de 9 renglones, y el total calculado da **exacto** el del PDF: `$ 9.420.060`.
+  Códigos `504, 557, 544, 102, 207, 026, 870E, 513, 280` → **9 de 9 matchean** (8 en
+  `products`, el `102` en `loke_products` como `102E`).
+- **Alta del pedido**: probada con `BEGIN … ROLLBACK`: crea la orden con `web_discount 0`
+  y el admin como dueño, 2 ítems (1 Loke) con su precio, el `order_number` en el
+  `sheets_payload`, y deja la OC en `cargado | ok | <aviso>`. Nada quedó escrito.
+- **Espejo**: `select public.sync_krikos_oc_virgilio();` → **6** (las 6 pendientes).
+- Antes ya se había verificado el parseo contra 4 OC reales cargadas a mano: Coto 9/9,
+  Carrefour 14/14, Diarco 10/10 idénticos; La Anónima 17 de 18 (el `198E` no está en el
+  maestro — problema 26 de `github_repo_problemas`, sigue abierto).
+
+### PRENDIDO (2026-09-11, 18:28 ART)
+
+La función está **deployada** y el cron es el **jobid 43** de LK,
+`krikos-auto-import-10min`, `3-59/10 * * * *`: corre 3′ después del ingest (26) y 2′ antes
+del espejo a Virgilio (42). Así una OC que entra a las 10:00 está en la PPP a las 10:05.
+
+**Dry-run contra las 6 OC pendientes reales** (`{"dry_run": true, "force": true}`, no
+escribe nada): **5 entrarían limpias y el total calculado dio EXACTO el del PDF en las 5** —
+Coto 21881017093 (9 renglones, $ 9.420.060), La Anónima 22824280 (12, $ 2.946.900),
+22824281 (13, $ 27.860.460), 22870732 (16, $ 19.779.720) y Carrefour 0958095800240533
+(16, $ 18.956.790). La sexta, La Anónima **22908256**, sale `parcial` con el aviso que
+pidió el dueño, palabra por palabra:
+
+> *1 de 14 renglones NO entraron (código sin match en el catálogo: 198E × 70 caj) · el
+> total no cierra: calculado $ 16.695.240 vs PDF $ 17.627.640 (5.3% de diferencia)*
+
+Ese 5,3% **es** el renglón que falta: el aviso se explica solo. (Es el problema 26 de
+`github_repo_problemas`: el `198E` no existe en `products` ni en `loke_products`.)
+
+**Corrida real** (sin `force`): las 6 quedaron `salteada` — todas tienen la fecha de
+entrega vencida (5 son de junio/julio) — **sin crear ni un pedido**, y con el motivo
+escrito para que la PPP lo muestre. Es exactamente lo que tenía que pasar.
+
+**Y llega a la PPP**: verificado que los pedidos de Krikos cargados por el panel viajan por
+`v_pedidos_match` → `lk_pedidos_match` con sus ítems y sucursal (1156, 1157, 1292, 1293,
+1316). La fecha de entrega viaja por `sheets_payload->>'fecha_entrega'`, que es de donde la
+lee esa vista (`fecha_entrega_txt`), y el importador la carga del mail de Krikos.
+
+**El filtro del espejo, probado** (en LK, con `BEGIN … ROLLBACK`): marcando a mano una OC
+como `parcial` y otra como `ok`, `sync_krikos_oc_virgilio()` devolvió **5** — las 4
+pendientes **más la `parcial`**, y la `ok` **no viajó**. Después del rollback Virgilio
+volvió solo a 6 filas / 0 parciales (el `postgres_fdw` propaga el rollback).
+
+**Para apagarlo:** `select cron.alter_job(43, active := false);` en LK. Nada más depende de
+él: las OC vuelven a cargarse a mano desde el panel.
+
+### Qué se ve hoy en A Programar
+
+Las 6 OC viejas quedaron en el bloque naranja con el motivo *"fecha de entrega vencida
+(dd/mm/aaaa) — se carga a mano si todavía va"*. Se van de ahí solas cuando alguien las
+descarta desde la Bandeja del panel, o si se cargan a mano.
+
+### Rollback
+
+```sql
+-- en LK
+select cron.unschedule('krikos-auto-import-10min');
+-- y, si hace falta desarmar todo, el bloque ROLLBACK de sql/krikos_auto_import.sql
+-- en VIRGILIO (opcional: las columnas no molestan a nadie)
+alter table public."GV_Krikos_OC" drop column if exists auto_estado,
+  drop column if exists auto_aviso, drop column if exists auto_at, drop column if exists order_id;
+```
+Sin cron, todo esto queda inerte: las OC siguen cargándose a mano desde el panel, como hasta ahora.
+
+## §3.cj.3 — v15.91 (2026-09-11): barrido de TODO lo que leía `vista_saldos_stock` sin agrupar
+
+Después del bug de Corregir códigos (§3.cj.2) se revisó **quién más** quedó atrás del cambio de
+grano de la **v15.71** (`vista_saldos_stock` pasó de una fila por código a **una por (cod_art,
+empresa)**; hoy **292 códigos tienen dos filas**).
+
+| Dónde | Estado | |
+|---|---|---|
+| `index.html` (5 lugares) y `recepcion.js` (2) | ✅ ya corregidos en la v15.71 | acumulan ("SUMAR, no pisar") |
+| `vista_stock_vs_pedidos`, `vista_faltante_catalogo`, `vista_generador_oc`, `vista_importados_partes`, `vista_facturable_anticipado` | ✅ | filas = claves distintas (310 / 505 / 349 / 5 / 724) |
+| `vista_correcciones_pedido_rich` | ❌ → arreglada en §3.cj.2 | |
+| **`gondola_return_check(jsonb)`** | ❌ → **arreglada acá** | CTE `gond` sin `group by` |
+| **`aceptar_conteo(bigint,text)`** | ❌ → **arreglada acá** | `SELECT … INTO` sin agregado |
+| `oc_backfill_valores`, `notificar_conteo_gondola_telegram` | ✅ | ya sumaban y agrupaban |
+| `check_stock_anomalias`, `generar_reporte_agentes` | sin tocar | miran fila por fila; hoy **0 negativos**, y ahí el corte por empresa es información, no ruido |
+| `actualizar_saldo_trigger` | sin tocar | sólo la nombra en un comentario |
+
+**`gondola_return_check`** es el chequeo de *"¿devolver a góndola?"* de Recepción: duplicaba las
+filas del resultado y tomaba el `terminado` de **una** empresa (muchas veces 0) en vez del total →
+**el aviso de exceso de góndola no saltaba**. Ahora `sum(...) group by`.
+
+**`aceptar_conteo`** es más delicado: cuando `Conteo_Stock.stock_sistema` viene null, el fallback
+leía una fila cualquiera y con ese número calcula el delta del ajuste que **escribe** en
+`Movimientos_Stock`. Ahora `SUM(...)`. **Sin daño histórico**: los 2 conteos aceptados hasta hoy
+tenían `stock_sistema` cargado (el front manda el snapshot, que ya sumaba bien).
+
+**Prueba:** `select * from gondola_return_check('[{"cod":"505","cajas":5000},{"cod":"513","cajas":5000}]')`
+→ **1 fila por código** (antes 2), con `gond` = 2719 y 2162, que es el total. Antes una de las dos
+filas de cada código traía `gond = 0`.
+
+**Archivo:** `sql/gv_saldos_group_by_funciones_v1589.sql` · migración `gv_saldos_group_by_funciones_v1589`
+· backup de las definiciones previas en `sql/backups/funciones_vista_saldos_stock_20260911_pre_v1589.sql`.
+
+## v15.92 (2026-09-11) — armado duplicado por reprogramación de tanda: fix + limpieza
+
+**Síntoma.** 4 NP con las filas de `Entregas_Virgilio` por duplicado, cada juego en una tanda
+distinta: 98532 y 98533 (D60E 09/09 → E10A 11/09), 98490 (D47C 27/08 → D54C 02/09) y 98583
+(D50C 31/08 → D50D 01/09). 43 filas, 57 cajas contadas dos veces.
+
+**Causa raíz.** El pedido se reprogramó de tanda (para 98532/98533 lo movió el propio override
+`GV_PPP_Prog_Override`, v14.09) y se volvió a armar. Los dos candados miran la **tanda**, no la
+**NP**: `_compTandaYaArmada()` en el front y la clave `np|tanda|cod_art` del trigger
+`entregas_virgilio_dedup`. Con tanda nueva, los dos dejan pasar.
+
+**Efecto en stock (medido).** El armado emite `separado`: `separar_pedidos −n` / `a_facturar +n`
+por artículo. El segundo armado lo volvió a emitir → `separar_pedidos` quedó 57 cajas más
+negativo y `a_facturar` 57 infladas. Borrar las filas de `Entregas_Virgilio` **no** revierte eso:
+no hay trigger `AFTER DELETE`.
+
+**Qué se hizo.**
+1. Backup: `public."GV_Backup_Entregas_Dup_20260911"` (43 filas, el armado viejo de cada NP).
+2. `delete` de esas 43 filas de `Entregas_Virgilio`.
+3. Compensación en `Movimientos_Stock` (libro event-sourced: no se borra, se compensa): 80 filas
+   `tipo='ajuste'`, `ref='reversa armado duplicado NP <np> tanda <tanda> (backup …)'`,
+   `+57` a `separar_pedidos` y `−57` a `a_facturar`. **No** se revirtió el `terminado +1` del
+   941E de D60E: ese devuelto al depósito ocurrió una sola vez y es legítimo.
+4. Backend: `entregas_virgilio_dedup()` pasa a clave `np|cod_art`
+   (`sql/entregas_virgilio_dedup_v1592.sql`, anotado en `docs/ROLLBACK-PRODUCCION.md`).
+5. Front: `_compNpsYaArmadas(nps)` nuevo + chequeo en `compTerminar()` — corta el armado y
+   nombra las NP ya armadas, aunque sea en otra tanda.
+
+**Chequeo (debe dar 0 filas):**
+```sql
+select np from (
+  select btrim(np::text) np, upper(btrim(tanda)) t from public."Entregas_Virgilio"
+   where nullif(btrim(tanda),'') is not null group by 1,2
+) z group by np having count(*) > 1;
+```
+
+**Pendiente aparte (no tocado).** 22 filas de `Entregas_Virgilio` con `tanda` NULL y
+`fecha_salida` NULL, creadas del 10 al 14/08 en 20 NP; 19 son del artículo **574E**, el resto
+838E, 809E, 943E, 948E y 580. No tienen evento `TAL` que las respalde ni movieron stock
+(no hay `Movimientos_Stock` en esa ventana para esos códigos): parecen una carga manual o una
+migración puntual. En 14 de ellas el mismo artículo ya existe en la fila con tanda de esa NP,
+con las mismas cajas. Queda como problema abierto en `github_repo_problemas`.
+### §3.cn.1 — v15.92: el cartel de vencidos prometía algo que la v15.85 apagó
+
+Al sacar de En Salida lo que no tiene Carga Camión quedó un texto viejo mintiendo en la lista de
+**vencidos** de Programación:
+
+> *"N pedidos salieron con la tanda armada y nadie marcó el remito. **A las 36 h del armado pasan
+> solos a En Salida**, donde se cierran con Controlado."*
+
+Eso era la v15.55 (`armada_sin_carga`), que la v15.85 desactivó: **ya no pasan solos**. La
+operadora iba a esperar un pase automático que no va a ocurrir. Ahora dice lo que corresponde:
+
+> *"N pedidos salieron con la tanda armada y **nadie registró la Carga Camión**. Mientras no se
+> registre, el pedido queda acá: no entra a En Salida y no se puede cerrar. El que lo cargó tiene
+> que marcarlo en **Carga Camión** — de ahí pasa a En Salida y se cierra con **Recepción Remitos**.
+> Si la mercadería nunca salió, 📅 Reprogramar o 🚫 Cancelar."*
+
+Es el flujo que ya existe, no uno nuevo: **el que cargó el camión es el que marca la carga**. Por
+eso no se agregó ningún botón de "dar por cargado" desde el escritorio — escribiría un CCN sin
+legajo real de quien cargó, y la vista justamente descarta los CCN de legajo de prueba.
+
+También se ajustaron dos etiquetas que decían lo mismo viejo: la celda de la fila
+(`salió · marcar remito` → **`salió · falta la Carga Camión`**) y el cartel de Resumen
+(`… y el remito sin marcar` → **`… y la Carga Camión sin registrar`**).
+
+**Estado al cerrar (11/09):** quedan **15** pedidos en esa lista, todos de ISIS y todos con la
+tanda armada (TAP), esperando decisión de Thomas — 6 sin fecha de entrega (98585..98590, D56D,
+armadas 03/09, facturadas 04/09, **con CCR**: control de remitos hecho y carga sin registrar) y 9
+vencidas (44612..44617 Cencosud D72B/D72C, 98480/98481 D47B armadas el **27/08**, 98530 D60C).
+
+---
+
+## 3.ci Los 10 artículos que se venden y no están en el maestro (v15.94) — 2026-09-11
+
+Repasando **uno por uno** los 7 huecos que quedaban, los dos artículos reales resultaron ser
+el mismo problema, y de fondo:
+
+| Cód | Artículo | Quién | Situación |
+|---|---|---|---|
+| `574` | Corta Queso Blandos Mango Alambre | **4170 Ichariba Chode SRL**, 3 NP × 1 cj, entregadas | se le factura a **72 clientes desde 2023**, siempre a **$2.770** bruto |
+| `838E` | Rallador Cilíndrico Mini | 1474 Celestino (1 cj) y 2447 Clapera (3 cj) | **faltante puro**, 0 entregado |
+
+Las otras 2 filas eran las mismas NP repetidas con **`cod_cliente` vacío** en
+`Entregas_Virgilio` — basura, no artículos (engancha con el problema abierto de las filas sin
+tanda que duplican cajas).
+
+### La causa
+
+`precios_venta` —el espejo que Virgilio usa para valorizar— se arma **sólo de `products` de
+LK**. Los precios cargados a mano en **`item_precios`** nunca viajaban. Son **10 códigos**:
+
+`120` Filtros de Café · `193` Tostador Enlozado · `198E` Pelador Dentado · `55215` Palo de
+Amasar · `574` Corta Queso · `599EZ` Pelador Mad Verde · `727EN` Sacacorcho Doble Imp. ·
+`809` Corta Queso · `838E` Rallador Mini · `865ED` Rallador Plano
+
+Son **justo** los que venían apareciendo "sin precio" toda la tarde. No era casualidad.
+
+### Lo que NO se trajo, y por qué
+
+La idea original era que el sync leyera `v_item_precio` entero. Mirándolo de cerca, **eso
+rompía dos cosas**:
+
+- **`chef_products` (98 códigos)** → reintroduce el bug que arregló la v14.44: el `809E` de
+  Chef a $3.005 pisando el de LK a $4.060 en una NP de Loekemeyer.
+- **`variante_L` (78) + `loke_products` (16)** → es la **línea Loke**, que por regla del dueño
+  **no tiene lista general**: el precio es el pactado con cada cliente.
+
+Así que se traen **sólo los `origen = 'manual'`**, y **`products` manda**: si un código está en
+el maestro, el manual no lo pisa.
+
+### Medido
+
+`sync-precios-venta` v9: `precios_venta` 223 → **233** filas, `precios_lk_manuales: 10`,
+`cob_uxb_lk` 295. **0 precios existentes modificados** (comparado fila a fila contra
+`gv_bkp_precios_venta_20260911_pre_manuales`).
+
+| Vista | antes de hoy | tras el precio facturado | **ahora** |
+|---|---|---|---|
+| `vista_facturacion_neto_items` | 1.178 | 7 | **0** |
+| `vista_facturable_anticipado` | 67 | 0 | **0** |
+| `vista_plata_perdida` | 154 | 5 | **1** |
+
+La única que queda es el artículo **`597`** a Clapera (LK 2394), 8 cajas faltantes del 20/08:
+no está en ninguna lista y **nunca se facturó**, así que no hay de dónde sacarlo. Ése sí es
+un alta de artículo pendiente.
+
+### Lo que este arreglo NO toca
+
+La card de OC de súper de LK matchea contra `products` + `loke_products`, **no** contra
+`precios_venta` de Virgilio. Por eso **sigue abierto** que una OC de La Anónima entrara con
+**17 de 18 renglones**: el `198E` no está en ese catálogo y la línea se cae **sin aviso** —
+aunque a La Anónima se le viene facturando el 198E desde junio ($1.110 bruto, 19% de dto,
+última el **08/09**). Es el mismo agujero, del otro lado, y es un fix de LK.
+
+### Rollback
+
+Redeployar `sync-precios-venta` sin el bloque `1b` (la versión previa está en el historial de
+`supabase/functions/sync-precios-venta/index.ts`) y restaurar desde
+`gv_bkp_precios_venta_20260911_pre_manuales`.
+
+### §3.cp.1 — El 198E existía en todos lados menos en el maestro (v15.95) — 2026-09-11
+
+El primer caso real que dejó el importador automático: la OC de La Anónima **22908256**
+entraba `parcial` porque el **198E** (Pelador Negro Dentado Loke) no estaba en `products`
+ni en `loke_products` de LK. Pero se vende hace rato — 25 movimientos de stock en Virgilio
+(último 09/09), m³ 0,0033, lista de Coto $1.100, lista de La Anónima $1.110 y facturas
+reales: 771 el 08/09 por 840 u a $1.110 bruto (19% dto → $899,10 neto) y Osa el 09/09 por
+1.656 u. Vivía sólo en `item_precios`, la tabla de precios manuales de LK, que **no** es lo
+que mira el match por código: por eso el renglón se caía en silencio (y por eso la
+valorización lo calculaba por unidad, sin `uxb` — §3.cf).
+
+**Alta (pedido de Thomas):** `loke_products` ← `198E`, "Pelador Negro Dentado Loke",
+categoría Peladores, **lista $1.110, uxb 12, activo**. Es el precio que `v_item_precio` ya
+servía, así que **no cambió ningún precio**, sólo la fuente:
+
+| Quién | Qué paga el 198E | De dónde sale |
+|---|---|---|
+| Coto (801) | $1.100 | lista de súper (`precios_super`) |
+| La Anónima (771) | $1.110 | lista de súper |
+| Osa (2533) | $660 | precio pactado con Fede, `GV_Precios_Cliente` con `es_final` — le gana a la lista |
+| Extralimp (4114) | $1.110 | la lista: compra la línea Loke entera con **dto 0**, verificado contra sus facturas (102E 1100=1100, 103 465=465, 121 1420=1420, 123 790=790 el 17/06) |
+
+**Medido:** la misma OC pasa de `parcial` (13 de 14 renglones, $16.695.240 vs $17.627.640
+del PDF) a **`importada` con 14 de 14 y el total exacto**. Backup de las 23 filas previas en
+`sql/backups/loke_products_20260911_pre_198E.sql` de `pagina-lk-copia`; deshacer es
+`delete from public.loke_products where cod = '198E';`. Problema **26** de
+`github_repo_problemas`, cerrado.
+
+**Ojo:** el alta lo hace aparecer en el catálogo Loke del portal (23 → 24 productos, a
+$1.110). Si no se quiere que se vea en la web, `active = false` lo saca sin romper nada: el
+importador matchea igual porque no filtra por `active`.
+## §3.cn.2 — "Sin programar" para una NP de ISIS: las 8 viejas sin Carga Camión (v15.93, 2026-09-11)
+
+Thomas, sobre los 15 que quedaron en la lista de vencidos después de la v15.85:
+
+> *"No lo sé, por las dudas, ponelos todos sin programar para que los revise, los que no se
+> cargaron el camión nunca, y son claramente viejos."*
+
+### El agujero que había
+
+`GV_PPP_Prog_Override` sabía **pisar** tanda/fecha y **ocultar** una NP de ISIS, pero no
+**vaciarla**: la vista hace `coalesce(nullif(btrim(o.tanda),''), p.tanda)`, así que un `''` caía
+al valor de ISIS. Para las web existía `gv_ppp_web_desprogramar`; para ISIS sólo había
+**📅 Reprogramar** (a un día nuevo) o **🚫 Cancelar** (que la saca para siempre). No existía el
+punto medio, que es justo lo que pidió: *sacarlo de la programación para revisarlo*.
+
+### Lo que se agregó
+
+1. `GV_PPP_Prog_Override.desprogramada` boolean not null default false (**aditivo**).
+2. `gv_ppp_programacion_diaria`: con la marca, devuelve `tanda = ''` y `fecha_entrega = ''` → el
+   front lo cuenta como **no programado** (`_pppRowFromSupa`) y cae en **📥 A Programar**.
+   `PPP_Programacion_Diaria` (compartida) **no se toca**.
+3. **`gv_ppp_isis_desprogramar(p_nps, p_motivo, p_por)`** — sólo supervisor. **Guarda:** corta si
+   alguna NP ya tiene **CCN** o **CRN**. Si salió de verdad no se saca de la programación: se
+   cierra con el remito.
+4. `gv_ppp_isis_sin_tanda`: una NP desprogramada entra **aunque esté facturada**. Sin esto las 8
+   (todas facturadas) quedaban invisibles en A Programar y `gv_ppp_isis_programar` las rechazaba
+   con *"ya no están sin tanda"* — o sea, sin camino de vuelta. Cancelada sigue afuera siempre.
+5. `gv_ppp_isis_programar`: al volver a programarla, `desprogramada = false` (si no, la vista le
+   vaciaría la tanda recién asignada).
+6. **Front**: en la lista de **vencidos**, el pedido con la tanda armada pasa a tener acción —
+   antes su fila sólo decía un texto. Botón **↩ Sin programar** (`pppVencSinProgramar`), supervisor.
+
+### A quiénes se aplicó (criterio: sin Carga Camión **y** armado hace ≥ 3 días)
+
+| NP | Tanda | Armado | Facturado | |
+|---|---|---|---|---|
+| 98585..98590 | D56D | 03/09 | 04/09 | tienen **CCR** (control de remitos) y nunca CCN |
+| 98480 · 98481 | D47B | **27/08** | 28/08 | 15 días |
+
+**NO se tocaron** — son de esta semana, no entran en "claramente viejos": 98530 (D60C, armada
+09/09), 44612/13/14 (D72B, armadas 10/09) y 44615/16/17 (D72C, armadas **hoy** 11/09 14:11).
+
+**Medición:** las 8 quedan sin tanda y sin fecha; `gv_ppp_isis_sin_tanda` pasa de 0 a **8** (leído
+también como `anon`); `gv_ppp_programacion_diaria` sigue en **123** filas — no se perdió ninguna.
+
+**Backup:** `public."GV_PPP_Prog_Override_bkp_20260911_v1593"` (105 filas), tomado antes de escribir.
+**Rollback rápido:** `update public."GV_PPP_Prog_Override" set desprogramada = false where desprogramada;`
+**Archivo:** `sql/gv_ppp_isis_desprogramar_v1593.sql`. Objetos todos nuestros (`GV_*` / `gv_*`).
+
+## §3.cn.3 — Dar por salida una NP a mano (v16.00, 2026-09-11/12)
+
+Thomas, cerrando los 7 que quedaban: *"Los 44xxx mandalos a programar? El otro, dejalo en en
+salida"*.
+
+### 44612..44617 (Cencosud, D72B/D72C) → 📥 A Programar
+
+Armadas (TAP 10/09 y 11/09), **sin facturar**, sin ningún registro de carga. `gv_ppp_isis_desprogramar`
+las dejó sin tanda ni fecha. A Programar pasa de 8 a **14**.
+
+### 98530 (D60C, Shopping Domino) → En Salida
+
+Acá había un choque con la regla que él mismo había puesto a la mañana (v15.85: *"en En Salida no
+puede haber ningún pedido sin fecha, ni pedidos que no se hayan cargado a un camión"*). La 98530
+está armada (TAP 09/09) y facturada (10/09), pero **nadie registró la Carga Camión**.
+
+**La regla no se tocó**: a En Salida sigue sin entrar **sola** ninguna NP sin CCN. Lo que se agregó
+es un **override explícito por NP** — el mismo patrón que `GV_PPP_Prog_Override` para la PPP: un
+supervisor decide que ese pedido salió y queda registrado **quién, cuándo y con qué fecha**.
+
+**No se escribe un CCN falso.** Inventaría el legajo del que cargó el camión, y la vista justamente
+descarta los CCN de legajo de prueba. La marca es otra cosa y se ve como otra cosa.
+
+| | |
+|---|---|
+| `GV_PPP_Prog_Override.en_salida_manual` | bool not null default false |
+| `GV_PPP_Prog_Override.en_salida_fecha` | date — **obligatoria**; si no se pasa, la fecha de entrega de la PPP (o la de factura) |
+| `gv_ppp_en_salida` | la marca entra a la base y pasa el filtro `solo_cargadas`; `estado = 'salida_manual'`, `fecha_carga = coalesce(CCN, en_salida_fecha)` |
+| `gv_ppp_en_salida_marcar(nps, fecha, motivo, por)` | sólo supervisor; corta si ya tiene **CRN** (entregada) o **CCN** (ya está en En Salida) |
+| `gv_ppp_en_salida_desmarcar(nps, por)` | deshace |
+| `en_salida_manual` ↔ `desprogramada` | **excluyentes**: cada RPC apaga la otra |
+
+**Front:** chip **📝 Dada por salida a mano** en En Salida, y botón **🚚 Ya salió** en la lista de
+vencidos, al lado de **↩ Sin programar**. Pide la fecha (default: la de entrega) y la manda al
+backend en ISO — reusando `_pppFechaISO`, que ya existía; la primera versión de este cambio la
+duplicó por descuido y se sacó antes de pushear (una redefinición silenciosa habría cambiado cómo
+se guardan las fechas de `PPP_Web_Programacion`).
+
+**Medido (como `anon`):** En Salida 19 → **20**, con **0 sin fecha**. A Programar 8 → **14**.
+`gv_ppp_programacion_diaria` sigue en **123**.
+
+**Backup:** `public."GV_PPP_Prog_Override_bkp_20260912_pre_ensalida"` (113 filas).
+**Archivo:** `sql/gv_ppp_en_salida_manual_v1600.sql`. Objetos todos nuestros (`GV_*` / `gv_*`).
+
+### §3.cn.4 — v16.01: "armado" no quiere decir que salió
+
+Thomas: *"Aclará 'ya armado' de alguna manera"*. La app venía **afirmando la salida** cuando lo
+único que consta es el armado de la tanda (evento TAP). Cuatro textos corregidos:
+
+| Dónde | Antes | Ahora |
+|---|---|---|
+| Fila de vencidos | `salió · falta la Carga Camión` | **`ARMADO` / `¿salió? sin registro`** |
+| Cartel de vencidos | *"N pedidos **salieron** con la tanda armada y nadie registró la Carga Camión"* | *"N pedidos con la tanda **ARMADA** y nadie registró la Carga Camión. **Armado no quiere decir que salió**: sin ese registro no consta que haya subido a un camión."* |
+| Cartel de Resumen | *"N con la tanda armada y la Carga Camión sin registrar"* | idem + *"(armado no es que salió)"* |
+| Chip de En Salida | `🧰 Armada` | **`🧰 Armada (no es que salió)`**, con tooltip: pasó por armado (TAL) y nada más; la salida la dice el chip de al lado |
+
+Es la misma idea que la v15.85: **sólo la Carga Camión (o la salida marcada a mano) dice que un
+pedido salió**. La v15.55 había ido al revés — dar por salido lo armado hace +36 h — y se apagó.
+
+## §3.cn.5 — REVERTIDO: una tanda ya pickeada no vuelve a la cola de picking (v16.04, 2026-09-12)
+
+Thomas, mirando las 14 que la v15.93 había mandado a A Programar: *"Esto marca un precedente raro.
+Cómo armaron la tanda si no había tanda."* **Tenía razón, y el riesgo era peor que el conceptual.**
+
+### Qué medí
+
+Las **14** (98585..98590 D56D · 98480/98481 D47B · 44612..44617 D72B/D72C) tenían el trabajo hecho:
+
+| | |
+|---|---|
+| Picking de la tanda | **EP + TP** en las 4 tandas |
+| Armado de la tanda | **AP + TAP** en las 4 |
+| Armado por NP | **TAL** en las 14 |
+| Líneas de PKC (cajas contadas) | **30 a 89** por tanda |
+
+**A Programar es la cola de pedidos POR PICKEAR.** Al programarlas de nuevo,
+`gv_ppp_isis_programar` crea una **tanda nueva**, el operario las pickea otra vez y el stock se
+descuenta **dos veces** por mercadería que ya salió de góndola y está armada en un pallet. Además
+la vista borraba una tanda que sí existió y sí se armó: se perdía la trazabilidad.
+
+### Qué se hizo
+
+1. **Revertidas las 14** (`desprogramada = false`): vuelven con su tanda y su fecha, a la lista de
+   vencidos. A Programar 14 → **0**; la PPP sigue en 123 y **ninguna fila queda sin tanda**.
+   Nadie llegó a re-pickear nada.
+2. **Guarda en `gv_ppp_isis_desprogramar`** — tres cortes, no uno:
+   - ya tiene **CCN/CRN** (salió) — ya estaba;
+   - la NP tiene **TAL** (está armada) — nuevo;
+   - la **tanda** ya se empezó a trabajar (`gv_ppp_tanda_tocada`: EP/TP/AP/TAP) — nuevo.
+   Es la misma guarda que `gv_ppp_web_desprogramar` ya tenía para las NP web y que a la de ISIS le
+   faltaba. Probado: desprogramar la 98585 ahora corta y no escribe nada.
+3. **Front**: el botón **↩ Sin programar** sale de los vencidos **armados** — que es justo donde lo
+   había puesto la v15.93. Ahí queda sólo **🚚 Ya salió**; para mover el día está **📅 Reprogramar**,
+   que no toca la tanda ni el picking. El cartel lo dice: *"estos pedidos ya están pickeados y
+   armados, así que no vuelven a A Programar"*.
+
+### Lo que queda por decidir (de Thomas)
+
+Los 14 están otra vez en **vencidos**, con su tanda. Como están armados, las salidas reales son dos:
+**🚚 Ya salió** (si salieron y nadie lo marcó) o **📅 Reprogramar** a un día nuevo. La 98530 sigue en
+En Salida como `salida_manual` (esa no se tocó).
+
+Auditoría: *"gv_ppp_isis_desprogramar mandaba a la cola de picking tandas YA pickeadas y armadas"*.
+
+## §3.cn.6 — v16.03: van a A Programar igual, pero vuelven a SU tanda (no se pickean de nuevo)
+
+Le planteé a Thomas el riesgo de la v16.02 (las 14 ya estaban pickeadas y armadas; A Programar es la
+cola de pedidos por pickear) y **reafirmó**: *"No. Que vayan a programar."* Es su decisión y se hizo.
+
+Lo que **no** se dejó suelto es el riesgo real — que alguien las pickee dos veces y el stock se
+descuente doble. Tres piezas:
+
+1. **`GV_PPP_Prog_Override.tanda_previa`** guarda la tanda que el pedido tenía al sacarlo. También
+   contesta lo que marcó Thomas (*"cómo armaron la tanda si no había tanda"*): la tanda **no se
+   pierde**, queda registrada aunque la vista la muestre vacía.
+2. **`gv_ppp_isis_sin_tanda`** expone `tanda_previa`, `ya_armada` y `ya_pickeada`; la tarjeta de
+   A Programar lleva un chip rojo **«⚠ ya pickeada y armada · D56D»**.
+3. **`gv_ppp_isis_programar` REUSA esa tanda**: si todas las NP del grupo vienen de la misma
+   `tanda_previa`, se programa con **ese** código y no con uno nuevo → el picking y el armado ya
+   hechos siguen valiendo y nadie los repite. El aviso lo dice: *"Volvió a su tanda D56D: ya estaba
+   pickeada y armada, así que NO hay que pickearla de nuevo."* Si vienen de tandas distintas, va una
+   tanda nueva y el aviso avisa que revise antes de mandarlas a pickear.
+
+**Guardas de `gv_ppp_isis_desprogramar`:** quedó **sólo** la de CCN/CRN (lo que ya salió, que es la
+que el propio dueño pidió). Las de "ya armada" y "tanda ya trabajada" que había puesto la v16.02 se
+sacaron por su decisión.
+
+**Front:** vuelve el botón **↩ Sin programar** en los vencidos armados, con el texto que corresponde.
+
+**Aplicado:** las 14 otra vez en A Programar, las 14 con `tanda_previa` (D47B, D56D, D72B, D72C) y
+`ya_armada = ya_pickeada = true`. A Programar **0 → 14**. En Salida sigue en 20 (98530, salida manual).
+## §3.cq — El stock del módulo de importados pasa a ser el STOCK REAL (v16.04) — 2026-09-12
+
+Thomas, 12/09: ***"que lea el stock real"***.
+
+### Qué estaba mal
+
+`v_importados_ordenes.stock_actual` **no era el stock del depósito**. Salía de
+`Importados_Mov_Stock`, un libro propio del módulo:
+
+```
+stock_actual = (seed del Excel + el sync manual del 11/09)
+             - cajas de Entregas_Virgilio desde el "inicial" x uni_x_caja
+```
+
+O sea: lo único que lo bajaba eran **las entregas**. Ajustes, facturado, movimientos de racks,
+envasado y recepciones nunca le llegaban. Empataba el día que alguien corría el sync
+(`ref = 'sync stock depósito 2026-09-11 (vista_saldos_stock)'`, 95 ajustes) y se despegaba un
+poco por día. Al 12/09, de 112 códigos comparables **31 no coincidían** con la pantalla de Stock.
+
+Además: **"marcar llegada" sumaba stock al módulo** (`importados_marcar_llegada` inserta en
+`Importados_Mov_Stock`) y la recepción real del depósito lo sumaba **otra vez**.
+
+### Qué se hizo
+
+`v_importados_ordenes` **NO se tocó**: la lee Producción Virgilio por REST
+(`index.html:12022` de ese repo). Protocolo del `CLAUDE.md` → objeto nuevo con prefijo `gv_`.
+
+| Objeto nuevo | Qué es |
+|---|---|
+| **`gv_importados_stock_dep`** | stock real del depósito por código normalizado (`gv_cod_stock`) y empresa, en **cajas**. Suma los mismos 8 depósitos que `vista_stock_procesada.stock_total`: terminado + excedente + separar_pedidos + a_facturar + a_guardar + racks + racks_ch + para_envasar. `insumos` va aparte. |
+| **`gv_importados_ordenes`** | copia de `v_importados_ordenes` con `stock_actual = round(cajas del depósito × uni_x_caja)`. Agrega **`stock_cajas`**. |
+
+Las dos con `security_invoker = true` y `grant select` a `anon, authenticated`.
+
+**El reparto LK / CH.** Hay 4 códigos con dos filas en `Importados` que normalizan igual, y
+siempre son una LK y una CH: `437E`/`437EL`, `438E`/`438EL`, `439E`/`439EL` y `809E` (dos veces
+el mismo código). Ahí el stock se parte por empresa — la fila CH se lleva `empresa = 'CH'`, la
+LK se lleva `'LK' + 'Mixto'`. Si el código tiene una sola fila, se lleva todo. Verificado: la
+suma de las dos filas da exacto el total del depósito, sin doble conteo.
+
+| | cajas depósito | módulo |
+|---|---|---|
+| 437E CH / 437EL LK | 16 / 295 | 384 u / 7.080 u |
+| 438E CH / 438EL LK | 2 / 127 | 48 u / 3.048 u |
+| 439E CH / 439EL LK | 16 / 16 | 96 u / 96 u |
+| 809E CH / 809E LK | 489 / 28 | 5.868 u / 336 u |
+
+**Las partes no cambian.** Para un `es_parte` sigue mandando el insumo
+(`stock_total = gv_importados_stock_insumos.stock_uni`, regla de la v15.75). Por eso 505C pasa de
+`stock_actual` 262.400 → 0 y 1000900 de 68.000 → 0 **sin que cambie su `stock_total`** (130.000 y
+107.500): ese `stock_actual` era un seed que no se usaba para nada.
+
+### Medido
+
+154 filas `principal and activo`: **122 sin cambio, 32 cambiaron**. Sacando las 2 partes, las 30
+que quedan son: 026 **+2.520 u** y 027 **+1.272 u** (antes no cruzaban contra el depósito) y 28 de
+entre 8 y 192 unidades (1 a 16 cajas), que es la deriva desde el sync del 11/09.
+
+Chequeo que tiene que dar 0 filas de acá en adelante:
+
+```sql
+select i.cod_art, i.marca, i.stock_cajas, s.cajas
+  from public.gv_importados_ordenes i
+  join public.gv_importados_stock_dep s on s.cod_norm = public.gv_cod_stock(i.cod_art)
+ where i.principal and i.activo and not i.es_parte
+ group by 1,2,3,4 having sum(s.cajas) <> i.stock_cajas;
+```
+
+### Front
+
+`SUPABASE_IMPORTADOS_OC_ENDPOINT` ahora apunta a `/rest/v1/gv_importados_ordenes` y el `select`
+pide además `stock_cajas`. Nada más cambió: las columnas son las mismas.
+
+**Rollback:** devolver ese endpoint a `v_importados_ordenes`. SQL y detalle en
+`sql/gv_importados_stock_real_v1604.sql`; anotado también en `docs/ROLLBACK-PRODUCCION.md`.

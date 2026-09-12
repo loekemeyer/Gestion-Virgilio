@@ -12,7 +12,7 @@
 > única**; no se replica. Ante la duda entre parche rápido y fix de raíz → **fix
 > de raíz**.
 >
-> Última actualización: 2026-09-11 (viernes) · Versión app al documentar: **v15.86**
+> Última actualización: 2026-09-12 (sábado) · Versión app al documentar: **v16.04**
 >
 > Nota **v15.40 (2026-09-11) — HANDOFF de planimetría / Acacia: `docs/HANDOFF-PLANIMETRIA-Y-ACACIA.md`.**
 > Thomas sigue este tema en otra sesión. Ahí está todo junto: los **13 artículos activos del catálogo LK
@@ -4238,8 +4238,12 @@ fichadas-monitor.html y productividad.html) — rotar la key = editar solo ese a
 > `uni_x_caja`, `principal`, `activo`, `est_madre_seed/override`, `pedido_manual`, `pedido_curso`),
 > **`Importados_Config`** (`meses_objetivo` = **índice**, ahora **10**), **`Importados_Mov_Stock`**
 > (stock **en unidades** event-sourced; `delta_uni`, `tipo='inicial'`) y la vista
-> **`v_importados_ordenes`** (motor: `stock_actual` en unidades = mov − ventas×uni_x_caja desde el
-> inicial; `est_madre_eff` = proyección madre live/seed; `meses_objetivo`). **Pantalla "Proveedor de
+> **`gv_importados_ordenes`** (motor, **v16.04**: `stock_actual` en unidades = **cajas del depósito
+> real × `uni_x_caja`**, vía `gv_importados_stock_dep` → `vista_saldos_stock`; trae además
+> `stock_cajas`; `est_madre_eff` = proyección madre live/seed; `meses_objetivo`). ⚠ La vieja
+> **`v_importados_ordenes`** sigue viva y **no se toca**: la lee Producción Virgilio, y su
+> `stock_actual` salía de `Importados_Mov_Stock` (seed + sync manual, sólo descontaba entregas),
+> que es justo lo que se dejó de usar acá. §3.cq de `docs/SUPABASE-GESTION-VIRGILIO.md`. **Pantalla "Proveedor de
 > importación"** (botón 🏭 en Administración, `stkOpenProvImp`): lee/escribe el **maestro `Importados`**
 > vía la vista **`vista_prov_importacion`** (1 fila por `cod_art` activo; `cod, descripcion, marca,
 > proveedor, n_prov, es_e`; GRANT SELECT anon). Al tocar el desplegable hace **PATCH `Importados.proveedor`**
@@ -11237,6 +11241,36 @@ distinta, empresa distinta.
 > **`docs/IMPORTACIONES-PAGOS-ARGENTINA.md`** + §3.ca de `docs/SUPABASE-GESTION-VIRGILIO.md`.
 > **Marcado sin tocar**: Frontier FOB 14.400 vs 14.000 del motor y su llegada (04/11) que no cierra con el
 > embarque 26/10; Becky 2ª con el 30% pagado el 02/jun y 112 días hasta embarcar.
+
+> Nota **2026-09-11 (v15.98) — El mapa carga ↔ pedido se carga desde la pantalla, no por chat.**
+> En vez de esperar que Thomas conteste qué carga es qué pedido, la pantalla se lo pregunta y lo guarda:
+> **🔗 Asignar** en cada fila de 📦 Cargas (elige de la lista de pedidos en curso del proveedor, o `0` = ninguno,
+> que también es una respuesta válida), y en 💵 **Giros** una columna nueva *"Cargas (a través de → fue a)"* que,
+> si el Excel lo dice, muestra la sugerencia con un **✓ usar** para aceptarla de una — el giro de 14.000 de
+> Ownland ya trae *"según el Excel: CQ-9553 → CQ-9694"*. Backend: `GV_Imp_Carga_Pedido` +
+> `GV_Imp_Pagos.carga_origen/carga_destino`. **v15.99**: el aviso de los 5 nombres del extracto sin definir
+> también tiene su **✏️** para resolverlos ahí mismo (o escribir `EMPRESA` si no son un proveedor).
+> §7 de `docs/IMPORTACIONES-PAGOS-ARGENTINA.md`.
+
+> Nota **2026-09-11 (v15.93) — NTL: cargas, conciliación y alias de proveedor.**
+> La solapa 💱 NTL pasa a tener **tres vistas**: 📄 Extracto · 📦 **Cargas** (las del Excel —`CQ-9154`, `China 2`…—
+> con lo girado, el FOB y el saldo, más el pedido que le calza) · 🔗 **Conciliación** (cada giro cargado buscado
+> en el Excel: **4 de 6 aparecen**; Frontier y Zhixin exactos, Fujian con la fecha real 04/08, y Becky y Hugo
+> **sin match**). Los nombres del extracto se traducen en `GV_Imp_Prov_Alias` **sin tocar el dato importado**
+> (`Fuyian`→Fujian, `Xihin`→Zhixin, `Becky Chen`→Becky; `Chef` y `Tierra` marcados como empresa). Quedan **5 sin
+> decidir** y la pantalla los avisa. **Hallazgo**: el adelanto de 14.000 de Ownland figura *a través de `CQ-9553`,
+> fue a `CQ-9694`* — la mecánica de pagar un pedido con la factura de otra carga, tal cual. Y el FOB de `CQ-9694`
+> es **34.956** contra los 46.626 del sistema: la diferencia, **11.670**, es clavada el "Falta" de la planilla de
+> deudas. Sin tocar. §6 de `docs/IMPORTACIONES-PAGOS-ARGENTINA.md`.
+
+> Nota **2026-09-11 (v15.90) — La cuenta de NTL andando en la app: solapa 💱 NTL.**
+> Cuarta solapa del módulo de importación, con el **extracto navegable** del forwarder de Hong Kong: saldo de
+> hoy (**u$s 230,43**), saldo por empresa (**D** 129.601 · **TN** −76.857 · **CH** −52.513), los acumulados del
+> circuito y los **recuperos pendientes** (u$s 42.908). Cada movimiento queda clasificado (ingreso / recupero /
+> giro / comisión / gasto bancario) con lo que dice el propio Excel. **Prueba de integridad: el saldo corrido
+> recalculado coincide fila por fila con el del Excel — 177 filas, 0 diferencias.**
+> Y de paso salió que **el bloque resumen del Excel tiene dos números viejos**: el saldo de CH y un "Saldo
+> Final" de 12.335,33 que en realidad es el del 05/01/2026. §5 de `docs/IMPORTACIONES-PAGOS-ARGENTINA.md`.
 
 > Nota **2026-09-11 (v15.89) — Importado el Excel de la cuenta corriente de NTL (6 hojas, 280 movimientos).**
 > Ahora está entendido el circuito completo: entra **efectivo** a NTL (u$s 140.300, con 3% de comisión por
