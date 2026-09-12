@@ -1,0 +1,82 @@
+-- ============================================================================
+-- v16.16 (2026-09-12) — el listado de Thomas cargado, las dos vistas migradas, y
+-- la primera tabla de UxB borrada
+--
+-- Thomas mandó los dos Excel del catálogo mayorista:
+--   Chef_SRL_listado_por_familia.xlsx        hoja "Lista plana"    100 filas
+--   Loekemeyer_articulos_por_familia.xlsx    hoja "Listado plano"  199 filas
+-- Más dos correcciones por chat: "832 discontinuo" y "824: 36".
+--
+-- ---------------------------------------------------------------------------
+-- 1) CARGA — 300 filas en public."GV_UxB"
+-- ---------------------------------------------------------------------------
+-- 299 del listado (CH 100 + LK 199), ninguna sin UxB, ningún código repetido
+-- dentro de su empresa. Datos crudos en `sql/data/gv_uxb_carga_20260912.sql`.
+-- Las descripciones se completaron desde Articulos_Cajas (por marca) y OC_Maximos.
+--
+-- Correcciones aplicadas encima del listado:
+--   · CH 824 "COLADOR 8 CM" — el listado decía 12, el dueño corrigió a **36**.
+--   · 832 "COLADOR PINTADO N10" → Articulos_Discontinuados (no está en el listado).
+--   · CH 830 "COLADOR N° 20 CM" → **24**. No venía en el listado, pero cae bajo la
+--     regla del 12/09 ("Colador 20: 24") y era el último conflicto vivo.
+--
+-- ⚠ DATO IMPORTANTE: **cero códigos tienen UxB distinto entre LK y CH.** Los 296
+-- códigos que están en las dos empresas coinciden. O sea que el UxB NO depende de
+-- la empresa, y por eso se pudo migrar sin ambigüedad. (La clave (empresa, cod) de
+-- GV_UxB igual se mantiene: es lo que permite representar los 21 códigos que son
+-- DOS PRODUCTOS distintos, aunque casualmente compartan el UxB.)
+--
+-- Cobertura: **274 de los 310 códigos activos** (con stock o pedidos abiertos) = 88 %.
+-- Los 36 que faltan siguen resolviéndose por el fallback.
+--
+-- ---------------------------------------------------------------------------
+-- 2) MIGRACIÓN — `GV_UxB` pasa a ser la primera prioridad de las dos vistas
+-- ---------------------------------------------------------------------------
+-- OBJETOS COMPARTIDOS (Producción los usa): `vista_uni_x_caja` y
+-- `vista_uxb_articulo`. `create or replace`, mismas columnas. Definiciones
+-- anteriores en public."GV_Backup_Viewdefs_20260912".
+--
+-- Se migran LAS VISTAS, no los consumidores: así todos los módulos pasan a la
+-- fuente única de una vez y sin tocar el front.
+--     vista_uni_x_caja  -> GV_UxB -> maestro -> OC_Maximos -> proyeccion_madre
+--     vista_uxb_articulo-> GV_UxB -> Articulos_Cajas -> OC_Maximos -> precios_venta
+--
+-- Y de paso se arregla el bug de la §3.cv: los `DISTINCT ON` de
+-- `vista_uxb_articulo` ahora llevan **desempate explícito** en el ORDER BY, así que
+-- la vista dejó de ser no determinista.
+--
+-- MEDIDO después de migrar:
+--   vista_uni_x_caja ... GV_UxB 296 · maestro 67 · ocmax 23 · uxb 3
+--   vista_uxb_articulo . GV_UxB 296 · articulos_cajas 171 · oc_maximos 10 · precios_venta 10
+--   conflictos COMPRA vs FACTURA: de 33 -> **1**, y el que queda es el 724, que es
+--   discontinuo.
+--   `refresh materialized view concurrently vista_stock_procesada` OK, 363 filas,
+--   centinela gv_stock_cod_duplicado en 0.
+--
+-- Lo que cambia de valor respecto de ayer (todo por el listado del dueño):
+--   231/232/233 Palos de amasar  12 -> 24     712E Pelador Económico CH  12 -> 24
+--   730/731 Sacacorchos CH       24 -> 12     824 Colador 8 cm CH        12 -> 36
+--   801/901/910/911 (los DISPLAY, que quedaban sin resolver)  factura 36 -> 12
+--
+-- ---------------------------------------------------------------------------
+-- 3) BORRADA — `Uni_x_Articulo_x_Caja` (447 filas)
+-- ---------------------------------------------------------------------------
+-- Primera de las tablas de UxB que se va, y se fue porque ya estaba sin uso:
+-- 0 vistas, 0 funciones, 0 referencias en el front. Lo único que la nombraba era
+-- `sql/hardening_seguridad_20260828.sql`, que le sacaba los permisos.
+-- Backup completo en public."GV_Backup_Uni_x_Articulo_x_Caja_20260912".
+--
+-- Rollback: `create table public."Uni_x_Articulo_x_Caja" as select * from
+-- public."GV_Backup_Uni_x_Articulo_x_Caja_20260912";`
+--
+-- ---------------------------------------------------------------------------
+-- LO QUE SIGUE
+-- ---------------------------------------------------------------------------
+-- Todavía NO se pueden borrar `Articulos_Cajas`, `OC_Maximos`, el maestro,
+-- `precios_venta`, `cob_uxb_lk` ni `proyeccion_madre`: además del UxB tienen otras
+-- columnas que se usan (descripción, marca, proveedor, máximos, proyección, precio).
+-- Lo que se puede ir sacando es la COLUMNA de UxB de cada una, cuando el fallback
+-- deje de tocarlas. Termómetro:
+--     select fuente, count(*) from public.vista_uxb_articulo group by 1;
+-- Cuando dé sólo `GV_UxB`, ninguna otra columna de UxB se está leyendo.
+-- ============================================================================
