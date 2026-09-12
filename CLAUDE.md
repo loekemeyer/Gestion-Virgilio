@@ -758,13 +758,23 @@ archivo con miles de líneas borradas no es un cambio, es un error.**
   (`project_id = hrxfctzncixxqmpfhskv`).
 - **Tabla central**: `Registros_Produccion_Virgilio` (log de eventos; `opcion` =
   código de acción, `texto` = código de tanda/pedido, `ts_inicio` no nulo = cierre).
-- **m³ SÍ están en Supabase** (desde v5.33): `PPP_Programacion_Diaria.m3`,
-  `PPP_Entregados_Meta.m3` (por NP) y la vista `vista_tanda_m3` — se calculan por
-  SQL desde el sandbox. El **origen upstream** sigue siendo el Google Sheet
-  "PPP Pedidos Entregados 2026" (col `Mt3`, NO col H ni "Mt3 FC"), espejado en UNA
-  vía: `PPP_Entregados_Meta` (np,cod,rs,tanda,m3,fecha_entrega) vía función Postgres
-  `sync_ppp_entregados_meta()` por cron (ver `sql/`). La tabla `PPP_Pedidos_Entregados`
-  (espejo duplicado vía Apps Script) se **borró en v10.25** — no citarla.
+- ⚠ **La hoja "PPP Pedidos Entregados 2026" YA NO EXISTE y `PPP_Entregados_Meta` NO SE USA MÁS.**
+  Dueño, 2026-09-12: *"la hoja PPP entregados ya dejó de existir, porque ya no se usa más esa
+  tabla, ya que fue el cambio fundamental entre el repositorio gestión Virgilio y producción
+  Virgilio"*. El cron que la llenaba (jobid 27 `sync-ppp-entregados-meta`) está en `active=false`
+  y la tabla quedó congelada el **2026-09-02**. **No citarla como fuente de nada, no proponer
+  reactivar el cron, y no volver a escribir acá que el Sheet es el upstream** — este párrafo decía
+  eso hasta la v16.44 y por leerlo se trató al espejo muerto como si estuviera vivo.
+  La tabla **se conserva sólo como historia** (2.783 filas hasta el 02/09); las vistas que la
+  nombran la usan de fallback histórico, nunca como fuente viva.
+- **De dónde salen los m³ HOY**: `PPP_Programacion_Diaria.m3` (ISIS) y `PPP_Web_Programacion.m3`
+  (web). La vista `vista_tanda_m3` las une con COALESCE en ese orden, más el histórico del espejo
+  para las tandas viejas (v16.44 — antes ignoraba la web y se comía 32 tandas / 20,71 m³).
+- **Quién está ENTREGADO hoy**: **Recepción Remitos** (`Registros_Produccion_Virgilio.opcion='CRN'`).
+  `gv_ppp_entregados_meta` devuelve el histórico del Sheet **más** los entregados vivos por remito,
+  con cod/razón social/tanda/m³ resueltos desde la programación viva y, si no está, desde
+  `Facturacion_NP` (v16.44). La columna `fuente` dice `hoja` o `remito`.
+  La tabla `PPP_Pedidos_Entregados` (espejo duplicado vía Apps Script) se **borró en v10.25** — no citarla.
 - **Zona horaria**: `America/Argentina/Buenos_Aires`, UTC-3 fijo.
 - **Versión**: `APP_VERSION` en `index.html` y `SW_VERSION` en `sw.js`.
 - Legajos `0` y `1` (Pruebas) son test/basura: excluir de reportes.

@@ -9942,6 +9942,10 @@ del Apps Script → se permiten filas repetidas, fiel a la hoja.
   entregado ahora sale de **`PPP_Entregados_Meta`** (`np`, `cod`, `rs`, `tanda`, `m3`,
   `fecha_entrega` — superconjunto), que se sincroniza sola cada 30 min por la función
   Postgres `sync_ppp_entregados_meta()` (col Mt3 — NO "Mt3 FC"). `vista_tanda_m3` ya la lee.
+  ⚠ **DESACTUALIZADO desde el 2026-09-12 (v16.44): la hoja ya no existe y esa tabla no se usa
+  más.** El cron 27 está apagado y `PPP_Entregados_Meta` quedó congelada el 02/09; se conserva
+  sólo como historia. Hoy el m³ sale de `PPP_Programacion_Diaria.m3` (ISIS) y
+  `PPP_Web_Programacion.m3` (web), y el entregado sale de Recepción Remitos (`opcion='CRN'`).
 - **`PPP_Base_Pedidos`** ← hoja "PPP Excel Base Datos Pedidos". Una fila por línea.
   Cols: `pedido`, `articulo`, `cajas` (numeric).
 
@@ -10726,6 +10730,13 @@ lo excluye de horas/productividad (guard `opcion==="LT"` en
 
 ## 7. De dónde salen los metros cúbicos (m³)
 
+> ⚠ **2026-09-12 (v16.44): la hoja "PPP Pedidos Entregados 2026" YA NO EXISTE y
+> `PPP_Entregados_Meta` NO SE USA MÁS** (dueño: fue el cambio fundamental de Producción
+> Virgilio a Gestión Virgilio). Cron 27 apagado, tabla congelada el 02/09, se conserva sólo
+> como historia. **Hoy: m³ de `PPP_Programacion_Diaria.m3` (ISIS) + `PPP_Web_Programacion.m3`
+> (web); entregado = Recepción Remitos (`opcion='CRN'`).** Lo que sigue abajo describe el
+> Sheet de origen y quedó como HISTORIA — no es el estado actual.
+>
 > **Los m³ SÍ están en Supabase** (desde v5.33, `PPP_SOURCE=supabase`):
 > `PPP_Programacion_Diaria.m3`, `PPP_Entregados_Meta.m3` (por NP) y la vista
 > `vista_tanda_m3` — **se calculan por SQL** desde el sandbox (§ 11). El **origen

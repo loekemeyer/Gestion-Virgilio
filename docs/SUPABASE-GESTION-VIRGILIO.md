@@ -9734,3 +9734,63 @@ que faltaba pedir desde el 06/09.
 
 Archivo: `sql/gv_demanda_web_en_stock_y_oc_v1643.sql`. Chequeo:
 `select * from public.gv_endpoints_rotos;` (vacía = todo bien).
+
+---
+
+### §3.ds — v16.44: se corta el espejo muerto; "entregado" pasa a salir de Recepción Remitos — 2026-09-12
+
+**Corrección del dueño:** *"la hoja PPP entregados ya dejó de existir, porque ya no se usa más esa
+tabla, ya que fue el cambio fundamental entre el repositorio gestión Virgilio y producción
+Virgilio"*.
+
+**Por qué se había tratado como viva.** El **Quick-ref del `CLAUDE.md` decía textualmente que el
+Sheet "PPP Pedidos Entregados 2026" *sigue siendo* el origen upstream**, y la `GUIA-PROYECTO.md` lo
+repetía en dos lugares en presente. La memoria del repo afirmaba lo contrario de la realidad, así
+que leerla llevaba al error. **Se corrigieron los tres textos en este mismo commit** — es la parte
+que evita que vuelva a pasar.
+
+**Estado real:** cron 27 `sync-ppp-entregados-meta` en `active=false`, `PPP_Entregados_Meta`
+congelada el **2026-09-02** con 2.783 filas. Pero seguía cableada en **16 objetos** y la app la
+leía en **6 lugares**, con daño visible:
+
+| Dónde | Qué se veía mal |
+|---|---|
+| Pantalla **Entregados** (`pppRefreshEntregadosFull`) | congelada en el 02/09 |
+| **Recepción Remitos** (`fetchEntregadosMeta`) | sin nombre de cliente para las NP posteriores |
+| `vista_tanda_m3` (Ocupación, `productividad.html`) | **32 tandas web / 20,71 m³ invisibles** |
+
+Lo último es el mismo agujero que la v16.43: la vista hacía `COALESCE(espejo, ISIS)` y **no miraba
+`PPP_Web_Programacion`**.
+
+**Qué se hizo.** En vez de tocar los 6 llamados del front, se arregló la vista que todos leen:
+
+1. **`gv_ppp_entregados_meta`** = histórico del Sheet **UNION** entregados **vivos** por Recepción
+   Remitos (`opcion='CRN'`), resolviendo `cod`/`rs`/`tanda`/`m3` desde la programación viva (ISIS
+   por `gv_ppp_programacion_diaria`, web por `PPP_Web_Programacion`) y, si la NP ya no está ahí,
+   desde `Facturacion_NP`. Columna nueva **`fuente`** = `hoja` | `remito`.
+   El fallback a `Facturacion_NP` no es decorativo: sin él, **58 de las 83** filas vivas salían sin
+   cliente ni m³, porque su NP ya no está en la programación del día.
+2. **`vista_tanda_m3`** suma `PPP_Web_Programacion` como tercera fuente del `COALESCE`.
+
+**Medición (antes → después):**
+
+| | antes | después |
+|---|---|---|
+| `gv_ppp_entregados_meta` | 2.783 | **2.866** (+83, todas con cod, rs, tanda y m³) |
+| `vista_tanda_m3` filas | 1.164 | **1.196** (+32 tandas web) |
+| `vista_tanda_m3` m³ | 1.020 | **1.041** (+20,71) |
+| `gv_clientes_habituales` | 615 | **629** |
+| `gv_ppp_entregados` | 426 | 426 *(sin cambio: ya era CRN)* |
+| `gv_ppp_en_salida` | 20 | 20 *(sin cambio)* |
+
+**La tabla NO se borra.** Queda como historia (2.783 filas hasta el 02/09) y es el primer término
+del `COALESCE` para las tandas viejas. Borrarla sería destructivo y no hace falta.
+
+**Lo que todavía queda cableado, medido.** `cerradas` de `vista_stock_procesada` usa la **tabla
+cruda**, no esta vista, así que este cambio no la toca. Se midió aparte que sacarla de `cerradas`
+mueve la demanda **1 caja** — la NP 98275 art 501, entregada el 31/07 y nunca facturada. O sea que
+ese cable también se puede cortar cuando se quiera, sin sorpresas.
+
+Archivo: `sql/gv_entregados_vivo_v1644.sql` (con el `CREATE` completo de las dos vistas; se verificó
+por `md5` que reproducen byte a byte lo que está vivo). Backup de las definiciones previas en
+`zz_backups."GV_Backup_defs_entmeta_20260912"`. Chequeo: `select * from public.gv_endpoints_rotos;`
