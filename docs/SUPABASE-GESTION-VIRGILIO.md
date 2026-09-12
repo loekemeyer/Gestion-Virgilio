@@ -9423,3 +9423,42 @@ rechazado por **6 vistas / 16 objetos** a serlo por **2**, y ninguna es de produ
 agujero que costó una filtración el 2026-09-04. No se arregló en bloque porque prender el invoker
 puede dejar una vista en 0 filas si la RLS de alguna tabla base no le da acceso a `anon`: va vista
 por vista, comprobando antes, como se hizo con `vista_ppp_pedidos_entregados`.
+
+---
+
+### §3.dm — v16.38: el UxB sale de UNA sola tabla, sin excepciones — 2026-09-12
+
+Dueño, textual: *"yo para las unidades por caja creo que solamente miren a una tabla Supabase,
+no es tan complejo"*. Tenía razón: en la v16.36 me quedé corto.
+
+Ahí saqué `precios_venta.uxb` y el shim `gv_uxb_lk` de las cadenas, pero **dejé dos eslabones
+por delante de `GV_UxB`** argumentando que eran "el UxB pactado por cliente y por súper".
+Mirando los datos, esa defensa no se sostenía:
+
+- **`pcl` = `GV_Precios_Cliente`**: la tabla tiene **4 filas**, de un solo cliente (2533), y
+  **una sola tiene `uxb`** — el código 198E con **12**, que es exactamente lo que dice `GV_UxB`.
+  Ese eslabón nunca aportó un valor distinto.
+- **`ps` = `cobranzas_precios_super`**: sus dos ramas ya iban a `GV_UxB` (`u` vía `gv_uxb_lk`,
+  `pv` vía `cobranzas_precios`, repuntada en la v16.36).
+
+Con eso, las tres cadenas quedaron en `uxe.uxb` a secas (`gv_uxb_emp`, que es `GV_UxB`).
+**0 filas de diferencia** en `vista_facturacion_neto_items` comparando fila a fila;
+$1.395.224.315,83 · anticipado $77.843.819,56 · plata perdida 902 filas.
+
+**Chequeo de que no quedó nada** — barrido sobre todas las vistas de `public`:
+
+```sql
+select n.nspname||'.'||c.relname
+  from pg_class c join pg_namespace n on n.oid = c.relnamespace
+ where n.nspname = 'public' and c.relkind in ('v','m')
+   and pg_get_viewdef(c.oid, true) ~
+       '(precios_venta\.uxb|precios_venta_chef\.uxb|pv\.uxb|pc\.uxb|pcl\.uxb|ux\.uxb|ps\.uxb)';
+```
+
+Devuelve sólo `cobranzas_precios_super`, cuyo `pv` es `cobranzas_precios` → `GV_UxB`.
+
+**De paso:** `gv_bkp_facneto_items_v1604` era una vista de BACKUP viviendo en `public`; no la lee
+nadie (0 vistas, 0 funciones, 0 apariciones en el front de los 4 repos) y se mudó a
+`zz_backups`. Con eso el `drop column uxb` de prueba pasó de ser rechazado por **6 vistas /
+16 objetos** a **2**, ninguna de producción: la de backup ya mudada y `gv_uxb_desalineado`.
+**La columna no se dropeó**: es irreversible y ya es inalcanzable desde todo camino vivo.
