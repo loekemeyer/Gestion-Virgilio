@@ -9126,16 +9126,30 @@ y otras partes: no son artículos) · `vista_importados_partes` 5 · facturació
 
 #### Lo que falta para poder DROPEAR las columnas
 
-Los lectores **directos**, que leen la columna sin pasar por los resolvedores:
+> ⚠ **Corrección.** La primera versión de esta tabla decía que `Articulos_Cajas.Uni_x_Caja`
+> no la leía nadie y estaba "lista para dropear". **Era falso:** sólo se habían mirado las
+> vistas de la base, no el front. Tiene **7 lectores** en el código —
+> `cervantes-admin/entero/Despiece x Articulo/app.js` y `app-inverso.js`, los mismos dos en
+> `cervantes-admin/gp2/`, sus originales en el repo `Gestion-Productiva-2.0`, y
+> `produccion-virgilio/index.html:29555`. Dropearla rompía el módulo de Despiece de Cervantes
+> y de GP2. **Ninguna columna se toca sin contar los lectores del front en los 4 repos.**
 
-| columna | quién la lee todavía |
-|---|---|
-| `Articulos_Cajas.Uni_x_Caja` | **nadie** → lista para dropear |
-| `OC_Maximos.uni_x_caja` | `vista_generador_oc`, `vista_stock_procesada` |
-| `proyeccion_madre.uxb` | `vista_generador_oc` |
-| maestro `.Uni_x_Caja` | `v_piezas_por_tallerista`, `vista_racks_bajadas_pendientes` |
-| `Importados.uni_x_caja` | `gv_importados_ordenes`, `vista_importados_partes` |
-| `precios_venta(.chef).uxb` | las vistas de valuación |
-| `Despiece x Articulo.Uni_x_Caja` | `v_piezas_por_tallerista` (y está mal cargada) |
+| columna | vistas de la base | lectores en el front | ¿se puede dropear? |
+|---|---|--:|---|
+| `Articulos_Cajas.Uni_x_Caja` | centinela + resolutoras (sólo grafías) | **7** | no |
+| `OC_Maximos.uni_x_caja` | `vista_generador_oc`, `vista_stock_procesada` | **13** | no |
+| maestro `.Uni_x_Caja` | `v_piezas_por_tallerista`, `vista_racks_bajadas_pendientes` | **10** | no |
+| `Despiece x Articulo.Uni_x_Caja` | `v_piezas_por_tallerista` | **7** | no (y está mal cargada) |
+| `precios_venta.uxb` | las vistas de valuación | **4** | no |
+| `proyeccion_madre.uxb` | `vista_generador_oc` | **0** | falta 1 vista |
+| `precios_venta_chef.uxb` | las vistas de valuación | **0** | faltan las vistas |
+| `Importados.uni_x_caja` | `gv_importados_ordenes`, `vista_importados_partes` | **0** | faltan 2 vistas |
+
+**Dónde quedó el objetivo.** *"Que sólo haya una"* está cumplido a nivel **fuente**: los tres
+resolvedores leen únicamente `GV_UxB` y ninguno depende ya del **valor** de otra columna — sólo
+de las grafías de código, que es otra cosa. Lo que no está es el borrado de las columnas: son
+**41 lugares del front** más 8 vistas los que todavía leen un `uni_x_caja` propio, y cada uno
+hay que migrarlo antes. Las tres más cercanas son `proyeccion_madre`, `precios_venta_chef` e
+`Importados`, que no tienen ningún lector en el front.
 
 Archivo: `sql/gv_uxb_fuente_unica_v1628.sql`.
