@@ -8483,3 +8483,107 @@ Los lectores a migrar (§3.cv):
 `sql/hardening_seguridad_20260828.sql`, que le saca los permisos.
 
 Archivo: `sql/gv_uxb_tabla_unica_v1614.sql`.
+
+## §3.cx — El listado de UxB cargado, las dos vistas migradas y la primera tabla borrada (v16.16) — 2026-09-12
+
+Thomas mandó los dos Excel del catálogo mayorista (Chef "Lista plana" 100 filas, Loekemeyer
+"Listado plano" 199) más dos correcciones por chat: *"832 discontinuo"* y *"824: 36"*.
+
+### 1) Carga — 300 filas en `GV_UxB`
+
+299 del listado, **ninguna sin UxB** y **ningún código repetido** dentro de su empresa. Datos crudos
+en `sql/data/gv_uxb_carga_20260912.sql`; las descripciones se completaron desde `Articulos_Cajas`
+(por marca) y `OC_Maximos`.
+
+Encima del listado:
+- **CH 824 "COLADOR 8 CM"** — el listado decía 12, el dueño corrigió a **36**.
+- **832 "COLADOR PINTADO N10"** → `Articulos_Discontinuados` (no está en el listado).
+- **CH 830 "COLADOR N° 20 CM"** → **24**. No venía en el listado pero cae bajo la regla del 12/09
+  ("Colador 20: 24"), y era el último conflicto vivo.
+
+⚠ **Dato importante: cero códigos tienen UxB distinto entre LK y CH.** Los 296 que están en las dos
+empresas coinciden. O sea que el UxB **no depende de la empresa**, y por eso se pudo migrar sin
+ambigüedad. La clave `(empresa, cod)` igual se mantiene: es lo que permite representar los 21
+códigos que son **dos productos distintos**, aunque casualmente compartan el UxB.
+
+**Cobertura: 274 de los 310 códigos activos** (con stock o pedidos abiertos) = **88 %**. Los 36 que
+faltan siguen resolviéndose por el fallback.
+
+### 2) Migración — `GV_UxB` es la primera prioridad de las dos vistas
+
+Se migraron **las vistas, no los consumidores**: así todos los módulos pasan a la fuente única de
+una vez y sin tocar el front. Son objetos compartidos (Producción los usa); definiciones anteriores
+en `public."GV_Backup_Viewdefs_20260912"`.
+
+```
+vista_uni_x_caja   -> GV_UxB -> maestro -> OC_Maximos -> proyeccion_madre
+vista_uxb_articulo -> GV_UxB -> Articulos_Cajas -> OC_Maximos -> precios_venta
+```
+
+Y de paso **se arregló el bug de la §3.cv**: los `DISTINCT ON` de `vista_uxb_articulo` ahora llevan
+desempate explícito en el `ORDER BY`. **Dejó de ser no determinista.**
+
+**Medido después de migrar:**
+
+| Vista | GV_UxB | resto |
+|---|---|---|
+| `vista_uni_x_caja` | **296** | maestro 67 · ocmax 23 · uxb 3 |
+| `vista_uxb_articulo` | **296** | articulos_cajas 171 · oc_maximos 10 · precios_venta 10 |
+
+Conflictos COMPRA vs FACTURA: de **33 → 1**, y el que queda es el **724**, que es discontinuo.
+`refresh materialized view concurrently vista_stock_procesada` OK (363 filas), centinela
+`gv_stock_cod_duplicado` en 0.
+
+**Lo que cambia de valor respecto de ayer** (todo por el listado del dueño):
+
+| | Era | Es |
+|---|---|---|
+| 231 / 232 / 233 Palos de amasar | 12 | **24** |
+| 712E Pelador Económico CH | 12 | **24** |
+| 730 / 731 Sacacorchos CH | 24 | **12** |
+| 824 Colador 8 cm CH | 12 | **36** |
+| 801 / 901 / 910 / 911 (los DISPLAY) | factura 36 | **12** |
+
+### 3) Borrada — `Uni_x_Articulo_x_Caja` (447 filas)
+
+Primera de las tablas de UxB que se va, y se fue **porque ya estaba sin uso**: 0 vistas,
+0 funciones, 0 referencias en el front. Lo único que la nombraba era
+`sql/hardening_seguridad_20260828.sql`, que le sacaba los permisos.
+
+Backup completo en `public."GV_Backup_Uni_x_Articulo_x_Caja_20260912"`.
+
+### Lo que sigue
+
+Todavía **no** se pueden borrar `Articulos_Cajas`, `OC_Maximos`, el maestro, `precios_venta`,
+`cob_uxb_lk` ni `proyeccion_madre`: además del UxB tienen otras columnas que se usan (descripción,
+marca, proveedor, máximos, proyección, precio). Lo que se puede ir sacando es **la columna de UxB**
+de cada una, cuando el fallback deje de tocarlas. Termómetro:
+
+```sql
+select fuente, count(*) from public.vista_uxb_articulo group by 1;
+```
+
+Cuando dé sólo `GV_UxB`, ninguna otra columna de UxB se está leyendo.
+
+Archivo: `sql/gv_uxb_carga_y_migracion_v1616.sql`.
+
+### §3.cx.1 — v16.17: la columna Estado, que la carga anterior se había comido
+
+Thomas: ***"revisaste los 2 excels que te pase?"***. Revisándolos en serio aparecieron dos cosas.
+
+**Las hojas están completas.** Comparación hoja contra hoja:
+
+| | plana | por familia | |
+|---|---|---|---|
+| Chef | 100 | 100 | idénticas |
+| Loeke | 199 | 204 | los 5 de más son subtítulos de subfamilia (Madera, Silicona, Nylon Premium, Inoxidable, Nylon), no códigos |
+
+Ningún código quedó afuera y ningún UxB difiere entre las dos hojas de un mismo archivo.
+
+**Pero se había perdido la columna `Estado`.** La v16.16 cargó código + UxB y descartó esa columna,
+que traía **85 filas con dato**: Nuevo 66 · Nuevo · Reingreso est. 29/09 7 · Liquidación 7 ·
+Sin stock 4 · Nuevo · Liquidación 1. Se agregó `GV_UxB.estado` y se cargó — verificado, 85 exactas.
+
+Los 7 con **"Reingreso est. 29/09"** (952E, 955E, 953E, 951E, 957E, 958E, 934E) **ya tenían**
+`Importados.reingreso_est = 2026-09-29`: el Excel y la base coinciden, no hubo nada que corregir.
+5 de los 7 están además en stock 0, que es justo cuando el portal de LK muestra el reingreso.

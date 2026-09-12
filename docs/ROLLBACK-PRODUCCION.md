@@ -772,6 +772,35 @@ select definicion from public."GV_Backup_Viewdefs_20260912"
 ```
 Notas: `sql/gv_trigger_stock_total_v1609.sql`.
 
+## v16.16 (2026-09-12) — `vista_uni_x_caja` y `vista_uxb_articulo` pasan a leer `GV_UxB`
+
+**Objetos compartidos tocados:** `public.vista_uni_x_caja` y `public.vista_uxb_articulo`
+(`create or replace`, mismas columnas y tipos). Las usan `vista_stock_procesada` (pantalla Stock),
+`vista_generador_oc` (Generar OCs), `vista_importados_partes` y el Excel de ISIS de Facturación —
+todo eso lo lee también Producción.
+
+**Qué cambia:** se les antepone `GV_UxB` (la tabla única de unidades por caja, cargada del listado
+mayorista que pasó Thomas el 12/09) como primera prioridad. El resto de la cascada queda igual, así
+que un código que no esté en el listado resuelve exactamente como antes. Además los `DISTINCT ON`
+de `vista_uxb_articulo` pasan a llevar desempate explícito: antes eran **no deterministas** y
+devolvían un valor distinto según la corrida.
+
+**Impacto medido:** 296 de los códigos pasan a resolver por `GV_UxB`; los conflictos entre la vista
+de compra y la de factura bajaron de **33 a 1** (el 724, discontinuo). Cambian de valor 10 códigos,
+todos por el listado del dueño: 231/232/233 (12→24), 712E (12→24), 730/731 (24→12), 824 (12→36) y
+los DISPLAY 801/901/910/911 (factura 36→12).
+
+**Rollback exacto:**
+```sql
+select definicion from public."GV_Backup_Viewdefs_20260912"
+ where objeto in ('public.vista_uni_x_caja','public.vista_uxb_articulo');
+-- ejecutar cada texto como create or replace view <objeto> as <definicion>
+```
+
+**Aparte, tabla borrada:** `public."Uni_x_Articulo_x_Caja"` (447 filas), que no la usaba nadie —
+ni Gestión ni Producción. Backup en `public."GV_Backup_Uni_x_Articulo_x_Caja_20260912"`; para
+volverla: `create table public."Uni_x_Articulo_x_Caja" as select * from public."GV_Backup_Uni_x_Articulo_x_Caja_20260912";`
+
 ## 2026-09-12 · v16.16 — `vista_saldos_stock` gana la columna `clave` (objeto COMPARTIDO)
 
 **Qué se cambió.** `create or replace view public.vista_saldos_stock` agregando **una columna
@@ -807,3 +836,4 @@ siete lecturas piden `clave` (`pkFetchExcedente`, `_pkConteoSistema`, `_stkGondo
 `stockFetchSaldos`, `_pppChkFetchSaldos`, y las dos de `recepcion.js`) y PostgREST devuelve
 **400** si la columna no existe. Los `try/catch` degradan a "sin datos" en vez de romper la
 pantalla, pero el stock se vería en 0.
+
