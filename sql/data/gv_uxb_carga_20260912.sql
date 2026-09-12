@@ -298,4 +298,12 @@ insert into public."GV_UxB" (empresa, cod, uxb, descripcion, origen) values
 ('LK','993E',12.0,'Pelador V Mgo Acacia','listado Thomas 12/09/2026'),
 ('LK','997E',12.0,'Rallador 3 En 1 Mgo Acacia','listado Thomas 12/09/2026'),
 ('LK','989E',12.0,'Rallador de Limón Mgo Acacia','listado Thomas 12/09/2026')
-on conflict (empresa, cod) do update set uxb = excluded.uxb, descripcion = excluded.descripcion, origen = excluded.origen, actualizado = now();
+on conflict (empresa, cod) do update set uxb = excluded.uxb, descripcion = excluded.descripcion, origen = excluded.origen, actualizado = now();update public."GV_UxB" g set estado = e.est, actualizado = now() from (values
+('CH','Liquidación',array['613','977']),
+('CH','Nuevo',array['702E','798E','712E','729E','725E','727E','809E','865E','437E','438E','890E']),
+('CH','Nuevo · Liquidación',array['690E']),
+('CH','Sin stock',array['618','619']),
+('LK','Liquidación',array['337','547','509','311','396']),
+('LK','Nuevo',array['598E','589E','599E','540E','536E','539E','538E','522E','440E','441','035E','404E','981E','982E','983E','984E','985E','980E','988E','954E','956E','935E','936E','937E','932E','931E','942E','943E','944E','945E','941E','946E','948E','601E','606E','056E','514E','969E','970E','971E','960E','590E','234','659','658','255','256','591','541E','582E','583E','584E','566E','071','070']),
+('LK','Nuevo · Reingreso est. 29/09',array['952E','955E','953E','951E','957E','958E','934E']),
+('LK','Sin stock',array['517','573'])) e(emp, est, cods) where g.empresa = e.emp and g.cod = any(e.cods);

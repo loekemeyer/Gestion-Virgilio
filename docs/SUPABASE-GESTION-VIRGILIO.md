@@ -8566,3 +8566,24 @@ select fuente, count(*) from public.vista_uxb_articulo group by 1;
 Cuando dé sólo `GV_UxB`, ninguna otra columna de UxB se está leyendo.
 
 Archivo: `sql/gv_uxb_carga_y_migracion_v1616.sql`.
+
+### §3.cx.1 — v16.17: la columna Estado, que la carga anterior se había comido
+
+Thomas: ***"revisaste los 2 excels que te pase?"***. Revisándolos en serio aparecieron dos cosas.
+
+**Las hojas están completas.** Comparación hoja contra hoja:
+
+| | plana | por familia | |
+|---|---|---|---|
+| Chef | 100 | 100 | idénticas |
+| Loeke | 199 | 204 | los 5 de más son subtítulos de subfamilia (Madera, Silicona, Nylon Premium, Inoxidable, Nylon), no códigos |
+
+Ningún código quedó afuera y ningún UxB difiere entre las dos hojas de un mismo archivo.
+
+**Pero se había perdido la columna `Estado`.** La v16.16 cargó código + UxB y descartó esa columna,
+que traía **85 filas con dato**: Nuevo 66 · Nuevo · Reingreso est. 29/09 7 · Liquidación 7 ·
+Sin stock 4 · Nuevo · Liquidación 1. Se agregó `GV_UxB.estado` y se cargó — verificado, 85 exactas.
+
+Los 7 con **"Reingreso est. 29/09"** (952E, 955E, 953E, 951E, 957E, 958E, 934E) **ya tenían**
+`Importados.reingreso_est = 2026-09-29`: el Excel y la base coinciden, no hubo nada que corregir.
+5 de los 7 están además en stock 0, que es justo cuando el portal de LK muestra el reingreso.
