@@ -8289,3 +8289,54 @@ select * from public.gv_geo_incoherente;   -- 0 filas = todo bien
 Lista las direcciones cuyo **barrio es del AMBA** y cuya **coordenada no**. Al 12/09 da **0**.
 
 Archivo: `sql/gv_limpieza_duplicados_v1610.sql`.
+
+## §3.cu — Las unidades por caja de los coladores, unificadas (v16.11) — 2026-09-12
+
+Primera bajada del problema 69 (`uni_x_caja` en 8 tablas con dos vistas resolutoras que se
+contradicen). Thomas, 12/09: ***"Colador 8cm: 36 · Colador 10: 24 · Colador 16: 24 · Colador 20: 24"***.
+
+**4 filas corregidas** (backup en `public."GV_UxC_bkp_20260912"`):
+
+| Tabla | Cód | Descripción | Era | Es |
+|---|---|---|---|---|
+| `Articulos_Cajas` | 112 | Ø 16 Env. Loke | 12 | **24** |
+| `Articulos_Cajas` | 113 | Colador N°20 Loke | 12 | **24** |
+| `Articulos_Cajas` | 828 | COLADOR 16 CM | 36 | **24** |
+| `OC_Maximos` | 030 | Ø 20 Env. | 12 | **24** |
+
+Los **13 códigos** de colador 8/10/16/20 (26, 110, 27, 111, 825, 29, 112, 437E, 828, 30, 113, 438E,
+830) ahora dan **lo mismo en las cuatro fuentes**: `Articulos_Cajas`, `OC_Maximos`,
+`vista_uni_x_caja` (la que manda para **comprar**) y `vista_uxb_articulo` (la que manda para
+**facturar**). El único que sigue distinto es el 026, y por otro motivo (abajo).
+
+### Lo que NO se tocó, a propósito
+
+- **043** — en `OC_Maximos` y en el maestro **no es un colador**: es "Tres En Uno" /
+  "Abrelatas Uña 3 En 1" a 12. La fila "COLADOR 10 CM" a 24 existe **sólo** en `Articulos_Cajas`.
+  Es un choque de códigos, no un uxc mal cargado.
+- **824 "COLADOR 8 CM"** — dice **12 en las cuatro tablas**, sin contradicción. Por la regla del
+  dueño tendría que ser 36, pero es un código 8xx (Chef) y puede ser otro empaque. No se cambia un
+  valor consistente por inferencia.
+- **832 "COLADOR PINTADO N10"** a 36 — mismo caso (la regla diría 24).
+
+### Lo que esto destapó: `Articulos_Cajas` tiene el mismo código dos veces
+
+**21 códigos con más de una fila, 18 con `Uni_x_Caja` distinto.** Y en varios no es un error de
+carga: son **dos productos bajo el mismo número, uno por empresa**. El testigo:
+
+```
+026  LK  "COLADOR N°8"                    36
+026  CH  "PINZA DE FIDEOS AC INOX VERDE"  12
+```
+
+`vista_uxb_articulo` **no mira la empresa** y se queda con 12, así que el Excel de ISIS del colador
+026 sale con 12 unidades por caja. Eso no se arregla cambiando un número: o la vista distingue
+empresa, o son códigos distintos. **Decisión del dueño.**
+
+```sql
+select regexp_replace(upper(btrim("Cod_Art")),'^0+(?=.)','') cod, count(*) filas,
+       string_agg("Marca" || ' ' || "Descripcion" || ' = ' || "Uni_x_Caja", ' | ')
+  from public."Articulos_Cajas" group by 1 having count(distinct "Uni_x_Caja") > 1;
+```
+
+Archivo: `sql/gv_uxc_coladores_v1611.sql`.
