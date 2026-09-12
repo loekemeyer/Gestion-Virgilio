@@ -8911,6 +8911,22 @@ suite local es más permisiva que la de GitHub. De los 152 tests, **60 no interc
 (muchos no hacen fetch, pero la superficie está). Mientras eso siga así, un `EXIT=0` local no
 garantiza un CI verde: **hay que mirar el run de GitHub después de cada push.**
 
+**Resultado: con ese arreglo alcanzó.** Los cuatro runs siguientes —532 (v16.24), 533 (v16.25),
+534 (v16.26) y 535 (v16.27)— terminaron **verdes**, todos en ~2 min 45 s. Main salió de 15
+corridas rojas seguidas.
+
+> ⚠ **Corrección de lo que se escribió en la v16.25.** Mientras el run 532 corría, la API de
+> GitHub me devolvía su estado `in_progress` ya desactualizado, y lo leí como que el job llevaba
+> 19 minutos colgado. **No era cierto:** ese run había terminado en 2 min 42 s y en verde. La
+> conclusión que saqué —"hay otro test que se cuelga esperando red"— era falsa, y el commit de
+> la v16.25 la da por buena. No hay ningún test colgado.
+>
+> El `timeout-minutes: 15` y el `concurrency` que agregó esa versión **se quedan igual**: valen
+> por sí solos (un job sin límite puede tomarse 6 horas sin publicar el log, y las corridas de
+> commits ya superados no deberían pelear por el runner). Lo que no vale es la anécdota con la
+> que se justificaron. Y la lección de fondo es otra: **el estado de un run en curso leído por
+> API no es confiable — hay que esperar a `completed` antes de sacar conclusiones.**
+
 Archivo: `tests/comp-terminar-unificado.cjs`.
 
 ### §3.dd — v16.26: el módulo de Importados estaba CAÍDO, y el inventario de tablas — 2026-09-12
