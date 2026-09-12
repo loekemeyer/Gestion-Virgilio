@@ -395,3 +395,28 @@ cerraba igual: el suelto es un pedido aparte, no entra en el PI.
 
 SQL y rollback: `sql/gv_imp_323es_fob_v1600.sql`. Backups `GV_Importados_bkp_323ES_20260912` y
 `GV_Baches_bkp_323ES_20260912`.
+
+## 9. El giro de 3.000 de Hugo Wong (v16.01, 12/09/2026)
+
+Dueño, 12/09: ***"el giro de 3000usd mas reciente ... 2400usd fue para el pedido de barco y 600
+para el pedido de 323ES"***. **No estaba cargado** — y tampoco está en el extracto de NTL, que
+termina el **04/09/2026** (fila 184). O es posterior al Excel que mandó, o salió por fuera de NTL.
+Se cargó como dos giros, uno por pedido.
+
+| Pedido | FOB | Pagado | Pend. giro directo | Falta |
+|---|---|---|---|---|
+| `323ES suelto` | 600 | **600** (el giro nuevo) | — | **0** |
+| `PI NY26-031438` | 38.640 | **16.441** (14.041 + 2.400) | 21.952 | **247** |
+
+Los 600 **cierran exacto** el 323ES suelto una vez puesto el FOB de 0,20 (§8): 3.000 u × 0,20 = 600.
+Eso confirma el precio del suelto por partida doble.
+
+**Criterio tomado** (queda marcado porque se puede leer de dos maneras): los 2.400 se **suman a
+"pagado" y no se descuentan del "pend. giro directo"** — es el cambio más chico y reversible. Si
+esos 2.400 salían de los 21.952 que estaban pendientes de girar derecho, hay que bajar el pend. giro
+directo a **19.552** y la falta vuelve a **2.647**.
+
+**Y falta la fecha**: quedó en 12/09 como provisoria. Se corrige desde 🚢 En curso → 💵 Plata →
+💵 Giros.
+
+SQL y rollback: `sql/gv_imp_hugo_giro3000_v1601.sql`. Backup `GV_Imp_Pagos_bkp_20260912`.
