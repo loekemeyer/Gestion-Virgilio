@@ -8068,3 +8068,34 @@ Backup y restore exacto en `sql/backups/gv_precios_cliente_osa_20260912_pre_list
 sigue sin mirar `GV_Precios_Cliente` — para ella 102E, 103 y 106E de esa NP siguen *sin precio*,
 y al 198E ahora le pone **$1.110**, la lista general de LK, que para Osa es el precio equivocado.
 Es el problema **63** de `github_repo_problemas`, abierto.
+
+## §3.cq — Facturación y Conciliación ya no tienen dos precios distintos (v16.06) — 2026-09-12
+
+Había **dos cascadas de precio** conviviendo: la pantalla de Facturación valoriza con
+`vista_facturacion_neto_items` (vía `facturacion_neto_lote` / `_detalle`) y Conciliación con
+`gv_vista_facturacion_neto_items`. La `gv_` **no miraba `GV_Precios_Cliente` ni el precio de la
+última factura**, así que marcaba *sin precio* **391 líneas que la otra sí valoriza**: Cencosud
+254, Aimetta (2460) 59, South Naz (2714) 41, Dorinka 22 y Osa 3.
+
+**Ahora la `gv_` es un pasamanos de la otra** (mismas 15 columnas, mismos tipos, mismo orden,
+verificado antes de reemplazar). `gv_vista_facturacion_neto` agrega sobre ella y hereda el
+cambio solo. La definición vieja quedó como vista `gv_bkp_facneto_items_v1604`.
+
+**Medido:**
+
+| | NP | neto total | items sin precio |
+|---|---|---|---|
+| antes | 903 | $1.245.479.863 | **391** (46 NP) |
+| después | 903 | $1.360.979.779 | **0** |
+
+Los +$115,5 M son la plata de esas 391 líneas, que Conciliación contaba como cero; **el total de
+la pantalla de Facturación no cambió** porque ya las valorizaba. `gv_conciliacion_totales()`
+sigue dando 59 ok / 7 diff / 1 sin factura.
+
+⚠ **Corrección de lo que se dijo el 12/09 en el chat:** el "391 líneas sin precio" era de la
+vista de Conciliación, **no** de la de Facturación, que tiene **0**. Las 6 NP de Cencosud ya
+estaban valorizadas ($16,84 M en total) — lo que les falta es la tanda y la fecha (§3.cp y
+problema 58), no el precio. Lo de **Cencosud y Dorinka sin lista propia cargada** (problema 62)
+sigue en pie: sus precios salen hoy del último facturado, no de una lista.
+
+SQL y rollback: `sql/gv_facneto_items_una_verdad_v1606.sql`. Problema **63**, cerrado.
