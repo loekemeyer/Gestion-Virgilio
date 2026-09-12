@@ -7816,7 +7816,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v16.07";
+const APP_VERSION = "v16.08";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -13758,7 +13758,8 @@ function _ocgAutoEnTxt() { const n = _ocgNextAuto(); return "se genera automáti
 let _ocgCdTimer = null;
 function ocgStartCountdown() { if (_ocgCdTimer) return; _ocgCdTimer = setInterval(function () { const el = document.getElementById("ocgCountdown"); if (!el) { clearInterval(_ocgCdTimer); _ocgCdTimer = null; return; } el.textContent = _ocgAutoEnTxt(); }, 30000); }
 /* v9.12 — OC de IMPORTADOS (circuito propio, aparte del generador nacional). Lee la vista
-   `gv_importados_ordenes` (motor de importados: stock en UNIDADES sacado del DEPÓSITO REAL, proyección madre
+   `gv_importados_ordenes` (motor de importados: stock en UNIDADES = depósito real EN VIVO menos lo ya
+   pedido (piso 0), proyección madre
    en unidades/mes y meses objetivo = 10 de Importados_Config). Agrega por cod_art sumando las
    marcas/plantas (principal=true), y calcula lo a pedir en unidades y en cajas (÷ uni_x_caja).
    Se muestra como sección dentro de "Generar OCs", agrupado por PROVEEDOR CHINO. La fórmula fina
@@ -13769,7 +13770,7 @@ async function ocgFetchImportados() {
   try {
     // v15.27 — stock_total = stock del módulo + depósito insumos (gv_importados_stock_insumos: partes y
     // reenvasados, convertido con Insumos_Factores); para una PARTE el insumo REEMPLAZA al seed del Excel.
-    rows = await supaFetchAllSafe(SUPABASE_IMPORTADOS_OC_ENDPOINT, "select=id,cod_art,marca,proveedor,descripcion,uni_x_caja,fob_uni,est_madre_eff,meses_objetivo,stock_actual,stock_cajas,stock_insumos,stock_total,pedido_curso,principal,activo&principal=eq.true&activo=eq.true");
+    rows = await supaFetchAllSafe(SUPABASE_IMPORTADOS_OC_ENDPOINT, "select=id,cod_art,marca,proveedor,descripcion,uni_x_caja,fob_uni,est_madre_eff,meses_objetivo,stock_actual,stock_cajas,stock_cajas_bruto,cajas_pedidas,unidades_pedidas,stock_insumos,stock_total,pedido_curso,principal,activo&principal=eq.true&activo=eq.true");
   } catch (_e) { return { items: [], meses: 10 }; }
   // v10.38 — alias de códigos que se piden JUNTOS (misma master caja / mismo pedido al chino):
   // 865ED se suma dentro de 865E (pedido del usuario). Agregar acá futuros pares si hacen falta.
@@ -13787,12 +13788,13 @@ async function ocgFetchImportados() {
     const codRaw = String(r.cod_art || "").trim(); if (!codRaw) return;
     const cod = IMP_ALIAS[codRaw.toUpperCase()] || codRaw;   // canónico (865ED → 865E)
     const k = cod.toUpperCase();
-    if (!by[k]) by[k] = { cod: cod, desc: r.descripcion || "", prov: String(r.proveedor || "").trim() || "(sin proveedor)", uxc: 0, fob: 0, proyUni: 0, stockUni: 0, stockIns: 0, enCurso: 0, det: [] };
+    if (!by[k]) by[k] = { cod: cod, desc: r.descripcion || "", prov: String(r.proveedor || "").trim() || "(sin proveedor)", uxc: 0, fob: 0, proyUni: 0, stockUni: 0, stockIns: 0, uniPed: 0, enCurso: 0, det: [] };
     const o = by[k];
     if (codRaw.toUpperCase() === k && r.descripcion) o.desc = r.descripcion;   // la fila canónica manda la descripción
     o.proyUni += Number(r.est_madre_eff) || 0;
     o.stockUni += (r.stock_total != null) ? (Number(r.stock_total) || 0) : (Number(r.stock_actual) || 0);   // v15.27: incluye insumos
     o.stockIns += Number(r.stock_insumos) || 0;
+    o.uniPed += Number(r.unidades_pedidas) || 0;   // v16.08 — lo ya pedido, que YA está descontado del stock
     o.enCurso += Number(r.pedido_curso) || 0;
     const fb = Number(r.fob_uni) || 0; if (fb > 0 && !o.fob) o.fob = fb;   // v10.06 — FOB USD/unidad (del maestro Importados)
     // filas subyacentes (por marca/planta) para poder editar "en curso" y marcar llegada por Importados.id
@@ -13863,7 +13865,7 @@ async function ocgFetchImportados() {
     // v10.06 — cotización USD = unidades a pedir × FOB unitario (por ítem; el total se suma en el render)
     const fobUni = o.fob || 0;
     const usdTotal = (fobUni > 0) ? (aPedirUni * fobUni) : 0;
-    items.push({ cod: o.cod, desc: o.desc, prov: o.prov, proyUni: Math.round(proyUni), meses: meses, objetivoUni: objetivoUni, stockUni: Math.round(stockTot), stockPropio: Math.round(o.stockUni), stockParteU: Math.round(stockParteU), stockParteCods: (sp ? sp.partes : ""), stockTermU: Math.round(stockTermU), stockInsU: Math.round(o.stockIns), enCurso: Math.round(o.enCurso), aPedirUni: aPedirUni, uxc: o.uxc, uniMaster: uniMaster, cajasEsMaster: cajasEsMaster, aPedirCajas: aPedirCajas, fobUni: fobUni, usdTotal: usdTotal, m3Master: m3Master, m3Dims: vm ? { l: vm.l, a: vm.a, h: vm.h } : null, m3Total: m3Total, esParte: esParte, parteDet: (pp ? pp.detalle : null), reingresoEst: (reingresoEst[kk] || ""), det: o.det || [] });
+    items.push({ cod: o.cod, desc: o.desc, prov: o.prov, proyUni: Math.round(proyUni), meses: meses, objetivoUni: objetivoUni, stockUni: Math.round(stockTot), stockPropio: Math.round(o.stockUni), stockParteU: Math.round(stockParteU), stockParteCods: (sp ? sp.partes : ""), stockTermU: Math.round(stockTermU), stockInsU: Math.round(o.stockIns), uniPedidas: Math.round(o.uniPed), enCurso: Math.round(o.enCurso), aPedirUni: aPedirUni, uxc: o.uxc, uniMaster: uniMaster, cajasEsMaster: cajasEsMaster, aPedirCajas: aPedirCajas, fobUni: fobUni, usdTotal: usdTotal, m3Master: m3Master, m3Dims: vm ? { l: vm.l, a: vm.a, h: vm.h } : null, m3Total: m3Total, esParte: esParte, parteDet: (pp ? pp.detalle : null), reingresoEst: (reingresoEst[kk] || ""), det: o.det || [] });
   });
   return { items: items, meses: meses };
 }
@@ -17167,7 +17169,7 @@ function _pedImpRender() {
     // las 14 columnas se pisaban entre sí. Bloque diagnóstico (proy→a pedir) | bloque pedido (MC→m³).
     h += '<div class="mva-tblwrap wide"><table class="mva-tbl wide">' +
       '<colgroup><col style="width:104px"><col><col style="width:68px"><col style="width:78px"><col style="width:96px"><col style="width:68px"><col style="width:72px"><col style="width:98px"><col style="width:98px"><col style="width:80px"><col style="width:78px"><col style="width:92px"><col style="width:58px"><col style="width:120px"><col style="width:96px"></colgroup>' +
-      '<thead><tr><th>Código</th><th>Descripción</th><th class="num">Proy u/mes</th><th class="num">Objetivo</th><th class="num">Stock</th><th class="num">En curso</th><th class="num">A pedir u</th><th class="num" title="Unidades por master caja (del Excel de quiebres / Importados_Volumen).">uni/master</th><th class="num" title="Master cajas a pedir (editable). Poné 0 para no pedir. Vacío = vuelve al calculado.">MC pedido</th><th class="num" title="Unidades = MC × uni/master (master cajas redondas)">Unidades</th><th class="num" title="FOB unitario (USD)">FOB u$s/u</th><th class="num" title="u$s = unidades × FOB">u$s</th><th class="num" title="m³ = MC × m³/master">m³</th><th class="num" title="Fecha estimada de reingreso del importado. Se muestra en el portal LK (Reingreso Est dd/mm) cuando el artículo está sin stock. Vacío = no se muestra.">Reingreso</th><th>Acciones</th></tr></thead><tbody>';
+      '<thead><tr><th>Código</th><th>Descripción</th><th class="num">Proy u/mes</th><th class="num">Objetivo</th><th class="num" title="Stock de hoy EN VIVO del depósito (los mismos depósitos que la pantalla de Stock) MENOS los pedidos abiertos, más el depósito insumos. Nunca negativo: si hay más pedidos que stock, muestra 0.">Stock</th><th class="num">En curso</th><th class="num">A pedir u</th><th class="num" title="Unidades por master caja (del Excel de quiebres / Importados_Volumen).">uni/master</th><th class="num" title="Master cajas a pedir (editable). Poné 0 para no pedir. Vacío = vuelve al calculado.">MC pedido</th><th class="num" title="Unidades = MC × uni/master (master cajas redondas)">Unidades</th><th class="num" title="FOB unitario (USD)">FOB u$s/u</th><th class="num" title="u$s = unidades × FOB">u$s</th><th class="num" title="m³ = MC × m³/master">m³</th><th class="num" title="Fecha estimada de reingreso del importado. Se muestra en el portal LK (Reingreso Est dd/mm) cuando el artículo está sin stock. Vacío = no se muestra.">Reingreso</th><th>Acciones</th></tr></thead><tbody>';
     arr.sort(function (a, b) { return _pedImpUniOf(b) - _pedImpUniOf(a) || (b.aPedirUni - a.aPedirUni); }).forEach(function (it) {
       const badge = it.esParte ? ' <span style="color:#7c3aed" title="Parte">🧩</span>' : '';
       const _stkShow = Math.max(0, Number(it.stockUni) || 0);
@@ -17182,6 +17184,8 @@ function _pedImpRender() {
       }
       // v15.27 — depósito insumos (parte suelta o importado sin reenvasar), convertido a unidades
       if (it.stockInsU > 0) stockTxt += ' <span style="color:#0369a1;font-weight:700;font-size:11px" title="Incluye ' + it.stockInsU + ' u del depósito insumos (Movimientos_Stock, convertido con Insumos_Factores). En una parte, este stock reemplaza al seed del Excel.">🧰' + it.stockInsU + '</span>';
+      // v16.08 — lo que se muestra ya es el DISPONIBLE: stock de hoy menos lo pedido, con piso en 0.
+      if (it.uniPedidas > 0) stockTxt += ' <span style="color:#b45309;font-weight:700;font-size:11px" title="Ya descontadas ' + it.uniPedidas + ' u de pedidos abiertos. Si los pedidos superan al stock, esta columna muestra 0, no un negativo.">📋−' + it.uniPedidas + '</span>';
       const _codEncV = encodeURIComponent(it.cod);
       const actHtml = (it.det || []).map(function (d) {
         const multi = (it.det || []).length > 1;

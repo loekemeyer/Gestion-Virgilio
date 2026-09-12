@@ -8036,7 +8036,7 @@ pide además `stock_cajas`. Nada más cambió: las columnas son las mismas.
 **Rollback:** devolver ese endpoint a `v_importados_ordenes`. SQL y detalle en
 `sql/gv_importados_stock_real_v1604.sql`; anotado también en `docs/ROLLBACK-PRODUCCION.md`.
 
-## §3.cf.1 — Osa: lo pactado era el NETO, no la lista (v16.05) — 2026-09-12
+## §3.cf.1 — Osa: lo pactado era el NETO, no la lista (v16.08) — 2026-09-12
 
 **Corrección de Thomas (12/09):** *"Osa, los precios, eso es lo que él paga considerando su
 dieciséis de descuento y el dos de descuento. En función de eso se calcula el precio de lista
@@ -8099,3 +8099,71 @@ problema 58), no el precio. Lo de **Cencosud y Dorinka sin lista propia cargada*
 sigue en pie: sus precios salen hoy del último facturado, no de una lista.
 
 SQL y rollback: `sql/gv_facneto_items_una_verdad_v1606.sql`. Problema **63**, cerrado.
+## §3.cr — La pantalla de Stock estuvo CONGELADA 10 h, y el stock de importados pasa a ser "lo que hay menos lo pedido" (v16.08) — 2026-09-12
+
+Dos cosas, y la primera apareció buscando la segunda.
+
+### A) El refresh de `vista_stock_procesada` fallaba hace 10 horas
+
+Yendo a buscar los "pedidos" para restarlos, `vista_stock_procesada` decía que el 584E tenía
+**19 cajas** (terminado 15 + a facturar 4) cuando en vivo eran **15** (terminado 15, a facturar 0).
+`vista_stock_procesada` es una **MATERIALIZED VIEW** y el cron 55 la refresca cada 2 minutos.
+Estaba **fallando desde el 11/09 14:44 ART** — 60 fallas seguidas en las últimas 2 h:
+
+```
+ERROR: duplicate key value violates unique constraint "idx_vista_stock_procesada_cod"
+DETAIL: Key (cod)=(547) already exists.
+```
+
+Como `REFRESH ... CONCURRENTLY` no podía escribir, la materializada se quedó con el snapshot de
+las 14:44 y **la pantalla de Stock mostró números de 10 horas atrás con los operarios pickeando**.
+
+**La causa** estaba en `vista_saldos_stock`: agrupaba por `(ckey, empresa)` pero el `cod_art` de
+salida sólo llevaba el sufijo de empresa **si el código está en `codigos_duales`**. Un código no
+dual con movimientos estampados `'LK'`/`'CH'` y otros `'Mixto'` salía **dos veces con el mismo
+`cod_art`**. Al 12/09 eran **~280 códigos** (547, 584E, 598E, 522E, 809, 890E…). Probablemente se
+destapó cuando la v14.75 hizo que 6 writers pasaran `empresa` explícita.
+
+**El arreglo:** la clave de salida se calcula por fila y se agrupa por ella
+(`create or replace`, mismas columnas y tipos). Los duales no cambian; los no duales se funden en
+una fila y `empresa` queda `'Mixto'` si venían mezclados. El front ya acumulaba las repetidas
+desde la v15.71.
+
+**Medido:** 781 filas → **488**, duplicados **0**, total de cajas **idéntico** (48.197,00). El
+refresh volvió a correr (363 filas) y el cron 55 se recuperó solo. Backup de la definición vieja
+en `public."GV_Backup_Viewdefs_20260912"`; rollback en `docs/ROLLBACK-PRODUCCION.md`.
+
+⚠ **Regla que deja:** el índice único de `vista_stock_procesada` es lo único que avisa de esto, y
+avisa **rompiendo el refresh en silencio**. Chequeo que tiene que dar 0:
+
+```sql
+select cod_art, count(*) from public.vista_saldos_stock group by 1 having count(*) > 1;
+```
+
+### B) El stock de importados = lo que HAY menos lo que YA ESTÁ PEDIDO, piso 0
+
+Thomas, 12/09: ***"en importados tiene que mirar stock hoy (en vivo) - pedidos (si hay mas
+pedidos que stock, que diga 0)"***. Es la misma cuenta que él hacía a mano el 11/09 mirando el
+584E: *"en stock veo 10 cajas (19-9 pedidas)"*.
+
+`gv_importados_stock_dep` ahora trae las dos patas separadas (`cajas_bruto` y `cajas_pedidas`) y
+**la resta la hace `gv_importados_ordenes` DESPUÉS de sumar las empresas que le tocan a la fila**.
+Restar por empresa estaría mal: un pedido cargado sin empresa contra un stock estampado `LK` se
+perdería en el piso de 0.
+
+`cajas_pedidas` sale de `vista_stock_procesada.cajas_pedidas`, la misma cuenta que muestra la
+pantalla de Stock (PPP_Base_Pedidos menos las NP cerradas por `Facturacion_NP` /
+`PPP_Entregados_Meta` / `NP_Canceladas`).
+
+Columnas nuevas de `gv_importados_ordenes`: **`stock_cajas_bruto`**, **`cajas_pedidas`**,
+**`unidades_pedidas`**. `stock_cajas` pasa a ser el **disponible**.
+
+**Medido (154 filas `principal and activo`):** 72 códigos con pedidos abiertos, **17 tocan el piso
+de 0**. 18.173 cajas brutas − 1.351 pedidas = **17.130 disponibles**. Testigo: 584E → 15 en el
+depósito, 5 pedidas, **10 disponibles** (60 u).
+
+**Front:** la columna **Stock** ya muestra el disponible, con un chip **`📋−N`** que dice cuántas
+unidades se descontaron, y el `title` de la cabecera aclara que nunca es negativo. Test
+`tests/imp-stock-real.cjs`.
+
+Archivo: `sql/gv_stock_vivo_menos_pedidos_v1608.sql`.

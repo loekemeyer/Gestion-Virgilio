@@ -9,6 +9,9 @@
    `v_importados_ordenes` NO se puede seguir usando acá: la lee Producción Virgilio y
    por eso quedó intacta. Si alguien devuelve el endpoint, este test se pone rojo.
 
+   v16.08 — además el stock que llega ya viene NETO de los pedidos abiertos (con piso en 0)
+   y el front no lo recalcula: sólo muestra el chip 📋− con lo que se descontó.
+
    Chequea, sin red (se intercepta el fetch):
    - `ocgFetchImportados()` pega contra `gv_importados_ordenes`, no contra `v_importados_ordenes`;
    - el `select` pide `stock_cajas` (la columna nueva) además de `stock_total`;
@@ -34,7 +37,8 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
       if (s.indexOf("importados_ordenes") >= 0) {
         body = [{ id: 1, cod_art: "598E", marca: "LK", proveedor: "Hugo Wong", descripcion: "Pelador Negro Dentado",
                   uni_x_caja: 12, fob_uni: 0.3, est_madre_eff: 1200, meses_objetivo: 10,
-                  stock_actual: 21048, stock_cajas: 1754, stock_insumos: 0, stock_total: 21048,
+                  stock_actual: 20196, stock_cajas: 1683, stock_cajas_bruto: 1754, cajas_pedidas: 71,
+                  unidades_pedidas: 852, stock_insumos: 0, stock_total: 20196,
                   pedido_curso: 0, principal: true, activo: true }];
       }
       // supaFetchAll pagina con Range y lee content-range: sin `headers` el fetch falsa
@@ -54,7 +58,9 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
       vistaVieja: u.indexOf("/rest/v1/v_importados_ordenes") >= 0,
       pideStockCajas: u.indexOf("stock_cajas") >= 0,
       pideStockTotal: u.indexOf("stock_total") >= 0,
-      stockMostrado: it ? it.stockUni : null
+      pidePedidas: u.indexOf("unidades_pedidas") >= 0,
+      stockMostrado: it ? it.stockUni : null,
+      pedidasEnItem: it ? it.uniPedidas : null
     };
   });
 
@@ -65,7 +71,9 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
   ok(!r.vistaVieja, "NO pega contra v_importados_ordenes (es la que usa Producción)");
   ok(r.pideStockCajas, "el select pide stock_cajas");
   ok(r.pideStockTotal, "el select sigue pidiendo stock_total");
-  ok(r.stockMostrado === 21048, "el stock de la vista es el que se muestra (21048, dio " + r.stockMostrado + ")");
+  ok(r.pidePedidas, "el select pide unidades_pedidas (lo ya pedido, que la vista ya descontó)");
+  ok(r.stockMostrado === 20196, "el stock de la vista (ya neto de pedidos) es el que se muestra (20196, dio " + r.stockMostrado + ")");
+  ok(r.pedidasEnItem === 852, "las unidades pedidas llegan al item para el chip 📋− (852, dio " + r.pedidasEnItem + ")");
   ok(errs.length === 0, "sin errores de página" + (errs.length ? ": " + errs[0] : ""));
   console.log("  detalle: " + JSON.stringify(r));
   if (fallas.length) { console.log("imp-stock-real: " + fallas.length + " FALLA(S)"); process.exit(1); }

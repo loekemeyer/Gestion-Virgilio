@@ -1,0 +1,65 @@
+-- ============================================================================
+-- v16.08 (2026-09-12) — DOS cosas, y la primera es un incendio:
+--
+--   A) La pantalla de Stock estaba CONGELADA hace 10 horas.
+--      El cron 55 (`REFRESH MATERIALIZED VIEW CONCURRENTLY vista_stock_procesada`,
+--      cada 2 min) venía fallando desde el 11/09 14:44 ART con:
+--        duplicate key value violates unique constraint "idx_vista_stock_procesada_cod"
+--        DETAIL: Key (cod)=(547) already exists.
+--      Causa: `vista_saldos_stock` agrupaba por (ckey, EMPRESA) pero sólo ponía el
+--      sufijo de empresa en el cod_art cuando el código está en `codigos_duales`.
+--      Un código que NO es dual pero tiene movimientos estampados 'LK'/'CH' Y otros
+--      'Mixto' salía DOS VECES con el MISMO cod_art. Al 12/09 eran ~280 códigos.
+--      Como CONCURRENTLY no podía escribir, la materializada se quedó con el
+--      snapshot de las 14:44 y los operarios pickeaban contra stock de 10 h atrás.
+--
+--   B) Dueño, 12/09: "en importados tiene que mirar stock hoy (en vivo) - pedidos
+--      (si hay mas pedidos que stock, que diga 0)".
+-- ============================================================================
+
+-- ---------------------------------------------------------------------------
+-- A) vista_saldos_stock: la clave de salida se calcula por fila y se agrupa POR ELLA
+-- ---------------------------------------------------------------------------
+-- OBJETO COMPARTIDO (lo lee Producción Virgilio y varias pantallas de Gestión).
+-- Se usa `create or replace`: mismas columnas, mismo orden, mismos tipos.
+-- Backup de la definición anterior: public."GV_Backup_Viewdefs_20260912".
+--
+-- Semántica: para un código dual nada cambia (la clave ya llevaba el sufijo).
+-- Para uno no dual, las 2 filas se funden en 1 y `empresa` pasa a 'Mixto' cuando
+-- los movimientos venían con empresas distintas. El front de Gestión ya acumulaba
+-- las filas repetidas (v15.71), así que no lo afecta.
+--
+-- Medido: 781 filas -> 488, duplicados 0, total de cajas IDÉNTICO (48.197,00).
+-- Después de esto, `refresh materialized view concurrently vista_stock_procesada`
+-- volvió a andar (363 filas, 0 duplicados) y el cron 55 se recuperó solo.
+--
+-- (la definición completa está aplicada en la base; para el rollback:
+--  select definicion from public."GV_Backup_Viewdefs_20260912"
+--   where objeto = 'public.vista_saldos_stock';)
+
+-- ---------------------------------------------------------------------------
+-- B) El stock de importados = lo que HAY hoy menos lo que YA ESTÁ PEDIDO, piso 0
+-- ---------------------------------------------------------------------------
+-- `gv_importados_stock_dep` ahora trae las dos patas por separado
+-- (`cajas_bruto` y `cajas_pedidas`) y la RESTA la hace `gv_importados_ordenes`
+-- DESPUÉS de sumar las empresas que le tocan a cada fila. Restar por empresa
+-- estaría mal: un pedido cargado sin empresa contra un stock estampado 'LK' se
+-- perdería en el piso de 0.
+--
+-- `cajas_pedidas` sale de `vista_stock_procesada.cajas_pedidas`, que es la misma
+-- cuenta que muestra la pantalla de Stock: PPP_Base_Pedidos menos las NP cerradas
+-- por Facturacion_NP / PPP_Entregados_Meta / NP_Canceladas.
+--
+-- Columnas nuevas de gv_importados_ordenes: stock_cajas_bruto, cajas_pedidas,
+-- unidades_pedidas. `stock_cajas` pasa a ser el DISPONIBLE.
+--
+-- Medido al 12/09 (154 filas principal+activo):
+--   72 códigos con pedidos abiertos, 17 tocan el piso de 0.
+--   18.173 cajas brutas - 1.351 pedidas = 17.130 disponibles.
+--   Testigo del dueño: 584E -> 15 cajas en el depósito, 5 pedidas, 10 disponibles
+--   (60 u), que es exactamente la cuenta que él hace a mano.
+--
+-- ROLLBACK: `sql/gv_importados_stock_real_v1604.sql` deja la versión sin la resta.
+-- Para volver la pantalla a la vista vieja, `SUPABASE_IMPORTADOS_OC_ENDPOINT` ->
+-- `/rest/v1/v_importados_ordenes` (esa vista nunca se tocó).
+-- ============================================================================

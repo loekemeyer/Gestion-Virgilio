@@ -695,3 +695,40 @@ contra el depósito). Las otras 28 son de 8 a 192 unidades.
 `drop view if exists public.gv_importados_ordenes;` y
 `drop view if exists public.gv_importados_stock_dep;`. SQL completo en
 `sql/gv_importados_stock_real_v1604.sql`.
+
+## v16.08 (2026-09-12) — `vista_saldos_stock` deja de emitir el mismo `cod_art` dos veces
+
+**Objeto compartido tocado:** `public.vista_saldos_stock` (`create or replace`, mismas columnas,
+mismo orden, mismos tipos). La lee Producción Virgilio (`sql/generar_reporte_agentes_v2.sql`,
+`notificar_conteo_gondola`) y media docena de pantallas de Gestión.
+
+**Por qué se tocó (era un incendio):** el cron 55
+(`REFRESH MATERIALIZED VIEW CONCURRENTLY vista_stock_procesada`, cada 2 min) venía **fallando
+desde el 11/09 14:44 ART** con `duplicate key value violates unique constraint
+"idx_vista_stock_procesada_cod" — Key (cod)=(547) already exists`. La materializada quedó con el
+snapshot de las 14:44 y **la pantalla de Stock mostró datos de 10 horas atrás mientras los
+operarios pickeaban**.
+
+**La causa:** la vista agrupaba por `(ckey, empresa)` pero sólo metía el sufijo de empresa dentro
+del `cod_art` cuando el código está en `codigos_duales`. Un código **no dual** con movimientos
+estampados `'LK'`/`'CH'` **y** otros `'Mixto'` salía **dos veces con el mismo `cod_art`**. Al
+12/09 eran **~280 códigos**.
+
+**Qué cambia:** la clave de salida se calcula por fila (`outkey`) y se agrupa por ella. Para un
+código dual no cambia nada. Para uno no dual las dos filas se funden en una y `empresa` pasa a
+`'Mixto'` cuando los movimientos traían empresas distintas. El front de Gestión ya acumulaba las
+filas repetidas desde la v15.71, así que no lo afecta.
+
+**Impacto medido:** 781 filas → **488**, duplicados **0**, total de cajas **idéntico**
+(48.197,00). Después del cambio, `refresh materialized view concurrently vista_stock_procesada`
+volvió a correr (363 filas, 0 duplicados) y **el cron 55 se recuperó solo** (los runs de 21:58 y
+22:00 en `succeeded`).
+
+**Rollback exacto:**
+```sql
+select definicion from public."GV_Backup_Viewdefs_20260912"
+ where objeto = 'public.vista_saldos_stock';
+-- ejecutar ese texto como create or replace view public.vista_saldos_stock as <definicion>
+```
+⚠ Volver atrás **reinstala la falla del refresh**: el duplicado vuelve y la pantalla de Stock se
+vuelve a congelar. Notas: `sql/gv_stock_vivo_menos_pedidos_v1608.sql`.

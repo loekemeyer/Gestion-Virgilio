@@ -12,7 +12,7 @@
 > única**; no se replica. Ante la duda entre parche rápido y fix de raíz → **fix
 > de raíz**.
 >
-> Última actualización: 2026-09-12 (sábado) · Versión app al documentar: **v16.04**
+> Última actualización: 2026-09-12 (sábado) · Versión app al documentar: **v16.08**
 >
 > Nota **v15.40 (2026-09-11) — HANDOFF de planimetría / Acacia: `docs/HANDOFF-PLANIMETRIA-Y-ACACIA.md`.**
 > Thomas sigue este tema en otra sesión. Ahí está todo junto: los **13 artículos activos del catálogo LK
@@ -4240,7 +4240,9 @@ fichadas-monitor.html y productividad.html) — rotar la key = editar solo ese a
 > (stock **en unidades** event-sourced; `delta_uni`, `tipo='inicial'`) y la vista
 > **`gv_importados_ordenes`** (motor, **v16.04**: `stock_actual` en unidades = **cajas del depósito
 > real × `uni_x_caja`**, vía `gv_importados_stock_dep` → `vista_saldos_stock`; trae además
-> `stock_cajas`; `est_madre_eff` = proyección madre live/seed; `meses_objetivo`). ⚠ La vieja
+> `stock_cajas`; `est_madre_eff` = proyección madre live/seed; `meses_objetivo`). **v16.08: ese
+> stock es el DISPONIBLE — lo que hay hoy MENOS los pedidos abiertos, con piso en 0** (`stock_cajas_bruto`,
+> `cajas_pedidas` y `unidades_pedidas` quedan expuestas aparte). ⚠ La vieja
 > **`v_importados_ordenes`** sigue viva y **no se toca**: la lee Producción Virgilio, y su
 > `stock_actual` salía de `Importados_Mov_Stock` (seed + sync manual, sólo descontaba entregas),
 > que es justo lo que se dejó de usar acá. §3.cq de `docs/SUPABASE-GESTION-VIRGILIO.md`. **Pantalla "Proveedor de
