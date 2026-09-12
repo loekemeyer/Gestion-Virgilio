@@ -76,12 +76,48 @@ función, ningún lector cambia de clave, ninguna suma se mueve.
 ⚠ **El rollback de la vista obliga a rollear la app a ≤ v16.15**: siete lecturas piden
 `clave` y PostgREST devuelve 400 si no existe.
 
-### Lo que FALTA para pelarlo de verdad (tramos 3 y 4)
+### Tramo 3: HECHO (v16.20, 2026-09-12)
+
+`vista_saldos_stock.cod_art` **quedó pelado**: 488 filas, **0 con sufijo** (eran 8), y `clave`
+distinta de `cod_art` en exactamente esas 8 (los duales). Detalle y rollback en
+`sql/gv_vista_saldos_pelar_cod_art_v1620.sql`.
+
+**No alcanzaba con tocar la vista.** Se midió md5 + count de los **10 objetos que dependen de
+ella** antes y después. Cinco no se movieron; cinco sí:
+
+| objeto | antes | sin fix | final | qué pasaba |
+|:--|--:|--:|--:|:--|
+| `gv_stock_cod_duplicado` | 0 | 4 | 0 | el chequeo agrupaba por `cod_art` y dejaba de servir |
+| `vista_facturable_anticipado` | 724 | 749 | 724 | join por `canon_cod(cod_art)` → duplicaba |
+| `vista_stock_procesada` (matview) | 363 | 367 | 363 | CTE `stock` por `cod_art` |
+| `stock_v2.vsp_fix` (matview) | 363 | 367 | 363 | ídem |
+| `vista_faltante_catalogo` | 505 | 497 | **497** | corrección, ver abajo |
+
+⚠ **`vista_stock_procesada` tiene un UNIQUE INDEX en `cod`**: sin el fix, el próximo `REFRESH`
+habría fallado por clave duplicada. Falla ruidosa, pero falla — y la pantalla de Stock la lee
+por `Stock_Saldos`.
+
+`vista_faltante_catalogo` baja 8 filas **a propósito**: los pseudo-códigos con sufijo
+(`809E CH` no es un código) figuraban como "en stock y sin alta en el catálogo" siendo falsos
+positivos.
+
+Las dos matviews no admiten `create or replace`, así que fueron **DROP + CREATE WITH DATA en
+UNA transacción**, recreando el unique index y las dos vistas que colgaban de la matview
+(`Stock_Saldos` y `gv_importados_stock_dep`, ésta con `security_invoker=true`) con sus grants.
+Las matviews **no tenían grants a `anon`**: la app las lee por `Stock_Saldos`.
+
+**Funciones migradas a `clave` (5):** `aceptar_conteo`, `gondola_return_check`,
+`oc_backfill_valores`, `check_stock_anomalias` y `generar_reporte_agentes` (las dos últimas
+para que el Telegram siga diciendo de qué empresa es el negativo). **No se tocaron**
+`actualizar_saldo_trigger` (arma su propia clave, sólo menciona la vista en un comentario) ni
+`notificar_conteo_gondola_telegram` (ya pelaba el sufijo con un regexp que ahora es un no-op).
+
+### Lo que FALTA (tramo 4)
 
 La clave del mapa tiene que dejar de ser un string que parece un código y pasar a ser el par
 `(cod, empresa)` **explícito**, en los 14 lectores, ANTES de tocar la vista. Concretamente:
 
-3. **Tramo 3:** `cod_art` deja de llevar el sufijo — se borra la rama del `CASE` y queda
+3. ~~**Tramo 3:**~~ HECHO — ver arriba. `cod_art` deja de llevar el sufijo — se borra la rama del `CASE` y queda
    `(array_agg(cod_art order by length(cod_art), cod_art))[1]`, o sea la grafía cruda más
    corta, igual que hoy para los no duales. Para un dual las dos filas devuelven `809E`
    (el trigger pela el sufijo al escribir en `Movimientos_Stock`), y `clave` las sigue

@@ -1,0 +1,77 @@
+-- v16.20 — TRAMO 3 de docs/PLAN-SACAR-SUFIJO-EMPRESA.md: `cod_art` queda PELADO
+--
+-- Pedido de Luis (2026-09-12): "dale, hacé el tramo 3", con la restricción del mensaje
+-- anterior: "no mezcles con el otro de CH, lo mismo para 437".
+--
+-- QUÉ CAMBIA
+--   `vista_saldos_stock.cod_art` deja de llevar el sufijo de empresa. Se borró la rama del
+--   CASE que pegaba " LK" / " CH" para los 4 duales; ahora `cod_art` es siempre la grafía
+--   cruda más corta del código, igual que ya salía para los otros 484 códigos. La distinción
+--   de los duales la sostiene `clave` (agregada en la v16.16).
+--
+--   Antes: 488 filas · 8 con sufijo en cod_art · clave = cod_art en las 488
+--   Ahora: 488 filas · 0 con sufijo en cod_art · clave ≠ cod_art en 8 (los duales)
+--
+-- POR QUÉ HAY QUE MIGRAR LECTORES Y NO ALCANZA CON TOCAR LA VISTA
+--   Un dual devuelve ahora DOS filas con el mismo `cod_art` y distinta `empresa`. Quien use
+--   `cod_art` como clave las funde, y para el 809E eso es sumar Corta Pizza (LK, J13-J14) con
+--   Corta Queso (CH, M13-M15). El front ya se había migrado a `clave` en la v16.16; en este
+--   tramo se migró el backend.
+--
+-- CÓMO SE VERIFICÓ (no por lectura: medido)
+--   Se tomó md5 + count de los 10 objetos que dependen de la vista ANTES, se aplicó el
+--   pelado, y se volvió a medir. 5 no se movieron y 5 sí:
+--
+--   | objeto                              | antes | sin fix | final | qué era |
+--   |:------------------------------------|------:|--------:|------:|:--|
+--   | gv_stock_cod_duplicado              |     0 |       4 |     0 | el chequeo agrupaba por cod_art |
+--   | vista_facturable_anticipado         |   724 |     749 |   724 | join por canon_cod(cod_art) |
+--   | vista_stock_procesada (matview)     |   363 |     367 |   363 | CTE `stock` por cod_art |
+--   | stock_v2.vsp_fix (matview)          |   363 |     367 |   363 | ídem |
+--   | vista_faltante_catalogo             |   505 |     497 |   497 | CORRECCIÓN, ver abajo |
+--
+--   Los otros 5 (gv_importados_stock_dep, vista_correcciones_pedido_rich, vista_generador_oc,
+--   vista_importados_partes, vista_stock_vs_pedidos) quedaron con la MISMA firma md5.
+--   Snapshots en la tabla GV_Backup_snapshot_dependientes_20260912 (momentos antes/despues/
+--   control/final).
+--
+--   ⚠ `vista_stock_procesada` tiene un UNIQUE INDEX en `cod`: sin el fix, el próximo REFRESH
+--   habría FALLADO por clave duplicada (falla ruidosa, no silenciosa — pero falla).
+--
+--   `vista_faltante_catalogo` baja de 505 a 497 a propósito: las 8 filas que se van son los
+--   pseudo-códigos con sufijo ("809E CH" no es un código), que figuraban como "en stock y sin
+--   alta en el catálogo" siendo falsos positivos. El código pelado sí está en el catálogo.
+--
+--   Tres objetos quedaron con misma cantidad de filas y firma distinta al final
+--   (vista_stock_procesada, vsp_fix, vista_generador_oc): es DERIVA DE DATOS de otro chat que
+--   estuvo cambiando GV_UxB y las vistas de UxB en paralelo. Se comprobó: vista_generador_oc
+--   tenía firma IDÉNTICA justo después del pelado y cambió después, sin que se la tocara.
+--
+-- LO QUE SE TOCÓ
+--   Vistas:    vista_saldos_stock (el pelado), gv_stock_cod_duplicado (agrupa por clave),
+--              vista_facturable_anticipado (join por canon_cod(s.clave))
+--   Matviews:  public.vista_stock_procesada y stock_v2.vsp_fix — no admiten `create or replace`,
+--              así que fueron DROP + CREATE WITH DATA dentro de UNA transacción, recreando el
+--              unique index `idx_vista_stock_procesada_cod` y las dos vistas que colgaban de la
+--              matview (public."Stock_Saldos" y public.gv_importados_stock_dep, ésta con
+--              security_invoker=true) con sus grants a anon/authenticated/service_role.
+--              Las matviews NO tenían grants a anon: la app las lee por "Stock_Saldos".
+--   Funciones: aceptar_conteo (WHERE clave = v_cod_norm) · gondola_return_check (norm_cod(s.clave) ×3)
+--              oc_backfill_valores (CTE stk por clave) · check_stock_anomalias (el mensaje de
+--              Telegram muestra la clave, así se ve de qué empresa es el negativo) ·
+--              generar_reporte_agentes (ídem, el título de la fila)
+--   NO se tocaron: actualizar_saldo_trigger (sólo la menciona en un comentario; arma su propia
+--              clave igual que la vista) y notificar_conteo_gondola_telegram (ya pelaba el
+--              sufijo con un regexp, que ahora es un no-op y da el mismo número).
+--
+-- BACKUPS (RLS prendida, sin insert/update/delete para anon)
+--   GV_Backup_vista_saldos_def_20260912          — DDL previo de la vista, las 2 matviews,
+--                                                  las 2 vistas dependientes y las 5 funciones
+--   GV_Backup_snapshot_dependientes_20260912     — count + md5 de cada dependiente por momento
+--
+-- ROLLBACK
+--   select objeto, definicion from public."GV_Backup_vista_saldos_def_20260912" order by id;
+--   y ejecutar cada `definicion` (las de función ya vienen como CREATE OR REPLACE FUNCTION;
+--   las de vista van como `create or replace view <objeto> as <definicion>`; las dos matviews
+--   como DROP + CREATE, recreando el unique index y las dos vistas dependientes).
+--   ⚠ Rollear la vista obliga a rollear la app a v16.15 o anterior (la v16.16 pide `clave`).

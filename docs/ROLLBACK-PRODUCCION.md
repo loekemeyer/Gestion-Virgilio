@@ -837,3 +837,58 @@ siete lecturas piden `clave` (`pkFetchExcedente`, `_pkConteoSistema`, `_stkGondo
 **400** si la columna no existe. Los `try/catch` degradan a "sin datos" en vez de romper la
 pantalla, pero el stock se vería en 0.
 
+## 2026-09-12 · v16.20 — `vista_saldos_stock.cod_art` queda PELADO (tramo 3) · objetos COMPARTIDOS
+
+**Qué se cambió.** Se borró del `CASE` de `cod_art` la rama que le pegaba `" LK"` / `" CH"` a los
+4 códigos duales. `cod_art` es ahora siempre la grafía cruda más corta; la empresa vive en su
+columna y la identidad de los duales la sostiene `clave` (v16.16).
+
+Y con eso hubo que tocar los dependientes que usaban `cod_art` como CLAVE:
+
+| objeto | tipo | qué se le hizo |
+|:--|:--|:--|
+| `vista_saldos_stock` | vista | el pelado |
+| `gv_stock_cod_duplicado` | vista | agrupa por `clave` |
+| `vista_facturable_anticipado` | vista | join por `canon_cod(s.clave)` |
+| `public.vista_stock_procesada` | **matview** | DROP + CREATE WITH DATA (CTE `stock` por `clave`) |
+| `stock_v2.vsp_fix` | **matview** | ídem |
+| `public."Stock_Saldos"` | vista | recreada igual (colgaba de la matview) |
+| `public.gv_importados_stock_dep` | vista | recreada igual, con `security_invoker=true` |
+| `aceptar_conteo`, `gondola_return_check`, `oc_backfill_valores`, `check_stock_anomalias`, `generar_reporte_agentes` | funciones | pasan a `clave` |
+
+**Impacto medido** (count + md5 de los 10 dependientes, antes / sin el fix / final):
+
+| objeto | antes | sin fix | final |
+|:--|--:|--:|--:|
+| `gv_stock_cod_duplicado` | 0 | 4 | 0 |
+| `vista_facturable_anticipado` | 724 | 749 | 724 |
+| `vista_stock_procesada` | 363 | 367 | 363 |
+| `stock_v2.vsp_fix` | 363 | 367 | 363 |
+| `vista_faltante_catalogo` | 505 | 497 | **497** (corrección: los 8 pseudo-códigos con sufijo dejan de figurar como sin alta) |
+| los otros 5 | — | — | misma firma md5 |
+
+Tres quedaron con misma cantidad de filas y firma distinta al final (`vista_stock_procesada`,
+`vsp_fix`, `vista_generador_oc`): es **deriva de datos** de otro chat que cambiaba `GV_UxB` en
+paralelo. Comprobado: `vista_generador_oc` tenía firma idéntica justo después del pelado y
+cambió después, sin que se la tocara.
+
+⚠ **`vista_stock_procesada` tiene un UNIQUE INDEX en `cod`**: sin el fix el próximo `REFRESH`
+habría fallado por clave duplicada.
+
+**Backups:** `GV_Backup_vista_saldos_def_20260912` (DDL previo de la vista, las 2 matviews, las 2
+vistas dependientes y las 5 funciones) y `GV_Backup_snapshot_dependientes_20260912` (count + md5
+por momento). Las dos con RLS y sin `insert/update/delete` para `anon`.
+
+**Rollback exacto:**
+
+```sql
+select id, objeto, definicion from public."GV_Backup_vista_saldos_def_20260912" order by id;
+-- funciones: la definicion ya viene como CREATE OR REPLACE FUNCTION, se ejecuta tal cual
+-- vistas:    create or replace view <objeto> as <definicion>
+-- matviews:  drop materialized view … cascade; create materialized view … as <definicion> with data;
+--            create unique index idx_vista_stock_procesada_cod on public.vista_stock_procesada (cod);
+--            + recrear "Stock_Saldos" y gv_importados_stock_dep con sus grants
+```
+
+⚠ Rollear la vista obliga a rollear la app a **v16.15 o anterior** (desde la v16.16 el front
+pide `clave`). Notas: `sql/gv_vista_saldos_pelar_cod_art_v1620.sql`.
