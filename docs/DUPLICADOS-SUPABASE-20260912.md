@@ -262,15 +262,41 @@ sin `sql/`, sin `docs/`. Es lo que **falta tocar** para que `GV_UxB` quede como 
 Regla aprendida el 12/09: *ninguna columna se toca sin contar lectores del FRONT en los 4 repos*
 (casi se dropea `Articulos_Cajas.Uni_x_Caja` "sin lectores" cuando tenía 7).
 
-### `precios_venta.uxb` — **0 lectores vivos** ✅
+### `precios_venta.uxb` — 0 lectores en el FRONT, pero **6 vistas la leen** ⚠
 
 - La Edge Function `sync-precios-venta` **ya no la escribe** (v16.22).
 - Único lector del front: `loekemeyer/produccion-virgilio/index.html:30221` ("Plata perdida"),
   y esa app **está retirada desde el 2026-09-08**.
 - Gestión Virgilio **no lee `precios_venta` directo en ningún lado**: la única mención en su
   `index.html` (línea 12349) es un comentario.
-- → Es la primera candidata a `drop column`, una vez confirmado en la base que ninguna
-  vista/función la siga leyendo.
+
+**Corrección (12/09, con la base a mano).** Escribí acá que era "la primera candidata a
+`drop column`". **No lo es.** Probado con un `alter table ... drop column uxb` dentro de un
+`begin/rollback`, Postgres lo rechaza: **6 vistas la leen directo** y cascadean a 16 objetos —
+`vista_plata_perdida`, `cobranzas_precios`, `vista_facturacion_neto_items`,
+`vista_facturable_anticipado`, `gv_ppp_np_valor`, `gv_uxb_desalineado`.
+
+Ahora bien, mirando **cómo** la usan, las tres de facturación ya toman `GV_UxB` **primero** y
+`precios_venta.uxb` quedó de último recurso en el `COALESCE`:
+
+| vista | cadena |
+|---|---|
+| `vista_facturacion_neto_items` | `COALESCE(ps.uxb, pcl.uxb, uxe.uxb, pv.uxb, ux.uxb)` |
+| `vista_facturable_anticipado` | `COALESCE(pcl.uxb, uxe.uxb, pv.uxb, ux.uxb)` |
+| `gv_ppp_np_valor` | `COALESCE((max de gv_uxb_emp), pc.uxb / pv.uxb)` |
+
+`uxe` es `gv_uxb_emp`, o sea `GV_UxB`. **Y hoy no cuelga un peso de ese fallback**: 0 líneas y
+$0 en `vista_facturacion_neto_items` corresponden a códigos que estén en `precios_venta.uxb` y
+no en `GV_UxB`.
+
+**Pero es un fallback congelado**, y ahí está el riesgo: la Edge Function dejó de escribir esa
+columna en la v16.22, así que un código que mañana falte en `GV_UxB` se facturaría con un UxB
+que ya nadie actualiza, en silencio. **Lo que hay que hacer no es dropear la columna: es sacar
+`pv.uxb` (y `ux.uxb`, que es el shim `gv_uxb_lk`) de las tres cadenas**, para que `GV_UxB` sea
+la única fuente genérica. Recién ahí la columna se puede dropear.
+
+⚠ Ojo con `ps.uxb` y `pcl.uxb`, que van **antes** que `GV_UxB` en la cadena: son el UxB pactado
+por cliente / por súper y ganan a propósito. Ésos no se tocan.
 
 ### `OC_Maximos.uni_x_caja` — **1 lector real** (no 13)
 
