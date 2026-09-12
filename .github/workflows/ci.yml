@@ -15,9 +15,19 @@ on:
     branches: [main]
   pull_request:
 
+# v16.25 — un push nuevo cancela el run viejo del mismo branch. Sin esto se apilaban
+# corridas de commits ya superados peleando por el runner.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   smoke:
     runs-on: ubuntu-latest
+    # v16.25 — sin límite, un test colgado esperando red deja el job tomado 6 horas (el
+    # default de GitHub) y encima NO publica el log, así que no se puede ni diagnosticar.
+    # Pasó: el run 532 quedó 19 minutos adentro de la suite, que local tarda 5-6.
+    timeout-minutes: 15
     env:
       # 0 => Playwright guarda/busca los browsers dentro de node_modules (portable).
       # tests/run.sh respeta esta variable (no cae al path /opt del sandbox).
