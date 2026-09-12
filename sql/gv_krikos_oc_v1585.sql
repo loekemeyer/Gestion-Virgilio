@@ -100,3 +100,44 @@ grant select, insert, update, delete on public."GV_Krikos_OC" to lk_ppp_reader;
 --              drop foreign table if exists virgilio."GV_Krikos_OC";
 -- En Virgilio: drop table if exists public."GV_Krikos_OC";
 -- Nada más lo lee: el bloque de A Programar simplemente deja de dibujarse.
+
+------------------------------------------------------------------------------
+-- v16.04 (2026-09-11) — FIX DE SEGURIDAD: se leía con la ANON KEY PÚBLICA
+------------------------------------------------------------------------------
+-- La versión de arriba le dejó `grant select` + policy `using (true)` al rol **anon**, y el
+-- front la consultaba con SUPABASE_KEY, que está escrita en el JS del sitio.
+--
+-- Cómo se vio: captura del dueño con la PPP Web diciendo "Iniciá sesión para ver la PPP
+-- Web" y, abajo, el cartel con las 6 OC de súper dibujado igual.
+--
+-- Qué se exponía: no sólo la lista (cadena, nº de OC, sucursal, dirección de entrega,
+-- fecha). La columna `link` es la URL de Planexware con un token que abre el PDF de la
+-- orden de compra SIN pedir credenciales — es la misma URL que krikos-ingest usa con un GET
+-- plano para bajar el PDF. O sea: el token del link ES la credencial.
+--
+-- Y al sacarle el SELECT no alcanzaba: quedaban los grants POR DEFECTO del esquema public,
+-- con lo cual anon todavía tenía INSERT / UPDATE / DELETE / **TRUNCATE**. TRUNCATE no
+-- respeta RLS (mismo agujero que documenta el CLAUDE.md en la v6.43): con la anon key se
+-- podía vaciar la tabla y dejar la PPP sin el aviso, en silencio.
+
+revoke select on public."GV_Krikos_OC" from anon;
+
+drop policy if exists gv_krikos_oc_lectura on public."GV_Krikos_OC";
+create policy gv_krikos_oc_lectura on public."GV_Krikos_OC"
+  for select to authenticated using (true);
+
+revoke all on public."GV_Krikos_OC" from anon;
+revoke insert, update, delete, truncate, references, trigger
+  on public."GV_Krikos_OC" from authenticated;
+
+-- Verificado después de aplicar (no supuesto):
+--   authenticated  → SELECT
+--   lk_ppp_reader  → DELETE, INSERT, SELECT, UPDATE   (el FDW que la escribe desde LK)
+--   anon           → (nada)
+--
+-- Front: aprKrikosCargar pasó a pedir el token de sesión (sbAuth.getAccessToken) y, si no
+-- hay, no consulta y no dibuja el bloque — igual que el resto de la PPP Web.
+-- Regresión: tests/apr-krikos.cjs (sinSesionNoPide / sinSesionSinCartel / conSesionPide).
+--
+-- ⚠ NO revertir esto. Si algo deja de andar es porque estaba usando la anon key donde no
+-- corresponde; lo que se arregla es el llamador.

@@ -8035,3 +8035,36 @@ pide además `stock_cajas`. Nada más cambió: las columnas son las mismas.
 
 **Rollback:** devolver ese endpoint a `v_importados_ordenes`. SQL y detalle en
 `sql/gv_importados_stock_real_v1604.sql`; anotado también en `docs/ROLLBACK-PRODUCCION.md`.
+
+## §3.cf.1 — Osa: lo pactado era el NETO, no la lista (v16.05) — 2026-09-12
+
+**Corrección de Thomas (12/09):** *"Osa, los precios, eso es lo que él paga considerando su
+dieciséis de descuento y el dos de descuento. En función de eso se calcula el precio de lista
+de él. El precio de mil doscientos sesenta es lo neto que él me va a pagar más IVA."*
+
+La v15.83 había cargado los cuatro precios de Fede en `GV_Precios_Cliente` con
+**`es_final = true`**, o sea como precio final: la cascada no les aplicaba ni el 16 % de
+`clientes_dto` ni el 2 %. El importe facturado daba bien, pero **el sistema no sabía la lista
+de Osa** — el portal le cotizaba la lista general de LK, que no tiene nada que ver.
+
+**Ahora se guarda la LISTA y los descuentos corren solos** (`es_final = false`):
+
+| cod | lista (nueva) | × 0,84 (su 16 %) | × 0,98 | neto pactado |
+|---|---|---|---|---|
+| 102E | **1.530** | 1.285,20 | 1.259,50 | 1.260 |
+| 103 | **632** | 530,88 | 520,26 | 520 |
+| 106E | **1.956** | 1.643,04 | 1.610,18 | 1.610 |
+| 198E | **802** | 673,68 | 660,21 | 660 |
+
+**Los valores no se inventaron: son los de la factura real del 09/09** (`GV_Precio_Facturado_Cache`,
+cod_cliente 2533, las cuatro con dto 16 %). Coinciden al peso con el cálculo *neto ÷ 0,84 ÷ 0,98*
+(1.530,61 · 631,68 · 1.955,78 · 801,75), así que **Gestión ahora dice lo mismo que ISIS emite**.
+
+**Medido:** la NP **98650** pasa de `$9.453.600` a **`$9.453.905,40`** (+$305,40, 0,003 %), que es
+sólo el redondeo de la lista de ISIS contra la derivada exacta. Cero códigos sin precio.
+Backup y restore exacto en `sql/backups/gv_precios_cliente_osa_20260912_pre_lista.sql`.
+
+⚠ **Lo que esto NO arregla:** `gv_vista_facturacion_neto_items` (la que alimenta Conciliación)
+sigue sin mirar `GV_Precios_Cliente` — para ella 102E, 103 y 106E de esa NP siguen *sin precio*,
+y al 198E ahora le pone **$1.110**, la lista general de LK, que para Osa es el precio equivocado.
+Es el problema **63** de `github_repo_problemas`, abierto.
