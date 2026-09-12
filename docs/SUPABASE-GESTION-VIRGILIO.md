@@ -9462,3 +9462,44 @@ nadie (0 vistas, 0 funciones, 0 apariciones en el front de los 4 repos) y se mud
 `zz_backups`. Con eso el `drop column uxb` de prueba pasó de ser rechazado por **6 vistas /
 16 objetos** a **2**, ninguna de producción: la de backup ya mudada y `gv_uxb_desalineado`.
 **La columna no se dropeó**: es irreversible y ya es inalcanzable desde todo camino vivo.
+
+---
+
+### §3.dn — v16.39: se borran `precios_venta.uxb` y `precios_venta_chef.uxb` — 2026-09-12
+
+Dueño: *"si ya solamente se utiliza una sola hoja de UxB, eliminá las otras. ¿Estás muy seguro
+que no se usan para ningún otro repo?"*. Detalle y rollback en
+`sql/gv_uxb_drop_columnas_duplicadas_v1639.sql`.
+
+**Primero, una corrección de cómo lo conté yo:** no son tablas de UxB aparte, son **columnas**
+adentro de tablas que se usan para otra cosa (`precios_venta` es la lista de precios,
+`OC_Maximos` la config de compras, etc.). Borrar la tabla sería un desastre; lo que se borra es
+la columna, y sólo donde se probó que nadie la lee.
+
+**Cómo se verificó, con tres pruebas independientes:**
+
+1. **Dentro de la base** — `alter table … drop column` en `begin/rollback`: Postgres enumera
+   cada dependiente. Bajó de 6 vistas / 16 objetos a 0.
+2. **Tráfico real de la API (24 h de `edge_logs`)** — esto es lo que grepear repos NO da: ve a
+   cualquier cliente, incluidos n8n, Apps Script o un repo que no tengo clonado.
+   `precios_venta` y `precios_venta_chef`: **0 GET**, sólo el POST del sync y el DELETE de
+   reconcile.
+3. **El fuente del sync** — `mapProductos` devuelve `{cod, precio_unit, descripcion,
+   actualizado}`: no manda `uxb` desde la v16.22. Si lo mandara, el POST fallaría con "column
+   does not exist" y se cortaría la lista de precios.
+
+⚠ **24 h de tráfico NO prueban que algo no se use**, y conviene tenerlo escrito:
+`OC_Maximos.uni_x_caja` no aparece en el tráfico pero **sí** la lee `ocgFetchMaximos` para la
+Ficha del artículo — nadie abrió esa pantalla en 24 h. Por eso de las 7 columnas duplicadas
+**sólo se borraron 2**.
+
+**Lo que quedó y por qué:** las otras cinco tienen lectores probados y sacarlas exige tocar el
+front primero — `OC_Maximos.uni_x_caja` (Ficha del artículo), `"Articulos Virgilio X
+Tallerista".Uni_x_Caja` (Stock, Racks y el alta de talleristas, que **escribe**),
+`Articulos_Cajas.Uni_x_Caja` y `"Despiece x Articulo".Uni_x_Caja` (Cervantes, **otro dominio**,
+no una copia del mismo dato), e `Importados.uni_x_caja` (`vista_importados_partes` y
+`v_importados_ordenes`, que sigue recibiendo 8 requests/día).
+
+**Rollback:** el dato de las 334 filas está en `zz_backups."GV_Backup_precios_uxb_20260912"`.
+
+Facturación $1.395.224.315,83 · anticipado $77.843.819,56 · centinelas en 0.

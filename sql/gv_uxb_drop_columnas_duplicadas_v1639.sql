@@ -1,0 +1,87 @@
+-- gv_uxb_drop_columnas_duplicadas_v1639.sql — APLICADO 2026-09-12.
+--
+-- Pedido del dueño: *"si ya solamente se utiliza una sola hoja de UxB, eliminá las otras.
+-- ¿Estás muy seguro que no se usan para ningún otro repo?"*
+--
+-- ⚠ PRIMERO, UNA CORRECCIÓN A CÓMO LO CONTÉ. **No son tablas de UxB aparte.** Son COLUMNAS
+-- adentro de tablas que se usan para otra cosa, y esas tablas no se pueden borrar:
+--
+--   precios_venta.uxb                        → la tabla es la LISTA DE PRECIOS de LK
+--   precios_venta_chef.uxb                   → la lista de precios de Chef
+--   GV_Precios_Cliente.uxb                   → precios pactados por cliente
+--   OC_Maximos.uni_x_caja                    → config de COMPRAS (proveedor, máximo, índice)
+--   Importados.uni_x_caja                    → ficha del artículo importado
+--   Articulos_Cajas.Uni_x_Caja               → empaque del DESPIECE de Cervantes (otro dominio)
+--   "Articulos Virgilio X Tallerista".Uni_x_Caja → maestro de talleristas (el front ESCRIBE ahí)
+--
+-- Lo que se borra es la columna, y sólo donde se probó que nadie la lee.
+--
+-- ── CÓMO SE VERIFICÓ (y qué NO prueba) ───────────────────────────────────────────────────
+--
+-- 1. **Dentro de la base**: un `alter table … drop column` dentro de `begin/rollback` es la
+--    prueba dura — Postgres enumera cada dependiente. Bajó de 6 vistas / 16 objetos a 0.
+--
+-- 2. **Tráfico real de la API, 24 h de `edge_logs`.** Esto es lo que grepear repos no da:
+--    muestra a CUALQUIER cliente, incluido n8n, Apps Script o un repo que no tengo clonado.
+--
+--    | endpoint | columna pedida | requests 24 h |
+--    |---|---|--:|
+--    | `Articulos_Cajas` | `Uni_x_Caja` | **65** ← VIVO |
+--    | `Articulos Virgilio X Tallerista` | `Uni_x_Caja` | **34** ← VIVO |
+--    | `Despiece x Articulo` | `select=*` (la trae implícita) | **2** ← VIVO |
+--    | `v_importados_ordenes` | `uni_x_caja` | 8 ← VIVO (la vista vieja de Producción) |
+--    | `vista_generador_oc` | `uni_x_caja` | 8 ← ya sale de `GV_UxB` |
+--    | `precios_venta` / `precios_venta_chef` | — | **0 GET** (sólo POST del sync y DELETE de reconcile) |
+--
+-- ⚠ **24 h de tráfico NO prueban que algo no se use.** Caso concreto: `OC_Maximos.uni_x_caja`
+--    no aparece en el tráfico, pero SÍ la lee `ocgFetchMaximos` (index.html) para la columna
+--    Uni/Caja de la Ficha del artículo — simplemente nadie abrió esa pantalla en 24 h. Por eso
+--    **`OC_Maximos.uni_x_caja` no se tocó**, ni ninguna de las otras cinco.
+--
+-- ── QUÉ SE BORRÓ ─────────────────────────────────────────────────────────────────────────
+-- Sólo dos columnas, las únicas con las tres condiciones: 0 dependientes en la base, 0 GET en
+-- la API, y el sync que las alimentaba ya no las escribe.
+--
+--   alter table public.precios_venta      drop column uxb;   -- 233 filas de dato
+--   alter table public.precios_venta_chef drop column uxb;   -- 101 filas
+--
+-- Antes hubo que sacar los dos últimos dependientes, los dos NO productivos:
+--   · `zz_backups.gv_bkp_facneto_items_v1604` — vista de backup, 0 lectores en base y en los
+--     4 repos. Se dropeó (su definición quedó respaldada).
+--   · `gv_uxb_desalineado` — al centinela se le sacó la rama de `precios_venta`, que comparaba
+--     contra una columna que ya no existe. Sigue vigilando las otras 4 copias. Da 0.
+--
+-- ── POR QUÉ EL SYNC NO SE ROMPE ──────────────────────────────────────────────────────────
+-- `sync-precios-venta` (cron 66, cada 15 min) hace `POST … ?on_conflict=cod`. Su `mapProductos`
+-- devuelve `{cod, precio_unit, descripcion, actualizado}` — verificado en el fuente, **no manda
+-- `uxb`** a ninguna de las dos desde la v16.22. Si lo mandara, el POST fallaría con "column
+-- does not exist" y se cortaría la lista de precios entera.
+--
+-- ── MEDICIÓN ─────────────────────────────────────────────────────────────────────────────
+--   facturación $1.395.224.315,83 · anticipado $77.843.819,56 · `gv_endpoints_rotos` 0 ·
+--   `gv_uxb_desalineado` 0 · `gv_stock_procesada_dup` 0
+--
+-- ── ROLLBACK ─────────────────────────────────────────────────────────────────────────────
+-- El dato está en `zz_backups."GV_Backup_precios_uxb_20260912"` (tabla, cod, uxb):
+--
+--   alter table public.precios_venta add column uxb integer;
+--   update public.precios_venta p set uxb = b.uxb
+--     from zz_backups."GV_Backup_precios_uxb_20260912" b
+--    where b.tabla = 'precios_venta' and b.cod = p.cod;
+--   -- ídem precios_venta_chef
+--
+-- Las definiciones de vistas están en `zz_backups."GV_Backup_viewdefs_uxb_chain_20260912"`.
+--
+-- ── LO QUE QUEDA, Y POR QUÉ NO SE TOCA ───────────────────────────────────────────────────
+-- Las otras 5 columnas tienen lectores probados. Para sacarlas hay que **cambiar el front
+-- primero** (y en dos casos es otro dominio, no una copia del mismo dato):
+--
+--   OC_Maximos.uni_x_caja                        → `ocgFetchMaximos` (Ficha del artículo)
+--   "Articulos Virgilio X Tallerista".Uni_x_Caja → Stock, Racks y el alta de talleristas, que ESCRIBE
+--   Articulos_Cajas.Uni_x_Caja                   → Despiece de Cervantes — OTRO dominio
+--   "Despiece x Articulo".Uni_x_Caja             → Cervantes — otro dominio (ver problema 102)
+--   Importados.uni_x_caja                        → `vista_importados_partes` y `v_importados_ordenes`
+--
+-- **Y la respuesta honesta a "¿estás muy seguro?":** para estas dos, sí — tres pruebas
+-- independientes coinciden y el rollback está listo. Para las otras cinco, **no**, y por eso
+-- no se tocaron.
