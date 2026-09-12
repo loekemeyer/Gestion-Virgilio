@@ -9232,3 +9232,67 @@ es un dato propio de la ficha del artículo importado, no una copia — lo que i
 la vista que lo **muestra** tome la fuente única, y eso ya está.
 
 Archivo: `sql/gv_uxb_importados_v1630.sql`.
+
+---
+
+### §3.di — v16.33: el matview del stock fallaba 1 de cada 3 refrescos — 2026-09-12
+
+Tres fallas de producción encontradas mirando `postgres_logs` y `cron.job_run_details`, no
+pedidas por nadie. Diagnóstico completo en `docs/HALLAZGOS-LOGS-20260912.md`; el impacto y el
+rollback de los objetos compartidos, en `docs/ROLLBACK-PRODUCCION.md`.
+
+**1. `vista_stock_procesada` no se refrescaba** (auditoría: problema 100). El cron 55 falló
+**212 de 688** corridas en 24 h y el 57, **96 de 275** — todas con `duplicate key` contra
+`idx_vista_stock_procesada_cod`. O sea que **el stock que veían los operarios se quedaba viejo un
+tercio del tiempo, en silencio**. Causa: el CTE `stock` normalizaba la clave (`053` → `53`) pero
+no agrupaba, así que dos grafías del mismo artículo daban dos filas con el mismo `cod` y el
+índice único que `REFRESH CONCURRENTLY` necesita las rechazaba. Cuando lo miré la tabla estaba
+limpia — el matview estaba **a un movimiento mal escrito de fallar, sobre cualquier código**.
+Arreglado agrupando y sumando en el CTE (`sql/gv_stock_procesada_dup_v1633.sql`). Como
+`create or replace` no existe para matviews, fue DROP CASCADE + CREATE, recreando
+`Stock_Saldos` y `gv_importados_stock_dep` en la misma transacción.
+
+Medición: **363 filas / `stock_total` 48197.00 / `a_pedir` 7561 antes y después**, o sea un no-op
+comprobado sobre los datos de hoy; lo único que cambia es que no puede volver a fallar.
+
+**Centinela nuevo** — el CTE `stock` era una de CINCO fuentes que pueden duplicar; las otras
+cuatro siguen como estaban, y el modo de falla es mudo:
+
+```sql
+select * from public.gv_stock_procesada_dup;   -- 0 filas = el REFRESH no va a fallar
+```
+
+**2. `vista_ppp_pedidos_entregados` tiraba 500** (problema 99): 39 veces en 24 h, contra el
+select exacto de `pppRefreshDelivered()`. `PPP_Programacion_Diaria.fecha_entrega` es TEXT, 16
+filas tienen cadena vacía, y la vista hacía `::date` pelado. Pegaba callado porque
+`supaFetchAllSafe` se traga el error: el supervisor veía el panel **Entregados / En viaje**
+vacío y creía que no había entregas. Fix: `nullif(btrim(...), '')::date` — que la vista no
+reviente con algo que la tabla permite guardar, en vez de salir a limpiar datos. Una `''` no la
+encuentra un `where fecha is null`, que es por lo que estuvo escondido.
+
+**De paso:** esa vista **no tenía `security_invoker`** aunque `sql/ppp_vistas_sheet.sql` decía
+que sí — corría como `postgres` y salteaba la RLS. Se prendió tras comprobar que `anon` lee las
+5 tablas base completas. **Conviene barrer el resto de las vistas buscando lo mismo.**
+
+Y `sql/ppp_vistas_sheet.sql` estaba desactualizado: le faltaban `fecha_carga`, `fecha_ppp` y
+`fecha_salida_real`. Que el archivo mienta no es cosmético — se tardó en encontrar el 500
+justamente porque el `::date` que lo causaba no estaba ahí. Ya está re-versionado.
+
+**3. Deadlock diario cron 57 ↔ cron 68** (problema 98): 11 el 12/09, víctima siempre
+`refresh_stocks_carga_rapida()`. Los 11 caen en minuto múltiplo de 10, que es cuando `*/5` y
+`*/10` coinciden. Fix: `pg_advisory_xact_lock(5768)` en el **command del cron**, no en las
+funciones — pg_cron manda el command como una sola simple-query, así que comparten transacción.
+No se toca lógica. No va adentro de las funciones porque `reconciliar_pipeline_stock` la llaman
+además **3 triggers de operario**, y un candado bloqueante ahí haría esperar una escritura de
+picking hasta 24 s. Riesgo residual anotado: un trigger todavía puede chocar con el cron 57.
+
+**Chequeo a las 24 h — las tres tienen que dar 0:**
+
+```sql
+select count(*) from cron.job_run_details
+ where jobid in (55,57) and status='failed' and start_time > now() - interval '24 hours';
+select * from public.gv_stock_procesada_dup;
+-- y en los logs: 0 'deadlock detected' y 0 'invalid input syntax for type date'
+```
+
+Facturación neto **$1.395.224.315,83 sin moverse** · centinelas en 0.

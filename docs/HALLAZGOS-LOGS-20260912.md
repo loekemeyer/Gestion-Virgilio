@@ -1,4 +1,9 @@
-# Dos fallas de producción encontradas en los logs de Postgres — 2026-09-12
+# Tres fallas de producción encontradas en los logs de Postgres — 2026-09-12
+
+> **ESTADO: las tres arregladas y verificadas el mismo día (v16.33).** Lo de abajo es el
+> diagnóstico tal como se escribió, con el canal SQL caído. Lo que cambió al poder consultar la
+> base está al final, en **"Lo que apareció al abrir el SQL"** — y ahí está el hallazgo grande,
+> que NO era ninguna de las dos primeras.
 
 Encontradas mirando `postgres_logs` mientras el canal SQL del MCP estaba caído (el proyecto
 seguía `ACTIVE_HEALTHY` y PostgREST sirviendo; sólo la conexión directa daba timeout). Las dos
@@ -99,3 +104,55 @@ select * from cron.job_run_details where jobid = 55 order by start_time desc lim
 
 No lo toco sin medirlo: bajar la frecuencia del refresh cambia cuán fresco está el stock, y eso
 es una decisión de negocio, no de plomería.
+
+
+---
+
+## Lo que apareció al abrir el SQL (18:00 UTC)
+
+Con la conexión de vuelta, `cron.job_run_details` mostró que **el deadlock era la punta chica**.
+En 24 h:
+
+| cron | qué hace | corridas | fallidas | % |
+|---|---|--:|--:|--:|
+| 55 (`*/2`) | `REFRESH MATERIALIZED VIEW CONCURRENTLY vista_stock_procesada` | 688 | **212** | 31% |
+| 57 (`*/5`) | `refresh_stocks_carga_rapida()` | 275 | **96** | 35% |
+| 68 (`*/10`) | `reconciliar_pipeline_stock()` | 137 | 0 | 0% |
+
+De las 96 del cron 57, **sólo 11 son el deadlock**. Las otras 85, y las 212 del cron 55, son
+todas lo mismo:
+
+```
+ERROR: duplicate key value violates unique constraint "idx_vista_stock_procesada_cod"
+ERROR: could not create unique index "idx_vista_stock_procesada_cod"
+```
+
+**El matview del stock no se estaba refrescando un tercio del tiempo.** Ése era el problema
+grande, y no aparecía en `postgres_logs` como error de la app porque el que falla es el cron, y
+el cron no le avisa a nadie.
+
+**Causa raíz:** el CTE `stock` normalizaba la clave (`053` → `53`) pero no agrupaba. Dos grafías
+del mismo artículo en `vista_saldos_stock` daban dos filas con el mismo `cod`, y el índice único
+que `REFRESH CONCURRENTLY` necesita las rechazaba. Al momento de mirar, la tabla estaba limpia:
+el fallo aparecía cada vez que alguien escribía un movimiento con la grafía que faltaba. El
+matview estaba **a un movimiento mal escrito de fallar, sobre cualquier código**.
+
+Arreglado en `sql/gv_stock_procesada_dup_v1633.sql`, con centinela
+`public.gv_stock_procesada_dup` para las otras cuatro fuentes que también pueden duplicar.
+
+### Y un tercer hallazgo, de paso
+
+`vista_ppp_pedidos_entregados` **no tenía `security_invoker`** (`reloptions` en null), aunque el
+archivo versionado decía que sí: corría como `postgres` y salteaba la RLS. Se prendió después de
+comprobar que `anon` lee las 5 tablas base completas, así que no cambió nada para la app.
+Conviene barrer el resto de las vistas buscando lo mismo.
+
+### Medición del antes / después
+
+| | antes | después |
+|---|---|---|
+| `vista_stock_procesada` | 363 filas · 48197.00 | **igual** (no-op comprobado) |
+| `REFRESH CONCURRENTLY` | fallaba 1 de cada 3 | corre limpio |
+| `vista_ppp_pedidos_entregados` | 500 | 1227 filas, y como `anon` también |
+| `gv_stock_procesada_dup` | — | 0 filas |
+| facturación neto | $1.395.224.315,83 | **sin moverse** |

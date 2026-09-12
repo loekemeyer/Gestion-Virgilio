@@ -1028,3 +1028,68 @@ drop function public.gv_stock_clave(text, text);
 ```
 
 Notas: `sql/gv_stock_clave_tramo4_v1630.sql`.
+
+---
+
+## v16.33 (2026-09-12) — `vista_stock_procesada` recreada + `vista_ppp_pedidos_entregados` + crons 57/68
+
+Tres objetos compartidos. Los tres arreglan fallas que ya estaban en producción, medidas sobre
+24 h de logs y de `cron.job_run_details` — no son cambios de comportamiento pedidos.
+
+### 1. `vista_stock_procesada` (matview) — DROP CASCADE + CREATE
+
+**Impacto medido: ninguno sobre los datos de hoy.** Antes y después dan idéntico:
+363 filas · `stock_total` 48197.00 · `cajas_pedidas` 4720.66 · `a_pedir` 7561.00 ·
+`uni_x_caja` 5163.00 · 361 visibles. Las dependientes también: `Stock_Saldos` 363,
+`gv_importados_stock_dep` 482. Y `refresh_stocks_carga_rapida()` deja `stocks_carga_rapida`
+en 363 / 48197.00, igual que el matview.
+
+Lo que cambia es que **ya no puede fallar el refresh**: el CTE `stock` ahora agrupa por código
+normalizado y suma, en vez de dejar pasar dos filas cuando `053` y `53` conviven. Sin eso, el
+`REFRESH CONCURRENTLY` fallaba 1 de cada 3 veces contra el índice único y el stock quedaba viejo.
+
+⚠ El DROP fue **CASCADE**, así que se llevó `Stock_Saldos` y `gv_importados_stock_dep`; las dos
+se vuelven a crear en la misma transacción, con sus opciones (`gv_importados_stock_dep` mantiene
+`security_invoker=true`; `Stock_Saldos` sigue **sin** él, como estaba) y sus grants.
+
+**Backup:** `zz_backups."GV_Backup_stock_procesada_20260912"` — def del matview, sus índices, y
+def + opciones + grants de las dos dependientes.
+
+**Rollback:** correr `sql/gv_stock_procesada_dup_v1633.sql` cambiando
+`replace(d, viejo, nuevo)` por `d` a secas. Y `drop view public.gv_stock_procesada_dup;`.
+
+### 2. `vista_ppp_pedidos_entregados`
+
+`max(p.fecha_entrega::date)` → `max(nullif(btrim(p.fecha_entrega), '')::date)`, y se le prendió
+`security_invoker = true` (no lo tenía, o sea salteaba la RLS). Antes tiraba 500; después 1227
+filas, las mismas corridas como `anon`. Se comprobó primero que `anon` lee las 5 tablas base
+completas, así que prender el invoker no le saca nada a nadie.
+
+**Backup:** `zz_backups."GV_Backup_viewdef_ppp_entregados_20260912"`.
+
+**Rollback:**
+
+```sql
+do $$ begin execute 'create or replace view public.vista_ppp_pedidos_entregados as '
+  || (select def from zz_backups."GV_Backup_viewdef_ppp_entregados_20260912"); end $$;
+```
+
+### 3. Crons 57 y 68 — `pg_advisory_xact_lock(5768)` en el `command`
+
+No se tocó ninguna función: sólo el `command` del cron, que pg_cron manda como una sola
+simple-query, así que los dos statements comparten transacción y el candado se suelta al commit.
+Serializa las dos corridas y mata los 11 deadlocks diarios.
+
+**Backup:** `zz_backups."GV_Backup_cron_job_20260912"`.
+
+**Rollback:**
+
+```sql
+select cron.alter_job(57, command := (select command from
+  zz_backups."GV_Backup_cron_job_20260912" where jobid = 57));
+select cron.alter_job(68, command := (select command from
+  zz_backups."GV_Backup_cron_job_20260912" where jobid = 68));
+```
+
+Notas: `sql/gv_stock_procesada_dup_v1633.sql`, `sql/gv_fix_entregados_y_deadlock_v1633.sql`,
+`docs/HALLAZGOS-LOGS-20260912.md`.
