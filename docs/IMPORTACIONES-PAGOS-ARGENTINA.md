@@ -375,3 +375,23 @@ Que Thomas pase por 📦 Cargas y asigne las 9 cargas, y por 💵 Giros y acepte
 cada giro. Ahí el circuito queda atado de punta a punta. Lo único que **no** se puede resolver desde
 la pantalla es lo que no está en ningún lado: el anticipo de la 1.ª Becky, qué es la empresa `D`, y
 la hoja de Hugo Wong que no vino en el Excel.
+
+## 8. El 323ES suelto vale 0,20, no 0,225 (v16.00, 12/09/2026)
+
+Dueño, 12/09: ***"me cobra 0.225 el 323E, si viene suelto (323ES), es 0.2"***. Hugo Wong cobra el
+rallador **envasado** a u$s 0,225 y **suelto** (a granel, para envasar acá como 323E LK o 838E CH)
+a u$s **0,20**.
+
+Estaban mal dos cosas, las dos por copiar el precio del envasado:
+
+1. `Importados.323ES.fob_uni` = 0,225 → **0,20**.
+2. La única línea del pedido **`323ES suelto`** estaba codificada **`323E`**, así que tomaba 0,225.
+   → pasa a `323ES`.
+
+Resultado: el pedido `323ES suelto` pasa de **675** a **600** (3.000 u × 0,20). El
+**`PI NY26-031438` no se toca**: ahí el 323E (4.464 u) y el 838E (1.008 u) van envasados a 0,225, y
+el FOB calculado sigue dando **38.639,84** contra los 38.640 del Excel. Por eso la cuenta de Hugo
+cerraba igual: el suelto es un pedido aparte, no entra en el PI.
+
+SQL y rollback: `sql/gv_imp_323es_fob_v1600.sql`. Backups `GV_Importados_bkp_323ES_20260912` y
+`GV_Baches_bkp_323ES_20260912`.
