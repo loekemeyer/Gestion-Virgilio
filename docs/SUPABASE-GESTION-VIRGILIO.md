@@ -7932,3 +7932,31 @@ Los 14 están otra vez en **vencidos**, con su tanda. Como están armados, las s
 En Salida como `salida_manual` (esa no se tocó).
 
 Auditoría: *"gv_ppp_isis_desprogramar mandaba a la cola de picking tandas YA pickeadas y armadas"*.
+
+## §3.cn.6 — v16.03: van a A Programar igual, pero vuelven a SU tanda (no se pickean de nuevo)
+
+Le planteé a Thomas el riesgo de la v16.02 (las 14 ya estaban pickeadas y armadas; A Programar es la
+cola de pedidos por pickear) y **reafirmó**: *"No. Que vayan a programar."* Es su decisión y se hizo.
+
+Lo que **no** se dejó suelto es el riesgo real — que alguien las pickee dos veces y el stock se
+descuente doble. Tres piezas:
+
+1. **`GV_PPP_Prog_Override.tanda_previa`** guarda la tanda que el pedido tenía al sacarlo. También
+   contesta lo que marcó Thomas (*"cómo armaron la tanda si no había tanda"*): la tanda **no se
+   pierde**, queda registrada aunque la vista la muestre vacía.
+2. **`gv_ppp_isis_sin_tanda`** expone `tanda_previa`, `ya_armada` y `ya_pickeada`; la tarjeta de
+   A Programar lleva un chip rojo **«⚠ ya pickeada y armada · D56D»**.
+3. **`gv_ppp_isis_programar` REUSA esa tanda**: si todas las NP del grupo vienen de la misma
+   `tanda_previa`, se programa con **ese** código y no con uno nuevo → el picking y el armado ya
+   hechos siguen valiendo y nadie los repite. El aviso lo dice: *"Volvió a su tanda D56D: ya estaba
+   pickeada y armada, así que NO hay que pickearla de nuevo."* Si vienen de tandas distintas, va una
+   tanda nueva y el aviso avisa que revise antes de mandarlas a pickear.
+
+**Guardas de `gv_ppp_isis_desprogramar`:** quedó **sólo** la de CCN/CRN (lo que ya salió, que es la
+que el propio dueño pidió). Las de "ya armada" y "tanda ya trabajada" que había puesto la v16.02 se
+sacaron por su decisión.
+
+**Front:** vuelve el botón **↩ Sin programar** en los vencidos armados, con el texto que corresponde.
+
+**Aplicado:** las 14 otra vez en A Programar, las 14 con `tanda_previa` (D47B, D56D, D72B, D72C) y
+`ya_armada = ya_pickeada = true`. A Programar **0 → 14**. En Salida sigue en 20 (98530, salida manual).
