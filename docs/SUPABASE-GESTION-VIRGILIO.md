@@ -9334,3 +9334,41 @@ una vista con `replace()` sobre su propia definición, hay que guardar después 
 584E (el testigo del dueño): 6 u/caja · 15 − 5 = 10 cajas · 60 unidades
 anon lee las 156 · gv_endpoints_rotos de vuelta en 0
 ```
+
+---
+
+### §3.dk — Despiece x Articulo: 67 UxB mal, MEDIDOS y no corregidos — 2026-09-12
+
+**Nada tocado. Es modificación de datos reales y falta el OK del dueño** (protocolo de
+`CLAUDE.md`: *"SOLO reportá el problema… NO modificar nada en Supabase sin permiso directo"*).
+Queda como problema **abierto** en la auditoría. Detalle y el `update` listo para cuando se
+apruebe: `sql/gv_despiece_uxb_medicion_v1635.sql`.
+
+**Qué alimenta:** `cajasUsadas = ceil(eMadre / uniXCaja)`, el consumo mensual de cajas de
+**cartón**, en `Compras/cajas.html` y `Inicio/index.html` de los admin de Cervantes (las tres
+copias). Con el UxB al doble, el consumo se calcula a la mitad y **la alerta de compra no
+salta**; al revés, se compra de más.
+
+**La nota vieja decía 21 códigos. Son 154.** Y no todos por el mismo motivo — por eso el plan
+original (alinear la tabla entera contra `GV_UxB`) habría pisado datos buenos:
+
+| evidencia | códigos | qué hacer |
+|---|--:|---|
+| la columna vieja `Uni x Cja` **coincide con `GV_UxB`** | **67** | dos fuentes independientes contra el valor actual → corregir |
+| no hay columna vieja para corroborar | 72 | evidencia floja, dejar |
+| las tres discrepan | 15 | mirar uno por uno |
+
+Los 67 tienen un patrón limpio: **multiplicados o divididos por exactamente 2**, que es lo que
+pasa al cargar la caja MASTER en vez de la interna. `101` y `114` en 12 cuando va 6; `333`,
+`336`, `859`, `862`, `863`, `908` en 24 cuando va 12; `307` y `390`–`394` en 12 cuando va 24;
+`550` en 12 cuando va 36.
+
+⚠ **De los 15 ambiguos, `A10`, `A15`, `C1`, `C10`, `GRJ9` y `V9` dicen 30 en las DOS columnas de
+la tabla** contra 12 de `GV_UxB`. No parecen artículos de LK/Chef sino códigos propios de
+Cervantes: probablemente **otro dominio**, igual que `Articulos_Cajas.Uni_x_Caja`. Ésos no se
+tocan ni con el OK.
+
+**Trampa del join, anotada porque cuesta:** `COD` **no es único** en esa tabla (754 filas, 238
+códigos). El primer intento de medir dio 3.821 filas por multiplicar. Hay que agrupar por código
+antes de comparar. Y los joins con `gv_cod_stock()` sobre la tabla cruda tumbaron la conexión:
+van materializados con índice (`zz_backups."GV_tmp_despiece_map"` y `"GV_tmp_gvuxb_map"`).
