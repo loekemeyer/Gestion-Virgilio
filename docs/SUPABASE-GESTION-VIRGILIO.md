@@ -9794,3 +9794,75 @@ ese cable también se puede cortar cuando se quiera, sin sorpresas.
 Archivo: `sql/gv_entregados_vivo_v1644.sql` (con el `CREATE` completo de las dos vistas; se verificó
 por `md5` que reproducen byte a byte lo que está vivo). Backup de las definiciones previas en
 `zz_backups."GV_Backup_defs_entmeta_20260912"`. Chequeo: `select * from public.gv_endpoints_rotos;`
+
+---
+
+### §3.dt — v16.45: las tablas PPP pasan a nombre GV, y 3 funciones que la v16.39 dejó rotas — 2026-09-12
+
+**Pedido del dueño:** *"te dejo borrar las viejas de ppp, ya no se usan más. Ya pasamos a usar solo GV"*.
+
+**No se borraron: se renombraron, y el motivo está medido.** Borrarlas perdía datos vivos:
+
+- `PPP_Base_Pedidos` + `PPP_Programacion_Diaria` cargan **59 pedidos pendientes con 3.994,66
+  cajas**, todos programados, y entre ellos **8 con entrega futura y sin ningún evento**: las 5 del
+  **lunes 14/09** (Arguello 98615/98616, Succarelli 98621, Martinelli 98622, **Extralimp 98651 con
+  300 cajas**) y 3 de Matiz (16/09, 07/10, 28/10). Además son la pata ISIS de `gv_demanda_pedidos`.
+- `PPP_Entregados_Meta` es el **único** registro del m³ entregado histórico: sin ella
+  `vista_tanda_m3` pierde **1.114 de sus 1.196 tandas (961 m³)**.
+
+El renombre cumple el objetivo —ninguna `PPP_*` vieja en `public`, todo GV— sin perder nada, y se
+deshace con otro rename.
+
+**El hallazgo que ahorró el 95% del trabajo: las vistas referencian por OID, no por nombre.** Un
+`rename` es transparente para las 29 vistas + la matview. Sólo hay que reescribir lo que nombra por
+**texto**: las funciones y el front. Eso bajó el cambio de **~70 objetos a 31 funciones + 1
+constante** de `index.html`.
+
+| | |
+|---|---|
+| `PPP_Base_Pedidos` → | **`GV_PPP_Base_Pedidos`** (9.786 filas) |
+| `PPP_Programacion_Diaria` → | **`GV_PPP_Programacion_Diaria`** (133) |
+| `PPP_Entregados_Meta` → | **`GV_PPP_Entregados_Historico`** (2.783) |
+
+También se **borró `sync_ppp_entregados_meta()` y se desprogramó el cron 27**: el Sheet ya no
+existe y esa función hace `TRUNCATE`, o sea que un cron mal prendido borraba el histórico de m³.
+
+`index.html`: **`PPP_TABLE` apunta a los nombres nuevos**. Si queda con el viejo, `pppSubir()`
+(la importación del Excel de la PPP) tira 404.
+
+**Verificación — todos los números idénticos al baseline previo:** 0 tablas viejas, 0 vistas y 0
+funciones nombrándolas, `gv_endpoints_rotos` vacía, `refresh concurrently` OK,
+`vista_stock_procesada` 366 / 7409,66 / 9092, `gv_ppp_base_pedidos` 9.668,
+`gv_ppp_programacion_diaria` 123, `gv_ppp_entregados_meta` 2.866, `vista_tanda_m3` 1.196 / 1.041,
+`vista_generador_oc` 345, `v_cajas_pedidas` 254, `gv_ppp_en_salida` 20. Las 8 NP pendientes
+intactas. RLS y policies sobrevivieron el rename (anon SELECT sí, DELETE no).
+
+#### El bug que destapó el intento — problema 105
+
+La primera corrida de la transacción **abortó entera** (bien: atómica, no quedó nada a medias)
+porque un `CREATE OR REPLACE` no compilaba: **`column pv.uxb does not exist`**.
+
+**La v16.39 borró `precios_venta.uxb` con un barrido que miró vistas y no funciones.** Postgres
+**no revalida el cuerpo de una función** al dropear una columna, así que el `DROP COLUMN` salió sin
+un error y el fallo quedó **latente hasta la primera llamada**. Quedaron **tres funciones rotas en
+producción durante un día**:
+
+| Función | Qué hace |
+|---|---|
+| `isis_pedido_json(text)` | el JSON del pedido para ISIS |
+| `gv_isis_pedido_json(text)` | ídem, versión GV |
+| `gv_ppp_web_valor_items(...)` | **valoriza los ítems de un pedido web** — camino de precio |
+
+Se arreglaron sacando el UxB de **`GV_UxB`** (fuente única desde la v16.38) con una **subconsulta
+escalar con `max()`**, no con un join: `gv_uxb_resuelto` tiene 961 filas para 526 códigos, así que
+joinear ahí **multiplica**. Es el mismo patrón `gux` que ya usa `vista_generador_oc`.
+Comprobado: las 3 llamadas devuelven OK y, sobre las 3 últimas NP facturadas, **43 de 43 ítems con
+UxB real** (26=36, 315=12, 558=24, 566E=6, 514E=100), ninguno nulo ni en 1.
+
+**La regla nueva, ya en el `CLAUDE.md`:** al dropear una columna hay que barrer también
+`pg_proc.prosrc`, y después **llamar** a las funciones que la usaban — un `DROP COLUMN` limpio no
+prueba nada.
+
+Archivos: `sql/gv_ppp_rename_a_gv_v1645.sql` y `sql/gv_fix_funciones_uxb_rotas_v1645.sql`.
+Backups: `zz_backups."GV_Backup_PPP_*_20260912"` (las 3 tablas completas) y
+`zz_backups."GV_Backup_funcdefs_ppp_20260912"` (32 definiciones previas).

@@ -733,6 +733,31 @@ texto sobre `pg_get_viewdef`, así que el repo no tenía la definición viva y h
 reconstruirla juntando un archivo viejo con instrucciones en prosa. Si se parchea una vista con
 `replace()` sobre su propia definición, **guardar después el `CREATE` resultante completo**.
 
+⚠⚠ **`DROP COLUMN`: barrer también `pg_proc.prosrc`, no sólo las vistas — y DESPUÉS llamar a
+las funciones.** Postgres **no revalida el cuerpo de una función** cuando se dropea una columna:
+el `DROP COLUMN` sale sin un solo error y el fallo queda **latente hasta la primera llamada**. El
+2026-09-12 la v16.39 borró `precios_venta.uxb` con un barrido que miró vistas y no funciones, y
+dejó **tres funciones rotas** en producción — `isis_pedido_json`, `gv_isis_pedido_json` y
+`gv_ppp_web_valor_items` (esta última **valoriza los ítems de un pedido web**, o sea camino de
+precio). Se descubrieron de casualidad un día después, al hacer un `CREATE OR REPLACE` de esas
+funciones por otro motivo: ahí Postgres sí validó el cuerpo y falló.
+
+```sql
+-- ANTES de dropear una columna
+select p.oid::regprocedure from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+ where n.nspname = 'public' and p.prosrc ~* '\muxb\M';   -- el nombre de la columna
+-- DESPUÉS del drop: llamar de verdad a cada una. Un DROP COLUMN limpio no prueba nada.
+```
+
+⚠ **Renombrar una tabla es MUCHO más barato que reescribir sus consumidores.** Las **vistas
+referencian por OID**, así que un `alter table ... rename to` es transparente para ellas y siguen
+andando sin tocarlas. Sólo hay que reescribir lo que nombra por **texto**: las funciones
+(`prosrc`) y el front. El 2026-09-12, pasar las 3 tablas PPP a nombre `GV_` bajó el cambio de
+**~70 objetos a 31 funciones + 1 constante** de `index.html`. El loop mecánico es
+`pg_get_functiondef` → `replace()` → `execute`, todo en UNA transacción con el nombre de la
+función en el `raise exception`: si una no compila, no queda nada a medias (pasó, y así se
+encontró lo del `DROP COLUMN`).
+
 **2026-09-11 (v15.44) — `index.html` y `sw.js` pusheados VACÍOS a `main`: la app quedó en blanco
 con los operarios pickeando.** Causa: un script de edición que abría el archivo en modo `w` dentro
 de la misma expresión que lo leía (`open(p,"w").write(open(p).read()...)`); Python evalúa el `open`

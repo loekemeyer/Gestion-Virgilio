@@ -1,0 +1,65 @@
+-- ============================================================================
+-- v16.45 — Se reparan 3 funciones que la v16.39 dejo rotas al borrar
+--          precios_venta.uxb.  Cierra el problema 105.
+-- Proyecto Supabase: hrxfctzncixxqmpfhskv
+--
+-- QUE PASO
+-- --------
+-- La v16.39 unifico el UxB en "GV_UxB" y borro precios_venta.uxb y
+-- precios_venta_chef.uxb. Ese barrido miro VISTAS pero NO FUNCIONES. Postgres no
+-- revalida el cuerpo de una funcion cuando se dropea una columna, asi que el
+-- DROP COLUMN salio sin un solo error y el fallo quedo LATENTE hasta la primera
+-- llamada. Quedaron tres funciones tirando "column pv.uxb does not exist":
+--
+--   isis_pedido_json(text)                        -- JSON del pedido para ISIS
+--   gv_isis_pedido_json(text)                     -- idem, version GV
+--   gv_ppp_web_valor_items(text,text,jsonb,text)  -- VALORIZA los items web (precio)
+--
+-- Se detectaron de casualidad: al intentar un CREATE OR REPLACE de esas funciones
+-- por otro motivo (el rename de las tablas PPP), Postgres valido el cuerpo y
+-- fallo. Si no, seguian rotas sin avisar.
+--
+-- LECCION (esta en el CLAUDE.md): al dropear una COLUMNA hay que barrer tambien
+-- pg_proc.prosrc, no solo las vistas. Y despues del drop, LLAMAR a las funciones
+-- que la usaban: un DROP COLUMN limpio no prueba nada.
+--
+-- EL ARREGLO
+-- ----------
+-- El UxB sale de "GV_UxB" (fuente unica desde la v16.38) con una SUBCONSULTA
+-- ESCALAR con max(), no con un JOIN: gv_uxb_resuelto tiene 961 filas para 526
+-- codigos, o sea que joinear ahi MULTIPLICA las filas. Es el mismo patron `gux`
+-- que ya usa vista_generador_oc.
+--
+-- VERIFICACION
+-- ------------
+--   Las tres llamadas devuelven OK (antes: "column pv.uxb does not exist").
+--   isis_pedido_json sobre las 3 ultimas NP facturadas: 43 de 43 items con UxB
+--   real (26=36, 315=12, 558=24, 566E=6, 514E=100...), ninguno nulo ni en 1.
+-- ============================================================================
+
+-- El reemplazo aplicado a cada una (sobre pg_get_functiondef, con guard de que el
+-- patron aparezca exactamente 1 vez):
+--
+-- isis_pedido_json:
+--   'pv.uxb  AS unidades_x_caja'
+--     -> (select max(g.uxb) from public."GV_UxB" g
+--          where public.gv_cod_stock(g.cod) = public.gv_cod_stock(ent.cod)
+--            and g.uxb > 0) AS unidades_x_caja
+--   (se conserva el join a precios_venta: de ahi sigue saliendo pv.descripcion)
+--
+-- gv_isis_pedido_json:
+--   'ent.cajas_ent AS cajas, pv.uxb'
+--     -> ent.cajas_ent AS cajas, (select max(g.uxb) ... ent.cod ...) AS uxb
+--
+-- gv_ppp_web_valor_items:
+--   'coalesce(ps.uxb, pv.uxb, pc.uxb, 1) as uxb'
+--     -> coalesce(ps.uxb,
+--                 (select max(g.uxb) from public."GV_UxB" g
+--                   where public.gv_cod_stock(g.cod) = public.gv_cod_stock(v.cod_precio)
+--                     and g.uxb > 0),
+--                 1) as uxb
+--   (ps = cobranzas_precios_super, que desde la v16.38 ya resuelve contra GV_UxB)
+
+-- Chequeo de que no quede ninguna otra funcion nombrando una columna uxb muerta:
+-- select p.oid::regprocedure from pg_proc p join pg_namespace n on n.oid=p.pronamespace
+--  where n.nspname='public' and p.prosrc ~* 'p[cv]\.uxb';   -- vacio = todo bien
