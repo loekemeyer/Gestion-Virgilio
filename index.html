@@ -7794,7 +7794,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v15.99";
+const APP_VERSION = "v16.00";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -30202,6 +30202,10 @@ function _pppEsRow(p) { return (p && p._es) ? p._es : {}; }
 function _pppEsChips(p) {
   const r = _pppEsRow(p), out = [];
   if (r.estado === "cargada") out.push('<span class="ppp-es-chip ok">🚚 Cargado al camión</span>');
+  // v15.97 (dueño, sobre la 98530: "el otro, dejalo en en salida"): un supervisor la dio por salida
+  // a mano. No hay CCN — y no se inventa uno: la marca vive en GV_PPP_Prog_Override.en_salida_manual
+  // con su fecha, y la nota dice quién y cuándo. Se cierra igual que las demás, con Recepción Remitos.
+  else if (r.estado === "salida_manual") out.push('<span class="ppp-es-chip warn" title="La dio por salida un supervisor: no hay evento de Carga Camión. La fecha es la que se le puso al marcarla.">📝 Dada por salida a mano</span>');
   // v15.55 (dueño: "si ya salieron hace más de 36hs y no se controló, tiene que aparecer allá la alerta, y
   // aparecer en En Salida"): la tanda se armó hace más de `salida_presunta_horas` (36) y nadie la cargó ni
   // la facturó. Seguro salió; falta el papel. Viene de gv_ppp_en_salida con estado 'armada_sin_carga'.
@@ -30246,7 +30250,7 @@ function _pppEnViajeHtml() {
     byDay[k].push(p);
   }
   keys.sort(); keys.reverse();
-  let html = '<div class="ppp-ent-note">🚚 <b>En salida</b> — sólo lo que se <b>cargó al camión</b> (con su fecha de carga) y todavía no tiene <b>control de remito</b>. Con el control pasan a Pedidos Entregados. Lo que no se cargó vuelve a <b>Programación</b> / <b>A Programar</b>. ' +
+  let html = '<div class="ppp-ent-note">🚚 <b>En salida</b> — sólo lo que se <b>cargó al camión</b> (con su fecha de carga) o lo que un supervisor <b>dio por salido</b>, y todavía no tiene <b>control de remito</b>. Con el control pasan a Pedidos Entregados. Lo que no se cargó vuelve a <b>Programación</b> / <b>A Programar</b>. ' +
     '<b>' + list.length + '</b> pedido(s) · <b>' + totM3.toFixed(2).replace('.', ',') + '</b> m³ · ' +
     '<b>' + nCarg + '</b> cargada(s) al camión · <b>' + nSin + '</b> sin registro de carga.' +
     (nVenc ? ' <span style="color:#b91c1c;font-weight:800;">· 🚨 ' + nVenc + ' pasado el plazo</span>' : '') + '</div>';
@@ -31600,7 +31604,36 @@ async function pppVencSinProgramar(np) {
     try { alert("No pude sacar " + n + " de la programación:\n\n" + msg); } catch (_e) {}
   }
 }
-window.pppVencVolver = pppVencVolver; window.pppVencSinProgramar = pppVencSinProgramar; window.pppVencCancelar = pppVencCancelar;
+/* v15.97 — DAR POR SALIDO un pedido que salió sin que nadie registrara la Carga Camión
+   (dueño, 11/09: "el otro, dejalo en en salida"). No escribe un CCN falso: marca
+   `GV_PPP_Prog_Override.en_salida_manual` con su FECHA (en En Salida no puede haber un pedido sin
+   fecha, v15.85) y queda la nota de quién y cuándo. El pedido sale de Programación y entra a En
+   Salida con el chip "📝 Dada por salida a mano"; se cierra con Recepción Remitos como el resto. */
+async function pppVencDarPorSalido(np) {
+  const n = String(np || "").trim(); if (!n) return;
+  let p = null;
+  try { p = (_pppParsed.prog || []).find(function (x) { return String(x.np) === n; }) || null; } catch (_e) {}
+  const feDef = (p && p.fecha_entrega) ? String(p.fecha_entrega) : "";
+  let f = "";
+  try { f = prompt("¿Qué día salió " + n + "?\n\nFormato dd/mm/aaaa. Es la fecha con la que va a figurar en En Salida.", feDef) || ""; } catch (_e) {}
+  f = f.trim(); if (!f) return;
+  const iso = _pppFechaISO(f);
+  if (!iso) { try { alert("No entendí la fecha \"" + f + "\". Poné dd/mm/aaaa."); } catch (_e) {} return; }
+  if (!confirm("¿Dar por SALIDO el pedido " + n + " el " + f + "?\n\nNadie registró la Carga Camión, así que queda anotado que lo diste por salido vos.\nPasa a «En Salida» y se cierra con Recepción Remitos.")) return;
+  pppSetStatus("Dando por salido " + n + "…", true);
+  try {
+    const r = await aprRpc("gv_ppp_en_salida_marcar", { p_nps: [n], p_fecha: iso, p_motivo: "dado por salido desde la lista de vencidos", p_por: await aprQuien() });
+    const x = (r && r[0]) || {};
+    pppSetStatus("🚚 " + n + " quedó en En Salida (" + (x.np_marcadas || 0) + " NP), con fecha " + f + ".", true);
+    await pppLoadProgFromSupabase();
+    if (typeof pppRefreshEnSalida === "function") await pppRefreshEnSalida();
+  } catch (e) {
+    const msg = (e && e.message) ? e.message : String(e);
+    pppSetStatus("⚠ No se pudo: " + msg, false);
+    try { alert("No pude dar por salido " + n + ":\n\n" + msg); } catch (_e) {}
+  }
+}
+window.pppVencVolver = pppVencVolver; window.pppVencSinProgramar = pppVencSinProgramar; window.pppVencCancelar = pppVencCancelar; window.pppVencDarPorSalido = pppVencDarPorSalido;
 /* v14.36 — Reprogramar un pedido de ISIS que NO salió (tanda sin armar) a un día nuevo, POR SU NÚMERO.
    Reusa el mismo pop-up de días de mover tandas (gv_ppp_web_calendario). Al elegir el día llama a
    gv_ppp_isis_programar, que escribe GV_PPP_Prog_Override (no toca la tabla que comparte Producción ni
@@ -33968,7 +34001,7 @@ function _pppPlanDiaHtml(programados, key, opts) {
     // sin fecha, ni pedidos que no se hayan cargado a un camión"). El camino real es registrar la carga
     // desde Carga Camión, que es lo que faltó: ahí el pedido pasa a En Salida y se cierra con Recepción
     // Remitos. Dejar el texto viejo mandaba a la operadora a esperar algo que ya no pasa.
-    if (sinRem) h += '<div class="pn-note"><b>' + sinRem + '</b> ' + (sinRem === 1 ? 'pedido salió' : 'pedidos salieron') + ' con la tanda armada y <b>nadie registró la Carga Camión</b>. Mientras no se registre, el pedido queda acá: no entra a <b>En Salida</b> y no se puede cerrar. El que lo cargó tiene que marcarlo en <b>Carga Camión</b> — de ahí pasa a En Salida y se cierra con <b>Recepción Remitos</b>. Si no sabés si salió, <b>↩ Sin programar</b> lo saca de la programación (sin tanda ni fecha) y queda en <b>📥 A Programar</b> para revisarlo.</div>';
+    if (sinRem) h += '<div class="pn-note"><b>' + sinRem + '</b> ' + (sinRem === 1 ? 'pedido salió' : 'pedidos salieron') + ' con la tanda armada y <b>nadie registró la Carga Camión</b>. Mientras no se registre, el pedido queda acá: no entra a <b>En Salida</b> y no se puede cerrar. El que lo cargó tiene que marcarlo en <b>Carga Camión</b> — de ahí pasa a En Salida y se cierra con <b>Recepción Remitos</b>. Si ya salió y nadie lo marcó, <b>🚚 Ya salió</b> lo pasa a En Salida con su fecha. Si no sabés si salió, <b>↩ Sin programar</b> lo saca de la programación y queda en <b>📥 A Programar</b> para revisarlo.</div>';
   }
   const dk = esVenc ? "venc" : key;
   for (const c of cams) {
@@ -34045,6 +34078,7 @@ function _pppPlanDiaHtml(programados, key, opts) {
         : (esVenc && e === "armado")
         ? '<div class="pn-acc">' +
             '<button class="pn-acc-b" onclick="event.stopPropagation();pppVencSinProgramar(\'' + _npS + '\')" title="Nunca se registró la carga al camión: sacalo de la programación (sin tanda ni fecha) y revisalo en A Programar">↩ Sin programar</button>' +
+            '<button class="pn-acc-b" onclick="event.stopPropagation();pppVencDarPorSalido(\'' + _npS + '\')" title="Salió igual, pero nadie registró la Carga Camión: dalo por salido con su fecha y pasa a En Salida">🚚 Ya salió</button>' +
           '</div>'
         : (!esVenc && e === "sin")
         ? '<div class="pn-acc">' +

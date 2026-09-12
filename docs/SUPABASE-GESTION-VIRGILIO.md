@@ -7828,3 +7828,47 @@ también como `anon`); `gv_ppp_programacion_diaria` sigue en **123** filas — n
 **Backup:** `public."GV_PPP_Prog_Override_bkp_20260911_v1593"` (105 filas), tomado antes de escribir.
 **Rollback rápido:** `update public."GV_PPP_Prog_Override" set desprogramada = false where desprogramada;`
 **Archivo:** `sql/gv_ppp_isis_desprogramar_v1593.sql`. Objetos todos nuestros (`GV_*` / `gv_*`).
+
+## §3.cn.3 — Dar por salida una NP a mano (v16.00, 2026-09-11/12)
+
+Thomas, cerrando los 7 que quedaban: *"Los 44xxx mandalos a programar? El otro, dejalo en en
+salida"*.
+
+### 44612..44617 (Cencosud, D72B/D72C) → 📥 A Programar
+
+Armadas (TAP 10/09 y 11/09), **sin facturar**, sin ningún registro de carga. `gv_ppp_isis_desprogramar`
+las dejó sin tanda ni fecha. A Programar pasa de 8 a **14**.
+
+### 98530 (D60C, Shopping Domino) → En Salida
+
+Acá había un choque con la regla que él mismo había puesto a la mañana (v15.85: *"en En Salida no
+puede haber ningún pedido sin fecha, ni pedidos que no se hayan cargado a un camión"*). La 98530
+está armada (TAP 09/09) y facturada (10/09), pero **nadie registró la Carga Camión**.
+
+**La regla no se tocó**: a En Salida sigue sin entrar **sola** ninguna NP sin CCN. Lo que se agregó
+es un **override explícito por NP** — el mismo patrón que `GV_PPP_Prog_Override` para la PPP: un
+supervisor decide que ese pedido salió y queda registrado **quién, cuándo y con qué fecha**.
+
+**No se escribe un CCN falso.** Inventaría el legajo del que cargó el camión, y la vista justamente
+descarta los CCN de legajo de prueba. La marca es otra cosa y se ve como otra cosa.
+
+| | |
+|---|---|
+| `GV_PPP_Prog_Override.en_salida_manual` | bool not null default false |
+| `GV_PPP_Prog_Override.en_salida_fecha` | date — **obligatoria**; si no se pasa, la fecha de entrega de la PPP (o la de factura) |
+| `gv_ppp_en_salida` | la marca entra a la base y pasa el filtro `solo_cargadas`; `estado = 'salida_manual'`, `fecha_carga = coalesce(CCN, en_salida_fecha)` |
+| `gv_ppp_en_salida_marcar(nps, fecha, motivo, por)` | sólo supervisor; corta si ya tiene **CRN** (entregada) o **CCN** (ya está en En Salida) |
+| `gv_ppp_en_salida_desmarcar(nps, por)` | deshace |
+| `en_salida_manual` ↔ `desprogramada` | **excluyentes**: cada RPC apaga la otra |
+
+**Front:** chip **📝 Dada por salida a mano** en En Salida, y botón **🚚 Ya salió** en la lista de
+vencidos, al lado de **↩ Sin programar**. Pide la fecha (default: la de entrega) y la manda al
+backend en ISO — reusando `_pppFechaISO`, que ya existía; la primera versión de este cambio la
+duplicó por descuido y se sacó antes de pushear (una redefinición silenciosa habría cambiado cómo
+se guardan las fechas de `PPP_Web_Programacion`).
+
+**Medido (como `anon`):** En Salida 19 → **20**, con **0 sin fecha**. A Programar 8 → **14**.
+`gv_ppp_programacion_diaria` sigue en **123**.
+
+**Backup:** `public."GV_PPP_Prog_Override_bkp_20260912_pre_ensalida"` (113 filas).
+**Archivo:** `sql/gv_ppp_en_salida_manual_v1600.sql`. Objetos todos nuestros (`GV_*` / `gv_*`).
