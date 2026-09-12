@@ -4,6 +4,7 @@
 //   2. Chef products (CHEF_KEY — publishable key, lectura pública) → precios_venta_chef
 //   3. LK products ∪ loke_products ∪ item_precios(manual) → GV_UxB (empresa=LK)
 // v16.21 (2026-09-12): el destino 3 pasó de la tabla cob_uxb_lk a GV_UxB, la única de UxB.
+// v16.22 (2026-09-12): precios_venta ya no recibe uxb — es lista de precios, el UxB es de GV_UxB.
 // v14.44: listas SEPARADAS por empresa (antes merge con "Chef gana", ensuciaba LK).
 // v14.47: RECONCILIA — borra de cada mirror lo que ya no está en su catálogo de origen,
 //         así precios_venta = catálogo LK exacto y precios_venta_chef = catálogo Chef exacto
@@ -129,21 +130,23 @@ Deno.serve(async (_req: Request): Promise<Response> => {
     // compartido (809E, 437E, 438E) tomaba el precio de Chef (809E 3005 en vez de
     // 4060). Ahora cada lista es de su empresa y la valuación se enruta por empresa
     // (gv_vista_facturacion_neto_items, gv_ppp_np_valor, cobranzas_precios).
+    // v16.22: el payload YA NO lleva uxb. precios_venta es la lista de PRECIOS; el UxB lo
+    // manda GV_UxB y nadie más. Mientras el sync mandaba uxb, el catálogo de LK le ganaba a
+    // lo que decidió Thomas en cada corrida: el 067 volvía a 50 cada 15 min aunque GV_UxB
+    // dijera 60. Como PostgREST con merge-duplicates sólo pisa las columnas presentes en el
+    // payload, al sacarla la columna queda intacta y la alinea gv_uxb_desalineado.
     const mapProductos = (prods: Product[]) => {
-      const m = new Map<string, { precio_unit: number; uxb: number | null; descripcion: string }>();
+      const m = new Map<string, { precio_unit: number; descripcion: string }>();
       for (const p of prods) {
         const cod = (p.cod || "").trim();
         if (!cod || !p.list_price || p.list_price <= 0) continue;
         m.set(cod, {
           precio_unit: p.list_price,
-          // v16.21: uxb <= 1 es el placeholder de "no sé" del catálogo; guardarlo como null.
-          // Con el 1 adentro, Facturación cobraba unidades donde iban cajas.
-          uxb: p.uxb && p.uxb > 1 ? p.uxb : null,
           descripcion: (p.description || "").slice(0, 200),
         });
       }
       return Array.from(m, ([cod, v]) => ({
-        cod, precio_unit: v.precio_unit, uxb: v.uxb, descripcion: v.descripcion, actualizado: nowIso,
+        cod, precio_unit: v.precio_unit, descripcion: v.descripcion, actualizado: nowIso,
       }));
     };
     // products PRIMERO: al recorrer en orden, un manual con el mismo cod no pisa al maestro
@@ -161,7 +164,7 @@ Deno.serve(async (_req: Request): Promise<Response> => {
     if (preciosChefRows.length) await reconcileStale("precios_venta_chef", nowIso);
 
     // ── 4) GV_UxB (empresa='LK') — uxb de LK products ∪ loke_products ∪ manuales ──
-    // v16.21: dos guardas nuevas.
+    // v16.21/22: dos guardas.
     //   a) uxb <= 1 NO se escribe: en el catálogo de LK el 1 es un placeholder de "no sé" y
     //      viajaba tal cual, así que Facturación cobraba 5 unidades donde iban 5 cajas de 24
     //      (029 Colador Ø16). Sin dato es mejor que un dato falso.

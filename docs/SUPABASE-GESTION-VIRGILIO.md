@@ -8723,3 +8723,86 @@ LK y `precios_venta` dicen **50**, y `Articulos_Cajas` / `OC_Maximos` / el maest
 para que el centinela lo siga mostrando.
 
 Archivo: `sql/gv_uxb_redireccion_v1621.sql`. Rollback en `docs/ROLLBACK-PRODUCCION.md`.
+
+### §3.da — v16.22: el 067 es 60, y el UxB se resuelve POR EMPRESA — 2026-09-12
+
+Dos cosas, las dos de Thomas: *"067 60"* y *"2 desarrollame un poco mas"*.
+
+#### 067 Sacacorcho Tipo Mozo Suelto = 60
+
+El catálogo de LK decía **50**, y `Articulos_Cajas` / `OC_Maximos` / el maestro decían **60**.
+Thomas resolvió: **60**. Queda `curado` en `GV_UxB`, así que el trigger `gv_uxb_protege_curado`
+impide que el sync lo pise.
+
+**Pero faltaba tapar una fuga.** El sync también escribía `precios_venta.uxb` desde el catálogo
+de LK, y ahí no había ninguna protección: el 067 volvía a 50 **cada 15 minutos**. Se comprobó en
+vivo — se puso 60, corrió el cron, y volvió a 50. Arreglado en `sync-precios-venta` **v12**: el
+payload de `precios_venta` **ya no lleva `uxb`**. Esa tabla es la lista de **precios**; el UxB lo
+manda `GV_UxB` y nadie más. Como PostgREST con `merge-duplicates` sólo pisa las columnas que
+vienen en el payload, al sacarla la columna queda intacta. Verificado: se corrió el sync dos
+veces más y el 60 aguanta en las dos tablas.
+
+#### Los 12 códigos que son dos productos distintos
+
+Un mismo `cod` es un artículo en LK y otro en Chef (tabla `GV_Cod_Dos_Productos`):
+
+| cod | en LK | en Chef |
+|---|---|---|
+| 26 | Colador N°8 (36) | Pinza de Fideos (12) |
+| 29 | Colador N°16 (24) | Batidor Resorte (24) |
+| 34 | Filtro de Café Gastronómico (24) | Espumadera (24) |
+| 36 | Rallador Cilíndrico (36) | Cuchara Ac. Inox (12) |
+| 37 | Espátula Lisa Nylon (24) | Cuchara Calada Ac. Inox (12) |
+| 42 | Cuchara Calada Nylon (24) | Abrelatas Mariposa (12) |
+| 43 | Colador 10 cm | Tres en Uno (12) |
+| 51 | Limpia Bombilla (36) | Pinza de Fiambre (12) |
+| 655 | Bombilla Eco Plástica (24) | Cuch. Calada Verde Nylon (12) |
+| 658 | Bombilla Básica Larga Recta (24) | Esp. Calada Nylon Verde (24) |
+| 659 | Bombilla Básica Larga Curva (24) | Pala de Torta Verde (24) |
+| 724 | Vaso Fernetero Cerámica (4) | Sacacorcho Espumante (24) |
+
+**El problema no era el nombre: era que Facturación resolvía el UxB sin mirar la empresa.**
+
+```
+COALESCE(ps.uxb, pcl.uxb, pc.uxb, pv.uxb, ux.uxb)
+                          ^chef   ^LK     ^LK
+```
+
+Si el código no estaba en la lista de Chef (`pc`), caía en las **dos fuentes de LK**. O sea que
+una NP de Chef podía tomar el UxB del artículo de LK que comparte el número. **Pasó de verdad:**
+el 26 de una NP de Chef (Pinza de Fideos, x12) se facturó con **36**, el del Colador de LK.
+
+**No hace falta cambiarle el código a Chef** (eso sería tocar su catálogo y el ISIS). Alcanza con
+que la vista resuelva por empresa, dato que ya tenía a mano: `empresa_precio`, que además ya
+contempla la regla de la "L" (artículo de Loeke vendido por Chef → se valúa como LK).
+
+```sql
+gv_uxb_emp (empresa_precio, cod_canon, cod_norm, uxb)   -- sobre GV_UxB
+COALESCE(ps.uxb, pcl.uxb, uxe.uxb, pc.uxb, pv.uxb, ux.uxb)
+```
+
+`uxe` va **después** de los overrides por cliente (`ps` precio de súper, `pcl` precio por cliente)
+y **antes** de las listas, porque las listas arrastran el uxb viejo del catálogo y `GV_UxB` es la
+fuente. Se aplicó a las tres vistas con `create or replace` (sin `drop`, tipos idénticos):
+`vista_facturacion_neto_items`, `vista_facturable_anticipado` y `vista_plata_perdida` (esta última
+usa `norm_cod`, por eso `gv_uxb_emp` trae las dos normalizaciones).
+
+**Impacto medido** — `vista_facturacion_neto_items`, mismas **10.604 filas**, **+$10.405.249**
+sobre la v16.21, todo en 5 códigos de Chef:
+
+| cod | líneas | antes → ahora | delta | por qué |
+|---|--:|---|--:|---|
+| 824 | 36 | 12 → 36 | +6.247.481 | Thomas: *"824: 36"*; `Articulos_Cajas` CH también dice 36 |
+| 830 | 2 | — → 24 | +1.798.085 | regla del dueño (colador 20 = 24); antes no se valuaba |
+| 877E | 3 | — → 12 | +1.319.333 | del listado de Thomas (CH x12); antes no se valuaba |
+| 828 | 2 | — → 24 | +1.060.346 | `Articulos_Cajas` CH = 24 (Colador N°16) |
+| 26 | 1 | 36 → 12 | −73.372 | **acá estaba el error**: Pinza de Fideos con el UxB del Colador de LK |
+
+Los cuatro positivos son líneas de Chef que antes salían **sin UxB** (importe 0) o con el de LK.
+`vista_plata_perdida` y `vista_facturable_anticipado`: **0 de diferencia** — mismo cambio, ningún
+caso vivo. Los otros 7 duales no mueven nada: o no tienen líneas facturadas, o los dos lados
+tienen la misma UxB (29 y 34 son 24 en las dos; 658 y 659 son 24 en las dos).
+
+**Centinela:** `select count(*) from public.gv_uxb_desalineado;` → **0**.
+
+Archivo: `sql/gv_uxb_por_empresa_v1622.sql`. Rollback en `docs/ROLLBACK-PRODUCCION.md`.

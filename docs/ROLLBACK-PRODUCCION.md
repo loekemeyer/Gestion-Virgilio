@@ -943,3 +943,42 @@ insert into public."GV_UxB" select * from public."GV_UxB_bkp_prenorm_20260912";
 -- 5) la Edge Function: redeployar la v9 (el diff está en el commit de la v16.21,
 --    supabase/functions/sync-precios-venta/index.ts)
 ```
+
+## v16.22 (2026-09-12) — el UxB se resuelve por empresa; 067 = 60
+
+**Objetos compartidos tocados:** `vista_facturacion_neto_items`, `vista_facturable_anticipado` y
+`vista_plata_perdida` (se les agregó el join a `gv_uxb_emp` y el escalón `uxe.uxb` en el COALESCE
+del uxb; nada más de la definición), la tabla `precios_venta` (realineada desde `GV_UxB`), y la
+Edge Function `sync-precios-venta` (v12: el payload de `precios_venta` ya no lleva `uxb`).
+Objetos nuevos: la vista `gv_uxb_emp`.
+
+**Impacto medido:** `vista_facturacion_neto_items` pasa de $1.384.819.066,43 a $1.395.224.315,83
+(+$10.405.249) con las **mismas 10.604 filas**, todo en 5 códigos de Chef (824, 830, 877E, 828 y
+26 — ver §3.da de `docs/SUPABASE-GESTION-VIRGILIO.md` para el detalle línea por línea).
+`vista_plata_perdida` y `vista_facturable_anticipado`: **0 de diferencia**.
+
+**Backup:** `GV_Viewdefs_bkp_20260912c` (definición previa de las 3 vistas; con RLS y sin
+escritura para `anon`).
+
+**Rollback exacto:**
+
+```sql
+do $$
+declare r record;
+begin
+  for r in select nombre, def from public."GV_Viewdefs_bkp_20260912c" loop
+    execute format('create or replace view public.%I as %s', r.nombre, r.def);
+  end loop;
+end $$;
+drop view if exists public.gv_uxb_emp;
+
+-- volver el 067 a 50 y sacarle el curado (sólo si se decide que era 50)
+update public."GV_UxB" set uxb = 50, curado = false where empresa = 'LK' and cod = '67';
+
+-- sacar el lado CH de los duales que se cargó en esta versión
+delete from public."GV_UxB"
+ where empresa = 'CH' and origen like 'dual 12/09/2026: lado CH desde Articulos_Cajas%';
+
+-- la Edge Function: redeployar la v11 (el diff está en el commit de la v16.22,
+-- supabase/functions/sync-precios-venta/index.ts) — vuelve a mandar uxb a precios_venta
+```
