@@ -9201,3 +9201,34 @@ $1.395.224.315,83 (sin moverse) · anticipado $77.843.819,56 · `gv_ppp_np_valor
 $1.395.961.659 · los 4 centinelas en 0.
 
 Archivo: `sql/gv_uxb_lectores_v1629.sql`.
+
+### §3.dh — v16.30: Importados toma el UxB de GV_UxB — 2026-09-12
+
+Tercer tramo. Verificación previa sobre las 154 filas principal+activo de `Importados`:
+
+- **0 difieren** de `GV_UxB` — los que están, coinciden exacto
+- sólo **4** faltaban con valor real: `119E`=12, `522ES`=25, `602E`=12 y `814E`=1
+- `814E` **no** se absorbió: ese 1 es el placeholder de "no sé" del catálogo de LK
+- 32 no tienen dato en ningún lado (5 son **partes** —`505C`, `587C`, `523C`, `1000900`,
+  `1546903`— que no llevan caja)
+
+**Una trampa del matcheo que vale anotar:** cruzando por `canon_cod` parecían faltar **39**,
+pero `canon_cod` **no quita la L final**, así que `437EL`/`438EL`/`439EL` no encontraban a
+`437E`/`438E`/`439E`. Cruzando por `gv_cod_stock` los 39 bajan a 4. El código con L es el
+artículo de Loeke vendido por Chef, no otro artículo.
+
+`gv_importados_ordenes` toma ahora el uxb de `GV_UxB` por empresa, con
+`Importados.uni_x_caja` de fallback. **Los tres usos** —la columna de salida,
+`est_madre_live` y el cálculo de `stock_actual`/`unidades_pedidas`— pasan por el mismo valor,
+así que no puede repetirse lo de `vista_facturable_anticipado` (mostrar un UxB y calcular con
+otro).
+
+**Medido:** 156 filas · 18.173 brutas · 1.351 pedidas · 17.130 disponibles — idéntico.
+Testigos: **584E** 15−5=10 cajas / 60 u · **824** en 36 · `437EL` resuelto vía `gv_cod_stock`.
+
+**Por qué no se renombra `Importados.uni_x_caja`:** la leen todavía `vista_importados_partes` y
+`v_importados_ordenes`, que es la vista vieja de Producción y por protocolo no se toca. Además
+es un dato propio de la ficha del artículo importado, no una copia — lo que importaba era que
+la vista que lo **muestra** tome la fuente única, y eso ya está.
+
+Archivo: `sql/gv_uxb_importados_v1630.sql`.
