@@ -25,6 +25,61 @@ no tiene más razón de ser. La meta es `cod: "438E"` + `emp: "LK"`, siempre.
 | `vista_saldos_stock.cod_art` | 8 | lo **emite** la vista |
 | `index.html` | — | `codBase` ×67, `PICK_UBIC_DUAL` ×15, `pkCodEmpresa` ×11, `pkResolveArt` ×3 |
 
+## ⚠ CORRECCIÓN (2026-09-12, Luis): el paso 1 tal como estaba escrito FUNDE dos productos
+
+> *"1 sí, pero no mezcles con el otro de CH, lo mismo para 437"*.
+
+**El paso 1 de abajo está mal y no se ejecuta como está.** Decía "es un `CASE` de menos".
+Medido: **no lo es**, y el que lo corre funde 809E LK con 809E CH.
+
+El motivo es una línea de `stockFetchSaldos`:
+
+```js
+const k = String(x.cod_art);   // ⬅ la CLAVE del mapa de saldos es el código CON sufijo
+```
+
+Hay **14 call sites** de `stockFetchSaldos` (MG, Bajar de racks, Insumos, OCG, CP, faltantes,
+capacidad de góndola…) y todos leen `m[cod]` como el **total** de ese artículo. Hoy el sufijo
+es lo único que mantiene separados los cuatro duales; si la vista deja de emitirlo:
+
+| código | LK | CH | sumarlos es… |
+|:--|:--|:--|:--|
+| `809E` | Corta **Pizza** (J13-J14) | Corta **Queso** (M13-M15) | **incorrecto: dos productos** |
+| `437E` | colador LK (F09-F12) | colador CH (L07-L08) | **incorrecto** |
+| `438E` | (F13-F16) | (L05-L06) | **incorrecto** |
+| los otros 292 códigos con dos filas | mismo artículo | mismo artículo | correcto |
+
+O sea: para **4** códigos sumar está mal y para **292** está bien. Un cambio en la vista no
+puede distinguirlos — el que distingue es el lector.
+
+### Lo que SÍ se hizo (v16.14)
+
+`codCanonSuf` —la función única de mostrar un código, 50 call sites— ahora separa la empresa
+del código: **`809E · CH`** en vez de `809E CH`. Es el 100% de la parte VISIBLE (que era el
+pedido original: *"eliminar toda instancia de esos códigos feos"*) con cero riesgo: una
+función, ningún lector cambia de clave, ninguna suma se mueve.
+
+### Lo que FALTA para pelarlo de verdad (paso 1 corregido)
+
+La clave del mapa tiene que dejar de ser un string que parece un código y pasar a ser el par
+`(cod, empresa)` **explícito**, en los 14 lectores, ANTES de tocar la vista. Concretamente:
+
+1. `vista_saldos_stock` agrega una columna `clave` (= `cod_art` de hoy, con sufijo para duales)
+   y deja `cod_art` **siempre pelado**. Las dos conviven: nada se rompe.
+2. Los 14 lectores pasan de `x.cod_art` a `x.clave` — cambio mecánico, sin cambio de conducta,
+   verificable comparando el mapa viejo contra el nuevo (tiene que dar idéntico).
+3. Recién ahí la vista puede dejar de emitir el sufijo en `cod_art`, porque ya nadie lo usa
+   como clave.
+4. **Invariante a chequear en cada paso:** `m` tiene que seguir teniendo **dos entradas** para
+   809E, 437E y 438E. Si en algún momento queda una sola, el operario trae el producto
+   equivocado — es el mismo bug que costó la v15.77.
+
+Ojo con `439E`: está en `codigos_duales` pero en `gv_lugar_articulo` **sólo tiene lugar LK**
+(H33 H34 Ñ54). O es dual y le falta el lugar de CH, o no es dual. Hay que resolverlo antes,
+porque el invariante de arriba no se puede escribir sin saber cuántas entradas le tocan.
+
+---
+
 ## Paso 1 — la vista (es un `CASE` de menos, no una vista nueva)
 
 `vista_saldos_stock` **ya agrupa por `(ckey, empresa)` y ya devuelve la columna `empresa`**.
