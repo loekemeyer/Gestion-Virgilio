@@ -1016,7 +1016,7 @@ async function gondReturnCheck(items) {
     if (!cods.length) return [];
     const res = await Promise.all([
       supabase.from("Capacidad_Sector").select("cod,cajas_max"),
-      supabase.from("vista_saldos_stock").select("cod_art,terminado").in("cod_art", cods),
+      supabase.from("vista_saldos_stock").select("clave,cod_art,terminado").in("clave", cods),
       supabase.from("proyeccion_madre").select("cod,proy_cajas_mes")
     ]);
     const cap = {}, gond = {}, proy = {};
@@ -1024,7 +1024,11 @@ async function gondReturnCheck(items) {
     // v15.71 — ACUMULA (ver stockFetchSaldos de index.html): vista_saldos_stock agrupa por
     // (código, empresa) y un código pelado puede volver en varias filas; con el `=` el aviso
     // de exceso de góndola comparaba contra el saldo de UNA de ellas.
-    ((res[1] && res[1].data) || []).forEach(function (r) { const kk = _ocgNorm(r.cod_art); if (kk) gond[kk] = (gond[kk] || 0) + (Number(r.terminado) || 0); });
+    // v16.16 — por `clave` (ver stockFetchSaldos de index.html). OJO: `cods` son los codigos
+    // PELADOS de la recepcion, asi que para los 4 duales este filtro no matchea ni antes ni
+    // ahora (la clave es "809E CH") y el aviso de exceso no salta. Para cubrirlos hay que
+    // pasarle la empresa; queda anotado en docs/PLAN-SACAR-SUFIJO-EMPRESA.md.
+    ((res[1] && res[1].data) || []).forEach(function (r) { const kk = _ocgNorm(r.clave || r.cod_art); if (kk) gond[kk] = (gond[kk] || 0) + (Number(r.terminado) || 0); });
     ((res[2] && res[2].data) || []).forEach(function (r) { const k = _ocgNorm(r.cod); if (k) proy[k] = Number(r.proy_cajas_mes) || 0; });
     const flag = [];
     (items || []).forEach(function (it) {
@@ -1662,7 +1666,7 @@ async function _opPrefetchGond(cod) {
     await sessionReady;
     const res = await Promise.all([
       supabase.from("Capacidad_Sector").select("cajas_max").eq("cod", k),
-      supabase.from("vista_saldos_stock").select("terminado").eq("cod_art", k)
+      supabase.from("vista_saldos_stock").select("terminado").eq("clave", k)
     ]);
     let cap = 0, hasCap = false;
     ((res[0] && res[0].data) || []).forEach(function (r) { hasCap = true; cap += Number(r.cajas_max) || 0; });

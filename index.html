@@ -7816,7 +7816,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v16.15";
+const APP_VERSION = "v16.16";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -9815,7 +9815,7 @@ async function pkFetchExcedente(arts) {
     let rs, ru;
     try {
       const res = await Promise.all([
-        fetch(SUPABASE_URL + "/rest/v1/vista_saldos_stock?cod_art=in.(" + inList + ")&select=cod_art,excedente&limit=1000", { headers: H, cache: "no-store", signal: _ctrl ? _ctrl.signal : undefined }),
+        fetch(SUPABASE_URL + "/rest/v1/vista_saldos_stock?clave=in.(" + inList + ")&select=clave,cod_art,excedente&limit=1000", { headers: H, cache: "no-store", signal: _ctrl ? _ctrl.signal : undefined }),
         fetch(SUPABASE_STOCK_ENDPOINT + "?deposito=eq.excedente&delta=gt.0&ubicacion=not.is.null&cod_art=in.(" + inList + ")&select=cod_art,ubicacion,ts&order=ts.desc&limit=1000", { headers: H, cache: "no-store", signal: _ctrl ? _ctrl.signal : undefined })
       ]);
       rs = res[0]; ru = res[1];
@@ -9829,7 +9829,9 @@ async function pkFetchExcedente(arts) {
     // fila, no el total.
     const acum = {};
     (Array.isArray(saldos) ? saldos : []).forEach(function (x) {
-      const k = String(x.cod_art).toUpperCase();
+      // v16.16 — por `clave`, no por `cod_art`: son el MISMO valor hoy, pero `clave` es la
+      // que va a seguir distinguiendo 809E LK de 809E CH cuando `cod_art` quede pelado.
+      const k = String(x.clave || x.cod_art).toUpperCase();
       acum[k] = (acum[k] || 0) + (Number(x.excedente) || 0);
     });
     Object.keys(acum).forEach(function (k) {
@@ -10176,7 +10178,7 @@ async function _pkCeldasPorCod() {
    del código exacto = lo que suma el trigger. Devuelve null si no se pudo. */
 async function _pkConteoSistema(art) {
   try {
-    const rows = await supaFetchAllSafe(SUPABASE_URL + "/rest/v1/vista_saldos_stock", "select=cod_art,terminado&cod_art=eq." + encodeURIComponent(String(art).trim()));
+    const rows = await supaFetchAllSafe(SUPABASE_URL + "/rest/v1/vista_saldos_stock", "select=clave,terminado&clave=eq." + encodeURIComponent(String(art).trim()));
     let s = 0; (rows || []).forEach(function (r) { s += Number(r.terminado) || 0; });
     return Math.round(s);
   } catch (_e) { return null; }
@@ -12068,7 +12070,7 @@ function stockMove(rows) {
 async function _stkGondolaSaldoVivo(cod) {
   try {
     const H = { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY };
-    const r = await fetch(SUPABASE_URL + "/rest/v1/vista_saldos_stock?cod_art=eq." + encodeURIComponent(cod) + "&select=terminado", { headers: H, cache: "no-store" });
+    const r = await fetch(SUPABASE_URL + "/rest/v1/vista_saldos_stock?clave=eq." + encodeURIComponent(cod) + "&select=terminado", { headers: H, cache: "no-store" });
     if (!r.ok) return null;
     const a = await r.json();
     if (!a || !a.length) return 0;   // sin fila = sin saldo = 0
@@ -12171,7 +12173,11 @@ async function stockFetchSaldos() {
   const m = {};
   const DEPS = ["terminado", "excedente", "separar_pedidos", "a_facturar", "a_guardar", "racks", "insumos", "para_envasar", "racks_ch"];
   rows.forEach(function (x) {
-    const k = String(x.cod_art);
+    // v16.16 — la clave del mapa pasa a ser la columna `clave` de la vista, que se llama
+    // lo que es. Hoy vale lo MISMO que `cod_art` (verificado: 0 filas distintas de 488),
+    // asi que este cambio es un no-op medible; lo que habilita es pelar `cod_art` despues
+    // sin fundir los 4 duales. Ver docs/PLAN-SACAR-SUFIJO-EMPRESA.md.
+    const k = String(x.clave || x.cod_art);
     // v12.98 (idea 9017): para_envasar y racks_ch ya venían en la vista (idea 7263) pero acá se
     // perdían → "Bajar de racks", MG guardado, catálogo de Insumos y CP los veían en 0 aunque
     // hubiera stock real (712E racks_ch=444, 584E para_envasar=424).
@@ -32175,7 +32181,7 @@ function _pppChkCard(titulo, cuerpo) {
    estar la mercadería que falta. Devuelve las filas crudas de la vista. */
 function _pppChkFetchSaldos() {
   return supaFetchAllSafe(SUPABASE_URL + "/rest/v1/vista_saldos_stock",
-    "select=cod_art,descripcion,terminado,excedente,racks,racks_ch,a_guardar,para_envasar");
+    "select=clave,cod_art,descripcion,terminado,excedente,racks,racks_ch,a_guardar,para_envasar");
 }
 /* Picking físicamente hecho pero TODAVÍA no descontado del stock (ver el ⚠ de arriba):
    PKC de los últimos 3 días cuyas tandas no tienen ningún movimiento `picking` escrito.
@@ -32218,7 +32224,7 @@ function _pppChkBuildMaps(saldos) {
     m[k].aguardar += num(s.a_guardar); m[k].envasar += num(s.para_envasar);
   };
   (saldos || []).forEach(function (s) {
-    const raw = String(s.cod_art == null ? "" : s.cod_art);
+    const raw = String((s.clave != null ? s.clave : s.cod_art) == null ? "" : (s.clave != null ? s.clave : s.cod_art));   // v16.16: por `clave` (ver stockFetchSaldos)
     const k = _ocgNorm(raw);
     acum(byKey, k, s); acum(byFam, _ocgNorm(codBase(raw)), s);
     const d = String(s.descripcion || "").trim();

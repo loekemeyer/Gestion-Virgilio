@@ -771,3 +771,39 @@ select definicion from public."GV_Backup_Viewdefs_20260912"
 -- ejecutar ese texto
 ```
 Notas: `sql/gv_trigger_stock_total_v1609.sql`.
+
+## 2026-09-12 · v16.16 — `vista_saldos_stock` gana la columna `clave` (objeto COMPARTIDO)
+
+**Qué se cambió.** `create or replace view public.vista_saldos_stock` agregando **una columna
+al final**, `clave`, con el mismo valor que `cod_art` tiene hoy. Ninguna otra columna se tocó.
+Sin cambio de `reloptions` (la vista sigue sin `security_invoker`, como estaba) ni de grants.
+
+**Impacto medido** (misma consulta antes y después):
+
+| | antes | después |
+|:--|--:|--:|
+| filas | 488 | 488 |
+| firma md5 de todas las columnas viejas | `84f2d585c9f6c01310ed5b53e41a2092` | igual |
+| filas con `clave` distinta de `cod_art` | — | 0 de 488 |
+
+**Por qué.** El front usaba `cod_art` como clave del mapa de saldos y el sufijo de empresa era
+lo único que separaba 809E LK (Corta Pizza) de 809E CH (Corta Queso). `clave` permite migrar
+los lectores antes de pelar `cod_art`.
+
+**Backup de la definición previa:** tabla `public."GV_Backup_vista_saldos_def_20260912"`
+(columna `definicion`, RLS prendida).
+
+**Rollback exacto:**
+
+```sql
+-- 1) recuperar la definición previa
+select definicion from public."GV_Backup_vista_saldos_def_20260912"
+ where objeto = 'public.vista_saldos_stock' order by guardado_at limit 1;
+-- 2) ejecutarla como: create or replace view public.vista_saldos_stock as <definicion>;
+```
+
+⚠ **El rollback de la vista OBLIGA a rollear la app a v16.15 o anterior.** Desde la v16.16
+siete lecturas piden `clave` (`pkFetchExcedente`, `_pkConteoSistema`, `_stkGondolaSaldoVivo`,
+`stockFetchSaldos`, `_pppChkFetchSaldos`, y las dos de `recepcion.js`) y PostgREST devuelve
+**400** si la columna no existe. Los `try/catch` degradan a "sin datos" en vez de romper la
+pantalla, pero el stock se vería en 0.

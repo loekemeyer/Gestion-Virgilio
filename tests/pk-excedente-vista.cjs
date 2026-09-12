@@ -28,7 +28,10 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
       const J = (rows, status) => ({ ok: (status || 200) < 400, status: status || 200, json: async () => rows, headers: { get: () => null } });
       if (String(url).indexOf("vista_saldos_stock") >= 0) {
         if (vistaFalla) return J([], 500);
-        return J([{ cod_art: "502", excedente: 0 }, { cod_art: "066", excedente: 137 }, { cod_art: "315", excedente: 4 }]);
+        // v16.16 — la vista devuelve `clave` (la que distingue 809E LK de 809E CH) además de
+        // `cod_art`. El 315 va SIN `clave` a propósito: prueba el fallback a `cod_art` por si
+        // se rueda atrás la vista y la columna desaparece.
+        return J([{ clave: "502", cod_art: "502", excedente: 0 }, { clave: "066", cod_art: "066", excedente: 137 }, { cod_art: "315", excedente: 4 }]);
       }
       if (String(url).indexOf("Movimientos_Stock") >= 0) {
         return J([
@@ -51,7 +54,10 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
     out.noPedido546 = !m["546"];
     const uv = urls.find(u => u.indexOf("vista_saldos_stock") >= 0) || "";
     const um = urls.find(u => u.indexOf("Movimientos_Stock") >= 0) || "";
-    out.vistaFiltraCods = uv.indexOf("cod_art=in.(502,066,315,546)") >= 0 && uv.indexOf("select=cod_art,excedente") >= 0;
+    // v16.16 — filtra y selecciona por `clave`, no por `cod_art`: es la columna que sigue
+    // separando los duales cuando `cod_art` quede pelado (docs/PLAN-SACAR-SUFIJO-EMPRESA.md).
+    out.vistaFiltraCods = uv.indexOf("clave=in.(502,066,315,546)") >= 0 && uv.indexOf("select=clave,cod_art,excedente") >= 0
+      && uv.indexOf("cod_art=in.(") < 0;
     out.movsSoloEntradasConUbic = um.indexOf("deposito=eq.excedente") >= 0 && um.indexOf("delta=gt.0") >= 0 && um.indexOf("ubicacion=not.is.null") >= 0;
     vistaFalla = true;
     const m2 = await pkFetchExcedente(["502", "066"]);

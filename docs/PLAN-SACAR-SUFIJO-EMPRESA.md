@@ -59,17 +59,37 @@ del código: **`809E · CH`** en vez de `809E CH`. Es el 100% de la parte VISIBL
 pedido original: *"eliminar toda instancia de esos códigos feos"*) con cero riesgo: una
 función, ningún lector cambia de clave, ninguna suma se mueve.
 
-### Lo que FALTA para pelarlo de verdad (paso 1 corregido)
+### Tramos 1 y 2: HECHOS (v16.16, 2026-09-12)
+
+- **Tramo 1** — `vista_saldos_stock` tiene `clave` (al final del select; `create or replace
+  view` no deja insertar una columna en el medio). Medido antes y después: **488 filas, misma
+  firma md5 `84f2d585c9f6c01310ed5b53e41a2092`, `clave` distinta de `cod_art` en 0 filas**.
+  `sql/gv_vista_saldos_clave_v1616.sql`, backup en `GV_Backup_vista_saldos_def_20260912`.
+- **Tramo 2** — los **7** lectores de la vista pasaron a `clave`: `pkFetchExcedente`,
+  `_pkConteoSistema`, `_stkGondolaSaldoVivo`, `stockFetchSaldos` (la clave del mapa),
+  `_pppChkFetchSaldos`/`_pppChkBuildMaps`, y los dos de `recepcion.js`. Todos con fallback
+  `x.clave || x.cod_art` en JS. Suite 138 bloques EXIT=0.
+- **El invariante quedó medido: 8 filas de duales** (809E, 437E, 438E y 439E × LK/CH). El
+  439E **sí** vuelve en dos filas acá (tiene movimientos en las dos empresas); lo que le
+  falta es el LUGAR de CH en `GV_Lugar_Item` — problema aparte, ya registrado.
+
+⚠ **El rollback de la vista obliga a rollear la app a ≤ v16.15**: siete lecturas piden
+`clave` y PostgREST devuelve 400 si no existe.
+
+### Lo que FALTA para pelarlo de verdad (tramos 3 y 4)
 
 La clave del mapa tiene que dejar de ser un string que parece un código y pasar a ser el par
 `(cod, empresa)` **explícito**, en los 14 lectores, ANTES de tocar la vista. Concretamente:
 
-1. `vista_saldos_stock` agrega una columna `clave` (= `cod_art` de hoy, con sufijo para duales)
-   y deja `cod_art` **siempre pelado**. Las dos conviven: nada se rompe.
-2. Los 14 lectores pasan de `x.cod_art` a `x.clave` — cambio mecánico, sin cambio de conducta,
-   verificable comparando el mapa viejo contra el nuevo (tiene que dar idéntico).
-3. Recién ahí la vista puede dejar de emitir el sufijo en `cod_art`, porque ya nadie lo usa
-   como clave.
+3. **Tramo 3:** `cod_art` deja de llevar el sufijo — se borra la rama del `CASE` y queda
+   `(array_agg(cod_art order by length(cod_art), cod_art))[1]`, o sea la grafía cruda más
+   corta, igual que hoy para los no duales. Para un dual las dos filas devuelven `809E`
+   (el trigger pela el sufijo al escribir en `Movimientos_Stock`), y `clave` las sigue
+   separando. **Chequeo obligatorio: el mapa tiene que seguir con 8 entradas de duales.**
+4. **Tramo 4:** el aviso de exceso de góndola de la recepción. Sus `cods` son PELADOS, así
+   que para los 4 duales el filtro por `clave` no matchea ni antes ni después y el aviso no
+   salta. Hay que pasarle la empresa de la recepción (que ya la tiene: es la que usa
+   `trg_normalizar_empresa_stock`).
 4. **Invariante a chequear en cada paso:** `m` tiene que seguir teniendo **dos entradas** para
    809E, 437E y 438E. Si en algún momento queda una sola, el operario trae el producto
    equivocado — es el mismo bug que costó la v15.77.

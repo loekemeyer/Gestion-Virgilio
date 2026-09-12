@@ -1,0 +1,33 @@
+-- v16.16 — tramo 1+2 de docs/PLAN-SACAR-SUFIJO-EMPRESA.md
+--
+-- QUÉ: `vista_saldos_stock` agrega la columna `clave` al FINAL del select. Hoy vale
+-- EXACTAMENTE lo mismo que `cod_art` (el código con sufijo de empresa para los 4 duales,
+-- la grafía cruda más corta para el resto). No se toca ninguna otra columna.
+--
+-- PARA QUÉ: el front usaba `cod_art` como CLAVE del mapa de saldos, y el sufijo era lo
+-- único que mantenía separados 809E LK (Corta Pizza, J13-J14) de 809E CH (Corta Queso,
+-- M13-M15). Pelar `cod_art` de una habría fundido los 4 duales en un total. Con `clave`
+-- los lectores pasan a una columna que se llama lo que es, y recién DESPUÉS se puede
+-- pelar `cod_art` sin fundir nada.
+--
+-- MEDICIÓN (antes y después del cambio, misma consulta):
+--   filas = 488 · firma md5 = 84f2d585c9f6c01310ed5b53e41a2092 · idénticas
+--   clave distinta de cod_art = 0 filas de 488
+--   filas de duales (809E/437E/438E/439E × LK/CH) = 8 → el invariante del plan es 8
+--
+-- OBJETO COMPARTIDO: anotado en docs/ROLLBACK-PRODUCCION.md.
+-- Backup de la definición previa: tabla GV_Backup_vista_saldos_def_20260912.
+--
+-- ROLLBACK: restaurar la definición de esa tabla. ⚠ El rollback de la vista OBLIGA a
+-- rollear la app a v16.15 o anterior: desde la v16.16 siete lecturas piden `clave` y
+-- PostgREST devuelve 400 si la columna no existe (los try/catch degradan a "sin datos",
+-- no rompen la pantalla, pero el stock se ve en 0).
+--
+-- LECTORES MIGRADOS EN LA v16.16 (7):
+--   index.html   pkFetchExcedente · _pkConteoSistema · _stkGondolaSaldoVivo ·
+--                stockFetchSaldos (la clave del mapa) · _pppChkFetchSaldos/_pppChkBuildMaps
+--   recepcion.js aviso de exceso de góndola · precarga de stock de góndola
+--
+-- LO QUE FALTA (tramo 3 y 4 del plan): pelar `cod_art`, y cubrir el caso de la recepción
+-- (sus códigos son pelados, así que para los duales el filtro por `clave` no matchea y el
+-- aviso de exceso de góndola no salta — hace falta pasarle la empresa).
