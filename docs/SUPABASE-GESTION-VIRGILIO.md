@@ -7887,3 +7887,48 @@ Thomas: *"Aclará 'ya armado' de alguna manera"*. La app venía **afirmando la s
 
 Es la misma idea que la v15.85: **sólo la Carga Camión (o la salida marcada a mano) dice que un
 pedido salió**. La v15.55 había ido al revés — dar por salido lo armado hace +36 h — y se apagó.
+
+## §3.cn.5 — REVERTIDO: una tanda ya pickeada no vuelve a la cola de picking (v16.02, 2026-09-12)
+
+Thomas, mirando las 14 que la v15.93 había mandado a A Programar: *"Esto marca un precedente raro.
+Cómo armaron la tanda si no había tanda."* **Tenía razón, y el riesgo era peor que el conceptual.**
+
+### Qué medí
+
+Las **14** (98585..98590 D56D · 98480/98481 D47B · 44612..44617 D72B/D72C) tenían el trabajo hecho:
+
+| | |
+|---|---|
+| Picking de la tanda | **EP + TP** en las 4 tandas |
+| Armado de la tanda | **AP + TAP** en las 4 |
+| Armado por NP | **TAL** en las 14 |
+| Líneas de PKC (cajas contadas) | **30 a 89** por tanda |
+
+**A Programar es la cola de pedidos POR PICKEAR.** Al programarlas de nuevo,
+`gv_ppp_isis_programar` crea una **tanda nueva**, el operario las pickea otra vez y el stock se
+descuenta **dos veces** por mercadería que ya salió de góndola y está armada en un pallet. Además
+la vista borraba una tanda que sí existió y sí se armó: se perdía la trazabilidad.
+
+### Qué se hizo
+
+1. **Revertidas las 14** (`desprogramada = false`): vuelven con su tanda y su fecha, a la lista de
+   vencidos. A Programar 14 → **0**; la PPP sigue en 123 y **ninguna fila queda sin tanda**.
+   Nadie llegó a re-pickear nada.
+2. **Guarda en `gv_ppp_isis_desprogramar`** — tres cortes, no uno:
+   - ya tiene **CCN/CRN** (salió) — ya estaba;
+   - la NP tiene **TAL** (está armada) — nuevo;
+   - la **tanda** ya se empezó a trabajar (`gv_ppp_tanda_tocada`: EP/TP/AP/TAP) — nuevo.
+   Es la misma guarda que `gv_ppp_web_desprogramar` ya tenía para las NP web y que a la de ISIS le
+   faltaba. Probado: desprogramar la 98585 ahora corta y no escribe nada.
+3. **Front**: el botón **↩ Sin programar** sale de los vencidos **armados** — que es justo donde lo
+   había puesto la v15.93. Ahí queda sólo **🚚 Ya salió**; para mover el día está **📅 Reprogramar**,
+   que no toca la tanda ni el picking. El cartel lo dice: *"estos pedidos ya están pickeados y
+   armados, así que no vuelven a A Programar"*.
+
+### Lo que queda por decidir (de Thomas)
+
+Los 14 están otra vez en **vencidos**, con su tanda. Como están armados, las salidas reales son dos:
+**🚚 Ya salió** (si salieron y nadie lo marcó) o **📅 Reprogramar** a un día nuevo. La 98530 sigue en
+En Salida como `salida_manual` (esa no se tocó).
+
+Auditoría: *"gv_ppp_isis_desprogramar mandaba a la cola de picking tandas YA pickeadas y armadas"*.

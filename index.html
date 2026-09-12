@@ -7794,7 +7794,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v16.01";
+const APP_VERSION = "v16.02";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -31591,7 +31591,7 @@ async function pppVencCancelar(np) {
 async function pppVencSinProgramar(np) {
   const n = String(np || "").trim(); if (!n) return;
   if (_pppEsNpWeb(n)) return pppVencVolver(n);   // las web ya tenían su camino (↩ A Programar)
-  if (!confirm("¿Sacar " + n + " de la programación?\n\nQueda SIN tanda y SIN fecha, en «📥 A Programar», para revisarlo.\nNo se toca nada de ISIS y se puede volver a programar cuando quieras.")) return;
+  if (!confirm("¿Sacar " + n + " de la programación?\n\nQueda SIN tanda y SIN fecha, en «📥 A Programar», para revisarlo.\nNo se toca nada de ISIS y se puede volver a programar cuando quieras.\n\nOjo: A Programar es la cola de pedidos POR PICKEAR. Si la tanda ya se pickeó o se armó, el servidor lo va a rechazar (se pickearía dos veces).")) return;
   let motivo = "";
   try { motivo = prompt("¿Por qué lo sacás? (queda en la nota del pedido)", "nunca se registró la carga al camión") || ""; } catch (_e) {}
   pppSetStatus("Sacando " + n + " de la programación…", true);
@@ -34003,7 +34003,7 @@ function _pppPlanDiaHtml(programados, key, opts) {
     // sin fecha, ni pedidos que no se hayan cargado a un camión"). El camino real es registrar la carga
     // desde Carga Camión, que es lo que faltó: ahí el pedido pasa a En Salida y se cierra con Recepción
     // Remitos. Dejar el texto viejo mandaba a la operadora a esperar algo que ya no pasa.
-    if (sinRem) h += '<div class="pn-note"><b>' + sinRem + '</b> ' + (sinRem === 1 ? 'pedido con la tanda ARMADA' : 'pedidos con la tanda ARMADA') + ' y <b>nadie registró la Carga Camión</b>. <b>Armado no quiere decir que salió</b>: sin ese registro no consta que haya subido a un camión. Mientras no se registre, el pedido queda acá: no entra a <b>En Salida</b> y no se puede cerrar. El que lo cargó tiene que marcarlo en <b>Carga Camión</b> — de ahí pasa a En Salida y se cierra con <b>Recepción Remitos</b>. Si ya salió y nadie lo marcó, <b>🚚 Ya salió</b> lo pasa a En Salida con su fecha. Si no sabés si salió, <b>↩ Sin programar</b> lo saca de la programación y queda en <b>📥 A Programar</b> para revisarlo.</div>';
+    if (sinRem) h += '<div class="pn-note"><b>' + sinRem + '</b> ' + (sinRem === 1 ? 'pedido con la tanda ARMADA' : 'pedidos con la tanda ARMADA') + ' y <b>nadie registró la Carga Camión</b>. <b>Armado no quiere decir que salió</b>: sin ese registro no consta que haya subido a un camión. Mientras no se registre, el pedido queda acá: no entra a <b>En Salida</b> y no se puede cerrar. El que lo cargó tiene que marcarlo en <b>Carga Camión</b> — de ahí pasa a En Salida y se cierra con <b>Recepción Remitos</b>. Si ya salió y nadie lo marcó, <b>🚚 Ya salió</b> lo pasa a En Salida con su fecha. <b>Ojo:</b> estos pedidos ya están pickeados y armados, así que <b>no</b> vuelven a «A Programar» — eso los pondría en la cola de picking y se pickearían de nuevo.</div>';
   }
   const dk = esVenc ? "venc" : key;
   for (const c of cams) {
@@ -34081,8 +34081,13 @@ function _pppPlanDiaHtml(programados, key, opts) {
       // si la NP ya tiene CCN o CRN (si salió de verdad, se cierra con el remito, no se saca).
       const _accPed = !_puedeAcc ? ''
         : (esVenc && e === "armado")
+        // v16.02 (Thomas: "esto marca un precedente raro, cómo armaron la tanda si no había tanda"):
+        // acá el pedido YA ESTÁ ARMADO — la mercadería se pickeó de góndola y está en un pallet.
+        // "↩ Sin programar" lo mandaba a A Programar, que es la cola de pedidos POR PICKEAR: se
+        // habría pickeado de nuevo y el stock se descontaba dos veces. Ese botón sale de acá (y el
+        // backend además lo rechaza). Lo que sí corresponde: darlo por salido, o moverle la fecha
+        // con 📅 Reprogramar, que NO le toca la tanda ni el picking hecho.
         ? '<div class="pn-acc">' +
-            '<button class="pn-acc-b" onclick="event.stopPropagation();pppVencSinProgramar(\'' + _npS + '\')" title="Nunca se registró la carga al camión: sacalo de la programación (sin tanda ni fecha) y revisalo en A Programar">↩ Sin programar</button>' +
             '<button class="pn-acc-b" onclick="event.stopPropagation();pppVencDarPorSalido(\'' + _npS + '\')" title="Salió igual, pero nadie registró la Carga Camión: dalo por salido con su fecha y pasa a En Salida">🚚 Ya salió</button>' +
           '</div>'
         : (!esVenc && e === "sin")
