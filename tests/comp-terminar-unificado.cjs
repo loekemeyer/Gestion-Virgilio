@@ -33,6 +33,12 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
     window.stockSepararAFacturar = async function (t, l) { calls.push("stockSepararAFacturar"); };
     window.updatePendingIndicator = function () { calls.push("updatePendingIndicator"); };
     window._compTandaYaArmada = async function () { calls.push("_compTandaYaArmada"); return false; };
+    // v16.24 — el candado POR NP de la v15.92 se agregó después de escribir este test y no
+    // estaba stubeado, así que pegaba contra Supabase EN VIVO: la NP 98151 del fixture existe
+    // de verdad en Entregas_Virgilio (5 filas), o sea que donde hay red el candado corta y el
+    // test falla. En el sandbox el proxy bloquea el fetch, el catch devuelve [] y pasaba igual:
+    // por eso local daba verde y el CI rojo. Un test no puede depender de la base de producción.
+    window._compNpsYaArmadas = async function () { calls.push("_compNpsYaArmadas"); return []; };
     window.liosSend = function () { calls.push("liosSend"); };
     window._compBuildLiosData = function () { calls.push("_compBuildLiosData"); };
     window._compLiosResumen = function () { return ""; };

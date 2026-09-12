@@ -8868,3 +8868,47 @@ Se verificó que **falla** con el `_padCod` viejo (`_padCod(35E) = 35E, esperaba
 porque los joins usan los normalizadores que pelan y ésos no se tocaron.
 
 Archivo: `sql/gv_cod_cero_adelante_v1623.sql`. Backup: `GV_UxB_bkp_prepad_20260912`.
+
+### §3.dc — v16.24: main estaba en rojo desde la v16.12 y nadie lo veía — 2026-09-12
+
+Revisando el estado del repo apareció que **el CI venía fallando en 15 corridas seguidas**
+(runs 517 a 531, de la v16.12 a la v16.23). No lo rompió ninguno de esos commits: el test
+`comp-terminar-unificado` quedó desactualizado y **pega contra Supabase en vivo**.
+
+Es exactamente el pecado que el propio `.github/workflows/ci.yml` documenta que ya pasó una
+vez: *"fallaba siempre por un test que miraba la planimetría de producción en vivo, así que
+main quedaba en rojo permanente y **el rojo dejaba de significar algo**"*.
+
+**Qué pasó.** La v15.92 agregó a `compTerminar()` un segundo candado anti doble-armado, ahora
+**por NP** (`_compNpsYaArmadas`), porque un pedido reprogramado a otra tanda pasaba el candado
+por tanda y se duplicaba igual. El test es anterior: stubea `_compTandaYaArmada` pero no el
+nuevo. Y `_compNpsYaArmadas` hace un `fetch` real contra `Entregas_Virgilio`.
+
+El fixture del test usa la NP **98151**, que existe de verdad y **tiene 5 filas** en esa tabla.
+Entonces:
+
+| | el fetch | `_compNpsYaArmadas` | el test |
+|---|---|---|---|
+| **CI de GitHub** (hay red) | responde con la NP | `["98151"]` → el candado corta | ✗ FAIL |
+| **Sandbox** (el proxy bloquea) | tira | `catch` → `[]` → sigue | ✓ OK |
+
+Por eso local daba verde y el CI rojo, y por eso nadie lo cazó antes de pushear.
+
+**Comprobado, no supuesto.** Se reprodujo la condición del CI en el sandbox interceptando la
+red con `page.route` para que devolviera la NP como ya armada:
+
+```
+SIN stub  → TAP emitido: false   calls: _compTandaYaArmada        ← idéntico al log del CI
+CON stub  → TAP emitido: true    calls: _compTandaYaArmada, _compNpsYaArmadas, liosSend
+```
+
+**El arreglo** es una línea: stubear `_compNpsYaArmadas` en el test, como ya se hacía con el
+candado por tanda. Un test no puede depender de la base de producción — si mañana alguien
+borra esas 5 filas, el test cambia de resultado sin que se toque una línea de código.
+
+**Lo que esto deja a la vista:** el sandbox **no llega a Supabase** y el CI **sí**, así que la
+suite local es más permisiva que la de GitHub. De los 152 tests, **60 no interceptan la red**
+(muchos no hacen fetch, pero la superficie está). Mientras eso siga así, un `EXIT=0` local no
+garantiza un CI verde: **hay que mirar el run de GitHub después de cada push.**
+
+Archivo: `tests/comp-terminar-unificado.cjs`.
