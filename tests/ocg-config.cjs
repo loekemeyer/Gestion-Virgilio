@@ -58,8 +58,11 @@ catch (_e) {
 
     out.changedN = Object.keys(_oc.cfg.changed).length === 2;   // 107 y 202
 
-    // Índice a todos (necesita el input #ociAll en el DOM)
-    document.body.innerHTML = '<input id="ociAll" value="3">';
+    // Índice a todos (necesita el input #ociAll en el DOM).
+    // Se AGREGA, no se pisa el body: borrarlo dejaba a cualquier timer de la app buscando
+    // un elemento que ya no existía, y el pageerror ("Cannot read properties of null
+    // (reading 'classList')") hacía fallar este test en CI de forma intermitente.
+    document.body.insertAdjacentHTML("beforeend", '<input id="ociAll" value="3">');
     ocCfgSetAllIndice();
     out.setAll = _oc.cfg.rows.every((a) => a.indice === 3) &&
                  _oc.cfg.changed["107"].indice === 3 && _oc.cfg.changed["202"].indice === 3;

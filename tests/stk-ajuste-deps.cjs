@@ -33,8 +33,12 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
     out.racksch809 = sd["809E"].racks_ch === 12;
 
     // 3) stockAjustar usa el depósito elegido en el <select> (escribe deposito=para_envasar)
-    document.body.innerHTML = '<select id="stkAjDep"><option value="para_envasar" selected>x</option></select>' +
-      '<input id="stkAjCod" value="035E"><input id="stkAjCant" value="5">';
+    // Se AGREGA, no se pisa el body: borrarlo deja a los timers de la app buscando elementos
+    // que ya no existen y el pageerror hace fallar el test de forma intermitente (le pasó a
+    // ocg-config en CI el 12/09).
+    document.body.insertAdjacentHTML("beforeend",
+      '<select id="stkAjDep"><option value="para_envasar" selected>x</option></select>' +
+      '<input id="stkAjCod" value="035E"><input id="stkAjCant" value="5">');
     _stk = { movs: movs, cutoff: 0 };
     let posted = null;
     window.stkInsertMov = function (rows) { posted = rows; return Promise.resolve(); };
