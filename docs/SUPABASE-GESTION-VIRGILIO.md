@@ -9866,3 +9866,55 @@ prueba nada.
 Archivos: `sql/gv_ppp_rename_a_gv_v1645.sql` y `sql/gv_fix_funciones_uxb_rotas_v1645.sql`.
 Backups: `zz_backups."GV_Backup_PPP_*_20260912"` (las 3 tablas completas) y
 `zz_backups."GV_Backup_funcdefs_ppp_20260912"` (32 definiciones previas).
+
+---
+
+### §3.du — v16.46: las 46 filas duplicadas de `Entregas_Virgilio` (caso B) — 2026-09-12
+
+**El hallazgo original estaba mal, y aplicarlo tal cual rompía datos.** El problema 72 decía "62
+filas duplicadas" y proponía un **índice único sobre `(np, cod_art)`**. Ese índice habría
+**rechazado pedidos legítimos**. Los 60 pares son dos casos opuestos, y el discriminante es el
+timestamp **`creado`**:
+
+**CASO A — 16 pares — NO son duplicados, no se tocaron.** Las dos filas comparten el **mismo
+`creado` al microsegundo**: entraron en la misma carga. Son **dos líneas de pedido** del mismo
+artículo. Comprobado contra la fuente: en **9 de los 16**, `GV_PPP_Base_Pedidos` trae exactamente
+las mismas dos líneas con las mismas cantidades.
+
+| NP / art | en el pedido | en Entregas |
+|---|---|---|
+| 44496 / 713 | 2 + 8 | 2 + 8 |
+| 97966 / 590E | 4 + 7 | 4 + 7 |
+| 98332 / 323E | 3 + 3 | 3 + 3 |
+
+Borrarlas destruía **34 cajas entregadas reales**. Única excepción conocida: **98139/590E**, donde
+el pedido trae 1 línea de 10 y Entregas tiene 8+10 — ahí el 8 sobra, pero es un caso aislado sin
+segunda fuente que lo confirme, así que **quedó como está**.
+
+**CASO B — 44 pares, 46 filas — re-insert, ésas sí se borraron.** `creado` distinto, los 44 pares
+con la **misma tanda** (cero con tandas distintas) y 30 de los 44 byte a byte idénticos. Criterio:
+por par se conserva la fila **con tanda y el `creado` más nuevo** (desempate por `id` mayor).
+
+**Medición — todos los valores predichos se cumplieron exacto:**
+
+| | antes | después |
+|---|---|---|
+| filas | 10.652 | **10.606** (−46) |
+| `cajas_entregadas` | 53.272,33 | **53.110,33** (−162) |
+| `cajas_pedidas` | 56.802,33 | **56.622,33** (−180) |
+| pares duplicados | 60 | **16** (sólo caso A) |
+| `gv_venta_mensual_cliente` cajas | 52.893 | **52.753** (−140) |
+
+El −140 en vez de −162 es correcto: esa vista filtra `fecha_salida` válida y `cajas <> 0`.
+Verificación posterior: de los 16 pares que quedan, **los 16 son caso A y 0 son B**.
+
+**No se puso índice único sobre `(np, cod_art)` y no hay que ponerlo** — el caso A demuestra que un
+pedido puede traer el mismo artículo dos veces. Un guard real tendría que incluir un **número de
+línea del pedido**, que la tabla hoy no tiene.
+
+El borrado se ejecutó con **guards que abortaban** si se colaba una fila del caso A o si el conteo
+no daba exactamente 46.
+
+Archivo: `sql/gv_entregas_dup_caso_b_v1646.sql`. Backups:
+`zz_backups."GV_Backup_Entregas_Virgilio_20260912"` (la tabla entera con su PK `id`) y
+`zz_backups."GV_Backup_Entregas_dup_borradas_20260912"` (las 46 exactas, con el motivo).
