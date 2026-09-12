@@ -9503,3 +9503,62 @@ no una copia del mismo dato), e `Importados.uni_x_caja` (`vista_importados_parte
 **Rollback:** el dato de las 334 filas está en `zz_backups."GV_Backup_precios_uxb_20260912"`.
 
 Facturación $1.395.224.315,83 · anticipado $77.843.819,56 · centinelas en 0.
+
+---
+
+### §3.do — v16.40: 42 vistas dejan de saltear la RLS; quedan 4 — 2026-09-12
+
+Cierra el problema 103. Detalle, script y rollback en `sql/gv_rls_security_invoker_v1640.sql`.
+
+**El problema:** `security_invoker` **no es el default** en Postgres. Una vista creada sin esa
+opción corre con los permisos de su dueño (`postgres`) y **la RLS de las tablas de abajo no se
+aplica**. Como la anon key vive en el HTML de la app, cada una de esas vistas era una ventana
+que saltea el candado. Había **45**.
+
+**Por qué no se podía prender en bloque:** puede dejar una vista en 0 filas o en error si `anon`
+no llega a alguna tabla de abajo, y una pantalla vacía en pleno picking es peor que el agujero.
+
+**El test que lo hace seguro** — y que no requiere tocar nada: **correr la definición de la
+vista como `anon` aplica la RLS exactamente igual que tendría el invoker prendido.**
+
+```sql
+-- como postgres
+select count(*) from public.<vista>;
+-- como anon, sin tocar la vista
+begin; set local role anon;
+select count(*) from ( <pg_get_viewdef(<vista>)> ) z;   -- ⚠ sacarle el ';' final
+rollback;
+```
+
+Iguales → prenderlo es un no-op. Distintas o error → no se toca.
+
+**Resultado: 46 medidas → 42 prendidas, 4 intactas, 0 con diferencia de filas.** Verificado
+*después* de prender, leyendo las vistas reales como `anon`: **42 de 42** dan el mismo número,
+0 errores. `public` pasó de 85 a **125** vistas con invoker, y de 45 expuestas a **4**.
+
+**Las 4 que quedan son definer A PROPÓSITO**, y no es casualidad que sean las más sensibles:
+
+| vista | qué le falta a `anon` |
+|---|---|
+| `vista_factura_metodo_pago` | el schema `isis_lk` (el puente FDW) |
+| `vista_facturacion_faltantes` | `vista_facturacion_neto_items` |
+| `vista_facturacion_neto` | ídem |
+| `vista_plata_perdida` | `GV_Precios_Cliente` |
+
+Muestran un agregado escondiendo la fuente, y a `anon` esas fuentes le están negadas justamente
+para eso. ⚠ **Pero ahí la seguridad no la da la RLS sino el filtrado que la vista misma haga**,
+así que hay que **leerlas a mano** y confirmar que no expongan por la ventana lo que la puerta
+niega. Eso no se arregla con un switch y queda pendiente.
+
+**Chequeo permanente** — cualquier vista nueva mal creada aparece acá:
+
+```sql
+select c.relname from pg_class c join pg_namespace n on n.oid = c.relnamespace
+ where n.nspname='public' and c.relkind='v'
+   and (c.reloptions is null or c.reloptions::text !~ 'security_invoker=(true|on)')
+   and has_table_privilege('anon', c.oid, 'SELECT');
+-- hoy: sólo las 4 de arriba
+```
+
+Facturación $1.395.224.315,83 · anticipado $77.843.819,56 · `vista_saldos_stock` 488 ·
+`vista_stock_procesada` 363 · los 4 centinelas en 0.
