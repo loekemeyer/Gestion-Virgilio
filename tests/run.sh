@@ -418,3 +418,6 @@ node tests/krikos-parsers.cjs
 
 echo "== apr-krikos (v15.90: las OC de súper en A Programar — las que entraron mal gritan, las que no entraron dicen por qué) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/apr-krikos.cjs
+
+echo "== gond-exceso-dual (v16.30: el aviso de no-devolver-a-góndola mira la góndola de SU empresa) =="
+node tests/gond-exceso-dual.cjs

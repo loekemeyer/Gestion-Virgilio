@@ -1,0 +1,83 @@
+-- ============================================================================
+-- v16.30 (2026-09-12) — TRAMO 4 de docs/PLAN-SACAR-SUFIJO-EMPRESA.md
+-- "Los 4 duales dejan de ser invisibles para los chequeos de stock"
+--
+-- Pedido de Luis: "Dale, tramo 4".
+--
+-- EL PROBLEMA. Cuatro lugares preguntaban "¿cuánto hay de este código en góndola?"
+-- filtrando por el código PELADO. Para los 4 códigos duales la vista emitía la clave con
+-- la empresa ("809E CH"), así que el filtro no matcheaba NINGUNA fila, el saldo daba 0 y
+-- el chequeo no hacía nada — en silencio. Y sumar las dos empresas tampoco sirve: el 809E
+-- en la góndola de Loeke (J13-J14) es un Corta Pizza y en la de Chef (M13-M15) un Corta
+-- Queso. Son dos productos.
+--
+-- IMPACTO MEDIDO, el más caro primero:
+--
+--   oc_backfill_valores — el stock que se descuenta al armar una OC:
+--     código  linea   stock HOY   stock con el fix
+--     809E    CH             0            456      ← se compraba como si no hubiera nada
+--     437E    CH             0             16
+--     439E    LK             0             16
+--     438E    CH             0              0  (es 0 de verdad)
+--     Ninguna de las 574 OC abiertas es de un dual, así que el fix no reescribe nada:
+--     cambia la PRÓXIMA.
+--
+--   gondola_return_check / el aviso de la Recepción — 400 cajas de 809E, capacidad 388
+--   (umbral 1,20× = 465,6):
+--     por CH  → góndola 120 → 520 > 465,6 → AVISA "exceso_gondola"
+--     por LK  → góndola  28 → 428 < 465,6 → no avisa (y está bien: hay lugar)
+--     v16.29  → góndola   0 → 400 < 465,6 → NO AVISABA. Ese era el bug.
+--     Control de no-regresión: el 505 (no dual) da 2.719 de góndola con y sin empresa.
+--
+--   aceptar_conteo — el ajuste de stock que se ESCRIBE al aceptar un conteo: para un dual
+--   leía 0 y ajustaba por la diferencia entera. 0 conteos históricos de duales y 0
+--   pendientes, así que no hay daño para reparar.
+--
+-- LA PIEZA NUEVA: public.gv_stock_clave(p_cod, p_empresa)
+--   Una sola definición de "la clave de saldos de (código, empresa)". Hace UNA cosa:
+--   le agrega la empresa al código cuando el código es dual. Para todo lo demás devuelve
+--   el código tal cual, o sea que es un no-op demostrable.
+--   ⚠ NO re-canoniza el código: el `clave` de la vista para un NO dual es la grafía CRUDA
+--   más corta ("66", "NY Virgen"), no la canónica ("066", "NY VIRGEN"). Una primera versión
+--   sí canonizaba y fallaba el match en 17 de 488 filas (6 con cero adelante + 11 insumos
+--   con mayúsculas mezcladas). Con la definición final: 488 de 488 coinciden con la columna
+--   `clave` de la vista.
+--
+-- LO QUE SE TOCÓ
+--   NUEVA     public.gv_stock_clave(text,text)  — STABLE, execute revocado a PUBLIC y
+--             otorgado a anon/authenticated/service_role.
+--   FUNCIONES public.aceptar_conteo(bigint,text)
+--               · la empresa se resuelve ANTES de leer el stock (antes se resolvía después
+--                 y sólo servía para ESCRIBIR el movimiento)
+--               · sale de GV_Lugar por el sector, con fallback a Capacidad_Sector
+--               · un dual sin empresa resuelta NO se procesa: devuelve error pidiendo que
+--                 se le cargue la empresa al sector. Un número mal acá corrompe el stock de
+--                 uno de los dos productos, así que mejor que lo mire alguien.
+--             public.gondola_return_check(jsonb, text)  — firma NUEVA con la empresa.
+--               La de 1 argumento queda como envoltorio que pasa NULL (sin DEFAULT: con
+--               default las dos firmas serían ambiguas y Postgres rechaza la llamada).
+--             public.oc_backfill_valores(boolean)  — el CTE `stk` se joinea por la clave
+--               esperada, que sale de OC_Maximos.linea.
+--   FRONT     recepcion.js — la lógica se extrajo a `gondAcumPorCod(rows, linea, norm)`,
+--               pura y testeada de verdad en tests/gond-exceso-dual.cjs (12 chequeos).
+--               Un código es dual si la vista devuelve `clave` distinta de `cod_art`: no
+--               hace falta pedir `codigos_duales`, y si mañana aparece un 5.º dual se
+--               cubre solo. Se bumpeó el `?v=` de recepcion.js en index.html, que estaba
+--               clavado en 15.39 (el test lo ata a APP_VERSION para que no se vuelva a
+--               desfasar).
+--
+-- LO QUE NO SE TOCÓ Y ESTÁ ANOTADO
+--   La CAPACIDAD de góndola de un dual sigue siendo la suma de las dos góndolas.
+--   `Capacidad_Sector` tiene columna `empresa` pero no se filtra todavía: filtrarla
+--   cambiaría también la conducta de los no duales, así que va aparte.
+--
+-- BACKUPS: zz_backups."GV_Backup_vista_saldos_def_20260912", filas con objeto
+--          'DDL v16.29 public.<funcion>(...)' — son las definiciones previas al tramo 4.
+--
+-- ROLLBACK
+--   select objeto, definicion from zz_backups."GV_Backup_vista_saldos_def_20260912"
+--    where objeto like 'DDL v16.29%';
+--   -- cada `definicion` ya viene como CREATE OR REPLACE FUNCTION: se ejecuta tal cual.
+--   -- y aparte: drop function public.gondola_return_check(jsonb, text);
+--   --           drop function public.gv_stock_clave(text, text);
+-- ============================================================================

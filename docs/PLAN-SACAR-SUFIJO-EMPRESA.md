@@ -112,7 +112,63 @@ para que el Telegram siga diciendo de qué empresa es el negativo). **No se toca
 `actualizar_saldo_trigger` (arma su propia clave, sólo menciona la vista en un comentario) ni
 `notificar_conteo_gondola_telegram` (ya pelaba el sufijo con un regexp que ahora es un no-op).
 
-### Lo que FALTA (tramo 4)
+### Tramo 4: HECHO (v16.30, 2026-09-12) — y era el que más plata costaba
+
+Los 4 duales dejan de ser invisibles para los chequeos de stock. Detalle y rollback en
+`sql/gv_stock_clave_tramo4_v1630.sql`.
+
+**Pieza nueva: `public.gv_stock_clave(p_cod, p_empresa)`** — una sola definición de "la clave
+de saldos de (código, empresa)". Hace UNA cosa: le agrega la empresa al código **cuando el
+código es dual**; para todo lo demás devuelve el código tal cual, o sea que es un no-op
+demostrable. **488 de 488 filas** coinciden con la columna `clave` de la vista.
+
+⚠ **No re-canoniza el código.** Una primera versión sí lo hacía y fallaba el match en **17 de
+488** filas: el `clave` de la vista para un no dual es la grafía **cruda** más corta (`66`,
+`NY Virgen`), no la canónica (`066`, `NY VIRGEN`).
+
+**Impacto medido, lo más caro primero:**
+
+`oc_backfill_valores` — el stock que se descuenta al armar una OC:
+
+| código | línea | stock antes | stock con el fix |
+|:--|:--|--:|--:|
+| `809E` | CH | 0 | **456** |
+| `437E` | CH | 0 | 16 |
+| `439E` | LK | 0 | 16 |
+| `438E` | CH | 0 | 0 |
+
+O sea: **el 809E se compraba como si no hubiera una sola caja, habiendo 456.** Ninguna de las
+574 OC abiertas es de un dual, así que el fix no reescribe nada — cambia la próxima.
+
+El aviso de "no devolver a góndola" — 400 cajas de 809E, capacidad 388 (umbral 1,20× = 465,6):
+
+| por | góndola | total | ¿avisa? |
+|:--|--:|--:|:--|
+| CH | 120 | 520 | **sí**, exceso |
+| LK | 28 | 428 | no, y está bien: hay lugar |
+| v16.29 (sin empresa) | 0 | 400 | **NO avisaba** ← el bug |
+
+Control de no-regresión: el 505 (no dual) da 2.719 de góndola con empresa y sin.
+
+`aceptar_conteo` — la empresa **ya estaba resuelta por el sector**, pero sólo se usaba para
+ESCRIBIR el movimiento; la lectura iba por el código pelado, así que para un dual leía 0 y
+ajustaba por la diferencia entera. Ahora se resuelve antes (de `GV_Lugar`, con fallback a
+`Capacidad_Sector`) y **un dual sin empresa resuelta no se procesa**: devuelve error pidiendo
+que se le cargue la empresa al sector. 0 conteos históricos de duales y 0 pendientes.
+
+En el front la lógica quedó en **`gondAcumPorCod`**, pura y testeada de verdad
+(`tests/gond-exceso-dual.cjs`, 12 chequeos). Un código es dual si la vista devuelve `clave`
+distinta de `cod_art` — no hace falta pedir `codigos_duales` y un 5.º dual se cubre solo.
+De paso: el **`?v=` de `recepcion.js` estaba clavado en 15.39**; ahora acompaña a `APP_VERSION`
+y el test lo ata para que no se vuelva a desfasar.
+
+### Lo que FALTA
+
+- **La capacidad de góndola de un dual sigue siendo la suma de las dos góndolas.**
+  `Capacidad_Sector` tiene columna `empresa` pero no se filtra: filtrarla cambiaría también la
+  conducta de los no duales, así que va aparte.
+- Los pasos 3 a 6 de la Parte 1 (borrar las 6 filas de sufijo de `Equivalencias_Codigos`,
+  retirar `Planimetria`, limpiar los `codBase` no-op) y el enrutamiento de racks de la Parte 2.
 
 La clave del mapa tiene que dejar de ser un string que parece un código y pasar a ser el par
 `(cod, empresa)` **explícito**, en los 14 lectores, ANTES de tocar la vista. Concretamente:

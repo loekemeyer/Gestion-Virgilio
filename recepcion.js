@@ -1008,6 +1008,33 @@ function ocPctExceso(cod, cajas) {
    proyeccion_madre.proy_cajas_mes (rotación), opState.ocPorCod (lo pedido en la OC). */
 const GOND_EXCESO_FACTOR = 1.20;   // "por mucho" = 20% arriba de la capacidad de góndola
 const GOND_BAJA_ROT = 50;          // baja rotación = menos de 50 cajas/mes de proyección
+/* v16.30 (tramo 4) — saldo de góndola por código, PURA y testeable (tests/gond-exceso-dual.cjs).
+   Recibe las filas crudas de `vista_saldos_stock` y la línea de la recepción, y devuelve
+   { codNormalizado: cajas }.
+
+   · código DUAL  → sólo la fila de la góndola de ESA empresa. El 809E en la góndola de Loeke
+     (J13-J14) es un Corta Pizza y en la de Chef (M13-M15) un Corta Queso: sumar las dos no
+     significa nada. Cómo se sabe que es dual sin pedir nada más: la vista lo delata sola, su
+     `clave` difiere del `cod_art` (para el resto son iguales).
+   · código común → todas las filas sumadas, igual que antes de la v16.30 (la vista agrupa por
+     (código, empresa), así que un código común igual puede volver en varias filas). */
+function gondAcumPorCod(rows, linea, norm) {
+  const lin = String(linea || "").toUpperCase();
+  const porCod = {}, out = {};
+  (rows || []).forEach(function (r) {
+    const k = norm(r.cod_art || r.clave); if (!k) return;
+    (porCod[k] || (porCod[k] = [])).push(r);
+  });
+  Object.keys(porCod).forEach(function (k) {
+    const arr = porCod[k];
+    const esDual = arr.some(function (r) { return String(r.clave || "") !== String(r.cod_art || ""); });
+    const usar = esDual
+      ? arr.filter(function (r) { return String(r.empresa || "").toUpperCase() === lin; })
+      : arr;
+    out[k] = usar.reduce(function (a, r) { return a + (Number(r.terminado) || 0); }, 0);
+  });
+  return out;
+}
 async function gondReturnCheck(items) {
   try {
     await sessionReady;
@@ -1016,19 +1043,25 @@ async function gondReturnCheck(items) {
     if (!cods.length) return [];
     const res = await Promise.all([
       supabase.from("Capacidad_Sector").select("cod,cajas_max"),
-      supabase.from("vista_saldos_stock").select("clave,cod_art,terminado").in("clave", cods),
+      supabase.from("vista_saldos_stock").select("cod_art,clave,empresa,terminado").in("cod_art", cods),
       supabase.from("proyeccion_madre").select("cod,proy_cajas_mes")
     ]);
     const cap = {}, gond = {}, proy = {};
     ((res[0] && res[0].data) || []).forEach(function (r) { const k = _ocgNorm(r.cod); if (k) cap[k] = (cap[k] || 0) + (Number(r.cajas_max) || 0); });
-    // v15.71 — ACUMULA (ver stockFetchSaldos de index.html): vista_saldos_stock agrupa por
-    // (código, empresa) y un código pelado puede volver en varias filas; con el `=` el aviso
-    // de exceso de góndola comparaba contra el saldo de UNA de ellas.
-    // v16.16 — por `clave` (ver stockFetchSaldos de index.html). OJO: `cods` son los codigos
-    // PELADOS de la recepcion, asi que para los 4 duales este filtro no matchea ni antes ni
-    // ahora (la clave es "809E CH") y el aviso de exceso no salta. Para cubrirlos hay que
-    // pasarle la empresa; queda anotado en docs/PLAN-SACAR-SUFIJO-EMPRESA.md.
-    ((res[1] && res[1].data) || []).forEach(function (r) { const kk = _ocgNorm(r.clave || r.cod_art); if (kk) gond[kk] = (gond[kk] || 0) + (Number(r.terminado) || 0); });
+    // v15.71 — ACUMULA: `vista_saldos_stock` agrupa por (código, empresa), así que un código
+    // vuelve en varias filas; con el `=` el aviso comparaba contra el saldo de UNA de ellas.
+    //
+    // v16.30 (tramo 4) — y para los 4 códigos DUALES no alcanza con sumar: el saldo que
+    // importa es el de la góndola de ESTA recepción. El 809E en la góndola de Loeke (J13-J14)
+    // es un Corta Pizza y en la de Chef (M13-M15) un Corta Queso; sumar las dos no significa
+    // nada. Hasta la v16.29 el filtro iba por `clave` contra códigos PELADOS, así que para un
+    // dual no matcheaba ninguna fila, la góndola daba 0 y el aviso de exceso NUNCA saltaba.
+    //
+    // Cómo se sabe que un código es dual sin pedir nada más: la vista lo dice sola — es dual
+    // si su `clave` difiere del `cod_art` (para el resto son iguales). Así que:
+    //   · código dual  → sólo la fila cuya `empresa` es la línea que eligió el operario
+    //   · código común → todas las filas sumadas, igual que antes (conducta idéntica)
+    Object.assign(gond, gondAcumPorCod((res[1] && res[1].data) || [], opState.linea, _ocgNorm));
     ((res[2] && res[2].data) || []).forEach(function (r) { const k = _ocgNorm(r.cod); if (k) proy[k] = Number(r.proy_cajas_mes) || 0; });
     const flag = [];
     (items || []).forEach(function (it) {
@@ -1042,6 +1075,9 @@ async function gondReturnCheck(items) {
     return flag;
   } catch (_e) { return []; }
 }
+// v16.30 — `gondAcumPorCod` (arriba) es la parte pura y es la que testea
+// tests/gond-exceso-dual.cjs. El módulo es `type="module"` y no carga por file://, así que
+// el test lee el fuente, aísla esa función y la corre en Node.
 
 /* ============== Paso 4: grilla de códigos ============== */
 async function renderArticulos() {

@@ -65,9 +65,9 @@
 --              sufijo con un regexp, que ahora es un no-op y da el mismo número).
 --
 -- BACKUPS (RLS prendida, sin insert/update/delete para anon)
---   GV_Backup_vista_saldos_def_20260912          — DDL previo de la vista, las 2 matviews,
+--   zz_backups."GV_Backup_vista_saldos_def_20260912" — DDL previo de la vista, las 2 matviews,
 --                                                  las 2 vistas dependientes y las 5 funciones
---   GV_Backup_snapshot_dependientes_20260912     — count + md5 de cada dependiente por momento
+--   zz_backups."GV_Backup_snapshot_dependientes_20260912" — count + md5 por dependiente y momento
 --
 -- ROLLBACK
 --   select objeto, definicion from public."GV_Backup_vista_saldos_def_20260912" order by id;

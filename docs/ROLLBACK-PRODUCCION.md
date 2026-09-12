@@ -990,3 +990,41 @@ delete from public."GV_UxB"
 -- la Edge Function: redeployar la v11 (el diff está en el commit de la v16.22,
 -- supabase/functions/sync-precios-venta/index.ts) — vuelve a mandar uxb a precios_venta
 ```
+
+## 2026-09-12 · v16.30 — tramo 4: los 4 duales dejan de ser invisibles para los chequeos de stock
+
+**Objetos tocados.** Función NUEVA `public.gv_stock_clave(text,text)` (STABLE, `execute`
+revocado a `PUBLIC` y otorgado a `anon`/`authenticated`/`service_role`), y `create or replace`
+de tres funciones compartidas: `aceptar_conteo(bigint,text)`,
+`gondola_return_check(jsonb,text)` (firma nueva; la de 1 argumento queda como envoltorio que
+pasa `NULL`, **sin DEFAULT** porque con default las dos firmas serían ambiguas) y
+`oc_backfill_valores(boolean)`.
+
+**Impacto medido.** Cuatro lugares preguntaban "¿cuánto hay de este código en góndola?"
+filtrando por el código PELADO; para los 4 duales no matcheaba nada y el saldo daba 0:
+
+| dónde | antes | con el fix |
+|:--|--:|--:|
+| `oc_backfill_valores`, stock del `809E` | 0 | **456** |
+| ídem `437E` / `439E` | 0 / 0 | 16 / 16 |
+| aviso de góndola, 400 cajas de `809E` por CH | no avisaba | **avisa** (120+400 > 465,6) |
+| ídem por LK | no avisaba | no avisa (28+400 < 465,6), correcto |
+| control: `505` (no dual) | 2.719 | 2.719 |
+
+Ninguna de las **574 OC abiertas** es de un dual, así que nada se reescribió: cambia la
+próxima. `aceptar_conteo` tenía **0 conteos de duales** en la historia y 0 pendientes.
+
+**Backup:** `zz_backups."GV_Backup_vista_saldos_def_20260912"`, filas con
+`objeto like 'DDL v16.29%'`.
+
+**Rollback exacto:**
+
+```sql
+select objeto, definicion from zz_backups."GV_Backup_vista_saldos_def_20260912"
+ where objeto like 'DDL v16.29%';
+-- cada `definicion` ya viene como CREATE OR REPLACE FUNCTION: se ejecuta tal cual
+drop function public.gondola_return_check(jsonb, text);
+drop function public.gv_stock_clave(text, text);
+```
+
+Notas: `sql/gv_stock_clave_tramo4_v1630.sql`.
