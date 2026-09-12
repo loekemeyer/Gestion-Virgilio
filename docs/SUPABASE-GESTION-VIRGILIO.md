@@ -8399,3 +8399,19 @@ select regexp_replace(upper(btrim("Cod_Art")),'^0+(?=.)','') cod, count(*),
 ```
 
 Archivo: `sql/gv_uxc_unificado_v1612.sql`.
+
+### §3.cv.1 — v16.13: el 043 queda en 12
+
+Thomas: ***"043 x12"***, confirmando lo de antes (*"no es colador, es tres en uno en chef"*). La
+única fila que decía 24 era `Articulos_Cajas` **043 LK "COLADOR 10 CM"**; pasa a **12**. La otra
+(`043 CH "TRES EN UNO"`), `OC_Maximos` y el maestro ya decían 12.
+
+⚠ La descripción de esa fila sigue diciendo "COLADOR 10 CM", que según el dueño no es lo que ese
+código es. El uxc ya no molesta, pero el nombre sí: entra en la bolsa de los **21 códigos con dos
+productos** de la §3.cv.
+
+**Estado del problema 69:** de los 33 conflictos COMPRA vs FACTURA quedan **11**, y 7 son los
+discontinuados (631–636, 724), que ya no se compran. Los **4 reales** son los DISPLAY
+**801, 901, 910, 911** (compra 12, factura 36).
+
+Backup: `public."GV_UxC_bkp2_20260912"`.
