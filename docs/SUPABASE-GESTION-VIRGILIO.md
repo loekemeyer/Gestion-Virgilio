@@ -9646,3 +9646,91 @@ exacto.
 multiplica. El primer intento de contar las filas a tocar dio **1320 de una tabla de 754** —
 imposible, y por eso no se ejecutó. El mapa bueno es `GV_tmp_despiece_map2`, con `distinct` e
 índice único. **Si un conteo da más filas que la tabla, el join está mal, no los datos.**
+
+---
+
+### §3.dr — v16.43: el stock y el generador de OC dejan de ser ciegos a la demanda web — 2026-09-12
+
+**El síntoma que nadie veía: un número más chico.** Toda la cadena de demanda —cuánto hay
+pedido, cuánto falta, cuánto hay que comprar— leía **una sola tabla**: `"PPP_Base_Pedidos"`,
+el espejo de ISIS. Esa tabla quedó **congelada el 04/09** (9.786 filas, no crece más). Desde
+el **06/09 los pedidos de la página caen directo a `"PPP_Web_Base"`** — fue el primer cambio
+de Producción Virgilio hacia Gestión Virgilio. Nadie lo notó porque no daba error: daba menos.
+
+Al 12/09: **3.415 cajas de demanda web invisibles** para el stock y para las OC, sobre 4.720,66
+que el sistema creía pendientes. La demanda real estaba subestimada **~42%**, y el generador de
+OC pedía de menos en consecuencia.
+
+**El arreglo:** una vista unión, **`gv_demanda_pedidos`**, que es la demanda completa, y las
+5 vistas + 1 matview de la cadena pasan a leerla.
+
+```sql
+create view public.gv_demanda_pedidos with (security_invoker = true) as
+ select b.pedido, b.articulo, b.cajas, 'isis'::text as origen from gv_ppp_base_pedidos b
+union all
+ select w.np_label, w.articulo, w.cajas, 'web'::text  from "PPP_Web_Base" w;
+```
+
+**Por qué `gv_ppp_base_pedidos` (el espejo) y no la tabla cruda.** Hay **11 NP de ISIS** con
+`GV_PPP_Prog_Override.oculto = true` (98696–98703, 98050, 44620, 44621): son **duplicados** de
+pedidos web que Gestión ya programó (§3.ap). Sumarlas junto con su versión web contaría la misma
+mercadería dos veces. El espejo ya las descuenta.
+
+**Medición (antes → después), y la reconciliación exacta:**
+
+| | antes | después |
+|---|---|---|
+| `vista_stock_procesada` filas | 363 | **366** (+3 códigos con demanda sólo web) |
+| `vista_stock_procesada` stock_total | 48197 | 48197 *(sin cambios: el stock no se tocó)* |
+| `vista_stock_procesada` cajas_pedidas | 4720,66 | **7409,66** |
+| `vista_stock_procesada` a_pedir | 7561 | **9092** |
+| `v_cajas_pedidas` filas | 192 | 254 |
+| `vista_generador_oc` filas | 349 | 345 |
+| `gv_importados_ordenes` cajas_pedidas | 1351 | 2079 |
+
+```
+ISIS crudo pendiente                 4720,66
+ISIS por el espejo (−11 NP ocultas)  3994,66   (−726,00)
++ web pendiente                     +3415,00   (3571 totales − 156 ya facturadas/canceladas)
+= 7409,66  ✔ coincide con lo medido
+```
+
+**Tres cambios dentro de la matview, no uno.** Repuntar la tabla no alcanzaba:
+
+1. **`cerradas` += `"GV_Web_Cancelados"`.** Una NP web cancelada **no** se anota en
+   `"NP_Canceladas"` sino ahí (misma convención que `gv_ppp_en_salida`). Sin esto, la única
+   cancelada (LK 0052) seguía contando como demanda.
+2. **`dem_raw` y `dem_oc_raw` → `gv_demanda_pedidos`** (el patrón aparece **2 veces**, no 1).
+3. **`pend_np_oc` += las NP web.** Éste era el que se escapaba: `pend_np_oc` sale de
+   `"PPP_Programacion_Diaria"`, que es **sólo de ISIS** (133 filas, 0 web). La programación web
+   vive en `"PPP_Web_Programacion"` (88 filas) y su identidad es
+   `gv_ppp_web_np_label(empresa, np, np_idx)` = el `np_label` de `"PPP_Web_Base"` (88 y 88, 1:1).
+   Sin este tercer cambio el `a_pedir` del generador de OC no se movía nada.
+
+**Lo que NO se tocó, a propósito.** Quedan 5 vistas leyendo `"PPP_Base_Pedidos"` y está bien:
+`vista_np_sin_programar`, `vista_np_prog_sin_base`, `vista_np_faltantes_secuencia`,
+`vista_np_sucursal` y `gv_ppp_isis_sin_tanda` son **diagnósticos sobre la numeración de ISIS**,
+y las NP web no tienen número de secuencia de ISIS. Otras 6 (`vista_pedidos_equivalencia`,
+`vista_pedidos_secundarios`, `vista_facturable_anticipado`, `vista_nc_loeke_chef`,
+`vista_ppp_empresa_armado`, `gv_np_web_dobles`) no las lee ninguna pantalla.
+
+**La matview otra vez: el CASCADE llega a nivel 3.** `vista_stock_procesada` no admite
+`create or replace`, así que va DROP CASCADE + CREATE. Esta vez **sí** se corrió la consulta
+recursiva del `CLAUDE.md` antes de tocar nada, y devolvió los tres: `Stock_Saldos` (nivel 2),
+`gv_importados_stock_dep` (nivel 2) y **`gv_importados_ordenes` (nivel 3)** — el que se cayó en
+la v16.20 y en la v16.33 por mirar sólo las dependencias directas. Los cuatro se respaldaron con
+definición, opciones, índices y grants, se recrearon en la misma transacción, y
+`gv_endpoints_rotos` quedó **vacía**. Se verificó además que
+`refresh materialized view concurrently` sigue andando (366 filas, 366 `cod` distintos).
+
+**El archivo del repo tiene el `CREATE` completo de las 8 vistas**, y se comprobó por `md5` que
+las 8 coinciden **byte a byte** con lo que está vivo en la base — la regla que salió de la v16.33,
+aplicada de entrada esta vez. De paso quedó a la vista que `sql/vista_generador_oc.sql` estaba
+**desactualizado** (le faltaba el CTE `gux` de la v16.30); la definición viva está ahora en
+`sql/gv_demanda_web_en_stock_y_oc_v1643.sql`.
+
+**Aviso para Compras:** el "a pedir" sube de 7.561 a 9.092 cajas. No es un error nuevo — es lo
+que faltaba pedir desde el 06/09.
+
+Archivo: `sql/gv_demanda_web_en_stock_y_oc_v1643.sql`. Chequeo:
+`select * from public.gv_endpoints_rotos;` (vacía = todo bien).

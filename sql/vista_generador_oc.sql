@@ -1,3 +1,9 @@
+-- ⚠ DESACTUALIZADO (2026-09-12). Esta definicion NO es la que corre hoy:
+--   * le falta el CTE `gux` (GV_UxB) que entro en la v16.30
+--   * la demanda ya no sale de "PPP_Base_Pedidos" sino de gv_demanda_pedidos (v16.43)
+-- La definicion VIVA esta en sql/gv_demanda_web_en_stock_y_oc_v1643.sql
+-- Se deja como historia; no aplicar.
+
 -- ============================================================
 -- vista_generador_oc — genera "A pedir" para las OCs
 -- Proyecto Supabase: Control Partes Talleristas (hrxfctzncixxqmpfhskv)
