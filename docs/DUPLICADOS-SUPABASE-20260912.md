@@ -17,8 +17,15 @@ dos o tres lugares que hoy no coinciden**.
 | ✅ | **`vista_saldos_stock` emitía el mismo `cod_art` dos veces** (~280 códigos). Rompía el `REFRESH CONCURRENTLY` de `vista_stock_procesada` y **la pantalla de Stock quedó congelada 10 h** | v16.08, §3.cr |
 | ✅ | **El trigger de `stocks_carga_rapida` sumaba el depósito insumos al stock total** y nunca llenaba `insumos_dep` (590E: 2.447 cajas cuando hay 51) | v16.09, §3.cs |
 | ✅ | **El módulo de importados tenía su propio libro de stock** (`Importados_Mov_Stock`) en vez de leer el depósito | v16.04 / v16.08, §3.cq |
+| ✅ | **El front leía `Volumen_Articulos` cruda** (hallazgo 5): el picking veía 548 artículos en m³ = 0 y 82 con el valor equivocado | v16.10, §3.ct |
+| ✅ | **Geocodificaciones que contradicen a su barrio** (hallazgo 2): 21 filas, Soldati en Corrientes, Parque Patricios en Bahía Blanca | v16.10, §3.ct |
 
-Centinela nuevo: `select * from public.gv_stock_cod_duplicado;` — **tiene que dar 0 filas siempre**.
+Centinelas nuevos, los dos tienen que dar **0 filas siempre**:
+
+```sql
+select * from public.gv_stock_cod_duplicado;   -- el refresh de Stock no se va a caer
+select * from public.gv_geo_incoherente;       -- ningún barrio del AMBA con coordenada lejos
+```
 
 ---
 

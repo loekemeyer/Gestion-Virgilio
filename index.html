@@ -7816,7 +7816,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v16.09";
+const APP_VERSION = "v16.10";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -9290,16 +9290,22 @@ function corrArt(art, np, corr) {
   return corr[pickNormNp(np) + "|" + _ocgNorm(art)] || art;
 }
 
-/* m³ por artículo desde Supabase (tabla "Volumen_Articulos", migrada de la hoja
-   "VolumenArticulos" en v5.33 — incluye los DOS bloques de la hoja, que el parser
-   gviz perdía). Devuelve Map<códigoUP, m3>. v>0 entra al mapa; 0 = sin medir → el
-   armado guiado no se activa para ese código. Si falla, tira (mismo contrato que antes). */
+/* m³ por artículo desde Supabase. Devuelve Map<códigoUP, m3>. v>0 entra al mapa;
+   0 = sin medir → el armado guiado no se activa para ese código. Si falla, tira.
+
+   v16.10 — se lee la VISTA `vista_volumen_articulo_resuelto`, NO la tabla cruda
+   `Volumen_Articulos`. La cruda ignora el override `GV_Volumen_Articulos` (que le
+   gana en 55 de 157 códigos, con la coma corrida hasta 10 lugares: 521L 0,0024 vs
+   0,0240) y tampoco deriva el m³ de un código con "L" final desde su artículo base.
+   Medido al 12/09: la tabla da m³ a 934 códigos, la vista a 1.482 — eran 548
+   códigos que el armado guiado veía en 0. El que escribe (dpSaveVol) sigue yendo a
+   la tabla base, que es la escribible. */
 async function fetchVolumenArticulos() {
   const now = Date.now();
   if (_pickM3Cache && (now - _pickM3CacheTs) < PICK_BASE_TTL_MS) return _pickM3Cache;
   // ⚠ supaFetchAll (pagina): PostgREST corta en 1000 filas y Volumen_Articulos tiene ~2500
   // códigos → un fetch simple dejaba ~1500 sin m³ (=0) → m³ mal en todos los módulos. v5.42.
-  const rows = await supaFetchAll(SUPABASE_URL + "/rest/v1/Volumen_Articulos", "select=codigo,m3");
+  const rows = await supaFetchAll(SUPABASE_URL + "/rest/v1/vista_volumen_articulo_resuelto", "select=codigo,m3");
   const m3map = new Map();
   for (let i = 0; i < rows.length; i++) {
     const art = String(rows[i].codigo || "").trim().toUpperCase();
@@ -35072,7 +35078,9 @@ async function dpLoad(force) {
       var res = await Promise.all([
         supaFetchAllSafe(SUPABASE_URL + "/rest/v1/gv_ppp_programacion_diaria", "select=cod"),
         supaFetchAllSafe(SUPABASE_URL + "/rest/v1/Articulos_Cajas", "select=Cod_Art,Descripcion,Marca,N_Caja,Uni_x_Caja"),
-        supaFetchAllSafe(SUPABASE_URL + "/rest/v1/Volumen_Articulos", "select=codigo,m3"),
+        // v16.10 — la vista resuelta, no la cruda: si no, el panel pide cargar el m³ de
+        // 548 códigos que ya lo tienen resuelto por el override o por su artículo base.
+        supaFetchAllSafe(SUPABASE_URL + "/rest/v1/vista_volumen_articulo_resuelto", "select=codigo,m3"),
         supaFetchAllSafe(SUPABASE_CAPACIDAD_ENDPOINT, "select=cod,empresa,sector,cajas_max"),
         supaFetchAllSafe(SUPABASE_URL + "/rest/v1/Insumos", "select=cod,isis,nombre,categoria"),
         supaFetchAllSafe(SUPABASE_URL + "/rest/v1/gv_ppp_base_pedidos", "select=articulo"),

@@ -1,0 +1,63 @@
+-- ============================================================================
+-- v16.10 (2026-09-12) — primera tanda de limpieza del barrido de duplicados
+-- Dueño, 12/09: "empezá a limpiarlas".
+-- Mapa completo: docs/DUPLICADOS-SUPABASE-20260912.md
+-- ============================================================================
+
+-- ---------------------------------------------------------------------------
+-- 1) El m³ del front sale de la VISTA RESUELTA, no de la tabla cruda
+-- ---------------------------------------------------------------------------
+-- Cambio de front, sin SQL. `index.html` tenía DOS lecturas contra
+-- `/rest/v1/Volumen_Articulos`:
+--   · `fetchVolumenArticulos()` — el caché de m³ del picking / armado guiado
+--   · el panel "Datos pendientes", que lista los artículos SIN m³
+-- Las dos pasan a `/rest/v1/vista_volumen_articulo_resuelto`, que aplica el
+-- override `GV_Volumen_Articulos` y deriva el m³ de un código con "L" final
+-- desde su artículo base.
+--
+-- El que ESCRIBE (`dpSaveVol`) sigue yendo a `Volumen_Articulos`: es la tabla
+-- escribible, y la vista la lee.
+--
+-- Medido al 12/09:
+--   Volumen_Articulos con m³ > 0 ........  934 códigos
+--   vista_volumen_articulo_resuelto ..... 1.482 códigos  (+548)
+--   códigos donde la vista difiere de la tabla ......  82
+-- O sea: el armado guiado veía 548 artículos en m³ = 0, y 82 con el valor
+-- equivocado (521L 0,0024 contra 0,0240 — la coma corrida 10 lugares).
+
+-- ---------------------------------------------------------------------------
+-- 2) Geocodificaciones que contradicen a su propio barrio
+-- ---------------------------------------------------------------------------
+-- `gv-geocodificar` v14.19 ya valida que el punto no caiga a más de 20 km del
+-- centro del barrio. Las filas malas son ANTERIORES a ese guard y nunca se
+-- rehicieron, porque ya tenían coordenada y la vista de faltantes sólo mira las
+-- que no la tienen.
+--
+-- Criterio (determinista, no a ojo): el `barrio` está en `Zonas_Barrios` — o sea
+-- es del AMBA — y la coordenada cayó fuera de la caja del AMBA
+-- (lat -35,20..-34,20 · lng -59,25..-57,90). La caja llega hasta -59,25 a
+-- propósito, para no marcar Luján (-34,5635/-59,1366), que es correcto.
+-- Se suman las filas GEMELAS sin barrio de la misma calle, que arrastran la
+-- misma coordenada mala. NO se tocan los clientes del interior cuyo barrio SÍ
+-- dice interior (Mar del Plata, Coronel Dorrego, Olavarría, Zárate, y el
+-- `luna 1299|bahia blanca` y `pergamino 3751|pergamino` del mismo cliente).
+--
+-- Backup: public."GV_Geo_Cliente_bkp_20260912" (21 filas).
+--
+-- 21 filas borradas de GV_Geo_Cliente (y su marca en GV_Geo_Fallidas), de 8
+-- direcciones: Soldati en Corrientes (798 km), Barracas en Olavarría (305 km),
+-- Parque Patricios en Bahía Blanca (628 km), Palermo en City Bell, Quilmes en
+-- Chaco, Lomas del Mirador en Mar de Ajó, Soldati en Pergamino (253 km).
+--
+-- De esas, DOS se repusieron en el acto con la coordenada correcta que ya tenía
+-- `PPP_Geo`: `luna 1299|parque patricios` y `pergamino 3751|soldati`. El resto
+-- queda sin geo para que el cron 75 las rehaga con el guard puesto.
+--
+-- ROLLBACK:
+--   insert into public."GV_Geo_Cliente" select * from public."GV_Geo_Cliente_bkp_20260912"
+--   on conflict (cod, dir_key) do nothing;
+
+-- CENTINELA nuevo (tiene que dar 0 filas):
+--   select * from public.gv_geo_incoherente;
+-- Lista las direcciones cuyo barrio es del AMBA y cuya coordenada no.
+-- ============================================================================

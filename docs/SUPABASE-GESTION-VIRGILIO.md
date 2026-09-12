@@ -8217,3 +8217,75 @@ Si devuelve algo, el refresh del cron 55 va a fallar y la pantalla de Stock se v
 último snapshot que zafó. Al 12/09 devuelve **0 filas**.
 
 Archivo: `sql/gv_trigger_stock_total_v1609.sql`.
+
+## §3.ct — Primera tanda de limpieza de duplicados: el m³ del front y la geo incoherente (v16.10) — 2026-09-12
+
+Thomas, 12/09: ***"empezá a limpiarlas"***. Mapa completo en
+`docs/DUPLICADOS-SUPABASE-20260912.md`.
+
+### A) El m³ del front sale de la vista resuelta, no de la tabla cruda
+
+`index.html` tenía **dos** lecturas contra `/rest/v1/Volumen_Articulos`:
+
+| Dónde | Qué hace |
+|---|---|
+| `fetchVolumenArticulos()` | el caché de m³ del **picking / armado guiado** |
+| el panel **Datos pendientes** | lista los artículos **sin** m³ para cargarlos |
+
+Las dos pasan a **`/rest/v1/vista_volumen_articulo_resuelto`**, que aplica el override
+`GV_Volumen_Articulos` y deriva el m³ de un código con "L" final desde su artículo base. El que
+**escribe** (`dpSaveVol`) sigue yendo a `Volumen_Articulos`, que es la tabla escribible.
+
+**Medido al 12/09:**
+
+| | códigos con m³ > 0 |
+|---|---|
+| `Volumen_Articulos` (cruda) | **934** |
+| `vista_volumen_articulo_resuelto` | **1.482** |
+
+Son **548 artículos** que el armado guiado veía en m³ = 0, más **82** donde la vista y la tabla dan
+distinto (521L: 0,0024 contra **0,0240** — la coma corrida 10 lugares). El panel de Datos
+pendientes, además, dejaba de pedir m³ que ya estaba resuelto.
+
+### B) Geocodificaciones que contradicen a su propio barrio
+
+`gv-geocodificar` **ya valida** desde la v14.19 que el punto no caiga a más de 20 km del centro del
+barrio. Las filas malas son **anteriores a ese guard** y nunca se rehicieron, porque ya tenían
+coordenada y la vista de faltantes sólo mira las que no la tienen.
+
+**El criterio, determinista:** el `barrio` está en `Zonas_Barrios` (o sea es del AMBA) y la
+coordenada cayó fuera de la caja del AMBA — lat −35,20…−34,20 · lng **−59,25**…−57,90. La caja
+llega hasta −59,25 a propósito, para **no** marcar Luján (−34,5635/−59,1366), que es correcto. Se
+suman las filas **gemelas sin barrio** de la misma calle, que arrastran la misma coordenada.
+
+**No se tocó** a ningún cliente del interior cuyo barrio *sí* dice interior: Mar del Plata,
+Coronel Dorrego, Olavarría, Zárate, y las filas `luna 1299|bahia blanca` y `pergamino 3751|pergamino`
+del mismo cliente que tenía también la variante con barrio de CABA.
+
+**21 filas borradas** de `GV_Geo_Cliente` (más su marca en `GV_Geo_Fallidas`), de 8 direcciones:
+
+| dir_key | decía | son |
+|---|---|---|
+| `b de astrada 2836\|soldati` (×4) y `b. de astrada 2850\|soldati` (×2) | Corrientes | **798 km** |
+| `luna 1299\|parque patricios` | Bahía Blanca | 628 km |
+| `av.del valle 1139\|barracas` | Olavarría | 305 km |
+| `pergamino 3751\|soldati` | ciudad de Pergamino | 253 km |
+| `lavalle 661 0\|quilmes` | Chaco | 630 km |
+| `alte brown 3251\|lomas del mirador` | Mar de Ajó | 330 km |
+| `santa fe 3432\|palermo` | City Bell | 65 km |
+
+**Dos se repusieron en el acto** con la coordenada correcta que `PPP_Geo` ya tenía:
+`luna 1299|parque patricios` (−34,6413/−58,3983) y `pergamino 3751|soldati` (−34,6685/−58,4364).
+El resto queda sin geo para que el cron 75 las rehaga **con el guard puesto**.
+
+Backup: `public."GV_Geo_Cliente_bkp_20260912"` (21 filas).
+
+### Centinela nuevo
+
+```sql
+select * from public.gv_geo_incoherente;   -- 0 filas = todo bien
+```
+
+Lista las direcciones cuyo **barrio es del AMBA** y cuya **coordenada no**. Al 12/09 da **0**.
+
+Archivo: `sql/gv_limpieza_duplicados_v1610.sql`.
