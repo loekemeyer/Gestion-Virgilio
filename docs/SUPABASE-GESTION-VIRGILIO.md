@@ -9153,3 +9153,51 @@ hay que migrarlo antes. Las tres más cercanas son `proyeccion_madre`, `precios_
 `Importados`, que no tienen ningún lector en el front.
 
 Archivo: `sql/gv_uxb_fuente_unica_v1628.sql`.
+
+### §3.dg — v16.29: los lectores empiezan a apuntar a GV_UxB, y aparecen 2 bugs de valuación — 2026-09-12
+
+Segundo tramo de *"que todos los lugares que usan esas tablas usen solo 1 lugar"*. La v16.28
+dejó la fuente única; acá se empiezan a repuntar los **lectores directos**.
+
+| lector | qué leía | ahora | resultado |
+|---|---|---|---|
+| `vista_generador_oc` | `proyeccion_madre.uxb` | `GV_UxB` | **firma idéntica** (349 filas, md5 `05e1b8f6…`) |
+| `vista_facturacion_neto_items` | `pc.uxb` en el COALESCE | fuera (ya ganaba `uxe`) | sin cambio |
+| `vista_plata_perdida` | idem | idem | sin cambio |
+| `cobranzas_precios` | idem | idem | sin cambio |
+| `vista_facturable_anticipado` | **un segundo COALESCE** | `uxe` | **+$445.548** ⚠ |
+| `gv_ppp_np_valor` | `CASE chef → pc.uxb` | `GV_UxB` por empresa | **+$6.072.000** ⚠ |
+
+#### Los dos que se movieron son bugs, y los dos son el 824
+
+**`vista_facturable_anticipado` era internamente inconsistente.** Tenía dos COALESCE: el de la
+columna `uxb` (que ya usaba `uxe`) y otro adentro del `round(...)` que calcula
+`valor_estimado`, que seguía en `pc.uxb`. O sea: **mostraba un UxB y valuaba con otro.** Tres
+líneas del 824, +$445.548.
+
+**`gv_ppp_np_valor` tomaba el UxB de la lista de precios de Chef.** 33 NP, todas de Chef, todas
+suben: +$6.072.000. El desglose por artículo da **un solo código: el 824**, en 28 líneas —
+`precios_venta_chef` dice 12 y `GV_UxB` dice **36**, que es la corrección que dio Thomas
+(*"824: 36"*). Con la lista vieja, esas NP se valuaban a un tercio.
+
+#### Primera columna liberada
+
+`proyeccion_madre.uxb` → renombrada a **`uxb_obsoleto_v1629`**. No la lee nadie más: el front
+sólo pide `cod,proy_cajas_mes` y ninguna función la nombra. **Se renombró en vez de dropear**
+porque hay un sync mensual externo (n8n / Apps Script) que no se pudo inspeccionar desde acá —
+si algo la escribe, se ve sin haber perdido los 410 valores. Backup:
+`zz_backups."GV_proyeccion_madre_uxb_20260912"`. Si en unos días nada falla, se dropea.
+
+También sale del centinela `gv_uxb_desalineado`: ya no es fuente, no hay nada que alinear.
+
+#### Dónde quedó `precios_venta_chef.uxb`
+
+Sin lectores que **compitan**: donde se usaba para decidir, ahora gana `GV_UxB`. Quedan dos
+menciones (`cobranzas_precios` y el propio `gv_ppp_np_valor`) pero como **fallback** detrás de
+la fuente única, que es sano. No se renombró por eso.
+
+**Medido al cierre:** stock 363 con 0 filas sin uxb · `vista_generador_oc` 349 · facturación
+$1.395.224.315,83 (sin moverse) · anticipado $77.843.819,56 · `gv_ppp_np_valor`
+$1.395.961.659 · los 4 centinelas en 0.
+
+Archivo: `sql/gv_uxb_lectores_v1629.sql`.
