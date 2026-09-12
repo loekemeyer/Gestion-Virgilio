@@ -7872,3 +7872,18 @@ se guardan las fechas de `PPP_Web_Programacion`).
 
 **Backup:** `public."GV_PPP_Prog_Override_bkp_20260912_pre_ensalida"` (113 filas).
 **Archivo:** `sql/gv_ppp_en_salida_manual_v1600.sql`. Objetos todos nuestros (`GV_*` / `gv_*`).
+
+### §3.cn.4 — v16.01: "armado" no quiere decir que salió
+
+Thomas: *"Aclará 'ya armado' de alguna manera"*. La app venía **afirmando la salida** cuando lo
+único que consta es el armado de la tanda (evento TAP). Cuatro textos corregidos:
+
+| Dónde | Antes | Ahora |
+|---|---|---|
+| Fila de vencidos | `salió · falta la Carga Camión` | **`ARMADO` / `¿salió? sin registro`** |
+| Cartel de vencidos | *"N pedidos **salieron** con la tanda armada y nadie registró la Carga Camión"* | *"N pedidos con la tanda **ARMADA** y nadie registró la Carga Camión. **Armado no quiere decir que salió**: sin ese registro no consta que haya subido a un camión."* |
+| Cartel de Resumen | *"N con la tanda armada y la Carga Camión sin registrar"* | idem + *"(armado no es que salió)"* |
+| Chip de En Salida | `🧰 Armada` | **`🧰 Armada (no es que salió)`**, con tooltip: pasó por armado (TAL) y nada más; la salida la dice el chip de al lado |
+
+Es la misma idea que la v15.85: **sólo la Carga Camión (o la salida marcada a mano) dice que un
+pedido salió**. La v15.55 había ido al revés — dar por salido lo armado hace +36 h — y se apagó.

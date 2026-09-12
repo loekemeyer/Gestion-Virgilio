@@ -7794,7 +7794,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v16.00";
+const APP_VERSION = "v16.01";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -30211,7 +30211,9 @@ function _pppEsChips(p) {
   // la facturó. Seguro salió; falta el papel. Viene de gv_ppp_en_salida con estado 'armada_sin_carga'.
   else if (r.estado === "armada_sin_carga") out.push('<span class="ppp-es-chip bad" title="La tanda se armó hace ' + (r.horas_desde_armado || "?") + ' h y nadie registró la carga al camión (CCN) ni la facturó. Pasado el plazo se da por salida. Cerrala con Controlado, o ↩ si la mercadería volvió.">🚨 Salió hace ' + (r.horas_desde_armado || "?") + ' h sin registro de carga · falta el remito</span>');
   else out.push('<span class="ppp-es-chip warn" title="Está facturada pero nadie registró la carga al camión (evento CCN). Se muestra igual para que se pueda cerrar desde acá.">⚠ Sin registro de carga</span>');
-  if (r.armada) out.push('<span class="ppp-es-chip">🧰 Armada</span>');
+  // v16.01 — el chip dice que la NP pasó por armado (evento TAL), NADA más. Que haya salido lo
+  // dice el chip de al lado (🚚 Cargado al camión / 📝 Dada por salida a mano), no éste.
+  if (r.armada) out.push('<span class="ppp-es-chip" title="Pasó por armado (evento TAL). Armado no quiere decir que salió: eso lo dice el chip de la carga.">🧰 Armada (no es que salió)</span>');
   else out.push('<span class="ppp-es-chip warn" title="No hay evento TAL: la NP no pasó por armado en la app.">Sin armar</span>');
   if (r.facturada) out.push('<span class="ppp-es-chip">🧾 Facturada</span>');
   // v13.68 (dueño: "el orden real es Control Remitos → Carga Camión → Recepción Remitos; el control se puede saltear
@@ -32647,7 +32649,7 @@ function pppResumenHtml(prog) {
     const _rep = _venc.filter(function (p) { return _pppEstadoPed(p) !== "armado"; }).length;
     head += '<div class="ppp-res-note' + (_rep ? ' rep' : '') + '">⏰ <b>' + _nVenc + '</b> pedido(s) con fecha de entrega vencida: ' +
       (_rep ? '<b>' + _rep + ' sin salir → hay que reprogramar</b>' + (_nVenc - _rep ? ' · ' : '') : '') +
-      (_nVenc - _rep ? (_nVenc - _rep) + ' con la tanda armada y la Carga Camión sin registrar' : '') + '. ' +
+      (_nVenc - _rep ? (_nVenc - _rep) + ' con la tanda ARMADA y la Carga Camión sin registrar (armado no es que salió)' : '') + '. ' +
       // v13.94 (dueño: "tengo que entrar a Resumen para que me aparezca el botón que me lleve de
       // nuevo a Programación, una locura"): antes esto hacía pppTab('plan') + pppPlanAbrir('venc'),
       // o sea te sacaba de la solapa. Ahora la lista se abre ACÁ, debajo del cartel.
@@ -34001,7 +34003,7 @@ function _pppPlanDiaHtml(programados, key, opts) {
     // sin fecha, ni pedidos que no se hayan cargado a un camión"). El camino real es registrar la carga
     // desde Carga Camión, que es lo que faltó: ahí el pedido pasa a En Salida y se cierra con Recepción
     // Remitos. Dejar el texto viejo mandaba a la operadora a esperar algo que ya no pasa.
-    if (sinRem) h += '<div class="pn-note"><b>' + sinRem + '</b> ' + (sinRem === 1 ? 'pedido salió' : 'pedidos salieron') + ' con la tanda armada y <b>nadie registró la Carga Camión</b>. Mientras no se registre, el pedido queda acá: no entra a <b>En Salida</b> y no se puede cerrar. El que lo cargó tiene que marcarlo en <b>Carga Camión</b> — de ahí pasa a En Salida y se cierra con <b>Recepción Remitos</b>. Si ya salió y nadie lo marcó, <b>🚚 Ya salió</b> lo pasa a En Salida con su fecha. Si no sabés si salió, <b>↩ Sin programar</b> lo saca de la programación y queda en <b>📥 A Programar</b> para revisarlo.</div>';
+    if (sinRem) h += '<div class="pn-note"><b>' + sinRem + '</b> ' + (sinRem === 1 ? 'pedido con la tanda ARMADA' : 'pedidos con la tanda ARMADA') + ' y <b>nadie registró la Carga Camión</b>. <b>Armado no quiere decir que salió</b>: sin ese registro no consta que haya subido a un camión. Mientras no se registre, el pedido queda acá: no entra a <b>En Salida</b> y no se puede cerrar. El que lo cargó tiene que marcarlo en <b>Carga Camión</b> — de ahí pasa a En Salida y se cierra con <b>Recepción Remitos</b>. Si ya salió y nadie lo marcó, <b>🚚 Ya salió</b> lo pasa a En Salida con su fecha. Si no sabés si salió, <b>↩ Sin programar</b> lo saca de la programación y queda en <b>📥 A Programar</b> para revisarlo.</div>';
   }
   const dk = esVenc ? "venc" : key;
   for (const c of cams) {
@@ -34058,7 +34060,10 @@ function _pppPlanDiaHtml(programados, key, opts) {
       let carga = "";
       if (esVenc) {
         carga = e === "armado"
-          ? '<div class="pn-carga"><span class="t">salió · <b>falta la Carga Camión</b></span></div>'
+          // v16.01 (dueño: aclarar "ya armado"): ARMADO no quiere decir que salió. Lo único que
+          // consta es el armado de la tanda (TAP); sin Carga Camión (CCN) nadie registró que subiera
+          // a un camión. Antes acá decía "salió", que era una afirmación sin respaldo.
+          ? '<div class="pn-carga"><span class="t" title="Sólo consta el ARMADO (TAP). Sin Carga Camión no hay registro de que haya salido del depósito.">ARMADO<br><b>¿salió? sin registro</b></span></div>'
           : '<div class="pn-carga"><span class="t rep">⚠ NO SALIÓ<br>reprogramar</span></div>';
       } else if (oc) {
         const esPrimero = primero && p === primero;
