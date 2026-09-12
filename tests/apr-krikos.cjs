@@ -113,6 +113,27 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
     window.aprArmarAhora = _ar; window.aprCargar = _ac;
     _apr.krikos = [];
 
+    // ---- v16.04 — el motivo NO se repite renglón por renglón cuando es el mismo ----
+    // Con 6 OC salteadas por "fecha de entrega vencida", el cartel decía seis veces la misma
+    // frase a ancho completo y llenaba la pantalla. Va una sola vez arriba.
+    const mismo = "fecha de entrega vencida — se carga a mano si todavía va";
+    _apr.krikos = [
+      { inbox_id: 1, cadena: "COTO", nro_documento: "A", fecha_entrega_d: dia(-5), tiene_pdf: true, auto_aviso: mismo },
+      { inbox_id: 2, cadena: "COTO", nro_documento: "B", fecha_entrega_d: dia(-6), tiene_pdf: true, auto_aviso: mismo },
+      { inbox_id: 3, cadena: "COTO", nro_documento: "C", fecha_entrega_d: dia(-7), tiene_pdf: true, auto_aviso: mismo }
+    ];
+    const dm = box(aprKrikosHtml());
+    out.motivoUnaVez = dm.querySelectorAll(".apr-krikos-motivo").length === 1 &&
+                       dm.querySelectorAll(".apr-krikos-aviso").length === 0;
+    out.motivoSeLee = /Todas por lo mismo/.test(dm.textContent) && dm.textContent.includes(mismo);
+    out.filasIgual = dm.querySelectorAll(".apr-krikos-r").length === 3;
+
+    // Motivos DISTINTOS → no se agrupa, cada renglón se explica solo.
+    _apr.krikos[2].auto_aviso = "el link no devolvió el PDF";
+    const dd = box(aprKrikosHtml());
+    out.motivosDistintosNoAgrupa = dd.querySelectorAll(".apr-krikos-motivo").length === 0 &&
+                                   dd.querySelectorAll(".apr-krikos-aviso").length === 3;
+
     // ---- SEGURIDAD (v16.04) — sin sesión NO se pide nada y el bloque no se dibuja ----
     // Regresión del problema "las OC de Krikos se leían con la anon key pública": el cartel
     // aparecía aunque la PPP Web dijera "Iniciá sesión", y el `link` de cada OC es la URL de
