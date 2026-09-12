@@ -12,7 +12,7 @@
 > única**; no se replica. Ante la duda entre parche rápido y fix de raíz → **fix
 > de raíz**.
 >
-> Última actualización: 2026-09-11 (viernes) · Versión app al documentar: **v15.86**
+> Última actualización: 2026-09-12 (sábado) · Versión app al documentar: **v16.04**
 >
 > Nota **v15.40 (2026-09-11) — HANDOFF de planimetría / Acacia: `docs/HANDOFF-PLANIMETRIA-Y-ACACIA.md`.**
 > Thomas sigue este tema en otra sesión. Ahí está todo junto: los **13 artículos activos del catálogo LK
@@ -4238,8 +4238,12 @@ fichadas-monitor.html y productividad.html) — rotar la key = editar solo ese a
 > `uni_x_caja`, `principal`, `activo`, `est_madre_seed/override`, `pedido_manual`, `pedido_curso`),
 > **`Importados_Config`** (`meses_objetivo` = **índice**, ahora **10**), **`Importados_Mov_Stock`**
 > (stock **en unidades** event-sourced; `delta_uni`, `tipo='inicial'`) y la vista
-> **`v_importados_ordenes`** (motor: `stock_actual` en unidades = mov − ventas×uni_x_caja desde el
-> inicial; `est_madre_eff` = proyección madre live/seed; `meses_objetivo`). **Pantalla "Proveedor de
+> **`gv_importados_ordenes`** (motor, **v16.04**: `stock_actual` en unidades = **cajas del depósito
+> real × `uni_x_caja`**, vía `gv_importados_stock_dep` → `vista_saldos_stock`; trae además
+> `stock_cajas`; `est_madre_eff` = proyección madre live/seed; `meses_objetivo`). ⚠ La vieja
+> **`v_importados_ordenes`** sigue viva y **no se toca**: la lee Producción Virgilio, y su
+> `stock_actual` salía de `Importados_Mov_Stock` (seed + sync manual, sólo descontaba entregas),
+> que es justo lo que se dejó de usar acá. §3.cq de `docs/SUPABASE-GESTION-VIRGILIO.md`. **Pantalla "Proveedor de
 > importación"** (botón 🏭 en Administración, `stkOpenProvImp`): lee/escribe el **maestro `Importados`**
 > vía la vista **`vista_prov_importacion`** (1 fila por `cod_art` activo; `cod, descripcion, marca,
 > proveedor, n_prov, es_e`; GRANT SELECT anon). Al tocar el desplegable hace **PATCH `Importados.proveedor`**

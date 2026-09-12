@@ -661,3 +661,37 @@ tandas nombradas distintas.
 archivo): volver a `np|tanda|cod_art` + `and coalesce(e.tanda,'') = coalesce(new.tanda,'')`.
 Datos: `insert into public."Entregas_Virgilio" select * from public."GV_Backup_Entregas_Dup_20260911";`
 y `delete from public."Movimientos_Stock" where tipo='ajuste' and ref like 'reversa armado duplicado%';`
+
+## v16.04 (2026-09-12) — el módulo de importados pasa a leer el STOCK REAL (sin tocar `v_importados_ordenes`)
+
+**Objeto compartido tocado:** NINGUNO. Se anota igual porque el cambio nace de un objeto que
+**sí** usa Producción y por eso NO se tocó.
+
+**Qué usa Producción:** `v_importados_ordenes` se lee por REST con la anon key desde
+`index.html:12022` del repo `loekemeyer/Produccion-Virgilio`, e `Importados_Mov_Stock` recibe
+inserts vía la RPC `importados_marcar_llegada` (`sql/importados_pedidos_rpc.sql:56`). Las dos
+**quedan exactamente como estaban**.
+
+**Qué se agregó (objetos nuevos, prefijo `gv_`, `security_invoker = true`):**
+
+- `public.gv_importados_stock_dep` — stock real del depósito por código normalizado
+  (`gv_cod_stock`) y empresa, en cajas. Misma suma de depósitos que
+  `vista_stock_procesada.stock_total` (terminado + excedente + separar_pedidos + a_facturar +
+  a_guardar + racks + racks_ch + para_envasar).
+- `public.gv_importados_ordenes` — copia de `v_importados_ordenes` con `stock_actual` sacado de
+  esa vista en lugar del libro propio `Importados_Mov_Stock`. Agrega `stock_cajas`.
+
+Gestión (`index.html`, `SUPABASE_IMPORTADOS_OC_ENDPOINT`) apunta a la vista nueva; Producción
+sigue leyendo la vieja.
+
+**Impacto medido (12/09/2026, 154 filas `principal and activo`):** 122 sin cambio, 32 cambiaron.
+Las dos grandes son PARTES y **no cambian el resultado**: 505C `stock_actual` 262.400 → 0 y
+1000900 68.000 → 0, pero su `stock_total` sigue siendo el del depósito de insumos (130.000 y
+107.500) porque para una parte manda el insumo. 026 +2.520 u y 027 +1.272 u (antes no cruzaban
+contra el depósito). Las otras 28 son de 8 a 192 unidades.
+
+**Rollback exacto:** en `index.html`, volver
+`SUPABASE_IMPORTADOS_OC_ENDPOINT` a `/rest/v1/v_importados_ordenes`. Opcional:
+`drop view if exists public.gv_importados_ordenes;` y
+`drop view if exists public.gv_importados_stock_dep;`. SQL completo en
+`sql/gv_importados_stock_real_v1604.sql`.

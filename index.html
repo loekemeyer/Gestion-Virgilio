@@ -7797,7 +7797,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v16.03";
+const APP_VERSION = "v16.04";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -13739,18 +13739,18 @@ function _ocgAutoEnTxt() { const n = _ocgNextAuto(); return "se genera automáti
 let _ocgCdTimer = null;
 function ocgStartCountdown() { if (_ocgCdTimer) return; _ocgCdTimer = setInterval(function () { const el = document.getElementById("ocgCountdown"); if (!el) { clearInterval(_ocgCdTimer); _ocgCdTimer = null; return; } el.textContent = _ocgAutoEnTxt(); }, 30000); }
 /* v9.12 — OC de IMPORTADOS (circuito propio, aparte del generador nacional). Lee la vista
-   `v_importados_ordenes` (motor de importados: stock en UNIDADES event-sourced, proyección madre
+   `gv_importados_ordenes` (motor de importados: stock en UNIDADES sacado del DEPÓSITO REAL, proyección madre
    en unidades/mes y meses objetivo = 10 de Importados_Config). Agrega por cod_art sumando las
    marcas/plantas (principal=true), y calcula lo a pedir en unidades y en cajas (÷ uni_x_caja).
    Se muestra como sección dentro de "Generar OCs", agrupado por PROVEEDOR CHINO. La fórmula fina
    (stock por todos los estadios, partes, etc.) se sigue afinando. */
-const SUPABASE_IMPORTADOS_OC_ENDPOINT = SUPABASE_URL + "/rest/v1/v_importados_ordenes";
+const SUPABASE_IMPORTADOS_OC_ENDPOINT = SUPABASE_URL + "/rest/v1/gv_importados_ordenes";
 async function ocgFetchImportados() {
   let rows = [];
   try {
     // v15.27 — stock_total = stock del módulo + depósito insumos (gv_importados_stock_insumos: partes y
     // reenvasados, convertido con Insumos_Factores); para una PARTE el insumo REEMPLAZA al seed del Excel.
-    rows = await supaFetchAllSafe(SUPABASE_IMPORTADOS_OC_ENDPOINT, "select=id,cod_art,marca,proveedor,descripcion,uni_x_caja,fob_uni,est_madre_eff,meses_objetivo,stock_actual,stock_insumos,stock_total,pedido_curso,principal,activo&principal=eq.true&activo=eq.true");
+    rows = await supaFetchAllSafe(SUPABASE_IMPORTADOS_OC_ENDPOINT, "select=id,cod_art,marca,proveedor,descripcion,uni_x_caja,fob_uni,est_madre_eff,meses_objetivo,stock_actual,stock_cajas,stock_insumos,stock_total,pedido_curso,principal,activo&principal=eq.true&activo=eq.true");
   } catch (_e) { return { items: [], meses: 10 }; }
   // v10.38 — alias de códigos que se piden JUNTOS (misma master caja / mismo pedido al chino):
   // 865ED se suma dentro de 865E (pedido del usuario). Agregar acá futuros pares si hacen falta.
@@ -13993,7 +13993,7 @@ function ocBodyGenImportados() {
   if (!gen.imp) return '<div class="oc-meta" style="margin-top:16px;color:#94a3b8">🌎 Importados: calculando…</div>';
   const items = (gen.imp.items || []).filter(function (it) { return it.aPedirUni > 0; });
   const gf = (_oc.genFiltro || "").toLowerCase().trim();
-  let h = '<div class="oc-meta" style="margin-top:18px;border-top:2px solid #e2e8f0;padding-top:12px"><b>🌎 Importados — OC por proveedor chino</b> · índice <b>' + (gen.imp.meses || 10) + ' meses</b> · <small style="color:#94a3b8">stock y proyección en unidades (motor <code>v_importados_ordenes</code>). Vista previa — la emisión se afina con más análisis.</small></div>';
+  let h = '<div class="oc-meta" style="margin-top:18px;border-top:2px solid #e2e8f0;padding-top:12px"><b>🌎 Importados — OC por proveedor chino</b> · índice <b>' + (gen.imp.meses || 10) + ' meses</b> · <small style="color:#94a3b8">stock y proyección en unidades (motor <code>gv_importados_ordenes</code>, stock real del depósito). Vista previa — la emisión se afina con más análisis.</small></div>';
   if (!items.length) { h += '<div class="oc-empty" style="margin-top:6px">No hay importados para pedir (todo en o sobre el objetivo).</div>'; return h; }
   const g = {};
   items.forEach(function (it) { const k = it.prov || "(sin proveedor)"; if (!g[k]) g[k] = []; g[k].push(it); });

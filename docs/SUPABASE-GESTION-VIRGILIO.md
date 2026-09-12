@@ -7888,7 +7888,7 @@ Thomas: *"Aclará 'ya armado' de alguna manera"*. La app venía **afirmando la s
 Es la misma idea que la v15.85: **sólo la Carga Camión (o la salida marcada a mano) dice que un
 pedido salió**. La v15.55 había ido al revés — dar por salido lo armado hace +36 h — y se apagó.
 
-## §3.cn.5 — REVERTIDO: una tanda ya pickeada no vuelve a la cola de picking (v16.02, 2026-09-12)
+## §3.cn.5 — REVERTIDO: una tanda ya pickeada no vuelve a la cola de picking (v16.04, 2026-09-12)
 
 Thomas, mirando las 14 que la v15.93 había mandado a A Programar: *"Esto marca un precedente raro.
 Cómo armaron la tanda si no había tanda."* **Tenía razón, y el riesgo era peor que el conceptual.**
@@ -7960,3 +7960,78 @@ sacaron por su decisión.
 
 **Aplicado:** las 14 otra vez en A Programar, las 14 con `tanda_previa` (D47B, D56D, D72B, D72C) y
 `ya_armada = ya_pickeada = true`. A Programar **0 → 14**. En Salida sigue en 20 (98530, salida manual).
+## §3.cq — El stock del módulo de importados pasa a ser el STOCK REAL (v16.04) — 2026-09-12
+
+Thomas, 12/09: ***"que lea el stock real"***.
+
+### Qué estaba mal
+
+`v_importados_ordenes.stock_actual` **no era el stock del depósito**. Salía de
+`Importados_Mov_Stock`, un libro propio del módulo:
+
+```
+stock_actual = (seed del Excel + el sync manual del 11/09)
+             - cajas de Entregas_Virgilio desde el "inicial" x uni_x_caja
+```
+
+O sea: lo único que lo bajaba eran **las entregas**. Ajustes, facturado, movimientos de racks,
+envasado y recepciones nunca le llegaban. Empataba el día que alguien corría el sync
+(`ref = 'sync stock depósito 2026-09-11 (vista_saldos_stock)'`, 95 ajustes) y se despegaba un
+poco por día. Al 12/09, de 112 códigos comparables **31 no coincidían** con la pantalla de Stock.
+
+Además: **"marcar llegada" sumaba stock al módulo** (`importados_marcar_llegada` inserta en
+`Importados_Mov_Stock`) y la recepción real del depósito lo sumaba **otra vez**.
+
+### Qué se hizo
+
+`v_importados_ordenes` **NO se tocó**: la lee Producción Virgilio por REST
+(`index.html:12022` de ese repo). Protocolo del `CLAUDE.md` → objeto nuevo con prefijo `gv_`.
+
+| Objeto nuevo | Qué es |
+|---|---|
+| **`gv_importados_stock_dep`** | stock real del depósito por código normalizado (`gv_cod_stock`) y empresa, en **cajas**. Suma los mismos 8 depósitos que `vista_stock_procesada.stock_total`: terminado + excedente + separar_pedidos + a_facturar + a_guardar + racks + racks_ch + para_envasar. `insumos` va aparte. |
+| **`gv_importados_ordenes`** | copia de `v_importados_ordenes` con `stock_actual = round(cajas del depósito × uni_x_caja)`. Agrega **`stock_cajas`**. |
+
+Las dos con `security_invoker = true` y `grant select` a `anon, authenticated`.
+
+**El reparto LK / CH.** Hay 4 códigos con dos filas en `Importados` que normalizan igual, y
+siempre son una LK y una CH: `437E`/`437EL`, `438E`/`438EL`, `439E`/`439EL` y `809E` (dos veces
+el mismo código). Ahí el stock se parte por empresa — la fila CH se lleva `empresa = 'CH'`, la
+LK se lleva `'LK' + 'Mixto'`. Si el código tiene una sola fila, se lleva todo. Verificado: la
+suma de las dos filas da exacto el total del depósito, sin doble conteo.
+
+| | cajas depósito | módulo |
+|---|---|---|
+| 437E CH / 437EL LK | 16 / 295 | 384 u / 7.080 u |
+| 438E CH / 438EL LK | 2 / 127 | 48 u / 3.048 u |
+| 439E CH / 439EL LK | 16 / 16 | 96 u / 96 u |
+| 809E CH / 809E LK | 489 / 28 | 5.868 u / 336 u |
+
+**Las partes no cambian.** Para un `es_parte` sigue mandando el insumo
+(`stock_total = gv_importados_stock_insumos.stock_uni`, regla de la v15.75). Por eso 505C pasa de
+`stock_actual` 262.400 → 0 y 1000900 de 68.000 → 0 **sin que cambie su `stock_total`** (130.000 y
+107.500): ese `stock_actual` era un seed que no se usaba para nada.
+
+### Medido
+
+154 filas `principal and activo`: **122 sin cambio, 32 cambiaron**. Sacando las 2 partes, las 30
+que quedan son: 026 **+2.520 u** y 027 **+1.272 u** (antes no cruzaban contra el depósito) y 28 de
+entre 8 y 192 unidades (1 a 16 cajas), que es la deriva desde el sync del 11/09.
+
+Chequeo que tiene que dar 0 filas de acá en adelante:
+
+```sql
+select i.cod_art, i.marca, i.stock_cajas, s.cajas
+  from public.gv_importados_ordenes i
+  join public.gv_importados_stock_dep s on s.cod_norm = public.gv_cod_stock(i.cod_art)
+ where i.principal and i.activo and not i.es_parte
+ group by 1,2,3,4 having sum(s.cajas) <> i.stock_cajas;
+```
+
+### Front
+
+`SUPABASE_IMPORTADOS_OC_ENDPOINT` ahora apunta a `/rest/v1/gv_importados_ordenes` y el `select`
+pide además `stock_cajas`. Nada más cambió: las columnas son las mismas.
+
+**Rollback:** devolver ese endpoint a `v_importados_ordenes`. SQL y detalle en
+`sql/gv_importados_stock_real_v1604.sql`; anotado también en `docs/ROLLBACK-PRODUCCION.md`.
