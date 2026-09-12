@@ -9562,3 +9562,43 @@ select c.relname from pg_class c join pg_namespace n on n.oid = c.relnamespace
 
 Facturación $1.395.224.315,83 · anticipado $77.843.819,56 · `vista_saldos_stock` 488 ·
 `vista_stock_procesada` 363 · los 4 centinelas en 0.
+
+---
+
+### §3.dp — v16.41: las 4 vistas definer dejan de estar abiertas a `anon` — 0 expuestas — 2026-09-12
+
+Termina lo que la v16.40 dejó abierto: ahí bajé de 45 a 4 y dije que a esas 4 había que
+**leerlas a mano**. Esto es esa lectura. Detalle en `sql/gv_rls_definer_revoke_v1641.sql`.
+
+**La política del proyecto, mirando los grants, es coherente:**
+
+| | |
+|---|---|
+| **visible** para `anon` | `precios_venta` · `precios_venta_chef` · `precios_super_lk` · `Facturacion_NP` · `Entregas_Virgilio` — la lista **general** |
+| **negado** a `anon` | `GV_Precios_Cliente` · `clientes_dto` · `GV_Precio_Facturado_Cache` · `vista_facturacion_neto_items` · schema `isis_lk` — lo **pactado con cada cliente** |
+
+**Y las 4 vistas pasaban por encima de eso:**
+
+| vista | qué exponía que `anon` no consigue de otra forma |
+|---|---|
+| `vista_factura_metodo_pago` | CUIT, CAE, punto de venta, nº de factura, total y método de pago — de `isis_lk` |
+| `vista_plata_perdida` | `precio_unit` desde `COALESCE(pcl.precio_unit, …, pfc.precio_neto)`: el precio **pactado** por cliente |
+| `vista_facturacion_neto` | el neto por NP, calculado con el `dto_vol` de `clientes_dto`; con el neto y las cajas se despeja el descuento |
+| `vista_facturacion_faltantes` | `importe_falto`, misma familia |
+
+**Pero nadie las usa.** La app pide `facturacion_neto_detalle` y `facturacion_neto_lote`, que
+son **RPCs `SECURITY DEFINER`** — corren como el dueño y por eso pueden leer las fuentes negadas
+sin exponerlas. Ése es el patrón correcto y ya estaba implementado. Tráfico 24 h: **0 GET** a
+las 4 vistas, 9 POST a las RPCs. En el front de los 4 repos: 0 referencias vivas (las únicas
+están en `produccion-virgilio`, retirada el 08/09).
+
+O sea que el grant a `anon` no habilitaba **ninguna** función: sólo dejaba la puerta de atrás
+abierta al lado de la puerta buena. Se revocó.
+
+⚠ **A `authenticated` no se le tocó nada.** Un supervisor logueado con Google es
+`authenticated`, no `anon`; si mañana aparece una pantalla suya que use alguna, sigue andando.
+Lo que se cierra es el acceso **anónimo**, el de cualquiera que lea la anon key del HTML.
+
+**Verificación:** las 4 dan `permission denied` leídas como `anon`; la RPC llamada como `anon`
+devuelve 3 filas y $66.028.932,60 — el camino legítimo intacto. **Vistas de `public` sin
+`security_invoker` que `anon` pueda leer: 0** (eran 45).

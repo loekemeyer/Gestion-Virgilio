@@ -1,0 +1,78 @@
+-- gv_rls_definer_revoke_v1641.sql — APLICADO 2026-09-12.
+--
+-- Termina lo que la v16.40 dejó abierto. Ahí bajé de 45 vistas expuestas a 4 prendiendo
+-- `security_invoker`, y dije que a esas 4 había que **leerlas a mano** porque son definer a
+-- propósito y ahí la seguridad no la da la RLS. Esto es esa lectura.
+--
+-- ── QUÉ ESTÁ NEGADO A `anon` A PROPÓSITO ─────────────────────────────────────────────────
+-- Mirando los grants, la política del proyecto es coherente y clara:
+--
+--   VISIBLE para anon : precios_venta · precios_venta_chef · precios_super_lk ·
+--                       Facturacion_NP · Entregas_Virgilio        (la lista GENERAL)
+--   NEGADO   a anon   : GV_Precios_Cliente · clientes_dto · GV_Precio_Facturado_Cache ·
+--                       vista_facturacion_neto_items · schema isis_lk
+--                       (lo PACTADO con cada cliente, y el puente a ISIS)
+--
+-- O sea: la lista de precios general la puede ver la app; **lo que paga cada cliente en
+-- particular, no**.
+--
+-- ── Y LAS 4 VISTAS PASABAN POR ENCIMA DE ESO ─────────────────────────────────────────────
+--
+-- | vista | qué expone que `anon` NO puede conseguir de otra forma |
+-- |---|---|
+-- | `vista_factura_metodo_pago` | CUIT, CAE, punto de venta, número de factura, total y método de pago — todo de `isis_lk`, al que `anon` no llega |
+-- | `vista_plata_perdida` | `precio_unit`, que sale de `COALESCE(pcl.precio_unit, …, pfc.precio_neto, …)` — o sea el precio PACTADO por cliente y el facturado cacheado, las dos negadas |
+-- | `vista_facturacion_neto` | el neto por NP, calculado con el `dto_vol` de `clientes_dto` (negada): con el neto y las cajas se despeja el descuento |
+-- | `vista_facturacion_faltantes` | `importe_falto`, misma familia |
+--
+-- ── PERO NADIE LAS USA: EL CAMINO LEGÍTIMO ES OTRO ───────────────────────────────────────
+-- La app **no lee estas vistas**. Pide `facturacion_neto_detalle` y `facturacion_neto_lote`,
+-- que son **RPCs `SECURITY DEFINER`** — corren como el dueño y por eso pueden leer las fuentes
+-- negadas sin exponerlas. Ése es el patrón correcto y ya estaba implementado.
+--
+--   · Tráfico 24 h: **0 GET** a las 4 vistas; 6 POST a `facturacion_neto_detalle` y 3 a
+--     `facturacion_neto_lote`.
+--   · Front de los 4 repos: 0 referencias vivas. Las únicas están en `produccion-virgilio`,
+--     la app retirada el 2026-09-08.
+--
+-- O sea que el grant a `anon` sobre las 4 vistas no habilitaba ninguna función: sólo dejaba la
+-- puerta de atrás abierta al lado de la puerta buena.
+--
+-- ── QUÉ SE HIZO ──────────────────────────────────────────────────────────────────────────
+--   revoke all on public.vista_factura_metodo_pago   from anon;
+--   revoke all on public.vista_facturacion_faltantes from anon;
+--   revoke all on public.vista_facturacion_neto      from anon;
+--   revoke all on public.vista_plata_perdida         from anon;
+--
+-- **A `authenticated` NO se le tocó nada.** Un supervisor logueado con Google es
+-- `authenticated`, no `anon`; si mañana aparece una pantalla suya que use alguna de estas
+-- vistas, sigue andando. Lo que se cierra es el acceso ANÓNIMO, que es el que tiene cualquiera
+-- que lea la anon key del HTML.
+--
+-- ── VERIFICACIÓN ─────────────────────────────────────────────────────────────────────────
+--   · Las 4, leídas como `anon`: `permission denied for view …` en las cuatro.
+--   · La RPC, llamada como `anon`: `facturacion_neto_lote(array['98647','97939','97890'])`
+--     devuelve 3 filas y $66.028.932,60. **El camino legítimo quedó intacto.**
+--   · Vistas de `public` sin `security_invoker` que `anon` pueda leer: **0** (eran 45).
+--   · facturación $1.395.224.315,83 · anticipado $77.843.819,56 · centinelas en 0.
+--
+-- ── ROLLBACK ─────────────────────────────────────────────────────────────────────────────
+-- Los grants viejos están en `zz_backups."GV_Backup_grants_definer_20260912"`:
+--   grant select on public.vista_factura_metodo_pago   to anon;   -- (etc. para las 4)
+--
+-- ── LO QUE QUEDA ANOTADO ─────────────────────────────────────────────────────────────────
+-- Estas 4 siguen siendo definer, y eso está bien: es lo que les permite leer `isis_lk` y los
+-- precios por cliente para que la RPC arme el resultado. Pero **por definición no las protege
+-- la RLS**, así que si alguna vez se le vuelve a dar `select` a `anon`, se vuelve a abrir el
+-- agujero. El chequeo de la v16.40 lo caza:
+--
+--   select c.relname from pg_class c join pg_namespace n on n.oid = c.relnamespace
+--    where n.nspname='public' and c.relkind='v'
+--      and (c.reloptions is null or c.reloptions::text !~ 'security_invoker=(true|on)')
+--      and has_table_privilege('anon', c.oid, 'SELECT');
+--   -- hoy: vacío.
+
+revoke all on public.vista_factura_metodo_pago   from anon;
+revoke all on public.vista_facturacion_faltantes from anon;
+revoke all on public.vista_facturacion_neto      from anon;
+revoke all on public.vista_plata_perdida         from anon;
