@@ -1,0 +1,65 @@
+-- ============================================================================
+-- v16.14 (2026-09-12) — UNA sola fuente de unidades por caja: `GV_UxB`
+-- Dueño, 12/09: "quiero que empieces a borrar las tablas de uxb en supabase para
+-- que quede solo 1, pero claramente a medida que ya esten sin uso. Las que tengan
+-- uno, empezá a cambiarles la búsqueda para que solo busquen en 1 sola."
+--
+-- Esta versión pone los DOS cimientos. No borra ni migra nada todavía: eso va
+-- cuando esté cargado el listado que va a pasar Thomas (Loeke y Chef).
+--
+-- ---------------------------------------------------------------------------
+-- 1) La tabla canónica: public."GV_UxB"
+-- ---------------------------------------------------------------------------
+--   empresa ('LK'|'CH') · cod · uxb · descripcion · origen · actualizado
+--   PK (empresa, cod). RLS prendida, select para anon/authenticated.
+--
+-- La CLAVE es (empresa, cod), y eso es lo que arregla el problema de fondo: hay
+-- 21 códigos que son DOS PRODUCTOS distintos según la empresa, y ninguna tabla
+-- vieja podía representarlos.
+--     026  LK  COLADOR N°8                    36
+--     026  CH  PINZA DE FIDEOS AC INOX VERDE  12
+--
+-- ---------------------------------------------------------------------------
+-- 2) El único lugar donde preguntar: public.gv_uxb_resuelto
+-- ---------------------------------------------------------------------------
+-- Devuelve (empresa, cod, uxb, fuente). Primero mira `GV_UxB`; si ese código
+-- todavía no está cargado, cae en cascada a las tablas viejas:
+--     Articulos_Cajas (FILTRADA POR MARCA) -> OC_Maximos activo -> maestro
+--     -> precios_venta -> cob_uxb_lk -> proyeccion_madre
+--
+-- Dos diferencias contra `vista_uxb_articulo`, que es a la que reemplaza:
+--   · separa por EMPRESA (hoy 026 LK da 36 y 026 CH da 12, cada uno lo suyo);
+--   · **cada paso tiene desempate explícito**, así que el resultado NO cambia
+--     entre corridas. `vista_uxb_articulo` usa `DISTINCT ON` sin `ORDER BY`
+--     completo y con un código de dos filas devuelve una u otra según el plan:
+--     comprobado en vivo el 12/09, el 026 dio 12 y minutos después 36 (§3.cv).
+--
+-- Cobertura al crearla (973 filas, GV_UxB vacía):
+--     Articulos_Cajas 460 · OC_Maximos 314 · maestro 86 · cob_uxb_lk 64 ·
+--     precios_venta 49
+-- La columna `fuente` es el termómetro de la migración: cuando diga `GV_UxB`
+-- para todos, las viejas quedan sin uso y recién ahí se borran.
+--
+-- ---------------------------------------------------------------------------
+-- EL PLAN, en orden (cada paso se verifica antes del siguiente)
+-- ---------------------------------------------------------------------------
+--   a) [HECHO] tabla `GV_UxB` + vista `gv_uxb_resuelto` con fallback.
+--   b) cargar el listado de Thomas (Loeke y Chef).
+--   c) diff: `gv_uxb_resuelto` contra `vista_uni_x_caja` y `vista_uxb_articulo`,
+--      código por código, ANTES de tocar ningún lector. Lo que cambie se revisa.
+--   d) migrar los lectores de a uno:
+--        · `vista_uni_x_caja`  -> lo usan vista_stock_procesada (pantalla Stock),
+--          vista_generador_oc (Generar OCs) y vista_importados_partes
+--        · `vista_uxb_articulo` -> el Excel de ISIS de Facturación (_facXlsArmar)
+--        · `cob_uxb_lk` -> vista_facturacion_neto_items, vista_plata_perdida,
+--          cobranzas_precios_super, vista_facturable_anticipado, gv_articulo_empresa
+--        · lecturas directas del front a Articulos_Cajas y OC_Maximos
+--   e) recién cuando una tabla no tenga NINGÚN lector, backup y borrar.
+--
+-- Primera candidata a borrarse: `Uni_x_Articulo_x_Caja` (447 filas). Ya está sin
+-- uso hoy: 0 vistas, 0 funciones y 0 referencias en el front. Lo único que la
+-- nombra es `sql/hardening_seguridad_20260828.sql`, que le saca los permisos.
+--
+-- ROLLBACK de esta versión: `drop view public.gv_uxb_resuelto;` y
+-- `drop table public."GV_UxB";`. No se tocó ninguna tabla existente.
+-- ============================================================================
