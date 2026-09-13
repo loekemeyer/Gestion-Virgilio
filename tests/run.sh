@@ -12,6 +12,9 @@ node tests/checkhtml.cjs
 echo "== version-sync (APP_VERSION == SW_VERSION base — evita PWA cacheando app vieja) =="
 node tests/version-sync.cjs
 
+echo "== version-tokens (los ?v= de los .js propios vs APP_VERSION — el bug que dejo main en rojo 2 veces el 13/09) =="
+node tests/version-tokens.cjs
+
 echo "== smoke (Playwright headless) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/smoke.cjs
 

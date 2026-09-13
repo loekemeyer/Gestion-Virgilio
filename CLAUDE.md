@@ -1117,3 +1117,30 @@ que en el momento pida verlo.
 - **Desde el 2026-09-05: TODO cambio lleva bump** de `APP_VERSION` (index.html) y `SW_VERSION`
   (sw.js), también los de backend/Supabase/Edge Functions. Pedido del dueño: *"empezá a bumpear
   las modificaciones así voy chequeando"* — mira el badge de versión para saber qué llegó.
+
+### ⚠ El bump se hace CON EL SCRIPT, no a mano
+
+```bash
+node scripts/bump-version.cjs 16.70     # o --patch para subir el último número solo
+```
+
+**Son TRES lugares que tienen que quedar en el mismo número** y el bump de este repo es
+**100 % manual** (no hay hook ni workflow que lo haga): `APP_VERSION` en `index.html`,
+`SW_VERSION` en `sw.js` (con su sufijo `-vir`) y el **`?v=` de `recepcion.js`** en el index.
+El script los mueve juntos y después corre los dos tests de versión.
+
+**Por qué existe:** el 13/09 se desalinearon **dos veces la misma noche** (v16.64 y v16.67) y
+`main` quedó en rojo las dos. Cuando eso pasa **nadie se entera**: el celular del operario
+sigue corriendo el JS viejo cacheado.
+
+**Los otros tres `?v=` del index NO siguen a `APP_VERSION`, y está bien así**:
+`planimetria.js` (15.79), `pasaje-papeles.js` (5.2) y `supabase-config.js` (1201) tienen
+numeración propia. `tests/version-tokens.cjs` los lista sin exigirles nada — pero **falla si
+aparece un `.js` propio nuevo con `?v=`** que no esté clasificado en una de las dos listas, así
+que al agregar un script hay que decidir a qué grupo pertenece.
+
+⚠ **`index.html` tiene un byte NUL adentro** (línea ~33512, es el separador de claves de
+`_pppGeoCod`, escrito como carácter literal en vez de `\u0000`). Por eso `grep` lo trata como
+**binario**. Cualquier script que lo edite tiene que leer y escribir en **latin1 o bytes** — si
+lo procesás como texto "limpio" te comés el NUL y las claves del caché de geocodificación
+empiezan a colisionar. El script de bump ya lo hace bien.
