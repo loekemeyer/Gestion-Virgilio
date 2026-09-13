@@ -10883,3 +10883,90 @@ otra tabla:
 ⚠ **No se ejecutó nada.** El paso 2 toca una función viva de OTRO proyecto y el 4 es un DROP de
 dos tablas: las dos cosas necesitan el sí del dueño en el momento.
 
+
+---
+
+### §3.dz — v16.90: en la PPP va la RAZÓN SOCIAL, nunca el nombre de fantasía — 2026-09-13
+
+**Regla del dueño (textual):** *"En ningún lado tengo explicado que debe ponerse el nombre de
+fantasía. Solo la razón social."*
+
+**Qué pasaba.** ISIS manda en `razon_social` el nombre de fantasía del local. Lo destapó el dueño
+mirando la pantalla: las NP **98669/98670/98671** (cod **1792**) salían *"Pettish Lacroze 2481"*
+cuando la razón social es **"Dapelo Claudio Marcelo"** — mismo CUIT 20202038507, y su mail es
+`pettishbazar@hotmail.com`, o sea Pettish es su nombre de fantasía, no otro cliente.
+
+**Medición, cruzando cada empresa contra SU padrón** (LK → `customers`, Chef → `chef_padron`):
+
+| Empresa | Pares cod+razón social | Coinciden | No |
+|---|--:|--:|--:|
+| LK | 93 | 89 | 4 |
+| Chef | 15 | 15 | 0 |
+
+De las 4: **2 son este cliente** (7 NP) y 2 son basura de formato que **no se toca** — cod 2533
+(doble espacio) y cod 4223 (salto de línea): mismo cliente, y el PPP está mejor escrito que el
+padrón.
+
+⚠ **El error que cometí antes de medir bien, para no repetirlo:** crucé `ppp_np_feed` —que trae NP
+de LK **y** de Chef— contra `public.customers`, que es el padrón de **LK solo**, por `cod`. Daba 9
+discrepancias y **5 eran falsas**: los cod 2393 / 2444 / 2447 / 2448 / 2469 son clientes de **Chef**
+con CUIT propio que comparten número con otro cliente de LK. **No se puede cruzar por cod sin
+empresa** — es el mismo pozo que describe el problema abierto "el cod de cliente no identifica al
+cliente".
+
+**Por qué un override y no un UPDATE.** La tabla madre `GV_PPP_Programacion_Diaria` la escribe el
+sync de ISIS desde **afuera** de la base (ninguna función SQL la toca: verificado sobre
+`pg_proc.prosrc`). Un UPDATE se perdería en la próxima corrida, y además las NP nuevas del mismo
+cliente volverían a entrar mal. El override se aplica **al leer**.
+
+**Qué se creó** (`sql/gv_cliente_razon_social_v1690.sql`):
+
+1. `public."GV_Cliente_Razon_Social"` — PK **(empresa, cod)**. La empresa es obligatoria a
+   propósito: el cod 1792 en Chef es **Supertextil S.R.L**, otro CUIT. RLS prendida + policy de
+   SELECT para `anon`. Hoy tiene **1 fila**.
+2. `public.gv_ppp_prog_rs` — la tabla madre con la razón social ya resuelta. Mismas filas, mismas
+   columnas; lo único que cambia es el texto. Por eso se puede pegar en lugar de la tabla en
+   cualquier consumidor sin leer el resto de su definición.
+3. `gv_ppp_programacion_diaria` — se le agregó el join y el `COALESCE`.
+4. Las **6 vistas** que exponían `razon_social` leyendo la tabla madre directo pasan a leer
+   `gv_ppp_prog_rs`: `gv_np_web_dobles`, `gv_venta_mensual_cliente`, `vista_cola_impresion`
+   (¡las etiquetas de lío!), `vista_correcciones_pedido_rich`, `vista_ppp_pedidos_entregados`,
+   `vista_ppp_programacion_pendiente`. Definiciones originales en
+   `zz_backups."GV_Backup_Vistas_RS_20260913"`.
+
+⚠⚠ **`CREATE OR REPLACE VIEW` BORRA LAS `reloptions`.** Pasó en este mismo cambio:
+`gv_ppp_programacion_diaria` quedó **sin `security_invoker`**, o sea corriendo como `postgres` y
+salteando la RLS — exactamente la causa de la filtración del 2026-09-04. Se cazó comparando contra
+sus vistas hermanas (`gv_ppp_base_pedidos`, `gv_ppp_entregados_meta`, `vista_control_remitos`, que
+sí la tenían). **Después de cada `CREATE OR REPLACE VIEW`, reponerla:**
+
+```sql
+alter view public.<vista> set (security_invoker = true);
+-- y controlar:  select relname, reloptions from pg_class where relname = '<vista>';
+```
+
+**Verificación, corrida como `anon`** (que es quien lee desde la app):
+
+| Vista | Filas | Dapelo | Pettish |
+|---|--:|--:|--:|
+| `gv_ppp_programacion_diaria` | 123 | 18 | **0** |
+| `vista_ppp_programacion_pendiente` | 70 | 18 | **0** |
+| `gv_venta_mensual_cliente` | 8.859 | 49 | **0** |
+
+`gv_endpoints_rotos` = 0, y las 6 vistas conservan `security_invoker=true`.
+
+**Lo que NO se tocó a propósito:** `Facturacion_NP`, `wa_np_snapshot`, `GV_Clientes_Direcciones` y
+`GV_Geo_Cliente` guardan la razón social como **snapshot del momento**. Lo viejo queda como está
+(es historia); lo nuevo entra bien porque la app lee de las vistas corregidas.
+
+**Rollback:** `delete from public."GV_Cliente_Razon_Social" where empresa='lk' and cod='1792';`
+Para volver las 6 vistas a la tabla madre, el mismo loop al revés o las `def_original` del backup.
+
+**Para cargar otro cliente que venga con nombre de fantasía:**
+
+```sql
+insert into public."GV_Cliente_Razon_Social" (empresa, cod, razon_social, motivo)
+values ('lk','<cod>','<razón social del padrón>','<por qué>')
+on conflict (empresa, cod) do update
+  set razon_social = excluded.razon_social, motivo = excluded.motivo, actualizado_at = now();
+```
