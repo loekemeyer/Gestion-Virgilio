@@ -1,5 +1,13 @@
 # CLAUDE.md — Producción Virgilio
 
+## 📌 LEER PRIMERO: `docs/ESTADO-Y-PENDIENTES.md`
+
+**Foto del estado al 2026-09-13.** Qué falta de verdad está en la base
+(`select * from github_repo_problemas.v_problemas where estado='abierto'`), pero ese archivo tiene
+lo que la tabla NO cuenta: **qué decidió el dueño y no hay que revisitar**, **qué sólo puede
+destrabar él** (redeploy de Vercel, rotar las credenciales de Meta y OpenAI) y **qué quedó a
+medias**. Mantenerlo al día al cerrar cada tanda de trabajo.
+
 ## ⚠ REGLA: preguntar QUIÉN habla y dejar cada pedido como tarea en su Planify
 
 **Vale para TODOS los repos** (LK, Gestión Virgilio, Planify y cualquiera nuevo: copiar este
