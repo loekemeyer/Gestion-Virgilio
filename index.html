@@ -3186,18 +3186,66 @@ tr.ppp-err-zona > td{ background:#fffbeb !important; }
    el botón "s/salida" quedaban fuera de vista, sin scrollbar visible que lo delate (revisor-render,
    auditoría 2026-09-11). Se pasa a tarjeta apilada por fila, cada celda con su etiqueta
    (`data-label`, agregado en crRender). El click en la fila sigue tildando "Controlado" igual. */
+/* v16.80 (dueno, 2026-09-13): "no hay necesidad de que eso sea tan grande. El boton de
+   facturado y de sin salida, ponelo a la derecha que ahi esta vacio". La tarjeta apilaba
+   las 6 celdas una abajo de otra con la etiqueta ENCIMA del valor, asi que entraban 2
+   remitos por pantalla y la mitad derecha quedaba vacia -- justo lo que la regla del dueno
+   prohibe. Ahora la fila es un grid de 2 columnas: los datos a la izquierda y Controlado +
+   Volvio en el hueco de la derecha. La etiqueta pasa a ir AL LADO del valor, no arriba. */
 @media (max-width: 560px) {
   .cr-table thead { display: none; }
-  .cr-table, .cr-table tbody, .cr-table tr, .cr-table td { display: block; width: 100%; }
-  .cr-row { border: 2px solid #e2e8f0; border-radius: 10px; margin-bottom: 8px; padding: 2px 12px; }
-  .cr-row.cc-on { border-color: #16a34a; }
+  .cr-table, .cr-table tbody { display: block; width: 100%; }
+  .cr-table tr { display: grid; width: 100%; box-sizing: border-box; }
+  .cr-table td { display: block; width: auto; box-sizing: border-box; min-width: 0; }
+  /* el wrapper scrollea en horizontal; sin border-box la fila sumaba padding+borde
+     sobre el 100% y la columna derecha quedaba recortada fuera de la vista */
+  .cr-tablewrap { overflow-x: hidden; }
+
+  .cr-row {
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas:
+      "np   ctrl"
+      "cod  ctrl"
+      "rs   act"
+      "lios act";
+    align-items: center;
+    column-gap: 12px;
+    border: 2px solid #e2e8f0; border-radius: 10px;
+    margin-bottom: 8px; padding: 8px 12px;
+  }
+  .cr-row.cc-on { border-color: #16a34a; background: #ecfdf5; }
   .cr-row.cr-venc { border-color: #fca5a5; }
-  .cr-table td { border-bottom: 1px dashed #eef2f7; padding: 7px 0; }
-  .cr-table tr:last-child td:last-child, .cr-table td:last-child { border-bottom: none; }
-  .cr-table td[data-label]::before { content: attr(data-label); display: block; font-size: 10px; font-weight: 800; text-transform: uppercase; letter-spacing: .3px; color: #94a3b8; margin-bottom: 2px; }
-  .cr-td-rs{ max-width: none; white-space: normal; overflow: visible; text-overflow: clip; }
-  .cr-td-lios, .cr-td-ctrl { text-align: left; }
-  .cr-td-act { text-align: right; }
+  /* el fondo va en la tarjeta, no en cada celda: en grid dejaria franjas entre celdas */
+  .cr-row.cc-on > td, .cr-row:active > td { background: transparent; }
+  .cr-row.cr-venc > td { animation: none; }
+  .cr-row.cr-venc { animation: cr-rowpulse 1.1s ease-in-out infinite; }
+  .cr-row.cr-venc.cc-on { animation: none; background: #ecfdf5; }
+
+  .cr-td-np { grid-area: np; }
+  .cr-td-cod { grid-area: cod; }
+  .cr-td-rs { grid-area: rs; }
+  .cr-td-lios { grid-area: lios; }
+  .cr-td-ctrl { grid-area: ctrl; }
+  .cr-td-act { grid-area: act; }
+
+  /* sin lineas internas ni padding vertical: la tarjeta ya separa una fila de otra */
+  .cr-table td { border-bottom: none; padding: 1px 0; }
+
+  /* la etiqueta AL LADO del valor. Poniendola arriba se duplicaba el alto de la tarjeta. */
+  .cr-table td[data-label]::before {
+    content: attr(data-label) ":"; display: inline; font-size: 10px; font-weight: 800;
+    text-transform: uppercase; letter-spacing: .3px; color: #94a3b8; margin-right: 5px;
+  }
+  /* el NP se lee solo, y los dos de la derecha se entienden por su forma */
+  .cr-td-np::before, .cr-td-ctrl::before, .cr-td-act::before { content: none !important; }
+
+  .cr-td-np { font-size: 17px; }
+  .cr-cc-date { display: inline; margin: 0 0 0 7px; }
+  .cr-td-rs { max-width: none; white-space: normal; overflow: visible; text-overflow: clip; }
+  .cr-td-cod, .cr-td-lios { text-align: left; }
+  .cr-td-ctrl, .cr-td-act { justify-self: end; text-align: center; }
+  .cr-td-ctrl { align-self: end; padding-bottom: 5px; }
+  .cr-td-act { align-self: start; }
 }
 .fac-lios-cell{ text-align: center; font-weight: 800; color: #b45309; white-space: nowrap; }
 .fac-lios-cell .fac-lios0{ color: #94a3b8; font-weight: 600; }
@@ -4714,7 +4762,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=16.79"></script>
+<script type="module" src="recepcion.js?v=16.80"></script>
 <!-- Config del módulo de fichada (compartido con fichada.html). El secret
      hmacSecret tiene que ser el mismo acá y allá; cargándolo desde un solo
      archivo evitamos que se desincronicen. -->
@@ -7829,7 +7877,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v16.79";
+const APP_VERSION = "v16.80";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
