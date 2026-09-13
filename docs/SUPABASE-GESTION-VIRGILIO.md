@@ -10970,3 +10970,39 @@ values ('lk','<cod>','<razón social del padrón>','<por qué>')
 on conflict (empresa, cod) do update
   set razon_social = excluded.razon_social, motivo = excluded.motivo, actualizado_at = now();
 ```
+
+### §3.ea — Reprogramación de la semana del 14/09 con las reglas del dueño (sin código) — 2026-09-13
+
+**Disparador.** Autopsia del domingo 13/09 a la noche: para el lunes 14 la PPP tenía 39 NP y sólo 6 estaban
+facturadas; 33 no iban a salir (5 armadas sin facturar, 4 en armado, 24 sin ni un evento de picking). El viernes a
+las 16:45 había 34 NP armadas sin facturar (32 en la PPP + 2 de error, ver abajo); de las 13 que se facturaron
+después, 8 tenían fecha 10 u 11/09 — se facturaron el mismo día de salida o después. Diagnóstico del dueño:
+*"Marianela no está poniendo correctamente la fecha de programación en la PPP, por ende no la usa"*.
+
+**Reglas que fijó Thomas en esta sesión (valen para adelante):**
+1. *"Todo se factura el día anterior, así que también debe estar armado."* Lo que facturó el viernes es lo único
+   que sale el lunes; lo demás se reprograma.
+2. **6 m³ por día** (o algo similar) de picking/armado — es `PPP_Web_Config.m3_max_dia`/cupo. Excepción explícita:
+   el miércoles 16 lleva Matiz D71A (9,3 m³, una parada) **más ~4 m³**.
+3. **Primero los pedidos más viejos** (`fecha_recep`), tandas enteras.
+4. **Máximo 2 camiones por día**; la app cuenta un camión por NÚMERO de tanda (v13.07), así que ordenar el día
+   implica **renumerar** las tandas no tocadas. Súper y Retira van aparte y no cuentan; la kangoo de Luján (E11A)
+   tampoco es un camión.
+5. Los súper se miran aparte de este reordenado.
+
+**Qué se hizo (6 pasos, restore exacto en `sql/backups/reprogramacion_20260913_lunes_al_martes.sql`):** lunes
+queda con las 6 facturadas; martes 5,8 m³ (D67 Dapelo + tocadas, E01); miércoles Matiz + 3,97 m³ de los pedidos más
+viejos (D71 GBA Sur, D69 Norte+Oeste); jueves 5,8 (E03, E12); viernes 6,5 (E17 Norte, E12 Capital); lunes 21 1,7.
+El aviso "cliente con entregas en días distintos" quedó sólo con Andser (98637 facturada para el lunes, LK 0052 de
+0,03 m³ sin armar el miércoles), a propósito. Sólo datos (`GV_PPP_Prog_Override`, `PPP_Web_Programacion`,
+`PPP_Web_Tandas`); ninguna vista ni función cambió.
+
+**Dos NP de error que aparecían en Facturación** (el módulo mostraba 21 = 13 del badge + 6 Cencosud sin tanda
++ estas 2): 44500 Ruiz Graciela fue **cancelada por el cliente el 11/08** pero ya estaba armada (20/07) y
+`gv_fac_armado_sin_facturar` no excluye `NP_Canceladas` → pendiente de arreglar la vista. 98272 Cittadini está armada
+desde el 13/08 (completada el 01/09), nunca facturada, sin factura en ISIS → tarea Planify a Viviana (#3242) y
+Marianela (#3243) para el 14/09.
+
+**Pendiente (pedido principal de Thomas, sin empezar):** pantalla para la operadora que diga, para el día
+siguiente, "llegaron a armar todo → pedí N camiones" / "no llegaron → reprogramá", y el guard en Facturación que
+no deje facturar con la fecha de salida mal. Falta el dato de m³ por camión.
