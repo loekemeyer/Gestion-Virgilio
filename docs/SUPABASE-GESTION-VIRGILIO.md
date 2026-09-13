@@ -10464,3 +10464,45 @@ los ~4 minutos de build).
 **Dato suelto que apareció buscando una `sb_secret_` para probar:** el Vault de LK tiene una
 guardada con el nombre **`CLAUDE_API_KEY`**. No es una API key de Anthropic: es una clave secreta
 de Supabase. El nombre está mal y alguien la va a usar donde no va.
+
+---
+
+## §3.dk — v16.65: el tope de jornada se medía por TANDA, así que no saltaba nunca (problema 112)
+
+**Qué estaba mal.** El aviso de la **§3.co (v15.86)** agrupa los pedidos con `_pppCamiones`, que
+arma **un camión por número de tanda**. Sobre la programación real del **14 al 18/09/2026** eso
+da 17 "camiones" y **ninguno llega a 8 h** — el mayor da 5,7 h. O sea: el aviso estaba pusheado y
+no aparecía nunca. Mientras tanto los fleteros son **dos** y casi nunca hacen dos vueltas (Thomas,
+11/09: *"son 2, pero no hacen dos vueltas casi nunca"*), y el **16/09 tenía 6 tandas** que suman
+**20,6 h de camión** y **448 km**: repartidas en 2 vehículos son **10,3 h cada uno**.
+
+| Día | Tandas | NP | Paradas | km | h-camión | ÷ 2 fleteros |
+|---|--:|--:|--:|--:|--:|--:|
+| 16/09 | 6 | 24 | 18 | 448 | 20,6 | **10,3** ← se pasa |
+| 15/09 | 4 | 32 | 19 | 273 | 14,5 | 7,2 |
+| 14/09 | 4 | 39 | 17 | 199 | 11,4 | 5,7 |
+| 17/09 | 2 | 29 | 16 | 76 | 6,7 | 3,4 |
+| 18/09 | 1 | 7 | 4 | 39 | 2,4 | 1,2 |
+
+**Qué cambió.** `_pppComputeErrors` ahora devuelve **`jornadaDia`** además de `jornada`: suma las
+horas de **todas** las tandas del día (Retira afuera: no viaja) y las divide por
+**`jornada_camiones`** (nuevo, `= 2`). Si el resultado pasa `jornada_horas_max`, el panel lo
+muestra **primero**, arriba del aviso por tanda, que se mantiene tal cual para el caso de una sola
+tanda imposible: `🚚 Día que no entra en la jornada (1): 16/09 · 6 tandas → 20,6 h de camión
+(18 paradas · 448 km) · con 2 camión(es) son 10,3 h cada uno, 2,3 h de más · la más larga es
+Zona 5 + Zona 6 (5,4 h)`.
+
+**Causa raíz.** Se tomó "camión" en el sentido que ya tenía el código (`_pppCamiones` = una fila
+de la vista por tanda) en vez del sentido del pedido: **el vehículo físico que maneja el fletero**.
+El test de la v15.86 no lo detectó porque usaba UNA tanda con 13 paradas — un caso que la
+programación real no produce.
+
+**Chequeo**: `tests/ppp-jornada-camion.cjs` (casos 6 y 7) arma el 16/09 real repartido en 4 tandas
+y verifica que **ninguna sola** se pase (`ningunaSola`) y que el **día sí** avise; subiendo
+`jornada_camiones` a 8 el aviso desaparece.
+
+**Rollback**: `delete from public."PPP_Web_Config" where clave = 'jornada_camiones';` (el front cae
+al default 2 — para apagar el aviso del todo, subir el número). `sql/gv_jornada_camion_dia_v1665.sql`.
+
+**No toca Producción**: sólo agrega una fila a `PPP_Web_Config`, que es nuestra. El cálculo vive en
+el front porque es un aviso sobre lo ya programado: no persiste nada ni bloquea el armado.
