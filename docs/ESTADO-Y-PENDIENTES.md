@@ -1,4 +1,4 @@
-# Estado y pendientes — al 2026-09-13 (última actualización: v16.53)
+# Estado y pendientes — al 2026-09-13 (última actualización: v16.60)
 
 > **Para quien abra una sesión nueva:** esto es la foto del estado. Lo que falta de verdad está
 > en la base, no acá: `select * from github_repo_problemas.v_problemas where estado='abierto'`.
@@ -11,6 +11,8 @@
 |---|---|---|
 | **Redeploy de Vercel** | dashboard de Vercel → Deployments → Redeploy | El sitio quedó en 2.3.374 y el repo va por 2.3.375. Hay 6 commits sin publicar desde el 11/09 18:30, pero **sólo uno toca la página** (`64f98ba`, el aviso de renglones sin match en OC de súper); los otros 5 son backend y andan igual. **Al 13/09 hay dos commits más en LK** (`d4f79e7` doc de Cloudflare y `68c676e` el fix de `krikos-ingest`), los dos backend/doc: no cambian la página. Se confirma arreglado cuando `https://loekemeyer.com/version.js` devuelva 2.3.375. **No hay acceso a Vercel desde la sesión.** Problema 16. |
 | **Rotar el token de Meta WhatsApp y la API key de OpenAI** | consolas de Meta y de OpenAI | Ver la decisión en el punto 2. Problema 20. |
+| **Correr de nuevo el workflow `build-deploy.yml` de Planify** | GitHub Actions de `loekemeyer/Planify` | Es lo ÚNICO que falta para poder apagar las claves legacy. La excepción del Storage **ya no existe** (medida el 13/09, v16.56): con la `sb_publishable_` el Storage escribe bien en los dos proyectos. Lo que no se pudo re-medir desde acá son las `sb_secret_`, y ese workflow es el caso testigo que falló (runs 112-115 del 11/09). Si pasa, se aprieta `Disable JWT-based API keys`. Problema 12. |
+| **Decidir qué hacer con los 10 pedidos ya programados de clientes con deuda** | con Vivi / cobranzas | Salen en rojo arriba de la columna Cuarentena (v16.57). Torres y Liva $32,1M entrega el lunes 14. **No se retiran solos a propósito**: sacar un pedido de una tanda armada rompe el picking. Problema 14. |
 | ~~Cargar `KRIKOS_IMAP_PASS` en el Vault de LK~~ | — | **YA ESTÁ** (comprobado 2026-09-13): el secreto está en el Vault de LK desde el 11/09 y la rama de Krikos ya está en `main`. El ingest corre: 21 OC en la bandeja y `ok:true` en cada corrida. |
 
 ## 2. Decisiones del dueño que NO hay que revisitar
@@ -77,6 +79,12 @@
 | 92 | la capacidad de góndola de un dual sumaba las dos góndolas: por LK no avisaba nunca | v16.51 |
 | 80 (parcial) | el detector de NP dobles sacaba la fecha de una tabla congelada | v16.51b |
 | 27 | `krikos-ingest` armaba un `in()` con todos los `mail_uid` y moría con ventanas largas | LK `68c676e` |
+| 19 | `admin-login-otp` mandaba la anon **legacy** de Gestión; el repo ya tenía la nueva y nunca se redeployó | v16.55 |
+| 12 (avance) | **cayó el bloqueo del Storage**: con la clave nueva se escribe bien. Falta sólo el workflow de Planify | v16.56 |
+| 14 | la Cuarentena no veía los pedidos que YA tienen tanda: 10 con deuda, $47M | v16.57 |
+| 58 | una NP armada sin tanda no aparecía en Facturación: 8 invisibles, 638 cajas de Cencosud | v16.58 |
+| 53 (avance) | la Conciliación leía el `precio_unit` malo de ISIS; ahora despeja el precio del importe | v16.59 |
+| 76 | `wa_np_snapshot` fingía estar fresca: 14 direcciones viejas con `updated_at` de hoy | v16.60 |
 
 Y las tablas `PPP_*` de la era ISIS pasaron a nombre `GV_*` sin perder el trabajo pendiente (v16.45).
 
@@ -102,3 +110,10 @@ Gestión no se entera**.
   sin que el registro lo dijera.
 - **Un pendiente viejo puede estar hecho.** `KRIKOS_IMAP_PASS` figuraba como pendiente del dueño en
   **cinco** archivos y estaba cargado desde el 11/09. Antes de pedirle algo, comprobarlo.
+- **"Está en el repo" no es "está arreglado" para una Edge Function.** Se deployan a mano, sin CI:
+  el problema 19 estaba corregido en el archivo desde el 11/09 y en producción seguía la clave
+  vieja. Mirar `get_edge_function`, no el `git log`.
+- **Un `updated_at` fresco no prueba que el contenido lo sea** (problema 76): el `ON CONFLICT`
+  pisaba la fecha siempre y el dato nunca. Comparar contra la fuente, no contra el timestamp.
+- **En un `ON CONFLICT ... DO UPDATE`, `s` (o como se llame el alias del INSERT) es la fila VIEJA**,
+  no la que entra. `coalesce(s.x, excluded.x)` = "escribí sólo la primera vez".
