@@ -10807,3 +10807,46 @@ Hacer viajar `empresa` desde `vista_ppp_programacion_pendiente` hasta el join de
 pasar el join a `GV_Clientes_Whatsapp` por `(empresa, cod)`. Cambia a quién le llega el mensaje,
 así que no se hace solo — **y tiene que estar hecho ANTES de prender el envío**.
 
+## §3.dn — v16.87: "Est Madre" está en TRES tablas vivas, y sólo debería haber una — 2026-09-13
+
+Pedido del dueño: *"Revisá supa si hay muchas 'est madre' en muchas tablas. Sólo debe haber
+una."* Hay tres, más dos backups (que están bien, son copias a propósito).
+
+| Objeto | Filas | Última | Qué es |
+|---|--:|---|---|
+| **`public.proyeccion_madre`** | **410** | **12/09** | **LA VIVA.** 6 vistas y 6 funciones la leen |
+| `GP2.est_madre` | 404 | copiada el 12/09 | La copia de GP2, **legítima**: la Regla 0 exige que GP2 tenga la suya. Fresca |
+| `public."E. Madre LK"` | 290 | **24/08** | Vieja |
+| `public."E. Madre CH"` | 302 | **12/03** | Vieja, de hace **seis meses** |
+
+`public."Pieza Madre"` (75 filas) es **otra cosa** — pieza y matriz madre, no proyección. No
+entra en esto.
+
+### Las dos viejas no están muertas, y ahí está el problema
+
+- Las llena `actualizar_e_madre_desde_proyeccion()`, **que ningún cron llama**. Por eso quedaron
+  congeladas: la LK en agosto y la de Chef en marzo.
+- **`E. Madre LK` sigue siendo la fuente de PRIMERA PRIORIDAD del nombre de los artículos**
+  (`vista_nombres_articulos`, que la prefiere sobre `Articulos Virgilio X Tallerista` y sobre el
+  Excel). De los **428** códigos con nombre, **281 (66 %) salen de esa tabla congelada**.
+  ⚠ Usa sólo `Cod` y `Desc`, **nunca** la columna `E. Madre` — o sea que el número viejo no se
+  filtra a ningún cálculo. Lo que puede estar viejo es el **nombre**.
+- `E. Madre CH` no la lee ninguna vista: sólo esa función de sync. Es la más candidata a irse.
+
+### Y la viva tiene 5 filas que no son artículos
+
+De los 6 códigos que están en `proyeccion_madre` y no en `GP2.est_madre`, **cinco no son
+productos**: `E`, `GASTOTRRECH`, `CHEQRECHAZAO`, `ANTICIPO VTA MERCAERIA`, `TRANSFRECH` — son
+conceptos contables (transferencia rechazada, cheque rechazado, anticipo de venta) que entraron
+desde la venta como si fueran artículos. Los cinco tienen `proy_uni_mes = 0`, así que no
+inflan nada, pero ensucian la cuenta de "cuántos artículos hay". **GP2 hace bien en no tenerlos.**
+El sexto, **573**, sí es un artículo real (52 uni/mes) y es el que otra sesión estaba trabajando
+el mismo día (backup `zz_backups.GP2_Backup_est_madre_573_20260913`).
+
+### Qué hacer, y por qué no se hizo solo
+
+Borrar `E. Madre LK` / `E. Madre CH` **rompería `vista_nombres_articulos`**, que hoy saca de ahí
+dos tercios de los nombres. El orden correcto es: primero mover esa vista a una fuente viva
+(`proyeccion_madre` no tiene `Desc`, así que habría que ver de dónde sale el nombre), después
+borrar. **Es una decisión del dueño y no se tocó nada.**
+
