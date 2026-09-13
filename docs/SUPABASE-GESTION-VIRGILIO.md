@@ -10633,3 +10633,96 @@ jornada del 16/09 deja de contar la kangoo como camión de fletero.
    lo sabe la chica del depósito. El problema 88 sigue abierto.
 
 Los cuatro archivos quedan en `sql/` con un sello arriba que dice exactamente qué corrió y qué no.
+
+## §3.dl — v16.78: barrido de claves. Las dos bases YA están migradas; los "9 archivos con clave legacy" son casi todos falsos positivos — 2026-09-13
+
+**Por qué se hizo:** el paso 5 de la regla de claves (`Disable JWT-based API keys`) figura como
+bloqueado por "que ningún cliente siga mandando la anon legacy", sin que nadie hubiera medido
+cuántos quedan de verdad. Se midió.
+
+### Lo que hay en los repos
+
+`grep -rIl 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9'` da **9 archivos** en los 4 repos. **8 de los 9
+no son una clave**:
+
+| archivo | qué es |
+|---|---|
+| `CLAUDE.md` × 4 (GV, GP2, Planify, pagina-lk-copia) | la **cadena de búsqueda** escrita en la propia regla de migración |
+| `docs/SUPABASE-GESTION-VIRGILIO.md` | ídem |
+| `cervantes-admin/gp2/tests/ui/test_tokens_cache.js` y `Gestion-Productiva-2.0/tests/ui/test_tokens_cache.js` | los **tests guardianes**: guardan el prefijo como constante para fallar si la clave reaparece |
+| `sql/backups/backup_limpieza_virgilio_20260902.sql` | **la única clave real**, y está inerte (ver abajo) |
+
+⚠ **La regla se muerde la cola**: el `grep` que la regla manda correr encuentra a la regla misma.
+Quien lo corra sin mirar archivo por archivo va a concluir que faltan 9 migraciones y no falta
+ninguna. Para contar de verdad, excluir `.md` y los `test_tokens_cache.js`.
+
+**El único archivo con clave real** (`backup_limpieza_virgilio_20260902.sql`, línea ~114) la tiene
+adentro del cuerpo de `refresh_proyeccion_madre()`, que es una función **borrada el 2026-09-02** y
+reemplazada por `sync_proyeccion_madre_virgilio()` (push desde LK). Es texto de un restore de algo
+que ya no se usa. **No se reescribió la clave**: es un archivo de restore y cambiarle el contenido
+lo volvería una restauración falsa de lo que había ese día. Se le puso un cartel arriba.
+
+### Lo que hay en las bases (esto es lo que importa)
+
+Se buscó en `pg_proc.prosrc` de los dos proyectos toda función que lleve una clave de Supabase
+escrita a mano:
+
+| proyecto | funciones con clave | sistema |
+|---|---|---|
+| Virgilio `hrxfctzncixxqmpfhskv` (schemas `public` + `GP2`) | `ventas_mensuales_cod` | **nueva** (`sb_publishable_`/`sb_secret_`) |
+| LK `kwkclwhmoygunqmlegrg` (`public`) | `postear_envio_pedidos`, `detectar_pedidos_anomalos` | **nueva** |
+
+**Cero funciones con la legacy en cualquiera de las dos bases.** O sea la migración del lado del
+backend SQL está terminada, cosa que la doc no decía.
+
+### Credenciales de terceros
+
+`grep` de patrones vivos (`sk-proj-`, `sk-ant-`, `EAA…` de Meta, `SG.` de SendGrid, `re_` de Resend)
+sobre los 4 repos: **0 archivos**. El repo está limpio de claves de terceros en el árbol de trabajo
+(lo del **historial** de git es otra cosa y no se arregla reescribiéndolo — ver la regla de claves).
+
+### Las Edge Functions: 98 revisadas, CERO con la clave legacy
+
+Se leyó el código de **87 de 98** Edge Functions (GV 53, LK 45). **La cadena
+`eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9` no aparece ni una vez.** Todo lo que usa `anon` o
+`service_role` la lee de `Deno.env.get(...)`, que es la plataforma inyectándola.
+
+Sí hay **11 apariciones de claves del sistema NUEVO** hardcodeadas, pero son **3 valores** y las
+tres son **publishable, no secret** (o sea las mismas que ya viajan en el front):
+
+| dónde | clave de |
+|---|---|
+| GV `planify_recruit_cv_url` | Virgilio |
+| GV `sync-precios-venta` | Chef (default de `CHEF_KEY`) |
+| GV `gv-ppp-web-tandas-diarias` | LK (default de `GV_LK_ANON`) |
+| LK `admin-login-otp`, `lk_faq-admin` | Virgilio |
+| LK `lk_templates`, `lk_chat-test`, `lk_notif-sim`, `lk_conversaciones`, `lk_agente-modelos`, `lk_parse-comprobante` | Virgilio, vía el módulo compartido `_shared/admin-gate.ts` |
+
+⚠ **HUECO REAL, y no es de claves: 11 Edge Functions de GV no tienen fuente recuperable.**
+`planify_send-wa`, `planify_sync-feriados`, `planify_get-produccion-dia`, `planify_telegram-tarde`,
+`planify_chat_media_url`, `planify_chat_limpiar_media`, `planify_recorrido-poli-preguntar`,
+`planify_notificar-reprog`, `planify_transcribir`, `planify_chat_media_up`, `planify_spike_imap`.
+`get_edge_function` devuelve `Failed to retrieve function bundle` en las 11, y son exactamente las
+11 que en `list_edge_functions` figuran **sin `ezbr_sha256`**: el bundle no está guardado del lado
+de Supabase. **Tampoco están en el repo de Planify** (ahí sólo vive
+`supabase/functions/planify_get-admin-user-permissions`). O sea: si mañana se borra una de esas 11,
+**no hay de dónde volver a deployarla**. No se pudieron auditar por eso, no por la clave.
+
+### Secretos que NO son de Supabase y siguen hardcodeados (esto es el problema 20, sigue abierto)
+
+Aparecieron de paso, sin buscarlos: el token de WhatsApp de Meta en `send-whatsapp`,
+`send-rendimiento-matrices` y `reporte-diario-rendimiento` (GV); un `SECRET` compartido en
+`virgilio-entrega-sync` y `lk_notif-facturado` (LK); el `SHEETS_SECRET` de Apps Script en
+`sheets-proxy`, `sheets-entregas-proxy` y `retry-sheets`; y `SHEET_SYNC_SECRET` como fallback en
+`sync-product-m3`. **Decisión del dueño sobre el token de Meta: "No la cambiemos por ahora".**
+
+### Qué falta de verdad para poder apretar el botón
+
+1. ~~Las Edge Functions~~ — **medido, ninguna tiene la legacy.**
+2. El secret **`SUPABASE_SERVICE_KEY` de Planify**, que sólo lo cambia el dueño, y mirar ese primer
+   build (el paso que sube el `.exe` corre DESPUÉS de compilar: si falla se pierden los ~4 min).
+3. El botón lo aprieta el dueño, no Claude: apaga también la `anon` que usa el frontend.
+
+**Resumen para decidir:** el código de los 4 repos, las 2 bases y las 98 Edge Functions están
+migrados. Lo único que queda antes del botón es el secret de Planify.
+

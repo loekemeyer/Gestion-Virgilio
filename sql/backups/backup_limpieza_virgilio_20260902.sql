@@ -1,4 +1,20 @@
 -- =====================================================================
+-- ⚠ 2026-09-13 — ESTE ARCHIVO TIENE UNA CLAVE `anon` LEGACY (JWT) ADENTRO, Y ESTA INERTE.
+--   Está en el cuerpo de `refresh_proyeccion_madre()` (línea ~114), que es una función
+--   **BORRADA** el 2026-09-02 y reemplazada por `sync_proyeccion_madre_virgilio()` (push
+--   desde LK). Comprobado el 13/09: en la base de Virgilio NO existe ninguna función con esa
+--   clave — la única que lleva una clave de Supabase es `ventas_mensuales_cod`, y ya está en
+--   el sistema nuevo (`sb_publishable_`/`sb_secret_`). En la base de LK pasa lo mismo:
+--   `postear_envio_pedidos` y `detectar_pedidos_anomalos`, las dos con la clave nueva.
+--   O sea: acá no hay nada vivo, es el texto de un restore de algo que ya no se usa.
+--
+--   NO se reescribió la clave por la nueva a propósito: es un archivo de RESTORE, y cambiarle
+--   el contenido lo volvería una restauración falsa de lo que realmente había ese día.
+--   **Si algún día hubiera que restaurar esta función, primero cambiarle la clave** — la
+--   legacy va a dejar de andar en cuanto se aprete `Disable JWT-based API keys`. Aunque lo
+--   correcto sería no restaurarla: el pull HTTP con anon key fallaba en silencio, que es
+--   justo el motivo por el que se borró.
+-- =====================================================================
 -- BACKUP LIMPIEZA 2026-09-02 (propuesta 2496, "arregla todo lo que este de sobra")
 -- Proyecto Virgilio (hrxfctzncixxqmpfhskv). Restore: correr tal cual en el SQL editor.
 --
