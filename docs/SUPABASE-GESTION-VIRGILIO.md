@@ -10576,3 +10576,31 @@ nombran (Y13, X14, X13) tampoco coinciden con la planimetría de hoy (AD12, AE09
 **Queda abierto (problema 110 sigue `abierto`):** bloque (2) la espiral `1000900` — Luis tiene que
 elegir el código (`007` o `H201PART`); bloque (3) `522S` → `522E` — decidir si además se cargan
 las 80 cajas en `para_envasar`.
+
+---
+
+### §3.dx — v16.72: cuatro PENDIENTE para el "dale" de Thomas (jornada, kangoo, OC 63xE, prensa/439E) — 2026-09-13
+
+**Nada de esto se corrió en la base.** Regla de esta sesión: el dueño ve el SQL y dice "dale" en el
+momento; hasta entonces cada cambio vive en un `sql/PENDIENTE-*.sql` con encabezado (qué es, quién lo
+pidió, qué lee cada tabla que se toca), backup en `zz_backups` con RLS y sin escritura para `anon`, el
+cambio y los SELECT de verificación — mismo formato que `sql/PENDIENTE-racks-codigos-inventados-20260913.sql`.
+Lo que se leyó para armarlos fue todo con SELECT.
+
+| archivo | qué hace | decisión que espera |
+|---|---|---|
+| `sql/PENDIENTE-jornada-datos-20260913.sql` | (a) `GV_PPP_Prog_Override` gana columna `zona` y la vista `gv_ppp_programacion_diaria` la superpone (`coalesce(o.zona, p.zona)`, mismas 16 columnas → `create or replace`, 19 vistas dependientes intactas); override de **97889 Matiz SA** (Burzaco, 9,25 m³, D71A 16/09) de "Zona 2 - CABA Centro" a **"Zona 4 - GBA Sur"** — es como ISIS carga a ese cliente las 3 veces que aparece. (b) `GV_Geo_Cliente` para **Cencosud 2444** ("Km 38.5, Au Panamericana", Tortuguitas, D72A): Nominatim no resuelve "km 38.5" y desde la sesión no hay internet → **`<LAT>/<LNG>` como placeholder**. (c) las otras 8 sin geocodificar: 4 se copian de `PPP_Geo` bajo la clave exacta (Coto 801, Bazar Mandarin LK 2447 — hoy caía en Clapera Chef 2447 —, Gastronomía González 2445, Maravillas 2499), Retira no se geocodifica, Cresta 2105 queda al cron, Perez Zarate 4036 es una dirección de Córdoba sin expreso (no se puede), Del Plastic 1996 "Taabre" = Tabaré (typo, placeholder). | el "dale"; lat/lng de Cencosud y Tabaré 1240; corregir Matiz también en la PPP de ISIS |
+| `sql/PENDIENTE-vehiculo-propio-20260913.sql` | tabla **`GV_Vehiculo_Propio`** (tanda pk, vehiculo, fecha, activo, nota) con RLS/grants de `GV_Dias_No_Habiles`, y la marca **E11A = kangoo** (Extralimp, Luján, 16/09). Tabla y no columna en `PPP_Web_Programacion` porque E11A es tanda de ISIS (vive en el espejo, que no se modifica) y la marca es por tanda. **El front ya la lee desde la v16.72** (`pppRefreshVehPropio` → `_pppComputeErrors` descuenta del día las tandas marcadas) y **tolera que no exista**: 404, error o 0 filas = nada cambia. Test: `tests/ppp-jornada-camion.cjs` caso 8. Sin UI para marcar (después). | el "dale" |
+| `sql/PENDIENTE-oc-63xE-y-nombres-20260913.sql` | (a) 5 filas en `OC_Maximos` para **630E/631E/634E/635E/636E** (CH, 'Log/ Fabr', descripción del código sin E en `Articulos_Cajas`, uni_x_caja 12, índice 1,5, prop 100, max 0). (b) **`vista_generador_oc` completa** (pg_get_viewdef + cambio): `GV_UxB` y `Articulos_Cajas` como 3ª y 4ª fuente de nombre, y **'LIBRE' fuera del universo** (es la celda vacía de `Capacidad_Sector`; A83 tiene 72 cajas y entraba como artículo). Medido con el SELECT equivalente: recuperan nombre 231/232/233/657 y los cinco 63xE; siguen sin nombre 441Z, 501B, 587C, 592E, 599EZ (no existen en ningún lado). Única dependiente transitiva: `vista_faltante_catalogo` (lvl 2); mismas columnas → sin DROP. (c) la capacidad duplicada M34/M35/M36 (`cap` cuenta 630 y 630E como dos: M34 60, M35 46, M36 32) **se propone, no se decide**: A) sumar por código base → sólo cambia 631 (máximo 12→24, total 14→26); B) bajar a 0 las filas E de `Capacidad_Sector` → M34 36 / M35 29 / M36 22, nada cambia en 630..636; C) el E es el vigente (`Articulos_Cajas` tiene los sin-E suspendidos) → pasar la config al E y apagar 630..636 — pero 630 y 631 tienen 2 cajas pedidas cada uno hoy. | el "dale" de (a)+(b); elegir A/B/C para (c); si 630 y 630E son el mismo artículo |
+| `sql/PENDIENTE-prensa-matambre-y-439E-20260913.sql` | (a) **246 vs 55219** "Prensa Matambre": la vista `vista_articulos_prov_at` toma la descripción de **`"Articulos x Prov AT".Descripcion`** (DISTINCT ON cod+proveedor, Activo=true; la línea sale por LATERAL de `Articulos Virgilio X Tallerista`). 55219 no tiene fila en `Articulos_Cajas` (sin N° de caja) → se diferencia por el NOMBRE, con `<DESC_55219>` como marcador en las tres tablas que lo muestran (`Articulos x Prov AT` id 108, `OC_Maximos`, y opcional la madre `Articulos Virgilio X Tallerista` id 633), más el `btrim` de los 10 espacios colgados del 246/Cabral. ⚠ Los N° de caja no coinciden entre tablas (`Articulos_Cajas` 246 → 10; `Articulos x Prov AT` 246 → 2 y 6, 55219 → 10): no se toca ninguno. Hallazgo de paso: el generador ve **333,33 cajas pedidas de 55219** en la NP 98426 contra 72 de stock — revisar `gv_demanda_pedidos` para ese código. (b) **439E en Chef** (problema 88): filas para `Capacidad_Sector` (empresa CH) y `GV_Lugar_Item` con **`<SECTOR_CHEF>`** y `<CAJAS_MAX>` — el sector lo sabe la chica del depósito, tiene que ser una góndola CH de `GV_Lugar` (L01–L60, M01–M60, P01–P40, Ñ56–Ñ59). `OC_Maximos` 439E sólo existe en línea LK: si Chef compra aparte hace falta la fila CH (comentada). | el texto de 55219; el sector y la capacidad de Chef; si va OC de Chef para 439E |
+
+**Recálculo de camiones 14–18/09** con las correcciones de (a) aplicadas hipotéticamente:
+`docs/JORNADA-CAMIONES-14-18-09.md`. Resumen: lun 2 · mar 2 · **mié 3** (aun con la kangoo: Matiz,
+Cencosud y Pilar son viajes "solos") · jue 1 · vie 1 fleteros. Con Matiz D71A al jueves 17 y E20A
+(Schell, una parada) al martes 15 —misma dirección que E03C— la semana baja de 9 a 7 fletero-días y
+ningún día pasa de 8 h. **No existe capacidad en m³ en ninguna tabla**: los 9,25 m³ de Matiz no se
+pueden validar contra nada.
+
+**Código que sí entró en la v16.72 (front, sin tocar la base):** `index.html` — `_pppVehPropio`,
+`pppRefreshVehPropio()` (se dispara desde `pppRefreshGeo`), `_pppCamEsVehPropio(cam)` y el `continue`
+en el loop del día de `_pppComputeErrors`; `tests/ppp-jornada-camion.cjs` caso 8.

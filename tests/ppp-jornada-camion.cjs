@@ -27,6 +27,13 @@
    6) el día cuyas tandas repartidas entre `jornada_camiones` pasan el tope entra en
       `_pppComputeErrors().jornadaDia` y sale en el panel con las horas, las de más y la peor tanda,
    7) el mismo día con más camiones deja de avisar.
+
+   v16.72 — VEHÍCULO PROPIO: E11A (Luján) salió en la kangoo, no en el camión del fletero. Con la
+   tanda marcada en `_pppVehPropio` (lo que carga `pppRefreshVehPropio` desde `GV_Vehiculo_Propio`)
+   el día la descuenta; si la marca no está (tabla inexistente, select fallido, vacío) nada cambia:
+   8) con E11A marcada el aviso del 16/09 desaparece (entra en las 8 h) y, forzando el tope a 1 h para
+      verlo, el día queda con 3 tandas y menos horas; con `null` o `{}` vuelve a las 4 de antes; una
+      marca sobre una tanda que no está ese día no cambia nada.
    Sale 1 si falla. */
 const path = require("path");
 let chromium;
@@ -141,6 +148,26 @@ catch (_e) {
                    /4 tandas → <b>\d+,\d h<\/b> de camión/.test(htmlD) &&
                    /con 2 camión\(es\) son <b>\d+,\d h<\/b> cada uno/.test(htmlD);
 
+    // --- (8) v16.72: la tanda marcada como vehículo propio no ocupa camión de fletero ---
+    _pppVehPropio = { E11A: "kangoo" };
+    // con Luján en la kangoo el 16/09 entra en la jornada: el aviso del día DESAPARECE (8,5 h → menos de 8)
+    out.vehSinAviso = (_pppComputeErrors(dia).jornadaDia || []).length === 0;
+    // y para ver que fue por descontar la tanda (no por otra cosa) se fuerza el aviso con un tope de 1 h
+    const maxOrig = _pppJorCfg.horasMax; _pppJorCfg.horasMax = 1;
+    const eV = _pppComputeErrors(dia);
+    const dV = (eV.jornadaDia || [])[0] || {};
+    _pppJorCfg.horasMax = maxOrig;
+    out.vehTandas   = dV.tandas;                                       // 3, no 4
+    out.vehBaja     = (dV.horas || 0) < (d0.horas || 0) - 1;            // la kangoo se lleva las horas de Luján
+    out.vehHorasDia = Math.round((dV.horas || 0) * 10) / 10;
+    _pppVehPropio = { E99Z: "kangoo" };                                 // marca de otra tanda: no cambia nada
+    out.vehOtraIgual = ((_pppComputeErrors(dia).jornadaDia || [])[0] || {}).tandas === 4;
+    _pppVehPropio = {};
+    out.vehVacioIgual = ((_pppComputeErrors(dia).jornadaDia || [])[0] || {}).tandas === 4;
+    _pppVehPropio = null;                                               // como cuando la tabla no existe
+    out.vehNullIgual = ((_pppComputeErrors(dia).jornadaDia || [])[0] || {}).tandas === 4;
+    out.vehFnExiste = typeof pppRefreshVehPropio === "function" && typeof _pppCamEsVehPropio === "function";
+
     // --- (7) con más camiones el mismo día deja de avisar ---
     const camOrig = _pppJorCfg.camiones;
     _pppJorCfg.camiones = 8;
@@ -169,6 +196,7 @@ catch (_e) {
     r.cortoSinAviso && r.retiraSinAviso &&
     r.diaAvisa && r.diaTandas === 4 && r.diaCamiones === 2 && r.diaHoras > 0 &&
     r.diaCada > 8 && r.diaRepartoOk && r.ningunaSola && r.diaTexto && r.masCamionesSinAviso &&
+    r.vehSinAviso && r.vehTandas === 3 && r.vehBaja && r.vehOtraIgual && r.vehVacioIgual && r.vehNullIgual && r.vehFnExiste &&
     errs.length === 0;
   const { html, htmlD, ...vis } = r;
   console.log("ppp-jornada-camion:", JSON.stringify(vis), "· pageerrors:", errs.length ? errs.join("|") : "none", "·", pass ? "✓ OK" : "✗ FAIL");

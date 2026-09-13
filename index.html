@@ -4714,7 +4714,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=16.71"></script>
+<script type="module" src="recepcion.js?v=16.72"></script>
 <!-- Config del módulo de fichada (compartido con fichada.html). El secret
      hmacSecret tiene que ser el mismo acá y allá; cargándolo desde un solo
      archivo evitamos que se desincronicen. -->
@@ -7829,7 +7829,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v16.71";
+const APP_VERSION = "v16.72";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -33304,6 +33304,7 @@ function _pppComputeErrors(peds, entSet) {
       let hDia = 0, kmDia = 0, parDia = 0, tandas = 0, peor = null;
       for (const cam of _pppCamiones(porDia[fe])) {
         if (cam.ruta === "ret") continue;
+        if (_pppCamEsVehPropio(cam)) continue;   // v16.72: salió en la kangoo, no ocupa camión de fletero
         const j = _pppJornadaCam(cam);
         hDia += j.horas; kmDia += j.km; parDia += j.paradas; tandas++;
         if (!peor || j.horas > peor.j.horas) peor = { cam: cam, j: j };
@@ -33445,6 +33446,32 @@ async function pppRefreshValor() {
    config no cargó (sin red la PPP tiene que seguir andando). */
 let _pppJorCfg = { horasMax: 8, minParada: 15, kmH: 28, factor: 1.35, camiones: 2 };
 let _pppJorCfgOk = false;
+/* v16.72 — TANDAS QUE SALEN EN VEHÍCULO PROPIO (la kangoo). Caso real: E11A (Extralimp, Luján, 16/09)
+   salió en kangoo aparte y no en el camión del fletero, pero `_pppComputeErrors` la sumaba a las
+   horas del día y el aviso "Día que no entra en la jornada" salía inflado. La marca vive en
+   `GV_Vehiculo_Propio` (tanda → vehículo), tabla que HOY puede no existir todavía (queda en
+   sql/PENDIENTE-vehiculo-propio-20260913.sql hasta el "dale" del dueño): si el select falla o
+   viene vacío, nada cambia. Sin UI para marcar todavía; se carga por SQL. */
+let _pppVehPropio = null;      // { "E11A": "kangoo", … } — tandas que NO viajan en camión de fletero
+async function pppRefreshVehPropio() {
+  try {
+    const r = await fetch(SUPABASE_URL + "/rest/v1/GV_Vehiculo_Propio?select=tanda,vehiculo&activo=eq.true&limit=1000",
+      { headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY }, cache: "no-store" });
+    if (!r.ok) return;                       // la tabla no existe todavía (404) u otro error: se sigue sin la marca
+    const rows = await r.json();
+    if (!Array.isArray(rows)) return;
+    const m = {};
+    for (const x of rows) { const t = String((x && x.tanda) || "").trim().toUpperCase(); if (t) m[t] = String((x && x.vehiculo) || "propio"); }
+    _pppVehPropio = m;
+  } catch (_e) {}
+}
+/* Un camión de la vista (`_pppCamiones`) va en vehículo propio si TODAS sus tandas están marcadas. */
+function _pppCamEsVehPropio(cam) {
+  const v = _pppVehPropio; if (!v) return false;
+  const ts = (cam && cam.tandas) || []; if (!ts.length) return false;
+  for (const t of ts) if (!v[String(t || "").trim().toUpperCase()]) return false;
+  return true;
+}
 async function pppRefreshJornadaCfg() {
   if (_pppJorCfgOk) return;
   try {
@@ -33497,6 +33524,7 @@ function _pppJornadaCam(cam) {
 }
 async function pppRefreshGeo() {
   pppRefreshJornadaCfg();   // best-effort, en paralelo: si falla quedan los defaults
+  pppRefreshVehPropio();    // v16.72: tandas en vehículo propio (si la tabla no existe, no pasa nada)
   if (_pppGeo) return;
   try { _pppGeo = await _rtCacheAll(); } catch (_e) { _pppGeo = {}; }
   // v13.40: además de PPP_Geo (por dirección), la ubicación POR CÓD DE CLIENTE. Es el paracaídas
