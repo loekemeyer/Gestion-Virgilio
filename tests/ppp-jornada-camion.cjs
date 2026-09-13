@@ -18,6 +18,15 @@
       las horas, de qué se componen y qué parada lo estira,
    4) un camión corto no avisa,
    5) Retira nunca cuenta (no viaja).
+
+   v16.65 — y el caso que la v15.86 NO veía: el tope es por VEHÍCULO y por DÍA. `_pppCamiones`
+   hace un camión por número de tanda, así que ninguna tanda sola llegaba a 8 h (medido sobre la
+   programación real del 14 al 18/09: la mayor daba 5,7 h) y el aviso no salía nunca — mientras
+   el 16/09 tenía 6 tandas que suman 20,6 h de camión y, con los 2 fleteros que hay, son 10,3 h
+   cada uno. Se chequea además:
+   6) el día cuyas tandas repartidas entre `jornada_camiones` pasan el tope entra en
+      `_pppComputeErrors().jornadaDia` y sale en el panel con las horas, las de más y la peor tanda,
+   7) el mismo día con más camiones deja de avisar.
    Sale 1 si falla. */
 const path = require("path");
 let chromium;
@@ -105,6 +114,39 @@ catch (_e) {
     out.avisaHoras = /<b>\d+,\d h<\/b> \(viaje \d+,\d h \+ 13 paradas × 15′\)/.test(html);
     out.avisaLejos = /lo estira <b>Luj[áa]n<\/b> \(a \d+ km\)/.test(html);   // pppLocDisp le pone el tilde
 
+    // --- (6) el DÍA no entra, aunque ninguna tanda sola se pase ---
+    // 6 tandas del 16/09 con los mismos destinos reales: cada una corta, el día entero no.
+    const dia = [];
+    const TANDAS = [
+      { t: "D69A", cods: ["4188", "2715", "3927", "2543", "3861", "4221", "4024", "2328", "4045"] },
+      { t: "E11A", cods: ["4114"] },
+      { t: "E17A", cods: ["4281", "4198"] },
+      { t: "E15A", cods: ["3927", "4189"] }
+    ];
+    let k = 0;
+    for (const g of TANDAS) for (const c of g.cods) dia.push(mk(String(++k + 100), c, "Cli " + c, "Loc " + c, g.t, "16/09/2026"));
+    const eD = _pppComputeErrors(dia);
+    const d0 = (eD.jornadaDia || [])[0] || {};
+    out.diaAvisa   = (eD.jornadaDia || []).length === 1 && d0.fecha === "16/09/2026";
+    out.diaTandas  = d0.tandas;
+    out.diaCamiones = d0.camiones;                       // el default de _pppJorCfg
+    out.diaHoras   = Math.round((d0.horas || 0) * 10) / 10;
+    out.diaCada    = Math.round((d0.hCada || 0) * 10) / 10;
+    out.diaRepartoOk = Math.abs((d0.hCada || 0) * d0.camiones - (d0.horas || 0)) < 1e-9;
+    out.ningunaSola = (eD.jornada || []).length === 0;   // ← esto es lo que la v15.86 no veía
+    const htmlD = pppErroresHtml(eD);
+    out.htmlD = htmlD;
+    out.diaTexto = /🚚 <b>Día que no entra en la jornada \(1\)/.test(htmlD) &&
+                   htmlD.indexOf("<b>16/09</b>") >= 0 &&
+                   /4 tandas → <b>\d+,\d h<\/b> de camión/.test(htmlD) &&
+                   /con 2 camión\(es\) son <b>\d+,\d h<\/b> cada uno/.test(htmlD);
+
+    // --- (7) con más camiones el mismo día deja de avisar ---
+    const camOrig = _pppJorCfg.camiones;
+    _pppJorCfg.camiones = 8;
+    out.masCamionesSinAviso = (_pppComputeErrors(dia).jornadaDia || []).length === 0;
+    _pppJorCfg.camiones = camOrig;
+
     // --- (4) camión corto: no avisa ---
     const corto = [mk("8", "4024", "G. Pellegrini", "Ciudadela", "D69H", "17/09/2026")];
     const e2 = _pppComputeErrors(corto);
@@ -125,10 +167,12 @@ catch (_e) {
     r.sinLujanBaja && r.sinLujanHoras < r.horas &&
     r.enJornada && r.avisaDia && r.avisaHoras && r.avisaLejos &&
     r.cortoSinAviso && r.retiraSinAviso &&
+    r.diaAvisa && r.diaTandas === 4 && r.diaCamiones === 2 && r.diaHoras > 0 &&
+    r.diaCada > 8 && r.diaRepartoOk && r.ningunaSola && r.diaTexto && r.masCamionesSinAviso &&
     errs.length === 0;
-  const { html, ...vis } = r;
+  const { html, htmlD, ...vis } = r;
   console.log("ppp-jornada-camion:", JSON.stringify(vis), "· pageerrors:", errs.length ? errs.join("|") : "none", "·", pass ? "✓ OK" : "✗ FAIL");
-  if (!pass) console.log("HTML:", String(html).slice(0, 700));
+  if (!pass) console.log("HTML:", String(html).slice(0, 500), "\n--- día:", String(htmlD).slice(0, 500));
   await b.close();
   process.exit(pass ? 0 : 1);
 })();

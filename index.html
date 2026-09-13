@@ -4714,7 +4714,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=16.64"></script>
+<script type="module" src="recepcion.js?v=16.66"></script>
 <!-- Config del módulo de fichada (compartido con fichada.html). El secret
      hmacSecret tiene que ser el mismo acá y allá; cargándolo desde un solo
      archivo evitamos que se desincronicen. -->
@@ -7829,7 +7829,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v16.64";
+const APP_VERSION = "v16.66";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -33287,7 +33287,7 @@ function _pppComputeErrors(peds, entSet) {
   // v15.85 (Thomas: "más que 8 hs por día no se puede programar") — camiones que no entran en la
   // jornada: viaje óptimo + 15' por parada. Se agrupa por DÍA y por camión con la misma función
   // que usa la vista (_pppCamiones); Retira no viaja y queda afuera.
-  const jornada = [];
+  const jornada = [], dias = [];
   try {
     const porDia = {};
     for (const p of peds) {
@@ -33296,18 +33296,33 @@ function _pppComputeErrors(peds, entSet) {
       (porDia[fe] = porDia[fe] || []).push(p);
     }
     for (const fe of Object.keys(porDia)) {
+      // v15.87 — el tope es por VEHÍCULO y por DÍA, no por tanda. `_pppCamiones` hace un camión
+      // por número de tanda, y así ninguna tanda sola llega a 8 h: medido sobre el 14–18/09 el
+      // mayor daba 5,7 h y el aviso no salía nunca. Pero los fleteros son DOS y casi nunca hacen
+      // dos vueltas (Thomas, 11/09), así que lo que importa es cuánto trabajo tiene el día
+      // entero repartido entre los vehículos que hay (`jornada_camiones`). Retira no viaja.
+      let hDia = 0, kmDia = 0, parDia = 0, tandas = 0, peor = null;
       for (const cam of _pppCamiones(porDia[fe])) {
         if (cam.ruta === "ret") continue;
         const j = _pppJornadaCam(cam);
+        hDia += j.horas; kmDia += j.km; parDia += j.paradas; tandas++;
+        if (!peor || j.horas > peor.j.horas) peor = { cam: cam, j: j };
         if (j.excede) jornada.push({ fecha: fe, cam: cam, j: j });
+      }
+      const nCam = Math.max(1, _pppJorCfg.camiones || 1);
+      const hCada = hDia / nCam;
+      if (tandas > 0 && hCada > _pppJorCfg.horasMax) {
+        dias.push({ fecha: fe, tandas: tandas, camiones: nCam, horas: hDia, hCada: hCada,
+                    km: kmDia, paradas: parDia, peor: peor });
       }
     }
     jornada.sort(function (a, b) { return b.j.horas - a.j.horas; });
+    dias.sort(function (a, b) { return b.hCada - a.hCada; });
   } catch (_e) {}
-  return { sacar: sacar, sinZona: sinZona, zonaDif: zonaDif, tandasMal: tandasMal, jornada: jornada };
+  return { sacar: sacar, sinZona: sinZona, zonaDif: zonaDif, tandasMal: tandasMal, jornada: jornada, jornadaDia: dias };
 }
 function pppErroresHtml(e) {
-  const n = e.sacar.length + e.sinZona.length + e.zonaDif.length + e.tandasMal.length + ((e.jornada || []).length);
+  const n = e.sacar.length + e.sinZona.length + e.zonaDif.length + e.tandasMal.length + ((e.jornada || []).length) + ((e.jornadaDia || []).length);
   if (!n) return "";   // v13.12: sin errores no se muestra nada (dueño: "sacá esas 2 alertas")
   const np = function (p) { const s = escapeHtml(String(p.np)); return '<a class="ppp-go" onclick="pppGoToRow(\'' + s + '\')" title="Ir a la fila del pedido">' + s + '</a>'; };
   const cli = function (p) { const r = (p.razon_social || "").trim(); return r ? " " + escapeHtml(r.slice(0, 20)) : ""; };
@@ -33317,8 +33332,21 @@ function pppErroresHtml(e) {
   if (e.zonaDif.length)   h += '<div class="ppp-ei warn">⚠ <b>Zona no coincide (' + e.zonaDif.length + '):</b> ' + e.zonaDif.map(function (p) { return np(p) + " [" + escapeHtml(pppLocDisp(p.localidad) || "?") + ": Excel=" + escapeHtml(p.zona || "—") + " / barrio=" + escapeHtml(pppZonaDeBarrio(p.localidad) || "—") + "]"; }).join(" · ") + '</div>';
   // v15.85 — la jornada del camión. Es lo primero porque obliga a mover pedidos de día, no a
   // corregir un tipeo: dice cuánto se pasa, de qué se compone y qué parada lo estira.
+  const h1 = function (x) { return (Math.round(x * 10) / 10).toString().replace(".", ","); };
+  // v15.87 — el día entero no entra en la jornada: todas sus tandas (sin Retira) repartidas
+  // entre los camiones que hay. Va PRIMERO porque es el que obliga a mover pedidos de día.
+  if ((e.jornadaDia || []).length) {
+    h += '<div class="ppp-ei bad">🚚 <b>Día que no entra en la jornada (' + e.jornadaDia.length + '):</b><div class="ppp-ei-det">' +
+      e.jornadaDia.map(function (d) {
+        const pe = d.peor && d.peor.cam;
+        const lejos = pe ? (' · la más larga es <b>' + escapeHtml(pe.zona || (pe.tandas || []).join("+") || "?") + '</b> (' + h1(d.peor.j.horas) + ' h)') : "";
+        return '<div><b>' + escapeHtml(String(d.fecha).replace(/\/\d{4}$/, "")) + '</b> · ' +
+               d.tandas + ' tandas → <b>' + h1(d.horas) + ' h</b> de camión (' + d.paradas + ' paradas · ' +
+               Math.round(d.km) + ' km) · con ' + d.camiones + ' camión(es) son <b>' + h1(d.hCada) +
+               ' h</b> cada uno, ' + h1(d.hCada - _pppJorCfg.horasMax) + ' h de más' + lejos + '</div>';
+      }).join("") + '</div></div>';
+  }
   if ((e.jornada || []).length) {
-    const h1 = function (x) { return (Math.round(x * 10) / 10).toString().replace(".", ","); };
     h += '<div class="ppp-ei bad">🕗 <b>Camión de más de ' + _pppJorCfg.horasMax + ' h (' + e.jornada.length + '):</b><div class="ppp-ei-det">' +
       e.jornada.map(function (x) {
         const c = x.cam, j = x.j;
@@ -33415,7 +33443,7 @@ async function pppRefreshValor() {
    Los dos últimos son una estimación: se recalibran con las horas reales de la hoja de ruta
    (`GV_Viaje_Horas`, §3.bx) cuando empiecen a cargarse. Acá quedan los defaults por si la
    config no cargó (sin red la PPP tiene que seguir andando). */
-let _pppJorCfg = { horasMax: 8, minParada: 15, kmH: 28, factor: 1.35 };
+let _pppJorCfg = { horasMax: 8, minParada: 15, kmH: 28, factor: 1.35, camiones: 2 };
 let _pppJorCfgOk = false;
 async function pppRefreshJornadaCfg() {
   if (_pppJorCfgOk) return;
@@ -33429,7 +33457,8 @@ async function pppRefreshJornadaCfg() {
       horasMax:  n(map.jornada_horas_max,   _pppJorCfg.horasMax),
       minParada: n(map.jornada_min_parada,  _pppJorCfg.minParada),
       kmH:       n(map.jornada_km_h,        _pppJorCfg.kmH),
-      factor:    n(map.jornada_factor_ruta, _pppJorCfg.factor)
+      factor:    n(map.jornada_factor_ruta, _pppJorCfg.factor),
+      camiones:  n(map.jornada_camiones,    _pppJorCfg.camiones)
     };
     _pppJorCfgOk = true;
   } catch (_e) {}
