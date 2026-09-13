@@ -10843,10 +10843,43 @@ inflan nada, pero ensucian la cuenta de "cuántos artículos hay". **GP2 hace bi
 El sexto, **573**, sí es un artículo real (52 uni/mes) y es el que otra sesión estaba trabajando
 el mismo día (backup `zz_backups.GP2_Backup_est_madre_573_20260913`).
 
-### Qué hacer, y por qué no se hizo solo
+### La cadena completa: son CINCO copias en DOS proyectos, pero el NÚMERO ya es uno solo
 
-Borrar `E. Madre LK` / `E. Madre CH` **rompería `vista_nombres_articulos`**, que hoy saca de ahí
-dos tercios de los nombres. El orden correcto es: primero mover esa vista a una fuente viva
-(`proyeccion_madre` no tiene `Desc`, así que habría que ver de dónde sale el nombre), después
-borrar. **Es una decisión del dueño y no se tocó nada.**
+Buscando en el proyecto de LK aparece el origen, y cambia el diagnóstico para mejor:
+
+| Proyecto | Objeto | Filas | Qué es |
+|---|---|--:|---|
+| **LK** | `fn_proyeccion_madre()` / `fn_proyeccion_oc_virgilio()` | — | **EL MOTOR.** Lo calcula desde la venta |
+| LK | `estadistica_madre_cache` | 537 | Cache del motor. ⚠ **Tiene `descripcion`** |
+| LK | `estadistica_madre` (vista) | 357 | Lectura del motor |
+| Virgilio | `proyeccion_madre` | 410 | Lo que LK **empuja** (`sync_proyeccion_madre_virgilio`, reemplazo total) |
+| Virgilio | `GP2.est_madre` | 404 | La copia de GP2 (Regla 0) |
+| Virgilio | `E. Madre LK` / `E. Madre CH` | 290 / 302 | **Las viejas** |
+
+**El comentario del propio motor lo dice: *"mismo motor que las OCs de Virgilio. Un solo número
+en todo el sistema."*** O sea que **el número ya está unificado** — lo que sobra son copias, y
+sólo dos de ellas son un problema: las que **nadie refresca**.
+
+### Por qué no se pueden borrar todavía, y cuál es el camino
+
+`E. Madre LK` es hoy la **primera fuente del nombre** de los artículos (281 de 428). Sacándola y
+usando todas las fuentes vivas juntas (`precios_venta`, `GV_UxB`, `GP2.articulo`,
+`precios_venta_chef`) se cubren **226** y quedan **55 sin nombre** — entre ellos el `505I`, que
+tiene 32 movimientos de stock. Y `E. Madre CH` tiene **279 códigos que LK no tiene** (el catálogo
+de Chef), aunque hoy no los lea ninguna vista.
+
+**El camino limpio es hacer viajar el nombre por donde ya viaja el número**, en vez de inventar
+otra tabla:
+
+1. Agregar `gv_descripcion` (nullable) a `proyeccion_madre` — permitido por el protocolo de
+   tablas compartidas.
+2. Que `sync_proyeccion_madre_virgilio()` (en **LK**) la mande: el dato ya está en
+   `estadistica_madre_cache.descripcion`. Medido sobre 20 códigos huérfanos, LK trae 13, y con
+   **mejor** nombre ("Colador N°7" en vez de "Colador N°7 Discontinuo").
+3. Repuntar `vista_nombres_articulos` a `proyeccion_madre` + las fuentes vivas.
+4. Recién ahí borrar `E. Madre LK`, `E. Madre CH` y la función muerta
+   `actualizar_e_madre_desde_proyeccion()`.
+
+⚠ **No se ejecutó nada.** El paso 2 toca una función viva de OTRO proyecto y el 4 es un DROP de
+dos tablas: las dos cosas necesitan el sí del dueño en el momento.
 
