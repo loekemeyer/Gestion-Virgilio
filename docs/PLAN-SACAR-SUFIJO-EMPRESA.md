@@ -313,8 +313,34 @@ Cada paso es reversible solo y se puede parar en cualquiera de ellos.
 |:--|:--|--:|:--|
 | `Planimetria` | `GV_Lugar_Item` + `GV_Lugar.orden` | 2 | `planimUpsert` (L34510, POST) · `planimDeleteRow` (L34550, DELETE) — **el editor del supervisor** |
 | `Capacidad_Sector` | `GV_Lugar_Item.cajas_max` | 8 | `dpSaveCap` (L34400, POST) · `stkCapImport` (L19280, POST + **DELETE masivo**) |
-| `Racks_Planimetria` | `GV_Lugar` (`tipo='rack'`) + `GV_Lugar_Item` | 9 | `stkInsAlta` (L20712, POST) |
+| `Racks_Planimetria` | **NADIE — ver el aviso de abajo** | 6 + 1 RPC | `stkInsAlta` (POST) |
 | `planimetria.js` (estático, 7 kB) | cache offline de `GV_Lugar_Item` | baseline de `window.GONDOLA` | se **regenera**, no se edita |
+
+> ### ⚠ CORRECCIÓN (2026-09-13): `Racks_Planimetria` NO se reemplaza. Es otra cosa.
+>
+> La fila de arriba decía que la reemplazan `GV_Lugar` + `GV_Lugar_Item`. **Es un error de
+> categoría y el que lo ejecute pierde las cantidades.**
+>
+> | tabla | qué responde | columnas que lo prueban |
+> |:--|:--|:--|
+> | `GV_Lugar` + `GV_Lugar_Item` | *¿qué código **pertenece** a este lugar y cuánto entra?* | `cod`, `clase`, `cajas_max` |
+> | `Racks_Planimetria` | *¿qué hay **ahora** en esta posición?* | `master_cajas`, `innercajas`, `estado` |
+>
+> `Racks_Planimetria` es el **libro de ocupación**: 105 posiciones ocupadas y 49 libres, una
+> fila por palet. Las tablas nuevas **no tienen dónde guardar cuánto hay**.
+>
+> Verificadas las **6 lecturas + la RPC `racks_plani_mover`**: todas preguntan por la
+> ocupación (`master_cajas`/`innercajas`/`estado`, o "dónde está hoy este código"), **ninguna**
+> pregunta "dónde pertenece". Repuntarlas a `GV_Lugar` habría roto **Bajar de racks**, el
+> movedor de palets y el alta de insumos.
+>
+> **Las dos tablas conviven, con roles distintos.** No hay nada que enrutar acá.
+>
+> Lo que sí salió de mirarlas juntas (problema `El depósito inventó 809E-QUESO…`): **9
+> "códigos" ocupando racks que no existen en el maestro**, y los dos peores son la misma
+> enfermedad del sufijo con el nombre del producto pegado — **`809E-QUESO` (696 cajas) y
+> `809E-PIZZA` (64)**, con CERO movimientos de stock. Más 2 posiciones que contradicen su
+> planimetría y 37 ocupadas sin planimetría cargada.
 
 `Ubicaciones_Articulos` y `Stock_Ubicaciones` **no se leen desde el front**: fueron fuentes de
 la carga inicial y nada más. Se retiran sin tocar código.
@@ -374,7 +400,7 @@ que sea explícito y acotado al lugar.
 4. **El editor fundido** (Planimetría + Capacidad en uno) escribiendo a `GV_Lugar_Item`.
    Hasta que exista, **dejar el viejo andando**: un supervisor sin editor es peor que un
    editor que escribe a una tabla que ya nadie lee.
-5. **Recién ahí** retirar `Planimetria`, `Capacidad_Sector`, `Racks_Planimetria`,
+5. **Recién ahí** retirar `Planimetria`, `Capacidad_Sector`, ~~`Racks_Planimetria`~~ (no se retira: ver el aviso),
    `Ubicaciones_Articulos` y `Stock_Ubicaciones`. Con backup y entrada en
    `docs/ROLLBACK-PRODUCCION.md`: son tablas compartidas.
 
