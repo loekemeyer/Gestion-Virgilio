@@ -10320,3 +10320,64 @@ que se entienda de dónde salieron. Si la vista no responde, la lista queda exac
 (la carga es best-effort y no bloquea).
 
 Archivo: `sql/gv_fac_armado_sin_facturar_v1658.sql`.
+
+---
+
+## §3.dh — v16.59: la Conciliación leía el `precio_unit` malo de ISIS (problema 53)
+
+**La fórmula real de un renglón de factura de ISIS**, medida sobre las 212.771 líneas de
+`isis_lk.documento_items` con importe y cantidad:
+
+```
+importe = cantidad × precio_unit × (1 − dto_1/100) × (1 − dto_2/100)
+```
+
+Y el registro viejo del problema tenía **dos cosas mal**:
+
+- la cantidad que manda es **`cantidad` (unidades)**, no `cantidad_caja` (468 unidades = 39 cajas).
+  Con `cantidad_caja` cuadran 6.088 líneas; con `cantidad`, 152.759.
+- los descuentos son **multiplicativos**, no aditivos: 162.219 contra 152.759. La columna
+  `descuento` está en 0 en las 212.771 filas.
+
+Con la fórmula correcta cuadran **162.219 de 212.771 = 76,2%**; fallan **50.552 (23,8%)** — del
+orden del 25,6% que decía el registro. Pero *"el caso típico es el precio POR CAJA"* **no se
+sostiene**:
+
+| de las que fallan | filas | |
+|---|---|---|
+| precio por caja (ratio = unidades/cajas) | 7.241 | 14% |
+| una línea "N% Descuento" en el documento (sin código, se prorratea) | 9.809 | 19% |
+| exceso chico, +1% a +35% (ratio ~1,02) | ~33.000 | 65% |
+| resto | ~400 | 1% |
+
+El precio por caja es **1 de cada 7**, no el caso típico.
+
+**La descripción sí está corrida, confirmado:** el mismo `102EL` aparece en la misma factura con
+descripciones *"106EL Abr Mariposa Loke"*, *"123L Abr Mariposa Loke"* y *"Abr Mariposa Loke"* — le
+queda pegado adelante el código de otro renglón. **El `codigo_articulo` sí es confiable.**
+
+### Qué se arregló
+
+El parser vive aguas arriba y no se toca desde acá; los 50.552 renglones ya cargados son datos
+reales que no se reescriben sin permiso. Lo que sí se cerró es **el consumo**: se barrió `pg_proc`
+y `pg_get_viewdef`, y **el único lugar que leía `documento_items.precio_unit` era
+`gv_conciliacion_comparar(text)`** — la pantalla de Conciliación. Las otras cuatro funciones que
+nombran `precio_unit` (`cobranzas_resumen`, `cobranzas_valorizar_np`, `gv_ppp_web_valor_items`,
+`GP2.factura_match`) lo leen de las **listas de precios**, que es otra columna y no está afectada.
+
+Ahora despeja el precio del importe, igual que `gv_precio_facturado_cliente` (v15.87):
+
+```sql
+precio = sum(importe) / sum(cantidad × (1−dto_1/100) × (1−dto_2/100))
+```
+
+**Verificado contra el caso testigo del registro:** la línea del 102EL con `precio_unit` 29.700,
+cantidad 468, dto 16% e importe 972.972 **despeja 2.475,00**, que es el unitario real.
+
+**No regresión:** se recreó la definición vieja como `zz_conciliacion_comparar_vieja` y se
+corrieron las dos sobre las NP 98637, 98662, 98661 y 98654 (13, 13, 18 y 3 renglones). Resultado
+idéntico renglón por renglón, mismo `motivo`, cero filas marcadas `'precio'` con las dos. La
+función temporal se dropeó.
+
+**Backup:** `zz_backups."GV_Backup_conciliacion_comparar_20260913"`.
+Archivo: `sql/gv_conciliacion_precio_despejado_v1659.sql`.

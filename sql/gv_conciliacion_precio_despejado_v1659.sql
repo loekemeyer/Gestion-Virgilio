@@ -1,0 +1,75 @@
+-- v16.59 — Problema 53: la Conciliación leía `documento_items.precio_unit`, que viene mal
+--
+-- QUÉ SE MIDIÓ (y por qué el registro viejo del problema estaba mal en dos cosas)
+--
+-- La fórmula real de un renglón de factura de ISIS es, medida sobre las 212.771 líneas de
+-- `isis_lk.documento_items` con importe y cantidad:
+--
+--     importe = cantidad × precio_unit × (1 − dto_1/100) × (1 − dto_2/100)
+--
+--   · la cantidad que manda es **`cantidad` (unidades)**, NO `cantidad_caja` (que son cajas:
+--     468 unidades = 39 cajas). Con `cantidad_caja` cuadran 6.088 líneas; con `cantidad`, 152.759.
+--   · los descuentos son **multiplicativos**, no aditivos: 162.219 cuadran contra 152.759.
+--   · la columna `descuento` está en 0 en las 212.771 filas: no interviene.
+--
+-- Con la fórmula correcta cuadran **162.219 de 212.771 = 76,2%**; fallan **50.552 (23,8%)**,
+-- que es del orden del 25,6% que decía el registro. Pero el diagnóstico de "el caso típico es
+-- el precio POR CAJA" **no se sostiene**: de las que fallan,
+--
+--     precio por caja (ratio = unidades/cajas)      7.241   14%
+--     una línea "N% Descuento" en el documento      9.809   19%   (sin código, se prorratea)
+--     exceso chico, +1% a +35% (ratio ~1,02)       ~33.000  65%
+--     resto                                        ~  400    1%
+--
+-- O sea: el precio por caja es 1 de cada 7, no el caso típico.
+--
+-- LA DESCRIPCIÓN SÍ ESTÁ CORRIDA, confirmado: el mismo `102EL` aparece con descripciones
+-- "106EL Abr Mariposa Loke", "123L Abr Mariposa Loke" y "Abr Mariposa Loke" en la misma factura
+-- — le queda pegado adelante el código de otro renglón. **El `codigo_articulo` sí es confiable.**
+--
+-- QUÉ SE ARREGLÓ
+--
+-- El parser vive aguas arriba (la ingesta a `isis_lk` / `isis_ch`) y no se toca desde acá, y los
+-- 50.552 renglones ya cargados son datos reales que no se reescriben sin permiso. Lo que sí se
+-- puede cerrar es el consumo: se barrió `pg_proc` y `pg_get_viewdef` y **el único lugar que leía
+-- `documento_items.precio_unit` era `public.gv_conciliacion_comparar(text)`** — la pantalla de
+-- Conciliación, que compara lo facturado contra lo armado. Las otras cuatro funciones que
+-- mencionan `precio_unit` (`cobranzas_resumen`, `cobranzas_valorizar_np`, `gv_ppp_web_valor_items`,
+-- `GP2.factura_match`) lo leen de las LISTAS DE PRECIOS, que es otra columna y no está afectada.
+--
+-- Ahora `gv_conciliacion_comparar` **despeja el precio del importe**, igual que ya hacía
+-- `gv_precio_facturado_cliente` (v15.87):
+--
+--     precio = sum(importe) / sum(cantidad × (1−dto_1/100) × (1−dto_2/100))
+--
+-- Es el promedio ponderado del unitario bruto del renglón. Verificado contra el caso testigo del
+-- registro: la línea de 102EL con `precio_unit` 29.700, cantidad 468, dto 16% e importe 972.972
+-- **despeja 2.475,00**, que es el unitario real.
+--
+-- NO REGRESIÓN: se recreó la definición vieja como `zz_conciliacion_comparar_vieja` y se
+-- corrieron las dos sobre las NP 98637, 98662, 98661 y 98654 (13, 13, 18 y 3 renglones).
+-- Resultado idéntico renglón por renglón, mismo `motivo` en todos, cero filas marcadas 'precio'
+-- con la vieja y con la nueva. La función temporal se dropeó.
+--
+-- BACKUP: zz_backups."GV_Backup_conciliacion_comparar_20260913", fila
+--         'DDL v16.58 public.gv_conciliacion_comparar(text)' — se ejecuta tal cual para volver.
+--
+-- CÓMO SE APLICÓ (reemplazo de texto sobre pg_get_functiondef, en un DO con guarda):
+--   1) agregar `cantidad` a los dos SELECT del lateral (antes sólo traía `cantidad_caja`)
+--   2) cambiar  max(di.precio_unit) as precio
+--      por      round(sum(di.importe) / nullif(sum(di.cantidad
+--                 * (1 - coalesce(di.dto_1,0)/100.0)
+--                 * (1 - coalesce(di.dto_2,0)/100.0)), 0), 2) as precio
+--   3) `raise exception` si el reemplazo no aparece en el texto resultante.
+
+-- Consulta de control, para volver a medir cuando se toque la ingesta:
+--   with x as (
+--     select precio_unit, cantidad, importe, coalesce(dto_1,0) d1, coalesce(dto_2,0) d2
+--       from isis_lk.documento_items
+--      where importe is not null and cantidad is not null and cantidad <> 0
+--        and precio_unit is not null and precio_unit <> 0)
+--   select count(*) total,
+--          count(*) filter (where abs(importe - cantidad*precio_unit*(1-d1/100.0)*(1-d2/100.0))
+--                                 <= greatest(0.05, abs(importe)*0.005)) cuadran
+--     from x;
+--   -- al 2026-09-13: 212.771 total, 162.219 cuadran (76,2%)
