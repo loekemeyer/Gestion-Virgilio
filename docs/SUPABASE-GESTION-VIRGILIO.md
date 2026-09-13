@@ -9918,3 +9918,55 @@ no daba exactamente 46.
 Archivo: `sql/gv_entregas_dup_caso_b_v1646.sql`. Backups:
 `zz_backups."GV_Backup_Entregas_Virgilio_20260912"` (la tabla entera con su PK `id`) y
 `zz_backups."GV_Backup_Entregas_dup_borradas_20260912"` (las 46 exactas, con el motivo).
+
+---
+
+### §3.dv — v16.47: `gv_secret()`, y la medición que baja la urgencia del problema 20 — 2026-09-13
+
+**El problema 20** son 11 Edge Functions con credenciales escritas en el código. Antes de tocar
+nada se midió **si eso está expuesto públicamente**, porque de ahí depende la urgencia.
+
+**No lo está.** Se barrieron **todos los blobs del historial** de los dos repos **públicos**
+(`Gestion-Virgilio` 305 commits, `pagina-LK-copia` 311 tras profundizar el clon shallow):
+
+| | |
+|---|---|
+| claves de OpenAI (`sk-proj`/`sk-`) | **0** |
+| tokens de Meta (`EAA…`) | **0** |
+| `SHEETS_SECRET` / URL del Apps Script | **0** |
+| JWT legacy `service_role` | **0** |
+| JWT legacy `anon` | 1 en LK, 2 en GV — pública por diseño |
+
+Los 473 hits de la palabra `service_role` en LK son **nombres de variable**
+(`SUPABASE_SERVICE_ROLE_KEY`); se buscó el JWT real por el marcador de su *payload*, no por la
+palabra suelta.
+
+**Conclusión:** la exposición es al **bundle de la función deployada**, que sólo puede leer quien
+ya tenga acceso al proyecto Supabase. No es una filtración a internet como la del problema 21.
+Sigue habiendo que arreglarlo, pero no hay que rotar de emergencia.
+
+**De paso se descartó un agujero peor.** Hay dos funciones que leen el Vault y figuran como
+ejecutables por `anon` — `fn_facturado_notif_wa` y `fn_virgilio_entrega_to_formato`. **No lo son
+en la práctica**: devuelven `trigger`. Comprobado ejecutando como `anon`: *"trigger functions can
+only be called as triggers"*, y *"permission denied for schema vault"* al intentar leer el Vault
+directo. Verificado, no asumido.
+
+**Lo que se construyó: `gv_secret(p_name text)`.** Desde esta sesión **no se pueden cargar env
+vars de Edge Functions** (no existe la herramienta), así que la vía para sacar los secretos del
+código es el Vault de Postgres más una RPC que sólo lea `service_role`. Es el mismo patrón que ya
+usaba LK con `krikos_secret` y el que cerró el problema 21. Ésta nace cerrada: se le revocan los
+permisos a `public`, `anon` y `authenticated` en el mismo script. Verificado: `anon` **no**,
+`authenticated` **no**, `service_role` **sí**.
+
+**⚠ El orden importa, y es lo que falta.** Mover un secreto al Vault **no lo rota**: quien ya tuvo
+acceso al proyecto ya lo vio. Para los de **terceros** (token de Meta WhatsApp, API key de OpenAI)
+el orden correcto es **rotar primero**:
+
+1. rotar en la consola de Meta / OpenAI — **lo hace el dueño**
+2. `select vault.create_secret('<valor nuevo>', 'META_WA_TOKEN');` (ídem `OPENAI_API_KEY`)
+3. redeployar las 5 funciones leyendo `gv_secret()` y sin el literal
+
+Al revés obligaría a copiar a mano el secreto viejo —pasearlo por una conversación y un
+historial— para una credencial que igual hay que reemplazar.
+
+Archivo: `sql/gv_secret_rpc_v1647.sql`.
