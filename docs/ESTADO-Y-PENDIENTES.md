@@ -1,4 +1,4 @@
-# Estado y pendientes — al 2026-09-13 (última actualización: v16.60)
+# Estado y pendientes — al 2026-09-13 (última actualización: v16.76)
 
 > **Para quien abra una sesión nueva:** esto es la foto del estado. Lo que falta de verdad está
 > en la base, no acá: `select * from github_repo_problemas.v_problemas where estado='abierto'`.
@@ -10,7 +10,8 @@
 | Qué | Dónde | Por qué está frenado |
 |---|---|---|
 | **Redeploy de Vercel** | dashboard de Vercel → Deployments → Redeploy | El sitio quedó en 2.3.374 y el repo va por 2.3.375. Hay 6 commits sin publicar desde el 11/09 18:30, pero **sólo uno toca la página** (`64f98ba`, el aviso de renglones sin match en OC de súper); los otros 5 son backend y andan igual. **Al 13/09 hay dos commits más en LK** (`d4f79e7` doc de Cloudflare y `68c676e` el fix de `krikos-ingest`), los dos backend/doc: no cambian la página. Se confirma arreglado cuando `https://loekemeyer.com/version.js` devuelva 2.3.375. **No hay acceso a Vercel desde la sesión.** Problema 16. |
-| **Rotar el token de Meta WhatsApp y la API key de OpenAI** | consolas de Meta y de OpenAI | Ver la decisión en el punto 2. Problema 20. |
+| **Revocar la API key de OpenAI** `sk-proj-FBnb7LWW…` | consola de OpenAI | **Cambió el 13/09 de madrugada.** Thomas dijo *"2 borralo"* y la clave **ya no está en ningún deploy**: `leer-factura` pasó a ser un tapón que contesta 410 y `leer-produccion-foto` la lee sólo del secret `OPENAI_API_KEY` (que hoy NO está cargado, así que contesta 500 claro). Falta lo único que no puedo hacer yo: **revocarla en platform.openai.com**, porque quien la haya copiado antes la sigue teniendo. Y si querés que la foto de planilla vuelva a andar, cargar ese secret. Problema 106 cerrado (GP2 `8e7dfce`). |
+| **Rotar el token de Meta WhatsApp** | consola de Meta | Ver la decisión en el punto 2. Problema 20, que baja de 11 Edge Functions a 9: el token de Meta en 3 de Gestión y 6 credenciales de LK. |
 | **Correr de nuevo el workflow `build-deploy.yml` de Planify** | GitHub Actions de `loekemeyer/Planify` | Es lo ÚNICO que falta para poder apagar las claves legacy. La excepción del Storage **ya no existe** (medida el 13/09, v16.56): con la `sb_publishable_` el Storage escribe bien en los dos proyectos. Lo que no se pudo re-medir desde acá son las `sb_secret_`, y ese workflow es el caso testigo que falló (runs 112-115 del 11/09). Si pasa, se aprieta `Disable JWT-based API keys`. Problema 12. |
 | **Decidir qué hacer con los 10 pedidos ya programados de clientes con deuda** | con Vivi / cobranzas | Salen en rojo arriba de la columna Cuarentena (v16.57). Torres y Liva $32,1M entrega el lunes 14. **No se retiran solos a propósito**: sacar un pedido de una tanda armada rompe el picking. Problema 14. |
 | ~~Cargar `KRIKOS_IMAP_PASS` en el Vault de LK~~ | — | **YA ESTÁ** (comprobado 2026-09-13): el secreto está en el Vault de LK desde el 11/09 y la rama de Krikos ya está en `main`. El ingest corre: 21 OC en la bandeja y `ok:true` en cada corrida. |
@@ -55,7 +56,21 @@
    11/09). Está a la vista con `select * from public.gv_gondola_divergente;` (vacía = todo bien).
 7. **Las 14 líneas `(pedido, articulo)` duplicadas de `GV_PPP_Base_Pedidos`** (problema 80) siguen
    ahí: son datos reales y el protocolo pide permiso explícito. La tabla hoy es histórica.
-8. **187 mails viejos de Krikos nunca ingresados**: el cron mira 90 días y ésos son más viejos.
+8. **La pantalla de Facturas del admin viejo quedó rota por matar la clave de OpenAI.**
+   `cervantes-admin/entero/Facturas/index.html` llama a la Edge Function `leer-factura`, que desde
+   el 13/09 es un tapón que contesta **410**. Está linkeada desde
+   `cervantes-admin/entero/Inicio/index.html:1256` ("Lectura de Facturas Entrantes") y ese admin se
+   abre desde el panel supervisor, o sea que **es alcanzable y hoy no lee ninguna factura**. Es
+   consecuencia aceptada de sacar la clave, no un descuido. La copia gemela de `gp2/` ya se borró
+   (v16.75), porque su origen la había borrado. **Decide Thomas:** sacarle el botón del menú de
+   `entero/` (sería el cuarto parche propio de esa copia) o dejarlo hasta apagar el admin viejo.
+   `GestionProductivaEntero` no está en el alcance de esta sesión. Problema 79, **sigue abierto**.
+9. **`flejes_stock_planta` es huérfana y nadie lo había confirmado.** Verificado el 13/09:
+   **0 funciones, 0 vistas, 0 referencias** en el front de Gestión y de GP2; 54 filas. O sea que las
+   47 de 54 divergencias del problema 78 **no le hacen daño a nadie hoy** — pero el problema queda
+   **abierto** a propósito: nadie arregló la divergencia, simplemente resultó inerte. Si algún día
+   alguien la enchufa, arrastra los 47 valores malos.
+10. **187 mails viejos de Krikos nunca ingresados**: el cron mira 90 días y ésos son más viejos.
    Traerlos es un `{"action":"sync","days":365}` a mano — decisión del dueño, no se hizo.
 
 ## 4. Tareas de Planify abiertas de esta sesión
@@ -85,6 +100,40 @@
 | 58 | una NP armada sin tanda no aparecía en Facturación: 8 invisibles, 638 cajas de Cencosud | v16.58 |
 | 53 (avance) | la Conciliación leía el `precio_unit` malo de ISIS; ahora despeja el precio del importe | v16.59 |
 | 76 | `wa_np_snapshot` fingía estar fresca: 14 direcciones viejas con `updated_at` de hoy | v16.60 |
+
+### Segunda tanda, madrugada del 13/09 (v16.70 → v16.76)
+
+| Problema | Qué era | Dónde |
+|---|---|---|
+| 106 | la **clave de OpenAI** estaba pegada como fallback en dos Edge Functions. La expuesta de verdad no era `leer-factura` (verify_jwt=true, llamador huérfano) sino **`leer-produccion-foto`**, con `verify_jwt=false` y sin tope | GP2 `8e7dfce` |
+| 113 | la matriz 78 del rompenueces modelada como dos pasos paralelos. **El síntoma registrado era falso** (no se cobraba dos veces: `v_costo_componente` agrupa la mano de obra por matriz); el problema real era estructural | GP2 `bc75f15` |
+| 114 | el **pintado de Jade** cargado por mitad ($305 en B1 y en B2). Lo encontró Thomas preguntando por qué el 707 costaba $377 más que el 507. Corregido a $152,50: el 707 baja de 1.264,56 a **959,56** | GP2 `bc75f15` |
+| 111 | el plan decía migrar `Racks_Planimetria` a `GV_Lugar` y eso perdía las cantidades | v16.63 `f11af92` |
+| 46 | 7 artículos con una parte en la receta que ninguna rama de su ruta llevaba. De **13 pares a 2**, y los 2 que quedan son del tallerista "Fábrica" (legítimos) | GP2 `bc75f15` |
+| 110 (avance) | el bloque 1: `1546903` y `VASTIDOR` unificados en **`546V`**, 891 cajas en AD12/AE09/X13. **Sigue abierto**: `Movimientos_Stock` de `546V` = 0, así que esas cajas todavía no se cuentan | v16.71 |
+
+**Lo que se construyó en la misma tanda** (no son problemas, son pedidos):
+
+- **El bump de versión dejó de ser a mano**: `scripts/bump-version.cjs` mueve `APP_VERSION`,
+  `SW_VERSION` y el `?v=` de `recepcion.js` juntos, y `tests/version-tokens.cjs` lo vigila. Era la
+  causa raíz de que `main` quedara en rojo dos veces la noche del 13/09 (v16.64 y v16.67). v16.70.
+- **Jornada de camión**: `GV_Vehiculo_Propio` (la kangoo de Luján deja de contar como fletero), la
+  zona de la NP 97889 corregida por override, 4 direcciones geocodificadas, y el recálculo del
+  14-18/09 en `docs/JORNADA-CAMIONES-14-18-09.md`. v16.72 / v16.74.
+- **Generador de OC**: los 5 `63xE` con proveedor `Log/ Fabr`, `Articulos_Cajas` como 4ª fuente de
+  nombre y **`LIBRE` fuera del universo** (no es un artículo: es la celda vacía de
+  `Capacidad_Sector`, y entraba porque A83 tiene 72 cajas). De 15 códigos sin nombre a **5**. v16.74.
+- **Bandeja de Krikos**: el badge muestra los cuatro estados (LK `21ac9b0`, espejado en v16.73) y
+  **las OC que FALLAN ahora viajan a Gestión** (LK `1e925c2`), con ventana de 30 días sobre la fecha
+  del mail para que las 6 históricas de junio/julio no queden como avisos muertos. Antes, una OC
+  que fallaba sólo se veía abriendo el panel de LK.
+- **GP2**: la pantalla **Tablet** rehecha desde cero (su código se había perdido: la base tenía
+  `tablet_bundle`/`tablet_registrar` vivas y `main` no tenía el front), el circuito del **pincel**
+  documentado, y el cruce contra `loekemeyer.com` — **11 artículos activos en la página sin despiece
+  en GP2**.
+- **Planify**: `procesos.automatizaciones` (6 secciones del proceso escrito marcadas como ya
+  automatizadas), 3 áreas y 9 responsables nuevos, la cola de revisión de **203 a 158**, y las 40
+  preguntas de las 7 personas en `docs/PREGUNTAS-40-POR-PERSONA.md`.
 
 Y las tablas `PPP_*` de la era ISIS pasaron a nombre `GV_*` sin perder el trabajo pendiente (v16.45).
 
@@ -117,3 +166,22 @@ Gestión no se entera**.
   pisaba la fecha siempre y el dato nunca. Comparar contra la fuente, no contra el timestamp.
 - **En un `ON CONFLICT ... DO UPDATE`, `s` (o como se llame el alias del INSERT) es la fila VIEJA**,
   no la que entra. `coalesce(s.x, excluded.x)` = "escribí sólo la primera vez".
+- **La proyección de la Est Madre NO es evidencia de que algo se venda** `[Thomas, 2026-09-13,
+  textual: "No hay chance que se venda 486 uni de 515"]`. `GP2.est_madre.proy_uni_mes` proyecta
+  sobre lo vendido histórico y arrastra discontinuados. Antes de usar ese número para decidir un
+  alta, mirar ventas reales o preguntar.
+- **Cuando el dueño dice "formato X", mirar la tabla de formatos antes de buscar un componente.**
+  "Cartón huevo" no era un cartón compartido: `Huevo` es un `carton_formato` (el troquel) que ya
+  usaban 36 cartones. Cada artículo tiene el suyo; lo que se comparte es el formato.
+- **Un cartón cuyo número no cruza con ningún artículo es un artículo que falta, no un cartón mal
+  codificado.** De 152 cartones con número, 147 son un código de artículo; de las 5 excepciones,
+  `C1B` (574) y `O6A` (809) son artículos del grupo A que todavía no existen — el cartón ya está.
+- **`colgado = []` es inalcanzable en una convergencia.** `__sim_articulo` corre cada ruta entera,
+  así que tres ramas producen tres veces la pieza de salida. El criterio correcto es "se comporta
+  como el testigo 521", no "no cuelga nada".
+- **`git add -A <ruta>` sobre una ruta ya borrada aborta el add ENTERO** y el commit sale con la
+  mitad de lo que ibas a subir. Mirar `git status` DESPUÉS de commitear, no sólo antes (pasó en
+  `329fe3f`, corregido en `fd03f99`).
+- **Antes de hacer viajar algo a una pantalla, mirar qué ventana de fechas usa.** Al hacer que las
+  OC en `error` lleguen a Gestión, el corte por `created_at` habría mandado 6 avisos muertos (su
+  `created_at` es el del backfill, no el del mail). El corte va por la fecha del hecho real.
