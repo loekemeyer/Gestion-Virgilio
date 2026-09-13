@@ -10244,3 +10244,46 @@ dentro del comando `grep` de la propia documentación**. La única clave entera 
 dentro de `sql/backups/backup_limpieza_virgilio_20260902.sql`, y `anon` es pública por diseño.
 Contra eso, **92 archivos ya usan `sb_publishable_`** sólo en este repo. La parte de "66 archivos"
 del problema 12 está hecha; lo que queda es el historial de git (que no se arregla) y el apagado.
+
+---
+
+## §3.df — v16.57: la Cuarentena no veía lo que YA tiene tanda (problema 14)
+
+La Cuarentena sólo evalúa lo que **todavía no está programado**: `gv_cuarentena_marcar` y
+`gv_cuarentena_limite` corren **adentro del armado**, sobre los pendientes. Si el reporte de deuda
+entra *después* de que el pedido recibió tanda, el pedido sigue viaje y nadie se entera.
+
+**Medido al 13/09, con el reporte de deuda del 11/09 12:43 cargado: 10 pedidos ya programados de
+clientes en cuarentena**, todos con entrega del 14 al 17/09 y **ninguno con picking empezado**:
+
+| NP | tanda | entrega | cliente | deuda |
+|---|---|---|---|---|
+| LK 0007 · LK 0008 | E01A | 14/09 | Torres Y Liva S.A | $32.172.182 |
+| 98635 | D67I | 14/09 | Distribuidora Pezzali S.A. | $2.033.330 |
+| 98617 | D67H | 14/09 | Riondini Lucas | $1.008.629 |
+| CH 0004 | E03B | 15/09 | Ierakuin Srl | $2.062.528 |
+| CH 0003 | D69E | 16/09 | Gifel S.R.L. | $1.955.317 |
+| LK 0018 | D69F | 16/09 | Bazar Monica | $1.080.583 |
+| CH 0014 · CH 0015 | E12G | 17/09 | Clapera Alicia Raquel | $4.894.986 |
+| CH 0018 | E12H | 17/09 | Del Plastic S.R.L. | $4.030 |
+
+**No retira nada, y es a propósito**: sacar un pedido de una tanda ya armada rompe el picking y
+deja un camión a medias — eso lo decide una persona. Lo que se arregló es que **dejen de ser
+invisibles**.
+
+**Los motivos son exactamente los de `gv_cuarentena_marcar`**, no una regla nueva: suspendido /
+sin cta. cte., deuda > $1.000, con la **exención de súper** de la v14.94
+(`cobranzas_cliente_cadena`, normalizando `chef` ↔ `ch`), el **"Ya pagó"** de la v15.46 y los
+**liberados**. Sólo mira lo todavía frenable: entrega de hoy en adelante y sin fila en
+`Facturacion_NP`. Cubre las dos fuentes (`PPP_Web_Programacion` y `gv_ppp_programacion_diaria`).
+
+Es **SECURITY DEFINER** porque `GV_Cuarentena_Fuente` y `GV_Cuarentena_Liberados` tienen RLS
+prendida **sin policies y sin grants**: no se leen desde el cliente, sólo por función. Mantiene el
+mismo gate que la original y nace cerrada (execute revocado a `public` y `anon`).
+
+**En pantalla:** bloque rojo arriba de la columna 🚧 Cuarentena de "A Programar"
+(`cuarYaProgHtml`), con NP, tanda, fecha, cliente, motivo y monto, y una etiqueta *pickeando* si
+ya hay eventos de operarios sobre esa tanda. Rojo y no naranja a propósito: no es "retenido a
+tiempo", es "se escapó".
+
+Archivo: `sql/gv_cuarentena_ya_programado_v1657.sql`.
