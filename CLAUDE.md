@@ -506,11 +506,14 @@ una sesión nueva. **Leerlo antes de tocar Supabase.**
 pipeline está **cerrado de punta a punta**: pedido de la página → NP = nº de pedido → A
 Programar / job 00:01 → picking, armado, carga (mismo código que Producción) → Facturación
 (NP web: bajar el Excel ISIS = facturada) → control de remito = entregado, solo. Lo que
-queda es del dueño (cron de Chef, El Martillo, operarios a Gestión, y **de Krikos: cargar
-`KRIKOS_IMAP_PASS` en el Vault de LK + mergear la rama de LK a `main`**) o estacionado
+queda es del dueño (cron de Chef, El Martillo, operarios a Gestión) o estacionado
 (duales, módulo Chef, tracking a la página). **Krikos ya no está estacionado** (v14.17,
 07/09): la Bandeja de OC de supermercados está construida y la fecha de entrega del súper ya
-viaja de LK a `lk_pedidos_match`; falta sólo lo del dueño. **Leerlo al abrir una sesión nueva sobre el pipeline.**
+viaja de LK a `lk_pedidos_match`. ⚠ **Y lo de Krikos que figuraba como pendiente del dueño YA
+ESTÁ HECHO** (comprobado el 2026-09-13): `KRIKOS_IMAP_PASS` está en el Vault de LK desde el
+11/09 y la rama `claude/krikos-tema-anterior-v0l88o` no tiene ningún commit fuera de `main`.
+El ingest **corre**: la bandeja tiene 21 OC y la corrida de los :00/:10/:20 contesta
+`ok:true`. No volver a pedirlos. **Leerlo al abrir una sesión nueva sobre el pipeline.**
 
 ## ⚠⚠⚠ CUANDO GESTIÓN TOMA CONTROL Y SE VUELVE LA VERSIÓN QUE USAMOS, SEGUIR CON LA NUMERACIÓN QUE DEJÓ VIRGILIO
 

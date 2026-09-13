@@ -16,8 +16,8 @@
 | # | Qué | Por qué no lo puede hacer otro |
 |---|---|---|
 | **A1** | **Rotar `isis_supabase_service_key` y `LK_WA_TOKEN`** | Se rotan desde el dashboard de Supabase / Meta. La lectura pública ya se tapó (ver abajo), pero las claves siguen quemadas |
-| **A2** | Cargar `KRIKOS_IMAP_PASS` en el Vault de LK: `select vault.create_secret('<password>', 'KRIKOS_IMAP_PASS');` | Es la password de `ventas@loekemeyer.com` |
-| **A3** | Mergear a `main` la rama `claude/krikos-tema-anterior-v0l88o` de **`pagina-LK-copia`** | Ese repo no está atado a la sesión de Gestión |
+| ~~**A2**~~ | ~~Cargar `KRIKOS_IMAP_PASS` en el Vault de LK~~ | ✅ **HECHO el 2026-09-11** (comprobado el 13/09: el ingest corre y la bandeja tiene 21 OC) |
+| ~~**A3**~~ | ~~Mergear a `main` la rama `claude/krikos-tema-anterior-v0l88o` de **`pagina-LK-copia`**~~ | ✅ **HECHO** (al 13/09 la rama no tiene ningún commit fuera de `main`) |
 | **A4** | Chequear la PC de la oficina **el martes después de las 10** | Acceso físico. **No hoy** — ver E1 |
 | **A5** | Los descuentos de cadena que Gestión no tiene cargados (Cencosud 2444, Dorinka 2686, Superimperio 961, 1806, 4254) | Hay que pedirle la lista a quien maneja esos acuerdos — ver §"Los $10,7 M" |
 
@@ -112,7 +112,7 @@ Rollback: `delete from public."GV_Cruce_Avisadas";`
   `PPP_Geo.__deposito_virgilio_2788__` = `-34.6157998, -58.5252267`. Antes el front caía a un
   fallback a 11 km.
 - **v14.17** — mergeada la rama de la Bandeja Krikos de **este** repo. Se ve por
-  🌐 Panel Web LK → PDF Krikos → Bandeja Krikos. Vacía hasta A2.
+  🌐 Panel Web LK → PDF Krikos → Bandeja Krikos. Al 13/09 ya tiene 21 OC (A2 y A3 hechos).
 - **v14.18** — la hoja de ruta del fletero lleva **columna Viaje**: el manejo acumulado desde el
   depósito hasta cada parada, sin la descarga. Es lo que había pedido el dueño y no se podía hacer
   hasta que el depósito quedó geocodificado en la v14.16.
@@ -162,7 +162,7 @@ Cuatro cosas que llegaron mal escritas y conviene no repetir:
 
 1. **A1** — rotar las dos claves. La lectura pública ya está tapada, pero siguen quemadas.
 2. Después de las 10, mirar si entró algún PDF de ISIS. Si no entró, ahí sí ir a la PC (**A4**).
-3. **A2** + **A3** para que Krikos empiece a andar.
+3. ~~**A2** + **A3** para que Krikos empiece a andar.~~ ✅ hechos; Krikos anda.
 4. A las 18:30 llega el digest con las **42 NP de cajas distintas**: esa es la lista a revisar.
 5. **A5** — conseguir los descuentos de las cinco cadenas.
 6. Cuando C1 termine: devolver el cron 75 y rehacer el análisis de recorridos con los tiempos.

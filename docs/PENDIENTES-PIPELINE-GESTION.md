@@ -328,17 +328,22 @@ Archivos: `sql/krikos_oc_inbox.sql`, `supabase/functions/krikos-ingest/index.ts`
 | Edge Fn `krikos-ingest` | ✅ desplegada (v6) |
 | cron `krikos-ingest-10min` | ✅ activo, 584 corridas, 0 fallidas (el `net.http_post` siempre "succeeded": mide el encolado, no el resultado) |
 | `KRIKOS_INGEST_SECRET` en el Vault de LK | ✅ |
-| `KRIKOS_IMAP_PASS` en el Vault de LK | ❌ **falta** — es lo único que traba el ingest. Medido en `net._http_response`: la función contesta **500 `{"ok":false,"error":"KRIKOS_IMAP_PASS no configurado (ni env ni Vault)"}`** en cada corrida de los :00/:10/:20… Inocuo, pero la bandeja queda vacía |
+| `KRIKOS_IMAP_PASS` en el Vault de LK | ✅ **cargado el 2026-09-11**. Comprobado el 13/09: la corrida de los :00/:10/:20 contesta `{"ok":true,"auth":"CRAM-MD5",…,"encontrados":21,"nuevos":0}` |
 | bucket `krikos-oc` | ✅ existe |
-| rama de LK con la Bandeja Krikos | ✅ en `claude/krikos-tema-anterior-v0l88o`, **sin mergear a `main`** |
+| rama de LK con la Bandeja Krikos | ✅ **mergeada**: al 13/09 `git log origin/main..origin/claude/krikos-tema-anterior-v0l88o` no devuelve ningún commit |
 | espejo `/admin/` en Gestión (este repo) | ✅ **mergeado a `main` el 2026-09-07 (v14.17)**. La Bandeja ya se ve entrando por 🌐 Panel Web LK; hasta que entre la primera OC muestra la bandeja vacía |
 | `sync_pedidos_match_virgilio()` lleva la fecha | ✅ **desde el 2026-09-07** |
 | pedidos con `sheets_payload.fecha_entrega` | **0** (nadie cargó todavía una OC por la bandeja) |
 | `lk_pedidos_match.fecha_entrega` en Virgilio | ✅ existe (04/09) y ya se llena (07/09), hoy con 0 fechas |
 
-O sea: la cañería está completa de punta a punta pero **todavía no corre**, y las dos cosas
-que faltan son del dueño: cargar `KRIKOS_IMAP_PASS` en el Vault de LK y **mergear la rama de
-`pagina-LK-copia` a `main`** (ese merge es el que despliega la Bandeja del lado LK).
+O sea: la cañería está completa de punta a punta **y corre** (actualizado el 2026-09-13). Las
+dos cosas que figuraban como pendientes del dueño ya están: el secreto se cargó el 11/09 y la
+rama está en `main`. La bandeja `krikos_oc_inbox` tiene **21 OC** (5 pendientes, 6 con error) y
+el último mail es del **04/09**: desde entonces Krikos no mandó ninguna OC nueva.
+
+⚠ Con la ventana de 365 días aparecen **187 mails de Krikos más viejos** que nunca se
+ingresaron, porque el cron mira sólo 90 días. Si se los quiere en la bandeja es correr un
+`{"action":"sync","days":365}` a mano — pero eso lo decide el dueño, no se hizo.
 
 > **Actualización 2026-09-07 (v14.17):** la rama gemela de **este** repo ya se mergeó a `main`
 > —el `CLAUDE.md` prohíbe dejar ramas dando vueltas— así que el espejo `/admin/admin-supercot.js`

@@ -11,7 +11,7 @@
 |---|---|---|
 | **Redeploy de Vercel** | dashboard de Vercel → Deployments → Redeploy | El sitio quedó en 2.3.374 y el repo va por 2.3.375. Hay 6 commits sin publicar desde el 11/09 18:30, pero **sólo uno toca la página** (`64f98ba`, el aviso de renglones sin match en OC de súper); los otros 5 son backend y andan igual. Se confirma arreglado cuando `https://loekemeyer.com/version.js` devuelva 2.3.375. **No hay acceso a Vercel desde la sesión.** Problema 16. |
 | **Rotar el token de Meta WhatsApp y la API key de OpenAI** | consolas de Meta y de OpenAI | Ver la decisión en el punto 2. Problema 20. |
-| Cargar `KRIKOS_IMAP_PASS` en el Vault de LK | Supabase LK | Pendiente viejo, ver `docs/PENDIENTES-PIPELINE-GESTION.md`. |
+| ~~Cargar `KRIKOS_IMAP_PASS` en el Vault de LK~~ | — | **YA ESTÁ** (comprobado 2026-09-13): el secreto está en el Vault de LK desde el 11/09 y la rama de Krikos ya está en `main`. El ingest corre: 21 OC en la bandeja y `ok:true` en cada corrida. |
 
 ## 2. Decisiones del dueño que NO hay que revisitar
 

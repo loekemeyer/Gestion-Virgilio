@@ -3642,9 +3642,11 @@ nuevas**, o sea que no hizo falta ningún grant.
 **Medido antes, en LK:** `krikos_oc_inbox` existe (24 col) · `sync_pedidos_match_virgilio()`
 existe · **0 de 1.025** pedidos con payload tienen `fecha_entrega`.
 
-**Lo que falta, y es todo del lado LK:** mergear la rama, cargar `KRIKOS_IMAP_PASS` en el
-Vault, exponer el campo en `v_pedidos_match` y copiarlo en `sync_pedidos_match_virgilio()`.
-Hasta entonces las columnas quedan vacías. Después: consumirla en la PPP de Producción, y
+**Lo que falta, y es todo del lado LK:** ~~mergear la rama~~, ~~cargar `KRIKOS_IMAP_PASS` en el
+Vault~~ (⚠ **las dos ya están hechas**: comprobado el 2026-09-13, el secreto entró al Vault el
+11/09 y la rama `claude/krikos-tema-anterior-v0l88o` no tiene commits fuera de `main`; el ingest
+corre y la bandeja tiene 21 OC), exponer el campo en `v_pedidos_match` y copiarlo en
+`sync_pedidos_match_virgilio()`. Hasta entonces las columnas quedan vacías. Después: consumirla en la PPP de Producción, y
 en Gestión mostrarla en la tarjeta de "A Programar".
 
 Detalle completo, con los pasos en orden, en `docs/PENDIENTES-PIPELINE-GESTION.md` §9357.
