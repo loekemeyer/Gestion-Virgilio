@@ -10604,3 +10604,32 @@ pueden validar contra nada.
 **Código que sí entró en la v16.72 (front, sin tocar la base):** `index.html` — `_pppVehPropio`,
 `pppRefreshVehPropio()` (se dispara desde `pppRefreshGeo`), `_pppCamEsVehPropio(cam)` y el `continue`
 en el loop del día de `_pppComputeErrors`; `tests/ppp-jornada-camion.cjs` caso 8.
+
+### §3.dy — v16.74: se corrieron 3 de los 4 PENDIENTE del 13/09 ("1 dale" de Thomas) — 2026-09-13
+
+**Qué entró a la base** (backups en `zz_backups`, con RLS y sin escritura para anon):
+
+| Archivo | Estado | Qué quedó aplicado |
+|---|---|---|
+| `PENDIENTE-vehiculo-propio` | **entero** | `GV_Vehiculo_Propio` (RLS + grants como `GV_Dias_No_Habiles`), marca **E11A = kangoo** |
+| `PENDIENTE-jornada-datos` | **parcial** | columna `zona` en `GV_PPP_Prog_Override`, la vista con el `coalesce`, override **97889 Matiz → Zona 4 - GBA Sur**, y 4 filas de `GV_Geo_Cliente` (801, 2445, 2447, 2499) |
+| `PENDIENTE-oc-63xE-y-nombres` | **parcial** | 5 filas de `OC_Maximos` (630E..636E, `Log/ Fabr`) y `vista_generador_oc` con `nom_ac` + `LIBRE` fuera |
+| `PENDIENTE-prensa-matambre-y-439E` | **nada** | los dos bloques tienen marcadores que sólo completa el dueño |
+
+**Medido después:** `vista_generador_oc` pasa de 15 códigos sin nombre a **5** (441Z, 501B, 587C,
+592E, 599EZ — no existen en ninguna fuente) y **`LIBRE` desapareció del universo** (344 filas).
+`gv_ppp_super_mezclado` 0, `gv_endpoints_rotos` 0, `vista_faltante_catalogo` responde (496 filas).
+El front ya leía `GV_Vehiculo_Propio` con tolerancia (v16.72): ahora la tabla existe y el aviso de
+jornada del 16/09 deja de contar la kangoo como camión de fletero.
+
+**Lo que NO se corrió y por qué — todo espera un dato del dueño, no una decisión técnica:**
+
+1. **CENCOSUD 2444** (Tortuguitas, D72A) y **Del Plastic 1996** (Tabaré 1240): falta `lat`/`lng`.
+   No se inventan; la sesión no tiene salida a internet. Con el par de números se corre sólo ese
+   `insert`.
+2. **Capacidad duplicada M34/M35/M36**: es la propuesta A/B/C del bloque (c); la elige el dueño.
+3. **Prensa Matambre 55219**: falta el texto que la distinga de la 246 (`<DESC_55219>`).
+4. **439E de Chef**: falta el sector de góndola y su capacidad (`<SECTOR_CHEF>`, `<CAJAS_MAX>`) —
+   lo sabe la chica del depósito. El problema 88 sigue abierto.
+
+Los cuatro archivos quedan en `sql/` con un sello arriba que dice exactamente qué corrió y qué no.

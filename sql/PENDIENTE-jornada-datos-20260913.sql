@@ -1,3 +1,12 @@
+-- #####################################################################################
+-- EJECUTADO el 2026-09-13 con el "dale" de Thomas (sesión session_016eFzFQwpy6ceA9EEgSqUeC).
+-- CORRIÓ PARCIAL. SÍ: backups (override 119 filas, geo 3), columna zona en GV_PPP_Prog_Override,
+-- vista gv_ppp_programacion_diaria con el coalesce, override 97889 Matiz → Zona 4 - GBA Sur
+-- (verificado), y 4 de las 5 filas de GV_Geo_Cliente (801, 2445, 2447, 2499) + el delete de
+-- GV_Geo_Fallidas de 2445. super_mezclado 0, endpoints_rotos 0.
+-- NO CORRIÓ: (b) CENCOSUD 2444 y el punto 8 (Del Plastic, Tabaré 1240) — les falta lat/lng y
+-- NO SE INVENTAN. Cuando Thomas los dé, se corre sólo ese insert.
+-- #####################################################################################
 -- ============================================================================
 -- PENDIENTE DE EJECUTAR — espera el "dale" de Thomas. NADA de esto se corrió.
 -- v16.72 · 2026-09-13 · datos que ensucian el cálculo de jornada de camión (PPP 14–18/09):

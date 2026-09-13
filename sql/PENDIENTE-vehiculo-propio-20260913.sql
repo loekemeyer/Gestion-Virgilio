@@ -1,3 +1,7 @@
+-- #####################################################################################
+-- EJECUTADO el 2026-09-13 con el "dale" de Thomas (sesión session_016eFzFQwpy6ceA9EEgSqUeC).
+-- CORRIÓ ENTERO: tabla GV_Vehiculo_Propio creada con RLS y grants, marca E11A = kangoo.
+-- #####################################################################################
 -- ============================================================================
 -- PENDIENTE DE EJECUTAR — espera el "dale" de Thomas. NADA de esto se corrió.
 -- v16.72 · 2026-09-13 · GV_Vehiculo_Propio: tandas que salen en vehículo PROPIO (la kangoo) y por eso

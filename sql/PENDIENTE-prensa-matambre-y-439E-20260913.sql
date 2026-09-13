@@ -1,3 +1,9 @@
+-- #####################################################################################
+-- EJECUTADO el 2026-09-13 con el "dale" de Thomas (sesión session_016eFzFQwpy6ceA9EEgSqUeC).
+-- NO CORRIÓ NADA: los dos bloques tienen marcadores que sólo puede completar Thomas —
+-- <DESC_55219> (cómo se llama la segunda Prensa Matambre) y <SECTOR_CHEF>/<CAJAS_MAX>
+-- (la góndola de Chef del 439E, que sabe la chica del depósito). No se inventan.
+-- #####################################################################################
 -- ============================================================================
 -- PENDIENTE DE EJECUTAR — espera el "dale" de Thomas. NADA de esto se corrió.
 -- v16.72 · 2026-09-13 · (a) Prensa Matambre: 246 y 55219 se llaman igual · (b) 439E: Chef no tiene

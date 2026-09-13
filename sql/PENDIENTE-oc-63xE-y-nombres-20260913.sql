@@ -1,3 +1,12 @@
+-- #####################################################################################
+-- EJECUTADO el 2026-09-13 con el "dale" de Thomas (sesión session_016eFzFQwpy6ceA9EEgSqUeC).
+-- CORRIÓ PARCIAL. SÍ: backup OC_Maximos, los 5 INSERT de 630E..636E ('Log/ Fabr') y el CREATE OR
+-- REPLACE de vista_generador_oc (nom_ac + 'LIBRE' fuera). Verificado: la vista pasa a 344 filas,
+-- LIBRE ya no está, y quedan 5 sin nombre (441Z, 501B, 587C, 592E, 599EZ) contra 15 antes.
+-- endpoints_rotos 0 y vista_faltante_catalogo responde (496 filas).
+-- NO CORRIÓ: el bloque (c), la capacidad duplicada de M34/M35/M36 — es una propuesta A/B/C y la
+-- elige Thomas.
+-- #####################################################################################
 -- ============================================================================
 -- PENDIENTE DE EJECUTAR — espera el "dale" de Thomas. NADA de esto se corrió.
 -- v16.72 · 2026-09-13 · generador de OC: los 63xE sin configurar, 15 códigos sin nombre y
