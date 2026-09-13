@@ -12,7 +12,7 @@
 > única**; no se replica. Ante la duda entre parche rápido y fix de raíz → **fix
 > de raíz**.
 >
-> Última actualización: 2026-09-12 (sábado) · Versión app al documentar: **v16.18**
+> Última actualización: 2026-09-13 (domingo) · Versión app al documentar: **v16.65**
 >
 > Nota **v15.40 (2026-09-11) — HANDOFF de planimetría / Acacia: `docs/HANDOFF-PLANIMETRIA-Y-ACACIA.md`.**
 > Thomas sigue este tema en otra sesión. Ahí está todo junto: los **13 artículos activos del catálogo LK
@@ -11175,6 +11175,12 @@ distinta, empresa distinta.
 >   (umbral ≈ 3× su período; dedup un aviso por sync por día). **No se creó tabla
 >   `Sync_Estado`**: `cron.job_run_details` ya tiene la verdad. DDL en
 >   `sql/watchdog_syncs_externos.sql`.
+
+> Nota **2026-09-13 (v16.65) — El tope de 8 h se medía por TANDA y no saltaba nunca (problema 112).**
+> `_pppCamiones` hace un camión por número de tanda: sobre el 14–18/09 reales, los 17 que salían de ahí daban
+> como mucho 5,7 h. Pero los fleteros son **2** y el 16/09 tenía 6 tandas = 20,6 h de camión y 448 km → **10,3 h
+> cada uno**. Ahora el panel avisa por **día**, repartiendo entre `jornada_camiones` (nuevo, = 2), y deja el aviso
+> por tanda para el caso de una tanda sola imposible. §3.dk de `docs/SUPABASE-GESTION-VIRGILIO.md`.
 
 > Nota **2026-09-11 (v15.86) — La PPP avisa el camión que no entra en la jornada: viaje + 15′ por parada > 8 h.**
 > Pedido de Thomas; los dos parámetros que faltaban (28 km/h de marcha, recorrido 1,35× la línea recta) los definí acá y
