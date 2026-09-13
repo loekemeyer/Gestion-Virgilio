@@ -69,6 +69,10 @@ select sector, cod from public."GV_Lugar_Item" where upper(btrim(cod)) in ('546V
 
 -- ============================================================================
 -- (2) LA ESPIRAL `1000900` — ⛔ FALTA QUE LUIS ELIJA EL CÓDIGO
+--     ⚠ 2026-09-13: Thomas dijo "dale" a los bloques frenados, pero ESTE NO SE PUEDE
+--        ejecutar con un "dale": no está frenado por falta de autorización, está frenado
+--        porque falta ELEGIR entre `007` y `H201PART`, y ese dato lo tiene Luis. Escribir
+--        cualquiera de los dos a ojo mezcla el saldo de dos importaciones distintas.
 --     Luis: "es todo lo mismo, pero de diferentes importaciones".
 --     Candidatos que ya existen en Insumos, todos categoría importados:
 --       007        "Espiral (Chef) (500 u/MC)"  ubic Z2     saldo   3.500 Uni
@@ -84,6 +88,9 @@ select sector, cod from public."GV_Lugar_Item" where upper(btrim(cod)) in ('546V
 
 -- ============================================================================
 -- (3) `522S` → `522E` — ⛔ FALTA DEFINIR CUÁNDO ENTRA AL STOCK
+--     ⚠ 2026-09-13: ídem (2). El "dale" de Thomas no alcanza acá: (a) y (b) dan un número
+--        de stock DISTINTO, y (b) mete 80 cajas al depósito `para_envasar`, que es plata.
+--        No se elige por defecto; lo define Luis.
 --     Luis: "es el artículo suelto sin cartón del importado 522E. Vamos a mandarlo
 --     a envasar y pasa a ser 522E".
 --     Hoy: Racks_Planimetria id 199 · W04 · 20 master / 80 cajas, sin contar.

@@ -64,7 +64,33 @@ un sync ciego subiría 19% La Anónima ($67.095 vs $54.347 en la lista) y 10% Di
 - **A (código):** extender `supabase/functions/sync-precios-venta/index.ts` con un paso 5: `fetchAll(LK_URL, LK_KEY, "precios_super.precio"…)` (PostgREST expone schemas sólo si están en `db-schemas`; si no, pasar por una RPC de LK que devuelva `super_key, cod, price`) + `precios_super.cadena.item_discount`, y upsert en `cobranzas_precios_super(super_key, nc, precio_unit)` con `precio_unit = price * (1 - item_discount)` y `nc = cob_norm_cod(cod)`. Reconciliar sólo las cadenas que vengan de LK (no borrar `gm`/`gigot`).
 - **C (decisión):** (1) confirmar que el 19% de La Anónima es un descuento de lista y cargarlo en LK `precios_super.cadena.item_discount` (si no, el sync la sube 19%); (2) `gm` y `gigot`: ¿se cargan en LK o quedan sólo en GV?
 
-### 110 · El depósito inventa códigos en los racks — **B + C**
+### 110 · El depósito inventa códigos en los racks — ⚠ B A MEDIAS 2026-09-13
+
+> **Se hizo el renombre. NO se cargó el stock, y es a propósito — el SQL de abajo está mal.**
+>
+> ✅ `Racks_Planimetria`: `809E-QUESO` y `809E-PIZZA` → **`809E`** en las 3 filas
+> (AD06 30/360 CH · AE11 8/64 LK · AD5 28/336 CH). Backup en
+> `zz_backups."GV_Backup_Racks_Planimetria_809E_20260913"`. Quedan **0** filas con códigos
+> inventados (`809E-QUESO`, `809E-PIZZA`, `1546903`, `VASTIDOR`).
+>
+> ⛔ **El INSERT a `Movimientos_Stock` de abajo NO se corrió.** El propio bloque avisaba
+> "confirmar `tipo`/`ref` con el formato de `stkInsAlta`"; al medirlo contra la tabla real
+> aparecieron **tres** cosas que lo invalidan:
+> 1. **`ubicacion` no se usa nunca** en `deposito='racks'` (todas las filas la tienen NULL).
+>    El INSERT la llenaba con `'AD06'` / `'AE11'`.
+> 2. **`unidad` no es `'cajas'`**: en racks es NULL, o `'inner'` en los `conteo_racks`.
+> 3. **Y lo que importa de verdad: existe el depósito `racks_ch`.** El 809E de Chef ya tuvo
+>    ahí un `conteo_racks` de **+360** y un `ajuste` de **−360** (neto 0) — o sea los 360 de
+>    AD06 **ya se contaron una vez** y alguien los sacó. Meter otros +360 en `racks` con
+>    `empresa='CH'` no es "cargar lo que faltaba": es un cuarto movimiento sobre algo que ya
+>    tiene historia, en **otro depósito** del que usa Chef.
+>
+> Saldos reales de 809E hoy: `racks` = **336** · `racks_ch` = **0**.
+> Son **424 cajas** en juego, así que no se adivina: hay que decidir si AD06 va a `racks_ch`
+> o a `racks`, y por qué se neteó el conteo anterior.
+
+<details><summary>Diagnóstico y SQL original (el INSERT está mal, ver arriba)</summary>
+
 
 - **Bloque 1 verificado:** `Racks_Planimetria` ya dice `546V` en AD12 (63/189), AE09 (117/351), X13 (117/351) = 891 cajas; `Insumos` tiene `546V Bastidor 546 importados AD12`; `GV_Lugar_Item` AD12/AE09 → 546V. **Pero `Movimientos_Stock` para 546V = 0 movimientos** (1546903 n=3 saldo 0, VASTIDOR n=2 saldo 0): las 891 cajas siguen fuera del stock.
 - **Sigue igual:** `809E-QUESO` AD06 30/360 (CH) y AD5 28/336 (CH), `809E-PIZZA` AE11 8/64 (LK). Movimientos 809E: CH racks 336 (= AD5), AD06 y AE11 no. `1000900` Y4 40/160 y `522S` W04 20/80 sin alta en `Insumos` ni `OC_Maximos`. 33 posiciones ocupadas sin planimetría (antes 37). `GV_Lugar_Item` dice AD06 → 368E (contradice al rack).
@@ -83,6 +109,8 @@ un sync ciego subiría 19% La Anónima ($67.095 vs $54.347 en la lista) y 10% Di
   ```
   Cadena: `refresh_stocks_carga_rapida` (cron 57) y `reconciliar_pipeline_stock` (68) lo toman solos; `gv_ocupacion_lugar`/`gv_gondola_divergente` ven el código al instante. **Antes de correrlo confirmar `tipo`/`ref` con el formato que usa `stkInsAlta`** (no lo verifiqué contra el front).
 - **C (Luis):** (1) 546V: ¿stock inicial 891 en depósito `insumos` (como 523C) o `racks`? — es un INSERT igual al de arriba; (2) `1000900` (espiral) y `522S`: nombre y categoría para `Insumos`; (3) si el 809E de Loeke pasa a 820E "en la próxima importación", ¿la fila AE11 se renombra ya o espera?
+
+</details>
 
 ### 20 · Credenciales hardcodeadas en 11 Edge Functions — **E**
 
@@ -155,7 +183,34 @@ No hay clon del repo LK ni acceso a Vercel en esta sesión; no se puede re-medir
 - **Hoy:** saldo `a_facturar` = **1.623** (CH 705, LK 976, Mixto −58); NP armadas sin facturar = **21 NP / 1.456 cajas** → **167 sobran** (el 221 de la NP 98532 ya se corrigió: era 168). Sigue sin poder atribuirse por NP (salida con ref `TANDA|NP` / `NP|CP`, entrada con la tanda).
 - **Pregunta:** ¿conteo físico de a_facturar (por empresa) para un ajuste único? El "Mixto = −58" sugiere movimientos sin empresa que también hay que mirar.
 
-### 80 · Espejo ISIS congelado + 14 líneas duplicadas — **B + E**
+### 80 · Espejo ISIS congelado + 14 líneas duplicadas — ✅ B EJECUTADO 2026-09-13 ("dale")
+
+> **Aplicado y verificado.** Backup previo en
+> `zz_backups."GV_Backup_PPP_Base_Pedidos_dup_20260913"` (**28 filas** = los 14 pares enteros).
+> El DELETE borró **5 filas** (duplicados exactos, se quedó el `id` menor):
+> `GV_PPP_Base_Pedidos` pasó de **9.786 a 9.781**.
+>
+> ⚠ **CORRECCIÓN al diagnóstico de abajo: NO eran 5 los pares con `cajas` distintas, son 9.**
+> El texto original listaba sólo 5 y por eso subestimaba lo que queda por decidir. Los 9 que
+> siguen duplicados, con las dos cantidades:
+>
+> | pedido | artículo | filas (id:cajas) |
+> |---|---|---|
+> | 44496 | 713  | 4582093:2 / 4582097:8 |
+> | 97966 | 590E | 4583328:4 / 4583329:7 |
+> | 97971 | 590E | 4583387:2 / 4583388:4 |
+> | 97996 | 323E | 4583677:2 / 4583678:1 |
+> | 98128 | 590E | 4585079:0 / 4585080:4 |
+> | 98161 | 590E | 4585449:0 / 4585450:5 |
+> | 98293 | 574  | 4586878:4 / 4586879:2 |
+> | 98336 | 590E | 4587459:2 / 4587460:1 |
+> | 98608 | 323E | 4590508:2 / 4590509:1 |
+>
+> `gv_np_web_dobles` sigue en **20** (no lo movía este borrado). Sin índice único hasta que
+> queden 0. **E (el congelamiento del espejo) es decisión del dueño y no se tocó.**
+
+<details><summary>Diagnóstico y SQL original</summary>
+
 
 - **Hoy:** 14 pares `(pedido, articulo)` duplicados en `GV_PPP_Base_Pedidos` (9.786 filas), `max(fecha)` 04/09 en Base y en `GV_PPP_Programacion_Diaria` (NP máx 98704). `gv_np_web_dobles` = 20 (igual). El congelamiento es decisión del dueño (E).
 - **B — SQL listo (borra sólo los duplicados exactos; los que difieren en `cajas` quedan para decidir):**
@@ -176,12 +231,32 @@ No hay clon del repo LK ni acceso a Vercel en esta sesión; no se puede re-medir
   Cadena: la tabla es histórica; la leen `gv_np_web_dobles`, `gv_ppp_base_pedidos` y la facturación de NP de ISIS ya facturadas. Sin índice único hasta que queden 0.
 - **C:** los 5 pares con cajas distintas (98608/323E 2 vs 1, 98293/574 4 vs 2, 98161/590E 0 vs 5, 98128/590E 0 vs 4, 44496/713 2 vs 8): cuál vale.
 
+</details>
+
 ### 81 · `db_n8n_espejo` difiere de su madre — **C**
 
 - **Hoy:** 1.775 cierres (opción C) en 90 días; **21 sin fila en el espejo** (ventana ±3 min, mismo legajo). Madre 18.219 / espejo 15.220, las dos al día (12/09 13:41). **No hay trigger** sobre `Registros Produccion Cervantes`: el espejo lo escribe la app, así que un cierre que falló al insertar no se recupera solo.
 - **Pregunta:** ¿se regeneran esos 21 en el espejo (con `recalcular_matriz` para premio)? Es un INSERT por fila con `Legajo, Matriz, Uni, Fecha, Hora_Inicio/Fin` sacados de la madre; lo dejo como C porque el premio de esos días ya se reportó y reinsertar cambia el histórico de rendimiento.
 
-### 82 · `public.Matrices` con `Uni_X_Golpe` en 0 — **B**
+### 82 · `public.Matrices` con `Uni_X_Golpe` en 0 — ✅✅ EJECUTADO 2026-09-13 ("dale" de Thomas)
+
+> **Aplicado y verificado.** Backup completo previo en
+> `zz_backups."GV_Backup_Matrices_20260913"` (**414 filas**, la tabla entera: 414 con
+> `Uni_X_Golpe` en 0 y 173 con `Tiempo_Historico` en 0).
+> Después del UPDATE, sobre los **114 pares** public↔GP2: `Uni_X_Golpe` en 0 → **0**,
+> `Uni_X_Golpe` distinto de GP2 → **0**, `Tiempo_Historico` en 0 teniendo GP2 valor → **0**.
+> No se pisó ningún valor ya cargado (el UPDATE es condicional).
+>
+> ⛔ **Queda abierto el único par contradictorio** (el "C chico"): matriz **365 · Corte Pieza
+> Grande SacaFuente Pizzero**, `Tiempo_Historico` public = **1,7** vs GP2 = **2,41**. Los dos
+> tienen valor, así que el UPDATE no lo tocó a propósito. **Cuál manda lo decide Thomas.**
+>
+> ⛔ **Falta** `select public.recalcular_matriz(<N_Matriz>)` para las que tenían TH en 0: los
+> **65 eventos** de 90 días del espejo con `Tiempo_Historico=0` **no se recalculan solos**.
+> No se corrió porque reescribe premios ya registrados — eso es plata y va con su propio "dale".
+
+<details><summary>Diagnóstico y SQL original</summary>
+
 
 - **Hoy:** 114 pares public↔GP2: **114 con UxG=0 en public** (GP2 lo tiene en los 114, 0 contradicciones); **14 con TH=0 en public y cargado en GP2**; 1 par con TH distinto entre los dos; **65 eventos** en 90 días en el espejo con `Tiempo_Historico=0` pese a que GP2 lo tiene.
 - **Quién lo consume:** `reporte-diario-rendimiento` y `send-rendimiento-matrices` (Edge) leen `public.Matrices.Tiempo_Historico`; el espejo lo copia al registrar; RPC `recalcular_matriz` lo recalcula. Triggers en `Matrices`: `trg_audit_matrices` (loguea), `trg_matrices_disc_flow`, `trg_sync_stock_matrices` (upsertea `UnixCajon_Stock_Registro_Prod_Cerv` con `Uni_X_Cajon`, que no se toca → inocuo).
@@ -200,6 +275,8 @@ No hay clon del repo LK ni acceso a Vercel en esta sesión; no se puede re-medir
   -- después: select public.recalcular_matriz(<N_Matriz>) para las 14 (los 65 eventos no se recalculan solos)
   ```
   Ojo: `Matrices` es **tabla madre** según CLAUDE.md (alimenta `db_n8n_espejo`); el UPDATE va con backup y `trg_audit_matrices` lo deja trazado. **C chico:** el par con TH contradictorio (public > 0 y GP2 > 0 distintos) — cuál manda.
+
+</details>
 
 ### 83 · Copias congeladas — **D + C**
 
