@@ -10781,9 +10781,29 @@ hacerlo viajar desde arriba, y eso toca vistas **compartidas**. La fuente correc
 ⚠ **Mirar `gv_aviso_cliente_dudoso` ANTES de mandar los avisos de programación.** Vacía = todo
 bien. `sql/gv_clientes_cod_ambiguo_v1685.sql`, con su rollback.
 
+### ⚠ GESTIÓN NO MANDA WHATSAPP TODAVÍA, Y ESO CAMBIA LA URGENCIA
+
+**Dueño, 2026-09-13, textual: *"Todavía no quiero que mande wpp GV. Está en desarrollo y con un
+teléfono que no se deben contactar."*** Verificado en la base el mismo día, y se cumple:
+
+| | |
+|---|---|
+| `wa_grupo_listo` marcadas `enviado` | **8**, todas del **31/08** |
+| A quién fueron | las 8 a `cod_cliente = 99999`, **`CLIENTE SIMULACIÓN`** |
+| ¿Alguno era un teléfono de cliente real? | **No** — ninguno de los 8 destinos figura en `GV_Clientes_Whatsapp` |
+| Pendientes sin enviar | **90**, del 31/08 al 11/09, `enviado_at` en null |
+| Funciones de la base que marquen `enviado = true` o manden HTTP | **ninguna** (`wa_grupo_completo_check` y `wa_sim_cleanup_all` no lo hacen) |
+
+O sea: **no hay gatillo armado del lado de Gestión** y nunca se contactó a un cliente real. El
+`enviado = true` de esas 8 vino de afuera durante la simulación.
+
+**Consecuencia para el problema 77:** los 3 avisos dudosos de hoy **no le mandan nada a nadie**.
+El riesgo es real pero **futuro** — se materializa el día que se prenda el envío. Por eso el
+orden correcto es: primero hacer viajar la empresa, después prender. **No al revés.**
+
 ### Lo que falta, y es decisión del dueño
 
 Hacer viajar `empresa` desde `vista_ppp_programacion_pendiente` hasta el join del teléfono, y
 pasar el join a `GV_Clientes_Whatsapp` por `(empresa, cod)`. Cambia a quién le llega el mensaje,
-así que no se hace solo.
+así que no se hace solo — **y tiene que estar hecho ANTES de prender el envío**.
 
