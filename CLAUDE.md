@@ -225,39 +225,56 @@ and secret API keys and disable the anon and service_role keys."*
 **NO apretarlo todavia:** apaga TAMBIEN la `anon`, que es la que usa el frontend. Hoy eso
 tira abajo la app entera.
 
-### 3. EXCEPCION MEDIDA: Storage rechaza las claves nuevas al ESCRIBIR
+### 3. ⚠ LA EXCEPCION DE STORAGE YA NO EXISTE (re-medida el 2026-09-13)
 
-Comprobado en vivo el 2026-09-11 contra los dos proyectos (hrxfctzncixxqmpfhskv y
-kwkclwhmoygunqmlegrg). El Storage API de estos proyectos NO entiende el formato nuevo
-cuando la operacion escribe:
+**Hasta la v16.55 este bloque decia que el Storage rechazaba las claves nuevas al ESCRIBIR y
+que por eso NO se podian apagar las legacy. Se volvio a medir y ya no es cierto.** Supabase
+actualizo el Storage de estos proyectos en algun momento entre el 11 y el 13 de septiembre.
 
-| Operacion | Clave legacy (JWT) | Clave nueva (`sb_publishable_` / `sb_secret_`) |
-|---|---|---|
-| `GET /storage/v1/object/...` | anda | anda |
-| `POST /storage/v1/object/...` (upload) | anda | **403 `Invalid Compact JWS` / AccessDenied** |
-| `POST /rest/v1/rpc/...` (PostgREST) | anda | anda |
-| Edge Functions con `verify_jwt` | anda | anda |
+Medicion del **2026-09-13**, contra los dos proyectos, con la `sb_publishable_` mandada a la
+vez como `apikey` y como `Authorization: Bearer` (que es el caso que antes fallaba):
 
-`Invalid Compact JWS` = el Storage intento parsear el token como JWT y no pudo. No es la
-clave equivocada ni un permiso faltante: el servicio no soporta el formato. Repro exacta:
+| Operacion | Resultado |
+|---|---|
+| `POST /storage/v1/object/remitos/...` en **GV** | **200** `{"Key":"remitos/…","Id":"…"}` — el objeto se creo de verdad (y se borro despues) |
+| `DELETE /storage/v1/object/remitos/...` en **GV** | **200** `{"message":"Successfully deleted"}` |
+| `POST /storage/v1/object/krikos-oc/...` en **LK** | **415** `invalid_mime_type` — el bucket solo acepta PDF, o sea que **la clave paso el control de auth** |
+
+Ni un `Invalid Compact JWS`, que era la firma del problema viejo.
+
+**Y la app lo venia probando sola sin que nadie lo notara:** Gestion pasó a la
+`sb_publishable_` el 11/09 a las 00:29 ART (commit `53b23ae`) y ese mismo dia los operarios
+subieron **9 fotos de remito** entre las 08:44 y las 16:39 — todas despues del cambio, todas
+con foto (`Control_Modo_OP`: 9 filas, 9 con `foto_url`). O sea que el camino real
+(`apikey` publishable + JWT del usuario como Bearer) nunca estuvo roto.
+
+**Lo que NO se re-midio:** las claves **`sb_secret_`**. El caso testigo del bloque viejo era el
+workflow `build-deploy.yml` de `loekemeyer/Planify`, que subia el `.exe` a `planify_updates` y
+empezo a fallar al cambiarle el secret por una `sb_secret_` (runs 112 a 115 del 11/09). **Antes
+de dar por cerrado el tema, correr ese workflow de nuevo**: si ahora pasa, cae el ultimo
+bloqueo para apagar las legacy.
+
+Repro, para volver a medirlo cuando haga falta (ojo: **si da 200 crea el objeto**, hay que
+borrarlo con un `DELETE` a la misma URL — `storage.objects` no se puede borrar por SQL,
+`storage.protect_delete()` lo impide):
 
 ```sql
 select r.status, r.content from public.http((
-  'POST','https://<ref>.supabase.co/storage/v1/object/__no_existe__/x.txt',
-  array[public.http_header('Authorization','Bearer <clave>')],
+  'POST','https://<ref>.supabase.co/storage/v1/object/<bucket>/__prueba__.txt',
+  array[public.http_header('Authorization','Bearer <clave>'),
+        public.http_header('apikey','<clave>')],
   'text/plain','x')::public.http_request) r;
 ```
 
-**Consecuencia:** cualquier cosa que SUBA a Storage tiene que seguir con la
-`service_role` legacy hasta que Supabase actualice el Storage de estos proyectos. Caso
-real: el workflow `build-deploy.yml` de `loekemeyer/Planify` sube el `Planify.exe` a
-`planify_updates`; al cambiarle el secret `SUPABASE_SERVICE_KEY` por una `sb_secret_`
-empezo a fallar el paso "Upload to Supabase Storage" en 2 segundos, con el `.exe` ya
-compilado (runs 112 a 115 del 2026-09-11).
+**Igual sigue valiendo el inventario antes de apagar las legacy** (`storage/v1/object` con
+POST/PUT/DELETE, `.storage.from(...).upload(`, `.remove(`): al 13/09 los que escriben son
+`recepcion.js` de Gestion (bucket `remitos`), `krikos-ingest` de LK (`krikos-oc`, con
+`service_role` de env), `script.js` de LK (`.remove()` de videos) y los workflows de Planify.
 
-**Antes de apagar las legacy, buscar todo lo que escriba en Storage** (`storage/v1/object`
-con POST/PUT, `.storage.from(...).upload(`, `.upload(`) y confirmar que ese camino sigue
-andando. Si no anda, NO se apagan las legacy todavia.
+⚠ **Y hay un pedazo de `recepcion.js` que quedo muerto por esto**: `pendUploadFoto` tiene un
+tercer intento que hace `signOut()` y sube con la clave pelada como Bearer. Estaba pensado para
+la anon legacy. Hoy el primer intento anda, asi que no molesta, pero el comentario que dice que
+ese fallback "sube igual" hay que leerlo con esta nota al lado.
 
 ### Orden obligatorio
 
@@ -269,11 +286,14 @@ andando. Si no anda, NO se apagan las legacy todavia.
 2. Reemplazar esa cadena por la `sb_publishable_...` del proyecto Supabase de ESTE repo
    (cada proyecto tiene la suya; no mezclar).
 3. Migrar todo backend que use `service_role` (Edge Functions, n8n, scripts) a `sb_secret_...`.
-4. Inventariar lo que escribe en Storage (ver la excepcion de arriba) y dejarlo con la
-   `service_role` legacy; si algo de eso ya se paso a `sb_secret_`, volverlo atras.
+4. Inventariar lo que escribe en Storage (ver el punto 3) y **probar cada camino**. Ya NO
+   hay que dejarlos en legacy por defecto: con la `sb_publishable_` el Storage escribe bien
+   (medido el 13/09). Lo unico sin re-medir son las `sb_secret_`: correr el workflow de
+   Planify antes de concluir.
 5. Recien con 1-4 hechos en TODOS los repos que peguen contra ese proyecto:
-   `Disable JWT-based API keys`. Mientras exista un upload a Storage vivo, este paso
-   queda bloqueado.
+   `Disable JWT-based API keys`. **Este paso ya no esta bloqueado por el Storage** (punto 3);
+   lo que falta es confirmar las `sb_secret_` y que ningun cliente siga mandando la anon
+   legacy. Lo aprieta el dueno, no Claude: apaga la `anon` que usa el frontend.
 
 ### Paso opcional: rotar el JWT secret
 

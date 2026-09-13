@@ -10193,3 +10193,54 @@ anon key LEGACY … el formato nuevo no siempre lo aceptan los endpoints de auth
 medición de arriba pegada al lado.
 
 Archivo: `admin/supabase/admin-login-otp/index.ts`.
+
+---
+
+## §3.de — v16.55: la excepción de Storage con las claves nuevas ya no existe (problema 12)
+
+Desde el 2026-09-11 el `CLAUDE.md` decía, como hecho medido, que **el Storage rechaza las claves
+nuevas al escribir** (`403 Invalid Compact JWS`) y que por eso **no se pueden apagar las claves
+legacy**. Ése era el último bloqueo del problema 12. **Se volvió a medir el 13/09 y ya no es
+cierto**: Supabase actualizó el Storage de estos proyectos en el medio.
+
+Medición, con la `sb_publishable_` mandada a la vez como `apikey` y como `Authorization: Bearer`
+—que es exactamente el caso que antes fallaba:
+
+| operación | resultado |
+|---|---|
+| `POST /storage/v1/object/remitos/…` en **GV** | **200** `{"Key":"remitos/…","Id":"…"}` |
+| `DELETE` del mismo objeto en **GV** | **200** `{"message":"Successfully deleted"}` |
+| `POST /storage/v1/object/krikos-oc/…` en **LK** | **415** `invalid_mime_type` — el bucket sólo acepta PDF, o sea que **la clave pasó el control de auth** |
+
+Ni un `Invalid Compact JWS`. El objeto de prueba de GV se creó de verdad y **se borró en el acto**
+con un `DELETE` a la misma URL: `storage.objects` no se puede borrar por SQL, lo impide
+`storage.protect_delete()`.
+
+**Y la app lo venía probando sola sin que nadie lo mirara.** Gestión pasó a la `sb_publishable_`
+el 11/09 a las 00:29 ART (commit `53b23ae`), y ese mismo día los operarios subieron **9 fotos de
+remito entre las 08:44 y las 16:39** — todas después del cambio: `Control_Modo_OP` tiene 9 filas
+ese día y las 9 con `foto_url`. O sea que el camino real (apikey publishable + JWT del usuario
+como Bearer) nunca estuvo roto.
+
+**Lo que NO se re-midió: las `sb_secret_`.** El caso testigo del bloque viejo era el workflow
+`build-deploy.yml` de `loekemeyer/Planify`, que empezó a fallar al cambiarle el secret por una
+`sb_secret_` (runs 112–115 del 11/09). **Antes de dar el tema por cerrado hay que correr ese
+workflow de nuevo.** Si pasa, cae el último bloqueo para apretar `Disable JWT-based API keys`
+(que lo aprieta el dueño, no Claude: apaga también la `anon` del frontend).
+
+**Inventario de lo que escribe en Storage, al 13/09** (para el paso 4 del protocolo):
+`recepcion.js` de Gestión (bucket `remitos`) · `krikos-ingest` de LK (`krikos-oc`, con
+`service_role` de env) · `script.js` de LK (`.remove()` de videos) · los workflows de Planify.
+
+⚠ **Deuda que quedó a la vista:** `pendUploadFoto` de `recepcion.js` tiene un tercer intento que
+hace `signOut()` y sube con la clave pelada como Bearer. Estaba pensado para la anon legacy. Hoy
+el primer intento anda, así que no molesta — pero el comentario que dice que ese fallback "sube
+igual" hay que leerlo con esta nota al lado.
+
+**Y en los árboles de trabajo ya no queda anon legacy escrita.** Se contó en los cuatro repos
+clonados: `Gestion-Virgilio` 4 archivos, `pagina-lk-copia` 1, `planify` 1, `loekemeyer/*` 4 — y
+mirando uno por uno, **todas menos una son el prefijo `eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9` suelto
+dentro del comando `grep` de la propia documentación**. La única clave entera es una `anon` de LK
+dentro de `sql/backups/backup_limpieza_virgilio_20260902.sql`, y `anon` es pública por diseño.
+Contra eso, **92 archivos ya usan `sb_publishable_`** sólo en este repo. La parte de "66 archivos"
+del problema 12 está hecha; lo que queda es el historial de git (que no se arregla) y el apagado.
