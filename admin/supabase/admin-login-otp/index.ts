@@ -37,8 +37,14 @@ const RECIPIENT_EMAIL = "loekemeyer.n8n@gmail.com";
 
 // Proyecto Supabase de Producción Virgilio — usado por la acción "bridge" para
 // validar el access_token del supervisor contra SU PostgREST (RPC bridge_jwt_email).
-// Se usa la anon key LEGACY (JWT) como apikey del request a PostgREST (el formato
-// nuevo sb_publishable_ no siempre lo aceptan los endpoints de auth). Es pública.
+// Se usa la clave PUBLISHABLE (sb_publishable_), no la anon legacy. Es pública por
+// diseño, y hace falta que sea la nueva: el día que se apaguen las claves legacy de
+// Virgilio, con la vieja acá el login del admin de LK se caía entero (problema 19).
+// Medido el 2026-09-13 contra el endpoint real, las dos claves dan lo MISMO:
+//   POST /rest/v1/rpc/bridge_jwt_email  → 200 "null" con publishable y con legacy
+//   GET  /auth/v1/user                  → 401 no_authorization con publishable
+// o sea que PostgREST y auth aceptan el formato nuevo (lo que NO lo acepta es el
+// Storage al escribir; ver el bloque de claves en CLAUDE.md).
 const VIRGILIO_URL = "https://hrxfctzncixxqmpfhskv.supabase.co";
 const VIRGILIO_ANON_KEY = "sb_publishable_BqpAgZH6ty-9wft10_YMhw_0rcIPuWT";
 

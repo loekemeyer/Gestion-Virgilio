@@ -1014,7 +1014,8 @@ Al verificar setea un password temporal aleatorio en el user y el front hace
 - **Acción `bridge` (v12.35):** entrada directa sin OTP desde Producción
   Virgilio. Recibe el `access_token` de la sesión del supervisor de Virgilio
   (`vjwt`), lo valida server-side contra el auth de Virgilio
-  (`hrxfctzncixxqmpfhskv`, anon key hardcodeada en la función) y **sólo si el
+  (`hrxfctzncixxqmpfhskv`, con la **clave publishable** de GV escrita en la función —
+  ya no la anon legacy, v16.55, problema 19) y **sólo si el
   mail del token == `RECIPIENT_EMAIL`** (mismo dueño, no amplía acceso a nadie)
   devuelve el mismo password temporal que `verify`. Gate 100% en backend: el
   front no puede falsear identidad. Si mañana se quiere que otro supervisor

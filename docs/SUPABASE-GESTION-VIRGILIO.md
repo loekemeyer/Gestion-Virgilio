@@ -10155,3 +10155,41 @@ pedidos propios, Gestión no se enteraría** hasta que alguien vuelva a alimenta
 
 **Backup:** `zz_backups."GV_Backup_np_web_dobles_20260913"`.
 Archivo: `sql/gv_np_web_dobles_dos_fuentes_v1651.sql`.
+
+---
+
+## §3.dd — v16.55: `admin-login-otp` deja de usar la anon legacy de Gestión (problema 19)
+
+La Edge Function `admin-login-otp` (proyecto **LK**) es la que deja entrar al Panel Web LK. Su
+acción `bridge` valida el `access_token` del supervisor contra el PostgREST de **Gestión**
+(`rpc/bridge_jwt_email`), y para eso manda una `apikey` de Gestión escrita en el código.
+
+**El repo ya tenía la clave nueva desde el commit `a1fbbb8`; lo que nunca se hizo fue
+redeployar.** La función desplegada seguía con la **anon legacy** (versión 14). O sea que el día
+que se aprieten las `Disable JWT-based API keys` de Gestión, el login del admin de LK se caía —
+y nadie lo hubiera relacionado, porque el botón está del lado de Virgilio y la clave que muere
+es de otro proyecto.
+
+**Medido antes de tocar nada**, contra los endpoints reales de Gestión, con las dos claves:
+
+| request | con `sb_publishable_` | con la anon legacy |
+|---|---|---|
+| `POST /rest/v1/rpc/bridge_jwt_email` | **200 `null`** | 200 `null` |
+| `GET /auth/v1/user` (sin Bearer válido) | 401 `no_authorization` | — |
+
+O sea que PostgREST y auth aceptan el formato nuevo. Lo que **no** lo acepta es el Storage al
+escribir (la excepción medida que ya está en `CLAUDE.md`), y esta función no sube nada.
+
+**Deployada como `admin-login-otp` v15** (`verify_jwt` sigue en `false`: el destinatario está
+hardcodeado y se chequea contra `public.admins`). Verificada en vivo desde Postgres:
+
+- `{"action":"bridge","vjwt":"token_falso_de_prueba"}` → **401** `invalid_token`, con el detalle
+  `virgilio 401: PGRST301 "Expected 3 parts in JWT; got 1"`. Ese error es del **token del
+  usuario**, no de la apikey: prueba que Gestión aceptó la clave publishable y llegó a validar.
+- `{"action":"nada"}` → **400** `unknown_action`. El resto de la función quedó intacta.
+
+De paso se corrigió el comentario del código, que decía lo contrario de lo que hacía (*"se usa la
+anon key LEGACY … el formato nuevo no siempre lo aceptan los endpoints de auth"*), con la
+medición de arriba pegada al lado.
+
+Archivo: `admin/supabase/admin-login-otp/index.ts`.
