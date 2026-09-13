@@ -1,4 +1,4 @@
-# Estado y pendientes — al 2026-09-13
+# Estado y pendientes — al 2026-09-13 (última actualización: v16.53)
 
 > **Para quien abra una sesión nueva:** esto es la foto del estado. Lo que falta de verdad está
 > en la base, no acá: `select * from github_repo_problemas.v_problemas where estado='abierto'`.
@@ -9,7 +9,7 @@
 
 | Qué | Dónde | Por qué está frenado |
 |---|---|---|
-| **Redeploy de Vercel** | dashboard de Vercel → Deployments → Redeploy | El sitio quedó en 2.3.374 y el repo va por 2.3.375. Hay 6 commits sin publicar desde el 11/09 18:30, pero **sólo uno toca la página** (`64f98ba`, el aviso de renglones sin match en OC de súper); los otros 5 son backend y andan igual. Se confirma arreglado cuando `https://loekemeyer.com/version.js` devuelva 2.3.375. **No hay acceso a Vercel desde la sesión.** Problema 16. |
+| **Redeploy de Vercel** | dashboard de Vercel → Deployments → Redeploy | El sitio quedó en 2.3.374 y el repo va por 2.3.375. Hay 6 commits sin publicar desde el 11/09 18:30, pero **sólo uno toca la página** (`64f98ba`, el aviso de renglones sin match en OC de súper); los otros 5 son backend y andan igual. **Al 13/09 hay dos commits más en LK** (`d4f79e7` doc de Cloudflare y `68c676e` el fix de `krikos-ingest`), los dos backend/doc: no cambian la página. Se confirma arreglado cuando `https://loekemeyer.com/version.js` devuelva 2.3.375. **No hay acceso a Vercel desde la sesión.** Problema 16. |
 | **Rotar el token de Meta WhatsApp y la API key de OpenAI** | consolas de Meta y de OpenAI | Ver la decisión en el punto 2. Problema 20. |
 | ~~Cargar `KRIKOS_IMAP_PASS` en el Vault de LK~~ | — | **YA ESTÁ** (comprobado 2026-09-13): el secreto está en el Vault de LK desde el 11/09 y la rama de Krikos ya está en `main`. El ingest corre: 21 OC en la bandeja y `ok:true` en cada corrida. |
 
@@ -45,6 +45,16 @@
    sobra, pero es un caso aislado sin segunda fuente que lo confirme, así que se dejó (v16.46).
 5. **Avisarle a Compras** que 55 códigos de Despiece que antes no calculaban consumo de cartón
    ahora sí, así que van a empezar a aparecer en las alertas de compra (v16.42).
+6. **Góndola: el mapa y la capacidad no coinciden en 107 celdas** (problema 84, mitad abierta).
+   `Capacidad_Sector` manda la capacidad y `GV_Lugar_Item` manda el mapa, y la migración quedó a
+   medias (`GV_Lugar_Item.cajas_max` está en NULL en las 782 filas). Medido: 40 códigos afectados,
+   **832 cajas de capacidad fantasma** y 26 códigos en el mapa sin capacidad, 21 con stock real.
+   **No lo puedo resolver yo**: cuál de los dos mapas manda es de quien cargó la góndola (Luis, el
+   11/09). Está a la vista con `select * from public.gv_gondola_divergente;` (vacía = todo bien).
+7. **Las 14 líneas `(pedido, articulo)` duplicadas de `GV_PPP_Base_Pedidos`** (problema 80) siguen
+   ahí: son datos reales y el protocolo pide permiso explícito. La tabla hoy es histórica.
+8. **187 mails viejos de Krikos nunca ingresados**: el cron mira 90 días y ésos son más viejos.
+   Traerlos es un `{"action":"sync","days":365}` a mano — decisión del dueño, no se hizo.
 
 ## 4. Tareas de Planify abiertas de esta sesión
 
@@ -62,8 +72,20 @@
 | 72 | 46 filas duplicadas en `Entregas_Virgilio` (las otras 16 eran legítimas) | v16.46 |
 | 21 | **crítico** — 5 Edge Functions de LK abiertas sin autenticación | LK `e221d81` |
 | 69 | comprar y cobrar usaban UxB distinto en 33 códigos | ya estaba, por v16.38 |
+| 84 (mitad duales) | 3 tablas con la misma lista de duales; ahora 1 tabla + 2 vistas | v16.49 |
+| 84 (mitad góndola) | **sigue abierta**; se midió bien (107, no 204) y se dejó el centinela | v16.50 |
+| 92 | la capacidad de góndola de un dual sumaba las dos góndolas: por LK no avisaba nunca | v16.51 |
+| 80 (parcial) | el detector de NP dobles sacaba la fecha de una tabla congelada | v16.51b |
+| 27 | `krikos-ingest` armaba un `in()` con todos los `mail_uid` y moría con ventanas largas | LK `68c676e` |
 
 Y las tablas `PPP_*` de la era ISIS pasaron a nombre `GV_*` sin perder el trabajo pendiente (v16.45).
+
+**Hallazgo grande de esta tanda, que no es un bug pero hay que saberlo:** el **espejo de ISIS
+entero está congelado desde el 04/09** (`GV_PPP_Base_Pedidos` y `GV_PPP_Programacion_Diaria`,
+última NP 98704 Salvetti D60G). No hay cron que las alimente: se escribían desde afuera por
+PostgREST, o sea desde el Apps Script de la hoja PPP, que ya no existe. Es la consecuencia
+esperada de haber pasado todo a Gestión — pero **si ISIS volviera a cargar pedidos propios,
+Gestión no se entera**.
 
 ## 6. Reglas nuevas que salieron de esta tanda (ya están en `CLAUDE.md`)
 
@@ -74,3 +96,9 @@ Y las tablas `PPP_*` de la era ISIS pasaron a nombre `GV_*` sin perder el trabaj
 - El `CREATE` completo de cada vista va **en el repo**, no "aplicado en la base".
 - El backup se guarda con la **clave primaria**; un join por columna no única multiplica.
 - Medir con la **misma granularidad** con la que se va a escribir.
+- **No creer el registro del problema: re-medirlo.** Tres veces en esta tanda la descripción vieja
+  estaba mal — el 84 decía 204 divergencias (son 107; 97 eran racks), decía que `Codigos_Duales` la
+  usaban `empresa_de_np()` y el front (no la usa nadie), y el 27 y el 92 ya estaban medio resueltos
+  sin que el registro lo dijera.
+- **Un pendiente viejo puede estar hecho.** `KRIKOS_IMAP_PASS` figuraba como pendiente del dueño en
+  **cinco** archivos y estaba cargado desde el 11/09. Antes de pedirle algo, comprobarlo.
