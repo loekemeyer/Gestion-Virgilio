@@ -10726,3 +10726,64 @@ Aparecieron de paso, sin buscarlos: el token de WhatsApp de Meta en `send-whatsa
 **Resumen para decidir:** el código de los 4 repos, las 2 bases y las 98 Edge Functions están
 migrados. Lo único que queda antes del botón es el secret de Planify.
 
+## §3.dm — v16.85: el código de cliente no lleva empresa, y el WhatsApp puede irle al cliente de la otra (problema 77) — 2026-09-13
+
+**No se tocó el camino del envío.** Se midió el daño y se pusieron **dos centinelas**, porque el
+arreglo de fondo cambia **a quién le llega un WhatsApp** y eso lo decide el dueño.
+
+### Lo medido
+
+`whatsapp_clientes` (942 filas) y `clientes_vendedor` (1.245) tienen el **código como única
+clave, sin empresa**. Y el código no es único entre LK y Chef — es la propia regla del dueño
+(v13.76): *"el cod cliente no significa nada, sólo el CUIT vale"*.
+
+Contra los documentos de ISIS, que son el padrón que factura de verdad:
+
+| | |
+|---|---:|
+| Códigos en LK | 1.640 |
+| Códigos en Chef | 406 |
+| En las dos | 86 |
+| **De esos, con razón social DISTINTA** | **85** |
+| Filas de `whatsapp_clientes` sobre un código ambiguo | **71** |
+| Filas de `clientes_vendedor` sobre un código ambiguo | **84** |
+
+Casi todo lo que se solapa es **gente diferente**.
+
+### Por qué no alcanza con arreglar el join
+
+`vista_avisar_programacion` busca el teléfono con
+`LEFT JOIN LATERAL (select telefono from whatsapp_clientes where cod_cliente = g.cod LIMIT 1)`
+— sólo el código, y con `LIMIT 1`: sobre un código ambiguo agarra el que venga primero.
+
+Pero el fondo es peor: **ni esa vista ni su fuente `vista_ppp_programacion_pendiente` tienen
+columna `empresa`**. El dato no está en el camino, así que no hay join que lo salve — hay que
+hacerlo viajar desde arriba, y eso toca vistas **compartidas**. La fuente correcta ya existe:
+`GV_Clientes_Whatsapp` (358 filas) tiene empresa + código + teléfono + razón social.
+
+### Los tres casos vivos al 13/09 — ninguno es teórico
+
+`select * from public.gv_aviso_cliente_dudoso;`
+
+| cod | el aviso dice | LK | Chef | teléfono que saldría |
+|---|---|---|---|---|
+| **1792** | Pettish Villa Crespo | DAPELO CLAUDIO MARCELO | SUPERTEXTIL S.R.L | es de **LK/Dapelo**, y el nombre del aviso **no coincide con ninguno de los dos**. **18 NP** colgando |
+| 2191 | Romagessi Antonio | **ROMAGESSI ANTONIO** | GARCIA ALBERTO JUAN | 54 2234542216 |
+| 2393 | MIGUEL ADDOUMIE SRL | FORRAJERIA TRELEW | **MIGUEL ADDOUMIE SRL** | +5493413602270 |
+
+### Los dos centinelas
+
+- **`gv_clientes_cod_ambiguo`** — los 85 códigos, con las dos razones sociales y cuántas filas
+  de teléfono y de vendedor cuelgan de cada uno.
+- **`gv_aviso_cliente_dudoso`** — los avisos de HOY que caen sobre uno de esos códigos, con la
+  empresa probable (deducida de la razón social) y de quién es realmente ese teléfono.
+
+⚠ **Mirar `gv_aviso_cliente_dudoso` ANTES de mandar los avisos de programación.** Vacía = todo
+bien. `sql/gv_clientes_cod_ambiguo_v1685.sql`, con su rollback.
+
+### Lo que falta, y es decisión del dueño
+
+Hacer viajar `empresa` desde `vista_ppp_programacion_pendiente` hasta el join del teléfono, y
+pasar el join a `GV_Clientes_Whatsapp` por `(empresa, cod)`. Cambia a quién le llega el mensaje,
+así que no se hace solo.
+
