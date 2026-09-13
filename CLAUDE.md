@@ -225,56 +225,58 @@ and secret API keys and disable the anon and service_role keys."*
 **NO apretarlo todavia:** apaga TAMBIEN la `anon`, que es la que usa el frontend. Hoy eso
 tira abajo la app entera.
 
-### 3. ⚠ LA EXCEPCION DE STORAGE YA NO EXISTE (re-medida el 2026-09-13)
+### 3. ⚠ EL STORAGE SI ACEPTA LAS CLAVES NUEVAS — lo que falta es el header `apikey`
 
-**Hasta la v16.55 este bloque decia que el Storage rechazaba las claves nuevas al ESCRIBIR y
-que por eso NO se podian apagar las legacy. Se volvio a medir y ya no es cierto.** Supabase
-actualizo el Storage de estos proyectos en algun momento entre el 11 y el 13 de septiembre.
+**Este bloque cambio DOS veces el mismo dia, y la segunda es la buena.** Vale la pena leer las
+dos, porque la equivocacion del medio es facil de repetir:
 
-Medicion del **2026-09-13**, contra los dos proyectos, con la `sb_publishable_` mandada a la
-vez como `apikey` y como `Authorization: Bearer` (que es el caso que antes fallaba):
+- **11/09** decia *"el Storage rechaza las claves nuevas al ESCRIBIR"* y que por eso no se podian
+  apagar las legacy.
+- **13/09 (v16.56)** dije que esa excepcion ya no existia, porque mande un upload con la
+  `sb_publishable_` y dio 200. **Estaba mal la conclusion, no la medicion**: en esa prueba mande
+  la clave en `apikey` **y** en `Authorization`, y no me di cuenta de que el que hacia el trabajo
+  era el primero.
+- **13/09 (v16.62), la buena:** el formato de la clave nunca fue el problema. **Lo que faltaba es
+  el header `apikey`.**
 
-| Operacion | Resultado |
+Medicion contra el Storage real (bucket `inbox` de LK, objeto de prueba creado y borrado):
+
+| Request | Resultado |
 |---|---|
-| `POST /storage/v1/object/remitos/...` en **GV** | **200** `{"Key":"remitos/…","Id":"…"}` — el objeto se creo de verdad (y se borro despues) |
-| `DELETE /storage/v1/object/remitos/...` en **GV** | **200** `{"message":"Successfully deleted"}` |
-| `POST /storage/v1/object/krikos-oc/...` en **LK** | **415** `invalid_mime_type` — el bucket solo acepta PDF, o sea que **la clave paso el control de auth** |
+| `Bearer sb_secret_…` y nada mas | **403 `Invalid Compact JWS`** |
+| `Bearer sb_secret_…` **+ `apikey: sb_secret_…`** | **200**, el objeto se sube |
+| `Bearer sb_publishable_…` y nada mas | 403 `Invalid Compact JWS` |
+| `Bearer sb_publishable_…` **+ `apikey: …`** | 403 **`new row violates row-level security policy`** ← paso auth; lo frena la RLS, que es lo correcto para una clave publica |
 
-Ni un `Invalid Compact JWS`, que era la firma del problema viejo.
+**Por que la legacy andaba sin `apikey`:** la legacy **es** un JWT, asi que el Storage la podia
+parsear del Bearer. Con la clave nueva intenta lo mismo, no puede, y contesta `Invalid Compact
+JWS`. Ese error significa *"no pude parsear el token"*, no *"no soporto el formato"*.
 
-**Y la app lo venia probando sola sin que nadie lo notara:** Gestion pasó a la
-`sb_publishable_` el 11/09 a las 00:29 ART (commit `53b23ae`) y ese mismo dia los operarios
-subieron **9 fotos de remito** entre las 08:44 y las 16:39 — todas despues del cambio, todas
-con foto (`Control_Modo_OP`: 9 filas, 9 con `foto_url`). O sea que el camino real
-(`apikey` publishable + JWT del usuario como Bearer) nunca estuvo roto.
+**Y por eso la app nunca estuvo rota:** `supabase-js` manda `apikey` siempre. Los que fallaban
+eran los `curl` / `Invoke-RestMethod` escritos a mano, que mandan solo el Bearer — exactamente el
+caso del workflow de Planify (runs 112 a 115 del 11/09). **Ya corregido**: `build-deploy.yml` y
+`deploy-only.yml` de `loekemeyer/Planify` mandan las dos cabeceras desde el commit `75179d7`.
 
-**Lo que NO se re-midio:** las claves **`sb_secret_`**. El caso testigo del bloque viejo era el
-workflow `build-deploy.yml` de `loekemeyer/Planify`, que subia el `.exe` a `planify_updates` y
-empezo a fallar al cambiarle el secret por una `sb_secret_` (runs 112 a 115 del 11/09). **Antes
-de dar por cerrado el tema, correr ese workflow de nuevo**: si ahora pasa, cae el ultimo
-bloqueo para apagar las legacy.
-
-Repro, para volver a medirlo cuando haga falta (ojo: **si da 200 crea el objeto**, hay que
-borrarlo con un `DELETE` a la misma URL — `storage.objects` no se puede borrar por SQL,
-`storage.protect_delete()` lo impide):
+Repro, para volver a medirlo (ojo: **si da 200 crea el objeto**, hay que borrarlo con un `DELETE`
+a la misma URL — `storage.objects` no se puede borrar por SQL, `storage.protect_delete()` lo
+impide):
 
 ```sql
-select r.status, r.content from public.http((
-  'POST','https://<ref>.supabase.co/storage/v1/object/<bucket>/__prueba__.txt',
-  array[public.http_header('Authorization','Bearer <clave>'),
-        public.http_header('apikey','<clave>')],
-  'text/plain','x')::public.http_request) r;
+select net.http_post(
+  url := 'https://<ref>.supabase.co/storage/v1/object/<bucket>/__prueba__.json',
+  headers := jsonb_build_object('Authorization','Bearer <clave>','apikey','<clave>',
+                                'Content-Type','application/json'),
+  body := '{"p":1}'::jsonb);
 ```
 
-**Igual sigue valiendo el inventario antes de apagar las legacy** (`storage/v1/object` con
-POST/PUT/DELETE, `.storage.from(...).upload(`, `.remove(`): al 13/09 los que escriben son
-`recepcion.js` de Gestion (bucket `remitos`), `krikos-ingest` de LK (`krikos-oc`, con
-`service_role` de env), `script.js` de LK (`.remove()` de videos) y los workflows de Planify.
+**Inventario de lo que escribe en Storage, al 13/09** (todos con `supabase-js` salvo Planify, o
+sea que ya mandan `apikey`): `recepcion.js` de Gestion (bucket `remitos`), `krikos-ingest` de LK
+(`krikos-oc`), `script.js` de LK (`.remove()` de videos) y los workflows de Planify (corregidos).
 
-⚠ **Y hay un pedazo de `recepcion.js` que quedo muerto por esto**: `pendUploadFoto` tiene un
-tercer intento que hace `signOut()` y sube con la clave pelada como Bearer. Estaba pensado para
-la anon legacy. Hoy el primer intento anda, asi que no molesta, pero el comentario que dice que
-ese fallback "sube igual" hay que leerlo con esta nota al lado.
+⚠ **Y hay un pedazo de `recepcion.js` que quedo muerto**: `pendUploadFoto` tiene un tercer intento
+que hace `signOut()` y sube con la clave pelada como Bearer. Estaba pensado para la anon legacy.
+Hoy el primer intento anda, asi que no molesta, pero el comentario que dice que ese fallback
+"sube igual" hay que leerlo con esta nota al lado.
 
 ### Orden obligatorio
 
@@ -286,14 +288,16 @@ ese fallback "sube igual" hay que leerlo con esta nota al lado.
 2. Reemplazar esa cadena por la `sb_publishable_...` del proyecto Supabase de ESTE repo
    (cada proyecto tiene la suya; no mezclar).
 3. Migrar todo backend que use `service_role` (Edge Functions, n8n, scripts) a `sb_secret_...`.
-4. Inventariar lo que escribe en Storage (ver el punto 3) y **probar cada camino**. Ya NO
-   hay que dejarlos en legacy por defecto: con la `sb_publishable_` el Storage escribe bien
-   (medido el 13/09). Lo unico sin re-medir son las `sb_secret_`: correr el workflow de
-   Planify antes de concluir.
+4. Inventariar lo que escribe en Storage (ver el punto 3) y confirmar que **cada uno manda el
+   header `apikey`**, no solo el Bearer. Ya NO hay que dejar nada en legacy por eso: con
+   `apikey` el Storage acepta tanto `sb_secret_` como `sb_publishable_` (medido el 13/09).
+   Lo que usa `supabase-js` ya lo manda solo; lo escrito a mano (`curl`, `Invoke-RestMethod`)
+   hay que mirarlo uno por uno.
 5. Recien con 1-4 hechos en TODOS los repos que peguen contra ese proyecto:
-   `Disable JWT-based API keys`. **Este paso ya no esta bloqueado por el Storage** (punto 3);
-   lo que falta es confirmar las `sb_secret_` y que ningun cliente siga mandando la anon
-   legacy. Lo aprieta el dueno, no Claude: apaga la `anon` que usa el frontend.
+   `Disable JWT-based API keys`. **Ya no esta bloqueado por el Storage** (punto 3). Lo que
+   falta: que el dueno cambie el secret `SUPABASE_SERVICE_KEY` de Planify por una
+   `sb_secret_` y mire ese primer build, y que ningun cliente siga mandando la anon legacy.
+   El boton lo aprieta el dueno, no Claude: apaga la `anon` que usa el frontend.
 
 ### Paso opcional: rotar el JWT secret
 

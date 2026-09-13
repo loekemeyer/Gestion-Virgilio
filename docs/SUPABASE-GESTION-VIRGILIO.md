@@ -10424,3 +10424,43 @@ creó ni se borró ninguna) y las cuatro divergencias quedaron en 0.
 **Backups:** `zz_backups."GV_Backup_wa_np_snapshot_20260913"` (las 265 filas como estaban) y
 `zz_backups."GV_Backup_wa_np_snapshot_run_ddl_20260913"` (la definición previa).
 Archivo: `sql/gv_wa_np_snapshot_run_v1660.sql`.
+
+---
+
+## §3.dj — v16.62: corrección de la §3.de — el Storage necesita el header `apikey` (problema 12)
+
+**La §3.de (v16.56) sacó la conclusión equivocada de una medición correcta, y hay que dejarlo
+escrito porque el error es fácil de repetir.** Ahí dije que la excepción del Storage "ya no
+existe" porque un upload con la `sb_publishable_` devolvió 200. Lo que no vi es que en esa prueba
+mandé la clave **en `apikey` y en `Authorization`**, y el que hacía el trabajo era el primero.
+
+**Lo que pasa de verdad:** el Storage necesita la clave en el header **`apikey`**. Si sólo llega
+como `Bearer`, intenta parsearla como JWT y contesta `Invalid Compact JWS`. La legacy andaba sin
+`apikey` **de casualidad**: es un JWT, así que se dejaba parsear del Bearer.
+
+Medición contra el Storage real (bucket `inbox` de LK, objeto de prueba creado y borrado):
+
+| request | resultado |
+|---|---|
+| `Bearer sb_secret_…` y nada más | **403 `Invalid Compact JWS`** |
+| `Bearer sb_secret_…` **+ `apikey`** | **200**, el objeto se sube |
+| `Bearer sb_publishable_…` y nada más | 403 `Invalid Compact JWS` |
+| `Bearer sb_publishable_…` **+ `apikey`** | 403 `new row violates row-level security policy` ← pasó auth; lo frena la RLS, que es lo correcto para una clave pública |
+
+`Invalid Compact JWS` significa **"no pude parsear el token"**, no "no soporto el formato". Esa
+lectura de más es la que costó dos días.
+
+**Por eso la app nunca estuvo rota:** `supabase-js` manda `apikey` siempre. Los que fallaban eran
+los `curl` / `Invoke-RestMethod` escritos a mano, que mandan sólo el Bearer — exactamente el caso
+del workflow de Planify (runs 112 a 115 del 11/09).
+
+**Ya está corregido del lado de Planify:** `build-deploy.yml` (el GET del guard y los tres uploads)
+y `deploy-only.yml` (los tres `curl`) mandan las dos cabeceras, commit `75179d7` de
+`loekemeyer/Planify`. Es inocuo con la legacy, así que quedó puesto para las dos. **Lo único que
+falta para poder apagar las legacy es que el dueño cambie el secret `SUPABASE_SERVICE_KEY` por una
+`sb_secret_` y mire ese primer build** (el upload corre después de compilar: si falla se pierden
+los ~4 minutos de build).
+
+**Dato suelto que apareció buscando una `sb_secret_` para probar:** el Vault de LK tiene una
+guardada con el nombre **`CLAUDE_API_KEY`**. No es una API key de Anthropic: es una clave secreta
+de Supabase. El nombre está mal y alguien la va a usar donde no va.
