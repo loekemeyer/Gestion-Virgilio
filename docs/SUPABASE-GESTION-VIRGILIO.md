@@ -10116,3 +10116,40 @@ cartel decía **"s/dato" siempre**. Ahora pide por `cod_art` y pasa por los mism
 `CREATE OR REPLACE` y se ejecuta tal cual para volver atrás.
 
 Archivo: `sql/gv_gondola_capacidad_por_empresa_v1651.sql`.
+
+---
+
+## §3.dc — v16.51: el detector de NP dobles sacaba la fecha de una sola tabla (problema 80)
+
+`public.gv_np_web_dobles` avisa cuando el mismo cliente tiene, para la **misma fecha de
+recepción**, un pedido web programado por Gestión **y** una NP de ISIS: o sea, el pedido cargado
+dos veces. Para saber de qué fecha era la NP de ISIS miraba sólo `GV_PPP_Base_Pedidos.fecha`, que
+está congelada el 2026-09-04, así que cualquier NP de ISIS posterior quedaba sin fecha, el
+`join np_fecha` la descartaba y el detector no la podía ver.
+
+Ahora la fecha sale de **dos** fuentes, con `UNION` y no con `min()` — alcanza con que una
+coincida:
+
+| fuente | pares (np, fecha) |
+|---|---|
+| `GV_PPP_Base_Pedidos.fecha` | 833 |
+| `GV_PPP_Programacion_Diaria.fecha_recep` | 133, de los cuales **2 no están en la primera** |
+
+**Medición: la vista devolvía 20 filas y sigue devolviendo 20.** Hoy no agrega ni saca nada; lo
+que hace es que el detector siga sirviendo si ISIS vuelve a cargar. Se le agregó `DISTINCT`
+porque con dos fuentes de fecha una misma NP puede llegar por las dos.
+
+### ⚠ Lo que se descubrió mirando esto, y es más grande que el bug
+
+**El espejo de ISIS entero se congeló el 04/09**, no sólo `GV_PPP_Base_Pedidos`.
+`GV_PPP_Programacion_Diaria` también: su última NP es la **98704** (Salvetti, D60G) y su
+`fecha_recep` máxima es 2026-09-04. **No hay ningún cron que las alimente**: las dos se escriben
+desde afuera por PostgREST (`anon` tiene INSERT/UPDATE con policy `*`), o sea desde el Apps Script
+de la hoja PPP — y esa hoja **ya no existe** (dueño, 2026-09-12).
+
+O sea que el espejo congelado es **la consecuencia esperada** de haber pasado todo a Gestión, no
+una falla nueva. Queda escrito para que nadie lo lea como fuente viva: **si ISIS volviera a cargar
+pedidos propios, Gestión no se enteraría** hasta que alguien vuelva a alimentar esas dos tablas.
+
+**Backup:** `zz_backups."GV_Backup_np_web_dobles_20260913"`.
+Archivo: `sql/gv_np_web_dobles_dos_fuentes_v1651.sql`.

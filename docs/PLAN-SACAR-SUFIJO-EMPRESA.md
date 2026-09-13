@@ -157,16 +157,38 @@ ajustaba por la diferencia entera. Ahora se resuelve antes (de `GV_Lugar`, con f
 que se le cargue la empresa al sector. 0 conteos históricos de duales y 0 pendientes.
 
 En el front la lógica quedó en **`gondAcumPorCod`**, pura y testeada de verdad
-(`tests/gond-exceso-dual.cjs`, 12 chequeos). Un código es dual si la vista devuelve `clave`
+(`tests/gond-exceso-dual.cjs`; 12 chequeos entonces, 19 desde la v16.51). Un código es dual si la vista devuelve `clave`
 distinta de `cod_art` — no hace falta pedir `codigos_duales` y un 5.º dual se cubre solo.
 De paso: el **`?v=` de `recepcion.js` estaba clavado en 15.39**; ahora acompaña a `APP_VERSION`
 y el test lo ata para que no se vuelva a desfasar.
 
+### Tramo 4 bis: HECHO (v16.51, 2026-09-13) — la CAPACIDAD también
+
+Lo que el tramo 4 había dejado anotado como pendiente: *"la capacidad de góndola de un dual
+sigue siendo la suma de las dos góndolas; filtrarla cambiaría también la conducta de los no
+duales, así que va aparte"*. **No era cierto**: alcanza con aplicar el filtro **sólo cuando el
+código es dual** (`gv_stock_clave` ya lo sabe decir), y para el resto es un no-op demostrable.
+
+El chequeo comparaba **una** góndola contra la capacidad de **dos**:
+
+| 809E, 400 cajas | capacidad | umbral 1,20× | góndola | ¿avisa? |
+|:--|--:|--:|--:|:--|
+| antes, por LK | 388 | 465,6 | 28 | **NO** ← el bug |
+| antes, por CH | 388 | 465,6 | 120 | sí |
+| ahora, por LK | **100** | 120,0 | 28 | **SÍ** |
+| ahora, por CH | **288** | 345,6 | 120 | sí |
+
+Control de no-regresión: el 505 da capacidad 3.340 y góndola 2.719 con LK y con CH, idéntico a
+antes. `LOKE` cuenta como `LK` (el 439E en Ñ53-Ñ54). Capacidad de los 4 duales al 13/09: 437E
+LK 120 / CH 48 · 438E LK 64 / CH 30 · 439E LK 66 / CH **0** (problema 88) · 809E LK 100 / CH 288.
+
+En el front: `gondDualesDe` y `gondCapPorCod`, puras, en `tests/gond-exceso-dual.cjs` (**19
+chequeos**). De paso se arregló `_opPrefetchGond`, que pedía `vista_saldos_stock.clave` con el
+código pelado y para un dual no matcheaba nada: el cartel "cap / góndola" decía **"s/dato"
+siempre**. Detalle y rollback en `sql/gv_gondola_capacidad_por_empresa_v1651.sql`.
+
 ### Lo que FALTA
 
-- **La capacidad de góndola de un dual sigue siendo la suma de las dos góndolas.**
-  `Capacidad_Sector` tiene columna `empresa` pero no se filtra: filtrarla cambiaría también la
-  conducta de los no duales, así que va aparte.
 - Los pasos 3 a 6 de la Parte 1 (borrar las 6 filas de sufijo de `Equivalencias_Codigos`,
   retirar `Planimetria`, limpiar los `codBase` no-op) y el enrutamiento de racks de la Parte 2.
 
