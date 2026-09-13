@@ -10381,3 +10381,46 @@ función temporal se dropeó.
 
 **Backup:** `zz_backups."GV_Backup_conciliacion_comparar_20260913"`.
 Archivo: `sql/gv_conciliacion_precio_despejado_v1659.sql`.
+
+---
+
+## §3.di — v16.60: `wa_np_snapshot` fingía estar fresca (problema 76)
+
+El bug, en una línea: **el `coalesce` estaba al revés**.
+
+```sql
+insert into public.wa_np_snapshot as s ...
+on conflict (np) do update set
+  direccion  = coalesce(s.direccion, excluded.direccion),   -- ⬅ s = la fila VIEJA
+  updated_at = now();
+```
+
+`s` es el alias de la tabla **destino**, así que eso significaba *"si ya hay algo cargado,
+dejalo"*: una vez que el valor dejaba de ser null **no se actualizaba nunca más**. Y como
+`updated_at = now()` sí se pisaba en cada corrida (cron 64, cada hora), la fila **parecía fresca**
+con el contenido del día en que se vio la NP por primera vez. Un dato viejo que se presenta como
+nuevo es peor que un dato viejo: nadie lo va a dudar.
+
+Y es el dato con el que **se le avisa al cliente por WhatsApp adónde va el pedido**.
+
+| campo | divergencias antes | después |
+|---|---|---|
+| `direccion` | 14 | **0** |
+| `razon_social` | 7 | **0** |
+| `barrio` | 7 | **0** |
+| `zona` | 4 | **0** |
+
+*(sobre las 133 NP que están en el snapshot y en la programación)*
+
+**Caso testigo, la NP 98686:** el snapshot decía `Av. F. Lacroze 2481` (Colegiales) y la
+programación `Av Corrientes 3864` (Almagro). No era una variante de escritura: **era otra
+dirección, en otro barrio.** Ahora dice Corrientes.
+
+**El arreglo** es invertir el coalesce: manda el valor nuevo y el viejo queda sólo de respaldo
+cuando el nuevo viene null, así un null de la programación no borra un dato bueno. Se corrió la
+función una vez después de aplicar: **133 filas tocadas, las 265 del snapshot siguen ahí** (no se
+creó ni se borró ninguna) y las cuatro divergencias quedaron en 0.
+
+**Backups:** `zz_backups."GV_Backup_wa_np_snapshot_20260913"` (las 265 filas como estaban) y
+`zz_backups."GV_Backup_wa_np_snapshot_run_ddl_20260913"` (la definición previa).
+Archivo: `sql/gv_wa_np_snapshot_run_v1660.sql`.
