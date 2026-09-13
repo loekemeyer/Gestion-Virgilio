@@ -10068,3 +10068,51 @@ select motivo, count(*) from public.gv_gondola_divergente group by 1;
 ```
 
 Archivo: `sql/gv_gondola_divergente_v1650.sql`. El problema 84 queda **abierto** con esta mitad.
+
+---
+
+## §3.db — v16.51: la capacidad de góndola de un dual es la de SU góndola (problema 92, cierre)
+
+La v16.30 (tramo 4) arregló el **saldo**: para un dual, el aviso de *"no devolver a góndola"* de
+Recepción pasó a mirar la góndola de la empresa de la recepción. Pero dejó anotado, textual, lo que
+no había tocado: *"La CAPACIDAD de góndola de un dual sigue siendo la suma de las dos góndolas.
+`Capacidad_Sector` tiene columna `empresa` pero no se filtra todavía."*
+
+Así que el chequeo comparaba **una** góndola contra la capacidad de **dos**:
+
+| 809E, 400 cajas recibidas | capacidad | umbral 1,20× | góndola | ¿avisa? |
+|---|---|---|---|---|
+| antes (capacidad sumada), por LK | 388 | 465,6 | 28 | **NO** ← el bug |
+| antes, por CH | 388 | 465,6 | 120 | sí |
+| ahora, por LK | **100** | 120,0 | 28 | **SÍ** |
+| ahora, por CH | **288** | 345,6 | 120 | sí |
+
+Por LK no avisaba nunca: la góndola de Loeke aguanta 100 cajas y el umbral estaba puesto en 465,6
+porque le sumaba las 288 de la góndola de Chef, que es **otro producto** (809E en J13-J14 es un
+Corta Pizza; en M13-M15, un Corta Queso).
+
+**El filtro se aplica sólo a los duales** (`gv_stock_clave` los delata: para un dual la clave
+difiere del código), así que para el resto la conducta es idéntica. Control con el 505: capacidad
+3.340 y góndola 2.719 con LK y con CH, igual que antes. `LOKE` cuenta como `LK` (así está cargado
+el 439E en Ñ53-Ñ54).
+
+Capacidad de los 4 duales al 13/09: **437E** LK 120 / CH 48 · **438E** LK 64 / CH 30 · **439E**
+LK 66 / CH **0** · **809E** LK 100 / CH 288. El 439E no tiene ninguna celda de Chef — es el
+problema 88 — así que por CH la capacidad da 0 y el chequeo no avisa, que es lo correcto mientras
+no se le cargue el lugar.
+
+**El camino vivo es el front, no la RPC.** `gondola_return_check` no la llama nadie hoy
+(`recepcion.js` hace el cálculo por su cuenta), pero se arregló igual para que las dos digan lo
+mismo. En `recepcion.js` se agregaron dos funciones puras, `gondDualesDe` y `gondCapPorCod`,
+testeadas de verdad en `tests/gond-exceso-dual.cjs` (**19 chequeos**) con los mismos números que
+devuelve el backend.
+
+**De paso se arregló `_opPrefetchGond`**, el cartel "cap / góndola" de la pantalla de cajas: pedía
+`vista_saldos_stock.clave = <código pelado>` y para un dual eso no matchea ninguna fila, así que el
+cartel decía **"s/dato" siempre**. Ahora pide por `cod_art` y pasa por los mismos dos helpers.
+
+**Backup:** `zz_backups."GV_Backup_gondola_return_check_20260913"`, fila
+`'DDL v16.50 public.gondola_return_check(jsonb,text)'` — la definición previa ya viene como
+`CREATE OR REPLACE` y se ejecuta tal cual para volver atrás.
+
+Archivo: `sql/gv_gondola_capacidad_por_empresa_v1651.sql`.

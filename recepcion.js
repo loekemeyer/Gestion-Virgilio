@@ -1035,6 +1035,41 @@ function gondAcumPorCod(rows, linea, norm) {
   });
   return out;
 }
+/* v16.51 (problema 92) — el conjunto de códigos DUALES según la vista de saldos: su `clave`
+   difiere del `cod_art` (para el resto son iguales). Se saca aparte porque ahora lo necesitan
+   DOS cosas: el saldo de góndola (gondAcumPorCod) y la capacidad (gondCapPorCod). */
+function gondDualesDe(rows, norm) {
+  const set = {};
+  (rows || []).forEach(function (r) {
+    if (String(r.clave || "") !== String(r.cod_art || "")) {
+      const k = norm(r.cod_art || r.clave); if (k) set[k] = true;
+    }
+  });
+  return set;
+}
+
+/* v16.51 (problema 92) — CAPACIDAD de góndola por código, pura y testeable.
+   Para un DUAL sólo cuentan las celdas de SU empresa: el 809E tiene 100 cajas en la góndola de
+   Loeke (J13-J14) y 288 en la de Chef (M13-M15). Hasta la v16.50 el saldo ya salía filtrado por
+   empresa (v16.30) pero la capacidad seguía siendo la SUMA de las dos, así que el aviso comparaba
+   una góndola contra la capacidad de dos: por LK el umbral quedaba en 388×1,20 = 465,6 cuando la
+   góndola de Loeke aguanta 100, y el aviso no saltaba nunca.
+   Para un código común suma todas sus celdas, igual que antes: conducta idéntica.
+   `LOKE` cuenta como `LK` (así está cargado el 439E en Ñ53-Ñ54). */
+function gondCapPorCod(capRows, duales, linea, norm) {
+  const lin = String(linea || "").toUpperCase();
+  const out = {};
+  (capRows || []).forEach(function (r) {
+    const k = norm(r.cod); if (!k) return;
+    if (duales && duales[k]) {
+      let e = String(r.empresa || "").toUpperCase().trim();
+      if (e === "LOKE") e = "LK";
+      if (e !== lin) return;
+    }
+    out[k] = (out[k] || 0) + (Number(r.cajas_max) || 0);
+  });
+  return out;
+}
 async function gondReturnCheck(items) {
   try {
     await sessionReady;
@@ -1042,12 +1077,14 @@ async function gondReturnCheck(items) {
     (items || []).forEach(function (it) { const c = String(it.cod || "").trim(); if (c && cods.indexOf(c) < 0) cods.push(c); });
     if (!cods.length) return [];
     const res = await Promise.all([
-      supabase.from("Capacidad_Sector").select("cod,cajas_max"),
+      supabase.from("Capacidad_Sector").select("cod,cajas_max,empresa"),
       supabase.from("vista_saldos_stock").select("cod_art,clave,empresa,terminado").in("cod_art", cods),
       supabase.from("proyeccion_madre").select("cod,proy_cajas_mes")
     ]);
     const cap = {}, gond = {}, proy = {};
-    ((res[0] && res[0].data) || []).forEach(function (r) { const k = _ocgNorm(r.cod); if (k) cap[k] = (cap[k] || 0) + (Number(r.cajas_max) || 0); });
+    const _saldoRows = (res[1] && res[1].data) || [];
+    // v16.51 — la capacidad de un DUAL es la de SU góndola, no la suma de las dos (ver gondCapPorCod).
+    Object.assign(cap, gondCapPorCod((res[0] && res[0].data) || [], gondDualesDe(_saldoRows, _ocgNorm), opState.linea, _ocgNorm));
     // v15.71 — ACUMULA: `vista_saldos_stock` agrupa por (código, empresa), así que un código
     // vuelve en varias filas; con el `=` el aviso comparaba contra el saldo de UNA de ellas.
     //
@@ -1061,7 +1098,7 @@ async function gondReturnCheck(items) {
     // si su `clave` difiere del `cod_art` (para el resto son iguales). Así que:
     //   · código dual  → sólo la fila cuya `empresa` es la línea que eligió el operario
     //   · código común → todas las filas sumadas, igual que antes (conducta idéntica)
-    Object.assign(gond, gondAcumPorCod((res[1] && res[1].data) || [], opState.linea, _ocgNorm));
+    Object.assign(gond, gondAcumPorCod(_saldoRows, opState.linea, _ocgNorm));
     ((res[2] && res[2].data) || []).forEach(function (r) { const k = _ocgNorm(r.cod); if (k) proy[k] = Number(r.proy_cajas_mes) || 0; });
     const flag = [];
     (items || []).forEach(function (it) {
@@ -1700,14 +1737,21 @@ async function _opPrefetchGond(cod) {
   if (!k) return;
   try {
     await sessionReady;
+    // v16.51 (problema 92) — se pide `cod_art` en vez de `clave`: para un DUAL la vista emite
+    // "809E LK" / "809E CH", así que el `eq("clave", k)` con el código pelado no matcheaba
+    // NINGUNA fila y el cartel decía "s/dato" siempre. Y la capacidad se filtra por empresa,
+    // que es lo mismo que hace el aviso de exceso (gondCapPorCod / gondAcumPorCod).
     const res = await Promise.all([
-      supabase.from("Capacidad_Sector").select("cajas_max").eq("cod", k),
-      supabase.from("vista_saldos_stock").select("terminado").eq("clave", k)
+      supabase.from("Capacidad_Sector").select("cod,cajas_max,empresa").eq("cod", k),
+      supabase.from("vista_saldos_stock").select("cod_art,clave,empresa,terminado").eq("cod_art", k)
     ]);
-    let cap = 0, hasCap = false;
-    ((res[0] && res[0].data) || []).forEach(function (r) { hasCap = true; cap += Number(r.cajas_max) || 0; });
-    let gond = 0, hasG = false;
-    ((res[1] && res[1].data) || []).forEach(function (r) { hasG = true; gond += Number(r.terminado) || 0; });
+    const _rowsCap = (res[0] && res[0].data) || [], _rowsG = (res[1] && res[1].data) || [];
+    const _dual = gondDualesDe(_rowsG, _ocgNorm);
+    const _capX = gondCapPorCod(_rowsCap, _dual, opState.linea, _ocgNorm);
+    const _gondX = gondAcumPorCod(_rowsG, opState.linea, _ocgNorm);
+    const _k = _ocgNorm(k);
+    const hasCap = _rowsCap.length > 0, cap = _capX[_k] || 0;
+    const hasG = _rowsG.length > 0, gond = _gondX[_k] || 0;
     if (opState.cajasCod === k) opState.cajasGond = { cap: hasCap ? cap : null, gond: hasG ? gond : null };
   } catch (_e) { /* best-effort: queda null → "s/dato" */ }
 }
