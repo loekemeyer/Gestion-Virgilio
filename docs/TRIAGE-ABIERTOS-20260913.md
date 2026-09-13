@@ -64,7 +64,67 @@ un sync ciego subiría 19% La Anónima ($67.095 vs $54.347 en la lista) y 10% Di
 - **A (código):** extender `supabase/functions/sync-precios-venta/index.ts` con un paso 5: `fetchAll(LK_URL, LK_KEY, "precios_super.precio"…)` (PostgREST expone schemas sólo si están en `db-schemas`; si no, pasar por una RPC de LK que devuelva `super_key, cod, price`) + `precios_super.cadena.item_discount`, y upsert en `cobranzas_precios_super(super_key, nc, precio_unit)` con `precio_unit = price * (1 - item_discount)` y `nc = cob_norm_cod(cod)`. Reconciliar sólo las cadenas que vengan de LK (no borrar `gm`/`gigot`).
 - **C (decisión):** (1) confirmar que el 19% de La Anónima es un descuento de lista y cargarlo en LK `precios_super.cadena.item_discount` (si no, el sync la sube 19%); (2) `gm` y `gigot`: ¿se cargan en LK o quedan sólo en GV?
 
-### 110 · El depósito inventa códigos en los racks — ⚠ B A MEDIAS 2026-09-13
+### 110 · El depósito inventa códigos en los racks — ⚠ MAL PLANTEADO, re-diagnosticado 2026-09-13
+
+> **El título de este problema hace pensar en un caso puntual del 809E. No lo es.**
+> `Racks_Planimetria` y `Movimientos_Stock` divergen en **16 de los 50 artículos** que tienen
+> racks, **en las dos direcciones**: el rack dice **2.308 cajas de más** en unos y el stock dice
+> **1.178 de más** en otros (plani 16.514 vs stock 15.811, neto **703**). El 809E es uno de los 16.
+> Nada de esto se resuelve cargando un ajuste suelto.
+>
+> | cod | pos | plani | stock | dif | dónde |
+> |---|--:|--:|--:|--:|---|
+> | `505I` | 1 | 336 | 1.310 | **−974** | AD09 (LK 336) |
+> | `546V` | 3 | 891 | 0 | **+891** | AD12 189 · AE09 351 · X13 351 |
+> | `809E` | 3 | 760 | 336 | **+424** | AD06 (CH 360) · AD5 (CH 336) · AE11 (LK 64) |
+> | `437E` | 5 | 432 | 189 | **+243** | AC04 105 · Z05 120 · **Z07 69 ×3** |
+> | `523C` | 1 | 240 | 0 | **+240** | W1 (LK 240) |
+> | `1000900` | 1 | 160 | 0 | **+160** | Y4 (LK 160) |
+> | `816E` | 3 | 368 | 488 | **−120** | AB05 184 · AD03 128 · X12 56 |
+> | `056E` | 1 | 216 | 300 | **−84** | W03 (LK 216) |
+> | `522S` | 1 | 80 | 0 | **+80** | W04 (LK 80) |
+> | `438E` | 2 | 156 | 90 | **+66** | AD11 78 · X11 78 |
+>
+> (siguen 585E 42, 541E 42, 106E 36, 725E 36, 702E 24, 589E 24)
+>
+> **Qué pasó de verdad con el 809E** — leyendo los 14 movimientos uno por uno. El **04/08** hubo
+> una **migración**: el stock de racks pasó del modelo viejo (`Mixto` + depósito `racks_ch`) al
+> nuevo (`racks` + columna `empresa`). Se ve en el 437E, que ese día se partió en LK 258 + CH 36.
+> Para el 809E se fijó **CH = 336** (que es AD5) y **LK = 48**, y se puso `racks_ch` en 0 con el
+> ref *"pedido del usuario"*. **AD06 (360) se quedó afuera de esa migración** y AE11 se cargó
+> como 48 cuando el rack dice 64; el 20/08 esos 48 salieron como *"rack s/sector"*.
+> O sea: **no fue una decisión de que la mercadería no estuviera — fue una migración incompleta.**
+> ⚠ El dueño no tiene por qué recordarlo: el ref decía sólo "pedido del usuario".
+>
+> **Correcciones a lo que decía la versión anterior de esta ficha:**
+> 1. ~~"meter los 360 en `racks` podría contarlos dos veces"~~ — **falso**. `racks_ch` es una
+>    **columna aparte** en `vista_saldos_stock`, no se suma con `racks`, y el 809E ahí está en 0.
+> 2. `racks_ch` **está muerto**: 5 movimientos en total, 3 artículos, el último el 10/08 (contra
+>    379 movimientos y 83 artículos de `racks`, vivo al 11/09). El modelo bueno es `racks` +
+>    `empresa`. ⚠ **Pero tiene un saldo vivo varado: 444 cajas de `712E`**, de un conteo del
+>    08/07 que nadie neteó, en una columna que no mira nadie.
+>
+> **Lo único de todo esto que NO necesita mirar el depósito** (y por lo tanto se puede hacer un
+> domingo): `Z07` / `437E` tiene **3 filas idénticas** en `Racks_Planimetria` (ids 241, 242, 259,
+> 69 cajas cada una) — y es el **único** duplicado (sector, cod_art) de toda la tabla. Sacando
+> las dos de más, la divergencia del 437E baja de 243 a **105**, que es exactamente la posición
+> `AC04`. No cierra del todo, pero 138 de esas 243 cajas **no existen: son una fila repetida**.
+>
+> ```sql
+> create table zz_backups."GV_Backup_Racks_Plani_Z07_20260913" as
+>   select * from public."Racks_Planimetria" where id in (242, 259);
+> alter table zz_backups."GV_Backup_Racks_Plani_Z07_20260913" enable row level security;
+> revoke insert, update, delete, truncate
+>   on zz_backups."GV_Backup_Racks_Plani_Z07_20260913" from anon, authenticated;
+> delete from public."Racks_Planimetria" where id in (242, 259);  -- se queda la 241
+> ```
+>
+> ✅ Lo que sí se hizo el 13/09: `809E-QUESO` y `809E-PIZZA` → **`809E`** en las 3 filas, con
+> backup en `zz_backups."GV_Backup_Racks_Planimetria_809E_20260913"`. Quedan **0** filas con
+> códigos inventados.
+
+<details><summary>Diagnóstico y SQL originales (el INSERT de stock está mal, ver arriba)</summary>
+
 
 > **Se hizo el renombre. NO se cargó el stock, y es a propósito — el SQL de abajo está mal.**
 >
