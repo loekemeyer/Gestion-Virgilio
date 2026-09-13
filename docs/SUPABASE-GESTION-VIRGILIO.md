@@ -10506,3 +10506,46 @@ al default 2 — para apagar el aviso del todo, subir el número). `sql/gv_jorna
 
 **No toca Producción**: sólo agrega una fila a `PPP_Web_Config`, que es nuestra. El cálculo vive en
 el front porque es un aviso sobre lo ya programado: no persiste nada ni bloquea el armado.
+
+## v16.67 (2026-09-13) — cierre del armado duplicado: las 8 filas huérfanas y el 221 de la 98532
+
+Cola de la v15.92 (armado duplicado por reprogramación de tanda). Todo son **datos**, no hay
+cambio de lógica.
+
+**1. Las 8 filas de `Entregas_Virgilio` sin tanda.** Quedaban del lote de 22 del 10–14/08 (la
+v16.46 borró las 14 que pisaban un artículo ya cargado). Se cruzaron contra el pedido antes de
+tocarlas: **ninguna duplica nada** (en ninguna el mismo artículo aparece en otra fila con tanda
+de esa NP) y **4 son entregas reales** — el pedido pide exactamente esas cajas (98295, 98297,
+98299 con 574E ×1 y 98301 con 574E ×5). Borrarlas habría perdido el dato. Se les **completó
+`tanda` y `fecha_salida`** con las de su propia NP (cada una tenía una sola, sin ambigüedad):
+
+| NP | Art | Cajas | Tanda | Fecha |
+|---|---|---:|---|---|
+| 44566 | 809E | 14 | D29A | 12/08 |
+| 98293 | 574E | 6 | D23C | 19/08 |
+| 98295 | 574E | 1 | D22D | 18/08 |
+| 98297 | 574E | 1 | D22D | 18/08 |
+| 98299 | 574E | 1 | D22D | 18/08 |
+| 98301 | 574E | 5 | D22E | 18/08 |
+| 98396 | 580 | 0 (faltó) | D39A | 21/08 |
+| 98424 | 580 | 1 | D40D | 24/08 |
+
+Backup: `zz_backups."GV_Backup_Entregas_SinTanda_20260913"` (8 filas).
+Después: `sin tanda = 0`; los pares `np+tanda+cod_art` siguen siendo **16** (los del caso A
+legítimo de la v16.46), o sea que el update no creó ningún duplicado nuevo.
+
+**Queda anotado, no resuelto:** 4 de esas 8 entregan un artículo que **el pedido no pide**
+(44566/809E ×14, 98293/574E ×6, 98424/580 ×1, 98396/580 faltó). Es un agregado o un cambio de
+artículo sin documentar; hay que cotejarlo contra el remito.
+
+**2. El 221 de la NP 98532.** La misma caja se cargó **tres veces**: dos CP por góndola el 10/09
+(15:37 y 15:38) más el picking normal de E10A. El pedido pide **1** y `Entregas_Virgilio` tiene 1.
+Neto antes de corregir: `terminado −3`, `a_facturar +2`, `separar_pedidos +1`. Compensación
+(3 filas `tipo='ajuste'`, ref `correccion 221 NP 98532: …`): `terminado +2`, `a_facturar −1`,
+`separar_pedidos −1`. Neto final verificado: `terminado −1`, `a_facturar +1`,
+`separar_pedidos 0` — una caja, como corresponde.
+
+**Rollback.** Filas huérfanas: `update public."Entregas_Virgilio" e set tanda = null,
+fecha_salida = b.fecha_salida from zz_backups."GV_Backup_Entregas_SinTanda_20260913" b
+where b.id = e.id;`. Ajustes del 221: `delete from public."Movimientos_Stock" where tipo='ajuste'
+and ref like 'correccion 221 NP 98532%';`.
