@@ -10287,3 +10287,36 @@ ya hay eventos de operarios sobre esa tanda. Rojo y no naranja a propósito: no 
 tiempo", es "se escapó".
 
 Archivo: `sql/gv_cuarentena_ya_programado_v1657.sql`.
+
+---
+
+## §3.dg — v16.58: una NP armada sin tanda no aparecía en Facturación (problema 58)
+
+El Facturador arma su lista **recorriendo tandas**. Una NP que se armó pero quedó **sin tanda** en
+la PPP —o que ya ni figura en la PPP— no está en ninguna tanda, así que **no se lista**, aunque
+esté armada, con salida registrada y sin facturar. No hay error en pantalla: simplemente no está.
+
+La prueba de que se armó es `Entregas_Virgilio`, y esa tabla **no depende de la tanda**. De ahí
+sale la vista nueva `gv_fac_armado_sin_facturar`.
+
+**Medido al 13/09: 21 NP armadas sin facturar, 1.456 cajas, de las cuales 8 son invisibles:**
+
+| NP | origen | cliente | tanda | salida | cajas | por qué no se ve |
+|---|---|---|---|---|---|---|
+| 44612 · 44613 · 44614 | isis | CENCOSUD S.A. | D72B | 10/09 | 28 · 76 · 5 | está en la PPP sin tanda |
+| 44615 · 44616 · 44617 | isis | CENCOSUD S.A. | D72C | 10/09 | 118 · 291 · 120 | está en la PPP sin tanda |
+| 44500 | fuera de la PPP | cod 1768 | C86C | 22/07 | 5 | la NP no está en la PPP |
+| 98272 | fuera de la PPP | cod 2336 | D20F | 14/08 | 4 | la NP no está en la PPP |
+
+**638 cajas son de CENCOSUD.** Las otras 13 NP (809 cajas) sí se ven.
+
+⚠ **El registro viejo del problema decía "sólo 8 se ven". Medido hoy es al revés: 13 se ven y 8
+no.** El total (21 NP) sí coincide.
+
+**No es sólo un aviso: entran a la lista y se pueden tildar.** `facSinTandaCargar()` trae las
+invisibles y `facRender()` las inyecta como filas normales con la **tanda del armado**, así pasan
+por el mismo camino de tilde y cierre que el resto. Llevan un chip amarillo **"sin tanda"** para
+que se entienda de dónde salieron. Si la vista no responde, la lista queda exactamente como antes
+(la carga es best-effort y no bloquea).
+
+Archivo: `sql/gv_fac_armado_sin_facturar_v1658.sql`.
