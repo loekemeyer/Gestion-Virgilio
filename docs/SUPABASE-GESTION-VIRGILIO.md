@@ -10026,3 +10026,45 @@ Archivo: `sql/gv_codigos_duales_unico_v1649.sql`.
 (`Capacidad_Sector` vs `GV_Lugar_Item` vs `zzz_backup_Capacidad_Gondola`, 204 asignaciones que
 divergen): eso no es una copia que se pueda colapsar en una vista, es una migración a medias con
 datos distintos de los dos lados.
+
+---
+
+## §3.da — v16.50: centinela de góndola (problema 84, mitad "góndola")
+
+Hay dos fuentes que deberían decir lo mismo sobre dónde está cada artículo en la góndola, y no
+lo dicen:
+
+| fuente | filas | qué maneja hoy |
+|---|---|---|
+| `public."Capacidad_Sector"` | 736 (669 con `cajas_max`) | la **capacidad**: el máximo de la OC, el ajuste "llenar góndola", el % de ocupación |
+| `public."GV_Lugar_Item"` + `public."GV_Lugar"` | 782 (`cajas_max` **NULL en las 782**) | el **mapa** que ve el operario (`gv_lugar_articulo` → `window.GONDOLA`) |
+
+La migración está declarada en `index.html` (*"GV_Lugar / GV_Lugar_Item reemplazan a Planimetria +
+Capacidad_Sector"*) pero quedó a medias: la tabla nueva no tiene ni una capacidad cargada, así que
+conviven el mapa nuevo con la capacidad vieja y nadie los cruza.
+
+**La medición vieja del problema 84 estaba mal.** Decía 204 divergencias. De las "125 sólo en la
+nueva", **97 son racks** (`GV_Lugar.tipo = 'rack'`), que `Capacidad_Sector` no tiene por diseño.
+Mirando sólo `tipo = 'gondola'`, la divergencia real es **107**:
+
+| motivo | filas | qué significa |
+|---|---|---|
+| `solo_capacidad` | 70 | la capacidad cuenta esa celda pero el mapa no pone el artículo ahí |
+| `solo_mapa` | 28 | el mapa lo muestra ahí pero esa celda no tiene capacidad cargada |
+| `sector_inexistente` | 9 | la capacidad apunta a un sector que no existe en `GV_Lugar` |
+
+**Impacto medido:** 40 códigos afectados, **832 cajas de capacidad fantasma** (se suman al máximo
+de la OC aunque el artículo no esté en esa celda → se pide de más) y **26 códigos que aparecen en
+el mapa sin capacidad**, 21 de ellos con stock real (→ el máximo les queda corto y "llenar góndola"
+no los alcanza). Desvía el generador de OC, donde `a_pedir ≈ Máximo − Stock − Pedidos`.
+
+**No se tocó ningún dato**: cuál de los dos mapas manda es de quien cargó la góndola (Luis, el
+11/09), no una decisión que se pueda deducir de la base. Lo que sí se hizo es dejarlo a la vista,
+igual que `gv_ppp_super_mezclado`:
+
+```sql
+select * from public.gv_gondola_divergente;   -- vacía = todo bien
+select motivo, count(*) from public.gv_gondola_divergente group by 1;
+```
+
+Archivo: `sql/gv_gondola_divergente_v1650.sql`. El problema 84 queda **abierto** con esta mitad.
