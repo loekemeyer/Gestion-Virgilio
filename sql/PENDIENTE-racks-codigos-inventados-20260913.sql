@@ -18,6 +18,15 @@
 --
 -- ============================================================================
 -- (1) BASTIDOR DEL 546 → código único `546V`   ✅ decisión cerrada
+--     ✅✅ EJECUTADO el 2026-09-13 ("dale" de Thomas, v16.71). Backup en
+--     zz_backups."GV_Backup_racks_codigos_20260913" (8 filas: 5 de Racks_Planimetria, 3 de
+--     GV_Lugar_Item; incluye las filas de (2) y (3) por si se ejecutan después). Verificado:
+--     546V en AD12 (63/189), AE09 (117/351), X13 (117/351) y en GV_Lugar_Item AD12 + AE09;
+--     Insumos 546V creado. 0 filas quedan con 1546903 / VASTIDOR en esas dos tablas.
+--     ⚠ CORRECCIÓN A LA PREMISA DE ABAJO: los códigos viejos SÍ tienen movimientos de stock
+--     (1546903: 3, VASTIDOR: 2, todos deposito=racks, unidad=inner) pero el NETO es 0 — los
+--     ajustes fix_recatalog_bastidor del 31/07 los netearon. La decisión no cambia; la frase
+--     "0 movimientos" era falsa. Esos 5 movimientos quedan con el código viejo (histórico).
 --     Luis: "Tendría que llamarse solo 546V".
 --     Hoy son 891 cajas (297 master) en 3 posiciones bajo DOS grafías:
 --       Racks_Planimetria id 176 · AD12 · 1546903 ·  63 master / 189 cajas
@@ -26,8 +35,8 @@
 --       GV_Lugar_Item          · AD12 · 1546903 (cap 0)
 --       GV_Lugar_Item          · AE09 · 1546903 (cap 0)   [AE09 además tiene 366E]
 --     `546V` está LIBRE: 0 filas en Insumos, OC_Maximos, Movimientos_Stock y
---     Racks_Planimetria. Los dos códigos viejos tienen 0 movimientos de stock, así
---     que no hay saldo que migrar.
+--     Racks_Planimetria. Los dos códigos viejos tienen saldo NETO 0 en Movimientos_Stock
+--     (ver corrección arriba), así que no hay saldo que migrar.
 
 -- backup
 create table zz_backups."GV_Backup_racks_codigos_20260913" as

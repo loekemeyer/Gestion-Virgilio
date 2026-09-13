@@ -10549,3 +10549,30 @@ Neto antes de corregir: `terminado −3`, `a_facturar +2`, `separar_pedidos +1`.
 fecha_salida = b.fecha_salida from zz_backups."GV_Backup_Entregas_SinTanda_20260913" b
 where b.id = e.id;`. Ajustes del 221: `delete from public."Movimientos_Stock" where tipo='ajuste'
 and ref like 'correccion 221 NP 98532%';`.
+
+### §3.dw — v16.71: el bastidor del 546 pasa a `546V` (bloque 1 del problema 110) — 2026-09-13
+
+**Qué:** las dos grafías inventadas en los racks para el mismo bastidor (`1546903` y `VASTIDOR`)
+se unificaron en el código único **`546V`** "Bastidor 546", como pidió Luis. Lo autorizó Thomas en
+esta sesión (*"3 dale"*); el SQL es el bloque (1) de
+`sql/PENDIENTE-racks-codigos-inventados-20260913.sql`, ejecutado tal cual.
+
+**Dónde escribió:** `Racks_Planimetria` (3 filas: AD12 63/189, AE09 117/351, X13 117/351 → 891
+cajas), `GV_Lugar_Item` (2 filas: AD12, AE09) e `Insumos` (alta de `546V`, categoría importados,
+ubicación AD12). Ningún trigger sobre esas tablas; `vista_insumos`, `gv_lugar_articulo`,
+`gv_ocupacion_lugar` y `gv_gondola_divergente` ven el código nuevo al instante.
+
+**Backup:** `zz_backups."GV_Backup_racks_codigos_20260913"`, 8 filas con RLS y sin escritura para
+anon — incluye también las filas de `1000900` y `522S` (bloques 2 y 3) por si se ejecutan después.
+
+**Corrección a la premisa del archivo:** decía *"los dos códigos viejos tienen 0 movimientos de
+stock"*. Falso: `1546903` tiene 3 y `VASTIDOR` 2 en `Movimientos_Stock` (depósito `racks`, unidad
+`inner`), pero el **neto es 0** — los ajustes `fix_recatalog_bastidor` del 31/07 los netearon. La
+decisión no cambia; esos 5 movimientos quedan con el código viejo como historia. Las posiciones que
+nombran (Y13, X14, X13) tampoco coinciden con la planimetría de hoy (AD12, AE09, X13).
+
+**Rollback:** `update public."Racks_Planimetria" set cod_art = b.cod_art from zz_backups."GV_Backup_racks_codigos_20260913" b where b.tabla = 'Racks_Planimetria' and "Racks_Planimetria".id = b.clave::bigint;` — ídem `GV_Lugar_Item` por `sector|cod|clase`; `delete from public."Insumos" where cod = '546V'`.
+
+**Queda abierto (problema 110 sigue `abierto`):** bloque (2) la espiral `1000900` — Luis tiene que
+elegir el código (`007` o `H201PART`); bloque (3) `522S` → `522E` — decidir si además se cargan
+las 80 cajas en `para_envasar`.
