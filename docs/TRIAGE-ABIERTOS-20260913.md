@@ -125,6 +125,21 @@ No hay clon del repo LK ni acceso a Vercel en esta sesión; no se puede re-medir
 - **La pantalla no existe más en su origen:** GP2 `8e7dfce` (13/09, en origin/main) borró `Facturas/index.html`; el menú `GP2_MODULOS.html` linkea `Compras/LecturaFacturas_GP2.html`. En GV quedan las copias `cervantes-admin/entero/Facturas/index.html` (admin viejo) y `cervantes-admin/gp2/Facturas/index.html` (copia desactualizada), ninguna linkeada desde un menú.
 - **Propuesta:** `descartado` con esta evidencia, y en la próxima re-sincronización de `cervantes-admin/gp2/` borrar esa copia (A trivial).
 
+> ⚠ **CORREGIDO EL MISMO DÍA (v16.75). El 79 NO se cierra: las copias SÍ están linkeadas.**
+> La línea de arriba dice "ninguna linkeada desde un menú" y es falsa —
+> `cervantes-admin/entero/Inicio/index.html:1256` tiene el botón
+> **"Lectura de Facturas Entrantes"** → `../Facturas/index.html`, y ese admin se abre desde el
+> panel supervisor de Gestión. O sea que la pantalla sigue viva y alcanzable.
+> Lo que SÍ se hizo: se borró `cervantes-admin/gp2/Facturas/` (el origen, GP2, la borró en
+> `8e7dfce`; era pura desincronización del espejo).
+> **Y hay algo nuevo que empeora el cuadro:** al sacar la clave de OpenAI filtrada (13/09), la
+> Edge Function `leer-factura` quedó como tapón que contesta **410**. La copia de `entero/` la
+> sigue llamando, así que hoy esa pantalla **no lee ninguna factura**: falla con un error, no
+> con la lista vieja de abril. Es consecuencia aceptada de matar la clave, no un descuido.
+> **Decide Thomas:** sacarle el botón del menú de `entero/` (parche de la copia, como los otros
+> tres que ya tiene), o dejarlo hasta que se apague el admin viejo. `GestionProductivaEntero`
+> no está en el alcance de esta sesión, así que allá no se tocó nada.
+
 ### 46 · 7 artículos con parte en receta sin rama de ruta (GP2) — **D**
 
 - Corrí hoy la consulta informativa `receta_sin_rama_que_la_lleve` de `db/verificar.sql` (líneas 230-251) contra la base: **2 pares, ambos tallerista "Fábrica"** (570 y 858 con E6 Pala Canelón), que el propio archivo marca como correctos. Chequeo directo: 547 tiene un solo A4 (Caja N°10) y está en ruta; 508/518/708 ya no listan D13; 103/120/564 no tienen partes sin ruta.
