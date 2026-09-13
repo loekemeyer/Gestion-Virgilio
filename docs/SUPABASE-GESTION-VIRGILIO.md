@@ -9970,3 +9970,59 @@ Al revés obligaría a copiar a mano el secreto viejo —pasearlo por una conver
 historial— para una credencial que igual hay que reemplazar.
 
 Archivo: `sql/gv_secret_rpc_v1647.sql`.
+
+---
+
+## §3.cz — v16.49: una sola lista de códigos duales (problema 84, mitad "duales")
+
+**Antes había tres tablas con las mismas 4 filas y ningún vínculo entre ellas** (437E, 438E, 439E,
+809E: los códigos que existen en LK y en CH como productos físicos distintos). El riesgo no era el
+presente —coincidían— sino el futuro: agregar un 5.º dual en una sola tabla y que los otros dos
+caminos lo trataran como código único, mezclando el stock de las dos empresas.
+
+| tabla | columnas | quién la leía |
+|---|---|---|
+| `public."Codigos_Duales"` | `cod, nombre_lk, nombre_ch, actualizado_en` | **nadie** |
+| `public.codigos_duales` | `cod, nota, creado` | `actualizar_saldo_trigger()`, `trg_normalizar_empresa_stock()`, `gv_stock_clave()`, `aceptar_conteo()`, `public.vista_saldos_stock`, `public.gv_articulo_empresa` |
+| `stock_v2.codigos_duales` | `cod, nota, creado` | `stock_v2.trg_normalizar_empresa()` (tablas de prueba `mov_prueba` / `mov_dedup`) y `stock_v2.vista_saldos_stock` |
+
+**El registro del problema decía que la de mayúsculas la usaban `empresa_de_np()` y el front. Es
+falso hoy y se midió:** `empresa_de_np(text)` decide por el número de NP (`> 90000` → LK) y no
+nombra la tabla; ninguna función la nombra (`pg_proc.prosrc`), ninguna vista la nombra
+(`pg_get_viewdef`), y `grep -rn -i 'codigos_duales' --include=*.js --include=*.html` en el repo da
+**cero**. Era una tabla huérfana con datos que sólo existían ahí (los nombres de 809E).
+
+**Ahora `public.codigos_duales` es la única tabla y las otras dos son VISTAS sobre ella**, con las
+mismas columnas y el mismo nombre, así que no pueden divergir nunca más. La canónica absorbió
+`nombre_lk`, `nombre_ch` y `actualizado_en` (nullable, sin default, backfilleadas desde la
+huérfana antes de dropearla) y heredó su guarda de formato: el `check (cod = upper(btrim(cod)) and
+cod !~ '\s+(LK|CH|LOKE)$')` y el trigger `trg_canon_codigos_duales_cod` → `fn_canon_col_cod()`.
+
+`stock_v2.vista_saldos_stock` colgaba de la tabla de `stock_v2` en **nivel 2**, así que se respaldó
+su definición y se recreó idéntica en la misma transacción (la regla de `DROP CASCADE` de
+`CLAUDE.md`). Sólo `postgres` tiene grants sobre ella: ninguna app la lee.
+
+**De paso se cerró un grant que sobraba:** `public.codigos_duales` tenía `INSERT` para `anon` y
+`INSERT/UPDATE/DELETE/TRUNCATE` para `authenticated`. No era un agujero vivo —la única policy es
+de `SELECT`, así que la RLS lo bloqueaba igual— pero el grant no tenía por qué estar. Revocado.
+
+**Medición, antes y después (idéntica):**
+
+| | antes | después |
+|---|---|---|
+| `public.vista_saldos_stock` filas / Σ terminado | 488 / 26.806,00 | 488 / 26.806,00 |
+| `stock_v2.vista_saldos_stock` filas / Σ terminado | 481 / 26.806,00 | 481 / 26.806,00 |
+| `public.gv_articulo_empresa` filas | 442 | 442 |
+| filas con `empresa <> 'Mixto'` (o sea, duales) | 8 | 8 |
+| las tres listas | 4 / 4 / 4 | 4 / 4 / 4 |
+| `public.gv_endpoints_rotos` | 0 | 0 |
+
+**Rollback:** `zz_backups."GV_Backup_codigos_duales_20260913"` (clave: `origen` + `cod`) tiene las
+tres tablas como estaban. Para volver atrás: dropear las dos vistas y recrear las tablas desde ahí.
+
+Archivo: `sql/gv_codigos_duales_unico_v1649.sql`.
+
+**Queda abierta la otra mitad del problema 84**, la de la capacidad de góndola
+(`Capacidad_Sector` vs `GV_Lugar_Item` vs `zzz_backup_Capacidad_Gondola`, 204 asignaciones que
+divergen): eso no es una copia que se pueda colapsar en una vista, es una migración a medias con
+datos distintos de los dos lados.
