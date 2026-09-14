@@ -142,13 +142,13 @@ function renderSug() {
 
   thead.innerHTML = `
     <tr>
-      <th style="width:120px">Img</th>
-      <th style="width:80px">Cod</th>
-      <th>Descripción</th>
-      <th style="width:70px">UxB</th>
-      <th style="width:140px">Tu precio contado</th>
-      <th style="width:300px">Motivo</th>
-      <th style="width:220px">Pedido</th>
+      <th style="width:9%">Img</th>
+      <th style="width:7%">Cod</th>
+      <th style="width:22%">Descripción</th>
+      <th style="width:6%">UxB</th>
+      <th style="width:12%">Tu precio contado</th>
+      <th style="width:26%">Motivo</th>
+      <th style="width:18%">Pedido</th>
     </tr>
   `;
 
