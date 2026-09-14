@@ -14516,3 +14516,69 @@ tiene `_submitSingleOrder`). Además su `update` de `sheets_payload` **ya lleva 
 (`.then(ok, err => console.warn(...))`), así que un fallo ahí no le tumba la confirmación. Y sus
 pedidos entran a Gestión con normalidad — la última NP web de Chef es del 14/09 11:00. **No hay
 nada que cambiar ni que subir en Chef.**
+
+### §3.fk (cont.) — v17.71: el camión lo define la ZONA, no el número de tanda (corrección de la v17.62)
+
+**Dueño (2026-09-14), mirando la pantalla del 15/09:** *"Sí, está mal esto, porque la zona uno se
+entrega con zona dos, así que no son dos camiones diferentes. Revisá cómo es la lógica, no hagas
+sin primero revisar la lógica."*
+
+Tenía razón, y la regla **ya estaba escrita en la base** desde la v13.60. Revisada antes de tocar:
+
+```sql
+gv_ppp_web_camion(p_zona, p_sector)
+  → GV_Sectores.camion por sector (A-H = Capital · J,K,L = GBA Sur · M = GBA Oeste · N,P = GBA Norte)
+  → si el barrio no está mapeado, por número de zona:
+       1, 2, 3 → Capital · 4 → GBA Sur · 5 → GBA Oeste · 6, 7 → GBA Norte
+```
+
+El sector lo resuelve `gv_ppp_web_sector(zona, barrio, direccion)` contra `GV_Barrios_Sector`. Las
+dos son las que usa el armado, así que la vista **llama a lo que ya decide el camión**, no
+reimplementa nada. El propio encabezado del `sql/gv_ppp_web_camion_del_dia.sql` lo dice: *"misma
+que ISIS: D60 = zonas 4+5, D67 = 1+2+3, D69 = 5+6"*.
+
+#### El contraejemplo: la etiqueta sola tampoco alcanza
+
+Agrupando sólo por etiqueta, una serie de tanda que cruza dos etiquetas se partiría en dos. Medido
+del 8 al 18/09, pasa **dos veces** y siempre igual:
+
+| Día | Serie | Etiquetas | NP |
+|---|---|---|---:|
+| 09/09 | D57 | GBA Norte + GBA Oeste | 9 |
+| 17/09 | D69 | GBA Norte + GBA Oeste | 11 |
+
+Es exactamente el "D69 = 5+6" del comentario. Por eso `camion_key` = **el conjunto de etiquetas que
+toca la serie**: dos series de la misma etiqueta se juntan (Capital), y una serie que cruza dos
+etiquetas queda entera.
+
+#### Antes y después, medido
+
+| Día | Camiones por serie de tanda (v17.62) | Por etiqueta | Con la unión (v17.71) |
+|---|---:|---:|---:|
+| 14/09 | 3 | 2 | **2** |
+| 15/09 | 5 | 3 | **3** |
+| 16/09 | 4 | 4 | **4** |
+| 17/09 | 5 | 4 | **3** |
+| 18/09 | 2 | 2 | **2** |
+
+El 15/09 pasa de 5 "camiones" a 3: **Capital** (D56 + D67 + E01 · Zona 1 + Zona 2 · 26 NP ·
+3,90 m³), **Súper E16** y **Retira**. Es lo que pedía el dueño.
+
+#### ⚠ Y recién ahora el tope sirve
+
+Con el camión bien agrupado, **Capital del 17/09 da 7,02 m³ y se pasa del tope de 6**. Con la
+agrupación por número de tanda de la v17.62 ese mismo día se veía como E01 (1,98), E03 (3,24) y
+E12 (1,81) — ninguno llegaba a 3,25 y el aviso no aparecía nunca. O sea: el tope de la v17.62 era
+decorativo.
+
+#### En pantalla
+
+La cabecera pasa a ser el **nombre del camión** con las series de tanda de subtítulo:
+`🚚 Capital  D56 + D67 + E01 · 26 NP · 5 tandas · 3,90 / 6,00 m³`. Súper: `🛒 Súper D72`
+(sin repetir la serie). Retira: `🏭 Retira en fábrica`.
+
+#### Queda pendiente
+
+El tope vive en **dos lugares**: `PPP_Web_Config.camion_m3_tope` (6,00, el que usa esta vista, y es
+compartido) y `pppGetCfg().dayCap` (6, en el `localStorage` de cada supervisor, que usa el ruteo).
+Hoy valen lo mismo; unificarlos es otro cambio.

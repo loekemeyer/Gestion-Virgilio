@@ -27,14 +27,14 @@ const FILAS = [
 ];
 
 const DETALLE = [
-  // E01 · Zona 1 — dos empresas en el mismo camión (por eso el filtro recalcula por camión)
-  { np: "CH 0002", np_num: "2",     tanda: "E01E", m3: "0.070", razon_social: "Elbantonio",   cod: "2101", localidad: "Soldati",     camion: "E01", camion_key: "E01", ruta: "", zona_corta: "Zona 1", camion_m3: 0.710, camion_tope: 6, empresa: "CH", pickeado: true,  armado: true,  facturado: true },
-  { np: "LK 0031", np_num: "31",    tanda: "E01A", m3: "0.640", razon_social: "Chen Li Yu",   cod: "4102", localidad: "Belgrano",    camion: "E01", camion_key: "E01", ruta: "", zona_corta: "Zona 2", camion_m3: 0.710, camion_tope: 6, empresa: "LK", pickeado: false, armado: false, facturado: false },
-  // súper: MISMO número de tanda que un camión de clientes, pero va aparte (regla v14.23)
-  { np: "44612",   np_num: "44612", tanda: "D72B", m3: "0.250", razon_social: "CENCOSUD S.A.", cod: "2444", localidad: "Tortuguitas", camion: "D72", camion_key: "SUP:D72", ruta: "sup", zona_corta: "Súper", camion_m3: 0.250, camion_tope: 6, empresa: "CH", pickeado: true,  armado: true,  facturado: false },
-  // D67 · pasado de tope
-  { np: "98652",   np_num: "98652", tanda: "D67A", m3: "0.090", razon_social: "Milera Patricia Lorena", cod: "3958", localidad: "Mataderos", camion: "D67", camion_key: "D67", ruta: "", zona_corta: "Zona 3", camion_m3: 6.490, camion_tope: 6, empresa: "LK", pickeado: true, armado: false, facturado: false },
-  { np: "98704",   np_num: "98704", tanda: "D67M", m3: "6.400", razon_social: "S.A.Imp Y Exp De La Patagonia", cod: "771", localidad: "Esteban Echeverria", camion: "D67", camion_key: "D67", ruta: "", zona_corta: "Zona 3", camion_m3: 6.490, camion_tope: 6, empresa: "LK", pickeado: false, armado: false, facturado: false }
+  // Zona 1 y Zona 2 son EL MISMO camión ("Capital", gv_ppp_web_camion): dos series de tanda
+  // distintas (E01 y D67) tienen que salir juntas, no como dos camiones.
+  { np: "CH 0002", np_num: "2",     tanda: "E01E", m3: "0.070", razon_social: "Elbantonio",   cod: "2101", localidad: "Soldati",     camion: "E01", camion_key: "Capital", ruta: "", zona_corta: "Zona 1", camion_m3: 6.760, camion_tope: 6, empresa: "CH", pickeado: true,  armado: true,  facturado: true },
+  { np: "LK 0031", np_num: "31",    tanda: "E01A", m3: "0.640", razon_social: "Chen Li Yu",   cod: "4102", localidad: "Belgrano",    camion: "E01", camion_key: "Capital", ruta: "", zona_corta: "Zona 2", camion_m3: 6.760, camion_tope: 6, empresa: "LK", pickeado: false, armado: false, facturado: false },
+  // súper: va aparte aunque sea el mismo día (regla v14.23)
+  { np: "44612",   np_num: "44612", tanda: "D72B", m3: "0.250", razon_social: "CENCOSUD S.A.", cod: "2444", localidad: "Tortuguitas", camion: "D72", camion_key: "Súper D72", ruta: "sup", zona_corta: "Súper", camion_m3: 0.250, camion_tope: 6, empresa: "CH", pickeado: true,  armado: true,  facturado: false },
+  { np: "98652",   np_num: "98652", tanda: "D67A", m3: "0.050", razon_social: "Milera Patricia Lorena", cod: "3958", localidad: "Mataderos", camion: "D67", camion_key: "Capital", ruta: "", zona_corta: "Zona 1", camion_m3: 6.760, camion_tope: 6, empresa: "LK", pickeado: true, armado: false, facturado: false },
+  { np: "98704",   np_num: "98704", tanda: "D67M", m3: "6.000", razon_social: "S.A.Imp Y Exp De La Patagonia", cod: "771", localidad: "Esteban Echeverria", camion: "D67", camion_key: "Capital", ruta: "", zona_corta: "Zona 2", camion_m3: 6.760, camion_tope: 6, empresa: "LK", pickeado: false, armado: false, facturado: false }
 ];
 
 (async () => {
@@ -153,17 +153,18 @@ const DETALLE = [
     fail.push("encabezado del detalle != 'NP;Cliente;Tanda;Mt3;Pick;Arm;Fact' → " + det.th.join(";"));
   // el orden: camión por camión, en el orden de la NP más baja; adentro, por NP
   const secuencia = det.filas.map((x) => x.cam ? "[" + x.cam.replace(/\s+/g, " ") + "]" : x.np);
-  const esperado = ["[🚚 Camión E01 · Zona 1 + Zona 2 · 2 NP · 2 tandas · 0,71 / 6,00 m³]", "CH 0002", "LK 0031",
-                    "[🚚 Camión D67 · Zona 3 · 2 NP · 2 tandas · 6,49 / 6,00 m³ ⚠ pasado 0,49 m³]", "98652", "98704",
-                    "[🛒 Camión D72 · Súper · 1 NP · 1 tanda · 0,25 / 6,00 m³]", "44612"];
+  // UN solo camión Capital con las dos series (E01 y D67): la zona 1 se entrega con la zona 2
+  const esperado = ["[🚚 Capital D67 + E01 · 4 NP · 4 tandas · 6,76 / 6,00 m³ ⚠ pasado 0,76 m³]",
+                    "CH 0002", "LK 0031", "98652", "98704",
+                    "[🛒 Súper D72 · 1 NP · 1 tanda · 0,25 / 6,00 m³]", "44612"];
   if (secuencia.join("|") !== esperado.join("|"))
     fail.push("no quedó separado por camión / ordenado por NP →\n     " + secuencia.join("|") + "\n     esperaba: " + esperado.join("|"));
   // los tics salen tal cual los manda el backend
   const tics = det.filas.filter((x) => !x.cam).map((x) => x.tic.join(""));
   if (tics.join("|") !== "✓✓✓||✓||✓✓") fail.push("los tics no salen como los manda el backend → " + tics.join("|"));
-  if (det.tot.join(";") !== "5 NP;3 camiones;;7,45;3;2;1") fail.push("el pie del detalle no cierra → " + det.tot.join(";"));
+  if (det.tot.join(";") !== "5 NP;2 camiones;;7,01;3;2;1") fail.push("el pie del detalle no cierra → " + det.tot.join(";"));
   // el tope y el aviso de pasado salen del backend, no de una cuenta del front
-  if (!/⚠ pasado 0,49 m³/.test(det.filas.map((x) => x.cam || "").join(" ")))
+  if (!/⚠ pasado 0,76 m³/.test(det.filas.map((x) => x.cam || "").join(" ")))
     fail.push("no avisa que el camión se pasó del tope");
   const over = await p.evaluate(() => document.querySelectorAll("#pppOpBody .pppop-cam-over").length);
   if (over !== 1) fail.push("el aviso de tope pasado aparece " + over + " veces (esperaba 1)");
@@ -189,10 +190,10 @@ const DETALLE = [
   const secLk = lk.filas.map((x) => x.cam ? "[" + x.cam.replace(/\s+/g, " ") + "]" : x.np);
   // con filtro: el camión dice cuántos se ven "de" cuántos tiene, pero los m³ y el tope siguen
   // siendo los del CAMIÓN entero — el tope es del camión, no de lo que se está mirando
-  if (secLk.join("|") !== ["[🚚 Camión E01 · Zona 2 · 1 NP (de 2) · 1 tanda · 0,71 / 6,00 m³]", "LK 0031",
-                           "[🚚 Camión D67 · Zona 3 · 2 NP · 2 tandas · 6,49 / 6,00 m³ ⚠ pasado 0,49 m³]", "98652", "98704"].join("|"))
+  if (secLk.join("|") !== ["[🚚 Capital D67 + E01 · 3 NP (de 4) · 3 tandas · 6,76 / 6,00 m³ ⚠ pasado 0,76 m³]",
+                           "LK 0031", "98652", "98704"].join("|"))
     fail.push("el filtro LK no dejó sólo LK (ni recalculó el camión) → " + secLk.join("|"));
-  if (lk.tot.join(";") !== "3 NP;2 camiones;;7,13;1;0;0") fail.push("el pie no se recalcula con el filtro → " + lk.tot.join(";"));
+  if (lk.tot.join(";") !== "3 NP;1 camion;;6,69;1;0;0") fail.push("el pie no se recalcula con el filtro → " + lk.tot.join(";"));
   if (pedidos !== antesFiltro || detUrl !== antesDet) fail.push("filtrar volvió a consultar al servidor");
 
   await p.evaluate(() => pppOpFiltrar("CH"));

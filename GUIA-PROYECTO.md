@@ -150,7 +150,20 @@ Pedido de Luis. Dos cosas:
 > única**; no se replica. Ante la duda entre parche rápido y fix de raíz → **fix
 > de raíz**.
 >
-> Última actualización: 2026-09-14 (domingo) · Versión app al documentar: **v17.62**
+> Última actualización: 2026-09-14 (domingo) · Versión app al documentar: **v17.71**
+>
+> Nota **v17.71 (2026-09-14, Thomas) — el camión lo define la ZONA, no el número de tanda.**
+> Corrección de la v17.62. Dueño, mirando la pantalla: *"la zona uno se entrega con zona dos, así
+> que no son dos camiones diferentes. Revisá cómo es la lógica"*. Tenía razón y **la regla ya estaba
+> escrita**: `gv_ppp_web_camion(zona, sector)` (v13.60) → por sector (`GV_Sectores`: A-H Capital,
+> J/K/L GBA Sur, M GBA Oeste, N/P GBA Norte) y si no, por zona: **1, 2 y 3 = Capital**, 4 = GBA Sur,
+> 5 = GBA Oeste, 6 y 7 = GBA Norte. La vista ahora LLAMA a esa función en vez de agrupar por tanda.
+> **Contraejemplo medido**: una serie que cruza dos etiquetas (D57 el 09/09 y D69 el 17/09, las dos
+> GBA Oeste + GBA Norte — el "D69 = 5+6" del comentario) quedaría partida en dos camiones que salen
+> juntos, así que `camion_key` es el CONJUNTO de etiquetas de la serie. El 15/09 pasa de 5 camiones
+> a 3 (Capital con D56+D67+E01, Súper E16, Retira). ⚠ **Y recién ahora el tope sirve**: Capital del
+> 17/09 da 7,02 m³ y se pasa de 6; con la agrupación vieja los tres pedazos daban menos de 3,25 y el
+> aviso no aparecía nunca. §3.fk de `docs/SUPABASE-GESTION-VIRGILIO.md` · test `tests/ppp-operario.cjs`.
 >
 > Nota **v17.62 (2026-09-14, Thomas) — el camión del detalle sale por ZONA, y con tope de 6 m³.**
 > *"La lógica del camión no tiene que ser sólo por el número de tanda, sino x la zona"* y *"con topes

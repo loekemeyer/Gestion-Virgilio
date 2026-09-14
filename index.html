@@ -5145,7 +5145,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=17.65"></script>
+<script type="module" src="recepcion.js?v=17.71"></script>
 <!-- Config del módulo de fichada (compartido con fichada.html). El secret
      hmacSecret tiene que ser el mismo acá y allá; cargándolo desde un solo
      archivo evitamos que se desincronicen. -->
@@ -7468,13 +7468,15 @@ function pppOpDetRender(fecha, rows, aviso) {
     const k = String(r.camion_key || r.camion || "—");
     if (!(k in ix)) {
       ix[k] = grupos.length;
-      grupos.push({ key: k, cam: String(r.camion || "—"), ruta: String(r.ruta || ""), ped: [], m3: 0, tandas: {}, zonas: [],
+      grupos.push({ key: k, cam: k, ruta: String(r.ruta || ""), ped: [], m3: 0, tandas: {}, zonas: [], series: [],
                     m3Cam: Number(r.camion_m3) || 0, tope: Number(r.camion_tope) || 0, nTot: 0 });
     }
     const g = grupos[ix[k]];
     g.ped.push(r); g.m3 += Number(r.m3) || 0; g.tandas[String(r.tanda || "—")] = 1;
     const z = String(r.zona_corta || "").trim();
     if (z && g.zonas.indexOf(z) < 0) g.zonas.push(z);
+    const se = String(r.camion || "").trim();       // serie de tanda (D67, E01…), va de subtítulo
+    if (se && se !== "—" && g.series.indexOf(se) < 0) g.series.push(se);
   }
   // cuántos pedidos tiene el camión ENTERO (para decir "13 NP (de 18)" cuando hay filtro)
   for (const r of rows) {
@@ -7491,10 +7493,13 @@ function pppOpDetRender(fecha, rows, aviso) {
         + '<th class="pppop-tic">Pick</th><th class="pppop-tic">Arm</th><th class="pppop-tic">Fact</th></tr></thead><tbody>';
   for (const g of grupos) {
     const tn = Object.keys(g.tandas).length;
+    // El NOMBRE del camión ya viene resuelto del backend (Capital · GBA Sur · GBA Oeste · GBA
+    // Norte, o "Súper <serie>" / "Retira"). Las series de tanda que van adentro son el subtítulo.
     const ico = g.ruta === "ret" ? "🏭" : (g.ruta === "sup" ? "🛒" : "🚚");
-    const zonas = g.zonas.sort().join(" + ");
+    // en Súper el nombre ya trae la serie ("Súper D72"): no repetirla de subtítulo
+    const series = (g.ruta === "sup") ? "" : g.series.sort().join(" + ");
     const nombre = g.ruta === "ret" ? "Retira en fábrica"
-                 : ("Camión " + escapeHtml(g.cam) + (zonas ? " · " + escapeHtml(zonas) : ""));
+                 : (escapeHtml(g.cam) + (series ? ' <span class="pppop-cam-sub">' + escapeHtml(series) + '</span>' : ""));
     // m³ del CAMIÓN entero contra su tope (6 m³, salvo que un solo pedido lo pase: ése va en
     // un camión más grande y el tope pasa a ser el pedido). Con filtro puesto los m³ siguen
     // siendo los del camión — el tope es del camión, no de lo que se está mirando.
@@ -8552,7 +8557,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v17.65";
+const APP_VERSION = "v17.71";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
