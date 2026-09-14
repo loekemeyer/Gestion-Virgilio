@@ -424,3 +424,6 @@ PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node te
 
 echo "== gond-exceso-dual (v16.30: el aviso de no-devolver-a-góndola mira la góndola de SU empresa) =="
 node tests/gond-exceso-dual.cjs
+
+echo "== ppp-avance (v16.97: % listo / % armado del día en la PPP — el número sale del backend) =="
+PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/ppp-avance.cjs

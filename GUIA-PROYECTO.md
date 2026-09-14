@@ -12,7 +12,39 @@
 > única**; no se replica. Ante la duda entre parche rápido y fix de raíz → **fix
 > de raíz**.
 >
-> Última actualización: 2026-09-13 (domingo) · Versión app al documentar: **v16.65**
+> Última actualización: 2026-09-14 (domingo) · Versión app al documentar: **v16.97**
+>
+> Nota **v16.97 (2026-09-14, Thomas) — AVANCE DEL DÍA: "85 % listo · 60 % armado" en la PPP, por
+> Telegram a las 16:00 y como tarea de Planify para Marianela.**
+> Pedido del dueño: *"a las cuatro de la tarde quiero que mande su mensaje por Telegram, y que también se
+> vea en la PPP el porcentaje de estado de los pedidos para un solo día… cosa que se puede ver si ya se
+> llegó al total de lo que se tenía que armar para ese día con antelación, no a último minuto"*; y
+> *"que a las cuatro le aparezca en Planify, de la misma manera que figura para la recepción de remitos
+> del tallerista al sector de Pagos, a Marianela, que le diga tal porcentaje listo, cosa de que sea
+> imposible que no lo vea, a pesar de que no lea Telegram o que no se metan a la PPP"*.
+>
+> - **listo** = la tanda tiene el **picking terminado** (último evento EP/TP = `TP`); incluye lo que ya se
+>   está armando o está armado. **armado** = `TAP`, o el pedido ya está **cargado al camión** / entregado
+>   (si salió, se armó, aunque nadie haya tocado el TAP). Legajos 0 y 1 (Pruebas) no cuentan.
+> - **El % va por m³** — es el volumen de trabajo del día, la misma unidad del cupo; si el día no tiene m³
+>   cargados, cae a contar pedidos. Los porcentajes por pedidos vienen igual en la misma fila
+>   (`pct_listo_ped` / `pct_armado_ped`) y se muestran en la letra chica de la tarjeta.
+> - **100 % sólo si de verdad está todo**: 15 de 16 redondeaba a 100 y el aviso diría "ya está" con uno sin
+>   armar. Mientras falte algo, el tope es 99 (`gv_pct`).
+> - **Un solo número para los tres lugares.** Lo calcula el backend (`gv_ppp_avance_dias`, RPC) y la PPP lo
+>   **lee**, no lo recalcula: si el front hiciera su propia cuenta, la pantalla y el Telegram podrían decir
+>   cosas distintas del mismo día. Además el backend suma los pedidos del día que **ya salieron**
+>   (cargados/entregados), que Programación esconde: sin ellos el denominador se achica al despachar y el
+>   porcentaje mentiría (10 entregados y 10 sin armar daría 0 %).
+> - **Dónde se ve:** adentro de un día de Programación, tarjeta **Avance del día** con los dos números, la
+>   barra y qué falta armar (m³ y pedidos, cuántos en curso y cuántos sin empezar); y una línea chiquita
+>   `85 % listo · 60 % armado` en cada tarjeta de la grilla de 6 días.
+> - **16:00 (lun–vie, feriado no):** cron **85 `gv-avance-dia-16h`** (`0 19 * * 1-5` UTC) → Telegram al grupo
+>   (dedup por día) **y** tarea en el Planify de **Marianela Becker (38)** por
+>   `planify.planify_aviso_diario` — el mismo camino que el aviso de Facturación de las 16:00 (cron 84),
+>   urgente y con `broadcast`, así que le salta el cartel.
+> - SQL: `sql/gv_ppp_avance_dia_v1697.sql`. Detalle, medición y rollback: `docs/SUPABASE-GESTION-VIRGILIO.md`
+>   §3.ec. Test: `tests/ppp-avance.cjs`.
 >
 > Nota **v15.40 (2026-09-11) — HANDOFF de planimetría / Acacia: `docs/HANDOFF-PLANIMETRIA-Y-ACACIA.md`.**
 > Thomas sigue este tema en otra sesión. Ahí está todo junto: los **13 artículos activos del catálogo LK

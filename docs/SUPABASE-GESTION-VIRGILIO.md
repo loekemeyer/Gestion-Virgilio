@@ -11319,3 +11319,93 @@ telefonos 942).
 ⚠ **Lo que sigue abierto:** mientras la función se trague los errores y el cron diga `succeeded`, el próximo
 rename vuelve a congelar el espejo en silencio. Habría que hacer que el cron falle (o avise) cuando `ok`
 viene en `false`.
+
+---
+
+### §3.ef — v16.97: el AVANCE DEL DÍA (% listo / % armado) en la PPP, en Telegram a las 16:00 y en el Planify de Marianela — 2026-09-14
+
+**Pedido de Thomas (14/09):** *"a las cuatro de la tarde quiero que mande su mensaje por Telegram, y que
+también se vea en la PPP el porcentaje de estado de los pedidos para un solo día… 85 % listo, 60 % armado…
+cosa que se puede ver si ya se llegó al total de lo que se tenía que armar para ese día con antelación, no
+a último minuto"* + *"que a las cuatro le aparezca en Planify, de la misma manera que figura para la
+recepción de remitos del tallerista al sector de Pagos, a Marianela, que le diga tal porcentaje listo,
+cosa de que sea imposible que no lo vea, a pesar de que no lea Telegram o que no se metan a la PPP"*.
+
+### Qué se aplicó (todo nuevo, nada pisado)
+
+| objeto | qué hace |
+|---|---|
+| `public.gv_pct(numeric, numeric)` | % entero con **tope 99 mientras falte algo** (100 sólo si `parte >= total`) |
+| `public.gv_ppp_avance_dias(date, date)` | una fila por día: pedidos, m³, pickeado, armado, en curso, sin empezar y los 4 porcentajes |
+| `public.gv_ppp_avance_dia(date)` | un solo día (default hoy AR) |
+| `public.gv_ppp_avance_texto(date, boolean)` | el texto del aviso — **uno solo** para Telegram y Planify |
+| `public.gv_avance_dia_16h(boolean)` | las 16:00: encola el Telegram (dedup `gv_avance16_<fecha>`) + crea la tarea de Planify. `p_forzar` para correrla a mano |
+| cron **85** `gv-avance-dia-16h` | `0 19 * * 1-5` UTC = **16:00 ART lun–vie**; el feriado lo corta `gv_es_dia_habil` |
+
+Las tres primeras son `stable`, **invoker** (no `security definer`): leen lo mismo que ya lee el front con
+la anon key, así que no abren nada nuevo. `gv_avance_dia_16h` sí es definer (escribe en `planify.tasks` y
+en el outbox) y está **revocada para `anon`/`authenticated`**: sólo `service_role` y el cron.
+
+### Las definiciones
+
+- **listo** = la tanda tiene **picking terminado**: el último evento `EP`/`TP` de esa tanda es `TP`.
+  Incluye lo que se está armando y lo armado (si se arma, el picking terminó).
+- **armado** = último `AP`/`TAP` de la tanda es `TAP`, **o** el pedido está en `gv_ppp_en_salida`
+  (cargado al camión) o en `gv_ppp_entregados`. Si salió, se armó.
+- Legajos **0 y 1** (Pruebas) no marcan estado — misma regla que `getActivityStatus()` del front.
+- El **% principal va por m³** (es el volumen de trabajo, la unidad del cupo diario); si el día no tiene
+  m³, cae a pedidos. Los de pedidos se devuelven igual (`pct_listo_ped`, `pct_armado_ped`).
+
+### El universo del día es más grande que "Programación"
+
+Programación **esconde** lo que ya se cargó (`gv_ppp_en_salida`) y lo entregado (`gv_ppp_entregados`).
+Si el avance se calculara sobre lo que muestra la pantalla, el denominador se achicaría a medida que sale
+la mercadería: 10 entregados y 10 sin armar daría **0 %**. Por eso la función une **cuatro** fuentes y
+deduplica por NP (`distinct on (np)`, prioridad programación → web → en salida → entregados):
+
+```
+gv_ppp_programacion_diaria  (ISIS, con overrides y ocultos ya aplicados)
+PPP_Web_Programacion        (web, sólo con tanda)
+gv_ppp_en_salida            (cargado al camión)
+gv_ppp_entregados           (remito controlado)
+```
+
+Las NP web ya vienen etiquetadas igual en las cuatro (`LK 0057`), así que el dedup cierra.
+
+### Medición (14/09, con datos reales)
+
+| fecha | pedidos | m³ | pick | arm | % listo | % armado |
+|---|--:|--:|--:|--:|--:|--:|
+| 09/09 | 16 | 10,468 | 16 | 15 | 100 | **99** ← 15 de 16: el tope del 99 evita el falso "ya está" |
+| 10/09 | 24 | 7,923 | 24 | 24 | 100 | 100 |
+| 11/09 | 21 | 8,574 | 21 | 21 | 100 | 100 |
+| 15/09 | 40 | 7,996 | 9 | 5 | 13 | 7 |
+| 16/09 | 26 | 15,513 | 0 | 0 | 0 | 0 |
+
+Los días ya cerrados dan 100 % y los futuros 0 %, que es lo esperable. El aviso completo se probó de punta
+a punta **dentro de una transacción con `rollback`** (se verificó primero que el rollback funciona): encola
+el Telegram correcto en `telegram_outbox` y arma la tarea de Planify con el nombre
+`Avance del día: 100 % listo · 100 % armado`, `prio='urgente'`, `broadcast=true`, `system_generated=true`,
+`employee_id=38`, hora `16:00`. Después del rollback quedaron **0 filas** en el outbox y **0** en
+`planify.tasks`, o sea que la prueba no mandó ni creó nada.
+
+### El front (index.html v16.97)
+
+`pppAvanceNeed(desde, hasta)` pide el rango por RPC (una sola llamada para los 6 días, TTL 60 s) y guarda
+`_pppAvance`; `_pppAvanceHtml(key)` dibuja la tarjeta grande adentro de un día y `_pppAvancePctHtml(key)`
+la línea chiquita de la grilla. **El front no recalcula el número**: si lo hiciera, la pantalla y el
+Telegram podrían decir cosas distintas del mismo día. Test: `tests/ppp-avance.cjs` (en `tests/run.sh`).
+
+### Rollback
+
+```sql
+select cron.unschedule('gv-avance-dia-16h');
+drop function public.gv_avance_dia_16h(boolean);
+drop function public.gv_ppp_avance_texto(date, boolean);
+drop function public.gv_ppp_avance_dia(date);
+drop function public.gv_ppp_avance_dias(date, date);
+drop function public.gv_pct(numeric, numeric);
+```
+
+Y en el front, sacar `pppAvanceNeed` / `_pppAvanceHtml` / `_pppAvancePctHtml` y sus dos llamadas en
+`_pppPlanGridHtml` y `_pppPlanDiaHtml`. SQL versionado: `sql/gv_ppp_avance_dia_v1697.sql`.
