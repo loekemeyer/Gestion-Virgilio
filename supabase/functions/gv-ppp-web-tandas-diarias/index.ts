@@ -127,15 +127,99 @@ async function lk(path: string, init: RequestInit = {}): Promise<Response> {
 
 type Fila = Record<string, unknown>;
 
+/** v17.80 — TIERRA DEL FUEGO: el pedido entra por la página de LK pero ES DE CHEF.
+ *
+ *  Dueño (14/09): *"esos pedidos se pasen como pedidos de CH y se facturen como CH … se
+ *  marcan y se evalúan para cuarentena con código de cliente CH"*, y sobre la NP:
+ *  *"debería estar como NP de CH"*.
+ *
+ *  La condición ya viene resuelta del feed: `v_pedidos_web` de LK devuelve
+ *  `isis_empresa = 'chef'` + `cod_isis` para el pedido cuya sucursal de entrega está en
+ *  Tierra del Fuego (o para un CUIT puesto a mano en `gv_isis_override`). Acá sólo se lo
+ *  MUEVE de lote: sale del de LK y entra al de Chef, con el código de cliente de Chef.
+ *  Desde ahí el pipeline lo trata como Chef solo: NP del contador de Chef (`CH 0020`),
+ *  tanda y remito de Chef, cuarentena contra el padrón de Chef.
+ *
+ *  ⚠ POR QUÉ ACÁ Y NO EN LAS RPC DE LK, que sería el lugar natural: se probó el 14/09 y
+ *  **`gv_pedidos_web_np_chef` ya tarda 7,0 s contra un `statement_timeout` de 8 s** (lee
+ *  Chef por FDW). Sumarle el bloque de TdF —600 ms medidos— la llevó a 7,7 s y después a
+ *  timeout: la corrida entera de Chef quedó en `HTTP 500 canceling statement due to
+ *  statement timeout`. Mientras esa RPC no se acelere, NO SE LE PUEDE COLGAR NADA MÁS.
+ *
+ *  ⚠ EL `order_id` LLEVA OFFSET, y no es opcional. La clave de `PPP_Web_NP` y de
+ *  `PPP_Web_Programacion` es `(empresa, order_id, np_idx)`, y el `order_id` es el número
+ *  del pedido de la PÁGINA. Guardar el 1431 de la página LK como `chef` lo pone a chocar
+ *  con el 1431 de la página de Chef el día que ese portal llegue (hoy va por 228). Se le
+ *  suma `web_order_offset_lk` (1.000.000), así `1431 → 1001431`: nunca puede chocar, el
+ *  número original se lee a simple vista y volver atrás es restar. Lo que ve el operario
+ *  no es éste sino la NP, que la asigna el contador de Chef.
+ *
+ *  ⚠ EL PISO DE FECHA TAMPOCO ES OPCIONAL (`tdf_como_chef_desde`). Un pedido anterior ya
+ *  está programado como LK, y sacarlo del feed de LK para meterlo en el de Chef lo haría
+ *  entrar como pedido NUEVO: dos veces en la PPP. Medido antes de prender: sin el piso, 4
+ *  pedidos (7 bloques) se habrían re-armado.
+ *
+ *  Se pickea de la góndola LOEKE igual, y eso NO depende de la empresa de la NP: los
+ *  artículos vienen con la L pegada (505L) y `pkEmpresaArt` fuerza góndola Loeke a todo
+ *  código terminado en L. Es el mismo camino que usan desde la v13.71 los pedidos de Chef
+ *  con artículos de Loekemeyer.
+ *
+ *  PERILLAS: viven en `app_settings` de **LK**, que son las mismas que lee el front de A
+ *  Programar (`aprPartirTdF`) y la función `gv_web_es_tdf_chef`. Una sola perilla para los
+ *  dos caminos: si el job y la pantalla decidieran distinto, el pedido saldría pendiente en
+ *  LK y programado en Chef, o sea dos veces. Si la lectura falla queda APAGADO. */
+let _cfgTdf: { on: boolean; off: number; desde: string } | null = null;
+async function cfgTdF(): Promise<{ on: boolean; off: number; desde: string }> {
+  if (_cfgTdf) return _cfgTdf;
+  const apagado = { on: false, off: 1_000_000, desde: "9999-12-31" };
+  try {
+    const r = await lk("/rest/v1/app_settings?select=key,value&key=in.(tdf_como_chef,web_order_offset_lk,tdf_como_chef_desde)");
+    if (!r.ok) { _cfgTdf = apagado; return _cfgTdf; }
+    const rows = await r.json() as { key: string; value: string | null }[];
+    const val = (k: string) => String(rows.find((x) => x.key === k)?.value ?? "").trim();
+    _cfgTdf = {
+      on: val("tdf_como_chef") === "1",
+      off: Number(val("web_order_offset_lk")) || 1_000_000,
+      desde: val("tdf_como_chef_desde") || "9999-12-31",
+    };
+  } catch (_e) { _cfgTdf = apagado; }
+  return _cfgTdf;
+}
+
+/** Las filas de LK que en realidad son de Chef, ya remapeadas y esperando a `traerChef`.
+ *  ⚠ Depende de que `traerLk` corra ANTES que `traerChef`, que es como está ordenado el
+ *  main en los tres caminos (dry, intradía y normal): LK primero porque de ahí salen los
+ *  clientes a forzar en Chef. `traerLk` la vacía al empezar, así que si falla no quedan
+ *  filas viejas colgadas; si nunca corrió, Chef sale como siempre. */
+let _tdfParaChef: Fila[] = [];
+
 /** Los pedidos de Loekemeyer. Va por RPC y no leyendo `v_pedidos_web_np`
  *  directo: la vista es `security_invoker`, asi que un rol acotado chocaria con
  *  la RLS de las tablas de abajo y no veria nada. Envuelta en una funcion
  *  SECURITY DEFINER el permiso pasa a ser el GRANT, que es lo que se audita. */
 async function traerLk(desde: string): Promise<Fila[]> {
+  _tdfParaChef = [];
   const r = await lk("/rest/v1/rpc/gv_pedidos_web_np_lk",
     { method: "POST", body: JSON.stringify({ p_desde: desde }) });
   if (!r.ok) throw new Error(`LK gv_pedidos_web_np_lk: HTTP ${r.status} ${(await r.text()).slice(0, 300)}`);
-  return await r.json();
+  const todas = await r.json() as Fila[];
+  const cfg = await cfgTdF();
+  if (!cfg.on) return todas;
+  const propias: Fila[] = [];
+  for (const n of todas) {
+    const codIsis = String(n.cod_isis ?? "").trim();
+    const f = String(n.fecha_recep ?? "").slice(0, 10);
+    if (String(n.isis_empresa ?? "lk").toLowerCase() === "chef" && codIsis && f && f >= cfg.desde) {
+      _tdfParaChef.push({
+        ...n,
+        empresa: "chef",
+        order_id: Number(n.order_id) + cfg.off,
+        order_id_pagina: n.order_id,   // el número real de la página LK, para el que lo tenga que leer
+        cod: codIsis,                  // el cliente con el que se factura y se evalúa el crédito
+      });
+    } else propias.push(n);
+  }
+  return propias;
 }
 
 /** Chef vive en otro proyecto y se lee por FDW desde LK, por eso va por RPC
@@ -150,7 +234,10 @@ async function traerChef(dias: number): Promise<Fila[]> {
   const r = await lk("/rest/v1/rpc/gv_pedidos_web_np_chef",
     { method: "POST", body: JSON.stringify({ p_dias: dias }) });
   if (!r.ok) throw new Error(`Chef RPC: HTTP ${r.status} ${(await r.text()).slice(0, 300)}`);
-  return await r.json();
+  const propios = await r.json() as Fila[];
+  // v17.80: más los de Tierra del Fuego, que entraron por la página de LK pero son de Chef
+  // (ver el comentario largo de `traerLk`). Si `traerLk` no corrió o falló, esto va vacío.
+  return _tdfParaChef.length ? [...propios, ..._tdfParaChef] : propios;
 }
 
 /** PENDIENTE PARA GESTIÓN = pedido de la página con fecha >= gestion_desde que

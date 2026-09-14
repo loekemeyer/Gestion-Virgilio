@@ -15101,15 +15101,29 @@ se había leído como "NP de LK". **Pero la góndola de picking no depende de la
 con la NP en Chef el armado sale igual de la góndola Loeke y la regla del 07/09 se sigue cumpliendo.
 Es el mismo camino que ya usan desde la v13.71 los pedidos de Chef con artículos de Loekemeyer.
 
-### Dónde se corta: en los dos feeds, con UNA sola condición
+### ⚠ Dónde se corta: en la Edge Function y en el front, NO en las RPC de LK
 
-`gv_web_es_tdf_chef(isis_empresa, cod_isis, fecha)` en **LK**. La usan `gv_pedidos_web_np_lk` (que
-ya no devuelve esos bloques), `gv_pedidos_web_np_chef` (que los devuelve con el cod de Chef) y el
-front de A Programar (`aprPartirTdF`, que lee la misma configuración de `app_settings` de LK).
-**La Edge Function no se tocó**: lee esas dos RPC y recibe los pedidos ya reclasificados.
+**El primer intento fue meter el corte adentro de los dos feeds de LK** (`gv_pedidos_web_np_lk`
+dejaba de devolver esos bloques y `gv_pedidos_web_np_chef` los devolvía con el cod de Chef, las dos
+con `gv_web_es_tdf_chef`). **Se revirtió el mismo día: `gv_pedidos_web_np_chef` ya tarda 7,03 s
+contra un `statement_timeout` de 8 s** (lee el padrón de Chef por FDW), y el bloque agregado le
+sumaba ~600 ms → 7,73 s y el job empezó a contestar
+`Chef RPC: HTTP 500 {"code":"57014", … statement timeout}`. Las dos RPC quedaron como estaban.
 
-Que la condición sea una sola no es prolijidad: si el job y la pantalla decidieran distinto sobre el
-mismo pedido, saldría **pendiente en LK y programado en Chef** — dos veces en la PPP.
+Hoy el corte vive en **dos** lugares, con la misma condición y la misma configuración
+(`app_settings` de LK: `tdf_como_chef`, `web_order_offset_lk`, `tdf_como_chef_desde`):
+
+- **Edge Function `gv-ppp-web-tandas-diarias`** (`cfgTdF()` + `_tdfParaChef`): `traerLk()` lee el
+  feed de LK entero, aparta las filas con `isis_empresa='chef'`, `cod_isis` cargado y
+  `fecha_recep >= desde`, y `traerChef()` las devuelve pegadas a los pedidos nativos de Chef, ya con
+  `empresa:"chef"`, `order_id + offset` y `cod = cod_isis`.
+- **Front de A Programar** (`aprCfgTdF()` + `aprPartirTdF()`): la pantalla siempre lee el feed de LK
+  y hace el mismo reparto.
+
+Que la condición sea la misma no es prolijidad: si el job y la pantalla decidieran distinto sobre el
+mismo pedido, saldría **pendiente en LK y programado en Chef** — dos veces en la PPP. Las dos leen
+`app_settings`, así que la perilla las mueve juntas y, si la lectura falla, las dos caen a apagado
+(`{on:false, desde:"9999-12-31"}`).
 
 ### ⚠ El `order_id` lleva offset
 
@@ -15158,10 +15172,28 @@ zona del expreso (Villa Luro, Barracas, Soldati).
 facturar, entrega 21/09. Se borraron sus filas de LK —backup en
 `zz_backups."GV_Backup_TdF_a_Chef_20260914"`— para que entren por el feed de Chef y tomen NP de Chef.
 Las tandas E12O y D69F **no quedan vacías**: tienen otros clientes (verificado antes de borrar).
-Quedan 5 números de LK quemados (79, 80, 81, 83, 84): un hueco en la numeración no rompe nada, el
-contador sigue desde el último.
+
+**Resultado, corrida intradía de las 16:35** (log `GV_Tandas_Auto_Log` id 514):
+
+| pedido de la página | `order_id` guardado | NP | tanda | entrega |
+|---|---|---|---|---|
+| LK 1430 (El Martillo, 2 bloques) | 1001430 | **CH 0020 / CH 0021** | E12H (Zona 1 · Barracas) | 21/09 |
+| LK 1431 (Il Cheff, 2 bloques) | 1001431 | **CH 0022 / CH 0023** | E12P (Zona 3 · Villa Luro) | 21/09 |
+| LK 1432 (El Martillo, 1 bloque) | 1001432 | **CH 0024** | E12H | 21/09 |
+
+60 filas en `PPP_Web_Base` (31 + 25 + 4), las mismas que tenía el lado LK. `gv_ppp_super_mezclado`
+sigue vacía. Los números de LK que quedaron libres **se reusan solos** (el contador es `max(np)+1`):
+el 83 se lo llevó el pedido LK 1440 ese mismo día.
 
 Perillas y rollback: `sql/gv_web_tdf_como_chef.sql` del repo `pagina-LK-copia`.
+
+### ⚠ Deuda que quedó a la vista: `gv_pedidos_web_np_chef` está a 1 segundo del timeout
+
+7,03 s medidos contra un `statement_timeout` de 8 s. No lo causó este cambio —se ve en el log de
+las corridas 511 y 513 del 14/09, que fallaron con `57014` sin nada de TdF encima— pero es lo que
+impidió poner el corte en la RPC y es lo que va a hacer fallar el próximo agregado. Lo caro es el
+FDW contra el padrón de Chef; la salida sería una copia local del padrón con su cron, el mismo
+patrón que ya usa `chef_padron` en LK.
 
 ## §3.fs — v17.82: el armado ya no depende del caché del celular del operario — 2026-09-14
 
