@@ -11603,3 +11603,54 @@ regla: mirando sólo LK desapareció (−100 %); mirando por CUIT se mudó a Che
 
 **Queda abierto:** el importador sigue metiendo las facturas de Chef en el batch de LK. Esto lo arregla
 *después*, con una tabla de corrección; lo que corresponde es que cargue con la empresa que va.
+
+---
+
+### §3.ed — Barrido de escritores sin canonizar: 9 tablas, y el trigger que sólo cubría INSERT (v17.03, 2026-09-14)
+
+Revisión pedida después del §3.ec: *"que no haya quedado ningún otro escritor sin canonizar"*.
+Se barrió **toda** tabla de `public` con columna `cod` / `cod_art` / `codigo`, buscando el mismo
+código escrito de dos formas (normalizando ceros a la izquierda y mayúsculas).
+
+**La correlación es perfecta, y es el resultado que importa:** las tablas **con** trigger de
+canonización dan **cero**; las **9 sin trigger** acumulan **30** códigos con doble grafía.
+
+| tabla | códigos | por qué importa |
+|---|--:|---|
+| `Planimetria` | 16 | marcada para retirar en el plan del sufijo (§3.4 del doc del 13/09) |
+| `precios_super_lk` | 5 | el cotizador busca por el código canónico → una lista de súper puede no matchear y el pedido se valoriza con la **lista general** |
+| `Ordenes_Compra` | 2 | `515`/`0515`, `725`/`0725`; se cruzan con stock y proyección |
+| `Insumos_Historial` | 2 | `h201Part`/`H201Part`, `7`/`007` |
+| `Stock_Ubicaciones`, `Insumos_Ubicaciones`, `Insumos_Ubicaciones_Unificadas`, `Stock_Inicial_Cartones`, `Ubicaciones_Articulos` | 1 c/u | ubicaciones; `538e` vs `538E` |
+
+**`Movimientos_Stock` da 0** — la v17.01 la dejó limpia y protegida.
+
+#### Lo que sí se arregló: el trigger sólo cubría INSERT
+
+De los **11** triggers de canonización del proyecto, **10 son `BEFORE INSERT OR UPDATE OF <col>`**
+y el de `Movimientos_Stock` era el único `BEFORE INSERT` a secas. O sea que un `UPDATE` de
+`cod_art` se canonizaba en todas las tablas **menos en la principal** — y un UPDATE manual de
+`cod_art` es justo lo que se hizo dos veces este mismo día. Ahora también cubre UPDATE. No afecta
+al cron: su `ON CONFLICT DO UPDATE` toca `delta` y `legajo`, no `cod_art`, y `UPDATE OF cod_art`
+sólo dispara si la sentencia menciona esa columna.
+
+#### Lo que NO se tocó, a propósito
+
+**Los datos de esas 9 tablas quedan como están.** Cada una tiene su lector, y normalizar sin mirar
+al lector es exactamente lo que causó el problema 130 ese mismo día. **Primero el escritor, después
+los datos.** En `precios_super_lk`, por ejemplo, canonizar mejora el match con el catálogo pero hay
+que confirmar antes cómo lo busca `admin-supercot.js` (vive en el repo de LK), o el cotizador deja
+de encontrar la lista.
+
+⚠⚠ **Y las tablas de INSUMOS no se pueden canonizar con `fn_canon_col_cod`**: esa resuelve contra
+`OC_Maximos`, que es el maestro de **artículos** y no lleva insumos. Para un insumo el maestro es
+`Insumos` — es literalmente el error nº 3 de la sesión del 13/09, repetido.
+
+`Proveedores.codigo` queda fuera del centinela a propósito: tiene 21 códigos con doble grafía
+(`0003511` vs `3511`) pero son códigos de **proveedor**, otro dominio.
+
+#### Centinela permanente
+
+`public.gv_codigos_multigrafia` — vacío = todo bien. Devuelve tabla, columna, código normalizado,
+las grafías con su conteo, y **si esa tabla tiene trigger de canonización** (que es lo que dice si
+el problema se va a repetir solo). Problema **134**. `sql/gv_codigos_multigrafia.sql`.

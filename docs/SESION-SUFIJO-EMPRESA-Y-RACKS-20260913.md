@@ -106,9 +106,15 @@ abiertas era de un dual, así que no hubo datos que reparar.
 
 ### 3.1 Los códigos inventados en los racks — `sql/PENDIENTE-racks-codigos-inventados-20260913.sql`
 
-Ese archivo tiene el backup, las filas exactas y qué pantalla se mueve con cada write. **No se
-ejecutó nada.** ⚠ Los códigos malos están en **DOS** tablas: `Racks_Planimetria` (ocupación) y
-`GV_Lugar_Item` (planimetría).
+Ese archivo tiene el backup, las filas exactas y qué pantalla se mueve con cada write. ⚠ Los
+códigos malos están en **DOS** tablas: `Racks_Planimetria` (ocupación) y `GV_Lugar_Item`
+(planimetría).
+
+> **Actualizado 14/09 (verificado contra la base, no contra este archivo):** el **bloque (1) YA SE
+> EJECUTÓ** — `546V` está en `Racks_Planimetria` (X13 117 · AE09 117 · AD12 63 master) y en las 2
+> filas de `GV_Lugar_Item`, y `1546903` / `VASTIDOR` ya no existen. Donde abajo dice "no se ejecutó
+> nada", léase sólo para los bloques (2) y (3), que **siguen pendientes**: `1000900` sigue en Y4
+> (40 master) y `522S` en W04 (20 master). El problema **110** sigue abierto.
 
 | bloque | qué | estado |
 |:--|:--|:--|
@@ -143,6 +149,10 @@ tiene **28 cajas** en góndola contadas + **64 en el rack AE11** que el stock no
 
 `124` reportes que cruzan LK y Chef por `cod_cliente` · `125` el espejo PPP de LK congelado por el
 rename a `GV_` · `127` dos saldos negativos sin diagnóstico · `117` el log del sync de feriados.
+
+> **Actualizado 14/09:** `124` y `125` **cerrados**. `127` **cerrado**, y con una corrección: no
+> había tales negativos — la medición agrupaba por `cod_art` crudo y la app netea por código
+> canónico (§3.eb.1 de la doc de Supabase). `117` sigue abierto.
 Lista viva: `select * from github_repo_problemas.v_problemas where estado='abierto'`.
 
 ---
