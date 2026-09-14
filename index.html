@@ -5182,7 +5182,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=17.76"></script>
+<script type="module" src="recepcion.js?v=17.77"></script>
 <!-- Config del módulo de fichada (compartido con fichada.html). El secret
      hmacSecret tiene que ser el mismo acá y allá; cargándolo desde un solo
      archivo evitamos que se desincronicen. -->
@@ -8595,7 +8595,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v17.76";
+const APP_VERSION = "v17.77";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -9429,24 +9429,21 @@ document.getElementById("btnHistDias").addEventListener("click", openHistoryModa
    pisa/agrega a la estática. Si la tabla no existe o no hay red, no rompe nada:
    queda la planimetría estática. v2.78. */
 async function loadPlanimetriaRemote() {
-  // v15.77 — la fuente pasa a ser GV_Lugar (vía gv_lugar_articulo). Si no está o
-  // viene vacía, cae a "Planimetria" como siempre. Ninguno de los 25 consumidores
-  // de window.GONDOLA se entera: la FORMA no cambia.
-  if (await _gondolaDesdeGvLugar()) return;
-  try {
-    // OJO: sin `&_=`+Date.now() acá. PostgREST lo interpreta como filtro de una
-    // columna inexistente y devuelve 400. El anti-caché lo da `cache:"no-store"`.
-    const r = await fetch(SUPABASE_PLANIMETRIA_ENDPOINT + "?select=cod,sector,orden&limit=5000",
-      { headers: { "apikey": SUPABASE_KEY, "Authorization": "Bearer " + SUPABASE_KEY }, cache: "no-store" });
-    if (!r.ok) return;
-    const rows = await r.json();
-    if (!Array.isArray(rows) || !rows.length) return;
-    if (!window.GONDOLA) window.GONDOLA = {};
-    rows.forEach(function (row) {
-      const cod = String(row.cod || "").trim().toUpperCase();
-      if (cod) window.GONDOLA[cod] = [String(row.sector || ""), (row.orden != null ? Number(row.orden) : 0)];
-    });
-  } catch (_e) { /* offline / sin tabla: queda la planimetría estática */ }
+  // v15.77 — la fuente pasa a ser GV_Lugar (vía gv_lugar_articulo). Ninguno de los 25
+  // consumidores de window.GONDOLA se entera: la FORMA no cambia.
+  //
+  // v17.77 — SE FUE el fallback a la tabla "Planimetria". Cuando `gv_lugar_articulo`
+  // fallaba o venía vacía, esto bajaba la tabla vieja y PISABA window.GONDOLA con ella.
+  // Hoy eso sólo puede empeorar las cosas: `Planimetria` quedó congelada el 11/09 con
+  // 370 filas del modelo viejo, mientras que el baseline estático `planimetria.js` tiene
+  // 352 claves REGENERADAS ese mismo día desde `gv_lugar_articulo`, o sea del modelo
+  // nuevo. El fallback cambiaba un baseline bueno por datos viejos y mandaba al operario
+  // al sector de antes — el mismo daño que la pantalla retirada en la v17.26.
+  // Sin fallback, si la vista no responde queda el estático, que es lo correcto.
+  //
+  // ⚠ La tabla NO queda sin lectores en el front: `pmapViejaFetch()` la sigue leyendo,
+  // y ése NO se puede sacar — es el rescate de los 16 códigos del problema 156.
+  await _gondolaDesdeGvLugar();
 }
 
 /* v15.77 — Llena window.GONDOLA desde GV_Lugar / GV_Lugar_Item (vista

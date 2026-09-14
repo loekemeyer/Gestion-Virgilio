@@ -14942,3 +14942,73 @@ pedido** · 186 con badge de horario. Los pedidos de `Facturacion_NP` / históri
 ni fecha de pedido, que es lo esperado: esas tablas no los guardan.
 
 Test: `tests/ppp-tabla-arbol.cjs` (30 chequeos).
+
+### §3.fo
+
+**v17.77 (2026-09-14) — `vista_nc_loeke_chef` deja de leer `Planimetria`, y se retira el
+fallback del picking a esa tabla.** Primer paso real para poder retirarla. ⚠ **Todavía no se
+puede: quedan dos lectores, y uno no se toca.**
+
+**El barrido, porque la tarea 3284 decía "un lector" y eran cuatro.** Se miró: vistas por
+`pg_depend` transitivo, funciones por `prosrc`, triggers, FK en los dos sentidos, policies
+propias y ajenas, crons, constraints, publicaciones, grants y `grep` sobre el repo.
+
+| Quién | Qué pasa |
+|---|---|
+| `vista_nc_loeke_chef` | **migrada acá** |
+| `loadPlanimetriaRemote()` (`index.html`) | **fallback retirado acá** |
+| `gv_codigos_multigrafia` | **todavía no** |
+| `pmapViejaFetch()` (`index.html`) | **NO se puede sacar** — es el rescate del problema 156 |
+| `racks_plani_mover` · `racks_plani_ingreso` · `racks_plani_ingreso_nacional` · `racks_plani_descontar` · `registrar_baja_racks` | **FALSOS POSITIVOS** |
+
+⚠ **Las cinco funciones de racks usan `Racks_Planimetria`, que es OTRA tabla.** Un
+`prosrc ~ 'Planimetria'` las matchea porque el nombre la contiene. Medido contando
+ocurrencias: las cinco tienen `veces_racks = veces_total`, o sea **cero** menciones de
+`Planimetria` sola. La única función que sí la toca es `planimetria_autoorden()`, que es el
+trigger de la propia tabla (`trg_planimetria_autoorden`): su maquinaria, no un consumidor.
+
+**El destino NO era `GV_Lugar_Item`, y esto importa porque la vista es plata.** El CTE `split`
+no preguntaba *dónde está* un artículo sino **si es DUAL**: buscaba códigos que en la tabla
+vieja aparecían con ` LK` **y** con ` CH`, porque ahí la empresa viajaba pegada al código. El
+modelo nuevo no guarda el sufijo (`GV_Lugar_Item.cod` está canonizado desde la v17.51 y la
+empresa vive en `GV_Lugar.empresa`: **0 filas** con sufijo). Medido:
+
+| Fuente | Duales que devuelve |
+|---|---|
+| `Planimetria` (lo que usaba) | **4** — 437E, 438E, 439E, 809E |
+| `GV_Lugar` + `GV_Lugar_Item` | **5** — agrega **396** ← falso positivo |
+| **`codigos_duales`** | **4** — los mismos ← **idéntico** |
+
+El `396` está en celdas de las dos empresas sin ser dual; meterlo habría generado notas de
+crédito de un artículo que no corresponde. Se migró a **`codigos_duales`**, que es el padrón de
+duales — lo que la pregunta pedía desde el principio (la vista ya lo asumía: su `WHERE` trata
+aparte a `437E/438E/439E` con una condición fija). Verificado en transacción: **misma cantidad
+de filas y md5 idéntico**, con `security_invoker = true` y los grants conservados.
+
+**El fallback del picking se retiró porque hoy sólo puede empeorar.** `loadPlanimetriaRemote()`
+bajaba la tabla vieja y **pisaba `window.GONDOLA`** cuando `gv_lugar_articulo` fallaba o venía
+vacía. Pero `Planimetria` quedó congelada el 11/09 con **370 filas del modelo viejo**, mientras
+que el baseline estático `planimetria.js` tiene **352 claves regeneradas ese mismo día desde
+`gv_lugar_articulo`**, o sea del modelo nuevo. El fallback cambiaba un baseline bueno por datos
+viejos y mandaba al operario al sector de antes — el mismo daño que la pantalla retirada en la
+v17.26. Sin fallback, si la vista no responde queda el estático. `tests/gondola-gv-lugar.cjs`
+pasó de exigir el fallback a exigir lo contrario (4 asserts nuevos, 12/12 en verde).
+
+**⚠ Por qué `Planimetria` NO se puede retirar todavía:**
+
+1. **`pmapViejaFetch()`** — el panel "lo que quedó en la planimetría vieja" del 🗺️ Mapa de
+   góndolas lee la tabla para listar los **16 códigos que viven sólo ahí** y traerlos de a uno
+   (`pmapViejaTraer`). **Es el único camino de rescate del problema 156.** Sale cuando el
+   depósito diga qué hacer con cada uno.
+2. **`gv_codigos_multigrafia`** — `Planimetria` es la tabla que **más aporta al centinela: 16
+   de las 30 filas** (27/027, 31/031, 66/066 — el mismo `66` que duplicó el picking de D72C).
+   Sacar el bloque mientras la tabla siga existiendo **con `anon` teniendo INSERT/UPDATE** es
+   perder vigilancia sobre una tabla viva. Se saca **junto con** el retiro, no antes.
+   (`GV_Lugar_Item` ya está en la lista del centinela y hoy reporta 0: lo cubre su trigger de
+   canonización desde la v17.51.)
+
+**Orden que queda:** resolver los 16 del problema 156 → sacar `pmapVieja*` del front → sacar el
+bloque de `gv_codigos_multigrafia` → retirar `Planimetria` con su trigger y su función.
+
+Nota: `sql/gv_nc_loeke_chef_sin_planimetria_v1777.sql`. Rollback: volver el CTE `split` a la
+versión de `Planimetria` (está en el historial de git; es la única diferencia).

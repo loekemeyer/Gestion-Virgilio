@@ -13,7 +13,9 @@
      picking cae al pelado — que para el 809E es la góndola de CHEF y el operario
      trae un Corta Queso en vez de un Corta Pizza.
    - Un código de UNA sola empresa NO genera clave con sufijo (no hace falta).
-   - Si la vista no está (404) o viene vacía → cae a "Planimetria", como siempre.
+   - v17.77: si la vista no está (404) o viene vacía, NO cae a "Planimetria" (el
+     fallback se retiró): queda el baseline estático de planimetria.js, que se regenera
+     desde gv_lugar_articulo y por lo tanto es más nuevo que la tabla vieja.
    - Si no hay red → no rompe: queda la planimetría estática.
    Sale 1 si falla. */
 const path = require("path");
@@ -65,15 +67,20 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
     out.unaEmpresaSinSufijo  = !GONDOLA["505 LK"] && !!GONDOLA["505"];
     out.unaEmpresaPrimero    = GONDOLA["505"] && GONDOLA["505"][0] === "D18";
 
-    // --- (b) la vista no está → cae a Planimetria
-    window.GONDOLA = {}; modo = "404"; pidioPlanimetria = false;
+    // --- (b) v17.77: la vista no está → NO cae a Planimetria, queda el estático
+    //     El fallback se sacó porque la tabla vieja quedó congelada el 11/09 con el
+    //     modelo viejo, mientras que el baseline de planimetria.js se regeneró ese mismo
+    //     día desde gv_lugar_articulo: pisarlo con la tabla mandaba al sector de antes.
+    window.GONDOLA = { "PREVIO": ["A01", 1] }; modo = "404"; pidioPlanimetria = false;
     await loadPlanimetriaRemote();
-    out.sin404CaeAPlanimetria = pidioPlanimetria && GONDOLA["999"] && GONDOLA["999"][0] === "Z99";
+    out.sin404NoPidePlanimetria = (pidioPlanimetria === false) && !GONDOLA["999"];
+    out.sin404DejaElEstatico    = !!GONDOLA["PREVIO"];
 
-    // --- (c) la vista está pero vacía → también cae (no deja el picking sin góndola)
-    window.GONDOLA = {}; modo = "vacio"; pidioPlanimetria = false;
+    // --- (c) la vista está pero vacía → tampoco pide la tabla vieja
+    window.GONDOLA = { "PREVIO": ["A01", 1] }; modo = "vacio"; pidioPlanimetria = false;
     await loadPlanimetriaRemote();
-    out.vaciaCaeAPlanimetria = pidioPlanimetria && !!GONDOLA["999"];
+    out.vaciaNoPidePlanimetria = (pidioPlanimetria === false) && !GONDOLA["999"];
+    out.vaciaDejaElEstatico    = !!GONDOLA["PREVIO"];
 
     // --- (d) sin red → no rompe
     window.GONDOLA = { "PREVIO": ["A01", 1] }; modo = "red"; pidioPlanimetria = false;
