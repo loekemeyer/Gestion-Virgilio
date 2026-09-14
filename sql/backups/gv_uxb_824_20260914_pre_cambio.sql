@@ -42,3 +42,24 @@ update public."GV_UxB"
 -- update public."Articulos_Cajas" set "Uni_x_Caja" = 12 where "Cod_Art" = '824';
 -- Y el catálogo de la página de Chef (products.uxb, proyecto nkhzocgdpwtgrmwleihr): no se toca
 -- desde acá, el MCP no tiene permiso sobre ese proyecto.
+
+-- ─────────────────────────────────────────────────────────────────────────────────────────
+-- SEGUNDA PASADA — v16.95, mismo día. Marianela contó el bulto: son 12. Se alinea el resto.
+-- Backup del Articulos_Cajas: zz_backups."GV_Backup_ArticulosCajas_824_20260914" (1 fila, uxc 36).
+update public."GV_UxB"
+   set uxb = 12, origen = 'Marianela 14/09/2026 (conteo fisico del bulto)', curado = true, actualizado = now()
+ where cod = '824' and empresa = 'LK';
+update public."Articulos_Cajas" set "Uni_x_Caja" = 12 where "Cod_Art" = '824';
+--
+-- Después: GV_UxB LK 12 · GV_UxB CH 12 · gv_uxb_emp lk/chef 12 · vista_uxb_articulo 12 ·
+--          Articulos_Cajas 12. El Excel de ISIS y la OC ya usan 12.
+--          vista_facturacion_neto_items no se movió ($2.988.638,40): ya leía la fila CH.
+--
+-- Rollback de esta segunda pasada:
+-- update public."GV_UxB" set uxb = 36, origen = 'absorbido del fallback 12/09 (v16.28) - venia de OC_Maximos',
+--        curado = false where cod = '824' and empresa = 'LK';
+-- update public."Articulos_Cajas" a set "Uni_x_Caja" = b."Uni_x_Caja"
+--   from zz_backups."GV_Backup_ArticulosCajas_824_20260914" b where a."Cod_Art" = b."Cod_Art";
+--
+-- ⚠ PENDIENTE, sin tocar: gv_uxb_desalineado pasó de 4 filas a 7 — OC_Maximos, Importados y maestro
+--    siguen con 36 para el 824. No son fuente de UxB para Gestión, pero son las que mira la compra.

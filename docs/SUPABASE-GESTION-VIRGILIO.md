@@ -11007,7 +11007,7 @@ Marianela (#3243) para el 14/09.
 siguiente, "llegaron a armar todo → pedí N camiones" / "no llegaron → reprogramá", y el guard en Facturación que
 no deje facturar con la fecha de salida mal. Falta el dato de m³ por camión.
 
-### §3.eb — v16.91: el UxB del 824 de Chef pasa a 12 (problema 122) — 2026-09-14
+### §3.ee — v16.91/v16.95: el UxB del 824 pasa a 12 (problema 122) — 2026-09-14
 
 Pedido de **Marianela**: el bulto de Chef del **824 (COLADOR 8 CM)** son **12 unidades**, no 36.
 
@@ -11042,6 +11042,22 @@ que cambiaron todas: 213 cajas entregadas, **$8.965.915,20 → $2.988.638,40** (
 **No se tocó el catálogo de la página de Chef** (`products.uxb`, proyecto `nkhzocgdpwtgrmwleihr`): el MCP
 no tiene permiso sobre ese proyecto. Si el 824 se vende por la web de Chef, el `uxb` del carrito sigue
 saliendo de ahí y hay que cambiarlo a mano desde su admin.
+
+**Segunda pasada, v16.95 (mismo día)** — Marianela contó el bulto físicamente: **son 12**. Con eso, el 36
+que quedaba en las otras fuentes pasó de "discrepancia" a dato sabido mal, así que se alinearon las dos que
+faltaban: `GV_UxB` empresa **LK** (36 → 12, `curado=true`) y `Articulos_Cajas."Uni_x_Caja"` (36 → 12; backup
+en `zz_backups."GV_Backup_ArticulosCajas_824_20260914"`). Ahora las cuatro fuentes dicen **12**, o sea que el
+**Excel de ISIS y la OC también usan 12** — que era el punto. `vista_facturacion_neto_items` no se movió
+($2.988.638,40): ya venía leyendo la fila CH.
+
+Dos cosas que quedaron cerradas por respuesta de ella, para no volver a plantearlas:
+- Los otros coladores N°8 (**026**, **110**, **831**) **son artículos diferentes**: su 36 está bien, no se tocan.
+- El catálogo de la **página de Chef ya tiene bien las unidades por bulto**; no hay nada que cambiar ahí.
+
+⚠ **Lo que el centinela `gv_uxb_desalineado` destapó y NO se tocó** (pasó de 4 filas a 7): hay otras tres
+tablas con su propia copia del UxB del 824, todas todavía en 36 — `OC_Maximos`, `Importados` y `maestro`.
+No son fuente de UxB para Gestión (desde la v16.38 eso es sólo `GV_UxB`), pero son las que mira la compra.
+Quedan pendientes de decisión.
 
 ---
 
