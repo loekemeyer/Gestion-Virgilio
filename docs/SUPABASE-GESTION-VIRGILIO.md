@@ -13106,3 +13106,62 @@ El front sólo suma una línea al pie del aviso aclarando que ahí se listan las
 para que nadie lo lea como si mostrara todo. SQL, medición y rollback:
 `sql/sync_krikos_oc_virgilio.sql` del repo **`pagina-LK-copia`** (verificado contra la base: md5
 del cuerpo normalizado idéntico).
+
+---
+
+### §3.ey — v17.38: se mueve el `cajas_max` al código que el depósito confirmó — problema 84 de 31 a 15 — 2026-09-14
+
+Luis autorizó el punto 2 del handoff (`docs/HANDOFF-PLANIMETRIA-20260914.md` §5): *"2) dale"*.
+El relevamiento ya decía qué hay en cada celda; el patrón era que **la capacidad quedó pegada al
+código viejo y el mapa al nuevo**, así que no había nada que decidir — había que mover el número.
+
+**Todo por las RPC** (`gv_lugar_item_guardar` / `_sacar`), que escriben `GV_Lugar_Item` **y**
+`Capacidad_Sector` juntas: es la regla 1 del handoff y evita fabricar divergencias nuevas.
+
+| Celda | Antes (capacidad) | Ahora | Cajas |
+|---|---|---|---|
+| E10 | 225 | **312** | 50 |
+| F49 | 574 | **574E** | 136 |
+| G15 | 509 | **256** | 70 |
+| M10 | 702 | **702E** | 60 |
+| G13 | 823 | **509** | s/número |
+| C02 | 601E | **510T + 581T** | s/número (ver abajo) |
+| C10 | 071 (vacía) | — | el 547 ya tenía 6 |
+| J44 | 335 | — | el 599E ya tenía 40 |
+| H60 | — | **592E** | 18 (faltaba en el mapa) |
+| P39 | — | **396** | 20 (faltaba en el mapa) |
+| L08 · L57 | 828 · 865ED | — | el relevamiento dice 437E y 865E |
+
+**Resultado: 31 → 15 divergencias, y `solo_capacidad` quedó en CERO.** Las 15 que siguen son todas
+`solo_mapa`: el código está bien, **falta medir cuántas cajas entran**. Eso necesita a alguien con
+un metro en la góndola, no una decisión. `Capacidad_Sector` 736 → 732.
+
+#### Dos números NO se trasladaron, a propósito
+
+`C02` tenía **44 cajas medidas para el 601E**, y el relevamiento dice que ahí van 510T y 581T —
+**otro artículo**. Una caja de 601E no mide lo mismo, y repartir 44 a cada uno diría que la celda
+aguanta 88. Se cargaron **sin número**, igual que su celda gemela `C15`, que también tiene
+510T + 581T en null. Mismo criterio para `J44`/`C10`, donde el código bueno ya traía su propio
+número.
+
+⚠ **Dónde sí se trasladó el número aunque cambie el artículo** (`E10` 225→312, `G15` 509→256):
+la alternativa era dejarlos en cero, y cero apaga "Cap gónd." y "Llenar góndola" para un artículo
+que está en el generador de OC. Se eligió lo reversible —el backup está— pero **son dos celdas a
+re-medir** cuando alguien pase.
+
+Backups completos de las dos tablas: `zz_backups."GV_Backup_Capacidad_pre_84_20260914"` (736 filas)
+y `zz_backups."GV_Backup_Lugar_Item_pre_84_20260914"` (790), con RLS y sin escritura para
+`anon`/`authenticated`. `gv_endpoints_rotos` quedó vacía.
+
+#### Y sobre los 7 códigos del problema 156: la red de seguridad YA existe
+
+Luis preguntó si no serán discontinuados que ya no importan, y pidió que **si algún día entran,
+salte solo**. Medido: **ninguno tiene stock**, pero **5 de 7 están en el generador de OC** y se
+movieron el 10–11/09 (231/232/233 Palos de Amasar, 537 Pela y Pica ajo, 567 Corta Palta) — o sea
+que no están de baja. 997E y 998E sí parecen de la línea Acacia que se dio de baja.
+
+**No hay que construir nada:** `recepcion.js` (v4.61) ya emite un evento **`RSP` "Recepción sin
+planimetría"** cuando llega un código que no está en `window.GONDOLA`, con
+`trg_recepcion_sin_planim_telegram` → Telegram y la categoría `sin_planimetria` del tablero de
+Agentes (`generar_reporte_agentes`). **Está vivo: 13 eventos RSP, el último hoy 14/09 10:59.**
+Los 7 no están en el mapa, así que el día que entren, salta.
