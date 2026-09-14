@@ -156,14 +156,13 @@ catch (_e) {
     _apr.pedidos = [mk({ order_id: 101, razon_social: "Cliente Dos" })];
     aprRender(); await new Promise((res) => setTimeout(res, 200));
     html = document.getElementById("pppPreview").innerHTML;
-    out.ypTabla = /cuar-yaprog-tbl/.test(html) && /<th>NP<\/th>/.test(html) && /<th>Aprobación<\/th>/.test(html);
+    out.ypTabla = /cuar-yaprog-tbl/.test(html) && /<th>NP<\/th>/.test(html) && /<th>Enviar a<\/th>/.test(html);
+    // v17.23: el aprobado sale de la lista (lo filtra el backend), así que la columna no va más
+    out.ypSinColAprob = !/<th>Aprobación<\/th>/.test(html) && !/sin aprobar/.test(html);
     out.ypCuenta = /Ya programados y el cliente está en cuarentena <b>\(2\)<\/b>/.test(html);
     out.ypCod = /cuar-yaprog-cod[^>]*>LK 4263</.test(html) && /cuar-yaprog-cod[^>]*>CH 2715</.test(html);
     out.ypBadges = /cuar-badge b-deuda/.test(html) && /cuar-badge b-nuevo/.test(html);
-    out.ypAprob = /✅ 14\/09 10:35/.test(html) && /vivi@loekemeyer\.com/.test(html) && /cuar-yp-ok/.test(html);
-    out.ypSinAprob = /sin aprobar/.test(html);
     out.ypLibrito = /cuarComAbrirIdx\(0\)/.test(html) && /cuarComAbrirIdx\(1\)/.test(html) && /📖<b>2<\/b>/.test(html);
-    out.ypAprobN = /1 aprobado</.test(html);
 
     // el librito abre el modal con el log (RPC stubeada)
     const llamadas = [];
@@ -190,11 +189,19 @@ catch (_e) {
     const ah = (document.getElementById("cuarComModal") || {}).innerHTML || "";
     out.aprModal = /Enviar a Pedidos a programar/.test(ah) && /Zhang Qikuan/.test(ah) && /Aprobar y enviar/.test(ah);
     out.aprSinLiberar = !llamadas.some(function (c) { return c.fn === "gv_cuarentena_liberar"; });
-    // y al confirmar sí libera, con el comentario adentro
+    // v17.23: el cuadro pide QUIÉN aprueba, y sin eso no libera
+    out.aprPideQuien = /¿Quién aprueba\?/.test(ah) && /cuarQuienSet\('Vivi'\)/.test(ah) && /cuarQuienSet\('__otro'\)/.test(ah);
+    document.getElementById("cuarComTexto").value = "Lo autorizó cobranzas";
+    await cuarLiberarConfirmar(); await new Promise((res) => setTimeout(res, 120));
+    out.aprSinQuien = !llamadas.some(function (c) { return c.fn === "gv_cuarentena_liberar"; }) &&
+                      /Decinos quién aprueba/.test((document.getElementById("cuarComModal") || {}).innerHTML || "");
+    // se elige la persona y ahí sí
+    cuarQuienSet("Vivi");
     document.getElementById("cuarComTexto").value = "Lo autorizó cobranzas";
     await cuarLiberarConfirmar(); await new Promise((res) => setTimeout(res, 120));
     const lib = llamadas.find(function (c) { return c.fn === "gv_cuarentena_liberar"; });
-    out.aprLibera = !!lib && lib.args.p_order_id === "900" && lib.args.p_comentario === "Lo autorizó cobranzas";
+    out.aprLibera = !!lib && lib.args.p_order_id === "900" && lib.args.p_comentario === "Lo autorizó cobranzas" &&
+                    lib.args.p_persona === "Vivi";
 
     // (6) v17.16 — columna "Marcar": aprobar / volver a cuarentena
     // (el bloque anterior dejó la lista recargada contra la RPC stubeada: se repone)
@@ -214,7 +221,7 @@ catch (_e) {
     out.marcarCol = /<th>Enviar a<\/th>/.test(html);
     const filas = html.split("<tr").filter(function (t) { return /cuarYpCuarentena/.test(t); });
     out.marcarSinAprobar = /cuarYpAprobar\(0\)/.test(html) && /cuarYpCuarentena\(0\)/.test(html);
-    out.marcarAprobada = !/cuarYpAprobar\(1\)/.test(html) && /cuarYpCuarentena\(1\)/.test(html);
+    out.marcarAprobada = /cuarYpAprobar\(1\)/.test(html) && /cuarYpCuarentena\(1\)/.test(html);
     out.marcarFilas = filas.length === 2;   // las dos filas ofrecen volver a cuarentena
 
     cuarYpCuarentena(0); await new Promise((res) => setTimeout(res, 120));
@@ -225,6 +232,27 @@ catch (_e) {
     const dev = llamadas.find(function (c) { return c.fn === "gv_cuarentena_devolver"; });
     out.devRpc = !!dev && dev.args.p_np === "97889" && dev.args.p_clave === "97889" &&
                  dev.args.p_empresa === "lk" && dev.args.p_comentario === "No lo autorizó cobranzas";
+
+    // (7) v17.23 — submódulo LOG en Config. Cuarentena
+    _apr.cuarLog = [
+      { empresa: "lk", clave: "1368", np: "web LK 1368", cod: "4281", razon_social: "Biaggio Valentin",
+        motivos: ["cliente_nuevo"], deuda: null, entro_at: "2026-09-14T09:10:00-03:00",
+        estado: "aprobado", cerrado_at: "2026-09-14T11:05:00-03:00", persona: "Vivi",
+        por: "thomasloke1@gmail.com", comentario: "Pagó la seña", comentarios: 2, eventos: 3 },
+      { empresa: "chef", clave: "55", np: "CH 0003", cod: "2715", razon_social: "Gifel S.R.L.",
+        motivos: ["deuda"], deuda: 1955318, entro_at: "2026-09-13T18:00:00-03:00",
+        estado: "retenido", cerrado_at: null, persona: null, por: null, comentario: null,
+        comentarios: 0, eventos: 1 }
+    ];
+    _pppTab = "cuarcfg"; pppRenderProg(); await new Promise((res) => setTimeout(res, 150));
+    const ch = document.getElementById("pppPreview").innerHTML;
+    out.logTitulo = /📋 Log de Cuarentena/.test(ch) && /2 pedidos/.test(ch);
+    out.logFilas = /web LK 1368/.test(ch) && /Gifel S\.R\.L\./.test(ch) && /LK 4281/.test(ch);
+    out.logEstado = /e-aprobado">aprobado</.test(ch) && /e-retenido">retenido</.test(ch);
+    out.logQuien = /Vivi<\/span> · 14\/09 11:05/.test(ch) && /thomasloke1@gmail\.com/.test(ch);
+    out.logEntro = /14\/09 09:10/.test(ch);
+    out.logComent = /cuarLogComentarios\(0\)/.test(ch) && /📖<b>2<\/b>/.test(ch);
+    _pppTab = "prog";
 
     out.errs = null;
     return out;
@@ -250,27 +278,33 @@ catch (_e) {
   chk(r.nuevoCodChip, "cliente nuevo de Chef: el chip dice CH 2533");
   chk(r.nuevoMotivo, "cliente nuevo: el motivo dice cuántos pedidos facturó");
   chk(r.nuevoEtq === "Cliente nuevo", "etiqueta de cliente_nuevo = 'Cliente nuevo'");
-  chk(r.ypTabla, "ya programados: es una tabla con columnas NP / … / Aprobación");
+  chk(r.ypTabla, "ya programados: es una tabla con columnas NP / … / Enviar a");
+  chk(r.ypSinColAprob, "ya programados: sin columna Aprobación (el aprobado sale de la lista)");
   chk(r.ypCuenta, "ya programados: el contador cuenta las 2 filas");
   chk(r.ypCod, "ya programados: el número de cliente por empresa (LK 4263 / CH 2715)");
   chk(r.ypBadges, "ya programados: los motivos salen como badges");
-  chk(r.ypAprob, "ya programados: la fila aprobada muestra fecha y quién, y queda en verde");
-  chk(r.ypSinAprob, "ya programados: la fila sin aprobar dice 'sin aprobar'");
   chk(r.ypLibrito, "ya programados: el librito 📖 con la cantidad de comentarios");
-  chk(r.ypAprobN, "ya programados: el título dice cuántos están aprobados");
   chk(r.comModal, "el librito abre el log con fecha, hora y autor");
   chk(r.comPideTexto, "el log deja agregar un comentario nuevo");
   chk(r.comRpc, "el log pide los comentarios de ESE pedido (empresa + clave)");
   chk(r.comCerrado, "el modal se cierra");
   chk(r.aprModal, "aprobar abre el cuadro de comentario (no libera de una)");
   chk(r.aprSinLiberar, "aprobar NO llamó a gv_cuarentena_liberar antes de confirmar");
-  chk(r.aprLibera, "al confirmar libera y manda el comentario");
+  chk(r.aprPideQuien, "aprobar pide quién (Vivi / Marian / Otro)");
+  chk(r.aprSinQuien, "sin elegir quién NO libera y avisa");
+  chk(r.aprLibera, "al confirmar libera y manda el comentario y la persona");
   chk(r.marcarCol, "la tabla tiene la columna 'Enviar a'");
   chk(r.marcarSinAprobar, "sin aprobar: ofrece Aprobar y Cuarentena");
-  chk(r.marcarAprobada, "ya aprobada: ofrece SOLO Cuarentena");
+  chk(r.marcarAprobada, "todas las filas ofrecen Aprobar y Cuarentena");
   chk(r.marcarFilas, "las dos filas ofrecen volver a cuarentena");
   chk(r.devModal, "volver a cuarentena avisa que lo saca de la programación y de qué tanda");
   chk(r.devRpc, "al confirmar llama gv_cuarentena_devolver con NP, clave y comentario");
+  chk(r.logTitulo, "Config. Cuarentena tiene el log con la cantidad de pedidos");
+  chk(r.logFilas, "el log lista NP, cliente y su número");
+  chk(r.logEstado, "el log muestra el estado (aprobado / retenido)");
+  chk(r.logQuien, "el log dice quién aprobó, cuándo y con qué usuario");
+  chk(r.logEntro, "el log dice cuándo entró a cuarentena");
+  chk(r.logComent, "el log abre los comentarios del pedido");
   chk(r.deudorCliente, "el cliente deudor se ve en el sector");
   chk(r.soloUnCheckbox, "el retenido NO es tildable (solo el normal tiene checkbox)");
   // v14.88: los botones se movieron a la pestaña Config. Cuarentena

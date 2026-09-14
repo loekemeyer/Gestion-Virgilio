@@ -12,7 +12,27 @@
 > única**; no se replica. Ante la duda entre parche rápido y fix de raíz → **fix
 > de raíz**.
 >
-> Última actualización: 2026-09-14 (domingo) · Versión app al documentar: **v17.32**
+> Última actualización: 2026-09-14 (domingo) · Versión app al documentar: **v17.34**
+>
+> Nota **v17.34 (2026-09-14, Luis) — CUARENTENA: log propio, "¿quién aprueba?" y el aprobado sale de
+> la lista.**
+> (1) El pedido **aprobado ya no figura** en "Ya programados y el cliente está en cuarentena": esa
+> lista vuelve a ser lo que falta resolver. Se pudo recién ahora porque la historia de la aprobación
+> pasó a vivir en el log (hasta la v17.15 la lista era el único registro que había).
+> (2) Antes de confirmar una aprobación —en la tabla o en **"Enviar a Pedidos a programar"** de la
+> ficha— hay que decir **quién autoriza**: Vivi / Marian / Otro (con texto). Se guarda en `persona`,
+> aparte del mail de la sesión (`por`): una cosa es quién apretó el botón y otra quién autorizó. Es
+> **obligatoria** y el backend la exige también (`gv_cuarentena_liberar` falla sin ella); no se
+> preselecciona a nadie a propósito.
+> (3) **Submódulo "📋 Log de Cuarentena"** en Config. Cuarentena: cada pedido retenido con cuándo
+> entró, sus motivos, el estado (retenido / aprobado / devuelto) y quién lo cerró, cuándo y con qué
+> comentario. Sale de `GV_Cuarentena_Log` (append-only) vía `gv_cuarentena_log(dias)`.
+> ⚠ Escriben **dos** funciones y las dos hacen falta: `gv_cuarentena_marcar` (lo que todavía no tiene
+> tanda; el cálculo quedó intacto en `gv_cuarentena_marcar_calc`) y `gv_cuarentena_log_registrar` (lo
+> que YA tiene tanda, que no pasa por marcar). Las dos escriben sólo si hay novedad, porque marcar
+> corre en cada carga de A Programar.
+> `sql/gv_cuarentena_log_v1723.sql` · §3.ew de `docs/SUPABASE-GESTION-VIRGILIO.md` ·
+> test `tests/apr-cuarentena.cjs`.
 >
 > Nota **v17.20/v17.22 (2026-09-14, Luis) — CUARENTENA: columna "Enviar a" en la tabla de ya
 > programados** (se llamó "Marcar" hasta que Luis la renombró, mismo día).

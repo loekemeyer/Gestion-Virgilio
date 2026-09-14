@@ -888,6 +888,41 @@ button {
 .cuar-danger[disabled]{ opacity:.6; cursor:default; }
 .cuar-m-warn{ background:#fff7ed; border:1px solid #fed7aa; color:#7c2d12; border-radius:8px;
   padding:7px 10px; font-size:12.5px; margin-bottom:10px; line-height:1.45; }
+/* v17.23 (Luis) — "¿quién aprueba?": se elige antes de confirmar y queda en el log. */
+.cuar-quien{ margin-bottom:10px; }
+.cuar-quien-t{ font-size:12.5px; font-weight:800; color:#0f172a; margin-bottom:5px; }
+.cuar-quien-ops{ display:flex; gap:6px; flex-wrap:wrap; }
+.cuar-quien-op{ width:auto; margin:0; background:#fff; border:1.5px solid #cbd5e1; color:#334155;
+  border-radius:999px; padding:5px 14px; font-size:13px; font-weight:700; cursor:pointer; }
+.cuar-quien-op:hover{ background:#f1f5f9; }
+.cuar-quien-op.on{ background:#0f766e; border-color:#0f766e; color:#fff; }
+.cuar-quien-otro{ width:100%; margin-top:6px; border:1px solid #cbd5e1; border-radius:8px;
+  padding:6px 9px; font-size:13px; font-family:inherit; box-sizing:border-box; }
+/* v17.23 — submódulo LOG de Cuarentena en Config. Cuarentena */
+.cuar-log-cfg{ margin-top:18px; }
+.cuar-log-cfg h3{ margin:0 0 3px; font-size:16px; color:#7c2d12; }
+.cuar-log-cfg p{ margin:0 0 9px; font-size:12.5px; color:#475569; line-height:1.45; }
+.cuar-log-bar{ display:flex; align-items:center; gap:8px; margin-bottom:8px; flex-wrap:wrap; }
+.cuar-log-bar select{ padding:4px 7px; border:1px solid #cbd5e1; border-radius:7px; font-size:12.5px; }
+.cuar-log-bar button{ width:auto; margin:0; background:#fff; border:1px solid #cbd5e1; color:#334155;
+  border-radius:7px; padding:4px 10px; font-size:12.5px; font-weight:700; cursor:pointer; }
+.cuar-log-tblwrap{ overflow-x:auto; border:1px solid #e2e8f0; border-radius:10px; }
+.cuar-log-tbl{ width:100%; border-collapse:collapse; font-size:12px; }
+.cuar-log-tbl th{ text-align:left; font-size:10px; letter-spacing:.4px; text-transform:uppercase;
+  color:#475569; background:#f8fafc; border-bottom:1px solid #e2e8f0; padding:5px 7px; white-space:nowrap; }
+.cuar-log-tbl td{ border-top:1px solid #eef2f7; padding:5px 7px; vertical-align:middle; color:#0f172a; }
+.cuar-log-tbl td:nth-child(1), .cuar-log-tbl td:nth-child(4){ white-space:nowrap; }
+.cuar-log-tbl td:nth-child(2){ min-width:150px; }
+.cuar-log-tbl .cuar-badge{ font-size:9.5px; padding:1px 7px; }
+.cuar-log-tbl .cuar-badges{ margin-top:0; gap:4px; }
+.cuar-log-est{ font-size:10.5px; font-weight:800; border-radius:999px; padding:2px 9px; white-space:nowrap; }
+.cuar-log-est.e-retenido{ background:#fef3c7; color:#92400e; border:1px solid #fcd34d; }
+.cuar-log-est.e-aprobado{ background:#dcfce7; color:#166534; border:1px solid #86efac; }
+.cuar-log-est.e-devuelto{ background:#ffe4e6; color:#9f1239; border:1px solid #fda4af; }
+.cuar-log-quien{ font-weight:800; }
+.cuar-log-mail{ display:block; font-size:10px; color:#64748b; }
+.cuar-log-com{ color:#334155; max-width:280px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.cuar-log-vacio2{ padding:14px; font-size:12.5px; color:#64748b; font-style:italic; }
 /* v17.15 — log de comentarios (modal) */
 .cuar-log{ display:flex; flex-direction:column; gap:8px; margin-bottom:10px; max-height:40vh; overflow:auto; }
 .cuar-log-it{ border-left:3px solid #cbd5e1; padding:1px 0 1px 9px; }
@@ -4942,7 +4977,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=17.11"></script>
+<script type="module" src="recepcion.js?v=17.34"></script>
 <!-- Config del módulo de fichada (compartido con fichada.html). El secret
      hmacSecret tiene que ser el mismo acá y allá; cargándolo desde un solo
      archivo evitamos que se desincronicen. -->
@@ -8063,7 +8098,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v17.11";
+const APP_VERSION = "v17.34";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -37823,6 +37858,7 @@ let _apr = {
   m3Min: 0.6,       // v13.84: PPP_Web_Config.tanda_m3_min (se relee en cada carga)
   // v14.82 — CUARENTENA: resumen de lo cargado por los 4 botones de importación
   cuarResumen: null, cuarResumenLoading: false,
+  cuarLog: undefined, cuarLogLoading: false, cuarLogDias: 60, cuarLogErr: "",   // v17.23
   // v14.90 — CUARENTENA: contacto WhatsApp (vendedor/cliente) por empresa:cod
   cuarContacto: null, cuarContactoLoading: false
 };
@@ -39000,6 +39036,8 @@ async function cuarLiberarConfirmar() {
   const empresa = s.empresa, orderId = s.clave;
   const ta = document.getElementById("cuarComTexto");
   const txt = ((ta && ta.value) || "").trim();
+  const quien = cuarQuienValor(s);
+  if (!quien) { s.err = "Decinos quién aprueba el pedido (Vivi, Marian u Otro)."; cuarComRender(); return; }
   const key = String(empresa) + ":" + String(orderId);
   const p = (_apr.pedidosTodos || []).find(function (x) { return aprKey(x.empresa, x.order_id) === key; });
   s.saving = true; s.err = ""; cuarComRender();
@@ -39008,9 +39046,9 @@ async function cuarLiberarConfirmar() {
     // YA programado no está en `pedidosTodos`: se fue de A Programar cuando recibió tanda)
     await aprRpc("gv_cuarentena_liberar", { p_empresa: empresa, p_order_id: String(orderId),
       p_motivos: (p && aprCuarentenaMotivos(p)) || s.motivos || null,
-      p_comentario: txt || null, p_por: await aprQuien() });
+      p_comentario: txt || null, p_por: await aprQuien(), p_persona: quien, p_np: s.np || null });
     s.saving = false; cuarComCerrar(); cuarYaProgRecargar();
-    _apr.msg = "Pedido enviado a Pedidos a programar (mantiene el aviso)" + (txt ? ", con tu comentario." : "."); _apr.msgErr = false;
+    _apr.msg = "Pedido enviado a Pedidos a programar (aprobado por " + quien + ")" + (txt ? ", con tu comentario." : "."); _apr.msgErr = false;
     if (p) { p._cuarLiberado = true; }   // pinta al toque; aprCargar lo confirma
     aprRender();
     aprCargar();
@@ -39073,6 +39111,17 @@ async function cuarYaProgCargar() {
   _apr.cuarYaProgLoading = true;
   try { _apr.cuarYaProg = (await aprRpc("gv_cuarentena_ya_programado", {})) || []; }
   catch (_e) { _apr.cuarYaProg = _apr.cuarYaProg || []; }
+  // v17.23 — estos pedidos NO pasan por gv_cuarentena_marcar (ya tienen tanda), así que sin esto
+  // el log no sabría cuándo entraron: sólo vería la aprobación. Escribe sólo si hay novedad.
+  try {
+    if ((_apr.cuarYaProg || []).length)
+      await aprRpc("gv_cuarentena_log_registrar", {
+        p_filas: _apr.cuarYaProg.map(function (r) {
+          return { empresa: r.empresa || "lk", clave: String(r.clave || r.np || ""), np: r.np,
+                   cod: r.cod, razon_social: r.razon_social, motivos: r.motivos || [], deuda: r.deuda };
+        })
+      });
+  } catch (_e) { /* el log es registro, no bloquea la pantalla */ }
   _apr.cuarYaProgLoading = false;
   if (_pppTab === "prog") aprRender();
 }
@@ -39106,12 +39155,10 @@ function cuarYaProgHtml() {
   if (_apr.cuarYaProg === undefined && !_apr.cuarYaProgLoading) { cuarYaProgCargar(); return ""; }
   const l = _apr.cuarYaProg || [];
   if (!l.length) return "";
-  const aprob = l.filter(function (r) { return !!r.aprobado_at; }).length;
   let h = '<div class="cuar-yaprog"><div class="cuar-yaprog-t">⚠ Ya programados y el cliente está en cuarentena <b>(' + l.length + ')</b>'
-    + (aprob ? '<span class="cuar-yaprog-aprob-n" title="Ya aprobados por alguien (se siguen mostrando, con su fecha)">' + aprob + ' aprobado' + (aprob === 1 ? "" : "s") + '</span>' : '')
-    + '<span class="apr-cuar-help" title="Estos pedidos YA tienen tanda: la cuarentena no los alcanzó porque el reporte de deuda entró después del armado. No se retiran solos — mirarlos con cobranzas y decidir. El 📖 abre el log de comentarios.">ⓘ</span></div>'
+    + '<span class="apr-cuar-help" title="Estos pedidos YA tienen tanda: la cuarentena no los alcanzó porque el reporte de deuda entró después del armado. No se retiran solos — mirarlos con cobranzas y decidir. Al aprobar uno, sale de esta lista y queda en el log de 🚧 Config. Cuarentena. El 📖 abre sus comentarios.">ⓘ</span></div>'
     + '<div class="cuar-yaprog-wrap"><table class="cuar-yaprog-tbl"><thead><tr>'
-    + '<th>NP</th><th>Tanda</th><th>Entrega</th><th>Cliente</th><th>Motivos</th><th>Aprobación</th><th>Enviar a</th><th>Coment.</th>'
+    + '<th>NP</th><th>Tanda</th><th>Entrega</th><th>Cliente</th><th>Motivos</th><th>Enviar a</th><th>Coment.</th>'
     + '</tr></thead><tbody>';
   l.forEach(function (r, i) {
     const cod = String(r.cod || "").trim();
@@ -39120,7 +39167,7 @@ function cuarYaProgHtml() {
       cuarentena_detalle: { deuda: r.deuda, estado: r.estado, nuevo_pedidos: r.nuevo_pedidos }
     });
     const nCom = Number(r.comentarios || 0);
-    h += '<tr' + (r.aprobado_at ? ' class="cuar-yp-ok"' : '') + '>'
+    h += '<tr>'
       + '<td><span class="cuar-yaprog-np">' + escapeHtml(String(r.np || "")) + '</span></td>'
       + '<td><span class="cuar-yaprog-tanda">' + escapeHtml(String(r.tanda || "sin tanda")) + '</span>'
         + (r.picking_empezado ? ' <span class="cuar-yaprog-pick" title="Ya hay eventos de operarios sobre esa tanda">pickeando</span>' : '') + '</td>'
@@ -39129,13 +39176,8 @@ function cuarYaProgHtml() {
         + (cod ? '<span class="cuar-yaprog-cod" title="Número de cliente en ' + (cuarEmpCod(r.empresa) === "CH" ? "Chef" : "Loekemeyer") + '">' + cuarEmpCod(r.empresa) + " " + escapeHtml(cod) + '</span> ' : '')
         + escapeHtml(String(r.razon_social || cod || "")) + '</td>'
       + '<td>' + (badges || '<span class="cuar-yp-sin">—</span>') + '</td>'
-      + '<td>' + (r.aprobado_at
-          ? '<span class="cuar-yp-ok-tag" title="Aprobado (enviado a Pedidos a programar) el ' + escapeHtml(String(r.aprobado_at)) + '">✅ ' + escapeHtml(cuarFechaHora(r.aprobado_at)) + '</span>'
-            + (r.aprobado_por ? '<span class="cuar-yp-por" title="' + escapeHtml(String(r.aprobado_por)) + '">' + escapeHtml(String(r.aprobado_por)) + '</span>' : '')
-          : '<span class="cuar-yp-sin">sin aprobar</span>') + '</td>'
       + '<td><div class="cuar-yp-marcar">'
-        + (r.aprobado_at ? '' :
-           '<button class="cuar-yp-act cuar-yp-act-ok" onclick="cuarYpAprobar(' + i + ')" title="Dejarlo aprobado: sigue en su tanda y queda registrado quién lo aprobó (pide un comentario)">✅ Aprobar</button>')
+        + '<button class="cuar-yp-act cuar-yp-act-ok" onclick="cuarYpAprobar(' + i + ')" title="Aprobarlo: sigue en su tanda, SALE de esta lista y queda en el log de Config. Cuarentena con quién lo aprobó">✅ Aprobar</button>'
         + '<button class="cuar-yp-act cuar-yp-act-cuar" onclick="cuarYpCuarentena(' + i + ')" title="Devolverlo a Cuarentena: lo saca de la programación (pierde tanda y fecha) y vuelve a A Programar retenido">🚧 Cuarentena</button>'
         + '</div></td>'
       + '<td><button class="cuar-yp-lib" onclick="cuarComAbrirIdx(' + i + ')" title="' + (nCom ? nCom + ' comentario' + (nCom === 1 ? "" : "s") : "Sin comentarios") + ' — abrir el log">📖' + (nCom ? '<b>' + nCom + '</b>' : '') + '</button></td>'
@@ -39188,6 +39230,8 @@ function cuarComRender() {
   if (!s || !el) return;
   const ta = document.getElementById("cuarComTexto");
   if (ta) s.texto = ta.value;   // no perder lo tipeado al redibujar
+  const otro = document.getElementById("cuarComOtro");
+  if (otro) s.personaOtro = otro.value;
   const aprobar = s.modo === "aprobar", devolver = s.modo === "cuarentena";
   let log = "";
   if (s.cargando) log = '<div class="cuar-m-load">Buscando comentarios…</div>';
@@ -39210,6 +39254,7 @@ function cuarComRender() {
           (aprobar ? '<br>Dejá un comentario de por qué se aprueba (cobranzas lo autorizó, ya pagó, lo pidió el dueño…). Queda en el log con tu usuario, la fecha y la hora.'
                    : devolver ? '<br>Vuelve a Cuarentena: se lo <b>saca de la programación</b> (pierde tanda y fecha) y reaparece en <b>A Programar</b>, retenido. Contá por qué, queda en el log.'
                    : '') + '</p>' +
+        (aprobar || devolver ? cuarQuienHtml(s, aprobar) : '') +
         (devolver && s.tanda ? '<div class="cuar-m-warn">Sale de la tanda <b>' + escapeHtml(String(s.tanda)) + '</b>.' +
           (s.picking ? ' ⚠ Esa tanda <b>ya se empezó a trabajar</b>: lo más probable es que el servidor no deje sacarlo — primero hay que resolverlo con el depósito.' : '') +
           '</div>' : '') +
@@ -39227,6 +39272,38 @@ function cuarComRender() {
     '</div>';
   const t2 = document.getElementById("cuarComTexto");
   if (t2 && !s.saving) { t2.focus(); t2.selectionStart = t2.value.length; }
+}
+/* v17.23 (Luis, 2026-09-14) — "que solicite que la persona que lo apretó indique quién es".
+   Vivi / Marian / Otro (con texto). En el chat quedó claro que es una AUTORIZACIÓN, así que en
+   la aprobación es OBLIGATORIO: sin persona el botón no se habilita y el backend también lo
+   rechaza (gv_cuarentena_liberar levanta excepción). No se preselecciona a nadie a propósito:
+   un valor puesto de fábrica se confirma sin leerlo, y entonces el dato no vale nada. */
+const CUAR_PERSONAS = ["Vivi", "Marian"];
+function cuarQuienHtml(s, obligatorio) {
+  const sel = String(s.persona || "");
+  let h = '<div class="cuar-quien"><div class="cuar-quien-t">¿Quién ' + (obligatorio ? "aprueba" : "lo devuelve") + '?' +
+    (obligatorio ? ' <span style="color:#b42318">*</span>' : ' <span style="font-weight:600;color:#64748b">(opcional)</span>') + '</div>' +
+    '<div class="cuar-quien-ops">';
+  CUAR_PERSONAS.forEach(function (n) {
+    h += '<button class="cuar-quien-op' + (sel === n ? ' on' : '') + '" onclick="cuarQuienSet(\'' + n + '\')">' + escapeHtml(n) + '</button>';
+  });
+  h += '<button class="cuar-quien-op' + (sel === "__otro" ? ' on' : '') + '" onclick="cuarQuienSet(\'__otro\')">Otro…</button>';
+  h += '</div>';
+  if (sel === "__otro")
+    h += '<input id="cuarComOtro" class="cuar-quien-otro" placeholder="¿Quién? (nombre)" value="' + escapeHtml(String(s.personaOtro || "")) + '">';
+  return h + '</div>';
+}
+function cuarQuienSet(v) {
+  const s = _apr.cuarCom; if (!s) return;
+  s.persona = (s.persona === v ? "" : v);
+  cuarComRender();
+  if (s.persona === "__otro") { const i = document.getElementById("cuarComOtro"); if (i) i.focus(); }
+}
+/* El nombre que se guarda: el chip elegido, o lo que escribieron en "Otro". */
+function cuarQuienValor(s) {
+  if (!s) return "";
+  if (s.persona === "__otro") return String(s.personaOtro || "").trim();
+  return String(s.persona || "").trim();
 }
 async function cuarComAgregar() {
   const s = _apr.cuarCom; if (!s) return;
@@ -39255,7 +39332,7 @@ async function cuarDevolverConfirmar() {
   s.saving = true; s.err = ""; cuarComRender();
   try {
     await aprRpc("gv_cuarentena_devolver", { p_empresa: s.empresa, p_np: s.np, p_clave: s.clave,
-      p_comentario: txt || null, p_por: await aprQuien() });
+      p_comentario: txt || null, p_por: await aprQuien(), p_persona: cuarQuienValor(s) || null });
     s.saving = false; cuarComCerrar(); cuarYaProgRecargar();
     _apr.msg = s.np + " volvió a Cuarentena: salió de la programación y está en A Programar, retenido.";
     _apr.msgErr = false;
@@ -39370,10 +39447,79 @@ function cuarConfigHtml() {
       '<b>estado</b> (Suspendido / Sin Cta.Cte.). <b>Deuda</b> trae el <b>saldo adeudado</b> por cliente.</p>' +
     '</div>' +
     aprCuarToolsHtml() +
-    '<div class="cuar-cfg-note">Los pedidos de clientes con deuda &gt; $1.000, suspendidos o que superan ' +
-    'su límite de crédito caen solos en el sector <b>🚧 Cuarentena</b> de <b>📥 A Programar</b> y no se ' +
-    'programan (ni a mano ni por el automático) hasta liberarlos.</div>' +
+    '<div class="cuar-cfg-note">Los pedidos de clientes con deuda &gt; $1.000, suspendidos, que superan ' +
+    'su límite de crédito o que son <b>clientes nuevos</b> caen solos en el sector <b>🚧 Cuarentena</b> de ' +
+    '<b>📥 A Programar</b> y no se programan (ni a mano ni por el automático) hasta aprobarlos.</div>' +
+    cuarLogHtml() +
   '</div>';
+}
+
+/* ── v17.23 (Luis, 2026-09-14) — LOG DE CUARENTENA ──────────────────────────────────────────
+   "un log de pedidos que caen en cuarentena, cuándo entran, qué motivos, quién los aprobó,
+   cuándo, etc". Una fila por pedido: el backend (gv_cuarentena_log) colapsa los eventos de
+   GV_Cuarentena_Log —que es append-only— a entrada + estado + cierre. */
+function cuarLogCargar(dias) {
+  if (_apr.cuarLogLoading) return;
+  if (dias != null) _apr.cuarLogDias = Number(dias) || 60;
+  _apr.cuarLogLoading = true;
+  if (_pppTab === "cuarcfg") pppRenderProg();
+  aprRpc("gv_cuarentena_log", { p_dias: _apr.cuarLogDias || 60 }).then(function (r) {
+    _apr.cuarLog = r || [];
+  }).catch(function (e) { _apr.cuarLog = []; _apr.cuarLogErr = String((e && e.message) || e); })
+    .then(function () { _apr.cuarLogLoading = false; if (_pppTab === "cuarcfg") pppRenderProg(); });
+}
+function cuarLogHtml() {
+  if (_apr.cuarLog === undefined && !_apr.cuarLogLoading) { cuarLogCargar(); }
+  const dias = _apr.cuarLogDias || 60;
+  const l = _apr.cuarLog || [];
+  let h = '<div class="cuar-log-cfg"><h3>📋 Log de Cuarentena</h3>' +
+    '<p>Cada pedido que quedó retenido: cuándo entró, por qué, y quién lo aprobó o lo devolvió. ' +
+    'Se escribe solo — no hay que cargar nada.</p>' +
+    '<div class="cuar-log-bar">' +
+      '<select onchange="cuarLogCargar(this.value)">' +
+        [7, 30, 60, 90, 365].map(function (d) {
+          return '<option value="' + d + '"' + (d === dias ? " selected" : "") + '>' +
+            (d === 365 ? "último año" : "últimos " + d + " días") + '</option>';
+        }).join("") +
+      '</select>' +
+      '<button onclick="cuarLogCargar()">↻ Refrescar</button>' +
+      '<span class="cuar-stat">' + (_apr.cuarLogLoading ? "buscando…" : l.length + " pedido" + (l.length === 1 ? "" : "s")) + '</span>' +
+    '</div>';
+  if (_apr.cuarLogErr) h += '<div class="cuar-m-err">⚠ ' + escapeHtml(_apr.cuarLogErr) + '</div>';
+  h += '<div class="cuar-log-tblwrap"><table class="cuar-log-tbl"><thead><tr>' +
+    '<th>NP</th><th>Cliente</th><th>Motivos</th><th>Entró</th><th>Estado</th><th>Quién / cuándo</th><th>Comentario</th><th></th>' +
+    '</tr></thead><tbody>';
+  if (!l.length) {
+    h += '<tr><td colspan="8"><div class="cuar-log-vacio2">' +
+      (_apr.cuarLogLoading ? "Buscando…" : "Todavía no cayó ningún pedido en cuarentena en este período.") +
+      '</div></td></tr>';
+  } else {
+    l.forEach(function (r, i) {
+      const cod = String(r.cod || "").trim();
+      const badges = aprCuarBadgesHtml({ cuarentena_motivos: r.motivos || [],
+        cuarentena_detalle: { deuda: r.deuda } });
+      h += '<tr>'
+        + '<td><b>' + escapeHtml(String(r.np || r.clave || "")) + '</b></td>'
+        + '<td>' + (cod ? '<span class="cuar-card-cod">' + cuarEmpCod(r.empresa) + " " + escapeHtml(cod) + '</span>' : '')
+          + escapeHtml(String(r.razon_social || "")) + '</td>'
+        + '<td>' + (badges || '<span class="cuar-yp-sin">—</span>') + '</td>'
+        + '<td>' + escapeHtml(cuarFechaHora(r.entro_at)) + '</td>'
+        + '<td><span class="cuar-log-est e-' + escapeHtml(String(r.estado || "retenido")) + '">' + escapeHtml(String(r.estado || "retenido")) + '</span></td>'
+        + '<td>' + (r.cerrado_at
+            ? '<span class="cuar-log-quien">' + escapeHtml(String(r.persona || "—")) + '</span> · ' + escapeHtml(cuarFechaHora(r.cerrado_at))
+              + (r.por ? '<span class="cuar-log-mail">' + escapeHtml(String(r.por)) + '</span>' : '')
+            : '<span class="cuar-yp-sin">—</span>') + '</td>'
+        + '<td class="cuar-log-com" title="' + escapeHtml(String(r.comentario || "")) + '">' + escapeHtml(String(r.comentario || "")) + '</td>'
+        + '<td><button class="cuar-yp-lib" onclick="cuarLogComentarios(' + i + ')" title="' + (r.comentarios ? r.comentarios + " comentario" + (r.comentarios === 1 ? "" : "s") : "Sin comentarios") + ' — abrir el log">📖' + (r.comentarios ? '<b>' + r.comentarios + '</b>' : '') + '</button></td>'
+        + '</tr>';
+    });
+  }
+  return h + '</tbody></table></div></div>';
+}
+function cuarLogComentarios(i) {
+  const r = (_apr.cuarLog || [])[i]; if (!r) return;
+  cuarComAbrir({ modo: "log", empresa: r.empresa || "lk", clave: String(r.clave || ""),
+                 np: String(r.np || r.clave || ""), cli: String(r.razon_social || r.cod || "") });
 }
 /* Fila "Ver ejemplo" — vive en el sector Cuarentena (no en Config). */
 function cuarDemoRowHtml() {
@@ -39559,7 +39705,11 @@ async function cuarMarcarPedidos() {
     const webPend = peds.filter(function (p) { return !p._demo && !p._isis; });
     const [res, lim, libs] = await Promise.all([
       aprRpc("gv_cuarentena_marcar", {
-        p_pedidos: peds.map(function (p) { return { order_id: String(p.order_id), empresa: p.empresa || "lk", cod: String(p.cod || "").trim() }; })
+        // v17.23: np y razón social viajan para que el LOG de Cuarentena se lea sin joins
+        p_pedidos: peds.map(function (p) {
+          return { order_id: String(p.order_id), empresa: p.empresa || "lk", cod: String(p.cod || "").trim(),
+                   np: aprPedLabel(p), razon_social: p.razon_social || null };
+        })
       }),
       webPend.length ? aprRpc("gv_cuarentena_limite", {
         p_pendientes: webPend.map(function (p) {

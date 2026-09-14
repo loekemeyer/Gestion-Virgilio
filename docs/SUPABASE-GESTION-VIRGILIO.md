@@ -12986,3 +12986,53 @@ Luis con esa pista; se corrige contando y registrando la bajada que falta.
 
 **Primera vez que el módulo del ⛔ trabajó en un caso real** — y la primera corrida mostró que el
 criterio traía ruido. Mejor que lo encuentre yo hoy que Luis mañana con una tarea que miente.
+### §3.ew — v17.34: el LOG de Cuarentena, "¿quién aprueba?", y el aprobado sale de la lista — 2026-09-14
+
+**Pedido de Luis (2026-09-14),** tres cosas del mismo movimiento:
+1. *"si un cliente está aprobado, que salga de esa lista"*.
+2. Al aprobar —tanto desde la tabla como desde **"Enviar a Pedidos a programar"** de la ficha—
+   un pop-up previo que pida **quién es la persona** (*Vivi*, *Marian*, *Otro* con texto) junto
+   con el comentario.
+3. Un submódulo en **Config. Cuarentena** con el **log** de los pedidos que caen en cuarentena:
+   cuándo entran, con qué motivos, quién los aprobó y cuándo.
+
+**(1) y (3) van juntos, y ese es el punto.** Los aprobados se podían esconder recién ahora: hasta
+la v17.15 la lista era el único lugar donde quedaba registro de la aprobación, y por eso se los
+dejaba a la vista. Con el log, la historia vive donde corresponde y la lista vuelve a ser lo que
+tiene que ser: **lo que falta resolver**. `gv_cuarentena_ya_programado` vuelve a excluir los
+liberados (16 filas contra 20) y el front perdió la columna *Aprobación*, que sin aprobados
+mostraría siempre lo mismo.
+
+**(2) `persona` es un dato distinto de `por`, y por eso son dos columnas.** `por` es el mail de la
+sesión que apretó el botón (trazabilidad técnica, sale solo del JWT); `persona` es la respuesta a
+*"¿quién autorizó esto?"*, que es lo que se mira después. **Es obligatoria**: el front no deja
+confirmar sin elegir y `gv_cuarentena_liberar` levanta excepción igual, porque una validación que
+sólo vive en el navegador no es una validación. Y **no se preselecciona a nadie**: un valor puesto
+de fábrica se confirma sin leerlo, y entonces el dato no vale nada.
+
+**La pieza nueva es `GV_Cuarentena_Log`, append-only.** Eventos: `entro` (primera vez que se lo ve
+retenido, o re-entrada después de un aprobado/devuelto), `motivos` (le cambiaron), `aprobado` y
+`devuelto`. `gv_cuarentena_log(p_dias)` los colapsa a una fila por pedido para la pantalla.
+
+**Hacen falta DOS caminos de escritura, y conviene entender por qué.**
+- `gv_cuarentena_marcar` cubre lo que **todavía no tiene tanda**. Se partió en dos: el cálculo de
+  siempre quedó **intacto** en `gv_cuarentena_marcar_calc` (`sql`, `stable`) y el envoltorio en
+  `plpgsql` sólo le suma el registro — así el cálculo se puede seguir usando sin efectos.
+- `gv_cuarentena_log_registrar` cubre lo que **ya tiene tanda** (la lista de "ya programados"), que
+  no pasa por marcar. Sin esto el log vería la aprobación sin saber cuándo había entrado.
+
+Los dos escriben **sólo si hay novedad** (primera vez, re-entrada, o cambio de motivos): `marcar`
+se llama en cada carga de A Programar, y el log no puede crecer una fila por refresco. Verificado:
+dos llamadas seguidas dejan una sola fila.
+
+**Backfill** el mismo día: por cada fila de `GV_Cuarentena_Liberados` sin evento se insertó un
+`aprobado` con su `liberado_at`/`liberado_por` y **sin `persona`** — cuando se aprobaron todavía no
+se preguntaba quién autorizaba, y rellenarlo sería inventar.
+
+El archivo del repo está **verificado contra la base**: el md5 del cuerpo normalizado de las 7
+funciones da idéntico. SQL y rollback: `sql/gv_cuarentena_log_v1723.sql` (el archivo se llama `1723` porque así se numeró
+al escribirlo; la app terminó en **v17.34** porque otras sesiones del mismo día se llevaron los
+números del medio, y renumerar el archivo obligaría a reaplicar las funciones sólo para que el
+md5 siga dando). Tests en
+`tests/apr-cuarentena.cjs` (sin columna Aprobación; aprobar pide quién y sin eso no libera; el log
+lista NP, cliente, estado, quién y cuándo).
