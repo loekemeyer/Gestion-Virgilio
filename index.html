@@ -2370,12 +2370,6 @@ button.pk-anular small{ display:block; font-size:12px; font-weight:700; opacity:
 .planim-ord-sug{ background: #ecfdf5 !important; border-color: #6ee7b7 !important; }
 .planim-search{ width: 100%; }
 .planim-hint{ font-size: 12px; color: #64748b; margin-top: 8px; }
-/* v15.91 — aviso de que este editor ya no manda (ver #lugarEditorOverlay). */
-.planim-obsoleto{ background:#fef3c7; border:1px solid #f59e0b; border-radius:10px;
-  padding:10px 12px; margin:0 0 12px; font-size:13px; line-height:1.45; color:#78350f; }
-.planim-obsoleto b{ color:#7c2d12; }
-.planim-obsoleto button{ margin-top:8px; background:#f59e0b; color:#fff; border:0;
-  border-radius:8px; padding:8px 14px; font-size:13px; font-weight:600; cursor:pointer; }
 .planim-btn-save{ width: auto; margin: 0; padding: 0 16px; height: 42px; background: #16a34a; color: #fff; border: 0; border-radius: 8px; font-weight: bold; cursor: pointer; transition: background .12s; }
 .planim-btn-save:hover{ background: #15803d; }
 .planim-btn-del{ width: auto; margin: 0; padding: 0 14px; height: 42px; background: #fff; color: #b42318; border: 1px solid #fecaca; border-radius: 8px; font-weight: bold; cursor: pointer; transition: background .12s; }
@@ -2494,6 +2488,29 @@ button.pk-anular small{ display:block; font-size:12px; font-weight:700; opacity:
 .pmap-leg .leg-scap{ background:#f5f3ff; border-color:#c4b5fd; color:#5b21b6; }
 .pmap-leg .leg-scap b{ color:#5b21b6; }
 @media (max-width:460px){ .pmap-cols{ grid-template-columns:repeat(auto-fill, minmax(96px, 1fr)); gap:8px; } .pmap-cell{ height:70px; } .pmap-cod{ font-size:16px; } }
+/* Editor de celda (v17.31) y aviso de la planimetría vieja. */
+.pmap-modal{ display:none; position:fixed; inset:0; z-index:1260; background:rgba(2,6,23,.55); align-items:center; justify-content:center; padding:16px; }
+.pmap-modal.show{ display:flex; }
+.pmap-modal-box{ background:#fff; border-radius:14px; width:min(560px,100%); max-height:88vh; overflow:auto; box-shadow:0 20px 50px rgba(2,6,23,.35); }
+.pmap-modal-head{ display:flex; align-items:center; justify-content:space-between; gap:10px; padding:14px 16px; border-bottom:1px solid #e2e8f0; font-size:19px; font-weight:800; color:#0f172a; position:sticky; top:0; background:#fff; }
+.pmap-modal-x{ width:auto; margin:0; padding:6px 12px; font-size:16px; background:#f1f5f9; border:1px solid #cbd5e1; border-radius:8px; }
+.pmap-modal-body{ padding:14px 16px; display:flex; flex-direction:column; gap:12px; }
+.pmap-modal-body .planim-inp{ margin:0; }
+.pmap-it{ display:flex; align-items:center; gap:8px; flex-wrap:wrap; border:1px solid #e2e8f0; border-radius:10px; padding:8px 10px; background:#f8fafc; }
+.pmap-it-cod{ font-size:17px; font-weight:800; color:#0f172a; min-width:64px; }
+.pmap-it-desc{ flex:1 1 140px; font-size:12.5px; color:#64748b; min-width:0; }
+.pmap-it input{ width:78px; flex:0 0 auto; text-align:center; }
+.pmap-it .pmap-it-u{ font-size:12px; color:#64748b; }
+.pmap-it button{ width:auto; margin:0; padding:7px 12px; font-size:14px; border-radius:8px; }
+.pmap-bt{ background:#0f172a; color:#fff; border:none; font-weight:700; }
+.pmap-bt-del{ background:#fee2e2; color:#b91c1c; border:1px solid #fecaca; font-weight:700; }
+.pmap-alta{ border:1px dashed #cbd5e1; border-radius:10px; padding:10px; display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
+.pmap-alta .planim-inp{ flex:1 1 110px; min-width:0; }
+.pmap-alta .planim-inp-num{ flex:0 0 96px; }
+.pmap-sub{ font-size:12.5px; color:#64748b; }
+.pmap-vieja{ background:#fffbeb; border:2px solid #fcd34d; border-radius:12px; padding:12px 14px; margin-bottom:10px; font-size:14px; color:#92400e; }
+.pmap-vieja b{ color:#7c2d12; }
+.pmap-vieja button{ width:auto; margin:6px 6px 0 0; padding:7px 12px; font-size:13.5px; border-radius:8px; background:#fff; border:1px solid #f59e0b; color:#92400e; font-weight:700; }
 .lug-x{ border:0; background:transparent; color:#64748b; cursor:pointer; font-size:13px; line-height:1; padding:0 2px; }
 .lug-x:hover{ color:#b42318; }
 .lug-libre{ font-size:13px; color:#94a3b8; font-style:italic; }
@@ -4925,7 +4942,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=17.30"></script>
+<script type="module" src="recepcion.js?v=17.31"></script>
 <!-- Config del módulo de fichada (compartido con fichada.html). El secret
      hmacSecret tiene que ser el mismo acá y allá; cargándolo desde un solo
      archivo evitamos que se desincronicen. -->
@@ -5140,33 +5157,12 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
        (window.openRecepcionOp). El viejo iframe a Control-Carga-Remitos-FC se quitó: esa
        app se borró y la recepción ahora es 100% local. -->
 
-  <!-- Overlay: editor de Planimetría (solo supervisores). Edita la tabla Supabase
-       "Planimetria" que se mergea sobre planimetria.js. -->
-  <div id="planimEditorOverlay" class="recp-admin-overlay">
-    <div class="recp-admin-bar">
-      <span class="recp-admin-title">🗺️ Planimetría (sólo lectura)</span>
-      <button class="recp-admin-close" onclick="closePlanimEditor()">Cerrar</button>
-    </div>
-    <div class="planim-body">
-      <!-- v15.91 — desde la v15.77 window.GONDOLA se llena de gv_lugar_articulo
-           (GV_Lugar / GV_Lugar_Item) y sólo cae a "Planimetria" si esa vista falla.
-           O sea que lo que se edite acá NO cambia la ubicación que ve el picking.
-           El editor NO se borra (regla de Luis, 11/09: nada se borra hasta que el
-           reemplazo esté rodando) — pero tiene que decirlo en la cara. -->
-      <div class="planim-obsoleto">
-        ⚠ <b>Esta pantalla es sólo para MIRAR.</b> Hasta la v17.26 se editaba acá y no servía
-        de nada: escribía a una tabla que el picking dejó de leer en la v15.77. Las ubicaciones
-        se cargan en <b>Lugares del depósito</b> y se ven dibujadas en el <b>Mapa de góndolas</b>.
-        Lo de abajo es lo que hoy usa el picking, en orden de recorrido.
-        <br><button onclick="closePlanimEditor(); openLugarEditor();">📍 Editar en Lugares del depósito</button>
-        <button onclick="closePlanimEditor(); openPlanimMapa();">🗺️ Ver el mapa</button>
-      </div>
-      <div class="planim-sec-t">Buscar ubicaciones</div>
-      <input id="planimSearch" class="planim-inp planim-search" type="text" placeholder="🔍 Buscar código o sector…" oninput="planimRender(this.value)">
-      <div id="planimList" class="planim-list"></div>
-      <div id="planimStatus" class="planim-status"></div>
-    </div>
-  </div>
+  <!-- v17.31 — El overlay "Editar Planimetría" SE RETIRÓ (pedido de Thomas: combinar los
+       dos módulos). Era sólo lectura desde la v17.26 y mostraba lo mismo que el mapa, peor:
+       una lista. Lo que tenía de propio —el ORDEN DE RECORRIDO del lugar— ahora se edita en
+       el 🗺️ Mapa de góndolas, tocando la celda. La tabla "Planimetria" NO se borra: dos
+       vistas la leen (gv_codigos_multigrafia, vista_nc_loeke_chef) y guarda los códigos que
+       nunca llegaron al mapa, que el propio mapa ahora ofrece traer. -->
 
   <!-- Overlay: editor de LUGARES (v15.76, solo supervisores). Edita GV_Lugar /
        GV_Lugar_Item, que reemplazan a Planimetria + Capacidad_Sector.
@@ -5217,9 +5213,23 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
         <button class="planim-btn-save" onclick="closePlanimMapa();openLugarEditor()">✏️ Editar lugares</button>
       </div>
       <div id="pmapTabs" class="pmap-tabs"></div>
+      <div id="pmapVieja" class="pmap-vieja" hidden></div>
       <div id="pmapGrid"></div>
       <div id="pmapLeg" class="pmap-leg"></div>
       <div id="pmapStatus" class="planim-status"></div>
+    </div>
+
+    <!-- Editor de UNA celda (v17.31). Se abre tocando la celda en el mapa y escribe por
+         RPC: gv_lugar_item_guardar / gv_lugar_item_sacar / gv_lugar_orden. -->
+    <div id="pmapCeldaModal" class="pmap-modal">
+      <div class="pmap-modal-box">
+        <div class="pmap-modal-head">
+          <span id="pmapCeldaTit">Celda</span>
+          <button class="pmap-modal-x" onclick="pmapCerrarCelda()">✕</button>
+        </div>
+        <div id="pmapCeldaBody" class="pmap-modal-body"></div>
+        <div id="pmapCeldaStatus" class="planim-status"></div>
+      </div>
     </div>
   </div>
 
@@ -5297,7 +5307,6 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
       <div class="sup-actions sup-secondary cfg-actions">
         <button class="sup-action-btn" onclick="cfgGo(openPrintStation)"><span class="sup-ico">🖨️</span><span>Cola de impresión</span></button>
         <button class="sup-action-btn" onclick="cfgGo(openMailsEditor)"><span class="sup-ico">✉️</span><span>Mails autorizados</span></button>
-        <button class="sup-action-btn" onclick="cfgGo(openPlanimEditor)"><span class="sup-ico">🗺️</span><span>Editar Planimetría</span></button>
         <button class="sup-action-btn" onclick="cfgGo(openLugarEditor)"><span class="sup-ico">📍</span><span>Lugares del depósito</span></button>
         <button class="sup-action-btn" onclick="cfgGo(openPlanimMapa)" title="Ver el depósito dibujado: cada góndola con sus celdas, el código que va en cada una y cuántas cajas entran"><span class="sup-ico">🗺️</span><span>Mapa de góndolas</span></button>
         <button class="sup-action-btn" onclick="cfgGo(openTallEditor)"><span class="sup-ico">👷</span><span>Talleristas de Recepción</span></button>
@@ -8054,7 +8063,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v17.30";
+const APP_VERSION = "v17.31";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -36541,46 +36550,6 @@ async function dpSaveCap(cn) {
   } catch (_e) { _dpMsg("dpCapMsg_" + cn, "Sin conexión.", false); }
 }
 
-function openPlanimEditor() {
-  if (!requireSupervisor()) return;
-  const ov = document.getElementById("planimEditorOverlay");
-  if (ov) ov.classList.add("show");
-  const s = document.getElementById("planimSearch");
-  planimRender(s ? s.value : "");
-}
-function closePlanimEditor() {
-  const ov = document.getElementById("planimEditorOverlay");
-  if (ov) ov.classList.remove("show");
-}
-function planimSetStatus(msg, ok) {
-  const el = document.getElementById("planimStatus");
-  if (el) { el.textContent = msg || ""; el.style.color = (ok === false) ? "#b42318" : "#166534"; }
-}
-function planimRender(filter) {
-  const list = document.getElementById("planimList");
-  if (!list) return;
-  const G = window.GONDOLA || {};
-  const f = String(filter || "").trim().toUpperCase();
-  // Sin búsqueda → muestra TODO. Con búsqueda → filtra por código o sector. Siempre
-  // ordenado por N° de orden (orden de góndola), no alfabético.
-  const ordOf = function (k) { const o = Number((G[k] || [])[1]); return isNaN(o) ? Number.MAX_SAFE_INTEGER : o; };
-  const keys = Object.keys(G).filter(function (k) {
-    if (!f) return true;
-    const e = G[k] || [];
-    return k.indexOf(f) >= 0 || String(e[0] || "").toUpperCase().indexOf(f) >= 0;
-  }).sort(function (a, b) { return ordOf(a) - ordOf(b) || (a < b ? -1 : a > b ? 1 : 0); });
-  if (!keys.length) { list.innerHTML = '<div class="planim-empty">' + (f ? 'Nada coincide con "' + escapeHtml(filter) + '".' : 'No hay ubicaciones cargadas todavía.') + '</div>'; return; }
-  const head = '<div class="planim-list-head"><span class="plh-cod">Código</span><span class="plh-sec">Sector</span><span class="plh-ord">Orden</span></div>';
-  const CAP = 500;
-  list.innerHTML = head + keys.slice(0, CAP).map(function (k) {
-    const e = G[k] || ["", 0];
-    return '<div class="planim-row planim-row-ro">' +
-      '<span class="planim-row-cod">' + escapeHtml(k) + '</span>' +
-      '<span class="planim-row-sec">' + escapeHtml(String(e[0] || "—")) + '</span>' +
-      '<span class="planim-row-ord">' + (e[1] != null ? Number(e[1]) : 0) + '</span>' +
-    '</div>';
-  }).join("") + (keys.length > CAP ? '<div class="planim-empty">Mostrando ' + CAP + ' de ' + keys.length + ' — afiná la búsqueda.</div>' : "");
-}
 /* ═══════════════════════════════════════════════════════════════════
    EDITOR DE LUGARES — v15.76 (pedido de Luis, 2026-09-11: "rehacemos el editor")
 
@@ -36745,22 +36714,19 @@ async function lugAddItem(sector) {
   const capEl = document.getElementById("lugCap_" + s);
   const cod = codEl ? codCanon(codEl.value.trim().toUpperCase()) : "";   // v16.23 — con el cero adelante
   if (!cod) { lugSetStatus("Falta el código.", false); return; }
-  const clase = clsEl ? clsEl.value : "articulo";
   const capRaw = capEl ? capEl.value.trim() : "";
-  const cajas_max = capRaw === "" ? null : (Number(capRaw) || 0);
-  const headers = await facAuthWriteHeaders({ "Prefer": "resolution=merge-duplicates,return=minimal" });
-  if (!headers) { lugSetStatus(authNoSesionMsg("Iniciá sesión con Google para editar."), false); return; }
-  try {
-    const r = await fetch(SUPABASE_GVLUGARITEM_ENDPOINT + "?on_conflict=sector,cod,clase", {
-      method: "POST", headers: headers,
-      body: JSON.stringify({ sector: s, cod: cod, clase: clase, cajas_max: cajas_max, activo: true })
-    });
-    if (!r.ok) { lugSetStatus("No se guardó: HTTP " + r.status + (r.status === 401 || r.status === 403 ? " (faltan los permisos de escritura — sql/gv_lugar_editor.sql)" : ""), false); return; }
-    await lugFetch(true);
-    lugSetStatus("✓ " + cod + " agregado a " + s + ".", true);
-    if (codEl) codEl.value = ""; if (capEl) capEl.value = "";
-    lugRender((document.getElementById("lugSearch") || {}).value || "");
-  } catch (_e) { lugSetStatus("Sin conexión: no se guardó.", false); }
+  // v17.31 — por la MISMA RPC que el mapa, que además espeja la capacidad en
+  // Capacidad_Sector. El POST directo que había acá escribía sólo GV_Lugar_Item y
+  // dejaba la capacidad vieja colgada: esa era la mitad "solo_mapa" del problema 84.
+  const r = await pmapRpc("gv_lugar_item_guardar", {
+    p_sector: s, p_cod: cod, p_clase: clsEl ? clsEl.value : "articulo",
+    p_cajas_max: capRaw === "" ? null : (Number(capRaw) || 0)
+  });
+  if (!r.ok) { lugSetStatus("No se guardó: " + r.err, false); return; }
+  await lugFetch(true);
+  lugSetStatus("✓ " + cod + " agregado a " + s + ".", true);
+  if (codEl) codEl.value = ""; if (capEl) capEl.value = "";
+  lugRender((document.getElementById("lugSearch") || {}).value || "");
 }
 /* Saca un código DE ESTE LUGAR — no borra el código del depósito. Es la diferencia
    con el editor viejo, donde borrar el código lo sacaba de todos lados porque sólo
@@ -36771,17 +36737,15 @@ async function lugDelItem(sector, cod, clase) {
     return String(i.cod).toUpperCase() === c && String(i.sector).toUpperCase() !== s;
   }).length;
   if (!confirm("¿Sacar " + c + " de " + s + "?\n\n" +
-      (otros ? "Le quedan otros " + otros + " lugar(es)." : "⚠ Es su ÚNICO lugar: queda sin planimetría."))) return;
-  const headers = await facAuthWriteHeaders({ "Prefer": "return=minimal" });
-  if (!headers) { lugSetStatus(authNoSesionMsg("Iniciá sesión con Google para editar."), false); return; }
-  try {
-    const q = "?sector=eq." + encodeURIComponent(s) + "&cod=eq." + encodeURIComponent(c) + "&clase=eq." + encodeURIComponent(cl);
-    const r = await fetch(SUPABASE_GVLUGARITEM_ENDPOINT + q, { method: "DELETE", headers: headers });
-    if (!r.ok) { lugSetStatus("No se borró: HTTP " + r.status + (r.status === 401 || r.status === 403 ? " (faltan los permisos — sql/gv_lugar_editor.sql)" : ""), false); return; }
-    await lugFetch(true);
-    lugSetStatus("✓ " + c + " sacado de " + s + ".", true);
-    lugRender((document.getElementById("lugSearch") || {}).value || "");
-  } catch (_e) { lugSetStatus("Sin conexión: no se borró.", false); }
+      (otros ? "Le quedan otros " + otros + " lugar(es)." : "⚠ Es su ÚNICO lugar: queda sin planimetría.") +
+      "\n\nSe borra del mapa Y de la capacidad.")) return;
+  // v17.31 — misma RPC que el mapa: el DELETE directo que había acá borraba del mapa y
+  // dejaba la fila de Capacidad_Sector, que es la mitad "solo_capacidad" del problema 84.
+  const r = await pmapRpc("gv_lugar_item_sacar", { p_sector: s, p_cod: c, p_clase: cl });
+  if (!r.ok) { lugSetStatus("No se borró: " + r.err, false); return; }
+  await lugFetch(true);
+  lugSetStatus("✓ " + c + " sacado de " + s + ".", true);
+  lugRender((document.getElementById("lugSearch") || {}).value || "");
 }
 /* ═══════════════════════════════════════════════════════════════════
    🗺️ MAPA DE GÓNDOLAS — v17.23 (pedido de Thomas, 2026-09-14: "quiero un módulo
@@ -36805,6 +36769,8 @@ async function lugDelItem(sector, cod, clase) {
    corrida de 1 a N sin huecos (A=85, B/D/F/H/J/L/M/Ñ=60, C/E/G/I=20, P=40), así
    que el corte de a 5 cae siempre donde tiene que caer. */
 const PMAP_ALTO = 5;
+const PMAP_SELECT = "select=sector,gondola,celda,empresa,orden,cod,descripcion,cajas_max,max_fuente,estado" +
+                    "&order=gondola.asc,celda.asc";
 let _pmap = null, _pmapG = "", _pmapQ = "";
 
 function pmapSetStatus(msg, ok) {
@@ -36830,10 +36796,11 @@ async function openPlanimMapa() {
   // la lectura vuelve vacía (sin red) se conserva lo que ya estaba en vez de borrarlo.
   if (_pmap) pmapRender();
   pmapSetStatus("Cargando el mapa…", true);
-  const filas = await supaFetchAllSafe(SUPABASE_URL + "/rest/v1/gv_planimetria_celda",
-    "select=sector,gondola,celda,empresa,cod,descripcion,cajas_max,max_fuente,estado&order=gondola.asc,celda.asc");
+  const filas = await supaFetchAllSafe(SUPABASE_URL + "/rest/v1/gv_planimetria_celda", PMAP_SELECT);
   if ((filas && filas.length) || !_pmap) _pmap = filas || [];
   pmapRender();
+  // el aviso de lo que quedó en la planimetría vieja se baja una vez, sin frenar el dibujo
+  pmapViejaFetch().then(pmapViejaRender).catch(function () {});
 }
 function closePlanimMapa() {
   const ov = document.getElementById("planimMapaOverlay");
@@ -36984,7 +36951,7 @@ function pmapCellHtml(g, n, porCelda) {
   let cuerpo = "", tip = sec;
   if (libre) {
     cuerpo = '<span class="pmap-cod">libre</span>';
-    tip += " · celda libre";
+    tip += " · celda libre — tocá para asignarle un código";
   } else {
     // Con UN código entra grande y el máximo abajo. Con varios, cada uno va en UNA
     // línea (código + cajas al lado) para que la celda no crezca: la altura es fija
@@ -37010,9 +36977,208 @@ function pmapCellHtml(g, n, porCelda) {
          : "");
     }).join("\n");
   }
-  const click = libre ? "" : ' onclick="pmapBuscar(' + JSON.stringify(String(its[0].cod || "")).replace(/"/g, "&quot;") + ')"';
+  const click = ' onclick="pmapAbrirCelda(' + JSON.stringify(sec).replace(/"/g, "&quot;") + ')"';
   return '<div class="pmap-cell ' + cls + (hit ? " pmap-hit" : "") + '" title="' + escapeHtml(tip) + '"' + click + '>' +
          '<span class="pmap-sec">' + escapeHtml(sec) + '</span>' + cuerpo + '</div>';
+}
+/* ═══════════════════════════════════════════════════════════════════
+   EDICIÓN DESDE EL MAPA — v17.31 (pedido de Thomas, 2026-09-14: "que se pueda en
+   el nuevo módulo de Mapa de góndolas editar los lugares, artículos, etc y que
+   tenga efecto en la data en el backend")
+
+   Tocar una celda abre su editor: qué códigos hay, cuántas cajas entran de cada
+   uno, y el orden de recorrido del lugar. Todo se escribe por **RPC**
+   (`gv_lugar_item_guardar`, `gv_lugar_item_sacar`, `gv_lugar_orden`), que es la
+   que se ocupa de escribir LAS DOS tablas —el mapa `GV_Lugar_Item` y la capacidad
+   `Capacidad_Sector`— porque hay cinco consumidores que todavía leen la segunda
+   (generador de OC, aviso de "no entra en góndola", conteo cíclico). Escribir una
+   sola era, justamente, la fábrica de las divergencias del problema 84.
+
+   Acá NO se decide nada: la regla vive en la RPC (sql/gv_lugar_editar_v1731.sql).
+   El front sólo junta lo que tipeó el supervisor y refresca desde la vista. */
+let _pmapCelda = "";     // sector abierto en el editor
+let _pmapVieja = null;   // huérfanos de la tabla "Planimetria" (se baja una vez)
+
+async function pmapRpc(fn, body) {
+  const headers = await facAuthWriteHeaders();
+  if (!headers) return { ok: false, err: authNoSesionMsg("Iniciá sesión con Google para editar.") };
+  try {
+    const r = await fetch(SUPABASE_URL + "/rest/v1/rpc/" + fn, {
+      method: "POST", headers: headers, body: JSON.stringify(body || {})
+    });
+    const txt = await r.text();
+    let data = null; try { data = txt ? JSON.parse(txt) : null; } catch (_e) {}
+    if (!r.ok) {
+      const msg = (data && (data.message || data.hint)) || ("HTTP " + r.status);
+      return { ok: false, err: (r.status === 401 || r.status === 403) ? "Sin permiso para escribir: " + msg : msg };
+    }
+    return { ok: true, data: data };
+  } catch (_e) { return { ok: false, err: "Sin conexión: no se guardó." }; }
+}
+function pmapCeldaStatus(msg, ok) {
+  const el = document.getElementById("pmapCeldaStatus");
+  if (el) { el.textContent = msg || ""; el.style.color = (ok === false) ? "#b42318" : "#166534"; }
+}
+function pmapFilasDe(sector) {
+  const s = String(sector || "").toUpperCase();
+  return (_pmap || []).filter(function (r) { return String(r.sector || "").toUpperCase() === s && r.cod; });
+}
+function pmapAbrirCelda(sector) {
+  _pmapCelda = String(sector || "").toUpperCase();
+  const m = document.getElementById("pmapCeldaModal");
+  if (m) m.classList.add("show");
+  pmapCeldaStatus("");
+  pmapCeldaRender();
+}
+function pmapCerrarCelda() {
+  const m = document.getElementById("pmapCeldaModal");
+  if (m) m.classList.remove("show");
+  _pmapCelda = "";
+}
+function pmapCeldaRender() {
+  const tit = document.getElementById("pmapCeldaTit"), box = document.getElementById("pmapCeldaBody");
+  if (!tit || !box) return;
+  const sec = _pmapCelda, secJ = JSON.stringify(sec).replace(/"/g, "&quot;");
+  const todas = (_pmap || []).filter(function (r) { return String(r.sector || "").toUpperCase() === sec; });
+  const meta = todas[0] || {};
+  const its = pmapFilasDe(sec);
+  tit.innerHTML = '📍 ' + escapeHtml(sec) + ' <span class="pmap-sub">· ' + escapeHtml(String(meta.empresa || "—")) + '</span>';
+  let h = '<div class="pmap-it"><span class="pmap-it-u">Orden de recorrido</span>' +
+    '<input class="planim-inp planim-inp-num" id="pmapOrd" type="number" inputmode="numeric" value="' +
+      (meta.orden != null ? Number(meta.orden) : "") + '">' +
+    '<button class="pmap-bt" onclick="pmapGuardarOrden()">Guardar</button>' +
+    '<span class="pmap-it-desc">Por dónde pasa el pickeador. Más chico = antes.</span></div>';
+  h += its.length
+    ? its.map(function (r) {
+        const c = String(r.cod), cJ = JSON.stringify(c).replace(/"/g, "&quot;");
+        const cl = String(r.clase || "articulo"), clJ = JSON.stringify(cl).replace(/"/g, "&quot;");
+        const d = pmapDesc(r);
+        return '<div class="pmap-it">' +
+          '<span class="pmap-it-cod">' + escapeHtml(c) + '</span>' +
+          '<span class="pmap-it-desc">' + escapeHtml(d || (cl === "insumo" ? "insumo" : "")) + '</span>' +
+          '<input class="planim-inp planim-inp-num" id="pmapCap_' + escapeHtml(c) + '" type="number" inputmode="numeric" ' +
+            'placeholder="cajas" value="' + (r.cajas_max != null ? Number(r.cajas_max) : "") + '">' +
+          '<button class="pmap-bt" onclick="pmapGuardarItem(' + cJ + ',' + clJ + ')">Guardar</button>' +
+          '<button class="pmap-bt-del" onclick="pmapSacarItem(' + cJ + ',' + clJ + ')">Sacar</button>' +
+          '<button onclick="pmapCerrarCelda();pmapBuscar(' + cJ + ')" style="width:auto;margin:0;padding:7px 10px;font-size:13px;border-radius:8px;background:#eff6ff;border:1px solid #bfdbfe;color:#1e3a8a">📍 sus lugares</button>' +
+        '</div>';
+      }).join("")
+    : '<div class="pmap-sub">Celda <b>libre</b>: no tiene ningún código asignado.</div>';
+  h += '<div class="pmap-alta">' +
+    '<input class="planim-inp" id="pmapNuevoCod" type="text" placeholder="Código (438E, 505…)" oninput="this.value=this.value.toUpperCase()">' +
+    '<select class="planim-inp" id="pmapNuevoCls"><option value="articulo">artículo</option><option value="insumo">insumo</option></select>' +
+    '<input class="planim-inp planim-inp-num" id="pmapNuevoCap" type="number" inputmode="numeric" placeholder="cajas máx">' +
+    '<button class="pmap-bt" onclick="pmapAltaItem()">Agregar a ' + escapeHtml(sec) + '</button></div>';
+  h += '<div class="pmap-sub">Lo que se guarda acá va al <b>mapa</b> (GV_Lugar_Item) <b>y</b> a la <b>capacidad</b> ' +
+       '(Capacidad_Sector), que es la que mira el generador de OC y el aviso de “no entra en góndola”. ' +
+       'Sacar un código lo borra de las dos.</div>';
+  box.innerHTML = h;
+}
+/* Después de cada escritura se vuelve a leer la VISTA, no se parchea el estado local:
+   la RPC canoniza el código (66 → 066) y resuelve la empresa, así que lo que quedó
+   guardado puede no ser exactamente lo que se tipeó. */
+async function pmapRefrescar() {
+  const filas = await supaFetchAllSafe(SUPABASE_URL + "/rest/v1/gv_planimetria_celda", PMAP_SELECT);
+  if (filas && filas.length) _pmap = filas;
+  pmapRender();
+  if (_pmapCelda) pmapCeldaRender();
+}
+async function pmapGuardarItem(cod, clase) {
+  const el = document.getElementById("pmapCap_" + cod);
+  const raw = el ? String(el.value).trim() : "";
+  pmapCeldaStatus("Guardando…", true);
+  const r = await pmapRpc("gv_lugar_item_guardar", {
+    p_sector: _pmapCelda, p_cod: cod, p_clase: clase || "articulo",
+    p_cajas_max: raw === "" ? null : (Number(raw) || 0)
+  });
+  if (!r.ok) { pmapCeldaStatus(r.err, false); return; }
+  await pmapRefrescar();
+  pmapCeldaStatus("✓ " + cod + ": " + (raw === "" ? "sin capacidad" : raw + " cajas") + " en " + _pmapCelda + ".", true);
+}
+async function pmapSacarItem(cod, clase) {
+  const otros = (_pmap || []).filter(function (r) {
+    return r.cod && String(r.cod).toUpperCase() === String(cod).toUpperCase() &&
+           String(r.sector || "").toUpperCase() !== _pmapCelda;
+  }).length;
+  if (!confirm("¿Sacar " + cod + " de " + _pmapCelda + "?\n\n" +
+      (otros ? "Le quedan otros " + otros + " lugar(es)." : "⚠ Es su ÚNICO lugar: queda sin planimetría y el picking no va a saber dónde buscarlo.") +
+      "\n\nSe borra del mapa Y de la capacidad.")) return;
+  pmapCeldaStatus("Sacando…", true);
+  const r = await pmapRpc("gv_lugar_item_sacar", { p_sector: _pmapCelda, p_cod: cod, p_clase: clase || "articulo" });
+  if (!r.ok) { pmapCeldaStatus(r.err, false); return; }
+  await pmapRefrescar();
+  pmapCeldaStatus("✓ " + cod + " sacado de " + _pmapCelda + ".", true);
+}
+async function pmapAltaItem() {
+  const cEl = document.getElementById("pmapNuevoCod"), clEl = document.getElementById("pmapNuevoCls"), capEl = document.getElementById("pmapNuevoCap");
+  const cod = cEl ? String(cEl.value).trim().toUpperCase() : "";
+  if (!cod) { pmapCeldaStatus("Falta el código.", false); return; }
+  const raw = capEl ? String(capEl.value).trim() : "";
+  pmapCeldaStatus("Agregando…", true);
+  const r = await pmapRpc("gv_lugar_item_guardar", {
+    p_sector: _pmapCelda, p_cod: cod, p_clase: clEl ? clEl.value : "articulo",
+    p_cajas_max: raw === "" ? null : (Number(raw) || 0)
+  });
+  if (!r.ok) { pmapCeldaStatus(r.err, false); return; }
+  const guardado = (r.data && r.data[0] && r.data[0].cod) || cod;
+  if (cEl) cEl.value = ""; if (capEl) capEl.value = "";
+  await pmapRefrescar();
+  pmapCeldaStatus("✓ " + guardado + " agregado a " + _pmapCelda + ".", true);
+}
+async function pmapGuardarOrden() {
+  const el = document.getElementById("pmapOrd");
+  const raw = el ? String(el.value).trim() : "";
+  pmapCeldaStatus("Guardando el orden…", true);
+  const r = await pmapRpc("gv_lugar_orden", { p_sector: _pmapCelda, p_orden: raw === "" ? null : (Number(raw) || 0) });
+  if (!r.ok) { pmapCeldaStatus(r.err, false); return; }
+  await pmapRefrescar();
+  pmapCeldaStatus("✓ orden de " + _pmapCelda + " guardado.", true);
+}
+
+/* ── Lo que quedó en la planimetría VIEJA y nunca llegó al mapa ──────────────
+   La tabla "Planimetria" se dejó de leer en la v15.77 y de escribir en la v17.26,
+   pero quedaron códigos cargados ahí que no están en GV_Lugar_Item — entre ellos
+   los 9 que alguien cargó el 11/09 creyendo que los estaba dando de alta. En vez
+   de migrarlos por atrás (cuál mapa manda es decisión del depósito, problema 156),
+   el mapa los muestra y deja traerlos de a uno, con un click. */
+async function pmapViejaFetch() {
+  if (_pmapVieja) return _pmapVieja;
+  const rows = await supaFetchAllSafe(SUPABASE_PLANIMETRIA_ENDPOINT, "select=cod,sector,orden,updated_at&order=updated_at.desc");
+  const enMapa = {};
+  (_pmap || []).forEach(function (r) { if (r.cod) enMapa[_ocgNorm(r.cod)] = 1; });
+  const vistos = {};
+  _pmapVieja = (rows || []).filter(function (r) {
+    const k = _ocgNorm(r.cod);
+    if (!k || k === "LIBRE" || enMapa[k] || vistos[k]) return false;
+    vistos[k] = 1; return true;
+  });
+  return _pmapVieja;
+}
+function pmapViejaRender() {
+  const box = document.getElementById("pmapVieja");
+  if (!box) return;
+  const hay = (_pmapVieja || []).length;
+  box.hidden = !hay;
+  if (!hay) return;
+  box.innerHTML = '⚠ <b>' + hay + ' código(s) de la planimetría vieja no están en el mapa.</b> ' +
+    'Se cargaron en la pantalla que se retiró (escribía a una tabla que el picking dejó de leer en la v15.77), ' +
+    'así que hoy el operario no los encuentra. Tocá uno para traerlo a su celda:' +
+    '<div>' + _pmapVieja.map(function (r) {
+      const c = String(r.cod), sec = String(r.sector || "").toUpperCase();
+      return '<button onclick="pmapViejaTraer(' + JSON.stringify(c).replace(/"/g, "&quot;") + ',' +
+             JSON.stringify(sec).replace(/"/g, "&quot;") + ')">' + escapeHtml(c) + ' → ' + escapeHtml(sec) + '</button>';
+    }).join("") + '</div>';
+}
+/* No importa solo: abre la celda con el código puesto, para que el supervisor
+   confirme (y le ponga la capacidad, que la tabla vieja no tenía). */
+function pmapViejaTraer(cod, sector) {
+  const g = String(sector || "").replace(/[0-9]+$/, "").toUpperCase();
+  if (g && g !== _pmapG) _pmapG = g;
+  pmapRender();
+  pmapAbrirCelda(sector);
+  const el = document.getElementById("pmapNuevoCod");
+  if (el) { el.value = String(cod || "").toUpperCase(); el.focus(); }
+  pmapCeldaStatus('Venía de la planimetría vieja. Revisá la capacidad y tocá "Agregar".', true);
 }
 /* v17.26 — SE FUERON las 7 funciones de ESCRITURA del editor viejo de planimetría
    (planimSuggestOrden, planimFillOrden, planimUpsert, planimSaveRow, planimAdd,
@@ -37029,13 +37195,14 @@ function pmapCellHtml(g, n, porCelda) {
    Ninguno llegó a GV_Lugar_Item: siguen sin lugar, y el mapa los muestra como celda libre
    o con otro código adentro.
 
-   Ahora #planimEditorOverlay es SÓLO LECTURA: lista window.GONDOLA (que desde la v15.77
-   sale de GV_Lugar) en orden de recorrido. Se edita en 📍 Lugares del depósito y se mira
-   dibujado en 🗺️ Mapa de góndolas.
+   v17.31 — la pantalla se RETIRÓ del todo (pedido de Thomas: combinar los dos módulos).
+   Todo se hace en 🗺️ Mapa de góndolas: se mira dibujado y se edita tocando la celda.
 
-   ⚠ La tabla "Planimetria" NO se toca: es el único lugar donde viven esos 17 pares hasta
-   que el depósito diga cuál de los dos mapas manda (problema 156). El trigger backend
-   planimetria_autoorden() queda sin llamadores desde el front. */
+   ⚠ La tabla "Planimetria" NO se borra: la leen dos vistas (gv_codigos_multigrafia,
+   vista_nc_loeke_chef) y es donde viven esos 17 códigos hasta que alguien los traiga —
+   cosa que ahora se hace con un click desde el propio mapa (pmapViejaTraer), sin migrar
+   nada por atrás: cuál mapa manda sigue siendo decisión del depósito (problema 156).
+   El trigger backend planimetria_autoorden() queda sin llamadores desde el front. */
 
 function openFaltantes() {
   if (!requireSupervisor()) return;

@@ -153,6 +153,22 @@
 >   alcanza de lejos). La leyenda pasó a pastillas de 15 px teñidas de su color, con el cuadradito
 >   hecho con **las mismas clases que la celda** —así no se puede desincronizar del dibujo— y con
 >   **cuántas celdas hay de cada tipo en la góndola abierta**.
+> - **v17.31 (mismo día, Thomas: *"fijate si planimetría es una tabla que ya no vale la pena y
+>   combinalas… que se pueda editar en el nuevo módulo y tenga efecto en el backend"*):**
+>   **el mapa ahora se edita.** Tocar una celda abre su editor: qué códigos hay, cuántas cajas entran
+>   de cada uno, el **orden de recorrido** del lugar, alta y baja de códigos. Escribe por **RPC**
+>   (`gv_lugar_item_guardar`, `gv_lugar_item_sacar`, `gv_lugar_orden`).
+>   **⚠ La RPC escribe LAS DOS tablas** —`GV_Lugar_Item` (el mapa) y `Capacidad_Sector` (la
+>   capacidad)— porque siguen leyendo la segunda el generador de OC, el aviso de "no entra en
+>   góndola" de recepción y el conteo cíclico. Escribir una sola era lo que fabricaba las
+>   divergencias del problema 84: 📍 Lugares agregaba al mapa sin capacidad y borraba del mapa
+>   dejándola colgada. Ese editor **ahora usa la misma RPC**.
+>   **Se retiró el módulo "Editar Planimetría"** (era sólo lectura desde la v17.26 y mostraba lo
+>   mismo peor). **La tabla `Planimetria` NO se borra**: la leen `gv_codigos_multigrafia` y
+>   `vista_nc_loeke_chef`, y guarda **17 códigos que nunca llegaron al mapa** —entre ellos los 9 que
+>   alguien cargó el 11/09 creyendo darlos de alta—: el mapa ahora los muestra en un aviso y deja
+>   **traerlos de a uno con un click**, sin migrar nada por atrás (cuál mapa manda sigue siendo del
+>   depósito, problema 156).
 > - Test: `tests/pmap-gondolas.cjs`. Detalle y rollback: `docs/SUPABASE-GESTION-VIRGILIO.md` §3.eq.
 >
 > Nota **v17.26 (2026-09-14, Luis) — el editor viejo de planimetría ya no escribe, y el centinela

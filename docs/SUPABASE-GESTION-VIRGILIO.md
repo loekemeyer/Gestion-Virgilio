@@ -12621,6 +12621,42 @@ motivos: los cuadraditos usan **las mismas clases que la celda** (no se pueden d
 dibujo) y cada pastilla muestra **cuántas celdas de ese tipo tiene la góndola abierta** — sin el
 número es un cartel decorativo; con el número se sabe si hay algo que revisar sin recorrer la grilla.
 
+**v17.31 — el mapa se EDITA, y se fusionan los tres editores (Thomas).** *"Fijate si planimetría es
+una tabla que ya no vale la pena y combinalas (que se pueda en el nuevo módulo editar los lugares,
+artículos, etc y que tenga efecto en la data en el backend)"*.
+
+**Lo nuevo en la base:** `sql/gv_lugar_editar_v1731.sql` — tres RPC, `SECURITY INVOKER`, execute sólo
+para `authenticated` (las policies `gv_lugar_item_write` y `cap_write` ya daban ALL a ese rol, así que
+no amplían permisos: **ordenan** la escritura).
+
+| RPC | Qué hace |
+|---|---|
+| `gv_lugar_item_guardar(sector, cod, clase, cajas_max)` | canoniza el código (`canon_cod_art_val`: 66 → 066), valida que el lugar exista, upsert en `GV_Lugar_Item` **y** espejo en `Capacidad_Sector` (empresa tomada del lugar) |
+| `gv_lugar_item_sacar(sector, cod, clase)` | borra de **las dos**, comparando por `gv_cod_stock` para que no quede la otra grafía |
+| `gv_lugar_orden(sector, orden)` | el orden de recorrido, que hasta ahora sólo se podía tocar en la tabla muerta `Planimetria` |
+
+⚠ **Por qué se escriben las dos tablas.** `Capacidad_Sector` la siguen leyendo `vista_generador_oc`,
+el `capMap` del generador de OC, `gondola_return_check` (el aviso de "no entra en góndola" de
+recepción), el conteo cíclico y `aceptar_conteo`. Escribir sólo el mapa dejaría al generador comprando
+contra una capacidad vieja. **Ese desacople era el que fabricaba las divergencias del problema 84**:
+`lugAddItem` hacía POST a `GV_Lugar_Item` (→ `solo_mapa`) y `lugDelItem` un DELETE que dejaba la
+capacidad colgada (→ `solo_capacidad`). Quedó registrado como **problema 160** y los dos editores
+ahora pasan por la misma RPC. El día que esos cinco consumidores lean `gv_planimetria_celda`, se borra
+el bloque del espejo y nada más.
+
+⚠ **`#variable_conflict use_column`** en las tres: las columnas de salida se llaman igual que las de
+la tabla (`sector`, `cod`, `clase`), y sin eso el `insert ... (sector, cod, …)` no compila
+("column reference sector is ambiguous").
+
+**Se retiró la pantalla "Editar Planimetría"** (overlay, botón de Configuración, `openPlanimEditor` /
+`closePlanimEditor` / `planimSetStatus` / `planimRender` y su CSS). Era sólo lectura desde la v17.26.
+**La tabla `Planimetria` NO se borra** — la leen `gv_codigos_multigrafia` y `vista_nc_loeke_chef`, y
+guarda **17 códigos + "LIBRE" que no están en `GV_Lugar_Item`**: 9 cargados el 11/09 entre las 16:07 y
+las 16:13 (231/232/233, 537, 567, 989E, 992E, 997E, 998E), 6 de baja o grafías viejas (071, 124, 580E,
+592E, 702, 724) y 2 con sufijo N (702EN, 727EN). El mapa los muestra en un aviso y `pmapViejaTraer`
+abre la celda con el código puesto para que el supervisor confirme y le cargue la capacidad: **no se
+migra nada por atrás**, cuál mapa manda sigue siendo del depósito (problema 156).
+
 ⚠ **Las variantes del cuadradito se repiten bajo `.pmap-leg`** (`.pmap-leg .pmap-smapa`, etc.) y no se
 heredan de la celda: `.pmap-sw` viene **después** en la hoja y con la misma especificidad le ganaba el
 borde y el fondo, así que la leyenda salía con los cuatro cuadraditos **blancos**.

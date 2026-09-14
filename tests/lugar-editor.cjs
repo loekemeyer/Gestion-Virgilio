@@ -59,7 +59,9 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
     let httpStatus = 201;
     window.fetch = async function (url, opts) {
       posts.push({ url: String(url), method: (opts && opts.method) || "GET", body: opts && opts.body ? JSON.parse(opts.body) : null });
-      return { ok: httpStatus < 400, status: httpStatus, json: async () => [] };
+      // v17.29: la escritura pasa por RPC y pmapRpc lee r.text(), no r.json()
+      return { ok: httpStatus < 400, status: httpStatus, json: async () => [],
+               text: async () => (httpStatus < 400 ? "[]" : '{"message":"permiso denegado"}') };
     };
     window.supaFetchAllSafe = async function () { return []; };   // lugFetch(true) no pisa _lug de prueba
     const origFetch = lugFetch;
@@ -102,12 +104,13 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
     document.getElementById("lugCod_F13").value = "505";
     document.getElementById("lugCap_F13").value = "30";
     await lugAddItem("F13");
+    // v17.29 — ya no es un POST a la tabla: va por la RPC gv_lugar_item_guardar, que
+    // escribe el mapa Y espeja la capacidad en Capacidad_Sector (antes quedaba colgada).
     const post = posts.filter(x => x.method === "POST").pop();
-    out.agregaPost = !!post && post.url.indexOf("GV_Lugar_Item") >= 0;
-    out.agregaOnConflict = !!post && post.url.indexOf("on_conflict=sector,cod,clase") >= 0;
-    out.agregaMandaLugar = !!post && post.body.sector === "F13" && post.body.cod === "505" && post.body.clase === "articulo";
-    out.agregaCajasMax = !!post && post.body.cajas_max === 30;
-    out.NOmandaEmpresa = !!post && !("empresa" in post.body);
+    out.agregaPorRpc = !!post && post.url.indexOf("/rpc/gv_lugar_item_guardar") >= 0;
+    out.agregaMandaLugar = !!post && post.body.p_sector === "F13" && post.body.p_cod === "505" && post.body.p_clase === "articulo";
+    out.agregaCajasMax = !!post && post.body.p_cajas_max === 30;
+    out.NOmandaEmpresa = !!post && !("empresa" in post.body) && !("p_empresa" in post.body);
 
     // --- (f) borrar: avisa distinto según le queden otros lugares o sea el único
     const avisos = [];
@@ -116,8 +119,10 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
     await lugDelItem("K01", "437E", "insumo");       // único lugar de ese (cod, clase)
     out.borraAvisaOtros = /otros 3 lugar/.test(avisos[0] || "");
     out.borraAvisaUnico = /ÚNICO lugar/.test(avisos[1] || "");
-    const del = posts.filter(x => x.method === "DELETE").pop();
-    out.borraPorLos3 = !!del && del.url.indexOf("sector=eq.K01") >= 0 && del.url.indexOf("cod=eq.437E") >= 0 && del.url.indexOf("clase=eq.insumo") >= 0;
+    // el borrado también pasa por RPC (saca del mapa y de la capacidad, en una)
+    const del = posts.filter(x => x.url.indexOf("/rpc/gv_lugar_item_sacar") >= 0).pop();
+    out.borraPorLos3 = !!del && del.body.p_sector === "K01" && del.body.p_cod === "437E" && del.body.p_clase === "insumo";
+    out.borraAvisaCapacidad = /capacidad/i.test(avisos[1] || "");
 
     // --- (g) sin permisos: lo dice y nombra el SQL que falta
     httpStatus = 401;
@@ -125,7 +130,7 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
     lugRender("F13"); document.getElementById("lugCod_F13").value = "600";
     await lugAddItem("F13");
     const st = document.getElementById("lugStatus").textContent;
-    out.sinPermisoAvisa = st.indexOf("401") >= 0 && st.indexOf("gv_lugar_editor.sql") >= 0;
+    out.sinPermisoAvisa = /no se guard/i.test(st) && /permiso|401/i.test(st);
 
     window.fetch = realFetch; window.lugFetch = origFetch;
     return out;

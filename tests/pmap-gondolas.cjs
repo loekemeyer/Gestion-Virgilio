@@ -73,6 +73,56 @@ const FILAS = [
     };
     pmapBuscar("");
     o.trasLimpiar = (document.querySelector("#pmapTabs .lug-tab-on") || {}).textContent;
+
+    // ── v17.29: editar desde el mapa ───────────────────────────────────────────
+    const rpc = [];
+    window.facAuthWriteHeaders = async function () { return { apikey: "x", Authorization: "Bearer x" }; };
+    window.fetch = async function (url, opt) {
+      const u = String(url);
+      rpc.push({ url: u, body: opt && opt.body ? JSON.parse(opt.body) : null });
+      return { ok: true, status: 200, text: async () => '[{"cod":"066"}]' };
+    };
+    window.supaFetchAllSafe = async function () { return []; };   // el refresco no pisa el fixture
+    window.confirm = function () { return true; };
+
+    pmapAbrirCelda("A05");
+    o.modalAbre = document.getElementById("pmapCeldaModal").classList.contains("show");
+    o.modalTitulo = document.getElementById("pmapCeldaTit").textContent.trim();
+    o.modalOrden = (document.getElementById("pmapOrd") || {}).value;
+    o.modalCap321 = (document.getElementById("pmapCap_321") || {}).value;
+
+    document.getElementById("pmapCap_321").value = "77";
+    await pmapGuardarItem("321", "articulo");
+    const g = rpc[rpc.length - 1];
+    o.guardaRpc = g.url.indexOf("/rpc/gv_lugar_item_guardar") >= 0;
+    o.guardaBody = JSON.stringify(g.body);
+
+    await pmapSacarItem("321", "articulo");
+    const d = rpc[rpc.length - 1];
+    o.sacaRpc = d.url.indexOf("/rpc/gv_lugar_item_sacar") >= 0 && d.body.p_sector === "A05" && d.body.p_cod === "321";
+
+    document.getElementById("pmapOrd").value = "9";
+    await pmapGuardarOrden();
+    const or = rpc[rpc.length - 1];
+    o.ordenRpc = or.url.indexOf("/rpc/gv_lugar_orden") >= 0 && or.body.p_sector === "A05" && or.body.p_orden === 9;
+
+    // alta en una celda LIBRE
+    pmapAbrirCelda("A04");
+    o.libreDiceLibre = /libre/i.test(document.getElementById("pmapCeldaBody").textContent);
+    document.getElementById("pmapNuevoCod").value = "66";
+    document.getElementById("pmapNuevoCap").value = "12";
+    await pmapAltaItem();
+    const al = rpc[rpc.length - 1];
+    o.altaRpc = al.url.indexOf("/rpc/gv_lugar_item_guardar") >= 0 &&
+                al.body.p_sector === "A04" && al.body.p_cod === "66" && al.body.p_cajas_max === 12;
+
+    // sin sesión de Google no escribe y lo dice
+    window.facAuthWriteHeaders = async function () { return null; };
+    const antes = rpc.length;
+    document.getElementById("pmapNuevoCod").value = "505";   // el alta anterior lo limpió
+    await pmapAltaItem();
+    o.sinSesionNoEscribe = rpc.length === antes &&
+      /sesi[óo]n/i.test(document.getElementById("pmapCeldaStatus").textContent);
     return o;
   });
 
@@ -109,8 +159,23 @@ const FILAS = [
   if (!/438E/.test(out.trasBuscar.status)) fail.push("el pie no dice cuántas celdas tienen el código");
   eq(out.trasLimpiar, "F", "al limpiar la búsqueda no se pierde la góndola abierta");
 
+  // (f) editar desde el mapa
+  if (!out.modalAbre) fail.push("tocar la celda no abre su editor");
+  if (!/A05/.test(out.modalTitulo)) fail.push("el editor no dice qué celda es: " + out.modalTitulo);
+  eq(out.modalCap321, "50", "el editor trae la capacidad actual");
+  if (!out.guardaRpc) fail.push("guardar no pega contra la RPC gv_lugar_item_guardar");
+  const gb = JSON.parse(out.guardaBody || "{}");
+  eq(gb.p_sector, "A05", "guardar manda el lugar");
+  eq(gb.p_cod, "321", "guardar manda el código");
+  eq(gb.p_cajas_max, 77, "guardar manda la capacidad nueva");
+  if (!out.sacaRpc) fail.push("sacar no pega contra la RPC gv_lugar_item_sacar");
+  if (!out.ordenRpc) fail.push("el orden de recorrido no pega contra gv_lugar_orden");
+  if (!out.libreDiceLibre) fail.push("una celda libre no lo dice en su editor");
+  if (!out.altaRpc) fail.push("el alta en una celda libre no manda lo tipeado");
+  if (!out.sinSesionNoEscribe) fail.push("sin sesión de Google escribe igual (o no avisa)");
+
   if (errs.length) fail.push("errores de página: " + errs.join(" | "));
   await b.close();
   if (fail.length) { console.error("FALLÓ:\n- " + fail.join("\n- ")); process.exit(1); }
-  console.log("pmap-gondolas OK — 2 columnas, A05→A01, códigos con capacidad, libre y s/cap, y buscar resalta sin filtrar.");
+  console.log("pmap-gondolas OK — dibujo (2 columnas, A05→A01, capacidad, libre, s/cap, buscar) y edición por RPC (guardar, sacar, orden, alta, sin sesión).");
 })();
