@@ -220,7 +220,6 @@ const RCP_CSS = `
 /* v17.27 — aviso a Thomas por lo que entró por encima de la OC: va en la pantalla de
    resumen, debajo de la foto, y es obligatorio igual que la foto. */
 #rcpRoot .opExcSection{ margin:16px 0 4px; text-align:center; }
-#rcpRoot .opExcDet{ font-size:13.5px; font-weight:700; color:#7f1d1d; background:#fef2f2; border:1px solid #fca5a5; border-radius:10px; padding:9px 11px; margin-bottom:10px; text-align:left; line-height:1.45; }
 #rcpRoot .opExcWaBtn{ width:100%; padding:18px; font-size:18px; font-weight:900; border:2px dashed #25d366; border-radius:14px; background:#fff; color:#12813f; cursor:pointer; }
 #rcpRoot .opExcWaBtn.has{ border-style:solid; background:#e9f9ef; }
 #rcpRoot .opExcHint{ font-size:13px; color:#b91c1c; font-weight:700; margin-top:6px; }
@@ -1780,16 +1779,9 @@ function _opExcesoSeccion() {
   const exc = opExcesoItems();
   if (!exc.length) { sec.style.display = "none"; return sec; }
 
+  // v17.30 (Luis): sin cartel de detalle — el operario ya lo vio al cargar las cajas y el
+  // desglose viaja en el WhatsApp. Acá va sólo el botón y el aviso de que es obligatorio.
   const firma = opExcesoFirma();
-  const det = document.createElement("div");
-  det.className = "opExcDet";
-  det.innerHTML = "⚠ <b>Entró más mercadería que la habilitada por OC:</b><br>" +
-    exc.map(function (i) {
-      return escapeHtmlRcp(i.cod) + ": recibís <b>" + i.cajas + "</b>, por OC faltan " +
-        i.ref + " → <b>" + i.exced + " de más</b>";
-    }).join("<br>");
-  sec.appendChild(det);
-
   const btn = document.createElement("button");
   btn.type = "button";
   btn.className = "opExcWaBtn" + (opState.excesoAvisado === firma ? " has" : "");

@@ -10,7 +10,7 @@
    Verifica:
    - el pop-up de cajas avisa el exceso EN VIVO pero sin botón — cargar no se interrumpe,
    - en la pantalla de resumen, debajo de la foto, aparece #opExcWa SÓLO si algún código
-     supera lo que falta recibir por OC, con el detalle de todos los que se pasaron,
+     supera lo que falta recibir por OC (sin cartel de detalle: se sacó en la v17.30),
    - "Confirmar y enviar" está bloqueado sin foto, bloqueado con foto pero sin WhatsApp, y
      recién se habilita con las dos cosas,
    - el botón arma el wa.me con proveedor, remito y TODOS los códigos,
@@ -103,8 +103,9 @@ if (!/window\.supabase/.test(src)) { console.error("rcp-exceso-gate: recepcion.j
     R.renderResumen();
     const sec = document.getElementById("opExcSection");
     out.seccionVisible = !!sec && sec.style.display !== "none" && !!wa();
-    out.detalle = sec.textContent.indexOf("586") >= 0 && sec.textContent.indexOf("50 de más") >= 0
-      && sec.textContent.indexOf("518") < 0 && sec.textContent.indexOf("999") < 0;
+    // v17.30 (Luis): sin cartel de detalle, sólo el botón y el aviso de obligatorio.
+    out.sinCartel = sec.textContent.indexOf("de más") < 0 && sec.textContent.indexOf("586") < 0
+      && sec.textContent.indexOf("Obligatorio") >= 0;
 
     // ---- 3) el Enviar está bloqueado: sin foto y sin WhatsApp ----
     out.confBloqSinNada = conf().disabled === true;

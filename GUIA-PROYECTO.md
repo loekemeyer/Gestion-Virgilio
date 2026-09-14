@@ -12,7 +12,7 @@
 > única**; no se replica. Ante la duda entre parche rápido y fix de raíz → **fix
 > de raíz**.
 >
-> Última actualización: 2026-09-14 (domingo) · Versión app al documentar: **v17.27**
+> Última actualización: 2026-09-14 (domingo) · Versión app al documentar: **v17.30**
 >
 > Nota **v17.20/v17.22 (2026-09-14, Luis) — CUARENTENA: columna "Enviar a" en la tabla de ya
 > programados** (se llamó "Marcar" hasta que Luis la renombró, mismo día).
@@ -2915,10 +2915,11 @@
 > v17.27 lo sacó** y lo puso como pedía Luis: *"tal y como es obligatorio sacar una foto … un botón abajo
 > de eso que sea 'Enviar WhatsApp a Thomas' … que el botón enviar no se pueda apretar hasta que no se carga
 > la imagen y hasta que no se aprieta el botón de enviar mensaje a Thomas"*.
-> **Cómo queda (v17.27):** debajo de la sección de la foto, `_opExcesoSeccion()` agrega —**sólo si algún
-> código supera lo que falta recibir por OC**— el detalle de todos los que se pasaron (recibidas ·
-> faltantes · excedente) y el botón **📲 Enviar WhatsApp a Thomas** (`#opExcWa`), con el hint rojo
-> "Obligatorio: avisale a Thomas antes de enviar". El WhatsApp es **uno solo** con proveedor, RTO/FC y
+> **Cómo queda (v17.27, cartel sacado en la v17.30):** debajo de la sección de la foto,
+> `_opExcesoSeccion()` agrega —**sólo si algún código supera lo que falta recibir por OC**— el botón
+> **📲 Enviar WhatsApp a Thomas** (`#opExcWa`) con el hint rojo "Obligatorio: avisale a Thomas antes de
+> enviar". **Sin cartel con el detalle** (Luis, v17.30: *"sacá ese cartel de ahí, no hace falta"*): el
+> operario ya vio el aviso rojo al cargar cada código y el desglose viaja en el WhatsApp. El WhatsApp es **uno solo** con proveedor, RTO/FC y
 > TODOS los códigos, cada uno con góndola/capacidad (`opWhatsExceso`, `_opPrefetchGond`).
 > **`✓ Confirmar y enviar` lo habilita `_opConfActualizar()`, único lugar que decide: `!fotoFile ||
 > opExcesoPendiente()`.** `opState.excesoAvisado` guarda la firma `cod:cajas` avisada, así que si el
