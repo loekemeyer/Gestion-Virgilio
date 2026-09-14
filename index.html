@@ -2431,6 +2431,11 @@ button.pk-anular small{ display:block; font-size:12px; font-weight:700; opacity:
    una góndola por vez, columnas de 5 celdas con la de arriba primero (como el
    estante real) y en cada una el código y las cajas que entran. */
 .pmap-bar{ display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin-bottom:8px; }
+/* El mapa ocupa TODA la pantalla (Thomas, 2026-09-14: "ponelo más grande, que ocupe
+   100 % de la pantalla"): el `.planim-body > *{ max-width:560px }` del editor de
+   planimetría lo metía en una columnita y cortaba la góndola a la derecha. */
+#planimMapaOverlay .planim-body{ padding:12px 16px; align-items:stretch; }
+#planimMapaOverlay .planim-body > *{ max-width:none; }
 .pmap-bar .planim-search{ flex:1 1 220px; min-width:0; }
 .pmap-tabs{ display:flex; gap:6px; flex-wrap:wrap; margin-bottom:10px; }
 /* el `button{width:100%}` global estira las solapas a una por renglón: acá son 17
@@ -2438,16 +2443,25 @@ button.pk-anular small{ display:block; font-size:12px; font-weight:700; opacity:
 .pmap-tabs .lug-tab{ width:auto; flex:0 0 auto; min-width:46px; margin-top:0; }
 .pmap-bar .planim-btn-save{ width:auto; flex:0 0 auto; margin-top:0; }
 .pmap-tab-hit{ box-shadow:0 0 0 2px #fde68a; }
-.pmap-head{ font-size:13px; color:#475569; margin:2px 0 8px; }
+.pmap-head{ font-size:14px; color:#475569; margin:2px 0 8px; }
 .pmap-head b{ color:#0f172a; }
 .pmap-wrap{ overflow-x:auto; padding-bottom:6px; }
-.pmap-cols{ display:flex; gap:10px; align-items:flex-start; min-width:min-content; }
-.pmap-col{ display:flex; flex-direction:column; gap:4px; }
-.pmap-colft{ text-align:center; font-size:10px; font-weight:700; color:#94a3b8; padding-top:2px; }
-.pmap-cell{ width:88px; min-height:58px; box-sizing:border-box; border:1px solid #e2e8f0; border-radius:8px; background:#fff; padding:4px 6px; display:flex; flex-direction:column; gap:1px; cursor:pointer; }
-.pmap-sec{ font-size:10px; font-weight:800; color:#94a3b8; letter-spacing:.3px; }
-.pmap-cod{ font-size:15px; font-weight:800; color:#0f172a; line-height:1.15; overflow:hidden; text-overflow:ellipsis; }
-.pmap-cap{ font-size:11px; color:#475569; margin-top:-1px; }
+.pmap-cols{ display:grid; grid-template-columns:repeat(auto-fill, minmax(124px, 1fr)); gap:12px; align-items:start; }
+/* Los módulos de 5 celdas ENVUELVEN y se reparten el ancho en vez de irse de
+   costado: la góndola A son 17 columnas y antes se veían 6, el resto scrolleaba.
+   Va en GRID y no en flex para que la última fila tenga columnas del MISMO ancho
+   que las de arriba (con flex, 3 módulos sueltos se estiraban al doble). */
+.pmap-col{ display:flex; flex-direction:column; gap:5px; min-width:0; }
+.pmap-colft{ text-align:center; font-size:11px; font-weight:700; color:#94a3b8; padding-top:2px; }
+.pmap-cell{ width:auto; height:82px; box-sizing:border-box; border:1px solid #e2e8f0; border-radius:8px; background:#fff; padding:4px 7px; display:flex; flex-direction:column; gap:1px; cursor:pointer; overflow:hidden; }
+/* Altura FIJA: una celda con dos códigos crecía y desalineaba toda la fila de
+   módulos. Cuando hay más de uno, los códigos entran más chicos en la misma caja. */
+.pmap-cell-multi .pmap-cod{ font-size:15px; line-height:1.3; display:flex; align-items:baseline; justify-content:space-between; gap:4px; }
+.pmap-cell-multi .pmap-cod i{ font-style:normal; font-weight:700; font-size:11px; color:#475569; }
+.pmap-cell-multi .pmap-sec{ line-height:1.1; }
+.pmap-sec{ font-size:11px; font-weight:800; color:#94a3b8; letter-spacing:.3px; }
+.pmap-cod{ font-size:20px; font-weight:800; color:#0f172a; line-height:1.15; overflow:hidden; text-overflow:ellipsis; }
+.pmap-cap{ font-size:13px; color:#475569; margin-top:-1px; }
 .pmap-cap b{ font-weight:800; color:#0f172a; }
 .pmap-nocap{ color:#b45309; font-weight:700; }
 .pmap-mas{ font-size:10px; color:#64748b; }
@@ -2458,7 +2472,7 @@ button.pk-anular small{ display:block; font-size:12px; font-weight:700; opacity:
 .pmap-hit{ outline:3px solid #facc15; outline-offset:1px; }
 .pmap-leg{ display:flex; gap:14px; flex-wrap:wrap; font-size:11.5px; color:#64748b; margin-top:12px; }
 .pmap-leg i{ width:12px; height:12px; border-radius:3px; display:inline-block; vertical-align:-2px; margin-right:4px; border:1px solid #cbd5e1; }
-@media (max-width:460px){ .pmap-cell{ width:78px; min-height:54px; } .pmap-cod{ font-size:14px; } }
+@media (max-width:460px){ .pmap-cols{ grid-template-columns:repeat(auto-fill, minmax(96px, 1fr)); gap:8px; } .pmap-cell{ height:70px; } .pmap-cod{ font-size:16px; } }
 .lug-x{ border:0; background:transparent; color:#64748b; cursor:pointer; font-size:13px; line-height:1; padding:0 2px; }
 .lug-x:hover{ color:#b42318; }
 .lug-libre{ font-size:13px; color:#94a3b8; font-style:italic; }
@@ -4890,7 +4904,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=17.24"></script>
+<script type="module" src="recepcion.js?v=17.25"></script>
 <!-- Config del módulo de fichada (compartido con fichada.html). El secret
      hmacSecret tiene que ser el mismo acá y allá; cargándolo desde un solo
      archivo evitamos que se desincronicen. -->
@@ -8033,7 +8047,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v17.24";
+const APP_VERSION = "v17.25";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -36927,9 +36941,10 @@ function pmapCellHtml(g, n, porCelda) {
   if (!its || !its.length) return '<div class="pmap-cell pmap-libre" style="visibility:hidden"></div>';
   const sec = String(its[0].sector || (g + (n < 10 ? "0" + n : n)));
   const estados = its.map(function (r) { return r.estado; });
-  const cls = estados.indexOf("solo_capacidad") >= 0 ? "pmap-scap"
+  const cls = (estados.indexOf("solo_capacidad") >= 0 ? "pmap-scap"
             : estados.indexOf("solo_mapa") >= 0 ? "pmap-smapa"
-            : (its.length === 1 && estados[0] === "libre") ? "pmap-libre" : "";
+            : (its.length === 1 && estados[0] === "libre") ? "pmap-libre" : "") +
+            (its.length > 1 ? " pmap-cell-multi" : "");
   const hit = _pmapQ && its.some(function (r) { return pmapMatch(r, _pmapQ); });
   const libre = (its.length === 1 && its[0].estado === "libre");
   let cuerpo = "", tip = sec;
@@ -36937,12 +36952,19 @@ function pmapCellHtml(g, n, porCelda) {
     cuerpo = '<span class="pmap-cod">libre</span>';
     tip += " · celda libre";
   } else {
-    const vis = its.slice(0, 2);
+    // Con UN código entra grande y el máximo abajo. Con varios, cada uno va en UNA
+    // línea (código + cajas al lado) para que la celda no crezca: la altura es fija
+    // y si crece se desalinea toda la fila de módulos.
+    const vis = its.slice(0, 2), multi = its.length > 1;
     cuerpo = vis.map(function (r) {
-      const cap = (r.cajas_max != null)
-        ? '<span class="pmap-cap"><b>' + pmapNum(r.cajas_max) + '</b> caj</span>'
-        : '<span class="pmap-cap pmap-nocap">s/cap</span>';
-      return '<span class="pmap-cod">' + escapeHtml(String(r.cod || "—")) + '</span>' + cap;
+      const n = (r.cajas_max != null) ? pmapNum(r.cajas_max) : null;
+      if (multi) {
+        return '<span class="pmap-cod">' + escapeHtml(String(r.cod || "—")) +
+               (n != null ? '<i>' + n + '</i>' : '<i class="pmap-nocap">s/cap</i>') + '</span>';
+      }
+      return '<span class="pmap-cod">' + escapeHtml(String(r.cod || "—")) + '</span>' +
+             (n != null ? '<span class="pmap-cap"><b>' + n + '</b> caj</span>'
+                        : '<span class="pmap-cap pmap-nocap">s/cap</span>');
     }).join("");
     if (its.length > vis.length) cuerpo += '<span class="pmap-mas">+' + (its.length - vis.length) + ' más</span>';
     tip = its.map(function (r) {

@@ -141,6 +141,11 @@
 >   front no decide nada. Hoy **`GV_Lugar_Item.cajas_max` está NULL en las 782 filas**, así que todos
 >   los máximos salen de `Capacidad_Sector`; cuando se haga el backfill la pantalla no cambia.
 >   Normaliza el sector (**J9 y J09 son la misma celda**) y el código (`gv_cod_stock`: 066 = 66).
+> - **v17.25 (mismo día, Thomas: *"ponelo más grande, que ocupe 100 % de la pantalla"*):** el mapa
+>   usa **todo el ancho** (se le saca el cap de 560 px del editor de planimetría), las celdas son más
+>   grandes, y los módulos de 5 **envuelven en grilla** en vez de irse de costado — la góndola A son
+>   17 columnas y antes se veían 6. Celda de **altura fija**: una con dos códigos crecía y desalineaba
+>   la fila entera, así que con varios códigos cada uno va en **una línea** (código + cajas al lado).
 > - Test: `tests/pmap-gondolas.cjs`. Detalle y rollback: `docs/SUPABASE-GESTION-VIRGILIO.md` §3.eq.
 
 > Nota **v15.40 (2026-09-11) — HANDOFF de planimetría / Acacia: `docs/HANDOFF-PLANIMETRIA-Y-ACACIA.md`.**

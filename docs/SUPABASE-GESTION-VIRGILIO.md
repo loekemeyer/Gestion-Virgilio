@@ -12597,6 +12597,20 @@ que restaurar: la vista no escribe.
 **Test:** `tests/pmap-gondolas.cjs` (orden a5→a1, corte de a 5, código + capacidad, libre y `s/cap`,
 buscar que resalta sin filtrar, y que el módulo pega contra la **vista** y no contra las tablas).
 
+**v17.25 (mismo día) — "que ocupe 100 % de la pantalla" (Thomas).** Tres cosas, y las tres eran del
+layout, no del dato:
+
+1. **El ancho.** `.planim-body > *{ max-width:560px }` (del editor de planimetría) metía la góndola en
+   una columnita y la cortaba a la derecha. Se anula dentro de `#planimMapaOverlay`.
+2. **Los módulos envuelven.** `.pmap-cols` pasó de flex a **grid `auto-fill minmax(124px, 1fr)`**: las
+   17 columnas de la góndola A entran en dos filas en vez de scrollear de costado, y —esto es lo que
+   el flex no daba— **la última fila tiene columnas del mismo ancho que las de arriba** (con flex, 3
+   módulos sueltos se estiraban al doble).
+3. **La celda tiene altura fija** (82 px; 70 en celular). Antes una celda con dos códigos crecía y
+   **desalineaba toda la fila de módulos**. Con más de un código, cada uno va en **una línea**
+   (código + cajas a la derecha, `.pmap-cell-multi`), y a partir del tercero `+N más`; el detalle
+   completo sigue en el tooltip. El récord es **M34, con 5 códigos**.
+
 ### §3.er — v17.24: PRENDIDO — `sales_lines` ya se llena desde ISIS — 2026-09-14
 
 **Thomas (14/09): *"necesita imput manual humano para arrancar? no podés guardar el backup bien etiquetado
