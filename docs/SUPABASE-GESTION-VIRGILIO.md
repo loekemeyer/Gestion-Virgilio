@@ -12468,3 +12468,80 @@ se los trata distinto.
 
 Sin esto, el cron 86 le habría creado a Luis una tarea a las 08:00 para **contar 24 sacafuentes que
 están guardados** — y una alerta que miente es peor que no tenerla.
+### §3.ep — v17.21: `sales_lines` se llena sola desde ISIS (entregado APAGADO) — 2026-09-14
+
+**Thomas (14/09): *"dale, construilo"*.** Construido y probado. **Se entrega con el interruptor en 0**: todo
+corre, mide y **no escribe** hasta que él lo prenda. Archivo: `sql/gv_sales_lines_desde_isis_v1721.sql`.
+
+#### Qué se creó
+
+**En Virgilio** — la fuente:
+
+| objeto | qué hace |
+|---|---|
+| `gv_isis_ventas_feed` (vista) | las ventas de las dos empresas unidas: NC en negativo, sin comprobantes de proveedor, sin las líneas de texto legal. **La empresa sale del esquema** (`isis_lk` / `isis_ch`), no de una columna que alguien puede olvidar |
+| policy `lk_ppp_reader_ro` en `isis_lk/isis_ch.documento_items` | faltaba: `documentos` ya la tenía y `documento_items` no, así que el FDW veía 0 filas |
+
+**En LK** — el destino:
+
+| objeto | qué hace |
+|---|---|
+| `virgilio.isis_ventas` (foreign table) | la ventana a esa vista |
+| `GV_Sales_Auto_Config` | **`activo`** (0/1) y **`desde`** (2026-02-01). RLS ON, sin escritura para `anon` |
+| `gv_sales_lines_auto_sync(p_aplicar)` | rehace `sales_lines` desde el corte. Idempotente. Con `activo=0` sólo informa |
+| `gv_sales_isis_vs_excel` (vista) | el tablero mes a mes para correr los dos en paralelo |
+| cron **45** `gv-sales-lines-desde-isis` | todos los días 07:40 ART. Mientras `activo=0`, no hace nada |
+
+#### Detalles que costaron
+
+- **`row_hash` tiene índice ÚNICO.** La clave `(empresa, documento, nro_línea)` sí es única — medido:
+  33.041 filas, 33.041 claves. El prefijo `isis:` evita chocar con lo que dejó la carga manual.
+- **RLS.** `isis_lk/isis_ch` tienen RLS prendida y la vista va con `security_invoker = true` (regla del
+  repo), así que el FDW devolvía **0 filas**. Se resolvió **agregando la policy que faltaba**, no apagando
+  el `security_invoker`.
+- `cantidad_caja` es `numeric` pero **no tiene un solo decimal** en 221.083 filas: el cast a `bigint` es
+  limpio.
+
+#### Lo que mide hoy, sin escribir
+
+```
+select public.gv_sales_lines_auto_sync();
+→ {"aplicado": false, "activo": false, "desde": "2026-02-01",
+   "sales_lines_hoy": {"filas": 29125, "cajas": 154685},
+   "isis_traeria":    {"filas": 31621, "cajas": 164498}}
+```
+
+Y el tablero, mes a mes (`gv_sales_isis_vs_excel`):
+
+| mes | LK cargado → ISIS | Chef cargado → ISIS |
+|---|---|---|
+| feb | 19.715 → 19.367 (−1,8 %) | 2.883 → 2.905 |
+| mar | 18.522 → 18.519 (**0,0 %**) | 3.277 → 3.301 |
+| abr | 14.196 → 13.829 (−2,6 %) | 4.112 → 4.135 |
+| may | 25.074 → 25.242 (+0,7 %) | 4.820 → 4.833 |
+| jun | 16.625 → 16.625 (**0,0 %**) | 3.873 → 3.908 |
+| jul | 19.032 → 15.852 (−16,7 %) | **0 → 3.171** |
+| ago | 22.556 → 19.076 (−15,4 %) | **0 → 3.463** |
+| **sep** | **0 → 8.127** | **0 → 2.145** |
+
+Julio y agosto se acomodan (lo que estaba de más en LK aparece en Chef) y **septiembre deja de estar en
+blanco**: 10.272 cajas que hoy no ve ningún tablero.
+
+#### Cómo se prende (una línea, en LK)
+
+```sql
+update public."GV_Sales_Auto_Config" set valor='1', actualizado=now() where clave='activo';
+select public.gv_sales_lines_auto_sync(true);   -- primera corrida a mano
+```
+
+La primera corrida guarda sola la foto previa en `zz_backups."GV_Backup_Sales_Lines_PreISIS"`. Rollback:
+poner `activo=0`, borrar `import_batch='isis_auto'` y reinsertar el backup.
+
+#### Qué queda pendiente para después de prender
+
+1. **`GV_Ventas_Correccion` se borra.** Sus filas apuntan a `julio_26`/`ago-26`; cuando esos lotes se
+   reemplacen por `isis_auto`, quedan inertes. El parche deja de hacer falta: la empresa viene bien de
+   origen.
+2. **El `drop default` de `sales_lines.empresa`** pasa a ser un candado inofensivo, porque ya no va a haber
+   carga manual que se olvide la columna.
+3. **Avisarle a quien sube el Excel** que deje de hacerlo — recién después del mes en paralelo.
