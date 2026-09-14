@@ -13381,3 +13381,70 @@ muestra **quién** lo escribió y **cuándo** arriba, el texto abajo (dos línea
 
 **Rollback:** volver a `sql/gv_cuarentena_log_v1723.sql` (mismo DROP + CREATE + grants). El front
 anterior no leía `com_*`, así que el backend es reversible solo.
+
+### §3.fc — v17.44: `fn_canon_cod_art` separa el sufijo de empresa antes de buscar la grafía (opción B)
+
+**Qué estaba mal.** El código llegaba entero a la búsqueda contra `OC_Maximos`:
+`k := regexp_replace(upper(btrim(NEW.cod_art)), '^0+(?=.)', '')` — para un dual eso era
+`437E LK`, que no matchea nada (ahí el código es `437E`), y el `elsif NEW.cod_art ~ '^[0-9]+$'`
+tampoco aplica. **La función no hacía nada: para los 4 duales (809E/437E/438E/439E) la
+resolución de grafía estaba de hecho APAGADA.**
+
+Andaba de casualidad porque el front manda justo la grafía canónica (`index.html` ~10851 arma
+el `texto` del PKC con el código crudo: `D67L|437E LK|1|1|0|LK`). Cualquier variante entraba
+cruda y el índice de idempotencia `mov_stock_pipeline_dedup` —que compara por
+`upper(trim(cod_art))`— la veía como OTRA fila. Es el mismo mecanismo que el 14/09 duplicó el
+picking de `D72C` con `66` vs `066`: `0437E LK` terminaba guardado como `0437E`/LK y
+`437E LK` como `437E`/LK, dos filas para el mismo artículo y la misma empresa.
+
+**Qué NO se hizo, y por qué.** La idea original era renombrar `trg_canon_cod_art` a `zzz_`
+para que corriera después de `zz_normalizar_empresa`. Se descartó al medir:
+
+- renombrar `trg_canon_cod_art` a `zzz_` mueve **también** a `trg_validar_mov_insumo`, que
+  pasaría de ver el código canonizado a verlo crudo y dejaría de encontrar la categoría del
+  insumo (no falla: deja de validar, que es peor);
+- adelantar `zz_normalizar_empresa` al principio rompe la conversión MC→Uni: **`Insumos_Factores`
+  guarda los factores como `437E CH` y `439E LK`, CON sufijo** (×72 y ×24).
+
+Con el fix adentro de la función no se movió ningún trigger. Orden actual (BEFORE INSERT,
+alfabético): `normalizar_unidad_insumo` → `trg_canon_cod_art` → `trg_validar_mov_insumo` →
+`zz_normalizar_empresa`.
+
+**Medición antes de aplicar.** Sobre los **392 códigos crudos reales** (campo 2 del `texto` de
+todo evento PKC/CP + todo `cod_art` distinto de `Movimientos_Stock` con `deposito <> 'insumos'`):
+**cambian 0**. Es una garantía, no un cambio de comportamiento — por eso se pudo aplicar con el
+depósito operando.
+
+**Verificación después** (transacción con `ROLLBACK`, triggers de Telegram deshabilitados
+dentro de la transacción): `437e lk` / `0437E LK` / `437E  LK` / `437E LK` → todos a `437E`/LK
+(convergen a UNA fila); `0809e ch` → `809E`/CH; `66` → `066`/Mixto, `599E` → `599E`/Mixto y
+`439EL` → `439E`/LK sin cambio. Post-rollback: 0 filas de prueba, 0 triggers deshabilitados,
+0 movimientos con sufijo, `gv_stock_particion_sospechosa` vacía.
+
+**Rollback:** `sql/fn_canon_cod_art_v1701.sql` (ejecutar tal cual).
+**Definición nueva:** `sql/fn_canon_cod_art_v1744.sql`.
+
+### §3.fd — Lo que B NO arregla: 4 reglas de canonización distintas (plan en `docs/PLAN-CANONIZACION-UNICA.md`)
+
+Medido el 14/09: **73 objetos** de `public` canonizan código de artículo; **25 copian el regexp
+a mano** y de esos **sólo 2 sacan el sufijo de empresa**. Corriendo las 6 canonizadoras sobre los
+**520 códigos crudos reales**:
+
+- **`norm_cod`, `canon_cod` y `cob_norm_cod` dan 0 diferencias entre sí** — son la misma función
+  escrita tres veces. Fusionarlas es gratis.
+- `gv_cod_stock` vs `canon_cod_art_val`: 67 códigos en desacuerdo; `canon_cod_art_val` vs
+  `norm_cod`: 43; `canon_cod_art_val` vs `resolver_equiv`: 34; `gv_cod_stock` vs `norm_cod`: 24.
+
+Motivos, clasificados: 43 códigos por resolver o no contra `OC_Maximos` (`007` vs `7`), 14 por el
+punto medio de insumos, 12 por `Equivalencias_Codigos` (`727EN`→`727E`), 8 por el sufijo de
+empresa, 2 por la variante `L`.
+
+⚠ **La función "más completa" es la MENOS correcta en dos de esos grupos.** `gv_cod_stock` pela
+ceros sin volver a resolver contra el catálogo (produce `7`, que no existe: sirve como clave de
+join, no como valor) y **trunca en `·`, colapsando 10 insumos distintos en 4 claves** (33 filas:
+los 4 flejes de Chef cuentan como uno). Lo segundo está registrado como problema aparte y hoy es
+**latente** — `vista_stock_procesada` muestra el código entero.
+
+Por eso la opción A **no** es "que todos llamen a `gv_cod_stock`": primero hay que arreglar esa
+función. El plan por etapas, con el riesgo medido de cada una y cuáles se pueden aplicar con
+operarios pickeando, está en `docs/PLAN-CANONIZACION-UNICA.md`.
