@@ -12,7 +12,7 @@
 > única**; no se replica. Ante la duda entre parche rápido y fix de raíz → **fix
 > de raíz**.
 >
-> Última actualización: 2026-09-14 (domingo) · Versión app al documentar: **v17.34**
+> Última actualización: 2026-09-14 (domingo) · Versión app al documentar: **v17.36**
 >
 > Nota **v17.34 (2026-09-14, Luis) — CUARENTENA: log propio, "¿quién aprueba?" y el aprobado sale de
 > la lista.**

@@ -13036,3 +13036,35 @@ números del medio, y renumerar el archivo obligaría a reaplicar las funciones 
 md5 siga dando). Tests en
 `tests/apr-cuarentena.cjs` (sin columna Aprobación; aprobar pide quién y sin eso no libera; el log
 lista NP, cliente, estado, quién y cuándo).
+### §3.ex — v17.36: la v17.32 dejó sin lugar a 634/635/636, que son los que tienen el stock (problema 162) — 2026-09-14
+
+**Lo que salió mal.** La v17.32 renombró en `GV_Lugar_Item` los códigos pelados de M34/M35/M36 a
+su versión con E, siguiendo el pedido de Luis (*"claramente relevaron esos sin la E, agregásela"*).
+El criterio para elegir la grafía con E fue bueno —es la que tiene nombre en el maestro— pero
+**faltó mirar dónde está el stock**:
+
+| Código | Nombre en el maestro | Stock en góndola |
+|---|---|---|
+| `634E` | Cuchara calada ac inox c/m | **0** |
+| `634` | *(vacío)* | **12** |
+| `635` / `636` | *(vacío)* | **11 / 4** |
+
+`gv_cod_stock` **no unifica** `634` con `634E`, así que al renombrar, esos tres códigos quedaron
+sin ninguna fila en `gv_lugar_articulo` → sin sector en `window.GONDOLA`. **Un operario pickeando
+el 634 no tenía a dónde ir.** Estuvo así un domingo, entre la v17.32 y esta.
+
+**Cómo quedó.** Conviven las dos grafías en la misma celda: se repusieron `630`, `631`, `634`,
+`635` y `636` al lado de sus `…E`. Es además lo que Luis pidió al pie de la letra — *agregásela*,
+no *reemplazala*. Nada pierde su lugar y el mapa muestra las dos.
+
+**La lección, que vale para cualquier cambio de grafía:** antes de renombrar un código en el mapa,
+**preguntarle al stock bajo qué grafía se mueve**. El maestro dice cuál *debería* ser; el picking
+usa la que existe.
+
+```sql
+select v.cod_art, v.terminado, (select descripcion from vista_nombres_articulos n where n.cod = v.cod_art)
+  from vista_saldos_stock v where gv_cod_stock(v.cod_art) in ('<cod>','<cod>E');
+```
+
+**El fondo sigue abierto:** `634` y `634E` son el mismo artículo con dos grafías, y el stock está
+partido. Eso es materia de `gv_codigos_multigrafia`, no de la planimetría, y no se tocó.
