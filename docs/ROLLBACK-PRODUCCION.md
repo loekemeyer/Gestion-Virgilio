@@ -1121,3 +1121,36 @@ update public."GV_PPP_Prog_Override" o set tanda = b.tanda, tanda_previa = b.tan
 ```
 
 Nota: `sql/gv_camion1_1509_v1747.sql`.
+
+---
+
+## v17.73 (2026-09-14) — trigger `zzz_guardado_no_negativo` en `Movimientos_Stock`
+
+**Objeto compartido tocado:** `public."Movimientos_Stock"` — se le agregó un **quinto trigger**
+`BEFORE INSERT`, `zzz_guardado_no_negativo` (función `public.trg_guardado_no_negativo()`).
+No se modificó ninguna fila ni columna existente, y no se tocó ninguno de los otros triggers.
+
+**Qué hace:** rechaza un `insert` que deje `a_guardar` en negativo. Filtra durísimo antes de
+mirar nada: sólo actúa si `tipo = 'guardado'` **y** `deposito = 'a_guardar'` **y** `delta < 0`.
+Todo lo demás (recepción, picking, separado, facturado, ajuste, insumos, `guardado_fuera_lista`,
+y las patas de destino `terminado`/`excedente`) sale por el `return NEW` de la primera línea sin
+consultar nada.
+
+**Impacto en Producción Virgilio:** la app ya no se usa (dueño, 2026-09-08). Si se la volviera a
+abrir, su módulo de guardado escribe contra la misma tabla, así que le aplicaría el mismo
+candado — y ahí sí importa que **Producción NO tiene la mitad del front de la v17.73**: su
+`stockMove` seguiría tragándose el 400 en `console.error` y el operario vería un "✅ Guardado"
+que no ocurrió. **Si se reactiva Producción Virgilio, o se apaga este trigger, o se le porta el
+cambio de `stockMove`/`mgConfirmar`.**
+
+**Costo:** un `sum()` sobre `Movimientos_Stock` filtrado por `deposito` y por la expresión del
+índice `idx_ms_norm_cod`, que ya existe sobre exactamente esa expresión. Sólo en el guardado.
+
+**Rollback exacto:**
+
+```sql
+drop trigger if exists zzz_guardado_no_negativo on public."Movimientos_Stock";
+drop function if exists public.trg_guardado_no_negativo();
+```
+
+Nota: `sql/gv_guardado_no_negativo_v1773.sql`, `docs/SUPABASE-GESTION-VIRGILIO.md` §3.fn.

@@ -14651,3 +14651,84 @@ otra copia más.
 - Backup previo: `zz_backups."GV_Backup_cobranzas_cliente_cadena_20260914"` (14 filas).
 
 SQL y rollback completo: `sql/gv_supers_una_lista_v1772.sql`. Test: `tests/supers-una-lista.cjs`.
+
+### §3.fn
+
+**v17.73 (2026-09-14) — candado: no se puede GUARDAR más cajas de las que hay en "A guardar"**
+(trigger `zzz_guardado_no_negativo`), y el doble guardado del 14/09 corregido.
+
+**Qué pasó.** El legajo 94 guardó dos veces lo mismo:
+
+| Cod | Entró | Guardado 1 | Guardado 2 | Quedaba |
+|---|---|---|---|---|
+| 508 | +24 (remito 38789, 11/09) | −24 · 10:39 · `Mixto` | −24 · 13:29 · `LK` | `a_guardar` −24 |
+| 511 | +52 (mismo remito) | −44 · 11:37 · `Mixto` | −52 (el total) · 13:30 · `LK` | `a_guardar` −44 |
+
+`client_id` distintos en cada par: son dos ENVÍOS, no el reintento del mismo (ése ya lo frena
+`mov_stock_clientid_dedup`). Las dos repeticiones caen en la misma ráfaga de 13:29–13:31, junto
+con 544 y 504 que no se repitieron.
+
+⚠ **La mitad que no se ve es la que importa.** Un guardado escribe DOS o TRES patas —
+`a_guardar −(cargar+exc)`, `terminado +cargar` (góndola), `excedente +exc` (rack, con ubicación)—
+así que el doble no sólo dejó la pila en negativo: dejó **68 cajas fantasma en góndola** (508 en
+41 cuando eran 17; 511 en 95 cuando eran 51). El negativo en tránsito es el síntoma, el stock
+inflado es el daño.
+
+**Por qué se podía.** Los dos índices únicos de `Movimientos_Stock` cubren
+`tipo in (picking, separado, facturado)` y `tipo='aguardar'`, y los dos se apoyan en `ref`. Los
+movimientos `guardado` tienen **`ref = null` y ningún índice**. El tope de la pantalla
+(`it.disponible` del modal MG) se lee **cuando se abre el modal**: si el borrador queda abierto y
+se confirma dos horas después, ese tope está viejo.
+
+**Por qué un trigger y no un índice único.** Un índice sobre (cod, depósito, delta, legajo, día)
+habría agarrado el 508 (−24 y −24) **pero no el 511** (−44 y después −52 son filas distintas). Y
+peor: `stockMove` manda `Prefer: resolution=ignore-duplicates`, así que el choque de índice se
+traga en silencio y un guardado legítimo repetido se perdería sin que nadie se entere. El
+invariante que sirve para los dos casos es **no sacar de la pila más de lo que hay**: no molesta
+al guardado por partes (−61, −27, −5 el mismo día sigue andando) y **es ciego al destino**, porque
+la pata que se controla es la de `a_guardar`, que lleva `cargar + exc` junta → cubre igual
+**góndola** y **excedente/rack**.
+
+**Cuánto molesta.** Saldo corrido sobre TODA la historia de `a_guardar` (55.208 movimientos):
+sólo **6 códigos** pasaron alguna vez por debajo de cero — 511 y 508 el 14/09, 546 (−60, 23/07) y
+tres de −1 (922 14/08, 960E 29/07, 280 24/07). 6 rechazos en 3 meses, y los 6 estaban mal.
+
+**Dos detalles que no son capricho.** (a) Se llama `zzz_` para correr DESPUÉS de
+`zz_normalizar_empresa`: los triggers disparan por orden alfabético y ése es el que pela el
+sufijo, así que antes de él `508L` normalizaría a `508L` y el saldo daría 0. (b) **Suma todas las
+empresas del código**, no la partición: el mismo 508 entró `Mixto` a la mañana y `LK` a la tarde
+(el front manda `empresa` sólo cuando el renglón la resolvió), así que mirar por empresa habría
+dado "LK: 0" y dejado pasar el segundo — por eso `gv_stock_negativos` decía `LK: 0.0 · Mixto: -24.0`.
+
+⚠⚠ **La mitad del front NO es opcional.** PostgREST devuelve **HTTP 400** ante un `RAISE` de
+trigger, y `stockMove` mandaba todo 4xx no-transitorio a `console.error` y lo **descartaba**,
+mientras `mgConfirmar` ya había cerrado el modal, borrado el borrador y mostrado "✅ Guardado".
+Con el trigger solo, el rechazo habría sido **peor que el doble**: la mercadería se quedaba en la
+pila, la góndola no la recibía y el operario se iba convencido de que guardó. Por eso la v17.73
+toca las dos mitades: `stockMove` devuelve `{rechazado, motivo}` en vez de tragarse el 4xx, y
+`mgConfirmar` **espera** la confirmación — si el server rechaza no cierra el modal, no borra el
+borrador, no emite el MG y muestra el mensaje del trigger. Sin red sigue igual que siempre:
+`stockMove` encola y devuelve `{encolado:true}`, que cuenta como éxito optimista. Y `_mg._enviando`
+frena el doble toque en Confirmar, que es la otra mitad del bug.
+
+**Verificación** (transacción con ROLLBACK, nada quedó escrito):
+
+| | |
+|---|---|
+| pila en 0 (508) → guardar 1 | **rechazado** con el mensaje en criollo |
+| 321 con 118 → guardar 10 (7 góndola + 3 rack `A12`) | pasa, pila 108 |
+| seguir por partes (−100, −8) el mismo día | pasa, pila 0 |
+| una caja más | **rechazado** |
+| lo mismo escrito `0321 LK` | **rechazado** (el trigger ve el código ya normalizado) |
+| `guardado_fuera_lista` con la pila en 0 | pasa (no mira la pila) |
+| recepción / picking / ajuste | intactos |
+
+**Dato corregido.** Borradas las 4 filas del guardado de la MAÑANA de cada uno (ids 63122645/46 y
+63190062/63): se dejó el de la tarde porque es el completo (511 −52 = todo) y porque lleva la
+empresa bien resuelta. Resultado medido: `a_guardar` 508 = 0 y 511 = 0; góndola 508 = 17 y
+511 = 51; `gv_stock_negativos` bajó de 4 a 2 filas (quedan 323E y 503E, que son picking real en
+`terminado`, otra cosa). Backup completo —los 715 movimientos de los dos códigos— en
+`zz_backups."GV_Backup_Mov_Stock_doble_guardado_20260914"`.
+
+**Rollback:** `sql/gv_guardado_no_negativo_v1773.sql` (trae el `drop trigger` + `drop function`);
+los datos, reinsertando esas 4 filas desde el backup.

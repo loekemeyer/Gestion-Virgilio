@@ -5145,7 +5145,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=17.72"></script>
+<script type="module" src="recepcion.js?v=17.73"></script>
 <!-- Config del módulo de fichada (compartido con fichada.html). El secret
      hmacSecret tiene que ser el mismo acá y allá; cargándolo desde un solo
      archivo evitamos que se desincronicen. -->
@@ -5491,7 +5491,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
           <input id="pppSupNom" class="planim-inp" placeholder="Nombre (ej. Coto)">
           <button class="planim-btn-save" onclick="pppSuperAdd()">Agregar</button>
         </div>
-        <div class="planim-hint">v17.72 — esta lista es <b>la única</b> y vive en la base (<code>GV_Supers</code>): la ven todos los dispositivos y la usan también Facturación, Cobranzas y Cuarentena. El código va <b>con su empresa</b>: el 2444 de Chef es Cencosud, pero el 2444 de LK es Relca S.R.L. y no es súper. Además se detectan los de Tipo <b>KRIKOS</b> y los de barrio <b>Súper</b>.</div>
+        <div class="planim-hint">v17.73 — esta lista es <b>la única</b> y vive en la base (<code>GV_Supers</code>): la ven todos los dispositivos y la usan también Facturación, Cobranzas y Cuarentena. El código va <b>con su empresa</b>: el 2444 de Chef es Cencosud, pero el 2444 de LK es Relca S.R.L. y no es súper. Además se detectan los de Tipo <b>KRIKOS</b> y los de barrio <b>Súper</b>.</div>
       </div>
       <div class="planim-sec-t">Lista de súper</div>
       <div id="pppSupersList" class="planim-list"></div>
@@ -8558,7 +8558,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v17.72";
+const APP_VERSION = "v17.73";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -12774,6 +12774,13 @@ function _stockClientId() {
   try { if (typeof crypto !== "undefined" && crypto.randomUUID) return "mst_" + crypto.randomUUID(); } catch (_e) {}
   return "mst_" + Date.now().toString(36) + "_" + Math.random().toString(36).slice(2, 10);
 }
+/* v17.73 — el texto que el server explica, para poder mostrárselo al operario. PostgREST
+   devuelve {code, details, hint, message}; el `message` es el del RAISE del trigger, escrito
+   en criollo a propósito. Si el body no es JSON, se muestra crudo y recortado. */
+function _stockMotivo(body) {
+  try { const j = JSON.parse(body || "{}"); return String(j.message || j.details || j.hint || "").trim() || null; }
+  catch (_e) { return String(body || "").trim().slice(0, 300) || null; }
+}
 function stockMove(rows) {
   if (!rows || !rows.length) return Promise.resolve();
   if (esOperadorPrueba()) { try { console.warn("[PRUEBA] stockMove NO persistido (operador de prueba)"); } catch (_e) {} return Promise.resolve(); }
@@ -12782,7 +12789,7 @@ function stockMove(rows) {
   const headers = { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY, "Content-Type": "application/json", Prefer: "return=minimal,resolution=ignore-duplicates" };
   return fetch(SUPABASE_STOCK_ENDPOINT, { method: "POST", headers: headers, body: JSON.stringify(norm) })
     .then(async function (r) {
-      if (r.ok) return;
+      if (r.ok) return { ok: true };
       // v12.18 — Distinción 4xx datos-malformados vs 4xx permisos/RLS.
       // Antes: TODO 4xx era "fila mal formada, no reintentar". Escondía el caso
       // 42501 (permission denied) — mismo bug que rompió Entregas_Virgilio el 28/8.
@@ -12800,10 +12807,14 @@ function stockMove(rows) {
         bodyU.indexOf("PGRST116") >= 0           // RLS violation
       );
       if (isTransient) { throw new Error("HTTP " + r.status + " transient: " + body.slice(0, 120)); }
-      if (r.status >= 400 && r.status < 500) { try { console.error("stockMove HTTP " + r.status + " — fila rechazada", body.slice(0, 200), norm); } catch (_e) {} return; }
+      // v17.73 — un 4xx de DATOS ya no se tira a la basura en silencio: se DEVUELVE.
+      // Con el candado `zzz_guardado_no_negativo` (guardar más de lo que hay en A guardar)
+      // PostgREST contesta 400, y hasta acá eso iba a console.error mientras el operario ya
+      // había visto "✅ Guardado". Quien llama decide qué mostrar (ver mgConfirmar).
+      if (r.status >= 400 && r.status < 500) { try { console.error("stockMove HTTP " + r.status + " — fila rechazada", body.slice(0, 200), norm); } catch (_e) {} return { ok: false, rechazado: true, motivo: _stockMotivo(body) }; }
       throw new Error("HTTP " + r.status);
     })
-    .catch(function () { try { const p = JSON.parse(localStorage.getItem("vir_stock_pend") || "[]"); p.push.apply(p, norm); localStorage.setItem("vir_stock_pend", JSON.stringify(p.slice(-5000))); } catch (_e) {} });
+    .catch(function () { try { const p = JSON.parse(localStorage.getItem("vir_stock_pend") || "[]"); p.push.apply(p, norm); localStorage.setItem("vir_stock_pend", JSON.stringify(p.slice(-5000))); } catch (_e) {} return { ok: false, encolado: true }; });
 }
 /* v7.39 — saldo VIVO de góndola (deposito 'terminado') de UN código, leído de la vista
    viva `vista_saldos_stock`. Lo usa la regla de "picking difiere" para devolver a góndola
@@ -24888,6 +24899,7 @@ function mgSetUbic(i, v) {
 }
 async function mgConfirmar() {
   if (!_mg) return;
+  if (_mg._enviando) return;   // v17.73: el doble toque en Confirmar es la mitad front del doble guardado
   const sel = _mg.items.filter(function (it) { return (it.cargar > 0) || (it.exc > 0); });
   if (!sel.length) return;
   // El excedente no tiene lugar fijo → la ubicación es obligatoria para tenerla
@@ -24923,16 +24935,30 @@ async function mgConfirmar() {
     if (it.cargar > 0) rows.push({ cod_art: it.cod, descripcion: it.desc || null, deposito: "terminado", delta: it.cargar, tipo: tp, ref: null, legajo: _mg.legajo || null, empresa: _emp });
     if (it.exc > 0)    rows.push({ cod_art: it.cod, descripcion: it.desc || null, deposito: "excedente", delta: it.exc, tipo: tp, ref: null, legajo: _mg.legajo || null, empresa: _emp, ubicacion: gvNormSector(it.ubic) || null });
   });
-  // Alerta Telegram por cada código guardado fuera de lista (evento MGX).
-  sel.filter(function (it) { return it.manual && (it.cargar + (it.exc || 0)) > 0; }).forEach(function (it) {
-    try { mgEmitFueraLista(it.cod, it.cargar, it.exc || 0, _mg.legajo); } catch (_e) {}
-  });
   const nG = sel.reduce(function (s, it) { return s + it.cargar; }, 0);
   const nE = sel.reduce(function (s, it) { return s + (it.exc || 0); }, 0);
   const _tsIni = _mg.tsInicio, _leg = _mg.legajo;   // capturar ANTES de cerrar (closeMG anula _mg)
-  try { opDraftClear(_mg && _mg.legajo); } catch (_e) {}
+  /* v17.73 — el guardado se CONFIRMA CONTRA EL SERVER antes de darlo por hecho.
+     Hasta acá esto cerraba el modal, borraba el borrador y avisaba "✅ Guardado" SIN esperar
+     a stockMove, que manda los 4xx de datos a console.error y los descarta. Con el candado
+     `zzz_guardado_no_negativo` (no se puede guardar más de lo que hay en A guardar) eso
+     habría sido PEOR que el doble: la mercadería se quedaba en la pila, la góndola no la
+     recibía, y el operario se iba convencido de que había guardado.
+     Ojo con qué cuenta como rechazo: sin red, stockMove ENCOLA y devuelve {encolado:true} →
+     eso sigue siendo éxito optimista, como siempre. Sólo frena el {rechazado:true}. */
+  _mg._enviando = true;
+  const _res = await stockMove(rows);
+  if (_res && _res.rechazado) {
+    if (_mg) _mg._enviando = false;
+    try { alert("⛔ NO se guardó nada.\n\n" + (_res.motivo || "El servidor rechazó el movimiento.") + "\n\nCerrá y volvé a abrir Mover a Góndola: la lista te va a mostrar lo que queda de verdad."); } catch (_e) {}
+    return;
+  }
+  // Alerta Telegram por cada código guardado fuera de lista (evento MGX).
+  sel.filter(function (it) { return it.manual && (it.cargar + (it.exc || 0)) > 0; }).forEach(function (it) {
+    try { mgEmitFueraLista(it.cod, it.cargar, it.exc || 0, _leg); } catch (_e) {}
+  });
+  try { opDraftClear(_leg); } catch (_e) {}
   closeMG();
-  stockMove(rows);
   try { emitGuardadoSesion(nG + nE, _tsIni, _leg); } catch (_e) {}   // ratio de guardado (se autonutre)
   try { mgEmitGuardado(_leg, _tsIni); } catch (_e) {}   // v7.68: evento MG (con duración open→confirmar) para Rendimiento/Monitor
   try { alert("✓ Guardado: " + nG + " caja(s) a góndola" + (nE > 0 ? " y " + nE + " a excedente" : "") + "."); } catch (_e) {}
@@ -30715,7 +30741,7 @@ async function pppLoadProgFromSupabase() {
    (1) lista de clientes súper (editable, sembrada con los 4 actuales),
    (2) Tipo = KRIKOS si el Excel lo trae,
    (3) Zona = "Super" según la tabla de barrios (Esteban Echeverria, Campo de Mayo…). ===== */
-/* ⚠ v17.72 (Luis: "no puede haber 3 y 1 en el front… fijate si se puede unificar en una") —
+/* ⚠ v17.73 (Luis: "no puede haber 3 y 1 en el front… fijate si se puede unificar en una") —
    LA LISTA DE SÚPER ES UNA SOLA Y VIVE EN LA BASE: `public."GV_Supers"`. Antes había CINCO
    definiciones sueltas de "es súper" y ninguna mandaba:
      (a) la regex de zona `super|coto|carrefour|chango|krikos` en la PPP,
@@ -30799,7 +30825,7 @@ function pppEsSuper(p) {
   if (pppZonaDeBarrio(p.localidad) === "Super") return true;
   return !!pppSuperDe(p);
 }
-/* Editor de la lista de clientes súper. v17.72: escribe en la BASE (gv_supers_set /
+/* Editor de la lista de clientes súper. v17.73: escribe en la BASE (gv_supers_set /
    gv_supers_baja), no en el localStorage — la lista es una sola para todos los dispositivos. */
 function openPppSupers() { if (!requireSupervisor()) return; const ov = document.getElementById("pppSupersOverlay"); if (ov) ov.classList.add("show"); pppSupersNeed(true); pppSupersRender(); }
 function closePppSupers() { const ov = document.getElementById("pppSupersOverlay"); if (ov) ov.classList.remove("show"); }
@@ -34931,7 +34957,7 @@ function _pppCamionIco(c) { return c.ruta === "ret" ? "🏭" : (c.ruta === "sup"
 /* v13.35 (dueño: "si es súper, pone el nombre directamente"): un camión de súper es siempre de UN
    cliente, así que "Camión 2 · Súper" no dice nada. Va el nombre: el de la lista de clientes súper
    (que el supervisor puede editar en Configuración) y, si no está, la razón social del pedido. */
-/* v17.72: el nombre corto sale de la MISMA lista (GV_Supers.nombre). Los dos mapas que había acá
+/* v17.73: el nombre corto sale de la MISMA lista (GV_Supers.nombre). Los dos mapas que había acá
    hardcodeados (PPP_SUPER_ALIAS y PPP_SUPER_LEGACY) se fueron: eran otra copia más de la lista. */
 function _pppSuperNombre(p) {
   const s = pppSuperDe(p);
