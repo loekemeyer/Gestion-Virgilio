@@ -13710,3 +13710,51 @@ tienen 0 filas con `FLEJE`.
 **14 códigos**. Si ese número sube, o si algún día aparece un consumidor que agrupe por
 `gv_cod_stock`, se ve ahí. La etapa 2a del plan pasa a **descartada** y el problema de la auditoría
 a `descartado`. **No reabrirlo sin que el dueño lo pida.**
+
+---
+---
+
+### §3.fg — v17.50: una sola identidad por pedido en Cuarentena — 2026-09-14
+
+**Luis (2026-09-14):** *"no está sacando la razón social de ese cliente, ¿por qué?"* — el pedido
+1426 (cod LK 4210) salía en el Log de Cuarentena sin nombre. La respuesta fueron **dos** defectos
+con la misma raíz (problema 172): la identidad del pedido y sus datos no eran confiables.
+
+**(a) El mismo pedido de ISIS entra con DOS claves.** En "A Programar", una NP de ISIS sin tanda
+se **disfraza de pedido** para reusar el tildado y los pasos: `order_id = 'np' + np` (`np98587`,
+`index.html` ~38202). `gv_cuarentena_ya_programado`, en cambio, la llama `98587`
+(`coalesce(order_id, np)`). Las dos formas caen en las mismas tablas —`GV_Cuarentena_Log`,
+`_Liberados`, `_Comentarios`— como si fueran pedidos distintos. Medido: **6 duplicados** en el log
+(98585…98590), y las NP 98585/98586 —aprobadas bajo `np9858x`— figuraban **retenidas** porque su
+evento `entro` había quedado bajo la otra forma. Y una aprobación hecha desde una pantalla no la
+veía la otra, así que el pedido volvía a caer en cuarentena.
+
+`gv_cuarentena_clave()` normaliza (`np98587` → `98587`) y se usa en los cuatro lugares donde esa
+clave se compara: el log, los comentarios, `gv_cuarentena_marcar_calc` y `gv_cuarentena_ya_programado`.
+`gv_cuarentena_liberados()` devuelve **las dos formas** de cada clave, así el front matchea sin
+tocarlo. Es seguro: el `order_id` de un pedido web es siempre dígitos, nunca `np####`, así que el
+prefijo sólo puede venir del disfraz de ISIS.
+
+**(b) La fila del log nacía ciega y no se completaba nunca.** `GV_Cuarentena_Log` guardaba
+`np`/`cod`/`razon_social` **tal como se los mandaba el front**; si una llamada no los traía, la
+fila quedaba así para siempre, porque `gv_cuarentena_marcar` sólo inserta cuando hay novedad
+(primera vez, re-entrada o cambio de motivos). Al 14/09 había **7 filas** en ese estado.
+
+El arreglo **no** es pedirle al front que mande mejor los datos —eso deja las filas viejas rotas y
+se vuelve a romper con cualquier otra entrada— sino **resolverlos en la lectura**, en cascada y
+desde lo que ya está en la base: `cod` de la programación viva; **razón social** de la programación
+o de `GV_Cuarentena_Fuente` (la planilla del ERP que puso al pedido en cuarentena: si está retenido
+por deuda o suspensión, el nombre está sí o sí); **NP** de `PPP_Web_NP`, la clave si es de ISIS, o
+la etiqueta `web LK 1426` que muestra A Programar. La resolución vive en **un solo lugar**, así que
+arregla también lo ya escrito y no hay dos copias que se desincronicen.
+
+**Medición (antes → después).** 32 → **26 pedidos** en el log; **0 sin razón social** (eran 7), 0
+sin NP, 0 sin cod, 0 repetidos. El 1426 pasó a `web LK 1426 · LK 4210 · Garbarino Franco Tomas`. Y
+`gv_cuarentena_marcar_calc`, llamada con las dos formas de una NP aprobada (`np98585` y `98585`),
+no devuelve ninguna: antes la forma sin prefijo volvía a caer en cuarentena. Las seis funciones
+verificadas por md5 del cuerpo normalizado contra la base, y ninguna quedó con `EXECUTE` para `anon`.
+
+**Rollback:** NO usar `drop ... cascade` sobre `gv_cuarentena_clave` — se lleva las cuatro. Volver
+una por una a `sql/gv_cuarentena_log_v1743.sql` y `sql/gv_cuarentena_comentarios_v1715.sql`, y en
+`marcar_calc` / `ya_programado` / `liberados` reemplazar cada `gv_cuarentena_clave(X)` por `X`.
+Todo en `sql/gv_cuarentena_identidad_v1750.sql`.

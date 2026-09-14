@@ -1,3 +1,20 @@
+## Nota v17.50 (2026-09-14) — por qué un pedido salía sin razón social
+
+Luis preguntó por qué el pedido 1426 (LK 4210) figuraba en el Log de Cuarentena sin nombre.
+Eran dos cosas, la misma raíz:
+
+1. **La fila del log guardaba lo que le mandaba el front, y si no venía, no se completaba
+   nunca** (el log sólo se escribe cuando hay novedad). Ahora el `cod`, la **razón social** y la
+   **NP** se resuelven al leer: de la programación viva, de `GV_Cuarentena_Fuente` —la planilla
+   del ERP que puso al pedido en cuarentena, así que el nombre está sí o sí— y de `PPP_Web_NP`.
+   Eso arregla también las filas ya escritas: quedó 0 sin nombre, 0 sin NP, 0 sin cod.
+2. **Una NP de ISIS entraba con dos claves distintas**: `np98587` en A Programar (es el
+   order_id falso con el que se disfraza de pedido) y `98587` en la lista de ya programados.
+   Eran 6 pedidos duplicados en el log, y dos aprobados que seguían figurando retenidos.
+   `gv_cuarentena_clave()` las unifica en todos lados.
+
+SQL y rollback: `sql/gv_cuarentena_identidad_v1750.sql` · §3.fg.
+
 ## Nota v17.46 (2026-09-14) — Config. Cuarentena aprovecha la pantalla
 
 Pedido de Luis: *"hay que aprovechar mejor el espacio de esta pestaña, texto e info está muy
