@@ -217,6 +217,15 @@ const RCP_CSS = `
 #rcpRoot .arBusNada{ padding:12px 0; color:#666; font-size:15px; }
 #rcpRoot .arBusIgual{ width:100%; margin-top:10px; padding:14px; border-radius:10px; border:2px solid #b45309; background:#fffbeb; color:#7c2d12; font-weight:800; font-size:16px; cursor:pointer; }
 #rcpRoot .modalClose{ background:#fff; border:1px solid var(--border); width:32px; height:32px; border-radius:50%; cursor:pointer; font-size:14px; font-weight:900; }
+/* v17.17 — pop-up de pre-aceptación: lo que entró por encima de la OC (todos los códigos juntos). */
+#rcpRoot #opExcesoModal .modalTitle{ color:#b91c1c; }
+#rcpRoot .excIntro{ font-size:14px; font-weight:800; color:#334155; margin-bottom:10px; }
+#rcpRoot .excList{ overflow-y:auto; flex:1 1 auto; margin-bottom:14px; }
+#rcpRoot .excRow{ border:1px solid #fca5a5; background:#fef2f2; border-radius:10px; padding:9px 11px; margin-bottom:8px; }
+#rcpRoot .excRowCod{ font-weight:900; font-size:17px; color:#111; }
+#rcpRoot .excRowDet{ font-size:13px; font-weight:700; color:#7f1d1d; margin-top:2px; }
+#rcpRoot .excWaBtn{ width:100%; height:52px; border:0; border-radius:10px; background:#25d366; color:#fff; font-weight:900; font-size:17px; cursor:pointer; }
+#rcpRoot .excOkBtn{ width:100%; margin-top:10px; }
 #rcpRoot .btnCancel{ padding:10px 16px; border-radius:10px; border:1px solid var(--border); background:#fff; font-weight:900; cursor:pointer; }
 #rcpRoot .btnSend{ padding:10px 16px; border-radius:10px; border:0; background:#111; color:#fff; font-weight:900; cursor:pointer; }
 /* Pendientes (Marianela) = TARJETAS verticales (sin scroll horizontal): tilde + No
@@ -365,6 +374,17 @@ const RCP_HTML = `
     </div>
   </div>
 </div>
+<div id="opExcesoModal" class="modal" role="dialog" aria-modal="true">
+  <div class="modalCard">
+    <div class="modalHeader">
+      <div class="modalTitle">Entró de más</div>
+    </div>
+    <div class="excIntro">Estos artículos superan lo que pide la OC. Avisale a Thomas antes de terminar:</div>
+    <div id="opExcesoList" class="excList"></div>
+    <button id="opExcesoWa" type="button" class="excWaBtn">📲 Escribirle a Thomas</button>
+    <button id="opExcesoOk" type="button" class="btnSend btnBig excOkBtn">✓ Ya le escribí</button>
+  </div>
+</div>
 `;
 
 const rcpRoot = document.createElement("div");
@@ -395,6 +415,10 @@ const arBusModal = document.getElementById("arBusModal");
 const arBusInput = document.getElementById("arBusInput");
 const arBusList = document.getElementById("arBusList");
 const arBusClose = document.getElementById("arBusClose");
+const opExcesoModal = document.getElementById("opExcesoModal");
+const opExcesoList = document.getElementById("opExcesoList");
+const opExcesoWa = document.getElementById("opExcesoWa");
+const opExcesoOk = document.getElementById("opExcesoOk");
 
 const opState = {
   step: null,
@@ -408,6 +432,8 @@ const opState = {
   articulos: null,   // [{Cod_Art, Desc}]
   cargas: {},        // { Cod_Art: cajas }
   cajasCod: null,    // codigo abierto en el popup
+  excesoVisto: null, // v17.17: firma del exceso ya avisado a Thomas en la pre-aceptación
+  excesoGond: null,  // v17.17: { codNorm: {cap,gond} } para el mensaje de WhatsApp
   listaTipo: null,
   ocPorCod: null     // v7.07: OCs vigentes del proveedor { codNorm: {ped,rec,pend,fecha} } (null = sin cargar)
 };
@@ -475,6 +501,7 @@ function opResetState() {
   opState.remito = ""; opState.articulos = null; opState.cargas = {};
   opState.altaNuevos = {};      // v15.36: altas del "+" esperando el OK de Thomas
   opState.ocPorCod = null;
+  opState.excesoVisto = null; opState.excesoGond = null;   // v17.17
   opState.fotoFile = null;
   if (opState.fotoPreviewUrl) { try { URL.revokeObjectURL(opState.fotoPreviewUrl); } catch(_e){} }
   opState.fotoPreviewUrl = null;
@@ -525,6 +552,7 @@ function closeOp() {
   rcpDraftSave();   // v7.12: salir NO pierde la recepción a medio cargar
   opAnularBarRender(false);
   opPage.classList.remove("open");
+  try { opExcesoModal.classList.remove("open"); } catch (_e) {}   // v17.17
   if (_pendTimer) { clearInterval(_pendTimer); _pendTimer = null; }
 }
 opClose.onclick = closeOp;
@@ -1670,6 +1698,10 @@ function renderResumen() {
   opActions.appendChild(volver);
   opActions.appendChild(conf);
   rcpDraftSave();
+
+  // v17.17 — pre-aceptación: si algún código entró por encima de la OC, pop-up con el
+  // resumen de TODOS y el botón para avisarle a Thomas. Sale sólo con "Ya le escribí".
+  try { opExcesoGate(function () {}); } catch (_e) { /* nunca traba el envío */ }
 }
 
 /* ============== Popup de cajas ============== */
@@ -1682,10 +1714,6 @@ function openCajas(cod) {
   // v7.07: recordatorio de la OC vigente mientras carga las cajas.
   const oc = ocDeCod(cod);
   opState.cajasOc = oc || null;   // v8.60 — guardado para el aviso de exceso en vivo
-  // v14.61 — si hay OC, precargo stock/capacidad de góndola de este código para el mensaje a
-  // Thomas (así el botón arma el WhatsApp sincrónico, sin esperar la red al tocarlo).
-  opState.cajasGond = null;
-  if (oc) { try { _opPrefetchGond(cod); } catch (_e) {} }
   if (opCajasOc) {
     if (oc) {
       opCajasOc.style.display = "";
@@ -1715,26 +1743,77 @@ function _opCajasExceso() {
   const n = _esCodDecimal(opState.cajasCod) ? (parseFloat(opCajasInput.value) || 0) : (parseInt(opCajasInput.value, 10) || 0);
   if (n > oc.pend) {
     opCajasOc.style.background = "#fef2f2"; opCajasOc.style.borderColor = "#fca5a5";
-    // v14.61 — aviso claro + botón para escribirle a Thomas por WhatsApp con el mensaje prearmado
-    // (proveedor, pedido, por recibir, pendiente, excedente, stock góndola y si entra). El dueño
-    // decide con todos los datos si el excedente entra o se devuelve.
+    // v17.17 — el aviso queda, pero SIN botón: el operario carga todo de corrido y el
+    // pedido de aviso a Thomas se juntó en UN pop-up en la pre-aceptación (opExcesoGate),
+    // con todos los códigos que entraron de más. Antes (v14.61) el botón de WhatsApp
+    // estaba acá y lo interrumpía código por código.
     opCajasOc.innerHTML = _opCajasOcBase(oc) +
       '<br><b style="color:#b91c1c;">⚠ Estás recibiendo más mercadería que la que tenés habilitada: cargás ' + n +
-      ' y por OC faltan ' + oc.pend + '.</b>' +
-      '<br><button type="button" class="waThomasBtn" style="margin-top:8px;padding:8px 12px;border:0;border-radius:8px;background:#25d366;color:#fff;font-weight:700;font-size:14px;cursor:pointer;">📲 Escribirle a Thomas</button>';
-    const b = opCajasOc.querySelector(".waThomasBtn");
-    if (b) b.onclick = function () { opWhatsExceso(n); };
+      ' y por OC faltan ' + oc.pend + '.</b>';
   } else {
     opCajasOc.style.background = ""; opCajasOc.style.borderColor = "";
     opCajasOc.innerHTML = _opCajasOcBase(oc);
   }
 }
+
+/* ============== v17.17 — pre-aceptación: lo que entró de MÁS que la OC =================
+   Pedido de Luis (2026-09-14): *"dejar que carguen todo normal y que, al final haya una
+   pre-aceptación (cuando aprietan enviar), si cargaron un remito que tenía una cantidad de
+   cajas MAYOR a lo que hay en OC, les salga un pop-up en esa pantalla con un botón
+   'Escribirle a Thomas' … y otro botón 'Ya le escribí' que permita terminar con el
+   registro"*.
+
+   Criterio de exceso: MAYOR a lo que falta recibir por OC (`ocRef`), el mismo que el aviso
+   en vivo del pop-up de cajas — NO el +20% de `ocExcede`, que es el umbral del aviso por
+   Telegram (evento ROC) y sigue como estaba.
+
+   No traba la recepción más allá del pop-up: la única salida es "Ya le escribí", y ahí el
+   operario sigue con la foto y el envío. Si vuelve atrás y cambia las cantidades, el
+   pop-up vuelve a salir sólo si el exceso cambió (`opState.excesoVisto` guarda la firma). */
+const WA_THOMAS = "5491162521635";
+/* Artículos cargados que superan lo que falta recibir por OC. */
+function opExcesoItems() {
+  return Object.entries(opState.cargas)
+    .filter(function (e) { return e[1] > 0; })
+    .map(function (e) {
+      const cod = e[0], cajas = e[1], oc = ocDeCod(cod), ref = ocRef(oc);
+      return { cod: cod, cajas: cajas, oc: oc, ref: ref, exced: cajas - ref };
+    })
+    .filter(function (i) { return i.ref > 0 && i.cajas > i.ref; });
+}
+/* Pop-up de pre-aceptación. `next` corre cuando el operario toca "Ya le escribí" (o si no
+   hay nada que avisar). */
+function opExcesoGate(next) {
+  const exc = opExcesoItems();
+  const firma = exc.map(function (i) { return i.cod + ":" + i.cajas; }).join("|");
+  if (!exc.length || opState.excesoVisto === firma) { next(); return; }
+  opExcesoList.innerHTML = "";
+  exc.forEach(function (i) {
+    const row = document.createElement("div"); row.className = "excRow";
+    const c = document.createElement("div"); c.className = "excRowCod"; c.textContent = i.cod;
+    const d = document.createElement("div"); d.className = "excRowDet";
+    d.textContent = "Recibís " + i.cajas + " · por OC faltan " + i.ref + " → " + i.exced + " de más";
+    row.appendChild(c); row.appendChild(d);
+    opExcesoList.appendChild(row);
+  });
+  // Góndola de los códigos en exceso, para el mensaje (best-effort, en paralelo: si todavía
+  // no llegó cuando tocan el botón, el mensaje dice "s/dato").
+  opState.excesoGond = {};
+  try { _opPrefetchGond(exc.map(function (i) { return i.cod; })); } catch (_e) {}
+  opExcesoWa.onclick = function () { opWhatsExceso(exc); };
+  opExcesoOk.onclick = function () {
+    opState.excesoVisto = firma;
+    opExcesoModal.classList.remove("open");
+    next();
+  };
+  opExcesoModal.classList.add("open");
+}
 /* v14.61 — precarga stock de góndola (vista_saldos_stock.terminado) y capacidad
-   (Capacidad_Sector.cajas_max) del código, para el mensaje a Thomas. Best-effort: si no hay
-   dato, el mensaje dice "s/dato". */
-async function _opPrefetchGond(cod) {
-  const k = String(cod || "").trim();
-  if (!k) return;
+   (Capacidad_Sector.cajas_max) de los códigos en exceso, para el mensaje a Thomas.
+   Best-effort: si no hay dato, el mensaje dice "s/dato". */
+async function _opPrefetchGond(cods) {
+  const ks = (cods || []).map(function (c) { return String(c || "").trim(); }).filter(Boolean);
+  if (!ks.length) return;
   try {
     await sessionReady;
     // v16.51 (problema 92) — se pide `cod_art` en vez de `clave`: para un DUAL la vista emite
@@ -1742,47 +1821,44 @@ async function _opPrefetchGond(cod) {
     // NINGUNA fila y el cartel decía "s/dato" siempre. Y la capacidad se filtra por empresa,
     // que es lo mismo que hace el aviso de exceso (gondCapPorCod / gondAcumPorCod).
     const res = await Promise.all([
-      supabase.from("Capacidad_Sector").select("cod,cajas_max,empresa").eq("cod", k),
-      supabase.from("vista_saldos_stock").select("cod_art,clave,empresa,terminado").eq("cod_art", k)
+      supabase.from("Capacidad_Sector").select("cod,cajas_max,empresa").in("cod", ks),
+      supabase.from("vista_saldos_stock").select("cod_art,clave,empresa,terminado").in("cod_art", ks)
     ]);
     const _rowsCap = (res[0] && res[0].data) || [], _rowsG = (res[1] && res[1].data) || [];
     const _dual = gondDualesDe(_rowsG, _ocgNorm);
     const _capX = gondCapPorCod(_rowsCap, _dual, opState.linea, _ocgNorm);
     const _gondX = gondAcumPorCod(_rowsG, opState.linea, _ocgNorm);
-    const _k = _ocgNorm(k);
-    const hasCap = _rowsCap.length > 0, cap = _capX[_k] || 0;
-    const hasG = _rowsG.length > 0, gond = _gondX[_k] || 0;
-    if (opState.cajasCod === k) opState.cajasGond = { cap: hasCap ? cap : null, gond: hasG ? gond : null };
-  } catch (_e) { /* best-effort: queda null → "s/dato" */ }
+    const out = {};
+    ks.forEach(function (k) {
+      const _k = _ocgNorm(k);
+      const hasCap = _rowsCap.some(function (r) { return _ocgNorm(r.cod) === _k; });
+      const hasG = _rowsG.some(function (r) { return _ocgNorm(r.cod_art) === _k; });
+      out[_k] = { cap: hasCap ? (_capX[_k] || 0) : null, gond: hasG ? (_gondX[_k] || 0) : null };
+    });
+    opState.excesoGond = out;
+  } catch (_e) { /* best-effort: queda {} → "s/dato" */ }
 }
-/* v14.61 — WhatsApp a Thomas (dueño) con el resumen del exceso, mensaje prearmado. */
-const WA_THOMAS = "5491162521635";
-function opWhatsExceso(n) {
-  const oc = opState.cajasOc || {};
-  const prov = opState.tallNombre || "?";
-  const cod = opState.cajasCod || "?";
-  const ped = oc.ped || 0, pend = oc.pend || 0;
-  const exced = Math.max(0, n - pend);
-  const g = opState.cajasGond || {};
-  const gond = (g.gond != null) ? g.gond : null;
-  const cap = (g.cap != null) ? g.cap : null;
-  const libre = (cap != null && gond != null) ? (cap - gond) : null;
-  const entra = (libre != null)
-    ? (libre >= exced ? ("SÍ (" + libre + " libres en góndola)") : ("NO (solo " + libre + " libres en góndola)"))
-    : "s/dato de capacidad";
+/* v14.61 / v17.17 — WhatsApp a Thomas (dueño) con el resumen de TODO lo que entró de más. */
+function opWhatsExceso(exc) {
+  const g = opState.excesoGond || {};
   const L = [
-    "Hola Thomas, exceso al recibir mercadería:",
-    "Proveedor: " + prov,
-    "Código: " + cod,
-    "OC pide: " + ped,
-    "Estoy por recibir: " + n,
-    "Pendiente de recibir: " + pend,
-    "Excedente sobre lo habilitado: " + exced,
-    "Stock actual en góndola: " + (gond != null ? gond : "s/dato"),
-    "¿Entra el excedente en góndola?: " + entra,
-    "",
-    "¿Lo recibo?"
+    "Hola Thomas, entró más mercadería que la habilitada por OC:",
+    "Proveedor: " + (opState.tallNombre || "?"),
+    "RTO/FC: " + (opState.remito || "s/remito") + " · " + (opState.linea || "") + " · " + fechaCorta(opState.fecha),
+    ""
   ];
+  exc.forEach(function (i) {
+    const d = g[_ocgNorm(i.cod)] || {};
+    const cap = (d.cap != null) ? d.cap : null, gond = (d.gond != null) ? d.gond : null;
+    const libre = (cap != null && gond != null) ? (cap - gond) : null;
+    const entra = (libre != null)
+      ? (libre >= i.exced ? ("entra en góndola, " + libre + " libres") : ("NO entra en góndola, solo " + libre + " libres"))
+      : "s/dato de capacidad";
+    L.push("• " + i.cod + ": recibo " + i.cajas + ", por OC faltaban " + i.ref +
+      " (OC pedía " + ((i.oc && i.oc.ped) || i.ref) + ") → " + i.exced + " de más · " + entra);
+  });
+  L.push("");
+  L.push("¿Lo recibo?");
   const url = "https://wa.me/" + WA_THOMAS + "?text=" + encodeURIComponent(L.join("\n"));
   try { window.open(url, "_blank"); } catch (_e) { location.href = url; }
 }

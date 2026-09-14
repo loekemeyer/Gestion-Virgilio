@@ -12,7 +12,7 @@
 > única**; no se replica. Ante la duda entre parche rápido y fix de raíz → **fix
 > de raíz**.
 >
-> Última actualización: 2026-09-14 (domingo) · Versión app al documentar: **v17.15**
+> Última actualización: 2026-09-14 (domingo) · Versión app al documentar: **v17.17**
 >
 > Nota **v17.15 (2026-09-14, Luis) — CUARENTENA: "Ya programados" es una TABLA y aprobar pide un
 > COMENTARIO.**
@@ -2836,6 +2836,23 @@
 > (WhatsApp `wa.me/5491162521635`) con mensaje prearmado: proveedor, OC pide, por recibir, pendiente, excedente,
 > stock de góndola y si el excedente entra en góndola (`Capacidad_Sector` − `vista_saldos_stock.terminado`).
 > Detalle backend: `docs/SUPABASE-GESTION-VIRGILIO.md` §3.bn/§3.bo.
+> **⚠ (v17.17) ese botón ya NO está en el popup de cajas** — ver la nota de abajo.
+>
+> Nota **v17.17 (2026-09-14) — el aviso de exceso de OC se pide UNA vez, en la pre-aceptación.**
+> Pedido de Luis: *"dejar que carguen todo normal y que, al final haya una pre-aceptación (cuando aprietan
+> enviar), si cargaron un remito que tenía una cantidad de cajas MAYOR a lo que hay en OC, les salga un
+> pop-up en esa pantalla con un botón 'Escribirle a Thomas' … y otro botón 'Ya le escribí' que permita
+> terminar con el registro"*. En el popup de cajas **queda el aviso rojo en vivo** (caza el typo 500 vs 50)
+> pero **sin botón**: el operario carga todo de corrido. Al tocar **Enviar**, sobre la pantalla
+> "Confirmá el envío" sale **`#opExcesoModal`** con **una fila por código** que supera lo que falta recibir
+> por OC (recibidas · faltantes · excedente) y dos botones: **📲 Escribirle a Thomas** (un solo WhatsApp con
+> proveedor, RTO/FC y TODOS los códigos, con góndola/capacidad de cada uno) y **✓ Ya le escribí**, que es la
+> única salida y devuelve al flujo normal (foto → Confirmar y enviar). El criterio del pop-up es
+> **`cajas > ocRef(oc)`** (lo que falta recibir), no el **+20%** de `ocExcede` — ése sigue siendo sólo el
+> umbral del evento **ROC** que dispara el Telegram, sin cambios. `opState.excesoVisto` guarda la firma
+> `cod:cajas` avisada: si el operario vuelve atrás y cambia cantidades, el pop-up vuelve a salir.
+> Código: `recepcion.js` (`opExcesoGate`, `opExcesoItems`, `opWhatsExceso`, `_opPrefetchGond`).
+> Test: `tests/rcp-exceso-gate.cjs`.
 >
 > Nota **2026-08-27 — Facturación neto/faltantes: cálculo centralizado en vistas (`sql/facturacion_neto.sql`).**
 > El neto y los faltantes dejan de vivir sólo en el front: el cálculo está en **vistas en vivo**
