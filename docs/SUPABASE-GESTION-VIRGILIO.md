@@ -14732,3 +14732,76 @@ empresa bien resuelta. Resultado medido: `a_guardar` 508 = 0 y 511 = 0; góndola
 
 **Rollback:** `sql/gv_guardado_no_negativo_v1773.sql` (trae el `drop trigger` + `drop function`);
 los datos, reinsertando esas 4 filas desde el backup.
+
+## §3.fo — v17.74: badge de HORARIO en A Programar, y el horario viaja a Programación — 2026-09-14
+
+Pedido de Luis: *"para todos esos clientes (excepto Distribuidora GM) + CL 3905 Andser Química,
+CL 1974 Rayabo S.A, CL 2533 Osa Distribuidora SRL + los clientes que marcan retirar, quiero que
+cuando aparecen en la pestaña de A Programar tengan un badge con horario. […] La persona que
+programa debería poder hacer click en ese badge y editar el día y horario manualmente ahí. Y ese
+dato debería viajar con el pedido a Programación."* Y sobre lo viejo: *"forward-facing todo, si se
+puede hacer un backfill lo vemos después."*
+
+### ¿La página manda el horario? Sí, pero todavía no llega
+
+El checkout de `pagina-LK-copia` **ya lo captura**: `_esRetira()` → `_retiroSeleccion()` exige día
+(≥ 3 días hábiles, lun–vie) y franja, y los manda como `retiro_fecha` / `retiro_franja` dentro de
+`orders.sheets_payload`, además de anteponer `RETIRA dd/mm franja` a las observaciones.
+
+⚠ **Ese front no está deployado.** Al 14/09, de **610 pedidos en 90 días, 0** traen la clave
+`retiro_fecha` — y hubo **65 de retira**. Por eso el badge arranca en `----` para todos. Cuando el
+deploy llegue empieza a aparecer solo: Gestión ya lo lee por `gv_pedidos_web_retiro` (vista nueva
+en LK, no toca ninguna existente).
+
+### Quién lleva badge — una sola pregunta
+
+`gv_pide_horario(empresa, cod, zona)`:
+
+- los súper con **`pide_horario`** — columna nueva en `GV_Supers`, con **Distribuidora GM en
+  `false`**, que es la excepción que pidió Luis;
+- los de **`GV_Clientes_Horario`** — los 3 aparte, **con su espejo de Chef del mismo CUIT** (regla
+  del dueño: *"el cod cliente no significa nada, sólo el CUIT vale"*):
+
+| Cliente | LK | CH | CUIT |
+|---|---:|---:|---|
+| Andser Química SRL | 3905 | 2188 | 30-68182315-4 |
+| Rayabo S.A | 1974 | 1253 | 30-70859541-8 |
+| Osa Distribuidora SRL | 2533 | 2340 | 30-71517501-7 |
+
+- y cualquiera cuya zona diga `retira`.
+
+`gv_clientes_horario` junta las dos listas y es lo que lee el front.
+
+### Dónde vive el horario
+
+**`GV_Pedido_Horario`** (empresa, clave, np, fecha, franja, origen). La **clave** es la misma idea
+que `gv_cuarentena_clave`: el `order_id` si el pedido vino de la página, la NP si es de ISIS — así
+el dato **no se pierde cuando el pedido pasa de A Programar a Programación** y recibe su NP.
+`origen` = `cliente` (lo eligió en el checkout) | `manual` (lo puso el que programa; **pisa** al
+otro). Se escribe sólo por `gv_pedido_horario_set` / `gv_pedido_horario_borrar`; vaciar los dos
+campos borra la fila.
+
+`gv_ppp_prog_arbol` suma 5 columnas — `clave`, `pide_horario`, `horario_fecha`, `horario_franja`,
+`horario_origen` — así el horario viaja hasta la tabla de Programación (donde se **ve** pero no se
+edita: se edita en A Programar).
+
+⚠ Esa función hubo que **dropearla y recrearla**: Postgres no deja cambiar el tipo de retorno con
+`create or replace`. No le cuelga ninguna vista, sólo la llama el front por RPC.
+
+⚠ Virgilio **no tiene FDW contra LK** (`pg_foreign_server` vacío), así que el merge de las dos
+fuentes lo hace el front. Lo que se **edita** va siempre a Virgilio, que es lo que lee el árbol. Si
+algún día se arma el FDW, el merge se puede mudar al backend.
+
+### Medición (14/09)
+
+- `gv_clientes_horario` = **24 filas** (18 súper con horario + 6 de la lista aparte).
+- `gv_pide_horario`: Coto → true · **Distribuidora GM (LK 4080) → false** · Andser (LK 3905) → true
+  · Osa (LK 2533) → true · zona "Retira en depósito" → true · cliente común → false.
+- En el árbol (−180 / +120 días): **186 NP con badge** = 160 súper + 2 retira + 24 de los 3.
+  Los totales **no cambiaron**: 2.237 NP y 762,13 m³, iguales a `gv_ppp_avance_dias`.
+- Circuito probado de punta a punta con `gv_pedido_horario_set` sobre una NP de ISIS (98426) y
+  sobre un pedido web (order_id 1388): los dos salen por `gv_ppp_prog_arbol` con fecha, franja y
+  origen. Las filas de prueba se borraron (`GV_Pedido_Horario` quedó en 0).
+- En LK, `gv_pedidos_web_retiro` = 0 filas (el front que las graba no está deployado).
+
+SQL y rollback: `sql/gv_pedido_horario_v1774.sql`. Test: `tests/apr-badge-horario.cjs`.

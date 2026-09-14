@@ -1168,6 +1168,25 @@ button {
 .apr-chip-dif{ background:#fff7ed; color:#b45309; font-weight:800; }
 .apr-chip-m3{ background:#f1f5f9; color:#334155; } /* idea 7999: es un dato, no una alerta */
 .apr-chip-np{ background:#ede9fe; color:#5b21b6; }
+/* v17.74 (Luis) — BADGE DE HORARIO: sólo en los clientes que coordinan (súper sin GM, los 3
+   aparte, y todos los que retiran). Se toca y se edita; "----" = todavía no hay ninguno. */
+.apr-hor{ font-size:11.5px; font-weight:800; border-radius:999px; padding:2px 9px; cursor:pointer;
+  background:#e0f2fe; color:#075985; border:1px solid #bae6fd; white-space:nowrap; }
+.apr-hor:hover{ background:#bae6fd; }
+.apr-hor.vacio{ background:#fff; color:#94a3b8; border:1px dashed #cbd5e1; font-weight:700; }
+.apr-hor.vacio:hover{ background:#f8fafc; color:#475569; }
+.apr-hor.cli{ background:#dcfce7; color:#14532d; border-color:#86efac; }   /* lo eligió el cliente */
+.apr-hor.cli:hover{ background:#bbf7d0; }
+.apr-card-cuar .cuar-card-zona .apr-hor{ margin-left:7px; }
+/* el pop-up de edición reusa la caja de Cuarentena */
+.apr-hor-f{ display:grid; grid-template-columns:70px 1fr; align-items:center; gap:9px; margin-bottom:9px; }
+.apr-hor-f label{ font-size:12.5px; font-weight:800; color:#475569; }
+.apr-hor-f input{ padding:8px 10px; border:1px solid #cbd5e1; border-radius:8px; font-size:14px; width:100%; }
+.apr-hor-chips{ display:flex; flex-wrap:wrap; gap:6px; }
+.apr-hor-chip{ width:auto; margin:0; background:#f1f5f9; border:1px solid #e2e8f0; color:#475569;
+  border-radius:999px; padding:5px 11px; font-size:12px; font-weight:700; cursor:pointer; }
+.apr-hor-chip:hover{ background:#e2e8f0; }
+.apr-hor-chip.on{ background:#0369a1; border-color:#0369a1; color:#fff; }
 .apr-card-body{ margin-top:7px; border-top:1px dashed #e2e8f0; padding-top:6px; }
 .apr-kv{ font-size:12px; color:#475569; margin-bottom:3px; }
 .apr-bloque{ font-size:11.5px; font-weight:700; color:#0f172a; margin-top:8px; margin-bottom:2px; }
@@ -5145,7 +5164,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=17.73"></script>
+<script type="module" src="recepcion.js?v=17.74"></script>
 <!-- Config del módulo de fichada (compartido con fichada.html). El secret
      hmacSecret tiene que ser el mismo acá y allá; cargándolo desde un solo
      archivo evitamos que se desincronicen. -->
@@ -5491,7 +5510,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
           <input id="pppSupNom" class="planim-inp" placeholder="Nombre (ej. Coto)">
           <button class="planim-btn-save" onclick="pppSuperAdd()">Agregar</button>
         </div>
-        <div class="planim-hint">v17.73 — esta lista es <b>la única</b> y vive en la base (<code>GV_Supers</code>): la ven todos los dispositivos y la usan también Facturación, Cobranzas y Cuarentena. El código va <b>con su empresa</b>: el 2444 de Chef es Cencosud, pero el 2444 de LK es Relca S.R.L. y no es súper. Además se detectan los de Tipo <b>KRIKOS</b> y los de barrio <b>Súper</b>.</div>
+        <div class="planim-hint">v17.74 — esta lista es <b>la única</b> y vive en la base (<code>GV_Supers</code>): la ven todos los dispositivos y la usan también Facturación, Cobranzas y Cuarentena. El código va <b>con su empresa</b>: el 2444 de Chef es Cencosud, pero el 2444 de LK es Relca S.R.L. y no es súper. Además se detectan los de Tipo <b>KRIKOS</b> y los de barrio <b>Súper</b>.</div>
       </div>
       <div class="planim-sec-t">Lista de súper</div>
       <div id="pppSupersList" class="planim-list"></div>
@@ -8558,7 +8577,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v17.73";
+const APP_VERSION = "v17.74";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -12774,7 +12793,7 @@ function _stockClientId() {
   try { if (typeof crypto !== "undefined" && crypto.randomUUID) return "mst_" + crypto.randomUUID(); } catch (_e) {}
   return "mst_" + Date.now().toString(36) + "_" + Math.random().toString(36).slice(2, 10);
 }
-/* v17.73 — el texto que el server explica, para poder mostrárselo al operario. PostgREST
+/* v17.74 — el texto que el server explica, para poder mostrárselo al operario. PostgREST
    devuelve {code, details, hint, message}; el `message` es el del RAISE del trigger, escrito
    en criollo a propósito. Si el body no es JSON, se muestra crudo y recortado. */
 function _stockMotivo(body) {
@@ -12807,7 +12826,7 @@ function stockMove(rows) {
         bodyU.indexOf("PGRST116") >= 0           // RLS violation
       );
       if (isTransient) { throw new Error("HTTP " + r.status + " transient: " + body.slice(0, 120)); }
-      // v17.73 — un 4xx de DATOS ya no se tira a la basura en silencio: se DEVUELVE.
+      // v17.74 — un 4xx de DATOS ya no se tira a la basura en silencio: se DEVUELVE.
       // Con el candado `zzz_guardado_no_negativo` (guardar más de lo que hay en A guardar)
       // PostgREST contesta 400, y hasta acá eso iba a console.error mientras el operario ya
       // había visto "✅ Guardado". Quien llama decide qué mostrar (ver mgConfirmar).
@@ -24899,7 +24918,7 @@ function mgSetUbic(i, v) {
 }
 async function mgConfirmar() {
   if (!_mg) return;
-  if (_mg._enviando) return;   // v17.73: el doble toque en Confirmar es la mitad front del doble guardado
+  if (_mg._enviando) return;   // v17.74: el doble toque en Confirmar es la mitad front del doble guardado
   const sel = _mg.items.filter(function (it) { return (it.cargar > 0) || (it.exc > 0); });
   if (!sel.length) return;
   // El excedente no tiene lugar fijo → la ubicación es obligatoria para tenerla
@@ -24938,7 +24957,7 @@ async function mgConfirmar() {
   const nG = sel.reduce(function (s, it) { return s + it.cargar; }, 0);
   const nE = sel.reduce(function (s, it) { return s + (it.exc || 0); }, 0);
   const _tsIni = _mg.tsInicio, _leg = _mg.legajo;   // capturar ANTES de cerrar (closeMG anula _mg)
-  /* v17.73 — el guardado se CONFIRMA CONTRA EL SERVER antes de darlo por hecho.
+  /* v17.74 — el guardado se CONFIRMA CONTRA EL SERVER antes de darlo por hecho.
      Hasta acá esto cerraba el modal, borraba el borrador y avisaba "✅ Guardado" SIN esperar
      a stockMove, que manda los 4xx de datos a console.error y los descarta. Con el candado
      `zzz_guardado_no_negativo` (no se puede guardar más de lo que hay en A guardar) eso
@@ -30741,7 +30760,7 @@ async function pppLoadProgFromSupabase() {
    (1) lista de clientes súper (editable, sembrada con los 4 actuales),
    (2) Tipo = KRIKOS si el Excel lo trae,
    (3) Zona = "Super" según la tabla de barrios (Esteban Echeverria, Campo de Mayo…). ===== */
-/* ⚠ v17.73 (Luis: "no puede haber 3 y 1 en el front… fijate si se puede unificar en una") —
+/* ⚠ v17.74 (Luis: "no puede haber 3 y 1 en el front… fijate si se puede unificar en una") —
    LA LISTA DE SÚPER ES UNA SOLA Y VIVE EN LA BASE: `public."GV_Supers"`. Antes había CINCO
    definiciones sueltas de "es súper" y ninguna mandaba:
      (a) la regex de zona `super|coto|carrefour|chango|krikos` en la PPP,
@@ -30825,7 +30844,7 @@ function pppEsSuper(p) {
   if (pppZonaDeBarrio(p.localidad) === "Super") return true;
   return !!pppSuperDe(p);
 }
-/* Editor de la lista de clientes súper. v17.73: escribe en la BASE (gv_supers_set /
+/* Editor de la lista de clientes súper. v17.74: escribe en la BASE (gv_supers_set /
    gv_supers_baja), no en el localStorage — la lista es una sola para todos los dispositivos. */
 function openPppSupers() { if (!requireSupervisor()) return; const ov = document.getElementById("pppSupersOverlay"); if (ov) ov.classList.add("show"); pppSupersNeed(true); pppSupersRender(); }
 function closePppSupers() { const ov = document.getElementById("pppSupersOverlay"); if (ov) ov.classList.remove("show"); }
@@ -34957,7 +34976,7 @@ function _pppCamionIco(c) { return c.ruta === "ret" ? "🏭" : (c.ruta === "sup"
 /* v13.35 (dueño: "si es súper, pone el nombre directamente"): un camión de súper es siempre de UN
    cliente, así que "Camión 2 · Súper" no dice nada. Va el nombre: el de la lista de clientes súper
    (que el supervisor puede editar en Configuración) y, si no está, la razón social del pedido. */
-/* v17.73: el nombre corto sale de la MISMA lista (GV_Supers.nombre). Los dos mapas que había acá
+/* v17.74: el nombre corto sale de la MISMA lista (GV_Supers.nombre). Los dos mapas que había acá
    hardcodeados (PPP_SUPER_ALIAS y PPP_SUPER_LEGACY) se fueron: eran otra copia más de la lista. */
 function _pppSuperNombre(p) {
   const s = pppSuperDe(p);
@@ -35163,6 +35182,11 @@ function _pppArbolHtml(programados) {
           '<td><span class="pga-chev">' + (nb ? "▾" : "▸") + '</span>' +
             '<span class="pga-np">' + escapeHtml(r.np) + '</span>' + _npSrcChip(r.np) +
             '<span class="pga-pill e-' + est + '">' + PGA_EST_TXT[est] + '</span>' +
+            // v17.74 (Luis): el horario viaja con el pedido — acá se ve, no se edita
+            (r.pide_horario ? '<span class="apr-hor' + ((r.horario_fecha || r.horario_franja) ? (r.horario_origen === "cliente" ? " cli" : "") : " vacio") + '" style="cursor:default"' +
+              ' title="' + ((r.horario_fecha || r.horario_franja) ? "Horario coordinado con el cliente. Se edita en A Programar."
+                                                                  : "Este cliente coordina horario y no hay ninguno cargado. Se carga en A Programar.") + '">🕑 ' +
+              escapeHtml(aprHorTxt({ fecha: r.horario_fecha, franja: r.horario_franja })) + '</span>' : '') +
             '<span class="pga-cli">' + escapeHtml(r.razon_social || r.cod || "—") + '</span>' +
             '<span class="pga-loc">' + escapeHtml(r.zona_corta || r.localidad || "") + '</span></td>' +
           '<td>' + _pppFmtM3(r.m3) + '</td><td colspan="6"></td></tr>';
@@ -39489,6 +39513,8 @@ function aprRender() {
   pppPaintTabs();
   // v14.82: resumen de los reportes de cuarentena (una sola vez; se refresca al importar)
   if (_apr.cuarResumen === null && !_apr.cuarResumenLoading) cuarResumenCargar();
+  // v17.74 (Luis): quién lleva badge de horario y qué horario tiene cada pedido
+  aprHorNeed();
   // v15.48: alerta de mismo cliente en dos días de la misma semana
   if (_apr.dosDias === undefined && !_apr.dosDiasLoading) aprDosDiasCargar();
   // v15.85: OC de súper que bajó Krikos y todavía no se cargaron
@@ -39582,6 +39608,154 @@ function aprPorQueHtml(lista) {
   if (mano)   partes.push('<b>' + mano + '</b> retira o súper: siempre a mano');
   return '<div class="apr-porque">Ninguno tiene tanda todavía · ' + partes.join(' · ') + '</div>';
 }
+/* ═══ BADGE DE HORARIO (v17.74, Luis 2026-09-14) ═════════════════════════════════════════════
+   Pedido: *"para todos esos clientes (excepto Distribuidora GM) + CL 3905 Andser Química, CL 1974
+   Rayabo, CL 2533 Osa Distribuidora + los clientes que marcan retirar, quiero que cuando aparecen
+   en A Programar tengan un badge con horario. La persona que programa debería poder hacer click en
+   ese badge y editar el día y horario manualmente ahí. Y ese dato debería viajar con el pedido a
+   Programación."*
+
+   QUIÉN LLEVA BADGE lo decide el backend en UNA sola lista, `gv_clientes_horario` (los súper con
+   `pide_horario` — o sea todos menos Distribuidora GM — más `GV_Clientes_Horario`), y acá se suma
+   la zona `retira`. La misma regla que usa `gv_pide_horario()` del otro lado.
+
+   DE DÓNDE SALE EL DÍA Y LA FRANJA. Dos fuentes, y la manual pisa a la del cliente:
+     · el cliente, al retirar, los elige en el checkout de la página → `orders.sheets_payload`
+       (`retiro_fecha` / `retiro_franja`), que Gestión lee por la vista `gv_pedidos_web_retiro`.
+       ⚠ Al 14/09 eso todavía NO llega: el front de la página que los graba no está deployado
+       (0 de 610 pedidos en 90 días traen la clave). Por eso el badge arranca en "----" para todos.
+     · el que programa, tocando el badge → `GV_Pedido_Horario` (RPC `gv_pedido_horario_set`).
+   Como Virgilio no tiene FDW contra LK, el merge de las dos fuentes se hace acá; lo que se EDITA va
+   siempre a la tabla de Virgilio, que es la que después lee `gv_ppp_prog_arbol` para Programación. */
+const APR_HORARIO_TTL_MS = 5 * 60 * 1000;
+/* Las franjas de siempre, como atajo; el que programa igual puede escribir cualquier cosa. */
+const APR_FRANJAS = ["08:00 a 12:00", "12:00 a 16:00", "16:00 a 20:00", "Mañana", "Tarde", "Todo el día"];
+let _aprHorLista = null, _aprHorListaTs = 0, _aprHorListaBusy = false;   // quién lleva badge
+let _aprHor = null, _aprHorTs = 0, _aprHorBusy = false;                  // clave → {fecha, franja, origen}
+let _aprHorEdit = null;                                                  // el pop-up abierto
+
+function aprHorKey(empresa, clave) { return pppEmpNorm(empresa) + ":" + String(clave == null ? "" : clave).trim().replace(/\.0+$/, ""); }
+/* La clave del pedido: el order_id si vino de la página, la NP si es de ISIS — igual que el backend. */
+function aprHorClave(p) { return (p && p._isis) ? String(p.np || "") : String((p && p.order_id) || ""); }
+function aprHorNeed(force) {
+  if (!_aprHorListaBusy && (force || !_aprHorListaTs || (Date.now() - _aprHorListaTs) >= APR_HORARIO_TTL_MS)) {
+    _aprHorListaBusy = true; _aprHorListaTs = Date.now();
+    aprGet("gv_clientes_horario?select=empresa,cod,nombre,origen&limit=500")
+      .then(function (rows) {
+        const m = {};
+        for (const r of (rows || [])) m[pppEmpNorm(r.empresa) + ":" + String(r.cod || "").trim()] = r.nombre || "";
+        _aprHorLista = m; _aprHorListaBusy = false; if (_pppTab === "prog") aprRender();
+      })
+      .catch(function (e) { _aprHorListaBusy = false; console.warn("[apr] lista de horario:", (e && e.message) || e); });
+  }
+  if (!_aprHorBusy && (force || !_aprHorTs || (Date.now() - _aprHorTs) >= APR_HORARIO_TTL_MS)) {
+    _aprHorBusy = true; _aprHorTs = Date.now();
+    const manual = aprGet("GV_Pedido_Horario?select=empresa,clave,fecha,franja,origen&limit=2000").catch(function () { return []; });
+    // el día/franja que eligió el cliente al retirar (LK). Si falla, sólo se pierden ésos; los
+    // cargados a mano son los que de verdad usa el que programa.
+    const delCliente = fetch(PWEB_LK_URL + "/rest/v1/gv_pedidos_web_retiro?select=order_id,empresa,retiro_fecha,retiro_franja&limit=2000",
+                             { headers: { apikey: PWEB_LK_ANON }, cache: "no-store" })
+      .then(function (r) { return r.ok ? r.json() : []; }).catch(function () { return []; });
+    Promise.all([manual, delCliente]).then(function (res) {
+      const m = {};
+      for (const r of (res[1] || [])) {   // primero lo que eligió el cliente…
+        m[aprHorKey(r.empresa || "lk", r.order_id)] = { fecha: r.retiro_fecha || "", franja: r.retiro_franja || "", origen: "cliente" };
+      }
+      for (const r of (res[0] || [])) {   // …y encima lo que puso el que programa
+        m[aprHorKey(r.empresa, r.clave)] = { fecha: r.fecha || "", franja: r.franja || "", origen: r.origen || "manual" };
+      }
+      _aprHor = m; _aprHorBusy = false; if (_pppTab === "prog") aprRender();
+    }).catch(function (e) { _aprHorBusy = false; console.warn("[apr] horarios:", (e && e.message) || e); });
+  }
+}
+/* ¿Este pedido lleva badge? Retira, o el cliente está en la lista (súper sin GM + los 3). */
+function aprPideHorario(p) {
+  if (!p) return false;
+  if (/retira/i.test(String(p.zona || ""))) return true;
+  const cod = String(p.cod || "").trim().replace(/\.0+$/, "");
+  if (!cod || !_aprHorLista) return false;
+  return _aprHorLista[pppEmpDePedido(p) + ":" + cod] !== undefined;
+}
+function aprHorDe(p) { return (_aprHor || {})[aprHorKey(pppEmpDePedido(p), aprHorClave(p))] || null; }
+function aprHorTxt(h) {
+  if (!h || (!h.fecha && !h.franja)) return "----";
+  const f = h.fecha ? String(h.fecha).slice(8, 10) + "/" + String(h.fecha).slice(5, 7) : "";
+  return [f, h.franja].filter(Boolean).join(" ");
+}
+function aprHorBadge(p) {
+  if (!aprPideHorario(p)) return "";
+  const h = aprHorDe(p), vacio = !h || (!h.fecha && !h.franja);
+  const k = aprHorKey(pppEmpDePedido(p), aprHorClave(p));
+  return '<span class="apr-hor' + (vacio ? " vacio" : "") + (h && h.origen === "cliente" ? " cli" : "") + '"' +
+    ' onclick="event.stopPropagation();aprHorAbrir(\'' + escapeHtml(k) + '\')"' +
+    ' title="' + (vacio ? "Este cliente coordina horario y todavía no hay ninguno cargado. Tocá para ponerlo."
+                        : (h.origen === "cliente" ? "Día y franja que eligió el cliente en la página. Tocá para cambiarlos."
+                                                  : "Día y franja cargados a mano. Tocá para cambiarlos.")) + '">' +
+    "🕑 " + escapeHtml(aprHorTxt(h)) + "</span>";
+}
+
+/* El pop-up: día + franja. Vaciar los dos y guardar = sacar el horario. */
+function aprHorPedidoDe(k) {
+  for (const p of (_apr.pedidosTodos || _apr.pedidos || [])) {
+    if (aprHorKey(pppEmpDePedido(p), aprHorClave(p)) === k) return p;
+  }
+  return null;
+}
+function aprHorAbrir(k) {
+  const p = aprHorPedidoDe(k), h = (_aprHor || {})[k] || {};
+  _aprHorEdit = { k: k, cli: (p && (p.razon_social || p.cod)) || "", np: p ? aprPedLabel(p) : "",
+                  fecha: h.fecha || "", franja: h.franja || "", origen: h.origen || "", err: "", saving: false };
+  aprHorRender();
+}
+function aprHorCerrar() { _aprHorEdit = null; aprHorRender(); }
+function aprHorSet(campo, v) { if (_aprHorEdit) { _aprHorEdit[campo] = v; _aprHorEdit.err = ""; aprHorRender(); } }
+function aprHorRender() {
+  let ov = document.getElementById("aprHorModal");
+  if (!_aprHorEdit) { if (ov) ov.hidden = true; return; }
+  if (!ov) { ov = document.createElement("div"); ov.id = "aprHorModal"; ov.className = "cuar-modal"; document.body.appendChild(ov); }
+  ov.hidden = false;
+  const s = _aprHorEdit;
+  ov.innerHTML = '<div class="cuar-m-back" onclick="aprHorCerrar()"></div>' +
+    '<div class="cuar-m-card">' +
+      '<div class="cuar-m-head"><span>🕑 Horario · ' + escapeHtml(s.np) + '</span>' +
+        '<button class="cuar-m-x" onclick="aprHorCerrar()">✕</button></div>' +
+      '<div class="cuar-m-body">' +
+        '<p class="cuar-m-sub">' + escapeHtml(s.cli) +
+          (s.origen === "cliente" ? ' · <b>lo eligió el cliente</b> en la página' : '') +
+          '<br>Este cliente coordina el retiro/la entrega. El día y la franja viajan con el pedido a Programación.</p>' +
+        '<div class="apr-hor-f"><label>Día</label>' +
+          '<input id="aprHorFecha" type="date" value="' + escapeHtml(s.fecha) + '" onchange="aprHorSet(\'fecha\',this.value)"></div>' +
+        '<div class="apr-hor-f"><label>Franja</label>' +
+          '<input id="aprHorFranja" type="text" placeholder="ej. 08:00 a 12:00" value="' + escapeHtml(s.franja) + '" oninput="_aprHorEdit.franja=this.value"></div>' +
+        '<div class="apr-hor-chips">' + APR_FRANJAS.map(function (f) {
+          return '<button class="apr-hor-chip' + (s.franja === f ? " on" : "") + '" onclick="aprHorSet(\'franja\',' + JSON.stringify(f).replace(/"/g, "&quot;") + ')">' + escapeHtml(f) + '</button>';
+        }).join("") + '</div>' +
+        (s.err ? '<div class="cuar-m-err">' + escapeHtml(s.err) + '</div>' : '') +
+      '</div>' +
+      '<div class="cuar-m-foot">' +
+        '<button class="cuar-file-again" onclick="aprHorGuardar(true)">Sacar el horario</button> ' +
+        '<button class="cuar-save"' + (s.saving ? " disabled" : "") + ' onclick="aprHorGuardar(false)">' + (s.saving ? "Guardando…" : "Guardar") + '</button>' +
+      '</div></div>';
+  try { const el = document.getElementById("aprHorFranja"); if (el && !s.franja) el.focus(); } catch (_e) {}
+}
+async function aprHorGuardar(vaciar) {
+  const s = _aprHorEdit; if (!s) return;
+  const emp = s.k.split(":")[0], clave = s.k.slice(emp.length + 1);
+  const fecha = vaciar ? null : (s.fecha || null);
+  const franja = vaciar ? null : ((s.franja || "").trim() || null);
+  if (!vaciar && !fecha && !franja) { s.err = "Poné el día, la franja, o las dos."; aprHorRender(); return; }
+  s.saving = true; s.err = ""; aprHorRender();
+  try {
+    const p = aprHorPedidoDe(s.k);
+    await aprRpc("gv_pedido_horario_set", { p_empresa: emp, p_clave: clave, p_fecha: fecha, p_franja: franja,
+      p_np: p ? aprPedLabel(p) : null, p_origen: "manual", p_por: await aprQuien() });
+    _aprHor = _aprHor || {};
+    if (!fecha && !franja) delete _aprHor[s.k];
+    else _aprHor[s.k] = { fecha: fecha || "", franja: franja || "", origen: "manual" };
+    _aprHorEdit = null; aprHorRender(); aprRender();
+  } catch (e) { s.saving = false; s.err = String((e && e.message) || e); aprHorRender(); }
+}
+
 /* ── CONTENIDO DEL PEDIDO (v17.57, Luis 2026-09-14) ──────────────────────────────────────────
    "Necesito que aparezca el dato del contenido de las NP en algún lado visible en todo momento".
    Un solo bloque de detalle para las DOS columnas de A Programar (Pedidos a programar y
@@ -39731,6 +39905,7 @@ function aprColPedidos() {
       '</div>' +
       '<div class="apr-card-cli" onclick="aprToggle(\'' + id + '\')">' + cuarCodChip(p) + escapeHtml(p.razon_social || p.cod || ("#" + p.order_id)) + '</div>' +
       '<div class="apr-card-d">' +
+        aprHorBadge(p) +     // v17.74 (Luis): el cliente coordina horario — tocalo para editarlo
         aprEsperaChip(p) +   // v13.85: hace cuánto llegó
         aprDiferidoChip(p) + // v15.67: espera un reingreso
         '<span class="apr-chip apr-chip-z">' + escapeHtml(p.zona || "sin zona") + '</span>' +
@@ -39884,7 +40059,7 @@ function aprColCuarentena() {
           '<span class="apr-card-chev" title="Ver qué pidieron (códigos y cajas)">' + (cab ? "▾" : "▸") + '</span>' +
         '</div>' +
         '<div class="cuar-card-cli">' + cuarCodChip(p) + escapeHtml(p.razon_social || p.cod || ("#" + p.order_id)) + '</div>' +
-        '<div class="cuar-card-zona">📍 ' + escapeHtml(p.zona || "sin zona") + '</div>' +
+        '<div class="cuar-card-zona">📍 ' + escapeHtml(p.zona || "sin zona") + aprHorBadge(p) + '</div>' +
         aprCuarBadgesHtml(p) +
         (cab ? '<div class="apr-card-body">' + aprContenidoHtml(p) + '</div>' : '') +
       '</div>' +

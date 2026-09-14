@@ -1,3 +1,29 @@
+## Nota v17.74 (2026-09-14) — badge de HORARIO en A Programar
+
+Pedido de Luis. Los clientes que **coordinan horario** llevan un badge 🕑 en su ficha de A
+Programar: los **súper menos Distribuidora GM**, **Andser Química (LK 3905 / CH 2188)**,
+**Rayabo S.A (LK 1974 / CH 1253)**, **Osa Distribuidora (LK 2533 / CH 2340)** y **todo el que
+retira**. Son 186 NP hoy.
+
+- Sin dato el badge dice **`----`**. Se toca y se abre un cuadro con **día** y **franja** (con las
+  franjas de siempre como atajo); se guarda y queda ahí. Vaciar los dos saca el horario.
+- El badge se pinta **verde** cuando el día y la franja los eligió **el cliente** en la página, y
+  celeste cuando los cargó el que programa (lo manual pisa a lo del cliente).
+- **El dato viaja con el pedido**: `gv_ppp_prog_arbol` lo lleva hasta la tabla de Programación, y
+  ahí se ve (no se edita: se edita en A Programar). La clave es el `order_id` si el pedido vino de
+  la página y la NP si es de ISIS, así no se pierde al programarse.
+
+⚠ **La página ya captura el día y la franja de retiro** (`retiro_fecha` / `retiro_franja` en
+`orders.sheets_payload`), **pero ese front todavía no está deployado**: de 610 pedidos en 90 días,
+**0** traen el dato, con 65 de retira. Por eso hoy arranca todo en `----`. Cuando se deployee
+empieza a llegar solo — Gestión ya lo lee.
+
+Quién lleva badge lo decide **una sola pregunta**, `gv_pide_horario(empresa, cod, zona)`, sobre la
+misma lista de súper de la v17.72 (con la columna `pide_horario`) más `GV_Clientes_Horario`.
+
+§3.fo de `docs/SUPABASE-GESTION-VIRGILIO.md` · `sql/gv_pedido_horario_v1774.sql` ·
+test `tests/apr-badge-horario.cjs`.
+
 ## Nota v17.72 (2026-09-14) — UNA sola lista de clientes súper
 
 Pedido de Luis: *"pasá la lista a la base y arreglá lo de Gigot. No puede haber 3 y 1 en el front…
