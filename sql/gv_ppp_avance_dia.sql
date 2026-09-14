@@ -1,4 +1,4 @@
--- v16.97 / v17.03 (2026-09-14) — AVANCE DEL DÍA: % listo, % armado, % en curso, % sin empezar y
+-- v16.97 / v17.03 / v17.07 (2026-09-14) — AVANCE DEL DÍA: % listo, % armado, % en curso, % sin empezar y
 -- % FACTURADO sobre lo armado. Lo miran tres lugares: la PPP, el Telegram de las 16:00 y la tarea
 -- de Planify de Marianela.
 --
@@ -151,31 +151,27 @@ select g.fecha,
        coalesce(a.pick_ped, 0), coalesce(a.pick_m3, 0),
        coalesce(a.arm_ped, 0), coalesce(a.arm_m3, 0),
        coalesce(a.curso_ped, 0), coalesce(a.sin_ped, 0),
-       case when coalesce(a.m3, 0) > 0 then public.gv_pct(a.pick_m3, a.m3)
-            when coalesce(a.pedidos, 0) > 0 then public.gv_pct(a.pick_ped, a.pedidos) else 0 end,
-       case when coalesce(a.m3, 0) > 0 then public.gv_pct(a.arm_m3, a.m3)
-            when coalesce(a.pedidos, 0) > 0 then public.gv_pct(a.arm_ped, a.pedidos) else 0 end,
+       -- ⚠ v17.07: los porcentajes PRINCIPALES son POR PEDIDOS (dueño: "% por pedidos, no m3").
+       --   Los de m³ siguen disponibles en pct_listo_m3 / pct_armado_m3.
+       public.gv_pct(a.pick_ped, a.pedidos),
+       public.gv_pct(a.arm_ped,  a.pedidos),
        public.gv_pct(a.pick_ped, a.pedidos),
        public.gv_pct(a.arm_ped,  a.pedidos),
        public.gv_pct(a.pick_m3,  a.m3),
        public.gv_pct(a.arm_m3,   a.m3),
-       case when coalesce(a.m3, 0) > 0 then 'm3' else 'pedidos' end,
+       'pedidos'::text,
        coalesce(a.curso_m3, 0), coalesce(a.sin_m3, 0),
        coalesce(a.fact_ped, 0), coalesce(a.fact_m3, 0),
-       -- facturado SOBRE LO ARMADO (lo que pidió el dueño), en la misma base que el resto
-       case when coalesce(a.arm_m3, 0) > 0 then public.gv_pct(a.fact_m3, a.arm_m3)
-            when coalesce(a.arm_ped, 0) > 0 then public.gv_pct(a.fact_ped, a.arm_ped) else 0 end,
-       case when coalesce(a.m3, 0) > 0 then public.gv_pct(a.curso_m3, a.m3)
-            when coalesce(a.pedidos, 0) > 0 then public.gv_pct(a.curso_ped, a.pedidos) else 0 end,
-       case when coalesce(a.m3, 0) > 0 then public.gv_pct(a.sin_m3, a.m3)
-            when coalesce(a.pedidos, 0) > 0 then public.gv_pct(a.sin_ped, a.pedidos) else 0 end
+       public.gv_pct(a.fact_ped,  a.arm_ped),   -- facturado SOBRE LO ARMADO, por pedidos
+       public.gv_pct(a.curso_ped, a.pedidos),
+       public.gv_pct(a.sin_ped,   a.pedidos)
   from (select generate_series(p_desde, p_hasta, interval '1 day')::date as fecha) g
   left join agg a on a.fe = g.fecha
  order by 1;
 $$;
 
 comment on function public.gv_ppp_avance_dias(date, date) is
-  'v17.03 - avance por dia: % listo / armado / en curso / sin empezar (por m3) y % facturado SOBRE LO ARMADO. Lo usan la PPP, el Telegram de las 16 y la tarea de Planify.';
+  'v17.07 - avance por dia: % listo / armado / en curso / sin empezar (por PEDIDOS) y % facturado SOBRE LO ARMADO. Lo usan la PPP, el Telegram de las 16 y la tarea de Planify.';
 
 -- un solo día (lo que llama el front y el aviso de las 16)
 create or replace function public.gv_ppp_avance_dia(p_fecha date default null)
@@ -215,20 +211,20 @@ begin
   if p_corto then
     return a.pct_listo || ' % listo · ' || a.pct_armado || ' % armado · ' || a.pct_fact || ' % facturado';
   end if;
+  -- v17.07: los porcentajes van POR PEDIDOS (pedido del dueño). Los m³ quedan como dato al lado.
   return
     a.pct_listo || ' % LISTO (picking terminado) · ' || a.pct_armado || ' % ARMADO' || E'\n' ||
     'Entrega del ' || to_char(v_f, 'DD/MM') || ': ' || a.pedidos || ' pedido' ||
       case when a.pedidos = 1 then '' else 's' end ||
       ' · ' || trim(to_char(a.m3, 'FM9990.00')) || ' m³ en total.' || E'\n' ||
-    'Armado: ' || trim(to_char(a.arm_m3, 'FM9990.00')) || ' de ' || trim(to_char(a.m3, 'FM9990.00')) ||
-      ' m³ (' || a.arm_ped || ' de ' || a.pedidos || ' pedidos).' || E'\n' ||
-    'Picking terminado: ' || trim(to_char(a.pick_m3, 'FM9990.00')) || ' m³ (' || a.pick_ped ||
-      ' pedidos).' || E'\n' ||
-    'Facturado: ' || a.pct_fact || ' % de lo armado (' || a.fact_ped || ' de ' || a.arm_ped ||
-      ' pedidos · ' || trim(to_char(a.fact_m3, 'FM9990.00')) || ' m³).' || E'\n' ||
-    'Falta armar: ' || trim(to_char(greatest(a.m3 - a.arm_m3, 0), 'FM9990.00')) || ' m³ — ' ||
-      (a.pedidos - a.arm_ped) || ' pedido' || case when (a.pedidos - a.arm_ped) = 1 then '' else 's' end ||
-      ' (' || a.curso_ped || ' en curso, ' || a.sin_ped || ' sin empezar).';
+    'Armado: ' || a.arm_ped || ' de ' || a.pedidos || ' pedidos (' ||
+      trim(to_char(a.arm_m3, 'FM9990.00')) || ' de ' || trim(to_char(a.m3, 'FM9990.00')) || ' m³).' || E'\n' ||
+    'Picking terminado: ' || a.pick_ped || ' pedidos (' || trim(to_char(a.pick_m3, 'FM9990.00')) || ' m³).' || E'\n' ||
+    'Facturado: ' || a.pct_fact || ' % de lo armado (' || a.fact_ped || ' de ' || a.arm_ped || ' pedidos).' || E'\n' ||
+    'Falta armar: ' || (a.pedidos - a.arm_ped) || ' pedido' ||
+      case when (a.pedidos - a.arm_ped) = 1 then '' else 's' end || ' — ' ||
+      trim(to_char(greatest(a.m3 - a.arm_m3, 0), 'FM9990.00')) || ' m³ (' ||
+      a.curso_ped || ' en curso, ' || a.sin_ped || ' sin empezar).';
 end $$;
 
 grant execute on function public.gv_ppp_avance_texto(date, boolean) to anon, authenticated, service_role;

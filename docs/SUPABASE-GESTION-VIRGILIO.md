@@ -4628,6 +4628,26 @@ Debajo de cada botón, `gv_cuarentena_fuente_resumen` muestra qué se cargó.
   buscado (acceso únicamente por las RPC gateadas). Sin `rls_disabled` ni warnings.
 - Smoke: `tests/apr-cuarentena.cjs` (4 botones + etiquetas, resumen, auto-map, parseo AR/estado).
 
+### Tercera pasada — v17.07: los porcentajes van POR PEDIDOS, y la barra de facturado no puede desaparecer
+
+Thomas, con la pantalla delante: *"1) % por pedidos, no m3. No veo la barra de facturado que te pedí
+abajo de la de armado-en curso-sin empezar"*.
+
+- **Por pedidos.** `pct_listo`, `pct_armado`, `pct_curso`, `pct_sin` y `pct_fact` pasan a calcularse
+  sobre la **cantidad de pedidos**; `pct_listo_m3` / `pct_armado_m3` quedan para el que quiera volumen,
+  y `base` ahora siempre dice `pedidos`. La firma no cambió, así que fue `create or replace` sin DROP.
+  El texto de las 16:00 también arranca por pedidos y deja los m³ entre paréntesis.
+- **Por qué no veía la barra de facturado.** Los porcentajes que mostraba su pantalla (23 / 13 / 65 el
+  martes) son exactamente los del **respaldo local** del front — `9`, `5` y `26` pedidos sobre 40 —, no
+  los que devolvía la RPC, que en ese momento calculaba por m³ (13 %). O sea que **la RPC no le
+  contestó** y el front cayó al conteo local, donde no hay dato de facturación y la barra no se
+  dibujaba. La causa más probable es el **schema cache de PostgREST**: agregar columnas obligó a
+  `DROP` + `CREATE` de `gv_ppp_avance_dias`, y hasta el `notify pgrst, 'reload schema'` la RPC contesta
+  404. Desde ahora, **cada vez que se toque la firma de una función que llama el front, va el NOTIFY**.
+- Dos cambios para que no vuelva a pasar en silencio: la barra de facturado **se dibuja siempre** (sin
+  dato del backend se ve vacía y dice `buscando…`, en vez de desaparecer), y el fallo de la RPC deja un
+  `console.warn` en vez de no decir nada.
+
 ### Rollback
 
 Todo nuevo, nada compartido → NO va a `ROLLBACK-PRODUCCION.md`.
@@ -11338,7 +11358,7 @@ viene en `false`.
 
 ---
 
-### §3.ef — v16.97/v17.03: el AVANCE DEL DÍA (% listo / % armado) en la PPP, en Telegram a las 16:00 y en el Planify de Marianela — 2026-09-14
+### §3.ef — v16.97/v17.03/v17.07: el AVANCE DEL DÍA (% listo / % armado) en la PPP, en Telegram a las 16:00 y en el Planify de Marianela — 2026-09-14
 
 **Pedido de Thomas (14/09):** *"a las cuatro de la tarde quiero que mande su mensaje por Telegram, y que
 también se vea en la PPP el porcentaje de estado de los pedidos para un solo día… 85 % listo, 60 % armado…

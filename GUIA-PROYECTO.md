@@ -12,7 +12,7 @@
 > única**; no se replica. Ante la duda entre parche rápido y fix de raíz → **fix
 > de raíz**.
 >
-> Última actualización: 2026-09-14 (domingo) · Versión app al documentar: **v17.03**
+> Última actualización: 2026-09-14 (domingo) · Versión app al documentar: **v17.07**
 >
 > Nota **v16.97 (2026-09-14, Thomas) — AVANCE DEL DÍA: "85 % listo · 60 % armado" en la PPP, por
 > Telegram a las 16:00 y como tarea de Planify para Marianela.**
@@ -47,6 +47,12 @@
 >   visible** (15 px) y lleva los **tres porcentajes** — armado / en curso / sin empezar — con la cuenta
 >   de pedidos al lado; y abajo hay una **segunda barra, FACTURADO**, que muestra qué parte **de lo
 >   armado** ya está facturado (NP en `Facturacion_NP`). El aviso de las 16:00 también lo dice.
+> - **v17.07 (mismo día):** los porcentajes van **por PEDIDOS**, no por m³ (*"% por pedidos, no m3"*);
+>   los de volumen quedan en `pct_listo_m3` / `pct_armado_m3`. Y la barra de facturado **se dibuja
+>   siempre**: si la RPC no contesta se ve vacía con `buscando…` y queda un `console.warn`, porque así
+>   fue como desapareció sin que se notara (la PPP mostraba los % del respaldo local, que no tiene
+>   facturación). ⚠ Al cambiar la firma de una función que llama el front, **mandar siempre
+>   `notify pgrst, 'reload schema'`**: mientras el cache de PostgREST no se recarga, la RPC da 404.
 > - SQL: `sql/gv_ppp_avance_dia.sql`. Detalle, medición y rollback: `docs/SUPABASE-GESTION-VIRGILIO.md`
 >   §3.ef. Test: `tests/ppp-avance.cjs`.
 >

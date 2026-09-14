@@ -70,11 +70,11 @@ catch (_e) {
   ok(r.cargo, "no guardó la respuesta en _pppAvance");
   ok(/85 %<\/b>listo/.test(r.dia), "falta el % listo en la tarjeta del día");
   ok(/60 %<\/b>armado/.test(r.dia), "falta el % armado en la tarjeta del día");
-  ok(/12 de 20 pedidos/.test(r.dia), "falta el detalle de pedidos armados");
-  ok(/falta armar <b>2,9 m³<\/b>/.test(r.dia), "falta lo que queda por armar: " + r.dia);
+  ok(/Armado 12 de 20 pedidos/.test(r.dia), "falta el detalle de pedidos armados");
+  ok(/falta armar <b>8 pedidos<\/b>/.test(r.dia), "falta lo que queda por armar: " + r.dia);
   ok(/width:85%/.test(r.dia) && /width:60%/.test(r.dia), "la barra no refleja los dos %");
   ok(/40 %<\/b>facturado/.test(r.dia), "falta el % facturado en la tarjeta del día");
-  ok(/5 de 12 · 1,7 de 4,3 m³/.test(r.dia), "falta el detalle de facturado: " + r.dia);
+  ok(/5 de 12 pedidos · 1,7 de 4,3 m³/.test(r.dia), "falta el detalle de facturado: " + r.dia);
   ok(/<b>60 %<\/b>armado/.test(r.barra) && /<b>25 %<\/b>en curso/.test(r.barra) && /<b>15 %<\/b>sin empezar/.test(r.barra),
      "la barra de la grilla no muestra los tres porcentajes: " + r.barra);
   ok(/pn-bar big/.test(r.barra), "la barra de estado no es la gruesa");
@@ -82,8 +82,8 @@ catch (_e) {
      "falta la segunda barra (facturado sobre lo armado): " + r.barra);
   ok(/width:60%/.test(r.barra) && /width:25%/.test(r.barra) && /width:15%/.test(r.barra), "los anchos no siguen los %");
   ok(!/pn-facw/.test(r.barraDia), "adentro de un día el facturado va en la tarjeta, no en la barra");
-  ok(/<b>60 %<\/b>armado/.test(r.barraSinDato) && !/pn-facw/.test(r.barraSinDato),
-     "sin dato del backend la barra tiene que caer al conteo de pedidos: " + r.barraSinDato);
+  ok(/<b>60 %<\/b>armado/.test(r.barraSinDato) && /pn-facw/.test(r.barraSinDato) && /buscando…/.test(r.barraSinDato),
+     "sin dato del backend: % por conteo de pedidos y la barra de facturado visible pero vacía: " + r.barraSinDato);
   ok(r.vacio === "", "un día sin pedidos no tiene que dibujar nada: " + r.vacio);
   ok(/ya está todo armado/.test(r.completo) && /pn-av ok/.test(r.completo), "el día completo no avisa que está todo armado");
   ok(!errs.length, "errores de página: " + errs.join(" | "));

@@ -4807,7 +4807,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=17.06"></script>
+<script type="module" src="recepcion.js?v=17.07"></script>
 <!-- Config del módulo de fichada (compartido con fichada.html). El secret
      hmacSecret tiene que ser el mismo acá y allá; cargándolo desde un solo
      archivo evitamos que se desincronicen. -->
@@ -7922,7 +7922,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v17.06";
+const APP_VERSION = "v17.07";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -34066,10 +34066,15 @@ function _pppPlanBarraHtml(est, tot, key, sinFact) {
       '<span class="cur"><b>' + pCur + ' %</b>en curso<em>' + (a ? a.curso_ped : est.curso) + '</em></span>' +
       '<span class="sin"><b>' + pSin + ' %</b>sin empezar<em>' + (a ? a.sin_ped : est.sin) + '</em></span>' +
     '</div>';
-  if (a && a.pedidos && !sinFact) {   // adentro de un día el facturado va en la tarjeta de Avance
-    const pFac = Number(a.pct_fact) || 0;
-    h += '<div class="pn-facw"><div class="pn-fac-h"><span class="t">Facturado</span><b>' + pFac + ' %</b>' +
-      '<small>' + (Number(a.arm_ped) ? (a.fact_ped + ' de ' + a.arm_ped + ' armados') : 'todavía no hay nada armado') + '</small></div>' +
+  // La barra de FACTURADO se dibuja SIEMPRE (salvo adentro de un día, donde el dato vive en la
+  // tarjeta de Avance): si el backend todavía no contestó se ve vacía y lo dice, en vez de
+  // desaparecer sin que nadie sepa por qué.
+  if (!sinFact) {
+    const pFac = a ? (Number(a.pct_fact) || 0) : 0;
+    const det = !a ? 'buscando…'
+      : (Number(a.arm_ped) ? (a.fact_ped + ' de ' + a.arm_ped + ' armados') : 'todavía no hay nada armado');
+    h += '<div class="pn-facw"><div class="pn-fac-h"><span class="t">Facturado</span><b>' + (a ? pFac + ' %' : '—') + '</b>' +
+      '<small>' + det + '</small></div>' +
       '<div class="pn-bar fac"><i style="width:' + pFac + '%"></i></div></div>';
   }
   return h;
@@ -34109,7 +34114,12 @@ function pppAvanceNeed(desdeKey, hastaKey) {
       _pppAvance = m; _pppAvanceTs = Date.now(); _pppAvanceRango = rango; _pppAvanceBusy = false;
       pppRenderProg();
     })
-    .catch(function () { _pppAvanceBusy = false; if (!_pppAvance) _pppAvance = new Map(); });
+    .catch(function (e) {
+      _pppAvanceBusy = false; if (!_pppAvance) _pppAvance = new Map();
+      // sin esto el fallo era mudo: la PPP mostraba los % del conteo local y la barra de
+      // facturado no aparecía, sin ninguna pista de por qué.
+      console.warn("[ppp] avance del día: la RPC gv_ppp_avance_dias no contestó:", (e && e.message) || e);
+    });
 }
 function _pppAvanceGet(key) { return (_pppAvance && key) ? (_pppAvance.get(String(key)) || null) : null; }
 /* Tarjeta grande, adentro de UN día — lo que pidió el dueño. */
@@ -34129,12 +34139,12 @@ function _pppAvanceHtml(key) {
       '<span class="k fa"><b>' + fac + ' %</b>facturado<small>de lo armado</small></span></div>' +
     '<div class="pn-av-bar"><i class="li" style="width:' + listo + '%"></i><i class="ar" style="width:' + arm + '%"></i></div>' +
     '<div class="pn-av-fac"><span class="t">Facturado de lo armado</span><div class="pn-bar fac"><i style="width:' + fac + '%"></i></div>' +
-      '<span class="n">' + a.fact_ped + ' de ' + a.arm_ped + ' · ' + _pppFmtM3(a.fact_m3) + ' de ' + _pppFmtM3(a.arm_m3) + ' m³</span></div>' +
-    '<div class="pn-av-d">Armado ' + _pppFmtM3(a.arm_m3) + ' de ' + _pppFmtM3(a.m3) + ' m³ · ' + a.arm_ped + ' de ' + a.pedidos + ' pedido' + (Number(a.pedidos) === 1 ? '' : 's') +
+      '<span class="n">' + a.fact_ped + ' de ' + a.arm_ped + ' pedidos · ' + _pppFmtM3(a.fact_m3) + ' de ' + _pppFmtM3(a.arm_m3) + ' m³</span></div>' +
+    '<div class="pn-av-d">Armado ' + a.arm_ped + ' de ' + a.pedidos + ' pedido' + (Number(a.pedidos) === 1 ? '' : 's') + ' · ' + _pppFmtM3(a.arm_m3) + ' de ' + _pppFmtM3(a.m3) + ' m³' +
       (ok ? ' · <b class="ok">ya está todo armado</b>'
-          : ' · falta armar <b>' + _pppFmtM3(faltaM3) + ' m³</b> (' + faltaPed + ' pedido' + (faltaPed === 1 ? '' : 's') + ': ' + a.curso_ped + ' en curso, ' + a.sin_ped + ' sin empezar)') +
+          : ' · falta armar <b>' + faltaPed + ' pedido' + (faltaPed === 1 ? '' : 's') + '</b> (' + _pppFmtM3(faltaM3) + ' m³: ' + a.curso_ped + ' en curso, ' + a.sin_ped + ' sin empezar)') +
       '</div>' +
-    '<div class="pn-av-h">Listo = picking terminado · Armado = armado terminado. El % va por m³ (por pedidos: ' + a.pct_listo_ped + ' % / ' + a.pct_armado_ped + ' %). A las 16:00 se manda por Telegram y a Planify.</div>' +
+    '<div class="pn-av-h">Listo = picking terminado · Armado = armado terminado · Facturado = sobre lo armado. Los % van por PEDIDOS (por m³: ' + a.pct_listo_m3 + ' % listo / ' + a.pct_armado_m3 + ' % armado). A las 16:00 se manda por Telegram y a Planify.</div>' +
     '</div>';
 }
 function _pppPlanValor(ped) { let v = 0, sin = 0; for (const p of ped) { const x = _pppValorPed(p); if (x == null) sin++; else v += x; } return { valor: v, sin: sin }; }
