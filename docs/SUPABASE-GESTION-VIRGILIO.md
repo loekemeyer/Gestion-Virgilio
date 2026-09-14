@@ -12097,3 +12097,59 @@ Las versiones previas de las dos funciones están en `sql/gv_cuarentena_ya_progr
 **Lo que queda pendiente de este tema:** el badge en **Facturación** que pedía la idea 9793 (este
 trabajo cubre Cuarentena, no `facRender`), y la definición fina de *pagado* — hoy es *facturado*,
 contado como **fechas de factura distintas** porque `sales_lines` no guarda número de comprobante.
+### §3.el — v17.13: la columna ya está, y la fuente entera también: `isis_lk` / `isis_ch` — 2026-09-14
+
+**Thomas (14/09): *"fijate si la columna no está ya"*.** Está. Y mucho más que la columna.
+
+**Virgilio ya tiene los comprobantes de ISIS separados por empresa, en dos esquemas propios:**
+
+| esquema | documentos | desde | hasta |
+|---|--:|---|---|
+| `isis_lk` | 31.648 | 2019-05-03 | **2026-09-14 (hoy)** |
+| `isis_ch` | 8.449 | 2019-08-16 | **2026-09-14 (hoy)** |
+
+Con `documentos` (fecha, `contraparte_codigo`, `contraparte_cuit`, tipo, `marca`, `total_cajas`) y
+`documento_items` (`codigo_articulo`, `cantidad`, **`cantidad_caja`**, precio). Es decir: **todo lo que
+`sales_lines` necesita, ya separado por empresa.** Y entra solo: `isis_lk.ingesta_log` tiene **112 archivos
+procesados en los últimos 7 días**, el último **hoy 10:14**, y hay un cron de vigilancia
+(**78 `gv-alerta-ingesta-isis`**, lun-vie 20:00).
+
+**Que miden lo mismo está probado:** ISIS Chef netas de junio = **3.873 cajas**, y `sales_lines` chef junio
+= **3.873**. Clavado. Junio es el único mes que se cargó bien, y coincide al entero.
+
+**Y ahí se ve que el Excel manual no sólo se come a Chef — también equivoca a LK:**
+
+| mes | ISIS chef | `sales_lines` chef | ISIS lk | `sales_lines` lk |
+|---|--:|--:|--:|--:|
+| 2026-06 | 3.873 | **3.873** ✅ | 16.421 | 16.625 |
+| 2026-07 | 4.392 | **0** | 22.744 | **19.032** (−3.712) |
+| 2026-08 | 3.445 | **0** | 18.896 | **22.556** (+3.660) |
+| 2026-09 | 2.125 | — | 7.941 | — (todavía no se cargó) |
+
+O sea: julio quedó **corto** 3.712 cajas y agosto **pasado** 3.660 en la propia LK. No es sólo un problema de
+etiqueta de empresa: el Excel manual está mal en las dos direcciones.
+
+⚠ **Y esto corrige mi propia estimación**: el retag de §3.eh/§3.ej dio chef julio 3.242 y agosto 4.000. ISIS
+dice **4.392 y 3.445**. Mi reconstrucción era del orden correcto pero no es el número: **la fuente buena es
+`isis_lk`/`isis_ch`, no una inferencia por artículos.**
+
+#### Esto cambia la recomendación entera
+
+Lo que venía proponiendo (pedirle a alguien que agregue una columna al Excel, y después el `drop default`)
+**sobra**. No hay que pedirle nada a nadie:
+
+1. **Llenar `sales_lines` desde `isis_lk` / `isis_ch`.** Es la idea **4856 Fase 2**, pero con **ISIS de
+   verdad** en vez de la aproximación de Gestión que proponía la Fase 1.5 — y por eso desaparece la objeción
+   que tenía ese plan (*"le falta la facturación directa, no tiene NC/ND, difieren las fechas"*): acá están
+   los comprobantes de ISIS, con sus NC y ND y sus fechas. El mapeo es directo:
+   `invoice_date` ← `d.fecha` · `customer_code` ← `d.contraparte_codigo` · `item_code` ←
+   `i.codigo_articulo` · `boxes` ← `i.cantidad_caja` (negativo en NC) · `empresa` ← el esquema.
+2. **La carga manual mensual deja de existir**, y con ella el bug. El `drop default` pasa a ser un candado
+   de segunda línea, no el arreglo.
+3. **`GV_Ventas_Correccion` queda como parche de transición**: una vez que julio y agosto se rehagan desde
+   ISIS, sus filas se borran.
+
+**Pendiente de confirmar antes de construirlo** (no se hizo nada): que `cantidad_caja` de
+`documento_items` sea exactamente el `boxes` de `sales_lines` artículo por artículo (el total de junio
+coincide, falta el detalle), y qué hacer con los **560 archivos con error** que tiene `ingesta_log` sobre
+32.192 — si son documentos que faltan, hay un hueco que tapar antes de usarlo como fuente única.
