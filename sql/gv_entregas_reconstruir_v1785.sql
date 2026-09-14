@@ -172,8 +172,12 @@ revoke all on public."GV_Entregas_Reparadas" from anon, authenticated;
 --    2. Exige el evento ENT. Sin el no se escribe nada — ver arriba por que no se adivina.
 --    3. Colchon de p_min_edad_min minutos desde el TAP: no se mete con un armado recien
 --       cerrado que el dispositivo puede estar por subir.
---    (El "candado 4" de la v17.84, que se abstenia con codigos en dos renglones, ya no
---     existe: el evento trae una entrada por renglon, asi que ese caso se reconstruye bien.)
+--    4. Una NP DESARMADA o CANCELADA no se resucita (v17.89, ver el comentario en el cuerpo).
+--       PROBADO con control positivo, en transaccion revertida: sin desarme reconstruye las
+--       55 filas de D67L; con la NP 98686 marcada desarmada, reconstruye 37 (55-18) y esa NP
+--       queda en 0.
+--    (El candado 4 de la v17.84 era otro —el de codigos en dos renglones— y YA NO EXISTE:
+--     el evento trae una entrada por renglon, asi que ese caso se reconstruye bien.)
 --
 --    Y si el dispositivo sube DESPUES, trg_entregas_virgilio_dedup lo descarta: las
 --    cantidades son identicas, porque salen del mismo calculo que el front ya hizo.
@@ -205,6 +209,21 @@ begin
       join tap t on t.tanda = i.tanda
      where (p_tanda is null or i.tanda = upper(btrim(p_tanda)))
        and not exists (select 1 from public."Entregas_Virgilio" e where e.np = i.np)
+       -- CANDADO 4 (v17.89) — una NP DESARMADA o CANCELADA no se resucita.
+       -- gv_ppp_np_desarmar (v17.88, otro chat el mismo dia) NO borra Entregas_Virgilio:
+       -- oculta la NP (ISIS) o le saca la tanda (web), y DEVUELVE EL STOCK a gondola. Sin
+       -- este candado, una NP desarmada antes de que su armado llegara a Entregas volveria
+       -- sola en la corrida siguiente y, peor, trg_entregas_reconciliar volveria a mover ese
+       -- stock: cajas contadas dos veces sobre un desarme que ya las devolvio.
+       -- Hoy tambien la frenaria el "cod_cliente is not null" de mas abajo (al desarmar, la
+       -- NP sale de la programacion), pero eso es un efecto lateral, no una decision: si
+       -- manana un desarme dejara la NP en la PPP, el cron la resucitaria. Esto es explicito.
+       and not exists (select 1 from public."GV_Desarmes" d
+                        where upper(btrim(d.np)) = upper(btrim(i.np)))
+       and not exists (select 1 from public."NP_Canceladas" c
+                        where upper(btrim(c.np)) = upper(btrim(i.np)))
+       and not exists (select 1 from public."GV_PPP_Prog_Override" ov
+                        where upper(btrim(ov.np)) = upper(btrim(i.np)) and ov.oculto)
   ),
   nuevas as (
     insert into public."Entregas_Virgilio"

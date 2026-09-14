@@ -15506,3 +15506,35 @@ el motivo `desarmado: <justificativo>`).
 En `sql/gv_ppp_np_desarmar_v1786.sql`. ⚠ Los movimientos de stock ya escritos **no se borran**: se
 compensan con un `ajuste` de signo contrario (el `insert … select -delta` que deja comentado el
 archivo).
+⚠ **No hizo falta índice nuevo.** Creé `idx_rpv_opcion_created_at` y lo **dropeé** al ver que el
+planner elegía `registros_produccion_virgilio_created_at_idx`, que ya existía. Un índice de más en
+una tabla de alta escritura (cada evento de cada operario) se paga en cada insert y no compra nada.
+
+## §3.fx — v17.89: el cron no resucita una NP desarmada — 2026-09-14
+
+Cruce con la **v17.88** ("Desarmar pedido"), que salió de otro chat el mismo día. Vale la pena
+anotarlo porque las dos cosas se escribieron en paralelo y **se pisaban de una forma silenciosa**.
+
+`gv_ppp_np_desarmar` **no borra** `Entregas_Virgilio`: oculta la NP (ISIS, vía
+`GV_PPP_Prog_Override.oculto`) o le saca la tanda (web), y **devuelve el stock a góndola**.
+
+El problema: si una NP se desarma **antes** de que su armado llegara a `Entregas_Virgilio`, para el
+cron 87 eso es exactamente "un armado con TAP y cero filas" → la reconstruía en la corrida
+siguiente. Y peor que la fila: `trg_entregas_reconciliar` **volvería a mover ese stock**, que el
+desarme ya había devuelto. Cajas contadas dos veces.
+
+Hoy también lo frenaba el `cod_cliente is not null` (al desarmar, la NP sale de la programación),
+pero **eso es un efecto lateral, no una decisión**: si mañana un desarme dejara la NP en la PPP, el
+cron la resucitaría. Ahora es explícito: no se toca una NP que esté en `GV_Desarmes`, en
+`NP_Canceladas`, o marcada `oculto` en `GV_PPP_Prog_Override`.
+
+**Probado con control positivo**, en transacción revertida:
+
+| | filas reconstruidas |
+|---|---|
+| sin desarme (control) | **55** |
+| con la NP 98686 desarmada | **37** (55 − 18) |
+| filas de la NP desarmada | **0** |
+
+El control positivo está para que la prueba pruebe algo: sin él, "0 filas" también sería el
+resultado de una función rota.
