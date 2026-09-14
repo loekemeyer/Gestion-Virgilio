@@ -11042,3 +11042,100 @@ que cambiaron todas: 213 cajas entregadas, **$8.965.915,20 → $2.988.638,40** (
 **No se tocó el catálogo de la página de Chef** (`products.uxb`, proyecto `nkhzocgdpwtgrmwleihr`): el MCP
 no tiene permiso sobre ese proyecto. Si el 824 se vende por la web de Chef, el `uxb` del carrito sigue
 saliendo de ahí y hay que cambiarlo a mano desde su admin.
+
+---
+
+### §3.eb — Stock negativo en `a_facturar`: el reconciliador no veía los ajustes manuales y drenaba dos veces (v16.92, 2026-09-14)
+
+**Síntoma.** El badge de Stock marcaba **13 códigos con stock NEGATIVO**. Todos en el MISMO
+depósito — `a_facturar`, −1 o −2, **16 cajas** — y con su espejo positivo en `separar_pedidos`
+(la columna PICKEADOS). La góndola estaba bien: no era stock físico mal contado, era **la misma
+caja descontada dos veces**.
+
+**Cadena, medida fila por fila.**
+
+1. Varias NP quedaron **armadas dos veces** (98490, 98532, 98533, 98583…). Ej.: la NP 98532 se
+   armó en la tanda `D60E` (09/09) y otra vez en `E10A` (11/09).
+2. El **11/09 18:34** se corrigió a mano: **40 movimientos `ajuste`** en `a_facturar` (−57 cajas)
+   con contrapartida +57 en `separar_pedidos`, y el `ref` escrito como **texto libre**
+   (`reversa armado duplicado NP 98490 tanda D47C (backup …)`). El **13/09 00:38** se sumó otro
+   (−1 en `a_facturar`, +2 en `terminado`, `correccion 221 NP 98532: …`).
+3. La **ETAPA 3** de `reconciliar_pipeline_stock()` calculaba el neto por tanda sumando **sólo
+   `separado` + `facturado`**. Los `ajuste` **no entraban**, así que para esas tandas seguía
+   viendo `net > 0` y volvía a insertar el `facturado`.
+   La **ETAPA 4** (CP) sí sumaba `ajuste`, pero emparejaba por `split_part(ref,'|',1)` — o sea
+   sólo si el ref arranca con el NP. Un ref de texto libre tampoco entraba.
+   **`gv_reconciliar_facturado_web()` tenía el mismo bug** (es la gemela para tandas web).
+4. El cron 68 corrió el **14/09 06:21–06:40** y facturó de nuevo esas tandas (refs `D60E`,
+   `E10A|98532`, `D72B|44613`, `D72C|44616`, `98532|CP`…) → negativo.
+
+**Tamaño real.** De las 41 filas del ajuste manual, **36 (47 cajas) se drenaron dos veces**:
+13 cajas de tandas ya facturadas ANTES de la reversa y 34 de tandas facturadas DESPUÉS. Sólo
+16 cajas quedaron visibles como negativo; **las otras 31 se comieron en silencio** saldo
+`a_facturar` de otras tandas del mismo código. Más ~47 cajas fantasma infladas en PICKEADOS.
+
+```sql
+-- las dos mediciones que lo prueban
+select tipo, deposito, count(*), sum(delta) from public."Movimientos_Stock"
+ where ref ilike 'reversa armado duplicado%' group by 1,2;   -- 40 filas, -57 / +57
+select deposito, tipo, count(*), sum(delta) from public."Movimientos_Stock"
+ where cod_art='221' group by 1,2;   -- a_facturar: separado +45, cp +5, facturado -49, ajuste -3
+```
+
+**Fix (v16.92).** Las dos funciones, con el mismo patrón:
+
+- **(a)** el neto por tanda/NP suma también `ajuste`;
+- **(b)** un `ajuste` se atribuye a su tanda/NP **aunque el ref sea texto libre**: se extrae
+  `tanda ([A-Za-z0-9]+)` / `NP ([0-9]+)` con regex y, si no hay, se cae al `split_part(ref,'|',1)`
+  de siempre;
+- **(c)** **CLAMP anti-negativo**: el `facturado` que se inserta nunca puede superar el saldo
+  disponible del artículo en `a_facturar`. Cuando varias tandas del mismo artículo caen en la
+  misma corrida, el disponible se reparte con una **ventana acumulada** — sin eso todas verían
+  el mismo `disp` y sobre-drenarían igual. Si hay que recortar, el ref lleva sufijo `|PARCIAL`
+  para que se vea en la auditoría; el guard por tanda lo sigue reconociendo porque compara por
+  `split_part(ref,'|',1)`.
+
+(b) arregla la causa; (c) es el cinturón para cualquier ajuste futuro cuyo ref no mencione ni
+tanda ni NP: con el clamp, `a_facturar` **no puede** quedar negativo.
+
+Archivos: `sql/reconciliar_pipeline_stock_v1692.sql` y `sql/gv_reconciliar_facturado_web_v1692.sql`
+(el `CREATE` completo, no un parche de texto). Rollback:
+`sql/backups/reconciliar_pipeline_stock_pre_v1692_20260914.sql` y
+`sql/backups/gv_reconciliar_facturado_web_pre_v1692_20260914.sql`.
+
+**Corrección de datos.** No se intentó recalcular el saldo canónico: el pipeline arrastra ruido
+histórico por tanda de antes del cutoff (hay tandas con neto −50 y −70 que se compensan entre
+sí), así que reconstruirlo sería reescribir medio año. Se hizo la **operación exactamente
+inversa** de la que rompió: 77 movimientos `ajuste` que revierten la reversa del 11/09 y la
+corrección del 13/09, **sólo en `a_facturar` (+58) y `separar_pedidos` (−56)**.
+
+⚠ **La parte de `terminado` NO se revirtió, y ese es el detalle que importa.** El ajuste del
+13/09 incluía `terminado +2` para el 221: eso era una corrección **física** real (2 cajas de la
+CP que nunca salieron y volvieron a góndola). El primer INSERT la revirtió por arrastre y se
+anuló en el acto con otro movimiento. **Un neteo contable no debe tocar depósitos físicos**;
+al filtrar por "las filas de tal ajuste", chequear depósito por depósito qué significa cada una.
+
+⚠ **El `ref` de esos 77 movimientos en la base empieza con `v16.91`**, no con `v16.92`: se
+aplicaron antes de ver que otra sesión ya había usado el número 16.91 en `main`. Para buscarlos:
+`where ref like 'v16.91 neteo doble drenaje%'`.
+
+Backups: `zz_backups."GV_Backup_Stock_Rev_Ajustes_20260914"` (las 83 filas del ajuste manual) y
+`zz_backups."GV_Backup_Stock_Saldos_Pre_20260914"` (289 saldos por cod/depósito/empresa antes
+del cambio). Las dos con RLS prendida y sin escritura para `anon`/`authenticated`.
+
+**Verificación (post-cambio).**
+
+| Chequeo | Resultado |
+|---|---|
+| `stocks_carga_rapida` con algún depósito < 0 | **0 códigos** (eran 13) |
+| `reconciliar_pipeline_stock()` a mano | `etapa3=0 etapa4=0` → **no re-drena** |
+| `gv_reconciliar_facturado_web()` a mano | `facturado_web=0` |
+| Góndola de los 13 | sin cambios (133, 36, 66, 85… igual que antes) |
+| Pendientes que quedan | 207→1, 229→1, 816E→4 = la tanda `D67E`, realmente sin facturar |
+| `terminado` del 221 | 36, el valor que tenía |
+
+Los crons 68 y 74 se pausaron durante el cambio y quedaron **activos** de nuevo.
+
+**Queda abierto, NO se tocó:** `66 / terminado = −28` y `H201PART / insumos = −2000` son negativos
+**preexistentes**, ajenos a esta corrección y sin diagnóstico todavía. `66` no salía en el badge
+porque no está en `stocks_carga_rapida`; `insumos` se chequea en su propia sección.
