@@ -11463,3 +11463,73 @@ las que muestra las inventó el importador. Mientras eso no se acomode (problema
 
 **Cencosud queda afuera de la alarma**: 3.965 vs 4.664 de pico = **−15 %**, todo por Chef, sin migración y
 sin `chef_incompleto`. Relca no aparece: no vende nada por LK.
+
+---
+
+### §3.ec — El ⛔ con dueño y el trigger que se autoexcluía del pipeline (v17.01, 2026-09-14)
+
+Cierra los puntos 1 y 2 del §3.eb.1. **Y en el camino el propio arreglo rompió algo**, que es
+lo primero que hay que leer de esta sección.
+
+#### ⚠ La normalización de la v16.96 duplicó un picking. Orden equivocado.
+
+A las **09:00:01** del 14/09, la corrida del cron 68 **reinsertó** el picking de la tanda `D72C`
+como `66`, y la góndola del 066 quedó descontada dos veces: **188 → 159**, con 28 cajas fantasma
+en Pickeados. Causa: la v16.96 normalizó las filas de `66` a `066`, el índice
+`mov_stock_pipeline_dedup` (que compara por `upper(trim(cod_art))`) dejó de matchear, el
+`ON CONFLICT` no disparó y el cron volvió a escribir la grafía vieja.
+
+**Es exactamente el agujero que la v16.96 había documentado como riesgo teórico, disparado por la
+propia normalización.** El error fue de orden: **primero se arregla el escritor, después se
+normalizan los datos** — o se para el cron antes de tocar nada. Se borraron las 3 filas espurias
+(ids 63018844 / 63023277 / 63027710, backup `zz_backups."GV_Backup_Stock_Dup_D72C_20260914"`) y el
+saldo volvió a 187 = 188 − el picking real de hoy de la tanda `D67G`.
+
+#### 1. `fn_canon_cod_art` ya no se autoexcluye del pipeline
+
+Se sacó `if NEW.tipo in ('picking','separado','facturado') then return NEW; end if;`. Esa línea
+dejaba sin canonizar justo lo que escribe el operario, así que front y cron podían escribir dos
+grafías que el índice de idempotencia ve distintas → picking duplicado.
+
+Medido **antes** de sacarla, para acotar el riesgo: de los **313** códigos que hoy pasan por el
+pipeline **cambia 1** (el `66`), y de los **5** `cod_real` que usa el cron (`Equivalencias_Codigos`)
+**no cambia ninguno** — o sea que front y cron convergen a la misma grafía en vez de divergir.
+Verificado **después**: con el trigger nuevo, correr el cron a mano ya no reinserta nada.
+
+También se arregló la rama de insumos: hacía `upper()` ciego mientras el catálogo `Insumos` guarda
+`H201Part` en CamelCase, o sea que **el trigger fabricaba la grafía que no matcheaba con su propio
+catálogo**. Ahora resuelve contra `Insumos` y respeta su grafía.
+
+`sql/fn_canon_cod_art_v1701.sql`, rollback en `sql/backups/fn_canon_cod_art_pre_v1701_20260914.sql`.
+
+#### 2. El ⛔ ahora tiene dueño — y qué se puede automatizar y qué no
+
+La pregunta era si el aviso de stock negativo puede resolverse solo. **La mitad sí, la otra mitad
+no**, y la vista `gv_stock_negativos` lo dice explícito en la columna `clase`:
+
+| Clase | Depósitos | ¿Automatizable? |
+|---|---|---|
+| `contable` | `a_facturar`, `separar_pedidos` | **Sí, y ya está**: son papeles, el negativo siempre es error de registro. El clamp de la v16.92 hace que `a_facturar` no pueda quedar negativo. Si igual aparece uno, el clamp falló y es bug. |
+| `fisico` | `terminado`, `excedente`, `racks`, `a_guardar`, `insumos` | **No.** Significa que se descontaron cajas que el sistema no sabía que estaban; nadie puede inventar de dónde salieron. Hay que ir y **contar**. |
+
+Lo que sí se automatiza para el caso físico es **el trabajo de acordarse**:
+`gv_stock_negativos_tarea()` mantiene UNA tarea de Planify viva para **Luis Rial Otero (52)** — es
+a quien el dueño derivó lo de stock. Si hay negativos la crea; en las corridas siguientes le
+**reescribe la nota** con lo que falta hoy (regla del dueño: la nota se reescribe, no se le agrega
+texto encima); si ya no hay ninguno, **cierra la tarea sola**. Cron `gv-stock-negativos-tarea`
+(jobid 86, lun–vie 08:00 ART). El aviso de Telegram no se toca: sigue siendo la alerta inmediata,
+esto es la red de abajo.
+
+⚠ **La vista canoniza el código, y eso no es cosmético**: medir por `cod_art` crudo hace ver
+negativos que no existen (pasó: el 066 aparecía en −28 porque una grafía tenía el picking y la otra
+el saldo). Cualquier chequeo de negativos debe usar `gv_stock_negativos` o `stocks_carga_rapida`,
+nunca un `group by cod_art` pelado.
+
+**La prueba encontró un bug antes de que llegara al cron.** Se probó con negativos simulados dentro
+de una transacción con `ROLLBACK` (uno físico en racks y uno contable en a_facturar, con el trigger
+de Telegram deshabilitado para no mandar un ⛔ falso): ahí saltó que `prio='alta'` viola
+`tasks_prio_check` — los valores válidos son `normal` y `urgente` — y como la función atrapa la
+excepción, **el cron habría fallado en silencio todos los días**. `sql/gv_stock_negativos.sql`.
+
+**Estado al cierre:** 0 saldos negativos en cualquier depósito, 0 códigos con más de una grafía,
+crons 68 / 74 / 86 activos.
