@@ -1,3 +1,12 @@
+## Nota v17.46 (2026-09-14) — Config. Cuarentena aprovecha la pantalla
+
+Pedido de Luis: *"hay que aprovechar mejor el espacio de esta pestaña, texto e info está muy
+chiquito"*. La pestaña estaba en 820px centrados con todo en 12-13px. Ahora cabecera,
+importadores y log comparten un solo ancho (hasta 1680px), el título y la nota van lado a lado,
+los 4 importadores en una fila, y todo subió un escalón de tamaño (tabla 14,5px). El alto del
+log lo decide la pantalla (`calc(100vh - 430px)`), así que el espacio que se ganó arriba se ve
+en filas. Abajo de 1100px vuelve al layout angosto. Sólo visual: no cambia ningún dato.
+
 ## Nota v17.43 (2026-09-14) — el Log de Cuarentena muestra los comentarios, y más grande
 
 Pedido de Luis. Dos cosas:

@@ -272,7 +272,11 @@ catch (_e) {
     out.logTitulo = /📋 Log de Cuarentena/.test(ch) && /Todos <b>2<\/b>/.test(ch);
     out.logFilas = /web LK 1368/.test(ch) && /Gifel S\.R\.L\./.test(ch) && /LK 4281/.test(ch);
     out.logEstado = /e-aprobado">aprobado</.test(ch) && /e-retenido">retenido</.test(ch);
-    out.logQuien = /Vivi<\/span> · 14\/09 11:05/.test(ch) && /thomasloke1@gmail\.com/.test(ch);
+    // v17.46: quién cerró va en dos líneas (persona arriba, fecha abajo) para que un
+    // "Otro: <nombre largo>" no parta la fecha al medio.
+    out.logQuien = /cuar-log-quien">Vivi<\/div>/.test(ch) &&
+                   /cuar-log-cuando">14\/09 11:05<\/div>/.test(ch) &&
+                   /thomasloke1@gmail\.com/.test(ch);
     out.logEntro = /14\/09 09:10/.test(ch);
     out.logComent = /cuarLogComentarios\(0\)/.test(ch) && /📖<b>2<\/b>/.test(ch);
     // v17.40: el comentario de un pedido RETENIDO se ve en la fila, con quién lo dejó y cuándo

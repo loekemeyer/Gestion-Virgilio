@@ -904,21 +904,22 @@ button {
    de 1240px, con encabezado, chips de estado que filtran, y una tabla de 13px con el
    encabezado fijo. La columna del 📖 se fusionó con la del comentario: suelta al final se
    salía del ancho y quedaba cortada. */
-.cuar-log-cfg{ max-width:1240px; margin:22px auto 0; background:#fff; border:1px solid #e2e8f0;
-  border-radius:14px; padding:16px 18px 14px; box-shadow:0 1px 3px rgba(15,23,42,.06); }
+.cuar-log-cfg{ --cuar-w:min(1680px, 96vw); max-width:var(--cuar-w); margin:18px auto 0;
+  background:#fff; border:1px solid #e2e8f0;
+  border-radius:14px; padding:18px 20px 16px; box-shadow:0 1px 3px rgba(15,23,42,.06); }
 .cuar-log-top{ display:flex; align-items:flex-start; justify-content:space-between; gap:14px;
   flex-wrap:wrap; margin-bottom:12px; }
-.cuar-log-cfg h3{ margin:0 0 4px; font-size:19px; color:#7c2d12; }
-.cuar-log-cfg p{ margin:0; font-size:13px; color:#475569; line-height:1.5; max-width:640px; }
+.cuar-log-cfg h3{ margin:0 0 5px; font-size:22px; color:#7c2d12; }
+.cuar-log-cfg p{ margin:0; font-size:14.5px; color:#475569; line-height:1.55; max-width:760px; }
 .cuar-log-bar{ display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
-.cuar-log-bar select{ padding:6px 10px; border:1px solid #cbd5e1; border-radius:8px; font-size:13px;
+.cuar-log-bar select{ padding:8px 12px; border:1px solid #cbd5e1; border-radius:9px; font-size:14.5px;
   font-family:inherit; background:#fff; }
 .cuar-log-bar button{ width:auto; margin:0; background:#fff; border:1px solid #cbd5e1; color:#334155;
-  border-radius:8px; padding:6px 12px; font-size:13px; font-weight:700; cursor:pointer; }
+  border-radius:9px; padding:8px 15px; font-size:14.5px; font-weight:700; cursor:pointer; }
 .cuar-log-bar button:hover{ background:#f1f5f9; }
 /* chips de estado: además de contar, filtran la tabla */
 .cuar-log-chips{ display:flex; gap:7px; flex-wrap:wrap; margin-bottom:10px; }
-.cuar-log-chip{ width:auto; margin:0; border-radius:999px; padding:5px 13px; font-size:12.5px;
+.cuar-log-chip{ width:auto; margin:0; border-radius:999px; padding:7px 17px; font-size:14px;
   font-weight:700; cursor:pointer; border:1.5px solid #e2e8f0; background:#f8fafc; color:#475569;
   font-family:inherit; }
 .cuar-log-chip b{ font-weight:900; }
@@ -927,41 +928,47 @@ button {
 .cuar-log-chip.on.c-retenido{ background:#b45309; border-color:#b45309; }
 .cuar-log-chip.on.c-aprobado{ background:#166534; border-color:#166534; }
 .cuar-log-chip.on.c-devuelto{ background:#9f1239; border-color:#9f1239; }
-.cuar-log-tblwrap{ overflow:auto; max-height:62vh; border:1px solid #e2e8f0; border-radius:10px; }
-.cuar-log-tbl{ width:100%; border-collapse:separate; border-spacing:0; font-size:13px; }
-.cuar-log-tbl th{ position:sticky; top:0; z-index:1; text-align:left; font-size:11px; letter-spacing:.5px;
+.cuar-log-tblwrap{ overflow:auto; max-height:max(340px, calc(100vh - 430px));
+  border:1px solid #e2e8f0; border-radius:10px; }
+.cuar-log-tbl{ width:100%; border-collapse:separate; border-spacing:0; font-size:14.5px; }
+.cuar-log-tbl th{ position:sticky; top:0; z-index:1; text-align:left; font-size:12px; letter-spacing:.5px;
   text-transform:uppercase; color:#475569; background:#f1f5f9; border-bottom:1px solid #cbd5e1;
-  padding:9px 11px; white-space:nowrap; }
-.cuar-log-tbl td{ border-top:1px solid #eef2f7; padding:9px 11px; vertical-align:top; color:#0f172a; }
+  padding:11px 14px; white-space:nowrap; }
+.cuar-log-tbl td{ border-top:1px solid #eef2f7; padding:11px 14px; vertical-align:top; color:#0f172a; }
 .cuar-log-tbl tbody tr:nth-child(even){ background:#fbfdff; }
 .cuar-log-tbl tbody tr:hover{ background:#f1f5f9; }
 .cuar-log-tbl td:first-child{ border-left:4px solid transparent; }
 .cuar-log-tbl tr.r-retenido td:first-child{ border-left-color:#fcd34d; }
 .cuar-log-tbl tr.r-aprobado td:first-child{ border-left-color:#86efac; }
 .cuar-log-tbl tr.r-devuelto td:first-child{ border-left-color:#fda4af; }
-.cuar-log-np{ font-weight:800; font-size:13.5px; white-space:nowrap; }
-.cuar-log-cli{ display:flex; flex-direction:column; gap:3px; min-width:170px; }
+.cuar-log-np{ font-weight:800; font-size:15px; white-space:nowrap; }
+.cuar-log-cli{ display:flex; flex-direction:column; gap:4px; min-width:190px; }
 .cuar-log-rs{ color:#334155; overflow-wrap:anywhere; }
 .cuar-log-fh{ white-space:nowrap; color:#475569; }
-.cuar-log-tbl .cuar-badge{ font-size:10.5px; padding:2px 9px; }
-.cuar-log-tbl .cuar-badges{ margin-top:0; gap:5px; }
-.cuar-log-est{ font-size:11px; font-weight:800; border-radius:999px; padding:3px 11px; white-space:nowrap;
+.cuar-log-tbl .cuar-badge{ font-size:12px; padding:3px 11px; }
+.cuar-log-tbl .cuar-badges{ margin-top:0; gap:6px; }
+.cuar-log-tbl .cuar-card-cod{ font-size:13px; padding:2px 9px; }
+.cuar-log-est{ font-size:12.5px; font-weight:800; border-radius:999px; padding:4px 13px; white-space:nowrap;
   display:inline-block; }
 .cuar-log-est.e-retenido{ background:#fef3c7; color:#92400e; border:1px solid #fcd34d; }
 .cuar-log-est.e-aprobado{ background:#dcfce7; color:#166534; border:1px solid #86efac; }
 .cuar-log-est.e-devuelto{ background:#ffe4e6; color:#9f1239; border:1px solid #fda4af; }
-.cuar-log-quien{ font-weight:800; }
-.cuar-log-mail{ display:block; font-size:11px; color:#64748b; max-width:190px; overflow:hidden;
+.cuar-log-quien{ font-weight:800; overflow-wrap:anywhere; }
+.cuar-log-cuando{ font-size:13px; color:#475569; white-space:nowrap; }
+.cuar-log-mail{ display:block; font-size:12px; color:#64748b; max-width:220px; overflow:hidden;
   text-overflow:ellipsis; white-space:nowrap; }
 /* celda de comentario: quién + cuándo arriba, el texto abajo (2 líneas) y el 📖 a la derecha */
-.cuar-log-comcell{ display:flex; align-items:flex-start; gap:8px; min-width:250px; }
+.cuar-log-comcell{ display:flex; align-items:flex-start; gap:10px; min-width:300px; }
 .cuar-log-combox{ flex:1; min-width:0; }
 .cuar-log-com{ color:#0f172a; line-height:1.4; display:-webkit-box; -webkit-line-clamp:2;
   -webkit-box-orient:vertical; overflow:hidden; overflow-wrap:anywhere; }
-.cuar-log-comq{ font-size:11px; color:#64748b; margin-bottom:2px; }
+.cuar-log-comq{ font-size:12.5px; color:#64748b; margin-bottom:3px; }
 .cuar-log-comq b{ color:#0f766e; }
 .cuar-log-sin{ color:#94a3b8; }
-.cuar-log-vacio2{ padding:18px; font-size:13px; color:#64748b; font-style:italic; }
+.cuar-log-vacio2{ padding:22px; font-size:14.5px; color:#64748b; font-style:italic; }
+/* el 📖 dentro de la celda de comentario, a tono con el resto */
+.cuar-log-comcell .cuar-yp-lib{ font-size:17px; padding:4px 10px; border-color:#dbe3ec; }
+.cuar-log-comcell .cuar-yp-lib b{ font-size:12px; }
 /* v17.15 — log de comentarios (modal) */
 .cuar-log{ display:flex; flex-direction:column; gap:8px; margin-bottom:10px; max-height:40vh; overflow:auto; }
 .cuar-log-it{ border-left:3px solid #cbd5e1; padding:1px 0 1px 9px; }
@@ -1075,13 +1082,26 @@ button {
 .cuar-liberado-nota{ font-size:11px; font-weight:800; color:#166534; margin-top:5px; }
 .cuar-demo-hint{ display:block; font-size:10.5px; color:#b45309; margin-top:3px; }
 /* v14.88 — pestaña Config. Cuarentena */
-.cuar-cfg{ max-width:820px; margin:6px auto; }
-.cuar-cfg-head h2{ margin:0 0 4px; font-size:19px; color:#7c2d12; }
-.cuar-cfg-head p{ margin:0 0 14px; font-size:13px; color:#475569; line-height:1.5; }
-.cuar-cfg .cuar-tools{ grid-template-columns:1fr 1fr; gap:12px; }
-.cuar-cfg .cuar-tool .cuar-btn{ font-size:13px; padding:11px 10px; }
-.cuar-cfg .cuar-stat{ font-size:11.5px; white-space:normal; }
-.cuar-cfg-note{ margin-top:16px; padding:11px 14px; background:#fff7ed; border:1px solid #fed7aa; border-radius:10px; font-size:12.5px; color:#7c2d12; line-height:1.5; }
+/* v17.46 (Luis: *"hay que aprovechar mejor el espacio de esta pestaña, el texto e info está
+   muy chiquito"*). La pestaña vivía en 820px centrados en una pantalla de 1900 y todo iba en
+   12-13px. Ahora toda la pestaña —cabecera, importadores y log— comparte el MISMO ancho
+   (`--cuar-w`), los 4 importadores van en UNA fila en vez de 2x2, y la nota se corrió al lado
+   del título en vez de comerse una franja entera abajo. Todo eso le deja al log ~200px más de
+   alto, que es lo que de verdad se mira. */
+.cuar-cfg{ --cuar-w:min(1680px, 96vw); max-width:var(--cuar-w); margin:6px auto; }
+.cuar-cfg-top{ display:grid; grid-template-columns:minmax(0,1.35fr) minmax(0,1fr); gap:18px;
+  align-items:start; margin-bottom:14px; }
+.cuar-cfg-head h2{ margin:0 0 6px; font-size:25px; color:#7c2d12; }
+.cuar-cfg-head p{ margin:0; font-size:15px; color:#475569; line-height:1.55; }
+.cuar-cfg .cuar-tools{ grid-template-columns:repeat(4, minmax(0,1fr)); gap:14px; }
+.cuar-cfg .cuar-tool .cuar-btn{ font-size:15px; padding:14px 10px; border-radius:10px; }
+.cuar-cfg .cuar-stat{ font-size:13px; white-space:normal; }
+.cuar-cfg-note{ margin:0; padding:13px 16px; background:#fff7ed; border:1px solid #fed7aa;
+  border-radius:12px; font-size:14px; color:#7c2d12; line-height:1.55; }
+@media (max-width:1100px){
+  .cuar-cfg-top{ grid-template-columns:1fr; gap:12px; }
+  .cuar-cfg .cuar-tools{ grid-template-columns:1fr 1fr; }
+}
 
 /* Tarjeta de PEDIDO (lo que se arrastra) */
 .apr-card{ background:#fff; border:1px solid #dbe3ec; border-left:4px solid #1e6bd6; border-radius:8px; padding:7px 9px; cursor:grab; }
@@ -5016,7 +5036,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=17.45"></script>
+<script type="module" src="recepcion.js?v=17.46"></script>
 <!-- Config del módulo de fichada (compartido con fichada.html). El secret
      hmacSecret tiene que ser el mismo acá y allá; cargándolo desde un solo
      archivo evitamos que se desincronicen. -->
@@ -8137,7 +8157,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v17.45";
+const APP_VERSION = "v17.46";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -39490,17 +39510,21 @@ function aprCuarToolsHtml() {
 /* Pantalla completa de la pestaña Config. Cuarentena. */
 function cuarConfigHtml() {
   cuarTickStart();   // timer en vivo de "última vez cargada …"
+  // v17.46: el título y la nota van lado a lado (antes la nota se comía una franja entera
+  // abajo) y los 4 importadores en UNA fila. Lo que se gana en alto se lo lleva el log.
   return '<div class="cuar-cfg">' +
-    '<div class="cuar-cfg-head">' +
-      '<h2>🚧 Config. Cuarentena</h2>' +
-      '<p>Subí las planillas del ERP que alimentan la Cuarentena. Cada importación <b>reemplaza</b> ' +
-      'todo lo de esa fuente (no es aditiva). <b>Búsqueda CL</b> trae el <b>límite de crédito</b> y el ' +
-      '<b>estado</b> (Suspendido / Sin Cta.Cte.). <b>Deuda</b> trae el <b>saldo adeudado</b> por cliente.</p>' +
+    '<div class="cuar-cfg-top">' +
+      '<div class="cuar-cfg-head">' +
+        '<h2>🚧 Config. Cuarentena</h2>' +
+        '<p>Subí las planillas del ERP que alimentan la Cuarentena. Cada importación <b>reemplaza</b> ' +
+        'todo lo de esa fuente (no es aditiva). <b>Búsqueda CL</b> trae el <b>límite de crédito</b> y el ' +
+        '<b>estado</b> (Suspendido / Sin Cta.Cte.). <b>Deuda</b> trae el <b>saldo adeudado</b> por cliente.</p>' +
+      '</div>' +
+      '<div class="cuar-cfg-note">Los pedidos de clientes con deuda &gt; $1.000, suspendidos, que superan ' +
+      'su límite de crédito o que son <b>clientes nuevos</b> caen solos en el sector <b>🚧 Cuarentena</b> de ' +
+      '<b>📥 A Programar</b> y no se programan (ni a mano ni por el automático) hasta aprobarlos.</div>' +
     '</div>' +
     aprCuarToolsHtml() +
-    '<div class="cuar-cfg-note">Los pedidos de clientes con deuda &gt; $1.000, suspendidos, que superan ' +
-    'su límite de crédito o que son <b>clientes nuevos</b> caen solos en el sector <b>🚧 Cuarentena</b> de ' +
-    '<b>📥 A Programar</b> y no se programan (ni a mano ni por el automático) hasta aprobarlos.</div>' +
   '</div>' +
   cuarLogHtml();   // v17.40: afuera de `.cuar-cfg`, que lo dejaba en 820px y cortaba columnas
 }
@@ -39596,7 +39620,8 @@ function cuarLogHtml() {
         + '<td class="cuar-log-fh">' + escapeHtml(cuarFechaHora(r.entro_at)) + '</td>'
         + '<td><span class="cuar-log-est e-' + escapeHtml(est) + '">' + escapeHtml(est) + '</span></td>'
         + '<td>' + (r.cerrado_at
-            ? '<span class="cuar-log-quien">' + escapeHtml(String(r.persona || "—")) + '</span> · ' + escapeHtml(cuarFechaHora(r.cerrado_at))
+            ? '<div class="cuar-log-quien">' + escapeHtml(String(r.persona || "—")) + '</div>'
+              + '<div class="cuar-log-cuando">' + escapeHtml(cuarFechaHora(r.cerrado_at)) + '</div>'
               + (r.por ? '<span class="cuar-log-mail" title="' + escapeHtml(String(r.por)) + '">' + escapeHtml(String(r.por)) + '</span>' : '')
             : '<span class="cuar-log-sin">— sigue retenido</span>') + '</td>'
         + '<td><div class="cuar-log-comcell"><div class="cuar-log-combox">'

@@ -13448,3 +13448,30 @@ los 4 flejes de Chef cuentan como uno). Lo segundo está registrado como problem
 Por eso la opción A **no** es "que todos llamen a `gv_cod_stock`": primero hay que arreglar esa
 función. El plan por etapas, con el riesgo medido de cada una y cuáles se pueden aplicar con
 operarios pickeando, está en `docs/PLAN-CANONIZACION-UNICA.md`.
+
+---
+
+### §3.fb — v17.46: Config. Cuarentena usa el ancho de la pantalla — 2026-09-14
+
+**Luis (2026-09-14):** *"hay que aprovechar mejor el espacio de esta pestaña, texto e info está
+muy chiquito"*.
+
+La pestaña entera vivía en **820px centrados** (`.cuar-cfg`) sobre un monitor de 1900, con todo
+en 12-13px, y el log (v17.43) en otros 1240px — dos anchos distintos, los dos cortos. Ahora la
+cabecera, los importadores y el log comparten **un solo ancho** (`--cuar-w: min(1680px, 96vw)`),
+y el contenido se reacomodó para que lo que se gana no sea sólo margen:
+
+- **Título y nota, lado a lado** (`.cuar-cfg-top`, grid 1,35fr / 1fr). La nota de qué cae en
+  cuarentena se comía una franja entera abajo; corrida al costado, no cuesta alto.
+- **Los 4 importadores en UNA fila** en vez de 2×2, y más grandes (15px, 14px de padding).
+  Abajo de 1100px vuelven a 2×2 y la nota baja — la pestaña se sigue usando en pantallas chicas.
+- **Todo un escalón más grande**: h2 19→25px, bajada 13→15px, tabla del log 13→14,5px con
+  11×14 de padding, encabezados 11→12px, badges 10,5→12px, chips 12,5→14px.
+- **El alto del log lo decide la pantalla**, no un número fijo: `max-height` pasó de `62vh` a
+  `max(340px, calc(100vh - 430px))`, así el espacio que ganó la cabecera se lo lleva la tabla.
+- **"Quién lo cerró" en dos líneas** (persona / fecha / mail). En una sola, un `Otro: <nombre>`
+  largo partía la fecha al medio.
+
+Sólo CSS y armado de HTML: no cambia ninguna consulta ni ningún dato. **Rollback:** volver
+`.cuar-cfg` a `max-width:820px`, `.cuar-log-cfg` a `1240px`, y el `cuarConfigHtml` de la v17.43
+(nota debajo de los importadores, `cuar-tools` en 2 columnas).
