@@ -146,6 +146,13 @@
 >   grandes, y los módulos de 5 **envuelven en grilla** en vez de irse de costado — la góndola A son
 >   17 columnas y antes se veían 6. Celda de **altura fija**: una con dos códigos crecía y desalineaba
 >   la fila entera, así que con varios códigos cada uno va en **una línea** (código + cajas al lado).
+> - **v17.28 (mismo día, Thomas: *"hacé los colores y formatos más identificables a simple vista y
+>   aumentá el tamaño de la leyenda"*):** la celda normal queda callada (blanca) y las otras tres
+>   gritan — **libre** rayada en diagonal con borde punteado, **sin capacidad** ámbar y **capacidad
+>   sin artículo** violeta, las dos últimas con una **barra gruesa a la izquierda** (el color solo no
+>   alcanza de lejos). La leyenda pasó a pastillas de 15 px teñidas de su color, con el cuadradito
+>   hecho con **las mismas clases que la celda** —así no se puede desincronizar del dibujo— y con
+>   **cuántas celdas hay de cada tipo en la góndola abierta**.
 > - Test: `tests/pmap-gondolas.cjs`. Detalle y rollback: `docs/SUPABASE-GESTION-VIRGILIO.md` §3.eq.
 >
 > Nota **v17.26 (2026-09-14, Luis) — el editor viejo de planimetría ya no escribe, y el centinela

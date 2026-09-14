@@ -12611,6 +12611,20 @@ layout, no del dato:
    (código + cajas a la derecha, `.pmap-cell-multi`), y a partir del tercero `+N más`; el detalle
    completo sigue en el tooltip. El récord es **M34, con 5 códigos**.
 
+**v17.28 (mismo día) — "más identificables a simple vista" (Thomas).** La celda `ok` queda **callada**
+(blanca) porque es la mayoría; las otras tres se separan por **tres señales a la vez**, no sólo por el
+color: fondo saturado, borde de 2 px y —en las dos que hay que revisar— una **barra de 8 px a la
+izquierda**. `libre` además va **rayada en diagonal**, que se lee incluso en blanco y negro.
+
+La leyenda ahora la **dibuja el front** (`pmapLegRender`, `#pmapLeg`) en vez de ser HTML fijo, por dos
+motivos: los cuadraditos usan **las mismas clases que la celda** (no se pueden desincronizar del
+dibujo) y cada pastilla muestra **cuántas celdas de ese tipo tiene la góndola abierta** — sin el
+número es un cartel decorativo; con el número se sabe si hay algo que revisar sin recorrer la grilla.
+
+⚠ **Las variantes del cuadradito se repiten bajo `.pmap-leg`** (`.pmap-leg .pmap-smapa`, etc.) y no se
+heredan de la celda: `.pmap-sw` viene **después** en la hoja y con la misma especificidad le ganaba el
+borde y el fondo, así que la leyenda salía con los cuatro cuadraditos **blancos**.
+
 ### §3.er — v17.24: PRENDIDO — `sales_lines` ya se llena desde ISIS — 2026-09-14
 
 **Thomas (14/09): *"necesita imput manual humano para arrancar? no podés guardar el backup bien etiquetado

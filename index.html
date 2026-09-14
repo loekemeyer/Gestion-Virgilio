@@ -2465,13 +2465,34 @@ button.pk-anular small{ display:block; font-size:12px; font-weight:700; opacity:
 .pmap-cap b{ font-weight:800; color:#0f172a; }
 .pmap-nocap{ color:#b45309; font-weight:700; }
 .pmap-mas{ font-size:10px; color:#64748b; }
-.pmap-libre{ background:#f8fafc; border-style:dashed; }
-.pmap-libre .pmap-cod{ color:#cbd5e1; font-size:12px; font-weight:700; }
-.pmap-smapa{ border-color:#fcd34d; background:#fffbeb; }
-.pmap-scap{ border-color:#c4b5fd; background:#f5f3ff; }
-.pmap-hit{ outline:3px solid #facc15; outline-offset:1px; }
-.pmap-leg{ display:flex; gap:14px; flex-wrap:wrap; font-size:11.5px; color:#64748b; margin-top:12px; }
-.pmap-leg i{ width:12px; height:12px; border-radius:3px; display:inline-block; vertical-align:-2px; margin-right:4px; border:1px solid #cbd5e1; }
+/* Thomas (2026-09-14): "hacé los colores y formatos más identificables a simple
+   vista". La celda normal queda callada (blanca) y las otras tres gritan: borde de
+   2 px, fondo saturado y, en las dos que hay que revisar, una BARRA de color a la
+   izquierda — el color solo no alcanza para el que ve la pantalla de lejos. */
+.pmap-libre{ background:repeating-linear-gradient(135deg,#eef2f7,#eef2f7 6px,#e2e8f0 6px,#e2e8f0 12px); border:2px dashed #94a3b8; }
+.pmap-libre .pmap-cod{ color:#64748b; font-size:13px; font-weight:800; letter-spacing:.5px; }
+.pmap-smapa{ border:2px solid #f59e0b; border-left-width:8px; background:#fef3c7; }
+.pmap-scap{ border:2px solid #7c3aed; border-left-width:8px; background:#ede9fe; }
+.pmap-hit{ outline:4px solid #facc15; outline-offset:2px; }
+.pmap-leg{ display:flex; gap:10px; flex-wrap:wrap; margin-top:16px; }
+.pmap-leg > span{ display:inline-flex; align-items:center; gap:9px; font-size:15px; font-weight:700; color:#334155;
+  background:#fff; border:1px solid #e2e8f0; border-radius:10px; padding:8px 14px; }
+.pmap-leg b{ font-weight:800; color:#0f172a; }
+/* el cuadradito de la leyenda usa LAS MISMAS clases que la celda, así no se puede
+   desincronizar del dibujo */
+.pmap-sw{ width:32px; height:26px; border-radius:6px; border:2px solid #94a3b8; background:#fff; flex:0 0 auto; }
+/* Las variantes se repiten acá (y no se heredan de la celda) porque .pmap-sw viene
+   DESPUÉS en la hoja y le ganaba el borde y el fondo a todas: la leyenda salía con
+   los cuatro cuadraditos blancos. Con `.pmap-leg .x` la especificidad alcanza. */
+.pmap-leg .pmap-libre{ background:repeating-linear-gradient(135deg,#eef2f7,#eef2f7 5px,#cbd5e1 5px,#cbd5e1 10px); border:2px dashed #94a3b8; }
+.pmap-leg .pmap-smapa{ background:#fef3c7; border:2px solid #f59e0b; border-left-width:9px; }
+.pmap-leg .pmap-scap{ background:#ede9fe; border:2px solid #7c3aed; border-left-width:9px; }
+/* y la pastilla entera se tiñe del color del estado: se reconoce sin leerla */
+.pmap-leg .leg-libre{ background:#f1f5f9; border-color:#cbd5e1; }
+.pmap-leg .leg-smapa{ background:#fffbeb; border-color:#fcd34d; color:#92400e; }
+.pmap-leg .leg-smapa b{ color:#92400e; }
+.pmap-leg .leg-scap{ background:#f5f3ff; border-color:#c4b5fd; color:#5b21b6; }
+.pmap-leg .leg-scap b{ color:#5b21b6; }
 @media (max-width:460px){ .pmap-cols{ grid-template-columns:repeat(auto-fill, minmax(96px, 1fr)); gap:8px; } .pmap-cell{ height:70px; } .pmap-cod{ font-size:16px; } }
 .lug-x{ border:0; background:transparent; color:#64748b; cursor:pointer; font-size:13px; line-height:1; padding:0 2px; }
 .lug-x:hover{ color:#b42318; }
@@ -4904,7 +4925,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=17.27"></script>
+<script type="module" src="recepcion.js?v=17.28"></script>
 <!-- Config del módulo de fichada (compartido con fichada.html). El secret
      hmacSecret tiene que ser el mismo acá y allá; cargándolo desde un solo
      archivo evitamos que se desincronicen. -->
@@ -5197,12 +5218,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
       </div>
       <div id="pmapTabs" class="pmap-tabs"></div>
       <div id="pmapGrid"></div>
-      <div class="pmap-leg">
-        <span><i style="background:#fff"></i>con código y capacidad</span>
-        <span><i style="background:#f8fafc;border-style:dashed"></i>celda libre</span>
-        <span><i style="background:#fffbeb;border-color:#fcd34d"></i>sin capacidad cargada</span>
-        <span><i style="background:#f5f3ff;border-color:#c4b5fd"></i>capacidad sin el artículo en el mapa</span>
-      </div>
+      <div id="pmapLeg" class="pmap-leg"></div>
       <div id="pmapStatus" class="planim-status"></div>
     </div>
   </div>
@@ -8038,7 +8054,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v17.27";
+const APP_VERSION = "v17.28";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -36879,6 +36895,7 @@ function pmapRender() {
            escapeHtml(g) + (n ? ' <b>' + n + '</b>' : "") + '</button>';
   }).join("");
   box.innerHTML = pmapGondolaHtml(_pmapG);
+  pmapLegRender(_pmapG);
   const celdas = {}; let libres = 0, alertas = 0;
   (_pmap || []).forEach(function (r) {
     celdas[String(r.sector || "").toUpperCase()] = 1;
@@ -36891,6 +36908,35 @@ function pmapRender() {
       const n = Object.keys(hits).reduce(function (a, k) { return a + hits[k]; }, 0);
       return " · " + n + (n === 1 ? " celda" : " celdas") + ' con "' + _pmapQ + '"';
     })() : ""));
+}
+/* La leyenda dice qué es cada color Y CUÁNTAS celdas hay de cada uno en la góndola
+   abierta: sin el número es un cartel decorativo; con el número se sabe si hay algo
+   que revisar sin recorrer la grilla con la vista. */
+function pmapLegRender(g) {
+  const box = document.getElementById("pmapLeg");
+  if (!box) return;
+  const rows = (_pmap || []).filter(function (r) { return String(r.gondola || "").toUpperCase() === g; });
+  const celdas = {};
+  rows.forEach(function (r) {
+    const k = String(r.sector || "").toUpperCase();
+    (celdas[k] || (celdas[k] = [])).push(r.estado);
+  });
+  const n = { ok: 0, libre: 0, solo_mapa: 0, solo_capacidad: 0 };
+  Object.keys(celdas).forEach(function (k) {
+    const es = celdas[k];
+    if (es.indexOf("solo_capacidad") >= 0) n.solo_capacidad++;
+    else if (es.indexOf("solo_mapa") >= 0) n.solo_mapa++;
+    else if (es.length === 1 && es[0] === "libre") n.libre++;
+    else n.ok++;
+  });
+  const item = function (cls, chip, txt, cant) {
+    return '<span class="' + chip + '"><i class="pmap-sw ' + cls + '"></i>' + txt + ' <b>' + cant + '</b></span>';
+  };
+  box.innerHTML =
+    item("", "", "con código y capacidad", n.ok) +
+    item("pmap-libre", "leg-libre", "celda libre", n.libre) +
+    item("pmap-smapa", "leg-smapa", "sin capacidad cargada", n.solo_mapa) +
+    item("pmap-scap", "leg-scap", "capacidad sin el artículo en el mapa", n.solo_capacidad);
 }
 function pmapGondolaHtml(g) {
   const rows = (_pmap || []).filter(function (r) { return String(r.gondola || "").toUpperCase() === g; });
