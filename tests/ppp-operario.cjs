@@ -8,10 +8,10 @@
    (d) la tabla NO se estira al ancho de la tarjeta (regla del dueño: nada de
        ocupar el 100% porque sí) y los números van a la derecha;
    (e) sin red, muestra lo último que bajó (cache) en vez de una pantalla vacía;
-   (f) tocar un día abre su composición (NP ; Cliente ; Tanda ; Mt3 ; Estado)
-       ORDENADA por número de NP —el orden lo pide la consulta, no el front—, con
-       el estado tal cual lo manda el backend (Sin armar / Pickeado / Armado /
-       Facturado) y "← Días" vuelve al resumen sin volver a consultarlo. */
+   (f) tocar un día abre su composición SEPARADA POR CAMIÓN y ordenada por número
+       de NP —el orden lo pide la consulta, no el front—, con los tres tics
+       (Pick / Arm / Fact) tal cual los manda el backend, el filtro LK / CH que no
+       vuelve a consultar, y "← Días" que vuelve al resumen sin re-consultar. */
 const path = require("path");
 let chromium;
 try { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
@@ -25,11 +25,11 @@ const FILAS = [
 ];
 
 const DETALLE = [
-  { np: "CH 0001", np_num: "1",     tanda: "E01F", m3: "0.326", razon_social: "Elbantonio",          cod: "2101", localidad: "Soldati",        estado: "Facturado", estado_orden: 4 },
-  { np: "LK 0004", np_num: "4",     tanda: "E12L", m3: "0.102", razon_social: "Chen Li Yu",          cod: "4102", localidad: "Belgrano",       estado: "Armado",    estado_orden: 3 },
-  { np: "CH 0011", np_num: "11",    tanda: "E03G", m3: "0.189", razon_social: "Bazar Mandarin S.R.L", cod: "2277", localidad: "Nueva Pompeya",  estado: "Pickeado",  estado_orden: 2 },
-  { np: "44620",   np_num: "44620", tanda: "E03G", m3: "1.245", razon_social: "Gonzalez Pellegrini Dario", cod: "4024", localidad: "Ciudadela", estado: "Sin armar", estado_orden: 1 },
-  { np: "98704",   np_num: "98704", tanda: "D69F", m3: "6.170", razon_social: "S.A.Imp Y Exp De La Patagonia", cod: "771", localidad: "Esteban Echeverria", estado: "Sin armar", estado_orden: 1 }
+  { np: "CH 0002", np_num: "2",     tanda: "E01E", m3: "0.070", razon_social: "Elbantonio",   cod: "2101", localidad: "Soldati",     camion: "E01", empresa: "CH", pickeado: true,  armado: true,  facturado: true },
+  { np: "LK 0031", np_num: "31",    tanda: "E01A", m3: "0.640", razon_social: "Chen Li Yu",   cod: "4102", localidad: "Belgrano",    camion: "E01", empresa: "LK", pickeado: false, armado: false, facturado: false },
+  { np: "44612",   np_num: "44612", tanda: "D72B", m3: "0.250", razon_social: "CENCOSUD S.A.", cod: "2444", localidad: "Tortuguitas", camion: "D72", empresa: "CH", pickeado: true,  armado: true,  facturado: false },
+  { np: "98652",   np_num: "98652", tanda: "D67A", m3: "0.090", razon_social: "Milera Patricia Lorena", cod: "3958", localidad: "Mataderos", camion: "D67", empresa: "LK", pickeado: true, armado: false, facturado: false },
+  { np: "98704",   np_num: "98704", tanda: "D67M", m3: "1.180", razon_social: "S.A.Imp Y Exp De La Patagonia", cod: "771", localidad: "Esteban Echeverria", camion: "D67", empresa: "LK", pickeado: false, armado: false, facturado: false }
 ];
 
 (async () => {
@@ -111,27 +111,30 @@ const DETALLE = [
   if (t.celdasPintadas) fail.push(t.celdasPintadas + " celdas con relleno de color (el dueño las quiere sin color)");
   if (!/fecha=gte\.2026-09-14/.test(ultimaUrl)) fail.push("la consulta no filtra desde hoy → " + ultimaUrl);
 
-  // (f) tocar un día abre su composición, ordenada por número de NP
+  // (f) tocar un día abre su composición: agrupada por CAMIÓN, ordenada por NP,
+  //     con los tres tics, y el filtro LK / CH
   await p.click("#pppOpBody tbody tr:nth-child(3)");          // Miércoles 16/09
-  await p.waitForFunction(() => !!document.querySelector("#pppOpBody .pppop-det-top"), null, { timeout: 5000 });
-  await p.waitForFunction(() => !!document.querySelector("#pppOpBody .pppop-tbl"), null, { timeout: 5000 });
+  await p.waitForFunction(() => !!document.querySelector("#pppOpBody .pppop-cam"), null, { timeout: 5000 });
 
-  const det = await p.evaluate(() => {
+  const leer = () => p.evaluate(() => {
     const tbl = document.querySelector("#pppOpBody .pppop-tbl");
+    const filas = [...tbl.querySelectorAll("tbody tr")].map((tr) =>
+      tr.classList.contains("pppop-cam")
+        ? { cam: tr.textContent.trim() }
+        : { np: tr.children[0].textContent.trim(),
+            tic: [...tr.querySelectorAll("td.pppop-tic")].map((td) => td.textContent.trim()) });
     return {
       th: [...tbl.querySelectorAll("thead th")].map((x) => x.textContent.trim()),
-      filas: [...tbl.querySelectorAll("tbody tr")].map((tr) => [...tr.querySelectorAll("td")].map((td) => td.textContent.trim())),
+      filas: filas,
       tot: [...tbl.querySelectorAll("tfoot td")].map((td) => td.textContent.trim()),
       titulo: document.querySelector("#pppOpModal .pppop-title").textContent.trim(),
-      alineNp: getComputedStyle(tbl.querySelector("tbody td:first-child")).textAlign,
+      chipOn: (document.querySelector(".pppop-chip.on") || {}).textContent,
+      alineNp: getComputedStyle(tbl.querySelector("tbody tr:not(.pppop-cam) td:first-child")).textAlign,
       alineCli: getComputedStyle(tbl.querySelector("tbody td.pppop-cli")).textAlign,
-      alineM3: getComputedStyle(tbl.querySelector("tbody td:nth-child(4)")).textAlign,
-      estados: [...tbl.querySelectorAll("tbody td.pppop-est")].map((td) => td.textContent.trim()),
-      sinArmarApagado: [...tbl.querySelectorAll("tbody tr")].filter((tr) => {
-        const td = tr.querySelector("td.pppop-est");
-        return td && td.textContent.trim() === "Sin armar" && td.classList.contains("pppop-est-0");
-      }).length,
-      pie: (document.querySelector("#pppOpBody .pppop-msg") || {}).textContent,
+      alineM3: getComputedStyle(tbl.querySelector("tbody tr:not(.pppop-cam) td:nth-child(4)")).textAlign,
+      anchoTabla: tbl.getBoundingClientRect().width,
+      anchoCard: document.querySelector(".pppop-card").getBoundingClientRect().width,
+      scrollW: document.documentElement.scrollWidth,
       pintadas: [...tbl.querySelectorAll("td")].filter((td) => {
         const bg = getComputedStyle(td).backgroundColor;
         return bg && bg !== "rgba(0, 0, 0, 0)" && bg !== "transparent";
@@ -139,34 +142,51 @@ const DETALLE = [
       hayVolver: !!document.querySelector(".pppop-volver")
     };
   });
-  if (det.th.join(";") !== "NP;Cliente;Tanda;Mt3;Estado") fail.push("encabezado del detalle != 'NP;Cliente;Tanda;Mt3;Estado' → " + det.th.join(";"));
-  if (det.estados.join("|") !== "Facturado|Armado|Pickeado|Sin armar|Sin armar")
-    fail.push("los estados no salen como vienen del backend → " + det.estados.join("|"));
-  if (det.sinArmarApagado !== 2) fail.push('los "Sin armar" no quedan apagados (' + det.sinArmarApagado + " de 2)");
-  if (String(det.pie || "").indexOf("1 facturado · 1 armado · 1 pickeado · 2 sin armar") < 0)
-    fail.push("el pie no resume los estados → " + det.pie);
-  if (det.pintadas) fail.push(det.pintadas + " celdas del detalle con relleno de color");
-  if (det.filas.length !== DETALLE.length) fail.push("detalle: esperaba " + DETALLE.length + " filas, salieron " + det.filas.length);
-  if (det.filas.map((f) => f[0]).join("|") !== "CH 0001|LK 0004|CH 0011|44620|98704")
-    fail.push("el detalle no respeta el orden por número de NP → " + det.filas.map((f) => f[0]).join("|"));
-  if (det.filas[4] && det.filas[4][3] !== "6,17") fail.push("m³ del detalle sin coma decimal: '" + det.filas[4][3] + "'");
-  if (det.tot.join(";") !== "5 NP;4 tanda(s);;8,03;") fail.push("el pie del detalle no cierra → " + det.tot.join(";"));
+
+  const det = await leer();
+  if (det.th.join(";") !== "NP;Cliente;Tanda;Mt3;Pick;Arm;Fact")
+    fail.push("encabezado del detalle != 'NP;Cliente;Tanda;Mt3;Pick;Arm;Fact' → " + det.th.join(";"));
+  // el orden: camión por camión, en el orden de la NP más baja; adentro, por NP
+  const secuencia = det.filas.map((x) => x.cam ? "[" + x.cam.replace(/\s+/g, " ") + "]" : x.np);
+  const esperado = ["[🚚 Camión E01 · 2 NP · 2 tandas · 0,71 m³]", "CH 0002", "LK 0031",
+                    "[🚚 Camión D72 · 1 NP · 1 tanda · 0,25 m³]", "44612",
+                    "[🚚 Camión D67 · 2 NP · 2 tandas · 1,27 m³]", "98652", "98704"];
+  if (secuencia.join("|") !== esperado.join("|"))
+    fail.push("no quedó separado por camión / ordenado por NP →\n     " + secuencia.join("|") + "\n     esperaba: " + esperado.join("|"));
+  // los tics salen tal cual los manda el backend
+  const tics = det.filas.filter((x) => !x.cam).map((x) => x.tic.join(""));
+  if (tics.join("|") !== "✓✓✓||✓✓|✓|") fail.push("los tics no salen como los manda el backend → " + tics.join("|"));
+  if (det.tot.join(";") !== "5 NP;3 camiones;;2,23;3;2;1") fail.push("el pie del detalle no cierra → " + det.tot.join(";"));
   if (det.titulo.indexOf("Miércoles 16/09") < 0) fail.push("el título no dice qué día se está viendo → " + det.titulo);
   if (det.alineNp !== "left") fail.push("la NP no va a la izquierda (" + det.alineNp + ")");
   if (det.alineCli !== "left") fail.push("el cliente no va a la izquierda (" + det.alineCli + ")");
   if (det.alineM3 !== "right") fail.push("el m³ no va a la derecha (" + det.alineM3 + ")");
+  if (det.pintadas) fail.push(det.pintadas + " celdas del detalle con relleno de color");
+  if (det.anchoTabla > det.anchoCard) fail.push("la tabla del detalle se pasa de la tarjeta (" + Math.round(det.anchoTabla) + " > " + Math.round(det.anchoCard) + ")");
+  if (det.scrollW > 412) fail.push("el detalle hace scroll horizontal en un celular de 412px (" + det.scrollW + ")");
+  if (String(det.chipOn || "").trim() !== "Todos") fail.push("el filtro no arranca en Todos → " + det.chipOn);
   if (!/fecha=eq\.2026-09-16/.test(detUrl)) fail.push("el detalle no pide el día tocado → " + detUrl);
   if (!/order=np_num\.asc/.test(detUrl)) fail.push("el orden por NP no lo pide la consulta → " + detUrl);
-  if (!/select=[^&]*estado/.test(detUrl)) fail.push("la consulta del detalle no pide el estado → " + detUrl);
+  if (!/select=[^&]*camion/.test(detUrl) || !/select=[^&]*pickeado/.test(detUrl))
+    fail.push("la consulta no pide camión / tics → " + detUrl);
   if (!det.hayVolver) fail.push("no hay botón para volver a los días");
 
-  // y ← Días vuelve al resumen sin volver a pedirlo
-  const antes = pedidos;
-  await p.click(".pppop-volver");
-  await p.waitForFunction(() => !!document.querySelector("#pppOpBody thead th"), null, { timeout: 5000 });
-  const volvio = await p.evaluate(() => document.querySelector("#pppOpBody thead th").textContent.trim());
-  if (volvio !== "Fecha") fail.push("← Días no volvió al resumen (1ª columna: " + volvio + ")");
-  if (pedidos !== antes) fail.push("volver re-consultó el resumen (" + antes + " → " + pedidos + ")");
+  // el filtro LK deja sólo lo de LK, sin volver a consultar, y recalcula los subtotales
+  const antesFiltro = pedidos, antesDet = detUrl;
+  await p.evaluate(() => pppOpFiltrar("LK"));
+  const lk = await leer();
+  const secLk = lk.filas.map((x) => x.cam ? "[" + x.cam.replace(/\s+/g, " ") + "]" : x.np);
+  if (secLk.join("|") !== ["[🚚 Camión E01 · 1 NP · 1 tanda · 0,64 m³]", "LK 0031",
+                           "[🚚 Camión D67 · 2 NP · 2 tandas · 1,27 m³]", "98652", "98704"].join("|"))
+    fail.push("el filtro LK no dejó sólo LK (ni recalculó el camión) → " + secLk.join("|"));
+  if (lk.tot.join(";") !== "3 NP;2 camiones;;1,91;1;0;0") fail.push("el pie no se recalcula con el filtro → " + lk.tot.join(";"));
+  if (pedidos !== antesFiltro || detUrl !== antesDet) fail.push("filtrar volvió a consultar al servidor");
+
+  await p.evaluate(() => pppOpFiltrar("CH"));
+  const ch = await leer();
+  const secCh = ch.filas.map((x) => x.cam ? "cam" : x.np);
+  if (secCh.join("|") !== "cam|CH 0002|cam|44612") fail.push("el filtro CH no dejó sólo CH → " + secCh.join("|"));
+  await p.evaluate(() => pppOpFiltrar(""));
 
   // (e) sin red → sale el cache, no una pantalla vacía
   await p.unroute("**/rest/v1/**");

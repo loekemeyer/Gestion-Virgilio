@@ -5074,7 +5074,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=17.58"></script>
+<script type="module" src="recepcion.js?v=17.59"></script>
 <!-- Config del módulo de fichada (compartido con fichada.html). El secret
      hmacSecret tiene que ser el mismo acá y allá; cargándolo desde un solo
      archivo evitamos que se desincronicen. -->
@@ -7233,8 +7233,17 @@ function _pppOpCss() {
     + ".pppop-tbl td.pppop-cli,.pppop-tbl th.pppop-cli{text-align:left;}"
     + ".pppop-tbl td.pppop-cli{white-space:normal;line-height:1.25;}"
     + "#pppOpModal.det .pppop-tbl th,#pppOpModal.det .pppop-tbl td{padding-left:6px;padding-right:6px;}"
-    + ".pppop-tbl td.pppop-est,.pppop-tbl th.pppop-est{text-align:left;white-space:normal;line-height:1.2;}"
-    + ".pppop-est-0{color:#94a3b8;}";
+    /* los 3 tics: angostos, centrados, sin celda pintada */
+    + ".pppop-tbl th.pppop-tic{text-align:center;font-size:11px;font-weight:800;color:#475569;padding-left:3px;padding-right:3px;}"
+    + ".pppop-tbl td.pppop-tic{text-align:center;padding-left:3px;padding-right:3px;color:#15803d;font-weight:800;}"
+    /* una fila por camión: separa sin pintar celdas */
+    + ".pppop-tbl tr.pppop-cam td{border-top:2px solid #cbd5e1;border-bottom:1px solid #e5e7eb;text-align:left;font-weight:800;font-size:13px;color:#0f172a;padding-top:9px;}"
+    + ".pppop-tbl tr.pppop-cam:first-child td{border-top:none;}"
+    + ".pppop-cam-sub{font-weight:600;color:#64748b;}"
+    /* filtro LK / CH */
+    + ".pppop-filtro{display:flex;gap:6px;align-items:center;margin-left:auto;}"
+    + ".pppop-chip{background:#eef2f7;color:#475569;border:none;border-radius:999px;padding:5px 11px;font-size:13px;font-weight:800;cursor:pointer;width:auto;}"
+    + ".pppop-chip.on{background:#1e6bd6;color:#fff;}";
   document.head.appendChild(s);
 }
 function pppOpAbrir() {
@@ -7330,7 +7339,7 @@ async function pppOpDia(fecha) {
   const body = document.getElementById("pppOpBody"); if (!body) return;
   if (_pppOpDet[fecha]) { pppOpDetRender(fecha, _pppOpDet[fecha], ""); return; }
   body.innerHTML = '<div class="pppop-msg">Cargando el día…</div>';
-  const url = PPP_OP_DET_ENDPOINT + "?select=np,np_num,tanda,m3,razon_social,cod,localidad,estado,estado_orden"
+  const url = PPP_OP_DET_ENDPOINT + "?select=np,np_num,tanda,m3,razon_social,cod,localidad,camion,empresa,pickeado,armado,facturado"
             + "&fecha=eq." + fecha + "&order=np_num.asc,np.asc&limit=2000";
   try {
     const r = await fetch(url, { headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY }, cache: "no-store" });
@@ -7345,35 +7354,76 @@ async function pppOpDia(fecha) {
        + '<div class="pppop-msg">⚠ No pude traer el día (' + escapeHtml(String((e && e.message) || e)) + ').<br>Probá de nuevo con señal.</div>';
   }
 }
+/* Filtro por empresa del detalle: "" = las dos, "LK" / "CH". Vive acá y no en la
+   consulta: el día ya está bajado, filtrar de nuevo contra el servidor sería
+   pedir lo mismo dos veces (y no andaría sin señal). */
+let _pppOpEmp = "";
+function pppOpFiltrar(emp) {
+  _pppOpEmp = (emp === "LK" || emp === "CH") ? emp : "";
+  if (_pppOpDetVista) pppOpDetRender(_pppOpDetVista.fecha, _pppOpDetVista.rows, _pppOpDetVista.aviso);
+}
+let _pppOpDetVista = null;   // el día abierto, para re-pintar al cambiar el filtro
+
 function pppOpDetRender(fecha, rows, aviso) {
   const body = document.getElementById("pppOpBody"); if (!body) return;
   const ov = document.getElementById("pppOpModal"); if (ov) ov.classList.add("det");
   rows = (rows || []).filter(function (r) { return r && r.np; });
   const f = String(fecha).slice(0, 10);
+  _pppOpDetVista = { fecha: f, rows: rows, aviso: aviso };
   const dia = (_pppOpUlt && (_pppOpUlt.rows || []).filter(function (x) { return String(x.fecha).slice(0, 10) === f; })[0]) || null;
   const titulo = (dia && dia.dia ? dia.dia + " " : "") + f.slice(8, 10) + "/" + f.slice(5, 7);
   const ti = document.querySelector("#pppOpModal .pppop-title"); if (ti) ti.textContent = "🗓️ PPP · " + titulo;
-  let html = '<div class="pppop-det-top"><button class="pppop-volver" onclick="pppOpVolver()">← Días</button></div>';
-  if (!rows.length) { body.innerHTML = html + '<div class="pppop-msg">Ese día no tiene nada programado.</div>'; return; }
-  let sm3 = 0; const tandas = {}, porEstado = {};
-  html += '<table class="pppop-tbl"><thead><tr><th>NP</th><th class="pppop-cli">Cliente</th><th>Tanda</th><th>Mt3</th><th class="pppop-est">Estado</th></tr></thead><tbody>';
-  for (const r of rows) {
-    sm3 += Number(r.m3) || 0; tandas[String(r.tanda || "—")] = 1;
-    const est = String(r.estado || "Sin armar");
-    porEstado[est] = (porEstado[est] || 0) + 1;
-    html += '<tr><td>' + escapeHtml(String(r.np)) + '</td>'
-         + '<td class="pppop-cli">' + escapeHtml(String(r.razon_social || r.cod || "—")) + '</td>'
-         + '<td>' + escapeHtml(String(r.tanda || "—")) + '</td>'
-         + '<td>' + _pppOpM3(r.m3) + '</td>'
-         + '<td class="pppop-est' + (est === "Sin armar" ? " pppop-est-0" : "") + '">' + escapeHtml(est) + '</td></tr>';
+
+  const chip = function (v, txt) {
+    return '<button class="pppop-chip' + (_pppOpEmp === v ? " on" : "") + '" onclick="pppOpFiltrar(\'' + v + '\')">' + txt + '</button>';
+  };
+  let html = '<div class="pppop-det-top"><button class="pppop-volver" onclick="pppOpVolver()">← Días</button>'
+           + '<span class="pppop-filtro">' + chip("", "Todos") + chip("LK", "LK") + chip("CH", "CH") + '</span></div>';
+
+  const vis = _pppOpEmp ? rows.filter(function (r) { return String(r.empresa || "") === _pppOpEmp; }) : rows;
+  if (!vis.length) {
+    body.innerHTML = html + '<div class="pppop-msg">' + (rows.length ? "Ese día no tiene nada de " + escapeHtml(_pppOpEmp) + "." : "Ese día no tiene nada programado.") + '</div>';
+    return;
   }
-  const resumenEst = ["Facturado", "Armado", "Pickeado", "Sin armar"]
-    .filter(function (e) { return porEstado[e]; })
-    .map(function (e) { return porEstado[e] + " " + e.toLowerCase(); }).join(" · ");
-  html += '</tbody><tfoot><tr class="pppop-tot"><td>' + rows.length + ' NP</td>'
-       + '<td class="pppop-cli">' + Object.keys(tandas).length + ' tanda(s)</td><td></td><td>' + _pppOpM3(sm3) + '</td>'
-       + '<td class="pppop-est"></td></tr></tfoot></table>'
-       + (resumenEst ? '<div class="pppop-msg">' + escapeHtml(resumenEst) + '</div>' : "");
+
+  // agrupado por CAMIÓN, en el orden en que aparecen: como las filas vienen ordenadas por
+  // número de NP, el primer camión es el de la NP más baja y adentro de cada uno el orden se mantiene.
+  const grupos = [], ix = {};
+  for (const r of vis) {
+    const cam = String(r.camion || "—");
+    if (!(cam in ix)) { ix[cam] = grupos.length; grupos.push({ cam: cam, ped: [], m3: 0, tandas: {} }); }
+    const g = grupos[ix[cam]];
+    g.ped.push(r); g.m3 += Number(r.m3) || 0; g.tandas[String(r.tanda || "—")] = 1;
+  }
+
+  let sm3 = 0, nPick = 0, nArm = 0, nFact = 0;
+  const tic = function (v) { return v ? "✓" : ""; };
+  html += '<table class="pppop-tbl"><thead><tr><th>NP</th><th class="pppop-cli">Cliente</th><th>Tanda</th><th>Mt3</th>'
+        + '<th class="pppop-tic">Pick</th><th class="pppop-tic">Arm</th><th class="pppop-tic">Fact</th></tr></thead><tbody>';
+  for (const g of grupos) {
+    const tn = Object.keys(g.tandas).length;
+    html += '<tr class="pppop-cam"><td colspan="7">🚚 Camión ' + escapeHtml(g.cam)
+         + ' <span class="pppop-cam-sub">· ' + g.ped.length + ' NP · ' + tn + ' tanda' + (tn === 1 ? "" : "s")
+         + ' · ' + _pppOpM3(g.m3) + ' m³</span></td></tr>';
+    for (const r of g.ped) {
+      sm3 += Number(r.m3) || 0;
+      if (r.pickeado) nPick++;
+      if (r.armado) nArm++;
+      if (r.facturado) nFact++;
+      html += '<tr><td>' + escapeHtml(String(r.np)) + '</td>'
+           + '<td class="pppop-cli">' + escapeHtml(String(r.razon_social || r.cod || "—")) + '</td>'
+           + '<td>' + escapeHtml(String(r.tanda || "—")) + '</td>'
+           + '<td>' + _pppOpM3(r.m3) + '</td>'
+           + '<td class="pppop-tic">' + tic(r.pickeado) + '</td>'
+           + '<td class="pppop-tic">' + tic(r.armado) + '</td>'
+           + '<td class="pppop-tic">' + tic(r.facturado) + '</td></tr>';
+    }
+  }
+  html += '</tbody><tfoot><tr class="pppop-tot"><td>' + vis.length + ' NP</td>'
+       + '<td class="pppop-cli">' + grupos.length + ' camion' + (grupos.length === 1 ? "" : "es") + '</td><td></td>'
+       + '<td>' + _pppOpM3(sm3) + '</td>'
+       + '<td class="pppop-tic">' + nPick + '</td><td class="pppop-tic">' + nArm + '</td><td class="pppop-tic">' + nFact + '</td>'
+       + '</tr></tfoot></table>';
   if (aviso) html += '<div class="pppop-msg">' + escapeHtml(aviso) + '</div>';
   body.innerHTML = html;
 }
@@ -8401,7 +8451,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v17.58";
+const APP_VERSION = "v17.59";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción

@@ -94,7 +94,21 @@ Pedido de Luis. Dos cosas:
 > única**; no se replica. Ante la duda entre parche rápido y fix de raíz → **fix
 > de raíz**.
 >
-> Última actualización: 2026-09-14 (domingo) · Versión app al documentar: **v17.56**
+> Última actualización: 2026-09-14 (domingo) · Versión app al documentar: **v17.59**
+>
+> Nota **v17.59 (2026-09-14, Thomas) — el detalle del día: tics, separado por camión y filtrable LK/CH.**
+> Tres pedidos sobre la misma pantalla: *"que a la derecha figure con tics: Pickeado; Armado;
+> Facturado — sólo figura el tic si ya fue"*, *"que esté separado por camión"* y *"que pueda filtrar
+> por LK o CH"*. La columna Estado se partió en **Pick · Arm · Fact** (tres booleanos nuevos de
+> `gv_ppp_detalle_dia`, mismas reglas que antes): ahora se ven las tres a la vez. `pickeado` es
+> monótono (armado ⇒ pickeado), pero **`facturado` es independiente**: hay NP facturadas sin `TAP`, y
+> ahí se ve Fact sin Arm — es la verdad del dato. Las filas se agrupan por **camión = número de tanda**
+> (`D72B` y `D72C` → `D72`, la regla de `_pppTandaNum()`); ⚠ **no** es el "Camión 1/2/3" del supervisor,
+> que se numera por orden de pantalla y podría contradecir a la PPP. El **filtro LK/CH vive en el
+> front** —el día ya está bajado, así anda también sin señal— y **recalcula los subtotales de cada
+> camión**, no sólo esconde filas (el 15/09 el camión `E01` lleva de las dos empresas). Entra en un
+> celular de 412 px sin scroll horizontal, con los tics en verde y ninguna celda pintada.
+> §3.fk de `docs/SUPABASE-GESTION-VIRGILIO.md` · test `tests/ppp-operario.cjs`.
 >
 > Nota **v17.56 (2026-09-14, Thomas) — el detalle del día dice en qué ESTADO está cada pedido.**
 > *"Que diga el estado del pedido: Pickeado; Armado; Facturado"* … *"o sin armar"*. La tabla del

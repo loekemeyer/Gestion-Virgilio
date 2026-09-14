@@ -13987,7 +13987,7 @@ Salud al cerrar: `Z. ALARMA` 0 · `gv_endpoints_rotos` 0 · `gv_stock_particion_
 **Definición y rollback:** `sql/gv_lugar_item_rpc_alineadas_v1755.sql`.
 ---
 
-## §3.fk — v17.56: el detalle del día dice en qué ESTADO está cada pedido — 2026-09-14
+## §3.fk — v17.56 / v17.59: el estado de cada pedido, con tics, por camión y filtrable — 2026-09-14
 
 **Pedido del dueño (14/09), encima del detalle de la v17.54:** *"que diga el estado del pedido:
 Pickeado; Armado; Facturado"* … *"o sin armar"*.
@@ -14040,3 +14040,39 @@ del pie, que la consulta pida `estado`, y que ninguna celda tenga relleno.
 
 Volver a la versión sin estado: `sql/gv_ppp_detalle_dia.sql` en el commit de la v17.54, y sacar del
 front la columna `pppop-est`.
+
+### §3.fk (cont.) — v17.59: los tics, el camión y el filtro LK/CH
+
+Tres pedidos más del dueño, el mismo día, sobre la misma pantalla:
+
+> *"Que a la derecha figure con tics: Pickeado; Armado; Facturado. Sólo figura el tic si ya fue
+> pickeado/armado/facturado"* · *"que esté separado por camión"* · *"que pueda filtrar por LK o CH"*.
+
+**1. Tres tics en vez de una etiqueta.** La columna `Estado` se partió en **`Pick` · `Arm` · `Fact`**,
+alimentadas por tres booleanos nuevos de `gv_ppp_detalle_dia` (`pickeado`, `armado`, `facturado`).
+Las reglas son las mismas de antes; lo que cambia es que ahora se ven **las tres a la vez** en vez
+de colapsarlas en la más avanzada. `pickeado` es **monótono** (armado ⇒ pickeado: no se puede armar
+sin pickear), pero **`facturado` es independiente**: hay NP facturadas sin `TAP` registrado, y ahí
+se ve el tic de Fact sin el de Arm. Es la verdad del dato, no un bug de la vista. `estado` y
+`estado_orden` siguen existiendo para ordenar/filtrar por estado.
+
+**2. Separado por camión.** Columna nueva `camion` = el **número de la tanda** (letra + número):
+`D72B` y `D72C` viajan en el camión `D72`. Misma regla que `_pppTandaNum()` de la PPP. El detalle
+agrupa por ahí, con una fila de cabecera por camión (`🚚 Camión D67 · 3 NP · 2 tandas · 1,49 m³`).
+
+⚠ **A propósito NO es el "Camión 1 / 2 / 3" del supervisor.** Ése se numera por **orden de pantalla**
+(v13.13) y depende de la ruta y las zonas; replicarlo acá sería una segunda numeración que puede
+contradecir a la PPP. Se muestra el código de la tanda, que el operario ya lee en las cajas.
+
+**3. Filtro LK / CH.** Columna nueva `empresa`: para la web, la que trae la fila; para ISIS, la
+misma regla que `empresaDeNp()` del front (**NP > 90000 = Loekemeyer**). El filtro vive en el
+**front**, no en la consulta: el día ya está bajado, volver a pedirlo sería consultar lo mismo dos
+veces — y así **también funciona sin señal**, sobre el cache. Cambiar el filtro **recalcula los
+subtotales de cada camión y el total**, no sólo esconde filas.
+
+Medición (14/09, de hoy en adelante): 146 pedidos, **124 LK · 22 CH**, 17 camiones distintos.
+El 15/09 el camión `E01` tiene pedidos de las dos empresas — por eso el filtro recalcula por camión
+y no simplemente saca camiones enteros.
+
+El detalle entra en un celular de **412 px sin scroll horizontal** con las 7 columnas (tabla 360 px
+de una tarjeta de 388). Los tics son **texto verde, no celdas pintadas**.
