@@ -4977,7 +4977,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=17.38"></script>
+<script type="module" src="recepcion.js?v=17.39"></script>
 <!-- Config del módulo de fichada (compartido con fichada.html). El secret
      hmacSecret tiene que ser el mismo acá y allá; cargándolo desde un solo
      archivo evitamos que se desincronicen. -->
@@ -8098,7 +8098,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v17.38";
+const APP_VERSION = "v17.39";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -39238,7 +39238,10 @@ function cuarComRender() {
   else if (!s.lista.length) log = '<div class="cuar-log-vacio">Todavía no hay comentarios en este pedido.</div>';
   else {
     log = '<div class="cuar-log">' + s.lista.map(function (c) {
+      // v17.38: primero la IDENTIDAD (Vivi / Marian / lo que escribieron) y después, chiquito,
+      // el usuario de la sesión: son dos cosas distintas y la que se busca al leer es la primera.
       return '<div class="cuar-log-it"><div class="cuar-log-meta">' + escapeHtml(cuarFechaHora(c.creado_at)) +
+        (c.persona ? ' · <b>' + escapeHtml(String(c.persona)) + '</b>' : '') +
         (c.por ? ' · ' + escapeHtml(String(c.por)) : '') + '</div>' +
         '<div class="cuar-log-txt">' + escapeHtml(String(c.texto || "")) + '</div></div>';
     }).join("") + '</div>';
@@ -39254,7 +39257,7 @@ function cuarComRender() {
           (aprobar ? '<br>Dejá un comentario de por qué se aprueba (cobranzas lo autorizó, ya pagó, lo pidió el dueño…). Queda en el log con tu usuario, la fecha y la hora.'
                    : devolver ? '<br>Vuelve a Cuarentena: se lo <b>saca de la programación</b> (pierde tanda y fecha) y reaparece en <b>A Programar</b>, retenido. Contá por qué, queda en el log.'
                    : '') + '</p>' +
-        (aprobar || devolver ? cuarQuienHtml(s, aprobar) : '') +
+        cuarQuienHtml(s, s.modo) +
         (devolver && s.tanda ? '<div class="cuar-m-warn">Sale de la tanda <b>' + escapeHtml(String(s.tanda)) + '</b>.' +
           (s.picking ? ' ⚠ Esa tanda <b>ya se empezó a trabajar</b>: lo más probable es que el servidor no deje sacarlo — primero hay que resolverlo con el depósito.' : '') +
           '</div>' : '') +
@@ -39279,10 +39282,15 @@ function cuarComRender() {
    rechaza (gv_cuarentena_liberar levanta excepción). No se preselecciona a nadie a propósito:
    un valor puesto de fábrica se confirma sin leerlo, y entonces el dato no vale nada. */
 const CUAR_PERSONAS = ["Vivi", "Marian"];
-function cuarQuienHtml(s, obligatorio) {
+/* v17.38 (Luis, 2026-09-14): *"para alguien que deja un comentario, siempre tiene que estar
+   vinculado con una identidad"*. Así que el selector ya no es sólo de la aprobación: va en los
+   TRES modos y en los tres es obligatorio — aprobar, devolver y comentar dejan una línea en el
+   log, y una línea sin nombre no sirve después (no se le puede volver a preguntar a nadie). */
+function cuarQuienHtml(s, modo) {
   const sel = String(s.persona || "");
-  let h = '<div class="cuar-quien"><div class="cuar-quien-t">¿Quién ' + (obligatorio ? "aprueba" : "lo devuelve") + '?' +
-    (obligatorio ? ' <span style="color:#b42318">*</span>' : ' <span style="font-weight:600;color:#64748b">(opcional)</span>') + '</div>' +
+  const verbo = modo === "aprobar" ? "aprueba" : modo === "cuarentena" ? "lo devuelve" : "comenta";
+  let h = '<div class="cuar-quien"><div class="cuar-quien-t">¿Quién ' + verbo + '?' +
+    ' <span style="color:#b42318">*</span></div>' +
     '<div class="cuar-quien-ops">';
   CUAR_PERSONAS.forEach(function (n) {
     h += '<button class="cuar-quien-op' + (sel === n ? ' on' : '') + '" onclick="cuarQuienSet(\'' + n + '\')">' + escapeHtml(n) + '</button>';
@@ -39310,10 +39318,12 @@ async function cuarComAgregar() {
   const ta = document.getElementById("cuarComTexto");
   const txt = ((ta && ta.value) || "").trim();
   if (!txt) { s.err = "Escribí algo antes de guardar."; cuarComRender(); return; }
+  const quien = cuarQuienValor(s);
+  if (!quien) { s.err = "Decinos quién deja el comentario (Vivi, Marian u Otro)."; cuarComRender(); return; }
   s.saving = true; s.err = ""; cuarComRender();
   try {
     await aprRpc("gv_cuarentena_comentar", { p_empresa: s.empresa, p_order_id: s.clave,
-      p_texto: txt, p_np: s.np || null, p_por: await aprQuien() });
+      p_texto: txt, p_np: s.np || null, p_por: await aprQuien(), p_persona: quien });
     s.texto = ""; s.saving = false;
     s.lista = (await aprRpc("gv_cuarentena_comentarios", { p_empresa: s.empresa, p_order_id: s.clave })) || [];
     cuarComRender();
@@ -39329,10 +39339,12 @@ async function cuarDevolverConfirmar() {
   const s = _apr.cuarCom; if (!s) return;
   const ta = document.getElementById("cuarComTexto");
   const txt = ((ta && ta.value) || "").trim();
+  const quien = cuarQuienValor(s);
+  if (!quien) { s.err = "Decinos quién lo devuelve a Cuarentena (Vivi, Marian u Otro)."; cuarComRender(); return; }
   s.saving = true; s.err = ""; cuarComRender();
   try {
     await aprRpc("gv_cuarentena_devolver", { p_empresa: s.empresa, p_np: s.np, p_clave: s.clave,
-      p_comentario: txt || null, p_por: await aprQuien(), p_persona: cuarQuienValor(s) || null });
+      p_comentario: txt || null, p_por: await aprQuien(), p_persona: quien });
     s.saving = false; cuarComCerrar(); cuarYaProgRecargar();
     _apr.msg = s.np + " volvió a Cuarentena: salió de la programación y está en A Programar, retenido.";
     _apr.msgErr = false;

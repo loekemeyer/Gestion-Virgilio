@@ -13165,3 +13165,40 @@ planimetría"** cuando llega un código que no está en `window.GONDOLA`, con
 `trg_recepcion_sin_planim_telegram` → Telegram y la categoría `sin_planimetria` del tablero de
 Agentes (`generar_reporte_agentes`). **Está vivo: 13 eventos RSP, el último hoy 14/09 10:59.**
 Los 7 no están en el mapa, así que el día que entren, salta.
+---
+
+### §3.ez — v17.39: todo comentario de Cuarentena lleva IDENTIDAD — 2026-09-14
+
+**Luis (2026-09-14):** *"para alguien que deja un comentario, siempre tiene que estar vinculado
+con una identidad (Vivi, Marian, Otro — y si marcan Otro, que tenga un cuadro de texto)"*.
+
+Hasta la v17.34 la identidad se pedía sólo al **aprobar**. Pero el log lo escriben **tres**
+acciones —aprobar, devolver a Cuarentena y comentar— y las tres dejan una línea que alguien va a
+leer después. **Una línea sin nombre no sirve: no se le puede volver a preguntar a nadie.** Ahora
+el selector aparece en los tres modos del cuadro y en los tres es obligatorio; y no sólo en el
+navegador: `gv_cuarentena_comentar` y `gv_cuarentena_devolver` levantan excepción sin `persona`,
+porque una validación que vive sólo en el front no es validación.
+
+`persona` y `por` siguen separadas: `por` es el mail de la sesión que apretó el botón, `persona`
+es quién lo dijo. El log del pedido ahora muestra **primero la identidad** (en negrita) y después,
+chiquito, el usuario — que es el orden en que se los busca. `gv_cuarentena_comentarios` devuelve
+la columna nueva (DROP + CREATE: cambió el tipo de retorno, con los GRANT repuestos).
+
+⚠ **Una trampa que mordió acá, y está documentada en el `CLAUDE.md`.** El primer intento agregó la
+validación con un `replace()` sobre `pg_get_functiondef`, y le metió al cuerpo una referencia a
+`p_persona`… que **no estaba en la firma** de `gv_cuarentena_comentar` (esa función nunca la había
+tenido). **plpgsql no valida el cuerpo al crear la función**: el `CREATE` salió sin un solo error
+y la función quedó rota, lista para explotar en la primera llamada — y encima el front ya le
+estaba mandando `p_persona`, así que PostgREST no habría encontrado la firma. Se descubrió al
+mirar la definición viva antes de pushear. Por eso el archivo del repo trae el **CREATE completo**
+y por eso se probó **llamándolas**, no sólo creándolas.
+
+**Probado el mismo día** (un `DO` con `raise exception` final para revertir): comentar sin persona
+falla con el mensaje correcto, con persona inserta y devuelve `persona = 'Vivi'`, y devolver sin
+persona falla. Las tres pasaron y no quedó nada escrito.
+
+SQL y rollback: `sql/gv_cuarentena_identidad_v1739.sql` — reemplaza `gv_cuarentena_comentar` /
+`gv_cuarentena_comentarios` de `sql/gv_cuarentena_comentarios_v1715.sql` y `gv_cuarentena_devolver`
+de `sql/gv_cuarentena_log_v1723.sql`. Verificado contra la base: md5 del cuerpo normalizado de las
+tres, idéntico. Tests en `tests/apr-cuarentena.cjs` (los tres modos piden identidad y sin ella no
+llaman a la RPC).

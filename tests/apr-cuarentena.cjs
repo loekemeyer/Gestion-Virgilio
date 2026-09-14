@@ -176,7 +176,19 @@ catch (_e) {
     const mh = (document.getElementById("cuarComModal") || {}).innerHTML || "";
     out.comModal = /📖 Comentarios/.test(mh) && /Habló Vivi, lo autoriza/.test(mh) && /14\/09 09:00/.test(mh);
     out.comPideTexto = /id="cuarComTexto"/.test(mh) && /Agregar comentario/.test(mh);
-    out.comRpc = llamadas.length === 1 && llamadas[0].fn === "gv_cuarentena_comentarios" &&
+    // v17.38: un comentario sin identidad no se guarda
+    out.comPideQuien = /¿Quién comenta\?/.test(mh);
+    document.getElementById("cuarComTexto").value = "Probando";
+    await cuarComAgregar(); await new Promise((res) => setTimeout(res, 100));
+    out.comSinQuien = !llamadas.some(function (c) { return c.fn === "gv_cuarentena_comentar"; }) &&
+                      /Decinos quién deja el comentario/.test((document.getElementById("cuarComModal") || {}).innerHTML || "");
+    cuarQuienSet("Vivi");
+    document.getElementById("cuarComTexto").value = "Probando";
+    await cuarComAgregar(); await new Promise((res) => setTimeout(res, 100));
+    const com = llamadas.find(function (c) { return c.fn === "gv_cuarentena_comentar"; });
+    out.comConQuien = !!com && com.args.p_persona === "Vivi" && com.args.p_texto === "Probando";
+    // la PRIMERA llamada es la del log (después vienen las de comentar, que agrega el bloque de arriba)
+    out.comRpc = llamadas.length >= 1 && llamadas[0].fn === "gv_cuarentena_comentarios" &&
                  llamadas[0].args.p_empresa === "chef" && llamadas[0].args.p_order_id === "55";
     cuarComCerrar();
     out.comCerrado = !!(document.getElementById("cuarComModal") || {}).hidden;
@@ -227,11 +239,17 @@ catch (_e) {
     cuarYpCuarentena(0); await new Promise((res) => setTimeout(res, 120));
     const dh = (document.getElementById("cuarComModal") || {}).innerHTML || "";
     out.devModal = /Volver a Cuarentena/.test(dh) && /saca de la programación/.test(dh) && /D71A/.test(dh);
+    out.devPideQuien = /¿Quién lo devuelve\?/.test(dh);
+    document.getElementById("cuarComTexto").value = "No lo autorizó cobranzas";
+    await cuarDevolverConfirmar(); await new Promise((res) => setTimeout(res, 120));
+    out.devSinQuien = !llamadas.some(function (c) { return c.fn === "gv_cuarentena_devolver"; });
+    cuarQuienSet("Marian");
     document.getElementById("cuarComTexto").value = "No lo autorizó cobranzas";
     await cuarDevolverConfirmar(); await new Promise((res) => setTimeout(res, 120));
     const dev = llamadas.find(function (c) { return c.fn === "gv_cuarentena_devolver"; });
     out.devRpc = !!dev && dev.args.p_np === "97889" && dev.args.p_clave === "97889" &&
-                 dev.args.p_empresa === "lk" && dev.args.p_comentario === "No lo autorizó cobranzas";
+                 dev.args.p_empresa === "lk" && dev.args.p_comentario === "No lo autorizó cobranzas" &&
+                 dev.args.p_persona === "Marian";
 
     // (7) v17.23 — submódulo LOG en Config. Cuarentena
     _apr.cuarLog = [
@@ -286,6 +304,9 @@ catch (_e) {
   chk(r.ypLibrito, "ya programados: el librito 📖 con la cantidad de comentarios");
   chk(r.comModal, "el librito abre el log con fecha, hora y autor");
   chk(r.comPideTexto, "el log deja agregar un comentario nuevo");
+  chk(r.comPideQuien, "comentar pide quién (identidad obligatoria)");
+  chk(r.comSinQuien, "sin identidad NO guarda el comentario y avisa");
+  chk(r.comConQuien, "con identidad guarda el comentario con la persona");
   chk(r.comRpc, "el log pide los comentarios de ESE pedido (empresa + clave)");
   chk(r.comCerrado, "el modal se cierra");
   chk(r.aprModal, "aprobar abre el cuadro de comentario (no libera de una)");
@@ -298,7 +319,9 @@ catch (_e) {
   chk(r.marcarAprobada, "todas las filas ofrecen Aprobar y Cuarentena");
   chk(r.marcarFilas, "las dos filas ofrecen volver a cuarentena");
   chk(r.devModal, "volver a cuarentena avisa que lo saca de la programación y de qué tanda");
-  chk(r.devRpc, "al confirmar llama gv_cuarentena_devolver con NP, clave y comentario");
+  chk(r.devPideQuien, "volver a cuarentena pide quién");
+  chk(r.devSinQuien, "sin elegir quién NO devuelve");
+  chk(r.devRpc, "al confirmar llama gv_cuarentena_devolver con NP, clave, comentario y persona");
   chk(r.logTitulo, "Config. Cuarentena tiene el log con la cantidad de pedidos");
   chk(r.logFilas, "el log lista NP, cliente y su número");
   chk(r.logEstado, "el log muestra el estado (aprobado / retenido)");

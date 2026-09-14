@@ -12,7 +12,22 @@
 > única**; no se replica. Ante la duda entre parche rápido y fix de raíz → **fix
 > de raíz**.
 >
-> Última actualización: 2026-09-14 (domingo) · Versión app al documentar: **v17.37**
+> Última actualización: 2026-09-14 (domingo) · Versión app al documentar: **v17.39**
+>
+> Nota **v17.39 (2026-09-14, Luis) — CUARENTENA: TODO comentario lleva identidad.**
+> *"Para alguien que deja un comentario, siempre tiene que estar vinculado con una identidad"*:
+> **Vivi / Marian / Otro** (con cuadro de texto). Hasta la v17.34 se pedía sólo al aprobar, pero el
+> log lo escriben **tres** acciones —aprobar, devolver a Cuarentena y comentar— y las tres dejan una
+> línea que alguien va a leer: **sin nombre no sirve, no se le puede volver a preguntar a nadie.**
+> Obligatorio en los tres modos y **también en el backend** (`gv_cuarentena_comentar` y
+> `gv_cuarentena_devolver` fallan sin `persona`): una validación que vive sólo en el front no es
+> validación. En el log la identidad va primero, en negrita, y el mail de la sesión después.
+> ⚠ Acá mordió la trampa del `CLAUDE.md`: parchear una función con `replace()` sobre
+> `pg_get_functiondef` le metió una referencia a `p_persona` que **no estaba en la firma**, y como
+> **plpgsql no valida el cuerpo al crear**, el CREATE salió limpio y la función quedó rota hasta la
+> primera llamada. Por eso ahora el repo guarda el CREATE completo y se prueba LLAMANDO.
+> `sql/gv_cuarentena_identidad_v1739.sql` · §3.ez de `docs/SUPABASE-GESTION-VIRGILIO.md` ·
+> test `tests/apr-cuarentena.cjs`.
 >
 > Nota **v17.37 (2026-09-14, Luis) — el aviso de OC de Krikos muestra sólo lo NUEVO.**
 > Había 6 renglones rojos fijos en "A Programar" (COTO ×3, LA ANÓNIMA ×2, CARREFOUR ×1, mails del
