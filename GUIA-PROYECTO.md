@@ -120,7 +120,22 @@ Pedido de Luis. Dos cosas:
 > única**; no se replica. Ante la duda entre parche rápido y fix de raíz → **fix
 > de raíz**.
 >
-> Última actualización: 2026-09-14 (domingo) · Versión app al documentar: **v17.59**
+> Última actualización: 2026-09-14 (domingo) · Versión app al documentar: **v17.62**
+>
+> Nota **v17.62 (2026-09-14, Thomas) — el camión del detalle sale por ZONA, y con tope de 6 m³.**
+> *"La lógica del camión no tiene que ser sólo por el número de tanda, sino x la zona"* y *"con topes
+> de lo que entra en un camión (6 m³), salvo pedidos más grandes, que se mandan en camiones más
+> grandes"*. **Se midió antes de partir nada**: de 39 camiones, 8 llevan 2-3 zonas y todas son
+> VECINAS (Zona 1+2, Zona 5+6+7) — es el armado por cercanía de la v13.07. Partir por zona
+> inventaría camiones que no existen. Así que `camion_key` copia la lógica de `_pppCamiones` de la
+> PPP: **Retira** va solo, **cada Súper en su camión** (nunca con clientes, v14.23), el resto por
+> número de tanda; y **la zona va en la etiqueta** (`🚚 Camión E12 · Zona 2 + Zona 3`). Lo que sí
+> arregla: un súper y clientes con el mismo número de tanda ya no salen como un solo camión.
+> **Tope**: `camion_m3` / `camion_tope` nuevas; el tope es `PPP_Web_Config.camion_m3_tope` = **6,00**
+> (config, no código) **salvo que un solo pedido lo pase** — ése va en camión más grande y el tope
+> pasa a ser el pedido, si no el de 9,25 m³ del 16/09 gritaría para siempre. En pantalla:
+> `1,81 / 6,00 m³`, y `⚠ pasado 0,49 m³` en rojo si se pasa.
+> §3.fk de `docs/SUPABASE-GESTION-VIRGILIO.md` · test `tests/ppp-operario.cjs`.
 >
 > Nota **v17.59 (2026-09-14, Thomas) — el detalle del día: tics, separado por camión y filtrable LK/CH.**
 > Tres pedidos sobre la misma pantalla: *"que a la derecha figure con tics: Pickeado; Armado;

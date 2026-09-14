@@ -14182,3 +14182,63 @@ filtrada por `np`, **6 ms**.
 
 `drop view if exists public.gv_ppp_isis_items;` — es una vista NUEVA y no la lee nadie más que la
 ficha de A Programar. Sin ella la ficha vuelve a decir que no pudo leer el detalle, nada más.
+
+### §3.fk (cont.) — v17.62: el camión sale por ZONA, y con tope de 6 m³
+
+Dos pedidos más del dueño sobre la misma pantalla:
+
+> *"La lógica del camión no tiene que ser sólo por el número de tanda, sino x la zona"* ·
+> *"con topes de lo que entra en un camión (6 m³)"* … *"salvo pedidos más grandes, que se mandan en
+> camiones más grandes"*.
+
+#### La zona: se midió antes de partir nada
+
+La tentación era partir el camión por zona. **Se midió primero** (8 al 18/09, 39 camiones, 208
+pedidos):
+
+| Zonas del camión | Camiones | Pedidos |
+|---|---:|---:|
+| 1 | 31 | 123 |
+| 2 | 7 | 76 |
+| 3 | 1 | 9 |
+
+Los 8 camiones multi-zona llevan **zonas VECINAS** (Zona 1 + 2, Zona 5 + 6 + 7, Zona 2 + 3) — que es
+justo lo que hace el armado por cercanía desde la v13.07. Partirlos por zona **inventaría camiones
+que no existen** y le mostraría al operario más camiones que los que salen del depósito.
+
+Entonces se copió la lógica que ya usa la PPP del supervisor (`_pppCamiones`), en la columna nueva
+**`camion_key`**:
+
+| Caso | Clave | Por qué |
+|---|---|---|
+| Retira | `RET` | no viaja: va todo junto y no es un camión |
+| Súper | `SUP:<nº tanda>` | un camión por súper, **nunca con clientes** (regla del dueño v14.23) y "2 súper, 2 camiones" (v13.20) |
+| Resto | `<nº tanda>` | la tanda ya se armó por cercanía: agrupa zonas vecinas |
+| Sin tanda | `Z:<zona>` | lo único que queda para agrupar |
+
+**La zona va en la ETIQUETA, no en la clave**: `zona_corta` ("Zona 1", "Súper", "Retira") y el front
+arma `🚚 Camión E12 · Zona 2 + Zona 3`. Súper y Retira van al final de la lista, como en la PPP.
+Lo que esto **sí** arregla: un súper y clientes con el mismo número de tanda ya no salen como un
+solo camión.
+
+#### El tope
+
+Columnas nuevas **`camion_m3`** (m³ del camión entero, window sobre `fecha + camion_key`) y
+**`camion_tope`**. El tope sale de **`PPP_Web_Config.camion_m3_tope` = 6,00** — config, no código:
+
+```sql
+update public."PPP_Web_Config" set valor = 7 where clave = 'camion_m3_tope';
+```
+
+⚠ **La excepción que pidió el dueño está en el SQL**: `greatest(tope, max(m3) del camión)`. Un
+pedido más grande que el tope viaja en un camión más grande, así que el tope de **ese** camión es el
+pedido. Sin eso, el pedido de **9,25 m³** del 16/09 (D71, Zona 4, un solo NP) figuraría para siempre
+"pasado de tope" y el aviso se volvería ruido que nadie mira.
+
+El front muestra `1,81 / 6,00 m³` en la cabecera del camión y, si se pasa, `⚠ pasado 0,49 m³` en
+rojo (**texto**, no celda pintada). Con el filtro LK/CH puesto, los m³ y el tope siguen siendo los
+del **camión entero** —el tope es del camión, no de lo que se está mirando— y el conteo avisa
+`1 NP (de 2)`.
+
+Medido al 14/09: ningún camión pasado; los tres que superan 6 m³ son de **un solo pedido** (9,25 ·
+6,47 · 6,17 m³) y el tope los acompaña, así que no se marcan.

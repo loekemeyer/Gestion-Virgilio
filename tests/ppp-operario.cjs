@@ -8,10 +8,12 @@
    (d) la tabla NO se estira al ancho de la tarjeta (regla del dueño: nada de
        ocupar el 100% porque sí) y los números van a la derecha;
    (e) sin red, muestra lo último que bajó (cache) en vez de una pantalla vacía;
-   (f) tocar un día abre su composición SEPARADA POR CAMIÓN y ordenada por número
-       de NP —el orden lo pide la consulta, no el front—, con los tres tics
-       (Pick / Arm / Fact) tal cual los manda el backend, el filtro LK / CH que no
-       vuelve a consultar, y "← Días" que vuelve al resumen sin re-consultar. */
+   (f) tocar un día abre su composición SEPARADA POR CAMIÓN —Retira y Súper aparte,
+       el resto por número de tanda, con la ZONA en la etiqueta— y ordenada por
+       número de NP (el orden lo pide la consulta, no el front), con los tres tics
+       (Pick / Arm / Fact) tal cual los manda el backend, los m³ del camión contra
+       su TOPE (6 m³, salvo un pedido más grande), el filtro LK / CH que no vuelve
+       a consultar, y "← Días" que vuelve al resumen sin re-consultar. */
 const path = require("path");
 let chromium;
 try { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
@@ -25,11 +27,14 @@ const FILAS = [
 ];
 
 const DETALLE = [
-  { np: "CH 0002", np_num: "2",     tanda: "E01E", m3: "0.070", razon_social: "Elbantonio",   cod: "2101", localidad: "Soldati",     camion: "E01", empresa: "CH", pickeado: true,  armado: true,  facturado: true },
-  { np: "LK 0031", np_num: "31",    tanda: "E01A", m3: "0.640", razon_social: "Chen Li Yu",   cod: "4102", localidad: "Belgrano",    camion: "E01", empresa: "LK", pickeado: false, armado: false, facturado: false },
-  { np: "44612",   np_num: "44612", tanda: "D72B", m3: "0.250", razon_social: "CENCOSUD S.A.", cod: "2444", localidad: "Tortuguitas", camion: "D72", empresa: "CH", pickeado: true,  armado: true,  facturado: false },
-  { np: "98652",   np_num: "98652", tanda: "D67A", m3: "0.090", razon_social: "Milera Patricia Lorena", cod: "3958", localidad: "Mataderos", camion: "D67", empresa: "LK", pickeado: true, armado: false, facturado: false },
-  { np: "98704",   np_num: "98704", tanda: "D67M", m3: "1.180", razon_social: "S.A.Imp Y Exp De La Patagonia", cod: "771", localidad: "Esteban Echeverria", camion: "D67", empresa: "LK", pickeado: false, armado: false, facturado: false }
+  // E01 · Zona 1 — dos empresas en el mismo camión (por eso el filtro recalcula por camión)
+  { np: "CH 0002", np_num: "2",     tanda: "E01E", m3: "0.070", razon_social: "Elbantonio",   cod: "2101", localidad: "Soldati",     camion: "E01", camion_key: "E01", ruta: "", zona_corta: "Zona 1", camion_m3: 0.710, camion_tope: 6, empresa: "CH", pickeado: true,  armado: true,  facturado: true },
+  { np: "LK 0031", np_num: "31",    tanda: "E01A", m3: "0.640", razon_social: "Chen Li Yu",   cod: "4102", localidad: "Belgrano",    camion: "E01", camion_key: "E01", ruta: "", zona_corta: "Zona 2", camion_m3: 0.710, camion_tope: 6, empresa: "LK", pickeado: false, armado: false, facturado: false },
+  // súper: MISMO número de tanda que un camión de clientes, pero va aparte (regla v14.23)
+  { np: "44612",   np_num: "44612", tanda: "D72B", m3: "0.250", razon_social: "CENCOSUD S.A.", cod: "2444", localidad: "Tortuguitas", camion: "D72", camion_key: "SUP:D72", ruta: "sup", zona_corta: "Súper", camion_m3: 0.250, camion_tope: 6, empresa: "CH", pickeado: true,  armado: true,  facturado: false },
+  // D67 · pasado de tope
+  { np: "98652",   np_num: "98652", tanda: "D67A", m3: "0.090", razon_social: "Milera Patricia Lorena", cod: "3958", localidad: "Mataderos", camion: "D67", camion_key: "D67", ruta: "", zona_corta: "Zona 3", camion_m3: 6.490, camion_tope: 6, empresa: "LK", pickeado: true, armado: false, facturado: false },
+  { np: "98704",   np_num: "98704", tanda: "D67M", m3: "6.400", razon_social: "S.A.Imp Y Exp De La Patagonia", cod: "771", localidad: "Esteban Echeverria", camion: "D67", camion_key: "D67", ruta: "", zona_corta: "Zona 3", camion_m3: 6.490, camion_tope: 6, empresa: "LK", pickeado: false, armado: false, facturado: false }
 ];
 
 (async () => {
@@ -148,15 +153,20 @@ const DETALLE = [
     fail.push("encabezado del detalle != 'NP;Cliente;Tanda;Mt3;Pick;Arm;Fact' → " + det.th.join(";"));
   // el orden: camión por camión, en el orden de la NP más baja; adentro, por NP
   const secuencia = det.filas.map((x) => x.cam ? "[" + x.cam.replace(/\s+/g, " ") + "]" : x.np);
-  const esperado = ["[🚚 Camión E01 · 2 NP · 2 tandas · 0,71 m³]", "CH 0002", "LK 0031",
-                    "[🚚 Camión D72 · 1 NP · 1 tanda · 0,25 m³]", "44612",
-                    "[🚚 Camión D67 · 2 NP · 2 tandas · 1,27 m³]", "98652", "98704"];
+  const esperado = ["[🚚 Camión E01 · Zona 1 + Zona 2 · 2 NP · 2 tandas · 0,71 / 6,00 m³]", "CH 0002", "LK 0031",
+                    "[🚚 Camión D67 · Zona 3 · 2 NP · 2 tandas · 6,49 / 6,00 m³ ⚠ pasado 0,49 m³]", "98652", "98704",
+                    "[🛒 Camión D72 · Súper · 1 NP · 1 tanda · 0,25 / 6,00 m³]", "44612"];
   if (secuencia.join("|") !== esperado.join("|"))
     fail.push("no quedó separado por camión / ordenado por NP →\n     " + secuencia.join("|") + "\n     esperaba: " + esperado.join("|"));
   // los tics salen tal cual los manda el backend
   const tics = det.filas.filter((x) => !x.cam).map((x) => x.tic.join(""));
-  if (tics.join("|") !== "✓✓✓||✓✓|✓|") fail.push("los tics no salen como los manda el backend → " + tics.join("|"));
-  if (det.tot.join(";") !== "5 NP;3 camiones;;2,23;3;2;1") fail.push("el pie del detalle no cierra → " + det.tot.join(";"));
+  if (tics.join("|") !== "✓✓✓||✓||✓✓") fail.push("los tics no salen como los manda el backend → " + tics.join("|"));
+  if (det.tot.join(";") !== "5 NP;3 camiones;;7,45;3;2;1") fail.push("el pie del detalle no cierra → " + det.tot.join(";"));
+  // el tope y el aviso de pasado salen del backend, no de una cuenta del front
+  if (!/⚠ pasado 0,49 m³/.test(det.filas.map((x) => x.cam || "").join(" ")))
+    fail.push("no avisa que el camión se pasó del tope");
+  const over = await p.evaluate(() => document.querySelectorAll("#pppOpBody .pppop-cam-over").length);
+  if (over !== 1) fail.push("el aviso de tope pasado aparece " + over + " veces (esperaba 1)");
   if (det.titulo.indexOf("Miércoles 16/09") < 0) fail.push("el título no dice qué día se está viendo → " + det.titulo);
   if (det.alineNp !== "left") fail.push("la NP no va a la izquierda (" + det.alineNp + ")");
   if (det.alineCli !== "left") fail.push("el cliente no va a la izquierda (" + det.alineCli + ")");
@@ -167,8 +177,9 @@ const DETALLE = [
   if (String(det.chipOn || "").trim() !== "Todos") fail.push("el filtro no arranca en Todos → " + det.chipOn);
   if (!/fecha=eq\.2026-09-16/.test(detUrl)) fail.push("el detalle no pide el día tocado → " + detUrl);
   if (!/order=np_num\.asc/.test(detUrl)) fail.push("el orden por NP no lo pide la consulta → " + detUrl);
-  if (!/select=[^&]*camion/.test(detUrl) || !/select=[^&]*pickeado/.test(detUrl))
-    fail.push("la consulta no pide camión / tics → " + detUrl);
+  if (!/select=[^&]*camion_key/.test(detUrl) || !/select=[^&]*pickeado/.test(detUrl)
+      || !/select=[^&]*camion_tope/.test(detUrl) || !/select=[^&]*zona_corta/.test(detUrl))
+    fail.push("la consulta no pide camión / zona / tope / tics → " + detUrl);
   if (!det.hayVolver) fail.push("no hay botón para volver a los días");
 
   // el filtro LK deja sólo lo de LK, sin volver a consultar, y recalcula los subtotales
@@ -176,16 +187,22 @@ const DETALLE = [
   await p.evaluate(() => pppOpFiltrar("LK"));
   const lk = await leer();
   const secLk = lk.filas.map((x) => x.cam ? "[" + x.cam.replace(/\s+/g, " ") + "]" : x.np);
-  if (secLk.join("|") !== ["[🚚 Camión E01 · 1 NP · 1 tanda · 0,64 m³]", "LK 0031",
-                           "[🚚 Camión D67 · 2 NP · 2 tandas · 1,27 m³]", "98652", "98704"].join("|"))
+  // con filtro: el camión dice cuántos se ven "de" cuántos tiene, pero los m³ y el tope siguen
+  // siendo los del CAMIÓN entero — el tope es del camión, no de lo que se está mirando
+  if (secLk.join("|") !== ["[🚚 Camión E01 · Zona 2 · 1 NP (de 2) · 1 tanda · 0,71 / 6,00 m³]", "LK 0031",
+                           "[🚚 Camión D67 · Zona 3 · 2 NP · 2 tandas · 6,49 / 6,00 m³ ⚠ pasado 0,49 m³]", "98652", "98704"].join("|"))
     fail.push("el filtro LK no dejó sólo LK (ni recalculó el camión) → " + secLk.join("|"));
-  if (lk.tot.join(";") !== "3 NP;2 camiones;;1,91;1;0;0") fail.push("el pie no se recalcula con el filtro → " + lk.tot.join(";"));
+  if (lk.tot.join(";") !== "3 NP;2 camiones;;7,13;1;0;0") fail.push("el pie no se recalcula con el filtro → " + lk.tot.join(";"));
   if (pedidos !== antesFiltro || detUrl !== antesDet) fail.push("filtrar volvió a consultar al servidor");
 
   await p.evaluate(() => pppOpFiltrar("CH"));
   const ch = await leer();
   const secCh = ch.filas.map((x) => x.cam ? "cam" : x.np);
   if (secCh.join("|") !== "cam|CH 0002|cam|44612") fail.push("el filtro CH no dejó sólo CH → " + secCh.join("|"));
+  // el súper NO se junta con clientes ni con el filtro puesto (regla del dueño v14.23)
+  const camsCh = ch.filas.filter((x) => x.cam).map((x) => x.cam.replace(/\s+/g, " "));
+  if (camsCh.length !== 2 || camsCh[1].indexOf("🛒") !== 0)
+    fail.push("el súper no quedó en su propio camión al final → " + camsCh.join(" ~ "));
   await p.evaluate(() => pppOpFiltrar(""));
 
   // (e) sin red → sale el cache, no una pantalla vacía
