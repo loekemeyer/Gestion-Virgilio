@@ -11006,3 +11006,39 @@ Marianela (#3243) para el 14/09.
 **Pendiente (pedido principal de Thomas, sin empezar):** pantalla para la operadora que diga, para el día
 siguiente, "llegaron a armar todo → pedí N camiones" / "no llegaron → reprogramá", y el guard en Facturación que
 no deje facturar con la fecha de salida mal. Falta el dato de m³ por camión.
+
+### §3.eb — v16.91: el UxB del 824 de Chef pasa a 12 (problema 122) — 2026-09-14
+
+Pedido de **Marianela**: el bulto de Chef del **824 (COLADOR 8 CM)** son **12 unidades**, no 36.
+
+**Se tocó una sola fila**: `public."GV_UxB"` empresa `CH`, cod `824` → `uxb = 12`, `curado = true`,
+`origen = 'Marianela 14/09/2026 (corrige a Thomas 12/09: el bulto de Chef es de 12)'`. La fila **LK
+del 824 queda en 36**, por decisión suya. Backup de las dos filas en
+`zz_backups."GV_Backup_UxB_824_20260914"`; SQL, medición y rollback exacto en
+`sql/backups/gv_uxb_824_20260914_pre_cambio.sql`.
+
+⚠ **Pisa una curación del dueño.** Esa fila la había puesto Thomas a mano el 12/09 con origen textual
+*"Thomas 12/09/2026 (corrige el listado)"*. Antes de escribir se le mostró a Marianela el contraejemplo
+completo — los otros cuatro coladores N°8 del sistema (**824 LK, 110, 026, 831**) dicen **36**, y
+`Articulos_Cajas` también dice 36 para el 824 — y confirmó 12 igual.
+
+⚠ **Tocar sólo CH deja dos respuestas vivas para el mismo artículo**, y es esperado, no un bug:
+
+| fuente | valor |
+|---|--:|
+| `GV_UxB` CH · `gv_uxb_emp` chef | 12 |
+| `GV_UxB` LK · `gv_uxb_emp` lk | 36 |
+| `vista_uxb_articulo` | 36 |
+| `Articulos_Cajas.Uni_x_Caja` | 36 |
+
+`vista_uxb_articulo` toma `max(uxb)` entre las dos empresas del mismo código base, así que con LK en 36
+**el Excel de ISIS (`_facXlsArmar`) y la OC siguen usando 36**. Lo que cambió es `gv_uxb_emp`, o sea la
+facturación de lo que se valoriza como Chef. Para unificar hay que tocar también la fila LK (y, si se
+quiere, `Articulos_Cajas`); el SQL está comentado en el archivo de backup.
+
+**Medición, `vista_facturacion_neto_items` código 824** — las 36 líneas se valorizan como Chef, o sea
+que cambiaron todas: 213 cajas entregadas, **$8.965.915,20 → $2.988.638,40** (−$5.977.276,80).
+
+**No se tocó el catálogo de la página de Chef** (`products.uxb`, proyecto `nkhzocgdpwtgrmwleihr`): el MCP
+no tiene permiso sobre ese proyecto. Si el 824 se vende por la web de Chef, el `uxb` del carrito sigue
+saliendo de ahí y hay que cambiarlo a mano desde su admin.
