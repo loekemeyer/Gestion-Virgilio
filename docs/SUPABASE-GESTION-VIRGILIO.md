@@ -11136,9 +11136,29 @@ del cambio). Las dos con RLS prendida y sin escritura para `anon`/`authenticated
 
 Los crons 68 y 74 se pausaron durante el cambio y quedaron **activos** de nuevo.
 
-**Queda abierto, NO se tocó:** `66 / terminado = −28` y `H201PART / insumos = −2000` son negativos
-**preexistentes**, ajenos a esta corrección y sin diagnóstico todavía. `66` no salía en el badge
-porque no está en `stocks_carga_rapida`; `insumos` se chequea en su propia sección.
+⚠ **Corrección del mismo día:** al cerrar esto reporté `66 / terminado = −28` y
+`H201PART / insumos = −2000` como "dos negativos preexistentes". **Era un error de medición, no
+había tales negativos.** La consulta agrupaba por `cod_art` **crudo** y la app netea por código
+**canónico**. Verificado: el 066 (Abrelatas Super Mariposa) tiene `terminado` 216 más las 6 filas
+escritas como `66` (−28 de un picking legítimo de la tanda `D72C`, ciclo completo
+picking→separado→facturado que cierra en 0) = **188**, que es lo que muestra la pantalla; y el
+insumo `H201Part` tiene **+104.000** en Uni contra una sola fila de −2.000 escrita `H201PART` =
+**+102.000**. **Después de la v16.92 no queda ningún saldo negativo en ningún depósito.**
+
+Lo que sí quedó como hallazgo (problema 127, bajo): **un mismo artículo se escribe con más de una
+grafía** en `Movimientos_Stock`. Son dos casos en toda la tabla — `066` (280 filas) vs `66` (6, todas
+del picking de `D72C` del 09/09, legajo 277) y `H201Part` (12) vs `H201PART` (1, del 26/08). No
+rompen ningún saldo porque las vistas canonizan, pero **ensucian cualquier consulta que agrupe por
+`cod_art` crudo** — que es exactamente la trampa en la que caí. Al medir stock, canonizar SIEMPRE:
+
+```sql
+-- MAL: ve negativos que no existen
+select cod_art, deposito, sum(delta) from public."Movimientos_Stock" group by 1,2 having sum(delta)<0;
+-- BIEN: lo que ve la app
+select cod, terminado, excedente, separar_pedidos, a_facturar, a_guardar, racks
+  from public.stocks_carga_rapida
+ where terminado<0 or excedente<0 or separar_pedidos<0 or a_facturar<0 or a_guardar<0 or racks<0;
+```
 ### §3.ec — v16.93: un cliente = un CUIT. Se termina el cruce LK/Chef por cod_cliente — 2026-09-14
 
 **Pedido de Thomas (14/09), sobre el informe "Clientes en riesgo":** *"Relca esta mal. Es cencosud, no relca.
