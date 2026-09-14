@@ -12596,3 +12596,63 @@ que restaurar: la vista no escribe.
 
 **Test:** `tests/pmap-gondolas.cjs` (orden a5→a1, corte de a 5, código + capacidad, libre y `s/cap`,
 buscar que resalta sin filtrar, y que el módulo pega contra la **vista** y no contra las tablas).
+
+### §3.er — v17.24: PRENDIDO — `sales_lines` ya se llena desde ISIS — 2026-09-14
+
+**Thomas (14/09): *"necesita imput manual humano para arrancar? no podés guardar el backup bien etiquetado
+vos y correr el sistema nuevo?"*.** Prendido. `sql/gv_prendido_carga_isis_v1724.sql`.
+
+**Backup completo previo**, verificado idéntico a la tabla viva **antes** de tocar nada:
+`zz_backups."GV_Backup_sales_lines_20260914_pre_isis"` — **233.776 filas / 1.249.870 cajas**, copia
+**entera** de `sales_lines` (no sólo el tramo). RLS ON, sin escritura para `anon`. Restaurar es dos líneas,
+están en el comentario de la tabla.
+
+**Primera corrida:** `{"aplicado": true, "desde": "2026-02-01", "borradas": 29125, "insertadas": 31621,
+"cajas": 164498}`. Desde el corte quedó **un solo lote `isis_auto`**, con las dos empresas separadas y datos
+**hasta hoy**.
+
+**`gv_sales_isis_vs_excel`: 16 filas, todas en 0,0 %.** Los meses que antes diferían (julio −16,7 %, agosto
+−15,4 %, Chef en 0) ahora cierran clavados, y septiembre dejó de estar en blanco.
+
+El parche `GV_Ventas_Correccion` de julio/agosto quedó **inerte y se borró**. Sobrevive **una** fila: la del
+batch `jumbo_2026_02_20`, que va de 2024-03 a 2026-01 — antes del corte, donde sigue siendo un duplicado real.
+
+#### ⚠ Dos efectos del dato en vivo, y su corrección
+
+Con el Excel mensual `sales_lines` **nunca** tenía el mes en curso. Ahora llega hasta hoy, y **un mes a
+medias hace ver caídas que no existen**. Salió en la verificación, no después:
+
+1. **La alarma de clientes.** Cencosud pasó de −15 % a **−38 %** sólo por tener septiembre a mitad de camino.
+   Corregido: el trimestre actual termina en el **último mes completo** (`gv_ventas_corte_empresa` capa el
+   corte y `gv_clientes_riesgo` lo toma de ahí). Con eso la alarma vuelve a **41 clientes** y Cencosud a
+   **−15 %, fuera de la lista**.
+2. **La proyección de compras.** `_fn_proy_window` y `_fn_proy_window_emp` promedian N meses terminando en el
+   último mes de `sales_lines`; con septiembre a medias el promedio bajaba y **se pediría de menos**. Se les
+   capó el `endm` al último mes completo. Definiciones anteriores en
+   `zz_backups."GV_Backup_defs_proy_window_20260914"`.
+
+#### Verificación posterior, toda corrida
+
+| chequeo | resultado |
+|---|---|
+| `gv_sales_isis_vs_excel` | 16 filas, **todas 0,0 %** |
+| `gv_ventas_cliente` sin cliente | **0** |
+| `gv_ventas_carga_sospechosa` pendientes | **0** |
+| alarma (pico ≥ 300, ≤ −30 %) | 41 clientes · 11 migraciones · 0 incompletos |
+| **Cencosud** | **−15 %, todo Chef, fuera de la alarma** |
+| `_fn_proy_window_emp(6,'lk')` | 210 artículos / 18.275 cajas-mes |
+| `_fn_proy_window_emp(6,'chef')` | 218 / 3.827 |
+| `GV_Proyeccion_Emp` (Virgilio) | lk **220** filas / 18.359 · chef **313** / 4.983 |
+| `refresh_estadistica_madre_cache` | 537 filas |
+| `proyeccion_madre` (Virgilio) | 461 filas, actualizada |
+
+La proyección de LK pasó de **383 artículos a 220**: se fueron los fantasma (los `L` y el catálogo 7xx/8xx de
+Chef), y Chef subió de 231 a 313. Es lo que se había medido en el dry run de §3.ej.
+
+#### Lo que queda
+
+- **Avisarle a quien sube el Excel que deje de hacerlo.** Si lo sube igual el 1-6 de octubre, la corrida
+  siguiente lo pisa (la función borra el tramo y lo reescribe), así que no rompe nada — pero es trabajo al
+  pedo.
+- El `drop default` de `sales_lines.empresa` pasa a ser un candado inofensivo: ya no hay carga manual que se
+  olvide la columna.
