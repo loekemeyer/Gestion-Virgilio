@@ -12404,10 +12404,10 @@ Con esto el §3.4 queda cerrado: 0 filas con sufijo en `Equivalencias_Codigos`, 
 `Movimientos_Stock`, y las 8 de `vista_saldos_stock.clave` son las que **tienen que estar**.
 ---
 
-### §3.ep — v17.20: columna "Marcar" — aprobar, o mandarlo de vuelta a Cuarentena — 2026-09-14
+### §3.eq — v17.20/v17.22: columna "Enviar a" — aprobar, o mandarlo de vuelta a Cuarentena — 2026-09-14
 
 **Pedido de Luis (2026-09-14):** en la tabla de "Ya programados y el cliente está en cuarentena",
-una columna **Marcar**: para los **sin aprobar**, *Aprobar* (lo deja aprobado y abre el pop-up de
+una columna **Enviar a** (nació como *Marcar*; Luis la renombró en la v17.22): para los **sin aprobar**, *Aprobar* (lo deja aprobado y abre el pop-up de
 comentario) o *Cuarentena*; para los demás, sólo *Cuarentena*.
 
 **"Volver a Cuarentena" saca el pedido de la programación, no despinta una marca.** Si sólo se

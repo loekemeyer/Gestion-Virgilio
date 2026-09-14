@@ -211,7 +211,7 @@ catch (_e) {
     ];
     aprRender(); await new Promise((res) => setTimeout(res, 150));
     html = document.getElementById("pppPreview").innerHTML;
-    out.marcarCol = /<th>Marcar<\/th>/.test(html);
+    out.marcarCol = /<th>Enviar a<\/th>/.test(html);
     const filas = html.split("<tr").filter(function (t) { return /cuarYpCuarentena/.test(t); });
     out.marcarSinAprobar = /cuarYpAprobar\(0\)/.test(html) && /cuarYpCuarentena\(0\)/.test(html);
     out.marcarAprobada = !/cuarYpAprobar\(1\)/.test(html) && /cuarYpCuarentena\(1\)/.test(html);
@@ -265,7 +265,7 @@ catch (_e) {
   chk(r.aprModal, "aprobar abre el cuadro de comentario (no libera de una)");
   chk(r.aprSinLiberar, "aprobar NO llamó a gv_cuarentena_liberar antes de confirmar");
   chk(r.aprLibera, "al confirmar libera y manda el comentario");
-  chk(r.marcarCol, "la tabla tiene la columna 'Marcar'");
+  chk(r.marcarCol, "la tabla tiene la columna 'Enviar a'");
   chk(r.marcarSinAprobar, "sin aprobar: ofrece Aprobar y Cuarentena");
   chk(r.marcarAprobada, "ya aprobada: ofrece SOLO Cuarentena");
   chk(r.marcarFilas, "las dos filas ofrecen volver a cuarentena");
