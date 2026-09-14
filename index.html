@@ -3150,6 +3150,11 @@ tr.ppp-err-zona > td{ background:#fffbeb !important; }
 .pga-cli{ color:#334155; font-weight:700; margin-left:6px; }
 .pga-loc{ color:#94a3b8; font-size:11px; margin-left:7px; }
 .pga-ped{ color:#94a3b8; font-size:11px; margin-left:7px; font-variant-numeric:tabular-nums; }
+/* v17.85 (Luis): las acciones de la fila de la NP, al final del rengl�n de la info */
+.pga-acc{ display:inline-block; margin-left:10px; white-space:nowrap; }
+.pga-acc-b{ background:#eef2f7; color:#1e6bd6; border:1px solid #d7e2f3; border-radius:7px;
+  padding:1px 8px; font-size:11px; font-weight:800; cursor:pointer; width:auto; line-height:1.6; }
+.pga-acc-b:hover{ background:#e0eaf9; }
 .pga-pill{ display:inline-block; font-size:10px; font-weight:900; border-radius:999px; padding:1px 8px; letter-spacing:.03em; margin-left:7px; vertical-align:1px; }
 .pga-pill.e-facturado{ background:#dbeafe; color:#1e3a8a; } .pga-pill.e-armado{ background:#dcfce7; color:#14532d; }
 .pga-pill.e-proceso{ background:#fef9c3; color:#854d0e; }   .pga-pill.e-pendiente{ background:#fee2e2; color:#991b1b; }
@@ -5183,7 +5188,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=17.84"></script>
+<script type="module" src="recepcion.js?v=17.85"></script>
 <!-- Config del módulo de fichada (compartido con fichada.html). El secret
      hmacSecret tiene que ser el mismo acá y allá; cargándolo desde un solo
      archivo evitamos que se desincronicen. -->
@@ -8613,7 +8618,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v17.84";
+const APP_VERSION = "v17.85";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -32552,14 +32557,16 @@ function pppCuarAvisoSacada(np, cu) {
 }
 async function pppVencVolver(np) {
   const n = String(np || "").trim(); if (!n) return;
-  if (!confirm("¿Devolver " + n + " a A Programar?\n\nSale de su tanda y queda pendiente: lo toma el automático (zonas 1-3 / camión ya previsto) o lo programás a mano.")) return;
+  // v17.85 (Luis): el automático YA NO lo vuelve a agarrar — queda retenido en A Programar hasta
+  // que alguien le ponga día a mano, y vuelve a SU misma tanda (no se pickea ni se arma de nuevo).
+  if (!confirm("¿Devolver " + n + " a A Programar?\n\nSale de su tanda y queda esperándote ahí: el automático de las zonas 1-3 NO lo vuelve a programar solo.\n\nSi la tanda ya se pickeó o se armó, queda anotado: al darle día vuelve a ESA tanda, no a una nueva.")) return;
   pppSetStatus("Devolviendo " + n + " a A Programar…", true);
   try {
     const r = await aprRpc("gv_ppp_web_desprogramar", { p_np: n, p_por: await aprQuien() });
     const x = (r && r[0]) || {};
     const cu = await pppCuarDeNpSacada(n);   // v17.50: ¿quedó retenido en Cuarentena?
     pppSetStatus(cu ? pppCuarAvisoSacada(n, cu)
-      : ("✓ " + n + " volvió a A Programar (" + (x.np_sacadas || 0) + " NP del pedido)."), true);
+      : ("✓ " + n + " volvió a 📥 A Programar (" + (x.np_sacadas || 0) + " NP del pedido). Ponele día vos: el automático no lo toca."), true);
     await pppLoadProgFromSupabase();
   } catch (e) {
     const msg = (e && e.message) ? e.message : String(e);
@@ -35232,6 +35239,12 @@ function _pppArbolHtml(programados) {
             (_lug ? '<span class="pga-loc">' + escapeHtml(_lug) + '</span>' : '') +
             (r.fecha_pedido ? '<span class="pga-ped" title="Fecha en que entró el pedido">ped. ' +
               escapeHtml(String(r.fecha_pedido).slice(8, 10) + "/" + String(r.fecha_pedido).slice(5, 7)) + '</span>' : '') +
+            // v17.85 (Luis): "un botón que sea una flecha para atrás y que sea «Enviar a programar»
+            // en caso de que se tenga que reprogramar la fecha de entrega".
+            ((window.__isSupervisor || !PPP_READONLY)
+              ? '<span class="pga-acc"><button class="pga-acc-b" title="Sacarlo de esta tanda y mandarlo a 📥 A Programar para darle otra fecha. Queda anotado en qué tanda estaba: al reprogramarlo vuelve a ESA tanda, así no se pickea ni se arma dos veces. El automático no lo toca."'
+                + ' onclick="event.stopPropagation();pgaEnviarAProgramar(\'' + escapeHtml(r.np) + '\')">↩ Enviar a programar</button></span>'
+              : '') +
           '</td>' +
           '<td>' + _pppFmtM3(r.m3) + '</td><td></td><td></td>' +
           '<td></td><td></td><td></td><td></td></tr>';
@@ -35243,6 +35256,15 @@ function _pppArbolHtml(programados) {
     '<td>Total</td><td>' + _pppFmtM3(tot.m3) + '</td><td>' + tot.tandas + '</td><td>' + tot.nps + '</td>' +
     _pgaPctFila(tot.est, tot.nps) + '</tr></tfoot></table></div>';
   return h;
+}
+
+/* v17.85 (Luis) — ENVIAR A PROGRAMAR desde la tabla de Programación. Reusa el camino que ya
+   estaba probado (`pppVencSinProgramar`: manda al de ISIS o al web según la NP) y además recarga
+   el árbol, que tiene su propio caché. */
+async function pgaEnviarAProgramar(np) {
+  const n = String(np || "").trim(); if (!n) return;
+  await pppVencSinProgramar(n);
+  await pgaRecargar();
 }
 
 function _pppPlanGridHtml(programados) {
@@ -39051,11 +39073,33 @@ async function aprTraerPedidos(e) {
       cajas: Number(n.cajas) || 0, m3_parcial: !!n.m3_parcial, items: n.items || []
     });
   }
+  // v17.85 (Luis) — LA MEMORIA de lo que un supervisor sacó de su tanda con "↩ Enviar a programar".
+  // `GV_PPP_Web_Retenido` guarda de qué tanda venía y si esa tanda ya se pickeó o se armó. Se
+  // pegan los MISMOS tres campos que trae el lado de ISIS (`tanda_previa` / `ya_pickeada` /
+  // `ya_armada`), así el chip rojo de A Programar y `_aprYaHecho` andan igual para los dos.
+  // Si la consulta falla, el pedido se muestra igual: sin memoria, no roto.
+  const _ret = new Map();
+  try {
+    const rr = await aprGet("gv_ppp_web_retenido?select=empresa,order_id,tanda_previa,ya_pickeada,ya_armada&limit=2000");
+    for (const x of (rr || [])) {
+      const k = String(x.empresa) + ":" + String(x.order_id);
+      const v = _ret.get(k) || { tanda_previa: "", ya_pickeada: false, ya_armada: false };
+      if (!v.tanda_previa && x.tanda_previa) v.tanda_previa = String(x.tanda_previa);
+      v.ya_pickeada = v.ya_pickeada || !!x.ya_pickeada;
+      v.ya_armada   = v.ya_armada   || !!x.ya_armada;
+      _ret.set(k, v);
+    }
+  } catch (_e) {}
+
   const out = [];
   for (const p of by.values()) {
     p.bloques.sort(function (a, b) { return a.np_idx - b.np_idx; });
     p.np_total = p.bloques.length;
     p.m3 = Number(p.m3.toFixed(3));
+    const _r = _ret.get(String(p.empresa) + ":" + String(p.order_id));
+    p.tanda_previa = (_r && _r.tanda_previa) || "";
+    p.ya_pickeada  = !!(_r && _r.ya_pickeada);
+    p.ya_armada    = !!(_r && _r.ya_armada);
     out.push(p);
   }
   out.sort(function (a, b) {
@@ -39465,6 +39509,36 @@ async function aprGenerarTanda(fecha, keys, opts) {
       });
       const x = (r && r[0]) || {};
       _apr.msg = "✅ " + (x.codigo || "") + " programada para el " + aprDiaCorto(fecha) + ": " + (x.np_programadas || 0) + " NP de ISIS · " + aprNum(x.m3) + " m³." + (x.aviso ? "  ⚠ " + x.aviso : "");
+      _apr.msgErr = false;
+    } catch (e) {
+      _apr.msg = "⚠ " + (e && e.message ? e.message : String(e));
+      _apr.msgErr = true;
+    }
+    _apr.ocupado = false;
+    await aprCargar();
+    return;
+  }
+  // v17.85 (Luis) — PEDIDO RETENIDO: vuelve a SU tanda de antes, no a una nueva. Es lo que pidió
+  // con "el sistema tiene memoria para no mandar a armar algo dos veces o no mandar algo a armar
+  // que no estaba armado": si vuelve a la misma tanda, el estado (pickeado / armado / facturado)
+  // vuelve con ella, porque el estado sale de los eventos de esa tanda. Espejo de lo que ya hacía
+  // `gv_ppp_isis_programar` con `tanda_previa`.
+  const _reten = peds.filter(function (p) { return p.tanda_previa; });
+  if (_reten.length) {
+    if (_reten.length !== peds.length) { _apr.msg = "Hay pedidos que ya tenían tanda y otros que no: programalos por separado."; _apr.msgErr = true; aprRender(); return; }
+    const _ts = [...new Set(_reten.map(function (p) { return p.tanda_previa; }))];
+    if (_ts.length > 1) { _apr.msg = "Estos pedidos venían de tandas distintas (" + _ts.join(", ") + "): programalos de a uno."; _apr.msgErr = true; aprRender(); return; }
+    if (!(opts && opts.sinConfirm) &&
+        !confirm("¿Devolver " + labels + " a su tanda " + _ts[0] + ", para el " + aprDiaCorto(fecha) + "?\n\nVuelve a la MISMA tanda de antes: no se arma una nueva y no se pickea ni se arma de nuevo lo que ya estaba hecho.")) return;
+    _apr.ocupado = true; aprRender();
+    try {
+      const por = await aprQuien();
+      let _np = 0;
+      for (const pp of _reten) {
+        const r = await aprRpc("gv_ppp_web_tanda_reusar", { p_empresa: pp.empresa || emp, p_order_id: pp.order_id, p_fecha: fecha, p_por: por });
+        _np += Number(((r && r[0]) || {}).np_programadas) || 0;
+      }
+      _apr.msg = "✅ " + _ts[0] + " (la misma de antes) programada para el " + aprDiaCorto(fecha) + ": " + _np + " NP.";
       _apr.msgErr = false;
     } catch (e) {
       _apr.msg = "⚠ " + (e && e.message ? e.message : String(e));

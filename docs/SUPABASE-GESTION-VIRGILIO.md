@@ -15315,3 +15315,48 @@ subtotal · 59 filas en D67M+E01J · 0 duplicados nuevos.
 
 **Rollback:** `select cron.unschedule('gv-alerta-armado-sin-entregas');` +
 `drop function public.gv_alerta_armado_sin_entregas_telegram();`
+
+Perillas y rollback: `sql/gv_web_tdf_como_chef.sql` del repo `pagina-LK-copia`.
+
+## §3.fu — v17.85: "Enviar a programar" con retención y memoria de tanda (lado web) — 2026-09-14
+
+Pedido de Luis: el botón ↩ en la fila de cada NP de la tabla de Programación. El backend que hacía
+falta, porque el lado web no tenía lo que el de ISIS ya tenía desde la v16.03.
+
+### Lo que se creó
+
+| Objeto | Qué hace |
+|---|---|
+| `GV_PPP_Web_Retenido` (tabla) | qué pedido web se sacó de su tanda, de qué tanda y fecha venía, y si esa tanda ya estaba pickeada / armada. PK `(empresa, order_id, np_idx)`. RLS prendida, `anon` SELECT y nada más: escribe sólo la RPC. |
+| `gv_ppp_web_retenido` (vista) | lo mismo + `np_label`, con `security_invoker = true`. La lee A Programar. |
+| `gv_ppp_web_tanda_reusar(empresa, order_id, fecha, por)` | devuelve el pedido a **SU** tanda de antes con la fecha nueva y borra la retención. |
+
+### Lo que se cambió
+
+- **`gv_ppp_web_desprogramar` v2.** Se le sacó el rechazo *"Alguna tanda de X ya se empezó a
+  trabajar"*. Thomas ya había sacado ese mismo rechazo del lado de ISIS en la v16.03 (*"No. Que
+  vayan a programar"*) y el riesgo de re-pickear lo cubre `tanda_previa`. Queda **una** guarda, la
+  misma que la de ISIS: si la NP tiene `CCN` o `CRN`, salió. Además anota la retención.
+  ⚠ Necesita `#variable_conflict use_column`: `order_id` es a la vez parámetro de salida y columna
+  de la tabla nueva, y sin eso el `INSERT` no compila (*column reference order_id is ambiguous*).
+- **`gv_ppp_web_armar_pendientes`.** Un bloque `(a0b)` nuevo, pegado al de `GV_PPP_Web_Diferido`,
+  que saca de `p_filas` todo lo retenido. **Es la pieza que hace que el botón sirva**: sin ella el
+  cron de las zonas 1-3 lo reprograma solo en 15 minutos. `_simular` no se tocó: llama a ésta.
+
+### Prueba (14/09, en transacción revertida)
+
+Sobre **LK 0008**, tanda **E01A**, que ya estaba **pickeada y armada** — o sea el caso que la
+versión vieja rechazaba:
+
+```
+sacadas=2 · retenido=[E01A pick=true arm=true fe=2026-09-15 | E01A pick=true arm=true fe=2026-09-15]
+reprogramadas=2 · tanda_ahora=E01A
+```
+
+Sale de la tanda con memoria y vuelve a **la misma** tanda. Todo revertido con un `raise`.
+
+### Rollback
+
+`sql/gv_ppp_web_retenido_v1782.sql` lo trae al final. Las definiciones **previas** de
+`gv_ppp_web_armar_pendientes` y `gv_ppp_web_desprogramar` quedaron en
+`zz_backups."GV_Backup_Funcdefs_20260914"`.

@@ -1,3 +1,35 @@
+## Nota v17.85 (2026-09-14) — "↩ Enviar a programar" en la fila de cada NP
+
+Pedido de Luis: *"un botón que sea una flecha para atrás y que sea «Enviar a programar» en caso de
+que se tenga que reprogramar la fecha de entrega. Atento a que, si es uno de los que se programan
+automáticamente (zona 1 y zona 2), tiene que quedar en «A programar» (quedan en el estado que
+estaban… el sistema tiene memoria para no mandar a armar algo dos veces o no mandar algo a armar
+que no estaba armado)"*.
+
+En la tabla de **Programación**, cada fila de NP trae ahora **↩ Enviar a programar**: la saca de su
+tanda y la manda a 📥 **A Programar** para darle otra fecha. Sirve para las dos clases de NP (web e
+ISIS) y sólo lo ve un supervisor.
+
+Las dos condiciones que puso Luis, que son las que hacen que el botón sirva:
+
+1. **El automático NO lo vuelve a agarrar.** Lo que se saca queda anotado en `GV_PPP_Web_Retenido`
+   y `gv_ppp_web_armar_pendientes` lo saltea. Sin esto, el cron de las zonas 1-3 (jobs 71 y 73,
+   cada 15 min) lo reprogramaba solo en la corrida siguiente y el botón no servía para nada.
+2. **Memoria del estado.** Se guarda de qué tanda venía (`tanda_previa`) y si esa tanda ya estaba
+   pickeada o armada. En A Programar sale con el chip rojo **"⚠ ya pickeada y armada · E01A"**, y al
+   darle día vuelve a **ESA** tanda (`gv_ppp_web_tanda_reusar`), no a una nueva. Como el estado sale
+   de los eventos de la tanda, volver a la tanda es volver al estado: no se pickea ni se arma dos
+   veces, y lo que no estaba armado sigue sin estarlo.
+
+El lado de **ISIS** ya tenía todo esto desde la v16.03 (`tanda_previa` en `GV_PPP_Prog_Override`);
+lo que se hizo acá es el espejo del lado **web**, que no lo tenía y encima **rechazaba** el pedido
+cuya tanda ya se había tocado. Ese rechazo se retiró: la única guarda que queda es la misma que la
+de ISIS — **si la NP ya tiene Carga Camión o Recepción Remitos, salió, y no se saca de la
+programación**: eso se cierra con el remito.
+
+§3.fu de `docs/SUPABASE-GESTION-VIRGILIO.md` · `sql/gv_ppp_web_retenido_v1785.sql` ·
+`tests/pga-enviar-a-programar.cjs` (13 chequeos).
+
 ## Nota v17.81 (2026-09-14) — la PPP del operario muestra el código de cliente
 
 Pedido de Luis: *"agregale columna de código de cliente a la visión de la PPP en el módulo de
