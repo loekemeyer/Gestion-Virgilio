@@ -14079,7 +14079,7 @@ de una tarjeta de 388). Los tics son **texto verde, no celdas pintadas**.
 
 ### §3.fi — v17.60: `LIBRE` es residuo, no señal. `guardar` lo limpia; `sacar` NO lo repone
 
-⚠⚠ **Esta sección corrige a §3.fh (v17.58). Vale ésta.** Aquélla decía que `cod='LIBRE'` estaba
+⚠⚠ **Esta sección corrige a §3.fh (v17.61). Vale ésta.** Aquélla decía que `cod='LIBRE'` estaba
 *"vivo en cinco lugares"* y que no había que tocarlo. **Estaba mal, por leer el código al revés**:
 esos `if (k === "LIBRE") return` no son consumidores que la usan, son **guardas para esquivarla**.
 
@@ -14121,3 +14121,64 @@ sacar los dos → mapa y cap vacíos, **no repuso LIBRE**; y `gv_planimetria_cel
 **`estado = 'libre'`**. No se tocó ningún dato: las 5 filas se van solas al usar esas celdas.
 
 **Definición y rollback:** `sql/gv_lugar_item_libre_v1760.sql`.
+## §3.fl — v17.61: el contenido de una NP de ISIS (`gv_ppp_isis_items`) — 2026-09-14
+
+**Qué pasó.** La v17.57 puso el detalle del pedido (códigos / cajas / unidades) en la ficha de
+A Programar. Para las NP que vienen de ISIS el front no tenía ítems —esos pedidos no pasan por la
+página— y la ficha escribía *"el detalle de artículos no está en la página, se ve en ISIS"*.
+Luis lo cazó en el día: ***"esa NP tenía el detalle de los códigos y las cajas, en algún lugar
+está. Si no, después cuando pase por la pipeline y llegue a facturación, ¿cómo se factura?"***.
+Tenía razón. Auditado como problema **"A Programar decía que una NP de ISIS no tiene detalle de
+artículos, y sí lo tiene"**.
+
+**Dónde estaba.** En `GV_PPP_Base_Pedidos` — la base del PPP, la misma que alimenta el picking y,
+río abajo, la facturación. Lo llamativo: `gv_ppp_isis_sin_tanda` ya cuenta ahí las `lineas` y las
+`cajas` que la propia ficha venía mostrando en el resumen. Los renglones estaban a un JOIN de
+distancia del número que decía que no existían.
+
+**Qué se hizo.** Vista nueva `public.gv_ppp_isis_items` (`security_invoker = true`, SELECT para
+`anon`/`authenticated`), en `sql/gv_ppp_isis_items_v1761.sql`:
+
+| Columna | |
+|---|---|
+| `np` | NP normalizada igual que en `gv_ppp_isis_sin_tanda`: `regexp_replace(btrim(pedido), '\.0+$', '')` — la base trae `98587.0` |
+| `empresa` | `chef` si la NP empieza con `4`, si no `lk` (misma regla que la otra vista) |
+| `art`, `cajas`, `renglones` | agrupado por código: la base puede traer el mismo artículo en dos renglones |
+| `uxb`, `uni` | del `uxb` resuelto del artículo (`gv_uxb_resuelto`); `null` si no se puede resolver |
+
+Lee `gv_ppp_base_pedidos` (la **vista**, no la tabla), así respeta el corte del espejo de ISIS y
+las filas ocultas por `GV_PPP_Prog_Override.oculto`, como el resto de Gestión.
+
+⚠ **`gv_uxb_resuelto.empresa` es `LK` / `CH` en MAYÚSCULA**, no `lk` / `chef`. Joinear en minúscula
+devuelve `uxb` NULL para todo — pasó al escribir esto y el síntoma es una tabla entera con
+"Unidades —", que parece un problema de datos y no lo es.
+
+**Front.** `aprIsisItemsCargar(np)` pide la vista **al abrir la ficha** (no en la carga inicial: a
+esa pantalla ya le dijeron *"tardan mucho en aparecer pedidos"*), cachea en `_apr.isisItems[np]` y
+re-renderiza. Vale para las NP de ISIS estén donde estén: Pedidos a programar o Cuarentena. Si la
+lectura falla, la ficha dice que **no se pudo leer** —nunca que el detalle no existe— y el 🔄 la
+reintenta (`aprCargar` borra del caché sólo las entradas en `null`).
+
+### Medición (14/09)
+
+```sql
+select s.np, s.lineas, s.cajas, i.lineas_v, i.cajas_v, i.sin_uxb,
+       (s.lineas = i.lineas_v and s.cajas = i.cajas_v) as coincide
+  from public.gv_ppp_isis_sin_tanda s
+  left join lateral (
+    select count(*)::int lineas_v, coalesce(sum(cajas),0) cajas_v,
+           count(*) filter (where uxb is null)::int sin_uxb
+      from public.gv_ppp_isis_items x where x.np = s.np
+  ) i on true
+ order by s.np;
+```
+
+5 NP (98587, 98588, 98589, 98590, 98617), las **5 `coincide = true`**, **0** códigos sin `uxb`.
+Ej. 98587 (Zhang Qikuan): 18 renglones, 21 cajas — los mismos que la ficha ya decía. Lectura como
+`anon` comprobada (`set local role anon`): devuelve las 18 filas. La base tiene ~9.800 filas;
+filtrada por `np`, **6 ms**.
+
+### Rollback
+
+`drop view if exists public.gv_ppp_isis_items;` — es una vista NUEVA y no la lee nadie más que la
+ficha de A Programar. Sin ella la ficha vuelve a decir que no pudo leer el detalle, nada más.

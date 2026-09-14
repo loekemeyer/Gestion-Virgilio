@@ -1,3 +1,29 @@
+## Nota v17.61 (2026-09-14) — una NP de ISIS SÍ tiene detalle, y está en la base del PPP
+
+Corrección de la v17.57. Ahí, para las NP que vienen de ISIS, la ficha decía *"el detalle de
+artículos no está en la página, se ve en ISIS"*. Luis: ***"esa NP tenía el detalle de los códigos
+y las cajas, en algún lugar está. Si no, después cuando pase por la pipeline y llegue a
+facturación, ¿cómo se factura?"***. Tenía razón.
+
+Está en **`GV_PPP_Base_Pedidos`** — la base del PPP, la misma que alimenta el picking y la
+facturación. Lo llamativo es que `gv_ppp_isis_sin_tanda` ya contaba ahí las **líneas** y las
+**cajas** que la propia ficha mostraba en el resumen: los renglones estaban a un JOIN del número
+que decía que no existían.
+
+- Vista nueva **`gv_ppp_isis_items`** (`sql/gv_ppp_isis_items_v1761.sql`): por NP, el **código**,
+  las **cajas** agrupadas y —resolviendo el `uxb` del artículo— las **unidades**. Normaliza la NP
+  y deduce la empresa con las mismas reglas que `gv_ppp_isis_sin_tanda`, así los totales dan igual
+  (medido: 5 NP, las 5 coinciden, 0 códigos sin `uxb`).
+- El front la pide **al abrir la ficha** y la cachea (`_apr.isisItems`), para no sumarle otra
+  vuelta de red a la carga inicial. Vale para **todas** las NP viejas de ISIS, estén en Pedidos a
+  programar o en Cuarentena.
+- Si no se puede leer, la ficha dice **que no se pudo leer** — nunca que el detalle no existe — y
+  el 🔄 lo reintenta.
+
+⚠ Para la próxima: `gv_uxb_resuelto.empresa` es `LK`/`CH` en MAYÚSCULA, no `lk`/`chef`.
+
+§3.fl de `docs/SUPABASE-GESTION-VIRGILIO.md`.
+
 ## Nota v17.57 (2026-09-14) — el contenido de la NP se ve con la flechita, en las dos columnas
 
 Pedido de Luis: *"necesito que aparezca el dato del contenido de las NP en algún lado visible en

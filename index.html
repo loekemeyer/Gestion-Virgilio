@@ -5074,7 +5074,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=17.60"></script>
+<script type="module" src="recepcion.js?v=17.61"></script>
 <!-- Config del módulo de fichada (compartido con fichada.html). El secret
      hmacSecret tiene que ser el mismo acá y allá; cargándolo desde un solo
      archivo evitamos que se desincronicen. -->
@@ -8451,7 +8451,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v17.60";
+const APP_VERSION = "v17.61";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -38250,6 +38250,9 @@ let _apr = {
 
   horizonte: 21,    // cuántos días muestra la lista
   q: "", exp: {}, drag: null, dragTanda: null, msg: "", msgErr: false,
+  // v17.61 (Luis) — renglones de una NP de ISIS: np → "cargando" | [items] | null (no se pudo).
+  // No vienen con el pedido (ISIS no pasa por la página): se piden al abrir la ficha.
+  isisItems: {},
   ocupado: false,   // hay una acción en vuelo: no dejar arrastrar encima
   // v13.81 (dueño: "se ve todo muy chiquitito; hagamos dos pasos: armar la tanda y después elegir el día"):
   paso: 1,          // 1 = elegir pedidos · 2 = elegir día
@@ -38733,6 +38736,9 @@ function aprLogHtml() {
 async function aprCargar() {
   if (_apr.cargando) return;
   _apr.cargando = true; _apr.err = ""; aprRender();
+  // v17.61: los detalles de NP de ISIS que NO se pudieron leer se reintentan en esta vuelta;
+  // los que se leyeron bien quedan cacheados (la base del PPP no cambia sola).
+  for (const k in (_apr.isisItems || {})) if (_apr.isisItems[k] === null) delete _apr.isisItems[k];
   try {
     // v13.58: las dos empresas juntas, sin filtro. `order_id` se repite entre LK y Chef
     // (1350 de LK ≠ 1350 de Chef), así que la clave de "ya está afuera" es empresa+order_id.
@@ -39171,8 +39177,41 @@ function aprPorQueHtml(lista) {
    los artículos iban como chips `505L ×2`, que no decía si ese 2 eran cajas o unidades.
    Los ítems vienen de LK (`v_pedidos_web_np.items`) con la forma {art, cajas, uni, uxb}:
    art = código del artículo, cajas = bultos, uni = unidades, uxb = unidades por bulto.
-   Las NP de ISIS (`_isis`) no traen ítems: ahí se dice, no se miente con una tabla vacía. */
+
+   v17.61 (Luis: "esa NP tenía el detalle de los códigos y las cajas, en algún lugar está; si no,
+   cuando llega a facturación ¿cómo se factura?"). Tenía razón: la v17.57 decía que una NP de ISIS
+   no tenía detalle, y sí lo tiene — no en la página, pero sí en la **base del PPP**
+   (`GV_PPP_Base_Pedidos`), que es de donde sale el picking y, río abajo, la facturación. La
+   vista `gv_ppp_isis_items` (v17.61) devuelve esos renglones ya agrupados por código, con las
+   cajas y —resolviendo el uxb del artículo— las unidades. Vale para TODAS las NP viejas de ISIS,
+   estén en Pedidos a programar o en Cuarentena. Se piden al abrir la ficha (una NP por vez,
+   cacheadas en `_apr.isisItems`): no se cargan de entrada para no sumarle otra vuelta de red a
+   una pantalla de la que ya se dijo que "tarda mucho en aparecer pedidos". */
 function aprItemUni(it) { const u = Number(it && it.uni); return isFinite(u) ? u : 0; }
+function aprIsisNp(p) { return (p && p._isis) ? String(p.np || "").trim() : ""; }
+async function aprIsisItemsCargar(np) {
+  np = String(np || "").trim(); if (!np) return;
+  _apr.isisItems = _apr.isisItems || {};
+  if (_apr.isisItems[np] !== undefined) return;   // ya está cargada, cargando, o ya falló
+  _apr.isisItems[np] = "cargando";
+  try {
+    const rows = await aprGet("gv_ppp_isis_items?select=art,cajas,uxb,uni&np=eq." +
+      encodeURIComponent(np) + "&order=art.asc&limit=2000");
+    _apr.isisItems[np] = (rows || []).map(function (r) {
+      return { art: r.art, cajas: Number(r.cajas) || 0, uxb: Number(r.uxb) || 0, uni: Number(r.uni) || 0 };
+    });
+  } catch (_e) { _apr.isisItems[np] = null; }     // null = no se pudo leer (se reintenta al recargar)
+  if (_pppTab === "prog") aprRender();
+}
+/* El detalle de una NP de ISIS: lo que haya en el caché, o el aviso de en qué está. */
+function aprIsisItemsHtml(np) {
+  const c = (_apr.isisItems || {})[np];
+  if (c === undefined) { aprIsisItemsCargar(np); return '<div class="apr-det-sin">Buscando el detalle en la base del PPP…</div>'; }
+  if (c === "cargando") return '<div class="apr-det-sin">Buscando el detalle en la base del PPP…</div>';
+  if (c === null) return '<div class="apr-det-sin">No se pudo leer el detalle de la NP ' + escapeHtml(np) + '. Probá con 🔄.</div>';
+  if (!c.length) return '<div class="apr-det-sin">La NP ' + escapeHtml(np) + ' no tiene renglones en la base del PPP.</div>';
+  return aprItemsTablaHtml(c);
+}
 function aprItemsTablaHtml(items) {
   const its = (items || []).slice();
   if (!its.length) return "";
@@ -39191,8 +39230,14 @@ function aprItemsTablaHtml(items) {
 }
 function aprContenidoHtml(p) {
   const bl = (p && p.bloques) || [];
+  const isisNp = aprIsisNp(p);
   let uni = 0;
   for (const b of bl) for (const it of (b.items || [])) uni += aprItemUni(it);
+  // v17.61: en una NP de ISIS las unidades salen del detalle que trajimos de la base del PPP
+  if (!uni && isisNp) {
+    const c = (_apr.isisItems || {})[isisNp];
+    if (Array.isArray(c)) for (const it of c) uni += aprItemUni(it);
+  }
   let h = '<div class="apr-det-res">' +
       '<span class="apr-det-n"><b>' + aprNum(p.lineas || 0, 0) + '</b> líneas</span>' +
       '<span class="apr-det-n"><b>' + aprNum(p.cajas || 0, 0) + '</b> cajas</span>' +
@@ -39204,10 +39249,11 @@ function aprContenidoHtml(p) {
     '<div class="apr-kv"><b>Cliente</b> ' + escapeHtml(p.razon_social || "—") + ' · <b>Cód</b> ' + cuarEmpCod(p.empresa) + ' ' + escapeHtml(p.cod || "—") + '</div>' +
     '<div class="apr-kv"><b>Entrega</b> ' + escapeHtml(p.direccion || p.localidad || "—") + '</div>';
   const conItems = bl.filter(function (b) { return (b.items || []).length; });
-  if (!conItems.length) {
-    h += '<div class="apr-det-sin">' + (p._isis
-      ? 'Esta NP viene de ISIS: el detalle de artículos no está en la página, se ve en ISIS.'
-      : 'Este pedido no trajo el detalle de artículos.') + '</div>';
+  if (!conItems.length && isisNp) {
+    // v17.61: NO viene de la página, pero está en la base del PPP — la misma que pickea y factura
+    h += aprIsisItemsHtml(isisNp);
+  } else if (!conItems.length) {
+    h += '<div class="apr-det-sin">Este pedido no trajo el detalle de artículos.</div>';
   } else if (bl.length === 1) {
     h += aprItemsTablaHtml(bl[0].items);
   } else {

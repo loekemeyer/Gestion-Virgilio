@@ -4,6 +4,9 @@
      (a) Pedidos a programar — la ficha se lee como la de Cuarentena: NP grande arriba, m³ al lado,
          flechita a la derecha, cliente abajo con su número (LK 1000 / CH 2533).
      (b) Cuarentena — la ficha, que antes no se abría, tiene la misma flechita y el mismo detalle.
+   v17.61 (Luis: "esa NP tenía el detalle de los códigos y las cajas, en algún lugar está") —
+     (c) una NP vieja de ISIS SÍ tiene detalle: sale de la base del PPP (`gv_ppp_isis_items`), se
+         pide al abrir la ficha y se cachea. Si no se puede leer, lo dice; no inventa una tabla.
    Estado inyectado; no pega contra la red. */
 const path = require("path");
 let chromium;
@@ -61,10 +64,44 @@ catch (_e) {
     out.resumen = /apr-det-n"><b>2<\/b> líneas/.test(html) && /<b>3<\/b> cajas/.test(html) && /<b>36<\/b> unidades/.test(html);
     out.entrega = /<b>Entrega<\/b> Montes de Oca 1/.test(html);
 
-    // una NP de ISIS no trae ítems: lo dice, no muestra una tabla vacía
-    aprToggle("pnp98587"); await new Promise((res) => setTimeout(res, 150));
+    // ── (c) v17.61 — la NP de ISIS pide su detalle a la base del PPP ───────────────────────
+    // con la red cortada: avisa que no pudo, NO dice que el detalle no existe
+    aprToggle("pnp98587"); await new Promise((res) => setTimeout(res, 250));
     html = document.getElementById("pppPreview").innerHTML;
-    out.isisSinItems = /Esta NP viene de ISIS: el detalle de artículos no está en la página/.test(html);
+    out.isisPidio = _apr.isisItems && _apr.isisItems["98587"] === null;
+    out.isisFalla = /No se pudo leer el detalle de la NP 98587/.test(html);
+    out.isisSinMentira = !/el detalle de artículos no está en la página/.test(html);
+
+    // con la vista respondiendo: tabla con los códigos y las cajas de la base
+    const pedidos = [];
+    window.aprGet = async function (ruta) {
+      pedidos.push(ruta);
+      if (/gv_ppp_isis_items/.test(ruta)) return [
+        { art: "035E", cajas: 2, uxb: 12, uni: 24 },
+        { art: "207", cajas: 1, uxb: 12, uni: 12 },
+        { art: "404E", cajas: 2, uxb: 4, uni: 8 }
+      ];
+      return [];
+    };
+    delete _apr.isisItems["98587"];
+    aprRender(); await new Promise((res) => setTimeout(res, 250));
+    html = document.getElementById("pppPreview").innerHTML;
+    out.isisRuta = pedidos.some((u) => /^gv_ppp_isis_items\?select=art,cajas,uxb,uni&np=eq\.98587&/.test(u));
+    out.isisTabla = /apr-tab-cod">035E<\/td><td class="n"><b>2<\/b><\/td>/.test(html) &&
+                    /apr-tab-cod">404E</.test(html);
+    out.isisUni = /24 <span class="apr-tab-uxb">×12<\/span>/.test(html);
+    out.isisTotal = /<tfoot><tr><td>3 códigos<\/td><td class="n">5<\/td><td class="n">44<\/td>/.test(html);
+    // el resumen de arriba toma las unidades del detalle que trajo de la base
+    out.isisResumen = /<b>44<\/b> unidades/.test(html);
+    // una sola vuelta de red por NP: la segunda vez sale del caché
+    const antes = pedidos.length;
+    aprRender(); await new Promise((res) => setTimeout(res, 150));
+    out.isisCache = pedidos.length === antes;
+    // 🔄 reintenta sólo las que fallaron; las buenas quedan
+    _apr.isisItems["99999"] = null;
+    for (const k in _apr.isisItems) if (_apr.isisItems[k] === null) delete _apr.isisItems[k];
+    out.isisReintento = _apr.isisItems["99999"] === undefined && Array.isArray(_apr.isisItems["98587"]);
+    aprToggle("pnp98587");
 
     // ── (b) Cuarentena ─────────────────────────────────────────────────────────────────────
     _apr.exp = {};
@@ -110,7 +147,16 @@ catch (_e) {
   t(r.tablaTotal, "(a) el total de códigos, cajas y unidades");
   t(r.resumen, "(a) el resumen de arriba: líneas, cajas, unidades");
   t(r.entrega, "(a) la dirección de entrega");
-  t(r.isisSinItems, "(a) una NP de ISIS avisa que el detalle no está, sin tabla vacía");
+  t(r.isisPidio, "(c) abrir una NP de ISIS dispara la lectura del detalle");
+  t(r.isisFalla, "(c) si no se puede leer, lo dice");
+  t(r.isisSinMentira, "(c) NUNCA dice que el detalle de una NP de ISIS no existe");
+  t(r.isisRuta, "(c) lo pide a gv_ppp_isis_items filtrando por esa NP");
+  t(r.isisTabla, "(c) muestra los códigos y las cajas de la base del PPP");
+  t(r.isisUni, "(c) con las unidades resueltas por el uxb del artículo");
+  t(r.isisTotal, "(c) y su total de códigos, cajas y unidades");
+  t(r.isisResumen, "(c) el resumen de arriba suma las unidades del detalle");
+  t(r.isisCache, "(c) una sola vuelta de red por NP (después sale del caché)");
+  t(r.isisReintento, "(c) el 🔄 reintenta sólo las que fallaron");
   t(r.cuarChev, "(b) la ficha de Cuarentena tiene la flechita arriba a la derecha");
   t(r.cuarCerrada, "(b) arranca cerrada");
   t(r.cuarTabla, "(b) abierta muestra el mismo detalle de códigos y cajas");
