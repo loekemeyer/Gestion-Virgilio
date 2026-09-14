@@ -12,7 +12,7 @@
 > única**; no se replica. Ante la duda entre parche rápido y fix de raíz → **fix
 > de raíz**.
 >
-> Última actualización: 2026-09-14 (domingo) · Versión app al documentar: **v17.07**
+> Última actualización: 2026-09-14 (domingo) · Versión app al documentar: **v17.09**
 >
 > Nota **v16.97 (2026-09-14, Thomas) — AVANCE DEL DÍA: "85 % listo · 60 % armado" en la PPP, por
 > Telegram a las 16:00 y como tarea de Planify para Marianela.**
@@ -53,6 +53,13 @@
 >   fue como desapareció sin que se notara (la PPP mostraba los % del respaldo local, que no tiene
 >   facturación). ⚠ Al cambiar la firma de una función que llama el front, **mandar siempre
 >   `notify pgrst, 'reload schema'`**: mientras el cache de PostgREST no se recarga, la RPC da 404.
+> - **v17.09 (mismo día) — por qué la barra se quedaba en "buscando…":** la RPC tardaba **7,3 s** y el
+>   rol `anon` corta a los **3 s** (`statement_timeout`), así que el navegador **nunca** recibía el
+>   dato. Culpables: `gv_ppp_en_salida` (~4 s) y `gv_ppp_entregados` (~3,2 s), usadas dos veces cada
+>   una. Se reemplazaron por las tablas base (`Facturacion_NP` + `GV_PPP_Entregados_Historico` para el
+>   universo, y los eventos **CCN/CRN** para la marca de "ya salió"): **149 ms**. ⚠ Toda función que
+>   llame el front con la clave anon **se mide** con `explain (analyze, timing off)` después de
+>   tocarla; y si cambia su firma, `notify pgrst, 'reload schema'`.
 > - SQL: `sql/gv_ppp_avance_dia.sql`. Detalle, medición y rollback: `docs/SUPABASE-GESTION-VIRGILIO.md`
 >   §3.ef. Test: `tests/ppp-avance.cjs`.
 >

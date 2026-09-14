@@ -1,4 +1,4 @@
--- v16.97 / v17.03 / v17.07 (2026-09-14) — AVANCE DEL DÍA: % listo, % armado, % en curso, % sin empezar y
+-- v16.97 / v17.03 / v17.07 / v17.09 (2026-09-14) — AVANCE DEL DÍA: % listo, % armado, % en curso, % sin empezar y
 -- % FACTURADO sobre lo armado. Lo miran tres lugares: la PPP, el Telegram de las 16:00 y la tarea
 -- de Planify de Marianela.
 --
@@ -22,19 +22,27 @@
 --   listo     = la tanda del pedido tiene el PICKING TERMINADO (último evento EP/TP de la tanda es
 --               TP). Incluye lo que ya se está armando o está armado.
 --   armado    = la tanda tiene TAP (último AP/TAP es TAP), o el pedido ya está cargado al camión
---               (gv_ppp_en_salida) o entregado (gv_ppp_entregados): si salió, se armó.
+--               (evento CCN) o con el remito controlado (CRN): si salió, se armó.
 --   facturado = la NP está en Facturacion_NP. El % va SOBRE LO ARMADO (lo pidió así), no sobre el
 --               total del día: dice cuánto de lo ya armado pasó por facturación.
---   El % principal va por m³ (el volumen de trabajo del día, la misma unidad del cupo); si el día
---   no tiene m³ cargados, cae a contar pedidos. Los de pedidos se devuelven igual.
+--   Los % PRINCIPALES van POR PEDIDOS (v17.07, dueño: "% por pedidos, no m3"). Los de volumen
+--   quedan en pct_listo_m3 / pct_armado_m3, para el que quiera mirar m³.
 --   100 % SÓLO si de verdad está todo: 15 de 16 redondeaba a 100 y el aviso diría "ya está" con uno
 --   sin armar. Mientras falte algo, el tope es 99 (gv_pct).
 --
 -- UNIVERSO DEL DÍA = todos los pedidos con esa fecha de entrega, de ISIS
 -- (gv_ppp_programacion_diaria) o de la web (PPP_Web_Programacion), MÁS los que ya salieron de la
--- programación porque se cargaron (gv_ppp_en_salida) o se entregaron (gv_ppp_entregados). Sin esos
--- dos el denominador se achica al despachar y el % miente: 10 de 20 entregados y 10 sin armar daría
--- 0 %. Dedup por NP (las NP web vienen etiquetadas "LK 0057" en las cuatro fuentes).
+-- programación porque se facturaron (Facturacion_NP, con fecha_salida de fecha de entrega) o están en
+-- el histórico de entregados (GV_PPP_Entregados_Historico). Sin esos dos el denominador se achica al
+-- despachar y el % miente: 10 de 20 entregados y 10 sin armar daría 0 %. Dedup por NP (las NP web
+-- vienen etiquetadas "LK 0057" en las cuatro fuentes).
+--
+-- ⚠ PERFORMANCE: a esto lo llama el FRONT con la clave anon, y `anon` tiene statement_timeout = 3 s.
+--   Medir SIEMPRE después de tocarla:
+--     explain (analyze, timing off) select * from public.gv_ppp_avance_dias(current_date, current_date + 6);
+--   Hoy: 149 ms. La primera versión usaba gv_ppp_en_salida y gv_ppp_entregados y daba 7,3 s → el
+--   navegador recibía timeout y la PPP nunca mostraba estos números. Y si cambia la FIRMA de la
+--   función: notify pgrst, 'reload schema' (si no, PostgREST contesta 404 hasta que recargue).
 --
 -- Legajos 0 y 1 (Pruebas) no marcan estado, igual que getActivityStatus() del front.
 --
@@ -65,30 +73,31 @@ stable
 set search_path to 'public', 'pg_temp'
 as $$
 with fuentes as (
-  select 1 as pri,
-         regexp_replace(btrim(p.np), '\.0+$', '')            as np,
-         upper(btrim(coalesce(p.tanda, '')))                 as tanda,
-         coalesce(p.m3, 0)::numeric                          as m3,
-         nullif(left(btrim(p.fecha_entrega), 10), '')::date  as fe
+  -- ⚠⚠ TABLAS BASE, NO gv_ppp_en_salida / gv_ppp_entregados. Esas dos vistas tardan ~4 s y ~3 s cada
+  --    una y acá se usaban DOS veces: la función completa daba 7,3 s y el rol `anon` tiene
+  --    `statement_timeout = 3s`, así que al navegador le contestaba timeout y la PPP se quedaba con
+  --    el cálculo local (y sin la barra de facturado). Con las tablas base: 149 ms. §3.ef.
+  select 1 as pri, regexp_replace(btrim(p.np), '\.0+$', '') as np,
+         upper(btrim(coalesce(p.tanda, ''))) as tanda, coalesce(p.m3, 0)::numeric as m3,
+         nullif(left(btrim(p.fecha_entrega), 10), '')::date as fe
     from public.gv_ppp_programacion_diaria p
    where left(btrim(coalesce(p.fecha_entrega, '')), 10) ~ '^\d{4}-\d{2}-\d{2}$'
   union all
   select 2, public.gv_ppp_web_np_label(w.empresa, w.np, w.np_idx),
          upper(btrim(coalesce(w.tanda, ''))), coalesce(w.m3, 0)::numeric, w.fecha_entrega
-    from public."PPP_Web_Programacion" w
-   where w.tanda is not null and btrim(w.tanda) <> ''
+    from public."PPP_Web_Programacion" w where w.tanda is not null and btrim(w.tanda) <> ''
   union all
-  select 3, regexp_replace(btrim(s.np), '\.0+$', ''),
-         upper(btrim(coalesce(s.tanda, ''))), coalesce(s.m3, 0)::numeric,
-         case when left(btrim(coalesce(s.fecha_entrega, '')), 10) ~ '^\d{4}-\d{2}-\d{2}$'
-              then left(btrim(s.fecha_entrega), 10)::date end
-    from public.gv_ppp_en_salida s
+  -- ya facturado: salió de la programación de ISIS. `fecha_salida` hace de fecha de entrega, igual
+  -- que hace gv_ppp_en_salida con esta misma tabla.
+  select 3, regexp_replace(upper(btrim(f.np)), '\.0+$', ''),
+         upper(btrim(coalesce(f.tanda, ''))), coalesce(f.m3, 0)::numeric, f.fecha_salida
+    from public."Facturacion_NP" f where f.fecha_salida is not null
   union all
-  select 4, regexp_replace(btrim(e.np), '\.0+$', ''),
-         upper(btrim(coalesce(e.tanda, ''))), coalesce(e.m3, 0)::numeric,
-         case when left(btrim(coalesce(e.fecha_entrega, '')), 10) ~ '^\d{4}-\d{2}-\d{2}$'
-              then left(btrim(e.fecha_entrega), 10)::date end
-    from public.gv_ppp_entregados e
+  select 4, regexp_replace(btrim(h.np), '\.0+$', ''),
+         upper(btrim(coalesce(h.tanda, ''))), coalesce(h.m3, 0)::numeric,
+         case when left(btrim(coalesce(h.fecha_entrega, '')), 10) ~ '^\d{4}-\d{2}-\d{2}$'
+              then left(btrim(h.fecha_entrega), 10)::date end
+    from public."GV_PPP_Entregados_Historico" h
 ),
 uni as (
   select distinct on (np) np, tanda, m3, fe from fuentes
@@ -105,10 +114,11 @@ ev as (
 ),
 pick as (select distinct on (tanda) tanda, opcion from ev where opcion in ('EP','TP') order by tanda, ts_cliente desc),
 arm  as (select distinct on (tanda) tanda, opcion from ev where opcion in ('AP','TAP') order by tanda, ts_cliente desc),
-salio as (
-  select regexp_replace(btrim(np), '\.0+$', '') as np from public.gv_ppp_en_salida
-  union
-  select regexp_replace(btrim(np), '\.0+$', '') from public.gv_ppp_entregados
+salio as (   -- cargado al camión (CCN) o remito controlado (CRN) = salió, o sea armado sí o sí
+  select distinct regexp_replace(upper(btrim(split_part(r.texto, '|', 1))), '\.0+$', '') as np
+    from public."Registros_Produccion_Virgilio" r
+   where r.opcion in ('CCN','CRN') and coalesce(btrim(r.legajo), '') not in ('0','1')
+     and btrim(coalesce(r.texto, '')) <> ''
 ),
 fact as (
   select distinct regexp_replace(upper(btrim(f.np)), '\.0+$', '') as np from public."Facturacion_NP" f
@@ -125,7 +135,7 @@ est as (
          end as est,
          (fc.np is not null) as facturada
     from dia d
-    left join salio s on s.np = d.np
+    left join salio s on s.np = upper(d.np)
     left join fact fc on fc.np = upper(d.np)
     left join pick  p on p.tanda = d.tanda and d.tanda <> ''
     left join arm   a on a.tanda = d.tanda and d.tanda <> ''

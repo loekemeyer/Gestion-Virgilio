@@ -4648,6 +4648,42 @@ abajo de la de armado-en curso-sin empezar"*.
   dato del backend se ve vacía y dice `buscando…`, en vez de desaparecer), y el fallo de la RPC deja un
   `console.warn` en vez de no decir nada.
 
+### Cuarta pasada — v17.09: el verdadero motivo del "buscando…": 7,3 s contra un timeout de 3 s
+
+La barra de facturado seguía en `buscando…`. **La RPC no llegaba a contestar nunca**: el rol `anon`
+tiene `statement_timeout = 3s` (`authenticated` y `authenticator`, 8 s) y la función tardaba **7,3
+segundos**. No era el schema cache.
+
+Por qué tardaba: usaba `gv_ppp_en_salida` y `gv_ppp_entregados`, dos vistas **carísimas** —medidas
+solas, **~4 s y 3,2 s**— y encima cada una **dos veces** (para el universo y para la marca de "ya
+salió"). Las dos escanean `Registros_Produccion_Virgilio` entero varias veces con `regexp_replace`
+sobre cada fila y se cruzan con el histórico.
+
+El arreglo es no llamarlas: lo que la función necesita de ellas sale de las **tablas base**.
+
+| Lo que hacía falta | De dónde sale ahora |
+|---|---|
+| pedidos del día que ya salieron de la programación | `Facturacion_NP` (con `fecha_salida` de fecha de entrega, igual que hace `gv_ppp_en_salida`) + `GV_PPP_Entregados_Historico` |
+| marca "ya salió" (= armado seguro) | eventos **CCN** o **CRN** de `Registros_Produccion_Virgilio` (índice por `opcion`) |
+
+**149 ms** contra los 7,3 s de antes — 49 veces más rápido. Probado además **como `anon` con el
+timeout puesto**, que es lo que hace el navegador:
+
+```sql
+begin; set local statement_timeout = '3s'; set local role anon;
+select count(*) from public.gv_ppp_avance_dias(current_date, current_date + 6);   -- 7 filas, ok
+rollback;
+```
+
+De paso el universo quedó **más completo**: el 10/09 pasó de 24 a 30 pedidos (los facturados que ya
+no están en el espejo de ISIS) y el 09/09 y 11/09 muestran 94 % y 95 % facturado en vez de números
+calculados sobre menos pedidos.
+
+⚠ **Regla que queda**: esta función la llama el front con la clave `anon`, así que **cada vez que se
+toca hay que medirla** con `explain (analyze, timing off)`; si pasa de ~2 s, no sirve. Y cualquier
+vista que empiece con `gv_ppp_en_salida` o `gv_ppp_entregados` adentro de algo que mira el front es
+sospechosa por definición.
+
 ### Rollback
 
 Todo nuevo, nada compartido → NO va a `ROLLBACK-PRODUCCION.md`.
@@ -11358,7 +11394,7 @@ viene en `false`.
 
 ---
 
-### §3.ef — v16.97/v17.03/v17.07: el AVANCE DEL DÍA (% listo / % armado) en la PPP, en Telegram a las 16:00 y en el Planify de Marianela — 2026-09-14
+### §3.ef — v16.97/v17.03/v17.07/v17.09: el AVANCE DEL DÍA (% listo / % armado) en la PPP, en Telegram a las 16:00 y en el Planify de Marianela — 2026-09-14
 
 **Pedido de Thomas (14/09):** *"a las cuatro de la tarde quiero que mande su mensaje por Telegram, y que
 también se vea en la PPP el porcentaje de estado de los pedidos para un solo día… 85 % listo, 60 % armado…
@@ -11761,7 +11797,7 @@ con doble grafía (problema 134) quedan como están hasta entonces.
 Lo tercero del §3.4 —los **67 `codBase`** no-op de `index.html`— sigue pendiente: es limpieza de
 front, sin riesgo activo, pero toca el archivo de 33k líneas con el byte NUL adentro.
 
-### §3.ei — v17.08: por qué se carga mal, y el centinela que lo caza el mismo día — 2026-09-14
+### §3.ei — v17.09: por qué se carga mal, y el centinela que lo caza el mismo día — 2026-09-14
 
 **Thomas (14/09): *"¿se puede hacer que cargue como corresponde?"* y *"fijate si no rompe alguna otra cosa
 eso, o sea, si no está así por algún otro motivo"*.** Fui a ver lo segundo primero.
