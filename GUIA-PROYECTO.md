@@ -1,3 +1,20 @@
+## Nota v17.53 (2026-09-14) — se acabaron los pedidos duplicados en el Log de Cuarentena
+
+Luis pidió verificar que no queden duplicados y arreglar la causa. La v17.50 los fusionaba **al
+leer**; la causa seguía viva: las dos formas del mismo pedido de ISIS (`np98587` en A Programar,
+`98587` en la lista de ya programados) **se seguían escribiendo** — había 32 claves para 26
+pedidos. Ahora:
+
+1. Las 5 RPC que escriben guardan siempre la clave canónica (y deduplican el payload).
+2. Un **CHECK** en las tres tablas rechaza la forma vieja: si mañana aparece otra puerta de
+   entrada, falla en el insert en vez de duplicar en silencio.
+3. Centinela para mirarlo de un vistazo: `select * from public.gv_cuarentena_claves_sueltas;`
+   — vacío = todo bien.
+4. Las 8 filas viejas se migraron a la clave canónica (con backup en `zz_backups`).
+
+Resultado: 26 pedidos, **0 repetidos**, centinela vacío. SQL y rollback:
+`sql/gv_cuarentena_clave_unica_v1753.sql` · §3.fi.
+
 ## Nota v17.50 (2026-09-14) — por qué un pedido salía sin razón social
 
 Luis preguntó por qué el pedido 1426 (LK 4210) figuraba en el Log de Cuarentena sin nombre.

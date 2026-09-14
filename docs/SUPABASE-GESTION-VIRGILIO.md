@@ -13803,3 +13803,53 @@ Salud al cerrar: `Z. ALARMA` 0 · `gv_endpoints_rotos` 0 · `gv_stock_particion_
 índice `indisvalid` true · `GV_Lugar_Item` 790 · 0 transacciones abiertas.
 
 **Definición y rollback:** `sql/gv_canon_etapa3_v1751.sql`.
+
+---
+---
+
+### §3.fi — v17.53: la clave única se normaliza AL ESCRIBIR, y la base lo exige — 2026-09-14
+
+**Luis (2026-09-14):** *"fijate que no haya más pedidos duplicados en el log — arreglá el problema
+que lo causaba"*.
+
+**Qué faltaba.** La v17.50 (§3.fg) normalizó la clave **en la lectura**, así que el log dejó de
+mostrar duplicados. Pero eso tapa el síntoma: las dos formas del mismo pedido de ISIS —`np98587`
+desde "A Programar", donde la NP se disfraza de pedido con `order_id = 'np' + np`, y `98587` desde
+la lista de ya programados— **se seguían escribiendo**. Medido: `GV_Cuarentena_Log` tenía **32
+claves para 26 pedidos** (6 con prefijo) y `GV_Cuarentena_Liberados` 2 más. Cada vez que alguien
+abriera una pantalla, la deuda crecía.
+
+**Tres capas, porque con una sola esto vuelve.**
+
+1. **Las 5 RPC que escriben normalizan** (`gv_cuarentena_marcar`, `_log_registrar`, `_liberar`,
+   `_devolver`, `_comentar`). Además `marcar` y `log_registrar` **deduplican el payload**
+   (`distinct on` por empresa + clave normalizada): si en una misma llamada llegaran las dos
+   formas, el `left join lateral` que decide si hay novedad no ve la fila que se está insertando
+   en esa misma pasada y escribiría dos eventos `entro` — verificado, antes escribía 2 filas y
+   ahora 1. Y `devolver` compara normalizado al borrar de `_Liberados`: si no, una fila vieja con
+   prefijo no se borraba y el pedido quedaba aprobado para siempre.
+2. **Un CHECK en las tres tablas** (`gv_cuar_*_clave_canonica`) que rechaza la forma vieja. Es lo
+   que convierte "arreglado" en "no puede volver a pasar": si mañana aparece otra puerta —otra
+   RPC, un script, un cron— **falla en el insert** en vez de duplicar en silencio. Probado: un
+   `insert` con `np99999` es rechazado.
+3. **Un centinela**: `select * from public.gv_cuarentena_claves_sueltas;` — vacío = todo bien.
+
+**Migración de lo ya escrito** (autorizada por Luis). Las 8 filas con la forma vieja (6 en el log,
+2 en aprobados, 0 en comentarios) pasaron a la clave canónica. **Backup previo** de las dos tablas
+**enteras** en `zz_backups."GV_Backup_Cuarentena_Log_20260914"` (36 filas) y
+`..._Liberados_20260914"` (10), anotadas en `GV_Backups_Indice`. Antes se verificó que ninguna
+clave canónica ya existiera junto a su prefijada —chocaría con la PK `(empresa, order_id)` de
+Liberados—: 0 casos. Recién con las filas migradas se **validaron** los tres CHECK, que hasta
+entonces eran `NOT VALID`.
+
+**Medición final.** Centinela **vacío**; log **26 pedidos y 0 repetidos**; filas intactas (36 y 10
+— sólo cambió el valor de la clave, no se borró ni se creó nada). Auditadas las otras dos vías
+posibles de duplicado, las dos en 0: una misma clave con dos empresas, y una misma NP en dos filas.
+Las cinco funciones verificadas por md5 del cuerpo normalizado contra la base; ninguna quedó
+abierta a `anon`.
+
+**Rollback:** los tres `drop constraint`, `drop view gv_cuarentena_claves_sueltas`, sacar
+`gv_cuarentena_clave(...)` de las 5 RPC, y restaurar los datos desde las dos tablas de
+`zz_backups`. La normalización de LECTURA (§3.fg) es independiente y puede quedarse: con ella
+puesta, revertir esto no vuelve a mostrar duplicados, sólo los vuelve a escribir. Todo en
+`sql/gv_cuarentena_clave_unica_v1753.sql`.
