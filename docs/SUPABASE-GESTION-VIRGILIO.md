@@ -12644,6 +12644,25 @@ capacidad colgada (→ `solo_capacidad`). Quedó registrado como **problema 160*
 ahora pasan por la misma RPC. El día que esos cinco consumidores lean `gv_planimetria_celda`, se borra
 el bloque del espejo y nada más.
 
+**v17.33 — qué pasó cuando intenté traer los 9 del 11/09 (Thomas: *"¿por qué no podrías traerlos
+al mapa? ¿chocan con algo?"*).** Los traje, y **sí chocaban**: ocho de las diez celdas las tenía
+ocupadas **otro código**, y eso no lo dice la base sino la planilla del relevamiento que Luis subió
+esa misma tarde (`docs/relevamiento-lugares-deposito-20260911.md`, v17.32) — la única fuente que dice
+**qué vio una persona parada delante de la góndola**: `G06`=208, `G07`/`G08`=355, `H60`=592E,
+`C01`=547, `A65`=396+556. El modelo permite que una celda tenga varios códigos (42 ya los tienen),
+así que el `insert` no falla: simplemente **habría hecho ir al operario a buscar un palo de amasar
+donde hay otra cosa**. Se revirtieron los 8 con `gv_lugar_item_sacar` (backups
+`zz_backups.GV_Backup_Lugar_Item_pre_v1731_20260914` y `..._Capacidad_pre_v1731_...`).
+
+**Quedaron los 2 que el relevamiento confirma**: `A60` estaba libre y ahí van **989E y 992E**
+(785 filas en `GV_Lugar_Item`, 783 antes). Los dos entran como `solo_mapa` —ámbar, "sin capacidad
+cargada"— porque la tabla vieja no traía cajas.
+
+⚠ **Y por eso el espejo de capacidad ahora se escribe SÓLO si hay número.** La primera versión
+insertaba la fila igual, con `cajas_max` null, y la celda quedaba en verde (`ok`) cuando lo que
+pasaba era que faltaba cargar la capacidad. Sin fila, la vista la deja en `solo_mapa` y el mapa la
+pinta de ámbar, que es el aviso. Limpiar el campo en el editor ahora **borra** la capacidad.
+
 ⚠ **`#variable_conflict use_column`** en las tres: las columnas de salida se llaman igual que las de
 la tabla (`sector`, `cod`, `clase`), y sin eso el `insert ... (sector, cod, …)` no compila
 ("column reference sector is ambiguous").

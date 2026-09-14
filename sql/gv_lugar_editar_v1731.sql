@@ -64,12 +64,20 @@ begin
   on conflict (sector, cod, clase) do update
     set cajas_max = excluded.cajas_max, activo = true, updated_at = now();
 
-  -- espejo (ver el encabezado)
-  insert into public."Capacidad_Sector" (sector, cod, cajas_max, empresa)
-  values (v_sec, v_cod, p_cajas_max, v_emp)
-  on conflict (sector, cod) do update
-    set cajas_max = excluded.cajas_max,
-        empresa   = coalesce(excluded.empresa, public."Capacidad_Sector".empresa);
+  -- Espejo (ver el encabezado). Existe SI HAY capacidad: sin número no se escribe una
+  -- fila vacía, porque entonces la celda quedaría en verde («ok») cuando lo que pasa es
+  -- que al depósito le falta cargar cuántas cajas entran. Sin fila, la vista la deja en
+  -- `solo_mapa` y el mapa la pinta de ámbar, que es el aviso.
+  if p_cajas_max is null then
+    delete from public."Capacidad_Sector"
+     where upper(btrim(sector)) = v_key and public.gv_cod_stock(cod) = public.gv_cod_stock(v_cod);
+  else
+    insert into public."Capacidad_Sector" (sector, cod, cajas_max, empresa)
+    values (v_sec, v_cod, p_cajas_max, v_emp)
+    on conflict (sector, cod) do update
+      set cajas_max = excluded.cajas_max,
+          empresa   = coalesce(excluded.empresa, public."Capacidad_Sector".empresa);
+  end if;
 
   return query select v_sec, v_cod, p_clase, p_cajas_max, v_emp;
 end $$;
