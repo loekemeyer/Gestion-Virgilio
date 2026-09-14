@@ -13306,3 +13306,33 @@ SQL completo: `sql/gv_lk_rellenar_sheets_payload_v1740.sql`.
 3. **NP asignada sin programación en los "Retira"** (1395 Ricci desde el 11/09, ahora 1416):
    quedan en A Programar esperando que alguien les ponga fecha. Es el comportamiento esperado de
    Retira, pero conviene mirar que no se acumulen.
+
+### §3.do (cont.) — lo que se midió después de aplicar
+
+**1. El cliente SIGUE viendo un error, y por eso sigue cargando el pedido 5 y 9 veces.**
+`_submitSingleOrder` corre dentro de un `try` de `submitOrder` cuyo `catch` muestra
+**"No se pudo confirmar el pedido: …"** y hace `return` — pero la RPC `submit_order_fast` **ya
+grabó el pedido**. El cliente ve el error, vuelve a apretar, y queda otra fila de `orders`. Los 9
+intentos de Rodríguez (3969) en un minuto son eso. **La red no arregla lo que ve el cliente.**
+
+**2. La excepción salta ANTES del update del payload — o sea que no es la RLS ni la clave.**
+`sheets_sent` quedó en `false` en las 32 filas. Si el fallo fuera EN el `update` (paso 4), sería
+fire-and-forget: no tira excepción sincrónica, el flujo seguiría y `sendOrderToSheetsWithRetry`
+(paso 6) habría puesto `sheets_sent = true`. No pasó → el flujo muere en los pasos 2-3 (armado de
+`pdfItems` / `sheetsPayload`) o en la evaluación sincrónica del objeto del `.update({…})`.
+Candidatos que quedan: `deliveryChoiceSnapshot` o `currentSession` en null.
+
+**3. Efecto en cadena que no se previó: el cron 1 de LK `retry-sheets-cron` (cada 5 min, activo)
+levantó los 6 rellenados y los mandó al Google Sheet** → `sheets_sent = true` en los 6. Medido y
+sin daño: `enviado_a_compras_at` sigue en **null** en los seis, y los crons **7**
+(`procesar-pedidos-web`, el mail de las 12:30 a compras) y **10** (`retry-procesar-pedidos`) están
+en `active = false` desde el 05/09 — así que **no salió ningún mail a compras y nada puede
+tipearse dos veces en ISIS**. De hecho ese cron completó solo el paso 6 que el front no hizo.
+Lección: antes de escribir en una tabla, mirar también qué crons la miran, no sólo qué vistas.
+
+**4. El arreglo de fondo (propuesto, no hecho).** Que `submit_order_fast` **reciba y guarde el
+`sheets_payload` adentro de la RPC**, en la misma transacción que crea el pedido. Hoy un dato del
+que depende que Gestión vea el pedido lo sostiene un `update` posterior que puede fallar en
+silencio. Con el payload adentro de la RPC, un pedido **no puede existir sin payload** y se cae la
+clase entera de problema — y es lo que pide el protocolo de este `CLAUDE.md`: la lógica de negocio
+va en el backend. Requiere tocar el front (mandarle el payload a la RPC) y deploy al IIS.
