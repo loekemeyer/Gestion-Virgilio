@@ -410,9 +410,13 @@ para cuarentena con código de cliente CH"*).** El padrón de LK los tiene con *
 justamente porque a ese cliente no se le vende por LK: evaluar por LK retiene pedidos sanos (pasó con **LK 1431**,
 Il Cheff) y nunca mide el crédito. El mapeo `(lk, cod)` → `(chef, cod_isis)` vive en `GV_Cliente_Isis` —lo empuja LK
 con `sync_cliente_isis_virgilio()`, cron cada 15 min— y lo resuelve `gv_cuarentena_ident`, que usan las tres
-funciones de Cuarentena. **Una NP tipeada en ISIS NO se remapea**: lleva el código de ese ISIS. **Cencosud todavía
-NO entra**: no existe como cliente en `customers` de LK (CUIT 30590360763); hay que darlo de alta y agregarlo a
-`gv_isis_override` como `chef`. `sql/gv_cliente_isis_v1775.sql`, §3.fp.
+funciones de Cuarentena. **Una NP tipeada en ISIS NO se remapea**: lleva el código de ese ISIS. **⚠ Cencosud NO entra
+por esta regla y NO hay que darlo de alta** (dueño, 14/09: *"Cencosud sube pedido por Krikos… siempre (histórico)
+subió pedidos por CH. No lo voy a dar de alta."*): no carga por la página, sus OC entran por **Krikos** y la Bandeja
+las manda directo al portal de **Chef** (`precios_super.cadena`: `cencosud` → `empresa='chef'`, `cod_cliente_chef=2444`,
+`cod_cliente_lk` nulo). Medido: 4.452 líneas del 2444 en `sales_lines` marcadas `chef` desde 2021-05-27, ninguna en LK.
+Su caso propio —NP de Chef con artículos de Loeke **sin** L— ya lo cubre `gv_fac_ajustes_isis` (v13.79): es el caso
+**inverso** al de Tierra del Fuego. `sql/gv_cliente_isis_v1775.sql`, §3.fp.
 
 ## ⚠ Regla del dueño (2026-09-07, v14.12): el agregado va en tanda nueva SÓLO si mezclaría ISIS con web
 

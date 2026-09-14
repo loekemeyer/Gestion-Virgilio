@@ -63,18 +63,27 @@
 -- continente, deja de cumplir "todas TdF" y vuelve a evaluarse por LK: se degrada al
 -- comportamiento viejo, no inventa nada.
 --
--- CENCOSUD: hoy NO puede entrar por esta regla porque **no existe como cliente en el
--- padrón de LK** (verificado el 14/09: 0 filas en `customers` con el CUIT 30590360763; en
--- Chef es el 2444). Sus OC entran por PDF Krikos. Para que aplique hacen falta dos cosas
--- del lado de LK: darlo de alta en `customers` con ese CUIT, y —como sus sucursales no son
--- de TdF— agregar `('30590360763','chef')` a `gv_isis_override`. Con esas dos, la vista le
--- pone la L y el cod de Chef, y este mapeo lo toma solo en la próxima corrida del cron.
+-- ⚠ CENCOSUD NO ENTRA POR ESTA REGLA, Y NO HAY QUE DARLO DE ALTA. La primera versión de
+-- este archivo decía que faltaba crearlo en `customers` de LK y agregarlo a
+-- `gv_isis_override`. El dueño lo corrigió el mismo día: *"Cencosud sube pedido por Krikos
+-- y eso lo detectaba… ya el sistema funcionaba antes y siempre (histórico) subió pedidos
+-- por CH. No lo voy a dar de alta."*
+-- Es verdad que no está en `customers` (0 filas con el CUIT 30590360763), pero no lo
+-- necesita: **no carga por la página**. Sus OC llegan por Krikos y la Bandeja las manda
+-- derecho al portal de Chef — `precios_super.cadena` tiene `cencosud` con `empresa='chef'`,
+-- `cod_cliente_chef='2444'` y `cod_cliente_lk` nulo. El pedido NACE como pedido de Chef:
+-- no hay ningún LK del que convertirlo. Medido: 4.452 líneas del 2444 en `sales_lines`
+-- marcadas `chef`, del 2021-05-27 a hoy (47.328 cajas), ninguna en LK.
+-- Su caso propio —NP de Chef con artículos de Loeke SIN la L— ya lo cubre
+-- `gv_fac_ajustes_isis` (v13.79). Es el caso INVERSO al de Tierra del Fuego, no el mismo.
 --
 -- MEDICIÓN DESPUÉS (14/09): `gv_cuarentena_marcar_calc` sobre LK 1431 pasó de 1 motivo
--- ('suspendido') a 0; el armado intradía de las 15:45 lo programó solo como **LK 0083 /
--- LK 0084, tanda D69F, entrega 21/09**. `gv_cuarentena_ya_programado` quedó en las mismas
--- 3 filas y ninguna es de los 9 clientes mapeados. Ningún cliente GANA un motivo por el
--- remapeo (ver el cuadro de arriba).
+-- ('suspendido') a 0 y el armado lo programó solo. `gv_cuarentena_ya_programado` quedó en
+-- las mismas 3 filas y ninguna es de los 9 clientes mapeados. Ningún cliente GANA un motivo
+-- por el remapeo (ver el cuadro de arriba). Unas horas más tarde, la v17.80/83 llevó esos
+-- pedidos un paso más: ya no son NP de LK con la cuarentena remapeada, son **NP de Chef**
+-- (LK 1430/1431/1432 → CH 0020..CH 0024). Este mapeo sigue haciendo falta igual, porque es
+-- lo que resuelve el cod de Chef con el que se evalúan.
 --
 -- ROLLBACK (deja todo como el 14/09 a la mañana):
 --   -- en LK:       select cron.unschedule('sync-cliente-isis-virgilio');

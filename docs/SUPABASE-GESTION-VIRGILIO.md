@@ -14873,13 +14873,27 @@ sucursal de entrega). Hoy coinciden porque el único cliente con sucursales mixt
 va por LK. Si un cliente de TdF suma una sucursal en el continente, deja de cumplir "todas TdF" y
 vuelve a evaluarse por LK: se degrada al comportamiento viejo, no inventa nada.
 
-### Cencosud: falta un paso que es del dueño
+### ⚠ Cencosud NO entra por esta regla, y no tiene que entrar
 
-**Hoy NO puede entrar por esta regla porque no existe como cliente en el padrón de LK** (verificado el
-14/09: 0 filas en `customers` con el CUIT 30590360763; en Chef es el 2444). Sus OC entran por PDF
-Krikos. Para que aplique hacen falta dos cosas en LK: **darlo de alta en `customers` con ese CUIT**, y
-—como sus sucursales no son de TdF— **agregar `('30590360763','chef')` a `gv_isis_override`**. Con eso
-la vista le pone la L y el cod de Chef, y el mapeo lo toma solo en la corrida siguiente.
+Esta sección decía, hasta el 14/09 a la tarde, que Cencosud *"falta darlo de alta en `customers` de
+LK y agregarlo a `gv_isis_override`"*. **Está mal, y el dueño lo corrigió el mismo día:** *"Cencosud
+sube pedido por Krikos y eso lo detectaba… ya el sistema funcionaba antes y siempre (histórico)
+subió pedidos por CH. No lo voy a dar de alta."*
+
+Es cierto que no existe en `customers` de LK (0 filas con el CUIT 30590360763), pero **no lo
+necesita**: Cencosud no carga por la página. Sus OC llegan por **Krikos**, y la Bandeja las manda
+directo al portal de **Chef** — `precios_super.cadena` tiene `super_key='cencosud'` con
+`empresa='chef'`, `cod_cliente_chef='2444'`, `cod_cliente_lk = null` y la nota *"Cliente/RPC/Sheets
+de Chef, pero matchea productos de LK + loke_products"*. O sea que el pedido **nace** como pedido de
+Chef: no hay ningún LK del que convertirlo.
+
+Medido: `sales_lines` tiene **4.452 líneas del 2444 marcadas `chef`**, desde el **2021-05-27** hasta
+hoy, 47.328 cajas. Nunca facturó por LK.
+
+Lo único de Cencosud que sí es un caso aparte ya está resuelto por otro lado: su NP de Chef lleva
+artículos de Loeke **sin** la L, y por eso entra al checklist de ajustes de ISIS
+(`gv_fac_ajustes_isis` v2, v13.79, §3.bd). Es el caso **inverso** al de Tierra del Fuego, no el
+mismo. Darlo de alta en LK no arreglaría nada y crearía un cliente duplicado.
 
 SQL, medición y rollback: `sql/gv_cliente_isis_v1775.sql`; definición previa de las tres funciones en
 `sql/backups/gv_cuarentena_pre_v1775_20260914.sql`.
