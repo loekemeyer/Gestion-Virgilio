@@ -12,7 +12,7 @@
 > única**; no se replica. Ante la duda entre parche rápido y fix de raíz → **fix
 > de raíz**.
 >
-> Última actualización: 2026-09-14 (domingo) · Versión app al documentar: **v17.30**
+> Última actualización: 2026-09-14 (domingo) · Versión app al documentar: **v17.32**
 >
 > Nota **v17.20/v17.22 (2026-09-14, Luis) — CUARENTENA: columna "Enviar a" en la tabla de ya
 > programados** (se llamó "Marcar" hasta que Luis la renombró, mismo día).
@@ -190,6 +190,23 @@
 >   otro lado, y **54 eran celdas `Libre`** — una celda vacía no es una divergencia. ⚠ **El
 >   problema 84 está anclado al 107; el número que vale es 35.**
 > - `sql/gv_gondola_divergente_v1726.sql`. Detalle: `docs/SUPABASE-GESTION-VIRGILIO.md` §3.et.
+>
+> Nota **v17.32 (2026-09-14, Luis) — el relevamiento del depósito entra al repo COMPLETADO.**
+> `docs/relevamiento-lugares-deposito-20260911.xlsx` era la versión **antes de recorrer**, con la
+> columna amarilla vacía. Ahora está el bueno, con **41 respuestas de quien caminó el depósito**, y
+> al lado `docs/relevamiento-lugares-deposito-20260911.md` con la guía de lectura.
+>
+> - ⚠ **La planilla NO es la verdad de hoy.** Luis: *"ya la laburamos antes y se hicieron
+>   correcciones que quedaron en el código pero no en el excel"*. Si choca con `GV_Lugar` /
+>   `GV_Lugar_Item`, **manda la base**. El `.md` lista los choques conocidos para no rediscutirlos.
+> - **Cierra el problema 88:** `Ñ53` es la góndola de **Chef** del 439E (Luis: *"poné la Ñ53 al 439E
+>   de CH"*). Las 8 cajas de `439E CH` tenían stock y ningún lugar; ahora lo tienen.
+> - **M34/M35/M36 van con E:** el relevamiento los anotó pelados y Luis pidió agregársela —
+>   `630E`, `631E`, `634E`, `635E`, `636E`. Es el código con E el que tiene nombre en el maestro.
+> - **La celda U2 (A62) dice `355.06599999999997` y es un error de tipeo**: son DOS códigos
+>   (`355, 066` escrito con punto), y el primero va **`335`**, que es lo que el mapa ya tiene.
+>   **A62 no se toca.** Si se automatiza esa columna, leerla como texto.
+> - Detalle: `docs/SUPABASE-GESTION-VIRGILIO.md` §3.ev.
 
 > Nota **v15.40 (2026-09-11) — HANDOFF de planimetría / Acacia: `docs/HANDOFF-PLANIMETRIA-Y-ACACIA.md`.**
 > Thomas sigue este tema en otra sesión. Ahí está todo junto: los **13 artículos activos del catálogo LK

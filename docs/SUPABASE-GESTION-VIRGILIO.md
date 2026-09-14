@@ -12874,3 +12874,55 @@ meses; al pie, cuántos días hábiles van y el margen típico a esa altura.
 |---|--:|--:|--:|--:|
 | Loekemeyer | 8.127 cj | **17.879** | 19.076 | 17.184 |
 | Chef | 2.145 cj | **4.719** | 3.463 | 3.514 |
+
+---
+
+### §3.ev — v17.32: el relevamiento del 11/09 entra al repo COMPLETADO, y cierra el problema 88 — 2026-09-14
+
+Luis subió el xlsx del relevamiento **con la columna amarilla llena**. El que estaba versionado
+(`docs/relevamiento-lugares-deposito-20260911.xlsx`) era la versión **antes de recorrer**: misma
+forma, misma cantidad de filas, pero sin una sola respuesta. Se reemplazó por el bueno (el viejo
+queda en la historia de git) y se le agregó **`docs/relevamiento-lugares-deposito-20260911.md`**
+con la guía de lectura.
+
+⚠ **La planilla NO es la verdad de hoy** (Luis: *"ya la laburamos antes y se hicieron correcciones
+que quedaron en el código pero no en el excel"*). Si choca con `GV_Lugar` / `GV_Lugar_Item`, manda
+la base. El `.md` lista los casos donde ya chocan, para no rediscutirlos.
+
+**Qué resuelve:** las respuestas son **41 de 70** lugares (las 29 que faltan son los racks de
+insumos, excluidos a propósito). Contestan **las 35 divergencias** del problema 84 — el patrón
+dominante es que *la capacidad quedó pegada al código viejo y el mapa al nuevo* (E10 225→312,
+F49 574→574E, G13 823→509, G15 509→256, J44 335→599E, M10 702→702E, C10 071→547), así que no hay
+que elegir quién manda: hay que mover el `cajas_max`. Y descartan 7 de las 8 celdas que
+`Planimetria` reclamaba (§3.et): G06=208, G07/G08=355, H60=592E, C01=547, A65=396+556. **A60 es la
+única libre**, y ahí sí van 989E y 992E.
+
+#### Dos cambios de datos aplicados (backup en `zz_backups`, con RLS)
+
+1. **`Ñ53` es la góndola de CHEF del 439E** — Luis, textual: *"poné la Ñ53 al 439E de CH"*.
+   `GV_Lugar.Ñ53.empresa` LK → **CH**, más la fila `(Ñ53, 439E, articulo)` en `GV_Lugar_Item`.
+   **Cierra el problema 88**: las 8 cajas de `439E CH` tenían stock y ningún lugar. Deja sin efecto
+   la nota del 11/09 ("LOKE y libre").
+2. **M34 / M35 / M36 van con E** — el relevamiento los anotó pelados; Luis: *"claramente relevaron
+   esos sin la E, agregásela"*. `630`→`630E`, `631`→`631E`, `634`→`634E`, `635`→`635E`,
+   `636`→`636E` (5 filas). Es el código con E el que tiene nombre en el maestro (Cucharón,
+   Espumadera, Cuchara calada, Espátula lisa, Espátula); el pelado tiene la descripción vacía.
+   `632`, `633`, `613`, `637` y `858` no tienen par y no se tocaron.
+
+Backups: `zz_backups."GV_Backup_Lugar_Item_20260914"` (11 filas) y
+`zz_backups."GV_Backup_Lugar_20260914"` (5), las dos con RLS y sin INSERT/UPDATE/DELETE para
+`anon`/`authenticated`.
+
+**El centinela bajó de 35 a 34, no a 29, y está bien:** `Capacidad_Sector` tiene las DOS grafías
+cargadas en esas celdas (`630` y `630E`, los dos con 12 cajas). Al pasar el mapa a `630E` el par
+quedó `ok` y el que sobra ahora es la fila pelada de capacidad. Sacar esos 5 duplicados va en la
+misma tanda que las otras filas viejas de capacidad — **todavía sin autorizar**.
+
+#### La celda U2 (A62) y el punto decimal
+
+Dice `355.06599999999997`. **Son dos códigos**: se escribió `355, 066` con un `.` en vez de coma y
+Excel lo guardó como número. Y el primero tampoco es 355: **va `335`**, que es justo lo que ya
+tiene `GV_Lugar_Item` (`335` + `066`). Confirmado por Luis. **A62 no se toca** — lo que en §3.et
+figuraba como "typo del mapa" era un error de tipeo de la planilla, al revés de como lo leí.
+
+Si alguna vez se automatiza la lectura de esa columna, **leerla como texto**, nunca como número.
