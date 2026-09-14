@@ -2795,7 +2795,7 @@ tr.ppp-err-zona > td{ background:#fffbeb !important; }
 .pn-av-top{ display:flex; align-items:center; gap:12px; flex-wrap:wrap; }
 .pn-av-top .t{ font-size:12px; font-weight:800; color:#64748b; text-transform:uppercase; letter-spacing:.04em; }
 .pn-av-top .k{ font-size:13px; font-weight:700; color:#334155; }
-.pn-av-top .k b{ font-size:22px; font-weight:900; margin-right:3px; }
+.pn-av-top .k b{ font-size:22px; font-weight:900; margin-right:6px; }
 .pn-av-top .k.li b{ color:#b45309; } .pn-av-top .k.ar b{ color:#1e6bd6; }
 .pn-av-bar{ position:relative; height:12px; border-radius:999px; background:#e2e8f0; overflow:hidden; margin:8px 0 6px; }
 .pn-av-bar i{ position:absolute; left:0; top:0; height:100%; border-radius:999px; }
@@ -4789,7 +4789,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=16.97"></script>
+<script type="module" src="recepcion.js?v=16.98"></script>
 <!-- Config del módulo de fichada (compartido con fichada.html). El secret
      hmacSecret tiene que ser el mismo acá y allá; cargándolo desde un solo
      archivo evitamos que se desincronicen. -->
@@ -7904,7 +7904,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v16.97";
+const APP_VERSION = "v16.98";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
