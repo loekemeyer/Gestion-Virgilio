@@ -14076,3 +14076,48 @@ y no simplemente saca camiones enteros.
 
 El detalle entra en un celular de **412 px sin scroll horizontal** con las 7 columnas (tabla 360 px
 de una tarjeta de 388). Los tics son **texto verde, no celdas pintadas**.
+
+### §3.fi — v17.60: `LIBRE` es residuo, no señal. `guardar` lo limpia; `sacar` NO lo repone
+
+⚠⚠ **Esta sección corrige a §3.fh (v17.58). Vale ésta.** Aquélla decía que `cod='LIBRE'` estaba
+*"vivo en cinco lugares"* y que no había que tocarlo. **Estaba mal, por leer el código al revés**:
+esos `if (k === "LIBRE") return` no son consumidores que la usan, son **guardas para esquivarla**.
+
+**Lo medido:**
+
+- **`gv_planimetria_celda` no devuelve ni una fila `cod='LIBRE'`** (0 de 54) y calcula
+  `estado = 'libre'` como **`p.k IS NULL`** — por **ausencia de artículo**, sin mirar la marca.
+- El badge de libres del mapa usa `r.estado === "libre"`, no la fila.
+- El badge *"posiciones LIBRES"* que se citó como prueba **es el de RACKS**
+  (`stkRacksCapCompute`) y usa `p.ocupado`.
+- `vista_generador_oc` la **excluye** dos veces (`<> 'LIBRE'`).
+- `_ocgNorm(...) === "LIBRE"` y `pmapVieja` la **saltean**.
+- `gvFetchLugares` declara `libres: new Set()` **y nunca lo llena** (lee `GV_Lugar`, no
+  `Capacidad_Sector`): **código muerto**.
+
+→ **`cod='LIBRE'` es residuo de la planimetría vieja que todos tienen que esquivar.** "Celda
+vacía" ya se resuelve por ausencia de artículo.
+
+Y la alarma de §3.fh (*"5 celdas marcadas LIBRE con artículo → el mapa las ofrece como vacías"*)
+**también era infundada**: de esos 54 sectores la vista reporta 49 `libre`, 4 `solo_mapa` y 1 `ok`
+— **ninguno de los ocupados sale como libre**.
+
+**Qué se hizo** (pedido del dueño: *"que guardar saque la marca LIBRE y que vaciar la aplique"* —
+se hizo la primera mitad, no la segunda):
+
+1. `gv_lugar_item_guardar` **borra la fila `LIBRE` del sector** al cargar un artículo. Limpieza
+   gradual: hoy 5 de las 54 están sobre una celda con artículo; las otras 49 son celdas realmente
+   vacías y se quedan.
+2. **Guard: `LIBRE` no se puede cargar como código de artículo** (compara en mayúscula porque
+   `canon_cod_art_val('libre')` devuelve `'LIBRE'`).
+
+**Qué NO se hizo, y por qué: reponer `LIBRE` al vaciar.** Sería fabricar filas que todos esquivan
+y que no le dicen nada a nadie. Y la convención **ni siquiera existe**: hay **88 celdas vacías SIN
+marca** contra 54 con marca — las 54 no son una regla, son lo que quedó.
+
+**Verificado** (ROLLBACK, sector A60, el caso testigo): estado inicial mapa `989E,992E` + cap
+`LIBRE`; guardar `989E` → cap pasa a `989E`, **la marca se fue**; guardar `'libre'` → **rechazado**;
+sacar los dos → mapa y cap vacíos, **no repuso LIBRE**; y `gv_planimetria_celda` igual reporta
+**`estado = 'libre'`**. No se tocó ningún dato: las 5 filas se van solas al usar esas celdas.
+
+**Definición y rollback:** `sql/gv_lugar_item_libre_v1760.sql`.
