@@ -873,6 +873,20 @@ button {
 .cuar-yp-lib:hover{ background:#fff1f1; }
 .cuar-yp-lib b{ font-size:10px; color:#991b1b; margin-left:3px; vertical-align:2px; }
 .cuar-yaprog-aprob-n{ background:#dcfce7; color:#166534; border-radius:999px; padding:0 8px; font-size:10.5px; margin-left:6px; }
+/* v17.20 (Luis) — columna "Marcar": aprobar (deja el pedido y pide comentario) o devolverlo
+   a Cuarentena (lo saca de la programación y vuelve a A Programar). */
+.cuar-yp-marcar{ display:flex; gap:4px; flex-wrap:wrap; }
+.cuar-yp-act{ width:auto; margin:0; border-radius:7px; padding:2px 8px; font-size:10.5px;
+  font-weight:800; cursor:pointer; white-space:nowrap; line-height:1.5; }
+.cuar-yp-act-ok{ background:#166534; color:#fff; border:none; }
+.cuar-yp-act-ok:hover{ background:#14532d; }
+.cuar-yp-act-cuar{ background:#fff; color:#9a3412; border:1px solid #e8b894; }
+.cuar-yp-act-cuar:hover{ background:#fff1e7; }
+.cuar-danger{ background:#9a3412; color:#fff; border:none; border-radius:8px; padding:8px 16px;
+  font-weight:800; cursor:pointer; width:auto; }
+.cuar-danger[disabled]{ opacity:.6; cursor:default; }
+.cuar-m-warn{ background:#fff7ed; border:1px solid #fed7aa; color:#7c2d12; border-radius:8px;
+  padding:7px 10px; font-size:12.5px; margin-bottom:10px; line-height:1.45; }
 /* v17.15 — log de comentarios (modal) */
 .cuar-log{ display:flex; flex-direction:column; gap:8px; margin-bottom:10px; max-height:40vh; overflow:auto; }
 .cuar-log-it{ border-left:3px solid #cbd5e1; padding:1px 0 1px 9px; }
@@ -4843,7 +4857,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=17.09"></script>
+<script type="module" src="recepcion.js?v=17.20"></script>
 <!-- Config del módulo de fichada (compartido con fichada.html). El secret
      hmacSecret tiene que ser el mismo acá y allá; cargándolo desde un solo
      archivo evitamos que se desincronicen. -->
@@ -7958,7 +7972,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v17.09";
+const APP_VERSION = "v17.20";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -38623,8 +38637,11 @@ async function cuarLiberarConfirmar() {
   const p = (_apr.pedidosTodos || []).find(function (x) { return aprKey(x.empresa, x.order_id) === key; });
   s.saving = true; s.err = ""; cuarComRender();
   try {
+    // los motivos salen del pedido si está a la vista, y si no de la fila de la tabla (un pedido
+    // YA programado no está en `pedidosTodos`: se fue de A Programar cuando recibió tanda)
     await aprRpc("gv_cuarentena_liberar", { p_empresa: empresa, p_order_id: String(orderId),
-      p_motivos: (p && aprCuarentenaMotivos(p)) || null, p_comentario: txt || null, p_por: await aprQuien() });
+      p_motivos: (p && aprCuarentenaMotivos(p)) || s.motivos || null,
+      p_comentario: txt || null, p_por: await aprQuien() });
     s.saving = false; cuarComCerrar(); cuarYaProgRecargar();
     _apr.msg = "Pedido enviado a Pedidos a programar (mantiene el aviso)" + (txt ? ", con tu comentario." : "."); _apr.msgErr = false;
     if (p) { p._cuarLiberado = true; }   // pinta al toque; aprCargar lo confirma
@@ -38727,7 +38744,7 @@ function cuarYaProgHtml() {
     + (aprob ? '<span class="cuar-yaprog-aprob-n" title="Ya aprobados por alguien (se siguen mostrando, con su fecha)">' + aprob + ' aprobado' + (aprob === 1 ? "" : "s") + '</span>' : '')
     + '<span class="apr-cuar-help" title="Estos pedidos YA tienen tanda: la cuarentena no los alcanzó porque el reporte de deuda entró después del armado. No se retiran solos — mirarlos con cobranzas y decidir. El 📖 abre el log de comentarios.">ⓘ</span></div>'
     + '<div class="cuar-yaprog-wrap"><table class="cuar-yaprog-tbl"><thead><tr>'
-    + '<th>NP</th><th>Tanda</th><th>Entrega</th><th>Cliente</th><th>Motivos</th><th>Aprobación</th><th>Coment.</th>'
+    + '<th>NP</th><th>Tanda</th><th>Entrega</th><th>Cliente</th><th>Motivos</th><th>Aprobación</th><th>Marcar</th><th>Coment.</th>'
     + '</tr></thead><tbody>';
   l.forEach(function (r, i) {
     const cod = String(r.cod || "").trim();
@@ -38749,6 +38766,11 @@ function cuarYaProgHtml() {
           ? '<span class="cuar-yp-ok-tag" title="Aprobado (enviado a Pedidos a programar) el ' + escapeHtml(String(r.aprobado_at)) + '">✅ ' + escapeHtml(cuarFechaHora(r.aprobado_at)) + '</span>'
             + (r.aprobado_por ? '<span class="cuar-yp-por" title="' + escapeHtml(String(r.aprobado_por)) + '">' + escapeHtml(String(r.aprobado_por)) + '</span>' : '')
           : '<span class="cuar-yp-sin">sin aprobar</span>') + '</td>'
+      + '<td><div class="cuar-yp-marcar">'
+        + (r.aprobado_at ? '' :
+           '<button class="cuar-yp-act cuar-yp-act-ok" onclick="cuarYpAprobar(' + i + ')" title="Dejarlo aprobado: sigue en su tanda y queda registrado quién lo aprobó (pide un comentario)">✅ Aprobar</button>')
+        + '<button class="cuar-yp-act cuar-yp-act-cuar" onclick="cuarYpCuarentena(' + i + ')" title="Devolverlo a Cuarentena: lo saca de la programación (pierde tanda y fecha) y vuelve a A Programar retenido">🚧 Cuarentena</button>'
+        + '</div></td>'
       + '<td><button class="cuar-yp-lib" onclick="cuarComAbrirIdx(' + i + ')" title="' + (nCom ? nCom + ' comentario' + (nCom === 1 ? "" : "s") : "Sin comentarios") + ' — abrir el log">📖' + (nCom ? '<b>' + nCom + '</b>' : '') + '</button></td>'
       + '</tr>';
   });
@@ -38769,8 +38791,21 @@ function cuarComCerrar() { const el = document.getElementById("cuarComModal"); i
 function cuarComAbrirIdx(i) {
   const r = (_apr.cuarYaProg || [])[i];
   if (!r) return;
-  cuarComAbrir({ modo: "log", empresa: r.empresa || "lk", clave: String(r.clave || r.order_id || r.np || ""),
-                 np: String(r.np || ""), cli: String(r.razon_social || r.cod || "") });
+  cuarComAbrir(Object.assign({ modo: "log" }, cuarYpDatos(r)));
+}
+/* v17.20 (Luis) — columna "Marcar" de la tabla de ya programados. */
+function cuarYpDatos(r) {
+  return { empresa: r.empresa || "lk", clave: String(r.clave || r.order_id || r.np || ""),
+           np: String(r.np || ""), cli: String(r.razon_social || r.cod || ""),
+           motivos: r.motivos || null, picking: !!r.picking_empezado, tanda: String(r.tanda || "") };
+}
+function cuarYpAprobar(i) {
+  const r = (_apr.cuarYaProg || [])[i]; if (!r) return;
+  cuarComAbrir(Object.assign({ modo: "aprobar" }, cuarYpDatos(r)));
+}
+function cuarYpCuarentena(i) {
+  const r = (_apr.cuarYaProg || [])[i]; if (!r) return;
+  cuarComAbrir(Object.assign({ modo: "cuarentena" }, cuarYpDatos(r)));
 }
 async function cuarComAbrir(o) {
   _apr.cuarCom = Object.assign({ lista: [], cargando: true, err: "", saving: false, texto: "" }, o);
@@ -38786,7 +38821,7 @@ function cuarComRender() {
   if (!s || !el) return;
   const ta = document.getElementById("cuarComTexto");
   if (ta) s.texto = ta.value;   // no perder lo tipeado al redibujar
-  const aprobar = s.modo === "aprobar";
+  const aprobar = s.modo === "aprobar", devolver = s.modo === "cuarentena";
   let log = "";
   if (s.cargando) log = '<div class="cuar-m-load">Buscando comentarios…</div>';
   else if (!s.lista.length) log = '<div class="cuar-log-vacio">Todavía no hay comentarios en este pedido.</div>';
@@ -38800,20 +38835,26 @@ function cuarComRender() {
   el.innerHTML =
     '<div class="cuar-m-back" onclick="cuarComCerrar()"></div>' +
     '<div class="cuar-m-card">' +
-      '<div class="cuar-m-head"><b>' + (aprobar ? '➡ Enviar a Pedidos a programar' : '📖 Comentarios') + '</b>' +
+      '<div class="cuar-m-head"><b>' + (aprobar ? '➡ Enviar a Pedidos a programar' : devolver ? '🚧 Volver a Cuarentena' : '📖 Comentarios') + '</b>' +
         '<button class="cuar-m-x" onclick="cuarComCerrar()">✕</button></div>' +
       '<div class="cuar-m-body">' +
         '<p class="cuar-com-sub"><b>' + escapeHtml(String(s.np || "")) + '</b>' +
           (s.cli ? ' · ' + escapeHtml(String(s.cli)) : '') +
           (aprobar ? '<br>Dejá un comentario de por qué se aprueba (cobranzas lo autorizó, ya pagó, lo pidió el dueño…). Queda en el log con tu usuario, la fecha y la hora.'
+                   : devolver ? '<br>Vuelve a Cuarentena: se lo <b>saca de la programación</b> (pierde tanda y fecha) y reaparece en <b>A Programar</b>, retenido. Contá por qué, queda en el log.'
                    : '') + '</p>' +
+        (devolver && s.tanda ? '<div class="cuar-m-warn">Sale de la tanda <b>' + escapeHtml(String(s.tanda)) + '</b>.' +
+          (s.picking ? ' ⚠ Esa tanda <b>ya se empezó a trabajar</b>: lo más probable es que el servidor no deje sacarlo — primero hay que resolverlo con el depósito.' : '') +
+          '</div>' : '') +
         log +
-        '<textarea id="cuarComTexto" class="cuar-com-ta" placeholder="' + (aprobar ? 'Comentario de la aprobación (opcional)' : 'Escribí un comentario…') + '">' + escapeHtml(String(s.texto || "")) + '</textarea>' +
+        '<textarea id="cuarComTexto" class="cuar-com-ta" placeholder="' + (aprobar ? 'Comentario de la aprobación (opcional)' : devolver ? 'Por qué vuelve a Cuarentena (opcional)' : 'Escribí un comentario…') + '">' + escapeHtml(String(s.texto || "")) + '</textarea>' +
         (s.err ? '<div class="cuar-m-err">⚠ ' + escapeHtml(s.err) + '</div>' : '') +
       '</div>' +
       '<div class="cuar-m-foot">' +
         (aprobar
           ? '<button class="cuar-save" ' + (s.saving ? "disabled" : "") + ' onclick="cuarLiberarConfirmar()">' + (s.saving ? "Enviando…" : "✅ Aprobar y enviar") + '</button>'
+          : devolver
+          ? '<button class="cuar-danger" ' + (s.saving ? "disabled" : "") + ' onclick="cuarDevolverConfirmar()">' + (s.saving ? "Sacando…" : "🚧 Volver a Cuarentena") + '</button>'
           : '<button class="cuar-save" ' + (s.saving ? "disabled" : "") + ' onclick="cuarComAgregar()">' + (s.saving ? "Guardando…" : "Agregar comentario") + '</button>') +
       '</div>' +
     '</div>';
@@ -38836,6 +38877,25 @@ async function cuarComAgregar() {
   } catch (e) { s.saving = false; s.err = String((e && e.message) || e); cuarComRender(); }
 }
 function cuarYaProgRecargar() { _apr.cuarYaProg = undefined; _apr.cuarYaProgLoading = false; cuarYaProgCargar(); }
+/* v17.20 (Luis) — "Marcar → Cuarentena": lo saca de la programación de verdad (si sólo se
+   borrara la marca de aprobado, el pedido seguiría en su tanda y saliendo igual). Las guardas
+   las ponen las funciones de siempre: web con tanda tocada, o NP de ISIS ya cargada/entregada,
+   no salen — y el error se muestra adentro del cuadro. */
+async function cuarDevolverConfirmar() {
+  const s = _apr.cuarCom; if (!s) return;
+  const ta = document.getElementById("cuarComTexto");
+  const txt = ((ta && ta.value) || "").trim();
+  s.saving = true; s.err = ""; cuarComRender();
+  try {
+    await aprRpc("gv_cuarentena_devolver", { p_empresa: s.empresa, p_np: s.np, p_clave: s.clave,
+      p_comentario: txt || null, p_por: await aprQuien() });
+    s.saving = false; cuarComCerrar(); cuarYaProgRecargar();
+    _apr.msg = s.np + " volvió a Cuarentena: salió de la programación y está en A Programar, retenido.";
+    _apr.msgErr = false;
+    aprRender();
+    aprCargar();
+  } catch (e) { s.saving = false; s.err = String((e && e.message) || e); cuarComRender(); }
+}
 function cuarTituloCase(s) { return String(s || "").toLowerCase().replace(/\b\w/g, function (c) { return c.toUpperCase(); }); }
 function cuarWppContactoMsg(p, c) {
   const np = aprPedLabel(p || {});

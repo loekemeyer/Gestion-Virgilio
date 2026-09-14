@@ -12402,3 +12402,35 @@ select clave from public.vista_saldos_stock where clave ~* '\s+(LK|CH|LOKE)$';
 
 Con esto el §3.4 queda cerrado: 0 filas con sufijo en `Equivalencias_Codigos`, 0 en
 `Movimientos_Stock`, y las 8 de `vista_saldos_stock.clave` son las que **tienen que estar**.
+---
+
+### §3.ep — v17.20: columna "Marcar" — aprobar, o mandarlo de vuelta a Cuarentena — 2026-09-14
+
+**Pedido de Luis (2026-09-14):** en la tabla de "Ya programados y el cliente está en cuarentena",
+una columna **Marcar**: para los **sin aprobar**, *Aprobar* (lo deja aprobado y abre el pop-up de
+comentario) o *Cuarentena*; para los demás, sólo *Cuarentena*.
+
+**"Volver a Cuarentena" saca el pedido de la programación, no despinta una marca.** Si sólo se
+borrara la fila de `GV_Cuarentena_Liberados`, el pedido seguiría en su tanda, con su fecha, y
+saldría igual: el botón sería mentiroso. Sacándolo de la programación vuelve a **A Programar**, y
+ahí `gv_cuarentena_marcar` lo retiene solo — el cliente sigue en cuarentena y ya no está liberado.
+El circuito cierra sin tocar nada más.
+
+**Las guardas no se reescribieron: se reusan.** `gv_cuarentena_devolver` delega en las dos
+funciones que ya sabían cuándo NO se puede desprogramar — `gv_ppp_web_desprogramar` (falla si
+alguna tanda del pedido ya se empezó a trabajar) y `gv_ppp_isis_desprogramar` (falla si la NP ya
+tuvo **Carga Camión** o **Recepción Remitos**, o sea si ya salió). Si una falla, la excepción
+aborta todo: no se borra el liberado ni se escribe el comentario, y el error se muestra adentro
+del mismo cuadro, con lo que la persona escribió todavía ahí.
+
+El cuadro avisa de qué tanda sale, y si esa tanda ya se está trabajando lo dice antes de intentar
+(`picking_empezado`), para no mandar a alguien contra un error evitable. El motivo es **opcional**
+y queda en el log como `↩ Vuelto a Cuarentena (sacado de la programación): …`.
+
+**Probado en seco** el 2026-09-14 con un `DO` que llama a las dos ramas (NP de ISIS `98626` y NP
+web `LK 0028`) y termina con un `raise exception` para revertir: las dos pasaron y no quedó nada
+escrito (0 comentarios, 6 liberados, el override de 98626 igual que antes).
+
+SQL y rollback: `sql/gv_cuarentena_devolver_v1720.sql`. Tests en `tests/apr-cuarentena.cjs`
+(la columna existe; sin aprobar ofrece las dos acciones y aprobada sólo *Cuarentena*; el cuadro
+avisa la tanda; al confirmar llama la RPC con NP, clave y comentario).

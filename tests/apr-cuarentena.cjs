@@ -196,6 +196,36 @@ catch (_e) {
     const lib = llamadas.find(function (c) { return c.fn === "gv_cuarentena_liberar"; });
     out.aprLibera = !!lib && lib.args.p_order_id === "900" && lib.args.p_comentario === "Lo autorizó cobranzas";
 
+    // (6) v17.16 — columna "Marcar": aprobar / volver a cuarentena
+    // (el bloque anterior dejó la lista recargada contra la RPC stubeada: se repone)
+    _apr.cuarCom = null;
+    llamadas.length = 0;
+    _apr.cuarYaProg = [
+      { empresa: "lk", np: "97889", order_id: null, clave: "97889", tanda: "D71A",
+        fecha_entrega: "2026-09-16", cod: "4263", razon_social: "Matiz SA", motivos: ["deuda"],
+        deuda: 12039500, picking_empezado: false, aprobado_at: null, comentarios: 0 },
+      { empresa: "chef", np: "CH 0003", order_id: 55, clave: "55", tanda: "D69E",
+        fecha_entrega: "2026-09-16", cod: "2715", razon_social: "Gifel S.R.L.", motivos: ["deuda"],
+        deuda: 1955318, picking_empezado: false, aprobado_at: "2026-09-14T10:35:00-03:00",
+        aprobado_por: "vivi@loekemeyer.com", comentarios: 1 }
+    ];
+    aprRender(); await new Promise((res) => setTimeout(res, 150));
+    html = document.getElementById("pppPreview").innerHTML;
+    out.marcarCol = /<th>Marcar<\/th>/.test(html);
+    const filas = html.split("<tr").filter(function (t) { return /cuarYpCuarentena/.test(t); });
+    out.marcarSinAprobar = /cuarYpAprobar\(0\)/.test(html) && /cuarYpCuarentena\(0\)/.test(html);
+    out.marcarAprobada = !/cuarYpAprobar\(1\)/.test(html) && /cuarYpCuarentena\(1\)/.test(html);
+    out.marcarFilas = filas.length === 2;   // las dos filas ofrecen volver a cuarentena
+
+    cuarYpCuarentena(0); await new Promise((res) => setTimeout(res, 120));
+    const dh = (document.getElementById("cuarComModal") || {}).innerHTML || "";
+    out.devModal = /Volver a Cuarentena/.test(dh) && /saca de la programación/.test(dh) && /D71A/.test(dh);
+    document.getElementById("cuarComTexto").value = "No lo autorizó cobranzas";
+    await cuarDevolverConfirmar(); await new Promise((res) => setTimeout(res, 120));
+    const dev = llamadas.find(function (c) { return c.fn === "gv_cuarentena_devolver"; });
+    out.devRpc = !!dev && dev.args.p_np === "97889" && dev.args.p_clave === "97889" &&
+                 dev.args.p_empresa === "lk" && dev.args.p_comentario === "No lo autorizó cobranzas";
+
     out.errs = null;
     return out;
   });
@@ -235,6 +265,12 @@ catch (_e) {
   chk(r.aprModal, "aprobar abre el cuadro de comentario (no libera de una)");
   chk(r.aprSinLiberar, "aprobar NO llamó a gv_cuarentena_liberar antes de confirmar");
   chk(r.aprLibera, "al confirmar libera y manda el comentario");
+  chk(r.marcarCol, "la tabla tiene la columna 'Marcar'");
+  chk(r.marcarSinAprobar, "sin aprobar: ofrece Aprobar y Cuarentena");
+  chk(r.marcarAprobada, "ya aprobada: ofrece SOLO Cuarentena");
+  chk(r.marcarFilas, "las dos filas ofrecen volver a cuarentena");
+  chk(r.devModal, "volver a cuarentena avisa que lo saca de la programación y de qué tanda");
+  chk(r.devRpc, "al confirmar llama gv_cuarentena_devolver con NP, clave y comentario");
   chk(r.deudorCliente, "el cliente deudor se ve en el sector");
   chk(r.soloUnCheckbox, "el retenido NO es tildable (solo el normal tiene checkbox)");
   // v14.88: los botones se movieron a la pestaña Config. Cuarentena

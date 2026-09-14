@@ -12,7 +12,20 @@
 > única**; no se replica. Ante la duda entre parche rápido y fix de raíz → **fix
 > de raíz**.
 >
-> Última actualización: 2026-09-14 (domingo) · Versión app al documentar: **v17.17**
+> Última actualización: 2026-09-14 (domingo) · Versión app al documentar: **v17.20**
+>
+> Nota **v17.20 (2026-09-14, Luis) — CUARENTENA: columna "Marcar" en la tabla de ya programados.**
+> Para los pedidos **sin aprobar**: **✅ Aprobar** (lo deja aprobado y abre el cuadro de comentario) o
+> **🚧 Cuarentena**. Para los **ya aprobados**: sólo **🚧 Cuarentena**.
+> ⚠ **"Volver a Cuarentena" SACA el pedido de la programación** (pierde tanda y fecha) y lo devuelve a
+> **A Programar**, donde `gv_cuarentena_marcar` lo retiene solo porque el cliente sigue en cuarentena y
+> ya no está liberado. Si sólo se borrara la marca de aprobado, el pedido seguiría en su tanda y saldría
+> igual — el botón sería mentiroso. `gv_cuarentena_devolver` **reusa** las guardas que ya existían:
+> `gv_ppp_web_desprogramar` (no deja si la tanda ya se empezó a trabajar) y `gv_ppp_isis_desprogramar`
+> (no deja si la NP ya tuvo Carga Camión o Recepción Remitos). Si fallan, no se borra el liberado ni se
+> escribe el comentario, y el error se ve adentro del cuadro.
+> `sql/gv_cuarentena_devolver_v1720.sql` · §3.ep de `docs/SUPABASE-GESTION-VIRGILIO.md` ·
+> test `tests/apr-cuarentena.cjs`.
 >
 > Nota **v17.15 (2026-09-14, Luis) — CUARENTENA: "Ya programados" es una TABLA y aprobar pide un
 > COMENTARIO.**
