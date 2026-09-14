@@ -205,3 +205,79 @@ select f.import_batch, f.customer_code, 'chef', false,
   'Claude (pedido de Thomas 14/09)'
   from final f
  on conflict (import_batch, coalesce(customer_code,'*')) do nothing;
+
+-- ============================================================================
+-- CORRECCION v17.10 — la señal (B) sola no alcanzaba: se sacaron 14 filas
+--
+-- Thomas pidio un dry run antes de tocar la carga. Haciendolo aparecio una
+-- fuente INDEPENDIENTE que no se habia usado: `public.fact_live`, que el cron 38
+-- refresca cada 30 min desde `virgilio.comprobantes_venta` y que trae la empresa
+-- del campo `marca` del comprobante ('CH' -> chef). O sea: Gestion ya sabe, por
+-- cada comprobante, de que empresa es.
+--
+-- Cruzado contra el anexo anterior, delataba 12 codigos mal marcados. Mirando
+-- sus articulos se ve el error: son 5xx/3xx del catalogo de Loekemeyer, SIN
+-- sufijo L (ej. 448 = 34, 057, 248, 315, 501..; 85 = 248, 392, 501, 502, 505..).
+-- Son ventas de LK.
+--
+-- CAUSA: la señal (B) del anexo — "el codigo ya venia en la carga propia de
+-- Chef" — no prueba nada por si sola. Un mismo numero es un cliente en LK y
+-- otro en Chef (justo lo que dispara todo este trabajo), asi que que el numero
+-- aparezca en Chef no hace de Chef a ESTAS filas.
+--
+-- REGLA NUEVA: (B) ya no alcanza sola. Se conserva la marca solo si ademas hay
+-- evidencia propia de las filas:
+--    * todas sus lineas llevan sufijo L  (se facturo por Chef), o
+--    * la mitad o mas de sus lineas son articulos que LK no vende, o
+--    * el codigo no existe en el padron de LK y si en el de Chef.
+-- Se borraron 14 filas (1.780 cajas) que no cumplian ninguna.
+--
+-- VALIDACION contra fact_live despues del borrado: julio 25 ok / 0 discrepan,
+-- agosto 25 ok / 0 discrepan. Antes: 3 y 9 discrepancias.
+--
+-- QUE CAMBIA EN LOS NUMEROS: Chef queda julio 3.242 y agosto 4.000 cajas
+-- (contra junio 3.873 de su propia carga). Y se cae la "migracion" de Horcada
+-- Marcelo y de Supermercado Remo: eran de este error, no movimientos reales.
+-- Las 471 cajas de agosto del cod 448 vuelven a M.Sanchez (LK), que es de quien
+-- son.
+-- ============================================================================
+
+with ch_items as (
+  select item_code from public.sales_lines
+   where import_batch = 'chef_hist_xlsx_202607' and invoice_date::date between '2026-06-01' and '2026-06-30'
+  except
+  select item_code from public.sales_lines where import_batch = 'junio_26'
+), ev as (
+  select f.id,
+         count(s.*)                                      filas,
+         count(*) filter (where s.item_code ~ 'L$')      filas_L,
+         count(*) filter (where i.item_code is not null) filas_chef,
+         (lkp.cod is null)     sin_padron_lk,
+         (chp.cod is not null) en_padron_chef
+    from public."GV_Ventas_Correccion" f
+    join public.sales_lines s on s.import_batch = f.import_batch and s.customer_code = f.customer_code
+    left join ch_items i on i.item_code = s.item_code
+    left join (select cod_cliente::text cod from public.customers)   lkp on lkp.cod = f.customer_code
+    left join (select cod_cliente::text cod from public.chef_padron) chp on chp.cod = f.customer_code
+   where f.import_batch in ('julio_26','ago-26')
+   group by f.id, lkp.cod, chp.cod
+)
+delete from public."GV_Ventas_Correccion" f
+ using ev
+ where f.id = ev.id
+   and ev.filas_L <> ev.filas
+   and ev.filas_chef * 2 < ev.filas
+   and not (ev.sin_padron_lk and ev.en_padron_chef);
+
+-- Chequeo contra la fuente independiente (tiene que dar 0 discrepancias):
+--   with sl as (select s.customer_code cod, to_char(s.invoice_date::date,'YYYY-MM') ym,
+--                      bool_or(f.customer_code is not null) marcado_chef
+--                 from public.sales_lines s
+--                 left join public."GV_Ventas_Correccion" f
+--                   on f.import_batch = s.import_batch and f.customer_code = s.customer_code
+--                where s.import_batch in ('julio_26','ago-26') group by 1,2),
+--        fl as (select cod_cliente cod, ym, bool_or(empresa='chef') en_chef
+--                 from public.fact_live where clase='FC' group by 1,2)
+--   select sl.ym, count(*) filter (where sl.marcado_chef and fl.en_chef) ok,
+--          count(*) filter (where sl.marcado_chef and fl.cod is not null and not fl.en_chef) discrepan
+--     from sl left join fl on fl.cod = sl.cod and fl.ym = sl.ym group by 1;

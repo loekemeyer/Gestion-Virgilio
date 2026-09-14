@@ -11908,3 +11908,83 @@ físico**, o **(b)** el saldo por código entero es negativo. En los contables n
 particiones se compensan (95 casos medidos, todos contables, que suman 0 por código); alertarlos
 sería ruido puro. Verificado: da 0 hoy, y sobre el backup de las 27 filas habría devuelto los 3
 casos exactos.
+
+### §3.ej — v17.10: dry run del 1+3 — qué toca de verdad, cuánto cuesta, y un error propio que salió a la luz — 2026-09-14
+
+**Thomas (14/09): *"esto solo afecta datos para proyección de ventas en términos prácticos, no? sino qué más?
+calculá costo y problemas de tu plan 1+3 y hacé dry run si podés de cómo quedaría todo"*.**
+
+#### Lo primero: el dry run encontró un error MÍO
+
+Buscando con qué validar aparecló una fuente independiente que no había usado: **`public.fact_live`**, que el
+**cron 38** refresca cada 30 min desde `virgilio.comprobantes_venta` y trae la empresa del campo **`marca`**
+del comprobante (`CH` → chef). O sea: **Gestión ya sabe, comprobante por comprobante, de qué empresa es.**
+
+Cruzada contra el retag de §3.eh, delataba **12 códigos mal marcados**. Mirando sus artículos se ve el error:
+son **5xx/3xx del catálogo de Loekemeyer, sin sufijo L** (cod 448 → 34, 057, 248, 315, 501…; cod 85 → 248,
+392, 501, 502, 505…). Son ventas de LK.
+
+**Causa:** la señal **(B)** del anexo anterior — *"el código ya venía en la carga propia de Chef"* — **no
+prueba nada por sí sola**. Un mismo número es un cliente en LK y otro en Chef (que es justo lo que dispara
+todo este trabajo), así que que el número aparezca en Chef no hace de Chef a **esas** filas.
+
+**Corregido**: (B) ya no alcanza sola; hace falta evidencia de las filas mismas (todas con sufijo L · la
+mitad o más de sus líneas son artículos que LK no vende · el código no está en el padrón de LK y sí en el de
+Chef). **Se borraron 14 filas / 1.780 cajas.** Validación contra `fact_live` después: **julio 25 ok / 0
+discrepan, agosto 25 ok / 0 discrepan** (antes 3 y 9).
+
+⚠ **Dos ejemplos que di en §3.eh estaban mal y se caen**: la "migración" de **Horcada Marcelo** y la de
+**Supermercado Remo** eran de este error, no movimientos reales. Y las **471 cajas de agosto del cod 448
+vuelven a M.Sanchez (LK)**, que es de quien son. Chef queda **julio 3.242 · agosto 4.000** (contra junio
+3.873 de su propia carga).
+
+#### ¿Sólo afecta la proyección? No. Son 36 funciones
+
+`sales_lines` lo leen **36 funciones** y **7 vistas**; **30 de ellas filtran `empresa='lk'` hardcodeado**, así
+que todas cambian. Ordenadas por lo que pueden hacer, no por lo que muestran:
+
+| Qué | Quién | Qué pasa hoy |
+|---|---|---|
+| **Compra de importados** | `_fn_proy_window_emp` → `GV_Proyeccion_Emp` → módulo Importados | LK proyecta demanda que no es suya |
+| **WhatsApp a clientes** | `bot_reactivar_inactivos` (cron 22, lun-vie 09:00 ART) | **Está APAGADO** (`bot_reactivacion_config.enabled = false`). Si se prende, manda |
+| **Comisiones** | `get_vendedores_ranking`, `get_acuerdo_vendedores` | ventas de Chef contadas al vendedor de LK |
+| **Paneles** | Estadística Madre, Ranking Inactivos, dashboard, `gv_*`, `rep_*` | números inflados |
+| **Telegram diario/semanal** | crons 29-36 (`rep_enviar_*`) | los reportes salen con esos números |
+
+#### Dry run, números medidos
+
+**1) Proyección / compra de importados.** Cambian **205 artículos**; **145 desaparecen enteros de LK** —
+`31L, 123L, 102EL, 504L, 315L, 106EL` (sufijo L = facturado por Chef) y `706, 713, 701, 836, 798E, 97, 99`
+(catálogo 7xx/8xx de Chef). Son **7.242 cajas en 6 meses = 6,2 % del volumen LK**, y **202 de esos 205
+artículos están hoy en la proyección de LK**: **791 cajas/mes de demanda fantasma**.
+
+**Cuánto de eso es plata de verdad:** de los 108 artículos que más se mueven, **sólo 17 están en
+`Importados`** — **205 cajas/mes ≈ US$ 1.146/mes de FOB** (~US$ 14 k/año) mal repartidos entre la OC de LK y
+la de Chef. **No es plata que se ahorra: es plata que hoy se pide del lado equivocado.** El resto de los
+artículos fantasma (L-variantes y 7xx/8xx) **no están en el módulo de importados**, así que no llegan a
+generar OC.
+
+**2) Ranking de Inactivos de LK.** **41 clientes** pasarían a inactivos, y **34 de ellos ni existen en el
+padrón de LK** (Dorinka 2686, Rayabo 1253, Celestino 1474, Gifel 2715, Los Andes 2687…). O sea que **hoy LK
+cuenta 41 clientes activos que son de Chef**. De los 7 que sí son de LK, el caso más llamativo es
+**Gastroeuropa (2335)**: figura comprando el 10/08/2026 y su última compra real por LK es de **2021-09-21** —
+lo de agosto es de Montenegro (Chef), que tiene el mismo número.
+
+**3) Riesgo de mandar un WhatsApp equivocado: hoy CERO**, porque el bot está apagado. Pero es el que hay que
+mirar antes de prenderlo: esos 41 pasarían a ser candidatos a la campaña de reactivación *de LK*.
+
+#### Costo y problemas del plan 1+3
+
+| | Qué es | Costo | Problema real |
+|---|---|---|---|
+| **1** | `alter table sales_lines alter column empresa drop default` | 1 línea, segundos | **Corta la carga mensual** hasta que el Excel traiga la columna. Si se aprieta sin avisar, el día 1-6 del mes que viene la importación falla y nadie sabe por qué |
+| **3** | Idea 4856 Fase 1.5: llenar desde `fact_live` / `comprobantes_venta`, empresa por prefijo de NP | días de trabajo, en el repo de LK | El dato de Gestión **no es igual al de ISIS**: le falta la facturación directa (~$17 M/mes), no tiene NC/ND y difiere en fechas. Sirve como **tentativo**, no como cierre. Y hay que respetar que ISIS lo pise al cerrar el mes |
+
+**Lo que el dry run cambió de la recomendación:** el **1 solo, ya**, no alcanza — deja el histórico de julio y
+agosto mal igual, y encima puede frenar la carga. Y el **3** ahora tiene un atajo: **`fact_live` ya está
+poblado y corriendo**, así que la parte cara (traer el dato de Gestión con la empresa bien) **ya está hecha**.
+Lo que falta es el paso de `fact_live` a `sales_lines`.
+
+**Orden sugerido:** (a) el centinela de §3.ei, que ya está y no cuesta nada; (b) avisar a quien importa que el
+Excel tiene que traer la columna `empresa`; (c) recién ahí el `drop default`, para que el error no vuelva a
+entrar mudo; (d) el 4856 Fase 1.5 cuando haya tiempo. **Nada de esto se aplicó: son decisiones del dueño.**
