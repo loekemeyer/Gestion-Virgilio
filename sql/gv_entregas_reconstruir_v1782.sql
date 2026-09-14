@@ -1,3 +1,9 @@
+-- ⚠⚠ SUPERADO por sql/gv_entregas_reconstruir_v1785.sql. Este archivo queda como
+--    HISTORIA: su reconstruccion deducia el armado del TAL y de los PKC, y eso NO
+--    alcanza — medido sobre 1.280 filas reales, erraba 6 (TAL) / 13 (PKC+FAL). La
+--    version vigente reconstruye desde el evento ENT que el front reporta al cerrar
+--    el armado, y es exacta. El "candado 4" de aca ya no existe alla: con el evento,
+--    un codigo en dos renglones se reconstruye bien.
 -- =============================================================================
 -- v17.82 (2026-09-14) — el armado NO puede depender del cache del celular
 -- Proyecto Virgilio (hrxfctzncixxqmpfhskv) · segundo pase del problema 194

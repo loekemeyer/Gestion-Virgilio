@@ -15374,3 +15374,77 @@ Sale de la tanda con memoria y vuelve a **la misma** tanda. Todo revertido con u
 `sql/gv_ppp_web_retenido_v1782.sql` lo trae al final. Las definiciones **previas** de
 `gv_ppp_web_armar_pendientes` y `gv_ppp_web_desprogramar` quedaron en
 `zz_backups."GV_Backup_Funcdefs_20260914"`.
+## §3.fv — v17.87: el armado se REPORTA al servidor (y por qué el backend solo no alcanzaba) — 2026-09-14
+
+**Dueño, 14/09** — dos frases que son la misma exigencia:
+> *"no me interesa un centinela que avise, cae en oídos sordos eso. Necesito que el sistema
+> funcione y contemple esos casos."*
+> *"para arreglar un problema que se daba porque algo vivía sólo en el front, no lo vayamos a
+> arreglar con una solución que sólo viva en el front, ¿no?"*
+
+### Se intentó resolverlo 100% en el backend, sin tocar el front. **No alcanza.**
+
+Se probaron dos derivaciones contra las **1.280 filas reales** que el front ya había grabado
+(todas las NP con TAP), para ver si el servidor podía deducir el armado con los eventos que
+**ya existían**:
+
+| Intento | Bien | Se abstiene | **Mal** |
+|---|---|---|---|
+| pedido + `TAL` | 1.159 | 114 | **6** |
+| pedido + `PKC` + `FAL` | 1.258 | 8 | **13** |
+
+Por qué no cierra, medido caso por caso:
+
+- **el `TAL` cuenta LÍOS, no cajas** — en un pedido de 72 cajas del 550, el resumen dice 4;
+- **el `PKC` no es la última palabra**: en **11 de los 13** errores el picking marcó faltante y el
+  armado **igual salió completo** (98673: `pkc 2→0` y Entregas `2/2/0`). El depósito lo resolvió
+  entre el picking y el cierre, y eso **no deja ningún evento**;
+- y hay faltantes sin ningún evento que los explique (44607, códigos 727E y 836).
+
+Escribir la facturación mal en el 1% de las filas es peor que no escribirla. **Adivinar queda
+descartado: el dato tiene que emitirse.**
+
+### Dónde vive cada cosa (y por qué esto NO es "arreglarlo en el front")
+
+- El **hecho físico** (qué se armó, qué faltó) sólo puede nacer en el depósito — igual que el
+  `TAP`, el `TAL`, el `PKC` y el `FAL`, que nacen ahí desde siempre. Lo que estaba mal no era eso:
+  era que **el armado no se reportaba**. Se escribía derecho a una tabla que podía fallar, y si
+  fallaba quedaba **sólo en el `localStorage` de ese celular**.
+- Ahora el armado se reporta como evento **`ENT`** por la **misma cola** que el `TAP` y el `TAL`
+  (`enqueueReport` → IndexedDB, reintentos). Es la cola que el 14/09 **funcionó** mientras el POST
+  a `Entregas_Virgilio` moría con 42501.
+- La **lógica y la reparación** viven en el servidor: `gv_entregas_reconstruir` + cron 87. El front
+  no repara nada y no decide nada: **reporta**.
+
+### El formato, y el candado 4 que dejó de hacer falta
+
+```
+texto = NP|TANDA|cod:pedidas:entregadas:faltó,…|ENT
+```
+
+**Un ítem por RENGLÓN**, en orden, sin agrupar — un código puede venir en dos renglones y el front
+escribe dos filas. Por eso el **candado 4 de la v17.84** (que se abstenía justo en ese caso) **ya no
+existe**: con el evento, ese caso se reconstruye bien.
+
+**Sin evento `ENT` no se reconstruye nada. No se adivina.**
+
+### Prueba de punta a punta (transacción revertida por `RAISE`)
+
+Se fabricó el evento `ENT` que el front emitiría para las 55 filas de D67L, se **borraron** las 55
+filas, y se dejó que el servidor las rehiciera:
+
+> *"originales=55 · reconstruidas desde el evento ENT=55 · **DIFERENCIAS=0**"*
+
+comparando np, cod_art, las tres cantidades, cod_cliente y fecha_salida, con `EXCEPT ALL` en los dos
+sentidos.
+
+### Objetos
+
+`sql/gv_entregas_reconstruir_v1785.sql` (reemplaza al `_v1782`, que queda como historia).
+`gv_armado_ent_items` parsea el evento; `gv_armado_sin_entregas` pasa a tener un solo motivo posible
+(`sin evento ENT` = celular con versión vieja). Se **dropearon** las heurísticas del intento fallido
+— `gv_armado_por_np`, `gv_pedido_renglones`, `gv_armado_tal_items` — para no dejar objetos muertos
+que alguien tome por buenos.
+
+Front: `_compSendEntregasEvento` en `compTerminar`, emitido **antes** del POST (si el POST falla, el
+evento ya salió) y **no** para el operador de prueba. Test: `tests/comp-ent-evento.cjs`, en la suite.

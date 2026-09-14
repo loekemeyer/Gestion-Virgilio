@@ -5188,7 +5188,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=17.86"></script>
+<script type="module" src="recepcion.js?v=17.87"></script>
 <!-- Config del módulo de fichada (compartido con fichada.html). El secret
      hmacSecret tiene que ser el mismo acá y allá; cargándolo desde un solo
      archivo evitamos que se desincronicen. -->
@@ -8618,7 +8618,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v17.86";
+const APP_VERSION = "v17.87";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -12664,6 +12664,12 @@ async function compTerminar() {
   _comp = null;
   const ov = document.getElementById("completarModal"); if (ov) ov.classList.remove("show");
   if (_difPend.length) { try { await stockMove(_difPend); } catch (_e) {} }   // v11.09: llega ANTES de Entregas
+  // v17.85 — el armado viaja TAMBIÉN por la cola de eventos (ENT), que es la que nunca
+  // falla: el 14/09 el POST a Entregas_Virgilio murió con 42501 y el TAP/TAL del mismo
+  // armado llegaron igual. Con esto el servidor puede rehacer Entregas_Virgilio solo
+  // (gv_entregas_reconstruir), sin depender de que este dispositivo vuelva a abrir la app.
+  // Va ANTES del POST: si el POST falla, el evento ya salió.
+  if (rows.length) { try { _compSendEntregasEvento(legajo, tanda, rows); } catch (_e) {} }
   if (rows.length) { _compSaveEntregas(rows); try { _armadoRegistrado.add(String(tanda).trim().toUpperCase()); } catch (_e) {} }   // v7.74: marca la tanda como armado registrado
   try { alert("✓ Completado: líos guardados" + (nFalt ? " · " + nFalt + " artículo(s) con faltante" : "") + ". Entregas registradas: " + rows.length + "."); } catch (_e) {}
 
@@ -27906,6 +27912,43 @@ function ccSendDetail(legajo, np, tanda, camionero, orden) {
    ========================================================= */
 let _lios = null;   // { legajo, tanda, nps:[{np, rs}] }
 
+/* v17.85 — ENT: el detalle EXACTO de lo que va a Entregas_Virgilio, por la cola de eventos.
+   POR QUÉ EXISTE. Hasta la v17.84 el servidor intentaba rehacer un armado perdido a partir
+   del TAL y de los PKC, y NO alcanza: medido sobre 1.280 filas reales, esa reconstrucción
+   acertaba 1.159, se abstenía en 114 y ERRABA 6. Dos motivos, los dos de fondo:
+     · el TAL cuenta LÍOS, no cajas — en un pedido grande (72 cajas del 550) el resumen dice 4;
+     · el faltante que el armador carga a mano en el Paso 2 no deja NINGÚN evento (98639: el
+       picking sacó las 2 cajas y el armado igual las marcó faltantes).
+   Adivinar mejor no era la salida: el dato tenía que EMITIRSE. Con este evento la
+   reconstrucción del servidor deja de ser heurística y pasa a ser exacta por construcción.
+
+   texto = NP|TANDA|cod:pedidas:entregadas:faltó,…|ENT   ← un ítem por RENGLÓN del pedido,
+   sin agrupar, en el mismo orden en que se escriben las filas (un código puede venir en dos
+   renglones y el front escribe dos filas: así se respeta).
+   Va por enqueueReport, la misma cola de IndexedDB del TAP/TAL, no por un fetch suelto. */
+function _compSendEntregasEvento(legajo, tanda, rows) {
+  // Mismo criterio que _compSaveEntregas: el operador de PRUEBA no persiste nada, y menos
+  // un evento que el servidor podría usar para fabricar un armado fantasma.
+  if (typeof esOperadorPrueba === "function" && esOperadorPrueba()) return;
+  const porNp = {};
+  (rows || []).forEach(function (r) { (porNp[r.np] = porNp[r.np] || []).push(r); });
+  Object.keys(porNp).forEach(function (np) {
+    const det = porNp[np].map(function (r) {
+      return String(r.cod_art) + ":" + r.cajas_pedidas + ":" + r.cajas_entregadas + ":" + r.cajas_falto;
+    }).join(",");
+    const nowMs = Date.now();
+    const payload = {
+      legajo: legajo, opcion: "ENT", descripcion: "Entregas por NP (TAP)",
+      texto: (String(np) + "|" + String(tanda) + "|" + det + "|ENT").toUpperCase(),
+      ts: nowMs, id: nowMs.toString(36) + "_" + Math.random().toString(36).slice(2, 8), ts_inicio_iso: null
+    };
+    try {
+      enqueueReport(payload);
+      if (typeof trySendOneReport === "function") trySendOneReport(payload).then(function (r) { if (r && r.ok) removeFromQueue(payload.id); }).catch(function () {});
+    } catch (_e) {}
+  });
+  try { updatePendingIndicator(); } catch (_e) {}
+}
 function liosSend(legajo, np, lios, tanda, resumen, clase) {
   const nowMs = Date.now();
   // texto = NP|líos|tanda[|resumen[|clase]]. clase (v5.12) = lio|etiqueta|nada por NP
