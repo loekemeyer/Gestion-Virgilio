@@ -15201,7 +15201,7 @@ el 83 se lo llevó el pedido LK 1440 ese mismo día.
 
 Perillas y rollback: `sql/gv_web_tdf_como_chef.sql` del repo `pagina-LK-copia`.
 
-### ⚠ Deuda que quedó a la vista: `gv_pedidos_web_np_chef` está a 1 segundo del timeout
+### ⚠ Deuda que quedó a la vista: `gv_pedidos_web_np_chef` está a 1 segundo del timeout — **RESUELTA el mismo día, §3.fy**
 
 7,03 s medidos contra un `statement_timeout` de 8 s. No lo causó este cambio —se ve en el log de
 las corridas 511 y 513 del 14/09, que fallaron con `57014` sin nada de TdF encima— pero es lo que
@@ -15587,3 +15587,85 @@ La otra sesión hizo que `gv_entregas_reconstruir` no resucite una NP desarmada,
 siempre la fila en `GV_Desarmes` (también cuando devuelve 0 cajas), que es de lo que depende esa
 guarda. Verificado en la base: la definición viva tiene el `a_guardar` de acá y ningún resto de la
 versión de góndola.
+
+## §3.fy — v17.91: el feed de Chef deja de leerse por FDW — 7,03 s → 0,14 s — 2026-09-14
+
+**Cierra la deuda que anotó §3.fr.** `gv_pedidos_web_np_chef` (en LK) es lo que le da a la
+Edge Function el feed de pedidos web de Chef. Tardaba **7,03 s contra un `statement_timeout`
+de 8 s**: el **3,1 % de las corridas del armado** moría con
+`Chef RPC: HTTP 500 {"code":"57014", … statement timeout}` — 14 de 446 en la semana del 08
+al 14/09, contadas sobre `GV_Tandas_Auto_Log`. Cada una de esas corridas programaba LK y
+**no** programaba Chef.
+
+### ⚠ La causa no era la consulta: era la conexión
+
+Medido con `EXPLAIN ANALYZE` sobre las propias foreign tables:
+
+| consulta | Execution Time |
+|---|---:|
+| `select count(*) from public.chef_customers` (lo resuelve el remoto, vuelve **un número**) | **2.879 ms** |
+| `select count(*) from virgilio.volumen_articulo` (mismo mecanismo, otro destino) | **70 ms** |
+
+Mismo `postgres_fdw`, misma configuración de server en los dos (`port=5432`,
+`sslmode=require`). Lo que cambia es **a dónde se conecta**: LK y Virgilio están en la misma
+organización y región (`sa-east-1`); el proyecto de Chef está en **otra organización** — ni
+siquiera aparece en `list_projects` desde la cuenta que ve a los otros dos. Abrir esa
+conexión cuesta **~2,4 s fijos**, traiga una fila o diez mil. **Ninguna optimización de SQL
+baja ese número**, y por eso el intento de la §3.fr (meterle el bloque de TdF a esa RPC)
+estaba condenado.
+
+Los 7,03 s, desarmados:
+
+| | |
+|---|---:|
+| abrir la conexión a Chef | **~2,4 s** |
+| `chef_orders` — el filtro de fecha **no se empuja** (`Rows Removed by Filter: 45` sobre 72): traía los 72 pedidos con el `sheets_payload` entero. `current_date` es STABLE y postgres_fdw sólo manda inmutables | ~0,8 s |
+| `chef_customers` + `chef_customer_delivery_addresses` — padrón y sucursales completos, sin filtro | ~0,7 s |
+| parseo de jsonb, group by, y el FDW a Virgilio (70 ms) | el resto |
+
+### La solución es el patrón que LK ya usaba
+
+`chef_padron` existe por exactamente este motivo (su `CLAUDE.md`: *"Leerlas cuesta segundos…
+Nunca joinearlas en el camino caliente"*). Lo que faltaba era que la función del feed lo
+aprovechara — iba a las foreign tables directas. Ahora hay copia local de las tres
+(`chef_orders_cache`, `chef_customers_cache`, `chef_dirs_cache`), las refresca
+`sincronizar_chef_orders(90)` desde el cron `sincronizar-chef-orders` (**jobid 48, cada
+5 min**, ~7 s por corrida) y la RPC lee las copias. El cambio en la función son **tres
+líneas**: las tres fuentes.
+
+**No se tocó nada del proyecto Supabase de Chef.** Lo sigue leyendo sólo LK, por el mismo
+FDW y el mismo rol, pero 288 veces por día en vez de en cada corrida del armado.
+
+### Medición
+
+| | antes | después |
+|---|---:|---:|
+| `gv_pedidos_web_np_chef(30)` | 7.030 ms | **143 ms** (49×) |
+| corrida entera del armado | 16.573 / 25.297 ms | **8.065 ms** |
+
+**Salida idéntica**, y se verificó antes de dejarlo puesto: 36 filas = 36 filas, `except all`
+en los **dos** sentidos = 0, y md5 del resultado completo igual en las dos
+(`dffd1a383abfc4193654582c8055aa14`).
+
+### Los guardas
+
+- **Si el padrón remoto viene vacío, el sync no pisa nada** y lo anota en `chef_cache_log`.
+  Una copia vaciada saca de la PPP todos los pedidos de Chef **sin que nadie se entere**:
+  es peor que trabajar con datos de hace cinco minutos.
+- **`chef_cache_salud()`** compara la copia contra la madre (pedidos, clientes, direcciones)
+  y avisa si el cron dejó de correr. Vacío = todo bien. Cuesta los ~7 s del FDW, así que no
+  se llama desde ninguna pantalla. Existe porque **una tabla derivada se desincroniza en
+  silencio**, y ése es el riesgo que este cambio agrega.
+- **`gv_pedidos_web_np_chef_fdw(integer)`** es la copia exacta de la versión vieja: es el
+  rollback y es la vara contra la que se compara.
+
+### Lo que queda
+
+Siguen leyendo el FDW de Chef, y pagando los ~2,4 s, `get_pedidos_web_np_chef`,
+`oc_super_ya_cargada`, `refrescar_chef_padron` y `costos_sync_razones`. Ninguna está en el
+camino del armado, por eso no se tocaron.
+
+Y **recién ahora tiene sentido bajar el cron 73 a 5 minutos**: con la RPC en 143 ms,
+triplicar las corridas ya no arrastra el timeout. Queda a decisión del dueño.
+
+SQL, medición y rollback: `sql/chef_orders_cache.sql` del repo `pagina-LK-copia`.
