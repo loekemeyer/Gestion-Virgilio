@@ -2788,6 +2788,21 @@ tr.ppp-err-zona > td{ background:#fffbeb !important; }
 .pn-leg{ display:flex; gap:11px; flex-wrap:wrap; margin-top:5px; font-size:11.5px; font-weight:700; color:#475569; }
 .pn-leg b{ display:inline-block; width:9px; height:9px; border-radius:3px; margin-right:4px; vertical-align:middle; }
 .pn-leg b.arm{ background:#1e6bd6; } .pn-leg b.cur{ background:#f59e0b; } .pn-leg b.sin{ background:#cbd5e1; }
+/* v17.03 — estado del día MÁS VISIBLE: barra gruesa, los tres porcentajes en grande y,
+   abajo, la barra de FACTURADO sobre lo armado. */
+.pn-bar.big{ height:15px; border-radius:999px; }
+.pn-pcts{ display:flex; gap:10px; flex-wrap:wrap; margin-top:7px; font-size:11px; font-weight:700; color:#64748b; }
+.pn-pcts span{ display:flex; align-items:baseline; gap:4px; }
+.pn-pcts b{ font-size:16px; font-weight:900; }
+.pn-pcts em{ font-style:normal; font-size:10.5px; font-weight:800; color:#94a3b8; background:#f1f5f9; border-radius:999px; padding:1px 6px; }
+.pn-pcts .arm b{ color:#1e6bd6; } .pn-pcts .cur b{ color:#b45309; } .pn-pcts .sin b{ color:#64748b; }
+.pn-facw{ margin-top:9px; padding-top:8px; border-top:1px dashed #e2e8f0; }
+.pn-fac-h{ display:flex; align-items:baseline; gap:6px; flex-wrap:wrap; margin-bottom:5px; }
+.pn-fac-h .t{ font-size:11px; font-weight:800; color:#64748b; text-transform:uppercase; letter-spacing:.04em; }
+.pn-fac-h b{ font-size:16px; font-weight:900; color:#15803d; }
+.pn-fac-h small{ font-size:10.5px; font-weight:700; color:#94a3b8; }
+.pn-bar.fac{ height:11px; background:#e5e7eb; }
+.pn-bar.fac i{ background:#16a34a; }
 /* v16.97 — AVANCE DEL DÍA (% listo / % armado). Tarjeta grande adentro de un día y
    línea chiquita en la tarjeta de la grilla de 6 días. */
 .pn-av{ margin-top:10px; padding:10px 12px; border:1.5px solid #bfdbfe; background:#f8fbff; border-radius:12px; }
@@ -2796,15 +2811,18 @@ tr.ppp-err-zona > td{ background:#fffbeb !important; }
 .pn-av-top .t{ font-size:12px; font-weight:800; color:#64748b; text-transform:uppercase; letter-spacing:.04em; }
 .pn-av-top .k{ font-size:13px; font-weight:700; color:#334155; }
 .pn-av-top .k b{ font-size:22px; font-weight:900; margin-right:6px; }
-.pn-av-top .k.li b{ color:#b45309; } .pn-av-top .k.ar b{ color:#1e6bd6; }
+.pn-av-top .k.li b{ color:#b45309; } .pn-av-top .k.ar b{ color:#1e6bd6; } .pn-av-top .k.fa b{ color:#15803d; }
+.pn-av-top .k small{ font-size:10.5px; font-weight:700; color:#94a3b8; margin-left:4px; }
+.pn-av-fac{ display:flex; align-items:center; gap:9px; flex-wrap:wrap; margin:0 0 6px; }
+.pn-av-fac .t{ font-size:11px; font-weight:800; color:#64748b; text-transform:uppercase; letter-spacing:.04em; }
+.pn-av-fac .pn-bar{ flex:1 1 160px; min-width:120px; }
+.pn-av-fac .n{ font-size:11.5px; font-weight:800; color:#15803d; }
 .pn-av-bar{ position:relative; height:12px; border-radius:999px; background:#e2e8f0; overflow:hidden; margin:8px 0 6px; }
 .pn-av-bar i{ position:absolute; left:0; top:0; height:100%; border-radius:999px; }
 .pn-av-bar i.li{ background:#fcd34d; } .pn-av-bar i.ar{ background:#1e6bd6; }
 .pn-av-d{ font-size:12.5px; font-weight:700; color:#475569; }
 .pn-av-d b.ok{ color:#15803d; }
 .pn-av-h{ margin-top:3px; font-size:11px; font-weight:600; color:#94a3b8; }
-.pn-avmini{ display:flex; gap:10px; margin-top:6px; font-size:11.5px; font-weight:800; }
-.pn-avmini .li{ color:#b45309; } .pn-avmini .ar{ color:#1e6bd6; }
 .pn-warn{ display:inline-block; font-size:11.5px; font-weight:800; color:#b91c1c; background:#fee2e2; padding:3px 9px; border-radius:999px; margin-top:7px; }
 .pn-day .emptytxt{ margin:auto; text-align:center; color:#94a3b8; font-weight:700; font-size:14px; } .pn-day .emptytxt small{ display:block; font-size:12px; font-weight:600; }
 .pn-otras{ margin-top:12px; display:flex; align-items:center; gap:8px; flex-wrap:wrap; font-size:12.5px; }
@@ -4789,7 +4807,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=17.02"></script>
+<script type="module" src="recepcion.js?v=17.03"></script>
 <!-- Config del módulo de fichada (compartido con fichada.html). El secret
      hmacSecret tiene que ser el mismo acá y allá; cargándolo desde un solo
      archivo evitamos que se desincronicen. -->
@@ -7904,7 +7922,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v17.02";
+const APP_VERSION = "v17.03";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -34029,13 +34047,32 @@ function pppHojaAbrir(k) {
   document.getElementById("pppHrBody").innerHTML = pppHojaHtml(H);
   o.classList.add("show");
 }
-function _pppPlanBarraHtml(est, tot) {
+/* v17.03 (dueño, mirando la pantalla: "la barra del estado de los pedidos del día… hacela más
+   visible, poneles un porcentaje visible y agregá una segunda barra abajo que sea facturados, y
+   que de todos los armados del día vaya mostrando el porcentaje que ya está facturado").
+   Los porcentajes NO se calculan acá: salen de la RPC gv_ppp_avance_dias (por m³, la unidad del
+   cupo; el % facturado va SOBRE LO ARMADO, no sobre el día). `est`/`tot` (conteo de pedidos) se
+   siguen usando de respaldo mientras el backend no contestó, así la barra nunca desaparece. */
+function _pppPlanBarraHtml(est, tot, key, sinFact) {
   if (!tot) return "";
+  const a = _pppAvanceGet(key);
   const w = function (n) { return Math.round(100 * n / tot); };
-  return '<div class="pn-bar"><i class="arm" style="width:' + w(est.armado) + '%"></i><i class="cur" style="width:' + w(est.curso) + '%"></i><i class="sin" style="width:' + w(est.sin) + '%"></i></div>' +
-    '<div class="pn-leg">' + (est.armado ? '<span><b class="arm"></b>' + est.armado + ' armado' + (est.armado === 1 ? '' : 's') + '</span>' : '') +
-    (est.curso ? '<span><b class="cur"></b>' + est.curso + ' en curso</span>' : '') +
-    (est.sin ? '<span><b class="sin"></b>' + est.sin + ' sin empezar</span>' : '') + '</div>';
+  const pArm = a ? (Number(a.pct_armado) || 0) : w(est.armado);
+  const pCur = a ? (Number(a.pct_curso)  || 0) : w(est.curso);
+  const pSin = a ? (Number(a.pct_sin)    || 0) : w(est.sin);
+  let h = '<div class="pn-bar big"><i class="arm" style="width:' + pArm + '%"></i><i class="cur" style="width:' + pCur + '%"></i><i class="sin" style="width:' + pSin + '%"></i></div>' +
+    '<div class="pn-pcts">' +
+      '<span class="arm"><b>' + pArm + ' %</b>armado<em>' + (a ? a.arm_ped : est.armado) + '</em></span>' +
+      '<span class="cur"><b>' + pCur + ' %</b>en curso<em>' + (a ? a.curso_ped : est.curso) + '</em></span>' +
+      '<span class="sin"><b>' + pSin + ' %</b>sin empezar<em>' + (a ? a.sin_ped : est.sin) + '</em></span>' +
+    '</div>';
+  if (a && a.pedidos && !sinFact) {   // adentro de un día el facturado va en la tarjeta de Avance
+    const pFac = Number(a.pct_fact) || 0;
+    h += '<div class="pn-facw"><div class="pn-fac-h"><span class="t">Facturado</span><b>' + pFac + ' %</b>' +
+      '<small>' + (Number(a.arm_ped) ? (a.fact_ped + ' de ' + a.arm_ped + ' armados') : 'todavía no hay nada armado') + '</small></div>' +
+      '<div class="pn-bar fac"><i style="width:' + pFac + '%"></i></div></div>';
+  }
+  return h;
 }
 function _pppPlanEstDia(ped) { const est = { armado: 0, curso: 0, sin: 0 }; for (const p of ped) { const e = _pppEstadoPed(p); est[e === "armado" ? "armado" : (e === "sin" ? "sin" : "curso")]++; } return est; }
 /* ===== v16.97 — AVANCE DEL DÍA: "85 % listo · 60 % armado" (pedido del dueño) =====
@@ -34075,12 +34112,6 @@ function pppAvanceNeed(desdeKey, hastaKey) {
     .catch(function () { _pppAvanceBusy = false; if (!_pppAvance) _pppAvance = new Map(); });
 }
 function _pppAvanceGet(key) { return (_pppAvance && key) ? (_pppAvance.get(String(key)) || null) : null; }
-/* Línea chiquita para cada tarjeta de la grilla de 6 días. */
-function _pppAvancePctHtml(key) {
-  const a = _pppAvanceGet(key);
-  if (!a || !a.pedidos) return "";
-  return '<div class="pn-avmini"><span class="li">' + a.pct_listo + ' % listo</span><span class="ar">' + a.pct_armado + ' % armado</span></div>';
-}
 /* Tarjeta grande, adentro de UN día — lo que pidió el dueño. */
 function _pppAvanceHtml(key) {
   const a = _pppAvanceGet(key);
@@ -34090,11 +34121,15 @@ function _pppAvanceHtml(key) {
   const faltaM3  = Math.max(0, (Number(a.m3) || 0) - (Number(a.arm_m3) || 0));
   const faltaPed = Math.max(0, (Number(a.pedidos) || 0) - (Number(a.arm_ped) || 0));
   const ok = arm >= 100;
+  const fac = Math.max(0, Math.min(100, Number(a.pct_fact) || 0));
   return '<div class="pn-av' + (ok ? ' ok' : '') + '">' +
     '<div class="pn-av-top"><span class="t">Avance del día</span>' +
       '<span class="k li"><b>' + listo + ' %</b>listo</span>' +
-      '<span class="k ar"><b>' + arm + ' %</b>armado</span></div>' +
+      '<span class="k ar"><b>' + arm + ' %</b>armado</span>' +
+      '<span class="k fa"><b>' + fac + ' %</b>facturado<small>de lo armado</small></span></div>' +
     '<div class="pn-av-bar"><i class="li" style="width:' + listo + '%"></i><i class="ar" style="width:' + arm + '%"></i></div>' +
+    '<div class="pn-av-fac"><span class="t">Facturado de lo armado</span><div class="pn-bar fac"><i style="width:' + fac + '%"></i></div>' +
+      '<span class="n">' + a.fact_ped + ' de ' + a.arm_ped + ' · ' + _pppFmtM3(a.fact_m3) + ' de ' + _pppFmtM3(a.arm_m3) + ' m³</span></div>' +
     '<div class="pn-av-d">Armado ' + _pppFmtM3(a.arm_m3) + ' de ' + _pppFmtM3(a.m3) + ' m³ · ' + a.arm_ped + ' de ' + a.pedidos + ' pedido' + (Number(a.pedidos) === 1 ? '' : 's') +
       (ok ? ' · <b class="ok">ya está todo armado</b>'
           : ' · falta armar <b>' + _pppFmtM3(faltaM3) + ' m³</b> (' + faltaPed + ' pedido' + (faltaPed === 1 ? '' : 's') + ': ' + a.curso_ped + ' en curso, ' + a.sin_ped + ' sin empezar)') +
@@ -34220,7 +34255,7 @@ function _pppPlanGridHtml(programados) {
       h += '<div class="pn-trk"><div class="ico ' + c.ruta + '">' + _pppCamionIco(c) + '</div><div><div class="z">' + escapeHtml(_pppCamionNombre(c)) + '</div><div class="sub">' + (c.tandas.length ? _pppTandasCorto(c.tandas) : "sin tanda") + ' · ' + c.ped.length + ' pedido' + (c.ped.length === 1 ? '' : 's') + '</div></div><div class="m3">' + _pppFmtM3(c.m3) + ' m³</div><div class="p">' + (_pppValor ? _pppFmtPesos(c.valor) : '…') + '</div></div>';
     }
     if (cams.length > camsShow.length) h += '<div class="pn-more">+ ' + (cams.length - camsShow.length) + ' más</div>';
-    h += '<div class="pn-state">' + _pppPlanBarraHtml(est, dd.ped.length) + _pppAvancePctHtml(d.key) + over + '</div></div>';
+    h += '<div class="pn-state">' + _pppPlanBarraHtml(est, dd.ped.length, d.key) + over + '</div></div>';
   }
   h += '</div>';
   // v13.17: las fechas de hojas anteriores no se listan (ya se vieron en su hoja)
@@ -34256,7 +34291,7 @@ function _pppPlanDiaHtml(programados, key, opts) {
     : '<div class="pn-topbar"><button class="pn-back" onclick="pppPlanVolver()">← Volver a los 6 días</button><button class="pn-lnk" onclick="pppPlanClasica(true)">Vista clásica</button></div>';
   h += '<div class="pn-dayhead' + (esVenc ? ' venc' : '') + '"><div><div class="d1">' + escapeHtml(sub) + '</div><div class="d2">' + escapeHtml(titulo) + '</div></div>' +
     '<div class="kp"><div class="k"><i>📦</i><div><div class="l">Pedidos</div><div class="v">' + ped.length + '</div></div></div><div class="k"><i>🚚</i><div><div class="l">Camiones</div><div class="v">' + nCam + '</div></div></div><div class="k"><i>🧊</i><div><div class="l">Volumen</div><div class="v">' + _pppFmtM3(_pppM3Sum(ped)) + ' m³</div></div></div><div class="k"><i>💰</i><div><div class="l">Valor estimado</div><div class="v g">' + (_pppValor ? _pppFmtPesos(val.valor) : '…') + '</div></div></div></div>' +
-    '<div class="barw">' + _pppPlanBarraHtml(est, ped.length) + '</div></div>';
+    '<div class="barw">' + _pppPlanBarraHtml(est, ped.length, esVenc ? null : key, true) + '</div></div>';
   // v16.97 — el avance del día (% listo / % armado), calculado en el backend.
   if (!esVenc) { pppAvanceNeed(key, key); h += _pppAvanceHtml(key); }
   if (!ped.length) return h + '<div class="planim-empty">Nada programado para este día.</div>';

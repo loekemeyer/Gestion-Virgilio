@@ -12,7 +12,7 @@
 > única**; no se replica. Ante la duda entre parche rápido y fix de raíz → **fix
 > de raíz**.
 >
-> Última actualización: 2026-09-14 (domingo) · Versión app al documentar: **v16.97**
+> Última actualización: 2026-09-14 (domingo) · Versión app al documentar: **v17.03**
 >
 > Nota **v16.97 (2026-09-14, Thomas) — AVANCE DEL DÍA: "85 % listo · 60 % armado" en la PPP, por
 > Telegram a las 16:00 y como tarea de Planify para Marianela.**
@@ -43,8 +43,12 @@
 >   (dedup por día) **y** tarea en el Planify de **Marianela Becker (38)** por
 >   `planify.planify_aviso_diario` — el mismo camino que el aviso de Facturación de las 16:00 (cron 84),
 >   urgente y con `broadcast`, así que le salta el cartel.
-> - SQL: `sql/gv_ppp_avance_dia_v1697.sql`. Detalle, medición y rollback: `docs/SUPABASE-GESTION-VIRGILIO.md`
->   §3.ec. Test: `tests/ppp-avance.cjs`.
+> - **v17.03 (mismo día, mirando la pantalla):** la barra de estado de cada día de la grilla es **más
+>   visible** (15 px) y lleva los **tres porcentajes** — armado / en curso / sin empezar — con la cuenta
+>   de pedidos al lado; y abajo hay una **segunda barra, FACTURADO**, que muestra qué parte **de lo
+>   armado** ya está facturado (NP en `Facturacion_NP`). El aviso de las 16:00 también lo dice.
+> - SQL: `sql/gv_ppp_avance_dia.sql`. Detalle, medición y rollback: `docs/SUPABASE-GESTION-VIRGILIO.md`
+>   §3.ef. Test: `tests/ppp-avance.cjs`.
 >
 > Nota **v15.40 (2026-09-11) — HANDOFF de planimetría / Acacia: `docs/HANDOFF-PLANIMETRIA-Y-ACACIA.md`.**
 > Thomas sigue este tema en otra sesión. Ahí está todo junto: los **13 artículos activos del catálogo LK

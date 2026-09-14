@@ -11338,7 +11338,7 @@ viene en `false`.
 
 ---
 
-### §3.ef — v16.97: el AVANCE DEL DÍA (% listo / % armado) en la PPP, en Telegram a las 16:00 y en el Planify de Marianela — 2026-09-14
+### §3.ef — v16.97/v17.03: el AVANCE DEL DÍA (% listo / % armado) en la PPP, en Telegram a las 16:00 y en el Planify de Marianela — 2026-09-14
 
 **Pedido de Thomas (14/09):** *"a las cuatro de la tarde quiero que mande su mensaje por Telegram, y que
 también se vea en la PPP el porcentaje de estado de los pedidos para un solo día… 85 % listo, 60 % armado…
@@ -11412,6 +11412,30 @@ el Telegram correcto en `telegram_outbox` y arma la tarea de Planify con el nomb
 la línea chiquita de la grilla. **El front no recalcula el número**: si lo hiciera, la pantalla y el
 Telegram podrían decir cosas distintas del mismo día. Test: `tests/ppp-avance.cjs` (en `tests/run.sh`).
 
+### Segunda pasada — v17.03: la barra de cada día, con porcentajes, y la barra de FACTURADO
+
+Thomas, mirando la pantalla: *"en la pantalla principal de programación, abajo de cada día, tenés la barra
+del estado de los pedidos del día (armado, en curso y sin empezar). Hacela más visible, poneles un
+porcentaje visible y agregá una segunda barra abajo que sea 'facturados' y que, de todos los armados del
+día, vaya mostrando el porcentaje que ya está facturado"*.
+
+- `gv_ppp_avance_dias` devuelve **7 columnas más**: `curso_m3`, `sin_m3`, `fact_ped`, `fact_m3`,
+  `pct_fact`, `pct_curso`, `pct_sin`. Agregar columnas al `returns table` **obliga a DROP + CREATE**
+  (el `create or replace` no alcanza), y el `DROP ... CASCADE` se lleva `gv_ppp_avance_dia`: hay que
+  recrearla en el mismo paso — está en el archivo, en ese orden.
+- **facturado = la NP está en `Facturacion_NP`** (misma normalización que usa `gv_ppp_en_salida`:
+  `upper` + sin el `.0` final). El **% va sobre lo ARMADO**, no sobre el día: contesta "de lo que ya
+  armamos, cuánto pasó por facturación".
+- El texto de las 16:00 ganó una línea: `Facturado: 38 % de lo armado (15 de 21 pedidos · 3,24 m³)`.
+- Front: `_pppPlanBarraHtml(est, tot, key, sinFact)` — barra de 15 px, los tres porcentajes en 16 px con
+  la cuenta de pedidos al lado, y debajo la barra verde de facturado. Adentro de un día el facturado va
+  en la tarjeta de Avance (con `sinFact = true`), para no decir lo mismo dos veces. Si el backend todavía
+  no contestó, la barra cae al conteo de pedidos de siempre y nunca desaparece.
+
+**Medición (14/09):** 10/09 → 100 % armado, **100 % facturado**. 11/09 → 100 % armado, **38 % facturado**
+(15 de 21 pedidos pero sólo 3,24 de 8,57 m³: lo que falta facturar son los pedidos grandes). 15/09 → 53 %
+armado, 2 % facturado.
+
 ### Rollback
 
 ```sql
@@ -11424,7 +11448,7 @@ drop function public.gv_pct(numeric, numeric);
 ```
 
 Y en el front, sacar `pppAvanceNeed` / `_pppAvanceHtml` / `_pppAvancePctHtml` y sus dos llamadas en
-`_pppPlanGridHtml` y `_pppPlanDiaHtml`. SQL versionado: `sql/gv_ppp_avance_dia_v1697.sql`.
+`_pppPlanGridHtml` y `_pppPlanDiaHtml`. SQL versionado: `sql/gv_ppp_avance_dia.sql`.
 
 ### §3.eg — v16.99: la alarma de clientes en riesgo mira las DOS empresas juntas — 2026-09-14
 
@@ -11534,7 +11558,7 @@ excepción, **el cron habría fallado en silencio todos los días**. `sql/gv_sto
 **Estado al cierre:** 0 saldos negativos en cualquier depósito, 0 códigos con más de una grafía,
 crons 68 / 74 / 86 activos.
 
-### §3.eh — v17.02: julio y agosto de Chef SÍ estaban, cargados como LK — 2026-09-14
+### §3.eh — v17.03: julio y agosto de Chef SÍ estaban, cargados como LK — 2026-09-14
 
 **Thomas (14/09): *"datos de agosto de chef deberíamos tener"*.** Tenía razón. Estaban — adentro de los
 batches **`julio_26` y `ago-26`, con `empresa='lk'`**. Por eso la §3.eg decía que el feed de Chef se cortaba
