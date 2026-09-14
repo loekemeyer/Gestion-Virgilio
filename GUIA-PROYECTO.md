@@ -12,7 +12,30 @@
 > única**; no se replica. Ante la duda entre parche rápido y fix de raíz → **fix
 > de raíz**.
 >
-> Última actualización: 2026-09-14 (domingo) · Versión app al documentar: **v17.11**
+> Última actualización: 2026-09-14 (domingo) · Versión app al documentar: **v17.12**
+>
+> Nota **v17.12 (2026-09-14, Luis) — CUARENTENA: el pedido de un CLIENTE NUEVO queda retenido, y la
+> pantalla muestra el NÚMERO DE CLIENTE.**
+> Pedido: *"ponelos para que caigan en cuarentena cuando caiga un pedido de ellos, con un badge que
+> diga Cliente nuevo"* y *"que tengan bien claro el número de cliente (de LK o de CH según la empresa
+> del pedido)"*.
+> **(1) Motivo nuevo `cliente_nuevo`.** La regla ya estaba escrita en `docs/PLAN-BADGE-CLIENTE-NUEVO.md`
+> (idea 9793, regla del dueño): es **nuevo** el cliente con **código alto** (LK ≥ 3800 / CH ≥ 2300) **y
+> menos de 3 pedidos facturados en toda su historia**, contando sobre el **cliente real** — se unen los
+> códigos por **CUIT**, por `customer_grupos` (cambió de razón social) y por `clientes_lk_ch_links`
+> (LK↔CH), con cierre transitivo. El cálculo vive en **LK** (`gv_clientes_nuevos_calc`), que es donde
+> están `sales_lines` y los dos padrones, y se **espeja** a `GV_Clientes_Nuevos` de Gestión por el FDW
+> (cron `sync-clientes-nuevos-virgilio`, cada hora al :40, mismo patrón que `lk_pedidos_match`).
+> `gv_cuarentena_marcar` y `gv_cuarentena_ya_programado` suman el motivo y devuelven `nuevo_pedidos`.
+> En la ficha sale el badge verde **🆕 Cliente nuevo**. **"Ya pagó" NO lo levanta** (no es deuda): se
+> saca con **"➡ Enviar a Pedidos a programar"**, como cualquier liberación.
+> **(2) Número de cliente visible**: chip **`LK 4281` / `CH 2533`** en la ficha de Cuarentena
+> (`cuarCodChip`) y en cada fila de *"Ya programados y el cliente está en cuarentena"*, que además
+> mostraba los motivos con la clave interna (`cliente_nuevo` crudo) y ahora usa los nombres.
+> Medido el día: 368 clientes nuevos sobre 2.040 del padrón; **12 pedidos web en 30 días** de esos
+> clientes (no inunda la Cuarentena); la lista de ya programados pasó de 12 a 17 filas.
+> SQL y rollback: `sql/gv_clientes_nuevos_v1712.sql` · §3.ek de `docs/SUPABASE-GESTION-VIRGILIO.md` ·
+> test `tests/apr-cuarentena.cjs`.
 >
 > Nota **v16.97 (2026-09-14, Thomas) — AVANCE DEL DÍA: "85 % listo · 60 % armado" en la PPP, por
 > Telegram a las 16:00 y como tarea de Planify para Marianela.**
@@ -307,7 +330,8 @@
 > normal, no se tilda, y muestra badge + motivo. Funciones en `index.html`: `aprEnCuarentena`,
 > `aprCuarentenaMotivos/Etiqueta/Motivo`, `aprColCuarentena`; CSS `.apr-col-cuar` / `.apr-chip-cuar` /
 > `.apr-card-cuar`; test `tests/apr-cuarentena.cjs`. La marca se lee del pedido: `p.cuarentena` (bool) o
-> `p.cuarentena_motivos` (array: `deuda` · `suspendido` · `limite_credito`). Mientras ningún pedido la
+> `p.cuarentena_motivos` (array: `deuda` · `suspendido` · `sin_cta_cte` · `limite_credito` ·
+> `cliente_nuevo`, este último desde v17.12). Mientras ningún pedido la
 > traiga, el sector queda vacío.
 > **PENDIENTE (definir con el dueño antes del paso 2):** (a) **backend vs front** para la lógica de
 > calificación — por el protocolo del `CLAUDE.md` (regla de negocio → backend), debería resolverse en una

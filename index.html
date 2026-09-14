@@ -927,6 +927,13 @@ button {
 .cuar-badge.b-deuda{ background:#fee2e2; color:#991b1b; border:1px solid #fca5a5; }
 .cuar-badge.b-limite{ background:#fef3c7; color:#92400e; border:1px solid #fcd34d; }
 .cuar-badge.b-susp{ background:#e0e7ff; color:#3730a3; border:1px solid #c7d2fe; }
+/* v17.12 — cliente nuevo (código alto + menos de 3 pedidos facturados). */
+.cuar-badge.b-nuevo{ background:#dcfce7; color:#14532d; border:1px solid #86efac; }
+/* v17.12 (Luis) — el NÚMERO DE CLIENTE, bien visible: LK 4281 / CH 2533. La empresa
+   es la del pedido, así que el mismo número no se confunde entre LK y Chef. */
+.cuar-card-cod{ display:inline-block; background:#fff1e7; color:#9a3412; border:1px solid #f0d2bb;
+  border-radius:6px; padding:0 6px; font-size:11.5px; font-weight:900; margin-right:6px; vertical-align:1px; }
+.cuar-yaprog-cod{ background:#fee2e2; color:#7f1d1d; border-radius:4px; padding:0 5px; font-weight:900; }
 /* v15.41 — barra de acciones: las dos de WhatsApp mitad y mitad arriba, y el
    CTA verde abajo ocupando el ancho de la ficha (nunca desborda). */
 .cuar-enviar{ grid-column:1 / -1; width:100%; margin-top:0; background:#166534; color:#fff; border:none; border-radius:8px; padding:8px 10px; font-size:12.5px; font-weight:800; cursor:pointer; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; box-shadow:0 1px 2px rgba(22,101,52,.25); }
@@ -4808,7 +4815,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=17.08"></script>
+<script type="module" src="recepcion.js?v=17.12"></script>
 <!-- Config del módulo de fichada (compartido con fichada.html). El secret
      hmacSecret tiene que ser el mismo acá y allá; cargándolo desde un solo
      archivo evitamos que se desincronicen. -->
@@ -7923,7 +7930,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v17.08";
+const APP_VERSION = "v17.12";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -38444,7 +38451,25 @@ function aprCuarBadgesHtml(p) {
     const ex = cuarPlata(d.exceso), li = cuarPlata(d.limite);
     h += '<span class="cuar-badge b-limite" title="El pedido supera el límite de crédito del cliente' + (li ? " (" + li + ")" : "") + '.">📈 Excede crédito' + (ex ? " x " + ex : "") + '</span>';
   }
+  // v17.12 (Luis, 2026-09-14) — CLIENTE NUEVO: código alto (LK ≥ 3800 / CH ≥ 2300) y menos de 3
+  // pedidos facturados en toda su historia, contando la identidad cruzada (mismo CUIT, razón
+  // social agrupada, vínculo LK↔CH). Lo calcula LK y lo espeja GV_Clientes_Nuevos.
+  if (has("cliente_nuevo")) {
+    const n = Number(d.nuevo_pedidos);
+    h += '<span class="cuar-badge b-nuevo" title="Cliente nuevo: código alto y ' +
+      (isFinite(n) ? (n === 0 ? "ninguna compra facturada" : n + " pedido" + (n === 1 ? "" : "s") + " facturado" + (n === 1 ? "" : "s")) : "menos de 3 pedidos facturados") +
+      ' en toda su historia (se cuentan también sus otros códigos y la otra empresa).">🆕 Cliente nuevo</span>';
+  }
   return h + '</div>';
+}
+/* v17.12 (Luis, 2026-09-14) — "que tengan bien claro el número de cliente": chip LK 4281 /
+   CH 2533. La empresa sale del pedido, porque el mismo número es otro cliente en cada una. */
+function cuarEmpCod(emp) { return String(emp || "lk") === "chef" ? "CH" : "LK"; }
+function cuarCodChip(p) {
+  const cod = String((p && p.cod) || "").trim();
+  if (!cod) return "";
+  return '<span class="cuar-card-cod" title="Número de cliente en ' + (cuarEmpCod(p.empresa) === "CH" ? "Chef" : "Loekemeyer") + '">' +
+    cuarEmpCod(p.empresa) + " " + escapeHtml(cod) + '</span>';
 }
 function aprCuarentenaMotivos(p) {
   if (!p) return [];
@@ -38454,7 +38479,7 @@ function aprCuarentenaMotivos(p) {
   return [];
 }
 function aprCuarentenaEtiqueta(p) {
-  const T = { deuda: "Deuda", suspendido: "Suspendido", sin_cta_cte: "Sin Cta.Cte.", limite_credito: "Excede crédito", cuarentena: "Retenido" };
+  const T = { deuda: "Deuda", suspendido: "Suspendido", sin_cta_cte: "Sin Cta.Cte.", limite_credito: "Excede crédito", cliente_nuevo: "Cliente nuevo", cuarentena: "Retenido" };
   const ms = aprCuarentenaMotivos(p);
   return ms.length ? ms.map(function (m) { return T[m] || m; }).join(" · ") : "Retenido";
 }
@@ -38467,6 +38492,8 @@ function aprCuarentenaMotivo(p) {
     limite_credito: "El pedido supera el límite de crédito del cliente" +
       (cuarPlata(d.limite) ? " (" + cuarPlata(d.limite) + ")" : "") +
       (cuarPlata(d.exceso) ? " por " + cuarPlata(d.exceso) : "") + ".",
+    cliente_nuevo: "Cliente nuevo" +
+      (d.nuevo_pedidos != null ? " (" + Number(d.nuevo_pedidos) + " pedido" + (Number(d.nuevo_pedidos) === 1 ? "" : "s") + " facturado" + (Number(d.nuevo_pedidos) === 1 ? "" : "s") + " en toda su historia)" : "") + ".",
     cuarentena: "Pedido retenido en cuarentena.",
   };
   const ms = aprCuarentenaMotivos(p);
@@ -38480,14 +38507,14 @@ function aprColCuarentena() {
   const _cuarCargando = !_apr.listo || aprCargandoAlgo();   // v15.54: mismo criterio que la columna de pedidos
   let h = '<div class="apr-col apr-col-cuar' + (_cuarCargando ? ' apr-col-cargando' : '') + '">' +
     '<div class="apr-col-t">🚧 Cuarentena <b>(' + (_cuarCargando ? '…' : lista.length) + ')</b>' +
-      '<span class="apr-cuar-help" title="Pedidos de clientes con deuda, suspendidos o que superan su límite de crédito. No se programan (ni a mano ni por el automático): hay que liberarlos primero.">ⓘ</span>' +
+      '<span class="apr-cuar-help" title="Pedidos de clientes con deuda, suspendidos, que superan su límite de crédito o que son CLIENTES NUEVOS. No se programan (ni a mano ni por el automático): hay que liberarlos primero.">ⓘ</span>' +
     '</div>' +
     cuarDemoRowHtml();   // v14.88: los 4 botones de importación se movieron a "Config. Cuarentena"
   h += cuarYaProgHtml();   // v16.57 — aviso de los que YA tienen tanda (problema 14)
   if (!lista.length) {
     h += _cuarCargando
       ? '<div class="apr-cargando apr-cargando-cuar"><span class="apr-cargando-ic">⏳</span><b>Todavía controlando…</b></div>'
-      : '<div class="apr-vacio">Sin pedidos retenidos. Acá caen los de clientes con <b>deuda</b>, <b>suspendidos</b> o que <b>superan su límite de crédito</b>: no se programan solos.</div>';
+      : '<div class="apr-vacio">Sin pedidos retenidos. Acá caen los de clientes con <b>deuda</b>, <b>suspendidos</b>, que <b>superan su límite de crédito</b> o que son <b>clientes nuevos</b>: no se programan solos.</div>';
     return h + '</div>';
   }
   h += '<div class="apr-scroll">';
@@ -38500,7 +38527,7 @@ function aprColCuarentena() {
           (p._demo ? '<span class="cuar-demo-tag">EJEMPLO</span>' : '') +
           '<span class="cuar-card-m3">' + aprNum(p.m3) + ' m³</span>' +
         '</div>' +
-        '<div class="cuar-card-cli">' + escapeHtml(p.razon_social || p.cod || ("#" + p.order_id)) + '</div>' +
+        '<div class="cuar-card-cli">' + cuarCodChip(p) + escapeHtml(p.razon_social || p.cod || ("#" + p.order_id)) + '</div>' +
         '<div class="cuar-card-zona">📍 ' + escapeHtml(p.zona || "sin zona") + '</div>' +
         aprCuarBadgesHtml(p) +
       '</div>' +
@@ -38538,9 +38565,9 @@ async function cuarYaPago(empresa, orderId) {
   if (!confirm("¿" + cli + " ya pagó?\n\nSalen de Cuarentena TODOS los pedidos de ese cliente que estaban retenidos por deuda.\nSi al subir el próximo reporte sigue debiendo, vuelven solos.")) return;
   try {
     const r = await aprRpc("gv_cuarentena_pago", { p_empresa: empresa || "lk", p_cod: cod });
-    const otros = (aprCuarentenaMotivos(p) || []).filter(function (m) { return m !== "deuda"; });
+    const otros = (aprCuarentenaMotivos(p) || []).filter(function (m) { return m !== "deuda"; });   // v17.12: incluye cliente_nuevo, que pagar NO levanta
     _apr.msg = "💚 " + cli + " marcado como pagado" + ((r && r[0] && r[0].deuda_al_pagar != null) ? " (deuda $" + aprNum(r[0].deuda_al_pagar) + ")" : "") + "." +
-      (otros.length ? " Ojo: el pedido sigue retenido por " + otros.map(function (m) { return m === "limite_credito" ? "límite de crédito" : m === "sin_cta_cte" ? "Sin Cta.Cte." : m; }).join(" y ") + "." : "");
+      (otros.length ? " Ojo: el pedido sigue retenido por " + otros.map(function (m) { return m === "limite_credito" ? "límite de crédito" : m === "sin_cta_cte" ? "Sin Cta.Cte." : m === "cliente_nuevo" ? "cliente nuevo" : m; }).join(" y ") + "." : "");
     _apr.msgErr = false;
     aprRender();
     aprCargar();
@@ -38625,11 +38652,15 @@ function cuarYaProgHtml() {
   let h = '<div class="cuar-yaprog"><div class="cuar-yaprog-t">⚠ Ya programados y el cliente está en cuarentena <b>(' + l.length + ')</b>'
     + '<span class="apr-cuar-help" title="Estos pedidos YA tienen tanda: la cuarentena no los alcanzó porque el reporte de deuda entró después del armado. No se retiran solos — mirarlos con cobranzas y decidir.">ⓘ</span></div>';
   for (const r of l) {
-    const motivos = (r.motivos || []).join(" · ");
+    // v17.12 (Luis): los motivos se muestran con el nombre, no con la clave interna
+    // (`cliente_nuevo` se leía crudo), y la fila arranca con el NÚMERO DE CLIENTE.
+    const motivos = aprCuarentenaEtiqueta({ cuarentena_motivos: r.motivos || [] });
+    const cod = String(r.cod || "").trim();
     h += '<div class="cuar-yaprog-row">'
       + '<span class="cuar-yaprog-np">' + escapeHtml(String(r.np || "")) + '</span>'
       + '<span class="cuar-yaprog-tanda">' + escapeHtml(String(r.tanda || "sin tanda")) + '</span>'
       + '<span class="cuar-yaprog-fecha">' + escapeHtml(String(r.fecha_entrega || "")) + '</span>'
+      + (cod ? '<span class="cuar-yaprog-cod" title="Número de cliente en ' + (cuarEmpCod(r.empresa) === "CH" ? "Chef" : "Loekemeyer") + '">' + cuarEmpCod(r.empresa) + " " + escapeHtml(cod) + '</span>' : '')
       + '<span class="cuar-yaprog-cli">' + escapeHtml(String(r.razon_social || r.cod || "")) + '</span>'
       + '<span class="cuar-yaprog-motivo">' + escapeHtml(motivos) + (r.deuda ? " " + cuarPlata(r.deuda) : "") + '</span>'
       + (r.picking_empezado ? '<span class="cuar-yaprog-pick" title="Ya hay eventos de operarios sobre esa tanda">pickeando</span>' : '')
@@ -38951,6 +38982,7 @@ async function cuarMarcarPedidos() {
       detKey[k] = detKey[k] || {};
       if (r.deuda != null) detKey[k].deuda = Number(r.deuda);
       if (r.estado) detKey[k].estado = String(r.estado);
+      if (r.nuevo_pedidos != null) detKey[k].nuevo_pedidos = Number(r.nuevo_pedidos);   // v17.12
     });
     (lim || []).forEach(function (r) {
       const k = String(r.empresa) + ":" + String(r.order_id);
@@ -38977,8 +39009,8 @@ async function cuarMarcarPedidos() {
 /* Pedido de EJEMPLO para ver el sector sin datos reales (dueño: "poneme un pedido de prueba"). */
 function cuarDemoPedido() {
   return { order_id: "EJEMPLO", empresa: "lk", cod: "9999", razon_social: "CLIENTE DE EJEMPLO S.A.",
-           zona: "Zona 1 - CABA Sur", m3: 0.42, cuarentena_motivos: ["deuda", "limite_credito"],
-           cuarentena_detalle: { deuda: 10000, exceso: 100000, limite: 250000 }, _demo: true };
+           zona: "Zona 1 - CABA Sur", m3: 0.42, cuarentena_motivos: ["deuda", "limite_credito", "cliente_nuevo"],
+           cuarentena_detalle: { deuda: 10000, exceso: 100000, limite: 250000, nuevo_pedidos: 1 }, _demo: true };
 }
 function cuarDemoToggle() { _apr.cuarDemo = !_apr.cuarDemo; aprRender(); }
 

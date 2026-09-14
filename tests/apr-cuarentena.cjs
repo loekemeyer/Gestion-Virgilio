@@ -124,6 +124,22 @@ catch (_e) {
     out.deudorCliente = /Cliente Deudor/.test(html);
     const chks = [...document.querySelectorAll(".apr-sel-chk")].length;
     out.soloUnCheckbox = chks === 1;  // solo el pedido normal es tildable
+    // v17.11 (Luis): el número de cliente tiene que verse en la ficha (LK 1000 / CH 2533)
+    out.codChip = /cuar-card-cod[^>]*>LK 1000</.test(html);
+
+    // (3) v17.11 — CLIENTE NUEVO: badge propio y el número de cliente de Chef con prefijo CH
+    _apr.pedidos = [
+      mk({ order_id: 200, empresa: "chef", cod: "2533", razon_social: "Cliente Nuevo SA",
+           cuarentena_motivos: ["cliente_nuevo"], cuarentena_detalle: { nuevo_pedidos: 1 } }),
+      mk({ order_id: 201, razon_social: "Cliente Dos" })
+    ];
+    aprRender(); await new Promise((res) => setTimeout(res, 200));
+    html = document.getElementById("pppPreview").innerHTML;
+    out.nuevoBadge = /cuar-badge b-nuevo[^>]*>🆕 Cliente nuevo</.test(html);
+    out.nuevoCuenta = /🚧 Cuarentena <b>\(1\)<\/b>/.test(html);
+    out.nuevoCodChip = /cuar-card-cod[^>]*>CH 2533</.test(html);
+    out.nuevoMotivo = /Cliente nuevo \(1 pedido facturado en toda su historia\)\./.test(html);
+    out.nuevoEtq = aprCuarentenaEtiqueta({ cuarentena_motivos: ["cliente_nuevo"] });
 
     out.errs = null;
     return out;
@@ -143,6 +159,12 @@ catch (_e) {
   chk(r.cobranzasBtn, "la ficha tiene el botón '💬 A cobranzas' (WhatsApp fijo)");
   chk(r.contactoBtn, "la ficha tiene el botón WhatsApp al vendedor/cliente");
   chk(r.motivo, "el retenido muestra el texto del motivo");
+  chk(r.codChip, "la ficha muestra el número de cliente (LK 1000)");
+  chk(r.nuevoBadge, "cliente nuevo: badge '🆕 Cliente nuevo'");
+  chk(r.nuevoCuenta, "cliente nuevo: el pedido cae en Cuarentena (1)");
+  chk(r.nuevoCodChip, "cliente nuevo de Chef: el chip dice CH 2533");
+  chk(r.nuevoMotivo, "cliente nuevo: el motivo dice cuántos pedidos facturó");
+  chk(r.nuevoEtq === "Cliente nuevo", "etiqueta de cliente_nuevo = 'Cliente nuevo'");
   chk(r.deudorCliente, "el cliente deudor se ve en el sector");
   chk(r.soloUnCheckbox, "el retenido NO es tildable (solo el normal tiene checkbox)");
   // v14.88: los botones se movieron a la pestaña Config. Cuarentena

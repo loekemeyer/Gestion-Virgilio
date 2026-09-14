@@ -12042,3 +12042,58 @@ entren en una clave. Lo que hay que mirar de esa vista no es el número, es si a
 **nueva** o una cuya columna pase a formar parte de un índice único.
 
 `sql/canon_candados_v1708.sql`.
+
+---
+
+### §3.ek — v17.12: el pedido de un CLIENTE NUEVO cae en Cuarentena, y la Cuarentena muestra el número de cliente — 2026-09-14
+
+**Pedido de Luis (2026-09-14):** *"tenemos la lógica para identificar clientes nuevos, no? Ponelos
+para que caigan en cuarentena cuando caiga un pedido de ellos con un badge que diga 'Cliente
+nuevo'"* y *"los clientes en cuarentena, y la lista de los ya programados, tienen que tener bien
+claro el número de cliente (de LK o de CH según la empresa del pedido)"*.
+
+**La lógica existía escrita, no implementada.** `docs/PLAN-BADGE-CLIENTE-NUEVO.md` (idea 9793,
+regla del dueño del 2026-09-10) ya definía quién es NUEVO; el plan quedó parado esperando resolver
+el "Hueco A" (no hay marca de *pagado* por pedido). Se implementó con la opción que el propio plan
+recomendaba para v1: **facturado** como proxy de *pagado y entregado*.
+
+**Regla, tal cual:** es nuevo el cliente con **código alto** (`cod >= 3800` en LK / `cod >= 2300`
+en CH) **y menos de 3 pedidos facturados en toda su historia**, contando sobre el **cliente real**:
+se unen los códigos por **CUIT**, por `customer_grupos` (cambió de razón social) y por
+`clientes_lk_ch_links` (LK↔CH), con **cierre transitivo** (`WITH RECURSIVE`). Un código nuevo del
+mismo CUIT que uno viejo con historia **no** es nuevo, que es justo el caso que el plan quería cubrir.
+
+**Dónde vive cada mitad.** El cálculo va en **LK** (`gv_clientes_nuevos_calc`), que es donde están
+`sales_lines` (260k líneas de historia), los dos padrones y los vínculos; Gestión no tiene con qué:
+su historia propia arranca en 2026, y tratar "sin entregas en 2026" como *cliente nuevo* marcaría a
+media cartera. El resultado se **espeja** a `public."GV_Clientes_Nuevos"` de Gestión: LK empuja por
+el FDW `virgilio_db` con el rol `lk_ppp_reader` (cron `sync-clientes-nuevos-virgilio`, job 44 de LK,
+cada hora al :40), **mismo patrón que `lk_pedidos_match`**. Gestión lee una tabla local — cero FDW en
+el camino caliente.
+
+**Qué cambió en Gestión.** `gv_cuarentena_marcar` y `gv_cuarentena_ya_programado` suman el motivo
+**`cliente_nuevo`** y devuelven `nuevo_pedidos` (cuántos facturó). Las dos van con DROP + CREATE
+porque cambia el tipo de retorno, así que **se repusieron los GRANT** (quedaron en `authenticated` +
+`service_role`, sin `anon`; el gate real está adentro). El front pinta el badge verde
+**🆕 Cliente nuevo** al lado de los de deuda / crédito / suspendido, y el **número de cliente** como
+chip `LK 4281` / `CH 2533` tanto en la ficha de Cuarentena como en cada fila de "Ya programados y el
+cliente está en cuarentena" (esa lista además mostraba los motivos con la clave interna —
+`cliente_nuevo` crudo— y ahora usa los nombres).
+
+**"Ya pagó" NO levanta este motivo** (no es deuda): un pedido de cliente nuevo sale con **"Enviar a
+Pedidos a programar"**, que es una decisión por pedido y queda registrada en `GV_Cuarentena_Liberados`.
+
+**Medición del día (2026-09-14).** Padrón 1.275 LK + 765 Chef; con código alto 492 + 311 = 803;
+**nuevos 228 + 140 = 368**. El cálculo tarda **693 ms**. Pedidos web de esos clientes en los últimos
+30 días: **12** (≈ 1 cada 2-3 días), o sea que la Cuarentena no se inunda.
+`gv_cuarentena_ya_programado()` pasó de **12 a 17** filas (5 por este motivo).
+
+**Apagón rápido, sin tocar código:** `delete from public."GV_Clientes_Nuevos";` (el cron lo vuelve a
+llenar en la hora; para que no, desactivar el job 44 en LK). Rollback completo y las dos mitades del
+SQL: `sql/gv_clientes_nuevos_v1712.sql` (y `sql/gv_clientes_nuevos.sql` del repo `pagina-LK-copia`).
+Las versiones previas de las dos funciones están en `sql/gv_cuarentena_ya_programado_v1657.sql` y
+`sql/gv_cuarentena_pago_planify_v1546.sql`.
+
+**Lo que queda pendiente de este tema:** el badge en **Facturación** que pedía la idea 9793 (este
+trabajo cubre Cuarentena, no `facRender`), y la definición fina de *pagado* — hoy es *facturado*,
+contado como **fechas de factura distintas** porque `sales_lines` no guarda número de comprobante.

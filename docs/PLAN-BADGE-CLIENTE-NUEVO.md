@@ -1,6 +1,18 @@
 # Plan de acción — Badge "Cliente NUEVO" en Facturación (idea 9793)
 
-> Estado: **PLAN, no implementado.** Pedido del dueño (2026-09-10): dejar el plan y no
+> ✅ **La lógica YA ESTÁ IMPLEMENTADA (v17.12, 2026-09-14, pedido de Luis), pero en CUARENTENA,
+> no en Facturación.** La regla de abajo se aplicó tal cual, con el **Hueco A resuelto por la
+> opción 1** (facturado ≈ pagado y entregado): la calcula `gv_clientes_nuevos_calc` en LK y la
+> espeja a `GV_Clientes_Nuevos` de Gestión el cron `sync-clientes-nuevos-virgilio` (el camino
+> "espejo + cron" del punto 4.2). Hoy el pedido de un cliente nuevo **cae en Cuarentena** con el
+> badge 🆕 *Cliente nuevo*. Detalle, medición y rollback: §3.ek de `docs/SUPABASE-GESTION-VIRGILIO.md`
+> y `sql/gv_clientes_nuevos_v1712.sql`.
+>
+> **Lo que sigue pendiente de este plan:** el badge en **Facturación** (`facRender`, punto 4.3) y
+> la definición fina de "pagado" (hoy es *facturado*, contado como fechas de factura distintas
+> porque `sales_lines` no guarda número de comprobante).
+
+> Estado original: **PLAN, no implementado.** Pedido del dueño (2026-09-10): dejar el plan y no
 > tocar nada hasta OK. El badge de arranque es **sólo estético**, pero la lógica de
 > "¿es nuevo?" va a servir para más cosas después, así que se define bien de una vez.
 >
