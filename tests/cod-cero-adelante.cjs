@@ -51,7 +51,8 @@ const BUSQUEDA = [["26", "026"], ["27", "0027"], ["35E", "035E"], ["67", "067"]]
     });
 
     // las tres altas por teclado guardan con el cero adelante (no lo que se tipeó crudo)
-    ["tallArtAdd", "lugAddItem", "planimAdd"].forEach((fn) => {
+    // v17.26 - planimAdd se borro: el editor viejo de planimetria quedo solo lectura
+    ["tallArtAdd", "lugAddItem"].forEach((fn) => {
       if (typeof window[fn] !== "function") { fallas.push("no existe " + fn); return; }
       if (!/codCanon\(/.test(String(window[fn]))) fallas.push(fn + " guarda el código sin pasar por codCanon");
     });

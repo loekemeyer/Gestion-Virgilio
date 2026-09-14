@@ -12716,3 +12716,61 @@ trimestre vendió menos que el anterior, y eso es exactamente lo que se pedía q
 **Aparte, la carga automática ya hizo más dinámica la proyección por otro lado**: antes el dato entraba una
 vez por mes con hasta 14 días de atraso, ahora entra todos los días. La ventana sigue siendo de 6 meses,
 pero ya no se mira con un mes de retraso.
+---
+
+### §3.et — v17.26: el editor viejo de planimetría deja de escribir, y el centinela de góndola pasa a salir del mapa — 2026-09-14
+
+Pedido de **Luis**. Dos cosas que quedaron colgando de la migración a `GV_Lugar` y que el
+Mapa de góndolas (§3.eq) dejó a la vista.
+
+#### 1. `#planimEditorOverlay` queda SÓLO LECTURA (front, problema 85 segundo pase)
+
+Desde la **v15.77** `window.GONDOLA` se llena de `gv_lugar_articulo`; `loadPlanimetriaRemote()`
+hace `return` temprano si esa vista devuelve filas, **así que NO mergea** la tabla `Planimetria`
+(el comentario de `index.html` que dice "MERGEA" quedó mintiendo desde entonces). El editor
+viejo seguía haciendo `POST` a `Planimetria`: el supervisor corregía una ubicación, leía
+*"✓ guardado en Supabase"*, y la app seguía mandando al operario al sector viejo.
+
+La **v15.91** cerró el problema 85 con un banner y dejó vivo el camino de escritura. **No
+alcanzó, y ya había pasado:** el 11/09 entre las 16:07 y las 16:13 alguien cargó ahí los 9
+códigos que `docs/HANDOFF-PLANIMETRIA-Y-ACACIA.md` daba por "sin sector" — palos de amasar
+231/232/233, línea Acacia 989E/992E/997E/998E, 537 y 567. **Ninguno llegó a `GV_Lugar_Item`.**
+
+Se borraron las **7 funciones de escritura** (`planimSuggestOrden`, `planimFillOrden`,
+`planimUpsert`, `planimSaveRow`, `planimAdd`, `planimDeleteRow`, `planimNearby`) y el formulario
+de alta. La pantalla ahora lista `window.GONDOLA` en orden de recorrido y manda a
+📍 **Lugares del depósito** (editar) y 🗺️ **Mapa de góndolas** (mirar).
+
+⚠ **La tabla `Planimetria` NO se toca** (370 filas): es el único lugar donde viven esos 17 pares
+hasta que el depósito diga cuál mapa manda — **problema 156**, abierto. El trigger
+`planimetria_autoorden()` queda sin llamadores desde el front. `tests/cod-cero-adelante.cjs` ya
+no le pide `codCanon` a `planimAdd` (los que quedan vivos son `tallArtAdd` y `lugAddItem`).
+
+#### 2. `gv_gondola_divergente` se reescribe sobre `gv_planimetria_celda`
+
+Quedaron **dos centinelas con dos números para la misma pregunta**: el viejo (v16.50) decía
+**107** y el mapa dice **35**. Medido: los 72 de diferencia son ruido del viejo, no celdas que
+el mapa se pierda.
+
+| Del centinela viejo | Qué eran |
+|---|---|
+| 9 `sector_inexistente` (J1…J9) | grafía: `Capacidad_Sector` guarda `J1`, `GV_Lugar` `J01`, y comparaba el sector como TEXTO |
+| 9 `solo_mapa` | misma causa |
+| 54 `solo_capacidad` | las 54 filas con `cod = 'Libre'` — una celda vacía no es una divergencia |
+| **19 `solo_mapa` + 16 `solo_capacidad`** | **35 reales** |
+
+`gv_planimetria_celda` no tiene ninguno de los tres problemas (parte el sector en góndola+celda,
+excluye `Libre`, compara por `gv_cod_stock`). El centinela ahora se deriva de ella, con los
+mismos nombres de columna. **Consumidores: ninguno** — verificado, 0 funciones, 0 vistas, 0 crons
+y 0 apariciones en el front; por eso el `DROP` + `CREATE` no necesitó cascada.
+`gv_endpoints_rotos` quedó **vacía** después del cambio.
+
+⚠ **El problema 84 está anclado al 107. El número que vale es 35.**
+
+**Qué NO cambió:** los máximos siguen saliendo **enteros** de `Capacidad_Sector`
+(`max_fuente = 'item'` en **0** de 654 celdas); `gv_planimetria_celda` los resuelve con
+`COALESCE`, así que el backfill de `GV_Lugar_Item.cajas_max` dejó de ser urgente pero
+`Capacidad_Sector` **no se puede jubilar**.
+
+**SQL:** `sql/gv_gondola_divergente_v1726.sql` (con el `CREATE` viejo entero al pie, para rollback).
+**Suite:** 144 bloques, `EXIT=0` — incluidos `dead-handlers` (703 handlers, 0 muertos) y `checkhtml`.

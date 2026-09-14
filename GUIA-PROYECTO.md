@@ -12,7 +12,7 @@
 > única**; no se replica. Ante la duda entre parche rápido y fix de raíz → **fix
 > de raíz**.
 >
-> Última actualización: 2026-09-14 (domingo) · Versión app al documentar: **v17.22**
+> Última actualización: 2026-09-14 (domingo) · Versión app al documentar: **v17.26**
 >
 > Nota **v17.20/v17.22 (2026-09-14, Luis) — CUARENTENA: columna "Enviar a" en la tabla de ya
 > programados** (se llamó "Marcar" hasta que Luis la renombró, mismo día).
@@ -147,6 +147,26 @@
 >   17 columnas y antes se veían 6. Celda de **altura fija**: una con dos códigos crecía y desalineaba
 >   la fila entera, así que con varios códigos cada uno va en **una línea** (código + cajas al lado).
 > - Test: `tests/pmap-gondolas.cjs`. Detalle y rollback: `docs/SUPABASE-GESTION-VIRGILIO.md` §3.eq.
+>
+> Nota **v17.26 (2026-09-14, Luis) — el editor viejo de planimetría ya no escribe, y el centinela
+> de góndola sale del mapa.**
+>
+> - **🗺️ Editar Planimetría pasó a ser 🗺️ Planimetría (sólo lectura).** Escribía a la tabla
+>   `Planimetria`, que el picking **dejó de leer en la v15.77**: `loadPlanimetriaRemote()` hace
+>   `return` temprano si `gv_lugar_articulo` trae filas, **o sea que no mergea** (el comentario que
+>   dice "MERGEA" quedaba mintiendo). Se guardaba, decía *"✓ guardado"*, y no pasaba nada. Se
+>   borraron las 7 funciones de escritura y el formulario de alta; se edita en 📍 Lugares del
+>   depósito y se mira en 🗺️ Mapa de góndolas.
+> - **No es sólo teoría: ya se perdió trabajo.** El 11/09 16:07–16:13 alguien cargó ahí los 9
+>   códigos que el handoff daba por "sin sector" (palos de amasar 231/232/233, línea Acacia
+>   989E/992E/997E/998E, 537, 567) y **ninguno llegó a `GV_Lugar_Item`**. Siguen sin lugar: el mapa
+>   los muestra como celda libre o con otro código adentro. **Problema 156**, abierto — necesita que
+>   el depósito diga qué hay hoy en esas celdas. Por eso la tabla `Planimetria` **no se borra**.
+> - **`gv_gondola_divergente` ahora se deriva de `gv_planimetria_celda`.** Decía **107**
+>   divergencias contra las **35** del mapa: 9 eran grafía del sector (J1 vs J01), 9 lo mismo por
+>   otro lado, y **54 eran celdas `Libre`** — una celda vacía no es una divergencia. ⚠ **El
+>   problema 84 está anclado al 107; el número que vale es 35.**
+> - `sql/gv_gondola_divergente_v1726.sql`. Detalle: `docs/SUPABASE-GESTION-VIRGILIO.md` §3.et.
 
 > Nota **v15.40 (2026-09-11) — HANDOFF de planimetría / Acacia: `docs/HANDOFF-PLANIMETRIA-Y-ACACIA.md`.**
 > Thomas sigue este tema en otra sesión. Ahí está todo junto: los **13 artículos activos del catálogo LK

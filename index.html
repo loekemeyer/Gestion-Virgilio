@@ -4904,7 +4904,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=17.25"></script>
+<script type="module" src="recepcion.js?v=17.26"></script>
 <!-- Config del módulo de fichada (compartido con fichada.html). El secret
      hmacSecret tiene que ser el mismo acá y allá; cargándolo desde un solo
      archivo evitamos que se desincronicen. -->
@@ -5123,7 +5123,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
        "Planimetria" que se mergea sobre planimetria.js. -->
   <div id="planimEditorOverlay" class="recp-admin-overlay">
     <div class="recp-admin-bar">
-      <span class="recp-admin-title">🗺️ Editar Planimetría</span>
+      <span class="recp-admin-title">🗺️ Planimetría (sólo lectura)</span>
       <button class="recp-admin-close" onclick="closePlanimEditor()">Cerrar</button>
     </div>
     <div class="planim-body">
@@ -5133,24 +5133,15 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
            El editor NO se borra (regla de Luis, 11/09: nada se borra hasta que el
            reemplazo esté rodando) — pero tiene que decirlo en la cara. -->
       <div class="planim-obsoleto">
-        ⚠ <b>Este editor ya no manda.</b> Las ubicaciones que usa el picking salen de
-        <b>Lugares del depósito</b>. Lo que cambies acá no se va a ver en la app.
-        <br><button onclick="closePlanimEditor(); openLugarEditor();">📍 Ir a Lugares del depósito</button>
+        ⚠ <b>Esta pantalla es sólo para MIRAR.</b> Hasta la v17.26 se editaba acá y no servía
+        de nada: escribía a una tabla que el picking dejó de leer en la v15.77. Las ubicaciones
+        se cargan en <b>Lugares del depósito</b> y se ven dibujadas en el <b>Mapa de góndolas</b>.
+        Lo de abajo es lo que hoy usa el picking, en orden de recorrido.
+        <br><button onclick="closePlanimEditor(); openLugarEditor();">📍 Editar en Lugares del depósito</button>
+        <button onclick="closePlanimEditor(); openPlanimMapa();">🗺️ Ver el mapa</button>
       </div>
-      <div class="planim-add">
-        <div class="planim-add-t">Agregar / actualizar ubicación</div>
-        <div class="planim-add-row">
-          <input id="planimNewCod" class="planim-inp" type="text" placeholder="Código (ej. 580)">
-          <input id="planimNewSec" class="planim-inp" type="text" placeholder="Sector (ej. C19)" oninput="this.value=this.value.toUpperCase();planimFillOrden('planimNewSec','planimNewOrd')">
-          <input id="planimNewOrd" class="planim-inp planim-inp-num" type="number" inputmode="numeric" placeholder="Orden" oninput="this.classList.remove('planim-ord-sug')">
-          <button class="planim-btn-save" onclick="planimAdd()">Guardar</button>
-        </div>
-        <input id="planimRef" class="planim-inp planim-search" type="text" placeholder="🧭 ¿Al lado de qué código o sector va? — te muestro los órdenes cercanos" oninput="planimNearby(this.value)">
-        <div id="planimNearby" class="planim-near"></div>
-        <div class="planim-hint">Para el par Nacional/Importado: cargá <b>580</b> y <b>580E</b> con el <b>mismo sector</b>.</div>
-      </div>
-      <div class="planim-sec-t">Buscar y editar ubicaciones</div>
-      <input id="planimSearch" class="planim-inp planim-search" type="text" placeholder="🔍 Buscar código o sector para editar…" oninput="planimRender(this.value)">
+      <div class="planim-sec-t">Buscar ubicaciones</div>
+      <input id="planimSearch" class="planim-inp planim-search" type="text" placeholder="🔍 Buscar código o sector…" oninput="planimRender(this.value)">
       <div id="planimList" class="planim-list"></div>
       <div id="planimStatus" class="planim-status"></div>
     </div>
@@ -8047,7 +8038,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v17.25";
+const APP_VERSION = "v17.26";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -36563,17 +36554,14 @@ function planimRender(filter) {
     return k.indexOf(f) >= 0 || String(e[0] || "").toUpperCase().indexOf(f) >= 0;
   }).sort(function (a, b) { return ordOf(a) - ordOf(b) || (a < b ? -1 : a > b ? 1 : 0); });
   if (!keys.length) { list.innerHTML = '<div class="planim-empty">' + (f ? 'Nada coincide con "' + escapeHtml(filter) + '".' : 'No hay ubicaciones cargadas todavía.') + '</div>'; return; }
-  const head = '<div class="planim-list-head"><span class="plh-cod">Código</span><span class="plh-sec">Sector</span><span class="plh-ord">Orden</span><span class="plh-act">Acciones</span></div>';
+  const head = '<div class="planim-list-head"><span class="plh-cod">Código</span><span class="plh-sec">Sector</span><span class="plh-ord">Orden</span></div>';
   const CAP = 500;
   list.innerHTML = head + keys.slice(0, CAP).map(function (k) {
     const e = G[k] || ["", 0];
-    const kE = escapeHtml(k);
-    return '<div class="planim-row">' +
-      '<span class="planim-row-cod">' + kE + '</span>' +
-      '<input class="planim-inp planim-row-sec" id="planimSec_' + kE + '" type="text" value="' + escapeHtml(String(e[0] || "")) + '" placeholder="Sector" oninput="this.value=this.value.toUpperCase();planimFillOrden(\'planimSec_' + kE + '\',\'planimOrd_' + kE + '\',\'' + kE + '\')">' +
-      '<input class="planim-inp planim-inp-num planim-row-ord" id="planimOrd_' + kE + '" type="number" inputmode="numeric" value="' + (e[1] != null ? Number(e[1]) : 0) + '" oninput="this.classList.remove(\'planim-ord-sug\')">' +
-      '<button class="planim-btn-save" onclick="planimSaveRow(\'' + kE + '\')">Guardar</button>' +
-      '<button class="planim-btn-del" onclick="planimDeleteRow(\'' + kE + '\')">Borrar</button>' +
+    return '<div class="planim-row planim-row-ro">' +
+      '<span class="planim-row-cod">' + escapeHtml(k) + '</span>' +
+      '<span class="planim-row-sec">' + escapeHtml(String(e[0] || "—")) + '</span>' +
+      '<span class="planim-row-ord">' + (e[1] != null ? Number(e[1]) : 0) + '</span>' +
     '</div>';
   }).join("") + (keys.length > CAP ? '<div class="planim-empty">Mostrando ' + CAP + ' de ' + keys.length + ' — afiná la búsqueda.</div>' : "");
 }
@@ -36581,7 +36569,7 @@ function planimRender(filter) {
    EDITOR DE LUGARES — v15.76 (pedido de Luis, 2026-09-11: "rehacemos el editor")
 
    Reemplaza a DOS editores que escribían a DOS tablas que ahora son una:
-     · Editor de Planimetría (planimUpsert / planimDeleteRow) → "Planimetria"
+     · Editor de Planimetría (sus funciones de escritura, borradas en la v17.26) → "Planimetria"
      · Capacidad por sector  (dpSaveCap / stkCapImport)       → "Capacidad_Sector"
    Los dos siguen andando a propósito (regla de Luis: nada se borra hasta que el
    reemplazo esté rodando). Éste escribe a GV_Lugar / GV_Lugar_Item.
@@ -36980,138 +36968,28 @@ function pmapCellHtml(g, n, porCelda) {
   return '<div class="pmap-cell ' + cls + (hit ? " pmap-hit" : "") + '" title="' + escapeHtml(tip) + '"' + click + '>' +
          '<span class="pmap-sec">' + escapeHtml(sec) + '</span>' + cuerpo + '</div>';
 }
-/* v11.13 — Sugerencia de N° de orden para un sector, MISMA lógica que el trigger
-   backend planimetria_autoorden (sql/planimetria_autoorden.sql). Lee window.GONDOLA.
-   Devuelve un número o null. */
-function planimSuggestOrden(sector, excludeCod) {
-  const G = window.GONDOLA || {};
-  const S = String(sector || "").trim().toUpperCase();
-  if (!S) return null;
-  const exc = String(excludeCod || "").toUpperCase();
-  const rows = Object.keys(G).map(function (k) {
-    const e = G[k] || ["", 0];
-    return { cod: String(k).toUpperCase(), sector: String(e[0] || "").toUpperCase(), orden: Number(e[1]) };
-  }).filter(function (r) { return r.cod !== exc && r.sector && !isNaN(r.orden) && r.orden !== 0; });
-  if (!rows.length) return null;
-  // 1) mismo sector exacto → su orden (mínimo)
-  const same = rows.filter(function (r) { return r.sector === S; });
-  if (same.length) return Math.min.apply(null, same.map(function (r) { return r.orden; }));
-  // 2) mismo pasillo (misma letra inicial), interpolar por nombre de sector
-  const letra = S.charAt(0);
-  let prev = null, next = null;
-  const bump = function (r) {
-    if (r.sector < S) prev = (prev == null) ? r.orden : Math.max(prev, r.orden);
-    else if (r.sector > S) next = (next == null) ? r.orden : Math.min(next, r.orden);
-  };
-  rows.filter(function (r) { return r.sector.charAt(0) === letra; }).forEach(bump);
-  // 3) sin pasillo → vecinos globales por nombre
-  if (prev == null && next == null) rows.forEach(bump);
-  if (prev != null && next != null) return Math.round((prev + next) / 2);
-  if (prev != null) return prev + 1;
-  if (next != null) return Math.max(next - 1, 1);
-  // 4) nada → el mayor + 1
-  return Math.max.apply(null, rows.map(function (r) { return r.orden; })) + 1;
-}
-/* Autocompleta el input de orden con la sugerencia si está vacío/0 o si el valor
-   actual fue puesto por la propia sugerencia (clase planim-ord-sug). Nunca pisa un
-   número puesto a mano. */
-function planimFillOrden(secElId, ordElId, excludeCod) {
-  const secEl = document.getElementById(secElId);
-  const ordEl = document.getElementById(ordElId);
-  if (!secEl || !ordEl) return;
-  const cur = parseInt(ordEl.value, 10);
-  const wasAuto = ordEl.classList.contains("planim-ord-sug");
-  if (cur && cur !== 0 && !wasAuto) return;   // orden puesto a mano → no lo piso
-  const sug = planimSuggestOrden(secEl.value, excludeCod);
-  if (sug != null) { ordEl.value = sug; ordEl.classList.add("planim-ord-sug"); }
-  else if (wasAuto) { ordEl.value = ""; ordEl.classList.remove("planim-ord-sug"); }
-}
-async function planimUpsert(cod, sector, orden) {
-  const headers = await facAuthWriteHeaders({ "Prefer": "resolution=merge-duplicates,return=minimal" });
-  if (!headers) { planimSetStatus(authNoSesionMsg("Iniciá sesión con Google para editar."), false); return false; }
-  try {
-    const r = await fetch(SUPABASE_PLANIMETRIA_ENDPOINT + "?on_conflict=cod", {
-      method: "POST", headers: headers, body: JSON.stringify({ cod: cod, sector: sector, orden: orden })
-    });
-    if (!r.ok) { planimSetStatus("Error guardando en Supabase: HTTP " + r.status, false); return false; }
-    return true;
-  } catch (_e) { planimSetStatus("Sin conexión: NO se guardó en Supabase.", false); return false; }
-}
-async function planimSaveRow(cod) {
-  const c = String(cod).toUpperCase();
-  const secEl = document.getElementById("planimSec_" + c);
-  const ordEl = document.getElementById("planimOrd_" + c);
-  const sector = secEl ? secEl.value.trim() : "";
-  const orden = ordEl ? (parseInt(ordEl.value, 10) || 0) : 0;
-  if (await planimUpsert(c, sector, orden)) {
-    if (!window.GONDOLA) window.GONDOLA = {};
-    window.GONDOLA[c] = [sector, orden];
-    planimSetStatus("✓ " + c + " guardado en Supabase.", true);
-  }
-}
-async function planimAdd() {
-  const codEl = document.getElementById("planimNewCod");
-  const secEl = document.getElementById("planimNewSec");
-  const ordEl = document.getElementById("planimNewOrd");
-  const cod = codEl ? codCanon(codEl.value.trim().toUpperCase()) : "";   // v16.23 — con el cero adelante
-  if (!cod) { planimSetStatus("Falta el código.", false); return; }
-  const sector = secEl ? secEl.value.trim() : "";
-  const orden = ordEl ? (parseInt(ordEl.value, 10) || 0) : 0;
-  if (await planimUpsert(cod, sector, orden)) {
-    if (!window.GONDOLA) window.GONDOLA = {};
-    window.GONDOLA[cod] = [sector, orden];
-    planimSetStatus("✓ " + cod + " guardado en Supabase.", true);
-    if (codEl) codEl.value = ""; if (secEl) secEl.value = ""; if (ordEl) ordEl.value = "";
-    const s = document.getElementById("planimSearch");
-    planimRender(s ? s.value : "");
-  }
-}
-async function planimDeleteRow(cod) {
-  const c = String(cod).toUpperCase();
-  if (!confirm("¿Borrar " + c + " de la planimetría (Supabase)?\n\n(Si el código venía del archivo base, puede reaparecer; los agregados acá se borran del todo.)")) return;
-  const headers = await facAuthWriteHeaders({ "Prefer": "return=minimal" });
-  if (!headers) { planimSetStatus(authNoSesionMsg("Iniciá sesión con Google para editar."), false); return; }
-  try {
-    const r = await fetch(SUPABASE_PLANIMETRIA_ENDPOINT + "?cod=eq." + encodeURIComponent(c), { method: "DELETE", headers: headers });
-    if (!r.ok) { planimSetStatus("Error borrando: HTTP " + r.status, false); return; }
-    if (window.GONDOLA) delete window.GONDOLA[c];
-    planimSetStatus("✓ " + c + " borrado de Supabase.", true);
-    const s = document.getElementById("planimSearch");
-    planimRender(s ? s.value : "");
-  } catch (_e) { planimSetStatus("Sin conexión: no se borró.", false); }
-}
-/* Muestra las ubicaciones CERCANAS (por orden) a un código/sector de referencia,
-   con su número de orden, para elegir bien el orden de la ubicación nueva. Lee de
-   window.GONDOLA (planimetría estática + lo que ya esté en Supabase). */
-function planimNearby(ref) {
-  const box = document.getElementById("planimNearby");
-  if (!box) return;
-  const r = String(ref || "").trim().toUpperCase();
-  if (!r) { box.innerHTML = ""; return; }
-  const G = window.GONDOLA || {};
-  const ordOf = (e) => (e && typeof e[1] === "number") ? e[1] : (parseInt(e && e[1], 10) || 0);
-  const all = Object.keys(G)
-    .map(function (k) { const e = G[k] || ["", 0]; return { cod: k, sector: String(e[0] || ""), orden: ordOf(e) }; })
-    .sort(function (a, b) { return a.orden - b.orden; });
-  if (!all.length) { box.innerHTML = ""; return; }
-  // Orden objetivo: si la referencia es un código, su orden; si es un sector, el menor de ese sector.
-  let target = null;
-  if (G[r]) target = ordOf(G[r]);
-  else {
-    const inSec = all.filter(function (x) { return x.sector.toUpperCase().indexOf(r) >= 0; });
-    if (inSec.length) target = inSec[0].orden;
-  }
-  if (target == null) { box.innerHTML = '<div class="planim-empty">No encontré "' + escapeHtml(ref) + '". Probá con un código o sector que ya exista.</div>'; return; }
-  // Ventana: 4 anteriores y 4 siguientes por orden alrededor del más cercano al target.
-  let idx = 0, best = Infinity;
-  all.forEach(function (x, i) { const d = Math.abs(x.orden - target); if (d < best) { best = d; idx = i; } });
-  const win = all.slice(Math.max(0, idx - 4), Math.min(all.length, idx + 5));
-  box.innerHTML = '<div class="planim-near-t">Ubicaciones cercanas (por orden):</div>' +
-    win.map(function (x) {
-      return '<div class="planim-near-row"><span class="planim-near-ord">' + x.orden + '</span>' +
-             '<b>' + escapeHtml(x.cod) + '</b> — ' + escapeHtml(x.sector) + '</div>';
-    }).join("");
-}
+/* v17.26 — SE FUERON las 7 funciones de ESCRITURA del editor viejo de planimetría
+   (planimSuggestOrden, planimFillOrden, planimUpsert, planimSaveRow, planimAdd,
+   planimDeleteRow, planimNearby). Escribían a la tabla "Planimetria", que el picking
+   dejó de leer en la v15.77: `loadPlanimetriaRemote` hace `return` temprano si
+   `gv_lugar_articulo` devuelve filas, o sea que NO mergea — el comentario de esa función
+   que dice "MERGEA" quedó mintiendo. El supervisor corregía una ubicación, leía
+   "✓ guardado en Supabase", y la app seguía mandando al operario al sector viejo.
+
+   Eso es el problema 85, que la v15.91 "cerró" con un banner dejando vivo el camino de
+   escritura. No alcanzó, y para entonces ya había pasado: el 11/09 entre las 16:07 y las
+   16:13 alguien cargó acá los 9 códigos que docs/HANDOFF-PLANIMETRIA-Y-ACACIA.md daba por
+   "sin sector" (palos de amasar 231/232/233, línea Acacia 989E/992E/997E/998E, 537 y 567).
+   Ninguno llegó a GV_Lugar_Item: siguen sin lugar, y el mapa los muestra como celda libre
+   o con otro código adentro.
+
+   Ahora #planimEditorOverlay es SÓLO LECTURA: lista window.GONDOLA (que desde la v15.77
+   sale de GV_Lugar) en orden de recorrido. Se edita en 📍 Lugares del depósito y se mira
+   dibujado en 🗺️ Mapa de góndolas.
+
+   ⚠ La tabla "Planimetria" NO se toca: es el único lugar donde viven esos 17 pares hasta
+   que el depósito diga cuál de los dos mapas manda (problema 156). El trigger backend
+   planimetria_autoorden() queda sin llamadores desde el front. */
 
 function openFaltantes() {
   if (!requireSupervisor()) return;
