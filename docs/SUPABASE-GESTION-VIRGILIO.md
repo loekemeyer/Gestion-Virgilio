@@ -15084,3 +15084,81 @@ select p.proname, c.relname
 
 **Rollback:** `ALTER FUNCTION public.fn_canon_cols() SECURITY INVOKER RESET search_path;` (= volver
 al estado roto; no hay motivo). Problema **194** de `github_repo_problemas`.
+## §3.fr — v17.80: el pedido de Tierra del Fuego ES un pedido de CHEF (NP incluida) — 2026-09-14
+
+**Dueño, mismo día, después de la v17.75:** *"¿lo programó como LK? porque debería estar como **NP
+de CH**"*, y *"esos pedidos se pasen como pedidos de CH y se facturen como CH"*.
+
+Hasta acá la regla estaba a mitad de camino: el pedido de un cliente de TdF entraba por la página
+de LK, quedaba como **NP de LK**, y sólo la FACTURA se enrutaba al ISIS de Chef (v13.77) — más la
+Cuarentena, arreglada unas horas antes (§3.fp). Ahora el pedido es de Chef de punta a punta.
+
+### El dato que destrabó la decisión
+
+La regla del dueño del 07/09 decía *"el pedido se arma como Loeke (con una L al final)"*, y por eso
+se había leído como "NP de LK". **Pero la góndola de picking no depende de la empresa de la NP:**
+`pkEmpresaArt` fuerza góndola **Loeke** a todo código terminado en L, sea la NP LK o CH. O sea que
+con la NP en Chef el armado sale igual de la góndola Loeke y la regla del 07/09 se sigue cumpliendo.
+Es el mismo camino que ya usan desde la v13.71 los pedidos de Chef con artículos de Loekemeyer.
+
+### Dónde se corta: en los dos feeds, con UNA sola condición
+
+`gv_web_es_tdf_chef(isis_empresa, cod_isis, fecha)` en **LK**. La usan `gv_pedidos_web_np_lk` (que
+ya no devuelve esos bloques), `gv_pedidos_web_np_chef` (que los devuelve con el cod de Chef) y el
+front de A Programar (`aprPartirTdF`, que lee la misma configuración de `app_settings` de LK).
+**La Edge Function no se tocó**: lee esas dos RPC y recibe los pedidos ya reclasificados.
+
+Que la condición sea una sola no es prolijidad: si el job y la pantalla decidieran distinto sobre el
+mismo pedido, saldría **pendiente en LK y programado en Chef** — dos veces en la PPP.
+
+### ⚠ El `order_id` lleva offset
+
+La clave de `PPP_Web_NP` y `PPP_Web_Programacion` es `(empresa, order_id, np_idx)`, y el `order_id`
+es el número del pedido de la **página**. Guardar el 1431 de la página LK como `chef` lo pone a
+chocar con el 1431 de la página de Chef el día que ese portal llegue (hoy va por 228). Se le suma
+`web_order_offset_lk` = 1.000.000 → `1431 → 1001431`: nunca choca, el número original se lee a
+simple vista, y volver atrás es restar.
+
+**La NP no necesitó nada:** `gv_ppp_web_np_asignar` ya toma el próximo libre de cada empresa con
+lock (`max(np)+1` + índice único `(empresa, np)`), que es justo lo que pidió el dueño — *"que tome el
+próximo número de chef disponible … que chequee cuáles ya están generados"*.
+
+### ⚠ El piso de fecha tampoco es opcional
+
+`tdf_como_chef_desde` (hoy `2026-09-14`). Un pedido anterior no se mueve de empresa aunque cumpla la
+regla: ya está programado o entregado como LK, y sacarlo del feed de LK para meterlo en el de Chef lo
+haría entrar como pedido NUEVO. **Medido antes de prender: sin el piso, 4 pedidos (7 bloques) se
+habrían re-armado**, entre ellos el 1228 del 20/08, que ya no está ni en la PPP.
+
+### Medición (14/09, ventana de 30 días)
+
+| | `gv_pedidos_web_np_lk` | `gv_pedidos_web_np_chef` |
+|---|---:|---:|
+| perilla apagada | 328 bloques | 36 |
+| perilla prendida | **321** | **43** |
+
+Los 7 bloques se movieron enteros: 0 perdidos, 0 duplicados. Salen con el cod de Chef (2465 Il
+Cheff, 2643 El Martillo, 2600 Alesso), la razón social del padrón de Chef, los artículos con L y la
+zona del expreso (Villa Luro, Barracas, Soldati).
+
+### Lo que además hubo que tocar en el front
+
+- **Excel para ISIS**: el enrutamiento al archivo de Chef, el tope de 15 líneas y el código de
+  cliente ya salen solos de que la NP sea `CH`. Lo que NO salía solo es el **vendedor y la condición
+  de pago**: `gv_pedidos_web_np_chef_admin` es el padrón de pedidos NATIVOS de Chef y no los tiene,
+  así que se van a buscar a LK con el `order_id` original (`- offset`).
+- **Sucursal de entrega**: en `lk_pedidos_match` el pedido está como `('lk', cod LK)`, y el filtro
+  del Excel busca `('chef', cod de Chef)`. Se agregó una búsqueda por **`order_id`**, que es exacta
+  y no depende ni del código de cliente ni de la fecha (y por eso el select de `lk_pedidos_match`
+  ahora trae `order_id`).
+
+### Migración de los 3 pedidos del día
+
+1430, 1431 y 1432 ya estaban programados como LK (LK 0079/0080/0081/0083/0084), sin picking y sin
+facturar, entrega 21/09. Se borraron sus filas de LK —backup en
+`zz_backups."GV_Backup_TdF_a_Chef_20260914"`— para que entren por el feed de Chef y tomen NP de Chef.
+Las tandas E12O y D69F **no quedan vacías**: tienen otros clientes (verificado antes de borrar).
+Quedan 5 números de LK quemados (79, 80, 81, 83, 84): un hueco en la numeración no rompe nada, el
+contador sigue desde el último.
+
+Perillas y rollback: `sql/gv_web_tdf_como_chef.sql` del repo `pagina-LK-copia`.

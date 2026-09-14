@@ -3100,7 +3100,7 @@ tr.ppp-err-zona > td{ background:#fffbeb !important; }
 .pga th{ position:sticky; top:0; z-index:2; background:#f8fafc; text-align:right; font-size:10.5px; font-weight:800;
   letter-spacing:.05em; text-transform:uppercase; color:#64748b; padding:10px 12px; border-bottom:2px solid #cbd5e1; white-space:nowrap; }
 .pga td{ text-align:right; padding:7px 12px; border-bottom:1px solid #eef2f7; white-space:nowrap; font-variant-numeric:tabular-nums; }
-/* v17.76 (Luis) — las 4 columnas de estado van PRIMERAS, lo más angostas posible (el encabezado
+/* v17.80 (Luis) — las 4 columnas de estado van PRIMERAS, lo más angostas posible (el encabezado
    parte en dos renglones) y con el color de cada una arriba. La 5ª, la del día / la tanda / la NP,
    se queda con todo el ancho que sobra: es la que tiene la info que se lee. */
 /* El truco para que se encojan: TODAS las columnas a `width:1%`, y la 1ª a `width:100%` — así el
@@ -3137,7 +3137,7 @@ tr.ppp-err-zona > td{ background:#fffbeb !important; }
 .pga-t.e-pendiente>td{ background:#fff6f6; } .pga-t.e-pendiente>td:first-child{ box-shadow:inset 4px 0 0 #dc2626; color:#991b1b; }
 .pga-sub{ font-weight:600; color:#94a3b8; font-size:11.5px; margin-left:7px; }
 /* fila de NP — acá va lo que se lee: NP, estado, horario, código de cliente, cliente, zona ·
-   barrio y la fecha en que entró el pedido (v17.76, pedido de Luis) */
+   barrio y la fecha en que entró el pedido (v17.80, pedido de Luis) */
 .pga-n{ cursor:pointer; }
 .pga-n>td{ font-size:12.5px; color:#334155; }
 .pga-n>td:first-child{ padding-left:48px; white-space:normal; line-height:1.45; }
@@ -5181,7 +5181,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=17.79"></script>
+<script type="module" src="recepcion.js?v=17.80"></script>
 <!-- Config del módulo de fichada (compartido con fichada.html). El secret
      hmacSecret tiene que ser el mismo acá y allá; cargándolo desde un solo
      archivo evitamos que se desincronicen. -->
@@ -8594,7 +8594,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v17.79";
+const APP_VERSION = "v17.80";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -35194,7 +35194,7 @@ function _pppArbolHtml(programados) {
       for (const r of t.filas) {
         const nk = t.key + "|" + r.np, nb = !!_pgaOpenN[nk];
         const est = PGA_EST.indexOf(r.estado) >= 0 ? r.estado : "pendiente";
-        // v17.76 (Luis): "que ahí aparezca el código de cliente (si es pedido de LK el código LK,
+        // v17.80 (Luis): "que ahí aparezca el código de cliente (si es pedido de LK el código LK,
         // si es de CH, CH), barrio al lado de zona y fecha de pedido".
         const _lug = [r.zona_corta || r.localidad || "", r.barrio || ""]
           .filter(function (x, i, a) { return x && a.indexOf(x) === i; }).join(" · ");
@@ -38881,9 +38881,70 @@ async function aprTraerTodos() {
   return out;
 }
 
+/* v17.80 — TIERRA DEL FUEGO: el pedido entra por la página de LK pero ES DE CHEF.
+   Espejo EXACTO de lo que hace la Edge Function `gv-ppp-web-tandas-diarias` (ver el
+   comentario largo de `traerLk` ahí): la vista `v_pedidos_web` de LK ya marca
+   `isis_empresa = 'chef'` + `cod_isis`, y acá la fila se mueve del lote de LK al de Chef
+   con el código de cliente de Chef y el `order_id` con offset (la clave de
+   PPP_Web_* es `(empresa, order_id, np_idx)` y el 1431 de la página LK chocaría con el
+   1431 de la página de Chef). Los dos lados TIENEN que aplicar la misma regla: si el
+   front la ignorara, el mismo pedido saldría como pendiente en LK y como programado en
+   Chef, o sea dos veces en la PPP.
+   ⚠ LA PERILLA Y EL PISO DE FECHA VIVEN EN **LK** (`app_settings`), no acá: son los mismos
+   que leen `gv_web_es_tdf_chef` y los dos feeds del armado automático. Una sola perilla
+   para los dos caminos, o el front y el job harían cosas distintas con el mismo pedido.
+   Si no se puede leer → apagado, que es el comportamiento viejo. */
+let _aprCfgTdf = null;
+async function aprCfgTdF() {
+  if (_aprCfgTdf) return _aprCfgTdf;
+  try {
+    const tok = await pwebLkToken();
+    const r = await fetch(PWEB_LK_URL + "/rest/v1/app_settings?select=key,value&key=in.(tdf_como_chef,web_order_offset_lk,tdf_como_chef_desde)",
+      { headers: { apikey: PWEB_LK_ANON, Authorization: "Bearer " + tok }, cache: "no-store" });
+    const rows = r.ok ? (await r.json() || []) : [];
+    const val = function (k) { const f = rows.find(function (x) { return x.key === k; }); return f ? String(f.value || "").trim() : ""; };
+    _aprCfgTdf = {
+      on: val("tdf_como_chef") === "1",
+      off: Number(val("web_order_offset_lk")) || 1000000,
+      desde: val("tdf_como_chef_desde") || "9999-12-31"
+    };
+  } catch (_e) { _aprCfgTdf = { on: false, off: 1000000, desde: "9999-12-31" }; }
+  return _aprCfgTdf;
+}
+/* Parte el feed de LK en los que se quedan en LK y los que pasan a Chef.
+   Espejo EXACTO de `gv_web_es_tdf_chef`: perilla + isis_empresa + cod_isis + piso de fecha. */
+function aprPartirTdF(nps, cfg) {
+  const lk = [], chef = [];
+  (nps || []).forEach(function (n) {
+    const codIsis = String((n && n.cod_isis) || "").trim();
+    const f = String((n && n.fecha_recep) || "").slice(0, 10);
+    if (cfg.on && String((n && n.isis_empresa) || "lk").toLowerCase() === "chef" && codIsis
+        && f && f >= cfg.desde) {
+      chef.push(Object.assign({}, n, {
+        empresa: "chef",
+        order_id: Number(n.order_id) + cfg.off,
+        order_id_pagina: n.order_id,
+        cod: codIsis
+      }));
+    } else lk.push(n);
+  });
+  return { lk: lk, chef: chef };
+}
+
 async function aprTraerPedidos(e) {
   const emp = e || _apr.emp || "lk";
   const tok = await pwebLkToken();
+  const cfgTdf = await aprCfgTdF();
+  // El feed de LK se lee SIEMPRE, también cuando la pantalla muestra Chef: de ahí salen
+  // los pedidos de Tierra del Fuego, que viven en la página de LK y son de Chef.
+  const desde = new Date(Date.now() - PWEB_VENTANA_DIAS * 86400000).toISOString().slice(0, 10);
+  const rLk = await fetch(PWEB_LK_URL + "/rest/v1/v_pedidos_web_np"
+    + "?select=empresa,order_id,np_idx,cod,razon_social,fecha_recep,direccion,lineas,cajas,items,m3,m3_parcial,localidad,zona_expreso,nombre_expreso,direccion_expreso,enviado_a_compras,condicion_pago_code,diferido,no_antes_de,isis_empresa,cod_isis"
+    + "&fecha_recep=gte." + desde + "&order=order_id.asc,np_idx.asc&limit=5000",
+    { headers: { apikey: PWEB_LK_ANON, Authorization: "Bearer " + tok } });
+  if (!rLk.ok) throw new Error("LK respondió " + rLk.status);
+  const partido = aprPartirTdF(await rLk.json(), cfgTdf);
+
   let nps;
   if (emp === "chef") {
     const rc = await fetch(PWEB_LK_URL + "/rest/v1/rpc/gv_pedidos_web_np_chef_admin", {
@@ -38892,15 +38953,9 @@ async function aprTraerPedidos(e) {
       body: JSON.stringify({ p_dias: PWEB_VENTANA_DIAS })
     });
     if (!rc.ok) throw new Error("Chef respondió " + rc.status);
-    nps = await rc.json();
+    nps = (await rc.json() || []).concat(partido.chef);
   } else {
-    const desde = new Date(Date.now() - PWEB_VENTANA_DIAS * 86400000).toISOString().slice(0, 10);
-    const r = await fetch(PWEB_LK_URL + "/rest/v1/v_pedidos_web_np"
-      + "?select=empresa,order_id,np_idx,cod,razon_social,fecha_recep,direccion,lineas,cajas,items,m3,m3_parcial,localidad,zona_expreso,nombre_expreso,direccion_expreso,enviado_a_compras,condicion_pago_code,diferido,no_antes_de"
-      + "&fecha_recep=gte." + desde + "&order=order_id.asc,np_idx.asc&limit=5000",
-      { headers: { apikey: PWEB_LK_ANON, Authorization: "Bearer " + tok } });
-    if (!r.ok) throw new Error("LK respondió " + r.status);
-    nps = await r.json();
+    nps = partido.lk;
   }
 
   // v12.89 — PENDIENTE PARA GESTIÓN = pedido de la página con fecha >= gestion_desde
@@ -44180,7 +44235,7 @@ async function _facXlsArmar(nps) {
     fetch(SUPABASE_URL + "/rest/v1/gv_ppp_base_pedidos?select=pedido,fecha&pedido=in." + inList + "&limit=20000", { headers: H, cache: "no-store" }).then(function (r) { return r.ok ? r.json() : []; }),
     supaFetchAllSafe(SUPABASE_URL + "/rest/v1/vista_uxb_articulo", "select=cod,uxb").catch(function () { return []; }),
     supaFetchAllSafe(SUPABASE_URL + "/rest/v1/clientes_vendedor", "select=cod_cliente,vend").catch(function () { return []; }),
-    supaFetchAllSafe(SUPABASE_URL + "/rest/v1/lk_pedidos_match", "select=cod_cliente,empresa,fecha_pedido,sucursal_entrega,items_string,ambiguo,orden_en_dia").catch(function () { return []; }),
+    supaFetchAllSafe(SUPABASE_URL + "/rest/v1/lk_pedidos_match", "select=cod_cliente,empresa,order_id,fecha_pedido,sucursal_entrega,items_string,ambiguo,orden_en_dia").catch(function () { return []; }),
     // La fecha de una NP de ISIS sale de PPP_Base_Pedidos; una NP web NO está ahí,
     // así que su fecha de recepción se guarda al programar y se lee de acá. Sin
     // esto el Excel salía con la fecha vacía para todo lo que viene de la página.
@@ -44244,6 +44299,31 @@ async function _facXlsArmar(nps) {
     } catch (_e) {}
   }
 
+  // v17.80 — Los de Tierra del Fuego que YA entraron como NP de Chef (dueño 14/09:
+  // "debería estar como NP de CH"). Su fila dice empresa 'chef' pero el pedido vive en la
+  // página de LK, con el `order_id` corrido por `web_order_offset_lk`: el vendedor y la
+  // condición de pago hay que ir a buscarlos a LK con el número original, porque
+  // `gv_pedidos_web_np_chef_admin` —que es el padrón de pedidos NATIVOS de Chef— no los
+  // tiene. Sin esto el Excel para ISIS Chef sale sin vendedor y sin condición de pago.
+  // El enrutamiento al archivo de Chef y el código de cliente ya salen solos de la fila.
+  try {
+    const cfgTdf = await aprCfgTdF();
+    const ordersTdf = Object.keys(orderByNp)
+      .filter(function (k) { return orderByNp[k].empresa === "chef" && Number(orderByNp[k].order_id) >= cfgTdf.off; })
+      .map(function (k) { return Number(orderByNp[k].order_id) - cfgTdf.off; });
+    if (ordersTdf.length) {
+      const tokLk4 = await pwebLkToken();
+      const rt = await fetch(PWEB_LK_URL + "/rest/v1/v_pedidos_web_np?select=order_id,v,condicion_pago_code&empresa=eq.lk&order_id=in.(" + [...new Set(ordersTdf)].join(",") + ")", {
+        headers: { apikey: PWEB_LK_ANON, Authorization: "Bearer " + tokLk4 }, cache: "no-store"
+      });
+      if (rt.ok) for (const x of (await rt.json() || [])) {
+        const oid = Number(x.order_id) + cfgTdf.off;
+        if (x.v != null && x.v !== "") vendChef[String(oid)] = String(x.v);
+        if (x.condicion_pago_code != null && x.condicion_pago_code !== "") condByOrder["chef:" + oid] = String(x.condicion_pago_code);
+      }
+    }
+  } catch (_e) { /* sin esto el Excel sale sin vend/condición, no se rompe */ }
+
   // Cabecera (cod cliente, razón social) desde la lista que ya está en pantalla
   const cab = {};
   (_facLastTandas || []).forEach(function (t) {
@@ -44304,6 +44384,20 @@ async function _facXlsArmar(nps) {
         if (!best || score > best.score) best = { m: m, score: score };
       });
       suc = String(best.m.sucursal_entrega || "");
+    }
+    // v17.80 — Tierra del Fuego ya numerado como NP de Chef: el pedido vive en la página de
+    // LK, así que en `lk_pedidos_match` está como ('lk', cod LK) y el filtro de arriba
+    // —que busca ('chef', cod de Chef)— no lo encuentra y la sucursal sale vacía. Acá se lo
+    // busca por ORDER_ID, que es exacto y no depende del código de cliente ni de la fecha.
+    if (!suc && orderByNp[np] && orderByNp[np].empresa === "chef") {
+      const offTdf = (_aprCfgTdf && _aprCfgTdf.off) || 1000000;
+      const oidLk = Number(orderByNp[np].order_id) - offTdf;
+      if (oidLk > 0) {
+        const mm = (match || []).find(function (m) {
+          return String(m.empresa) === "lk" && Number(m.order_id) === oidLk;
+        });
+        if (mm) suc = String(mm.sucursal_entrega || "");
+      }
     }
 
     const tdf = (orderByNp[np] && orderByNp[np].empresa === "lk") ? (isisChefBy[String(orderByNp[np].order_id)] || "") : "";   // v13.77
