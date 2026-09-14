@@ -13565,3 +13565,57 @@ Un solo pedido nuevo, no dos. Y el `1427` no quedó: el `max(id)` de `orders` si
 En `pagina-lk-copia`: `git revert bcea995`. En LK, el guard de la RPC se saca borrando el bloque
 `v_dup` de `submit_order_fast` (el resto de la función quedó igual). El barrido de la §3.do es
 independiente y puede quedar: con el front sano no encuentra candidatos.
+
+### §3.fe — v17.46: etapa 0 y 1 del plan de canonización (dos centinelas + `cob_norm_cod` fusionada)
+
+Primeras dos etapas de `docs/PLAN-CANONIZACION-UNICA.md`. **Los centinelas van primero porque el
+ciclo que hay que cortar no es "el sufijo vuelve": es que nada avisa cuando aparece el objeto n+1
+con su propio regexp.**
+
+**`gv_canon_sin_funcion`** — objetos de `public` que canonizan con un regexp copiado a mano en vez
+de llamar a una función. Catálogo puro, no escanea datos. Línea de base: **22 objetos, 8 de ellos
+ESCRIBEN, y sólo 1 saca el sufijo de empresa**.
+
+**`gv_canon_divergencias`** — las canonizadoras aplicadas al dominio real de códigos, con el motivo
+clasificado. Línea de base: **59 códigos** — 28 `D. resuelve grafía contra OC_Maximos`, 14
+`B. punto medio (insumo): gv_cod_stock lo TRUNCA`, 13 `E. resuelve Equivalencias_Codigos`, 2
+`C. variante L`, 2 `A. sufijo de empresa`, y **`Z. ALARMA` en 0**.
+
+⚠ **Los números son la línea de base: lo que importa es que NO SUBAN.** A–F son divergencias de
+diseño (cada canonizadora hace un subconjunto distinto a propósito), así que la vista nunca va a
+dar vacía. **La fila `Z` es otra cosa: son las que DEBERÍAN ser idénticas.** Si devuelve una fila,
+alguien las hizo divergir.
+
+**Etapa 1 se hizo por la mitad, y es una decisión.** Medido sobre el **dominio real completo** (523
+entradas: todo `cod_art` de `Movimientos_Stock` + `OC_Maximos` + `Insumos` + `GV_Lugar_Item` +
+`Capacidad_Sector` + las dos columnas de `Equivalencias_Codigos` + `GV_Precios_Cliente` + los bordes
+`null` / `''` / `'   '`): `canon_cod` ≡ `norm_cod` → **0 diferencias**; `cob_norm_cod` ≡
+`nullif(norm_cod(x),'')` → **0**; `cob_norm_cod` ≡ `norm_cod` a secas → **3** (null, `''`, `'   '`).
+
+- **`cob_norm_cod` se fusionó** (no está en ningún índice). ⚠ El `nullif` no es cosmético: devuelve
+  NULL para vacío donde `norm_cod` devuelve `''`, y de eso dependen sus 4 funciones + 3 vistas.
+- **`canon_cod` NO se tocó**: está dentro del índice único `gv_precios_cliente_canon_uk ON
+  "GV_Precios_Cliente" (empresa, cod_cliente, canon_cod(cod))`. Cambiarle el cuerpo a una función
+  IMMUTABLE que vive en un índice obliga a reindexar, y si difiere en un solo valor el índice puede
+  no reconstruirse por clave duplicada. Como ya es **idéntica**, fusionarla no arregla nada hoy: su
+  único beneficio lo entrega la fila `Z`. Queda para una ventana (la tabla tiene 4 filas, 0 claves
+  cambian).
+
+⚠ **La verificación por hash de las 12 vistas consumidoras fue la equivocada, y queda anotado para
+no repetirla.** Las tres funciones son `IMMUTABLE` y puras: si dan idéntico resultado para todo
+input posible, no pueden cambiar la salida de ninguna vista. Materializar `vista_plata_perdida` y
+`vista_deudores_documentos` enteras contra producción es **más invasivo que el cambio en sí** y
+tardó más de 60 s. **La verificación correcta es sobre el DOMINIO DE ENTRADAS** y cuesta
+milisegundos. La foto igual quedó en `zz_backups."GV_Backup_CanonFoto_20260914"`, y las 3 vistas que
+consumen `cob_norm_cod` se re-hashearon: **hash idéntico** (`cobranzas_precios` 327,
+`cobranzas_precios_super` 522, `vista_facturacion_neto_items` 10.711).
+
+Y se llamó de verdad a las 4 funciones que la usan, porque **Postgres no revalida el cuerpo de una
+función hasta la primera llamada** (lección del `DROP COLUMN` de la v16.39): `cob_estado_articulo`,
+`cobranzas_resumen`, `cobranzas_valorizar_np` y `gv_ppp_web_valor_items` (camino de precio). Las 4
+sin error, en una transacción con `ROLLBACK`.
+
+Chequeo de salud al cerrar: `gv_endpoints_rotos` 0 · `Z. ALARMA` 0 · `gv_stock_particion_sospechosa`
+0 · movimientos con sufijo 0 · 0 transacciones abiertas.
+
+**Definición y rollback:** `sql/gv_canon_centinelas_v1746.sql`.
