@@ -14420,3 +14420,42 @@ Cobertura del contenido sobre lo programado de hoy en adelante: ISIS 65 de 66 NP
 `index.html` — la pestaña vuelve al tablero de 6 días, que no se tocó. Para `gv_ppp_np_items`, el
 orden está en su propio archivo (primero recrear `gv_ppp_isis_items` de la v17.61, después dropear
 la nueva).
+
+### §3.fm — v17.70: `fn_canon_cols`, UNA canonizadora de columna para las 13 tablas
+
+Reemplaza a las **cinco** funciones que eran la misma escrita con distinto nombre de columna
+(`fn_canon_col_cod`, `_cod_art`, `_codigo`, `_cod_art_quoted`, `_articulo` — las 5 dropeadas), y
+agrega el candado que faltaba en **`Correcciones_Pedido`**, que tiene **dos** columnas de código:
+justo el caso que no se podía cubrir sin fabricar otra función más.
+
+**Antes:** 12 triggers, 4 funciones + 1 huérfana. **Ahora:** 13 triggers, 1 función.
+
+**El riesgo no era cero, y no era el que parecía.** Lo medido antes de aplicar:
+
+1. `jsonb_populate_record` **reconstruye el record entero**, y las 12 tablas tienen **26 columnas
+   `numeric` y 16 `timestamptz`**. Medido y descartado: `numeric` con ceros finales, `numeric(12,4)`,
+   `timestamptz` con microsegundos, `bigint` sobre 2⁵³, `date` y `boolean` vuelven **idénticos**.
+2. **El riesgo real era la falla SILENCIOSA**: un dedazo en el nombre de columna haría que el
+   trigger dejara de canonizar **sin avisar**. Por eso la función **explota** si la columna no
+   existe. Es el guard que convierte el error mudo en ruidoso.
+3. Un borde: `canon_cod_art_val('   ')` da `''`, así que las viejas normalizan un valor de sólo
+   espacios y el guard original lo dejaba pasar. Se sacó — ahora sólo se saltea el NULL.
+4. **Costo 1,74×**, pero en absoluto **0,035 ms por fila**: en `Entregas_Virgilio` (10.439 filas,
+   la más caliente) son 3,5 ms cada 100 filas.
+5. El mapeo tabla→columna **no se tipeó a mano**: se derivó del catálogo y se validó contra
+   `information_schema` (las 12 columnas existen y son `text`).
+
+**Verificado sobre las 13 tablas REALES** (ROLLBACK): un `UPDATE` con `'  66 '` en una fila de
+cada una — el `UPDATE` dispara el mismo trigger y esquiva los `NOT NULL`/FK que frenaban al
+`INSERT`. **12 dieron `066`**, y `Volumen_Articulos` dio *duplicate key*, que **es el trigger
+funcionando**: canonizó y chocó contra una fila que ya tenía `066`. → **13 de 13.**
+
+⚠ **El propio guard frenó un error mío**: el primer intento contaba las viejas con
+`proname like 'fn_canon_col_%'`, y en `LIKE` el `_` es **comodín**, así que matcheaba también a
+`fn_canon_cols` y reportó "quedaron 13 con las viejas". El `DO` abortó y **no quedó nada a
+medias**. Se pasó a lista explícita.
+
+Las 5 viejas se dropearon **después** de verificar 0 triggers usándolas y 0 funciones o vistas
+nombrándolas.
+
+**Definición, mapeo de los 13 y rollback:** `sql/fn_canon_cols_v1770.sql`.
