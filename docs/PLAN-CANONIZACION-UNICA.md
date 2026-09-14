@@ -119,9 +119,14 @@ diferencias sobre los 520 códigos.
 
 Dos cambios independientes, uno por vez:
 
-**2a. El punto medio.** Dejar de truncar en `·`, o restringirlo a `deposito <> 'insumos'`.
-Hay que decidir con el dueño qué significa `·` (parece separador de variante). Afecta 14
-códigos / 33 filas. **Es el único punto del plan que necesita una decisión de negocio.**
+**2a. El punto medio — DESCARTADA. Decisión del dueño (Thomas, 2026-09-14), no revisitar.**
+Textual: *"ese punto no significa nada. No hay tanto quilombo con los códigos de insumos,
+dejalo ahí"*. `gv_cod_stock` sigue truncando en `·` y los 4 flejes de Chef siguen colapsando
+en una clave. Medido que es **inocuo hoy**: ningún consumidor vivo agrupa por esa clave —
+`vista_stock_procesada` muestra el código entero, y `gv_planimetria_celda` y
+`gv_lugar_articulo` tienen 0 filas con `FLEJE`. Queda **vigilado** por el motivo `B` de
+`gv_canon_divergencias` (14 códigos, línea de base al 14/09): si ese número sube, o si algún
+día aparece un consumidor que agrupe por `gv_cod_stock`, ahí se ve. Problema 169 → `descartado`.
 
 **2b. Los ceros a la izquierda.** Que resuelva contra `OC_Maximos` como hace
 `canon_cod_art_val`, en vez de pelar ceros a ciegas. Afecta 43 códigos.
@@ -224,12 +229,18 @@ La etapa **2b** (que `gv_cod_stock` resuelva contra el catálogo en vez de pelar
 |---|---|---|---|
 | 0 · centinelas | no | 0 | **ya** |
 | 1 · fusionar los 3 idénticos | no | **0** (verificado) | **ya** |
-| 2a · punto medio en `gv_cod_stock` | sí (indirecto) | 14 cód / 33 filas | necesita decisión del dueño + ventana |
+| ~~2a · punto medio~~ | — | 14 cód | **DESCARTADA** — decisión del dueño 14/09, no revisitar |
 | 2b · ceros en `gv_cod_stock` | sí (indirecto) | 43 cód | ventana |
 | 3 · `gv_cod_canon` única | sí | a medir en su momento | ventana |
 | 4 · front | sí | — | después de 1-3 |
 
-**Recomendación: hacer 0 y 1 ya** (riesgo medido = cero, y la 0 es lo único que corta el
+> **Estado al 14/09 (v17.46): las etapas 0 y 1 están HECHAS** (`sql/gv_canon_centinelas_v1746.sql`,
+> §3.fe). La 1 se hizo por la mitad a propósito: `cob_norm_cod` fusionada, `canon_cod` no —
+> está dentro del índice único `gv_precios_cliente_canon_uk` y ya es idéntica, así que la
+> vigila la fila `Z` del centinela. **La 2a está DESCARTADA** por decisión del dueño.
+> Quedan la 2b, la 3 y la 4.
+
+**Recomendación original: hacer 0 y 1 ya** (riesgo medido = cero, y la 0 es lo único que corta el
 ciclo de que el problema vuelva por un lugar nuevo). **2, 3 y 4 en ventana**, de a una, con
 la medición delante.
 

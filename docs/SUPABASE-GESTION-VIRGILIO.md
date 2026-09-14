@@ -13693,3 +13693,20 @@ y el cache offline.
 drop view public.gv_ppp_resumen_dias;
 ```
 y sacar del `index.html` el bloque `PPP_OP_*` / `pppOp*` + el `"PPP"` de `ALWAYS_ALLOWED_CODES`.
+
+### §3.ff — Decisión del dueño (2026-09-14): el punto medio de los códigos de insumo NO se toca
+
+*"Ese punto no significa nada. No hay tanto quilombo con los códigos de insumos, dejalo ahí."*
+
+→ **`gv_cod_stock` sigue truncando en `·`** y los 4 flejes de Chef (`FLEJES CHEF·1.00 X 121` /
+`·1.00 X 84` / `·1.50 X 132` / `·1.50 X 84`) siguen colapsando en la clave `FLEJES CHEF`. Son 10
+insumos en 4 claves, 33 filas de movimiento.
+
+**Medido que es inocuo hoy:** ningún consumidor vivo agrupa por esa clave —
+`vista_stock_procesada` muestra el código entero, y `gv_planimetria_celda` y `gv_lugar_articulo`
+tienen 0 filas con `FLEJE`.
+
+**Queda vigilado, no olvidado:** es el motivo `B` de `gv_canon_divergencias`, con línea de base de
+**14 códigos**. Si ese número sube, o si algún día aparece un consumidor que agrupe por
+`gv_cod_stock`, se ve ahí. La etapa 2a del plan pasa a **descartada** y el problema de la auditoría
+a `descartado`. **No reabrirlo sin que el dueño lo pida.**

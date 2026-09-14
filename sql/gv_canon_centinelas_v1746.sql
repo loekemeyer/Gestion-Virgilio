@@ -16,7 +16,7 @@
 --                             (8 de ellos ESCRIBEN; sólo 1 saca el sufijo de empresa)
 --    gv_canon_divergencias  → 59 códigos, repartidos así:
 --        D. resuelve grafía contra OC_Maximos ......... 28
---        B. punto medio (insumo), gv_cod_stock TRUNCA .. 14
+--        B. punto medio (insumo), DECIDIDO: se deja asi . 14   ← ver la nota de abajo
 --        E. resuelve Equivalencias_Codigos ............ 13
 --        C. variante L ................................. 2
 --        A. sufijo de empresa .......................... 2
@@ -26,6 +26,16 @@
 --  A-F son divergencias de DISEÑO (cada canonizadora hace un subconjunto distinto a
 --  propósito), así que la vista nunca va a dar vacía. La Z es otra cosa: son las que
 --  DEBERÍAN ser idénticas. Si la Z devuelve una fila, alguien las hizo divergir.
+--
+--  ── EL MOTIVO `B` NO ES UN PENDIENTE: ES UNA DECISIÓN ────────────────
+--  Dueño (Thomas, 2026-09-14): *"ese punto no significa nada. No hay tanto quilombo con los
+--  códigos de insumos, dejalo ahí"*. `gv_cod_stock` sigue truncando en `·`, y los 4 flejes
+--  de Chef siguen colapsando en la clave `FLEJES CHEF`. Medido que es **inocuo hoy**:
+--  ningún consumidor vivo agrupa por esa clave — `vista_stock_procesada` muestra el código
+--  entero, y `gv_planimetria_celda` / `gv_lugar_articulo` tienen 0 filas con `FLEJE`.
+--  Queda VIGILADO, no olvidado: si los 14 suben, o si aparece un consumidor que agrupe por
+--  `gv_cod_stock`, se ve acá. La etapa 2a del plan quedó **descartada** y el problema de la
+--  auditoría en `descartado`. **No reabrirlo sin que el dueño lo pida.**
 --
 --  ── ETAPA 1: por qué se hizo sólo la mitad ───────────────────────────
 --  Medido sobre el **dominio real completo** — 523 entradas distintas: todo `cod_art` de
@@ -138,7 +148,10 @@ r as (
 select c codigo, f_stock, f_catalogo, f_ceros, f_equiv,
        case
          when c ~* '\s+(LK|CH|LOKE)$'               then 'A. sufijo de empresa'
-         when c ~ '·'                               then 'B. punto medio (insumo): gv_cod_stock lo TRUNCA'
+         -- B: DECISION DEL DUENO 14/09, no se corrige. "ese punto no significa nada. No hay tanto
+         -- quilombo con los codigos de insumos, dejalo ahi". Inocuo hoy: ningun consumidor vivo
+         -- agrupa por esta clave. Si el conteo SUBE o aparece un consumidor que agrupe, mirar.
+         when c ~ '·'                               then 'B. punto medio (insumo): DECIDIDO 14/09, se deja asi'
          when c ~ '[0-9E]L$' and f_stock <> f_ceros then 'C. variante L'
          when f_catalogo <> f_ceros                 then 'D. resuelve grafia contra OC_Maximos'
          when f_equiv    <> f_ceros                 then 'E. resuelve Equivalencias_Codigos'
