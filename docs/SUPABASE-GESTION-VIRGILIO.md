@@ -11849,3 +11849,62 @@ dejó sin tocar. Es justo el caso que tiene que decidir una persona.
    `docs/plan-4856-auto-sales-lines.md` de `pagina-LK-copia`, **Fase 1.5** — llenar `sales_lines` desde la
    facturación viva de Gestión con la empresa sacada del prefijo de la NP (`4xxxx` = Chef). El plan ya dice,
    textual, que eso *"resuelve solo el caso Cencosud"*.
+
+---
+
+### §3.ef — La pantalla marcaba 3 negativos y el histórico no: era un picking duplicado por empresa (v17.07, 2026-09-14)
+
+**Síntoma.** La pantalla de Stock mostraba `437E`, `438E` y `809E` en rojo (góndola −1, −2 y −43)
+pero el histórico de movimientos del mismo artículo daba positivo (118 para el 437E). Parecía un
+problema de la vista. **No lo era.**
+
+**El saldo de un depósito es por EMPRESA, y el negativo estaba en la partición `Mixto`:**
+
+| | LK | CH | Mixto |
+|---|--:|--:|--:|
+| 437E góndola | 103 | 16 | **−1** |
+| 438E góndola | 33 | — | **−2** |
+| 809E góndola | 28 | 120 | **−43** |
+
+103 + 16 − 1 = **118** — exactamente lo que mostraba el histórico, que suma todo junto.
+
+**Causa: 27 filas de picking duplicadas**, insertadas a las 09:37 para 8 tandas de agosto (D23A,
+D32C, D33A, D33B, D33C, D36G, D37A, D38B). Cada una tenía ya su gemela con el mismo delta y
+empresa `LK`/`CH`. El mecanismo:
+
+1. `etapa1_pkc_desde` = **13/08**, así que esas tandas caen en la rama **forward**, que no tiene
+   el guard por tanda de la rama vieja y deduplica con
+   `ON CONFLICT (upper(ref), upper(cod_art), coalesce(empresa,''), deposito, tipo)`.
+2. Son anteriores al corte `pkc_empresa_desde` (11/09 17:55) → la etapa no puede derivar la
+   empresa del evento → `emp` NULL → inserta `'Mixto'`.
+3. Pero sus filas existentes ya no están en `Mixto`: **el backfill `gv_empresa_backfill` de ese
+   mismo 11/09 les puso `LK`/`CH`**.
+4. `'Mixto'` ≠ `'CH'` → el ON CONFLICT no matchea → en vez de actualizar **inserta un duplicado**,
+   y el descuento cae sobre una partición que estaba en 0.
+
+**O sea: el backfill del 11/09 dejó el desalineo armado**, y se dispara en la primera corrida que
+reprocese una de esas tandas. Había **64 tandas expuestas**. Lo mío fue sólo el gatillo: correr el
+reconciliador a mano lo adelantó respecto del cron.
+
+**Fix** (`sql/reconciliar_pipeline_stock_etapa1_v1707.sql`): si la empresa no se puede derivar del
+evento pero la fila ya existe con empresa real, se **reusa esa empresa**, así el ON CONFLICT
+matchea y hace `DO UPDATE` en vez de insertar. Verificado corriendo el reconciliador: 0 duplicados
+por empresa en toda la tabla, 0 filas `Mixto` nuevas, 0 negativos. Las 27 filas se borraron con
+backup (`zz_backups."GV_Backup_Dup_Mixto_20260914"`), y los saldos volvieron a LK 103 / CH 16.
+
+⚠ **El archivo `sql/reconciliar_pipeline_stock_etapa1.sql` estaba desactualizado** — es anterior al
+pipeline de la empresa y su `_fwd_alloc` ni siquiera tiene la columna `emp`. Quedó con un banner que
+lo dice; la definición viva es la `_v1707`.
+
+#### Y una corrección a lo mío: `gv_stock_negativos` tenía el mismo punto ciego
+
+La vista centinela de la v17.01 agrupaba **sólo por código**, así que devolvía **0** mientras la
+pantalla mostraba 3 — porque LK + CH + Mixto sumados daban positivo. Repetí en el centinela el
+mismo error de medición que ya había cometido dos veces ese día: mirar el total y no la partición.
+
+Criterio nuevo: alerta si **(a)** el saldo por (código, empresa) es negativo **en un depósito
+físico**, o **(b)** el saldo por código entero es negativo. En los contables no se mira por empresa
+**a propósito**: el corte del 11/09 deja lo viejo en `Mixto` y lo nuevo en `LK`/`CH`, y las
+particiones se compensan (95 casos medidos, todos contables, que suman 0 por código); alertarlos
+sería ruido puro. Verificado: da 0 hoy, y sobre el backup de las 27 filas habría devuelto los 3
+casos exactos.

@@ -49,28 +49,41 @@
 --            `drop view public.gv_stock_negativos;`
 -- =====================================================================
 
-create or replace view public.gv_stock_negativos
+-- v17.07: se recrea (DROP + CREATE: no se puede renombrar columnas con OR REPLACE).
+drop view if exists public.gv_stock_negativos;
+create view public.gv_stock_negativos
 with (security_invoker = true) as
-with s as (
+with base as (
   select regexp_replace(upper(btrim(m.cod_art)),'^0+(?=.)','') k,
-         min(btrim(m.cod_art)) cod,
-         m.deposito,
-         round(sum(m.delta),2) saldo,
-         max(m.ts) ultimo_mov
+         btrim(m.cod_art) cod, m.deposito, coalesce(m.empresa,'Mixto') empresa, m.delta, m.ts
   from public."Movimientos_Stock" m
-  group by 1,3
-  having round(sum(m.delta),2) < 0
-)
-select s.cod, s.k cod_norm, s.deposito, s.saldo, s.ultimo_mov,
-       case when s.deposito in ('a_facturar','separar_pedidos') then 'contable' else 'fisico' end clase,
-       case when s.deposito in ('a_facturar','separar_pedidos')
+),
+-- (a) por particion de EMPRESA, solo en depositos FISICOS: ahi una particion negativa es real
+-- (es lo que la pantalla mostro el 14/09 con 437E/438E/809E). En los contables NO se mira por
+-- empresa: el corte pkc_empresa_desde del 11/09 deja a proposito lo viejo en 'Mixto' y lo nuevo
+-- en LK/CH, asi que las particiones se compensan entre si (95 casos, todos contables, suman 0
+-- por codigo). Mirarlas ahi seria ruido puro.
+por_emp as (
+  select k, min(cod) cod, deposito, empresa, round(sum(delta),2) saldo, max(ts) ultimo_mov
+  from base where deposito not in ('a_facturar','separar_pedidos')
+  group by 1,3,4 having round(sum(delta),2) < 0
+),
+-- (b) por CODIGO entero, en cualquier deposito: si el total da negativo, falta algo de verdad
+por_cod as (
+  select k, min(cod) cod, deposito, 'TODAS'::text empresa, round(sum(delta),2) saldo, max(ts) ultimo_mov
+  from base group by 1,3 having round(sum(delta),2) < 0
+),
+u as (select * from por_emp union all select * from por_cod)
+select u.cod, u.k cod_norm, u.deposito, u.empresa, u.saldo, u.ultimo_mov,
+       case when u.deposito in ('a_facturar','separar_pedidos') then 'contable' else 'fisico' end clase,
+       case when u.deposito in ('a_facturar','separar_pedidos')
             then 'Error de registro: se descontaron papeles que no habian entrado. Se corrige en la base, no en el deposito.'
             else 'Falta mercaderia real: se descontaron cajas que el sistema no sabia que estaban. Hay que CONTAR y cargar el faltante.'
        end que_significa,
        (select o.descripcion from public."OC_Maximos" o
-         where regexp_replace(upper(btrim(o.cod)),'^0+(?=.)','') = s.k limit 1) descripcion
-from s
-order by (case when s.deposito in ('a_facturar','separar_pedidos') then 'contable' else 'fisico' end), s.saldo;
+         where regexp_replace(upper(btrim(o.cod)),'^0+(?=.)','') = u.k limit 1) descripcion
+from u
+order by (case when u.deposito in ('a_facturar','separar_pedidos') then 'contable' else 'fisico' end), u.saldo;
 
 grant select on public.gv_stock_negativos to anon, authenticated;
 
@@ -142,3 +155,19 @@ revoke execute on function public.gv_stock_negativos_tarea() from public, anon, 
 -- cron (jobid 86): lun-vie 08:00 ART = 11:00 UTC
 -- select cron.schedule('gv-stock-negativos-tarea', '0 11 * * 1-5',
 --   $$select public.gv_stock_negativos_tarea();$$);
+
+-- ⚠⚠ v17.07 — LA VISTA TENÍA UN PUNTO CIEGO Y SE CORRIGIÓ.
+-- Agrupaba sólo por CÓDIGO, así que el 14/09 devolvía 0 mientras la pantalla mostraba
+-- 437E/438E/809E en rojo: el negativo estaba en la partición `empresa='Mixto'` (−1, −2,
+-- −43) y LK+CH+Mixto sumados daban positivo. **El saldo de un depósito es por empresa.**
+-- Criterio nuevo, que alerta sólo de lo real:
+--   (a) saldo negativo por (código, empresa) SÓLO en depósitos FÍSICOS — ahí una
+--       partición negativa significa que faltan cajas de verdad;
+--   (b) saldo negativo por CÓDIGO entero en cualquier depósito.
+-- En los depósitos CONTABLES no se mira por empresa a propósito: el corte
+-- `pkc_empresa_desde` del 11/09 deja lo viejo en 'Mixto' y lo nuevo en LK/CH, así que las
+-- particiones se compensan entre sí (95 casos medidos, todos contables, que suman 0 por
+-- código). Alertarlos sería ruido puro y le llenaría la tarea de Planify a Luis.
+-- Verificado: con el criterio nuevo la vista da 0 hoy, y sobre el backup de las 27 filas
+-- duplicadas habría devuelto exactamente los 3 casos (−1, −2, −43).
+

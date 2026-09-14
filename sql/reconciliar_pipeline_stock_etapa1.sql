@@ -1,3 +1,10 @@
+-- =====================================================================
+-- ⚠ DESACTUALIZADO — NO es la definición viva. Este archivo es ANTERIOR al pipeline
+-- de la empresa: su `_fwd_alloc` ni siquiera tiene la columna `emp`.
+-- La definición VIVA está en sql/reconciliar_pipeline_stock_etapa1_v1707.sql.
+-- Se conserva sólo como historia del diseño original.
+-- =====================================================================
+
 -- reconciliar_pipeline_stock_etapa1.sql
 -- v11.73: B.2 excedente cambia DO NOTHING → DO UPDATE para recalcular cada corrida.
 --   Root cause: DO NOTHING preservaba asignaciones viejas; al cambiar el excedente
