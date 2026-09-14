@@ -433,3 +433,6 @@ PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node te
 
 echo "== pmap-gondolas (v17.23: 🗺️ Mapa de góndolas — celdas de a 5, la de arriba primero, con código y capacidad) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/pmap-gondolas.cjs
+
+echo "== ppp-operario (v17.48: botón PPP en la botonera — Fecha;Mt3;Tandas;NPs, sin estirar, con cache offline) =="
+PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/ppp-operario.cjs

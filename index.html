@@ -5036,7 +5036,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=17.46"></script>
+<script type="module" src="recepcion.js?v=17.48"></script>
 <!-- Config del módulo de fichada (compartido con fichada.html). El secret
      hmacSecret tiene que ser el mismo acá y allá; cargándolo desde un solo
      archivo evitamos que se desincronicen. -->
@@ -6780,7 +6780,7 @@ const DEAD_TIME_CODES = ["AT","PB","Limp","PC","CT"];
 /* Botones SIEMPRE tocables — no se les aplica NINGUNA regla de bloqueo
    impuesta por otras tareas. Caso de uso: el operario está en limpieza
    y necesita ir al baño / a comer; al volver, sigue limpieza. */
-const ALWAYS_ALLOWED_CODES = ["PB","PC"];
+const ALWAYS_ALLOWED_CODES = ["PB","PC","PPP"];   // v17.48: PPP es solo lectura — mirar la programación nunca se bloquea
 
 function readStateMap(){
   try { return JSON.parse(localStorage.getItem(STATE_KEY)) || {}; }
@@ -7133,6 +7133,116 @@ try {
   const r4 = document.getElementById("row4");
   if (r4) r4.appendChild(mov);
 } catch (_e) { /* no-op */ }
+
+/* ===== 🗓️ PPP — la programación resumida, para el OPERARIO (v17.48) ======
+   Dueño (2026-09-14): "desde la botonera de los operarios, tengan un botón
+   para ver la PPP", con el formato  Fecha ; Mt3 ; Tandas ; NPs.
+
+   Es SOLO MIRAR: cuatro números por día, ninguna acción. Los cuatro salen ya
+   sumados del backend (vista `gv_ppp_resumen_dias`), con ISIS y web juntos
+   como manda la regla del dueño de la v13.64 — el celular no baja la PPP
+   entera para contar 4 números. Sin red muestra lo último que trajo, con la
+   hora, en vez de una pantalla vacía. ===== */
+const PPP_OP_ENDPOINT  = SUPABASE_URL + "/rest/v1/gv_ppp_resumen_dias";
+const PPP_OP_CACHE_KEY = "vir_ppp_resumen_op_v1";
+const PPP_OP_DIAS      = 14;      // cuántos días CON programación se listan (no días de calendario)
+
+try {
+  const pppBox = document.createElement("div");
+  pppBox.className = "box box-sm";
+  pppBox.setAttribute("data-code", "PPP");
+  pppBox.innerHTML = `<div class="box-title">PPP</div><div class="box-desc">Programación por día</div>`;
+  pppBox.onclick = () => pppOpAbrir();
+  const r4p = document.getElementById("row4");
+  if (r4p) r4p.appendChild(pppBox);
+} catch (_e) { /* no-op */ }
+
+/* m³ como se escriben acá: coma decimal, punto de miles, siempre 2 decimales. */
+function _pppOpM3(n) {
+  const v = Number(n);
+  if (!isFinite(v)) return "—";
+  try { return v.toLocaleString("es-AR", { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
+  catch (_e) { return v.toFixed(2); }
+}
+function _pppOpCss() {
+  if (document.getElementById("pppOpCss")) return;
+  const s = document.createElement("style"); s.id = "pppOpCss";
+  s.textContent = "#pppOpModal{display:none;position:fixed;inset:0;z-index:1300;background:rgba(2,6,23,.78);overflow:auto;padding:12px;}"
+    + "#pppOpModal.show{display:block;}"
+    + ".pppop-card{background:#fff;max-width:380px;margin:0 auto;border-radius:16px;overflow:hidden;box-shadow:0 24px 70px rgba(0,0,0,.5);}"
+    + ".pppop-head{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:12px 14px;background:#1e6bd6;color:#fff;}"
+    + ".pppop-title{font-size:16px;font-weight:800;}"
+    + ".pppop-close{background:rgba(255,255,255,.2);color:#fff;border:none;border-radius:8px;padding:6px 12px;font-size:14px;font-weight:800;cursor:pointer;width:auto;}"
+    + ".pppop-body{padding:12px 14px 16px;}"
+    /* ancho por contenido (sin width:100%) y centrada: 4 columnas cortas no se estiran. */
+    + ".pppop-tbl{border-collapse:collapse;margin:0 auto;font-size:14px;color:#0f172a;}"
+    + ".pppop-tbl th{font-size:14px;font-weight:800;text-align:right;padding:2px 10px 6px;border-bottom:2px solid #cbd5e1;white-space:nowrap;}"
+    + ".pppop-tbl th:first-child,.pppop-tbl td:first-child{text-align:left;padding-left:0;}"
+    + ".pppop-tbl td{text-align:right;padding:5px 10px;border-bottom:1px solid #e5e7eb;white-space:nowrap;font-variant-numeric:tabular-nums;}"
+    + ".pppop-tbl tr:last-child td{border-bottom:none;}"
+    + ".pppop-hoy td{font-weight:800;}"
+    + ".pppop-tot td{border-top:2px solid #cbd5e1;font-weight:800;}"
+    + ".pppop-msg{font-size:13px;color:#64748b;padding:8px 0 0;line-height:1.35;}";
+  document.head.appendChild(s);
+}
+function pppOpAbrir() {
+  _pppOpCss();
+  let ov = document.getElementById("pppOpModal");
+  if (!ov) {
+    ov = document.createElement("div"); ov.id = "pppOpModal";
+    ov.onclick = function (e) { if (e.target && e.target.id === "pppOpModal") pppOpCerrar(); };
+    ov.innerHTML = '<div class="pppop-card">'
+      + '<div class="pppop-head"><div class="pppop-title">🗓️ PPP</div>'
+      + '<button class="pppop-close" onclick="pppOpCerrar()">Cerrar</button></div>'
+      + '<div class="pppop-body" id="pppOpBody"></div></div>';
+    document.body.appendChild(ov);
+  }
+  ov.classList.add("show");
+  const b = document.getElementById("pppOpBody");
+  if (b) b.innerHTML = '<div class="pppop-msg">Cargando…</div>';
+  pppOpCargar();
+}
+function pppOpCerrar() { const ov = document.getElementById("pppOpModal"); if (ov) ov.classList.remove("show"); }
+async function pppOpCargar() {
+  const hoy = getTodayKey();
+  const url = PPP_OP_ENDPOINT + "?select=fecha,dia,m3,tandas,nps&fecha=gte." + hoy
+            + "&order=fecha.asc&limit=" + PPP_OP_DIAS;
+  try {
+    const r = await fetch(url, { headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY }, cache: "no-store" });
+    if (!r.ok) throw new Error("HTTP " + r.status);
+    const rows = await r.json();
+    try { localStorage.setItem(PPP_OP_CACHE_KEY, JSON.stringify({ ts: Date.now(), rows: rows })); } catch (_e) {}
+    pppOpRender(rows, hoy, "");
+  } catch (e) {
+    let cache = null;
+    try { cache = JSON.parse(localStorage.getItem(PPP_OP_CACHE_KEY) || "null"); } catch (_e) {}
+    if (cache && Array.isArray(cache.rows)) {
+      pppOpRender(cache.rows.filter(function (x) { return x && String(x.fecha || "").slice(0, 10) >= hoy; }), hoy,
+        "⚠ Sin conexión — esto es lo último que bajó (" + formatDateTime(cache.ts) + ").");
+    } else {
+      const b = document.getElementById("pppOpBody");
+      if (b) b.innerHTML = '<div class="pppop-msg">⚠ No pude traer la PPP (' + escapeHtml(String((e && e.message) || e)) + ').<br>Probá de nuevo con señal.</div>';
+    }
+  }
+}
+function pppOpRender(rows, hoy, aviso) {
+  const body = document.getElementById("pppOpBody"); if (!body) return;
+  const avisoHtml = aviso ? '<div class="pppop-msg">' + escapeHtml(aviso) + '</div>' : "";
+  rows = (rows || []).filter(function (r) { return r && r.fecha; });
+  if (!rows.length) { body.innerHTML = '<div class="pppop-msg">No hay nada programado de hoy en adelante.</div>' + avisoHtml; return; }
+  let sm3 = 0, stan = 0, snp = 0;
+  let html = '<table class="pppop-tbl"><thead><tr><th>Fecha</th><th>Mt3</th><th>Tandas</th><th>NPs</th></tr></thead><tbody>';
+  for (const r of rows) {
+    const f = String(r.fecha).slice(0, 10);
+    const esHoy = (f === hoy);
+    sm3 += Number(r.m3) || 0; stan += Number(r.tandas) || 0; snp += Number(r.nps) || 0;
+    html += '<tr' + (esHoy ? ' class="pppop-hoy"' : '') + '><td>'
+         + escapeHtml(String(r.dia || "")) + " " + escapeHtml(f.slice(8, 10) + "/" + f.slice(5, 7)) + (esHoy ? " (hoy)" : "")
+         + '</td><td>' + _pppOpM3(r.m3) + '</td><td>' + (Number(r.tandas) || 0) + '</td><td>' + (Number(r.nps) || 0) + '</td></tr>';
+  }
+  html += '</tbody><tfoot><tr class="pppop-tot"><td>Total</td><td>' + _pppOpM3(sm3) + '</td><td>' + stan + '</td><td>' + snp + '</td></tr></tfoot></table>';
+  body.innerHTML = html + avisoHtml;
+}
 
 // v9.15: Planilla Conteo removida — no se usa
 // try {
@@ -8157,7 +8267,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v17.46";
+const APP_VERSION = "v17.48";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción

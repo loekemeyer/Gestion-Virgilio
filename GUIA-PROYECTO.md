@@ -36,7 +36,20 @@ Pedido de Luis. Dos cosas:
 > única**; no se replica. Ante la duda entre parche rápido y fix de raíz → **fix
 > de raíz**.
 >
-> Última actualización: 2026-09-14 (domingo) · Versión app al documentar: **v17.39**
+> Última actualización: 2026-09-14 (domingo) · Versión app al documentar: **v17.48**
+>
+> Nota **v17.48 (2026-09-14, Thomas) — el OPERARIO ve la PPP desde su botonera.**
+> *"Quiero que desde la botonera de los operarios tengan un botón para ver la PPP"*, con el formato
+> `Fecha ; Mt3 ; Tandas ; NPs`. Botón **PPP** en las acciones secundarias (`#row4`, al lado de
+> 🔀 Mover racks) → modal de **solo lectura**: una fila por día de hoy en adelante (día de la semana +
+> `dd/mm`, hoy en negrita), m³ con coma decimal, tandas y NPs, más el total. **Los cuatro números
+> salen ya sumados del backend** (vista nueva `gv_ppp_resumen_dias`, `sql/gv_ppp_resumen_dias.sql`),
+> que une las mismas dos fuentes de la PPP del supervisor — `gv_ppp_programacion_diaria` (ISIS, ya
+> sin lo oculto/desprogramado) y `PPP_Web_Programacion` con tanda — y las **suma**, porque ISIS y web
+> no se muestran separados (regla v13.64). Así el celular no baja ~20k filas para contar 4 números.
+> Sin señal muestra lo último que bajó, con la hora (`localStorage vir_ppp_resumen_op_v1`). `PPP`
+> entró a `ALWAYS_ALLOWED_CODES`: **mirar** la programación no se bloquea en tiempo muerto.
+> §3.ff de `docs/SUPABASE-GESTION-VIRGILIO.md` · test `tests/ppp-operario.cjs`.
 >
 > Nota **v17.39 (2026-09-14, Luis) — CUARENTENA: TODO comentario lleva identidad.**
 > *"Para alguien que deja un comentario, siempre tiene que estar vinculado con una identidad"*:

@@ -13619,3 +13619,77 @@ Chequeo de salud al cerrar: `gv_endpoints_rotos` 0 · `Z. ALARMA` 0 · `gv_stock
 0 · movimientos con sufijo 0 · 0 transacciones abiertas.
 
 **Definición y rollback:** `sql/gv_canon_centinelas_v1746.sql`.
+---
+
+## §3.ff — v17.48: el operario ve la PPP desde su botonera (`gv_ppp_resumen_dias`) — 2026-09-14
+
+**Pedido del dueño (14/09):** *"quiero que desde la botonera de los operarios, tengan un botón para
+ver la PPP"*, con el formato `Fecha ; Mt3 ; Tandas ; NPs`.
+
+### Qué se agregó
+
+Botón **PPP** en la botonera del operario (`#row4`, al lado de 🔀 Mover racks). Abre un modal de
+**solo lectura**: una fila por día, de hoy en adelante, con cuatro números y un total.
+
+| Columna | De dónde sale |
+|---|---|
+| Fecha | día de la semana + `dd/mm`; el de hoy va en negrita y con "(hoy)" |
+| Mt3 | `sum(m3)` del día, con coma decimal y 2 decimales |
+| Tandas | `count(distinct tanda)` |
+| NPs | `count(distinct np)` |
+
+### El objeto nuevo: `public.gv_ppp_resumen_dias`
+
+Vista **nueva** (prefijo `gv_`, `security_invoker = true`, `grant select` a `anon`/`authenticated`),
+definición completa en **`sql/gv_ppp_resumen_dias.sql`**. Une las **mismas dos fuentes** que ya usa
+la PPP del supervisor y las suma:
+
+- `public.gv_ppp_programacion_diaria` — ISIS. Ya saltea lo oculto/desprogramado de
+  `GV_PPP_Prog_Override`, así que el operario ve exactamente lo que ve la PPP.
+- `public."PPP_Web_Programacion"` con `tanda not null` — pedidos de la página ya programados, el
+  mismo filtro de `pppTraerWebProgramados`.
+
+**Van sumados, no separados**: regla del dueño de la v13.64 (*"que el pedido sea de ISIS o cargado
+por la web no me interesa para absolutamente nada"* fuera de Facturación).
+
+**Por qué backend y no sumar en el front:** el operario entra del celular. Bajar las dos tablas
+enteras para contar cuatro números son ~20k filas por apertura; así viaja **una fila por día**. Y es
+la regla del repo: la agregación es lógica de negocio.
+
+Detalle de implementación: `fecha_entrega` es **texto** en el espejo de ISIS (`2026-09-16 00:00:00`)
+y **date** en la web, así que la rama de ISIS filtra con `~ '^\d{4}-\d{2}-\d{2}'` antes de castear —
+hoy hay 4 filas con la fecha vacía y ninguna con otro formato. Las NP se cuentan con prefijo
+(`isis:` / `web:<empresa>:`) para que dos números iguales de origen distinto no se pisen.
+
+### Medición (14/09, con la vista ya creada)
+
+```
+ fecha      | dia       |   m3  | tandas | nps
+ 2026-09-14 | Lunes     |  5.16 |      4 |  12
+ 2026-09-15 | Martes    |  6.15 |     12 |  28
+ 2026-09-16 | Miércoles | 17.86 |     20 |  43
+ 2026-09-17 | Jueves    |  5.84 |     10 |  33
+ 2026-09-18 | Viernes   |  6.46 |      5 |  24
+```
+
+Leída con `set local role anon` devuelve las 13 filas (213 NPs), o sea que la RLS de las dos fuentes
+deja pasar al operario igual que hoy.
+
+### Front
+
+`index.html`: `PPP_OP_ENDPOINT` / `pppOpAbrir` / `pppOpCargar` / `pppOpRender`. La consulta es
+`?select=fecha,dia,m3,tandas,nps&fecha=gte.<hoy AR>&order=fecha.asc&limit=14`. Cada respuesta se
+guarda en `localStorage` (`vir_ppp_resumen_op_v1`): **sin señal muestra lo último que bajó con la
+hora**, en vez de una pantalla vacía. `PPP` se sumó a `ALWAYS_ALLOWED_CODES` — mirar la
+programación no se bloquea en tiempo muerto (comida, baño), como sí se bloquean las acciones.
+
+Test: `tests/ppp-operario.cjs` (en `tests/run.sh`) — encabezado exacto, orden cronológico, coma
+decimal y punto de miles, totales, números a la derecha, tabla sin estirarse ni celdas pintadas,
+y el cache offline.
+
+### Rollback
+
+```sql
+drop view public.gv_ppp_resumen_dias;
+```
+y sacar del `index.html` el bloque `PPP_OP_*` / `pppOp*` + el `"PPP"` de `ALWAYS_ALLOWED_CODES`.
