@@ -12253,3 +12253,77 @@ con `formatToParts`, porque `es-AR` con día+mes solos devuelve `14/9` aunque se
 SQL completo y rollback: `sql/gv_cuarentena_comentarios_v1715.sql`. Tests:
 `tests/apr-cuarentena.cjs` (tabla, badges, aprobación, librito, y que aprobar **no** dispare la RPC
 antes de confirmar).
+
+### §3.em — v17.16: el chequeo de `isis_lk`/`isis_ch` como fuente — SIRVE, desde 2026-02 — 2026-09-14
+
+**Thomas (14/09): *"avanzá con el chequeo de que realmente esté bien lo que tenemos para implementar esto"*.**
+Hecho. Nada se cambió: es todo lectura. Consultas y resultado en `sql/gv_chequeo_isis_como_fuente_v1716.sql`.
+Tarea de Planify **3276**.
+
+#### 1. ¿ISIS reproduce lo que cargó el Excel? Sí, al entero
+
+| mes | Excel | ISIS con NC | ISIS solo FC | |
+|---|--:|--:|--:|---|
+| feb | 19.367 | **19.367** ✅ | 19.962 | clavado |
+| mar | 18.522 | 18.519 | 21.149 | difieren **3 cajas** (0,02 %) |
+| abr | 14.196 | 13.829 | **14.196** ✅ | el Excel vino **sin notas de crédito** |
+| may | 25.074 | **25.242** ✅ | 25.609 | el Excel trajo los códigos administrativos (−168) |
+| jun | 16.625 | **16.625** ✅ | 16.713 | clavado |
+
+Cuatro de cinco cierran al entero y el quinto por 3 cajas. **Y las dos "diferencias" resultaron ser
+inconsistencias del Excel, no de ISIS**: abril vino sin NC y mayo trajo los descuentos administrativos que
+los demás meses excluyen. ISIS es consistente mes a mes; el Excel no.
+
+**Junio, además, se comparó artículo por artículo y cliente por cliente:**
+
+- **Clientes: 141 de 141.** La cadena entera, idéntica carácter por carácter.
+- **Artículos: 183 de 196 iguales.** Los 13 restantes: **9 son códigos administrativos** (P25 %, DTOSUPER,
+  DEVERRORFC…) que ya están en `sales_excluded_items` y suman −204, justo la diferencia al total
+  (16.421 + 204 = 16.625); **256/256ZZ** ISIS los separa y el Excel los neteó (da cero igual); y
+  **580/580E** — acá el **Excel los fundió** en `580=42` y **ISIS los distingue** (580=2, 580E=40). Otro
+  punto para ISIS.
+
+#### 2. Los 560 "archivos con error" no son ventas
+
+**419 son facturas de COMPRA** (`FC Compra A LOEKEMEY_…`) y **141 son ajustes** (`Aj.Negativo_`,
+`Aj.Positivo_`) que `pdftotext` no pudo leer. **Cero facturas de venta.** Chef tiene **1 error sobre 8.446**.
+El agujero que me preocupaba no existe para lo que nos importa.
+
+#### 3. Las líneas sin código de artículo son texto legal
+
+3.035 de 33.938 en 2026, **todas con 0 cajas y 0 importe**: *"2 % Descuento Web"*, *"Incluye 2 % Cotizador"*,
+*"Pequeños Contribuyentes de la Ley 27.618"*, *"El crédito fiscal discriminado…"*. Se filtran con
+`codigo_articulo is not null`.
+
+#### 4. ⚠ El límite: el histórico viejo NO cierra
+
+| año | ISIS | `sales_lines` | dif |
+|---|--:|--:|--:|
+| 2020 | 107.587 | 107.523 | +0,06 % |
+| 2021 | 169.302 | 164.767 | +2,8 % |
+| 2022 | 155.015 | 154.948 | +0,04 % |
+| 2023 | 142.586 | 143.648 | −0,7 % |
+| **2024** | 116.886 | 125.954 | **−7,2 %** |
+| **2025** | 190.777 | 202.819 | **−5,9 %** |
+| 2026 | 154.111 | 154.699 | −0,4 % |
+
+**Por qué:** la ingesta de ISIS arrancó el **2026-07-03**. Todo lo anterior entró de una, leyendo los PDF que
+había en disco: los meses recientes estaban completos, los de 2024/2025 no. Las diferencias van **para los
+dos lados** (2024-05 ISIS −26 %, 2025-04 ISIS +25 %), o sea ruido disperso, no un agujero limpio que se pueda
+tapar.
+
+**Consecuencia: el corte va en 2026-02.** De ahí para adelante ISIS cierra al entero; para atrás se deja lo
+que ya está cargado y no se toca. Es exactamente el `sales_lines_auto_corte` que preveía el plan 4856.
+
+#### 5. El mapeo, confirmado campo por campo
+
+`invoice_date` ← `d.fecha` · `customer_code` ← `d.contraparte_codigo` (formato idéntico: junio dio 141 de
+141) · `item_code` ← `i.codigo_articulo` (zero-padded igual que `products.cod`) · `boxes` ←
+`i.cantidad_caja`, en negativo si el tipo empieza con `NC` · **`empresa` ← el esquema**. Filtros:
+`contraparte_tipo = 'cliente'` (hay 195 docs de proveedor y 209 sin tipo), `codigo_articulo is not null` y
+`sales_excluded_items`.
+
+#### Veredicto
+
+**Sirve.** Con una condición: **el corte arranca en 2026-02**, no antes. Y hay un premio no buscado —
+rehacer julio y agosto desde ISIS **reemplaza el parche** de `GV_Ventas_Correccion`, que se borra.
