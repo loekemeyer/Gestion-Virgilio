@@ -151,11 +151,79 @@ la función en el `raise exception`. Si una no compila, no queda nada a medias.
 ⚠ Y lo que ese día enseñó: después del loop hay que **llamar de verdad a cada función**.
 Postgres no revalida el cuerpo de una función hasta la primera llamada.
 
-### Etapa 4 — El front
+### Etapa 4 — El front — **DESCARTADA. Habría roto los duales.**
 
-`codBase()` de `index.html` (67 call sites) pasa a ser lo que dice el protocolo del repo:
-una duplicación de UX de la regla del backend, no una quinta regla. Y el payload del PKC
-(`index.html` ~10851) deja de mandar el código crudo con sufijo.
+Decía: *"el payload del PKC deja de mandar el código crudo con sufijo"*. **Medido el 14/09, eso
+rompe el pipeline de los 4 duales.**
+
+De los **120 eventos PKC con sufijo, 114 tienen el campo 6 (empresa) VACÍO** — sólo 6 la traen
+ahí. Y el reconciliador lo confirma: `reconciliar_pipeline_stock_etapa1` toma la empresa del
+campo 6 **sólo si viene y es única**; si no viene, el código entra entero a `Movimientos_Stock`
+y ahí `trg_normalizar_empresa_stock` lo separa (`437E LK` → `cod_art='437E'`, `empresa='LK'`).
+
+→ **El sufijo del código NO es "una quinta regla del front": es el CANAL por el que viaja la
+empresa.** Sacarlo sin llenar el campo 6 primero pierde la empresa en el 95% de los eventos.
+
+Y llenar el campo 6 tampoco aporta: el front sólo sabe la empresa **por ese mismo sufijo**, así
+que sería derivarla en el front para volver a mandarla — duplicar en el front lo que el backend
+ya hace bien desde la v17.44. El protocolo del repo dice exactamente lo contrario.
+
+`codBase()` (67 call sites) queda como está: es **display**. Sobre un código que viene del
+backend ya canonizado es no-op.
+
+**Conclusión: la etapa 4 no se hace.** Igual que 2a y 2b, el plan original sobreestimó el
+problema: el sufijo está resuelto en el backend y funciona.
+
+---
+
+## 5. Lo que QUEDA de verdad: los candados que faltan (medido el 14/09)
+
+Después de descartar 2a, 2b y 4, lo único que sigue abierto del problema de fondo es esto.
+
+**El riesgo de los 22 objetos con regexp propio NO es que busquen con su propia regla** — es qué
+pasa con lo que **escriben**. De los 22, **8 escriben**, y lo que importa es si la tabla destino
+tiene candado:
+
+| tabla destino | candado | quién escribe ahí |
+|---|---|---|
+| `Movimientos_Stock` | ✅ `fn_canon_cod_art` + `trg_normalizar_empresa_stock` | etapa1, etapa2, `_rt`, `aceptar_conteo`, `faltante_resolver` |
+| `Capacidad_Sector` | ✅ `fn_canon_col_cod` | las RPC del mapa |
+| `GV_Lugar_Item` | ✅ `fn_canon_col_cod` (v17.51) | las RPC del mapa |
+| `Ordenes_Compra` | ✅ `fn_canon_col_codigo` | — |
+| **`stocks_carga_rapida`** | ❌ | `refresh_stocks_carga_rapida`, `actualizar_saldo_trigger` |
+| **`OC_Maximos`** | ❌ | (el **catálogo madre**) |
+| **`Correcciones_Pedido`** | ❌ | `corregir_pedido_secundario_auto` |
+| `Conteo_Stock` · `Faltantes_Revisados` | ❌ | `aceptar_conteo`, `faltante_resolver` |
+
+**Lo que escribe a `Movimientos_Stock` ya está cubierto**: aunque la función busque con su regexp,
+lo que guarda sale canonizado por los dos triggers. Ése es el 62% de los escritores.
+
+**Cuánto cambiaría poner el candado que falta** (`canon_cod_art_val` vs. lo guardado):
+
+| tabla | filas | cambiarían |
+|---|---|---|
+| `stocks_carga_rapida` | 399 | **22** |
+| `OC_Maximos` | 354 | **0** |
+| `Correcciones_Pedido` (las 2 columnas) | 274 | **0** |
+| `Conteo_Stock` | 2 | 0 |
+| `Faltantes_Revisados` | 0 | 0 |
+
+**Ninguno de los tres que importan es aplicable a ciegas:**
+
+- **`OC_Maximos`** cambia 0 filas hoy, pero el candado sería **recursivo**: `fn_canon_col_cod` →
+  `canon_cod_art_val` → *busca en `OC_Maximos`*. No es recursión infinita (es un `SELECT`), pero
+  **cambia el alta de artículos**: dar de alta `0999` con `999` ya existente pasaría a chocar
+  contra la PK en vez de crear una segunda grafía. Probablemente sea lo deseado — pero es una
+  decisión de negocio, no una limpieza.
+- **`stocks_carga_rapida`** son **22 filas** que cambian, y es una tabla **caché** que refresca
+  `refresh_stocks_carga_rapida`. Canonizarla por trigger puede desalinearla de su fuente.
+  Hay que mirar las 22 una por una antes de nada.
+- **`Correcciones_Pedido`** tiene **dos** columnas de código, y `fn_canon_col_cod` sólo toca
+  `NEW.cod`. Haría falta una función nueva — o sea **más proliferación**, justo lo que este plan
+  quiere evitar. Conviene un trigger genérico parametrizado por `TG_ARGV`, no uno por tabla.
+
+`Conteo_Stock` (2 filas) y `Faltantes_Revisados` (0) no mueven la aguja: poner el candado ahí es
+gratis pero no protege nada hoy.
 
 **Va última, y sólo cuando las etapas 1-3 estén hechas**: con el backend garantizado, que el
 front mande sucio deja de ser un problema de integridad y pasa a ser sólo cosmético. Al

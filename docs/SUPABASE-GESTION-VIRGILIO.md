@@ -14292,3 +14292,48 @@ guarda la **decisión**, no cada vez que se vuelve a tomar. Las 4 filas repetida
 
 También quedó el umbral en **3 minutos** (era 10): mientras el front de la página no esté deployado
 en el IIS, cuanto antes entre el pedido a Gestión, mejor.
+
+### §3.fk — La etapa 4 (el front) queda DESCARTADA: el sufijo es el canal de la empresa
+
+Medido el 14/09, antes de tocar nada. El plan decía *"el payload del PKC deja de mandar el código
+crudo con sufijo"*. **Eso habría roto el pipeline de los 4 duales.**
+
+De los **120 eventos PKC con sufijo, 114 tienen el campo 6 (empresa) VACÍO** — sólo 6 la traen
+ahí. Y `reconciliar_pipeline_stock_etapa1` lo confirma: toma la empresa del campo 6 **sólo si
+viene y es única** (`count(distinct split_part(texto,'|',6)) = 1`); si no viene, el código entra
+entero a `Movimientos_Stock` y ahí `trg_normalizar_empresa_stock` lo separa
+(`437E LK` → `cod_art='437E'`, `empresa='LK'`).
+
+→ **El sufijo del código no es "una quinta regla del front": es el CANAL por el que viaja la
+empresa.** Y llenar el campo 6 tampoco aporta, porque el front sólo sabe la empresa **por ese
+mismo sufijo** — sería derivarla en el front para volver a mandarla, o sea duplicar lo que el
+backend ya hace bien desde la v17.44. `codBase()` (67 call sites) queda como está: es display, y
+sobre un código ya canonizado por el backend es no-op.
+
+**Con esto se caen 2a, 2b y 4.** El plan original sobreestimó el problema: el sufijo está resuelto
+en el backend y funciona.
+
+### §3.fl — Lo que queda del problema de fondo: 5 tablas sin candado de canonización
+
+El riesgo de los 22 objetos con regexp propio **no es que busquen con su propia regla** — es qué
+pasa con lo que **escriben**. De los 22, **8 escriben**, y lo que decide es si la tabla destino
+tiene candado.
+
+**Ya cubiertas:** `Movimientos_Stock` (`fn_canon_cod_art` + `trg_normalizar_empresa_stock`),
+`Capacidad_Sector` y `GV_Lugar_Item` (`fn_canon_col_cod`), `Ordenes_Compra`
+(`fn_canon_col_codigo`). **Ahí escriben 5 de los 8** — o sea que aunque busquen con su regexp, lo
+que guardan sale canonizado.
+
+**Sin candado**, con lo que cambiaría ponerlo:
+
+| tabla | filas | cambiarían | por qué no es automático |
+|---|---|---|---|
+| `stocks_carga_rapida` | 399 | **22** | es **caché**; canonizarla por trigger puede desalinearla de su fuente |
+| `OC_Maximos` | 354 | 0 | el candado sería **recursivo** (`canon_cod_art_val` busca en `OC_Maximos`) y **cambia el alta de artículos**: `0999` con `999` existente pasaría a chocar contra la PK |
+| `Correcciones_Pedido` | 274 | 0 | tiene **dos** columnas de código y `fn_canon_col_cod` sólo toca `NEW.cod` → haría falta una función nueva, o sea más proliferación |
+| `Conteo_Stock` | 2 | 0 | gratis, pero no protege nada hoy |
+| `Faltantes_Revisados` | 0 | 0 | ídem |
+
+**Ninguno de los tres que importan es aplicable a ciegas.** Lo correcto para
+`Correcciones_Pedido` —y para cualquier tabla nueva— es **un trigger genérico parametrizado por
+`TG_ARGV`**, no uno por tabla.
