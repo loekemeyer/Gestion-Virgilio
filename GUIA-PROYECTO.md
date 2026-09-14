@@ -1,3 +1,33 @@
+## Nota v17.66 (2026-09-14) — Programación es una tabla: día → tanda → NP → contenido
+
+Pedido de Luis: *"darle un formato más limpio al estilo de como se ve en el módulo de operarios"*.
+La pestaña **Programación** abre ahora en una tabla con las mismas cuatro cabeceras que la PPP del
+operario —**Día · m³ · Tandas · NPs**— más **cuatro columnas de avance en números y con color**:
+
+| | |
+|---|---|
+| **Facturado** (verde) | ya facturado |
+| **Armado** (azul) | armado y todavía sin facturar |
+| **En proceso** (ámbar) | armando o pickeando ahora |
+| **Pendientes** (gris) | programado para ese día y sin empezar |
+
+Los cuatro son excluyentes: **siempre suman el 100 % del día**. Todo se abre hacia adentro en la
+misma tabla, sin cambiar de pantalla: **tocás un día** y salen sus tandas (cada fila pintada según
+en qué está), **tocás una tanda** y salen sus NP, **tocás una NP** y sale su contenido (códigos,
+cajas y unidades). Abajo, el total de todo.
+
+El tablero de 6 días con los camiones y la lista clásica **siguen estando**, atrás de sus botones, y
+entrar a UN día sigue abriendo la pantalla de siempre con sus acciones.
+
+Backend: **una sola** llamada trae el árbol entero (`gv_ppp_prog_arbol`, una fila por NP con la
+tanda y el estado ya resueltos), así el día, la tanda y la NP **cuadran por construcción**. Usa el
+mismo universo que `gv_ppp_avance_dias` —si se toca una hay que tocar la otra— y da los mismos
+números que la PPP del operario, día por día. El contenido de cada NP sale de **`gv_ppp_np_items`**,
+que ahora sirve tanto una NP de ISIS como una **web** (`PPP_Web_Base`), no sólo las de ISIS.
+
+§3.fm de `docs/SUPABASE-GESTION-VIRGILIO.md` · `sql/gv_ppp_prog_arbol_v1766.sql` ·
+`sql/gv_ppp_np_items_v1766.sql` · test `tests/ppp-tabla-arbol.cjs`.
+
 ## Nota v17.61 (2026-09-14) — una NP de ISIS SÍ tiene detalle, y está en la base del PPP
 
 Corrección de la v17.57. Ahí, para las NP que vienen de ISIS, la ficha decía *"el detalle de

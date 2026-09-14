@@ -5,7 +5,7 @@
          flechita a la derecha, cliente abajo con su número (LK 1000 / CH 2533).
      (b) Cuarentena — la ficha, que antes no se abría, tiene la misma flechita y el mismo detalle.
    v17.61 (Luis: "esa NP tenía el detalle de los códigos y las cajas, en algún lugar está") —
-     (c) una NP vieja de ISIS SÍ tiene detalle: sale de la base del PPP (`gv_ppp_isis_items`), se
+     (c) una NP vieja de ISIS SÍ tiene detalle: sale de la base del PPP (`gv_ppp_np_items`), se
          pide al abrir la ficha y se cachea. Si no se puede leer, lo dice; no inventa una tabla.
    Estado inyectado; no pega contra la red. */
 const path = require("path");
@@ -76,7 +76,7 @@ catch (_e) {
     const pedidos = [];
     window.aprGet = async function (ruta) {
       pedidos.push(ruta);
-      if (/gv_ppp_isis_items/.test(ruta)) return [
+      if (/gv_ppp_np_items/.test(ruta)) return [
         { art: "035E", cajas: 2, uxb: 12, uni: 24 },
         { art: "207", cajas: 1, uxb: 12, uni: 12 },
         { art: "404E", cajas: 2, uxb: 4, uni: 8 }
@@ -86,7 +86,7 @@ catch (_e) {
     delete _apr.isisItems["98587"];
     aprRender(); await new Promise((res) => setTimeout(res, 250));
     html = document.getElementById("pppPreview").innerHTML;
-    out.isisRuta = pedidos.some((u) => /^gv_ppp_isis_items\?select=art,cajas,uxb,uni&np=eq\.98587&/.test(u));
+    out.isisRuta = pedidos.some((u) => /^gv_ppp_np_items\?select=art,cajas,uxb,uni&np=eq\.98587&/.test(u));
     out.isisTabla = /apr-tab-cod">035E<\/td><td class="n"><b>2<\/b><\/td>/.test(html) &&
                     /apr-tab-cod">404E</.test(html);
     out.isisUni = /24 <span class="apr-tab-uxb">×12<\/span>/.test(html);
@@ -150,7 +150,7 @@ catch (_e) {
   t(r.isisPidio, "(c) abrir una NP de ISIS dispara la lectura del detalle");
   t(r.isisFalla, "(c) si no se puede leer, lo dice");
   t(r.isisSinMentira, "(c) NUNCA dice que el detalle de una NP de ISIS no existe");
-  t(r.isisRuta, "(c) lo pide a gv_ppp_isis_items filtrando por esa NP");
+  t(r.isisRuta, "(c) lo pide a gv_ppp_np_items filtrando por esa NP");
   t(r.isisTabla, "(c) muestra los códigos y las cajas de la base del PPP");
   t(r.isisUni, "(c) con las unidades resueltas por el uxb del artículo");
   t(r.isisTotal, "(c) y su total de códigos, cajas y unidades");

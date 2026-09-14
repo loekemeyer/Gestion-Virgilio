@@ -14242,6 +14242,7 @@ del **camión entero** —el tope es del camión, no de lo que se está mirando�
 
 Medido al 14/09: ningún camión pasado; los tres que superan 6 m³ son de **un solo pedido** (9,25 ·
 6,47 · 6,17 m³) y el tope los acompaña, así que no se marcan.
+
 ## §3.dq — v17.44: Tierra del Fuego verificado cliente por cliente, y el log del barrido se repetía — 2026-09-14
 
 ### Tierra del Fuego: la regla ya cubre a los 10 clientes
@@ -14337,3 +14338,85 @@ que guardan sale canonizado.
 **Ninguno de los tres que importan es aplicable a ciegas.** Lo correcto para
 `Correcciones_Pedido` —y para cualquier tabla nueva— es **un trigger genérico parametrizado por
 `TG_ARGV`**, no uno por tabla.
+## §3.fm — v17.66: Programación como árbol día → tanda → NP → contenido — 2026-09-14
+
+Pedido de Luis: *"vamos a cambiar la visualización actual de Programación… una especie de tabla al
+estilo del módulo de operarios. Arranca con el día, M3, Tandas, NPs, y agrega 4 columnas que son el
+porcentaje de completado expresado en números (color coded): Facturado, Armado (armados pendientes
+de facturar), En proceso (armado o pickeado) y Pendientes (programados para el día pero no
+empezados). Cuando se aprieta sobre un día se expande para mostrar las tandas (color coded), cada
+tanda se puede apretar para mostrar las NPs, y cada NP se puede apretar para mostrar el
+contenido."*
+
+### `gv_ppp_prog_arbol(p_desde, p_hasta)` — una fila por NP, con su estado ya resuelto
+
+`sql/gv_ppp_prog_arbol_v1766.sql`. Devuelve `fecha, tanda, np, np_num, cod, razon_social,
+localidad, zona, zona_corta, empresa, origen, m3, estado, estado_orden`.
+
+**Por qué una RPC y no cuentas en el front:** el día, la tanda y la NP tienen que cuadrar entre sí.
+Si el total del día sale de una fuente y el de las tandas de otra, se abre un día y las partes no
+suman al todo. Acá el front agrupa **las mismas filas**, así que por construcción
+día = Σ tandas = Σ NPs.
+
+⚠ **El universo es el mismo que `gv_ppp_avance_dias`, a propósito**: mismas 4 fuentes
+(`gv_ppp_programacion_diaria`, `PPP_Web_Programacion`, `Facturacion_NP`,
+`GV_PPP_Entregados_Historico`), mismo `distinct on (np)` con la misma prioridad, misma
+clasificación de eventos. **Si se toca una, tocar la otra** — si no, la tabla nueva y el "Avance
+del día" dicen números distintos del mismo día.
+
+Los 4 estados son mutuamente excluyentes (siempre suman el total del día):
+
+| `estado` | |
+|---|---|
+| `facturado` | está en `Facturacion_NP` |
+| `armado` | armado y todavía sin facturar (TAP, o CCN/CRN — cargado al camión o remito controlado) |
+| `proceso` | armando (AP) o pickeando (EP / TP sin armar) |
+| `pendiente` | programado para ese día y nadie lo tocó |
+
+⚠ `ev` se limita a `p_desde - 60 días`, igual que `gv_ppp_avance_dias`: el rol `anon` corta a los
+3 s y `Registros_Produccion_Virgilio` es el log entero (§3.ef).
+
+### `gv_ppp_np_items` — el contenido de cualquier NP, de ISIS o web
+
+`sql/gv_ppp_np_items_v1766.sql`. La v17.61 había hecho `gv_ppp_isis_items` para las NP de ISIS;
+para una NP **web** los renglones no están en `GV_PPP_Base_Pedidos` sino en **`PPP_Web_Base`** (lo
+que escribe `gv_ppp_web_tanda_programar`). Las dos tablas tienen la misma forma, así que en vez de
+dos endpoints va **uno**: la unión, agrupada por código, con cajas y unidades.
+`gv_ppp_isis_items` queda como vista de compatibilidad (misma vista filtrada a `origen='isis'`)
+para las pestañas que hayan quedado abiertas en la v17.61; se puede dropear más adelante.
+
+### Front
+
+`_pppArbolHtml()` es ahora la vista por defecto de la pestaña Programación (`_pppPlanTabla = true`).
+El tablero de 6 días (`_pppPlanGridHtml`) y la lista clásica quedan detrás de sus botones, y
+entrar a UN día sigue abriendo la pantalla de siempre con sus camiones y acciones. Una sola llamada
+trae todo el árbol (TTL 60 s); el contenido de cada NP se pide al abrirla y se cachea.
+
+### Medición (14/09)
+
+```sql
+with a as (select * from public.gv_ppp_avance_dias(current_date - 10, current_date + 60)),
+     t as (select fecha, count(*) n, round(sum(m3),3) m3,
+                  count(*) filter (where estado='facturado') fac,
+                  count(*) filter (where estado='armado')    arm,
+                  count(*) filter (where estado='proceso')   pro,
+                  count(*) filter (where estado='pendiente') pen
+             from public.gv_ppp_prog_arbol(current_date - 10, current_date + 60) group by 1)
+select t.fecha from t full join a on a.fecha = t.fecha
+ where coalesce(a.pedidos,0) <> coalesce(t.n,0) or coalesce(a.m3,0) <> coalesce(t.m3,0)
+    or t.fac+t.arm+t.pro+t.pen <> t.n;
+-- vacío = cuadra con el Avance del día y los 4 baldes suman el total
+```
+
+Y cuadra con la PPP del operario (`gv_ppp_resumen_dias`) día por día: 14/09 → 5,16 m³ · 4 tandas ·
+12 NP; 15/09 → 6,15 · 12 · 28; 16/09 → 12,56 · 4 · 7; 17/09 → 10,08 · 24 · 64; 18/09 → 6,46 · 5 ·
+24; 21/09 → 1,33 · 2 · 8. Como `anon`: **189 ms** para 234 filas (hoy → +90 días).
+
+Cobertura del contenido sobre lo programado de hoy en adelante: ISIS 65 de 66 NP, web 80 de 80.
+
+### Rollback
+
+`drop function if exists public.gv_ppp_prog_arbol(date, date);` y poner `_pppPlanTabla = false` en
+`index.html` — la pestaña vuelve al tablero de 6 días, que no se tocó. Para `gv_ppp_np_items`, el
+orden está en su propio archivo (primero recrear `gv_ppp_isis_items` de la v17.61, después dropear
+la nueva).

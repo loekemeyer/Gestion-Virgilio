@@ -65,7 +65,7 @@ catch (_e) {
     await pppRefreshControlado(); await pppRefreshArmado(); await pppRefreshEnSalida(); await pppRefreshValor();
 
     // (a)+(b)+(e) la grilla de Programación
-    _pppTab = "plan"; _pppPlanDay = null; _pppPlanClasica = false; pppRenderProg();
+    _pppTab = "plan"; _pppPlanDay = null; _pppPlanClasica = false; _pppPlanTabla = false; pppRenderProg();
     let h = document.getElementById("pppPreview").innerHTML;
     out.banda = /class="pn-venc-band rep"[^>]*onclick="pppPlanAbrir\('venc'\)"/.test(h);
     out.bandaDice = /<b>⏰ 4 atrasados<\/b>/.test(h) && /3 sin salir → reprogramar/.test(h) && /1 salieron · falta el remito/.test(h);
@@ -110,7 +110,7 @@ catch (_e) {
 
     // (b) sin atrasados no hay banda
     _pppParsed.prog = _pppParsed.prog.filter((x) => ["E92A"].indexOf(x.tanda) >= 0);   // deja sólo los del día
-    _pppTab = "plan"; _pppPlanDay = null; pppRenderProg();
+    _pppTab = "plan"; _pppPlanDay = null; _pppPlanTabla = false; pppRenderProg();
     out.sinAtrasados = !/pn-venc-band/.test(document.getElementById("pppPreview").innerHTML);
     return out;
   });

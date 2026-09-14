@@ -1188,6 +1188,7 @@ button {
 .apr-tab-uxb{ color:#94a3b8; font-size:10px; }
 .apr-tab tfoot td{ border-bottom:none; border-top:1px solid #cbd5e1; font-weight:800; color:#0f172a; padding-top:3px; }
 .apr-det-sin{ font-size:11.5px; color:#94a3b8; font-style:italic; margin-top:3px; }
+.apr-det-err{ color:#b42318; font-style:normal; font-weight:700; }
 
 /* Caja de TANDA (zona de soltar) */
 .apr-nueva{ width:100% !important; border:2px dashed #94a3b8; background:#fff; color:#334155; border-radius:9px; padding:10px !important; font-size:13.5px; font-weight:800; cursor:pointer; margin-bottom:9px; }
@@ -3070,6 +3071,76 @@ tr.ppp-err-zona > td{ background:#fffbeb !important; }
 .pn-fac-h small{ font-size:15px; font-weight:800; color:#64748b; }
 .pn-bar.fac{ height:11px; background:#e5e7eb; }
 .pn-bar.fac i{ background:#16a34a; }
+/* v17.66 (Luis) — PROGRAMACIÓN COMO TABLA: día → tanda → NP → contenido.
+   Pedido: *"darle un formato más limpio al estilo de como se ve en el módulo de operarios"*.
+   Mismas cuatro columnas de cabecera que la PPP del operario (Día · m³ · Tandas · NPs) más los
+   cuatro porcentajes de avance, y todo se abre hacia adentro en la misma tabla: no hay que salir
+   de la pantalla para ver una tanda ni una NP. */
+.pga-wrap{ margin-top:12px; border:1px solid #e2e8f0; border-radius:14px; background:#fff; overflow:auto; }
+.pga{ width:100%; border-collapse:collapse; font-size:14px; color:#0f172a; }
+.pga th{ position:sticky; top:0; z-index:2; background:#f8fafc; text-align:right; font-size:10.5px; font-weight:800;
+  letter-spacing:.05em; text-transform:uppercase; color:#64748b; padding:10px 12px; border-bottom:2px solid #cbd5e1; white-space:nowrap; }
+.pga th:first-child{ text-align:left; }
+.pga td{ text-align:right; padding:7px 12px; border-bottom:1px solid #eef2f7; white-space:nowrap; font-variant-numeric:tabular-nums; }
+.pga td:first-child{ text-align:left; }
+.pga-chev{ display:inline-block; width:12px; color:#94a3b8; font-weight:700; }
+/* fila de DÍA */
+.pga-d{ cursor:pointer; }
+.pga-d>td{ border-left:4px solid transparent; border-top:2px solid #e2e8f0; font-weight:700; }
+.pga tbody tr:first-child>td{ border-top:none; }
+.pga-d>td:first-child{ color:#1e6bd6; font-weight:800; }
+.pga-d:hover>td{ background:#f8fbff; }
+.pga-d.on>td{ background:#eff6ff; }
+.pga-d.hoy>td:first-child::after{ content:"HOY"; background:#1e6bd6; color:#fff; font-size:9.5px; font-weight:900;
+  border-radius:999px; padding:1px 7px; margin-left:7px; vertical-align:1px; letter-spacing:.04em; }
+/* fila de TANDA — el color dice en qué está */
+.pga-t{ cursor:pointer; }
+.pga-t>td{ font-size:13px; }
+.pga-t>td:first-child{ padding-left:30px; font-weight:800; }
+.pga-t:hover>td{ filter:brightness(.98); }
+.pga-t.e-facturado>td{ background:#f4fdf7; } .pga-t.e-facturado>td:first-child{ box-shadow:inset 4px 0 0 #15803d; color:#14532d; }
+.pga-t.e-armado>td{    background:#f5f9ff; } .pga-t.e-armado>td:first-child{    box-shadow:inset 4px 0 0 #1d4ed8; color:#1e3a8a; }
+.pga-t.e-proceso>td{   background:#fffcf3; } .pga-t.e-proceso>td:first-child{   box-shadow:inset 4px 0 0 #d97706; color:#92400e; }
+.pga-t.e-pendiente>td{ background:#fafbfc; } .pga-t.e-pendiente>td:first-child{ box-shadow:inset 4px 0 0 #cbd5e1; color:#475569; }
+.pga-sub{ font-weight:600; color:#94a3b8; font-size:11.5px; margin-left:7px; }
+/* fila de NP */
+.pga-n{ cursor:pointer; }
+.pga-n>td{ font-size:12.5px; color:#334155; }
+.pga-n>td:first-child{ padding-left:56px; white-space:normal; line-height:1.3; }
+.pga-n:hover>td{ background:#f8fafc; }
+.pga-np{ font-weight:800; color:#0f172a; }
+.pga-cli{ color:#475569; margin-left:6px; }
+.pga-loc{ color:#94a3b8; font-size:11px; margin-left:6px; }
+.pga-pill{ display:inline-block; font-size:10px; font-weight:900; border-radius:999px; padding:1px 8px; letter-spacing:.03em; margin-left:7px; vertical-align:1px; }
+.pga-pill.e-facturado{ background:#dcfce7; color:#14532d; } .pga-pill.e-armado{ background:#dbeafe; color:#1e3a8a; }
+.pga-pill.e-proceso{ background:#fef3c7; color:#92400e; }   .pga-pill.e-pendiente{ background:#f1f5f9; color:#64748b; }
+/* fila de CONTENIDO de la NP (los códigos y las cajas) */
+.pga-c>td{ padding:0 12px 12px 56px; background:#fbfdff; border-bottom:1px solid #e2e8f0; text-align:left; white-space:normal; }
+.pga-c .apr-tab{ max-width:520px; }
+/* los porcentajes, en números y con color */
+.pga-pct{ font-weight:800; }
+.pga-pct small{ font-weight:700; color:#94a3b8; font-size:10.5px; margin-left:4px; }
+.pga-pct.fac{ color:#15803d; } .pga-pct.arm{ color:#1d4ed8; }
+.pga-pct.pro{ color:#b45309; } .pga-pct.pen{ color:#475569; }
+.pga-pct.z{ color:#cbd5e1; font-weight:700; } .pga-pct.z small{ display:none; }
+.pga tfoot td{ border-bottom:none; border-top:2px solid #cbd5e1; font-weight:900; background:#f8fafc; }
+.pga-msg{ padding:14px; font-size:13.5px; color:#64748b; }
+.pga-msg b{ color:#0f172a; }
+.pga-err{ color:#b42318; }
+/* En el celular la tabla no entra a lo ancho: scrollea adentro de su caja, y la primera columna
+   (el día / la tanda / la NP) queda fija, si no se pierde de vista justo lo que se está mirando. */
+@media (max-width:760px){
+  .pga{ font-size:13px; } .pga th, .pga td{ padding:6px 8px; }
+  .pga-t>td:first-child{ padding-left:20px; } .pga-n>td:first-child{ padding-left:34px; }
+  .pga-c>td{ padding-left:34px; } .pga-pct small{ display:none; }
+  .pga th:first-child, .pga td:first-child{ position:sticky; left:0; z-index:1;
+    box-shadow:inset -1px 0 0 #e2e8f0; }
+  .pga th:first-child, .pga tfoot td:first-child{ z-index:3; background:#f8fafc; }
+  .pga-d>td:first-child, .pga-n>td:first-child, .pga-c>td{ background:#fff; }
+  .pga-d.on>td:first-child{ background:#eff6ff; }
+  .pga-c>td{ background:#fbfdff; }
+}
+
 /* v16.97 — AVANCE DEL DÍA (% listo / % armado). Tarjeta grande adentro de un día y
    línea chiquita en la tarjeta de la grilla de 6 días. */
 .pn-av{ margin-top:10px; padding:10px 12px; border:1.5px solid #bfdbfe; background:#f8fbff; border-radius:12px; }
@@ -5074,7 +5145,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=17.65"></script>
+<script type="module" src="recepcion.js?v=17.66"></script>
 <!-- Config del módulo de fichada (compartido con fichada.html). El secret
      hmacSecret tiene que ser el mismo acá y allá; cargándolo desde un solo
      archivo evitamos que se desincronicen. -->
@@ -8481,7 +8552,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v17.65";
+const APP_VERSION = "v17.66";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -34135,6 +34206,7 @@ function pppGoToRow(np) {
    ===================================================================================== */
 let _pppPlanDay = null;        // null = grilla de 6 días · "YYYYMMDD" = adentro de un día · "venc" = vencidas
 let _pppPlanClasica = false;   // true = lista clásica por fecha/tanda (v13.01)
+let _pppPlanTabla = true;      // v17.66 (Luis): por defecto, la tabla día → tanda → NP → contenido
 let _pppPlanHoja = 0;          // v13.17: hoja de la grilla (0 = próximos 6 hábiles, 1 = los 6 siguientes…)
 let _pppVencInline = false;    // v13.94: la lista de atrasados desplegada adentro de Resumen
 let _pppValor = null;          // Map np(norm) → { valor, sinPrecio }  (gv_ppp_np_valor)
@@ -34282,7 +34354,10 @@ function pppVencInline(v) {
 }
 /* v13.17: "Ver hoja 2" (dueño): la grilla pagina de a 6 días hábiles. */
 function pppPlanHoja(n) { _pppPlanHoja = Math.max(0, Number(n) || 0); _pppPlanDay = null; pppRenderProg(); try { const el = document.getElementById("pppPreview"); if (el) el.scrollIntoView({ block: "start" }); } catch (_e) {} }
-function pppPlanClasica(v) { _pppPlanClasica = !!v; pppRenderProg(); }
+function pppPlanClasica(v) { _pppPlanClasica = !!v; if (v) _pppPlanTabla = false; pppRenderProg(); }
+/* v17.66 (Luis) — la TABLA día → tanda → NP es la vista por defecto de Programación; el tablero
+   de 6 días y la lista clásica quedan detrás de sus botones. */
+function pppPlanTabla(v) { _pppPlanTabla = !!v; _pppPlanClasica = false; _pppPlanDay = null; pppRenderProg(); }
 function _pppFmtPesos(n) { n = Math.round(Number(n) || 0); const s = String(Math.abs(n)).replace(/\B(?=(\d{3})+(?!\d))/g, "."); return (n < 0 ? "-$ " : "$ ") + s; }
 function _pppFmtPesosCorto(n) { n = Number(n) || 0; if (Math.abs(n) >= 1e6) return "$" + (n / 1e6).toFixed(1).replace(".", ",") + " M"; if (Math.abs(n) >= 1e3) return "$" + Math.round(n / 1e3) + " mil"; return _pppFmtPesos(n); }
 // v13.16: 1 decimal, salvo volúmenes chicos (0,04 mostraba "0,0" como si el pedido no tuviera nada)
@@ -34797,6 +34872,202 @@ function _pppCamionSuperTxt(c) {
 }
 function _pppCamionNombre(c) { return c.ruta === "ret" ? "Retira en fábrica" : (c.ruta === "sup" ? "Camión " + c.num + " · " + _pppCamionSuperTxt(c) : ((c.tn != null ? "Camión " + c.num : "Sin tanda") + " · " + c.zona)); }
 /* ---- GRILLA: KPI + banda de vencidas + 6 días + otras fechas ---- */
+/* ═══ PROGRAMACIÓN COMO TABLA — día → tanda → NP → contenido (v17.66, Luis 2026-09-14) ═══════
+   Pedido textual: *"vamos a cambiar la visualización actual de Programación. La idea es darle un
+   formato más limpio al estilo de como se ve en el módulo de operarios. Una especie de tabla:
+   arranca con el día, M3, Tandas, NPs, y agrega 4 columnas que son el porcentaje de completado
+   expresado en números (color coded): Facturado, Armado (armados pendientes de facturar), En
+   proceso (proceso de armado o pickeado) y Pendientes (programados para el día pero no empezados).
+   Cuando se aprieta sobre un día se expande para mostrar las tandas (color coded esas filas), y
+   cada tanda se puede apretar para mostrar las NPs. Y cada NP se puede apretar para mostrar el
+   contenido."*
+
+   TODO SALE DE UNA SOLA LLAMADA: `gv_ppp_prog_arbol(desde, hasta)` devuelve una fila por NP con su
+   tanda y su estado ya resuelto. El día, la tanda y la NP se suman acá a partir de ESAS filas, así
+   que las partes siempre suman el todo — si el total del día saliera de otra fuente que el de las
+   tandas, abrir un día mostraría números que no cierran. El universo es el mismo que el de
+   `gv_ppp_avance_dias` ("Avance del día"): los dos tienen que decir lo mismo del mismo día.
+   El contenido de cada NP sale de `gv_ppp_np_items` (ISIS + web), al abrirla y cacheado. */
+const PGA_TTL_MS = 60 * 1000;
+const PGA_DIAS   = 120;          // hasta dónde mira para adelante
+const PGA_EST    = ["facturado", "armado", "proceso", "pendiente"];
+const PGA_EST_TXT = { facturado: "Facturado", armado: "Armado", proceso: "En proceso", pendiente: "Pendiente" };
+const PGA_EST_CLS = { facturado: "fac", armado: "arm", proceso: "pro", pendiente: "pen" };
+let _pgaRows = null, _pgaTs = 0, _pgaBusy = false, _pgaErr = "";
+let _pgaOpenD = {}, _pgaOpenT = {}, _pgaOpenN = {};   // qué día / tanda / NP están abiertos
+let _pgaItems = {};                                   // np → "cargando" | [items] | null (no se pudo)
+
+function pgaNeed(force) {
+  if (_pgaBusy) return;
+  if (!force && _pgaRows && (Date.now() - _pgaTs) < PGA_TTL_MS) return;
+  _pgaBusy = true;
+  const hoyK = _pppHoyKey(), desde = _pppKeyISO(hoyK);
+  const h = _pppKeyDate(hoyK); h.setDate(h.getDate() + PGA_DIAS);
+  const hasta = _pppKeyISO(_pppDateKey(h));
+  if (!desde || !hasta) { _pgaBusy = false; return; }
+  fetch(SUPABASE_URL + "/rest/v1/rpc/gv_ppp_prog_arbol", {
+    method: "POST",
+    headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY, "Content-Type": "application/json" },
+    body: JSON.stringify({ p_desde: desde, p_hasta: hasta })
+  }).then(function (r) { if (!r.ok) throw new Error("HTTP " + r.status); return r.json(); })
+    .then(function (rows) { _pgaRows = rows || []; _pgaTs = Date.now(); _pgaErr = ""; _pgaBusy = false; pppRenderProg(); })
+    .catch(function (e) {
+      _pgaBusy = false; _pgaErr = String((e && e.message) || e);
+      if (!_pgaRows) _pgaRows = [];
+      pppRenderProg();
+    });
+}
+function pgaRecargar() { _pgaTs = 0; _pgaItems = {}; pgaNeed(true); pppRenderProg(); }
+function pgaAbrirDia(k)   { _pgaOpenD[k] = !_pgaOpenD[k]; pppRenderProg(); }
+function pgaAbrirTanda(k) { _pgaOpenT[k] = !_pgaOpenT[k]; pppRenderProg(); }
+function pgaAbrirNp(k, np) {
+  _pgaOpenN[k] = !_pgaOpenN[k];
+  if (_pgaOpenN[k]) pgaItemsCargar(np);
+  pppRenderProg();
+}
+/* El contenido de la NP: `gv_ppp_np_items` sirve tanto una NP de ISIS como una web. */
+async function pgaItemsCargar(np) {
+  np = String(np || "").trim(); if (!np) return;
+  if (_pgaItems[np] !== undefined) return;
+  _pgaItems[np] = "cargando";
+  try {
+    const r = await fetch(SUPABASE_URL + "/rest/v1/gv_ppp_np_items?select=art,cajas,uxb,uni&np=eq." +
+      encodeURIComponent(np) + "&order=art.asc&limit=2000", { headers: { apikey: SUPABASE_KEY }, cache: "no-store" });
+    if (!r.ok) throw new Error("HTTP " + r.status);
+    const rows = await r.json();
+    _pgaItems[np] = (rows || []).map(function (x) {
+      return { art: x.art, cajas: Number(x.cajas) || 0, uxb: Number(x.uxb) || 0, uni: Number(x.uni) || 0 };
+    });
+  } catch (_e) { _pgaItems[np] = null; }
+  pppRenderProg();
+}
+/* Estado de un grupo (día o tanda) a partir de sus NP: todo facturado, todo armado o mejor,
+   nada empezado, o mezcla = en proceso. Es lo que pinta la fila. */
+function _pgaEstadoGrupo(e, n) {
+  if (!n) return "pendiente";
+  if (e.facturado === n) return "facturado";
+  if (e.facturado + e.armado === n) return "armado";
+  if (e.pendiente === n) return "pendiente";
+  return "proceso";
+}
+function _pgaEstCero() { return { facturado: 0, armado: 0, proceso: 0, pendiente: 0 }; }
+function _pgaArbol() {
+  const dias = new Map();
+  for (const r of (_pgaRows || [])) {
+    const k = String(r.fecha == null ? "" : r.fecha).replace(/-/g, ""); if (!k) continue;
+    const est = PGA_EST.indexOf(r.estado) >= 0 ? r.estado : "pendiente";
+    let d = dias.get(k);
+    if (!d) { d = { key: k, m3: 0, nps: 0, est: _pgaEstCero(), tandas: new Map() }; dias.set(k, d); }
+    d.m3 += Number(r.m3) || 0; d.nps++; d.est[est]++;
+    const tk = String(r.tanda || "—");
+    let t = d.tandas.get(tk);
+    if (!t) { t = { tanda: tk, key: k + "|" + tk, m3: 0, nps: 0, est: _pgaEstCero(), filas: [] }; d.tandas.set(tk, t); }
+    t.m3 += Number(r.m3) || 0; t.nps++; t.est[est]++; t.filas.push(r);
+  }
+  const out = [...dias.values()].sort(function (a, b) { return a.key.localeCompare(b.key); });
+  for (const d of out) d.tandasArr = [...d.tandas.values()].sort(function (a, b) { return a.tanda.localeCompare(b.tanda); });
+  return out;
+}
+function _pgaPctTd(n, tot, cls) {
+  const p = tot ? Math.round(100 * n / tot) : 0;
+  return '<td><span class="pga-pct ' + cls + (n ? '' : ' z') + '">' + p + ' %<small>' + n + '</small></span></td>';
+}
+function _pgaPctFila(e, n) {
+  return _pgaPctTd(e.facturado, n, "fac") + _pgaPctTd(e.armado, n, "arm") +
+         _pgaPctTd(e.proceso, n, "pro") + _pgaPctTd(e.pendiente, n, "pen");
+}
+/* A dónde va la tanda: la zona de sus NP. Casi siempre es una sola (por eso se arma así);
+   si hay más de una, se dice cuántas para no escupir un renglón larguísimo. */
+function _pgaZonaTanda(t) {
+  const z = [];
+  for (const r of t.filas) { const s = String(r.zona_corta || "").trim(); if (s && z.indexOf(s) < 0) z.push(s); }
+  if (!z.length) return "";
+  return z.length === 1 ? z[0] : (z[0] + " +" + (z.length - 1));
+}
+function _pgaDiaTxt(k) {
+  const d = _pppKeyDate(k);
+  return _PN_DOW[d.getDay()] + " " + d.getDate() + "/" + String(d.getMonth() + 1).padStart(2, "0");
+}
+/* El contenido de UNA NP: la misma tabla Código/Cajas/Unidades de A Programar (v17.57). */
+function _pgaItemsHtml(np) {
+  const c = _pgaItems[np];
+  if (c === undefined || c === "cargando") return '<div class="apr-det-sin">Buscando el contenido…</div>';
+  if (c === null) return '<div class="apr-det-sin apr-det-err">No se pudo leer el contenido de la NP ' + escapeHtml(np) + '. Probá con 🔄.</div>';
+  if (!c.length) return '<div class="apr-det-sin">La NP ' + escapeHtml(np) + ' no tiene renglones cargados en la base del PPP.</div>';
+  return aprItemsTablaHtml(c);
+}
+function _pppArbolHtml(programados) {
+  pgaNeed();
+  const g = _pppPlanAgrupar(programados), nVenc = g.venc.length;
+  let h = '<div class="pn-head"><div><div class="pn-h1">Programación de entregas</div>' +
+    '<div class="pn-h2">Tocá un día para ver sus tandas · una tanda para ver sus NP · una NP para ver qué lleva</div></div>' +
+    '<div class="pn-tools">' +
+      '<button class="pn-lnk" onclick="pgaRecargar()" title="Volver a leer la programación">🔄 Actualizar</button>' +
+      '<button class="pn-lnk" onclick="pppPlanTabla(false)" title="El tablero de 6 días con los camiones">Tablero de 6 días</button>' +
+      '<button class="pn-lnk" onclick="pppPlanClasica(true)" title="Lista por fecha y tanda (como antes)">Vista clásica</button>' +
+    '</div></div>';
+  if (nVenc) {
+    const _rep = g.venc.filter(function (p) { return _pppEstadoPed(p) !== "armado"; }).length;
+    h += '<div class="pn-avisos"><div class="pn-venc-band' + (_rep ? ' rep' : '') + '" onclick="pppPlanAbrir(\'venc\')" title="Ver la lista de atrasados">' +
+      '<b>⏰ ' + nVenc + ' atrasado' + (nVenc === 1 ? '' : 's') + '</b>' +
+      (_rep ? '<span class="r">' + _rep + ' sin salir → reprogramar</span>' : '') +
+      ((nVenc - _rep) ? '<span>' + (nVenc - _rep) + ' salieron · falta el remito</span>' : '') +
+      '<span class="go">Ver la lista →</span></div></div>';
+  }
+  const dias = _pgaArbol();
+  h += '<div class="pga-wrap">';
+  if (!_pgaRows) { return h + '<div class="pga-msg">Leyendo la programación…</div></div>'; }
+  if (_pgaErr && !dias.length) {
+    return h + '<div class="pga-msg pga-err">No se pudo leer la programación (' + escapeHtml(_pgaErr) +
+      '). <button class="pn-lnk" onclick="pgaRecargar()">Reintentar</button></div></div>';
+  }
+  if (!dias.length) return h + '<div class="pga-msg">No hay nada programado de hoy en adelante.</div></div>';
+  h += '<table class="pga"><thead><tr>' +
+      '<th>Día</th><th>m³</th><th>Tandas</th><th>NPs</th>' +
+      '<th title="Ya facturado">Facturado</th>' +
+      '<th title="Armado y todavía sin facturar">Armado</th>' +
+      '<th title="Pickeando o armando ahora">En proceso</th>' +
+      '<th title="Programado para ese día y todavía sin empezar">Pendientes</th>' +
+    '</tr></thead><tbody>';
+  const hoy = _pppHoyKey();
+  const tot = { m3: 0, nps: 0, tandas: 0, est: _pgaEstCero() };
+  for (const d of dias) {
+    tot.m3 += d.m3; tot.nps += d.nps; tot.tandas += d.tandasArr.length;
+    for (const k of PGA_EST) tot.est[k] += d.est[k];
+    const ab = !!_pgaOpenD[d.key];
+    h += '<tr class="pga-d' + (ab ? ' on' : '') + (d.key === hoy ? ' hoy' : '') + '" onclick="pgaAbrirDia(\'' + d.key + '\')">' +
+      '<td><span class="pga-chev">' + (ab ? "▾" : "▸") + '</span>' + escapeHtml(_pgaDiaTxt(d.key)) + '</td>' +
+      '<td>' + _pppFmtM3(d.m3) + '</td><td>' + d.tandasArr.length + '</td><td>' + d.nps + '</td>' +
+      _pgaPctFila(d.est, d.nps) + '</tr>';
+    if (!ab) continue;
+    for (const t of d.tandasArr) {
+      const tb = !!_pgaOpenT[t.key], te = _pgaEstadoGrupo(t.est, t.nps);
+      h += '<tr class="pga-t e-' + te + '" onclick="pgaAbrirTanda(\'' + escapeHtml(t.key) + '\')">' +
+        '<td><span class="pga-chev">' + (tb ? "▾" : "▸") + '</span>' + escapeHtml(t.tanda) +
+          '<span class="pga-pill e-' + te + '">' + PGA_EST_TXT[te] + '</span>' +
+          '<span class="pga-sub">' + escapeHtml(_pgaZonaTanda(t)) + '</span></td>' +
+        '<td>' + _pppFmtM3(t.m3) + '</td><td></td><td>' + t.nps + '</td>' +
+        _pgaPctFila(t.est, t.nps) + '</tr>';
+      if (!tb) continue;
+      for (const r of t.filas) {
+        const nk = t.key + "|" + r.np, nb = !!_pgaOpenN[nk];
+        const est = PGA_EST.indexOf(r.estado) >= 0 ? r.estado : "pendiente";
+        h += '<tr class="pga-n" onclick="pgaAbrirNp(\'' + escapeHtml(nk) + '\',\'' + escapeHtml(r.np) + '\')">' +
+          '<td><span class="pga-chev">' + (nb ? "▾" : "▸") + '</span>' +
+            '<span class="pga-np">' + escapeHtml(r.np) + '</span>' + _npSrcChip(r.np) +
+            '<span class="pga-pill e-' + est + '">' + PGA_EST_TXT[est] + '</span>' +
+            '<span class="pga-cli">' + escapeHtml(r.razon_social || r.cod || "—") + '</span>' +
+            '<span class="pga-loc">' + escapeHtml(r.zona_corta || r.localidad || "") + '</span></td>' +
+          '<td>' + _pppFmtM3(r.m3) + '</td><td colspan="6"></td></tr>';
+        if (nb) h += '<tr class="pga-c"><td colspan="8">' + _pgaItemsHtml(r.np) + '</td></tr>';
+      }
+    }
+  }
+  h += '</tbody><tfoot><tr><td>Total</td><td>' + _pppFmtM3(tot.m3) + '</td><td>' + tot.tandas + '</td><td>' + tot.nps + '</td>' +
+    _pgaPctFila(tot.est, tot.nps) + '</tr></tfoot></table></div>';
+  return h;
+}
+
 function _pppPlanGridHtml(programados) {
   const g = _pppPlanAgrupar(programados);
   const hoja = _pppPlanHoja || 0;
@@ -34814,7 +35085,8 @@ function _pppPlanGridHtml(programados) {
   if (_pppEnSalida) _pppEnSalida.forEach(function (r, np) { try { if (_pppCargaVencida({ np: np })) sinCtrl++; } catch (_e) {} });
   const nVenc = g.venc.length;
   let h = '<div class="pn-head"><div><div class="pn-h1">Programación de entregas</div><div class="pn-h2">' + (hoja ? 'Hoja ' + (hoja + 1) + ' · ' + escapeHtml(rangoTxt) : 'Próximos 6 días hábiles') + ' · tocá un día para ver sus camiones y pedidos</div></div>' +
-    '<div class="pn-tools"><button class="pn-lnk" onclick="pppPlanClasica(true)" title="Lista por fecha y tanda (como antes)">Vista clásica</button></div></div>';
+    '<div class="pn-tools"><button class="pn-lnk" onclick="pppPlanTabla(true)" title="La tabla día → tanda → NP">↩ Tabla</button>' +
+    '<button class="pn-lnk" onclick="pppPlanClasica(true)" title="Lista por fecha y tanda (como antes)">Vista clásica</button></div></div>';
   // v13.33 (dueño: "los 48 atrasados no deben aparecer en Programación… es un dato para que lo revise
   // alguien de gerencia"): esta solapa es la de programar, así que cuenta SÓLO lo que todavía tiene
   // fecha por delante. Los vencidos se miran desde Resumen.
@@ -34905,7 +35177,7 @@ function _pppPlanDiaHtml(programados, key, opts) {
   const nCam = cams.filter(function (c) { return c.ruta !== "ret"; }).length;
   let h = inline
     ? '<div class="pn-topbar"><button class="pn-back" onclick="pppVencInline(false)">✕ Cerrar la lista</button></div>'
-    : '<div class="pn-topbar"><button class="pn-back" onclick="pppPlanVolver()">← Volver a los 6 días</button><button class="pn-lnk" onclick="pppPlanClasica(true)">Vista clásica</button></div>';
+    : '<div class="pn-topbar"><button class="pn-back" onclick="pppPlanVolver()">← Volver a ' + (_pppPlanTabla ? 'la tabla' : 'los 6 días') + '</button><button class="pn-lnk" onclick="pppPlanClasica(true)">Vista clásica</button></div>';
   h += '<div class="pn-dayhead' + (esVenc ? ' venc' : '') + '"><div><div class="d1">' + escapeHtml(sub) + '</div><div class="d2">' + escapeHtml(titulo) + '</div></div>' +
     '<div class="kp"><div class="k"><i>📦</i><div><div class="l">Pedidos</div><div class="v">' + ped.length + '</div></div></div><div class="k"><i>🚚</i><div><div class="l">Camiones</div><div class="v">' + nCam + '</div></div></div><div class="k"><i>🧊</i><div><div class="l">Volumen</div><div class="v">' + _pppFmtM3(_pppM3Sum(ped)) + ' m³</div></div></div><div class="k"><i>💰</i><div><div class="l">Valor estimado</div><div class="v g">' + (_pppValor ? _pppFmtPesos(val.valor) : '…') + '</div></div></div></div>' +
     '<div class="barw">' + _pppPlanBarraHtml(est, ped.length, esVenc ? null : key, true) + '</div></div>';
@@ -35248,10 +35520,13 @@ function pppRenderProg() {
       if (_pppValor == null) { try { pppRefreshValor(); } catch (_e) {} }
       if (_pppGeo == null) { try { pppRefreshGeo(); } catch (_e) {} }
       if (_pppNoHabiles == null) { try { pppRefreshNoHabiles(); } catch (_e) {} }   // v13.25
-      html += '<div class="pn-wrap">' + (_pppPlanDay ? _pppPlanDiaHtml(programados, _pppPlanDay) : _pppPlanGridHtml(programados)) + '</div>';
+      // v17.66 (Luis): la tabla día → tanda → NP es lo primero que se ve. Adentro de UN día
+      // (o de las vencidas) sigue mandando la pantalla de siempre, con sus camiones y acciones.
+      html += '<div class="pn-wrap">' + (_pppPlanDay ? _pppPlanDiaHtml(programados, _pppPlanDay)
+              : (_pppPlanTabla ? _pppArbolHtml(programados) : _pppPlanGridHtml(programados))) + '</div>';
       _renderKeepFocus(box, html); return;
     }
-    html += '<div class="ppp-res-leg">🎨 Color por camión: <span class="rtleg rt-so">Sur/Centro/Oeste</span> <span class="rtleg rt-n">Norte</span> <span class="rtleg rt-ret">Retira</span> <span class="rtleg rt-sup">Súper</span>. Tocá una tanda para abrirla. <button class="pn-lnk" onclick="pppPlanClasica(false)">↩ Tablero de 6 días</button></div>';
+    html += '<div class="ppp-res-leg">🎨 Color por camión: <span class="rtleg rt-so">Sur/Centro/Oeste</span> <span class="rtleg rt-n">Norte</span> <span class="rtleg rt-ret">Retira</span> <span class="rtleg rt-sup">Súper</span>. Tocá una tanda para abrirla. <button class="pn-lnk" onclick="pppPlanTabla(true)">↩ Tabla</button> <button class="pn-lnk" onclick="pppPlanClasica(false)">Tablero de 6 días</button></div>';
     const DOW = ["Dom", "Lun", "Mar", "Mié", "Jue", "Vie", "Sáb"];
     const byD = {}; for (const p of programados) { const k = _pppFechaKey(p.fecha_entrega || ""); if (!byD[k]) byD[k] = { fecha: p.fecha_entrega || "—", ped: [] }; byD[k].ped.push(p); }
     for (const dk of Object.keys(byD).sort()) {
@@ -39225,7 +39500,9 @@ async function aprIsisItemsCargar(np) {
   if (_apr.isisItems[np] !== undefined) return;   // ya está cargada, cargando, o ya falló
   _apr.isisItems[np] = "cargando";
   try {
-    const rows = await aprGet("gv_ppp_isis_items?select=art,cajas,uxb,uni&np=eq." +
+    // v17.66: `gv_ppp_np_items` sirve una NP de ISIS o una web con el mismo filtro por NP
+    // (reemplaza a `gv_ppp_isis_items`, que quedó como vista de compatibilidad).
+    const rows = await aprGet("gv_ppp_np_items?select=art,cajas,uxb,uni&np=eq." +
       encodeURIComponent(np) + "&order=art.asc&limit=2000");
     _apr.isisItems[np] = (rows || []).map(function (r) {
       return { art: r.art, cajas: Number(r.cajas) || 0, uxb: Number(r.uxb) || 0, uni: Number(r.uni) || 0 };
