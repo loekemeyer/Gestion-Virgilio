@@ -13954,10 +13954,29 @@ segunda fila); sacar `'66'` → borró mapa=1 cap=1, las dos vacías. Y ninguna 
 `regexp_replace(prosrc,'--[^\n]*','','g')`, porque medir sobre el texto crudo da un falso positivo
 (error ya cometido antes en esta misma sesión).
 
-⚠ **Hallazgo al costado, NO tocado: 54 filas `cod = 'LIBRE'`.** `Capacidad_Sector` tiene 54 filas con
-ese pseudo-código (53 con `cajas_max` NULL) y `GV_Lugar_Item` tiene 0. El handoff de planimetría ya
-avisa que *"`LIBRE` no es código"*, y además contradicen su regla 2 ("sin número no hay fila de
-capacidad"). No se tocaron: son datos, y el protocolo dice no modificarlos sin permiso explícito.
+⚠⚠ **Hallazgo al costado, CORREGIDO: `LIBRE` no es basura y NO hay que limpiarlo.** Esta sección
+decía que las 54 filas `cod = 'LIBRE'` contradecían la regla 2 del handoff y convenía borrarlas.
+**Está mal, y borrarlas rompe cosas.** `LIBRE` es el marcador de **"esta posición está vacía y
+disponible"**, y está vivo en cinco lugares: `vista_generador_oc` lo excluye explícitamente dos veces
+(`<> 'LIBRE'`); el badge **"posiciones LIBRES"** del mapa lo cuenta y lo muestra; el autocompletado
+de la ubicación del excedente **lo prioriza a propósito**; el modal **Mover** valida con él ("el
+destino tiene que estar LIBRE o con el mismo código"); y `pmapVieja` lo saltea. La "contradicción"
+con la regla 2 tampoco existe: esa regla es para artículos reales, y una posición vacía con
+`cajas_max` NULL es exactamente lo correcto. Son 54 filas en 54 sectores, **todos existentes en
+`GV_Lugar`** (39 de la góndola P entera con empresa CH, 8 LK, 6 LOKE).
+
+**Lo que sí está mal son 6**, marcadas `LIBRE` pero con algo adentro: **A60** (`989E`, `992E`),
+**A65** (`396`, `556`), **C01** (`547`), **C15** (`510T`, `581T`), **Ñ55** (`838E`), y **A83**
+(`LIBRE` con `cajas_max = 72` y sin artículo — inconsistente pero inocuo). Las 5 primeras importan:
+el badge cuenta libres de más y el autocompletado puede mandar a un operario a dejar un excedente en
+una celda ocupada, que es justo lo que el handoff advierte (*"que una celda ACEPTE otro código no
+significa que ESTÉ libre"*).
+
+**Causa raíz, con caso testigo:** A60 es la celda que la sesión de Thomas ocupó el 14/09 con `989E` y
+`992E`. Le pusieron el artículo y **la marca `LIBRE` quedó** — o sea que `gv_lugar_item_guardar` no
+saca la fila `LIBRE` del sector al cargar un artículo. Ése es el bug de fondo; las 6 filas son el
+síntoma acumulado. Registrado como problema aparte, **sin tocar ningún dato**.
+
 **Ojo al medir**: con `cajas_max` NULL, un `string_agg(cod || '=' || cajas_max::text)` las
 **esconde** (el `||` con NULL da NULL) — eso hizo que una prueba pareciera dejar una fila huérfana
 cuando la fila era preexistente y ajena.
