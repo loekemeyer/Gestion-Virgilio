@@ -217,15 +217,13 @@ const RCP_CSS = `
 #rcpRoot .arBusNada{ padding:12px 0; color:#666; font-size:15px; }
 #rcpRoot .arBusIgual{ width:100%; margin-top:10px; padding:14px; border-radius:10px; border:2px solid #b45309; background:#fffbeb; color:#7c2d12; font-weight:800; font-size:16px; cursor:pointer; }
 #rcpRoot .modalClose{ background:#fff; border:1px solid var(--border); width:32px; height:32px; border-radius:50%; cursor:pointer; font-size:14px; font-weight:900; }
-/* v17.17 — pop-up de pre-aceptación: lo que entró por encima de la OC (todos los códigos juntos). */
-#rcpRoot #opExcesoModal .modalTitle{ color:#b91c1c; }
-#rcpRoot .excIntro{ font-size:14px; font-weight:800; color:#334155; margin-bottom:10px; }
-#rcpRoot .excList{ overflow-y:auto; flex:1 1 auto; margin-bottom:14px; }
-#rcpRoot .excRow{ border:1px solid #fca5a5; background:#fef2f2; border-radius:10px; padding:9px 11px; margin-bottom:8px; }
-#rcpRoot .excRowCod{ font-weight:900; font-size:17px; color:#111; }
-#rcpRoot .excRowDet{ font-size:13px; font-weight:700; color:#7f1d1d; margin-top:2px; }
-#rcpRoot .excWaBtn{ width:100%; height:52px; border:0; border-radius:10px; background:#25d366; color:#fff; font-weight:900; font-size:17px; cursor:pointer; }
-#rcpRoot .excOkBtn{ width:100%; margin-top:10px; }
+/* v17.27 — aviso a Thomas por lo que entró por encima de la OC: va en la pantalla de
+   resumen, debajo de la foto, y es obligatorio igual que la foto. */
+#rcpRoot .opExcSection{ margin:16px 0 4px; text-align:center; }
+#rcpRoot .opExcDet{ font-size:13.5px; font-weight:700; color:#7f1d1d; background:#fef2f2; border:1px solid #fca5a5; border-radius:10px; padding:9px 11px; margin-bottom:10px; text-align:left; line-height:1.45; }
+#rcpRoot .opExcWaBtn{ width:100%; padding:18px; font-size:18px; font-weight:900; border:2px dashed #25d366; border-radius:14px; background:#fff; color:#12813f; cursor:pointer; }
+#rcpRoot .opExcWaBtn.has{ border-style:solid; background:#e9f9ef; }
+#rcpRoot .opExcHint{ font-size:13px; color:#b91c1c; font-weight:700; margin-top:6px; }
 #rcpRoot .btnCancel{ padding:10px 16px; border-radius:10px; border:1px solid var(--border); background:#fff; font-weight:900; cursor:pointer; }
 #rcpRoot .btnSend{ padding:10px 16px; border-radius:10px; border:0; background:#111; color:#fff; font-weight:900; cursor:pointer; }
 /* Pendientes (Marianela) = TARJETAS verticales (sin scroll horizontal): tilde + No
@@ -374,17 +372,6 @@ const RCP_HTML = `
     </div>
   </div>
 </div>
-<div id="opExcesoModal" class="modal" role="dialog" aria-modal="true">
-  <div class="modalCard">
-    <div class="modalHeader">
-      <div class="modalTitle">Entró de más</div>
-    </div>
-    <div class="excIntro">Estos artículos superan lo que pide la OC. Avisale a Thomas antes de terminar:</div>
-    <div id="opExcesoList" class="excList"></div>
-    <button id="opExcesoWa" type="button" class="excWaBtn">📲 Escribirle a Thomas</button>
-    <button id="opExcesoOk" type="button" class="btnSend btnBig excOkBtn">✓ Ya le escribí</button>
-  </div>
-</div>
 `;
 
 const rcpRoot = document.createElement("div");
@@ -415,10 +402,6 @@ const arBusModal = document.getElementById("arBusModal");
 const arBusInput = document.getElementById("arBusInput");
 const arBusList = document.getElementById("arBusList");
 const arBusClose = document.getElementById("arBusClose");
-const opExcesoModal = document.getElementById("opExcesoModal");
-const opExcesoList = document.getElementById("opExcesoList");
-const opExcesoWa = document.getElementById("opExcesoWa");
-const opExcesoOk = document.getElementById("opExcesoOk");
 
 const opState = {
   step: null,
@@ -432,8 +415,8 @@ const opState = {
   articulos: null,   // [{Cod_Art, Desc}]
   cargas: {},        // { Cod_Art: cajas }
   cajasCod: null,    // codigo abierto en el popup
-  excesoVisto: null, // v17.17: firma del exceso ya avisado a Thomas en la pre-aceptación
-  excesoGond: null,  // v17.17: { codNorm: {cap,gond} } para el mensaje de WhatsApp
+  excesoAvisado: null, // v17.27: firma cod:cajas del exceso ya avisado a Thomas por WhatsApp
+  excesoGond: null,    // v17.27: { codNorm: {cap,gond} } para el mensaje de WhatsApp
   listaTipo: null,
   ocPorCod: null     // v7.07: OCs vigentes del proveedor { codNorm: {ped,rec,pend,fecha} } (null = sin cargar)
 };
@@ -501,7 +484,7 @@ function opResetState() {
   opState.remito = ""; opState.articulos = null; opState.cargas = {};
   opState.altaNuevos = {};      // v15.36: altas del "+" esperando el OK de Thomas
   opState.ocPorCod = null;
-  opState.excesoVisto = null; opState.excesoGond = null;   // v17.17
+  opState.excesoAvisado = null; opState.excesoGond = null;   // v17.27
   opState.fotoFile = null;
   if (opState.fotoPreviewUrl) { try { URL.revokeObjectURL(opState.fotoPreviewUrl); } catch(_e){} }
   opState.fotoPreviewUrl = null;
@@ -552,7 +535,6 @@ function closeOp() {
   rcpDraftSave();   // v7.12: salir NO pierde la recepción a medio cargar
   opAnularBarRender(false);
   opPage.classList.remove("open");
-  try { opExcesoModal.classList.remove("open"); } catch (_e) {}   // v17.17
   if (_pendTimer) { clearInterval(_pendTimer); _pendTimer = null; }
 }
 opClose.onclick = closeOp;
@@ -1677,12 +1659,16 @@ function renderResumen() {
         fotoPreview.innerHTML = "";
         const pi = document.createElement("img"); pi.src = opState.fotoPreviewUrl; fotoPreview.appendChild(pi);
       } catch(_e){}
-      const cb = document.getElementById("opConfirmar");
-      if (cb) cb.disabled = false;
+      _opConfActualizar();
     }
   };
   fotoSec.appendChild(fotoInput); fotoSec.appendChild(fotoBtn); fotoSec.appendChild(fotoPreview); fotoSec.appendChild(fotoHint);
   opBody.appendChild(fotoSec);
+
+  // v17.27 — igual que la foto, si entró MÁS mercadería que la habilitada por OC hay que
+  // avisarle a Thomas por WhatsApp ANTES de enviar. El botón aparece sólo en ese caso y
+  // "Confirmar y enviar" queda bloqueado hasta que se toque.
+  opBody.appendChild(_opExcesoSeccion());
 
   opActions.innerHTML = "";
   const volver = document.createElement("button");
@@ -1694,14 +1680,10 @@ function renderResumen() {
   conf.id = "opConfirmar";
   conf.textContent = "✓ Confirmar y enviar";
   conf.onclick = opEnviar;
-  conf.disabled = !opState.fotoFile;
   opActions.appendChild(volver);
   opActions.appendChild(conf);
+  _opConfActualizar();
   rcpDraftSave();
-
-  // v17.17 — pre-aceptación: si algún código entró por encima de la OC, pop-up con el
-  // resumen de TODOS y el botón para avisarle a Thomas. Sale sólo con "Ya le escribí".
-  try { opExcesoGate(function () {}); } catch (_e) { /* nunca traba el envío */ }
 }
 
 /* ============== Popup de cajas ============== */
@@ -1743,10 +1725,10 @@ function _opCajasExceso() {
   const n = _esCodDecimal(opState.cajasCod) ? (parseFloat(opCajasInput.value) || 0) : (parseInt(opCajasInput.value, 10) || 0);
   if (n > oc.pend) {
     opCajasOc.style.background = "#fef2f2"; opCajasOc.style.borderColor = "#fca5a5";
-    // v17.17 — el aviso queda, pero SIN botón: el operario carga todo de corrido y el
-    // pedido de aviso a Thomas se juntó en UN pop-up en la pre-aceptación (opExcesoGate),
-    // con todos los códigos que entraron de más. Antes (v14.61) el botón de WhatsApp
-    // estaba acá y lo interrumpía código por código.
+    // v17.17 / v17.27 — el aviso queda, pero SIN botón: el operario carga todo de corrido
+    // y el aviso a Thomas se pide UNA vez en la pantalla de resumen, con el botón
+    // "📲 Enviar WhatsApp a Thomas" (_opExcesoSeccion), que además traba el envío hasta
+    // que se toque. Antes (v14.61) el botón estaba acá y lo interrumpía código por código.
     opCajasOc.innerHTML = _opCajasOcBase(oc) +
       '<br><b style="color:#b91c1c;">⚠ Estás recibiendo más mercadería que la que tenés habilitada: cargás ' + n +
       ' y por OC faltan ' + oc.pend + '.</b>';
@@ -1756,20 +1738,19 @@ function _opCajasExceso() {
   }
 }
 
-/* ============== v17.17 — pre-aceptación: lo que entró de MÁS que la OC =================
-   Pedido de Luis (2026-09-14): *"dejar que carguen todo normal y que, al final haya una
-   pre-aceptación (cuando aprietan enviar), si cargaron un remito que tenía una cantidad de
-   cajas MAYOR a lo que hay en OC, les salga un pop-up en esa pantalla con un botón
-   'Escribirle a Thomas' … y otro botón 'Ya le escribí' que permita terminar con el
-   registro"*.
+/* ============== v17.27 — lo que entró de MÁS que la OC: WhatsApp obligatorio ============
+   Pedido de Luis (2026-09-14): *"tal y como es obligatorio sacar una foto de la mercadería,
+   pone un botón abajo de eso que sea 'Enviar WhatsApp a Thomas' que aparezca cuando se
+   selecciona una cantidad de cajas superior a lo que hay en OCs. Que el botón enviar no se
+   pueda apretar hasta que no se carga la imagen y hasta que no se aprieta el botón de
+   enviar mensaje a Thomas"*. Reemplaza al pop-up de la v17.17, que se sacó.
 
    Criterio de exceso: MAYOR a lo que falta recibir por OC (`ocRef`), el mismo que el aviso
    en vivo del pop-up de cajas — NO el +20% de `ocExcede`, que es el umbral del aviso por
    Telegram (evento ROC) y sigue como estaba.
 
-   No traba la recepción más allá del pop-up: la única salida es "Ya le escribí", y ahí el
-   operario sigue con la foto y el envío. Si vuelve atrás y cambia las cantidades, el
-   pop-up vuelve a salir sólo si el exceso cambió (`opState.excesoVisto` guarda la firma). */
+   `opState.excesoAvisado` guarda la firma `cod:cajas` de lo que se avisó: si el operario
+   vuelve atrás y cambia cantidades, el botón se vuelve a exigir. */
 const WA_THOMAS = "5491162521635";
 /* Artículos cargados que superan lo que falta recibir por OC. */
 function opExcesoItems() {
@@ -1781,32 +1762,73 @@ function opExcesoItems() {
     })
     .filter(function (i) { return i.ref > 0 && i.cajas > i.ref; });
 }
-/* Pop-up de pre-aceptación. `next` corre cuando el operario toca "Ya le escribí" (o si no
-   hay nada que avisar). */
-function opExcesoGate(next) {
+/* Firma de lo que hay que avisar. "" = no hay exceso, no hay nada que avisar. */
+function opExcesoFirma() {
+  return opExcesoItems().map(function (i) { return i.cod + ":" + i.cajas; }).join("|");
+}
+/* ¿Falta avisarle a Thomas? (hay exceso y todavía no se tocó el botón para ESTA carga). */
+function opExcesoPendiente() {
+  const f = opExcesoFirma();
+  return !!f && opState.excesoAvisado !== f;
+}
+/* Bloque de la pantalla de resumen: aviso + botón de WhatsApp. Devuelve el nodo siempre
+   (vacío y escondido si no hay exceso), así renderResumen no se ramifica. */
+function _opExcesoSeccion() {
+  const sec = document.createElement("div");
+  sec.className = "opExcSection";
+  sec.id = "opExcSection";
   const exc = opExcesoItems();
-  const firma = exc.map(function (i) { return i.cod + ":" + i.cajas; }).join("|");
-  if (!exc.length || opState.excesoVisto === firma) { next(); return; }
-  opExcesoList.innerHTML = "";
-  exc.forEach(function (i) {
-    const row = document.createElement("div"); row.className = "excRow";
-    const c = document.createElement("div"); c.className = "excRowCod"; c.textContent = i.cod;
-    const d = document.createElement("div"); d.className = "excRowDet";
-    d.textContent = "Recibís " + i.cajas + " · por OC faltan " + i.ref + " → " + i.exced + " de más";
-    row.appendChild(c); row.appendChild(d);
-    opExcesoList.appendChild(row);
-  });
+  if (!exc.length) { sec.style.display = "none"; return sec; }
+
+  const firma = opExcesoFirma();
+  const det = document.createElement("div");
+  det.className = "opExcDet";
+  det.innerHTML = "⚠ <b>Entró más mercadería que la habilitada por OC:</b><br>" +
+    exc.map(function (i) {
+      return escapeHtmlRcp(i.cod) + ": recibís <b>" + i.cajas + "</b>, por OC faltan " +
+        i.ref + " → <b>" + i.exced + " de más</b>";
+    }).join("<br>");
+  sec.appendChild(det);
+
+  const btn = document.createElement("button");
+  btn.type = "button";
+  btn.className = "opExcWaBtn" + (opState.excesoAvisado === firma ? " has" : "");
+  btn.id = "opExcWa";
+  btn.textContent = opState.excesoAvisado === firma
+    ? "📲 ✓ Mensaje enviado a Thomas — tocá para reenviar"
+    : "📲 Enviar WhatsApp a Thomas";
+  btn.onclick = function () {
+    opWhatsExceso(exc);
+    opState.excesoAvisado = firma;
+    btn.classList.add("has");
+    btn.textContent = "📲 ✓ Mensaje enviado a Thomas — tocá para reenviar";
+    const h = document.getElementById("opExcHint");
+    if (h) h.style.display = "none";
+    _opConfActualizar();
+    rcpDraftSave();
+  };
+  sec.appendChild(btn);
+
+  const hint = document.createElement("div");
+  hint.className = "opExcHint";
+  hint.id = "opExcHint";
+  hint.textContent = "Obligatorio: avisale a Thomas antes de enviar";
+  hint.style.display = opState.excesoAvisado === firma ? "none" : "";
+  sec.appendChild(hint);
+
   // Góndola de los códigos en exceso, para el mensaje (best-effort, en paralelo: si todavía
   // no llegó cuando tocan el botón, el mensaje dice "s/dato").
   opState.excesoGond = {};
   try { _opPrefetchGond(exc.map(function (i) { return i.cod; })); } catch (_e) {}
-  opExcesoWa.onclick = function () { opWhatsExceso(exc); };
-  opExcesoOk.onclick = function () {
-    opState.excesoVisto = firma;
-    opExcesoModal.classList.remove("open");
-    next();
-  };
-  opExcesoModal.classList.add("open");
+  return sec;
+}
+/* "Confirmar y enviar" se habilita sólo con la foto sacada Y, si hubo exceso, el WhatsApp
+   a Thomas ya mandado. Un solo lugar decide, así no se desincroniza con el onchange de la
+   foto ni con el botón de WhatsApp. */
+function _opConfActualizar() {
+  const cb = document.getElementById("opConfirmar");
+  if (!cb) return;
+  cb.disabled = !opState.fotoFile || opExcesoPendiente();
 }
 /* v14.61 — precarga stock de góndola (vista_saldos_stock.terminado) y capacidad
    (Capacidad_Sector.cajas_max) de los códigos en exceso, para el mensaje a Thomas.

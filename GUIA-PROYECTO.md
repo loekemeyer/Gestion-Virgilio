@@ -12,7 +12,7 @@
 > única**; no se replica. Ante la duda entre parche rápido y fix de raíz → **fix
 > de raíz**.
 >
-> Última actualización: 2026-09-14 (domingo) · Versión app al documentar: **v17.26**
+> Última actualización: 2026-09-14 (domingo) · Versión app al documentar: **v17.27**
 >
 > Nota **v17.20/v17.22 (2026-09-14, Luis) — CUARENTENA: columna "Enviar a" en la tabla de ya
 > programados** (se llamó "Marcar" hasta que Luis la renombró, mismo día).
@@ -2899,23 +2899,27 @@
 > (WhatsApp `wa.me/5491162521635`) con mensaje prearmado: proveedor, OC pide, por recibir, pendiente, excedente,
 > stock de góndola y si el excedente entra en góndola (`Capacidad_Sector` − `vista_saldos_stock.terminado`).
 > Detalle backend: `docs/SUPABASE-GESTION-VIRGILIO.md` §3.bn/§3.bo.
-> **⚠ (v17.17) ese botón ya NO está en el popup de cajas** — ver la nota de abajo.
+> **⚠ (v17.17 / v17.27) ese botón ya NO está en el popup de cajas** — ver la nota de abajo.
 >
-> Nota **v17.17 (2026-09-14) — el aviso de exceso de OC se pide UNA vez, en la pre-aceptación.**
-> Pedido de Luis: *"dejar que carguen todo normal y que, al final haya una pre-aceptación (cuando aprietan
-> enviar), si cargaron un remito que tenía una cantidad de cajas MAYOR a lo que hay en OC, les salga un
-> pop-up en esa pantalla con un botón 'Escribirle a Thomas' … y otro botón 'Ya le escribí' que permita
-> terminar con el registro"*. En el popup de cajas **queda el aviso rojo en vivo** (caza el typo 500 vs 50)
-> pero **sin botón**: el operario carga todo de corrido. Al tocar **Enviar**, sobre la pantalla
-> "Confirmá el envío" sale **`#opExcesoModal`** con **una fila por código** que supera lo que falta recibir
-> por OC (recibidas · faltantes · excedente) y dos botones: **📲 Escribirle a Thomas** (un solo WhatsApp con
-> proveedor, RTO/FC y TODOS los códigos, con góndola/capacidad de cada uno) y **✓ Ya le escribí**, que es la
-> única salida y devuelve al flujo normal (foto → Confirmar y enviar). El criterio del pop-up es
-> **`cajas > ocRef(oc)`** (lo que falta recibir), no el **+20%** de `ocExcede` — ése sigue siendo sólo el
-> umbral del evento **ROC** que dispara el Telegram, sin cambios. `opState.excesoVisto` guarda la firma
-> `cod:cajas` avisada: si el operario vuelve atrás y cambia cantidades, el pop-up vuelve a salir.
-> Código: `recepcion.js` (`opExcesoGate`, `opExcesoItems`, `opWhatsExceso`, `_opPrefetchGond`).
-> Test: `tests/rcp-exceso-gate.cjs`.
+> Nota **v17.17 → v17.27 (2026-09-14) — recibir de MÁS que la OC: el WhatsApp a Thomas es obligatorio,
+> igual que la foto.** En el popup de cajas **queda el aviso rojo en vivo** (caza el typo 500 vs 50) pero
+> **sin botón**: el operario carga todo de corrido. El aviso se pide **una sola vez, en la pantalla
+> "Confirmá el envío"**. La v17.17 lo hizo con un pop-up ("Escribirle a Thomas" + "Ya le escribí"); **la
+> v17.27 lo sacó** y lo puso como pedía Luis: *"tal y como es obligatorio sacar una foto … un botón abajo
+> de eso que sea 'Enviar WhatsApp a Thomas' … que el botón enviar no se pueda apretar hasta que no se carga
+> la imagen y hasta que no se aprieta el botón de enviar mensaje a Thomas"*.
+> **Cómo queda (v17.27):** debajo de la sección de la foto, `_opExcesoSeccion()` agrega —**sólo si algún
+> código supera lo que falta recibir por OC**— el detalle de todos los que se pasaron (recibidas ·
+> faltantes · excedente) y el botón **📲 Enviar WhatsApp a Thomas** (`#opExcWa`), con el hint rojo
+> "Obligatorio: avisale a Thomas antes de enviar". El WhatsApp es **uno solo** con proveedor, RTO/FC y
+> TODOS los códigos, cada uno con góndola/capacidad (`opWhatsExceso`, `_opPrefetchGond`).
+> **`✓ Confirmar y enviar` lo habilita `_opConfActualizar()`, único lugar que decide: `!fotoFile ||
+> opExcesoPendiente()`.** `opState.excesoAvisado` guarda la firma `cod:cajas` avisada, así que si el
+> operario vuelve atrás y cambia cantidades el WhatsApp se vuelve a exigir.
+> Criterio de exceso: **`cajas > ocRef(oc)`** (lo que falta recibir), NO el **+20%** de `ocExcede` — ése
+> sigue siendo sólo el umbral del evento **ROC** que dispara el Telegram, sin cambios.
+> Código: `recepcion.js` (`_opExcesoSeccion`, `_opConfActualizar`, `opExcesoItems`, `opExcesoPendiente`,
+> `opWhatsExceso`). Test: `tests/rcp-exceso-gate.cjs`.
 >
 > Nota **2026-08-27 — Facturación neto/faltantes: cálculo centralizado en vistas (`sql/facturacion_neto.sql`).**
 > El neto y los faltantes dejan de vivir sólo en el front: el cálculo está en **vistas en vivo**
