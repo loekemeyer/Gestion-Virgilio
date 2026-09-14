@@ -12327,3 +12327,36 @@ que ya está cargado y no se toca. Es exactamente el `sales_lines_auto_corte` qu
 
 **Sirve.** Con una condición: **el corte arranca en 2026-02**, no antes. Y hay un premio no buscado —
 rehacer julio y agosto desde ISIS **reemplaza el parche** de `GV_Ventas_Correccion`, que se borra.
+
+### §3.eo — v17.19: el checklist de NC a Loeke pedía 34 notas de crédito que no correspondían (problema 152) — 2026-09-14
+
+Marianela: *"el art 809E CORTA QUESO es un art de Chef que vende Chef"* … *"no corresponde hacer NC
+de Loekemeyer a Chef"*. El checklist **"NC a Loeke + stock a Chef"** de Facturación mostraba **36
+pendientes y 34 eran del 809E** (Corta queso x12, 203 cajas). Ninguna correspondía.
+
+**Por qué lo marcaba.** `vista_nc_loeke_chef` cruza `Importados` (proveedor Ownland/Kangli/Fujian/
+Frontier) con `Planimetria` cargada en las dos góndolas. El 809E cumple las dos: está comprado a
+Ownland y `Planimetria` tiene **tres** filas — `809E` (M13), `809E CH` (M13) y `809E LK` (J13). O sea
+que físicamente sí está en las dos góndolas; lo que no corresponde es la nota de crédito.
+
+⚠ **Y la válvula de escape que la vista ya traía nunca funcionó.** El CTE `home_chef` excluye lo que
+`Equivalencias_Codigos` tenga con `cod_real` terminado en `' CH'`, pero esa tabla tiene **4 filas y
+ninguna termina en `' CH'` ni en `' LK'`** (438EL→438E, 439EL→439E, 727→727E, 727EN→727E). No
+matcheaba nada: no excluía a nadie, desde siempre.
+
+**Qué se hizo** (`sql/gv_nc_loeke_chef_excluidos_v1719.sql`): tabla propia
+`GV_NC_Loeke_Chef_Excluidos` (RLS on, `select` para anon) con el 809E, y `home_chef` pasa a ser la
+unión de lo de antes más esa tabla. **No** se tocó `Equivalencias_Codigos` —traduce códigos en el
+picking, meterle una fila para apagar un cartel de Facturación cambiaría cómo se pickea— ni se borró
+el `809E LK` de `Planimetria`, que es la góndola real.
+
+**Y la Razón Social, que salía vacía.** No era un dato faltante: el front la buscaba en
+`_facLastTandas`, o sea **sólo entre las tandas que estaban en pantalla ese día**, y el checklist
+lista NP históricas (44506, 44508, …), así que devolvía `""` siempre. Ahora la resuelve el backend —
+`gv_ppp_prog_rs` → `Facturacion_NP` → el cliente de la base del pedido — y el front la usa con el
+mapa de pantalla sólo como respaldo.
+
+**Medición:** de **36 filas a 2** — 44600 (439E, 16 cajas) y 44601 (438E, 16 cajas), las dos con
+razón social "Dorinka S.R.L". Son las legítimas: la regla de los coladores 437E/438E/439E (sólo
+cuando el artículo viene con L) ya estaba y no se tocó. `NC_Loeke_Chef_Hechas` tenía **0 filas del
+809E**, así que nadie llegó a tildar ninguna de las 34 y no hay NC mal emitida que deshacer.
