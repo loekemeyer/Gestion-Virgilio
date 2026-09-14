@@ -13202,3 +13202,107 @@ SQL y rollback: `sql/gv_cuarentena_identidad_v1739.sql` — reemplaza `gv_cuaren
 de `sql/gv_cuarentena_log_v1723.sql`. Verificado contra la base: md5 del cuerpo normalizado de las
 tres, idéntico. Tests en `tests/apr-cuarentena.cjs` (los tres modos piden identidad y sin ella no
 llaman a la RPC).
+
+## §3.do — v17.40: la página LK dejó de escribir `sheets_payload` y Gestión no vio 6 pedidos — 2026-09-14
+
+**Lo detectó un cruce pedido por Tomás González:** pedidos de la PPP contra pedidos recibidos en la
+página LK, del lunes 07/09 a hoy.
+
+### El síntoma
+
+`orders.sheets_payload` viene en **NULL** desde el **2026-09-11 11:11 ART**. La vista
+`v_pedidos_web` de LK filtra por `sheets_payload is not null and jsonb_typeof(…->'items')='array'`,
+así que esos pedidos **no salen por `gv_pedidos_web_np_lk`** y Gestión no los ve: ni NP, ni tanda,
+ni A Programar (la solapa lee `v_pedidos_web_np`, la misma vista).
+
+| Día | Pedidos LK | Sin payload |
+|---|---:|---:|
+| 10/09 | 8 | 0 |
+| 11/09 | 9 | 6 |
+| 12/09 | 7 | 7 |
+| 14/09 | 19 | 19 |
+
+**32 filas de `orders` = 6 pedidos reales** (el resto son reintentos), 4,30 M$ y 166 cajas. El feed
+`gv_pedidos_web_np_lk('2026-09-01')` cortaba en el `order_id` **1395**. Chef **no** está afectado
+(su última NP web es del 14/09 11:00), o sea que el pipeline de Gestión funciona.
+
+### La causa
+
+El checkout crea el pedido con la RPC `submit_order_fast` y **después**, en un `update` aparte
+**sin `catch`** (`script.js` ~8750, repo `pagina-lk-copia`), guarda `sheets_payload`,
+`is_promo`, `extra_discount` y `placed_by_auth_user_id`. Ese update no se ejecuta y **nadie se
+entera**: el pedido queda guardado, el cliente ve todo normal, y `sheets_sent` queda en `false`.
+
+Descartado que sea la RLS: probado el `UPDATE` con la identidad del cliente de Spahn
+(`set role authenticated` + `request.jwt.claims` con su `sub`) → **afectó 1 fila**, con rollback.
+El patrón real es otro: **falla con sesión de CLIENTE (`<cuit>@cuit.loekemeyer`) y anda con la del
+admin** — los tres que se salvaron el 11/09 (1388, 1394, 1395) son de `loekemeyer.n8n@gmail.com`.
+[Adivinando] Sospechoso: el commit `5959bd5` del 11/09 ("anon key legacy → sb_publishable en los
+archivos con cliente"); no se puede confirmar sin abrir la consola del navegador con una sesión de
+cliente en producción. **La causa del front sigue abierta.**
+
+### La red que se puso (no es el arreglo)
+
+`public.gv_lk_rellenar_sheets_payload(...)` **en el proyecto LK** + cron `gv-lk-rellenar-payload`
+(jobid 46 de LK, `*/10 * * * *`). Arma el payload desde `order_items` + `customers` +
+`customer_delivery_addresses`. **Nada de triggers sobre `orders`**: no toca el camino crítico del
+checkout, así que no puede romper el alta de un pedido. Todo lo que hace queda en
+`public.gv_lk_payload_recuperado` (RLS prendida, sin grants a `anon`/`authenticated`).
+
+No recupera lo que sólo vivía en el payload: **número de OC** y **observaciones del cliente**. La
+sucursal se autocompleta con la dirección del cliente (mismo orden que usa `v_pedidos_web`) y se
+marca `sucursal_autocompletada` / `sucursal_ambigua`.
+
+⚠ **Los tres guardas, y por qué están** — los dos primeros los encontró el dry-run:
+
+1. **`p_desde` = 2026-09-11.** Sin ese piso el barrido agarra **~60 pedidos de MARZO** que también
+   tienen el payload en NULL y los mete en la PPP de esta semana. **No bajarlo.**
+2. **Ráfaga (30 min).** Al fallar, el cliente vuelve a confirmar y cada intento crea una fila nueva
+   de `orders` — Rodríguez (3969) lo intentó **9 veces**. Sólo se rellena el último de la ráfaga.
+3. **Ya cubierto (6 h).** Si el cliente recargó y ESE pedido sí tiene payload, el anterior no se
+   rellena. Caso testigo: Schell (3790), 1391/1392/1393 rotos y **1394 bueno** (mismos 6 artículos,
+   sólo cambió el 505 de 12 a 15 cajas), ya programado en la tanda E01H. Sin este guarda se
+   duplicaba.
+
+Los descartados **quedan con el payload en NULL** — invisibles, pero no borrados.
+
+### Medido (2026-09-14)
+
+Corrida real: **6 rellenos** (1398, 1407, 1416, 1423, 1425, 1426), 23 descartes por ráfaga y 3 por
+"ya cubierto". Después de disparar la Edge Function `gv-ppp-web-tandas-diarias` con
+`{"intradia": true}` (`ok:true, encolada:true`):
+
+| order_id | Cliente | NP | Tanda | Entrega |
+|---:|---|---|---|---|
+| 1398 | Sucesión De García (2398) | 73 + 74 | E12O | 21/09 |
+| 1407 | Fernández Diego (3994) | 75 | D71F | 16/09 |
+| 1423 | Sergio Salamone (4078) | 77 | E12O | 21/09 |
+| 1425 | Celestino Spahn (1725) | 78 | E12O | 21/09 |
+| 1416 | Rodríguez Jonatán (3969) | 76 | — | Retira → A Programar |
+| 1426 | Garbarino Franco (4210) | — | — | Retira → A Programar |
+
+El 1398 se partió en dos bloques (22 líneas > 18), como corresponde.
+
+### Rollback
+
+```sql
+-- en LK (kwkclwhmoygunqmlegrg)
+select cron.unschedule('gv-lk-rellenar-payload');
+update public.orders set sheets_payload = null
+ where id in (select order_id from public.gv_lk_payload_recuperado where accion = 'relleno');
+drop function public.gv_lk_rellenar_sheets_payload(bigint[], boolean, timestamptz, integer, integer, integer);
+drop table public.gv_lk_payload_recuperado;
+```
+
+SQL completo: `sql/gv_lk_rellenar_sheets_payload_v1740.sql`.
+
+### Lo que queda abierto
+
+1. **La causa en el front**: mientras no se arregle, todo pedido de cliente entra por la red, sin
+   OC ni observaciones. Se confirma abriendo la consola del navegador con una sesión de cliente.
+2. **Confirmar la sucursal de Spahn (1725)**: tiene **10** sucursales cargadas y se tomó la del
+   slot 1 (Tucumán 117, Sgo del Estero). Las 10 van por expreso Soldati, así que la tanda y el
+   picking no cambian — sólo el remito. Los otros 5 clientes tienen una sola dirección.
+3. **NP asignada sin programación en los "Retira"** (1395 Ricci desde el 11/09, ahora 1416):
+   quedan en A Programar esperando que alguien les ponga fecha. Es el comportamiento esperado de
+   Retira, pero conviene mirar que no se acumulen.
