@@ -11139,3 +11139,101 @@ Los crons 68 y 74 se pausaron durante el cambio y quedaron **activos** de nuevo.
 **Queda abierto, NO se tocó:** `66 / terminado = −28` y `H201PART / insumos = −2000` son negativos
 **preexistentes**, ajenos a esta corrección y sin diagnóstico todavía. `66` no salía en el badge
 porque no está en `stocks_carga_rapida`; `insumos` se chequea en su propia sección.
+### §3.ec — v16.93: un cliente = un CUIT. Se termina el cruce LK/Chef por cod_cliente — 2026-09-14
+
+**Pedido de Thomas (14/09), sobre el informe "Clientes en riesgo":** *"Relca esta mal. Es cencosud, no relca.
+Tenés un bardo con los cod de clientes que no quiero ver más."*
+
+Tenía razón, y arriba del mismo código había **dos** errores distintos.
+
+**(1) El nombre se resolvía por `customer_code` solo.** `sales_lines` (proyecto LK) guarda las facturas de LK
+y de Chef en la misma tabla, separadas nada más que por la columna `empresa`. El informe pegaba el nombre
+contra `public.customers` (padrón de LK) mirando únicamente el código. **El cod 2444 es Relca en LK y
+Cencosud en Chef.** Medido el 14/09 sobre 24 meses: **62 códigos usados por las dos empresas, 27 son
+clientes distintos (CUIT distinto), 59.680 cajas mal atribuidas.** Los más pesados: 2444 Relca/Cencosud,
+2447 Bazar Mandarin/Clapera, 2128 Bio Lim/Renatek, 1903 Mundo Bazar/Feser, 794 Indianapolis/Bastos.
+
+**(2) Las filas "de Relca" no son de Relca.** En LK el cod 2444 **no tiene una sola venta propia**. Sus 979
+filas salen de dos lados: el batch **`jumbo_2026_02_20`** (Jumbo = Cencosud, subido el 20/02/2026: 552 filas,
+22.721 cajas, 2024-03 a 2026-02) que **duplica** lo que ya estaba bajo `empresa='chef'` —los totales
+mensuales coinciden uno a uno en los 24 meses—, y julio/agosto 2026 de los batches `julio_26` y `ago-26`.
+O sea: **todo el cod 2444 de sales_lines es Cencosud**, y el nombre "Relca" venía del padrón de LK.
+
+Regla del dueño que ya estaba escrita y que esto hace cumplir (v13.76): *"el cod cliente no significa nada,
+sólo el CUIT vale"*.
+
+**Objetos nuevos** (`sql/gv_cliente_canon_v1693.sql`, todos en el proyecto **LK**, `security_invoker = true`;
+**no se tocó un solo dato** de `sales_lines` ni de `customers`):
+
+| Objeto | Qué hace |
+|---|---|
+| `GV_Ventas_Correccion` | tabla: qué batch entró con la empresa equivocada y cuál es duplicado. RLS ON, sin escritura para `anon`. |
+| `gv_cliente_padron` | `(empresa, cod)` → CUIT + razón social cruda de los dos padrones |
+| `gv_cliente_canon` | `(empresa, cod)` → **`cliente_id`** (el CUIT) + una sola razón social |
+| `gv_ventas_cliente_raw` | `sales_lines` + corrección + cliente, con `duplicado` y `correccion` a la vista |
+| `gv_ventas_cliente` | idem sin los duplicados — **ésta es la que usan los reportes** |
+| `gv_ventas_corte_empresa` | hasta qué mes llegó el feed de cada empresa (LK 2026-08, Chef 2026-06) |
+| `gv_clientes_riesgo` | el informe de caídas, ya por CUIT |
+
+`cliente_id` = CUIT normalizado a 11 dígitos; si el código no tiene CUIT en ningún padrón cae a `empresa:cod`,
+así nunca se juntan dos desconocidos distintos por compartir el número. Para los códigos que no están en su
+propio padrón pero sí en el de la otra empresa (39 casos, entre ellos **Dorinka 2686** y **Loekemeyer 1434**,
+los dos ya anotados en §3.bm.23) se toma la identidad de la otra y queda marcado en `cruzado_otra_empresa`.
+
+**El corte por empresa importa:** el feed de Chef llega al **30/06** y el de LK al **31/08**. Sin eso, todo
+cliente de Chef aparece cayendo porque le faltan julio y agosto. Y el "pico" ahora se busca en ventanas que
+**no solapan** con el trimestre actual (terminan 3 meses o más atrás): si no, un cliente que compra a saltos
+"cae" siempre.
+
+**Medido:**
+
+- `select count(*) from gv_ventas_cliente where cliente is null` → **0** (antes 9.219 filas sin resolver).
+- `gv_cliente_canon` cod 2444 → `chef` Cencosud S.A. (CUIT 30590360763) y `lk` Relca S.R.L (30715858130),
+  cada uno con el suyo.
+- **Cencosud queda con una serie sola y continua** (abr 1685 · may 1917 · jun 1470 · jul 1092 · ago 1403) y
+  **no está cayendo: 3.965 cj/trim vs 4.664 de pico = −15 %**. Relca desaparece del informe porque no vende
+  nada por LK.
+- El resto del informe da igual que antes, cliente por cliente (Coto 2115 vs 9516 −78 %, Osa 372 vs 4657
+  −92 %, Extralimp 536 vs 2186 −75 %, Inc 1370 vs 2994 −54 %, Torres y Liva 2112 vs 3391 −38 %…), salvo
+  **Totalmix**, que sale de la lista: su "pico" de 1.324 era una ventana que se solapaba con el trimestre
+  actual; sin solape queda **+7 %**.
+- Los bloques "se les factura menos de lo que piden" y "pedidos que nunca se facturaron" **no estaban
+  afectados**: ninguno de sus clientes (Sauer 2305, Osa 2533, Coto 801, Cuyana 45, Dia 3947) tiene el código
+  cruzado, y Alberdi (2320, que sí está cruzado con Distribuidora Veneto en Chef) tiene su última factura
+  bien: el 2320 de Chef no factura desde 2023.
+
+**Lo que queda abierto** (no se tocó, hace falta que lo mire Thomas):
+
+- El padrón web de LK tiene **Relca S.R.L en el cod 2444** y no tiene ninguna fila de Cencosud. Mientras eso
+  siga así, cualquier pantalla que lea `customers` directo va a decir Relca.
+- **Sauer está dos veces** en `customers` con dos códigos y dos CUIT (1949 `Sauer I.J.Sauerd.S.S.H`
+  33709034729 y 2305 `Sauer Ignacio Jose` 20119169306): su historia queda partida en dos clientes.
+- Los batches **`julio_26` y `ago-26`** traen además **19 y 21 códigos** que sólo existen en el padrón de
+  Chef (Dorinka, Rayabo, Ierakuin, Mundo Bazar…, 1.635 + 1.520 cajas). Se dejaron como están: puede ser que
+  sean clientes de LK que no figuran en el padrón web, y retaguearlos sin confirmarlo sería peor.
+
+**Rollback:** los `drop` están en la cabecera del `.sql`. Son objetos nuevos: borrarlos deja todo como estaba.
+
+### §3.ed — v16.93: el espejo PPP de LK estaba congelado desde el rename a `GV_` — 2026-09-14
+
+Salió a la luz buscando de dónde sacar la razón social de los códigos que facturan y no están en el padrón.
+
+La v16.x renombró en Virgilio `PPP_Programacion_Diaria` → `GV_PPP_Programacion_Diaria`, `PPP_Base_Pedidos` →
+`GV_PPP_Base_Pedidos` y `PPP_Entregados_Meta` → `GV_PPP_Entregados_Historico`. Las **foreign tables** del
+proyecto LK (schema `virgilio`, server `virgilio_db`) siguieron apuntando al nombre viejo.
+
+**Y nadie se enteró** porque el cron 19 de LK (`sincronizar-ppp-diario`, 10:00 UTC) figuraba `succeeded`
+todos los días: cada bloque de `public.sincronizar_ppp()` tiene su propio `EXCEPTION WHEN OTHERS`, se traga
+el error y deja la tabla espejo con los datos viejos. Es el mismo pozo que avisa el comentario de la propia
+función (*"la caída de PPP_Pedidos_Entregados congeló TODAS las tablas ppp_* durante 22 días, en silencio"*).
+`ppp_programacion` (133 filas) y `ppp_base_pedidos` (9.786) estaban clavadas desde el rename; además había
+tres bloques más caídos por permisos del rol `lk_ppp_reader`.
+
+**Arreglado** (`sql/gv_fix_fdw_espejo_ppp_lk_v1693.sql`): repunte de las 3 foreign tables + los `grant select`
+que faltaban. `select public.sincronizar_ppp();` ahora devuelve **`"ok": true`** con los seis bloques verdes
+(programacion 133 · base 9.781 · entregados 2.783 · facturacion 1.237 · entregas_np 1.229 · np_feed 1.372 ·
+telefonos 942).
+
+⚠ **Lo que sigue abierto:** mientras la función se trague los errores y el cron diga `succeeded`, el próximo
+rename vuelve a congelar el espejo en silencio. Habría que hacer que el cron falle (o avise) cuando `ok`
+viene en `false`.
