@@ -11654,3 +11654,43 @@ de encontrar la lista.
 `public.gv_codigos_multigrafia` — vacío = todo bien. Devuelve tabla, columna, código normalizado,
 las grafías con su conteo, y **si esa tabla tiene trigger de canonización** (que es lo que dice si
 el problema se va a repetir solo). Problema **134**. `sql/gv_codigos_multigrafia.sql`.
+
+### §3.ei — v17.05: siete NP de Pettish estaban con el cod de Dapelo, y la vista pisaba la razón social buena (problemas 132 y 133) — 2026-09-14
+
+Marianela: *"los pedidos 98669 98670 98671 pertenecen al cliente de Loeke 2145 Pettish Lacroze 2481;
+los 98672 98673 98674 98675 al 2384 Pettish Villa Crespo"*. Las siete estaban con **cod 1792, Dapelo
+Claudio Marcelo**.
+
+**Son tres CUIT distintos** — 1792 → 20202038507, 2145 → 30715210963, 2384 → 30716050935 — o sea que no
+es una sucursal del mismo titular: facturadas así iban al **CUIT equivocado**. No estaban facturadas
+(no figuran en `Facturacion_NP`) y salen el **15/09** en las tandas D67E y D67F.
+
+**De dónde viene:** los pedidos se cargaron en la página LK **desde la cuenta de Dapelo** — orders
+1330/1331/1332 (01/09) y 1337/1338 (02/09), todos `customer_code = 1792`, con la sucursal real sólo en
+`sucursal_entrega`. Pasaron a compras el 02 y 03/09 e ISIS creó las NP bajo 1792. Los códigos 2145 y
+2384 **no tienen ni un pedido web**. ⚠ Mientras la gente de Pettish siga pidiendo desde esa cuenta,
+esto se repite: el arreglo de fondo es en la página, no acá.
+
+**Dos arreglos, en `sql/gv_prog_override_cod_y_rs_v1705.sql`:**
+
+1. **El `cod` ahora se puede pisar por NP** desde `GV_PPP_Prog_Override` (columnas nuevas `cod` y
+   `razon_social`, nullable). Es tabla nuestra: **el espejo de ISIS no se toca**. Las 7 NP quedaron
+   apuntando a 2145 / 2384.
+2. **Las vistas ya no pisan la razón social de la fila.** `gv_ppp_programacion_diaria` y
+   `gv_ppp_prog_rs` resolvían el nombre con `COALESCE(rs.razon_social, p.razon_social)` contra
+   `GV_Cliente_Razon_Social`, indexada sólo por `(cod, empresa)`: con un cod que arrastra varias
+   razones sociales, el nombre del código ganaba y **borraba el que había traído ISIS, que era el
+   correcto**. Ahora, cuando el cod es ambiguo (más de una razón social en el espejo) manda la fila;
+   con cod unívoco sigue mandando la tabla, que es lo que pidió la v16.90. Medido antes del arreglo:
+   **7 NP pisadas**, todas del cod 1792 — el único con más de una razón social (18 NP: 11 Dapelo +
+   7 Pettish).
+
+**Importante, corrige algo que dije en el chat:** para una NP web la factura **no sale de ISIS por su
+cuenta** — el Excel que se carga en ISIS lo arma Gestión (`_facXlsArmar`), y toma `cod` y razón social
+de esta misma vista (`cab[np] = { cod: p.cod, rs: p.razonSocial }`). Así que arreglarlo acá **sí**
+cambia a quién se factura, siempre que el Excel no se haya bajado antes. Estas 7 no se bajaron.
+
+**Medición:** `gv_ppp_programacion_diaria` 123 filas (las mismas), las 7 con cod 2145/2384 y razón
+social Pettish; `gv_ppp_prog_rs` 133 filas, 7 Pettish; `gv_endpoints_rotos` **0** (las dos vistas se
+reemplazaron sin cambiar la lista de columnas, así que los 18 objetos que cuelgan siguen válidos).
+Backup: `zz_backups."GV_Backup_ProgOverride_20260914"` (120 filas).
