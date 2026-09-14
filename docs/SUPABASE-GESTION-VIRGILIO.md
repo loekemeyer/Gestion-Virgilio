@@ -13503,3 +13503,65 @@ compartida con Producción**, así que el cambio está anotado en `docs/ROLLBACK
 **Verificado:** el TAP del 11/09 y las 17 líneas de entregas figuran bajo `E01E`, y no quedó ninguna
 fila con `D67B`. Centinelas después: `gv_ppp_super_mezclado` 0, `gv_endpoints_rotos` 0,
 `gv_np_prog_sin_base` 0. SQL, medición y rollback: `sql/gv_camion1_1509_v1747.sql`.
+
+## §3.dp — v17.43: la causa era `retiroSel`, un ReferenceError de una línea — 2026-09-14
+
+Cierra la §3.do. **No era la clave publishable ni la RLS: era una variable prestada.**
+
+### La causa
+
+`_submitSingleOrder` (repo `pagina-lk-copia`, `script.js`) arma el `sheetsPayload` usando
+**`retiroSel`** (línea 8715). Pero `retiroSel` se declara en **`submitOrder()`, otra función**
+(línea 8867). Son funciones hermanas, no anidadas → `ReferenceError: retiroSel is not defined`,
+**justo después** de que la RPC `submit_order_fast` ya grabó el pedido.
+
+Lo introdujo el commit `896726e` (**2.3.359, 11/09 00:07**). El primer pedido roto es del 11/09
+11:11 — el deploy de esa mañana.
+
+**Y es el MISMO bug que ya habían corregido una vez.** El comentario de la línea 8544 del propio
+`script.js` lo dice textual sobre `observacionesValue`: *"Antes se referenciaba una var declarada
+en submitOrder() → ReferenceError que grababa el pedido pero tumbaba la confirmación"*. Al agregar
+los campos de Retira al payload volvieron a tomar prestada una variable, esta vez `retiroSel`.
+
+**Por qué el admin no se veía afectado:** los pedidos de `loekemeyer.n8n@gmail.com` se cargan
+desde `admin.js` / `carga-pedidos.html`, otro flujo que no pasa por `_submitSingleOrder`. Por eso
+el patrón "falla con sesión de cliente, anda con la de admin" — que hacía sospechar de la clave.
+
+### Lo que se cambió (`pagina-lk-copia`, commit `bcea995`, v2.3.389)
+
+1. **`retiroSel` se lee dentro de `_submitSingleOrder`**, al lado de `observacionesValue`.
+2. **Todo lo posterior a la RPC queda en un `try/catch`.** Son efectos secundarios de un pedido
+   **ya grabado**: ninguno puede volver a tumbar la confirmación. Si algo falla ahí, el cliente ve
+   igual "¡Pedido confirmado!" y el barrido de la §3.do completa el payload.
+3. **`tests/payload-scope.cjs`**: falla si el payload vuelve a tomar una variable prestada de otra
+   función, o si se pierde ese `try/catch`. **Verificado contra el `script.js` que estaba en
+   producción: lo caza** (`FALLA: … retiroSel`) y pasa con el fix.
+
+### Y en la base (LK): guard anti-reintento en `submit_order_fast`
+
+Mismo `customer_id`, mismo `total` y misma cantidad de líneas **dentro de 2 minutos** → devuelve el
+`id` del pedido que ya existe en vez de crear otro. Así, cualquier falla futura posterior a la RPC
+—o un doble toque— ya no duplica el pedido, aunque el front vuelva a romperse por otra causa.
+
+**Probado con rollback**, dos submits idénticos seguidos con la identidad del cliente de Garbarino:
+
+```
+1er submit: 1427 | 2do submit: 1427 | iguales: t | pedidos antes: 24 despues: 25
+```
+
+Un solo pedido nuevo, no dos. Y el `1427` no quedó: el `max(id)` de `orders` sigue en 1426.
+
+### Las 4 fallas, cerradas
+
+| Falla | Qué la cierra |
+|---|---|
+| El front no escribe `sheets_payload` | `retiroSel` declarado (fix 1) |
+| El cliente ve "No se pudo confirmar el pedido" | fix 1, y el `try/catch` (fix 2) por si vuelve a pasar |
+| El cliente reintenta → otra fila de `orders` | fix 1, y el guard de la RPC como red |
+| Se pierden OC y observaciones | fix 1: el payload se escribe entero |
+
+### Rollback
+
+En `pagina-lk-copia`: `git revert bcea995`. En LK, el guard de la RPC se saca borrando el bloque
+`v_dup` de `submit_order_fast` (el resto de la función quedó igual). El barrido de la §3.do es
+independiente y puede quedar: con el front sano no encuentra candidatos.
