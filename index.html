@@ -898,31 +898,70 @@ button {
 .cuar-quien-op.on{ background:#0f766e; border-color:#0f766e; color:#fff; }
 .cuar-quien-otro{ width:100%; margin-top:6px; border:1px solid #cbd5e1; border-radius:8px;
   padding:6px 9px; font-size:13px; font-family:inherit; box-sizing:border-box; }
-/* v17.23 — submódulo LOG de Cuarentena en Config. Cuarentena */
-.cuar-log-cfg{ margin-top:18px; }
-.cuar-log-cfg h3{ margin:0 0 3px; font-size:16px; color:#7c2d12; }
-.cuar-log-cfg p{ margin:0 0 9px; font-size:12.5px; color:#475569; line-height:1.45; }
-.cuar-log-bar{ display:flex; align-items:center; gap:8px; margin-bottom:8px; flex-wrap:wrap; }
-.cuar-log-bar select{ padding:4px 7px; border:1px solid #cbd5e1; border-radius:7px; font-size:12.5px; }
+/* v17.23 — submódulo LOG de Cuarentena en Config. Cuarentena.
+   v17.40 (Luis: *"ajustá la visual para que esté más grande y mejor estructurado el módulo"*):
+   deja de vivir apretado adentro de los 820px de `.cuar-cfg` y pasa a ser una TARJETA propia
+   de 1240px, con encabezado, chips de estado que filtran, y una tabla de 13px con el
+   encabezado fijo. La columna del 📖 se fusionó con la del comentario: suelta al final se
+   salía del ancho y quedaba cortada. */
+.cuar-log-cfg{ max-width:1240px; margin:22px auto 0; background:#fff; border:1px solid #e2e8f0;
+  border-radius:14px; padding:16px 18px 14px; box-shadow:0 1px 3px rgba(15,23,42,.06); }
+.cuar-log-top{ display:flex; align-items:flex-start; justify-content:space-between; gap:14px;
+  flex-wrap:wrap; margin-bottom:12px; }
+.cuar-log-cfg h3{ margin:0 0 4px; font-size:19px; color:#7c2d12; }
+.cuar-log-cfg p{ margin:0; font-size:13px; color:#475569; line-height:1.5; max-width:640px; }
+.cuar-log-bar{ display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+.cuar-log-bar select{ padding:6px 10px; border:1px solid #cbd5e1; border-radius:8px; font-size:13px;
+  font-family:inherit; background:#fff; }
 .cuar-log-bar button{ width:auto; margin:0; background:#fff; border:1px solid #cbd5e1; color:#334155;
-  border-radius:7px; padding:4px 10px; font-size:12.5px; font-weight:700; cursor:pointer; }
-.cuar-log-tblwrap{ overflow-x:auto; border:1px solid #e2e8f0; border-radius:10px; }
-.cuar-log-tbl{ width:100%; border-collapse:collapse; font-size:12px; }
-.cuar-log-tbl th{ text-align:left; font-size:10px; letter-spacing:.4px; text-transform:uppercase;
-  color:#475569; background:#f8fafc; border-bottom:1px solid #e2e8f0; padding:5px 7px; white-space:nowrap; }
-.cuar-log-tbl td{ border-top:1px solid #eef2f7; padding:5px 7px; vertical-align:middle; color:#0f172a; }
-.cuar-log-tbl td:nth-child(1), .cuar-log-tbl td:nth-child(4){ white-space:nowrap; }
-.cuar-log-tbl td:nth-child(2){ min-width:150px; }
-.cuar-log-tbl .cuar-badge{ font-size:9.5px; padding:1px 7px; }
-.cuar-log-tbl .cuar-badges{ margin-top:0; gap:4px; }
-.cuar-log-est{ font-size:10.5px; font-weight:800; border-radius:999px; padding:2px 9px; white-space:nowrap; }
+  border-radius:8px; padding:6px 12px; font-size:13px; font-weight:700; cursor:pointer; }
+.cuar-log-bar button:hover{ background:#f1f5f9; }
+/* chips de estado: además de contar, filtran la tabla */
+.cuar-log-chips{ display:flex; gap:7px; flex-wrap:wrap; margin-bottom:10px; }
+.cuar-log-chip{ width:auto; margin:0; border-radius:999px; padding:5px 13px; font-size:12.5px;
+  font-weight:700; cursor:pointer; border:1.5px solid #e2e8f0; background:#f8fafc; color:#475569;
+  font-family:inherit; }
+.cuar-log-chip b{ font-weight:900; }
+.cuar-log-chip:hover{ background:#eef2f7; }
+.cuar-log-chip.on{ background:#0f172a; border-color:#0f172a; color:#fff; }
+.cuar-log-chip.on.c-retenido{ background:#b45309; border-color:#b45309; }
+.cuar-log-chip.on.c-aprobado{ background:#166534; border-color:#166534; }
+.cuar-log-chip.on.c-devuelto{ background:#9f1239; border-color:#9f1239; }
+.cuar-log-tblwrap{ overflow:auto; max-height:62vh; border:1px solid #e2e8f0; border-radius:10px; }
+.cuar-log-tbl{ width:100%; border-collapse:separate; border-spacing:0; font-size:13px; }
+.cuar-log-tbl th{ position:sticky; top:0; z-index:1; text-align:left; font-size:11px; letter-spacing:.5px;
+  text-transform:uppercase; color:#475569; background:#f1f5f9; border-bottom:1px solid #cbd5e1;
+  padding:9px 11px; white-space:nowrap; }
+.cuar-log-tbl td{ border-top:1px solid #eef2f7; padding:9px 11px; vertical-align:top; color:#0f172a; }
+.cuar-log-tbl tbody tr:nth-child(even){ background:#fbfdff; }
+.cuar-log-tbl tbody tr:hover{ background:#f1f5f9; }
+.cuar-log-tbl td:first-child{ border-left:4px solid transparent; }
+.cuar-log-tbl tr.r-retenido td:first-child{ border-left-color:#fcd34d; }
+.cuar-log-tbl tr.r-aprobado td:first-child{ border-left-color:#86efac; }
+.cuar-log-tbl tr.r-devuelto td:first-child{ border-left-color:#fda4af; }
+.cuar-log-np{ font-weight:800; font-size:13.5px; white-space:nowrap; }
+.cuar-log-cli{ display:flex; flex-direction:column; gap:3px; min-width:170px; }
+.cuar-log-rs{ color:#334155; overflow-wrap:anywhere; }
+.cuar-log-fh{ white-space:nowrap; color:#475569; }
+.cuar-log-tbl .cuar-badge{ font-size:10.5px; padding:2px 9px; }
+.cuar-log-tbl .cuar-badges{ margin-top:0; gap:5px; }
+.cuar-log-est{ font-size:11px; font-weight:800; border-radius:999px; padding:3px 11px; white-space:nowrap;
+  display:inline-block; }
 .cuar-log-est.e-retenido{ background:#fef3c7; color:#92400e; border:1px solid #fcd34d; }
 .cuar-log-est.e-aprobado{ background:#dcfce7; color:#166534; border:1px solid #86efac; }
 .cuar-log-est.e-devuelto{ background:#ffe4e6; color:#9f1239; border:1px solid #fda4af; }
 .cuar-log-quien{ font-weight:800; }
-.cuar-log-mail{ display:block; font-size:10px; color:#64748b; }
-.cuar-log-com{ color:#334155; max-width:280px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-.cuar-log-vacio2{ padding:14px; font-size:12.5px; color:#64748b; font-style:italic; }
+.cuar-log-mail{ display:block; font-size:11px; color:#64748b; max-width:190px; overflow:hidden;
+  text-overflow:ellipsis; white-space:nowrap; }
+/* celda de comentario: quién + cuándo arriba, el texto abajo (2 líneas) y el 📖 a la derecha */
+.cuar-log-comcell{ display:flex; align-items:flex-start; gap:8px; min-width:250px; }
+.cuar-log-combox{ flex:1; min-width:0; }
+.cuar-log-com{ color:#0f172a; line-height:1.4; display:-webkit-box; -webkit-line-clamp:2;
+  -webkit-box-orient:vertical; overflow:hidden; overflow-wrap:anywhere; }
+.cuar-log-comq{ font-size:11px; color:#64748b; margin-bottom:2px; }
+.cuar-log-comq b{ color:#0f766e; }
+.cuar-log-sin{ color:#94a3b8; }
+.cuar-log-vacio2{ padding:18px; font-size:13px; color:#64748b; font-style:italic; }
 /* v17.15 — log de comentarios (modal) */
 .cuar-log{ display:flex; flex-direction:column; gap:8px; margin-bottom:10px; max-height:40vh; overflow:auto; }
 .cuar-log-it{ border-left:3px solid #cbd5e1; padding:1px 0 1px 9px; }
@@ -4977,7 +5016,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=17.42"></script>
+<script type="module" src="recepcion.js?v=17.43"></script>
 <!-- Config del módulo de fichada (compartido con fichada.html). El secret
      hmacSecret tiene que ser el mismo acá y allá; cargándolo desde un solo
      archivo evitamos que se desincronicen. -->
@@ -8098,7 +8137,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v17.42";
+const APP_VERSION = "v17.43";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -39462,8 +39501,8 @@ function cuarConfigHtml() {
     '<div class="cuar-cfg-note">Los pedidos de clientes con deuda &gt; $1.000, suspendidos, que superan ' +
     'su límite de crédito o que son <b>clientes nuevos</b> caen solos en el sector <b>🚧 Cuarentena</b> de ' +
     '<b>📥 A Programar</b> y no se programan (ni a mano ni por el automático) hasta aprobarlos.</div>' +
-    cuarLogHtml() +
-  '</div>';
+  '</div>' +
+  cuarLogHtml();   // v17.40: afuera de `.cuar-cfg`, que lo dejaba en 820px y cortaba columnas
 }
 
 /* ── v17.23 (Luis, 2026-09-14) — LOG DE CUARENTENA ──────────────────────────────────────────
@@ -39480,49 +39519,102 @@ function cuarLogCargar(dias) {
   }).catch(function (e) { _apr.cuarLog = []; _apr.cuarLogErr = String((e && e.message) || e); })
     .then(function () { _apr.cuarLogLoading = false; if (_pppTab === "cuarcfg") pppRenderProg(); });
 }
+/* v17.40 (Luis, 2026-09-14) — dos pedidos en uno:
+   1. *"fijate que muestre bien lo que pongan en el log de ahora en más"*: la columna de
+      comentario ahora muestra el ÚLTIMO comentario del pedido con quién lo escribió y cuándo,
+      venga de una aprobación, de una devolución o de alguien que abrió el 📖 sobre un pedido
+      todavía retenido. Ese último caso no se veía: `gv_cuarentena_log` sacaba el comentario
+      del evento de cierre, así que la fila quedaba en "—" y sólo se movía el contador del 📖.
+      El backend pasó a leerlo de `GV_Cuarentena_Comentarios` (com_persona / com_por / com_at).
+   2. *"ajustá la visual para que esté más grande y mejor estructurado el módulo"*: tarjeta
+      propia de 1240px (antes heredaba los 820px de Config. y cortaba la última columna),
+      tabla de 13px con encabezado fijo, y chips de estado que además de contar, filtran. */
+function cuarLogFiltro(est) {
+  _apr.cuarLogEstado = (_apr.cuarLogEstado === est) ? null : est;
+  if (_pppTab === "cuarcfg") pppRenderProg();
+}
 function cuarLogHtml() {
   if (_apr.cuarLog === undefined && !_apr.cuarLogLoading) { cuarLogCargar(); }
   const dias = _apr.cuarLogDias || 60;
-  const l = _apr.cuarLog || [];
-  let h = '<div class="cuar-log-cfg"><h3>📋 Log de Cuarentena</h3>' +
-    '<p>Cada pedido que quedó retenido: cuándo entró, por qué, y quién lo aprobó o lo devolvió. ' +
-    'Se escribe solo — no hay que cargar nada.</p>' +
-    '<div class="cuar-log-bar">' +
-      '<select onchange="cuarLogCargar(this.value)">' +
-        [7, 30, 60, 90, 365].map(function (d) {
-          return '<option value="' + d + '"' + (d === dias ? " selected" : "") + '>' +
-            (d === 365 ? "último año" : "últimos " + d + " días") + '</option>';
-        }).join("") +
-      '</select>' +
-      '<button onclick="cuarLogCargar()">↻ Refrescar</button>' +
-      '<span class="cuar-stat">' + (_apr.cuarLogLoading ? "buscando…" : l.length + " pedido" + (l.length === 1 ? "" : "s")) + '</span>' +
+  const todos = _apr.cuarLog || [];
+  const filtro = _apr.cuarLogEstado || null;
+  const l = filtro ? todos.filter(function (r) { return String(r.estado || "retenido") === filtro; }) : todos;
+  const cuenta = function (e) { return todos.filter(function (r) { return String(r.estado || "retenido") === e; }).length; };
+  let h = '<div class="cuar-log-cfg">' +
+    '<div class="cuar-log-top">' +
+      '<div><h3>📋 Log de Cuarentena</h3>' +
+      '<p>Cada pedido que quedó retenido: cuándo entró, por qué, en qué estado está y el último ' +
+      'comentario que alguien le dejó, con su nombre. Se escribe solo — no hay que cargar nada.</p></div>' +
+      '<div class="cuar-log-bar">' +
+        '<select onchange="cuarLogCargar(this.value)">' +
+          [7, 30, 60, 90, 365].map(function (d) {
+            return '<option value="' + d + '"' + (d === dias ? " selected" : "") + '>' +
+              (d === 365 ? "último año" : "últimos " + d + " días") + '</option>';
+          }).join("") +
+        '</select>' +
+        '<button onclick="cuarLogCargar()">↻ Refrescar</button>' +
+      '</div>' +
     '</div>';
   if (_apr.cuarLogErr) h += '<div class="cuar-m-err">⚠ ' + escapeHtml(_apr.cuarLogErr) + '</div>';
+  h += '<div class="cuar-log-chips">' +
+    '<button class="cuar-log-chip' + (filtro ? "" : " on") + '" onclick="cuarLogFiltro(null)" ' +
+      'title="Ver todos">Todos <b>' + todos.length + '</b></button>' +
+    [["retenido", "🚧 Retenidos"], ["aprobado", "✅ Aprobados"], ["devuelto", "↩ Devueltos"]].map(function (e) {
+      return '<button class="cuar-log-chip c-' + e[0] + (filtro === e[0] ? " on" : "") + '" ' +
+        'onclick="cuarLogFiltro(\'' + e[0] + '\')">' + e[1] + ' <b>' + cuenta(e[0]) + '</b></button>';
+    }).join("") +
+    (_apr.cuarLogLoading ? '<span class="cuar-stat">buscando…</span>' : "") +
+    '</div>';
   h += '<div class="cuar-log-tblwrap"><table class="cuar-log-tbl"><thead><tr>' +
-    '<th>NP</th><th>Cliente</th><th>Motivos</th><th>Entró</th><th>Estado</th><th>Quién / cuándo</th><th>Comentario</th><th></th>' +
+    '<th>NP</th><th>Cliente</th><th>Motivos</th><th>Entró</th><th>Estado</th>' +
+    '<th>Quién lo cerró</th><th>Último comentario</th>' +
     '</tr></thead><tbody>';
   if (!l.length) {
-    h += '<tr><td colspan="8"><div class="cuar-log-vacio2">' +
-      (_apr.cuarLogLoading ? "Buscando…" : "Todavía no cayó ningún pedido en cuarentena en este período.") +
+    h += '<tr><td colspan="7"><div class="cuar-log-vacio2">' +
+      (_apr.cuarLogLoading ? "Buscando…"
+        : filtro ? "Ningún pedido " + filtro + " en este período."
+        : "Todavía no cayó ningún pedido en cuarentena en este período.") +
       '</div></td></tr>';
   } else {
-    l.forEach(function (r, i) {
+    l.forEach(function (r) {
+      const i = todos.indexOf(r);   // el 📖 indexa sobre la lista completa, no sobre el filtro
       const cod = String(r.cod || "").trim();
+      const est = String(r.estado || "retenido");
       const badges = aprCuarBadgesHtml({ cuarentena_motivos: r.motivos || [],
         cuarentena_detalle: { deuda: r.deuda } });
-      h += '<tr>'
-        + '<td><b>' + escapeHtml(String(r.np || r.clave || "")) + '</b></td>'
-        + '<td>' + (cod ? '<span class="cuar-card-cod">' + cuarEmpCod(r.empresa) + " " + escapeHtml(cod) + '</span>' : '')
-          + escapeHtml(String(r.razon_social || "")) + '</td>'
-        + '<td>' + (badges || '<span class="cuar-yp-sin">—</span>') + '</td>'
-        + '<td>' + escapeHtml(cuarFechaHora(r.entro_at)) + '</td>'
-        + '<td><span class="cuar-log-est e-' + escapeHtml(String(r.estado || "retenido")) + '">' + escapeHtml(String(r.estado || "retenido")) + '</span></td>'
+      const txt = String(r.comentario || "");
+      // quién escribió el último comentario: la persona que eligió (Vivi / Marian / lo que
+      // hayan puesto en "Otro"); el mail de la sesión queda en el title, como trazabilidad.
+      const comQuien = String(r.com_persona || "").trim();
+      h += '<tr class="r-' + escapeHtml(est) + '">'
+        + '<td class="cuar-log-np">' + escapeHtml(String(r.np || r.clave || "")) + '</td>'
+        + '<td><div class="cuar-log-cli">'
+          + (cod ? '<span class="cuar-card-cod">' + cuarEmpCod(r.empresa) + " " + escapeHtml(cod) + '</span>' : '')
+          + '<span class="cuar-log-rs">' + escapeHtml(String(r.razon_social || "")) + '</span>'
+          + '</div></td>'
+        + '<td>' + (badges || '<span class="cuar-log-sin">—</span>') + '</td>'
+        + '<td class="cuar-log-fh">' + escapeHtml(cuarFechaHora(r.entro_at)) + '</td>'
+        + '<td><span class="cuar-log-est e-' + escapeHtml(est) + '">' + escapeHtml(est) + '</span></td>'
         + '<td>' + (r.cerrado_at
             ? '<span class="cuar-log-quien">' + escapeHtml(String(r.persona || "—")) + '</span> · ' + escapeHtml(cuarFechaHora(r.cerrado_at))
-              + (r.por ? '<span class="cuar-log-mail">' + escapeHtml(String(r.por)) + '</span>' : '')
-            : '<span class="cuar-yp-sin">—</span>') + '</td>'
-        + '<td class="cuar-log-com" title="' + escapeHtml(String(r.comentario || "")) + '">' + escapeHtml(String(r.comentario || "")) + '</td>'
-        + '<td><button class="cuar-yp-lib" onclick="cuarLogComentarios(' + i + ')" title="' + (r.comentarios ? r.comentarios + " comentario" + (r.comentarios === 1 ? "" : "s") : "Sin comentarios") + ' — abrir el log">📖' + (r.comentarios ? '<b>' + r.comentarios + '</b>' : '') + '</button></td>'
+              + (r.por ? '<span class="cuar-log-mail" title="' + escapeHtml(String(r.por)) + '">' + escapeHtml(String(r.por)) + '</span>' : '')
+            : '<span class="cuar-log-sin">— sigue retenido</span>') + '</td>'
+        + '<td><div class="cuar-log-comcell"><div class="cuar-log-combox">'
+          + (txt
+              ? (comQuien || r.com_at
+                  ? '<div class="cuar-log-comq"' + (r.com_por ? ' title="' + escapeHtml(String(r.com_por)) + '"' : '') + '>'
+                    + '<b>' + escapeHtml(comQuien || "—") + '</b>'
+                    + (r.com_at ? ' · ' + escapeHtml(cuarFechaHora(r.com_at)) : '')
+                    + '</div>'
+                  : '')
+                + '<div class="cuar-log-com" title="' + escapeHtml(txt) + '">' + escapeHtml(txt) + '</div>'
+              : '<span class="cuar-log-sin">sin comentarios</span>')
+          + '</div>'
+          + '<button class="cuar-yp-lib" onclick="cuarLogComentarios(' + i + ')" title="' +
+            (r.comentarios ? r.comentarios + " comentario" + (r.comentarios === 1 ? "" : "s") + " — abrirlos o agregar uno"
+                           : "Sin comentarios — dejar el primero") + '">📖' +
+            (r.comentarios ? '<b>' + r.comentarios + '</b>' : '') + '</button>'
+          + '</div></td>'
         + '</tr>';
     });
   }

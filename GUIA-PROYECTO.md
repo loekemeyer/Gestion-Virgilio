@@ -1,3 +1,18 @@
+## Nota v17.43 (2026-09-14) — el Log de Cuarentena muestra los comentarios, y más grande
+
+Pedido de Luis. Dos cosas:
+
+- **Lo que escriben se ve.** La tabla del log mostraba el comentario sólo si venía de una
+  aprobación o una devolución; un comentario dejado desde el 📖 sobre un pedido que seguía
+  retenido no aparecía (la fila decía `—` y sólo se movía el contador). Ahora la columna
+  muestra el **último comentario del pedido**, con **quién** lo dejó (Vivi / Marian / lo que
+  hayan puesto en "Otro") y **cuándo**, venga de donde venga. Backend:
+  `sql/gv_cuarentena_log_v1743.sql` (`com_persona`, `com_por`, `com_at`).
+- **Módulo más grande y mejor armado.** Salió de los 820px de Config. Cuarentena y es una
+  tarjeta de 1240px: tabla de 13px con encabezado fijo, filas con color por estado, chips que
+  cuentan y filtran (Retenidos / Aprobados / Devueltos), y el 📖 adentro de la celda de
+  comentario en vez de una columna suelta al final que se salía del ancho.
+
 # Guía del Proyecto — Producción Virgilio
 
 > Guía viva de referencia. Documenta **cómo funciona el programa** y **de dónde

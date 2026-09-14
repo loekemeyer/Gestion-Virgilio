@@ -251,25 +251,43 @@ catch (_e) {
                  dev.args.p_empresa === "lk" && dev.args.p_comentario === "No lo autorizó cobranzas" &&
                  dev.args.p_persona === "Marian";
 
-    // (7) v17.23 — submódulo LOG en Config. Cuarentena
+    // (7) v17.23 — submódulo LOG en Config. Cuarentena (visual y campos de la v17.40)
     _apr.cuarLog = [
       { empresa: "lk", clave: "1368", np: "web LK 1368", cod: "4281", razon_social: "Biaggio Valentin",
         motivos: ["cliente_nuevo"], deuda: null, entro_at: "2026-09-14T09:10:00-03:00",
         estado: "aprobado", cerrado_at: "2026-09-14T11:05:00-03:00", persona: "Vivi",
-        por: "thomasloke1@gmail.com", comentario: "Pagó la seña", comentarios: 2, eventos: 3 },
+        por: "thomasloke1@gmail.com", comentario: "Pagó la seña", com_persona: "Vivi",
+        com_por: "thomasloke1@gmail.com", com_at: "2026-09-14T11:05:00-03:00",
+        comentarios: 2, eventos: 3 },
+      // v17.40: RETENIDO pero con un comentario suelto — el caso que antes no se veía
       { empresa: "chef", clave: "55", np: "CH 0003", cod: "2715", razon_social: "Gifel S.R.L.",
         motivos: ["deuda"], deuda: 1955318, entro_at: "2026-09-13T18:00:00-03:00",
-        estado: "retenido", cerrado_at: null, persona: null, por: null, comentario: null,
-        comentarios: 0, eventos: 1 }
+        estado: "retenido", cerrado_at: null, persona: null, por: null,
+        comentario: "Llamar a cobranzas antes de soltarlo", com_persona: "Marian",
+        com_por: "marian@loekemeyer.com", com_at: "2026-09-14T12:40:00-03:00",
+        comentarios: 1, eventos: 1 }
     ];
     _pppTab = "cuarcfg"; pppRenderProg(); await new Promise((res) => setTimeout(res, 150));
     const ch = document.getElementById("pppPreview").innerHTML;
-    out.logTitulo = /📋 Log de Cuarentena/.test(ch) && /2 pedidos/.test(ch);
+    out.logTitulo = /📋 Log de Cuarentena/.test(ch) && /Todos <b>2<\/b>/.test(ch);
     out.logFilas = /web LK 1368/.test(ch) && /Gifel S\.R\.L\./.test(ch) && /LK 4281/.test(ch);
     out.logEstado = /e-aprobado">aprobado</.test(ch) && /e-retenido">retenido</.test(ch);
     out.logQuien = /Vivi<\/span> · 14\/09 11:05/.test(ch) && /thomasloke1@gmail\.com/.test(ch);
     out.logEntro = /14\/09 09:10/.test(ch);
     out.logComent = /cuarLogComentarios\(0\)/.test(ch) && /📖<b>2<\/b>/.test(ch);
+    // v17.40: el comentario de un pedido RETENIDO se ve en la fila, con quién lo dejó y cuándo
+    out.logComRet = /Llamar a cobranzas antes de soltarlo/.test(ch) &&
+                    /<b>Marian<\/b> · 14\/09 12:40/.test(ch);
+    // los chips cuentan por estado y filtran
+    out.logChips = /c-retenido[^>]*>🚧 Retenidos <b>1<\/b>/.test(ch) &&
+                   /c-aprobado[^>]*>✅ Aprobados <b>1<\/b>/.test(ch);
+    cuarLogFiltro("aprobado"); await new Promise((res) => setTimeout(res, 120));
+    const chF = document.getElementById("pppPreview").innerHTML;
+    out.logFiltra = /web LK 1368/.test(chF) && !/Gifel S\.R\.L\./.test(chF) &&
+                    /cuarLogComentarios\(0\)/.test(chF);
+    cuarLogFiltro("aprobado"); await new Promise((res) => setTimeout(res, 120));
+    const chT = document.getElementById("pppPreview").innerHTML;
+    out.logFiltraOff = /Gifel S\.R\.L\./.test(chT);
     _pppTab = "prog";
 
     out.errs = null;
@@ -328,6 +346,10 @@ catch (_e) {
   chk(r.logQuien, "el log dice quién aprobó, cuándo y con qué usuario");
   chk(r.logEntro, "el log dice cuándo entró a cuarentena");
   chk(r.logComent, "el log abre los comentarios del pedido");
+  chk(r.logComRet, "el log muestra el comentario de un pedido retenido, con quién y cuándo");
+  chk(r.logChips, "el log tiene chips por estado con su cantidad");
+  chk(r.logFiltra, "tocar un chip filtra la tabla y el 📖 sigue apuntando al pedido correcto");
+  chk(r.logFiltraOff, "tocarlo de nuevo vuelve a mostrar todos");
   chk(r.deudorCliente, "el cliente deudor se ve en el sector");
   chk(r.soloUnCheckbox, "el retenido NO es tildable (solo el normal tiene checkbox)");
   // v14.88: los botones se movieron a la pestaña Config. Cuarentena

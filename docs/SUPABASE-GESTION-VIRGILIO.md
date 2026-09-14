@@ -13336,3 +13336,48 @@ que depende que Gestión vea el pedido lo sostiene un `update` posterior que pue
 silencio. Con el payload adentro de la RPC, un pedido **no puede existir sin payload** y se cae la
 clase entera de problema — y es lo que pide el protocolo de este `CLAUDE.md`: la lógica de negocio
 va en el backend. Requiere tocar el front (mandarle el payload a la RPC) y deploy al IIS.
+
+---
+
+### §3.fa — v17.43: el Log de Cuarentena muestra lo que la gente escribe — 2026-09-14
+
+**Luis (2026-09-14):** *"fijate que muestre bien lo que pongan en el log de ahora en más, y
+ajustá la visual de eso para que esté más grande y mejor estructurado el módulo"*.
+
+**Lo que no se veía** (problema 168 de `github_repo_problemas`). `gv_cuarentena_log` (v17.23)
+sacaba `comentario` / `persona` / `por` de los eventos `aprobado` | `devuelto` de
+`GV_Cuarentena_Log`. Pero los comentarios no viven ahí: viven en `GV_Cuarentena_Comentarios`,
+donde caen **todos** — `gv_cuarentena_liberar` y `gv_cuarentena_devolver` insertan ahí además
+del evento, y `gv_cuarentena_comentar` escribe los sueltos que alguien deja desde el 📖.
+Resultado: un comentario sobre un pedido que **seguía retenido** no aparecía en la tabla —la
+fila mostraba `—` y sólo se movía el contador del 📖—, que es justo lo que el log venía a
+evitar: tener que abrir el pop-up pedido por pedido para enterarse.
+
+**Backend (`sql/gv_cuarentena_log_v1743.sql`).** `comentario` pasa a ser el **último comentario
+del pedido**, salga de donde salga, y se agregan `com_persona` / `com_por` / `com_at`. Son datos
+distintos de `persona` / `por` / `cerrado_at`, que siguen siendo los del **cierre**: un pedido lo
+puede aprobar Vivi y comentarlo Marian media hora después, y las dos cosas importan. La ventana
+de `p_dias` ahora entra también por los comentarios (`union` en `base`), si no un pedido viejo
+comentado hoy se caía de la lista; y el orden es por lo último que pasó. Cambia el tipo de
+retorno ⇒ **DROP + CREATE**, así que el archivo repone los grants a mano (`authenticated` y
+`service_role`; `anon` nunca — es `SECURITY DEFINER` y el guard de supervisor es lo único que la
+protege). Verificado: `anon` sigue sin `EXECUTE`.
+
+**Medición.** 32 pedidos en 60 días, los mismos que antes (25 retenidos, 7 aprobados), 3 con
+comentario. Y probada contra un pedido retenido real dentro de una transacción abortada: se
+insertó un comentario con `gv_cuarentena_comentar(… 'Marian')` y la fila pasó a devolver
+`comentario=[PRUEBA: ojo con este cliente] com_persona=Marian com_at=14/09 12:36 comentarios=1`
+— con la v17.23 esa misma fila devolvía todo en `NULL`. Después se confirmó que no quedó escrito
+nada (`GV_Cuarentena_Comentarios` siguió en 3 filas).
+
+**Visual (`index.html`).** El log dejó de heredar los **820px** de `.cuar-cfg` —por eso la
+columna del 📖 salía cortada— y pasó a ser una **tarjeta propia de 1240px** que se renderiza
+fuera de esa caja. Tabla de 13px (antes 12) con el encabezado **fijo** al scrollear, filas con
+borde de color por estado, y **chips que cuentan y filtran** (Todos / 🚧 Retenidos / ✅ Aprobados
+/ ↩ Devueltos). La columna suelta del 📖 se fusionó con la del comentario: ahora la celda
+muestra **quién** lo escribió y **cuándo** arriba, el texto abajo (dos líneas, el resto en el
+`title`) y el 📖 con su contador a la derecha. El filtro no rompe el 📖: el índice que recibe
+`cuarLogComentarios` se calcula contra la lista completa, no contra la filtrada.
+
+**Rollback:** volver a `sql/gv_cuarentena_log_v1723.sql` (mismo DROP + CREATE + grants). El front
+anterior no leía `com_*`, así que el backend es reversible solo.
