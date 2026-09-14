@@ -84,8 +84,8 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
     // v17.02 (pedido del dueño: "hacela más visible, poneles un porcentaje visible"): la leyenda
     // "2 armados · 2 en curso · 1 sin empezar" pasó a ser barra gruesa + los tres PORCENTAJES con
     // la cuenta de pedidos al lado. Sin backend (acá el REST está abortado) usa ese conteo.
-    out.barra = /pn-bar big/.test(html) && /armado<em>2<\/em>/.test(html) &&
-                /en curso<em>2<\/em>/.test(html) && /sin empezar<em>1<\/em>/.test(html);
+    out.barra = /pn-bar big/.test(html) && /armado <em>\(2\)<\/em>/.test(html) &&
+                /en curso <em>\(2\)<\/em>/.test(html) && /sin empezar <em>\(1\)<\/em>/.test(html);
     // adentro del día 1
     pppPlanAbrir(_pppDateKey(hab[0]));
     html = document.getElementById("pppPreview").innerHTML;

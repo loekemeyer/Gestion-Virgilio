@@ -2791,16 +2791,17 @@ tr.ppp-err-zona > td{ background:#fffbeb !important; }
 /* v17.03 — estado del día MÁS VISIBLE: barra gruesa, los tres porcentajes en grande y,
    abajo, la barra de FACTURADO sobre lo armado. */
 .pn-bar.big{ height:15px; border-radius:999px; }
-.pn-pcts{ display:flex; gap:10px; flex-wrap:wrap; margin-top:7px; font-size:11px; font-weight:700; color:#64748b; }
-.pn-pcts span{ display:flex; align-items:baseline; gap:4px; }
-.pn-pcts b{ font-size:16px; font-weight:900; }
-.pn-pcts em{ font-style:normal; font-size:10.5px; font-weight:800; color:#94a3b8; background:#f1f5f9; border-radius:999px; padding:1px 6px; }
+.pn-pcts{ display:flex; gap:14px; flex-wrap:wrap; margin-top:8px; font-size:15px; font-weight:800; color:#334155; line-height:1.35; }
+.pn-pcts span{ display:inline-flex; align-items:baseline; gap:5px; white-space:nowrap; }
+.pn-pcts b{ font-size:15px; font-weight:900; }
+.pn-pcts em{ font-style:normal; font-size:15px; font-weight:800; color:#64748b; }
 .pn-pcts .arm b{ color:#1e6bd6; } .pn-pcts .cur b{ color:#b45309; } .pn-pcts .sin b{ color:#64748b; }
 .pn-facw{ margin-top:9px; padding-top:8px; border-top:1px dashed #e2e8f0; }
 .pn-fac-h{ display:flex; align-items:baseline; gap:6px; flex-wrap:wrap; margin-bottom:5px; }
-.pn-fac-h .t{ font-size:11px; font-weight:800; color:#64748b; text-transform:uppercase; letter-spacing:.04em; }
-.pn-fac-h b{ font-size:16px; font-weight:900; color:#15803d; }
-.pn-fac-h small{ font-size:10.5px; font-weight:700; color:#94a3b8; }
+.pn-fac-h{ gap:7px; }
+.pn-fac-h .t{ font-size:15px; font-weight:800; color:#334155; letter-spacing:0; }
+.pn-fac-h b{ font-size:15px; font-weight:900; color:#15803d; }
+.pn-fac-h small{ font-size:15px; font-weight:800; color:#64748b; }
 .pn-bar.fac{ height:11px; background:#e5e7eb; }
 .pn-bar.fac i{ background:#16a34a; }
 /* v16.97 — AVANCE DEL DÍA (% listo / % armado). Tarjeta grande adentro de un día y
@@ -4807,7 +4808,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=17.10"></script>
+<script type="module" src="recepcion.js?v=17.11"></script>
 <!-- Config del módulo de fichada (compartido con fichada.html). El secret
      hmacSecret tiene que ser el mismo acá y allá; cargándolo desde un solo
      archivo evitamos que se desincronicen. -->
@@ -7922,7 +7923,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v17.10";
+const APP_VERSION = "v17.11";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -34062,9 +34063,9 @@ function _pppPlanBarraHtml(est, tot, key, sinFact) {
   const pSin = a ? (Number(a.pct_sin)    || 0) : w(est.sin);
   let h = '<div class="pn-bar big"><i class="arm" style="width:' + pArm + '%"></i><i class="cur" style="width:' + pCur + '%"></i><i class="sin" style="width:' + pSin + '%"></i></div>' +
     '<div class="pn-pcts">' +
-      '<span class="arm"><b>' + pArm + ' %</b>armado<em>' + (a ? a.arm_ped : est.armado) + '</em></span>' +
-      '<span class="cur"><b>' + pCur + ' %</b>en curso<em>' + (a ? a.curso_ped : est.curso) + '</em></span>' +
-      '<span class="sin"><b>' + pSin + ' %</b>sin empezar<em>' + (a ? a.sin_ped : est.sin) + '</em></span>' +
+      '<span class="arm"><b>' + pArm + ' %</b> armado <em>(' + (a ? a.arm_ped : est.armado) + ')</em></span>' +
+      '<span class="cur"><b>' + pCur + ' %</b> en curso <em>(' + (a ? a.curso_ped : est.curso) + ')</em></span>' +
+      '<span class="sin"><b>' + pSin + ' %</b> sin empezar <em>(' + (a ? a.sin_ped : est.sin) + ')</em></span>' +
     '</div>';
   // La barra de FACTURADO se dibuja SIEMPRE (salvo adentro de un día, donde el dato vive en la
   // tarjeta de Avance): si el backend todavía no contestó se ve vacía y lo dice, en vez de
@@ -34074,7 +34075,7 @@ function _pppPlanBarraHtml(est, tot, key, sinFact) {
     const det = !a ? 'buscando…'
       : (Number(a.arm_ped) ? (a.fact_ped + ' de ' + a.arm_ped + ' armados') : 'todavía no hay nada armado');
     h += '<div class="pn-facw"><div class="pn-fac-h"><span class="t">Facturado</span><b>' + (a ? pFac + ' %' : '—') + '</b>' +
-      '<small>' + det + '</small></div>' +
+      '<small>(' + det + ')</small></div>' +
       '<div class="pn-bar fac"><i style="width:' + pFac + '%"></i></div></div>';
   }
   return h;

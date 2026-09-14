@@ -12,7 +12,7 @@
 > única**; no se replica. Ante la duda entre parche rápido y fix de raíz → **fix
 > de raíz**.
 >
-> Última actualización: 2026-09-14 (domingo) · Versión app al documentar: **v17.09**
+> Última actualización: 2026-09-14 (domingo) · Versión app al documentar: **v17.11**
 >
 > Nota **v16.97 (2026-09-14, Thomas) — AVANCE DEL DÍA: "85 % listo · 60 % armado" en la PPP, por
 > Telegram a las 16:00 y como tarea de Planify para Marianela.**
@@ -60,6 +60,9 @@
 >   universo, y los eventos **CCN/CRN** para la marca de "ya salió"): **149 ms**. ⚠ Toda función que
 >   llame el front con la clave anon **se mide** con `explain (analyze, timing off)` después de
 >   tocarla; y si cambia su firma, `notify pgrst, 'reload schema'`.
+> - **v17.11 (mismo día):** los tres campos de la barra se leen de un vistazo — **`100 % armado (6)`**,
+>   con el porcentaje, la palabra y la cuenta **todos del mismo tamaño** (15 px), igual en la línea de
+>   Facturado (*"más grandes los números de cada campo… para claridad visual rápida"*).
 > - SQL: `sql/gv_ppp_avance_dia.sql`. Detalle, medición y rollback: `docs/SUPABASE-GESTION-VIRGILIO.md`
 >   §3.ef. Test: `tests/ppp-avance.cjs`.
 >
