@@ -11760,3 +11760,56 @@ con doble grafía (problema 134) quedan como están hasta entonces.
 
 Lo tercero del §3.4 —los **67 `codBase`** no-op de `index.html`— sigue pendiente: es limpieza de
 front, sin riesgo activo, pero toca el archivo de 33k líneas con el byte NUL adentro.
+
+### §3.ei — v17.08: por qué se carga mal, y el centinela que lo caza el mismo día — 2026-09-14
+
+**Thomas (14/09): *"¿se puede hacer que cargue como corresponde?"* y *"fijate si no rompe alguna otra cosa
+eso, o sea, si no está así por algún otro motivo"*.** Fui a ver lo segundo primero.
+
+**No está así por otro motivo: es un bug conocido y ya auditado del otro lado.** El `CLAUDE.md` de
+`pagina-LK-copia` tiene una sección entera — ***"Anomalía de carga de julio-agosto 2026 — SIN RESOLVER"***,
+auditada el 9/9/2026 — con el mismo diagnóstico y la misma indicación: *"Remarcar como `empresa='chef'`.
+**No borrar**: son ventas reales en la empresa equivocada"*.
+
+**El mecanismo.** `sales_lines.empresa` se agregó en `impactar_ventas_chef_en_sales_lines.sql` como
+`text not null default 'lk'` — el default era para que el histórico ya cargado quedara marcado LK. Pero la
+carga mensual es **manual**: el Excel de ISIS se sube al Table Editor, un lote por mes con el `import_batch`
+tipeado a mano (`febrero_26`, `marzo_26`, … `ago-26`, entre el día 1 y 14 del mes siguiente). **Si ese Excel
+no trae la columna `empresa`, el default la pone en `lk` y nadie se entera.** Eso pasó en julio y agosto.
+
+**Qué cambia si se corrige.** Sobre los últimos 6 meses se mueven **9.022 cajas: LK −8 %, Chef +56 %**. Toca
+todo lo que filtra por empresa — la proyección que arma las OC de importados (`_fn_proy_window_emp`),
+Estadística Madre, Ranking de Inactivos, dashboard, ranking de vendedores. **No es una rotura: es la
+corrección.** El propio `CLAUDE.md` de LK lo dice: hoy *"ensucia todo lo que lee la facturación de
+Loekemeyer… son clientes que figuran como 'dejaron de comprar' sin haber comprado nunca"*.
+
+⚠ **Un detalle donde la auditoría de LK se quedó corta.** Separa tres grupos y al **grupo B** (sufijo L, 789
+líneas, *"concentrado en Relca (427 líneas)"*) lo da por variante de código de un cliente de LK. **Esas 427
+líneas son exactamente el cod 2444 de julio + agosto** (147 + 280) y **el 100 % lleva sufijo L**. Por la regla
+del dueño (v13.71) un artículo de Loekemeyer va con **L** al final **cuando se factura por Chef** — así que
+no es una variante: es una factura de Chef. Es el mismo caso Cencosud de §3.ec.
+
+**Lo que se hizo ahora** (`sql/gv_ventas_carga_sospechosa_v1708.sql`, vista nueva, sólo lectura):
+`gv_ventas_carga_sospechosa` marca los códigos cargados como `lk` que parecen de Chef, con tres señales
+independientes — (1) todas sus líneas llevan sufijo L, (2) el código no existe en el padrón de LK y sí en el
+de Chef, (3) la mitad o más de sus líneas son artículos que LK no vende (medido contra junio 2026, que tiene
+las dos cargas separadas y limpias). La columna `ya_corregido` cruza contra `GV_Ventas_Correccion`.
+
+```sql
+select * from public.gv_ventas_carga_sospechosa where not ya_corregido;  -- vacío = entró bien
+```
+
+Al 14/09 devuelve **53 códigos ya corregidos y 1 pendiente**: el **1903**, que es Mundo Bazar en LK y Feser
+en Chef, con 10 de 11 líneas de artículos que LK no vende — pero como también factura por LK de verdad, se
+dejó sin tocar. Es justo el caso que tiene que decidir una persona.
+
+**Lo que NO se hizo, porque es decisión del dueño:**
+
+1. **Sacarle el `default 'lk'` a la columna** (`alter table public.sales_lines alter column empresa drop
+   default;`). Con el default afuera, un Excel sin esa columna **falla** en vez de entrar mudo como LK. Es
+   una línea — pero corta la rutina mensual hasta que el Excel traiga la columna.
+2. **Que el Excel de ISIS salga separado por empresa**, o traiga la columna. Eso está fuera de la base.
+3. **La solución de fondo ya está planificada del otro lado**: idea **4856**,
+   `docs/plan-4856-auto-sales-lines.md` de `pagina-LK-copia`, **Fase 1.5** — llenar `sales_lines` desde la
+   facturación viva de Gestión con la empresa sacada del prefijo de la NP (`4xxxx` = Chef). El plan ya dice,
+   textual, que eso *"resuelve solo el caso Cencosud"*.
