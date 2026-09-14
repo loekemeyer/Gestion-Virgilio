@@ -12,7 +12,23 @@
 > única**; no se replica. Ante la duda entre parche rápido y fix de raíz → **fix
 > de raíz**.
 >
-> Última actualización: 2026-09-14 (domingo) · Versión app al documentar: **v17.36**
+> Última actualización: 2026-09-14 (domingo) · Versión app al documentar: **v17.37**
+>
+> Nota **v17.37 (2026-09-14, Luis) — el aviso de OC de Krikos muestra sólo lo NUEVO.**
+> Había 6 renglones rojos fijos en "A Programar" (COTO ×3, LA ANÓNIMA ×2, CARREFOUR ×1, mails del
+> 16/06 al 13/07) todos por *el link no devolvió un PDF*: el link de Planexware ya venció y la
+> entrega pasó hace meses, así que **nadie podía hacer nada con ese aviso**. Estaban a propósito —
+> el 13/09 la ventana se había ampliado a 90 días para poder probar que el push al espejo
+> funcionaba, porque hasta entonces `GV_Krikos_OC` nunca había entregado una fila. Esa prueba ya
+> está hecha.
+> El corte va en **LK**, en `sync_krikos_oc_virgilio()` (si se filtrara en el front, el espejo
+> seguiría lleno): rama `error` con **30 días móviles** sobre `mail_fecha` **+ piso fijo el
+> 2026-09-14** (el "de ahora en adelante": sin el piso, una OC vieja re-procesada hoy volvería a
+> aparecer), y rama `pendiente` con los mismos 30 días. Medido: la función devolvió 0 y el espejo
+> quedó vacío; no se escondió nada vivo (0 `pendiente` sin pedido). Las viejas siguen en la
+> **Bandeja Krikos** del panel de LK, que es donde se resuelven.
+> `sql/sync_krikos_oc_virgilio.sql` del repo `pagina-LK-copia` · §3.ey de
+> `docs/SUPABASE-GESTION-VIRGILIO.md`.
 >
 > Nota **v17.34 (2026-09-14, Luis) — CUARENTENA: log propio, "¿quién aprueba?" y el aprobado sale de
 > la lista.**

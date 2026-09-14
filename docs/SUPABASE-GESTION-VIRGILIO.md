@@ -13068,3 +13068,41 @@ select v.cod_art, v.terminado, (select descripcion from vista_nombres_articulos 
 
 **El fondo sigue abierto:** `634` y `634E` son el mismo artículo con dos grafías, y el stock está
 partido. Eso es materia de `gv_codigos_multigrafia`, no de la planimetría, y no se tocó.
+
+---
+
+### §3.ey — v17.37: el aviso de OC de Krikos deja de arrastrar las viejas — 2026-09-14
+
+**Luis (2026-09-14):** *"fijate que ahí está mostrando avisos de pedidos por mail al pedo (son
+viejos). Sacalos, debería ser de ahora en adelante la cosa para pedidos nuevos que entren"*.
+
+En "A Programar" había **6 renglones rojos permanentes** —COTO ×3, LA ANÓNIMA ×2, CARREFOUR ×1,
+mails del 16/06 al 13/07— todos con el mismo motivo: *el link no devolvió un PDF*. Ese link de
+Planexware ya venció y la fecha de entrega de las 6 pasó hace meses: **no había nada que alguien
+pudiera hacer con ese aviso**, así que era ruido fijo tapando lo que sí importa.
+
+**Estaban ahí a propósito, y eso es lo que había que entender antes de tocar.** El 13/09 la
+ventana de la rama `error` se amplió de 30 a **90 días** porque hasta ese momento el espejo
+`GV_Krikos_OC` **nunca había entregado una sola fila**, y no había forma de saber si el push
+funcionaba (un cron en `succeeded` prueba que la función corrió, no que la fila llegó del otro
+lado). Con 90 días viajaron las 6 y ahí quedó probado el camino de punta a punta. Esa prueba ya
+está hecha; el ruido, no hace falta.
+
+**El arreglo va del lado de LK, en `sync_krikos_oc_virgilio()`** — no en el front. Si se filtrara
+en pantalla, el espejo seguiría lleno y el próximo que lo lea vuelve a ver la basura:
+- rama `error`: **30 días móviles** sobre `mail_fecha` (lo que el propio archivo ya documentaba
+  desde el 13/09; el `90` estaba sólo en el código) **y un piso fijo el 2026-09-14**, que es el
+  *"de ahora en adelante"* de Luis: sin el piso, una OC vieja que se re-procese hoy volvería a
+  aparecer. En 30 días el corte móvil manda solo y el piso queda inocuo.
+- rama `pendiente`: la misma ventana de 30 días.
+
+**Medido al aplicarlo:** la función devolvió **0** y `GV_Krikos_OC` quedó en **0 filas** — el
+cartel desapareció. Y no se escondió nada vivo: de las 21 OC de la bandeja, 5 están `cargado`,
+10 `descartado` y las 6 de `error` son las de junio/julio; **`pendiente` sin pedido: ninguna**.
+Las viejas no se pierden — siguen en la **Bandeja Krikos** del panel de LK, que es donde se
+resuelven.
+
+El front sólo suma una línea al pie del aviso aclarando que ahí se listan las OC del último mes,
+para que nadie lo lea como si mostrara todo. SQL, medición y rollback:
+`sql/sync_krikos_oc_virgilio.sql` del repo **`pagina-LK-copia`** (verificado contra la base: md5
+del cuerpo normalizado idéntico).
