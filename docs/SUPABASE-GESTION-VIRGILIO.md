@@ -11409,3 +11409,41 @@ drop function public.gv_pct(numeric, numeric);
 
 Y en el front, sacar `pppAvanceNeed` / `_pppAvanceHtml` / `_pppAvancePctHtml` y sus dos llamadas en
 `_pppPlanGridHtml` y `_pppPlanDiaHtml`. SQL versionado: `sql/gv_ppp_avance_dia_v1697.sql`.
+
+### §3.eg — v16.99: la alarma de clientes en riesgo mira las DOS empresas juntas — 2026-09-14
+
+**Thomas (14/09), poniendo la lógica completa:** *"Chef y LK usan códigos diferentes. Tenemos clientes que
+compran en los dos, clientes que sólo le compran a uno, clientes que antes le compraban a uno y después
+pasaron a comprarle al otro. Cada empresa usa su propia convención de códigos (un cliente que tiene código
+"102" en LK puede estar en CH con código "333"). Queremos hacer el análisis limpio (a lo mejor pasaron de
+comprarle a LK a comprarle a CH y la venta real no cayó)."*
+
+La unión por CUIT ya la hacía `gv_cliente_canon` (§3.ec). Se comprobó que es así de verdad: **183 clientes
+facturan en las dos empresas y casi ninguno comparte número** — Aboudi Moussa es `chef:2648` / `lk:1800`,
+Aimetta `chef:2460` / `lk:490`, Andre Plast `chef:2326` / `lk:2183`. Por eso emparejar por código no sólo
+cruza clientes distintos: además **parte en dos al mismo cliente**.
+
+**Lo que cambia en `gv_clientes_riesgo`** (`sql/gv_clientes_riesgo_migracion_v1699.sql`, reemplaza el punto 5
+de `gv_cliente_canon_v1693.sql`):
+
+1. **Un solo corte calendario para todos.** Antes cada empresa se comparaba contra su propio último mes. Así
+   una migración no se puede ver: si el cliente dejó LK en mayo y arrancó en Chef en junio, con ventanas
+   corridas los dos movimientos no caen en el mismo trimestre. Ahora las dos empresas se miden en **los
+   mismos meses**.
+2. **Columnas nuevas** `lk_ahora` / `lk_pico` / `ch_ahora` / `ch_pico` y **`migracion`** (`pasó de LK a Chef`
+   / `pasó de Chef a LK`) cuando una empresa bajó y la otra subió. El cliente sigue en la vista, pero con el
+   cartel: la venta real no cayó, cambió de empresa.
+3. **`chef_incompleto`**: el cliente factura por Chef y no tiene ninguna fila de Chef después del corte de
+   ese feed (2026-06). Ahí la caída puede ser mentira y no hay con qué probarlo.
+
+**Medido (pico ≥ 300 y caída ≤ −30 %): 40 clientes en la alarma — 3 con migración, 7 con `chef_incompleto`,
+33 caída limpia.**
+
+⚠ **Los 3 y los 7 son el mismo artefacto de carga, no movimientos comerciales.** Todos salen de los batches
+`julio_26` y `ago-26`, que metieron facturas de Chef con `empresa='lk'` (Dorinka, Del Plastic, Ierakuin,
+Clapera, Superimperio, Andre Plast, L.P. Global). O sea que **hoy la alarma no tiene ni una migración real**:
+las que muestra las inventó el importador. Mientras eso no se acomode (problema abierto de §3.ec), la columna
+`migracion` sirve, pero lo que marca hay que leerlo con esta nota al lado.
+
+**Cencosud queda afuera de la alarma**: 3.965 vs 4.664 de pico = **−15 %**, todo por Chef, sin migración y
+sin `chef_incompleto`. Relca no aparece: no vende nada por LK.
