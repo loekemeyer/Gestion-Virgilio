@@ -12545,3 +12545,54 @@ poner `activo=0`, borrar `import_batch='isis_auto'` y reinsertar el backup.
 2. **El `drop default` de `sales_lines.empresa`** pasa a ser un candado inofensivo, porque ya no va a haber
    carga manual que se olvide la columna.
 3. **Avisarle a quien sube el Excel** que deje de hacerlo — recién después del mes en paralelo.
+### §3.eq — v17.23: 🗺️ Mapa de góndolas — la planimetría dibujada (`gv_planimetria_celda`) — 2026-09-14
+
+**Pedido de Thomas (2026-09-14):** *"quiero un módulo en la APP que muestre la planimetría · Góndola A
+/ a5 502 Cap / a4 502 Cap / a3 502 Cap / a2 502 Cap / a1 502 Cap"* + *"así con todos"*.
+
+**Lo nuevo en la base: la vista `gv_planimetria_celda`** (`sql/gv_planimetria_celda.sql`, `security_invoker`,
+SELECT para `anon` y `authenticated`). Una fila por **celda de góndola × código que va ahí**. No toca
+ninguna tabla: es sólo lectura sobre `GV_Lugar` + `GV_Lugar_Item` + `Capacidad_Sector` +
+`vista_nombres_articulos`.
+
+**Por qué es una vista y no lógica del front (protocolo backend):** *cuál máximo manda* es una regla
+de negocio, no una decisión de pantalla. Hoy el mapa vive en `GV_Lugar_Item` y el máximo en
+`Capacidad_Sector` porque la migración quedó a medias (**`GV_Lugar_Item.cajas_max` está NULL en las
+782 filas** — problema 84). La vista resuelve el empate con `coalesce(item, capacidad)` y dice en
+**`max_fuente`** (`item` | `capacidad`) de dónde salió: el día del backfill, el front no cambia.
+
+**Tres normalizaciones, las mismas del resto del pipeline:**
+
+- **Sector → letra + número**, así `J9` y `J09` son **la misma celda**. Medido: las 9 filas de
+  capacidad con la grafía sin cero (`J1`…`J9`, las que `gv_gondola_divergente` cuenta como
+  `sector_inexistente`) tienen **el mismo código** que su `J0x`, y esas celdas **no tenían capacidad**
+  cargada con la grafía buena. Con la normalización, esas 9 capacidades aparecen donde corresponde.
+- **Código → `gv_cod_stock()`** para cruzar (`066` = `66`, `505L` = `505`, `505 LK` = `505`), pero se
+  **muestra la grafía del mapa**, que es la canónica (`066`, no `66` — regla de `planimetria.js`).
+- **Sólo `tipo='gondola'` y `activo`.** Los racks tienen su propia planimetría (`Racks_Planimetria`).
+
+**`estado` es el semáforo de la celda:** `libre` · `ok` · `solo_mapa` (artículo mapeado **sin**
+capacidad cargada) · `solo_capacidad` (capacidad cargada y el mapa **no** pone el artículo ahí).
+
+**Medido al crearla:** 751 filas sobre **688 celdas** de góndola — 666 `ok`, 50 `libre`, 19
+`solo_mapa`, 16 `solo_capacidad`, y 33 celdas ocupadas sin ningún máximo. ⚠ Esos 35 divergentes **no
+contradicen** los 107 de `gv_gondola_divergente`: esa vista además cuenta las filas de capacidad que
+apuntan a un **rack** y las 9 de grafía `J9`, que acá no son divergencia. La decisión de fondo
+(cuál mapa manda) **sigue siendo de Luis**; la vista no la toma, sólo la muestra.
+
+**En el front** (`index.html`, sólo lectura, supervisor): overlay `#planimMapaOverlay` +
+`openPlanimMapa` / `pmapRender` / `pmapGondolaHtml` / `pmapCellHtml` / `pmapBuscar`. Entra por
+**⚙️ Configuración → 🗺️ Mapa de góndolas**. Las celdas se agrupan **de a `PMAP_ALTO` = 5** con la de
+número más alto **arriba** (a5 → a1, como el estante); el corte cae siempre bien porque todas las
+letras tienen la numeración corrida de 1 a N (A=85, B/D/F/H/J/L/M/Ñ=60, C/E/G/I=20, P=40, más tres
+sueltas: AD09, Y29, Z07). Una celda con más de 2 códigos muestra los dos primeros y `+N más` (el
+récord es M34, con 5). Buscar **no filtra: resalta** y salta a la góndola que tiene el código.
+
+⚠ **El `button{width:100%}` global** estiraba las 17 solapas a una por renglón: van con
+`.pmap-tabs .lug-tab{ width:auto; flex:0 0 auto }`. Mismo motivo en el botón de la barra.
+
+**Rollback:** `drop view public.gv_planimetria_celda;` y sacar el botón de Configuración. No hay nada
+que restaurar: la vista no escribe.
+
+**Test:** `tests/pmap-gondolas.cjs` (orden a5→a1, corte de a 5, código + capacidad, libre y `s/cap`,
+buscar que resalta sin filtrar, y que el módulo pega contra la **vista** y no contra las tablas).

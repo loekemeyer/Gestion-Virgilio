@@ -430,3 +430,6 @@ node tests/gond-exceso-dual.cjs
 
 echo "== ppp-avance (v16.97: % listo / % armado del día en la PPP — el número sale del backend) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/ppp-avance.cjs
+
+echo "== pmap-gondolas (v17.23: 🗺️ Mapa de góndolas — celdas de a 5, la de arriba primero, con código y capacidad) =="
+PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/pmap-gondolas.cjs

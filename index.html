@@ -2427,6 +2427,38 @@ button.pk-anular small{ display:block; font-size:12px; font-weight:700; opacity:
 .lug-chip{ display:inline-flex; align-items:center; gap:4px; background:#eff6ff; border:1px solid #bfdbfe; color:#1e3a8a; border-radius:999px; padding:3px 8px; font-size:13px; }
 .lug-chip-ins{ background:#fef3c7; border-color:#fcd34d; color:#92400e; }
 .lug-chip b{ font-weight:800; }
+/* 🗺️ Mapa de góndolas (v17.23) — dibuja gv_planimetria_celda. Sólo lectura:
+   una góndola por vez, columnas de 5 celdas con la de arriba primero (como el
+   estante real) y en cada una el código y las cajas que entran. */
+.pmap-bar{ display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin-bottom:8px; }
+.pmap-bar .planim-search{ flex:1 1 220px; min-width:0; }
+.pmap-tabs{ display:flex; gap:6px; flex-wrap:wrap; margin-bottom:10px; }
+/* el `button{width:100%}` global estira las solapas a una por renglón: acá son 17
+   góndolas y tienen que entrar como pastillas. Mismo motivo en el botón de la barra. */
+.pmap-tabs .lug-tab{ width:auto; flex:0 0 auto; min-width:46px; margin-top:0; }
+.pmap-bar .planim-btn-save{ width:auto; flex:0 0 auto; margin-top:0; }
+.pmap-tab-hit{ box-shadow:0 0 0 2px #fde68a; }
+.pmap-head{ font-size:13px; color:#475569; margin:2px 0 8px; }
+.pmap-head b{ color:#0f172a; }
+.pmap-wrap{ overflow-x:auto; padding-bottom:6px; }
+.pmap-cols{ display:flex; gap:10px; align-items:flex-start; min-width:min-content; }
+.pmap-col{ display:flex; flex-direction:column; gap:4px; }
+.pmap-colft{ text-align:center; font-size:10px; font-weight:700; color:#94a3b8; padding-top:2px; }
+.pmap-cell{ width:88px; min-height:58px; box-sizing:border-box; border:1px solid #e2e8f0; border-radius:8px; background:#fff; padding:4px 6px; display:flex; flex-direction:column; gap:1px; cursor:pointer; }
+.pmap-sec{ font-size:10px; font-weight:800; color:#94a3b8; letter-spacing:.3px; }
+.pmap-cod{ font-size:15px; font-weight:800; color:#0f172a; line-height:1.15; overflow:hidden; text-overflow:ellipsis; }
+.pmap-cap{ font-size:11px; color:#475569; margin-top:-1px; }
+.pmap-cap b{ font-weight:800; color:#0f172a; }
+.pmap-nocap{ color:#b45309; font-weight:700; }
+.pmap-mas{ font-size:10px; color:#64748b; }
+.pmap-libre{ background:#f8fafc; border-style:dashed; }
+.pmap-libre .pmap-cod{ color:#cbd5e1; font-size:12px; font-weight:700; }
+.pmap-smapa{ border-color:#fcd34d; background:#fffbeb; }
+.pmap-scap{ border-color:#c4b5fd; background:#f5f3ff; }
+.pmap-hit{ outline:3px solid #facc15; outline-offset:1px; }
+.pmap-leg{ display:flex; gap:14px; flex-wrap:wrap; font-size:11.5px; color:#64748b; margin-top:12px; }
+.pmap-leg i{ width:12px; height:12px; border-radius:3px; display:inline-block; vertical-align:-2px; margin-right:4px; border:1px solid #cbd5e1; }
+@media (max-width:460px){ .pmap-cell{ width:78px; min-height:54px; } .pmap-cod{ font-size:14px; } }
 .lug-x{ border:0; background:transparent; color:#64748b; cursor:pointer; font-size:13px; line-height:1; padding:0 2px; }
 .lug-x:hover{ color:#b42318; }
 .lug-libre{ font-size:13px; color:#94a3b8; font-style:italic; }
@@ -4858,7 +4890,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=17.22"></script>
+<script type="module" src="recepcion.js?v=17.23"></script>
 <!-- Config del módulo de fichada (compartido con fichada.html). El secret
      hmacSecret tiene que ser el mismo acá y allá; cargándolo desde un solo
      archivo evitamos que se desincronicen. -->
@@ -5143,6 +5175,33 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
     </div>
   </div>
 
+  <!-- Overlay: MAPA de góndolas (v17.23, pedido de Thomas). SÓLO LECTURA —
+       para editar está 📍 Lugares del depósito. Lo dibuja todo la vista
+       gv_planimetria_celda (sql/gv_planimetria_celda.sql). -->
+  <div id="planimMapaOverlay" class="recp-admin-overlay">
+    <div class="recp-admin-bar">
+      <span class="recp-admin-title">🗺️ Mapa de góndolas</span>
+      <button class="recp-admin-close" onclick="closePlanimMapa()">Cerrar</button>
+    </div>
+    <div class="planim-body">
+      <div class="pmap-bar">
+        <input id="pmapSearch" class="planim-inp planim-search" type="text"
+               placeholder="🔍 Código (438E, 505…), celda (F13) o descripción"
+               oninput="pmapBuscar(this.value)">
+        <button class="planim-btn-save" onclick="closePlanimMapa();openLugarEditor()">✏️ Editar lugares</button>
+      </div>
+      <div id="pmapTabs" class="pmap-tabs"></div>
+      <div id="pmapGrid"></div>
+      <div class="pmap-leg">
+        <span><i style="background:#fff"></i>con código y capacidad</span>
+        <span><i style="background:#f8fafc;border-style:dashed"></i>celda libre</span>
+        <span><i style="background:#fffbeb;border-color:#fcd34d"></i>sin capacidad cargada</span>
+        <span><i style="background:#f5f3ff;border-color:#c4b5fd"></i>capacidad sin el artículo en el mapa</span>
+      </div>
+      <div id="pmapStatus" class="planim-status"></div>
+    </div>
+  </div>
+
   <!-- Módulo PPP (supervisor) — placeholder; el contenido se define después. -->
   <div id="pppOverlay" class="recp-admin-overlay">
     <div class="recp-admin-bar">
@@ -5219,6 +5278,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
         <button class="sup-action-btn" onclick="cfgGo(openMailsEditor)"><span class="sup-ico">✉️</span><span>Mails autorizados</span></button>
         <button class="sup-action-btn" onclick="cfgGo(openPlanimEditor)"><span class="sup-ico">🗺️</span><span>Editar Planimetría</span></button>
         <button class="sup-action-btn" onclick="cfgGo(openLugarEditor)"><span class="sup-ico">📍</span><span>Lugares del depósito</span></button>
+        <button class="sup-action-btn" onclick="cfgGo(openPlanimMapa)" title="Ver el depósito dibujado: cada góndola con sus celdas, el código que va en cada una y cuántas cajas entran"><span class="sup-ico">🗺️</span><span>Mapa de góndolas</span></button>
         <button class="sup-action-btn" onclick="cfgGo(openTallEditor)"><span class="sup-ico">👷</span><span>Talleristas de Recepción</span></button>
         <!-- v13.25: venían de la barra de la PPP (dueño: "llevalo a configuración, sacalo de acá") -->
         <button class="sup-action-btn" onclick="cfgGo(openPppSupers)" title="Agregar/quitar clientes súper (salen en camión propio)"><span class="sup-ico">🛒</span><span>Clientes súper</span></button>
@@ -7973,7 +8033,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v17.22";
+const APP_VERSION = "v17.23";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -36704,6 +36764,199 @@ async function lugDelItem(sector, cod, clase) {
     lugSetStatus("✓ " + c + " sacado de " + s + ".", true);
     lugRender((document.getElementById("lugSearch") || {}).value || "");
   } catch (_e) { lugSetStatus("Sin conexión: no se borró.", false); }
+}
+/* ═══════════════════════════════════════════════════════════════════
+   🗺️ MAPA DE GÓNDOLAS — v17.23 (pedido de Thomas, 2026-09-14: "quiero un módulo
+   en la APP que muestre la planimetría · Góndola A / a5 502 Cap / a4 502 Cap …")
+
+   Dibuja el depósito como está parado: una góndola por vez, sus celdas apiladas
+   de a 5 —la 5 arriba y la 1 abajo, como el estante— y adentro de cada una el
+   código que va ahí y cuántas cajas entran.
+
+   SÓLO LECTURA. Para editar está 📍 Lugares del depósito (lugAddItem/lugDelItem);
+   acá no se escribe nada, así que el mapa se puede mirar sin sesión de Google.
+
+   Todo lo que muestra sale de UNA vista, `gv_planimetria_celda`
+   (sql/gv_planimetria_celda.sql): el front no decide de dónde sale la capacidad.
+   Hoy el mapa vive en GV_Lugar_Item y el máximo en Capacidad_Sector (la migración
+   quedó a medias, problema 84), y la vista resuelve ese empate y avisa en qué
+   celdas los dos no coinciden — que es justo lo que este dibujo deja ver de una.
+
+   Las celdas se agrupan de a PMAP_ALTO porque así está armada la góndola: A01..A05
+   son un módulo, A06..A10 el siguiente. Todas las letras tienen la numeración
+   corrida de 1 a N sin huecos (A=85, B/D/F/H/J/L/M/Ñ=60, C/E/G/I=20, P=40), así
+   que el corte de a 5 cae siempre donde tiene que caer. */
+const PMAP_ALTO = 5;
+let _pmap = null, _pmapG = "", _pmapQ = "";
+
+function pmapSetStatus(msg, ok) {
+  const el = document.getElementById("pmapStatus");
+  if (el) { el.textContent = msg || ""; el.style.color = (ok === false) ? "#b42318" : "#64748b"; }
+}
+function pmapNum(n) { const v = Number(n); return isNaN(v) ? "—" : v.toLocaleString("es-AR"); }
+/* La descripción de vista_nombres_articulos a veces es el código otra vez ("502L"
+   para el 502): en ese caso no aporta nada y no se muestra. */
+function pmapDesc(r) {
+  const d = String((r && r.descripcion) || "").trim();
+  if (!d) return "";
+  const du = d.toUpperCase(), c = String((r && r.cod) || "").toUpperCase();
+  if (du === c || /^[0-9]+E?L?$/.test(du)) return "";
+  return d;
+}
+async function openPlanimMapa() {
+  if (!requireSupervisor()) return;
+  const ov = document.getElementById("planimMapaOverlay");
+  if (ov) ov.classList.add("show");
+  // Se recarga en CADA apertura: si alguien acaba de mover un código en 📍 Lugares,
+  // el mapa tiene que mostrarlo. Lo cacheado se sigue dibujando mientras llega, y si
+  // la lectura vuelve vacía (sin red) se conserva lo que ya estaba en vez de borrarlo.
+  if (_pmap) pmapRender();
+  pmapSetStatus("Cargando el mapa…", true);
+  const filas = await supaFetchAllSafe(SUPABASE_URL + "/rest/v1/gv_planimetria_celda",
+    "select=sector,gondola,celda,empresa,cod,descripcion,cajas_max,max_fuente,estado&order=gondola.asc,celda.asc");
+  if ((filas && filas.length) || !_pmap) _pmap = filas || [];
+  pmapRender();
+}
+function closePlanimMapa() {
+  const ov = document.getElementById("planimMapaOverlay");
+  if (ov) ov.classList.remove("show");
+}
+function pmapGondolas() {
+  const seen = {}, out = [];
+  (_pmap || []).forEach(function (r) {
+    const g = String(r.gondola || "").toUpperCase();
+    if (g && !seen[g]) { seen[g] = 1; out.push(g); }
+  });
+  return out.sort(function (a, b) { return a.localeCompare(b, "es"); });
+}
+function pmapMatch(r, q) {
+  if (!q) return false;
+  return String(r.cod || "").toUpperCase().indexOf(q) >= 0 ||
+         String(r.sector || "").toUpperCase().indexOf(q) >= 0 ||
+         String(r.descripcion || "").toUpperCase().indexOf(q) >= 0;
+}
+/* Buscar no filtra: resalta. Un código vive en varias celdas y lo que se quiere ver
+   es DÓNDE están, no una lista. Si lo buscado no está en la góndola abierta, salta
+   sola a la primera que lo tiene; las solapas muestran cuántas celdas tocó en cada una. */
+function pmapBuscar(v) {
+  _pmapQ = String(v == null ? "" : v).trim().toUpperCase();
+  const inp = document.getElementById("pmapSearch");
+  if (inp && inp.value !== v && v != null) inp.value = v;
+  if (_pmapQ) {
+    const hayAca = (_pmap || []).some(function (r) {
+      return String(r.gondola || "").toUpperCase() === _pmapG && pmapMatch(r, _pmapQ);
+    });
+    if (!hayAca) {
+      const otra = (_pmap || []).filter(function (r) { return pmapMatch(r, _pmapQ); })[0];
+      if (otra) _pmapG = String(otra.gondola || "").toUpperCase();
+    }
+  }
+  pmapRender();
+}
+function pmapGo(g) { _pmapG = String(g || "").toUpperCase(); pmapRender(); }
+function pmapRender() {
+  const tabs = document.getElementById("pmapTabs"), box = document.getElementById("pmapGrid");
+  if (!tabs || !box) return;
+  if (!_pmap) { box.innerHTML = '<div class="planim-empty">Cargando…</div>'; return; }
+  const gs = pmapGondolas();
+  if (!gs.length) {
+    tabs.innerHTML = "";
+    box.innerHTML = '<div class="planim-empty">No pude leer el mapa (sin conexión, o falta la vista <b>gv_planimetria_celda</b> — sql/gv_planimetria_celda.sql).</div>';
+    pmapSetStatus("");
+    return;
+  }
+  if (!_pmapG || gs.indexOf(_pmapG) < 0) _pmapG = gs[0];
+  const hits = {};
+  if (_pmapQ) (_pmap || []).forEach(function (r) {
+    if (pmapMatch(r, _pmapQ)) { const g = String(r.gondola || "").toUpperCase(); hits[g] = (hits[g] || 0) + 1; }
+  });
+  tabs.innerHTML = gs.map(function (g) {
+    const n = hits[g] || 0;
+    return '<button class="lug-tab' + (g === _pmapG ? " lug-tab-on" : "") + (n ? " pmap-tab-hit" : "") + '"' +
+           ' onclick="pmapGo(' + JSON.stringify(g).replace(/"/g, "&quot;") + ')">' +
+           escapeHtml(g) + (n ? ' <b>' + n + '</b>' : "") + '</button>';
+  }).join("");
+  box.innerHTML = pmapGondolaHtml(_pmapG);
+  const celdas = {}; let libres = 0, alertas = 0;
+  (_pmap || []).forEach(function (r) {
+    celdas[String(r.sector || "").toUpperCase()] = 1;
+    if (r.estado === "libre") libres++;
+    else if (r.estado === "solo_mapa" || r.estado === "solo_capacidad") alertas++;
+  });
+  pmapSetStatus(gs.length + " góndolas · " + Object.keys(celdas).length + " celdas · " +
+    libres + " libres · " + alertas + " a revisar" +
+    (_pmapQ ? (function () {
+      const n = Object.keys(hits).reduce(function (a, k) { return a + hits[k]; }, 0);
+      return " · " + n + (n === 1 ? " celda" : " celdas") + ' con "' + _pmapQ + '"';
+    })() : ""));
+}
+function pmapGondolaHtml(g) {
+  const rows = (_pmap || []).filter(function (r) { return String(r.gondola || "").toUpperCase() === g; });
+  if (!rows.length) return '<div class="planim-empty">La góndola ' + escapeHtml(g) + ' no tiene celdas.</div>';
+  const porCelda = {}; let maxN = 0, capTot = 0, libres = 0, ocupadas = {};
+  const emps = {};
+  rows.forEach(function (r) {
+    const n = Number(r.celda);
+    if (isNaN(n)) return;
+    (porCelda[n] || (porCelda[n] = [])).push(r);
+    if (n > maxN) maxN = n;
+    if (r.cajas_max != null) capTot += Number(r.cajas_max) || 0;
+    if (r.empresa) emps[String(r.empresa).toUpperCase()] = 1;
+  });
+  Object.keys(porCelda).forEach(function (k) {
+    const its = porCelda[k];
+    if (its.length === 1 && its[0].estado === "libre") libres++; else ocupadas[k] = 1;
+  });
+  const nCeldas = Object.keys(porCelda).length;
+  let h = '<div class="pmap-head">Góndola <b>' + escapeHtml(g) + '</b> · ' + nCeldas + ' celdas · ' +
+          Object.keys(ocupadas).length + ' con artículo · ' + libres + ' libres · ' +
+          'capacidad <b>' + pmapNum(capTot) + '</b> cajas' +
+          (Object.keys(emps).length ? ' · ' + escapeHtml(Object.keys(emps).sort().join("/")) : "") + '</div>';
+  h += '<div class="pmap-wrap"><div class="pmap-cols">';
+  const cols = Math.ceil(maxN / PMAP_ALTO) || 1;
+  for (let c = 0; c < cols; c++) {
+    h += '<div class="pmap-col">';
+    for (let lvl = PMAP_ALTO; lvl >= 1; lvl--) h += pmapCellHtml(g, c * PMAP_ALTO + lvl, porCelda);
+    h += '<div class="pmap-colft">' + (c * PMAP_ALTO + 1) + '–' + (c * PMAP_ALTO + PMAP_ALTO) + '</div>';
+    h += '</div>';
+  }
+  return h + '</div></div>';
+}
+function pmapCellHtml(g, n, porCelda) {
+  const its = porCelda[n];
+  if (!its || !its.length) return '<div class="pmap-cell pmap-libre" style="visibility:hidden"></div>';
+  const sec = String(its[0].sector || (g + (n < 10 ? "0" + n : n)));
+  const estados = its.map(function (r) { return r.estado; });
+  const cls = estados.indexOf("solo_capacidad") >= 0 ? "pmap-scap"
+            : estados.indexOf("solo_mapa") >= 0 ? "pmap-smapa"
+            : (its.length === 1 && estados[0] === "libre") ? "pmap-libre" : "";
+  const hit = _pmapQ && its.some(function (r) { return pmapMatch(r, _pmapQ); });
+  const libre = (its.length === 1 && its[0].estado === "libre");
+  let cuerpo = "", tip = sec;
+  if (libre) {
+    cuerpo = '<span class="pmap-cod">libre</span>';
+    tip += " · celda libre";
+  } else {
+    const vis = its.slice(0, 2);
+    cuerpo = vis.map(function (r) {
+      const cap = (r.cajas_max != null)
+        ? '<span class="pmap-cap"><b>' + pmapNum(r.cajas_max) + '</b> caj</span>'
+        : '<span class="pmap-cap pmap-nocap">s/cap</span>';
+      return '<span class="pmap-cod">' + escapeHtml(String(r.cod || "—")) + '</span>' + cap;
+    }).join("");
+    if (its.length > vis.length) cuerpo += '<span class="pmap-mas">+' + (its.length - vis.length) + ' más</span>';
+    tip = its.map(function (r) {
+      const d = pmapDesc(r);
+      return sec + " · " + String(r.cod || "") + (d ? " — " + d : "") +
+        " · " + (r.cajas_max != null ? r.cajas_max + " cajas" : "sin capacidad cargada") +
+        (r.estado === "solo_mapa" ? " · ⚠ el mapa lo pone acá pero no tiene capacidad cargada"
+         : r.estado === "solo_capacidad" ? " · ⚠ hay capacidad cargada acá pero el mapa no pone el artículo"
+         : "");
+    }).join("\n");
+  }
+  const click = libre ? "" : ' onclick="pmapBuscar(' + JSON.stringify(String(its[0].cod || "")).replace(/"/g, "&quot;") + ')"';
+  return '<div class="pmap-cell ' + cls + (hit ? " pmap-hit" : "") + '" title="' + escapeHtml(tip) + '"' + click + '>' +
+         '<span class="pmap-sec">' + escapeHtml(sec) + '</span>' + cuerpo + '</div>';
 }
 /* v11.13 — Sugerencia de N° de orden para un sector, MISMA lógica que el trigger
    backend planimetria_autoorden (sql/planimetria_autoorden.sql). Lee window.GONDOLA.

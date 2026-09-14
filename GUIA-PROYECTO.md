@@ -119,6 +119,30 @@
 > - SQL: `sql/gv_ppp_avance_dia.sql`. Detalle, medición y rollback: `docs/SUPABASE-GESTION-VIRGILIO.md`
 >   §3.ef. Test: `tests/ppp-avance.cjs`.
 >
+> Nota **v17.23 (2026-09-14, Thomas) — 🗺️ MAPA DE GÓNDOLAS: la planimetría dibujada.**
+> Pedido textual: *"quiero un módulo en la APP que muestre la planimetría · Góndola A / a5 502 Cap /
+> a4 502 Cap … así con todos"*. Está en **⚙️ Configuración → 🗺️ Mapa de góndolas** (supervisor), y es
+> **sólo lectura**: para editar sigue estando 📍 Lugares del depósito.
+>
+> - **Cómo se dibuja:** una góndola por vez (solapas A, B, C… Ñ, P), sus celdas en **columnas de 5**
+>   con la de **arriba primero** (a5 → a1, como el estante), y en cada celda el **código** y las
+>   **cajas que entran**. El corte de a 5 es el módulo real de góndola: todas las letras tienen la
+>   numeración corrida sin huecos (A=85, B/D/F/H/J/L/M/Ñ=60, C/E/G/I=20, P=40).
+> - **Buscar no filtra: resalta.** Un código vive en varias celdas y lo que se quiere ver es *dónde*
+>   están. Si lo buscado no está en la góndola abierta, salta sola a la primera que lo tiene y cada
+>   solapa muestra cuántas celdas tocó.
+> - **Los colores dicen el estado de la celda:** blanca (código + capacidad), gris punteada (libre),
+>   ámbar (el mapa lo pone ahí pero **no tiene capacidad cargada**), violeta (**hay capacidad y el
+>   mapa no pone el artículo**). Los dos últimos son la mitad abierta del **problema 84**, ahora a la
+>   vista en la pantalla y no sólo en una consulta.
+> - **De dónde sale el dato:** la vista nueva **`gv_planimetria_celda`** (`sql/gv_planimetria_celda.sql`),
+>   que cruza `GV_Lugar` + `GV_Lugar_Item` (el mapa) con `Capacidad_Sector` (el máximo por celda) y
+>   resuelve el empate con `coalesce(item, capacidad)`, diciendo en `max_fuente` de dónde salió — el
+>   front no decide nada. Hoy **`GV_Lugar_Item.cajas_max` está NULL en las 782 filas**, así que todos
+>   los máximos salen de `Capacidad_Sector`; cuando se haga el backfill la pantalla no cambia.
+>   Normaliza el sector (**J9 y J09 son la misma celda**) y el código (`gv_cod_stock`: 066 = 66).
+> - Test: `tests/pmap-gondolas.cjs`. Detalle y rollback: `docs/SUPABASE-GESTION-VIRGILIO.md` §3.eq.
+
 > Nota **v15.40 (2026-09-11) — HANDOFF de planimetría / Acacia: `docs/HANDOFF-PLANIMETRIA-Y-ACACIA.md`.**
 > Thomas sigue este tema en otra sesión. Ahí está todo junto: los **13 artículos activos del catálogo LK
 > sin sector** (+ 578 y el caso 517/991E), las tres reglas de qué alertas de planimetría son ruido
