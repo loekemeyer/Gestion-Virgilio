@@ -5036,7 +5036,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=17.53"></script>
+<script type="module" src="recepcion.js?v=17.54"></script>
 <!-- Config del módulo de fichada (compartido con fichada.html). El secret
      hmacSecret tiene que ser el mismo acá y allá; cargándolo desde un solo
      archivo evitamos que se desincronicen. -->
@@ -7145,6 +7145,8 @@ try {
    hora, en vez de una pantalla vacía. ===== */
 const PPP_OP_ENDPOINT  = SUPABASE_URL + "/rest/v1/gv_ppp_resumen_dias";
 const PPP_OP_CACHE_KEY = "vir_ppp_resumen_op_v1";
+const PPP_OP_DET_ENDPOINT  = SUPABASE_URL + "/rest/v1/gv_ppp_detalle_dia";
+const PPP_OP_DET_CACHE_KEY = "vir_ppp_detalle_op_v1";
 const PPP_OP_DIAS      = 14;      // cuántos días CON programación se listan (no días de calendario)
 
 try {
@@ -7182,7 +7184,16 @@ function _pppOpCss() {
     + ".pppop-tbl tr:last-child td{border-bottom:none;}"
     + ".pppop-hoy td{font-weight:800;}"
     + ".pppop-tot td{border-top:2px solid #cbd5e1;font-weight:800;}"
-    + ".pppop-msg{font-size:13px;color:#64748b;padding:8px 0 0;line-height:1.35;}";
+    + ".pppop-msg{font-size:13px;color:#64748b;padding:8px 0 0;line-height:1.35;}"
+    + ".pppop-dia{cursor:pointer;}"
+    + ".pppop-dia td:first-child{color:#1e6bd6;}"
+    + ".pppop-chev{color:#94a3b8;font-weight:700;padding-left:6px;}"
+    /* el detalle necesita más ancho que el resumen: 4 columnas con nombres de cliente */
+    + "#pppOpModal.det .pppop-card{max-width:460px;}"
+    + ".pppop-det-top{display:flex;align-items:center;gap:10px;padding:0 0 8px;}"
+    + ".pppop-volver{background:#eef2f7;color:#1e6bd6;border:none;border-radius:8px;padding:6px 11px;font-size:14px;font-weight:800;cursor:pointer;width:auto;}"
+    + ".pppop-tbl td.pppop-cli,.pppop-tbl th.pppop-cli{text-align:left;}"
+    + ".pppop-tbl td.pppop-cli{white-space:normal;line-height:1.25;}";
   document.head.appendChild(s);
 }
 function pppOpAbrir() {
@@ -7236,12 +7247,86 @@ function pppOpRender(rows, hoy, aviso) {
     const f = String(r.fecha).slice(0, 10);
     const esHoy = (f === hoy);
     sm3 += Number(r.m3) || 0; stan += Number(r.tandas) || 0; snp += Number(r.nps) || 0;
-    html += '<tr' + (esHoy ? ' class="pppop-hoy"' : '') + '><td>'
-         + escapeHtml(String(r.dia || "")) + " " + escapeHtml(f.slice(8, 10) + "/" + f.slice(5, 7)) + (esHoy ? " (hoy)" : "")
-         + '</td><td>' + _pppOpM3(r.m3) + '</td><td>' + (Number(r.tandas) || 0) + '</td><td>' + (Number(r.nps) || 0) + '</td></tr>';
+    html += '<tr class="pppop-dia' + (esHoy ? " pppop-hoy" : "") + '" onclick="pppOpDia(\'' + f + '\')">'
+         + '<td>' + escapeHtml(String(r.dia || "")) + " " + escapeHtml(f.slice(8, 10) + "/" + f.slice(5, 7)) + (esHoy ? " (hoy)" : "")
+         + '<span class="pppop-chev">›</span></td>'
+         + '<td>' + _pppOpM3(r.m3) + '</td><td>' + (Number(r.tandas) || 0) + '</td><td>' + (Number(r.nps) || 0) + '</td></tr>';
   }
   html += '</tbody><tfoot><tr class="pppop-tot"><td>Total</td><td>' + _pppOpM3(sm3) + '</td><td>' + stan + '</td><td>' + snp + '</td></tr></tfoot></table>';
   body.innerHTML = html + avisoHtml;
+  _pppOpUlt = { rows: rows, hoy: hoy, aviso: aviso };
+  const ov = document.getElementById("pppOpModal"); if (ov) ov.classList.remove("det");
+  const ti = document.querySelector("#pppOpModal .pppop-title"); if (ti) ti.textContent = "🗓️ PPP";
+}
+
+/* ===== El DETALLE del día: qué sale, pedido por pedido (v17.54) ==========
+   Dueño (2026-09-14): "debe poder clickear sobre el día y ver la composición
+   de lo que sale ese día. Cuando entra que vea ordenado x número de NP".
+   Sale de `gv_ppp_detalle_dia`, que se arma con las mismas dos fuentes y el
+   mismo criterio que el resumen: los totales de las dos vistas coinciden.
+   El orden lo pide la consulta (`np_num`), no el front. ===== */
+let _pppOpUlt = null;      // último resumen mostrado, para volver sin re-pedirlo
+let _pppOpDet = {};        // detalle ya bajado en esta sesión, por fecha
+
+function pppOpVolver() {
+  if (_pppOpUlt) pppOpRender(_pppOpUlt.rows, _pppOpUlt.hoy, _pppOpUlt.aviso);
+  else pppOpCargar();
+}
+function _pppOpDetCache(fecha, rows) {
+  let c = {};
+  try { c = JSON.parse(localStorage.getItem(PPP_OP_DET_CACHE_KEY) || "{}") || {}; } catch (_e) { c = {}; }
+  const hoy = getTodayKey();
+  for (const k in c) { if (k < hoy) delete c[k]; }        // lo de ayer no sirve más
+  c[fecha] = { ts: Date.now(), rows: rows };
+  try { localStorage.setItem(PPP_OP_DET_CACHE_KEY, JSON.stringify(c)); } catch (_e) {}
+}
+function _pppOpDetLeer(fecha) {
+  try { return (JSON.parse(localStorage.getItem(PPP_OP_DET_CACHE_KEY) || "{}") || {})[fecha] || null; }
+  catch (_e) { return null; }
+}
+async function pppOpDia(fecha) {
+  fecha = String(fecha || "").slice(0, 10); if (!fecha) return;
+  const body = document.getElementById("pppOpBody"); if (!body) return;
+  if (_pppOpDet[fecha]) { pppOpDetRender(fecha, _pppOpDet[fecha], ""); return; }
+  body.innerHTML = '<div class="pppop-msg">Cargando el día…</div>';
+  const url = PPP_OP_DET_ENDPOINT + "?select=np,np_num,tanda,m3,razon_social,cod,localidad"
+            + "&fecha=eq." + fecha + "&order=np_num.asc,np.asc&limit=2000";
+  try {
+    const r = await fetch(url, { headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY }, cache: "no-store" });
+    if (!r.ok) throw new Error("HTTP " + r.status);
+    const rows = await r.json();
+    _pppOpDet[fecha] = rows; _pppOpDetCache(fecha, rows);
+    pppOpDetRender(fecha, rows, "");
+  } catch (e) {
+    const c = _pppOpDetLeer(fecha);
+    if (c && Array.isArray(c.rows)) pppOpDetRender(fecha, c.rows, "⚠ Sin conexión — esto es lo último que bajó (" + formatDateTime(c.ts) + ").");
+    else body.innerHTML = '<div class="pppop-det-top"><button class="pppop-volver" onclick="pppOpVolver()">← Días</button></div>'
+       + '<div class="pppop-msg">⚠ No pude traer el día (' + escapeHtml(String((e && e.message) || e)) + ').<br>Probá de nuevo con señal.</div>';
+  }
+}
+function pppOpDetRender(fecha, rows, aviso) {
+  const body = document.getElementById("pppOpBody"); if (!body) return;
+  const ov = document.getElementById("pppOpModal"); if (ov) ov.classList.add("det");
+  rows = (rows || []).filter(function (r) { return r && r.np; });
+  const f = String(fecha).slice(0, 10);
+  const dia = (_pppOpUlt && (_pppOpUlt.rows || []).filter(function (x) { return String(x.fecha).slice(0, 10) === f; })[0]) || null;
+  const titulo = (dia && dia.dia ? dia.dia + " " : "") + f.slice(8, 10) + "/" + f.slice(5, 7);
+  const ti = document.querySelector("#pppOpModal .pppop-title"); if (ti) ti.textContent = "🗓️ PPP · " + titulo;
+  let html = '<div class="pppop-det-top"><button class="pppop-volver" onclick="pppOpVolver()">← Días</button></div>';
+  if (!rows.length) { body.innerHTML = html + '<div class="pppop-msg">Ese día no tiene nada programado.</div>'; return; }
+  let sm3 = 0; const tandas = {};
+  html += '<table class="pppop-tbl"><thead><tr><th>NP</th><th class="pppop-cli">Cliente</th><th>Tanda</th><th>Mt3</th></tr></thead><tbody>';
+  for (const r of rows) {
+    sm3 += Number(r.m3) || 0; tandas[String(r.tanda || "—")] = 1;
+    html += '<tr><td>' + escapeHtml(String(r.np)) + '</td>'
+         + '<td class="pppop-cli">' + escapeHtml(String(r.razon_social || r.cod || "—")) + '</td>'
+         + '<td>' + escapeHtml(String(r.tanda || "—")) + '</td>'
+         + '<td>' + _pppOpM3(r.m3) + '</td></tr>';
+  }
+  html += '</tbody><tfoot><tr class="pppop-tot"><td>' + rows.length + ' NP</td>'
+       + '<td class="pppop-cli">' + Object.keys(tandas).length + ' tanda(s)</td><td></td><td>' + _pppOpM3(sm3) + '</td></tr></tfoot></table>';
+  if (aviso) html += '<div class="pppop-msg">' + escapeHtml(aviso) + '</div>';
+  body.innerHTML = html;
 }
 
 // v9.15: Planilla Conteo removida — no se usa
@@ -8267,7 +8352,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v17.53";
+const APP_VERSION = "v17.54";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción

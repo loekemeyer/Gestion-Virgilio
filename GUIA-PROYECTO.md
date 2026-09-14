@@ -70,7 +70,19 @@ Pedido de Luis. Dos cosas:
 > única**; no se replica. Ante la duda entre parche rápido y fix de raíz → **fix
 > de raíz**.
 >
-> Última actualización: 2026-09-14 (domingo) · Versión app al documentar: **v17.48**
+> Última actualización: 2026-09-14 (domingo) · Versión app al documentar: **v17.54**
+>
+> Nota **v17.54 (2026-09-14, Thomas) — en el PPP del operario se toca el día y se ve QUÉ SALE.**
+> *"Debe poder clickear sobre el día y ver la composición de lo que sale ese día. Cuando entra que
+> vea ordenado x número de NP"*. La fila del día (v17.48) ahora es tocable y abre, en el mismo modal,
+> el detalle: **NP · Cliente · Tanda · Mt3**, con el pie de NP / tandas / m³ y `← Días` para volver.
+> Sale de la vista nueva **`gv_ppp_detalle_dia`** (`sql/gv_ppp_detalle_dia.sql`), que usa **las mismas
+> dos fuentes y el mismo criterio** que `gv_ppp_resumen_dias`: comparados los 9 días programados,
+> filas/m³/tandas del detalle coinciden exactamente con el resumen. **El orden lo pide la consulta**
+> (`order=np_num.asc`), no el front; `np_num` es el número pelado de la NP, así que la web (4 dígitos)
+> va antes que ISIS (5). La etiqueta la arma `gv_ppp_web_np_label`, la misma del front. Cada día abierto
+> queda cacheado (`vir_ppp_detalle_op_v1`), así que sin señal también se abre.
+> §3.fj de `docs/SUPABASE-GESTION-VIRGILIO.md` · test `tests/ppp-operario.cjs`.
 >
 > Nota **v17.48 (2026-09-14, Thomas) — el OPERARIO ve la PPP desde su botonera.**
 > *"Quiero que desde la botonera de los operarios tengan un botón para ver la PPP"*, con el formato

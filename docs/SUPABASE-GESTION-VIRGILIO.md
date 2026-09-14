@@ -13853,3 +13853,70 @@ abierta a `anon`.
 `zz_backups`. La normalización de LECTURA (§3.fg) es independiente y puede quedarse: con ella
 puesta, revertir esto no vuelve a mostrar duplicados, sólo los vuelve a escribir. Todo en
 `sql/gv_cuarentena_clave_unica_v1753.sql`.
+---
+
+## §3.fj — v17.54: se toca el día y se ve QUÉ SALE, ordenado por NP (`gv_ppp_detalle_dia`) — 2026-09-14
+
+**Pedido del dueño (14/09), sobre el botón PPP de la v17.48 (§3.ff):** *"debe poder clickear
+sobre el día y ver la composición de lo que sale ese día. Cuando entra que vea ordenado x número
+de NP"*.
+
+### Qué se agregó
+
+La fila del día pasó a ser tocable (fecha en azul + `›`). Abre el detalle **dentro del mismo
+modal**, con `← Días` para volver:
+
+| Columna | Qué es |
+|---|---|
+| NP | `LK 0028` / `CH 0011` para la web, el número crudo para ISIS |
+| Cliente | razón social; si no hay, el código |
+| Tanda | `E12L`, `D69F`… (`—` si no tiene) |
+| Mt3 | m³ del pedido, coma decimal |
+
+Pie: cantidad de NP, cuántas tandas distintas y el m³ del día.
+
+### El objeto nuevo: `public.gv_ppp_detalle_dia`
+
+Vista **nueva** (`gv_`, `security_invoker = true`, `grant select` a `anon`/`authenticated`),
+definición completa en **`sql/gv_ppp_detalle_dia.sql`**. Es el detalle de `gv_ppp_resumen_dias`:
+**las mismas dos fuentes y el mismo criterio**, una fila por pedido en vez de una por día — a
+propósito, para que los dos números cierren. Verificado el 14/09, día por día:
+
+```
+ fecha      | filas det | m3 det | tandas det || nps res | m3 res | tandas res
+ 2026-09-14 |    12     |  5,16  |     4      ||   12    |  5,16  |     4
+ 2026-09-15 |    28     |  6,15  |    12      ||   28    |  6,15  |    12
+ 2026-09-16 |    14     | 13,43  |     7      ||   14    | 13,43  |     7
+ 2026-09-17 |    58     |  9,24  |    21      ||   58    |  9,24  |    21
+ 2026-09-18 |    24     |  6,46  |     5      ||   24    |  6,46  |     5
+```
+(9 días comparados, ninguno difiere.)
+
+**El orden lo pide la consulta, no el front**: `order=np_num.asc,np.asc`. `np_num` es el número
+pelado de la NP — para ISIS, los dígitos del `np`; para la web, el contador propio. Como las NP
+web son de 4 dígitos (v13.70) y las de ISIS de 5, la web queda primero. El desempate por
+etiqueta existe porque `CH 0010` y `LK 0010` comparten número.
+
+La etiqueta la arma **`gv_ppp_web_np_label`**, la misma función que usa el front — no se
+reescribió el formato por segunda vez. Un pedido web sin NP asignada todavía se muestra como
+`LK pedido 1398`.
+
+### Front
+
+`index.html`: `PPP_OP_DET_ENDPOINT`, `pppOpDia`, `pppOpDetRender`, `pppOpVolver`. El detalle de
+cada día se guarda en memoria (`_pppOpDet`) y en `localStorage`
+(`vir_ppp_detalle_op_v1`, podado a fechas ≥ hoy), así que **sin señal también se abre**, con la
+hora de la bajada. Volver a "Días" **no re-consulta** el resumen: se guarda el último
+(`_pppOpUlt`).
+
+Test: `tests/ppp-operario.cjs` cubre ahora encabezado del detalle, orden por NP, alineación
+(NP y Cliente a la izquierda, Tanda y Mt3 a la derecha), totales del pie, que la consulta lleve
+`fecha=eq.<día>` y `order=np_num.asc`, y que `← Días` vuelva sin re-consultar.
+
+### Rollback
+
+```sql
+drop view public.gv_ppp_detalle_dia;
+```
+y sacar del `index.html` `PPP_OP_DET_*` / `pppOpDia` / `pppOpDetRender` / `pppOpVolver` y el
+`onclick` de la fila del día.
