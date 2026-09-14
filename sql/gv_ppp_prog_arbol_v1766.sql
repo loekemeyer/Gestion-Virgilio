@@ -51,7 +51,10 @@ returns table(
   pide_horario   boolean,  -- este cliente coordina horario (super, los 3 aparte, o retira)
   horario_fecha  date,
   horario_franja text,
-  horario_origen text      -- 'cliente' (lo eligio en la pagina) | 'manual' (lo puso quien programa)
+  horario_origen text,     -- 'cliente' (lo eligio en la pagina) | 'manual' (lo puso quien programa)
+  -- v17.76 (Luis): lo que la fila de la NP muestra ademas del cliente
+  barrio        text,      -- el barrio de verdad, sin caer a la direccion como `localidad`
+  fecha_pedido  date       -- cuando entro el pedido (fecha_recep)
 )
 language sql
 stable
@@ -69,6 +72,9 @@ with fuentes as (
                   btrim(coalesce(p.direccion, '')))                        as localidad,
          coalesce(btrim(p.zona), '')                                       as zona,
          regexp_replace(btrim(p.np), '\.0+$', '')                          as clave,
+         nullif(btrim(coalesce(p.barrio, '')), '')                          as barrio,
+         case when left(btrim(coalesce(p.fecha_recep, '')), 10) ~ '^\d{4}-\d{2}-\d{2}$'
+              then left(btrim(p.fecha_recep), 10)::date end                 as fecha_pedido,
          'isis'::text                                                      as origen
     from public.gv_ppp_programacion_diaria p
    where left(btrim(coalesce(p.fecha_entrega, '')), 10) ~ '^\d{4}-\d{2}-\d{2}$'
@@ -83,6 +89,8 @@ with fuentes as (
          coalesce(nullif(btrim(coalesce(w.barrio, '')), ''), btrim(coalesce(w.direccion, ''))),
          coalesce(btrim(w.zona), ''),
          w.order_id::text,
+         nullif(btrim(coalesce(w.barrio, '')), ''),
+         w.fecha_recep::date,
          'web'
     from public."PPP_Web_Programacion" w
    where w.tanda is not null and btrim(w.tanda) <> ''
@@ -94,7 +102,7 @@ with fuentes as (
          f.fecha_salida,
          coalesce(btrim(f.cod_cliente), ''),
          coalesce(btrim(f.razon_social), ''),
-         '', '', regexp_replace(upper(btrim(f.np)), '\.0+$', ''), 'fact'
+         '', '', regexp_replace(upper(btrim(f.np)), '\.0+$', ''), null::text, null::date, 'fact'
     from public."Facturacion_NP" f
    where f.fecha_salida is not null
   union all
@@ -106,7 +114,7 @@ with fuentes as (
               then left(btrim(h.fecha_entrega), 10)::date end,
          coalesce(btrim(h.cod), ''),
          coalesce(btrim(h.rs), ''),
-         '', '', regexp_replace(btrim(h.np), '\.0+$', ''), 'hist'
+         '', '', regexp_replace(btrim(h.np), '\.0+$', ''), null::text, null::date, 'hist'
     from public."GV_PPP_Entregados_Historico" h
 ),
 uni as (
@@ -134,7 +142,7 @@ salio as (   -- cargado al camión (CCN) o remito controlado (CRN) = salió, o s
 ),
 fact as (select distinct regexp_replace(upper(btrim(f.np)), '\.0+$', '') as np from public."Facturacion_NP" f),
 est as (
-  select d.fe, d.np, d.tanda, d.m3, d.cod, d.razon_social, d.localidad, d.zona, d.origen, d.clave,
+  select d.fe, d.np, d.tanda, d.m3, d.cod, d.razon_social, d.localidad, d.zona, d.origen, d.clave, d.barrio, d.fecha_pedido,
          (fc.np is not null)                                   as b_fact,
          (s.np is not null or a.opcion = 'TAP')                as b_arm,
          (a.opcion = 'AP' or p.opcion in ('TP','EP'))          as b_curso
@@ -174,7 +182,8 @@ select e.fe,
             else                1 end,
        e.clave,
        public.gv_pide_horario_np(e.np, e.cod, e.zona),
-       h.fecha, h.franja, h.origen
+       h.fecha, h.franja, h.origen,
+       e.barrio, e.fecha_pedido
   from est e
   -- el horario se busca por la clave del pedido Y por la NP: en A Programar la clave de un
   -- pedido web es su order_id, y cuando se programa recibe ademas su NP.

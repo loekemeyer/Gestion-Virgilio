@@ -14883,3 +14883,62 @@ la vista le pone la L y el cod de Chef, y el mapeo lo toma solo en la corrida si
 
 SQL, medición y rollback: `sql/gv_cliente_isis_v1775.sql`; definición previa de las tres funciones en
 `sql/backups/gv_cuarentena_pre_v1775_20260914.sql`.
+
+## §3.fp — v17.76: la fila de la NP dice de quién es, y los 4 estados se achican — 2026-09-14
+
+Pedido de Luis, mirando la tabla de Programación:
+
+1. *"Programación > NP particular. Quiero que ahí aparezca el código de cliente (si es pedido de LK
+   el código LK, si es de CH, CH), barrio al lado de zona y fecha de pedido."*
+2. *"Quiero que las cuatro columnas que denotan estado del pedido (facturado, armado, en proceso y
+   pendientes) ocupen el menor espacio posible para darle más espacio a la info de cada NP.
+   Mandalas bien a la izquierda de la tabla, en doble fila si hace falta y agregales el color de
+   identidad (verde, azul, etc) en el header."*
+
+### Backend — dos columnas más en `gv_ppp_prog_arbol`
+
+| Columna | De dónde sale |
+|---|---|
+| `barrio` | `barrio` a secas de `gv_ppp_programacion_diaria` / `PPP_Web_Programacion`. ⚠ **No es `localidad`**: ésa cae a la dirección cuando no hay barrio, y acá se quiere el barrio o nada. |
+| `fecha_pedido` | `fecha_recep` de las mismas dos tablas (cuándo entró el pedido). |
+
+`Facturacion_NP` y `GV_PPP_Entregados_Historico` no tienen ninguno de los dos → `null::text` /
+`null::date` (tipados a propósito: en un `union all` con la primera rama calculada, un `null` pelado
+puede quedar sin tipo).
+
+El código de cliente y su prefijo ya estaban (`cod` y `empresa`), sólo faltaba mostrarlos.
+
+⚠ La función se **dropea y recrea** otra vez (cambia el tipo de retorno). No le cuelga nada; sólo
+la llama el front por RPC.
+
+### Front — el orden de las columnas cambió
+
+Ahora es: **`Facturado · Armado · En proceso · Pendientes` | Día | m³ | Tandas | NPs**.
+
+- Los 4 estados van **primeros y angostos**, con el encabezado partido en dos renglones
+  (`Factu/rado`, `Ar/mado`, `En/proceso`, `Pen/dientes`) y **una línea del color de cada uno arriba**
+  (verde / azul / ámbar / gris), que es el mismo color con el que se pinta el número.
+- El truco para que se encojan: **todas** las columnas a `width:1%` y la 5ª a `width:100%` — así el
+  ancho sobrante se lo lleva entero la columna de la info. Con `width:auto` el navegador lo repartía
+  y los 4 estados se comían media tabla.
+
+⚠ **La columna que manda ahora es la 5ª, no la 1ª.** Todas las reglas CSS que decían
+`:first-child` (indentación de tanda y NP, el color del día, el chip HOY, el borde de estado de la
+tanda, la columna fija en el celular) pasaron a `:nth-child(5)`. Si se agrega o saca una columna
+antes, hay que mover ese número.
+
+La fila de la NP quedó:
+
+```
+▸ LK 0058 [WEB] [En proceso] [🕑 …] [LK 2118] Ricci Gabriel Edgardo  Zona 2 - CABA Centro · Villa Crespo  ped. 11/09
+```
+
+Zona y barrio se juntan con `·` y se deduplican (si el barrio es igual a la zona no se repite).
+
+### Medición (14/09)
+
+En el árbol (−180 / +120 días): 2.239 NP · 762,36 m³ · **212 con barrio** · **206 con fecha de
+pedido** · 186 con badge de horario. Los pedidos de `Facturacion_NP` / histórico quedan sin barrio
+ni fecha de pedido, que es lo esperado: esas tablas no los guardan.
+
+Test: `tests/ppp-tabla-arbol.cjs` (30 chequeos).

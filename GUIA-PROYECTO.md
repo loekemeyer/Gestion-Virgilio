@@ -1,3 +1,22 @@
+## Nota v17.76 (2026-09-14) — la fila de la NP dice de quién es, y los 4 estados se achican
+
+Pedido de Luis sobre la tabla de Programación:
+
+- **La fila de cada NP** muestra ahora el **código de cliente con su prefijo** (`LK 2118` / `CH 2118`,
+  según de qué empresa sea el pedido), el **barrio al lado de la zona** (`Zona 2 - CABA Centro ·
+  Villa Crespo`) y la **fecha en que entró el pedido** (`ped. 11/09`). El barrio sale del campo
+  `barrio` a secas — no de `localidad`, que cae a la dirección cuando no hay barrio.
+- **Las 4 columnas de estado** (Facturado · Armado · En proceso · Pendientes) se fueron **al
+  principio de la tabla**, lo más angostas posible, con el encabezado partido en dos renglones y
+  **una línea del color de cada una arriba**. Todo el ancho que sobra es para la info de la NP, que
+  ahora entra en un solo renglón.
+
+⚠ Para el que toque el CSS: **la columna que manda pasó a ser la 5ª**, no la 1ª. Las reglas que
+decían `:first-child` (indentación, color del día, chip HOY, borde de la tanda, columna fija en el
+celular) ahora son `:nth-child(5)`.
+
+§3.fp de `docs/SUPABASE-GESTION-VIRGILIO.md` · `sql/gv_ppp_prog_arbol_v1766.sql`.
+
 ## Nota v17.74 (2026-09-14) — badge de HORARIO en A Programar
 
 Pedido de Luis. Los clientes que **coordinan horario** llevan un badge 🕑 en su ficha de A

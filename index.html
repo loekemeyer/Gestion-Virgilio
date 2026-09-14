@@ -3099,46 +3099,65 @@ tr.ppp-err-zona > td{ background:#fffbeb !important; }
 .pga{ width:100%; border-collapse:collapse; font-size:14px; color:#0f172a; }
 .pga th{ position:sticky; top:0; z-index:2; background:#f8fafc; text-align:right; font-size:10.5px; font-weight:800;
   letter-spacing:.05em; text-transform:uppercase; color:#64748b; padding:10px 12px; border-bottom:2px solid #cbd5e1; white-space:nowrap; }
-.pga th:first-child{ text-align:left; }
 .pga td{ text-align:right; padding:7px 12px; border-bottom:1px solid #eef2f7; white-space:nowrap; font-variant-numeric:tabular-nums; }
-.pga td:first-child{ text-align:left; }
+/* v17.76 (Luis) — las 4 columnas de estado van PRIMERAS, lo más angostas posible (el encabezado
+   parte en dos renglones) y con el color de cada una arriba. La 5ª, la del día / la tanda / la NP,
+   se queda con todo el ancho que sobra: es la que tiene la info que se lee. */
+/* El truco para que se encojan: TODAS las columnas a `width:1%` + nowrap, y la 5ª a `width:100%`
+   — así el reparto del ancho sobrante se lo lleva entera la columna de la info. */
+.pga th, .pga td{ width:1%; }
+.pga th:nth-child(-n+4), .pga td:nth-child(-n+4){ padding-left:8px; padding-right:8px; text-align:right; }
+.pga th:nth-child(5), .pga td:nth-child(5){ text-align:left; width:100%; }
+.pga-h{ text-align:right !important; line-height:1.15; padding-top:7px !important; padding-bottom:7px !important;
+  border-top:3px solid transparent; letter-spacing:.02em; }
+.pga-h.fac{ border-top-color:#15803d; color:#15803d; }
+.pga-h.arm{ border-top-color:#1d4ed8; color:#1d4ed8; }
+.pga-h.pro{ border-top-color:#b45309; color:#b45309; }
+.pga-h.pen{ border-top-color:#94a3b8; color:#475569; }
 .pga-chev{ display:inline-block; width:12px; color:#94a3b8; font-weight:700; }
+/* ⚠ La columna que manda es la 5ª (día / tanda / NP), no la 1ª: las cuatro primeras son los
+   porcentajes de estado (v17.76). Por eso las reglas van a `nth-child(5)` y no a `first-child`. */
 /* fila de DÍA */
 .pga-d{ cursor:pointer; }
-.pga-d>td{ border-left:4px solid transparent; border-top:2px solid #e2e8f0; font-weight:700; }
+.pga-d>td{ border-top:2px solid #e2e8f0; font-weight:700; }
 .pga tbody tr:first-child>td{ border-top:none; }
-.pga-d>td:first-child{ color:#1e6bd6; font-weight:800; }
+.pga-d>td:nth-child(5){ color:#1e6bd6; font-weight:800; }
 .pga-d:hover>td{ background:#f8fbff; }
 .pga-d.on>td{ background:#eff6ff; }
-.pga-d.hoy>td:first-child::after{ content:"HOY"; background:#1e6bd6; color:#fff; font-size:9.5px; font-weight:900;
+.pga-d.hoy>td:nth-child(5)::after{ content:"HOY"; background:#1e6bd6; color:#fff; font-size:9.5px; font-weight:900;
   border-radius:999px; padding:1px 7px; margin-left:7px; vertical-align:1px; letter-spacing:.04em; }
 /* fila de TANDA — el color dice en qué está */
 .pga-t{ cursor:pointer; }
 .pga-t>td{ font-size:13px; }
-.pga-t>td:first-child{ padding-left:30px; font-weight:800; }
+.pga-t>td:nth-child(5){ padding-left:26px; font-weight:800; }
 .pga-t:hover>td{ filter:brightness(.98); }
-.pga-t.e-facturado>td{ background:#f4fdf7; } .pga-t.e-facturado>td:first-child{ box-shadow:inset 4px 0 0 #15803d; color:#14532d; }
-.pga-t.e-armado>td{    background:#f5f9ff; } .pga-t.e-armado>td:first-child{    box-shadow:inset 4px 0 0 #1d4ed8; color:#1e3a8a; }
-.pga-t.e-proceso>td{   background:#fffcf3; } .pga-t.e-proceso>td:first-child{   box-shadow:inset 4px 0 0 #d97706; color:#92400e; }
-.pga-t.e-pendiente>td{ background:#fafbfc; } .pga-t.e-pendiente>td:first-child{ box-shadow:inset 4px 0 0 #cbd5e1; color:#475569; }
+.pga-t.e-facturado>td{ background:#f4fdf7; } .pga-t.e-facturado>td:nth-child(5){ box-shadow:inset 4px 0 0 #15803d; color:#14532d; }
+.pga-t.e-armado>td{    background:#f5f9ff; } .pga-t.e-armado>td:nth-child(5){    box-shadow:inset 4px 0 0 #1d4ed8; color:#1e3a8a; }
+.pga-t.e-proceso>td{   background:#fffcf3; } .pga-t.e-proceso>td:nth-child(5){   box-shadow:inset 4px 0 0 #d97706; color:#92400e; }
+.pga-t.e-pendiente>td{ background:#fafbfc; } .pga-t.e-pendiente>td:nth-child(5){ box-shadow:inset 4px 0 0 #cbd5e1; color:#475569; }
 .pga-sub{ font-weight:600; color:#94a3b8; font-size:11.5px; margin-left:7px; }
-/* fila de NP */
+/* fila de NP — acá va lo que se lee: NP, estado, horario, código de cliente, cliente, zona ·
+   barrio y la fecha en que entró el pedido (v17.76, pedido de Luis) */
 .pga-n{ cursor:pointer; }
 .pga-n>td{ font-size:12.5px; color:#334155; }
-.pga-n>td:first-child{ padding-left:56px; white-space:normal; line-height:1.3; }
+.pga-n>td:nth-child(5){ padding-left:48px; white-space:normal; line-height:1.45; }
 .pga-n:hover>td{ background:#f8fafc; }
 .pga-np{ font-weight:800; color:#0f172a; }
-.pga-cli{ color:#475569; margin-left:6px; }
-.pga-loc{ color:#94a3b8; font-size:11px; margin-left:6px; }
+.pga-cod{ display:inline-block; background:#eef4ff; color:#1e40af; border:1px solid #c7d9f7;
+  border-radius:6px; padding:0 6px; font-size:11px; font-weight:900; margin-left:7px; vertical-align:1px; }
+.pga-cli{ color:#334155; font-weight:700; margin-left:6px; }
+.pga-loc{ color:#94a3b8; font-size:11px; margin-left:7px; }
+.pga-ped{ color:#94a3b8; font-size:11px; margin-left:7px; font-variant-numeric:tabular-nums; }
 .pga-pill{ display:inline-block; font-size:10px; font-weight:900; border-radius:999px; padding:1px 8px; letter-spacing:.03em; margin-left:7px; vertical-align:1px; }
 .pga-pill.e-facturado{ background:#dcfce7; color:#14532d; } .pga-pill.e-armado{ background:#dbeafe; color:#1e3a8a; }
 .pga-pill.e-proceso{ background:#fef3c7; color:#92400e; }   .pga-pill.e-pendiente{ background:#f1f5f9; color:#64748b; }
 /* fila de CONTENIDO de la NP (los códigos y las cajas) */
-.pga-c>td{ padding:0 12px 12px 56px; background:#fbfdff; border-bottom:1px solid #e2e8f0; text-align:left; white-space:normal; }
+.pga-c>td{ padding:0; border-bottom:1px solid #e2e8f0; background:#fbfdff; }
+.pga-c>td:nth-child(2){ padding:0 12px 12px 48px; text-align:left; white-space:normal; }
 .pga-c .apr-tab{ max-width:520px; }
 /* los porcentajes, en números y con color */
-.pga-pct{ font-weight:800; }
-.pga-pct small{ font-weight:700; color:#94a3b8; font-size:10.5px; margin-left:4px; }
+.pga-pct{ font-weight:800; white-space:nowrap; }
+.pga-pct small{ font-weight:700; color:#94a3b8; font-size:10px; margin-left:3px; }
 .pga-pct.fac{ color:#15803d; } .pga-pct.arm{ color:#1d4ed8; }
 .pga-pct.pro{ color:#b45309; } .pga-pct.pen{ color:#475569; }
 .pga-pct.z{ color:#cbd5e1; font-weight:700; } .pga-pct.z small{ display:none; }
@@ -3146,18 +3165,17 @@ tr.ppp-err-zona > td{ background:#fffbeb !important; }
 .pga-msg{ padding:14px; font-size:13.5px; color:#64748b; }
 .pga-msg b{ color:#0f172a; }
 .pga-err{ color:#b42318; }
-/* En el celular la tabla no entra a lo ancho: scrollea adentro de su caja, y la primera columna
-   (el día / la tanda / la NP) queda fija, si no se pierde de vista justo lo que se está mirando. */
+/* En el celular la tabla no entra a lo ancho: scrollea adentro de su caja, y la columna del
+   día / la tanda / la NP queda fija, si no se pierde de vista justo lo que se está mirando. */
 @media (max-width:760px){
-  .pga{ font-size:13px; } .pga th, .pga td{ padding:6px 8px; }
-  .pga-t>td:first-child{ padding-left:20px; } .pga-n>td:first-child{ padding-left:34px; }
-  .pga-c>td{ padding-left:34px; } .pga-pct small{ display:none; }
-  .pga th:first-child, .pga td:first-child{ position:sticky; left:0; z-index:1;
+  .pga{ font-size:13px; } .pga th, .pga td{ padding:6px 7px; }
+  .pga-t>td:nth-child(5){ padding-left:18px; } .pga-n>td:nth-child(5){ padding-left:30px; }
+  .pga-c>td:nth-child(2){ padding-left:30px; } .pga-pct small{ display:none; }
+  .pga th:nth-child(5), .pga td:nth-child(5){ position:sticky; left:0; z-index:1;
     box-shadow:inset -1px 0 0 #e2e8f0; }
-  .pga th:first-child, .pga tfoot td:first-child{ z-index:3; background:#f8fafc; }
-  .pga-d>td:first-child, .pga-n>td:first-child, .pga-c>td{ background:#fff; }
-  .pga-d.on>td:first-child{ background:#eff6ff; }
-  .pga-c>td{ background:#fbfdff; }
+  .pga th:nth-child(5), .pga tfoot td:nth-child(5){ z-index:3; background:#f8fafc; }
+  .pga-d>td:nth-child(5), .pga-n>td:nth-child(5){ background:#fff; }
+  .pga-d.on>td:nth-child(5){ background:#eff6ff; }
 }
 
 /* v16.97 — AVANCE DEL DÍA (% listo / % armado). Tarjeta grande adentro de un día y
@@ -5164,7 +5182,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=17.75"></script>
+<script type="module" src="recepcion.js?v=17.76"></script>
 <!-- Config del módulo de fichada (compartido con fichada.html). El secret
      hmacSecret tiene que ser el mismo acá y allá; cargándolo desde un solo
      archivo evitamos que se desincronicen. -->
@@ -8577,7 +8595,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v17.75";
+const APP_VERSION = "v17.76";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -35148,12 +35166,14 @@ function _pppArbolHtml(programados) {
       '). <button class="pn-lnk" onclick="pgaRecargar()">Reintentar</button></div></div>';
   }
   if (!dias.length) return h + '<div class="pga-msg">No hay nada programado de hoy en adelante.</div></div>';
+  // v17.76 (Luis): los 4 estados van primero, angostos y con su color en el encabezado; todo el
+  // ancho que sobra es para la info de cada NP.
   h += '<table class="pga"><thead><tr>' +
+      '<th class="pga-h fac" title="Ya facturado">Factu<br>rado</th>' +
+      '<th class="pga-h arm" title="Armado y todavía sin facturar">Ar<br>mado</th>' +
+      '<th class="pga-h pro" title="Pickeando o armando ahora">En<br>proceso</th>' +
+      '<th class="pga-h pen" title="Programado para ese día y todavía sin empezar">Pen<br>dientes</th>' +
       '<th>Día</th><th>m³</th><th>Tandas</th><th>NPs</th>' +
-      '<th title="Ya facturado">Facturado</th>' +
-      '<th title="Armado y todavía sin facturar">Armado</th>' +
-      '<th title="Pickeando o armando ahora">En proceso</th>' +
-      '<th title="Programado para ese día y todavía sin empezar">Pendientes</th>' +
     '</tr></thead><tbody>';
   const hoy = _pppHoyKey();
   const tot = { m3: 0, nps: 0, tandas: 0, est: _pgaEstCero() };
@@ -35162,23 +35182,28 @@ function _pppArbolHtml(programados) {
     for (const k of PGA_EST) tot.est[k] += d.est[k];
     const ab = !!_pgaOpenD[d.key];
     h += '<tr class="pga-d' + (ab ? ' on' : '') + (d.key === hoy ? ' hoy' : '') + '" onclick="pgaAbrirDia(\'' + d.key + '\')">' +
+      _pgaPctFila(d.est, d.nps) +
       '<td><span class="pga-chev">' + (ab ? "▾" : "▸") + '</span>' + escapeHtml(_pgaDiaTxt(d.key)) + '</td>' +
-      '<td>' + _pppFmtM3(d.m3) + '</td><td>' + d.tandasArr.length + '</td><td>' + d.nps + '</td>' +
-      _pgaPctFila(d.est, d.nps) + '</tr>';
+      '<td>' + _pppFmtM3(d.m3) + '</td><td>' + d.tandasArr.length + '</td><td>' + d.nps + '</td></tr>';
     if (!ab) continue;
     for (const t of d.tandasArr) {
       const tb = !!_pgaOpenT[t.key], te = _pgaEstadoGrupo(t.est, t.nps);
       h += '<tr class="pga-t e-' + te + '" onclick="pgaAbrirTanda(\'' + escapeHtml(t.key) + '\')">' +
+        _pgaPctFila(t.est, t.nps) +
         '<td><span class="pga-chev">' + (tb ? "▾" : "▸") + '</span>' + escapeHtml(t.tanda) +
           '<span class="pga-pill e-' + te + '">' + PGA_EST_TXT[te] + '</span>' +
           '<span class="pga-sub">' + escapeHtml(_pgaZonaTanda(t)) + '</span></td>' +
-        '<td>' + _pppFmtM3(t.m3) + '</td><td></td><td>' + t.nps + '</td>' +
-        _pgaPctFila(t.est, t.nps) + '</tr>';
+        '<td>' + _pppFmtM3(t.m3) + '</td><td></td><td>' + t.nps + '</td></tr>';
       if (!tb) continue;
       for (const r of t.filas) {
         const nk = t.key + "|" + r.np, nb = !!_pgaOpenN[nk];
         const est = PGA_EST.indexOf(r.estado) >= 0 ? r.estado : "pendiente";
+        // v17.76 (Luis): "que ahí aparezca el código de cliente (si es pedido de LK el código LK,
+        // si es de CH, CH), barrio al lado de zona y fecha de pedido".
+        const _lug = [r.zona_corta || r.localidad || "", r.barrio || ""]
+          .filter(function (x, i, a) { return x && a.indexOf(x) === i; }).join(" · ");
         h += '<tr class="pga-n" onclick="pgaAbrirNp(\'' + escapeHtml(nk) + '\',\'' + escapeHtml(r.np) + '\')">' +
+          '<td class="n"></td><td class="n"></td><td class="n"></td><td class="n"></td>' +
           '<td><span class="pga-chev">' + (nb ? "▾" : "▸") + '</span>' +
             '<span class="pga-np">' + escapeHtml(r.np) + '</span>' + _npSrcChip(r.np) +
             '<span class="pga-pill e-' + est + '">' + PGA_EST_TXT[est] + '</span>' +
@@ -35187,15 +35212,21 @@ function _pppArbolHtml(programados) {
               ' title="' + ((r.horario_fecha || r.horario_franja) ? "Horario coordinado con el cliente. Se edita en A Programar."
                                                                   : "Este cliente coordina horario y no hay ninguno cargado. Se carga en A Programar.") + '">🕑 ' +
               escapeHtml(aprHorTxt({ fecha: r.horario_fecha, franja: r.horario_franja })) + '</span>' : '') +
-            '<span class="pga-cli">' + escapeHtml(r.razon_social || r.cod || "—") + '</span>' +
-            '<span class="pga-loc">' + escapeHtml(r.zona_corta || r.localidad || "") + '</span></td>' +
-          '<td>' + _pppFmtM3(r.m3) + '</td><td colspan="6"></td></tr>';
-        if (nb) h += '<tr class="pga-c"><td colspan="8">' + _pgaItemsHtml(r.np) + '</td></tr>';
+            (r.cod ? '<span class="pga-cod" title="Número de cliente en ' + (r.empresa === "CH" ? "Chef" : "Loekemeyer") + '">' +
+              escapeHtml(r.empresa || "LK") + " " + escapeHtml(r.cod) + '</span>' : '') +
+            '<span class="pga-cli">' + escapeHtml(r.razon_social || "—") + '</span>' +
+            (_lug ? '<span class="pga-loc">' + escapeHtml(_lug) + '</span>' : '') +
+            (r.fecha_pedido ? '<span class="pga-ped" title="Fecha en que entró el pedido">ped. ' +
+              escapeHtml(String(r.fecha_pedido).slice(8, 10) + "/" + String(r.fecha_pedido).slice(5, 7)) + '</span>' : '') +
+          '</td>' +
+          '<td>' + _pppFmtM3(r.m3) + '</td><td></td><td></td></tr>';
+        if (nb) h += '<tr class="pga-c"><td colspan="4"></td><td colspan="4">' + _pgaItemsHtml(r.np) + '</td></tr>';
       }
     }
   }
-  h += '</tbody><tfoot><tr><td>Total</td><td>' + _pppFmtM3(tot.m3) + '</td><td>' + tot.tandas + '</td><td>' + tot.nps + '</td>' +
-    _pgaPctFila(tot.est, tot.nps) + '</tr></tfoot></table></div>';
+  h += '</tbody><tfoot><tr>' + _pgaPctFila(tot.est, tot.nps) +
+    '<td>Total</td><td>' + _pppFmtM3(tot.m3) + '</td><td>' + tot.tandas + '</td><td>' + tot.nps + '</td>' +
+    '</tr></tfoot></table></div>';
   return h;
 }
 
