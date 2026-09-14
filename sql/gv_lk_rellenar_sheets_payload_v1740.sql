@@ -76,7 +76,7 @@ create or replace function public.gv_lk_rellenar_sheets_payload(
   p_ids                bigint[]    default null,   -- null = barrido; con ids = sólo esos
   p_dry_run            boolean     default true,   -- true = no escribe, sólo informa
   p_desde              timestamptz default '2026-09-11 00:00:00-03',  -- ⚠ piso duro, ver guarda 1
-  p_min_edad_min       integer     default 10,     -- deja respirar al front antes de meter mano
+  p_min_edad_min       integer     default 3,      -- deja respirar al front antes de meter mano
   p_ventana_rafaga_min integer     default 30,     -- reintentos del mismo cliente
   p_ventana_recarga_h  integer     default 6       -- recarga que SÍ entró
 )
@@ -199,7 +199,14 @@ begin
            d.ganador,
            case when d.accion = 'relleno' then d.payload end
       from decidido d
-     where not p_dry_run and (d.accion <> 'relleno' or d.id in (select id from escrito))
+     where not p_dry_run
+       and (d.accion <> 'relleno' or d.id in (select id from escrito))
+       -- Un descarte queda con el payload en NULL para siempre, así que el barrido lo
+       -- vuelve a evaluar en cada corrida. Sin esta línea se logueaba la MISMA fila cada
+       -- 10 minutos (~4.300 por mes y por descarte; lo cazó el 1428 el mismo día). El log
+       -- guarda la decisión, no cada vez que se vuelve a tomar.
+       and not exists (select 1 from public.gv_lk_payload_recuperado g
+                        where g.order_id = d.id and g.accion = d.accion)
     returning 1
   )
   select d.id, d.accion,

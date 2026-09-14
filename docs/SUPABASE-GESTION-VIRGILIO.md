@@ -14242,3 +14242,53 @@ del **camión entero** —el tope es del camión, no de lo que se está mirando�
 
 Medido al 14/09: ningún camión pasado; los tres que superan 6 m³ son de **un solo pedido** (9,25 ·
 6,47 · 6,17 m³) y el tope los acompaña, así que no se marcan.
+## §3.dq — v17.44: Tierra del Fuego verificado cliente por cliente, y el log del barrido se repetía — 2026-09-14
+
+### Tierra del Fuego: la regla ya cubre a los 10 clientes
+
+Pedido de Tomás González: *"todos los pedidos de Tierra del Fuego cargados a Chef, con los artículos
+de Loekemeyer y una L al final"*. **Ya funciona** — se verificó evaluando la misma expresión que usa
+`v_pedidos_web` (`coalesce(gv_isis_override.isis_empresa, case when provincia ilike '%tierra del
+fuego%' then 'chef' else 'lk' end)`) sobre **todas** las direcciones de entrega de TdF:
+
+| Cód. LK | Cliente | Va al ISIS de | Lleva L | Cód. en Chef |
+|---:|---|---|---|---:|
+| 490 | Aimetta Jorge Gustavo | chef | sí | 2460 |
+| 687 | Domingo Granja S.A. (2 sucursales) | chef | sí | 2461 |
+| 1941 | Alesso Vilarino Liliana (2 sucursales) | chef | sí | 2600 |
+| 2293 | Il Cheff | chef | sí | 2465 |
+| 2322 | La Victoria S.R.L | chef | sí | 2458 |
+| 2528 | Caticha Jorge Nazareno (2 sucursales) | chef | sí | 2508 |
+| 3831 | El Martillo SRL | chef | sí | 2643 |
+| 4207 | South Naz S.A. | chef | sí | 2714 |
+| 4245 | Ferreyra Andrea Paola | chef | sí | 2691 |
+| **771** | **S.A. Imp y Exp de la Patagonia (La Anónima)** | **lk** | **no** | 1804 |
+
+**La Anónima es la excepción a propósito** (`gv_isis_override` por CUIT, dueño 07/09: *"se le vende
+por LK, no por CH"* aunque tenga sucursal en Ushuaia). Las otras nueve van a Chef con la L.
+
+**Los 10 tienen código de cliente en `chef_padron` cruzado por CUIT**, así que ninguna queda sin
+`cod_isis`. Y el barrido inverso —direcciones de Ushuaia / Río Grande / Tolhuin cuya `provincia` NO
+diga "Tierra del Fuego"— **devuelve 0 filas**: no hay ninguna que se escape de la regla por estar
+mal escrita. Medido con `~* '(ushuaia|usuahia|rio grande|río grande|tolhuin|t\.?\s*del\s*fuego|tdf|fueguin)'`.
+
+⚠ **Lo que NO se ve: la PPP no muestra a qué ISIS va el pedido.** El dato existe (`isis_empresa` en
+`v_pedidos_web`) pero la tarjeta sólo dice "web LK NNNN", que es lo correcto —la NP es de LK y se
+pickea de la góndola Loeke—, así que desde la pantalla no hay forma de saber que la factura sale por
+Chef salvo abrir el detalle y ver la L en los artículos. Por eso el 14/09 se pidió "convertir" un
+pedido (1431, Il Cheff) que ya estaba convertido. Queda como mejora pendiente: un badge "→ ISIS Chef".
+
+### El log del barrido se repetía en cada corrida
+
+Un descarte queda con el payload en `NULL` **para siempre**, así que `gv_lk_rellenar_sheets_payload`
+lo vuelve a evaluar cada 10 minutos y **volvía a loguearlo cada vez**. El pedido 1428 tenía 5 filas
+en `gv_lk_payload_recuperado` a las tres horas de creado el barrido: 13:14 (`descartado_rafaga`) y
+después 13:20, 13:30, 13:40 y 13:50 (`descartado_ya_cubierto`). Proyectado: ~4.300 filas por mes y
+por descarte.
+
+Corregido en el `insert` del CTE `logueado` con un `not exists` sobre `(order_id, accion)`: el log
+guarda la **decisión**, no cada vez que se vuelve a tomar. Las 4 filas repetidas del 1428 se dejaron
+—son inocuas y dejan constancia—. `sql/gv_lk_rellenar_sheets_payload_v1740.sql`.
+
+También quedó el umbral en **3 minutos** (era 10): mientras el front de la página no esté deployado
+en el IIS, cuanto antes entre el pedido a Gestión, mejor.
