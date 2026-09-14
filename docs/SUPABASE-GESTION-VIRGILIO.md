@@ -11533,3 +11533,49 @@ excepción, **el cron habría fallado en silencio todos los días**. `sql/gv_sto
 
 **Estado al cierre:** 0 saldos negativos en cualquier depósito, 0 códigos con más de una grafía,
 crons 68 / 74 / 86 activos.
+
+### §3.eh — v17.02: julio y agosto de Chef SÍ estaban, cargados como LK — 2026-09-14
+
+**Thomas (14/09): *"datos de agosto de chef deberíamos tener"*.** Tenía razón. Estaban — adentro de los
+batches **`julio_26` y `ago-26`, con `empresa='lk'`**. Por eso la §3.eg decía que el feed de Chef se cortaba
+el 30/06: no se cortaba, se estaba cargando con la etiqueta equivocada.
+
+**Cómo se probó.** `junio_26` es carga **pura de LK** y `chef_hist_xlsx_202607` es la carga **propia de
+Chef**, así que sirven de patrón:
+
+- Hay **20 artículos que en junio vendió sólo Chef** (701, 706, 718, 722, 723, 725E, 727E, 731, 735, 801,
+  825, 839, 840, 859, 862, 901, 908, 909, 922, 936E). En `junio_26` aparecen en **0 filas**. En `julio_26`
+  aparecen en **314** y en `ago-26` en **370**.
+- Casi todos esos códigos ya venían en la carga propia de Chef de junio, y la mayoría **no tiene nombre en
+  el padrón de LK** (Rayabo 1253, Celestino 1474, Del Plastic 1996, Dorinka 2686, Gifel 2715…).
+
+**Regla aplicada, conservadora** (`sql/gv_clientes_riesgo_migracion_v1699.sql`, anexo): el código se marca
+Chef si **(A)** compró algún artículo que sólo vende Chef **o (B)** ya venía en la carga propia de Chef —
+**y además no aparece en `junio_26`**. Esa última condición deja afuera los ambiguos (un código que factura
+de los dos lados) y los deja como LK hasta que alguien los mire de verdad. Son **67 filas** en
+`GV_Ventas_Correccion`; no se tocó `sales_lines`.
+
+**Resultado.** Chef pasa a tener **julio 3.802 cajas / 29 clientes** y **agosto 5.220 / 35**, contra
+**junio 3.873 / 46** de su propia carga: el mismo orden de magnitud. Los dos feeds llegan ahora a
+**2026-08**.
+
+**Efecto en la alarma** (pico ≥ 300 y caída ≤ −30 %): **39 clientes, 0 con `chef_incompleto` y 0 falsas
+migraciones** (antes 40, con 3 migraciones y 7 incompletos que eran todos este artefacto). Dorinka queda
+100 % Chef y su caída es **real** (−55 %); Clapera pasa de **−88 % a −41 %** porque le aparecieron julio y
+agosto. Se corrigió además la definición de `chef_incompleto`, que ahora es *"el feed de Chef no llega al
+corte general"* — antes miraba si había filas después del corte de Chef y con los dos feeds parejos marcaba
+a todos.
+
+**Y recién ahora se ven las migraciones de verdad**, que es lo que pedía la regla:
+
+| cliente | códigos | LK pico → hoy | Chef pico → hoy | total |
+|---|---|--:|--:|--:|
+| Horcada Marcelo | `lk:85` → `chef:85` | 1.194 → 0 | 0 → 939 | **−21 %, no cayó** |
+| Grupo Maravillas | `lk:2469` → `chef:1980` | 134 → 0 | 0 → 37 | −72 %, migró **y** cayó |
+| Supermercado Remo | `lk:3972` + `chef:448` | 107 → 74 | 0 → 471 | +409 % |
+
+**13 clientes con migración en total, 11 de ellos sin caída.** Horcada es el caso que justifica toda la
+regla: mirando sólo LK desapareció (−100 %); mirando por CUIT se mudó a Chef y bajó 21 %.
+
+**Queda abierto:** el importador sigue metiendo las facturas de Chef en el batch de LK. Esto lo arregla
+*después*, con una tabla de corrección; lo que corresponde es que cargue con la empresa que va.
