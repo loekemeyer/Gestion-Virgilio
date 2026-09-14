@@ -15669,3 +15669,39 @@ Y **recién ahora tiene sentido bajar el cron 73 a 5 minutos**: con la RPC en 14
 triplicar las corridas ya no arrastra el timeout. Queda a decisión del dueño.
 
 SQL, medición y rollback: `sql/chef_orders_cache.sql` del repo `pagina-LK-copia`.
+
+## §3.fz — v17.92: el armado intradía pasa a cada 5 minutos — 2026-09-14
+
+**Dueño, después de la §3.fy: *"bajalo a 5 y estamos"*.** El cron **73**
+(`gv-ppp-web-tandas-intradia`) pasó de `*/15 9-23 * * *` a **`*/5 9-23 * * *`**: de ~60 a
+~180 corridas por día, 06:00–20:55 ART.
+
+**Sólo se podía hacer después de la §3.fy.** Antes, con `gv_pedidos_web_np_chef` en 7,03 s
+contra un timeout de 8 s y un **3,1 %** de corridas muriendo con `57014`, triplicar la
+frecuencia era triplicar la presión sobre la consulta que ya fallaba. Con la RPC en 143 ms
+el margen dejó de ser el problema.
+
+### Lo que gana y lo que cuesta, medido
+
+| | 15 min | 5 min |
+|---|---:|---:|
+| Corridas por día | ~60 | ~180 |
+| Corridas que arman algo | **5/día** (14 %) | las mismas 5 |
+| Espera promedio de un pedido | 7,5 min | **2,5 min** |
+| Corrida completa | 16–25 s | **8,0 s** |
+
+El 86 % de las corridas no arma nada (`intradia_sin_umbral`) y a 5 min ese número sube a
+~95 %. Es esperado: la corrida que no arma nada es barata y el punto es no perderse la que sí.
+
+### ⚠ Los dos crons quedaron DESFASADOS a propósito
+
+El copiador de Chef (`sincronizar-chef-orders`, jobid 48 en LK) pasó de `*/5 * * * *` a
+**`2-59/5 * * * *`** — minutos 2, 7, 12… — y el armado corre en los minutos 0, 5, 10…
+
+No es por contención: el sync hace `delete` + `insert` en **una** transacción, así que un
+lector ve la copia vieja entera o la nueva entera, nunca a medias. Es por **frescura**: así
+el armado de las :05 lee lo que el copiador trajo a las :02, en vez de leer y copiar al
+mismo tiempo y quedarse con lo de cinco minutos antes.
+
+**Rollback:** `select cron.alter_job(73, schedule := '*/15 9-23 * * *');` en Virgilio (y, si
+se quiere, `'*/5 * * * *'` para el jobid 48 de LK).
