@@ -80,6 +80,34 @@ catch (_e) {
     await pgaEnviarAProgramar("98700"); await new Promise((res) => setTimeout(res, 250));
     out.rpcIsis = rpc.map((x) => x.fn).join(",");
 
+    // (g) v17.88 — el tacho: pop-up de ATENCIÓN, justificativo obligatorio y la RPC del desarme
+    rpc.length = 0;
+    const filaD = [...prev.querySelectorAll("tr.pga-n")].find((x) => x.textContent.indexOf("LK 0058") >= 0);
+    const btD = filaD && filaD.querySelector(".pga-acc-b.del");
+    out.hayTacho = !!btD;
+    out.textoTacho = btD ? btD.textContent.trim() : "";
+    btD.click(); await new Promise((res) => setTimeout(res, 150));
+    const mh = (document.getElementById("dsmModal") || {}).innerHTML || "";
+    out.atencion = /ATENCIÓN/.test(mh) && /NO SE DESHACE/.test(mh) && /permanente/i.test(mh);
+    out.explica = /sale de la PPP<\/b>/.test(mh) && /vuelven a góndola/.test(mh) &&
+                  /NO se borra de la página/.test(mh);
+    out.avisoIsisWeb = /dsm-isis/.test(mh);                 // una NP web NO lleva el aviso de ISIS
+    out.okBloqueado = !!(document.getElementById("dsmOk") || {}).disabled;
+    document.getElementById("dsmJust").value = "corto"; dsmChk();
+    out.cortoBloqueado = !!(document.getElementById("dsmOk") || {}).disabled;
+    document.getElementById("dsmJust").value = "el cliente lo cancelo por telefono"; dsmChk();
+    out.largoHabilita = !(document.getElementById("dsmOk") || {}).disabled;
+    await dsmConfirmar(); await new Promise((res) => setTimeout(res, 250));
+    const g = rpc.find((x) => x.fn === "gv_ppp_np_desarmar");
+    out.desarma = !!g && g.args.p_np === "LK 0058" && g.args.p_justificativo === "el cliente lo cancelo por telefono";
+    out.cerro = !!(document.getElementById("dsmModal") || {}).hidden;
+
+    // y una NP de ISIS sí lleva el aviso de darla de baja a mano
+    dsmAbrir("98700"); await new Promise((res) => setTimeout(res, 120));
+    const mi = (document.getElementById("dsmModal") || {}).innerHTML || "";
+    out.avisoIsis = /dsm-isis/.test(mi) && /dar de baja a mano/.test(mi);
+    dsmCerrar();
+
     // (d) el cartel del web ya no promete el automático
     out.cartel = String(window.pppVencVolver).indexOf("NO lo vuelve a programar solo") >= 0 &&
                  String(window.pppVencVolver).indexOf("lo toma el automático") < 0;
@@ -118,6 +146,17 @@ catch (_e) {
   t(/gv_ppp_isis_desprogramar/.test(r.rpcIsis), "(b) y una de ISIS por gv_ppp_isis_desprogramar — " + r.rpcIsis);
   t(r.recargo >= 1, "(c) después de sacarlo se recarga el árbol");
   t(r.cartel, "(d) el cartel ya no promete que lo reprograma el automático");
+  t(r.hayTacho, "(g) la fila trae también el tacho");
+  t(r.textoTacho === "🗑 Desarmar pedido", "(g) y dice «🗑 Desarmar pedido» — " + JSON.stringify(r.textoTacho));
+  t(r.atencion, "(g) el pop-up grita ATENCIÓN, que no se deshace y que es permanente");
+  t(r.explica, "(g) y explica las tres cosas: sale de la PPP, vuelve el stock, NO se borra de la página");
+  t(!r.avisoIsisWeb, "(g) una NP web no lleva el aviso de ISIS");
+  t(r.okBloqueado, "(g) sin justificativo no se puede confirmar");
+  t(r.cortoBloqueado, "(g) con un justificativo corto tampoco");
+  t(r.largoHabilita, "(g) con uno de 10+ caracteres sí");
+  t(r.desarma, "(g) confirmar llama a gv_ppp_np_desarmar con la NP y el justificativo");
+  t(r.cerro, "(g) y cierra el pop-up");
+  t(r.avisoIsis, "(g) en una NP de ISIS avisa que además hay que darla de baja a mano");
   t(r.yaHecho, "(e) el pedido web retenido cuenta como «ya hecho»");
   t(/ya pickeada y armada · E01A/.test(r.chip), "(e) y sale con su chip rojo en A Programar — " + JSON.stringify(r.chip));
   t(/gv_ppp_web_tanda_reusar/.test(r.rpcProg) && !/gv_ppp_web_tanda_nueva/.test(r.rpcProg),

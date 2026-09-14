@@ -15448,3 +15448,61 @@ que alguien tome por buenos.
 
 Front: `_compSendEntregasEvento` en `compTerminar`, emitido **antes** del POST (si el POST falla, el
 evento ya salió) y **no** para el operador de prueba. Test: `tests/comp-ent-evento.cjs`, en la suite.
+
+
+
+## §3.fw — v17.88: `gv_ppp_np_desarmar` — desarmar un pedido y devolver el stock — 2026-09-14
+
+### Objetos
+
+| Objeto | Qué hace |
+|---|---|
+| `GV_Desarmes` (tabla) | el registro: NP, cliente, tanda, fecha, m³, **`items`** (qué había pedido el cliente), **`stock_devuelto`**, **`justificativo`** (constraint: ≥ 10 caracteres), quién y cuándo. RLS prendida, `anon` sólo SELECT. |
+| `gv_ppp_np_desarmar(np, justificativo, por)` | hace todo: valida, devuelve el stock, saca de la PPP y guarda el registro. SECURITY DEFINER con gate de supervisor. |
+
+### El circuito del stock, medido
+
+```
+picking   →  terminado −N  ·  excedente −M  ·  separar_pedidos +(N+M)
+separado  →  separar_pedidos −N  ·  a_facturar +N          (el armado / TAP)
+```
+
+Así que desarmar son **dos** cosas: de dónde se **descuenta** hoy (`a_facturar` si ya se armó, si
+no `separar_pedidos`) y a dónde **vuelve** (a los mismos depósitos de los que el picking la sacó).
+
+⚠ **El picking reparte entre `terminado` y `excedente`.** La primera versión mandaba todo a
+`terminado`; con **E16A / LK 0049** (370 cajas: 328 de terminado, 42 de excedente) eso movía 42
+cajas de un depósito al otro sin que nadie lo pidiera. Y mirar sólo la columna `terminado` hacía
+parecer que ese picking había sido parcial — no lo era.
+
+Cantidad por artículo: `least(lo que pide la NP, lo que la tanda tiene parado hoy)`. Nunca más de
+lo que salió, y desarmar dos veces no duplica. La `empresa` se copia del movimiento original: sin
+eso un código **dual** volvería a la góndola de la otra empresa.
+
+`vista_saldos_stock` **no** filtra por tipo (sólo usa `tipo` para la excepción del cutoff), así que
+el tipo nuevo `desarme` entra al saldo solo, sin tocar la vista.
+
+### Prueba (14/09, transacción revertida)
+
+`gv_ppp_np_desarmar('LK 0049', …)` → 9 artículos / 370 cajas.
+
+```
+a_facturar -370 | excedente 42 | terminado 328     NETO TOTAL = 0
+```
+
+Por artículo, 026: salió 39 de terminado + 1 de excedente, y vuelve igual. El registro quedó con
+los 9 ítems y la NP salió de la PPP (`PPP_Web_Programacion.tanda = NULL`, `GV_Web_Cancelados` con
+el motivo `desarmado: <justificativo>`).
+
+### Guardas
+
+- Sólo supervisor.
+- Justificativo de 10 caracteres o más (front **y** constraint).
+- Si la NP ya tiene **Carga Camión** o **Recepción Remitos**, no se desarma: salió, y eso se cierra
+  con el remito.
+
+### Rollback
+
+En `sql/gv_ppp_np_desarmar_v1786.sql`. ⚠ Los movimientos de stock ya escritos **no se borran**: se
+compensan con un `ajuste` de signo contrario (el `insert … select -delta` que deja comentado el
+archivo).

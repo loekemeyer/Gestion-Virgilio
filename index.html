@@ -3155,6 +3155,38 @@ tr.ppp-err-zona > td{ background:#fffbeb !important; }
 .pga-acc-b{ background:#eef2f7; color:#1e6bd6; border:1px solid #d7e2f3; border-radius:7px;
   padding:1px 8px; font-size:11px; font-weight:800; cursor:pointer; width:auto; line-height:1.6; }
 .pga-acc-b:hover{ background:#e0eaf9; }
+/* v17.88 (Luis): el tacho. Rojo, para que no se confunda con el de al lado. */
+.pga-acc-b.del{ background:#fee2e2; color:#b91c1c; border-color:#fca5a5; }
+.pga-acc-b.del:hover{ background:#fecaca; }
+/* el pop-up de ATENCIÓN: "bien grande y bien notorio que avise que la acción es permanente" */
+#dsmModal{ position:fixed; inset:0; z-index:100000; background:rgba(15,23,42,.72);
+  display:flex; align-items:center; justify-content:center; padding:16px; }
+#dsmModal[hidden]{ display:none; }
+.dsm-card{ background:#fff; border-radius:16px; max-width:560px; width:100%; max-height:92vh;
+  overflow:auto; box-shadow:0 24px 60px rgba(0,0,0,.45); border:4px solid #b91c1c; }
+.dsm-top{ background:#b91c1c; color:#fff; padding:16px 20px; }
+.dsm-top h3{ margin:0; font-size:26px; font-weight:900; letter-spacing:.02em; line-height:1.15; }
+.dsm-top p{ margin:6px 0 0; font-size:15px; font-weight:700; opacity:.95; }
+.dsm-body{ padding:16px 20px 20px; }
+.dsm-np{ font-size:20px; font-weight:900; color:#0f172a; }
+.dsm-cli{ color:#334155; font-weight:700; margin-top:2px; }
+.dsm-sub{ color:#64748b; font-size:13px; margin-top:2px; }
+.dsm-list{ margin:14px 0 0; padding:12px 14px; background:#fef2f2; border:1px solid #fecaca;
+  border-radius:10px; color:#7f1d1d; font-size:14px; line-height:1.5; }
+.dsm-list b{ color:#b91c1c; }
+.dsm-isis{ margin-top:10px; padding:12px 14px; background:#fffbeb; border:1px solid #fcd34d;
+  border-radius:10px; color:#92400e; font-size:14px; font-weight:700; line-height:1.45; }
+.dsm-lbl{ display:block; margin:16px 0 6px; font-weight:800; color:#0f172a; font-size:14px; }
+#dsmJust{ width:100%; min-height:82px; padding:10px 12px; border:2px solid #cbd5e1; border-radius:10px;
+  font-size:15px; font-family:inherit; resize:vertical; box-sizing:border-box; }
+#dsmJust:focus{ outline:none; border-color:#b91c1c; }
+.dsm-hint{ color:#64748b; font-size:12.5px; margin-top:5px; }
+.dsm-btns{ display:flex; gap:10px; margin-top:18px; }
+.dsm-btns button{ flex:1; padding:13px 14px; border:none; border-radius:11px; font-size:15px;
+  font-weight:900; cursor:pointer; width:auto; }
+.dsm-no{ background:#eef2f7; color:#0f172a; }
+.dsm-si{ background:#b91c1c; color:#fff; }
+.dsm-si:disabled{ background:#e5e7eb; color:#9ca3af; cursor:not-allowed; }
 .pga-pill{ display:inline-block; font-size:10px; font-weight:900; border-radius:999px; padding:1px 8px; letter-spacing:.03em; margin-left:7px; vertical-align:1px; }
 .pga-pill.e-facturado{ background:#dbeafe; color:#1e3a8a; } .pga-pill.e-armado{ background:#dcfce7; color:#14532d; }
 .pga-pill.e-proceso{ background:#fef9c3; color:#854d0e; }   .pga-pill.e-pendiente{ background:#fee2e2; color:#991b1b; }
@@ -5188,7 +5220,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=17.87"></script>
+<script type="module" src="recepcion.js?v=17.88"></script>
 <!-- Config del módulo de fichada (compartido con fichada.html). El secret
      hmacSecret tiene que ser el mismo acá y allá; cargándolo desde un solo
      archivo evitamos que se desincronicen. -->
@@ -8618,7 +8650,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v17.87";
+const APP_VERSION = "v17.88";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -35286,7 +35318,10 @@ function _pppArbolHtml(programados) {
             // en caso de que se tenga que reprogramar la fecha de entrega".
             ((window.__isSupervisor || !PPP_READONLY)
               ? '<span class="pga-acc"><button class="pga-acc-b" title="Sacarlo de esta tanda y mandarlo a 📥 A Programar para darle otra fecha. Queda anotado en qué tanda estaba: al reprogramarlo vuelve a ESA tanda, así no se pickea ni se arma dos veces. El automático no lo toca."'
-                + ' onclick="event.stopPropagation();pgaEnviarAProgramar(\'' + escapeHtml(r.np) + '\')">↩ Enviar a programar</button></span>'
+                + ' onclick="event.stopPropagation();pgaEnviarAProgramar(\'' + escapeHtml(r.np) + '\')">↩ Enviar a programar</button>'
+                // v17.88 (Luis): el tacho. Lo permanente lo explica el pop-up, no este title.
+                + '<button class="pga-acc-b del" title="DESARMAR el pedido: sale de la PPP para siempre y las cajas vuelven a góndola. Pide un justificativo y avisa antes."'
+                + ' onclick="event.stopPropagation();dsmAbrir(\'' + escapeHtml(r.np) + '\')">🗑 Desarmar pedido</button></span>'
               : '') +
           '</td>' +
           '<td>' + _pppFmtM3(r.m3) + '</td><td></td><td></td>' +
@@ -35308,6 +35343,77 @@ async function pgaEnviarAProgramar(np) {
   const n = String(np || "").trim(); if (!n) return;
   await pppVencSinProgramar(n);
   await pgaRecargar();
+}
+
+/* v17.88 (Luis) — DESARMAR PEDIDO. *"un botón que sea un tacho de basura y que sea «Desarmar
+   pedido» que, si se aprieta, se elimina el pedido y acomoda el stock de las cajas que lo
+   componían (tiene que saltar un pop-up de ATENCIÓN, bien grande y bien notorio que avise que la
+   acción que se está por tomar es permanente)"*.
+   Y lo que definió después: el pedido NO se borra de la página de la empresa — sale de la PPP y
+   queda el registro de lo que el cliente había pedido; hay que escribir un JUSTIFICATIVO, que se
+   guarda; y si la NP es de ISIS, el aviso dice que además hay que darla de baja en ISIS a mano.
+   Todo el trabajo lo hace `gv_ppp_np_desarmar` en el backend: es plata y stock. */
+let _dsm = null;
+function dsmAbrir(np) {
+  const n = String(np || "").trim(); if (!n) return;
+  const r = (_pgaRows || []).find(function (x) { return String(x.np) === n; }) || {};
+  _dsm = { np: n, isis: !/^(LK|CH)\s*\d+/i.test(n), r: r, ocupado: false };
+  let m = document.getElementById("dsmModal");
+  if (!m) { m = document.createElement("div"); m.id = "dsmModal"; document.body.appendChild(m); }
+  m.hidden = false;
+  m.innerHTML = '<div class="dsm-card">' +
+    '<div class="dsm-top"><h3>⚠ ATENCIÓN — ESTO NO SE DESHACE</h3>' +
+      '<p>Vas a DESARMAR un pedido. La acción es permanente.</p></div>' +
+    '<div class="dsm-body">' +
+      '<div class="dsm-np">' + escapeHtml(n) + (r.tanda ? ' · tanda ' + escapeHtml(r.tanda) : '') + '</div>' +
+      '<div class="dsm-cli">' + escapeHtml(r.razon_social || "—") + (r.cod ? ' (' + escapeHtml((r.empresa || "LK") + " " + r.cod) + ')' : '') + '</div>' +
+      '<div class="dsm-sub">' + (r.fecha ? aprDiaCorto(r.fecha) + ' · ' : '') + _pppFmtM3(r.m3) + ' m³</div>' +
+      '<div class="dsm-list"><b>Qué va a pasar:</b><br>' +
+        '• El pedido <b>sale de la PPP</b> y no vuelve a entrar.<br>' +
+        '• Las cajas que ya se pickearon o se armaron <b>vuelven a góndola</b>, a los mismos depósitos de los que salieron.<br>' +
+        '• Queda guardado el registro de lo que el cliente había pedido, con tu justificativo.<br>' +
+        '• <b>El pedido NO se borra de la página</b>: el cliente lo sigue teniendo.</div>' +
+      (_dsm.isis ? '<div class="dsm-isis">📋 Esta NP es de <b>ISIS</b>: acá se saca de la PPP, pero en ISIS la vas a tener que <b>dar de baja a mano</b>.</div>' : '') +
+      '<label class="dsm-lbl" for="dsmJust">Justificativo (obligatorio) — queda guardado con el registro</label>' +
+      '<textarea id="dsmJust" placeholder="Por qué se desarma este pedido" oninput="dsmChk()"></textarea>' +
+      '<div class="dsm-hint" id="dsmHint">Escribí al menos 10 caracteres.</div>' +
+      '<div class="dsm-btns">' +
+        '<button class="dsm-no" onclick="dsmCerrar()">No, dejarlo como está</button>' +
+        '<button class="dsm-si" id="dsmOk" disabled onclick="dsmConfirmar()">🗑 Sí, desarmar</button>' +
+      '</div>' +
+    '</div></div>';
+  try { document.getElementById("dsmJust").focus(); } catch (_e) {}
+}
+function dsmCerrar() { const m = document.getElementById("dsmModal"); if (m) { m.hidden = true; m.innerHTML = ""; } _dsm = null; }
+function dsmChk() {
+  const t = (document.getElementById("dsmJust") || {}).value || "";
+  const ok = t.trim().length >= 10;
+  const b = document.getElementById("dsmOk"); if (b) b.disabled = !ok || !!(_dsm && _dsm.ocupado);
+  const h = document.getElementById("dsmHint");
+  if (h) h.textContent = ok ? "✓ Listo." : ("Escribí al menos 10 caracteres (van " + t.trim().length + ").");
+}
+async function dsmConfirmar() {
+  if (!_dsm || _dsm.ocupado) return;
+  const just = ((document.getElementById("dsmJust") || {}).value || "").trim();
+  if (just.length < 10) return;
+  _dsm.ocupado = true; dsmChk();
+  const n = _dsm.np, isis = _dsm.isis;
+  const b = document.getElementById("dsmOk"); if (b) b.textContent = "Desarmando…";
+  try {
+    const r = await aprRpc("gv_ppp_np_desarmar", { p_np: n, p_justificativo: just, p_por: await aprQuien() });
+    const x = (r && r[0]) || {};
+    dsmCerrar();
+    pppSetStatus("🗑 " + n + " desarmado · " + (x.detalle || "") +
+      (isis ? "  ⚠ Acordate de darla de baja en ISIS a mano." : ""), true);
+    if (isis) { try { alert(n + " salió de la PPP.\n\n⚠ Como es una NP de ISIS, además hay que darla de baja EN ISIS a mano."); } catch (_e) {} }
+    await pppLoadProgFromSupabase();
+    await pgaRecargar();
+  } catch (e) {
+    _dsm.ocupado = false; dsmChk();
+    if (b) b.textContent = "🗑 Sí, desarmar";
+    const msg = (e && e.message) ? e.message : String(e);
+    const h = document.getElementById("dsmHint"); if (h) { h.textContent = "⚠ " + msg; h.style.color = "#b91c1c"; }
+  }
 }
 
 function _pppPlanGridHtml(programados) {

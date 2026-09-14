@@ -1,3 +1,36 @@
+## Nota v17.88 (2026-09-14) — "🗑 Desarmar pedido": sale de la PPP, vuelve el stock, queda el registro
+
+Pedido de Luis, la otra mitad de la v17.85: *"un botón que sea un tacho de basura y que sea
+«Desarmar pedido» que, si se aprieta, se elimina el pedido y acomoda el stock de las cajas que lo
+componían (tiene que saltar un pop-up de ATENCIÓN, bien grande y bien notorio que avise que la
+acción que se está por tomar es permanente)"*. Y lo que definió después, preguntado:
+
+- **No se borra de la página.** *"Se borra de la PPP, tiene que quedar registro en algún lado de
+  que el cliente hizo ese pedido"* → el pedido sigue vivo en LK / Chef; acá queda el **snapshot de
+  lo que había pedido** en `GV_Desarmes`.
+- **Justificativo obligatorio.** *"Que tenga que poner un justificativo y que también quede
+  guardado"* → mínimo 10 caracteres, lo exige el front **y** la base (constraint). Sin eso el
+  botón rojo del pop-up no se habilita.
+- **NP de ISIS.** *"Ídem, se saca de la PPP, se guarda el registro. Agregá en el aviso que como es
+  de ISIS, la va a tener que borrar manualmente"* → el pop-up lo dice, y lo repite al cerrar.
+- **Stock.** *"Se ajusta el stock por los ítems armados en esa NP… movimiento compensatorio que
+  explique que es por desarme de pedido armado"* → `tipo = 'desarme'`, `ref` = la NP, y la
+  descripción de cada movimiento dice el pedido, la tanda y el justificativo.
+
+⚠ **Lo que casi sale mal, para el que toque esto.** El picking NO saca todo de `terminado`:
+reparte entre `terminado` y `excedente`. La primera versión devolvía todo a `terminado`, y en la
+prueba con **LK 0049** (370 cajas: 328 de terminado y 42 de excedente) eso habría movido 42 cajas
+de un depósito al otro en silencio. Ahora vuelve a los mismos depósitos de los que salió. Mirar
+sólo la columna `terminado` además hacía parecer que ese picking había sido *parcial*: no lo era.
+
+**La cuenta se cierra**: en la prueba (transacción revertida) los movimientos escritos suman
+`a_facturar −370 · terminado +328 · excedente +42`, **neto 0**. No se inventa ni se pierde stock.
+Y la cantidad de cada artículo es `least(lo que pide la NP, lo que la tanda tiene parado hoy)`:
+nunca más de lo que salió, y desarmar dos veces no duplica.
+
+§3.fw de `docs/SUPABASE-GESTION-VIRGILIO.md` · `sql/gv_ppp_np_desarmar_v1788.sql` ·
+`tests/pga-enviar-a-programar.cjs` (25 chequeos, los 12 últimos son del tacho).
+
 ## Nota v17.85 (2026-09-14) — "↩ Enviar a programar" en la fila de cada NP
 
 Pedido de Luis: *"un botón que sea una flecha para atrás y que sea «Enviar a programar» en caso de
