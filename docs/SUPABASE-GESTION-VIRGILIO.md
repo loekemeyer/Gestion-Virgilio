@@ -15162,3 +15162,73 @@ Quedan 5 números de LK quemados (79, 80, 81, 83, 84): un hueco en la numeració
 contador sigue desde el último.
 
 Perillas y rollback: `sql/gv_web_tdf_como_chef.sql` del repo `pagina-LK-copia`.
+
+## §3.fs — v17.82: el armado ya no depende del caché del celular del operario — 2026-09-14
+
+**Dueño, 14/09:** *"no puede ser loco, debería subir automático y no depender del caché del
+dispositivo local. Suponete que cerró el celu y se fue a la casa."*
+
+Tenía razón, y era el agujero de fondo detrás de §3.fq. Hasta hoy, si el POST del front a
+`Entregas_Virgilio` fallaba, la **única** red era `localStorage.vir_entregas_pend` +
+`_compFlushEntregas`, que reintenta cuando **ese** dispositivo vuelve a abrir la app. El 14/09
+pasó exactamente eso: **E16A** (legajo 8) volvió a entrar a las 16:28 y subió sola, pero **D67M** y
+**E01J** (legajo 237) se quedaron en el celular del armador, que se fue.
+
+**Lo que no hacía falta: los eventos SÍ llegan siempre.** El `TAP` y los `TAL` (líos por NP, con
+código y cajas) viajan por la cola de eventos a `Registros_Produccion_Virgilio`, que no tiene
+trigger de canonización y por eso nunca falló. **El servidor ya tenía todo para reconstruir
+`Entregas_Virgilio` solo.**
+
+### Cómo se reconstruye una fila
+
+| Columna | De dónde sale |
+|---|---|
+| `cajas_pedidas` | `gv_ppp_np_items` (el pedido; cubre ISIS **y** web, por `origen`) |
+| `cajas_entregadas` | el detalle del `TAL`, acotado a lo pedido (igual que el `Math.max(it.cajas - falto, 0)` del front) |
+| `cajas_falto` | pedidas − armadas |
+| `cod_cliente` · `fecha_salida` · `tanda` | la programación (ISIS o web) |
+
+Es **exactamente** la cuenta de `compTerminar` (`index.html` ~12630).
+
+### Se validó ANTES de escribir una sola fila
+
+1. Se corrió la reconstrucción contra **D67L** — una tanda que el front **sí** había grabado bien
+   ese mismo día — y se comparó fila por fila contra las 55 reales: **0 diferencias** en `cod_art`,
+   las tres cantidades, `cod_cliente` y `fecha_salida`, **incluidas las 2 filas con faltante**
+   (550 y 659). Recién con eso se aplicó a D67M / E01J (**59 filas**, ids 12153..12211).
+2. **Prueba de fuego de la función**, en transacción revertida por un `RAISE`: se **borraron** las
+   55 filas de D67L y se dejó que `gv_entregas_reconstruir('D67L', 0)` las rehiciera sola →
+   *"originales=55 · reconstruidas=55 · **DIFERENCIAS=0**"*, con `EXCEPT ALL` en los dos sentidos
+   (así que tampoco sobra ninguna).
+
+### Objetos (`sql/gv_entregas_reconstruir_v1782.sql`)
+
+- **`gv_np_prog`** — cabecera unificada ISIS + web (tanda, cliente, fecha).
+  ⚠ `PPP_Web_Programacion.np` es el número **crudo** (`49`) y `Entregas_Virgilio` guarda la
+  **etiqueta** (`LK 0049`): hay que pasar por `gv_ppp_web_np_label`. La primera versión de la vista
+  no lo hacía y el centinela nació con **14 falsos positivos**.
+- **`gv_armado_tal_items`** — parsea el `TAL` (`np|líos|tanda|A=codXn,…|clase`) a (np, tanda, art,
+  cajas armadas), sacando el sufijo de empresa (`437E LK` → `437E`) para cruzar con el pedido.
+- **`gv_armado_sin_entregas`** — **centinela**: armado con `TAP` que no llegó a `Entregas_Virgilio`.
+  La columna `motivo` dice si es `reconstruible` o hay que mirarlo a mano. **Vacío = todo bien.**
+- **`GV_Entregas_Reparadas`** — log de lo que reparó el cron. RLS prendida y sin policies.
+- **`gv_entregas_reconstruir(p_tanda, p_min_edad_min, p_dias)`** — SECURITY DEFINER, idempotente,
+  con `REVOKE` a `anon`/`authenticated`.
+- **cron `gv-entregas-reconstruir`, jobid 87**, cada 10 min.
+
+### Los tres candados (por qué esto no puede duplicar un armado)
+
+1. Sólo toca NPs con **CERO** filas. Una NP con filas parciales no se toca: sale en el centinela.
+2. Exige un **`TAL` con detalle parseable**. Sin `TAL` no hay con qué saber qué se armó, y asumir
+   "0 armado" marcaría el pedido entero como faltante — peor que no hacer nada.
+3. Colchón de `p_min_edad_min` (10 min por defecto) desde el `TAP`: no se mete con un armado recién
+   cerrado que el dispositivo puede estar por subir.
+
+Y si el dispositivo sube **después**, `trg_entregas_virgilio_dedup` lo descarta, porque las
+cantidades son idénticas — que es justamente lo que probó D67L.
+
+**Salud al aplicar:** cron 87 activo · centinela en 0 · `gv_endpoints_rotos` 0 · `anon` no puede
+ejecutar la función ni leer el log.
+
+**Rollback:** `select cron.unschedule('gv-entregas-reconstruir');` y los `drop` del pie del archivo
+SQL.
