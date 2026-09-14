@@ -12153,3 +12153,60 @@ Lo que venía proponiendo (pedirle a alguien que agregue una columna al Excel, y
 `documento_items` sea exactamente el `boxes` de `sales_lines` artículo por artículo (el total de junio
 coincide, falta el detalle), y qué hacer con los **560 archivos con error** que tiene `ingesta_log` sobre
 32.192 — si son documentos que faltan, hay un hueco que tapar antes de usarlo como fuente única.
+
+---
+
+### §3.em — v17.14: en Facturación había clientes SIN razón social (problema 140) — 2026-09-14
+
+Lo vio **Luis**: en el módulo de Facturación, dos filas con la columna **Razón Social vacía**.
+
+| NP | Entrega | Cod | Razón Social |
+|---|---|---|---|
+| 44500 · chip ISIS · *sin tanda* | 2026-07-22 | 1768 | *(vacío)* |
+| 98272 · chip ISIS · *sin tanda* | 2026-08-14 | 2336 | *(vacío)* |
+
+Son las dos NP que entran por `gv_fac_armado_sin_facturar` (v16.58, §3.dg): **armadas pero
+fuera de la PPP**, que la pantalla inyecta con la tanda del armado para que se puedan tildar.
+
+**El nombre nunca estuvo perdido: no se podía LEER.** La vista lo resolvía con un
+`left join lateral` al padrón `GV_Clientes_Direcciones`, y esa tabla tiene RLS con policy
+SELECT **sólo para `authenticated`**. La vista es `security_invoker = true` (correcto) y
+`facSinTandaCargar()` la lee con la **anon key** pelada, no con el JWT del supervisor: el join
+corre como `anon`, no ve ni una fila del padrón y `razon_social` queda `null`.
+
+```sql
+select policyname, roles, cmd from pg_policies where tablename = 'GV_Clientes_Direcciones';
+-- gv_cli_dir_lectura | {authenticated} | SELECT     ← anon no entra
+
+-- como postgres:  44500 → 'Ruiz Graciela Beatriz'   98272 → 'Cittadini Gerardo Alberto'
+-- set role anon:  44500 → null                      98272 → null      ← lo que ve la app
+```
+
+**No se arregló dándole la policy a `anon`.** Esa tabla tiene direcciones, localidad, CP y
+expreso de todos los clientes, y la anon key viaja en el front: abrirla es publicar el padrón
+de direcciones entero. La pantalla necesita **un nombre por NP**, no el padrón. Por eso el
+resolutor es una función **SECURITY DEFINER acotada**, `gv_fac_rs_np(np)`, que sólo contesta
+por una NP que está en `Entregas_Virgilio` (o sea, armada de verdad) y **sin facturar** —
+exactamente las filas que la pantalla ya muestra. Por un cod suelto no devuelve nada, así que
+no sirve para enumerar el padrón. Primero mira el override `GV_Cliente_Razon_Social` (regla del
+dueño del 13/09: razón social, nunca nombre de fantasía) y después el padrón.
+
+**De paso, el pendiente que había dejado anotado §3.ea**: la vista **no excluía
+`NP_Canceladas`**. La **44500** (Ruiz Graciela) se armó el 20/07 y **el cliente la canceló el
+11/08**; estaba listada como si hubiera que facturarla. Ya no aparece.
+
+**Medición (como `anon`, que es quien lee desde la app):**
+
+| | antes | después |
+|---|---|---|
+| 44500 | listada, sin nombre | **no aparece** (cancelada el 11/08) |
+| 98272 | listada, sin nombre | listada, **Cittadini Gerardo Alberto** |
+| `gv_endpoints_rotos` | 0 | 0 |
+| reloptions de la vista | `security_invoker=true` | `security_invoker=true` |
+
+⚠ La definición viva de la vista **no era la del repo**: alguien le había agregado el `lateral`
+al padrón y la columna `empresa` sin guardar el `CREATE`. Por eso el archivo nuevo
+`sql/gv_fac_armado_sin_facturar_v1714.sql` tiene la definición **completa**, no un parche.
+
+Archivo: `sql/gv_fac_armado_sin_facturar_v1714.sql`. Rollback: reaplicar el `_v1658.sql`,
+reponer `security_invoker` y `drop function public.gv_fac_rs_np(text)`.
