@@ -15012,3 +15012,69 @@ bloque de `gv_codigos_multigrafia` → retirar `Planimetria` con su trigger y su
 
 Nota: `sql/gv_nc_loeke_chef_sin_planimetria_v1777.sql`. Rollback: volver el CTE `split` a la
 versión de `Planimetria` (está en el historial de git; es la única diferencia).
+
+## §3.fq — v17.78: `fn_canon_cols()` vuelve a ser SECURITY DEFINER (el facturador sin subtotal) — 2026-09-14
+
+**Síntoma reportado:** la columna **💵 Subtotal (dto x ítem)** del facturador en `—` para las NP
+98690 / 98691 / 98692 / 98694, y el modal de desglose diciendo *"La NP 98690 todavía no tiene
+ítems armados para valorizar"* — cuando los pedidos **sí estaban armados** (por eso figuran en
+Facturación, con sus líos y el tilde verde de FC).
+
+**Lo que pasaba:** el armado quedó registrado (TP + TAP + TAL en `Registros_Produccion_Virgilio`)
+pero **ninguna fila llegó a `Entregas_Virgilio`**, que es la única fuente de
+`vista_facturacion_neto_items` → `facturacion_neto_lote` → esa columna. Sin filas ahí, la RPC no
+devuelve la NP y el front pinta `—`.
+
+| Tanda | TAP | app | filas en `Entregas_Virgilio` |
+|---|---|---|---|
+| D67L | 14:01 | v17.41 | 55 ✅ |
+| **D67M** (98690/91/92) | **15:05** | v17.68 | **0** ❌ |
+| **E01J** (98694) | **15:25** | v17.72 | **0** ❌ |
+| **E16A** | **16:01** | v17.73 | **0** ❌ |
+
+**Causa raíz — el mismo pozo del 28/08, pisado de nuevo.** La **v17.70** (aplicada ~14:30 ART)
+fusionó las cinco `fn_canon_col_*` en una sola `fn_canon_cols()` genérica y la creó **sin
+`SECURITY DEFINER`**. Esa función llama a `canon_cod_art_val(text)`, que tiene
+`REVOKE EXECUTE FROM public, anon, authenticated`; corriendo como invoker, todo INSERT de `anon`
+en las **12 tablas** con ese trigger moría con `42501 permission denied for function
+canon_cod_art_val`. Las cinco funciones viejas **eran** SECURITY DEFINER, y lo eran exactamente
+por el incidente del 28/08 (`sql/fix_canon_col_security_definer_20260831.sql`): la fusión se
+llevó puesto el fix sin que nadie lo notara.
+
+**Por qué la verificación de la v17.70 no lo vio:** probó las 13 tablas con `UPDATE`s en una
+transacción **como `postgres`**, que sí tiene EXECUTE. El fix del 31/08 se había verificado con
+`SET LOCAL ROLE anon`. **Regla que queda:** una prueba de un trigger que dispara el front **va con
+`SET LOCAL ROLE anon`**; corrida como `postgres` no prueba el camino de la app.
+
+**Fix** (`sql/fn_canon_cols_security_definer_v1778.sql`), idéntico al del 31/08:
+
+```sql
+ALTER FUNCTION public.fn_canon_cols() SECURITY DEFINER SET search_path = public;
+REVOKE EXECUTE ON FUNCTION public.fn_canon_cols() FROM public, anon, authenticated;
+```
+
+Verificado con un INSERT real como `anon` en `Entregas_Virgilio`, revertido por un `RAISE` al
+final: *"anon insertó id=12143, cod_art canonizado=066"*. Antes del fix, el mismo bloque daba
+42501.
+
+**Datos: no hay que restaurar nada a mano.** `_compSaveEntregas` (front v12.18, puesto tras el
+28/08) **encola en `localStorage.vir_entregas_pend` cualquier no-2xx** y le muestra al operario un
+toast rojo; `_compFlushEntregas` reintenta al cargar la app y al volver la red. Las filas de D67M /
+E01J / E16A están en el dispositivo del armador y suben solas la próxima vez que abra Gestión. Si
+un dispositivo se limpió, el backfill desde los eventos TAL es
+`sql/backfill_entregas_virgilio_20260831.sql`. Se revisó el resto de las 12 tablas: `GV_Lugar_Item`
+(última escritura 12:19), `Correcciones_Pedido` y `Faltantes_Notas` no tuvieron intentos en la
+ventana, así que `Entregas_Virgilio` fue la única con pérdida.
+
+**Centinela para la próxima** (vacío = todo bien):
+
+```sql
+select p.proname, c.relname
+  from pg_trigger t
+  join pg_proc p on p.oid = t.tgfoid
+  join pg_class c on c.oid = t.tgrelid
+ where not t.tgisinternal and p.proname like 'fn\_canon\_col%' and not p.prosecdef;
+```
+
+**Rollback:** `ALTER FUNCTION public.fn_canon_cols() SECURITY INVOKER RESET search_path;` (= volver
+al estado roto; no hay motivo). Problema **194** de `github_repo_problemas`.

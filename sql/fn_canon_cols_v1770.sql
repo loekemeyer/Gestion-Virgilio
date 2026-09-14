@@ -1,4 +1,14 @@
 -- =====================================================================
+-- ⚠⚠ ESTE ARCHIVO DEJO LA BASE ROTA POR ~1h30 EL 14/09. Leer SIEMPRE junto con
+--    sql/fn_canon_cols_security_definer_v1778.sql, que es el fix.
+--    La funcion se creo SIN SECURITY DEFINER y llama a canon_cod_art_val, que tiene
+--    REVOKE a anon → todo INSERT del front en las 12 tablas dio 42501 y las tandas
+--    D67M / E01J / E16A no escribieron nada en Entregas_Virgilio (facturador sin
+--    subtotal). Las 5 funciones que esta reemplazo SI eran SECURITY DEFINER, y lo
+--    eran por el MISMO incidente del 28/08 (sql/fix_canon_col_security_definer_20260831.sql).
+--    La verificacion de abajo ("13 de 13") corrio como postgres: por eso no lo vio.
+--    Toda prueba de un trigger que dispara el front va con `SET LOCAL ROLE anon`.
+-- =====================================================================
 --  fn_canon_cols() — UNA canonizadora de columna para todas las tablas — v17.70 (2026-09-14)
 --
 --  Reemplaza a las CINCO funciones que eran la misma escrita con distinto nombre de columna:

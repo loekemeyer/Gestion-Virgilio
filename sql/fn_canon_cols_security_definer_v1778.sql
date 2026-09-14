@@ -1,0 +1,88 @@
+-- =============================================================================
+-- v17.78 (2026-09-14) — fn_canon_cols() vuelve a ser SECURITY DEFINER
+-- Proyecto Virgilio (hrxfctzncixxqmpfhskv) · problema 194 de github_repo_problemas
+-- =============================================================================
+-- QUE SE ROMPIO
+--   Desde la v17.70 (aplicada el 14/09 ~14:30 ART) TODO INSERT del front como `anon`
+--   en las 12 tablas con trigger de canonizacion fallaba con:
+--       42501 permission denied for function canon_cod_art_val
+--
+--   Sintoma que lo canto: la columna "Subtotal (dto x item)" del facturador en guion,
+--   y el modal de desglose diciendo "la NP ... todavia no tiene items armados para
+--   valorizar". Las tandas SI se armaron (TP + TAP + TAL quedaron registrados en
+--   Registros_Produccion_Virgilio), pero ninguna fila llego a Entregas_Virgilio, que
+--   es la unica fuente de vista_facturacion_neto_items / facturacion_neto_lote.
+--
+--   Tandas afectadas el 14/09 (TAP OK, 0 filas en Entregas_Virgilio):
+--     D67M 15:05 (NP 98690 / 98691 / 98692)   · app v17.68
+--     E01J 15:25 (NP 98694)                   · app v17.72
+--     E16A 16:01                              · app v17.73
+--   Ultima tanda que escribio bien: D67L 14:01 (app v17.41).
+--
+-- CAUSA RAIZ
+--   Es EL MISMO POZO del 2026-08-28/31 (ver sql/fix_canon_col_security_definer_20260831.sql).
+--   `canon_cod_art_val(text)` tiene REVOKE EXECUTE FROM public, anon, authenticated.
+--   Aquel fix habia puesto SECURITY DEFINER a las CINCO fn_canon_col_* justamente por
+--   eso. La v17.70 fusiono las cinco en una sola `fn_canon_cols()` generica y la creo
+--   SIN el SECURITY DEFINER: la funcion nueva corre como el invocador (anon) y no
+--   puede llamar a canon_cod_art_val.
+--
+--   Por que no se vio al aplicar la v17.70: su verificacion de las 13 tablas se hizo
+--   con UPDATEs en una transaccion **como postgres**, que si tiene EXECUTE. El fix del
+--   31/08 se habia verificado con `SET LOCAL ROLE anon`. Sin ese SET ROLE, la prueba
+--   no prueba nada del camino que usa la app.
+--
+-- FIX (identico al del 31/08)
+--   1) SECURITY DEFINER + SET search_path = public → corre como el owner (postgres),
+--      que si tiene EXECUTE sobre canon_cod_art_val, y queda blindada contra
+--      search_path hijack.
+--   2) REVOKE EXECUTE a public/anon/authenticated sobre la propia trigger fn: los
+--      triggers NO chequean EXECUTE del rol invocador al dispararse, asi que los
+--      inserts de anon siguen andando, y se cierra la superficie
+--      /rest/v1/rpc/fn_canon_cols que quedaria abierta por ser SECURITY DEFINER
+--      (WARN del advisor).
+--
+-- ROLLBACK
+--   ALTER FUNCTION public.fn_canon_cols() SECURITY INVOKER RESET search_path;
+--   GRANT EXECUTE ON FUNCTION public.fn_canon_cols() TO anon, authenticated;
+--   (= volver al estado roto; no hay motivo para hacerlo)
+--
+-- DATOS: no hay que restaurar nada a mano. `_compSaveEntregas` (front v12.18, puesto
+--   tras el incidente del 28/8) encola en localStorage `vir_entregas_pend` CUALQUIER
+--   no-2xx y muestra un toast rojo al operario; `_compFlushEntregas` reintenta al
+--   cargar la app y al volver la red. Las filas de D67M / E01J / E16A estan en el
+--   dispositivo del armador y suben solas la proxima vez que abra Gestion. Si algun
+--   dispositivo se limpio, el backfill desde los eventos TAL es
+--   sql/backfill_entregas_virgilio_20260831.sql.
+-- =============================================================================
+
+ALTER FUNCTION public.fn_canon_cols() SECURITY DEFINER SET search_path = public;
+REVOKE EXECUTE ON FUNCTION public.fn_canon_cols() FROM public, anon, authenticated;
+
+-- ─────────────────────────────────────────────────────────────────────────────
+-- VERIFICACION — insert REAL como anon, revertido por el RAISE del final.
+-- Aplicada el 14/09: "PRUEBA OK (se revierte): anon inserto id=12143,
+-- cod_art canonizado=066". Sin el fix esto da 42501.
+-- ⚠ La prueba TIENE que hacer SET LOCAL ROLE anon. Correrla como postgres es
+--   exactamente el error que dejo pasar la v17.70.
+-- ─────────────────────────────────────────────────────────────────────────────
+-- DO $$
+-- DECLARE v_id bigint;
+-- BEGIN
+--   SET LOCAL ROLE anon;
+--   INSERT INTO public."Entregas_Virgilio"
+--     (fecha_salida, cod_cliente, np, cod_art, cajas_pedidas, cajas_entregadas, cajas_falto, tanda)
+--   VALUES ('2026-09-14','FIXTEST','FIXTEST_NP','  66 ',1,1,0,'FIXTEST_TANDA')
+--   RETURNING id INTO v_id;
+--   RESET ROLE;
+--   RAISE EXCEPTION 'PRUEBA OK (se revierte): anon inserto id=%, cod_art canonizado=%',
+--     v_id, (select cod_art from public."Entregas_Virgilio" where id = v_id);
+-- END $$;
+
+-- Centinela para la proxima: ninguna trigger fn de canonizacion puede quedar INVOKER.
+-- Vacio = todo bien.
+-- select p.proname, c.relname
+--   from pg_trigger t
+--   join pg_proc p on p.oid = t.tgfoid
+--   join pg_class c on c.oid = t.tgrelid
+--  where not t.tgisinternal and p.proname like 'fn\_canon\_col%' and not p.prosecdef;
