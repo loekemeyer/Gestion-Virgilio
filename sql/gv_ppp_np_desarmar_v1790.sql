@@ -1,4 +1,8 @@
--- v17.88 (Luis, 2026-09-14) — "DESARMAR PEDIDO": sale de la PPP, queda el registro, vuelve el stock.
+-- v17.88 / v17.90 (Luis, 2026-09-14) — "DESARMAR PEDIDO": sale de la PPP, queda el registro,
+-- y el stock pasa a "A guardar".
+--
+-- Nació en la v17.88 devolviendo el stock a góndola; en la v17.90 pasó a mandarlo a `a_guardar`
+-- (pedido de Luis) — el archivo está en ese estado, que es el que corre.
 --
 -- Pedido: *"un botón que sea un tacho de basura y que sea «Desarmar pedido» que, si se aprieta, se
 -- elimina el pedido y acomoda el stock de las cajas que lo componían (tiene que saltar un pop-up de
@@ -19,23 +23,28 @@
 --    picking   →  terminado −N  ·  excedente −M  ·  separar_pedidos +(N+M)
 --    separado  →  separar_pedidos −N  ·  a_facturar +N          (el armado / TAP)
 --
--- O sea que desarmar son DOS cosas distintas, y por eso la función lleva cuatro columnas:
---   · de dónde se DESCUENTA hoy: `a_facturar` si la tanda ya se armó, si no `separar_pedidos`;
---   · a dónde VUELVE: a los MISMOS depósitos de los que el picking la sacó.
+-- ⚠⚠ **EL DESARME NO DEVUELVE A GÓNDOLA: MANDA TODO A `a_guardar`.** Luis, 14/09, después de ver
+-- la primera versión: *"cuando se aprieta ese botón, debería ir «A guardar» el pedido para hacerlo
+-- lo más limpio posible, y que un operador después lo tenga que procesar como toda la mercadería a
+-- guardar, ¿no?"*. Y es lo correcto: la pantalla **📥 Guardar a góndola (MG)** lista por SALDO de
+-- `a_guardar` (por código y empresa), así que el desarme aparece ahí solo, sin tocar nada más, y es
+-- **el operario** el que decide si va a góndola o a excedente y con qué ubicación.
 --
--- ⚠ Lo segundo no es un detalle. **El picking reparte entre `terminado` y `excedente`**, y la
--- primera versión de esto mandaba todo a `terminado`. Medido en E16A (LK 0049): de 370 cajas,
--- 328 salieron de `terminado` y 42 de `excedente` — devolverlas todas a `terminado` habría
--- movido 42 cajas de un depósito al otro en silencio. (Y ese mismo dato, mirado sólo por la
--- columna `terminado`, hacía parecer que el picking había sido PARCIAL: no lo era.) Ahora vuelve
--- primero lo que salió de terminado y el resto a excedente.
+-- Esa decisión es justamente la que la primera versión intentaba adivinar sola, y adivinaba mal:
+-- devolvía todo a `terminado`, cuando el picking reparte entre `terminado` y `excedente`. Medido en
+-- E16A (LK 0049): de 370 cajas, 328 salieron de `terminado` y 42 de `excedente` — devolverlas todas
+-- a `terminado` habría movido 42 cajas de un depósito al otro en silencio. (Y ese mismo dato,
+-- mirado sólo por la columna `terminado`, hacía parecer que el picking había sido PARCIAL: no lo
+-- era.)
+--
+-- **De dónde había salido cada caja igual se guarda** (`salio_de_terminado` / `salio_de_excedente`
+-- en `GV_Desarmes.stock_devuelto`): es dato útil para el que después la guarda, pero no mueve
+-- stock. El movimiento es: `a_facturar` (o `separar_pedidos`) −N  ·  `a_guardar` +N.
 --
 -- La cantidad de cada artículo es `least(lo que pide la NP, lo que la tanda tiene parado hoy)`:
--- nunca se devuelve más de lo que salió, y desarmar dos veces no duplica.
---
--- `vista_saldos_stock` NO filtra por tipo (sólo usa `tipo` para la excepción del cutoff), así que
--- el tipo nuevo `desarme` entra al saldo solo. La `empresa` se copia del movimiento original: sin
--- eso un código DUAL volvería a la góndola de la otra empresa.
+-- nunca se devuelve más de lo que salió, y desarmar dos veces no duplica. ⚠ Una NP **ya facturada**
+-- no tiene nada parado (el `facturado` ya vació `a_facturar`), así que el desarme la saca de la PPP
+-- pero devuelve 0 cajas — el pop-up lo avisa antes.
 
 begin;
 
@@ -130,8 +139,8 @@ begin
 
   -- (2) el stock que vuelve. DOS cosas distintas, y por eso hay cuatro columnas:
   --   de donde se DESCUENTA hoy: a_facturar si la tanda ya se armo, si no separar_pedidos;
-  --   a donde VUELVE: a los mismos depositos de los que el picking la saco (terminado y/o
-  --   excedente). Ver la nota de arriba: mandar todo a terminado mueve cajas entre depositos.
+  --   a donde VA: a `a_guardar`, para que lo procese un operario con la pantalla MG. De donde
+  --   HABIA salido cada caja se guarda en el JSON, pero no mueve stock (ver la nota de arriba).
   -- La cantidad es least(lo que pide la NP, lo que la tanda tiene parado hoy).
   drop table if exists _gv_dev;
   create temp table _gv_dev on commit drop as
@@ -154,11 +163,9 @@ begin
            least(p.cajas, greatest(s.fact, 0) + greatest(s.sep, 0)) as total
       from ped p join sal s on s.ck = p.ck
   )
-  select c.cod_art, c.empresa,
+  select c.cod_art, c.empresa, c.org_term, c.org_exc, c.total,
          least(c.total, greatest(c.fact, 0))           as de_fact,
-         c.total - least(c.total, greatest(c.fact, 0)) as de_sep,
-         least(c.total, c.org_term)                    as a_term,
-         c.total - least(c.total, c.org_term)          as a_exc
+         c.total - least(c.total, greatest(c.fact, 0)) as de_sep
     from c where c.total > 0;
 
   insert into public."Movimientos_Stock" (ts, cod_art, descripcion, deposito, delta, tipo, ref, legajo, empresa)
@@ -169,16 +176,16 @@ begin
     cross join lateral (values
       ('a_facturar',      -1, d.de_fact),
       ('separar_pedidos', -1, d.de_sep),
-      ('terminado',        1, d.a_term),
-      ('excedente',        1, d.a_exc)
+      ('a_guardar',        1, d.total)
     ) as x(dep, signo, cant)
    where x.cant > 0;
 
   select coalesce(jsonb_agg(jsonb_build_object('art', d.cod_art, 'empresa', d.empresa,
                               'de_a_facturar', d.de_fact, 'de_separar', d.de_sep,
-                              'a_terminado', d.a_term, 'a_excedente', d.a_exc)
+                              'a_guardar', d.total,
+                              'salio_de_terminado', d.org_term, 'salio_de_excedente', d.org_exc)
                             order by d.cod_art), '[]'::jsonb),
-         count(*), coalesce(sum(d.a_term + d.a_exc), 0)
+         count(*), coalesce(sum(d.total), 0)
     into v_dev, v_arts, v_cajas
     from _gv_dev d;
 
@@ -188,8 +195,8 @@ begin
     values (v_np, 'desarmado: ' || v_just, coalesce(nullif(btrim(p_por),''), 'supervisor'))
     on conflict (np) do update set motivo = excluded.motivo, legajo = excluded.legajo;
     insert into public."GV_PPP_Prog_Override" (np, oculto, nota)
-    values (v_np, true, 'v17.88 ' || to_char(now() at time zone 'America/Argentina/Buenos_Aires','YYYY-MM-DD HH24:MI')
-                        || ' · DESARMADO (' || v_arts || ' art / ' || v_cajas || ' cajas devueltas): ' || v_just
+    values (v_np, true, 'v17.90 ' || to_char(now() at time zone 'America/Argentina/Buenos_Aires','YYYY-MM-DD HH24:MI')
+                        || ' · DESARMADO (' || v_arts || ' art / ' || v_cajas || ' cajas a guardar): ' || v_just
                         || coalesce(' · por ' || nullif(btrim(p_por),''), ''))
     on conflict (np) do update set oculto = true, nota = excluded.nota;
   else
@@ -213,7 +220,7 @@ begin
 
   return query select v_np, v_isis, v_tanda, v_arts, v_cajas,
     (v_arts || ' articulo' || case when v_arts = 1 then '' else 's' end || ' · ' || v_cajas
-     || ' caja' || case when v_cajas = 1 then '' else 's' end || ' de vuelta en gondola')::text;
+     || ' caja' || case when v_cajas = 1 then '' else 's' end || ' pasaron a A GUARDAR')::text;
 end;
 $function$;
 revoke all on function public.gv_ppp_np_desarmar(text,text,text) from public;

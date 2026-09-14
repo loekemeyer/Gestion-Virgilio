@@ -31,7 +31,8 @@ catch (_e) {
   const r = await p.evaluate(async () => {
     const out = {}, rpc = [];
     window.__isSupervisor = true;
-    window.confirm = function () { return true; };
+    const confirms = [];
+    window.confirm = function (t) { confirms.push(String(t || "")); return true; };
     window.prompt = function (_m, d) { return d || "x"; };
     window.alert = function () {};
     window.getTodayKey = () => "2026-09-14";
@@ -66,12 +67,16 @@ catch (_e) {
     const bt = fila && fila.querySelector(".pga-acc-b");
     out.hayBoton = !!bt;
     out.textoBoton = bt ? bt.textContent.trim() : "";
+    out.titleBoton = bt ? bt.getAttribute("title") : "";
     out.abiertasAntes = prev.querySelectorAll("tr.pga-c").length;
 
     // (b) NP web → gv_ppp_web_desprogramar
     bt.click(); await new Promise((res) => setTimeout(res, 250));
     out.abiertasDespues = document.getElementById("pppPreview").querySelectorAll("tr.pga-c").length;
     out.rpcWeb = rpc.map((x) => x.fn).join(",");
+    // v17.90 (Luis): "que también pida confirmación para enviar a programar", con su texto, UNA vez
+    out.confirmTxt = confirms.join(" ||| ");
+    out.confirmUno = confirms.length === 1;
     out.argWeb = JSON.stringify((rpc.find((x) => x.fn === "gv_ppp_web_desprogramar") || {}).args || {});
     out.recargo = recargas;
 
@@ -82,15 +87,22 @@ catch (_e) {
 
     // (g) v17.88 — el tacho: pop-up de ATENCIÓN, justificativo obligatorio y la RPC del desarme
     rpc.length = 0;
-    const filaD = [...prev.querySelectorAll("tr.pga-n")].find((x) => x.textContent.indexOf("LK 0058") >= 0);
+    // ⚠ NO volver a llamar a pgaAbrirDia / pgaAbrirTanda acá: son TOGGLE, y llamarlas de nuevo
+    // CIERRAN el día que ya estaba abierto y la fila desaparece. Basta con volver a pedir el nodo
+    // (#pppPreview se puede haber redibujado con el click de arriba).
+    const prev2 = document.getElementById("pppPreview");
+    const filaD = [...prev2.querySelectorAll("tr.pga-n")].find((x) => x.textContent.indexOf("LK 0058") >= 0);
     const btD = filaD && filaD.querySelector(".pga-acc-b.del");
     out.hayTacho = !!btD;
     out.textoTacho = btD ? btD.textContent.trim() : "";
+    out.titleTacho = btD ? btD.getAttribute("title") : "";
     btD.click(); await new Promise((res) => setTimeout(res, 150));
     const mh = (document.getElementById("dsmModal") || {}).innerHTML || "";
     out.atencion = /ATENCIÓN/.test(mh) && /NO SE DESHACE/.test(mh) && /permanente/i.test(mh);
-    out.explica = /sale de la PPP<\/b>/.test(mh) && /vuelven a góndola/.test(mh) &&
-                  /NO se borra de la página/.test(mh);
+    // v17.90 (Luis): el stock NO vuelve a góndola — pasa a "A guardar" y lo procesa un operario
+    out.explica = /sale de la PPP<\/b>/.test(mh) && /A guardar<\/b>, y un operario las guarda/.test(mh) &&
+                  !/vuelven a góndola/.test(mh) && /NO se borra de la página/.test(mh);
+    out.sinAvisoFact = !/ya está facturada/.test(mh);   // LK 0058 está armada, no facturada
     out.avisoIsisWeb = /dsm-isis/.test(mh);                 // una NP web NO lleva el aviso de ISIS
     out.okBloqueado = !!(document.getElementById("dsmOk") || {}).disabled;
     document.getElementById("dsmJust").value = "corto"; dsmChk();
@@ -106,6 +118,8 @@ catch (_e) {
     dsmAbrir("98700"); await new Promise((res) => setTimeout(res, 120));
     const mi = (document.getElementById("dsmModal") || {}).innerHTML || "";
     out.avisoIsis = /dsm-isis/.test(mi) && /dar de baja a mano/.test(mi);
+    // 98700 además está facturada: tiene que avisar que no va a devolver ninguna caja
+    out.avisoFacturada = /ya está facturada/.test(mi) && /no devuelve ninguna/.test(mi);
     dsmCerrar();
 
     // (d) el cartel del web ya no promete el automático
@@ -139,17 +153,25 @@ catch (_e) {
   let ok = true;
   const t = (c, m) => { console.log((c ? "  ✅ " : "  ❌ ") + m); if (!c) ok = false; };
   t(r.hayBoton, "(a) la fila de la NP trae el botón");
-  t(r.textoBoton === "↩ Enviar a programar", "(a) y dice «↩ Enviar a programar» — " + JSON.stringify(r.textoBoton));
+  // v17.90 (Luis): "hacé que los botones sean sólo los íconos y agregá la descripción cuando uno
+  // pone el mouse encima"
+  t(r.textoBoton === "↩", "(a) es SÓLO el ícono — " + JSON.stringify(r.textoBoton));
+  t(/Enviar a programar/.test(r.titleBoton), "(a) y lo que hace lo dice el tooltip — " + JSON.stringify(r.titleBoton));
   t(r.abiertasAntes === r.abiertasDespues, "(a) tocarlo NO abre ni cierra el contenido de la NP");
   t(/gv_ppp_web_desprogramar/.test(r.rpcWeb), "(b) una NP web va por gv_ppp_web_desprogramar — " + r.rpcWeb);
   t(/"p_np":"LK 0058"/.test(r.argWeb), "(b) con su NP — " + r.argWeb);
   t(/gv_ppp_isis_desprogramar/.test(r.rpcIsis), "(b) y una de ISIS por gv_ppp_isis_desprogramar — " + r.rpcIsis);
   t(r.recargo >= 1, "(c) después de sacarlo se recarga el árbol");
+  t(/¿Estás seguro que querés sacar este pedido de esta tanda y mandarlo «A PROGRAMAR»\?/.test(r.confirmTxt),
+    "(h) pide confirmación con el texto que pidió Luis — " + JSON.stringify(r.confirmTxt));
+  t(r.confirmUno, "(h) y una sola vez (no encadena la confirmación vieja)");
   t(r.cartel, "(d) el cartel ya no promete que lo reprograma el automático");
   t(r.hayTacho, "(g) la fila trae también el tacho");
-  t(r.textoTacho === "🗑 Desarmar pedido", "(g) y dice «🗑 Desarmar pedido» — " + JSON.stringify(r.textoTacho));
+  t(r.textoTacho === "🗑", "(g) el tacho también es sólo el ícono — " + JSON.stringify(r.textoTacho));
+  t(/Desarmar pedido/.test(r.titleTacho), "(g) con su tooltip — " + JSON.stringify(r.titleTacho));
   t(r.atencion, "(g) el pop-up grita ATENCIÓN, que no se deshace y que es permanente");
-  t(r.explica, "(g) y explica las tres cosas: sale de la PPP, vuelve el stock, NO se borra de la página");
+  t(r.explica, "(g) y explica las tres cosas: sale de la PPP, el stock pasa a «A guardar», NO se borra de la página");
+  t(r.sinAvisoFact, "(g) una NP armada (no facturada) no lleva ese aviso");
   t(!r.avisoIsisWeb, "(g) una NP web no lleva el aviso de ISIS");
   t(r.okBloqueado, "(g) sin justificativo no se puede confirmar");
   t(r.cortoBloqueado, "(g) con un justificativo corto tampoco");
@@ -157,6 +179,7 @@ catch (_e) {
   t(r.desarma, "(g) confirmar llama a gv_ppp_np_desarmar con la NP y el justificativo");
   t(r.cerro, "(g) y cierra el pop-up");
   t(r.avisoIsis, "(g) en una NP de ISIS avisa que además hay que darla de baja a mano");
+  t(r.avisoFacturada, "(g) y si ya está facturada, que el desarme no va a devolver ninguna caja");
   t(r.yaHecho, "(e) el pedido web retenido cuenta como «ya hecho»");
   t(/ya pickeada y armada · E01A/.test(r.chip), "(e) y sale con su chip rojo en A Programar — " + JSON.stringify(r.chip));
   t(/gv_ppp_web_tanda_reusar/.test(r.rpcProg) && !/gv_ppp_web_tanda_nueva/.test(r.rpcProg),

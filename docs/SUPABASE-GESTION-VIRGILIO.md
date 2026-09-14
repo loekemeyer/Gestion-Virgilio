@@ -15538,3 +15538,52 @@ cron la resucitaría. Ahora es explícito: no se toca una NP que esté en `GV_De
 
 El control positivo está para que la prueba pruebe algo: sin él, "0 filas" también sería el
 resultado de una función rota.
+
+
+## §3.fx — v17.90: el desarme manda el stock a `a_guardar` — 2026-09-14
+
+Corrección de Luis sobre la §3.fw: *"cuando se aprieta ese botón, debería ir «A guardar» el pedido
+para hacerlo lo más limpio posible, y que un operador después lo tenga que procesar como toda la
+mercadería a guardar, ¿no?"*.
+
+`gv_ppp_np_desarmar` ya no devuelve las cajas a `terminado` / `excedente`: las manda a
+**`a_guardar`**. El movimiento queda:
+
+```
+a_facturar (o separar_pedidos)  −N     ·     a_guardar  +N
+```
+
+**Por qué es mejor, y no sólo distinto.** La pantalla **📥 Guardar a góndola (MG)** arma su lista
+leyendo el **saldo de `a_guardar`** por código y empresa (`showMGModal` → `stockFetchSaldos`), así
+que el desarme entra ahí solo, sin tocar esa pantalla ni ninguna vista. Y la decisión de *si va a
+góndola o a excedente, y con qué ubicación* vuelve a ser del **operario**, que es de quien siempre
+fue: la v17.88 la adivinaba en el backend, y la adivinaba mal (mandaba todo a `terminado`).
+
+**De dónde había salido cada caja igual se guarda**, en `GV_Desarmes.stock_devuelto`:
+`salio_de_terminado` y `salio_de_excedente` por artículo. Es dato para el que después la guarda; no
+mueve stock.
+
+### Medición (14/09, transacción revertida)
+
+`gv_ppp_np_desarmar('LK 0008', …)` → 3 artículos / 30 cajas:
+
+```
+movs:  a_facturar -30 | a_guardar 30        NETO 0
+saldo global de a_guardar: 1472 → 1502      (aparece en la pantalla del operario)
+registro art 586: {a_guardar:10, de_a_facturar:10, salio_de_terminado:10, salio_de_excedente:0}
+```
+
+### ⚠ Una NP ya facturada devuelve 0
+
+El `facturado` ya vació `a_facturar`, así que no queda nada parado. El desarme la saca igual de la
+PPP y guarda el registro, pero **no devuelve ninguna caja**. Se descubrió midiendo: **E16A** se
+facturó entre dos pruebas y el desarme pasó de 370 cajas a 0. El pop-up lo avisa antes, en ámbar.
+Deshacer eso es anular la factura, y eso es ISIS.
+
+### No choca con la v17.89
+
+La otra sesión hizo que `gv_entregas_reconstruir` no resucite una NP desarmada, leyendo
+`GV_Desarmes`. Esto no toca esa función ni el contrato: `gv_ppp_np_desarmar` sigue insertando
+siempre la fila en `GV_Desarmes` (también cuando devuelve 0 cajas), que es de lo que depende esa
+guarda. Verificado en la base: la definición viva tiene el `a_guardar` de acá y ningún resto de la
+versión de góndola.

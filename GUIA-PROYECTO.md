@@ -1,4 +1,28 @@
-## Nota v17.88 (2026-09-14) — "🗑 Desarmar pedido": sale de la PPP, vuelve el stock, queda el registro
+## Nota v17.90 (2026-09-14) — el desarme manda el stock a "A guardar", y los botones son sólo íconos
+
+Tres correcciones de Luis sobre la v17.88:
+
+1. **El stock del desarme va a `a_guardar`, no a góndola.** *"Cuando se aprieta ese botón, debería
+   ir «A guardar» el pedido para hacerlo lo más limpio posible, y que un operador después lo tenga
+   que procesar como toda la mercadería a guardar, ¿no?"*. Y es lo correcto: la pantalla **📥
+   Guardar a góndola (MG)** lista por **saldo de `a_guardar`**, así que el desarme aparece ahí solo
+   y es **el operario** el que decide si va a góndola o a excedente y con qué ubicación — que es
+   justo la decisión que la v17.88 intentaba adivinar sola. El movimiento queda
+   `a_facturar −N · a_guardar +N`. **De dónde había salido cada caja igual se guarda**
+   (`salio_de_terminado` / `salio_de_excedente` en `GV_Desarmes.stock_devuelto`): es dato útil para
+   el que la guarda, pero ya no mueve stock.
+2. **Confirmación para «Enviar a programar»**, con su texto: *"¿Estás seguro que querés sacar este
+   pedido de esta tanda y mandarlo «A PROGRAMAR»?"*. Va **una sola vez**: `pppVencSinProgramar` /
+   `pppVencVolver` aceptan `{sinConfirm:true}` para no encadenar la suya.
+3. **Los dos botones quedan sólo con el ícono** (`↩` y `🗑`) y lo que hacen lo dice el `title` al
+   pasar el mouse. Así la fila de la NP entra entera en un renglón.
+
+⚠ Y se agregó un aviso que faltaba: **una NP ya facturada no tiene stock parado** (el `facturado`
+ya vació `a_facturar`), así que el desarme la saca de la PPP pero **no devuelve ninguna caja**. Se
+descubrió midiendo: E16A se facturó entre dos pruebas y el desarme pasó a devolver 0. El pop-up lo
+avisa antes, en ámbar.
+
+## Nota v17.88 (2026-09-14) — "🗑 Desarmar pedido": sale de la PPP, se acomoda el stock, queda el registro
 
 Pedido de Luis, la otra mitad de la v17.85: *"un botón que sea un tacho de basura y que sea
 «Desarmar pedido» que, si se aprieta, se elimina el pedido y acomoda el stock de las cajas que lo
@@ -16,6 +40,9 @@ acción que se está por tomar es permanente)"*. Y lo que definió después, pre
 - **Stock.** *"Se ajusta el stock por los ítems armados en esa NP… movimiento compensatorio que
   explique que es por desarme de pedido armado"* → `tipo = 'desarme'`, `ref` = la NP, y la
   descripción de cada movimiento dice el pedido, la tanda y el justificativo.
+
+⚠ **Lo de abajo quedó viejo en la v17.90: el stock ya no vuelve a góndola, va a «A guardar».**
+Se deja porque explica por qué mandar todo a `terminado` estaba mal.
 
 ⚠ **Lo que casi sale mal, para el que toque esto.** El picking NO saca todo de `terminado`:
 reparte entre `terminado` y `excedente`. La primera versión devolvía todo a `terminado`, y en la
