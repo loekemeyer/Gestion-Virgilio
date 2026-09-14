@@ -61,42 +61,28 @@
 --  medir sobre el texto crudo da un falso positivo, error que ya se cometió antes).
 --
 -- ─────────────────────────────────────────────────────────────────────
---  ⚠ HALLAZGO AL COSTADO: `LIBRE` NO ES BASURA — y 6 filas que sí están mal
+--  ⚠⚠ EL BLOQUE SOBRE `LIBRE` QUE ESTABA ACÁ QUEDÓ REFUTADO — VER `sql/gv_lugar_item_libre_v1760.sql`
 -- ─────────────────────────────────────────────────────────────────────
---  ⚠⚠ **CORRECCIÓN de lo que decía este bloque antes: NO hay que "limpiar" las 54 filas
---  `cod = 'LIBRE'`.** Se escribió que contradecían la regla 2 del handoff ("sin número no
---  hay fila de capacidad") y que convenía borrarlas. **Está mal, y borrarlas rompe cosas.**
+--  Acá decía que `cod='LIBRE'` era el marcador de "posición vacía", que estaba **vivo en
+--  cinco lugares** y que 5 celdas mal marcadas hacían que el mapa las ofreciera como vacías.
+--  **Las tres cosas son falsas.** Se midió el 14/09 (v17.60):
+--    • `gv_planimetria_celda` **no devuelve ni una fila `cod='LIBRE'`** (0 de 54) y calcula
+--      `estado='libre'` como **`p.k IS NULL`** — por AUSENCIA de artículo, sin mirar la marca;
+--    • los `if (k === "LIBRE") return` del front NO son consumidores usándola: son **guardas
+--      para esquivarla**, igual que el `<> 'LIBRE'` de `vista_generador_oc`;
+--    • el badge "posiciones LIBRES" que se citó como prueba **es el de RACKS**
+--      (`stkRacksCapCompute`) y usa `p.ocupado`;
+--    • `gvFetchLugares` declara `libres: new Set()` **y nunca lo llena**: código muerto;
+--    • y de los 54 sectores la vista reporta 49 `libre`, 4 `solo_mapa` y 1 `ok` — **ninguno de
+--      los ocupados sale como libre**, así que la alarma tampoco tenía sustento.
+--  `LIBRE` es residuo de la planimetría vieja. Desde la v17.60 `gv_lugar_item_guardar` lo
+--  borra al ocupar la celda y rechaza `LIBRE` como código de artículo; **`_sacar` NO lo
+--  repone** (hay 88 celdas vacías SIN marca contra 54 con marca: la convención no existe).
 --
---  `LIBRE` es el marcador de **"esta posición está vacía y disponible"**, y está VIVO:
---    • `vista_generador_oc` lo excluye explícitamente dos veces (`<> 'LIBRE'`);
---    • el badge **"posiciones LIBRES"** del mapa lo cuenta y lo muestra;
---    • el autocompletado de la ubicación del excedente **lo prioriza a propósito**
---      ("se prioriza lo que está LIBRE, que es donde suele ir un excedente");
---    • el modal **Mover** valida con él ("el destino tiene que estar LIBRE o con el MISMO código");
---    • `pmapVieja` y el armado de código→sectores lo saltean.
---  Y la "contradicción" con la regla 2 no existe: esa regla es para artículos reales. Una
---  posición vacía con `cajas_max` NULL es exactamente lo correcto.
---
---  Son 54 filas en 54 sectores, **todos existentes en `GV_Lugar`** (39 de la góndola P entera
---  con empresa CH, 8 LK, 6 LOKE).
---
---  **LO QUE SÍ ESTÁ MAL SON 6**, marcadas `LIBRE` pero con algo adentro:
---    A60 → tiene `989E` y `992E`   ·  A65 → `396` y `556`   ·  C01 → `547`
---    C15 → `510T` y `581T`          ·  Ñ55 → `838E`
---    A83 → `LIBRE` con `cajas_max = 72` y sin artículo (inconsistente pero inocuo)
---  Las 5 primeras importan: el badge cuenta libres de más y el autocompletado puede mandar a
---  un operario a dejar un excedente en una celda ocupada — justo lo que el handoff advierte
---  ("que una celda ACEPTE otro código no significa que ESTÉ libre").
---
---  **Causa raíz, con caso testigo:** A60 es la celda que la sesión de Thomas ocupó el 14/09
---  con `989E` y `992E`. Le pusieron el artículo y **la marca `LIBRE` quedó**: o sea que
---  `gv_lugar_item_guardar` no saca la fila `LIBRE` del sector al cargar un artículo. Ése es
---  el bug de fondo; las 6 filas son el síntoma acumulado. Registrado como problema aparte,
---  **sin tocar ningún dato** (protocolo: no modificar sin permiso explícito).
---
---  Ojo al medir: con `cajas_max` NULL, un `string_agg(cod || '=' || cajas_max::text)` las
---  **esconde** (el `||` con NULL da NULL). Eso hizo que una prueba pareciera dejar una fila
---  huérfana cuando en realidad la fila era preexistente y ajena.
+--  Lo único de ese bloque que sigue valiendo, porque es una trampa de medición real:
+--  con `cajas_max` NULL, un `string_agg(cod || '=' || cajas_max::text)` **esconde** esas filas
+--  (el `||` con NULL da NULL). Eso hizo que una prueba pareciera dejar una fila huérfana
+--  cuando en realidad era preexistente y ajena.
 --
 --  Rollback: el cuerpo anterior de las dos funciones está en el historial de git; la única
 --  diferencia es volver `cod = v_cod` a

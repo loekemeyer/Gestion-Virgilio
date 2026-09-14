@@ -14077,7 +14077,7 @@ y no simplemente saca camiones enteros.
 El detalle entra en un celular de **412 px sin scroll horizontal** con las 7 columnas (tabla 360 px
 de una tarjeta de 388). Los tics son **texto verde, no celdas pintadas**.
 
-### §3.fi — v17.60: `LIBRE` es residuo, no señal. `guardar` lo limpia; `sacar` NO lo repone
+### §3.fj — v17.60: `LIBRE` es residuo, no señal. `guardar` lo limpia; `sacar` NO lo repone
 
 ⚠⚠ **Esta sección corrige a §3.fh (v17.61). Vale ésta.** Aquélla decía que `cod='LIBRE'` estaba
 *"vivo en cinco lugares"* y que no había que tocarlo. **Estaba mal, por leer el código al revés**:
@@ -14098,7 +14098,7 @@ esos `if (k === "LIBRE") return` no son consumidores que la usan, son **guardas 
 → **`cod='LIBRE'` es residuo de la planimetría vieja que todos tienen que esquivar.** "Celda
 vacía" ya se resuelve por ausencia de artículo.
 
-Y la alarma de §3.fh (*"5 celdas marcadas LIBRE con artículo → el mapa las ofrece como vacías"*)
+Y la alarma de ese bloque (*"5 celdas marcadas LIBRE con artículo → el mapa las ofrece como vacías"*)
 **también era infundada**: de esos 54 sectores la vista reporta 49 `libre`, 4 `solo_mapa` y 1 `ok`
 — **ninguno de los ocupados sale como libre**.
 
