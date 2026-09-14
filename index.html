@@ -5036,7 +5036,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=17.55"></script>
+<script type="module" src="recepcion.js?v=17.56"></script>
 <!-- Config del módulo de fichada (compartido con fichada.html). El secret
      hmacSecret tiene que ser el mismo acá y allá; cargándolo desde un solo
      archivo evitamos que se desincronicen. -->
@@ -7193,7 +7193,10 @@ function _pppOpCss() {
     + ".pppop-det-top{display:flex;align-items:center;gap:10px;padding:0 0 8px;}"
     + ".pppop-volver{background:#eef2f7;color:#1e6bd6;border:none;border-radius:8px;padding:6px 11px;font-size:14px;font-weight:800;cursor:pointer;width:auto;}"
     + ".pppop-tbl td.pppop-cli,.pppop-tbl th.pppop-cli{text-align:left;}"
-    + ".pppop-tbl td.pppop-cli{white-space:normal;line-height:1.25;}";
+    + ".pppop-tbl td.pppop-cli{white-space:normal;line-height:1.25;}"
+    + "#pppOpModal.det .pppop-tbl th,#pppOpModal.det .pppop-tbl td{padding-left:6px;padding-right:6px;}"
+    + ".pppop-tbl td.pppop-est,.pppop-tbl th.pppop-est{text-align:left;white-space:normal;line-height:1.2;}"
+    + ".pppop-est-0{color:#94a3b8;}";
   document.head.appendChild(s);
 }
 function pppOpAbrir() {
@@ -7289,7 +7292,7 @@ async function pppOpDia(fecha) {
   const body = document.getElementById("pppOpBody"); if (!body) return;
   if (_pppOpDet[fecha]) { pppOpDetRender(fecha, _pppOpDet[fecha], ""); return; }
   body.innerHTML = '<div class="pppop-msg">Cargando el día…</div>';
-  const url = PPP_OP_DET_ENDPOINT + "?select=np,np_num,tanda,m3,razon_social,cod,localidad"
+  const url = PPP_OP_DET_ENDPOINT + "?select=np,np_num,tanda,m3,razon_social,cod,localidad,estado,estado_orden"
             + "&fecha=eq." + fecha + "&order=np_num.asc,np.asc&limit=2000";
   try {
     const r = await fetch(url, { headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY }, cache: "no-store" });
@@ -7314,17 +7317,25 @@ function pppOpDetRender(fecha, rows, aviso) {
   const ti = document.querySelector("#pppOpModal .pppop-title"); if (ti) ti.textContent = "🗓️ PPP · " + titulo;
   let html = '<div class="pppop-det-top"><button class="pppop-volver" onclick="pppOpVolver()">← Días</button></div>';
   if (!rows.length) { body.innerHTML = html + '<div class="pppop-msg">Ese día no tiene nada programado.</div>'; return; }
-  let sm3 = 0; const tandas = {};
-  html += '<table class="pppop-tbl"><thead><tr><th>NP</th><th class="pppop-cli">Cliente</th><th>Tanda</th><th>Mt3</th></tr></thead><tbody>';
+  let sm3 = 0; const tandas = {}, porEstado = {};
+  html += '<table class="pppop-tbl"><thead><tr><th>NP</th><th class="pppop-cli">Cliente</th><th>Tanda</th><th>Mt3</th><th class="pppop-est">Estado</th></tr></thead><tbody>';
   for (const r of rows) {
     sm3 += Number(r.m3) || 0; tandas[String(r.tanda || "—")] = 1;
+    const est = String(r.estado || "Sin armar");
+    porEstado[est] = (porEstado[est] || 0) + 1;
     html += '<tr><td>' + escapeHtml(String(r.np)) + '</td>'
          + '<td class="pppop-cli">' + escapeHtml(String(r.razon_social || r.cod || "—")) + '</td>'
          + '<td>' + escapeHtml(String(r.tanda || "—")) + '</td>'
-         + '<td>' + _pppOpM3(r.m3) + '</td></tr>';
+         + '<td>' + _pppOpM3(r.m3) + '</td>'
+         + '<td class="pppop-est' + (est === "Sin armar" ? " pppop-est-0" : "") + '">' + escapeHtml(est) + '</td></tr>';
   }
+  const resumenEst = ["Facturado", "Armado", "Pickeado", "Sin armar"]
+    .filter(function (e) { return porEstado[e]; })
+    .map(function (e) { return porEstado[e] + " " + e.toLowerCase(); }).join(" · ");
   html += '</tbody><tfoot><tr class="pppop-tot"><td>' + rows.length + ' NP</td>'
-       + '<td class="pppop-cli">' + Object.keys(tandas).length + ' tanda(s)</td><td></td><td>' + _pppOpM3(sm3) + '</td></tr></tfoot></table>';
+       + '<td class="pppop-cli">' + Object.keys(tandas).length + ' tanda(s)</td><td></td><td>' + _pppOpM3(sm3) + '</td>'
+       + '<td class="pppop-est"></td></tr></tfoot></table>'
+       + (resumenEst ? '<div class="pppop-msg">' + escapeHtml(resumenEst) + '</div>' : "");
   if (aviso) html += '<div class="pppop-msg">' + escapeHtml(aviso) + '</div>';
   body.innerHTML = html;
 }
@@ -8352,7 +8363,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v17.55";
+const APP_VERSION = "v17.56";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción

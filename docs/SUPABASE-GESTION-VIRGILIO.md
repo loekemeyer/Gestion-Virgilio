@@ -13966,3 +13966,58 @@ Salud al cerrar: `Z. ALARMA` 0 · `gv_endpoints_rotos` 0 · `gv_stock_particion_
 `GV_Lugar_Item` 790 · `Capacidad_Sector` 732 · 0 transacciones abiertas.
 
 **Definición y rollback:** `sql/gv_lugar_item_rpc_alineadas_v1755.sql`.
+---
+
+## §3.fk — v17.56: el detalle del día dice en qué ESTADO está cada pedido — 2026-09-14
+
+**Pedido del dueño (14/09), encima del detalle de la v17.54:** *"que diga el estado del pedido:
+Pickeado; Armado; Facturado"* … *"o sin armar"*.
+
+### Las reglas no son nuevas — son las de `gv_ppp_avance_dias`
+
+`gv_ppp_detalle_dia` ganó dos columnas, `estado` y `estado_orden`, calculadas con **las mismas
+fuentes y el mismo criterio** que `gv_ppp_avance_dias` (`sql/gv_ppp_avance_dia.sql`), la función
+que ya alimenta los % de la PPP, el Telegram de las 16:00 y la tarea de Planify de Marianela.
+Se repiten a propósito: un pedido no puede figurar "armado" en un lado y "sin armar" en el otro.
+
+| Señal | De dónde sale |
+|---|---|
+| picking | último evento `EP`/`TP` de la **tanda** (`TP` = terminado) |
+| armado | último evento `AP`/`TAP` de la **tanda** (`TAP` = terminado) |
+| salió | la **NP** tiene `CCN` (cargada al camión) o `CRN` (remito controlado) → se armó sí o sí |
+| facturado | la **NP** está en `Facturacion_NP` |
+
+Legajos 0 y 1 (Pruebas) no marcan estado, igual que en el front.
+
+### Las cuatro etiquetas que pidió, y dónde caen los cinco estados internos
+
+| Etiqueta | `estado_orden` | Qué la dispara |
+|---|---:|---|
+| Facturado | 4 | la NP está facturada — **gana sobre todo**: es lo más lejos que llegó el pedido |
+| Armado | 3 | `TAP` de la tanda, o la NP ya salió (`CCN`/`CRN`) |
+| Pickeado | 2 | `TP` de la tanda, **y también** `AP` sin `TAP`: si se está armando, pickeado ya está |
+| Sin armar | 1 | nada, **y también** `EP` sin `TP`: mientras el picking no termine, para el depósito no está listo |
+
+Ésa es la única diferencia con la función: su `sin_ped` cuenta sólo los que no empezaron, mientras
+que acá "Sin armar" incluye los que están **pickeándose**. Medido el 14/09 sobre el 15/09:
+función `pedidos 28 · pick 22 · arm 17 · fact 8 · sin 3`; vista `total 28 · ≥pickeado 22 ·
+≥armado 17 · facturado 8 · sin armar 6` → los 3 de diferencia son los `EP` sin `TP` (22 + 3 + 3 = 28).
+Todo lo demás coincide exactamente, día por día, del 10/09 al 18/09.
+
+Y las dos vistas siguen cerrando entre sí: en los 9 días programados, `filas`, `m³` y `tandas` del
+detalle son idénticos a `nps`, `m3` y `tandas` del resumen.
+
+### Front
+
+La tabla del detalle pasó a 5 columnas — **NP · Cliente · Tanda · Mt3 · Estado** — y abajo una
+línea con el reparto (`2 facturado · 1 armado · 2 pickeado · 2 sin armar`). "Sin armar" va en gris:
+**el estado es texto, no una celda pintada** (regla del dueño). Entra en un celular de 412 px.
+
+Test: `tests/ppp-operario.cjs` verifica el encabezado de 5 columnas, que los estados salgan **tal
+cual los manda el backend** (el front no los recalcula), que "Sin armar" quede apagado, el resumen
+del pie, que la consulta pida `estado`, y que ninguna celda tenga relleno.
+
+### Rollback
+
+Volver a la versión sin estado: `sql/gv_ppp_detalle_dia.sql` en el commit de la v17.54, y sacar del
+front la columna `pppop-est`.

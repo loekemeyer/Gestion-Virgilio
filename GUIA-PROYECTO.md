@@ -70,7 +70,19 @@ Pedido de Luis. Dos cosas:
 > única**; no se replica. Ante la duda entre parche rápido y fix de raíz → **fix
 > de raíz**.
 >
-> Última actualización: 2026-09-14 (domingo) · Versión app al documentar: **v17.54**
+> Última actualización: 2026-09-14 (domingo) · Versión app al documentar: **v17.56**
+>
+> Nota **v17.56 (2026-09-14, Thomas) — el detalle del día dice en qué ESTADO está cada pedido.**
+> *"Que diga el estado del pedido: Pickeado; Armado; Facturado"* … *"o sin armar"*. La tabla del
+> detalle (v17.54) pasó a **NP · Cliente · Tanda · Mt3 · Estado**, con una línea abajo que resume el
+> reparto. **Las reglas no son nuevas**: `gv_ppp_detalle_dia` calcula `estado`/`estado_orden` con las
+> mismas fuentes que `gv_ppp_avance_dias` —último `EP`/`TP` y `AP`/`TAP` de la **tanda**, `CCN`/`CRN`
+> de la **NP**, y `Facturacion_NP`— para que un pedido no figure armado en un lado y sin armar en el
+> otro. Los cinco estados internos caen en las cuatro etiquetas que pidió: **Facturado** (gana sobre
+> todo), **Armado** (TAP o ya salió), **Pickeado** (TP, y también AP sin TAP), **Sin armar** (nada, y
+> también EP sin TP). Contrastado día por día del 10 al 18/09 contra la función: coincide en todo
+> salvo esos `EP` sin `TP`, que la función cuenta aparte y acá van a "Sin armar" a propósito.
+> §3.fk de `docs/SUPABASE-GESTION-VIRGILIO.md` · test `tests/ppp-operario.cjs`.
 >
 > Nota **v17.54 (2026-09-14, Thomas) — en el PPP del operario se toca el día y se ve QUÉ SALE.**
 > *"Debe poder clickear sobre el día y ver la composición de lo que sale ese día. Cuando entra que

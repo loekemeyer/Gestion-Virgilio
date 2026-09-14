@@ -8,9 +8,10 @@
    (d) la tabla NO se estira al ancho de la tarjeta (regla del dueño: nada de
        ocupar el 100% porque sí) y los números van a la derecha;
    (e) sin red, muestra lo último que bajó (cache) en vez de una pantalla vacía;
-   (f) tocar un día abre su composición (NP ; Cliente ; Tanda ; Mt3) ORDENADA por
-       número de NP —el orden lo pide la consulta, no el front— y "← Días" vuelve
-       al resumen sin volver a consultarlo. */
+   (f) tocar un día abre su composición (NP ; Cliente ; Tanda ; Mt3 ; Estado)
+       ORDENADA por número de NP —el orden lo pide la consulta, no el front—, con
+       el estado tal cual lo manda el backend (Sin armar / Pickeado / Armado /
+       Facturado) y "← Días" vuelve al resumen sin volver a consultarlo. */
 const path = require("path");
 let chromium;
 try { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
@@ -24,11 +25,11 @@ const FILAS = [
 ];
 
 const DETALLE = [
-  { np: "CH 0001", np_num: "1",     tanda: "E01F", m3: "0.326", razon_social: "Elbantonio",          cod: "2101", localidad: "Soldati" },
-  { np: "LK 0004", np_num: "4",     tanda: "E12L", m3: "0.102", razon_social: "Chen Li Yu",          cod: "4102", localidad: "Belgrano" },
-  { np: "CH 0011", np_num: "11",    tanda: "E03G", m3: "0.189", razon_social: "Bazar Mandarin S.R.L", cod: "2277", localidad: "Nueva Pompeya" },
-  { np: "44620",   np_num: "44620", tanda: "E03G", m3: "1.245", razon_social: "Gonzalez Pellegrini Dario", cod: "4024", localidad: "Ciudadela" },
-  { np: "98704",   np_num: "98704", tanda: "D69F", m3: "6.170", razon_social: "S.A.Imp Y Exp De La Patagonia", cod: "771", localidad: "Esteban Echeverria" }
+  { np: "CH 0001", np_num: "1",     tanda: "E01F", m3: "0.326", razon_social: "Elbantonio",          cod: "2101", localidad: "Soldati",        estado: "Facturado", estado_orden: 4 },
+  { np: "LK 0004", np_num: "4",     tanda: "E12L", m3: "0.102", razon_social: "Chen Li Yu",          cod: "4102", localidad: "Belgrano",       estado: "Armado",    estado_orden: 3 },
+  { np: "CH 0011", np_num: "11",    tanda: "E03G", m3: "0.189", razon_social: "Bazar Mandarin S.R.L", cod: "2277", localidad: "Nueva Pompeya",  estado: "Pickeado",  estado_orden: 2 },
+  { np: "44620",   np_num: "44620", tanda: "E03G", m3: "1.245", razon_social: "Gonzalez Pellegrini Dario", cod: "4024", localidad: "Ciudadela", estado: "Sin armar", estado_orden: 1 },
+  { np: "98704",   np_num: "98704", tanda: "D69F", m3: "6.170", razon_social: "S.A.Imp Y Exp De La Patagonia", cod: "771", localidad: "Esteban Echeverria", estado: "Sin armar", estado_orden: 1 }
 ];
 
 (async () => {
@@ -125,21 +126,38 @@ const DETALLE = [
       alineNp: getComputedStyle(tbl.querySelector("tbody td:first-child")).textAlign,
       alineCli: getComputedStyle(tbl.querySelector("tbody td.pppop-cli")).textAlign,
       alineM3: getComputedStyle(tbl.querySelector("tbody td:nth-child(4)")).textAlign,
+      estados: [...tbl.querySelectorAll("tbody td.pppop-est")].map((td) => td.textContent.trim()),
+      sinArmarApagado: [...tbl.querySelectorAll("tbody tr")].filter((tr) => {
+        const td = tr.querySelector("td.pppop-est");
+        return td && td.textContent.trim() === "Sin armar" && td.classList.contains("pppop-est-0");
+      }).length,
+      pie: (document.querySelector("#pppOpBody .pppop-msg") || {}).textContent,
+      pintadas: [...tbl.querySelectorAll("td")].filter((td) => {
+        const bg = getComputedStyle(td).backgroundColor;
+        return bg && bg !== "rgba(0, 0, 0, 0)" && bg !== "transparent";
+      }).length,
       hayVolver: !!document.querySelector(".pppop-volver")
     };
   });
-  if (det.th.join(";") !== "NP;Cliente;Tanda;Mt3") fail.push("encabezado del detalle != 'NP;Cliente;Tanda;Mt3' → " + det.th.join(";"));
+  if (det.th.join(";") !== "NP;Cliente;Tanda;Mt3;Estado") fail.push("encabezado del detalle != 'NP;Cliente;Tanda;Mt3;Estado' → " + det.th.join(";"));
+  if (det.estados.join("|") !== "Facturado|Armado|Pickeado|Sin armar|Sin armar")
+    fail.push("los estados no salen como vienen del backend → " + det.estados.join("|"));
+  if (det.sinArmarApagado !== 2) fail.push('los "Sin armar" no quedan apagados (' + det.sinArmarApagado + " de 2)");
+  if (String(det.pie || "").indexOf("1 facturado · 1 armado · 1 pickeado · 2 sin armar") < 0)
+    fail.push("el pie no resume los estados → " + det.pie);
+  if (det.pintadas) fail.push(det.pintadas + " celdas del detalle con relleno de color");
   if (det.filas.length !== DETALLE.length) fail.push("detalle: esperaba " + DETALLE.length + " filas, salieron " + det.filas.length);
   if (det.filas.map((f) => f[0]).join("|") !== "CH 0001|LK 0004|CH 0011|44620|98704")
     fail.push("el detalle no respeta el orden por número de NP → " + det.filas.map((f) => f[0]).join("|"));
   if (det.filas[4] && det.filas[4][3] !== "6,17") fail.push("m³ del detalle sin coma decimal: '" + det.filas[4][3] + "'");
-  if (det.tot.join(";") !== "5 NP;4 tanda(s);;8,03") fail.push("el pie del detalle no cierra → " + det.tot.join(";"));
+  if (det.tot.join(";") !== "5 NP;4 tanda(s);;8,03;") fail.push("el pie del detalle no cierra → " + det.tot.join(";"));
   if (det.titulo.indexOf("Miércoles 16/09") < 0) fail.push("el título no dice qué día se está viendo → " + det.titulo);
   if (det.alineNp !== "left") fail.push("la NP no va a la izquierda (" + det.alineNp + ")");
   if (det.alineCli !== "left") fail.push("el cliente no va a la izquierda (" + det.alineCli + ")");
   if (det.alineM3 !== "right") fail.push("el m³ no va a la derecha (" + det.alineM3 + ")");
   if (!/fecha=eq\.2026-09-16/.test(detUrl)) fail.push("el detalle no pide el día tocado → " + detUrl);
   if (!/order=np_num\.asc/.test(detUrl)) fail.push("el orden por NP no lo pide la consulta → " + detUrl);
+  if (!/select=[^&]*estado/.test(detUrl)) fail.push("la consulta del detalle no pide el estado → " + detUrl);
   if (!det.hayVolver) fail.push("no hay botón para volver a los días");
 
   // y ← Días vuelve al resumen sin volver a pedirlo
