@@ -12788,3 +12788,53 @@ y 0 apariciones en el front; por eso el `DROP` + `CREATE` no necesitó cascada.
 
 **SQL:** `sql/gv_gondola_divergente_v1726.sql` (con el `CREATE` viejo entero al pie, para rollback).
 **Suite:** 144 bloques, `EXIT=0` — incluidos `dead-handlers` (703 handlers, 0 muertos) y `checkhtml`.
+
+### §3.eu — v17.29: "Cómo viene el mes" — el cierre proyectado, en el dashboard del gerente — 2026-09-14
+
+**Thomas (14/09): *"Nada de eso. Calculá proyección para compras como lo viene haciendo. Fijate si se puede
+tener el dato (y mostrar en algún lado que tenga sentido, a lo mejor agarrate los repos de las páginas para
+hacerlo ahí) la proyección final del mes en curso"*.**
+
+⚠ **La proyección de compras NO se tocó.** `_fn_proy_window` y `_fn_proy_window_emp` quedan exactamente como
+estaban: ventana de 6 meses terminando en el último mes completo. El backtest de §3.es queda como
+información, sin aplicar. Son dos cosas distintas:
+
+| | para qué |
+|---|---|
+| proyección de **compras** | cuánto se vende por mes, para pedir a China |
+| proyección **del mes** (esto) | cómo va a cerrar septiembre, para mirarlo hoy |
+
+**Se puede recién ahora**: desde §3.er el mes corriente está en vivo. Con el Excel mensual no existía.
+
+**Método: regla de tres por días hábiles transcurridos.** Se midió la curva de cómo se factura dentro del
+mes y en LK sale **casi recta** — al 50 % de los días hábiles va el **49,0 %** de las cajas, al 75 % el
+**72,7 %**, al 90 % el **90,0 %** — así que no hace falta ninguna curva de forma.
+
+**Error medido** (24 meses, LK, contra el cierre real):
+
+| a esta altura del mes | error |
+|---|--:|
+| 25 % | 11,8 % |
+| 50 % | 12,7 % |
+| **75 %** | **5,2 %** |
+| 90 % | 4,8 % |
+| *adivinar con el promedio de los 3 meses previos, sin dato vivo* | *15,0 %* |
+
+**Objetos** (`sql/gv_proyeccion_mes_curso_v1729.sql`): vista `gv_proyeccion_mes_curso` y RPC
+`gv_proyeccion_mes()`. La RPC hace falta porque la **RLS de `sales_lines` sólo deja ver las filas propias**
+del cliente logueado, así que el front no puede leer la vista directo: va `SECURITY DEFINER` con guard
+`gv_es_admin()`, el mismo patrón que `gv_dashboard`.
+
+**Dónde se ve:** banda nueva en el **dashboard del Gerente de ventas**, justo abajo de la de PPP. Por
+empresa: cierre proyectado, facturado hasta hoy, y cómo se compara contra el mes anterior y el promedio de 3
+meses; al pie, cuántos días hábiles van y el margen típico a esa altura.
+
+**Se hizo en el repo de origen** (`pagina-LK-copia`, commit `a0a27eb`, función `_gvCargarMes` en `admin.js`)
+**y se espejó acá** en `admin/admin.js`, como manda la regla de que la copia bajo `/admin/` no es un fork.
+
+**Medido el 14/09** (10 de 22 días hábiles, 45 % del mes):
+
+| | hasta hoy | cierre proyectado | mes anterior | prom. 3 meses |
+|---|--:|--:|--:|--:|
+| Loekemeyer | 8.127 cj | **17.879** | 19.076 | 17.184 |
+| Chef | 2.145 cj | **4.719** | 3.463 | 3.514 |
