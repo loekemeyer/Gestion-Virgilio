@@ -12945,3 +12945,44 @@ tiene `GV_Lugar_Item` (`335` + `066`). Confirmado por Luis. **A62 no se toca** �
 figuraba como "typo del mapa" era un error de tipeo de la planilla, al revés de como lo leí.
 
 Si alguna vez se automatiza la lectura de esa columna, **leerla como texto**, nunca como número.
+
+---
+
+### §3.ej — La alerta de negativos alertaba de más: el criterio pasa a ser el TOTAL, no la partición (v17.11, 2026-09-14)
+
+El 503E (Abrelatas Doble Engranaje) apareció con la góndola en **−1**, y al correr el módulo la
+tarea de Luis salió con **3 renglones**. Dos eran mentira. Es la tercera vez en el día que la
+partición por empresa engaña, así que ahora el criterio cambia de raíz.
+
+| caso | partición | total | ¿falta algo? |
+|---|---|--:|---|
+| `508` a_guardar | LK +24 / Mixto −24 | **0** | **No** — las 24 se guardaron |
+| `026` excedente | LK −6 / Mixto +6 | **0** | **No** — entraron Mixto, salieron LK |
+| 95 casos en a_facturar / separar_pedidos | varias | **0** | **No** |
+| `503E` góndola | LK −1 / Mixto 0 | **−1** | **Sí** |
+
+**Desde el corte `pkc_empresa_desde` del 11/09, cualquier depósito donde se entra por un evento y
+se sale por otro puede mostrar una partición negativa sin que falte nada** — lo viejo quedó en
+`Mixto` y lo nuevo en `LK`/`CH`. No es sólo de los de tránsito: el `excedente` lo hizo igual.
+
+**Criterio nuevo: alerta sólo si el TOTAL por (código, depósito) es negativo.** Eso es lo único que
+significa "falta mercadería". La partición se sigue mostrando en la columna `detalle_empresas`
+porque sirve para entender el caso, pero no dispara nada. Y se eliminó la duplicación: antes el
+mismo hallazgo salía dos veces (una por empresa y otra por código).
+
+⚠ **Lo que la partición SÍ detectaba se mueve a su propio centinela.** El caso del 14/09
+(437E/438E/809E) era un **picking duplicado**, y ahí la partición negativa fue el síntoma que lo
+delató. Para eso está ahora **`gv_stock_particion_sospechosa`**: misma tanda + código + depósito +
+tipo con dos empresas distintas = el reconciliador insertó en vez de actualizar. Es específico y no
+trae falsos positivos, a diferencia de usar el negativo como proxy.
+
+#### El 503E, que sí es real
+
+Góndola **−1** con **204 cajas en racks**. La última bajada de racks registrada fue el **17/08**
+(−20 del rack Y09); desde entonces **ninguna**, pero se siguió pickeando todos los días (16 cajas
+sólo en septiembre). Lo más probable: alguien bajó de racks a góndola **sin registrar la bajada**,
+lo que deja la góndola en negativo y los racks inflados en la misma cantidad. Va en la tarea de
+Luis con esa pista; se corrige contando y registrando la bajada que falta.
+
+**Primera vez que el módulo del ⛔ trabajó en un caso real** — y la primera corrida mostró que el
+criterio traía ruido. Mejor que lo encuentre yo hoy que Luis mañana con una tarea que miente.

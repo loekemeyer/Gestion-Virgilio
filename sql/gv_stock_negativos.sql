@@ -49,43 +49,41 @@
 --            `drop view public.gv_stock_negativos;`
 -- =====================================================================
 
--- v17.10: se recrea (DROP + CREATE: no se puede renombrar columnas con OR REPLACE).
+-- v17.11: se recrea (DROP + CREATE).
 drop view if exists public.gv_stock_negativos;
 create view public.gv_stock_negativos
 with (security_invoker = true) as
-with base as (
-  select regexp_replace(upper(btrim(m.cod_art)),'^0+(?=.)','') k,
-         btrim(m.cod_art) cod, m.deposito, coalesce(m.empresa,'Mixto') empresa, m.delta, m.ts
-  from public."Movimientos_Stock" m
+-- v17.11: SOLO el total por (codigo, deposito). La particion por empresa se dejo de usar
+-- como criterio de alerta: desde el corte pkc_empresa_desde del 11/09, lo viejo quedo en
+-- 'Mixto' y lo nuevo en LK/CH, y CUALQUIER deposito donde se entra por un evento y se sale
+-- por otro puede mostrar una particion negativa sin que falte nada. Medido: 508 a_guardar
+-- (LK +24 / Mixto -24, total 0, las cajas se guardaron), 026 excedente (LK -6 / Mixto +6,
+-- total 0) y 95 casos en a_facturar/separar_pedidos. Los tres eran falsos positivos.
+-- Lo unico que significa "falta mercaderia" es que el TOTAL del codigo en ese deposito sea
+-- negativo. La particion se muestra en detalle_empresas para entender el caso, pero no
+-- dispara la alerta. (El sintoma de particion del 14/09 -437E/438E/809E- era un picking
+-- DUPLICADO: para eso esta gv_stock_particion_sospechosa, especifica de ese caso.)
+with agg as (
+  select regexp_replace(upper(btrim(m.cod_art)),'^0+(?=.)','') k, m.deposito,
+         coalesce(m.empresa,'Mixto') empresa,
+         min(btrim(m.cod_art)) cod, sum(m.delta) saldo_emp, max(m.ts) ultimo
+  from public."Movimientos_Stock" m group by 1,2,3
 ),
--- v17.10: la particion por EMPRESA solo se mira en los depositos de SALDO ESTABLE
--- (gondola, excedente, racks, para_envasar, insumos). Los de TRANSITO -a_facturar,
--- separar_pedidos y a_guardar- entran por un evento y salen por otro, y desde el corte
--- pkc_empresa_desde del 11/09 los dos eventos no siempre traen la misma empresa: la
--- recepcion del 508 vino como LK y el guardado de hoy como Mixto, asi que la particion
--- Mixto quedo en -24 aunque las 24 cajas se guardaron y el total por codigo da 0.
--- Mirar la particion ahi son falsos positivos; el saldo que vale es el del codigo.
-por_emp as (
-  select k, min(cod) cod, deposito, empresa, round(sum(delta),2) saldo, max(ts) ultimo_mov
-  from base where deposito not in ('a_facturar','separar_pedidos','a_guardar')
-  group by 1,3,4 having round(sum(delta),2) < 0
-),
--- por CODIGO entero, en cualquier deposito: si el total da negativo, falta algo de verdad
-por_cod as (
-  select k, min(cod) cod, deposito, 'TODAS'::text empresa, round(sum(delta),2) saldo, max(ts) ultimo_mov
-  from base group by 1,3 having round(sum(delta),2) < 0
-),
-u as (select * from por_emp union all select * from por_cod)
-select u.cod, u.k cod_norm, u.deposito, u.empresa, u.saldo, u.ultimo_mov,
-       case when u.deposito in ('a_facturar','separar_pedidos','a_guardar') then 'transito' else 'fisico' end clase,
-       case when u.deposito in ('a_facturar','separar_pedidos','a_guardar')
+s as (
+  select k, deposito, min(cod) cod, round(sum(saldo_emp),2) saldo, max(ultimo) ultimo_mov,
+         string_agg(empresa||': '||round(saldo_emp,1)::text, ' · ' order by empresa) detalle_empresas
+  from agg group by 1,2 having round(sum(saldo_emp),2) < 0
+)
+select s.cod, s.k cod_norm, s.deposito, s.saldo, s.ultimo_mov, s.detalle_empresas,
+       case when s.deposito in ('a_facturar','separar_pedidos','a_guardar') then 'transito' else 'fisico' end clase,
+       case when s.deposito in ('a_facturar','separar_pedidos','a_guardar')
             then 'Deposito de transito: el saldo negativo es error de registro, no falta mercaderia. Lo corrige Sistemas.'
             else 'Falta mercaderia real: se descontaron cajas que el sistema no sabia que estaban. Hay que CONTAR y cargar el faltante.'
        end que_significa,
        (select o.descripcion from public."OC_Maximos" o
-         where regexp_replace(upper(btrim(o.cod)),'^0+(?=.)','') = u.k limit 1) descripcion
-from u
-order by (case when u.deposito in ('a_facturar','separar_pedidos','a_guardar') then 'transito' else 'fisico' end), u.saldo;
+         where regexp_replace(upper(btrim(o.cod)),'^0+(?=.)','') = s.k limit 1) descripcion
+from s
+order by (case when s.deposito in ('a_facturar','separar_pedidos','a_guardar') then 'transito' else 'fisico' end), s.saldo;
 
 grant select on public.gv_stock_negativos to anon, authenticated;
 
@@ -173,3 +171,17 @@ revoke execute on function public.gv_stock_negativos_tarea() from public, anon, 
 -- Verificado: con el criterio nuevo la vista da 0 hoy, y sobre el backup de las 27 filas
 -- duplicadas habría devuelto exactamente los 3 casos (−1, −2, −43).
 
+
+
+-- v17.11 — centinela ESPECIFICO del caso del 14/09 (§3.ef): misma tanda + codigo +
+-- deposito + tipo con DOS empresas distintas = el reconciliador inserto en vez de
+-- actualizar. Es lo que caza el picking duplicado, que la vista de negativos ya no
+-- mira (ahi era un sintoma indirecto y traia falsos positivos).
+create or replace view public.gv_stock_particion_sospechosa
+with (security_invoker = true) as
+select upper(trim(ref)) tanda, cod_art, deposito, tipo,
+       count(*) filas, string_agg(coalesce(empresa,'Mixto')||':'||delta::text, ' · ') detalle
+from public."Movimientos_Stock"
+where tipo in ('picking','separado','facturado')
+group by 1,2,3,4 having count(distinct coalesce(empresa,'Mixto')) > 1;
+grant select on public.gv_stock_particion_sospechosa to anon, authenticated;
