@@ -11988,3 +11988,57 @@ Lo que falta es el paso de `fact_live` a `sales_lines`.
 **Orden sugerido:** (a) el centinela de §3.ei, que ya está y no cuesta nada; (b) avisar a quien importa que el
 Excel tiene que traer la columna `empresa`; (c) recién ahí el `drop default`, para que el error no vuelva a
 entrar mudo; (d) el 4856 Fase 1.5 cuando haya tiempo. **Nada de esto se aplicó: son decisiones del dueño.**
+
+---
+
+### §3.eg — Candados de código: el riesgo no era la grafía, era la clave de dedupe (v17.08, 2026-09-14)
+
+Cierre del problema **134** (9 tablas con 30 códigos escritos con dos grafías). **La evaluación dio
+vuelta el plan**, y eso es lo que vale la pena leer.
+
+#### Todos los lectores ya normalizan
+
+Por eso ninguna de las 30 grafías dobles causó un problema real:
+
+| tabla | cómo busca su lector |
+|---|---|
+| `precios_super_lk` | `cobranzas_precios_super` hace `cob_norm_cod(cod) AS nc`, y `gv_ppp_web_valor_items` compara `ps.nc = cob_norm_cod(v.art)` |
+| `Ordenes_Compra` | `gv_oc_recompute_recibido` y `oc_vigentes_por_proveedor` usan `norm_cod(o.codigo)`, `oc_backfill_valores` canoniza, y el front usa `_ocgNorm` **145 veces** |
+
+**El daño real nunca vino de un lector: vino de una CLAVE DE DEDUPE.** Las dos roturas del día
+fueron en `Movimientos_Stock`, donde el índice compara texto crudo — el problema **130** (cambió el
+`cod_art` → el cron duplicó el picking) y el **136** (el backfill cambió la `empresa` → duplicó otra
+vez). O sea: **el riesgo no es "el código está escrito distinto", es "la columna entra en una clave
+de dedupe o de unicidad"**.
+
+#### Lo que se hizo
+
+**(1) `precios_super_lk` — el único con consecuencia medible.** Su PK es `(super_key, cod)` **crudo**,
+así que nada impedía cargar `26` y `026` para el mismo súper; si pasara, el join devolvería dos filas
+y **el precio se contaría dos veces**. Índice único sobre `(super_key, código normalizado)`.
+
+⚠ La expresión va **inline**, no `canon_cod_art_val(cod)`: esa función es **STABLE** (lee
+`OC_Maximos`) y Postgres no la acepta en un índice.
+
+Probado: `insert ... ('abastecedor','026',999)` → `duplicate key value violates unique constraint`,
+`Key (super_key, regexp_replace(...))=(abastecedor, 26) already exists`.
+
+**(2) `Ordenes_Compra` — trigger de canonización.** Beneficio menor (los lectores ya normalizan) pero
+riesgo nulo: PK es `id`, no hay unique por `codigo`, sólo afecta escrituras futuras. Probado con
+ROLLBACK: un insert con `'0515'` queda guardado como `'515'`.
+
+#### Lo que NO se tocó, y por qué
+
+`Ubicaciones_Articulos` (65 filas cambiarían), `Stock_Ubicaciones` (30) y `Stock_Inicial_Cartones`
+(17) **no las lee nadie** — 0 funciones, 0 vistas, 0 front. Canonizarlas es mover datos históricos
+sin un solo consumidor que se beneficie. Encima `Stock_Inicial_Cartones` tiene **PK sobre `cod`** y
+una colisión (`52`/`052`), así que ni siquiera se podría normalizar sin decidir a mano qué fila gana.
+`Planimetria` (16) queda fuera: tiene 3 consumidores vivos y está para retirar. Las tres de INSUMOS
+tampoco: `fn_canon_col_cod` resuelve contra `OC_Maximos`, el maestro de **artículos**, que no lleva
+insumos.
+
+`gv_codigos_multigrafia` sigue devolviendo 30 **a propósito**: son reales, pero inocuas mientras no
+entren en una clave. Lo que hay que mirar de esa vista no es el número, es si aparece una tabla
+**nueva** o una cuya columna pase a formar parte de un índice único.
+
+`sql/canon_candados_v1708.sql`.
