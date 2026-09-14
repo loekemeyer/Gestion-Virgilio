@@ -5036,7 +5036,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=17.51"></script>
+<script type="module" src="recepcion.js?v=17.52"></script>
 <!-- Config del módulo de fichada (compartido con fichada.html). El secret
      hmacSecret tiene que ser el mismo acá y allá; cargándolo desde un solo
      archivo evitamos que se desincronicen. -->
@@ -8267,7 +8267,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v17.51";
+const APP_VERSION = "v17.52";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -32066,6 +32066,50 @@ function _pppNpMismo(a, b) {
   };
   return f(a) === f(b);
 }
+/* v17.50 (Thomas, 14/09: "estoy sacando pedidos de acá pero no aparecen en A Programar") — DÓNDE
+   QUEDÓ el pedido que se sacó de su tanda. Sacarlo de la tanda lo devuelve a la pantalla de A
+   Programar, pero si el CLIENTE está en Cuarentena `aprEnCuarentena` lo saca de la lista "Pedidos
+   a programar" y lo manda al sector Cuarentena, retenido: el cartel que decía "volvió a A
+   Programar" mandaba a buscarlo donde no está. Esto pregunta por ese pedido (sin escribir nada:
+   `gv_cuarentena_marcar_calc` es el cálculo puro; `gv_cuarentena_marcar` además registra en el
+   log y acá no corresponde) y devuelve los motivos si quedó retenido, o null si va a la lista
+   normal. Si algo falla, null: el mensaje vuelve a ser el de siempre, no se rompe nada. */
+async function pppCuarDeNpSacada(np) {
+  try {
+    const s = String(np || "").trim(); if (!s) return null;
+    let emp = "lk", oid = "", cod = "";
+    const m = s.toUpperCase().replace(/\s+/g, "").match(/^(LK|CH)0*(\d+)$/);
+    if (m) {                                   // NP web: la clave del pedido es el order_id
+      emp = m[1] === "CH" ? "chef" : "lk";
+      const rows = await aprGet("PPP_Web_Programacion?select=empresa,order_id,cod_cliente"
+        + "&empresa=eq." + emp + "&np=eq." + m[2] + "&limit=1");
+      const r = (rows || [])[0]; if (!r) return null;
+      oid = String(r.order_id); cod = String(r.cod_cliente || "").trim();
+    } else {                                   // NP de ISIS: A Programar la llama "np" + número
+      const rows = await aprGet("gv_ppp_isis_sin_tanda?select=np,cod,empresa&np=eq."
+        + encodeURIComponent(s) + "&limit=1");
+      const r = (rows || [])[0]; if (!r) return null;
+      emp = r.empresa || "lk"; oid = "np" + String(r.np); cod = String(r.cod || "").trim();
+    }
+    const res = await aprRpc("gv_cuarentena_marcar_calc",
+      { p_pedidos: [{ order_id: oid, empresa: emp, cod: cod, np: s }] });
+    const x = (res || [])[0];
+    if (!x || !Array.isArray(x.motivos) || !x.motivos.length) return null;
+    // Un pedido YA APROBADO en Cuarentena conserva los motivos para el badge pero no está
+    // retenido: ése sí va a la lista normal (misma regla que `_cuarLiberado` en A Programar).
+    const libs = (await aprRpc("gv_cuarentena_liberados")) || [];
+    if (libs.some(function (l) { return String(l.empresa) === emp && String(l.order_id) === oid; })) return null;
+    return { cuarentena_motivos: x.motivos, cuarentena_detalle: { deuda: x.deuda, estado: x.estado, nuevo_pedidos: x.nuevo_pedidos } };
+  } catch (_e) { return null; }
+}
+/* El cartel (y el alert) de "quedó retenido en Cuarentena", uno solo para los dos botones. */
+function pppCuarAvisoSacada(np, cu) {
+  const et = aprCuarentenaEtiqueta(cu);
+  const txt = "🚧 " + np + " salió de su tanda, pero el cliente está en CUARENTENA (" + et + "): "
+    + "quedó RETENIDO ahí, NO en «Pedidos a programar». Para programarlo hay que aprobarlo en el sector Cuarentena.";
+  try { alert(txt.replace("🚧 ", "") + "\n\n" + aprCuarentenaMotivo(cu)); } catch (_e) {}
+  return txt;
+}
 async function pppVencVolver(np) {
   const n = String(np || "").trim(); if (!n) return;
   if (!confirm("¿Devolver " + n + " a A Programar?\n\nSale de su tanda y queda pendiente: lo toma el automático (zonas 1-3 / camión ya previsto) o lo programás a mano.")) return;
@@ -32073,7 +32117,9 @@ async function pppVencVolver(np) {
   try {
     const r = await aprRpc("gv_ppp_web_desprogramar", { p_np: n, p_por: await aprQuien() });
     const x = (r && r[0]) || {};
-    pppSetStatus("✓ " + n + " volvió a A Programar (" + (x.np_sacadas || 0) + " NP del pedido).", true);
+    const cu = await pppCuarDeNpSacada(n);   // v17.50: ¿quedó retenido en Cuarentena?
+    pppSetStatus(cu ? pppCuarAvisoSacada(n, cu)
+      : ("✓ " + n + " volvió a A Programar (" + (x.np_sacadas || 0) + " NP del pedido)."), true);
     await pppLoadProgFromSupabase();
   } catch (e) {
     const msg = (e && e.message) ? e.message : String(e);
@@ -32126,7 +32172,9 @@ async function pppVencSinProgramar(np) {
   try {
     const r = await aprRpc("gv_ppp_isis_desprogramar", { p_nps: [n], p_motivo: (motivo.trim() || null), p_por: await aprQuien() });
     const x = (r && r[0]) || {};
-    pppSetStatus("↩ " + n + " quedó SIN programar (" + (x.np_sacadas || 0) + " NP). Está en 📥 A Programar.", true);
+    const cu = await pppCuarDeNpSacada(n);   // v17.50: ¿quedó retenido en Cuarentena?
+    pppSetStatus(cu ? pppCuarAvisoSacada(n, cu)
+      : ("↩ " + n + " quedó SIN programar (" + (x.np_sacadas || 0) + " NP). Está en 📥 A Programar."), true);
     await pppLoadProgFromSupabase();
   } catch (e) {
     const msg = (e && e.message) ? e.message : String(e);
