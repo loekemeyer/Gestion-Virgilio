@@ -11694,3 +11694,49 @@ cambia a quién se factura, siempre que el Excel no se haya bajado antes. Estas 
 social Pettish; `gv_ppp_prog_rs` 133 filas, 7 Pettish; `gv_endpoints_rotos` **0** (las dos vistas se
 reemplazaron sin cambiar la lista de columnas, así que los 18 objetos que cuelgan siguen válidos).
 Backup: `zz_backups."GV_Backup_ProgOverride_20260914"` (120 filas).
+
+---
+
+### §3.ee — `Equivalencias_Codigos` sin el sufijo de empresa (§3.4 del plan del sufijo) (v17.06, 2026-09-14)
+
+**Por qué era urgente y no higiene.** `reconciliar_pipeline_stock_etapa1` canoniza el código del
+picking contra esta tabla. Mientras `437E` mapeara a `437E LK`, el cron tenía una **vía viva para
+reintroducir el sufijo** en `Movimientos_Stock.cod_art` — justo lo que costó cuatro tramos sacar.
+
+Hoy no estaba pasando (0 movimientos con sufijo), y la razón es incómoda: el front escribe primero
+con el código pelado y el guard del cron (`not exists` por tanda) hace que no reinserte. O sea que
+**el sufijo sólo habría vuelto el día que el front fallara** — que es exactamente el caso para el
+que existe el cron. Bomba latente.
+
+**Y las "6 filas de sufijo" no eran 6 filas iguales.** El plan decía borrarlas; mirándolas una por
+una son dos cosas distintas, y borrarlas todas habría perdido información:
+
+| fila | qué es | qué se hizo |
+|---|---|---|
+| `437E` → `437E LK` | mapeo **identidad** + sufijo | **borrada** |
+| `438E` → `438E LK` | ídem | **borrada** |
+| `439E` → `439E LK` | ídem | **borrada** |
+| `809E` → `809E CH` | ídem | **borrada** |
+| `438EL` → `438E LK` | mapea la **variante L** al artículo base — eso SÍ sirve | **corregida** a `438E` |
+| `439EL` → `439E LK` | ídem | **corregida** a `439E` |
+
+Borrar las 4 de identidad es seguro: `resolver_equiv` cae a `p_cod` y los cuatro ya están en
+`OC_Maximos` **activos con esa misma grafía pelada**. `727` → `727E` y `727EN` → `727E` se
+conservan: son equivalencias de verdad.
+
+**Verificación.** Los 9 códigos probados resuelven a un código que existe en `OC_Maximos` activo
+(`437E`→`437E`, `438EL`→`438E`, `809E`→`809E`, `727`→`727E`, …). Después del cambio: 0 filas con
+sufijo, 0 movimientos con sufijo, 0 negativos, 0 multigrafía en `Movimientos_Stock`, y
+`vista_pedidos_equivalencia` / `vista_nc_loeke_chef` responden (2 y 36 filas). Backup:
+`zz_backups."GV_Backup_Equivalencias_20260914"`. `sql/equivalencias_sin_sufijo_v1705.sql`.
+
+#### ⚠ Lo que el plan del sufijo dice de `Planimetria` está mal caracterizado
+
+El §3.4 pide "retirar `Planimetria`" como si ya no la leyera nadie. **No es así**, medido el 14/09:
+la leen la vista **`vista_nc_loeke_chef`** (viva, 36 filas), la función **`planimetria_autoorden()`**
+y **7 puntos de `index.html`**. Lo que está retirado es el *editor* viejo (§2.4 del doc del 13/09),
+no la tabla. Retirarla es un trabajo con tres consumidores por delante, no un `drop`. Sus 16 códigos
+con doble grafía (problema 134) quedan como están hasta entonces.
+
+Lo tercero del §3.4 —los **67 `codBase`** no-op de `index.html`— sigue pendiente: es limpieza de
+front, sin riesgo activo, pero toca el archivo de 33k líneas con el byte NUL adentro.
