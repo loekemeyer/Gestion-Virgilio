@@ -314,3 +314,95 @@ la medición delante.
 
 Lo que NO hay que hacer: las 6 etapas juntas "porque total es el mismo tema". Cada una tiene
 su propia verificación y su propio rollback.
+
+---
+
+## 6. Las tres decisiones del 14/09 sobre los candados que faltaban
+
+### 6.1 `OC_Maximos` — **NO ahora.** Decisión del dueño
+
+Textual: *"lo de OC_Maximos de momento no, entiendo que se puede comer códigos válidos a futuro
+eso, y si la posibilidad de que en la estructura actual joda es 0, dejémoslo y lo vemos más
+adelante"*.
+
+Exacto: cambia 0 filas hoy, pero el candado **cambiaría el alta de artículos** — dar de alta
+`0999` con `999` ya existente pasaría a chocar contra la PK en vez de crear una segunda grafía.
+Eso puede comerse un código válido si alguna vez dos códigos legítimos difieren sólo en un cero.
+Es decisión de negocio, no limpieza. **Queda para más adelante, sin hacer.**
+
+### 6.2 `stocks_carga_rapida` — **SALE DE LA LISTA. No tiene problema propio**
+
+Estaba en la lista como "399 filas, 22 cambiarían". **Medido: no es una tabla sin candado que
+haya que candar — es un ESPEJO FIEL de `vista_stock_procesada`.**
+
+- `refresh_stocks_carga_rapida` toma `cod` y `cod_base` de `vsp` = la matview;
+- la matview tiene **las mismas 22** filas no canónicas (401 en total);
+- la caché matchea **401 de 401** con la matview por `cod`;
+- el refresh hace **`DELETE FROM` + reinsert**, no upsert.
+
+→ **Poner un trigger ahí sería un error de diagnóstico.** Rompería la correspondencia 401 = 401
+con su fuente, y como el refresh borra y reinserta, la caché quedaría **permanentemente** distinta
+de la matview: cualquier join por `cod` entre las dos se cae.
+
+Lo que sí es cierto: **el front lee `stocks_carga_rapida.cod`** (pantalla de Stock y badge), así
+que esos 22 códigos se ven como `7` en vez de `007`. Es el mismo síntoma cosmético de la etapa 2b
+—ya descartada— pero ahora se sabe que además llega a la pantalla de Stock, no sólo a 3 vistas de
+análisis. El arreglo sigue siendo el de 2b (caro: `gv_cod_stock` pasaría a `STABLE`, 14 vistas +
+matview) o tocar la matview (DROP + CREATE con CASCADE, que ya mordió dos veces). **Sin hacer.**
+
+### 6.3 `Correcciones_Pedido` — el diseño, PROBADO pero NO aplicado
+
+El problema era: tiene **dos** columnas de código y `fn_canon_col_cod` sólo toca `NEW.cod`, así que
+haría falta una función nueva — o sea **más proliferación**, justo lo que este plan quiere evitar.
+
+**La salida es un trigger genérico parametrizado por `TG_ARGV`**, que sirve para cualquier tabla y
+cualquier cantidad de columnas:
+
+```sql
+create or replace function public.fn_canon_cols()
+ returns trigger language plpgsql as $$
+declare
+  v_col text; v_rec jsonb := to_jsonb(NEW); v_val text;
+begin
+  foreach v_col in array TG_ARGV loop
+    v_val := v_rec ->> v_col;
+    if v_val is not null and btrim(v_val) <> '' then
+      v_rec := jsonb_set(v_rec, array[v_col], to_jsonb(public.canon_cod_art_val(v_val)));
+    end if;
+  end loop;
+  NEW := jsonb_populate_record(NEW, v_rec);
+  return NEW;
+end $$;
+
+create trigger trg_canon_correcciones_pedido
+  before insert or update of cod_principal, cod_secundario on public."Correcciones_Pedido"
+  for each row execute function public.fn_canon_cols('cod_principal','cod_secundario');
+```
+
+**Probado el 14/09 en una transacción con `ROLLBACK`:**
+
+| entró | quedó |
+|---|---|
+| `'  66 '` | **`066`** |
+| `'7'` | **`007`** |
+| `'599E'` | `599E` (sin cambio) |
+| `'0437e lk'` | `0437E LK` ⚠ |
+
+Y las 274 filas existentes: **0 desalineadas** — es `BEFORE INSERT OR UPDATE OF`, sólo actúa al
+escribir, no reescribe lo viejo.
+
+**Lo que hay que saber antes de aplicarlo — tres cosas:**
+
+1. ⚠ **Hereda la limitación de `canon_cod_art_val`: NO resuelve el sufijo de empresa.** `0437e lk`
+   quedó en `0437E LK`. El sufijo lo manejan `fn_canon_cod_art` (v17.44) y
+   `trg_normalizar_empresa_stock`, que son de `Movimientos_Stock`. Para una tabla que pueda recibir
+   códigos con sufijo, este trigger **no alcanza**. Para `Correcciones_Pedido` (códigos de pedido,
+   sin sufijo) alcanza.
+2. **Cuesta más que asignar una columna**: `to_jsonb` + `jsonb_populate_record` por fila. En una
+   tabla de alta escritura (`Movimientos_Stock`) habría que medirlo antes; en las de baja no importa.
+3. **Las columnas nombradas tienen que ser `text`.** `to_jsonb` sobre otro tipo rompería la fila.
+
+**El beneficio de fondo**: esta función sola reemplaza a las **cinco** que hoy hacen lo mismo con
+distinto nombre de columna — `fn_canon_col_cod`, `fn_canon_col_cod_art`, `fn_canon_col_codigo`,
+`fn_canon_col_articulo`, `fn_canon_col_cod_art_quoted`. Ésa es la migración que de verdad baja la
+proliferación, y es el paso que queda del problema de fondo.
