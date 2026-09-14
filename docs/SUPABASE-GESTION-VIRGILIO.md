@@ -14582,3 +14582,72 @@ La cabecera pasa a ser el **nombre del camión** con las series de tanda de subt
 El tope vive en **dos lugares**: `PPP_Web_Config.camion_m3_tope` (6,00, el que usa esta vista, y es
 compartido) y `pppGetCfg().dayCap` (6, en el `localStorage` de cada supervisor, que usa el ruteo).
 Hoy valen lo mismo; unificarlos es otro cambio.
+## §3.fn — v17.72: UNA sola lista de clientes súper (`GV_Supers`) — 2026-09-14
+
+Pedido de Luis: *"pasá la lista a la base y arreglá lo de Gigot. No puede haber 3 y 1 en el front.
+Fijate qué cosas lee cada una y cuáles dependen de cada una, y fijate si se puede unificar en una."*
+
+### Lo que había: CINCO definiciones de "es súper", ninguna mandaba
+
+| # | Definición | Quién la usaba |
+|---|---|---|
+| a | `zona ~* 'super\|coto\|carrefour\|chango\|krikos'` | `gv_ppp_isis_sin_tanda`, `gv_ppp_detalle_dia`, `gv_ppp_prog_arbol`, `gv_ppp_super_mezclado` |
+| b | `lower(zona) ~ 'super\|súper'` | `gv_viaje_np` (hoja de ruta / En Salida) |
+| c | `lower(trim(zona)) = 'super'` | `vista_faltante_demanda` |
+| d | `exists cobranzas_cliente_cadena(empresa, cod)` | 3 vistas de Facturación + 7 funciones (Facturación, Cobranzas, Cuarentena, armado de tandas) |
+| e | `localStorage vir_ppp_supers` (6 códigos, por dispositivo) | `pppEsSuper()` en el front — el backend no la veía |
+
+**a, b y c son tres formas de mirar la ZONA, y la zona casi nunca dice "Super":** de 158 NP de
+clientes súper en la PPP, la regex marcaba **5**. Y **e comparaba sólo por código**, así que el
+**2444 de LK (Relca S.R.L.) se colaba como súper** porque el 2444 de Chef es Cencosud.
+
+### Lo que queda: una
+
+- **`public."GV_Supers"`** (empresa, cod, cuit, super_key, nombre, activo, nota) — la única lista y
+  lo único que se edita. RLS prendida, `anon` sólo lee; se escribe por **`gv_supers_set`** /
+  **`gv_supers_baja`** (baja lógica: `activo = false`, la auditoría no se pierde).
+- **`gv_es_super(empresa, cod)`** y **`gv_es_super_np(np, cod)`** — la única pregunta.
+  `gv_emp_de_np` deduce la empresa de la NP con la regla de siempre (prefijo `LK`/`CH`, y una NP de
+  ISIS por su número: arriba de 90000 es Loekemeyer).
+- **`gv_supers`** — la vista que lee el front.
+- Las 6 definiciones de zona pasaron a `gv_es_super_np(np, cod) OR <la señal de zona de siempre>`:
+  **la zona deja de ser la definición y queda como red de seguridad** para un súper que nadie cargó.
+
+⚠ **Por qué `cobranzas_cliente_cadena` sigue existiendo.** Lo natural sería dropearla y dejar una
+vista sobre `GV_Supers`. **No se hizo**: tiene **10 vistas de Facturación** colgando
+(`vista_facturacion_neto_items`, `vista_cruce_facturacion`, `vista_facturable_anticipado`,
+`vista_facturacion_estado`, `vista_facturacion_faltantes`, `vista_facturacion_neto`, las `gv_vista_*`
+y `gv_lk_np_feed`), y un `DROP … CASCADE` ahí es exactamente el pozo de la v16.20 y la v16.33,
+encima sobre Facturación. Quedó como **tabla derivada**: un trigger sobre `GV_Supers` la rellena y
+se le revocó la escritura a `anon`. Para el que mantiene la lista hay **una sola**; para los 10
+consumidores no cambió nada. Centinela: `select * from public.gv_supers_desincronizado;` (vacío = ok).
+
+### Gigot
+
+La base decía `gigot → LK 5000`. **Ese código no existe en ningún padrón**, así que Gigot nunca fue
+tratado como súper. Es **Matiz SA, LK 4263** (CUIT 30627435033), que sí está en la PPP con NP de
+hasta 12,6 m³. ⚠ Al pasar a súper, sus pedidos **web** dejan de llevar el 2 %
+(`vista_facturacion_neto_items.factor_web` 0,98 → 1,0) y le aplican los precios de
+`precios_super_lk` con `super_key = 'gigot'`. En `Facturacion_NP` toca 1 NP.
+
+### El front
+
+`pppEsSuper` lee `gv_supers` de la base (TTL 5 min) y compara **(empresa, código)**. El
+`localStorage` quedó como **caché offline**, nunca como fuente, y cambió de clave a
+`vir_ppp_supers_v2` para no arrastrar la lista vieja. El editor de Configuración escribe por RPC y
+pide la empresa. Se borraron los mapas hardcodeados `PPP_SUPER_ALIAS` y `PPP_SUPER_LEGACY`: eran
+otra copia más.
+
+### Medición (14/09)
+
+- `GV_Supers` = **19 filas** (12 LK + 7 Chef), **14 cadenas**; `cobranzas_cliente_cadena` = 19.
+- `gv_supers_desincronizado` → **0**. `gv_endpoints_rotos` → vacío.
+- NP marcadas Súper en la PPP (−180 / +120 días): **de 5 a 162** · 235,22 m³.
+- Las otras vistas contestan: `gv_viaje_np` 914/54 · `vista_faltante_demanda` 551/40 ·
+  `vista_facturacion_neto_items` 10.772/596 · `vista_cruce_facturacion` 1.248/40 ·
+  **`gv_ppp_super_mezclado` = 0** (ningún camión mezcla súper con clientes: la regla del dueño de la
+  v14.23 se sigue respetando con la lista completa).
+- Entran 6 códigos (los 5 espejos de Chef + Gigot LK 4263) y sale 1 (el fantasma LK 5000).
+- Backup previo: `zz_backups."GV_Backup_cobranzas_cliente_cadena_20260914"` (14 filas).
+
+SQL y rollback completo: `sql/gv_supers_una_lista_v1772.sql`. Test: `tests/supers-una-lista.cjs`.

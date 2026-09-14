@@ -144,8 +144,9 @@ select e.fe,
        e.razon_social,
        e.localidad,
        e.zona,
-       case when e.zona ~* 'retira'                             then 'Retira'
-            when e.zona ~* 'super|coto|carrefour|chango|krikos' then 'Súper'
+       case when e.zona ~* 'retira'                                    then 'Retira'
+            when public.gv_es_super_np(e.np, e.cod)
+              or e.zona ~* 'super|coto|carrefour|chango|krikos'        then 'Súper'
             else coalesce(substring(e.zona, '^(Zona\s*[0-9]+)'), nullif(btrim(e.zona), ''), 'Sin zona') end,
        -- una NP web ya viene etiquetada (LK 0052 / CH pedido 88); una de ISIS se deduce del número,
        -- igual que en gv_ppp_detalle_dia: arriba de 90000 es Loekemeyer, si no Chef.

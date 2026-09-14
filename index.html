@@ -5145,7 +5145,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=17.71"></script>
+<script type="module" src="recepcion.js?v=17.72"></script>
 <!-- Config del módulo de fichada (compartido con fichada.html). El secret
      hmacSecret tiene que ser el mismo acá y allá; cargándolo desde un solo
      archivo evitamos que se desincronicen. -->
@@ -5486,11 +5486,12 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
       <div class="planim-add">
         <div class="planim-add-t">Agregar cliente súper</div>
         <div class="planim-add-row">
+          <select id="pppSupEmp" class="planim-inp planim-inp-num"><option value="lk">LK</option><option value="chef">Chef</option></select>
           <input id="pppSupCod" class="planim-inp planim-inp-num" placeholder="Cód (ej. 801)">
-          <input id="pppSupNom" class="planim-inp" placeholder="Nombre (ej. Coto C.I.C.S.A.)">
+          <input id="pppSupNom" class="planim-inp" placeholder="Nombre (ej. Coto)">
           <button class="planim-btn-save" onclick="pppSuperAdd()">Agregar</button>
         </div>
-        <div class="planim-hint">Los pedidos de estos clientes (por <b>código</b>) se separan solos como súper, con su propia tanda y fecha. También se detectan los de Tipo <b>KRIKOS</b> o barrio <b>Súper</b>.</div>
+        <div class="planim-hint">v17.72 — esta lista es <b>la única</b> y vive en la base (<code>GV_Supers</code>): la ven todos los dispositivos y la usan también Facturación, Cobranzas y Cuarentena. El código va <b>con su empresa</b>: el 2444 de Chef es Cencosud, pero el 2444 de LK es Relca S.R.L. y no es súper. Además se detectan los de Tipo <b>KRIKOS</b> y los de barrio <b>Súper</b>.</div>
       </div>
       <div class="planim-sec-t">Lista de súper</div>
       <div id="pppSupersList" class="planim-list"></div>
@@ -8557,7 +8558,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v17.71";
+const APP_VERSION = "v17.72";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -30714,67 +30715,138 @@ async function pppLoadProgFromSupabase() {
    (1) lista de clientes súper (editable, sembrada con los 4 actuales),
    (2) Tipo = KRIKOS si el Excel lo trae,
    (3) Zona = "Super" según la tabla de barrios (Esteban Echeverria, Campo de Mayo…). ===== */
-const PPP_SUPER_KEY = "vir_ppp_supers";
-const PPP_SUPER_SEED = [{ cod: "801", nombre: "Coto" }, { cod: "1651", nombre: "Carrefour" }, { cod: "771", nombre: "La Anónima" }, { cod: "2444", nombre: "Jumbo" }, { cod: "2686", nombre: "Chango Mas" }, { cod: "4263", nombre: "Gigot" }];
-/* v13.37 (dueño: "abreviemos los nombres de los supermercados") — la razón social no se lee de un
-   vistazo en un cartel de camión: "Inc Sociedad Anonima" es Carrefour y "S.A.Imp Y Exp De La
-   Patagonia" es La Anónima. La abreviatura va por CÓDIGO y acá en el código, no sólo en el seed,
-   porque la lista de súper vive en el localStorage de cada dispositivo: sin esta migración, el que
-   ya la tiene guardada seguiría viendo el nombre largo para siempre. `PPP_SUPER_LEGACY` es el
-   nombre viejo de cada uno: sólo se pisa si el nombre guardado es ése — si el supervisor le puso
-   otro a mano, se respeta. */
-let _pppSupers = null;
-const PPP_SUPER_ALIAS = { "801": "Coto", "1651": "Carrefour", "771": "La Anónima", "2444": "Jumbo", "2686": "Chango Mas", "4263": "Gigot" };
-const PPP_SUPER_LEGACY = { "801": "Coto C.I.C.S.A.", "1651": "Inc Sociedad Anonima", "771": "S.A.Imp Y Exp De La Patagonia", "2444": "CENCOSUD S.A.", "2686": "Dorinka S.R.L", "4263": "Matiz SA" };
-function _pppSupersMigrar(arr) {
-  let cambio = false;
-  for (const cod in PPP_SUPER_ALIAS) {
-    const s = arr.filter(function (x) { return String(x && x.cod) === cod; })[0];
-    if (!s) { arr.push({ cod: cod, nombre: PPP_SUPER_ALIAS[cod] }); cambio = true; continue; }
-    const n = String(s.nombre || "").trim();
-    if (!n || n === PPP_SUPER_LEGACY[cod]) { s.nombre = PPP_SUPER_ALIAS[cod]; cambio = true; }
-  }
-  return cambio;
+/* ⚠ v17.72 (Luis: "no puede haber 3 y 1 en el front… fijate si se puede unificar en una") —
+   LA LISTA DE SÚPER ES UNA SOLA Y VIVE EN LA BASE: `public."GV_Supers"`. Antes había CINCO
+   definiciones sueltas de "es súper" y ninguna mandaba:
+     (a) la regex de zona `super|coto|carrefour|chango|krikos` en la PPP,
+     (b) `lower(zona) ~ 'super|súper'` en la hoja de ruta,
+     (c) `lower(trim(zona)) = 'super'` en faltantes,
+     (d) `cobranzas_cliente_cadena` en Facturación / Cobranzas / Cuarentena,
+     (e) esta lista, en el **localStorage de cada dispositivo** — que el backend no veía.
+   Hoy todas preguntan lo mismo: `gv_es_super(empresa, cod)`. La zona quedó como red de
+   seguridad (un súper nuevo que todavía nadie cargó), no como definición.
+
+   ⚠ El código va SIEMPRE con su empresa: el 2444 de Chef es Cencosud, pero el 2444 de LK es
+   Relca S.R.L. y NO es súper. La versión vieja comparaba sólo por código y los confundía.
+
+   El localStorage queda como CACHÉ para no dejar la pantalla sin datos si falla la red, nunca
+   como fuente. */
+const PPP_SUPER_KEY = "vir_ppp_supers_v2";
+const PPP_SUPER_TTL_MS = 5 * 60 * 1000;
+let _pppSupers = null, _pppSupersTs = 0, _pppSupersBusy = false;
+/* Misma regla que `gv_emp_de_np` en el backend: de la NP sale la empresa. */
+function pppEmpDeNp(np) {
+  const s = String(np == null ? "" : np).trim().toLowerCase();
+  if (s.indexOf("ch") === 0) return "chef";
+  if (s.indexOf("lk") === 0) return "lk";
+  const n = Number(s.replace(/\D/g, "") || 0);
+  return n > 90000 ? "lk" : "chef";
 }
-function pppLoadSupers() { if (_pppSupers) return _pppSupers; try { _pppSupers = JSON.parse(localStorage.getItem(PPP_SUPER_KEY) || "null"); } catch (_e) { _pppSupers = null; } if (!Array.isArray(_pppSupers)) { _pppSupers = PPP_SUPER_SEED.slice(); pppSaveSupers(); } else if (_pppSupersMigrar(_pppSupers)) { pppSaveSupers(); } return _pppSupers; }
-function pppSaveSupers() { try { localStorage.setItem(PPP_SUPER_KEY, JSON.stringify(_pppSupers || [])); } catch (_e) {} }
+function pppEmpNorm(e) { const s = String(e == null ? "" : e).trim().toLowerCase(); return (s === "ch" || s === "chef") ? "chef" : "lk"; }
+/* La empresa de un pedido de la PPP: la que traiga, y si no la que dice su NP. */
+function pppEmpDePedido(p) {
+  if (!p) return "lk";
+  if (p.empresa) return pppEmpNorm(p.empresa);
+  return pppEmpDeNp(p.np != null ? p.np : p.np_label);
+}
+function pppLoadSupers() {
+  if (!_pppSupers) {
+    try { const c = JSON.parse(localStorage.getItem(PPP_SUPER_KEY) || "null"); if (Array.isArray(c)) _pppSupers = c; } catch (_e) {}
+    if (!_pppSupers) _pppSupers = [];
+  }
+  pppSupersNeed();
+  return _pppSupers;
+}
+/* ⚠ La guarda mira el TIMESTAMP, no el largo de la lista, y el re-render sale sólo si la lista
+   CAMBIÓ. Con la guarda puesta en `_pppSupers.length` una lista vacía (o un fetch que devuelve [])
+   volvía a pedir en cada render, y como el .then re-renderiza, era un bucle infinito de red. */
+function pppSupersNeed(force) {
+  if (_pppSupersBusy) return;
+  if (!force && _pppSupersTs && (Date.now() - _pppSupersTs) < PPP_SUPER_TTL_MS) return;
+  _pppSupersBusy = true;
+  _pppSupersTs = Date.now();   // aunque falle: no se reintenta hasta que venza el TTL
+  fetch(SUPABASE_URL + "/rest/v1/gv_supers?select=empresa,cod,nombre,super_key,cuit&activo=is.true&limit=500",
+        { headers: { apikey: SUPABASE_KEY }, cache: "no-store" })
+    .then(function (r) { if (!r.ok) throw new Error("HTTP " + r.status); return r.json(); })
+    .then(function (rows) {
+      const lista = (rows || []).map(function (s) {
+        return { empresa: pppEmpNorm(s.empresa), cod: String(s.cod || "").trim(), nombre: s.nombre || "", super_key: s.super_key || "", cuit: s.cuit || "" };
+      });
+      const cambio = JSON.stringify(lista) !== JSON.stringify(_pppSupers || []);
+      _pppSupers = lista; _pppSupersTs = Date.now(); _pppSupersBusy = false;
+      try { localStorage.setItem(PPP_SUPER_KEY, JSON.stringify(_pppSupers)); } catch (_e) {}
+      if (!cambio) return;
+      try { if (typeof pppRenderProg === "function") pppRenderProg(); } catch (_e) {}
+      try { const ov = document.getElementById("pppSupersOverlay"); if (ov && ov.classList.contains("show")) pppSupersRender(); } catch (_e) {}
+    })
+    .catch(function (e) {
+      _pppSupersBusy = false;
+      // sin esto el fallo era mudo: la pantalla mostraba la caché vieja sin ninguna pista
+      console.warn("[ppp] lista de súper: no se pudo leer gv_supers:", (e && e.message) || e);
+    });
+}
+function pppSuperDe(p) {
+  if (!p) return null;
+  const cod = String(p.cod || p.cod_cliente || "").trim().replace(/\.0+$/, "");
+  if (!cod) return null;
+  const emp = pppEmpDePedido(p);
+  for (const s of pppLoadSupers()) { if (s.cod === cod && s.empresa === emp) return s; }
+  return null;
+}
 function pppEsSuper(p) {
   if (!p) return false;
   if (String(p.tipo || "").toUpperCase().indexOf("KRIKOS") >= 0) return true;
   if (pppZonaDeBarrio(p.localidad) === "Super") return true;
-  const cod = String(p.cod || "").trim();
-  if (cod) { for (const s of pppLoadSupers()) { if (s.cod && String(s.cod) === cod) return true; } }
-  return false;
+  return !!pppSuperDe(p);
 }
-/* Editor de la lista de clientes súper (agregar/quitar). Persistido en vir_ppp_supers. */
-function openPppSupers() { if (!requireSupervisor()) return; const ov = document.getElementById("pppSupersOverlay"); if (ov) ov.classList.add("show"); pppSupersRender(); }
+/* Editor de la lista de clientes súper. v17.72: escribe en la BASE (gv_supers_set /
+   gv_supers_baja), no en el localStorage — la lista es una sola para todos los dispositivos. */
+function openPppSupers() { if (!requireSupervisor()) return; const ov = document.getElementById("pppSupersOverlay"); if (ov) ov.classList.add("show"); pppSupersNeed(true); pppSupersRender(); }
 function closePppSupers() { const ov = document.getElementById("pppSupersOverlay"); if (ov) ov.classList.remove("show"); }
+async function pppSupersRpc(fn, body) {
+  const r = await fetch(SUPABASE_URL + "/rest/v1/rpc/" + fn, {
+    method: "POST",
+    headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY, "Content-Type": "application/json" },
+    body: JSON.stringify(body)
+  });
+  const txt = await r.text();
+  if (!r.ok) { let m = txt; try { m = (JSON.parse(txt) || {}).message || txt; } catch (_e) {} throw new Error(m); }
+  return txt ? JSON.parse(txt) : null;
+}
 function pppSupersRender() {
   const list = document.getElementById("pppSupersList"); if (!list) return;
   const sup = pppLoadSupers();
   if (!sup.length) { list.innerHTML = '<div class="planim-empty">Sin clientes súper en la lista.</div>'; return; }
-  list.innerHTML = sup.slice().sort(function (a, b) { return String(a.nombre || a.cod).localeCompare(String(b.nombre || b.cod)); }).map(function (s) {
-    const idx = sup.indexOf(s);
+  list.innerHTML = sup.slice().sort(function (a, b) {
+    return String(a.nombre || a.cod).localeCompare(String(b.nombre || b.cod)) || a.empresa.localeCompare(b.empresa);
+  }).map(function (s) {
     return '<div class="tall-row"><span class="tall-name">' + escapeHtml(s.nombre || ("Cód " + s.cod)) + '</span>' +
-      '<span class="tall-lin">cód ' + escapeHtml(String(s.cod || "—")) + '</span>' +
-      '<button class="planim-btn-del" onclick="pppSuperDel(' + idx + ')">Borrar</button></div>';
+      '<span class="tall-lin">' + (s.empresa === "chef" ? "CH" : "LK") + ' ' + escapeHtml(String(s.cod || "—")) +
+        (s.cuit ? ' · CUIT ' + escapeHtml(s.cuit) : '') + '</span>' +
+      '<button class="planim-btn-del" onclick="pppSuperDel(\'' + s.empresa + '\',\'' + escapeHtml(s.cod) + '\')">Borrar</button></div>';
   }).join("");
 }
-function pppSuperAdd() {
-  const ci = document.getElementById("pppSupCod"), ni = document.getElementById("pppSupNom");
-  const c = (ci ? ci.value : "").trim().replace(/\.0+$/, ""), n = (ni ? ni.value : "").trim();
-  if (!c && !n) { alert("Poné al menos el código o el nombre."); return; }
-  const sup = pppLoadSupers();
-  if (c && sup.some(function (s) { return String(s.cod) === c; })) { alert("Ese código ya está en la lista."); return; }
-  sup.push({ cod: c, nombre: n || ("Cód " + c) }); _pppSupers = sup; pppSaveSupers();
-  if (ci) ci.value = ""; if (ni) ni.value = "";
-  pppSupersRender(); pppRenderProg();
+async function pppSuperAdd() {
+  const ei = document.getElementById("pppSupEmp"), ci = document.getElementById("pppSupCod"), ni = document.getElementById("pppSupNom");
+  const e = (ei ? ei.value : "lk"), c = (ci ? ci.value : "").trim().replace(/\.0+$/, ""), n = (ni ? ni.value : "").trim();
+  if (!c || !n) { alert("Poné el código y el nombre."); return; }
+  const emp = pppEmpNorm(e);
+  if (pppLoadSupers().some(function (s) { return s.cod === c && s.empresa === emp; })) { alert("Ese cliente ya está en la lista."); return; }
+  try {
+    await pppSupersRpc("gv_supers_set", { p_empresa: emp, p_cod: c, p_nombre: n, p_por: (typeof pppQuien === "function" ? pppQuien() : null) });
+    if (ci) ci.value = ""; if (ni) ni.value = "";
+    pppSupersNeed(true);
+  } catch (err) { alert("No se pudo guardar: " + ((err && err.message) || err)); }
 }
-function pppSuperDel(i) {
-  const sup = pppLoadSupers(); if (i < 0 || i >= sup.length) return;
-  if (!confirm("¿Quitar \"" + (sup[i].nombre || sup[i].cod) + "\" de la lista de súper?")) return;
-  sup.splice(i, 1); _pppSupers = sup; pppSaveSupers();
-  pppSupersRender(); pppRenderProg();
+async function pppSuperDel(empresa, cod) {
+  const sup = pppLoadSupers();
+  const s = sup.filter(function (x) { return x.cod === String(cod) && x.empresa === empresa; })[0];
+  if (!s) return;
+  if (!confirm("¿Quitar \"" + (s.nombre || s.cod) + "\" (" + (empresa === "chef" ? "CH" : "LK") + " " + s.cod + ") de la lista de súper?\n\nLa usan también Facturación, Cobranzas y Cuarentena.")) return;
+  try {
+    await pppSupersRpc("gv_supers_baja", { p_empresa: empresa, p_cod: String(cod), p_por: (typeof pppQuien === "function" ? pppQuien() : null) });
+    pppSupersNeed(true);
+  } catch (err) { alert("No se pudo borrar: " + ((err && err.message) || err)); }
 }
 function pppDragOver(e, el) { if (e) { e.preventDefault(); e.stopPropagation(); } if (el) el.classList.add("ppp-drag"); }
 function pppDragLeave(e, el) { if (el) el.classList.remove("ppp-drag"); }
@@ -34859,13 +34931,17 @@ function _pppCamionIco(c) { return c.ruta === "ret" ? "🏭" : (c.ruta === "sup"
 /* v13.35 (dueño: "si es súper, pone el nombre directamente"): un camión de súper es siempre de UN
    cliente, así que "Camión 2 · Súper" no dice nada. Va el nombre: el de la lista de clientes súper
    (que el supervisor puede editar en Configuración) y, si no está, la razón social del pedido. */
+/* v17.72: el nombre corto sale de la MISMA lista (GV_Supers.nombre). Los dos mapas que había acá
+   hardcodeados (PPP_SUPER_ALIAS y PPP_SUPER_LEGACY) se fueron: eran otra copia más de la lista. */
 function _pppSuperNombre(p) {
+  const s = pppSuperDe(p);
+  if (s && s.nombre) return String(s.nombre);
   const cod = String((p && p.cod) || "").trim();
-  if (cod) { for (const s of pppLoadSupers()) { if (s.cod && String(s.cod) === cod && s.nombre) return String(s.nombre); } }
-  if (PPP_SUPER_ALIAS[cod]) return PPP_SUPER_ALIAS[cod];
   const rs = String((p && p.razon_social) || "").trim();
-  // v13.37: hay filas viejas de ISIS sin cód; se reconocen por la razón social larga.
-  for (const k in PPP_SUPER_LEGACY) { if (PPP_SUPER_LEGACY[k] === rs) return PPP_SUPER_ALIAS[k]; }
+  // hay filas viejas de ISIS sin cód: se reconocen por la razón social del padrón
+  if (!s && rs) {
+    for (const x of pppLoadSupers()) { if (x.nota && String(x.nota).toLowerCase() === rs.toLowerCase()) return x.nombre; }
+  }
   return rs || (cod ? "Cód " + cod : "");
 }
 function _pppCamionSuperTxt(c) {

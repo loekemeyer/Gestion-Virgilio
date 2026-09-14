@@ -1,3 +1,31 @@
+## Nota v17.72 (2026-09-14) — UNA sola lista de clientes súper
+
+Pedido de Luis: *"pasá la lista a la base y arreglá lo de Gigot. No puede haber 3 y 1 en el front…
+fijate si se puede unificar en una."* Había **cinco** definiciones de "es súper" y ninguna mandaba:
+tres variantes de mirar la **zona** (y la zona casi nunca dice "Super": de 158 NP de clientes súper
+en la PPP, marcaba **5**), `cobranzas_cliente_cadena`, y una lista en el **localStorage de cada
+dispositivo** que el backend no veía y que comparaba **sólo por código** — por eso el **2444 de LK
+(Relca S.R.L.) se colaba como súper**, porque el 2444 de Chef es Cencosud.
+
+Ahora hay **una**: `public."GV_Supers"` (empresa, cod, CUIT, cadena, nombre), y **una** pregunta:
+`gv_es_super(empresa, cod)`. Las seis definiciones de zona pasaron a preguntarle a la lista; **la
+zona quedó como red de seguridad**, no como definición. El front la lee de la base y el editor de
+Configuración escribe ahí (el localStorage quedó de caché offline). Resultado: **de 5 NP marcadas
+súper a 162** (235 m³), y ningún camión mezcla súper con clientes (la regla del dueño de la v14.23
+se sigue respetando).
+
+**Gigot arreglado:** la base decía `LK 5000`, un código que **no existe en ningún padrón** — así
+que Gigot nunca fue tratado como súper. Es **Matiz SA, LK 4263**. ⚠ Al pasar a súper, sus pedidos
+**web** dejan de llevar el 2 % y le aplican los precios de `precios_super_lk`.
+
+⚠ `cobranzas_cliente_cadena` **no se dropeó**: tiene 10 vistas de Facturación colgando y un
+`DROP … CASCADE` ahí es el pozo de la v16.20 y la v16.33. Quedó como **tabla derivada**, rellenada
+por trigger desde `GV_Supers` y sin escritura para `anon`. Centinela:
+`select * from public.gv_supers_desincronizado;` (vacío = ok).
+
+§3.fn de `docs/SUPABASE-GESTION-VIRGILIO.md` · `sql/gv_supers_una_lista_v1772.sql` ·
+test `tests/supers-una-lista.cjs`.
+
 ## Nota v17.66 (2026-09-14) — Programación es una tabla: día → tanda → NP → contenido
 
 Pedido de Luis: *"darle un formato más limpio al estilo de como se ve en el módulo de operarios"*.
