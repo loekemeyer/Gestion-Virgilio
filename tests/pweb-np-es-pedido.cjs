@@ -56,9 +56,13 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
     _apr.tandas = _apr.tandas || [];
     let html = "";
     try { aprRender(); html = (document.getElementById("pppProgBody") || document.body).innerHTML; } catch (e) { out.errApr = String(e && e.message || e); }
-    // v13.70: sin número todavía → se muestra el pedido de la página ("web LK 1348") y el bloque ("bloque 2/2")
+    // v13.70: sin número todavía → se muestra el pedido de la página ("web LK 1348").
+    // ⚠ v17.63 — el pedido partido ya NO se anuncia como "bloque 2/2" en la fila: la v17.57 movió
+    // ese cartel adentro del detalle desplegado (y sólo sale si el bloque trae artículos, que acá
+    // se stubean vacíos) y en la fila quedó "sale en 2 NP". Decisión del dueño (2026-09-14):
+    // "Sale en x NP" es la forma buena. Lo que NO puede volver es el sufijo viejo "LK 1348-2".
     out.aprMuestra1348   = html.indexOf("web LK 1348") >= 0;
-    out.aprMuestra1348b2 = html.indexOf("bloque 2/2") >= 0 && html.indexOf("LK 1348-2") < 0;
+    out.aprMuestra1348b2 = html.indexOf("sale en <b>2</b> NP") >= 0 && html.indexOf("LK 1348-2") < 0;
     out.aprMuestra1350   = html.indexOf("web LK 1350") >= 0;
     out.aprSinNumeroRpc  = true;   // no hay RPC de numerar en el fetch stub: si se llamara, aprTraerPedidos igual no la necesita
 
@@ -100,7 +104,7 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
     ["pasado 9999 crece: LK 12345",                             r.l5 === "LK 12345"],
     ["acepta strings",                                          r.l6 === "LK 1350"],
     ["A Programar muestra el pedido de la página (web LK 1348)", r.aprMuestra1348 === true],
-    ["y el bloque 2 como 'bloque 2/2', sin LK 1348-2",           r.aprMuestra1348b2 === true],
+    ["y que el pedido 'sale en 2 NP', sin LK 1348-2",            r.aprMuestra1348b2 === true],
     ["y web LK 1350",                                            r.aprMuestra1350 === true],
     ["la PPP etiqueta lo programado con el contador; sin número → web CH 217", r.progNps === "LK 0015,LK 0016,web CH 217"],
     ["Facturación toma el TAP de LK 0016 como armada",           r.armada1348b2 === true],
