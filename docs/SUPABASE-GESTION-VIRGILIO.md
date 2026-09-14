@@ -12434,3 +12434,37 @@ escrito (0 comentarios, 6 liberados, el override de 98626 igual que antes).
 SQL y rollback: `sql/gv_cuarentena_devolver_v1720.sql`. Tests en `tests/apr-cuarentena.cjs`
 (la columna existe; sin aprobar ofrece las dos acciones y aprobada sólo *Cuarentena*; el cuadro
 avisa la tanda; al confirmar llama la RPC con NP, clave y comentario).
+
+---
+
+### §3.ei — Cierre de la sesión: `a_guardar` también es de tránsito, y el cron 68 había quedado apagado (v17.10, 2026-09-14)
+
+Dos cosas que aparecieron **en la verificación final**, y que valen como lección: cerrar una sesión
+sin volver a medir el estado no cierra nada.
+
+#### 1. El cron 68 estuvo ~1 hora apagado sin que nadie lo notara
+
+Se apagó para aplicar el fix de la etapa 1 (§3.ef) y el `cron.alter_job(68, active := true)` que lo
+volvía a prender iba **en la misma sentencia** que el `create or replace view` que falló por el
+rename de columna. La sentencia abortó entera y el `alter_job` no se aplicó. **Un `alter_job` de
+reactivación no se manda junto con nada que pueda fallar.** Reactivado.
+
+#### 2. `a_guardar` es de TRÁNSITO, no de saldo estable
+
+La vista alertó `508` Sacafuentes en `a_guardar` con **−24**, clase `fisico`. Falso positivo:
+
+- **11/09 13:16** — recepción `+24`, empresa `LK`
+- **14/09 10:39** — el operario 94 las guardó, `−24`, empresa `Mixto`
+
+Las 24 cajas **se guardaron**; el total por código da 0. Es el mismo desalineo de partición de los
+contables: desde el corte `pkc_empresa_desde` del 11/09, un depósito donde **se entra por un evento
+y se sale por otro** puede recibir los dos con empresa distinta.
+
+La clasificación estaba mal: `a_guardar` se comporta como `a_facturar` y `separar_pedidos`, no como
+la góndola. La partición por empresa ahora se mira **sólo en los depósitos de saldo estable**
+(`terminado`, `excedente`, `racks`, `para_envasar`, `insumos`); en los tres de tránsito vale el
+saldo **por código**. La clase se renombró de `contable` a **`transito`**, que describe mejor por qué
+se los trata distinto.
+
+Sin esto, el cron 86 le habría creado a Luis una tarea a las 08:00 para **contar 24 sacafuentes que
+están guardados** — y una alerta que miente es peor que no tenerla.

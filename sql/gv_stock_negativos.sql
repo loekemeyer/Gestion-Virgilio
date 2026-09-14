@@ -49,7 +49,7 @@
 --            `drop view public.gv_stock_negativos;`
 -- =====================================================================
 
--- v17.07: se recrea (DROP + CREATE: no se puede renombrar columnas con OR REPLACE).
+-- v17.10: se recrea (DROP + CREATE: no se puede renombrar columnas con OR REPLACE).
 drop view if exists public.gv_stock_negativos;
 create view public.gv_stock_negativos
 with (security_invoker = true) as
@@ -58,32 +58,34 @@ with base as (
          btrim(m.cod_art) cod, m.deposito, coalesce(m.empresa,'Mixto') empresa, m.delta, m.ts
   from public."Movimientos_Stock" m
 ),
--- (a) por particion de EMPRESA, solo en depositos FISICOS: ahi una particion negativa es real
--- (es lo que la pantalla mostro el 14/09 con 437E/438E/809E). En los contables NO se mira por
--- empresa: el corte pkc_empresa_desde del 11/09 deja a proposito lo viejo en 'Mixto' y lo nuevo
--- en LK/CH, asi que las particiones se compensan entre si (95 casos, todos contables, suman 0
--- por codigo). Mirarlas ahi seria ruido puro.
+-- v17.10: la particion por EMPRESA solo se mira en los depositos de SALDO ESTABLE
+-- (gondola, excedente, racks, para_envasar, insumos). Los de TRANSITO -a_facturar,
+-- separar_pedidos y a_guardar- entran por un evento y salen por otro, y desde el corte
+-- pkc_empresa_desde del 11/09 los dos eventos no siempre traen la misma empresa: la
+-- recepcion del 508 vino como LK y el guardado de hoy como Mixto, asi que la particion
+-- Mixto quedo en -24 aunque las 24 cajas se guardaron y el total por codigo da 0.
+-- Mirar la particion ahi son falsos positivos; el saldo que vale es el del codigo.
 por_emp as (
   select k, min(cod) cod, deposito, empresa, round(sum(delta),2) saldo, max(ts) ultimo_mov
-  from base where deposito not in ('a_facturar','separar_pedidos')
+  from base where deposito not in ('a_facturar','separar_pedidos','a_guardar')
   group by 1,3,4 having round(sum(delta),2) < 0
 ),
--- (b) por CODIGO entero, en cualquier deposito: si el total da negativo, falta algo de verdad
+-- por CODIGO entero, en cualquier deposito: si el total da negativo, falta algo de verdad
 por_cod as (
   select k, min(cod) cod, deposito, 'TODAS'::text empresa, round(sum(delta),2) saldo, max(ts) ultimo_mov
   from base group by 1,3 having round(sum(delta),2) < 0
 ),
 u as (select * from por_emp union all select * from por_cod)
 select u.cod, u.k cod_norm, u.deposito, u.empresa, u.saldo, u.ultimo_mov,
-       case when u.deposito in ('a_facturar','separar_pedidos') then 'contable' else 'fisico' end clase,
-       case when u.deposito in ('a_facturar','separar_pedidos')
-            then 'Error de registro: se descontaron papeles que no habian entrado. Se corrige en la base, no en el deposito.'
+       case when u.deposito in ('a_facturar','separar_pedidos','a_guardar') then 'transito' else 'fisico' end clase,
+       case when u.deposito in ('a_facturar','separar_pedidos','a_guardar')
+            then 'Deposito de transito: el saldo negativo es error de registro, no falta mercaderia. Lo corrige Sistemas.'
             else 'Falta mercaderia real: se descontaron cajas que el sistema no sabia que estaban. Hay que CONTAR y cargar el faltante.'
        end que_significa,
        (select o.descripcion from public."OC_Maximos" o
          where regexp_replace(upper(btrim(o.cod)),'^0+(?=.)','') = u.k limit 1) descripcion
 from u
-order by (case when u.deposito in ('a_facturar','separar_pedidos') then 'contable' else 'fisico' end), u.saldo;
+order by (case when u.deposito in ('a_facturar','separar_pedidos','a_guardar') then 'transito' else 'fisico' end), u.saldo;
 
 grant select on public.gv_stock_negativos to anon, authenticated;
 
