@@ -158,6 +158,66 @@ revés (tocar el front primero) se pierde la red de abajo.
 
 ---
 
+---
+
+## 5. Cruce con Planimetría (leído después: los dos handoffs del 14/09)
+
+`docs/HANDOFF-PLANIMETRIA-20260914.md` y `docs/HANDOFF-PLANIMETRIA-20260914-SESION-LUIS.md`
+describen el mapa de góndolas. **Tocan este mismo problema y conviene leerlos juntos con esto.**
+
+### 5.1 La regla 6 del handoff de Thomas dice menos de lo que pasa
+
+Dice *"la RPC canoniza con `canon_cod_art_val`"*. Es verdad a medias: **`gv_lugar_item_guardar`
+usa las DOS canonizadoras, y en mitades distintas de la misma función**:
+
+- escribe con `v_cod := canon_cod_art_val(p_cod)` → **estricto**, y el `on conflict (sector, cod)`
+  compara **texto crudo**;
+- borra el espejo con `gv_cod_stock(cod) = gv_cod_stock(v_cod)` → **laxo** (matchea `7` con `007`,
+  y además pela la variante `L` y el sufijo de empresa).
+
+O sea: **borrar sí encuentra la grafía vieja, pero escribir no la pisa — crea una SEGUNDA fila**
+en `Capacidad_Sector` para el mismo artículo y el mismo sector. Que es exactamente la divergencia
+del problema 84 que la RPC debería evitar, y el mismo mecanismo que duplicó el picking de `D72C`.
+
+**Estado: LATENTE, no activo.** Medido el 14/09: 0 filas duplicadas por
+`(sector, gv_cod_stock(cod))` en las dos tablas, y 0 filas con una grafía distinta de la que
+devuelve `canon_cod_art_val`. Hoy no hay con qué dispararlo.
+
+### 5.2 El hueco que lo puede activar
+
+**`Capacidad_Sector` tiene trigger de canonización** (`trg_canon_capacidad_sector_cod` →
+`fn_canon_col_cod` → `canon_cod_art_val`). **`GV_Lugar_Item` no tiene ninguno** — y es la tabla
+MADRE del mapa, la que lee el picking vía `gv_lugar_articulo`.
+
+El espejo está protegido y la fuente no. Depende 100% de que todo el mundo entre por la RPC, y el
+handoff documenta que **se escribió a mano por SQL**.
+
+**Fix medido, NO aplicado:** ponerle a `GV_Lugar_Item` el mismo trigger que ya tiene
+`Capacidad_Sector`. Sobre las 790 filas actuales **cambian 0**. No se aplicó por dos razones:
+había dos sesiones editando esa tabla ese día, y `canon_cod_art_val` resuelve contra `OC_Maximos`
+(catálogo de artículos) — hoy `GV_Lugar_Item` tiene **0 filas con `clase='insumo'`**, pero si entra
+una la canonizaría contra el catálogo equivocado. Va junto con alinear las dos mitades de la RPC.
+
+### 5.3 Y una tercera regla en el mismo módulo
+
+`gv_lugar_articulo` (lo que lee el picking) usa **regex propio**; `gv_planimetria_celda` (lo que se
+dibuja) usa **`gv_cod_stock`**. **Lo que se dibuja y lo que lee el picking se canonizan distinto.**
+Esa es otra vía por la que el problema 84 puede fabricar divergencias solo.
+
+### 5.4 Lo que el handoff de Luis ya había anotado, y es esto
+
+§6, textual: *"`634` y `634E` son el mismo artículo con el stock partido en dos grafías (12 cajas
+en el pelado, 0 en el que tiene nombre). Eso no es planimetría: es `gv_codigos_multigrafia`, y es
+más grande que todo lo demás de esta lista."* **Coincide**: es este problema, visto desde el mapa.
+
+### 5.5 Consecuencia para el orden de las etapas
+
+La etapa **2b** (que `gv_cod_stock` resuelva contra el catálogo en vez de pelar ceros a ciegas)
+**sube de prioridad**: `gv_cod_stock` está en un camino de ESCRITURA vivo
+(`gv_lugar_item_guardar`), no sólo en lecturas. Y las etapas 0 y 1 no cambian.
+
+---
+
 ## 4. Orden, riesgo y cuándo
 
 | etapa | toca escritura | cambios medidos | cuándo |
