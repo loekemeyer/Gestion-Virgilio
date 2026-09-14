@@ -13714,7 +13714,7 @@ a `descartado`. **No reabrirlo sin que el dueño lo pida.**
 ---
 ---
 
-### §3.fg — v17.50: una sola identidad por pedido en Cuarentena — 2026-09-14
+### §3.fg — v17.51: una sola identidad por pedido en Cuarentena — 2026-09-14
 
 **Luis (2026-09-14):** *"no está sacando la razón social de ese cliente, ¿por qué?"* — el pedido
 1426 (cod LK 4210) salía en el Log de Cuarentena sin nombre. La respuesta fueron **dos** defectos
@@ -13758,3 +13758,48 @@ verificadas por md5 del cuerpo normalizado contra la base, y ninguna quedó con 
 una por una a `sql/gv_cuarentena_log_v1743.sql` y `sql/gv_cuarentena_comentarios_v1715.sql`, y en
 `marcar_calc` / `ya_programado` / `liberados` reemplazar cada `gv_cuarentena_clave(X)` por `X`.
 Todo en `sql/gv_cuarentena_identidad_v1750.sql`.
+
+### §3.fg — v17.51: candado en `GV_Lugar_Item`, `canon_cod` fusionada, y 2b descartada con el número delante
+
+**(1) Candado en `GV_Lugar_Item`.** Cierra el hueco de los handoffs de planimetría del 14/09:
+`Capacidad_Sector` (el espejo) tenía trigger de canonización y **`GV_Lugar_Item` —la tabla madre
+del mapa, la que lee el picking vía `gv_lugar_articulo`— no tenía ninguno**. Dependía de que todos
+entraran por la RPC, y el handoff documenta que se escribió a mano por SQL.
+
+⚠ Se usó `fn_canon_col_cod`, **el mismo trigger que ya tiene `Capacidad_Sector`**, y no una función
+nueva que mire `clase`: **no se inventa una regla**. `gv_lugar_item_guardar` ya canoniza con
+`canon_cod_art_val` sin mirar la clase, y `fn_canon_col_cod` es ese mismo camino. Las dos tablas
+hermanas quedan canonizando idéntico. Medido: 790 filas, **cambian 0**; 0 filas `clase='insumo'`.
+Verificado con ROLLBACK: un `INSERT` a mano con `'  66 '` quedó guardado como **`066`**.
+
+**(2) `canon_cod` fusionada con `norm_cod`.** En la v17.46 se había dejado por vivir dentro del
+índice único `gv_precios_cliente_canon_uk`. Ahora sí: idéntica sobre las 523 entradas del dominio,
+la tabla tiene **4 filas** y **0 claves cambian**, sigue `IMMUTABLE` (obligatorio en un índice) y se
+reindexó igual. **Con esto "pelar ceros a la izquierda" tiene UNA sola implementación**
+(`norm_cod`); `canon_cod` y `cob_norm_cod` son envoltorios. Se llamó de verdad a las 5 funciones que
+la usan (`isis_pedido_json`, `gv_isis_pedido_json`, `gv_conciliacion_comparar`,
+`gv_ppp_web_valor_items`, `gv_cruce_fc_asignacion`): las 5 sin error.
+
+**(3) Etapa 2b — descartada, con la medición.** Era hacer que `gv_cod_stock` resolviera contra
+`OC_Maximos`. El riesgo que la justificaba —comparar `gv_cod_stock(a)` contra un `b` crudo— **se
+midió y no existe: las 8 comparaciones son simétricas**, incluido el `v_codstock` de
+`gv_importados_resync`. Lo que sí hay es más chico: **3 vistas la usan como VALOR y no como clave**,
+así que muestran el código con los ceros pelados (`gv_venta_mensual_cliente` 574 de 8.892,
+`vista_venta_mensual` 60 de 845, `vista_stock_vs_pedidos` 19 de 301; todo `31`→`031`). Es
+**cosmético** y los dos arreglos son desproporcionados con el depósito operando: tocar
+`gv_cod_stock` la vuelve **`STABLE`** y la usan 8 funciones + 14 vistas incluida la matview
+`vista_stock_procesada`; reescribir las 3 vistas implica una con **12 dependientes directos** y las
+tres con `GROUP BY`. Queda medido para una ventana.
+
+⚠⚠ **LECCIÓN MEDIDA: el hash de una vista contra una foto vieja NO aísla el cambio.**
+`vista_facturable_anticipado` dio hash distinto con las mismas 582 filas y parecía culpa de
+`canon_cod`. No lo era: corriendo el **cuerpo viejo** de la función **sobre los datos de ahora**
+(dentro de una transacción con `ROLLBACK`) dio el **mismo hash** que el nuevo — lo que cambió fue el
+**dato**, que se mueve solo. **Contra una base que opera, la comparación válida es las dos versiones
+de la función sobre los mismos datos, en una transacción**, no una foto de hace una hora. Es el
+mismo punto de §3.fe, ahora con un caso real que lo prueba.
+
+Salud al cerrar: `Z. ALARMA` 0 · `gv_endpoints_rotos` 0 · `gv_stock_particion_sospechosa` 0 ·
+índice `indisvalid` true · `GV_Lugar_Item` 790 · 0 transacciones abiertas.
+
+**Definición y rollback:** `sql/gv_canon_etapa3_v1751.sql`.
