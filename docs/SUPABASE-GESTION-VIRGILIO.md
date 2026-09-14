@@ -12670,3 +12670,49 @@ Chef), y Chef subió de 231 a 313. Es lo que se había medido en el dry run de �
   pedo.
 - El `drop default` de `sales_lines.empresa` pasa a ser un candado inofensivo: ya no hay carga manual que se
   olvide la columna.
+
+### §3.es — v17.25: ¿la proyección de las OC conviene a 1 mes? Medido: no, pero 3 sí — 2026-09-14
+
+**Thomas (14/09): *"conviene hacerlo un 1 month rolling average sobre que vea último mes para proyección?
+Estimo que el ajuste sería más dinámico de esa forma"*.** Se midió con un backtest en vez de opinar.
+**No se cambió nada**: es una decisión comercial.
+
+**Primero, el horizonte real.** De `GV_Importados_Baches`: **47 días de embarque a reingreso** (40–54, sobre
+67 baches cerrados) y **58 días desde que se carga el bache hasta que llega**. Sumando la producción, lo que
+hay que cubrir con la OC es del orden de **3 meses**. Por eso el backtest mide contra **el promedio de los
+3 meses siguientes**, no contra el mes siguiente.
+
+**El backtest.** 1.652 observaciones (artículo × mes) de los últimos 20 meses, LK, artículos de ≥ 20
+cajas/mes, venta media **179,8 cajas/mes**:
+
+| método | error medio | % de la venta | sesgo |
+|---|--:|--:|--:|
+| **1 mes** | **56,0** | 31 % | +2,0 |
+| 3 meses | 42,3 | 24 % | **−1,7** |
+| 6 meses (media pelada) | 41,9 | 23 % | −5,6 |
+| **6 meses con la guarda `m4` — lo que corre hoy** | **42,0** | 23 % | −4,8 |
+| 3 meses con guarda | 43,9 | 24 % | +3,8 |
+
+**Conclusión: 1 mes es 33 % peor.** La intuición de que reacciona más rápido es correcta, pero un solo mes
+es demasiado ruido: se termina pidiendo de más lo que tuvo un pico y de menos lo que tuvo un mes flojo,
+y la mercadería tarda 3 meses en llegar.
+
+**Lo que sí conviene, si se busca dinamismo: pasar de 6 a 3 meses.** Mismo error que hoy (42,3 vs 42,0),
+reacciona **el doble de rápido**, y **corrige el sesgo**: hoy el método pide de menos (−4,8 cajas por
+artículo y mes), con 3 meses casi no sesga (−1,7).
+
+⚠ **Si se pasa a 3, la guarda desaparece sola y hay que saberlo.** `_fn_proy_window_emp` hace
+`greatest(media, m4)` donde `m4` es el 4.º valor más alto de la ventana. Con 6 meses eso es un "mes típico
+alto" que protege de quedarse corto; con 3 meses `least(4,3) = 3` → el 3.º más alto de 3 valores **es el
+mínimo**, y `greatest(media, mínimo) = media`. O sea que a 3 meses la fórmula queda en media pelada — que
+es justamente la variante que mejor midió, así que no es un problema, pero no hay que agregarle una guarda
+nueva: medida, **empeora** (43,9 y pasa a pedir de más).
+
+**Qué cambiaría hoy el pase de 6 a 3** (LK): total **18.275 → 17.184 cajas/mes (−6 %)**, con **42 artículos
+que suben más de 20 %** y **56 que bajan más de 20 %**. Los que más se mueven son los pesados: 505 −295,
+506 −177, 504 −156, 501 −115; y suben 225 (+48) y 102E (+42). El −6 % no es un recorte: es que el último
+trimestre vendió menos que el anterior, y eso es exactamente lo que se pedía que se note.
+
+**Aparte, la carga automática ya hizo más dinámica la proyección por otro lado**: antes el dato entraba una
+vez por mes con hasta 14 días de atraso, ahora entra todos los días. La ventana sigue siendo de 6 meses,
+pero ya no se mira con un mes de retraso.
