@@ -15264,3 +15264,54 @@ ejecutar la función ni leer el log.
 
 **Rollback:** `select cron.unschedule('gv-entregas-reconstruir');` y los `drop` del pie del archivo
 SQL.
+
+## §3.ft — v17.84: el cuarto candado, y el centinela que sí avisa — 2026-09-14
+
+Dos cosas que faltaban para dar por cerrado lo de §3.fs. Las dos salieron de mirar el estado real
+en vez de confiar en que el centinela vacío significaba "listo".
+
+### 1. El cuarto candado: código repetido en dos renglones
+
+Al revisar la tabla aparecieron **16 duplicados `np|cod_art`** — todos de julio/agosto, ninguno de
+hoy, ninguno del backfill. Mirados de cerca **no son duplicados de armado**: son pedidos que traen
+**el mismo código en dos renglones** y el front escribe **una fila por renglón** (ej. `590E` 4 y 6
+cajas, ids consecutivos).
+
+Eso destapaba un agujero en la reconstrucción: `gv_ppp_np_items` **agrupa** los renglones, así que
+la función habría escrito **1 fila con la suma**. El total en cajas cerraría, pero **las cantidades
+por fila no** — y entonces `trg_entregas_virgilio_dedup` ya **no** reconocería la subida tardía del
+dispositivo y la dejaría entrar: **armado y stock duplicados**, el incidente del 11/09 otra vez.
+
+**Candado 4:** la función no toca NPs cuyo pedido tenga algún código con `renglones > 1`. Salen en
+el centinela con motivo `codigo repetido en 2 renglones — a mano`.
+
+Es raro (**1 NP en 30 días**, y ninguna armada), pero existe — y el precio de no verlo era duplicar
+stock.
+
+**Probado fabricando el caso**, porque no había ninguno real con TAP: se insertó un TAP de D69G y un
+TAL de la NP **98608** (`323E` en 2 renglones) y se le borraron las filas →
+**0 filas reconstruidas** y el centinela la mostró con el motivo nuevo (o sea: frena, pero **no en
+silencio**). En la misma corrida **D67L siguió en 55/55 con 0 diferencias**, así que el candado
+nuevo no rompió el camino normal. Todo revertido por `RAISE`.
+
+### 2. El centinela ahora avisa solo
+
+**Dueño:** *"centinela no avisa nada, ¿quedó cerrado esto entonces, no?"* — la vista estaba en 0,
+pero **una vista no avisa**: hay que acordarse de mirarla, y un centinela que nadie mira no es un
+centinela.
+
+**`gv_alerta_armado_sin_entregas_telegram()`** + cron **`gv-alerta-armado-sin-entregas` (jobid 88)**,
+`15 11-23 * * 1-6` UTC = **08:15 a 20:15 ART, lunes a sábado**. Usa el mismo `tg_enqueue` +
+`tg_outbox_flush` que `gv_alerta_sin_eventos`, con clave de dedup para no repetir el mismo aviso.
+
+Avisa **todo lo que siga colgado 30 min después del TAP**, incluido lo marcado `reconstruible`: si a
+esa altura sigue ahí, es que el **cron 87 no lo pudo arreglar**, y eso también hay que saberlo.
+
+⚠ La prueba de la alerta se corta **antes** de `tg_enqueue`/`tg_outbox_flush` a propósito: se
+verifica la consulta que arma el mensaje, **no se manda un Telegram de prueba** a un canal real.
+
+**Estado al cierre:** cron 87 corrió (`0 rows`, no hizo falta) · centinela en 0 · las 4 NP con
+subtotal · 59 filas en D67M+E01J · 0 duplicados nuevos.
+
+**Rollback:** `select cron.unschedule('gv-alerta-armado-sin-entregas');` +
+`drop function public.gv_alerta_armado_sin_entregas_telegram();`

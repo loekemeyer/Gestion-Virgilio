@@ -46,7 +46,7 @@
 --   cantidades, cod_cliente y fecha_salida — asi que tampoco sobra ninguna.
 --   Repetirla es sano cada vez que se toque esta funcion; el bloque esta al final.
 --
--- LOS TRES CANDADOS (por que esto no puede duplicar un armado)
+-- LOS CUATRO CANDADOS (por que esto no puede duplicar un armado)
 --   1. Solo toca NPs con **CERO** filas en Entregas_Virgilio. Una NP con filas
 --      parciales NO se toca: sale en el centinela para mirarla a mano.
 --   2. Exige que exista un **TAL con detalle parseable** para esa NP en esa tanda.
@@ -54,6 +54,16 @@
 --      el pedido como faltante, que es peor que no hacer nada. Queda en el centinela.
 --   3. Colchon de `p_min_edad_min` minutos desde el TAP: no se mete con un armado
 --      recien cerrado que el dispositivo puede estar por subir.
+--   4. El pedido no puede traer el MISMO CODIGO EN DOS RENGLONES. El front escribe
+--      UNA FILA POR RENGLON; `gv_ppp_np_items` los agrupa, asi que la reconstruccion
+--      daria 1 fila con la suma. El total en cajas cerraria, pero las cantidades POR
+--      FILA no, y entonces el dedup ya no reconoceria la subida tardia del
+--      dispositivo y la dejaria entrar = armado y stock duplicados (el incidente del
+--      11/09). Esas NP se dejan a mano y salen en el centinela.
+--      Como se encontro: al revisar los 16 duplicados np|cod_art de la tabla, que son
+--      TODOS de julio/agosto y TODOS este caso (ej. 590E en 4 y 6 cajas, ids
+--      consecutivos). Es raro — 1 NP en 30 dias, y ninguna armada — pero existe.
+--
 --   Y si el dispositivo sube DESPUES: el trigger trg_entregas_virgilio_dedup lo
 --   descarta, porque las cantidades son identicas (eso es lo que probo D67L).
 -- =============================================================================
@@ -138,6 +148,9 @@ select p.tanda, p.np, p.cod_cliente, p.fecha_salida, t.tap_at,
          when (select count(*) from public.gv_armado_tal_items a
                 where a.np = p.np and a.tanda = p.tanda) = 0
            then 'sin TAL con detalle — a mano'
+         when exists (select 1 from public.gv_ppp_np_items i2
+                       where i2.np::text = p.np and i2.renglones > 1)
+           then 'codigo repetido en 2 renglones — a mano'
          else 'reconstruible'
        end as motivo
   from public.gv_np_prog p
@@ -194,6 +207,9 @@ begin
        and exists (select 1 from public.gv_ppp_np_items i where i.np::text = p.np)
        and exists (select 1 from public.gv_armado_tal_items a
                     where a.np = p.np and a.tanda = p.tanda)
+       -- candado 4: ver la cabecera. El front escribe una fila por RENGLON.
+       and not exists (select 1 from public.gv_ppp_np_items i2
+                        where i2.np::text = p.np and i2.renglones > 1)
   ),
   nuevas as (
     insert into public."Entregas_Virgilio"
@@ -275,3 +291,65 @@ revoke execute on function public.gv_entregas_reconstruir(text, integer, integer
 --   raise exception 'PRUEBA (se revierte): originales=% · reconstruidas=% · DIFERENCIAS=%',
 --     v_orig, v_ins, v_dif;
 -- end $$;
+
+-- ═════════════════════════════════════════════════════════════════════════════
+-- v17.84 (2026-09-14) — el centinela AVISA, no espera que alguien lo mire
+-- ═════════════════════════════════════════════════════════════════════════════
+-- Dueno, 14/09: "centinela no avisa nada, quedo cerrado esto entonces, no?"
+-- La respuesta honesta era: la vista estaba en 0, pero una VISTA no avisa — hay que
+-- acordarse de mirarla. Un centinela que nadie mira no es un centinela. Asi que se
+-- engancha al mismo Telegram que ya usan gv_alerta_sin_eventos / _cruce_facturacion
+-- (tg_enqueue + tg_outbox_flush, con clave de dedup para no repetir el mismo aviso).
+--
+-- Avisa TODO lo que siga colgado 30 min DESPUES del TAP — incluido lo marcado
+-- "reconstruible": si a esa altura sigue ahi, es que el cron 87 no lo pudo arreglar,
+-- y eso tambien hay que saberlo.
+
+create or replace function public.gv_alerta_armado_sin_entregas_telegram()
+returns void language plpgsql security definer set search_path to 'public','pg_temp' as $$
+declare
+  v_hoy date := (now() at time zone 'America/Argentina/Buenos_Aires')::date;
+  v_txt text;
+  v_n   int;
+begin
+  select count(*), string_agg('· NP ' || np || ' (' || tanda || ') — ' || motivo, E'\n' order by tap_at)
+    into v_n, v_txt
+    from public.gv_armado_sin_entregas
+   where tap_at < now() - interval '30 minutes';
+  if coalesce(v_n, 0) = 0 then return; end if;
+  perform public.tg_enqueue(
+    '⚠ GESTIÓN — ARMADO SIN ENTREGAS (' ||
+      to_char(now() at time zone 'America/Argentina/Buenos_Aires', 'DD/MM HH24:MI') || ')' || E'\n' ||
+    'Se cerró el armado pero no llegó a Entregas_Virgilio, así que estas NP NO tienen subtotal y NO se pueden facturar:' || E'\n' ||
+    v_txt || E'\n' ||
+    'El cron gv-entregas-reconstruir (cada 10 min) repara solo lo que dice "reconstruible". Lo que dice "a mano" necesita a alguien. Doc: §3.fs de docs/SUPABASE-GESTION-VIRGILIO.md',
+    'gv_armado_sin_entregas_' || v_hoy::text || '_' || md5(v_txt));
+  perform public.tg_outbox_flush();
+end $$;
+
+revoke execute on function public.gv_alerta_armado_sin_entregas_telegram()
+  from public, anon, authenticated;
+
+-- APLICADO el 14/09 → jobid 88. 11-23 UTC = 08:15 a 20:15 ART, lun a sab.
+-- select cron.schedule('gv-alerta-armado-sin-entregas', '15 11-23 * * 1-6',
+--                      $q$select public.gv_alerta_armado_sin_entregas_telegram();$q$);
+
+-- ─────────────────────────────────────────────────────────────────────────────
+-- PRUEBAS DEL CANDADO 4 Y DE LA ALERTA (14/09, transaccion revertida por RAISE)
+--
+-- No existia NINGUN caso real con TAP para probar el candado 4 (1 sola NP en 30 dias
+-- con codigo repetido, y sin armar), asi que se FABRICO el caso: un TAP de D69G y un
+-- TAL de la NP 98608 (cod 323E en 2 renglones), y se le borraron sus filas.
+--   · filas que reconstruyo la funcion = 0                                   ← el candado frena
+--   · el centinela la muestra: "codigo repetido en 2 renglones — a mano"     ← NO frena en silencio
+--   · la alerta arma el texto con las 3 NP de esa tanda
+-- Y en la misma corrida, D67L siguio dando "originales=55 reconstruidas=55
+-- DIFERENCIAS=0", o sea que el candado nuevo no rompio el camino normal.
+--
+-- ⚠ La prueba de la ALERTA se corta ANTES de tg_enqueue/tg_outbox_flush a proposito:
+--   se verifica la consulta que arma el mensaje, no se manda un Telegram de prueba.
+-- ─────────────────────────────────────────────────────────────────────────────
+
+-- ROLLBACK de este bloque:
+--   select cron.unschedule('gv-alerta-armado-sin-entregas');
+--   drop function public.gv_alerta_armado_sin_entregas_telegram();
