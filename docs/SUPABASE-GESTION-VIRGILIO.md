@@ -12210,3 +12210,46 @@ al padrón y la columna `empresa` sin guardar el `CREATE`. Por eso el archivo nu
 
 Archivo: `sql/gv_fac_armado_sin_facturar_v1714.sql`. Rollback: reaplicar el `_v1658.sql`,
 reponer `security_invoker` y `drop function public.gv_fac_rs_np(text)`.
+
+---
+
+### §3.en — v17.15: la lista de "Ya programados" es una TABLA, y aprobar pide un COMENTARIO — 2026-09-14
+
+**Pedido de Luis (2026-09-14):** que el aviso de la imagen sea *"una tabla (columnas: NP, Tanda,
+cod cliente, Motivos [a modo de badges], Aprobación [si fue aprobado, fecha de aprobación],
+Comentario [un icono de un librito que, al hacer click, levante un pop-up con el comentario que se
+puso cuando se aprobó y que se pueda agregar, a modo de logs con fecha y hora])"*; y que al
+**aprobar** un pedido de Cuarentena y mandarlo a programación **salte un cuadro de comentario**.
+
+**Lo que hubo que decidir:** `gv_cuarentena_ya_programado()` **escondía** los pedidos ya liberados
+(un `not exists` contra `GV_Cuarentena_Liberados`). Con esa exclusión la columna *Aprobación*
+habría estado siempre vacía — no hay forma de mostrar "quién lo aprobó" de algo que se oculta al
+aprobarlo. Así que ahora **se muestran**, en verde, con fecha y con el mail de quien aprobó, y el
+título aclara cuántos son (`1 aprobado`). Lo que sigue acotando la lista es lo de siempre: entrega
+de hoy en adelante y NP sin facturar. Medido: pasó de **17 a 20** filas.
+
+**Una sola clave para todo.** Liberados, comentarios y la lista usan la **misma**: el `order_id`
+del pedido web o, cuando es una NP de ISIS que no tiene, **la NP**. La función la devuelve
+resuelta en la columna `clave` para que el front no la arme por su cuenta y se desincronice.
+
+**Lo nuevo en la base:** tabla **`GV_Cuarentena_Comentarios`** (empresa, order_id, np, texto, por,
+creado_at — RLS prendida, sin policies, se lee y escribe sólo por RPC) y dos RPC,
+`gv_cuarentena_comentar` y `gv_cuarentena_comentarios`, las dos con el chequeo de supervisor
+adentro y sin `anon`. **`gv_cuarentena_liberar` cambió de firma** (suma `p_comentario` y `p_por`):
+fue DROP + CREATE, así que se repusieron los GRANT; las llamadas viejas de 3 argumentos siguen
+andando por los defaults. El comentario de la aprobación entra al MISMO log que el librito.
+
+**En el front** (`index.html`): `cuarYaProgHtml` dibuja la tabla, `cuarComAbrir` / `cuarComRender` /
+`cuarComAgregar` manejan el pop-up (reusa el `.cuar-modal` que ya existía para la importación, con
+su propio contenedor `#cuarComModal`), y `cuarLiberar` **ya no libera de una**: abre el cuadro y
+recién `cuarLiberarConfirmar` llama a la RPC con el comentario. El comentario de la aprobación es
+**opcional** (Luis dijo *"pueda dejar un comentario"*, no que sea obligatorio).
+
+⚠ **Las fechas se muestran SIEMPRE en hora de Buenos Aires** (`cuarFechaHora`, `Intl` con
+`timeZone`), no en la del navegador: un `timestamptz` viaja en UTC y un equipo con otro huso —o un
+headless, que corre en UTC— mostraba el comentario 3 horas después del que lo escribió. Y se arma
+con `formatToParts`, porque `es-AR` con día+mes solos devuelve `14/9` aunque se le pida `2-digit`.
+
+SQL completo y rollback: `sql/gv_cuarentena_comentarios_v1715.sql`. Tests:
+`tests/apr-cuarentena.cjs` (tabla, badges, aprobación, librito, y que aprobar **no** dispare la RPC
+antes de confirmar).

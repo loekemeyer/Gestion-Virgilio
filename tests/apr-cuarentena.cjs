@@ -141,6 +141,61 @@ catch (_e) {
     out.nuevoMotivo = /Cliente nuevo \(1 pedido facturado en toda su historia\)\./.test(html);
     out.nuevoEtq = aprCuarentenaEtiqueta({ cuarentena_motivos: ["cliente_nuevo"] });
 
+    // (4) v17.13 — "Ya programados" es una TABLA, con aprobación y librito de comentarios
+    _apr.cuarYaProg = [
+      { origen: "isis", empresa: "lk", np: "97889", order_id: null, clave: "97889", tanda: "D71A",
+        fecha_entrega: "2026-09-16", cod: "4263", razon_social: "Matiz SA",
+        motivos: ["deuda", "cliente_nuevo"], deuda: 12039500, estado: null, picking_empezado: false,
+        nuevo_pedidos: 1, aprobado_at: null, aprobado_por: null, comentarios: 0 },
+      { origen: "web", empresa: "chef", np: "CH 0003", order_id: 55, clave: "55", tanda: "D69E",
+        fecha_entrega: "2026-09-16", cod: "2715", razon_social: "Gifel S.R.L.",
+        motivos: ["deuda"], deuda: 1955318, estado: null, picking_empezado: true,
+        nuevo_pedidos: null, aprobado_at: "2026-09-14T10:35:00-03:00", aprobado_por: "vivi@loekemeyer.com",
+        comentarios: 2 }
+    ];
+    _apr.pedidos = [mk({ order_id: 101, razon_social: "Cliente Dos" })];
+    aprRender(); await new Promise((res) => setTimeout(res, 200));
+    html = document.getElementById("pppPreview").innerHTML;
+    out.ypTabla = /cuar-yaprog-tbl/.test(html) && /<th>NP<\/th>/.test(html) && /<th>Aprobación<\/th>/.test(html);
+    out.ypCuenta = /Ya programados y el cliente está en cuarentena <b>\(2\)<\/b>/.test(html);
+    out.ypCod = /cuar-yaprog-cod[^>]*>LK 4263</.test(html) && /cuar-yaprog-cod[^>]*>CH 2715</.test(html);
+    out.ypBadges = /cuar-badge b-deuda/.test(html) && /cuar-badge b-nuevo/.test(html);
+    out.ypAprob = /✅ 14\/09 10:35/.test(html) && /vivi@loekemeyer\.com/.test(html) && /cuar-yp-ok/.test(html);
+    out.ypSinAprob = /sin aprobar/.test(html);
+    out.ypLibrito = /cuarComAbrirIdx\(0\)/.test(html) && /cuarComAbrirIdx\(1\)/.test(html) && /📖<b>2<\/b>/.test(html);
+    out.ypAprobN = /1 aprobado</.test(html);
+
+    // el librito abre el modal con el log (RPC stubeada)
+    const llamadas = [];
+    window.aprRpc = async function (fn, args) {
+      llamadas.push({ fn: fn, args: args });
+      if (fn === "gv_cuarentena_comentarios")
+        return [{ id: 1, creado_at: "2026-09-14T09:00:00-03:00", por: "luis@loekemeyer.com", texto: "Habló Vivi, lo autoriza" }];
+      return null;
+    };
+    cuarComAbrirIdx(1); await new Promise((res) => setTimeout(res, 120));
+    const mh = (document.getElementById("cuarComModal") || {}).innerHTML || "";
+    out.comModal = /📖 Comentarios/.test(mh) && /Habló Vivi, lo autoriza/.test(mh) && /14\/09 09:00/.test(mh);
+    out.comPideTexto = /id="cuarComTexto"/.test(mh) && /Agregar comentario/.test(mh);
+    out.comRpc = llamadas.length === 1 && llamadas[0].fn === "gv_cuarentena_comentarios" &&
+                 llamadas[0].args.p_empresa === "chef" && llamadas[0].args.p_order_id === "55";
+    cuarComCerrar();
+    out.comCerrado = !!(document.getElementById("cuarComModal") || {}).hidden;
+
+    // (5) aprobar NO dispara la RPC de una: primero pide el comentario
+    llamadas.length = 0;
+    _apr.pedidosTodos = [mk({ order_id: 900, empresa: "lk", cod: "4275", razon_social: "Zhang Qikuan",
+                              cuarentena_motivos: ["deuda"], cuarentena_detalle: { deuda: 2734562 } })];
+    await cuarLiberar("lk", 900); await new Promise((res) => setTimeout(res, 120));
+    const ah = (document.getElementById("cuarComModal") || {}).innerHTML || "";
+    out.aprModal = /Enviar a Pedidos a programar/.test(ah) && /Zhang Qikuan/.test(ah) && /Aprobar y enviar/.test(ah);
+    out.aprSinLiberar = !llamadas.some(function (c) { return c.fn === "gv_cuarentena_liberar"; });
+    // y al confirmar sí libera, con el comentario adentro
+    document.getElementById("cuarComTexto").value = "Lo autorizó cobranzas";
+    await cuarLiberarConfirmar(); await new Promise((res) => setTimeout(res, 120));
+    const lib = llamadas.find(function (c) { return c.fn === "gv_cuarentena_liberar"; });
+    out.aprLibera = !!lib && lib.args.p_order_id === "900" && lib.args.p_comentario === "Lo autorizó cobranzas";
+
     out.errs = null;
     return out;
   });
@@ -165,6 +220,21 @@ catch (_e) {
   chk(r.nuevoCodChip, "cliente nuevo de Chef: el chip dice CH 2533");
   chk(r.nuevoMotivo, "cliente nuevo: el motivo dice cuántos pedidos facturó");
   chk(r.nuevoEtq === "Cliente nuevo", "etiqueta de cliente_nuevo = 'Cliente nuevo'");
+  chk(r.ypTabla, "ya programados: es una tabla con columnas NP / … / Aprobación");
+  chk(r.ypCuenta, "ya programados: el contador cuenta las 2 filas");
+  chk(r.ypCod, "ya programados: el número de cliente por empresa (LK 4263 / CH 2715)");
+  chk(r.ypBadges, "ya programados: los motivos salen como badges");
+  chk(r.ypAprob, "ya programados: la fila aprobada muestra fecha y quién, y queda en verde");
+  chk(r.ypSinAprob, "ya programados: la fila sin aprobar dice 'sin aprobar'");
+  chk(r.ypLibrito, "ya programados: el librito 📖 con la cantidad de comentarios");
+  chk(r.ypAprobN, "ya programados: el título dice cuántos están aprobados");
+  chk(r.comModal, "el librito abre el log con fecha, hora y autor");
+  chk(r.comPideTexto, "el log deja agregar un comentario nuevo");
+  chk(r.comRpc, "el log pide los comentarios de ESE pedido (empresa + clave)");
+  chk(r.comCerrado, "el modal se cierra");
+  chk(r.aprModal, "aprobar abre el cuadro de comentario (no libera de una)");
+  chk(r.aprSinLiberar, "aprobar NO llamó a gv_cuarentena_liberar antes de confirmar");
+  chk(r.aprLibera, "al confirmar libera y manda el comentario");
   chk(r.deudorCliente, "el cliente deudor se ve en el sector");
   chk(r.soloUnCheckbox, "el retenido NO es tildable (solo el normal tiene checkbox)");
   // v14.88: los botones se movieron a la pestaña Config. Cuarentena

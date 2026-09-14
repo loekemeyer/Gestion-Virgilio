@@ -12,7 +12,23 @@
 > única**; no se replica. Ante la duda entre parche rápido y fix de raíz → **fix
 > de raíz**.
 >
-> Última actualización: 2026-09-14 (domingo) · Versión app al documentar: **v17.12**
+> Última actualización: 2026-09-14 (domingo) · Versión app al documentar: **v17.15**
+>
+> Nota **v17.15 (2026-09-14, Luis) — CUARENTENA: "Ya programados" es una TABLA y aprobar pide un
+> COMENTARIO.**
+> (1) La lista pasó a tabla: **NP · tanda · entrega · cliente (con su número) · motivos como badges ·
+> aprobación · 📖**. Los pedidos **ya aprobados no se esconden más** (antes un `not exists` contra
+> `GV_Cuarentena_Liberados` los sacaba, y así la columna de aprobación habría quedado siempre vacía):
+> se ven en verde con la fecha y el mail de quien aprobó. Pasó de 17 a 20 filas.
+> (2) **Log de comentarios** por pedido (`GV_Cuarentena_Comentarios`, fecha + hora + autor), que se
+> abre con el librito y deja agregar líneas. Y al **aprobar** un pedido de Cuarentena salta el mismo
+> cuadro para dejar el comentario de la aprobación (opcional), que entra al mismo log.
+> Clave única para Liberados, Comentarios y la lista: el `order_id` del pedido web o, si es una NP de
+> ISIS sin order_id, **la NP** (la función la devuelve resuelta en `clave`).
+> ⚠ Las fechas se muestran **siempre en hora de Buenos Aires** (`cuarFechaHora`): el `timestamptz`
+> viaja en UTC y un equipo con otro huso mostraba el comentario 3 h después del que lo escribió.
+> `sql/gv_cuarentena_comentarios_v1715.sql` · §3.en de `docs/SUPABASE-GESTION-VIRGILIO.md` ·
+> test `tests/apr-cuarentena.cjs`.
 >
 > Nota **v17.12 (2026-09-14, Luis) — CUARENTENA: el pedido de un CLIENTE NUEVO queda retenido, y la
 > pantalla muestra el NÚMERO DE CLIENTE.**

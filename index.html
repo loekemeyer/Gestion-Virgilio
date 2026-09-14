@@ -854,6 +854,34 @@ button {
 .cuar-yaprog-cli{ flex:1 1 120px; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .cuar-yaprog-motivo{ font-weight:700; }
 .cuar-yaprog-pick{ background:#991b1b; color:#fff; border-radius:4px; padding:0 5px; font-size:10px; font-weight:800; }
+/* v17.15 (Luis) — la lista pasó a ser una TABLA: NP · tanda · entrega · cliente · motivos ·
+   aprobación · comentarios. Las filas ya aprobadas quedan en verde, no se esconden. */
+.cuar-yaprog-wrap{ overflow-x:auto; }
+.cuar-yaprog-tbl{ width:100%; border-collapse:collapse; font-size:11.5px; color:#7f1d1d; }
+.cuar-yaprog-tbl th{ text-align:left; font-size:10px; letter-spacing:.4px; text-transform:uppercase;
+  color:#991b1b; border-bottom:1px solid #fecaca; padding:3px 6px; white-space:nowrap; }
+.cuar-yaprog-tbl td{ border-top:1px solid #fee2e2; padding:4px 6px; vertical-align:middle; }
+.cuar-yaprog-tbl tr.cuar-yp-ok{ background:#f2fdf5; }
+.cuar-yaprog-tbl .cuar-badges{ margin-top:0; gap:4px; }
+.cuar-yaprog-tbl .cuar-badge{ font-size:9.5px; padding:1px 7px; }
+.cuar-yp-cli{ overflow-wrap:anywhere; }
+.cuar-yp-sin{ color:#c49a9a; }
+.cuar-yp-ok-tag{ color:#166534; font-weight:800; white-space:nowrap; }
+.cuar-yp-por{ display:block; font-size:10px; color:#4b7a5a; max-width:160px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.cuar-yp-lib{ width:auto; margin:0; background:transparent; border:1px solid #f1c9c9; border-radius:7px;
+  padding:2px 8px; cursor:pointer; font-size:14px; line-height:1.25; }
+.cuar-yp-lib:hover{ background:#fff1f1; }
+.cuar-yp-lib b{ font-size:10px; color:#991b1b; margin-left:3px; vertical-align:2px; }
+.cuar-yaprog-aprob-n{ background:#dcfce7; color:#166534; border-radius:999px; padding:0 8px; font-size:10.5px; margin-left:6px; }
+/* v17.15 — log de comentarios (modal) */
+.cuar-log{ display:flex; flex-direction:column; gap:8px; margin-bottom:10px; max-height:40vh; overflow:auto; }
+.cuar-log-it{ border-left:3px solid #cbd5e1; padding:1px 0 1px 9px; }
+.cuar-log-meta{ font-size:11px; color:#64748b; }
+.cuar-log-txt{ font-size:13px; color:#0f172a; white-space:pre-wrap; overflow-wrap:anywhere; }
+.cuar-log-vacio{ font-size:12.5px; color:#64748b; font-style:italic; margin-bottom:10px; }
+.cuar-com-ta{ width:100%; min-height:72px; border:1px solid #cbd5e1; border-radius:8px; padding:7px 9px;
+  font-size:13px; font-family:inherit; resize:vertical; box-sizing:border-box; }
+.cuar-com-sub{ font-size:12.5px; color:#475569; margin:0 0 8px; line-height:1.45; }
 .apr-col-cuar .apr-col-t{ color:#9a3412; }
 .apr-cuar-help{ font-weight:800; color:#c2410c; cursor:help; margin-left:5px; }
 .apr-col-cuar .apr-vacio{ color:#b45309; }
@@ -4815,7 +4843,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=17.14"></script>
+<script type="module" src="recepcion.js?v=17.15"></script>
 <!-- Config del módulo de fichada (compartido con fichada.html). El secret
      hmacSecret tiene que ser el mismo acá y allá; cargándolo desde un solo
      archivo evitamos que se desincronicen. -->
@@ -7930,7 +7958,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v17.14";
+const APP_VERSION = "v17.15";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -38576,17 +38604,36 @@ async function cuarYaPago(empresa, orderId) {
 
 /* Liberar: mandar el pedido a "Pedidos a programar" (mantiene el badge). Se auto-programa si es
    zona automática; si no, queda en la lista de arriba y se puede agregar a tandas. */
+/* v17.15 (Luis): aprobar abre un cuadro de COMENTARIO antes de mandar el pedido. El comentario
+   es opcional, pero queda como una línea del log con quién lo aprobó y a qué hora. */
 async function cuarLiberar(empresa, orderId) {
   const key = String(empresa) + ":" + String(orderId);
   const p = (_apr.pedidosTodos || []).find(function (x) { return aprKey(x.empresa, x.order_id) === key; });
   if ((p && p._demo) || String(orderId) === "EJEMPLO") { _apr.cuarDemo = false; aprRender(); return; }
+  cuarComAbrir({ modo: "aprobar", empresa: empresa || "lk", clave: String(orderId),
+                 np: p ? aprPedLabel(p) : String(orderId),
+                 cli: (p && (p.razon_social || p.cod)) || "" });
+}
+async function cuarLiberarConfirmar() {
+  const s = _apr.cuarCom; if (!s) return;
+  const empresa = s.empresa, orderId = s.clave;
+  const ta = document.getElementById("cuarComTexto");
+  const txt = ((ta && ta.value) || "").trim();
+  const key = String(empresa) + ":" + String(orderId);
+  const p = (_apr.pedidosTodos || []).find(function (x) { return aprKey(x.empresa, x.order_id) === key; });
+  s.saving = true; s.err = ""; cuarComRender();
   try {
-    await aprRpc("gv_cuarentena_liberar", { p_empresa: empresa, p_order_id: String(orderId), p_motivos: (p && aprCuarentenaMotivos(p)) || null });
-    _apr.msg = "Pedido enviado a Pedidos a programar (mantiene el aviso)."; _apr.msgErr = false;
+    await aprRpc("gv_cuarentena_liberar", { p_empresa: empresa, p_order_id: String(orderId),
+      p_motivos: (p && aprCuarentenaMotivos(p)) || null, p_comentario: txt || null, p_por: await aprQuien() });
+    s.saving = false; cuarComCerrar(); cuarYaProgRecargar();
+    _apr.msg = "Pedido enviado a Pedidos a programar (mantiene el aviso)" + (txt ? ", con tu comentario." : "."); _apr.msgErr = false;
     if (p) { p._cuarLiberado = true; }   // pinta al toque; aprCargar lo confirma
     aprRender();
     aprCargar();
-  } catch (e) { _apr.msg = String((e && e.message) || e); _apr.msgErr = true; aprRender(); }
+  } catch (e) {
+    // el error se muestra DENTRO del cuadro: si se cerrara, se perdería lo que la persona escribió
+    s.saving = false; s.err = String((e && e.message) || e); cuarComRender();
+  }
 }
 
 /* v14.89 — Botón "A cobranzas": abre WhatsApp al teléfono FIJO de cobranzas (+5491165574113)
@@ -38645,29 +38692,150 @@ async function cuarYaProgCargar() {
   _apr.cuarYaProgLoading = false;
   if (_pppTab === "prog") aprRender();
 }
+/* v17.15 (Luis, 2026-09-14) — la lista es una TABLA: NP · tanda · entrega · cliente (con su
+   número) · motivos como badges · aprobación (quién y cuándo) · comentarios (el librito).
+   Los pedidos ya aprobados NO se esconden más: se ven en verde con su fecha de aprobación —
+   si se escondieran, la columna de aprobación estaría siempre vacía. */
+function cuarFechaHora(ts) {
+  // Siempre en hora de Buenos Aires: el `timestamptz` llega en UTC y un navegador con otro huso
+  // (o un headless, que corre en UTC) mostraría el comentario 3 horas después del que lo escribió.
+  if (!ts) return "";
+  const d = new Date(ts);
+  if (isNaN(d.getTime())) return String(ts);
+  const p2 = function (n) { return String(n).padStart(2, "0"); };
+  try {
+    // formatToParts y no format(): con día+mes solos, es-AR devuelve "14/9" aunque se le pida
+    // 2-digit, y la columna queda desalineada. Acá se arma a mano, siempre con dos dígitos.
+    const q = {};
+    new Intl.DateTimeFormat("es-AR", {
+      timeZone: "America/Argentina/Buenos_Aires", day: "2-digit", month: "2-digit",
+      hour: "2-digit", minute: "2-digit", hour12: false
+    }).formatToParts(d).forEach(function (x) { q[x.type] = x.value; });
+    if (q.day && q.month && q.hour != null && q.minute != null)
+      return p2(q.day) + "/" + p2(q.month) + " " + p2(q.hour === "24" ? "00" : q.hour) + ":" + p2(q.minute);
+  } catch (_e) {}
+  {
+    return p2(d.getDate()) + "/" + p2(d.getMonth() + 1) + " " + p2(d.getHours()) + ":" + p2(d.getMinutes());
+  }
+}
 function cuarYaProgHtml() {
   if (_apr.cuarYaProg === undefined && !_apr.cuarYaProgLoading) { cuarYaProgCargar(); return ""; }
   const l = _apr.cuarYaProg || [];
   if (!l.length) return "";
+  const aprob = l.filter(function (r) { return !!r.aprobado_at; }).length;
   let h = '<div class="cuar-yaprog"><div class="cuar-yaprog-t">⚠ Ya programados y el cliente está en cuarentena <b>(' + l.length + ')</b>'
-    + '<span class="apr-cuar-help" title="Estos pedidos YA tienen tanda: la cuarentena no los alcanzó porque el reporte de deuda entró después del armado. No se retiran solos — mirarlos con cobranzas y decidir.">ⓘ</span></div>';
-  for (const r of l) {
-    // v17.12 (Luis): los motivos se muestran con el nombre, no con la clave interna
-    // (`cliente_nuevo` se leía crudo), y la fila arranca con el NÚMERO DE CLIENTE.
-    const motivos = aprCuarentenaEtiqueta({ cuarentena_motivos: r.motivos || [] });
+    + (aprob ? '<span class="cuar-yaprog-aprob-n" title="Ya aprobados por alguien (se siguen mostrando, con su fecha)">' + aprob + ' aprobado' + (aprob === 1 ? "" : "s") + '</span>' : '')
+    + '<span class="apr-cuar-help" title="Estos pedidos YA tienen tanda: la cuarentena no los alcanzó porque el reporte de deuda entró después del armado. No se retiran solos — mirarlos con cobranzas y decidir. El 📖 abre el log de comentarios.">ⓘ</span></div>'
+    + '<div class="cuar-yaprog-wrap"><table class="cuar-yaprog-tbl"><thead><tr>'
+    + '<th>NP</th><th>Tanda</th><th>Entrega</th><th>Cliente</th><th>Motivos</th><th>Aprobación</th><th>Coment.</th>'
+    + '</tr></thead><tbody>';
+  l.forEach(function (r, i) {
     const cod = String(r.cod || "").trim();
-    h += '<div class="cuar-yaprog-row">'
-      + '<span class="cuar-yaprog-np">' + escapeHtml(String(r.np || "")) + '</span>'
-      + '<span class="cuar-yaprog-tanda">' + escapeHtml(String(r.tanda || "sin tanda")) + '</span>'
-      + '<span class="cuar-yaprog-fecha">' + escapeHtml(String(r.fecha_entrega || "")) + '</span>'
-      + (cod ? '<span class="cuar-yaprog-cod" title="Número de cliente en ' + (cuarEmpCod(r.empresa) === "CH" ? "Chef" : "Loekemeyer") + '">' + cuarEmpCod(r.empresa) + " " + escapeHtml(cod) + '</span>' : '')
-      + '<span class="cuar-yaprog-cli">' + escapeHtml(String(r.razon_social || r.cod || "")) + '</span>'
-      + '<span class="cuar-yaprog-motivo">' + escapeHtml(motivos) + (r.deuda ? " " + cuarPlata(r.deuda) : "") + '</span>'
-      + (r.picking_empezado ? '<span class="cuar-yaprog-pick" title="Ya hay eventos de operarios sobre esa tanda">pickeando</span>' : '')
-      + '</div>';
-  }
-  return h + '</div>';
+    const badges = aprCuarBadgesHtml({
+      cuarentena_motivos: r.motivos || [],
+      cuarentena_detalle: { deuda: r.deuda, estado: r.estado, nuevo_pedidos: r.nuevo_pedidos }
+    });
+    const nCom = Number(r.comentarios || 0);
+    h += '<tr' + (r.aprobado_at ? ' class="cuar-yp-ok"' : '') + '>'
+      + '<td><span class="cuar-yaprog-np">' + escapeHtml(String(r.np || "")) + '</span></td>'
+      + '<td><span class="cuar-yaprog-tanda">' + escapeHtml(String(r.tanda || "sin tanda")) + '</span>'
+        + (r.picking_empezado ? ' <span class="cuar-yaprog-pick" title="Ya hay eventos de operarios sobre esa tanda">pickeando</span>' : '') + '</td>'
+      + '<td><span class="cuar-yaprog-fecha">' + escapeHtml(String(r.fecha_entrega || "")) + '</span></td>'
+      + '<td class="cuar-yp-cli">'
+        + (cod ? '<span class="cuar-yaprog-cod" title="Número de cliente en ' + (cuarEmpCod(r.empresa) === "CH" ? "Chef" : "Loekemeyer") + '">' + cuarEmpCod(r.empresa) + " " + escapeHtml(cod) + '</span> ' : '')
+        + escapeHtml(String(r.razon_social || cod || "")) + '</td>'
+      + '<td>' + (badges || '<span class="cuar-yp-sin">—</span>') + '</td>'
+      + '<td>' + (r.aprobado_at
+          ? '<span class="cuar-yp-ok-tag" title="Aprobado (enviado a Pedidos a programar) el ' + escapeHtml(String(r.aprobado_at)) + '">✅ ' + escapeHtml(cuarFechaHora(r.aprobado_at)) + '</span>'
+            + (r.aprobado_por ? '<span class="cuar-yp-por" title="' + escapeHtml(String(r.aprobado_por)) + '">' + escapeHtml(String(r.aprobado_por)) + '</span>' : '')
+          : '<span class="cuar-yp-sin">sin aprobar</span>') + '</td>'
+      + '<td><button class="cuar-yp-lib" onclick="cuarComAbrirIdx(' + i + ')" title="' + (nCom ? nCom + ' comentario' + (nCom === 1 ? "" : "s") : "Sin comentarios") + ' — abrir el log">📖' + (nCom ? '<b>' + nCom + '</b>' : '') + '</button></td>'
+      + '</tr>';
+  });
+  return h + '</tbody></table></div></div>';
 }
+
+/* ── v17.15 — LOG DE COMENTARIOS (pedido de Luis) ───────────────────────────────────────────
+   Dos puertas a lo mismo: el 📖 de la tabla (modo "log") y el cuadro que salta al APROBAR un
+   pedido de Cuarentena (modo "aprobar"). Todo va a GV_Cuarentena_Comentarios con fecha, hora y
+   autor; la clave es (empresa, order_id) — y para una NP de ISIS, que no tiene order_id, la NP:
+   exactamente la misma clave que usa GV_Cuarentena_Liberados. */
+function cuarComEl() {
+  let el = document.getElementById("cuarComModal");
+  if (!el) { el = document.createElement("div"); el.id = "cuarComModal"; el.className = "cuar-modal"; el.hidden = true; document.body.appendChild(el); }
+  return el;
+}
+function cuarComCerrar() { const el = document.getElementById("cuarComModal"); if (el) el.hidden = true; _apr.cuarCom = null; }
+function cuarComAbrirIdx(i) {
+  const r = (_apr.cuarYaProg || [])[i];
+  if (!r) return;
+  cuarComAbrir({ modo: "log", empresa: r.empresa || "lk", clave: String(r.clave || r.order_id || r.np || ""),
+                 np: String(r.np || ""), cli: String(r.razon_social || r.cod || "") });
+}
+async function cuarComAbrir(o) {
+  _apr.cuarCom = Object.assign({ lista: [], cargando: true, err: "", saving: false, texto: "" }, o);
+  cuarComEl().hidden = false; cuarComRender();
+  try {
+    _apr.cuarCom.lista = (await aprRpc("gv_cuarentena_comentarios",
+      { p_empresa: _apr.cuarCom.empresa, p_order_id: _apr.cuarCom.clave })) || [];
+  } catch (e) { _apr.cuarCom.err = String((e && e.message) || e); }
+  if (_apr.cuarCom) { _apr.cuarCom.cargando = false; cuarComRender(); }
+}
+function cuarComRender() {
+  const s = _apr.cuarCom, el = document.getElementById("cuarComModal");
+  if (!s || !el) return;
+  const ta = document.getElementById("cuarComTexto");
+  if (ta) s.texto = ta.value;   // no perder lo tipeado al redibujar
+  const aprobar = s.modo === "aprobar";
+  let log = "";
+  if (s.cargando) log = '<div class="cuar-m-load">Buscando comentarios…</div>';
+  else if (!s.lista.length) log = '<div class="cuar-log-vacio">Todavía no hay comentarios en este pedido.</div>';
+  else {
+    log = '<div class="cuar-log">' + s.lista.map(function (c) {
+      return '<div class="cuar-log-it"><div class="cuar-log-meta">' + escapeHtml(cuarFechaHora(c.creado_at)) +
+        (c.por ? ' · ' + escapeHtml(String(c.por)) : '') + '</div>' +
+        '<div class="cuar-log-txt">' + escapeHtml(String(c.texto || "")) + '</div></div>';
+    }).join("") + '</div>';
+  }
+  el.innerHTML =
+    '<div class="cuar-m-back" onclick="cuarComCerrar()"></div>' +
+    '<div class="cuar-m-card">' +
+      '<div class="cuar-m-head"><b>' + (aprobar ? '➡ Enviar a Pedidos a programar' : '📖 Comentarios') + '</b>' +
+        '<button class="cuar-m-x" onclick="cuarComCerrar()">✕</button></div>' +
+      '<div class="cuar-m-body">' +
+        '<p class="cuar-com-sub"><b>' + escapeHtml(String(s.np || "")) + '</b>' +
+          (s.cli ? ' · ' + escapeHtml(String(s.cli)) : '') +
+          (aprobar ? '<br>Dejá un comentario de por qué se aprueba (cobranzas lo autorizó, ya pagó, lo pidió el dueño…). Queda en el log con tu usuario, la fecha y la hora.'
+                   : '') + '</p>' +
+        log +
+        '<textarea id="cuarComTexto" class="cuar-com-ta" placeholder="' + (aprobar ? 'Comentario de la aprobación (opcional)' : 'Escribí un comentario…') + '">' + escapeHtml(String(s.texto || "")) + '</textarea>' +
+        (s.err ? '<div class="cuar-m-err">⚠ ' + escapeHtml(s.err) + '</div>' : '') +
+      '</div>' +
+      '<div class="cuar-m-foot">' +
+        (aprobar
+          ? '<button class="cuar-save" ' + (s.saving ? "disabled" : "") + ' onclick="cuarLiberarConfirmar()">' + (s.saving ? "Enviando…" : "✅ Aprobar y enviar") + '</button>'
+          : '<button class="cuar-save" ' + (s.saving ? "disabled" : "") + ' onclick="cuarComAgregar()">' + (s.saving ? "Guardando…" : "Agregar comentario") + '</button>') +
+      '</div>' +
+    '</div>';
+  const t2 = document.getElementById("cuarComTexto");
+  if (t2 && !s.saving) { t2.focus(); t2.selectionStart = t2.value.length; }
+}
+async function cuarComAgregar() {
+  const s = _apr.cuarCom; if (!s) return;
+  const ta = document.getElementById("cuarComTexto");
+  const txt = ((ta && ta.value) || "").trim();
+  if (!txt) { s.err = "Escribí algo antes de guardar."; cuarComRender(); return; }
+  s.saving = true; s.err = ""; cuarComRender();
+  try {
+    await aprRpc("gv_cuarentena_comentar", { p_empresa: s.empresa, p_order_id: s.clave,
+      p_texto: txt, p_np: s.np || null, p_por: await aprQuien() });
+    s.texto = ""; s.saving = false;
+    s.lista = (await aprRpc("gv_cuarentena_comentarios", { p_empresa: s.empresa, p_order_id: s.clave })) || [];
+    cuarComRender();
+    cuarYaProgRecargar();   // el contador del librito lo cuenta el backend
+  } catch (e) { s.saving = false; s.err = String((e && e.message) || e); cuarComRender(); }
+}
+function cuarYaProgRecargar() { _apr.cuarYaProg = undefined; _apr.cuarYaProgLoading = false; cuarYaProgCargar(); }
 function cuarTituloCase(s) { return String(s || "").toLowerCase().replace(/\b\w/g, function (c) { return c.toUpperCase(); }); }
 function cuarWppContactoMsg(p, c) {
   const np = aprPedLabel(p || {});
