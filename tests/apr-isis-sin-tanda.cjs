@@ -65,7 +65,8 @@ catch (_e) {
     out.n = (_apr.pedidos || []).length;
     out.isis = (_apr.pedidos || []).filter((x) => x._isis).map((x) => x.np);
     out.html = prev.innerHTML;
-    out.chipNp = [...prev.querySelectorAll(".apr-chip-ped")].map((e) => e.textContent.trim());
+    // v17.57: la NP dejó de ser un chip gris entre los de abajo y pasó a ser el título de la ficha
+    out.chipNp = [...prev.querySelectorAll(".apr-card-np")].map((e) => e.textContent.trim());
     out.chipIsis = [...prev.querySelectorAll(".apr-chip-sal")].map((e) => e.textContent.trim());
     // (b) la línea de por qué siguen acá
     out.porque = (prev.querySelector(".apr-porque") || {}).textContent || "";

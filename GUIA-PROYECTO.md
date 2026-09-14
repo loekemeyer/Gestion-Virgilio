@@ -1,3 +1,27 @@
+## Nota v17.57 (2026-09-14) — el contenido de la NP se ve con la flechita, en las dos columnas
+
+Pedido de Luis: *"necesito que aparezca el dato del contenido de las NP en algún lado visible en
+todo momento y estandarizar algunas cosas"*. Sólo front (A Programar); no cambia ningún dato.
+
+1. **Pedidos a programar — la ficha se lee como la de Cuarentena.** Arriba el **número bien
+   grande** (`web LK 1395` / `NP 98587` en marrón si es de ISIS, que no se renumera), el **m³**
+   al lado y la **flechita** a la derecha; abajo el **cliente con su número** (`LK 1000`, el
+   mismo chip de Cuarentena). El chip gris del pedido y el del m³ se fueron de la fila de abajo,
+   que queda para lo que cambia (espera, zona, día de salida, avisos).
+2. **El detalle dice qué pidieron.** Antes eran chips `505L ×2`, sin decir si ese 2 eran cajas o
+   unidades. Ahora es una tabla **Código / Cajas / Unidades** (con `×12` = cuántas unidades
+   entran en el bulto) y su total, más un resumen de líneas · cajas · unidades · m³, el cliente
+   con su código y la dirección de entrega. Los ítems salen de LK (`v_pedidos_web_np.items`,
+   `{art, cajas, uni, uxb}`). Si el pedido se parte en varias NP, va una tabla por bloque.
+   **Una NP de ISIS no trae ítems**: lo dice con todas las letras en vez de mostrar una tabla
+   vacía.
+3. **Cuarentena tiene la misma flechita.** La ficha retenida no se abría; ahora la fila de
+   arriba (número · m³ · ▸) abre el **mismo** bloque de detalle, debajo de los badges del motivo
+   y arriba de los botones. El pedido de EJEMPLO también trae contenido.
+
+Un solo renderizador para las dos columnas: `aprContenidoHtml()` / `aprItemsTablaHtml()`.
+Test: `tests/apr-contenido-np.cjs`.
+
 ## Nota v17.53 (2026-09-14) — se acabaron los pedidos duplicados en el Log de Cuarentena
 
 Luis pidió verificar que no queden duplicados y arreglar la causa. La v17.50 los fusionaba **al
