@@ -14459,3 +14459,60 @@ Las 5 viejas se dropearon **después** de verificar 0 triggers usándolas y 0 fu
 nombrándolas.
 
 **Definición, mapeo de los 13 y rollback:** `sql/fn_canon_cols_v1770.sql`.
+
+## §3.dr — v17.65: el guard anti-reintento no puede pisar las cargas en ráfaga del panel — 2026-09-14
+
+Tomás González preguntó si el arreglo del checkout **rompe alguna otra cosa**. Al revisarlo apareció
+un riesgo que había introducido el guard de la §3.dp, y se acotó.
+
+### El riesgo
+
+`submit_order_fast` no la llama sólo el carrito del cliente. En el front de LK la llaman **cinco**
+archivos:
+
+| Archivo | Qué carga | Modo |
+|---|---|---|
+| `script.js` | el carrito del cliente | de a uno |
+| `admin.js` | el cotizador del panel | de a uno |
+| `admin-supercot.js` | OC de supermercados (parseadas del PDF) | **en ráfaga** |
+| `admin-excel-krikos.js` | OC de Krikos | **en ráfaga** |
+| `vendor-import-excel.js` | pedidos de vendedores desde Excel | **en ráfaga** |
+
+El guard fusionaba cualquier par (mismo cliente, mismo total, misma cantidad de líneas, < 2 min).
+En una importación masiva **dos pedidos iguales seguidos son dos pedidos de verdad**, no un
+reintento: fusionarlos **perdería una OC**. Ninguna función de la base llama a la RPC (medido con
+`pg_proc.prosrc`), así que el riesgo era entero del front.
+
+### La medición, sobre los 9 meses de historia
+
+Todos los pares que el guard habría fusionado:
+
+| Origen | Pares | Qué son |
+|---|---:|---|
+| Sesión de **cliente** | 71 | **Todos reintentos** — las ráfagas del bug (3790, 2398, 3994, 3969, 4210, 4078, 1725) más dos viejos (2507 el 01/07, 3929 el 11/03) |
+| Sesión de **admin** | 15 | **Todos del cliente 1 (Loekemeyer SRL)**, marzo y mayo, por $11.460 a $33.120: pruebas internas |
+
+Cero casos de dos pedidos legítimos distintos de un cliente real. Pero los 15 del panel muestran que
+**desde el admin sí se dan de alta pedidos idénticos seguidos a propósito**.
+
+### La corrección
+
+El guard corre **sólo si quien carga NO es admin**. El carrito queda protegido; el cotizador y las
+tres importaciones quedan exentos.
+
+**Probado con rollback, los dos caminos en la misma transacción:**
+
+```
+CLIENTE: 1433 y 1433 → FUSIONADO (correcto)
+ADMIN:   1434 y 1435 → DOS PEDIDOS (correcto)
+```
+
+Nada quedó escrito: el `max(id)` de `orders` sigue en 1432.
+
+### Chef (`paginach`) no tiene el bug
+
+Verificado sobre el repo: **no usa `retiroSel` en ningún lado** y su checkout es otro código (no
+tiene `_submitSingleOrder`). Además su `update` de `sheets_payload` **ya lleva manejador de error**
+(`.then(ok, err => console.warn(...))`), así que un fallo ahí no le tumba la confirmación. Y sus
+pedidos entran a Gestión con normalidad — la última NP web de Chef es del 14/09 11:00. **No hay
+nada que cambiar ni que subir en Chef.**
