@@ -13920,3 +13920,49 @@ drop view public.gv_ppp_detalle_dia;
 ```
 y sacar del `index.html` `PPP_OP_DET_*` / `pppOpDia` / `pppOpDetRender` / `pppOpVolver` y el
 `onclick` de la fila del día.
+
+### §3.fh — v17.55: las dos mitades de `gv_lugar_item_guardar` / `_sacar`, alineadas a UNA regla
+
+Cierra la mitad pendiente del problema *"gv_lugar_item_guardar borra el espejo con una regla laxa y
+escribe con una estricta"* (la otra mitad, el candado en `GV_Lugar_Item`, fue la v17.51).
+
+**Qué estaba mal.** Las dos mitades de la misma función usaban canonizadoras distintas: escribía con
+`on conflict (sector, cod)` sobre el **texto crudo** (estricto) y borraba con
+`gv_cod_stock(cod) = gv_cod_stock(v_cod)` (**laxo** — `gv_cod_stock` además de pelar ceros pela el
+sufijo de empresa, la variante `L` y trunca en el punto medio). La asimetría cortaba para los dos
+lados: borrar sí encontraba una grafía vieja pero escribir no la pisaba → **segunda fila** en
+`Capacidad_Sector` (la divergencia del problema 84, mismo mecanismo que duplicó el picking de
+`D72C`); y al revés, el delete laxo podía llevarse la capacidad de **otro** artículo que colapsara
+en la misma clave (`437E` vs `437E CH`, o dos flejes que sólo se distinguen tras el punto medio).
+
+En `gv_lugar_item_sacar` era **peor**: ahí el delete laxo borra de `GV_Lugar_Item`, el mapa vivo que
+lee el picking.
+
+**A cuál se alineó.** A la **estricta** (`cod = v_cod`), la misma del `on conflict`. Se puede porque
+desde la v17.51 las dos tablas están canonizadas por trigger, así que el código canónico **es** la
+identidad de la fila: ya no pueden entrar grafías viejas que haga falta buscar con una regla laxa.
+
+**Medición antes:** fila por fila sobre las **1.522 filas** de las dos tablas — `Capacidad_Sector`
+732 y `GV_Lugar_Item` 790 — **0 difieren**, 0 que la estricta no encuentre, 0 que la laxa agarre de
+más. Más 0 pares de códigos que colapsen bajo `gv_cod_stock` en un mismo sector y 0 grafías no
+canónicas.
+
+**Verificación después** (ROLLBACK, sector A80): guardar `'66'` cap=5 → mapa `066`, cap `066=5`;
+re-guardar `'  066 '` cap=9 → **una sola fila**, cap `066=9` (ese paso es el que antes fabricaba la
+segunda fila); sacar `'66'` → borró mapa=1 cap=1, las dos vacías. Y ninguna usa ya `gv_cod_stock`
+**en código real** — aparece sólo en los comentarios, medido con
+`regexp_replace(prosrc,'--[^\n]*','','g')`, porque medir sobre el texto crudo da un falso positivo
+(error ya cometido antes en esta misma sesión).
+
+⚠ **Hallazgo al costado, NO tocado: 54 filas `cod = 'LIBRE'`.** `Capacidad_Sector` tiene 54 filas con
+ese pseudo-código (53 con `cajas_max` NULL) y `GV_Lugar_Item` tiene 0. El handoff de planimetría ya
+avisa que *"`LIBRE` no es código"*, y además contradicen su regla 2 ("sin número no hay fila de
+capacidad"). No se tocaron: son datos, y el protocolo dice no modificarlos sin permiso explícito.
+**Ojo al medir**: con `cajas_max` NULL, un `string_agg(cod || '=' || cajas_max::text)` las
+**esconde** (el `||` con NULL da NULL) — eso hizo que una prueba pareciera dejar una fila huérfana
+cuando la fila era preexistente y ajena.
+
+Salud al cerrar: `Z. ALARMA` 0 · `gv_endpoints_rotos` 0 · `gv_stock_particion_sospechosa` 0 ·
+`GV_Lugar_Item` 790 · `Capacidad_Sector` 732 · 0 transacciones abiertas.
+
+**Definición y rollback:** `sql/gv_lugar_item_rpc_alineadas_v1755.sql`.
