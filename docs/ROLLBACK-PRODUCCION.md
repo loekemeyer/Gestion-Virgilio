@@ -1093,3 +1093,31 @@ select cron.alter_job(68, command := (select command from
 
 Notas: `sql/gv_stock_procesada_dup_v1633.sql`, `sql/gv_fix_entregados_y_deadlock_v1633.sql`,
 `docs/HALLAZGOS-LOGS-20260912.md`.
+
+## 2026-09-14 (v17.47) — la tanda D67B se renombró a E01E en `Registros_Produccion_Virgilio`
+
+**Qué se tocó (tabla COMPARTIDA):** `update public."Registros_Produccion_Virgilio" set texto = 'E01E'
+where upper(btrim(texto)) = 'D67B'` — **5 filas** (AP, EP, PUB, TAP y TP de esa tanda). Misma operación
+en `Entregas_Virgilio` (17 filas), que no es compartida.
+
+**Por qué:** Marianela pidió pasar D67B, D67N y E01A al camión 1 del 15/09. El camión agrupa por el
+número de la tanda, así que había que meter D67B en la serie E01; y como el estado de armado se
+resuelve por código de tanda, dejar los registros en D67B habría mostrado como "Sin empezar" una
+tanda que estaba armada desde el 11/09.
+
+**Impacto en Producción Virgilio:** ninguno medible — la app de Producción ya no se usa (dueño,
+2026-09-08). Si se la volviera a abrir, la tanda D67B ya no existe con ese nombre: sus eventos
+aparecen bajo E01E, con las mismas fechas y legajos.
+
+**Rollback exacto** (backup completo en `zz_backups."GV_Backup_D67B_Registros_20260914"`, 5 filas, y
+`zz_backups."GV_Backup_D67B_Entregas_20260914"`, 17 filas):
+
+```sql
+update public."Registros_Produccion_Virgilio" set texto = 'D67B' where upper(btrim(texto)) = 'E01E';
+update public."Entregas_Virgilio"             set tanda = 'D67B' where upper(btrim(tanda)) = 'E01E';
+update public."GV_PPP_Prog_Override" o set tanda = b.tanda, tanda_previa = b.tanda_previa, nota = b.nota
+  from zz_backups."GV_Backup_ProgOverride_20260914b" b
+ where o.np = b.np and o.np in ('44607','44608','98694');
+```
+
+Nota: `sql/gv_camion1_1509_v1747.sql`.

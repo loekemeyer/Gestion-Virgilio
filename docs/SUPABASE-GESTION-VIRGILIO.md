@@ -13475,3 +13475,31 @@ y el contenido se reacomodó para que lo que se gana no sea sólo margen:
 Sólo CSS y armado de HTML: no cambia ninguna consulta ni ningún dato. **Rollback:** volver
 `.cuar-cfg` a `max-width:820px`, `.cuar-log-cfg` a `1240px`, y el `cuarConfigHtml` de la v17.43
 (nota debajo de los importadores, `cuar-tools` en 2 columnas).
+
+### §3.fe — v17.47: D67B y D67N pasan al camión 1 del 15/09, con el armado a cuestas — 2026-09-14
+
+Marianela: *"quiero que la tanda D67N, D67B y E01A pasen al camión número 1"*, *"del día 15/09"*.
+
+**Por qué hay que renumerar.** El camión agrupa por el **número** de la tanda (`_pppCamiones`, key
+`n<tn>`) y los camiones se numeran 1, 2, 3 según el orden de la pantalla (v13.13, *"Camión 46 con el
+nº de la tanda no se entendía"*). El 15/09 el camión 1 era **E01A**, así que las otras dos tenían que
+entrar a la serie E01: **D67B → E01E** y **D67N → E01J**.
+
+⚠ **D67B ya estaba armada** (TAP del 11/09 11:26, 17 líneas en `Entregas_Virgilio`). El estado de
+armado se resuelve **por código de tanda** (`_pppEstadoPed` mira `_pppArmadoDone.has(t)`), así que
+cambiarle el código sólo en la programación la habría mostrado **"Sin empezar"** el día que sale. Se
+le dieron las dos opciones a Marianela y eligió mover las tres llevando el armado: se repuntaron
+también `Registros_Produccion_Virgilio` (5 filas) y `Entregas_Virgilio` (17). La primera es **tabla
+compartida con Producción**, así que el cambio está anotado en `docs/ROLLBACK-PRODUCCION.md`.
+
+**Cómo queda el 15/09:**
+
+| camión | tandas | zona | m³ |
+|--:|---|---|--:|
+| 1 | E01A · E01E · E01J | Zona 1 — Barracas, Villa Soldati, La Boca | 1,266 |
+| 2 | D56D | Zona 1 — Soldati | 0,132 |
+| 3 | D67E · D67F · D67G · D67J · D67L · D67M | Zona 2 | 2,505 |
+
+**Verificado:** el TAP del 11/09 y las 17 líneas de entregas figuran bajo `E01E`, y no quedó ninguna
+fila con `D67B`. Centinelas después: `gv_ppp_super_mezclado` 0, `gv_endpoints_rotos` 0,
+`gv_np_prog_sin_base` 0. SQL, medición y rollback: `sql/gv_camion1_1509_v1747.sql`.
