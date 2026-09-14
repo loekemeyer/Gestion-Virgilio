@@ -14805,3 +14805,81 @@ algún día se arma el FDW, el merge se puede mudar al backend.
 - En LK, `gv_pedidos_web_retiro` = 0 filas (el front que las graba no está deployado).
 
 SQL y rollback: `sql/gv_pedido_horario_v1774.sql`. Test: `tests/apr-badge-horario.cjs`.
+
+## §3.fp — v17.75: la Cuarentena de un pedido que se factura por Chef mira el padrón de CHEF — 2026-09-14
+
+**Pedido del dueño (Thomas, 14/09), textual:** *"Hay clientes que compran productos de LK pero se les
+factura como clientes de CH. Esos clientes son cualquier cliente de Tierra del Fuego + Cencosud. Esos
+clientes cargan sus pedidos desde la página de LK y se cargan con códigos que terminan con L … La
+idea es que esos pedidos se pasen como pedidos de CH y se facturen como CH (también, **se marcan y se
+evalúan para cuarentena con código de cliente CH**)."*
+
+La parte de la factura ya estaba (§3.dq, v13.77 y v17.44): `v_pedidos_web` de LK devuelve
+`isis_empresa='chef'` + `cod_isis`, los artículos salen con la L y el Excel enruta la fila al archivo
+de Chef. Lo que faltaba era el paréntesis: **la Cuarentena seguía mirando el padrón de LK.**
+
+### Por qué eso frena pedidos sanos
+
+El padrón de LK dice lo que tiene que decir para un cliente al que NO se le vende por LK. Medido el
+14/09 sobre `GV_Cuarentena_Fuente`, los 9 clientes de TdF que van por Chef:
+
+| | en LK | en Chef |
+|---|---|---|
+| límite de crédito | **0 los nueve** | de $1,2 M a $16 M |
+| estado | 4 "Suspendido" | los nueve "Activo" |
+| deuda positiva | ninguna | ninguna (3 con saldo a favor) |
+
+O sea que evaluar por LK **retiene sin motivo real** y, encima, **nunca mide el crédito**: con límite 0
+el cliente ni entra al CTE `lim` de `gv_cuarentena_limite`, que exige límite > 0.
+
+Caso testigo: **LK 1431** (Il Cheff, LK 2293 / Chef 2465, 25 líneas en 2 bloques, entrega Deloqui 67,
+Tierra del Fuego) quedó retenido por `suspendido`, no se programó y le abrió tarea a Viviana.
+Problema **192** de `github_repo_problemas`.
+
+### El arreglo: una tabla de mapeo y UNA función, todo en el backend
+
+`GV_Cliente_Isis` `(empresa, cod)` → `(isis_empresa, cod_isis)`, que **LK empuja por el FDW** con
+`sync_cliente_isis_virgilio()` (cron `sync-cliente-isis-virgilio`, jobid 47 de LK, `7-59/15`) — el
+mismo patrón que `GV_Clientes_Nuevos` y `lk_pedidos_match`: Virgilio lee una tabla local, cero FDW en
+el camino caliente. Y `gv_cuarentena_ident(empresa, cod, es_web)`, que devuelve el par con el que hay
+que mirar el padrón (el mismo que entró si no hay mapeo).
+
+**Por qué una tabla y no el payload:** los tres caminos que evalúan cuarentena son el armado
+automático (Edge Function), "A Programar" (front) y el aviso de lo ya programado
+(`gv_cuarentena_ya_programado`, que lee `PPP_Web_Programacion` y **no tiene payload**). Con la tabla la
+regla queda en un solo lugar y la ven los tres. **Por eso esta versión no toca ni `index.html` ni la
+Edge Function**: es backend puro, como pide el protocolo.
+
+**Qué se mapea:** cliente de LK con **todas** sus direcciones de entrega en Tierra del Fuego, o con
+`gv_isis_override` mandándolo a Chef, y con CUIT presente en `chef_padron`. **9 clientes** al 14/09.
+La Anónima (771) queda afuera por las dos vías (override `lk`, y 10 de sus 11 sucursales fuera de TdF).
+
+**Qué NO se remapea:** una NP tipeada en ISIS. Lleva el código de ESE ISIS y se factura por esa
+empresa. Por eso el tercer argumento `p_es_web`: en `ya_programado` se pasa `origen='web'`; en
+`marcar_calc` / `limite`, que el `order_id` no empiece con `np` (así disfraza el front a una NP de ISIS
+sin tanda). Sin ese corte, las NP 98480/98481 de ISIS LK del cliente 1941 se habrían evaluado contra
+el padrón de Chef.
+
+### Medición después
+
+- `gv_cuarentena_marcar_calc` sobre LK 1431: de 1 motivo (`suspendido`) a **0**.
+- El armado intradía de las **15:45** lo programó solo: **LK 0083 / LK 0084, tanda D69F, entrega 21/09**.
+- `gv_cuarentena_ya_programado`: las mismas **3** filas que antes, ninguna de los 9 clientes mapeados.
+- Ningún cliente **gana** un motivo por el remapeo (cuadro de arriba).
+- `gv_cuarentena_ident('lk','2293')` → `2465`; con `es_web=false` → `2293`.
+
+⚠ **Límite conocido:** el mapeo es por CLIENTE y la regla real es por PEDIDO (la provincia de la
+sucursal de entrega). Hoy coinciden porque el único cliente con sucursales mixtas es La Anónima, que
+va por LK. Si un cliente de TdF suma una sucursal en el continente, deja de cumplir "todas TdF" y
+vuelve a evaluarse por LK: se degrada al comportamiento viejo, no inventa nada.
+
+### Cencosud: falta un paso que es del dueño
+
+**Hoy NO puede entrar por esta regla porque no existe como cliente en el padrón de LK** (verificado el
+14/09: 0 filas en `customers` con el CUIT 30590360763; en Chef es el 2444). Sus OC entran por PDF
+Krikos. Para que aplique hacen falta dos cosas en LK: **darlo de alta en `customers` con ese CUIT**, y
+—como sus sucursales no son de TdF— **agregar `('30590360763','chef')` a `gv_isis_override`**. Con eso
+la vista le pone la L y el cod de Chef, y el mapeo lo toma solo en la corrida siguiente.
+
+SQL, medición y rollback: `sql/gv_cliente_isis_v1775.sql`; definición previa de las tres funciones en
+`sql/backups/gv_cuarentena_pre_v1775_20260914.sql`.
