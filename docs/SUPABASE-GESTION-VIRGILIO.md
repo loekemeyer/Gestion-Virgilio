@@ -11059,6 +11059,22 @@ tablas con su propia copia del UxB del 824, todas todavía en 36 — `OC_Maximos
 No son fuente de UxB para Gestión (desde la v16.38 eso es sólo `GV_UxB`), pero son las que mira la compra.
 Quedan pendientes de decisión.
 
+**Tercera pasada, v17.00 (mismo día)** — Marianela: *"donde esté el art 824 debe figurar por 12 uni"*.
+Se barrió **toda la base** por `information_schema` buscando columnas de unidades por caja/bulto
+(`uxb`, `uxc`, `uni_x_caja`, `*x_caja`, `*x_bulto`, `*por_bulto`) y se filtró el 824 con `gv_cod_stock()`.
+Aparecieron **tres tablas más en 36** — `OC_Maximos`, `Importados` y el maestro
+(`Articulos Virgilio X Tallerista`) — y una cuarta, `Despiece x Articulo`, que lo tenía en **NULL**.
+Las cuatro pasaron a 12 (backups en `zz_backups."GV_Backup_824_*_20260914"`, uno por tabla).
+
+**Las 11 lecturas del 824 dan 12** y `gv_uxb_desalineado` volvió de 7 filas a 4, ninguna del 824
+(las 4 son los `63xE`, de antes).
+
+✔ **La confirmación independiente**: `Ordenes_Compra` ya tenía `oc_uni_caja = 12` para el 824. La OC que
+se le mandó al proveedor estaba bien; la que estaba mal era la ficha. No se tocó.
+
+⚠ Sin revisar: `OC_Maximos.max_cajas`. El máximo está en **cajas**, así que el número no cambia, pero las
+**unidades** que muestra la pantalla de compra ahora dan un tercio de lo que daban.
+
 ---
 
 ### §3.eb — Stock negativo en `a_facturar`: el reconciliador no veía los ajustes manuales y drenaba dos veces (v16.92, 2026-09-14)

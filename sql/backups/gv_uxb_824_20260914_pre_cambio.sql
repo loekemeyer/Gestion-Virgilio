@@ -63,3 +63,35 @@ update public."Articulos_Cajas" set "Uni_x_Caja" = 12 where "Cod_Art" = '824';
 --
 -- ⚠ PENDIENTE, sin tocar: gv_uxb_desalineado pasó de 4 filas a 7 — OC_Maximos, Importados y maestro
 --    siguen con 36 para el 824. No son fuente de UxB para Gestión, pero son las que mira la compra.
+
+-- ─────────────────────────────────────────────────────────────────────────────────────────
+-- TERCERA PASADA — v17.00, mismo día. Marianela: "donde esté el art 824 debe figurar por 12 uni".
+-- Barrido de TODA la base buscando columnas de unidades por caja/bulto (information_schema:
+-- uxb | uxc | uni_x_caja | *x_caja | *x_bulto | *por_bulto) y filtrando el 824 por gv_cod_stock().
+-- Backups: zz_backups."GV_Backup_824_{OCMaximos,Importados,Maestro,Despiece}_20260914" (1 fila c/u).
+update public."OC_Maximos" set uni_x_caja = 12 where public.gv_cod_stock(cod) = public.gv_cod_stock('824');
+update public."Importados"  set uni_x_caja = 12 where public.gv_cod_stock(cod_art) = public.gv_cod_stock('824');
+update public."Articulos Virgilio X Tallerista" set "Uni_x_Caja" = 12
+ where public.gv_cod_stock("Cod_Art"::text) = public.gv_cod_stock('824');
+update public."Despiece x Articulo" set "Uni_x_Caja" = 12, "Uni x Cja" = '12'
+ where id = '4e1db1cf-fb67-4b8e-8052-bd8265dffe89';   -- estaba en NULL, no en 36
+--
+-- Después: las 11 lecturas del 824 dan 12 (GV_UxB CH y LK, gv_uxb_emp chef y lk,
+-- vista_uxb_articulo, Articulos_Cajas, OC_Maximos, Importados, maestro, Despiece, Ordenes_Compra).
+-- gv_uxb_desalineado volvió de 7 filas a 4, y ninguna es del 824 (las 4 son los 63xE, de antes).
+--
+-- ⚠ NO se tocó Ordenes_Compra: su única fila del 824 YA decía 12.0 — o sea que la OC que se
+--    mandó al proveedor estaba bien y la que estaba mal era la ficha. Es la confirmación
+--    independiente de que 12 es el número.
+-- ⚠ Queda sin revisar OC_Maximos.max_cajas: el máximo está en CAJAS, así que el número no cambia,
+--    pero las UNIDADES que muestra la pantalla de compra ahora dan un tercio.
+--
+-- Rollback de esta tercera pasada (cada backup tiene su fila original):
+-- update public."OC_Maximos" o set uni_x_caja = b.uni_x_caja
+--   from zz_backups."GV_Backup_824_OCMaximos_20260914" b where o.cod = b.cod;
+-- update public."Importados" i set uni_x_caja = b.uni_x_caja
+--   from zz_backups."GV_Backup_824_Importados_20260914" b where i.cod_art = b.cod_art;
+-- update public."Articulos Virgilio X Tallerista" t set "Uni_x_Caja" = b."Uni_x_Caja"
+--   from zz_backups."GV_Backup_824_Maestro_20260914" b where t."Cod_Art" = b."Cod_Art";
+-- update public."Despiece x Articulo" d set "Uni_x_Caja" = b."Uni_x_Caja", "Uni x Cja" = b."Uni x Cja"
+--   from zz_backups."GV_Backup_824_Despiece_20260914" b where d.id = b.id;
