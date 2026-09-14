@@ -14913,19 +14913,25 @@ la llama el front por RPC.
 
 ### Front — el orden de las columnas cambió
 
-Ahora es: **`Facturado · Armado · En proceso · Pendientes` | Día | m³ | Tandas | NPs**.
+Ahora es: **Día | m³ | Tandas | NPs | `Facturado · Armado · En proceso · Pendientes`**.
 
-- Los 4 estados van **primeros y angostos**, con el encabezado partido en dos renglones
-  (`Factu/rado`, `Ar/mado`, `En/proceso`, `Pen/dientes`) y **una línea del color de cada uno arriba**
-  (verde / azul / ámbar / gris), que es el mismo color con el que se pinta el número.
-- El truco para que se encojan: **todas** las columnas a `width:1%` y la 5ª a `width:100%` — así el
-  ancho sobrante se lo lleva entero la columna de la info. Con `width:auto` el navegador lo repartía
+- Los 4 estados van **al final, a la derecha del todo, y angostos**, con el encabezado partido en dos renglones
+  (`Factu/rado`, `Ar/mado`, `En/proceso`, `Pen/dientes`) y **una línea del color de cada uno arriba**,
+  que es el mismo color con el que se pinta el número.
+- **Los colores los eligió Luis (v17.79): Facturado AZUL · Armado VERDE · En proceso AMARILLO ·
+  Pendiente ROJO.** Antes eran verde / azul / ámbar / gris y se dieron vuelta los dos primeros.
+  El color vive en cuatro lugares y los cuatro tienen que ir juntos: el encabezado (`.pga-h.fac|arm|pro|pen`),
+  el número (`.pga-pct.fac|arm|pro|pen`), la fila de la tanda (`.pga-t.e-facturado|…`) y la pastilla
+  de la fila de la NP (`.pga-pill.e-facturado|…`). De paso el chip del código de cliente (`.pga-cod`)
+  pasó de azul a gris: con el azul nuevo de "facturado" al lado se leía como un estado.
+- El truco para que se encojan: **todas** las columnas a `width:1%` y la 1ª a `width:100%` — así el
+  ancho sobrante se lo lleva entera la columna de la info. Con `width:auto` el navegador lo repartía
   y los 4 estados se comían media tabla.
 
-⚠ **La columna que manda ahora es la 5ª, no la 1ª.** Todas las reglas CSS que decían
-`:first-child` (indentación de tanda y NP, el color del día, el chip HOY, el borde de estado de la
-tanda, la columna fija en el celular) pasaron a `:nth-child(5)`. Si se agrega o saca una columna
-antes, hay que mover ese número.
+⚠ La v17.76 los puso a la **izquierda** y hubo que moverlos: Luis los quería a la derecha
+(v17.79). En el medio las reglas CSS de la columna ancha pasaron a `:nth-child(5)` y volvieron a
+`:first-child`. Si algún día se reordenan otra vez, son éstas: indentación de tanda y NP, color del
+día, chip HOY, borde de estado de la tanda, `width:100%` y la columna fija del celular.
 
 La fila de la NP quedó:
 
@@ -14941,7 +14947,7 @@ En el árbol (−180 / +120 días): 2.239 NP · 762,36 m³ · **212 con barrio**
 pedido** · 186 con badge de horario. Los pedidos de `Facturacion_NP` / histórico quedan sin barrio
 ni fecha de pedido, que es lo esperado: esas tablas no los guardan.
 
-Test: `tests/ppp-tabla-arbol.cjs` (30 chequeos).
+Test: `tests/ppp-tabla-arbol.cjs` (32 chequeos — dos miran la paleta).
 
 ### §3.fo
 

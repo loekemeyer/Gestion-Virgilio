@@ -6,14 +6,20 @@ Pedido de Luis sobre la tabla de Programación:
   según de qué empresa sea el pedido), el **barrio al lado de la zona** (`Zona 2 - CABA Centro ·
   Villa Crespo`) y la **fecha en que entró el pedido** (`ped. 11/09`). El barrio sale del campo
   `barrio` a secas — no de `localidad`, que cae a la dirección cuando no hay barrio.
-- **Las 4 columnas de estado** (Facturado · Armado · En proceso · Pendientes) se fueron **al
-  principio de la tabla**, lo más angostas posible, con el encabezado partido en dos renglones y
-  **una línea del color de cada una arriba**. Todo el ancho que sobra es para la info de la NP, que
-  ahora entra en un solo renglón.
+- **Las 4 columnas de estado** (Facturado · Armado · En proceso · Pendientes) quedaron **a la
+  derecha del todo**, lo más angostas posible, con el encabezado partido en dos renglones y **una
+  línea del color de cada una arriba**. Todo el ancho que sobra es para la info de la NP, que ahora
+  entra en un solo renglón. (La v17.76 las había puesto a la izquierda; Luis las quería a la
+  derecha — corregido en la v17.79.)
 
-⚠ Para el que toque el CSS: **la columna que manda pasó a ser la 5ª**, no la 1ª. Las reglas que
-decían `:first-child` (indentación, color del día, chip HOY, borde de la tanda, columna fija en el
-celular) ahora son `:nth-child(5)`.
+- **Los colores de los 4 estados los eligió Luis (v17.79): Facturado AZUL · Armado VERDE · En
+  proceso AMARILLO · Pendiente ROJO.** Pintan el encabezado, el número, la fila de la tanda y la
+  pastilla de la NP — los cuatro se cambian juntos. El chip del código de cliente pasó a gris para
+  no confundirse con el azul de "facturado".
+
+El truco para que se encojan: **todas** las columnas a `width:1%` y la 1ª a `width:100%`, así el
+ancho sobrante se lo lleva entero la columna del día / la tanda / la NP. Con `auto` el navegador lo
+reparte parejo y los estados se comen media tabla.
 
 §3.fp de `docs/SUPABASE-GESTION-VIRGILIO.md` · `sql/gv_ppp_prog_arbol_v1766.sql`.
 

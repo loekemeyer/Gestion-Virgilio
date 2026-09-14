@@ -71,21 +71,40 @@ catch (_e) {
 
     // (1) la tabla es lo que se ve por defecto, con las 8 columnas
     out.esDefault = /class="pga"/.test(html) && !/pn-days/.test(html);
-    // v17.76: los 4 estados van PRIMERO, angostos, con el encabezado partido en dos y con color
+    // v17.79: los 4 estados van a la DERECHA, angostos, con el encabezado partido en dos y con color
     out.cols = ["Día", "m³", "Tandas", "NPs"].every((c) => new RegExp(">" + c + "<").test(html)) &&
       /pga-h fac[^>]*>Factu<br>rado</.test(html) && /pga-h arm[^>]*>Ar<br>mado</.test(html) &&
       /pga-h pro[^>]*>En<br>proceso</.test(html) && /pga-h pen[^>]*>Pen<br>dientes</.test(html);
-    out.estadosPrimero = (function () {
+    out.estadosDerecha = (function () {
       const th = [...prev.querySelectorAll("table.pga thead th")].map((e) => e.className);
-      return /fac/.test(th[0]) && /arm/.test(th[1]) && /pro/.test(th[2]) && /pen/.test(th[3]) && !th[4];
+      return th.length === 8 && !th[0] && !th[1] && !th[2] && !th[3] &&
+             /fac/.test(th[4]) && /arm/.test(th[5]) && /pro/.test(th[6]) && /pen/.test(th[7]);
     })();
     out.salidas = /pppPlanTabla\(false\)/.test(html) && /pppPlanClasica\(true\)/.test(html);
+    // v17.79 (Luis): "Facturado azul, armado verde, en proceso amarillo, pendiente rojo"
+    out.paleta = (function () {
+      const fam = function (css) {
+        const m = /(\d+),\s*(\d+),\s*(\d+)/.exec(css) || [0, 0, 0, 0];
+        const r = +m[1], g = +m[2], b = +m[3];
+        if (b > r + 30 && b > g + 30) return "azul";
+        if (g > r + 30 && g > b + 30) return "verde";
+        if (r > b + 60 && g > b + 60) return "amarillo";
+        if (r > g + 40 && r > b + 40) return "rojo";
+        return "otro";
+      };
+      const th = [...prev.querySelectorAll("table.pga thead th")].slice(4);
+      // el martes es el único día con los 4 estados en juego (los que están en 0 % se pintan grises)
+      const d15 = [...prev.querySelectorAll("tr.pga-d")].find((tr) => /15\/09/.test(tr.textContent));
+      return {
+        head: th.map((e) => fam(getComputedStyle(e).borderTopColor)),
+        num: [...d15.querySelectorAll(".pga-pct")].map((e) => fam(getComputedStyle(e).color))
+      };
+    })();
 
     // (2) una fila por día, cerrada, con m³ / tandas / NPs
     const filaDe = (sel) => [...prev.querySelectorAll(sel)].map((tr) =>
       [...tr.children].map((td) => td.textContent.trim()));
-    // las 4 primeras celdas son los %, y la 5ª el día
-    out.dias = filaDe("tr.pga-d").map((c) => c.slice(4).concat(c.slice(0, 4)));
+    out.dias = filaDe("tr.pga-d");
     out.hoy = !!prev.querySelector("tr.pga-d.hoy");
     out.sinTandasCerrado = prev.querySelectorAll("tr.pga-t").length === 0;
 
@@ -97,7 +116,7 @@ catch (_e) {
     // (4) tocar el día lo expande en sus tandas, con color por estado
     pgaAbrirDia("20260915"); await new Promise((res) => setTimeout(res, 120));
     out.tandas = [...prev.querySelectorAll("tr.pga-t")].map((tr) =>
-      (/^[▸▾]?([A-Z]\d+[A-Z])/.exec(tr.children[4].textContent.trim()) || [])[1]);
+      (/^[▸▾]?([A-Z]\d+[A-Z])/.exec(tr.children[0].textContent.trim()) || [])[1]);
     out.tandaClases = [...prev.querySelectorAll("tr.pga-t")].map((tr) => tr.className);
     out.sinNpsCerrado = prev.querySelectorAll("tr.pga-n").length === 0;
 
@@ -126,7 +145,7 @@ catch (_e) {
     out.cacheItems = pedidos.length === antes;
 
     // (7) el total de abajo suma todos los días
-    out.total = (function () { const c = filaDe("table.pga > tfoot > tr")[0]; return c.slice(4).concat(c.slice(0, 4)); })();
+    out.total = filaDe("table.pga > tfoot > tr")[0];
 
     // (8) volver al tablero de 6 días y a la tabla
     pppPlanTabla(false); await new Promise((res) => setTimeout(res, 150));
@@ -144,7 +163,13 @@ catch (_e) {
 
   t(r.esDefault, "(1) la tabla es la vista por defecto de Programación");
   t(r.cols, "(1) columnas Día · m³ · Tandas · NPs + los 4 estados con el encabezado partido y su color");
-  t(r.estadosPrimero, "(1) los 4 estados van primeros, bien a la izquierda");
+  t(r.estadosDerecha, "(1) los 4 estados van últimos, bien a la derecha");
+  const _pal = ["azul", "verde", "amarillo", "rojo"];
+  t(r.paleta && JSON.stringify(r.paleta.head) === JSON.stringify(_pal),
+    "(1) facturado azul · armado verde · en proceso amarillo · pendiente rojo, en el encabezado — " +
+    JSON.stringify(r.paleta && r.paleta.head));
+  t(r.paleta && JSON.stringify(r.paleta.num) === JSON.stringify(_pal),
+    "(1) y el número de cada uno con el mismo color — " + JSON.stringify(r.paleta && r.paleta.num));
   t(r.salidas, "(1) botones para el tablero de 6 días y la vista clásica");
   t(r.dias.length === 2, "(2) una fila por día con programación (2)");
   t(eq(r.dias[0].slice(0, 4), ["▸Lunes 14/09", "5,2", "2", "3"]), "(2) el día trae m³, tandas y NPs — " + JSON.stringify(r.dias[0].slice(0, 4)));
