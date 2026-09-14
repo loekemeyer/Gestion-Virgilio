@@ -127,6 +127,7 @@ const DETALLE = [
       tr.classList.contains("pppop-cam")
         ? { cam: tr.textContent.trim() }
         : { np: tr.children[0].textContent.trim(),
+            cod: (tr.querySelector("td.pppop-cod") || {}).textContent,
             tic: [...tr.querySelectorAll("td.pppop-tic")].map((td) => td.textContent.trim()) });
     return {
       th: [...tbl.querySelectorAll("thead th")].map((x) => x.textContent.trim()),
@@ -136,9 +137,17 @@ const DETALLE = [
       chipOn: (document.querySelector(".pppop-chip.on") || {}).textContent,
       alineNp: getComputedStyle(tbl.querySelector("tbody tr:not(.pppop-cam) td:first-child")).textAlign,
       alineCli: getComputedStyle(tbl.querySelector("tbody td.pppop-cli")).textAlign,
-      alineM3: getComputedStyle(tbl.querySelector("tbody tr:not(.pppop-cam) td:nth-child(4)")).textAlign,
+      alineCod: getComputedStyle(tbl.querySelector("tbody td.pppop-cod")).textAlign,
+      alineM3: getComputedStyle(tbl.querySelector("tbody tr:not(.pppop-cam) td:nth-child(5)")).textAlign,
       anchoTabla: tbl.getBoundingClientRect().width,
       anchoCard: document.querySelector(".pppop-card").getBoundingClientRect().width,
+      // ⚠ lo que importa NO es el ancho de la tarjeta sino el HUECO que deja su padding:
+      // #pppOpBody tiene 14px a cada lado, así que comparar contra la tarjeta dejaba pasar
+      // 28px de desborde — con eso "Fact" salía cortada y el test decía OK (v17.81).
+      anchoHueco: (function () {
+        const bd = document.getElementById("pppOpBody"), cs = getComputedStyle(bd);
+        return bd.getBoundingClientRect().width - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight);
+      })(),
       scrollW: document.documentElement.scrollWidth,
       pintadas: [...tbl.querySelectorAll("td")].filter((td) => {
         const bg = getComputedStyle(td).backgroundColor;
@@ -149,8 +158,9 @@ const DETALLE = [
   });
 
   const det = await leer();
-  if (det.th.join(";") !== "NP;Cliente;Tanda;Mt3;Pick;Arm;Fact")
-    fail.push("encabezado del detalle != 'NP;Cliente;Tanda;Mt3;Pick;Arm;Fact' → " + det.th.join(";"));
+  // v17.81 (Luis): "agregale columna de código de cliente a la visión de la PPP en el módulo de operarios"
+  if (det.th.join(";") !== "NP;Cód;Cliente;Tanda;Mt3;Pick;Arm;Fact")
+    fail.push("encabezado del detalle != 'NP;Cód;Cliente;Tanda;Mt3;Pick;Arm;Fact' → " + det.th.join(";"));
   // el orden: camión por camión, en el orden de la NP más baja; adentro, por NP
   const secuencia = det.filas.map((x) => x.cam ? "[" + x.cam.replace(/\s+/g, " ") + "]" : x.np);
   // UN solo camión Capital con las dos series (E01 y D67): la zona 1 se entrega con la zona 2
@@ -162,7 +172,11 @@ const DETALLE = [
   // los tics salen tal cual los manda el backend
   const tics = det.filas.filter((x) => !x.cam).map((x) => x.tic.join(""));
   if (tics.join("|") !== "✓✓✓||✓||✓✓") fail.push("los tics no salen como los manda el backend → " + tics.join("|"));
-  if (det.tot.join(";") !== "5 NP;2 camiones;;7,01;3;2;1") fail.push("el pie del detalle no cierra → " + det.tot.join(";"));
+  if (det.tot.join(";") !== "5 NP;;2 camiones;;7,01;3;2;1") fail.push("el pie del detalle no cierra → " + det.tot.join(";"));
+  // el código va con su empresa adelante: el mismo número existe en LK y en Chef
+  const cods = det.filas.filter((x) => !x.cam).map((x) => x.cod);
+  if (cods.join("|") !== "2101|4102|3958|771|2444")
+    fail.push("la columna de código de cliente no sale → " + cods.join("|"));
   // el tope y el aviso de pasado salen del backend, no de una cuenta del front
   if (!/⚠ pasado 0,76 m³/.test(det.filas.map((x) => x.cam || "").join(" ")))
     fail.push("no avisa que el camión se pasó del tope");
@@ -171,9 +185,10 @@ const DETALLE = [
   if (det.titulo.indexOf("Miércoles 16/09") < 0) fail.push("el título no dice qué día se está viendo → " + det.titulo);
   if (det.alineNp !== "left") fail.push("la NP no va a la izquierda (" + det.alineNp + ")");
   if (det.alineCli !== "left") fail.push("el cliente no va a la izquierda (" + det.alineCli + ")");
+  if (det.alineCod !== "left") fail.push("el código de cliente no va a la izquierda (" + det.alineCod + ")");
   if (det.alineM3 !== "right") fail.push("el m³ no va a la derecha (" + det.alineM3 + ")");
   if (det.pintadas) fail.push(det.pintadas + " celdas del detalle con relleno de color");
-  if (det.anchoTabla > det.anchoCard) fail.push("la tabla del detalle se pasa de la tarjeta (" + Math.round(det.anchoTabla) + " > " + Math.round(det.anchoCard) + ")");
+  if (det.anchoTabla > det.anchoHueco + 3) fail.push("la tabla del detalle se pasa del hueco de la tarjeta (" + Math.round(det.anchoTabla) + " > " + Math.round(det.anchoHueco) + ")");
   if (det.scrollW > 412) fail.push("el detalle hace scroll horizontal en un celular de 412px (" + det.scrollW + ")");
   if (String(det.chipOn || "").trim() !== "Todos") fail.push("el filtro no arranca en Todos → " + det.chipOn);
   if (!/fecha=eq\.2026-09-16/.test(detUrl)) fail.push("el detalle no pide el día tocado → " + detUrl);
@@ -193,7 +208,7 @@ const DETALLE = [
   if (secLk.join("|") !== ["[🚚 Capital D67 + E01 · 3 NP (de 4) · 3 tandas · 6,76 / 6,00 m³ ⚠ pasado 0,76 m³]",
                            "LK 0031", "98652", "98704"].join("|"))
     fail.push("el filtro LK no dejó sólo LK (ni recalculó el camión) → " + secLk.join("|"));
-  if (lk.tot.join(";") !== "3 NP;1 camion;;6,69;1;0;0") fail.push("el pie no se recalcula con el filtro → " + lk.tot.join(";"));
+  if (lk.tot.join(";") !== "3 NP;;1 camion;;6,69;1;0;0") fail.push("el pie no se recalcula con el filtro → " + lk.tot.join(";"));
   if (pedidos !== antesFiltro || detUrl !== antesDet) fail.push("filtrar volvió a consultar al servidor");
 
   await p.evaluate(() => pppOpFiltrar("CH"));

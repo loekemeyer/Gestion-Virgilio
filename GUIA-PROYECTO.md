@@ -1,3 +1,25 @@
+## Nota v17.81 (2026-09-14) — la PPP del operario muestra el código de cliente
+
+Pedido de Luis: *"agregale columna de código de cliente a la visión de la PPP en el módulo de
+operarios"*. Al abrir un día en el botón **PPP** de la botonera, la tabla pasó de 7 columnas a 8:
+
+```
+NP | Cód | Cliente | Tanda | Mt3 | Pick | Arm | Fact
+```
+
+Es **sólo front**: `gv_ppp_detalle_dia` ya devolvía `cod`, no hubo que tocar la vista. De paso el
+Cliente dejó de caer al código cuando no hay razón social (ahora muestra `—`): el código tiene
+columna propia.
+
+**Sale el número solo, sin `LK` / `CH` adelante.** Se probó con el prefijo y la tabla se iba 23 px
+de la tarjeta en un celular de 412 px: *Fact* quedaba cortada. De qué empresa es se ve en los chips
+**LK / CH** de arriba (que filtran) y en la NP de los pedidos de la página; el prefijo queda en el
+`title` de la celda. Con el número solo entra en 362 px de los 360 disponibles, o sea justo.
+
+⚠ **El guard de ancho del test estaba mal y por eso esto casi pasa**: comparaba contra el ancho de
+la tarjeta (388 px) en vez de contra el **hueco** que deja su padding (360 px), así que dejaba pasar
+28 px de desborde. `tests/ppp-operario.cjs` ahora mide el hueco real.
+
 ## Nota v17.76 (2026-09-14) — la fila de la NP dice de quién es, y los 4 estados se achican
 
 Pedido de Luis sobre la tabla de Programación:

@@ -3100,9 +3100,11 @@ tr.ppp-err-zona > td{ background:#fffbeb !important; }
 .pga th{ position:sticky; top:0; z-index:2; background:#f8fafc; text-align:right; font-size:10.5px; font-weight:800;
   letter-spacing:.05em; text-transform:uppercase; color:#64748b; padding:10px 12px; border-bottom:2px solid #cbd5e1; white-space:nowrap; }
 .pga td{ text-align:right; padding:7px 12px; border-bottom:1px solid #eef2f7; white-space:nowrap; font-variant-numeric:tabular-nums; }
-/* v17.80 (Luis) — las 4 columnas de estado van PRIMERAS, lo más angostas posible (el encabezado
-   parte en dos renglones) y con el color de cada una arriba. La 5ª, la del día / la tanda / la NP,
-   se queda con todo el ancho que sobra: es la que tiene la info que se lee. */
+/* v17.76 (Luis) — las 4 columnas de estado van lo más angostas posible (el encabezado parte en
+   dos renglones) y con el color de cada una arriba; la del día / la tanda / la NP se queda con
+   todo el ancho que sobra, que es la que tiene la info que se lee.
+   ⚠ La v17.76 las había puesto PRIMERAS; la v17.79 las mandó a la DERECHA (Luis: "mandalos a la
+   derecha"). Este comentario decía lo viejo hasta la v17.81. */
 /* El truco para que se encojan: TODAS las columnas a `width:1%`, y la 1ª a `width:100%` — así el
    reparto del ancho sobrante se lo lleva entera la columna de la info (día / tanda / NP). */
 .pga th, .pga td{ width:1%; }
@@ -3137,7 +3139,7 @@ tr.ppp-err-zona > td{ background:#fffbeb !important; }
 .pga-t.e-pendiente>td{ background:#fff6f6; } .pga-t.e-pendiente>td:first-child{ box-shadow:inset 4px 0 0 #dc2626; color:#991b1b; }
 .pga-sub{ font-weight:600; color:#94a3b8; font-size:11.5px; margin-left:7px; }
 /* fila de NP — acá va lo que se lee: NP, estado, horario, código de cliente, cliente, zona ·
-   barrio y la fecha en que entró el pedido (v17.80, pedido de Luis) */
+   barrio y la fecha en que entró el pedido (v17.76, pedido de Luis) */
 .pga-n{ cursor:pointer; }
 .pga-n>td{ font-size:12.5px; color:#334155; }
 .pga-n>td:first-child{ padding-left:48px; white-space:normal; line-height:1.45; }
@@ -5181,7 +5183,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=17.80"></script>
+<script type="module" src="recepcion.js?v=17.81"></script>
 <!-- Config del módulo de fichada (compartido con fichada.html). El secret
      hmacSecret tiene que ser el mismo acá y allá; cargándolo desde un solo
      archivo evitamos que se desincronicen. -->
@@ -7339,8 +7341,16 @@ function _pppOpCss() {
     + ".pppop-det-top{display:flex;align-items:center;gap:10px;padding:0 0 8px;}"
     + ".pppop-volver{background:#eef2f7;color:#1e6bd6;border:none;border-radius:8px;padding:6px 11px;font-size:14px;font-weight:800;cursor:pointer;width:auto;}"
     + ".pppop-tbl td.pppop-cli,.pppop-tbl th.pppop-cli{text-align:left;}"
+    // v17.81 (Luis): la columna del codigo de cliente, entre la NP y el nombre
+    + ".pppop-tbl th.pppop-cod,.pppop-tbl td.pppop-cod{text-align:left;padding-left:6px;padding-right:6px;}"
+    + ".pppop-tbl td.pppop-cod{color:#475569;font-weight:700;font-size:12.5px;}"
+    + "#pppOpModal.det .pppop-tbl th.pppop-cod,#pppOpModal.det .pppop-tbl td.pppop-cod{padding-left:4px;padding-right:4px;}"
     + ".pppop-tbl td.pppop-cli{white-space:normal;line-height:1.25;}"
-    + "#pppOpModal.det .pppop-tbl th,#pppOpModal.det .pppop-tbl td{padding-left:6px;padding-right:6px;}"
+    + "#pppOpModal.det .pppop-tbl th,#pppOpModal.det .pppop-tbl td{padding-left:4px;padding-right:4px;}"
+    // v17.81: con la columna del codigo son 8. En un celular la tabla ya no puede crecer
+    // libre: se le pone el techo de la tarjeta y el navegador la comprime a min-content
+    // (el Cliente parte en mas renglones). Sin esto se salia 23px y "Fact" quedaba cortada.
+    + "#pppOpModal.det .pppop-tbl{max-width:100%;}"
     /* los 3 tics: angostos, centrados, sin celda pintada */
     + ".pppop-tbl th.pppop-tic{text-align:center;font-size:11px;font-weight:800;color:#475569;padding-left:3px;padding-right:3px;}"
     + ".pppop-tbl td.pppop-tic{text-align:center;padding-left:3px;padding-right:3px;color:#15803d;font-weight:800;}"
@@ -7526,7 +7536,8 @@ function pppOpDetRender(fecha, rows, aviso) {
 
   let sm3 = 0, nPick = 0, nArm = 0, nFact = 0;
   const tic = function (v) { return v ? "✓" : ""; };
-  html += '<table class="pppop-tbl"><thead><tr><th>NP</th><th class="pppop-cli">Cliente</th><th>Tanda</th><th>Mt3</th>'
+  html += '<table class="pppop-tbl"><thead><tr><th>NP</th><th class="pppop-cod">Cód</th>'
+        + '<th class="pppop-cli">Cliente</th><th>Tanda</th><th>Mt3</th>'
         + '<th class="pppop-tic">Pick</th><th class="pppop-tic">Arm</th><th class="pppop-tic">Fact</th></tr></thead><tbody>';
   for (const g of grupos) {
     const tn = Object.keys(g.tandas).length;
@@ -7543,7 +7554,7 @@ function pppOpDetRender(fecha, rows, aviso) {
     const m3Cam = g.m3Cam || g.m3, tope = g.tope || 0;
     const pasado = tope > 0 && (m3Cam - tope) > 0.005;
     const cuantos = (g.nTot && g.nTot !== g.ped.length) ? (g.ped.length + ' NP (de ' + g.nTot + ')') : (g.ped.length + ' NP');
-    html += '<tr class="pppop-cam"><td colspan="7">' + ico + ' ' + nombre
+    html += '<tr class="pppop-cam"><td colspan="8">' + ico + ' ' + nombre
          + ' <span class="pppop-cam-sub">· ' + cuantos + ' · ' + tn + ' tanda' + (tn === 1 ? "" : "s")
          + ' · ' + _pppOpM3(m3Cam) + (tope ? ' / ' + _pppOpM3(tope) : "") + ' m³</span>'
          + (pasado ? ' <span class="pppop-cam-over">⚠ pasado ' + _pppOpM3(m3Cam - tope) + ' m³</span>' : "")
@@ -7553,8 +7564,15 @@ function pppOpDetRender(fecha, rows, aviso) {
       if (r.pickeado) nPick++;
       if (r.armado) nArm++;
       if (r.facturado) nFact++;
+      // El codigo SOLO, sin la empresa adelante: con el prefijo la tabla se iba 23px de la
+      // tarjeta en un celular de 412px y "Fact" quedaba cortada. De que empresa es se ve en
+      // los chips LK / CH de arriba, que filtran, y en la NP de los pedidos de la pagina.
+      const _cod = String(r.cod || "").trim();
+      const _emp = String(r.empresa || "").trim().toUpperCase();
       html += '<tr><td>' + escapeHtml(String(r.np)) + '</td>'
-           + '<td class="pppop-cli">' + escapeHtml(String(r.razon_social || r.cod || "—")) + '</td>'
+           + '<td class="pppop-cod"' + (_emp ? ' title="' + escapeHtml(_emp + " " + _cod) + '"' : "")
+           + '>' + escapeHtml(_cod) + '</td>'
+           + '<td class="pppop-cli">' + escapeHtml(String(r.razon_social || "—")) + '</td>'
            + '<td>' + escapeHtml(String(r.tanda || "—")) + '</td>'
            + '<td>' + _pppOpM3(r.m3) + '</td>'
            + '<td class="pppop-tic">' + tic(r.pickeado) + '</td>'
@@ -7563,6 +7581,7 @@ function pppOpDetRender(fecha, rows, aviso) {
     }
   }
   html += '</tbody><tfoot><tr class="pppop-tot"><td>' + vis.length + ' NP</td>'
+       + '<td class="pppop-cod"></td>'
        + '<td class="pppop-cli">' + grupos.length + ' camion' + (grupos.length === 1 ? "" : "es") + '</td><td></td>'
        + '<td>' + _pppOpM3(sm3) + '</td>'
        + '<td class="pppop-tic">' + nPick + '</td><td class="pppop-tic">' + nArm + '</td><td class="pppop-tic">' + nFact + '</td>'
@@ -8594,7 +8613,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v17.80";
+const APP_VERSION = "v17.81";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -35194,7 +35213,7 @@ function _pppArbolHtml(programados) {
       for (const r of t.filas) {
         const nk = t.key + "|" + r.np, nb = !!_pgaOpenN[nk];
         const est = PGA_EST.indexOf(r.estado) >= 0 ? r.estado : "pendiente";
-        // v17.80 (Luis): "que ahí aparezca el código de cliente (si es pedido de LK el código LK,
+        // v17.76 (Luis): "que ahí aparezca el código de cliente (si es pedido de LK el código LK,
         // si es de CH, CH), barrio al lado de zona y fecha de pedido".
         const _lug = [r.zona_corta || r.localidad || "", r.barrio || ""]
           .filter(function (x, i, a) { return x && a.indexOf(x) === i; }).join(" · ");
