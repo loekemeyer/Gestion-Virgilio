@@ -12360,3 +12360,45 @@ mapa de pantalla sólo como respaldo.
 razón social "Dorinka S.R.L". Son las legítimas: la regla de los coladores 437E/438E/439E (sólo
 cuando el artículo viene con L) ya estaba y no se tocó. `NC_Loeke_Chef_Hechas` tenía **0 filas del
 809E**, así que nadie llegó a tildar ninguna de las 34 y no hay NC mal emitida que deshacer.
+
+---
+
+### §3.eh — Se cierra el §3.4 del plan del sufijo: dos de sus tres pendientes estaban mal (v17.09, 2026-09-14)
+
+El §3.4 del doc del 13/09 pedía tres cosas. Una se hizo; **las otras dos no había que hacerlas**, y
+eso sólo se ve midiendo.
+
+| pendiente | veredicto |
+|---|---|
+| borrar las 6 filas de sufijo de `Equivalencias_Codigos` | **hecho** (v17.06) — pero no eran 6 filas iguales: 4 de identidad se borraron y 2 de la variante `L` se corrigieron |
+| retirar `Planimetria` | **no se puede**: la leen `vista_nc_loeke_chef` (viva), `planimetria_autoorden()` y 7 puntos de `index.html` |
+| limpiar los ~67 `codBase` "no-op" | **NO SON NO-OP. No hay que borrarlos.** |
+
+#### Los `codBase` están trabajando hoy
+
+```js
+function codBase(cod) { return String(cod ?? "").trim().toUpperCase().replace(/\s+(LK|CH|LOKE)$/, ""); }
+```
+
+Las **dos** mitades siguen haciendo trabajo:
+
+- `trim().toUpperCase()` — siempre, en las 67 comparaciones;
+- `.replace(...)` — sobre las **8 claves con sufijo que hoy devuelve `vista_saldos_stock.clave`**:
+  los 4 duales × 2 empresas (`437E LK/CH`, `438E LK/CH`, `439E LK/CH`, `809E LK/CH`).
+
+Eso es **exactamente por diseño**: `gv_stock_clave` agrega la empresa a la clave **sólo cuando el
+código es dual**, y `codBase` es la función que la pela para volver al código. **Borrar las 67
+llamadas rompía la pantalla de stock justo para los 4 duales**, que son los que más problemas dan.
+
+El malentendido es entendible: el sufijo se sacó de `cod_art` (v16.20), y de ahí a suponer que
+también desapareció de `clave` hay un paso. Pero `clave` es la columna que se creó **para llevarlo**.
+
+**Chequeo antes de volver a intentarlo:**
+
+```sql
+select clave from public.vista_saldos_stock where clave ~* '\s+(LK|CH|LOKE)$';
+-- mientras devuelva filas, codBase es código vivo
+```
+
+Con esto el §3.4 queda cerrado: 0 filas con sufijo en `Equivalencias_Codigos`, 0 en
+`Movimientos_Stock`, y las 8 de `vista_saldos_stock.clave` son las que **tienen que estar**.

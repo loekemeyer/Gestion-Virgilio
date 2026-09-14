@@ -145,6 +145,27 @@ tiene **28 cajas** en góndola contadas + **64 en el rack AE11** que el stock no
   sufijo de `Equivalencias_Codigos` (conservando `727` y `727EN`, que son equivalencias de
   verdad), retirar `Planimetria`, y limpiar los ~67 `codBase` que quedaron no-op.
 
+> **CERRADO el 14/09 — y dos de las tres cosas estaban mal caracterizadas.** Verificado contra la
+> base, no contra este archivo:
+>
+> 1. **`Equivalencias_Codigos`: HECHO** (v17.06). Pero no eran "6 filas de sufijo" iguales: cuatro
+>    (`437E`, `438E`, `439E`, `809E`) eran mapeo **identidad + sufijo** y se borraron; las otras dos
+>    (`438EL`, `439EL`) mapean la **variante L** al artículo base — eso sí sirve, así que se les
+>    corrigió el destino en vez de borrarlas. Era el único de los tres con riesgo activo: el cron
+>    canoniza el picking contra esa tabla, así que era una vía viva para reintroducir el sufijo.
+> 2. **`Planimetria`: NO se puede retirar.** El plan lo pide como si ya no la leyera nadie y la leen
+>    **`vista_nc_loeke_chef`** (viva, 36 filas), **`planimetria_autoorden()`** y **7 puntos de
+>    `index.html`**. Lo retirado es el *editor* viejo (§2.4), no la tabla.
+> 3. **Los 67 `codBase` NO son no-op — NO HAY QUE BORRARLOS.** La función es
+>    `trim().toUpperCase().replace(/\s+(LK|CH|LOKE)$/,"")`, y las dos mitades siguen trabajando:
+>    el `trim/upper` siempre, y el `replace` sobre las **8 claves con sufijo que hoy devuelve
+>    `vista_saldos_stock.clave`** — los 4 duales × 2 empresas (`437E LK/CH`, `438E LK/CH`,
+>    `439E LK/CH`, `809E LK/CH`), que es justo lo que produce `gv_stock_clave` al agregar la empresa
+>    sólo cuando el código es dual. **Borrarlos rompía la pantalla de stock para los 4 duales.**
+>    Chequeo antes de volver a intentarlo:
+>    `select clave from public.vista_saldos_stock where clave ~* '\s+(LK|CH|LOKE)$';` — mientras
+>    devuelva filas, `codBase` es código vivo.
+
 ### 3.5 Otros problemas abiertos que salieron en paralelo
 
 `124` reportes que cruzan LK y Chef por `cod_cliente` · `125` el espejo PPP de LK congelado por el
