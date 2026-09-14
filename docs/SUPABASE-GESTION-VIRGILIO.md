@@ -15540,7 +15540,7 @@ El control positivo está para que la prueba pruebe algo: sin él, "0 filas" tam
 resultado de una función rota.
 
 
-## §3.fx — v17.90: el desarme manda el stock a `a_guardar` — 2026-09-14
+## §3.gb — v17.90: el desarme manda el stock a `a_guardar` — 2026-09-14
 
 Corrección de Luis sobre la §3.fw: *"cuando se aprieta ese botón, debería ir «A guardar» el pedido
 para hacerlo lo más limpio posible, y que un operador después lo tenga que procesar como toda la
@@ -15705,3 +15705,60 @@ mismo tiempo y quedarse con lo de cinco minutos antes.
 
 **Rollback:** `select cron.alter_job(73, schedule := '*/15 9-23 * * *');` en Virgilio (y, si
 se quiere, `'*/5 * * * *'` para el jobid 48 de LK).
+
+
+## §3.ga — v17.93: las alertas dejan de avisar por una NP cancelada o desarmada — 2026-09-14
+
+Salió de una pregunta de Luis sobre el desarme: *"lo de ocultar la NP me hizo ruido. ¿Por qué
+«ocultar» y no «borrar»?"*.
+
+### Por qué se oculta y no se borra
+
+Porque **la fila no es nuestra**. `GV_PPP_Programacion_Diaria` es el espejo de ISIS: se alimenta
+**desde afuera** (al 14/09, 133 filas, 117 de los últimos 7 días, con entregas hasta el 28/10) y
+**ninguna función de la base la escribe**. Un `delete` ahí sería un borrado que se deshace solo: la
+próxima importación de la PPP vuelve a traer la fila. El `oculto` de `GV_PPP_Prog_Override` es
+nuestro y sobrevive a la reimportación. Es además lo que manda el `CLAUDE.md` para una tabla
+compartida: se agrega, no se borra → override + vista que lo superpone.
+
+La NP **web** sí se borra de verdad: el desarme le pone `tanda = null` / `fecha_entrega = null` en
+`PPP_Web_Programacion`, que es tabla nuestra, y la manda a `GV_Web_Cancelados`.
+
+### Pero el ruido tenía razón de ser
+
+"Oculto" sólo sirve si **todos** miran el override, y no todos lo miraban: **11 funciones leen la
+tabla madre directo** y no miran ni `oculto` ni `NP_Canceladas`. La peor,
+`notificar_falta_facturacion_telegram` (y la de las 16:30): filtra por *tanda con TAP + fecha de
+entrega hoy/mañana + sin facturar*, que es **exactamente la forma de una NP desarmada**, así que la
+nombraba como si faltara facturarla. No lo trajo el desarme — viene de `gv_ppp_np_cancelar`
+(v15.55), que oculta igual; el botón nuevo lo vuelve frecuente.
+
+### Lo que se cambió
+
+Cinco funciones pasan a leer la vista `gv_ppp_programacion_diaria`, que ya saltea lo oculto:
+`notificar_falta_facturacion_telegram`, `notificar_falta_facturacion_1630_telegram`,
+`notificar_pedido_adelantado_telegram`, `notificar_tandas_adelantar_telegram` y
+`generar_inconsistencias`. Es cambio de **fuente**, no de lógica: la vista expone las mismas
+columnas. `sql/gv_alertas_respetan_oculto_v1793.sql`.
+
+### Medición, con control positivo
+
+Contra los datos de hoy el cambio **no saca ni una fila** (no hay ninguna tanda con TAP reciente y
+NP sin facturar), así que hizo falta el control — un "0" también sería el resultado de un cambio
+que no hace nada:
+
+| np | en la madre | en la vista |
+|---|---|---|
+| 44620 | 1 | 0 |
+| 44621 | 1 | 0 |
+| 98696 | 1 | 0 |
+
+### ⚠ Lo que queda abierto
+
+Otras seis siguen leyendo la madre directo, y **una importa de verdad**:
+`gv_pedidos_web_excluidos` la usa para decidir *"este pedido ya está en ISIS"*, sin saltear lo
+oculto — así que ocultar una NP de ISIS que duplicaba un pedido web **no libera** a ese pedido web,
+que era justo el motivo de ocultarla. (⚠ El `CLAUDE.md` dice que esa RPC saltea el override: **no
+lo hace**.) Tocarla cambia qué pedidos entran a A Programar, así que va medido y aparte. Las de
+cobranzas / valorización se dejan como están a propósito: si una NP cancelada debe seguir
+valorizada en el histórico lo decide el dueño.

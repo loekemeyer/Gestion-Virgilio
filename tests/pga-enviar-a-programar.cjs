@@ -55,11 +55,28 @@ catch (_e) {
     window._pppPlanAgrupar = function () { return { venc: [], byDay: new Map() }; };
     window.pppPaintTabs = function () {};
 
+    // ⚠ esperar por CONDICIÓN, no por reloj: con la máquina cargada 200 ms no siempre alcanzan
+    // y el test fallaba de a ratos con "bt is null" (que además tapaba el resto de los chequeos).
+    const esperar = async function (fn, ms) {
+      const t0 = Date.now();
+      while (Date.now() - t0 < (ms || 4000)) {
+        if (fn()) return true;
+        await new Promise((res) => setTimeout(res, 40));
+      }
+      return false;
+    };
+    const hayFila = function (np) {
+      const p = document.getElementById("pppPreview");
+      return !!(p && [...p.querySelectorAll("tr.pga-n")].some((x) => x.textContent.indexOf(np) >= 0));
+    };
     _pppTab = "plan"; _pppPlanTabla = true; _pppPlanClasica = false; _pppPlanDay = null;
     document.getElementById("pppOverlay").classList.add("show");
-    pppRenderProg(); await new Promise((res) => setTimeout(res, 200));
-    pgaAbrirDia("20260915"); await new Promise((res) => setTimeout(res, 120));
-    pgaAbrirTanda("20260915|E01A"); await new Promise((res) => setTimeout(res, 150));
+    pppRenderProg();
+    await esperar(() => !!document.querySelector("#pppPreview table.pga"));
+    pgaAbrirDia("20260915");
+    await esperar(() => !!document.querySelector("#pppPreview tr.pga-t"));
+    pgaAbrirTanda("20260915|E01A");
+    out.aparecioLaFila = await esperar(() => hayFila("LK 0058"));
     const prev = document.getElementById("pppPreview");
 
     // (a) el botón está, dice lo que pidió Luis y no abre la fila
@@ -152,7 +169,8 @@ catch (_e) {
 
   let ok = true;
   const t = (c, m) => { console.log((c ? "  ✅ " : "  ❌ ") + m); if (!c) ok = false; };
-  t(r.hayBoton, "(a) la fila de la NP trae el botón");
+  t(r.aparecioLaFila, "(a) la fila de la NP se dibuja");
+  t(r.hayBoton, "(a) y trae el botón");
   // v17.90 (Luis): "hacé que los botones sean sólo los íconos y agregá la descripción cuando uno
   // pone el mouse encima"
   t(r.textoBoton === "↩", "(a) es SÓLO el ícono — " + JSON.stringify(r.textoBoton));

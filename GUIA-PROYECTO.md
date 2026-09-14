@@ -1,3 +1,22 @@
+## Nota v17.93 (2026-09-14) — por qué la NP se OCULTA y no se borra (y qué no lo respetaba)
+
+Pregunta de Luis: *"lo de ocultar la NP me hizo ruido. ¿Por qué «ocultar» y no «borrar»?"*.
+
+**Porque la fila no es nuestra.** `GV_PPP_Programacion_Diaria` es el **espejo de ISIS**: se alimenta
+desde afuera (133 filas, 117 de los últimos 7 días) y ninguna función de la base la escribe. Un
+`delete` ahí se deshace solo — la próxima importación de la PPP vuelve a traer la fila. El `oculto`
+de `GV_PPP_Prog_Override` es nuestro y sobrevive a la reimportación. La NP **web** sí se borra de
+verdad, porque esa tabla sí es nuestra.
+
+**Pero el ruido tenía razón de ser:** "oculto" sólo sirve si todos miran el override, y **11
+funciones leen la tabla madre directo**. La peor era la alerta de Telegram de falta de facturación:
+su filtro es *tanda con TAP + entrega hoy/mañana + sin facturar*, que es exactamente la forma de una
+NP desarmada, así que la avisaba como si faltara facturarla. Ya no: cinco funciones pasaron a leer
+la vista. **Queda abierto** que `gv_pedidos_web_excluidos` tampoco lo respeta — y ahí importa, porque
+un pedido web que se liberó ocultando su NP de ISIS sigue sin entrar a A Programar.
+
+§3.ga de `docs/SUPABASE-GESTION-VIRGILIO.md` · `sql/gv_alertas_respetan_oculto_v1793.sql`.
+
 ## Nota v17.90 (2026-09-14) — el desarme manda el stock a "A guardar", y los botones son sólo íconos
 
 Tres correcciones de Luis sobre la v17.88:
@@ -55,7 +74,7 @@ sólo la columna `terminado` además hacía parecer que ese picking había sido 
 Y la cantidad de cada artículo es `least(lo que pide la NP, lo que la tanda tiene parado hoy)`:
 nunca más de lo que salió, y desarmar dos veces no duplica.
 
-§3.fw de `docs/SUPABASE-GESTION-VIRGILIO.md` · `sql/gv_ppp_np_desarmar_v1788.sql` ·
+§3.fw de `docs/SUPABASE-GESTION-VIRGILIO.md` · `sql/gv_ppp_np_desarmar_v1790.sql` ·
 `tests/pga-enviar-a-programar.cjs` (25 chequeos, los 12 últimos son del tacho).
 
 ## Nota v17.85 (2026-09-14) — "↩ Enviar a programar" en la fila de cada NP
