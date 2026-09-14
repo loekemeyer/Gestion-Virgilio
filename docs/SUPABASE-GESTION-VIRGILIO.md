@@ -11175,6 +11175,52 @@ select cod, terminado, excedente, separar_pedidos, a_facturar, a_guardar, racks
   from public.stocks_carga_rapida
  where terminado<0 or excedente<0 or separar_pedidos<0 or a_facturar<0 or a_guardar<0 or racks<0;
 ```
+
+**Normalizadas el mismo día (v16.96).** Las 7 filas pasaron a la grafía canónica — 6 de `66` → `066`
+y 1 de `H201PART` → `H201Part` (que es como figura en el catálogo `Insumos`). Ningún saldo se movió
+(el 066 sigue en 188 / 136 / 0 / 2 = 326) porque las vistas ya canonizaban; y **no había duplicado**:
+el ciclo completo de `D72C` quedó consistentemente en una sola grafía, el cron no lo reescribió.
+Backup: `zz_backups."GV_Backup_Stock_Grafias_20260914"`. Chequeo para que no vuelvan a aparecer:
+
+```sql
+with norm as (select regexp_replace(upper(btrim(cod_art)),'^0+(?=.)','') k, btrim(cod_art) crudo,
+                     count(*) n from public."Movimientos_Stock" group by 1,2)
+select k, count(*) grafias, string_agg(crudo||' ('||n||')',' · ') from norm group by k having count(*)>1;
+-- vacío = todo bien
+```
+
+### §3.eb.1 — Por qué ninguna defensa frenó esto, y qué queda abierto (2026-09-14)
+
+Al revisar el punto anterior apareció lo que de verdad importa: **las defensas existen y funcionaron.
+Lo que falló es que nadie accionó el aviso.**
+
+**La alerta de stock negativo avisó, en el momento exacto, las 13 veces.** El trigger
+`trg_stock_negativo_telegram` está prendido (`Stock_Config.alerta_sin_stock_gondola = 1`) y
+`telegram_outbox` tiene los 13 mensajes con `sent_at` cargado: 11 el 14/09 entre 06:21 y 06:39, y
+**2 el 11/09 a las 18:34** — o sea que en el mismo minuto en que la corrección manual dejó al 338 y
+al 566E en negativo, salió el ⛔. Si alguien hubiera mirado ese aviso, la cosa se cortaba ahí y los
+otros 11 no pasaban. **No falta detección: falta que el ⛔ tenga dueño.**
+
+**Tres agujeros reales que quedan, en orden de riesgo:**
+
+1. **`fn_canon_cod_art` se autoexcluye justo de los tipos del pipeline.** El trigger que canoniza el
+   código arranca con `if NEW.tipo in ('picking','separado','facturado') then return NEW; end if;`
+   — o sea que **no corre para los movimientos que escribe el operario**. Por eso entró el `66`
+   crudo. Peor: el índice de dedupe `mov_stock_pipeline_dedup` compara por `upper(trim(cod_art))`,
+   así que si el front escribe `66` y el cron escribe `066` (él sí canoniza, contra
+   `Equivalencias_Codigos`) **el índice los ve como filas distintas y el picking se puede duplicar**.
+   Esta vez no pasó de casualidad, porque el guard del cron es por tanda y no por código.
+2. **Para insumos el trigger hace `upper()` ciego** (`if NEW.deposito = 'insumos' then NEW.cod_art :=
+   upper(btrim(...))`), pero el catálogo `Insumos` guarda **`H201Part`** en CamelCase. O sea que el
+   trigger **fabrica** la grafía que no matchea con el catálogo. Es el que creó el `H201PART`.
+   Debería resolver contra `Insumos.cod` y quedarse con esa grafía, igual que hace con `OC_Maximos`.
+3. **`ajuste` no tiene ni dedupe ni convención de `ref`.** Los índices únicos cubren
+   `picking/separado/facturado` y `aguardar`; `ajuste` y `cp` quedan afuera, y el `ref` es texto
+   libre. Ése fue el escritor que rompió todo el 11/09. El clamp de la v16.92 evita que deje
+   `a_facturar` en negativo, pero no evita que un ajuste sin tanda/NP en el ref quede invisible para
+   el reconciliador. Falta la convención: **un `ajuste` sobre `a_facturar`/`separar_pedidos` debería
+   llevar la tanda o la NP como primer campo del ref** (`D47C|reversa …`), no enterrada en la prosa.
+
 ### §3.ec — v16.93: un cliente = un CUIT. Se termina el cruce LK/Chef por cod_cliente — 2026-09-14
 
 **Pedido de Thomas (14/09), sobre el informe "Clientes en riesgo":** *"Relca esta mal. Es cencosud, no relca.
