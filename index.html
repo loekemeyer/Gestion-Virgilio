@@ -2790,6 +2790,13 @@ button.pk-anular small{ display:block; font-size:12px; font-weight:700; opacity:
 .ppp-es-cj{ color:#64748b; font-size:11px; margin-top:2px; }
 .ppp-es-table td.td{ white-space:nowrap; font-weight:700; color:#334155; }
 .ppp-es-table td.fc{ white-space:nowrap; font-weight:700; color:#0f172a; }
+/* v18.09 (Luis) — QUIÉN LO LLEVÓ. El dato viaja en el evento de Carga Camión desde la v11.47
+   (`texto = NP|TANDA|CAMIONERO`) y nadie lo mostraba: para reclamar un remito, saber a quién
+   reclamárselo es la mitad del trabajo. */
+.ppp-es-table td.cam{ white-space:nowrap; font-weight:700; color:#334155; }
+.ppp-es-sincam{ color:#94a3b8; font-weight:500; }
+.ppp-es-camres{ font-weight:500; color:#475569; }
+.ppp-es-camres b{ color:#0f172a; }
 .ppp-es-hh{ color:#94a3b8; font-weight:500; font-size:11px; }
 .ppp-es-nofc{ color:#b45309; font-weight:700; font-size:11.5px; }
 .ppp-es-table td.est{ min-width:210px; }
@@ -5414,7 +5421,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=18.08"></script>
+<script type="module" src="recepcion.js?v=18.09"></script>
 <!-- Config del módulo de fichada (compartido con fichada.html). El secret
      hmacSecret tiene que ser el mismo acá y allá; cargándolo desde un solo
      archivo evitamos que se desincronicen. -->
@@ -8859,7 +8866,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v18.08";
+const APP_VERSION = "v18.09";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -31305,7 +31312,7 @@ let _pppEnSalida = null;   // Map np(normalizada) → fila de gv_ppp_en_salida
 async function pppRefreshEnSalida() {
   try {
     const rows = await supaFetchAllSafe(SUPABASE_URL + "/rest/v1/gv_ppp_en_salida",
-      "select=np,empresa,es_web,tanda,cod_cliente,razon_social,m3,fecha_entrega,zona,barrio,fecha_carga,cargado_at,facturada,armada,armado_at,cargada,control_previo,facturada_el,estado,dias_sin_controlar,horas_desde_armado,salida_presunta&order=cargado_at.desc");
+      "select=np,empresa,es_web,tanda,cod_cliente,razon_social,m3,fecha_entrega,zona,barrio,fecha_carga,cargado_at,facturada,armada,armado_at,cargada,control_previo,facturada_el,estado,dias_sin_controlar,horas_desde_armado,salida_presunta,camionero&order=cargado_at.desc");
     const m = new Map();
     (rows || []).forEach(function (r) { const np = _pppNpNorm(r.np); if (np) m.set(np, r); });
     _pppEnSalida = m;
@@ -31504,6 +31511,33 @@ function _pppEsChips(p) {
     d + ' día' + (d === 1 ? "" : "s") + ' hábil' + (d === 1 ? "" : "es") + ' sin controlar</span>');
   return out.join(" ");
 }
+/* v18.09 — el camionero de la NP. Vacío es normal en un RETIRA (lo pasa a buscar el cliente) y
+   en las cargas viejas: la app lo pide desde la v11.47, así que antes de eso no hay ninguno. */
+function _pppEsCamionero(p) {
+  const c = String(_pppEsRow(p).camionero || "").trim();
+  if (c) return escapeHtml(c);
+  const z = String(p.zona || _pppEsRow(p).zona || "");
+  return '<span class="ppp-es-sincam" title="' + (/retira/i.test(z)
+    ? "Retira en fábrica: lo pasa a buscar el cliente, no hay fletero."
+    : "La carga al camión no registró el fletero (las cargas anteriores a la v11.47 no lo piden).") +
+    '">—</span>';
+}
+/* v18.09 — quién tiene los remitos de ese día, ordenado por los que más deben. Es la pregunta
+   que se hace el que reclama: "los 9 que faltan, ¿de quién son?". */
+function _pppEsCamResumen(arr) {
+  const m = new Map(); let sin = 0;
+  for (const p of arr) {
+    const c = String(_pppEsRow(p).camionero || "").trim();
+    if (c) m.set(c, (m.get(c) || 0) + 1); else sin++;
+  }
+  if (!m.size) return "";                       // un día entero sin fletero: no hay nada que desglosar
+  const t = [...m.entries()].sort(function (a, b) { return b[1] - a[1] || a[0].localeCompare(b[0]); })
+    .map(function (e) { return '<b>' + escapeHtml(e[0]) + '</b> ' + e[1]; });
+  /* Los que no tienen fletero van al FINAL y con nombre: mezclados entre los camioneros como un
+     "— 1" no se entiende qué son (casi siempre son retiras, que los pasa a buscar el cliente). */
+  if (sin) t.push('<span class="ppp-es-sincam">sin fletero ' + sin + '</span>');
+  return '<span class="ppp-es-camres">🚛 ' + t.join(" · ") + '</span>';
+}
 function _pppEsFechaCarga(p) {
   const r = _pppEsRow(p), fc = String(r.fecha_carga || "").slice(0, 10);
   if (!fc) return '<span class="ppp-es-nofc" title="No hay evento CCN para esta NP">— sin carga</span>';
@@ -31543,9 +31577,10 @@ function _pppEnViajeHtml() {
     let m3d = 0; for (const p of arr) m3d += (p.m3 || 0);
     let dh = "Sin fecha";
     if (k !== "00000000") { const dt = new Date(+k.slice(0, 4), +k.slice(4, 6) - 1, +k.slice(6, 8)); dh = DOW[dt.getDay()] + " " + (+k.slice(6, 8)) + "/" + (+k.slice(4, 6)) + "/" + k.slice(0, 4); }
-    html += '<div class="ppp-es-day"><div class="ppp-es-day-h"><span>🗓️ ' + dh + '</span><span class="m3">' + arr.length + ' ped · ' + m3d.toFixed(2).replace('.', ',') + ' m³</span></div>' +
+    const camRes = _pppEsCamResumen(arr);
+    html += '<div class="ppp-es-day"><div class="ppp-es-day-h"><span>🗓️ ' + dh + (camRes ? ' ' + camRes : '') + '</span><span class="m3">' + arr.length + ' ped · ' + m3d.toFixed(2).replace('.', ',') + ' m³</span></div>' +
       '<div class="ppp-es-wrap"><table class="ppp-es-table"><thead><tr>' +
-      '<th>NP</th><th>Cliente</th><th>Tanda</th><th class="c">m³</th><th class="c">Cargado</th><th>Estado</th>' +
+      '<th>NP</th><th>Cliente</th><th>Tanda</th><th class="c">m³</th><th class="c">Cargado</th><th>Camionero</th><th>Estado</th>' +
       (sup ? '<th class="c">Controlado</th><th class="c">Volvió</th>' : '') +
       '</tr></thead><tbody>';
     for (const p of arr) {
@@ -31558,6 +31593,7 @@ function _pppEnViajeHtml() {
         '<td class="td">' + escapeHtml(p.tanda || "—") + '</td>' +
         '<td class="c">' + (p.m3 != null ? p.m3.toFixed(3).replace('.', ',') : "—") + '</td>' +
         '<td class="c fc">' + _pppEsFechaCarga(p) + '</td>' +
+        '<td class="cam">' + _pppEsCamionero(p) + '</td>' +
         '<td class="est">' + _pppEsChips(p) + '</td>' +
         (sup ? ('<td class="c"><span class="ppp-es-chk">' + (on ? "✓" : "") + '</span></td>' +
                 '<td class="c"><button class="ppp-es-sinsal" onclick="event.stopPropagation();pppEsSinSalida(\'' + npc + '\')" title="El cliente no recibió — la mercadería volvió al depósito. Queda en «FC s/Salida» (Stocks).">↩</button></td>') : "") +

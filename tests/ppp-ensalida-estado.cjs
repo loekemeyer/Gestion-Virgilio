@@ -21,6 +21,7 @@ catch (_e) {
   await p.goto("file://" + path.join(root, "index.html"), { waitUntil: "domcontentloaded" });
 
   const r = await p.evaluate(() => {
+    const SRC = document.documentElement.innerHTML;
     // Dos filas como las que devuelve gv_ppp_en_salida v13.60: una cargada al camión y
     // una facturada sin registro de carga (el caso que motivó el cambio).
     const filas = [
@@ -29,13 +30,23 @@ catch (_e) {
         barrio: "Barracas", fecha_carga: "2026-09-03", cargado_at: "2026-09-03T17:20:00-03:00",
         facturada: true, armada: true, armado_at: "2026-09-03T11:00:00-03:00",
         cargada: true, control_previo: true, facturada_el: "2026-09-02",
-        estado: "cargada", dias_sin_controlar: 3 },
+        estado: "cargada", dias_sin_controlar: 3, camionero: "Guillermo" },
       { np: "98665", empresa: "lk", es_web: false, tanda: "D50E", cod_cliente: "2193",
         razon_social: "Merajver Marcelo Fabian", m3: 0.042, fecha_entrega: "2026-09-02", zona: "Zona 1 - CABA Sur",
         barrio: "Pompeya", fecha_carga: null, cargado_at: null,
         facturada: true, armada: true, armado_at: "2026-09-02T10:00:00-03:00",
         cargada: false, control_previo: false, facturada_el: "2026-09-01",
-        estado: "facturada_sin_cargar", dias_sin_controlar: 4 }
+        // v18.09: sin camionero — es lo normal en un RETIRA y en las cargas anteriores a la v11.47
+        estado: "facturada_sin_cargar", dias_sin_controlar: 4, camionero: null, zona: "Retira" },
+      // v18.09: MISMO día que la 98602, y sin fletero — así el desglose del día tiene las dos
+      // cosas y se puede ver que el "sin fletero" va al final. Con las dos filas de arriba solas
+      // no servía: caen en días distintos y cada resumen tenía un solo tipo.
+      { np: "98603", empresa: "lk", es_web: false, tanda: "D53F", cod_cliente: "3915",
+        razon_social: "Haidezer Sa", m3: 0.1, fecha_entrega: "2026-09-03", zona: "Retira en fábrica",
+        barrio: "Barracas", fecha_carga: "2026-09-03", cargado_at: "2026-09-03T18:00:00-03:00",
+        facturada: true, armada: true, armado_at: "2026-09-03T11:00:00-03:00",
+        cargada: true, control_previo: true, facturada_el: "2026-09-02",
+        estado: "cargada", dias_sin_controlar: 3, camionero: null }
     ];
     // OJO: estas son `let` en el <script> (binding global declarativo), NO propiedades
     // de window. Hay que asignarlas SIN `window.` o el módulo sigue viendo su null.
@@ -64,6 +75,22 @@ catch (_e) {
       chipCargado:     hOp.indexOf("Cargado al camión") >= 0,
       chipSinRegistro: hOp.indexOf("Sin registro de carga") >= 0,
       chipArmada:      hOp.indexOf("Armada") >= 0,
+      // ── v18.09 (Luis: "pintá el camionero en En Salida") ──────────────────
+      // el dato ya viajaba en el evento de Carga Camión desde la v11.47 y no se mostraba
+      camColumna:      /<th[^>]*>Camionero<\/th>/.test(hOp),
+      camPintado:      /<td class="cam">Guillermo<\/td>/.test(hOp),
+      camVacioRaya:    /<td class="cam"><span class="ppp-es-sincam"[^>]*>—<\/span><\/td>/.test(hOp),
+      // y un retira dice POR QUÉ está vacío, en vez de dejar una raya muda
+      camRetiraExplica: /Retira en f\u00e1brica: lo pasa a buscar el cliente/.test(hOp),
+      // el desglose del día: quién tiene los remitos que faltan
+      camResumen:      /🚛 <b>Guillermo<\/b> 1/.test(hOp),
+      // los sin fletero van al FINAL y con nombre: un "— 1" entre los camioneros no se entiende
+      camResumenSin:   /<b>Guillermo<\/b> 1[\s\S]{0,90}sin fletero 1/.test(hOp) &&
+                       !/🚛 <span class="ppp-es-sincam">/.test(hOp),
+      // el select tiene que PEDIR la columna, si no la fila llega sin el dato
+      // anclado a gv_ppp_en_salida: hay varios `select=` en el archivo y un regex suelto podría
+      // matchear cualquiera y dar verde de mentira
+      camEnSelect:     /gv_ppp_en_salida"[\s\S]{0,80}?select=[^"']*\bcamionero\b/.test(SRC),
       // v18.07: son días HÁBILES (gv_dias_habiles en el backend); el chip lo dice y el title explica
       // que no cuenta sábados, domingos ni feriados.
       chipDias:        hOp.indexOf("4 días hábiles sin controlar") >= 0 &&

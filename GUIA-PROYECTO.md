@@ -1,3 +1,38 @@
+## Nota v18.09 (2026-09-15) — En Salida: el camionero, pintado
+
+Luis: *"dale, ahora pintá el camionero en En Salida"*. La columna ya estaba en
+`gv_ppp_en_salida` desde la v18.07; faltaba **pedirla en el `select` del front y dibujarla**.
+
+Recordatorio de dónde sale: el `texto` del evento de **Carga Camión** es `NP|TANDA|CAMIONERO`
+desde la v11.47 — la pantalla ya le pide el fletero al operario, con autocompletado contra la
+tabla `Camioneros`. El dato estuvo ahí todo este tiempo sin que nadie lo mirara.
+
+**Dos lugares**, no uno:
+
+1. **Columna `Camionero`** en la tabla, entre *Cargado* y *Estado*.
+2. **Desglose en el encabezado del día**: `🚛 Guillermo 3 · Eduardo 2 · Edgardo 1 · Nicolás 1`.
+   Ésa es la pregunta real del que reclama un remito —*"los que faltan, ¿de quién son?"*— y una
+   columna sola obliga a contarlos a ojo.
+
+**Vacío no es un error.** Es lo normal en un **retira** (lo pasa a buscar el cliente, no hay
+fletero) y en las cargas anteriores a la v11.47. Se muestra `—` con un `title` que dice **cuál de
+los dos casos es**, en vez de una raya muda.
+
+⚠ Y en el desglose, los sin fletero van **al final y con nombre** (`sin fletero 1`): la primera
+versión los metía entre los camioneros como un `— 1` y no se entendía qué era. Si un día entero no
+tiene ningún fletero, no se escribe desglose.
+
+Medido en la base al 15/09: **25/25** NP de En Salida tienen camionero (Eduardo 13, Guillermo 9,
+Nicolás 2, Edgardo 1). Histórico: 154 de 927 cargas, porque la captura es de la v11.47.
+
+⚠ **El chequeo del `select` se probó con control positivo.** Un regex suelto de `select=…camionero`
+podía matchear cualquiera de los muchos `select=` del archivo; se ancló a `gv_ppp_en_salida` y se
+verificó sacando la columna a mano: el test se pone **rojo**. Y el chequeo del desglose necesitó
+una fila más en el fixture: las dos que había caen en **días distintos**, así que ningún resumen
+tenía a la vez un camionero y un sin-fletero, y la afirmación no se estaba midiendo.
+
+`tests/ppp-ensalida-estado.cjs`.
+
 ## Nota v18.08 (2026-09-15) — Recepción: el aviso que faltaba cuando el código no tiene OC, y la ×
 
 Luis, mirando el pop-up de **Cajas entregadas**: *"el botón X para cerrar se ve feo ahí, ponelo más
