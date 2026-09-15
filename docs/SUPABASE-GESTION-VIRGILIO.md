@@ -18141,7 +18141,35 @@ que ya se fue.
    «Entrar» antes de que parsee el script grande, ve "un segundo… volvé a tocar" en vez de un
    ReferenceError. La definición real lo pisa al cargar.
 
-**No hecho a propósito:** el `statement_timeout = '30s'` en `gv_ppp_web_armar_pendientes` y
+**No hecho a propósito (y resuelto de otra forma en §3.hp):** el `statement_timeout = '30s'` en `gv_ppp_web_armar_pendientes` y
 `gv_cuarentena_limite` (4 cancelaciones el 15/09 17:29). Un `SET` a nivel función no re-arma el
 timer del statement que ya arrancó con el tope del rol (8 s), así que no está claro que sirva;
 antes de tocarlo hay que medirlo con una llamada real, no asumirlo.
+
+## §3.hp — v18.68: la Cuarentena 30× más rápida por artículo — tres índices de expresión, ningún timeout tocado — 2026-09-15
+
+> **Luis:** *"¿Lo avanzás?"* (el `statement_timeout` que había dejado sin hacer). Problema **314**, tarea 3480.
+
+**Primero se midió lo que el auditor proponía, y no sirve:** `alter function … set statement_timeout='30s'`
+no alarga nada. El timer del statement se arma al empezar con el tope del rol (8 s); cambiar la GUC
+adentro de la función no lo re-arma. Prueba: rol con 2 s, función con `SET 30s` y `pg_sleep(4)` →
+cancelada a los 2 s. Queda escrito para no volver a proponerlo.
+
+**Lo que sí era:** `pg_stat_statements` — `gv_cuarentena_limite` 821 llamadas/día, media 1,2–1,9 s,
+máximo 7,7 s (de ahí los 4 HTTP 500). Adentro, `gv_ppp_web_valor_items` hacía por CADA artículo un
+seq scan de `GV_UxB` (984 filas) evaluando `gv_cod_stock(cod)` fila por fila, y los joins a
+`precios_venta` / `precios_venta_chef` comparaban `canon_cod(cod)` sin índice: 26 ms por artículo,
+340 ms por pedido de 18 líneas. Y la CTE `base` de la Cuarentena valoriza además todas las NP sin
+facturar de esos clientes.
+
+**Arreglo:** las tres funciones son `IMMUTABLE` y puras → índices de expresión, sin tocar ninguna
+función (`sql/gv_valor_items_indices_v1868.sql`):
+
+| Medición | Antes | Después |
+|---|---|---|
+| precio + uxb de un artículo | 26,2 ms (2 seq scan) | 0,087 ms (index scan + bitmap) |
+| `gv_ppp_web_valor_items`, pedido de 18 líneas | 340 ms | 12 ms |
+| CTE `base` con TODOS los clientes con límite (40 NP) | 8.324 ms | 1.027 ms |
+
+Lo que queda de ese segundo es `cobranzas_precios_super`, que es una vista (no se indexa) y sólo
+pesa para clientes de súper. Verificar mañana en `edge_logs` que `gv_cuarentena_limite` no dé más 500.
