@@ -26,7 +26,7 @@ create or replace function public.anular_armado_virgilio(p_legajo text, p_tanda 
  security definer
  set search_path to 'public','pg_temp'
 as $function$
-declare v_id uuid; v_ts timestamptz; v_leg text; v_tanda text; v_tal int; v_ent int;
+declare v_id uuid; v_ts timestamptz; v_leg text; v_tanda text; v_tal int; v_ent int; v_etl int;
 begin
   v_leg   := btrim(coalesce(p_legajo, ''));
   v_tanda := upper(btrim(coalesce(p_tanda, '')));
@@ -48,17 +48,31 @@ begin
     return 'ya_cerrado';
   end if;
 
-  -- si el asistente «Completar» YA grabó, no se anula por acá: hay Entregas cargadas y
-  -- borrarlas mueve stock y datos de facturación. Eso lo resuelve sistemas, a mano.
+  -- ⚠ El asistente NO escribe nada en el servidor mientras el operario arma: los líos (TAL), las
+  -- Entregas y el TAP salen TODOS JUNTOS recién al tocar «Terminar» (compTerminar). O sea que en
+  -- el caso normal —empecé, fui marcando, me dicen que está mal— acá no hay nada y se suelta
+  -- limpio, como si nunca lo hubiera agarrado. Este chequeo es para el caso raro en que
+  -- «Terminar» grabó a medias (pasó el 14/09: el POST a Entregas murió con 42501 y el TAP llegó
+  -- igual). Ahí sí hay que mirarlo a mano: borrar Entregas mueve stock y facturación.
+  -- Se acota a lo creado DESDE el AP, así una entrega vieja de cuando el código de tanda se usó
+  -- antes no frena una anulación legítima de hoy.
   select count(*) into v_tal from public."Registros_Produccion_Virgilio"
    where opcion = 'TAL' and upper(split_part(btrim(coalesce(texto,'')), '|', 3)) = v_tanda
      and created_at >= v_ts;
   select count(*) into v_ent from public."Entregas_Virgilio"
-   where upper(btrim(coalesce(tanda,''))) = v_tanda;
+   where upper(btrim(coalesce(tanda,''))) = v_tanda and creado >= v_ts;
   if v_tal > 0 or v_ent > 0 then return 'tiene_registros'; end if;
 
   insert into public."GV_Tanda_Anulada" (tanda, fase, legajo, motivo, ts_evento)
   values (v_tanda, 'armado', v_leg, nullif(btrim(coalesce(p_motivo,'')),''), v_ts);
+
+  -- Lo único que SÍ sale durante el armado son las etiquetas de lío, que se encolan al cerrar
+  -- cada lío. Las que todavía no se imprimieron se cancelan: si no, la impresora escupe papel
+  -- de un armado que se deshizo. Las ya impresas quedan (el papel ya salió) con su estado.
+  update public."Etiquetas_Lio" set estado = 'anulada'
+   where upper(btrim(coalesce(tanda,''))) = v_tanda
+     and coalesce(estado,'') = 'pendiente' and creado_en >= v_ts;
+  get diagnostics v_etl = row_count;
 
   delete from public."Registros_Produccion_Virgilio" where id = v_id;
 
