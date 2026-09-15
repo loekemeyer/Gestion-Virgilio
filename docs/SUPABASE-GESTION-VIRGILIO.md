@@ -17621,3 +17621,70 @@ y elegida, 1 fila de log con `empresa='chef'`. Rollback limpio.
 
 **Rollback:** los `revoke`/`drop policy` del lado de Chef, y de este lado volver los dos `if` del
 despacho al `raise exception ... feature_not_supported` + `drop function` de las dos `_chef`.
+
+---
+
+## §3.hh — v18.47: el tope del CAMIÓN no existía en el backend (centinela `gv_ppp_camion_pasado`) — 2026-09-15
+
+**Luis, textual:** *"lo del camión que dijo Thomas queda. contempla capacidad máxima del camión
+eso, no? no puede asignar tandas a lo loco ahí que haga que termine con más tandas de lo que le
+entra al camión, no? chequeá eso"*.
+
+**La respuesta es que NO lo contempla, y no es sólo el bloque que preguntó: el tope por camión no
+está aplicado en ninguna parte del backend.** Medido:
+
+```sql
+select p.oid::regprocedure from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+ where n.nspname = 'public' and p.prosrc ilike '%camion_m3_tope%';
+-- 0 filas
+```
+
+`PPP_Web_Config.camion_m3_tope` vale 6,00 y **nadie la lee**. Los dos topes que el backend sí
+aplica son otra cosa y no tapan éste:
+
+| Tope | Qué acota | Dónde vive |
+|---|---|---|
+| `tanda_m3_max_mezcla` = 0,80 | UNA tanda (cuánto acumula antes de cerrarla) | `ppp_web_armar_tandas` |
+| `gv_ppp_web_cupo` = pickers × 3 m³ | el PICKING del día entero, todas las zonas | `gv_ppp_web_proximo_dia_entrega` |
+| `camion_m3_tope` = 6,00 | **el camión** | **nadie** |
+
+Y el 6 que muestra el front (`pppGetCfg().dayCap`) vive en el `localStorage` de cada máquina,
+sólo pinta el aviso naranja, y ni siquiera es el mismo dato que la clave de la base.
+
+**Dónde falta el chequeo, concretamente:**
+- `gv_ppp_web_dia_camion` elige el primer día que ya tiene camión a esa zona **sin mirar cuánto
+  lleva encima** — es el bloque (c) que Luis acaba de dejar prendido (`zonas_manuales_con_camion`
+  en 1, §3.hb);
+- el reuso de camión de `ppp_web_armar_tandas` (v13.60, §3.at) mete la tanda nueva en el camión
+  que ya va ese día **sin sumar m³**.
+
+**Medición al 15/09 — no explotó por apilado, pero eso es azar, no una guarda.** El camión con
+más tandas juntas va en **3,61 m³ de 6**. Los tres pasados de tope son otra cosa:
+
+| día | camión | m³ | tandas | NP | % | qué es |
+|---|---|---|---|---|---|---|
+| 2026-09-16 | D71 | 9,250 | 1 | 1 | 154 % | NP 97889, Matiz SA (4263), de ISIS |
+| 2026-10-07 | D70 | 6,467 | 1 | 1 | 108 % | NP 97964, Matiz SA |
+| 2026-10-28 | D63 | 6,167 | 1 | 1 | 103 % | NP 98426, Matiz SA |
+
+**Las tres son de UNA sola NP**, así que ningún reparto de tandas las arregla: el pedido solo no
+entra en el camión. Es decisión comercial (partir el pedido, mandar dos camiones, o que el tope
+de 6 no aplique a ese cliente), no código. Problemas 270 (falta la guarda) y 271 (los 3 de Matiz).
+
+**Lo que se hizo ahora: el centinela, que avisa pero NO frena.** Mismo criterio que
+`gv_ppp_super_mezclado` (v14.23): una vista de sólo lectura que hay que mirar, no un cambio en el
+armado. Se eligió así por la regla del más seguro y reversible — meterle un tope al armado hoy
+puede dejar pedidos sin programar y todavía no está decidido qué hacer cuando no entra.
+
+```sql
+select * from public.gv_ppp_camion_pasado;   -- vacía = todo bien
+```
+
+Suma web (`PPP_Web_Programacion`) + ISIS (`gv_ppp_programacion_diaria`) por (día, camión =
+LETRA+NN), excluye `super|retira|expo` (van aparte por la regla v14.23) y la columna `que_pasa`
+separa los dos casos, que se arreglan distinto:
+- `apilado: N tandas juntas` → el automático juntó de más: ahí sirve un tope al reusar el camión;
+- `una sola NP no entra en el camion` → ningún reparto lo arregla.
+
+**Archivo:** `sql/gv_ppp_camion_pasado.sql`. `security_invoker = true` verificado.
+**Rollback:** `drop view public.gv_ppp_camion_pasado;` — no la lee ninguna pantalla todavía.
