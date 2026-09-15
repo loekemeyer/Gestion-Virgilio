@@ -85,7 +85,11 @@ begin
            cd.l_dir, cd.l_vend, cd.l_cond, cd.l_oc, cd.l_pactada, cd.l_enviado,
            cd.l_localidad, cd.l_provincia, cd.l_zona_expreso, cd.l_nombre_expreso,
            cd.l_dir_entrega, cd.l_intermediario,
-           lpad((regexp_match(it.value->>'cod_art', '\d+'))[1], 3, '0')
+           -- FIX v18.xx: lpad recortaba a 3 los códigos de 4+ dígitos (55219 → 552).
+           -- Sólo rellenar cuando tiene menos de 3; dejar intactos los de bazar.
+           (case when char_length((regexp_match(it.value->>'cod_art', '\d+'))[1]) < 3
+                 then lpad((regexp_match(it.value->>'cod_art', '\d+'))[1], 3, '0')
+                 else (regexp_match(it.value->>'cod_art', '\d+'))[1] end)
              || coalesce((regexp_match(it.value->>'cod_art', '[a-zA-Z]+'))[1], '') as l_art,
            nullif(coalesce(it.value->>'cajas', it.value->>'Cajas'), '')::numeric as l_cajas,
            nullif(it.value->>'uxb', '')::numeric as l_uxb

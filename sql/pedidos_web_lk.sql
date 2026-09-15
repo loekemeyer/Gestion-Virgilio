@@ -126,44 +126,87 @@
 --    primera corrida de dígitos a 3 posiciones + primera corrida de letras.
 --    El filtro `~ '\d'` no pierde nada: 0 de 16.137 ítems históricos no tienen
 --    dígitos (medido 2026-09-03).
+-- ⚠ DEFINICIÓN VIVA (dump de la base, no la versión histórica). Incluye el CTE
+--   `base`, las columnas de Tierra del Fuego (isis_empresa, cod_isis) y el join a
+--   `gv_isis_override` de la v13.77/v13.79. El bloque de abajo (que arrancaba con
+--   `select 'lk'::text as empresa ...`) había quedado en la versión PRE-TdF: se
+--   reemplazó acá por la viva para no repetir el pozo de "la def viva no está en el
+--   repo".
+--
+-- ⚠ FIX v18.xx (pedido web LK 1450, Matiz): el `art` se armaba con
+--   `lpad((regexp_match(cod_art,'\d+'))[1], 3, '0')`. lpad NO sólo rellena: si el
+--   código es más largo que 3, lo RECORTA a 3 (55219 y 55289 salían los dos como
+--   "552", perdían identidad y colapsaban). Ahora sólo rellena cuando tiene menos de
+--   3 dígitos y deja intactos los de 4+ (bazar de 5 dígitos). Mismo fix en la función
+--   de Chef `gv_pedidos_web_np_chef` (sql/gv_pedidos_web_np_chef_v1343.sql).
 create or replace view public.v_pedidos_web
 with (security_invoker = true) as
-select
-  'lk'::text                                                as empresa,
-  o.id                                                      as order_id,
-  it.ord::int                                               as linea_rn,
-  coalesce(o.sheets_payload->>'cod_cliente',
-           o.sheets_payload->>'codCliente')                 as cod_cliente,
-  c.business_name                                           as razon_social,
-  (o.created_at at time zone 'America/Argentina/Buenos_Aires')::date        as fecha_pedido,
-  to_char(o.created_at at time zone 'America/Argentina/Buenos_Aires',
-          'HH24:MI:SS')                                     as hora_pedido,
-  o.created_at,
-  coalesce(o.sheets_payload->>'sucursal_entrega',
-           o.sheets_payload->>'sucursalEntrega')            as sucursal_entrega,
-  o.sheets_payload->>'vend'                                 as vend,
-  coalesce(o.sheets_payload->>'condicion_pago_code',
-           o.sheets_payload->>'condicionPagoCode')          as condicion_pago_code,
-  coalesce(o.sheets_payload->>'numOC',
-           o.sheets_payload->>'numero_oc',
-           o.sheets_payload->>'numeroOC')                   as numero_oc,
-  o.sheets_payload->>'observaciones'                        as observaciones,
-  lpad((regexp_match(it.value->>'cod_art', '\d+'))[1], 3, '0')
-    || coalesce((regexp_match(it.value->>'cod_art', '[a-zA-Z]+'))[1], '')   as art,
-  nullif(coalesce(it.value->>'cajas', it.value->>'Cajas'), '')::numeric     as cajas,
-  nullif(it.value->>'uxb', '')::numeric                                     as uxb,
-  coalesce(nullif(it.value->>'cajas', ''), '0')::numeric
-    * coalesce(nullif(it.value->>'uxb', ''), '0')::numeric                  as uni,
-  o.enviado_a_compras_at
-from public.orders o
-left join public.customers c
-  on c.cod_cliente::text = coalesce(o.sheets_payload->>'cod_cliente',
-                                    o.sheets_payload->>'codCliente')
-cross join lateral jsonb_array_elements(o.sheets_payload->'items')
-     with ordinality as it(value, ord)
-where o.sheets_payload is not null
-  and jsonb_typeof(o.sheets_payload->'items') = 'array'
-  and (it.value->>'cod_art') ~ '\d';
+ WITH base AS (
+         SELECT o.id AS order_id,
+            o.created_at,
+            o.sheets_payload,
+            o.enviado_a_compras_at,
+            COALESCE(o.sheets_payload ->> 'cod_cliente', o.sheets_payload ->> 'codCliente') AS cod_cliente,
+            c.business_name AS razon_social,
+            c.cuit,
+            COALESCE(o.sheets_payload ->> 'sucursal_entrega', o.sheets_payload ->> 'sucursalEntrega') AS sucursal_entrega,
+            dir.localidad,
+            dir.provincia,
+            dir.zona_expreso,
+            dir.nombre_expreso,
+            dir.direccion_expreso,
+            COALESCE(ov.isis_empresa,
+                CASE WHEN COALESCE(dir.provincia, ''::text) ~~* '%tierra del fuego%'::text THEN 'chef'::text ELSE 'lk'::text END) AS isis_empresa
+           FROM orders o
+             LEFT JOIN customers c ON c.cod_cliente::text = COALESCE(o.sheets_payload ->> 'cod_cliente'::text, o.sheets_payload ->> 'codCliente'::text)
+             LEFT JOIN gv_isis_override ov ON ov.cuit = regexp_replace(COALESCE(c.cuit, ''::text), '\D'::text, ''::text, 'g'::text)
+             LEFT JOIN LATERAL ( SELECT d.localidad, d.provincia, d.zona_expreso, d.nombre_expreso, d.direccion_expreso
+                   FROM customer_delivery_addresses d
+                  WHERE d.customer_id = c.id AND btrim(lower(d.label)) = btrim(lower(COALESCE(o.sheets_payload ->> 'sucursal_entrega'::text, o.sheets_payload ->> 'sucursalEntrega'::text)))
+                  ORDER BY (btrim(COALESCE(d.zona_expreso, ''::text)) <> ''::text) DESC, d.slot
+                 LIMIT 1) dir ON true
+          WHERE o.sheets_payload IS NOT NULL AND jsonb_typeof(o.sheets_payload -> 'items'::text) = 'array'::text
+        )
+ SELECT 'lk'::text AS empresa,
+    b.order_id,
+    it.ord::integer AS linea_rn,
+    b.cod_cliente,
+    b.razon_social,
+    (b.created_at AT TIME ZONE 'America/Argentina/Buenos_Aires'::text)::date AS fecha_pedido,
+    to_char((b.created_at AT TIME ZONE 'America/Argentina/Buenos_Aires'::text), 'HH24:MI:SS'::text) AS hora_pedido,
+    b.created_at,
+    b.sucursal_entrega,
+    b.sheets_payload ->> 'vend'::text AS vend,
+    COALESCE(b.sheets_payload ->> 'condicion_pago_code'::text, b.sheets_payload ->> 'condicionPagoCode'::text) AS condicion_pago_code,
+    COALESCE(b.sheets_payload ->> 'numOC'::text, b.sheets_payload ->> 'numero_oc'::text, b.sheets_payload ->> 'numeroOC'::text) AS numero_oc,
+    b.sheets_payload ->> 'observaciones'::text AS observaciones,
+    ((CASE WHEN char_length((regexp_match(it.value ->> 'cod_art'::text, '\d+'::text))[1]) < 3 THEN lpad((regexp_match(it.value ->> 'cod_art'::text, '\d+'::text))[1], 3, '0'::text) ELSE (regexp_match(it.value ->> 'cod_art'::text, '\d+'::text))[1] END) || COALESCE((regexp_match(it.value ->> 'cod_art'::text, '[a-zA-Z]+'::text))[1], ''::text)) ||
+        CASE
+            WHEN b.isis_empresa = 'chef'::text AND ((CASE WHEN char_length((regexp_match(it.value ->> 'cod_art'::text, '\d+'::text))[1]) < 3 THEN lpad((regexp_match(it.value ->> 'cod_art'::text, '\d+'::text))[1], 3, '0'::text) ELSE (regexp_match(it.value ->> 'cod_art'::text, '\d+'::text))[1] END) || COALESCE((regexp_match(it.value ->> 'cod_art'::text, '[a-zA-Z]+'::text))[1], ''::text)) !~* 'L$'::text THEN 'L'::text
+            ELSE ''::text
+        END AS art,
+    NULLIF(COALESCE(it.value ->> 'cajas'::text, it.value ->> 'Cajas'::text), ''::text)::numeric AS cajas,
+    NULLIF(it.value ->> 'uxb'::text, ''::text)::numeric AS uxb,
+    COALESCE(NULLIF(it.value ->> 'cajas'::text, ''::text), '0'::text)::numeric * COALESCE(NULLIF(it.value ->> 'uxb'::text, ''::text), '0'::text)::numeric AS uni,
+    b.enviado_a_compras_at,
+    b.localidad,
+    b.provincia,
+    NULLIF(btrim(b.zona_expreso), ''::text) AS zona_expreso,
+    NULLIF(btrim(b.nombre_expreso), ''::text) AS nombre_expreso,
+    NULLIF(btrim(b.direccion_expreso), ''::text) AS direccion_expreso,
+    b.isis_empresa,
+        CASE
+            WHEN b.isis_empresa = 'chef'::text THEN ( SELECT p.cod_cliente
+               FROM chef_padron p
+              WHERE NULLIF(regexp_replace(COALESCE(p.cuit, ''::text), '\D'::text, ''::text, 'g'::text), ''::text) IS NOT NULL AND regexp_replace(COALESCE(p.cuit, ''::text), '\D'::text, ''::text, 'g'::text) = regexp_replace(COALESCE(b.cuit, ''::text), '\D'::text, ''::text, 'g'::text)
+              ORDER BY p.cod_cliente
+             LIMIT 1)
+            ELSE b.cod_cliente
+        END AS cod_isis
+   FROM base b
+     CROSS JOIN LATERAL jsonb_array_elements(b.sheets_payload -> 'items'::text) WITH ORDINALITY it(value, ord)
+  WHERE (it.value ->> 'cod_art'::text) ~ '\d'::text;
+alter view public.v_pedidos_web set (security_invoker = true);
 
 
 -- 2) Las NP ya cortadas. Esto es lo que consume Gestión Virgilio.

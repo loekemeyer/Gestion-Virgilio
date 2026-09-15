@@ -17260,3 +17260,38 @@ tanda **se muestra**, gris, con candado y sin poder tocarse, y abajo dice quién
 select opcion, texto, legajo, ts_cliente from public."Registros_Produccion_Virgilio"
  where upper(btrim(texto)) = 'E11B' and opcion in ('EP','TP','AP','TAP') order by ts_cliente;
 ```
+
+## §3.gd — v18.34 (2026-09-15) · Pedido web LK 1450 (Matiz) y truncado de códigos de 5 díg
+
+Reportado por Tomás Gonzalez: en A Programar, el pedido web **LK 1450** (Matiz, cliente 4263)
+mostraba unidades mal en 55219 y 55289. Tres cosas, no una:
+
+1. **UxB del pedido en 1.** El origen del dato NO es `order_items`, es
+   `orders.sheets_payload` (proyecto LK): el JSON traía las 2 líneas con `uxb:1, cajas:166`.
+   A Programar muestra `it.uni` del feed = `cajas × uxb` del propio pedido
+   (`index.html` `aprItemsTablaHtml`, `it.uni`), así que daba 166 un por línea.
+   **Fix (dato, "por esta vez", autorizado por Tomás):** `sheets_payload.items` de la order
+   1450 → `uxb 6/12` y `cajas 166.6667` → unidades **1000 / 2000**. Backup (restore) = el
+   JSON previo `[{uxb:1,cajas:166,cod_art:55219},{uxb:1,cajas:166,cod_art:55289}]`.
+
+2. **`v_pedidos_web` (LK) truncaba el código.** `lpad((regexp_match(cod_art,'\d+'))[1],3,'0')`
+   no sólo rellena: recorta a 3 los códigos de 4+ dígitos → 55219 y 55289 salían los dos como
+   **"552"** (identidad perdida, dos artículos colapsados). Escrito para códigos de 3 díg
+   (505, 438E); rompe el bazar de 5 díg. **Fix (código):** rellenar sólo cuando `< 3` díg,
+   dejar intactos los de 4+. Mismo fix en la función hermana de Chef `gv_pedidos_web_np_chef`.
+   Las dos conservan `security_invoker=true`; corridos los 3 chequeos de la doc:
+   anon=deny (has_table_privilege false), authenticated sin JWT = 0 filas, admin ve. Medido:
+   sólo 1 pedido (1450) tenía códigos de 5 díg en 45 días → blast radius = ese pedido.
+   Repo: `sql/pedidos_web_lk.sql` (se pisó la def vieja pre-TdF por la VIVA) y
+   `sql/gv_pedidos_web_np_chef_v1343.sql`.
+
+3. **Display de cajas.** `aprItemsTablaHtml` mostraba cajas con `aprNum(cajas,0)` (0 dec) →
+   166.6667 se veía "167". Nuevo helper `aprCajas`: entero cuando es entero, hasta 4 decimales
+   sin ceros de cola cuando es fraccionario → muestra **166,6667**. No afecta a los pedidos de
+   cajas enteras.
+
+Además, maestro `GV_UxB`: se cargó **55289 = 12** (LK y CH), que faltaba (55219 ya era 6).
+No alimenta la unidad de A Programar (esa sale del pedido), pero sí m³/conversiones futuras.
+
+Rollback: revertir el commit de `index.html`/`sql/*`, restaurar el `sheets_payload` de la
+order 1450 con el JSON de arriba, y `delete from public."GV_UxB" where cod='55289'`.
