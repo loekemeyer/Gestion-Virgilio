@@ -27,7 +27,6 @@
 --                    que no haya salido por el mail.)
 --
 -- Motivos que devuelve (un pedido puede traer más de uno):
---   anulado            → el pedido se anuló / canceló / desarmó (GV_Web_Cancelados). v18.04.
 --   enviado_a_isis     → enviado_a_compras = true, SÓLO con excluir_enviados_a_isis = 1.
 --   anterior_al_cambio → fecha_recep < gestion_desde (piso, 2026-09-03).
 --   en_produccion      → hay NP de ISIS de ese cliente con esa fecha de pedido en
@@ -57,42 +56,32 @@ values ('excluir_enviados_a_isis', 0,
         'v13.15: 1 = un pedido que salió a ISIS por el mail (enviado_a_compras) no se programa en Gestión (regla de convivencia con Producción); 0 = se programa igual (desde el 2026-09-07 todos usan Gestión). Rollback: valor = 1.')
 on conflict (clave) do nothing;
 
--- ⚠⚠ v18.04 (2026-09-15): lo de abajo es la definición VIVA, copiada tal cual de
--- `pg_get_functiondef`. El archivo que había acá hasta hoy estaba DESACTUALIZADO: le faltaban
--- `SECURITY DEFINER` y el `pg_temp` del search_path, así que aplicarlo habría roto la función
--- (sin definer, la anon no puede leer las tablas que consulta). Si se vuelve a parchear esta
--- función en la base, hay que volver a copiar el CREATE completo acá.
-CREATE OR REPLACE FUNCTION public.gv_pedidos_web_excluidos(p_pedidos jsonb)
- RETURNS TABLE(empresa text, order_id bigint, motivo text)
- LANGUAGE sql
- STABLE SECURITY DEFINER
- SET search_path TO 'public', 'pg_temp'
-AS $function$
+create or replace function public.gv_pedidos_web_excluidos(p_pedidos jsonb)
+returns table(empresa text, order_id bigint, motivo text)
+language sql
+stable
+set search_path to 'public'
+as $function$
   with cfg as (
     select coalesce((select nullif(valor_texto,'')::date from public."PPP_Web_Config" where clave = 'gestion_desde'),
                     date '9999-12-31') as desde,
-           coalesce((select valor from public."PPP_Web_Config" where clave = 'excluir_enviados_a_isis'), 1) <> 0 as excluir_enviados,
-           coalesce((select valor from public."PPP_Web_Config" where clave = 'doble_lk_dias'), 0)::int as doble_dias,
-           coalesce((select valor from public."PPP_Web_Config" where clave = 'doble_lk_mismo_dia'), 0) <> 0 as doble_mismo_dia
+           coalesce((select valor from public."PPP_Web_Config" where clave = 'excluir_enviados_a_isis'), 1) <> 0 as excluir_enviados
   ),
   corte as (select lk, chef from public.gv_espejo_corte()),
   ped as (
     select lower(coalesce(p->>'empresa','lk')) as empresa,
            (p->>'order_id')::bigint            as order_id,
            btrim(p->>'cod')                    as cod,
-           nullif(btrim(p->>'cod_alt'), '')    as cod_alt,
-           nullif(regexp_replace(coalesce(p->>'cuit',''), '\D', '', 'g'), '') as cuit,
            (p->>'fecha_recep')::date           as fecha,
-           coalesce((p->>'enviado_a_compras')::boolean, false) as enviado,
-           nullif(p->>'fc_lk', '')::date       as fc_lk
+           coalesce((p->>'enviado_a_compras')::boolean, false) as enviado
     from jsonb_array_elements(coalesce(p_pedidos, '[]'::jsonb)) p
   ),
   np_prod as (
     select regexp_replace(btrim(x.np),'\.0+$','') as np, btrim(x.cod) as cod
     from (
-      select np, cod         from public."GV_PPP_Programacion_Diaria"
+      select np, cod         from public."PPP_Programacion_Diaria"
       union all select np, cod_cliente from public."Facturacion_NP"
-      union all select np, cod         from public."GV_PPP_Entregados_Historico"
+      union all select np, cod         from public."PPP_Entregados_Meta"
       union all select np, cod_cliente from public."Entregas_Virgilio"
     ) x
     cross join corte c
@@ -101,7 +90,7 @@ AS $function$
   ),
   np_fecha as (
     select regexp_replace(btrim(pedido),'\.0+$','') as np, min(fecha::date) as fecha
-    from public."GV_PPP_Base_Pedidos" group by 1
+    from public."PPP_Base_Pedidos" group by 1
   )
   select d.empresa, d.order_id, 'enviado_a_isis'::text
     from ped d cross join cfg where d.enviado and cfg.excluir_enviados
@@ -110,46 +99,13 @@ AS $function$
     from ped d cross join cfg
    where d.fecha is null or d.fecha < cfg.desde
   union
-  -- v18.04 (problema 213) — el pedido se ANULO (o se cancelo, o se desarmo): no vuelve NUNCA.
-  -- GV_Web_Cancelados existia desde la v15.55 pero no la leia nadie: al quedar con tanda=null el
-  -- pedido volvia a contar como pendiente y el cron lo re-armaba. Medido: LK 1375, cancelado el
-  -- 11/09 "Cancelado por el cliente", tenia otra vez tanda E22A para el 28/09.
-  -- Para revivir uno a proposito hay que borrarle la fila a GV_Web_Cancelados.
-  select d.empresa, d.order_id, 'anulado'::text
-    from ped d
-   where exists (select 1 from public."GV_Web_Cancelados" x
-                  where x.empresa = d.empresa and x.order_id = d.order_id)
-  union
   select d.empresa, d.order_id, 'en_produccion'::text
     from ped d
    where exists (
      select 1 from np_prod n join np_fecha f on f.np = n.np
       where n.cod = d.cod and f.fecha = d.fecha
         and ((d.empresa = 'lk' and n.np ~ '^9') or (d.empresa = 'chef' and n.np ~ '^4'))
-   )
-  union
-  -- v13.72 -> v13.82: solo con doble_lk_mismo_dia = 1 (dueno: "eso no corresponde")
-  select d.empresa, d.order_id, 'en_produccion_lk'::text
-    from ped d cross join cfg
-   where cfg.doble_mismo_dia and d.empresa = 'chef' and d.cod_alt is not null
-     and exists (
-       select 1 from np_prod n join np_fecha f on f.np = n.np
-        where n.cod = d.cod_alt and f.fecha = d.fecha and n.np ~ '^9'
-     )
-  union
-  -- v13.75/76 -> apagado con doble_lk_dias = 0 (v13.77)
-  select d.empresa, d.order_id, 'cliente_fc_lk'::text
-    from ped d cross join cfg
-   where d.empresa = 'chef' and d.cuit is not null and cfg.doble_dias > 0
-     and (
-       (d.fc_lk is not null and d.fc_lk >= coalesce(d.fecha, current_date) - cfg.doble_dias)
-       or exists (
-         select 1 from isis_lk.documentos dd
-          where dd.familia = 'factura_venta'
-            and regexp_replace(coalesce(dd.contraparte_cuit,''), '\D', '', 'g') = d.cuit
-            and dd.fecha >= coalesce(d.fecha, current_date) - cfg.doble_dias
-       )
-     );
+   );
 $function$;
 
 grant execute on function public.gv_pedidos_web_excluidos(jsonb) to anon, authenticated;
@@ -186,12 +142,3 @@ grant execute on function public.gv_pedidos_web_excluidos(jsonb) to anon, authen
 -- está en ISIS LK (mismo cliente por CUIT, mismo día)": "ya expliqué que eso no corresponde". 'en_produccion_lk'
 -- queda detrás de PPP_Web_Config.doble_lk_mismo_dia (0). Motivos vivos: enviado_a_isis (interruptor),
 -- anterior_al_cambio, en_produccion. Probado con SET ROLE anon: 208 (cod_alt 4044, fc_lk 01/09) → sólo anterior_al_cambio.
-
--- =============================================================================
--- v18.04 (2026-09-15) — v6. Motivo NUEVO: 'anulado'. Ver §3.gh de
--- docs/SUPABASE-GESTION-VIRGILIO.md y sql/gv_pedido_anular_v1804.sql.
--- Backup de la definición anterior: sql/backups/gv_pedidos_web_excluidos_pre_v1804.sql
--- Probado con control positivo: el pedido lk/1375 (cancelado el 11/09, con tanda E22A puesta
--- por el cron después de cancelarlo) sale con motivo 'anulado'; el lk/1416, que no está
--- cancelado, no sale.
--- =============================================================================

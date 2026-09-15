@@ -16081,3 +16081,87 @@ Las fichas (`.apr-card-cuar` y su grilla) **quedan en el CSS**: las usa el resto
 cliente, zona, badges, botones, 📖 con contador, fila de detalle, apertura del log, una sola
 llamada al lote, y los tres casos de "Ya pagó": llama la RPC, saca el motivo deuda en el acto,
 avisa por qué el pedido sigue retenido, y libera al que sólo tenía deuda).
+
+---
+
+### §3.gh — v18.04: ANULAR un pedido, y el pedido cancelado que volvía solo — 2026-09-15
+
+**Pedido (Luis, 2026-09-15):** sacar el botón "Ya pagó" de Cuarentena (*"enviar pedidos a
+programar es suficiente"*) y agregar en su lugar, y también en **Pedidos a programar**, un botón
+para **anular** un pedido: *"lo saca de «a programar», a usarse para pedidos que entran erróneos,
+que quede el log de pedidos que se anulan y que requiera confirmación y comentario (quién lo hace
+y por qué)"*. En Pedidos a programar, *"visto debajo del detalle de la NP cuando se expande"*.
+
+#### 1. ⚠ El agujero que apareció al mirar esto: un pedido cancelado VOLVÍA (problema 213)
+
+`gv_ppp_np_cancelar` (v15.55) cancela un pedido web escribiendo en `GV_Web_Cancelados` y
+poniéndole `tanda = null` a `PPP_Web_Programacion`, y contesta *"fuera de la PPP; no vuelve a
+entrar"*. **Pero a `GV_Web_Cancelados` no la leía nadie**: ni `gv_pedidos_web_excluidos` (la RPC
+que decide qué entra a A Programar, y que usan también los crons 71 y 73), ni ninguna vista. Con
+`tanda = null` el pedido vuelve a contar como pendiente, así que el armado automático lo re-arma
+en la corrida siguiente.
+
+**Caso vivo, medido el 15/09:** el pedido web **LK 1375** (Andser Química SRL, cod 3905) se
+canceló el **11/09** con motivo *"Cancelado por el cliente"* … y hoy tiene **NP LK 0052, tanda
+E22A y entrega el 28/09**. Lo mismo valía para el lado web de `gv_ppp_np_desarmar`, que escribe
+en la misma tabla. El lado ISIS nunca tuvo el bug: `gv_ppp_isis_sin_tanda` ya excluye
+`NP_Canceladas`.
+
+**Arreglo:** `gv_pedidos_web_excluidos` suma el motivo **`anulado`**. Probado con control
+positivo: el 1375 sale con `anulado`, y el 1416 —que no está cancelado— no sale.
+
+⚠ **Y de paso:** el archivo `sql/gv_pedidos_web_excluidos.sql` del repo estaba **desactualizado**
+— le faltaban `SECURITY DEFINER` y el `pg_temp` del `search_path`, así que aplicarlo habría roto
+la función (sin definer, la `anon` no puede leer las tablas que consulta). Ahora el archivo tiene
+la definición **viva**, copiada de `pg_get_functiondef`, y se comprobó aplicándola.
+
+#### 2. `gv_pedido_anular` + `GV_Pedidos_Anulados` (objetos NUEVOS)
+
+`sql/gv_pedido_anular_v1804.sql`. Tres cosas parecidas que no son lo mismo:
+
+| | para qué | toca stock | la página |
+|---|---|---|---|
+| **Anular** (esto) | el pedido entró **mal** y no tiene que salir nunca | no | no se toca |
+| **Desarmar** (`gv_ppp_np_desarmar`) | ya se pickeó/armó | sí, vuelve a `a_guardar` | no se toca |
+| **Borrar** (regla del `CLAUDE.md`) | sacarlo de todos lados | — | **sí**, en los dos proyectos |
+
+- **El efecto** usa los mecanismos que ya existían, para no inventar un tercero: ISIS →
+  `NP_Canceladas` + `GV_PPP_Prog_Override.oculto`; web → `GV_Web_Cancelados` + sacarle la tanda +
+  borrarlo de `GV_PPP_Web_Retenido`.
+- **El guard:** si la tanda del pedido **ya se empezó a trabajar** (`gv_ppp_tanda_tocada`), la
+  función se niega y dice que eso se saca con **Desarmar**. Probado con las dos puntas: la NP
+  98617 (tanda previa E12I sin tocar) se anula y desaparece de `gv_ppp_isis_sin_tanda`; la 98587
+  (tanda D56D ya pickeada) frena con el mensaje.
+- **El log**, `GV_Pedidos_Anulados`, es tabla nueva y no duplicada por capricho: las dos tablas
+  del efecto guardan la mitad de la historia (`GV_Web_Cancelados` no tiene ni cliente ni m³,
+  `NP_Canceladas` sólo np/motivo/legajo) y **ninguna guarda la PERSONA** (Vivi / Marian / …), que
+  es distinta del usuario de la sesión. Acá va el snapshot completo: qué pedido, de qué cliente,
+  de cuántos m³, cuándo entró, quién lo anuló, con qué usuario y por qué.
+- RLS prendida y **sin policies**: no se lee por PostgREST, sólo por `gv_pedidos_anulados(p_dias)`
+  (security definer, puerta de supervisor). Grants: `authenticated` + `service_role`, nada para
+  `anon`. Chequeado que no quedó ninguna tabla de `public` abierta a `anon`.
+
+Todas las pruebas se corrieron dentro de un `DO … raise exception` para que se revirtieran: al
+terminar, `GV_Pedidos_Anulados` = 0 filas, `NP_Canceladas` sin las NP de prueba y
+`GV_Web_Cancelados` con la única fila vieja del 11/09.
+
+#### 3. La pantalla
+
+- **Se fue "💚 Ya pagó"** de Cuarentena, con `cuarTieneDeuda` / `cuarYaPagoBtn` / `cuarYaPago` /
+  `cuarSacarDeuda` y su CSS. La RPC `gv_cuarentena_pago` **queda en la base y arreglada**
+  (v18.01, problema 205) por si algún día se la vuelve a colgar de un botón.
+- **Cuarentena**: `✕ Anular pedido` debajo del verde, en la columna "Enviar a".
+- **Pedidos a programar**: el mismo botón **debajo del detalle**, y sólo cuando la ficha está
+  expandida — anular no se deshace desde la pantalla, así que primero hay que abrir el pedido y
+  mirar qué tiene.
+- **El cuadro** reusa el pop-up de Cuarentena con un modo nuevo (`anular`): explica qué hace,
+  pide **quién** (obligatorio, como en aprobar/devolver) y el **motivo**, que acá **también es
+  obligatorio** (≥ 5 caracteres) porque dentro de un mes el log es lo único que va a explicar por
+  qué ese pedido no salió. Después pide `confirm()` con el pedido, el motivo y la persona.
+- **El log** se abre desde el chip `✕ N anulados` de la cabecera de Pedidos a programar: cuándo,
+  qué pedido, m³, cliente, quién y por qué, de los últimos 90 días.
+
+**Tests:** `tests/apr-cuarentena.cjs` suma 15 chequeos (que "Ya pagó" no está, el botón en las dos
+columnas, que sin persona o sin motivo no anula, la confirmación, la RPC con su snapshot, el caso
+ISIS con `p_es_isis = true`, que en Pedidos a programar sólo aparece al expandir y **debajo** del
+detalle, y el log con su chip).

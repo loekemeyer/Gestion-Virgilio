@@ -317,7 +317,7 @@ catch (_e) {
     out.tblCod = /cuar-card-cod[^>]*>LK 4275</.test(html);
     out.tblZona = /Zona 1 - CABA Sur/.test(html);
     out.tblBadges = /cuar-badge b-deuda/.test(html) && /cuar-badge b-nuevo/.test(html);
-    out.tblBotones = /cuar-wpp-cob/.test(html) && /cuar-pago/.test(html) &&
+    out.tblBotones = /cuar-wpp-cob/.test(html) && /apr-anular/.test(html) &&
                      /Enviar a Pedidos a programar/.test(html);
     out.tblLibrito = /cuarComAbrirPed\('lk','900'\)/.test(html) && /📖<b>3<\/b>/.test(html);
     // la flechita abre el contenido del pedido en una fila aparte, a lo ancho de la tabla
@@ -350,25 +350,89 @@ catch (_e) {
                   lote[0].args.p_pedidos.length === 1 && lote[0].args.p_pedidos[0].clave === "900";
     out.loteN = cuarComN(retenido) === 3;
 
-    // "Ya pagó": llama a la RPC con empresa+cod y el badge de deuda se cae al toque. El pedido
-    // sigue retenido porque además es cliente nuevo, y eso se DICE.
+    // (9) v18.04 — "Ya pagó" se fue; en su lugar está ANULAR, con confirmación y comentario.
+    out.sinYaPago = !/cuar-pago/.test(html) && !/Ya pag/.test(html) &&
+                    typeof window.cuarYaPago === "undefined";
+    out.anularEnCuar = /apr-anular apr-anular-chico/.test(html) &&
+                       /aprAnularAbrir\('lk','900'\)/.test(html);
+
     llamadas.length = 0;
-    const confirmOrig = window.confirm; window.confirm = function () { return true; };
-    await cuarYaPago("lk", 900); await new Promise((res) => setTimeout(res, 150));
+    const confirmOrig = window.confirm;
+    let confirmado = null;
+    window.confirm = function (t) { confirmado = String(t || ""); return true; };
+    aprAnularAbrir("lk", "900"); await new Promise((res) => setTimeout(res, 150));
+    let anh = (document.getElementById("cuarComModal") || {}).innerHTML || "";
+    out.anuModal = /✕ Anular pedido/.test(anh) && /Zhang Qikuan/.test(anh) &&
+                   /no lo toma m[aá]s/.test(anh) && /¿Quién lo anula\?/.test(anh);
+    // sin persona no anula
+    document.getElementById("cuarComTexto").value = "lo cargó mal el cliente";
+    await aprAnularConfirmar(); await new Promise((res) => setTimeout(res, 100));
+    out.anuSinQuien = !llamadas.some(function (c) { return c.fn === "gv_pedido_anular"; }) &&
+                      /Decinos quién anula/.test((document.getElementById("cuarComModal") || {}).innerHTML || "");
+    // con persona pero sin motivo tampoco
+    cuarQuienSet("Vivi");
+    document.getElementById("cuarComTexto").value = "";
+    await aprAnularConfirmar(); await new Promise((res) => setTimeout(res, 100));
+    out.anuSinMotivo = !llamadas.some(function (c) { return c.fn === "gv_pedido_anular"; }) &&
+                       /por qué se anula/.test((document.getElementById("cuarComModal") || {}).innerHTML || "");
+    // con las dos cosas: confirma y llama a la RPC con el snapshot del pedido
+    document.getElementById("cuarComTexto").value = "pedido duplicado, lo cargó dos veces";
+    await aprAnularConfirmar(); await new Promise((res) => setTimeout(res, 150));
     window.confirm = confirmOrig;
-    const pago = llamadas.find(function (c) { return c.fn === "gv_cuarentena_pago"; });
-    out.pagoRpc = !!pago && pago.args.p_empresa === "lk" && pago.args.p_cod === "4275";
-    out.pagoSacaDeuda = (aprCuarentenaMotivos(retenido) || []).indexOf("deuda") < 0 &&
-                        (aprCuarentenaMotivos(retenido) || []).indexOf("cliente_nuevo") >= 0;
-    out.pagoAvisa = /sigue retenido por cliente nuevo/.test(String(_apr.msg || ""));
-    // el mismo pago, en un pedido cuyo ÚNICO motivo era la deuda: se va de Cuarentena
-    const soloDeuda = mk({ order_id: 902, empresa: "lk", cod: "7777", razon_social: "Solo Deuda SA",
-                           cuarentena_motivos: ["deuda"], cuarentena_detalle: { deuda: 5000 } });
-    _apr.pedidos = [soloDeuda]; _apr.pedidosTodos = [soloDeuda];
+    const anu = llamadas.find(function (c) { return c.fn === "gv_pedido_anular"; });
+    out.anuPideConfirmar = /¿Anular/.test(String(confirmado || "")) &&
+                           /pedido duplicado/.test(String(confirmado || "")) && /Vivi/.test(String(confirmado || ""));
+    out.anuRpc = !!anu && anu.args.p_empresa === "lk" && anu.args.p_clave === "900" &&
+                 anu.args.p_motivo === "pedido duplicado, lo cargó dos veces" &&
+                 anu.args.p_persona === "Vivi" && anu.args.p_es_isis === false;
+    out.anuSnapshot = !!anu && !!anu.args.p_datos && anu.args.p_datos.cod === "4275" &&
+                      anu.args.p_datos.razon_social === "Zhang Qikuan" && anu.args.p_datos.m3 === "0.172";
+    out.anuCierra = !!(document.getElementById("cuarComModal") || {}).hidden;
+
+    // una NP de ISIS viaja con p_es_isis = true
+    llamadas.length = 0;
+    const isisPed = mk({ order_id: "np98617", empresa: "lk", cod: "2381", razon_social: "Riondini Lucas",
+                         _isis: true, np: "98617", cuarentena_motivos: ["deuda"], cuarentena_detalle: { deuda: 1000 } });
+    _apr.pedidos = [isisPed]; _apr.pedidosTodos = [isisPed];
     window.confirm = function () { return true; };
-    await cuarYaPago("lk", 902); await new Promise((res) => setTimeout(res, 150));
+    aprAnularAbrir("lk", "np98617"); await new Promise((res) => setTimeout(res, 150));
+    cuarQuienSet("Marian");
+    document.getElementById("cuarComTexto").value = "la NP se tipeó mal en ISIS";
+    await aprAnularConfirmar(); await new Promise((res) => setTimeout(res, 150));
     window.confirm = confirmOrig;
-    out.pagoLibera = !aprEnCuarentena(soloDeuda) && /Sale de Cuarentena/.test(String(_apr.msg || ""));
+    const anuI = llamadas.find(function (c) { return c.fn === "gv_pedido_anular"; });
+    out.anuIsis = !!anuI && anuI.args.p_clave === "np98617" && anuI.args.p_es_isis === true &&
+                  anuI.args.p_persona === "Marian" && anuI.args.p_datos.np_label === "NP 98617";
+
+    // (10) v18.04 — en "Pedidos a programar" el botón va DEBAJO del detalle, al expandir
+    _apr.cuarCom = null; _apr.exp = {};
+    const normal = mk({ order_id: 950, razon_social: "Cliente Normal SA",
+                        bloques: [{ np_idx: 1, m3: 0.4, lineas: 1, cajas: 2, items: [{ art: "505", uni: 24, uxb: 12, cajas: 2 }] }] });
+    _apr.pedidos = [normal]; _apr.pedidosTodos = [normal];
+    aprRender(); await new Promise((res) => setTimeout(res, 150));
+    html = document.getElementById("pppPreview").innerHTML;
+    out.anuCerradoNo = !/apr-anular/.test(html);          // cerrado: el botón NO está
+    aprToggle("p950"); await new Promise((res) => setTimeout(res, 150));
+    html = document.getElementById("pppPreview").innerHTML;
+    out.anuAbiertoSi = /apr-anular-row/.test(html) && /aprAnularAbrir\('lk','950'\)/.test(html) &&
+                       html.indexOf("apr-anular-row") > html.indexOf("apr-tab");   // debajo del detalle
+
+    // (11) v18.04 — el log de anulados
+    _apr.anulados = [
+      { id: 1, empresa: "lk", clave: "1416", es_isis: false, np_label: "web LK 1416", cod: "3969",
+        razon_social: "Rodriguez Jonatan", m3: 0.024, motivo: "lo cargó mal el cliente",
+        persona: "Vivi", por: "vivi@loekemeyer.com", anulado_at: "2026-09-15T10:20:00-03:00" }
+    ];
+    aprRender(); await new Promise((res) => setTimeout(res, 120));
+    html = document.getElementById("pppPreview").innerHTML;
+    out.anuChip = /apr-anu-chip[^>]*>✕ 1 anulado</.test(html);
+    aprAnuAbrir(); await new Promise((res) => setTimeout(res, 120));
+    const lh = (document.getElementById("aprAnuModal") || {}).innerHTML || "";
+    out.anuLog = /Pedidos anulados/.test(lh) && /web LK 1416/.test(lh) &&
+                 /lo cargó mal el cliente/.test(lh) && /<b>Vivi<\/b>/.test(lh) &&
+                 /15\/09 10:20/.test(lh) && /LK 3969/.test(lh);
+    aprAnuCerrar();
+    out.anuLogCerrado = !!(document.getElementById("aprAnuModal") || {}).hidden;
 
     out.errs = null;
     return out;
@@ -477,17 +541,29 @@ catch (_e) {
   chk(r.tblCod, "la tabla conserva el chip del número de cliente (LK 4275)");
   chk(r.tblZona, "la tabla conserva la zona");
   chk(r.tblBadges, "la tabla conserva los badges de motivo");
-  chk(r.tblBotones, "la tabla conserva los botones (cobranzas, Ya pagó, Enviar a programar)");
+  chk(r.tblBotones, "la tabla conserva los botones (cobranzas, Enviar a programar, Anular)");
   chk(r.tblLibrito, "cada fila tiene el 📖 con su cantidad de comentarios");
   chk(r.tblDetalle, "la flechita abre el contenido del pedido en una fila a todo el ancho");
   chk(r.retComModal, "el 📖 de un retenido abre el log de comentarios");
   chk(r.retComClave, "el log pide los comentarios de ESE pedido (empresa + order_id)");
   chk(r.loteUna, "el contador de comentarios se pide UNA vez para toda la lista");
   chk(r.loteN, "el contador que devuelve el lote llega a la fila");
-  chk(r.pagoRpc, "'Ya pagó' llama a gv_cuarentena_pago con empresa + código de cliente");
-  chk(r.pagoSacaDeuda, "'Ya pagó' saca el motivo deuda en el acto (y deja los demás)");
-  chk(r.pagoAvisa, "'Ya pagó' avisa por qué el pedido sigue retenido");
-  chk(r.pagoLibera, "'Ya pagó' saca de Cuarentena al pedido cuyo único motivo era la deuda");
+  // v18.04 — se fue "Ya pagó" y entró "Anular pedido"
+  chk(r.sinYaPago, "el botón 'Ya pagó' ya no está (ni su función)");
+  chk(r.anularEnCuar, "Cuarentena tiene el botón '✕ Anular pedido'");
+  chk(r.anuModal, "anular abre un cuadro que explica qué hace y pide quién lo anula");
+  chk(r.anuSinQuien, "sin persona NO anula y avisa");
+  chk(r.anuSinMotivo, "sin motivo NO anula y avisa (el motivo es obligatorio)");
+  chk(r.anuPideConfirmar, "pide confirmación con el pedido, el motivo y quién lo anula");
+  chk(r.anuRpc, "llama a gv_pedido_anular con empresa, clave, motivo y persona");
+  chk(r.anuSnapshot, "manda el snapshot del pedido (cliente, código y m³) para el log");
+  chk(r.anuCierra, "al anular se cierra el cuadro");
+  chk(r.anuIsis, "una NP de ISIS viaja con p_es_isis = true y su etiqueta");
+  chk(r.anuCerradoNo, "en 'Pedidos a programar' el botón NO está con la ficha cerrada");
+  chk(r.anuAbiertoSi, "al expandir la NP aparece debajo del detalle");
+  chk(r.anuChip, "la cabecera muestra el chip '✕ N anulados'");
+  chk(r.anuLog, "el log lista cuándo, qué pedido, cliente, quién y por qué");
+  chk(r.anuLogCerrado, "el log se cierra");
   chk(errs.length === 0, "sin errores de página" + (errs.length ? " (" + errs.join(" | ") + ")" : ""));
 
   await b.close();

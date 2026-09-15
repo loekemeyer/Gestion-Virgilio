@@ -1021,11 +1021,32 @@ button {
    así que se les saca el width:100% y el grid-column que traían de la grilla de acciones. */
 .cuar-td-acc{ display:flex; flex-wrap:wrap; gap:4px; align-items:center; }
 .cuar-tbl .cuar-wpp{ width:auto; font-size:10.5px; padding:3px 8px; }
-.cuar-tbl .cuar-pago{ width:auto; grid-column:auto; font-size:11px; padding:3px 9px; }
 .cuar-tbl .cuar-enviar{ width:auto; grid-column:auto; font-size:11px; padding:4px 10px; }
 .cuar-tbl .cuar-yp-lib{ border-color:#f0d2bb; }
 .cuar-tbl .cuar-yp-lib:hover{ background:#fff1e7; }
 .cuar-tbl .cuar-yp-lib b{ color:#9a3412; }
+/* v18.04 (Luis) — ANULAR PEDIDO. Rojo y con el ✕ adelante: es la única acción de estas dos
+   columnas que no se deshace desde la pantalla, así que no tiene que parecerse a las otras.
+   La versión `-chico` es la que va en la celda "Enviar a" de la tabla de Cuarentena, debajo del
+   verde; la grande va debajo del detalle de la NP en "Pedidos a programar". */
+.apr-anular{ width:auto; margin:0; background:#fff; color:#b42318; border:1.5px solid #f3b4ad;
+  border-radius:8px; padding:6px 12px; font-size:12px; font-weight:800; cursor:pointer; white-space:nowrap; }
+.apr-anular:hover{ background:#fef2f2; border-color:#e26a5c; }
+.apr-anular-chico{ padding:3px 9px; font-size:11px; }
+/* debajo del contenido del pedido, separado y a la derecha: no se aprieta de paso */
+.apr-anular-row{ display:flex; justify-content:flex-end; margin-top:8px; padding-top:7px;
+  border-top:1px dashed #e2e8f0; }
+.cuar-tbl-det .apr-anular-row{ border-top-color:#f0ddcc; }
+/* el chip del log, en la cabecera de "Pedidos a programar" */
+.apr-anu-chip{ width:auto; margin:0 0 0 6px; background:#fff1f1; color:#b42318; border:1px solid #f3c9c4;
+  border-radius:999px; padding:2px 10px; font-size:11.5px; font-weight:800; cursor:pointer; vertical-align:1px; }
+.apr-anu-chip:hover{ background:#fee2e2; }
+.apr-anu-card{ width:min(980px, 96vw); }
+.apr-anu-tbl{ color:#0f172a; }
+.apr-anu-tbl th{ background:#f8fafc; color:#475569; border-bottom-color:#e2e8f0; }
+.apr-anu-tbl td{ border-top-color:#eef2f7; }
+.apr-anu-tbl .cuar-card-np{ color:#0f172a; font-size:13px; }
+.apr-anu-motivo{ min-width:220px; overflow-wrap:anywhere; }
 /* la fila que se abre con la flechita: el contenido del pedido, a lo ancho de toda la tabla */
 .cuar-tbl tr.cuar-tbl-det > td{ background:#fffaf5; padding:0 10px 9px 30px; }
 /* el detalle no se estira a los 1400px de la tabla: a ese ancho, "505 … 2 cajas … 24" quedaba
@@ -1098,10 +1119,6 @@ button {
    CTA verde abajo ocupando el ancho de la ficha (nunca desborda). */
 .cuar-enviar{ grid-column:1 / -1; width:100%; margin-top:0; background:#166534; color:#fff; border:none; border-radius:8px; padding:8px 10px; font-size:12.5px; font-weight:800; cursor:pointer; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; box-shadow:0 1px 2px rgba(22,101,52,.25); }
 .cuar-enviar:hover{ background:#14532d; box-shadow:0 2px 5px rgba(22,101,52,.3); }
-/* v15.46 — "Ya pagó" (cobranzas). Sólo aparece cuando el motivo incluye deuda. Va en su propia
-   fila, arriba del CTA y al ancho de la ficha: compartiendo fila, el texto del CTA se cortaba. */
-.cuar-pago{ grid-column:1 / -1; width:100%; margin-top:0; background:#fff; color:#166534; border:1.5px solid #86c79a; border-radius:8px; padding:7px 10px; font-size:12.5px; font-weight:800; cursor:pointer; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-.cuar-pago:hover{ background:#f0faf2; border-color:#4f9d68; }
 .cuar-wpp{ width:100%; max-width:none; min-width:0; margin-top:0; background:#fff; border-radius:8px; padding:6px 8px; font-size:11.5px; font-weight:700; cursor:pointer; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 .cuar-wpp-cob{ color:#0e7568; border:1px solid #9ad2ca; }
 .cuar-wpp-cob:hover{ background:#effbf8; }
@@ -3331,7 +3348,7 @@ tr.ppp-err-zona > td{ background:#fffbeb !important; }
 .pgp-dia > h3{ font-size:15px; font-weight:900; margin:0 0 4px; padding:4px 6px;
   background:#eef2f7; border-left:4px solid #333; break-after:avoid; page-break-after:avoid; }
 .pgp-dia > h3 small{ font-weight:700; font-size:12px; margin-left:8px; }
-/* v18.02 — ANCHOS AJUSTADOS AL DATO, no a porcentajes a ojo. Sigue siendo `table-layout:fixed`
+/* v18.04 — ANCHOS AJUSTADOS AL DATO, no a porcentajes a ojo. Sigue siendo `table-layout:fixed`
    con un `<colgroup>` —si cada día dimensiona su tabla sola las columnas no alinean entre días—
    pero los anchos los calcula `_pgpAnchos()` midiendo el texto real de TODA la hoja, una sola vez.
    Antes eran 17/28/22/14/7/12 fijos y sobraba medio ancho de papel sin usar. */
@@ -5384,7 +5401,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=18.03"></script>
+<script type="module" src="recepcion.js?v=18.04"></script>
 <!-- Config del módulo de fichada (compartido con fichada.html). El secret
      hmacSecret tiene que ser el mismo acá y allá; cargándolo desde un solo
      archivo evitamos que se desincronicen. -->
@@ -8824,7 +8841,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v18.03";
+const APP_VERSION = "v18.04";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -35728,7 +35745,7 @@ function pgaImprimirRango() {
   pgaImprimirRender();
 }
 /* v18.03 — NADA DE ADIVINAR EL ANCHO DEL PAPEL.
-   La v18.02 medía contra un `PGP_ANCHO_PAPEL = 718` (190 mm a 96 dpi, el útil de una A4) y con eso
+   La v18.04 medía contra un `PGP_ANCHO_PAPEL = 718` (190 mm a 96 dpi, el útil de una A4) y con eso
    elegía un font en px. Si el útil real es más ancho —y lo es— la letra queda chica y sobra aire
    adentro de cada columna: exactamente lo que se veía en la primera hoja de verdad.
 
@@ -39364,7 +39381,9 @@ let _apr = {
   // v14.90 — CUARENTENA: contacto WhatsApp (vendedor/cliente) por empresa:cod
   cuarContacto: null, cuarContactoLoading: false,
   // v18.01 — CUARENTENA: cuántos comentarios tiene cada pedido retenido (empresa:order_id → n)
-  cuarComN: null, cuarComNLoading: false
+  cuarComN: null, cuarComNLoading: false,
+  // v18.04 — log de pedidos ANULADOS (undefined = todavía no se pidió)
+  anulados: undefined, anuladosLoading: false, anuModal: false
 };
 // v14.82 — estado del pop-up de importación de reportes de cuarentena
 let _cuarImp = { open: false };
@@ -40644,6 +40663,7 @@ function aprColPedidos() {
   let h = '<div class="apr-col apr-col-nps' + (_cargando ? ' apr-col-cargando' : '') + '">' +
     '<div class="apr-col-t">📋 Pedidos a programar <b>(' + (_cargando ? '…' : lista.length) + ')</b>' +
       (viejo !== null && viejo >= 2 ? ' <span class="apr-chip apr-chip-esp' + (viejo >= 4 ? ' viejo' : ' medio') + '" title="El pedido más viejo de la lista">⏱ el más viejo, hace ' + viejo + ' días</span>' : '') +
+      aprAnuladosChip() +   // v18.04: el log de los que se anularon, a un toque
     '</div>' +
     aprPorQueHtml(lista) +
     '<input class="apr-q" type="search" placeholder="🔎 cliente, zona, localidad…" value="' + escapeHtml(_apr.q) + '" oninput="aprBuscar(this.value)">' +
@@ -40692,7 +40712,11 @@ function aprColPedidos() {
       // v14.88: si el pedido fue LIBERADO de cuarentena, mantiene el aviso acá
       (aprTieneCuarMotivos(p) ? '<div class="cuar-liberado-nota">🚧 Liberado de cuarentena</div>' + aprCuarBadgesHtml(p) : '');
     // v17.57 (Luis): el detalle es el MISMO bloque que en Cuarentena — códigos, cajas y unidades.
-    if (ab) h += '<div class="apr-card-body">' + aprContenidoHtml(p) + '</div>';
+    // v18.04 (Luis: *"agregá un botón para anular pedidos, visto debajo del detalle de la NP
+    // cuando se expande"*) — va acá adentro y no en la tarjeta cerrada a propósito: anular es
+    // irreversible desde la pantalla, así que primero hay que abrir el pedido y mirar qué tiene.
+    if (ab) h += '<div class="apr-card-body">' + aprContenidoHtml(p) +
+      '<div class="apr-anular-row">' + aprAnularBtn(p) + '</div></div>';
     h += '</div>';
   }
   return h + '</div></div>';
@@ -40846,8 +40870,11 @@ function aprColCuarentena() {
       '<td><div class="cuar-td-acc">' + cuarWppContactoBtn(p) +
         '<button class="cuar-wpp cuar-wpp-cob" onclick="cuarWppCobranzas(\'' + emp + '\',\'' + oid + '\')" title="Escribir a Vivi (cobranzas) por WhatsApp (+54 9 11 6557-4113) para que chequee este pedido">💬 A cobranzas (Vivi)</button>' +
       '</div></td>' +
-      '<td><div class="cuar-td-acc">' + cuarYaPagoBtn(p) +
+      // v18.04 (Luis): el "Ya pagó" se fue — alcanza con "Enviar a Pedidos a programar" — y en su
+      // lugar está ANULAR, para el pedido que entró mal y no tiene que salir nunca.
+      '<td><div class="cuar-td-acc">' +
         '<button class="cuar-enviar" onclick="cuarLiberar(\'' + emp + '\',\'' + oid + '\')" title="Aprobarlo: pide quién lo autoriza y un comentario, y lo manda a «Pedidos a programar»">➡ Enviar a Pedidos a programar</button>' +
+        aprAnularBtn(p, "chico") +
       '</div></td>' +
       '<td class="cuar-td-com">' + cuarComBtnHtml(p) + '</td>' +
       '</tr>';
@@ -40912,68 +40939,135 @@ async function cuarComLoteCargar() {
   if (_pppTab === "prog") aprRender();
 }
 function cuarComLoteRecargar() { _apr.cuarComN = null; _apr.cuarComNLoading = false; cuarComLoteCargar(); }
-/* v15.46 — Botón "Ya pagó" (dueño, 2026-09-11: "para que Viviana los pueda habilitar y que salgan
-   de cuarentena"). Es del CLIENTE, no del pedido: se registra el pago en `GV_Cuarentena_Pagados`
-   (RPC `gv_cuarentena_pago`) y desde ahí `gv_cuarentena_marcar` deja de marcarlo por deuda — o sea
-   salen TODOS los pedidos de ese cliente, no sólo éste. El pago vale contra el reporte de deuda
-   vigente: si mañana se sube uno más nuevo y el cliente sigue debiendo, vuelve solo a Cuarentena.
-   NO levanta "suspendido" ni "excede crédito": con esos motivos el pedido sigue retenido y se avisa.
-   ⚠ v18.01 (Luis, 2026-09-15: *"el botón ya pagó me parece que no hace nada"* — tenía razón):
-   desde que existe, la RPC abortaba SIEMPRE con `42702 column reference "empresa" is ambiguous`
-   (sus OUT params se llaman `cod` y `empresa` y el `on conflict (empresa, cod)` no sabía a cuál
-   apuntaba), así que `GV_Cuarentena_Pagados` nunca tuvo una sola fila. Arreglado en
-   `sql/gv_cuarentena_pago_v1798.sql` (problema 205), junto con el par de cliente que se guardaba:
-   ahora también el del padrón con el que se evalúa (Tierra del Fuego se mira contra Chef).
-   Acá, además, el badge de deuda se saca al toque de todos los pedidos de ese cliente: el
-   `aprCargar()` tarda ~3 s y sin eso el botón seguía "sin hacer nada" a la vista. */
-function cuarTieneDeuda(p) { return (aprCuarentenaMotivos(p) || []).indexOf("deuda") >= 0; }
-function cuarYaPagoBtn(p) {
-  if (!cuarTieneDeuda(p)) return "";
-  const cod = String((p && p.cod) || "").trim();
-  if (!cod) return "";
-  return '<button class="cuar-pago" onclick="cuarYaPago(\'' + (p.empresa || "lk") + '\',\'' + escapeHtml(String(p.order_id)) + '\')"' +
-    ' title="El cliente pagó: sale de Cuarentena por deuda (todos sus pedidos). Si además está suspendido o excede el crédito, sigue retenido.">💚 Ya pagó</button>';
+
+/* ── v18.04 — ANULAR UN PEDIDO (Luis, 2026-09-15) ────────────────────────────────────────────
+   *"Agregá un botón que sea para anular el pedido (lo saca de «a programar»), a usarse para
+   pedidos que entran erróneos, que quede el log de pedidos que se anulan y que requiera
+   confirmación y comentario (quién lo hace y por qué)"*.
+
+   ⚠ Tres cosas parecidas que NO son lo mismo, para no confundirlas al tocar esto:
+     · ANULAR (esto)  — el pedido entró MAL y no tiene que salir nunca. Sólo antes de que se
+                        toque: si la tanda ya se empezó a trabajar, el backend se niega.
+     · DESARMAR       — ya se pickeó/armó: hay que devolver stock. Otra función, otra pantalla.
+     · BORRAR         — la regla del CLAUDE.md: se borra de la página Y de Gestión, en los dos
+                        proyectos Supabase. Anular NO toca la página: el pedido sigue allá.
+
+   Todo el peso está en el backend (`gv_pedido_anular`): el efecto (NP_Canceladas + oculto para
+   ISIS, GV_Web_Cancelados + sacarle la tanda para web), el guard de la tanda tocada y el log
+   (`GV_Pedidos_Anulados`, con quién, por qué y de cuánto era el pedido). Acá sólo se junta lo
+   que hay que preguntarle a la persona. */
+function aprAnularBtn(p, tam) {
+  if (!p || p._demo) return "";
+  return '<button class="apr-anular' + (tam === "chico" ? " apr-anular-chico" : "") + '"' +
+    ' onclick="event.stopPropagation();aprAnularAbrir(\'' + (p.empresa || "lk") + '\',\'' + escapeHtml(String(p.order_id)) + '\')"' +
+    ' title="El pedido entró MAL: sacarlo de A Programar para que no lo tome ni el armado automático ni nadie. Pide quién lo anula y por qué, y queda en el log de anulados.">✕ Anular pedido</button>';
 }
-async function cuarYaPago(empresa, orderId) {
+function aprAnularAbrir(empresa, orderId) {
+  if (String(orderId) === "EJEMPLO") return;
   const key = String(empresa) + ":" + String(orderId);
   const p = (_apr.pedidosTodos || []).find(function (x) { return aprKey(x.empresa, x.order_id) === key; });
-  if ((p && p._demo) || String(orderId) === "EJEMPLO") { _apr.cuarDemo = false; aprRender(); return; }
-  const cod = String((p && p.cod) || "").trim();
-  const cli = (p && (p.razon_social || p.cod)) || ("#" + orderId);
-  if (!cod) { _apr.msg = "Ese pedido no tiene código de cliente: no se puede marcar el pago."; _apr.msgErr = true; aprRender(); return; }
-  if (!confirm("¿" + cli + " ya pagó?\n\nSalen de Cuarentena TODOS los pedidos de ese cliente que estaban retenidos por deuda.\nSi al subir el próximo reporte sigue debiendo, vuelven solos.")) return;
+  if (!p) { _apr.msg = "No encuentro ese pedido en la pantalla: recargá y probá de nuevo."; _apr.msgErr = true; aprRender(); return; }
+  cuarComAbrir({ modo: "anular", empresa: empresa || "lk", clave: String(orderId),
+    np: aprPedLabel(p), cli: p.razon_social || p.cod || "", isis: !!p._isis,
+    m3: p.m3, motivos: aprCuarentenaMotivos(p),
+    // El snapshot viaja con la llamada: es lo que el supervisor tenía delante al apretar el
+    // botón, y es lo que queda en el log aunque después el pedido cambie o desaparezca.
+    datos: { np_label: aprPedLabel(p), cod: String(p.cod || ""), razon_social: String(p.razon_social || ""),
+             m3: (p.m3 == null ? "" : String(p.m3)), fecha_recep: String(p.fecha_recep || ""),
+             zona: String(p.zona || "") } });
+}
+async function aprAnularConfirmar() {
+  const s = _apr.cuarCom; if (!s) return;
+  const ta = document.getElementById("cuarComTexto");
+  const txt = ((ta && ta.value) || "").trim();
+  const quien = cuarQuienValor(s);
+  if (!quien) { s.err = "Decinos quién anula el pedido (Vivi, Marian u Otro)."; cuarComRender(); return; }
+  // El motivo es OBLIGATORIO, a diferencia del de aprobar: dentro de un mes, el log es lo único
+  // que va a explicar por qué este pedido no salió.
+  if (txt.length < 5) { s.err = "Escribí por qué se anula. Queda en el log y es lo único que va a explicar esto mañana."; cuarComRender(); return; }
+  if (!confirm("¿Anular " + String(s.np || "") + (s.cli ? " · " + s.cli : "") + "?\n\n" +
+               "Sale de A Programar y el armado automático no lo va a tomar más.\n\n" +
+               "Motivo: " + txt + "\nLo anula: " + quien)) return;
+  s.saving = true; s.err = ""; cuarComRender();
   try {
-    const r = await aprRpc("gv_cuarentena_pago", { p_empresa: empresa || "lk", p_cod: cod });
-    const otros = (aprCuarentenaMotivos(p) || []).filter(function (m) { return m !== "deuda"; });   // v17.12: incluye cliente_nuevo, que pagar NO levanta
-    // v18.01 — que se VEA en el acto: el motivo "deuda" se cae de TODOS los pedidos de ese
-    // cliente (el pago es del cliente, no del pedido). El aprCargar() de abajo lo vuelve a
-    // calcular contra la base, así que esto es sólo para no dejar la pantalla quieta 3 segundos.
-    const nPed = cuarSacarDeuda(empresa, cod);
-    _apr.msg = "💚 " + cli + " marcado como pagado" + ((r && r[0] && r[0].deuda_al_pagar != null) ? " (deuda $" + aprNum(r[0].deuda_al_pagar) + ")" : "") + "." +
-      (otros.length ? " Ojo: el pedido sigue retenido por " + otros.map(function (m) { return m === "limite_credito" ? "límite de crédito" : m === "sin_cta_cte" ? "Sin Cta.Cte." : m === "cliente_nuevo" ? "cliente nuevo" : m; }).join(" y ") + "."
-                    : (nPed > 1 ? " Salieron de Cuarentena " + nPed + " pedidos suyos." : " Sale de Cuarentena."));
+    const r = await aprRpc("gv_pedido_anular", {
+      p_empresa: s.empresa, p_clave: s.clave, p_motivo: txt, p_persona: quien,
+      p_por: await aprQuien(), p_es_isis: !!s.isis, p_datos: s.datos || null });
+    s.saving = false; cuarComCerrar();
+    _apr.msg = "✕ " + ((r && r[0] && r[0].np) || s.np || "") + " anulado" +
+      ((r && r[0] && r[0].detalle) ? " — " + r[0].detalle : "") + ".";
     _apr.msgErr = false;
+    aprAnuladosRecargar();
     aprRender();
     aprCargar();
-  } catch (e) { _apr.msg = String((e && e.message) || e); _apr.msgErr = true; aprRender(); }
-}
-/* v18.01 — saca el motivo "deuda" de todos los pedidos del cliente que están a la vista y
-   devuelve CUÁNTOS quedaron sin ningún motivo, o sea cuántos se fueron de Cuarentena de verdad
-   (los que además están suspendidos o son clientes nuevos siguen retenidos y no se cuentan). */
-function cuarSacarDeuda(empresa, cod) {
-  const emp = String(empresa || "lk"), c = String(cod || "").trim();
-  let n = 0;
-  (_apr.pedidosTodos || []).forEach(function (x) {
-    if (x._demo || String(x.empresa || "lk") !== emp || String(x.cod || "").trim() !== c) return;
-    if (!aprEnCuarentena(x)) return;
-    const ms = (aprCuarentenaMotivos(x) || []).filter(function (m) { return m !== "deuda"; });
-    if (x.cuarentena_detalle) delete x.cuarentena_detalle.deuda;
-    if (ms.length) { x.cuarentena_motivos = ms; }
-    else { delete x.cuarentena_motivos; delete x.cuarentena_motivo; delete x.cuarentena; n++; }
-  });
-  return n;
+  } catch (e) { s.saving = false; s.err = String((e && e.message) || e); cuarComRender(); }
 }
 
+/* El LOG de anulados: quién, cuándo, qué pedido y por qué. Se abre desde el botón de la cabecera
+   de "Pedidos a programar" y es sólo de lectura — un pedido anulado no se "desanula" desde acá
+   (para revivir uno hay que borrarle la fila a GV_Web_Cancelados / NP_Canceladas a mano). */
+async function aprAnuladosCargar() {
+  if (_apr.anuladosLoading) return;
+  _apr.anuladosLoading = true;
+  try { _apr.anulados = (await aprRpc("gv_pedidos_anulados", { p_dias: 90 })) || []; }
+  catch (_e) { _apr.anulados = _apr.anulados || []; }
+  _apr.anuladosLoading = false;
+  if (_pppTab === "prog") aprRender();
+  if (_apr.anuModal) aprAnuRender();
+}
+function aprAnuladosRecargar() { _apr.anulados = undefined; _apr.anuladosLoading = false; aprAnuladosCargar(); }
+function aprAnuladosChip() {
+  if (_apr.anulados === undefined && !_apr.anuladosLoading) { aprAnuladosCargar(); return ""; }
+  const n = (_apr.anulados || []).length;
+  if (!n) return "";
+  return ' <button class="apr-anu-chip" onclick="aprAnuAbrir()" title="Pedidos anulados en los últimos 90 días: quién los anuló y por qué">✕ ' + n + ' anulado' + (n === 1 ? "" : "s") + '</button>';
+}
+function aprAnuAbrir() { _apr.anuModal = true; aprAnuRender(); }
+function aprAnuCerrar() { _apr.anuModal = false; const el = document.getElementById("aprAnuModal"); if (el) el.hidden = true; }
+function aprAnuRender() {
+  let el = document.getElementById("aprAnuModal");
+  if (!el) { el = document.createElement("div"); el.id = "aprAnuModal"; el.className = "cuar-modal"; document.body.appendChild(el); }
+  el.hidden = !_apr.anuModal;
+  if (!_apr.anuModal) return;
+  const l = _apr.anulados || [];
+  let cuerpo;
+  if (!l.length) cuerpo = '<div class="cuar-log-vacio">Todavía no se anuló ningún pedido.</div>';
+  else {
+    cuerpo = '<div class="cuar-yaprog-wrap"><table class="cuar-tbl apr-anu-tbl"><thead><tr>' +
+      '<th>Cuándo</th><th>Pedido</th><th class="cuar-td-m3">m³</th><th>Cliente</th><th>Quién</th><th>Por qué</th>' +
+      '</tr></thead><tbody>' +
+      l.map(function (r) {
+        return '<tr>' +
+          '<td class="cuar-td-fecha">' + escapeHtml(cuarFechaHora(r.anulado_at)) + '</td>' +
+          '<td><span class="cuar-card-np">' + escapeHtml(String(r.np_label || r.clave || "")) + '</span></td>' +
+          '<td class="cuar-td-m3">' + (r.m3 == null ? "—" : aprNum(r.m3) + " m³") + '</td>' +
+          '<td class="cuar-td-cli">' + (r.cod ? cuarCodChip({ empresa: r.empresa, cod: r.cod }) : "") +
+            escapeHtml(String(r.razon_social || "")) + '</td>' +
+          '<td><b>' + escapeHtml(String(r.persona || "")) + '</b>' +
+            (r.por ? '<span class="cuar-yp-por">' + escapeHtml(String(r.por)) + '</span>' : '') + '</td>' +
+          '<td class="apr-anu-motivo">' + escapeHtml(String(r.motivo || "")) + '</td>' +
+          '</tr>';
+      }).join("") + '</tbody></table></div>';
+  }
+  el.innerHTML =
+    '<div class="cuar-m-back" onclick="aprAnuCerrar()"></div>' +
+    '<div class="cuar-m-card apr-anu-card">' +
+      '<div class="cuar-m-head"><b>✕ Pedidos anulados</b>' +
+        '<button class="cuar-m-x" onclick="aprAnuCerrar()">✕</button></div>' +
+      '<div class="cuar-m-body">' +
+        '<p class="cuar-com-sub">Últimos 90 días. Un pedido anulado sale de <b>A Programar</b> y el armado ' +
+          'automático no lo toma más; el pedido de la página <b>no se borra</b>.</p>' + cuerpo +
+      '</div>' +
+    '</div>';
+}
+/* v18.04 (Luis, 2026-09-15: *"el boton ya pago me parece que no hace nada... sacalo, enviar
+   pedidos a programar es suficiente"*) — se fue el boton "💚 Ya pago" y con el
+   `cuarTieneDeuda` / `cuarYaPagoBtn` / `cuarYaPago` / `cuarSacarDeuda`. Lo que hacia (marcar al
+   CLIENTE como pagado en `GV_Cuarentena_Pagados` para que `gv_cuarentena_marcar` dejara de
+   retenerlo por deuda) sigue existiendo y ARREGLADO en la base — `gv_cuarentena_pago`, v18.01,
+   problema 205 — por si alguna vez se lo quiere volver a colgar de un boton. Desde la pantalla,
+   un pedido con deuda se suelta igual: "➡ Enviar a Pedidos a programar", que pide quien lo
+   autoriza y por que, y eso es lo que Luis queria ver. */
 /* Liberar: mandar el pedido a "Pedidos a programar" (mantiene el badge). Se auto-programa si es
    zona automática; si no, queda en la lista de arriba y se puede agregar a tandas. */
 /* v17.15 (Luis): aprobar abre un cuadro de COMENTARIO antes de mandar el pedido. El comentario
@@ -41188,6 +41282,7 @@ function cuarComRender() {
   const otro = document.getElementById("cuarComOtro");
   if (otro) s.personaOtro = otro.value;
   const aprobar = s.modo === "aprobar", devolver = s.modo === "cuarentena";
+  const anular = s.modo === "anular";   // v18.04
   let log = "";
   if (s.cargando) log = '<div class="cuar-m-load">Buscando comentarios…</div>';
   else if (!s.lista.length) log = '<div class="cuar-log-vacio">Todavía no hay comentarios en este pedido.</div>';
@@ -41204,20 +41299,22 @@ function cuarComRender() {
   el.innerHTML =
     '<div class="cuar-m-back" onclick="cuarComCerrar()"></div>' +
     '<div class="cuar-m-card">' +
-      '<div class="cuar-m-head"><b>' + (aprobar ? '➡ Enviar a Pedidos a programar' : devolver ? '🚧 Volver a Cuarentena' : '📖 Comentarios') + '</b>' +
+      '<div class="cuar-m-head"><b>' + (aprobar ? '➡ Enviar a Pedidos a programar' : devolver ? '🚧 Volver a Cuarentena' : anular ? '✕ Anular pedido' : '📖 Comentarios') + '</b>' +
         '<button class="cuar-m-x" onclick="cuarComCerrar()">✕</button></div>' +
       '<div class="cuar-m-body">' +
         '<p class="cuar-com-sub"><b>' + escapeHtml(String(s.np || "")) + '</b>' +
           (s.cli ? ' · ' + escapeHtml(String(s.cli)) : '') +
           (aprobar ? '<br>Dejá un comentario de por qué se aprueba (cobranzas lo autorizó, ya pagó, lo pidió el dueño…). Queda en el log con tu usuario, la fecha y la hora.'
                    : devolver ? '<br>Vuelve a Cuarentena: se lo <b>saca de la programación</b> (pierde tanda y fecha) y reaparece en <b>A Programar</b>, retenido. Contá por qué, queda en el log.'
+                   : anular ? ('<br>Sale de <b>A Programar</b> y el armado automático <b>no lo toma más</b>. Es para un pedido que entró <b>mal</b>. El pedido de la página <b>no se borra</b>, y esto <b>no se deshace</b> desde la pantalla.'
+                       + (s.m3 != null ? ' Son <b>' + aprNum(s.m3) + ' m³</b>.' : ''))
                    : '') + '</p>' +
         cuarQuienHtml(s, s.modo) +
         (devolver && s.tanda ? '<div class="cuar-m-warn">Sale de la tanda <b>' + escapeHtml(String(s.tanda)) + '</b>.' +
           (s.picking ? ' ⚠ Esa tanda <b>ya se empezó a trabajar</b>: lo más probable es que el servidor no deje sacarlo — primero hay que resolverlo con el depósito.' : '') +
           '</div>' : '') +
         log +
-        '<textarea id="cuarComTexto" class="cuar-com-ta" placeholder="' + (aprobar ? 'Comentario de la aprobación (opcional)' : devolver ? 'Por qué vuelve a Cuarentena (opcional)' : 'Escribí un comentario…') + '">' + escapeHtml(String(s.texto || "")) + '</textarea>' +
+        '<textarea id="cuarComTexto" class="cuar-com-ta" placeholder="' + (aprobar ? 'Comentario de la aprobación (opcional)' : devolver ? 'Por qué vuelve a Cuarentena (opcional)' : anular ? 'Por qué se anula — OBLIGATORIO (ej: lo cargó mal el cliente, pedido duplicado…)' : 'Escribí un comentario…') + '">' + escapeHtml(String(s.texto || "")) + '</textarea>' +
         (s.err ? '<div class="cuar-m-err">⚠ ' + escapeHtml(s.err) + '</div>' : '') +
       '</div>' +
       '<div class="cuar-m-foot">' +
@@ -41225,6 +41322,8 @@ function cuarComRender() {
           ? '<button class="cuar-save" ' + (s.saving ? "disabled" : "") + ' onclick="cuarLiberarConfirmar()">' + (s.saving ? "Enviando…" : "✅ Aprobar y enviar") + '</button>'
           : devolver
           ? '<button class="cuar-danger" ' + (s.saving ? "disabled" : "") + ' onclick="cuarDevolverConfirmar()">' + (s.saving ? "Sacando…" : "🚧 Volver a Cuarentena") + '</button>'
+          : anular
+          ? '<button class="cuar-danger" ' + (s.saving ? "disabled" : "") + ' onclick="aprAnularConfirmar()">' + (s.saving ? "Anulando…" : "✕ Anular pedido") + '</button>'
           : '<button class="cuar-save" ' + (s.saving ? "disabled" : "") + ' onclick="cuarComAgregar()">' + (s.saving ? "Guardando…" : "Agregar comentario") + '</button>') +
       '</div>' +
     '</div>';
@@ -41243,7 +41342,8 @@ const CUAR_PERSONAS = ["Vivi", "Marian"];
    log, y una línea sin nombre no sirve después (no se le puede volver a preguntar a nadie). */
 function cuarQuienHtml(s, modo) {
   const sel = String(s.persona || "");
-  const verbo = modo === "aprobar" ? "aprueba" : modo === "cuarentena" ? "lo devuelve" : "comenta";
+  const verbo = modo === "aprobar" ? "aprueba" : modo === "cuarentena" ? "lo devuelve"
+            : modo === "anular" ? "lo anula" : "comenta";
   let h = '<div class="cuar-quien"><div class="cuar-quien-t">¿Quién ' + verbo + '?' +
     ' <span style="color:#b42318">*</span></div>' +
     '<div class="cuar-quien-ops">';
