@@ -6209,6 +6209,11 @@ const SUPABASE_PPP_PROG_ENDPOINT       = SUPABASE_URL + "/rest/v1/gv_ppp_program
    Se unificó para poder sacar esa hoja del Apps Script y borrar la tabla chica. */
 const SUPABASE_PPP_ENTREGADOS_ENDPOINT = SUPABASE_URL + "/rest/v1/gv_ppp_entregados_meta";
 const SUPABASE_PPP_BASE_ENDPOINT       = SUPABASE_URL + "/rest/v1/gv_ppp_base_pedidos";
+/* v18.58 — tandas que se DESHICIERON a propósito (desarme de sus NPs o anulación de
+   picking/armado). El monitor las saltea en el cartel "Tandas trabajadas que NO están en
+   PPP — alguien se equivocó": si la sacamos nosotros de la programación, nadie se equivocó.
+   Vista gv_tandas_deshechas = GV_Desarmes ∪ GV_Tanda_Anulada (security_invoker). */
+const SUPABASE_TANDAS_DESHECHAS_ENDPOINT = SUPABASE_URL + "/rest/v1/gv_tandas_deshechas";
 const SUPABASE_FACTURACION_CIERRES_ENDPOINT =
   SUPABASE_URL + "/rest/v1/Facturacion_Cierres";
 // Planimetría editable (tabla Supabase). El operario/monitor la lee (anon) y la
@@ -44525,6 +44530,35 @@ function _monActividadActual(eventos, todayKey, fjHoy, nowMs, fichados) {
   out.sort(function (a, b) { return (a.idle - b.idle) || (a.sinceTs - b.sinceTs); });
   return out;
 }
+/* v18.58 — tandas deshechas a propósito (desarme de sus NPs, o picking/armado anulado).
+   El cartel "Tandas trabajadas que NO están en PPP — alguien se equivocó" salta cuando una
+   tanda tiene TP/TAP de hoy y ya no figura en la programación. Una tanda que SACAMOS
+   nosotros de la programación cumple esa condición sin que nadie se haya equivocado: pasó
+   el 15/09 con E01G, desarmada a pedido de Luis y señalada igual como error.
+   Cachea 60 s (refreshMonitor corre seguido). Si la lectura falla devuelve un Set vacío:
+   el cartel vuelve a su comportamiento viejo, nunca se queda sin monitor por esto. */
+let _tandasDeshechas = null, _tandasDeshechasTs = 0;
+const TANDAS_DESHECHAS_TTL_MS = 60 * 1000;
+async function fetchTandasDeshechas() {
+  const ahora = Date.now();
+  if (_tandasDeshechas && (ahora - _tandasDeshechasTs) < TANDAS_DESHECHAS_TTL_MS) {
+    return _tandasDeshechas;
+  }
+  const set = new Set();
+  try {
+    const filas = await supaFetchAll(SUPABASE_TANDAS_DESHECHAS_ENDPOINT, "select=tanda&order=tanda.asc");
+    for (const f of (filas || [])) {
+      const t = String(f && f.tanda || "").trim().toUpperCase();
+      if (t) set.add(t);
+    }
+    _tandasDeshechas = set;
+    _tandasDeshechasTs = ahora;
+  } catch (e) {
+    console.warn("[monitor] gv_tandas_deshechas fetch fallido:", e.message);
+    return _tandasDeshechas || set;   // lo cacheado, o vacío
+  }
+  return set;
+}
 async function fetchMonitorEvents(targetTandaKeys, sheetMap) {
   const now = new Date();
   const startToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
@@ -44655,6 +44689,8 @@ async function fetchMonitorEvents(targetTandaKeys, sheetMap) {
   //   - TODOS los días: armar perDay (dayKey -> Set<tanda> TP y Set<tanda> TAP)
   //     para alimentar las filas de los días anteriores en el monitor.
   const alertasSet = new Set();
+  // v18.58 — las tandas que deshicimos a propósito no son un error de nadie.
+  const deshechas = await fetchTandasDeshechas();
   const perDay = new Map();   // dayKey -> { donePSet, doneASet }
   for (const ev of dataB) {
     const t = (ev.texto || "").trim().toUpperCase();
@@ -44671,7 +44707,7 @@ async function fetchMonitorEvents(targetTandaKeys, sheetMap) {
     // Lógica de HOY (existente): alerts off-sheet y done-today en statusMap.
     if (tsMs >= startTodayMs && tsMs < endTodayMs) {
       if (!sheetMap.has(t)) {
-        alertasSet.add(t);
+        if (!deshechas.has(t)) alertasSet.add(t);   // v18.58
       } else {
         const s = statusMap.get(t);
         if (s) {
