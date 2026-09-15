@@ -1,3 +1,40 @@
+## Nota v18.12 (2026-09-15) — PPP: solapa «Modificar Pedidos», vacía
+
+Luis: *"vamos con otro proyecto grande. En primer lugar, vamos a crear una pestaña nueva en la PPP
+que se llame «Modificar Pedidos»"*, y al rato: *"creá la pestaña y módulo vacío, después te digo
+bien qué le ponemos"*.
+
+**Es el marco y nada más.** No trae datos, no toca nada y no decide ninguna regla de negocio: qué
+se va a poder modificar (ítems, cantidades, cliente, fecha, tanda), con qué permisos y qué pasa si
+el pedido ya se pickeó, lo define Luis.
+
+Qué quedó puesto, para que llenarlo sea sólo escribir la pantalla:
+
+- el botón en `pppTabsHtml` (id `modif`), **después de Programación**, que es lo que se va a modificar;
+- la intercepción en `pppRenderProg`, junto a la de Config. Cuarentena — o sea que **no depende de
+  que se haya importado una PPP**;
+- `pppModifHtml()`, que hoy devuelve el cartel de "módulo vacío" y es **el único lugar a tocar**;
+- la solapa **exenta del zoom** de `pppFitPantalla`, para que el módulo se escriba sin pelearse con él.
+
+`tests/ppp-modificar-pedidos.cjs` (12 chequeos) fija el marco, no una funcionalidad: que la solapa
+exista y esté donde va, que dibuje lo suyo, que **no pise el estado de las otras**, que se pueda
+volver a Programación, y que **dibujarla no dispare ni un fetch** — si algún día pide datos, ese
+chequeo avisa y ahí se decide a conciencia.
+
+### ⚠ Dos cosas del andar que conviene no repetir
+
+1. **Renumerar con un `replace` global de la versión pisa comentarios de otras sesiones.** Al pasar
+   de v18.11 a v18.12 (la paralela ya había tomado el número) el reemplazo se llevó puesto un
+   comentario ajeno del pop-up de Proyección. Renombrar **sólo las referencias propias**, una por una.
+2. **El bump va SIEMPRE con el script.** Ese mismo `sed` movió `APP_VERSION` y dejó `sw.js` y el
+   `?v=` de `recepcion.js` atrás — exactamente el desastre que `scripts/bump-version.cjs` existe
+   para evitar, y que deja al celular del operario con el JS viejo cacheado. Se arregló volviendo
+   `APP_VERSION` a la anterior y corriendo el script, que mueve los tres juntos.
+
+⚠ **`tests/proy-entregadas.cjs` está en rojo en `main`** y **no es de este cambio**: se comprobó
+corriéndolo contra `origin/main` limpio. Es de la v18.11 de la sesión paralela (el pop-up de
+Proyección). Los otros **151 tests** pasan.
+
 ## Nota v18.11 (2026-09-15) — Pop-up de Proyección: el orden que pidió el dueño
 
 Pedido textual, mirando el pop-up de 513: *"que el pop el orden visual sea este: Cod; vta;

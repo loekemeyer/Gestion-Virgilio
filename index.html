@@ -2823,6 +2823,11 @@ button.pk-anular small{ display:block; font-size:12px; font-weight:700; opacity:
 .ppp-es-row.on .ppp-es-chk{ border-color:#059669; background:#ecfdf5; }
 .ppp-es-sinsal{ border:1px solid #e2e8f0; background:#fff; color:#b45309; border-radius:7px; padding:3px 9px; font-size:13px; font-weight:800; cursor:pointer; }
 .ppp-es-sinsal:hover{ background:#fffbeb; border-color:#fde68a; }
+/* v18.12 — Modificar Pedidos: el módulo está vacío a propósito (ver `pppModifHtml`). */
+.pmod-vacio{ text-align:center; padding:56px 20px; color:#64748b; }
+.pmod-ico{ font-size:42px; line-height:1; margin-bottom:10px; opacity:.55; }
+.pmod-t{ font-size:19px; font-weight:900; color:#0f172a; margin-bottom:4px; }
+.pmod-s{ font-size:14px; }
 .ppp-es-actions{ position:sticky; bottom:0; background:#fff; border-top:1px solid #e2e8f0; padding:10px 0 4px; display:flex; gap:8px; flex-wrap:wrap; }
 .ppp-es-ok{ background:#059669; color:#fff; border:0; border-radius:9px; padding:10px 18px; font-weight:800; font-size:13.5px; cursor:pointer; width:auto; flex:0 0 auto; }
 .ppp-es-ok:disabled{ background:#cbd5e1; cursor:default; }
@@ -5436,7 +5441,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=18.11"></script>
+<script type="module" src="recepcion.js?v=18.12"></script>
 <!-- Config del módulo de fichada (compartido con fichada.html). El secret
      hmacSecret tiene que ser el mismo acá y allá; cargándolo desde un solo
      archivo evitamos que se desincronicen. -->
@@ -6248,6 +6253,9 @@ function pppFitPantalla() {
   // larga, como A Programar: no se achica, se scrollea. Antes el zoom la comprimía Y encima el log
   // tenía su propio scroll adentro, así que se veían 4 filas en una ventanita.
   if (typeof _pppTab !== "undefined" && _pppTab === "cuarcfg") { body.style.zoom = "1"; body.style.overflowY = "auto"; return; }
+  // v18.12 — Modificar Pedidos: es una pantalla de trabajo propia, no una PPP que tenga que
+  // entrar entera. Se exime desde ahora para que el módulo se escriba sin pelearse con el zoom.
+  if (typeof _pppTab !== "undefined" && _pppTab === "modif") { body.style.zoom = "1"; body.style.overflowY = "auto"; return; }
   // v17.95 (Luis, con capturas del día y la tanda abiertos: "sigue colapsando para adentro y se hacen
   // más chiquitas las filas a medida que se abren"). NO era el CSS: era ESTE zoom. La tabla de
   // Programación crece al abrir un nivel, el zoom la comprime para que entre, y cada nivel que se
@@ -8881,7 +8889,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v18.11";
+const APP_VERSION = "v18.12";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -36255,6 +36263,25 @@ function _pppTandaBlocksHtml(dk, ped) {
   }
   return html;
 }
+/* ═══ MODIFICAR PEDIDOS (v18.12, Luis 2026-09-15) ══════════════════════════════════════════
+   Pedido: *"vamos a crear una pestaña nueva en la PPP que se llame «Modificar Pedidos»"* y, al
+   rato, *"creá la pestaña y módulo vacío, después te digo bien qué le ponemos"*.
+
+   Así que esto es EL MARCO Y NADA MÁS: la solapa, su lugar en la barra y el punto donde va a
+   colgar la pantalla. No trae datos, no toca nada y no decide ninguna regla de negocio — qué se
+   va a poder modificar (ítems, cantidades, cliente, fecha, tanda), con qué permisos y qué pasa
+   si el pedido ya se pickeó, lo define Luis.
+
+   Para llenarlo: escribir el HTML en `pppModifHtml()`. La intercepción en `pppRenderProg()` ya
+   está hecha (junto a la de Config. Cuarentena) y la solapa ya está exenta del zoom automático
+   de `pppFitPantalla`. */
+function pppModifHtml() {
+  return '<div class="pmod-vacio">' +
+    '<div class="pmod-ico">✏️</div>' +
+    '<div class="pmod-t">Modificar Pedidos</div>' +
+    '<div class="pmod-s">Módulo vacío — todavía sin definir qué se modifica.</div>' +
+  '</div>';
+}
 function pppTabsHtml(cProg, cPlan, cViaje, cEnt) {
   const n = function (v) { return (v == null ? "…" : v); };
   const b = function (id, txt) {
@@ -36264,6 +36291,7 @@ function pppTabsHtml(cProg, cPlan, cViaje, cEnt) {
   return '<div class="ppp-tabs">' +
     b("prog",    "📥 A Programar (" + n(cProg) + ")") +
     b("plan",    "🗓️ Programación (" + n(cPlan) + ")") +
+    b("modif",   "✏️ Modificar Pedidos") +
     b("enviaje", "🚚 En Salida (" + n(cViaje) + ")") +
     b("resumen", "🚚 Resumen") +
     b("ent",     "✅ Pedidos Entregados (" + n(cEnt) + ")") +
@@ -36324,6 +36352,13 @@ function pppRenderProg() {
     pppPaintTabs();
     if (_apr.cuarResumen === null && !_apr.cuarResumenLoading) cuarResumenCargar();
     _renderKeepFocus(box, cuarConfigHtml());
+    return;
+  }
+  // v18.12 — Modificar Pedidos. Pantalla propia, interceptada acá arriba por lo mismo que
+  // Config. Cuarentena: no depende de que se haya importado una PPP.
+  if (_pppTab === "modif") {
+    pppPaintTabs();
+    _renderKeepFocus(box, pppModifHtml());
     return;
   }
   // v8.61 — cargar (una vez) los entregados para el aviso "salió en fecha ≠ a la PPP".
