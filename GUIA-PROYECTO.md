@@ -1,3 +1,38 @@
+## Nota v18.07 (2026-09-15) — En Salida: días hábiles, 4× más rápida, y el camionero que ya estaba
+
+Luis, después de repasar el módulo: *"hacé 1 y 2"* y *"chequeá si tenemos la info para hacer algo
+respecto a 4"*.
+
+**(1) Los días sin controlar pasan a ser HÁBILES.** El chip salta a amarillo a los 2 días y contaba
+calendario: un pedido cargado el **viernes** mostraba 3 días el **lunes** y ya salía en amarillo
+habiendo pasado 1 solo día de trabajo. Con el feriado del 07/09 en el medio, 4 en vez de 1. Lo
+cuenta `gv_dias_habiles()`, que reusa `gv_es_dia_habil()` y por lo tanto ya saltea sábados,
+domingos, `planify.feriados` y `GV_Dias_No_Habiles`.
+
+**(2) La vista bajó de 451 ms a 113 ms** (promedio de 5 corridas, 25 filas).
+
+⚠ **Acá el diagnóstico de arranque estaba MAL y sólo lo salvó medir.** Se había dicho —y escrito en
+el chat— que el costo eran los cuatro escaneos de `Registros_Produccion_Virgilio` (31.641 filas,
+cuatro veces). Medido pieza por pieza, ese escaneo son **2,9 ms**. El costo real era
+`gv_ppp_entregados_meta`: **213 ms de los 410**, llamada **dos veces**. Lo caro de esa vista es su
+CTE `vivo`, con 3 LATERAL por NP con CRN sólo para resolver cod/razón social/tanda/m³ — datos que
+En Salida no usa. Y `vivo ⊆ crn`, que la vista ya excluye. Así que se lee la fuente barata directo.
+
+La lección es la de siempre en este repo: *"el impacto medido (la consulta que lo prueba, no «no
+debería afectar»)"*. Lo mismo vale para el diagnóstico, no sólo para el resultado.
+
+**(3) El camionero ya viajaba en el evento.** El `texto` del CCN es `NP|TANDA|CAMIONERO` desde la
+v11.47 y la vista leía sólo los dos primeros campos. Se agregó la columna `camionero` al final:
+las **25/25** NP de En Salida lo tienen (Eduardo 13, Guillermo 9, Nicolás 2, Edgardo 1). **El front
+todavía no lo pinta** — queda listo para cuando se pida.
+
+Control de que (2) y (3) no cambiaron nada: `except` en las dos direcciones sobre las 22 columnas
+comunes → **0 filas de diferencia**. Y la única función que nombra la vista (`gv_ppp_avance_dias`)
+se **llamó de verdad** después del replace, no alcanza con que el `create or replace` salga limpio.
+
+Detalle, medición y rollback: `docs/SUPABASE-GESTION-VIRGILIO.md` §3.gk ·
+`sql/gv_en_salida_habiles_y_perf_v1807.sql`.
+
 ## Nota v18.03 (2026-09-15) — la hoja impresa: la letra deja de adivinar el ancho del papel
 
 Luis, sobre la hoja de la v18.02: *"font más grande, menos espacio en blanco entre columnas"*.

@@ -64,7 +64,10 @@ catch (_e) {
       chipCargado:     hOp.indexOf("Cargado al camión") >= 0,
       chipSinRegistro: hOp.indexOf("Sin registro de carga") >= 0,
       chipArmada:      hOp.indexOf("Armada") >= 0,
-      chipDias:        hOp.indexOf("4 días sin controlar") >= 0,
+      // v18.07: son días HÁBILES (gv_dias_habiles en el backend); el chip lo dice y el title explica
+      // que no cuenta sábados, domingos ni feriados.
+      chipDias:        hOp.indexOf("4 días hábiles sin controlar") >= 0 &&
+                       /no cuenta sábados, domingos ni feriados/.test(hOp),
       // la NP sin CCN tiene que estar listada
       traeLaSinCCN:    hOp.indexOf("98665") >= 0,
       traeLaCargada:   hOp.indexOf("98602") >= 0,

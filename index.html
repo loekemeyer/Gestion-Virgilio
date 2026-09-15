@@ -5414,7 +5414,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=18.06"></script>
+<script type="module" src="recepcion.js?v=18.07"></script>
 <!-- Config del módulo de fichada (compartido con fichada.html). El secret
      hmacSecret tiene que ser el mismo acá y allá; cargándolo desde un solo
      archivo evitamos que se desincronicen. -->
@@ -8859,7 +8859,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v18.06";
+const APP_VERSION = "v18.07";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -31495,7 +31495,13 @@ function _pppEsChips(p) {
   // si no llegan"): con control y sin carga NO es un error, es el paso 1 hecho y el 2 pendiente.
   if (r.control_previo && r.estado !== "cargada") out.push('<span class="ppp-es-chip" title="Paso 1 de 3 hecho (Control de Remitos). Falta el paso 2: Carga al Camión (CCN). Si ya salió, el que cargó no lo marcó.">✔ controlada · falta cargar</span>');
   const d = Number(r.dias_sin_controlar);
-  if (d >= 2) out.push('<span class="ppp-es-chip ' + (d >= 5 ? "bad" : "warn") + '">⏱ ' + d + ' día' + (d === 1 ? "" : "s") + ' sin controlar</span>');
+  /* v18.07 — son días HÁBILES, no calendario. Los cuenta `gv_dias_habiles()` en el backend, que ya
+     saltea sábados, domingos, `planify.feriados` y `GV_Dias_No_Habiles`. Con calendario, un pedido
+     cargado el viernes mostraba 3 días el lunes y el chip ya salía en amarillo (salta a los 2)
+     habiendo pasado 1 solo día de trabajo; con el feriado del 07/09 en el medio, 4 en vez de 1. */
+  if (d >= 2) out.push('<span class="ppp-es-chip ' + (d >= 5 ? "bad" : "warn") +
+    '" title="Días hábiles desde la carga al camión: no cuenta sábados, domingos ni feriados.">⏱ ' +
+    d + ' día' + (d === 1 ? "" : "s") + ' hábil' + (d === 1 ? "" : "es") + ' sin controlar</span>');
   return out.join(" ");
 }
 function _pppEsFechaCarga(p) {

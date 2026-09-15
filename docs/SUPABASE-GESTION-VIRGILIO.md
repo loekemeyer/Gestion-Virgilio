@@ -16277,3 +16277,68 @@ padding de celda 11/14 → 10/11, `.cuar-log-cli` 190 → 150px, `.cuar-log-comc
 
 **Tests:** `tests/apr-cuarentena.cjs` suma 4 chequeos (las 18 filas dibujadas, sin zoom, la pestaña
 como scroller y el log sin barra propia).
+
+---
+
+## §3.gk — v18.07: En Salida en días hábiles, 4× más rápida, y el camionero que ya estaba — 2026-09-15
+
+Pedido de Luis, después de repasar el módulo: *"hacé 1 y 2"* (días hábiles y performance) y
+*"chequeá si tenemos la info para hacer algo respecto a 4"* (mostrar el camión / el fletero).
+
+### (1) `dias_sin_controlar` pasa a días HÁBILES
+
+El chip de En Salida salta a amarillo a los 2 días y a rojo a los 5, y contaba **días calendario**.
+Efecto medido:
+
+| caso | calendario | hábiles | |
+|---|---|---|---|
+| cargado viernes, mirado el lunes | 3 | **1** | antes salía en amarillo, ahora no |
+| cargado viernes 4, mirado martes 8 (lunes 7 = Día del Metalúrgico) | 4 | **1** | antes salía en amarillo, ahora no |
+| cargado jueves, mirado el lunes | 4 | **2** | sigue en amarillo, correcto |
+| cargado ayer | 1 | 1 | igual |
+
+Lo cuenta `gv_dias_habiles(desde, hasta)`, nueva, que reusa `gv_es_dia_habil()` — o sea que ya
+mira `planify.feriados` **y** `GV_Dias_No_Habiles`. No cuenta el día de partida.
+
+### (2) 451 ms → 113 ms
+
+⚠ **El diagnóstico de arranque estaba equivocado y la medición lo corrigió.** Se había dicho que
+el costo eran los cuatro escaneos de `Registros_Produccion_Virgilio` (31.641 filas, cuatro veces).
+Medido pieza por pieza, ese escaneo son **2,9 ms**. El costo real era `gv_ppp_entregados_meta`:
+**213 ms de los 410**, y la vista la llamaba **dos veces** (el CTE `meta` y la rama 3 de `isis`).
+
+Lo caro de esa vista es su CTE `vivo`, que hace **3 LATERAL join** por cada NP con CRN sólo para
+resolver cod / razón social / tanda / m³. Acá esos datos **no se usan**: `meta` sólo necesita la
+lista de NP. Y además `vivo ⊆ crn`, que esta vista ya excluye con `k.np IS NULL`, así que lo único
+que `meta` aportaba de verdad era el histórico del Sheet. Se lee entonces
+`GV_PPP_Entregados_Historico` directo, **con el mismo filtro de espejo y de `oculto`**.
+
+Medición (promedio de 5 corridas, 25 filas): **451 ms → 113 ms**, un 75 % menos.
+
+Control de que no cambió nada: `except` en las dos direcciones sobre las 22 columnas comunes →
+**0 filas de diferencia**; 0 NP del histórico coladas; 0 NP con CRN coladas.
+
+### (3) El camionero ya viajaba en el evento
+
+`texto` del CCN es **`NP|TANDA|CAMIONERO`** desde la v11.47 (la Carga Camión pide el fletero con
+autocompletado contra la tabla `Camioneros`) y la vista sólo leía los dos primeros campos. Se
+agrega la columna `camionero` **al final** (aditiva). Medido: las **25/25** NP de En Salida lo
+tienen — Eduardo 13, Guillermo 9, Nicolás 2, Edgardo 1.
+
+Histórico: 154 de 927 CCN traen camionero, porque la captura es de la v11.47 y los *retira* van sin
+fletero por diseño.
+
+**El front todavía NO lo pinta**: la columna queda lista para cuando se pida.
+
+### Front
+
+Sólo el texto del chip: *"⏱ N días hábiles sin controlar"*, con `title` que aclara que no cuenta
+sábados, domingos ni feriados.
+
+**Rollback:** definición anterior en `zz_backups."GV_Backup_Funcdefs_20260915"`.
+**Archivo:** `sql/gv_en_salida_habiles_y_perf_v1807.sql`.
+**No toca Producción:** objetos todos nuestros (`gv_*`), la vista sólo lee, `security_invoker = true`,
+`anon` con SELECT y sin INSERT/UPDATE. La única función que nombra la vista
+(`gv_ppp_avance_dias`) se **llamó de verdad** después del replace — un `create or replace` limpio
+no prueba nada.
+**Tests:** `tests/ppp-ensalida-estado.cjs`, `tests/ppp-en-salida.cjs` → OK.
