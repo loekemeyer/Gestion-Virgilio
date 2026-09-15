@@ -15762,3 +15762,72 @@ que era justo el motivo de ocultarla. (⚠ El `CLAUDE.md` dice que esa RPC salte
 lo hace**.) Tocarla cambia qué pedidos entran a A Programar, así que va medido y aparte. Las de
 cobranzas / valorización se dejan como están a propósito: si una NP cancelada debe seguir
 valorizada en el histórico lo decide el dueño.
+
+---
+
+### §3.fp — v17.97: la tarea de Cuarentena decía el motivo equivocado y pedía el trámite equivocado
+
+**Cómo apareció.** Buscando por qué los pedidos web LK **1441** (Goldar Héctor Maximiliano) y
+**1442** (Castro Ana Adelina), entrados el 14/09, no tenían NP mientras el 1440 sí. No era una
+falla: los dos están **retenidos en Cuarentena** por `cliente_nuevo`, y un pedido en cuarentena
+no se programa solo — sale de `p_filas` en `soloPendientes()` antes de llegar al armado. El
+pipeline hizo exactamente lo que tiene que hacer. Lo que estaba mal era lo que Viviana leía.
+
+**Los dos errores, medidos el 15/09.**
+
+| Qué decía la tarea de Planify | Qué era en realidad |
+|---|---|
+| "Suspendido" | `GV_Cuarentena_Log` dice `cliente_nuevo`; `GV_Cuarentena_Fuente` dice `estado = Activo`, `suspendido = false`, límite $4.000.000 (4185) y $1.200.000 (4200) |
+| "chequear si el cliente pago … tocar «Ya pago» y el pedido sale solo" | `Ya pago` escribe en `GV_Cuarentena_Pagados` y sólo apaga el motivo `deuda`. Con `cliente_nuevo` el pedido queda igual de retenido — el propio front lo avisa (`aprCuarentenaPagar`, v17.12) |
+
+1. **El rótulo.** El texto lo armaba la Edge Function `gv-ppp-web-tandas-diarias` con un `else`
+   cajón de sastre: `deuda` → "Deuda $X", `sin_cta_cte` → "Sin Cta.Cte.", **y todo lo demás** →
+   "Suspendido". Cuando nació el motivo `cliente_nuevo` heredó el cartel de otro. El camino de
+   ISIS nunca tuvo el bug (`gv_cuarentena_isis_pedidos` rotula "Cliente nuevo" bien: tareas
+   np98587–np98590), así que la misma pantalla mostraba dos verdades del mismo motivo.
+2. **El trámite.** El renglón "Falta: …" de la nota era **fijo** en
+   `gv_cuarentena_planify_sync`, igual para los cuatro motivos.
+
+**Qué se cambió.** El texto pasó al backend, que es donde manda el protocolo del repo: lo arma
+`gv_cuarentena_planify_sync` (`sql/gv_cuarentena_planify_nota_v1797.sql`).
+
+- Pide los **códigos** de motivo a **`gv_cuarentena_marcar_calc`** — la variante **pura**. Usar
+  `gv_cuarentena_marcar` habría metido un `INSERT` en `GV_Cuarentena_Log` en cada vuelta del
+  cron 73 (cada 5 min). Medido después del cambio: **0 filas nuevas de log**.
+- Los traduce con un mapa **explícito** (`deuda` · `sin_cta_cte` · `cliente_nuevo` ·
+  `suspendido`) y lo desconocido cae al código crudo: se lee feo, pero no miente.
+- Del texto que manda la Edge Function conserva **sólo** `Supera el limite de credito por $X`,
+  que necesita los ítems del pedido y lo calcula `gv_cuarentena_limite`. Si el cálculo no
+  devuelve nada para ese pedido, se usa el texto recibido tal cual, como antes.
+- Los pesos se formatean en SQL con `to_char(... ,'FM999,999,999,990.00')` + el swap de
+  separadores: da `$1.496.318,01`, idéntico a `toLocaleString("es-AR")` de la Edge Function.
+- El renglón de acción ahora depende del motivo:
+
+| Motivo | Renglón |
+|---|---|
+| sólo deuda | "chequear si el cliente pago … «Ya pago» … y el pedido sale solo" (correcto para ese caso) |
+| deuda + otra cosa | cobrar **y** "aun pagando el pedido sigue retenido por <lo otro>" |
+| sin deuda | "revisar y liberar si corresponde. El boton «Ya pago» NO lo saca: no esta retenido por deuda" |
+
+**Prueba, con rollback.** Se llamó a la función dentro de un `DO` que termina en `raise`,
+pasándole a propósito el motivo **equivocado**:
+
+| Entrada | Salió |
+|---|---|
+| cod 4200, motivo `"Suspendido"` | **"Cliente nuevo"** + "El boton «Ya pago» NO lo saca" |
+| cod 118, motivo `"Deuda $0,00"` | **"Deuda $1.496.318,01"** + el renglón de cobrar |
+
+Después: 0 tareas de prueba, 0 filas en el ledger, **13 tareas abiertas** (las mismas de antes)
+y 0 filas nuevas en `GV_Cuarentena_Log`.
+
+**Lo que NO se tocó.** Las **2 tareas ya abiertas** con el rótulo viejo (3356 del pedido 1441 y
+3371 del 1442) siguen diciendo "Suspendido": reescribir una nota es tocar datos y eso se pide.
+El fix vale para toda tarea nueva. Para arreglar esas dos hay que correr el `update` de
+`planify.tasks` que está en el chat, o cerrarlas a mano y dejar que el cron las vuelva a abrir.
+
+**Rollback:** `sql/backups/gv_cuarentena_planify_sync_20260915_pre_v1797.sql` (la definición viva
+de antes, tal cual salió de `pg_get_functiondef`).
+
+**La Edge Function también quedó con el mapa explícito** en el repo, pero **no se redeployó**:
+con el backend dueño del rótulo su texto ya no se usa para nada salvo el exceso de límite. Se
+deja arreglado para que las dos puntas digan lo mismo cuando toque el próximo deploy.

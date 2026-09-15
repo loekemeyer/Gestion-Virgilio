@@ -296,9 +296,28 @@ async function pedidosEnCuarentena(emp: "lk" | "chef", filas: Fila[], sync = tru
       const id = String(r.order_id);
       out.add(id);
       for (const m of (r.motivos ?? [])) {
+        // v17.97 — UN MOTIVO NUEVO NO PUEDE HEREDAR EL CARTEL DE OTRO. Hasta acá el
+        // `else` era cajón de sastre y rotulaba "Suspendido" a todo lo que no fuera
+        // deuda ni Sin Cta.Cte. Cuando apareció `cliente_nuevo`, a Viviana le llegaron
+        // los pedidos LK 1441 y 1442 como "Suspendido" con los dos clientes en estado
+        // Activo y `suspendido = false` — el dato estaba bien, el cartel no. El camino
+        // de ISIS (`gv_cuarentena_isis_pedidos`) ya rotulaba "Cliente nuevo" bien, así
+        // que la misma pantalla mostraba dos verdades distintas del mismo motivo.
+        // Ahora el mapa es explícito y lo desconocido cae al nombre crudo del motivo:
+        // se lee feo, pero no miente ni manda a hacer el trámite equivocado.
+        //
+        // ⚠ ESTE TEXTO YA NO ES LA FUENTE DEL ROTULO. La misma v17.97 movió el armado
+        // del motivo a `gv_cuarentena_planify_sync`, que pide los códigos a
+        // `gv_cuarentena_marcar_calc` y los traduce él (protocolo del repo: la lógica de
+        // negocio vive en el backend). De lo que sale de acá el backend sólo conserva
+        // "Supera el limite de credito por $X", que necesita los ítems y lo calcula
+        // `gv_cuarentena_limite`. El mapa de abajo queda igual de explícito para que las
+        // dos puntas digan lo mismo el día que algo más lea este campo.
         if (m === "deuda") sumar(id, "Deuda " + pesos(r.deuda));
         else if (m === "sin_cta_cte") sumar(id, "Sin Cta.Cte.");
-        else sumar(id, "Suspendido" + (r.estado ? " (" + r.estado + ")" : ""));
+        else if (m === "cliente_nuevo") sumar(id, "Cliente nuevo");
+        else if (m === "suspendido") sumar(id, "Suspendido" + (r.estado ? " (" + r.estado + ")" : ""));
+        else sumar(id, m);
       }
     }
     for (const r of (lim ?? [])) {
