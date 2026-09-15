@@ -1,3 +1,66 @@
+## Nota v18.29 (2026-09-15) — Quién y por qué (obligatorios), y el badge «modificado» en Facturación
+
+Tres cosas que pidió Luis sobre «Modificar Pedidos»:
+
+**1. Sin justificativo no se guarda.** El campo «por qué se modifica» pasó a ser obligatorio, y
+**la regla también está en el backend** (`gv_pedido_mod_guardar` corta con «Falta el justificativo»,
+y la columna `motivo` del log es `NOT NULL` y no acepta vacío). El botón «Guardar» queda apagado y
+dice al lado qué falta: *«Todavía no cambiaste nada» / «Falta elegir quién hace la modificación» /
+«Falta el justificativo»*.
+
+**2. «¿Quién hace la modificación?»** — desplegable con los nombres de la tabla
+`GV_Modif_Personas` (arranca con **Mariana**) y la opción **➕ Agregar nombre…**, que da de alta al
+nuevo en esa misma tabla (`gv_modif_persona_agregar`) y lo deja elegido. El navegador recuerda el
+último elegido. **Lo que se guarda en el log es el NOMBRE**, además del mail de la sesión.
+
+**3. Badge ✏ MOD en la columna NP de Facturación.** Luis: *"un cliente que manda un pedido y después
+llama para cambiar algo … en el módulo de facturación debería tener un badge al lado del código en
+la columna NP que indique que fue modificado y que si alguien lo aprieta o le pone el mouse encima
+diga qué cambio se le hizo (para que se pueda facturar a mano correctamente en ISIS)"*. El globito
+resume los cambios; tocándolo se ve quién, cuándo, qué y por qué, con el aviso de facturar **con
+eso, no con el pedido original**. La **dirección** entra en ese resumen porque es la que el
+facturador tiene que pasar bien en el Excel que se exporta.
+
+**4. La columna Estado, que no se veía.** Luis mandó la foto: la tabla llegaba hasta «Tanda» y
+Estado no estaba. No faltaba: **la tapaba el arreglo del botón**. Al anclar la última columna
+(v18.19) esa celda se queda quieta encima de lo que scrollea debajo, y lo que quedaba debajo era
+justo la columna de al lado. Ahora se anclan **las dos**, con la del botón de ancho fijo (126 px)
+para que Estado sepa a qué distancia pararse. El test lo mide con `elementFromPoint`, que es lo
+único que prueba «no está tapado» — mirar el rectángulo no alcanza, porque el rectángulo está igual
+aunque tenga otra celda encima (control negativo corrido: sin el anclaje, el punto del chip cae
+fuera del contenedor y `elementFromPoint` devuelve el fondo).
+
+**5. Un pedido que vuelve a A Programar YA ARMADO lo dice.** Luis: *"si se manda un pedido ya armado
+«A programar» debería quedar con la info de que el pedido ya está armado. Fijate que sea posible"*.
+**Es posible y no hizo falta backend nuevo**: cuando un supervisor saca una NP de su tanda,
+`GV_PPP_Web_Retenido` ya guarda de qué tanda venía y si esa tanda **ya se pickeó o ya se armó**
+(v17.85), y A Programar trae esos tres campos pegados al pedido. Entonces el Estado sale de ahí
+—**Armado** o **En proceso**— y la columna Tanda muestra **a cuál vuelve** con un «↩ vuelve», que es
+justo lo que no hay que volver a pickear. El que nunca se programó no tiene memoria: ése sigue en
+**A programar** (se dejó ese texto y no «Pendiente» porque dice más, y el borde violeta de la fila
+lo sigue marcando).
+
+### El log se mudó a Gestión (y LK escribe acá por FDW)
+
+Facturación es pantalla de Gestión y lee con la anon key, así que el log tiene que estar de este
+lado. Medido el 15/09 en transacción abortada: **LK sí puede ESCRIBIR en Virgilio** por el FDW
+(`insert` de prueba → `rows=1`). Entonces `gv_pedido_mod_guardar` (que corre en LK, donde vive el
+pedido) escribe el log en `public."GV_Pedido_Mod_Log"` **de Gestión**, por foreign table, **en la
+misma transacción** en la que cambia el pedido: si el log falla, el pedido no se modifica. La tabla
+de log que la v18.23 había creado en LK se dropeó (estaba vacía).
+
+⚠ **Trampa de `postgres_fdw`**: la foreign table **no** declara la columna `id`. Si se la declara,
+el INSERT remoto manda todas las columnas —`id` incluida, como NULL— y revienta contra el
+`not null` del `bigserial`. Sin declararla, el default del otro lado se aplica solo.
+
+La vista `gv_pedido_mod_np` arma **una fila por NP** (que es como mira Facturación) y, además de las
+NP guardadas en el momento del cambio, resuelve **las que el pedido tiene hoy**: si se volvió a
+partir después de la modificación, el badge igual aparece donde corresponde (medido: una
+modificación cargada con 2 NP salió con 3).
+
+**Lo que falta**: modificar pedidos **de ISIS** desde la pantalla (hoy avisa que se tipean en ISIS)
+y los de **Chef** (su base no acepta escritura desde acá). `sql/gv_pedido_mod_v1829.sql`, §3.gz.
+
 ## Nota v18.23 (2026-09-15) — Modificar Pedidos: ya modifica de verdad, con log
 
 Luis: *"la idea es que se puedan modificar aspectos de los pedidos acá y que esas modificaciones se

@@ -16914,3 +16914,41 @@ Los cuatro que tienen que quedar en el mismo número son ahora: `APP_VERSION` (i
 Ctrl+F5 una última vez**. A partir de esa recarga, el banner vuelve a avisar solo.
 
 Problema **241**.
+## §3.gz — v18.29: el log de modificaciones se muda a Gestión, y el badge MOD en Facturación — 2026-09-15
+
+**Reemplaza a §3.gu.** Lo aplicado está entero en `sql/gv_pedido_mod_v1829.sql`.
+
+**En Gestión (`hrxfctzncixxqmpfhskv`):**
+
+| Objeto | Qué es |
+|---|---|
+| `public."GV_Modif_Personas"` | quiénes pueden figurar como autor del cambio. Semilla: **Mariana**. RLS: lee `anon`/`authenticated`/`lk_ppp_reader`; escribe sólo la RPC |
+| `gv_modif_persona_agregar(nombre, por)` | el ➕ del desplegable. `SECURITY DEFINER`, sólo `authenticated` |
+| `public."GV_Pedido_Mod_Log"` | el log, canónico. `motivo` **NOT NULL y no vacío** (el justificativo obligatorio es regla de la base). `insert` sólo para `lk_ppp_reader` (el rol del FDW) con su policy |
+| `gv_pedido_mod_resumen(detalle)` | el texto corto del globito: `027: 1→7 cajas · + 025 ×3 · entrega: A → B` |
+| `gv_pedido_mod_np` | **una fila por NP** para Facturación: `np, mods, ultima, resumen, cambios`. `security_invoker` |
+
+**En LK (`kwkclwhmoygunqmlegrg`):** `virgilio."GV_Pedido_Mod_Log"` (foreign table, **sin la columna
+`id`**), `gv_pedido_mod_guardar` con dos parámetros nuevos (`p_nps`, y `p_quien` que ahora es el
+NOMBRE) y las dos guardas nuevas, y `gv_pedido_mod_ctx` leyendo el log del otro lado. Se dropeó la
+tabla de log local de la v18.23 (vacía) y la firma vieja de `gv_pedido_mod_guardar`.
+
+**Por qué del otro lado.** Facturación es pantalla de Gestión y lee con la anon key. Medido el
+15/09 (transacción abortada): **LK puede escribir en Virgilio por el FDW** —`insert` de prueba en
+`virgilio.gv_ppp_web_diferido` → `rows=1`— así que el log se escribe en Gestión desde la función de
+LK, **en la misma transacción** que el cambio del pedido.
+
+⚠ **Trampa de `postgres_fdw`, con su error exacto:** con la columna `id` declarada en la foreign
+table, el primer intento devolvió `ERROR 23502: null value in column "id" ... violates not-null
+constraint`, y el CONTEXT mostró que el INSERT remoto manda **todas** las columnas declaradas. La
+foreign table no declara `id`.
+
+**Prueba (15/09, transacción abortada, pedido 1445):** sin motivo → corta; sin quién → corta; con
+las dos cosas → el pedido cambia, y el log aparece **en Gestión** con `nps={"LK 0091","LK 0092"}` y
+el detalle correcto. Después del rollback, 0 filas de log de los dos lados y el pedido intacto.
+
+**Rollback:** en LK, volver a `sql/gv_pedido_mod_v1823.sql` y
+`drop foreign table virgilio."GV_Pedido_Mod_Log";`. En Gestión,
+`drop view public.gv_pedido_mod_np; drop function public.gv_pedido_mod_resumen(jsonb);`
+`drop table public."GV_Pedido_Mod_Log"; drop table public."GV_Modif_Personas";`
+`drop function public.gv_modif_persona_agregar(text,text);` (mejor conservar el log).

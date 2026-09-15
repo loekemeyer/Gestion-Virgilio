@@ -83,7 +83,14 @@ catch (_e) {
         m3: 0.3, lineas: 3, cajas: 5, bloques: [{ np_idx: 1 }, { np_idx: 2 }] },
       { order_id: 217, empresa: "chef", cod: "2533", razon_social: "Osa Hermanos",
         fecha_recep: "2026-09-13", zona: "Zona 2 - CABA Centro", localidad: "Almagro",
-        m3: 0.9, lineas: 2, cajas: 4, bloques: [{ np_idx: 1 }] }
+        m3: 0.9, lineas: 2, cajas: 4, bloques: [{ np_idx: 1 }] },
+      /* v18.29 (Luis) — el que un supervisor sacó de su tanda YA ARMADO: en A Programar tiene que
+         seguir diciendo que está armado y a qué tanda vuelve, no volver a "pendiente". Los tres
+         campos los pega `aprTraerPedidos` desde `GV_PPP_Web_Retenido`. */
+      { order_id: 1372, empresa: "lk", cod: "5555", razon_social: "Volvio Armado SA",
+        fecha_recep: "2026-09-12", zona: "Zona 1 - CABA Sur", localidad: "Soldati",
+        m3: 0.4, lineas: 1, cajas: 2, bloques: [{ np_idx: 1 }],
+        tanda_previa: "E12L", ya_pickeada: true, ya_armada: true }
     ];
 
     document.getElementById("pppOverlay").classList.add("show");
@@ -148,8 +155,11 @@ catch (_e) {
     window.confirm = function () { return true; };
     window.pwebLkToken = async function () { return "tok"; };
     window.aprQuien = async function () { return "luis@lk"; };
+    // aprRpc pide las cabeceras de escritura (sesión de supervisor): sin esto la RPC ni sale
+    window.facAuthWriteHeaders = async function () {
+      return { apikey: "k", Authorization: "Bearer t", "Content-Type": "application/json" }; };
     window.pppLoadProgFromSupabase = async function () {};
-    const lk = [];
+    const lk = []; const personas = [{ id: 1, nombre: "Mariana" }];
     const J = (d) => Promise.resolve({ ok: true, status: 200, json: () => Promise.resolve(d),
       text: () => Promise.resolve(JSON.stringify(d)), headers: { get: () => null } });
     const CTX = {
@@ -169,6 +179,10 @@ catch (_e) {
       const u = String(url), b = (opt && opt.body) ? JSON.parse(opt.body) : null;
       if (/rpc\/gv_pedido_mod_ctx/.test(u))     { lk.push(["ctx", b]);     return J(CTX); }
       if (/rpc\/gv_pedido_mod_guardar/.test(u)) { lk.push(["guardar", b]); return J({ ok: true, log_id: 7, detalle: {} }); }
+      if (/GV_Modif_Personas/.test(u)) return J(personas.slice());
+      if (/rpc\/gv_modif_persona_agregar/.test(u)) {
+        lk.push(["persona", b]); personas.push({ id: personas.length + 1, nombre: b.p_nombre });
+        return J([{ id: personas.length, nombre: b.p_nombre }]); }
       if (/\/rest\/v1\/(products|loke_products)/.test(u))
         return J([{ cod: "027", description: "Aceite", uxb: 24 }, { cod: "544", description: "Fideos", uxb: 12 },
                   { cod: "601", description: "Arroz", uxb: 6 }]);
@@ -197,18 +211,35 @@ catch (_e) {
     out.modalSinStock = /🕒/.test(ov.innerHTML);
     out.guardarApagado = !!(ov.querySelector(".pme-ok") || {}).disabled;   // sin cambios no se guarda
 
+    out.personas = [...ov.querySelectorAll(".pme-sel")].map((s) => s.textContent).join(" | ");
+
     // (c) 2 -> 5 cajas del 027 y se agrega el 601
     pmodCajas(0, "5");
     ov.querySelector("#pmeNuevoCod").value = "601";
     ov.querySelector("#pmeNuevoCj").value = "4";
     pmodAgregar();
     out.filasDespues = [...document.querySelectorAll("#pmodOverlay .pme-tab tbody tr")].length;
-    out.guardarPrendido = !document.querySelector("#pmodOverlay .pme-ok").disabled;
+    /* v18.29 (Luis) — con cambios pero SIN quién ni justificativo NO se guarda. Los dos chequeos
+       de abajo son la parte que importa: que el botón siga apagado y que diga qué falta. */
+    const btnOk = () => document.querySelector("#pmodOverlay .pme-ok");
+    out.sinQuien = !!btnOk().disabled && /quién/i.test(btnOk().title);
+    await pmodQuien("Mariana");
+    out.sinMotivo = !!btnOk().disabled && /justificativo/i.test(btnOk().title);
+    pmodMotivo("el cliente llamó para sumar cajas");
+    out.guardarPrendido = !btnOk().disabled;
+    // y agregar un nombre nuevo va a la tabla de Gestión
+    window.prompt = function () { return "Luis"; };
+    await pmodQuien("__nueva"); await esperar();
+    out.personaNueva = JSON.stringify((lk.filter((x) => x[0] === "persona")[0] || [])[1] || {});
+    out.quedoElegido = /Luis/.test((document.getElementById("pmeQuien") || {}).value || "");
+    await pmodQuien("Mariana");
     await pmodGuardar(); await esperar();
     const g = (lk.filter((x) => x[0] === "guardar")[0] || [])[1] || {};
     out.guardo = JSON.stringify(g.p_items || []);
     out.guardoEspera = JSON.stringify(g.p_espera || []);
     out.guardoQuien = g.p_quien;
+    out.guardoMotivo = g.p_motivo;
+    out.guardoNps = JSON.stringify(g.p_nps || []);
     out.cerroAlGuardar = !abierto();
 
     /* v18.19 (Luis) — dos cosas de esta tanda:
@@ -218,6 +249,16 @@ catch (_e) {
            Acá se fuerza el desborde achicando el wrap y se exige que el botón siga adentro con el
            scroll a la izquierda del todo. `stickyDesborda` es el control de no-trivialidad: sin
            desborde el chequeo pasaría solo. */
+    /* v18.29 (Luis) — (1) *"que figure el estado"*: con la tabla desbordada, la columna anclada
+       del botón se quedaba ENCIMA de Estado y lo tapaba. Se mide con elementFromPoint, que es lo
+       único que prueba "no está tapado": mirar el rect no alcanza, porque el rect está igual
+       aunque tenga otra celda encima. (2) el que volvió a A Programar ya armado. */
+    const pArm = f.find((x) => /Volvio Armado/.test(x.rs));
+    out.armadoDice = !!pArm && /Armado/.test(pArm.est);
+    out.armadoTanda = !!pArm && /E12L/.test(pArm.tanda) && /vuelve/.test(pArm.tanda);
+    const pNuevo = f.find((x) => /Web Nueva/.test(x.rs));
+    out.nuevoSigueApr = !!pNuevo && /A programar/i.test(pNuevo.est) && pNuevo.tanda === "—";
+
     const DOW = /(lun|mar|mié|jue|vie|sáb|dom)/i;
     const pProg = f.find((x) => x.tanda !== "—" && x.fProg !== "—");
     out.fPedSinDia = !!p1360 && /\d{1,2}\/\d{2}/.test(p1360.fPed) && !DOW.test(p1360.fPed);
@@ -230,6 +271,13 @@ catch (_e) {
     const rb = bt.getBoundingClientRect(), rw = wrap.getBoundingClientRect();
     out.stickyVisible = rb.right <= rw.right + 1 && rb.left >= rw.left - 1 && rb.width > 10;
     out.stickyPos = getComputedStyle(bt.closest("td")).position;
+    // el estado tiene que seguir VISIBLE y sin nada encima (elementFromPoint)
+    const ch = box.querySelector("tr.pmod-row td.est .pmod-est");
+    const rc = ch.getBoundingClientRect();
+    out.estDentro = rc.right <= rw.right + 1 && rc.left >= rw.left - 1 && rc.width > 10;
+    const enc = document.elementFromPoint(Math.round(rc.left + rc.width / 2), Math.round(rc.top + rc.height / 2));
+    out.estDestapado = !!enc && (enc === ch || ch.contains(enc) || enc.closest("td.est") !== null);
+    out.estTapadoPor = enc ? (enc.className || enc.tagName) : "(nada)";
     wrap.style.maxWidth = "";
 
     // ── (5) el contador: pedidos y NP por separado ─────────────────────────
@@ -250,13 +298,14 @@ catch (_e) {
     pmodBuscar("");
 
     // ── (7) los filtros ────────────────────────────────────────────────────
-    pmodFiltro("donde", "apr");   out.soloApr = filas().length === 2;
+    pmodFiltro("donde", "apr");   out.soloApr = filas().length === 3;
     pmodFiltro("donde", "plan");  out.soloPlan = filas().length === 5;
     pmodFiltro("donde", "todos");
     pmodFiltro("emp", "CH");      out.soloCh = filas().every((x) => /^CH /.test(x.cod));
     out.nCh = filas().length;
     pmodFiltro("emp", "todas");
-    pmodFiltro("estado", "armado"); out.soloArmado = filas().length === 1 && /Torres/.test(filas()[0].rs);
+    pmodFiltro("estado", "armado"); out.soloArmado = filas().length === 2 &&
+      filas().some((x) => /Torres/.test(x.rs)) && filas().some((x) => /Volvio Armado/.test(x.rs));
     // se combinan: estado armado + empresa Chef no da nada
     pmodFiltro("emp", "CH");      out.combinados = filas().length === 0;
     pmodLimpiar();
@@ -284,7 +333,7 @@ catch (_e) {
   chk(r.aprSinNpTodavia, "y se ve que todavía no tienen NP asignada");
   /* NP REALES, no bloques: los dos pedidos de A Programar todavía no tienen NP (se asigna al
      programarlos), así que van aparte. Contar sus bloques como NP decía 10 cuando existen 7. */
-  chk(/7 pedidos/.test(r.resumen) && /7 NP/.test(r.resumen) && /3 bloques sin NP/.test(r.resumen),
+  chk(/8 pedidos/.test(r.resumen) && /7 NP/.test(r.resumen) && /4 bloques sin NP/.test(r.resumen),
       "el contador separa pedidos, NP reales y bloques sin NP: " + JSON.stringify(r.resumen));
   chk(r.porPedido, "la búsqueda encuentra por número de pedido");
   chk(r.porNpDelMedio, "y por CUALQUIERA de sus NP — buscando la del medio sale el pedido entero");
@@ -292,10 +341,10 @@ catch (_e) {
   chk(r.porTanda, "por tanda");
   chk(r.porCod, "y por código de cliente");
   chk(r.sinCoincidencias, "sin coincidencias lo dice, no deja la tabla vacía y muda");
-  chk(r.soloApr, "el filtro «Sólo A Programar» deja 2");
+  chk(r.soloApr, "el filtro «Sólo A Programar» deja 3");
   chk(r.soloPlan, "«Sólo programados» deja 5");
   chk(r.soloCh && r.nCh === 2, "el filtro por empresa deja sólo los de Chef (" + r.nCh + ")");
-  chk(r.soloArmado, "el filtro por estado deja sólo el armado");
+  chk(r.soloArmado, "el filtro por estado deja los dos armados (el programado y el que volvió a A Programar)");
   chk(r.combinados, "los filtros se combinan (armado + Chef = ninguno)");
   chk(r.limpiarVuelve, "«Limpiar» devuelve todo y vacía la búsqueda");
   chk(r.botonEnCadaFila, "cada fila tiene su botón «Modificar» a la derecha de todo");
@@ -316,11 +365,25 @@ catch (_e) {
       "y lo que se manda al backend son las cajas nuevas y el código agregado: " + r.guardo);
   chk(/"cod_art":"027","cajas":2/.test(r.guardoEspera),
       "va también la foto de cómo estaba el pedido, para que el backend corte si cambió por otro lado");
-  chk(r.guardoQuien === "luis@lk", "y queda firmado por quien lo hizo (" + r.guardoQuien + ")");
+  chk(/Mariana/.test(r.personas) && /Agregar nombre/.test(r.personas),
+      "el desplegable trae los nombres de la tabla y la opción de agregar uno");
+  chk(r.sinQuien, "con cambios pero sin elegir quién, «Guardar» sigue apagado y dice qué falta");
+  chk(r.sinMotivo, "y sin justificativo tampoco deja guardar ← lo que pidió Luis");
+  chk(/"p_nombre":"Luis"/.test(r.personaNueva), "«Agregar nombre…» lo manda a la tabla de Gestión: " + r.personaNueva);
+  chk(r.quedoElegido, "y el nombre recién agregado queda elegido");
+  chk(r.guardoQuien === "Mariana", "lo que se guarda es el NOMBRE de quien modificó (" + r.guardoQuien + ")");
+  chk(/sumar cajas/.test(r.guardoMotivo || ""), "con su justificativo: " + JSON.stringify(r.guardoMotivo));
+  chk(/LK 0004/.test(r.guardoNps) && /LK 0006/.test(r.guardoNps),
+      "y las NP del pedido, que son las que Facturación va a marcar como modificadas: " + r.guardoNps);
   chk(r.cerroAlGuardar, "al guardar bien, el modal se cierra");
   chk(r.fPedSinDia, "«Pedido del» va sin el día de la semana (Luis)");
   chk(r.fProgConDia, "pero «En programación» lo conserva: ahí sirve para saber cuándo sale");
   chk(r.stickyDesborda, "control: con el wrap angosto la tabla DESBORDA (si no, lo de abajo pasa solo)");
+  chk(r.armadoDice, "un pedido que volvió a A Programar YA ARMADO lo dice en Estado ← lo que pidió Luis");
+  chk(r.armadoTanda, "y la columna Tanda muestra a cuál vuelve (no se pickea de nuevo)");
+  chk(r.nuevoSigueApr, "control: el que nunca se programó sigue en «A programar», sin tanda");
+  chk(r.estDentro, "con la tabla desbordada, la columna Estado sigue a la vista");
+  chk(r.estDestapado, "y NADA se le pone encima — lo que tapaba era la columna anclada del botón (encima: " + r.estTapadoPor + ")");
   chk(r.stickyVisible && r.stickyPos === "sticky",
       "y aun desbordada el botón «Modificar» sigue a la vista, anclado a la derecha (" + r.stickyPos + ")");
   chk(errs.length === 0, "sin errores de JS: " + JSON.stringify(errs));

@@ -461,5 +461,8 @@ PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node te
 echo "== rcp-cajas-aviso (v18.08: el pop-up de Cajas avisa tambien si el codigo no tiene OC; y la X prolija) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/rcp-cajas-aviso.cjs
 
-echo "== ppp-modificar-pedidos (v18.14: la solapa Modificar Pedidos — buscador, filtros y tabla POR PEDIDO) =="
+echo "== ppp-modificar-pedidos (v18.29: la solapa Modificar Pedidos — busca, filtra, y el modal que modifica) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/ppp-modificar-pedidos.cjs
+
+echo "== fac-np-modificada (v18.29: el badge MOD en la columna NP de Facturación) =="
+PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/fac-np-modificada.cjs
