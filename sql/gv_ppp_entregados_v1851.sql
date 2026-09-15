@@ -1,5 +1,5 @@
 -- =============================================================================
--- gv_ppp_entregados_v1850.sql — LA MISMA VISTA, 28 VECES MÁS RÁPIDA (2026-09-15, v18.50)
+-- gv_ppp_entregados_v1851.sql — LA MISMA VISTA, 28 VECES MÁS RÁPIDA (2026-09-15, v18.51)
 -- Proyecto Virgilio (hrxfctzncixxqmpfhskv) · problema 285
 -- =============================================================================
 -- SÍNTOMA. 236 HTTP 500 en 6 horas sobre /rest/v1/gv_ppp_entregados (449 timeouts en total,
@@ -19,7 +19,7 @@
 -- Columnas, nombres y tipos IGUALES (create or replace lo exige); gv_ppp_avance_dias() la sigue
 -- leyendo sin cambios. security_invoker se declara en el WITH y se refuerza con el ALTER de abajo.
 --
--- ROLLBACK: sql/backups/gv_ppp_entregados_pre_v1850_20260915.sql (definición viva anterior).
+-- ROLLBACK: sql/backups/gv_ppp_entregados_pre_v1851_20260915.sql (definición viva anterior).
 -- =============================================================================
 
 create or replace view public.gv_ppp_entregados
@@ -35,7 +35,7 @@ web as (
   select gv_ppp_web_np_label(p.empresa, p.np, p.np_idx) as np, p.empresa, p.tanda, p.cod_cliente as cod,
          p.razon_social as rs, p.m3, p.fecha_entrega::text as fecha_entrega
   from "PPP_Web_Programacion" p),
--- v18.50: la union de las 3 fuentes se materializa UNA vez y se elige la de menor prio por NP con
+-- v18.51: la union de las 3 fuentes se materializa UNA vez y se elige la de menor prio por NP con
 -- DISTINCT ON. Antes era un LEFT JOIN LATERAL (... ORDER BY prio LIMIT 1) que re-evaluaba la union
 -- entera (incluida gv_ppp_entregados_meta, que adentro vuelve a agrupar Registros) por cada una de
 -- las ~460 NP con CRN: 7.967 ms, contra los 8 s de statement_timeout de anon → HTTP 500. Ahora 283 ms.

@@ -1,4 +1,4 @@
--- BACKUP de la definicion VIVA de public.gv_ppp_entregados antes de la v18.50 (2026-09-15).
+-- BACKUP de la definicion VIVA de public.gv_ppp_entregados antes de la v18.51 (2026-09-15).
 -- Tomada con pg_get_viewdef(). Para volver atras: ejecutar este archivo entero.
 -- (CRN solo, sin CCR: la v13.57 lo dejo asi a proposito; ver comentario en index.html
 --  "SÓLO CRN (Recepción Remitos = el remito volvió) es controlado/entregado".)

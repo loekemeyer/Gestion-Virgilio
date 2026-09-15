@@ -1,6 +1,6 @@
-# Estado y pendientes — al 2026-09-15 (última actualización: v18.50)
+# Estado y pendientes — al 2026-09-15 (última actualización: v18.51)
 
-> **2026-09-15, revisión general pedida por Thomas (v18.50, §3.hi de la doc de Supabase).**
+> **2026-09-15, revisión general pedida por Thomas (v18.51, §3.hi de la doc de Supabase).**
 > *"Está andando mal en general la app y su paso a paso."* Seis agentes sobre `main` + los 10
 > chats del día. **Lo que NO es:** la suite está toda en verde, ninguna sesión pisó código de otra
 > (70 commits de 6 sesiones, 0 líneas perdidas), el motor de stock cierra (0 diferencias en 485

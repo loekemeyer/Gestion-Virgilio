@@ -17718,7 +17718,7 @@ end $$;
 esté mal. Se verifica con `has_column_privilege(...)` o con el `update` de prueba de arriba. Este
 detalle ya hizo dudar una vez de un grant que estaba perfecto.
 
-## §3.hi — v18.50: revisión general del 15/09 (6 agentes + los 10 chats del día): `gv_ppp_entregados` 28× más rápida, y cinco fixes de front — 2026-09-15
+## §3.hi — v18.51: revisión general del 15/09 (6 agentes + los 10 chats del día): `gv_ppp_entregados` 28× más rápida, y cinco fixes de front — 2026-09-15
 
 > **Pedido de Thomas** (*"lanzá agentes que revisen el funcionamiento general; está andando mal
 > en general la app y su paso a paso; revisá los últimos 10 chats"*). Sesión
@@ -17742,8 +17742,8 @@ detalle ya hizo dudar una vez de un grant que estaba perfecto.
 
 ### Arreglado en esta versión
 
-1. **`gv_ppp_entregados`: 7.967 ms → 222 ms** (`sql/gv_ppp_entregados_v1850.sql`, backup en
-   `sql/backups/gv_ppp_entregados_pre_v1850_20260915.sql`). El `LEFT JOIN LATERAL (… order by prio
+1. **`gv_ppp_entregados`: 7.967 ms → 222 ms** (`sql/gv_ppp_entregados_v1851.sql`, backup en
+   `sql/backups/gv_ppp_entregados_pre_v1851_20260915.sql`). El `LEFT JOIN LATERAL (… order by prio
    limit 1)` re-evaluaba la unión de las tres fuentes —con `gv_ppp_entregados_meta` adentro, que
    vuelve a agrupar `Registros_Produccion_Virgilio`— por cada una de las 457 NP con CRN. Ahora la
    unión se materializa una vez y la de menor prio sale por `DISTINCT ON`. **Misma salida**
