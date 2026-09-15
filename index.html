@@ -392,6 +392,14 @@ button {
 }
 .tanda-chip.ocupada:active{ background:#f1f5f9; color:#64748b; transform:none; }
 .tandas-ocupada-txt{ font-size:12px; color:#64748b; font-style:italic; margin-top:4px; line-height:1.3; }
+/* v18.46 — la que dejé empezada YO. Va en verde y se toca: me devuelve adentro del picking
+   o del armado. Tiene que saltar a la vista entre las demás, porque es la que hay que cerrar
+   antes de agarrar otra. */
+.tanda-chip.mia{
+  background:#dcfce7; border-color:#16a34a; color:#166534; font-weight:700;
+}
+.tanda-chip.mia:active{ background:#bbf7d0; }
+.tandas-mia-txt{ font-size:12px; color:#166534; font-weight:600; margin-top:4px; line-height:1.3; }
 .tandas-list-empty,
 .tandas-list-label{
   font-size: 14px;
@@ -5567,7 +5575,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=18.45"></script>
+<script type="module" src="recepcion.js?v=18.46"></script>
 <!-- Config del módulo de fichada (compartido con fichada.html). El secret
      hmacSecret tiene que ser el mismo acá y allá; cargándolo desde un solo
      archivo evitamos que se desincronicen. -->
@@ -8111,6 +8119,20 @@ let _tandasListMode      = "all";   // "all" | "pickingDone" | "notStarted"
 /* v18.31 (Luis) — en el modo AP: qué tanda ya tiene el armado empezado por otro y qué legajo
    lo arrancó. Se muestra bloqueada en vez de esconderse (ver populateTandasList). */
 let _apEnCurso           = new Map();
+/* v18.46 — lo que YO tengo abierto NO se bloquea: se ofrece para seguir.
+   `_apEnCurso` (arriba) es "la tiene OTRO" → candado. Estos son los míos, en las dos fases,
+   con el ts del evento para poder reconstruir el arranque si el celular perdió el estado
+   (la app se actualizó, es otro equipo, se limpió el storage). El bug que esto arregla:
+   Franco arrancó el armado de E11B, la app se actualizó, y al volver a la lista de AP su
+   propia tanda le aparecía con 🔒 "ya la está armando el legajo 237" — o sea él mismo. Sin
+   forma de retomarla desde esa pantalla, agarraba otra y E11B quedaba abierta para siempre. */
+let _apMio               = new Map();   // tanda -> ts del AP propio
+let _pkAjeno             = new Map();   // tanda -> legajo del EP de otro
+let _pkMio               = new Map();   // tanda -> ts del EP propio
+function _legajoActual() {
+  try { return String((typeof legajoInput !== "undefined" && legajoInput.value) || "").trim(); }
+  catch (_e) { return ""; }
+}
 let _activityStatusCache = null;    // { pickingStarted, pickingDone, armadoStarted, armadoDone }
 let _activityStatusTs    = 0;
 const PPP_OPERATOR_TTL_MS     = 30000;
@@ -8189,7 +8211,9 @@ async function getActivityStatus(force) {
     armadoDone:        new Set(),
     armadoDoneStrict:  new Set(),
     pickingEnCursoBy:  new Map(),   // v5.74: tanda EN CURSO (EP sin TP) -> legajo que la arrancó
-    armadoEnCursoBy:   new Map()    // v5.74: tanda EN CURSO (AP sin TAP) -> legajo que la arrancó
+    armadoEnCursoBy:   new Map(),   // v5.74: tanda EN CURSO (AP sin TAP) -> legajo que la arrancó
+    pickingEnCursoTs:  new Map(),   // v18.46: -> ts del EP (para retomar sin perder la duración)
+    armadoEnCursoTs:   new Map()    // v18.46: -> ts del AP
   };
   try {
     const since = new Date(Date.now() - ACTIVITY_LOOKBACK_DAYS*24*60*60*1000).toISOString();
@@ -8214,7 +8238,13 @@ async function getActivityStatus(force) {
       armadoDone:        new Set(),
       armadoDoneStrict:  new Set(),
       pickingEnCursoBy:  new Map(),
-      armadoEnCursoBy:   new Map()
+      armadoEnCursoBy:   new Map(),
+      // v18.46 — CUÁNDO arrancó, no sólo quién. Hace falta para que el que la empezó pueda
+      // RETOMARLA desde otro equipo o después de que la app se actualice: el `ts_inicio` vive
+      // en localStorage y si se pierde, el TP/TAP sale sin duración y la tanda no figura en
+      // «Terminar Día». Con esto se reconstruye desde el servidor, que es la fuente real.
+      pickingEnCursoTs:  new Map(),
+      armadoEnCursoTs:   new Map()
     };
     for (const ev of data) {
       const tRaw  = ev.texto || "";
@@ -8240,9 +8270,9 @@ async function getActivityStatus(force) {
         if (!curS || ts > curS.ts) lastArmStrict.set(tRaw, { opcion: ev.opcion, ts });
       }
     }
-    for (const [t, ev] of lastPick)       { if (ev.opcion === "TP")  status.pickingDone.add(t); else if (ev.opcion === "EP") status.pickingEnCursoBy.set(t, String(ev.legajo == null ? "" : ev.legajo).trim()); }
+    for (const [t, ev] of lastPick)       { if (ev.opcion === "TP")  status.pickingDone.add(t); else if (ev.opcion === "EP") { status.pickingEnCursoBy.set(t, String(ev.legajo == null ? "" : ev.legajo).trim()); status.pickingEnCursoTs.set(t, ev.ts || null); } }
     for (const [t, ev] of lastPickStrict) if (ev.opcion === "TP")  status.pickingDoneStrict.add(t);
-    for (const [t, ev] of lastArm)        { if (ev.opcion === "TAP") status.armadoDone.add(t);  else if (ev.opcion === "AP") status.armadoEnCursoBy.set(t, String(ev.legajo == null ? "" : ev.legajo).trim()); }
+    for (const [t, ev] of lastArm)        { if (ev.opcion === "TAP") status.armadoDone.add(t);  else if (ev.opcion === "AP") { status.armadoEnCursoBy.set(t, String(ev.legajo == null ? "" : ev.legajo).trim()); status.armadoEnCursoTs.set(t, ev.ts || null); } }
     for (const [t, ev] of lastArmStrict)  if (ev.opcion === "TAP") status.armadoDoneStrict.add(t);
     _activityStatusCache = status;
     _activityStatusTs    = Date.now();
@@ -8252,6 +8282,35 @@ async function getActivityStatus(force) {
     return _activityStatusCache || empty;
   }
 }
+
+/* v18.46 — VOLVER A ENTRAR a lo que dejé empezado, desde la lista de tandas.
+   Antes el único camino de vuelta era el botón «Seguir armado» de la pantalla inicial, que
+   sale del estado LOCAL (`st.armado` en localStorage). Si ese estado se perdió —la app se
+   actualizó, es otro celular, se limpió el storage— no había forma de retomar: la tanda
+   figuraba ocupada por uno mismo y el operario terminaba arrancando otra.
+   Acá el arranque se reconstruye desde el SERVIDOR (el ts del AP/EP que ya está registrado),
+   así el TAP/TP sale con la duración real y la tanda vuelve a figurar en «Terminar Día». */
+async function tandaChipSeguir(tanda, fase) {
+  const t = String(tanda || "").trim().toUpperCase();
+  const leg = _legajoActual();
+  if (!t) return;
+  if (!leg) { try { alert("Escribí tu legajo primero."); } catch (_e) {} return; }
+  try { textInput.value = t; } catch (_e) {}
+  try {
+    const st = getLegajoState(leg);
+    if (fase === "armado") {
+      const ya = st.armado && st.armado.active && String(st.armado.value || "").trim().toUpperCase() === t;
+      if (!ya) { st.armado = { active: true, value: t, ts_inicio: _apMio.get(t) || null }; setLegajoState(leg, st); }
+    } else {
+      const ya = st.picking && st.picking.active && String(st.picking.value || "").trim().toUpperCase() === t;
+      if (!ya) { st.picking = { active: true, value: t, ts_inicio: _pkMio.get(t) || null }; setLegajoState(leg, st); }
+    }
+  } catch (_e) { /* si el storage falla, igual lo dejamos entrar: lo importante es que siga */ }
+  try { hideTandasList(); } catch (_e) {}
+  if (fase === "armado") { try { showCompletarWizard(leg, t); } catch (_e) {} }
+  else                   { try { showPickingList(t, leg); } catch (_e) {} }
+}
+window.tandaChipSeguir = tandaChipSeguir;
 
 /* filterMode (opcional, persistido en _tandasListMode):
      "all"          → solo Op=SI (CC)
@@ -8263,6 +8322,7 @@ async function getActivityStatus(force) {
 async function populateTandasList(filterMode) {
   if (filterMode != null) _tandasListMode = filterMode;
   _apEnCurso = new Map();   // v18.31: tanda → legajo que ya arrancó el armado (solo modo AP)
+  _apMio = new Map(); _pkAjeno = new Map(); _pkMio = new Map();   // v18.46
   const container = document.getElementById("tandasList");
   if (!container) return;
   container.classList.remove("hidden");
@@ -8277,9 +8337,18 @@ async function populateTandasList(filterMode) {
     // pickingStarted: lenient (cualquier EP/TP entra como "empezado").
     // pickingDoneStrict: exacto, así un TP con espacio ("C02D ") no excluye
     // al PPP "C02D" — la tanda sigue apareciendo como en curso para cerrar.
+    // v18.46 — mismo criterio que el armado, en espejo: el picking que arrancó OTRO va con
+    // candado (no lo puede cerrar cualquiera) y el propio se ofrece para SEGUIR, aunque el
+    // celular haya perdido el estado.
+    _pkAjeno = new Map(); _pkMio = new Map();
+    const _legTP = _legajoActual();
     filtered = items.filter(it => {
       const k = it.tanda.toUpperCase();
-      return s.pickingStarted.has(k) && !s.pickingDoneStrict.has(it.tanda);
+      if (!(s.pickingStarted.has(k) && !s.pickingDoneStrict.has(it.tanda))) return false;
+      const due = String(s.pickingEnCursoBy.get(k) || "").trim();
+      if (due && _legTP && due === _legTP) _pkMio.set(it.tanda, s.pickingEnCursoTs.get(k) || null);
+      else if (due && !esLegajoPrueba(due)) _pkAjeno.set(it.tanda, due);
+      return true;
     });
   } else if (_tandasListMode === "pickingDone") {
     const s = await getActivityStatus();
@@ -8294,11 +8363,19 @@ async function populateTandasList(filterMode) {
     // E11B: picking cerrado 11:06, el legajo 237 le dio AP 11:15 y no cerró el TAP).
     // Ahora se muestra bloqueada y con el legajo que la tiene, para que se sepa a quién
     // reclamarle en vez de pensar que la app falla.
-    _apEnCurso = new Map();
+    // v18.46 (Luis, 15/09: "le salta que la E11B no se puede agarrar PERO ESTÁ EMPEZADA POR
+    // ÉL"): el candado es para la tanda de OTRO. La propia se ofrece para SEGUIR — si no,
+    // el que la empezó no tiene ningún camino de vuelta y la tanda queda abierta para siempre.
+    _apEnCurso = new Map(); _apMio = new Map();
+    const _legAP = _legajoActual();
     filtered = items.filter(it => {
       const k = it.tanda.toUpperCase();
       if (!s.pickingDone.has(k) || s.armadoDoneStrict.has(it.tanda)) return false;
-      if (s.armadoEnCursoBy.has(k)) _apEnCurso.set(it.tanda, s.armadoEnCursoBy.get(k) || "");
+      if (s.armadoEnCursoBy.has(k)) {
+        const due = String(s.armadoEnCursoBy.get(k) || "").trim();
+        if (due && _legAP && due === _legAP) _apMio.set(it.tanda, s.armadoEnCursoTs.get(k) || null);
+        else if (due && !esLegajoPrueba(due)) _apEnCurso.set(it.tanda, due);
+      }
       return true;
     });
   } else if (_tandasListMode === "armadoCurso") {
@@ -8360,16 +8437,34 @@ async function populateTandasList(filterMode) {
       <div class="tandas-day-header${g.fechaRaw === _hoyKey ? " hoy" : ""}">${escapeHtml(g.fechaDisplay)}${g.fechaRaw === _hoyKey ? ' <span class="tandas-hoy-badge">HOY</span>' : ""}</div>
       <div class="tandas-chips">
         ${g.codes.map(c => {
+          // v18.46 — LA MÍA PRIMERO: si el que la tiene abierta soy yo, no va candado, va
+          // «seguir» y me devuelve adentro. El candado es sólo para la de otro.
+          if (_apMio.has(c)) {
+            return `<button class="tanda-chip mia" type="button" data-code="${escapeHtml(c)}" title="La empezaste vos y quedó sin terminar. Tocá para volver al armado y cerrarlo." onclick="tandaChipSeguir(this.dataset.code,'armado')">${escapeHtml(c)} ▶ seguir</button>`;
+          }
+          if (_pkMio.has(c)) {
+            return `<button class="tanda-chip mia" type="button" data-code="${escapeHtml(c)}" title="Lo empezaste vos y quedó sin terminar. Tocá para volver al picking y cerrarlo." onclick="tandaChipSeguir(this.dataset.code,'picking')">${escapeHtml(c)} ▶ seguir</button>`;
+          }
           // v18.31 — la que otro ya empezó a armar se ve, pero no se puede tocar.
           if (_apEnCurso.has(c)) {
             const lg = String(_apEnCurso.get(c) || "").trim();
             return `<button class="tanda-chip ocupada" type="button" disabled title="Ya la está armando ${lg ? "el legajo " + escapeHtml(lg) : "otro operario"}. Cuando cierre con «Terminé Armado Pedido» se libera.">${escapeHtml(c)} 🔒</button>`;
           }
+          if (_pkAjeno.has(c)) {
+            const lg = String(_pkAjeno.get(c) || "").trim();
+            return `<button class="tanda-chip ocupada" type="button" disabled title="Lo está pickeando ${lg ? "el legajo " + escapeHtml(lg) : "otro operario"}. Lo cierra el que lo empezó.">${escapeHtml(c)} 🔒</button>`;
+          }
           return `<button class="tanda-chip" type="button" data-code="${escapeHtml(c)}" onclick="textInput.value=this.dataset.code;textInput.focus()">${escapeHtml(c)}</button>`;
         }).join("")}
       </div>
+      ${g.codes.some(c => _apMio.has(c) || _pkMio.has(c))
+        ? `<div class="tandas-mia-txt">▶ seguir = la dejaste empezada vos (${g.codes.filter(c => _apMio.has(c) || _pkMio.has(c)).map(escapeHtml).join(" · ")}). Tocala para volver adentro y cerrarla.</div>`
+        : ""}
       ${g.codes.some(c => _apEnCurso.has(c))
         ? `<div class="tandas-ocupada-txt">🔒 = ya la está armando ${g.codes.filter(c => _apEnCurso.has(c)).map(c => { const lg = String(_apEnCurso.get(c) || "").trim(); return escapeHtml(c) + (lg ? " → legajo " + escapeHtml(lg) : ""); }).join(" · ")}. Se libera cuando cierre con «Terminé Armado Pedido».</div>`
+        : ""}
+      ${g.codes.some(c => _pkAjeno.has(c))
+        ? `<div class="tandas-ocupada-txt">🔒 = lo está pickeando ${g.codes.filter(c => _pkAjeno.has(c)).map(c => { const lg = String(_pkAjeno.get(c) || "").trim(); return escapeHtml(c) + (lg ? " → legajo " + escapeHtml(lg) : ""); }).join(" · ")}. Lo cierra el que lo empezó.</div>`
         : ""}
     </div>
   `).join("");
@@ -9038,7 +9133,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v18.45";
+const APP_VERSION = "v18.46";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -9504,6 +9599,24 @@ async function send() {
       // EP/AP fantasma de legajo 0 dejaba la tanda "en curso por el legajo 0" y nadie la podía
       // arrancar (caso real D06C). getActivityStatus ya filtra 0/1, pero esto lo blinda también
       // acá por si un cliente viejo cacheado o un futuro cambio deja pasar un dueño de prueba.
+      // v18.46 — si el dueño SOY YO, la guarda v5.26 ya lo cubrió… salvo que el celular haya
+      // perdido el estado local (la app se actualizó, es otro equipo). Ahí llegaba hasta acá y
+      // emitía un SEGUNDO AP/EP sobre mi propia tanda, con ts_inicio nuevo: la duración salía
+      // mal y el evento original quedaba huérfano. Ahora se reabre donde estaba y se reconstruye
+      // el arranque desde el servidor, que es el que sabe.
+      if (dueno && String(dueno) === legajoStr) {
+        const tsSrv = (opcion === "EP") ? (sAct.pickingEnCursoTs && sAct.pickingEnCursoTs.get(texto))
+                                        : (sAct.armadoEnCursoTs  && sAct.armadoEnCursoTs.get(texto));
+        try {
+          const stY = getLegajoState(legajoStr);
+          if (opcion === "EP") { if (!(stY.picking && stY.picking.active && String(stY.picking.value || "").trim().toUpperCase() === texto)) { stY.picking = { active: true, value: texto, ts_inicio: tsSrv || null }; setLegajoState(legajoStr, stY); } }
+          else                { if (!(stY.armado  && stY.armado.active  && String(stY.armado.value  || "").trim().toUpperCase() === texto)) { stY.armado  = { active: true, value: texto, ts_inicio: tsSrv || null }; setLegajoState(legajoStr, stY); } }
+        } catch (_e) {}
+        try { alert("Esa tanda (" + texto + ") ya la tenés empezada vos — te la reabro donde la dejaste.\nNo hace falta marcar " + opcion + " de nuevo."); } catch (_e) {}
+        if (opcion === "EP") { try { showPickingList(texto, legajoStr); } catch (_e) {} }
+        else                 { try { showCompletarWizard(legajoStr, texto); } catch (_e) {} }
+        return;
+      }
       if (dueno && String(dueno) !== legajoStr && !esLegajoPrueba(dueno)) {
         let nom = "";
         try { const mp = await getEmpleadosNombres(); if (mp && mp.get) nom = mp.get(String(dueno)) || ""; } catch (_e) {}
@@ -10462,7 +10575,9 @@ async function _supaFetchAllRaw(endpoint, query) {
     const chunk = await r.json();
     const got = Array.isArray(chunk) ? chunk.length : 0;
     for (let i = 0; i < got; i++) out.push(chunk[i]);
-    const cr = r.headers.get("content-range") || "";
+    // v18.46: defensivo — un Response sin `headers` (o sin ese header) no puede tumbar la
+    // paginación entera; sin esto tira TypeError y el llamador se queda sin datos.
+    const cr = ((r.headers && typeof r.headers.get === "function") ? r.headers.get("content-range") : "") || "";
     const slash = cr.indexOf("/");
     if (slash >= 0) { const t = parseInt(cr.slice(slash + 1), 10); if (!isNaN(t)) total = t; }
     else if (got < 1000) { total = from + got; }   // sin header → heurística
@@ -37268,7 +37383,7 @@ async function pmodModificar(key) {
   // vistas superponen sin tocar lo que trae la importación del Excel PPP. El que factura se
   // entera por el badge ✏ MOD de Facturación, que es para lo que Luis lo pidió.
   if (p.esIsis) return pmodModificarIsis(p);
-  /* v18.45 — Chef ya entra por acá. Thomas dio del lado de Chef los dos grants y las policies
+  /* v18.46 — Chef ya entra por acá. Thomas dio del lado de Chef los dos grants y las policies
      que faltaban (el FDW podía leer pero no escribir), así que el backend despacha solo:
      `gv_pedido_mod_ctx` / `gv_pedido_mod_guardar` derivan a su gemela `_chef`, que trabaja
      contra las foreign tables y contra el catálogo `chef_ext.products`. Acá lo único que cambia

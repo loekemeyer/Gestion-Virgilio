@@ -48,6 +48,9 @@ PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node te
 echo "== pweb-base-paginada (regresión: la base de picking web se pagina; limit= no manda, manda db-max-rows=1000) =="
 node tests/pweb-base-paginada.cjs
 
+echo "== tanda-mia-seguir (regresión: la tanda que empecé YO no se bloquea — se retoma, aunque el celular perdiera el estado) =="
+PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/tanda-mia-seguir.cjs
+
 echo "== dos-en-curso (regresión: arrancar un 2º armado/picking sin cerrar el anterior avisa antes de pisarlo) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/dos-en-curso.cjs
 

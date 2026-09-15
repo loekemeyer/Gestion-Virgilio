@@ -69,13 +69,18 @@ const ZONAS = { mataderos:"Zona 3 - CABA Oeste", martinez:"Zona 6 - GBA Norte", 
     window.sbAuth = { getAccessToken: async () => "tok" };
     window._pppZonaSupa = ZONAS;
     // v18.44 — el stub tiene que traer `headers`. Desde la v18.43 el camino del operario
-    // (`mergeMonitorPppWeb`) pasa por `supaFetchAll`, que lee `r.headers.get("content-range")`
-    // para paginar; sin ese campo tiraba TypeError, el try/catch de esa función se lo comía en
-    // silencio y el operario se quedaba sin la tanda web — `operVeTanda:false`. Era el stub, no
-    // la app: la Response real de fetch sí trae headers. Sin `content-range`, supaFetchAll usa
-    // su heurística (< 1000 filas = una sola página), que es lo que pasa con estos datos.
-    const json = (o) => ({ ok: true, status: 200, json: async () => o, text: async () => JSON.stringify(o),
-      headers: { get: () => null } });
+    // (`mergeMonitorPppWeb`, `mergePickingBasePppWeb`) pasa por `supaFetchAll`, que lee
+    // `r.headers.get("content-range")` para paginar; sin ese campo tiraba TypeError, el
+    // try/catch de esas funciones se lo comía en silencio y el operario se quedaba sin la
+    // tanda web — `operVeTanda:false`. Era el stub, no la app: la Response real de fetch sí
+    // trae headers. Acá se devuelve el Content-Range igual que PostgREST, así el mock
+    // ejercita el camino de paginación de verdad y no la heurística de respaldo.
+    const json = (o) => ({
+      ok: true, status: 200,
+      headers: { get: (h) => (String(h).toLowerCase() === "content-range" && Array.isArray(o))
+        ? ("0-" + Math.max(0, o.length - 1) + "/" + o.length) : null },
+      json: async () => o, text: async () => JSON.stringify(o)
+    });
     window.fetch = async (url, opt) => {
       const u = String(url);
       if (opt && opt.method === "POST" && u.includes("PPP_Web_")) { posts.push({ u, b: JSON.parse(opt.body) }); return json([]); }
