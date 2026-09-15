@@ -5349,7 +5349,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=17.99"></script>
+<script type="module" src="recepcion.js?v=18.00"></script>
 <!-- Config del módulo de fichada (compartido con fichada.html). El secret
      hmacSecret tiene que ser el mismo acá y allá; cargándolo desde un solo
      archivo evitamos que se desincronicen. -->
@@ -8789,7 +8789,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v17.99";
+const APP_VERSION = "v18.00";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -12813,7 +12813,7 @@ async function compTerminar() {
     try { alert("⚠ Ya está armado el pedido NP " + _npsArmadas.join(", ") + " (en otra tanda).\n\nNo se puede armar de nuevo: duplicaría el pedido y el stock. Si se reprogramó y hay que rearmarlo, avisá para darlo de baja a mano primero."); } catch (_e) {}
     return;
   }
-  // v17.99 — ¿DÓNDE queda cada pedido armado? (evento AUB). La pregunta vivía SOLO en send(),
+  // v18.00 — ¿DÓNDE queda cada pedido armado? (evento AUB). La pregunta vivía SOLO en send(),
   // que para el TAP ya no corre: desde la v7.75 el TAP lo emite ESTE asistente, y la v12.98
   // (idea 6124) bloqueó con _tapCerradoSesion el segundo TAP del botón "Tenés un Armado
   // pendiente" — que era, sin querer, el único camino que seguía mostrando el modal. Medido:
@@ -12892,7 +12892,7 @@ async function compTerminar() {
 
     // Encolar y enviar el reporte TAP.
     enqueueReport(payload);
-    // v17.99 — 1 evento AUB por NP con la ubicación elegida arriba (mismo punto que send()).
+    // v18.00 — 1 evento AUB por NP con la ubicación elegida arriba (mismo punto que send()).
     if (_armUbics) { Object.keys(_armUbics).forEach(function (np) { emitArmadoUbic(np, _armUbics[np], legajo); }); }
     _activityStatusTs = 0;   // invalidar cache de actividad
 

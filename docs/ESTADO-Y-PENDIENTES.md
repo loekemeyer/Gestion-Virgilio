@@ -1,4 +1,4 @@
-# Estado y pendientes — al 2026-09-15 (última actualización: v17.99)
+# Estado y pendientes — al 2026-09-15 (última actualización: v18.00)
 
 > **Para quien abra una sesión nueva:** esto es la foto del estado. Lo que falta de verdad está
 > en la base, no acá: `select * from github_repo_problemas.v_problemas where estado='abierto'`.
@@ -37,7 +37,7 @@
 - **2026-09-15 — la ubicación del armado (AUB) se cargaba de rebote, por un bug.** Hasta la v12.98
   el modal salía porque el operario tocaba DOS veces «terminar» (el botón viejo que quedaba en
   pantalla). Al tapar ese doble TAP se apagó la pregunta: **0 eventos AUB entre el 04/09 y el
-  15/09**, con ~10 armados por día. Arreglado en la v17.99 (`compTerminar` pregunta él mismo) con
+  15/09**, con ~10 armados por día. Arreglado en la v18.00 (`compTerminar` pregunta él mismo) con
   regresión en `tests/comp-terminar-unificado.cjs`. Si vuelve a aparecer en 0, mirar ahí primero.
 
 ## 3. Lo que quedó a medias (deuda que dejé yo, no está en la tabla)

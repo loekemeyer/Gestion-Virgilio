@@ -70,7 +70,7 @@ pero `pppSupersNeed()` pedía `select=empresa,cod,nombre,super_key,cuit` — **s
 `gv_supers` tienen `nota` cargada y **14 de ellas son la razón social** (Coto C.I.C.S.A., Inc
 Sociedad Anonima, Dia Argentina SA, Libertad S.A…). El fix es una palabra en el select y un campo
 en el `.map()`; los dos chequeos nuevos del test lo dejan clavado.
-## Nota v17.99 (2026-09-15) — vuelve la ubicación al terminar armado, y el remito sin cliente
+## Nota v18.00 (2026-09-15) — vuelve la ubicación al terminar armado, y el remito sin cliente
 
 Dos cosas que avisó **Franco Tierra** el 15/09 a la mañana.
 
