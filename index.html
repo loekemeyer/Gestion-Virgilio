@@ -5575,7 +5575,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=18.48"></script>
+<script type="module" src="recepcion.js?v=18.49"></script>
 <!-- Config del módulo de fichada (compartido con fichada.html). El secret
      hmacSecret tiene que ser el mismo acá y allá; cargándolo desde un solo
      archivo evitamos que se desincronicen. -->
@@ -9133,7 +9133,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v18.48";
+const APP_VERSION = "v18.49";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -9641,6 +9641,43 @@ async function send() {
       let ok = false;
       try { ok = confirm("⚠ La tanda " + texto + " NO está en la programación (PPP) de hoy.\n\n¿Seguro que la vas a pickear? Puede que te hayas equivocado de tanda."); } catch (_e) { ok = true; }
       if (!ok) return;   // se equivocó de tanda → aborta el EP (no registra nada)
+    }
+  }
+
+  /* v18.49 — NO ARRANCAR una tanda que no tiene los artículos cargados.
+     Caso D71A: la NP 97889 (Matiz SA, 9,25 m³, entrega 16/09) entró a la PPP con su cabecera
+     pero SIN un solo renglón — se cargó en ISIS el 23/06 y la importación del detalle arranca
+     el 01/07, así que quedó afuera por ocho días. El operario le daba EP, recién ahí veía "no
+     encontré artículos", y el EP ya había salido: la tanda quedaba en curso para siempre y
+     trabada para todos por la exclusividad v5.74. Es lo que pasó el 14/09 a las 14:25.
+     Ahora se chequea ANTES de emitir: si la tanda está en el PPP y no tiene ni un renglón, no
+     se arranca y se dice qué hay que hacer. Falla ABIERTO: si no se puede verificar (sin red,
+     base vacía, la tanda no está en el PPP) no bloquea nada. Vale para EP y para AP — sin
+     renglones el asistente «Completar» tampoco se puede terminar, y sin asistente no hay TAP
+     (v7.74), que es como quedó colgado el armado de E11B. */
+  if ((opcion === "EP" || opcion === "AP") && texto) {
+    let _sinArts = false, _npsT = [];
+    try {
+      const [_sm, _pb] = await Promise.all([fetchMonitorSheet(), fetchPickingBase()]);
+      const _e = (_sm && typeof _sm.get === "function") ? _sm.get(texto) : null;
+      if (_e && _e.pedidos && _e.pedidos.length && _pb && _pb.size > 0) {
+        for (const _p of _e.pedidos) {
+          for (const _part of String(_p.np || "").split(/[,/]/)) {
+            const _n = pickNormNp(_part);
+            if (_n && /\d/.test(_n) && _npsT.indexOf(_n) < 0) _npsT.push(_n);
+          }
+        }
+        if (_npsT.length) _sinArts = _npsT.every(function (n) { return !((_pb.get(n) || []).length); });
+      }
+    } catch (_e2) { _sinArts = false; }   // no se pudo verificar → no bloqueamos
+    if (_sinArts) {
+      try {
+        alert("⛔ La tanda " + texto + " NO tiene los artículos cargados.\n\n" +
+              "El pedido (" + _npsT.join(", ") + ") está en la programación pero llegó sin renglones, " +
+              "así que no se puede pickear ni armar.\n\nNO la arranques: avisá a sistemas para que " +
+              "carguen el detalle. Agarrá otra tanda.");
+      } catch (_e3) {}
+      return;   // no emitimos el EP/AP: si sale, la tanda queda trabada para todos
     }
   }
 
