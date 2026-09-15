@@ -1252,3 +1252,32 @@ psql "$VIRGILIO_URL" -f sql/backups/empresa_mixto_ajuste_pre_v1830_20260915.sql
 
 o pegar ese archivo en el SQL editor: trae los `CREATE OR REPLACE` de las dos funciones tal como
 estaban antes del cambio.
+
+---
+
+## v18.40 — 2026-09-15 · UPDATE de 7 filas en `Entregas Tallerista Virgilio` (tabla compartida)
+
+**Qué se tocó.** 7 filas de `public."Entregas Tallerista Virgilio"` cuyo `Cod` estaba tipeado sin
+la `E` final (582, 583, 584, 599, 727, 943, 948 → sus variantes `NNNE`). Autorizado por el dueño
+el mismo día. Ids: 1961, 1962, 1960, 2293, 1902, 2294, 2295. 212 cajas.
+
+**Impacto medido en Producción Virgilio.** Ninguno en el front (`grep -rn "Entregas Tallerista"`
+sobre `produccion-virgilio` sólo pega en dos `.sql` de ahí: un script de prueba y la receta del
+trigger de Planify — no hay JS ni HTML que lea la tabla). **Y ningún trigger se disparó**: los dos
+que tiene la tabla, `trg_recep_pagos_tall` y `trg_virgilio_espejo_gp2`, son `AFTER INSERT`, no
+`AFTER UPDATE`. En Gestión, el efecto es el buscado: las entregas ahora imputan al artículo real y dejan de dispararse los avisos de
+"SIN OC generada" sobre códigos inexistentes. **El stock no se movió**: sólo 582 y 583 habían
+llegado a `Movimientos_Stock` y los dos ya estaban en 0 (queda la huella
+`ref = "fix typo 583->583E (racks->gondola)"`).
+
+**Rollback exacto.**
+
+```sql
+update public."Entregas Tallerista Virgilio" t
+   set "Cod" = b."Cod"
+  from zz_backups."GV_Backup_EntregasTall_SinE_20260915" b
+ where t.id = b.id;
+```
+
+El backup tiene las 7 filas completas (todas las columnas), con RLS prendida y sin grants para
+`anon`/`authenticated`. Detalle en `docs/SUPABASE-GESTION-VIRGILIO.md` §3.hf. Problema 264.

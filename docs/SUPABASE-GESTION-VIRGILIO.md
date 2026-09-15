@@ -17310,7 +17310,7 @@ overrides, 0 log, 9663 filas y ningún endpoint roto.
 
 ---
 
-## §3.ha — v18.31: 7 recepciones cargadas sin la E, y el "¿quisiste decir…?" que lo corta — 2026-09-15
+## §3.hf — v18.31/v18.40: 7 recepciones cargadas sin la E, el "¿quisiste decir…?" que lo corta, y la corrección de las filas — 2026-09-15
 
 Thomas, mirando la lista de códigos que no figuran en `OC_Maximos`: ***"está mal recibido todos
 esos sin la E"***.
@@ -17360,6 +17360,85 @@ lo que sobra sean **1 o 2 letras** (cubre `582→582E` y `438EL→438E`).
 
 **Test:** `tests/rcp-codigo-parecido.cjs`, con los dos sentidos, el caso de dos letras, el
 rechazo del dígito distinto y el catálogo sin cargar (que devuelve vacío y no traba a nadie).
+
+
+### v18.40 — las 7 filas corregidas (autorizado por el dueño el 15/09)
+
+Thomas: *"Está mal recibido todos esos sin la E"* → *"Sí"*. Backup previo en
+`zz_backups."GV_Backup_EntregasTall_SinE_20260915"` (7 filas, RLS prendida, sin grants para
+`anon`/`authenticated`), y después un `UPDATE` **por `id`** (la PK real de la tabla), no por código:
+
+```sql
+update public."Entregas Tallerista Virgilio"
+   set "Cod" = "Cod" || 'E'
+ where id in (1961,1962,1960,2293,1902,2294,2295)
+   and "Cod" in ('582','583','584','599','727','943','948');
+```
+
+| id | Fecha | Cod → | Cajas | Remito |
+|---|---|---|---|---|
+| 1961 | 2026-07-21 | 582 → **582E** | 136 | 09965 |
+| 1962 | 2026-07-21 | 583 → **583E** | 24 | 09965 |
+| 1960 | 2026-07-21 | 584 → **584E** | 10 | 38489 |
+| 2293 | 2026-09-02 | 599 → **599E** | 16 | 38087 |
+| 1902 | 2026-07-10 | 727 → **727E** | 7 | 38481 |
+| 2294 | 2026-09-02 | 943 → **943E** | 3 | 38087 |
+| 2295 | 2026-09-02 | 948 → **948E** | 16 | 38087 |
+
+212 cajas en total. **Rollback**: `update ... set "Cod" = b."Cod" from
+zz_backups."GV_Backup_EntregasTall_SinE_20260915" b where t.id = b.id;`
+
+**Barrido posterior — 0 filas.** Ya no queda en la tabla ningún código sin `E` que tenga variante
+con `E` en `vista_stock_procesada`:
+
+```sql
+with e as (select distinct regexp_replace(cod,'E$','') b
+             from public.vista_stock_procesada where cod ~ '[0-9]E$')
+select t."Cod", count(*), sum(t."Cajas") from public."Entregas Tallerista Virgilio" t
+  join e on e.b = t."Cod"
+ where not exists (select 1 from public.vista_stock_procesada s where s.cod = t."Cod")
+ group by 1;   -- vacío = todo bien
+```
+
+⚠ **`599E` existe como artículo pero NO está en `OC_Maximos`** (sí en `vista_stock_procesada` y en
+`precios_venta`, *Pelador Madera Multifunción*). O sea: no tiene máximo configurado, así que nunca
+va a entrar en una OC automática. No se tocó — es decisión de compras, no un dato roto.
+
+⚠ **`582E` / `583E` / `584E` figuran en `OC_Maximos` con proveedor `Garcia`, pero las tres entregas
+entraron a nombre de `Log/ Fabr`.** Es el mismo desajuste del **problema 250** (OC a nombre de uno,
+recepción a nombre de otro), no parte de este fix. Queda abierto.
+
+Problema **264**, cerrado con `6145ca5`.
+
+
+### Lo que apareció al revisar el impacto: el espejo a GP2 rebota TODO (problema 265, abierto)
+
+Antes del `UPDATE` había que ver qué triggers cuelgan de la tabla. Son dos, y los dos son
+**`AFTER INSERT`**, así que un `UPDATE` no dispara ninguno:
+
+| Trigger | Función | Qué hace |
+|---|---|---|
+| `trg_recep_pagos_tall` | `recepcion_crea_tarea_pagos()` | crea la tarea de pagos en Planify |
+| `trg_virgilio_espejo_gp2` | `"GP2".fn_entregas_virgilio_espejo()` | copia la recepción al stock de GP2 |
+
+El segundo, cuando no puede resolver el artículo, no falla: **lo estaciona** en
+`"GP2".virgilio_espejo_pend`. Ahí aparecieron 3 de las 7 filas de este fix (las del 02/09; las de
+julio son anteriores a que el espejo existiera). Pero al mirar la cola entera:
+
+```sql
+select count(*) total, count(*) filter (where motivo='articulo sin equivalente en GP2') sin_art
+  from "GP2".virgilio_espejo_pend;   --  25 | 25
+```
+
+**25 de 25.** Desde que el espejo se prendió (`entrega_id` 2291, 02/09) hasta el 14/09 **no entró
+una sola recepción a GP2**. Son 21 códigos distintos — `035E, 207, 395, 438E, 535, 584E, 590E,
+590ES, 599, 727E, 735, 760, 817, 823, 856, 877E, 922, 943, 943E, 945E, 948` — y el motivo no es el
+tipeo: `"GP2".articulo` tiene **195 artículos** y no cubre el catálogo que se recibe en Virgilio.
+El trigger busca por código exacto y por código sin ceros de adelante; ninguna de las dos pega.
+
+⚠ **Corregir los códigos NO destraba esto**: `599E`, `943E` y `948E` tampoco están en
+`"GP2".articulo`. Dar de alta artículos en GP2 es de quien administra ese módulo, así que el
+problema **265 queda abierto** y no se tocó nada.
 
 ## §3.he — v18.39: el m³ se recalcula al modificar una NP de ISIS, y `vista_tanda_m3` deja de ignorar los overrides — 2026-09-15
 
