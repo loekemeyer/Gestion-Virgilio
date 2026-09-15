@@ -5493,7 +5493,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=18.19"></script>
+<script type="module" src="recepcion.js?v=18.20"></script>
 <!-- Config del módulo de fichada (compartido con fichada.html). El secret
      hmacSecret tiene que ser el mismo acá y allá; cargándolo desde un solo
      archivo evitamos que se desincronicen. -->
@@ -8941,7 +8941,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v18.19";
+const APP_VERSION = "v18.20";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -16862,7 +16862,20 @@ function stkBodyStocks() {
   let shown = _stk.soloPin
     ? arts.filter(function (a) { return _pinSet.has(String(a.cod).trim().toUpperCase()); })
     : (_terms.length
-      ? arts.filter(function (a) { if (!_stkHasAny(a)) return false; const s = (a.cod + " " + a.desc).toLowerCase(); return _terms.some(function (t) { return s.indexOf(t) >= 0; }); })
+      ? arts.filter(function (a) {
+          if (!_stkHasAny(a)) return false;
+          const s = (a.cod + " " + a.desc).toLowerCase();
+          // v18.20 — la tabla muestra el código rellenado a 3 dígitos (031) pero en la base vive
+          // normalizado (31), así que tipear "031" no encontraba nada: la pantalla enseñaba un
+          // código que después ella misma no hallaba. Se compara también sin los ceros de
+          // adelante, de los dos lados, con el mismo _ocgNorm que usa el resto del módulo.
+          const cn = _ocgNorm(a.cod).toLowerCase();
+          return _terms.some(function (t) {
+            if (s.indexOf(t) >= 0) return true;
+            const tn = _ocgNorm(t).toLowerCase();
+            return !!tn && cn.indexOf(tn) >= 0;
+          });
+        })
       : arts.filter(_stkHasAny));
   // v7.73→v8.71: excluir códigos que están en la tabla Insumos, SALVO que tengan
   // stock en algún depósito de producto (terminado/excedente/separar/facturar/guardar/racks/p.env/rch).

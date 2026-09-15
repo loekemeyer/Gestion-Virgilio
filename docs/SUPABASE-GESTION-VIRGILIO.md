@@ -16528,3 +16528,49 @@ select cron.alter_job(51, active := true);
 -- y si ya generó de más ese día:
 delete from public."Ordenes_Compra" where fecha = '<YYYY-MM-DD>' and notas like 'auto%';
 ```
+
+---
+
+## §3.gp — v18.20: dos cosas que reportó Thomas en Stocks — el nombre de los Chef y el buscador con el cero adelante — 2026-09-15
+
+### a) "Se borraron las descripciones de Chef" (problema **227**, backend)
+
+631, 706, 707, 708 y 731 aparecían en Stock y Compras con **la descripción igual al código**.
+
+La descripción **sí existe**, y en cuatro tablas de Virgilio (`GV_UxB`, `Articulos_Cajas`,
+`Articulos Virgilio X Tallerista`, `OC_Maximos`): 706 = Abrelatas Uñas, 731 = Sacacorcho
+Combinado Color, 631 = Espumadera Acero Inox. Lo que pasaba es que `vista_nombres_articulos`
+pone **primera** en el `coalesce` a `proyeccion_madre.gv_descripcion`, que desde la **v16.88**
+viaja desde LK (`estadistica_madre_cache`) y, para los códigos que ese caché no conoce, trae
+**el código**. O sea: la fuente de mayor prioridad aportaba la falta de nombre disfrazada de
+nombre y tapaba a las que sí lo tenían.
+
+Medido: **225 de 461** filas de `proyeccion_madre` con `gv_descripcion` = el código, y **95**
+filas de `stocks_carga_rapida` mostrando el número como nombre.
+
+⚠ **No lo introdujeron los cambios del 15/09**: el respaldo
+`zz_backups."GV_Backup_ProyeccionMadre_20260915"`, tomado antes de tocar nada, ya tenía
+`gv_descripcion = '706'`. Viene de la v16.88 (12/09).
+
+**Arreglo:** una descripción igual al código se descarta en el `WHERE` de **cada** fuente, no
+sólo en la de LK. No se tocó el orden del `coalesce` ni se agregaron fuentes. Después:
+**95 → 1** filas con el código como nombre; la que queda es `690E`, que no tiene nombre en
+ninguna fuente — eso es un dato que falta cargar, no un bug.
+`sql/gv_vista_nombres_articulos_v1820.sql`.
+
+### b) "No busca bien si está el 0 adelante" (problema **228**, front)
+
+Tipear **`031`** en el buscador de Stocks no devolvía nada; tipear **`31`** sí, y mostraba la
+fila **031 Filtro De Café 10cm**. La tabla muestra el código canónico con los ceros (regla del
+dueño del 12/09) pero en la base vive normalizado (`stocks_carga_rapida.cod = '31'`), y el
+filtro comparaba lo tipeado contra el valor crudo: **la pantalla enseñaba un código que después
+ella misma no encontraba**.
+
+**Arreglo** (`index.html`, el filtro de `stkBodyStocks`): además del texto crudo se compara el
+código y el término **sin los ceros de adelante**, con el mismo `_ocgNorm` que usa el resto del
+módulo. No cambia el criterio (sigue siendo `indexOf`, así que `31` sigue trayendo 231, 311,
+531…), sólo deja de fallar el caso del cero. Es la cara "BUSCAR" de la regla del 12/09 que ya
+cuida `tests/cod-cero-adelante.cjs`.
+
+**Test nuevo:** `tests/stk-buscar-cero-adelante.cjs` — comprobado que **falla sin el fix**
+(`busca031: false`) y pasa con él.
