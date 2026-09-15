@@ -1,3 +1,38 @@
+## Nota v18.39 (2026-09-15) — El m³ se recalcula solo al modificar una NP de ISIS
+
+Luis: *"más vale, recalcula m3"*. Hasta la v18.35 se le podía cambiar el contenido a una NP de
+ISIS y el m³ seguía siendo el que trajo la importación, así que el cupo del día quedaba corrido.
+
+**Se recalcula por DELTA, no en absoluto.** Medido: multiplicar `cajas × m³ del artículo` **no**
+reproduce exactamente el m³ que trae ISIS (hasta 0,231 m³ de diferencia en una NP de 3 m³; la
+mayoría por debajo de 0,05). Recalcular de cero movería el número de NP que nadie tocó. Entonces
+al m³ guardado se le suma **sólo lo que cambió**, y el resultado se guarda en
+`GV_PPP_Prog_Override.m3` — sin tocar la tabla compartida, como todo lo demás.
+
+**Si algún artículo que se movió no tiene m³ cargado, no se escribe nada y la pantalla lo dice.**
+Un artículo sin medir suma 0 y el m³ sale de menos sin que nadie se entere: es la misma regla que
+el front ya usa para el m³ de la web.
+
+Probado (transacción abortada, NP 98664 · tanda E12J): +10 cajas del 034 (0,0051 m³/caja, esperado
++0,051) → **el m³ de la NP pasó de 0,100 a 0,151 y el de la TANDA de 0,437 a 0,488**, o sea que la
+cadena llega hasta el final.
+
+### De paso: el m³ por tanda ignoraba TODOS los overrides (problema 256)
+
+`vista_tanda_m3` sumaba la tabla cruda en vez de la vista, así que una NP movida de tanda por
+override **seguía sumando su m³ en la tanda vieja** y no sumaba en la nueva; una desprogramada u
+oculta también seguía contando. Medido: 14 tandas se quedaban con m³ ajeno (D66B 4,041 · D69A
+0,745 · D68B 0,483 · D67I 0,437 · …), 14 tandas reales figuraban sin m³ (E09A 4,041 · E07A 4,313 ·
+E11A 0,745 · …) y D56D contaba 0,598 con 4 de sus NP desprogramadas (real 0,132). Total:
+**1041,978 → 1045,631 m³** sobre 1203 tandas. `gv_ppp_web_m3_isis` —el m³ de ISIS del día, que
+alimenta el cupo— ya leía la vista, así que ésa estaba bien.
+
+`sql/gv_m3_override_v1839.sql`, §3.he.
+
+⚠ **La versión había quedado en v18.31**: un commit de la sesión paralela la bajó en los tres
+lugares justo después de que otro la arreglara (problema 241, el badge que miente). Este bump la
+vuelve a poner adelante de todo.
+
 ## Nota v18.35 (2026-09-15) — Modificar Pedidos: ahora también las NP de ISIS, y la tabla que no se deforma
 
 **1. Las NP de ISIS ya se pueden modificar.** Luis: *"para los pedidos de isis no hay problema con

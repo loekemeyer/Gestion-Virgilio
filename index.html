@@ -5528,7 +5528,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=18.38"></script>
+<script type="module" src="recepcion.js?v=18.39"></script>
 <!-- Config del módulo de fichada (compartido con fichada.html). El secret
      hmacSecret tiene que ser el mismo acá y allá; cargándolo desde un solo
      archivo evitamos que se desincronicen. -->
@@ -8999,7 +8999,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v18.38";
+const APP_VERSION = "v18.39";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -37611,8 +37611,14 @@ async function pmodGuardarIsis() {
     _pgaTs = 0;
     try { await pppLoadProgFromSupabase(); } catch (_e) {}
     pppRenderProg();
-    pppSetStatus("✓ " + np + " quedó modificada" +
-      (det.sin_uxb ? " (ojo: " + det.sin_uxb + " no tiene u×B cargado, el m³ puede salir de menos)" : "") +
+    /* v18.37 — el m³ se recalcula solo en el backend (por delta: se le suma al guardado sólo lo
+       que cambió). Si algún artículo que se movió no tiene m³ cargado, NO se toca y lo dice:
+       un m³ que suma 0 sale de menos y nadie se entera. */
+    const m3txt = (det.m3_a != null && det.m3_de != null)
+      ? " · m³ " + _pppFmtM3(det.m3_de) + " → " + _pppFmtM3(det.m3_a)
+      : (det.m3_sin_dato ? " · ⚠ el m³ NO se recalculó: " + det.m3_sin_dato + " no tiene m³ cargado" : "");
+    pppSetStatus("✓ " + np + " quedó modificada" + m3txt +
+      (det.sin_uxb ? " (ojo: " + det.sin_uxb + " no tiene u×B cargado)" : "") +
       ". En Facturación aparece con ✏ MOD.", true);
   } catch (e) {
     const msg = (e && e.message) ? e.message : String(e);

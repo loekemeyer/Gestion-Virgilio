@@ -185,7 +185,8 @@ catch (_e) {
       if (/gv_ppp_programacion_diaria/.test(u)) return J([{ np: "98701", direccion: "Lacroze 2481",
                                                             barrio: "Colegiales", zona: "Zona 1", tanda: "D67E" }]);
       if (/gv_uxb_resuelto/.test(u)) return J([{ cod: "034", uxb: 12 }, { cod: "960E", uxb: 6 }, { cod: "777", uxb: 24 }]);
-      if (/rpc\/gv_pedido_mod_isis/.test(u)) { lk.push(["isis", b]); return J({ ok: true, np: "98701", detalle: {} }); }
+      if (/rpc\/gv_pedido_mod_isis/.test(u)) { lk.push(["isis", b]);
+        return J({ ok: true, np: "98701", detalle: { m3_de: 0.437, m3_a: 0.488, m3_sin_dato: null } }); }
       if (/rpc\/gv_modif_persona_agregar/.test(u)) {
         lk.push(["persona", b]); personas.push({ id: personas.length + 1, nombre: b.p_nombre });
         return J([{ id: personas.length, nombre: b.p_nombre }]); }
@@ -216,6 +217,8 @@ catch (_e) {
     await pmodGuardar(); await esperar();
     const gi = (lk.filter((x) => x[0] === "isis")[0] || [])[1] || {};
     out.isisGuardo = JSON.stringify(gi);
+    out.isisDiceM3 = /m³/.test((document.getElementById("pppStatus") || {}).textContent || "");
+    out.isisStatus = ((document.getElementById("pppStatus") || {}).textContent || "").slice(0, 120);
     out.isisNoFueALk = !lk.some((x) => x[0] === "guardar");
     pmodCerrar();
 
@@ -401,6 +404,7 @@ catch (_e) {
       /Siempreviva/.test(r.isisGuardo) && /Mariana/.test(r.isisGuardo),
       "y guarda por la RPC de ISIS con NP, cajas, dirección y quién: " + r.isisGuardo);
   chk(r.isisNoFueALk, "sin tocar la RPC de LK ← son dos caminos distintos");
+  chk(r.isisDiceM3, "y la pantalla cuenta cómo quedó el m³ recalculado: " + JSON.stringify(r.isisStatus));
   chk(r.chefAvisa, "un pedido de Chef avisa que esa base todavía no acepta cambios");
   chk(r.abre, "un pedido web de LK abre el modal");
   chk(/"p_order_id":1343/.test(r.ctxPidio), "y pide el contexto del pedido correcto: " + r.ctxPidio);

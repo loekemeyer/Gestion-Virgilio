@@ -17360,3 +17360,35 @@ lo que sobra sean **1 o 2 letras** (cubre `582→582E` y `438EL→438E`).
 
 **Test:** `tests/rcp-codigo-parecido.cjs`, con los dos sentidos, el caso de dos letras, el
 rechazo del dígito distinto y el catálogo sin cargar (que devuelve vacío y no traba a nadie).
+
+## §3.he — v18.39: el m³ se recalcula al modificar una NP de ISIS, y `vista_tanda_m3` deja de ignorar los overrides — 2026-09-15
+
+**Qué se agregó (Virgilio):** `sql/gv_m3_override_v1839.sql`.
+
+| Objeto | Cambio |
+|---|---|
+| `GV_PPP_Prog_Override.m3` | columna nueva (numeric, nullable): el m³ pisado de una NP |
+| `gv_ppp_programacion_diaria` | `COALESCE(o.m3, p.m3) AS m3` |
+| `vista_tanda_m3` | el CTE `prog` pasa a leer **la vista**, no `"GV_PPP_Programacion_Diaria"` |
+| `gv_pedido_mod_isis` | recalcula el m³ por delta y lo guarda en el override; devuelve `m3_de`, `m3_a`, `m3_sin_dato` |
+
+**Por delta y no en absoluto.** `cajas × m³ del artículo` no reproduce el m³ de ISIS (hasta 0,231
+en una NP de 3 m³), así que recalcular de cero movería NP que nadie tocó. Al guardado se le suma
+sólo lo que cambió. Y si **algún artículo movido no tiene m³**, no se escribe nada: sumar 0 por un
+artículo sin medir deja el m³ de menos en silencio.
+
+⚠ **El orden importa y el primer intento estuvo mal:** el bloque tiene que ir **después** de armar
+`v_despues` (la foto de cómo quedó el pedido). Puesto antes, el `full join` contra un `v_despues`
+vacío daba todos los deltas en negativo y el m³ se iba a 0 — se vio en la prueba: +10 cajas y el m³
+pasaba de 0,1 a 0,000.
+
+**El otro arreglo (problema 256).** `vista_tanda_m3` leía la tabla cruda: ningún override le
+llegaba. Una NP movida de tanda seguía sumando en la vieja. El diff completo, tanda por tanda, está
+en el archivo SQL; el total va de **1041,978 a 1045,631 m³** sobre 1203 tandas y cada fila que
+cambia tiene su override que la explica.
+
+**Prueba (transacción abortada, NP 98664 · tanda E12J):** +10 cajas del 034 (0,0051 m³/caja) →
+m³ de la NP 0,100 → 0,151 y de la tanda 0,437 → 0,488. Tras el rollback, todo como estaba y
+`gv_endpoints_rotos` vacía.
+
+**Rollback:** al pie del archivo SQL.
