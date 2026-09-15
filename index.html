@@ -5612,7 +5612,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=18.66"></script>
+<script type="module" src="recepcion.js?v=18.67"></script>
 <!-- Config del módulo de fichada (compartido con fichada.html). El secret
      hmacSecret tiene que ser el mismo acá y allá; cargándolo desde un solo
      archivo evitamos que se desincronicen. -->
@@ -6159,6 +6159,10 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
 
 <script src="supabase-config.js?v=1201"></script>
 <script>
+/* v18.67 — el botón «Entrar con legajo» está arriba en el HTML y la función de verdad se define en el último
+   <script> (44k líneas después): en un celular lento el tap llega antes y tiraba
+   "loginWithLegajo is not defined" (errores_cliente, 15/09). Stub hasta que cargue; la real lo pisa. Problema 312. */
+window.loginWithLegajo = window.loginWithLegajo || function () { try { alert("Un segundo… la app todavía está cargando. Volvé a tocar «Entrar»."); } catch (_e) {} };
 /* =========================================================
    SUPABASE
    Org "Gestion Productiva" / Proyecto "Control Partes Talleristas".
@@ -9191,7 +9195,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v18.66";
+const APP_VERSION = "v18.67";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -9827,6 +9831,26 @@ async function send() {
       try { alert("⚠ Todavía no completaste el armado de " + texto + " en el asistente «Completar».\n\nSi terminás así, el pedido NO queda registrado y no se va a poder facturar / imprimir. Te abro el asistente para que lo completes."); } catch (_e) {}
       try { showCompletarWizard(legajoStr, texto); } catch (_e) {}
       return;   // no emitimos el TAP hueco
+    }
+    // v18.67 — el caso INVERSO: la tanda YA tiene Entregas (el asistente «Completar» la cerró —
+    // en esta sesión antes de un reload, o en otro equipo) y acá no hay un armado abierto para
+    // ella. Este TAP sería el SEGUNDO: id nuevo, ts_inicio real → el Monitor cuenta dos armados
+    // para la misma tanda/legajo, y encima vuelve a pedir la ubicación (AUB). `_armadoRegistrado`
+    // y `_tapCerradoSesion` viven en memoria y se vacían con cualquier recarga, así que el único
+    // testigo durable es el servidor. Si el armado SÍ está abierto localmente, se deja pasar: es
+    // el reintento legítimo de un TAP que no llegó a salir. Problema 310.
+    if (_tieneReg === true) {
+      let _abierto = false;
+      try {
+        const _st = getLegajoState(legajoStr);
+        _abierto = !!(_st && _st.armado && _st.armado.active &&
+                      String(_st.armado.value || "").trim().toUpperCase() === String(texto).trim().toUpperCase());
+      } catch (_e) {}
+      if (!_abierto) {
+        try { alert("✓ El armado de " + texto + " ya quedó cerrado por el asistente «Completar». No hace falta volver a tocar."); } catch (_e) {}
+        try { renderPendingSuggestion(); } catch (_e) {}
+        return;
+      }
     }
   }
   // v5.86: al TERMINAR ARMADO preguntar EN QUÉ UBICACIÓN queda cada NP de la tanda.

@@ -18119,3 +18119,29 @@ que ya se fue.
    `selectOption` hace `scrollIntoView` del área elegida en pantallas ≤ 700 px; se sacó la cabecera
    huérfana "🔨 Armado de pedido" (el `#row2` se conserva, el render lo busca por id); en ≤ 460 px la
    tabla de Modificar esconde U×B y Unidades. Los 8 detalles menores del problema quedan anotados ahí.
+
+## §3.ho — v18.67: los restos de la revisión general — TAP doble, el bump que no va para atrás, grants, stub de login — 2026-09-15
+
+> **Luis:** *"¿Falta algo más?"* → estos cuatro, chicos y sin riesgo. Tarea 3479.
+
+1. **TAP duplicado** (problema 310): `send()` sólo frenaba el TAP cuando la tanda NO tenía Entregas.
+   Si YA las tenía (el asistente la cerró antes de un reload, o en otro equipo) seguía de largo,
+   pedía AUB otra vez y emitía un segundo TAP → el Monitor contaba dos armados. Ahora, si el servidor
+   dice "ya cerrada" y no hay armado abierto localmente para esa tanda, avisa y no emite. Si el
+   armado está abierto localmente, pasa: es el reintento legítimo de un TAP que no salió.
+2. **`scripts/bump-version.cjs` no va para atrás** (problema 290): antes de escribir, hace `git fetch
+   origin main` y lee `version.json` de `origin/main`; si main ya está en ese número o más alto,
+   corta con el mensaje "otra sesión se te adelantó" (`BUMP_FORZAR=1` para saltear; sin red avisa y
+   sigue). Probado: pedir 18.66 con main en 18.66 corta. Lo de las 25 versiones en un día sigue
+   siendo de proceso (una sola sesión de guardia a `main`), no de script.
+3. **Grants de escritura a anon sobre 4 vistas revocados** (problema 311): `vista_faltante_real`,
+   `vista_ppp_pedidos_entregados`, `vista_saldos_stock`, `gv_pedido_mod_np` (el `grant all` de v18.24).
+   Inertes —no son actualizables—, pero sobraban.
+4. **Stub de `loginWithLegajo`** (problema 312) al principio del primer `<script>`: si el operario toca
+   «Entrar» antes de que parsee el script grande, ve "un segundo… volvé a tocar" en vez de un
+   ReferenceError. La definición real lo pisa al cargar.
+
+**No hecho a propósito:** el `statement_timeout = '30s'` en `gv_ppp_web_armar_pendientes` y
+`gv_cuarentena_limite` (4 cancelaciones el 15/09 17:29). Un `SET` a nivel función no re-arma el
+timer del statement que ya arrancó con el tope del rol (8 s), así que no está claro que sirva;
+antes de tocarlo hay que medirlo con una llamada real, no asumirlo.
