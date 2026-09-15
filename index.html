@@ -3311,7 +3311,10 @@ tr.ppp-err-zona > td{ background:#fffbeb !important; }
   body > *:not(#pgaPrint){ display:none !important; }
   #pgaPrint{ display:block !important; position:static !important; padding:0; margin:0;
     font-family:inherit; color:#000; background:#fff; }
-  html, body{ height:auto !important; overflow:visible !important; background:#fff !important; }
+  /* `margin:0` es parte del cálculo: el JS pone el font en `vw` contando con que la hoja ocupe el
+     ancho entero del área de página. Un margen del body ahí lo correría todo. */
+  html, body{ height:auto !important; overflow:visible !important; background:#fff !important;
+    margin:0 !important; padding:0 !important; }
   @page{ margin:12mm 10mm; }
 }
 /* la hoja va en NEGRO: el nombre del cliente heredaba el azul de la app y en papel se ve gris */
@@ -3334,9 +3337,12 @@ tr.ppp-err-zona > td{ background:#fffbeb !important; }
    Antes eran 17/28/22/14/7/12 fijos y sobraba medio ancho de papel sin usar. */
 .pgp-tab{ width:100%; border-collapse:collapse; font-size:13px; table-layout:fixed; }
 .pgp-tab td{ overflow:hidden; }
-.pgp-tab th{ text-align:left; font-size:10.5px; text-transform:uppercase; letter-spacing:.04em;
-  color:#444; border-bottom:1.5px solid #333; padding:3px 6px; }
-.pgp-tab td{ padding:4px 6px; border-bottom:1px solid #ddd; vertical-align:top;
+/* ⚠ Paddings y tamaños en `em`, NO en px: el font de la tabla lo pone el JS en `vw`, así que si
+   todo escala junto los anchos en % que calculó siguen valiendo en cualquier papel. Con paddings
+   fijos, en una hoja más ancha que la supuesta sobraba aire adentro de cada celda. */
+.pgp-tab th{ text-align:left; font-size:.78em; text-transform:uppercase; letter-spacing:.04em;
+  color:#444; border-bottom:1.5px solid #333; padding:.25em .45em; }
+.pgp-tab td{ padding:.3em .45em; border-bottom:1px solid #ddd; vertical-align:top;
   white-space:nowrap; text-overflow:ellipsis; }
 .pgp-tab th.n, .pgp-tab td.n{ text-align:right; white-space:nowrap; }
 /* El cliente es la única que PARTE en dos renglones en vez de cortar con "…": en una hoja de
@@ -3345,11 +3351,11 @@ tr.ppp-err-zona > td{ background:#fffbeb !important; }
 .pgp-cod{ font-weight:700; }
 /* El horario iba en una COLUMNA propia que estaba vacía en casi todas las filas (14 % del papel
    muerto). Ahora es un segundo renglón bajo el cliente, y sólo aparece cuando hay horario. */
-.pgp-hor{ display:block; font-size:11px; font-weight:700; margin-top:1px; }
+.pgp-hor{ display:block; font-size:.82em; font-weight:700; margin-top:.1em; }
 .pgp-t > td{ background:#f4f6f8; font-weight:900; border-top:1px solid #999; }
 .pgp-np td:first-child{ padding-left:16px; }
-.pgp-est{ display:inline-block; border:1px solid #666; border-radius:8px; padding:0 5px;
-  font-size:9.5px; font-weight:900; white-space:nowrap; }
+.pgp-est{ display:inline-block; border:1px solid #666; border-radius:8px; padding:0 .4em;
+  font-size:.74em; font-weight:900; white-space:nowrap; }
 .pgp-tot > td{ border-top:1.5px solid #333; border-bottom:none; font-weight:900; background:#f4f6f8; }
 .pgp-sin{ font-size:13px; color:#444; }
 
@@ -5378,7 +5384,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=18.02"></script>
+<script type="module" src="recepcion.js?v=18.03"></script>
 <!-- Config del módulo de fichada (compartido con fichada.html). El secret
      hmacSecret tiene que ser el mismo acá y allá; cargándolo desde un solo
      archivo evitamos que se desincronicen. -->
@@ -8818,7 +8824,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v18.02";
+const APP_VERSION = "v18.03";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -35721,64 +35727,53 @@ function pgaImprimirRango() {
   for (const d of _pgi.dias) _pgi.sel[d.key] = (d.key >= lo && d.key <= hi);
   pgaImprimirRender();
 }
-/* Ancho útil de una A4 con los márgenes de `@page` (210 − 2×10 mm ≈ 190 mm a 96 dpi). Es
-   nominal: los anchos se devuelven en %, así que si el papel es otro la proporción se mantiene. */
-const PGP_ANCHO_PAPEL = 718;
-/* Los anchos salen del DATO. Se mide con canvas el texto real de cada celda de TODA la hoja (no de
-   un día), cada columna se queda con lo que necesita su celda más larga, y lo que sobra va entero
-   a la columna `flex` — así no queda papel muerto a la derecha. Si no entra, el recorte también
-   sale de la `flex` (hasta su piso), nunca de mó o del estado, que quedarían cortados. */
-const PGP_PX_MIN = 12, PGP_PX_MAX = 17;
+/* v18.03 — NADA DE ADIVINAR EL ANCHO DEL PAPEL.
+   La v18.02 medía contra un `PGP_ANCHO_PAPEL = 718` (190 mm a 96 dpi, el útil de una A4) y con eso
+   elegía un font en px. Si el útil real es más ancho —y lo es— la letra queda chica y sobra aire
+   adentro de cada columna: exactamente lo que se veía en la primera hoja de verdad.
+
+   Ahora no hay ningún ancho supuesto. Se mide el texto a un tamaño de referencia, se le suma el
+   padding EN ESE MISMO tamaño (el CSS lo tiene en `em`, así que escala igual), y el resultado sale
+   en unidades relativas:
+     · cada columna en **%** de la tabla  → Ti / ΣT, que suma 100 % exacto;
+     · el font de la tabla en **vw**      → REF × 100 / ΣT, o sea "que ΣT entre justo en el ancho".
+   Como todo escala junto, la hoja llena el papel y las columnas quedan pegadas al dato, sea A4,
+   oficio o carta. El `clamp` sólo pone un piso y un techo de legibilidad. */
+const PGP_REF = 13;          // tamaño de referencia para medir; el real sale en vw
+const PGP_PAD = 0.9;         // los dos paddings de la celda, en em (CSS: .45em por lado)
+const PGP_SEG = 0.96;        // colchón: el viewport de impresión no es exactamente el área útil
 function _pgpAnchos(cols) {
   const ff = (typeof getComputedStyle === "function" &&
               getComputedStyle(document.body).fontFamily) || "sans-serif";
   const ctx = document.createElement("canvas").getContext("2d");
-  const ancho = function (txt, bold, px) {
-    ctx.font = (bold ? "700 " : "") + px + "px " + ff;
+  const ancho = function (txt, px) {
+    ctx.font = "700 " + px + "px " + ff;             // ⚠ siempre en negrita: medir de menos CORTA
     return ctx.measureText(String(txt == null ? "" : txt)).width;
   };
-  /* ⚠ Medir de MENOS corta datos; medir de más sólo deja aire. Así que se mide por arriba:
-       · el encabezado va en MAYÚSCULA y con `letter-spacing:.04em` — el CSS lo hace, el canvas no;
-       · el cliente se mide en negrita, porque el código entre paréntesis va en negrita;
-       · cada columna suma sus dos paddings (12 px fijos del CSS), el borde y un colchón.
-     La primera versión no hacía nada de esto y en papel salía "Total del …", "Zona 2 · Paler…". */
-  const PAD = 12 + 2 + 4;
-  const medir = function (px) {
-    return cols.map(function (c) {
-      const hp = Math.max(8, px - 2.5), hTxt = String(c.head).toUpperCase();
-      let mx = ancho(hTxt, true, hp) + hTxt.length * hp * 0.04;
-      for (const t of (c.textos || [])) {
-        const a = ancho(t.t, true, t.px ? t.px * px / 13 : px);
-        if (a > mx) mx = a;
-      }
-      return Math.ceil(mx) + PAD + (c.pad || 0);
-    });
+  /* ⚠ Medir de menos corta datos; medir de más sólo deja aire. Por eso: el encabezado se mide en
+     MAYÚSCULA y con su `letter-spacing` (el CSS los aplica, el canvas no), todo se mide en negrita
+     (el código de cliente lo va), y la píldora del estado suma su borde y su padding propios. */
+  const w = cols.map(function (c) {
+    const hp = PGP_REF * 0.78, hTxt = String(c.head).toUpperCase();
+    const enc = ancho(hTxt, hp) + hTxt.length * hp * 0.04;
+    const aa = (c.textos || []).map(function (t) {
+      return ancho(t.t, t.em ? PGP_REF * t.em : PGP_REF);
+    }).sort(function (x, y) { return x - y; });
+    /* La columna del cliente se dimensiona por el PERCENTIL 90, no por el máximo. Un solo
+       "Coto C.I.C.S.A. Sucursal Lanus Centro (LK 801)" en 102 NP le comía el ancho a la columna y,
+       como el font sale de ahí, achicaba la letra de TODA la hoja por una fila. Ese 10 % largo
+       parte en dos renglones — que es para lo que la celda tiene `white-space:normal`. El resto de
+       las columnas (NP, zona, m³, estado) van por el máximo: son cortas y no se parten. */
+    const i = aa.length ? (c.flex ? Math.floor((aa.length - 1) * 0.90) : aa.length - 1) : -1;
+    const mx = Math.max(enc, i >= 0 ? aa[i] : 0);
+    return mx + PGP_REF * (PGP_PAD + (c.padEm || 0)) + 3;   // +3: borde y redondeo del layout
+  });
+  const tot = w.reduce(function (a, b) { return a + b; }, 0);
+  return {
+    // "que ΣT entre justo en el ancho de la página", con piso y techo de legibilidad
+    font: "clamp(10px, " + (PGP_REF * 100 * PGP_SEG / tot).toFixed(3) + "vw, 26px)",
+    anchos: w.map(function (x) { return (100 * x / tot).toFixed(3) + "%"; })
   };
-  /* LA LETRA CRECE HASTA LLENAR EL PAPEL. Con las columnas ajustadas al dato sobraba aire entre
-     ellas — el hueco entre "Cliente" y "Zona", que es espacio muerto igual que los porcentajes
-     fijos de antes. En vez de repartir ese sobrante como huecos, se lo come la letra: se prueba de
-     PGP_PX_MAX para abajo y se usa el más grande que entre. */
-  const OBJ = PGP_ANCHO_PAPEL * 0.97;   // 3 % de colchón: el útil real no es exactamente el nominal
-  let px = PGP_PX_MIN, w = medir(PGP_PX_MIN);
-  for (let t = PGP_PX_MAX; t >= PGP_PX_MIN; t -= 0.5) {
-    const cand = medir(t);
-    const suma = cand.reduce(function (a, b) { return a + b; }, 0);
-    if (suma <= OBJ || t === PGP_PX_MIN) { px = t; w = cand; break; }
-  }
-  let tot = w.reduce(function (a, b) { return a + b; }, 0);
-  let iF = -1;
-  for (let i = 0; i < cols.length; i++) { if (cols[i].flex) { iF = i; break; } }
-  if (tot < PGP_ANCHO_PAPEL) {
-    // el resto (menos de media letra de diferencia) va a la `flex`, para cerrar contra el margen
-    if (iF >= 0) { w[iF] += PGP_ANCHO_PAPEL - tot; }
-    else { const k = PGP_ANCHO_PAPEL / tot; for (let i = 0; i < w.length; i++) w[i] *= k; }
-    tot = PGP_ANCHO_PAPEL;
-  } else if (tot > PGP_ANCHO_PAPEL && iF >= 0) {
-    // si ni con la letra más chica entra, el recorte sale de la `flex`, que parte en dos renglones
-    const baja = Math.min(tot - PGP_ANCHO_PAPEL, Math.max(0, w[iF] - (cols[iF].min || 120)));
-    w[iF] -= baja; tot -= baja;
-  }
-  return { px: px, anchos: w.map(function (x) { return (100 * x / tot).toFixed(2) + "%"; }) };
 }
 /* La hoja. Todo desplegado: día → tanda → NP, sin el contenido de cada NP. */
 function pgaImprimirHtml(dias) {
@@ -35820,7 +35815,7 @@ function pgaImprimirHtml(dias) {
         const hor = r.pide_horario ? aprHorTxt({ fecha: r.horario_fecha, franja: r.horario_franja }) : "";
         mNp.push({ t: String(r.np), b: true }); mCli.push({ t: cli }); mLug.push({ t: lug });
         mM3.push({ t: _pppFmtM3(r.m3) }); mEst.push({ t: PGA_EST_TXT[est] });
-        if (hor) mCli.push({ t: "⏱ " + hor, b: true, px: 11 });
+        if (hor) mCli.push({ t: "⏱ " + hor, em: 0.82 });
         fil.push('<tr class="pgp-np"><td><b>' + escapeHtml(String(r.np)) + '</b></td>' +
           '<td class="pgp-cli">' + escapeHtml(r.razon_social || "—") +
             (cod ? ' <span class="pgp-cod">' + escapeHtml(cod) + '</span>' : '') +
@@ -35840,9 +35835,9 @@ function pgaImprimirHtml(dias) {
     { head: "Cliente (cód)", textos: mCli, flex: true, min: 150 },
     { head: "Zona · barrio", textos: mLug },
     { head: "m³", textos: mM3 },
-    { head: "Estado", textos: mEst, pad: 14 }      // la píldora `.pgp-est` tiene borde y padding propios
+    { head: "Estado", textos: mEst, padEm: 0.8 }   // la píldora `.pgp-est` tiene borde y padding propios
   ]);
-  const an = med.anchos, estilo = ' style="font-size:' + med.px + 'px"';
+  const an = med.anchos, estilo = ' style="font-size:' + med.font + '"';
   const cg = '<colgroup>' + an.map(function (x) { return '<col style="width:' + x + '">'; }).join("") + '</colgroup>';
   const th = '<thead><tr><th>Tanda / NP</th><th>Cliente (cód)</th><th>Zona · barrio</th>' +
     '<th class="n">m³</th><th>Estado</th></tr></thead>';

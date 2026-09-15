@@ -181,9 +181,17 @@ catch (_e) {
       .filter((td) => td.scrollWidth > td.clientWidth + 1)
       .map((td) => td.textContent.trim().slice(0, 40));
     const tab = hoja.querySelector("table.pgp-tab");
+    // cuánto del ancho de cada columna usa de verdad su celda más larga (100 % = sin aire muerto)
+    const uso = [...tab.querySelectorAll("thead th")].map((th, i) => {
+      const tds = [...tab.querySelectorAll("tbody tr")].map((tr) => tr.children[i]).filter(Boolean);
+      const need = Math.max(...tds.map((td) => td.scrollWidth));
+      return Math.round(100 * need / th.getBoundingClientRect().width);
+    });
     return {
       cortadas: cortadas,
+      uso: uso,
       fontPx: parseFloat(getComputedStyle(tab).fontSize),
+      fontInline: tab.getAttribute("style") || "",
       anchoTabla: tab.getBoundingClientRect().width,
       anchoCont: hoja.getBoundingClientRect().width,
       hojaVisible: getComputedStyle(hoja).display !== "none",
@@ -191,6 +199,15 @@ catch (_e) {
       colorCliente: cli ? getComputedStyle(cli).color : null,
       colorHoja: getComputedStyle(hoja).color
     };
+  });
+  // (8) y el mismo papel, más ancho: la letra tiene que CRECER con él. La v18.02 la elegía en px
+  // contra un ancho supuesto (718), así que en una hoja más ancha quedaba chica y sobraba aire.
+  await p.setViewportSize({ width: 1000, height: 1100 });
+  const ancho = await p.evaluate(() => {
+    const tab = document.querySelector("#pgaPrint table.pgp-tab");
+    return { fontPx: parseFloat(getComputedStyle(tab).fontSize),
+      llena: tab.getBoundingClientRect().width /
+             document.getElementById("pgaPrint").getBoundingClientRect().width };
   });
   await p.emulateMedia({ media: "screen" });
   await b.close();
@@ -253,11 +270,20 @@ catch (_e) {
       "la hoja imprime en negro, no hereda el azul de la app: " + imp.colorCliente);
   chk(imp.cortadas.length === 0,
       "al ancho de una A4 no se corta NINGUNA celda: " + JSON.stringify(imp.cortadas));
-  chk(imp.fontPx >= 12 && imp.fontPx <= 17,
-      "la letra la elige _pgpAnchos() entre 12 y 17 px según cuánto papel sobre: " + imp.fontPx + "px");
+  chk(/vw/.test(imp.fontInline),
+      "la letra va en `vw`, no en px contra un ancho supuesto: " + JSON.stringify(imp.fontInline));
+  chk(imp.fontPx >= 14, "a 718 px (una A4) la letra da " + imp.fontPx.toFixed(1) +
+      " px — la v18.02 daba 11,5 fijos");
   chk(imp.anchoTabla / imp.anchoCont > 0.97,
-      "y la tabla llena el ancho del papel — nada de aire muerto a la derecha: " +
+      "la tabla llena el ancho del papel: " +
       Math.round(100 * imp.anchoTabla / imp.anchoCont) + " %");
+  chk(imp.uso.every((x) => x >= 90),
+      "y CADA columna la usa entera — nada de aire entre columnas: " +
+      JSON.stringify(imp.uso.map((x) => x + " %")));
+  chk(ancho.fontPx > imp.fontPx * 1.2,
+      "en un papel más ancho la letra CRECE con él: 718 px → " + imp.fontPx.toFixed(1) +
+      " px, 1000 px → " + ancho.fontPx.toFixed(1) + " px");
+  chk(ancho.llena > 0.97, "y ahí también llena el ancho: " + Math.round(100 * ancho.llena) + " %");
   chk(errs.length === 0, "sin errores de JS: " + JSON.stringify(errs));
 
   let malas = 0;

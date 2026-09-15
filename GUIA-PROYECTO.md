@@ -1,3 +1,48 @@
+## Nota v18.03 (2026-09-15) — la hoja impresa: la letra deja de adivinar el ancho del papel
+
+Luis, sobre la hoja de la v18.02: *"font más grande, menos espacio en blanco entre columnas"*.
+
+**La causa era una sola, y era mía.** La v18.02 medía contra `PGP_ANCHO_PAPEL = 718` (190 mm a
+96 dpi, el útil de una A4 con los márgenes de `@page`) y con eso **elegía un font en px**. El útil
+real del navegador al imprimir es más ancho, así que las columnas —calculadas en % sobre ese 718—
+quedaban proporcionalmente más anchas de lo que el texto necesitaba: letra chica **y** aire adentro
+de cada columna. Las dos quejas eran el mismo bug.
+
+Ahora **no hay ningún ancho supuesto**. Se mide el texto a un tamaño de referencia (13 px), se le
+suma el padding *en ese mismo tamaño* —el CSS lo tiene en `em`, así que escala igual— y todo sale en
+unidades relativas:
+
+- cada columna en **%** de la tabla → `Ti / ΣT`, que suma 100 % exacto;
+- el font de la tabla en **vw** → `13 × 100 / ΣT`, o sea *"que ΣT entre justo en el ancho"*.
+
+Como todo escala junto, la hoja llena el papel sea A4, oficio o carta. Medido a cuatro anchos:
+
+| viewport | font | ancho usado por columna |
+|---|---|---|
+| 600 px | 13,6 px | 100 / 100 / 100 / 100 / 100 % |
+| 718 px (A4) | **15,8 px** | 100 / 100 / 100 / 99 / 100 % |
+| 860 px | 19,6 px | 100 % en las cinco |
+| 1000 px | 22,0 px | 100 % en las cinco |
+
+Contra los **11,5 px fijos** de la v17.98 y los 13,8 de la v18.02. Y cero celdas cortadas en los
+cuatro anchos.
+
+⚠ **Para que el `vw` valga, el `@media print` fuerza `body{margin:0;padding:0}`**: el cálculo cuenta
+con que la hoja ocupe el ancho entero del área de página.
+
+### El otro cambio: la columna del cliente se dimensiona por el percentil 90, no por el máximo
+
+Un solo `Coto C.I.C.S.A. Sucursal Lanus Centro (LK 801)` entre 102 NP le fijaba el ancho a la
+columna y, como el font sale de ahí, **achicaba la letra de toda la hoja por una fila**. Ahora esa
+columna se mide por el p90 y ese 10 % largo **parte en dos renglones** — que es para lo que la celda
+tiene `white-space:normal` desde la v18.02, y lo que Luis pidió como "doble fila cuando tenga
+sentido". Sólo la columna del cliente: NP, zona, m³ y estado van por el máximo, son cortas y no se
+parten. Subió el font un 19 % (13,8 → 16,3 px a 718).
+
+`tests/pga-imprimir.cjs` queda en **50 chequeos**. Los tres nuevos son los que importan: que cada
+columna use ≥ 90 % de su ancho (nada de aire), que la letra vaya en `vw` y no en px, y que al pasar
+el papel de 718 a 1000 px **la letra crezca** — que es justo lo que la v18.02 no hacía.
+
 ## Nota v18.02 (2026-09-15) — la hoja impresa: el cód con el cliente, y los anchos salidos del dato
 
 Pedido de Luis, mirando la primera hoja en papel: *"código de cliente en el campo de razón social al
