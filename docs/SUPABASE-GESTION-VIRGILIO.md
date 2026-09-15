@@ -16429,3 +16429,69 @@ filas).
 
 **Rollback:** los dos `drop function` del final del archivo. El front aguanta que no existan
 (contesta 404 y el desglose lo dice en una línea).
+
+---
+
+## §3.gn — v18.17: la proyección en UNA tabla, no dos — y el desglose que ahora cierra — 2026-09-15
+
+Pedido del dueño: *"no quiero que la proyección esté en dos tablas distintas, solo una"*
+(problema **222**, tarea Planify **3412**).
+
+**Cómo estaba.** `proyeccion_madre` (461 filas, cron 25 de LK, motor `fn_proyeccion_oc_virgilio()`)
+y `GV_Proyeccion_Emp` (533 filas, cron 40, motor `fn_proyeccion_importados_emp()`). Los mismos
+461 códigos y **70 que no coincidían**: 22.305,87 contra 23.341,78 cj/mes (+4,6 %). Peores:
+816E 107,50 vs 230,17 · 574 86,67 vs 162,67 · 812E 20,00 vs 81,42 · 106E 5,67 vs 50,92.
+
+**Por qué el partido siempre daba más.** Dos motivos, no uno:
+1. `_fn_proy_window_emp()` decidía **por empresa** el fallback de 6 → 12 meses: un código sin
+   ventas en Chef los últimos 6 meses tomaba el promedio de 12 de Chef y se lo sumaba a la
+   ventana de 6 de LK. Mezclaba ventanas.
+2. Y aunque no haya fallback: el valor de la ventana de 6 es `greatest(promedio, 4º mes más
+   alto)`, y la suma de ese máximo calculado por empresa es **siempre ≥** el máximo calculado
+   sobre la serie junta. Es un artefacto del `greatest`, no demanda real.
+
+**Cómo quedó.** Una sola tabla, `proyeccion_madre`, con dos columnas nuevas (nullable, sin
+default): `proy_cajas_lk` y `proy_cajas_chef`. **El desglose es un reparto del total**, no un
+segundo cálculo: se calcula el total igual que siempre y se parte según lo que facturó cada
+empresa en esa misma ventana (`_fn_proy_window_split`). Por construcción
+`lk + chef = proy_cajas_mes`, fila por fila.
+
+⚠ **El total no se movió ni un centésimo** (22.305,87 antes y después) y eso fue a propósito: el
+total es el número que manda las OC, y unificar una tabla no puede cambiar de paso cuánto se le
+compra a un tallerista. Quedarse con la suma de las partes habría subido el total 4,6 %
+arrastrando el sesgo de arriba. Medido: **0 filas** donde `lk + chef <> total`, LK 18.358,55 y
+Chef 3.947,32.
+
+Ejemplo: el `513` figuraba "LK 1.132,17 + CH 29,83" contra un total de 1.132,17. Ahora Chef del
+513 es 0 —en 6 meses no le compró nada; los 29,83 salían del fallback de 12— y el `513L`, que es
+**la** variante Chef, sigue con sus 72 cj/mes del lado de Chef.
+
+**Los 4 consumidores** de `GV_Proyeccion_Emp` se repuntaron metiendo en el `FROM`, **conservando
+el alias**, un subselect con exactamente las mismas columnas (`cod`, `empresa`, `proy_cajas_mes`)
+sacadas de las dos columnas nuevas: `FROM "GV_Proyeccion_Emp"` → `FROM ( … ) "GV_Proyeccion_Emp"`.
+Así no hubo que reescribir ni una referencia. Son `vista_stock_procesada` (matview → DROP CASCADE,
+que se lleva `Stock_Saldos`, `gv_importados_stock_dep` y `gv_importados_ordenes`; las 3 recreadas
+en la misma transacción con `security_invoker=true` y sus grants), `v_importados_ordenes` y
+`gv_stock_procesada_dup` (estas dos con `create or replace` **+ el `alter view … set
+(security_invoker = true)`**, que el replace borra las `reloptions` sin avisar).
+
+**Qué se fue:** la tabla `GV_Proyeccion_Emp` (Virgilio) y, en LK, el cron 40
+`sync-proyeccion-emp-virgilio`, `sync_proyeccion_emp_virgilio()`, `fn_proyeccion_importados_emp()`,
+`_fn_proy_window_emp()` y la foreign table `virgilio."GV_Proyeccion_Emp"`. Queda **un** cron (25,
+miércoles 09:20), **un** motor y **una** tabla.
+
+Las vistas muertas `E. Madre LK` / `E. Madre CH` **no se tocaron**: son vistas, no guardan nada y
+nadie las refresca. Si molestan, se dropean aparte.
+
+**Verificado:** `gv_endpoints_rotos` = 0 · las 5 vistas con `security_invoker` · `stocks_carga_rapida`
+369 filas · `gv_importados_ordenes` y `v_importados_ordenes` 156 cada una (igual que antes) ·
+`gv_stock_procesada_dup` 0 duplicados.
+
+**Respaldos:** `zz_backups."GV_Backup_ProyeccionEmp_20260915"` (datos) y
+`zz_backups."GV_Backup_Defs_Proyeccion_20260915"` (las 6 definiciones vivas).
+**Rollback y SQL completo:** `sql/gv_proyeccion_una_sola_tabla_v1817.sql`.
+
+⚠ **Correr `sync_proyeccion_madre_virgilio()` a mano tarda más de 60 s** (va por FDW) y desde el
+MCP se corta el cliente. Va por `cron.schedule` con un minuto fijo, y **no se hace `unschedule`
+mientras corre**: eso cancela la corrida (`job canceled`). Dos jobs del mismo sync al mismo tiempo
+se pisan: `could not serialize access due to concurrent delete`.

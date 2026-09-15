@@ -1191,3 +1191,25 @@ después corre `select public.refresh_stocks_carga_rapida();`.
 `fn_proyeccion_oc_virgilio()` vive en `kwkclwhmoygunqmlegrg`. Lo que sí baja a esta base es su
 resultado, en `public.proyeccion_madre`, respaldado en
 `zz_backups."GV_Backup_ProyeccionMadre_20260915"`.
+
+---
+
+## La proyección pasa a una sola tabla — `proyeccion_madre` + columnas (v18.17, 2026-09-15)
+
+**Objetos compartidos tocados:** `public.proyeccion_madre` (dos columnas **nuevas**, nullable y
+sin default: `proy_cajas_lk` y `proy_cajas_chef` — agregar está permitido, no se tocó ninguna
+columna existente) y otra vez la matview `public.vista_stock_procesada` con sus 3 dependientes
+por el CASCADE. Además se **borró** la tabla `public."GV_Proyeccion_Emp"`.
+
+**Impacto en Producción Virgilio:** su `index.html`, `recepcion.js` y `admin/admin.js` nombran
+`proyeccion_madre`, que **sigue existiendo con las mismas columnas de antes** — sólo tiene dos
+más. `GV_Proyeccion_Emp` **no aparece en ningún archivo** de ese repo (grepeado el 15/09 sobre
+`--include=*.js --include=*.html --include=*.sql`), así que borrarla no le saca nada.
+
+**Medido:** `proyeccion_madre` sigue en 461 filas y el total en 22.305,87 cj/mes, idéntico al de
+antes; lo que cambia es que ahora el desglose por empresa sale de esa misma fila y cierra
+(0 filas donde `lk + chef <> total`).
+
+**Rollback exacto:** bloque `4) ROLLBACK` de `sql/gv_proyeccion_una_sola_tabla_v1817.sql`. Los
+datos de la tabla borrada están en `zz_backups."GV_Backup_ProyeccionEmp_20260915"` y las 6
+definiciones vivas previas en `zz_backups."GV_Backup_Defs_Proyeccion_20260915"`.
