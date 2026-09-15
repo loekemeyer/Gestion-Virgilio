@@ -16574,3 +16574,37 @@ cuida `tests/cod-cero-adelante.cjs`.
 
 **Test nuevo:** `tests/stk-buscar-cero-adelante.cjs` — comprobado que **falla sin el fix**
 (`busca031: false`) y pasa con él.
+
+---
+
+## §3.gq — v18.21: el pop-up de Proyección sin las barras — el gráfico, y los números grandes — 2026-09-15
+
+Pedido del dueño, con foto del 513: ***"sacá la barra lateral. Con el gráfico ya alcanza"*** y
+***"que los pocos datos que queden se vean MUCHO más grandes"***.
+
+**Qué se fue.** El bloque de barras por mes (v11.48 / v15.52): la tabla `mes · factur. · barra ·
+entreg.` con sus seis filas. Lo que mostraba —la venta de cada mes contra la proyección— ya lo
+dice el gráfico de tendencia, con 12 meses en vez de 6.
+
+**Qué quedó, y grande.** El nombre del artículo pasó a 19 px (era una nota al pie de 12 px) y los
+números del pie pasaron a **fichas** de 26 px: proyección (con "piso: 4.º mejor mes" cuando actúa),
+promedio 6m, facturado 6m, entregado 6m y "X/6 meses arriba". El gráfico creció de 340×134 a
+380×220, con la letra de 8 a 12,5 px y los puntos de 3,3 a 5 de radio.
+
+⚠ **Lo que NO se podía perder: el desglose del mes** (v18.13, y la RPC de ventas por cliente que
+se encendió ese mismo día, §3.gm). Vivía tocando el número dentro de la barra, así que **se mudó
+al gráfico**: cada mes tiene una franja invisible del ancho de medio paso a cada lado —para poder
+tocarla con el dedo y no sólo sobre el punto— y al tocarla se abre, debajo, el detalle del mes con
+**las dos caras juntas**: a quién se le facturó (los 5 más grandes + Otros, de la RPC) y cuándo se
+entregó (día, quién, remito). Antes eran dos desgloses separados y excluyentes; ahora un toque
+trae los dos. El mes abierto queda marcado en el gráfico.
+
+Las tablas del detalle pasaron de 11,5 a 15 px, que era el otro pedido.
+
+**Test:** `tests/proy-entregadas.cjs`, reescrito. ⚠ **Estaba en ROJO en `main` desde la v18.11** y
+nadie se había enterado: esa versión cambió el orden de las columnas por pedido del dueño y el test
+seguía esperando el viejo. Comprobado corriéndolo contra el `index.html` previo a esta sesión.
+Problema **231**; este repo no tiene CI que corra `tests/`, así que un test en rojo no avisa solo.
+Ahora verifica lo de hoy: la ficha de entregado suma sólo los meses cubiertos, no quedan rastros de
+las barras, el gráfico tiene una franja por mes, y tocar un mes abre y cierra el detalle con el
+cliente y el remito adentro.
