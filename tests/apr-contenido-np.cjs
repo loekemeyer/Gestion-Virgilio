@@ -109,8 +109,9 @@ catch (_e) {
                          cuarentena_motivos: ["deuda"], cuarentena_detalle: { deuda: 10000 } })];
     aprRender(); await new Promise((res) => setTimeout(res, 200));
     html = document.getElementById("pppPreview").innerHTML;
-    out.cuarChev = /cuar-card-top" onclick="aprToggle\('cchef1401'\)"/.test(html) &&
-                   /apr-card-chev" title="Ver qué pidieron/.test(html);
+    // v18.01: la ficha pasó a ser una FILA de tabla; la flechita abre lo mismo desde la celda de la NP
+    out.cuarChev = /cuar-td-np" onclick="aprToggle\('cchef1401'\)"/.test(html) &&
+                   /title="Ver qué pidieron/.test(html) && /apr-card-chev/.test(html);
     out.cuarCerrada = !/apr-tab/.test(html);
     aprToggle("cchef1401"); await new Promise((res) => setTimeout(res, 150));
     html = document.getElementById("pppPreview").innerHTML;

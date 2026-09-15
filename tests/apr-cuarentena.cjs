@@ -294,6 +294,82 @@ catch (_e) {
     out.logFiltraOff = /Gifel S\.R\.L\./.test(chT);
     _pppTab = "prog";
 
+    // (8) v18.01 (Luis) — los retenidos se ven como LISTA/TABLA, con la fecha del pedido y el
+    // 📖 de comentarios. Y "Ya pagó" tiene que hacer algo visible.
+    _apr.cuarCom = null; _apr.cuarYaProg = [];
+    llamadas.length = 0;
+    const retenido = mk({ order_id: 900, empresa: "lk", cod: "4275", razon_social: "Zhang Qikuan",
+                          fecha_recep: "2026-09-04", zona: "Zona 1 - CABA Sur", m3: 0.172,
+                          cuarentena_motivos: ["deuda", "cliente_nuevo"],
+                          cuarentena_detalle: { deuda: 2734562, nuevo_pedidos: 0 } });
+    _apr.pedidos = [retenido, mk({ order_id: 901, razon_social: "Cliente Dos" })];
+    _apr.pedidosTodos = _apr.pedidos.slice();
+    _apr.cuarContacto = {};                       // sin teléfono cargado → botón "Sin tel."
+    _apr.cuarComN = { "lk:900": 3 };              // el contador que trae el lote
+    aprRender(); await new Promise((res) => setTimeout(res, 200));
+    html = document.getElementById("pppPreview").innerHTML;
+    out.tblEs = /cuar-tbl"/.test(html) && /<th>NP<\/th>/.test(html) && /<th>Pedido<\/th>/.test(html) &&
+                /<th>Motivos<\/th>/.test(html) && /<th class="cuar-td-com">Coment\.<\/th>/.test(html);
+    out.tblSinFichas = !/apr-card apr-card-cuar/.test(html);
+    out.tblFecha = /cuar-tbl-fecha[^>]*>04\/09</.test(html);
+    out.tblEspera = /apr-chip-esp/.test(html);
+    out.tblM3 = /cuar-card-m3">0,172 m³</.test(html);
+    out.tblCod = /cuar-card-cod[^>]*>LK 4275</.test(html);
+    out.tblZona = /Zona 1 - CABA Sur/.test(html);
+    out.tblBadges = /cuar-badge b-deuda/.test(html) && /cuar-badge b-nuevo/.test(html);
+    out.tblBotones = /cuar-wpp-cob/.test(html) && /cuar-pago/.test(html) &&
+                     /Enviar a Pedidos a programar/.test(html);
+    out.tblLibrito = /cuarComAbrirPed\('lk','900'\)/.test(html) && /📖<b>3<\/b>/.test(html);
+    // la flechita abre el contenido del pedido en una fila aparte, a lo ancho de la tabla
+    aprToggle("clk900"); await new Promise((res) => setTimeout(res, 120));
+    html = document.getElementById("pppPreview").innerHTML;
+    out.tblDetalle = /cuar-tbl-det/.test(html) && /colspan="9"/.test(html);
+    aprToggle("clk900"); await new Promise((res) => setTimeout(res, 100));
+
+    // el 📖 de un retenido abre el MISMO log, con la clave del pedido
+    window.aprRpc = async function (fn, args) {
+      llamadas.push({ fn: fn, args: args });
+      if (fn === "gv_cuarentena_comentarios")
+        return [{ id: 9, creado_at: "2026-09-15T08:00:00-03:00", persona: "Vivi", por: "vivi@x", texto: "Quedó de pagar hoy" }];
+      if (fn === "gv_cuarentena_comentarios_lote") return [{ empresa: "lk", clave: "900", n: 3 }];
+      if (fn === "gv_cuarentena_pago") return [{ cod: "4275", empresa: "lk", deuda_al_pagar: 2734562, pedidos_liberados: 1 }];
+      return null;
+    };
+    cuarComAbrirPed("lk", "900"); await new Promise((res) => setTimeout(res, 150));
+    const rh = (document.getElementById("cuarComModal") || {}).innerHTML || "";
+    out.retComModal = /📖 Comentarios/.test(rh) && /Quedó de pagar hoy/.test(rh) && /Zhang Qikuan/.test(rh);
+    const rcom = llamadas.find(function (c) { return c.fn === "gv_cuarentena_comentarios"; });
+    out.retComClave = !!rcom && rcom.args.p_empresa === "lk" && rcom.args.p_order_id === "900";
+    cuarComCerrar();
+
+    // el contador sale de la RPC de lote, en UNA sola llamada para toda la lista
+    llamadas.length = 0; _apr.cuarComN = null; _apr.cuarComNLoading = false;
+    await cuarComLoteCargar(); await new Promise((res) => setTimeout(res, 80));
+    const lote = llamadas.filter(function (c) { return c.fn === "gv_cuarentena_comentarios_lote"; });
+    out.loteUna = lote.length === 1 && Array.isArray(lote[0].args.p_pedidos) &&
+                  lote[0].args.p_pedidos.length === 1 && lote[0].args.p_pedidos[0].clave === "900";
+    out.loteN = cuarComN(retenido) === 3;
+
+    // "Ya pagó": llama a la RPC con empresa+cod y el badge de deuda se cae al toque. El pedido
+    // sigue retenido porque además es cliente nuevo, y eso se DICE.
+    llamadas.length = 0;
+    const confirmOrig = window.confirm; window.confirm = function () { return true; };
+    await cuarYaPago("lk", 900); await new Promise((res) => setTimeout(res, 150));
+    window.confirm = confirmOrig;
+    const pago = llamadas.find(function (c) { return c.fn === "gv_cuarentena_pago"; });
+    out.pagoRpc = !!pago && pago.args.p_empresa === "lk" && pago.args.p_cod === "4275";
+    out.pagoSacaDeuda = (aprCuarentenaMotivos(retenido) || []).indexOf("deuda") < 0 &&
+                        (aprCuarentenaMotivos(retenido) || []).indexOf("cliente_nuevo") >= 0;
+    out.pagoAvisa = /sigue retenido por cliente nuevo/.test(String(_apr.msg || ""));
+    // el mismo pago, en un pedido cuyo ÚNICO motivo era la deuda: se va de Cuarentena
+    const soloDeuda = mk({ order_id: 902, empresa: "lk", cod: "7777", razon_social: "Solo Deuda SA",
+                           cuarentena_motivos: ["deuda"], cuarentena_detalle: { deuda: 5000 } });
+    _apr.pedidos = [soloDeuda]; _apr.pedidosTodos = [soloDeuda];
+    window.confirm = function () { return true; };
+    await cuarYaPago("lk", 902); await new Promise((res) => setTimeout(res, 150));
+    window.confirm = confirmOrig;
+    out.pagoLibera = !aprEnCuarentena(soloDeuda) && /Sale de Cuarentena/.test(String(_apr.msg || ""));
+
     out.errs = null;
     return out;
   });
@@ -392,6 +468,26 @@ catch (_e) {
   chk(r.demoBtnQuitar, "con ejemplo activo el botón dice 'Quitar ejemplo'");
   chk(r.demoOff, "al quitar el ejemplo desaparece y el botón vuelve a 'Ver ejemplo'");
   chk(r.itemsFlat.length === 2 && r.itemsFlat[0].art === "027" && r.itemsFlat[1].art === "505", "cuarItemsDe aplana los items de todos los bloques del pedido");
+  // v18.01 — los retenidos como lista/tabla
+  chk(r.tblEs, "los retenidos son una TABLA con NP / Pedido / Motivos / Coment.");
+  chk(r.tblSinFichas, "ya no se dibujan las fichas de 340px");
+  chk(r.tblFecha, "la tabla muestra la fecha del pedido (04/09)");
+  chk(r.tblEspera, "al lado de la fecha va el chip de hace cuánto llegó");
+  chk(r.tblM3, "la tabla conserva el m³ del pedido");
+  chk(r.tblCod, "la tabla conserva el chip del número de cliente (LK 4275)");
+  chk(r.tblZona, "la tabla conserva la zona");
+  chk(r.tblBadges, "la tabla conserva los badges de motivo");
+  chk(r.tblBotones, "la tabla conserva los botones (cobranzas, Ya pagó, Enviar a programar)");
+  chk(r.tblLibrito, "cada fila tiene el 📖 con su cantidad de comentarios");
+  chk(r.tblDetalle, "la flechita abre el contenido del pedido en una fila a todo el ancho");
+  chk(r.retComModal, "el 📖 de un retenido abre el log de comentarios");
+  chk(r.retComClave, "el log pide los comentarios de ESE pedido (empresa + order_id)");
+  chk(r.loteUna, "el contador de comentarios se pide UNA vez para toda la lista");
+  chk(r.loteN, "el contador que devuelve el lote llega a la fila");
+  chk(r.pagoRpc, "'Ya pagó' llama a gv_cuarentena_pago con empresa + código de cliente");
+  chk(r.pagoSacaDeuda, "'Ya pagó' saca el motivo deuda en el acto (y deja los demás)");
+  chk(r.pagoAvisa, "'Ya pagó' avisa por qué el pedido sigue retenido");
+  chk(r.pagoLibera, "'Ya pagó' saca de Cuarentena al pedido cuyo único motivo era la deuda");
   chk(errs.length === 0, "sin errores de página" + (errs.length ? " (" + errs.join(" | ") + ")" : ""));
 
   await b.close();

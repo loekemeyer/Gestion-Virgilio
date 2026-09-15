@@ -15995,3 +15995,89 @@ vacío), y `_tapCerradoSesion` sigue frenando el doble TAP.
 
 **Rollback:** sacar el bloque `let _armUbics = …` de `compTerminar` y la línea de `emitArmadoUbic`.
 No hay cambio de base: `AUB` ya existía como `opcion`.
+
+---
+
+### §3.ge — v18.01: Cuarentena en lista, con fecha y comentarios — y el "Ya pagó" que nunca funcionó — 2026-09-15
+
+**Pedido (Luis, 2026-09-15):** *"quiero que los pedidos A programar en cuarentena se vean más
+como lista/tabla (parecida a la visualización de los que ya están programados)… que conserven
+los badges y toda la info, agregales la fecha del pedido, el botón ya pagó me parece que no hace
+nada, agregales la opción de poner comentarios"*.
+
+#### 1. ⚠ El botón "Ya pagó" nunca escribió una sola fila (problema 205)
+
+No era una impresión. `gv_cuarentena_pago` **abortaba siempre**, desde que existe (v15.46,
+2026-09-11), con:
+
+```
+ERROR 42702: column reference "empresa" is ambiguous
+DETAIL: It could refer to either a PL/pgSQL variable or a table column.
+```
+
+La función devuelve **OUT params llamados `cod` y `empresa`**, y adentro hacía
+`insert … on conflict (empresa, cod) do update`: plpgsql no sabe si ese target del conflicto es
+la columna o la variable. Medido el 15/09 recreando la definición vieja con otro nombre y
+llamándola → mismo error. Coherente con el estado de la base: **`GV_Cuarentena_Pagados` tenía 0
+filas**. Y por eso §3.fp (v17.97) describe mal el botón cuando dice que "escribe en
+`GV_Cuarentena_Pagados` y apaga el motivo `deuda`": apagarlo no lo apagó nunca.
+
+**Arreglo** (`sql/gv_cuarentena_pago_v1801.sql`): `on conflict on constraint
+"GV_Cuarentena_Pagados_pkey"` — la PK es `(empresa, cod)` y así no pasa por la resolución de
+nombres. **No** se pueden renombrar los OUT params: definen el tipo de retorno, o sea DROP +
+CREATE y tocar el front.
+
+**Segundo defecto, en la misma función:** guardaba el par **crudo** del pedido (`lk` + código de
+la página). Desde la v17.74/v17.75 el motivo `deuda` se evalúa contra el padrón que resuelve
+`gv_cuarentena_ident` (`GV_Cliente_Isis`): para los **9 clientes de Tierra del Fuego** el par
+evaluado es `(chef, cod_isis)`, que es lo que busca el `not exists` de
+`gv_cuarentena_marcar_calc` y `gv_cuarentena_ya_programado`. Ahora se guardan **los dos pares**
+(es el mismo cliente, el mapeo va por CUIT); sin mapeo el `union` deja una fila sola y nada
+cambia.
+
+**Medición:** `select * from public.gv_cuarentena_pago('lk','ZZ_PRUEBA_V1798');` → devolvió la
+fila y escribió en la tabla (antes: 42702). La fila de prueba se borró; la tabla quedó en **0**.
+**Rollback:** `sql/backups/gv_cuarentena_pago_pre_v1801.sql` (ojo: vuelve a la versión rota).
+
+En el front (`cuarYaPago`) se agregó `cuarSacarDeuda()`: apenas responde la RPC, el motivo
+`deuda` se cae de **todos** los pedidos de ese cliente que están a la vista y el mensaje dice
+cuántos salieron o por qué el pedido sigue retenido. El `aprCargar()` tarda ~3 s y sin esto el
+botón seguía pareciendo muerto aunque ya funcionara.
+
+#### 2. `gv_cuarentena_comentarios_lote(jsonb)` — objeto NUEVO
+
+`sql/gv_cuarentena_comentarios_lote_v1801.sql`. Devuelve `(empresa, clave, n)`: cuántos
+comentarios tiene cada pedido retenido, en **una** vuelta de red para toda la lista. Los pedidos
+sin tanda no pasan por `gv_cuarentena_ya_programado()`, que es la que calcula ese contador para
+la tabla de "Ya programados", así que no había de dónde sacarlo. La clave es la de siempre:
+`(empresa, order_id)` normalizado con `gv_cuarentena_clave` — el mismo pedido de ISIS se llama
+`np98587` en A Programar y `98587` en el log. `security definer` + `stable`, con la misma puerta
+(`es_supervisor_virgilio() or gv_es_supervisor_o_servicio()`) y los mismos grants que sus
+hermanas (`authenticated`, `service_role`; nada para `anon`).
+
+Prueba: `gv_cuarentena_comentarios_lote('[{"empresa":"lk","clave":"np98617"},{"empresa":"lk","clave":"1429"}]')`
+→ `n = 1` en las dos (la fila del log está guardada como `98617`, o sea que la normalización de
+la clave anda).
+
+#### 3. La lista de retenidos pasó a ser una TABLA
+
+`aprColCuarentena()` dibujaba fichas de 340px en grilla (`.apr-col-cuar .apr-scroll`); ahora
+dibuja `<table class="cuar-tbl">` con las columnas **NP · Pedido · m³ · Cliente · Zona · Motivos
+· Contacto · Enviar a · Coment.**, a tono con la tabla de "Ya programados" que está justo arriba.
+
+- **Nada se perdió**: el chip del número de cliente, el m³, la zona, el badge de horario, los
+  badges de motivo, la flechita que abre el contenido (ahora en una fila `colspan="9"`) y los 4
+  botones siguen todos ahí, sólo que compactos (`.cuar-tbl .cuar-wpp/.cuar-pago/.cuar-enviar`
+  les sacan el `width:100%` y el `grid-column` que traían de la grilla de la ficha).
+- **Fecha del pedido** (columna "Pedido"): `fecha_recep` en `dd/mm` con la fecha completa en el
+  `title`, más el chip `⏱ hoy / ayer / hace N días` que ya existía en "Pedidos a programar".
+- **Comentarios**: el 📖 de cada fila abre **el mismo** pop-up que el de los ya programados
+  (`cuarComAbrirPed` → `cuarComAbrir` en modo `log`), así que un comentario dejado acá se lee
+  después en el log de 🚧 Config. Cuarentena, con su identidad obligatoria (Vivi / Marian / Otro).
+
+Las fichas (`.apr-card-cuar` y su grilla) **quedan en el CSS**: las usa el resto de A Programar.
+
+**Tests:** `tests/apr-cuarentena.cjs` suma 20 chequeos (tabla, fecha, chip de espera, m³, chip de
+cliente, zona, badges, botones, 📖 con contador, fila de detalle, apertura del log, una sola
+llamada al lote, y los tres casos de "Ya pagó": llama la RPC, saca el motivo deuda en el acto,
+avisa por qué el pedido sigue retenido, y libera al que sólo tenía deuda).

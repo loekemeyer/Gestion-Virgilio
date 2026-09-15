@@ -982,23 +982,55 @@ button {
 .apr-cuar-help{ font-weight:800; color:#c2410c; cursor:help; margin-left:5px; }
 .apr-col-cuar .apr-vacio{ color:#b45309; }
 .apr-col-cuar .apr-vacio b{ color:#9a3412; }
-.apr-chip-cuar{ background:#c2410c; color:#fff; font-weight:800; }
-.apr-card-cuar{ border-left-color:#c2410c; background:#fffbf5; cursor:default; display:flex; flex-direction:column; align-items:stretch; gap:0; padding:9px 10px 10px; }
-/* v15.41 — la ficha va apilada: datos arriba, barra de acciones abajo separada
-   por una línea. Antes (v15.02) iban a la derecha con margin-left:auto y en la
-   ficha angosta el botón verde quedaba nowrap contra el borde: se cortaba. */
-.cuar-info{ flex:1 1 auto; min-width:0; }
-/* v15.03 — LAS FICHAS VAN ANGOSTAS (dueño: "versión angosta"). Cuando el sector
-   Cuarentena ocupa todo el ancho de la pantalla, una ficha estirada quedaba con
-   los datos a la izquierda, un mar de blanco en el medio y los botones pegados
-   al borde derecho. Ahora son tarjetas de ancho fijo (~340px) en grilla: entran
-   varias por fila y ninguna se estira. `min(100%,300px)` en el minmax para que
-   dentro de una columna angosta de A Programar tampoco desborde. */
-/* v17.57: `align-items:start` para que al abrir el contenido de UNA ficha las vecinas de la
-   misma fila no se estiren a su alto (quedaban con medio cuerpo en blanco). */
-.apr-col-cuar .apr-scroll{ display:grid; grid-template-columns:repeat(auto-fill, minmax(min(100%,300px), 340px)); align-content:start; align-items:start; gap:8px; }
-.apr-col-cuar .apr-scroll .apr-card{ margin-bottom:0; }
-.apr-cuar-motivo{ font-size:12px; color:#9a3412; margin-top:5px; font-weight:600; line-height:1.4; }
+/* v18.01 — las FICHAS de Cuarentena (`.apr-card-cuar`, `.cuar-info`, `.cuar-card-top/-cli/-zona`,
+   `.cuar-acciones`, la grilla de 340px de `.apr-col-cuar .apr-scroll` y `.apr-card-demo`) se
+   borraron acá: la lista pasó a ser una tabla y ningún `.js` emite ya esas clases. De paso se
+   fueron `.apr-chip-cuar` y `.apr-cuar-motivo`, que ya estaban sin uso desde antes. Lo que sigue
+   vivo de la ficha —el número, el m³, el chip del cliente, los badges y los botones— está más
+   abajo, compartido con la tabla. */
+/* v18.01 (Luis, 2026-09-15: *"quiero que los pedidos A programar en cuarentena se vean más como
+   lista/tabla, parecida a la visualización de los que ya están programados"*) — las fichas de
+   340px en grilla pasaron a ser UNA tabla, con las mismas columnas que la de "Ya programados"
+   más la FECHA DEL PEDIDO y el 📖 de comentarios. Los badges, el chip del número de cliente, el
+   horario y la flechita que abre el contenido son EXACTAMENTE los mismos: cambió el envase, no
+   la información. Las fichas y su grilla de 340px se borraron: ningún `.js` emite ya esas
+   clases (ver la nota de arriba). */
+.cuar-tblwrap{ overflow-x:auto; border:1px solid #f0d2bb; border-radius:10px; background:#fff; }
+.cuar-tbl{ width:100%; border-collapse:collapse; font-size:12px; color:#7c2d12; }
+.cuar-tbl th{ text-align:left; font-size:10px; letter-spacing:.4px; text-transform:uppercase;
+  color:#9a3412; background:#fff7ed; border-bottom:1px solid #f0d2bb; padding:6px 8px; white-space:nowrap; }
+.cuar-tbl td{ border-top:1px solid #faece1; padding:6px 8px; vertical-align:middle; }
+.cuar-tbl tbody tr:hover{ background:#fffaf5; }
+.cuar-tbl tr.cuar-tr-demo{ background:#fffdf5; }
+.cuar-tbl tr.cuar-tr-open > td{ background:#fff7ed; }
+.cuar-td-np{ cursor:pointer; white-space:nowrap; }
+.cuar-td-np .apr-card-chev{ margin:0 5px 0 0; color:#c2410c; }
+.cuar-tbl .cuar-card-np{ font-size:14px; }
+.cuar-tbl .cuar-demo-tag{ margin-left:6px; }
+/* el m³ tiene columna propia: acá no lleva el "·" que lo separaba de la NP en la ficha */
+.cuar-tbl .cuar-card-m3::before{ content:none; }
+.cuar-td-m3{ white-space:nowrap; text-align:right; }
+.cuar-td-fecha{ white-space:nowrap; }
+.cuar-tbl-fecha{ font-weight:800; margin-right:5px; }
+.cuar-td-cli{ font-weight:800; color:#0f172a; min-width:170px; overflow-wrap:anywhere; }
+.cuar-td-zona{ min-width:125px; }
+.cuar-td-com{ text-align:center; }
+.cuar-tbl .cuar-badges{ margin-top:0; gap:4px; }
+.cuar-tbl .cuar-badge{ font-size:9.5px; padding:1px 7px; }
+/* los mismos botones de la ficha, compactos: acá no tienen que ocupar el ancho de una tarjeta,
+   así que se les saca el width:100% y el grid-column que traían de la grilla de acciones. */
+.cuar-td-acc{ display:flex; flex-wrap:wrap; gap:4px; align-items:center; }
+.cuar-tbl .cuar-wpp{ width:auto; font-size:10.5px; padding:3px 8px; }
+.cuar-tbl .cuar-pago{ width:auto; grid-column:auto; font-size:11px; padding:3px 9px; }
+.cuar-tbl .cuar-enviar{ width:auto; grid-column:auto; font-size:11px; padding:4px 10px; }
+.cuar-tbl .cuar-yp-lib{ border-color:#f0d2bb; }
+.cuar-tbl .cuar-yp-lib:hover{ background:#fff1e7; }
+.cuar-tbl .cuar-yp-lib b{ color:#9a3412; }
+/* la fila que se abre con la flechita: el contenido del pedido, a lo ancho de toda la tabla */
+.cuar-tbl tr.cuar-tbl-det > td{ background:#fffaf5; padding:0 10px 9px 30px; }
+/* el detalle no se estira a los 1400px de la tabla: a ese ancho, "505 … 2 cajas … 24" quedaba
+   con medio metro de blanco en el medio y no se leía de corrido */
+.cuar-tbl-det .apr-card-body{ margin-top:0; border-top:0; padding-top:0; max-width:780px; }
 /* v14.82 — 4 botones de importación de reportes en el sector Cuarentena */
 .cuar-tools{ display:grid; grid-template-columns:1fr 1fr; gap:6px; margin-bottom:9px; }
 .cuar-tool{ display:flex; flex-direction:column; gap:3px; min-width:0; }
@@ -1012,8 +1044,7 @@ button {
 .cuar-demo-hint{ font-size:11px; color:#b07a5a; margin-right:auto; }
 .cuar-demo-btn{ background:transparent; border:1px solid #e8cdb8; color:#9a3412; border-radius:7px; padding:3px 10px; font-size:11.5px; font-weight:700; cursor:pointer; width:auto; margin-top:0; }
 .cuar-demo-btn:hover{ background:#fff1e7; }
-.cuar-demo-tag{ background:#fde68a; color:#92400e; font-size:10px; font-weight:800; border-radius:5px; padding:1px 6px; margin-left:auto; letter-spacing:.5px; flex:0 0 auto; }
-.apr-card-demo{ border-style:dashed; }
+.cuar-demo-tag{ background:#fde68a; color:#92400e; font-size:10px; font-weight:800; border-radius:5px; padding:1px 6px; letter-spacing:.5px; flex:0 0 auto; }
 /* pop-up de importación (colgado de <body>, fuera del zoom de la PPP) */
 .cuar-modal{ position:fixed; inset:0; z-index:100000; }
 .cuar-m-back{ position:absolute; inset:0; background:rgba(15,23,42,.55); }
@@ -1039,25 +1070,18 @@ button {
 .cuar-m-load{ color:#475569; font-size:12.5px; margin-top:8px; }
 /* v14.88 — timer "última vez cargada …" en rojo tras 7 días */
 .cuar-stat-viejo{ color:#b42318 !important; font-weight:800; }
-/* v14.88 — ficha de pedido en Cuarentena: énfasis en la NP, luego zona/m³/razón, 3 badges y botón */
-.cuar-card-top{ display:flex; align-items:baseline; gap:8px; }
+/* v14.88 — el NÚMERO y el m³ del pedido en Cuarentena. Nacieron en la ficha; desde la v18.01
+   viven en las dos primeras celdas de la tabla (el "·" del m³ lo apaga `.cuar-tbl`). */
 .cuar-card-np{ font-size:16px; font-weight:900; color:#7c2d12; letter-spacing:.3px; }
-/* v15.02 — el m³ va pegado a la NP (antes con margin-left:auto se iba al otro
-   extremo: en una ficha ancha quedaba flotando lejos del número de pedido). */
 .cuar-card-m3{ font-size:12px; font-weight:800; color:#9a3412; white-space:nowrap; }
 .cuar-card-m3::before{ content:"·"; margin:0 6px 0 2px; color:#d9a988; }
-.apr-card-cuar .cuar-card-cli{ font-weight:800; font-size:13px; color:#0f172a; margin-top:3px; overflow-wrap:anywhere; }
-.cuar-card-zona{ font-size:12px; color:#7c2d12; margin-top:2px; }
-/* v17.57 (Luis: "para los que están en cuarentena, lo mismo, necesito una flechita arriba a la
-   derecha que los expanda y muestre lo que pidieron") — la fila de arriba de la ficha abre y
-   cierra el contenido, igual que en Pedidos a programar. */
-.cuar-card-top{ cursor:pointer; }
-.cuar-card-top .apr-card-chev{ color:#c2410c; }
-.apr-card-cuar .apr-card-body{ border-top-color:#f0ddcc; }
-.apr-card-cuar .apr-det-n{ background:#fff1e7; color:#7c2d12; }
-.apr-card-cuar .apr-det-n b{ color:#7c2d12; }
-.apr-card-cuar .apr-tab th{ color:#b45309; border-bottom-color:#f0ddcc; }
-.apr-card-cuar .apr-tab td{ border-bottom-color:#faece1; }
+/* v17.57 (Luis: "para los que están en cuarentena, lo mismo, necesito una flechita … que los
+   expanda y muestre lo que pidieron") — el contenido del pedido, con el mismo tono naranja que
+   tenía dentro de la ficha. v18.01: ahora cuelga de la fila `.cuar-tbl-det` de la tabla. */
+.cuar-tbl-det .apr-det-n{ background:#fff1e7; color:#7c2d12; }
+.cuar-tbl-det .apr-det-n b{ color:#7c2d12; }
+.cuar-tbl-det .apr-tab th{ color:#b45309; border-bottom-color:#f0ddcc; }
+.cuar-tbl-det .apr-tab td{ border-bottom-color:#faece1; }
 .cuar-badges{ display:flex; flex-wrap:wrap; gap:5px; margin-top:7px; }
 .cuar-badge{ font-size:10.5px; font-weight:800; border-radius:999px; padding:2px 9px; letter-spacing:.3px; white-space:nowrap; }
 .cuar-badge.b-deuda{ background:#fee2e2; color:#991b1b; border:1px solid #fca5a5; }
@@ -1078,11 +1102,6 @@ button {
    fila, arriba del CTA y al ancho de la ficha: compartiendo fila, el texto del CTA se cortaba. */
 .cuar-pago{ grid-column:1 / -1; width:100%; margin-top:0; background:#fff; color:#166534; border:1.5px solid #86c79a; border-radius:8px; padding:7px 10px; font-size:12.5px; font-weight:800; cursor:pointer; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 .cuar-pago:hover{ background:#f0faf2; border-color:#4f9d68; }
-/* v15.41 — fila de acciones: grilla 2 columnas, el botón Enviar abajo a todo
-   el ancho. min-width:0 en los hijos para que el texto largo elipse en vez de
-   estirar la grilla y salirse de la ficha. */
-.cuar-acciones{ display:grid; grid-template-columns:1fr 1fr; align-items:stretch; gap:6px; width:100%; min-width:0; margin:9px 0 0; padding-top:9px; border-top:1px solid #f0ddcc; }
-.cuar-acciones .cuar-enviar{ margin-top:0; }
 .cuar-wpp{ width:100%; max-width:none; min-width:0; margin-top:0; background:#fff; border-radius:8px; padding:6px 8px; font-size:11.5px; font-weight:700; cursor:pointer; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 .cuar-wpp-cob{ color:#0e7568; border:1px solid #9ad2ca; }
 .cuar-wpp-cob:hover{ background:#effbf8; }
@@ -1129,8 +1148,9 @@ button {
 .apr-card-m3{ font-size:12px; font-weight:800; color:#475569; white-space:nowrap; }
 .apr-card-m3::before{ content:"·"; margin:0 6px 0 2px; color:#94a3b8; }
 .apr-card-cli{ font-weight:800; font-size:13px; color:#0f172a; line-height:1.25; overflow-wrap:anywhere; margin-top:3px; cursor:pointer; }
-/* el chip del número de cliente es el mismo de Cuarentena, en el azul de esta columna */
-.apr-card:not(.apr-card-cuar) .cuar-card-cod{ background:#eef4ff; color:#1e40af; border-color:#c7d9f7; }
+/* el chip del número de cliente es el mismo de Cuarentena, en el azul de esta columna
+   (v18.01: el `:not(.apr-card-cuar)` se cayó — ninguna tarjeta es de Cuarentena, son filas) */
+.apr-card .cuar-card-cod{ background:#eef4ff; color:#1e40af; border-color:#c7d9f7; }
 .apr-card-chev{ color:#94a3b8; font-size:12px; margin-left:auto; cursor:pointer; flex:0 0 auto; }
 .apr-card-d{ display:flex; flex-wrap:wrap; gap:5px; margin-top:5px; }
 .apr-chip{ font-size:11.5px; background:#f1f5f9; color:#475569; border-radius:999px; padding:2px 8px; font-weight:600; }
@@ -1177,7 +1197,7 @@ button {
 .apr-hor.vacio:hover{ background:#f8fafc; color:#475569; }
 .apr-hor.cli{ background:#dcfce7; color:#14532d; border-color:#86efac; }   /* lo eligió el cliente */
 .apr-hor.cli:hover{ background:#bbf7d0; }
-.apr-card-cuar .cuar-card-zona .apr-hor{ margin-left:7px; }
+.cuar-td-zona .apr-hor{ margin-left:7px; }
 /* el pop-up de edición reusa la caja de Cuarentena */
 .apr-hor-f{ display:grid; grid-template-columns:70px 1fr; align-items:center; gap:9px; margin-bottom:9px; }
 .apr-hor-f label{ font-size:12.5px; font-weight:800; color:#475569; }
@@ -5349,7 +5369,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=18.00"></script>
+<script type="module" src="recepcion.js?v=18.01"></script>
 <!-- Config del módulo de fichada (compartido con fichada.html). El secret
      hmacSecret tiene que ser el mismo acá y allá; cargándolo desde un solo
      archivo evitamos que se desincronicen. -->
@@ -8789,7 +8809,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v18.00";
+const APP_VERSION = "v18.01";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -39252,7 +39272,9 @@ let _apr = {
   cuarResumen: null, cuarResumenLoading: false,
   cuarLog: undefined, cuarLogLoading: false, cuarLogDias: 60, cuarLogErr: "",   // v17.23
   // v14.90 — CUARENTENA: contacto WhatsApp (vendedor/cliente) por empresa:cod
-  cuarContacto: null, cuarContactoLoading: false
+  cuarContacto: null, cuarContactoLoading: false,
+  // v18.01 — CUARENTENA: cuántos comentarios tiene cada pedido retenido (empresa:order_id → n)
+  cuarComN: null, cuarComNLoading: false
 };
 // v14.82 — estado del pop-up de importación de reportes de cuarentena
 let _cuarImp = { open: false };
@@ -40689,6 +40711,8 @@ function aprColCuarentena() {
   let lista = (_apr.pedidos || []).filter(aprEnCuarentena);
   // v14.90: cargar (una vez) los contactos WhatsApp de los retenidos reales
   if (_apr.cuarContacto === null && !_apr.cuarContactoLoading && lista.some(function (p) { return !p._demo; })) cuarContactoCargar();
+  // v18.01: cuántos comentarios tiene cada retenido (una sola vuelta de red para toda la lista)
+  if (_apr.cuarComN === null && !_apr.cuarComNLoading && lista.some(function (p) { return !p._demo; })) cuarComLoteCargar();
   if (_apr.cuarDemo) lista = [cuarDemoPedido()].concat(lista);   // v14.84: pedido de ejemplo
   const _cuarCargando = !_apr.listo || aprCargandoAlgo();   // v15.54: mismo criterio que la columna de pedidos
   let h = '<div class="apr-col apr-col-cuar' + (_cuarCargando ? ' apr-col-cargando' : '') + '">' +
@@ -40703,41 +40727,115 @@ function aprColCuarentena() {
       : '<div class="apr-vacio">Sin pedidos retenidos. Acá caen los de clientes con <b>deuda</b>, <b>suspendidos</b>, que <b>superan su límite de crédito</b> o que son <b>clientes nuevos</b>: no se programan solos.</div>';
     return h + '</div>';
   }
-  h += '<div class="apr-scroll">';
+  // v18.01 (Luis): LISTA/TABLA, no fichas — las mismas columnas que la de "Ya programados"
+  // (arriba), más la FECHA DEL PEDIDO y el 📖 de comentarios. No se perdió nada de la ficha: el
+  // chip del número de cliente, el m³, la zona, el horario, los badges de motivo, la flechita
+  // que abre el contenido y los 4 botones están todos acá.
+  h += '<div class="cuar-tblwrap"><table class="cuar-tbl"><thead><tr>' +
+    '<th>NP</th><th>Pedido</th><th class="cuar-td-m3">m³</th><th>Cliente</th><th>Zona</th>' +
+    '<th>Motivos</th><th>Contacto</th><th>Enviar a</th><th class="cuar-td-com">Coment.</th>' +
+    '</tr></thead><tbody>';
   for (const p of lista) {
     const np = p._demo ? "web LK 9999" : aprPedLabel(p);
-    // v17.57 (Luis): flechita arriba a la derecha para ver qué pidieron, igual que en la columna
-    // de Pedidos a programar. El id lleva "c" adelante para no pisarse con el de esa lista.
+    // v17.57 (Luis): flechita para ver qué pidieron, igual que en la columna de Pedidos a
+    // programar. El id lleva "c" adelante para no pisarse con el de esa lista.
     const cid = "c" + p.empresa + p.order_id, cab = !!_apr.exp[cid];
-    h += '<div class="apr-card apr-card-cuar' + (p._demo ? ' apr-card-demo' : '') + '" title="' + escapeHtml(aprCuarentenaMotivo(p)) + '">' +
-      '<div class="cuar-info">' +
-        '<div class="cuar-card-top" onclick="aprToggle(\'' + cid + '\')">' +
-          '<span class="cuar-card-np">' + escapeHtml(np) + '</span>' +
-          (p._demo ? '<span class="cuar-demo-tag">EJEMPLO</span>' : '') +
-          '<span class="cuar-card-m3">' + aprNum(p.m3) + ' m³</span>' +
-          '<span class="apr-card-chev" title="Ver qué pidieron (códigos y cajas)">' + (cab ? "▾" : "▸") + '</span>' +
-        '</div>' +
-        '<div class="cuar-card-cli">' + cuarCodChip(p) + escapeHtml(p.razon_social || p.cod || ("#" + p.order_id)) + '</div>' +
-        '<div class="cuar-card-zona">📍 ' + escapeHtml(p.zona || "sin zona") + aprHorBadge(p) + '</div>' +
-        aprCuarBadgesHtml(p) +
-        (cab ? '<div class="apr-card-body">' + aprContenidoHtml(p) + '</div>' : '') +
-      '</div>' +
-      '<div class="cuar-acciones' + (cuarTieneDeuda(p) ? ' cuar-acciones-pago' : '') + '">' +
-        cuarWppContactoBtn(p) +
-        '<button class="cuar-wpp cuar-wpp-cob" onclick="cuarWppCobranzas(\'' + (p.empresa || "lk") + '\',\'' + escapeHtml(String(p.order_id)) + '\')" title="Escribir a Vivi (cobranzas) por WhatsApp (+54 9 11 6557-4113) para que chequee este pedido">💬 A cobranzas (Vivi)</button>' +
-        cuarYaPagoBtn(p) +
-        '<button class="cuar-enviar" onclick="cuarLiberar(\'' + (p.empresa || "lk") + '\',\'' + escapeHtml(String(p.order_id)) + '\')">➡ Enviar a Pedidos a programar</button>' +
-      '</div>' +
-    '</div>';
+    const emp = p.empresa || "lk", oid = escapeHtml(String(p.order_id));
+    h += '<tr class="cuar-tr' + (p._demo ? ' cuar-tr-demo' : '') + (cab ? ' cuar-tr-open' : '') + '"' +
+      ' title="' + escapeHtml(aprCuarentenaMotivo(p)) + '">' +
+      '<td class="cuar-td-np" onclick="aprToggle(\'' + cid + '\')" title="Ver qué pidieron (códigos y cajas)">' +
+        '<span class="apr-card-chev">' + (cab ? "▾" : "▸") + '</span>' +
+        '<span class="cuar-card-np">' + escapeHtml(np) + '</span>' +
+        (p._demo ? '<span class="cuar-demo-tag">EJEMPLO</span>' : '') +
+      '</td>' +
+      '<td class="cuar-td-fecha">' + cuarFechaPedidoHtml(p) + '</td>' +
+      '<td class="cuar-td-m3"><span class="cuar-card-m3">' + aprNum(p.m3) + ' m³</span></td>' +
+      '<td class="cuar-td-cli">' + cuarCodChip(p) + escapeHtml(p.razon_social || p.cod || ("#" + p.order_id)) + '</td>' +
+      '<td class="cuar-td-zona">📍 ' + escapeHtml(p.zona || "sin zona") + aprHorBadge(p) + '</td>' +
+      '<td>' + (aprCuarBadgesHtml(p) || '<span class="cuar-yp-sin">—</span>') + '</td>' +
+      '<td><div class="cuar-td-acc">' + cuarWppContactoBtn(p) +
+        '<button class="cuar-wpp cuar-wpp-cob" onclick="cuarWppCobranzas(\'' + emp + '\',\'' + oid + '\')" title="Escribir a Vivi (cobranzas) por WhatsApp (+54 9 11 6557-4113) para que chequee este pedido">💬 A cobranzas (Vivi)</button>' +
+      '</div></td>' +
+      '<td><div class="cuar-td-acc">' + cuarYaPagoBtn(p) +
+        '<button class="cuar-enviar" onclick="cuarLiberar(\'' + emp + '\',\'' + oid + '\')" title="Aprobarlo: pide quién lo autoriza y un comentario, y lo manda a «Pedidos a programar»">➡ Enviar a Pedidos a programar</button>' +
+      '</div></td>' +
+      '<td class="cuar-td-com">' + cuarComBtnHtml(p) + '</td>' +
+      '</tr>';
+    if (cab) h += '<tr class="cuar-tbl-det"><td colspan="9"><div class="apr-card-body">' + aprContenidoHtml(p) + '</div></td></tr>';
   }
-  return h + '</div></div>';
+  return h + '</tbody></table></div></div>';
 }
+/* v18.01 (Luis: *"agregales la fecha del pedido"*) — cuándo entró el pedido. Al lado va el
+   chip de espera que ya existía en "Pedidos a programar" (⏱ hoy / ayer / hace N días): la fecha
+   sola no dice si es de esta mañana o de la semana pasada. */
+function cuarFechaPedidoHtml(p) {
+  const s = String((p && p.fecha_recep) || "").slice(0, 10);
+  if (!s) return '<span class="cuar-yp-sin">—</span>';
+  const q = s.split("-");
+  const corta = q.length === 3 ? (q[2] + "/" + q[1]) : s;
+  return '<span class="cuar-tbl-fecha" title="' + escapeHtml("El pedido entró el " + s) + '">' +
+    escapeHtml(corta) + '</span>' + aprEsperaChip(p);
+}
+/* v18.01 (Luis: *"agregales la opción de poner comentarios"*) — el MISMO log que ya tenían los
+   pedidos ya programados: misma tabla (GV_Cuarentena_Comentarios), misma clave (empresa +
+   order_id normalizado con gv_cuarentena_clave) y mismo pop-up, así un comentario dejado acá se
+   lee después desde el log de Config. Cuarentena. El contador de cada 📖 lo trae en UNA vuelta
+   de red `gv_cuarentena_comentarios_lote` (estos pedidos no pasan por gv_cuarentena_ya_programado,
+   que es la que lo calcula para la tabla de arriba). */
+function cuarComN(p) {
+  const m = _apr.cuarComN;
+  if (!m) return null;
+  const v = m[String((p && p.empresa) || "lk") + ":" + String(p && p.order_id)];
+  return v == null ? 0 : Number(v);
+}
+function cuarComBtnHtml(p) {
+  if (p && p._demo) return '<button class="cuar-yp-lib" disabled title="En el ejemplo no hay comentarios">📖</button>';
+  const n = cuarComN(p);
+  const t = n === null ? "Buscando comentarios…"
+          : n ? (n + " comentario" + (n === 1 ? "" : "s") + " — abrir el log")
+              : "Sin comentarios — tocá para escribir uno";
+  return '<button class="cuar-yp-lib" onclick="cuarComAbrirPed(\'' + ((p && p.empresa) || "lk") + '\',\'' +
+    escapeHtml(String(p && p.order_id)) + '\')" title="' + escapeHtml(t) + '">📖' +
+    (n ? '<b>' + n + '</b>' : '') + '</button>';
+}
+function cuarComAbrirPed(empresa, orderId) {
+  if (String(orderId) === "EJEMPLO") return;
+  const p = (_apr.pedidosTodos || []).find(function (x) { return aprKey(x.empresa, x.order_id) === String(empresa) + ":" + String(orderId); });
+  cuarComAbrir({ modo: "log", empresa: empresa || "lk", clave: String(orderId),
+                 np: p ? aprPedLabel(p) : String(orderId),
+                 cli: (p && (p.razon_social || p.cod)) || "",
+                 motivos: (p && aprCuarentenaMotivos(p)) || null });
+}
+async function cuarComLoteCargar() {
+  const lista = (_apr.pedidos || []).filter(function (p) { return !p._demo && aprEnCuarentena(p); });
+  if (!lista.length) { _apr.cuarComN = {}; return; }
+  _apr.cuarComNLoading = true;
+  try {
+    const res = await aprRpc("gv_cuarentena_comentarios_lote", {
+      p_pedidos: lista.map(function (p) { return { empresa: p.empresa || "lk", clave: String(p.order_id) }; })
+    });
+    const m = {};
+    (res || []).forEach(function (r) { m[String(r.empresa) + ":" + String(r.clave)] = Number(r.n) || 0; });
+    _apr.cuarComN = m;
+  } catch (_e) { _apr.cuarComN = _apr.cuarComN || {}; }
+  _apr.cuarComNLoading = false;
+  if (_pppTab === "prog") aprRender();
+}
+function cuarComLoteRecargar() { _apr.cuarComN = null; _apr.cuarComNLoading = false; cuarComLoteCargar(); }
 /* v15.46 — Botón "Ya pagó" (dueño, 2026-09-11: "para que Viviana los pueda habilitar y que salgan
    de cuarentena"). Es del CLIENTE, no del pedido: se registra el pago en `GV_Cuarentena_Pagados`
    (RPC `gv_cuarentena_pago`) y desde ahí `gv_cuarentena_marcar` deja de marcarlo por deuda — o sea
    salen TODOS los pedidos de ese cliente, no sólo éste. El pago vale contra el reporte de deuda
    vigente: si mañana se sube uno más nuevo y el cliente sigue debiendo, vuelve solo a Cuarentena.
-   NO levanta "suspendido" ni "excede crédito": con esos motivos el pedido sigue retenido y se avisa. */
+   NO levanta "suspendido" ni "excede crédito": con esos motivos el pedido sigue retenido y se avisa.
+   ⚠ v18.01 (Luis, 2026-09-15: *"el botón ya pagó me parece que no hace nada"* — tenía razón):
+   desde que existe, la RPC abortaba SIEMPRE con `42702 column reference "empresa" is ambiguous`
+   (sus OUT params se llaman `cod` y `empresa` y el `on conflict (empresa, cod)` no sabía a cuál
+   apuntaba), así que `GV_Cuarentena_Pagados` nunca tuvo una sola fila. Arreglado en
+   `sql/gv_cuarentena_pago_v1798.sql` (problema 205), junto con el par de cliente que se guardaba:
+   ahora también el del padrón con el que se evalúa (Tierra del Fuego se mira contra Chef).
+   Acá, además, el badge de deuda se saca al toque de todos los pedidos de ese cliente: el
+   `aprCargar()` tarda ~3 s y sin eso el botón seguía "sin hacer nada" a la vista. */
 function cuarTieneDeuda(p) { return (aprCuarentenaMotivos(p) || []).indexOf("deuda") >= 0; }
 function cuarYaPagoBtn(p) {
   if (!cuarTieneDeuda(p)) return "";
@@ -40757,12 +40855,33 @@ async function cuarYaPago(empresa, orderId) {
   try {
     const r = await aprRpc("gv_cuarentena_pago", { p_empresa: empresa || "lk", p_cod: cod });
     const otros = (aprCuarentenaMotivos(p) || []).filter(function (m) { return m !== "deuda"; });   // v17.12: incluye cliente_nuevo, que pagar NO levanta
+    // v18.01 — que se VEA en el acto: el motivo "deuda" se cae de TODOS los pedidos de ese
+    // cliente (el pago es del cliente, no del pedido). El aprCargar() de abajo lo vuelve a
+    // calcular contra la base, así que esto es sólo para no dejar la pantalla quieta 3 segundos.
+    const nPed = cuarSacarDeuda(empresa, cod);
     _apr.msg = "💚 " + cli + " marcado como pagado" + ((r && r[0] && r[0].deuda_al_pagar != null) ? " (deuda $" + aprNum(r[0].deuda_al_pagar) + ")" : "") + "." +
-      (otros.length ? " Ojo: el pedido sigue retenido por " + otros.map(function (m) { return m === "limite_credito" ? "límite de crédito" : m === "sin_cta_cte" ? "Sin Cta.Cte." : m === "cliente_nuevo" ? "cliente nuevo" : m; }).join(" y ") + "." : "");
+      (otros.length ? " Ojo: el pedido sigue retenido por " + otros.map(function (m) { return m === "limite_credito" ? "límite de crédito" : m === "sin_cta_cte" ? "Sin Cta.Cte." : m === "cliente_nuevo" ? "cliente nuevo" : m; }).join(" y ") + "."
+                    : (nPed > 1 ? " Salieron de Cuarentena " + nPed + " pedidos suyos." : " Sale de Cuarentena."));
     _apr.msgErr = false;
     aprRender();
     aprCargar();
   } catch (e) { _apr.msg = String((e && e.message) || e); _apr.msgErr = true; aprRender(); }
+}
+/* v18.01 — saca el motivo "deuda" de todos los pedidos del cliente que están a la vista y
+   devuelve CUÁNTOS quedaron sin ningún motivo, o sea cuántos se fueron de Cuarentena de verdad
+   (los que además están suspendidos o son clientes nuevos siguen retenidos y no se cuentan). */
+function cuarSacarDeuda(empresa, cod) {
+  const emp = String(empresa || "lk"), c = String(cod || "").trim();
+  let n = 0;
+  (_apr.pedidosTodos || []).forEach(function (x) {
+    if (x._demo || String(x.empresa || "lk") !== emp || String(x.cod || "").trim() !== c) return;
+    if (!aprEnCuarentena(x)) return;
+    const ms = (aprCuarentenaMotivos(x) || []).filter(function (m) { return m !== "deuda"; });
+    if (x.cuarentena_detalle) delete x.cuarentena_detalle.deuda;
+    if (ms.length) { x.cuarentena_motivos = ms; }
+    else { delete x.cuarentena_motivos; delete x.cuarentena_motivo; delete x.cuarentena; n++; }
+  });
+  return n;
 }
 
 /* Liberar: mandar el pedido a "Pedidos a programar" (mantiene el badge). Se auto-programa si es
@@ -41074,6 +41193,7 @@ async function cuarComAgregar() {
     s.lista = (await aprRpc("gv_cuarentena_comentarios", { p_empresa: s.empresa, p_order_id: s.clave })) || [];
     cuarComRender();
     cuarYaProgRecargar();   // el contador del librito lo cuenta el backend
+    cuarComLoteRecargar();  // v18.01: ídem el de la lista de retenidos
   } catch (e) { s.saving = false; s.err = String((e && e.message) || e); cuarComRender(); }
 }
 function cuarYaProgRecargar() { _apr.cuarYaProg = undefined; _apr.cuarYaProgLoading = false; cuarYaProgCargar(); }
@@ -41567,6 +41687,7 @@ async function cuarMarcarPedidos() {
     });
   } catch (_e) { /* si falla, no marca; no rompe la pantalla */ }
   _apr.cuarContacto = null;   // v14.90: cambió el set de retenidos → recargar contactos WhatsApp
+  _apr.cuarComN = null;       // v18.01: ídem el contador de comentarios de cada 📖
   if (_pppTab === "prog") aprRender();
 }
 /* Pedido de EJEMPLO para ver el sector sin datos reales (dueño: "poneme un pedido de prueba"). */
