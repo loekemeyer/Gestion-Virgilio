@@ -17903,3 +17903,37 @@ Las tres tandas quedaron verificadas contra su base, sin renglones faltantes: `E
 (18 renglones / 58 cajas) y LK 0093 (1 / 6); `E25A` → LK 0097 (1 / 20); `D71A` → NP 97889,
 1 renglón (55219 × 500 cajas). Después de la limpieza el único picking/armado en curso era `E23A`
 del legajo 237, arrancado minutos antes: ése es real.
+
+## §3.hl — v18.60: el camión de un SÚPER no es "camión a esa zona" (cómo se armó E11 del 16/09 y por qué no se repite) — 2026-09-15
+
+> **Luis:** *"chequeá cómo se terminó armando eso porque me parece que fue automático por las reglas
+> del sistema. Hoy se cambiaron, verificá si podría volver a pasar."* Problema **305**, tarea 3467.
+
+**Cómo se armó E11** (`GV_Tandas_Auto_Log` 616/642/677 y `PPP_Web_Programacion`, todo `creado_por = sistema`):
+
+| Tanda | Quién | Cuándo | Por qué |
+|---|---|---|---|
+| E11A | 98651 Extralimp (ISIS, Zona 5) | — | ancla legítima del camión E11 del 16/09 |
+| E11B | CH 0025 **Dorinka (súper)**, zona "Zona 5 - GBA Oeste" | 10:12, automático | regla vieja: el súper se detectaba por grupo de zona, y Dorinka dice "Zona 5" |
+| E11C | LK 0092/0093 Todo Bazar (Zona 5) | 12:16, automático | bloque (c): "ya hay camión a zona 5 el 16/09" → se engancha a E11 |
+| E11D | LK 0099 Goldar (Zona 5) | 15:00, automático | idem |
+
+**Qué frenó la v18.31 (misma tarde):** el paso E11B. `ppp_web_armar_tandas` borra de `_sin_tanda` a
+todo cliente de `GV_Supers` (`gv_es_super`), así que un súper no se programa solo nunca más
+(simulación de mañana para lk y chef: sin tandas, sin error).
+
+**Qué seguía abierto (y es lo que cierra la v18.60):** los pasos E11C/E11D al revés. Un súper **ya
+programado** —a mano, o de antes— con zona numérica contaba como "camión a esa zona" en dos lugares:
+`gv_ppp_web_dia_camion` (elige el día por cualquier tanda con "Zona N") y el bloque `_ex` de
+`ppp_web_armar_tandas` (reusa el camión LETRA+NN filtrando sólo `zona ~ 'super|retira|expo'`). Si
+Luis movía a Dorinka a un camión propio de zona 5, el automático le seguía sumando clientes.
+Ahora la fila de un súper no cuenta en ninguno de los dos (`gv_es_super` / `gv_es_super_np`).
+`sql/gv_ppp_web_camion_sin_super_v1860.sql`; backup `zz_backups."GV_Backup_Funcdefs_20260915_v1860"`.
+
+**Medido:** `gv_ppp_web_dia_camion('Zona 5 - GBA Oeste', mañana)` sigue dando 16/09 (Extralimp es
+cliente común). Control positivo en transacción abortada —ocultando a Extralimp y sacando Todo
+Bazar/Goldar, con sólo Dorinka en zona 5 el 16/09— devuelve **21/09**, no 16/09.
+
+**Lo que queda en manos de Luis:** E11 del 16/09 ya está armado; mover a Dorinka de camión es a mano.
+El panel de errores de la PPP (v18.59) lo muestra en rojo hasta que se resuelva. El título del panel
+dejó de decir "en el Excel" (v18.60).

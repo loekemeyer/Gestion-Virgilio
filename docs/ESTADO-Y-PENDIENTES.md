@@ -17,9 +17,10 @@
 > 6. **Hoy no se facturó nada** (0 tics; ayer 38; 24 NP armadas sin facturar). No es un bug: la
 >    pantalla se abrió 1.282 veces y nadie tildó. Avisar a Marianela.
 >
-> **Para Luis/Thomas, mañana 16/09:** el camión **E11 mezcla el súper Dorinka (E11B) con 3 clientes
-> comunes** (E11A/C/D) — `gv_ppp_super_mezclado` da 5 filas; el automático ya no lo hace (v18.31)
-> pero esa tanda ya estaba armada. Y **D71 lleva 9,25 m³ en una sola NP** (154 % del tope).
+> **Para Luis, mañana 16/09:** el camión **E11 mezcla el súper Dorinka (E11B) con 3 clientes
+> comunes** (E11A/C/D). Se armó automático el 15/09 (§3.hl). El automático ya no programa súper (v18.31)
+> ni suma clientes al camión de un súper (v18.60); mover a Dorinka es a mano y el panel de errores de la
+> PPP lo muestra en rojo (v18.59). Y **D71 lleva 9,25 m³ en una sola NP** (154 % del tope).
 > **116 (E11A) ya está corregido** (Thomas dio el OK con la captura de la tarea 3424): góndola 0, Pickeados 0.
 > **119 (E11A) también corregido** con el OK de Thomas (*"sí, el 119 también"*, tarea 3460): el picking
 > escribió −50 con 49 en góndola y nadie marcó el "de menos" → `a_facturar −1` y `terminado +1`

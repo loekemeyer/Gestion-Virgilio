@@ -5609,7 +5609,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=18.59"></script>
+<script type="module" src="recepcion.js?v=18.60"></script>
 <!-- Config del módulo de fichada (compartido con fichada.html). El secret
      hmacSecret tiene que ser el mismo acá y allá; cargándolo desde un solo
      archivo evitamos que se desincronicen. -->
@@ -9178,7 +9178,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v18.59";
+const APP_VERSION = "v18.60";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -35601,7 +35601,8 @@ function pppErroresHtml(e) {
   if (!n) return "";   // v13.12: sin errores no se muestra nada (dueño: "sacá esas 2 alertas")
   const np = function (p) { const s = escapeHtml(String(p.np)); return '<a class="ppp-go" onclick="pppGoToRow(\'' + s + '\')" title="Ir a la fila del pedido">' + s + '</a>'; };
   const cli = function (p) { const r = (p.razon_social || "").trim(); return r ? " " + escapeHtml(r.slice(0, 20)) : ""; };
-  let h = '<div class="ppp-errpanel"><div class="ppp-errpanel-h">🚨 ' + n + ' cosa(s) para revisar/corregir en el Excel</div>';
+  // v18.60 (Luis): "ya no se usa ningún Excel en el pipeline" — el título decía "en el Excel".
+  let h = '<div class="ppp-errpanel"><div class="ppp-errpanel-h">🚨 ' + n + ' cosa(s) para revisar en la programación</div>';
   if (e.sacar.length)     h += '<div class="ppp-ei bad">🚮 <b>Ya entregados — SACAR (' + e.sacar.length + '):</b> ' + e.sacar.map(function (p) { return np(p) + cli(p); }).join(" · ") + '</div>';
   if (e.sinZona.length)   h += '<div class="ppp-ei warn">⚠ <b>Sin zona (' + e.sinZona.length + '):</b> ' + e.sinZona.map(function (p) { return np(p) + " — " + escapeHtml(pppLocDisp(p.localidad) || "?"); }).join(" · ") + '</div>';
   if (e.zonaDif.length)   h += '<div class="ppp-ei warn">⚠ <b>Zona no coincide (' + e.zonaDif.length + '):</b> ' + e.zonaDif.map(function (p) { return np(p) + " [" + escapeHtml(pppLocDisp(p.localidad) || "?") + ": Excel=" + escapeHtml(p.zona || "—") + " / barrio=" + escapeHtml(pppZonaDeBarrio(p.localidad) || "—") + "]"; }).join(" · ") + '</div>';
