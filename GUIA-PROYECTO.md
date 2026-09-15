@@ -1,3 +1,47 @@
+## Nota v18.02 (2026-09-15) — la hoja impresa: el cód con el cliente, y los anchos salidos del dato
+
+Pedido de Luis, mirando la primera hoja en papel: *"código de cliente en el campo de razón social al
+lado del nombre entre paréntesis. Optimizá tamaños (más grande el font, menos espacio vacío/muerto,
+columnas ajustadas en ancho al dato más largo de la columna, doble fila cuando tenga sentido)"*.
+
+**El cód pasa al cliente**: `Pettish Lacroze 2481 **(LK 2145)**`. La columna de la NP queda pelada
+(`98669`, antes `98669 LK 2145`), que es la que después se busca en ISIS.
+
+**La columna Horario se fue.** Estaba vacía en casi todas las filas y se llevaba el 14 % del papel.
+Ahora el horario es un **segundo renglón** dentro del cliente (`⏱ 15/09 08:00 a 12:00`) y sólo
+aparece cuando el pedido tiene horario pactado. Ésa es la "doble fila cuando tenga sentido"; la otra
+es el cliente, que es la única celda que **parte en dos renglones** en vez de cortar con `…`: en una
+hoja de reparto un nombre cortado es peor que una fila un poco más alta.
+
+**La zona no se repite.** El renglón de la tanda ya dice `Zona 2`; las NP de esa tanda dejan sólo el
+barrio (`Colegiales`). Si la NP está en otra zona, se escribe entera.
+
+### Los anchos y la letra, calculados (`_pgpAnchos`)
+
+Antes eran seis porcentajes puestos a ojo (17/28/22/14/7/12) y sobraba medio ancho de papel. Ahora
+se **mide con canvas el texto real de todas las celdas de toda la hoja** y cada columna se queda con
+lo que necesita su celda más larga. Se calcula **una sola vez para todos los días**, así las columnas
+siguen alineando de hoja en hoja (que es lo único que aportaba el `table-layout:fixed` con % fijos).
+
+Y como con las columnas ajustadas **sobraba aire entre ellas**, ese sobrante se lo come **la letra**:
+se prueba de 17 px para abajo y se usa la más grande que entre (`PGP_PX_MIN`/`PGP_PX_MAX`). Con los
+datos de la hoja de prueba da **15,5 px** — contra los 11,5 px fijos de la v17.98.
+
+⚠ **Medir de menos corta datos; medir de más sólo deja aire.** La primera versión medía de menos y en
+papel salía `Total del …`, `Zona 2 · Paler…`, `2 NP · En proce…`. Los cuatro motivos, todos
+corregidos, valen para cualquier medición con canvas contra CSS:
+
+- el encabezado se dibuja en **MAYÚSCULA** y con `letter-spacing:.04em` — el CSS lo hace, el canvas
+  no lo sabe;
+- el **cód va en negrita** dentro de una celda que se medía en redonda;
+- la píldora del estado (`.pgp-est`) tiene **borde y padding propios** además de los de la celda;
+- el ancho útil real no es exactamente el nominal → se apunta al **97 %**.
+
+El test lo controla **directo**, no por fórmula: lleva el viewport a 718 px (190 mm, el útil de una
+A4 con los márgenes de `@page`), emula `media print` y verifica que **ninguna celda** tenga
+`scrollWidth > clientWidth`. Más que la tabla llena ≥ 97 % del ancho, o sea que no volvió a quedar
+papel muerto. `tests/pga-imprimir.cjs` queda en **46 chequeos**.
+
 ## Nota v17.98 (2026-09-15) — 🖨 Imprimir la Programación
 
 Pedido de Luis: *"al lado del botón de «Actualizar» quiero que haya un botón de «Imprimir». Al

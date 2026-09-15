@@ -3328,15 +3328,24 @@ tr.ppp-err-zona > td{ background:#fffbeb !important; }
 .pgp-dia > h3{ font-size:15px; font-weight:900; margin:0 0 4px; padding:4px 6px;
   background:#eef2f7; border-left:4px solid #333; break-after:avoid; page-break-after:avoid; }
 .pgp-dia > h3 small{ font-weight:700; font-size:12px; margin-left:8px; }
-/* anchos fijos: si cada día dimensiona su tabla sola, las columnas no alinean entre días */
-.pgp-tab{ width:100%; border-collapse:collapse; font-size:11.5px; table-layout:fixed; }
-.pgp-tab col.c1{ width:17%; } .pgp-tab col.c2{ width:28%; } .pgp-tab col.c3{ width:22%; }
-.pgp-tab col.c4{ width:14%; } .pgp-tab col.c5{ width:7%; }  .pgp-tab col.c6{ width:12%; }
-.pgp-tab td{ overflow:hidden; text-overflow:ellipsis; }
-.pgp-tab th{ text-align:left; font-size:9.5px; text-transform:uppercase; letter-spacing:.04em;
-  color:#444; border-bottom:1.5px solid #333; padding:3px 5px; }
-.pgp-tab td{ padding:3px 5px; border-bottom:1px solid #ddd; vertical-align:top; }
+/* v18.02 — ANCHOS AJUSTADOS AL DATO, no a porcentajes a ojo. Sigue siendo `table-layout:fixed`
+   con un `<colgroup>` —si cada día dimensiona su tabla sola las columnas no alinean entre días—
+   pero los anchos los calcula `_pgpAnchos()` midiendo el texto real de TODA la hoja, una sola vez.
+   Antes eran 17/28/22/14/7/12 fijos y sobraba medio ancho de papel sin usar. */
+.pgp-tab{ width:100%; border-collapse:collapse; font-size:13px; table-layout:fixed; }
+.pgp-tab td{ overflow:hidden; }
+.pgp-tab th{ text-align:left; font-size:10.5px; text-transform:uppercase; letter-spacing:.04em;
+  color:#444; border-bottom:1.5px solid #333; padding:3px 6px; }
+.pgp-tab td{ padding:4px 6px; border-bottom:1px solid #ddd; vertical-align:top;
+  white-space:nowrap; text-overflow:ellipsis; }
 .pgp-tab th.n, .pgp-tab td.n{ text-align:right; white-space:nowrap; }
+/* El cliente es la única que PARTE en dos renglones en vez de cortar con "…": en una hoja de
+   reparto un nombre cortado es peor que una fila un poco más alta. */
+.pgp-cli{ white-space:normal !important; line-height:1.25; }
+.pgp-cod{ font-weight:700; }
+/* El horario iba en una COLUMNA propia que estaba vacía en casi todas las filas (14 % del papel
+   muerto). Ahora es un segundo renglón bajo el cliente, y sólo aparece cuando hay horario. */
+.pgp-hor{ display:block; font-size:11px; font-weight:700; margin-top:1px; }
 .pgp-t > td{ background:#f4f6f8; font-weight:900; border-top:1px solid #999; }
 .pgp-np td:first-child{ padding-left:16px; }
 .pgp-est{ display:inline-block; border:1px solid #666; border-radius:8px; padding:0 5px;
@@ -5369,7 +5378,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=18.01"></script>
+<script type="module" src="recepcion.js?v=18.02"></script>
 <!-- Config del módulo de fichada (compartido con fichada.html). El secret
      hmacSecret tiene que ser el mismo acá y allá; cargándolo desde un solo
      archivo evitamos que se desincronicen. -->
@@ -8809,7 +8818,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v18.01";
+const APP_VERSION = "v18.02";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -35712,6 +35721,65 @@ function pgaImprimirRango() {
   for (const d of _pgi.dias) _pgi.sel[d.key] = (d.key >= lo && d.key <= hi);
   pgaImprimirRender();
 }
+/* Ancho útil de una A4 con los márgenes de `@page` (210 − 2×10 mm ≈ 190 mm a 96 dpi). Es
+   nominal: los anchos se devuelven en %, así que si el papel es otro la proporción se mantiene. */
+const PGP_ANCHO_PAPEL = 718;
+/* Los anchos salen del DATO. Se mide con canvas el texto real de cada celda de TODA la hoja (no de
+   un día), cada columna se queda con lo que necesita su celda más larga, y lo que sobra va entero
+   a la columna `flex` — así no queda papel muerto a la derecha. Si no entra, el recorte también
+   sale de la `flex` (hasta su piso), nunca de mó o del estado, que quedarían cortados. */
+const PGP_PX_MIN = 12, PGP_PX_MAX = 17;
+function _pgpAnchos(cols) {
+  const ff = (typeof getComputedStyle === "function" &&
+              getComputedStyle(document.body).fontFamily) || "sans-serif";
+  const ctx = document.createElement("canvas").getContext("2d");
+  const ancho = function (txt, bold, px) {
+    ctx.font = (bold ? "700 " : "") + px + "px " + ff;
+    return ctx.measureText(String(txt == null ? "" : txt)).width;
+  };
+  /* ⚠ Medir de MENOS corta datos; medir de más sólo deja aire. Así que se mide por arriba:
+       · el encabezado va en MAYÚSCULA y con `letter-spacing:.04em` — el CSS lo hace, el canvas no;
+       · el cliente se mide en negrita, porque el código entre paréntesis va en negrita;
+       · cada columna suma sus dos paddings (12 px fijos del CSS), el borde y un colchón.
+     La primera versión no hacía nada de esto y en papel salía "Total del …", "Zona 2 · Paler…". */
+  const PAD = 12 + 2 + 4;
+  const medir = function (px) {
+    return cols.map(function (c) {
+      const hp = Math.max(8, px - 2.5), hTxt = String(c.head).toUpperCase();
+      let mx = ancho(hTxt, true, hp) + hTxt.length * hp * 0.04;
+      for (const t of (c.textos || [])) {
+        const a = ancho(t.t, true, t.px ? t.px * px / 13 : px);
+        if (a > mx) mx = a;
+      }
+      return Math.ceil(mx) + PAD + (c.pad || 0);
+    });
+  };
+  /* LA LETRA CRECE HASTA LLENAR EL PAPEL. Con las columnas ajustadas al dato sobraba aire entre
+     ellas — el hueco entre "Cliente" y "Zona", que es espacio muerto igual que los porcentajes
+     fijos de antes. En vez de repartir ese sobrante como huecos, se lo come la letra: se prueba de
+     PGP_PX_MAX para abajo y se usa el más grande que entre. */
+  const OBJ = PGP_ANCHO_PAPEL * 0.97;   // 3 % de colchón: el útil real no es exactamente el nominal
+  let px = PGP_PX_MIN, w = medir(PGP_PX_MIN);
+  for (let t = PGP_PX_MAX; t >= PGP_PX_MIN; t -= 0.5) {
+    const cand = medir(t);
+    const suma = cand.reduce(function (a, b) { return a + b; }, 0);
+    if (suma <= OBJ || t === PGP_PX_MIN) { px = t; w = cand; break; }
+  }
+  let tot = w.reduce(function (a, b) { return a + b; }, 0);
+  let iF = -1;
+  for (let i = 0; i < cols.length; i++) { if (cols[i].flex) { iF = i; break; } }
+  if (tot < PGP_ANCHO_PAPEL) {
+    // el resto (menos de media letra de diferencia) va a la `flex`, para cerrar contra el margen
+    if (iF >= 0) { w[iF] += PGP_ANCHO_PAPEL - tot; }
+    else { const k = PGP_ANCHO_PAPEL / tot; for (let i = 0; i < w.length; i++) w[i] *= k; }
+    tot = PGP_ANCHO_PAPEL;
+  } else if (tot > PGP_ANCHO_PAPEL && iF >= 0) {
+    // si ni con la letra más chica entra, el recorte sale de la `flex`, que parte en dos renglones
+    const baja = Math.min(tot - PGP_ANCHO_PAPEL, Math.max(0, w[iF] - (cols[iF].min || 120)));
+    w[iF] -= baja; tot -= baja;
+  }
+  return { px: px, anchos: w.map(function (x) { return (100 * x / tot).toFixed(2) + "%"; }) };
+}
 /* La hoja. Todo desplegado: día → tanda → NP, sin el contenido de cada NP. */
 function pgaImprimirHtml(dias) {
   const hoy = new Date();
@@ -35724,39 +35792,66 @@ function pgaImprimirHtml(dias) {
   let h = '<div class="pgp-h1">Programación de entregas — ' + escapeHtml(rango) + '</div>' +
     '<div class="pgp-h2">' + _pppFmtM3(m3) + ' m³ · ' + tn + ' tanda' + (tn === 1 ? '' : 's') +
     ' · ' + nps + ' NP · impreso el ' + cuando + '</div>';
+  /* Una sola pasada arma las filas de todos los días y va juntando el texto para medir: los anchos
+     tienen que ser LOS MISMOS en los 5 días, si no las columnas no alinean de hoja en hoja. */
+  const mNp = [{ t: "Total del día", b: true }], mCli = [], mLug = [], mM3 = [], mEst = [];
+  const porDia = [];
   for (const d of dias) {
+    const fil = [];
+    for (const t of d.tandasArr) {
+      const te = _pgaEstadoGrupo(t.est, t.nps), z = _pgaZonaTanda(t);
+      const estTxt = t.nps + " NP · " + PGA_EST_TXT[te];
+      mNp.push({ t: t.tanda, b: true }); mLug.push({ t: z }); mM3.push({ t: _pppFmtM3(t.m3), b: true });
+      mEst.push({ t: estTxt, b: true });
+      fil.push('<tr class="pgp-t"><td>' + escapeHtml(t.tanda) + '</td><td></td>' +
+        '<td>' + escapeHtml(z) + '</td>' +
+        '<td class="n">' + _pppFmtM3(t.m3) + '</td>' +
+        '<td>' + escapeHtml(estTxt) + '</td></tr>');
+      for (const r of t.filas) {
+        const est = PGA_EST.indexOf(r.estado) >= 0 ? r.estado : "pendiente";
+        /* La zona ya la dice el renglón de la tanda: si la NP está en esa misma zona sólo va el
+           barrio. Repetir "Zona 2" en las 4 NP de una tanda de Zona 2 es tinta y ancho al pedo. */
+        const zn = String(r.zona_corta || r.localidad || "").trim();
+        const lug = [(zn && zn !== z ? zn : ""), r.barrio || ""]
+          .filter(function (x, i, a) { return x && a.indexOf(x) === i; }).join(" · ");
+        // Pedido de Luis: el código de cliente al lado del nombre, entre paréntesis.
+        const cod = r.cod ? "(" + String(r.empresa || "LK").toUpperCase() + " " + r.cod + ")" : "";
+        const cli = (r.razon_social || "—") + (cod ? " " + cod : "");
+        const hor = r.pide_horario ? aprHorTxt({ fecha: r.horario_fecha, franja: r.horario_franja }) : "";
+        mNp.push({ t: String(r.np), b: true }); mCli.push({ t: cli }); mLug.push({ t: lug });
+        mM3.push({ t: _pppFmtM3(r.m3) }); mEst.push({ t: PGA_EST_TXT[est] });
+        if (hor) mCli.push({ t: "⏱ " + hor, b: true, px: 11 });
+        fil.push('<tr class="pgp-np"><td><b>' + escapeHtml(String(r.np)) + '</b></td>' +
+          '<td class="pgp-cli">' + escapeHtml(r.razon_social || "—") +
+            (cod ? ' <span class="pgp-cod">' + escapeHtml(cod) + '</span>' : '') +
+            (hor ? '<span class="pgp-hor">⏱ ' + escapeHtml(hor) + '</span>' : '') + '</td>' +
+          '<td>' + escapeHtml(lug) + '</td>' +
+          '<td class="n">' + _pppFmtM3(r.m3) + '</td>' +
+          '<td><span class="pgp-est">' + PGA_EST_TXT[est] + '</span></td></tr>');
+      }
+    }
+    fil.push('<tr class="pgp-tot"><td>Total del día</td><td></td><td></td>' +
+      '<td class="n">' + _pppFmtM3(d.m3) + '</td><td>' + d.nps + ' NP</td></tr>');
+    porDia.push(fil.join(""));
+    mM3.push({ t: _pppFmtM3(d.m3), b: true }); mEst.push({ t: d.nps + " NP", b: true });
+  }
+  const med = _pgpAnchos([
+    { head: "Tanda / NP", textos: mNp },
+    { head: "Cliente (cód)", textos: mCli, flex: true, min: 150 },
+    { head: "Zona · barrio", textos: mLug },
+    { head: "m³", textos: mM3 },
+    { head: "Estado", textos: mEst, pad: 14 }      // la píldora `.pgp-est` tiene borde y padding propios
+  ]);
+  const an = med.anchos, estilo = ' style="font-size:' + med.px + 'px"';
+  const cg = '<colgroup>' + an.map(function (x) { return '<col style="width:' + x + '">'; }).join("") + '</colgroup>';
+  const th = '<thead><tr><th>Tanda / NP</th><th>Cliente (cód)</th><th>Zona · barrio</th>' +
+    '<th class="n">m³</th><th>Estado</th></tr></thead>';
+  dias.forEach(function (d, i) {
     h += '<div class="pgp-dia"><h3>' + escapeHtml(_pgaDiaTxt(d.key)) +
       '<small>' + _pppFmtM3(d.m3) + ' m³ · ' + d.tandasArr.length + ' tanda' +
       (d.tandasArr.length === 1 ? '' : 's') + ' · ' + d.nps + ' NP</small></h3>' +
-      '<table class="pgp-tab">' +
-      '<colgroup><col class="c1"><col class="c2"><col class="c3"><col class="c4"><col class="c5"><col class="c6"></colgroup>' +
-      '<thead><tr>' +
-        '<th>Tanda / NP</th><th>Cliente</th><th>Zona · barrio</th><th>Horario</th>' +
-        '<th class="n">m³</th><th>Estado</th></tr></thead><tbody>';
-    for (const t of d.tandasArr) {
-      const te = _pgaEstadoGrupo(t.est, t.nps), z = _pgaZonaTanda(t);
-      h += '<tr class="pgp-t"><td>' + escapeHtml(t.tanda) + '</td>' +
-        '<td></td><td>' + escapeHtml(z) + '</td><td></td>' +
-        '<td class="n">' + _pppFmtM3(t.m3) + '</td>' +
-        '<td>' + t.nps + ' NP · ' + PGA_EST_TXT[te] + '</td></tr>';
-      for (const r of t.filas) {
-        const est = PGA_EST.indexOf(r.estado) >= 0 ? r.estado : "pendiente";
-        const lug = [r.zona_corta || r.localidad || "", r.barrio || ""]
-          .filter(function (x, i, a) { return x && a.indexOf(x) === i; }).join(" · ");
-        const hor = r.pide_horario ? aprHorTxt({ fecha: r.horario_fecha, franja: r.horario_franja }) : "";
-        h += '<tr class="pgp-np"><td><b>' + escapeHtml(String(r.np)) + '</b>' +
-            (r.cod ? ' <span>' + escapeHtml((r.empresa || "LK") + " " + r.cod) + '</span>' : '') + '</td>' +
-          '<td>' + escapeHtml(r.razon_social || "—") + '</td>' +
-          '<td>' + escapeHtml(lug) + '</td>' +
-          '<td>' + escapeHtml(hor) + '</td>' +
-          '<td class="n">' + _pppFmtM3(r.m3) + '</td>' +
-          '<td><span class="pgp-est">' + PGA_EST_TXT[est] + '</span></td></tr>';
-      }
-    }
-    h += '<tr class="pgp-tot"><td>Total del día</td><td></td><td></td><td></td>' +
-      '<td class="n">' + _pppFmtM3(d.m3) + '</td><td>' + d.nps + ' NP</td></tr>';
-    h += '</tbody></table></div>';
-  }
+      '<table class="pgp-tab"' + estilo + '>' + cg + th + '<tbody>' + porDia[i] + '</tbody></table></div>';
+  });
   return h;
 }
 function pgaImprimirHacer() {

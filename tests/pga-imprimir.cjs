@@ -128,14 +128,37 @@ catch (_e) {
     out.npsEnHoja = [...hoja.querySelectorAll("tr.pgp-np td:first-child b")].map((e) => e.textContent.trim());
     // lo que pidió textual: la NP con sus datos, NO su contenido
     out.sinContenido = !/pga-its|pga-it\b|apr-det/.test(hh) && !pedidosItems.length;
-    out.tieneCodCliente = /LK 2118/.test(hh) && /CH 2533/.test(hh);
+    // v18.02 (Luis): el cód va DENTRO de la celda del cliente, entre paréntesis — no en la de la NP
+    out.codEnCliente = [...hoja.querySelectorAll("tr.pgp-np")].map((tr) => ({
+      np: tr.children[0].textContent.trim(), cli: tr.children[1].textContent.trim() }));
+    out.tieneCodCliente = /\(LK 2118\)/.test(hh) && /\(CH 2533\)/.test(hh);
+    // ojo: la NP web ES "LK 0058", eso no es el cód. Lo que no tiene que estar es el cód entre
+    // paréntesis, y la NP de ISIS tiene que quedar pelada ("98701", antes "98701 LK 1974").
+    out.npSinCod = out.codEnCliente.every((x) => !/\(/.test(x.np)) &&
+      out.codEnCliente.some((x) => x.np === "98701");
+    out.cliConCod = out.codEnCliente.some((x) => /^Ricci Gabriel Edgardo \(LK 2118\)$/.test(x.cli));
     out.tieneCliente = /Ricci Gabriel Edgardo/.test(hh) && /Osa Hermanos/.test(hh);
+    // el horario dejó de ser columna (estaba vacía casi siempre): es un 2º renglón dentro del cliente
     out.tieneHorario = /08:00/.test(hh);
+    out.horEnCliente = !!hoja.querySelector("tr.pgp-np td.pgp-cli .pgp-hor");
+    out.sinColHorario = [...hoja.querySelectorAll("table.pgp-tab thead th")]
+      .every((e) => !/horario/i.test(e.textContent));
+    // la zona no se repite: el renglón de la tanda ya la dice, la NP deja sólo el barrio
+    out.lugares = [...hoja.querySelectorAll("tr.pgp-np td:nth-child(3)")].map((e) => e.textContent.trim());
     out.tieneEstado = [...hoja.querySelectorAll(".pgp-est")].map((e) => e.textContent.trim());
     out.tieneTotal = [...hoja.querySelectorAll("tr.pgp-tot")].length === 2;
     out.tieneEncabezado = /Programación de entregas/.test(hh) && /impreso el /.test(hh);
     // las columnas alinean entre días: cada tabla trae el mismo colgroup de 6
     out.colgroups = [...hoja.querySelectorAll("table.pgp-tab")].map((t) => t.querySelectorAll("col").length);
+    // los anchos salen del dato, pero tienen que ser LOS MISMOS en todos los días (si no, no alinean)
+    out.anchos = [...hoja.querySelectorAll("table.pgp-tab")].map((t) =>
+      [...t.querySelectorAll("col")].map((c) => c.style.width).join("|"));
+    out.anchosIguales = out.anchos.length === 2 && out.anchos[0] === out.anchos[1];
+    // ojo: buscar "7%" con regex daba falso positivo dentro de "5.57%". Se compara el juego entero.
+    out.anchosDelDato = (out.anchos[0] || "") !== "17%|28%|22%|14%|7%|12%" &&
+      (out.anchos[0] || "").split("|").every((x) => /^\d+(\.\d+)?%$/.test(x));
+    out.anchosSuman100 = Math.abs((out.anchos[0] || "").split("|")
+      .reduce((a, x) => a + parseFloat(x || 0), 0) - 100) < 0.5;
     out.thRepetido = [...hoja.querySelectorAll("table.pgp-tab thead")].length === 2;
 
     // ── (6) en pantalla la hoja no se ve ───────────────────────────────────
@@ -144,13 +167,25 @@ catch (_e) {
   });
 
   // ── (7) en `media print`: sólo la hoja, y en negro ────────────────────────
+  // El viewport se lleva al ancho ÚTIL de una A4 con los márgenes de @page (190 mm ≈ 718 px): es el
+  // único ancho en el que tiene sentido preguntar si algo se corta.
+  await p.setViewportSize({ width: 718, height: 1100 });
   await p.emulateMedia({ media: "print" });
   const imp = await p.evaluate(() => {
     const hoja = document.getElementById("pgaPrint");
     const otros = [...document.body.children].filter((e) =>
       e.id !== "pgaPrint" && getComputedStyle(e).display !== "none").map((e) => e.id || e.tagName);
     const cli = hoja.querySelector("tr.pgp-np td:nth-child(2)");
+    // nada truncado: con los anchos salidos del dato, ninguna celda puede desbordar su columna
+    const cortadas = [...hoja.querySelectorAll("table.pgp-tab td")]
+      .filter((td) => td.scrollWidth > td.clientWidth + 1)
+      .map((td) => td.textContent.trim().slice(0, 40));
+    const tab = hoja.querySelector("table.pgp-tab");
     return {
+      cortadas: cortadas,
+      fontPx: parseFloat(getComputedStyle(tab).fontSize),
+      anchoTabla: tab.getBoundingClientRect().width,
+      anchoCont: hoja.getBoundingClientRect().width,
       hojaVisible: getComputedStyle(hoja).display !== "none",
       otrosVisibles: otros,
       colorCliente: cli ? getComputedStyle(cli).color : null,
@@ -189,14 +224,26 @@ catch (_e) {
   chk(r.npsEnHoja.length === 5, "y abierta a nivel NP (5): " + JSON.stringify(r.npsEnHoja));
   chk(r.sinContenido, "pero SIN el contenido de cada NP (ni se pide gv_ppp_np_items)");
   chk(r.tieneCodCliente, "cada NP lleva su código de cliente con la empresa (LK 2118 / CH 2533)");
+  chk(r.cliConCod, "y va DENTRO del cliente, entre paréntesis: " +
+      JSON.stringify((r.codEnCliente[0] || {}).cli));
+  chk(r.npSinCod, "la columna de la NP ya NO lo repite: " +
+      JSON.stringify(r.codEnCliente.map((x) => x.np)));
   chk(r.tieneCliente, "y la razón social");
   chk(r.tieneHorario, "el horario pactado sale en la hoja");
+  chk(r.horEnCliente, "como 2º renglón dentro del cliente, no como columna propia");
+  chk(r.sinColHorario, "y la columna Horario —vacía en casi todas las filas— ya no existe");
+  chk(r.lugares.indexOf("Villa Crespo") >= 0 && !r.lugares.some((x) => /^Zona 2 · Zona 2/.test(x)),
+      "la NP no repite la zona que ya dice su tanda, deja el barrio: " + JSON.stringify(r.lugares));
   chk(r.tieneEstado.length === 5 && r.tieneEstado.indexOf("Facturado") >= 0 &&
       r.tieneEstado.indexOf("Armado") >= 0, "cada NP lleva su estado: " + JSON.stringify(r.tieneEstado));
   chk(r.tieneTotal, "cada día cierra con su total");
   chk(r.tieneEncabezado, "la hoja tiene título con el rango y la fecha de impresión");
-  chk(r.colgroups.length === 2 && r.colgroups.every((n) => n === 6),
-      "cada día trae el colgroup de 6 columnas → alinean entre días: " + JSON.stringify(r.colgroups));
+  chk(r.colgroups.length === 2 && r.colgroups.every((n) => n === 5),
+      "cada día trae el colgroup de 5 columnas: " + JSON.stringify(r.colgroups));
+  chk(r.anchosIguales, "y los anchos son idénticos entre días → alinean de hoja en hoja");
+  chk(r.anchosDelDato, "los anchos los calcula _pgpAnchos() del dato real, no son los % fijos viejos: " +
+      JSON.stringify(r.anchos[0]));
+  chk(r.anchosSuman100, "y suman 100 % → no queda papel muerto a la derecha");
   chk(r.thRepetido, "cada tabla tiene su thead (se repite al cortar de hoja)");
   chk(r.hojaEscondidaEnPantalla, "en pantalla la hoja no se ve");
   chk(imp.hojaVisible, "en `media print` la hoja SÍ se ve");
@@ -204,6 +251,13 @@ catch (_e) {
       "y no se ve nada más de la app: " + JSON.stringify(imp.otrosVisibles));
   chk(imp.colorCliente === "rgb(0, 0, 0)" && imp.colorHoja === "rgb(0, 0, 0)",
       "la hoja imprime en negro, no hereda el azul de la app: " + imp.colorCliente);
+  chk(imp.cortadas.length === 0,
+      "al ancho de una A4 no se corta NINGUNA celda: " + JSON.stringify(imp.cortadas));
+  chk(imp.fontPx >= 12 && imp.fontPx <= 17,
+      "la letra la elige _pgpAnchos() entre 12 y 17 px según cuánto papel sobre: " + imp.fontPx + "px");
+  chk(imp.anchoTabla / imp.anchoCont > 0.97,
+      "y la tabla llena el ancho del papel — nada de aire muerto a la derecha: " +
+      Math.round(100 * imp.anchoTabla / imp.anchoCont) + " %");
   chk(errs.length === 0, "sin errores de JS: " + JSON.stringify(errs));
 
   let malas = 0;
