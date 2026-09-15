@@ -1178,10 +1178,17 @@ que en el momento pida verlo.
 node scripts/bump-version.cjs 16.70     # o --patch para subir el último número solo
 ```
 
-**Son TRES lugares que tienen que quedar en el mismo número** y el bump de este repo es
+**Son CUATRO lugares que tienen que quedar en el mismo número** y el bump de este repo es
 **100 % manual** (no hay hook ni workflow que lo haga): `APP_VERSION` en `index.html`,
-`SW_VERSION` en `sw.js` (con su sufijo `-vir`) y el **`?v=` de `recepcion.js`** en el index.
-El script los mueve juntos y después corre los dos tests de versión.
+`SW_VERSION` en `sw.js` (con su sufijo `-vir`), el **`?v=` de `recepcion.js`** en el index y
+**`version.json`**. El script los mueve juntos y después corre los dos tests de versión.
+
+⚠ **`version.json` es el que dispara el aviso "🔄 Actualizar"** de la app ya abierta
+(`checkForUpdate`, v11.97: lo pide fresco cada 5 min y saca el banner si es MÁS NUEVO que el
+`APP_VERSION` cargado). Estuvo **clavado en v12.77** hasta la v18.28 porque nadie lo movía, así
+que el aviso **no salía desde hacía cinco versiones mayores** y todos se quedaban con el
+`index.html` cacheado hasta que alguien decía "Ctrl+F5". Si `tests/version-sync.cjs` se pone en
+rojo por esto, eso es lo que vuelve. Problema 241.
 
 **Por qué existe:** el 13/09 se desalinearon **dos veces la misma noche** (v16.64 y v16.67) y
 `main` quedó en rojo las dos. Cuando eso pasa **nadie se entera**: el celular del operario

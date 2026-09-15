@@ -16881,3 +16881,36 @@ las dos formas de abrir el detalle de un mes; la otra son los números de la tab
 
 **Test:** `tests/proy-entregadas.cjs` ahora también verifica el **orden** (la tabla aparece en el
 HTML antes que el `<svg>`), el título y los tres encabezados exactos.
+
+---
+
+## §3.gy — v18.28: por qué nadie veía las versiones nuevas — `version.json` clavado en v12.77 — 2026-09-15
+
+**El síntoma**, tres veces en la misma sesión: se pushea un cambio, se avisa, y el dueño manda foto
+de la pantalla **anterior**. Vio la v18.20 con la v18.21 ya arriba, la v18.24 con la v18.25, la
+v18.25 con la v18.26. Cada vez hubo que decirle "hacé Ctrl+F5".
+
+**La causa.** La app **ya tiene** el mecanismo para que eso no pase: `checkForUpdate` (v11.97) pide
+`version.json` fresco (`cache: no-store`) al bootear y cada 5 minutos, y si trae una versión **más
+nueva** que el `APP_VERSION` cargado muestra el banner verde **🔄 Actualizar**, que recarga con
+cache-buster. Funciona. El problema es que **`version.json` quedó clavado en `v12.77`**: ni
+`scripts/bump-version.cjs` ni `tests/version-sync.cjs` lo tocaban. Y como el banner sólo sale si el
+archivo es **más nuevo** (guarda puesta en v12.04/v12.15 para no clavarle el banner a todos),
+`_verNum("v12.77") = 12077` nunca supera al `APP_VERSION` real — **el aviso no salía desde hace
+cinco versiones mayores**. El `?v=` de los `.js` tampoco ayuda: quien manda es el `index.html`
+cacheado, que es donde viven `APP_VERSION` y los `?v=`.
+
+**Arreglo.** `version.json` pasa a ser **el cuarto lugar** que mueve el bump:
+
+- `scripts/bump-version.cjs` lo reescribe en cada bump y lo reporta en su salida
+  (`version.json v12.77 -> v18.28 (el aviso 'Actualizar' de la app)`).
+- `tests/version-sync.cjs` lo verifica junto con `APP_VERSION` y `SW_VERSION`, con el mensaje que
+  explica qué se rompe si queda atrás. Comprobado: con `version.json` en v12.77 el test **falla**.
+
+Los cuatro que tienen que quedar en el mismo número son ahora: `APP_VERSION` (index.html),
+`SW_VERSION` (sw.js), el `?v=` de `recepcion.js` y **`version.json`**.
+
+⚠ Esto no se arregla solo hacia atrás: **el que ya tiene el index.html viejo cacheado necesita un
+Ctrl+F5 una última vez**. A partir de esa recarga, el banner vuelve a avisar solo.
+
+Problema **241**.
