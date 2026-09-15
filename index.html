@@ -5567,7 +5567,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=18.44"></script>
+<script type="module" src="recepcion.js?v=18.45"></script>
 <!-- Config del módulo de fichada (compartido con fichada.html). El secret
      hmacSecret tiene que ser el mismo acá y allá; cargándolo desde un solo
      archivo evitamos que se desincronicen. -->
@@ -9038,7 +9038,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v18.44";
+const APP_VERSION = "v18.45";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -37162,7 +37162,8 @@ function pppModifHtml() {
    ===================================================================================== */
 let _pmodEd = null;          // { p, ctx, items, dirSel, dirNueva, quien, motivo, cargando, err, guardando }
 let _pmodCat = null;         // el catálogo del modo abierto (se apunta a uno de los dos de abajo)
-let _pmodCatLk = null;       // productos de la página (LK) — para un pedido web
+let _pmodCatLk = null;       // productos de la página (LK) — para un pedido web de LK
+let _pmodCatChef = null;     // catálogo de Chef — viaja dentro del contexto del pedido
 let _pmodCatIsis = null;     // gv_uxb_resuelto (Gestión) — para una NP de ISIS
 let _pmodPersonas = null;    // GV_Modif_Personas: quiénes pueden figurar como autor del cambio
 
@@ -37267,14 +37268,16 @@ async function pmodModificar(key) {
   // vistas superponen sin tocar lo que trae la importación del Excel PPP. El que factura se
   // entera por el badge ✏ MOD de Facturación, que es para lo que Luis lo pidió.
   if (p.esIsis) return pmodModificarIsis(p);
-  if (p.empresa !== "LK") {
-    try { alert("El pedido es de la página de Chef.\n\nLa base de Chef todavía no acepta cambios desde acá (se la lee por FDW, que es de sólo lectura), así que por ahora se modifica en la página de Chef."); } catch (_e) {}
-    return;
-  }
+  /* v18.45 — Chef ya entra por acá. Thomas dio del lado de Chef los dos grants y las policies
+     que faltaban (el FDW podía leer pero no escribir), así que el backend despacha solo:
+     `gv_pedido_mod_ctx` / `gv_pedido_mod_guardar` derivan a su gemela `_chef`, que trabaja
+     contra las foreign tables y contra el catálogo `chef_ext.products`. Acá lo único que cambia
+     es la empresa que se manda. */
   _pmodEdCss();
   let _ult = ""; try { _ult = localStorage.getItem("gv_modif_quien") || ""; } catch (_e) {}
-  _pmodCat = _pmodCatLk;
-  _pmodEd = { p: p, cargando: true, items: [], dirSel: "", dirNueva: null, quien: _ult, motivo: "" };
+  const emp = (p.empresa === "CH") ? "chef" : "lk";
+  _pmodCat = (emp === "chef") ? _pmodCatChef : _pmodCatLk;
+  _pmodEd = { p: p, emp: emp, cargando: true, items: [], dirSel: "", dirNueva: null, quien: _ult, motivo: "" };
   pmodPintar();
   pmodPersonasCargar().then(function () {
     if (!_pmodEd) return;
@@ -37283,7 +37286,7 @@ async function pmodModificar(key) {
     pmodPintar();
   });
   try {
-    const ctx = await pmodLkRpc("gv_pedido_mod_ctx", { p_empresa: "lk", p_order_id: Number(p.pedido) });
+    const ctx = await pmodLkRpc("gv_pedido_mod_ctx", { p_empresa: emp, p_order_id: Number(p.pedido) });
     _pmodEd.ctx = ctx;
     _pmodEd.items = (ctx.items || []).map(function (it) {
       return { cod: it.cod || _pmodCodNorm(it.cod_art), desc: it.descripcion || "",
@@ -37293,8 +37296,15 @@ async function pmodModificar(key) {
     _pmodEd.dirSel = String(ctx.sucursal_entrega || "");
     _pmodEd.dir0 = String(ctx.sucursal_entrega || "");
     _pmodEd.cargando = false;
+    /* El catálogo de Chef viene DENTRO del contexto: `chef_ext` no está publicado en la API de
+       PostgREST, así que no se puede pedir por REST como el de LK. Son ~150 códigos, no pesa. */
+    if (Array.isArray(ctx.catalogo) && ctx.catalogo.length) {
+      _pmodCatChef = ctx.catalogo.map(function (c) {
+        return { cod: _pmodCodNorm(c.cod), desc: String(c.desc || ""), uxb: Number(c.uxb) || 0 }; });
+      _pmodCat = _pmodCatChef;
+    }
     pmodPintar();
-    try { await pmodCatalogo(); pmodPintar(); } catch (_e) {}
+    if (emp !== "chef") { try { await pmodCatalogo(); pmodPintar(); } catch (_e) {} }
   } catch (e) {
     _pmodEd.cargando = false; _pmodEd.err = (e && e.message) ? e.message : String(e);
     pmodPintar();
@@ -37708,7 +37718,7 @@ async function pmodGuardar() {
   pppSetStatus("Guardando los cambios del pedido…", true);
   try {
     const body = {
-      p_empresa: "lk", p_order_id: Number(p.pedido),
+      p_empresa: E.emp || "lk", p_order_id: Number(p.pedido),
       p_motivo: E.motivo, p_quien: E.quien,
       // las NP que tiene HOY el pedido: con eso Facturación pinta el badge en cada una
       p_nps: (p.nps || []).slice(),

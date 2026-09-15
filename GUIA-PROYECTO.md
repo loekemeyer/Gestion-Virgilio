@@ -1,3 +1,43 @@
+## Nota v18.45 (2026-09-15) — Modificar Pedidos: los de CHEF también
+
+Thomas corrió del lado de Chef los dos `grant` y las tres `policy` que faltaban, así que el
+último agujero se cerró: **desde «Modificar Pedidos» ahora se editan los pedidos de LK, los de
+Chef y las NP de ISIS**.
+
+**Por qué hacía falta tocar Chef.** El FDW de LK a Chef podía **leer** pero no escribir. Y las
+policies hacen falta **además** de los grants, porque en Chef las dos tablas tienen RLS prendida.
+El `update` quedó acotado **por columna** (`sheets_payload`): `loke_reader` no puede tocar ni el
+total, ni el estado, ni el cliente.
+
+⚠ **Verificarlo tiene truco**: `has_table_privilege(...,'UPDATE')` da **false** aunque el grant
+esté bien, porque es un permiso por columna. Va `has_column_privilege(...,'sheets_payload',
+'UPDATE')`, o directamente el `update` de prueba en una transacción que se aborta — que es lo que
+se hizo.
+
+**Cómo quedó armado.** No se tocó el camino de LK, que ya estaba probado y en uso: las dos
+funciones **despachan** a una gemela `_chef`. Lo que de verdad cambia entre las dos ramas:
+
+| | LK | Chef |
+|---|---|---|
+| Tablas | locales | foreign tables (`chef_orders`, `chef_customer_delivery_addresses`) |
+| Catálogo | `products` + `loke_products` por REST | `chef_ext.products`, **dentro del contexto** (ese schema no está publicado en la API) |
+| Espejo `order_items` | se rearma | no existe de este lado: la ficha es lo único |
+| Lock de la fila | `for update` | **no se puede** (foreign table) → protege `p_espera`, que compara la ficha entera |
+| Sucursal | `sucursal_entrega` | los 63 pedidos de la página la guardan como **`sucursalEntrega`** (camelCase) y los 10 de Cotizador/Krikos como `sucursal_entrega`. Se leen y se escriben las dos |
+| Códigos | catálogo de LK | el de Chef, **o** pelándole la **L** el de LK (artículo de Loeke vendido por Chef, regla v13.71), **o** que ya aparezca en alguna ficha de Chef. Medido: de 106 códigos en uso, 91 + 3 por las dos primeras vías |
+
+**Prueba (transacción abortada, pedido CH 229):** sin motivo corta; con motivo, el **769L** pasó
+de 8 a 12 cajas, se agregó el **043 ×2**, se creó la dirección «PRUEBA Claude CH» (slot 2) y quedó
+elegida, y se escribió 1 fila de log con `empresa='chef'`. Tras el rollback, nada.
+
+`sql/gv_pedido_mod_chef_v1845.sql`, §3.hf. Tests: 72 chequeos en `ppp-modificar-pedidos`.
+
+⚠ **Queda una sola cosa de Chef, y es de seguridad:** el FDW de LK a Chef se conecta con un
+password que quedó en el **texto de ejemplo del instructivo** (literal, adivinable), y con ese
+usuario se leen pedidos, clientes y ventas de Chef. Se cambia en las dos puntas **en el mismo
+momento** (`alter role loke_reader with password …` en Chef y `alter user mapping … options (set
+password …)` en LK), o se corta la lectura.
+
 ## Nota v18.42 (2026-09-15) — Arrancar un 2º armado sin cerrar el anterior ahora AVISA
 
 Luis: *"un operario puede arrancar un armado, no cerrarlo y arrancar otro también?"*. Sí podía, y

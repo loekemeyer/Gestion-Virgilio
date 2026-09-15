@@ -17575,3 +17575,49 @@ antes: el botón nunca queda sin poder usarse.
 drop function public.gv_ppp_web_desprogramar_previo(text);
 ```
 y revertir el commit del front (el `confirm` viejo está en el propio `epaConfirmar` como fallback).
+
+## §3.hf — v18.45: «Modificar Pedidos» llega a Chef (dos grants y tres policies del lado de Chef) — 2026-09-15
+
+**Qué se agregó (LK):** `sql/gv_pedido_mod_chef_v1845.sql` — `gv_pedido_mod_ctx_chef(bigint)` y
+`gv_pedido_mod_guardar_chef(...)`, más el despacho en las dos funciones que ya existían.
+
+**Lo que corrió Thomas en el proyecto de Chef** (`nkhzocgdpwtgrmwleihr`):
+
+```sql
+grant update (sheets_payload) on public.orders to loke_reader;
+grant select, insert on public.customer_delivery_addresses to loke_reader;
+create policy loke_reader_edita_ficha on public.orders
+  for update to loke_reader using (true) with check (true);
+create policy loke_reader_lee_dir on public.customer_delivery_addresses
+  for select to loke_reader using (true);
+create policy loke_reader_agrega_dir on public.customer_delivery_addresses
+  for insert to loke_reader with check (true);
+```
+
+Las **policies** hacen falta además de los grants: las dos tablas tienen RLS prendida en Chef.
+El `update` es **por columna**, así que el rol del FDW sólo puede tocar `sheets_payload`.
+
+⚠ **`has_table_privilege(...,'UPDATE')` devuelve `false` con un grant por columna** — no es que
+el grant esté mal. La verificación buena es `has_column_privilege('loke_reader','public.orders',
+'sheets_payload','UPDATE')`, o el `update` de prueba en transacción abortada:
+
+```sql
+do $$ declare n int; begin
+  update public.chef_orders set sheets_payload = sheets_payload
+   where id = (select max(id) from public.chef_orders where sheets_payload is not null);
+  get diagnostics n = row_count;
+  raise exception 'ESCRIBE (% fila)', n;   -- aborta: no queda nada
+end $$;
+```
+
+**Diferencias reales de la rama Chef** (todo lo demás es igual que LK): foreign tables en vez de
+tablas locales; catálogo `chef_ext.products` que **viaja dentro del contexto** porque ese schema
+no está publicado en PostgREST; sin espejo `order_items`; sin `for update` (lo cubre `p_espera`);
+la sucursal en `sucursalEntrega` o `sucursal_entrega` según de dónde venga el pedido; y la
+validación de códigos que acepta la **L** de los artículos de Loeke vendidos por Chef.
+
+**Prueba (transacción abortada, CH 229):** 769L de 8 → 12 cajas, + 043 ×2, dirección nueva creada
+y elegida, 1 fila de log con `empresa='chef'`. Rollback limpio.
+
+**Rollback:** los `revoke`/`drop policy` del lado de Chef, y de este lado volver los dos `if` del
+despacho al `raise exception ... feature_not_supported` + `drop function` de las dos `_chef`.

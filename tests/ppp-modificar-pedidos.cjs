@@ -177,7 +177,19 @@ catch (_e) {
     };
     window.fetch = function (url, opt) {
       const u = String(url), b = (opt && opt.body) ? JSON.parse(opt.body) : null;
-      if (/rpc\/gv_pedido_mod_ctx/.test(u))     { lk.push(["ctx", b]);     return J(CTX); }
+      if (/rpc\/gv_pedido_mod_ctx/.test(u)) {
+        lk.push(["ctx", b]);
+        if (b && b.p_empresa === "chef") return J(Object.assign({}, CTX, {
+          empresa: "chef", order_id: 1001430, razon_social: "El Martillo Srl",
+          sucursal_entrega: "Passaponti 6501 - Moreno",
+          items: [{ i: 0, cod_art: "769L", cod: "769L", cajas: 8, uxb: 24, descripcion: "Loeke por Chef", catalogo: true }],
+          items_raw: [{ cod_art: "769L", cajas: 8, uxb: 24 }],
+          direcciones: [{ slot: 1, label: "Passaponti 6501 - Moreno", direccion: "Passaponti 6501",
+                          localidad: "Moreno", barrio: "Moreno", actual: true }],
+          catalogo: [{ cod: "043", desc: "Algo de Chef", uxb: 12 }, { cod: "769L", desc: "Loeke por Chef", uxb: 24 }]
+        }));
+        return J(CTX);
+      }
       if (/rpc\/gv_pedido_mod_guardar/.test(u)) { lk.push(["guardar", b]); return J({ ok: true, log_id: 7, detalle: {} }); }
       if (/GV_Modif_Personas/.test(u)) return J(personas.slice());
       if (/gv_ppp_np_items/.test(u)) return J([{ art: "034", cajas: 2, uxb: 12, renglones: 1 },
@@ -222,12 +234,26 @@ catch (_e) {
     out.isisNoFueALk = !lk.some((x) => x[0] === "guardar");
     pmodCerrar();
 
-    // (a2) Chef todavía no
-    aviso = ""; btnDe("El Martillo").click(); await esperar();
-    out.chefAvisa = /Chef/.test(aviso) && !abierto();
+    /* (a2) v18.45 — Chef TAMBIÉN se modifica: Thomas dio los grants del lado de Chef, así que
+       el backend despacha a su gemela `_chef`. Acá se chequea que el front mande la empresa
+       correcta y que use el catálogo que viene DENTRO del contexto (el de Chef no se puede
+       pedir por REST). */
+    aviso = ""; lk.length = 0; btnDe("El Martillo").click(); await esperar();
+    const ovC = document.getElementById("pmodOverlay");
+    out.chefAbre = abierto();
+    out.chefPidio = JSON.stringify((lk.filter((x) => x[0] === "ctx")[0] || [])[1] || {});
+    out.chefItems = [...ovC.querySelectorAll(".pme-tab tbody tr")].map((tr) => tr.children[0].textContent.trim());
+    out.chefCatalogo = /2 códigos en el catálogo/.test(ovC.innerHTML);
+    pmodCajas(0, "12");
+    await pmodQuien("Mariana"); pmodMotivo("el cliente de Chef pidió más cajas");
+    await pmodGuardar(); await esperar();
+    const gc = (lk.filter((x) => x[0] === "guardar")[0] || [])[1] || {};
+    out.chefGuardo = JSON.stringify(gc);
+    pmodCerrar();
 
     // (b) un pedido web de LK abre el modal con su contenido
-    aviso = ""; btnDe("Chen Li Yu").click(); await esperar();
+    // (se vacía el registro de llamadas: si no, los chequeos de abajo leerían las de Chef)
+    aviso = ""; lk.length = 0; btnDe("Chen Li Yu").click(); await esperar();
     out.abre = abierto();
     out.ctxPidio = JSON.stringify((lk.filter((x) => x[0] === "ctx")[0] || [])[1] || {});
     const ov = document.getElementById("pmodOverlay");
@@ -405,7 +431,13 @@ catch (_e) {
       "y guarda por la RPC de ISIS con NP, cajas, dirección y quién: " + r.isisGuardo);
   chk(r.isisNoFueALk, "sin tocar la RPC de LK ← son dos caminos distintos");
   chk(r.isisDiceM3, "y la pantalla cuenta cómo quedó el m³ recalculado: " + JSON.stringify(r.isisStatus));
-  chk(r.chefAvisa, "un pedido de Chef avisa que esa base todavía no acepta cambios");
+  chk(r.chefAbre, "un pedido de Chef también abre el modal (v18.45)");
+  chk(/"p_empresa":"chef"/.test(r.chefPidio), "y pide el contexto con empresa=chef: " + r.chefPidio);
+  chk(r.chefItems.length === 1 && /769L/.test(r.chefItems[0]),
+      "con sus renglones, incluido el artículo de Loeke con L al final: " + JSON.stringify(r.chefItems));
+  chk(r.chefCatalogo, "usa el catálogo que viene DENTRO del contexto, no el de LK");
+  chk(/"p_empresa":"chef"/.test(r.chefGuardo) && /"cajas":12/.test(r.chefGuardo) && /Mariana/.test(r.chefGuardo),
+      "y guarda con empresa=chef, las cajas nuevas y quién: " + r.chefGuardo);
   chk(r.abre, "un pedido web de LK abre el modal");
   chk(/"p_order_id":1343/.test(r.ctxPidio), "y pide el contexto del pedido correcto: " + r.ctxPidio);
   chk(/Chen Li Yu/.test(r.modalTitulo) && /LK 0004/.test(r.modalTitulo),
