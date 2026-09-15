@@ -1,3 +1,46 @@
+## Nota v17.95 (2026-09-15) — lo que achicaba la tabla NO era el CSS: era el zoom
+
+Luis, con capturas del día y la tanda abiertos: *"se sigue sin aprovechar al máximo el espacio.
+Font más grande, y cuando se descolapsa el día o la tanda quiero que mantenga el mismo tamaño y
+posición que día; actualmente sigue colapsando para adentro y se hacen más chiquitas las filas a
+medida que se abren"*.
+
+⚠⚠ **La v17.94 emparejó la letra en el CSS y aun así se seguía achicando, porque la causa era
+otra: `pppFitPantalla`.** Esa función le aplica **`zoom`** al cuerpo del overlay hasta que la PPP
+entre entera en la pantalla (regla del dueño de la v13.61: *"no quiero barras de scroll… achicalo
+lo que tengas que achicar"*), con piso 0,70. La tabla **crece** al abrir un nivel → el zoom la
+comprime → **cada nivel abierto la achica un poco más**. El CSS decía 15 px y el monitor mostraba
+10,5.
+
+**Medido, con control positivo** (misma medición sobre `HEAD` y sobre el cambio, 1340×700):
+
+| | tabla cerrada | con el día abierto | con la tanda abierta |
+|---|---|---|---|
+| antes | zoom 1 | zoom 1 | **zoom 0,70** ← el piso |
+| ahora | zoom 1 | zoom 1 | **zoom 1** |
+
+La vista tabla queda fuera del zoom: **ya tiene su propio scroll** (`.pga-wrap`). No es contra la
+regla del dueño sino dentro de su excepción, la de la v13.95: *"sólo para cuando hay algo tipo
+acordeón, ahí sí dejame el scroll, porque si no no puedo ver estas cosas"* — y esta tabla es un
+acordeón de tres niveles. **La vista clásica sigue achicándose igual que siempre** (el test lo
+chequea: 0,76 ahí, 1 acá).
+
+Y lo demás del pedido:
+
+- **Misma POSICIÓN, no sólo mismo tamaño.** Sangría **cero**: el día, la tanda y la NP arrancan en
+  la misma x (medido: 23 px los tres). Lo que dice en qué nivel estás es la barra de color de la
+  izquierda y la pastilla de estado, no el margen.
+- **Letra a 16 px**, los tres niveles.
+- **El ancho se reparte:** las 7 columnas de datos pasan de 8 a 16 px de aire. La columna del día
+  se llevaba ~740 px casi vacíos mientras los números se amontonaban contra el borde.
+
+⚠ Para el que toque un test de la PPP: **la vista tabla es la que trae por defecto la pestaña**, así
+que un test que quiera medir la clásica tiene que poner `_pppPlanTabla = false` a mano. Le pasó a
+`ppp-fit-acordeon`, que medía el zoom sin declararlo.
+
+`tests/ppp-tabla-arbol.cjs` queda en 38 chequeos (dos nuevos: la posición del contenido y que el
+zoom sea 1) y `ppp-fit-acordeon` suma el suyo.
+
 ## Nota v17.94 (2026-09-15) — el visual de la tabla de Programación
 
 Pedido de Luis: *"letra/font más grande, que mantenga el tamaño al expandirse (que no se «abra

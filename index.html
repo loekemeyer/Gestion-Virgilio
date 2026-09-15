@@ -3102,7 +3102,7 @@ tr.ppp-err-zona > td{ background:#fffbeb !important; }
    mantenga el tamaño al expandirse (que no se abra para adentro, sino en horizontal con todas las
    filas manteniendo el tamaño)"*. Ahora los tres niveles miden lo mismo y la jerarquía la marcan
    el color y la barra de la izquierda, no el tamaño. */
-.pga{ width:100%; border-collapse:collapse; font-size:15px; color:#0f172a; }
+.pga{ width:100%; border-collapse:collapse; font-size:16px; color:#0f172a; }
 .pga th{ position:sticky; top:0; z-index:2; background:#f8fafc; text-align:right; font-size:11.5px; font-weight:800;
   letter-spacing:.04em; text-transform:uppercase; color:#64748b; padding:9px 10px; border-bottom:2px solid #cbd5e1; white-space:nowrap; }
 .pga td{ text-align:right; padding:8px 10px; border-bottom:1px solid #eef2f7; white-space:nowrap; font-variant-numeric:tabular-nums; }
@@ -3114,7 +3114,10 @@ tr.ppp-err-zona > td{ background:#fffbeb !important; }
 /* El truco para que se encojan: TODAS las columnas a `width:1%`, y la 1ª a `width:100%` — así el
    reparto del ancho sobrante se lo lleva entera la columna de la info (día / tanda / NP). */
 .pga th, .pga td{ width:1%; }
-.pga th:nth-child(n+5), .pga td:nth-child(n+5){ padding-left:8px; padding-right:8px; text-align:right; }
+/* v17.95: los números dejan de apiñarse contra el borde. La columna del día se llevaba ~740 px
+   casi vacíos y las 7 columnas de datos se amontonaban en 360; con más aire el ancho se reparte. */
+.pga th:nth-child(n+2), .pga td:nth-child(n+2){ padding-left:16px; padding-right:16px; }
+.pga th:nth-child(n+5), .pga td:nth-child(n+5){ text-align:right; }
 .pga th:first-child, .pga td:first-child{ text-align:left; width:100%; }
 .pga-h{ text-align:right !important; line-height:1.15; padding-top:7px !important; padding-bottom:7px !important;
   border-top:3px solid transparent; letter-spacing:.02em; }
@@ -3136,7 +3139,10 @@ tr.ppp-err-zona > td{ background:#fffbeb !important; }
   border-radius:999px; padding:1px 8px; margin-left:8px; vertical-align:1px; letter-spacing:.04em; }
 /* fila de TANDA — el color dice en qué está */
 .pga-t{ cursor:pointer; }
-.pga-t>td:first-child{ padding-left:15px; font-weight:800; }
+/* v17.95 (Luis): "cuando se descolapsa el día o la tanda quiero que mantenga el mismo tamaño y
+   POSICIÓN que día". Sangría CERO en los tres niveles: todos arrancan en la misma x. Lo que dice
+   en qué nivel estás es la barra de color de la izquierda y la pastilla de estado, no el margen. */
+.pga-t>td:first-child{ font-weight:800; }
 .pga-t:hover>td{ filter:brightness(.98); }
 .pga-t.e-facturado>td{ background:#f5f9ff; } .pga-t.e-facturado>td:first-child{ box-shadow:inset 4px 0 0 #1d4ed8; color:#1e3a8a; }
 .pga-t.e-armado>td{    background:#f4fdf7; } .pga-t.e-armado>td:first-child{    box-shadow:inset 4px 0 0 #15803d; color:#14532d; }
@@ -3148,8 +3154,7 @@ tr.ppp-err-zona > td{ background:#fffbeb !important; }
 .pga-n{ cursor:pointer; }
 .pga-n>td{ color:#334155; }
 /* la barra gris marca el nivel sin gastar 48px de sangría: la info arranca casi al borde */
-.pga-n>td:first-child{ padding-left:30px; white-space:normal; line-height:1.55;
-  box-shadow:inset 3px 0 0 #cbd5e1; }
+.pga-n>td:first-child{ white-space:normal; line-height:1.55; box-shadow:inset 3px 0 0 #cbd5e1; }
 .pga-n:hover>td{ background:#f8fafc; }
 .pga-np{ font-weight:800; color:#0f172a; }
 .pga-cod{ display:inline-block; background:#f1f5f9; color:#475569; border:1px solid #d7dee7;
@@ -3217,7 +3222,7 @@ tr.ppp-err-zona > td{ background:#fffbeb !important; }
    códigos. Ahora es una GRILLA que fluye: cuantos más códigos, más columnas, y el ancho se usa.
    ⚠ No se toca `aprItemsTablaHtml` (esa tabla la comparte A Programar, donde la caja es angosta y
    la lista vertical está bien): esto es un render propio de la tabla de Programación. */
-.pga-c>td{ padding:2px 12px 14px 30px; background:#fbfdff; border-bottom:1px solid #e2e8f0; text-align:left;
+.pga-c>td{ padding:2px 12px 14px 10px; background:#fbfdff; border-bottom:1px solid #e2e8f0; text-align:left;
   white-space:normal; box-shadow:inset 3px 0 0 #cbd5e1; }
 .pga-its{ display:grid; grid-template-columns:repeat(auto-fill, minmax(196px, 1fr)); gap:6px 10px; }
 .pga-it{ display:flex; align-items:baseline; gap:8px; background:#fff; border:1px solid #e6edf5;
@@ -3243,8 +3248,8 @@ tr.ppp-err-zona > td{ background:#fffbeb !important; }
   /* v17.94: en el celular la letra baja un punto, pero SIGUE siendo la misma en los tres niveles
      — que es lo que pidió Luis; lo que se achica es todo junto, no la fila de la NP sola. */
   .pga{ font-size:14px; } .pga th, .pga td{ padding:6px 7px; }
-  .pga-t>td:first-child{ padding-left:12px; } .pga-n>td:first-child{ padding-left:24px; }
-  .pga-c>td{ padding-left:24px; } .pga-pct small{ display:none; }
+  .pga-pct small{ display:none; }
+  .pga th:nth-child(n+2), .pga td:nth-child(n+2){ padding-left:9px; padding-right:9px; }
   /* ⚠ las acciones NO se anclan a la derecha acá: la columna es mucho más ancha que la pantalla,
      así que `margin-left:auto` las mandaba fuera de lo que se ve y había que scrollear para
      encontrarlas. Van pegadas al texto y la fila puede cortar. */
@@ -5262,7 +5267,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=17.94"></script>
+<script type="module" src="recepcion.js?v=17.95"></script>
 <!-- Config del módulo de fichada (compartido con fichada.html). El secret
      hmacSecret tiene que ser el mismo acá y allá; cargándolo desde un solo
      archivo evitamos que se desincronicen. -->
@@ -6069,6 +6074,16 @@ function pppFitPantalla() {
   // v13.83: A Programar tampoco se achica en el monitor (dueño: "se ve feo"; el zoom descolocaba "Ver más días"
   // y la barra de estado). Es una lista de pedidos + días: se scrollea.
   if (typeof _pppTab !== "undefined" && _pppTab === "prog") { body.style.zoom = "1"; body.style.overflowY = "auto"; return; }
+  // v17.95 (Luis, con capturas del día y la tanda abiertos: "sigue colapsando para adentro y se hacen
+  // más chiquitas las filas a medida que se abren"). NO era el CSS: era ESTE zoom. La tabla de
+  // Programación crece al abrir un nivel, el zoom la comprime para que entre, y cada nivel que se
+  // abre la achica un poco más — hasta el piso de 0,70. La tabla ya scrollea sola (`.pga-wrap`),
+  // así que acá no se achica nada: se ve al tamaño que dice el CSS y se scrollea.
+  if (typeof _pppTab !== "undefined" && _pppTab === "plan" &&
+      typeof _pppPlanTabla !== "undefined" && _pppPlanTabla &&
+      !(typeof _pppPlanClasica !== "undefined" && _pppPlanClasica)) {
+    body.style.zoom = "1"; body.style.overflowY = "auto"; return;
+  }
   // v13.95 (dueño 07/09, con captura del día 9 abierto: "sólo para cuando hay algo tipo acordeón,
   // ahí sí dejame el scroll, porque si no no puedo ver estas cosas"): con una tanda desplegada, el
   // zoom achicaba todo Y encima cortaba abajo justo la tabla que se acababa de abrir. Si hay algún
@@ -8692,7 +8707,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v17.94";
+const APP_VERSION = "v17.95";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción

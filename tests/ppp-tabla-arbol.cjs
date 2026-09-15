@@ -130,6 +130,24 @@ catch (_e) {
       };
       return { dia: px("tr.pga-d > td"), tanda: px("tr.pga-t > td"), np: px("tr.pga-n > td") };
     })();
+    // v17.95 (Luis): "que mantenga el mismo tamaño y POSICIÓN que día". Se mide dónde arranca el
+    // CONTENIDO (el chevron), no el borde del td: el td nunca se movía, la sangría era padding.
+    out.pos = (function () {
+      const x = (sel) => {
+        const e = prev.querySelector(sel);
+        return e ? Math.round(e.getBoundingClientRect().left) : -1;
+      };
+      return { dia: x("tr.pga-d .pga-chev"), tanda: x("tr.pga-t .pga-chev"), np: x("tr.pga-n .pga-chev") };
+    })();
+    // v17.95: y el zoom de pppFitPantalla NO toca esta vista. Era lo que achicaba todo al abrir un
+    // nivel: la tabla crece, el zoom la comprime, y cada nivel abierto la achicaba un poco más
+    // (medido: caía al piso de 0,70 con la tanda abierta).
+    out.zoom = (function () {
+      const body = document.querySelector("#pppOverlay .planim-body");
+      if (!body) return "sin-body";
+      try { pppFitPantalla(); } catch (_e) { return "error"; }
+      return String(body.style.zoom || "1");
+    })();
     out.npPill = [...prev.querySelectorAll("tr.pga-n .pga-pill")].map((e) => e.textContent.trim());
     out.sinContenido = prev.querySelectorAll("tr.pga-c").length === 0;
     // v17.76 (Luis): código de cliente con su prefijo, barrio al lado de la zona y fecha de pedido
@@ -211,10 +229,14 @@ catch (_e) {
   // v17.94 (Luis): "letra más grande, que mantenga el tamaño al expandirse". Antes se ACHICABA
   // por nivel (14 → 13 → 12,5): la fila con más info era la que menos se leía.
   const _t = r.tam || {};
-  t(_t.dia >= 15 && _t.tanda >= 15 && _t.np >= 15,
-    "(9) la letra es de 15 px o más en los tres niveles — " + JSON.stringify(_t));
+  t(_t.dia >= 16 && _t.tanda >= 16 && _t.np >= 16,
+    "(9) la letra es de 16 px o más en los tres niveles — " + JSON.stringify(_t));
   t(_t.dia === _t.tanda && _t.tanda === _t.np,
     "(9) y es LA MISMA: no se achica al expandir — " + JSON.stringify(_t));
+  const _p = r.pos || {};
+  t(_p.dia > 0 && _p.dia === _p.tanda && _p.tanda === _p.np,
+    "(9) y los tres arrancan en la MISMA posición: no se abre hacia adentro — " + JSON.stringify(_p));
+  t(r.zoom === "1", "(9) pppFitPantalla no achica esta vista (antes caía a 0,70) — zoom " + r.zoom);
   t(eq(r.total.slice(0, 4), ["Total", "11,3", "5", "8"]), "(7) el total suma todos los días — " + JSON.stringify(r.total.slice(0, 4)));
   t(r.tablero, "(8) se puede volver al tablero de 6 días");
   t(r.vuelve, "(8) y volver a la tabla");

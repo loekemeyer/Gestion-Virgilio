@@ -37,7 +37,7 @@ catch (_e) {
     const body = ov.querySelector(".planim-body");
     const leer = () => ({ zoom: body.style.zoom, scroll: body.style.overflowY });
 
-    _pppTab = "plan"; _pppSearch = ""; _pppOpen = new Set();
+    _pppTab = "plan"; _pppPlanTabla = false; _pppSearch = ""; _pppOpen = new Set();
     pppFitPantalla();
     out.cerrado = leer();
 
@@ -67,14 +67,20 @@ catch (_e) {
     _pppTab = "prog"; _pppOpen = new Set();
     pppFitPantalla();
     out.aProgramar = leer();
-    _pppTab = "plan"; _pppOpen = new Set();
+    // (g) v17.95 (Luis) — la vista TABLA de Programación nunca se achica. Es un acordeón de tres
+    // niveles y el zoom la comprimía un poco más con cada nivel abierto (medido: caía al piso de
+    // 0,70 con la tanda abierta). Tiene su propio scroll.
+    _pppTab = "plan"; _pppPlanTabla = true; _pppPlanClasica = false; _pppOpen = new Set();
+    pppFitPantalla();
+    out.tabla = leer();
+    _pppTab = "plan"; _pppPlanTabla = false; _pppOpen = new Set();
     return out;
   });
 
   // (f) celular
   await p.setViewportSize({ width: 400, height: 800 });
   const cel = await p.evaluate(() => {
-    _pppTab = "plan"; _pppOpen = new Set(); pppFitPantalla();
+    _pppTab = "plan"; _pppPlanTabla = false; _pppOpen = new Set(); pppFitPantalla();
     const body = document.querySelector("#pppOverlay .planim-body");
     return { zoom: body.style.zoom, scroll: body.style.overflowY };
   });
@@ -83,6 +89,11 @@ catch (_e) {
   const fails = [];
   const chk = (c, m) => { console.log((c ? "ok   " : "MAL  ") + m); if (!c) fails.push(m); };
   chk(Number(r.cerrado.zoom) < 1 && r.cerrado.scroll === "hidden", "sin acordeón: achica para que entre y no scrollea (zoom " + r.cerrado.zoom + ")");
+  // v17.95 (Luis): la vista TABLA de Programación NO entra en esta regla. Es un acordeón de tres
+  // niveles y el zoom la achicaba un poco más con cada nivel abierto (medido: caía a 0,70). Tiene
+  // su propio scroll, así que se ve al tamaño que dice el CSS. La clásica sigue igual.
+  chk(r.tabla.zoom === "1" && r.tabla.scroll === "auto",
+    "la tabla de Programación no se achica: se ve a tamaño normal y scrollea (zoom " + r.tabla.zoom + ", " + r.tabla.scroll + ")");
   chk(r.abierto.zoom === "1" && r.abierto.scroll === "auto", "con un bloque abierto: tamaño normal y scroll (zoom " + r.abierto.zoom + ", " + r.abierto.scroll + ")");
   chk(r.buscando.zoom === "1" && r.buscando.scroll === "auto", "buscando (abre las tandas que coinciden): también scrollea");
   chk(Number(r.vuelve.zoom) < 1 && r.vuelve.scroll === "hidden", "al cerrar todo vuelve a entrar entera, sin scroll");
