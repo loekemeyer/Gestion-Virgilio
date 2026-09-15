@@ -40,6 +40,43 @@
 > Y quedaron **dos problemas nuevos `abierto`**: el excedente de una OC no queda registrado en
 > ningún lado, y 104 de 354 filas de `OC_Maximos` no tienen proveedor.
 
+> **2026-09-15, tanda de la noche (v18.19 → v18.48, con Luis).** Se construyó entera la pestaña
+> **Modificar Pedidos** de la PPP y quedó cerrada de punta a punta: se edita la **dirección de
+> entrega** (dando de alta la nueva como opción elegible del cliente) y el **contenido**
+> (cantidades, sacar renglones, agregar códigos) de los pedidos de **LK**, de **Chef** y de las
+> **NP de ISIS**, con **quién** y **justificativo obligatorios**, log en `GV_Pedido_Mod_Log`
+> (Gestión, escrito por LK vía FDW en la misma transacción que el cambio), **badge ✏ MOD en la
+> columna NP de Facturación** con el detalle —para tipearlo igual en ISIS—, recálculo de NP y
+> tanda (web, vía el `ppp_web_resync` que ya existía), recálculo de **m³ por delta** (ISIS) y
+> prompt para devolver el pedido a *A Programar* si le cambia la zona. Tarea Planify **3416
+> cerrada**.
+>
+> **Para Chef hizo falta que Thomas tocara el otro proyecto**: el FDW de LK podía leer pero no
+> escribir. Corrió dos `grant` (uno **por columna**, sólo `sheets_payload`) y tres `policy` —las
+> policies hacen falta además de los grants porque en Chef esas tablas tienen RLS—. ⚠ Y ojo:
+> `has_table_privilege(…,'UPDATE')` devuelve **false** con un grant por columna aunque esté bien;
+> se verifica con `has_column_privilege(…)` o con el `update` de prueba en transacción abortada.
+>
+> **Cuatro problemas cerrados en el camino, los cuatro encontrados midiendo, no buscándolos:**
+> · el FDW de LK a Chef se conectaba con el **password de ejemplo del instructivo** (literal,
+>   adivinable) — rotado en las dos puntas y verificado;
+> · `GV_Web_Cancelados` tenía **RLS sin ninguna policy**, así que la app **no veía las
+>   anulaciones** (la misma NP leía `desarmado` como `postgres` y `sin_programar` como la app);
+> · por lo mismo, **LK no podía leer `gv_pedido_web_estado_pagina`** y eso rompía `edit_order_fast`,
+>   o sea que **un cliente no podía editar su pedido desde la página**;
+> · **`vista_tanda_m3` ignoraba todos los overrides**: una NP movida de tanda seguía sumando su m³
+>   en la vieja. 14 tandas con m³ ajeno y 14 sin el suyo; el total pasó de 1041,978 a 1045,631 m³.
+>
+> **Quedó anotado y sin tocar** (problema abierto): **8 tablas más** con RLS y sin policies detrás
+> de vistas `security_invoker` que lee la app —Importados, cuenta corriente, multigrafía—. Hay que
+> confirmar pantalla por pantalla si leen por vista (roto) o por RPC `SECURITY DEFINER` (anda).
+>
+> **Lo único que quedó esperando a Thomas de esta tanda:** la tarea Planify **3366** — que los
+> pedidos facturados pasen solos a *En Salida* con el badge «Esperando carga / Esperando retiro».
+> Lo pide Luis; **existía en la v13.62 y Thomas lo hizo sacar en la v15.85**, así que no se toca
+> sin que él confirme. La propuesta está lista: sólo los pedidos con fecha ≥ hoy (22 de 30), un
+> `UPDATE` de `PPP_Web_Config.en_salida_solo_cargadas` y renombrar un chip que ya existe.
+
 > **Para quien abra una sesión nueva:** esto es la foto del estado. Lo que falta de verdad está
 > en la base, no acá: `select * from github_repo_problemas.v_problemas where estado='abierto'`.
 > Este archivo dice **qué decidió el dueño**, **qué sólo puede hacer él**, y **qué quedó a medias**,
