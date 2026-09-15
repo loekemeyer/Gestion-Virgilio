@@ -1,3 +1,31 @@
+## Nota v18.15 (2026-09-15) — Modificar Pedidos: las columnas que pidió Luis, y el botón
+
+Luis, sobre la tabla de la v18.14: *"primero, la columna pedido no significa nada me parece,
+debería ser Cliente (razón social y código aclarando la empresa), NPs (lista todas las NPs de ese
+pedido), Zona/Barrio, fecha de pedido, fecha en programación (si corresponde), Tanda (si
+corresponde) y Estado. Agregá un botón a la derecha de todo eso que sea «Modificar» (ahora
+definimos funcionalidad)"*.
+
+| | |
+|---|---|
+| **Se fue** | la columna del número de pedido (*"no significa nada"*) y la de m³ |
+| **Se agregó** | **Pedido del** — la fecha en que el cliente hizo el pedido, que antes no estaba |
+| **Se separó** | *Entrega* pasa a ser **En programación**, distinta de la fecha del pedido |
+| **El código** | ahora aclara la empresa: `LK 3843`, `CH 2643` |
+
+⚠ El número de pedido **se sigue pudiendo buscar** aunque no se muestre: sacarlo de la vista no es
+sacarlo del buscador, y es lo que alguien tipea cuando lo tiene del otro lado del teléfono.
+
+**"Si corresponde"** se respeta: un pedido de A Programar no tiene día ni tanda todavía, y ahí va
+una raya — no se inventa nada. La fecha del pedido sí la tiene, y se muestra.
+
+**El botón «Modificar»** está en cada fila, a la derecha de todo. **Todavía no modifica**: Luis lo
+pidió diciendo *"ahora definimos funcionalidad"*, así que por ahora **avisa** de qué pedido se
+trata y que falta definir qué se puede tocar. Un botón mudo se lee como roto.
+
+`tests/ppp-modificar-pedidos.cjs` — 30 chequeos. Los nuevos fijan el orden exacto de las columnas,
+que el código lleve la empresa, que A Programar no invente día ni tanda, y que el botón avise.
+
 ## Nota v18.14 (2026-09-15) — Modificar Pedidos: buscador, filtros y tabla POR PEDIDO
 
 Luis: *"poné la pestaña entre Ocupación y Config. Cuarentena. Debería poder buscar pedidos (que

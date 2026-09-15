@@ -2847,7 +2847,10 @@ button.pk-anular small{ display:block; font-size:12px; font-weight:700; opacity:
 .pmod-tab tr:last-child td{ border-bottom:0; }
 /* el cliente estira; el resto se queda con lo que necesita su dato (mismo criterio que En Salida) */
 .pmod-tab td.ped, .pmod-tab td.nps, .pmod-tab td.zo, .pmod-tab td.fe, .pmod-tab td.td,
-.pmod-tab td.n, .pmod-tab td.est{ width:1%; white-space:nowrap; }
+.pmod-tab td.n, .pmod-tab td.est, .pmod-tab td.c, .pmod-tab th.c{ width:1%; white-space:nowrap; }
+/* el botón va centrado en su celda, no colgado abajo: el resto de la fila es `vertical-align:top`
+   porque el cliente lleva dos renglones (razón social + código) */
+.pmod-tab td.c{ vertical-align:middle; text-align:right; padding-left:14px; }
 .pmod-tab td.rs{ width:100%; min-width:180px; color:#0f172a; }
 .pmod-tab th.n, .pmod-tab td.n{ text-align:right; }
 .pmod-row:hover{ background:#f8fafc; }
@@ -2863,6 +2866,11 @@ button.pk-anular small{ display:block; font-size:12px; font-weight:700; opacity:
 .pmod-est.e-armado{ background:#dcfce7; color:#15803d; border-color:#bbf7d0; }
 .pmod-est.e-proceso{ background:#fef9c3; color:#a16207; border-color:#fde68a; }
 .pmod-est.e-pendiente{ background:#fee2e2; color:#b91c1c; border-color:#fecaca; }
+.pmod-btn{ width:auto; padding:6px 14px; border:1px solid #c7d2fe; border-radius:8px;
+  background:#eef2ff; color:#3730a3; font-size:.85em; font-weight:800; cursor:pointer;
+  white-space:nowrap; transition:background .12s, border-color .12s; }
+.pmod-btn:hover{ background:#e0e7ff; border-color:#a5b4fc; }
+.pmod-btn:active{ background:#c7d2fe; }
 .ppp-es-actions{ position:sticky; bottom:0; background:#fff; border-top:1px solid #e2e8f0; padding:10px 0 4px; display:flex; gap:8px; flex-wrap:wrap; }
 .ppp-es-ok{ background:#059669; color:#fff; border:0; border-radius:9px; padding:10px 18px; font-weight:800; font-size:13.5px; cursor:pointer; width:auto; flex:0 0 auto; }
 .ppp-es-ok:disabled{ background:#cbd5e1; cursor:default; }
@@ -5476,7 +5484,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=18.14"></script>
+<script type="module" src="recepcion.js?v=18.15"></script>
 <!-- Config del módulo de fichada (compartido con fichada.html). El secret
      hmacSecret tiene que ser el mismo acá y allá; cargándolo desde un solo
      archivo evitamos que se desincronicen. -->
@@ -8924,7 +8932,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v18.14";
+const APP_VERSION = "v18.15";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -36596,31 +36604,51 @@ function pppModifHtml() {
         : "Acá salen los de A Programar y los programados que todavía no salieron.") + '</div></div>';
   }
 
+  /* v18.15 (Luis): *"la columna pedido no significa nada me parece"*. El orden es el que pidió:
+     Cliente (razón social + código con la empresa) · NPs · Zona/Barrio · fecha de PEDIDO · fecha
+     en PROGRAMACIÓN (si corresponde) · Tanda (si corresponde) · Estado · Modificar.
+     Se fueron el número de pedido y los m³ — el número igual se sigue pudiendo BUSCAR. */
   h += '<div class="pmod-wrap"><table class="pmod-tab"><thead><tr>' +
-    '<th>Pedido</th><th>NP</th><th>Cliente</th><th>Zona · barrio</th>' +
-    '<th>Entrega</th><th>Tanda</th><th class="n">m³</th><th>Estado</th>' +
+    '<th>Cliente</th><th>NP</th><th>Zona · barrio</th>' +
+    '<th>Pedido del</th><th>En programación</th><th>Tanda</th><th>Estado</th>' +
+    '<th class="c">&nbsp;</th>' +
     '</tr></thead><tbody>';
+  const RAYA = '<span class="pmod-sin">—</span>';
   for (const p of list) {
     const varias = p.nNp > 1;
     h += '<tr class="pmod-row e-' + p.estado + '">' +
-      /* Un pedido de ISIS se llama por su NP pelada — no existe un "LK 98701". El de la página sí
-         lleva la empresa, que es como se lo nombra ahí ("LK 1343"). */
-      '<td class="ped"><b>' + escapeHtml(p.esIsis ? p.pedido : (p.empresa + " " + p.pedido)) + '</b></td>' +
+      // el código con la empresa adelante, como pidió: "LK 3843", "CH 2643"
+      '<td class="rs">' + escapeHtml(p.rs || "—") +
+        '<div class="pmod-cod">' + escapeHtml(p.empresa + " " + (p.cod || "—")) + '</div></td>' +
       '<td class="nps">' + (p.nps.length
         ? escapeHtml(p.nps.join(", ")) + (varias ? '<span class="pmod-n">' + p.nNp + ' NP</span>' : '')
         : '<span class="pmod-sin">' + (varias ? p.nNp + ' bloques' : 'sin NP todavía') + '</span>') + '</td>' +
-      '<td class="rs">' + escapeHtml(p.rs || "—") + '<div class="pmod-cod">' + escapeHtml(p.cod) + '</div></td>' +
-      '<td class="zo">' + escapeHtml([p.zona, p.loc].filter(function (x, i, a) { return x && a.indexOf(x) === i; }).join(" · ")) + '</td>' +
+      '<td class="zo">' + (escapeHtml([p.zona, p.loc].filter(function (x, i, a) { return x && a.indexOf(x) === i; }).join(" · ")) || RAYA) + '</td>' +
+      '<td class="fe">' + (p.fechaPedido ? escapeHtml(_pmodFecha(p.fechaPedido)) : RAYA) + '</td>' +
+      // "si corresponde": un pedido de A Programar todavía no tiene día ni tanda
       '<td class="fe">' + (p.fecha ? escapeHtml(_pmodFecha(p.fecha)) +
           (p.fechaMax && p.fechaMax !== p.fecha ? '<span class="pmod-n" title="El pedido tiene NP en más de un día">+1 día</span>' : '')
-        : '<span class="pmod-sin">—</span>') + '</td>' +
-      '<td class="td">' + (p.tandas.length ? escapeHtml(p.tandas.join(" + ")) : '<span class="pmod-sin">—</span>') + '</td>' +
-      '<td class="n">' + _pppFmtM3(p.m3) + '</td>' +
+        : RAYA) + '</td>' +
+      '<td class="td">' + (p.tandas.length ? escapeHtml(p.tandas.join(" + ")) : RAYA) + '</td>' +
       '<td class="est"><span class="pmod-est e-' + p.estado + '">' + (PMOD_EST_TXT[p.estado] || p.estado) + '</span></td>' +
+      '<td class="c"><button class="pmod-btn" onclick="pmodModificar(\'' + escapeHtml(p.key) + '\')">Modificar</button></td>' +
       '</tr>';
   }
   h += '</tbody></table></div>';
   return h;
+}
+/* v18.15 — el botón está, la funcionalidad NO: Luis lo pidió diciendo "ahora definimos
+   funcionalidad". Así que avisa en vez de hacer algo a medias o quedarse mudo. */
+function pmodModificar(key) {
+  const p = _pmodPedidos().filter(function (x) { return x.key === key; })[0];
+  if (!p) { pppSetStatus("No encontré ese pedido. Probá con 🔄 Actualizar.", false); return; }
+  const qué = p.nps.length ? ("NP " + p.nps.join(", ")) : (p.nNp + " bloque(s) sin NP todavía");
+  try {
+    alert("Modificar el pedido de " + (p.rs || p.cod) + "\n" +
+      p.empresa + " " + (p.cod || "—") + " · " + qué + "\n\n" +
+      "Todavía no está definido QUÉ se puede modificar ni con qué reglas.\n" +
+      "El botón queda puesto para cablearlo cuando se decida.");
+  } catch (_e) {}
 }
 function _pmodFecha(iso) {
   const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(iso || "")); if (!m) return String(iso || "");

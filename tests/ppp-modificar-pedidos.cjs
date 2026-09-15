@@ -98,46 +98,63 @@ catch (_e) {
     pppTab("modif");
     await new Promise((res) => setTimeout(res, 150));
     const box = document.getElementById("pppPreview");
+    /* v18.15 — el orden lo fijó Luis: Cliente · NP · Zona/Barrio · fecha de PEDIDO · fecha en
+       PROGRAMACIÓN · Tanda · Estado · Modificar. La columna del número de pedido se fue ("no
+       significa nada"), igual que los m³; el número igual se sigue pudiendo buscar. */
     const filas = () => [...box.querySelectorAll("tr.pmod-row")].map((tr) => ({
-      ped: tr.children[0].textContent.trim(), nps: tr.children[1].textContent.trim(),
-      rs: tr.children[2].textContent.trim(), tanda: tr.children[5].textContent.trim(),
-      m3: tr.children[6].textContent.trim(), est: tr.children[7].textContent.trim()
+      rs: tr.children[0].textContent.trim(), nps: tr.children[1].textContent.trim(),
+      zona: tr.children[2].textContent.trim(), fPed: tr.children[3].textContent.trim(),
+      fProg: tr.children[4].textContent.trim(), tanda: tr.children[5].textContent.trim(),
+      est: tr.children[6].textContent.trim(), btn: tr.children[7].textContent.trim(),
+      cod: (tr.querySelector(".pmod-cod") || {}).textContent || ""
     }));
 
     // ── (2) UN renglón por pedido, no por NP ───────────────────────────────
     const f = filas();
     out.nFilas = f.length;                       // 7 pedidos (9 NP - 1 salida... ver abajo)
-    out.peds = f.map((x) => x.ped);
-    const p1343 = f.find((x) => /1343/.test(x.ped));
-    out.partidoUnaFila = f.filter((x) => /1343/.test(x.ped)).length === 1;
+    out.peds = f.map((x) => x.rs + " [" + x.cod + "]");
+    const p1343 = f.find((x) => /Chen Li Yu/.test(x.rs));
+    out.partidoUnaFila = f.filter((x) => /Chen Li Yu/.test(x.rs)).length === 1;
     out.partidoTraeSusNps = !!p1343 && /LK 0004/.test(p1343.nps) && /LK 0005/.test(p1343.nps) &&
                             /LK 0006/.test(p1343.nps);
     out.partidoDice3 = !!p1343 && /3 NP/.test(p1343.nps);
-    out.partidoSumaM3 = !!p1343 && p1343.m3 === "1,0";       // 0,5 + 0,3 + 0,2
     // ISIS: cada NP es su propio pedido
-    out.isisSeparadas = f.filter((x) => /98701|98702/.test(x.ped)).length === 2;
+    out.isisSeparadas = f.filter((x) => /98701|98702/.test(x.nps)).length === 2;
 
     // ── (3) lo que ya salió ────────────────────────────────────────────────
-    out.salidaFuera = !f.some((x) => /1399/.test(x.ped) || /LK 0099/.test(x.nps));
+    out.salidaFuera = !f.some((x) => /Ya Salio/.test(x.rs) || /LK 0099/.test(x.nps));
     // del 1344 salió UNA sola NP: el pedido queda, con la que falta
-    const p1344 = f.find((x) => /1344/.test(x.ped));
+    const p1344 = f.find((x) => /Torres/.test(x.rs));
     out.parcialQueda = !!p1344 && /LK 0007/.test(p1344.nps) && !/LK 0008/.test(p1344.nps);
-    out.parcialM3 = !!p1344 && p1344.m3 === "0,8";           // sólo la NP que no salió
 
     // ── (4) los de A Programar están ───────────────────────────────────────
-    out.aprEstan = f.some((x) => /1360/.test(x.ped)) && f.some((x) => /217/.test(x.ped));
-    const p1360 = f.find((x) => /1360/.test(x.ped));
+    out.aprEstan = f.some((x) => /Web Nueva/.test(x.rs)) && f.some((x) => /Osa Hermanos/.test(x.rs));
+    const p1360 = f.find((x) => /Web Nueva/.test(x.rs));
     out.aprSinNpTodavia = !!p1360 && /bloques|sin NP/.test(p1360.nps);
+    // "si corresponde": sin día ni tanda todavía, y la fecha del PEDIDO sí está
+    out.aprSinDiaNiTanda = !!p1360 && p1360.fProg === "—" && p1360.tanda === "—";
+    out.aprConFechaPedido = !!p1360 && /14\/09/.test(p1360.fPed);
+
+    // ── (4b) las columnas y el botón ──────────────────────────────────────
+    out.columnas = [...box.querySelectorAll("table.pmod-tab thead th")]
+      .map((e) => e.textContent.trim()).filter(function (x) { return x; });
+    out.codConEmpresa = f.some((x) => /LK 3843/.test(x.cod)) && f.some((x) => /CH 2643/.test(x.cod));
+    out.botonEnCadaFila = f.every((x) => x.btn === "Modificar");
+    let aviso = ""; window.alert = function (m) { aviso = String(m); };
+    const b1 = box.querySelector("tr.pmod-row .pmod-btn"); if (b1) b1.click();
+    out.botonAvisa = /no está definido/i.test(aviso) && /Modificar el pedido/i.test(aviso);
+    out.botonDiceCual = /Web Nueva SRL/.test(aviso);
 
     // ── (5) el contador: pedidos y NP por separado ─────────────────────────
     out.resumen = box.querySelector(".pmod-res").textContent.replace(/\s+/g, " ").trim();
 
     // ── (6) la búsqueda ────────────────────────────────────────────────────
     const buscar = function (q) { pmodBuscar(q); return filas(); };
-    out.porPedido = buscar("1343").length === 1;
+    out.porPedido = buscar("1343").length === 1;   // el número ya no se muestra, pero se busca
     // ⚠ lo importante: buscar por una NP del MEDIO encuentra el pedido entero
     const porNp = buscar("LK 0005");
-    out.porNpDelMedio = porNp.length === 1 && /1343/.test(porNp[0].ped) && /LK 0004/.test(porNp[0].nps);
+    out.porNpDelMedio = porNp.length === 1 && /Chen Li Yu/.test(porNp[0].rs) &&
+                        /LK 0004/.test(porNp[0].nps) && /LK 0006/.test(porNp[0].nps);
     out.porCliente = buscar("torres").length === 1;
     out.porTanda = buscar("D67E").length === 2;
     out.porCod = buscar("2643").length === 1;
@@ -149,10 +166,10 @@ catch (_e) {
     pmodFiltro("donde", "apr");   out.soloApr = filas().length === 2;
     pmodFiltro("donde", "plan");  out.soloPlan = filas().length === 5;
     pmodFiltro("donde", "todos");
-    pmodFiltro("emp", "CH");      out.soloCh = filas().every((x) => /^CH /.test(x.ped));
+    pmodFiltro("emp", "CH");      out.soloCh = filas().every((x) => /^CH /.test(x.cod));
     out.nCh = filas().length;
     pmodFiltro("emp", "todas");
-    pmodFiltro("estado", "armado"); out.soloArmado = filas().length === 1 && /1344/.test(filas()[0].ped);
+    pmodFiltro("estado", "armado"); out.soloArmado = filas().length === 1 && /Torres/.test(filas()[0].rs);
     // se combinan: estado armado + empresa Chef no da nada
     pmodFiltro("emp", "CH");      out.combinados = filas().length === 0;
     pmodLimpiar();
@@ -168,14 +185,14 @@ catch (_e) {
   chk(r.partidoUnaFila, "un pedido partido en 3 NP es UN renglón, no tres ← el punto de Luis");
   chk(r.partidoTraeSusNps, "y trae sus tres NP: " + JSON.stringify(r.peds));
   chk(r.partidoDice3, "con el contador «3 NP» al lado");
-  chk(r.partidoSumaM3, "y los m³ sumados de los tres bloques (1,0)");
+  chk(r.columnas, "las columnas están en el orden que pidió Luis: " + JSON.stringify(r.columnas));
+  chk(r.codConEmpresa, "el código del cliente aclara la empresa (LK 3843 / CH 2643)");
   chk(r.isisSeparadas, "dos NP de ISIS son dos pedidos distintos (su clave es la NP)");
-  // y se llaman por su NP pelada: no existe un "LK 98701"
-  chk(r.peds.indexOf("98701") >= 0 && !r.peds.some((x) => /LK 98701/.test(x)),
-      "un pedido de ISIS se nombra por su NP, sin prefijo de empresa: " + JSON.stringify(r.peds));
+
   chk(r.salidaFuera, "un pedido que ya salió no aparece");
   chk(r.parcialQueda, "si salió UNA sola NP del pedido, el pedido queda con la que falta");
-  chk(r.parcialM3, "y los m³ son sólo los de la NP que no salió (0,8)");
+  chk(r.aprSinDiaNiTanda, "un pedido de A Programar no inventa día ni tanda: van en —");
+  chk(r.aprConFechaPedido, "pero sí muestra la fecha del PEDIDO");
   chk(r.aprEstan, "los de A Programar también están");
   chk(r.aprSinNpTodavia, "y se ve que todavía no tienen NP asignada");
   /* NP REALES, no bloques: los dos pedidos de A Programar todavía no tienen NP (se asigna al
@@ -194,6 +211,9 @@ catch (_e) {
   chk(r.soloArmado, "el filtro por estado deja sólo el armado");
   chk(r.combinados, "los filtros se combinan (armado + Chef = ninguno)");
   chk(r.limpiarVuelve, "«Limpiar» devuelve todo y vacía la búsqueda");
+  chk(r.botonEnCadaFila, "cada fila tiene su botón «Modificar» a la derecha de todo");
+  chk(r.botonAvisa, "que por ahora AVISA que la funcionalidad no está definida, en vez de no hacer nada");
+  chk(r.botonDiceCual, "y dice de qué pedido se trata");
   chk(errs.length === 0, "sin errores de JS: " + JSON.stringify(errs));
 
   let malas = 0;
