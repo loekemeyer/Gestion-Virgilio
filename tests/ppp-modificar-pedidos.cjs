@@ -140,10 +140,76 @@ catch (_e) {
       .map((e) => e.textContent.trim()).filter(function (x) { return x; });
     out.codConEmpresa = f.some((x) => /LK 3843/.test(x.cod)) && f.some((x) => /CH 2643/.test(x.cod));
     out.botonEnCadaFila = f.every((x) => x.btn === "Modificar");
+    /* v18.23 — el botón ABRE EL MODAL. Se le pone delante un fetch de mentira para el
+       proyecto de LK (que es donde vive el pedido) y se chequea: (a) lo que NO se puede
+       modificar avisa y no abre nada; (b) lo que sí, abre con el contenido del pedido;
+       (c) tocar cajas y agregar un código llega al backend con los números correctos. */
     let aviso = ""; window.alert = function (m) { aviso = String(m); };
-    const b1 = box.querySelector("tr.pmod-row .pmod-btn"); if (b1) b1.click();
-    out.botonAvisa = /no está definido/i.test(aviso) && /Modificar el pedido/i.test(aviso);
-    out.botonDiceCual = /Web Nueva SRL/.test(aviso);
+    window.confirm = function () { return true; };
+    window.pwebLkToken = async function () { return "tok"; };
+    window.aprQuien = async function () { return "luis@lk"; };
+    window.pppLoadProgFromSupabase = async function () {};
+    const lk = [];
+    const J = (d) => Promise.resolve({ ok: true, status: 200, json: () => Promise.resolve(d),
+      text: () => Promise.resolve(JSON.stringify(d)), headers: { get: () => null } });
+    const CTX = {
+      empresa: "lk", order_id: 1343, cod_cliente: "3843", razon_social: "Chen Li Yu",
+      sucursal_entrega: "Rivadavia 100 - Flores", enviado_a_compras: false,
+      items: [{ i: 0, cod_art: "027", cod: "027", cajas: 2, uxb: 24, descripcion: "Aceite", catalogo: true },
+              { i: 1, cod_art: "544", cod: "544", cajas: 1, uxb: 12, descripcion: "Fideos", catalogo: true }],
+      items_raw: [{ cod_art: "027", cajas: 2, uxb: 24, cod_original: null },
+                  { cod_art: "544", cajas: 1, uxb: 12, cod_original: null }],
+      direcciones: [{ slot: 1, label: "Rivadavia 100 - Flores", direccion: "Rivadavia 100",
+                      localidad: "Flores", provincia: "CABA", barrio: "Flores", actual: true },
+                    { slot: 2, label: "Depósito Lanús", direccion: "Falsa 123",
+                      localidad: "Lanús", provincia: "Buenos Aires", barrio: "Lanus", actual: false }],
+      sin_stock: ["544"], estado: { estado: "programado", facturado: false, entregado: false }, log: []
+    };
+    window.fetch = function (url, opt) {
+      const u = String(url), b = (opt && opt.body) ? JSON.parse(opt.body) : null;
+      if (/rpc\/gv_pedido_mod_ctx/.test(u))     { lk.push(["ctx", b]);     return J(CTX); }
+      if (/rpc\/gv_pedido_mod_guardar/.test(u)) { lk.push(["guardar", b]); return J({ ok: true, log_id: 7, detalle: {} }); }
+      if (/\/rest\/v1\/(products|loke_products)/.test(u))
+        return J([{ cod: "027", description: "Aceite", uxb: 24 }, { cod: "544", description: "Fideos", uxb: 12 },
+                  { cod: "601", description: "Arroz", uxb: 6 }]);
+      return J([]);
+    };
+    const btnDe = (rs) => [...box.querySelectorAll("tr.pmod-row")]
+      .filter((tr) => new RegExp(rs).test(tr.children[0].textContent))[0].querySelector(".pmod-btn");
+    const esperar = () => new Promise((res) => setTimeout(res, 80));
+    const abierto = () => !!document.querySelector("#pmodOverlay.show");
+
+    // (a) una NP de ISIS no se modifica desde acá
+    aviso = ""; btnDe("Pettish").click(); await esperar();
+    out.isisAvisa = /ISIS/.test(aviso) && !abierto();
+    // (a2) Chef tampoco, todavía
+    aviso = ""; btnDe("El Martillo").click(); await esperar();
+    out.chefAvisa = /Chef/.test(aviso) && !abierto();
+
+    // (b) un pedido web de LK abre el modal con su contenido
+    aviso = ""; btnDe("Chen Li Yu").click(); await esperar();
+    out.abre = abierto();
+    out.ctxPidio = JSON.stringify((lk.filter((x) => x[0] === "ctx")[0] || [])[1] || {});
+    const ov = document.getElementById("pmodOverlay");
+    out.modalTitulo = (ov.querySelector(".pme-title") || {}).textContent || "";
+    out.modalItems = [...ov.querySelectorAll(".pme-tab tbody tr")].map((tr) => tr.children[0].textContent.trim());
+    out.modalDirs = [...ov.querySelectorAll(".pme-sel option")].map((o) => o.textContent.trim());
+    out.modalSinStock = /🕒/.test(ov.innerHTML);
+    out.guardarApagado = !!(ov.querySelector(".pme-ok") || {}).disabled;   // sin cambios no se guarda
+
+    // (c) 2 -> 5 cajas del 027 y se agrega el 601
+    pmodCajas(0, "5");
+    ov.querySelector("#pmeNuevoCod").value = "601";
+    ov.querySelector("#pmeNuevoCj").value = "4";
+    pmodAgregar();
+    out.filasDespues = [...document.querySelectorAll("#pmodOverlay .pme-tab tbody tr")].length;
+    out.guardarPrendido = !document.querySelector("#pmodOverlay .pme-ok").disabled;
+    await pmodGuardar(); await esperar();
+    const g = (lk.filter((x) => x[0] === "guardar")[0] || [])[1] || {};
+    out.guardo = JSON.stringify(g.p_items || []);
+    out.guardoEspera = JSON.stringify(g.p_espera || []);
+    out.guardoQuien = g.p_quien;
+    out.cerroAlGuardar = !abierto();
 
     /* v18.19 (Luis) — dos cosas de esta tanda:
        (a) «Pedido del» SIN el día de la semana; «En programación» lo conserva (ahí sí sirve).
@@ -233,8 +299,25 @@ catch (_e) {
   chk(r.combinados, "los filtros se combinan (armado + Chef = ninguno)");
   chk(r.limpiarVuelve, "«Limpiar» devuelve todo y vacía la búsqueda");
   chk(r.botonEnCadaFila, "cada fila tiene su botón «Modificar» a la derecha de todo");
-  chk(r.botonAvisa, "que por ahora AVISA que la funcionalidad no está definida, en vez de no hacer nada");
-  chk(r.botonDiceCual, "y dice de qué pedido se trata");
+  chk(r.isisAvisa, "una NP de ISIS avisa que se modifica en ISIS y NO abre el modal");
+  chk(r.chefAvisa, "un pedido de Chef avisa que esa base todavía no acepta cambios");
+  chk(r.abre, "un pedido web de LK abre el modal");
+  chk(/"p_order_id":1343/.test(r.ctxPidio), "y pide el contexto del pedido correcto: " + r.ctxPidio);
+  chk(/Chen Li Yu/.test(r.modalTitulo) && /LK 0004/.test(r.modalTitulo),
+      "el modal dice de quién es y qué NP toca: " + JSON.stringify(r.modalTitulo));
+  chk(r.modalItems.length === 2 && /027/.test(r.modalItems[0]), "muestra el contenido del pedido: " + JSON.stringify(r.modalItems));
+  chk(r.modalDirs.some((x) => /Depósito Lanús/.test(x)) && r.modalDirs.some((x) => /Dirección nueva/.test(x)),
+      "y las direcciones que el cliente ya tiene, más la opción de crear una: " + JSON.stringify(r.modalDirs));
+  chk(r.modalSinStock, "marca el código que hoy está sin stock (agregarlo deja el pedido diferido)");
+  chk(r.guardarApagado, "sin ningún cambio, «Guardar» está apagado");
+  chk(r.filasDespues === 3, "agregar un código suma su renglón (" + r.filasDespues + ")");
+  chk(r.guardarPrendido, "con cambios, «Guardar» se prende");
+  chk(/\{"cod_art":"027","cajas":5,"uxb":24\}/.test(r.guardo) && /\{"cod_art":"601","cajas":4,"uxb":6\}/.test(r.guardo),
+      "y lo que se manda al backend son las cajas nuevas y el código agregado: " + r.guardo);
+  chk(/"cod_art":"027","cajas":2/.test(r.guardoEspera),
+      "va también la foto de cómo estaba el pedido, para que el backend corte si cambió por otro lado");
+  chk(r.guardoQuien === "luis@lk", "y queda firmado por quien lo hizo (" + r.guardoQuien + ")");
+  chk(r.cerroAlGuardar, "al guardar bien, el modal se cierra");
   chk(r.fPedSinDia, "«Pedido del» va sin el día de la semana (Luis)");
   chk(r.fProgConDia, "pero «En programación» lo conserva: ahí sirve para saber cuándo sale");
   chk(r.stickyDesborda, "control: con el wrap angosto la tabla DESBORDA (si no, lo de abajo pasa solo)");

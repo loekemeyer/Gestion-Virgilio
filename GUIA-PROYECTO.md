@@ -1,3 +1,64 @@
+## Nota v18.23 (2026-09-15) — Modificar Pedidos: ya modifica de verdad, con log
+
+Luis: *"la idea es que se puedan modificar aspectos de los pedidos acá y que esas modificaciones se
+guarden en el back y que haya un log de modificaciones"*. El botón **Modificar** abre un modal donde
+se puede cambiar:
+
+- **La dirección de entrega**: se elige una de las que el cliente ya tiene en la página, o se le da
+  de alta una nueva — que le queda **como opción elegible para los próximos pedidos**
+  (`customer_delivery_addresses` de LK, con su slot).
+- **El contenido**: cambiar las cajas de cada renglón, sacar un renglón y **agregar códigos**
+  (con el catálogo de la página como autocompletado; el backend rechaza un código que no exista).
+
+**Dónde se escribe: en LK, no en Gestión.** La fuente de verdad del contenido y de la dirección de
+un pedido web es `orders.sheets_payload` del proyecto de la página — de ahí salen el Excel de ISIS,
+el corte en NP, el m³ y el picking. Gestión no tiene FDW a LK (medido: 0 foreign tables), así que el
+front llama a `gv_pedido_mod_ctx` / `gv_pedido_mod_guardar` con la misma sesión de admin de LK que ya
+usa A Programar. **El log queda en `GV_Pedido_Mod_Log` (LK), escrito en la misma transacción que el
+cambio**, con quién, cuándo, el antes, el después y el detalle (qué código subió, cuál se agregó,
+qué dirección se eligió). El modal lo muestra abajo.
+
+**Las NP y la tanda NO se recalculan a mano: ya existía quien lo hace.** `pwebResync` →
+`ppp_web_resync` pone la programación al día en cada carga de la PPP, porque un pedido web
+**siempre** se pudo editar desde la página hasta que se factura. Al guardar, la pantalla recarga y
+esa máquina —probada— reacomoda el corte en NP, el m³ y la tanda, respetando lo facturado y lo que
+ya está en marcha. **Si cambia la ZONA** de un pedido ya programado, pregunta si devolverlo a
+📥 A Programar (la tanda se armó por cercanía). La zona la resuelve `gv_ppp_web_zona`, la misma
+función que usa el armado.
+
+**Lo que NO se puede modificar desde acá, y avisa por qué:**
+
+| Caso | Por qué |
+|---|---|
+| NP de **ISIS** | su contenido vive en ISIS; se tipea allá |
+| Pedido de **Chef** | la foreign table `chef_orders` es de **sólo lectura** (medido: `permission denied for table orders` al intentar el UPDATE). Falta una RPC del lado de Chef |
+| **Facturado o entregado** | mismo corte que usa la página para dejar editar |
+
+Avisos que sí deja pasar, marcándolos: si la tanda ya está **armada o en picking**, el cambio no
+vuelve solo a la góndola; y un código **sin stock** lleva un 🕒, porque agregarlo marca el pedido
+entero como **diferido** (trigger `marcar_pedido_diferido` de LK).
+
+Otras dos de esta tanda: **«Pedido del» va sin el día de la semana** (queda en «En programación»,
+donde sirve), y el **botón Modificar ya no se escapa** — medido a 1180 px, con 120 pedidos la tabla
+mide 1242 y desbordaba, así que la columna quedaba fuera de la pantalla: ahora está anclada a la
+derecha. `sql/gv_pedido_mod_v1823.sql`, §3.gq de `docs/SUPABASE-GESTION-VIRGILIO.md`.
+
+### Y dos bugs de permisos que aparecieron midiendo (arreglados, aditivos)
+
+`public."GV_Web_Cancelados"` tenía **RLS prendida y cero policies**:
+
+1. **La app no veía las anulaciones.** Las tres vistas que la usan son `security_invoker`, o sea que
+   corren con el rol del que consulta: `anon` y `authenticated` leían 0 cancelados. Medido con la
+   NP **LK 0052**: `gv_ppp_web_estado.estado` daba `desarmado` como `postgres` y `sin_programar`
+   como `authenticated`. Ahora dicen lo mismo.
+2. **LK no podía leer `gv_pedido_web_estado_pagina` por FDW** (`permission denied for table
+   GV_Web_Cancelados`), lo que rompía `edit_order_fast` — la RPC con la que **un cliente edita su
+   pedido desde la página**.
+
+`sql/gv_web_cancelados_rls_v1823.sql`. Hay **8 tablas más** en el mismo pozo detrás de vistas
+`security_invoker` (Importados, cuenta corriente, multigrafía): quedaron **anotadas sin tocar**,
+hay que confirmar pantalla por pantalla si leen por vista o por RPC.
+
 ## Nota v18.15 (2026-09-15) — Modificar Pedidos: las columnas que pidió Luis, y el botón
 
 Luis, sobre la tabla de la v18.14: *"primero, la columna pedido no significa nada me parece,

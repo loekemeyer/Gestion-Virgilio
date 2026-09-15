@@ -5493,7 +5493,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=18.22"></script>
+<script type="module" src="recepcion.js?v=18.23"></script>
 <!-- Config del módulo de fichada (compartido con fichada.html). El secret
      hmacSecret tiene que ser el mismo acá y allá; cargándolo desde un solo
      archivo evitamos que se desincronicen. -->
@@ -8941,7 +8941,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v18.22";
+const APP_VERSION = "v18.23";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -36667,22 +36667,457 @@ function pppModifHtml() {
   h += '</tbody></table></div>';
   return h;
 }
-/* v18.15 — el botón está, la funcionalidad NO: Luis lo pidió diciendo "ahora definimos
-   funcionalidad". Así que avisa en vez de hacer algo a medias o quedarse mudo. */
-function pmodModificar(key) {
+/* =====================================================================================
+   v18.23 — MODIFICAR UN PEDIDO (Luis, 15/09): *"la idea es que se puedan modificar aspectos
+   de los pedidos acá y que esas modificaciones se guarden en el back y que haya un log de
+   modificaciones"*. Se puede tocar la DIRECCIÓN DE ENTREGA (eligiendo una de las que el
+   cliente ya tiene en la página, o dando de alta una nueva, que le queda como opción
+   elegible para la próxima) y el CONTENIDO (cambiar cajas, sacar un renglón, agregar
+   códigos).
+
+   DÓNDE SE ESCRIBE. En LK, no acá. La fuente de verdad del contenido y de la dirección de
+   un pedido web es `orders.sheets_payload` del proyecto de la página: de ahí salen el Excel
+   de ISIS, el corte en NP, el m³ y el picking. Gestión no tiene FDW a LK (medido: 0 foreign
+   tables), así que el front llama a las RPC `gv_pedido_mod_ctx` / `gv_pedido_mod_guardar`
+   con la MISMA sesión de admin de LK que ya usa A Programar (`pwebLkToken`). Las dos
+   funciones exigen que el mail esté en `admins` de LK; el log queda en `GV_Pedido_Mod_Log`,
+   escrito en la misma transacción que el cambio.
+
+   QUÉ **NO** HACE ESTA PANTALLA: recalcular NP, tandas ni m³ a mano. Eso ya existía y corre
+   solo — `pwebResync` → `ppp_web_resync` pone la programación al día en cada carga de la PPP
+   (un pedido web SIEMPRE se pudo editar desde la página hasta que se factura, así que la
+   máquina que absorbe el cambio está hecha y probada). Acá se cambia el pedido y se recarga:
+   el corte en NP lo recalcula la vista de LK y la tanda la reacomoda el resync, respetando
+   lo facturado y lo que ya está en marcha.
+
+   LO QUE SÍ SE PREGUNTA: si cambia la ZONA de entrega de un pedido ya programado, la tanda
+   deja de tener sentido (se armó por cercanía). Ahí ofrece devolverlo a 📥 A Programar.
+   ===================================================================================== */
+let _pmodEd = null;          // { p, ctx, items, dirSel, dirNueva, motivo, cargando, err, guardando }
+let _pmodCat = null;         // catálogo de LK para agregar códigos (se pide una vez)
+
+function _pmodEdCss() {
+  if (document.getElementById("pmodEdCss")) return;
+  const st = document.createElement("style"); st.id = "pmodEdCss";
+  st.textContent = "#pmodOverlay{display:none;position:fixed;inset:0;z-index:1600;background:rgba(2,6,23,.74);overflow:auto;padding:14px;}" +
+    "#pmodOverlay.show{display:block;}" +
+    ".pme-card{background:#f8fafc;max-width:1040px;margin:0 auto;border-radius:16px;overflow:hidden;box-shadow:0 24px 70px rgba(0,0,0,.5);}" +
+    ".pme-head{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:13px 16px;background:linear-gradient(90deg,#4338ca,#1e1b4b);color:#fff;}" +
+    ".pme-title{font-size:18px;font-weight:800;min-width:0;}" +
+    ".pme-title small{display:block;font-size:12.5px;font-weight:700;opacity:.85;}" +
+    ".pme-close{background:#dc2626;color:#fff;border:none;border-radius:8px;padding:6px 14px;font-weight:800;cursor:pointer;width:auto;flex-shrink:0;}" +
+    ".pme-body{padding:14px 16px;}" +
+    ".pme-sec{background:#fff;border:1px solid #e2e8f0;border-radius:12px;padding:12px 14px;margin-bottom:12px;}" +
+    ".pme-h{font-size:13px;font-weight:800;text-transform:uppercase;letter-spacing:.04em;color:#475569;margin-bottom:9px;}" +
+    ".pme-row{display:flex;gap:9px;flex-wrap:wrap;align-items:center;}" +
+    ".pme-sel,.pme-in{height:36px;padding:0 10px;border:1.5px solid #cbd5e1;border-radius:9px;font-size:14px;font-weight:700;color:#0f172a;background:#fff;width:auto;}" +
+    ".pme-in.ancho{flex:1 1 220px;min-width:140px;}" +
+    ".pme-sel{max-width:100%;}" +
+    ".pme-tabw{overflow-x:auto;}" +
+    ".pme-tab{width:100%;border-collapse:collapse;font-size:14.5px;}" +
+    ".pme-tab th{font-size:.76em;text-transform:uppercase;letter-spacing:.03em;color:#64748b;text-align:left;padding:5px 8px;border-bottom:1px solid #e2e8f0;white-space:nowrap;}" +
+    ".pme-tab td{padding:4px 8px;border-bottom:1px solid #f1f5f9;vertical-align:middle;}" +
+    ".pme-tab td.cod{font-family:Consolas,Menlo,monospace;font-weight:800;white-space:nowrap;width:1%;}" +
+    ".pme-tab td.de{color:#334155;width:100%;}" +
+    ".pme-tab td.n,.pme-tab th.n{text-align:right;white-space:nowrap;width:1%;}" +
+    ".pme-cj{width:74px;height:32px;text-align:right;padding:0 7px;border:1.5px solid #cbd5e1;border-radius:8px;font-size:14px;font-weight:800;}" +
+    ".pme-cj.tocado{border-color:#4338ca;background:#eef2ff;}" +
+    ".pme-x{width:auto;background:#fff;border:1px solid #fecaca;color:#b91c1c;border-radius:8px;padding:3px 9px;font-weight:800;font-size:12px;cursor:pointer;}" +
+    ".pme-x:hover{background:#fee2e2;}" +
+    ".pme-fila-fuera td{opacity:.45;text-decoration:line-through;}" +
+    ".pme-nueva{background:#f0fdf4;}" +
+    ".pme-add{width:auto;background:#eef2ff;border:1px solid #c7d2fe;color:#3730a3;border-radius:9px;padding:7px 14px;font-weight:800;font-size:13px;cursor:pointer;}" +
+    ".pme-foot{position:sticky;bottom:0;background:#f8fafc;border-top:1px solid #e2e8f0;padding:11px 16px;display:flex;gap:9px;align-items:center;flex-wrap:wrap;}" +
+    ".pme-ok{width:auto;background:#059669;color:#fff;border:0;border-radius:9px;padding:10px 20px;font-weight:800;font-size:14px;cursor:pointer;}" +
+    ".pme-ok:disabled{background:#cbd5e1;cursor:default;}" +
+    ".pme-cancel{width:auto;background:#f1f5f9;color:#475569;border:1px solid #e2e8f0;border-radius:9px;padding:10px 15px;font-weight:700;font-size:13.5px;cursor:pointer;}" +
+    ".pme-res{font-size:13px;color:#475569;font-weight:700;margin-left:auto;text-align:right;}" +
+    ".pme-res b{color:#0f172a;}" +
+    ".pme-nota{font-size:12px;color:#475569;background:#f1f5f9;border-radius:8px;padding:8px 11px;margin-top:9px;}" +
+    ".pme-warn{font-size:12.5px;color:#92400e;background:#fef3c7;border:1px solid #fde68a;border-radius:8px;padding:8px 11px;margin-bottom:10px;font-weight:700;}" +
+    ".pme-err{font-size:13px;color:#b91c1c;background:#fee2e2;border:1px solid #fecaca;border-radius:8px;padding:9px 12px;font-weight:700;}" +
+    ".pme-cargando{padding:28px;text-align:center;color:#64748b;font-weight:700;}" +
+    ".pme-log{font-size:12.5px;color:#334155;}" +
+    ".pme-log li{margin:0 0 5px;}" +
+    ".pme-log b{color:#0f172a;}" +
+    ".pme-vacio{color:#94a3b8;font-weight:700;font-size:12.5px;}";
+  document.head.appendChild(st);
+}
+function pmodCerrar() {
+  const o = document.getElementById("pmodOverlay"); if (o) o.classList.remove("show");
+  _pmodEd = null;
+}
+/* Una RPC contra LK, con la sesión de admin que ya arma A Programar. Devuelve el JSON o
+   tira con el mensaje que mandó Postgres — que está escrito para que lo lea una persona. */
+async function pmodLkRpc(fn, body) {
+  const tok = await pwebLkToken();
+  const r = await fetch(PWEB_LK_URL + "/rest/v1/rpc/" + fn, {
+    method: "POST",
+    headers: { apikey: PWEB_LK_ANON, Authorization: "Bearer " + tok, "Content-Type": "application/json" },
+    body: JSON.stringify(body || {})
+  });
+  let d = null; try { d = await r.json(); } catch (_e) {}
+  if (!r.ok) throw new Error((d && (d.message || d.hint || d.details)) || ("LK respondió " + r.status));
+  return d;
+}
+/* El catálogo para agregar códigos: los de LK y los "Loeke" que vende Chef. Una sola vez. */
+async function pmodCatalogo() {
+  if (_pmodCat) return _pmodCat;
+  const tok = await pwebLkToken();
+  const h = { apikey: PWEB_LK_ANON, Authorization: "Bearer " + tok };
+  const get = async function (t) {
+    const r = await fetch(PWEB_LK_URL + "/rest/v1/" + t + "?select=cod,description,uxb&order=cod.asc&limit=5000", { headers: h });
+    return r.ok ? (await r.json() || []) : [];
+  };
+  const [a, b] = await Promise.all([get("products"), get("loke_products")]);
+  const by = new Map();
+  for (const x of a.concat(b)) {
+    const c = _pmodCodNorm(x.cod); if (!c || by.has(c)) continue;
+    by.set(c, { cod: c, desc: String(x.description || ""), uxb: Number(x.uxb) || 0 });
+  }
+  _pmodCat = [...by.values()];
+  return _pmodCat;
+}
+/* La MISMA normalización que `gv_pedido_mod_cod` del backend: 3 dígitos + letras en mayúscula. */
+function _pmodCodNorm(c) {
+  const s = String(c == null ? "" : c);
+  const n = (s.match(/\d+/) || [])[0]; if (!n) return "";
+  return String(n).padStart(3, "0") + ((s.match(/[a-zA-Z]+/) || [""])[0]).toUpperCase();
+}
+
+async function pmodModificar(key) {
   const p = _pmodPedidos().filter(function (x) { return x.key === key; })[0];
   if (!p) { pppSetStatus("No encontré ese pedido. Probá con 🔄 Actualizar.", false); return; }
-  const qué = p.nps.length ? ("NP " + p.nps.join(", ")) : (p.nNp + " bloque(s) sin NP todavía");
+  // Lo que esta pantalla NO puede tocar, dicho antes de abrir nada:
+  if (p.esIsis) {
+    try { alert("La NP " + (p.nps[0] || "") + " se tipeó en ISIS.\n\nEl contenido y la dirección de un pedido de ISIS viven en ISIS, no en la página: desde acá no se pueden cambiar sin que las dos cosas queden distintas.\n\nSe modifica en ISIS; si hay que moverlo de día o de tanda, eso sí se hace desde 🗓️ Programación."); } catch (_e) {}
+    return;
+  }
+  if (p.empresa !== "LK") {
+    try { alert("El pedido es de la página de Chef.\n\nLa base de Chef todavía no acepta cambios desde acá (se la lee por FDW, que es de sólo lectura), así que por ahora se modifica en la página de Chef."); } catch (_e) {}
+    return;
+  }
+  _pmodEdCss();
+  _pmodEd = { p: p, cargando: true, items: [], dirSel: "", dirNueva: null, motivo: "" };
+  pmodPintar();
   try {
-    alert("Modificar el pedido de " + (p.rs || p.cod) + "\n" +
-      p.empresa + " " + (p.cod || "—") + " · " + qué + "\n\n" +
-      "Todavía no está definido QUÉ se puede modificar ni con qué reglas.\n" +
-      "El botón queda puesto para cablearlo cuando se decida.");
-  } catch (_e) {}
+    const ctx = await pmodLkRpc("gv_pedido_mod_ctx", { p_empresa: "lk", p_order_id: Number(p.pedido) });
+    _pmodEd.ctx = ctx;
+    _pmodEd.items = (ctx.items || []).map(function (it) {
+      return { cod: it.cod || _pmodCodNorm(it.cod_art), desc: it.descripcion || "",
+               uxb: Number(it.uxb) || 0, cajas: Number(it.cajas) || 0,
+               cajas0: Number(it.cajas) || 0, fuera: false, nueva: false };
+    });
+    _pmodEd.dirSel = String(ctx.sucursal_entrega || "");
+    _pmodEd.dir0 = String(ctx.sucursal_entrega || "");
+    _pmodEd.cargando = false;
+    pmodPintar();
+    try { await pmodCatalogo(); pmodPintar(); } catch (_e) {}
+  } catch (e) {
+    _pmodEd.cargando = false; _pmodEd.err = (e && e.message) ? e.message : String(e);
+    pmodPintar();
+  }
 }
-/* v18.19 (Luis): *"en 'pedido del' no hace falta poner el dia de la semana"*. El dia de la semana
-   sirve para la fecha de ENTREGA -se lee "jue 17/09" y se sabe cuando sale- pero no para la fecha
-   en que entro el pedido, que es solo referencia. Por eso el dia pasa a ser opcional. */
+
+function pmodPintar() {
+  _pmodEdCss();
+  let o = document.getElementById("pmodOverlay");
+  if (!o) {
+    o = document.createElement("div"); o.id = "pmodOverlay";
+    o.addEventListener("click", function (ev) { if (ev.target === o) pmodCerrar(); });
+    document.body.appendChild(o);
+  }
+  if (!_pmodEd) { o.classList.remove("show"); return; }
+  o.innerHTML = pmodEdHtml();
+  o.classList.add("show");
+}
+
+function _pmodDirDe(label) {
+  const ds = ((_pmodEd && _pmodEd.ctx && _pmodEd.ctx.direcciones) || []);
+  const l = String(label || "").trim().toLowerCase();
+  return ds.filter(function (d) { return String(d.label || "").trim().toLowerCase() === l; })[0] || null;
+}
+function _pmodItemsFinal() {
+  return ((_pmodEd && _pmodEd.items) || []).filter(function (it) { return !it.fuera && it.cajas > 0 && it.cod; });
+}
+function _pmodHayCambio() {
+  if (!_pmodEd) return false;
+  if (_pmodEd.dirNueva) return true;
+  if (String(_pmodEd.dirSel || "") !== String(_pmodEd.dir0 || "")) return true;
+  return _pmodEd.items.some(function (it) { return it.nueva || it.fuera || it.cajas !== it.cajas0; });
+}
+
+function pmodEdHtml() {
+  const E = _pmodEd, p = E.p;
+  let h = '<div class="pme-card"><div class="pme-head"><div class="pme-title">' +
+    escapeHtml(p.rs || p.cod || "Pedido") +
+    '<small>' + escapeHtml(p.empresa + " " + (p.cod || "—")) + ' · ' +
+      (p.nps.length ? escapeHtml(p.nps.join(", ")) : (p.nNp + " bloque(s), sin NP todavía")) +
+      (p.tandas.length ? ' · tanda ' + escapeHtml(p.tandas.join(" + ")) : "") +
+      ' · ' + escapeHtml(PMOD_EST_TXT[p.estado] || p.estado) + '</small></div>' +
+    '<button class="pme-close" onclick="pmodCerrar()">Cerrar</button></div>';
+
+  if (E.cargando) return h + '<div class="pme-cargando">Buscando el pedido en la página…</div></div>';
+  if (E.err) return h + '<div class="pme-body"><div class="pme-err">No pude abrirlo: ' + escapeHtml(E.err) + '</div></div></div>';
+
+  const est = (E.ctx && E.ctx.estado) || {};
+  h += '<div class="pme-body">';
+  if (est.facturado || est.entregado) {
+    h += '<div class="pme-warn">Este pedido ya está ' + (est.entregado ? "entregado" : "facturado") +
+      ': el backend no deja modificarlo. Se puede mirar, nada más.</div>';
+  } else if (p.estado === "armado" || p.estado === "proceso") {
+    h += '<div class="pme-warn">⚠ La tanda ya está ' + (p.estado === "armado" ? "armada" : "en picking") +
+      '. Lo que cambies acá NO vuelve a la góndola solo: avisale a quien lo está armando.</div>';
+  }
+
+  // ── dirección ────────────────────────────────────────────────────────────
+  const dirs = (E.ctx.direcciones || []);
+  const actual = _pmodDirDe(E.dir0);
+  h += '<div class="pme-sec"><div class="pme-h">Dirección de entrega</div><div class="pme-row">' +
+    '<select class="pme-sel" onchange="pmodDirSel(this.value)">';
+  for (const d of dirs) {
+    h += '<option value="' + escapeHtml(d.label) + '"' + (!E.dirNueva && String(E.dirSel) === String(d.label) ? " selected" : "") + '>' +
+      escapeHtml(d.label + (d.barrio ? " · " + d.barrio : (d.localidad ? " · " + d.localidad : ""))) + '</option>';
+  }
+  if (!dirs.length) h += '<option value="">(el cliente no tiene direcciones cargadas)</option>';
+  h += '<option value="__nueva"' + (E.dirNueva ? " selected" : "") + '>➕ Dirección nueva…</option></select>';
+  if (!E.dirNueva && actual && (actual.direccion || actual.localidad)) {
+    h += '<span class="pme-vacio">' + escapeHtml([actual.direccion, actual.localidad, actual.provincia].filter(Boolean).join(" · ")) + '</span>';
+  }
+  h += '</div>';
+  if (E.dirNueva) {
+    const n = E.dirNueva;
+    h += '<div class="pme-row" style="margin-top:9px">' +
+      '<input class="pme-in ancho" placeholder="Nombre con el que la va a ver el cliente (ej: Depósito Lanús)" value="' + escapeHtml(n.label || "") + '" oninput="pmodDirCampo(\'label\', this.value)">' +
+      '<input class="pme-in ancho" placeholder="Dirección (calle y altura)" value="' + escapeHtml(n.direccion || "") + '" oninput="pmodDirCampo(\'direccion\', this.value)">' +
+      '</div><div class="pme-row" style="margin-top:7px">' +
+      '<input class="pme-in" placeholder="Localidad" value="' + escapeHtml(n.localidad || "") + '" oninput="pmodDirCampo(\'localidad\', this.value)">' +
+      '<input class="pme-in" placeholder="Provincia" value="' + escapeHtml(n.provincia || "") + '" oninput="pmodDirCampo(\'provincia\', this.value)">' +
+      '<input class="pme-in" placeholder="Barrio / zona de reparto" value="' + escapeHtml(n.barrio || "") + '" oninput="pmodDirCampo(\'barrio\', this.value)" list="pmodBarrios">' +
+      '<input class="pme-in" placeholder="CP" value="' + escapeHtml(n.cp || "") + '" oninput="pmodDirCampo(\'cp\', this.value)">' +
+      '</div>' +
+      '<div class="pme-nota">La dirección nueva le queda al cliente como una opción más en la página, para los próximos pedidos. ' +
+      'El <b>barrio</b> es el que manda para la zona y para armar la tanda: si no sale ninguno de la lista, escribilo igual que en el resto de las direcciones.</div>' +
+      _pmodBarriosDatalist();
+  }
+  h += '</div>';
+
+  // ── contenido ────────────────────────────────────────────────────────────
+  const sinStock = new Set(((E.ctx.sin_stock) || []).map(_pmodCodNorm));
+  h += '<div class="pme-sec"><div class="pme-h">Contenido del pedido</div><div class="pme-tabw">' +
+    '<table class="pme-tab"><thead><tr><th>Código</th><th>Descripción</th><th class="n">U×B</th>' +
+    '<th class="n">Cajas</th><th class="n">Unidades</th><th class="n">&nbsp;</th></tr></thead><tbody>';
+  E.items.forEach(function (it, i) {
+    const cambiada = !it.fuera && it.cajas !== it.cajas0;
+    h += '<tr class="' + (it.fuera ? "pme-fila-fuera" : (it.nueva ? "pme-nueva" : "")) + '">' +
+      '<td class="cod">' + escapeHtml(it.cod) + (sinStock.has(it.cod) ? ' <span title="Hoy figura sin stock: si entra al pedido, el pedido queda marcado como diferido">🕒</span>' : '') + '</td>' +
+      '<td class="de">' + escapeHtml(it.desc || "—") + '</td>' +
+      '<td class="n">' + (it.uxb || "—") + '</td>' +
+      '<td class="n"><input class="pme-cj' + (cambiada ? " tocado" : "") + '" type="number" min="0" step="1" value="' + it.cajas + '"' +
+        (it.fuera ? " disabled" : "") + ' oninput="pmodCajas(' + i + ', this.value)"></td>' +
+      '<td class="n" id="pmeU' + i + '">' + (it.uxb ? (it.cajas * it.uxb) : "—") + '</td>' +
+      '<td class="n"><button class="pme-x" onclick="pmodQuitar(' + i + ')">' + (it.fuera ? "↩" : "✕") + '</button></td>' +
+      '</tr>';
+  });
+  h += '</tbody></table></div>';
+  h += '<div class="pme-row" style="margin-top:10px">' +
+    '<input class="pme-in" id="pmeNuevoCod" placeholder="Agregar código" list="pmodCat" style="width:170px">' +
+    '<input class="pme-in" id="pmeNuevoCj" type="number" min="1" step="1" placeholder="Cajas" style="width:100px">' +
+    '<button class="pme-add" onclick="pmodAgregar()">➕ Agregar al pedido</button>' +
+    '<span class="pme-vacio">' + (_pmodCat ? (_pmodCat.length + " códigos en el catálogo") : "buscando el catálogo…") + '</span>' +
+    '</div>' + _pmodCatDatalist() + '</div>';
+
+  // ── motivo + log ─────────────────────────────────────────────────────────
+  h += '<div class="pme-sec"><div class="pme-h">Por qué se modifica</div>' +
+    '<input class="pme-in ancho" style="width:100%" placeholder="Ej: el cliente pidió sumar 2 cajas del 544 / cambia la entrega a la sucursal nueva" ' +
+    'value="' + escapeHtml(E.motivo || "") + '" oninput="pmodMotivo(this.value)"></div>';
+  const log = (E.ctx.log || []);
+  h += '<div class="pme-sec"><div class="pme-h">Modificaciones anteriores (' + log.length + ')</div>';
+  if (!log.length) h += '<div class="pme-vacio">Ninguna todavía.</div>';
+  else {
+    h += '<ul class="pme-log">';
+    for (const l of log.slice(0, 12)) h += '<li>' + _pmodLogLinea(l) + '</li>';
+    h += '</ul>';
+  }
+  h += '</div></div>';
+
+  // ── pie ──────────────────────────────────────────────────────────────────
+  const fin = _pmodItemsFinal();
+  const uni = fin.reduce(function (a, it) { return a + (it.uxb ? it.cajas * it.uxb : 0); }, 0);
+  const bloq = est.facturado || est.entregado;
+  h += '<div class="pme-foot">' +
+    '<button class="pme-ok" onclick="pmodGuardar()"' + ((bloq || E.guardando || !_pmodHayCambio()) ? " disabled" : "") + '>' +
+      (E.guardando ? "Guardando…" : "Guardar cambios") + '</button>' +
+    '<button class="pme-cancel" onclick="pmodCerrar()">Cancelar</button>' +
+    '<span class="pme-res"><b>' + fin.length + '</b> renglones · <b>' +
+      fin.reduce(function (a, it) { return a + it.cajas; }, 0) + '</b> cajas · <b>' + uni + '</b> unidades</span>' +
+    '</div></div>';
+  return h;
+}
+function _pmodCatDatalist() {
+  if (!_pmodCat) return '<datalist id="pmodCat"></datalist>';
+  let h = '<datalist id="pmodCat">';
+  for (const c of _pmodCat) h += '<option value="' + escapeHtml(c.cod) + '">' + escapeHtml(c.desc) + '</option>';
+  return h + '</datalist>';
+}
+function _pmodBarriosDatalist() {
+  const vis = new Set();
+  for (const d of ((_pmodEd && _pmodEd.ctx && _pmodEd.ctx.direcciones) || [])) if (d.barrio) vis.add(d.barrio);
+  for (const r of (_pgaRows || [])) if (r.barrio) vis.add(r.barrio);
+  let h = '<datalist id="pmodBarrios">';
+  for (const b of [...vis].sort()) h += '<option value="' + escapeHtml(b) + '">';
+  return h + '</datalist>';
+}
+function _pmodLogLinea(l) {
+  const d = l.hecho_en ? new Date(l.hecho_en) : null;
+  const cuando = d ? (d.getDate() + "/" + String(d.getMonth() + 1).padStart(2, "0") + " " +
+    String(d.getHours()).padStart(2, "0") + ":" + String(d.getMinutes()).padStart(2, "0")) : "—";
+  const det = l.detalle || {};
+  const partes = [];
+  for (const x of (det.cambiados || [])) partes.push(x.cod + ": " + x.de + " → " + x.a + " cajas");
+  for (const x of (det.agregados || [])) partes.push("+ " + x.cod + " (" + x.cajas + ")");
+  for (const x of (det.quitados || [])) partes.push("− " + x.cod);
+  if (det.direccion) partes.push("entrega: " + (det.direccion.de || "—") + " → " + det.direccion.a +
+    (det.direccion.creada ? " (dirección nueva)" : ""));
+  return '<b>' + escapeHtml(cuando) + '</b> · ' + escapeHtml(l.quien || "—") + ' — ' +
+    escapeHtml(partes.join(" · ") || l.tipo) + (l.motivo ? ' <i>(' + escapeHtml(l.motivo) + ')</i>' : '');
+}
+
+/* ── los handlers ───────────────────────────────────────────────────────── */
+function pmodCajas(i, v) {
+  if (!_pmodEd || !_pmodEd.items[i]) return;
+  const n = Math.max(0, Math.floor(Number(v) || 0));
+  _pmodEd.items[i].cajas = n;
+  const it = _pmodEd.items[i];
+  const u = document.getElementById("pmeU" + i); if (u) u.textContent = it.uxb ? (n * it.uxb) : "—";
+  pmodPieRefrescar();
+}
+function pmodQuitar(i) {
+  if (!_pmodEd || !_pmodEd.items[i]) return;
+  const it = _pmodEd.items[i];
+  if (it.nueva && !it.fuera) _pmodEd.items.splice(i, 1);
+  else it.fuera = !it.fuera;
+  pmodPintar();
+}
+function pmodAgregar() {
+  if (!_pmodEd) return;
+  const c = _pmodCodNorm((document.getElementById("pmeNuevoCod") || {}).value || "");
+  const n = Math.floor(Number((document.getElementById("pmeNuevoCj") || {}).value || 0));
+  if (!c) { pppSetStatus("Escribí el código que querés agregar.", false); return; }
+  if (!(n > 0)) { pppSetStatus("¿Cuántas cajas del " + c + "?", false); return; }
+  const cat = (_pmodCat || []).filter(function (x) { return x.cod === c; })[0];
+  if (_pmodCat && !cat) {
+    try { alert("El código " + c + " no está en el catálogo de la página, así que el backend no lo va a aceptar.\n\nRevisá el número."); } catch (_e) {}
+    return;
+  }
+  const ya = _pmodEd.items.filter(function (x) { return x.cod === c; })[0];
+  if (ya) { ya.cajas = (ya.fuera ? 0 : ya.cajas) + n; ya.fuera = false; }
+  else _pmodEd.items.push({ cod: c, desc: (cat && cat.desc) || "", uxb: (cat && cat.uxb) || 0,
+                            cajas: n, cajas0: 0, fuera: false, nueva: true });
+  pmodPintar();
+}
+function pmodMotivo(v) { if (_pmodEd) { _pmodEd.motivo = String(v || ""); pmodPieRefrescar(); } }
+function pmodDirSel(v) {
+  if (!_pmodEd) return;
+  if (v === "__nueva") { _pmodEd.dirNueva = _pmodEd.dirNueva || { label: "", direccion: "", localidad: "", provincia: "", barrio: "", cp: "" }; }
+  else { _pmodEd.dirNueva = null; _pmodEd.dirSel = String(v || ""); }
+  pmodPintar();
+}
+function pmodDirCampo(k, v) { if (_pmodEd && _pmodEd.dirNueva) { _pmodEd.dirNueva[k] = String(v || ""); pmodPieRefrescar(); } }
+/* El pie se repinta solo (sin volver a dibujar la tabla) para no robarle el foco al input. */
+function pmodPieRefrescar() {
+  const o = document.getElementById("pmodOverlay"); if (!o || !_pmodEd) return;
+  const foot = o.querySelector(".pme-foot"); if (!foot) return;
+  const fin = _pmodItemsFinal();
+  const uni = fin.reduce(function (a, it) { return a + (it.uxb ? it.cajas * it.uxb : 0); }, 0);
+  const res = foot.querySelector(".pme-res");
+  if (res) res.innerHTML = '<b>' + fin.length + '</b> renglones · <b>' +
+    fin.reduce(function (a, it) { return a + it.cajas; }, 0) + '</b> cajas · <b>' + uni + '</b> unidades';
+  const est = (_pmodEd.ctx && _pmodEd.ctx.estado) || {};
+  const ok = foot.querySelector(".pme-ok");
+  if (ok) ok.disabled = !!(est.facturado || est.entregado) || !!_pmodEd.guardando || !_pmodHayCambio();
+}
+
+/* ── guardar ────────────────────────────────────────────────────────────── */
+async function pmodGuardar() {
+  if (!_pmodEd || _pmodEd.guardando) return;
+  const E = _pmodEd, p = E.p;
+  const fin = _pmodItemsFinal();
+  if (!fin.length) { try { alert("El pedido no puede quedar sin ningún renglón. Si no va nada, el camino es cancelarlo desde Programación."); } catch (_e) {} return; }
+  const tocaItems = E.items.some(function (it) { return it.nueva || it.fuera || it.cajas !== it.cajas0; });
+  const tocaDir = !!E.dirNueva || String(E.dirSel || "") !== String(E.dir0 || "");
+  if (!tocaItems && !tocaDir) return;
+
+  const resumen = [];
+  for (const it of E.items) {
+    if (it.nueva && !it.fuera) resumen.push("+ " + it.cod + " × " + it.cajas);
+    else if (it.fuera && it.cajas0) resumen.push("− " + it.cod);
+    else if (it.cajas !== it.cajas0) resumen.push(it.cod + ": " + it.cajas0 + " → " + it.cajas);
+  }
+  if (tocaDir) resumen.push("entrega → " + (E.dirNueva ? (E.dirNueva.label || E.dirNueva.direccion) : E.dirSel));
+  if (!confirm("Guardar los cambios del pedido de " + (p.rs || p.cod) + "?\n\n" + resumen.join("\n") +
+               "\n\nQueda anotado en el log con tu nombre. El pedido de la página cambia, y la programación se reacomoda sola.")) return;
+
+  E.guardando = true; pmodPieRefrescar();
+  pppSetStatus("Guardando los cambios del pedido…", true);
+  try {
+    const body = {
+      p_empresa: "lk", p_order_id: Number(p.pedido),
+      p_motivo: E.motivo || null, p_quien: await aprQuien(),
+      p_espera: (E.ctx && E.ctx.items_raw) || null
+    };
+    if (tocaItems) body.p_items = fin.map(function (it) { return { cod_art: it.cod, cajas: it.cajas, uxb: it.uxb }; });
+    if (E.dirNueva) body.p_dir_nueva = E.dirNueva;
+    else if (tocaDir) body.p_sucursal = E.dirSel;
+    const res = await pmodLkRpc("gv_pedido_mod_guardar", body);
+
+    const dirDespues = E.dirNueva ? { barrio: E.dirNueva.barrio, localidad: E.dirNueva.localidad, direccion: E.dirNueva.direccion }
+                                  : _pmodDirDe(E.dirSel);
+    const dirAntes = _pmodDirDe(E.dir0);
+    pmodCerrar();
+    pppSetStatus("✓ Pedido modificado" + ((res && res.detalle && res.detalle.order_items_sync === false)
+      ? " (ojo: el espejo de la página quedó como estaba porque hay un código fuera del catálogo)" : "") +
+      ". Recalculando NP y tanda…", true);
+    _pgaTs = 0;
+    try { await pppLoadProgFromSupabase(); } catch (_e) {}   // dispara ppp_web_resync
+    try { await aprCargar(); } catch (_e) {}
+    pppRenderProg();
+    pppSetStatus("✓ Listo: el pedido de " + (p.rs || p.cod) + " quedó modificado y la programación al día.", true);
+    if (tocaDir) await pmodZonaCambio(p, dirAntes, dirDespues);
+  } catch (e) {
+    const msg = (e && e.message) ? e.message : String(e);
+    if (_pmodEd) { _pmodEd.guardando = false; pmodPieRefrescar(); }
+    pppSetStatus("⚠ No se pudo guardar: " + msg, false);
+    try { alert("No se pudo guardar:\n\n" + msg); } catch (_e) {}
+  }
+}
+
+/* Cambió la dirección: ¿cambió también la ZONA? Si el pedido ya está programado, la tanda se
+   armó por cercanía, así que mandarlo a otra zona la rompe. La zona la resuelve el backend
+   (`gv_ppp_web_zona`), la misma función que usa el armado — no se adivina acá. */
+async function pmodZonaCambio(p, antes, despues) {
+  if (p.donde !== "plan" || !p.nps.length) return;
+  let za = "", zd = "";
+  try {
+    const q = async function (d) {
+      if (!d) return "";
+      const r = await aprRpc("gv_ppp_web_zona", { p_zona_expreso: d.barrio || null,
+        p_localidad: d.localidad || null, p_direccion: d.direccion || null });
+      return String((r && (r.gv_ppp_web_zona || r)) || "");
+    };
+    za = await q(antes); zd = await q(despues);
+  } catch (_e) { return; }
+  if (!zd || za === zd) return;
+  const txt = "La zona de entrega pasó de «" + (za || "sin zona") + "» a «" + zd + "».\n\n" +
+    "La tanda " + (p.tandas.join(" + ") || "") + " se armó por cercanía, así que con la zona nueva ya no cierra.\n\n" +
+    "¿Lo devuelvo a 📥 A Programar para que se arme donde corresponde?";
+  if (!confirm(txt)) {
+    pppSetStatus("La zona cambió a " + zd + " y el pedido quedó en su tanda: revisalo a mano.", false);
+    return;
+  }
+  await pppVencVolver(p.nps[0], { sinConfirm: true });
+  pppRenderProg();
+}
 function _pmodFecha(iso, conDia) {
   const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(iso || "")); if (!m) return String(iso || "");
   const d = new Date(+m[1], +m[2] - 1, +m[3]);

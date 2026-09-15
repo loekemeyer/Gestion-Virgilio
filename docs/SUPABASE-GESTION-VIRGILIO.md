@@ -16650,3 +16650,71 @@ no tenerla.
 
 **Rollback:** `sql/gv_ventas_clientes_500_timeout_v1822.sql`. ⚠ Volver atrás el timeout **sin**
 volver atrás lo de LK deja el 500 de nuevo: el viaje HTTP solo se come ~2 s de los 3 s.
+## §3.gq — v18.23: «Modificar Pedidos» escribe en LK, y dos permisos rotos de `GV_Web_Cancelados` — 2026-09-15
+
+**Qué se agregó (proyecto LK `kwkclwhmoygunqmlegrg`, NO Virgilio):** `sql/gv_pedido_mod_v1823.sql`.
+
+| Objeto | Qué es |
+|---|---|
+| `public."GV_Pedido_Mod_Log"` | el log. RLS prendida, `insert/update/delete` revocados a `anon`/`authenticated`, policy de SELECT sólo para el que esté en `admins`. Lo escribe la función, en la misma transacción que el cambio |
+| `gv_pedido_mod_cod(text)` | normaliza un código igual que `v_pedidos_web`: `44` → `044`, `438el` → `438EL` |
+| `gv_pedido_mod_ctx(empresa, order_id)` | lo que necesita el modal: renglones con descripción y u×b, la libreta de direcciones del cliente, el estado del pedido del lado de Gestión (por FDW), los códigos sin stock y el log |
+| `gv_pedido_mod_guardar(empresa, order_id, items, sucursal, dir_nueva, motivo, quien, espera)` | el cambio. `SECURITY DEFINER`, sólo `authenticated` y sólo si está en `admins` |
+
+**Por qué en LK.** La fuente de verdad del contenido y de la dirección de un pedido web es
+`orders.sheets_payload` de la página: de ahí salen el Excel de ISIS, el corte en NP, el m³ y el
+picking. Medido el 15/09: **Virgilio no tiene ninguna foreign table** (0 filas en
+`pg_foreign_table`), así que no puede escribir en LK; LK sí tiene FDW a Chef y a Virgilio.
+
+**Qué valida `gv_pedido_mod_guardar`, en orden:** que el que llama esté en `admins`; que la empresa
+sea `lk`; que el pedido exista y tenga ficha; que **no** esté facturado ni entregado (la misma
+guarda que usa `edit_order_fast` para dejar editar desde la página); que la ficha no haya cambiado
+mientras el modal estaba abierto (`p_espera`); que cada código exista en `products`/`loke_products`,
+con cajas enteras > 0 y u×b > 0; y que no haya un código repetido. Después escribe
+`sheets_payload`, rearma `order_items` **sólo si todos los códigos resuelven** (si no, deja el
+espejo como estaba y lo anota en el log: `order_items_sync:false`), y guarda el log.
+
+**Chef queda afuera y no es un olvido:** el UPDATE de prueba contra la foreign table `chef_orders`,
+en transacción abortada, devolvió `ERROR 42501: permission denied for table orders` — el usuario
+remoto del server `chef_db` no tiene UPDATE. Hace falta una RPC del lado de Chef.
+
+**Las NP y la tanda no se tocan acá:** las recalcula `ppp_web_resync` (§ existente), que ya corría
+en cada carga de la PPP porque un pedido web siempre se pudo editar desde la página.
+
+**Prueba (15/09, transacción abortada, pedido 1445):** se cambió un renglón de 1 → 7 cajas, se sacó
+el último, se agregó el `025` y se creó la dirección «PRUEBA Claude 15/09». Resultado: ficha con 25
+renglones, `sucursal_entrega` apuntando a la dirección nueva (slot 2), 1 fila de log, `order_items`
+rearmado (25) y el detalle `{"quitados":[992E], "agregados":[025×3], "cambiados":[027: 1→7],
+"direccion":{...,"creada":true}, "order_items_sync":true}`. Después del rollback: log 0 filas,
+dirección 0, `sucursal_entrega` y los 25 ítems originales intactos.
+
+**Rollback:** `drop function public.gv_pedido_mod_guardar(text,bigint,jsonb,text,jsonb,text,text,jsonb);`
+`drop function public.gv_pedido_mod_ctx(text,bigint);` `drop function public.gv_pedido_mod_cod(text);`
+y, si se quiere borrar el historial, `drop table public."GV_Pedido_Mod_Log";` (mejor conservarlo).
+
+### Y los dos permisos rotos de `public."GV_Web_Cancelados"` (Virgilio) — `sql/gv_web_cancelados_rls_v1823.sql`
+
+La tabla estaba con **RLS prendida y cero policies**, que no es deny-all "seguro": es deny-all
+**silencioso** para los que la necesitan.
+
+1. **La app no veía las anulaciones.** `gv_ppp_web_estado`, `gv_ppp_en_salida` y
+   `gv_fac_armado_sin_facturar` son `security_invoker`: con `anon`/`authenticated` leían 0
+   cancelados. Medido con la NP **LK 0052** (order_id 1375): `gv_ppp_web_estado.estado` daba
+   `desarmado` como `postgres` y `sin_programar` como `authenticated`. Las funciones
+   `SECURITY DEFINER` que la leen (`gv_pedido_anular`, `gv_ppp_np_cancelar`, `gv_ppp_np_desarmar`,
+   `gv_pedidos_web_excluidos`) sí la veían: por eso el efecto se veía a medias.
+2. **LK no podía leer `gv_pedido_web_estado_pagina` por FDW**: el rol `lk_ppp_reader` tenía el grant
+   de la vista pero no el de la tabla nueva → `ERROR 42501: permission denied for table
+   GV_Web_Cancelados`. Eso rompía **`edit_order_fast`**, la RPC con la que un CLIENTE edita su
+   pedido desde la página.
+
+Arreglo (aditivo, ninguna fila tocada): policy de SELECT `using (true)` para
+`anon, authenticated, lk_ppp_reader, ch_ppp_reader` + `grant select` a los dos roles del FDW.
+**Rollback:** `drop policy gv_web_cancelados_lee on public."GV_Web_Cancelados";` y
+`revoke select on public."GV_Web_Cancelados" from lk_ppp_reader, ch_ppp_reader;`.
+
+⚠ **Hay 8 tablas más en el mismo pozo** (RLS sin policies, detrás de vistas `security_invoker` que
+lee la app): `GV_Imp_Carga_Pedido`, `GV_Imp_NTL_Mov`, `GV_Imp_Pagos`, `GV_Imp_Pedido_CC`,
+`GV_Imp_Prov_Mov`, `GV_Importados_Baches`, `Insumos_Ubicaciones_Unificadas` y
+`Ubicaciones_Articulos`. **No se tocaron**: hay que confirmar módulo por módulo si leen por vista
+(roto) o por RPC `SECURITY DEFINER` (anda). La consulta que las lista está al pie del archivo SQL.
