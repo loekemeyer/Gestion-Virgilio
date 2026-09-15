@@ -5586,7 +5586,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=18.52"></script>
+<script type="module" src="recepcion.js?v=18.53"></script>
 <!-- Config del módulo de fichada (compartido con fichada.html). El secret
      hmacSecret tiene que ser el mismo acá y allá; cargándolo desde un solo
      archivo evitamos que se desincronicen. -->
@@ -9150,7 +9150,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v18.52";
+const APP_VERSION = "v18.53";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -10762,9 +10762,30 @@ function pkSave() {
     localStorage.setItem(PK_SAVE_PREFIX + _pk.legajo, JSON.stringify({
       day: getTodayKey(), tanda: _pk.tanda, legajo: _pk.legajo,
       items: _pk.items, idx: _pk.idx, results: _pk.results, mode: _pk.mode,
-      forced: _pk.forced || {}
+      forced: _pk.forced || {},
+      app: (typeof APP_VERSION !== "undefined" ? APP_VERSION : "")   // v18.53 — con qué versión se armó esta lista
     }));
   } catch (_e) { /* localStorage lleno / privado: no rompe el picking */ }
+}
+/* v18.53 — ⚠ el guardado del picking puede tener una lista INCOMPLETA.
+   Hasta la v18.43 la base de picking se pedía con `limit=20000` y PostgREST la cortaba en 1000
+   filas, así que a una tanda le podían faltar renglones. El fix arregló la consulta, pero NO lo
+   ya guardado: `showPickingList` reabre el snapshot local SIN tocar la red (es offline-first a
+   propósito), así que una tanda abierta antes del fix sigue mostrando la lista corta aunque el
+   celular ya tenga la versión nueva. Eso es lo que se vio el 15/09 después del deploy.
+   Un snapshot de versión anterior al fix se descarta: la lista se vuelve a bajar entera y el
+   avance se reconstruye desde los PKC que YA están en el servidor (pkFetchServerMarks), así que
+   no se pierde nada de lo marcado. */
+const PK_FIX_BASE_COMPLETA = [18, 43];
+function _pkVerNum(v) {
+  const m = String(v || "").match(/(\d+)\.(\d+)/);
+  return m ? [parseInt(m[1], 10), parseInt(m[2], 10)] : null;
+}
+function pkSnapshotDesactualizado(s) {
+  const v = _pkVerNum(s && s.app);
+  if (!v) return true;                                   // sin sello = anterior al fix
+  if (v[0] !== PK_FIX_BASE_COMPLETA[0]) return v[0] < PK_FIX_BASE_COMPLETA[0];
+  return v[1] < PK_FIX_BASE_COMPLETA[1];
 }
 function pkLoadSaved(legajo) {
   try {
@@ -10797,6 +10818,13 @@ function pkClearSaved(legajo) {
 function pkResume(legajo) {
   const saved = pkLoadSaved(legajo);
   if (!saved) return;
+  // v18.53 — lista guardada con una versión anterior al fix de la base: puede estar recortada.
+  // Se re-baja entera del servidor y el avance se reconstruye desde los PKC ya emitidos.
+  if (pkSnapshotDesactualizado(saved)) {
+    try { alert("Actualizo la lista de la tanda " + saved.tanda + " — la versión anterior de la app podía mostrarla incompleta.\n\nLo que ya marcaste se conserva."); } catch (_e) {}
+    try { showPickingList(saved.tanda, saved.legajo, { seedFromServer: true }); } catch (_e) {}
+    return;
+  }
   const m = document.getElementById("tandaModal");
   if (!m) return;
   m.querySelector(".tanda-modal-title").textContent = "Picking — Tanda " + saved.tanda;
@@ -10895,7 +10923,10 @@ async function showPickingList(tanda, legajo, opts) {
     try {
       const _lg = String(legajo || (typeof legajoInput !== "undefined" && legajoInput.value) || "").trim();
       const _snap = pkLoadSaved(_lg);
-      if (_snap && _snap.tanda === tNorm && _snap.items && _snap.items.length) { pkResume(_lg); return; }
+      // v18.53: el guardado de una versión anterior al fix de la base puede tener la lista
+      // recortada → NO se reabre de memoria, se sigue por la carga de red de abajo (que baja
+      // la lista completa; el avance se recupera con las marcas del servidor).
+      if (_snap && _snap.tanda === tNorm && _snap.items && _snap.items.length && !pkSnapshotDesactualizado(_snap)) { pkResume(_lg); return; }
     } catch (_e) { /* si algo falla, sigue por la carga normal de red */ }
   }
   m.querySelector(".tanda-modal-title").textContent = "Picking — Tanda " + tNorm;

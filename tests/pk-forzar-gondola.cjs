@@ -34,7 +34,10 @@ catch (_e) {
         { art: "321", key: "321", esp: 2, sector: "A02" },
         { art: "505", key: "505·EXC", esp: 5, sector: "P5", excUbic: "P5", isExc: true, exc: 5 }
       ],
-      idx: 0, results: {}, mode: "item", forced: {} };
+      idx: 0, results: {}, mode: "item", forced: {},
+      // v18.53: el guardado lleva el sello de versión. Sin él se considera anterior al fix de
+      // la base de picking y se re-baja del servidor en vez de reabrirse de memoria.
+      app: APP_VERSION };
     localStorage.setItem("vir_pk_" + leg, JSON.stringify(snap));
 
     pkResume(leg);
