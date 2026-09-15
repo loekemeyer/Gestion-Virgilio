@@ -16495,3 +16495,36 @@ nadie las refresca. Si molestan, se dropean aparte.
 MCP se corta el cliente. Va por `cron.schedule` con un minuto fijo, y **no se hace `unschedule`
 mientras corre**: eso cancela la corrida (`job canceled`). Dos jobs del mismo sync al mismo tiempo
 se pisan: `could not serialize access due to concurrent delete`.
+
+---
+
+## §3.go — v18.18: se prendió el cron 50 `ocs-auto-miercoles` — 2026-09-15
+
+Thomas dijo **"dale"**. El cron **50** (`generar_ocs_automaticas()`, miércoles 10:00 ART) pasó a
+`active = true` y el **51** (`ocs-auto-sim`, que sólo avisaba cuántas líneas generaría y no
+escribía) quedó en `active = false`. Estaba apagado desde el **04/08**, esperando un go-live que
+nunca se confirmó; las OC las venía generando alguien a mano cada miércoles con **⚙ Generar OCs**
+(las 604 líneas tenían `notas` nulo).
+
+**Por qué recién ahora:** el motivo para no prenderlo era que generaba sobre datos que
+subcontaban — el uni×caja de los códigos NNNL caía en 1 (§3.gl). Eso se arregló el mismo día y la
+proyección ya bajó corregida. Medido antes de prenderlo: generaría **95 líneas · 14 proveedores ·
+3.586 cajas**.
+
+**El orden del miércoles queda así:** 09:20 el cron 25 de LK baja la proyección → 10:00 el cron 50
+genera las OC y avisa por Telegram → 11:00 el cron 11 manda la alerta de OC pendientes.
+
+⚠ **No apretar ⚙ Generar OCs los miércoles.** La función tiene guarda: si ya hay líneas con la
+fecha de hoy en `Ordenes_Compra`, **no genera nada** y manda un Telegram diciendo cuántas había (a
+mano vs. automáticas). O sea que si alguien las carga a mano antes de las 10:00, el cron se
+abstiene — pero si las carga **después**, duplica lo que el cron ya generó. Las automáticas se
+reconocen por `notas = 'auto YYYY-MM-DD'`.
+
+**Rollback:**
+
+```sql
+select cron.alter_job(50, active := false);
+select cron.alter_job(51, active := true);
+-- y si ya generó de más ese día:
+delete from public."Ordenes_Compra" where fecha = '<YYYY-MM-DD>' and notas like 'auto%';
+```

@@ -12,7 +12,7 @@
 > | §1b El uni×caja que subcontaba en el generador de OC | **Hecho, v18.16** — `sql/fn_proyeccion_oc_virgilio_uxb_base_L_v1816.sql`. +1.464,45 cj/mes en 123 códigos. |
 > | §2 La proyección en dos tablas | **Hecho, v18.17** — `sql/gv_proyeccion_una_sola_tabla_v1817.sql`. Se borró `GV_Proyeccion_Emp`; queda una tabla, un motor y un cron. |
 > | §3 La RPC de ventas por cliente | **Hecho, v18.16** — las dos funciones aplicadas; el desglose del pop-up se encendió solo. |
-> | §4 El cron 50 `ocs-auto-miercoles` | **Sigue apagado, a propósito: lo decide Thomas.** Ver abajo. |
+> | §4 El cron 50 `ocs-auto-miercoles` | **PRENDIDO el 15/09** (Thomas: *"dale"*). El 51 `ocs-auto-sim` quedó apagado. §3.go. |
 > | Problemas 218 y 222 | **Cerrados** con su commit. |
 > | Tareas Planify 3405 y 3409 | **Cerradas.** La 3412 (proyección en una tabla) se abrió y se cerró el mismo día. |
 >
@@ -20,12 +20,12 @@
 > `abierto`: *"Lo que entra de más que una OC no queda registrado en ningún lado"* y
 > *"104 de 354 filas de OC_Maximos no tienen proveedor: nunca van a tener OC"*.
 >
-> **La decisión que queda.** El cron **50 `ocs-auto-miercoles`** (miércoles 10:00) está en
-> `active=false` desde el 04/08; lo que corre es `ocs-auto-sim` (51), que avisa y no escribe.
-> El motivo para no prenderlo —que generaba sobre datos que subcontaban— **ya no existe**: el
-> uni×caja está arreglado y la proyección bajada. Medido hoy, prenderlo generaría **95 líneas,
-> 14 proveedores, 3.586 cajas**. No se prende solo porque genera OC de verdad y eso es plata:
-> `select cron.alter_job(50, active := true);` y apagar el 51. **Lo aprieta Thomas.**
+> **La decisión que quedaba, ya tomada.** El cron **50 `ocs-auto-miercoles`** (miércoles 10:00)
+> estaba en `active=false` desde el 04/08 porque generaba sobre datos que subcontaban. Arreglado
+> el uni×caja, Thomas dijo **"dale"**: quedó **prendido**, y el 51 `ocs-auto-sim` apagado. Antes
+> de prenderlo se midió que generaría **95 líneas, 14 proveedores, 3.586 cajas**.
+> ⚠ **No apretar ⚙ Generar OCs los miércoles**: si las OC del día se cargan a mano *después* de
+> las 10:00 se duplican con las que ya generó el cron. Ver §3.go.
 >
 > Detalle de las mediciones y los rollbacks: `docs/SUPABASE-GESTION-VIRGILIO.md` §3.gl, §3.gm
 > y §3.gn, y `docs/ROLLBACK-PRODUCCION.md`.
