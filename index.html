@@ -5493,7 +5493,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=18.25"></script>
+<script type="module" src="recepcion.js?v=18.26"></script>
 <!-- Config del módulo de fichada (compartido con fichada.html). El secret
      hmacSecret tiene que ser el mismo acá y allá; cargándolo desde un solo
      archivo evitamos que se desincronicen. -->
@@ -8941,7 +8941,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v18.25";
+const APP_VERSION = "v18.26";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -17349,6 +17349,24 @@ var STK_POP_CSS =
   ".proyv-kpi.curso span{color:#d97706;}" +
   ".proyv-kpi.curso small{color:#d97706;}" +
   ".proyv-kpi small{display:block;margin-top:2px;font-size:11px;font-weight:700;color:#a78bfa;text-transform:none;letter-spacing:0;}" +
+  // v18.26 \xe2\x80\x94 la tabla de meses vuelve. El due\xc3\xb1o mando sacar LAS BARRAS ("sac\xc3\xa1 la barra
+  // lateral"), y en la v18.21 se saco el bloque entero, numeros incluidos: *"sacaste los
+  // numeros, que es lo que mas me importa"*. Asi que quedan los numeros, sin barra, y grandes.
+  ".proyv-tab{width:100%;border-collapse:collapse;margin-top:2px;}" +
+  ".proyv-tab th{font-size:11.5px;font-weight:800;color:#94a3b8;text-transform:uppercase;letter-spacing:.04em;text-align:right;padding:0 0 5px;}" +
+  ".proyv-tab th:first-child{text-align:left;}" +
+  ".proyv-tab td{padding:6px 0;border-top:1px solid #eef2f7;font-variant-numeric:tabular-nums;text-align:right;}" +
+  ".proyv-tab td:first-child{text-align:left;font-size:15px;font-weight:800;color:#475569;text-transform:capitalize;}" +
+  ".proyv-tab td.v{font-size:21px;font-weight:900;color:#4c1d95;}" +
+  ".proyv-tab td.v.bajo{color:#b91c1c;}" +
+  ".proyv-tab td.e{font-size:21px;font-weight:900;color:#047857;}" +
+  ".proyv-tab td.e.sd{font-size:14px;font-weight:700;color:#cbd5e1;}" +
+  ".proyv-tab tr.curso td:first-child{color:#b45309;}" +
+  ".proyv-tab tr.curso td.v{color:#b45309;}" +
+  ".proyv-tab tr.on td{background:#f5f3ff;}" +
+  ".proyv-lnk{background:none;border:0;padding:0;margin:0;font:inherit;color:inherit;cursor:pointer;" +
+    "text-decoration:underline;text-decoration-style:dotted;text-underline-offset:3px;}" +
+  ".proyv-lnk:hover{text-decoration-style:solid;}" +
   ".proyv-svg{display:block;width:100%;height:auto;}" +
   ".proyv-svg .hit{fill:transparent;cursor:pointer;}" +
   ".proyv-svg .hit:hover{fill:#6d28d9;fill-opacity:.07;}" +
@@ -17705,6 +17723,45 @@ function _stkProyDetHtml(mes) {
          '<div><h4 style="font-size:14px;color:#047857;">🚚 Entregado' + (e && e.cub ? ' · ' + fc(e.cajas) + ' cajas' : '') + '</h4>' + t + '</div>' +
          '</div></div>';
 }
+/* v18.26 — Los meses, con sus números. Esto es lo que el dueño quiere ver: cuánto se facturó
+   y cuánto entregó el proveedor, mes a mes. Lo que mandó sacar en la v18.21 fueron LAS BARRAS
+   ("sacá la barra lateral"), y se fue el bloque entero de arriba; al verlo: *"sacaste los
+   números, que es lo que más me importa"*. Así que vuelven, sin barra y más grandes.
+   Los números siguen siendo el botón que abre el desglose del mes, igual que el gráfico. */
+function _stkProyMesesHtml() {
+  var S = _stkProy; if (!S || !S.rows || !S.rows.length) return "";
+  var fc = _stkProyFc, esc = escapeHtml;
+  // se listan los meses de la VENTANA (los cerrados que usa el motor) + el mes en curso, que
+  // va marcado: no se compara con los otros, pero verlo es justamente lo que se pidió.
+  var lista = S.win.slice();
+  if (S.parcial) lista = lista.concat([S.parcial]);
+  var h = '<div class="stkpop-grp"><div style="font-size:15px;font-weight:900;color:#334155;margin-bottom:6px;">🧾 ' +
+          (S.hayEnt ? 'Facturado y entregado' : 'Cajas facturadas') + ' — mes a mes</div>' +
+          '<table class="proyv-tab"><tr><th>mes</th><th>factur.</th>' + (S.hayEnt ? '<th>entreg.</th>' : '') + '</tr>';
+  lista.forEach(function (x) {
+    var curso = S.parcial && x.mes === S.parcial.mes;
+    var bajo = !curso && S.proyN > 0.05 && x.cajas < S.proyN;
+    var e = S.ent[x.mes];
+    h += '<tr class="' + (curso ? 'curso ' : '') + (S.abierto === x.mes ? 'on' : '') + '">' +
+         '<td>' + esc(_stkFmtMes(x.mes)) + (curso ? ' *' : '') + '</td>' +
+         '<td class="v' + (bajo ? ' bajo' : '') + '"><button type="button" class="proyv-lnk"' +
+           ' onclick="stkProyMes(&quot;' + x.mes + '&quot;)"' +
+           ' title="Ver a qué clientes se les facturó y cuándo se entregó">' + fc(x.cajas) + '</button></td>' +
+         (S.hayEnt ? (e && e.cub
+            ? '<td class="e"><button type="button" class="proyv-lnk" onclick="stkProyMes(&quot;' + x.mes + '&quot;)"' +
+              ' title="Ver el detalle del mes">' + fc(e.cajas) + '</button></td>'
+            : '<td class="e sd" title="Ese mes las entregas todavía no se registraban en la app — no es un cero">s/d</td>') : '') +
+         '</tr>';
+  });
+  h += '</table>';
+  if (S.parcial) {
+    var mp = _stkProyMesParcial(S.parcial.cajas);
+    h += '<div style="margin-top:6px;font-size:12.5px;font-weight:700;color:#b45309;">* ' +
+         esc(_stkFmtMes(S.parcial.mes)) + ' está en curso: van ' + mp.dias + ' de ' + mp.total +
+         ' días hábiles. A este ritmo termina en <b>' + fc(Math.round(mp.proy)) + '</b> cajas, y por eso no entra en el promedio.</div>';
+  }
+  return h + '</div>';
+}
 /* Los números del pop-up, en fichas grandes, + el gráfico + el mes abierto. Se dibuja entero
    desde `_stkProy` para poder repintarse solo al abrir o cerrar un mes.
    v18.21 — acá vivía el bloque de barras por mes. El dueño lo mandó a sacar ("con el gráfico
@@ -17731,6 +17788,7 @@ function _stkProyChartHtml() {
   if (S.hayEnt) h += '<div class="proyv-kpi ent"><b>' + fc(S.totEnt) + '</b><span>entregado ' + S.win.length + 'm</span></div>';
   if (S.proyN > 0.05) h += '<div class="proyv-kpi"><b>' + S.arriba + '/' + S.win.length + '</b><span>meses arriba</span></div>';
   h += '</div></div>';
+  h += _stkProyMesesHtml();
   h += _stkProyTrendSvg(S.rows, S.proyN, S.prom);
   if (S.abierto) h += _stkProyDetHtml(S.abierto);
   return h;

@@ -16830,3 +16830,29 @@ en la descripción, para que buscar por nombre no se rompa.
 **Test:** `tests/stk-buscar-cero-adelante.cjs`, ampliado con las filas vecinas (031E, 231, 311,
 931E). Comprobado que **falla con el código de la v18.20** (`sinVecinos: false`, `busca31E: false`)
 y pasa con este.
+
+---
+
+## §3.gw — v18.26: vuelven los números mes a mes del pop-up de Proyección — 2026-09-15
+
+Thomas, viendo la v18.25: ***"No. Volvé a como estaba antes. Sacaste los números, que es lo que
+más me importa."***
+
+**Qué se había entendido mal.** En la v18.21 el pedido fue *"sacá la barra lateral, con el gráfico
+ya alcanza"* — y se sacó **el bloque entero**: las barras **y los números de cada mes**. Lo que
+sobraba eran las barras; los números eran el dato. Se fueron por arrastre.
+
+**Cómo queda.** Vuelve la tabla, **sin barras**: `mes · factur. · entreg.`, con los números a
+**21 px** (antes 12,5) y los meses a 15. Se listan los 6 meses de la ventana **más el mes en
+curso**, que va marcado con `*` y con su renglón explicando por qué no entra en el promedio.
+Los números **siguen siendo el botón** que abre el desglose del mes, igual que el gráfico — así
+que ninguna de las dos formas de llegar al detalle se perdió. El rojo del mes por debajo de la
+proyección se mantiene, y `s/d` sigue distinguiéndose de un cero.
+
+Orden del pop-up: **fichas grandes → los meses con sus números → el gráfico → el detalle del mes
+abierto**. Las fichas (proyección, promedio, facturado, entregado, meses arriba, mes en curso) y
+el gráfico de la v18.21/v18.24 se conservan: no se volvió atrás, se repuso lo que faltaba.
+
+**Test:** `tests/proy-entregadas.cjs` verifica ahora las dos cosas a la vez — que **no** haya
+`.proyv-row` / `.proyv-track` (las barras) y que **sí** haya 7 filas de meses (6 + el mes en
+curso, marcado) con sus números clickeables.

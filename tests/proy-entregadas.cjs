@@ -16,6 +16,12 @@
    y asterisco. La serie del test se arma RELATIVA a hoy, para que el test no dependa de en
    qué mes se corra.
 
+   v18.26 — vuelven los NÚMEROS mes a mes. Lo que el dueño mandó sacar en la v18.21 eran las
+   BARRAS; se fue el bloque entero y con él los números, y al verlo: *"sacaste los números,
+   que es lo que más me importa"*. Ahora hay una tabla sin barras, con lo facturado y lo
+   entregado de cada mes de la ventana + el mes en curso marcado, y los números siguen siendo
+   el botón que abre el desglose.
+
    ⚠ Este test estuvo en ROJO en main desde la v18.11 sin que nadie lo notara: esa versión
    cambió el orden de las columnas (pedido del dueño) y nadie lo actualizó. Se reescribió el
    15/09 contra lo que la pantalla hace hoy.
@@ -23,7 +29,8 @@
    Chequea, con fetch stubbeado (sin red):
    1) que pida gv_entregas_mensuales_cod con el código base,
    2) que el entregado esté en su ficha y sume SÓLO los meses cubiertos,
-   3) que no queden rastros del bloque de barras (.proyv-row / .proyv-track),
+   3) que no queden rastros de las BARRAS (.proyv-row / .proyv-track) pero sí los números:
+      una fila por mes de la ventana + el mes en curso, con factur. y entreg.,
    4) que el gráfico tenga una franja clicable por mes y que tocarla abra el desglose,
    5) que si la RPC de entregas no devuelve nada, la ficha de entregado NO aparezca,
    6) que el mes en curso NO entre en el promedio, el total ni "meses arriba", tenga su ficha
@@ -100,6 +107,11 @@ catch (_e) {
     out.sinBarras = !body.querySelector(".proyv-row") && !body.querySelector(".proyv-track") && !body.querySelector(".proyv-foot");
     // el gráfico: una franja clicable por mes (12)
     out.hits = body.querySelectorAll(".proyv-svg .hit").length;
+    // v18.26 — la tabla de meses: 6 de la ventana + el mes en curso, con sus dos numeros
+    const filasTab = Array.prototype.slice.call(body.querySelectorAll(".proyv-tab tr")).slice(1);
+    out.filasMes = filasTab.length;
+    out.mesCursoMarcado = filasTab.length ? /\*/.test(filasTab[filasTab.length - 1].textContent) : false;
+    out.numerosAbren = body.querySelectorAll(".proyv-tab .proyv-lnk").length >= 12;
     // el mes en curso: asterisco en el eje y punto hueco ambar
     const svgTxt = body.querySelector(".proyv-svg").textContent;
     out.asterisco = svgTxt.indexOf("*") >= 0;
@@ -129,7 +141,7 @@ catch (_e) {
   const pass =
     r.pidioEntregas && r.fichaEntregado && r.fichaProy && r.fichaFacturado && r.fichaArriba &&
     r.fichaCurso && r.cursoFueraDelProm && r.asterisco && r.puntoHueco &&
-    r.sinBarras && r.hits === 12 &&
+    r.sinBarras && r.hits === 12 && r.filasMes === 7 && r.mesCursoMarcado && r.numerosAbren &&
     r.abrioDet && r.detTieneCliente && r.detTieneRemito && r.detMarcado && r.cierraDet &&
     r.sinFichaEnt &&
     errs.length === 0;
