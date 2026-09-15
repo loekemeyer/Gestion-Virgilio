@@ -22,6 +22,11 @@
    entregado de cada mes de la ventana + el mes en curso marcado, y los números siguen siendo
    el botón que abre el desglose.
 
+   v18.34 — Luis mandó sacar cinco de las seis fichas ("saca lo de promedio, el ritmo, el
+   facturado, el entregado, el meses arriba"): queda SOLO la de proyección. El test pasó a
+   cuidar que no vuelvan, y lo de "sin entregas registradas" se chequea donde ahora se ve —
+   la columna «entrega» de la tabla, que era la ficha «entregado 6m».
+
    v18.27 — el orden que pidió el dueño: la tabla PRIMERO ("cuánto entró quiero ver primero"),
    titulada «Estad. Madre», con columnas mes / vtas / entrega, y el gráfico al final ("abajo
    de eso, el gráfico, que ni uso tiene").
@@ -99,14 +104,15 @@ catch (_e) {
       }).join("|");
     };
     const k = kpiTxt();
-    // la ventana son los indices 5..10 (350+360+370+380+390+400 = 2250); el 11 es el mes en curso
-    out.fichaEntregado = /entregado 6m=2500/.test(k);      // los cubiertos DE LA VENTANA: i 6..10 = 5 × 500
+    // v18.34 — queda UNA sola ficha: la proyeccion. Luis mando sacar promedio, ritmo,
+    // facturado, entregado y meses arriba. Lo que el test cuida ahora es que NO vuelvan.
     out.fichaProy = /proy\. caj\/mes=367\.2/.test(k);
-    out.fichaFacturado = /facturado 6m=2250/.test(k);
-    out.fichaArriba = /meses arriba=4\/6/.test(k);         // 370,380,390,400 > 367,2
-    const kCurso = body.querySelector(".proyv-kpi.curso");
-    out.fichaCurso = !!kCurso && /a este ritmo/.test(kCurso.textContent) && /d\u00edas h\u00e1biles/.test(kCurso.textContent);
-    out.cursoFueraDelProm = !/promedio 6m=410/.test(k);
+    out.unaSolaFicha = body.querySelectorAll(".proyv-kpi").length === 1;
+    out.sinPromedio = k.indexOf("promedio") < 0;
+    out.sinRitmo = !body.querySelector(".proyv-kpi.curso") && k.indexOf("a este ritmo") < 0;
+    out.sinFacturado = k.indexOf("facturado") < 0;
+    out.sinEntregado = k.indexOf("entregado") < 0;
+    out.sinArriba = k.indexOf("meses arriba") < 0;
     // el bloque de barras ya no existe
     out.sinBarras = !body.querySelector(".proyv-row") && !body.querySelector(".proyv-track") && !body.querySelector(".proyv-foot");
     // el gráfico: una franja clicable por mes (12)
@@ -140,21 +146,23 @@ catch (_e) {
     await stkProyMes(meses[9]);
     out.cierraDet = !document.getElementById("stkPopBody").querySelector(".proyv-det");
 
-    // sin entregas registradas → la ficha de entregado no aparece
+    // sin entregas registradas → la columna "entrega" de la tabla no aparece
     conEntregas = false;
     await stkShowProyVentas(encodeURIComponent("999"), 100);
     body = document.getElementById("stkPopBody");
-    out.sinFichaEnt = kpiTxt().indexOf("entregado") < 0;
+    out.sinColEnt = Array.prototype.map.call(body.querySelectorAll(".proyv-tab th"), function (t) {
+      return t.textContent.trim();
+    }).join("|") === "mes|vtas";
     return out;
   });
 
   const pass =
-    r.pidioEntregas && r.fichaEntregado && r.fichaProy && r.fichaFacturado && r.fichaArriba &&
-    r.fichaCurso && r.cursoFueraDelProm && r.asterisco && r.puntoHueco &&
+    r.pidioEntregas && r.fichaProy && r.unaSolaFicha && r.sinPromedio && r.sinRitmo &&
+    r.sinFacturado && r.sinEntregado && r.sinArriba && r.asterisco && r.puntoHueco &&
     r.sinBarras && r.hits === 12 && r.filasMes === 7 && r.mesCursoMarcado && r.numerosAbren &&
     r.tablaAntesDelGrafico && r.tituloEstadMadre && r.columnas === "mes|vtas|entrega" &&
     r.abrioDet && r.detTieneCliente && r.detTieneRemito && r.detMarcado && r.cierraDet &&
-    r.sinFichaEnt &&
+    r.sinColEnt &&
     errs.length === 0;
   const { urls, ...vis } = r;
   console.log("proy-entregadas:", JSON.stringify(vis), "· pageerrors:", errs.length ? errs.join("|") : "none", "·", pass ? "✓ OK" : "✗ FAIL");

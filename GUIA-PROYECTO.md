@@ -1,3 +1,21 @@
+## Nota v18.34 (2026-09-15) — Proyección: queda una sola ficha
+
+Luis, mirando el pop-up: *"Saca lo de promedio, el ritmo, el facturado, el entregado, el meses
+arriba"*. Se fueron las cinco fichas; queda **PROY. CAJ/MES** (o `UN/MES`, según el switch).
+
+Lo que sigue estando, porque no es una ficha: la tabla mes a mes con sus dos columnas, la nota del
+mes en curso al pie de la tabla (explica el `*` de «Sep 26 *»), y el gráfico con sus líneas `proy` y
+`prom`. **Los números no se dejaron de calcular** — `prom` es la línea gris del gráfico, y `tot`,
+`totEnt` y `arriba` siguen en `_stkProy`: si mañana se quiere volver alguna, es una línea.
+
+Y como el bloque de la derecha pasó de seis fichas a una, el pop-up se acomodó: la tarjeta bajó de
+1060 a **880 px**, la columna de la ficha se ajusta a su contenido (`minmax(190px,auto)`) y la tabla
+tiene tope de 540 px para no estirarse sola por el ancho que quedó libre. Medido a 1280×860:
+**762 px de contenido, sin scroll**.
+
+`tests/proy-entregadas.cjs` cuida ahora que las cinco fichas **no vuelvan**, y lo de «sin entregas
+registradas» se chequea donde hoy se ve: la columna «entrega» de la tabla (antes era la ficha
+«entregado 6m»).
 ## Nota v18.33 (2026-09-15) — Proyección: switch cajas ⇄ unidades
 
 Pedido de Luis: *"Poné dentro un switch para poder ver todo en cajas o unidades"*. Arriba del
