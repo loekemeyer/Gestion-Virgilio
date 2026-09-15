@@ -928,13 +928,24 @@ button {
 .cuar-log-chip.on.c-retenido{ background:#b45309; border-color:#b45309; }
 .cuar-log-chip.on.c-aprobado{ background:#166534; border-color:#166534; }
 .cuar-log-chip.on.c-devuelto{ background:#9f1239; border-color:#9f1239; }
-.cuar-log-tblwrap{ overflow:auto; max-height:max(340px, calc(100vh - 430px));
-  border:1px solid #e2e8f0; border-radius:10px; }
+/* v18.06 (Luis, 2026-09-15: *"no puede estar así el submódulo, se tiene que ver la tabla sin
+   scrollear en el submódulo, scrolleando en la página en sí si hace falta"*) — el log tenía su
+   PROPIO scroll (`max-height: calc(100vh - 430px)` + `overflow:auto`) adentro de una pestaña que
+   `pppFitPantalla` dejaba sin scroll: la tabla quedaba encerrada en una ventanita de 4 filas.
+   Ahora la tabla se dibuja entera y el que scrollea es el `.planim-body` de la pestaña (ver la
+   excepción de `cuarcfg` en `pppFitPantalla`). El `overflow-x` queda como red para el celular.
+   El `position:sticky` del encabezado sigue andando: ahora se pega contra ese scroll. */
+/* ⚠ SIN `overflow` en el monitor: un ancestro con overflow distinto de `visible` se convierte en
+   el contenedor del `position:sticky` del encabezado, y como este wrap mide lo mismo que la tabla,
+   el `th` quedaba pegado a una caja que no scrollea — o sea, se iba con el scroll. Medido. El
+   `overflow-x` queda sólo en pantalla angosta, donde no hay encabezado fijo que perder. */
+.cuar-log-tblwrap{ border:1px solid #e2e8f0; border-radius:10px; }
+@media (max-width:900px){ .cuar-log-tblwrap{ overflow-x:auto; } }
 .cuar-log-tbl{ width:100%; border-collapse:separate; border-spacing:0; font-size:14.5px; }
 .cuar-log-tbl th{ position:sticky; top:0; z-index:1; text-align:left; font-size:12px; letter-spacing:.5px;
   text-transform:uppercase; color:#475569; background:#f1f5f9; border-bottom:1px solid #cbd5e1;
-  padding:11px 14px; white-space:nowrap; }
-.cuar-log-tbl td{ border-top:1px solid #eef2f7; padding:11px 14px; vertical-align:top; color:#0f172a; }
+  padding:10px 11px; white-space:nowrap; }
+.cuar-log-tbl td{ border-top:1px solid #eef2f7; padding:10px 11px; vertical-align:top; color:#0f172a; }
 .cuar-log-tbl tbody tr:nth-child(even){ background:#fbfdff; }
 .cuar-log-tbl tbody tr:hover{ background:#f1f5f9; }
 .cuar-log-tbl td:first-child{ border-left:4px solid transparent; }
@@ -942,7 +953,7 @@ button {
 .cuar-log-tbl tr.r-aprobado td:first-child{ border-left-color:#86efac; }
 .cuar-log-tbl tr.r-devuelto td:first-child{ border-left-color:#fda4af; }
 .cuar-log-np{ font-weight:800; font-size:15px; white-space:nowrap; }
-.cuar-log-cli{ display:flex; flex-direction:column; gap:4px; min-width:190px; }
+.cuar-log-cli{ display:flex; flex-direction:column; gap:4px; min-width:150px; }
 .cuar-log-rs{ color:#334155; overflow-wrap:anywhere; }
 .cuar-log-fh{ white-space:nowrap; color:#475569; }
 .cuar-log-tbl .cuar-badge{ font-size:12px; padding:3px 11px; }
@@ -955,10 +966,10 @@ button {
 .cuar-log-est.e-devuelto{ background:#ffe4e6; color:#9f1239; border:1px solid #fda4af; }
 .cuar-log-quien{ font-weight:800; overflow-wrap:anywhere; }
 .cuar-log-cuando{ font-size:13px; color:#475569; white-space:nowrap; }
-.cuar-log-mail{ display:block; font-size:12px; color:#64748b; max-width:220px; overflow:hidden;
+.cuar-log-mail{ display:block; font-size:12px; color:#64748b; max-width:170px; overflow:hidden;
   text-overflow:ellipsis; white-space:nowrap; }
 /* celda de comentario: quién + cuándo arriba, el texto abajo (2 líneas) y el 📖 a la derecha */
-.cuar-log-comcell{ display:flex; align-items:flex-start; gap:10px; min-width:300px; }
+.cuar-log-comcell{ display:flex; align-items:flex-start; gap:9px; min-width:230px; }
 .cuar-log-combox{ flex:1; min-width:0; }
 .cuar-log-com{ color:#0f172a; line-height:1.4; display:-webkit-box; -webkit-line-clamp:2;
   -webkit-box-orient:vertical; overflow:hidden; overflow-wrap:anywhere; }
@@ -5403,7 +5414,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=18.05"></script>
+<script type="module" src="recepcion.js?v=18.06"></script>
 <!-- Config del módulo de fichada (compartido con fichada.html). El secret
      hmacSecret tiene que ser el mismo acá y allá; cargándolo desde un solo
      archivo evitamos que se desincronicen. -->
@@ -6210,6 +6221,11 @@ function pppFitPantalla() {
   // v13.83: A Programar tampoco se achica en el monitor (dueño: "se ve feo"; el zoom descolocaba "Ver más días"
   // y la barra de estado). Es una lista de pedidos + días: se scrollea.
   if (typeof _pppTab !== "undefined" && _pppTab === "prog") { body.style.zoom = "1"; body.style.overflowY = "auto"; return; }
+  // v18.06 (Luis: "no puede estar así el submódulo, se tiene que ver la tabla sin scrollear en el
+  // submódulo, scrolleando en la página en sí si hace falta") — Config. Cuarentena es una tabla
+  // larga, como A Programar: no se achica, se scrollea. Antes el zoom la comprimía Y encima el log
+  // tenía su propio scroll adentro, así que se veían 4 filas en una ventanita.
+  if (typeof _pppTab !== "undefined" && _pppTab === "cuarcfg") { body.style.zoom = "1"; body.style.overflowY = "auto"; return; }
   // v17.95 (Luis, con capturas del día y la tanda abiertos: "sigue colapsando para adentro y se hacen
   // más chiquitas las filas a medida que se abren"). NO era el CSS: era ESTE zoom. La tabla de
   // Programación crece al abrir un nivel, el zoom la comprime para que entre, y cada nivel que se
@@ -8843,7 +8859,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v18.05";
+const APP_VERSION = "v18.06";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción

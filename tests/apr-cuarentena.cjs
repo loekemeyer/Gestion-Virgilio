@@ -442,6 +442,26 @@ catch (_e) {
     aprAnuCerrar();
     out.anuLogCerrado = !!(document.getElementById("aprAnuModal") || {}).hidden;
 
+    // (12) v18.06 (Luis) — Config. Cuarentena: el log NO tiene scroll propio; scrollea la pestaña
+    _pppTab = "cuarcfg";
+    _apr.cuarLog = [];
+    for (let i = 0; i < 18; i++) _apr.cuarLog.push({
+      empresa: "lk", clave: String(1400 + i), np: "web LK " + (1400 + i), cod: String(3900 + i),
+      razon_social: "Cliente Numero " + i + " S.R.L.", motivos: ["deuda"], deuda: 1234567,
+      entro_at: "2026-09-14T12:00:00-03:00", estado: "retenido", cerrado_at: null,
+      persona: null, por: null, comentario: null, comentarios: 0, eventos: 1 });
+    pppRenderProg(); await new Promise((res) => setTimeout(res, 250));
+    pppFitPantalla(); await new Promise((res) => setTimeout(res, 200));
+    const cfgBody = document.querySelector("#pppOverlay .planim-body");
+    const cfgWrap = document.querySelector(".cuar-log-tblwrap");
+    out.cfgFilas = document.querySelectorAll(".cuar-log-tbl tbody tr").length;
+    // el zoom automático no achica esta pestaña (es una tabla larga, como A Programar)
+    out.cfgSinZoom = !!cfgBody && (cfgBody.style.zoom === "1" || cfgBody.style.zoom === "");
+    out.cfgPaginaScrollea = !!cfgBody && cfgBody.style.overflowY === "auto";
+    // y el submódulo NO tiene su propia barra vertical: la tabla se dibuja entera
+    out.cfgSinScrollPropio = !!cfgWrap && cfgWrap.scrollHeight <= cfgWrap.clientHeight + 1;
+    _pppTab = "prog";
+
     out.errs = null;
     return out;
   });
@@ -573,6 +593,11 @@ catch (_e) {
   chk(r.anuLog, "el log lista cuándo, qué pedido, cliente, quién y por qué");
   chk(r.anuLogNp, "el log muestra la NP que se quemó (y dice que no se reutiliza)");
   chk(r.anuLogCerrado, "el log se cierra");
+  // v18.06 — Config. Cuarentena sin scroll adentro del submódulo
+  chk(r.cfgFilas === 18, "Config. Cuarentena dibuja las 18 filas del log (dio " + r.cfgFilas + ")");
+  chk(r.cfgSinZoom, "el zoom automático NO achica la pestaña Config. Cuarentena");
+  chk(r.cfgPaginaScrollea, "la que scrollea es la pestaña, no el submódulo");
+  chk(r.cfgSinScrollPropio, "el log NO tiene barra de scroll vertical propia");
   chk(errs.length === 0, "sin errores de página" + (errs.length ? " (" + errs.join(" | ") + ")" : ""));
 
   await b.close();

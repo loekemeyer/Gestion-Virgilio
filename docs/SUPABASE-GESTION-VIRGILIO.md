@@ -16236,3 +16236,44 @@ por `anon` quedó sin la opción. La regla quedó escrita en el `CLAUDE.md`.
 rango 1..8 y devuelve el nombre por índice; un estado que no conoce cae en el `ELSE 1`, así que a
 un pedido anulado le sigue diciendo **"sin_programar"**. No se cambió: **que el cliente vea
 "anulado" en la página es una decisión comercial del dueño**, no técnica. Queda anotado acá.
+
+---
+
+### §3.gj — v18.06: Config. Cuarentena, el log sin scroll adentro del submódulo — 2026-09-15
+
+**Luis, 2026-09-15, con captura:** *"no puede estar así el submódulo, se tiene que ver la tabla sin
+scrollear en el submódulo, scrolleando en la página en sí si hace falta"*.
+
+**Eran dos cosas encimadas, no una:**
+
+1. **El log tenía su propio scroll**: `.cuar-log-tblwrap` con
+   `max-height: max(340px, calc(100vh - 430px))` + `overflow:auto` (v17.40).
+2. **Y la pestaña no scrolleaba**: `pppFitPantalla` no tenía excepción para `cuarcfg`, así que le
+   aplicaba el **zoom** para que entrara todo en una pantalla y le ponía `overflow-y: hidden`.
+
+O sea: una tabla comprimida, encerrada en una ventanita de 4 filas, dentro de una pestaña que no
+se podía scrollear. Ahora `cuarcfg` va en la misma lista que `prog` y `plan` —zoom 1 y
+`overflow-y: auto`— y el log se dibuja entero.
+
+**Medido** (18 filas de log, pestaña abierta, `pppFitPantalla()` corrido):
+
+| | antes | ahora |
+|---|---|---|
+| zoom del `.planim-body` | achicado | **1** |
+| quién scrollea | el submódulo | **la pestaña** |
+| barra vertical en el log | sí | **no** |
+| barra horizontal en el log (1340px) | sí | **no** |
+
+**⚠ Y una trampa de CSS en el camino:** al sacar el `max-height` dejé `overflow-x:auto` en el wrap
+y **el encabezado sticky dejó de funcionar** — se iba con el scroll. Un ancestro con `overflow`
+distinto de `visible` pasa a ser el contenedor del `position:sticky`, y como ese wrap mide lo mismo
+que la tabla, el `th` quedaba pegado a una caja que no scrollea. Se vio en la captura y se
+corrigió: sin `overflow` en el monitor (ahí el encabezado queda fijo) y `overflow-x:auto` sólo
+bajo 900px, donde no hay encabezado fijo que perder y sí hace falta correr la tabla.
+
+Para que no hiciera falta la barra horizontal en el monitor se apretaron los mínimos de la tabla:
+padding de celda 11/14 → 10/11, `.cuar-log-cli` 190 → 150px, `.cuar-log-comcell` 300 → 230px y
+`.cuar-log-mail` 220 → 170px.
+
+**Tests:** `tests/apr-cuarentena.cjs` suma 4 chequeos (las 18 filas dibujadas, sin zoom, la pestaña
+como scroller y el log sin barra propia).
