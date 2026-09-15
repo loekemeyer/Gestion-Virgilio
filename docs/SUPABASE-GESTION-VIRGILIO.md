@@ -16568,9 +16568,10 @@ ella misma no encontraba**.
 
 **Arreglo** (`index.html`, el filtro de `stkBodyStocks`): además del texto crudo se compara el
 código y el término **sin los ceros de adelante**, con el mismo `_ocgNorm` que usa el resto del
-módulo. No cambia el criterio (sigue siendo `indexOf`, así que `31` sigue trayendo 231, 311,
-531…), sólo deja de fallar el caso del cero. Es la cara "BUSCAR" de la regla del 12/09 que ya
-cuida `tests/cod-cero-adelante.cjs`.
+módulo. Es la cara "BUSCAR" de la regla del 12/09 que ya cuida `tests/cod-cero-adelante.cjs`.
+
+⚠ En esa primera vuelta se dejó el `indexOf`, así que `031` traía también 231, 311, 312, 315,
+531, 631, 731 y 931E. El dueño lo marcó enseguida y se corrigió en la **v18.25** — ver §3.gv.
 
 **Test nuevo:** `tests/stk-buscar-cero-adelante.cjs` — comprobado que **falla sin el fix**
 (`busca031: false`) y pasa con él.
@@ -16797,3 +16798,35 @@ serie de **todos** los códigos y merece su propio paso y su propia medición.
 **Test:** `tests/proy-entregadas.cjs`, ampliado. La serie del test ahora se arma **relativa a hoy**
 para que no dependa de en qué mes se corra, y verifica que el mes en curso no entre en el promedio,
 que tenga su ficha y que quede marcado en el gráfico.
+
+---
+
+## §3.gv — v18.25: el buscador de Stocks, segunda vuelta — el código entero, no el pedazo — 2026-09-15
+
+Thomas, el mismo día de la v18.20: ***"arreglado que pueda buscar, pero busca 31, no 031. Sólo
+debería mostrar lo que corresponde a la coincidencia de esos 3 dígitos"***.
+
+Tenía razón: la v18.20 arregló **que encontrara** (tipear `031` ya no devolvía vacío) pero dejó el
+`indexOf` de siempre, así que `031` traía nueve filas — el 031 y los ocho que contienen esos
+dígitos en algún lado: **231, 311, 312, 315, 531, 631, 731, 931E**. Eso no es buscar un código, es
+buscar una cadena.
+
+**Cómo quedó.** Un término que **es un código** (arranca con dígito) matchea el código **entero**:
+el código normalizado tiene que empezar con el término normalizado **y lo que sigue no puede ser
+otro dígito**. Así:
+
+| se tipea | trae | no trae |
+|---|---|---|
+| `031`, `31`, `0031` | 031 y sus variantes de letra (031E, `031 LK`) | 231, 311, 312, 315, 531, 631, 731, 931E |
+| `31E` | 031E | 931E |
+| `café` | todo lo que diga "café" en código o descripción | — |
+
+Las variantes de letra **sí** entran a propósito: `031E` y `031 LK` son el mismo artículo, no otro.
+Lo que queda afuera es lo que sigue con otro dígito, que es un código distinto.
+
+Un término que **no** arranca con dígito sigue siendo texto libre y busca por pedazo en el código y
+en la descripción, para que buscar por nombre no se rompa.
+
+**Test:** `tests/stk-buscar-cero-adelante.cjs`, ampliado con las filas vecinas (031E, 231, 311,
+931E). Comprobado que **falla con el código de la v18.20** (`sinVecinos: false`, `busca31E: false`)
+y pasa con este.
