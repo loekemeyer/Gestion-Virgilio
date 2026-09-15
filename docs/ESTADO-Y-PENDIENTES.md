@@ -1,4 +1,27 @@
-# Estado y pendientes — al 2026-09-15 (última actualización: v18.17)
+# Estado y pendientes — al 2026-09-15 (última actualización: v18.50)
+
+> **2026-09-15, revisión general pedida por Thomas (v18.50, §3.hi de la doc de Supabase).**
+> *"Está andando mal en general la app y su paso a paso."* Seis agentes sobre `main` + los 10
+> chats del día. **Lo que NO es:** la suite está toda en verde, ninguna sesión pisó código de otra
+> (70 commits de 6 sesiones, 0 líneas perdidas), el motor de stock cierra (0 diferencias en 485
+> códigos). **Lo que SÍ es:**
+> 1. **La vista de Pedidos Entregados tiraba HTTP 500 por timeout** (236 en 6 h; 7,97 s contra un
+>    tope de 8 s) y la pantalla caía en silencio a un fallback de 60 días → arreglada (222 ms).
+> 2. **Tocar una NP web en la tabla de la PPP no abría el detalle** (42 errores en un día) → arreglado.
+> 3. **El chip «▶ seguir» del picking (v18.46) abría la tanda sin lo ya pickeado** → arreglado.
+> 4. **Lecturas cortadas en 1000 filas** (RT ya perdía 524; reparto y faltantes a 50 del corte) → paginadas.
+> 5. **Los operarios corrieron 25 versiones en un día** (v17.87 → v18.47, un reload cada 15–20 min) y
+>    **la versión fue para atrás 3 veces** por una sesión sobre `main` viejo (problema 290). Esto es
+>    de proceso, no de código: seis sesiones a `main` en paralelo. **Propuesta:** una sola sesión
+>    "de guardia" bumpea y pushea a `main`; las demás entregan en rama y se mergean de a una.
+> 6. **Hoy no se facturó nada** (0 tics; ayer 38; 24 NP armadas sin facturar). No es un bug: la
+>    pantalla se abrió 1.282 veces y nadie tildó. Avisar a Marianela.
+>
+> **Para Luis/Thomas, mañana 16/09:** el camión **E11 mezcla el súper Dorinka (E11B) con 3 clientes
+> comunes** (E11A/C/D) — `gv_ppp_super_mezclado` da 5 filas; el automático ya no lo hace (v18.31)
+> pero esa tanda ya estaba armada. Y **D71 lleva 9,25 m³ en una sola NP** (154 % del tope).
+> **Decisión de Thomas:** el "mes en curso" del pop-up de Proyección lo pidió él (v18.24) y Luis lo
+> hizo sacar (v18.34). Detalle y lo que queda abierto: §3.hi.
 
 > **2026-09-15, tanda de la tarde (v18.16 / v18.17).** Se cerró el handoff
 > `docs/HANDOFF-OC-Y-PROYECCION-20260915.md` entero: los códigos NNNL salieron de la pantalla

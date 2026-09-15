@@ -8,7 +8,9 @@
      2) el AP en curso PROPIO → chip "▶ seguir", clickable, que abre el asistente;
      3) al tocarlo se reconstruye st.armado con el ts que trae el SERVIDOR, así el TAP sale
         con la duración real y la tanda vuelve a figurar en "Terminar Día";
-     4) lo mismo en el picking (modo TP): el EP ajeno con candado, el propio "▶ seguir".
+     4) lo mismo en el picking (modo TP): el EP ajeno con candado, el propio "▶ seguir";
+     5) v18.50: ese chip siembra lo ya pickeado desde el servidor (seedFromServer), y el detalle
+        de una NP web ("LK 0052", id con espacio) en la tabla PPP abre y cierra sin reventar.
    Sale 1 si falla. */
 const path = require("path");
 let chromium;
@@ -80,7 +82,7 @@ catch (_e) {
     await populateTandasList("pickingCurso");
     const pMio = chip("E11C");
     out.pkMiaClickable = !!(pMio && !pMio.disabled && /seguir/i.test(pMio.textContent));
-    let lista = null; window.showPickingList = function (t, l) { lista = [t, l]; };
+    let lista = null; window.showPickingList = function (t, l, o) { lista = [t, l, o]; };
     const st2 = getLegajoState(MIO);
     st2.picking = { active: false, value: "", ts_inicio: null }; setLegajoState(MIO, st2);
     pMio.click();
@@ -88,6 +90,25 @@ catch (_e) {
     out.pkMiaAbreLista  = lista && lista[0] === "E11C" && lista[1] === MIO;
     const st3 = getLegajoState(MIO);
     out.pkRestauraTs    = st3.picking && st3.picking.ts_inicio === TS_EP;
+    // v18.50 (problema 287): el chip tiene que SEMBRAR desde el servidor lo ya pickeado (PKC),
+    // igual que pkResumeServer; si no, con el snapshot local perdido la tanda abría sin marcas.
+    out.pkSiembraServer = !!(lista && lista[2] && lista[2].seedFromServer === true && lista[2].sinceIso === TS_EP);
+
+    // ---- v18.50 (problema 286): el detalle de una NP WEB en la tabla PPP (id con espacio) ----
+    // '#ppprow_LK 0052 .ppp-np-link' no es un selector válido: querySelector tiraba SyntaxError y
+    // el detalle nunca se abría (42 errores en errores_cliente el 15/09).
+    const tbl = document.createElement("table"); tbl.innerHTML = '<tbody><tr id="ppprow_LK 0052"><td><b class="ppp-np-link">LK 0052</b></td></tr></tbody>';
+    document.body.appendChild(tbl);
+    window.pppFetchDetalle = async function () { return [{ articulo: "505", cajas: 2 }]; };
+    let rejected = false; window.addEventListener("unhandledrejection", function () { rejected = true; });
+    await pppToggleDetalle("LK 0052");
+    await new Promise(function (r2) { setTimeout(r2, 60); });
+    const det = document.getElementById("pppdet_LK 0052");
+    out.npWebAbreDetalle  = !!(det && /505/.test(det.textContent)) && !rejected;
+    out.npWebLinkOpen     = document.getElementById("ppprow_LK 0052").querySelector(".ppp-np-link").classList.contains("open");
+    await pppToggleDetalle("LK 0052");
+    out.npWebCierraDetalle = !document.getElementById("pppdet_LK 0052") && !rejected;
+    tbl.remove();
 
     // ---- control: con OTRO legajo, la misma tanda vuelve a estar bloqueada ----
     legajoInput.value = "999";

@@ -624,8 +624,9 @@ Detalle, medición y rollback en `docs/SUPABASE-GESTION-VIRGILIO.md` §3.l y §3
   pedido con sufijo `-2`); `sql/gv_np_contador_v1370.sql`, §3.aw. Se
   programa por el job de las 00:01 para zona 1, 2 y 3 (`zonas_automaticas = '1,2,3'` desde v13.07)
   y a mano en "A Programar" para el resto.
-  **Desde el 2026-09-05 además hay armado INTRADÍA** (idea 7317, cron jobid 73 cada 15 min
-  lun–vie 07:00–18:45 ART, Edge Function v14 con `{"intradia": true}`): cuando lo pendiente de
+  **Desde el 2026-09-05 además hay armado INTRADÍA** (idea 7317, cron jobid 73 — **cada 5 min
+  desde el 15/09**, `*/5 9-23 * * *` UTC = 06:00–20:55 ART; antes cada 15 min lun–vie
+  07:00–18:45 —, Edge Function v14 con `{"intradia": true}`): cuando lo pendiente de
   las zonas automáticas suma ≥ 0,80 m³ se arma ya, para hoy si es antes de las 12:00 y hay cupo, si no
   para el próximo hábil con cupo (`gv_ppp_web_proximo_dia_entrega`). §3.x de la doc de Supabase.
   **v13.47 (domingo 06/09, dueño: *"mandá directo a Programación si ya está, no más en A Programar"*):
@@ -895,8 +896,8 @@ archivo con miles de líneas borradas no es un cambio, es un error.**
 - ⚠ **La hoja "PPP Pedidos Entregados 2026" YA NO EXISTE y `PPP_Entregados_Meta` NO SE USA MÁS.**
   Dueño, 2026-09-12: *"la hoja PPP entregados ya dejó de existir, porque ya no se usa más esa
   tabla, ya que fue el cambio fundamental entre el repositorio gestión Virgilio y producción
-  Virgilio"*. El cron que la llenaba (jobid 27 `sync-ppp-entregados-meta`) está en `active=false`
-  y la tabla quedó congelada el **2026-09-02**. **No citarla como fuente de nada, no proponer
+  Virgilio"*. El cron que la llenaba (jobid 27 `sync-ppp-entregados-meta`) **ya no existe** (se
+  borró; medido el 15/09, `cron.job` no lo tiene) y la tabla quedó congelada el **2026-09-02**. **No citarla como fuente de nada, no proponer
   reactivar el cron, y no volver a escribir acá que el Sheet es el upstream** — este párrafo decía
   eso hasta la v16.44 y por leerlo se trató al espejo muerto como si estuviera vivo.
   La tabla **se conserva sólo como historia** (2.783 filas hasta el 02/09); las vistas que la

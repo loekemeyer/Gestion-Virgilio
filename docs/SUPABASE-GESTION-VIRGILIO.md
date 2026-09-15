@@ -17717,3 +17717,79 @@ end $$;
 ⚠ **`has_table_privilege(..., 'UPDATE')` da `false` con un grant por columna** — no es que el grant
 esté mal. Se verifica con `has_column_privilege(...)` o con el `update` de prueba de arriba. Este
 detalle ya hizo dudar una vez de un grant que estaba perfecto.
+
+## §3.hi — v18.50: revisión general del 15/09 (6 agentes + los 10 chats del día): `gv_ppp_entregados` 28× más rápida, y cinco fixes de front — 2026-09-15
+
+> **Pedido de Thomas** (*"lanzá agentes que revisen el funcionamiento general; está andando mal
+> en general la app y su paso a paso; revisá los últimos 10 chats"*). Sesión
+> `session_01UCazx6951MVXDFfDUnDd3E`. Se corrieron seis agentes en paralelo (tests, lógica del
+> paso a paso, regresiones entre sesiones, Supabase, stock, render) sobre `main` v18.48/v18.49.
+
+### Lo que se midió antes de tocar nada
+
+| Señal | Valor | Lectura |
+|---|---|---|
+| Suite completa (`tests/run.sh` + 18 sueltos + `node --check` de 375 archivos) | **todo verde** | no es sintaxis ni una función pisada |
+| Pisado de código entre las 6 sesiones que pushearon a `main` hoy (70 commits) | **0** líneas perdidas | los borrados cruzados fueron rework declarado |
+| Versión hacia atrás | **3 veces** (`97f40b1` v18.30→v18.29, `264dc3c` v18.35→v18.30, `6145ca5` v18.36→v18.31) | entre 17:01 y 17:16 el banner «Actualizar» no salió (problema 290) |
+| Versiones distintas desde las que los operarios mandaron eventos hoy | **25** (v17.87 → v18.47, 08:00 → 15:18) | un reload cada 15–20 min en medio del picking |
+| `errores_cliente` del 15/09 | 43 (otros días 2–9) | 42 son el selector `#ppprow_LK 0052` (problema 286), 1 `loginWithLegajo is not defined` (tap antes de que parsee el script; una vez) |
+| `edge_logs` HTTP 500 en 6 h | **236** sobre `/rest/v1/gv_ppp_entregados` | timeout de 8 s (problema 285) |
+| `edge_logs` HTTP 400 | 65 sobre `gv_ppp_base_pedidos?select=np` | la vista tiene `pedido` (problema 289) |
+| Facturación | **0 tics** hoy (ayer 38; último 14/09 17:18), 24 NP armadas sin facturar, 1.282 lecturas de `Facturacion_NP` y **0 POST** | nadie tildó nada: no es un error del código (el POST no llegó a intentarse), es que hoy no se facturó |
+| Motor de stock | 0 diferencias front/servidor en 485 códigos, depósitos balanceados 3 días | sano |
+| `gv_endpoints_rotos`, vistas sin `security_invoker`, tablas abiertas a anon | 0 / 0 / 0 | sano |
+
+### Arreglado en esta versión
+
+1. **`gv_ppp_entregados`: 7.967 ms → 222 ms** (`sql/gv_ppp_entregados_v1850.sql`, backup en
+   `sql/backups/gv_ppp_entregados_pre_v1850_20260915.sql`). El `LEFT JOIN LATERAL (… order by prio
+   limit 1)` re-evaluaba la unión de las tres fuentes —con `gv_ppp_entregados_meta` adentro, que
+   vuelve a agrupar `Registros_Produccion_Virgilio`— por cada una de las 457 NP con CRN. Ahora la
+   unión se materializa una vez y la de menor prio sale por `DISTINCT ON`. **Misma salida**
+   (`EXCEPT` en las dos direcciones: 0 y 0). `security_invoker` en el `WITH` y reforzado con
+   `ALTER`. `gv_ppp_avance_dias()` (única función que la nombra) llamada después: anda. Problema 285.
+2. **Tocar una NP web en la tabla de la PPP no abría el detalle** (`pppToggleDetalle`): el espacio
+   de `LK 0052` rompía `querySelector('#ppprow_LK 0052 …')`. Se busca la fila por `getElementById`.
+   Problema 286.
+3. **El chip «▶ seguir» del picking (v18.46) abría la tanda sin lo ya pickeado**: no sembraba los
+   PKC desde el servidor como sí hace `pkResumeServer`. Ahora pasa `{seedFromServer:true}`. Problema 287.
+4. **Lecturas sin paginar contra el corte de 1000 de PostgREST**: `_stkLoadRtSes` (RT, 1.524 filas:
+   ya perdía 524), los dos fetch de CCN del reparto (949/1000), `Entregas_Virgilio?cajas_falto=gt.0`
+   (946/1000), la góndola `gv_lugar_articulo` (693) y los CCN de 60/30 días de Entregados y Ruteo.
+   Todos pasan a `supaFetchAll`/`supaFetchAllSafe` con `order=` total (`…,id`). Problema 288.
+5. **`pppCountTable` pedía `select=np`** y `gv_ppp_base_pedidos` tiene `pedido`: 400 en cada
+   apertura del menú de importación. Sin `select`, el conteo sale por `Content-Range` igual. Problema 289.
+
+### Lo que queda abierto (registrado, NO tocado)
+
+- **Súper mezclado mañana 16/09**: `gv_ppp_super_mezclado` da 5 filas — camión **E11** lleva a
+  Dorinka (E11B, súper) con Extralimp (E11A), Todo Bazar (E11C) y Goldar (E11D). El armado
+  automático ya no lo hace (v18.31), pero esa tanda ya estaba armada. Decisión de Luis/Thomas.
+- **`gv_ppp_camion_pasado`**: D71 (16/09) 9,25 m³ = 154 % del tope; D70 (07/10) 6,47; D63 (28/10)
+  6,17. Una sola NP cada uno (Matiz): no hay cómo partirlas. Problemas 270/271.
+- **v18.31 parte 3 no aplicada** (`gv_ppp_web_armar_pendientes` sin `zonas_manuales_con_camion`).
+  Inocuo mientras la config esté en 1. Problema 291. Para aplicar: bloque 3 de
+  `sql/gv_ppp_web_auto_z12_sin_super_v1831.sql` + guardar el backup.
+- **Stock, datos** (guardián): `119` góndola −1 en E11A (picking −50 con 49); `116` sigue partido
+  (§3.ha); NPD de `958E` en LK 0035 sin picking previo (el ajuste quedó en la cola del celular).
+  `vista_tanda_m3` D47B = 1,962 m³ para el 16/09 (real 0,238) porque se reusó un código ya entregado.
+  Todo requiere permiso del dueño para corregir.
+- **`gv_ppp_web_armar_pendientes` y `gv_cuarentena_limite` cancelados por el timeout de 8 s** desde
+  la UI (4 casos 17:29–17:30). Si se repite: `alter function … set statement_timeout='30s'`.
+- **Grants de escritura a anon sobre 4 vistas** (`vista_faltante_real`, `vista_ppp_pedidos_entregados`,
+  `vista_saldos_stock`, `gv_pedido_mod_np`; v18.24 hizo `grant all`). Hoy inertes (no son
+  actualizables). `revoke insert, update, delete, references, trigger, truncate … from anon, authenticated;`
+- **Planify pega sin permisos** desde anon (`planify.admin_kv` INSERT ×87, `planify.feriados` SELECT
+  ×63): es la app Planify, no este repo.
+- **`ESTADO-Y-PENDIENTES.md` decía v18.17** (32 versiones atrás): actualizado en esta versión.
+- **"Mes en curso" del pop-up de Proyección**: la v18.24 lo puso por pedido de Thomas y la v18.34 lo
+  sacó por pedido de Luis. Hay que preguntarle a Thomas cuál manda.
+- **TAP duplicado** si se toca el botón directo sobre un armado ya cerrado tras un reload (revisor
+  de lógica, `send()` ~9691): no toca stock (`stockSepararAFacturar` es no-op) pero infla las horas
+  del Monitor. Queda para otra tanda.
+
+### Crons, corregido en `CLAUDE.md`
+
+El 73 corre **cada 5 min** (`*/5 9-23 * * *` UTC = 06:00–20:55 ART), no cada 15; el **27 ya no
+existe** (se borró, no está en `active=false`); el 50 está activo desde v18.18.
