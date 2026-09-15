@@ -69,6 +69,9 @@ PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node te
 echo "== monitor-tanda-deshecha (regresión: una tanda desarmada/anulada no va al cartel de «alguien se equivocó») =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/monitor-tanda-deshecha.cjs
 
+echo "== lecturas-paginadas (v18.60: ninguna relación grande sin paginar, ninguna paginación sin order) =="
+node tests/lecturas-paginadas.cjs
+
 echo "== fac-cuelgue (regresión: Facturación no queda en «Cargando tandas…» para siempre — timeout + cartel con motivo) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/fac-cuelgue.cjs
 
