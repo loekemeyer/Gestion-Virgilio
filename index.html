@@ -3257,6 +3257,73 @@ tr.ppp-err-zona > td{ background:#fffbeb !important; }
 .pga-msg{ padding:14px; font-size:13.5px; color:#64748b; }
 .pga-msg b{ color:#0f172a; }
 .pga-err{ color:#b42318; }
+/* v17.97 (Luis) — IMPRIMIR. El pop-up para elegir los días, y la hoja. */
+#pgiModal{ position:fixed; inset:0; z-index:100000; background:rgba(15,23,42,.66);
+  display:flex; align-items:center; justify-content:center; padding:16px; }
+#pgiModal[hidden]{ display:none; }
+.pgi-card{ background:#fff; border-radius:14px; max-width:520px; width:100%; max-height:90vh;
+  display:flex; flex-direction:column; box-shadow:0 20px 50px rgba(0,0,0,.4); }
+.pgi-top{ padding:14px 18px; border-bottom:1px solid #e2e8f0; }
+.pgi-top h3{ margin:0; font-size:19px; font-weight:900; color:#0f172a; }
+.pgi-top p{ margin:3px 0 0; font-size:13px; color:#64748b; }
+.pgi-body{ padding:12px 18px; overflow:auto; }
+.pgi-rango{ display:flex; align-items:center; gap:8px; flex-wrap:wrap; font-size:13.5px;
+  color:#334155; padding-bottom:10px; margin-bottom:10px; border-bottom:1px dashed #e2e8f0; }
+.pgi-rango select{ height:34px; border:1.5px solid #cbd5e1; border-radius:8px; padding:0 8px;
+  font-size:13.5px; font-weight:700; width:auto; }
+.pgi-mini{ background:#eef2f7; color:#1e6bd6; border:none; border-radius:7px; padding:6px 11px;
+  font-size:12.5px; font-weight:800; cursor:pointer; width:auto; }
+.pgi-dia{ display:flex; align-items:center; gap:10px; padding:7px 4px; border-bottom:1px solid #f1f5f9;
+  font-size:14.5px; cursor:pointer; }
+.pgi-dia input{ width:18px; height:18px; margin:0; cursor:pointer; }
+.pgi-dia b{ color:#0f172a; min-width:132px; }
+.pgi-dia span{ color:#64748b; font-size:13px; }
+.pgi-btns{ display:flex; gap:10px; padding:12px 18px; border-top:1px solid #e2e8f0; }
+.pgi-btns button{ flex:1; padding:11px; border:none; border-radius:10px; font-size:15px;
+  font-weight:900; cursor:pointer; width:auto; }
+.pgi-no{ background:#eef2f7; color:#0f172a; }
+.pgi-si{ background:#1e6bd6; color:#fff; }
+.pgi-si:disabled{ background:#e5e7eb; color:#9ca3af; cursor:not-allowed; }
+
+/* la hoja: vive escondida en la pantalla y es LO ÚNICO que se ve al imprimir */
+#pgaPrint{ display:none; }
+@media print{
+  body > *:not(#pgaPrint){ display:none !important; }
+  #pgaPrint{ display:block !important; position:static !important; padding:0; margin:0;
+    font-family:inherit; color:#000; background:#fff; }
+  html, body{ height:auto !important; overflow:visible !important; background:#fff !important; }
+  @page{ margin:12mm 10mm; }
+}
+/* la hoja va en NEGRO: el nombre del cliente heredaba el azul de la app y en papel se ve gris */
+#pgaPrint, #pgaPrint *{ color:#000; }
+#pgaPrint .pgp-h2, #pgaPrint .pgp-dia > h3 small{ color:#444; }
+.pgp-h1{ font-size:19px; font-weight:900; margin:0; }
+.pgp-h2{ font-size:12px; margin:2px 0 12px; }
+/* ⚠ el día NO lleva `break-inside:avoid`: un día de 40 NP no entra en una hoja y el navegador lo
+   empujaba entero a la siguiente, dejando media hoja en blanco. Corta donde tenga que cortar, pero
+   NUNCA por el medio de un renglón, y el encabezado de la tabla se repite en cada hoja. */
+.pgp-dia{ margin:0 0 14px; }
+.pgp-tab thead{ display:table-header-group; }
+.pgp-tab tr{ break-inside:avoid; page-break-inside:avoid; }
+.pgp-dia > h3{ font-size:15px; font-weight:900; margin:0 0 4px; padding:4px 6px;
+  background:#eef2f7; border-left:4px solid #333; break-after:avoid; page-break-after:avoid; }
+.pgp-dia > h3 small{ font-weight:700; font-size:12px; margin-left:8px; }
+/* anchos fijos: si cada día dimensiona su tabla sola, las columnas no alinean entre días */
+.pgp-tab{ width:100%; border-collapse:collapse; font-size:11.5px; table-layout:fixed; }
+.pgp-tab col.c1{ width:17%; } .pgp-tab col.c2{ width:28%; } .pgp-tab col.c3{ width:22%; }
+.pgp-tab col.c4{ width:14%; } .pgp-tab col.c5{ width:7%; }  .pgp-tab col.c6{ width:12%; }
+.pgp-tab td{ overflow:hidden; text-overflow:ellipsis; }
+.pgp-tab th{ text-align:left; font-size:9.5px; text-transform:uppercase; letter-spacing:.04em;
+  color:#444; border-bottom:1.5px solid #333; padding:3px 5px; }
+.pgp-tab td{ padding:3px 5px; border-bottom:1px solid #ddd; vertical-align:top; }
+.pgp-tab th.n, .pgp-tab td.n{ text-align:right; white-space:nowrap; }
+.pgp-t > td{ background:#f4f6f8; font-weight:900; border-top:1px solid #999; }
+.pgp-np td:first-child{ padding-left:16px; }
+.pgp-est{ display:inline-block; border:1px solid #666; border-radius:8px; padding:0 5px;
+  font-size:9.5px; font-weight:900; white-space:nowrap; }
+.pgp-tot > td{ border-top:1.5px solid #333; border-bottom:none; font-weight:900; background:#f4f6f8; }
+.pgp-sin{ font-size:13px; color:#444; }
+
 /* En el celular la tabla no entra a lo ancho: scrollea adentro de su caja, y la columna del
    día / la tanda / la NP queda fija, si no se pierde de vista justo lo que se está mirando. */
 @media (max-width:760px){
@@ -5282,7 +5349,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=17.97"></script>
+<script type="module" src="recepcion.js?v=17.98"></script>
 <!-- Config del módulo de fichada (compartido con fichada.html). El secret
      hmacSecret tiene que ser el mismo acá y allá; cargándolo desde un solo
      archivo evitamos que se desincronicen. -->
@@ -8722,7 +8789,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v17.97";
+const APP_VERSION = "v17.98";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -30995,12 +31062,15 @@ function pppSupersNeed(force) {
   if (!force && _pppSupersTs && (Date.now() - _pppSupersTs) < PPP_SUPER_TTL_MS) return;
   _pppSupersBusy = true;
   _pppSupersTs = Date.now();   // aunque falle: no se reintenta hasta que venza el TTL
-  fetch(SUPABASE_URL + "/rest/v1/gv_supers?select=empresa,cod,nombre,super_key,cuit&activo=is.true&limit=500",
+  fetch(SUPABASE_URL + "/rest/v1/gv_supers?select=empresa,cod,nombre,super_key,cuit,nota&activo=is.true&limit=500",
         { headers: { apikey: SUPABASE_KEY }, cache: "no-store" })
     .then(function (r) { if (!r.ok) throw new Error("HTTP " + r.status); return r.json(); })
     .then(function (rows) {
       const lista = (rows || []).map(function (s) {
-        return { empresa: pppEmpNorm(s.empresa), cod: String(s.cod || "").trim(), nombre: s.nombre || "", super_key: s.super_key || "", cuit: s.cuit || "" };
+        /* ⚠ `nota` VIAJA: `_pppSuperNombre` la usa para reconocer las filas viejas de ISIS que
+           vienen sin cód, por la razón social. La v17.72 escribió ese fallback pero no la trajo, así
+           que nunca matcheaba y el camión salía como "Inc Sociedad Anonima" en vez de "Carrefour". */
+        return { empresa: pppEmpNorm(s.empresa), cod: String(s.cod || "").trim(), nombre: s.nombre || "", super_key: s.super_key || "", cuit: s.cuit || "", nota: s.nota || "" };
       });
       const cambio = JSON.stringify(lista) !== JSON.stringify(_pppSupers || []);
       _pppSupers = lista; _pppSupersTs = Date.now(); _pppSupersBusy = false;
@@ -35329,6 +35399,8 @@ function _pppArbolHtml(programados) {
     '<div class="pn-h2">Tocá un día para ver sus tandas · una tanda para ver sus NP · una NP para ver qué lleva</div></div>' +
     '<div class="pn-tools">' +
       '<button class="pn-lnk" onclick="pgaRecargar()" title="Volver a leer la programación">🔄 Actualizar</button>' +
+      // v17.97 (Luis): "al lado del botón de Actualizar quiero que haya un botón de Imprimir"
+      '<button class="pn-lnk" onclick="pgaImprimirAbrir()" title="Elegís qué días y sale la programación abierta hasta la NP, para papel">🖨 Imprimir</button>' +
       '<button class="pn-lnk" onclick="pppPlanTabla(false)" title="El tablero de 6 días con los camiones">Tablero de 6 días</button>' +
       '<button class="pn-lnk" onclick="pppPlanClasica(true)" title="Lista por fecha y tanda (como antes)">Vista clásica</button>' +
     '</div></div>';
@@ -35515,6 +35587,153 @@ async function dsmConfirmar() {
     const msg = (e && e.message) ? e.message : String(e);
     const h = document.getElementById("dsmHint"); if (h) { h.textContent = "⚠ " + msg; h.style.color = "#b91c1c"; }
   }
+}
+
+/* ═══ v17.97 (Luis) — IMPRIMIR LA PROGRAMACIÓN ═══════════════════════════════════════════
+   Pedido: *"al lado del botón de «Actualizar» quiero que haya un botón de «Imprimir». Al
+   apretarlo debería dar la opción de elegir qué días o rango de días imprimir, y la
+   visualización debería ser al estilo la tabla de abajo abierta al nivel de tandas (que muestre
+   las NPs y los datos pero no necesariamente el contenido individual de cada NP)"*.
+
+   O sea: en papel va TODO desplegado —día → tanda → NP con sus datos— sin el detalle de
+   códigos y cajas de cada NP. Lo que está abierto o cerrado en la pantalla no importa: la hoja
+   sale completa igual.
+
+   Cómo imprime: se arma la hoja en un `<div id="pgaPrint">` colgado del `<body>` y un
+   `@media print` esconde todo lo demás. NO se abre una ventana nueva a propósito: el navegador
+   la bloquea si el click no la disparó directo, y acá entre el click y el print hay un pop-up. */
+let _pgi = null;
+
+function pgaImprimirAbrir() {
+  const arbol = _pgaArbol();
+  let m = document.getElementById("pgiModal");
+  if (!m) { m = document.createElement("div"); m.id = "pgiModal"; document.body.appendChild(m); }
+  m.hidden = false;
+  if (!arbol.length) {
+    m.innerHTML = '<div class="pgi-card"><div class="pgi-top"><h3>🖨 Imprimir la programación</h3></div>' +
+      '<div class="pgi-body"><div class="pgp-sin">No hay nada programado para imprimir.</div></div>' +
+      '<div class="pgi-btns"><button class="pgi-no" onclick="pgaImprimirCerrar()">Cerrar</button></div></div>';
+    return;
+  }
+  // arranca con todo tildado: lo más común es imprimir la semana entera
+  _pgi = { dias: arbol, sel: {} };
+  for (const d of arbol) _pgi.sel[d.key] = true;
+  pgaImprimirRender();
+}
+function pgaImprimirCerrar() {
+  const m = document.getElementById("pgiModal");
+  if (m) { m.hidden = true; m.innerHTML = ""; }
+  _pgi = null;
+}
+function pgaImprimirRender() {
+  const m = document.getElementById("pgiModal"); if (!m || !_pgi) return;
+  const opts = _pgi.dias.map(function (d) {
+    return '<option value="' + d.key + '">' + escapeHtml(_pgaDiaTxt(d.key)) + '</option>';
+  }).join("");
+  const n = _pgi.dias.filter(function (d) { return _pgi.sel[d.key]; }).length;
+  const filas = _pgi.dias.map(function (d) {
+    return '<label class="pgi-dia"><input type="checkbox" ' + (_pgi.sel[d.key] ? "checked" : "") +
+      ' onchange="pgaImprimirTildar(\'' + d.key + '\', this.checked)">' +
+      '<b>' + escapeHtml(_pgaDiaTxt(d.key)) + '</b>' +
+      '<span>' + _pppFmtM3(d.m3) + ' m³ · ' + d.tandasArr.length + ' tanda' +
+        (d.tandasArr.length === 1 ? '' : 's') + ' · ' + d.nps + ' NP</span></label>';
+  }).join("");
+  m.innerHTML = '<div class="pgi-card">' +
+    '<div class="pgi-top"><h3>🖨 Imprimir la programación</h3>' +
+      '<p>Elegí los días. Sale abierta hasta la NP, sin el detalle de códigos.</p></div>' +
+    '<div class="pgi-body">' +
+      '<div class="pgi-rango">Rango: desde ' +
+        '<select id="pgiD1">' + opts + '</select> hasta ' +
+        '<select id="pgiD2">' + opts + '</select>' +
+        '<button class="pgi-mini" onclick="pgaImprimirRango()">Aplicar</button>' +
+        '<button class="pgi-mini" onclick="pgaImprimirTodos(true)">Todos</button>' +
+        '<button class="pgi-mini" onclick="pgaImprimirTodos(false)">Ninguno</button>' +
+      '</div>' + filas +
+    '</div>' +
+    '<div class="pgi-btns">' +
+      '<button class="pgi-no" onclick="pgaImprimirCerrar()">Cancelar</button>' +
+      '<button class="pgi-si" id="pgiOk" ' + (n ? '' : 'disabled') +
+        ' onclick="pgaImprimirHacer()">🖨 Imprimir ' + n + ' día' + (n === 1 ? '' : 's') + '</button>' +
+    '</div></div>';
+  // los selects del rango arrancan en el primer y el último día tildado
+  const sel = _pgi.dias.filter(function (d) { return _pgi.sel[d.key]; });
+  if (sel.length) {
+    const a = document.getElementById("pgiD1"), b = document.getElementById("pgiD2");
+    if (a) a.value = sel[0].key;
+    if (b) b.value = sel[sel.length - 1].key;
+  }
+}
+function pgaImprimirTildar(k, v) { if (_pgi) { _pgi.sel[k] = !!v; pgaImprimirRender(); } }
+function pgaImprimirTodos(v) {
+  if (!_pgi) return;
+  for (const d of _pgi.dias) _pgi.sel[d.key] = !!v;
+  pgaImprimirRender();
+}
+function pgaImprimirRango() {
+  if (!_pgi) return;
+  const a = (document.getElementById("pgiD1") || {}).value, b = (document.getElementById("pgiD2") || {}).value;
+  if (!a || !b) return;
+  const lo = a <= b ? a : b, hi = a <= b ? b : a;       // si los dan al revés, se ordenan solos
+  for (const d of _pgi.dias) _pgi.sel[d.key] = (d.key >= lo && d.key <= hi);
+  pgaImprimirRender();
+}
+/* La hoja. Todo desplegado: día → tanda → NP, sin el contenido de cada NP. */
+function pgaImprimirHtml(dias) {
+  const hoy = new Date();
+  const cuando = String(hoy.getDate()).padStart(2, "0") + "/" + String(hoy.getMonth() + 1).padStart(2, "0") +
+    "/" + hoy.getFullYear() + " " + String(hoy.getHours()).padStart(2, "0") + ":" + String(hoy.getMinutes()).padStart(2, "0");
+  const rango = dias.length === 1 ? _pgaDiaTxt(dias[0].key)
+    : (_pgaDiaTxt(dias[0].key) + " a " + _pgaDiaTxt(dias[dias.length - 1].key));
+  let m3 = 0, nps = 0, tn = 0;
+  for (const d of dias) { m3 += d.m3; nps += d.nps; tn += d.tandasArr.length; }
+  let h = '<div class="pgp-h1">Programación de entregas — ' + escapeHtml(rango) + '</div>' +
+    '<div class="pgp-h2">' + _pppFmtM3(m3) + ' m³ · ' + tn + ' tanda' + (tn === 1 ? '' : 's') +
+    ' · ' + nps + ' NP · impreso el ' + cuando + '</div>';
+  for (const d of dias) {
+    h += '<div class="pgp-dia"><h3>' + escapeHtml(_pgaDiaTxt(d.key)) +
+      '<small>' + _pppFmtM3(d.m3) + ' m³ · ' + d.tandasArr.length + ' tanda' +
+      (d.tandasArr.length === 1 ? '' : 's') + ' · ' + d.nps + ' NP</small></h3>' +
+      '<table class="pgp-tab">' +
+      '<colgroup><col class="c1"><col class="c2"><col class="c3"><col class="c4"><col class="c5"><col class="c6"></colgroup>' +
+      '<thead><tr>' +
+        '<th>Tanda / NP</th><th>Cliente</th><th>Zona · barrio</th><th>Horario</th>' +
+        '<th class="n">m³</th><th>Estado</th></tr></thead><tbody>';
+    for (const t of d.tandasArr) {
+      const te = _pgaEstadoGrupo(t.est, t.nps), z = _pgaZonaTanda(t);
+      h += '<tr class="pgp-t"><td>' + escapeHtml(t.tanda) + '</td>' +
+        '<td></td><td>' + escapeHtml(z) + '</td><td></td>' +
+        '<td class="n">' + _pppFmtM3(t.m3) + '</td>' +
+        '<td>' + t.nps + ' NP · ' + PGA_EST_TXT[te] + '</td></tr>';
+      for (const r of t.filas) {
+        const est = PGA_EST.indexOf(r.estado) >= 0 ? r.estado : "pendiente";
+        const lug = [r.zona_corta || r.localidad || "", r.barrio || ""]
+          .filter(function (x, i, a) { return x && a.indexOf(x) === i; }).join(" · ");
+        const hor = r.pide_horario ? aprHorTxt({ fecha: r.horario_fecha, franja: r.horario_franja }) : "";
+        h += '<tr class="pgp-np"><td><b>' + escapeHtml(String(r.np)) + '</b>' +
+            (r.cod ? ' <span>' + escapeHtml((r.empresa || "LK") + " " + r.cod) + '</span>' : '') + '</td>' +
+          '<td>' + escapeHtml(r.razon_social || "—") + '</td>' +
+          '<td>' + escapeHtml(lug) + '</td>' +
+          '<td>' + escapeHtml(hor) + '</td>' +
+          '<td class="n">' + _pppFmtM3(r.m3) + '</td>' +
+          '<td><span class="pgp-est">' + PGA_EST_TXT[est] + '</span></td></tr>';
+      }
+    }
+    h += '<tr class="pgp-tot"><td>Total del día</td><td></td><td></td><td></td>' +
+      '<td class="n">' + _pppFmtM3(d.m3) + '</td><td>' + d.nps + ' NP</td></tr>';
+    h += '</tbody></table></div>';
+  }
+  return h;
+}
+function pgaImprimirHacer() {
+  if (!_pgi) return;
+  const dias = _pgi.dias.filter(function (d) { return _pgi.sel[d.key]; });
+  if (!dias.length) return;
+  let hoja = document.getElementById("pgaPrint");
+  if (!hoja) { hoja = document.createElement("div"); hoja.id = "pgaPrint"; document.body.appendChild(hoja); }
+  hoja.innerHTML = pgaImprimirHtml(dias);
+  pgaImprimirCerrar();
+  // el pop-up se cierra ANTES de imprimir; si no, sale en la hoja
+  setTimeout(function () { try { window.print(); } catch (_e) {} }, 60);
 }
 
 function _pppPlanGridHtml(programados) {

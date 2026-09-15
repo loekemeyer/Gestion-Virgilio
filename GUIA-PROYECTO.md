@@ -1,3 +1,76 @@
+## Nota v17.98 (2026-09-15) — 🖨 Imprimir la Programación
+
+Pedido de Luis: *"al lado del botón de «Actualizar» quiero que haya un botón de «Imprimir». Al
+apretarlo debería dar la opción de elegir qué días o rango de días imprimir, y la visualización
+debería ser al estilo la tabla de abajo abierta al nivel de tandas (que muestre las NPs y los datos
+pero no necesariamente el contenido individual de cada NP)"*.
+
+**Dónde:** `🖨 Imprimir`, el renglón siguiente a `🔄 Actualizar` en la barra de Programación.
+
+**El pop-up** (`#pgiModal`) lista **un renglón por día** con sus m³ / tandas / NP, para elegir sin
+adivinar. Arranca con **todo tildado** (lo más común es la semana entera) y trae además dos
+selects **Desde/Hasta** + `Aplicar` para el rango, y `Todos` / `Ninguno`. El botón dice cuántos
+días va a mandar (`🖨 Imprimir 3 días`) y con **cero días queda deshabilitado**: no se manda una
+hoja vacía a la impresora. Un rango dado al revés (17 → 15) **se ordena solo**, no vacía la
+selección.
+
+**La hoja** sale **abierta hasta la NP y sin el contenido de cada NP**, que es textual lo que se
+pidió: día → tanda → NP con código de cliente, razón social, zona · barrio, horario pactado, m³ y
+estado, más el total por día. Lo que esté abierto o cerrado **en la pantalla no importa**: la hoja
+sale completa igual.
+
+Tres decisiones que no son obvias:
+
+- **No se abre una ventana nueva.** Entre el click y el `print()` hay un pop-up, y el navegador
+  bloquea la ventana si el click no la disparó directo. En vez de eso la hoja se arma en un
+  `<div id="pgaPrint">` colgado del `<body>` y un `@media print` esconde **todo lo demás**
+  (`body > *:not(#pgaPrint)`). Medido con `emulateMedia({media:"print"})`: sólo la hoja visible,
+  nada más de la app.
+- **El pop-up se cierra ANTES del `print()`** (y por eso el `setTimeout` de 60 ms): si no, sale
+  impreso encima de la hoja.
+- **`table-layout:fixed` + `<colgroup>` de 6 columnas.** Si cada día dimensiona su tabla solo, las
+  columnas **no alinean entre días** y la hoja se lee como seis tablas distintas.
+
+Y dos correcciones sobre la primera prueba en papel:
+
+- **La hoja va en negro** (`#pgaPrint, #pgaPrint * { color:#000 }`). Heredaba el azul de la app y
+  en papel el nombre del cliente salía gris claro.
+- **El día NO lleva `break-inside:avoid`.** Un día de 40 NP no entra en una hoja y el navegador lo
+  empujaba **entero** a la siguiente, dejando media hoja en blanco. Corta donde tenga que cortar,
+  pero nunca por el medio de un renglón (`tr { break-inside:avoid }`) y repitiendo el encabezado en
+  cada hoja (`thead { display:table-header-group }`).
+
+`tests/pga-imprimir.cjs` (35 chequeos) fija todo lo de arriba, incluido que la hoja **no pide**
+`gv_ppp_np_items` — el contenido de la NP no tiene que viajar ni salir impreso.
+
+### De paso: `main` estaba en rojo, y uno de los rojos destapó un bug (problema 203)
+
+La batería cortaba en `tests/ppp-plan-nueva.cjs` con **12 chequeos en rojo**, y no era el tablero:
+desde la v17.66 la vista por defecto de Programación es la **tabla**, y el test nunca declaraba
+`_pppPlanTabla = false`, así que medía el tablero de 6 días sobre una pantalla que ya no se
+dibujaba. Mismo bicho que tuvo `ppp-fit-acordeon` en la v17.95. Como `run.sh` corre con `set -e`,
+ese corte tapaba **dos tests más** que también estaban rotos y que nadie llegaba a ver:
+
+- **`ppp-prolijo`** — lo mismo, `_pppPlanTabla` sin declarar. Peor: sus chequeos **en negativo**
+  ("la tarjeta ya no escribe las 11 tandas") pasaban **solos**, porque no se dibujaba nada.
+- **`ppp-reprog-boton`** — el cartel de Atrasados se reescribió en algún momento y el test seguía
+  buscando la frase vieja ("Reprogramalo a un día con…"), que **nunca existió en el código**. Se
+  reescribió el chequeo contra la **intención** (que invite a volver a programar y nombre el botón)
+  en vez de contra la redacción exacta, que es lo que lo hacía romperse con cada retoque de texto.
+
+Barrido, para que no vuelva a pasar: de los 8 tests que dibujan Programación, los 7 que no
+declaraban la vista se corrieron uno por uno; los otros 5 pasan igual porque no miran el tablero.
+
+Arreglado eso quedó **un** chequeo rojo, y ése sí era un bug real: **el camión de un súper viejo de
+ISIS salía con la razón social cruda** (`Camión 5 · Inc Sociedad Anonima`) en vez del nombre
+(`Carrefour`). La v17.72 mudó el padrón de súper del `localStorage` a la tabla `gv_supers` y
+reescribió el fallback "fila vieja de ISIS sin cód" para que se resuelva por el campo **`nota`**,
+pero `pppSupersNeed()` pedía `select=empresa,cod,nombre,super_key,cuit` — **sin `nota`** — y el
+`.map()` tampoco lo copiaba. O sea: el fallback nació muerto. Medido: las **19 filas activas** de
+`gv_supers` tienen `nota` cargada y **14 de ellas son la razón social** (Coto C.I.C.S.A., Inc
+Sociedad Anonima, Dia Argentina SA, Libertad S.A…). El fix es una palabra en el select y un campo
+en el `.map()`; los dos chequeos nuevos del test lo dejan clavado.
+
 ## Nota v17.96 (2026-09-15) — el contenido de la NP va en las celdas que estaban vacías
 
 Pedido de Luis: *"en el caso de las NPs, cuando se abren, ¿podemos aprovechar el espacio entre
