@@ -5441,7 +5441,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=18.12"></script>
+<script type="module" src="recepcion.js?v=18.13"></script>
 <!-- Config del módulo de fichada (compartido con fichada.html). El secret
      hmacSecret tiene que ser el mismo acá y allá; cargándolo desde un solo
      archivo evitamos que se desincronicen. -->
@@ -8889,7 +8889,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v18.12";
+const APP_VERSION = "v18.13";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -17280,7 +17280,20 @@ var STK_POP_CSS =
   ".proyv-leg i.dash{background:repeating-linear-gradient(90deg,#6d28d9 0 5px,transparent 5px 8px);}" +
   ".proyv-leg i.dot{background:repeating-linear-gradient(90deg,#94a3b8 0 2px,transparent 2px 5px);}" +
   ".proyv-bar.bajo{background:linear-gradient(90deg,#f87171,#dc2626);}" +
-  ".proyv-mark{position:absolute;top:0;bottom:0;width:0;border-left:2px dashed #4c1d95;pointer-events:none;}";
+  ".proyv-mark{position:absolute;top:0;bottom:0;width:0;border-left:2px dashed #4c1d95;pointer-events:none;}" +
+  /* v18.12 - los numeros de facturado y entregado son botones: abren el desglose del mes */
+  ".proyv-lnk{background:none;border:0;padding:0;margin:0;font:inherit;color:inherit;cursor:pointer;" +
+  "text-decoration:underline;text-decoration-style:dotted;text-underline-offset:3px;touch-action:manipulation;}" +
+  ".proyv-lnk:hover{text-decoration-style:solid;}" +
+  ".proyv-lnk.on{text-decoration-style:solid;text-decoration-thickness:2px;}" +
+  ".proyv-det{margin:1px 0 7px 12px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:7px 9px;}" +
+  ".proyv-det table{width:100%;border-collapse:collapse;font-size:11.5px;}" +
+  ".proyv-det th{font-size:10px;font-weight:800;color:#94a3b8;text-transform:uppercase;letter-spacing:.03em;text-align:left;padding:0 6px 3px 0;}" +
+  ".proyv-det td{padding:2px 6px;color:#334155;border-top:1px solid #eef2f7;}" +
+  ".proyv-det td:first-child,.proyv-det th:first-child{padding-left:0;}" +
+  ".proyv-det td.n,.proyv-det th.n{text-align:right;padding-right:0;font-variant-numeric:tabular-nums;font-weight:800;}" +
+  ".proyv-det tr.otros td{color:#64748b;font-style:italic;}" +
+  ".proyv-det .vacio{color:#94a3b8;font-size:11.5px;line-height:1.45;}";
 /* v11.70 — `wide`: tarjeta ancha (hasta 1340px) para los pop-ups con tablas de muchas
    columnas (Importación). Los demás llaman con 2 argumentos y quedan igual que siempre. */
 function _stkPopShell(title, bodyId, wide) {
@@ -17373,7 +17386,8 @@ async function stkShowProyVentas(codEnc, proy) {
   var nombre = artNombre(cod, "") || "";
   var fc = function (n) { n = Number(n) || 0; return String(Math.round(n * 10) / 10); };
   body.innerHTML = '<div class="stkpop-empty">Cargando ventas facturadas de los últimos 12 meses' + (emp ? ' (' + emp + ')' : ' (LK + Chef)') + '…</div>';
-  var rows = [], ent = {};
+  var rows = [], ent = {}, entDet = [];
+  var _cn = _ocgNorm(codB);
   var _H = { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY, "Content-Type": "application/json" };
   try {
     // v15.52 — las dos series salen juntas: lo FACTURADO (ventas, motor de PáginaLK) y lo
@@ -17387,9 +17401,21 @@ async function stkShowProyVentas(codEnc, proy) {
       fetch(SUPABASE_URL + "/rest/v1/rpc/gv_entregas_mensuales_cod", {
         method: "POST", headers: _H,
         body: JSON.stringify({ p_cod: codB, p_meses: 12 }), cache: "no-store"
-      }).then(function (r) { return r.ok ? r.json() : []; }).catch(function () { return []; })
+      }).then(function (r) { return r.ok ? r.json() : []; }).catch(function () { return []; }),
+      // v18.12 - el DETALLE de cada entrega (dia, quien, remito), para el desglose del mes.
+      // Misma fuente que gv_entregas_mensuales_cod, pero fila por fila. El cod_art de la
+      // vista viene con los ceros a la izquierda tal cual se cargo ("031" para el 31), asi
+      // que se piden las tres variantes en vez de normalizar (PostgREST no hace regex).
+      fetch(SUPABASE_URL + "/rest/v1/vista_historial_entregas?select=fecha,cajas,quien,remito,fuente" +
+            "&cod_art=in.(" + [_cn, "0" + _cn, "00" + _cn].map(encodeURIComponent).join(",") + ")&limit=3000",
+            { headers: _H, cache: "no-store" })
+        .then(function (r) { return r.ok ? r.json() : []; }).catch(function () { return []; })
     ]);
     rows = _par[0];
+    entDet = (Array.isArray(_par[2]) ? _par[2] : []).map(function (r) {
+      return { mes: _stkProyMes(r.fecha), fecha: r.fecha, cajas: Number(r.cajas) || 0,
+               quien: r.quien || "", remito: r.remito || "" };
+    }).filter(function (r) { return r.mes; });
     // `cubierto` = ese mes el circuito del artículo YA se registraba. false ⇒ "s/d", NO un cero:
     // la recepción de proveedores AT arranca en 06/2026 y la de talleristas en 12/2025.
     (Array.isArray(_par[1]) ? _par[1] : []).forEach(function (x) {
@@ -17413,41 +17439,152 @@ async function stkShowProyVentas(codEnc, proy) {
   // v15.52 — la columna de entregadas sólo aparece si hay algo que mostrar: si de este código
   // no hay UN solo mes con registro de entregas, no se agrega una columna de "s/d" al pepe.
   var hayEnt = win.some(function (x) { var e = ent[x.mes]; return e && (e.cub || e.cajas > 0); });
-  var totEnt = win.reduce(function (s, x) { var e = ent[x.mes]; return s + (e && e.cub ? e.cajas : 0); }, 0);
-  h += '<div class="stkpop-grp"><div style="font-size:12px;font-weight:800;color:#334155;margin-bottom:8px;">🧾 ' +
-       (hayEnt ? 'Facturado y entregado' : 'Cajas facturadas') + ' — ventana de proyección (' + win.length + ' meses)</div>';
-  h += '<div class="proyv-chart">';
-  if (hayEnt) {
-    h += '<div class="proyv-row proyv-head"><span class="proyv-mes">mes</span>' +
-         '<span class="proyv-val">factur.</span><span class="proyv-track" style="background:none"></span>' +
-         '<span class="proyv-ent">entreg.</span></div>';
-  }
-  win.forEach(function (x) {
-    var pct = Math.max(2, Math.round(x.cajas / mx * 100));
-    var bajo = proyN > 0.05 && x.cajas < proyN;
-    var e = ent[x.mes];
-    h += '<div class="proyv-row">' +
-         '<span class="proyv-mes">' + escapeHtml(_stkFmtMes(x.mes)) + '</span>' +
-         '<span class="proyv-val"' + (bajo ? ' style="color:#b91c1c"' : '') + '>' + fc(x.cajas) + '</span>' +
-         '<span class="proyv-track"><span class="proyv-bar' + (bajo ? ' bajo' : '') + '" style="width:' + pct + '%"></span>' +
-         (proyN > 0.05 ? '<span class="proyv-mark" style="left:' + Math.round(proyN / mx * 100) + '%"></span>' : '') + '</span>' +
-         (hayEnt ? (e && e.cub
-            ? '<span class="proyv-ent" title="Cajas entregadas por el proveedor">' + fc(e.cajas) + '</span>'
-            : '<span class="proyv-ent sd" title="Ese mes las entregas todavía no se registraban en la app — no es un cero">s/d</span>') : '') +
-         '</div>';
-  });
-  h += '</div>';
-  var piso = proyN > 0.05 && prom > 0 && (proyN - prom) / prom > 0.005;   // actuó el piso del 4.º mejor mes
-  h += '<div class="proyv-foot">Total 6m: <b>' + fc(tot) + '</b> cajas' +
-       (hayEnt ? ' · Entregado: <b style="color:#047857">' + fc(totEnt) + '</b> cajas' : '') +
-       ' · Promedio: <b>' + fc(Math.round(prom)) + '</b> caj/mes' +
-       (proyN > 0.05 ? ' · Proyección: <b style="color:#6d28d9">' + fc(proyN) + '</b>' + (piso ? ' <small style="color:#6d28d9">(piso: 4.º mejor mes)</small>' : '') +
-                       ' · <b>' + arriba + ' de ' + win.length + '</b> meses por encima' : '') + '</div>';
-  h += '</div>';
+  // v18.12 — el bloque de barras se repinta ENTERO al abrir o cerrar un desglose, así que
+  // todo lo que necesita para dibujarse vive en `_stkProy` y no en variables locales.
+  _stkProy = {
+    codB: codB, emp: emp, empParam: (emp === "CH" ? "chef" : (emp === "LK" ? "lk" : null)),
+    win: win, ent: ent, entDet: entDet, proyN: proyN, mx: mx, hayEnt: hayEnt,
+    tot: tot, prom: prom, arriba: arriba,
+    totEnt: win.reduce(function (s, x) { var e = ent[x.mes]; return s + (e && e.cub ? e.cajas : 0); }, 0),
+    abierto: "", vta: {}
+  };
+  h += '<div id="stkProyChart">' + _stkProyChartHtml() + '</div>';
   // ── Gráfico de tendencia (12 meses) ── v18.11: va ÚLTIMO. Orden pedido por el dueño:
   // código · venta (facturado) · entrega · gráfico. Antes abría el pop-up y tapaba los números.
   h += _stkProyTrendSvg(rows, proyN, prom);
   body.innerHTML = h;
+}
+
+/* ============ v18.12 — desglose de un mes en el pop-up de Proyección ==================
+   Pedido del dueño (2026-09-15): *"quiero poder tocar sobre venta o sobre entrega y ver
+   cuándo entregó en ese mes"* y *"las ventas de los 5 más importantes + una fila de otros"*.
+
+   · Tocando el número de ENTREG. → día, quién y remito de cada entrega de ese mes. Sale de
+     `vista_historial_entregas`, la misma fuente que ya alimenta la columna, pero fila por
+     fila; se trae UNA vez al abrir el pop-up y el desglose sólo filtra en memoria.
+   · Tocando el número de FACTUR. → los 5 clientes más grandes del mes + una fila "Otros".
+     Eso vive en LK (`sales_lines`), así que va por RPC. */
+var _stkProy = null;
+
+/* El mes (YYYY-MM) de una fecha de entrega. `vista_historial_entregas.fecha` es TEXTO y
+   viene en tres formatos distintos: los mismos que parsea `gv_entregas_mensuales_cod`, y
+   por eso las cuentas del desglose cierran con las de la columna. */
+function _stkProyMes(f) {
+  var s = String(f || "").trim(), m;
+  if ((m = s.match(/^(\d{4})-(\d{2})-\d{2}/))) return m[1] + "-" + m[2];
+  if ((m = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2})$/))) return "20" + m[3] + "-" + ("0" + m[2]).slice(-2);
+  if ((m = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/))) return m[3] + "-" + ("0" + m[2]).slice(-2);
+  return "";
+}
+function _stkProyDia(f) {
+  var s = String(f || "").trim(), m;
+  if ((m = s.match(/^\d{4}-(\d{2})-(\d{2})/))) return m[2] + "/" + m[1];
+  if ((m = s.match(/^(\d{1,2})\/(\d{1,2})\//))) return ("0" + m[1]).slice(-2) + "/" + ("0" + m[2]).slice(-2);
+  return s;
+}
+function _stkProyFc(n) { n = Number(n) || 0; return String(Math.round(n * 10) / 10); }
+function _stkProyPintar() {
+  var c = document.getElementById("stkProyChart");
+  if (c) c.innerHTML = _stkProyChartHtml();
+}
+/* Abre o cierra el desglose de un mes. Un solo desglose abierto a la vez: en un celular
+   dos tablas abiertas dejan el pop-up sin pie ni gráfico a la vista. */
+async function stkProyDet(mes, tipo) {
+  if (!_stkProy) return;
+  var k = tipo + "|" + mes;
+  _stkProy.abierto = (_stkProy.abierto === k) ? "" : k;
+  _stkProyPintar();
+  if (_stkProy.abierto !== k || tipo !== "vta" || _stkProy.vta[mes]) return;
+  _stkProy.vta[mes] = { cargando: true };
+  _stkProyPintar();
+  _stkProy.vta[mes] = await _stkProyVtaClientes(mes);
+  if (_stkProy.abierto === k) _stkProyPintar();   // si ya lo cerró, no se le repinta encima
+}
+/* Los 5 clientes más grandes del mes + "Otros". El corte lo hace el BACKEND (la RPC
+   devuelve las 6 filas ya armadas): son ventas de LK, el front no tiene con qué cortarlas. */
+async function _stkProyVtaClientes(mes) {
+  try {
+    var r = await fetch(SUPABASE_URL + "/rest/v1/rpc/gv_ventas_clientes_mes_cod", {
+      method: "POST",
+      headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY, "Content-Type": "application/json" },
+      body: JSON.stringify({ p_cod: _stkProy.codB, p_mes: mes, p_empresa: _stkProy.empParam }),
+      cache: "no-store"
+    });
+    if (r.status === 404) return { error: "falta" };     // la RPC todavía no existe
+    if (!r.ok) return { error: "http " + r.status };
+    var j = await r.json();
+    return { filas: Array.isArray(j) ? j : [] };
+  } catch (_e) { return { error: "red" }; }
+}
+function _stkProyDetHtml(mes, tipo) {
+  var esc = escapeHtml, S = _stkProy;
+  var caja = function (x) { return '<div class="proyv-det">' + x + '</div>'; };
+  if (tipo === "ent") {
+    var L = (S.entDet || []).filter(function (r) { return r.mes === mes; })
+              .sort(function (a, b) { return String(a.fecha).localeCompare(String(b.fecha)); });
+    if (!L.length) return caja('<div class="vacio">Sin entregas registradas en ' + esc(_stkFmtMes(mes)) + '.</div>');
+    var t = '<table><tr><th>día</th><th>quién</th><th>remito</th><th class="n">cajas</th></tr>';
+    L.forEach(function (r) {
+      t += '<tr><td>' + esc(_stkProyDia(r.fecha)) + '</td><td>' + esc(r.quien || "—") + '</td><td>' +
+           esc(r.remito || "—") + '</td><td class="n">' + _stkProyFc(r.cajas) + '</td></tr>';
+    });
+    return caja(t + '</table>');
+  }
+  var d = (S.vta || {})[mes];
+  if (!d || d.cargando) return caja('<div class="vacio">Cargando…</div>');
+  if (d.error === "falta") return caja('<div class="vacio">El desglose por cliente todavía no está habilitado: falta crear la consulta en Supabase.</div>');
+  if (d.error) return caja('<div class="vacio">No se pudo traer el detalle (' + esc(d.error) + ').</div>');
+  if (!d.filas.length) return caja('<div class="vacio">Sin ventas facturadas en ' + esc(_stkFmtMes(mes)) + '.</div>');
+  var v = '<table><tr><th>cliente</th><th class="n">cajas</th></tr>';
+  d.filas.forEach(function (r) {
+    var otros = String(r.cliente || "").toLowerCase() === "otros";
+    v += '<tr' + (otros ? ' class="otros"' : '') + '><td>' + esc(r.cliente || "—") +
+         '</td><td class="n">' + _stkProyFc(r.cajas) + '</td></tr>';
+  });
+  return caja(v + '</table>');
+}
+/* El bloque de barras. Se dibuja desde `_stkProy` para poder repintarse solo. */
+function _stkProyChartHtml() {
+  var S = _stkProy; if (!S) return "";
+  var fc = _stkProyFc;
+  var h = '<div class="stkpop-grp"><div style="font-size:12px;font-weight:800;color:#334155;margin-bottom:8px;">🧾 ' +
+          (S.hayEnt ? 'Facturado y entregado' : 'Cajas facturadas') + ' — ventana de proyección (' + S.win.length + ' meses)</div>';
+  h += '<div class="proyv-chart">';
+  if (S.hayEnt) {
+    h += '<div class="proyv-row proyv-head"><span class="proyv-mes">mes</span>' +
+         '<span class="proyv-val">factur.</span><span class="proyv-track" style="background:none"></span>' +
+         '<span class="proyv-ent">entreg.</span></div>';
+  }
+  S.win.forEach(function (x) {
+    var pct = Math.max(2, Math.round(x.cajas / S.mx * 100));
+    var bajo = S.proyN > 0.05 && x.cajas < S.proyN;
+    var e = S.ent[x.mes];
+    var kv = "vta|" + x.mes, ke = "ent|" + x.mes;
+    h += '<div class="proyv-row">' +
+         '<span class="proyv-mes">' + escapeHtml(_stkFmtMes(x.mes)) + '</span>' +
+         '<span class="proyv-val"' + (bajo ? ' style="color:#b91c1c"' : '') + '>' +
+           '<button type="button" class="proyv-lnk' + (S.abierto === kv ? ' on' : '') +
+           '" onclick="stkProyDet(&quot;' + x.mes + '&quot;,&quot;vta&quot;)"' +
+           ' title="Ver a qué clientes se les facturó ese mes">' + fc(x.cajas) + '</button></span>' +
+         '<span class="proyv-track"><span class="proyv-bar' + (bajo ? ' bajo' : '') + '" style="width:' + pct + '%"></span>' +
+         (S.proyN > 0.05 ? '<span class="proyv-mark" style="left:' + Math.round(S.proyN / S.mx * 100) + '%"></span>' : '') + '</span>' +
+         (S.hayEnt ? (e && e.cub
+            ? '<span class="proyv-ent"><button type="button" class="proyv-lnk' + (S.abierto === ke ? ' on' : '') +
+              '" onclick="stkProyDet(&quot;' + x.mes + '&quot;,&quot;ent&quot;)"' +
+              ' title="Ver cuándo entregó ese mes">' + fc(e.cajas) + '</button></span>'
+            : '<span class="proyv-ent sd" title="Ese mes las entregas todavía no se registraban en la app — no es un cero">s/d</span>') : '') +
+         '</div>';
+    if (S.abierto === kv) h += _stkProyDetHtml(x.mes, "vta");
+    if (S.abierto === ke) h += _stkProyDetHtml(x.mes, "ent");
+  });
+  h += '</div>';
+  var piso = S.proyN > 0.05 && S.prom > 0 && (S.proyN - S.prom) / S.prom > 0.005;   // actuó el piso del 4.º mejor mes
+  h += '<div class="proyv-foot">Total 6m: <b>' + fc(S.tot) + '</b> cajas' +
+       (S.hayEnt ? ' · Entregado: <b style="color:#047857">' + fc(S.totEnt) + '</b> cajas' : '') +
+       ' · Promedio: <b>' + fc(Math.round(S.prom)) + '</b> caj/mes' +
+       (S.proyN > 0.05 ? ' · Proyección: <b style="color:#6d28d9">' + fc(S.proyN) + '</b>' + (piso ? ' <small style="color:#6d28d9">(piso: 4.º mejor mes)</small>' : '') +
+                       ' · <b>' + S.arriba + ' de ' + S.win.length + '</b> meses por encima' : '') + '</div>';
+  return h + '</div>';
 }
 /* v9.02/9.04 — Módulo "NP que faltan": pedidos que están en la base (PPP_Base_Pedidos) pero NO en
    Programación Diaria, y que no se facturaron ni entregaron. Los que disparan el ⚠ de Cajas

@@ -1,3 +1,59 @@
+## Nota v18.13 (2026-09-15) — Pop-up de Proyección: tocar un mes y ver qué pasó
+
+Pedido del dueño: *"quiero poder tocar sobre venta o sobre entrega y ver cuándo entregó en
+ese mes"* y *"las ventas de los 5 más importantes + una fila de otros"*.
+
+Los dos números de cada mes pasaron a ser botones. Se abre uno por vez: en un celular, dos
+tablas abiertas dejan el pie y el gráfico fuera de pantalla.
+
+### Entrega → día, quién y remito ✅ andando
+
+Sale de **`vista_historial_entregas`** (`fecha`, `cajas`, `quien`, `remito`, `fuente`), la
+misma fuente que ya alimenta la columna, pero fila por fila. Se trae **una sola vez** al
+abrir el pop-up, junto con las otras dos series, y el desglose filtra en memoria: abrir y
+cerrar meses no pega contra la base.
+
+⚠ `fecha` es **texto** y viene en tres formatos (`YYYY-MM-DD`, `D/M/YY`, `D/M/YYYY`).
+`_stkProyMes()` parsea **los mismos tres** que parsea `gv_entregas_mensuales_cod`; si se
+tocara uno sin el otro, el desglose no sumaría lo que muestra la columna. Cotejado con 513 /
+mayo 26: 420 + 226 + 224 + 138 = **1.008**, que es exactamente lo que dice la columna.
+
+⚠ El `cod_art` de la vista conserva los ceros a la izquierda tal como se cargó (`031` para el
+31), y PostgREST no hace regex, así que se piden las tres variantes
+(`cod_art=in.(31,031,0031)`) en lugar de normalizar del lado del servidor.
+
+El remito está en **855 de 1.539** filas (todas las de `prov_at`, la mitad de las de
+tallerista); las que no lo tienen muestran «—».
+
+### Venta → los 5 clientes más grandes + «Otros» ⏳ falta la RPC
+
+Las ventas viven en **`sales_lines` de LK**, y Virgilio no las alcanza: no hay foreign tables
+hacia ese proyecto (se comprobó), sólo el puente HTTP de `ventas_mensuales_cod`. Así que van
+**dos funciones**, una por proyecto, y están escritas en
+**`sql/gv_ventas_clientes_mes_v1812.sql`** — sin aplicar, la DDL quedó frenada por permisos.
+El front ya llama a `gv_ventas_clientes_mes_cod`: mientras no exista contesta 404 y el
+desglose lo dice en una línea. Cuando se cree, funciona sin tocar nada más.
+
+Probado a mano contra LK (513 / mayo 26): Osa 400 · Inc 183 · Patagonia 92 · Enrique Reyes 40
+· Horcada 40 · **Otros 846** = 1.601, igual que la columna. Ese mes el 513 le fue a **137
+clientes**: por eso el corte lo hace el backend y viajan 6 filas, no 137.
+
+⚠ La primera versión de esa consulta filtraba por mes y después por artículo, y **se pasó de
+los 60 s** (`sales_lines` tiene 236.272 filas). Normalizar `item_code` con `regexp_replace` en
+el `WHERE` inutiliza `idx_sales_lines_item_invoice`. La versión que quedó arma primero un
+juego de códigos candidatos (el código, sus formas con ceros, y los que `sales_item_remap`
+manda a él) y filtra con `in` de literales: vuelve en menos de un segundo.
+
+⚠ La clave y el `x-feed-secret` del puente **no se escriben en el repo** (se publica por
+GitHub Pages): el bloque que crea la función los lee del cuerpo de `ventas_mensuales_cod`,
+que ya los tiene, así que además no se pueden desincronizar.
+
+### Refactor
+
+El bloque de barras se repinta entero al abrir o cerrar un desglose, así que lo que necesita
+para dibujarse dejó de vivir en variables locales de `stkShowProyVentas` y pasó a `_stkProy`;
+lo dibuja `_stkProyChartHtml()`.
+
 ## Nota v18.12 (2026-09-15) — PPP: solapa «Modificar Pedidos», vacía
 
 Luis: *"vamos con otro proyecto grande. En primer lugar, vamos a crear una pestaña nueva en la PPP
