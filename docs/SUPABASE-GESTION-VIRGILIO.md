@@ -17440,6 +17440,38 @@ El trigger busca por código exacto y por código sin ceros de adelante; ninguna
 `"GP2".articulo`. Dar de alta artículos en GP2 es de quien administra ese módulo, así que el
 problema **265 queda abierto** y no se tocó nada.
 
+
+### v18.41 — el buscador de la recepción no encontraba nada con un cero adelante
+
+Thomas, al leer lo de arriba: *"habíamos dicho que si quieren recibir un artículo que no esté en su
+listado, los que solamente puedan escribir sean los de la base de Supa… y que si quieren crear un
+artículo nuevo, los deje, pero que les marque «estás creando un artículo nuevo». Creo que eso ya en
+algún commit lo habíamos hecho."* **Tiene razón, y está en §3.bn / §3.bn.1 (v15.36 y v15.39, 11/09).**
+Más todavía: esa sección arranca con *"Remito **38087** (02/09): el operario cargó **599, 943 y
+948**"* — son 3 de las 7 filas corregidas hoy. **Las 7 son anteriores al arreglo** (10/07, 21/07 ×3,
+02/09 ×3); lo que faltaba era corregir los datos viejos, no el circuito.
+
+Pero al releer el flujo apareció un agujero que sí seguía abierto. El catálogo se guarda con
+`_ocgNorm`, que **pela los ceros de adelante** (`0582` → `582`), y `arCatalogoBuscar` filtraba por lo
+tipeado **tal cual**:
+
+| El operario escribe | Antes (v18.40) | Ahora (v18.41) |
+|---|---|---|
+| `582` | 582E — Salero 90 ml | 582E — Salero 90 ml |
+| **`0582`** | **nada** → sólo queda "➕ Cargar igual: 582" | 582E — Salero 90 ml |
+
+O sea: el que tipeaba el código con el cero de adelante **no veía el artículo bueno**, y la única
+salida en pantalla era darlo de alta como nuevo. La red de contención funcionaba (WhatsApp a Thomas)
+pero la entrega igual quedaba con un código que no existe. Es el **mismo bug de los ceros** que se
+arregló en Stocks en la v18.26, en otra pantalla.
+
+**El arreglo:** `arCatalogoBuscar` prueba lo tipeado y, además, el código normalizado. Dos líneas.
+No toca cómo se decide el aviso de alta ni el botón "Cargar igual" — sólo hace que el artículo bueno
+aparezca en la lista.
+
+**Test:** `tests/rcp-buscar-cero-adelante.cjs`. Verificado que da **rojo** contra el `recepcion.js`
+de la v18.40 (`conCero: ""`) y verde con el arreglo. Problema **267**.
+
 ## §3.he — v18.39: el m³ se recalcula al modificar una NP de ISIS, y `vista_tanda_m3` deja de ignorar los overrides — 2026-09-15
 
 **Qué se agregó (Virgilio):** `sql/gv_m3_override_v1839.sql`.

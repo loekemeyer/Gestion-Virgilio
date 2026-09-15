@@ -1505,12 +1505,20 @@ function arCatalogoParecidos(cod) {
     return resto.length <= 2 && /^[A-Z]+$/.test(resto);     // y lo que sobra son letras
   }).slice(0, 4);
 }
-/* Códigos activos que matchean lo tipeado (por código o por descripción). */
+/* Códigos activos que matchean lo tipeado (por código o por descripción).
+   v18.41 — busca por lo tipeado TAL CUAL y, además, por el código normalizado. El
+   catálogo se guarda con `_ocgNorm` (sin ceros de adelante), así que tipear "0582" no
+   encontraba nada y el operario caía derecho en "Cargar igual: 582" con el 582E ahí al
+   lado, invisible. Es el mismo bug de los ceros que ya se arregló en Stocks. */
 function arCatalogoBuscar(txt) {
   if (!_arCatalogo) return [];
-  const q = opNorm(String(txt || "").trim());
+  const raw = String(txt || "").trim();
+  const q = opNorm(raw);
   if (!q) return _arCatalogo.slice(0, 60);
-  return _arCatalogo.filter(function (a) { return a.busq.indexOf(q) >= 0; }).slice(0, 60);
+  const qn = opNorm(_ocgNorm(raw));                        // "0582" -> "582"
+  return _arCatalogo.filter(function (a) {
+    return a.busq.indexOf(q) >= 0 || (qn && qn !== q && a.busq.indexOf(qn) >= 0);
+  }).slice(0, 60);
 }
 
 function arBusCerrar() {
