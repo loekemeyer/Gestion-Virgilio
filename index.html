@@ -5609,7 +5609,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=18.58"></script>
+<script type="module" src="recepcion.js?v=18.59"></script>
 <!-- Config del módulo de fichada (compartido con fichada.html). El secret
      hmacSecret tiene que ser el mismo acá y allá; cargándolo desde un solo
      archivo evitamos que se desincronicen. -->
@@ -9178,7 +9178,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v18.58";
+const APP_VERSION = "v18.59";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -35535,6 +35535,29 @@ function _pppComputeErrors(peds, entSet) {
     const nR = Object.keys(rutas).length, nF = Object.keys(fechas).length;
     if (nR > 1 || nF > 1) { tandasMal.push({ tanda: t, rutas: nR, fechas: nF, porRuta: rutas, porFecha: fechas }); for (const p of ps) if (p._err.indexOf("tandamal") < 0) p._err.push("tandamal"); }
   }
+  // v18.59 (Luis, 15/09: "no veo tandas inconsistentes ni panel de errores") — SÚPER MEZCLADO
+  // CON CLIENTES, por CAMIÓN. Regla del dueño (v14.23): un camión que lleva un súper no lleva
+  // ningún cliente común. "Tandas inconsistentes" mira por TANDA y deja a los súper afuera de la
+  // ruta, así que E11 del 16/09 (Dorinka en E11B con Extralimp/Todo Bazar/Goldar en E11A/C/D)
+  // no salía nunca. Espejo del centinela `gv_ppp_super_mezclado` del backend: camión =
+  // LETRA+NN (los 3 primeros caracteres de la tanda), agrupado por día de entrega.
+  const superMezcl = [];
+  try {
+    const porCam = {};
+    for (const p of peds) {
+      if (!p.programmed || !_pppTieneTanda(p)) continue;
+      const fe = _pppS(p.fecha_entrega) || "?", cam = String(p.tanda).trim().toUpperCase().slice(0, 3);
+      if (!/^[A-Z]\d\d$/.test(cam)) continue;
+      const k = fe + "|" + cam;
+      (porCam[k] = porCam[k] || { fecha: fe, cam: cam, supers: [], clientes: [] })[pppEsSuper(p) ? "supers" : "clientes"].push(p);
+    }
+    for (const k of Object.keys(porCam).sort()) {
+      const c = porCam[k];
+      if (!c.supers.length || !c.clientes.length) continue;
+      superMezcl.push(c);
+      for (const p of c.supers.concat(c.clientes)) if (p._err.indexOf("supermezcl") < 0) p._err.push("supermezcl");
+    }
+  } catch (_e) {}
   // v15.85 (Thomas: "más que 8 hs por día no se puede programar") — camiones que no entran en la
   // jornada: viaje óptimo + 15' por parada. Se agrupa por DÍA y por camión con la misma función
   // que usa la vista (_pppCamiones); Retira no viaja y queda afuera.
@@ -35571,10 +35594,10 @@ function _pppComputeErrors(peds, entSet) {
     jornada.sort(function (a, b) { return b.j.horas - a.j.horas; });
     dias.sort(function (a, b) { return b.hCada - a.hCada; });
   } catch (_e) {}
-  return { sacar: sacar, sinZona: sinZona, zonaDif: zonaDif, tandasMal: tandasMal, jornada: jornada, jornadaDia: dias };
+  return { sacar: sacar, sinZona: sinZona, zonaDif: zonaDif, tandasMal: tandasMal, superMezcl: superMezcl, jornada: jornada, jornadaDia: dias };
 }
 function pppErroresHtml(e) {
-  const n = e.sacar.length + e.sinZona.length + e.zonaDif.length + e.tandasMal.length + ((e.jornada || []).length) + ((e.jornadaDia || []).length);
+  const n = e.sacar.length + e.sinZona.length + e.zonaDif.length + e.tandasMal.length + ((e.superMezcl || []).length) + ((e.jornada || []).length) + ((e.jornadaDia || []).length);
   if (!n) return "";   // v13.12: sin errores no se muestra nada (dueño: "sacá esas 2 alertas")
   const np = function (p) { const s = escapeHtml(String(p.np)); return '<a class="ppp-go" onclick="pppGoToRow(\'' + s + '\')" title="Ir a la fila del pedido">' + s + '</a>'; };
   const cli = function (p) { const r = (p.razon_social || "").trim(); return r ? " " + escapeHtml(r.slice(0, 20)) : ""; };
@@ -35614,6 +35637,17 @@ function pppErroresHtml(e) {
                escapeHtml(c.num ? ("Camión " + c.num) : "Camión") + ' ' + escapeHtml(c.zona || "") +
                ' → <b>' + h1(j.horas) + ' h</b> (viaje ' + h1(j.hViaje) + ' h + ' + j.paradas + ' paradas × ' + _pppJorCfg.minParada + '′) · ' +
                Math.round(j.km) + ' km' + (j.sinUbic ? ' · <b>' + j.sinUbic + '</b> sin ubicación (los km quedan cortos)' : '') + lejos + '</div>';
+      }).join("") + '</div></div>';
+  }
+  if ((e.superMezcl || []).length) {
+    // v18.59 — súper y clientes en el MISMO camión (regla del dueño v14.23). Va primero porque
+    // obliga a mover tandas de camión, no a corregir un dato.
+    const dd = function (f) { return escapeHtml(String(f || "").replace(/\/\d{4}$/, "")); };
+    const tnd = function (p) { return np(p) + cli(p) + ' <u>' + escapeHtml(String(p.tanda || "").toUpperCase()) + '</u>'; };
+    h += '<div class="ppp-ei bad">🛒 <b>Súper mezclado con clientes en el mismo camión (' + e.superMezcl.length + '):</b><div class="ppp-ei-det">' +
+      e.superMezcl.map(function (c) {
+        return '<div><b>' + dd(c.fecha) + ' · Camión ' + escapeHtml(c.cam) + '</b> → SÚPER: ' + c.supers.map(tnd).join(", ") +
+               ' &nbsp;/&nbsp; clientes: ' + c.clientes.map(tnd).join(", ") + '</div>';
       }).join("") + '</div></div>';
   }
   if (e.tandasMal.length) {

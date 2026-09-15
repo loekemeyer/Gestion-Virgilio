@@ -60,9 +60,23 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
                              P({ np: "98015", tanda: "T3", localidad: "Flores", fecha_entrega: "2026-08-30" })], null);
     out.variasFechas = res.tandasMal.length === 1 && res.tandasMal[0].fechas === 2 && res.tandasMal[0].rutas <= 1;
 
+    // ---- v18.59: súper mezclado con clientes en el MISMO camión (regla v14.23), por camión = LETRA+NN ----
+    res = _pppComputeErrors([P({ np: "98020", tanda: "E11A", localidad: "Flores", fecha_entrega: "2026-09-16" }),
+                             P({ np: "98021", tanda: "E11B", localidad: "Flores", fecha_entrega: "2026-09-16", tipo: "KRIKOS", razon_social: "Dorinka" }),
+                             P({ np: "98022", tanda: "E11C", localidad: "Flores", fecha_entrega: "2026-09-16" })], null);
+    out.superMezclado = res.superMezcl.length === 1 && res.superMezcl[0].cam === "E11" &&
+      res.superMezcl[0].supers.length === 1 && res.superMezcl[0].clientes.length === 2 &&
+      res.superMezcl[0].supers[0]._err.indexOf("supermezcl") >= 0;
+    out.superMezcladoHtml = /S[úÚuU]per mezclado/i.test(pppErroresHtml(res)) && pppErroresHtml(res).indexOf("Dorinka") >= 0 && pppErroresHtml(res).indexOf("E11C") >= 0;
+    // súper solo en su camión, clientes solos en el suyo, y otro día no mezcla → nada
+    res = _pppComputeErrors([P({ np: "98023", tanda: "E12A", localidad: "Flores", fecha_entrega: "2026-09-16", tipo: "KRIKOS" }),
+                             P({ np: "98024", tanda: "E13A", localidad: "Flores", fecha_entrega: "2026-09-16" }),
+                             P({ np: "98025", tanda: "E12B", localidad: "Flores", fecha_entrega: "2026-09-17" })], null);
+    out.superSoloOk = res.superMezcl.length === 0;
+
     // ---- sin nada raro → panel limpio ----
     res = _pppComputeErrors([P({ np: "98016", tanda: "T4", localidad: "Flores", zona: "Zona 1 - CABA Sur" })], new Set());
-    out.limpio = res.sacar.length + res.sinZona.length + res.zonaDif.length + res.tandasMal.length === 0 &&
+    out.limpio = res.sacar.length + res.sinZona.length + res.zonaDif.length + res.tandasMal.length + res.superMezcl.length === 0 &&
       pppErroresHtml(res) === "";   // v13.12: sin errores no se dibuja nada (dueño: "sacá esas 2 alertas")
 
     return out;
