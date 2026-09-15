@@ -73,6 +73,7 @@ window.__rcp = { opState: opState,
   ocDeCod: ocDeCod, ocRef: ocRef, ocExcede: ocExcede, ocPctExceso: ocPctExceso,
   cargarOCVigentes: cargarOCVigentes, drawArticulosGrid: drawArticulosGrid,
   openCajas: openCajas, renderResumen: renderResumen, opEnviar: opEnviar, RECP: RECP,
+  opExcesoFirma: opExcesoFirma,
   el: { body: opBody, cajasInput: opCajasInput, cajasNext: opCajasNext, cajasOc: opCajasOc } };
 `;
 
@@ -156,9 +157,14 @@ if (!/window\.supabase/.test(src)) { console.error("rcp-oc: recepcion.js ya no t
     out.btnRojo = rojos["586"] === true && rojos["518"] === false;
 
     // ---- 6) al enviar sale UN evento ROC con los códigos pasados ----
+    /* v18.02: recibir de más obliga a avisarle a Thomas por WhatsApp antes de enviar
+       (`opEnviar` tiene el guard, y el botón está deshabilitado hasta tocarlo). Eso se
+       testea en rcp-exceso-gate.cjs; acá se simula que el operario YA avisó, para poder
+       verificar lo que este test mira: el evento ROC del +20%. */
     S.step = "resumen"; R.RECP.legajo = "104";
     window.__ins = [];
     R.renderResumen();
+    S.excesoAvisado = R.opExcesoFirma();
     await R.opEnviar();
     const roc = window.__ins.filter(function (x) {
       return x.table === "Registros_Produccion_Virgilio" && x.rows && x.rows.opcion === "ROC";
@@ -170,6 +176,7 @@ if (!/window\.supabase/.test(src)) { console.error("rcp-oc: recepcion.js ya no t
     S.cargas = { "518": 50 };
     window.__ins = [];
     R.renderResumen();          // vuelve a crear el botón Confirmar que usa opEnviar
+    S.excesoAvisado = R.opExcesoFirma();
     await R.opEnviar();
     out.sinExcesoSinRoc = window.__ins.filter(function (x) {
       return x.table === "Registros_Produccion_Virgilio" && x.rows && x.rows.opcion === "ROC";

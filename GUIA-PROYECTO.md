@@ -618,7 +618,7 @@ Pedido de Luis. Dos cosas:
 > única**; no se replica. Ante la duda entre parche rápido y fix de raíz → **fix
 > de raíz**.
 >
-> Última actualización: 2026-09-14 (domingo) · Versión app al documentar: **v17.99**
+> Última actualización: 2026-09-14 (domingo) · Versión app al documentar: **v18.02**
 >
 > Nota **v17.71 (2026-09-14, Thomas) — el camión lo define la ZONA, no el número de tanda.**
 > Corrección de la v17.62. Dueño, mirando la pantalla: *"la zona uno se entrega con zona dos, así
@@ -3704,6 +3704,15 @@ Pedido de Luis. Dos cosas:
 > N"*). **Guard:** sólo se exige si las OCs se pudieron leer (`opState.ocOk`, que `cargarOCVigentes` deja
 > en `true` únicamente cuando la RPC contestó); si la RPC falla no se distingue *"el proveedor no tiene
 > OCs"* de *"no hubo red"*, y trabar ahí dejaría a todos los operarios sin poder recibir.
+> **v18.02 — revisión de salud del gate, tres agujeros tapados:** (1) **reanudar un borrador parado en
+> "Confirmá el envío"** no pasa por la grilla, que es la que carga las OCs, así que `ocPorCod` quedaba en
+> `null`, `ocOk` en `false` y el aviso NO se exigía — el operario enviaba el exceso sin avisar; ahora
+> `renderResumen` las pide y repinta, y `_opConfActualizar` deja **bloqueado** el envío mientras
+> `ocPorCod === null` (si la consulta falla queda `{}` y se libera, como antes). (2) Si el navegador
+> **bloquea el pop-up**, `window.open` devuelve `null` sin tirar error: se marcaba el aviso como hecho y el
+> WhatsApp nunca salía; ahora cae a `location.href`. (3) `opEnviar` tiene **guard propio**: si falta el
+> aviso, avisa y no registra nada (red de contención del botón deshabilitado). Además la góndola se pide
+> una vez por firma (`excesoGondFirma`) en vez de en cada repintado.
 > Código: `recepcion.js` (`_opExcesoSeccion`, `_opConfActualizar`, `opExcesoItems`, `opExcesoPendiente`,
 > `opWhatsExceso`). Test: `tests/rcp-exceso-gate.cjs`.
 >

@@ -19,7 +19,11 @@
      recién se habilita con las dos cosas,
    - el botón arma el wa.me con proveedor, remito y TODOS los códigos,
    - si el operario vuelve atrás y cambia las cantidades, el WhatsApp se vuelve a exigir,
-   - sin exceso no aparece nada y alcanza con la foto.
+   - sin exceso no aparece nada y alcanza con la foto,
+   - v18.02: mientras las OCs no se leyeron (ocPorCod=null) el envío queda bloqueado y el
+     resumen las pide solo — el caso de reanudar un borrador parado en "Confirmá el envío",
+     que no pasa por la grilla y antes dejaba enviar el exceso sin avisar,
+   - v18.02: `opEnviar` tiene guard propio y no registra nada si falta el aviso.
    Sale 1 si falla. */
 const fs = require("fs");
 const path = require("path");
@@ -63,7 +67,7 @@ window.supabase = { createClient: function () {
 const patched = src + `
 window.__rcp = { opState: opState,
   cargarOCVigentes: cargarOCVigentes, openCajas: openCajas, renderResumen: renderResumen,
-  opExcesoItems: opExcesoItems, opExcesoPendiente: opExcesoPendiente,
+  opExcesoItems: opExcesoItems, opExcesoPendiente: opExcesoPendiente, opEnviar: opEnviar,
   el: { body: opBody, cajasInput: opCajasInput, cajasOc: opCajasOc } };
 `;
 
@@ -80,7 +84,9 @@ if (!/window\.supabase/.test(src)) { console.error("rcp-exceso-gate: recepcion.j
   const r = await p.evaluate(async () => {
     const R = window.__rcp, S = R.opState, out = {};
     window.__wa = [];
-    window.open = function (url) { window.__wa.push(url); return null; };
+    // devuelve un objeto truthy = el pop-up se abrió. Si devolviera null, recepcion.js
+    // cae a location.href (v18.02, pop-up bloqueado) y eso navegaría la página del test.
+    window.open = function (url) { window.__wa.push(url); return { closed: false }; };
     const conf = function () { return document.getElementById("opConfirmar"); };
     const wa = function () { return document.getElementById("opExcWa"); };
 
@@ -153,9 +159,26 @@ if (!/window\.supabase/.test(src)) { console.error("rcp-exceso-gate: recepcion.j
     R.renderResumen();
     out.sinFotoNoEnvia = conf().disabled === true;
 
+    // ---- 6.b) v18.02: OCs todavía sin leer (reanudar un borrador en "Confirmá el envío") ----
+    S.fotoFile = { fake: true };
+    S.cargas = { "586": 90 };
+    S.excesoAvisado = null;
+    S.ocPorCod = null; S.ocOk = false;          // como queda al reanudar el borrador
+    R.renderResumen();
+    out.ocSinLeerBloquea = conf().disabled === true;
+    // el resumen las pide solo y, cuando llegan, aparece el botón y sigue bloqueado
+    await new Promise(function (r) { setTimeout(r, 300); });
+    out.ocSeCarganSolas = S.ocOk === true && !!document.getElementById("opExcWa")
+      && conf().disabled === true && R.opExcesoPendiente() === true;
+
+    // ---- 6.c) v18.02: guard de opEnviar — sin aviso no registra nada ----
+    window.__ins = [];
+    await R.opEnviar();
+    out.enviarBloqueado = window.__ins.length === 0;
+
     // ---- 7) si las OCs no se pudieron leer, no se exige nada (ocOk = false) ----
     S.fotoFile = { fake: true };
-    S.ocOk = false;
+    S.ocOk = false;                  // la RPC falló: ocPorCod queda en {} (no null)
     S.cargas = { "999": 25, "586": 90 };
     S.excesoAvisado = null;
     R.renderResumen();

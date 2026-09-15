@@ -416,6 +416,7 @@ const opState = {
   cajasCod: null,    // codigo abierto en el popup
   excesoAvisado: null, // v17.27: firma cod:cajas del exceso ya avisado a Thomas por WhatsApp
   excesoGond: null,    // v17.27: { codNorm: {cap,gond} } para el mensaje de WhatsApp
+  excesoGondFirma: null, // v18.02: firma para la que ya se pidió la góndola (no repetir)
   listaTipo: null,
   ocPorCod: null,    // v7.07: OCs vigentes del proveedor { codNorm: {ped,rec,pend,fecha} } (null = sin cargar)
   ocOk: false        // v17.99: true sólo si la RPC de OCs contestó (sin eso no se exige el aviso)
@@ -484,7 +485,7 @@ function opResetState() {
   opState.remito = ""; opState.articulos = null; opState.cargas = {};
   opState.altaNuevos = {};      // v15.36: altas del "+" esperando el OK de Thomas
   opState.ocPorCod = null; opState.ocOk = false;
-  opState.excesoAvisado = null; opState.excesoGond = null;   // v17.27
+  opState.excesoAvisado = null; opState.excesoGond = null; opState.excesoGondFirma = null;   // v18.02
   opState.fotoFile = null;
   if (opState.fotoPreviewUrl) { try { URL.revokeObjectURL(opState.fotoPreviewUrl); } catch(_e){} }
   opState.fotoPreviewUrl = null;
@@ -1687,6 +1688,16 @@ function renderResumen() {
   opActions.appendChild(volver);
   opActions.appendChild(conf);
   _opConfActualizar();
+
+  // v18.02 — si las OCs todavía no se leyeron, traerlas ACÁ y repintar. Pasa al reanudar un
+  // borrador que quedó en el paso "resumen" (`recepcionReanudar` va derecho a esta pantalla
+  // sin pasar por la grilla, que es la que las carga): sin esto `ocOk` quedaba en false, el
+  // aviso a Thomas no se exigía y el operario enviaba el exceso sin avisar.
+  if (opState.ocPorCod === null) {
+    cargarOCVigentes().then(function () {
+      if (opState.step === "resumen") renderResumen();
+    });
+  }
   rcpDraftSave();
 }
 
@@ -1819,9 +1830,14 @@ function _opExcesoSeccion() {
   sec.appendChild(hint);
 
   // Góndola de los códigos en exceso, para el mensaje (best-effort, en paralelo: si todavía
-  // no llegó cuando tocan el botón, el mensaje dice "s/dato").
-  opState.excesoGond = {};
-  try { _opPrefetchGond(exc.map(function (i) { return i.cod; })); } catch (_e) {}
+  // no llegó cuando tocan el botón, el mensaje dice "s/dato"). v18.02: se pide UNA vez por
+  // firma — esta pantalla se repinta varias veces (foto, WhatsApp, volver) y antes cada
+  // repintado tiraba las dos consultas de nuevo y reseteaba lo ya traído a {}.
+  if (opState.excesoGondFirma !== firma) {
+    opState.excesoGondFirma = firma;
+    opState.excesoGond = {};
+    try { _opPrefetchGond(exc.map(function (i) { return i.cod; })); } catch (_e) {}
+  }
   return sec;
 }
 /* "Confirmar y enviar" se habilita sólo con la foto sacada Y, si hubo exceso, el WhatsApp
@@ -1830,7 +1846,10 @@ function _opExcesoSeccion() {
 function _opConfActualizar() {
   const cb = document.getElementById("opConfirmar");
   if (!cb) return;
-  cb.disabled = !opState.fotoFile || opExcesoPendiente();
+  // v18.02 — mientras las OCs no se hayan leído (`ocPorCod === null`) no se sabe si hay
+  // exceso, así que no se habilita: son los ms que tarda la consulta al reanudar un
+  // borrador. Si la consulta FALLA, `ocPorCod` queda en {} y el envío se libera.
+  cb.disabled = !opState.fotoFile || opState.ocPorCod === null || opExcesoPendiente();
 }
 /* v14.61 — precarga stock de góndola (vista_saldos_stock.terminado) y capacidad
    (Capacidad_Sector.cajas_max) de los códigos en exceso, para el mensaje a Thomas.
@@ -1888,7 +1907,11 @@ function opWhatsExceso(exc) {
   L.push("");
   L.push("¿Lo recibo?");
   const url = "https://wa.me/" + WA_THOMAS + "?text=" + encodeURIComponent(L.join("\n"));
-  try { window.open(url, "_blank"); } catch (_e) { location.href = url; }
+  // v18.02 — si el navegador BLOQUEA el pop-up, `window.open` devuelve null sin tirar error:
+  // antes se marcaba el aviso como hecho y el WhatsApp nunca salía. Ahí se navega a la URL.
+  let w = null;
+  try { w = window.open(url, "_blank"); } catch (_e) { w = null; }
+  if (!w) { try { location.href = url; } catch (_e2) {} }
 }
 function closeCajas() { opCajasModal.classList.remove("open"); opState.cajasCod = null; }
 // v11.78: códigos con decimales permitidos (cajas fraccionarias)
@@ -2057,6 +2080,14 @@ if (typeof window !== "undefined") {
 
 /* ============== Enviar (graba todo) ============== */
 async function opEnviar() {
+  // v18.02 — guard del aviso a Thomas. El gate real es el botón deshabilitado
+  // (`_opConfActualizar`); esto es la red de contención para cualquier camino que llegue acá
+  // con el exceso sin avisar (un repintado viejo, una carrera con la carga de las OCs).
+  if (opExcesoPendiente()) {
+    alert("Entró mercadería que la OC no habilita.\n\nTocá 📲 Enviar WhatsApp a Thomas antes de confirmar.");
+    _opConfActualizar();
+    return;
+  }
   // v10.11 — SACADA la "Verificación de Remito" (código a escribir en el remito ANTES de enviar):
   // la recepción da UN SOLO código, el de confirmación del final (pendGenCodigo, más abajo).
   const descPorCod = {};
