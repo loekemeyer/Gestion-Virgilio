@@ -17937,3 +17937,57 @@ Bazar/Goldar, con sólo Dorinka en zona 5 el 16/09— devuelve **21/09**, no 16/
 **Lo que queda en manos de Luis:** E11 del 16/09 ya está armado; mover a Dorinka de camión es a mano.
 El panel de errores de la PPP (v18.59) lo muestra en rojo hasta que se resuelva. El título del panel
 dejó de decir "en el Excel" (v18.60).
+
+## §3.hm — v18.63: el problema 236 era falsa alarma; lo que se arregló es el silencio — 2026-09-15
+
+**Qué decía el problema 236** (registrado la noche del 15/09, sin tocar): *"8 tablas con RLS y
+sin policies detrás de vistas `security_invoker` que la app lee"* → o sea, pantallas en blanco.
+Las tablas: `GV_Imp_Carga_Pedido`, `GV_Imp_NTL_Mov`, `GV_Imp_Pagos`, `GV_Imp_Pedido_CC`,
+`GV_Imp_Prov_Mov`, `GV_Importados_Baches`, `Insumos_Ubicaciones_Unificadas`,
+`Ubicaciones_Articulos`.
+
+**Medido endpoint por endpoint: la app no lee esas vistas.** Llama ocho RPC **SECURITY
+DEFINER**, y las ocho devuelven filas — como `anon` y como `authenticated`:
+
+| RPC | filas |
+|---|---|
+| `gv_imp_cargas()` | 9 |
+| `gv_imp_conciliacion()` | 8 |
+| `gv_imp_ntl_resumen()` | 3 |
+| `gv_imp_ntl_pendientes()` | 2 |
+| `gv_imp_ntl_mov(60,null,null)` | 60 |
+| `gv_imp_cc_lista()` | 8 |
+| `gv_importados_pedidos_curso()` | 8 |
+| `gv_imp_prov_alias()` | 10 |
+
+El patrón es **deliberado**: la vista arma el dato crudo y corre como el que la llama; el wrapper
+SECURITY DEFINER es lo que la app tiene permitido ejecutar. La RLS sin policies es justamente lo
+que impide que la **anon key —que es pública y viaja en `index.html`—** lea en crudo los pagos a
+proveedores y la cuenta corriente de importaciones. **Por eso NO se agregaron policies**: eso sí
+hubiera sido abrir la puerta. Ojo con la trampa de lectura que generó el problema: *"tabla con RLS
+sin policies detrás de una vista que la anon puede leer"* **no** significa pantalla rota; hay que
+mirar si el front llama la vista o el RPC. Acá `_pedImpRpc()` pega a `/rest/v1/rpc/<fn>`, y existen
+**una vista y una función con el mismo nombre** (PostgREST resuelve la función).
+
+**Lo que sí estaba mal:** esas siete vistas eran SELECT-ables por `anon`/`authenticated` y
+devolvían **0 filas en silencio** (RLS sin policies no da error: simplemente no ve nada). El día
+que alguien escriba una pantalla nueva y lea la vista en vez del RPC, se encuentra una pantalla
+vacía **sin un solo error en la consola** — que es exactamente cómo nació este problema 236. Se
+revocó el SELECT de las siete: ahora ese error es ruidoso (`permission denied`), no silencioso.
+
+```sql
+revoke select on public.gv_imp_cargas, public.gv_imp_conciliacion, public.gv_imp_cuenta_corriente,
+  public.gv_imp_ntl_cuenta, public.gv_imp_ntl_resumen, public.gv_importados_pedidos_curso,
+  public.gv_codigos_multigrafia from anon, authenticated;
+```
+
+**Impacto medido: ninguno.** Se probó primero en transacción abortada y después aplicado: las ocho
+RPC devuelven los mismos números como `anon` y como `authenticated`, y `gv_endpoints_rotos` sigue
+vacía. Los seis consumidores de estas vistas son todos funciones SECURITY DEFINER (corren como el
+dueño, el grant no las toca): `gv_imp_cargas()`, `gv_imp_cc_lista()`, `gv_imp_conciliacion()`,
+`gv_imp_ntl_mov(int,text,text)`, `gv_imp_ntl_resumen()`, `gv_importados_pedidos_curso()`.
+`gv_codigos_multigrafia` no la llama el front: es de diagnóstico y se mira por MCP (que entra como
+`postgres`).
+
+**Rollback:** el `grant select … to anon, authenticated` de vuelta.
+`sql/gv_imp_vistas_sin_anon_v1863.sql`.
