@@ -145,6 +145,27 @@ catch (_e) {
     out.botonAvisa = /no está definido/i.test(aviso) && /Modificar el pedido/i.test(aviso);
     out.botonDiceCual = /Web Nueva SRL/.test(aviso);
 
+    /* v18.19 (Luis) — dos cosas de esta tanda:
+       (a) «Pedido del» SIN el día de la semana; «En programación» lo conserva (ahí sí sirve).
+       (b) EL BOTÓN NO SE PUEDE ESCAPAR. Medido a 1180 px: con 2 pedidos la tabla entraba (1154) y
+           con 120 medía 1242 → `.pmod-wrap` scrolleaba y el botón, última columna, quedaba fuera.
+           Acá se fuerza el desborde achicando el wrap y se exige que el botón siga adentro con el
+           scroll a la izquierda del todo. `stickyDesborda` es el control de no-trivialidad: sin
+           desborde el chequeo pasaría solo. */
+    const DOW = /(lun|mar|mié|jue|vie|sáb|dom)/i;
+    const pProg = f.find((x) => x.tanda !== "—" && x.fProg !== "—");
+    out.fPedSinDia = !!p1360 && /\d{1,2}\/\d{2}/.test(p1360.fPed) && !DOW.test(p1360.fPed);
+    out.fProgConDia = !!pProg && DOW.test(pProg.fProg);
+    const wrap = box.querySelector(".pmod-wrap");
+    wrap.style.maxWidth = "420px";
+    wrap.scrollLeft = 0;
+    out.stickyDesborda = wrap.scrollWidth > wrap.clientWidth + 2;
+    const bt = box.querySelector("tr.pmod-row .pmod-btn");
+    const rb = bt.getBoundingClientRect(), rw = wrap.getBoundingClientRect();
+    out.stickyVisible = rb.right <= rw.right + 1 && rb.left >= rw.left - 1 && rb.width > 10;
+    out.stickyPos = getComputedStyle(bt.closest("td")).position;
+    wrap.style.maxWidth = "";
+
     // ── (5) el contador: pedidos y NP por separado ─────────────────────────
     out.resumen = box.querySelector(".pmod-res").textContent.replace(/\s+/g, " ").trim();
 
@@ -214,6 +235,11 @@ catch (_e) {
   chk(r.botonEnCadaFila, "cada fila tiene su botón «Modificar» a la derecha de todo");
   chk(r.botonAvisa, "que por ahora AVISA que la funcionalidad no está definida, en vez de no hacer nada");
   chk(r.botonDiceCual, "y dice de qué pedido se trata");
+  chk(r.fPedSinDia, "«Pedido del» va sin el día de la semana (Luis)");
+  chk(r.fProgConDia, "pero «En programación» lo conserva: ahí sirve para saber cuándo sale");
+  chk(r.stickyDesborda, "control: con el wrap angosto la tabla DESBORDA (si no, lo de abajo pasa solo)");
+  chk(r.stickyVisible && r.stickyPos === "sticky",
+      "y aun desbordada el botón «Modificar» sigue a la vista, anclado a la derecha (" + r.stickyPos + ")");
   chk(errs.length === 0, "sin errores de JS: " + JSON.stringify(errs));
 
   let malas = 0;
