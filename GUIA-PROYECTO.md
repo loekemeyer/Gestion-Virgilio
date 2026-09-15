@@ -1,3 +1,34 @@
+## Nota v17.96 (2026-09-15) — el contenido de la NP va en las celdas que estaban vacías
+
+Pedido de Luis: *"en el caso de las NPs, cuando se abren, ¿podemos aprovechar el espacio entre
+«Tandas» y «Pendientes» para mostrar ahí el contenido de la nota de pedido?"*.
+
+Sí, y era espacio muerto: en una fila de NP esas **6 celdas** (Tandas, NPs y los 4 estados) están
+**siempre vacías** — lo único que lleva la fila son los m³. Ahora el contenido va ahí, con
+`colspan="6"`, **en la misma fila**, en vez de en un renglón aparte debajo.
+
+Gana dos cosas: el árbol abierto ocupa bastante menos alto, y el contenido queda **al lado** de la
+NP a la que pertenece, no debajo (que con varias NP abiertas se confundía de quién era cuál).
+
+Detalles que hicieron falta:
+
+- **`stopPropagation` en la celda.** El `onclick` vive en el `<tr>`, así que sin eso tocar un
+  código cerraba la NP.
+- **`vertical-align:top` en la fila abierta.** Medido con 24 códigos: la fila se hace de ~290 px y
+  la info de la NP quedaba flotando **centrada** a media altura, sola. Ahora NP, m³ y contenido
+  arrancan arriba, alineados.
+- **La grilla se angosta dentro de la celda** (`minmax` 132 px): en los ~470 px que hay entre
+  Tandas y Pendientes entran **3 columnas**, así que 24 códigos son 8 renglones y no 12.
+
+⚠ **Trade-off en el celular**, a propósito: ahí la columna del día es *sticky* y el resto scrollea,
+así que el contenido cae en la zona scrolleable y hay que correrse para verlo entero (antes, como
+fila aparte, quedaba bajo la columna fija). Se deja así: es una pantalla de monitor, en el celular
+esa tabla ya se scrollea de costado por diseño, y hacer que el JS emita una estructura distinta
+por ancho no se re-dibuja al rotar.
+
+`tests/ppp-tabla-arbol.cjs` queda en 39: el chequeo nuevo verifica que la celda del contenido y la
+de la NP sean de la **misma `<tr>`** y que tenga `colspan="6"`.
+
 ## Nota v17.95 (2026-09-15) — lo que achicaba la tabla NO era el CSS: era el zoom
 
 Luis, con capturas del día y la tanda abiertos: *"se sigue sin aprovechar al máximo el espacio.

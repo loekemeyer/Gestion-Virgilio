@@ -3156,6 +3156,21 @@ tr.ppp-err-zona > td{ background:#fffbeb !important; }
 /* la barra gris marca el nivel sin gastar 48px de sangría: la info arranca casi al borde */
 .pga-n>td:first-child{ white-space:normal; line-height:1.55; box-shadow:inset 3px 0 0 #cbd5e1; }
 .pga-n:hover>td{ background:#f8fafc; }
+/* v17.96 (Luis) — el contenido de la NP vive en las 6 celdas que quedaban vacías (Tandas →
+   Pendientes), no en un renglón aparte. Arriba del todo, para que arranque a la misma altura que
+   la NP de al lado. */
+.pga-n.on>td{ background:#fbfdff; }
+.pga-ncont{ text-align:left !important; white-space:normal !important; vertical-align:top;
+  padding:7px 16px 9px !important; cursor:default; }
+/* con 24 códigos la fila se hace alta: la NP y los m³ van ARRIBA, no centrados en el medio de un
+   bloque de 400 px (medido con 24 ítems: la info quedaba flotando sola a media altura). */
+.pga-n.on>td{ vertical-align:top; }
+.pga-ncont .pga-its{ grid-template-columns:repeat(auto-fill, minmax(132px, 1fr)); gap:5px 7px; }
+.pga-ncont .pga-it{ padding:4px 8px; gap:6px; }
+.pga-ncont .pga-it-cod{ font-size:13px; }
+.pga-ncont .pga-it-un{ font-size:11.5px; }
+.pga-ncont .pga-it-tot{ margin-top:7px; font-size:12.5px; }
+.pga-ncont .apr-det-sin{ padding:2px 0; }
 .pga-np{ font-weight:800; color:#0f172a; }
 .pga-cod{ display:inline-block; background:#f1f5f9; color:#475569; border:1px solid #d7dee7;
   border-radius:6px; padding:0 7px; font-size:12.5px; font-weight:900; margin-left:8px; vertical-align:1px; }
@@ -5267,7 +5282,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=17.95"></script>
+<script type="module" src="recepcion.js?v=17.96"></script>
 <!-- Config del módulo de fichada (compartido con fichada.html). El secret
      hmacSecret tiene que ser el mismo acá y allá; cargándolo desde un solo
      archivo evitamos que se desincronicen. -->
@@ -8707,7 +8722,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v17.95";
+const APP_VERSION = "v17.96";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -35369,7 +35384,7 @@ function _pppArbolHtml(programados) {
         // si es de CH, CH), barrio al lado de zona y fecha de pedido".
         const _lug = [r.zona_corta || r.localidad || "", r.barrio || ""]
           .filter(function (x, i, a) { return x && a.indexOf(x) === i; }).join(" · ");
-        h += '<tr class="pga-n" onclick="pgaAbrirNp(\'' + escapeHtml(nk) + '\',\'' + escapeHtml(r.np) + '\')">' +
+        h += '<tr class="pga-n' + (nb ? " on" : "") + '" onclick="pgaAbrirNp(\'' + escapeHtml(nk) + '\',\'' + escapeHtml(r.np) + '\')">' +
           '<td>' +
             '<div class="pga-nrow"><span class="pga-ninfo">' +
           '<span class="pga-chev">' + (nb ? "▾" : "▸") + '</span>' +
@@ -35397,9 +35412,16 @@ function _pppArbolHtml(programados) {
               : '') +
             '</div>' +
           '</td>' +
-          '<td>' + _pppFmtM3(r.m3) + '</td><td></td><td></td>' +
-          '<td></td><td></td><td></td><td></td></tr>';
-        if (nb) h += '<tr class="pga-c"><td colspan="8">' + _pgaItemsHtml(r.np) + '</td></tr>';
+          '<td>' + _pppFmtM3(r.m3) + '</td>' +
+          // v17.96 (Luis): "cuando se abren, podemos aprovechar el espacio entre Tandas y
+          // Pendientes para mostrar ahí el contenido de la nota de pedido?". Esas 6 celdas están
+          // SIEMPRE vacías en una fila de NP (los m³ son lo único que lleva), así que el contenido
+          // va ahí, en la misma fila, en vez de en un renglón aparte debajo.
+          // `stopPropagation` en la celda: si no, tocar un código cierra la NP.
+          (nb ? '<td colspan="6" class="pga-ncont" onclick="event.stopPropagation()">' +
+                  _pgaItemsHtml(r.np) + '</td>'
+              : '<td></td><td></td><td></td><td></td><td></td><td></td>') +
+          '</tr>';
       }
     }
   }

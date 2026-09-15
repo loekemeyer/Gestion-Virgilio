@@ -149,7 +149,7 @@ catch (_e) {
       return String(body.style.zoom || "1");
     })();
     out.npPill = [...prev.querySelectorAll("tr.pga-n .pga-pill")].map((e) => e.textContent.trim());
-    out.sinContenido = prev.querySelectorAll("tr.pga-c").length === 0;
+    out.sinContenido = prev.querySelectorAll("td.pga-ncont").length === 0;
     // v17.76 (Luis): código de cliente con su prefijo, barrio al lado de la zona y fecha de pedido
     const fila58 = [...prev.querySelectorAll("tr.pga-n")].find((x) => x.textContent.indexOf("LK 0058") >= 0);
     out.npCod    = !!fila58 && (fila58.querySelector(".pga-cod") || {}).textContent === "LK 1000";
@@ -164,11 +164,21 @@ catch (_e) {
     out.pidioItems = pedidos.some((u) => /gv_ppp_np_items\?select=art,cajas,uxb,uni&np=eq\.LK%200058&/.test(u));
     // v17.94 (Luis): el contenido pasó de una tabla de 3 columnas clavada en 520px a una GRILLA
     // que fluye, para que se abra en horizontal y no hacia adentro.
-    out.contenido = /<tr class="pga-c">/.test(html) && /class="pga-its"/.test(html) &&
+    // v17.96 (Luis): el contenido ya no va en un renglón aparte — ocupa las 6 celdas que quedaban
+    // vacías en la MISMA fila de la NP (de Tandas a Pendientes).
+    out.contenido = /class="pga-ncont"/.test(html) && /colspan="6"/.test(html) && /class="pga-its"/.test(html) &&
                     /pga-it-cod">505</.test(html) && /pga-it-cj">20 cj</.test(html) &&
                     /pga-it-tot">3 códigos · <b>48<\/b> cajas · <b>528<\/b> unidades/.test(html);
+    // v17.96: la celda del contenido y la de la NP tienen que ser de la MISMA <tr>
+    out.contenidoEnLaFila = (function () {
+      const td = prev.querySelector("td.pga-ncont");
+      if (!td) return false;
+      const tr = td.parentElement;
+      return tr.classList.contains("pga-n") && !!tr.querySelector(".pga-np") &&
+             Number(td.getAttribute("colspan")) === 6;
+    })();
     out.contenidoAncho = (function () {
-      const g = prev.querySelector(".pga-its"), td = prev.querySelector("tr.pga-c > td");
+      const g = prev.querySelector(".pga-its"), td = prev.querySelector("td.pga-ncont");
       if (!g || !td) return 0;
       return Math.round(g.getBoundingClientRect().width / td.getBoundingClientRect().width * 100);
     })();
@@ -224,6 +234,7 @@ catch (_e) {
   t(r.pidioItems, "(6) abrir la NP pide su contenido a gv_ppp_np_items");
   t(r.contenido, "(6) y muestra los códigos, las cajas y las unidades");
   t(r.contenidoAncho >= 90, "(6) el contenido usa el ancho, no queda encajonado — " + r.contenidoAncho + " % del td");
+  t(r.contenidoEnLaFila, "(6) y va en la MISMA fila de la NP, en las celdas que estaban vacías");
   t(r.cacheItems, "(6) una sola vuelta de red por NP");
   // 1,8 + 1,5 + 1,86 + 0,1 + 2,5 + 0,9 + 1,3 + 1,35 = 11,31 m³ · 5 tandas · 8 NP
   // v17.94 (Luis): "letra más grande, que mantenga el tamaño al expandirse". Antes se ACHICABA

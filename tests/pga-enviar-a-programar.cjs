@@ -85,11 +85,11 @@ catch (_e) {
     out.hayBoton = !!bt;
     out.textoBoton = bt ? bt.textContent.trim() : "";
     out.titleBoton = bt ? bt.getAttribute("title") : "";
-    out.abiertasAntes = prev.querySelectorAll("tr.pga-c").length;
+    out.abiertasAntes = prev.querySelectorAll("td.pga-ncont").length;
 
     // (b) NP web → gv_ppp_web_desprogramar
     bt.click(); await new Promise((res) => setTimeout(res, 250));
-    out.abiertasDespues = document.getElementById("pppPreview").querySelectorAll("tr.pga-c").length;
+    out.abiertasDespues = document.getElementById("pppPreview").querySelectorAll("td.pga-ncont").length;
     out.rpcWeb = rpc.map((x) => x.fn).join(",");
     // v17.90 (Luis): "que también pida confirmación para enviar a programar", con su texto, UNA vez
     out.confirmTxt = confirms.join(" ||| ");
