@@ -784,7 +784,10 @@ button {
 #pppOverlay .pn-ped .rs, #pppOverlay .pn-ped .np{ display:inline; }
 #pppOverlay .pn-ped .np{ margin-left:8px; }
 #pppOverlay .pn-ped > div:nth-child(6){ display:flex; align-items:center; gap:6px; }
-#pppOverlay .ppp-tablewrap, #pppOverlay .ppp-ocup-chart-wrap, #pppOverlay .ppp-restbl-wrap{ overflow:visible; }
+#pppOverlay .ppp-tablewrap, #pppOverlay .ppp-ocup-chart-wrap{ overflow:visible; }
+/* v18.66 — el Resumen sólo pierde su scroll propio donde pppFitPantalla lo necesita (monitor);
+   en celular la tabla de 590 px se salía del card y había que scrollear todo el cuerpo (problema 295). */
+@media (min-width:900px){ #pppOverlay .ppp-restbl-wrap{ overflow:visible; } }
 .apr-reload{ border:1px solid #cbd5e1; background:#fff; border-radius:8px; padding:5px 10px !important; cursor:pointer; font-size:14px; }
 .apr-load{ font-size:12.5px; color:#64748b; }
 /* Relojito: mientras chequea las DOS bases (LK + Chef) en Supabase, avisa que todavía
@@ -5609,7 +5612,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=18.65"></script>
+<script type="module" src="recepcion.js?v=18.66"></script>
 <!-- Config del módulo de fichada (compartido con fichada.html). El secret
      hmacSecret tiene que ser el mismo acá y allá; cargándolo desde un solo
      archivo evitamos que se desincronicen. -->
@@ -6117,7 +6120,8 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
 
   <div class="botonera-grp">🛒 Picking</div>
   <div class="row row-2 row-core" id="row1"></div>
-  <div class="botonera-grp">🔨 Armado de pedido</div>
+  <!-- v18.66: la cabecera "🔨 Armado de pedido" se sacó — row2 está vacía desde v7.75 (AP va en
+       Picking) y el título quedaba huérfano arriba de nada. El div se conserva: el render lo busca por id. -->
   <div class="row row-2 row-core" id="row2"></div>
   <div class="botonera-grp">📦 Depósito y carga</div>
   <div class="row row-3" id="row3"></div>
@@ -8665,6 +8669,15 @@ function selectOption(code) {
       }
     }
   }
+  // v18.66 — en celular el área de la acción elegida (lista de tandas, input, Enviar) queda
+  // debajo de la botonera y del pliegue: se la trae a la vista (problema 295). Sólo en pantallas
+  // angostas; en el monitor no hace falta y moverlo molesta.
+  try {
+    if (window.innerWidth <= 700) {
+      const _sa = document.getElementById("selectedArea");
+      if (_sa && !_sa.classList.contains("hidden")) _sa.scrollIntoView({ block: "start", behavior: "smooth" });
+    }
+  } catch (_e) {}
 }
 
   // ======= Picking / Armado siguen igual (siempre piden nro)
@@ -9178,7 +9191,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v18.65";
+const APP_VERSION = "v18.66";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -37615,7 +37628,9 @@ function _pmodEdCss() {
   const st = document.createElement("style"); st.id = "pmodEdCss";
   st.textContent = "#pmodOverlay{display:none;position:fixed;inset:0;z-index:1600;background:rgba(2,6,23,.74);overflow:auto;padding:14px;}" +
     "#pmodOverlay.show{display:block;}" +
-    ".pme-card{background:#f8fafc;max-width:1040px;margin:0 auto;border-radius:16px;overflow:hidden;box-shadow:0 24px 70px rgba(0,0,0,.5);}" +
+    /* v18.66 — overflow:clip y no hidden: hidden convertía la tarjeta en contenedor de scroll y el
+       pie sticky (Guardar/Cancelar) quedaba fuera de la pantalla del celular (problema 295). */
+    ".pme-card{background:#f8fafc;max-width:1040px;margin:0 auto;border-radius:16px;overflow:clip;box-shadow:0 24px 70px rgba(0,0,0,.5);}" +
     ".pme-head{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:13px 16px;background:linear-gradient(90deg,#4338ca,#1e1b4b);color:#fff;}" +
     ".pme-title{font-size:18px;font-weight:800;min-width:0;}" +
     ".pme-title small{display:block;font-size:12.5px;font-weight:700;opacity:.85;}" +
@@ -37644,6 +37659,9 @@ function _pmodEdCss() {
     ".pme-foot{position:sticky;bottom:0;background:#f8fafc;border-top:1px solid #e2e8f0;padding:11px 16px;display:flex;gap:9px;align-items:center;flex-wrap:wrap;}" +
     ".pme-ok{width:auto;background:#059669;color:#fff;border:0;border-radius:9px;padding:10px 20px;font-weight:800;font-size:14px;cursor:pointer;}" +
     ".pme-ok:disabled{background:#cbd5e1;cursor:default;}" +
+    /* v18.66 — en celular la tabla cortaba CAJAS a la mitad y dejaba UNIDADES y la ✕ afuera sin
+       pista de scroll: se esconden U×B y Unidades (quedan Código · Descripción · Cajas · ✕). */
+    "@media (max-width:460px){.pme-tab th:nth-child(3),.pme-tab td:nth-child(3),.pme-tab th:nth-child(5),.pme-tab td:nth-child(5){display:none;}.pme-tab td.de{white-space:normal;}}" +
     ".pme-cancel{width:auto;background:#f1f5f9;color:#475569;border:1px solid #e2e8f0;border-radius:9px;padding:10px 15px;font-weight:700;font-size:13.5px;cursor:pointer;}" +
     ".pme-res{font-size:13px;color:#475569;font-weight:700;margin-left:auto;text-align:right;}" +
     ".pme-falta{font-size:12.5px;font-weight:800;color:#b45309;}" +

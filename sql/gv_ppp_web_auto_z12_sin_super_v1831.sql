@@ -160,7 +160,10 @@ do $do$
 declare v_def text; v_a text;
 begin
   v_def := pg_get_functiondef('public.gv_ppp_web_armar_pendientes(text,date,jsonb,jsonb)'::regprocedure);
-  if v_def like '%zonas_manuales_con_camion%' then raise notice 'ya estaba parchada'; return; end if;
+  -- v18.61: NO usar LIKE acá. El "_" es comodín: '%zonas_manuales_con_camion%' matcheaba el comentario
+  -- "-- (c) zonas manuales con camion" que la función YA tenía, decía "ya estaba parchada" y salía
+  -- sin aplicar nada. Por eso este bloque figuró como aplicado el 15/09 y no lo estaba (problema 291).
+  if position('zonas_manuales_con_camion' in v_def) > 0 then raise notice 'ya estaba parchada'; return; end if;
   v_a := '           and not public.gv_ppp_web_zona_automatica(x->>''zona'')';
   if (length(v_def) - length(replace(v_def, v_a, ''))) / length(v_a) <> 1 then
     raise exception 'el ancla del bloque (c) no aparece exactamente una vez';

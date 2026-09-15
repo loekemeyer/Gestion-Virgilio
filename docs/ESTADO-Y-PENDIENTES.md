@@ -25,8 +25,9 @@
 > **119 (E11A) también corregido** con el OK de Thomas (*"sí, el 119 también"*, tarea 3460): el picking
 > escribió −50 con 49 en góndola y nadie marcó el "de menos" → `a_facturar −1` y `terminado +1`
 > (`fix119_E11A_20260915_*`). Góndola 0, a facturar 49. `vista_saldos_stock` sin góndolas negativas.
-> **Decisión de Thomas:** el "mes en curso" del pop-up de Proyección lo pidió él (v18.24) y Luis lo
-> hizo sacar (v18.34). Detalle y lo que queda abierto: §3.hi.
+> **"Mes en curso" de Proyección:** restituido en v18.58 (Luis: lo había sacado otra persona en su sesión).
+> **Las tres tareas que Luis dejó para después se hicieron en v18.66** (§3.hn): v18.31 parte 3 aplicada
+> (el guard con `LIKE` la saltaba), Cervantes sin CDN, y los 5 arreglos de celular. Detalle: §3.hi.
 
 > **2026-09-15, tanda de la tarde (v18.16 / v18.17).** Se cerró el handoff
 > `docs/HANDOFF-OC-Y-PROYECCION-20260915.md` entero: los códigos NNNL salieron de la pantalla

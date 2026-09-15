@@ -18098,3 +18098,24 @@ pendiente que FJ cierre lo que quedó abierto, o que el monitor deje de contar h
 que ya se fue.
 
 `sql/gv_tandas_lock_v1865.sql` · `tests/tanda-lock-etapas.cjs` · tarea Planify 3473.
+
+## §3.hn — v18.66: las tres tareas que Luis dejó para después, hechas (291 · 294 · 295) — 2026-09-15
+
+> **Luis:** *"¿Nada se puede avanzar?"* → sí, las tres.
+
+1. **v18.31 parte 3 aplicada de verdad** (problema 291, tarea 3463). `gv_ppp_web_armar_pendientes`
+   ahora lee `PPP_Web_Config.zonas_manuales_con_camion` en el bloque (c). **Por qué no estaba:** el
+   guard del bloque 4 de `sql/gv_ppp_web_auto_z12_sin_super_v1831.sql` era
+   `if v_def like '%zonas_manuales_con_camion%'` — en `LIKE` el `_` es comodín, así que matcheaba
+   el comentario `-- (c) zonas manuales con camion` que la función ya tenía, decía "ya estaba
+   parchada" y salía sin hacer nada. Corregido en el archivo (`position(...)`). Backup:
+   `zz_backups."GV_Backup_Funcdefs_20260915_v1831_p4"`. Con la config en 1 el comportamiento no
+   cambia; el switch recién ahora hace algo.
+2. **Cervantes sin CDN** (294, tarea 3464): `cervantes/index.html` carga `../supabase.js` (el
+   bundle propio de la raíz, mismo global `supabase`). v1.9.3 en `LOCAL_VERSION`, `CACHE_VERSION`,
+   `?v=` y badge.
+3. **Celular** (295, tarea 3465): `.pme-card` pasa a `overflow:clip` (el pie sticky de Modificar
+   Pedidos vuelve a verse); el `overflow:visible` del Resumen queda sólo en `min-width:900px`;
+   `selectOption` hace `scrollIntoView` del área elegida en pantallas ≤ 700 px; se sacó la cabecera
+   huérfana "🔨 Armado de pedido" (el `#row2` se conserva, el render lo busca por id); en ≤ 460 px la
+   tabla de Modificar esconde U×B y Unidades. Los 8 detalles menores del problema quedan anotados ahí.
