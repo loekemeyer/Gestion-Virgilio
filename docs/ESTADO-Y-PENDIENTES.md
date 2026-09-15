@@ -67,9 +67,17 @@
 > · **`vista_tanda_m3` ignoraba todos los overrides**: una NP movida de tanda seguía sumando su m³
 >   en la vieja. 14 tandas con m³ ajeno y 14 sin el suyo; el total pasó de 1041,978 a 1045,631 m³.
 >
-> **Quedó anotado y sin tocar** (problema abierto): **8 tablas más** con RLS y sin policies detrás
-> de vistas `security_invoker` que lee la app —Importados, cuenta corriente, multigrafía—. Hay que
-> confirmar pantalla por pantalla si leen por vista (roto) o por RPC `SECURITY DEFINER` (anda).
+> **Las 8 tablas con RLS y sin policies detrás de vistas `security_invoker` (problema 236) eran
+> FALSA ALARMA, medido el 15/09 (v18.63).** La app no lee esas vistas: llama ocho RPC `SECURITY
+> DEFINER` y las ocho devuelven filas, como `anon` y como `authenticated`. El patrón es
+> deliberado —la RLS sin policies es lo que impide que la anon key, que es pública, lea en crudo
+> los pagos a proveedores—, así que **no se agregaron policies**. Lo que sí se corrigió es el
+> silencio: esas 7 vistas eran legibles por `anon` y devolvían **0 filas sin dar error**, que es
+> justo lo que hace que una pantalla nueva parezca rota sin decir por qué. Se les revocó el
+> SELECT. **La trampa de lectura, para no repetirla:** "tabla con RLS sin policies detrás de una
+> vista que anon puede leer" **no** es pantalla rota — hay que mirar si el front llama la vista o
+> el RPC, y acá existen **una vista y una función con el mismo nombre** (PostgREST resuelve la
+> función). §3.hm.
 >
 > **Lo único que quedó esperando a Thomas de esta tanda:** la tarea Planify **3366** — que los
 > pedidos facturados pasen solos a *En Salida* con el badge «Esperando carga / Esperando retiro».
