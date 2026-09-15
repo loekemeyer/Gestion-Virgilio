@@ -4744,7 +4744,15 @@ table.facfc-tbl tr.facneto-row-falt td{ background: #fef2f2; }
    mostrarlos, sacar el display:none de acá.
    ⚠ Con esto quedan sin acceso: el filtro "Con faltante", "Corregir códigos" y
    "Revertir". Avisado y confirmado por el dueño. */
+/* v18.57 — el bloque sigue OCULTO donde estaba (arriba del listado): ahí era donde ocupaba
+   media pantalla del celular antes de ver un solo pedido, que es lo que el dueño hizo sacar en
+   la v18.00. Se muestra sólo en su lugar nuevo, al pie (.fac-stats-pie), donde no estorba. */
 .fac-stats{ display: none; gap: 6px; align-items: center; font-size: 13px; flex-wrap: wrap; }
+.fac-stats.fac-stats-pie{
+  display: flex; margin: 14px 0 4px; padding: 12px 10px;
+  border-top: 2px solid #cbd5e1; background: #f8fafc; border-radius: 8px;
+  justify-content: center;
+}
 .fac-chip{ background: #fff; border: 1px solid #cbd5e1; border-radius: 6px; padding: 4px 10px; font-weight: bold; font-size: 12px; }
 .fac-chip.green{ border-color: #16a34a; color: #15803d; }
 .fac-chip.blue{ border-color: #1e6bd6; color: #1e3a8a; }
@@ -5375,15 +5383,6 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
   <div class="fac-ajustes" id="facAjustesIsis" style="display:none"></div>
   <div class="fac-top">
     <h1><img class="hdr-logo" src="icon.svg" alt="">Facturación — NPs a FC</h1>
-    <div class="fac-stats">
-      <span class="fac-chip blue">Tandas: <span id="facCntTandas">0</span></span>
-      <span class="fac-chip orange">NPs pendientes: <span id="facCntPend">0</span></span>
-      <span class="fac-chip green">NPs facturados hoy: <span id="facCntDone">0</span></span>
-      <span class="fac-chip red clickable" id="facChipFalt" onclick="facToggleSoloFalt()" style="display:none" title="Pedidos que salieron con faltante — clic para ver SOLO esos y revisarlos antes de facturar">⚠ Con faltante: <span id="facCntFalt">0</span></span>
-      <span class="fac-chip clickable" id="facChipCorr" onclick="facCorreccOpen()" style="display:none;background:#eff6ff;color:#1e40af;border:1px solid #bfdbfe;" title="Pedidos cargados en código SECUNDARIO. Cambiá la NP en el ERP y confirmá acá → el picking levanta el principal">🔀 Corregir códigos: <span id="facCntCorr">0</span></span>
-      <button id="facBtnRevertir" class="fac-btn-revertir" disabled onclick="facRevertir()" title="Borra todos los ticks pendientes de cierre">↺ Revertir</button>
-      <span class="fac-chip"><span class="fac-dot" id="facDot"></span><span id="facStatusTxt">Cargando…</span></span>
-    </div>
     <!-- v14.30: dos pestañas — Facturador (lo de siempre) y Conciliación (snapshot vs factura ISIS).
          v14.80: viven en la MISMA fila del título, entre el título y los 4 botones. -->
     <div class="fac-tabs2">
@@ -5425,6 +5424,22 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
     <div id="facTickedList" class="fac-ticked-list" style="display:none"></div>
     <button onclick="facNCOpen()" title="Anular una factura ya emitida con una Nota de Crédito" class="fac-cierre-sec danger">🧾 Anular factura (Nota de Crédito)</button>
   </div>
+  <!-- v18.57 (Luis, 15/09: "mandalos abajo de todo") — los contadores, los dos filtros y
+       «Revertir» vuelven a estar accesibles, pero al PIE del listado y no arriba: en la v18.00
+       se habían escondido con display:none porque en el celular ocupaban media pantalla ANTES
+       de ver un solo pedido. Acá no estorban y se recupera lo que quedó sin acceso — entre otras
+       cosas «Revertir», que es el camino para destildar una NP marcada facturada por error (pasó
+       con la 44619 el 15/09 y hubo que sacarla por SQL). Mismo bloque, mismos ids: el JS que los
+       actualiza no cambia. -->
+  <div class="fac-stats fac-stats-pie">
+      <span class="fac-chip blue">Tandas: <span id="facCntTandas">0</span></span>
+      <span class="fac-chip orange">NPs pendientes: <span id="facCntPend">0</span></span>
+      <span class="fac-chip green">NPs facturados hoy: <span id="facCntDone">0</span></span>
+      <span class="fac-chip red clickable" id="facChipFalt" onclick="facToggleSoloFalt()" style="display:none" title="Pedidos que salieron con faltante — clic para ver SOLO esos y revisarlos antes de facturar">⚠ Con faltante: <span id="facCntFalt">0</span></span>
+      <span class="fac-chip clickable" id="facChipCorr" onclick="facCorreccOpen()" style="display:none;background:#eff6ff;color:#1e40af;border:1px solid #bfdbfe;" title="Pedidos cargados en código SECUNDARIO. Cambiá la NP en el ERP y confirmá acá → el picking levanta el principal">🔀 Corregir códigos: <span id="facCntCorr">0</span></span>
+      <button id="facBtnRevertir" class="fac-btn-revertir" disabled onclick="facRevertir()" title="Borra todos los ticks pendientes de cierre">↺ Revertir</button>
+      <span class="fac-chip"><span class="fac-dot" id="facDot"></span><span id="facStatusTxt">Cargando…</span></span>
+    </div>
   </div><!-- /#facPanelFact -->
   <div id="facPanelConcil" style="display:none">
     <div class="fac-concil-bar">
@@ -5594,7 +5609,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=18.56"></script>
+<script type="module" src="recepcion.js?v=18.57"></script>
 <!-- Config del módulo de fichada (compartido con fichada.html). El secret
      hmacSecret tiene que ser el mismo acá y allá; cargándolo desde un solo
      archivo evitamos que se desincronicen. -->
@@ -9158,7 +9173,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v18.56";
+const APP_VERSION = "v18.57";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción

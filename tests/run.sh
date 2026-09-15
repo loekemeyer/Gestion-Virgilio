@@ -63,6 +63,9 @@ PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node te
 echo "== fac-par-indices (regresión: los resultados del Promise.all de Facturación se leen por NOMBRE, no por índice) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/fac-par-indices.cjs
 
+echo "== fac-stats-pie (regresión: contadores, filtros y «Revertir» de Facturación accesibles al pie) =="
+PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/fac-stats-pie.cjs
+
 echo "== fac-cuelgue (regresión: Facturación no queda en «Cargando tandas…» para siempre — timeout + cartel con motivo) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/fac-cuelgue.cjs
 
