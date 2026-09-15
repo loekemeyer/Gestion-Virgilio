@@ -1,5 +1,37 @@
 # Handoff — OC, códigos NNNL y proyección · 2026-09-15
 
+> ## ✅ CERRADO el mismo día (15/09). Lo único que queda es la decisión del cron 50.
+>
+> Este archivo se escribió para pasarle el trabajo a otro chat. Ese chat lo hizo. **No rehacer
+> nada de lo de abajo**; queda como registro de las mediciones y del porqué de cada decisión.
+>
+> | Lo que decía | Cómo quedó |
+> |---|---|
+> | ⛔ El permiso de DDL bloqueaba todo | **Ya no bloquea**: `apply_migration` corre. No hubo que tocar `.claude/settings.json`. |
+> | §1a Los NNNL en la pantalla Stocks | **Hecho, v18.16** — `sql/gv_stock_procesada_sufijo_L_v1816.sql`. 56 → 0 filas NNNL. |
+> | §1b El uni×caja que subcontaba en el generador de OC | **Hecho, v18.16** — `sql/fn_proyeccion_oc_virgilio_uxb_base_L_v1816.sql`. +1.464,45 cj/mes en 123 códigos. |
+> | §2 La proyección en dos tablas | **Hecho, v18.17** — `sql/gv_proyeccion_una_sola_tabla_v1817.sql`. Se borró `GV_Proyeccion_Emp`; queda una tabla, un motor y un cron. |
+> | §3 La RPC de ventas por cliente | **Hecho, v18.16** — las dos funciones aplicadas; el desglose del pop-up se encendió solo. |
+> | §4 El cron 50 `ocs-auto-miercoles` | **Sigue apagado, a propósito: lo decide Thomas.** Ver abajo. |
+> | Problemas 218 y 222 | **Cerrados** con su commit. |
+> | Tareas Planify 3405 y 3409 | **Cerradas.** La 3412 (proyección en una tabla) se abrió y se cerró el mismo día. |
+>
+> **Dos hallazgos del §4 que no estaban registrados ahora sí lo están**, como problemas
+> `abierto`: *"Lo que entra de más que una OC no queda registrado en ningún lado"* y
+> *"104 de 354 filas de OC_Maximos no tienen proveedor: nunca van a tener OC"*.
+>
+> **La decisión que queda.** El cron **50 `ocs-auto-miercoles`** (miércoles 10:00) está en
+> `active=false` desde el 04/08; lo que corre es `ocs-auto-sim` (51), que avisa y no escribe.
+> El motivo para no prenderlo —que generaba sobre datos que subcontaban— **ya no existe**: el
+> uni×caja está arreglado y la proyección bajada. Medido hoy, prenderlo generaría **95 líneas,
+> 14 proveedores, 3.586 cajas**. No se prende solo porque genera OC de verdad y eso es plata:
+> `select cron.alter_job(50, active := true);` y apagar el 51. **Lo aprieta Thomas.**
+>
+> Detalle de las mediciones y los rollbacks: `docs/SUPABASE-GESTION-VIRGILIO.md` §3.gl, §3.gm
+> y §3.gn, y `docs/ROLLBACK-PRODUCCION.md`.
+
+---
+
 Sesión: https://claude.ai/code/session_01FR4v2gqbcT4ASALUUmCdRd · Pedido de **Thomas**.
 Todo lo medido acá es del **2026-09-15**; si pasó un miércoles, volver a medir (los crons de
 proyección corren miércoles 09:20 y 09:25, y las OC se generan a mano los miércoles).

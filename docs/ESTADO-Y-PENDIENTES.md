@@ -1,4 +1,16 @@
-# Estado y pendientes — al 2026-09-15 (última actualización: v18.00)
+# Estado y pendientes — al 2026-09-15 (última actualización: v18.17)
+
+> **2026-09-15, tanda de la tarde (v18.16 / v18.17).** Se cerró el handoff
+> `docs/HANDOFF-OC-Y-PROYECCION-20260915.md` entero: los códigos NNNL salieron de la pantalla
+> Stocks y dejaron de subcontarse en el generador de OC, la proyección pasó a vivir en **una sola
+> tabla** (se borró `GV_Proyeccion_Emp`, el cron 40 y el motor por empresa) y se encendió el
+> desglose de ventas por cliente del pop-up de Proyección. Problemas **218** y **222** cerrados;
+> tareas Planify 3405, 3409 y 3412 cerradas.
+> **Lo único que quedó esperando a Thomas: prender el cron 50 `ocs-auto-miercoles`** (hoy en
+> `active=false`; generaría 95 líneas / 14 proveedores / 3.586 cajas). Ya no está frenado por
+> datos malos — el uni×caja se arregló —, es una decisión de plata.
+> Y quedaron **dos problemas nuevos `abierto`**: el excedente de una OC no queda registrado en
+> ningún lado, y 104 de 354 filas de `OC_Maximos` no tienen proveedor.
 
 > **Para quien abra una sesión nueva:** esto es la foto del estado. Lo que falta de verdad está
 > en la base, no acá: `select * from github_repo_problemas.v_problemas where estado='abierto'`.
