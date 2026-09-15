@@ -419,18 +419,26 @@ catch (_e) {
 
     // (11) v18.04 — el log de anulados
     _apr.anulados = [
-      { id: 1, empresa: "lk", clave: "1416", es_isis: false, np_label: "web LK 1416", cod: "3969",
-        razon_social: "Rodriguez Jonatan", m3: 0.024, motivo: "lo cargó mal el cliente",
-        persona: "Vivi", por: "vivi@loekemeyer.com", anulado_at: "2026-09-15T10:20:00-03:00" }
+      { id: 1, empresa: "lk", clave: "1416", es_isis: false, np_label: "web LK 1416", np: null,
+        cod: "3969", razon_social: "Rodriguez Jonatan", m3: 0.024, motivo: "lo cargó mal el cliente",
+        persona: "Vivi", por: "vivi@loekemeyer.com", anulado_at: "2026-09-15T10:20:00-03:00" },
+      // v18.05: uno que YA tenía NP asignada — la NP se muestra y no se reutiliza
+      { id: 2, empresa: "lk", clave: "1375", es_isis: false, np_label: "web LK 1375", np: "LK 0052",
+        cod: "3905", razon_social: "Andser Quimica SRL", m3: 0.025, motivo: "cancelado por el cliente",
+        persona: "Marian", por: "marian@loekemeyer.com", anulado_at: "2026-09-15T11:00:00-03:00" }
     ];
     aprRender(); await new Promise((res) => setTimeout(res, 120));
     html = document.getElementById("pppPreview").innerHTML;
-    out.anuChip = /apr-anu-chip[^>]*>✕ 1 anulado</.test(html);
+    out.anuChip = /apr-anu-chip[^>]*>✕ 2 anulados</.test(html);
     aprAnuAbrir(); await new Promise((res) => setTimeout(res, 120));
     const lh = (document.getElementById("aprAnuModal") || {}).innerHTML || "";
     out.anuLog = /Pedidos anulados/.test(lh) && /web LK 1416/.test(lh) &&
                  /lo cargó mal el cliente/.test(lh) && /<b>Vivi<\/b>/.test(lh) &&
                  /15\/09 10:20/.test(lh) && /LK 3969/.test(lh);
+    // v18.05 — la columna NP: el que tenía NP la muestra; el que no, dice "sin NP"
+    out.anuLogNp = /<th>NP<\/th>/.test(lh) &&
+                   /apr-anu-np[^>]*><span class="cuar-card-np">LK 0052<\/span>/.test(lh) &&
+                   /sin NP/.test(lh) && /no se reutiliza/.test(lh);
     aprAnuCerrar();
     out.anuLogCerrado = !!(document.getElementById("aprAnuModal") || {}).hidden;
 
@@ -563,6 +571,7 @@ catch (_e) {
   chk(r.anuAbiertoSi, "al expandir la NP aparece debajo del detalle");
   chk(r.anuChip, "la cabecera muestra el chip '✕ N anulados'");
   chk(r.anuLog, "el log lista cuándo, qué pedido, cliente, quién y por qué");
+  chk(r.anuLogNp, "el log muestra la NP que se quemó (y dice que no se reutiliza)");
   chk(r.anuLogCerrado, "el log se cierra");
   chk(errs.length === 0, "sin errores de página" + (errs.length ? " (" + errs.join(" | ") + ")" : ""));
 

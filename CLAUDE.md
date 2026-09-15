@@ -802,6 +802,26 @@ texto sobre `pg_get_viewdef`, así que el repo no tenía la definición viva y h
 reconstruirla juntando un archivo viejo con instrucciones en prosa. Si se parchea una vista con
 `replace()` sobre su propia definición, **guardar después el `CREATE` resultante completo**.
 
+⚠⚠ **`CREATE OR REPLACE VIEW` sin `WITH (...)` BORRA las `reloptions` — o sea que te comés el
+`security_invoker`.** No las conserva: las resetea a null, sin decir nada. Y una vista sin
+`security_invoker` corre como `postgres` y **saltea la RLS**, que es la filtración que costó caro
+el 2026-09-04. Pasó de nuevo el 2026-09-15 (v18.05) con `gv_ppp_web_estado` y
+`gv_fac_armado_sin_facturar`: las dos se reemplazaron para agregarles una condición y las dos
+perdieron la opción. Entonces, al reemplazar una vista:
+
+```sql
+-- ANTES: anotar qué opciones tiene
+select relname, reloptions from pg_class where oid = 'public.<vista>'::regclass;
+-- DESPUÉS (siempre, aunque parezca que no hacía falta):
+alter view public.<vista> set (security_invoker = true);
+-- Y el chequeo de que no quedó ninguna suelta que la anon pueda leer:
+select c.relname from pg_class c join pg_namespace n on n.oid = c.relnamespace
+ where n.nspname='public' and c.relkind='v'
+   and coalesce(array_to_string(c.reloptions,','),'') not like '%security_invoker%'
+   and has_table_privilege('anon', c.oid, 'SELECT');
+-- vacío = todo bien
+```
+
 ⚠⚠ **`DROP COLUMN`: barrer también `pg_proc.prosrc`, no sólo las vistas — y DESPUÉS llamar a
 las funciones.** Postgres **no revalida el cuerpo de una función** cuando se dropea una columna:
 el `DROP COLUMN` sale sin un solo error y el fallo queda **latente hasta la primera llamada**. El

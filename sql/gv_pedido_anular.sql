@@ -47,6 +47,7 @@ create table if not exists public."GV_Pedidos_Anulados" (
   m3            numeric,
   fecha_recep   date,
   zona          text,
+  np            text,                   -- v18.05: la(s) NP REAL(es) que se le habian asignado
   motivo        text        not null,   -- POR QUÉ se anula (obligatorio)
   persona       text        not null,   -- QUIÉN lo hace (Vivi / Marian / lo que escriban)
   por           text,                   -- el usuario de la sesión, que es otra cosa
@@ -63,8 +64,7 @@ alter table public."GV_Pedidos_Anulados" enable row level security;
 revoke all on public."GV_Pedidos_Anulados" from anon, authenticated;
 revoke all on sequence public."GV_Pedidos_Anulados_id_seq" from anon, authenticated;
 
--- ── Anular ───────────────────────────────────────────────────────────────────────────────────
-create or replace function public.gv_pedido_anular(
+-- ── Anular ───────────────────────────────────────────────────────────────────────────────────create or replace function public.gv_pedido_anular(
   p_empresa text, p_clave text, p_motivo text, p_persona text,
   p_por text default null, p_es_isis boolean default null, p_datos jsonb default null)
  returns table(tipo text, np text, detalle text)
@@ -81,6 +81,7 @@ declare
   v_d      jsonb := coalesce(p_datos, '{}'::jsonb);
   v_isis   boolean;
   v_np     text;
+  v_nps    text;     -- v18.05: la(s) NP REAL(es) que se le habian asignado
   v_oid    bigint;
   v_label  text;
   v_cod    text;
@@ -104,11 +105,9 @@ begin
     raise exception 'Falta quien lo anula.' using errcode='22023';
   end if;
 
-  -- Una NP de ISIS entra a A Programar disfrazada de pedido con order_id = 'np' + NP.
   v_isis := coalesce(p_es_isis, v_clave ~* '^np[0-9]+$');
-  v_np   := public.gv_cuarentena_clave(v_clave);   -- 'np98587' -> '98587'
+  v_np   := public.gv_cuarentena_clave(v_clave);
 
-  -- Datos que manda la pantalla (es lo que el supervisor tenia delante al apretar el boton).
   v_label := nullif(btrim(coalesce(v_d->>'np_label', '')), '');
   v_cod   := nullif(btrim(coalesce(v_d->>'cod', '')), '');
   v_rs    := nullif(btrim(coalesce(v_d->>'razon_social', '')), '');
@@ -117,22 +116,19 @@ begin
   v_zona  := nullif(btrim(coalesce(v_d->>'zona', '')), '');
 
   if v_isis then
-    -- Lo que sepa la programacion gana sobre lo que mando la pantalla (por si vino incompleto).
     select coalesce(nullif(btrim(p.cod),''), v_cod), coalesce(nullif(btrim(p.razon_social),''), v_rs),
            coalesce(p.m3, v_m3), regexp_replace(btrim(coalesce(p.tanda,'')), '\s+$','')
       into v_cod, v_rs, v_m3, v_tanda
       from public.gv_ppp_programacion_diaria p
      where regexp_replace(btrim(p.np), '\.0+$','') = v_np
      limit 1;
-    -- la que pudo haberla trabajado antes de que la desprogramaran
     if nullif(v_tanda,'') is null then
       select nullif(btrim(coalesce(o.tanda_previa,'')), '') into v_tanda
         from public."GV_PPP_Prog_Override" o where o.np = v_np limit 1;
     end if;
+    v_nps := v_np;   -- en ISIS el pedido ES la NP
   else
     v_oid := v_clave::bigint;
-    -- Un pedido de la pagina puede salir en VARIAS NP (bloques), asi que se agrega: el m3 es la
-    -- suma y la tanda que interesa para el guard es cualquiera que ya se haya tocado.
     select coalesce(nullif(btrim(max(w.cod_cliente)),''), v_cod),
            coalesce(nullif(btrim(max(w.razon_social)),''), v_rs),
            coalesce(sum(w.m3), v_m3),
@@ -140,6 +136,16 @@ begin
       into v_cod, v_rs, v_m3, v_tanda
       from public."PPP_Web_Programacion" w
      where w.empresa = v_emp and w.order_id = v_oid;
+    -- v18.05 (Luis: "¿que pasa con el codigo de NP? queda registrado que fue a ese pedido
+    -- anulado, no?") — SI: la fila de PPP_Web_NP no se borra y el contador es max(np)+1, asi que
+    -- el numero no se recicla nunca. Pero hasta la v18.04 el log guardaba la etiqueta de PANTALLA
+    -- ("web LK 1375"), que para un pedido web es el numero de PEDIDO, no la NP: quien buscaba la
+    -- NP no encontraba nada. Aca se resuelve la NP de verdad y se guarda con el resto.
+    select string_agg(x.lbl, ', ' order by x.np)
+      into v_nps
+      from (select distinct n.np, public.gv_ppp_web_np_label(n.empresa, n.np, n.np_idx) as lbl
+              from public."PPP_Web_NP" n
+             where n.empresa = v_emp and n.order_id = v_oid) x;
   end if;
 
   -- ⚠ Si la tanda ya se empezo a trabajar, esto NO alcanza: hay mercaderia movida y el stock hay
@@ -154,13 +160,13 @@ begin
             coalesce(nullif(btrim(p_por),''), 'supervisor'))
     on conflict (np) do update set motivo = excluded.motivo, legajo = excluded.legajo;
     insert into public."GV_PPP_Prog_Override" (np, oculto, nota)
-    values (v_np, true, 'v18.04 ' || to_char(now() at time zone 'America/Argentina/Buenos_Aires','YYYY-MM-DD HH24:MI')
+    values (v_np, true, 'v18.05 ' || to_char(now() at time zone 'America/Argentina/Buenos_Aires','YYYY-MM-DD HH24:MI')
                         || ' · ANULADO desde A Programar por ' || v_quien || ': ' || v_motivo
                         || coalesce(' · ' || nullif(btrim(p_por),''), ''))
     on conflict (np) do update set oculto = true, nota = excluded.nota;
   else
     insert into public."GV_Web_Cancelados" (empresa, order_id, np_label, motivo, por)
-    values (v_emp, v_oid, coalesce(v_label, v_np),
+    values (v_emp, v_oid, coalesce(v_nps, v_label, v_np),
             'anulado: ' || v_motivo || ' (' || v_quien || ')', nullif(btrim(p_por),''))
     on conflict on constraint "GV_Web_Cancelados_pkey" do update
        set motivo = excluded.motivo, por = excluded.por,
@@ -174,9 +180,9 @@ begin
   end if;
 
   insert into public."GV_Pedidos_Anulados"
-    (empresa, clave, es_isis, np_label, order_id, cod, razon_social, m3, fecha_recep, zona,
+    (empresa, clave, es_isis, np_label, np, order_id, cod, razon_social, m3, fecha_recep, zona,
      motivo, persona, por)
-  values (v_emp, v_clave, v_isis, coalesce(v_label, v_np), v_oid, v_cod, v_rs, v_m3, v_fr, v_zona,
+  values (v_emp, v_clave, v_isis, coalesce(v_label, v_np), v_nps, v_oid, v_cod, v_rs, v_m3, v_fr, v_zona,
           v_motivo, v_quien, nullif(btrim(p_por),''));
 
   return query select
@@ -186,7 +192,10 @@ begin
          then 'NP ' || v_np || ' anulada: sale de A Programar (NP_Canceladas + oculta en la PPP)'
          else 'pedido ' || v_oid || ' anulado: sale de A Programar y el armado automatico ya no lo toma'
               || case when v_n > 0 then ' (se le saco la tanda a ' || v_n || ' NP)' else '' end
-    end::text;
+    end::text
+    || case when not v_isis and v_nps is not null
+            then '. La NP ' || v_nps || ' queda registrada a este pedido y NO se reutiliza.'
+            else '' end;
 end;
 $function$;
 
@@ -194,8 +203,11 @@ revoke all on function public.gv_pedido_anular(text, text, text, text, text, boo
 grant execute on function public.gv_pedido_anular(text, text, text, text, text, boolean, jsonb) to authenticated, service_role;
 
 -- ── Leer el log ──────────────────────────────────────────────────────────────────────────────
+-- ⚠ v18.05: se le agrego la columna `np`, y eso CAMBIA el tipo de retorno: hay que DROPEARLA
+-- antes (`cannot change return type of existing function`), no alcanza el create or replace.
+drop function if exists public.gv_pedidos_anulados(integer);
 create or replace function public.gv_pedidos_anulados(p_dias integer default 90)
- returns table(id bigint, empresa text, clave text, es_isis boolean, np_label text,
+ returns table(id bigint, empresa text, clave text, es_isis boolean, np_label text, np text,
                cod text, razon_social text, m3 numeric, fecha_recep date, zona text,
                motivo text, persona text, por text, anulado_at timestamptz)
  language sql
@@ -203,7 +215,9 @@ create or replace function public.gv_pedidos_anulados(p_dias integer default 90)
  security definer
  set search_path to 'public'
 as $function$
-  select a.id, a.empresa, a.clave, a.es_isis, a.np_label, a.cod, a.razon_social, a.m3,
+  -- v18.05: devuelve tambien `np` — la(s) NP que se le habian asignado al pedido, que es por
+  -- donde uno la busca cuando aparece un hueco en la numeracion.
+  select a.id, a.empresa, a.clave, a.es_isis, a.np_label, a.np, a.cod, a.razon_social, a.m3,
          a.fecha_recep, a.zona, a.motivo, a.persona, a.por, a.anulado_at
     from public."GV_Pedidos_Anulados" a
    where a.anulado_at >= now() - make_interval(days => greatest(coalesce(p_dias, 90), 1))
@@ -213,3 +227,36 @@ $function$;
 
 revoke all on function public.gv_pedidos_anulados(integer) from public, anon;
 grant execute on function public.gv_pedidos_anulados(integer) to authenticated, service_role;
+
+-- =============================================================================
+-- v18.05 (2026-09-15) — Luis: *"si se anula un pedido ahora, ¿qué pasa con el código de NP?
+-- queda registrado que fue a ese pedido anulado, no? Fijate a lo largo de la PPP cuando se anula
+-- un pedido que siga esa lógica"*.
+--
+-- LA RESPUESTA ES SÍ, y ya era así antes de este cambio:
+--   · `PPP_Web_NP` (empresa, np, order_id, np_idx) NO se toca al anular: la NP sigue apuntando a
+--     ese pedido para siempre. Ninguna función del proyecto borra filas de esa tabla.
+--   · El próximo número sale de `max(np) + 1` (`gv_ppp_web_np_asignar`), así que un número
+--     anulado NO se recicla nunca — queda un hueco en la numeración, a propósito.
+--   · Y si ese MISMO pedido se volviera a programar, el `not exists` de esa función le devuelve
+--     SU misma NP, no una nueva.
+--
+-- LO QUE FALTABA ERA PODER VERLO. El log guardaba `np_label`, que es la etiqueta de PANTALLA: para
+-- un pedido web eso es el número de PEDIDO ("web LK 1375"), no la NP ("LK 0052"). O sea que quien
+-- encontraba el hueco en la numeración y buscaba la NP no encontraba nada. Ahora la columna `np`
+-- guarda la(s) NP de verdad, resueltas en el backend desde `PPP_Web_NP` (un pedido puede tener
+-- varias si salía en bloques: "LK 0052, LK 0053").
+--
+-- MEDIDO (anulando el pedido lk/1375 dentro de un `DO … raise exception`):
+--   detalle    → "…. La NP LK 0052 queda registrada a este pedido y NO se reutiliza."
+--   LOG np     → "LK 0052"      (antes: no existía la columna)
+--   estado     → pasó de `programado` a `anulado` en gv_ppp_web_estado
+--   próxima NP → sigue siendo 86, o sea que el contador no retrocedió
+--
+-- EL RESTO DE LA PPP: se midió con control positivo en qué vistas seguía apareciendo la NP.
+-- ANTES de anular se veía en gv_np_prog, gv_ppp_detalle_dia y gv_ppp_web_estado; DESPUÉS sólo
+-- quedaba en gv_ppp_web_estado (las demás la sueltan al perder la tanda), y ahí decía
+-- `sin_programar`. Eso se arregló en `sql/gv_ppp_web_estado_v1805.sql`. La otra asimetría
+-- encontrada —el centinela de facturación excluía `NP_Canceladas` (ISIS) pero no
+-- `GV_Web_Cancelados` (web)— está en `sql/gv_fac_armado_sin_facturar_v1805.sql`.
+-- =============================================================================

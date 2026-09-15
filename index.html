@@ -1047,6 +1047,8 @@ button {
 .apr-anu-tbl td{ border-top-color:#eef2f7; }
 .apr-anu-tbl .cuar-card-np{ color:#0f172a; font-size:13px; }
 .apr-anu-motivo{ min-width:220px; overflow-wrap:anywhere; }
+.apr-anu-np{ white-space:nowrap; }
+.apr-anu-np .cuar-card-np{ color:#7c2d12; font-size:13px; }
 /* la fila que se abre con la flechita: el contenido del pedido, a lo ancho de toda la tabla */
 .cuar-tbl tr.cuar-tbl-det > td{ background:#fffaf5; padding:0 10px 9px 30px; }
 /* el detalle no se estira a los 1400px de la tabla: a ese ancho, "505 … 2 cajas … 24" quedaba
@@ -5401,7 +5403,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=18.04"></script>
+<script type="module" src="recepcion.js?v=18.05"></script>
 <!-- Config del módulo de fichada (compartido con fichada.html). El secret
      hmacSecret tiene que ser el mismo acá y allá; cargándolo desde un solo
      archivo evitamos que se desincronicen. -->
@@ -8841,7 +8843,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v18.04";
+const APP_VERSION = "v18.05";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -41034,12 +41036,18 @@ function aprAnuRender() {
   if (!l.length) cuerpo = '<div class="cuar-log-vacio">Todavía no se anuló ningún pedido.</div>';
   else {
     cuerpo = '<div class="cuar-yaprog-wrap"><table class="cuar-tbl apr-anu-tbl"><thead><tr>' +
-      '<th>Cuándo</th><th>Pedido</th><th class="cuar-td-m3">m³</th><th>Cliente</th><th>Quién</th><th>Por qué</th>' +
+      '<th>Cuándo</th><th>Pedido</th><th>NP</th><th class="cuar-td-m3">m³</th><th>Cliente</th><th>Quién</th><th>Por qué</th>' +
       '</tr></thead><tbody>' +
       l.map(function (r) {
         return '<tr>' +
           '<td class="cuar-td-fecha">' + escapeHtml(cuarFechaHora(r.anulado_at)) + '</td>' +
           '<td><span class="cuar-card-np">' + escapeHtml(String(r.np_label || r.clave || "")) + '</span></td>' +
+          // v18.05 (Luis: "¿queda registrado que la NP fue a ese pedido anulado?") — sí: la NP
+          // sigue asignada a este pedido en PPP_Web_NP y el contador nunca la reutiliza. Acá se
+          // la muestra para poder buscar por NP cuando aparece un hueco en la numeración.
+          '<td class="apr-anu-np">' + (r.np
+              ? '<span class="cuar-card-np">' + escapeHtml(String(r.np)) + '</span>'
+              : '<span class="cuar-yp-sin" title="Se anuló antes de que se le asignara NP">sin NP</span>') + '</td>' +
           '<td class="cuar-td-m3">' + (r.m3 == null ? "—" : aprNum(r.m3) + " m³") + '</td>' +
           '<td class="cuar-td-cli">' + (r.cod ? cuarCodChip({ empresa: r.empresa, cod: r.cod }) : "") +
             escapeHtml(String(r.razon_social || "")) + '</td>' +
@@ -41056,7 +41064,9 @@ function aprAnuRender() {
         '<button class="cuar-m-x" onclick="aprAnuCerrar()">✕</button></div>' +
       '<div class="cuar-m-body">' +
         '<p class="cuar-com-sub">Últimos 90 días. Un pedido anulado sale de <b>A Programar</b> y el armado ' +
-          'automático no lo toma más; el pedido de la página <b>no se borra</b>.</p>' + cuerpo +
+          'automático no lo toma más; el pedido de la página <b>no se borra</b>. ' +
+          'Si ya tenía <b>NP</b>, esa NP <b>queda registrada a este pedido y no se reutiliza</b>: ' +
+          'por eso queda un hueco en la numeración, y acá está el por qué.</p>' + cuerpo +
       '</div>' +
     '</div>';
 }

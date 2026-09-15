@@ -16165,3 +16165,74 @@ terminar, `GV_Pedidos_Anulados` = 0 filas, `NP_Canceladas` sin las NP de prueba 
 columnas, que sin persona o sin motivo no anula, la confirmación, la RPC con su snapshot, el caso
 ISIS con `p_es_isis = true`, que en Pedidos a programar sólo aparece al expandir y **debajo** del
 detalle, y el log con su chip).
+
+---
+
+### §3.gi — v18.05: la NP de un pedido anulado — qué pasa con el número, y dónde se veía mal — 2026-09-15
+
+**Pregunta de Luis (2026-09-15):** *"si se anula un pedido ahora, ¿qué pasa con el código de NP?
+queda registrado que fue a ese pedido anulado, no? Fijate a lo largo de la PPP cuando se anula un
+pedido que siga esa lógica"*.
+
+#### La respuesta corta: sí, y ya era así
+
+- **`PPP_Web_NP`** (empresa, np, order_id, np_idx) **no se toca** al anular: la NP sigue apuntando
+  a ese pedido para siempre. Se comprobó que **ninguna función del proyecto borra** filas de esa
+  tabla (`prosrc ~ 'delete from … PPP_Web_NP'` → 0).
+- El próximo número sale de **`max(np) + 1`** (`gv_ppp_web_np_asignar`), así que un número anulado
+  **no se recicla nunca**: queda un hueco, a propósito. Medido: antes y después de anular el
+  pedido lk/1375, la próxima NP de LK sigue siendo la **86**.
+- Y si ese **mismo** pedido se volviera a programar, el `not exists` de esa función le devuelve
+  **su misma NP**, no una nueva.
+- Los huecos que hay hoy en LK (**65, 79, 80, 81**) no son de anulaciones: son de pedidos
+  **borrados** (la regla de "borrar un pedido = borrarlo de todos lados"), que sí borran la fila.
+
+#### Lo que faltaba: poder verlo
+
+El log guardaba `np_label`, que es la etiqueta de **pantalla**: para un pedido web eso es el
+número de **pedido** (`web LK 1375`), no la NP (`LK 0052`). O sea que quien encontraba el hueco en
+la numeración y buscaba la NP **no encontraba nada**. Ahora `GV_Pedidos_Anulados` tiene la columna
+**`np`** con la(s) NP de verdad, resueltas en el backend desde `PPP_Web_NP` (varias si el pedido
+salía en bloques: `LK 0052, LK 0053`), la RPC las devuelve y el log las muestra en su columna.
+El mensaje que ve el supervisor al anular ahora termina con *"La NP LK 0052 queda registrada a
+este pedido y NO se reutiliza"*.
+
+#### "A lo largo de la PPP": se midió, no se supuso
+
+Anulando el pedido lk/1375 dentro de un `DO … raise exception` y contando en qué vistas seguía
+apareciendo su NP `LK 0052`:
+
+| | dónde aparecía |
+|---|---|
+| **antes** de anular (control) | `gv_np_prog` · `gv_ppp_detalle_dia` · `gv_ppp_web_estado` |
+| **después** de anular | **`gv_ppp_web_estado`** ← el único que quedaba mal |
+
+Las demás la sueltan solas al perder la tanda. `gv_ppp_web_estado` la dejaba en
+**`sin_programar`**, que es lo mismo que dice de un pedido que todavía **no** se programó — y un
+pedido anulado no está esperando turno. Ahora devuelve **`anulado`** (o **`desarmado`**, según el
+motivo), después de los estados de trabajo: si la NP llegó a pickearse o facturarse, eso es lo que
+hay que ver. `sql/gv_ppp_web_estado_v1805.sql`.
+
+**Segunda asimetría encontrada:** `gv_fac_armado_sin_facturar` (el centinela "se armó y no está
+facturado") excluía `NP_Canceladas` —o sea el lado **ISIS**— pero **no** `GV_Web_Cancelados`. El
+día que se desarme un pedido web armado iba a quedar colgado ahí como *"la NP está en la PPP pero
+sin tanda"*, que es justo lo que el desarme le acababa de hacer. Con **control positivo**: marcando
+cancelado el pedido lk/1344, el centinela pasó de **8 a 6 filas** y sus dos NP (LK 0007 y LK 0008)
+desaparecieron. `sql/gv_fac_armado_sin_facturar_v1805.sql`.
+
+#### ⚠⚠ Y lo que casi se rompe en el camino
+
+**`CREATE OR REPLACE VIEW` sin `WITH (...)` BORRA las `reloptions`** — no las conserva, las
+resetea a null. Las dos vistas que se reemplazaron acá **perdieron `security_invoker = true`**, y
+una vista sin eso corre como `postgres` y **saltea la RLS**: exactamente la filtración del
+2026-09-04. Se detectó en el momento, se comprobó el mecanismo (un `create or replace` de
+`gv_np_prog` con su **propia** definición dejó `reloptions = (null)`) y se repuso con
+`alter view … set (security_invoker = true)`. Chequeo final: **ninguna** vista de `public` legible
+por `anon` quedó sin la opción. La regla quedó escrita en el `CLAUDE.md`.
+
+#### Lo que NO se tocó, y por qué
+
+`gv_pedido_web_estado_pagina` —lo que ve el **cliente** en la página de LK— mapea el estado a un
+rango 1..8 y devuelve el nombre por índice; un estado que no conoce cae en el `ELSE 1`, así que a
+un pedido anulado le sigue diciendo **"sin_programar"**. No se cambió: **que el cliente vea
+"anulado" en la página es una decisión comercial del dueño**, no técnica. Queda anotado acá.
