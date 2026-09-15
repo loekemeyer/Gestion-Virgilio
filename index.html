@@ -4359,6 +4359,10 @@ table.facfc-tbl tr.facneto-row-falt td{ background: #fef2f2; }
    PENDIENTE (retomable con "▶ Seguir armado"). Secundario (ámbar) al lado de Terminar. */
 .comp-pausar{ width:100%; margin:0; padding:14px; border:1.5px solid #f59e0b; border-radius:12px; background:#fffbeb; color:#92400e; font-size:16px; font-weight:800; cursor:pointer; }
 .comp-pausar:active{ background:#fef3c7; }
+/* v18.50 — soltar la tanda sin armarla. Rojo y con menos peso visual que "Terminar":
+   es la salida de escape, no el camino normal. */
+.comp-anular{ width:100%; margin:0; padding:13px; border:1.5px solid #dc2626; border-radius:12px; background:#fef2f2; color:#b91c1c; font-size:15px; font-weight:800; cursor:pointer; }
+.comp-anular:active{ background:#fee2e2; }
 .comp-mode-toggle{ display:inline-block; font-size:11.5px; font-weight:700; color:#1e6bd6; background:#eff6ff; border:1px solid #bfdbfe; border-radius:999px; padding:5px 12px; cursor:pointer; margin:0 0 10px; }
 .comp-mode-toggle b{ font-weight:800; }
 .comp-fnp-box{ display:flex; flex-direction:column; align-items:center; gap:2px; flex:0 0 auto; }
@@ -5272,6 +5276,13 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
     </div>
     <div class="comp-foot">
       <button class="comp-pausar" id="compPausar" onclick="compPausar()" title="Salir sin terminar: queda pendiente y lo retomás con “Seguir armado”. La pausa no cuenta en el tiempo.">⏸ Pausar</button>
+      <!-- v18.50 (Luis, 15/09: "la seleccionó por error, él no la hace"). Espejo del
+           "Anular picking": suelta la tanda sin darla por armada. Queda PENDIENTE DE ARMAR
+           para cualquiera, y el registro de que la soltó va a GV_Tanda_Anulada. Sin esto el
+           único camino era dar TAP — o sea marcarla armada y mover stock — o dejarla trabada
+           para siempre, que es lo que pasó con E11B. -->
+      <button class="comp-anular" id="compAnular" onclick="compAnularArmado()"
+              title="No la armás vos: suelta la tanda y vuelve a quedar pendiente de armar">✖ No la armo yo</button>
       <button class="comp-fin" id="compFin" onclick="compTerminar()">Terminar</button>
     </div>
   </div>
@@ -5575,7 +5586,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=18.49"></script>
+<script type="module" src="recepcion.js?v=18.50"></script>
 <!-- Config del módulo de fichada (compartido con fichada.html). El secret
      hmacSecret tiene que ser el mismo acá y allá; cargándolo desde un solo
      archivo evitamos que se desincronicen. -->
@@ -9133,7 +9144,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v18.49";
+const APP_VERSION = "v18.50";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -13365,6 +13376,81 @@ function compPausar() {
   try { updatePendingIndicator(); } catch (_e) {}
   try { alert("⏸ Armado en pausa" + (tanda ? " (tanda " + tanda + ")" : "") + ".\nSe guardó todo lo cargado. Cuando quieras retomalo con “▶ Seguir armado”.\nLa pausa NO cuenta en el tiempo del armado."); } catch (_e) {}
 }
+/* v18.50 — "No la armo yo": soltar la tanda SIN darla por armada.
+   Pedido de Luis (15/09): "FO tiene el armado de la E11B pero la seleccionó por error, él no la
+   hace" → antes las únicas salidas eran dar TAP (marcarla armada y mover stock, mentira) o
+   dejarla abierta, y abierta queda con candado para todos por la exclusividad v5.74. Así se
+   colgó E11B 3 h 30.
+   Espejo exacto del "Anular picking" (`pkAnular`): borra el AP en el servidor, suelta el lock,
+   limpia el estado local y el borrador del asistente. La tanda vuelve a quedar PENDIENTE DE
+   ARMAR para cualquiera, y en `GV_Tanda_Anulada` queda el registro de quién la soltó y por qué.
+   La RPC NO anula si el asistente ya grabó Entregas: eso mueve stock y lo tiene que resolver
+   sistemas, no un botón. */
+async function compAnularArmado() {
+  const tanda  = String((_comp && _comp.tanda) || (textInput && textInput.value) || "").trim().toUpperCase();
+  const legajo = String((_comp && _comp.legajo) || (legajoInput && legajoInput.value) || "").trim();
+  if (!tanda || !legajo) { try { alert("No sé qué tanda soltar. Cerrá y volvé a entrar."); } catch (_e) {} return; }
+  let ok = false;
+  try {
+    ok = confirm("¿Soltar el armado de la tanda " + tanda + "?\n\n" +
+                 "NO se marca como armada: vuelve a quedar PENDIENTE DE ARMAR y la puede agarrar " +
+                 "cualquiera, vos incluido.\n\nQueda registrado que la soltaste.");
+  } catch (_e) { ok = false; }
+  if (!ok) return;
+  let motivo = "";
+  try { motivo = prompt("¿Por qué la soltás? (opcional — ayuda a entender qué pasó)", "") || ""; } catch (_e) { motivo = ""; }
+
+  // 1) sacar de la cola local el AP de esta tanda, si todavía no se sincronizó
+  try {
+    readQueue().filter(function (it) {
+      return String(it.legajo || "") === legajo && it.opcion === "AP" &&
+             String(it.texto || "").trim().toUpperCase() === tanda;
+    }).forEach(function (it) { removeFromQueue(it.id); });
+  } catch (_e) {}
+
+  // 2) el servidor: borra el AP, libera el lock y deja el registro
+  let r = null;
+  try {
+    const res = await fetch(SUPABASE_URL + "/rest/v1/rpc/anular_armado_virgilio", {
+      method: "POST",
+      headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY, "Content-Type": "application/json" },
+      body: JSON.stringify({ p_legajo: legajo, p_tanda: tanda, p_motivo: motivo })
+    });
+    if (res.ok) r = await res.json();
+  } catch (_e) { r = null; }
+  if (r === "tiene_registros") {
+    try { alert("⚠ Esta tanda ya tiene pedidos cargados en el asistente, así que no se puede soltar desde acá.\n\nAvisá a sistemas: hay que deshacerlo a mano para no romper el stock."); } catch (_e) {}
+    return;
+  }
+  if (r === "ya_cerrado") {
+    try { alert("Esta tanda ya figura ARMADA (alguien le dio «Terminé Armado Pedido»). No hay nada que soltar."); } catch (_e) {}
+  }
+  try { tandaLiberar(tanda, "armado", legajo); } catch (_e) {}
+
+  // 3) estado local: el casillero del armado, el borrador del asistente y el historial del día
+  try { const st = getLegajoState(legajo); st.armado = { active: false, value: "", ts_inicio: null }; setLegajoState(legajo, st); } catch (_e) {}
+  try { localStorage.removeItem("vir_comp_" + tanda); } catch (_e) {}
+  try {
+    const f = getTodayKey();
+    writeDayHist(f, legajo, readDayHist(f, legajo).filter(function (h) {
+      return !(h.opcion === "AP" && String(h.texto || "").trim().toUpperCase() === tanda);
+    }));
+  } catch (_e) {}
+
+  _comp = null;
+  try { document.getElementById("completarModal").classList.remove("show"); } catch (_e) {}
+  try { _activityStatusTs = 0; } catch (_e) {}   // que la próxima lista de tandas salga fresca
+  try { renderLegajoHistory(legajo); } catch (_e) {}
+  try { renderPendingSuggestion(); } catch (_e) {}
+  try { updateCoreButtonsState(); } catch (_e) {}
+  try { updatePendingIndicator(); } catch (_e) {}
+  if (r === "ok" || r === null) {
+    try { alert("✔ Soltaste la tanda " + tanda + ".\n\nVolvió a quedar pendiente de armar" +
+                (r === null ? "\n\n(Sin señal: se limpió en el celular. Si al volver la señal sigue apareciendo tuya, tocá de nuevo.)" : ".")); } catch (_e) {}
+  }
+}
+window.compAnularArmado = compAnularArmado;
+
 /* Guarda el pedido entero en la tabla Entregas_Virgilio (POST en bloque, 1 sola llamada).
    Si no hay red o el server responde error, lo deja en localStorage para reintentar
    (_compFlushEntregas). v12.18 (2026-08-31): antes se tragaban silenciosamente los
