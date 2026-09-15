@@ -17806,3 +17806,100 @@ detalle ya hizo dudar una vez de un grant que estaba perfecto.
 
 El 73 corre **cada 5 min** (`*/5 9-23 * * *` UTC = 06:00–20:55 ART), no cada 15; el **27 ya no
 existe** (se borró, no está en `active=false`); el 50 está activo desde v18.18.
+
+---
+
+## §3.hj — v18.58: `gv_tandas_deshechas`, para que el monitor no acuse a nadie por una tanda que sacamos nosotros — 2026-09-15
+
+**Pedido de Luis, 15/09:** *"el cartel ese de «tandas trabajadas que no están en PPP - alguien se
+equivocó: E01G» no corresponde en este caso, te pedí yo por acá que lo ajustes"*.
+
+### Qué pasaba
+
+El monitor arma `alertasOffSheet` con las tandas que tienen **TP/TAP de hoy** y **no figuran en la
+programación** del día (`index.html`, `fetchMonitorEvents`). La lógica es correcta para lo que se
+pensó —un operario que pickea la tanda equivocada—, pero la misma condición la cumple una tanda que
+**sacamos nosotros** de la PPP. Ese mismo día se desarmó **E01G** a pedido de Luis (sus NP volvieron
+a *A Programar* porque el armado mostraba códigos que el picking nunca llegó a listar — el corte de
+1000 filas de PostgREST, problema **268**), y el cartel la señaló igual, como equivocación de un
+operario que no existió.
+
+### Lo que faltaba era una LECTURA, no un dato
+
+Las dos tablas donde ya queda asentado que algo se deshizo a propósito existían:
+
+| Tabla | La escribe | Qué guarda |
+|---|---|---|
+| `GV_Desarmes` | `gv_ppp_np_desarmar` | la NP desarmada **y su tanda**, con justificativo |
+| `GV_Tanda_Anulada` | `anular_armado_virgilio` (v18.50) | tanda + fase (`picking`/`armado`) + motivo |
+
+Nadie las consultaba desde el front. La vista nueva las une:
+
+```sql
+create or replace view public.gv_tandas_deshechas as
+  select upper(btrim(d.tanda)) tanda, 'desarme'::text motivo_tipo,
+         d.creado_at ts, coalesce(d.justificativo,'') detalle
+    from public."GV_Desarmes" d where coalesce(btrim(d.tanda),'') <> ''
+  union
+  select upper(btrim(a.tanda)), 'anulada'::text, a.anulado_en, coalesce(a.motivo,'')
+    from public."GV_Tanda_Anulada" a where coalesce(btrim(a.tanda),'') <> '';
+alter view public.gv_tandas_deshechas set (security_invoker = true);
+grant select on public.gv_tandas_deshechas to anon, authenticated;
+```
+
+⚠ **`GV_Tanda_Anulada` tenía RLS prendida y CERO policies**, o sea que `anon` veía 0 filas y media
+vista salía vacía sin decir nada. Lleva `gv_tanda_anulada_read` (SELECT, `using (true)`): la tabla
+tiene tanda, fase, legajo y motivo, nada sensible, y la app entera opera con la anon key.
+
+### Front
+
+`fetchTandasDeshechas()` (cache 60 s, `SUPABASE_TANDAS_DESHECHAS_ENDPOINT`) y una línea en el bucle
+de eventos: `if (!deshechas.has(t)) alertasSet.add(t);`. **Si la lectura falla, devuelve lo cacheado
+o un Set vacío** — la alerta vuelve a su comportamiento viejo y el monitor no se cae por esto.
+
+### Alcance, para no confundirse
+
+Desarmar **una** NP de una tanda con varias **no** saca a la tanda de la PPP, así que la alerta no
+salta y esta exclusión no tiene efecto. Sólo pesa cuando la tanda ya no está en la programación,
+que es exactamente el caso que se quiso arreglar.
+
+### Medición al aplicarlo
+
+```
+D71A | anulada  | 2026-09-15 16:56   ← el EP abierto de JC del 14/09, anulado en esta misma sesión
+E01G | desarme  | 2026-09-15 15:53   ← x2, una fila por NP (LK 0034 y LK 0035)
+E22A | desarme  | 2026-09-15 12:13
+```
+
+Y el centinela de vistas sin `security_invoker` legibles por `anon`: **vacío**.
+
+### Rollback
+
+```sql
+drop view public.gv_tandas_deshechas;
+drop policy gv_tanda_anulada_read on public."GV_Tanda_Anulada";
+```
+
+`sql/gv_tandas_deshechas_v1858.sql` · `tests/monitor-tanda-deshecha.cjs` · problema **304**.
+
+### Lo otro que se hizo en la misma tanda (datos, sin código)
+
+**Los tres pickings abiertos de JC (legajo 277)** que el monitor mostraba en curso: `E25A`
+(15/09 14:29), `E11C` (15/09 12:36) y `D71A` (14/09 14:25). Las tres tenían **cero renglones
+pickeados y cero movimientos de stock**, así que no había nada que devolver:
+
+```sql
+select public.anular_picking_virgilio('277','E25A');  -- ok
+select public.anular_picking_virgilio('277','E11C');  -- ok
+select public.anular_picking_virgilio('277','D71A');  -- sin_ep  ← la RPC sólo mira 24 h
+```
+
+D71A se hizo a mano (backup en `zz_backups."GV_Backup_EP_abiertos_JC_20260915"`, 3 filas): borrar
+la fila EP, dejar el registro en `GV_Tanda_Anulada` y `tanda_liberar`. **La ventana de 24 h de
+`anular_picking_virgilio` es a propósito** (no revivir picking viejo por accidente), pero deja sin
+herramienta al caso "quedó abierto desde ayer", que es justo el que hay que limpiar.
+
+Las tres tandas quedaron verificadas contra su base, sin renglones faltantes: `E11C` → LK 0092
+(18 renglones / 58 cajas) y LK 0093 (1 / 6); `E25A` → LK 0097 (1 / 20); `D71A` → NP 97889,
+1 renglón (55219 × 500 cajas). Después de la limpieza el único picking/armado en curso era `E23A`
+del legajo 237, arrancado minutos antes: ése es real.
