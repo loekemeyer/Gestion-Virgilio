@@ -5528,7 +5528,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=18.41"></script>
+<script type="module" src="recepcion.js?v=18.42"></script>
 <!-- Config del módulo de fichada (compartido con fichada.html). El secret
      hmacSecret tiene que ser el mismo acá y allá; cargándolo desde un solo
      archivo evitamos que se desincronicen. -->
@@ -8999,7 +8999,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v18.41";
+const APP_VERSION = "v18.42";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -9373,6 +9373,18 @@ async function sendTap() {
   try { return await send(); }
   finally { _sendBusy = false; }
 }
+/* v18.42 — hora corta (HH:MM ART) de un ts ISO, para los avisos de "lo tenés abierto desde…".
+   Devuelve "" si el ts no está o no se puede parsear: el aviso se muestra igual, sin la hora. */
+function _horaCortaAR(iso) {
+  if (!iso) return "";
+  try {
+    const d = new Date(iso);
+    if (isNaN(d.getTime())) return "";
+    return d.toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit",
+                                           timeZone: "America/Argentina/Buenos_Aires" });
+  } catch (_e) { return ""; }
+}
+
 async function send() {
   const legajoStr   = String(legajoInput.value || "").trim();
   const opcion      = selected;
@@ -9386,13 +9398,33 @@ async function send() {
   // un 2º evento AP (doble arranque, ensucia los tiempos): reabrimos el asistente donde
   // quedó. Cubre al operario que, tras una pausa (comida), aprieta AP de nuevo por
   // costumbre para volver. (Si es OTRA tanda, sigue el flujo normal = armado nuevo.)
+  //
+  // v18.42 — y si es OTRA tanda, ya NO pasa derecho: espejo de la guarda EP de abajo
+  // (idea 5138). `st.armado` es UN SOLO casillero, así que arrancar un 2º armado PISA al
+  // primero en silencio: se va el prefill del TAP, la tanda vieja desaparece de "Terminar
+  // Día" y queda AP sin TAP → trabada para todos por la exclusividad v5.74. Es lo que pasó
+  // con E11B (leg 237: AP 11:15, arrancó E01C 13:44 y E11B quedó colgada) y con D71A.
   if (opcion === "AP" && texto) {
     const stAP = getLegajoState(legajoStr);
-    if (stAP && stAP.armado && stAP.armado.active &&
-        String(stAP.armado.value || "").trim().toUpperCase() === texto) {
-      try { alert("Ese armado (tanda " + texto + ") ya estaba abierto — te lo reabro donde lo dejaste.\nNo hace falta marcar AP de nuevo."); } catch (_e) {}
-      try { showCompletarWizard(legajoStr, texto); } catch (_e) {}
-      return;
+    if (stAP && stAP.armado && stAP.armado.active) {
+      const abiertaAP = String(stAP.armado.value || "").trim().toUpperCase();
+      if (abiertaAP === texto) {
+        try { alert("Ese armado (tanda " + texto + ") ya estaba abierto — te lo reabro donde lo dejaste.\nNo hace falta marcar AP de nuevo."); } catch (_e) {}
+        try { showCompletarWizard(legajoStr, texto); } catch (_e) {}
+        return;
+      } else if (abiertaAP) {
+        const hAP = _horaCortaAR(stAP.armado.ts_inicio);
+        let ok = false;
+        try {
+          ok = confirm("⚠ Tenés el armado de la tanda " + abiertaAP + " SIN terminar (sin TAP)" +
+                       (hAP ? ", desde las " + hAP : "") + ".\n\nSi arrancás " + texto + " ahora, " +
+                       abiertaAP + " queda sin cerrar y trabada para los demás.\n\nAceptar = arrancar " +
+                       texto + " igual · Cancelar = terminar primero " + abiertaAP + ".");
+        } catch (_e) { ok = true; }
+        // Cancelar no deja al operario en la nada: le abrimos el asistente de la tanda vieja
+        // para que la cierre ahí mismo, que es lo que hay que hacer.
+        if (!ok) { try { showCompletarWizard(legajoStr, abiertaAP); } catch (_e) {} return; }
+      }
     }
   }
 
@@ -9409,9 +9441,12 @@ async function send() {
         try { showPickingList(texto, legajoStr); } catch (_e) {}
         return;
       } else if (abierta) {
+        // v18.42: con la hora de arranque (así sabe cuál dejó colgada) y, al cancelar, le
+        // reabrimos el picking viejo en vez de dejarlo en la pantalla sin saber qué hacer.
+        const hEP = _horaCortaAR(stEP.picking.ts_inicio);
         let ok = false;
-        try { ok = confirm("⚠ Tenés el picking de la tanda " + abierta + " SIN terminar (sin TP).\n\nSi arrancás " + texto + " ahora, " + abierta + " queda sin cerrar y trabada.\n\nAceptar = arrancar " + texto + " igual · Cancelar = terminar primero " + abierta + "."); } catch (_e) { ok = true; }
-        if (!ok) return;
+        try { ok = confirm("⚠ Tenés el picking de la tanda " + abierta + " SIN terminar (sin TP)" + (hEP ? ", desde las " + hEP : "") + ".\n\nSi arrancás " + texto + " ahora, " + abierta + " queda sin cerrar y trabada.\n\nAceptar = arrancar " + texto + " igual · Cancelar = terminar primero " + abierta + "."); } catch (_e) { ok = true; }
+        if (!ok) { try { showPickingList(abierta, legajoStr); } catch (_e) {} return; }
       }
     }
   }

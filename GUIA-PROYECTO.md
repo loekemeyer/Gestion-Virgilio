@@ -1,3 +1,35 @@
+## Nota v18.42 (2026-09-15) — Arrancar un 2º armado sin cerrar el anterior ahora AVISA
+
+Luis: *"un operario puede arrancar un armado, no cerrarlo y arrancar otro también?"*. Sí podía, y
+es la **causa raíz de D71A y de E11B** (problemas 262 y 263): no son dos incidentes, son el mismo.
+
+**Por qué.** El estado del operario tiene **UN SOLO casillero** por fase: `st.armado` y
+`st.picking`. La guarda v5.26 sólo frenaba el AP repetido de la **misma** tanda ("si es OTRA
+tanda, sigue el flujo normal"), así que el segundo AP **pisaba** al primero en silencio y con él
+se iban las tres cosas que servían para cerrarlo: el **prefill del TAP**, la fila "Armado en
+curso" de **Terminar Día**, y el `ts_inicio` (la duración del viejo salía con el arranque del
+nuevo). La tanda quedaba **AP sin TAP para siempre** → trabada para todos por la exclusividad
+v5.74. Caso medido: legajo 237 le dio AP a **E11B** 11:15, arrancó **E01C** 13:44 y E11B quedó
+colgada. En picking, idéntico: legajo 277, EP de **D71A** 14:25 y **D72A** 14:44 (su FJ de esa
+tarde: EP 9 / TP 8).
+
+**El arreglo (el chico, el que pidió Luis).** AP con otro armado abierto ya no pasa derecho:
+pregunta, con la **hora de arranque** del viejo (`_horaCortaAR`), *"⚠ Tenés el armado de la tanda
+E11B SIN terminar (sin TAP), desde las 11:15… Aceptar = arrancar E01C igual · Cancelar = terminar
+primero E11B"*. Es el espejo exacto de la guarda que EP ya tenía desde la idea 5138. **Y cancelar
+no te deja en la nada**: reabre el asistente de la tanda vieja (`showCompletarWizard`) — en EP,
+`showPickingList` —, que es lo que hay que hacer. El EP viejo también ganó la hora.
+
+No toca el modelo de datos: sigue habiendo un solo casillero. **Lo que NO arregla**: si el
+operario acepta igual, la tanda vieja se sigue perdiendo de Terminar Día. Eso es el cambio
+grande (listas en `st.picking`/`st.armado` y varias abiertas de verdad), que queda pendiente —
+en el depósito no tiene sentido armar dos pedidos a la vez, así que legitimarlo no es obvio.
+
+Guardas en `send()` de `index.html`; regresión **`tests/dos-en-curso.cjs`** (cancelar → 0
+encolados + reabre el viejo · aceptar → arranca · sin nada abierto → no pregunta), en `run.sh`.
+`tests/ap-resume.cjs` ahora contesta que sí al confirm, porque su check 2 es el camino "arranco
+igual".
+
 ## Nota v18.39 (2026-09-15) — El m³ se recalcula solo al modificar una NP de ISIS
 
 Luis: *"más vale, recalcula m3"*. Hasta la v18.35 se le podía cambiar el contenido a una NP de

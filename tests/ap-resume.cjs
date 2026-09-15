@@ -23,6 +23,10 @@ catch (_e) {
     const leg = "999";
     legajoInput.value = leg;
     window.alert = function () {};
+    // v18.42: AP sobre OTRA tanda con un armado abierto ahora PREGUNTA antes de pisarlo.
+    // Acá contestamos que sí (este test verifica el camino "arranco igual"); el confirm en
+    // sí lo cubre tests/dos-en-curso.cjs.
+    window.confirm = function () { return true; };
 
     // ---- Check 1: botón "Seguir armado" visible durante una pausa (PC comida) ----
     {
