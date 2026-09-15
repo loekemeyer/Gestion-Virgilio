@@ -5436,7 +5436,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=18.10"></script>
+<script type="module" src="recepcion.js?v=18.11"></script>
 <!-- Config del módulo de fichada (compartido con fichada.html). El secret
      hmacSecret tiene que ser el mismo acá y allá; cargándolo desde un solo
      archivo evitamos que se desincronicen. -->
@@ -8881,7 +8881,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v18.10";
+const APP_VERSION = "v18.11";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -17256,13 +17256,13 @@ var STK_POP_CSS =
   ".proyv-row{display:flex;align-items:center;gap:9px;}" +
   ".proyv-mes{flex:0 0 52px;font-size:12px;font-weight:800;color:#475569;text-transform:capitalize;}" +
   // v15.52 — cajas ENTREGADAS por el proveedor, entre el mes y la barra (gv_entregas_mensuales_cod).
-  ".proyv-ent{flex:0 0 46px;text-align:right;font-size:12.5px;font-weight:800;color:#047857;font-variant-numeric:tabular-nums;}" +
+  ".proyv-ent{flex:0 0 52px;text-align:right;font-size:12.5px;font-weight:800;color:#047857;font-variant-numeric:tabular-nums;}" +
   ".proyv-ent.sd{color:#cbd5e1;font-weight:700;}" +
   ".proyv-head{font-size:10px;font-weight:800;color:#94a3b8;text-transform:uppercase;letter-spacing:.03em;margin-bottom:-2px;}" +
   ".proyv-head .proyv-ent,.proyv-head .proyv-val{font-size:10px;font-weight:800;color:#94a3b8;}" +
   ".proyv-track{flex:1 1 auto;height:20px;background:#f1f5f9;border-radius:6px;overflow:hidden;position:relative;}" +
   ".proyv-bar{display:block;height:100%;background:linear-gradient(90deg,#8b5cf6,#6d28d9);border-radius:6px;}" +
-  ".proyv-val{flex:0 0 auto;min-width:42px;text-align:right;font-size:12.5px;font-weight:800;color:#4c1d95;font-variant-numeric:tabular-nums;}" +
+  ".proyv-val{flex:0 0 52px;text-align:right;font-size:12.5px;font-weight:800;color:#4c1d95;font-variant-numeric:tabular-nums;}" +
   ".proyv-foot{margin-top:10px;font-size:12px;color:#334155;line-height:1.5;border-top:1px dashed #cbd5e1;padding-top:8px;}" +
   /* v12.46 — gráfico de tendencia + marca de la proyección en las barras (idea 5766) */
   ".proyv-svg{display:block;width:100%;height:auto;}" +
@@ -17400,8 +17400,6 @@ async function stkShowProyVentas(codEnc, proy) {
   var tot = win.reduce(function (s, x) { return s + x.cajas; }, 0);
   var prom = win.length ? (tot / win.length) : 0;
   var arriba = win.filter(function (x) { return x.cajas > proyN; }).length;
-  // ── Gráfico de tendencia (12 meses) ──
-  h += _stkProyTrendSvg(rows, proyN, prom);
   // ── Barras de la ventana (6 meses) con la marca de la proyección ──
   var mx = Math.max(proyN, win.reduce(function (s, x) { return Math.max(s, x.cajas); }, 0)) || 1;
   // v15.52 — la columna de entregadas sólo aparece si hay algo que mostrar: si de este código
@@ -17409,12 +17407,12 @@ async function stkShowProyVentas(codEnc, proy) {
   var hayEnt = win.some(function (x) { var e = ent[x.mes]; return e && (e.cub || e.cajas > 0); });
   var totEnt = win.reduce(function (s, x) { var e = ent[x.mes]; return s + (e && e.cub ? e.cajas : 0); }, 0);
   h += '<div class="stkpop-grp"><div style="font-size:12px;font-weight:800;color:#334155;margin-bottom:8px;">🧾 ' +
-       (hayEnt ? 'Entregado y facturado' : 'Cajas facturadas') + ' — ventana de proyección (' + win.length + ' meses)</div>';
+       (hayEnt ? 'Facturado y entregado' : 'Cajas facturadas') + ' — ventana de proyección (' + win.length + ' meses)</div>';
   h += '<div class="proyv-chart">';
   if (hayEnt) {
     h += '<div class="proyv-row proyv-head"><span class="proyv-mes">mes</span>' +
-         '<span class="proyv-ent">entreg.</span><span class="proyv-track" style="background:none"></span>' +
-         '<span class="proyv-val">factur.</span></div>';
+         '<span class="proyv-val">factur.</span><span class="proyv-track" style="background:none"></span>' +
+         '<span class="proyv-ent">entreg.</span></div>';
   }
   win.forEach(function (x) {
     var pct = Math.max(2, Math.round(x.cajas / mx * 100));
@@ -17422,12 +17420,13 @@ async function stkShowProyVentas(codEnc, proy) {
     var e = ent[x.mes];
     h += '<div class="proyv-row">' +
          '<span class="proyv-mes">' + escapeHtml(_stkFmtMes(x.mes)) + '</span>' +
+         '<span class="proyv-val"' + (bajo ? ' style="color:#b91c1c"' : '') + '>' + fc(x.cajas) + '</span>' +
+         '<span class="proyv-track"><span class="proyv-bar' + (bajo ? ' bajo' : '') + '" style="width:' + pct + '%"></span>' +
+         (proyN > 0.05 ? '<span class="proyv-mark" style="left:' + Math.round(proyN / mx * 100) + '%"></span>' : '') + '</span>' +
          (hayEnt ? (e && e.cub
             ? '<span class="proyv-ent" title="Cajas entregadas por el proveedor">' + fc(e.cajas) + '</span>'
             : '<span class="proyv-ent sd" title="Ese mes las entregas todavía no se registraban en la app — no es un cero">s/d</span>') : '') +
-         '<span class="proyv-track"><span class="proyv-bar' + (bajo ? ' bajo' : '') + '" style="width:' + pct + '%"></span>' +
-         (proyN > 0.05 ? '<span class="proyv-mark" style="left:' + Math.round(proyN / mx * 100) + '%"></span>' : '') + '</span>' +
-         '<span class="proyv-val"' + (bajo ? ' style="color:#b91c1c"' : '') + '>' + fc(x.cajas) + '</span></div>';
+         '</div>';
   });
   h += '</div>';
   var piso = proyN > 0.05 && prom > 0 && (proyN - prom) / prom > 0.005;   // actuó el piso del 4.º mejor mes
@@ -17437,6 +17436,9 @@ async function stkShowProyVentas(codEnc, proy) {
        (proyN > 0.05 ? ' · Proyección: <b style="color:#6d28d9">' + fc(proyN) + '</b>' + (piso ? ' <small style="color:#6d28d9">(piso: 4.º mejor mes)</small>' : '') +
                        ' · <b>' + arriba + ' de ' + win.length + '</b> meses por encima' : '') + '</div>';
   h += '</div>';
+  // ── Gráfico de tendencia (12 meses) ── v18.11: va ÚLTIMO. Orden pedido por el dueño:
+  // código · venta (facturado) · entrega · gráfico. Antes abría el pop-up y tapaba los números.
+  h += _stkProyTrendSvg(rows, proyN, prom);
   body.innerHTML = h;
 }
 /* v9.02/9.04 — Módulo "NP que faltan": pedidos que están en la base (PPP_Base_Pedidos) pero NO en

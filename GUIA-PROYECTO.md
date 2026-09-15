@@ -1,3 +1,31 @@
+## Nota v18.11 (2026-09-15) — Pop-up de Proyección: el orden que pidió el dueño
+
+Pedido textual, mirando el pop-up de 513: *"que el pop el orden visual sea este: Cod; vta;
+entrega; grafico"*.
+
+**Antes:** código → **gráfico** de tendencia (12 m) → tabla `entreg. | barra | factur.` → totales.
+El gráfico ocupaba la mitad de la pantalla del celular y los números quedaban abajo del pliegue.
+
+**Ahora:** código → tabla `factur. (vta) | barra | entreg.` → totales → **gráfico al final**.
+El título del bloque pasó a *"Facturado y entregado"* para seguir el mismo orden. Los nombres de
+las columnas NO se tocaron (`factur.` / `entreg.`); si se quieren cortar a "vta" / "entrega", es
+otro cambio.
+
+### Y de paso: la marca punteada de la proyección estaba corrida fila por fila
+
+`.proyv-row` es un flex de 4 columnas y la última era `flex:0 0 auto`, así que su ancho cambiaba
+con la cantidad de dígitos (444 vs 1601). El `track` es `flex:1 1 auto` → absorbía la diferencia,
+y la marca de la proyección (`left:N%`) caía en una **x distinta en cada fila** — se ve en la
+captura del 15/09, la de *jul 26* queda corrida respecto de las demás. Ahora las dos columnas
+laterales van a **52 px fijos** (`.proyv-val` y `.proyv-ent`), que es el ancho de un valor de 4
+dígitos en `tabular-nums`: el track mide lo mismo en todas las filas y las barras y la marca
+arrancan alineadas.
+
+Todo front (`index.html`, `stkShowProyVentas` + `STK_POP_CSS`). Es presentación pura, no toca
+ningún dato ni ninguna cuenta: la proyección, el promedio y los totales salen de donde salían.
+
+⚠ `index.html` tiene un byte NUL adentro: el script que hizo esta edición lee y escribe en
+**latin1** y verifica el largo del resultado antes de guardar (regla de la v15.44).
 ## Nota v18.10 (2026-09-15) — En Salida: letra más grande y el ancho que se iba en repetir
 
 Luis: *"se ve muy chiquito todo y mucho espacio en blanco, optimizá más el espacio, font más
