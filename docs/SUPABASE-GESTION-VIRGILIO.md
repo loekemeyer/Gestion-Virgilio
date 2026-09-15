@@ -17030,10 +17030,15 @@ permiso). El `−1` de Pickeados y la caja fantasma en góndola de **E11A/116** 
 dejarlos en cero hace falta la orden, y son dos movimientos:
 
 ```sql
--- PENDIENTE DE PERMISO — no ejecutado
-insert into public."Movimientos_Stock"(cod_art, deposito, delta, tipo, ref, legajo, empresa) values
-  ('116','separar_pedidos', 1,'ajuste','E11A','<legajo>','Mixto'),   -- Pickeados −1 → 0
-  ('116','terminado',      -1,'ajuste','E11A','<legajo>','Mixto');   -- saca la caja fantasma
+-- EJECUTADO el 15/09 (sesión de revisión general, con el OK de Thomas: mandó la captura de la
+-- tarea 3424 con "considerá esto"). ids 65687362 / 65687363, legajo 0:
+insert into public."Movimientos_Stock"(cod_art, descripcion, deposito, delta, tipo, ref, legajo, empresa, client_id) values
+  ('116','Corta Pizza Loke','separar_pedidos',  1,'ajuste','E11A','0','Mixto','fix116_E11A_20260915_pickeados'),
+  ('116','Corta Pizza Loke','terminado',       -1,'ajuste','E11A','0','LK',   'fix116_E11A_20260915_gondola_fantasma');
+-- ⚠ el trigger v18.30 (capa 1) pisó el 'Mixto' de la primera fila y la dejó en LK: la (tanda, código)
+-- tiene picking LK. Da igual para el saldo (la capa 2 netea Mixto contra LK): 116 quedó
+-- góndola 0 · Pickeados 0 · a_facturar 49. Por empresa sigue partido (LK +1 / Mixto −1, neto 0).
+-- Rollback: delete from public."Movimientos_Stock" where client_id like 'fix116_E11A_20260915_%';
 ```
 
 **Chequeo de que no volvió a pasar** (vacío = todo bien):
