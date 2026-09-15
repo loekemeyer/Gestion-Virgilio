@@ -15834,7 +15834,7 @@ deja arreglado para que las dos puntas digan lo mismo cuando toque el próximo d
 
 ---
 
-### §3.fq — v17.98: el rename de las tablas PPP dejó a la app VIEJA imprimiendo remitos sin cliente
+### §3.gc — v17.99: el rename de las tablas PPP dejó a la app VIEJA imprimiendo remitos sin cliente
 
 **Lo reportó Franco Tierra el 15/09 por WhatsApp:** *"al imprimir las notas de pedido no me está
 saliendo el nombre del cliente"*. La foto es un remito de armado de la **NP 98626** impreso ese día
@@ -15925,7 +15925,7 @@ tiene que incluir **el front de los OTROS repos que pegan contra este proyecto**
 `pg_proc.prosrc` y el `index.html` de acá. Y antes de dar por muerta una app, **medirlo**
 (`gv_app`), no leerlo en un `.md`.
 
-### §3.fr — v17.98: al terminar el armado no se preguntaba más la ubicación (0 eventos AUB desde el 04/09)
+### §3.gd — v17.99: al terminar el armado no se preguntaba más la ubicación (0 eventos AUB desde el 04/09)
 
 **El otro reporte de Franco del 15/09:** *"no me está saliendo para poner la ubicación cuando terminó
 de armar un pedido"*. Es el modal `📍 ¿Dónde queda cada pedido?` (`askArmadoUbicaciones` → 1 evento
@@ -15971,7 +15971,7 @@ era el camino del TAP.
 O sea: durante meses la ubicación se cargó **de rebote**, gracias a un doble-toque que era un
 defecto. Al arreglar el defecto se apagó la función.
 
-**El arreglo (v17.98, `index.html`):** `compTerminar()` pregunta la ubicación por sí mismo.
+**El arreglo (v17.99, `index.html`):** `compTerminar()` pregunta la ubicación por sí mismo.
 
 - Va **antes del primer write** — antes de `liosSend` (TAL), de Entregas y del TAP. Así "Cancelar
   (no terminar)" no deja nada a medias, igual que en `send()`; `_comp._terminando` vuelve a `false`

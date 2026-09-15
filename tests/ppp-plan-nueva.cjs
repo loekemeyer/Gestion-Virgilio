@@ -38,6 +38,7 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
       mk("98709", "E05A", "1015", "Ferretería Oeste", 6.0, "Morón", "Rivadavia 18000", hab[4], "Zona 5 - GBA Oeste"),
       mk("98710", "E06A", "1016", "Más Adelante SRL", 0.5, "Quilmes", "Mitre 300", new Date(hab[5].getTime() + 7 * 86400000), "Zona 4 - GBA Sur")
     ];
+    const urlsSupers = [];        // para mirar QUÉ columnas pide el padrón de súper (problema 203)
     window.fetch = (url) => {
       const u = String(url);
       if (u.indexOf("gv_ppp_programacion_diaria") >= 0) return J(rows);
@@ -48,6 +49,14 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
           zona: "Zona 1 - CABA Sur", tanda: "E09A", fecha_entrega: iso(hab[2]), fecha_recep: "2026-09-05", m3: 0.3, m3_parcial: false, lineas: 3, cajas: 5 }
       ]);
       if (u.indexOf("gv_ppp_np_valor") >= 0) return J(rows.map((x) => ({ np: x.np, valor_lista: Math.round(x.m3 * 1000000), lineas_sin_precio: 0 })));
+      // ⚠ El padrón de súper: desde la v17.74 sale de la BASE (`gv_supers`), no del localStorage.
+      // Sin este stub la lista queda vacía y el camión de Coto sale como "Cód 801" — el test medía
+      // el nombre lindo y pasó a rojo cuando el padrón se mudó, sin que el tablero cambiara.
+      if (u.indexOf("gv_supers") >= 0) { urlsSupers.push(u); return J([
+        { empresa: "lk",   cod: "801", nombre: "Coto", super_key: "coto", cuit: "", nota: "Coto C.I.C.S.A." },
+        { empresa: "chef", cod: "801", nombre: "Coto", super_key: "coto", cuit: "", nota: "Coto C.I.C.S.A." },
+        { empresa: "lk",   cod: "802", nombre: "Carrefour", super_key: "carrefour", cuit: "", nota: "Inc Sociedad Anonima" }
+      ]); }
       if (u.indexOf("PPP_Geo") >= 0) return J([
         { dir_key: "__deposito_virgilio_2788__", lat: -34.65, lng: -58.5 },
         { dir_key: "alberdi 6000|mataderos", lat: -34.655, lng: -58.5 }, { dir_key: "montes de oca 1000|barracas", lat: -34.64, lng: -58.37 },
@@ -60,7 +69,25 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
     await pppLoadProgFromSupabase();
     await pppRefreshControlado(); await pppRefreshMetaEntSet(); await pppRefreshDelivered(); await pppRefreshEnSalida();
     await pppRefreshArmado(); await pppRefreshValor(); await pppRefreshGeo();
-    _pppTab = "plan"; _pppPlanDay = null; _pppPlanClasica = false; pppRenderProg();
+    // El padrón de súper se siembra en la caché ANTES de dibujar: `pppSupersNeed()` lo trae por red
+    // y resuelve después del render, así que con sólo stubear el fetch el primer dibujo sale con la
+    // lista vacía y el camión de Coto queda como "Cód 801".
+    // El padrón está por (empresa, cód), y la empresa del pedido sale de su NP cuando no la trae:
+    // las NP cortas de esta fixture ("8", "9") resuelven a chef, así que Coto va bajo las dos —
+    // un mismo súper puede estar en los dos padrones, y así el test no depende de ese detalle.
+    _pppSupers = [
+      { empresa: "lk",   cod: "801", nombre: "Coto", super_key: "coto", cuit: "", nota: "" },
+      { empresa: "chef", cod: "801", nombre: "Coto", super_key: "coto", cuit: "", nota: "" },
+      { empresa: "lk",   cod: "802", nombre: "Carrefour", super_key: "carrefour", cuit: "",
+        nota: "Inc Sociedad Anonima" }
+    ];
+    _pppSupersTs = Date.now();     // para que no salga a pedirla de nuevo
+
+    // ⚠ `_pppPlanTabla = false` a mano: desde la v17.66 la vista por DEFECTO de Programación es la
+    // tabla día→tanda→NP, así que sin esta línea `pppRenderProg()` dibuja la tabla y este test —que
+    // mide el tablero de 6 días— no encuentra nada. El tablero sigue existiendo (botón "Tablero de
+    // 6 días" → `pppPlanTabla(false)`); lo que quedó viejo era el test.
+    _pppTab = "plan"; _pppPlanDay = null; _pppPlanClasica = false; _pppPlanTabla = false; pppRenderProg();
     let html = document.getElementById("pppPreview").innerHTML;
     const kpi = (l) => { const m = new RegExp('<div class="l">' + l + '</div><div class="v">([^<]*)</div>').exec(html); return m ? m[1] : null; };
     out.kpiPed = kpi("Pedidos"); out.kpiCam = kpi("Camiones"); out.kpiVol = kpi("Volumen"); out.kpiVal = (function () { const m = /<div class="l">Valor<\/div><div class="v"><span class="full">([^<]*)<\/span><span class="short">([^<]*)<\/span>/.exec(html); return m ? m[1] + "|" + m[2] : null; })();   // v13.25: largo + corto (celular)
@@ -163,6 +190,16 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
       { np: "10", tanda: "D63A", m3: 1.0, zona: "", tipo: "KRIKOS", barrio: "" }         // v13.35: sin nombre ni cód → "Súper" como antes
     ]);
     out.porTanda = cams.map((c) => _pppCamionNombre(c) + "|" + c.tandas.join("+") + "|" + c.ped.length).join(" ; ");
+
+    // v17.97 (problema 203): el padrón que la app PIDE tiene que traer `nota`, si no el fallback
+    // por razón social de arriba es letra muerta. Se mide contra la lista que queda en memoria
+    // después de una lectura real (no la sembrada a mano).
+    _pppSupers = null; _pppSupersTs = 0; _pppSupersBusy = false;
+    try { localStorage.removeItem(PPP_SUPER_KEY); } catch (_e) {}
+    pppSupersNeed(true);
+    await new Promise((res) => setTimeout(res, 200));
+    out.urlSupers = urlsSupers[0] || null;
+    out.notaViaja = (pppLoadSupers().find((s) => s.cod === "802") || {}).nota === "Inc Sociedad Anonima";
     return out;
   });
 
@@ -197,6 +234,12 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
     ["día 2: Retira sin orden de carga ni camión",            r.dia2 === true],
     ["v13.07/v13.35: camión = n° de tanda, zonas mezcladas, y el súper con el NOMBRE del cliente",
       r.porTanda === "Camión 1 · Zona 1 + Zona 2 + Zona 3|E01A+E01B|3 ; Camión 2 · Zona 1 - CABA Sur|F01A|1 ; Sin tanda · Zona 4 - GBA Sur||1 ; Camión 3 · Zona 6 - GBA Norte|E02A|1 ; Camión 4 · Coto|D59A|1 ; Camión 5 · Carrefour|D61A|1 ; Camión 6 · Súper|D63A|1 ; Retira en fábrica|E01C|1"],
+    // problema 203: la v17.72 mudó el fallback "fila vieja de ISIS sin cód" al campo `nota` de
+    // gv_supers, pero el select no lo pedía → nunca matcheaba y el camión salía con la razón social
+    // cruda ("Inc Sociedad Anonima" en vez de "Carrefour"). Las 19 filas activas tienen nota.
+    ["problema 203: el padrón de súper pide `nota` (si no, el fallback por razón social es letra muerta)",
+      !!r.urlSupers && /[?&]select=[^&]*\bnota\b/.test(r.urlSupers)],
+    ["problema 203: y `nota` llega a la lista en memoria, no se pierde en el .map()", r.notaViaja === true],
     ["sin errores de página",                                 errs.length === 0]
   ];
   let bad = 0;

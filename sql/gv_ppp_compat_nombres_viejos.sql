@@ -1,4 +1,4 @@
--- v17.98 (2026-09-15) — COMPATIBILIDAD de nombres para la app Produccion-Virgilio.
+-- v17.99 (2026-09-15) — COMPATIBILIDAD de nombres para la app Produccion-Virgilio.
 --
 -- Qué pasó: el 2026-09-12 (v16.3x) se renombraron las tablas PPP para sacarlas del desorden
 -- de `public` y marcarlas como nuestras:
@@ -49,6 +49,6 @@ grant select on public."PPP_Programacion_Diaria" to anon, authenticated;
 grant select on public."PPP_Base_Pedidos"        to anon, authenticated;
 
 comment on view public."PPP_Programacion_Diaria" is
-  'v17.98 — compat de nombre para la app Produccion-Virgilio (v12.78), que pega por texto. Espejo de gv_ppp_programacion_diaria (con override). Solo SELECT. Borrar cuando esa app se apague.';
+  'v17.99 — compat de nombre para la app Produccion-Virgilio (v12.78), que pega por texto. Espejo de gv_ppp_programacion_diaria (con override). Solo SELECT. Borrar cuando esa app se apague.';
 comment on view public."PPP_Base_Pedidos" is
-  'v17.98 — compat de nombre para la app Produccion-Virgilio (v12.78), que pega por texto. Espejo de gv_ppp_base_pedidos (con override). Solo SELECT. Borrar cuando esa app se apague.';
+  'v17.99 — compat de nombre para la app Produccion-Virgilio (v12.78), que pega por texto. Espejo de gv_ppp_base_pedidos (con override). Solo SELECT. Borrar cuando esa app se apague.';

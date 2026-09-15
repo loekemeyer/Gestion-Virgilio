@@ -67,7 +67,10 @@ catch (_e) {
     let h = document.getElementById("pppPreview").innerHTML;
     // (a) el botón por pedido
     out.tieneBoton = /pn-reprog-btn/.test(h) && /pppReprogAbrir\('44609'\)/.test(h);
-    out.hintNuevo = /Reprogramalo a un día con/.test(h);
+    // El chequeo mira la INTENCIÓN, no la frase: el cartel tiene que invitar a volver a programar
+    // y nombrar el botón. Pinneado a la redacción exacta se rompía cada vez que alguien la retocaba
+    // (arrastraba roto desde que el texto pasó a "Volvelo a programar (📅 Reprogramar / ↩ A Programar)").
+    out.hintNuevo = /Volvelo a programar/.test(h) && /📅 Reprogramar/.test(h);
 
     // (b) abrir el pop-up
     pppReprogAbrir("44609");

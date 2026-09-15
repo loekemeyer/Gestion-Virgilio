@@ -43,7 +43,10 @@ catch (_e) {
     _pppSupers = null; _pppSupersTs = 0;
     pppLoadSupers();                                  // dispara la carga
     await new Promise((res) => setTimeout(res, 200));
-    out.leeDeLaBase = pedidos.some((x) => /gv_supers\?select=empresa,cod,nombre,super_key,cuit&activo=is\.true/.test(x.u));
+    // v17.98 (problema 203): `nota` tiene que estar en el select — `_pppSuperNombre` la usa para
+    // reconocer las filas viejas de ISIS que vienen sin cód, por la razón social. La v17.72 escribió
+    // ese fallback pero no pidió la columna, así que nació muerto.
+    out.leeDeLaBase = pedidos.some((x) => /gv_supers\?select=empresa,cod,nombre,super_key,cuit,nota&activo=is\.true/.test(x.u));
     out.pisaCache = _pppSupers.length === 5 && !_pppSupers.some((s) => s.cod === "9999");
     out.guardaCache = (JSON.parse(localStorage.getItem("vir_ppp_supers_v2") || "[]") || []).length === 5;
 

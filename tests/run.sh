@@ -454,3 +454,6 @@ PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node te
 
 echo "== ppp-operario (v17.48/71: botón PPP en la botonera — días + detalle por camión, tics Pick/Arm/Fact y filtro LK/CH) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/ppp-operario.cjs
+
+echo "== pga-imprimir (v17.97: boton Imprimir en Programacion — elegir dias/rango, hoja abierta hasta la NP sin su contenido) =="
+PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/pga-imprimir.cjs

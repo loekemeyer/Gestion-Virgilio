@@ -512,7 +512,7 @@ como optimización, pero el trigger es el que manda.
 > Y su repo tiene commits hasta el 2026-09-14. **Costó un bug real:** el rename de las tablas PPP
 > del 12/09 (`PPP_Programacion_Diaria` → `GV_PPP_Programacion_Diaria`) dejó a esa app imprimiendo
 > los remitos con `Cliente —` / `Fecha Entrega —` durante 3 días, hasta que lo reportó un operario.
-> Tapado con dos vistas de compatibilidad (`sql/gv_ppp_compat_nombres_viejos.sql`, §3.fq).
+> Tapado con dos vistas de compatibilidad (`sql/gv_ppp_compat_nombres_viejos.sql`, §3.gc).
 >
 > **La regla que queda:** "no romper Producción" sigue sin ser un bloqueo —se toca lo que haya que
 > tocar— pero **renombrar o borrar un objeto de `public.*` obliga a grepear TAMBIÉN el front de
