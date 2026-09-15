@@ -456,6 +456,26 @@ porque quedaba a 31,5 km— y se revirtió el mismo día.
 **Chequeo:** `select * from public.gv_ppp_super_mezclado;` — vacía = todo bien. Mirarla después
 de tocar tandas a mano. `sql/gv_ppp_super_mezclado_v1423.sql`.
 
+## ⚠ Regla del dueño (2026-09-15): Oscar hace el SKIN — la OC va a su nombre y NO se toca
+
+Al revisar por qué llegaban los WhatsApps de *"SIN OC generada"* aparecieron 14 códigos —casi
+todas bombillas, más 506 Abrelata Uña, 500 Abrelata Uña Pata y 280 Manga Repostera— configurados
+con proveedor **Oscar** pero recibidos siempre como **Log/ Fabr**. **No es un error de
+configuración.** Thomas: *"el 506, todos esos artículos, salen en la orden de compra de Logística
+Fabric históricamente, pero los entregaba Oscar. Lo que hacía Oscar era el skin solamente:
+nosotros le damos el artículo listo para que le ponga un skin y lo entregue en Virgilio
+encajado."* **Oscar falleció; sigue trabajando su nieto**, así que el dueño decidió dejarlo:
+*"dejalo ahí"*. **No cambiar el proveedor de esos códigos en `OC_Maximos`.**
+
+⚠ **Lo que sí está mal es la CARGA, y es de procedimiento, no de código.** Medido el 15/09:
+`Oscar` **está** en `vista_entidades_recepcion` como tallerista —o sea que el operario lo puede
+elegir en la pantalla de recepción— y sin embargo **no figura ni una vez** en
+`Entregas Tallerista Virgilio` (0 filas en 5 meses): siempre se carga `Log/ Fabr`. Las OC, al
+revés, salen **todas** a nombre de Oscar (31 líneas de esos 14 códigos en los 2 meses que tiene
+`Ordenes_Compra`, desde el 13/07). Mientras las dos puntas no coincidan, el aviso va a saltar
+siempre. **El arreglo es que al recibir esos artículos elijan `Oscar`, no `Log/ Fabr`.**
+Problema 250.
+
 ## ⚠ PROTOCOLO: Backend vs Front-end — decidir y avisar (ya NO se pregunta)
 
 **Cuando alguien pide cambiar lógica** (normalización de códigos, cálculos, filtros,
