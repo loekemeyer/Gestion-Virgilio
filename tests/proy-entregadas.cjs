@@ -10,6 +10,12 @@
    columna y pasó a ser su ficha, y el desglose de un mes —que se abría tocando el número de
    la barra— ahora se abre tocando el mes EN EL GRÁFICO.
 
+   v18.24 — el MES EN CURSO sale de la ventana: el motor de LK ya la cierra en el último mes
+   COMPLETO, así que la pantalla tiene que usar esa misma. El mes en curso se sigue dibujando,
+   pero aparte: ficha propia con lo que da a ese ritmo (por días hábiles), punto hueco ámbar
+   y asterisco. La serie del test se arma RELATIVA a hoy, para que el test no dependa de en
+   qué mes se corra.
+
    ⚠ Este test estuvo en ROJO en main desde la v18.11 sin que nadie lo notara: esa versión
    cambió el orden de las columnas (pedido del dueño) y nadie lo actualizó. Se reescribió el
    15/09 contra lo que la pantalla hace hoy.
@@ -19,7 +25,9 @@
    2) que el entregado esté en su ficha y sume SÓLO los meses cubiertos,
    3) que no queden rastros del bloque de barras (.proyv-row / .proyv-track),
    4) que el gráfico tenga una franja clicable por mes y que tocarla abra el desglose,
-   5) que si la RPC de entregas no devuelve nada, la ficha de entregado NO aparezca.
+   5) que si la RPC de entregas no devuelve nada, la ficha de entregado NO aparezca,
+   6) que el mes en curso NO entre en el promedio, el total ni "meses arriba", tenga su ficha
+      "a este ritmo" y quede marcado con asterisco en el gráfico.
    Sale 1 si falla. */
 const path = require("path");
 let chromium;
@@ -38,12 +46,19 @@ catch (_e) {
   const r = await p.evaluate(async () => {
     const out = { urls: [] };
     function J(data){ return Promise.resolve({ ok: true, status: 200, json: function(){ return Promise.resolve(data); } }); }
-    // 12 meses de ventas, oct-25 → sep-26; la ventana son los últimos 6 (abr → sep)
-    const ventas = ["2025-10","2025-11","2025-12","2026-01","2026-02","2026-03","2026-04","2026-05","2026-06","2026-07","2026-08","2026-09"]
-      .map(function (m, i) { return { mes: m, cajas: 300 + i * 10 }; });
-    // entregas: el circuito arranca en junio → abr/may sin cobertura
-    const entregas = ventas.map(function (v) {
-      const cub = v.mes >= "2026-06";
+    // 12 meses de ventas terminando en el MES EN CURSO (relativo a hoy, así el test no
+    // depende del calendario). La ventana son los 6 meses CERRADOS: los índices 5..10.
+    const hoyAR = new Date(Date.now() - 3 * 3600000);
+    const meses = [];
+    for (let k = 11; k >= 0; k--) {
+      const d = new Date(Date.UTC(hoyAR.getUTCFullYear(), hoyAR.getUTCMonth() - k, 1));
+      meses.push(d.toISOString().slice(0, 7));
+    }
+    const ventas = meses.map(function (m, i) { return { mes: m, cajas: 300 + i * 10 }; });
+    out.mesCurso = meses[11];
+    // entregas: el circuito arranca 6 meses atrás → los 6 primeros sin cobertura
+    const entregas = ventas.map(function (v, i) {
+      const cub = i >= 6;
       return { mes: v.mes, cajas: cub ? 500 : 0, cubierto: cub };
     });
     let conEntregas = true;
@@ -53,8 +68,8 @@ catch (_e) {
       if (url.indexOf("gv_entregas_mensuales_cod") >= 0) return J(conEntregas ? entregas : []);
       if (url.indexOf("gv_ventas_clientes_mes_cod") >= 0) return J([{ cliente: "Osa", cajas: 120 }, { cliente: "Otros", cajas: 80 }]);
       if (url.indexOf("vista_historial_entregas") >= 0) {
-        return J([{ fecha: "2026-07-04", cajas: 300, quien: "Carriero", remito: "R-9" },
-                  { fecha: "2026-07-19", cajas: 200, quien: "Carriero", remito: "R-11" }]);
+        return J([{ fecha: meses[9] + "-04", cajas: 300, quien: "Carriero", remito: "R-9" },
+                  { fecha: meses[9] + "-19", cajas: 200, quien: "Carriero", remito: "R-11" }]);
       }
       return J([]);
     };
@@ -73,17 +88,25 @@ catch (_e) {
       }).join("|");
     };
     const k = kpiTxt();
-    out.fichaEntregado = /entregado 6m=2000/.test(k);      // 4 meses cubiertos × 500, los s/d no suman
+    // la ventana son los indices 5..10 (350+360+370+380+390+400 = 2250); el 11 es el mes en curso
+    out.fichaEntregado = /entregado 6m=2500/.test(k);      // los cubiertos DE LA VENTANA: i 6..10 = 5 × 500
     out.fichaProy = /proy\. caj\/mes=367\.2/.test(k);
-    out.fichaFacturado = /facturado 6m=2310/.test(k);      // 360+370+380+390+400+410
-    out.fichaArriba = /meses arriba=5\/6/.test(k);
+    out.fichaFacturado = /facturado 6m=2250/.test(k);
+    out.fichaArriba = /meses arriba=4\/6/.test(k);         // 370,380,390,400 > 367,2
+    const kCurso = body.querySelector(".proyv-kpi.curso");
+    out.fichaCurso = !!kCurso && /a este ritmo/.test(kCurso.textContent) && /d\u00edas h\u00e1biles/.test(kCurso.textContent);
+    out.cursoFueraDelProm = !/promedio 6m=410/.test(k);
     // el bloque de barras ya no existe
     out.sinBarras = !body.querySelector(".proyv-row") && !body.querySelector(".proyv-track") && !body.querySelector(".proyv-foot");
     // el gráfico: una franja clicable por mes (12)
     out.hits = body.querySelectorAll(".proyv-svg .hit").length;
+    // el mes en curso: asterisco en el eje y punto hueco ambar
+    const svgTxt = body.querySelector(".proyv-svg").textContent;
+    out.asterisco = svgTxt.indexOf("*") >= 0;
+    out.puntoHueco = body.querySelectorAll('.proyv-svg circle[stroke="#d97706"]').length === 2;
 
     // tocar un mes abre el desglose, con las dos caras
-    await stkProyMes("2026-07");
+    await stkProyMes(meses[9]);
     body = document.getElementById("stkPopBody");
     const det = body.querySelector(".proyv-det");
     out.abrioDet = !!det;
@@ -92,7 +115,7 @@ catch (_e) {
     out.detTieneRemito = dt.indexOf("R-9") >= 0 && dt.indexOf("Carriero") >= 0;
     out.detMarcado = body.querySelectorAll(".proyv-svg .hit.on").length === 1;
     // volver a tocarlo lo cierra
-    await stkProyMes("2026-07");
+    await stkProyMes(meses[9]);
     out.cierraDet = !document.getElementById("stkPopBody").querySelector(".proyv-det");
 
     // sin entregas registradas → la ficha de entregado no aparece
@@ -105,6 +128,7 @@ catch (_e) {
 
   const pass =
     r.pidioEntregas && r.fichaEntregado && r.fichaProy && r.fichaFacturado && r.fichaArriba &&
+    r.fichaCurso && r.cursoFueraDelProm && r.asterisco && r.puntoHueco &&
     r.sinBarras && r.hits === 12 &&
     r.abrioDet && r.detTieneCliente && r.detTieneRemito && r.detMarcado && r.cierraDet &&
     r.sinFichaEnt &&

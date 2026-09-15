@@ -5493,7 +5493,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=18.23"></script>
+<script type="module" src="recepcion.js?v=18.24"></script>
 <!-- Config del módulo de fichada (compartido con fichada.html). El secret
      hmacSecret tiene que ser el mismo acá y allá; cargándolo desde un solo
      archivo evitamos que se desincronicen. -->
@@ -8941,7 +8941,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v18.23";
+const APP_VERSION = "v18.24";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -17337,6 +17337,10 @@ var STK_POP_CSS =
   ".proyv-kpi.proy b{color:#6d28d9;}" +
   ".proyv-kpi.proy span{color:#7c3aed;}" +
   ".proyv-kpi.ent b{color:#047857;}" +
+  ".proyv-kpi.curso{background:#fffbeb;border-color:#fde68a;}" +
+  ".proyv-kpi.curso b{color:#b45309;}" +
+  ".proyv-kpi.curso span{color:#d97706;}" +
+  ".proyv-kpi.curso small{color:#d97706;}" +
   ".proyv-kpi small{display:block;margin-top:2px;font-size:11px;font-weight:700;color:#a78bfa;text-transform:none;letter-spacing:0;}" +
   ".proyv-svg{display:block;width:100%;height:auto;}" +
   ".proyv-svg .hit{fill:transparent;cursor:pointer;}" +
@@ -17388,6 +17392,24 @@ function _stkFmtMes(ym) {
   var m = String(ym || "").match(/^(\d{4})-(\d{2})$/); if (!m) return String(ym || "");
   return _STK_MES_ABR[parseInt(m[2], 10) - 1] + " " + m[1].slice(2);
 }
+/* v18.23 — el mes EN CURSO, llevado a mes entero. Se extrapola por días HÁBILES, no por
+   días corridos: la facturación sale de lunes a viernes, así que contar los fines de semana
+   estira o achica el numero segun donde caigan. Devuelve tambien los dos contadores, porque
+   el numero solo no se puede auditar: "444 en 10 de 22 hábiles" se entiende, "977" no. */
+function _stkProyMesParcial(cajas) {
+  var hoy = _faltHoy();                                   // YYYY-MM-DD en AR
+  var y = parseInt(hoy.slice(0, 4), 10), m = parseInt(hoy.slice(5, 7), 10), d = parseInt(hoy.slice(8, 10), 10);
+  var ult = new Date(Date.UTC(y, m, 0)).getUTCDate();
+  var hab = 0, habHoy = 0;
+  for (var i = 1; i <= ult; i++) {
+    var dow = new Date(Date.UTC(y, m - 1, i)).getUTCDay();
+    if (dow === 0 || dow === 6) continue;                  // 0=dom, 6=sáb
+    hab++;
+    if (i <= d) habHoy++;
+  }
+  var c = Number(cajas) || 0;
+  return { dias: habHoy, total: hab, proy: habHoy > 0 ? (c * hab / habHoy) : c };
+}
 /* Gráfico de tendencia: rows = [{mes:'YYYY-MM', cajas}], proyN = proyección caj/mes, prom = promedio
    simple de la ventana. Devuelve el HTML del bloque (SVG + leyenda). Sin dependencias. */
 function _stkProyTrendSvg(rows, proyN, prom) {
@@ -17398,18 +17420,23 @@ function _stkProyTrendSvg(rows, proyN, prom) {
   var W = 380, H = 220, L = 12, R = 76, T = 16, B = 34, iw = W - L - R, ih = H - T - B;
   var S = _stkProy || {}, abierto = S.abierto || "";
   var vals = rows.map(function (x) { return x.cajas; });
-  var ymax = Math.max.apply(null, vals.concat([proyN, prom, 1])) * 1.08;
+  // v18.24 — el mes en curso se dibuja dos veces: donde va hoy, y adónde llega a este ritmo.
+  var iPar = S.parcial ? n - 1 : -1;
+  var parProy = iPar >= 0 ? _stkProyMesParcial(rows[iPar].cajas).proy : 0;
+  var ymax = Math.max.apply(null, vals.concat([proyN, prom, parProy, 1])) * 1.08;
   var xs = function (i) { return L + i * iw / (n - 1); };
   var ys = function (v) { return T + ih - (v / ymax) * ih; };
   var f1 = function (v) { return v.toFixed(1); };
   var pts = rows.map(function (x, i) { return f1(xs(i)) + "," + f1(ys(x.cajas)); });
   var line = "M" + pts.join(" L");
   var area = line + " L" + f1(xs(n - 1)) + "," + f1(T + ih) + " L" + f1(xs(0)) + "," + f1(T + ih) + " Z";
-  var w0 = Math.max(0, n - 6);
+  // la banda marca la ventana que usa el MOTOR (6 meses cerrados), no "los ultimos 6".
+  var w0 = (S.winIni != null && S.winIni >= 0) ? S.winIni : Math.max(0, n - 6);
+  var wFin = iPar >= 0 ? n - 2 : n - 1;
   var s = '<svg class="proyv-svg" viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="Tendencia de ventas y proyección">';
-  if (n > 6) {
-    s += '<rect x="' + f1(xs(w0)) + '" y="' + T + '" width="' + f1(xs(n - 1) - xs(w0)) + '" height="' + ih + '" rx="3" fill="#ddd6fe" opacity=".45"/>';
-    s += '<text x="' + f1(xs(w0) + 4) + '" y="' + (T + ih - 6) + '" font-size="11" font-weight="800" fill="#6d28d9">ventana 6m</text>';
+  if (wFin > w0) {
+    s += '<rect x="' + f1(xs(w0)) + '" y="' + T + '" width="' + f1(xs(wFin) - xs(w0)) + '" height="' + ih + '" rx="3" fill="#ddd6fe" opacity=".45"/>';
+    s += '<text x="' + f1(xs(w0) + 4) + '" y="' + (T + ih - 6) + '" font-size="11" font-weight="800" fill="#6d28d9">ventana ' + (wFin - w0 + 1) + 'm</text>';
   }
   s += '<line x1="' + L + '" y1="' + f1(T + ih) + '" x2="' + (L + iw) + '" y2="' + f1(T + ih) + '" stroke="#e2e8f0"/>';
   s += '<path d="' + area + '" fill="#8b5cf6" opacity=".13"/>';
@@ -17429,11 +17456,26 @@ function _stkProyTrendSvg(rows, proyN, prom) {
     s += '<line x1="' + L + '" x2="' + (L + iw) + '" y1="' + f1(yP) + '" y2="' + f1(yP) + '" stroke="#6d28d9" stroke-width="2" stroke-dasharray="5 3"/>';
     s += '<text x="' + (L + iw + 5) + '" y="' + f1(lyP + 4.5) + '" font-size="12.5" font-weight="800" fill="#6d28d9">proy ' + Math.round(proyN) + '</text>';
   }
+  // El mes en curso, primero: la subida punteada hasta donde llega a este ritmo. Va detras de
+  // los puntos para que no les pase por encima.
+  if (iPar >= 0 && parProy > rows[iPar].cajas) {
+    s += '<line x1="' + f1(xs(iPar)) + '" y1="' + f1(ys(rows[iPar].cajas)) + '" x2="' + f1(xs(iPar)) + '" y2="' + f1(ys(parProy)) +
+         '" stroke="#d97706" stroke-width="2" stroke-dasharray="3 3"/>';
+    s += '<circle cx="' + f1(xs(iPar)) + '" cy="' + f1(ys(parProy)) + '" r="5" fill="#fff" stroke="#d97706" stroke-width="2.4"/>';
+  }
   rows.forEach(function (x, i) {
     var bajo = proyN > 0.05 && x.cajas < proyN;
-    s += '<circle cx="' + f1(xs(i)) + '" cy="' + f1(ys(x.cajas)) + '" r="5" fill="' + (bajo ? "#dc2626" : "#6d28d9") + '" stroke="#fff" stroke-width="1.8"/>';
+    if (i === iPar) {
+      // hueco y en ambar: ese mes NO termino, no se compara con los demas
+      s += '<circle cx="' + f1(xs(i)) + '" cy="' + f1(ys(x.cajas)) + '" r="5" fill="#fff" stroke="#d97706" stroke-width="2.4"/>';
+    } else {
+      s += '<circle cx="' + f1(xs(i)) + '" cy="' + f1(ys(x.cajas)) + '" r="5" fill="' + (bajo ? "#dc2626" : "#6d28d9") + '" stroke="#fff" stroke-width="1.8"/>';
+    }
     var m = String(x.mes).match(/^(\d{4})-(\d{2})$/);
-    s += '<text x="' + f1(xs(i)) + '" y="' + (H - 12) + '" font-size="12.5" text-anchor="middle" fill="' + (i >= w0 ? "#4c1d95" : "#94a3b8") + '"' + (i >= w0 ? ' font-weight="800"' : '') + '>' + (m ? _STK_MES_ABR[parseInt(m[2], 10) - 1] : "") + '</text>';
+    var enWin = i >= w0 && i <= wFin;
+    s += '<text x="' + f1(xs(i)) + '" y="' + (H - 12) + '" font-size="12.5" text-anchor="middle" fill="' +
+         (i === iPar ? "#b45309" : (enWin ? "#4c1d95" : "#94a3b8")) + '"' + (enWin || i === iPar ? ' font-weight="800"' : '') + '>' +
+         (m ? _STK_MES_ABR[parseInt(m[2], 10) - 1] : "") + (i === iPar ? "*" : "") + '</text>';
   });
   // Las franjas van ÚLTIMAS para quedar por encima y recibir el click. Una por mes, del ancho
   // de medio paso a cada lado, así se puede tocar cómodo con el dedo y no sólo sobre el punto.
@@ -17448,7 +17490,8 @@ function _stkProyTrendSvg(rows, proyN, prom) {
        '<span><i style="background:#6d28d9"></i>venta mensual</span>' +
        '<span><i class="dash"></i>proyección</span>' +
        (yM !== null ? '<span><i class="dot"></i>promedio 6m</span>' : '') +
-       '<span><i style="background:#dc2626;width:9px;height:9px;border-radius:50%"></i>mes por debajo</span></div>';
+       '<span><i style="background:#dc2626;width:9px;height:9px;border-radius:50%"></i>mes por debajo</span>' +
+       (iPar >= 0 ? '<span><i style="background:#fff;border:2px solid #d97706;width:9px;height:9px;border-radius:50%"></i>mes en curso (*): va a ese ritmo</span>' : '') + '</div>';
   var d0 = _stkFmtMes(rows[0].mes), d1 = _stkFmtMes(rows[n - 1].mes);
   return '<div class="stkpop-grp" style="background:#faf5ff;border-color:#e9d5ff;padding:10px 10px 8px;">' +
          '<div style="font-size:15px;font-weight:900;color:#4c1d95;margin:0 0 4px 2px;">📈 Tendencia — ' + escapeHtml(d0) + ' → ' + escapeHtml(d1) + '</div>' + s +
@@ -17510,7 +17553,16 @@ async function stkShowProyVentas(codEnc, proy) {
     h += '<div class="stkpop-empty">Sin ventas facturadas en los últimos 12 meses para <b>' + escapeHtml(codCanon(codB)) + '</b>' + (emp ? ' (' + emp + ')' : '') + '.<br><small style="color:#94a3b8">(o el motor de PáginaLK no respondió)</small></div>';
     body.innerHTML = h; return;
   }
-  var win = rows.slice(-6);                                   // ventana de la proyección
+  // v18.24 — el MES EN CURSO no es un mes. El dueño: *"si el mes es en curso, poné
+  // proyección o algo; si no es injusto comparar 15 días con 30 días"*. Y tenía razón por
+  // partida doble, porque el motor de LK **ya lo excluye**: su ventana termina en el último
+  // mes CERRADO (`least(max(mes), mes_actual - 1)` en `_fn_proy_window`). O sea que la
+  // pantalla promediaba abr–sep y daba 993 mientras la proyección salía de mar–ago y daba
+  // 1.132: dos ventanas distintas, y la de la pantalla ensuciada por medio mes.
+  var _mesHoy = _faltHoy().slice(0, 7);
+  var parcial = (rows.length && rows[rows.length - 1].mes === _mesHoy) ? rows[rows.length - 1] : null;
+  var cerrados = parcial ? rows.slice(0, -1) : rows;
+  var win = cerrados.slice(-6);                               // la MISMA ventana que usa el motor
   var tot = win.reduce(function (s, x) { return s + x.cajas; }, 0);
   var prom = win.length ? (tot / win.length) : 0;
   var arriba = win.filter(function (x) { return x.cajas > proyN; }).length;
@@ -17525,6 +17577,7 @@ async function stkShowProyVentas(codEnc, proy) {
     codB: codB, emp: emp, empParam: (emp === "CH" ? "chef" : (emp === "LK" ? "lk" : null)),
     rows: rows, win: win, ent: ent, entDet: entDet, proyN: proyN, hayEnt: hayEnt,
     tot: tot, prom: prom, arriba: arriba,
+    parcial: parcial, winIni: rows.length - (parcial ? 1 : 0) - win.length,
     totEnt: win.reduce(function (s, x) { var e = ent[x.mes]; return s + (e && e.cub ? e.cajas : 0); }, 0),
     abierto: "", vta: {}
   };
@@ -17632,7 +17685,15 @@ function _stkProyDetHtml(mes) {
     }
   }
   var totV = (d && d.filas) ? d.filas.reduce(function (s, r) { return s + (Number(r.cajas) || 0); }, 0) : null;
-  return '<div class="proyv-det"><h4>' + esc(_stkFmtMes(mes)) + '</h4><div class="proyv-cols">' +
+  var _esCurso = S.parcial && S.parcial.mes === mes;
+  var _av = "";
+  if (_esCurso) {
+    var _mp = _stkProyMesParcial(S.parcial.cajas);
+    _av = '<div style="margin:-2px 0 8px;font-size:13px;font-weight:700;color:#b45309;">⏳ Mes en curso: van ' +
+          _mp.dias + ' de ' + _mp.total + ' días hábiles. A este ritmo termina en <b>' + fc(Math.round(_mp.proy)) +
+          '</b> cajas — no se compara con los meses cerrados ni entra en el promedio.</div>';
+  }
+  return '<div class="proyv-det"><h4>' + esc(_stkFmtMes(mes)) + (_esCurso ? ' *' : '') + '</h4>' + _av + '<div class="proyv-cols">' +
          '<div><h4 style="font-size:14px;color:#4c1d95;">🧾 Facturado' + (totV !== null ? ' · ' + fc(totV) + ' cajas' : '') + '</h4>' + v + '</div>' +
          '<div><h4 style="font-size:14px;color:#047857;">🚚 Entregado' + (e && e.cub ? ' · ' + fc(e.cajas) + ' cajas' : '') + '</h4>' + t + '</div>' +
          '</div></div>';
@@ -17651,6 +17712,14 @@ function _stkProyChartHtml() {
          (piso ? '<small>piso: 4.º mejor mes</small>' : '') + '</div>';
   }
   h += '<div class="proyv-kpi"><b>' + fc(Math.round(S.prom)) + '</b><span>promedio ' + S.win.length + 'm</span></div>';
+  // v18.24 — el mes en curso va aparte y NO entra en el promedio ni en "meses arriba": lleva
+  // medio mes de ventas y compararlo con meses enteros no dice nada. Se muestra a que ritmo va.
+  if (S.parcial) {
+    var _mp = _stkProyMesParcial(S.parcial.cajas);
+    h += '<div class="proyv-kpi curso" title="' + escapeHtml(_stkFmtMes(S.parcial.mes)) + ' todavía no terminó. Es lo facturado hasta hoy llevado a mes entero por días hábiles.">' +
+         '<b>' + fc(Math.round(_mp.proy)) + '</b><span>' + escapeHtml(_stkFmtMes(S.parcial.mes)) + ' a este ritmo</span>' +
+         '<small>' + fc(S.parcial.cajas) + ' en ' + _mp.dias + ' de ' + _mp.total + ' días hábiles</small></div>';
+  }
   h += '<div class="proyv-kpi"><b>' + fc(S.tot) + '</b><span>facturado ' + S.win.length + 'm</span></div>';
   if (S.hayEnt) h += '<div class="proyv-kpi ent"><b>' + fc(S.totEnt) + '</b><span>entregado ' + S.win.length + 'm</span></div>';
   if (S.proyN > 0.05) h += '<div class="proyv-kpi"><b>' + S.arriba + '/' + S.win.length + '</b><span>meses arriba</span></div>';

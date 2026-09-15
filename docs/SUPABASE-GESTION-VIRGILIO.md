@@ -16650,7 +16650,7 @@ no tenerla.
 
 **Rollback:** `sql/gv_ventas_clientes_500_timeout_v1822.sql`. ⚠ Volver atrás el timeout **sin**
 volver atrás lo de LK deja el 500 de nuevo: el viaje HTTP solo se come ~2 s de los 3 s.
-## §3.gq — v18.23: «Modificar Pedidos» escribe en LK, y dos permisos rotos de `GV_Web_Cancelados` — 2026-09-15
+## §3.gu — v18.23: «Modificar Pedidos» escribe en LK, y dos permisos rotos de `GV_Web_Cancelados` — 2026-09-15
 
 **Qué se agregó (proyecto LK `kwkclwhmoygunqmlegrg`, NO Virgilio):** `sql/gv_pedido_mod_v1823.sql`.
 
@@ -16718,3 +16718,82 @@ lee la app): `GV_Imp_Carga_Pedido`, `GV_Imp_NTL_Mov`, `GV_Imp_Pagos`, `GV_Imp_Pe
 `GV_Imp_Prov_Mov`, `GV_Importados_Baches`, `Insumos_Ubicaciones_Unificadas` y
 `Ubicaciones_Articulos`. **No se tocaron**: hay que confirmar módulo por módulo si leen por vista
 (roto) o por RPC `SECURITY DEFINER` (anda). La consulta que las lista está al pie del archivo SQL.
+
+---
+
+## §3.gs — v18.24: "Faltantes x día no muestra todos" — y el punto decimal que valía ×100 — 2026-09-15
+
+Thomas: ***"Módulo faltante x día no muestra todos los artículos faltantes. ¡Está andando mal!"***.
+Tenía razón, y por más de un motivo. Problemas **238** y **239**, tarea Planify **3418**.
+
+**Medido antes de tocar nada:** en 7 días hubo **148** faltantes de picking (929 cajas, 36 tandas)
+y `vista_faltante_real` devolvía **9**. En 45 días: **756** contra **9**.
+
+**Tres filtros se los comían**, y ninguno tiene que ver con si el faltante ocurrió:
+
+1. **Sólo miraba las tandas de ISIS.** `tandas_activas` salía de `GV_PPP_Programacion_Diaria`;
+   las tandas **web** viven en `PPP_Web_Programacion` y no entraban. 38 de los 148 de la semana
+   estaban sólo ahí.
+2. **Excluía la NP ya facturada o entregada.** De los 88 faltantes de ISIS de esos 7 días, eso
+   dejaba 9. Que el pedido se haya facturado después **no borra** que al pickear faltaron cajas —
+   y ver eso es justamente para qué sirve el módulo.
+3. **Exigía un evento TP** en la tanda. Un PKC con faltante es un dato completo por sí solo.
+
+Y un cuarto agujero, más silencioso: el JOIN con la programación era **INNER** y la programación
+conserva ~3 semanas, así que un faltante más viejo desaparecía aunque el evento estuviera guardado
+— **585 de los 756** de 45 días. Ahora es LEFT: la fila queda con np/rs vacíos y la fecha del
+propio evento. Lo único que se sigue excluyendo son las **NP canceladas**.
+
+### ⚠⚠ Y el parser borraba el punto decimal
+
+`regexp_replace(campo, '[^0-9-]', '', 'g')::integer` sobre `"333.33"` devuelve **33333**: el número
+queda **multiplicado por 100**. Caso real, que apareció recién al destapar la vista: el evento
+`D62A|55289|333.33|0` figuraba como **33.333 cajas faltantes** — el **91 %** del total de 45 días
+salía de esa sola fila.
+
+Es la **misma familia** que el incidente del 2026-08-26 ya anotado en el `CLAUDE.md` (55215: 20833
+en vez de 208.33). Ahora se conserva el separador y se castea a `numeric` (la coma pasa a punto).
+Son 2 de 6.623 eventos, pero pesan lo que pesan: el total de 45 días pasa de **36.667 a 3.667,33**
+cajas.
+
+⚠ `cajas_falto` pasa de `integer` a `numeric`, así que va **DROP + CREATE** (Postgres no deja
+cambiar el tipo de una columna de vista). Comprobado antes: **0 vistas y 0 funciones** la nombran.
+
+**Resultado:** 9 → **756 filas** · 128 códigos · 3.667,33 cajas · 0 filas sin fecha ·
+`gv_endpoints_rotos` en 0 · `security_invoker` conservado.
+`sql/gv_vista_faltante_real_v1824.sql`, respaldo en `zz_backups."GV_Backup_Def_FaltanteReal_20260915"`.
+
+---
+
+## §3.gt — v18.24: el mes en curso en Proyección, y la ventana que no era la del motor — 2026-09-15
+
+Thomas: ***"si el mes es en curso, poné proyección o algo; si no es injusto comparar 15 días con
+30 días"***. Tarea Planify **3417**.
+
+Tenía razón por partida doble, porque **el motor de LK ya excluye el mes en curso**: su ventana
+termina en el último mes **cerrado** (`least(max(mes), mes_actual - 1)` en `_fn_proy_window`). O
+sea que la pantalla promediaba **abr–sep** y mostraba 993, mientras la proyección salía de
+**mar–ago** y valía 1.132,17. Dos ventanas distintas, y la de la pantalla ensuciada por medio mes.
+Cotejado a mano: mar–ago del 513 = 1280+659+1601+1081+1144+1028 = 6.793 ÷ 6 = **1.132,17**, exacto
+el `proy_cajas_mes` de la tabla.
+
+**Cómo quedó.** La pantalla usa **la misma ventana que el motor** (los 6 meses cerrados), y el mes
+en curso sale del promedio, del total y de "meses arriba". Pero no se esconde: tiene **su propia
+ficha** — *"sep 26 a este ritmo: 888 · 444 en 11 de 22 días hábiles"* — y en el gráfico queda con
+**punto hueco ámbar**, un punteado hasta donde llega a ese ritmo, y un **asterisco** en la etiqueta
+del mes. Al abrir su detalle, lo dice con todas las letras.
+
+⚠ La extrapolación va por **días hábiles**, no corridos: la facturación sale de lunes a viernes, y
+contar los fines de semana estira o achica el número según dónde caigan. Y se muestran los dos
+contadores ("444 en 11 de 22") porque el número solo no se puede auditar.
+
+**Queda abierto, problema 240** (no se corrigió acá): desde la v18.16 la fila de Stocks funde el
+NNNL en su base, así que la proyección del 513 vale 1.204,17 — pero la **serie mensual** sale de
+`ventas_mensuales_cod('513')` y `fn_ventas_mensuales_virgilio` en LK **no pela la L**, así que las
+ventas del 513L quedan afuera. El gráfico compara una línea de proyección que incluye el L contra
+una serie que no. El arreglo es que esa función use la regla de `gv_cod_stock`, pero eso cambia la
+serie de **todos** los códigos y merece su propio paso y su propia medición.
+
+**Test:** `tests/proy-entregadas.cjs`, ampliado. La serie del test ahora se arma **relativa a hoy**
+para que no dependa de en qué mes se corra, y verifica que el mes en curso no entre en el promedio,
+que tenga su ficha y que quede marcado en el gráfico.
