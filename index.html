@@ -2766,17 +2766,27 @@ button.pk-anular small{ display:block; font-size:12px; font-weight:700; opacity:
 .ppp-tab{ width:auto; margin:0; flex:1 1 0; padding:10px; font-size:14px; font-weight:bold; background:#eef2ff; color:#3730a3; border:1px solid #c7d2fe; border-radius:10px; cursor:pointer; }
 .ppp-tab.on{ background:#1e6bd6; color:#fff; border-color:#1e6bd6; }
 /* v6.97 — Pedidos Entregados (lista durable) */
-.ppp-ent-note{ font-size:12.5px; color:#475569; margin:0 0 8px; }
+.ppp-ent-note{ font-size:13.5px; color:#475569; margin:0 0 8px; line-height:1.5; }
 /* ── En Salida v13.62: tabla propia (fecha de carga + estado por NP + RR embebido) ── */
-.ppp-es-help{ background:#eff6ff; border:1px solid #bfdbfe; color:#1e3a8a; border-radius:9px; padding:8px 11px; font-size:12.5px; line-height:1.45; margin:0 0 10px; }
+.ppp-es-help{ background:#eff6ff; border:1px solid #bfdbfe; color:#1e3a8a; border-radius:9px; padding:9px 12px; font-size:13.5px; line-height:1.5; margin:0 0 10px; }
 .ppp-es-day{ margin:0 0 12px; border:1px solid #e2e8f0; border-radius:11px; overflow:hidden; background:#fff; box-shadow:0 1px 2px rgba(15,23,42,.05); }
-.ppp-es-day-h{ background:#f1f5f9; padding:8px 12px; font-weight:800; color:#0f172a; font-size:13px; display:flex; justify-content:space-between; gap:10px; align-items:center; }
+.ppp-es-day-h{ background:#f1f5f9; padding:9px 12px; font-weight:800; color:#0f172a; font-size:14.5px; display:flex; justify-content:space-between; gap:10px; align-items:center; }
 .ppp-es-day-h .m3{ color:#1e6bd6; white-space:nowrap; font-weight:700; }
 .ppp-es-wrap{ overflow-x:auto; }
-.ppp-es-table{ width:100%; border-collapse:collapse; font-size:12.5px; }
-.ppp-es-table th{ background:#f8fafc; color:#475569; font-size:11px; text-transform:uppercase; letter-spacing:.03em; font-weight:800; text-align:left; padding:7px 9px; border-bottom:1px solid #e2e8f0; white-space:nowrap; position:sticky; top:0; }
+/* v18.10 (Luis: "se ve muy chiquito todo y mucho espacio en blanco") — la letra sube de 12,5 a
+   14 px y lo de adentro pasa a `em`, así escala junto. El ancho que eso pide se saca de la
+   columna Estado, que se llevaba 479 px de 1254 (el 38 %) repitiendo los mismos tres chips en
+   todas las filas — ver `_pppEsChips`. */
+.ppp-es-table{ width:100%; border-collapse:collapse; font-size:15.5px; table-layout:auto; }
+.ppp-es-table th{ background:#f8fafc; color:#475569; font-size:.8em; text-transform:uppercase; letter-spacing:.03em; font-weight:800; text-align:left; padding:7px 10px; border-bottom:1px solid #e2e8f0; white-space:nowrap; position:sticky; top:0; }
 .ppp-es-table th.c, .ppp-es-table td.c{ text-align:center; }
-.ppp-es-table td{ padding:8px 9px; border-bottom:1px solid #f1f5f9; vertical-align:top; }
+.ppp-es-table td{ padding:7px 10px; border-bottom:1px solid #f1f5f9; vertical-align:top; }
+/* Estiran DOS: el cliente y el estado; el resto se queda con lo que necesita su dato. Dárselo
+   todo al cliente dejaba 595 px para un nombre de 200 — el mismo blanco, corrido de lugar.
+   Repartido, el sobrante que sí sirve va al estado, que es donde los chips de una NP con
+   problema son largos ("🚨 Salió hace 40 h sin registro de carga · falta el remito"). */
+.ppp-es-table td.np, .ppp-es-table td.td, .ppp-es-table td.fc, .ppp-es-table td.cam,
+.ppp-es-table td.c, .ppp-es-table th.c{ width:1%; }
 .ppp-es-table tr:last-child td{ border-bottom:0; }
 .ppp-es-row{ cursor:pointer; transition:background .12s; }
 .ppp-es-row:hover{ background:#f8fafc; }
@@ -2785,9 +2795,11 @@ button.pk-anular small{ display:block; font-size:12px; font-weight:700; opacity:
 .ppp-es-row.venc{ box-shadow:inset 3px 0 0 #dc2626; }
 .ppp-es-table td.np{ white-space:nowrap; }
 .ppp-es-table td.np b{ font-size:13px; color:#0f172a; }
-.ppp-es-table td.rs{ min-width:150px; color:#0f172a; }
-.ppp-es-cod{ color:#94a3b8; font-size:11px; }
-.ppp-es-cj{ color:#64748b; font-size:11px; margin-top:2px; }
+/* El nombre del cliente tiene prioridad sobre el estado para NO partirse en dos renglones: con
+   `auto` las dos columnas elásticas se pelean el sobrante y ganaba la del estado. */
+.ppp-es-table td.rs{ min-width:230px; color:#0f172a; }
+.ppp-es-cod{ color:#94a3b8; font-size:.79em; }
+.ppp-es-cj{ color:#64748b; font-size:.79em; margin-top:2px; }
 .ppp-es-table td.td{ white-space:nowrap; font-weight:700; color:#334155; }
 .ppp-es-table td.fc{ white-space:nowrap; font-weight:700; color:#0f172a; }
 /* v18.09 (Luis) — QUIÉN LO LLEVÓ. El dato viaja en el evento de Carga Camión desde la v11.47
@@ -2797,14 +2809,17 @@ button.pk-anular small{ display:block; font-size:12px; font-weight:700; opacity:
 .ppp-es-sincam{ color:#94a3b8; font-weight:500; }
 .ppp-es-camres{ font-weight:500; color:#475569; }
 .ppp-es-camres b{ color:#0f172a; }
-.ppp-es-hh{ color:#94a3b8; font-weight:500; font-size:11px; }
-.ppp-es-nofc{ color:#b45309; font-weight:700; font-size:11.5px; }
-.ppp-es-table td.est{ min-width:210px; }
-.ppp-es-chip{ display:inline-block; background:#f1f5f9; color:#334155; border:1px solid #e2e8f0; border-radius:999px; padding:1px 8px; font-size:11px; font-weight:700; margin:1px 3px 1px 0; white-space:nowrap; }
+.ppp-es-hh{ color:#94a3b8; font-weight:500; font-size:.79em; }
+.ppp-es-nofc{ color:#b45309; font-weight:700; font-size:.82em; }
+.ppp-es-table td.est{ line-height:1.75; }
+.ppp-es-chip{ display:inline-block; background:#f1f5f9; color:#334155; border:1px solid #e2e8f0; border-radius:999px; padding:1px 8px; font-size:.79em; font-weight:700; margin:1px 3px 1px 0; white-space:nowrap; }
+/* Los dos que en una NP sana dicen siempre lo mismo (armada, facturada) van como ícono solo, con
+   el texto entero en el `title`. Cuando algo NO está bien vuelven a salir con todas las letras. */
+.ppp-es-ico{ display:inline-block; font-size:1.02em; margin:0 4px 0 0; cursor:help; opacity:.8; }
 .ppp-es-chip.ok{ background:#ecfdf5; color:#047857; border-color:#a7f3d0; }
 .ppp-es-chip.warn{ background:#fffbeb; color:#b45309; border-color:#fde68a; }
 .ppp-es-chip.bad{ background:#fef2f2; color:#b91c1c; border-color:#fecaca; }
-.ppp-es-chk{ display:inline-block; width:24px; height:24px; line-height:22px; border:2px solid #cbd5e1; border-radius:7px; color:#059669; font-weight:900; font-size:15px; background:#fff; }
+.ppp-es-chk{ display:inline-block; width:26px; height:26px; line-height:24px; border:2px solid #cbd5e1; border-radius:7px; color:#059669; font-weight:900; font-size:16px; background:#fff; }
 .ppp-es-row.on .ppp-es-chk{ border-color:#059669; background:#ecfdf5; }
 .ppp-es-sinsal{ border:1px solid #e2e8f0; background:#fff; color:#b45309; border-radius:7px; padding:3px 9px; font-size:13px; font-weight:800; cursor:pointer; }
 .ppp-es-sinsal:hover{ background:#fffbeb; border-color:#fde68a; }
@@ -2813,7 +2828,7 @@ button.pk-anular small{ display:block; font-size:12px; font-weight:700; opacity:
 .ppp-es-ok:disabled{ background:#cbd5e1; cursor:default; }
 .ppp-es-cancel{ background:#f1f5f9; color:#475569; border:1px solid #e2e8f0; border-radius:9px; padding:10px 14px; font-weight:700; font-size:13px; cursor:pointer; width:auto; flex:0 0 auto; }
 @media (max-width:640px){
-  .ppp-es-table{ font-size:12px; }
+  .ppp-es-table{ font-size:13.5px; }   /* v18.10: era 12; sigue achicando en el celular, pero menos */
   .ppp-es-table td.est{ min-width:0; }
   .ppp-es-table th, .ppp-es-table td{ padding:6px 7px; }
 }
@@ -5421,7 +5436,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=18.09"></script>
+<script type="module" src="recepcion.js?v=18.10"></script>
 <!-- Config del módulo de fichada (compartido con fichada.html). El secret
      hmacSecret tiene que ser el mismo acá y allá; cargándolo desde un solo
      archivo evitamos que se desincronicen. -->
@@ -8866,7 +8881,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v18.09";
+const APP_VERSION = "v18.10";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -31493,11 +31508,22 @@ function _pppEsChips(p) {
   // la facturó. Seguro salió; falta el papel. Viene de gv_ppp_en_salida con estado 'armada_sin_carga'.
   else if (r.estado === "armada_sin_carga") out.push('<span class="ppp-es-chip bad" title="La tanda se armó hace ' + (r.horas_desde_armado || "?") + ' h y nadie registró la carga al camión (CCN) ni la facturó. Pasado el plazo se da por salida. Cerrala con Controlado, o ↩ si la mercadería volvió.">🚨 Salió hace ' + (r.horas_desde_armado || "?") + ' h sin registro de carga · falta el remito</span>');
   else out.push('<span class="ppp-es-chip warn" title="Está facturada pero nadie registró la carga al camión (evento CCN). Se muestra igual para que se pueda cerrar desde acá.">⚠ Sin registro de carga</span>');
-  // v16.01 — el chip dice que la NP pasó por armado (evento TAL), NADA más. Que haya salido lo
-  // dice el chip de al lado (🚚 Cargado al camión / 📝 Dada por salida a mano), no éste.
-  if (r.armada) out.push('<span class="ppp-es-chip" title="Pasó por armado (evento TAL). Armado no quiere decir que salió: eso lo dice el chip de la carga.">🧰 Armada (no es que salió)</span>');
+  /* v18.10 — ARMADA y FACTURADA van como ÍCONO cuando la NP está sana. Medido: la columna Estado
+     se llevaba 479 px de 1254 (el 38 % de la tabla) repitiendo "🧰 Armada (no es que salió)" y
+     "🧾 Facturada" en todas las filas, que es lo que se espera de una NP que salió. Como ícono
+     ocupan ~40 px y el texto completo queda en el `title`.
+
+     ⚠ El texto largo de "Armada (no es que salió)" NO se acortó ni se perdió: es de la v16.01 y
+     está puesto a propósito para que nadie lea "armada" como "salió". Sigue entero en el `title`,
+     y vuelve a la vista con todas las letras apenas la NP deja de estar sana — que es cuando hace
+     falta leerlo. Lo que se sale de la norma ahora destaca en vez de perderse entre lo repetido. */
+  const sana = r.armada && r.facturada && r.estado === "cargada";
+  const TIT_ARM = "Pasó por armado (evento TAL). Armado no quiere decir que salió: eso lo dice el chip de la carga.";
+  if (r.armada) out.push(sana ? '<span class="ppp-es-ico" title="Armada — ' + TIT_ARM + '">🧰</span>'
+    : '<span class="ppp-es-chip" title="' + TIT_ARM + '">🧰 Armada (no es que salió)</span>');
   else out.push('<span class="ppp-es-chip warn" title="No hay evento TAL: la NP no pasó por armado en la app.">Sin armar</span>');
-  if (r.facturada) out.push('<span class="ppp-es-chip">🧾 Facturada</span>');
+  if (r.facturada) out.push(sana ? '<span class="ppp-es-ico" title="Facturada">🧾</span>'
+    : '<span class="ppp-es-chip">🧾 Facturada</span>');
   // v13.68 (dueño: "el orden real es Control Remitos → Carga Camión → Recepción Remitos; el control se puede saltear
   // si no llegan"): con control y sin carga NO es un error, es el paso 1 hecho y el 2 pendiente.
   if (r.control_previo && r.estado !== "cargada") out.push('<span class="ppp-es-chip" title="Paso 1 de 3 hecho (Control de Remitos). Falta el paso 2: Carga al Camión (CCN). Si ya salió, el que cargó no lo marcó.">✔ controlada · falta cargar</span>');
@@ -31581,7 +31607,10 @@ function _pppEnViajeHtml() {
     html += '<div class="ppp-es-day"><div class="ppp-es-day-h"><span>🗓️ ' + dh + (camRes ? ' ' + camRes : '') + '</span><span class="m3">' + arr.length + ' ped · ' + m3d.toFixed(2).replace('.', ',') + ' m³</span></div>' +
       '<div class="ppp-es-wrap"><table class="ppp-es-table"><thead><tr>' +
       '<th>NP</th><th>Cliente</th><th>Tanda</th><th class="c">m³</th><th class="c">Cargado</th><th>Camionero</th><th>Estado</th>' +
-      (sup ? '<th class="c">Controlado</th><th class="c">Volvió</th>' : '') +
+      /* v18.10 — "CONTROLADO" y "VOLVIÓ" enteros forzaban 114 y 69 px para un tilde y un botón:
+         el `th` va en `nowrap`, así que la palabra manda el ancho. El título va en el `title`. */
+      (sup ? '<th class="c" title="Tildá los remitos que ya volvieron">✓</th>' +
+             '<th class="c" title="El cliente no recibió: la mercadería volvió al depósito">↩</th>' : '') +
       '</tr></thead><tbody>';
     for (const p of arr) {
       const np = String(p.np), npc = _pppEsNpc(np), on = _pppEsSel.has(np);
@@ -31589,7 +31618,7 @@ function _pppEnViajeHtml() {
       const cajas = (p.cajE ? ('<div class="ppp-es-cj">' + p.cajE + ' cj' + (p.cajF ? ' · <b style="color:#dc2626">faltó ' + p.cajF + '</b>' : '') + '</div>') : "");
       html += '<tr class="ppp-es-row' + (on ? " on" : "") + (venc ? " venc" : "") + '"' + (sup ? ' onclick="pppEsToggle(\'' + npc + '\')"' : '') + '>' +
         '<td class="np"><b>' + escapeHtml(np) + '</b>' + cajas + '</td>' +   // v13.65: sin chip WEB/ISIS (dueño: da lo mismo, salvo en Facturación)
-        '<td class="rs">' + escapeHtml((p.rs || p.cod || "—").slice(0, 34)) + '<div class="ppp-es-cod">' + escapeHtml(p.cod || "") + '</div></td>' +
+        '<td class="rs">' + escapeHtml((p.rs || p.cod || "—").slice(0, 44)) + '<div class="ppp-es-cod">' + escapeHtml(p.cod || "") + '</div></td>' +
         '<td class="td">' + escapeHtml(p.tanda || "—") + '</td>' +
         '<td class="c">' + (p.m3 != null ? p.m3.toFixed(3).replace('.', ',') : "—") + '</td>' +
         '<td class="c fc">' + _pppEsFechaCarga(p) + '</td>' +

@@ -1,3 +1,53 @@
+## Nota v18.10 (2026-09-15) — En Salida: letra más grande y el ancho que se iba en repetir
+
+Luis: *"se ve muy chiquito todo y mucho espacio en blanco, optimizá más el espacio, font más
+grande, menos espacio horizontal perdido"*.
+
+**Se midió antes de tocar**, como con la hoja impresa. El aire no estaba repartido: estaba
+concentrado en dos columnas.
+
+| columna | antes (12,5 px) | ahora (15,5 px) |
+|---|---|---|
+| **Estado** | **479** | **383** |
+| **Controlado / Volvió** | **114 / 69** | **50 / 51** |
+| Cliente | 217 | 397 |
+| NP · Tanda · m³ · Cargado · Camionero | 62 · 65 · 56 · 91 · 102 | 56 · 64 · 59 · 93 · 100 |
+
+**Estado se llevaba el 38 % de la tabla** (479 px de 1254) repitiendo en **todas** las filas los
+mismos tres chips: `🚚 Cargado al camión` + `🧰 Armada (no es que salió)` + `🧾 Facturada`. Eso es
+lo que se espera de una NP que salió; lo que hay que ver es lo que **no** está bien.
+
+Entonces: cuando la NP está **sana** (cargada + armada + facturada), los dos chips que dicen lo
+esperado van como **ícono** (`🧰` `🧾`) con el texto entero en el `title`. Apenas algo se sale de
+la norma, **vuelven con todas las letras**. Gana doble: entra más en menos lugar, y las filas con
+problema ahora destacan en vez de perderse entre lo repetido.
+
+⚠ **El texto largo de "Armada (no es que salió)" NO se acortó.** Es de la v16.01 y está puesto a
+propósito para que nadie lea "armada" como "salió". Sigue entero en el `title` de la fila sana, y
+a la vista completo en cuanto la NP deja de estarlo — que es justo cuando hace falta leerlo.
+
+**`CONTROLADO` y `VOLVIÓ` → `✓` y `↩`** (con `title`): el `th` va en `nowrap`, así que la palabra
+entera forzaba 114 y 69 px para un tilde y un botón.
+
+**El ancho ahora se reparte solo**: las columnas de dato van con `width:1%` (se quedan con lo que
+necesitan) y el sobrante se lo reparten Cliente y Estado, que son las dos que lo pueden usar.
+⚠ La primera versión le daba **todo al Cliente** (595 px para un nombre de 200) — el mismo blanco,
+corrido de lugar. Y el nombre lleva `min-width:230px` para que no parta en dos renglones: con
+`auto`, las dos columnas elásticas se pelean el sobrante y ganaba la del estado.
+
+La letra del resto del panel también subió (la nota y la ayuda a 13,5; el encabezado del día a
+14,5; en el celular la tabla a 13,5 en vez de 12).
+
+### ⚠ Dos chequeos del test que el cambio dejó en falso
+
+Al acortar el encabezado a `✓`, los dos chequeos del gate de supervisor miraban el texto
+`"Controlado</th>"`: el del supervisor se puso **rojo** y el del operario pasó a dar verde
+**solo** — medía la ausencia de un texto que ya no existía para nadie. Ahora los dos cuentan las
+columnas de acción y miran el handler, que es lo que define el gate de verdad. Y el conteo va
+**por tabla**: el fixture tiene dos días, o sea dos tablas, así que un `=== 2` a secas contaba 4.
+
+`tests/ppp-ensalida-estado.cjs`.
+
 ## Nota v18.09 (2026-09-15) — En Salida: el camionero, pintado
 
 Luis: *"dale, ahora pintá el camionero en En Salida"*. La columna ya estaba en

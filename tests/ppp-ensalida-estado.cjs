@@ -74,7 +74,7 @@ catch (_e) {
       sinCargaVisible: hOp.indexOf("sin carga") >= 0,
       chipCargado:     hOp.indexOf("Cargado al camión") >= 0,
       chipSinRegistro: hOp.indexOf("Sin registro de carga") >= 0,
-      chipArmada:      hOp.indexOf("Armada") >= 0,
+      chipArmada:      hOp.indexOf("Armada") >= 0,   // el texto largo sigue existiendo (en la no-sana)
       // ── v18.09 (Luis: "pintá el camionero en En Salida") ──────────────────
       // el dato ya viajaba en el evento de Carga Camión desde la v11.47 y no se mostraba
       camColumna:      /<th[^>]*>Camionero<\/th>/.test(hOp),
@@ -91,6 +91,20 @@ catch (_e) {
       // anclado a gv_ppp_en_salida: hay varios `select=` en el archivo y un regex suelto podría
       // matchear cualquiera y dar verde de mentira
       camEnSelect:     /gv_ppp_en_salida"[\s\S]{0,80}?select=[^"']*\bcamionero\b/.test(SRC),
+
+      // ── v18.10 (Luis: "se ve muy chiquito todo y mucho espacio en blanco") ──
+      // Una NP SANA (cargada + armada + facturada) colapsa los dos chips que dicen lo esperado
+      // en íconos: medido, la columna Estado se llevaba 479 px de 1254 repitiéndolos en todas
+      // las filas. El texto entero queda en el `title`.
+      sanaIconos:      /<span class="ppp-es-ico" title="Armada — Pasó por armado[^"]*">🧰<\/span>/.test(hOp) &&
+                       /<span class="ppp-es-ico" title="Facturada">🧾<\/span>/.test(hOp),
+      // ⚠ y en una NP que NO está sana vuelve el texto completo — el aviso de la v16.01 ("armado
+      // no quiere decir que salió") no se perdió, se muestra cuando hace falta leerlo
+      noSanaTextoLargo: /<span class="ppp-es-chip" title="Pasó por armado[^"]*">🧰 Armada \(no es que salió\)<\/span>/.test(hOp),
+      // los encabezados de acción: la palabra entera forzaba 114 y 69 px para un tilde y un botón
+      thAccionCortos:  /<th class="c" title="Tildá los remitos que ya volvieron">✓<\/th>/.test(hSup) &&
+                       /<th class="c" title="El cliente no recibió[^"]*">↩<\/th>/.test(hSup) &&
+                       hSup.indexOf(">Controlado</th>") < 0,
       // v18.07: son días HÁBILES (gv_dias_habiles en el backend); el chip lo dice y el title explica
       // que no cuenta sábados, domingos ni feriados.
       chipDias:        hOp.indexOf("4 días hábiles sin controlar") >= 0 &&
@@ -98,10 +112,17 @@ catch (_e) {
       // la NP sin CCN tiene que estar listada
       traeLaSinCCN:    hOp.indexOf("98665") >= 0,
       traeLaCargada:   hOp.indexOf("98602") >= 0,
-      // gate: el operario NO ve las acciones de control
-      opSinControl:    hOp.indexOf("Controlado</th>") < 0 && hOp.indexOf("pppEsToggle") < 0,
-      // supervisor SÍ las ve
-      supConControl:   hSup.indexOf("Controlado</th>") >= 0 && hSup.indexOf("pppEsToggle") >= 0,
+      /* gate: el operario NO ve las acciones de control. ⚠ v18.10: esto miraba el texto
+         "Controlado</th>", que dejó de existir al acortar el encabezado a "✓" — el chequeo del
+         supervisor se puso rojo y el del operario pasaba SOLO. Ahora los dos cuentan las columnas
+         de acción y miran el handler, que es lo que de verdad define el gate. */
+      opSinControl:    hOp.indexOf("pppEsToggle") < 0 && hOp.indexOf("pppEsSinSalida") < 0 &&
+                       (hOp.match(/<th class="c" title=/g) || []).length === 0,
+      // supervisor SÍ las ve: DOS por tabla — el fixture tiene dos días, o sea dos tablas, así
+      // que un `=== 2` a secas fallaba contando 4
+      supConControl:   hSup.indexOf("pppEsToggle") >= 0 &&
+                       (hSup.match(/<th class="c" title=/g) || []).length ===
+                       2 * (hSup.match(/<table class="ppp-es-table">/g) || []).length,
       supConSinSalida: hSup.indexOf("pppEsSinSalida") >= 0,
       supConAyuda:     hSup.indexOf("Recepción de Remitos") >= 0,
       // el botón de confirmar arranca deshabilitado y cuenta lo tildado
@@ -111,7 +132,16 @@ catch (_e) {
       reusaCRN:        typeof window.crSendDetail === "function",
       reusaFSS:        typeof window.crSendSinSalida === "function",
       // el módulo RR de arriba sigue intacto
-      rrIntacto:       typeof window.showControlRemitos === "function" && typeof window.crFinish === "function"
+      rrIntacto:       typeof window.showControlRemitos === "function" && typeof window.crFinish === "function",
+      // el tamaño se mide sobre la tabla DIBUJADA, no sobre el CSS: era 12,5 px
+      fontMasGrande:   (function () {
+        const d = document.createElement("div"); d.innerHTML = hSup;
+        document.body.appendChild(d);
+        const t = d.querySelector("table.ppp-es-table");
+        const px = t ? parseFloat(getComputedStyle(t).fontSize) : 0;
+        d.remove();
+        return px >= 15;
+      })()
     };
   });
 
