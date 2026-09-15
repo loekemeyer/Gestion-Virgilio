@@ -5594,7 +5594,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=18.55"></script>
+<script type="module" src="recepcion.js?v=18.56"></script>
 <!-- Config del módulo de fichada (compartido con fichada.html). El secret
      hmacSecret tiene que ser el mismo acá y allá; cargándolo desde un solo
      archivo evitamos que se desincronicen. -->
@@ -9158,7 +9158,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v18.55";
+const APP_VERSION = "v18.56";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -49190,13 +49190,30 @@ async function facTick(){
       facFetchArmadosEventos().catch(function(){ return _facArmEv; }),  // v12.18: NPs con TAL/TAP recientes → fallback del filtro v12.01 (ver facEstaArmada)
       facCorreccRichCached().catch(function(){ return []; })            // v15.66: reparto del secundario (sec_cubre) → el chip cuenta las NP urgentes de verdad (caché 60 s)
     ]);
-    const fcKeys = _facPar[0] || new Set();
-    try { const _sal = _facPar[8] || {}; _facSaldosN = {}; Object.keys(_sal).forEach(function(k){ _facSaldosN[_cpNorm(k)] = _sal[k]; }); } catch(_e){ _facSaldosN = {}; }
-    _facGuardadoHoy = _facPar[9] || new Set();
+    /* ⚠ v18.56 — POR NOMBRE, NUNCA POR ÍNDICE.
+       Esto se leía por POSICIÓN (la 8, la 9 y la 10 del array). La v18.29 insertó
+       `facFetchModif()` en el MEDIO de la lista (posición 6) y no corrió los de abajo, así que
+       los tres quedaron apuntando a la lectura anterior: los saldos traían las tareas, y
+       `_facGuardadoHoy` —que tiene que ser un Set— pasó a ser el objeto de saldos. `.has` no
+       existe ahí, así que `facTick` moría con «_facGuardadoHoy.has is not a function», salía
+       por su catch y la pantalla quedaba en «Cargando tandas…». Lo destapó el cartel de error
+       de la v18.55; antes el motivo no se veía en ningún lado.
+       Con la desestructuración, agregar o mover una lectura no puede volver a desalinear nada:
+       si alguien inserta una entrada, el nombre sigue al valor. El orden de los nombres tiene
+       que seguir el mismo orden del Promise.all de arriba. */
+    const [
+      _resFcKeys, _resFactHoy, _resFactTodos, _resLios, _resEquiv, _resFalt, _resModif,
+      _resCajas, _resTareas, _resSaldos, _resGuardadoHoy, _resSec, _resNcChef, _resArmEv, _resCorrRich
+    ] = _facPar;
+    void _resFactHoy; void _resFactTodos; void _resLios; void _resEquiv; void _resFalt;
+    void _resModif; void _resCajas; void _resTareas; void _resNcChef; void _resArmEv; void _resCorrRich;
+    const fcKeys = _resFcKeys || new Set();
+    try { const _sal = _resSaldos || {}; _facSaldosN = {}; Object.keys(_sal).forEach(function(k){ _facSaldosN[_cpNorm(k)] = _sal[k]; }); } catch(_e){ _facSaldosN = {}; }
+    _facGuardadoHoy = (_resGuardadoHoy && typeof _resGuardadoHoy.has === "function") ? _resGuardadoHoy : new Set();
     // v7.92: agrupar los pedidos en secundario por NP + actualizar el chip "Corregir códigos"
     try {
       _facSecByNp = new Map();
-      const _sec = _facPar[10] || [];
+      const _sec = Array.isArray(_resSec) ? _resSec : [];
       _sec.forEach(function(p){ const k = String(p.np).trim().replace(/\.0+$/, ""); if (!_facSecByNp.has(k)) _facSecByNp.set(k, []); _facSecByNp.get(k).push({ sec: p.sec, ppal: p.ppal, cajas: p.cajas }); });
       const chip = document.getElementById("facChipCorr"), nEl = document.getElementById("facCntCorr");
       // v10.51 — el número del chip cuenta SOLO los urgentes. El chip sigue visible si hay cualquier
@@ -49289,8 +49306,12 @@ async function facLoadBadge(){
       facFetchCajas().catch(function(){ return _facCajas; }),   // v12.01: para filtrar no-armados del badge
       facFetchArmadosEventos().catch(function(){ return _facArmEv; })   // v12.18: fallback TAL/TAP (ver facEstaArmada)
     ]);
-    const fcKeys = res[0] || new Set();
-    const facN = new Set(); (res[1] || new Set()).forEach(function(v){ const k = pickNormNp(v); if (k) facN.add(k); });
+    // v18.56: por nombre, como en facTick — acá los índices estaban bien, pero es la misma
+    // trampa esperando a que alguien agregue una lectura en el medio.
+    const [_bFcKeys, _bFactTodos, _bCajas, _bArmEv] = res;
+    void _bCajas; void _bArmEv;
+    const fcKeys = _bFcKeys || new Set();
+    const facN = new Set(); (_bFactTodos || new Set()).forEach(function(v){ const k = pickNormNp(v); if (k) facN.add(k); });
     const tandasFC = tandasPlan.filter(t => fcKeys.has(t._key || t.tanda.toUpperCase()));
     const seen = {}; let n = 0;
     tandasFC.forEach(function(t){
