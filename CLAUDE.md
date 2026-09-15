@@ -496,6 +496,28 @@ como optimización, pero el trigger es el que manda.
 > **obligatoria**: todo cambio que toque un objeto compartido/de Producción se anota en
 > **`docs/ROLLBACK-PRODUCCION.md`** con impacto y rollback exacto (ese archivo es la fuente
 > única para desarmar lo que afecte a Producción). Los backups siguen siendo obligatorios.
+>
+> ⚠⚠ **MEDIDO el 2026-09-15: "ya no se usa" es falso para el FRONT.** Producción sigue abierta en
+> alguna máquina y sigue pegando contra esta base. Se mide con `gv_app` (v14.51: la pone Gestión;
+> **NULL = Producción**):
+>
+> ```sql
+> select coalesce(gv_app,'(null)') app, count(*) n,
+>        max(ts_cliente at time zone 'America/Argentina/Buenos_Aires')::text ultimo
+>   from public."Registros_Produccion_Virgilio"
+>  where ts_cliente >= now() - interval '3 days' group by 1 order by n desc;
+> -- (null) | 33 | 2026-09-15 08:02:43
+> ```
+>
+> Y su repo tiene commits hasta el 2026-09-14. **Costó un bug real:** el rename de las tablas PPP
+> del 12/09 (`PPP_Programacion_Diaria` → `GV_PPP_Programacion_Diaria`) dejó a esa app imprimiendo
+> los remitos con `Cliente —` / `Fecha Entrega —` durante 3 días, hasta que lo reportó un operario.
+> Tapado con dos vistas de compatibilidad (`sql/gv_ppp_compat_nombres_viejos.sql`, §3.fq).
+>
+> **La regla que queda:** "no romper Producción" sigue sin ser un bloqueo —se toca lo que haya que
+> tocar— pero **renombrar o borrar un objeto de `public.*` obliga a grepear TAMBIÉN el front de
+> `loekemeyer/produccion-virgilio`**, no sólo `pg_proc.prosrc` y el `index.html` de acá. Y antes de
+> escribir que una app está muerta, **medirlo con `gv_app`**.
 
 **Gestión Virgilio y Producción Virgilio usan el MISMO proyecto Supabase
 (`hrxfctzncixxqmpfhskv`) y la MISMA anon key.** Producción Virgilio (repo

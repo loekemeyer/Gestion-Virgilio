@@ -61,6 +61,10 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
     out.tapPrimero = calls.filter((c) => c === "enqueue:TAP").length;
     out.redibujo = renders;
     out.enSet = _tapCerradoSesion.has("D06B");
+    // v17.98 — el asistente SÍ pregunta la ubicación (1 vez): lo que no puede pasar es que el
+    // segundo toque del botón viejo la vuelva a pedir. Se mide antes y después del send().
+    out.askUbicPrimero = calls.filter((c) => c === "askUbic").length;
+    out.stockSepPrimero = calls.filter((c) => c === "stockSep").length;
     // segundo toque: el botón viejo hace selectOption("TAP") + textInput = tanda → send()
     window.confirm = () => true;
     window.esOperadorPrueba = () => false;
@@ -117,7 +121,8 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
     ["6124: y redibuja la sugerencia (botón viejo afuera)",     r.redibujo >= 1],
     ["6124: la tanda queda marcada como cerrada",               r.enSet === true],
     ["6124: el segundo toque NO manda otro TAP",                r.tapSegundo === 1 && !r.sendErr],
-    ["6124: ni pide ubicaciones ni mueve stock de nuevo",       r.askUbic === 0 && r.stockSep === 1],
+    ["6124: el asistente pide la ubicación UNA vez (v17.98)",   r.askUbicPrimero === 1 && r.stockSepPrimero === 1],
+    ["6124: ni pide ubicaciones ni mueve stock de nuevo",       r.askUbic === r.askUbicPrimero && r.stockSep === r.stockSepPrimero],
     ["6124: avisa que ya estaba terminado (sin abrir el asistente)", r.avisa === true && r.sinWizard === true],
     ["6124: otra tanda no está bloqueada",                      r.otraTandaPasa === true],
     ["5070: la barra existe",                                   r.progExiste === true],

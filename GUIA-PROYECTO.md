@@ -1,3 +1,31 @@
+## Nota v17.98 (2026-09-15) — vuelve la ubicación al terminar armado, y el remito sin cliente
+
+Dos cosas que avisó **Franco Tierra** el 15/09 a la mañana.
+
+**1) "No me está saliendo para poner la ubicación cuando terminó de armar un pedido."**
+Cierto y medible: **0 eventos `AUB` entre el 04/09 y el 15/09**, con ~10 `TAP` por día (el `PUB` del
+picking nunca se cortó, así que no era el modal ni la cola). La causa son dos cambios que por
+separado estaban bien: la **v7.75** unificó el cierre del armado en `compTerminar()` del asistente
+«Completar», pero `askArmadoUbicaciones` quedó sólo en `send()`; desde ahí el modal seguía saliendo
+**de rebote**, porque el operario tocaba el botón viejo *"Tenés un Armado pendiente"* y ESE segundo
+TAP era el que preguntaba. La **v12.98 (idea 6124)** tapó ese doble TAP —bien, duplicaba stock— y se
+llevó puesta la pregunta. Ahora `compTerminar()` la hace él mismo, **antes del primer write** (líos →
+Entregas → TAP), así "Cancelar (no terminar)" no deja nada a medias. `send()` no se tocó.
+
+**2) "Al imprimir las notas de pedido no me está saliendo el nombre del cliente."**
+Esa impresión **no salió de Gestión**: el pie de la hoja dice `…github.io/Produccion-Virgilio/`. El
+12/09 se renombraron desde acá `PPP_Programacion_Diaria` → `GV_PPP_Programacion_Diaria` (ídem
+`PPP_Base_Pedidos`); las vistas siguen por OID, pero la app vieja las nombra por **texto** y sus
+fetch pasaron a dar 404 → cabecera con `Cliente —` y `Fecha Entrega —`. Tapado con dos vistas de
+compatibilidad (`sql/gv_ppp_compat_nombres_viejos.sql`), apuntadas a las `gv_*` con override para que
+imprima la tanda/fecha de HOY y no la vieja.
+
+**Decisión del dueño (15/09): desde el 16/09 nadie usa más la app vieja — la URL buena es
+`https://loekemeyer.github.io/Gestion-Virgilio/`.** O sea que las dos vistas son un **puente**, no algo
+definitivo: se borran cuando no haya más eventos con `gv_app IS NULL` (rollback en el mismo `.sql`).
+
+Detalle, mediciones y rollback: §3.fq y §3.fr de `docs/SUPABASE-GESTION-VIRGILIO.md`.
+
 ## Nota v17.96 (2026-09-15) — el contenido de la NP va en las celdas que estaban vacías
 
 Pedido de Luis: *"en el caso de las NPs, cuando se abren, ¿podemos aprovechar el espacio entre
@@ -2427,7 +2455,10 @@ Pedido de Luis. Dos cosas:
 > pendiente" quedaba en pantalla con un closure viejo y un segundo toque mandaba OTRO TAP con
 > `ts_inicio=null`, volvía a pedir ubicaciones (AUB) y a mover stock. Ahora `compTerminar()` anota
 > la tanda en `_tapCerradoSesion` y redibuja la sugerencia; `send()` frena cualquier TAP de una tanda
-> ya cerrada en la sesión con un aviso ("ya quedó terminado"). **(5070)** Monitor: barra de avance
+> ya cerrada en la sesión con un aviso ("ya quedó terminado"). ⚠ **Efecto colateral que tardó 11 días en
+> verse (v17.98): ese segundo TAP era el ÚNICO que seguía pidiendo la ubicación**, así que al taparlo
+> se apagó el `AUB` — 0 eventos del 04/09 al 15/09. Desde la v17.98 la pregunta la hace
+> `compTerminar()` y no depende más de un doble toque. **(5070)** Monitor: barra de avance
 > grande debajo de los conteos del header (`#monitorProgress`, `.mon-prog`): tandas de la ventana
 > con picking Y armado terminados sobre las programadas para esa ventana, con color semáforo (rojo
 > <40 %, ámbar <80 %, verde) y tamaño mayor en modo TV. Test `tests/mejoras-v1298.cjs` (15 chequeos).

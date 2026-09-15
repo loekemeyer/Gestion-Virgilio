@@ -5282,7 +5282,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=17.97"></script>
+<script type="module" src="recepcion.js?v=17.98"></script>
 <!-- Config del módulo de fichada (compartido con fichada.html). El secret
      hmacSecret tiene que ser el mismo acá y allá; cargándolo desde un solo
      archivo evitamos que se desincronicen. -->
@@ -8722,7 +8722,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v17.97";
+const APP_VERSION = "v17.98";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -9020,7 +9020,7 @@ async function askArmadoUbicaciones(tanda) {
   return new Promise(function (resolve) {
     if (!document.getElementById("aubCss")) {
       const s = document.createElement("style"); s.id = "aubCss";
-      s.textContent = "#aubModal{display:none;position:fixed;inset:0;z-index:1300;background:rgba(2,6,23,.78);overflow:auto;padding:14px;}#aubModal.show{display:flex;align-items:flex-start;justify-content:center;}.aub-card{background:#f8fafc;max-width:460px;width:100%;margin:auto;border-radius:16px;overflow:hidden;box-shadow:0 24px 70px rgba(0,0,0,.5);}.aub-head{padding:14px 16px;background:linear-gradient(90deg,#7c3aed,#5b21b6);color:#fff;}.aub-title{font-size:17px;font-weight:800;}.aub-sub{font-size:12.5px;opacity:.92;margin-top:3px;}.aub-body{padding:14px;}.aub-all{display:flex;align-items:center;gap:8px;background:#f1f5f9;border:1px solid #e2e8f0;border-radius:11px;padding:9px 11px;margin-bottom:12px;}.aub-all label{font-size:12.5px;font-weight:800;color:#475569;flex:1;}.aub-row{display:flex;align-items:center;gap:9px;border:1px solid #e2e8f0;border-radius:11px;padding:9px 11px;margin-bottom:8px;background:#fff;}.aub-npi{flex:1;min-width:0;}.aub-np{font-size:14px;font-weight:800;color:#0f172a;}.aub-rs{font-size:12px;color:#64748b;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}.aub-sel{width:104px;height:44px;box-sizing:border-box;border:2px solid #cbd5e1;border-radius:10px;padding:0 8px;font-size:15px;font-weight:800;color:#0f172a;background:#fff;margin:0;}.aub-sel.set{border-color:#7c3aed;background:#faf5ff;}.aub-btns{display:flex;gap:8px;margin-top:12px;}.aub-ok{flex:2;padding:13px;border:none;border-radius:11px;background:#7c3aed;color:#fff;font-size:15px;font-weight:800;cursor:pointer;}.aub-ok:disabled{background:#cbd5e1;color:#64748b;cursor:not-allowed;}.aub-skip{flex:1;padding:13px 8px;border:1px solid #cbd5e1;border-radius:11px;background:#fff;color:#475569;font-size:13px;font-weight:800;cursor:pointer;}.aub-x{margin-top:9px;width:100%;padding:10px;border:none;border-radius:10px;background:#fee2e2;color:#b91c1c;font-weight:800;font-size:13px;cursor:pointer;}";
+      s.textContent = "#aubModal{display:none;position:fixed;inset:0;z-index:1400;background:rgba(2,6,23,.78);overflow:auto;padding:14px;}#aubModal.show{display:flex;align-items:flex-start;justify-content:center;}.aub-card{background:#f8fafc;max-width:460px;width:100%;margin:auto;border-radius:16px;overflow:hidden;box-shadow:0 24px 70px rgba(0,0,0,.5);}.aub-head{padding:14px 16px;background:linear-gradient(90deg,#7c3aed,#5b21b6);color:#fff;}.aub-title{font-size:17px;font-weight:800;}.aub-sub{font-size:12.5px;opacity:.92;margin-top:3px;}.aub-body{padding:14px;}.aub-all{display:flex;align-items:center;gap:8px;background:#f1f5f9;border:1px solid #e2e8f0;border-radius:11px;padding:9px 11px;margin-bottom:12px;}.aub-all label{font-size:12.5px;font-weight:800;color:#475569;flex:1;}.aub-row{display:flex;align-items:center;gap:9px;border:1px solid #e2e8f0;border-radius:11px;padding:9px 11px;margin-bottom:8px;background:#fff;}.aub-npi{flex:1;min-width:0;}.aub-np{font-size:14px;font-weight:800;color:#0f172a;}.aub-rs{font-size:12px;color:#64748b;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}.aub-sel{width:104px;height:44px;box-sizing:border-box;border:2px solid #cbd5e1;border-radius:10px;padding:0 8px;font-size:15px;font-weight:800;color:#0f172a;background:#fff;margin:0;}.aub-sel.set{border-color:#7c3aed;background:#faf5ff;}.aub-btns{display:flex;gap:8px;margin-top:12px;}.aub-ok{flex:2;padding:13px;border:none;border-radius:11px;background:#7c3aed;color:#fff;font-size:15px;font-weight:800;cursor:pointer;}.aub-ok:disabled{background:#cbd5e1;color:#64748b;cursor:not-allowed;}.aub-skip{flex:1;padding:13px 8px;border:1px solid #cbd5e1;border-radius:11px;background:#fff;color:#475569;font-size:13px;font-weight:800;cursor:pointer;}.aub-x{margin-top:9px;width:100%;padding:10px;border:none;border-radius:10px;background:#fee2e2;color:#b91c1c;font-weight:800;font-size:13px;cursor:pointer;}";
       document.head.appendChild(s);
     }
     let ov = document.getElementById("aubModal");
@@ -12746,6 +12746,19 @@ async function compTerminar() {
     try { alert("⚠ Ya está armado el pedido NP " + _npsArmadas.join(", ") + " (en otra tanda).\n\nNo se puede armar de nuevo: duplicaría el pedido y el stock. Si se reprogramó y hay que rearmarlo, avisá para darlo de baja a mano primero."); } catch (_e) {}
     return;
   }
+  // v17.98 — ¿DÓNDE queda cada pedido armado? (evento AUB). La pregunta vivía SOLO en send(),
+  // que para el TAP ya no corre: desde la v7.75 el TAP lo emite ESTE asistente, y la v12.98
+  // (idea 6124) bloqueó con _tapCerradoSesion el segundo TAP del botón "Tenés un Armado
+  // pendiente" — que era, sin querer, el único camino que seguía mostrando el modal. Medido:
+  // el ÚLTIMO evento AUB de la base es del 2026-09-04, con ~10 TAP por día desde entonces
+  // (el PUB del picking nunca se cortó). Lo reportó Franco el 15/09: "no me está saliendo
+  // para poner la ubicación cuando terminó de armar un pedido".
+  // Va ACÁ, antes del primer write (líos → Entregas → TAP): si cancela no queda nada a medias.
+  // Cancelar (null) = no terminar, igual que en send(); "Omitir" ({}) = terminar sin ubicaciones.
+  let _armUbics = null;
+  try { _armUbics = await askArmadoUbicaciones(tanda); } catch (_e) { _armUbics = {}; }   // falla ABIERTA: un error de red no traba el cierre del armado
+  if (!_comp) return;                       // cerraron el modal mientras elegía
+  if (_armUbics == null) { _comp._terminando = false; return; }   // canceló → no se termina (nada escrito todavía)
   _comp.nps.forEach(function (n) { liosSend(legajo, n.np, n.liosArr.length, tanda, _compLiosResumen(n), n.clase || ""); });   // líos (TAL) + resumen + clase (lio/etiqueta/nada)
   // idea 5290: las etiquetas de lío ya NO se encolan acá (TAP) — se encolan al CERRAR cada
   // lío, en _compAddLio (por pedido del dueño: imprime la pilita apenas la confirman).
@@ -12812,6 +12825,8 @@ async function compTerminar() {
 
     // Encolar y enviar el reporte TAP.
     enqueueReport(payload);
+    // v17.98 — 1 evento AUB por NP con la ubicación elegida arriba (mismo punto que send()).
+    if (_armUbics) { Object.keys(_armUbics).forEach(function (np) { emitArmadoUbic(np, _armUbics[np], legajo); }); }
     _activityStatusTs = 0;   // invalidar cache de actividad
 
     try { await trySendOneReport(payload).then(function (r) { if (r && r.ok) removeFromQueue(payload.id); }).catch(function () {}); } catch (_e) {}

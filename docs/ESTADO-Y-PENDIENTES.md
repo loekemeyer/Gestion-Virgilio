@@ -1,4 +1,4 @@
-# Estado y pendientes — al 2026-09-13 (última actualización: v16.76)
+# Estado y pendientes — al 2026-09-15 (última actualización: v17.98)
 
 > **Para quien abra una sesión nueva:** esto es la foto del estado. Lo que falta de verdad está
 > en la base, no acá: `select * from github_repo_problemas.v_problemas where estado='abierto'`.
@@ -16,6 +16,8 @@
 | **Decidir qué hacer con los 10 pedidos ya programados de clientes con deuda** | con Vivi / cobranzas | Salen en rojo arriba de la columna Cuarentena (v16.57). Torres y Liva $32,1M entrega el lunes 14. **No se retiran solos a propósito**: sacar un pedido de una tanda armada rompe el picking. Problema 14. |
 | ~~Cargar `KRIKOS_IMAP_PASS` en el Vault de LK~~ | — | **YA ESTÁ** (comprobado 2026-09-13): el secreto está en el Vault de LK desde el 11/09 y la rama de Krikos ya está en `main`. El ingest corre: 21 OC en la bandeja y `ok:true` en cada corrida. |
 
+| ~~Sacar la app VIEJA (`Produccion-Virgilio`) de las máquinas~~ **DECIDIDO 15/09** | avisado al equipo | **Thomas, 15/09: *"nueva página para mañana, no usen más la otra, usá esta"* → `https://loekemeyer.github.io/Gestion-Virgilio/`, desde el 16/09.** | **Medido el 15/09: esa app sigue en uso** (33 eventos con `gv_app` NULL en 3 días, el último el 15/09 08:02) y por eso Franco recibió remitos con `Cliente —` durante 3 días: el rename de las tablas PPP del 12/09 le rompió los endpoints. Lo tapé con dos vistas de compatibilidad (§3.fq), así que **hoy imprime bien** — pero esa app está 5 versiones mayores atrás y cada cambio de base la puede volver a romper. Las dos vistas son un **puente**: se borran cuando `select count(*) from public."Registros_Produccion_Virgilio" where gv_app is null and ts_cliente >= now() - interval '7 days'` dé 0. Problema 202. |
+
 ## 2. Decisiones del dueño que NO hay que revisitar
 
 - **2026-09-13 — las credenciales de terceros NO se rotan por ahora.** Textual: *"No la cambiemos
@@ -31,6 +33,12 @@
   (v16.47, sólo `service_role`) y `krikos_secret` en LK.
 - **La hoja "PPP Pedidos Entregados" no existe más** y `PPP_Entregados_Meta` no se usa (v16.44).
   Está en el Quick-ref del `CLAUDE.md`; no volver a escribir que el Sheet es el upstream.
+
+- **2026-09-15 — la ubicación del armado (AUB) se cargaba de rebote, por un bug.** Hasta la v12.98
+  el modal salía porque el operario tocaba DOS veces «terminar» (el botón viejo que quedaba en
+  pantalla). Al tapar ese doble TAP se apagó la pregunta: **0 eventos AUB entre el 04/09 y el
+  15/09**, con ~10 armados por día. Arreglado en la v17.98 (`compTerminar` pregunta él mismo) con
+  regresión en `tests/comp-terminar-unificado.cjs`. Si vuelve a aparecer en 0, mirar ahí primero.
 
 ## 3. Lo que quedó a medias (deuda que dejé yo, no está en la tabla)
 

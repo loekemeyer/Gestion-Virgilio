@@ -6,6 +6,7 @@
    - TAP event se emite (enqueueReport es llamado con opcion=TAP).
    - Stock se mueve (stockSepararAFacturar es llamado).
    - Armado state se marca inactivo.
+   - v17.98: se pregunta la ubicación de cada NP (AUB) ANTES de escribir, y se emite el AUB.
    Sale 1 si falla. */
 const path = require("path");
 let chromium;
@@ -42,6 +43,10 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
     window.liosSend = function () { calls.push("liosSend"); };
     window._compBuildLiosData = function () { calls.push("_compBuildLiosData"); };
     window._compLiosResumen = function () { return ""; };
+    // v17.98 — compTerminar ahora pregunta la UBICACIÓN de cada NP (evento AUB) antes de
+    // escribir nada. Sin este stub el modal real quedaría abierto y el test colgaría.
+    window.askArmadoUbicaciones = async function (t) { calls.push("askArmadoUbicaciones:" + t); return { "98151": "AB8" }; };
+    window.emitArmadoUbic = function (np, u) { calls.push("emitArmadoUbic:" + np + "@" + u); };
 
     // Setup _comp
     _comp = {
@@ -65,12 +70,17 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
     out.entregarSaved = calls.some(c => c.indexOf("_compSaveEntregas") === 0);
     out.tapEmitted = calls.some(c => c === "enqueueReport:TAP");
     out.stockSeparado = calls.some(c => c === "stockSepararAFacturar");
+    // v17.98 — la ubicación se pregunta ANTES del primer write (líos), y el AUB sale con el TAP.
+    out.ubicPreguntada = calls.indexOf("askArmadoUbicaciones:D06B") >= 0
+      && calls.indexOf("askArmadoUbicaciones:D06B") < calls.indexOf("liosSend");
+    out.aubEmitido = calls.some(c => c === "emitArmadoUbic:98151@AB8");
     out.callsList = calls;
 
     return out;
   });
 
-  const pass = r.compTerminarRan && r.entregarSaved && r.tapEmitted && r.stockSeparado && errs.length === 0;
+  const pass = r.compTerminarRan && r.entregarSaved && r.tapEmitted && r.stockSeparado
+    && r.ubicPreguntada && r.aubEmitido && errs.length === 0;
   console.log("comp-terminar-unificado:", JSON.stringify(r), "· pageerrors:", errs.length ? errs.join("|") : "none", "·", pass ? "✓ OK" : "✗ FAIL");
   await b.close(); process.exit(pass ? 0 : 1);
 })();

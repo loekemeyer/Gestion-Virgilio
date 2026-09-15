@@ -15831,3 +15831,167 @@ de antes, tal cual salió de `pg_get_functiondef`).
 **La Edge Function también quedó con el mapa explícito** en el repo, pero **no se redeployó**:
 con el backend dueño del rótulo su texto ya no se usa para nada salvo el exceso de límite. Se
 deja arreglado para que las dos puntas digan lo mismo cuando toque el próximo deploy.
+
+---
+
+### §3.fq — v17.98: el rename de las tablas PPP dejó a la app VIEJA imprimiendo remitos sin cliente
+
+**Lo reportó Franco Tierra el 15/09 por WhatsApp:** *"al imprimir las notas de pedido no me está
+saliendo el nombre del cliente"*. La foto es un remito de armado de la **NP 98626** impreso ese día
+a las 08:41, con la cabecera **`Cliente —`** y **`Fecha Entrega —`**. Los datos SÍ están en la base:
+
+```sql
+select np, cod, razon_social, tanda, fecha_entrega
+  from public.gv_ppp_programacion_diaria where np::text = '98626';
+-- 98626 | 4223 | Iro Iro S.R.L | D71B | 2026-09-17
+```
+
+**Qué lo rompió.** El pie de la hoja impresa dice `https://loekemeyer.github.io/Produccion-Virgilio/`:
+la impresión NO salió de Gestión, salió de la **app vieja**. Y el 2026-09-12 (v16.3x) se renombraron
+desde acá las dos tablas PPP:
+
+| Antes | Ahora |
+|---|---|
+| `public."PPP_Programacion_Diaria"` | `public."GV_PPP_Programacion_Diaria"` |
+| `public."PPP_Base_Pedidos"` | `public."GV_PPP_Base_Pedidos"` |
+
+Las **vistas** referencian por OID y no se enteraron; las **funciones** se reescribieron ese día
+(31) y el front de Gestión también. Lo que no se tocó fue el front de `loekemeyer/produccion-virgilio`
+(v12.78), que nombra las tablas por TEXTO en su REST: `SUPABASE_PPP_PROG_ENDPOINT`,
+`SUPABASE_PPP_BASE_ENDPOINT` y 13 `fetch` sueltos — **6 a Programación y 9 a Base, todos de lectura,
+ni un POST/PATCH/DELETE**. Desde el rename devuelven **404**, el `ppMap` del remito queda vacío y la
+cabecera imprime los dos guiones.
+
+**Y la app vieja SIGUE VIVA, contra lo que decía el `CLAUDE.md`.** Se mide con la columna `gv_app`
+(v14.51: la pone Gestión, NULL = Producción):
+
+```sql
+select coalesce(gv_app,'(null)') app, count(*) n,
+       max(ts_cliente at time zone 'America/Argentina/Buenos_Aires')::text ultimo
+  from public."Registros_Produccion_Virgilio"
+ where ts_cliente >= now() - interval '3 days' group by 1 order by n desc;
+-- (null) | 33 | 2026-09-15 08:02:43   ← Producción, hoy a la mañana
+```
+
+Su repo además tiene commits hasta el **2026-09-14**. No está apagada: está sin mantenimiento.
+
+**El arreglo** (`sql/gv_ppp_compat_nombres_viejos.sql`): dos vistas con el nombre viejo. Aplicado el
+15/09; no hay que redeployar nada de ninguna de las dos apps.
+
+```sql
+create or replace view public."PPP_Programacion_Diaria" with (security_invoker = true) as
+  select * from public.gv_ppp_programacion_diaria;
+create or replace view public."PPP_Base_Pedidos" with (security_invoker = true) as
+  select * from public.gv_ppp_base_pedidos;
+revoke all    on public."PPP_Programacion_Diaria", public."PPP_Base_Pedidos" from anon, authenticated;
+grant  select on public."PPP_Programacion_Diaria", public."PPP_Base_Pedidos" to   anon, authenticated;
+```
+
+Dos decisiones que no son obvias:
+
+1. **Apuntan a las vistas `gv_*` (con override), NO a las tablas crudas.** Tienen exactamente las
+   mismas 16 / 6 columnas, así que la app vieja no nota la diferencia, pero ve la MISMA verdad que
+   Gestión. Con la tabla cruda el remito de la 98626 habría salido **`D68B · 11/09`** cuando la NP
+   está reprogramada a **`D71B · 17/09`**: un remito con la fecha vieja es peor que uno sin fecha.
+   Al 15/09 las `gv_*` tapan 10 filas de programación (123 de 133) y 118 de base (9.663 de 9.781).
+2. **Sólo `SELECT`.** Una vista simple es auto-updatable: sin el `revoke` quedaba abierta una puerta
+   de escritura con la anon key que antes no existía, para una app que nunca escribió ahí.
+
+**Medición con el rol de la app** (`set local role anon`), que es lo que prueba que el remito ya sale
+con el cliente:
+
+```sql
+set local role anon;
+select np, cod, razon_social, tanda, fecha_entrega from public."PPP_Programacion_Diaria"
+ where np::text in ('98626','98627');
+-- 98626 | 4223 | Iro Iro S.R.L | D71B | 2026-09-17
+-- 98627 | 4223 | Iro Iro S.R.L | D71B | 2026-09-17
+select count(*) from public."PPP_Programacion_Diaria";  -- 123
+select count(*) from public."PPP_Base_Pedidos";         -- 9663
+```
+
+`select * from public.gv_endpoints_rotos;` → vacío, antes y después.
+
+**Rollback** (el día que la app vieja se apague de verdad):
+
+```sql
+drop view if exists public."PPP_Programacion_Diaria";
+drop view if exists public."PPP_Base_Pedidos";
+```
+
+⚠ **La lección, que es más grande que este arreglo:** renombrar una tabla es barato *para las vistas*
+(§ del `CLAUDE.md` sobre `alter table ... rename`), pero el barrido de "quién la nombra por texto"
+tiene que incluir **el front de los OTROS repos que pegan contra este proyecto**, no sólo
+`pg_proc.prosrc` y el `index.html` de acá. Y antes de dar por muerta una app, **medirlo**
+(`gv_app`), no leerlo en un `.md`.
+
+### §3.fr — v17.98: al terminar el armado no se preguntaba más la ubicación (0 eventos AUB desde el 04/09)
+
+**El otro reporte de Franco del 15/09:** *"no me está saliendo para poner la ubicación cuando terminó
+de armar un pedido"*. Es el modal `📍 ¿Dónde queda cada pedido?` (`askArmadoUbicaciones` → 1 evento
+**AUB** por NP, v5.86), el que alimenta a Facturación y a Carga de Camión para saber dónde quedó
+físicamente cada pedido armado.
+
+**Medición antes de tocar nada:**
+
+```sql
+select date_trunc('day', ts_cliente at time zone 'America/Argentina/Buenos_Aires')::date dia,
+       count(*) filter (where opcion='TAP') tap,
+       count(*) filter (where opcion='AUB') aub,
+       count(*) filter (where opcion='PUB') pub
+  from public."Registros_Produccion_Virgilio"
+ where opcion in ('TAP','AUB','PUB') and ts_cliente >= now() - interval '20 days'
+ group by 1 order by 1 desc;
+```
+
+| Día | TAP | AUB | PUB |
+|---|---|---|---|
+| 2026-09-15 | 1 | **0** | 1 |
+| 2026-09-14 | 10 | **0** | 13 |
+| 2026-09-11 | 9 | **0** | 5 |
+| 2026-09-10 | 10 | **0** | 10 |
+| 2026-09-09 | 8 | **0** | 9 |
+| 2026-09-08 | 6 | **0** | 6 |
+| 2026-09-04 | 4 | 1 | 5 |
+| 2026-09-03 | 11 | 15 | 4 |
+
+El **PUB** (la ubicación del picking) nunca se cortó, así que no era el modal ni la cola de eventos:
+era el camino del TAP.
+
+**Causa raíz, en dos pasos que por separado eran correctos:**
+
+1. **v7.75** unificó el cierre del armado: el TAP lo emite `compTerminar()` del asistente «Completar»,
+   no el botón suelto. Pero `askArmadoUbicaciones` quedó SÓLO en `send()`, que `compTerminar` no usa.
+2. Desde ahí, el modal seguía apareciendo **por un bug**: al terminar por el asistente quedaba en
+   pantalla el botón viejo *"Tenés un Armado pendiente"*, el operario lo tocaba, eso llamaba a `send()`
+   con `opcion='TAP'` — y ESE segundo TAP era el que preguntaba la ubicación. La **v12.98 (idea 6124)**
+   tapó ese segundo TAP con `_tapCerradoSesion` (bien: duplicaba el movimiento de stock y mandaba un
+   TAP con `ts_inicio=null`) y, sin querer, se llevó puesto el único camino que quedaba para el AUB.
+
+O sea: durante meses la ubicación se cargó **de rebote**, gracias a un doble-toque que era un
+defecto. Al arreglar el defecto se apagó la función.
+
+**El arreglo (v17.98, `index.html`):** `compTerminar()` pregunta la ubicación por sí mismo.
+
+- Va **antes del primer write** — antes de `liosSend` (TAL), de Entregas y del TAP. Así "Cancelar
+  (no terminar)" no deja nada a medias, igual que en `send()`; `_comp._terminando` vuelve a `false`
+  y el asistente queda abierto donde estaba.
+- `try/catch` alrededor: un error de red **no traba** el cierre del armado (falla abierta, mismo
+  criterio que el resto de los gates del TAP).
+- Los eventos AUB se emiten junto al TAP, en el mismo punto donde los emite `send()`.
+- `#aubModal` pasó de `z-index: 1300` a **1400**: era el mismo que `#completarModal` y quedaba
+  colgado del orden del DOM.
+
+`send()` **no se tocó**: sigue preguntando cuando el TAP entra por ahí (app recargada, `_tapCerradoSesion`
+vacío), y `_tapCerradoSesion` sigue frenando el doble TAP.
+
+**Regresión en los tests:**
+- `tests/comp-terminar-unificado.cjs` — ahora stubea `askArmadoUbicaciones` / `emitArmadoUbic` y
+  exige que la pregunta salga **antes** de `liosSend` y que el AUB se emita. Sin el stub el test
+  colgaría con el modal real abierto, que es la señal de que el cableado está.
+- `tests/mejoras-v1298.cjs` — el chequeo de la idea 6124 decía `askUbic === 0`. Era correcto cuando
+  nadie preguntaba; ahora mide **antes y después** del segundo toque: el asistente pregunta 1 vez y
+  el botón viejo no la vuelve a pedir.
+
+**Rollback:** sacar el bloque `let _armUbics = …` de `compTerminar` y la línea de `emitArmadoUbic`.
+No hay cambio de base: `AUB` ya existía como `opcion`.
