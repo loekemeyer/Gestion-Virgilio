@@ -139,9 +139,18 @@ catch (_e) {
     out.avisoFacturada = /ya está facturada/.test(mi) && /no devuelve ninguna/.test(mi);
     dsmCerrar();
 
-    // (d) el cartel del web ya no promete el automático
-    out.cartel = String(window.pppVencVolver).indexOf("NO lo vuelve a programar solo") >= 0 &&
-                 String(window.pppVencVolver).indexOf("lo toma el automático") < 0;
+    // (d) el cartel del web ya no promete el automático.
+    // v18.44: el aviso se mudó de `pppVencVolver` (era el texto del confirm) al pop-up
+    // `epaConfirmar`, que ahora es la única confirmación de las tres entradas. Lo que se chequea
+    // es lo MISMO de la v17.85 — que en ningún lado se prometa que el automático lo reprograma —,
+    // sólo que mirando también dónde vive hoy la frase.
+    out.cartel = (String(window.epaConfirmar).indexOf("el automático no las vuelve a tocar") >= 0 ||
+                  String(window.pppVencVolver).indexOf("NO lo vuelve a programar solo") >= 0) &&
+                 String(window.pppVencVolver).indexOf("lo toma el automático") < 0 &&
+                 String(window.epaConfirmar).indexOf("lo toma el automático") < 0;
+    // v18.44 — y el pop-up pide el previo al backend: es lo que le deja decir CUÁNTAS NP se
+    // llevan y qué tanda queda vacía antes de tocar nada.
+    out.previo = String(window.epaConfirmar).indexOf("gv_ppp_web_desprogramar_previo") >= 0;
 
     // (e)(f) A Programar: el retenido sale con su chip y vuelve a SU tanda
     rpc.length = 0;
@@ -184,6 +193,7 @@ catch (_e) {
     "(h) pide confirmación con el texto que pidió Luis — " + JSON.stringify(r.confirmTxt));
   t(r.confirmUno, "(h) y una sola vez (no encadena la confirmación vieja)");
   t(r.cartel, "(d) el cartel ya no promete que lo reprograma el automático");
+  t(r.previo, "(d) y el pop-up le pide al backend qué NP se lleva antes de tocar nada");
   t(r.hayTacho, "(g) la fila trae también el tacho");
   t(r.textoTacho === "🗑", "(g) el tacho también es sólo el ícono — " + JSON.stringify(r.textoTacho));
   t(/Desarmar pedido/.test(r.titleTacho), "(g) con su tooltip — " + JSON.stringify(r.titleTacho));

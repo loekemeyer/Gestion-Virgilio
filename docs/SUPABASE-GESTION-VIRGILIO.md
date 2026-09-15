@@ -17503,3 +17503,75 @@ m³ de la NP 0,100 → 0,151 y de la tanda 0,437 → 0,488. Tras el rollback, to
 `gv_endpoints_rotos` vacía.
 
 **Rollback:** al pie del archivo SQL.
+
+## §3.hg — v18.44: «Enviar a programar» dice ANTES qué se lleva por delante — 2026-09-15
+
+Pedido de Luis. El botón ↩ de la tabla de Programación **ya sacaba todas las NP del pedido**
+—`gv_ppp_web_desprogramar` resuelve el `order_id` y saca todas las que tengan tanda, de
+cualquier tanda y cualquier fecha— pero el front **avisaba después**: el `confirm` hablaba de
+una sola NP y recién el cartel final decía "(3 NP del pedido)".
+
+Textual de Luis, y las definiciones que quedaron:
+
+| # | Definición |
+|---|---|
+| 1 | *"todas las NP del `order_id`"*, aunque estén en **otra tanda y otra fecha** |
+| 2 | *"siempre que se quiera mandar una tanda deberían mandarse todas las tandas de ese pedido"* → **van siempre todas**, no hay rama por estado |
+| 3 | Una NP **facturada se saca igual**: *"puede ser que se arme, se facture y antes del envío el cliente pida enviarla otra fecha"* |
+| 4 | **Todas o ninguna** — dos botones, sin "sólo ésta" |
+| 5 | La tanda que queda vacía **quema su código**: *"si algo guarda registro de ese código de tanda, se quema; incluso si no, es más limpio para el futuro"* |
+| 6 | Aplica también a ISIS, con el aviso *"El pedido está cargado en ISIS, recordá limpiarlo de ahí también"* |
+| 7 | Al reprogramar, **cada NP vuelve a SU tanda previa** (la memoria de la v17.85) |
+| 8 | **El stock no se toca.** Devolver las cajas a *A guardar* ya lo hace 🗑 Desarmar (`gv_ppp_np_desarmar`); ↩ sólo mueve el día |
+
+### El cálculo va al backend
+
+`gv_ppp_web_desprogramar_previo(p_np)` (`sql/gv_ppp_web_desprogramar_previo.sql`) — no escribe
+nada, sólo dice qué va a pasar. Por el protocolo de siempre: es regla de negocio, no pintura, y
+así el front no replica cómo se resuelve el estado de una NP (sale de `gv_ppp_web_estado`).
+
+Devuelve las NP hermanas con tanda / fecha / m³ / estado y cuál es la que se tocó, más
+`hay_avanzada`, `tandas_vacias` y `bloqueo` (la única guarda que tiene `gv_ppp_web_desprogramar`:
+lo que ya tiene Carga Camión o Recepción Remitos no se saca). `security definer`, gate de
+supervisor adentro, `execute` revocado a `anon`.
+
+```sql
+-- pedido de 4 NP en la misma tanda: van las 4, la tanda no queda vacía
+select jsonb_pretty(public.gv_ppp_web_desprogramar_previo('LK 0019'));
+-- 1 NP sola en su tanda: tandas_vacias = ["E24A"]
+select jsonb_pretty(public.gv_ppp_web_desprogramar_previo('LK 0096'));
+```
+
+### El punto 5 ya estaba cumplido, sin escribir una línea
+
+`gv_ppp_web_desprogramar` nulea la tanda de la NP pero **no toca la fila de `PPP_Web_Tandas`**,
+que queda en `estado = 'programada'` — y `gv_ppp_web_codigo_tomado` cuenta como tomado todo lo
+que no esté `descartada`. Verificado con la tanda que se vació el mismo día:
+
+```sql
+select public.gv_ppp_web_codigo_tomado('D69H');   -- true, aunque no le quede ninguna NP
+```
+
+En ISIS pasa lo mismo por otro camino: `gv_ppp_isis_desprogramar` nulea tanda y fecha en
+`GV_PPP_Prog_Override`, pero la fila de `GV_PPP_Programacion_Diaria` conserva su código, así que
+`gv_ppp_web_codigo_tomado` lo sigue viendo. **Lo único que había que no hacer era marcarlas
+`descartada`** — eso sí liberaría el código.
+
+Y "desaparecer de Programación" también sale solo: la tabla se arma desde las NP
+(`gv_ppp_prog_arbol`), así que una tanda sin NP no tiene fila.
+
+### El front
+
+`epaConfirmar(np)` en `index.html` — un pop-up azul (no el rojo de Desarmar: acá el pedido no se
+pierde, se mueve) que lista cada NP con su tanda, su día y su estado, marca la que tocaste,
+y suma los avisos que correspondan. Lo usan **las tres** entradas que existían con su propio
+`confirm` de texto: el ↩ de la tabla (`pgaEnviarAProgramar`), el de la vista clásica
+(`pppVencVolver`) y el de ISIS (`pppVencSinProgramar`). Si el previo falla, cae al `confirm` de
+antes: el botón nunca queda sin poder usarse.
+
+### ROLLBACK
+
+```sql
+drop function public.gv_ppp_web_desprogramar_previo(text);
+```
+y revertir el commit del front (el `confirm` viejo está en el propio `epaConfirmar` como fallback).
