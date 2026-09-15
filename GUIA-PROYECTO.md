@@ -1,4 +1,4 @@
-## Nota v18.31 (2026-09-15) — el pop-up de Proyección entra de una sola vez
+## Nota v18.32 (2026-09-15) — el pop-up de Proyección entra de una sola vez
 
 Luis mandó la foto del pop-up y una palabra: *"Optimiza"*. Lo que mostraba la foto: la tarjeta de
 760 px en una pantalla ancha, un **río de espacio** entre cada mes y sus números, las fichas con una
