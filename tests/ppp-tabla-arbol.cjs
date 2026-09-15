@@ -123,6 +123,13 @@ catch (_e) {
     // (5) tocar la tanda la expande en sus NP
     pgaAbrirTanda("20260915|D67E"); await new Promise((res) => setTimeout(res, 120));
     out.nps = [...prev.querySelectorAll("tr.pga-n .pga-np")].map((e) => e.textContent.trim());
+    out.tam = (function () {
+      const px = (sel) => {
+        const e = prev.querySelector(sel);
+        return e ? Math.round(parseFloat(getComputedStyle(e).fontSize) * 10) / 10 : 0;
+      };
+      return { dia: px("tr.pga-d > td"), tanda: px("tr.pga-t > td"), np: px("tr.pga-n > td") };
+    })();
     out.npPill = [...prev.querySelectorAll("tr.pga-n .pga-pill")].map((e) => e.textContent.trim());
     out.sinContenido = prev.querySelectorAll("tr.pga-c").length === 0;
     // v17.76 (Luis): código de cliente con su prefijo, barrio al lado de la zona y fecha de pedido
@@ -137,8 +144,16 @@ catch (_e) {
     pgaAbrirNp("20260915|D67E|LK 0058", "LK 0058"); await new Promise((res) => setTimeout(res, 250));
     html = prev.innerHTML;
     out.pidioItems = pedidos.some((u) => /gv_ppp_np_items\?select=art,cajas,uxb,uni&np=eq\.LK%200058&/.test(u));
-    out.contenido = /<tr class="pga-c">/.test(html) && /apr-tab-cod">505</.test(html) &&
-                    /<tfoot><tr><td>3 códigos<\/td><td class="n">48<\/td><td class="n">528<\/td>/.test(html);
+    // v17.94 (Luis): el contenido pasó de una tabla de 3 columnas clavada en 520px a una GRILLA
+    // que fluye, para que se abra en horizontal y no hacia adentro.
+    out.contenido = /<tr class="pga-c">/.test(html) && /class="pga-its"/.test(html) &&
+                    /pga-it-cod">505</.test(html) && /pga-it-cj">20 cj</.test(html) &&
+                    /pga-it-tot">3 códigos · <b>48<\/b> cajas · <b>528<\/b> unidades/.test(html);
+    out.contenidoAncho = (function () {
+      const g = prev.querySelector(".pga-its"), td = prev.querySelector("tr.pga-c > td");
+      if (!g || !td) return 0;
+      return Math.round(g.getBoundingClientRect().width / td.getBoundingClientRect().width * 100);
+    })();
     // una sola vuelta de red por NP
     const antes = pedidos.length;
     pppRenderProg(); await new Promise((res) => setTimeout(res, 120));
@@ -189,9 +204,17 @@ catch (_e) {
   t(r.npZonaBarrio, "(5) el barrio al lado de la zona");
   t(r.npFechaPed, "(5) y la fecha de pedido");
   t(r.pidioItems, "(6) abrir la NP pide su contenido a gv_ppp_np_items");
-  t(r.contenido, "(6) y muestra la tabla de códigos, cajas y unidades");
+  t(r.contenido, "(6) y muestra los códigos, las cajas y las unidades");
+  t(r.contenidoAncho >= 90, "(6) el contenido usa el ancho, no queda encajonado — " + r.contenidoAncho + " % del td");
   t(r.cacheItems, "(6) una sola vuelta de red por NP");
   // 1,8 + 1,5 + 1,86 + 0,1 + 2,5 + 0,9 + 1,3 + 1,35 = 11,31 m³ · 5 tandas · 8 NP
+  // v17.94 (Luis): "letra más grande, que mantenga el tamaño al expandirse". Antes se ACHICABA
+  // por nivel (14 → 13 → 12,5): la fila con más info era la que menos se leía.
+  const _t = r.tam || {};
+  t(_t.dia >= 15 && _t.tanda >= 15 && _t.np >= 15,
+    "(9) la letra es de 15 px o más en los tres niveles — " + JSON.stringify(_t));
+  t(_t.dia === _t.tanda && _t.tanda === _t.np,
+    "(9) y es LA MISMA: no se achica al expandir — " + JSON.stringify(_t));
   t(eq(r.total.slice(0, 4), ["Total", "11,3", "5", "8"]), "(7) el total suma todos los días — " + JSON.stringify(r.total.slice(0, 4)));
   t(r.tablero, "(8) se puede volver al tablero de 6 días");
   t(r.vuelve, "(8) y volver a la tabla");

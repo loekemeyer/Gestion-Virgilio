@@ -3096,10 +3096,16 @@ tr.ppp-err-zona > td{ background:#fffbeb !important; }
    cuatro porcentajes de avance, y todo se abre hacia adentro en la misma tabla: no hay que salir
    de la pantalla para ver una tanda ni una NP. */
 .pga-wrap{ margin-top:12px; border:1px solid #e2e8f0; border-radius:14px; background:#fff; overflow:auto; }
-.pga{ width:100%; border-collapse:collapse; font-size:14px; color:#0f172a; }
-.pga th{ position:sticky; top:0; z-index:2; background:#f8fafc; text-align:right; font-size:10.5px; font-weight:800;
-  letter-spacing:.05em; text-transform:uppercase; color:#64748b; padding:10px 12px; border-bottom:2px solid #cbd5e1; white-space:nowrap; }
-.pga td{ text-align:right; padding:7px 12px; border-bottom:1px solid #eef2f7; white-space:nowrap; font-variant-numeric:tabular-nums; }
+/* v17.94 (Luis) — TAMAÑO PAREJO EN LOS TRES NIVELES. Antes la letra se ACHICABA al bajar
+   (día 14px → tanda 13 → NP 12,5 → los chips 11), justo al revés de lo que hace falta: la fila de
+   la NP es la que más info tiene y era la que menos se leía. Pedido: *"letra/font más grande, que
+   mantenga el tamaño al expandirse (que no se abra para adentro, sino en horizontal con todas las
+   filas manteniendo el tamaño)"*. Ahora los tres niveles miden lo mismo y la jerarquía la marcan
+   el color y la barra de la izquierda, no el tamaño. */
+.pga{ width:100%; border-collapse:collapse; font-size:15px; color:#0f172a; }
+.pga th{ position:sticky; top:0; z-index:2; background:#f8fafc; text-align:right; font-size:11.5px; font-weight:800;
+  letter-spacing:.04em; text-transform:uppercase; color:#64748b; padding:9px 10px; border-bottom:2px solid #cbd5e1; white-space:nowrap; }
+.pga td{ text-align:right; padding:8px 10px; border-bottom:1px solid #eef2f7; white-space:nowrap; font-variant-numeric:tabular-nums; }
 /* v17.76 (Luis) — las 4 columnas de estado van lo más angostas posible (el encabezado parte en
    dos renglones) y con el color de cada una arriba; la del día / la tanda / la NP se queda con
    todo el ancho que sobra, que es la que tiene la info que se lee.
@@ -3116,7 +3122,7 @@ tr.ppp-err-zona > td{ background:#fffbeb !important; }
 .pga-h.arm{ border-top-color:#15803d; color:#15803d; }
 .pga-h.pro{ border-top-color:#ca8a04; color:#a16207; }
 .pga-h.pen{ border-top-color:#dc2626; color:#b91c1c; }
-.pga-chev{ display:inline-block; width:12px; color:#94a3b8; font-weight:700; }
+.pga-chev{ display:inline-block; width:14px; color:#94a3b8; font-weight:700; }
 /* v17.79 (Luis): los 4 porcentajes de estado son las columnas 5 a 8, a la DERECHA del todo; la
    que manda y se estira es la 1ª (día / tanda / NP). */
 /* fila de DÍA */
@@ -3126,34 +3132,49 @@ tr.ppp-err-zona > td{ background:#fffbeb !important; }
 .pga-d>td:first-child{ color:#1e6bd6; font-weight:800; }
 .pga-d:hover>td{ background:#f8fbff; }
 .pga-d.on>td{ background:#eff6ff; }
-.pga-d.hoy>td:first-child::after{ content:"HOY"; background:#1e6bd6; color:#fff; font-size:9.5px; font-weight:900;
-  border-radius:999px; padding:1px 7px; margin-left:7px; vertical-align:1px; letter-spacing:.04em; }
+.pga-d.hoy>td:first-child::after{ content:"HOY"; background:#1e6bd6; color:#fff; font-size:11px; font-weight:900;
+  border-radius:999px; padding:1px 8px; margin-left:8px; vertical-align:1px; letter-spacing:.04em; }
 /* fila de TANDA — el color dice en qué está */
 .pga-t{ cursor:pointer; }
-.pga-t>td{ font-size:13px; }
-.pga-t>td:first-child{ padding-left:26px; font-weight:800; }
+.pga-t>td:first-child{ padding-left:15px; font-weight:800; }
 .pga-t:hover>td{ filter:brightness(.98); }
 .pga-t.e-facturado>td{ background:#f5f9ff; } .pga-t.e-facturado>td:first-child{ box-shadow:inset 4px 0 0 #1d4ed8; color:#1e3a8a; }
 .pga-t.e-armado>td{    background:#f4fdf7; } .pga-t.e-armado>td:first-child{    box-shadow:inset 4px 0 0 #15803d; color:#14532d; }
 .pga-t.e-proceso>td{   background:#fffdf0; } .pga-t.e-proceso>td:first-child{   box-shadow:inset 4px 0 0 #ca8a04; color:#854d0e; }
 .pga-t.e-pendiente>td{ background:#fff6f6; } .pga-t.e-pendiente>td:first-child{ box-shadow:inset 4px 0 0 #dc2626; color:#991b1b; }
-.pga-sub{ font-weight:600; color:#94a3b8; font-size:11.5px; margin-left:7px; }
+.pga-sub{ font-weight:600; color:#94a3b8; font-size:13px; margin-left:8px; }
 /* fila de NP — acá va lo que se lee: NP, estado, horario, código de cliente, cliente, zona ·
    barrio y la fecha en que entró el pedido (v17.76, pedido de Luis) */
 .pga-n{ cursor:pointer; }
-.pga-n>td{ font-size:12.5px; color:#334155; }
-.pga-n>td:first-child{ padding-left:48px; white-space:normal; line-height:1.45; }
+.pga-n>td{ color:#334155; }
+/* la barra gris marca el nivel sin gastar 48px de sangría: la info arranca casi al borde */
+.pga-n>td:first-child{ padding-left:30px; white-space:normal; line-height:1.55;
+  box-shadow:inset 3px 0 0 #cbd5e1; }
 .pga-n:hover>td{ background:#f8fafc; }
 .pga-np{ font-weight:800; color:#0f172a; }
 .pga-cod{ display:inline-block; background:#f1f5f9; color:#475569; border:1px solid #d7dee7;
-  border-radius:6px; padding:0 6px; font-size:11px; font-weight:900; margin-left:7px; vertical-align:1px; }
-.pga-cli{ color:#334155; font-weight:700; margin-left:6px; }
-.pga-loc{ color:#94a3b8; font-size:11px; margin-left:7px; }
-.pga-ped{ color:#94a3b8; font-size:11px; margin-left:7px; font-variant-numeric:tabular-nums; }
-/* v17.85 (Luis): las acciones de la fila de la NP, al final del rengl�n de la info */
-.pga-acc{ display:inline-block; margin-left:10px; white-space:nowrap; }
+  border-radius:6px; padding:0 7px; font-size:12.5px; font-weight:900; margin-left:8px; vertical-align:1px; }
+/* cada dato es indivisible: el renglón corta ENTRE datos, nunca adentro de uno. Sin esto,
+   "ped. 11/09" se partía al medio y los botones quedaban colgados en la línea de abajo. */
+.pga-cli{ display:inline-block; max-width:330px; overflow:hidden; text-overflow:ellipsis;
+  white-space:nowrap; vertical-align:bottom; color:#334155; font-weight:700; margin-left:7px; }
+.pga-loc{ color:#94a3b8; font-size:13px; margin-left:8px; white-space:nowrap; }
+.pga-ped{ color:#94a3b8; font-size:13px; margin-left:8px; font-variant-numeric:tabular-nums; white-space:nowrap; }
+/* v17.85 (Luis): las acciones de la fila de la NP.
+   v17.94: van ANCLADAS A LA DERECHA de la columna, no colgando detrás del texto. Quedan siempre en
+   el mismo lugar (se apuntan sin buscarlas) y le devuelven al renglón los ~90 px que ocupaban, que
+   era lo que hacía caer en dos líneas a una NP con badge de horario.
+   ⚠ Con `float:right` NO alcanza: el flotado se va al tope del bloque y queda desalineado del
+   texto. La fila es un FLEX — la info se estira y se banca el wrap (`min-width:0`), las acciones
+   se pegan a la derecha con `margin-left:auto` y quedan centradas contra el renglón.
+   ⚠ Y de paso: ese comentario tenía un byte LATIN1 suelto (0xF3) metido por la v17.85 — el único
+   byte inválido de todo index.html. Era sólo un comentario CSS, pero al editar el archivo por
+   script hay que escribir los acentos como bytes UTF-8, no como el carácter latin1. */
+.pga-nrow{ display:flex; align-items:center; gap:0; }
+.pga-ninfo{ flex:1 1 auto; min-width:0; }
+.pga-acc{ flex:0 0 auto; margin-left:auto; padding-left:14px; white-space:nowrap; }
 .pga-acc-b{ background:#eef2f7; color:#1e6bd6; border:1px solid #d7e2f3; border-radius:7px;
-  padding:1px 8px; font-size:11px; font-weight:800; cursor:pointer; width:auto; line-height:1.6; }
+  padding:2px 10px; font-size:13.5px; font-weight:800; cursor:pointer; width:auto; line-height:1.6; }
 .pga-acc-b:hover{ background:#e0eaf9; }
 /* v17.88 (Luis): el tacho. Rojo, para que no se confunda con el de al lado. */
 .pga-acc-b.del{ background:#fee2e2; color:#b91c1c; border-color:#fca5a5; }
@@ -3187,15 +3208,28 @@ tr.ppp-err-zona > td{ background:#fffbeb !important; }
 .dsm-no{ background:#eef2f7; color:#0f172a; }
 .dsm-si{ background:#b91c1c; color:#fff; }
 .dsm-si:disabled{ background:#e5e7eb; color:#9ca3af; cursor:not-allowed; }
-.pga-pill{ display:inline-block; font-size:10px; font-weight:900; border-radius:999px; padding:1px 8px; letter-spacing:.03em; margin-left:7px; vertical-align:1px; }
+.pga-pill{ display:inline-block; font-size:12px; font-weight:900; border-radius:999px; padding:1px 9px; letter-spacing:.02em; margin-left:8px; vertical-align:1px; }
 .pga-pill.e-facturado{ background:#dbeafe; color:#1e3a8a; } .pga-pill.e-armado{ background:#dcfce7; color:#14532d; }
 .pga-pill.e-proceso{ background:#fef9c3; color:#854d0e; }   .pga-pill.e-pendiente{ background:#fee2e2; color:#991b1b; }
 /* fila de CONTENIDO de la NP (los códigos y las cajas) */
-.pga-c>td{ padding:0 12px 12px 48px; background:#fbfdff; border-bottom:1px solid #e2e8f0; text-align:left; white-space:normal; }
-.pga-c .apr-tab{ max-width:520px; }
+/* v17.94 — el contenido se abre EN HORIZONTAL, no encajonado. Era una tabla de 3 columnas clavada
+   en 520px, con toda la mitad derecha vacía al lado y una lista larguísima cuando la NP tenía 20
+   códigos. Ahora es una GRILLA que fluye: cuantos más códigos, más columnas, y el ancho se usa.
+   ⚠ No se toca `aprItemsTablaHtml` (esa tabla la comparte A Programar, donde la caja es angosta y
+   la lista vertical está bien): esto es un render propio de la tabla de Programación. */
+.pga-c>td{ padding:2px 12px 14px 30px; background:#fbfdff; border-bottom:1px solid #e2e8f0; text-align:left;
+  white-space:normal; box-shadow:inset 3px 0 0 #cbd5e1; }
+.pga-its{ display:grid; grid-template-columns:repeat(auto-fill, minmax(196px, 1fr)); gap:6px 10px; }
+.pga-it{ display:flex; align-items:baseline; gap:8px; background:#fff; border:1px solid #e6edf5;
+  border-radius:9px; padding:5px 10px; }
+.pga-it-cod{ font-weight:900; color:#0f172a; font-family:Consolas,Menlo,monospace; font-size:14.5px; }
+.pga-it-cj{ font-weight:800; color:#1e6bd6; margin-left:auto; white-space:nowrap; }
+.pga-it-un{ color:#94a3b8; font-size:13px; white-space:nowrap; }
+.pga-it-tot{ margin-top:9px; font-size:13.5px; font-weight:800; color:#475569; }
+.pga-it-tot b{ color:#0f172a; }
 /* los porcentajes, en números y con color */
 .pga-pct{ font-weight:800; white-space:nowrap; }
-.pga-pct small{ font-weight:700; color:#94a3b8; font-size:10px; margin-left:3px; }
+.pga-pct small{ font-weight:700; color:#94a3b8; font-size:11.5px; margin-left:4px; }
 .pga-pct.fac{ color:#1d4ed8; } .pga-pct.arm{ color:#15803d; }
 .pga-pct.pro{ color:#a16207; } .pga-pct.pen{ color:#b91c1c; }
 .pga-pct.z{ color:#cbd5e1; font-weight:700; } .pga-pct.z small{ display:none; }
@@ -3206,9 +3240,17 @@ tr.ppp-err-zona > td{ background:#fffbeb !important; }
 /* En el celular la tabla no entra a lo ancho: scrollea adentro de su caja, y la columna del
    día / la tanda / la NP queda fija, si no se pierde de vista justo lo que se está mirando. */
 @media (max-width:760px){
-  .pga{ font-size:13px; } .pga th, .pga td{ padding:6px 7px; }
-  .pga-t>td:first-child{ padding-left:18px; } .pga-n>td:first-child{ padding-left:30px; }
-  .pga-c>td{ padding-left:30px; } .pga-pct small{ display:none; }
+  /* v17.94: en el celular la letra baja un punto, pero SIGUE siendo la misma en los tres niveles
+     — que es lo que pidió Luis; lo que se achica es todo junto, no la fila de la NP sola. */
+  .pga{ font-size:14px; } .pga th, .pga td{ padding:6px 7px; }
+  .pga-t>td:first-child{ padding-left:12px; } .pga-n>td:first-child{ padding-left:24px; }
+  .pga-c>td{ padding-left:24px; } .pga-pct small{ display:none; }
+  /* ⚠ las acciones NO se anclan a la derecha acá: la columna es mucho más ancha que la pantalla,
+     así que `margin-left:auto` las mandaba fuera de lo que se ve y había que scrollear para
+     encontrarlas. Van pegadas al texto y la fila puede cortar. */
+  .pga-nrow{ flex-wrap:wrap; }
+  .pga-acc{ margin-left:0; padding-left:10px; }
+  .pga-its{ grid-template-columns:repeat(auto-fill, minmax(160px, 1fr)); }
   .pga th:first-child, .pga td:first-child{ position:sticky; left:0; z-index:1;
     box-shadow:inset -1px 0 0 #e2e8f0; }
   .pga th:first-child, .pga tfoot td:first-child{ z-index:3; background:#f8fafc; }
@@ -5220,7 +5262,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=17.93"></script>
+<script type="module" src="recepcion.js?v=17.94"></script>
 <!-- Config del módulo de fichada (compartido con fichada.html). El secret
      hmacSecret tiene que ser el mismo acá y allá; cargándolo desde un solo
      archivo evitamos que se desincronicen. -->
@@ -8650,7 +8692,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v17.93";
+const APP_VERSION = "v17.94";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -35236,7 +35278,19 @@ function _pgaItemsHtml(np) {
   if (c === undefined || c === "cargando") return '<div class="apr-det-sin">Buscando el contenido…</div>';
   if (c === null) return '<div class="apr-det-sin apr-det-err">No se pudo leer el contenido de la NP ' + escapeHtml(np) + '. Probá con 🔄.</div>';
   if (!c.length) return '<div class="apr-det-sin">La NP ' + escapeHtml(np) + ' no tiene renglones cargados en la base del PPP.</div>';
-  return aprItemsTablaHtml(c);
+  // v17.94 (Luis): "que no se abra para adentro, sino en horizontal". Una grilla que fluye usa el
+  // ancho con 3 códigos y con 30; la tabla de 3 columnas de A Programar dejaba media pantalla vacía.
+  let cj = 0, un = 0;
+  const cel = c.map(function (it) {
+    const uni = aprItemUni(it), uxb = Number(it.uxb) || 0, cajas = Number(it.cajas) || 0;
+    cj += cajas; un += uni;
+    return '<div class="pga-it"><span class="pga-it-cod">' + escapeHtml(String(it.art || "—")) + '</span>' +
+      '<span class="pga-it-cj">' + aprNum(cajas, 0) + ' cj</span>' +
+      '<span class="pga-it-un">' + (uni ? aprNum(uni, 0) + " un" + (uxb ? " ×" + aprNum(uxb, 0) : "") : "—") + '</span></div>';
+  }).join("");
+  return '<div class="pga-its">' + cel + '</div>' +
+    '<div class="pga-it-tot">' + c.length + ' código' + (c.length === 1 ? '' : 's') +
+    ' · <b>' + aprNum(cj, 0) + '</b> cajas' + (un ? ' · <b>' + aprNum(un, 0) + '</b> unidades' : '') + '</div>';
 }
 function _pppArbolHtml(programados) {
   pgaNeed();
@@ -35301,7 +35355,9 @@ function _pppArbolHtml(programados) {
         const _lug = [r.zona_corta || r.localidad || "", r.barrio || ""]
           .filter(function (x, i, a) { return x && a.indexOf(x) === i; }).join(" · ");
         h += '<tr class="pga-n" onclick="pgaAbrirNp(\'' + escapeHtml(nk) + '\',\'' + escapeHtml(r.np) + '\')">' +
-          '<td><span class="pga-chev">' + (nb ? "▾" : "▸") + '</span>' +
+          '<td>' +
+            '<div class="pga-nrow"><span class="pga-ninfo">' +
+          '<span class="pga-chev">' + (nb ? "▾" : "▸") + '</span>' +
             '<span class="pga-np">' + escapeHtml(r.np) + '</span>' + _npSrcChip(r.np) +
             '<span class="pga-pill e-' + est + '">' + PGA_EST_TXT[est] + '</span>' +
             // v17.74 (Luis): el horario viaja con el pedido — acá se ve, no se edita
@@ -35311,12 +35367,11 @@ function _pppArbolHtml(programados) {
               escapeHtml(aprHorTxt({ fecha: r.horario_fecha, franja: r.horario_franja })) + '</span>' : '') +
             (r.cod ? '<span class="pga-cod" title="Número de cliente en ' + (r.empresa === "CH" ? "Chef" : "Loekemeyer") + '">' +
               escapeHtml(r.empresa || "LK") + " " + escapeHtml(r.cod) + '</span>' : '') +
-            '<span class="pga-cli">' + escapeHtml(r.razon_social || "—") + '</span>' +
+            '<span class="pga-cli" title="' + escapeHtml(r.razon_social || "") + '">' + escapeHtml(r.razon_social || "—") + '</span>' +
             (_lug ? '<span class="pga-loc">' + escapeHtml(_lug) + '</span>' : '') +
             (r.fecha_pedido ? '<span class="pga-ped" title="Fecha en que entró el pedido">ped. ' +
               escapeHtml(String(r.fecha_pedido).slice(8, 10) + "/" + String(r.fecha_pedido).slice(5, 7)) + '</span>' : '') +
-            // v17.85 (Luis): "un botón que sea una flecha para atrás y que sea «Enviar a programar»
-            // en caso de que se tenga que reprogramar la fecha de entrega".
+            '</span>' +
             // v17.90 (Luis): "hacé que los botones sean sólo los íconos y agregá la descripción
             // cuando uno pone el mouse encima". El `title` es el que cuenta qué hace cada uno.
             ((window.__isSupervisor || !PPP_READONLY)
@@ -35325,6 +35380,7 @@ function _pppArbolHtml(programados) {
                 + '<button class="pga-acc-b del" title="Desarmar pedido — sale de la PPP para siempre y las cajas pasan a 📥 A guardar. Pide un justificativo y avisa antes."'
                 + ' onclick="event.stopPropagation();dsmAbrir(\'' + escapeHtml(r.np) + '\')">🗑</button></span>'
               : '') +
+            '</div>' +
           '</td>' +
           '<td>' + _pppFmtM3(r.m3) + '</td><td></td><td></td>' +
           '<td></td><td></td><td></td><td></td></tr>';

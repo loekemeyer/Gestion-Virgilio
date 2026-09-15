@@ -1,3 +1,41 @@
+## Nota v17.94 (2026-09-15) — el visual de la tabla de Programación
+
+Pedido de Luis: *"letra/font más grande, que mantenga el tamaño al expandirse (que no se «abra
+para adentro», sino en horizontal con todas las filas manteniendo el tamaño), optimizar espacio
+para que la información sea más legible"*.
+
+**El problema medido: la letra se ACHICABA al bajar de nivel.** Día 14 px → tanda 13 → NP 12,5 →
+los chips 11. Justo al revés de lo que hace falta: la fila de la **NP** es la que más info tiene
+(NP, origen, estado, horario, código, cliente, zona · barrio, fecha) y era la que **menos** se
+leía. Y la sangría crecía igual: 0 → 26 → 48 px.
+
+Qué cambió:
+
+- **Un solo tamaño, 15 px, en los tres niveles.** La jerarquía la marcan el color y la barra de la
+  izquierda, no el tamaño. Los chips subieron de 11 a 12,5-13 px. En el celular baja a 14, pero
+  **los tres juntos**.
+- **La sangría se achicó** (26 → 15 y 48 → 30) y la de la NP pasó a ser una **barra gris** de 3 px:
+  marca el nivel sin gastar 48 px de ancho.
+- **El contenido de la NP se abre en horizontal.** Era una tabla de 3 columnas clavada en 520 px,
+  con media pantalla vacía al lado y una lista larguísima cuando la NP tenía 20 códigos. Ahora es
+  una **grilla que fluye**: cuantos más códigos, más columnas. Mide el 97 % del ancho (el test lo
+  chequea). ⚠ No se tocó `aprItemsTablaHtml`: esa tabla la comparte **A Programar**, donde la caja
+  es angosta y la lista vertical está bien. La grilla es un render propio de esta pantalla.
+- **Los dos botones se anclan a la derecha** de la columna, alineados entre filas. Devuelven al
+  renglón los ~90 px que ocupaban detrás del texto. ⚠ `float:right` **no** sirve (el flotado se va
+  al tope del bloque y queda desalineado): la fila es un **flex**. Y en el celular NO se anclan —
+  la columna es más ancha que la pantalla y quedaban fuera de lo que se ve.
+- **El nombre del cliente ya no parte la fila**: se trunca con `…` y el nombre entero va en el
+  `title`.
+
+⚠ **Un byte latin1 suelto**: el comentario CSS de `.pga-acc` que escribió la v17.85 tenía un
+`0xF3` crudo — el **único** byte inválido de todo `index.html`. Era sólo un comentario, pero al
+editar el archivo por script los acentos se escriben como bytes UTF-8, no como el carácter latin1.
+Corregido; el barrido da 0.
+
+`tests/ppp-tabla-arbol.cjs` queda en 36 chequeos: dos nuevos miran el **tamaño computado** de los
+tres niveles (que sean ≥ 15 px y que sean **iguales**) y uno que el contenido use el ancho.
+
 ## Nota v17.93 (2026-09-14) — por qué la NP se OCULTA y no se borra (y qué no lo respetaba)
 
 Pregunta de Luis: *"lo de ocultar la NP me hizo ruido. ¿Por qué «ocultar» y no «borrar»?"*.
