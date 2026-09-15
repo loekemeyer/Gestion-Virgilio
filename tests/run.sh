@@ -120,7 +120,7 @@ PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node te
 echo "== rcp-oc (v7.07: OC vigente en los botones de recepción + evento ROC por exceso +20%) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/rcp-oc.cjs
 
-echo "== rcp-exceso-gate (v17.27: WhatsApp a Thomas obligatorio, como la foto, si se recibe de mas) =="
+echo "== rcp-exceso-gate (v17.99: WhatsApp a Thomas obligatorio si se recibe de mas o sin OC) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/rcp-exceso-gate.cjs
 
 echo "== rcp-reanudar (v7.12: recepcion a medio cargar sobrevive + boton Seguir recepcion) =="

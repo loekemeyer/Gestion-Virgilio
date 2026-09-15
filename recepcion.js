@@ -417,7 +417,8 @@ const opState = {
   excesoAvisado: null, // v17.27: firma cod:cajas del exceso ya avisado a Thomas por WhatsApp
   excesoGond: null,    // v17.27: { codNorm: {cap,gond} } para el mensaje de WhatsApp
   listaTipo: null,
-  ocPorCod: null     // v7.07: OCs vigentes del proveedor { codNorm: {ped,rec,pend,fecha} } (null = sin cargar)
+  ocPorCod: null,    // v7.07: OCs vigentes del proveedor { codNorm: {ped,rec,pend,fecha} } (null = sin cargar)
+  ocOk: false        // v17.99: true sólo si la RPC de OCs contestó (sin eso no se exige el aviso)
 };
 
 /* v3.81-fix: usar TZ Argentina (igual que getTodayKey() en index.html) en
@@ -482,7 +483,7 @@ function opResetState() {
   opState.linea = null; opState.fecha = opTodayStr();
   opState.remito = ""; opState.articulos = null; opState.cargas = {};
   opState.altaNuevos = {};      // v15.36: altas del "+" esperando el OK de Thomas
-  opState.ocPorCod = null;
+  opState.ocPorCod = null; opState.ocOk = false;
   opState.excesoAvisado = null; opState.excesoGond = null;   // v17.27
   opState.fotoFile = null;
   if (opState.fotoPreviewUrl) { try { URL.revokeObjectURL(opState.fotoPreviewUrl); } catch(_e){} }
@@ -725,7 +726,7 @@ function seleccionarEntidad(e) {
   opState.linea = null;
   opState.articulos = null;
   opState.cargas = {};
-  opState.ocPorCod = null;   // las OCs vigentes son POR proveedor → se recargan
+  opState.ocPorCod = null; opState.ocOk = false;   // las OCs vigentes son POR proveedor → se recargan
   renderLinea();
 }
 
@@ -985,9 +986,13 @@ async function cargarOCVigentes() {
     });
     if (opState.tallNombre !== nombre) return;
     opState.ocPorCod = porCod;
+    opState.ocOk = true;    // v17.99: las OCs se leyeron de verdad (aunque no haya ninguna)
   } catch (e) {
     console.warn("OCs vigentes (sigue sin el detalle):", e);
-    if (opState.tallNombre === nombre) opState.ocPorCod = {};
+    // v17.99 — ojo: acá NO se sabe si el proveedor no tiene OCs o si falló la red. Queda
+    // ocOk = false y el aviso de "sin OC = OC 0" NO se exige, para no trabar la recepción
+    // entera de todos los proveedores cuando el que falla es el servidor.
+    if (opState.tallNombre === nombre) { opState.ocPorCod = {}; opState.ocOk = false; }
   }
 }
 function ocDeCod(cod) {
@@ -1753,13 +1758,18 @@ function _opCajasExceso() {
 const WA_THOMAS = "5491162521635";
 /* Artículos cargados que superan lo que falta recibir por OC. */
 function opExcesoItems() {
+  // v17.99 (Luis): un código SIN OC vigente es OC = 0, así que CUALQUIER cantidad es
+  // excedente y también hay que avisar. Requiere que las OCs se hayan podido leer
+  // (`ocOk`): si la RPC falló no se sabe si el proveedor no tiene OCs o si no hubo red,
+  // y ahí no se traba nada.
+  if (opState.ocOk !== true) return [];
   return Object.entries(opState.cargas)
     .filter(function (e) { return e[1] > 0; })
     .map(function (e) {
       const cod = e[0], cajas = e[1], oc = ocDeCod(cod), ref = ocRef(oc);
-      return { cod: cod, cajas: cajas, oc: oc, ref: ref, exced: cajas - ref };
+      return { cod: cod, cajas: cajas, oc: oc, ref: ref, exced: cajas - ref, sinOc: !oc };
     })
-    .filter(function (i) { return i.ref > 0 && i.cajas > i.ref; });
+    .filter(function (i) { return i.cajas > i.ref; });
 }
 /* Firma de lo que hay que avisar. "" = no hay exceso, no hay nada que avisar. */
 function opExcesoFirma() {
@@ -1856,7 +1866,7 @@ async function _opPrefetchGond(cods) {
 function opWhatsExceso(exc) {
   const g = opState.excesoGond || {};
   const L = [
-    "Hola Thomas, entró más mercadería que la habilitada por OC:",
+    "Hola Thomas, entró mercadería que la OC no habilita:",
     "Proveedor: " + (opState.tallNombre || "?"),
     "RTO/FC: " + (opState.remito || "s/remito") + " · " + (opState.linea || "") + " · " + fechaCorta(opState.fecha),
     ""
@@ -1868,8 +1878,12 @@ function opWhatsExceso(exc) {
     const entra = (libre != null)
       ? (libre >= i.exced ? ("entra en góndola, " + libre + " libres") : ("NO entra en góndola, solo " + libre + " libres"))
       : "s/dato de capacidad";
-    L.push("• " + i.cod + ": recibo " + i.cajas + ", por OC faltaban " + i.ref +
-      " (OC pedía " + ((i.oc && i.oc.ped) || i.ref) + ") → " + i.exced + " de más · " + entra);
+    // v17.99 — dos casos: sin OC generada (OC = 0, todo es excedente) o se pasó de la OC.
+    L.push(i.sinOc
+      ? ("• " + i.cod + ": recibo " + i.cajas + ", SIN OC generada (OC = 0) → las " + i.exced +
+         " son de más · " + entra)
+      : ("• " + i.cod + ": recibo " + i.cajas + ", por OC faltaban " + i.ref +
+         " (OC pedía " + ((i.oc && i.oc.ped) || i.ref) + ") → " + i.exced + " de más · " + entra));
   });
   L.push("");
   L.push("¿Lo recibo?");

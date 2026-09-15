@@ -574,7 +574,7 @@ Pedido de Luis. Dos cosas:
 > única**; no se replica. Ante la duda entre parche rápido y fix de raíz → **fix
 > de raíz**.
 >
-> Última actualización: 2026-09-14 (domingo) · Versión app al documentar: **v17.71**
+> Última actualización: 2026-09-14 (domingo) · Versión app al documentar: **v17.99**
 >
 > Nota **v17.71 (2026-09-14, Thomas) — el camión lo define la ZONA, no el número de tanda.**
 > Corrección de la v17.62. Dueño, mirando la pantalla: *"la zona uno se entrega con zona dos, así
@@ -3654,6 +3654,12 @@ Pedido de Luis. Dos cosas:
 > operario vuelve atrás y cambia cantidades el WhatsApp se vuelve a exigir.
 > Criterio de exceso: **`cajas > ocRef(oc)`** (lo que falta recibir), NO el **+20%** de `ocExcede` — ése
 > sigue siendo sólo el umbral del evento **ROC** que dispara el Telegram, sin cambios.
+> **v17.99 (Luis): un código SIN OC vigente cuenta como OC = 0**, así que CUALQUIER cantidad recibida es
+> excedente y también obliga a avisar. `opExcesoItems` dejó de filtrar `ref > 0` y marca `sinOc`; el
+> mensaje distingue los dos casos (*"SIN OC generada (OC = 0) → las N son de más"* vs *"por OC faltaban
+> N"*). **Guard:** sólo se exige si las OCs se pudieron leer (`opState.ocOk`, que `cargarOCVigentes` deja
+> en `true` únicamente cuando la RPC contestó); si la RPC falla no se distingue *"el proveedor no tiene
+> OCs"* de *"no hubo red"*, y trabar ahí dejaría a todos los operarios sin poder recibir.
 > Código: `recepcion.js` (`_opExcesoSeccion`, `_opConfActualizar`, `opExcesoItems`, `opExcesoPendiente`,
 > `opWhatsExceso`). Test: `tests/rcp-exceso-gate.cjs`.
 >
