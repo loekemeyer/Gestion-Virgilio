@@ -382,6 +382,16 @@ button {
 .tandas-urgente-txt{ font-size:13px; font-weight:700; color:#7f1d1d; line-height:1.3; }
 .tanda-chip.urgente{ background:#b91c1c; border-color:#7f1d1d; color:#fff; }
 .tanda-chip.urgente:active{ background:#7f1d1d; color:#fff; }
+/* v18.31 (Luis) — la tanda que OTRO ya empezó a armar. Antes desaparecía de la lista y el
+   operario leía "No hay tandas con Picking terminado disponibles para armado", así que creía
+   que la app estaba rota (pasó con E11B). Ahora se ve, gris y sin poder tocarse, con el
+   legajo que la tiene. */
+.tanda-chip.ocupada{
+  background:#f1f5f9; border-color:#94a3b8; color:#64748b;
+  cursor:not-allowed; opacity:.85;
+}
+.tanda-chip.ocupada:active{ background:#f1f5f9; color:#64748b; transform:none; }
+.tandas-ocupada-txt{ font-size:12px; color:#64748b; font-style:italic; margin-top:4px; line-height:1.3; }
 .tandas-list-empty,
 .tandas-list-label{
   font-size: 14px;
@@ -5508,7 +5518,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=18.29"></script>
+<script type="module" src="recepcion.js?v=18.31"></script>
 <!-- Config del módulo de fichada (compartido con fichada.html). El secret
      hmacSecret tiene que ser el mismo acá y allá; cargándolo desde un solo
      archivo evitamos que se desincronicen. -->
@@ -8049,6 +8059,9 @@ let _pppOperatorCache    = null;
 let _pppOperatorTs       = 0;
 let _tandasListExpanded  = false;   // se resetea cada vez que se oculta la lista
 let _tandasListMode      = "all";   // "all" | "pickingDone" | "notStarted"
+/* v18.31 (Luis) — en el modo AP: qué tanda ya tiene el armado empezado por otro y qué legajo
+   lo arrancó. Se muestra bloqueada en vez de esconderse (ver populateTandasList). */
+let _apEnCurso           = new Map();
 let _activityStatusCache = null;    // { pickingStarted, pickingDone, armadoStarted, armadoDone }
 let _activityStatusTs    = 0;
 const PPP_OPERATOR_TTL_MS     = 30000;
@@ -8200,6 +8213,7 @@ async function getActivityStatus(force) {
      "armadoCurso"  → AP empezado pero sin TAP — incluye no-SI — (TAP) */
 async function populateTandasList(filterMode) {
   if (filterMode != null) _tandasListMode = filterMode;
+  _apEnCurso = new Map();   // v18.31: tanda → legajo que ya arrancó el armado (solo modo AP)
   const container = document.getElementById("tandasList");
   if (!container) return;
   container.classList.remove("hidden");
@@ -8223,11 +8237,20 @@ async function populateTandasList(filterMode) {
     // pickingDone: lenient (normalizado), así matchea aunque haya tipos.
     // armadoDoneStrict: exacto, para que un TAP con espacio extra ("C02D ")
     // no excluya la tanda PPP "C02D" del filtro de AP.
-    // v5.74: además, si OTRO ya arrancó el armado (AP sin TAP), no la mostramos →
-    // no pueden empezar dos el mismo armado.
+    // v5.74: si OTRO ya arrancó el armado (AP sin TAP) no se puede empezar de nuevo →
+    // no pueden armar dos el mismo pedido. Esa regla NO cambia.
+    // v18.31 (Luis): lo que sí cambia es que ya no se ESCONDE. Antes desaparecía de la
+    // lista sin decir nada y el operario leía "No hay tandas con Picking terminado
+    // disponibles para armado", o sea que la tanda pickeada parecía no existir (caso
+    // E11B: picking cerrado 11:06, el legajo 237 le dio AP 11:15 y no cerró el TAP).
+    // Ahora se muestra bloqueada y con el legajo que la tiene, para que se sepa a quién
+    // reclamarle en vez de pensar que la app falla.
+    _apEnCurso = new Map();
     filtered = items.filter(it => {
       const k = it.tanda.toUpperCase();
-      return s.pickingDone.has(k) && !s.armadoDoneStrict.has(it.tanda) && !s.armadoEnCursoBy.has(k);
+      if (!s.pickingDone.has(k) || s.armadoDoneStrict.has(it.tanda)) return false;
+      if (s.armadoEnCursoBy.has(k)) _apEnCurso.set(it.tanda, s.armadoEnCursoBy.get(k) || "");
+      return true;
     });
   } else if (_tandasListMode === "armadoCurso") {
     const s = await getActivityStatus();
@@ -8287,8 +8310,18 @@ async function populateTandasList(filterMode) {
     <div class="tandas-day-group${g.fechaRaw === _hoyKey ? " hoy" : ""}">
       <div class="tandas-day-header${g.fechaRaw === _hoyKey ? " hoy" : ""}">${escapeHtml(g.fechaDisplay)}${g.fechaRaw === _hoyKey ? ' <span class="tandas-hoy-badge">HOY</span>' : ""}</div>
       <div class="tandas-chips">
-        ${g.codes.map(c => `<button class="tanda-chip" type="button" data-code="${escapeHtml(c)}" onclick="textInput.value=this.dataset.code;textInput.focus()">${escapeHtml(c)}</button>`).join("")}
+        ${g.codes.map(c => {
+          // v18.31 — la que otro ya empezó a armar se ve, pero no se puede tocar.
+          if (_apEnCurso.has(c)) {
+            const lg = String(_apEnCurso.get(c) || "").trim();
+            return `<button class="tanda-chip ocupada" type="button" disabled title="Ya la está armando ${lg ? "el legajo " + escapeHtml(lg) : "otro operario"}. Cuando cierre con «Terminé Armado Pedido» se libera.">${escapeHtml(c)} 🔒</button>`;
+          }
+          return `<button class="tanda-chip" type="button" data-code="${escapeHtml(c)}" onclick="textInput.value=this.dataset.code;textInput.focus()">${escapeHtml(c)}</button>`;
+        }).join("")}
       </div>
+      ${g.codes.some(c => _apEnCurso.has(c))
+        ? `<div class="tandas-ocupada-txt">🔒 = ya la está armando ${g.codes.filter(c => _apEnCurso.has(c)).map(c => { const lg = String(_apEnCurso.get(c) || "").trim(); return escapeHtml(c) + (lg ? " → legajo " + escapeHtml(lg) : ""); }).join(" · ")}. Se libera cuando cierre con «Terminé Armado Pedido».</div>`
+        : ""}
     </div>
   `).join("");
   const moreBtnHtml = hidden > 0
@@ -8956,7 +8989,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v18.29";
+const APP_VERSION = "v18.31";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -35861,9 +35894,22 @@ function _pgaEstadoGrupo(e, n) {
   return "proceso";
 }
 function _pgaEstCero() { return { facturado: 0, armado: 0, proceso: 0, pendiente: 0 }; }
+/* v18.31 (Luis) — LA BÚSQUEDA TAMBIÉN VALE ACÁ. La barra de arriba filtraba la lista
+   `programados` de pppRenderProg, pero esta tabla (día → tanda → NP) no se arma con esa lista:
+   se arma con `_pgaRows` (RPC gv_ppp_prog_arbol). O sea que escribir en el buscador no movía
+   ni una fila. Se filtra sobre los mismos campos que el resto (NP, cliente, cód, tanda,
+   localidad, barrio, zona, fecha) más la fecha en dd/mm, que es como se la lee en pantalla. */
+function _pgaSearchStr(r) {
+  const f = String(r.fecha == null ? "" : r.fecha);                 // "2026-09-21"
+  const dm = f.length >= 10 ? f.slice(8, 10) + "/" + f.slice(5, 7) : "";   // "21/09"
+  return [r.np, r.cod, r.razon_social, r.tanda, r.localidad, r.barrio, r.zona, r.zona_corta,
+          r.empresa, r.origen, r.estado, f, dm].join(" ").toLowerCase();
+}
 function _pgaArbol() {
+  const q = (typeof _pppSearch === "string" ? _pppSearch : "").trim().toLowerCase();
   const dias = new Map();
   for (const r of (_pgaRows || [])) {
+    if (q && _pgaSearchStr(r).indexOf(q) < 0) continue;
     const k = String(r.fecha == null ? "" : r.fecha).replace(/-/g, ""); if (!k) continue;
     const est = PGA_EST.indexOf(r.estado) >= 0 ? r.estado : "pendiente";
     let d = dias.get(k);
@@ -35945,7 +35991,9 @@ function _pppArbolHtml(programados) {
     return h + '<div class="pga-msg pga-err">No se pudo leer la programación (' + escapeHtml(_pgaErr) +
       '). <button class="pn-lnk" onclick="pgaRecargar()">Reintentar</button></div></div>';
   }
-  if (!dias.length) return h + '<div class="pga-msg">No hay nada programado de hoy en adelante.</div></div>';
+  if (!dias.length) return h + '<div class="pga-msg">' + (_pppSearch
+    ? 'Sin coincidencias para «' + escapeHtml(_pppSearch) + '» en lo programado de hoy en adelante.'
+    : 'No hay nada programado de hoy en adelante.') + '</div></div>';
   // v17.79 (Luis): los 4 estados van a la DERECHA del todo, angostos y con su color en el
   // encabezado; todo el ancho que sobra es para la info de cada NP.
   h += '<table class="pga"><thead><tr>' +
@@ -35960,14 +36008,16 @@ function _pppArbolHtml(programados) {
   for (const d of dias) {
     tot.m3 += d.m3; tot.nps += d.nps; tot.tandas += d.tandasArr.length;
     for (const k of PGA_EST) tot.est[k] += d.est[k];
-    const ab = !!_pgaOpenD[d.key];
+    // v18.31: buscando, los días y las tandas que quedaron abren solos — lo que se busca es
+    // una NP, no un día, así que esconderla atrás de dos clics es lo mismo que no encontrarla.
+    const ab = !!_pgaOpenD[d.key] || !!_pppSearch;
     h += '<tr class="pga-d' + (ab ? ' on' : '') + (d.key === hoy ? ' hoy' : '') + '" onclick="pgaAbrirDia(\'' + d.key + '\')">' +
       '<td><span class="pga-chev">' + (ab ? "▾" : "▸") + '</span>' + escapeHtml(_pgaDiaTxt(d.key)) + '</td>' +
       '<td>' + _pppFmtM3(d.m3) + '</td><td>' + d.tandasArr.length + '</td><td>' + d.nps + '</td>' +
       _pgaPctFila(d.est, d.nps) + '</tr>';
     if (!ab) continue;
     for (const t of d.tandasArr) {
-      const tb = !!_pgaOpenT[t.key], te = _pgaEstadoGrupo(t.est, t.nps);
+      const tb = !!_pgaOpenT[t.key] || !!_pppSearch, te = _pgaEstadoGrupo(t.est, t.nps);
       h += '<tr class="pga-t e-' + te + '" onclick="pgaAbrirTanda(\'' + escapeHtml(t.key) + '\')">' +
         '<td><span class="pga-chev">' + (tb ? "▾" : "▸") + '</span>' + escapeHtml(t.tanda) +
           '<span class="pga-pill e-' + te + '">' + PGA_EST_TXT[te] + '</span>' +
@@ -37508,7 +37558,14 @@ function pppRenderProg() {
   // y estables — el TOTAL, no la búsqueda). Antes iba prependeada acá con pppTabsHtml.
   pppPaintTabs();
   let html = "";
-  html += '<div class="ppp-search"><input id="pppSearchInp" type="search" autocomplete="off" placeholder="🔎 Buscar: NP, cliente, cód, tanda, localidad, zona, fecha…" value="' + escapeHtml(_pppSearch) + '" oninput="pppSetSearch(this.value)">' + (_pppSearch ? '<button class="ppp-search-clr" onclick="pppSetSearch(\'\')" title="Limpiar búsqueda">✕</button><span class="ppp-search-n">' + (programados.length + aProgramar.length + entreg.length) + ' coincidencia(s)</span>' : '') + '</div>';
+  // v18.31 (Luis) — el contador de coincidencias tiene que contar LO QUE SE ESTÁ MIRANDO. En la
+  // vista Tabla las filas salen de `_pgaRows` (gv_ppp_prog_arbol), no de `programados`, así que
+  // contar la otra lista mostraba un número que no tenía nada que ver con la tabla de abajo.
+  const _enTabla = (_pppTab === "plan" && !_pppPlanClasica && _pppPlanTabla && !_pppPlanDay);
+  const _nCoinc = (_enTabla && _pgaRows)
+    ? _pgaRows.filter(function (r) { return _pgaSearchStr(r).indexOf(_pppSearch.toLowerCase()) >= 0; }).length
+    : (programados.length + aProgramar.length + entreg.length);
+  html += '<div class="ppp-search"><input id="pppSearchInp" type="search" autocomplete="off" placeholder="🔎 Buscar: NP, cliente, cód, tanda, localidad, zona, fecha…" value="' + escapeHtml(_pppSearch) + '" oninput="pppSetSearch(this.value)">' + (_pppSearch ? '<button class="ppp-search-clr" onclick="pppSetSearch(\'\')" title="Limpiar búsqueda">✕</button><span class="ppp-search-n">' + _nCoinc + ' coincidencia(s)</span>' : '') + '</div>';
   // v13.12 — el aviso amarillo "N pedidos salieron en una fecha distinta a la programada" (v8.61)
   // se sacó de acá (dueño: "sacá esas 2 alertas"). La marca sigue por pedido en Pedidos Entregados.
   if (PPP_READONLY && _errInfo) html += pppErroresHtml(_errInfo);   // panel de errores (SACAR / sin zona / zona / tanda)

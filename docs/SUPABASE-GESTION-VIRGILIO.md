@@ -17103,3 +17103,160 @@ configuración.
 
 **Respaldo:** `zz_backups."GV_Backup_OC_Maximos_20260915"`.
 **SQL y rollback:** `sql/gv_oc_maximos_proveedores_v1829.sql`.
+## §3.hb — v18.31: el armado automático — solo Zona 1 y 2, nunca un súper, y una tanda no mezcla camiones — 2026-09-15
+
+Luis, textual:
+
+> *"se están programando automáticamente pedidos que no deberían programarse automáticamente (la
+> regla era solo los de zona 1 y zona 2, tengo Dorinka tanda E11B que se programó automáticamente).
+> Regla clara: solo se pueden programar automáticamente los pedidos de zona 1 y zona 2 que no sean
+> supers. Todos los demás van «A programar» para que un humano arme las tandas."*
+>
+> *"estaba armando mal las tandas, tanda D69H por ejemplo mezcló zona 2 con zona 6 (y puso en la
+> tanda que era «Zona 6 +1»). Eso está mal. ¿Por qué lo hacía? Que lo deje de hacer."*
+
+`sql/gv_ppp_web_auto_z12_sin_super_v1831.sql`. Backups previos:
+`zz_backups."GV_Backup_Funcdefs_20260915_v1831"` (las 3 funciones enteras) y
+`zz_backups."GV_Backup_PPP_Web_Config_20260915_v1831"` (la config entera), las dos con RLS.
+
+### 1. Por qué un SÚPER se programó solo
+
+`ppp_web_armar_tandas` decidía *"esto es un súper"* mirando el **grupo de zona**
+(`gv_ppp_web_grupo_zona(zona) = 'Super'`). Dorinka S.R.L viene con zona **"Zona 5 - GBA Oeste"**, o
+sea que para la función no era un súper: era un cliente común de zona 5. El padrón real es
+**`GV_Supers`**, y ahí sí está:
+
+```sql
+select public.gv_es_super('chef','2686');   -- Dorinka → true
+```
+
+Arreglo: los clientes de `GV_Supers` se borran de `_sin_tanda` antes de armar nada, **tengan la zona
+que tengan**. Quedan en A Programar. Eso cubre TODOS los caminos de golpe — los cuatro bloques de
+`gv_ppp_web_armar_pendientes` que llaman con `p_incluir_manuales = true` ((a1) tanda abierta del
+cliente, (a2) cliente con camión antes, (c) zona manual con camión, (b2) diferidos) pasan por la
+misma función.
+
+Medición (simulador, no escribe):
+
+```sql
+select public.gv_ppp_web_armar_pendientes_simular('chef', null, jsonb_build_array(
+  jsonb_build_object('order_id',999000001,'np_idx',1,'np',9901,'cod','2686',
+    'razon_social','Dorinka PRUEBA','zona','Zona 5 - GBA Oeste','barrio','Moreno',
+    'direccion','D. Passaponti 6501','m3','0.5','fecha_recep',current_date::text)), '[]'::jsonb);
+-- antes: una tanda · ahora: []
+```
+
+### 2. Por qué D69H mezcló Capital con GBA Norte
+
+Al buscar una tanda abierta donde meter un cliente, la función pedía **sólo** `gv_ppp_web_compat`
+(sectores iguales o vecinos) y **no** que fuera el mismo camión. El par **H–N** ("V. Pueyrredón/V.
+Urquiza – San Martín/V. Ballester") está cargado como vecino en `GV_Sectores_Vecinos`, pero **H es
+camión `Capital` y N es `GBA Norte`**: son dos camiones. Así entró LK 0083 (Núñez, Zona 2) a una
+tanda de Villa Ballester / Villa Lynch / San Miguel (Zona 6), y la pantalla la etiquetó "Zona 6 +1".
+
+Tres cambios, todos en la misma dirección — **una tanda es de UN camión**:
+
+1. `gv_ppp_web_compat` devuelve `false` si `gv_ppp_web_camion()` difiere. Los pares explícitos de
+   `GV_Barrios_Pares` (excepciones cargadas a mano por el dueño) se evalúan **antes** y siguen mandando.
+2. La búsqueda de tanda abierta exige `o.camion = r_cli.camion`.
+3. Una tanda que YA quedó con paradas de dos camiones no se vuelve a reusar (`q.ncam = 1`).
+
+Impacto medido **antes** del cambio: de todas las tandas web vivas (entrega ≥ hoy − 7) **una sola**
+mezclaba camiones — D69H. O sea que la regla nueva no rompe nada que hoy esté bien.
+
+```sql
+select public.gv_ppp_web_compat('Zona 2 - CABA Centro','H','nuñez','Zona 6 - GBA Norte','N','san miguel');
+-- antes true · ahora false
+select public.gv_ppp_web_compat('Zona 2 - CABA Centro','H','nuñez','Zona 2 - CABA Centro','G','palermo');
+-- true (Capital con Capital sigue igual)
+```
+
+Simulación con dos clientes de prueba (Núñez Z2 + San Miguel Z6): salen en **dos tandas distintas**
+(D69I y E25A), antes caían en la misma.
+
+### 3. La config
+
+| clave | antes | ahora |
+|---|---|---|
+| `zonas_automaticas` | `'1,2,3'` | **`'1,2'`** — la zona 3 vuelve a mano |
+| `zonas_manuales_con_camion` | (no existía) | **`1`** (= como venía funcionando) |
+
+`zonas_manuales_con_camion` es el interruptor del **bloque (c)** de `gv_ppp_web_armar_pendientes`, el
+que engancha una zona manual (4/5/6/7) al día en que YA hay un camión a esa zona. **Queda prendido a
+propósito**: eso lo pidió el dueño el 2026-09-11 (*"si ya hay programado algo para x día para esa
+zona, hay que agregarlo ahí"*), así que choca con la regla de Luis y no se apaga por cuenta propia.
+Para apagarlo, una línea:
+
+```sql
+update public."PPP_Web_Config" set valor = 0 where clave = 'zonas_manuales_con_camion';
+```
+
+### 4. Lo que quedó mal ARMADO no se tocó
+
+**D69H sigue mezclada** (entrega 21/09): LK 0083 Núñez con LK 0058/0070/0094/0095 de GBA Norte. El
+cambio evita que vuelva a pasar, pero no reescribe la tanda que ya está: eso es dato real y va por el
+protocolo de "no modificar datos sin permiso explícito". Chequeo:
+
+```sql
+with f as (select tanda, public.gv_ppp_web_camion(zona, public.gv_ppp_web_sector(zona, barrio, direccion)) cam
+             from public."PPP_Web_Programacion"
+            where coalesce(nullif(btrim(tanda),''),'') <> '' and fecha_entrega >= current_date - 7)
+select tanda, string_agg(distinct cam, ' | ') from f group by 1 having count(distinct cam) > 1;
+-- vacío = ninguna tanda mezcla camiones
+```
+
+### ROLLBACK
+
+```sql
+update public."PPP_Web_Config" set valor_texto = '1,2,3' where clave = 'zonas_automaticas';
+delete from public."PPP_Web_Config" where clave = 'zonas_manuales_con_camion';
+do $$ declare r record; begin
+  for r in select def from zz_backups."GV_Backup_Funcdefs_20260915_v1831" loop execute r.def; end loop;
+end $$;
+```
+
+## §3.hc — v18.31: dos cosas del front que Luis reportó el mismo día — 2026-09-15
+
+### a) El buscador de la vista **Tabla** de Programación no filtraba nada
+
+> *"en el módulo de tabla, la barra de búsqueda no funciona"*
+
+`pppRenderProg` filtra con `_pppSearch` las listas `programados` / `aProgramar` / `entreg`… pero la
+vista **Tabla** (día → tanda → NP, `_pppArbolHtml`, v17.66) **no se arma con esas listas**: se arma
+con `_pgaRows`, que sale de la RPC `gv_ppp_prog_arbol`. El parámetro `programados` que recibe lo usa
+sólo para la banda de atrasados. O sea que el filtro se calculaba y se tiraba: escribir en el
+buscador no movía una fila.
+
+Arreglo (`index.html`, v18.31):
+
+- `_pgaArbol()` filtra `_pgaRows` con `_pppSearch`, sobre los mismos campos que el resto (NP, cliente,
+  cód, tanda, localidad, barrio, zona, empresa, origen, estado, fecha) **más la fecha en `dd/mm`**,
+  que es como se la lee en pantalla.
+- Buscando, los días y las tandas que quedan **abren solos**: lo que se busca es una NP, esconderla
+  atrás de dos clics es lo mismo que no encontrarla.
+- Sin resultados dice *"Sin coincidencias para «…»"*, no *"No hay nada programado"*.
+- El contador "N coincidencia(s)" cuenta `_pgaRows` cuando la vista Tabla está activa: antes mostraba
+  el número de la OTRA lista, que no tenía nada que ver con la tabla de abajo.
+
+### b) Una tanda pickeada que desaparecía de «Empecé Armado Pedido»
+
+> *"los operarios del depo me dicen que por más que E11B ya se pickeó no les aparece como opción en
+> pedido para armar, ¿por qué?"*
+
+No era un bug de datos: E11B tenía el picking cerrado (**TP 15/09 11:06**, legajo 277) y a las
+**11:15 el legajo 237 le dio AP** y nunca cerró el TAP. El filtro `pickingDone` esconde toda tanda
+con AP sin TAP (v5.74) para que **no la empiecen dos personas**. Esa regla está bien y no se tocó.
+
+Lo que estaba mal es que la tanda **desaparecía sin decir nada**, y el operario leía *"No hay tandas
+con Picking terminado disponibles para armado"* — o sea, la app parecía rota. Desde la v18.31 la
+tanda **se muestra**, gris, con candado y sin poder tocarse, y abajo dice quién la tiene:
+
+> 🔒 = ya la está armando E11B → legajo 237. Se libera cuando cierre con «Terminé Armado Pedido».
+
+`populateTandasList` / `_apEnCurso` / `.tanda-chip.ocupada` en `index.html`.
+
+```sql
+-- quién tiene el armado abierto de una tanda
+select opcion, texto, legajo, ts_cliente from public."Registros_Produccion_Virgilio"
+ where upper(btrim(texto)) = 'E11B' and opcion in ('EP','TP','AP','TAP') order by ts_cliente;
+```
