@@ -54,6 +54,9 @@ PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node te
 echo "== tanda-sin-articulos (regresión: no se arranca una tanda que llegó sin renglones — caso D71A/97889) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/tanda-sin-articulos.cjs
 
+echo "== anular-armado (regresión: soltar un armado agarrado por error sin darlo por armado) =="
+PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/anular-armado.cjs
+
 echo "== dos-en-curso (regresión: arrancar un 2º armado/picking sin cerrar el anterior avisa antes de pisarlo) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/dos-en-curso.cjs
 
