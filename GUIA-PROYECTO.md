@@ -1,3 +1,32 @@
+## Nota v18.48 (2026-09-15) — Rotado el password del FDW LK→Chef
+
+El user mapping del foreign server `chef_db` se conectaba al proyecto de Chef con un password que
+había quedado en el **texto de ejemplo del instructivo de alta** (literal, entre `< >`, adivinable).
+No era config muerta: con ese usuario, desde cualquier lado —el host de la base es público— se leían
+`orders`, `customers`, `sales_lines`, `products` y `customer_delivery_addresses` de Chef. Y desde la
+v18.45, con los grants nuevos, además **escribía**.
+
+Lo rotó Thomas, en las dos puntas y en el mismo momento (si se hace una sola, LK deja de leer Chef):
+
+```sql
+-- en CHEF
+alter role loke_reader with password '<uno largo y aleatorio>';
+-- en LK, enseguida
+alter user mapping for postgres server chef_db options (set password '<el mismo>');
+```
+
+**Verificado después** (lecturas y una escritura que se aborta): `chef_orders` 130 · `chef_customers`
+765 · direcciones 713 · `sales_lines` 36.770 · catálogo 152 · escribe la ficha ✔ · escribe una
+dirección ✔.
+
+⚠ **Dos cosas para la próxima vez:**
+
+1. **`has_table_privilege(..., 'UPDATE')` miente cuando el grant es POR COLUMNA**: devuelve `false`
+   aunque esté bien. Va `has_column_privilege(...)`, o el `update` de prueba en una transacción que
+   se aborta.
+2. **El password no pasa por el chat**: las dos sentencias las corre la misma persona, en dos
+   pestañas. Si lo corre Claude, queda escrito en la transcripción.
+
 ## Nota v18.45 (2026-09-15) — Modificar Pedidos: los de CHEF también
 
 Thomas corrió del lado de Chef los dos `grant` y las tres `policy` que faltaban, así que el

@@ -17688,3 +17688,32 @@ separa los dos casos, que se arreglan distinto:
 
 **Archivo:** `sql/gv_ppp_camion_pasado.sql`. `security_invoker = true` verificado.
 **Rollback:** `drop view public.gv_ppp_camion_pasado;` — no la lee ninguna pantalla todavía.
+
+## §3.hg — v18.48: rotado el password del FDW LK→Chef (problema 253) — 2026-09-15
+
+El mapping del server `chef_db` usaba el password de ejemplo del instructivo. Rotado en las dos
+puntas el 15/09 (`alter role` en Chef + `alter user mapping ... options (set password ...)` en LK,
+uno detrás del otro: con una sola punta hecha, LK deja de leer Chef).
+
+**Verificación posterior, desde LK** (la escritura se aborta, no deja nada):
+
+```sql
+do $$
+declare v text := ''; n int; v_id bigint;
+begin
+  select count(*) into n from public.chef_orders;                      v := v || 'orders=' || n || ' ';
+  select count(*) into n from public.chef_customers;                   v := v || 'customers=' || n || ' ';
+  select count(*) into n from public.chef_customer_delivery_addresses; v := v || 'dir=' || n || ' ';
+  select count(*) into n from public.chef_sales_lines;                 v := v || 'sales=' || n || ' ';
+  select count(*) into n from chef_ext.products;                       v := v || 'prod=' || n || ' ';
+  select id into v_id from public.chef_orders where sheets_payload is not null order by id desc limit 1;
+  update public.chef_orders set sheets_payload = sheets_payload where id = v_id;
+  get diagnostics n = row_count;                                       v := v || '| ficha=' || n;
+  raise exception 'OK (abortada): %', v;
+end $$;
+-- 15/09: orders=130 customers=765 dir=713 sales=36770 prod=152 | ficha=1
+```
+
+⚠ **`has_table_privilege(..., 'UPDATE')` da `false` con un grant por columna** — no es que el grant
+esté mal. Se verifica con `has_column_privilege(...)` o con el `update` de prueba de arriba. Este
+detalle ya hizo dudar una vez de un grant que estaba perfecto.
