@@ -1,3 +1,28 @@
+## Nota v18.30 (2026-09-15) — el ajuste del "de menos" dejaba Pickeados en negativo y devolvía una caja fantasma a góndola
+
+Luis, mirando los movimientos del **116** en Stocks: *"entró +50 · salió −51 · saldo −1"*.
+
+El movimiento **Separado** es el cierre del armado (TAP): saca la mercadería de **Pickeados** y la
+manda a **A facturar**, y lo que el armador no entregó vuelve a góndola. En E11A/116 hizo
+`Pickeados −50 · A facturar +49 · góndola +1`, después de un `ajuste −1` del aviso
+**"de menos / no hay en góndola"** (evento `NPD` del wizard de armado, no lo tipeó nadie).
+
+**Por qué se descontó dos veces:** el saldo de un depósito es **por empresa**. El picking sale
+`LK`/`CH` (lo escribe el backend con `empresa_de_np`); el ajuste del front va sin empresa y, para un
+código no dual, el trigger lo forzaba a `Mixto`. `Mixto ≠ LK` → **el ajuste no se resta del
+picking**: la etapa 2 vio 50 en vez de 49, dejó Pickeados en −1 y devolvió a góndola la caja que el
+ajuste quería evitar. Hasta el 11/09 el picking también salía `Mixto` y se neteaban; desde el 14/09
+**ningún** picking sale `Mixto`, o sea que iba a pasar en cada aviso de "de menos".
+
+**El fix, dos capas en el backend:** (1) al **escribir**, una fila sin empresa cuyo `ref` es una
+tanda hereda la empresa del picking de esa (tanda, código); (2) al **calcular**, la etapa 2 netea
+las filas `Mixto` contra ese mismo picking. Las dos sólo actúan si el picking tiene una sola
+empresa; si no, queda el comportamiento de hoy. Probado con tandas sintéticas en transacción
+abortada: Pickeados cierra en 0 y la góndola no recibe la caja fantasma.
+
+**Los datos ya escritos NO se tocaron** (protocolo): el −1 de E11A/116 y su caja fantasma en
+góndola siguen ahí hasta que se dé la orden. `sql/gv_ajuste_hereda_empresa_v1830.sql` · §3.ha.
+
 ## Nota v18.29 (2026-09-15) — Quién y por qué (obligatorios), y el badge «modificado» en Facturación
 
 Tres cosas que pidió Luis sobre «Modificar Pedidos»:

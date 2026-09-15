@@ -16952,3 +16952,100 @@ el detalle correcto. Después del rollback, 0 filas de log de los dos lados y el
 `drop view public.gv_pedido_mod_np; drop function public.gv_pedido_mod_resumen(jsonb);`
 `drop table public."GV_Pedido_Mod_Log"; drop table public."GV_Modif_Personas";`
 `drop function public.gv_modif_persona_agregar(text,text);` (mejor conservar el log).
+
+---
+
+## §3.ha — v18.30: el ajuste del "de menos" quedaba en `Mixto`, no se neteaba con el picking, y devolvía una caja FANTASMA a góndola — 2026-09-15
+
+**Lo vio Luis** mirando los movimientos del artículo **116** en Stocks: *"entró +50 · salió −51 ·
+saldo −1"*.
+
+| Fecha | Movimiento | Qué escribió | empresa |
+|---|---|---|---|
+| 14/09 16:10 | `picking` (JC 277) | góndola −50 · **Pickeados +50** | **LK** |
+| 15/09 11:23 | `ajuste` (JF 8) | **Pickeados −1** | **Mixto** |
+| 15/09 12:05 | `separado` (pipeline) | Pickeados **−50** · A facturar **+49** · góndola **+1** | LK |
+
+Saldos del 116 al 15/09: `separar_pedidos` **LK 0 / Mixto −1**, `terminado` **LK 0 / Mixto +1**,
+`a_facturar` **LK 49**. El total cierra (49 cajas), pero **la góndola muestra una caja que no
+existe** y Pickeados queda en −1.
+
+**El ajuste no lo tipeó nadie.** Lo emite el wizard de armado cuando el armador marca
+**"de menos" + "no hay en góndola"** (evento `NPD`; `_compDifResolve` de `index.html`, v12.12).
+Existe justamente para que la ETAPA 2 **no** devuelva a góndola una caja que nunca estuvo:
+`Registros_Produccion_Virgilio` tiene el `NPD` `98651|116|menos|no|1|50|E11A`.
+
+**La causa: el saldo de un depósito es POR EMPRESA** (misma lección que la v17.07, §3.fx).
+
+* el `picking` lo escribe el backend con `empresa_de_np` → `LK` / `CH`;
+* el ajuste del front va **sin** empresa y, para un código **no dual**, el trigger
+  `trg_normalizar_empresa_stock` lo forzaba a `Mixto`;
+* `Mixto` ≠ `LK` → **el ajuste no se resta del picking**. La ETAPA 2 ve `net = 50` (no 49),
+  descuenta 50 de Pickeados (quedan −1) y manda a góndola la caja fantasma que el ajuste
+  quería evitar.
+
+**Por qué recién ahora, y por qué iba a pasar todos los días.** Hasta el 11/09 17:55
+(`pkc_empresa_desde`) el picking también salía `Mixto`, así que ajuste y picking se neteaban.
+Medido el 15/09:
+
+```sql
+select date_trunc('week', ts)::date semana, coalesce(empresa,'(null)') emp, count(*) n
+  from public."Movimientos_Stock" where tipo='picking' and deposito='separar_pedidos'
+   and ts >= now()-interval '45 days' group by 1,2 order by 1 desc;
+-- semana 14/09:  LK 439 · CH 76 · Mixto 0      ← desde acá, ningún ajuste netea
+-- semana 07/09:  Mixto 866 · LK 13 · CH 4
+```
+
+De los 10 ajustes `Mixto` sobre una tanda que hay en la historia, **E11A/116 es el primero** cuyo
+picking estaba en `LK`; los 9 anteriores tenían el picking también en `Mixto` y cerraron en 0.
+
+### El fix (`sql/gv_ajuste_hereda_empresa_v1830.sql`) — dos capas, las dos en el backend
+
+1. **Al escribir** — `trg_normalizar_empresa_stock`: si la fila no trae empresa y su `ref` es una
+   **tanda** (`LETRA+NN+LETRA`), hereda la empresa del `picking` de esa (tanda, código) cuando el
+   picking tiene **una sola**. Arregla el dato en el origen, venga del front, de la app vieja o de
+   un pegado a mano.
+2. **Al calcular** — `reconciliar_pipeline_stock_etapa2`: las filas `Mixto` de `separar_pedidos` se
+   netean contra la empresa del picking de esa (tanda, código). Defensa por si algo vuelve a
+   escribir sin empresa (p. ej. si el aviso del armador llega **antes** de que la etapa 1 escriba
+   el picking) y cubre lo ya escrito.
+
+Las dos son conservadoras: si el picking de esa (tanda, código) tiene **más de una** empresa, o no
+hay picking, no se toca nada y queda el comportamiento de hoy.
+
+**Pruebas (15/09, las tres en transacción abortada con `raise exception`):**
+
+| Prueba | Resultado |
+|---|---|
+| `insert` del ajuste sin empresa sobre `E11A`/116 | `empresa = LK` (antes `Mixto`) |
+| Tanda sintética `Z99Z`: picking +10 `LK` · ajuste −1 **forzado a `Mixto`** · Entregas 9 | `separar_pedidos −9` · `a_facturar +9` · **góndola sin fila** (antes: −10 y +1 a góndola) |
+| Tanda sintética `Z98Z`, las dos capas juntas: picking +10 `LK` · ajuste −1 sin empresa · Entregas 9 | saldo **`separar_pedidos LK = 0`** · `a_facturar LK = 9` |
+| `reconciliar_pipeline_stock_etapa2()` sobre los datos reales | **0 filas** — no emite nada nuevo |
+
+⚠ La capa 2 sola deja el saldo **partido** (`LK +1 / Mixto −1`, neto 0): netea el cálculo pero no
+mueve la fila vieja de partición. Con la capa 1 puesta, el caso nuevo ya no genera `Mixto`.
+
+**Lo que este fix NO hace: corregir datos ya escritos** (protocolo: los datos no se tocan sin
+permiso). El `−1` de Pickeados y la caja fantasma en góndola de **E11A/116** siguen ahí. Para
+dejarlos en cero hace falta la orden, y son dos movimientos:
+
+```sql
+-- PENDIENTE DE PERMISO — no ejecutado
+insert into public."Movimientos_Stock"(cod_art, deposito, delta, tipo, ref, legajo, empresa) values
+  ('116','separar_pedidos', 1,'ajuste','E11A','<legajo>','Mixto'),   -- Pickeados −1 → 0
+  ('116','terminado',      -1,'ajuste','E11A','<legajo>','Mixto');   -- saca la caja fantasma
+```
+
+**Chequeo de que no volvió a pasar** (vacío = todo bien):
+
+```sql
+select upper(trim(ref)) tanda,
+       upper(regexp_replace(regexp_replace(trim(cod_art),' +(LK|CH)$',''),'^0+(?=.)','')) art,
+       coalesce(empresa,'Mixto') emp, sum(delta) saldo
+  from public."Movimientos_Stock" where deposito='separar_pedidos'
+ group by 1,2,3 having sum(delta) < 0;
+-- al 15/09: E11A/116/Mixto = −1 (el caso viejo) y D53A/839/Mixto = −2 (agosto, sin picking)
+```
+
+**Rollback:** ejecutar `sql/backups/empresa_mixto_ajuste_pre_v1830_20260915.sql` (trae las dos
+definiciones anteriores enteras). No hay datos que revertir.

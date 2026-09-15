@@ -1213,3 +1213,42 @@ antes; lo que cambia es que ahora el desglose por empresa sale de esa misma fila
 **Rollback exacto:** bloque `4) ROLLBACK` de `sql/gv_proyeccion_una_sola_tabla_v1817.sql`. Los
 datos de la tabla borrada están en `zz_backups."GV_Backup_ProyeccionEmp_20260915"` y las 6
 definiciones vivas previas en `zz_backups."GV_Backup_Defs_Proyeccion_20260915"`.
+
+---
+
+## v18.30 (2026-09-15) — `trg_normalizar_empresa_stock` + `reconciliar_pipeline_stock_etapa2` (objetos COMPARTIDOS)
+
+**Qué se tocó:** dos funciones de `public.*` que usa el pipeline de stock, o sea también Producción
+si escribe movimientos.
+
+| Objeto | Cambio |
+|---|---|
+| `public.trg_normalizar_empresa_stock()` (trigger `zz_normalizar_empresa`, BEFORE INSERT de `Movimientos_Stock`) | una fila **sin empresa** cuyo `ref` es una tanda (`LETRA+NN+LETRA`) y cuyo depósito es `separar_pedidos` / `a_facturar` / `terminado` hereda la empresa del `picking` de esa (tanda, código), si es **una sola**. Antes caía en `Mixto` |
+| `public.reconciliar_pipeline_stock_etapa2()` | las filas `Mixto` de `separar_pedidos` se netean contra la empresa del picking de esa (tanda, código) al calcular el neto |
+
+**Por qué:** el ajuste del aviso "de menos / no hay en góndola" nacía `Mixto`, el picking sale
+`LK`/`CH` desde el 11/09, y como el saldo es por empresa **no se restaban**: Pickeados quedaba
+negativo y el `separado` devolvía a góndola una caja que no existe. Caso testigo E11A/116.
+Detalle completo y mediciones en `docs/SUPABASE-GESTION-VIRGILIO.md` §3.ha.
+
+**Impacto medido (no "no debería afectar"):**
+
+* `reconciliar_pipeline_stock_etapa2()` corrida sobre los datos reales en transacción abortada →
+  **0 filas emitidas**: no reprocesa ni toca nada de lo existente.
+* Ninguna fila de `Movimientos_Stock` fue modificada ni borrada. El cambio sólo afecta **inserts
+  nuevos** y el **cálculo** de tandas todavía sin `separado`.
+* Firmas sin cambios, así que los dos consumidores (`reconciliar_pipeline_stock()` y
+  `trg_entregas_reconciliar()`) siguen compilando igual.
+
+**Riesgo para Producción:** si Producción inserta un movimiento sobre una tanda ya pickeada **sin**
+empresa, ahora queda con la empresa del picking en vez de `Mixto`. Es la partición correcta; lo que
+cambia es que deja de sumar en `Mixto`.
+
+**Rollback exacto (vuelve todo al comportamiento previo, sin tocar datos):**
+
+```bash
+psql "$VIRGILIO_URL" -f sql/backups/empresa_mixto_ajuste_pre_v1830_20260915.sql
+```
+
+o pegar ese archivo en el SQL editor: trae los `CREATE OR REPLACE` de las dos funciones tal como
+estaban antes del cambio.
