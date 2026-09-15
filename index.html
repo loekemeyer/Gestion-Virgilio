@@ -4907,6 +4907,14 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
   .fac-btn-fc{ padding: 5px 8px; min-height: 36px; justify-content: center; }
 }
 .fac-empty{ padding: 32px 20px; text-align: center; color: #64748b; font-size: 15px; background: #fff; border-radius: 8px; border: 1px solid #cbd5e1; }
+/* v18.55 — el error de carga, DONDE se mira. El chip de estado (.fac-stats) está oculto desde
+   la v18.00, así que el motivo no aparecía en ningún lado y la pantalla parecía colgada. */
+.fac-errbox{ padding: 26px 20px; text-align: center; background: #fef2f2; border: 2px solid #dc2626; border-radius: 8px; }
+.fac-errtit{ font-size: 16px; font-weight: 800; color: #b91c1c; margin-bottom: 6px; }
+.fac-errmsg{ font-size: 13px; color: #7f1d1d; margin-bottom: 12px; word-break: break-word; }
+.fac-errbtn{ padding: 10px 22px; border: none; border-radius: 8px; background: #dc2626; color: #fff; font-size: 15px; font-weight: 700; cursor: pointer; }
+.fac-errbtn:active{ background: #b91c1c; }
+.fac-errpie{ font-size: 12px; color: #7f1d1d; margin-top: 10px; }
 .fac-cierre{
   background: #fff; border: 2px solid #1e6bd6; border-radius: 8px; padding: 12px; margin-top: 12px;
   display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;
@@ -5586,7 +5594,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=18.54"></script>
+<script type="module" src="recepcion.js?v=18.55"></script>
 <!-- Config del módulo de fichada (compartido con fichada.html). El secret
      hmacSecret tiene que ser el mismo acá y allá; cargándolo desde un solo
      archivo evitamos que se desincronicen. -->
@@ -9150,7 +9158,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v18.54";
+const APP_VERSION = "v18.55";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -10599,6 +10607,10 @@ function pickNormNp(v) {
    la cola de red demoraba 15 s lo que importaba. Ahora una consulta idéntica en vuelo
    se comparte: todos esperan el mismo fetch y cada uno recibe su propia copia de la
    lista (por si alguno la ordena o la recorta in place). */
+/* v18.55 — techo por página. Una lectura normal tarda decenas o cientos de ms; 20 s es tiempo
+   de sobra incluso para la consulta más pesada con la red del depósito, y corta en seco el
+   cuelgue indefinido que envenenaba el single-flight de acá abajo. */
+let SUPA_FETCH_TIMEOUT_MS = 20000;   // `let` a propósito: se baja desde la consola (o un test) para probarlo
 const _supaInflight = new Map();
 function supaFetchAll(endpoint, query) {
   const key = endpoint + "?" + query;
@@ -10615,18 +10627,52 @@ async function _supaFetchAllRaw(endpoint, query) {
   while (from < total) {
     // Sin cache-buster `&_=` en la URL: PostgREST lo toma como filtro de columna
     // inexistente → 400. El anti-caché ya lo da `cache:"no-store"`.
-    const r = await fetch(endpoint + "?" + query, {
-      cache: "no-store",
-      headers: {
-        apikey: SUPABASE_KEY,
-        Authorization: "Bearer " + SUPABASE_KEY,
-        "Range-Unit": "items",
-        Range: from + "-" + (from + 999),
-        Prefer: "count=exact"
-      }
+    /* v18.55 — TIMEOUT. Sin esto, un fetch que queda colgado (pestaña dormida, la máquina
+       suspendida, un corte de red de un segundo) deja la promesa PENDIENTE PARA SIEMPRE. Y
+       como `supaFetchAll` cachea la promesa en `_supaInflight` y la borra con `.finally()`,
+       que sólo corre cuando la promesa se asienta, la clave nunca se limpia: todos los
+       reintentos siguientes reciben esa misma promesa muerta y NO SALE NINGUNA REQUEST NUEVA.
+       El refresh automático deja de servir y sólo destraba recargar la página. Es lo que dejó
+       Facturación en «Cargando tandas…» el 15/09 — y por eso el servidor no registraba nada.
+       Con el AbortController la promesa SIEMPRE se asienta (con datos o con error), el
+       `.finally` corre, la clave se borra y el próximo intento pide de verdad.
+       Vale para toda la app: todo lo que pasa por `supaFetchAll` tenía el mismo agujero. */
+    const _ctrl = (typeof AbortController !== "undefined") ? new AbortController() : null;
+    let _tmo = null;
+    /* La carrera es lo que garantiza el corte. El `abort()` sólo sirve si el fetch respeta la
+       señal (un navegador viejo, o un fetch pisado por otro código, puede ignorarla) y lo que
+       acá importa es que ESTA promesa se asiente sí o sí, para que el `.finally` del
+       single-flight libere la clave. Con el abort además se cancela el pedido de verdad. */
+    const _corte = new Promise(function (_res, rej) {
+      _tmo = setTimeout(function () {
+        try { if (_ctrl) _ctrl.abort(); } catch (_e) {}
+        rej(new Error("Supabase " + endpoint + " sin respuesta en " + Math.round(SUPA_FETCH_TIMEOUT_MS / 1000) + " s"));
+      }, SUPA_FETCH_TIMEOUT_MS);
     });
-    if (!r.ok && r.status !== 206) throw new Error("Supabase " + endpoint + " HTTP " + r.status);
-    const chunk = await r.json();
+    let r, chunk;
+    try {
+      r = await Promise.race([fetch(endpoint + "?" + query, {
+        cache: "no-store",
+        signal: _ctrl ? _ctrl.signal : undefined,
+        headers: {
+          apikey: SUPABASE_KEY,
+          Authorization: "Bearer " + SUPABASE_KEY,
+          "Range-Unit": "items",
+          Range: from + "-" + (from + 999),
+          Prefer: "count=exact"
+        }
+      }), _corte]);
+      if (!r.ok && r.status !== 206) throw new Error("Supabase " + endpoint + " HTTP " + r.status);
+      // El body también entra en la carrera: un `json()` a medio bajar cuelga igual que el fetch.
+      chunk = await Promise.race([r.json(), _corte]);
+    } catch (e) {
+      if (e && e.name === "AbortError") throw new Error("Supabase " + endpoint + " sin respuesta en " + Math.round(SUPA_FETCH_TIMEOUT_MS / 1000) + " s");
+      throw e;
+    } finally {
+      // Sin esto el timer sigue vivo y termina rechazando `_corte` cuando ya no la espera
+      // nadie → unhandled rejection en cada lectura que salió bien.
+      if (_tmo) { try { clearTimeout(_tmo); } catch (_e) {} }
+    }
     const got = Array.isArray(chunk) ? chunk.length : 0;
     for (let i = 0; i < got; i++) out.push(chunk[i]);
     // v18.46: defensivo — un Response sin `headers` (o sin ese header) no puede tumbar la
@@ -49194,8 +49240,38 @@ async function facTick(){
   } catch (e){
     facSetStatus(false, "Error: " + e.message);
     console.error("[fac]", e);
+    /* v18.55 — EL CARTEL TIENE QUE DECIR LA VERDAD. `facSetStatus` escribe en `.fac-stats`,
+       que está en `display:none` desde la v18.00 por pedido del dueño ("en el celular ocupaban
+       media pantalla"), así que el motivo del error no se veía en ningún lado: la pantalla
+       quedaba en «Cargando tandas…» para siempre y parecía colgada. Ese cartel mintió durante
+       horas el 15/09 y costó más que el error en sí. Se pinta el error DONDE se mira, con un
+       botón para reintentar sin recargar la página. No se toca `.fac-stats`: su ocultamiento
+       fue una decisión, no un descuido. */
+    try {
+      // Sólo si la pantalla sigue en el cartel inicial: si un tick anterior ya pintó la lista,
+      // vale más dejar los datos viejos a la vista que taparlos con un error.
+      const cont = document.getElementById("facContainer");
+      if (cont && /Cargando tandas/.test(cont.innerHTML || "")) {
+        cont.innerHTML =
+          '<div class="fac-errbox">' +
+            '<div class="fac-errtit">No se pudo cargar la lista de tandas</div>' +
+            '<div class="fac-errmsg">' + escapeHtml(String(e && e.message || e || "")) + '</div>' +
+            '<button class="fac-errbtn" type="button" onclick="facReintentar()">↻ Reintentar</button>' +
+            '<div class="fac-errpie">Si sigue igual, recargá la página (Ctrl+F5).</div>' +
+          '</div>';
+      }
+    } catch (_e2) {}
   }
 }
+/* v18.55 — reintento a mano desde el cartel de error. Limpia el cache de la PPP para que la
+   lectura salga de verdad (si no, `facTick` reusa el mapa viejo y no se entera de nada). */
+function facReintentar() {
+  try { _pppCache = null; _pppCacheTs = 0; } catch (_e) {}
+  const cont = document.getElementById("facContainer");
+  if (cont) cont.innerHTML = '<div class="fac-empty">Cargando tandas…</div>';
+  try { facTick(); } catch (_e) {}
+}
+window.facReintentar = facReintentar;
 
 /* v9.69 — badge del botón "Facturación": cantidad de PEDIDOS (NP) listos para facturar =
    NPs en tandas FC (picking + separado terminados) que TODAVÍA no se facturaron. Mismo criterio
