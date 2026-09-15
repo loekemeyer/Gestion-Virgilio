@@ -1485,6 +1485,26 @@ function arCatalogoTiene(cod) {
   const cn = _ocgNorm(cod);
   return _arCatalogo.some(function (a) { return a.cod === cn; });
 }
+/* v18.31 — ¿hay un activo que se le PAREZCA? Sólo diferencias de LETRAS al final:
+   582 → 582E, 438EL → 438E. Un dígito distinto es OTRO artículo y no se sugiere nunca.
+   Existe porque el 15/09 aparecieron 7 recepciones cargadas con el código sin la E
+   (582, 583, 584, 599, 727, 943, 948) cuando el artículo real era el importado: el
+   operario tipea el número de memoria, se come la letra, y el sistema lo toma como un
+   artículo nuevo — le manda el WhatsApp de alta a Thomas y la entrega queda con un
+   código que no existe, así que después no cruza con ninguna OC. */
+function arCatalogoParecidos(cod) {
+  if (!_arCatalogo) return [];
+  const cn = _ocgNorm(cod);
+  if (!cn) return [];
+  return _arCatalogo.filter(function (a) {
+    if (a.cod === cn) return false;
+    const larg = a.cod.length > cn.length ? a.cod : cn;
+    const cort = a.cod.length > cn.length ? cn : a.cod;
+    if (larg.indexOf(cort) !== 0) return false;             // uno es prefijo del otro
+    const resto = larg.slice(cort.length);
+    return resto.length <= 2 && /^[A-Z]+$/.test(resto);     // y lo que sobra son letras
+  }).slice(0, 4);
+}
 /* Códigos activos que matchean lo tipeado (por código o por descripción). */
 function arCatalogoBuscar(txt) {
   if (!_arCatalogo) return [];
@@ -1562,6 +1582,24 @@ async function arAddCodeAplicar(cod, fueraDeLista) {
 
   const enActivos = arCatalogoTiene(cod);          // true | false | null
   const avisar = (enActivos === null) ? !altaEnPlanimetria(cod) : (enActivos === false);
+
+  // v18.31 — antes de darlo por artículo nuevo: ¿no será que se comió una letra? Se
+  // pregunta UNA vez, y la decisión es del operario. Si acepta, se carga el bueno y no
+  // sale ningún WhatsApp, porque ése sí está en la lista.
+  if (avisar) {
+    const par = arCatalogoParecidos(cod);
+    if (par.length) {
+      const otros = par.length > 1
+        ? "\n\n(También existen: " + par.slice(1).map(function (a) { return a.cod; }).join(", ") + ")"
+        : "";
+      const ok = confirm(
+        "El código " + cod + " no está en la lista de activos.\n\n" +
+        "¿Quisiste decir " + par[0].cod + (par[0].desc ? " — " + par[0].desc : "") + "?" + otros + "\n\n" +
+        "Aceptar = cargo " + par[0].cod + "\n" +
+        "Cancelar = sigo con " + cod + " y le aviso a Thomy que es un artículo nuevo");
+      if (ok) { await arAddCodeAplicar(par[0].cod, false); return; }
+    }
+  }
 
   if (avisar) {
     const ya = altaPendGet()[cod];

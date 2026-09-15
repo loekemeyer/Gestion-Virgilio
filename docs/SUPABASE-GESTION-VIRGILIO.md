@@ -17307,3 +17307,56 @@ se quitó el `960E` y se agregó el `001 ×3` → 16 renglones, la dirección pi
 overrides, 0 log, 9663 filas y ningún endpoint roto.
 
 **Rollback:** al pie del archivo SQL (incluye el `CREATE OR REPLACE` de la vista en su forma simple).
+
+---
+
+## §3.ha — v18.31: 7 recepciones cargadas sin la E, y el "¿quisiste decir…?" que lo corta — 2026-09-15
+
+Thomas, mirando la lista de códigos que no figuran en `OC_Maximos`: ***"está mal recibido todos
+esos sin la E"***.
+
+**Confirmado, y son 7 filas, una por código** — 212 cajas en total:
+
+| código | lo correcto | cajas | remito | fecha |
+|---|---|---|---|---|
+| 582 | 582E Salero 90 ml | 136 | 09965 | 21/07 |
+| 583 | 583E Especiero Tapa Bamboo | 24 | 09965 | 21/07 |
+| 584 | 584E Aceitera 400 ml | 10 | 38489 | 21/07 |
+| 599 | 599E Pelador Madera Multifunción | 16 | 38087 | 02/09 |
+| 727 | 727E Sacacorcho Doble Imp. Ac X12 | 7 | 38481 | 10/07 |
+| 943 | 943E Cucharón Ac. Inox | 3 | 38087 | 02/09 |
+| 948 | 948E Espumadera Ac. Inox | 16 | 38087 | 02/09 |
+
+Los 7 tienen su par con E, con descripción y stock; los sin E no tienen descripción y están en 0.
+
+⚠ **El stock NO quedó descuadrado**: de los 7, sólo 582 y 583 llegaron a mover `Movimientos_Stock`
+y hoy están en 0 — con un rastro explícito de que alguien ya lo corrigió a mano
+(`ref = "fix typo 583->583E (racks->gondola)"`) y del `reset previo conteo 01-08`. Los otros 5 no
+movieron stock. Lo que queda mal es el **registro de entregas**, que es de donde sale "quién
+entregó qué" y por eso no cruzan con ninguna OC. **Las 7 filas no se tocaron** (protocolo de
+datos).
+
+### La causa, y lo que se hizo para que no vuelva a pasar
+
+La pantalla de recepción **ya valida**: el catálogo de activos sale de `OC_Maximos` y, si el
+código tipeado no está, `altaAvisar` le manda un WhatsApp a Thomas — *"estoy creando un artículo
+nuevo, que es el 582, ¿me confirmás?"*. O sea el circuito avisaba bien; lo que faltaba era
+**evitar el error de tipeo**, que es lo que de verdad pasa: el operario escribe el número de
+memoria y se come la letra.
+
+**v18.31 — `arCatalogoParecidos()` en `recepcion.js`.** Antes de dar un código por artículo nuevo,
+busca en el catálogo uno que difiera **sólo en letras al final** y pregunta:
+
+> El código 582 no está en la lista de activos.
+> ¿Quisiste decir **582E — Salero 90 ml**?
+> Aceptar = cargo 582E · Cancelar = sigo con 582 y le aviso a Thomy
+
+Si acepta, se carga el bueno y **no sale ningún WhatsApp** (ése sí está en la lista). La decisión
+sigue siendo del operario: cancelar deja todo como antes.
+
+⚠ **Un dígito distinto NUNCA se sugiere.** `583` no propone `584E` ni `593`: en este catálogo un
+número distinto es otro artículo, y sugerirlo sería peor que no sugerir nada. Sólo se acepta que
+lo que sobra sean **1 o 2 letras** (cubre `582→582E` y `438EL→438E`).
+
+**Test:** `tests/rcp-codigo-parecido.cjs`, con los dos sentidos, el caso de dos letras, el
+rechazo del dígito distinto y el catálogo sin cargar (que devuelve vacío y no traba a nadie).
