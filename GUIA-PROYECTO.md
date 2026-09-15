@@ -1,3 +1,41 @@
+## Nota v18.35 (2026-09-15) — Modificar Pedidos: ahora también las NP de ISIS, y la tabla que no se deforma
+
+**1. Las NP de ISIS ya se pueden modificar.** Luis: *"para los pedidos de isis no hay problema con
+que se cambien en la PPP"*. El botón **Modificar** abre el mismo modal, pero por otro camino: una
+NP de ISIS no tiene pedido en la página, así que el cambio va a **dos tablas de override de
+Gestión** que las vistas superponen — `GV_PPP_Base_Override` para el contenido y las columnas
+nuevas `direccion` / `barrio` de `GV_PPP_Prog_Override` para la entrega. **No se toca ni
+`GV_PPP_Base_Pedidos` ni la tabla compartida de programación**, así que una re-importación del
+Excel PPP no pisa lo modificado. La dirección va como dos campos libres (ISIS no tiene libreta de
+direcciones) y el catálogo para agregar códigos sale de `gv_uxb_resuelto`, que es contra lo que
+valida el backend.
+
+Como el pedido de ISIS se tipea a mano allá, el modal lo dice con todas las letras: **esto cambia
+lo que ve la PPP, no lo que hay en ISIS**, y en Facturación la NP sale con el cartel **✏ MOD** y el
+detalle — que es exactamente para lo que Luis lo pidió.
+
+⚠ **`gv_ppp_base_pedidos` la lee medio sistema** (17 vistas y 8 funciones: picking, cobranzas,
+cuarentena, facturable, el JSON de ISIS). Por eso el cambio se hizo con `CREATE OR REPLACE` —
+mismas 6 columnas, sin `DROP CASCADE`— y se verificó con la huella de la vista: **9663 filas ·
+81644939734 · 50443,99 m³ antes y después**, con el override vacío. Lo mismo con la programación:
+**123 filas, misma huella**. Y `gv_endpoints_rotos` quedó vacía.
+
+⚠ **La trampa que había que ver:** `GV_PPP_Base_Pedidos` tiene **9 pares (pedido, artículo) con más
+de una fila**. Si el override pisara "las cajas" con un LEFT JOIN, cada una de esas filas se
+quedaría con el valor nuevo y el pedido saldría **duplicado**. Por eso el bloque de lo pisado
+agrupa: una sola fila por override.
+
+**2. La tabla ya no se deforma.** Luis lo marcó dos veces. La causa no era el contenido sino
+`table-layout:auto`: **el ancho de cada columna lo decidía lo que hubiera adentro**, así que cada
+tanda de pedidos que entraba —o cada filtro— repartía distinto y las columnas se movían solas.
+Ahora el ancho lo fija un `<colgroup>` con `table-layout:fixed`: se ve igual con 2 pedidos que con
+200. Lo que no entra se corta con puntos suspensivos y queda entero en el globito. Medido: las 8
+columnas dan **exactamente los mismos anchos** con 3 filas, con 120 y con un filtro puesto, a 1400
+y a 1180 px. El test lleva el control al revés — con el `auto` de antes, los anchos **sí** cambian.
+
+**Lo que queda pendiente**: los pedidos de **Chef** (su base no acepta escritura desde acá; hace
+falta una RPC del lado de Chef). `sql/gv_pedido_mod_isis_v1835.sql`, §3.hd.
+
 ## Nota v18.34 (2026-09-15) — Proyección: queda una sola ficha
 
 Luis, mirando el pop-up: *"Saca lo de promedio, el ritmo, el facturado, el entregado, el meses

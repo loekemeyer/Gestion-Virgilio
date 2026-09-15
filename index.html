@@ -2849,15 +2849,25 @@ button.pk-anular small{ display:block; font-size:12px; font-weight:700; opacity:
 .pmod-res{ font-size:14px; color:#0f172a; margin:0 0 9px; }
 .pmod-de{ color:#64748b; font-weight:500; }
 .pmod-wrap{ overflow-x:auto; border:1px solid #e2e8f0; border-radius:11px; background:#fff; }
-.pmod-tab{ width:100%; border-collapse:collapse; font-size:15px; }
+/* v18.35 (Luis: *"se sigue deformando la tabla"*). La causa era `table-layout:auto`: el ancho
+   de cada columna lo decidía el CONTENIDO, así que cada vez que entraban más pedidos —o cambiaba
+   el filtro— el navegador repartía distinto y las columnas se movían solas. Con `fixed` + un
+   `<colgroup>` de porcentajes, el ancho no depende de lo que haya adentro: la tabla se ve igual
+   con 2 pedidos que con 200. Lo que ya no entra se corta con puntos suspensivos y queda entero
+   en el globito. El `min-width` es para que en una pantalla angosta scrollee en vez de aplastarse
+   (las dos columnas ancladas siguen a la vista). */
+.pmod-tab{ width:100%; min-width:1060px; table-layout:fixed; border-collapse:collapse; font-size:15px; }
+.pmod-tab td.rs, .pmod-tab td.nps, .pmod-tab td.zo, .pmod-tab td.td{
+  overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.pmod-tab td.rs .pmod-cod{ overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .pmod-tab th{ background:#f8fafc; color:#475569; font-size:.78em; text-transform:uppercase;
   letter-spacing:.03em; font-weight:800; text-align:left; padding:8px 10px;
   border-bottom:1px solid #e2e8f0; white-space:nowrap; position:sticky; top:0; }
 .pmod-tab td{ padding:8px 10px; border-bottom:1px solid #f1f5f9; vertical-align:top; }
 .pmod-tab tr:last-child td{ border-bottom:0; }
-/* el cliente estira; el resto se queda con lo que necesita su dato (mismo criterio que En Salida) */
-.pmod-tab td.ped, .pmod-tab td.nps, .pmod-tab td.zo, .pmod-tab td.fe, .pmod-tab td.td,
-.pmod-tab td.n, .pmod-tab td.est, .pmod-tab td.c, .pmod-tab th.c{ width:1%; white-space:nowrap; }
+/* v18.35: los anchos los fija el <colgroup>, no el contenido. Acá queda sólo el "no me partas
+   el renglón" de las columnas cortas. */
+.pmod-tab td.fe, .pmod-tab td.n, .pmod-tab td.est, .pmod-tab td.c, .pmod-tab th.c{ white-space:nowrap; }
 /* el botón va centrado en su celda, no colgado abajo: el resto de la fila es `vertical-align:top`
    porque el cliente lleva dos renglones (razón social + código) */
 .pmod-tab td.c{ vertical-align:middle; text-align:right; padding-left:14px; }
@@ -2878,7 +2888,7 @@ button.pk-anular small{ display:block; font-size:12px; font-weight:700; opacity:
   box-shadow:-7px 0 7px -7px rgba(15,23,42,.28); }
 .pmod-tab th.c, .pmod-tab th.est{ z-index:4; background:#f8fafc; }
 .pmod-row:hover td.c, .pmod-row:hover td.est{ background:#f8fafc; }
-.pmod-tab td.rs{ width:100%; min-width:180px; color:#0f172a; }
+.pmod-tab td.rs{ color:#0f172a; }
 .pmod-tab th.n, .pmod-tab td.n{ text-align:right; }
 .pmod-row:hover{ background:#f8fafc; }
 .pmod-row.pmod-apr > td:first-child{ box-shadow:inset 3px 0 0 #7c3aed; }
@@ -5518,7 +5528,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=18.34"></script>
+<script type="module" src="recepcion.js?v=18.35"></script>
 <!-- Config del módulo de fichada (compartido con fichada.html). El secret
      hmacSecret tiene que ser el mismo acá y allá; cargándolo desde un solo
      archivo evitamos que se desincronicen. -->
@@ -8989,7 +8999,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v18.34";
+const APP_VERSION = "v18.35";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -36919,7 +36929,13 @@ function pppModifHtml() {
      Cliente (razón social + código con la empresa) · NPs · Zona/Barrio · fecha de PEDIDO · fecha
      en PROGRAMACIÓN (si corresponde) · Tanda (si corresponde) · Estado · Modificar.
      Se fueron el número de pedido y los m³ — el número igual se sigue pudiendo BUSCAR. */
-  h += '<div class="pmod-wrap"><table class="pmod-tab"><thead><tr>' +
+  h += '<div class="pmod-wrap"><table class="pmod-tab">' +
+    /* v18.35 — el ancho de cada columna, fijo. Suman 100 % menos los 126 px del botón, que es
+       ancho fijo porque de él cuelga el anclaje de la columna Estado. */
+    '<colgroup><col style="width:24%"><col style="width:17%"><col style="width:21%">' +
+    '<col style="width:8%"><col style="width:10%"><col style="width:9%"><col style="width:11%">' +
+    '<col style="width:126px"></colgroup>' +
+    '<thead><tr>' +
     '<th>Cliente</th><th>NP</th><th>Zona · barrio</th>' +
     '<th>Pedido del</th><th>En programación</th><th>Tanda</th><th class="est">Estado</th>' +
     '<th class="c">&nbsp;</th>' +
@@ -36929,12 +36945,13 @@ function pppModifHtml() {
     const varias = p.nNp > 1;
     h += '<tr class="pmod-row e-' + p.estado + (p.donde === "apr" ? " pmod-apr" : "") + '">' +
       // el código con la empresa adelante, como pidió: "LK 3843", "CH 2643"
-      '<td class="rs">' + escapeHtml(p.rs || "—") +
+      '<td class="rs" title="' + escapeHtml((p.rs || "—") + " · " + p.empresa + " " + (p.cod || "—")) + '">' +
+        escapeHtml(p.rs || "—") +
         '<div class="pmod-cod">' + escapeHtml(p.empresa + " " + (p.cod || "—")) + '</div></td>' +
-      '<td class="nps">' + (p.nps.length
+      '<td class="nps" title="' + escapeHtml(p.nps.join(", ")) + '">' + (p.nps.length
         ? escapeHtml(p.nps.join(", ")) + (varias ? '<span class="pmod-n">' + p.nNp + ' NP</span>' : '')
         : '<span class="pmod-sin">' + (varias ? p.nNp + ' bloques' : 'sin NP todavía') + '</span>') + '</td>' +
-      '<td class="zo">' + (escapeHtml([p.zona, p.loc].filter(function (x, i, a) { return x && a.indexOf(x) === i; }).join(" · ")) || RAYA) + '</td>' +
+      '<td class="zo" title="' + escapeHtml([p.zona, p.loc].filter(Boolean).join(" · ")) + '">' + (escapeHtml([p.zona, p.loc].filter(function (x, i, a) { return x && a.indexOf(x) === i; }).join(" · ")) || RAYA) + '</td>' +
       '<td class="fe">' + (p.fechaPedido ? escapeHtml(_pmodFecha(p.fechaPedido)) : RAYA) + '</td>' +
       // "si corresponde": un pedido de A Programar todavía no tiene día ni tanda
       '<td class="fe">' + (p.fecha ? escapeHtml(_pmodFecha(p.fecha, true)) +
@@ -36978,7 +36995,9 @@ function pppModifHtml() {
    deja de tener sentido (se armó por cercanía). Ahí ofrece devolverlo a 📥 A Programar.
    ===================================================================================== */
 let _pmodEd = null;          // { p, ctx, items, dirSel, dirNueva, quien, motivo, cargando, err, guardando }
-let _pmodCat = null;         // catálogo de LK para agregar códigos (se pide una vez)
+let _pmodCat = null;         // el catálogo del modo abierto (se apunta a uno de los dos de abajo)
+let _pmodCatLk = null;       // productos de la página (LK) — para un pedido web
+let _pmodCatIsis = null;     // gv_uxb_resuelto (Gestión) — para una NP de ISIS
 let _pmodPersonas = null;    // GV_Modif_Personas: quiénes pueden figurar como autor del cambio
 
 function _pmodEdCss() {
@@ -37049,7 +37068,7 @@ async function pmodLkRpc(fn, body) {
 }
 /* El catálogo para agregar códigos: los de LK y los "Loeke" que vende Chef. Una sola vez. */
 async function pmodCatalogo() {
-  if (_pmodCat) return _pmodCat;
+  if (_pmodCatLk) { _pmodCat = _pmodCatLk; return _pmodCat; }
   const tok = await pwebLkToken();
   const h = { apikey: PWEB_LK_ANON, Authorization: "Bearer " + tok };
   const get = async function (t) {
@@ -37062,7 +37081,7 @@ async function pmodCatalogo() {
     const c = _pmodCodNorm(x.cod); if (!c || by.has(c)) continue;
     by.set(c, { cod: c, desc: String(x.description || ""), uxb: Number(x.uxb) || 0 });
   }
-  _pmodCat = [...by.values()];
+  _pmodCatLk = [...by.values()]; _pmodCat = _pmodCatLk;
   return _pmodCat;
 }
 /* La MISMA normalización que `gv_pedido_mod_cod` del backend: 3 dígitos + letras en mayúscula. */
@@ -37075,17 +37094,20 @@ function _pmodCodNorm(c) {
 async function pmodModificar(key) {
   const p = _pmodPedidos().filter(function (x) { return x.key === key; })[0];
   if (!p) { pppSetStatus("No encontré ese pedido. Probá con 🔄 Actualizar.", false); return; }
-  // Lo que esta pantalla NO puede tocar, dicho antes de abrir nada:
-  if (p.esIsis) {
-    try { alert("La NP " + (p.nps[0] || "") + " se tipeó en ISIS.\n\nEl contenido y la dirección de un pedido de ISIS viven en ISIS, no en la página: desde acá no se pueden cambiar sin que las dos cosas queden distintas.\n\nSe modifica en ISIS; si hay que moverlo de día o de tanda, eso sí se hace desde 🗓️ Programación."); } catch (_e) {}
-    return;
-  }
+  // v18.35 (Luis): *"para los pedidos de isis no hay problema con que se cambien en la PPP"* —
+  // una NP de ISIS SÍ se modifica desde acá. Lo que cambia es dónde se escribe: ISIS no tiene
+  // pedido en la página, así que el cambio va a dos tablas de override de Gestión
+  // (`GV_PPP_Base_Override` para el contenido, `GV_PPP_Prog_Override` para la dirección) que las
+  // vistas superponen sin tocar lo que trae la importación del Excel PPP. El que factura se
+  // entera por el badge ✏ MOD de Facturación, que es para lo que Luis lo pidió.
+  if (p.esIsis) return pmodModificarIsis(p);
   if (p.empresa !== "LK") {
     try { alert("El pedido es de la página de Chef.\n\nLa base de Chef todavía no acepta cambios desde acá (se la lee por FDW, que es de sólo lectura), así que por ahora se modifica en la página de Chef."); } catch (_e) {}
     return;
   }
   _pmodEdCss();
   let _ult = ""; try { _ult = localStorage.getItem("gv_modif_quien") || ""; } catch (_e) {}
+  _pmodCat = _pmodCatLk;
   _pmodEd = { p: p, cargando: true, items: [], dirSel: "", dirNueva: null, quien: _ult, motivo: "" };
   pmodPintar();
   pmodPersonasCargar().then(function () {
@@ -37126,6 +37148,60 @@ function pmodPintar() {
   o.classList.add("show");
 }
 
+/* Una NP de ISIS: el contexto sale de Gestión, no de LK. Los renglones de `gv_ppp_np_items`
+   (que ya resuelve el u×B) y la dirección de la programación. */
+async function pmodModificarIsis(p) {
+  const np = p.nps[0] || p.pedido;
+  _pmodEdCss();
+  let _ult = ""; try { _ult = localStorage.getItem("gv_modif_quien") || ""; } catch (_e) {}
+  _pmodCat = _pmodCatIsis;
+  _pmodEd = { p: p, isis: true, np: np, cargando: true, items: [],
+              dirNueva: null, quien: _ult, motivo: "" };
+  pmodPintar();
+  pmodPersonasCargar().then(function () {
+    if (!_pmodEd) return;
+    if (_pmodEd.quien && !(_pmodPersonas || []).some(function (x) { return x.nombre === _pmodEd.quien; })) _pmodEd.quien = "";
+    pmodPintar();
+  });
+  try {
+    const q = encodeURIComponent(np);
+    const [its, prog] = await Promise.all([
+      aprGet("gv_ppp_np_items?select=art,cajas,uxb,renglones&np=eq." + q + "&order=art.asc"),
+      aprGet("gv_ppp_programacion_diaria?select=np,direccion,barrio,zona,tanda,fecha_entrega&np=eq." + q + "&limit=1")
+    ]);
+    const g = (prog && prog[0]) || {};
+    _pmodEd.items = (its || []).map(function (it) {
+      const c = Number(it.cajas) || 0;
+      return { cod: String(it.art || "").toUpperCase(), desc: "", uxb: Number(it.uxb) || 0,
+               cajas: c, cajas0: c, fuera: false, nueva: false };
+    });
+    _pmodEd.ctx = { items: _pmodEd.items.slice(), direcciones: [], sin_stock: [], log: [],
+                    estado: { estado: p.estado }, razon_social: p.rs,
+                    items_raw: (its || []).map(function (it) {
+                      return { cod_art: String(it.art || "").toUpperCase(), cajas: Number(it.cajas) || 0 }; }) };
+    _pmodEd.dirIsis  = { direccion: String(g.direccion || ""), barrio: String(g.barrio || "") };
+    _pmodEd.dirIsis0 = { direccion: String(g.direccion || ""), barrio: String(g.barrio || "") };
+    _pmodEd.cargando = false;
+    pmodPintar();
+    try { await pmodCatalogoIsis(); pmodPintar(); } catch (_e) {}
+  } catch (e) {
+    _pmodEd.cargando = false; _pmodEd.err = (e && e.message) ? e.message : String(e);
+    pmodPintar();
+  }
+}
+/* El catálogo para agregar códigos a una NP de ISIS sale de Gestión (`gv_uxb_resuelto`), que es
+   contra lo que el backend valida. El de LK no sirve acá: son universos distintos. */
+async function pmodCatalogoIsis() {
+  if (_pmodCatIsis) { _pmodCat = _pmodCatIsis; return _pmodCat; }
+  const rows = await aprGet("gv_uxb_resuelto?select=cod,uxb&limit=8000");
+  const by = new Map();
+  for (const x of (rows || [])) {
+    const c = String(x.cod || "").trim().toUpperCase(); if (!c || by.has(c)) continue;
+    by.set(c, { cod: c, desc: "", uxb: Number(x.uxb) || 0 });
+  }
+  _pmodCatIsis = [...by.values()]; _pmodCat = _pmodCatIsis;
+  return _pmodCat;
+}
 function _pmodDirDe(label) {
   const ds = ((_pmodEd && _pmodEd.ctx && _pmodEd.ctx.direcciones) || []);
   const l = String(label || "").trim().toLowerCase();
@@ -37136,6 +37212,10 @@ function _pmodItemsFinal() {
 }
 function _pmodHayCambio() {
   if (!_pmodEd) return false;
+  if (_pmodEd.isis) {
+    return _pmodDirIsisCambio() ||
+      _pmodEd.items.some(function (it) { return it.nueva || it.fuera || it.cajas !== it.cajas0; });
+  }
   if (_pmodEd.dirNueva) return true;
   if (String(_pmodEd.dirSel || "") !== String(_pmodEd.dir0 || "")) return true;
   return _pmodEd.items.some(function (it) { return it.nueva || it.fuera || it.cajas !== it.cajas0; });
@@ -37165,6 +37245,19 @@ function pmodEdHtml() {
   }
 
   // ── dirección ────────────────────────────────────────────────────────────
+  if (E.isis) {
+    const di = E.dirIsis || { direccion: "", barrio: "" };
+    h += '<div class="pme-sec"><div class="pme-h">Dirección de entrega</div><div class="pme-row">' +
+      '<input class="pme-in ancho" placeholder="Dirección de entrega" value="' + escapeHtml(di.direccion) + '" oninput="pmodDirIsis(\'direccion\', this.value)">' +
+      '<input class="pme-in" placeholder="Barrio / localidad" value="' + escapeHtml(di.barrio) + '" oninput="pmodDirIsis(\'barrio\', this.value)" list="pmodBarrios">' +
+      '</div>' + _pmodBarriosDatalist() +
+      '<div class="pme-nota">La NP se tipeó en ISIS, así que acá se <b>pisa</b> lo que muestra la PPP ' +
+      '(no se toca lo que trae la importación del Excel). En Facturación va a aparecer con el cartel ' +
+      '<b>✏ MOD</b> y el detalle del cambio, para tipearlo igual en ISIS.</div></div>';
+    h += _pmodContenidoHtml(E);
+    h += _pmodPieHtml(E, est);
+    return h;
+  }
   const dirs = (E.ctx.direcciones || []);
   const actual = _pmodDirDe(E.dir0);
   h += '<div class="pme-sec"><div class="pme-h">Dirección de entrega</div><div class="pme-row">' +
@@ -37196,6 +37289,15 @@ function pmodEdHtml() {
   }
   h += '</div>';
 
+  h += _pmodContenidoHtml(E);
+  h += _pmodPieHtml(E, est);
+  return h;
+}
+/* El contenido y el pie se dibujan igual para un pedido de la página y para una NP de ISIS —
+   cambia de dónde salieron los renglones, no cómo se editan. Por eso viven en su propia función:
+   antes de la v18.35 eran parte de `pmodEdHtml` y el modo ISIS los habría duplicado. */
+function _pmodContenidoHtml(E) {
+  let h = '';
   // ── contenido ────────────────────────────────────────────────────────────
   const sinStock = new Set(((E.ctx.sin_stock) || []).map(_pmodCodNorm));
   h += '<div class="pme-sec"><div class="pme-h">Contenido del pedido</div><div class="pme-tabw">' +
@@ -37221,6 +37323,10 @@ function pmodEdHtml() {
     '<span class="pme-vacio">' + (_pmodCat ? (_pmodCat.length + " códigos en el catálogo") : "buscando el catálogo…") + '</span>' +
     '</div>' + _pmodCatDatalist() + '</div>';
 
+  return h;
+}
+function _pmodPieHtml(E, est) {
+  let h = '';
   /* ── quién + por qué ───────────────────────────────────────────────────
      v18.29 (Luis): *"que no deje guardar cambios de modificación si la persona modificándolo no
      pone justificativo"* y *"agregá una casilla de ¿quién hace la modificación?"*. Los dos son
@@ -37340,6 +37446,13 @@ function pmodDirSel(v) {
   pmodPintar();
 }
 function pmodDirCampo(k, v) { if (_pmodEd && _pmodEd.dirNueva) { _pmodEd.dirNueva[k] = String(v || ""); pmodPieRefrescar(); } }
+/* ISIS no tiene libreta de direcciones: son dos campos libres que PISAN lo que muestra la PPP. */
+function pmodDirIsis(k, v) { if (_pmodEd && _pmodEd.dirIsis) { _pmodEd.dirIsis[k] = String(v || ""); pmodPieRefrescar(); } }
+function _pmodDirIsisCambio() {
+  const E = _pmodEd; if (!E || !E.isis) return false;
+  const a = E.dirIsis || {}, b = E.dirIsis0 || {};
+  return String(a.direccion || "") !== String(b.direccion || "") || String(a.barrio || "") !== String(b.barrio || "");
+}
 /* El pie se repinta solo (sin volver a dibujar la tabla) para no robarle el foco al input. */
 function pmodPieRefrescar() {
   const o = document.getElementById("pmodOverlay"); if (!o || !_pmodEd) return;
@@ -37405,6 +37518,7 @@ async function pmodQuien(v) {
 /* ── guardar ────────────────────────────────────────────────────────────── */
 async function pmodGuardar() {
   if (!_pmodEd || _pmodEd.guardando) return;
+  if (_pmodEd.isis) return pmodGuardarIsis();
   const E = _pmodEd, p = E.p;
   const fin = _pmodItemsFinal();
   if (!fin.length) { try { alert("El pedido no puede quedar sin ningún renglón. Si no va nada, el camino es cancelarlo desde Programación."); } catch (_e) {} return; }
@@ -37452,6 +37566,54 @@ async function pmodGuardar() {
     pppRenderProg();
     pppSetStatus("✓ Listo: el pedido de " + (p.rs || p.cod) + " quedó modificado y la programación al día.", true);
     if (tocaDir) await pmodZonaCambio(p, dirAntes, dirDespues);
+  } catch (e) {
+    const msg = (e && e.message) ? e.message : String(e);
+    if (_pmodEd) { _pmodEd.guardando = false; pmodPieRefrescar(); }
+    pppSetStatus("⚠ No se pudo guardar: " + msg, false);
+    try { alert("No se pudo guardar:\n\n" + msg); } catch (_e) {}
+  }
+}
+
+/* Guardar una NP de ISIS. Va por Gestión (`gv_pedido_mod_isis`), que escribe los dos overrides
+   y el log en la misma transacción. No hay `pwebResync` que valga acá: la NP de ISIS no se
+   re-parte ni cambia de tanda por cambiarle el contenido — lo único que se mueve es el m³ de la
+   tanda, que las vistas recalculan solas al releer. */
+async function pmodGuardarIsis() {
+  const E = _pmodEd, p = E.p, np = E.np;
+  const fin = _pmodItemsFinal();
+  if (!fin.length) { try { alert("El pedido no puede quedar sin ningún renglón."); } catch (_e) {} return; }
+  const tocaItems = E.items.some(function (it) { return it.nueva || it.fuera || it.cajas !== it.cajas0; });
+  const tocaDir = _pmodDirIsisCambio();
+  if (!tocaItems && !tocaDir) return;
+
+  const resumen = [];
+  for (const it of E.items) {
+    if (it.nueva && !it.fuera) resumen.push("+ " + it.cod + " × " + it.cajas);
+    else if (it.fuera && it.cajas0) resumen.push("− " + it.cod);
+    else if (it.cajas !== it.cajas0) resumen.push(it.cod + ": " + it.cajas0 + " → " + it.cajas);
+  }
+  if (tocaDir) resumen.push("entrega → " + (E.dirIsis.direccion || "—") + (E.dirIsis.barrio ? " · " + E.dirIsis.barrio : ""));
+  if (!confirm("Guardar los cambios de la NP " + np + " (" + (p.rs || p.cod) + ")?\n\n" + resumen.join("\n") +
+               "\n\nQuién: " + E.quien + "\nPor qué: " + E.motivo +
+               "\n\n⚠ La NP se tipeó en ISIS: esto cambia lo que ve la PPP, NO lo que hay en ISIS. " +
+               "En Facturación va a aparecer con ✏ MOD y el detalle, para tipearlo igual allá.")) return;
+
+  E.guardando = true; pmodPieRefrescar();
+  pppSetStatus("Guardando los cambios de " + np + "…", true);
+  try {
+    const body = { p_np: String(np), p_motivo: E.motivo, p_quien: E.quien,
+                   p_espera: (E.ctx && E.ctx.items_raw) || null };
+    if (tocaItems) body.p_items = fin.map(function (it) { return { cod_art: it.cod, cajas: it.cajas }; });
+    if (tocaDir) { body.p_direccion = E.dirIsis.direccion || null; body.p_barrio = E.dirIsis.barrio || null; }
+    const res = await aprRpc("gv_pedido_mod_isis", body);
+    const det = (res && (res.detalle || (res[0] && res[0].detalle))) || {};
+    pmodCerrar();
+    _pgaTs = 0;
+    try { await pppLoadProgFromSupabase(); } catch (_e) {}
+    pppRenderProg();
+    pppSetStatus("✓ " + np + " quedó modificada" +
+      (det.sin_uxb ? " (ojo: " + det.sin_uxb + " no tiene u×B cargado, el m³ puede salir de menos)" : "") +
+      ". En Facturación aparece con ✏ MOD.", true);
   } catch (e) {
     const msg = (e && e.message) ? e.message : String(e);
     if (_pmodEd) { _pmodEd.guardando = false; pmodPieRefrescar(); }

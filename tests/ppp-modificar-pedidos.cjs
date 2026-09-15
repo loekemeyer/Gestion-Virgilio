@@ -180,6 +180,12 @@ catch (_e) {
       if (/rpc\/gv_pedido_mod_ctx/.test(u))     { lk.push(["ctx", b]);     return J(CTX); }
       if (/rpc\/gv_pedido_mod_guardar/.test(u)) { lk.push(["guardar", b]); return J({ ok: true, log_id: 7, detalle: {} }); }
       if (/GV_Modif_Personas/.test(u)) return J(personas.slice());
+      if (/gv_ppp_np_items/.test(u)) return J([{ art: "034", cajas: 2, uxb: 12, renglones: 1 },
+                                               { art: "960E", cajas: 1, uxb: 6, renglones: 1 }]);
+      if (/gv_ppp_programacion_diaria/.test(u)) return J([{ np: "98701", direccion: "Lacroze 2481",
+                                                            barrio: "Colegiales", zona: "Zona 1", tanda: "D67E" }]);
+      if (/gv_uxb_resuelto/.test(u)) return J([{ cod: "034", uxb: 12 }, { cod: "960E", uxb: 6 }, { cod: "777", uxb: 24 }]);
+      if (/rpc\/gv_pedido_mod_isis/.test(u)) { lk.push(["isis", b]); return J({ ok: true, np: "98701", detalle: {} }); }
       if (/rpc\/gv_modif_persona_agregar/.test(u)) {
         lk.push(["persona", b]); personas.push({ id: personas.length + 1, nombre: b.p_nombre });
         return J([{ id: personas.length, nombre: b.p_nombre }]); }
@@ -193,10 +199,27 @@ catch (_e) {
     const esperar = () => new Promise((res) => setTimeout(res, 80));
     const abierto = () => !!document.querySelector("#pmodOverlay.show");
 
-    // (a) una NP de ISIS no se modifica desde acá
+    /* (a) v18.35 (Luis: *"para los pedidos de isis no hay problema con que se cambien en la PPP"*):
+       una NP de ISIS AHORA se modifica. Abre el mismo modal, pero con los renglones que trae
+       Gestión y con la dirección como dos campos libres (ISIS no tiene libreta de direcciones). */
     aviso = ""; btnDe("Pettish").click(); await esperar();
-    out.isisAvisa = /ISIS/.test(aviso) && !abierto();
-    // (a2) Chef tampoco, todavía
+    const ovI = document.getElementById("pmodOverlay");
+    out.isisAbre = abierto();
+    out.isisItems = [...ovI.querySelectorAll(".pme-tab tbody tr")].map((tr) => tr.children[0].textContent.trim());
+    out.isisDirLibre = /Dirección de entrega/.test(ovI.innerHTML) &&
+      !ovI.querySelector("#pmeQuien ~ select") && ovI.innerHTML.indexOf("Barrio / localidad") > 0;
+    out.isisAvisaPisa = /pisa/.test(ovI.innerHTML) && /MOD/.test(ovI.innerHTML);
+    // se modifica y se guarda: tiene que ir por la RPC de ISIS, no por la de LK
+    pmodCajas(0, "9");
+    await pmodQuien("Mariana"); pmodMotivo("el cliente cambió el pedido por teléfono");
+    pmodDirIsis("direccion", "Av. Siempreviva 742");
+    await pmodGuardar(); await esperar();
+    const gi = (lk.filter((x) => x[0] === "isis")[0] || [])[1] || {};
+    out.isisGuardo = JSON.stringify(gi);
+    out.isisNoFueALk = !lk.some((x) => x[0] === "guardar");
+    pmodCerrar();
+
+    // (a2) Chef todavía no
     aviso = ""; btnDe("El Martillo").click(); await esperar();
     out.chefAvisa = /Chef/.test(aviso) && !abierto();
 
@@ -222,6 +245,9 @@ catch (_e) {
     /* v18.29 (Luis) — con cambios pero SIN quién ni justificativo NO se guarda. Los dos chequeos
        de abajo son la parte que importa: que el botón siga apagado y que diga qué falta. */
     const btnOk = () => document.querySelector("#pmodOverlay .pme-ok");
+    // el modal se acuerda del último que modificó (localStorage): para probar el guard hay que
+    // vaciarlo a propósito, si no llega ya elegido de la vuelta anterior
+    await pmodQuien("");
     out.sinQuien = !!btnOk().disabled && /quién/i.test(btnOk().title);
     await pmodQuien("Mariana");
     out.sinMotivo = !!btnOk().disabled && /justificativo/i.test(btnOk().title);
@@ -258,6 +284,24 @@ catch (_e) {
     out.armadoTanda = !!pArm && /E12L/.test(pArm.tanda) && /vuelve/.test(pArm.tanda);
     const pNuevo = f.find((x) => /Web Nueva/.test(x.rs));
     out.nuevoSigueApr = !!pNuevo && /A programar/i.test(pNuevo.est) && pNuevo.tanda === "—";
+
+    /* v18.35 (Luis: *"se sigue deformando la tabla"*) — el ancho de cada columna NO puede
+       depender de lo que haya adentro. Se mide con todos los pedidos y con un filtro puesto
+       (menos filas, textos más cortos): tienen que dar lo mismo. El control de no-trivialidad
+       está abajo: con `table-layout:auto`, que era lo que había, los anchos SÍ cambian. */
+    const anchos = () => [...box.querySelectorAll("table.pmod-tab thead th")]
+      .map((e) => Math.round(e.getBoundingClientRect().width));
+    const aTodos = anchos();
+    pmodBuscar("Chen"); const aFiltrado = anchos(); pmodBuscar("");
+    out.noSeDeforma = JSON.stringify(aTodos) === JSON.stringify(aFiltrado);
+    out.anchos = JSON.stringify(aTodos);
+    const tb = box.querySelector("table.pmod-tab");
+    out.layoutFijo = getComputedStyle(tb).tableLayout === "fixed";
+    tb.style.tableLayout = "auto";
+    const aAuto1 = anchos();
+    pmodBuscar("Chen"); const aAuto2 = anchos(); pmodBuscar("");
+    box.querySelector("table.pmod-tab").style.tableLayout = "";
+    out.controlAutoSeDeforma = JSON.stringify(aAuto1) !== JSON.stringify(aAuto2);
 
     const DOW = /(lun|mar|mié|jue|vie|sáb|dom)/i;
     const pProg = f.find((x) => x.tanda !== "—" && x.fProg !== "—");
@@ -348,7 +392,15 @@ catch (_e) {
   chk(r.combinados, "los filtros se combinan (armado + Chef = ninguno)");
   chk(r.limpiarVuelve, "«Limpiar» devuelve todo y vacía la búsqueda");
   chk(r.botonEnCadaFila, "cada fila tiene su botón «Modificar» a la derecha de todo");
-  chk(r.isisAvisa, "una NP de ISIS avisa que se modifica en ISIS y NO abre el modal");
+  chk(r.isisAbre, "una NP de ISIS abre el modal ← lo que pidió Luis");
+  chk(r.isisItems.length === 2 && /034/.test(r.isisItems[0]),
+      "con los renglones que trae Gestión, no LK: " + JSON.stringify(r.isisItems));
+  chk(r.isisDirLibre, "y la dirección como campos libres (ISIS no tiene libreta de direcciones)");
+  chk(r.isisAvisaPisa, "avisando que se PISA lo que muestra la PPP y que va a salir con ✏ MOD en Facturación");
+  chk(/"p_np":"98701"/.test(r.isisGuardo) && /"cajas":9/.test(r.isisGuardo) &&
+      /Siempreviva/.test(r.isisGuardo) && /Mariana/.test(r.isisGuardo),
+      "y guarda por la RPC de ISIS con NP, cajas, dirección y quién: " + r.isisGuardo);
+  chk(r.isisNoFueALk, "sin tocar la RPC de LK ← son dos caminos distintos");
   chk(r.chefAvisa, "un pedido de Chef avisa que esa base todavía no acepta cambios");
   chk(r.abre, "un pedido web de LK abre el modal");
   chk(/"p_order_id":1343/.test(r.ctxPidio), "y pide el contexto del pedido correcto: " + r.ctxPidio);
@@ -382,6 +434,9 @@ catch (_e) {
   chk(r.armadoDice, "un pedido que volvió a A Programar YA ARMADO lo dice en Estado ← lo que pidió Luis");
   chk(r.armadoTanda, "y la columna Tanda muestra a cuál vuelve (no se pickea de nuevo)");
   chk(r.nuevoSigueApr, "control: el que nunca se programó sigue en «A programar», sin tanda");
+  chk(r.layoutFijo, "la tabla tiene el ancho de columnas FIJO, no por contenido");
+  chk(r.noSeDeforma, "y no se deforma al filtrar: mismas columnas con todos y con uno solo (" + r.anchos + ")");
+  chk(r.controlAutoSeDeforma, "control: con el `table-layout:auto` de antes, las columnas SÍ se movían");
   chk(r.estDentro, "con la tabla desbordada, la columna Estado sigue a la vista");
   chk(r.estDestapado, "y NADA se le pone encima — lo que tapaba era la columna anclada del botón (encima: " + r.estTapadoPor + ")");
   chk(r.stickyVisible && r.stickyPos === "sticky",

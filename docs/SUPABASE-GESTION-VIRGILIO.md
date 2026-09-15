@@ -17260,3 +17260,50 @@ tanda **se muestra**, gris, con candado y sin poder tocarse, y abajo dice quién
 select opcion, texto, legajo, ts_cliente from public."Registros_Produccion_Virgilio"
  where upper(btrim(texto)) = 'E11B' and opcion in ('EP','TP','AP','TAP') order by ts_cliente;
 ```
+
+## §3.hd — v18.35: las NP de ISIS también se modifican (dos overrides nuevos) — 2026-09-15
+
+**Qué se agregó (Virgilio):** `sql/gv_pedido_mod_isis_v1835.sql`.
+
+| Objeto | Qué es |
+|---|---|
+| `public."GV_PPP_Base_Override"` | el contenido pisado de una NP de ISIS: `(np, articulo)` único, con `cajas` (pisa), `quitado` (saca) o una fila que no existe en la base (agrega). RLS: lee todo el mundo, escribe sólo la RPC |
+| `gv_ppp_base_pedidos` (vista) | ahora superpone ese override. **Mismas 6 columnas y tipos** → `CREATE OR REPLACE`, sin `DROP CASCADE` |
+| `GV_PPP_Prog_Override.direccion` / `.barrio` | dos columnas nuevas (nullable), que `gv_ppp_programacion_diaria` resuelve con `COALESCE` igual que la tanda y la fecha |
+| `gv_pedido_mod_isis(np, items, direccion, barrio, motivo, quien, espera)` | la RPC. Exige quién y justificativo, corta si la NP ya está facturada, y escribe overrides + log en una sola transacción |
+
+**Por qué overrides y no la tabla.** El contenido de una NP de ISIS lo carga la importación del
+Excel PPP en `GV_PPP_Base_Pedidos`, y su dirección vive en `GV_PPP_Programacion_Diaria`, que es
+**compartida**. Escribir ahí sería pisar lo que trae la importación (y que la próxima la revierta).
+
+**Cómo se verificó que no se rompió nada** (la vista la leen 17 vistas y 8 funciones):
+
+```sql
+select count(*), sum(hashtext(coalesce(pedido,'')||'|'||coalesce(articulo,'')||'|'||
+       coalesce(cajas::text,'')||'|'||coalesce(cliente,'')||'|'||coalesce(fecha,''))::bigint),
+       sum(coalesce(cajas,0)) from public.gv_ppp_base_pedidos;
+-- antes y después, con el override vacío:  9663 · 81644939734 · 50443.99
+```
+
+Y la programación: **123 filas · -17233616518**, idéntica. `gv_endpoints_rotos` vacía.
+
+⚠ **Los 9 pares repetidos.** `GV_PPP_Base_Pedidos` tiene 9 `(pedido, artículo)` con más de una
+fila. Un LEFT JOIN del override contra la base le habría puesto las cajas nuevas a **cada** fila
+del par, duplicando el renglón. El bloque (2) de la vista agrupa por `o.id` y emite **una sola**
+fila por override.
+
+**El contenido se rearma entero en cada guardado** (`delete` del override de esa NP + `insert` del
+diff contra la base cruda): es idempotente y auto-reparable — si un renglón vuelve a su valor
+original, su fila de override simplemente no se escribe.
+
+**Validación de códigos:** vale si Gestión le conoce el u×B (`gv_uxb_resuelto`) **o** si ya aparece
+en alguna base. Medido el 15/09: **369 de los 373** códigos de la base de ISIS están en
+`gv_uxb_resuelto`, así que exigirlo a secas dejaría afuera 4 legítimos. Los que no tienen u×B
+vuelven en `detalle.sin_uxb` y la pantalla avisa que el m³ puede salir de menos.
+
+**Prueba (transacción abortada, NP 98664):** sin motivo corta; con motivo, el `034` pasó de 1 a 6,
+se quitó el `960E` y se agregó el `001 ×3` → 16 renglones, la dirección pisada se vio en
+`gv_ppp_programacion_diaria` y quedó 1 fila de log con `fuente='isis'`. Tras el rollback: 0
+overrides, 0 log, 9663 filas y ningún endpoint roto.
+
+**Rollback:** al pie del archivo SQL (incluye el `CREATE OR REPLACE` de la vista en su forma simple).
