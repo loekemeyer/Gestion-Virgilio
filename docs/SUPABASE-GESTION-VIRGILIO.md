@@ -17039,6 +17039,14 @@ insert into public."Movimientos_Stock"(cod_art, descripcion, deposito, delta, ti
 -- tiene picking LK. Da igual para el saldo (la capa 2 netea Mixto contra LK): 116 quedó
 -- góndola 0 · Pickeados 0 · a_facturar 49. Por empresa sigue partido (LK +1 / Mixto −1, neto 0).
 -- Rollback: delete from public."Movimientos_Stock" where client_id like 'fix116_E11A_20260915_%';
+
+-- Y el 119 de la MISMA tanda, con el mismo OK ("sí, el 119 también", tarea Planify 3460): picking
+-- −50 con 49 en góndola y SIN aviso "de menos" (ningún NPD), así que la etapa 2 mandó 50 a
+-- a_facturar. ids 65717445 / 65717446:
+insert into public."Movimientos_Stock"(cod_art, descripcion, deposito, delta, tipo, ref, legajo, empresa, client_id) values
+  ('119','<desc>','a_facturar', -1,'ajuste','E11A','0','LK','fix119_E11A_20260915_afacturar'),
+  ('119','<desc>','terminado',   1,'ajuste','E11A','0','LK','fix119_E11A_20260915_gondola');
+-- 119: góndola −1 → 0 · a_facturar 50 → 49. Rollback: delete … where client_id like 'fix119_E11A_20260915_%';
 ```
 
 **Chequeo de que no volvió a pasar** (vacío = todo bien):

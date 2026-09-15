@@ -21,7 +21,9 @@
 > comunes** (E11A/C/D) — `gv_ppp_super_mezclado` da 5 filas; el automático ya no lo hace (v18.31)
 > pero esa tanda ya estaba armada. Y **D71 lleva 9,25 m³ en una sola NP** (154 % del tope).
 > **116 (E11A) ya está corregido** (Thomas dio el OK con la captura de la tarea 3424): góndola 0, Pickeados 0.
-> Sigue **119** en góndola −1 (E11A, picking −50 con 49): mismo patrón, espera el mismo OK.
+> **119 (E11A) también corregido** con el OK de Thomas (*"sí, el 119 también"*, tarea 3460): el picking
+> escribió −50 con 49 en góndola y nadie marcó el "de menos" → `a_facturar −1` y `terminado +1`
+> (`fix119_E11A_20260915_*`). Góndola 0, a facturar 49. `vista_saldos_stock` sin góndolas negativas.
 > **Decisión de Thomas:** el "mes en curso" del pop-up de Proyección lo pidió él (v18.24) y Luis lo
 > hizo sacar (v18.34). Detalle y lo que queda abierto: §3.hi.
 
