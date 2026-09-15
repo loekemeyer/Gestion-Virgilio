@@ -22,6 +22,10 @@
    entregado de cada mes de la ventana + el mes en curso marcado, y los números siguen siendo
    el botón que abre el desglose.
 
+   v18.27 — el orden que pidió el dueño: la tabla PRIMERO ("cuánto entró quiero ver primero"),
+   titulada «Estad. Madre», con columnas mes / vtas / entrega, y el gráfico al final ("abajo
+   de eso, el gráfico, que ni uso tiene").
+
    ⚠ Este test estuvo en ROJO en main desde la v18.11 sin que nadie lo notara: esa versión
    cambió el orden de las columnas (pedido del dueño) y nadie lo actualizó. Se reescribió el
    15/09 contra lo que la pantalla hace hoy.
@@ -112,6 +116,12 @@ catch (_e) {
     out.filasMes = filasTab.length;
     out.mesCursoMarcado = filasTab.length ? /\*/.test(filasTab[filasTab.length - 1].textContent) : false;
     out.numerosAbren = body.querySelectorAll(".proyv-tab .proyv-lnk").length >= 12;
+    // v18.27 — la tabla va ANTES que el grafico, y con los nombres que pidio el dueno
+    const htmlCuerpo = body.innerHTML;
+    out.tablaAntesDelGrafico = htmlCuerpo.indexOf('class="proyv-tab"') < htmlCuerpo.indexOf('class="proyv-svg"');
+    out.tituloEstadMadre = /Estad\. Madre/.test(body.textContent);
+    const ths = Array.prototype.map.call(body.querySelectorAll(".proyv-tab th"), function (t) { return t.textContent.trim(); });
+    out.columnas = ths.join("|");
     // el mes en curso: asterisco en el eje y punto hueco ambar
     const svgTxt = body.querySelector(".proyv-svg").textContent;
     out.asterisco = svgTxt.indexOf("*") >= 0;
@@ -142,6 +152,7 @@ catch (_e) {
     r.pidioEntregas && r.fichaEntregado && r.fichaProy && r.fichaFacturado && r.fichaArriba &&
     r.fichaCurso && r.cursoFueraDelProm && r.asterisco && r.puntoHueco &&
     r.sinBarras && r.hits === 12 && r.filasMes === 7 && r.mesCursoMarcado && r.numerosAbren &&
+    r.tablaAntesDelGrafico && r.tituloEstadMadre && r.columnas === "mes|vtas|entrega" &&
     r.abrioDet && r.detTieneCliente && r.detTieneRemito && r.detMarcado && r.cierraDet &&
     r.sinFichaEnt &&
     errs.length === 0;

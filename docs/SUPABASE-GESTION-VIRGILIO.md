@@ -16856,3 +16856,28 @@ el gráfico de la v18.21/v18.24 se conservan: no se volvió atrás, se repuso lo
 **Test:** `tests/proy-entregadas.cjs` verifica ahora las dos cosas a la vez — que **no** haya
 `.proyv-row` / `.proyv-track` (las barras) y que **sí** haya 7 filas de meses (6 + el mes en
 curso, marcado) con sus números clickeables.
+
+---
+
+## §3.gx — v18.27: el pop-up de Proyección, en el orden que pidió el dueño — 2026-09-15
+
+Thomas, escribiendo el layout que quiere: ***"cuánto entró quiero ver primero. Estad Madre. Mes;
+Vtas; Entrega. Abajo de eso, el gráfico, que ni uso tiene."***
+
+**Cómo queda, de arriba a abajo:**
+
+1. el nombre del artículo,
+2. **📊 Estad. Madre** — la tabla `mes · vtas · entrega`, que es lo que va **primero**,
+3. las fichas de resumen (proyección, promedio, facturado, entregado, meses arriba, mes en curso),
+4. el **gráfico**, al final,
+5. el detalle del mes que se haya abierto.
+
+Cambia el orden y los nombres, nada del cálculo: el título pasa de "Facturado y entregado — mes a
+mes" a **Estad. Madre**, y las columnas de `factur.`/`entreg.` a **`vtas`/`entrega`**, que es como
+las nombró él.
+
+El gráfico **no se sacó** — dijo que no lo usa, no que sobre —, se mandó abajo. Sigue siendo una de
+las dos formas de abrir el detalle de un mes; la otra son los números de la tabla.
+
+**Test:** `tests/proy-entregadas.cjs` ahora también verifica el **orden** (la tabla aparece en el
+HTML antes que el `<svg>`), el título y los tres encabezados exactos.
