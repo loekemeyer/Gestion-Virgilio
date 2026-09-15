@@ -1,3 +1,27 @@
+## Nota v18.33 (2026-09-15) — Proyección: switch cajas ⇄ unidades
+
+Pedido de Luis: *"Poné dentro un switch para poder ver todo en cajas o unidades"*. Arriba del
+pop-up hay dos botones — **📦 Cajas** / **🔢 Unidades** — con el `×N un/caja` del artículo al lado.
+
+**Todo** el pop-up sigue al switch, no sólo la tabla: los meses (vtas y entrega), las seis fichas,
+las etiquetas `proy` y `prom` del gráfico, y el desglose que se abre al tocar un mes (clientes
+facturados y entregas con día/remito). Los textos también cambian la palabra: *"termina en 4.128
+**unidades**"*, y la ficha pasa de `PROY. CAJ/MES` a `PROY. UN/MES`.
+
+**Cómo está hecho:** todos los números del pop-up ya pasaban por un único formateador
+(`_stkProyFc`), así que la conversión vive ahí y nada más hubo que tocar. El uni×caja sale de
+`vista_uxb_articulo` (fuente única: Articulos_Cajas → OC_Maximos → precios_venta) vía el
+`loadArtUxb()` que ya existe y está cacheado — si la pantalla de Stocks lo cargó, el pop-up no
+pega a la red. **Si el artículo no tiene uni×caja cargado, el switch no aparece** y todo queda en
+cajas: un botón que no puede convertir nada confunde más de lo que ayuda.
+
+La elección **se recuerda por navegador** (`localStorage gv_proy_unidad`): no es un dato del
+negocio, es cómo lo mira cada uno. Los datos y la proyección **no cambian**: se guardan y se
+calculan en cajas, como siempre; esto es sólo la lectura.
+
+Dos detalles que costaron una pasada cada uno: las etiquetas del gráfico convertían **después** de
+redondear (`proy 8.160` en vez de `8.164`), y los botones salían como dos barras apiladas porque en
+esta app los `button` son `width:100%` por defecto.
 ## Nota v18.32 (2026-09-15) — el pop-up de Proyección entra de una sola vez
 
 Luis mandó la foto del pop-up y una palabra: *"Optimiza"*. Lo que mostraba la foto: la tarjeta de
