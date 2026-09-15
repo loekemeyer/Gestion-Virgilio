@@ -16608,3 +16608,45 @@ Problema **231**; este repo no tiene CI que corra `tests/`, así que un test en 
 Ahora verifica lo de hoy: la ficha de entregado suma sólo los meses cubiertos, no quedan rastros de
 las barras, el gráfico tiene una franja por mes, y tocar un mes abre y cierra el detalle con el
 cliente y el remito adentro.
+
+---
+
+## §3.gr — v18.22: el "http 500" del desglose por cliente — el techo de 3 s del rol `anon` — 2026-09-15
+
+Thomas, con foto: al tocar un mes en el pop-up de Proyección salía **"No se pudo traer el detalle
+(http 500)"**. Problema **234**.
+
+⚠ **Esa función nunca anduvo desde el navegador**, y en §3.gm se la dio por andando el mismo día.
+Se la había probado desde el MCP de Supabase, que entra como **`postgres`** — y `postgres` no
+tiene el techo que tiene `anon`. **La verificación estaba mal hecha, no el código.** Regla que
+queda: una RPC que va a llamar el front se prueba con el rol con el que va a correr.
+
+**La causa, dos cosas sumadas.** `anon` corre con `statement_timeout = 3s` (rolconfig del
+proyecto) y `gv_ventas_clientes_mes_cod` tardaba **4,5 s** → PostgREST cancela y devuelve 500. De
+esos 4,5 s:
+
+- **~2 s son el viaje HTTP a LK**, y son fijos. Por eso `ventas_mensuales_cod` (2,1 s), que ya
+  estaba en producción, también estaba **al filo** y fallaba de a ratos.
+- **578 ms eran la consulta en LK**: el plan entraba por `idx_sales_lines_item_invoice` usando
+  **sólo `item_code`**, traía los **10.060** renglones de todos los meses del código y recién
+  después filtraba con `substr(invoice_date,1,7) = mes`, que no es indexable.
+
+**Lo que se hizo.** (a) En LK el mes pasa a filtrarse como **rango de texto** sobre
+`invoice_date`, que es la 2.ª columna del índice — es TEXTO en ISO, así que comparar texto ordena
+igual que comparar fechas, y el regex sigue cuidando las filas con otro formato; del plan
+desaparecen las 10.060 filas y quedan las 142 del mes. (b) `anon` pasa de **3 s a 8 s**, que es lo
+que **ya tienen** `authenticated` y `authenticator`: no es aflojar un límite, es dejar los tres en
+el mismo número.
+
+⚠ **Lo que NO sirve, y hay que saberlo:** `alter function … set statement_timeout` **no alcanza**.
+Postgres arma el timer al empezar la sentencia y cambiarlo adentro de la función **no lo re-arma**.
+Medido: con la sesión en 1 s, la función con su propio `SET` de 15 s se canceló igual, en su
+`RETURN QUERY`. Se probó, no funcionó, y se sacó — dejar una protección que no protege es peor que
+no tenerla.
+
+**Medido, antes → después** (5 corridas seguidas, 5 meses distintos):
+`gv_ventas_clientes_mes_cod` **4,5 s → 2,2 s**, estable, contra un techo de 8 s ·
+`ventas_mensuales_cod` 2,1 s, que deja de estar al filo.
+
+**Rollback:** `sql/gv_ventas_clientes_500_timeout_v1822.sql`. ⚠ Volver atrás el timeout **sin**
+volver atrás lo de LK deja el 500 de nuevo: el viaje HTTP solo se come ~2 s de los 3 s.
