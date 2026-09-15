@@ -5528,7 +5528,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=18.42"></script>
+<script type="module" src="recepcion.js?v=18.43"></script>
 <!-- Config del módulo de fichada (compartido con fichada.html). El secret
      hmacSecret tiene que ser el mismo acá y allá; cargándolo desde un solo
      archivo evitamos que se desincronicen. -->
@@ -8999,7 +8999,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v18.42";
+const APP_VERSION = "v18.43";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -40762,13 +40762,14 @@ async function fetchMonitorFromSupabase() {
    exactamente igual. Por eso va en su propia función y con try/catch. */
 async function mergeMonitorPppWeb(acc) {
   try {
-    const url = SUPABASE_URL + "/rest/v1/PPP_Web_Programacion"
-      + "?select=empresa,np,np_idx,tanda,zona,fecha_entrega,cod_cliente,razon_social,direccion,barrio,m3"
+    // v18.43 — paginado, por lo mismo que `mergePickingBasePppWeb`: el `limit` no manda,
+    // manda db-max-rows (1000). Hoy son 106 filas y entra de una, pero es la OTRA pata del
+    // picking web (de acá salen las NP de la tanda): si se corta, la tanda no existe para
+    // el operario. No esperamos a que crezca para enterarnos.
+    const rows = await supaFetchAll(SUPABASE_URL + "/rest/v1/PPP_Web_Programacion",
+      "select=empresa,np,np_idx,tanda,zona,fecha_entrega,cod_cliente,razon_social,direccion,barrio,m3"
       + ",es_agregado,agregado_a_np,prioridad"
-      + "&tanda=not.is.null&limit=5000";
-    const r = await fetch(url, { headers: { apikey: SUPABASE_KEY } });
-    if (!r.ok) return;
-    const rows = await r.json();
+      + "&tanda=not.is.null&order=tanda.asc,np.asc");
     for (const x of rows) {
       const tanda = String(x.tanda || "").trim();
       if (!tanda || !x.np) continue;
@@ -40836,12 +40837,21 @@ function pwebAgregadoAviso(entry, comoFila) {
    el operario pickea lo que se programó, y el pedido no puede cambiarle abajo de
    la mano mientras lo levanta. Es lo mismo que hace `PPP_Base_Pedidos` con ISIS.
    (Además el operario no tiene, ni tiene por qué tener, sesión contra LK.) */
+/* ⚠ v18.43 — SE PAGINA. Esto era un `fetch` suelto con `limit=20000`, y ese límite es
+   ILUSORIO: PostgREST corta en 1000 filas (db-max-rows) y devuelve 200, sin avisar.
+   La tabla pasó las 1000 filas el 15/09 (1256) y el corte se comió las 256 últimas —
+   o sea las NP MÁS NUEVAS, que son justo las que se están pickeando. En la pantalla del
+   operario eso se veía como «No encontré artículos para la tanda X»: la tanda figuraba
+   en la programación (esa consulta trae 106 filas y entra entera) pero sus renglones no.
+   Pasó con E25A (LK 0097, 20 cajas del 607E) y con E11C (LK 0092/0093), y el operario, al
+   no poder pickear, arrancaba otra tanda y dejaba la primera abierta — de ahí salían las
+   tandas «sin cerrar» del monitor. `supaFetchAll` pagina con Range; el `order` explícito
+   NO es opcional: sin un orden estable las páginas pueden repetir o saltear filas. */
 async function mergePickingBasePppWeb(map) {
   try {
-    const url = SUPABASE_URL + "/rest/v1/PPP_Web_Base?select=np_label,articulo,cajas&limit=20000";
-    const r = await fetch(url, { headers: { apikey: SUPABASE_KEY } });
-    if (!r.ok) return;
-    for (const x of await r.json()) {
+    const rows = await supaFetchAll(SUPABASE_URL + "/rest/v1/PPP_Web_Base",
+      "select=np_label,articulo,cajas&order=np_label.asc,articulo.asc");
+    for (const x of rows) {
       const np  = pickNormNp(x.np_label);
       const art = String(x.articulo == null ? "" : x.articulo).trim();
       if (!np || !art) continue;
