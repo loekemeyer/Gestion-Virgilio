@@ -1,3 +1,58 @@
+## Nota v18.14 (2026-09-15) — Modificar Pedidos: buscador, filtros y tabla POR PEDIDO
+
+Luis: *"poné la pestaña entre Ocupación y Config. Cuarentena. Debería poder buscar pedidos (que
+estén en A programar y en Programación) — y **ojo acá digo PEDIDOS, no NPs**, ya que un pedido
+puede estar dividido en múltiples NPs. De momento hacé que tenga filtros, barra de búsqueda y
+muestre una tabla con los pedidos actuales a programar y programados (pedidos y que todavía no
+hayan salido)"*.
+
+### La unidad es el PEDIDO, y eso no es un detalle
+
+Medido en la base: de los **74 pedidos web programados, 26 están partidos en varias NP** (hasta 4)
+— 108 NP para 74 pedidos. Listando NP, el mismo pedido de Chen Li Yu saldría **tres veces**.
+
+**Cómo se identifica un pedido:** `(empresa, clave)`, donde `clave` la trae `gv_ppp_prog_arbol`.
+Se midió qué es antes de usarla:
+
+- en los **web** es el `order_id` de la página — LK 0004 / 0005 / 0006 comparten la `1343`;
+- en los de **ISIS** es la NP misma, y **ninguna se repite** (se verificó: cero claves de ISIS
+  compartidas), así que la misma agrupación sirve para los dos **sin caso especial**.
+
+En el rango probado: **545 NP → 511 pedidos**.
+
+### De dónde salen los datos — sin backend nuevo
+
+⚠ **Los pedidos de A Programar NO están en la base de Gestión**: `aprCargar` los lee del proyecto
+de **LK** (`v_pedidos_web_np`) y de **Chef** (RPC). No hay FDW, así que una vista de Gestión no los
+vería. Por eso el módulo usa las dos fuentes que ya cargan las otras solapas:
+
+| | fuente | ya agrupado |
+|---|---|---|
+| A Programar | `_apr.pedidos` | sí, por `order_id` |
+| Programación | `_pgaRows` (`gv_ppp_prog_arbol`) | no — se agrupa acá por `(empresa, clave)` |
+
+**"Que todavía no hayan salido"** se resuelve **NP por NP** contra `_pppEnSalida` y los entregados:
+si salió una sola NP del pedido, el pedido **sigue** con las que quedan y sus m³ son sólo los de
+ésas. Sólo desaparece cuando salieron todas.
+
+### Detalles que salieron de mirar la pantalla
+
+- **Un pedido de ISIS se nombra por su NP pelada**: no existe un "LK 98701". El de la página sí
+  lleva la empresa (`LK 1343`), que es como se lo nombra ahí.
+- **El contador cuenta NP REALES, no bloques.** Un pedido de A Programar todavía no tiene NP —se
+  le asigna al programarlo— y sumar sus bloques decía *"10 NP"* cuando las que existen son 7. Van
+  aparte: *"7 pedidos · 7 NP + 3 bloques sin NP"*.
+- La zona no estira (mismo criterio de anchos que En Salida): partía en dos renglones con medio
+  ancho al lado vacío.
+
+### Lo que NO hace todavía
+
+**Sólo muestra.** No modifica nada: qué se puede tocar (ítems, cantidades, cliente, fecha, tanda),
+con qué permisos y qué pasa con un pedido ya pickeado, lo define Luis.
+
+`tests/ppp-modificar-pedidos.cjs` — 26 chequeos, con el caso del pedido partido y el del pedido
+del que salió **una sola** NP.
+
 ## Nota v18.13 (2026-09-15) — Pop-up de Proyección: tocar un mes y ver qué pasó
 
 Pedido del dueño: *"quiero poder tocar sobre venta o sobre entrega y ver cuándo entregó en

@@ -2823,11 +2823,46 @@ button.pk-anular small{ display:block; font-size:12px; font-weight:700; opacity:
 .ppp-es-row.on .ppp-es-chk{ border-color:#059669; background:#ecfdf5; }
 .ppp-es-sinsal{ border:1px solid #e2e8f0; background:#fff; color:#b45309; border-radius:7px; padding:3px 9px; font-size:13px; font-weight:800; cursor:pointer; }
 .ppp-es-sinsal:hover{ background:#fffbeb; border-color:#fde68a; }
-/* v18.12 — Modificar Pedidos: el módulo está vacío a propósito (ver `pppModifHtml`). */
-.pmod-vacio{ text-align:center; padding:56px 20px; color:#64748b; }
+/* v18.14 — Modificar Pedidos: buscador + filtros + tabla POR PEDIDO (ver `pppModifHtml`). */
+.pmod-vacio{ text-align:center; padding:48px 20px; color:#64748b; }
 .pmod-ico{ font-size:42px; line-height:1; margin-bottom:10px; opacity:.55; }
 .pmod-t{ font-size:19px; font-weight:900; color:#0f172a; margin-bottom:4px; }
 .pmod-s{ font-size:14px; }
+.pmod-bar{ display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin:0 0 8px; }
+.pmod-q{ flex:1 1 280px; min-width:0; padding:8px 13px; font-size:15px; border:1.5px solid #cbd5e1;
+  border-radius:9px; background:#fff; box-sizing:border-box; }
+.pmod-q:focus{ outline:none; border-color:#2563eb; box-shadow:0 0 0 3px rgba(37,99,235,.12); }
+.pmod-sel{ width:auto; height:38px; padding:0 9px; font-size:14px; font-weight:700; color:#334155;
+  border:1.5px solid #cbd5e1; border-radius:9px; background:#fff; cursor:pointer; }
+.pmod-clr{ width:auto; padding:8px 14px; border:1px solid #e2e8f0; border-radius:9px; background:#f8fafc;
+  color:#475569; font-weight:800; font-size:14px; cursor:pointer; }
+.pmod-res{ font-size:14px; color:#0f172a; margin:0 0 9px; }
+.pmod-de{ color:#64748b; font-weight:500; }
+.pmod-wrap{ overflow-x:auto; border:1px solid #e2e8f0; border-radius:11px; background:#fff; }
+.pmod-tab{ width:100%; border-collapse:collapse; font-size:15px; }
+.pmod-tab th{ background:#f8fafc; color:#475569; font-size:.78em; text-transform:uppercase;
+  letter-spacing:.03em; font-weight:800; text-align:left; padding:8px 10px;
+  border-bottom:1px solid #e2e8f0; white-space:nowrap; position:sticky; top:0; }
+.pmod-tab td{ padding:8px 10px; border-bottom:1px solid #f1f5f9; vertical-align:top; }
+.pmod-tab tr:last-child td{ border-bottom:0; }
+/* el cliente estira; el resto se queda con lo que necesita su dato (mismo criterio que En Salida) */
+.pmod-tab td.ped, .pmod-tab td.nps, .pmod-tab td.zo, .pmod-tab td.fe, .pmod-tab td.td,
+.pmod-tab td.n, .pmod-tab td.est{ width:1%; white-space:nowrap; }
+.pmod-tab td.rs{ width:100%; min-width:180px; color:#0f172a; }
+.pmod-tab th.n, .pmod-tab td.n{ text-align:right; }
+.pmod-row:hover{ background:#f8fafc; }
+.pmod-row.e-a_programar > td:first-child{ box-shadow:inset 3px 0 0 #7c3aed; }
+.pmod-cod{ color:#94a3b8; font-size:.79em; }
+.pmod-sin{ color:#94a3b8; }
+.pmod-n{ display:inline-block; margin-left:6px; padding:0 6px; border-radius:999px; background:#eef2f7;
+  color:#475569; font-size:.72em; font-weight:800; }
+.pmod-est{ display:inline-block; border-radius:999px; padding:1px 9px; font-size:.79em; font-weight:800;
+  white-space:nowrap; background:#f1f5f9; color:#334155; border:1px solid #e2e8f0; }
+.pmod-est.e-a_programar{ background:#f5f3ff; color:#6d28d9; border-color:#ddd6fe; }
+.pmod-est.e-facturado{ background:#dbeafe; color:#1e3a8a; border-color:#bfdbfe; }
+.pmod-est.e-armado{ background:#dcfce7; color:#15803d; border-color:#bbf7d0; }
+.pmod-est.e-proceso{ background:#fef9c3; color:#a16207; border-color:#fde68a; }
+.pmod-est.e-pendiente{ background:#fee2e2; color:#b91c1c; border-color:#fecaca; }
 .ppp-es-actions{ position:sticky; bottom:0; background:#fff; border-top:1px solid #e2e8f0; padding:10px 0 4px; display:flex; gap:8px; flex-wrap:wrap; }
 .ppp-es-ok{ background:#059669; color:#fff; border:0; border-radius:9px; padding:10px 18px; font-weight:800; font-size:13.5px; cursor:pointer; width:auto; flex:0 0 auto; }
 .ppp-es-ok:disabled{ background:#cbd5e1; cursor:default; }
@@ -5441,7 +5476,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=18.13"></script>
+<script type="module" src="recepcion.js?v=18.14"></script>
 <!-- Config del módulo de fichada (compartido con fichada.html). El secret
      hmacSecret tiene que ser el mismo acá y allá; cargándolo desde un solo
      archivo evitamos que se desincronicen. -->
@@ -8889,7 +8924,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v18.13";
+const APP_VERSION = "v18.14";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -36400,24 +36435,197 @@ function _pppTandaBlocksHtml(dk, ped) {
   }
   return html;
 }
-/* ═══ MODIFICAR PEDIDOS (v18.12, Luis 2026-09-15) ══════════════════════════════════════════
-   Pedido: *"vamos a crear una pestaña nueva en la PPP que se llame «Modificar Pedidos»"* y, al
-   rato, *"creá la pestaña y módulo vacío, después te digo bien qué le ponemos"*.
+/* ═══ MODIFICAR PEDIDOS (v18.14, Luis 2026-09-15) ══════════════════════════════════════════
+   Pedido: *"debería poder buscar pedidos (que estén en A programar y en Programación) — y ojo acá
+   digo PEDIDOS, no NPs, ya que un pedido puede estar dividido en múltiples NPs. De momento hacé
+   que tenga filtros, barra de búsqueda y muestre una tabla con los pedidos actuales a programar y
+   programados (pedidos y que todavía no hayan salido)"*.
 
-   Así que esto es EL MARCO Y NADA MÁS: la solapa, su lugar en la barra y el punto donde va a
-   colgar la pantalla. No trae datos, no toca nada y no decide ninguna regla de negocio — qué se
-   va a poder modificar (ítems, cantidades, cliente, fecha, tanda), con qué permisos y qué pasa
-   si el pedido ya se pickeó, lo define Luis.
+   ⚠ LA UNIDAD ES EL PEDIDO, NO LA NP. Medido el 15/09: de los 74 pedidos web programados, **26
+   están partidos en varias NP** (hasta 4), o sea 108 NP para 74 pedidos. Listar NP mostraría el
+   mismo pedido tres veces.
 
-   Para llenarlo: escribir el HTML en `pppModifHtml()`. La intercepción en `pppRenderProg()` ya
-   está hecha (junto a la de Config. Cuarentena) y la solapa ya está exenta del zoom automático
-   de `pppFitPantalla`. */
+   Cómo se identifica un pedido: `(empresa, clave)`, donde `clave` la trae `gv_ppp_prog_arbol`.
+   Medido: en los pedidos **web** `clave` es el `order_id` de la página (LK 0004/0005/0006 comparten
+   la 1343), y en los de **ISIS** `clave` es la NP misma y **ninguna se repite** — así que la misma
+   agrupación sirve para los dos sin caso especial. En el rango probado: 545 NP → 511 pedidos.
+
+   De dónde salen los datos — las dos fuentes que ya cargan otras solapas, sin backend nuevo:
+     · **A Programar** → `_apr.pedidos`, que ya viene agrupado por `order_id` (viene de LK/Chef,
+       no de la base de Gestión: no hay FDW, así que una vista de acá no los vería);
+     · **Programación** → `_pgaRows` (`gv_ppp_prog_arbol`), agrupado acá por `(empresa, clave)`.
+
+   "Que todavía no hayan salido": se saca lo que está en `_pppEnSalida` o ya entregado, mirando
+   NP por NP — si una NP del pedido salió, esa NP no cuenta; si salieron todas, el pedido no se
+   lista.
+
+   Esto es SÓLO LA VISTA: busca, filtra y muestra. Todavía no modifica nada — qué se puede tocar
+   y con qué reglas lo define Luis. */
+let _pmod = { q: "", donde: "todos", emp: "todas", estado: "todos" };
+
+/* Un renglón por PEDIDO, de las dos fuentes, sin lo que ya salió. */
+function _pmodPedidos() {
+  const out = [];
+  const salida = _pppEnSalida || new Map();
+  const ent = (typeof pppLoadEntregados === "function") ? pppLoadEntregados() : new Set();
+  const salio = function (np) {
+    const k = String(np);
+    return salida.has(_pppNpNorm(k)) || ent.has(k);
+  };
+
+  // ── A Programar: ya viene un objeto por pedido ──────────────────────────
+  for (const p of ((_apr && _apr.pedidos) || [])) {
+    const emp = String(p.empresa || "").toUpperCase() === "CHEF" ? "CH" : "LK";
+    out.push({
+      key: emp + ":" + p.order_id, pedido: String(p.order_id), empresa: emp,
+      nps: [], nNp: (p.bloques || []).length || 1,
+      cod: String(p.cod || ""), rs: String(p.razon_social || ""),
+      zona: String(p.zona || ""), loc: String(p.localidad || ""),
+      fecha: "", fechaPedido: String(p.fecha_recep || "").slice(0, 10),
+      tandas: [], m3: Number(p.m3) || 0, estado: "a_programar", donde: "apr"
+    });
+  }
+
+  // ── Programación: las NP se juntan por pedido ───────────────────────────
+  const by = new Map();
+  for (const r of (_pgaRows || [])) {
+    if (salio(r.np)) continue;                       // esa NP ya salió: no cuenta
+    const emp = String(r.empresa || "LK").toUpperCase();
+    const k = emp + ":" + String(r.clave || r.np);
+    let g = by.get(k);
+    if (!g) {
+      g = { key: k, pedido: String(r.clave || r.np), empresa: emp, esIsis: String(r.origen || "") === "isis",
+            nps: [], nNp: 0,
+            cod: String(r.cod || ""), rs: String(r.razon_social || ""),
+            zona: String(r.zona_corta || r.zona || ""), loc: String(r.barrio || r.localidad || ""),
+            fecha: String(r.fecha || "").slice(0, 10), fechaPedido: String(r.fecha_pedido || "").slice(0, 10),
+            tandas: [], m3: 0, estados: {}, donde: "plan" };
+      by.set(k, g);
+    }
+    g.nps.push(String(r.np)); g.nNp++;
+    g.m3 += Number(r.m3) || 0;
+    const t = String(r.tanda || "").trim();
+    if (t && g.tandas.indexOf(t) < 0) g.tandas.push(t);
+    // ⚠ un pedido partido PODRÍA tener bloques en estados distintos. Hoy no pasa (medido: 0),
+    // pero se guarda el detalle y se resuelve con `_pgaEstadoGrupo`, la misma regla que usa
+    // Programación para una tanda — así los dos dicen lo mismo.
+    const e = (PGA_EST.indexOf(r.estado) >= 0 ? r.estado : "pendiente");
+    g.estados[e] = (g.estados[e] || 0) + 1;
+    // un pedido con varias fechas: se muestra la más temprana y se avisa al lado
+    const f = String(r.fecha || "").slice(0, 10);
+    if (f && (!g.fecha || f < g.fecha)) g.fecha = f;
+    if (f && g.fechaMax !== f) g.fechaMax = (!g.fechaMax || f > g.fechaMax) ? f : g.fechaMax;
+  }
+  for (const g of by.values()) {
+    const est = _pgaEstCero();
+    for (const k in g.estados) est[k] = g.estados[k];
+    g.estado = _pgaEstadoGrupo(est, g.nNp);
+    out.push(g);
+  }
+  return out;
+}
+
+/* El filtro + la búsqueda. La búsqueda mira todo lo que el operador puede tener a mano:
+   el número de pedido, cualquiera de sus NP, el cliente, el código, la tanda y la zona. */
+function _pmodFiltrar(list) {
+  const q = String(_pmod.q || "").trim().toLowerCase();
+  return list.filter(function (p) {
+    if (_pmod.donde !== "todos" && p.donde !== _pmod.donde) return false;
+    if (_pmod.emp !== "todas" && p.empresa !== _pmod.emp) return false;
+    if (_pmod.estado !== "todos" && p.estado !== _pmod.estado) return false;
+    if (!q) return true;
+    const heno = [p.pedido, p.cod, p.rs, p.zona, p.loc, p.tandas.join(" "), p.nps.join(" ")]
+      .join(" ").toLowerCase();
+    return heno.indexOf(q) >= 0;
+  });
+}
+function _pmodSet(k, v) { _pmod[k] = v; pppRenderProg(); }
+function pmodBuscar(v) { _pmod.q = v; pppRenderProg(); }
+function pmodFiltro(k, v) { _pmodSet(k, v); }
+function pmodLimpiar() { _pmod.q = ""; _pmod.donde = "todos"; _pmod.emp = "todas"; _pmod.estado = "todos"; pppRenderProg(); }
+function pmodRecargar() { _pgaTs = 0; try { pgaNeed(true); } catch (_e) {} try { aprCargar(); } catch (_e) {} pppRenderProg(); }
+
+const PMOD_EST_TXT = { a_programar: "A programar", facturado: "Facturado", armado: "Armado",
+                       proceso: "En proceso", pendiente: "Pendiente" };
 function pppModifHtml() {
-  return '<div class="pmod-vacio">' +
-    '<div class="pmod-ico">✏️</div>' +
-    '<div class="pmod-t">Modificar Pedidos</div>' +
-    '<div class="pmod-s">Módulo vacío — todavía sin definir qué se modifica.</div>' +
+  const todos = _pmodPedidos(), list = _pmodFiltrar(todos);
+  const cargando = (!_apr.listo && _apr.cargando) || (_pgaRows == null);
+  const nApr = todos.filter(function (p) { return p.donde === "apr"; }).length;
+  const nPlan = todos.length - nApr;
+  /* ⚠ El contador cuenta NP REALES (`p.nps.length`), no bloques. Un pedido de A Programar
+     todavía no tiene NP —se le asigna al programarlo— y sumar sus bloques ahí decía "10 NP"
+     cuando las NP que existen son 7. Los bloques se ven en su propio renglón. */
+  let m3 = 0, nNp = 0, nBloq = 0;
+  for (const p of list) { m3 += p.m3; nNp += p.nps.length; if (!p.nps.length) nBloq += p.nNp; }
+
+  const sel = function (k, opts) {
+    return '<select class="pmod-sel" onchange="pmodFiltro(\'' + k + '\', this.value)">' +
+      opts.map(function (o) {
+        return '<option value="' + o[0] + '"' + (_pmod[k] === o[0] ? " selected" : "") + '>' + o[1] + '</option>';
+      }).join("") + '</select>';
+  };
+
+  let h = '<div class="pn-head"><div><div class="pn-h1">Modificar Pedidos</div>' +
+    '<div class="pn-h2">Un renglón por <b>PEDIDO</b>, no por NP: un pedido de la página se parte en ' +
+    'varias NP y acá va junto. Están los de <b>A Programar</b> y los de <b>Programación</b> que ' +
+    'todavía no salieron.</div></div>' +
+    '<div class="pn-tools"><button class="pn-lnk" onclick="pmodRecargar()" title="Volver a leer las dos fuentes">🔄 Actualizar</button></div></div>';
+
+  h += '<div class="pmod-bar">' +
+    '<input class="pmod-q" type="search" placeholder="Buscar: pedido, NP, cliente, código, tanda, zona…" ' +
+      'value="' + escapeHtml(_pmod.q) + '" oninput="pmodBuscar(this.value)">' +
+    sel("donde", [["todos", "Dónde: todos"], ["apr", "Sólo A Programar"], ["plan", "Sólo programados"]]) +
+    sel("emp", [["todas", "Empresa: todas"], ["LK", "Loekemeyer"], ["CH", "Chef"]]) +
+    sel("estado", [["todos", "Estado: todos"], ["a_programar", "A programar"], ["pendiente", "Pendiente"],
+                   ["proceso", "En proceso"], ["armado", "Armado"], ["facturado", "Facturado"]]) +
+    '<button class="pmod-clr" onclick="pmodLimpiar()">Limpiar</button>' +
   '</div>';
+
+  h += '<div class="pmod-res"><b>' + list.length + '</b> pedido' + (list.length === 1 ? "" : "s") +
+    ' · <b>' + nNp + '</b> NP' +
+    (nBloq ? ' <span class="pmod-de">+ ' + nBloq + ' bloque' + (nBloq === 1 ? "" : "s") + ' sin NP</span>' : '') +
+    ' · <b>' + _pppFmtM3(m3) + '</b> m³' +
+    (list.length !== todos.length ? ' <span class="pmod-de">(de ' + todos.length + ')</span>' : '') +
+    ' <span class="pmod-de">· ' + nApr + ' a programar · ' + nPlan + ' programados</span></div>';
+
+  if (cargando && !list.length) return h + '<div class="planim-empty">Buscando los pedidos…</div>';
+  if (!list.length) {
+    return h + '<div class="pmod-vacio"><div class="pmod-ico">🔍</div>' +
+      '<div class="pmod-t">' + (todos.length ? "Sin coincidencias" : "No hay pedidos para mostrar") + '</div>' +
+      '<div class="pmod-s">' + (todos.length ? "Probá con otro texto o limpiá los filtros."
+        : "Acá salen los de A Programar y los programados que todavía no salieron.") + '</div></div>';
+  }
+
+  h += '<div class="pmod-wrap"><table class="pmod-tab"><thead><tr>' +
+    '<th>Pedido</th><th>NP</th><th>Cliente</th><th>Zona · barrio</th>' +
+    '<th>Entrega</th><th>Tanda</th><th class="n">m³</th><th>Estado</th>' +
+    '</tr></thead><tbody>';
+  for (const p of list) {
+    const varias = p.nNp > 1;
+    h += '<tr class="pmod-row e-' + p.estado + '">' +
+      /* Un pedido de ISIS se llama por su NP pelada — no existe un "LK 98701". El de la página sí
+         lleva la empresa, que es como se lo nombra ahí ("LK 1343"). */
+      '<td class="ped"><b>' + escapeHtml(p.esIsis ? p.pedido : (p.empresa + " " + p.pedido)) + '</b></td>' +
+      '<td class="nps">' + (p.nps.length
+        ? escapeHtml(p.nps.join(", ")) + (varias ? '<span class="pmod-n">' + p.nNp + ' NP</span>' : '')
+        : '<span class="pmod-sin">' + (varias ? p.nNp + ' bloques' : 'sin NP todavía') + '</span>') + '</td>' +
+      '<td class="rs">' + escapeHtml(p.rs || "—") + '<div class="pmod-cod">' + escapeHtml(p.cod) + '</div></td>' +
+      '<td class="zo">' + escapeHtml([p.zona, p.loc].filter(function (x, i, a) { return x && a.indexOf(x) === i; }).join(" · ")) + '</td>' +
+      '<td class="fe">' + (p.fecha ? escapeHtml(_pmodFecha(p.fecha)) +
+          (p.fechaMax && p.fechaMax !== p.fecha ? '<span class="pmod-n" title="El pedido tiene NP en más de un día">+1 día</span>' : '')
+        : '<span class="pmod-sin">—</span>') + '</td>' +
+      '<td class="td">' + (p.tandas.length ? escapeHtml(p.tandas.join(" + ")) : '<span class="pmod-sin">—</span>') + '</td>' +
+      '<td class="n">' + _pppFmtM3(p.m3) + '</td>' +
+      '<td class="est"><span class="pmod-est e-' + p.estado + '">' + (PMOD_EST_TXT[p.estado] || p.estado) + '</span></td>' +
+      '</tr>';
+  }
+  h += '</tbody></table></div>';
+  return h;
+}
+function _pmodFecha(iso) {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(iso || "")); if (!m) return String(iso || "");
+  const d = new Date(+m[1], +m[2] - 1, +m[3]);
+  return _PN_DOW[d.getDay()] + " " + (+m[3]) + "/" + m[2];
 }
 function pppTabsHtml(cProg, cPlan, cViaje, cEnt) {
   const n = function (v) { return (v == null ? "…" : v); };
@@ -36428,11 +36636,11 @@ function pppTabsHtml(cProg, cPlan, cViaje, cEnt) {
   return '<div class="ppp-tabs">' +
     b("prog",    "📥 A Programar (" + n(cProg) + ")") +
     b("plan",    "🗓️ Programación (" + n(cPlan) + ")") +
-    b("modif",   "✏️ Modificar Pedidos") +
     b("enviaje", "🚚 En Salida (" + n(cViaje) + ")") +
     b("resumen", "🚚 Resumen") +
     b("ent",     "✅ Pedidos Entregados (" + n(cEnt) + ")") +
     b("ocup",    "📦 Ocupación") +
+    b("modif",   "✏️ Modificar Pedidos") +          // v18.14 (Luis): entre Ocupación y Config. Cuarentena
     b("cuarcfg", "🚧 Config. Cuarentena") +
   '</div>';
 }
@@ -36495,6 +36703,11 @@ function pppRenderProg() {
   // Config. Cuarentena: no depende de que se haya importado una PPP.
   if (_pppTab === "modif") {
     pppPaintTabs();
+    /* Las dos fuentes son las que ya cargan otras solapas: `_pgaRows` (Programación) y
+       `_apr.pedidos` (A Programar). Se piden acá si faltan; las dos guardan su propio TTL/busy,
+       así que llamarlas en cada render no repite la red. */
+    pgaNeed();
+    if (!_apr.listo && !_apr.cargando) { try { aprCargar(); } catch (_e) {} }
     _renderKeepFocus(box, pppModifHtml());
     return;
   }
