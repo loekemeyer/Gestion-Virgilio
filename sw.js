@@ -8,7 +8,7 @@
    (Además admin/admin.js tiene la anon key del proyecto LK — esa es aparte.)
    ========================================================= */
 importScripts("supabase-config.js");
-const SW_VERSION = "v18.31-vir";
+const SW_VERSION = "v18.38-vir";
 /* nota: v7.68 — generador de OCs desde stock (vista_generador_oc). */
 
 const SUPABASE_URL = self.VIR_SUPABASE_URL;
@@ -125,7 +125,17 @@ async function trySendOneReport(payload) {
         descripcion: payload.descripcion,
         texto:       payload.texto,
         ts_cliente:  new Date(payload.ts).toISOString(),
-        ts_inicio:   payload.ts_inicio_iso || null
+        ts_inicio:   payload.ts_inicio_iso || null,
+        // v18.37 — EL SELLO DE APP FALTABA ACÁ. El index.html lo manda desde la v14.51,
+        // pero este envío (el del Service Worker: Background Sync, reintento con la pantalla
+        // apagada) es un espejo del de allá al que nunca se le agregó la columna. Resultado:
+        // esos eventos entraban con gv_app NULL, y NULL estaba documentado como "lo mandó
+        // Producción Virgilio" — así que el SW de Gestión se contaba como si fuera la app
+        // vieja. Medido el 15/09: 18 de 51 TP de la semana estaban NULL, y el caso testigo es
+        // el legajo 277 el 14/09, un solo celular, con el TP de D72A sin sello y su PUB de 5 ms
+        // después sellado `gestion@v17.71`. Va con prefijo propio para poder distinguir qué
+        // mandó la pantalla y qué mandó el SW.
+        gv_app: "gestion-sw@" + String(SW_VERSION || "").replace("-vir", "")
       }),
       signal: ctrl.signal
     });
