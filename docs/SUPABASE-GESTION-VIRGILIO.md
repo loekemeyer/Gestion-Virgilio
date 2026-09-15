@@ -17049,3 +17049,57 @@ select upper(trim(ref)) tanda,
 
 **Rollback:** ejecutar `sql/backups/empresa_mixto_ajuste_pre_v1830_20260915.sql` (trae las dos
 definiciones anteriores enteras). No hay datos que revertir.
+
+---
+
+## §3.gz — v18.29: los proveedores faltantes de `OC_Maximos` — eran 3, no 104 — 2026-09-15
+
+Thomas: ***"dale, arreglá lo de los proveedores faltantes"***. Problema **226**, tarea **3430**.
+
+⚠ **Lo primero que apareció es que el diagnóstico del 226 estaba mal dimensionado.** Decía "104
+códigos sin proveedor → nunca van a tener OC, y cada caja que entre manda un WhatsApp". La primera
+mitad es cierta; la segunda era **teórica**. Cruzado contra las entregas reales
+(`Entregas Tallerista Virgilio` + `Entregas Prov AT`):
+
+> de los 104 sin proveedor, **sólo 3 recibieron mercadería alguna vez**.
+
+Los otros 101 nunca entraron por recepción ni tuvieron OC previa, así que **no generan ningún
+aviso**: el aviso lo dispara *recibir* algo. Son filas de configuración que no corresponden a nada
+que hoy se compre, y no se les inventa proveedor.
+
+**Lo aplicado — los 3.** Los tres tienen **un solo entregador** y es el mismo, `Log/ Fabr`, que
+además es el proveedor más usado de la tabla (57 códigos): `323E` Rallador 4 Lados Mini,
+`702E` Abrelata Mariposa, `727E` Sacacorcho Doble Imp. Ac X12. Efecto medido en
+`vista_generador_oc`: **95 → 96 líneas, 3.586 → 3.648 cajas** — entra el 323E con 62; los otros dos
+tienen stock de sobra y siguen pidiendo 0, que es lo correcto.
+
+### Dónde estaba el ruido de verdad — problema 250, abierto
+
+Cruzando los **173** códigos que recibieron mercadería en 120 días contra `OC_Maximos`:
+104 coinciden · 19 tienen varios entregadores · 3 sin proveedor (éstos) · **8 no figuran** ·
+**81 con un proveedor distinto** al que entrega.
+
+De esos 81, **59 son falsa alarma**: `oc_vigentes_por_proveedor` ya los resuelve con el alias
+Pettofrezza→Rafael (19) y con su regla de prefijo de hasta 2 caracteres, que cubre Martin C→Martin
+(25) y Carlos E→Carlos (15). **Quedan 22 que la RPC no puede resolver**, y ésos sí disparan el
+aviso:
+
+| configurado → quien entrega | códigos | cajas |
+|---|---|---|
+| Oscar → Log/ Fabr | 14 | 5.626 |
+| Pintos → Log/ Fabr | 4 | 160 |
+| Tierra Nativa → Log/ Fabr | 1 | 44 |
+| Log/ Fabr → Pedernera | 1 | 104 |
+| Pedernera → AGUIRRE CARLOS RODOLFO | 1 | 68 |
+| Pettofrezza → German | 1 | 131 |
+
+Y los **8 que no figuran** son todos de Log/ Fabr y casi todos la versión **sin E** de un código
+que sí existe con E (582/582E, 583/583E, 599/599E, 727/727E): huelen a código mal tipeado en la
+recepción, no a artículo nuevo.
+
+⚠ **Nada de eso se corrigió solo**: a quién se le compra cada artículo es una decisión comercial
+del dueño, y la versión sin E puede ser un error de carga que se arregla en el remito, no en la
+configuración.
+
+**Respaldo:** `zz_backups."GV_Backup_OC_Maximos_20260915"`.
+**SQL y rollback:** `sql/gv_oc_maximos_proveedores_v1829.sql`.
