@@ -216,7 +216,18 @@ const RCP_CSS = `
 #rcpRoot .arBusDesc{ color:#555; font-size:14px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 #rcpRoot .arBusNada{ padding:12px 0; color:#666; font-size:15px; }
 #rcpRoot .arBusIgual{ width:100%; margin-top:10px; padding:14px; border-radius:10px; border:2px solid #b45309; background:#fffbeb; color:#7c2d12; font-weight:800; font-size:16px; cursor:pointer; }
-#rcpRoot .modalClose{ background:#fff; border:1px solid var(--border); width:32px; height:32px; border-radius:50%; cursor:pointer; font-size:14px; font-weight:900; }
+/* v18.08 (Luis): la × se veía descentrada y apenas se distinguía del fondo. El botón no tenía
+   display:flex, así que la centraba el user-agent con su padding propio, y era un círculo blanco
+   con borde gris clarito arriba de una tarjeta blanca. Ahora: gris suave sin borde, la × centrada
+   de verdad y legible, y con estados de toque — esto lo usa un operario con el celular en la mano. */
+#rcpRoot .modalClose{ display:flex; align-items:center; justify-content:center; flex:0 0 auto;
+  width:34px; height:34px; padding:0; line-height:1; border:none; border-radius:50%;
+  background:#eef2f7; color:#475569; font-size:22px; font-weight:700; cursor:pointer;
+  transition:background .12s, color .12s; -webkit-tap-highlight-color:transparent;
+  touch-action:manipulation; }
+#rcpRoot .modalClose:hover{ background:#e2e8f0; color:#0f172a; }
+#rcpRoot .modalClose:active{ background:#cbd5e1; }
+#rcpRoot .modalClose:focus-visible{ outline:2px solid #1e6bd6; outline-offset:2px; }
 /* v17.27 — aviso a Thomas por lo que entró por encima de la OC: va en la pantalla de
    resumen, debajo de la foto, y es obligatorio igual que la foto. */
 #rcpRoot .opExcSection{ margin:16px 0 4px; text-align:center; }
@@ -1711,21 +1722,23 @@ function openCajas(cod) {
   // v7.07: recordatorio de la OC vigente mientras carga las cajas.
   const oc = ocDeCod(cod);
   opState.cajasOc = oc || null;   // v8.60 — guardado para el aviso de exceso en vivo
+  /* v18.08 (Luis: "no pone cartel cuando el código no tiene OC"): la caja se muestra SIEMPRE que
+     se hayan podido leer las OCs. Antes, sin OC, se escondía entera y el operario cargaba a ciegas
+     — y recién en el resumen se enteraba de que tenía que avisarle a Thomas (gate de la v17.99). */
   if (opCajasOc) {
-    if (oc) {
-      opCajasOc.style.display = "";
-      opCajasOc.style.background = ""; opCajasOc.style.borderColor = "";
-      opCajasOc.innerHTML = _opCajasOcBase(oc);
-    } else {
-      opCajasOc.style.display = "none";
-      opCajasOc.innerHTML = "";
-    }
+    opCajasOc.style.display = "";
+    opCajasOc.style.background = ""; opCajasOc.style.borderColor = "";
+    if (oc) opCajasOc.innerHTML = _opCajasOcBase(oc);
+    else if (opState.ocOk === true) opCajasOc.innerHTML = _OC_SIN;
+    else { opCajasOc.style.display = "none"; opCajasOc.innerHTML = ""; }
   }
   // v11.78: teclado con punto decimal para códigos fraccionarios
   opCajasInput.inputMode = _esCodDecimal(cod) ? "decimal" : "numeric";
   opCajasModal.classList.add("open");
   setTimeout(() => { opCajasInput.focus(); _opCajasExceso(); }, 50);
 }
+/* v18.08 — el codigo no tiene ninguna OC vigente: lo habilitado es CERO. */
+const _OC_SIN = "📑 Este código <b>no tiene OC vigente</b>: no hay cajas habilitadas.";
 /* v8.60 — texto base del recordatorio de OC. */
 function _opCajasOcBase(oc) {
   return "📑 OC vigente (" + escapeHtmlRcp(fechaCorta(oc.fecha)) + "): <b>" + oc.ped + "</b> caja(s) pedidas" +
@@ -1736,20 +1749,26 @@ function _opCajasOcBase(oc) {
 function _opCajasExceso() {
   if (!opCajasOc) return;
   const oc = opState.cajasOc;
-  if (!oc || !(oc.pend > 0)) return;
+  /* v18.08 — el límite es `ocRef(oc)`, EL MISMO que usa `opExcesoItems()` para trabar el envío:
+     lo que falta por recibir, o lo pedido si la OC ya se recibió entera, o CERO si no hay OC.
+     Antes esto salía temprano con `!oc || !(oc.pend > 0)` y dejaba dos casos mudos — código sin
+     OC, y OC ya recibida entera— que el gate del resumen SÍ contaba como exceso (problema 217).
+     Si las OCs no se pudieron leer no se afirma nada, igual que el gate. */
+  if (opState.ocOk !== true) return;
+  const ref = ocRef(oc);
   const n = _esCodDecimal(opState.cajasCod) ? (parseFloat(opCajasInput.value) || 0) : (parseInt(opCajasInput.value, 10) || 0);
-  if (n > oc.pend) {
+  if (n > ref) {
     opCajasOc.style.background = "#fef2f2"; opCajasOc.style.borderColor = "#fca5a5";
     // v17.17 / v17.27 — el aviso queda, pero SIN botón: el operario carga todo de corrido
     // y el aviso a Thomas se pide UNA vez en la pantalla de resumen, con el botón
     // "📲 Enviar WhatsApp a Thomas" (_opExcesoSeccion), que además traba el envío hasta
     // que se toque. Antes (v14.61) el botón estaba acá y lo interrumpía código por código.
-    opCajasOc.innerHTML = _opCajasOcBase(oc) +
-      '<br><b style="color:#b91c1c;">⚠ Estás recibiendo más mercadería que la que tenés habilitada: cargás ' + n +
-      ' y por OC faltan ' + oc.pend + '.</b>';
+    opCajasOc.innerHTML = (oc ? _opCajasOcBase(oc) : _OC_SIN) +
+      '<br><b style="color:#b91c1c;">⚠ Estás recibiendo más mercadería que la que tenés habilitada: cargás ' +
+      n + (ref > 0 ? ' y por OC faltan ' + ref + '.' : ' y este código no tiene ninguna OC.') + '</b>';
   } else {
     opCajasOc.style.background = ""; opCajasOc.style.borderColor = "";
-    opCajasOc.innerHTML = _opCajasOcBase(oc);
+    opCajasOc.innerHTML = oc ? _opCajasOcBase(oc) : _OC_SIN;
   }
 }
 

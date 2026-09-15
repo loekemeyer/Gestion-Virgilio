@@ -1,3 +1,51 @@
+## Nota v18.08 (2026-09-15) — Recepción: el aviso que faltaba cuando el código no tiene OC, y la ×
+
+Luis, mirando el pop-up de **Cajas entregadas**: *"el botón X para cerrar se ve feo ahí, ponelo más
+lindo"* y *"no pone cartel cuando el código no tiene OC de que se está recibiendo más mercadería de
+la habilitada"*.
+
+### El aviso (problema 217)
+
+Tenía razón, y el agujero era más grande que eso. `_opCajasExceso()` cortaba con
+`if (!oc || !(oc.pend > 0)) return;` y `openCajas()` **escondía la caja entera** cuando no había OC.
+O sea, dos casos mudos:
+
+| caso | el pop-up avisaba | el gate de WhatsApp lo contaba como exceso |
+|---|---|---|
+| código **sin OC** vigente | ❌ nada | ✅ sí (v17.99) |
+| OC **ya recibida entera** (`pend = 0`) | ❌ nada | ✅ sí |
+| OC con saldo | ✅ | ✅ |
+
+El operario cargaba **sin ningún aviso** y recién en el resumen se enteraba de que tenía que
+avisarle a Thomas. Y el comentario de la v17.27 afirmaba que el criterio del pop-up era *"el mismo
+que"* el del gate — no lo era: el pop-up miraba `oc.pend` y el gate usa `ocRef(oc)`.
+
+Ahora el pop-up usa **`ocRef(oc)`**, exactamente la misma función. Y el mismo guard: si las OCs no
+se pudieron leer (`ocOk = false`) no se afirma nada, porque no se sabe si el proveedor no tiene OCs
+o si no hubo red.
+
+### La ×
+
+No tenía `display:flex`, así que la centraba el user-agent con su padding propio y quedaba
+corrida; y era un círculo **blanco con borde gris clarito** sobre una tarjeta blanca. Ahora: gris
+suave sin borde, 34 px, la × en 22 px centrada de verdad, con `:hover` / `:active` / `:focus-visible`
+y `touch-action:manipulation` — lo usa un operario con el celular en la mano.
+
+### ⚠ Dos falsos verdes al escribir el test — los dos los cazó mirar el dato, no el resultado
+
+1. **El stub tenía mal el nombre de la RPC** (`gv_oc_vigentes_por_cod` en vez de
+   `oc_vigentes_por_proveedor`), así que devolvía `[]` y **los tres casos caían en "sin OC"**: el
+   chequeo de que el pop-up y el gate coinciden pasaba **midiendo el mismo caso tres veces**.
+2. **El fixture usaba `cod: "034"`** y el lookup no lo encontraba. Antes de "arreglar" el código se
+   midió contra la base: `norm_cod()` es **idéntica** a `_ocgNorm()` del front
+   (`regexp_replace(upper(trim(c)), '^0+(?=.)', '')`), así que la RPC ya devuelve `"34"` y el
+   lookup está bien. **El fixture era irreal, no el código.**
+
+Por eso el test ahora trae un chequeo que verifica que **el fixture tenga los tres casos
+distintos**, y un guard que falla si `recepcion.js` deja de llamar a esa RPC.
+
+`tests/rcp-cajas-aviso.cjs` — 23 chequeos.
+
 ## Nota v18.07 (2026-09-15) — En Salida: días hábiles, 4× más rápida, y el camionero que ya estaba
 
 Luis, después de repasar el módulo: *"hacé 1 y 2"* y *"chequeá si tenemos la info para hacer algo

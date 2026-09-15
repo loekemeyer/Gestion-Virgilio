@@ -457,3 +457,6 @@ PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node te
 
 echo "== pga-imprimir (v17.97: boton Imprimir en Programacion — elegir dias/rango, hoja abierta hasta la NP sin su contenido) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/pga-imprimir.cjs
+
+echo "== rcp-cajas-aviso (v18.08: el pop-up de Cajas avisa tambien si el codigo no tiene OC; y la X prolija) =="
+PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/rcp-cajas-aviso.cjs
