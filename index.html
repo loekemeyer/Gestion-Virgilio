@@ -17350,6 +17350,7 @@ var STK_POP_CSS =
   // aunque sobrara pantalla (dueño: "hay espacio, no pongas barras de scroll"). Ahora el popup
   // usa el ancho disponible; el scroll horizontal queda sólo para pantallas angostas.
   ".stkpop-card.wide{max-width:min(1760px,98vw);}" +
+  ".stkpop-card.mid{max-width:min(1060px,96vw);}" +   // v18.31 — Proyección: dos columnas sin scroll
   ".mva-tbl .mva-pos{color:#15803d;}.mva-tbl .mva-neg{color:#b91c1c;}" +
   // v6.68 — celda MOVIMIENTO como flex: slot fijo para el toggle (vacío en guardado) →
   // 'recepcion' y 'guardado' arrancan alineados; cuerpo con chips que fluyen prolijo.
@@ -17384,7 +17385,15 @@ var STK_POP_CSS =
   // bloque de barras por mes (.proyv-chart/-row/-track/-bar/-val/-ent/-mark, v11.48/v15.52):
   // lo que mostraba ya lo dice el gráfico de tendencia. Queda: los números en fichas grandes,
   // el gráfico grande, y el desglose del mes que ahora se abre tocando el gráfico.
-  ".proyv-kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(112px,1fr));gap:10px;}" +
+  // v18.31 — el pop-up entraba en una sola columna de 760px: la tabla de meses quedaba con un
+  // río de espacio entre el mes y sus números, las fichas dejaban una huérfana en la última
+  // fila, y el gráfico se veía sólo scrolleando. Ahora el card es más ancho y, cuando hay
+  // lugar, «Estad. Madre» y el resumen van LADO A LADO (la tabla sigue primero: es la columna
+  // izquierda, que es lo que se lee antes). En celular se apila igual que antes.
+  ".proyv-wrap{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.05fr);gap:12px;align-items:start;}" +
+  ".proyv-wrap>.stkpop-grp{margin-bottom:0;}" +
+  "@media(max-width:820px){.proyv-wrap{grid-template-columns:1fr;gap:0;}.proyv-wrap>.stkpop-grp{margin-bottom:15px;}}" +
+  ".proyv-kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(132px,1fr));gap:10px;}" +
   ".proyv-kpi{background:#fff;border:1px solid #e2e8f0;border-radius:12px;padding:10px 12px;}" +
   ".proyv-kpi b{display:block;font-size:26px;font-weight:900;line-height:1.1;color:#0f172a;font-variant-numeric:tabular-nums;}" +
   ".proyv-kpi span{display:block;margin-top:3px;font-size:11.5px;font-weight:800;color:#94a3b8;text-transform:uppercase;letter-spacing:.04em;}" +
@@ -17400,7 +17409,10 @@ var STK_POP_CSS =
   // v18.26 \xe2\x80\x94 la tabla de meses vuelve. El due\xc3\xb1o mando sacar LAS BARRAS ("sac\xc3\xa1 la barra
   // lateral"), y en la v18.21 se saco el bloque entero, numeros incluidos: *"sacaste los
   // numeros, que es lo que mas me importa"*. Asi que quedan los numeros, sin barra, y grandes.
-  ".proyv-tab{width:100%;border-collapse:collapse;margin-top:2px;}" +
+  // v18.31 — `fixed` + anchos: sin eso el navegador le daba a «mes» todo el sobrante y los
+  // números quedaban lejísimos del mes al que pertenecen.
+  ".proyv-tab{width:100%;border-collapse:collapse;margin-top:2px;table-layout:fixed;}" +
+  ".proyv-tab th:first-child,.proyv-tab td:first-child{width:40%;}" +
   ".proyv-tab th{font-size:11.5px;font-weight:800;color:#94a3b8;text-transform:uppercase;letter-spacing:.04em;text-align:right;padding:0 0 5px;}" +
   ".proyv-tab th:first-child{text-align:left;}" +
   ".proyv-tab td{padding:6px 0;border-top:1px solid #eef2f7;font-variant-numeric:tabular-nums;text-align:right;}" +
@@ -17415,7 +17427,10 @@ var STK_POP_CSS =
   ".proyv-lnk{background:none;border:0;padding:0;margin:0;font:inherit;color:inherit;cursor:pointer;" +
     "text-decoration:underline;text-decoration-style:dotted;text-underline-offset:3px;}" +
   ".proyv-lnk:hover{text-decoration-style:solid;}" +
-  ".proyv-svg{display:block;width:100%;height:auto;}" +
+  // v18.31 — el SVG es viewBox 380×220 con `width:100%`: en la tarjeta ancha se escalaba a
+  // ~610px de alto y el pop-up entero pasaba a scrollearse por culpa del gráfico. Con el techo
+  // de altura el dibujo se achica parejo (aspect ratio intacto, queda centrado) y todo entra.
+  ".proyv-svg{display:block;width:100%;height:auto;max-height:clamp(180px,32vh,300px);margin:0 auto;}" +
   ".proyv-svg .hit{fill:transparent;cursor:pointer;}" +
   ".proyv-svg .hit:hover{fill:#6d28d9;fill-opacity:.07;}" +
   ".proyv-svg .hit.on{fill:#6d28d9;fill-opacity:.12;}" +
@@ -17444,7 +17459,9 @@ function _stkPopShell(title, bodyId, wide) {
   let ov = document.getElementById("stkPopModal");
   if (!ov) { ov = document.createElement("div"); ov.id = "stkPopModal"; document.body.appendChild(ov); }
   ov.classList.add("show");
-  ov.innerHTML = '<div class="stkpop-card' + (wide ? ' wide' : '') + '"><div class="stkpop-head"><span class="stkpop-title">' + title + '</span><button class="stkpop-close" onclick="stkPopClose()">Cerrar</button></div><div class="stkpop-body" id="' + bodyId + '"></div></div>';
+  // v18.31 — `wide` acepta además "mid": tarjeta intermedia (1060px) para los pop-ups que no
+  // necesitan 1760 pero sí más de 760, como el de Proyección.
+  ov.innerHTML = '<div class="stkpop-card' + (wide === "mid" ? ' mid' : (wide ? ' wide' : '')) + '"><div class="stkpop-head"><span class="stkpop-title">' + title + '</span><button class="stkpop-close" onclick="stkPopClose()">Cerrar</button></div><div class="stkpop-body" id="' + bodyId + '"></div></div>';
 }
 function stkPopClose() { const ov = document.getElementById("stkPopModal"); if (ov) ov.classList.remove("show"); _stkPop = null; }
 /* v11.48 — Pop-up "de dónde surge la proyección": al tocar el número de PROY. CAJ/MES muestra las
@@ -17490,7 +17507,11 @@ function _stkProyTrendSvg(rows, proyN, prom) {
   // v18.21 — el gráfico pasó a ser lo único que se ve, así que crece y se puede tocar:
   // antes 340x134 con letra 8, ahora 380x220 con letra 13. Y cada mes tiene su franja
   // invisible (.hit) que abre el desglose, que es la interacción que vivía en las barras.
-  var W = 380, H = 220, L = 12, R = 76, T = 16, B = 34, iw = W - L - R, ih = H - T - B;
+  // v18.31 — el viewBox se elige según el ancho de pantalla: en la tarjeta ancha (dos columnas
+  // arriba) el gráfico es PANORÁMICO y usa todo el ancho; con 380 quedaba un dibujo chiquito
+  // centrado y dos franjas de aire a los costados. En celular sigue igual que antes.
+  var _anchoOK = (typeof window !== "undefined" && window.innerWidth >= 900);
+  var W = _anchoOK ? 720 : 380, H = 220, L = 12, R = 76, T = 16, B = 34, iw = W - L - R, ih = H - T - B;
   var S = _stkProy || {}, abierto = S.abierto || "";
   var vals = rows.map(function (x) { return x.cajas; });
   // v18.24 — el mes en curso se dibuja dos veces: donde va hoy, y adónde llega a este ritmo.
@@ -17576,7 +17597,7 @@ async function stkShowProyVentas(codEnc, proy) {
   var sfx = String(cod || "").match(/\s+(LK|CH|LOKE)$/i);
   var emp = sfx ? sfx[1].toUpperCase().replace("LOKE", "LK") : "";
   var empTag = emp ? ' <span style="font-size:14px;font-weight:800;color:' + (emp === "LK" ? "#b91c1c" : "#1e40af") + ';">' + emp + '</span>' : '';
-  _stkPopShell("📈 Proyección — " + escapeHtml(codCanon(codB)) + empTag, "stkPopBody");
+  _stkPopShell("📈 Proyección — " + escapeHtml(codCanon(codB)) + empTag, "stkPopBody", "mid");   // v18.31
   var body = document.getElementById("stkPopBody"); if (!body) return;
   var nombre = artNombre(cod, "") || "";
   var fc = function (n) { n = Number(n) || 0; return String(Math.round(n * 10) / 10); };
@@ -17819,7 +17840,9 @@ function _stkProyChartHtml() {
   var piso = S.proyN > 0.05 && S.prom > 0 && (S.proyN - S.prom) / S.prom > 0.005;   // actuó el piso del 4.º mejor mes
   // v18.27 — el orden que pidio el duenio: los meses con sus numeros PRIMERO, despues el
   // resumen, y el grafico al final ("abajo de eso, el grafico, que ni uso tiene").
-  var h = _stkProyMesesHtml();
+  // v18.31 — los dos bloques de arriba van LADO A LADO si hay ancho (`.proyv-wrap`, una sola
+  // columna por debajo de 820px). El orden de lectura es el mismo: la tabla primero.
+  var h = '<div class="proyv-wrap">' + _stkProyMesesHtml();
   h += '<div class="stkpop-grp"><div class="proyv-kpis">';
   if (S.proyN > 0.05) {
     h += '<div class="proyv-kpi proy"><b>' + fc(S.proyN) + '</b><span>proy. caj/mes</span>' +
@@ -17837,7 +17860,7 @@ function _stkProyChartHtml() {
   h += '<div class="proyv-kpi"><b>' + fc(S.tot) + '</b><span>facturado ' + S.win.length + 'm</span></div>';
   if (S.hayEnt) h += '<div class="proyv-kpi ent"><b>' + fc(S.totEnt) + '</b><span>entregado ' + S.win.length + 'm</span></div>';
   if (S.proyN > 0.05) h += '<div class="proyv-kpi"><b>' + S.arriba + '/' + S.win.length + '</b><span>meses arriba</span></div>';
-  h += '</div></div>';
+  h += '</div></div></div>';   // v18.31: cierra .proyv-kpis, .stkpop-grp y .proyv-wrap
   h += _stkProyTrendSvg(S.rows, S.proyN, S.prom);
   if (S.abierto) h += _stkProyDetHtml(S.abierto);
   return h;

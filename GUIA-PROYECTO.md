@@ -1,3 +1,26 @@
+## Nota v18.31 (2026-09-15) — el pop-up de Proyección entra de una sola vez
+
+Luis mandó la foto del pop-up y una palabra: *"Optimiza"*. Lo que mostraba la foto: la tarjeta de
+760 px en una pantalla ancha, un **río de espacio** entre cada mes y sus números, las fichas con una
+huérfana sola en la última fila, y el gráfico **sólo visible scrolleando**.
+
+Qué se cambió (sólo presentación — ningún número, ningún dato, y el orden que pidió el dueño en la
+v18.27 se respeta: los meses primero, después el resumen, el gráfico al final):
+
+1. **La tarjeta es intermedia**, 1060 px (`stkpop-card.mid`, nuevo tercer valor de `_stkPopShell`;
+   antes sólo había 760 o el `wide` de 1760).
+2. **«Estad. Madre» y el resumen van lado a lado** cuando hay ancho (`.proyv-wrap`); por debajo de
+   820 px se apilan como antes. La tabla queda a la izquierda, o sea que se sigue leyendo primero.
+3. **La tabla dejó de desparramarse**: `table-layout:fixed` con la columna del mes al 40 %. Antes el
+   navegador le daba a «mes» todo el sobrante y los números quedaban lejísimos de su fila.
+4. **El gráfico tiene techo de altura** (`max-height:clamp(180px,32vh,300px)`) y **viewBox
+   panorámico** (720×220) cuando la pantalla pasa de 900 px. Era el que rompía todo: con
+   `width:100%` sobre 1060 px se escalaba a ~610 px de alto él solo.
+
+Medido con Playwright sobre el pop-up real (datos stubbeados): a **1280×860** pasó de **1053 px de
+contenido con scroll** a **742 px sin scroll**, sin desborde lateral; a **412 px** (celular) las
+fichas quedan en 2×3 sin huérfana y la tabla entra sin scroll horizontal. `tests/proy-entregadas.cjs`
+y `tests/checkhtml.cjs` en verde.
 ## Nota v18.30 (2026-09-15) — el ajuste del "de menos" dejaba Pickeados en negativo y devolvía una caja fantasma a góndola
 
 Luis, mirando los movimientos del **116** en Stocks: *"entró +50 · salió −51 · saldo −1"*.
