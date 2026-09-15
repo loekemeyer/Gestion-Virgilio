@@ -104,12 +104,13 @@ catch (_e) {
       }).join("|");
     };
     const k = kpiTxt();
-    // v18.34 — queda UNA sola ficha: la proyeccion. Luis mando sacar promedio, ritmo,
-    // facturado, entregado y meses arriba. Lo que el test cuida ahora es que NO vuelvan.
+    // v18.34 — Luis mando sacar promedio, ritmo, facturado, entregado y meses arriba.
+    // v18.58 — VUELVE la del mes en curso ("a este ritmo", la de Thomas v18.24; Luis: "restituilo
+    // si no rompe nada"). Quedan DOS fichas: proyeccion + mes en curso. Las otras tres no vuelven.
     out.fichaProy = /proy\. caj\/mes=367\.2/.test(k);
-    out.unaSolaFicha = body.querySelectorAll(".proyv-kpi").length === 1;
+    out.dosFichas = body.querySelectorAll(".proyv-kpi").length === 2;
     out.sinPromedio = k.indexOf("promedio") < 0;
-    out.sinRitmo = !body.querySelector(".proyv-kpi.curso") && k.indexOf("a este ritmo") < 0;
+    out.conRitmo = !!body.querySelector(".proyv-kpi.curso") && k.indexOf("a este ritmo") >= 0;
     out.sinFacturado = k.indexOf("facturado") < 0;
     out.sinEntregado = k.indexOf("entregado") < 0;
     out.sinArriba = k.indexOf("meses arriba") < 0;
@@ -157,7 +158,7 @@ catch (_e) {
   });
 
   const pass =
-    r.pidioEntregas && r.fichaProy && r.unaSolaFicha && r.sinPromedio && r.sinRitmo &&
+    r.pidioEntregas && r.fichaProy && r.dosFichas && r.sinPromedio && r.conRitmo &&
     r.sinFacturado && r.sinEntregado && r.sinArriba && r.asterisco && r.puntoHueco &&
     r.sinBarras && r.hits === 12 && r.filasMes === 7 && r.mesCursoMarcado && r.numerosAbren &&
     r.tablaAntesDelGrafico && r.tituloEstadMadre && r.columnas === "mes|vtas|entrega" &&

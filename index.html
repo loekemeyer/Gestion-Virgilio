@@ -5609,7 +5609,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=18.57"></script>
+<script type="module" src="recepcion.js?v=18.58"></script>
 <!-- Config del módulo de fichada (compartido con fichada.html). El secret
      hmacSecret tiene que ser el mismo acá y allá; cargándolo desde un solo
      archivo evitamos que se desincronicen. -->
@@ -9173,7 +9173,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v18.57";
+const APP_VERSION = "v18.58";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -18327,6 +18327,17 @@ function _stkProyChartHtml() {
     // v18.33 — la etiqueta sigue al switch: "8.164 proy. caj/mes" sería mentira.
     h += '<div class="proyv-kpi proy"><b>' + fc(S.proyN) + '</b><span>proy. ' + (S.uni && S.uxb > 0 ? 'un' : 'caj') + '/mes</span>' +
          (piso ? '<small>piso: 4.º mejor mes</small>' : '') + '</div>';
+  }
+  // v18.58 — VUELVE la ficha del mes en curso («<mes> a este ritmo», v18.24, pedido de Thomas).
+  // La v18.34 la sacó junto con las otras cuatro por el pedido de Luis ("sacá lo de promedio, el
+  // ritmo…"); Luis, 15/09: *"restituilo si no rompe nada"*. Las otras cuatro (promedio 6m,
+  // facturado 6m, entregado 6m, meses arriba) siguen afuera. Misma lógica de v18.24: lo
+  // facturado hasta hoy llevado a mes entero por días hábiles; no entra en el promedio.
+  if (S.parcial) {
+    var _mp = _stkProyMesParcial(S.parcial.cajas);
+    h += '<div class="proyv-kpi curso" title="' + escapeHtml(_stkFmtMes(S.parcial.mes)) + ' todavía no terminó. Es lo facturado hasta hoy llevado a mes entero por días hábiles.">' +
+         '<b>' + fc(Math.round(_mp.proy)) + '</b><span>' + escapeHtml(_stkFmtMes(S.parcial.mes)) + ' a este ritmo</span>' +
+         '<small>' + fc(S.parcial.cajas) + ' en ' + _mp.dias + ' de ' + _mp.total + ' días hábiles</small></div>';
   }
   h += '</div></div></div>';   // v18.32: cierra .proyv-kpis, .stkpop-grp y .proyv-wrap
   h += _stkProyTrendSvg(S.rows, S.proyN, S.prom);
