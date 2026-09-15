@@ -1,12 +1,19 @@
-# Log de sesión — 2026-09-15 · Cuarentena, Anular pedidos y Config. Cuarentena
+# Log del 2026-09-15 — las DOS sesiones de Luis, unificadas
 
-> **Para qué es este archivo:** que otra sesión pueda retomar esto sin releer el chat. Está
-> escrito para unificarse con otro log: lo que ya está cerrado va primero y corto; lo que queda
-> abierto y las trampas aprendidas están al final, que es lo que de verdad hay que leer.
+> **Para qué es este archivo:** que otra sesión pueda retomar el día sin releer los chats. Lo que
+> está cerrado va primero y corto; lo que queda abierto y las trampas aprendidas están al final,
+> que es lo que de verdad hay que leer.
 >
-> **Quién pidió:** Luis (Rial Otero, Planify `employee_id = 52`).
-> **Sesión:** https://claude.ai/code/session_01UbPBqhtM88KDGZ78Aia293
+> **Quién pidió:** Luis (Rial Otero, Planify `employee_id = 52`), en las dos.
 > **Repo:** `loekemeyer/Gestion-Virgilio` · todo pusheado a `main`.
+>
+> | | Sesión | Qué |
+> |---|---|---|
+> | **A** | [session_01UbPBqhtM…](https://claude.ai/code/session_01UbPBqhtM88KDGZ78Aia293) | Cuarentena, Anular pedidos, Config. Cuarentena — **§1 a §7** |
+> | **B** | [session_015qGyNXfR…](https://claude.ai/code/session_015qGyNXfRbLQeswCrJZaLZK) | Visual de Programación, Imprimir, En Salida — **§8** |
+>
+> Unificado el 15/09 desde la sesión B, que además **cerró el §5.3 de la A** (los tres tests que
+> estaban rojos en `main`) y de paso destapó un bug real por hacerlo.
 
 ---
 
@@ -211,11 +218,28 @@ rango 1..8 y devuelve el nombre por índice; un estado que no conoce cae en el `
 cambió a propósito: que el cliente vea "anulado" es una decisión comercial del dueño.** Si se
 decide que sí, hay que tocar esa vista (no `gv_ppp_web_estado`, que ya devuelve el estado real).
 
-### 5.3 Tres tests que ya fallaban en `main` antes de esta sesión
+### 5.3 ~~Tres tests que ya fallaban en `main`~~ → **CERRADO** en la v17.98 (sesión B)
 
-Comprobado con `git stash` (fallaban igual sin los cambios de acá): `ppp-plan-nueva`,
-`ppp-reprog-boton` y —una vez— `ppp-prolijo`, que después pasó. **No son de esta sesión**, pero
-están rotos y nadie los está mirando.
+El diagnóstico de acá era correcto: `ppp-plan-nueva`, `ppp-reprog-boton` y `ppp-prolijo` fallaban
+en `main` sin los cambios de esta sesión. Los arregló la sesión B, y valió la pena mirarlos:
+
+- **`ppp-plan-nueva` y `ppp-prolijo`** medían el tablero de 6 días **sin declarar
+  `_pppPlanTabla = false`**, y desde la v17.66 la vista por defecto de Programación es la tabla:
+  dibujaban otra pantalla. En `ppp-prolijo` los chequeos **en negativo** pasaban **solos**.
+- **`ppp-reprog-boton`** buscaba una frase del cartel de Atrasados que **nunca existió** en el
+  código; se reescribió contra la intención, no contra la redacción exacta.
+- Y como `run.sh` corre con `set -e`, el corte en el primero **tapaba los otros dos**.
+
+⚠ **Lo que apareció al arreglarlos**: con `ppp-plan-nueva` en verde quedó **un** chequeo rojo que
+sí era un bug real (**problema 203**, ya cerrado). La v17.72 mudó el padrón de súper a `gv_supers`
+y pasó el fallback "fila vieja de ISIS sin cód" al campo `nota`, pero `pppSupersNeed()` nunca pidió
+esa columna en el `select` ni la copió en el `.map()`: **el fallback nació muerto en la misma
+versión que lo escribió**. Efecto en pantalla: el camión salía `Camión 5 · Inc Sociedad Anonima`
+en vez de `Camión 5 · Carrefour`. Las 19 filas activas de `gv_supers` tienen `nota` y **14 son la
+razón social**.
+
+**La moraleja para el próximo:** un test rojo que "no es de esta sesión" igual hay que arreglarlo,
+porque mientras esté rojo **tapa todo lo que venga después** en la batería.
 
 ---
 
@@ -264,3 +288,114 @@ node tests/apr-cuarentena.cjs      # Cuarentena, anular, log, Config. Cuarentena
 node tests/apr-contenido-np.cjs    # el detalle del pedido al expandir
 node tests/checkhtml.cjs && node tests/smoke.cjs && node tests/dead-handlers.cjs
 ```
+
+---
+
+# 8. Sesión B — Programación (visual + imprimir) y En Salida
+
+> **Sesión:** https://claude.ai/code/session_015qGyNXfRbLQeswCrJZaLZK · pedidos de **Luis**.
+
+## 8.1 Lo que se entregó
+
+| Versión | Commit | Qué |
+|---|---|---|
+| **v17.94–17.96** | `4d66d8a`, `f360387`, `12b774e` | El visual de la tabla de Programación: letra pareja, sangría cero, y el contenido de la NP en las 6 celdas que estaban vacías. |
+| **v17.98** | `56dc196` | 🖨 **Imprimir la Programación**. Y los 3 tests rojos de `main` + el **problema 203**. |
+| **v18.02** | `d0d5f5d` | La hoja impresa: el cód dentro del cliente, y los anchos salidos del dato. |
+| **v18.03** | `033cd4c` | La hoja deja de **adivinar** el ancho del papel. |
+| **v18.07** | `e2a5d2e` | **En Salida**: días hábiles, la vista 4× más rápida, y el camionero que ya estaba. |
+
+## 8.2 Imprimir (v17.98 → v18.03) — lo que hay que saber
+
+Botón `🖨 Imprimir` al lado de `🔄 Actualizar`; pop-up con un renglón por día (m³ / tandas / NP),
+rango Desde/Hasta, y la hoja sale **abierta hasta la NP y sin el contenido de cada NP**.
+
+Tres decisiones que no son obvias y conviene no deshacer:
+
+1. **No se abre ventana nueva.** Entre el click y el `print()` hay un pop-up, y el navegador la
+   bloquea si el click no la disparó directo. La hoja se arma en `<div id="pgaPrint">` y un
+   `@media print` esconde todo lo demás.
+2. **El pop-up se cierra ANTES del `print()`** (de ahí el `setTimeout` de 60 ms): si no, sale
+   impreso encima de la hoja.
+3. ⚠ **Nada de anchos en px contra un ancho de papel supuesto.** La v18.02 medía contra
+   `718 px` (190 mm a 96 dpi) y elegía el font en px; el útil real del navegador al imprimir es
+   más ancho, así que las columnas —calculadas en % sobre ese 718— quedaban más anchas de lo que
+   el texto necesitaba: **letra chica Y aire entre columnas, las dos quejas por la misma causa**.
+   La v18.03 lo pasa todo a unidades relativas: columnas en **%** y el font en **vw** (el CSS de
+   la hoja va en `em` para que escale junto). Medido a cuatro anchos — 600/718/860/1000 px → font
+   13,6 / 15,8 / 19,6 / 22,0 px, y **cada columna usa el 100 %** de su ancho, sin cortar nada.
+
+Y la columna del cliente se dimensiona por el **percentil 90**, no por el máximo: un solo
+`Coto C.I.C.S.A. Sucursal Lanus Centro (LK 801)` entre 102 NP le fijaba el ancho y achicaba la
+letra de toda la hoja por una fila. Ese 10 % largo parte en dos renglones.
+
+`tests/pga-imprimir.cjs` — 50 chequeos, incluido el control directo: viewport a 718 px, `media
+print`, y **ninguna celda** con `scrollWidth > clientWidth`.
+
+## 8.3 En Salida (v18.07)
+
+- **`dias_sin_controlar` pasa a días HÁBILES** (`gv_dias_habiles()`, que reusa `gv_es_dia_habil()`
+  y ya mira `planify.feriados` + `GV_Dias_No_Habiles`). El chip salta a amarillo a los 2 días: con
+  calendario, un pedido cargado el **viernes** salía en amarillo el **lunes** habiendo pasado 1 día
+  de trabajo; con el feriado del 07/09 en el medio, 4 en vez de 1.
+- **451 ms → 113 ms.** ⚠ El diagnóstico de arranque estaba **mal** y sólo lo salvó medir: se había
+  dicho que el costo eran los cuatro escaneos de `Registros_Produccion_Virgilio`; medido pieza por
+  pieza son **2,9 ms**. El costo real era `gv_ppp_entregados_meta` — **213 ms de los 410**, y la
+  vista la llamaba **dos veces**. Lo caro de esa vista es su CTE `vivo`, con 3 LATERAL por NP con
+  remito para resolver cod/rs/tanda/m³, datos que En Salida **no usa**; y `vivo ⊆ crn`, que la
+  vista ya excluye. Se lee `GV_PPP_Entregados_Historico` directo, con el mismo filtro.
+- **Columna `camionero`**, aditiva. El dato **ya viajaba** en el evento desde la v11.47
+  (`texto = NP|TANDA|CAMIONERO`) y la vista leía sólo los dos primeros campos. **25/25** NP de En
+  Salida lo tienen. **El front todavía NO lo pinta** — queda listo para cuando se pida.
+
+`sql/gv_en_salida_habiles_y_perf_v1807.sql` · §3.gk · rollback en
+`zz_backups."GV_Backup_Funcdefs_20260915"`.
+
+## 8.4 ⚠ LO QUE QUEDA ABIERTO de la sesión B
+
+### 8.4.1 Los pedidos facturados NO pasan a En Salida — **esperando a Thomas**
+
+Pedido de Luis: *"que los pedidos facturados vayan automáticamente a En Salida con el badge
+Esperando carga o Esperando retiro según corresponda"*. **No se tocó nada.**
+
+Eso **ya existía** (v13.62) y **Thomas lo apagó** en la v15.85: *"en En Salida no puede haber
+ningún pedido sin fecha, ni pedidos que no se hayan cargado a un camión"*. Y en la v16.00 se le
+volvió a plantear el caso exacto (la 98530, armada y facturada sin carga) y eligió un **botón
+manual por NP** en vez de cambiar la regla. O sea: es el caso (b) del `CLAUDE.md` —dos reglas del
+dueño en conflicto— y Luis confirmó: *"no hagas nada, lo confirmo con thomas"*.
+
+**Medido el 15/09:** 30 NP facturadas sin carga en la programación viva — **22 con fecha ≥ hoy**
+(21 ISIS + 1 Retira) y **8 vencidas** (11 al 14/09).
+
+**Propuesta para cuando Thomas conteste**, que respeta las dos mitades de su regla: entran sólo
+las de **fecha ≥ hoy**; las vencidas siguen cayendo en la lista de vencidos. Y es barato: el chip
+**ya está escrito** en `_pppEsChips` (hoy dice *"⚠ Sin registro de carga"*) y el estado
+`facturada_sin_cargar` ya existe en la vista. Prenderlo es
+`update "PPP_Web_Config" set valor = 0 where clave = 'en_salida_solo_cargadas'` —o mejor, una
+llave nueva que además filtre por fecha— más renombrar el chip a *Esperando carga* / *Esperando
+retiro* (`zona ~* 'retira'`). **Planify 3366.**
+
+⚠ Y conviene que Thomas mire **las dos juntas**: `armada_sin_carga` (v15.55) se apagó en el mismo
+movimiento y probablemente la respuesta sea la misma.
+
+### 8.4.2 Mejoras de En Salida propuestas y NO pedidas
+
+Se ofrecieron cuatro; Luis pidió las dos primeras (hechas, §8.3). Quedan:
+
+- **Aviso proactivo**: el chip *"N días hábiles sin controlar"* sólo se ve si alguien abre la
+  solapa. Ya existe el cron de Telegram de las 10:30 al que engancharlo. Hoy hay 0 casos, pero el
+  21/08 hubo 8 que estuvieron 3 días.
+- **Pintar el camionero** en la pantalla (la columna ya está en la vista, §8.3). Para reclamar un
+  remito, saber a quién reclamárselo es la mitad del trabajo.
+
+---
+
+## 9. Estado del día al cerrar
+
+**Tareas de Planify de estas dos sesiones:** todas cerradas **salvo la 3366** (§8.4.1), que espera
+a Thomas.
+
+**Lo que sigue abierto y no es de nadie todavía:** §5.1 (el **LK 1375** de Andser Quimica sigue
+cancelado **y** con tanda `E22A` para el 28/09 — verificado el 15/09; se resuelve con `✕ Anular
+pedido` o a pedido, no se toca por el protocolo de datos) y §5.2 (qué ve el cliente en la página
+para un pedido anulado — decisión comercial del dueño).
