@@ -98,7 +98,10 @@ catch (_e) {
     await pkAnular();
     const rpcPk = rpcCalls("anular_picking_virgilio");
     out.llamaRpc = rpcPk.length === 1 && rpcPk[0].body && rpcPk[0].body.p_legajo === LEG && rpcPk[0].body.p_tanda === TANDA;
-    out.liberaTanda = rpcCalls("tanda_liberar").length === 1;
+    /* v18.65 — anular SUELTA el lock (vuelve a libre), no lo "completa". Antes las dos cosas
+       eran la misma RPC (`tanda_liberar`); ahora terminar deja la fase 'completada' para que
+       nadie la reabra, y sólo la anulación la borra. */
+    out.liberaTanda = rpcCalls("gv_tanda_lock_anular").length === 1;
     const stPk = getLegajoState(LEG);
     out.pickingCerrado = stPk.picking.active === false && stPk.picking.value === "";
     out.borraGuardado = localStorage.getItem("vir_pk_" + LEG) === null;

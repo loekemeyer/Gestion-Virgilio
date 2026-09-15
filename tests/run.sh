@@ -72,6 +72,9 @@ PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node te
 echo "== lecturas-paginadas (v18.60: ninguna relación grande sin paginar, ninguna paginación sin order) =="
 node tests/lecturas-paginadas.cjs
 
+echo "== tanda-lock-etapas (v18.63: una tanda tomada no se vuelve a tomar hasta anularla o pasar de etapa) =="
+PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/tanda-lock-etapas.cjs
+
 echo "== fac-cuelgue (regresión: Facturación no queda en «Cargando tandas…» para siempre — timeout + cartel con motivo) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/fac-cuelgue.cjs
 

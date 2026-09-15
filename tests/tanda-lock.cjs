@@ -52,14 +52,20 @@ catch (_e) {
     out.sendForce    = /getActivityStatus\(true\)/.test(srcSend);
     out.apEsconde    = /armadoEnCursoBy/.test(populateTandasList.toString());
 
-    // v5.74b — reserva ATÓMICA (RPC). tandaReservar devuelve el dueño que quedó.
+    /* v5.74b — reserva ATÓMICA (RPC).
+       v18.65: la RPC pasó a ser `gv_tanda_reservar` (tabla propia GV_Tandas_Lock, con estado)
+       y ahora contesta {ok, motivo, legajo, nombre}. La vieja `tanda_reservar` sigue existiendo
+       porque la usa Producción Virgilio, pero Gestión ya no la llama. El detalle del invariante
+       nuevo está en tests/tanda-lock-etapas.cjs; acá sólo se chequea el cableado. */
     window.fetch = function (url) {
       url = String(url);
-      if (url.indexOf("rpc/tanda_reservar") >= 0) return J({ tanda: "TANDA_X", fase: "picking", legajo: "77", nombre: "Marta" });
+      if (url.indexOf("rpc/gv_tanda_reservar") >= 0) {
+        return J({ ok: false, motivo: "tomada", legajo: "77", nombre: "Marta" });
+      }
       return J([]);
     };
     const lk = await tandaReservar("TANDA_X", "picking", "104", "Yo");
-    out.reservaDueno   = lk && lk.legajo === "77";        // otro (77) es el dueño → yo pierdo
+    out.reservaDueno   = lk && lk.ok === false && lk.legajo === "77";   // otro (77) la tiene → yo pierdo
     out.sendReserva    = /tandaReservar/.test(srcSend);   // send() usa la reserva atómica
     out.sendLibera     = /tandaLiberar/.test(srcSend);    // send() libera al terminar (TP/TAP)
     return out;

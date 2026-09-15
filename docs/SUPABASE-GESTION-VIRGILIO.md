@@ -17938,7 +17938,7 @@ Bazar/Goldar, con sólo Dorinka en zona 5 el 16/09— devuelve **21/09**, no 16/
 El panel de errores de la PPP (v18.59) lo muestra en rojo hasta que se resuelva. El título del panel
 dejó de decir "en el Excel" (v18.60).
 
-## §3.hm — v18.63: el problema 236 era falsa alarma; lo que se arregló es el silencio — 2026-09-15
+## §3.hm — v18.65: el problema 236 era falsa alarma; lo que se arregló es el silencio — 2026-09-15
 
 **Qué decía el problema 236** (registrado la noche del 15/09, sin tocar): *"8 tablas con RLS y
 sin policies detrás de vistas `security_invoker` que la app lee"* → o sea, pantallas en blanco.
@@ -17990,4 +17990,111 @@ dueño, el grant no las toca): `gv_imp_cargas()`, `gv_imp_cc_lista()`, `gv_imp_c
 `postgres`).
 
 **Rollback:** el `grant select … to anon, authenticated` de vuelta.
-`sql/gv_imp_vistas_sin_anon_v1863.sql`.
+`sql/gv_imp_vistas_sin_anon_v1865.sql`.
+---
+
+## §3.hk — v18.65: el lock de tanda deja de vencer solo — se suelta por ANULACIÓN o por AVANCE DE ETAPA — 2026-09-15
+
+**Pedido de Luis:** *"una vez que alguien agarra una tanda para armado o pickeado no se pueda
+agarrar otra vez al mismo tiempo hasta que no quede anulada o pase a la siguiente etapa
+(picking→armado)"*.
+
+### Lo que estaba mal
+
+El lock existía y era atómico (`Tandas_Lock` + `tanda_reservar`, `ON CONFLICT DO NOTHING`), pero
+se soltaba solo por dos vías y las dos dejaban la puerta abierta:
+
+1. **Vencía a las 10 horas.** `tanda_reservar` arranca con
+   `DELETE FROM "Tandas_Lock" WHERE tanda=t AND fase=f AND ts < now() - interval '10 hours'`,
+   así que un picking abierto de ayer quedaba libre hoy sin que nadie lo hubiera cerrado.
+2. **El TP lo borraba.** Al terminar el picking se llamaba `tanda_liberar`, o sea que una tanda
+   **ya pickeada** quedaba libre y cualquiera podía volver a abrirle el picking.
+
+De (2) salen los **«EP fantasma»**: alguien reabre una tanda ya terminada, casi siempre sin
+querer. Medidos: **6 en 120 días** — 5 con el lock ya vencido y 1 apenas **0,8 h** después del
+TP (ése entró justamente porque el TP libera). Dos siguen abiertos desde julio y agosto:
+
+```
+C69C  EP 237 03/07 07:52 → TP 237 08:29   ·  EP 104 el 10/07, 7 días después, nunca cerrado
+D30A  EP 122 10/08 14:13 → TP 122 14:27   ·  EP 122 el 12/08, 2 días después, nunca cerrado
+```
+
+⚠ **Y son peligrosos**, no sólo ruido en el monitor: `anular_picking_virgilio` pone en cero
+**todo** el picking de la tanda (`update Movimientos_Stock set delta = 0 where tipo='picking'
+and ref = tanda`), sin filtrar por legajo ni por fecha. Anular el EP fantasma de D30A borraría
+los **36 movimientos** del picking bueno, que además ya está armado.
+
+### El modelo nuevo: la fase tiene ESTADO
+
+```
+(tanda, fase)  →  libre  →  'tomada'  →  'completada'
+                    ↑__________|_______________|
+                        sólo por anulación explícita
+```
+
+| Estado | Qué significa |
+|---|---|
+| `tomada` | la agarró alguien y está trabajando. Nadie más entra. **No vence por tiempo.** |
+| `completada` | la fase terminó (TP → picking, TAP → armado). **Nadie la reabre.** |
+| libre | nunca se tomó, o se anuló a propósito |
+
+«Pasar a la etapa siguiente» es exactamente esto: al TP la fase *picking* queda `completada` y
+la fase *armado* nace libre, lista para que alguien la tome.
+
+**La salida de un lock trabado es la ANULACIÓN**, que ya existe en la app: «Anular picking» y
+«No la armo yo» (v18.50). Sin TTL, ésa es la única puerta — a propósito.
+
+### Por qué tabla NUEVA (`GV_Tandas_Lock`) y no tocar `Tandas_Lock`
+
+`Tandas_Lock` la comparte **Producción Virgilio**, que sigue viva (`index.html:6861` de ese repo
+llama a `tanda_reservar`). Si Gestión escribiera en la misma tabla, la función vieja de
+Producción seguiría aplicando su `DELETE ... < now() - 10 hours` y rompería el invariante nuevo
+sin que nadie se entere.
+
+Medido antes de decidir: **Producción ya no pickea** — su último `EP` y su último `AP` son del
+**09/09**; lo que sigue mandando es recepción (RT, LT, ROC, PC, RSP). Separar las dos tablas no
+le saca nada a nadie y es reversible sin tocar Producción.
+
+### Las tres RPC
+
+| Función | Cuándo | Qué hace |
+|---|---|---|
+| `gv_tanda_reservar(tanda, fase, legajo, nombre)` | al EP/AP | atómica. Devuelve `{ok, motivo, legajo, nombre, desde}`; `motivo` = `tomada` \| `ya_completada` \| `propia` |
+| `gv_tanda_completar(tanda, fase, legajo)` | al TP/TAP | marca `completada`. **No borra** |
+| `gv_tanda_lock_anular(tanda, fase, legajo)` | al anular | borra la fila → vuelve a libre |
+
+El front (`tandaReservar` / `tandaLiberar` / `tandaLockAnular` nueva) sigue **fallando ABIERTO**:
+sin red la RPC devuelve `null` y no se bloquea a nadie, igual que antes.
+
+### Prueba del invariante (los 9 pasos, corridos contra la base)
+
+```
+A) libre → la toma el 111 .............. ok:true  · propia
+B) el 222 NO puede ..................... ok:false · tomada       ← lo que pidió Luis
+C) el 111 SÍ reanuda ................... ok:true  · propia
+D) termina el picking (TP) ............. ok
+E) nadie reabre el picking ............. ok:false · ya_completada ← mata los EP fantasma
+F) ni el que lo hizo ................... ok:false · ya_completada
+G) pero el ARMADO está libre ........... ok:true  · propia        ← "pasa a la etapa siguiente"
+H) se anula el picking ................. ok
+I) ahora sí se puede de nuevo .......... ok:true  · propia
+```
+
+### Backfill
+
+Sin él el invariante nace vacío y todas las tandas viejas quedan reabribles. Se marcó
+`completada` cada fase ya terminada (TP/TAP) de los últimos 45 días: **263 picking + 260 armado**.
+
+Las que quedaron **tomadas y sin cerrar NO se backfillearon a propósito** — son las abandonadas
+de hoy (E25A de JC, E23A de FO) y tienen que quedar **libres** para que mañana alguien las
+agarre. Verificado: las dos figuran `(libre)`.
+
+### Lo que esto NO arregla
+
+El **monitor las va a seguir mostrando en curso**, porque mira los eventos `EP`/`AP` sin `TP`/
+`TAP`, no el lock. Los dos operarios ficharon **FJ** («terminé día») después de abrir —JC 17:17,
+FO 17:02— y eso no cierra el picking ni el armado: son cosas independientes en el modelo. Queda
+pendiente que FJ cierre lo que quedó abierto, o que el monitor deje de contar horas de alguien
+que ya se fue.
+
+`sql/gv_tandas_lock_v1865.sql` · `tests/tanda-lock-etapas.cjs` · tarea Planify 3473.
