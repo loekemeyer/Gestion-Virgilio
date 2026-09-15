@@ -16342,3 +16342,90 @@ sábados, domingos ni feriados.
 (`gv_ppp_avance_dias`) se **llamó de verdad** después del replace — un `create or replace` limpio
 no prueba nada.
 **Tests:** `tests/ppp-ensalida-estado.cjs`, `tests/ppp-en-salida.cjs` → OK.
+
+---
+
+## §3.gl — v18.16: los códigos NNNL dejan de ser artículos aparte, y el uni×caja que los subcontaba — 2026-09-15
+
+Dos mitades del mismo problema (**218** de `github_repo_problemas`), en dos proyectos distintos.
+`513L` es el código con el que Chef le vende a sus clientes mercadería de Loeke: **es el mismo
+artículo que `513`**, se pickea de la góndola LK y no tiene stock propio (regla del dueño,
+v13.71). Thomas: *"con la L al final ya hablé mil veces que no va"*.
+
+### a) El uni×caja — en LK (`kwkclwhmoygunqmlegrg`)
+
+`fn_proyeccion_oc_virgilio()` calculaba `proy_uni_mes = proy_cajas * coalesce(p.uxb, lk.uxb, 1)`
+y **ningún NNNL está en `products` ni en `loke_products`**, así que el `coalesce` caía en **1**:
+12 o 24 veces por debajo. `proy_cajas_mes` estaba bien (sale de `sales_lines.boxes`, ya viene en
+cajas); lo que estaba mal era `proy_uni_mes`. Y `vista_generador_oc` **no era inmune**: suma
+`proy_uni_mes` y divide por `GV_UxB`.
+
+**Arreglo:** si el código no tiene uxb propio, se resuelve el del código **base** pelando la L con
+la misma regla de `gv_cod_stock()` (`'([0-9E])L$'`), en capas: uxb propio → uxb del base → 1.
+
+Medido: 461 filas antes y después (no multiplica) · 124 filas NNNL, las 124 sin uxb propio, 121
+bases en `products` y 3 en `loke_products` · después, **0 NNNL sin uxb** y 1.610,56 cj/mes pasan
+de 1.610 a **20.396 unidades** · en `vista_generador_oc`, **123 códigos suben, +1.464,45 cj/mes**
+de proyección (cotejado contra `zz_backups."GV_Backup_ProyeccionMadre_20260915"`).
+
+`sql/fn_proyeccion_oc_virgilio_uxb_base_L_v1816.sql`. El resultado se bajó a Virgilio corriendo
+`sync_proyeccion_madre_virgilio()`; ⚠ **tarda más de 60 s** (va por FDW) y desde el MCP se corta
+el cliente: si hace falta a mano, va por `cron.schedule` y se borra después.
+
+### b) La fila fantasma en la pantalla Stocks — en Virgilio
+
+No entraba por el stock (`vista_saldos_stock` no tiene **ninguna** fila NNNL): entraba por la
+**demanda**, un pedido de Chef con artículo `513L`. `dem_raw` / `dem_oc_raw` normalizaban sólo
+los ceros a la izquierda, la L sobrevivía y nacía un código nuevo. Se pasaron esos dos CTE —y el
+brazo de `proyeccion_madre` del CTE `proy`— a `gv_cod_stock()`.
+
+⚠ **Fundir también `proy` es lo que el archivo v18.11 dejaba para después**, y tenía el motivo al
+revés (creía inflado `proy_cajas_mes`). Con el motor ya arreglado (a), fundirlo es lo correcto: si
+no, la proyección de los NNNL queda huérfana —la fila sale del universo, que es
+`stock_e UNION dem_raw`— y directamente se pierde de la pantalla. El desglose por empresa
+(`513 CH`) ya venía fundiendo la L, porque ese brazo lee `GV_Proyeccion_Emp` con `gv_cod_stock`.
+
+Medido sobre `stocks_carga_rapida`, antes → después: **425 → 369 filas** · **56 → 0** filas NNNL ·
+demanda **5.501,66 → 5.501,66** (re-atribución, no alta ni baja) · proyección
+**21.693,16 → 22.496,21** (+803,05) · `513` **184 → 190** cajas y **1.132,17 → 1.204,17** de
+proyección · `798E` 2 → 30 cajas. `gv_endpoints_rotos` = 0 y las 3 vistas del CASCADE conservan
+`security_invoker`.
+
+⚠ **No se usó `Equivalencias_Familia`** para mapear 513L→513: la leen
+`notificar_pedido_secundario_telegram()` y `corregir_pedido_secundario_auto()`, que le sacarían la
+L a los pedidos de Chef — lo contrario de la regla del dueño.
+
+**Rollback:** bloque `3) ROLLBACK` de `sql/gv_stock_procesada_sufijo_L_v1816.sql`, que recrea las
+4 definiciones desde `zz_backups."GV_Backup_Defs_StockProcesada_20260915"`.
+**Producción:** anotado en `docs/ROLLBACK-PRODUCCION.md` (su `index.html` lee estas tres vistas;
+no cambió ninguna columna).
+
+---
+
+## §3.gm — v18.16: el desglose de ventas por cliente del pop-up de Proyección — 2026-09-15
+
+Pedido: *"las ventas de los 5 más importantes + una fila de otros"*. El front salió en la v18.13 y
+ya llamaba a `gv_ventas_clientes_mes_cod`; faltaban las **dos** funciones (`sql/gv_ventas_clientes_mes_v1812.sql`),
+que se aplicaron el 15/09 y encendieron el desglose **sin tocar el front**:
+
+- LK: `fn_ventas_clientes_mes_virgilio(p_cod, p_mes, p_empresa)` — la que sabe; las ventas viven
+  en `sales_lines` de LK y Virgilio no las alcanza por FDW.
+- Virgilio: `gv_ventas_clientes_mes_cod(...)` — envoltorio HTTP calcado de `ventas_mensuales_cod`,
+  de donde lee la clave publishable y el `x-feed-secret` (así no se pueden desincronizar, y no
+  quedan escritos en el repo, que se publica por GitHub Pages).
+
+Mismos filtros que `fn_ventas_mensuales_virgilio` a propósito (clientes `1` y `3878` afuera,
+`sales_item_remap` aplicado, `sales_excluded_items` salteados): si el desglose no sumara exacto el
+número de la columna, el pop-up se contradice solo. El corte de 5 + **Otros** lo hace el backend
+(protocolo del `CLAUDE.md`) y además así viajan 6 filas y no 137.
+
+Verificado `513` / `2026-05`: Osa 400 · Inc 183 · Patagonia 92 · Enrique Reyes 40 · Horcada 40 ·
+**Otros 846** = **1.601**, igual que la columna.
+
+⚠ El filtro va **por artículo antes que por mes**, con un juego de códigos candidatos y un `in` de
+literales: normalizar `item_code` con `regexp_replace` en el `WHERE` inutiliza
+`idx_sales_lines_item_invoice` y la consulta se pasaba de los 60 s (`sales_lines` tiene 236.272
+filas).
+
+**Rollback:** los dos `drop function` del final del archivo. El front aguanta que no existan
+(contesta 404 y el desglose lo dice en una línea).

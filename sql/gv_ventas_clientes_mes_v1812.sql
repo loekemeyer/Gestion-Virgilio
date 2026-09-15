@@ -2,10 +2,10 @@
 -- gv_ventas_clientes_mes_v1812.sql — "las ventas de los 5 mas importantes + una fila de
 -- otros", para el desglose de un mes en el pop-up de Proyeccion (v18.12).
 --
--- ⚠ NO APLICADO TODAVIA: la DDL quedo frenada por permisos en la sesion del 15/09.
---    El front ya esta pusheado y llama a `gv_ventas_clientes_mes_cod`; mientras la RPC no
---    exista, tocar el numero de "factur." contesta 404 y el desglose dice que falta
---    habilitarlo. En cuanto se crea la funcion, empieza a andar sin tocar el front.
+-- ✅ APLICADO el 2026-09-15 en los dos proyectos. Verificado 513 / 2026-05:
+--    Osa Distribuidora 400 | Inc S.A. 183 | Patagonia 92 | Enrique Reyes 40 |
+--    Horcada 40 | Otros 846  ->  suma 1.601, igual que la columna del pop-up.
+--    El front (v18.13) ya lo llamaba, asi que el desglose de "factur." se encendio solo.
 --
 -- SON DOS FUNCIONES, EN DOS PROYECTOS:
 --   1. LK (kwkclwhmoygunqmlegrg): `fn_ventas_clientes_mes_virgilio` — la que sabe. Las

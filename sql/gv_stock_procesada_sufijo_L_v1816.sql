@@ -1,52 +1,58 @@
 -- =====================================================================================
--- gv_stock_procesada_sufijo_L_v1811.sql
+-- gv_stock_procesada_sufijo_L_v1816.sql
 -- Los codigos NNNL (variante Chef de un articulo de Loeke) dejan de ser articulos
--- aparte en la pantalla Stocks.
+-- aparte en la pantalla Stocks.   ✅ APLICADO el 2026-09-15 (antes v1811, sin aplicar).
+-- Problema 218 de github_repo_problemas · tarea Planify 3405.
 --
--- ⚠ NO APLICADO TODAVIA: la DDL quedo frenada por permisos en la sesion del 15/09.
---    Para aplicarlo, correr el bloque "1) APLICAR" con el MCP de Supabase.
---
--- EL PROBLEMA (problema 218 de github_repo_problemas)
+-- EL PROBLEMA
 -- ---------------------------------------------------------------------------------
 -- 513L es el codigo con el que Chef le vende a sus clientes mercaderia de Loeke: es el
 -- MISMO articulo que 513, se pickea de la gondola LK y no tiene stock propio (regla del
--- dueño, v13.71). Pero en la pantalla Stocks figura como una fila propia, con stock 0,
+-- dueño, v13.71). Pero en la pantalla Stocks figuraba como una fila propia, con stock 0,
 -- linea null, descripcion = el codigo y familia_principal apuntando a si misma.
 --
--- POR DONDE ENTRA. No por el stock: `vista_saldos_stock` no tiene ninguna fila NNNL.
--- El universo de la matview es `stock_e UNION dem_raw`, asi que entra por la DEMANDA:
--- un pedido de Chef con articulo 513L. `dem_raw` / `dem_oc_raw` normalizan con
+-- POR DONDE ENTRABA. No por el stock: `vista_saldos_stock` no tiene ninguna fila NNNL.
+-- El universo de la matview es `stock_e UNION dem_raw`, asi que entraba por la DEMANDA:
+-- un pedido de Chef con articulo 513L. `dem_raw` / `dem_oc_raw` normalizaban con
 --     regexp_replace(upper(resolver_equiv(...)), '^0+(?=.)', '')
--- que saca los ceros a la izquierda y nada mas. La L sobrevive y nace un codigo nuevo.
---
--- Medido el 2026-09-15 sobre `stocks_carga_rapida`:
---   · 56 filas NNNL visibles, todas con stock 0
---   · 192 cajas pedidas que NO se le suman a su codigo base -> la pantalla muestra menos
---     demanda de la real en los 56 codigos madre
---   · 807,51 cj/mes de proyeccion colgando de esas filas
--- Simulacion de la demanda con la normalizacion nueva (SELECT, sin escribir):
---   290 codigos -> 237; se funden 56; se mueven 192 cajas; total 5.426,66 cajas intacto.
+-- que saca los ceros a la izquierda y nada mas. La L sobrevivia y nacia un codigo nuevo.
 --
 -- LA SOLUCION es la funcion canonica que YA EXISTE y que ya usa `vista_generador_oc`:
 --   gv_cod_stock('513L') = '513'   (saca '·...', ' LK|CH|LOKE', ceros a la izquierda y la L)
--- Por eso el generador de OC nunca estuvo afectado y la pantalla si.
+-- Por eso el generador de OC no tenia el codigo partido y la pantalla si.
 --
--- ⚠⚠ SOLO SE TOCA LA DEMANDA, NO LA PROYECCION — y es a proposito.
--- El CTE `proy` tambien normaliza con el regex viejo, pero fundirlo HOY contaminaria al
--- codigo base: los 124 NNNL de `proyeccion_madre` vienen calculados a uni x caja = 1
--- (declaran 1.610,56 cj/mes cuando al uxb real son 145,34). Medido lo que pasaria:
---   106E: proy real 5,67 -> quedaria 105,67   (18x)
---   123 : proy real 49,17 -> quedaria 191,17  (4x)
---   31  : proy real 489,33 -> quedaria 680,33
--- Fundiendo SOLO la demanda, las filas NNNL desaparecen del universo (no tienen stock) y
--- su proyeccion inflada queda huerfana, o sea deja de mostrarse: es estrictamente mejor.
--- La segunda etapa (fundir tambien `proy`) recien cuando se arregle el motor en LK:
--- `fn_proyeccion_oc_virgilio()` del proyecto kwkclwhmoygunqmlegrg, que es donde nace el
--- uni x caja = 1. Ver la tarea "Th Sacar los codigos NNNL de la pantalla Stocks".
+-- SE TOCAN LOS DOS CTE: LA DEMANDA **Y** LA PROYECCION
+-- ---------------------------------------------------------------------------------
+-- ⚠ La version v1811 de este archivo fundia SOLO la demanda, a proposito, porque creia
+--   que `proyeccion_madre.proy_cajas_mes` de los NNNL venia inflado. Estaba al reves:
+--   lo inflado nunca fue `proy_cajas_mes` (sale de sales_lines.boxes, o sea ya en cajas),
+--   sino `proy_uni_mes`, por el uni-x-caja que caia en 1. Eso se arreglo en LK el mismo
+--   dia — `sql/fn_proyeccion_oc_virgilio_uxb_base_L_v1816.sql` — y recien DESPUES se
+--   aplico esto. Con el motor arreglado, fundir tambien `proy` es lo correcto:
+--     · 513L declara 72 cj/mes de demanda REAL de Chef; son del articulo 513
+--     · si no se funde, esa proyeccion queda huerfana (la fila NNNL sale del universo
+--       porque no tiene stock ni demanda propia) y se pierde de la pantalla
+--     · el desglose por empresa ("513 CH") ya venia fundiendo la L, porque el otro brazo
+--       del UNION ALL usa gv_cod_stock sobre GV_Proyeccion_Emp: fundir el total lo acerca
+--       a que total y desglose digan lo mismo (lo que falta para eso es el problema 222)
 --
--- RESPALDO. Las definiciones previas de la matview y de sus 3 vistas dependientes, con
--- reloptions e indices, estan en zz_backups."GV_Backup_Defs_StockProcesada_20260915".
--- El rollback del final las lee de ahi, asi que es exacto.
+-- MEDIDO el 2026-09-15, antes -> despues sobre `stocks_carga_rapida`:
+--   · filas            425 -> 369   (-56, las 56 NNNL visibles)
+--   · filas NNNL        56 -> 0
+--   · demanda total  5.501,66 -> 5.501,66   (re-atribucion, no alta ni baja)
+--   · proyeccion    21.693,16 -> 22.496,21  (+803,05: la que colgaba de las filas NNNL)
+--   · 513: cajas_pedidas 184 -> 190 (+6, las del 513L) · proy 1.132,17 -> 1.204,17 (+72)
+--   · 798E: cajas_pedidas 2 -> 30
+--   · gv_endpoints_rotos: 0 · las 3 vistas dependientes con security_invoker: OK
+--
+-- ⚠ NO USAR `Equivalencias_Familia` para mapear 513L->513: la leen
+--   notificar_pedido_secundario_telegram() y corregir_pedido_secundario_auto(), que le
+--   sacarian la L a los pedidos de Chef — justo lo contrario de la regla del dueño.
+--
+-- RESPALDO. Las definiciones previas de la matview y de sus 3 vistas dependientes estan
+-- en zz_backups."GV_Backup_Defs_StockProcesada_20260915". El rollback del final las lee
+-- de ahi, asi que es exacto. (Ojo: ese respaldo se guardo con pg_get_viewdef sin pretty;
+-- comparado contra la version linda difiere solo en parentesis y espacios.)
 --
 -- ⚠ Es matview: no hay CREATE OR REPLACE, hay que DROP + CREATE. El CASCADE se lleva
 --   Stock_Saldos, gv_importados_stock_dep y, en segundo nivel, gv_importados_ordenes
@@ -58,10 +64,11 @@
 -- 1) APLICAR ==========================================================================
 do $mig$
 declare
-  v_def text; v_new text; v_ss text; v_dep text; v_ord text;
+  v_def text; v_new text; v_ss text; v_dep text; v_ord text; v_obj text; c1 int; c2 int;
   a1 text := 'regexp_replace(upper(resolver_equiv(TRIM(BOTH FROM b.articulo))), ''^0+(?=.)''::text, ''''::text)';
   n1 text := 'gv_cod_stock(resolver_equiv(TRIM(BOTH FROM b.articulo)))';
-  c1 int; v_obj text;
+  a2 text := 'regexp_replace(upper(TRIM(BOTH FROM proyeccion_madre.cod)), ''^0+(?=.)''::text, ''''::text)';
+  n2 text := 'gv_cod_stock(proyeccion_madre.cod)';
 begin
   set local statement_timeout = '300s';
 
@@ -73,13 +80,20 @@ begin
     raise exception 'falta alguna definicion en el backup';
   end if;
 
-  -- 4 = dem_raw (SELECT + GROUP BY) + dem_oc_raw (SELECT + GROUP BY). Si no son 4, la
-  -- definicion cambio desde el 15/09: parar y volver a mirarla, no reemplazar a ciegas.
+  -- 4 = dem_raw (SELECT + GROUP BY) + dem_oc_raw (SELECT + GROUP BY)
+  -- 2 = el CTE proy, brazo de proyeccion_madre (SELECT + GROUP BY)
+  -- Si no son esos numeros, la definicion cambio desde el 15/09: parar y volver a mirarla,
+  -- no reemplazar a ciegas.
   c1 := (length(v_def) - length(replace(v_def, a1, ''))) / length(a1);
   if c1 <> 4 then raise exception 'demanda: esperaba 4 ocurrencias, hay %', c1; end if;
+  c2 := (length(v_def) - length(replace(v_def, a2, ''))) / length(a2);
+  if c2 <> 2 then raise exception 'proyeccion: esperaba 2 ocurrencias, hay %', c2; end if;
 
-  v_new := replace(v_def, a1, n1);
-  if position('gv_cod_stock(resolver_equiv' in v_new) = 0 then raise exception 'el reemplazo no quedo'; end if;
+  v_new := replace(replace(v_def, a1, n1), a2, n2);
+  if position('gv_cod_stock(resolver_equiv' in v_new) = 0
+     or position('gv_cod_stock(proyeccion_madre.cod)' in v_new) = 0 then
+    raise exception 'el reemplazo no quedo';
+  end if;
 
   execute 'drop materialized view public.vista_stock_procesada cascade';
   execute 'create materialized view public.vista_stock_procesada as ' || v_new;
@@ -113,13 +127,12 @@ select c.relname from pg_class c join pg_namespace n on n.oid = c.relnamespace
 -- (c) no queda ningun NNNL en la pantalla       -> tiene que dar 0
 select count(*) from public.stocks_carga_rapida where upper(btrim(cod)) ~ '^[0-9]+[A-Z]*L$';
 
--- (d) 513 se quedo con las 6 cajas que tenia el 513L, y su proyeccion NO cambio
---     (esperado: cajas_pedidas +6, proy_cajas_mes sigue en 1132.17)
+-- (d) 513 se quedo con lo que tenia el 513L (esperado: 190 cajas y proy 1204.17)
 select cod, cajas_pedidas, proy_cajas_mes, stock_total
-  from public.stocks_carga_rapida where cod in ('513','505','838','798E');
+  from public.stocks_carga_rapida where cod in ('513','505','798E');
 
--- (e) la demanda total no se movio: es re-atribucion, no alta ni baja
-select round(sum(cajas_pedidas), 2) from public.stocks_carga_rapida;   -- antes: ver nota
+-- (e) la demanda total no se movio: es re-atribucion, no alta ni baja (esperado 5501.66)
+select round(sum(cajas_pedidas), 2) from public.stocks_carga_rapida;
 
 
 -- 3) ROLLBACK =========================================================================

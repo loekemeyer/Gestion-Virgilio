@@ -1154,3 +1154,40 @@ drop function if exists public.trg_guardado_no_negativo();
 ```
 
 Nota: `sql/gv_guardado_no_negativo_v1773.sql`, `docs/SUPABASE-GESTION-VIRGILIO.md` §3.fn.
+
+---
+
+## Los códigos NNNL dejan de ser artículos aparte — `vista_stock_procesada` (v18.16, 2026-09-15)
+
+**Objeto compartido tocado:** la matview `public.vista_stock_procesada` (DROP + CREATE, porque
+no hay `create or replace` de matview) y, por el CASCADE, sus 3 dependientes:
+`public."Stock_Saldos"`, `public.gv_importados_stock_dep` y `public.gv_importados_ordenes`
+(ésta cuelga en segundo nivel y ya se cayó dos veces por esto — v16.20 y v16.33). Las tres se
+recrearon en la misma transacción, con `security_invoker = true` y sus grants.
+
+**Qué cambió:** dos CTE dejaron de normalizar con `regexp_replace(..., '^0+(?=.)', '')` y pasaron
+a usar `gv_cod_stock()`, que además le saca la **L** final (sólo detrás de dígito o E):
+`dem_raw` / `dem_oc_raw` (la demanda) y el brazo de `proyeccion_madre` del CTE `proy`. Con eso
+`513L` —la variante con la que Chef vende mercadería de Loeke— deja de ser una fila propia y
+sus cajas y su proyección se le suman al `513`. **Ninguna columna cambió**, así que nada que lea
+estas vistas se rompe: cambian los valores, no la forma.
+
+**Impacto en Producción Virgilio:** su `index.html` lee `vista_stock_procesada`, `Stock_Saldos`
+y `stocks_carga_rapida` (grepeado el 15/09 sobre el repo clonado). Va a ver los mismos números
+fundidos, que es justamente lo que pidió el dueño ("con la L al final ya hablé mil veces que no
+va"). No hay cambio de esquema, así que no hay nada que portar.
+
+**Medido, antes → después** (`stocks_carga_rapida`): 425 → 369 filas · 56 → 0 filas NNNL ·
+demanda 5.501,66 → 5.501,66 (re-atribución) · proyección 21.693,16 → 22.496,21 (+803,05, la que
+colgaba de las filas NNNL) · `513` 184 → 190 cajas y 1.132,17 → 1.204,17 de proyección ·
+`gv_endpoints_rotos` en 0 · las 3 vistas conservan `security_invoker`.
+
+**Rollback exacto:** el bloque `3) ROLLBACK` de `sql/gv_stock_procesada_sufijo_L_v1816.sql`, que
+recrea las 4 definiciones leyéndolas de `zz_backups."GV_Backup_Defs_StockProcesada_20260915"` y
+después corre `select public.refresh_stocks_carga_rapida();`.
+
+**Nota:** el motor de la proyección se arregló **antes**, en LK
+(`sql/fn_proyeccion_oc_virgilio_uxb_base_L_v1816.sql`). Eso no toca ningún objeto de Producción:
+`fn_proyeccion_oc_virgilio()` vive en `kwkclwhmoygunqmlegrg`. Lo que sí baja a esta base es su
+resultado, en `public.proyeccion_madre`, respaldado en
+`zz_backups."GV_Backup_ProyeccionMadre_20260915"`.
