@@ -20382,6 +20382,9 @@ Sin bump de versión: no cambió una línea de la app — el arreglo del código
 
 ## §3.ii — v19.03: las 6 RPC de Conciliación se cierran a `anon` — 2026-09-16
 
+> ⛔ **REVERTIDO el mismo día, a pedido de Thomas: *"volvé para atrás, no había que borrar nada"*.** Los permisos volvieron a como estaban (`grant execute … to public`) y se comprobó llamando las RPC como `anon`. Esta sección queda **sólo como registro de lo que se midió**, no de un cambio vigente. El archivo `.sql` se borró del repo.
+
+
 **Lo que estaba abierto.** Las 6 funciones `gv_conciliacion_*` (`lista`, `comparar`, `motivo`,
 `detalle`, `totales`, `registrar`) eran `SECURITY DEFINER` con `EXECUTE` para **PUBLIC**, y `anon`
 lo hereda. Medido con `set role anon`:
@@ -20449,9 +20452,12 @@ nunca**— va como `perform` en `plpgsql`.
 Y quedan **213** funciones `SECURITY DEFINER` abiertas a `anon` en el resto del proyecto. Eso es
 una tanda propia: inventariar cuáles llama el front de verdad y cerrar el resto.
 
-**Archivo:** `sql/gv_conciliacion_grants_v1903.sql` (lleva el rollback adentro). Problema 353.
+**El archivo `sql/gv_conciliacion_grants_v1903.sql` se borró** al revertir. Problema 353, revertido.
 
 ## §3.ik — v19.06: barrido de grants — 61 RPC cerradas a `anon` — 2026-09-16
+
+> ⛔ **REVERTIDO el mismo día, a pedido de Thomas: *"volvé para atrás, no había que borrar nada"*.** Los permisos volvieron a como estaban (`grant execute … to public`) y se comprobó llamando las RPC como `anon`. Esta sección queda **sólo como registro de lo que se midió**, no de un cambio vigente. El archivo `.sql` se borró del repo.
+
 
 **El problema (354).** Postgres otorga `EXECUTE` a **PUBLIC** en CADA función nueva, y `anon`
 hereda de PUBLIC. O sea que **toda RPC nace ejecutable con la clave pública** que está escrita
@@ -20516,5 +20522,5 @@ Vistas sin `security_invoker` legibles por anon → vacío.
   `recepcion_bundle`…) son `SECURITY DEFINER` y también están abiertos a `anon`. Otra tanda.
 - Para avanzar con las 9 de Planify hace falta **acceso al repo `loekemeyer/Planify`**.
 
-**Archivo:** `sql/gv_grants_anon_barrido_v1906.sql` (lleva el rollback y los chequeos).
-Problema 354, queda **en curso**.
+**El archivo `sql/gv_grants_anon_barrido_v1906.sql` se borró** al revertir.
+Problema 354, **revertido** — la medición queda anotada acá por si algún día se retoma.
