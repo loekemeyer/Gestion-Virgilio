@@ -1281,3 +1281,37 @@ update public."Entregas Tallerista Virgilio" t
 
 El backup tiene las 7 filas completas (todas las columnas), con RLS prendida y sin grants para
 `anon`/`authenticated`. Detalle en `docs/SUPABASE-GESTION-VIRGILIO.md` §3.hf. Problema 264.
+
+---
+
+## 2026-09-16 (v18.85) — `trg_normalizar_empresa_stock()`: el guardado hereda la empresa del montón
+
+**Objeto compartido tocado:** la función `public.trg_normalizar_empresa_stock()`, que usa el
+trigger `zz_normalizar_empresa` (BEFORE INSERT) de `public."Movimientos_Stock"`. Corre también
+para Producción Virgilio, que escribe en esa misma tabla.
+
+**Qué cambió.** Se agregó UN bloque: un movimiento de tipo `guardado*` que llega **sin empresa
+explícita** y va a `a_guardar` / `terminado` / `excedente` ahora hereda la empresa con la que
+ese artículo entró a A Guardar, **si entró con una sola**. Si entró con dos, no se adivina.
+Nada más se tocó: el resto del cuerpo es idéntico.
+
+**Impacto sobre Producción.** Estrictamente menos `'Mixto'` y más `LK`/`CH` en filas que antes
+quedaban sin empresa. No cambia ninguna fila que ya venga con empresa explícita, no cambia
+deltas ni depósitos, y no rechaza ningún INSERT. Producción no lee la columna `empresa` para
+decidir nada del picking; la usan las vistas de saldos, que mejoran.
+
+**Por qué hacía falta.** Sin eso, una fila sin empresa caía derecho en `'Mixto'` y partía el
+saldo del artículo: la mercadería entraba a A Guardar como LK y salía como Mixto, así que el
+`−` no cancelaba al `+`. El 16/09 eso puso **475 cajas inexistentes** en "Mover a Góndola".
+Detalle en `docs/SUPABASE-GESTION-VIRGILIO.md` §3.hz. Problema 331.
+
+**ROLLBACK exacto:** ejecutar `sql/backups/trg_normalizar_empresa_stock_pre_v1885.sql`, que es
+la definición anterior tal cual salió de `pg_get_functiondef`. No hay que tocar el trigger
+(sigue apuntando a la misma función).
+
+**También del 16/09, sobre datos de la tabla compartida:** se reasignaron **24 filas** de
+`Movimientos_Stock` (`empresa` 'Mixto' → 'LK'/'CH'), las 12 parejas del guardado del 14/09 y
+16/09 de los 10 códigos con saldo partido. Sólo cambió `empresa`; ni `delta`, ni `deposito`, ni
+`ts`. Backup fila por fila en `zz_backups."GV_Backup_MovStock_Mixto_guardado_20260916"`.
+Rollback: `update public."Movimientos_Stock" m set empresa = b.empresa from
+zz_backups."GV_Backup_MovStock_Mixto_guardado_20260916" b where b.id = m.id;`

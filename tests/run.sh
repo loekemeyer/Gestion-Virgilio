@@ -523,3 +523,6 @@ PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node te
 
 echo "== fac-cliente-nuevo (v18.77: el badge «Cliente nuevo» al lado de la razón social, por empresa+cod) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/fac-cliente-nuevo.cjs
+
+echo "== mg-neteo-empresa (v18.85: Mover a Góndola — el TOTAL manda sobre el desglose por empresa) =="
+PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/mg-neteo-empresa.cjs

@@ -19204,3 +19204,98 @@ cosas y dejar el SQL donde va:
 esta cuenta; el FDW `chef_db` de LK entra como `loke_reader` (sólo lectura) y escribir por REST
 con la publishable key no es camino (la RLS del catálogo es de admin, y no corresponde). Lo
 aprieta Thomas en el SQL Editor de Chef, o se habilita ese proyecto en el MCP y lo corro yo.
+
+## §3.hz — v18.85: las 475 cajas fantasma de "Mover a Góndola" — 2026-09-16
+
+**Síntoma (lo reportaron los operarios).** En *Mover a Góndola* aparecía para guardar una
+cantidad que no era real. Eran **475 cajas en 10 códigos**:
+
+| cód | cajas | | cód | cajas |
+|---|---|---|---|---|
+| 026 | 70 | | 562 | 54 |
+| 027 | 53 | | 564 | 17 |
+| 031 | 133 | | 735 | 41 |
+| 103 | 73 | | 859 | 21 |
+| 312 | 7 | | 862 | 6 |
+
+En el depósito no había ninguna: el saldo de `a_guardar` de los 10 era **cero**.
+
+**Qué pasaba.** El saldo estaba **partido por empresa**. La mercadería **entró** a A Guardar
+con su empresa (7 códigos LK, 3 CH) y **salió** marcada `'Mixto'`, así que el `−` no cancelaba
+al `+`:
+
+```
+026 →  a_guardar LK +70   ·   a_guardar Mixto −70   ·   total 0
+```
+
+La pantalla leía el **desglose** por empresa (`gv_saldos_stock_emp`) y mostraba la fila
+positiva; el total, que era 0, no lo miraba nadie.
+
+**Por qué salía 'Mixto'** — dos vistas que no usan la misma clave:
+
+| | clave de un código con cero adelante | de un dual |
+|---|---|---|
+| `vista_saldos_stock.clave` | `026` (crudo) | `438E LK` |
+| `gv_saldos_stock_emp.cod` | `26` (pelado) | `438E` |
+
+`stockFetchSaldos` colgaba el desglose por `String(x.cod)` → para esos **56 códigos** no
+enganchaba, y encima el `if (!m[k])` les **inventaba un artículo nuevo** (`"26"`) con desglose
+y sin total — que es justamente el renglón fantasma que veía el operario. El artículo real
+(`"026"`) se quedaba sin empresa, el guardado salía con `empresa: null` y el trigger lo
+marcaba `'Mixto'`.
+
+**Corrección de los datos (hecha, con backup).** Cada uno de los 10 códigos había entrado a A
+Guardar con **una sola** empresa, así que no hubo que adivinar nada: se reasignaron los **24
+movimientos** del guardado (12 pares `−a_guardar` / `+terminado|excedente`, del 14/09 11:18 en
+adelante) a la empresa de entrada. Backup completo en
+`zz_backups."GV_Backup_MovStock_Mixto_guardado_20260916"` (24 filas, RLS prendida).
+
+⚠ **El 355 quedó como estaba, a propósito**: es el único que entró a A Guardar con DOS
+empresas (LK 133 + Mixto 40) y sus salidas Mixto (−7 −33 = −40) cancelan exactamente su
+entrada Mixto. Ahí no hay nada roto y no hay evidencia para reasignar.
+
+**Los tres arreglos, para que no vuelva:**
+
+1. **Backend — `trg_normalizar_empresa_stock` (`sql/trg_normalizar_empresa_stock_v1885.sql`).**
+   Un movimiento `guardado*` sin empresa explícita **hereda la empresa con la que ese artículo
+   entró a A Guardar**, si entró con una sola. Mismo patrón que el bloque v18.24 (que resuelve
+   un `separar_pedidos`/`a_facturar` mirando el picking de esa tanda). Se mira el **historial
+   de entradas**, no el saldo del momento, para que las tres filas del mismo guardado (la que
+   baja el montón y las que suben a góndola/excedente) resuelvan **igual** sin depender del
+   orden dentro del INSERT. Probado contra la base en una transacción revertida:
+
+   ```
+   ZZTEST1 (entró sólo LK)      → a_guardar=LK   terminado=LK    ← antes: Mixto / Mixto
+   ZZTEST2 (entró LK y CH)      → a_guardar=Mixto terminado=Mixto ← no adivina, y está bien
+   ```
+   md5 del cuerpo normalizado: repo == base (`59d30d8d762a743acc3804d399d357d2`).
+   Rollback: `sql/backups/trg_normalizar_empresa_stock_pre_v1885.sql`.
+
+2. **Front — `index.html`.** (a) el desglose se engancha por el **código pelado** y, si no hay
+   a quién colgarlo, **no se inventa un artículo**; para los duales cada empresa va a SU clave
+   (`438E LK` / `438E CH`). (b) En la lista de MG **manda el total**: si `a_guardar` no es
+   positivo no hay renglón, diga lo que diga el desglose; y si el desglose no cierra contra el
+   total va **un** renglón con el total y sin empresa, que el trigger resuelve en el server.
+   (c) la lectura de `gv_saldos_stock_emp` lleva `order=` — pagina con `Range` y hoy son **842
+   filas**, a 158 de la página de 1000 donde empezaría a repetir y saltear en silencio.
+
+3. **Centinela — `gv_stock_empresa_fantasma`** (`sql/gv_stock_empresa_fantasma_v1885.sql`).
+   Lista (código, depósito) donde la suma de los saldos positivos por empresa supera al total,
+   o sea cajas que una pantalla puede ofrecer y no existen.
+
+   ⚠ **No arranca vacía.** Al 16/09, ya corregido, devuelve **61 códigos / 1.474 cajas**:
+   `racks` 870 · `terminado` 368 · `excedente` 236, y **cero en `a_guardar`**. Son restos
+   históricos del mismo origen (movimientos viejos sin empresa, de cuando recepción marcaba
+   todo 'Mixto') en otros módulos; **no se tocaron** porque cada uno necesita su propia
+   evidencia de con qué empresa entró. Lo que hay que mirar es que **no crezca** y que
+   `a_guardar` siga en 0:
+
+   ```sql
+   select deposito, count(*) codigos, sum(fantasma) cajas
+     from public.gv_stock_empresa_fantasma group by 1 order by 3 desc;
+   ```
+
+**Test:** `tests/mg-neteo-empresa.cjs` (9 chequeos). Verificado que **falla** contra el
+`index.html` anterior — incluido el renglón inventado `"26"` — y pasa con el nuevo.
+
+Problema 331.

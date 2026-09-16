@@ -13940,10 +13940,32 @@ async function stockFetchSaldos() {
   // necesite. Best-effort: si la vista todavía no existe, queda sin _emp y todo
   // sigue funcionando como hasta ahora.
   try {
-    const er = await supaFetchAll(SUPABASE_URL + "/rest/v1/gv_saldos_stock_emp", "select=*");
+    /* v18.85 - `order=` OBLIGATORIO: supaFetchAll pagina con Range y sin un orden estable
+       PostgREST puede repetir filas de una pagina y saltearse otras. Hoy son 842 filas
+       (una pagina de 1000), o sea a 158 de que empiece a mentir en silencio. */
+    const er = await supaFetchAll(SUPABASE_URL + "/rest/v1/gv_saldos_stock_emp", "select=*&order=cod.asc,empresa.asc");
+    /* v18.85 - las DOS vistas no usan la misma clave y por eso el desglose no se enganchaba:
+       `vista_saldos_stock.clave` trae el codigo CRUDO ("026") o con sufijo para los duales
+       ("438E LK"), y `gv_saldos_stock_emp.cod` lo trae PELADO ("026" -> "26", "438E").
+       Son 56 filas que no matcheaban; el `if (!m[k])` de abajo les inventaba un articulo
+       nuevo ("26") con desglose y sin total, y el que SI existia ("026") se quedaba sin
+       empresa -> el guardado salia con `empresa: null` y el server lo marcaba 'Mixto'.
+       Eso es lo que partio el saldo de A Guardar (475 cajas fantasma el 16/09).
+       Ahora se busca por el codigo pelado, y si no hay a quien colgarlo NO se inventa nada. */
+    const _pelar = function (s) { return String(s == null ? "" : s).trim().toUpperCase().replace(/^0+(?=.)/, ""); };
+    const _porBase = {};
+    Object.keys(m).forEach(function (k) {
+      const mm = /^(.*?)\s+(LK|CH)$/.exec(String(k));
+      const base = _pelar(mm ? mm[1] : k), suf = mm ? mm[2] : "";
+      (_porBase[base] || (_porBase[base] = [])).push({ k: k, suf: suf });
+    });
     (er || []).forEach(function (x) {
-      const k = String(x.cod), e = String(x.empresa || "Mixto");
-      if (!m[k]) m[k] = { cod: k, desc: x.descripcion || "", terminado: 0, excedente: 0, separar_pedidos: 0, a_facturar: 0, a_guardar: 0, racks: 0, insumos: 0, para_envasar: 0, racks_ch: 0 };
+      const e = String(x.empresa || "Mixto");
+      const cands = _porBase[_pelar(x.cod)] || [];
+      const hit = cands.find(function (c) { return c.suf === e; }) ||
+                  (cands.length === 1 ? cands[0] : null);
+      if (!hit) return;
+      const k = hit.k;
       (m[k]._emp || (m[k]._emp = {}))[e] = {
         terminado: Number(x.terminado) || 0, excedente: Number(x.excedente) || 0,
         separar_pedidos: Number(x.separar_pedidos) || 0, a_facturar: Number(x.a_facturar) || 0,
@@ -26115,16 +26137,28 @@ async function showMGModal(legajo, _resume) {
     // guardar" los dos se fundían en un renglón y el operario no sabía cuál
     // estaba bajando. Con `_emp` cargado se abre; sin él (vista nueva todavía
     // no desplegada) se comporta exactamente como antes.
+    /* v18.85 - EL TOTAL MANDA; `_emp` es SOLO el desglose. Si un codigo tiene +70 en LK y
+       -70 en 'Mixto' (entro a A Guardar con una empresa y salio con otra) el saldo real es
+       CERO y no hay nada que bajar, pero aca se listaba la fila POSITIVA del desglose y el
+       operario veia cajas que no existen: el 16/09 eran 475 en 10 codigos (026 70, 027 53,
+       031 133, 103 73, 312 7, 562 54, 564 17, 735 41, 859 21, 862 6), todos con neto 0.
+       Ahora: si el total no es positivo, no hay renglon, diga lo que diga el desglose. Y si
+       el desglose NO cierra contra el total, no se muestra partido: va UN renglon con el
+       total y sin empresa, que el trigger `zz_normalizar_empresa` (v18.85) resuelve en el
+       server mirando con que empresa entro el monton. */
     const _filas = [];
     Object.keys(saldos).forEach(function (k) {
       const a = saldos[k], det = a._emp;
-      if (det) {
-        Object.keys(det).forEach(function (e) {
-          const d = det[e];
-          if ((Number(d.a_guardar) || 0) > 0) _filas.push({ cod: a.cod, desc: a.desc, emp: e, a_guardar: Number(d.a_guardar) || 0, terminado: Number(d.terminado) || 0 });
+      const tot = Number(a.a_guardar) || 0;
+      if (tot <= 0) return;
+      const emps = det ? Object.keys(det).filter(function (e) { return (Number(det[e].a_guardar) || 0) > 0; }) : [];
+      const suma = emps.reduce(function (s, e) { return s + (Number(det[e].a_guardar) || 0); }, 0);
+      if (emps.length && suma === tot) {
+        emps.forEach(function (e) {
+          _filas.push({ cod: a.cod, desc: a.desc, emp: e, a_guardar: Number(det[e].a_guardar) || 0, terminado: Number(det[e].terminado) || 0 });
         });
-      } else if ((Number(a.a_guardar) || 0) > 0) {
-        _filas.push({ cod: a.cod, desc: a.desc, emp: "", a_guardar: Number(a.a_guardar) || 0, terminado: Number(a.terminado) || 0 });
+      } else {
+        _filas.push({ cod: a.cod, desc: a.desc, emp: "", a_guardar: tot, terminado: Number(a.terminado) || 0 });
       }
     });
     const items = _filas.map(function (a) {
