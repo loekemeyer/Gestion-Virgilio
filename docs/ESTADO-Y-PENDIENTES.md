@@ -1,5 +1,23 @@
 # Estado y pendientes — al 2026-09-16 (última actualización: v18.94)
 
+> **2026-09-16, tanda de Thomas (v18.88, §3.id) — Conciliación abría el detalle con timeout.**
+> `🔍 Comparar` moría con *"canceling statement due to statement timeout"*. Tres capas: (1)
+> `gv_conciliacion_comparar` sacaba el `doc_id` por `gv_vista_cruce_facturacion`, que llamaba a
+> `gv_cruce_fc_asignacion()` **en vivo** (recalcula la asignación GLOBAL con temp tables, 1,2 s
+> fijos por consulta); (2) el filtro por NP viajaba como JOIN contra un CTE, así que la vista de
+> ítems calculaba **todas** las NP (2.143 ms, contra 37 ms de una sola); (3) el listado dispara el
+> motivo de **cada** fila con diferencia (23) en paralelo, y cada uno llamaba a `comparar`.
+> Arreglado con el cache `GV_Cruce_FC_Asig` (cron `gv-cruce-fc-asig`, jobid 90, cada 10 min, más
+> refresco desde la propia pantalla si tiene más de 3 min), `comparar` en plpgsql con el filtro
+> empujado, y los motivos en cola de 6. **Salida idéntica verificada**: la vista entera con el
+> mismo md5 y las 142 NP con la misma firma. comparar 2.143 → 90 ms · motivo → 31 ms · lista 920 ms.
+> Problema 335, cerrado.
+>
+> **Queda para definir (de Thomas, no del código):** las RPC de Conciliación
+> (`gv_conciliacion_lista` / `_comparar` / `_motivo`) tienen `EXECUTE` para **`anon`** desde antes
+> de esta tanda — el gate es sólo del front. Cerrarlas a `authenticated` es un `revoke`, pero
+> primero hay que confirmar con qué rol entra la pantalla. **No se tocó.**
+
 > **2026-09-16 (v18.90) — CANCELAR un pedido desde Facturación (pedido de Thomas).**
 > Botón **✕ Cancelar** en cada fila de Facturación, con pop-up de motivo (**Falta stock** / **Otro**
 > con texto libre), del que se sale con ✕, «Volver», Escape o tocando afuera, y con un segundo paso

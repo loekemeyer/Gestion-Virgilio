@@ -538,3 +538,9 @@ PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node te
 
 echo "== fac-cancelar-pedido (v18.90: botón ✕ Cancelar en Facturación — motivo, salida sin tocar nada, y todo a «A guardar») =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/fac-cancelar-pedido.cjs
+
+echo "== fac-rs-sin-tanda (v19.01: una NP armada sin tanda en la PPP conserva razón social y cod de cliente) =="
+PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/fac-rs-sin-tanda.cjs
+
+echo "== hora-24h-renglon (v19.02: reloj de 24h en pantalla + un renglon por tarea + cierre de RI/EI) =="
+PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/hora-24h-renglon.cjs

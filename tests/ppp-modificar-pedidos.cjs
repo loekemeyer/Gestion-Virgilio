@@ -100,7 +100,13 @@ catch (_e) {
     const tabs = [...document.querySelectorAll("#pppTabsBar .ppp-tab")].map((e) => e.textContent.trim());
     out.tabs = tabs;
     const iM = tabs.findIndex((t) => /Modificar Pedidos/.test(t));
-    out.entreOcupYCuar = iM > 0 && /Ocupación/.test(tabs[iM - 1]) && /Cuarentena/.test(tabs[iM + 1]);
+    // v19.01 — se mide el ORDEN, no que sean vecinas pegadas. Lo que pidió Luis es que la solapa
+    // vaya "entre Ocupación y Config. Cuarentena", y eso sigue siendo cierto aunque después se
+    // agregue otra en el medio (pasó con «🆕 Clientes nuevos», que dejó este test en rojo en main
+    // sin que nadie tocara Modificar Pedidos).
+    const iO = tabs.findIndex((t) => /Ocupación/.test(t));
+    const iC = tabs.findIndex((t) => /Cuarentena/.test(t));
+    out.entreOcupYCuar = iO >= 0 && iM > iO && iC > iM;
 
     pppTab("modif");
     await new Promise((res) => setTimeout(res, 150));

@@ -1717,6 +1717,8 @@ body.apr-dnd-tanda .apr-col-nps, body.apr-dnd-tanda .apr-dia-cerrado{ opacity:.4
 .mon-act-row{ display: flex; align-items: center; gap: 9px; padding: 7px 4px; border-top: 1px solid #17203400; font-size: 14px; }
 .mon-act-row + .mon-act-row{ border-top-color: #172034; }
 .mon-act-who{ flex: 0 0 auto; min-width: 130px; color: #cbd5e1; font-weight: 600; white-space: nowrap; }
+.mon-act-who-click{ cursor: pointer; }
+.mon-act-who-click:hover{ text-decoration: underline; color: #fff; }
 .mon-act-who b{ color: #f8fafc; margin-right: 3px; }
 .mon-act-ic{ flex: 0 0 auto; font-size: 17px; line-height: 1; }
 .mon-act-what{ flex: 1 1 auto; color: #e2e8f0; font-weight: 700; }
@@ -5653,7 +5655,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=18.99"></script>
+<script type="module" src="recepcion.js?v=19.02"></script>
 <!-- Config del módulo de fichada (compartido con fichada.html). El secret
      hmacSecret tiene que ser el mismo acá y allá; cargándolo desde un solo
      archivo evitamos que se desincronicen. -->
@@ -6376,9 +6378,77 @@ function getTodayKey() {
   const dd = String(d.getDate()).padStart(2,"0");
   return `${y}-${m}-${dd}`;
 }
+/* v19.02 — RELOJ DE 24 h FORZADO. `toLocaleString("es-AR")` sin opciones deja que el
+   dispositivo elija el ciclo horario, y el WebView de varios Android resuelve es-AR a
+   12 h SIN mostrar el a.m./p.m. → las 13:34 se leían "01:34" y el operario/supervisor
+   creía que el registro era de la madrugada. Caso real (Jhonny Cartaya, 16/09): el
+   Resumen del día mostraba EP/TP a la "01:07" cuando la base tenía 13:07 y el server
+   lo había recibido en el MISMO segundo. El dato nunca estuvo mal; era el cartel.
+   Se fijan todos los campos + hour12:false para que no dependa del celular. El "24" de
+   la medianoche (algunos ICU dan h24 en vez de h23) se normaliza a "00".
+   Nota: las dos únicas llamadas a toLocale*String que YA traían hour12:false son las que
+   usan el resultado como DATO, no para mostrar — el bug estaba sólo en pantalla.
+   Problema 344. */
 function formatDateTime(ts) {
-  try { return new Date(ts).toLocaleString("es-AR", { timeZone: TZ_AR }); }
-  catch (_e) { return ""; }
+  try {
+    if (ts == null || ts === "" || ts === 0) return "";   // null/0 no es "1/1/1970"
+    const d = new Date(ts);
+    if (isNaN(d.getTime())) return "";
+    return d.toLocaleString("es-AR", {
+      timeZone: TZ_AR, hour12: false,
+      day: "numeric", month: "numeric", year: "numeric",
+      hour: "2-digit", minute: "2-digit", second: "2-digit"
+    }).replace(/(^|\s)24:/, "$100:");
+  } catch (_e) { return ""; }
+}
+/* Sólo la hora, mismo criterio de 24 h. Lo usa el renglón "desde … hasta …". */
+function formatTimeAr(ts) {
+  try {
+    if (ts == null || ts === "" || ts === 0) return "";   // null/0 no es "21:00" del 69
+    const d = new Date(ts);
+    if (isNaN(d.getTime())) return "";
+    return d.toLocaleTimeString("es-AR", {
+      timeZone: TZ_AR, hour12: false,
+      hour: "2-digit", minute: "2-digit", second: "2-digit"
+    }).replace(/^24:/, "00:");
+  } catch (_e) { return ""; }
+}
+/* Duración legible a partir de milisegundos: "2m 26s", "1h 05m". */
+function formatDur(ms) {
+  const n = Number(ms);
+  if (!isFinite(n) || n < 0) return "";   // ojo: Math.round(-5/1000) da -0, y -0 < 0 es false
+  const s = Math.round(n / 1000);
+  const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), sec = s % 60;
+  if (h > 0) return h + "h " + String(m).padStart(2, "0") + "m";
+  if (m > 0) return m + "m " + String(sec).padStart(2, "0") + "s";
+  return sec + "s";
+}
+/* v19.02 — UN RENGLÓN POR TAREA (pedido de Luis, 16/09: "se puede poner en un solo
+   renglón 'paré baño desde XX hasta XX'?"). Un toggle deja DOS filas —la apertura
+   (`ts_inicio` null) y el cierre (`ts_inicio` = la hora de apertura)— y las dos se
+   rotulaban igual, así que un baño de 2 minutos se leía como dos baños. Acá el cierre
+   absorbe a su apertura: se marca la fila de cierre con `_desde`/`_hasta`/`_durMs` y se
+   descarta la apertura que le corresponde. La apertura que NO tiene cierre sobrevive
+   marcada con `_abierto` — eso deja A LA VISTA del operario los RI/EI que quedan
+   colgados, que hoy no se ven en ninguna parte. Problema 345. */
+function _histColapsarPares(arr) {
+  const consumidas = new Set();
+  for (const it of arr) {
+    const ini = it.ts_inicio_iso ? new Date(it.ts_inicio_iso).getTime() : 0;
+    if (!ini || !isFinite(ini)) continue;
+    it._desde = ini;
+    it._hasta = it.ts || 0;
+    it._durMs = (it._hasta && it._hasta > ini) ? (it._hasta - ini) : 0;
+    consumidas.add(it.opcion + "@" + ini);
+  }
+  return arr.filter(it => {
+    if (it.ts_inicio_iso) return true;                       // es el cierre: queda
+    if (!TOGGLE_CODES.includes(it.opcion)) return true;      // no es toggle: queda
+    // apertura: se cae si su cierre ya está en la lista; si no, queda marcada
+    if (consumidas.has(it.opcion + "@" + (it.ts || 0))) return false;
+    it._abierto = true;
+    return true;
+  });
 }
 /* Total de cajas que el operario cargó hoy por el Modo OP de Recepción
    (recepcion.js lo va sumando en localStorage). Se usa para cerrar RT con esa
@@ -6673,13 +6743,22 @@ function renderLegajoHistory(legajo) {
 function _renderHistoryWithRemote(legajo, localHist, remoteHist) {
   const container = document.getElementById("legajoHistoryContent");
 
-  // Combinar sin duplicados (por ID):
+  // Combinar sin duplicados:
   // - remoteHist son definitivos (ya en server)
-  // - localHist se agregan si su ID no está en remoteHist
-  const remoteIds = new Set(remoteHist.map(r => r.id));
+  // - localHist se agregan si no están ya en remoteHist
+  // v19.02: el `id` de la fila remota es el UUID de la base, mientras que el del item
+  // local es el `client_id`. Comparar esos dos NUNCA daba match, así que un evento ya
+  // sincronizado podía salir DOS veces en el resumen (una por cada fuente). Se dedupe
+  // contra `client_id` —la misma clave que genera el celular— y se deja el `id` como red
+  // de seguridad para los items viejos que se hayan guardado con el uuid.
+  const remoteIds = new Set();
+  for (const r of remoteHist) {
+    if (r.id) remoteIds.add(String(r.id));
+    if (r.clientId) remoteIds.add(String(r.clientId));
+  }
   const combined = [
     ...remoteHist,
-    ...localHist.filter(l => !remoteIds.has(l.id))
+    ...localHist.filter(l => !remoteIds.has(String(l.id)))
   ];
 
   if (!combined.length) {
@@ -6691,16 +6770,26 @@ function _renderHistoryWithRemote(legajo, localHist, remoteHist) {
   // Orden defensivo: más reciente arriba, más viejo abajo.
   combined.sort((a, b) => (b.ts || b.createdAt || 0) - (a.ts || a.createdAt || 0));
   container.className = "history-list";
-  container.innerHTML = combined.map(h => {
+  // v19.02: un renglón por tarea (el cierre se come su apertura).
+  const filas = _histColapsarPares(combined);
+  container.innerHTML = filas.map(h => {
     const arrived = h.createdAt || h.sentAt;
     const showDato = h.opcion !== "FJ" && h.texto;
+    /* v19.02 — el cierre muestra "Desde HH:MM:SS hasta HH:MM:SS (dur)"; la apertura
+       todavía abierta avisa que lo está, en vez de parecer un evento suelto. */
+    const linea = h._desde
+      ? `Desde: <b>${escapeHtml(formatTimeAr(h._desde))}</b> hasta <b>${escapeHtml(formatTimeAr(h._hasta))}</b>` +
+        (h._durMs ? ` (${escapeHtml(formatDur(h._durMs))})` : "")
+      : (h._abierto
+          ? `Desde: <b>${escapeHtml(formatTimeAr(h.ts))}</b> — <b style="color:#b45309;">sin cerrar</b>`
+          : (h.ts ? `Fecha: ${escapeHtml(formatDateTime(h.ts))}` : ""));
     return `
       <div class="history-item">
         <div class="line1">${escapeHtml(h.opcion)} — ${escapeHtml(h.descripcion)}${statusBadge(h.status)}</div>
         <div class="line2">
           ${showDato ? `Dato: <b>${escapeHtml(h.texto)}</b><br>` : ""}
-          ${h.ts ? `Fecha: ${escapeHtml(formatDateTime(h.ts))}` : ""}
-          ${arrived ? `<br>Llegó al server: ${escapeHtml(formatDateTime(arrived))}` : ""}
+          ${linea}
+          ${arrived && !h._desde && !h._abierto ? `<br>Llegó al server: ${escapeHtml(formatDateTime(arrived))}` : ""}
         </div>
       </div>
     `;
@@ -6719,7 +6808,7 @@ async function _fetchAndRenderHistory(legajo, localHist) {
     const endOfDay = new Date(year, month - 1, day, 23, 59, 59);
 
     const { data, error } = await sb.from("Registros_Produccion_Virgilio")
-      .select("id,legajo,opcion,descripcion,texto,ts_inicio,ts_cliente,created_at")
+      .select("id,client_id,legajo,opcion,descripcion,texto,ts_inicio,ts_cliente,created_at")
       .eq("legajo", String(legajo))
       .gte("created_at", startOfDay.toISOString())
       .lte("created_at", endOfDay.toISOString());
@@ -6727,10 +6816,15 @@ async function _fetchAndRenderHistory(legajo, localHist) {
     if (!error && data) {
       remoteHist = data.map(r => ({
         id: r.id,
+        clientId: r.client_id || null,   // v19.02: para deduplicar contra el historial local
         legajo: r.legajo,
         opcion: r.opcion,
         descripcion: r.descripcion,
         texto: r.texto,
+        // v19.02: `ts_inicio` se traía en el select y se descartaba al mapear, así que el
+        // front nunca sabía qué fila era un CIERRE. Sin esto no se puede colapsar el par
+        // apertura/cierre en un solo renglón.
+        ts_inicio_iso: r.ts_inicio || null,
         ts: r.ts_cliente ? new Date(r.ts_cliente).getTime() : 0,
         createdAt: r.created_at ? new Date(r.created_at).getTime() : 0,
         status: "sent"  // ya llegó al server
@@ -6877,24 +6971,33 @@ function openHistoryModal() {
   } else {
     // Orden defensivo dentro de cada día: más reciente arriba.
     previas.forEach(d => d.items.sort((a, b) => (b.ts || 0) - (a.ts || 0)));
-    content.innerHTML = previas.map(d => `
+    content.innerHTML = previas.map(d => {
+      // v19.02: mismo renglón único que el Resumen de hoy.
+      const items = _histColapsarPares(d.items);
+      return `
       <div class="hist-day-block">
-        <div class="hist-day-title">${escapeHtml(formatDayLong(d.fecha))} (${d.items.length})</div>
-        ${d.items.map(it => {
+        <div class="hist-day-title">${escapeHtml(formatDayLong(d.fecha))} (${items.length})</div>
+        ${items.map(it => {
           const arrived = it.createdAt || it.sentAt;
           // FJ: ocultar el "Dato" (JSON técnico), mostrar la entrada igual.
           const showDato = it.opcion !== "FJ" && it.texto;
+          const linea = it._desde
+            ? `Desde ${escapeHtml(formatTimeAr(it._desde))} hasta ${escapeHtml(formatTimeAr(it._hasta))}` +
+              (it._durMs ? ` (${escapeHtml(formatDur(it._durMs))})` : "")
+            : (it._abierto
+                ? `Desde ${escapeHtml(formatTimeAr(it.ts))} — sin cerrar`
+                : (it.ts ? escapeHtml(formatDateTime(it.ts)) : ""));
           return `
             <div class="hist-day-item">
               <b>${escapeHtml(it.opcion)}</b> — ${escapeHtml(it.descripcion)}${statusBadge(it.status)}
               ${showDato ? ` — <i>${escapeHtml(it.texto)}</i>` : ""}
-              ${it.ts ? `<br><span style="color:#666;font-size:12px;">${escapeHtml(formatDateTime(it.ts))}</span>` : ""}
-              ${arrived ? `<br><span style="color:#666;font-size:12px;">Llegó al server: ${escapeHtml(formatDateTime(arrived))}</span>` : ""}
+              ${linea ? `<br><span style="color:#666;font-size:12px;">${linea}</span>` : ""}
+              ${arrived && !it._desde && !it._abierto ? `<br><span style="color:#666;font-size:12px;">Llegó al server: ${escapeHtml(formatDateTime(arrived))}</span>` : ""}
             </div>
           `;
         }).join("")}
       </div>
-    `).join("");
+    `;}).join("");
   }
   document.getElementById("histModal").classList.add("show");
 }
@@ -9236,7 +9339,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v18.99";
+const APP_VERSION = "v19.02";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -26006,7 +26109,8 @@ async function insAnular() {
   } catch (_e) { /* no-op */ }
 
   try { opDraftClear(legajo); } catch (_e) {}   // el borrador ya no vale
-  closeIns();                                    // cierra el modal y el toggle RI/EI
+  closeIns(true);                                // cierra el modal y el toggle RI/EI, SIN
+                                                 // emitir cierre: la apertura ya se borró
   try {
     renderLegajoHistory(legajo);
     updateCoreButtonsState();
@@ -26018,7 +26122,41 @@ async function insAnular() {
     : "✕ " + qué.charAt(0).toUpperCase() + qué.slice(1) + " de insumos anulada.");
 }
 function insAskClose() { opAskClose(insHasProgress(), "INS", _ins && _ins.legajo, (_ins && _ins.mode === "EI" ? "Entrega de insumos" : "Recepción de insumos"), _ins, closeIns); }
-function closeIns() {
+/* v19.02 — EMITIR el cierre de RI/EI al terminar la recepción/entrega (pedido de Luis,
+   16/09: "que se cierre cuando terminan de recepcionar/entregar").
+   `closeIns` bajaba el flag local con `toggleStartOrEnd`, que sólo toca el localStorage:
+   el evento de CIERRE nunca salía al servidor. Medido del 07/09 al 16/09: 15 aperturas de
+   EI con 2 cierres y 8 de RI con 1 — 20 toggles abiertos, algunos del 08/09 todavía sin
+   cerrar, así que la duración de insumos no se podía medir. Los pocos cierres que sí
+   existen son los casos en que el operario volvió a apretar el BOTÓN (ese camino pasa por
+   `send()`, que sí emite). El autocierre de las 17:00 tampoco los salvaba: corre en el
+   cambio de día y sólo si el flag local sobrevivió.
+   `texto` = total cargado en la sesión, igual que RT cierra con las cajas del día.
+   Problema 347. */
+function insEmitCierre(legajo, mode, tsInicioIso, total) {
+  const nowMs = Date.now();
+  const descr = desc[mode] || "";
+  const payload = {
+    legajo:        String(legajo || ""),
+    opcion:        mode,
+    descripcion:   descr,
+    texto:         String(total > 0 ? total : ""),
+    ts:            nowMs,
+    id:            nowMs.toString(36) + "_inscl_" + Math.random().toString(36).slice(2, 8),
+    ts_inicio_iso: tsInicioIso || null
+  };
+  try {
+    pushHistoryForLegajo(payload.legajo, {
+      ts: nowMs, opcion: mode, descripcion: descr, texto: payload.texto,
+      id: payload.id, status: "queued", ts_inicio_iso: payload.ts_inicio_iso
+    });
+  } catch (_e) { /* no-op */ }
+  try { _enqueueReportRaw(payload); } catch (_e) { /* no-op */ }
+  try { updatePendingIndicator(); } catch (_e) {}
+}
+/* `noEmit` = true sólo cuando la sesión se ANULA: `insAnular` ya borró la apertura del
+   server, así que mandar un cierre ahí dejaría un cierre huérfano. */
+function closeIns(noEmit) {
   const ov = document.getElementById("insModal"); if (ov) ov.classList.remove("show");
   // v5.02: al cerrar el modal, CERRAR el toggle RI/EI. Así cada recepción/entrega de
   // insumos vuelve a abrir el buscador desde cero. Antes el toggle quedaba activo tras
@@ -26026,7 +26164,19 @@ function closeIns() {
   // y el dispatch de send() ya no abría el modal → "deja subir una sola vez" (reportado
   // por Marianela). Mismo patrón de cierre que CC/RR/CR. Bonus: no queda RI "activo"
   // bloqueando EP/TP, ni aparece el input "Indicar Cantidad" suelto.
-  try { if (_ins && _ins.legajo && _ins.mode) { const st = getLegajoState(_ins.legajo); if (st && st.toggles && st.toggles[_ins.mode]) toggleStartOrEnd(_ins.legajo, _ins.mode); } } catch (_e) {}
+  try {
+    if (_ins && _ins.legajo && _ins.mode) {
+      const leg = String(_ins.legajo), mode = _ins.mode;
+      const st = getLegajoState(leg);
+      const cur = st && st.toggles ? st.toggles[mode] : null;
+      if (cur) {
+        const iniIso = (typeof cur === "string") ? cur : null;
+        const total = (_ins.items || []).reduce(function (a, it) { return a + (Number(it && it.qty) || 0); }, 0);
+        toggleStartOrEnd(leg, mode);                            // baja el flag local
+        if (!noEmit) insEmitCierre(leg, mode, iniIso, total);   // …y AVISA al server
+      }
+    }
+  } catch (_e) { /* no-op */ }
   _ins = null;
 }
 
@@ -30151,6 +30301,152 @@ async function showTandaMessages(tandaCode, kind) {
   } catch (e) {
     m.querySelector(".tanda-modal-body").innerHTML =
       `<div class="history-empty" style="color:#dc2626">Error cargando eventos: ${escapeHtml(e.message || String(e))}</div>`;
+  }
+}
+
+/* Click en el nombre del panel "En este momento" → línea de tiempo de lo que hizo
+   HOY ese operario. Cada tarea con duración = un evento de CIERRE (ts_inicio no nulo:
+   arranque; ts_cliente: fin) — TP=pickeó, TAP=armó, y los toggles (baño, comida, guardó,
+   carga, control/recepción de remitos, etc.). Lo que está ABIERTO ahora (EP/AP o un toggle
+   sin cerrar) se muestra "en curso" hasta el reloj. Reusa #tandaModal. Solo lectura. */
+var _DIA_ACT_LABELS = {
+  TP:  { ic: "🛒", vb: "Pickeó" },        TAP: { ic: "🔨", vb: "Armó" },
+  MG:  { ic: "📥", tx: "Guardó" },        RI:  { ic: "📥", tx: "Recibió insumos" },
+  EI:  { ic: "📤", tx: "Entregó insumos" }, CR: { ic: "📋", tx: "Controló remitos" },
+  RR:  { ic: "🚚", tx: "Recepción de remitos" }, CC: { ic: "🚛", tx: "Cargó camión" },
+  RT:  { ic: "🏭", tx: "Recibió mercadería" }, AT: { ic: "🔔", tx: "Atendió timbre" },
+  PB:  { ic: "🚽", tx: "Baño" },          Limp:{ ic: "🧹", tx: "Limpieza" },
+  PC:  { ic: "🍽", tx: "Comida" },        Perm:{ ic: "🚪", tx: "Permiso de salida" },
+  CT:  { ic: "🔢", tx: "Conteo" },        LT:  { ic: "⏱", tx: "Tiempo muerto" },
+  CP:  { ic: "🔢", tx: "Conteo parcial" }
+};
+async function showOperarioDia(legajo) {
+  const leg = String(legajo == null ? "" : legajo).trim();
+  if (!leg) return;
+  const nom = _empleadosNombres.get(leg) || "";
+  const m = document.getElementById("tandaModal");
+  if (!m) return;
+  m.querySelector(".tanda-modal-title").textContent = "Hoy — " + (nom || ("Legajo " + leg));
+  m.querySelector(".tanda-modal-body").innerHTML = `<div class="history-empty">Cargando…</div>`;
+  try { const _f = document.querySelector("#tandaModal .tanda-modal-foot"); if (_f) _f.innerHTML = ""; } catch (_e) {}
+  m.classList.add("show");
+  const fmtDur = function (ms) {
+    const mn = Math.round(ms / 60000);
+    if (!(mn >= 0)) return "";
+    return mn >= 60 ? (Math.floor(mn / 60) + "h" + String(mn % 60).padStart(2, "0")) : (mn + "m");
+  };
+  const hhmm = function (ms) {
+    return new Date(ms).toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit", timeZone: "America/Argentina/Buenos_Aires" });
+  };
+  try {
+    const dayKey = isoToDayKey(Date.now());
+    const dayStartIso = new Date(`${dayKey}T00:00:00-03:00`).toISOString();
+    const dayEndIso   = new Date(`${dayKey}T23:59:59-03:00`).toISOString();
+    const url = SUPABASE_TABLE_ENDPOINT +
+      "?legajo=eq." + encodeURIComponent(leg) +
+      "&ts_cliente=gte." + encodeURIComponent(dayStartIso) +
+      "&ts_cliente=lte." + encodeURIComponent(dayEndIso) +
+      "&order=ts_cliente.asc&limit=5000" +
+      "&select=opcion,texto,ts_cliente,ts_inicio";
+    const r = await fetch(url, { headers: { "apikey": SUPABASE_KEY, "Authorization": "Bearer " + SUPABASE_KEY } });
+    if (!r.ok) throw new Error("HTTP " + r.status);
+    const data = await r.json();
+
+    const rows = [];   // { startMs, endMs, ic, label, ongoing }
+    // 1) Tareas CERRADAS (ts_inicio no nulo) → una fila cada una, con arranque y fin reales.
+    for (const e of data) {
+      if (!e.ts_inicio) continue;
+      const op = String(e.opcion || "").trim();
+      const tanda = String(e.texto || "").trim().toUpperCase();
+      const info = _DIA_ACT_LABELS[op] || {};
+      const label = info.vb ? (info.vb + (tanda ? " " + tanda : "")) : (info.tx || (op + (tanda ? " " + tanda : "")));
+      const startMs = new Date(e.ts_inicio).getTime();
+      const endMs   = new Date(e.ts_cliente).getTime();
+      rows.push({ startMs, endMs, ic: info.ic || "•", label });
+    }
+    // 2) Lo que quedó ABIERTO ahora (misma lógica que el panel "En este momento").
+    let pick = null, pickTs = 0, arm = null, armTs = 0; const togOpen = {};
+    for (const e of data) {
+      const op = String(e.opcion || "").trim();
+      const tanda = String(e.texto || "").trim().toUpperCase();
+      const ts = new Date(e.ts_cliente).getTime();
+      if (op === "EP") { pick = tanda; pickTs = ts; }
+      else if (op === "TP") { if (!tanda || pick === tanda) pick = null; }
+      else if (op === "AP") { arm = tanda; armTs = ts; }
+      else if (op === "TAP") { if (!tanda || arm === tanda) arm = null; }
+      else if (_MON_ACT_TOGGLES[op]) { if (!e.ts_inicio) { togOpen[op] = ts; } else { delete togOpen[op]; } }
+    }
+    const nowMs = Date.now();
+    if (pick) rows.push({ startMs: pickTs, endMs: nowMs, ic: "🛒", label: "Pickeando " + pick, ongoing: true });
+    if (arm)  rows.push({ startMs: armTs,  endMs: nowMs, ic: "🔨", label: "Armando " + arm, ongoing: true });
+    for (const op in togOpen) {
+      const info = _DIA_ACT_LABELS[op] || _MON_ACT_INFO[op] || {};
+      rows.push({ startMs: togOpen[op], endMs: nowMs, ic: info.ic || "•", label: (info.tx || op) + " (en curso)", ongoing: true });
+    }
+
+    if (!rows.length) {
+      const picks = data.filter(e => e.opcion === "PKC").length;
+      m.querySelector(".tanda-modal-body").innerHTML =
+        `<div class="history-empty">Sin tareas con duración registradas hoy${picks ? ` (${picks} ítems pickeados sueltos)` : ""}.</div>`;
+      return;
+    }
+
+    rows.sort((a, b) => a.startMs - b.startMs);
+    const totalMs = rows.reduce((s, r2) => s + Math.max(0, r2.endMs - r2.startMs), 0);
+    const nPick = data.filter(e => e.opcion === "TP").length;
+    const nArm  = data.filter(e => e.opcion === "TAP").length;
+    const cortesMs = rows.filter(r2 => ["Baño", "Comida", "Permiso de salida"].some(t => r2.label.indexOf(t) === 0)).reduce((s, r2) => s + Math.max(0, r2.endMs - r2.startMs), 0);
+
+    // Huecos SIN TAREA entre tarea y tarea. Se calculan sobre la UNIÓN de los
+    // intervalos (no next.start − prev.end), así un armado que quedó abierto y se
+    // solapa con otras tareas —E23A cruzando la noche— no inventa huecos falsos.
+    // Umbral 1 min para no ensuciar con micro-cortes. No cuenta como "tiempo en tareas".
+    const GAP_MIN_MS = 60 * 1000;
+    const gaps = [];
+    const ivs = rows.map(r2 => [r2.startMs, Math.max(r2.startMs, r2.endMs)]).sort((a, b) => a[0] - b[0]);
+    if (ivs.length) {
+      let curEnd = ivs[0][1];
+      for (let i = 1; i < ivs.length; i++) {
+        if (ivs[i][0] > curEnd) {
+          if (ivs[i][0] - curEnd >= GAP_MIN_MS) gaps.push({ startMs: curEnd, endMs: ivs[i][0], gap: true });
+          curEnd = ivs[i][1];
+        } else if (ivs[i][1] > curEnd) { curEnd = ivs[i][1]; }
+      }
+    }
+    const sinTareaMs = gaps.reduce((s, g) => s + (g.endMs - g.startMs), 0);
+    const display = rows.concat(gaps).sort((a, b) => a.startMs - b.startMs);
+
+    const rowsHtml = display.map(r2 => {
+      const dur = fmtDur(Math.max(0, r2.endMs - r2.startMs));
+      const rango = hhmm(r2.startMs) + " – " + (r2.ongoing ? "ahora" : hhmm(r2.endMs));
+      if (r2.gap) {
+        return `
+        <tr style="color:#94a3b8;font-style:italic;background:#f8fafc">
+          <td class="center" style="white-space:nowrap">${escapeHtml(rango)}</td>
+          <td>⏸ Sin tarea</td>
+          <td class="center" style="font-weight:800;white-space:nowrap">${escapeHtml(dur)}</td>
+        </tr>`;
+      }
+      return `
+        <tr${r2.ongoing ? ' style="background:#f0f9ff"' : ""}>
+          <td class="center" style="white-space:nowrap">${escapeHtml(rango)}</td>
+          <td>${r2.ic} ${escapeHtml(r2.label)}${r2.ongoing ? ' <span style="color:#0284c7;font-weight:700">⏳</span>' : ""}</td>
+          <td class="center" style="font-weight:800;white-space:nowrap">${escapeHtml(dur)}</td>
+        </tr>`;
+    }).join("");
+
+    m.querySelector(".tanda-modal-body").innerHTML = `
+      <div style="font-size:14px; color:#475569; margin-bottom:10px;">
+        <b>${rows.length}</b> tarea(s) · ${nPick} tanda(s) pickeada(s) · ${nArm} armada(s)
+        · tiempo en tareas <b>${escapeHtml(fmtDur(totalMs))}</b>${cortesMs ? ` · cortes ${escapeHtml(fmtDur(cortesMs))}` : ""}${sinTareaMs ? ` · sin tarea ${escapeHtml(fmtDur(sinTareaMs))}` : ""}
+      </div>
+      <table class="tanda-modal-table">
+        <thead><tr><th class="center">Horario</th><th>Qué hizo</th><th class="center">Duración</th></tr></thead>
+        <tbody>${rowsHtml}</tbody>
+      </table>`;
+  } catch (e) {
+    m.querySelector(".tanda-modal-body").innerHTML =
+      `<div class="history-empty" style="color:#dc2626">Error cargando el día: ${escapeHtml(e.message || String(e))}</div>`;
   }
 }
 
@@ -45410,7 +45706,7 @@ function _monActPanelHtml(list, nombres) {
       actHtml = '<span class="mon-act-ic">' + (info.ic || "•") + '</span><span class="mon-act-what">' + txt + '</span>';
     }
     return '<div class="mon-act-row ' + (r.idle ? "mon-act-idle" : "mon-act-on") + '">' +
-      '<span class="mon-act-who" title="' + escapeHtml(nom || ("Legajo " + r.legajo)) + '"><b>' + escapeHtml(sig || ("#" + r.legajo)) + '</b> ' + escapeHtml(quien) + '</span>' +
+      '<span class="mon-act-who mon-act-who-click" data-leg="' + escapeHtml(String(r.legajo)) + '" title="Ver qué hizo hoy · ' + escapeHtml(nom || ("Legajo " + r.legajo)) + '" onclick="showOperarioDia(this.dataset.leg)"><b>' + escapeHtml(sig || ("#" + r.legajo)) + '</b> ' + escapeHtml(quien) + '</span>' +
       actHtml +
       (dur ? '<span class="mon-act-dur" style="color:' + durCol(r.sinceTs) + '">' + dur + '</span>' : '') +
       '</div>';
@@ -47508,14 +47804,10 @@ async function facXlsBajar() {
     const enArchivo = Array.from(new Set(filas.map(function (r) { return String(r.np); })));
     let marcadas = 0;
     for (const np of enArchivo) {
-      let ped = null, tandaObj = null;
-      for (const t of (_facLastTandas || [])) {
-        const pp = (t.pedidos || []).find(function (p) { return String(p.np) === np; });
-        if (pp) { ped = pp; tandaObj = t; break; }
-      }
-      const args = ped
-        ? { np: np, tanda: tandaObj.tanda, m3: ped.m3 || 0, rs: ped.razonSocial || "", cod: ped.cod || "", feRaw: tandaObj.fechaEntregaRaw || null }
-        : { np: np, tanda: "", m3: 0, rs: "", cod: "", feRaw: null };
+      // v19.01 — `facInfoNp` mira las tandas Y las armadas-sin-tanda. Antes miraba sólo las
+      // tandas y caía al fallback vacío, que es lo que dejó a LK 0034 / LK 0035 sin razón
+      // social ni código de cliente en `Facturacion_NP`.
+      const args = facInfoNp(np) || { np: np, tanda: "", m3: 0, rs: "", cod: "", feRaw: null };
       if (await facMarcarFacturada(args, headers)) { marcadas++; _facXlsSel.delete(np); }
     }
     facShowToast("Excel bajado · " + marcadas + " NP web facturadas");
@@ -48350,6 +48642,39 @@ function facEstaArmada(npNorm){
   return (_facCajas && _facCajas.has(npNorm)) || (_facArmEv && _facArmEv.has(npNorm));
 }
 
+/* v19.01 — DE DÓNDE SALEN rs / cod / tanda DE UNA NP (Thomas, 16/09: *"el cliente 4181 de LK
+   no tiene razón social en el módulo de facturación, ¿por qué?"*).
+
+   La lista de Facturación se arma de DOS fuentes: las tandas de la PPP (`_facLastTandas`) y las
+   NP que están armadas pero cuya tanda ya no está en la PPP (`_facSinTanda`, la vista
+   `gv_fac_armado_sin_facturar`, v16.58). Pero los dos lugares que después necesitan los datos
+   del pedido —lo que se ESCRIBE en `Facturacion_NP` al bajar el Excel, y la lista «Ya tildados
+   hoy»— miraban SÓLO la primera. Para una NP de la segunda fuente se caían al fallback vacío y
+   guardaban la fila **sin razón social, sin código de cliente, sin tanda, sin m³ y sin fecha**.
+
+   Caso testigo: `LK 0034` y `LK 0035` (Mitre Hugo Alberto, cod 4181, pedido LK 1364). Su tanda
+   E01G se desarmó el 15/09, así que quedaron armadas pero sin tanda en la PPP → entraron a
+   Facturación por `_facSinTanda`, se facturaron con el Excel el 16/09 y sus dos filas quedaron
+   vacías. Son las ÚNICAS 2 de 1.305 en `Facturacion_NP` sin razón social, y las dos son de este
+   cliente: el síntoma que vio Thomas.
+
+   El tilde ✓ (NP de ISIS) nunca tuvo el problema: ése lee el `data-args` de la fila, que
+   `facRender` ya arma con los datos de `_facSinTanda`. */
+function facInfoNp(np){
+  const n = String(np == null ? "" : np).trim();
+  if (!n) return null;
+  for (const t of (_facLastTandas || [])){
+    const p = (t.pedidos || []).find(function (x) { return String(x.np).trim() === n; });
+    if (p) return { np: n, tanda: t.tanda || "", m3: p.m3 || 0,
+                    rs: p.razonSocial || "", cod: p.cod || "", feRaw: t.fechaEntregaRaw || null };
+  }
+  const r = (_facSinTanda || []).find(function (x) { return String(x.np || "").trim() === n; });
+  if (r) return { np: n, tanda: String(r.tanda_armado || "").trim(), m3: 0,
+                  rs: String(r.razon_social || "").trim(), cod: String(r.cod || "").trim(),
+                  feRaw: r.fecha_salida || null };
+  return null;
+}
+
 /* v18.77 (Luis, 2026-09-16: "un badge al lado del nombre en la razón social que diga Cliente
    nuevo") — CLIENTE NUEVO en Facturación.
 
@@ -48999,6 +49324,13 @@ function facRenderTicked(){
     (t.pedidos || []).forEach(function(p){
       info.set(String(p.np), { rs: p.razonSocial || "", tanda: t.tanda || "" });
     });
+  });
+  // v19.01 — y las armadas SIN tanda en la PPP, que también se facturan desde acá. Sin esto
+  // salían en la lista con el número pelado, sin cliente ni tanda (caso LK 0034 / LK 0035).
+  (_facSinTanda || []).forEach(function(r){
+    const k = String(r.np || "").trim();
+    if (k && !info.has(k)) info.set(k, { rs: String(r.razon_social || "").trim(),
+                                         tanda: String(r.tanda_armado || "").trim() });
   });
   nps.sort(function(a,b){ return String(a).localeCompare(String(b), undefined, { numeric: true }); });
   const items = nps.map(function(np){

@@ -20322,3 +20322,55 @@ columna Monto muestra "—" y nada más se rompe.
 prueba de Cuarentena), `clinDemoPedido` / `clinDemoRowHtml` / `clinDemoToggle` con `_apr.cliDemo`.
 Agrega una fila EJEMPLO (cliente nuevo puro, monto de muestra $120.480) sin sumar al badge. Sirve
 para ver el submódulo aunque hoy no haya ningún cliente nuevo real. Cubierto en `tests/apr-cuarentena.cjs`.
+
+---
+
+## §3.ik — v19.01: las 2 filas de `Facturacion_NP` que quedaron sin cliente (dato, no código) — 2026-09-16
+
+El bug que las dejó así está arreglado en el front (problema 352, `GUIA-PROYECTO.md` nota
+v19.01): al bajar el Excel ISIS, una NP que venía de `_facSinTanda` caía a un fallback vacío y
+la fila se guardaba sin razón social, código, tanda, m³ ni fecha. **Esto es la reparación de las
+dos filas que ya estaban escritas**, que Thomas autorizó explícitamente (*"sí, rellenalas"*).
+
+**Qué eran:** `LK 0034` y `LK 0035` — Mitre Hugo Alberto, cod 4181, pedido LK 1364, tanda `E01G`
+desarmada el 15/09. Únicas 2 de 1.305 filas sin razón social.
+
+**De dónde salió cada dato** (ninguno se inventó):
+
+| campo | fuente |
+|---|---|
+| `razon_social`, `cod_cliente`, `m3` | `PPP_Web_Programacion` (empresa `lk`, np 34 y 35) |
+| `tanda`, `fecha_salida` | `Entregas_Virgilio` (el armado real: `E01G`, 2026-09-17) |
+
+```sql
+update public."Facturacion_NP" f
+   set razon_social = src.razon_social, cod_cliente = src.cod_cliente,
+       tanda = src.tanda_armado, fecha_salida = src.fecha_salida_armado::date, m3 = src.m3
+  from ( … PPP_Web_Programacion + Entregas_Virgilio … ) src
+ where btrim(f.np) = src.np
+   and nullif(btrim(coalesce(f.razon_social,'')),'') is null;   -- ⬅ sólo las vacías
+```
+
+El `and` final es el que hace que el `update` no pueda pisar una fila sana ni siquiera si se
+corre dos veces.
+
+**Medido después:** `Facturacion_NP` sigue con **1.305** filas (no se creó ni se borró ninguna),
+**0** sin razón social, **0** sin código de cliente, y el cliente 4181 pasó de 1 a **3** NP.
+
+```
+LK 0034 → Mitre Hugo Alberto / 4181 / E01G / 2026-09-17 / 0.299
+LK 0035 → Mitre Hugo Alberto / 4181 / E01G / 2026-09-17 / 0.009
+```
+
+**Backup y ROLLBACK:** `zz_backups."GV_Backup_FacturacionNP_4181_20260916"` (con RLS, las dos
+filas como estaban). Para deshacer:
+
+```sql
+update public."Facturacion_NP" f
+   set razon_social = b.razon_social, cod_cliente = b.cod_cliente, tanda = b.tanda,
+       fecha_salida = b.fecha_salida, m3 = b.m3
+  from zz_backups."GV_Backup_FacturacionNP_4181_20260916" b
+ where btrim(f.np) = btrim(b.np);
+```
+
+Sin bump de versión: no cambió una línea de la app — el arreglo del código ya viajó en la v19.01.
