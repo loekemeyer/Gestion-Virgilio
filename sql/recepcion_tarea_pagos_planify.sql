@@ -1,3 +1,19 @@
+-- ⛔ DADO DE BAJA el 2026-09-16 (v18.81) — pedido del dueño: "quiero sacar la alerta a
+-- pagos de carga de recepción de mercadería".
+--
+-- Ejecutado en Supabase (hrxfctzncixxqmpfhskv):
+--   drop trigger if exists trg_recep_pagos_prov on public."Entregas Prov AT";
+--   drop trigger if exists trg_recep_pagos_tall on public."Entregas Tallerista Virgilio";
+--   drop function if exists public.recepcion_crea_tarea_pagos();
+--
+-- Verificado: 0 triggers `trg_recep_pagos%` y 0 funciones `recepcion_crea_tarea_pagos`.
+-- No quedó nada que limpiar en Planify: `select count(*) from planify.tasks where note like
+-- '%[vrec:%'` daba 0 (la alerta nunca llegó a crear una sola tarea).
+--
+-- Este archivo se conserva como ROLLBACK: correrlo entero vuelve a crear la función y los
+-- dos triggers, tal cual estaban.
+--
+-- ─────────────────────────────────────────────────────────────────────────────
 -- idea 4041 (usuario) — Vincular Virgilio con las alarmas de Planify:
 -- al recepcionar un REMITO en Virgilio, crear una tarea en el Planify del sector PAGOS.
 -- APLICADO en Supabase (migraciones recepcion_crea_tarea_pagos_planify +

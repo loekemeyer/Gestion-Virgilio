@@ -12946,6 +12946,14 @@ tanda — se guardan como par open/close y el motor descuenta el `close` (la dur
 > del remito generan una sola tarea (no se recrea aunque Pagos ya la haya cerrado). Es el
 > primer cruce Virgilio→Planify (ambos schemas viven en el mismo Postgres
 > `hrxfctzncixxqmpfhskv`). DDL versionado en `sql/recepcion_tarea_pagos_planify.sql`.
+>
+> ⛔ **DADA DE BAJA el 2026-09-16 (v18.81).** El dueño pidió sacarla: *"quiero sacar la
+> alerta a pagos de carga de recepción de mercadería"*. Se dropearon los dos triggers
+> (`trg_recep_pagos_prov`, `trg_recep_pagos_tall`) y la función `recepcion_crea_tarea_pagos()`.
+> **Recepcionar un remito ya no crea ninguna tarea ni cartel en el Planify de Pagos.** No hubo
+> nada que limpiar: la alerta nunca llegó a crear una tarea (0 filas con el marcador `[vrec:`).
+> El archivo `sql/recepcion_tarea_pagos_planify.sql` queda como rollback: correrlo entero la
+> vuelve a prender. §3.hx de `docs/SUPABASE-GESTION-VIRGILIO.md`.
 
 ---
 
