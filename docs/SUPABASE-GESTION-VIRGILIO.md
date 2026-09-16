@@ -18965,3 +18965,60 @@ que ahí el año ahora aparece.
 
 **Rollback**: en `sql/gv_vista_historial_entregas_fecha_v1880.sql`. **Test**:
 `tests/rcp-hist-fecha.cjs` (en `run.sh`, sin navegador).
+
+---
+
+## §3.hx — v18.81: se saca la alerta a Pagos por carga de recepción — 2026-09-16
+
+**Pedido del dueño (Thomas):** *"quiero sacar la alerta a pagos de carga de recepción de
+mercadería"*.
+
+Era el cruce Virgilio → Planify de la idea 4041 (+ 6463): al insertar una fila de recepción con
+`Remito`, un trigger creaba una tarea **urgente, broadcast**, en el Planify del sector **Pagos**
+(`planify.tasks`, `department_id = 6`) — o sea un cartel bloqueante en la pantalla de todos los
+de Pagos hasta que alguien apretaba "Me encargo yo".
+
+**Qué se dropeó** (en `hrxfctzncixxqmpfhskv`):
+
+| Objeto | Tabla |
+|---|---|
+| `trg_recep_pagos_prov` | `public."Entregas Prov AT"` |
+| `trg_recep_pagos_tall` | `public."Entregas Tallerista Virgilio"` |
+| `public.recepcion_crea_tarea_pagos()` | — |
+
+```sql
+drop trigger if exists trg_recep_pagos_prov on public."Entregas Prov AT";
+drop trigger if exists trg_recep_pagos_tall on public."Entregas Tallerista Virgilio";
+drop function if exists public.recepcion_crea_tarea_pagos();
+```
+
+**Medición antes de tocar** — no hubo datos que limpiar, y de paso salió un dato que conviene
+anotar: **la alerta nunca creó una sola tarea** en los 19 días que estuvo prendida.
+
+```sql
+select count(*) total, count(*) filter (where not done) abiertas
+  from planify.tasks where note like '%[vrec:%';   --  0 | 0
+select id, name from planify.tasks
+ where department_id = 6 and name ilike 'Remito%';  --  0 filas
+```
+
+Por eso no quedó ninguna tarea abierta que cerrar ni ningún cartel colgado: alcanzó con dropear.
+
+**Verificación después:**
+
+```sql
+select (select count(*) from pg_trigger where tgname like 'trg_recep_pagos%') trigs,
+       (select count(*) from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+         where n.nspname='public' and p.proname='recepcion_crea_tarea_pagos') fn;
+-- 0 | 0
+```
+
+**Barrido de consumidores:** la única función de toda la base que nombraba `[vrec:` o cruzaba
+`department_id` con `remito` era ésta (`pg_proc.prosrc`), y ni `index.html` ni `recepcion.js`
+la llaman — el aviso era 100 % backend, así que el front no cambia. El otro trigger de
+`Entregas Tallerista Virgilio`, `trg_virgilio_espejo_gp2` (espejo al stock de GP2), **no se
+tocó** y sigue andando.
+
+**Rollback:** correr entero `sql/recepcion_tarea_pagos_planify.sql` — recrea la función y los
+dos triggers tal cual estaban. El archivo quedó con un encabezado que aclara que está dado de
+baja, para que nadie lo aplique de nuevo sin querer.
