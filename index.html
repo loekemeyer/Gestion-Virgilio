@@ -38523,6 +38523,14 @@ function _pmodFecha(iso, conDia) {
   const d = new Date(+m[1], +m[2] - 1, +m[3]);
   return (conDia ? _PN_DOW[d.getDay()] + " " : "") + (+m[3]) + "/" + m[2];
 }
+/* v18.95 (Luis) — cuántos pedidos de "cliente nuevo" (único motivo) hay para el badge de la
+   pestaña. Lectura en memoria, sin red; null hasta que A Programar terminó de cargar y marcar. */
+function _pppCliNuevosN() {
+  try {
+    if (typeof _apr === "undefined" || !_apr || !_apr.listo) return null;
+    return (_apr.pedidos || []).filter(function (p) { return aprEnCuarentena(p) && aprSoloClienteNuevo(p); }).length;
+  } catch (_e) { return null; }
+}
 function pppTabsHtml(cProg, cPlan, cViaje, cEnt) {
   const n = function (v) { return (v == null ? "…" : v); };
   const b = function (id, txt) {
@@ -38537,6 +38545,7 @@ function pppTabsHtml(cProg, cPlan, cViaje, cEnt) {
     b("ent",     "✅ Pedidos Entregados (" + n(cEnt) + ")") +
     b("ocup",    "📦 Ocupación") +
     b("modif",   "✏️ Modificar Pedidos") +          // v18.14 (Luis): entre Ocupación y Config. Cuarentena
+    b("clinuevos", "🆕 Clientes nuevos (" + n(_pppCliNuevosN()) + ")") +   // v18.95 (Luis)
     b("cuarcfg", "🚧 Config. Cuarentena") +
   '</div>';
 }
@@ -38605,6 +38614,15 @@ function pppRenderProg() {
     pgaNeed();
     if (!_apr.listo && !_apr.cargando) { try { aprCargar(); } catch (_e) {} }
     _renderKeepFocus(box, pppModifHtml());
+    return;
+  }
+  // v18.95 (Luis) — Clientes nuevos. Pantalla propia, mismo patrón: no depende de una PPP
+  // importada. Los pedidos y su marca de cuarentena salen de A Programar (aprCargar +
+  // cuarMarcarPedidos, que corre solo al terminar la carga aunque no estemos en esa solapa).
+  if (_pppTab === "clinuevos") {
+    pppPaintTabs();
+    if (!_apr.listo && !_apr.cargando) { try { aprCargar(); } catch (_e) {} }
+    _renderKeepFocus(box, clinNuevosHtml());
     return;
   }
   // v8.61 — cargar (una vez) los entregados para el aviso "salió en fecha ≠ a la PPP".
@@ -41779,6 +41797,8 @@ let _apr = {
   cuarContacto: null, cuarContactoLoading: false,
   // v18.01 — CUARENTENA: cuántos comentarios tiene cada pedido retenido (empresa:order_id → n)
   cuarComN: null, cuarComNLoading: false,
+  // v18.95 — CLIENTES NUEVOS: monto por lista de cada pedido (empresa:order_id → {valor})
+  cliValor: null, cliValorLoading: false,
   // v18.04 — log de pedidos ANULADOS (undefined = todavía no se pidió)
   anulados: undefined, anuladosLoading: false, anuModal: false
 };
@@ -43154,6 +43174,14 @@ function aprTieneCuarMotivos(p) {
   return !!(p && (p.cuarentena || p.cuarentena_motivo ||
     (Array.isArray(p.cuarentena_motivos) && p.cuarentena_motivos.length)));
 }
+/* v18.95 (Luis, 2026-09-16) — el corte entre los DOS submódulos: un pedido cuyo ÚNICO motivo es
+   "cliente_nuevo" va a la pestaña "🆕 Clientes nuevos"; si además tiene deuda, suspensión o
+   excede su límite, sigue en la columna Cuarentena (ej. Zhang Qikuan). El candado que impide
+   programarlos (aprEnCuarentena) NO cambia: los dos submódulos siguen retenidos igual. */
+function aprSoloClienteNuevo(p) {
+  const ms = aprCuarentenaMotivos(p);
+  return ms.length === 1 && ms[0] === "cliente_nuevo";
+}
 /* 3 badges separados (suspendido/deuda/límite), sólo los que aplican. */
 /* v15.04 (dueño: "que diga ahí el motivo de la cuarentena: ej deuda $10000") — los
    montos vienen del backend en `cuarentena_detalle` (deuda, exceso, limite, estado).
@@ -43232,7 +43260,10 @@ function aprCuarentenaMotivo(p) {
   return ms.length ? ms.map(function (m) { return T[m] || m; }).join(" ") : "Pedido retenido en cuarentena.";
 }
 function aprColCuarentena() {
-  let lista = (_apr.pedidos || []).filter(aprEnCuarentena);
+  // v18.95 (Luis): los pedidos cuyo único motivo es "cliente nuevo" se mudaron a la pestaña
+  // "🆕 Clientes nuevos"; acá quedan deuda / suspendido / excede crédito (y el cliente nuevo
+  // que ADEMÁS tiene alguno de ésos, como Zhang Qikuan).
+  let lista = (_apr.pedidos || []).filter(function (p) { return aprEnCuarentena(p) && !aprSoloClienteNuevo(p); });
   // v14.90: cargar (una vez) los contactos WhatsApp de los retenidos reales
   if (_apr.cuarContacto === null && !_apr.cuarContactoLoading && lista.some(function (p) { return !p._demo; })) cuarContactoCargar();
   // v18.01: cuántos comentarios tiene cada retenido (una sola vuelta de red para toda la lista)
@@ -43564,7 +43595,86 @@ async function cuarContactoCargar() {
     _apr.cuarContacto = m;
   } catch (_e) { _apr.cuarContacto = _apr.cuarContacto || {}; }
   _apr.cuarContactoLoading = false;
-  if (_pppTab === "prog") aprRender();
+  if (_pppTab === "prog") aprRender(); else if (_pppTab === "clinuevos") pppRenderProg();
+}
+
+/* ── CLIENTES NUEVOS (v18.95, Luis 2026-09-16) ───────────────────────────────
+   Submódulo hermano de Cuarentena. Misma marca (cuarentena_motivos), mismo candado
+   (aprEnCuarentena), pero SÓLO los pedidos cuyo único motivo es "cliente nuevo".
+   Tabla visual: pedido (con las NP que abriría) · fecha · m³ · cliente · zona ·
+   contacto · monto. El MONTO es el precio total por lista del pedido, valorizado en
+   el backend con gv_ppp_web_valor_items (misma función que usa el control de límite de
+   crédito), expuesto por gv_clientes_nuevos_valor_lote. Sólo web: un cliente nuevo que
+   entra por ISIS ya trae su NP y se valoriza aparte, así que ahí el monto queda en "—". */
+function clinNuevosValorNeed() { if (_apr.cliValor === null && !_apr.cliValorLoading) clinNuevosValorCargar(); }
+async function clinNuevosValorCargar() {
+  if (_apr.cliValorLoading) return;
+  const lista = (_apr.pedidos || []).filter(function (p) {
+    return !p._demo && !p._isis && aprEnCuarentena(p) && aprSoloClienteNuevo(p);
+  });
+  if (!lista.length) { _apr.cliValor = {}; return; }
+  _apr.cliValorLoading = true;
+  try {
+    const res = await aprRpc("gv_clientes_nuevos_valor_lote", {
+      p_pedidos: lista.map(function (p) {
+        return { order_id: String(p.order_id), empresa: p.empresa || "lk",
+                 cod: String(p.cod || "").trim(), cond: p.cond || "", items: cuarItemsDe(p) };
+      })
+    });
+    const m = {};
+    (res || []).forEach(function (r) { m[String(r.empresa) + ":" + String(r.order_id)] = { valor: Number(r.valor) }; });
+    _apr.cliValor = m;
+  } catch (_e) { _apr.cliValor = _apr.cliValor || {}; }
+  _apr.cliValorLoading = false;
+  if (_pppTab === "clinuevos") pppRenderProg();
+}
+function clinNuevosValorFmt(p) {
+  if (p && p._isis) return '<span class="cuar-yp-sin" title="El monto por lista se valoriza sobre los pedidos de la página; este entró por ISIS con NP propia">—</span>';
+  if (_apr.cliValor === null) return '<span class="cuar-yp-sin">…</span>';
+  const v = (_apr.cliValor || {})[aprKey(p.empresa, p.order_id)];
+  if (!v || !isFinite(v.valor) || v.valor <= 0)
+    return '<span class="cuar-yp-sin" title="Sin precio de lista para los artículos de este pedido">—</span>';
+  return '<b title="Precio total del pedido según lo pedido y la lista de precios (neto, sin IVA)">' + cuarPlata(v.valor) + '</b>';
+}
+function clinNuevosHtml() {
+  const cargando = !_apr.listo || aprCargandoAlgo();
+  const lista = (_apr.pedidos || []).filter(function (p) { return aprEnCuarentena(p) && aprSoloClienteNuevo(p); });
+  if (_apr.cuarContacto === null && !_apr.cuarContactoLoading && lista.some(function (p) { return !p._demo; })) cuarContactoCargar();
+  clinNuevosValorNeed();
+  let h = '<div class="apr-col apr-col-cuar' + (cargando ? ' apr-col-cargando' : '') + '">' +
+    '<div class="apr-col-t">🆕 Clientes nuevos <b>(' + (cargando ? '…' : lista.length) + ')</b>' +
+      '<span class="apr-cuar-help" title="Pedidos de CLIENTES NUEVOS (código alto y menos de 3 pedidos facturados en toda su historia). Si además tienen deuda, están suspendidos o superan su límite de crédito, NO caen acá: quedan en Cuarentena. No se programan solos: hay que liberarlos primero.">ⓘ</span>' +
+    '</div>';
+  if (!lista.length) {
+    h += cargando
+      ? '<div class="apr-cargando apr-cargando-cuar"><span class="apr-cargando-ic">⏳</span><b>Todavía controlando…</b></div>'
+      : '<div class="apr-vacio">Sin pedidos de clientes nuevos. Acá caen los pedidos de <b>clientes nuevos</b> sin ningún otro problema; si tienen <b>deuda</b>, están <b>suspendidos</b> o <b>superan su límite</b>, quedan en <b>Cuarentena</b>.</div>';
+    return h + '</div>';
+  }
+  h += '<div class="cuar-tblwrap"><table class="cuar-tbl"><thead><tr>' +
+    '<th>Pedido</th><th>Fecha</th><th class="cuar-td-m3">m³</th><th>Cliente</th><th>Zona</th>' +
+    '<th>Contacto</th><th class="cuar-td-m3">Monto</th>' +
+    '</tr></thead><tbody>';
+  for (const p of lista) {
+    const cid = "n" + p.empresa + p.order_id, cab = !!_apr.exp[cid];
+    const np = aprPedLabel(p);
+    const nblo = Number(p.np_total) || ((p.bloques && p.bloques.length) || 1);
+    h += '<tr class="cuar-tr' + (cab ? ' cuar-tr-open' : '') + '">' +
+      '<td class="cuar-td-np" onclick="aprToggle(\'' + cid + '\')" title="Ver qué pidió (códigos y cajas)">' +
+        '<span class="apr-card-chev">' + (cab ? "▾" : "▸") + '</span>' +
+        '<span class="cuar-card-np">' + escapeHtml(np) + '</span>' +
+        (nblo > 1 ? '<span class="cuar-demo-tag" title="Este pedido se parte en ' + nblo + ' NP">' + nblo + ' NP</span>' : '') +
+      '</td>' +
+      '<td class="cuar-td-fecha">' + cuarFechaPedidoHtml(p) + '</td>' +
+      '<td class="cuar-td-m3"><span class="cuar-card-m3">' + aprNum(p.m3) + ' m³</span></td>' +
+      '<td class="cuar-td-cli">' + cuarCodChip(p) + escapeHtml(p.razon_social || p.cod || ("#" + p.order_id)) + '</td>' +
+      '<td class="cuar-td-zona">📍 ' + escapeHtml(p.zona || "sin zona") + aprHorBadge(p) + '</td>' +
+      '<td><div class="cuar-td-acc">' + cuarWppContactoBtn(p) + '</div></td>' +
+      '<td class="cuar-td-m3">' + clinNuevosValorFmt(p) + '</td>' +
+      '</tr>';
+    if (cab) h += '<tr class="cuar-tbl-det"><td colspan="7"><div class="apr-card-body">' + aprContenidoHtml(p) + '</div></td></tr>';
+  }
+  return h + '</tbody></table></div></div>';
 }
 /* v16.57 (problema 14) — "YA PROGRAMADOS con el cliente en cuarentena".
    La Cuarentena sólo mira lo que TODAVÍA NO tiene tanda: gv_cuarentena_marcar corre adentro del
@@ -44296,7 +44406,8 @@ async function cuarMarcarPedidos() {
   } catch (_e) { /* si falla, no marca; no rompe la pantalla */ }
   _apr.cuarContacto = null;   // v14.90: cambió el set de retenidos → recargar contactos WhatsApp
   _apr.cuarComN = null;       // v18.01: ídem el contador de comentarios de cada 📖
-  if (_pppTab === "prog") aprRender();
+  _apr.cliValor = null;       // v18.95: cambió el set → recargar el monto de los clientes nuevos
+  if (_pppTab === "prog") aprRender(); else if (_pppTab === "clinuevos") pppRenderProg();
 }
 /* Pedido de EJEMPLO para ver el sector sin datos reales (dueño: "poneme un pedido de prueba"). */
 function cuarDemoPedido() {
