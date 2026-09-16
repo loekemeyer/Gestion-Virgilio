@@ -1,3 +1,53 @@
+## Nota v19.22 (2026-09-16) — Por qué un picking terminado puede no dejar NI RASTRO en el celular
+
+Luis, sobre E12E: *"me dijo que lo había terminado. no queda registro local en su celu? no
+entiendo eso"*. La respuesta es que **no hay registro local porque el evento nunca se creó**, y
+conviene tener clara la diferencia entre las dos cosas que el celular guarda:
+
+| Qué es | Qué guarda | Cuándo se escribe |
+|---|---|---|
+| **La cola** (IndexedDB + localStorage) | eventos **ya armados** que todavía no salieron; reintenta sola, y el Service Worker también | recién **después** de que `send()` armó el payload |
+| **El historial** (Resumen de hoy) | lo que el celular escribió + lo que trae el servidor | idem, salvo los `PKC`, que **no se guardan local** |
+
+O sea: **si `send()` vuelve antes de armar el payload, no hay cola ni historial que valgan.**
+No es que se perdió: **nunca existió**. Y esa vuelta estaba muda.
+
+### El paso donde se caía
+
+Al terminar picking, entre *"apretó Fin Picking"* y *"quedó registrado"* hay una pregunta:
+**📍 ¿Dónde dejás la tanda?** (`askPickUbicacion` → evento `PUB`). Si toca **Cancelar**:
+
+```js
+_pubUbic = await askPickUbicacion(texto);
+if (_pubUbic == null) return;   // ← y no decía nada
+```
+
+Ni `TP`, ni `PUB`, ni historial, ni cola, ni un cartel. El operario vio cerrarse el cuadro —que
+es justo la señal de que salió bien— y se fue. **El armado tenía el mismo silencio** con
+`askArmadoUbicaciones`.
+
+**Abortar es correcto** (una tanda pickeada sin ubicación no la encuentra nadie para armarla);
+lo que faltaba era decirlo. Desde la v19.22 avisa, nombra la tanda, dice qué hacer y **deja el
+picking abierto** para reintentar. `Omitir` ({}) sigue cerrando normal: no es cancelar.
+
+### Cómo se probó que fue eso y no la red
+
+| Evidencia | |
+|---|---|
+| E12E de Jhonny (lg 277) | **62 PKC**, sin `TP` **y sin `PUB`** |
+| sus otras 8 tandas del día | todas con `TP` **y** `PUB` |
+| pickings sin cerrar en todo el día, de todos | **1** (sólo ése) |
+| su `FJ` de las 17:05 | **llegó** → el celular tenía red y estaba despachando la cola |
+
+Ese último renglón es el que descarta la cola: si el `TP` hubiera estado encolado, salía a las
+17:05 junto con el `FJ`. `PUB` es el testigo fino — es el evento que se emite *sólo si eligió el
+lugar*, así que su ausencia marca el paso exacto donde se cortó. Problema 365.
+
+⚠ **Regla que queda:** en `send()`, **todo `return` anterior al `enqueueReport` tiene que
+avisar**. Cerrar un modal es, para el operario, la señal de que la cosa salió bien; un camino de
+error que se ve igual que el de éxito **produce trabajo perdido, no un reintento**. Es el mismo
+problema del botón «Terminar Día» con el legajo vacío (v19.21, problema 360), en otro lugar.
+
 ## Nota v19.21 (2026-09-16) — Dos razones por las que el Resumen le mentía al operario
 
 Jhonny (lg 277) avisó que **el Resumen no le marcaba el picking de E12E aunque lo había hecho
