@@ -11658,6 +11658,33 @@ Todo vive en `index.html`, alternando con la clase `.hidden` (no hay router):
   Tiene **dos pestañas**: **Monitor** (tablero de tandas) e **Inconsistencias**
   (hoja de alertas, ver § 12).
 
+### Pedidos atrasados — submódulo de Programación (v18.77, pedido de Luis)
+
+Arriba de **Programación de entregas**: **una fila por día que ya pasó** y todavía tiene pedidos
+sin registro de salida. La fila del día **aparece sola** cuando el día pasa y **desaparece sola**
+cuando esa NP se carga al camión. Se abre igual que la tabla de abajo: día → tanda → NP.
+
+**Qué cuenta como "no se registró la salida"** (lo decide el backend, `gv_ppp_atrasados`):
+
+| Situación | ¿Atrasado? |
+|---|---|
+| Sin Carga Camión (`CCN`) | sí — nunca se cargó |
+| `CCN` y después `FSS` («↩ sin salida») | **sí** — se cargó y volvió al depósito |
+| `CCN` vigente, sin remito | no — salió; eso vive en **En Salida** |
+| Recepción Remitos (`CRN`) | no — entregado |
+
+⚠ **El criterio NO se calcula en la pantalla**, y hay dos formas conocidas de errarle: mirar sólo
+el `CCN` sin el `FSS` posterior (una NP que volvió al depósito se cuenta como salida), y comparar
+la NP sin normalizar (la web viaja con espacio, `LK 0003`, y así **ninguna** matchea contra su
+evento: todas se cuentan como atrasadas). Detalle y medición en
+`docs/SUPABASE-GESTION-VIRGILIO.md` §3.hu.
+
+**Desde cuándo mira:** `PPP_Web_Config.atrasados_desde` (hoy `2026-09-01`). No se puede barrer más
+atrás: antes de que los operarios pasaran a Gestión casi no se registraba la Carga Camión, así que
+la falta de `CCN` no prueba nada (junio daría 274 "sin salida" que en realidad se entregaron).
+
+---
+
 ### Monitor TV — `monitor/tv.html` (v18.74, pedido de Luis)
 
 Versión **liviana y de solo lectura** del tablero, para la TV colgada en planta.

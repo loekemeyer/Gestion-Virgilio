@@ -18632,3 +18632,93 @@ mínima de 4 días hábiles** (`PPP_Web_Config.dias_anticipacion_min = 4`):
 
 El archivo del repo (`sql/gv_ppp_np_desarmar_vuelve_v1875_76.sql`) se verificó contra la base:
 md5 del cuerpo normalizado **idéntico** al de `pg_get_functiondef`.
+
+---
+
+## §3.hu — v18.77: submódulo "Pedidos atrasados" y el criterio de qué está atrasado — 2026-09-16
+
+**Pedido de Luis:** *"vamos a poner un submódulo arriba de Programación de entregas que sea
+«Pedidos atrasados». La idea es que se crea una fila de día cuando pasa un día, para poner ahí
+todos los pedidos que estaban programados para ese día y no se registró la salida todavía."*
+
+### Lo nuevo
+
+`public.gv_ppp_atrasados(p_desde date default null)` — `sql/gv_ppp_atrasados.sql`. Devuelve las
+**mismas columnas que `gv_ppp_prog_arbol`**, en el mismo orden, más `dias_atraso`. Es a propósito:
+el front arma el árbol día → tanda → NP con el mismo código (`_pgaCuerpoHtml`) que usa para los
+días futuros, así las dos tablas no pueden decir cosas distintas del mismo pedido.
+
+Internamente **llama a `gv_ppp_prog_arbol(desde, hoy - 1)`** y le saca lo que ya salió. No duplica
+el universo: si mañana cambia el árbol, cambian los dos.
+
+### El criterio, que es lo que importa
+
+Atrasado = fecha de entrega vencida **y** sin salida registrada:
+
+| Situación | ¿Atrasado? |
+|---|---|
+| Sin `CCN` | sí — nunca se cargó |
+| `CCN` y después `FSS` («↩ sin salida») | **sí** — se cargó y VOLVIÓ al depósito |
+| `CCN` vigente, sin `CRN` | no — salió, falta el remito (vive en **En Salida**) |
+| `CRN` | no — entregado |
+
+**Las dos formas de equivocarse con esto, las dos medidas ese día:**
+
+1. **Mirar sólo el `CCN` y no el `FSS` posterior.** La NP **98668** (Nexxo, D66D) tuvo `CCN` el
+   11/09 10:28 y `FSS` el 14/09 10:04: volvió al depósito. Un conteo que mirara sólo el `CCN` la
+   daba por salida — y lo destapó Luis al verla ofrecida en la pantalla de **Carga Camión** del
+   operario, que hacía bien en ofrecerla.
+2. **Comparar la NP sin normalizar.** La NP web viaja **con espacio** (`LK 0003`) y la de ISIS con
+   un `.0` que aparece y desaparece (`98651` / `98651.0`). Comparando el texto crudo **ninguna NP
+   web matchea contra su evento**, así que todas se cuentan como atrasadas: ese error dio **24
+   atrasados donde había 18**. Los que sobraban (LK 0003, LK 0011, LK 0001, CH 0005, CH 0009,
+   LK 0057, LK 0049) tenían `CCN` **y** `CRN`: habían salido y se habían entregado.
+
+Por eso el criterio vive en el backend y la pantalla sólo lo pide. `tests/ppp-atrasados.cjs`
+verifica justamente eso, más el armado en vivo.
+
+### Desde cuándo mira — y por qué no mira todo
+
+**No se puede barrer el histórico.** Antes de que los operarios pasaran a Gestión (2026-09-07) la
+Carga Camión casi no se registraba, así que la falta de `CCN` no prueba nada. Medido hacia atrás
+con el mismo criterio:
+
+| Mes | "sin salida" | Qué son en realidad |
+|---|--:|---|
+| septiembre | 18 | atrasados de verdad |
+| agosto | 15 | mezcla (ver §problema 327) |
+| julio | 9 | mezcla |
+| junio | 274 | salieron y se entregaron: no había registro |
+| mayo | 424 | ídem |
+| abril | 290 | ídem |
+
+Por eso hay un piso, **configurable sin tocar código**:
+
+```sql
+-- hoy: 2026-09-01
+select clave, valor_texto from public."PPP_Web_Config" where clave = 'atrasados_desde';
+-- para correrlo:
+update public."PPP_Web_Config" set valor_texto = '2026-08-01' where clave = 'atrasados_desde';
+```
+
+### Impacto medido
+
+```sql
+select count(*) pedidos, count(distinct fecha) dias, round(sum(m3)::numeric,2) m3
+  from public.gv_ppp_atrasados();
+-- 18 | 8 | 8,69   (2026-09-16)
+```
+
+La banda `⏰ N atrasados · Ver la lista →` que estaba arriba de la tabla **se sacó**: contaba con
+otro criterio (no miraba el `FSS`) y mandaba a otra pantalla. Dejar las dos era mostrar dos
+números distintos de lo mismo. El tablero de 6 días y su vista `venc` no se tocaron.
+
+### Rollback
+
+```sql
+drop function if exists public.gv_ppp_atrasados(date);
+delete from public."PPP_Web_Config" where clave = 'atrasados_desde';
+```
+
+Del lado del front, el submódulo es una línea en `_pppArbolHtml` (`let h = _patrHtml();`): sacarla
+deja la pantalla como estaba. `_pgaCuerpoHtml` queda igual — lo usa también la tabla de siempre.

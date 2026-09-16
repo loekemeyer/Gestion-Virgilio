@@ -3265,6 +3265,28 @@ tr.ppp-err-zona > td{ background:#fffbeb !important; }
    cuatro porcentajes de avance, y todo se abre hacia adentro en la misma tabla: no hay que salir
    de la pantalla para ver una tanda ni una NP. */
 .pga-wrap{ margin-top:12px; border:1px solid #e2e8f0; border-radius:14px; background:#fff; overflow:auto; }
+
+/* ── Pedidos atrasados (v18.77, Luis) ──────────────────────────────────────────
+   Submódulo propio arriba de la programación. Va en rojo y arriba de todo porque
+   es lo único de esta pantalla que ya salió mal: lo de abajo todavía se puede
+   cumplir. Reusa la tabla `.pga` (mismas columnas, mismo comportamiento al abrir)
+   y sólo le cambia el marco y el color del encabezado. */
+.patr{ margin-top:12px; border:1px solid #fecaca; border-left:5px solid #dc2626;
+  border-radius:14px; background:#fff7f7; overflow:auto; }
+.patr.ok{ border-color:#bbf7d0; border-left-color:#16a34a; background:#f6fefa; }
+.patr-h{ display:flex; align-items:baseline; gap:14px; flex-wrap:wrap; padding:11px 14px 9px; }
+.patr-t{ font-size:16px; font-weight:900; color:#b91c1c; white-space:nowrap; }
+.patr.ok .patr-t{ color:#15803d; }
+.patr-kpi{ font-size:13px; font-weight:700; color:#7f1d1d; white-space:nowrap; }
+.patr-kpi b{ font-size:15px; font-weight:900; }
+.patr-sub{ font-size:12.5px; color:#64748b; font-weight:600; }
+/* La tabla no lleva el marco propio de `.pga-wrap`: ya se lo pone `.patr`. */
+.patr-tbl{ border-top:1px solid #fecaca; }
+/* Hace cuántos días venció. A partir de una semana cambia de color: un día de
+   atraso se recupera, siete ya es otra cosa. */
+.patr-dias{ margin-left:9px; font-size:11.5px; font-weight:900; border-radius:999px;
+  padding:2px 9px; background:#fee2e2; color:#b91c1c; white-space:nowrap; }
+.patr-dias.grave{ background:#7f1d1d; color:#fff; }
 /* v17.94 (Luis) — TAMAÑO PAREJO EN LOS TRES NIVELES. Antes la letra se ACHICABA al bajar
    (día 14px → tanda 13 → NP 12,5 → los chips 11), justo al revés de lo que hace falta: la fila de
    la NP es la que más info tiene y era la que menos se leía. Pedido: *"letra/font más grande, que
@@ -5622,7 +5644,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=18.76"></script>
+<script type="module" src="recepcion.js?v=18.77"></script>
 <!-- Config del módulo de fichada (compartido con fichada.html). El secret
      hmacSecret tiene que ser el mismo acá y allá; cargándolo desde un solo
      archivo evitamos que se desincronicen. -->
@@ -9205,7 +9227,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v18.76";
+const APP_VERSION = "v18.77";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -36534,7 +36556,7 @@ function pgaNeed(force) {
       pppRenderProg();
     });
 }
-function pgaRecargar() { _pgaTs = 0; _pgaItems = {}; pgaNeed(true); pppRenderProg(); }
+function pgaRecargar() { _pgaTs = 0; _pgaItems = {}; _patrTs = 0; pgaNeed(true); patrNeed(true); pppRenderProg(); }
 function pgaAbrirDia(k)   { _pgaOpenD[k] = !_pgaOpenD[k]; pppRenderProg(); }
 function pgaAbrirTanda(k) { _pgaOpenT[k] = !_pgaOpenT[k]; pppRenderProg(); }
 function pgaAbrirNp(k, np) {
@@ -36579,114 +36601,94 @@ function _pgaSearchStr(r) {
   return [r.np, r.cod, r.razon_social, r.tanda, r.localidad, r.barrio, r.zona, r.zona_corta,
           r.empresa, r.origen, r.estado, f, dm].join(" ").toLowerCase();
 }
-function _pgaArbol() {
-  const q = (typeof _pppSearch === "string" ? _pppSearch : "").trim().toLowerCase();
-  const dias = new Map();
-  for (const r of (_pgaRows || [])) {
-    if (q && _pgaSearchStr(r).indexOf(q) < 0) continue;
-    const k = String(r.fecha == null ? "" : r.fecha).replace(/-/g, ""); if (!k) continue;
-    const est = PGA_EST.indexOf(r.estado) >= 0 ? r.estado : "pendiente";
-    let d = dias.get(k);
-    if (!d) { d = { key: k, m3: 0, nps: 0, est: _pgaEstCero(), tandas: new Map() }; dias.set(k, d); }
-    d.m3 += Number(r.m3) || 0; d.nps++; d.est[est]++;
-    const tk = String(r.tanda || "—");
-    let t = d.tandas.get(tk);
-    if (!t) { t = { tanda: tk, key: k + "|" + tk, m3: 0, nps: 0, est: _pgaEstCero(), filas: [] }; d.tandas.set(tk, t); }
-    t.m3 += Number(r.m3) || 0; t.nps++; t.est[est]++; t.filas.push(r);
+/* ═══════════════════════════════════════════════════════════════════════════
+   PEDIDOS ATRASADOS (v18.77, pedido de Luis 2026-09-16)
+   Submódulo propio ARRIBA de "Programación de entregas": una fila por día que YA
+   PASÓ y todavía tiene pedidos sin registro de salida. La fila del día aparece
+   sola cuando el día pasa, y desaparece sola cuando esa NP se carga al camión.
+
+   Quién decide qué está atrasado es el BACKEND (`gv_ppp_atrasados`), no esta
+   pantalla: es una regla de negocio, y calcularla a mano se equivoca. Dos formas
+   de equivocarse, las dos medidas el 16/09:
+     · mirar sólo el CCN y no el FSS posterior → una NP que VOLVIÓ al depósito se
+       cuenta como salida (pasó con la 98668 de Nexxo, que el operario veía bien
+       ofrecida en Carga Camión);
+     · comparar la NP sin normalizar → "LK 0003" nunca matchea contra el evento y
+       TODOS los pedidos web se cuentan como atrasados (daba 24 donde había 18).
+   ═══════════════════════════════════════════════════════════════════════════ */
+const PATR_TTL_MS = 60 * 1000;
+let _patrRows = null, _patrTs = 0, _patrBusy = false, _patrErr = "";
+
+function patrNeed(force) {
+  if (_patrBusy) return;
+  if (!force && _patrRows && (Date.now() - _patrTs) < PATR_TTL_MS) return;
+  _patrBusy = true;
+  fetch(SUPABASE_URL + "/rest/v1/rpc/gv_ppp_atrasados", {
+    method: "POST",
+    headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY, "Content-Type": "application/json" },
+    body: JSON.stringify({})
+  }).then(function (r) { if (!r.ok) throw new Error("HTTP " + r.status); return r.json(); })
+    .then(function (rows) { _patrRows = rows || []; _patrTs = Date.now(); _patrErr = ""; _patrBusy = false; pppRenderProg(); })
+    .catch(function (e) {
+      _patrBusy = false; _patrErr = String((e && e.message) || e);
+      if (!_patrRows) _patrRows = [];
+      pppRenderProg();
+    });
+}
+/* Los días del submódulo, del más reciente al más viejo: lo de ayer es lo que
+   todavía se puede resolver hoy; lo de hace dos semanas ya es otra conversación. */
+function _patrDias() {
+  return _pgaArbol(_patrRows).sort(function (a, b) { return b.key.localeCompare(a.key); });
+}
+function _patrHtml() {
+  if (!_patrRows) return '<div class="patr"><div class="patr-h"><span class="patr-t">⏰ Pedidos atrasados</span>' +
+    '<span class="patr-sub">Leyendo…</span></div></div>';
+  const dias = _patrDias();
+  if (!dias.length) {
+    // Sin atrasados el módulo no desaparece: que esté y diga que no hay nada es
+    // la única forma de saber que se miró.
+    return '<div class="patr ok"><div class="patr-h"><span class="patr-t">✅ Sin pedidos atrasados</span>' +
+      '<span class="patr-sub">Todo lo de los días que ya pasaron tiene la salida registrada' +
+      (_pppSearch ? ' (con el filtro puesto)' : '') + '</span></div></div>';
   }
-  const out = [...dias.values()].sort(function (a, b) { return a.key.localeCompare(b.key); });
-  for (const d of out) d.tandasArr = [...d.tandas.values()].sort(function (a, b) { return a.tanda.localeCompare(b.tanda); });
-  return out;
-}
-function _pgaPctTd(n, tot, cls) {
-  const p = tot ? Math.round(100 * n / tot) : 0;
-  return '<td><span class="pga-pct ' + cls + (n ? '' : ' z') + '">' + p + ' %<small>' + n + '</small></span></td>';
-}
-function _pgaPctFila(e, n) {
-  return _pgaPctTd(e.facturado, n, "fac") + _pgaPctTd(e.armado, n, "arm") +
-         _pgaPctTd(e.proceso, n, "pro") + _pgaPctTd(e.pendiente, n, "pen");
-}
-/* A dónde va la tanda: la zona de sus NP. Casi siempre es una sola (por eso se arma así);
-   si hay más de una, se dice cuántas para no escupir un renglón larguísimo. */
-function _pgaZonaTanda(t) {
-  const z = [];
-  for (const r of t.filas) { const s = String(r.zona_corta || "").trim(); if (s && z.indexOf(s) < 0) z.push(s); }
-  if (!z.length) return "";
-  return z.length === 1 ? z[0] : (z[0] + " +" + (z.length - 1));
-}
-function _pgaDiaTxt(k) {
-  const d = _pppKeyDate(k);
-  return _PN_DOW[d.getDay()] + " " + d.getDate() + "/" + String(d.getMonth() + 1).padStart(2, "0");
-}
-/* El contenido de UNA NP: la misma tabla Código/Cajas/Unidades de A Programar (v17.57). */
-function _pgaItemsHtml(np) {
-  const c = _pgaItems[np];
-  if (c === undefined || c === "cargando") return '<div class="apr-det-sin">Buscando el contenido…</div>';
-  if (c === null) return '<div class="apr-det-sin apr-det-err">No se pudo leer el contenido de la NP ' + escapeHtml(np) + '. Probá con 🔄.</div>';
-  if (!c.length) return '<div class="apr-det-sin">La NP ' + escapeHtml(np) + ' no tiene renglones cargados en la base del PPP.</div>';
-  // v17.94 (Luis): "que no se abra para adentro, sino en horizontal". Una grilla que fluye usa el
-  // ancho con 3 códigos y con 30; la tabla de 3 columnas de A Programar dejaba media pantalla vacía.
-  let cj = 0, un = 0;
-  const cel = c.map(function (it) {
-    const uni = aprItemUni(it), uxb = Number(it.uxb) || 0, cajas = Number(it.cajas) || 0;
-    cj += cajas; un += uni;
-    return '<div class="pga-it"><span class="pga-it-cod">' + escapeHtml(String(it.art || "—")) + '</span>' +
-      '<span class="pga-it-cj">' + aprNum(cajas, 0) + ' cj</span>' +
-      '<span class="pga-it-un">' + (uni ? aprNum(uni, 0) + " un" + (uxb ? " ×" + aprNum(uxb, 0) : "") : "—") + '</span></div>';
-  }).join("");
-  return '<div class="pga-its">' + cel + '</div>' +
-    '<div class="pga-it-tot">' + c.length + ' código' + (c.length === 1 ? '' : 's') +
-    ' · <b>' + aprNum(cj, 0) + '</b> cajas' + (un ? ' · <b>' + aprNum(un, 0) + '</b> unidades' : '') + '</div>';
-}
-function _pppArbolHtml(programados) {
-  pgaNeed();
-  const g = _pppPlanAgrupar(programados), nVenc = g.venc.length;
-  let h = '<div class="pn-head"><div><div class="pn-h1">Programación de entregas</div>' +
-    '<div class="pn-h2">Tocá un día para ver sus tandas · una tanda para ver sus NP · una NP para ver qué lleva</div></div>' +
-    '<div class="pn-tools">' +
-      '<button class="pn-lnk" onclick="pgaRecargar()" title="Volver a leer la programación">🔄 Actualizar</button>' +
-      // v17.97 (Luis): "al lado del botón de Actualizar quiero que haya un botón de Imprimir"
-      '<button class="pn-lnk" onclick="pgaImprimirAbrir()" title="Elegís qué días y sale la programación abierta hasta la NP, para papel">🖨 Imprimir</button>' +
-      '<button class="pn-lnk" onclick="pppPlanTabla(false)" title="El tablero de 6 días con los camiones">Tablero de 6 días</button>' +
-      '<button class="pn-lnk" onclick="pppPlanClasica(true)" title="Lista por fecha y tanda (como antes)">Vista clásica</button>' +
-    '</div></div>';
-  if (nVenc) {
-    const _rep = g.venc.filter(function (p) { return _pppEstadoPed(p) !== "armado"; }).length;
-    h += '<div class="pn-avisos"><div class="pn-venc-band' + (_rep ? ' rep' : '') + '" onclick="pppPlanAbrir(\'venc\')" title="Ver la lista de atrasados">' +
-      '<b>⏰ ' + nVenc + ' atrasado' + (nVenc === 1 ? '' : 's') + '</b>' +
-      (_rep ? '<span class="r">' + _rep + ' sin salir → reprogramar</span>' : '') +
-      ((nVenc - _rep) ? '<span>' + (nVenc - _rep) + ' salieron · falta el remito</span>' : '') +
-      '<span class="go">Ver la lista →</span></div></div>';
-  }
-  const dias = _pgaArbol();
-  h += '<div class="pga-wrap">';
-  if (!_pgaRows) { return h + '<div class="pga-msg">Leyendo la programación…</div></div>'; }
-  if (_pgaErr && !dias.length) {
-    return h + '<div class="pga-msg pga-err">No se pudo leer la programación (' + escapeHtml(_pgaErr) +
-      '). <button class="pn-lnk" onclick="pgaRecargar()">Reintentar</button></div></div>';
-  }
-  if (!dias.length) return h + '<div class="pga-msg">' + (_pppSearch
-    ? 'Sin coincidencias para «' + escapeHtml(_pppSearch) + '» en lo programado de hoy en adelante.'
-    : 'No hay nada programado de hoy en adelante.') + '</div></div>';
-  // v17.79 (Luis): los 4 estados van a la DERECHA del todo, angostos y con su color en el
-  // encabezado; todo el ancho que sobra es para la info de cada NP.
-  h += '<table class="pga"><thead><tr>' +
+  let nps = 0, m3 = 0;
+  for (const d of dias) { nps += d.nps; m3 += d.m3; }
+  const viejo = dias[dias.length - 1];
+  const _dAtraso = function (k) { return Math.round((_pppKeyDate(_pppHoyKey()) - _pppKeyDate(k)) / 86400000); };
+  let h = '<div class="patr"><div class="patr-h">' +
+    '<span class="patr-t">⏰ Pedidos atrasados</span>' +
+    '<span class="patr-kpi"><b>' + nps + '</b> pedido' + (nps === 1 ? '' : 's') + '</span>' +
+    '<span class="patr-kpi"><b>' + dias.length + '</b> día' + (dias.length === 1 ? '' : 's') + '</span>' +
+    '<span class="patr-kpi"><b>' + _pppFmtM3(m3) + '</b> m³</span>' +
+    '<span class="patr-kpi">el más viejo hace <b>' + _dAtraso(viejo.key) + '</b> días</span>' +
+    '<span class="patr-sub">Estaban programados para un día que ya pasó y nadie registró la Carga Camión</span>' +
+    '</div>';
+  h += '<table class="pga patr-tbl"><thead><tr>' +
       '<th>Día</th><th>m³</th><th>Tandas</th><th>NPs</th>' +
-      '<th class="pga-h fac" title="Ya facturado">Factu<br>rado</th>' +
-      '<th class="pga-h arm" title="Armado y todavía sin facturar">Ar<br>mado</th>' +
-      '<th class="pga-h pro" title="Pickeando o armando ahora">En<br>proceso</th>' +
-      '<th class="pga-h pen" title="Programado para ese día y todavía sin empezar">Pen<br>dientes</th>' +
+      '<th class="pga-h fac">Factu<br>rado</th><th class="pga-h arm">Ar<br>mado</th>' +
+      '<th class="pga-h pro">En<br>proceso</th><th class="pga-h pen">Pen<br>dientes</th>' +
     '</tr></thead><tbody>';
+  h += _pgaCuerpoHtml(dias, { atraso: true });
+  return h + '</div>';
+}
+
+/* El cuerpo de la tabla día → tanda → NP. Lo comparten la programación y los
+   atrasados: una sola copia, así las dos no pueden mostrar cosas distintas. */
+function _pgaCuerpoHtml(dias, opts) {
+  const esAtraso = !!(opts && opts.atraso);
   const hoy = _pppHoyKey();
   const tot = { m3: 0, nps: 0, tandas: 0, est: _pgaEstCero() };
+  let h = "";
   for (const d of dias) {
     tot.m3 += d.m3; tot.nps += d.nps; tot.tandas += d.tandasArr.length;
     for (const k of PGA_EST) tot.est[k] += d.est[k];
     // v18.31: buscando, los días y las tandas que quedaron abren solos — lo que se busca es
     // una NP, no un día, así que esconderla atrás de dos clics es lo mismo que no encontrarla.
     const ab = !!_pgaOpenD[d.key] || !!_pppSearch;
+    const atr = esAtraso ? Math.round((_pppKeyDate(hoy) - _pppKeyDate(d.key)) / 86400000) : 0;
     h += '<tr class="pga-d' + (ab ? ' on' : '') + (d.key === hoy ? ' hoy' : '') + '" onclick="pgaAbrirDia(\'' + d.key + '\')">' +
-      '<td><span class="pga-chev">' + (ab ? "▾" : "▸") + '</span>' + escapeHtml(_pgaDiaTxt(d.key)) + '</td>' +
+      '<td><span class="pga-chev">' + (ab ? "▾" : "▸") + '</span>' + escapeHtml(_pgaDiaTxt(d.key)) +
+        (esAtraso ? '<span class="patr-dias' + (atr >= 7 ? ' grave' : '') + '">hace ' + atr + ' día' + (atr === 1 ? '' : 's') + '</span>' : '') + '</td>' +
       '<td>' + _pppFmtM3(d.m3) + '</td><td>' + d.tandasArr.length + '</td><td>' + d.nps + '</td>' +
       _pgaPctFila(d.est, d.nps) + '</tr>';
     if (!ab) continue;
@@ -36747,9 +36749,114 @@ function _pppArbolHtml(programados) {
       }
     }
   }
-  h += '</tbody><tfoot><tr>' +
+  return h + '</tbody><tfoot><tr>' +
     '<td>Total</td><td>' + _pppFmtM3(tot.m3) + '</td><td>' + tot.tandas + '</td><td>' + tot.nps + '</td>' +
-    _pgaPctFila(tot.est, tot.nps) + '</tr></tfoot></table></div>';
+    _pgaPctFila(tot.est, tot.nps) + '</tr></tfoot></table>';
+}
+
+/* v18.77 — recibe las filas por parámetro para que el submódulo "Pedidos atrasados"
+   (RPC gv_ppp_atrasados) arme su árbol con ESTE mismo código. Si cada tabla agrupara
+   por su lado podrían decir cosas distintas del mismo pedido. Sin argumento sigue
+   usando `_pgaRows`, que es como la llama la programación de siempre. */
+function _pgaArbol(filas) {
+  const q = (typeof _pppSearch === "string" ? _pppSearch : "").trim().toLowerCase();
+  const dias = new Map();
+  for (const r of (filas || _pgaRows || [])) {
+    if (q && _pgaSearchStr(r).indexOf(q) < 0) continue;
+    const k = String(r.fecha == null ? "" : r.fecha).replace(/-/g, ""); if (!k) continue;
+    const est = PGA_EST.indexOf(r.estado) >= 0 ? r.estado : "pendiente";
+    let d = dias.get(k);
+    if (!d) { d = { key: k, m3: 0, nps: 0, est: _pgaEstCero(), tandas: new Map() }; dias.set(k, d); }
+    d.m3 += Number(r.m3) || 0; d.nps++; d.est[est]++;
+    const tk = String(r.tanda || "—");
+    let t = d.tandas.get(tk);
+    if (!t) { t = { tanda: tk, key: k + "|" + tk, m3: 0, nps: 0, est: _pgaEstCero(), filas: [] }; d.tandas.set(tk, t); }
+    t.m3 += Number(r.m3) || 0; t.nps++; t.est[est]++; t.filas.push(r);
+  }
+  const out = [...dias.values()].sort(function (a, b) { return a.key.localeCompare(b.key); });
+  for (const d of out) d.tandasArr = [...d.tandas.values()].sort(function (a, b) { return a.tanda.localeCompare(b.tanda); });
+  return out;
+}
+function _pgaPctTd(n, tot, cls) {
+  const p = tot ? Math.round(100 * n / tot) : 0;
+  return '<td><span class="pga-pct ' + cls + (n ? '' : ' z') + '">' + p + ' %<small>' + n + '</small></span></td>';
+}
+function _pgaPctFila(e, n) {
+  return _pgaPctTd(e.facturado, n, "fac") + _pgaPctTd(e.armado, n, "arm") +
+         _pgaPctTd(e.proceso, n, "pro") + _pgaPctTd(e.pendiente, n, "pen");
+}
+/* A dónde va la tanda: la zona de sus NP. Casi siempre es una sola (por eso se arma así);
+   si hay más de una, se dice cuántas para no escupir un renglón larguísimo. */
+function _pgaZonaTanda(t) {
+  const z = [];
+  for (const r of t.filas) { const s = String(r.zona_corta || "").trim(); if (s && z.indexOf(s) < 0) z.push(s); }
+  if (!z.length) return "";
+  return z.length === 1 ? z[0] : (z[0] + " +" + (z.length - 1));
+}
+function _pgaDiaTxt(k) {
+  const d = _pppKeyDate(k);
+  return _PN_DOW[d.getDay()] + " " + d.getDate() + "/" + String(d.getMonth() + 1).padStart(2, "0");
+}
+/* El contenido de UNA NP: la misma tabla Código/Cajas/Unidades de A Programar (v17.57). */
+function _pgaItemsHtml(np) {
+  const c = _pgaItems[np];
+  if (c === undefined || c === "cargando") return '<div class="apr-det-sin">Buscando el contenido…</div>';
+  if (c === null) return '<div class="apr-det-sin apr-det-err">No se pudo leer el contenido de la NP ' + escapeHtml(np) + '. Probá con 🔄.</div>';
+  if (!c.length) return '<div class="apr-det-sin">La NP ' + escapeHtml(np) + ' no tiene renglones cargados en la base del PPP.</div>';
+  // v17.94 (Luis): "que no se abra para adentro, sino en horizontal". Una grilla que fluye usa el
+  // ancho con 3 códigos y con 30; la tabla de 3 columnas de A Programar dejaba media pantalla vacía.
+  let cj = 0, un = 0;
+  const cel = c.map(function (it) {
+    const uni = aprItemUni(it), uxb = Number(it.uxb) || 0, cajas = Number(it.cajas) || 0;
+    cj += cajas; un += uni;
+    return '<div class="pga-it"><span class="pga-it-cod">' + escapeHtml(String(it.art || "—")) + '</span>' +
+      '<span class="pga-it-cj">' + aprNum(cajas, 0) + ' cj</span>' +
+      '<span class="pga-it-un">' + (uni ? aprNum(uni, 0) + " un" + (uxb ? " ×" + aprNum(uxb, 0) : "") : "—") + '</span></div>';
+  }).join("");
+  return '<div class="pga-its">' + cel + '</div>' +
+    '<div class="pga-it-tot">' + c.length + ' código' + (c.length === 1 ? '' : 's') +
+    ' · <b>' + aprNum(cj, 0) + '</b> cajas' + (un ? ' · <b>' + aprNum(un, 0) + '</b> unidades' : '') + '</div>';
+}
+function _pppArbolHtml(programados) {
+  pgaNeed();
+  patrNeed();
+  // v18.77 (Luis): "un submódulo arriba de Programación de entregas que sea Pedidos
+  // atrasados". Va PRIMERO y con su propia tabla: es lo que hay que resolver hoy, no
+  // una nota al pie de lo que viene. Reemplaza a la banda "⏰ N atrasados · Ver la
+  // lista →", que contaba con otro criterio (no miraba el FSS) y mandaba a otra
+  // pantalla; dejar las dos era mostrar dos números distintos de lo mismo.
+  let h = _patrHtml();
+  h += '<div class="pn-head"><div><div class="pn-h1">Programación de entregas</div>' +
+    '<div class="pn-h2">Tocá un día para ver sus tandas · una tanda para ver sus NP · una NP para ver qué lleva</div></div>' +
+    '<div class="pn-tools">' +
+      '<button class="pn-lnk" onclick="pgaRecargar()" title="Volver a leer la programación">🔄 Actualizar</button>' +
+      // v17.97 (Luis): "al lado del botón de Actualizar quiero que haya un botón de Imprimir"
+      '<button class="pn-lnk" onclick="pgaImprimirAbrir()" title="Elegís qué días y sale la programación abierta hasta la NP, para papel">🖨 Imprimir</button>' +
+      '<button class="pn-lnk" onclick="pppPlanTabla(false)" title="El tablero de 6 días con los camiones">Tablero de 6 días</button>' +
+      '<button class="pn-lnk" onclick="pppPlanClasica(true)" title="Lista por fecha y tanda (como antes)">Vista clásica</button>' +
+    '</div></div>';
+  const dias = _pgaArbol();
+  h += '<div class="pga-wrap">';
+  if (!_pgaRows) { return h + '<div class="pga-msg">Leyendo la programación…</div></div>'; }
+  if (_pgaErr && !dias.length) {
+    return h + '<div class="pga-msg pga-err">No se pudo leer la programación (' + escapeHtml(_pgaErr) +
+      '). <button class="pn-lnk" onclick="pgaRecargar()">Reintentar</button></div></div>';
+  }
+  if (!dias.length) return h + '<div class="pga-msg">' + (_pppSearch
+    ? 'Sin coincidencias para «' + escapeHtml(_pppSearch) + '» en lo programado de hoy en adelante.'
+    : 'No hay nada programado de hoy en adelante.') + '</div></div>';
+  // v17.79 (Luis): los 4 estados van a la DERECHA del todo, angostos y con su color en el
+  // encabezado; todo el ancho que sobra es para la info de cada NP.
+  h += '<table class="pga"><thead><tr>' +
+      '<th>Día</th><th>m³</th><th>Tandas</th><th>NPs</th>' +
+      '<th class="pga-h fac" title="Ya facturado">Factu<br>rado</th>' +
+      '<th class="pga-h arm" title="Armado y todavía sin facturar">Ar<br>mado</th>' +
+      '<th class="pga-h pro" title="Pickeando o armando ahora">En<br>proceso</th>' +
+      '<th class="pga-h pen" title="Programado para ese día y todavía sin empezar">Pen<br>dientes</th>' +
+    '</tr></thead><tbody>';
+  // v18.77: el cuerpo dia -> tanda -> NP lo arma _pgaCuerpoHtml, que comparten
+  // esta tabla y el submodulo de atrasados. Una sola copia = no pueden divergir.
+  h += _pgaCuerpoHtml(dias, {}) + '</div>';
   return h;
 }
 
