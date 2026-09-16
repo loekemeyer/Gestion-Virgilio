@@ -18099,7 +18099,7 @@ que ya se fue.
 
 `sql/gv_tandas_lock_v1865.sql` · `tests/tanda-lock-etapas.cjs` · tarea Planify 3473.
 
-## §3.hn — v18.66: las tres tareas que Luis dejó para después, hechas (291 · 294 · 295) — 2026-09-15
+## §3.hn — v18.70: las tres tareas que Luis dejó para después, hechas (291 · 294 · 295) — 2026-09-15
 
 > **Luis:** *"¿Nada se puede avanzar?"* → sí, las tres.
 
@@ -18189,3 +18189,77 @@ nada vivo. D47B → 0,238 / false; D46A (entregada de verdad) sigue 0,194 / true
 
 **Chequeos del cierre del día (16/09 00:55):** `errores_cliente` sin filas desde las 18:30; `edge_logs`
 sin ningún HTTP 500 en `/rest/v1/*` desde los índices de la v18.68.
+---
+
+## §3.hn — v18.70: anular un picking ya no puede borrar el stock de OTRO — 2026-09-15
+
+Continuación directa de §3.hk (el lock por etapas). Con el lock nuevo **ya no se pueden crear**
+EP fantasma, pero seguía existiendo el daño que podían hacer los que ya estaban.
+
+### El renglón que lo causaba
+
+`anular_picking_virgilio` (la vieja, que sigue usando Producción) hacía:
+
+```sql
+update "Movimientos_Stock" set delta = 0
+ where tipo = 'picking' and upper(trim(ref)) = v_tanda and delta <> 0;
+```
+
+**Sin filtrar por legajo ni por fecha.** Y dos renglones más arriba, en la misma función, los
+eventos PKC **sí** se borraban acotados (`legajo = v_leg and created_at >= v_ts`). O sea que la
+función ya sabía acotar y en el del stock no lo hacía.
+
+Con un **EP fantasma** (tanda ya pickeada que alguien reabre por error — 6 en 120 días) anular
+ponía en cero el picking **bueno**: en `D30A` eran **36 movimientos** de una tanda que además ya
+estaba armada; en `C69C`, 32.
+
+⚠ **La ventana de 24 h nunca fue un guard pensado**: era un amortiguador que tapaba esto por
+casualidad, y encima dejaba afuera justo el caso que hay que poder limpiar — «quedó abierto
+desde ayer», que es lo que pasó con `D71A` el 15/09 y hubo que resolver a mano por SQL.
+
+### Lo que hace `gv_anular_picking_virgilio`
+
+1. Busca el último EP del legajo+tanda dentro de **3 días** (era 24 h).
+2. Pregunta si la tanda **ya tiene TP o TAP**, de quien sea y cuando sea:
+   - **sí** → es una reapertura por error: borra el EP y los PKC de ese legajo, y **no toca una
+     sola fila de stock** → devuelve `ep_fantasma_limpiado`;
+   - **no** → anulación normal, con el `delta = 0` acotado a **ese legajo y desde ese EP**.
+3. Suelta el lock con `gv_tanda_lock_anular`.
+
+Ampliar la ventana es seguro **recién ahora**: lo que protege ya no es la fecha, es el guard.
+
+### Medición (EP fantasma simulado sobre D71A, pickeada y armada ese día)
+
+| | antes | después |
+|---|---|---|
+| movimientos de picking de D71A | 2 | **2** |
+| cajas movidas | 666 | **666** |
+| EP de D71A | 2 | **1** ← se fue sólo el fantasma |
+| 55219 en `a_facturar` | 333 | **333** |
+
+Resultado: `ep_fantasma_limpiado`.
+
+### Y se limpiaron los dos fantasma reales que quedaban
+
+Con el mismo criterio y sin tocar stock (backup en `zz_backups."GV_Backup_EP_fantasma_20260915"`):
+
+```
+C69C  (leg 104, reabierta el 10/07)  → queda 1 EP · 32 movimientos intactos
+D30A  (leg 122, reabierta el 12/08)  → queda 1 EP · 36 movimientos intactos
+```
+
+Estaban fuera de la ventana de 3 días, así que se borraron a mano seleccionando exactamente los
+EP que tienen un **TP anterior** — la firma de la reapertura.
+
+### Front
+
+La llamada pasó a la RPC nueva y se agregaron los dos avisos que faltaban: el de
+`ep_fantasma_limpiado` **dice que el stock no se tocó** (si no, el operario leería "anulado" y
+no sabría la diferencia) y el de `sin_ep` aclara que la ventana es de 3 días.
+
+**Falta todavía** que anular deje de **borrar** el evento: el celular lo reenvía desde su cola
+offline y lo resucita — pasó el 15/09 con E25A (borrado 16:56, reinsertado 17:17 por el celular
+de JC al fichar FJ, con `ts_cliente` idéntico y `created_at` nuevo). La dedup por `client_id` no
+alcanza justamente porque al borrar la fila desaparece contra qué deduplicar.
+
+`sql/gv_anular_picking_virgilio_v1870.sql` · `tests/anular-picking-fantasma.cjs`

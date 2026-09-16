@@ -89,14 +89,14 @@ catch (_e) {
     // cancelar el confirm no toca nada
     window.__confirm = false;
     await pkAnular();
-    out.cancelarNoToca = rpcCalls("anular_picking_virgilio").length === 0 &&
+    out.cancelarNoToca = rpcCalls("gv_anular_picking_virgilio").length === 0 &&
       getLegajoState(LEG).picking.active === true &&
       localStorage.getItem("vir_pk_" + LEG) !== null;
 
     // anular de verdad
     window.__confirm = true;
     await pkAnular();
-    const rpcPk = rpcCalls("anular_picking_virgilio");
+    const rpcPk = rpcCalls("gv_anular_picking_virgilio");
     out.llamaRpc = rpcPk.length === 1 && rpcPk[0].body && rpcPk[0].body.p_legajo === LEG && rpcPk[0].body.p_tanda === TANDA;
     /* v18.65 — anular SUELTA el lock (vuelve a libre), no lo "completa". Antes las dos cosas
        eran la misma RPC (`tanda_liberar`); ahora terminar deja la fase 'completada' para que

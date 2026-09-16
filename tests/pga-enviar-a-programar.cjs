@@ -107,12 +107,28 @@ catch (_e) {
     // ⚠ NO volver a llamar a pgaAbrirDia / pgaAbrirTanda acá: son TOGGLE, y llamarlas de nuevo
     // CIERRAN el día que ya estaba abierto y la fila desaparece. Basta con volver a pedir el nodo
     // (#pppPreview se puede haber redibujado con el click de arriba).
-    const prev2 = document.getElementById("pppPreview");
-    const filaD = [...prev2.querySelectorAll("tr.pga-n")].find((x) => x.textContent.indexOf("LK 0058") >= 0);
+    /* Buscar la fila, y si NO está, reabrir el día/tanda UNA vez y volver a buscar.
+       Antes esto era `btD.click()` a secas: cuando el preview se había redibujado con el día
+       cerrado, `btD` venía null y el test moría con «Cannot read properties of null (reading
+       'click')» — un TypeError que corta la suite entera y no dice qué salió mal. Pasaba de
+       forma intermitente (2 de 3 corridas completas del 15/09) y nunca corriéndolo aislado.
+       Ahora, si tras reabrir la fila sigue sin aparecer, el test falla por ASERCIÓN
+       (`hayTacho: false`) y la suite sigue. */
+    const buscarFila = () => {
+      const pv = document.getElementById("pppPreview");
+      return pv ? [...pv.querySelectorAll("tr.pga-n")].find((x) => x.textContent.indexOf("LK 0058") >= 0) : null;
+    };
+    let filaD = buscarFila();
+    if (!filaD) {                       // el toggle quedó cerrado en el redibujo: lo reabrimos
+      try { pgaAbrirDia("20260915"); pgaAbrirTanda("20260915|E01A"); } catch (_e) {}
+      await new Promise((res) => setTimeout(res, 150));
+      filaD = buscarFila();
+    }
     const btD = filaD && filaD.querySelector(".pga-acc-b.del");
     out.hayTacho = !!btD;
     out.textoTacho = btD ? btD.textContent.trim() : "";
     out.titleTacho = btD ? btD.getAttribute("title") : "";
+    if (!btD) return out;               // sin botón no hay nada que clickear: que falle la aserción
     btD.click(); await new Promise((res) => setTimeout(res, 150));
     const mh = (document.getElementById("dsmModal") || {}).innerHTML || "";
     out.atencion = /ATENCIÓN/.test(mh) && /NO SE DESHACE/.test(mh) && /permanente/i.test(mh);
