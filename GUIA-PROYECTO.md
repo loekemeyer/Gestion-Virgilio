@@ -1,3 +1,58 @@
+## Nota v19.09 (2026-09-16) — El detalle del picking, una línea por tanda en el Resumen
+
+Salió de mirar por qué *"Llegó al server"* mostraba una hora rara. Al contar las filas que
+un operario ve en el **Resumen de hoy** apareció otra cosa, más grande:
+
+| Legajo | Filas en el Resumen | De las cuales PKC | Tandas |
+|---|---|---|---|
+| **277 Jhonny** | **297** | **247** | 9 |
+| 104 Moncayo | 67 | 0 (32 CRN en 32 NP) | — |
+| 237 Franco | 62 | 0 | — |
+| 8 Farías | 34 | 0 | — |
+
+Cada artículo confirmado emite **su propio evento `PKC`**, y el Resumen los mostraba de a una
+tarjeta. Para ver lo que hizo en el día había que scrollear casi 300 veces en el celular.
+**El dato estaba bien; la pantalla no servía.**
+
+Luis: *"hace la 1"* (la opción de agrupar, contra la de sólo sacar el cartel).
+
+### Cómo queda
+
+Los `PKC` de una misma tanda entran en **UN renglón**:
+
+> **PKC — Picking artículo**
+> Tanda **E11C** · **12 artículos** · **2 con faltante**
+> Desde **08:31:24** hasta **08:57:04**
+> `▸ ver detalle`
+
+El desplegable lista cada artículo con `levantadas de pedidas` (`7 de 10`), y los que salieron
+**cortos** (`reales < esperadas`) van en ámbar. Ese contador de faltantes en el renglón es
+data nueva: antes había que abrir las 12 tarjetas para encontrarlo.
+
+### Lo que NO se agrupa, y por qué
+
+**Sólo `PKC`.** Los demás códigos emiten **una fila por NP o por tanda**, que ya es la
+granularidad correcta — agruparlos esconde cosas distintas bajo un número. Medido el mismo
+día, lo más numeroso después de PKC: 32 `CRN` en 32 NP, 15 `TAL`, 15 `ENT`, 9 `MG`. Ninguno
+justifica agruparse.
+
+### Detalles que importan si se toca
+
+- El estado abierto/cerrado vive en **`_pkcAbiertos`** (un `Set` de módulo) y **sobrevive el
+  re-render**: el Resumen se redibuja después de cada acción del operario, así que un estado
+  guardado en el DOM se perdía en el primer botón que apretara.
+- El grupo se ordena por el **último** artículo confirmado, para que quede donde corresponde
+  en la línea de tiempo del día. Por eso hay un `sort` **después** de agrupar.
+- Si alguno de los artículos sigue en la cola offline, **el grupo entero figura pendiente**.
+- `.pkc-ver` lleva `width: auto` porque el **`button{width:100%}` global** (deuda conocida,
+  línea 25 del CSS) lo estiraba de punta a punta.
+- El **historial de días anteriores** usa el mismo agrupador pero **sin desplegable**: ahí los
+  `PKC` casi nunca aparecen (`pkSendDetail` no escribe en el historial LOCAL, que es lo único
+  que ese modal lee) y repetir los `id` del desplegable en las dos vistas los haría chocar.
+
+`tests/resumen-pkc-agrupado.cjs` (28 aserciones: 247 PKC de 9 tandas → 9 renglones con los
+247 artículos adentro, el contador de faltantes, el desplegable y que el resto no se toca).
+
 ## Nota v19.07 (2026-09-16) — El tiempo muerto se resta del picking y del armado
 
 Regla de Luis: *"suponete que arma por 1 hora, va al baño 10 minutos y después arma 50 min
