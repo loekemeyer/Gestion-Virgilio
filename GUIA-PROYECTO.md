@@ -11564,6 +11564,7 @@ de pedidos de un Google Sheet.
 | `fichada.html` / `fichada.js` / `fichada-config.js` / `fichada-totp.js` / `fichada.css` | Sistema de **fichada por QR rotativo (TOTP)**. La página `fichada.html` se abre escaneando el QR y registra el **ingreso**. |
 | `fichadas-monitor.html` | Tablero **independiente** "Monitor Fichadas Esnaola" (lee de `Fichadas_Historico` y sincroniza otro Google Sheet distinto). No está enlazado desde `index.html`. |
 | `monitor/index.html` | Shim de **redirección**: da la URL limpia `/Produccion-Virgilio/monitor` → redirige a `/?monitor=tv` (para colgar la Smart TV). |
+| `monitor/tv.html` | **Monitor TV liviano** (v18.74): el mismo tablero, de SOLO LECTURA y sin nada clickeable, en **56 KB** en vez de los ~4,97 MB que pesa cargar el `index.html` entero. Ver la sección "Monitor TV" más abajo. |
 | `qrcode.js` | Librería vendorizada para generar QR. |
 | `icon.svg` | Ícono (fuente vectorial). |
 | `icons/` | Íconos PNG 192/512 + maskable + ícono 512 para la ficha de Play (generados desde `icon.svg`). Requeridos por la PWA/TWA. |
@@ -11656,6 +11657,58 @@ Todo vive en `index.html`, alternando con la clase `.hidden` (no hay router):
   (con **cache-buster** automático para no quedar pegada a una versión vieja, ver § 10).
   Tiene **dos pestañas**: **Monitor** (tablero de tandas) e **Inconsistencias**
   (hoja de alertas, ver § 12).
+
+### Monitor TV — `monitor/tv.html` (v18.74, pedido de Luis)
+
+Versión **liviana y de solo lectura** del tablero, para la TV colgada en planta.
+**No reemplaza al monitor grande**: es una segunda vista de los mismos datos.
+
+**Por qué existe.** La TV cargaba el `index.html` entero para ver el tablero:
+
+| | raw | gzip |
+|---|--:|--:|
+| `index.html` + vendor + `recepcion.js` + `supabase.js` | **4.969 KB** | 1.430 KB |
+| `monitor/tv.html` | **56 KB** | 18 KB |
+
+De esos 3.544 KB del `index.html`, **3.030 KB son un solo `<script>` inline** y el
+monitor usa **el 8,9 %** del código. En el SoC de una TV eso es un arranque lento y
+una pestaña que se queda sin RAM: por eso el modo kiosko se recarga sola **cada 7
+minutos** (`v6.35`, reload preventivo cuando el heap pasa el 65 %), o sea que baja y
+parsea esos ~5 MB ocho veces por hora. Esta página no necesita ese parche: se recarga
+una vez cada 6 h por higiene.
+
+**URL.** `…/monitor/tv.html?key=tv` la primera vez (mismo enrolamiento que el kiosko:
+marca el televisor en `localStorage` con la flag `vir_tv_kiosk` y borra la clave de la
+URL). Después entra con `…/monitor/tv.html` pelado. Un televisor ya enrolado en el
+monitor grande entra directo, porque comparten la flag.
+`…/monitor` **sigue yendo al monitor grande**; cambiarlo es una línea en
+`monitor/index.html`.
+
+**Qué muestra** (mismas vistas y tablas que el monitor grande, refresco cada 15 s):
+tandas de la ventana de entrega con picking y armado en vivo · quién está haciendo
+qué ahora · tandas a facturar con su ✅ · m³ por día y camión · m³ pickeados y armados
+hoy · el aviso de agregados y el de tandas trabajadas fuera de la PPP · barra de
+avance, reloj y estado de la conexión.
+
+**Qué NO tiene, a propósito:**
+- **Nada clickeable ni escribible.** Una TV de pared no tiene puntero, así que el
+  detalle de tanda, los mensajes y las inconsistencias del monitor grande no se
+  pueden abrir igual. El test falla si aparece un `onclick` o un `<input>`.
+- **Ni `supabase-js`, ni Chart.js, ni jsPDF, ni service worker.** Lee la API REST con
+  `fetch` pelado — que es lo que el monitor grande ya hacía (`supaFetchAll`).
+- **La tabla "Mts3 x Hora" por operario**, que depende de `computeClosureDur` (la
+  parte más pesada y más delicada del cálculo). En su lugar van los m³ de picking y
+  de armado terminados hoy, que es el número que se lee de lejos.
+
+**Al tocarla:** los puntos donde repite una regla del monitor grande están marcados en
+el código con `≡ index.html` (ventana de fechas, qué tanda sale del tablero, duración
+en horas laborales, actividad actual, etiqueta de NP). Si cambia una de esas reglas,
+hay que tocar los dos lados. `tests/mon-tv.cjs` lo verifica con las respuestas de
+Supabase simuladas, incluidos los casos borde (tanda abandonada, agregado, tanda
+fuera de la PPP, facturada + despachada, legajo de prueba).
+
+**No scrollea**: cada panel mide su propio alto y corta las filas que no entran
+(`cabenFilas`), porque desde la pared no hay forma de mover la pantalla.
 
 ---
 

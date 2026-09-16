@@ -930,6 +930,14 @@ borró). Layout:
   apps conviven sin pisarse: tablas Supabase distintas (`Registros_Produccion_Virgilio`
   vs `Registros Produccion Cervantes`), IndexedDB y claves `localStorage` con prefijos
   distintos. Cervantes usa rutas relativas y SW con scope `/cervantes/`.
+- **`/monitor/tv.html`** → **monitor liviano para la TV de pared** (v18.74): el mismo
+  tablero, de SOLO LECTURA y sin nada clickeable, en **56 KB** contra los ~4,97 MB que
+  pesa cargar el `index.html` entero (el monitor usa el 8,9 % de ese código, y el
+  kiosko se recarga cada 7 min porque se queda sin RAM). **Es una segunda vista de los
+  mismos datos**: si cambia una regla del tablero hay que tocar los dos lados — en el
+  código de `tv.html` esos puntos están marcados con `≡ index.html`, y `tests/mon-tv.cjs`
+  los verifica. `/monitor` sigue yendo al monitor grande. Detalle en `GUIA-PROYECTO.md`,
+  sección "Monitor TV".
 - **Entrada por defecto = Virgilio (raíz)**, no el selector (para no romper la URL
   actual ni la app de Play Store). Si se quisiera el selector como entrada, mover el
   selector a la raíz y Virgilio a `/virgilio/` (revisar TWA).
