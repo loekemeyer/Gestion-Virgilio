@@ -20932,6 +20932,93 @@ Y el chip de A Programar (`gv_ppp_web_dia_salida`, motivo nuevo **`super_auto`**
 (El archivo de backend y los comentarios del código quedaron nombrados `v19.14` de cuando la
 sesión iba por ese número; el bump final fue **v19.15** por colisión con otra sesión — el
 contenido es el mismo.)
+
+---
+
+## §3.ir — v19.16: la excepción de Cuarentena, en una tabla propia (`gv_excepcion_cuarentena`) — 2026-09-16
+
+**Luis:** *"Fijate que me parece que hay lógica en el front que exceptúa a los supers de cuarentena
+(saca el detalle de una tabla gv_supers o algo así). Quiero que crees una tabla en Supa que sea
+gv_excepcion_cuarentena que incluya a los supers que están exentos actualmente y además a Torres y
+Liva, Osa y Muller y Muller."*
+
+### 1. Dónde estaba la excepción — no era el front
+
+El front **no exime a nadie**: `cuarMarcarPedidos()` le manda al backend TODOS los pedidos de
+A Programar y pinta lo que vuelve. `pppEsSuper()` / `GV_Supers` sólo deciden camión, tanda y nombre
+corto.
+
+La excepción vivía en el backend y era **una línea repetida 4 veces** (dos en
+`gv_cuarentena_marcar_calc`, dos en `gv_cuarentena_ya_programado`):
+
+```sql
+and not exists (select 1 from public.cobranzas_cliente_cadena cc
+                 where cc.cod_cliente = p.cod_ev and lower(cc.empresa) in (…))
+```
+
+`cobranzas_cliente_cadena` es la tabla **derivada** de `GV_Supers` (la rellena el trigger
+`gv_supers_sync`, v17.72), así que Luis tenía razón en el origen del dato. Lo que no se veía:
+
+> ⚠ **La excepción tapa SÓLO el motivo `deuda`.** Un súper suspendido, sin cta. cte., excedido de
+> crédito o marcado como cliente nuevo cae en Cuarentena igual. `gv_cuarentena_limite` nunca miró
+> `cobranzas_cliente_cadena`.
+
+### 2. Lo que hay ahora
+
+| | |
+|---|---|
+| `public.gv_excepcion_cuarentena` | la lista explícita: `(empresa, cod)` PK, `nombre`, **`motivos text[]`** (hoy `{deuda}` en las 25 filas), `origen` (`super` \| `manual`), `activo`, `nota`, auditoría. RLS prendida, SELECT para `anon`/`authenticated`, escritura revocada. |
+| `gv_cuarentena_exento(empresa, cod, motivo)` | la única pregunta, al estilo de `gv_es_super`. |
+| `gv_supers_sync()` | el mismo trigger de `GV_Supers` mantiene además las filas `origen='super'`. Un súper nuevo queda exento solo, como hoy; una fila `origen='manual'` con la misma clave **gana y el sync no la toca**. |
+| `gv_excepcion_cuarentena_desincronizada` | centinela. Vacía = todo bien. |
+
+`cobranzas_cliente_cadena` **no se tocó**: le cuelgan 10 vistas de Facturación y un `DROP … CASCADE`
+ahí es el pozo de la v16.20 / v16.33. Queda como lo que es, una tabla de Facturación.
+
+### 3. Los 3 que pidió Luis (códigos POR EMPRESA)
+
+| Cliente | LK | Chef |
+|---|---|---|
+| Torres Y Liva S.A Cif | **288** | 271 |
+| Osa Distribuidora S.R.L. | **2533** | 2340 |
+| Muller Y Muller S.R.L. | **862** | 1179 |
+
+Los códigos salen de `GV_Cuarentena_Fuente` (las planillas del ERP de las dos empresas). Medido
+antes de tocar nada: los tres están **Activo** y sin suspensión, y caían **sólo por `deuda`** —
+Torres y Liva $30.231.142 (límite $90 M), Osa $14.581.914 (límite $72 M), Muller $12.031.476
+(límite $79 M). En Chef los tres vienen sin deuda cargada.
+
+### 4. Medición (antes → después)
+
+```sql
+select * from public.gv_cuarentena_marcar_calc(jsonb_build_array(
+  jsonb_build_object('order_id','999001','empresa','lk','cod','288'),
+  jsonb_build_object('order_id','999002','empresa','lk','cod','2533'),
+  jsonb_build_object('order_id','999003','empresa','lk','cod','862'),
+  jsonb_build_object('order_id','999004','empresa','lk','cod','801'),    -- Coto (súper)
+  jsonb_build_object('order_id','999005','empresa','lk','cod','1792'))); -- común, $9.739.800
+```
+
+| | antes | después |
+|---|---|---|
+| 288 / 2533 / 862 | los 3 con motivo `deuda` | **ninguno** ✅ |
+| 801 Coto (súper) | no caía | no cae ✅ (nada cambió para los súper) |
+| 1792 (cliente común) | caía por `deuda` | **sigue cayendo** ✅ |
+| `cobranzas_cliente_cadena` | 19 filas | 19 filas ✅ |
+| `gv_excepcion_cuarentena_desincronizada` | — | **vacía** ✅ |
+
+25 filas en la tabla: 19 `super` + 6 `manual`.
+
+### 5. Qué NO cambia
+
+Los tres siguen cayendo si alguna vez los **suspenden**, quedan **sin cta. cte.**, se pasan del
+**límite de crédito** o entran como **cliente nuevo**: la excepción es del motivo `deuda` y nada
+más. Para ampliarla a otro motivo alcanza con editar `motivos` de su fila — no hay que tocar código.
+
+**SQL**: `sql/gv_excepcion_cuarentena_v1916.sql`.
+**Rollback**: `sql/backups/gv_cuarentena_exento_pre_v1916.sql` (las 3 funciones como estaban) +
+`drop function public.gv_cuarentena_exento(text,text,text);` +
+`drop table public.gv_excepcion_cuarentena;`.
 ## §3.ig — pedido web de Dorinka con artículos de Chef y sufijo "L" (ruteo a LK) — 2026-09-16
 
 **Síntoma (Tomás González, PPP de hoy).** La NP **CH 0025** (Dorinka S.R.L, cod 2686, order_id
