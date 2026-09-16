@@ -6375,9 +6375,77 @@ function getTodayKey() {
   const dd = String(d.getDate()).padStart(2,"0");
   return `${y}-${m}-${dd}`;
 }
+/* v19.02 — RELOJ DE 24 h FORZADO. `toLocaleString("es-AR")` sin opciones deja que el
+   dispositivo elija el ciclo horario, y el WebView de varios Android resuelve es-AR a
+   12 h SIN mostrar el a.m./p.m. → las 13:34 se leían "01:34" y el operario/supervisor
+   creía que el registro era de la madrugada. Caso real (Jhonny Cartaya, 16/09): el
+   Resumen del día mostraba EP/TP a la "01:07" cuando la base tenía 13:07 y el server
+   lo había recibido en el MISMO segundo. El dato nunca estuvo mal; era el cartel.
+   Se fijan todos los campos + hour12:false para que no dependa del celular. El "24" de
+   la medianoche (algunos ICU dan h24 en vez de h23) se normaliza a "00".
+   Nota: las dos únicas llamadas a toLocale*String que YA traían hour12:false son las que
+   usan el resultado como DATO, no para mostrar — el bug estaba sólo en pantalla.
+   Problema 344. */
 function formatDateTime(ts) {
-  try { return new Date(ts).toLocaleString("es-AR", { timeZone: TZ_AR }); }
-  catch (_e) { return ""; }
+  try {
+    if (ts == null || ts === "" || ts === 0) return "";   // null/0 no es "1/1/1970"
+    const d = new Date(ts);
+    if (isNaN(d.getTime())) return "";
+    return d.toLocaleString("es-AR", {
+      timeZone: TZ_AR, hour12: false,
+      day: "numeric", month: "numeric", year: "numeric",
+      hour: "2-digit", minute: "2-digit", second: "2-digit"
+    }).replace(/(^|\s)24:/, "$100:");
+  } catch (_e) { return ""; }
+}
+/* Sólo la hora, mismo criterio de 24 h. Lo usa el renglón "desde … hasta …". */
+function formatTimeAr(ts) {
+  try {
+    if (ts == null || ts === "" || ts === 0) return "";   // null/0 no es "21:00" del 69
+    const d = new Date(ts);
+    if (isNaN(d.getTime())) return "";
+    return d.toLocaleTimeString("es-AR", {
+      timeZone: TZ_AR, hour12: false,
+      hour: "2-digit", minute: "2-digit", second: "2-digit"
+    }).replace(/^24:/, "00:");
+  } catch (_e) { return ""; }
+}
+/* Duración legible a partir de milisegundos: "2m 26s", "1h 05m". */
+function formatDur(ms) {
+  const n = Number(ms);
+  if (!isFinite(n) || n < 0) return "";   // ojo: Math.round(-5/1000) da -0, y -0 < 0 es false
+  const s = Math.round(n / 1000);
+  const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), sec = s % 60;
+  if (h > 0) return h + "h " + String(m).padStart(2, "0") + "m";
+  if (m > 0) return m + "m " + String(sec).padStart(2, "0") + "s";
+  return sec + "s";
+}
+/* v19.02 — UN RENGLÓN POR TAREA (pedido de Luis, 16/09: "se puede poner en un solo
+   renglón 'paré baño desde XX hasta XX'?"). Un toggle deja DOS filas —la apertura
+   (`ts_inicio` null) y el cierre (`ts_inicio` = la hora de apertura)— y las dos se
+   rotulaban igual, así que un baño de 2 minutos se leía como dos baños. Acá el cierre
+   absorbe a su apertura: se marca la fila de cierre con `_desde`/`_hasta`/`_durMs` y se
+   descarta la apertura que le corresponde. La apertura que NO tiene cierre sobrevive
+   marcada con `_abierto` — eso deja A LA VISTA del operario los RI/EI que quedan
+   colgados, que hoy no se ven en ninguna parte. Problema 345. */
+function _histColapsarPares(arr) {
+  const consumidas = new Set();
+  for (const it of arr) {
+    const ini = it.ts_inicio_iso ? new Date(it.ts_inicio_iso).getTime() : 0;
+    if (!ini || !isFinite(ini)) continue;
+    it._desde = ini;
+    it._hasta = it.ts || 0;
+    it._durMs = (it._hasta && it._hasta > ini) ? (it._hasta - ini) : 0;
+    consumidas.add(it.opcion + "@" + ini);
+  }
+  return arr.filter(it => {
+    if (it.ts_inicio_iso) return true;                       // es el cierre: queda
+    if (!TOGGLE_CODES.includes(it.opcion)) return true;      // no es toggle: queda
+    // apertura: se cae si su cierre ya está en la lista; si no, queda marcada
+    if (consumidas.has(it.opcion + "@" + (it.ts || 0))) return false;
+    it._abierto = true;
+    return true;
+  });
 }
 /* Total de cajas que el operario cargó hoy por el Modo OP de Recepción
    (recepcion.js lo va sumando en localStorage). Se usa para cerrar RT con esa
@@ -6672,13 +6740,22 @@ function renderLegajoHistory(legajo) {
 function _renderHistoryWithRemote(legajo, localHist, remoteHist) {
   const container = document.getElementById("legajoHistoryContent");
 
-  // Combinar sin duplicados (por ID):
+  // Combinar sin duplicados:
   // - remoteHist son definitivos (ya en server)
-  // - localHist se agregan si su ID no está en remoteHist
-  const remoteIds = new Set(remoteHist.map(r => r.id));
+  // - localHist se agregan si no están ya en remoteHist
+  // v19.02: el `id` de la fila remota es el UUID de la base, mientras que el del item
+  // local es el `client_id`. Comparar esos dos NUNCA daba match, así que un evento ya
+  // sincronizado podía salir DOS veces en el resumen (una por cada fuente). Se dedupe
+  // contra `client_id` —la misma clave que genera el celular— y se deja el `id` como red
+  // de seguridad para los items viejos que se hayan guardado con el uuid.
+  const remoteIds = new Set();
+  for (const r of remoteHist) {
+    if (r.id) remoteIds.add(String(r.id));
+    if (r.clientId) remoteIds.add(String(r.clientId));
+  }
   const combined = [
     ...remoteHist,
-    ...localHist.filter(l => !remoteIds.has(l.id))
+    ...localHist.filter(l => !remoteIds.has(String(l.id)))
   ];
 
   if (!combined.length) {
@@ -6690,16 +6767,26 @@ function _renderHistoryWithRemote(legajo, localHist, remoteHist) {
   // Orden defensivo: más reciente arriba, más viejo abajo.
   combined.sort((a, b) => (b.ts || b.createdAt || 0) - (a.ts || a.createdAt || 0));
   container.className = "history-list";
-  container.innerHTML = combined.map(h => {
+  // v19.02: un renglón por tarea (el cierre se come su apertura).
+  const filas = _histColapsarPares(combined);
+  container.innerHTML = filas.map(h => {
     const arrived = h.createdAt || h.sentAt;
     const showDato = h.opcion !== "FJ" && h.texto;
+    /* v19.02 — el cierre muestra "Desde HH:MM:SS hasta HH:MM:SS (dur)"; la apertura
+       todavía abierta avisa que lo está, en vez de parecer un evento suelto. */
+    const linea = h._desde
+      ? `Desde: <b>${escapeHtml(formatTimeAr(h._desde))}</b> hasta <b>${escapeHtml(formatTimeAr(h._hasta))}</b>` +
+        (h._durMs ? ` (${escapeHtml(formatDur(h._durMs))})` : "")
+      : (h._abierto
+          ? `Desde: <b>${escapeHtml(formatTimeAr(h.ts))}</b> — <b style="color:#b45309;">sin cerrar</b>`
+          : (h.ts ? `Fecha: ${escapeHtml(formatDateTime(h.ts))}` : ""));
     return `
       <div class="history-item">
         <div class="line1">${escapeHtml(h.opcion)} — ${escapeHtml(h.descripcion)}${statusBadge(h.status)}</div>
         <div class="line2">
           ${showDato ? `Dato: <b>${escapeHtml(h.texto)}</b><br>` : ""}
-          ${h.ts ? `Fecha: ${escapeHtml(formatDateTime(h.ts))}` : ""}
-          ${arrived ? `<br>Llegó al server: ${escapeHtml(formatDateTime(arrived))}` : ""}
+          ${linea}
+          ${arrived && !h._desde && !h._abierto ? `<br>Llegó al server: ${escapeHtml(formatDateTime(arrived))}` : ""}
         </div>
       </div>
     `;
@@ -6718,7 +6805,7 @@ async function _fetchAndRenderHistory(legajo, localHist) {
     const endOfDay = new Date(year, month - 1, day, 23, 59, 59);
 
     const { data, error } = await sb.from("Registros_Produccion_Virgilio")
-      .select("id,legajo,opcion,descripcion,texto,ts_inicio,ts_cliente,created_at")
+      .select("id,client_id,legajo,opcion,descripcion,texto,ts_inicio,ts_cliente,created_at")
       .eq("legajo", String(legajo))
       .gte("created_at", startOfDay.toISOString())
       .lte("created_at", endOfDay.toISOString());
@@ -6726,10 +6813,15 @@ async function _fetchAndRenderHistory(legajo, localHist) {
     if (!error && data) {
       remoteHist = data.map(r => ({
         id: r.id,
+        clientId: r.client_id || null,   // v19.02: para deduplicar contra el historial local
         legajo: r.legajo,
         opcion: r.opcion,
         descripcion: r.descripcion,
         texto: r.texto,
+        // v19.02: `ts_inicio` se traía en el select y se descartaba al mapear, así que el
+        // front nunca sabía qué fila era un CIERRE. Sin esto no se puede colapsar el par
+        // apertura/cierre en un solo renglón.
+        ts_inicio_iso: r.ts_inicio || null,
         ts: r.ts_cliente ? new Date(r.ts_cliente).getTime() : 0,
         createdAt: r.created_at ? new Date(r.created_at).getTime() : 0,
         status: "sent"  // ya llegó al server
@@ -6876,24 +6968,33 @@ function openHistoryModal() {
   } else {
     // Orden defensivo dentro de cada día: más reciente arriba.
     previas.forEach(d => d.items.sort((a, b) => (b.ts || 0) - (a.ts || 0)));
-    content.innerHTML = previas.map(d => `
+    content.innerHTML = previas.map(d => {
+      // v19.02: mismo renglón único que el Resumen de hoy.
+      const items = _histColapsarPares(d.items);
+      return `
       <div class="hist-day-block">
-        <div class="hist-day-title">${escapeHtml(formatDayLong(d.fecha))} (${d.items.length})</div>
-        ${d.items.map(it => {
+        <div class="hist-day-title">${escapeHtml(formatDayLong(d.fecha))} (${items.length})</div>
+        ${items.map(it => {
           const arrived = it.createdAt || it.sentAt;
           // FJ: ocultar el "Dato" (JSON técnico), mostrar la entrada igual.
           const showDato = it.opcion !== "FJ" && it.texto;
+          const linea = it._desde
+            ? `Desde ${escapeHtml(formatTimeAr(it._desde))} hasta ${escapeHtml(formatTimeAr(it._hasta))}` +
+              (it._durMs ? ` (${escapeHtml(formatDur(it._durMs))})` : "")
+            : (it._abierto
+                ? `Desde ${escapeHtml(formatTimeAr(it.ts))} — sin cerrar`
+                : (it.ts ? escapeHtml(formatDateTime(it.ts)) : ""));
           return `
             <div class="hist-day-item">
               <b>${escapeHtml(it.opcion)}</b> — ${escapeHtml(it.descripcion)}${statusBadge(it.status)}
               ${showDato ? ` — <i>${escapeHtml(it.texto)}</i>` : ""}
-              ${it.ts ? `<br><span style="color:#666;font-size:12px;">${escapeHtml(formatDateTime(it.ts))}</span>` : ""}
-              ${arrived ? `<br><span style="color:#666;font-size:12px;">Llegó al server: ${escapeHtml(formatDateTime(arrived))}</span>` : ""}
+              ${linea ? `<br><span style="color:#666;font-size:12px;">${linea}</span>` : ""}
+              ${arrived && !it._desde && !it._abierto ? `<br><span style="color:#666;font-size:12px;">Llegó al server: ${escapeHtml(formatDateTime(arrived))}</span>` : ""}
             </div>
           `;
         }).join("")}
       </div>
-    `).join("");
+    `;}).join("");
   }
   document.getElementById("histModal").classList.add("show");
 }
@@ -26005,7 +26106,8 @@ async function insAnular() {
   } catch (_e) { /* no-op */ }
 
   try { opDraftClear(legajo); } catch (_e) {}   // el borrador ya no vale
-  closeIns();                                    // cierra el modal y el toggle RI/EI
+  closeIns(true);                                // cierra el modal y el toggle RI/EI, SIN
+                                                 // emitir cierre: la apertura ya se borró
   try {
     renderLegajoHistory(legajo);
     updateCoreButtonsState();
@@ -26017,7 +26119,41 @@ async function insAnular() {
     : "✕ " + qué.charAt(0).toUpperCase() + qué.slice(1) + " de insumos anulada.");
 }
 function insAskClose() { opAskClose(insHasProgress(), "INS", _ins && _ins.legajo, (_ins && _ins.mode === "EI" ? "Entrega de insumos" : "Recepción de insumos"), _ins, closeIns); }
-function closeIns() {
+/* v19.02 — EMITIR el cierre de RI/EI al terminar la recepción/entrega (pedido de Luis,
+   16/09: "que se cierre cuando terminan de recepcionar/entregar").
+   `closeIns` bajaba el flag local con `toggleStartOrEnd`, que sólo toca el localStorage:
+   el evento de CIERRE nunca salía al servidor. Medido del 07/09 al 16/09: 15 aperturas de
+   EI con 2 cierres y 8 de RI con 1 — 20 toggles abiertos, algunos del 08/09 todavía sin
+   cerrar, así que la duración de insumos no se podía medir. Los pocos cierres que sí
+   existen son los casos en que el operario volvió a apretar el BOTÓN (ese camino pasa por
+   `send()`, que sí emite). El autocierre de las 17:00 tampoco los salvaba: corre en el
+   cambio de día y sólo si el flag local sobrevivió.
+   `texto` = total cargado en la sesión, igual que RT cierra con las cajas del día.
+   Problema 347. */
+function insEmitCierre(legajo, mode, tsInicioIso, total) {
+  const nowMs = Date.now();
+  const descr = desc[mode] || "";
+  const payload = {
+    legajo:        String(legajo || ""),
+    opcion:        mode,
+    descripcion:   descr,
+    texto:         String(total > 0 ? total : ""),
+    ts:            nowMs,
+    id:            nowMs.toString(36) + "_inscl_" + Math.random().toString(36).slice(2, 8),
+    ts_inicio_iso: tsInicioIso || null
+  };
+  try {
+    pushHistoryForLegajo(payload.legajo, {
+      ts: nowMs, opcion: mode, descripcion: descr, texto: payload.texto,
+      id: payload.id, status: "queued", ts_inicio_iso: payload.ts_inicio_iso
+    });
+  } catch (_e) { /* no-op */ }
+  try { _enqueueReportRaw(payload); } catch (_e) { /* no-op */ }
+  try { updatePendingIndicator(); } catch (_e) {}
+}
+/* `noEmit` = true sólo cuando la sesión se ANULA: `insAnular` ya borró la apertura del
+   server, así que mandar un cierre ahí dejaría un cierre huérfano. */
+function closeIns(noEmit) {
   const ov = document.getElementById("insModal"); if (ov) ov.classList.remove("show");
   // v5.02: al cerrar el modal, CERRAR el toggle RI/EI. Así cada recepción/entrega de
   // insumos vuelve a abrir el buscador desde cero. Antes el toggle quedaba activo tras
@@ -26025,7 +26161,19 @@ function closeIns() {
   // y el dispatch de send() ya no abría el modal → "deja subir una sola vez" (reportado
   // por Marianela). Mismo patrón de cierre que CC/RR/CR. Bonus: no queda RI "activo"
   // bloqueando EP/TP, ni aparece el input "Indicar Cantidad" suelto.
-  try { if (_ins && _ins.legajo && _ins.mode) { const st = getLegajoState(_ins.legajo); if (st && st.toggles && st.toggles[_ins.mode]) toggleStartOrEnd(_ins.legajo, _ins.mode); } } catch (_e) {}
+  try {
+    if (_ins && _ins.legajo && _ins.mode) {
+      const leg = String(_ins.legajo), mode = _ins.mode;
+      const st = getLegajoState(leg);
+      const cur = st && st.toggles ? st.toggles[mode] : null;
+      if (cur) {
+        const iniIso = (typeof cur === "string") ? cur : null;
+        const total = (_ins.items || []).reduce(function (a, it) { return a + (Number(it && it.qty) || 0); }, 0);
+        toggleStartOrEnd(leg, mode);                            // baja el flag local
+        if (!noEmit) insEmitCierre(leg, mode, iniIso, total);   // …y AVISA al server
+      }
+    }
+  } catch (_e) { /* no-op */ }
   _ins = null;
 }
 
