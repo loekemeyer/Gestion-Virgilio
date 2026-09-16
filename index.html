@@ -5652,7 +5652,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=19.01"></script>
+<script type="module" src="recepcion.js?v=19.02"></script>
 <!-- Config del módulo de fichada (compartido con fichada.html). El secret
      hmacSecret tiene que ser el mismo acá y allá; cargándolo desde un solo
      archivo evitamos que se desincronicen. -->
@@ -9235,7 +9235,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v19.01";
+const APP_VERSION = "v19.02";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -30246,9 +30246,36 @@ async function showOperarioDia(legajo) {
     const nArm  = data.filter(e => e.opcion === "TAP").length;
     const cortesMs = rows.filter(r2 => ["Baño", "Comida", "Permiso de salida"].some(t => r2.label.indexOf(t) === 0)).reduce((s, r2) => s + Math.max(0, r2.endMs - r2.startMs), 0);
 
-    const rowsHtml = rows.map(r2 => {
+    // Huecos SIN TAREA entre tarea y tarea. Se calculan sobre la UNIÓN de los
+    // intervalos (no next.start − prev.end), así un armado que quedó abierto y se
+    // solapa con otras tareas —E23A cruzando la noche— no inventa huecos falsos.
+    // Umbral 1 min para no ensuciar con micro-cortes. No cuenta como "tiempo en tareas".
+    const GAP_MIN_MS = 60 * 1000;
+    const gaps = [];
+    const ivs = rows.map(r2 => [r2.startMs, Math.max(r2.startMs, r2.endMs)]).sort((a, b) => a[0] - b[0]);
+    if (ivs.length) {
+      let curEnd = ivs[0][1];
+      for (let i = 1; i < ivs.length; i++) {
+        if (ivs[i][0] > curEnd) {
+          if (ivs[i][0] - curEnd >= GAP_MIN_MS) gaps.push({ startMs: curEnd, endMs: ivs[i][0], gap: true });
+          curEnd = ivs[i][1];
+        } else if (ivs[i][1] > curEnd) { curEnd = ivs[i][1]; }
+      }
+    }
+    const sinTareaMs = gaps.reduce((s, g) => s + (g.endMs - g.startMs), 0);
+    const display = rows.concat(gaps).sort((a, b) => a.startMs - b.startMs);
+
+    const rowsHtml = display.map(r2 => {
       const dur = fmtDur(Math.max(0, r2.endMs - r2.startMs));
       const rango = hhmm(r2.startMs) + " – " + (r2.ongoing ? "ahora" : hhmm(r2.endMs));
+      if (r2.gap) {
+        return `
+        <tr style="color:#94a3b8;font-style:italic;background:#f8fafc">
+          <td class="center" style="white-space:nowrap">${escapeHtml(rango)}</td>
+          <td>⏸ Sin tarea</td>
+          <td class="center" style="font-weight:800;white-space:nowrap">${escapeHtml(dur)}</td>
+        </tr>`;
+      }
       return `
         <tr${r2.ongoing ? ' style="background:#f0f9ff"' : ""}>
           <td class="center" style="white-space:nowrap">${escapeHtml(rango)}</td>
@@ -30260,7 +30287,7 @@ async function showOperarioDia(legajo) {
     m.querySelector(".tanda-modal-body").innerHTML = `
       <div style="font-size:14px; color:#475569; margin-bottom:10px;">
         <b>${rows.length}</b> tarea(s) · ${nPick} tanda(s) pickeada(s) · ${nArm} armada(s)
-        · tiempo en tareas <b>${escapeHtml(fmtDur(totalMs))}</b>${cortesMs ? ` · cortes ${escapeHtml(fmtDur(cortesMs))}` : ""}
+        · tiempo en tareas <b>${escapeHtml(fmtDur(totalMs))}</b>${cortesMs ? ` · cortes ${escapeHtml(fmtDur(cortesMs))}` : ""}${sinTareaMs ? ` · sin tarea ${escapeHtml(fmtDur(sinTareaMs))}` : ""}
       </div>
       <table class="tanda-modal-table">
         <thead><tr><th class="center">Horario</th><th>Qué hizo</th><th class="center">Duración</th></tr></thead>
