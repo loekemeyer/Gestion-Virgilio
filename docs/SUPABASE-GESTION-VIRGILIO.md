@@ -19081,3 +19081,78 @@ LK 0104, 0105, 0106 y 0107 son los cuatro bloques del pedido 1453 (Heredia Juan 
 pop-up muestra **las cuatro**, con la tocada marcada. O sea: el criterio es `order_id`, no el
 cliente — dos NP del mismo cliente pueden ser dos pedidos separados, y juntarlas arrastraría
 pedidos que nadie pidió mover.
+
+---
+
+## §3.hy — v18.84: los códigos E de Chef (630E…636E) — el m³ que faltaba, y qué se corrige en la página — 2026-09-16
+
+**Pedido de Thomas:** crear en Chef los artículos `630E`, `631E`, `634E`, `635E`, `636E`
+copiando sector, `cajas_max`, descripción y uni por bulto de los originales (que están
+`Suspendido = true`) — *"en el programa GV que ya estén, y corregir en Página CH. Salvo los que
+tengamos stock hoy sin la E"*.
+
+### En Gestión ya estaban… menos el m³
+
+Los cinco códigos E ya figuraban en las cuatro tablas del alta:
+
+| Tabla | 630E | 631E | 634E | 635E | 636E |
+|---|---|---|---|---|---|
+| `Capacidad_Sector` (CH) | M34 · 12 | M34 · 12 | M35 · 12 | M35 · 5 | M36 · 5 |
+| `Articulos_Cajas` | ✅ `Suspendido=false` | ✅ | ✅ | ✅ | ✅ |
+| `OC_Maximos` (línea CH) | uxc 12 | uxc 12 | uxc 12 | uxc 12 | uxc 12 |
+| `GV_Lugar_Item` | M34 | M34 | M35 | M35 | M36 |
+
+**Lo que faltaba — y no era menor — es el m³:** `vista_volumen_articulo_resuelto` devolvía
+`null` para los cinco. Un código sin m³ no suma volumen, así que un pedido web con esos
+artículos arma la tanda y mide el camión **de menos**, y el cupo diario tampoco lo cuenta.
+Se cargó copiando el del original (0,007 los cinco) en `GV_Volumen_Articulos`, que es la tabla
+**override de Gestión** — o sea un agregado en tabla propia, no un cambio sobre la tabla
+compartida `Volumen_Articulos`:
+
+```sql
+insert into public."GV_Volumen_Articulos" (codigo, m3, motivo)
+select v.c, 0.007, 'alta 2026-09-16: codigo E de Chef, m3 copiado del original sin E (0.007).'
+  from (values ('630E'),('631E'),('634E'),('635E'),('636E')) v(c)
+ where not exists (select 1 from public."GV_Volumen_Articulos" g
+                    where upper(btrim(g.codigo)) = v.c);
+-- 5 filas
+select codigo, m3, origen from public.vista_volumen_articulo_resuelto
+ where upper(btrim(codigo)) in ('630E','631E','634E','635E','636E');
+-- 0.007 · origen 'gestion' los cinco (y la variante `NNNEL` sale sola, origen 'base')
+```
+
+**Rollback:** `delete from public."GV_Volumen_Articulos" where codigo in ('630E','631E','634E','635E','636E');`
+
+### La página de Chef: sólo 630 y 631, y no la pudo tocar Claude
+
+El corte lo da el stock de hoy, como pidió Thomas (`vista_saldos_stock`):
+
+| Cod | Stock hoy sin la E | Qué pasa |
+|---|---|---|
+| 630 | **0** | ✅ pasa a `630E` |
+| 631 | **0** | ✅ pasa a `631E` |
+| 634 | 24 (12 terminado + 12 excedente) | ⛔ queda como está |
+| 635 | 11 | ⛔ queda como está |
+| 636 | 20 (4 + 16) | ⛔ queda como está |
+
+⚠ **No se aplicó: esta sesión no puede escribir en la página de Chef.** El proyecto
+`nkhzocgdpwtgrmwleihr` no está en el MCP de esta cuenta, y el FDW `chef_db` de LK
+(`chef_ext.products`) entra con el usuario **`loke_reader`**, o sea sólo lectura — probado con
+`begin; update …; rollback;` y contesta `permission denied for table products`. El SQL quedó
+listo, con backup, verificación y rollback, en **`sql/chef_pagina_codigos_e_v1884.sql`**, y hay
+tarea de Planify abierta (Th, `id 3512`).
+
+**Se renombra el producto, no se crea uno nuevo**: `order_items` de la página referencia
+`product_id` (uuid) y no el texto del código, así que ningún pedido viejo se rompe y el producto
+conserva precio, imágenes, orden de catálogo y ranking. Aguas abajo tampoco hay que tocar nada:
+`public.precios_venta_chef` de Gestión es espejo del catálogo de Chef (se actualizó hoy 11:30),
+así que el precio aparece solo bajo el código nuevo.
+
+### Lo que quedó marcado para que lo decida Thomas
+
+**`Articulos_Cajas` y `OC_Maximos` no dicen lo mismo sobre el bulto.** `631E`, `634E`, `635E` y
+`636E` están cargados con **`Uni_x_Caja = 24`** en `Articulos_Cajas`, mientras `OC_Maximos` dice
+**12** y el original sin E también es **12** (`630E` sí quedó en 12 en las dos). El pedido decía
+copiar el uni por bulto del original, así que o el 24 es lo correcto (la impo nueva viene x24 y
+hay que corregir `OC_Maximos` y la web) o es un error de carga. **No se tocó**: es dato de
+compra, lo define él.
