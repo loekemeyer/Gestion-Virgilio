@@ -3037,7 +3037,8 @@ button.pk-anular small{ display:block; font-size:12px; font-weight:700; opacity:
 /* Alerta pedidos web anómalos — badge en botón PPP + banner dentro del overlay (v8.82). */
 .sup-action-btn{ position:relative; }
 /* v19.14 — el badge de PPP pasa a `dp-badge`, el mismo de Facturacion / Stock / RR (supSetBadge).
-   Queda a la IZQUIERDA (`left:2px` inline en el boton) porque asi lo pidio Luis. */
+   Queda arriba a la DERECHA, igual que los demas (v19.18: Luis lo pidio a la izquierda y despues
+   lo corrigio a la derecha; `dp-badge` ya es `right:2px`, asi que no lleva estilo propio). */
 .ppp-alert-banner{ display:none; width:100%; }
 .ppp-alert-banner.on{ display:block; }
 /* v9.05 — tarjetas de alerta del PPP compactas (~1/4 del tamaño): todo en una fila, botones chicos */
@@ -5708,7 +5709,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=19.17"></script>
+<script type="module" src="recepcion.js?v=19.18"></script>
 <!-- Config del módulo de fichada (compartido con fichada.html). El secret
      hmacSecret tiene que ser el mismo acá y allá; cargándolo desde un solo
      archivo evitamos que se desincronicen. -->
@@ -5801,7 +5802,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
     <!-- GRANDES: uso diario (orden definido por el usuario). "Stock y Compras" = Stocks + OC en un solo botón. -->
     <div class="sup-actions sup-primary">
       <button class="sup-action-btn" onclick="openFacturacion()" style="position:relative;"><span class="sup-ico">📋</span><span>Facturación</span><span id="facBadge" class="dp-badge" style="display:none;" title="Pedidos listos para facturar (picking + separado terminados, todavía sin facturar)"></span></button>
-      <button class="sup-action-btn" onclick="openPPP()" style="position:relative;"><span class="sup-ico">🗓️</span><span>PPP</span><span id="pppAlertBadge" class="dp-badge" style="left:2px;right:auto;display:none;" title="Cosas para mirar en la PPP"></span></button>
+      <button class="sup-action-btn" onclick="openPPP()" style="position:relative;"><span class="sup-ico">🗓️</span><span>PPP</span><span id="pppAlertBadge" class="dp-badge" style="display:none;" title="Cosas para mirar en la PPP"></span></button>
       <button class="sup-action-btn" onclick="openRecepcionAdmin()" style="position:relative;"><span class="sup-ico">🏭</span><span>Carga Recepción Mercadería</span><span id="recepBadge" class="dp-badge" style="display:none;min-width:26px;height:26px;line-height:26px;font-size:15px;padding:0 6px;border-radius:13px;" title="Pendiente en Recepción: remitos por cargar + bajadas de racks por aprobar"></span></button>
       <button class="sup-action-btn" onclick="showFaltAvisar()" style="position:relative;"><span class="sup-ico">📦➕</span><span>Completar Pedido</span><span id="cpBadge" class="dp-badge" style="display:none;" title="Pedidos con faltante que tiene stock para completarse"></span></button>
       <button class="sup-action-btn" onclick="openStockAdmin()" style="position:relative;"><span class="sup-ico">📦</span><span>Stock y Compras</span><span id="stkBadge" class="dp-badge" style="display:none;" title="Códigos con stock negativo"></span><span id="stkOkBadge" style="display:none;position:absolute;top:2px;right:2px;min-width:18px;height:18px;padding:0 5px;border-radius:999px;background:#16a34a;color:#fff;font-size:10px;font-weight:800;line-height:18px;text-align:center;pointer-events:none;">✓</span></button>
@@ -9490,7 +9491,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v19.17";
+const APP_VERSION = "v19.18";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -39630,8 +39631,8 @@ async function pppFetchAlertasWeb() {
   } catch (_e) { return []; }
 }
 
-/* v19.14 (Luis: "badge rojo con número arriba a la izquierda del ícono de la PPP como con los
-   demás"). El badge existía desde la v8.82 pero NO se veía nunca, por dos motivos: contaba sólo
+/* v19.14 (Luis: "badge rojo con número arriba … del ícono de la PPP como con los demás"; lo
+   pidió a la izquierda y en la v19.18 lo corrigió a la DERECHA, donde están los otros). El badge existía desde la v8.82 pero NO se veía nunca, por dos motivos: contaba sólo
    `Alertas_Pedidos_Web` pendientes —que hoy son 0— y el botón no era `position:relative`, así
    que el badge se posicionaba contra otro ancestro. Ahora usa `supSetBadge`, el mismo que
    Facturación, Stock y los demás: número rojo si hay algo, ✓ verde si no.
@@ -39665,7 +39666,6 @@ function pppAlertBadgeUpdate() {
   badge.title = total
     ? _pppAvisos.map(function (x) { return x.n + " · " + (x.titulo || x.tipo); }).join("\n")
     : "Sin avisos en la PPP";
-  badge.style.left = "2px"; badge.style.right = "auto";   // supSetBadge repone className, no el style
 }
 
 function pppAlertBannerRender(alertas) {

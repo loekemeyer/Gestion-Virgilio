@@ -79,8 +79,9 @@ comment on view public.gv_ppp_avisos is
 
    Del lado del front (`index.html`): `pppFetchAvisos` la lee, `pppAlertBadgeUpdate` suma y llama
    a `supSetBadge`, el mismo que usan Facturación, Stock y Recepción Remitos — número rojo si hay
-   algo, ✓ verde si no. El badge va a la IZQUIERDA (`left:2px;right:auto` inline en el botón),
-   que es donde lo pidió Luis; el resto de los números de esa fila están a la derecha.
+   algo, ✓ verde si no. El badge va arriba a la DERECHA, igual que los demás
+   (Luis lo pidió a la izquierda y lo corrigió a la derecha el mismo día; `dp-badge` ya es
+   `right:2px`, así que no lleva estilo propio de posición).
 
    Rollback: `drop view public.gv_ppp_avisos;` y volver el botón de PPP a como estaba
    (sin `position:relative`, con la clase `ppp-alert-badge`). Test: `tests/ppp-badge.cjs`.       */

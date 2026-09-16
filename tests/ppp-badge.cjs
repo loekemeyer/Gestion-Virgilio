@@ -1,5 +1,6 @@
 /* El botón PPP del panel supervisor tiene badge, como los demás. (v19.14, pedido de Luis 2026-09-16:
-   *"badge rojo con número arriba a la izquierda del icono de la PPP como con los demás"*)
+   *"badge rojo con número arriba a la izquierda del icono de la PPP como con los demás"*, corregido
+   el mismo día a *"arriba a la derecha"*, que es donde están los de Facturación, Stock y RR)
 
    El badge existía desde la v8.82 y **no se veía nunca**, por dos motivos que este test cuida:
 
@@ -23,7 +24,7 @@ else {
   if (!/position:relative/.test(btn)) fallas.push("el botón PPP no es position:relative — el badge se va a ir de la tarjeta");
   if (!/id="pppAlertBadge"/.test(btn)) fallas.push("el botón PPP no tiene el badge adentro");
   if (!/class="dp-badge"/.test(btn)) fallas.push("el badge de PPP no usa dp-badge: no va a verse igual que los demás");
-  if (!/left:2px;right:auto/.test(btn)) fallas.push("el badge de PPP no está a la izquierda, que es donde lo pidió Luis");
+  if (/left:\s*2px/.test(btn)) fallas.push("el badge de PPP volvió a la izquierda: va a la DERECHA, como los demás");
 }
 if (!src.includes("rest/v1/gv_ppp_avisos")) fallas.push("el badge no lee gv_ppp_avisos: volvería a contar sólo las alertas web");
 if (/pppAlertBadgeUpdate\(_pppAlertasWeb\)/.test(src)) fallas.push("quedó una llamada vieja que le pasa sólo las alertas web");
@@ -64,7 +65,7 @@ catch (_e) {
     out.suma = el.textContent;                       // 10, no 4: suma los n, no cuenta los tipos
     out.rojo = el.className === "dp-badge";
     out.visible = el.style.display !== "none";
-    out.izquierda = getComputedStyle(el).left === "2px";
+    out.derecha = getComputedStyle(el).right === "2px";
     out.titleDesglosa = /7 · Pedidos sacados a mano/.test(el.title) && /1 · Súper mezclado/.test(el.title);
 
     // (b) el badge vive DENTRO del botón, y el botón está posicionado
@@ -77,7 +78,7 @@ catch (_e) {
     pppAlertBadgeUpdate();
     out.vacioTilde = el.textContent === "✓";
     out.vacioVerde = el.className === "dp-badge ok";
-    out.vacioSigueIzquierda = getComputedStyle(el).left === "2px";
+    out.vacioSigueDerecha = getComputedStyle(el).right === "2px";
 
     // (d) un tipo con n grande no rompe nada
     _pppAvisos = [{ tipo: "retenido_sin_fecha", titulo: "Pedidos esperando fecha", n: 137 }];
@@ -93,16 +94,16 @@ catch (_e) {
   ok(r.suma === "10", "el badge tiene que sumar los avisos (1+1+1+7 = 10) y muestra: " + r.suma);
   ok(r.rojo, "con avisos el badge no queda rojo");
   ok(r.visible, "con avisos el badge no se muestra");
-  ok(r.izquierda, "el badge no queda a la izquierda");
+  ok(r.derecha, "el badge no queda a la derecha, que es donde están los de los demás módulos");
   ok(r.titleDesglosa, "el título del badge no desglosa qué son los avisos");
   ok(r.dentroDelBoton, "el badge no está dentro del botón de PPP");
   ok(r.botonPosicionado, "el botón de PPP no es position:relative — el badge se va de la tarjeta");
   ok(r.vacioTilde, "sin avisos el badge debería mostrar ✓ como los demás módulos");
   ok(r.vacioVerde, "sin avisos el badge no se pinta verde");
-  ok(r.vacioSigueIzquierda, "al pasar a ✓ el badge se corrió de lugar (supSetBadge repone className)");
+  ok(r.vacioSigueDerecha, "al pasar a ✓ el badge se corrió de lugar (supSetBadge repone className)");
   ok(r.grande, "un número de 3 dígitos no se muestra");
 
   await b.close();
   if (mal.length) { console.log("ppp-badge: ✗ FAIL\n  - " + mal.join("\n  - ")); process.exit(1); }
-  console.log("ppp-badge: ✓ OK (suma todos los avisos, a la izquierda, ✓ verde cuando no hay nada)");
+  console.log("ppp-badge: ✓ OK (suma todos los avisos, a la derecha, ✓ verde cuando no hay nada)");
 })();

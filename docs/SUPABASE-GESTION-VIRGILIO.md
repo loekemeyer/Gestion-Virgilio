@@ -20852,10 +20852,9 @@ la pantalla y mirar.
 que usan Facturación, Stock y Recepción Remitos: número rojo si hay algo, **✓ verde si no**. El
 `title` desglosa los tipos, así no hace falta entrar para saber qué son.
 
-Va a la **izquierda** (`left:2px;right:auto` inline en el botón), que es donde lo pidió Luis; el
-resto de los números de esa fila están a la derecha. Ojo al tocarlo: `supSetBadge` repone
-`className`, así que el lado tiene que ir en el `style` inline o se pierde al pasar a ✓ — el test
-lo cubre.
+Va arriba a la **derecha**, igual que Facturación, Stock y RR. Luis lo pidió primero a la
+izquierda y lo corrigió a la derecha el mismo día (v19.18): `dp-badge` ya es `right:2px`, así que
+el badge no lleva estilo propio de posición. El test verifica el lado, para que no se corra.
 
 Se borró el CSS de `.ppp-alert-badge` y su animación, que quedaron sin uso.
 
