@@ -20524,3 +20524,89 @@ Vistas sin `security_invoker` legibles por anon → vacío.
 
 **El archivo `sql/gv_grants_anon_barrido_v1906.sql` se borró** al revertir.
 Problema 354, **revertido** — la medición queda anotada acá por si algún día se retoma.
+
+---
+
+## §3.il — v19.07: el tiempo muerto se RESTA del picking y del armado — 2026-09-16
+
+**Pedido de Luis**, textual: *"suponete que arma por 1 hora, va al baño 10 minutos y después
+arma 50 min más (todo armado de 1 tanda). Debería ser 1 hora 50 min de armado y 10 de baño
+(cada uno contado individual, a lo mejor conviene contar las 2 horas de tanda y después
+netear, lo que sea más cómodo para el código)"*. Y: *"pensábamos que ya estaba implementado
+esto"*.
+
+**No estaba implementado en ninguna parte.** Lo que se verificó antes de tocar nada:
+
+| Dónde se creía que estaba | Qué hace en realidad |
+|---|---|
+| `DEAD_TIME_CODES` (index.html) | Sólo **bloquea botones** mientras un tiempo muerto está abierto (línea 7612). No descuenta. |
+| `computeClosureDur` (monitor) | Parte el cierre que **cruza el día** (jornada de apertura + días intermedios + jornada de cierre, con la fichada real). No restaba nada. |
+| `vista_productividad_diaria` / `_semanal` | **Mergean solapes del MISMO código** (dos TP de la misma tanda) y **capean** la duración (TAP 180 min, TP 120). Las dos se parecen a netear y no lo son. |
+| Funciones/vistas de la base | Ninguna cruzaba los códigos de tiempo muerto con TP/TAP (sólo `generar_inconsistencias` los nombra, para detectar). |
+
+Y `PC` está en `ALWAYS_ALLOWED_CODES` (nunca bloquea), así que la media hora de comida corría
+adentro del armado **todos los días, con todos los operarios**, sin que nada lo frenara.
+
+**Medición** (07/09, arranque de Gestión, al 16/09; a mano, sin caps ni merges):
+
+| | tandas con muerto adentro | horas |
+|---|---|---|
+| TAP (armado) | 21 de 55 | 6,5 h |
+| TP (picking) | 12 de 64 | 2,9 h |
+
+Con los caps de la vista aplicados: TAP 20 / 5,9 h · TP 12 / 2,9 h. Sobre los 40 días de la
+vista diaria, el armado pasa de **210,9 h a 192,3 h** (−18,6 h).
+
+**Qué se cambió.** `vista_productividad_diaria` (ventana 40 días) y
+`vista_productividad_semanal` (56 días): se agregaron los CTE `dead_raw` → `dead_isl` →
+`dead` (los intervalos de `AT/PB/Limp/PC/CT` del legajo, mergeados) y un CTE `muerto` que
+resta el solape contra las islas de core ya mergeadas. El front duplica lo mismo en
+`computeClosureDur` como optimización de UX (`deadByLeg` + `deadOverlapMs`; el `breakdown`
+ahora lleva `brutoMs` y `muertoMs`) — la **fuente de verdad son las vistas**.
+
+**El tiempo no desaparece, cambia de columna:** se resta del core y se sigue sumando en su
+propio casillero (`t_comida`, `t_limp`, `t_otros` en la semanal; `movMin` en el monitor). Eso
+es el *"cada uno contado individual"* del pedido.
+
+Cada intervalo muerto se recorta a su propio tope (PC 90 min, el resto 30) — los mismos
+`cap_min` que las vistas ya usaban para sumar esos códigos, así lo que se resta del core es
+exactamente lo que se suma en los casilleros, y un `PB` que quedó abierto tres horas no borra
+el armado entero. Y se **mergean por legajo antes de restar** (458 crudos → 453 mergeados, el
+más largo 80 min): dos tiempos muertos que se pisan entre sí —un PC adentro de un Limp—
+descontarían de más.
+
+> ### ⚠⚠⚠ `LEAST` y `GREATEST` IGNORAN los NULL
+>
+> La primera versión restaba **129,6 h de 210 h** de armado. En una fila del `LEFT JOIN` sin
+> match, `d.s` y `d.e` son NULL, y entonces `least(c.me, NULL)` devuelve **`c.me`** y
+> `greatest(c.ms, NULL)` devuelve **`c.ms`** → la resta daba la **duración completa de la
+> tanda**. Postgres no avisa nada.
+>
+> **El síntoma que lo delató:** el **100 %** de las tandas marcadas como "afectadas"
+> (210 de 210) y `count(d.legajo) = 0` en las mismas filas que restaban 25 minutos.
+>
+> El arreglo es `case when d.legajo is null then 0 else … end`, que **no es defensivo: es
+> parte del cálculo**. Dos reglas que quedan de acá:
+> 1. Si un `LEFT JOIN` alimenta un `LEAST`/`GREATEST`, el `case` por NULL va siempre.
+> 2. Una resta que afecta al **100 %** de las filas no está midiendo lo que parece. Contar
+>    las filas afectadas, no sólo el total.
+
+**Chequeos corridos después de aplicar** (los cinco en verde):
+
+1. El ejemplo del pedido, a mano: lg8 / D72A / 15-09 → 212,1 min brutos con un `PC` de
+   40,5 min adentro → **171,6 min** de armado.
+2. Ninguna resta de más: lg277 / 16-09, 8 pickings, sólo D69C tiene un `AT` adentro
+   (0,84 min); los otros 7 quedan intactos.
+3. Coincide con el conteo a mano sin caps ni merges (TP: 12 tandas / 2,9 h).
+4. `select * from public.gv_endpoints_rotos;` → **0 filas**.
+5. Vistas de `public` legibles por `anon` sin `security_invoker` → **0 filas** (las dos
+   conservan la opción: van con `with (security_invoker = true)` adentro **y** el
+   `alter view` después).
+
+**Rollback:** `sql/backups/vista_productividad_pre_v1907_20260916.sql` — las dos definiciones
+tal como estaban. Detalle del cambio en `sql/gv_productividad_muerto_neteado_v1907.sql`.
+Front: `tests/muerto-neteado.cjs` reproduce el ejemplo textual del pedido.
+
+**Decisión de Luis sobre lo que NO se toca:** el legajo **600** (entrevistas) sigue entrando
+en `vista_productividad_diaria` — *"dejalo ahí que no jode"* (su prueba del 10/09 es 1 tanda /
+1,38 m³ / 93 min). No se cambia `es_legajo_test`. Problema 350 → `descartado`.
