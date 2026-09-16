@@ -19884,3 +19884,46 @@ select es_dual, deposito, count(*) codigos, sum(fantasma) cajas
 ```
 
 Problema 337.
+
+---
+
+## §3.ig — pedido web de Dorinka con artículos de Chef y sufijo "L" (ruteo a LK) — 2026-09-16
+
+**Síntoma (Tomás González, PPP de hoy).** La NP **CH 0025** (Dorinka S.R.L, cod 2686, order_id
+229, tanda E11B) tenía sus 5 artículos con **L** al final: `769L, 798EL, 838L, 840L, 865EL`. Son
+artículos **de Chef** (769/798E/840/865E están en `precios_venta_chef` sin L; ninguno existe en
+`precios_venta`). Con la L, todo el pipeline los trata como de **LK** (`pkEmpresaArt` fuerza LK) →
+góndola, precio de lista y Excel ISIS de LK. Cliente de Chef facturado por LK.
+
+**Causa raíz.** La página de Chef (`paginach`, `admin-supercot.js`) tiene a Dorinka (`WMart Chef`,
+key `dorinka`) en el grupo `isChefSuper`/`addLSuffix` junto a Cencosud: toma el código Chef (769) y
+le pega la L. El front de Gestión NO agrega la L, sólo la interpreta (`pkStripL`); pero `pppGuardarWeb`
+reescribe la foto en `PPP_Web_Base` por REST en **cada guardado**, así que la L reentra. Se midió que
+tras corregir la data a mano volvió a las 13:20 y quedó **duplicada** (`769` y `769L` conviven — clave
+`(empresa,order_id,np_idx,articulo)` distinta).
+
+**Regla del dueño (Tomás González).** Sólo **TdF** y **Cencosud (Jumbo)** de Chef llevan L. Los
+artículos de Chef comunes (Dorinka) NO. (Nota: el `CLAUDE.md` del dueño tenía a Cencosud como el caso
+inverso —NP Chef con artículos Loeke SIN L—; contradicción sin resolver, no había pedido Cencosud hoy.)
+
+**Fix (backend, aguanta el re-guardado).** Trigger `trg_gv_ppp_web_base_sin_l_chef` BEFORE INSERT/UPDATE
+en `PPP_Web_Base` (`sql/gv_ppp_web_base_sin_l_chef.sql`): pela la L cuando el código base está en la
+lista de Chef y **NO** en la de LK (exclusivo de Chef). Los 3 duales (437E/438E/809E) y los Loeke de
+TdF (500…) quedan intactos. Probado en transacción revertida: `769L`→`769` (colapsa sobre el existente,
+sin duplicar), `505L` y `438EL` intactos. Además se limpiaron las 5 filas L duplicadas del order 229
+(backup `zz_backups.GV_Backup_PPP_Web_Base_ch0025_20260916_v2`).
+
+`PPP_Web_Base` es del pipeline web de Gestión; Producción no la referencia (grep 0). El trigger cubre
+también los pedidos NUEVOS de Dorinka. Falta opcional: corregir el origen en `paginach` (sacar `dorinka`
+del grupo `addLSuffix`) para que la Chef DB tampoco guarde la L — no es necesario para el pipeline de
+Gestión, que ya queda cubierto por el trigger.
+
+**Rollback:** `drop trigger trg_gv_ppp_web_base_sin_l_chef on public."PPP_Web_Base"; drop function
+public.gv_ppp_web_base_sin_l_chef();` y restaurar del backup si hiciera falta.
+
+**Chequeo:** `select articulo from public."PPP_Web_Base" where empresa='chef' and articulo ~ 'L$'
+and exists (select 1 from public.precios_venta_chef c where regexp_replace(c.cod,'\s','','g')=regexp_replace(articulo,'L$',''))
+and not exists (select 1 from public.precios_venta l where regexp_replace(l.cod,'\s','','g')=regexp_replace(articulo,'L$',''));`
+— vacío = todo bien.
+
+Problema 339.
