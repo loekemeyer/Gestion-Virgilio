@@ -1,3 +1,30 @@
+## Nota v19.01 (2026-09-16) — Facturación: la NP armada SIN tanda perdía cliente y código
+
+Thomas: *"el cliente 4181 de LK no tiene razón social en el módulo de facturación, ¿por qué?"*
+
+**La lista de Facturación sale de DOS fuentes**, y hay que acordarse de las dos:
+1. las **tandas de la PPP** (`_facLastTandas`), y
+2. las NP **armadas cuya tanda ya no está en la PPP** (`_facSinTanda`, la vista
+   `gv_fac_armado_sin_facturar`, v16.58) — por ejemplo una tanda que se desarmó.
+
+Los dos lugares que después necesitan los datos del pedido miraban **sólo la primera**:
+- **lo que se ESCRIBE en `Facturacion_NP`** al bajar el Excel ISIS (`facXlsBajar`): si no la
+  encontraba, caía a un fallback vacío y guardaba la fila **sin razón social, sin código de
+  cliente, sin tanda, sin m³ y sin fecha de salida**;
+- la lista **«Ya tildados hoy»** (`facRenderTicked`): mostraba el número de NP pelado.
+
+Caso testigo: **`LK 0034` y `LK 0035`** (Mitre Hugo Alberto, cod **4181**, pedido LK 1364). Su
+tanda `E01G` se desarmó el 15/09, así que quedaron armadas pero sin tanda, se facturaron con el
+Excel el 16/09 y sus filas quedaron vacías. Son las **únicas 2 de 1.305** filas de
+`Facturacion_NP` sin razón social.
+
+**El arreglo** es un helper único, **`facInfoNp(np)`**, que busca primero en las tandas y después
+en las armadas-sin-tanda, y lo usan los dos. El tilde ✓ de las NP de ISIS **nunca** tuvo el
+problema: lee el `data-args` de la fila, que `facRender` ya arma con los datos de `_facSinTanda`.
+
+⚠ **Al tocar Facturación, preguntarse siempre si el código mira las dos fuentes.** `tests/fac-rs-sin-tanda.cjs`.
+Problema 352.
+
 ## Nota v18.90 (2026-09-16) — CANCELAR un pedido desde Facturación
 
 Pedido del dueño: un botón **✕ Cancelar** en cada fila del módulo de **Facturación**, al lado

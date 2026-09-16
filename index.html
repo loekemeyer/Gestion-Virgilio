@@ -5652,7 +5652,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=19.00"></script>
+<script type="module" src="recepcion.js?v=19.01"></script>
 <!-- Config del módulo de fichada (compartido con fichada.html). El secret
      hmacSecret tiene que ser el mismo acá y allá; cargándolo desde un solo
      archivo evitamos que se desincronicen. -->
@@ -9235,7 +9235,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v19.00";
+const APP_VERSION = "v19.01";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -47632,14 +47632,10 @@ async function facXlsBajar() {
     const enArchivo = Array.from(new Set(filas.map(function (r) { return String(r.np); })));
     let marcadas = 0;
     for (const np of enArchivo) {
-      let ped = null, tandaObj = null;
-      for (const t of (_facLastTandas || [])) {
-        const pp = (t.pedidos || []).find(function (p) { return String(p.np) === np; });
-        if (pp) { ped = pp; tandaObj = t; break; }
-      }
-      const args = ped
-        ? { np: np, tanda: tandaObj.tanda, m3: ped.m3 || 0, rs: ped.razonSocial || "", cod: ped.cod || "", feRaw: tandaObj.fechaEntregaRaw || null }
-        : { np: np, tanda: "", m3: 0, rs: "", cod: "", feRaw: null };
+      // v19.01 — `facInfoNp` mira las tandas Y las armadas-sin-tanda. Antes miraba sólo las
+      // tandas y caía al fallback vacío, que es lo que dejó a LK 0034 / LK 0035 sin razón
+      // social ni código de cliente en `Facturacion_NP`.
+      const args = facInfoNp(np) || { np: np, tanda: "", m3: 0, rs: "", cod: "", feRaw: null };
       if (await facMarcarFacturada(args, headers)) { marcadas++; _facXlsSel.delete(np); }
     }
     facShowToast("Excel bajado · " + marcadas + " NP web facturadas");
@@ -48474,6 +48470,39 @@ function facEstaArmada(npNorm){
   return (_facCajas && _facCajas.has(npNorm)) || (_facArmEv && _facArmEv.has(npNorm));
 }
 
+/* v19.01 — DE DÓNDE SALEN rs / cod / tanda DE UNA NP (Thomas, 16/09: *"el cliente 4181 de LK
+   no tiene razón social en el módulo de facturación, ¿por qué?"*).
+
+   La lista de Facturación se arma de DOS fuentes: las tandas de la PPP (`_facLastTandas`) y las
+   NP que están armadas pero cuya tanda ya no está en la PPP (`_facSinTanda`, la vista
+   `gv_fac_armado_sin_facturar`, v16.58). Pero los dos lugares que después necesitan los datos
+   del pedido —lo que se ESCRIBE en `Facturacion_NP` al bajar el Excel, y la lista «Ya tildados
+   hoy»— miraban SÓLO la primera. Para una NP de la segunda fuente se caían al fallback vacío y
+   guardaban la fila **sin razón social, sin código de cliente, sin tanda, sin m³ y sin fecha**.
+
+   Caso testigo: `LK 0034` y `LK 0035` (Mitre Hugo Alberto, cod 4181, pedido LK 1364). Su tanda
+   E01G se desarmó el 15/09, así que quedaron armadas pero sin tanda en la PPP → entraron a
+   Facturación por `_facSinTanda`, se facturaron con el Excel el 16/09 y sus dos filas quedaron
+   vacías. Son las ÚNICAS 2 de 1.305 en `Facturacion_NP` sin razón social, y las dos son de este
+   cliente: el síntoma que vio Thomas.
+
+   El tilde ✓ (NP de ISIS) nunca tuvo el problema: ése lee el `data-args` de la fila, que
+   `facRender` ya arma con los datos de `_facSinTanda`. */
+function facInfoNp(np){
+  const n = String(np == null ? "" : np).trim();
+  if (!n) return null;
+  for (const t of (_facLastTandas || [])){
+    const p = (t.pedidos || []).find(function (x) { return String(x.np).trim() === n; });
+    if (p) return { np: n, tanda: t.tanda || "", m3: p.m3 || 0,
+                    rs: p.razonSocial || "", cod: p.cod || "", feRaw: t.fechaEntregaRaw || null };
+  }
+  const r = (_facSinTanda || []).find(function (x) { return String(x.np || "").trim() === n; });
+  if (r) return { np: n, tanda: String(r.tanda_armado || "").trim(), m3: 0,
+                  rs: String(r.razon_social || "").trim(), cod: String(r.cod || "").trim(),
+                  feRaw: r.fecha_salida || null };
+  return null;
+}
+
 /* v18.77 (Luis, 2026-09-16: "un badge al lado del nombre en la razón social que diga Cliente
    nuevo") — CLIENTE NUEVO en Facturación.
 
@@ -49123,6 +49152,13 @@ function facRenderTicked(){
     (t.pedidos || []).forEach(function(p){
       info.set(String(p.np), { rs: p.razonSocial || "", tanda: t.tanda || "" });
     });
+  });
+  // v19.01 — y las armadas SIN tanda en la PPP, que también se facturan desde acá. Sin esto
+  // salían en la lista con el número pelado, sin cliente ni tanda (caso LK 0034 / LK 0035).
+  (_facSinTanda || []).forEach(function(r){
+    const k = String(r.np || "").trim();
+    if (k && !info.has(k)) info.set(k, { rs: String(r.razon_social || "").trim(),
+                                         tanda: String(r.tanda_armado || "").trim() });
   });
   nps.sort(function(a,b){ return String(a).localeCompare(String(b), undefined, { numeric: true }); });
   const items = nps.map(function(np){
