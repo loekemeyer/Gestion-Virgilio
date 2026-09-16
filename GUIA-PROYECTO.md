@@ -1,3 +1,62 @@
+## Nota v19.21 (2026-09-16) — Dos razones por las que el Resumen le mentía al operario
+
+Jhonny (lg 277) avisó que **el Resumen no le marcaba el picking de E12E aunque lo había hecho
+y lo había marcado**, y en su pantalla cada pausa aparecía **dos veces**. Las dos cosas eran
+ciertas y son dos bugs distintos. El dato, en las dos, estaba **entero en la base**.
+
+### 1) Cada pausa salía dos veces: la buena y un fantasma "sin cerrar" (problema 363)
+
+La v19.02 junta la apertura y el cierre de un toggle comparando el `ts_inicio` que trae el
+cierre con el `ts_cliente` de la apertura **por igualdad exacta de milisegundos**. Los dos
+salen de **dos llamadas distintas a `Date.now()`**, así que nunca caen en el mismo ms:
+
+| | |
+|---|---|
+| pares de toggle del 16/09 medidos | **33** |
+| pares con `ts_inicio` == `ts_cliente` de la apertura | **0** |
+| desvío real | de **2 ms** a **306 ms** |
+
+O sea que **no emparejaba ni uno**: se mostraba el renglón bien cerrado
+(*"Desde 13:31:57 hasta 13:34:23"*) **y además** la apertura marcada *"sin cerrar"* con la
+misma hora. Ahora se empareja con **tolerancia de 5 s** (16× el peor desvío medido, y muy por
+debajo del hueco real entre dos pausas del mismo código, que son minutos), tomando **la
+apertura más cercana** y consumiéndola **por identidad**: un cierre se come una sola, así una
+pausa que quedó abierta de verdad sigue avisando.
+
+⚠ **El test lo dejaba pasar porque el fixture usaba timestamps idénticos.** Ahora la apertura
+del fixture va desfasada 267 ms, como llegan de verdad. Regla: **un fixture de tiempos
+"perfectos" no prueba nada de lo que pasa con dos relojes.**
+
+### 2) Un error de red borraba TODO el picking de la pantalla, sin avisar (problema 364)
+
+`_fetchAndRenderHistory` guardaba el resultado en `_historyCache` **siempre**, también cuando
+la consulta fallaba o venía vacía. Y `renderLegajoHistory` usa el caché si existe → **un solo
+error de red dejaba el Resumen sin nada del servidor por el resto de la sesión**, sin
+reintentar y sin una palabra en pantalla.
+
+Y eso se lleva **el picking entero**: los `PKC` **no se guardan en el celular** (son cientos
+por día; `_enqueueReportRaw` no escribe historial local), viven **sólo en la base**. Así que
+un Resumen armado sin el servidor no tiene **una sola línea de picking** y parece completo.
+Jhonny miró el suyo, no vio E12E y dio por perdidos **62 artículos / 107 de 120 cajas** que
+estaban guardados.
+
+Desde la v19.21: el vacío **no se cachea** si la consulta falló, y arriba de la lista sale
+*"⚠ No se pudo leer el detalle del servidor — lo que marcaste está guardado, pero esta lista
+puede estar incompleta"* con un botón **↻ Reintentar** (`histReintentar`).
+
+### 3) "Terminar Día" con el legajo vacío cerraba el cuadro y no hacía nada (problema 360)
+
+El primer `return` de `confirmarTerminarDia` era `closeTerminarDia(); return;` **a secas**: el
+operario ve el cuadro cerrarse, se va convencido de que marcó, y **no hay FJ**. El campo puede
+estar vacío estando logueado, porque desde la v1.9.0 el login precarga el legajo y **esconde el
+input**: si esa precarga no corrió, queda en blanco sin que se note. Ahora **avisa y no cierra
+el cuadro**.
+
+Ese día el caso concreto fue otro: **Franco no le dio a Terminar Día** (último evento 14:19,
+`Limp` cerrado) y por eso el monitor lo mostraba sin marcar desde las 14. **Jhonny sí marcó
+FJ, a las 17:05.** Forense del día: **0** FJ llegados con cualquier legajo/fecha antes de esa
+hora y **0** eventos llegados con timestamp de otro día, o sea que nada se perdió en la cola.
+
 ## Nota v19.09 (2026-09-16) — El detalle del picking, una línea por tanda en el Resumen
 
 Salió de mirar por qué *"Llegó al server"* mostraba una hora rara. Al contar las filas que

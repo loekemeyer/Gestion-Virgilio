@@ -64,12 +64,17 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
                 formatDur(45000) === "45s" && formatDur(-5) === "";
 
     /* ================= (B) un renglón por tarea ================= */
-    const abreIso = "2026-09-16T13:31:57-03:00";
+    /* ⚠ La apertura va DESFASADA 267 ms respecto del `ts_inicio` del cierre, no en el
+       mismo milisegundo. Así llegan de verdad: son dos `Date.now()` distintos y en los
+       33 pares del 16/09 la diferencia fue de 2 a 306 ms, 33 de 33 distintos. Con el
+       fixture "perfecto" que tenía este test hasta la v19.20 el bug no se veía, y en el
+       celular de Jhonny cada pausa salía dos veces. v19.21. */
+    const abreIso = "2026-09-16T13:31:57.187-03:00";
     const lista = [
       // cierre del PB (llega primero porque la lista viene ordenada desc)
-      { opcion: "PB", descripcion: "Paré Baño", ts: new Date("2026-09-16T13:34:23-03:00").getTime(), ts_inicio_iso: abreIso },
-      // su apertura
-      { opcion: "PB", descripcion: "Paré Baño", ts: new Date(abreIso).getTime(), ts_inicio_iso: null },
+      { opcion: "PB", descripcion: "Paré Baño", ts: new Date("2026-09-16T13:34:23.187-03:00").getTime(), ts_inicio_iso: abreIso },
+      // su apertura: 267 ms ANTES de lo que dice el cierre
+      { opcion: "PB", descripcion: "Paré Baño", ts: new Date(abreIso).getTime() - 267, ts_inicio_iso: null },
       // un EI abierto que NADIE cerró (el caso de insumos)
       { opcion: "EI", descripcion: "Entrega Insumos", ts: new Date("2026-09-16T13:41:59-03:00").getTime(), ts_inicio_iso: null },
       // un EP: NO es toggle, tiene que quedar igual aunque no tenga cierre
@@ -93,6 +98,24 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
       { opcion: "PB", ts: 4000, ts_inicio_iso: null }
     ]);
     out.B_dos_pares_dan_dos = dosPares.length === 2 && dosPares.every(f => f._desde);
+    /* Un cierre se come UNA sola apertura: con dos aperturas al alcance de la tolerancia
+       y un solo cierre, la otra tiene que seguir figurando "sin cerrar" (si no, una pausa
+       que quedó abierta de verdad desaparecería de la pantalla). */
+    const unCierreDosAperturas = _histColapsarPares([
+      { opcion: "PB", ts: 9000, ts_inicio_iso: new Date(3000).toISOString() },
+      { opcion: "PB", ts: 3010, ts_inicio_iso: null },   // ← la que le corresponde (10 ms)
+      { opcion: "PB", ts: 1200, ts_inicio_iso: null }    // ← otra, dentro de los 5 s
+    ]);
+    out.B_no_se_come_dos = unCierreDosAperturas.length === 2 &&
+      unCierreDosAperturas.filter(f => f._abierto).length === 1 &&
+      unCierreDosAperturas.filter(f => f._abierto)[0].ts === 1200;
+    // y una diferencia MAYOR a la tolerancia no se empareja: queda abierta y avisa
+    const lejos = _histColapsarPares([
+      { opcion: "PB", ts: 60000, ts_inicio_iso: new Date(20000).toISOString() },
+      { opcion: "PB", ts: 6000,  ts_inicio_iso: null }   // 14 s de diferencia
+    ]);
+    out.B_lejos_no_empareja = lejos.length === 2 &&
+                              lejos.filter(f => f._abierto).length === 1;
 
     /* ================= (C) cierre de RI/EI ================= */
     // interceptamos la cola para ver QUÉ se encola, sin mandar nada.
@@ -162,6 +185,36 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
       // el JSON técnico del FJ sigue oculto (no se muestra como "Dato")
       out.D_fj_sin_json = cont.innerHTML.indexOf('"picking"') < 0;
       delete _historyCache["776::" + getTodayKey()];
+      cont.innerHTML = "";
+    }
+
+    /* ===== (E) SI EL SERVIDOR NO CONTESTA, SE AVISA Y NO SE CACHEA EL VACÍO =====
+       El picking NO se guarda en el celular: los PKC son cientos por día y viven sólo
+       en la base. Así que una lista armada sin el servidor no tiene una sola línea de
+       picking, y antes de la v19.21 eso se mostraba como si estuviera completa — y el
+       vacío quedaba cacheado, sin reintento. Jhonny miró su Resumen, no vio el picking
+       de E12E y dio por perdido lo que estaba guardado. Problema 364. */
+    if (cont) {
+      /* Bajo file:// no hay cliente de Supabase (el CDN no carga), así que
+         `_fetchAndRenderHistory` toma solo el camino de falla: es justo el que se
+         quiere probar, sin necesidad de pinchar nada. */
+      const KEY = "779::" + getTodayKey();
+      delete _historyCache[KEY];
+      await _fetchAndRenderHistory("779", []);
+      out.E_no_cachea_el_vacio = !(KEY in _historyCache);
+      out.E_avisa_en_pantalla  = cont.innerHTML.indexOf("No se pudo leer el detalle") >= 0;
+      out.E_ofrece_reintentar  = cont.innerHTML.indexOf("histReintentar") >= 0;
+      out.E_no_dice_que_no_hay = cont.innerHTML.indexOf("No hay reportes hoy") < 0;
+      // con red, en cambio, no aparece ningún aviso
+      _historyCache[KEY] = [];
+      _renderHistoryWithRemote("779", [], [], false);
+      out.E_ok_sin_aviso = cont.innerHTML.indexOf("No se pudo leer el detalle") < 0;
+      out.E_reintentar_limpia = (function () {
+        _historyCache[KEY] = [{ opcion: "EP", descripcion: "x", ts: 1, status: "sent" }];
+        histReintentar("779");                 // dispara el fetch de nuevo
+        return !(KEY in _historyCache) || _historyCache[KEY].length !== 1;
+      })();
+      delete _historyCache[KEY];
       cont.innerHTML = "";
     }
 

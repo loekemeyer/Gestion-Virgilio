@@ -104,7 +104,13 @@ const EVENTOS = [
     };
     const LEG = "999998";
     let st = getLegajoState(LEG);
-    st.armado = { active: true, value: "Z09Z", ts_inicio: "2026-09-16T09:00:00-03:00" };
+    /* ⚠ El ts_inicio va RELATIVO a ahora, no a una hora fija. Con una hora fija el test
+       era dependiente del reloj: a las 17:00 un ts_inicio de las 09:00 da 8 h de armado y
+       salta el confirm() de "duración absurda" (v12.99), que Playwright cancela solo → el
+       TAP no se emite y el control fallaba sin que nada estuviera roto. 30 min nunca lo
+       dispara. */
+    const _iniCerca = new Date(Date.now() - 30 * 60000).toISOString();
+    st.armado = { active: true, value: "Z09Z", ts_inicio: _iniCerca };
     st.continuar = { Armado: "2026-09-16" };
     setLegajoState(LEG, st);
     try { legajoInput.value = LEG; } catch (_e) {}
@@ -121,7 +127,7 @@ const EVENTOS = [
     // control: una tanda que el server NO tiene cerrada SÍ se emite
     window.__enc2.length = 0; alertado = "";
     st = getLegajoState(LEG);
-    st.armado = { active: true, value: "Z08Z", ts_inicio: "2026-09-16T09:00:00-03:00" };
+    st.armado = { active: true, value: "Z08Z", ts_inicio: _iniCerca };
     setLegajoState(LEG, st);
     try { textInput.value = "Z08Z"; } catch (_e) {}
     ev("selected = 'TAP';");

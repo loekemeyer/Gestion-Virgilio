@@ -5710,7 +5710,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=19.20"></script>
+<script type="module" src="recepcion.js?v=19.21"></script>
 <!-- Config del módulo de fichada (compartido con fichada.html). El secret
      hmacSecret tiene que ser el mismo acá y allá; cargándolo desde un solo
      archivo evitamos que se desincronicen. -->
@@ -6567,7 +6567,20 @@ function _histPkcHtml(h) {
            '<div class="pkc-det' + (abierto ? "" : " hidden") + '" id="pkcdet_' + k + '">' + det + "</div>" +
          "</div>";
 }
+/* v19.21 — el par apertura/cierre se empareja con TOLERANCIA, no por igualdad exacta.
+   El `ts_inicio` que viaja en el cierre y el `ts_cliente` de la apertura salen de DOS
+   llamadas distintas a `Date.now()`, así que NUNCA caen en el mismo milisegundo: medido
+   sobre los 33 pares del 16/09, la diferencia va de 2 ms a 306 ms — 33 de 33 distintos.
+   Con la comparación exacta de la v19.02 no emparejaba ni uno, así que cada pausa salía
+   DOS veces: el renglón bien cerrado ("Desde 13:31:57 hasta 13:34:23") y un fantasma
+   "sin cerrar" con la misma hora. Eso es lo que vio Jhonny en el celular. Problema 363.
+   El test lo dejaba pasar porque el fixture usaba timestamps idénticos. */
+const TOL_PAR_MS = 5000;   /* 16× el peor desvío medido, y muy por debajo del hueco real
+                              entre dos pausas del mismo código (minutos). */
 function _histColapsarPares(arr) {
+  const aperturas = arr.filter(it => !it.ts_inicio_iso && TOGGLE_CODES.includes(it.opcion));
+  // Se consume por IDENTIDAD del objeto, no por clave: si hay dos aperturas parecidas,
+  // cada cierre se come UNA sola (la más cercana) y la otra sigue figurando abierta.
   const consumidas = new Set();
   for (const it of arr) {
     const ini = it.ts_inicio_iso ? new Date(it.ts_inicio_iso).getTime() : 0;
@@ -6575,14 +6588,19 @@ function _histColapsarPares(arr) {
     it._desde = ini;
     it._hasta = it.ts || 0;
     it._durMs = (it._hasta && it._hasta > ini) ? (it._hasta - ini) : 0;
-    consumidas.add(it.opcion + "@" + ini);
+    let mejor = null, mejorDif = Infinity;
+    for (const ap of aperturas) {
+      if (consumidas.has(ap) || ap.opcion !== it.opcion) continue;
+      const dif = Math.abs((ap.ts || 0) - ini);
+      if (dif <= TOL_PAR_MS && dif < mejorDif) { mejor = ap; mejorDif = dif; }
+    }
+    if (mejor) consumidas.add(mejor);
   }
   return arr.filter(it => {
     if (it.ts_inicio_iso) return true;                       // es el cierre: queda
     if (!TOGGLE_CODES.includes(it.opcion)) return true;      // no es toggle: queda
-    // apertura: se cae si su cierre ya está en la lista; si no, queda marcada
-    if (consumidas.has(it.opcion + "@" + (it.ts || 0))) return false;
-    it._abierto = true;
+    if (consumidas.has(it)) return false;                    // su cierre ya lo muestra
+    it._abierto = true;                                      // apertura sin cierre: se avisa
     return true;
   });
 }
@@ -6876,8 +6894,22 @@ function renderLegajoHistory(legajo) {
 
 /* Función que render el histórico combinado (local + remote). Llamada desde
    renderLegajoHistory (sync, si hay caché) o desde _fetchAndRenderHistory (async). */
-function _renderHistoryWithRemote(legajo, localHist, remoteHist) {
+function _renderHistoryWithRemote(legajo, localHist, remoteHist, fallo) {
   const container = document.getElementById("legajoHistoryContent");
+
+  /* v19.21 — si la consulta al servidor falló, hay que DECIRLO. El picking no está en
+     el historial local (los PKC son cientos por día y no se guardan en el celular),
+     así que una lista sin el servidor no tiene una sola línea de picking y parece que
+     no se registró nada. Problema 364. */
+  const aviso = fallo
+    ? '<div class="history-item" style="border-color:#b45309;background:#fffbeb;">' +
+        '<div class="line1" style="color:#b45309;">⚠ No se pudo leer el detalle del servidor</div>' +
+        '<div class="line2">Lo que marcaste <b>está guardado</b>, pero esta lista puede estar ' +
+          'incompleta: el picking se lee del servidor.<br>' +
+          '<button type="button" class="pkc-ver" onclick="histReintentar(\'' +
+          escapeHtml(String(legajo)) + '\')">↻ Reintentar</button></div>' +
+      '</div>'
+    : "";
 
   // Combinar sin duplicados:
   // - remoteHist son definitivos (ya en server)
@@ -6898,6 +6930,7 @@ function _renderHistoryWithRemote(legajo, localHist, remoteHist) {
   ];
 
   if (!combined.length) {
+    if (fallo) { container.className = "history-list"; container.innerHTML = aviso; return; }
     container.className = "history-empty";
     container.innerText = "No hay reportes hoy para este legajo.";
     return;
@@ -6911,7 +6944,7 @@ function _renderHistoryWithRemote(legajo, localHist, remoteHist) {
   const filas = _histColapsarPares(_histAgruparPkc(combined));
   // El orden se rearma: el grupo de PKC se mueve al ts de su último artículo.
   filas.sort((a, b) => (b.ts || b.createdAt || 0) - (a.ts || a.createdAt || 0));
-  container.innerHTML = filas.map(h => {
+  container.innerHTML = aviso + filas.map(h => {
     const arrived = h.createdAt || h.sentAt;
     const showDato = h.opcion !== "FJ" && h.texto;
     /* v19.02 — el cierre muestra "Desde HH:MM:SS hasta HH:MM:SS (dur)"; la apertura
@@ -6942,6 +6975,7 @@ function _renderHistoryWithRemote(legajo, localHist, remoteHist) {
 async function _fetchAndRenderHistory(legajo, localHist) {
   const cacheKey = _getCacheKey(String(legajo), getTodayKey());
   let remoteHist = [];
+  let fallo = false;   // v19.21: la consulta no anduvo → NO se cachea y se avisa
 
   try {
     const today = getTodayKey(); // formato AAAA-MM-DD en zona horaria Buenos Aires
@@ -6955,6 +6989,7 @@ async function _fetchAndRenderHistory(legajo, localHist) {
       .gte("created_at", startOfDay.toISOString())
       .lte("created_at", endOfDay.toISOString());
 
+    if (error || !data) fallo = true;
     if (!error && data) {
       remoteHist = data.map(r => ({
         id: r.id,
@@ -6973,14 +7008,25 @@ async function _fetchAndRenderHistory(legajo, localHist) {
       }));
     }
   } catch (_e) {
+    fallo = true;
     console.warn("[renderLegajoHistory] Error al traer histórico de Supabase:", _e);
     // Si falla la consulta, continuar con solo localStorage
   }
 
-  // Guardar en caché y renderizar
-  _historyCache[cacheKey] = remoteHist;
-  _renderHistoryWithRemote(legajo, localHist, remoteHist);
+  /* v19.21 — el resultado se cachea SÓLO si la consulta anduvo. Antes se cacheaba
+     igual, y como renderLegajoHistory usa el caché cuando existe, un único error de
+     red dejaba el Resumen sin nada del servidor por el resto de la sesión: sin
+     reintentar y sin avisar. Eso borra de la pantalla TODO el picking, que no se
+     guarda en el celular. Problema 364. */
+  if (!fallo) _historyCache[cacheKey] = remoteHist;
+  _renderHistoryWithRemote(legajo, localHist, remoteHist, fallo);
 }
+/* Botón "↻ Reintentar" del aviso: tira el caché de hoy y vuelve a consultar. */
+function histReintentar(legajo) {
+  try { delete _historyCache[_getCacheKey(String(legajo), getTodayKey())]; } catch (_e) {}
+  renderLegajoHistory(String(legajo));
+}
+window.histReintentar = histReintentar;
 /* ===== v7.12 — RECEPCIÓN A MEDIO CARGAR (borrador de recepcion.js) =====
    Si el operario arrancó una recepción y se fue para atrás / cerró la pantalla, el
    módulo la deja guardada (localStorage, por legajo+día). El botón para retomarla va
@@ -7437,8 +7483,26 @@ async function terminarDiaDrenarCola() {
 }
 
 async function confirmarTerminarDia() {
-  const legajoStr = String(legajoInput.value || "");
-  if (!legajoStr) { closeTerminarDia(); return; }
+  const legajoStr = String(legajoInput.value || "").trim();
+  /* v19.21 — ANTES esto era `closeTerminarDia(); return;` A SECAS: si el campo del legajo
+     estaba vacío, el botón "Terminar Día" cerraba el cuadro y NO hacía absolutamente nada,
+     sin una palabra. El operario ve el cuadro cerrarse, se va convencido de que marcó, y no
+     hay FJ. Es exactamente el síntoma que reportó Luis el 16/09 ("me parece que terminaron,
+     marcaron y no te llega el registro").
+     El campo puede estar vacío aunque el operario esté logueado: desde v1.9.0 el login
+     precarga el legajo y ESCONDE el input, así que si esa precarga no corrió (sesión a medias,
+     otro celular, storage limpiado) queda en blanco sin que se note.
+     Ahora avisa y NO cierra el cuadro, así el operario puede escribir el legajo y reintentar
+     en vez de irse creyendo que quedó registrado. */
+  if (!legajoStr) {
+    try {
+      alert("⚠ NO se registró el fin de jornada: falta tu número de legajo.\n\n" +
+            "Cerrá este cuadro, escribí tu legajo y volvé a tocar «Terminar Día».\n" +
+            "Si el campo del legajo no aparece, avisá a sistemas — tu día NO quedó cerrado.");
+    } catch (_e) {}
+    try { legajoInput.focus(); } catch (_e) {}
+    return;   // ⚠ a propósito NO se cierra el modal: cerrarlo es lo que engañaba
+  }
 
   // Capturar pendientes ANTES de tocar el estado, así el resumen y la
   // limpieza son consistentes.
@@ -9492,7 +9556,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v19.20";
+const APP_VERSION = "v19.21";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -34412,7 +34476,7 @@ async function pppTandaMover(tanda, iso, opts) {
     if (nuevos.length) avisos.push("El " + f + " ya salen " + Number(nuevos[0].camiones_dia) + " camión(es) y esto abre otro: " +
       nuevos.map(function (c) { return c.camion; }).join(", ") + ". ¿Seguro que vas a usar un segundo camión?");
   } catch (_e) {}
-  // v19.11 — una tanda YA EMPEZADA (pickeada, armada o facturada) ahora SÍ se puede mover: es justo el
+  // v19.20 — una tanda YA EMPEZADA (pickeada, armada o facturada) ahora SÍ se puede mover: es justo el
   // caso de Pedidos atrasados, donde el 100 % de las tandas está armada y lo único que falta es el
   // camión. El contenido no cambia, así que no hay que volver a pickear; pero se avisa y se confirma.
   let forzar = !!(opts && opts.empezada);
@@ -34757,7 +34821,7 @@ function pppReprogAbrir(np) {
   o.classList.add("show");
   pppMovCargar();
 }
-/* v19.11 — el overlay del pop-up de días estaba copiado en `pppReprogAbrir` y en `pppMoverAbrir`; ahora
+/* v19.20 — el overlay del pop-up de días estaba copiado en `pppReprogAbrir` y en `pppMoverAbrir`; ahora
    lo arma esta única función, que usan también el botón nuevo de la tabla. */
 function pppMovOverlay(titulo) {
   _pppMovCss();
@@ -43618,7 +43682,7 @@ function aprHorPedidoDe(k) {
 }
 function aprHorAbrir(k) {
   const p = aprHorPedidoDe(k), h = (_aprHor || {})[k] || {};
-  /* v19.11 — si nadie cargó horario a mano pero el PEDIDO trae el turno de la OC, el pop-up
+  /* v19.20 — si nadie cargó horario a mano pero el PEDIDO trae el turno de la OC, el pop-up
      abre con ese turno puesto: confirmar es un clic y recién ahí el dato queda guardado y
      viaja a Programación y a la hoja de ruta (que leen `gv_pedido_horario`, no la OC). */
   const oc = (!h.fecha && !h.franja) ? aprTurnoOc(p) : null;
