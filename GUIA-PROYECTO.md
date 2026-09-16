@@ -53,6 +53,38 @@ justifica agruparse.
 `tests/resumen-pkc-agrupado.cjs` (28 aserciones: 247 PKC de 9 tandas → 9 renglones con los
 247 artículos adentro, el contador de faltantes, el desplegable y que el resto no se toca).
 
+## Nota v19.11/19.12 (2026-09-16) — De dónde sale el TURNO de un súper, y por qué un pedido no se programa solo
+
+**El turno (fecha y hora de entrega que exige el súper) sale de la OC, no de Gestión.** La OC entra
+por Krikos al mail de LK, la Bandeja la carga y el turno queda en
+`orders.sheets_payload.fecha_entrega` como **texto crudo** (`"29/09/2026 14:00"`). LK lo publica
+parseado en `v_pedidos_web_np` (`fecha_entrega_pactada`, `hora_entrega_pactada` y el crudo en
+`fecha_entrega_txt`; el parseo es `gv_fe_pactada_fecha` / `gv_fe_pactada_hora`) y **la tarjeta de
+"A Programar" lo muestra en el reloj, en ámbar con 📅**. Tocarlo abre el pop-up con ese turno ya
+puesto: **recién al confirmarlo queda guardado y viaja a Programación y a la hoja de ruta**, que
+leen `gv_pedido_horario`, no la OC. Un horario cargado a mano MANDA sobre el de la OC.
+
+⚠ **Ese texto nunca se castea con `::date`.** Un `"29/09/2026 14:00"` tira `22008` y mata la RPC
+entera: el 16/09, de 13:55 a 15:50, el cron de armado leyó **0 NP de LK** y ningún pedido web de
+LK se programó solo. §3.in de `docs/SUPABASE-GESTION-VIRGILIO.md`.
+
+**Por qué un pedido queda en "A Programar" (lo dice el chip del camioncito de cada tarjeta, que
+sale de `gv_ppp_web_dia_salida`):**
+
+| Chip | Qué pasó |
+|---|---|
+| `🤖 se arma solo → día` | zona automática (`PPP_Web_Config.zonas_automaticas`, hoy 1 y 2): lo toma el cron en minutos |
+| `🚚 va al camión del día` | zona manual con camión ya armado a esa zona (`zonas_manuales_con_camion`) |
+| `🔒 no lo toca el automático` | **retenido**: alguien lo sacó de su tanda con "↩ Enviar a programar" (`GV_PPP_Web_Retenido`, v17.85). Hay que ponerle día a mano |
+| `🛒 súper: a mano` | el cliente está en **`GV_Supers`** — y eso **no se ve en la zona**: Gigot entrega en Constitución, o sea "Zona 1" (v19.12) |
+| `🏭 retira` | lo pasa a buscar el cliente |
+| `⏳ sin camión previsto` | zona manual sin camión a esa zona en la ventana |
+| `❓ sin zona` | el barrio no resolvió: revisar la dirección de entrega |
+| `⏳ espera dd/mm` | bloque diferido: falta mercadería (`GV_PPP_Web_Diferido`) |
+
+Y lo que **ni aparece** en la lista: lo retenido por **Cuarentena** (va a su propia solapa) y lo
+que `gv_pedidos_web_excluidos` da por de ISIS/Producción.
+
 ## Nota v19.07 (2026-09-16) — El tiempo muerto se resta del picking y del armado
 
 Regla de Luis: *"suponete que arma por 1 hora, va al baño 10 minutos y después arma 50 min
