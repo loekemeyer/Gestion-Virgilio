@@ -547,3 +547,6 @@ PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node te
 
 echo "== muerto-neteado (v19.07: el tiempo muerto se resta del picking/armado + no cerrar dos veces) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/muerto-neteado.cjs
+
+echo "== resumen-pkc-agrupado (v19.09: el detalle del picking, una linea por tanda) =="
+PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/resumen-pkc-agrupado.cjs

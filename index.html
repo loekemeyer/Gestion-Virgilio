@@ -209,6 +209,36 @@ button {
   color: #666;
   margin-top: 18px;
 }
+/* v19.09 — el detalle del picking (PKC) va AGRUPADO por tanda en un solo renglón, con
+   el detalle artículo por artículo escondido detrás de "ver detalle". Antes salía una
+   tarjeta por artículo: el 16/09 el Resumen de Jhonny tenía 297 tarjetas y 247 eran
+   PKC de 9 tandas, o sea casi 300 scrolls para ver lo que hizo. */
+.history-item .pkc-ver{
+  display: inline-block;
+  margin-top: 6px;
+  padding: 4px 10px;
+  border: 1px solid #94a3b8;
+  border-radius: 8px;
+  background: #f1f5f9;
+  color: #334155;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  width: auto;                /* el button{width:100%} global lo estiraba de punta a punta */
+  text-transform: none;
+}
+.history-item .pkc-det{ margin-top: 6px; }
+.history-item .pkc-det.hidden{ display: none; }
+.history-item .pkc-art{
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 3px 0;
+  border-top: 1px dashed #cbd5e1;
+  font-size: 13px;
+}
+.history-item .pkc-art b{ font-variant-numeric: tabular-nums; }
+.history-item .pkc-falta{ color: #b45309; }   /* ámbar: levantó menos de lo pedido */
 
 .row { display: grid; gap: 8px; margin-top: 13px; }
 .row-6 { grid-template-columns: repeat(6, minmax(0, 1fr)); }
@@ -5660,7 +5690,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=19.08"></script>
+<script type="module" src="recepcion.js?v=19.09"></script>
 <!-- Config del módulo de fichada (compartido con fichada.html). El secret
      hmacSecret tiene que ser el mismo acá y allá; cargándolo desde un solo
      archivo evitamos que se desincronicen. -->
@@ -6436,6 +6466,87 @@ function formatDur(ms) {
    descarta la apertura que le corresponde. La apertura que NO tiene cierre sobrevive
    marcada con `_abierto` — eso deja A LA VISTA del operario los RI/EI que quedan
    colgados, que hoy no se ven en ninguna parte. Problema 345. */
+/* v19.09 — EL DETALLE DEL PICKING, UNA LÍNEA POR TANDA (pedido de Luis, 16/09).
+   Cada artículo confirmado emite su propio evento PKC, y el Resumen los mostraba de a una
+   tarjeta: el 16/09 el de Jhonny (lg 277) tenía **297 tarjetas, 247 de ellas PKC de 9
+   tandas** — para ver lo que hizo tenía que scrollear casi 300 veces. Acá los PKC de una
+   misma tanda se juntan en UN renglón ("E11C · 12 artículos") y el detalle queda detrás de
+   "ver detalle". Los demás códigos NO se agrupan: emiten una fila por NP o por tanda, que
+   ya es la granularidad correcta (lo más numeroso después de PKC son 32 CRN en 32 NP).
+   El texto del PKC es `TANDA|ART|esperadas|reales|excedente|empresa`, así que de paso se
+   cuenta cuántos artículos salieron cortos (`reales < esperadas`) y se avisa en el renglón:
+   es el dato que el operario y el supervisor van a buscar. */
+const _pkcAbiertos = new Set();   // qué tandas dejó abiertas el operario (sobrevive el re-render)
+function histTogglePkc(key) {
+  const k = String(key || "");
+  if (_pkcAbiertos.has(k)) _pkcAbiertos.delete(k); else _pkcAbiertos.add(k);
+  const el = document.getElementById("pkcdet_" + k);
+  const bt = document.getElementById("pkcver_" + k);
+  if (el) el.classList.toggle("hidden", !_pkcAbiertos.has(k));
+  if (bt) bt.textContent = _pkcAbiertos.has(k) ? "▾ ocultar detalle" : "▸ ver detalle";
+}
+window.histTogglePkc = histTogglePkc;
+function _histAgruparPkc(arr) {
+  const porTanda = new Map();
+  const out = [];
+  for (const it of arr) {
+    if (it.opcion !== "PKC") { out.push(it); continue; }
+    const p = String(it.texto || "").split("|");
+    const tanda = (p[0] || "?").toUpperCase();
+    if (!porTanda.has(tanda)) {
+      const g = {
+        opcion: "PKC", descripcion: "Picking artículo", texto: "",
+        ts: it.ts, status: it.status,
+        _pkcTanda: tanda, _pkcItems: [], _pkcDesde: it.ts, _pkcHasta: it.ts, _pkcFaltan: 0
+      };
+      porTanda.set(tanda, g);
+      out.push(g);
+    }
+    const g = porTanda.get(tanda);
+    const esp = parseInt(p[2], 10), real = parseInt(p[3], 10);
+    const falta = isFinite(esp) && isFinite(real) && real < esp;
+    if (falta) g._pkcFaltan++;
+    g._pkcItems.push({ art: p[1] || "?", esp: esp, real: real, falta: falta, ts: it.ts });
+    if (it.ts && it.ts < g._pkcDesde) g._pkcDesde = it.ts;
+    if (it.ts && it.ts > g._pkcHasta) g._pkcHasta = it.ts;
+    // la tarjeta del grupo se ordena por el ÚLTIMO artículo confirmado
+    g.ts = g._pkcHasta;
+    // si alguno todavía está en la cola, el grupo entero figura pendiente
+    if (it.status && it.status !== "sent") g.status = it.status;
+  }
+  for (const g of porTanda.values()) {
+    g._pkcItems.sort((a, b) => (a.ts || 0) - (b.ts || 0));
+  }
+  return out;
+}
+/* El renglón del grupo + su detalle escondido. */
+function _histPkcHtml(h) {
+  const k = escapeHtml(h._pkcTanda);
+  const n = h._pkcItems.length;
+  const abierto = _pkcAbiertos.has(h._pkcTanda);
+  const cuando = (h._pkcDesde && h._pkcHasta && h._pkcHasta > h._pkcDesde)
+    ? "Desde: <b>" + escapeHtml(formatTimeAr(h._pkcDesde)) + "</b> hasta <b>" +
+      escapeHtml(formatTimeAr(h._pkcHasta)) + "</b>"
+    : (h._pkcHasta ? "Fecha: " + escapeHtml(formatDateTime(h._pkcHasta)) : "");
+  const faltan = h._pkcFaltan > 0
+    ? ' · <b class="pkc-falta">' + h._pkcFaltan + (h._pkcFaltan === 1 ? " con faltante" : " con faltante") + "</b>"
+    : "";
+  const det = h._pkcItems.map(function (a) {
+    const cant = (isFinite(a.esp) && isFinite(a.real))
+      ? (a.real + " de " + a.esp)
+      : "—";
+    return '<div class="pkc-art' + (a.falta ? " pkc-falta" : "") + '">' +
+           "<span>" + escapeHtml(a.art) + "</span><b>" + escapeHtml(cant) + "</b></div>";
+  }).join("");
+  return '<div class="line2">' +
+           "Tanda <b>" + k + "</b> · <b>" + n + (n === 1 ? " artículo" : " artículos") + "</b>" + faltan +
+           (cuando ? "<br>" + cuando : "") +
+           '<br><button type="button" class="pkc-ver" id="pkcver_' + k +
+             '" onclick="histTogglePkc(\'' + k + '\')">' +
+             (abierto ? "▾ ocultar detalle" : "▸ ver detalle") + "</button>" +
+           '<div class="pkc-det' + (abierto ? "" : " hidden") + '" id="pkcdet_' + k + '">' + det + "</div>" +
+         "</div>";
+}
 function _histColapsarPares(arr) {
   const consumidas = new Set();
   for (const it of arr) {
@@ -6776,7 +6887,10 @@ function _renderHistoryWithRemote(legajo, localHist, remoteHist) {
   combined.sort((a, b) => (b.ts || b.createdAt || 0) - (a.ts || a.createdAt || 0));
   container.className = "history-list";
   // v19.02: un renglón por tarea (el cierre se come su apertura).
-  const filas = _histColapsarPares(combined);
+  // v19.09: y el detalle del picking va agrupado por tanda (247 tarjetas → 9).
+  const filas = _histColapsarPares(_histAgruparPkc(combined));
+  // El orden se rearma: el grupo de PKC se mueve al ts de su último artículo.
+  filas.sort((a, b) => (b.ts || b.createdAt || 0) - (a.ts || a.createdAt || 0));
   container.innerHTML = filas.map(h => {
     const arrived = h.createdAt || h.sentAt;
     const showDato = h.opcion !== "FJ" && h.texto;
@@ -6788,14 +6902,17 @@ function _renderHistoryWithRemote(legajo, localHist, remoteHist) {
       : (h._abierto
           ? `Desde: <b>${escapeHtml(formatTimeAr(h.ts))}</b> — <b style="color:#b45309;">sin cerrar</b>`
           : (h.ts ? `Fecha: ${escapeHtml(formatDateTime(h.ts))}` : ""));
-    return `
-      <div class="history-item">
-        <div class="line1">${escapeHtml(h.opcion)} — ${escapeHtml(h.descripcion)}${statusBadge(h.status)}</div>
-        <div class="line2">
+    const cuerpo = h._pkcItems
+      ? _histPkcHtml(h)
+      : `<div class="line2">
           ${showDato ? `Dato: <b>${escapeHtml(h.texto)}</b><br>` : ""}
           ${linea}
           ${arrived && !h._desde && !h._abierto ? `<br>Llegó al server: ${escapeHtml(formatDateTime(arrived))}` : ""}
-        </div>
+        </div>`;
+    return `
+      <div class="history-item">
+        <div class="line1">${escapeHtml(h.opcion)} — ${escapeHtml(h.descripcion)}${statusBadge(h.status)}</div>
+        ${cuerpo}
       </div>
     `;
   }).join("");
@@ -6978,7 +7095,13 @@ function openHistoryModal() {
     previas.forEach(d => d.items.sort((a, b) => (b.ts || 0) - (a.ts || 0)));
     content.innerHTML = previas.map(d => {
       // v19.02: mismo renglón único que el Resumen de hoy.
-      const items = _histColapsarPares(d.items);
+      // v19.09: y el picking agrupado por tanda. Acá los PKC casi nunca aparecen —
+      // `pkSendDetail` no escribe en el historial LOCAL, que es lo único que lee este
+      // modal— pero si alguno llega, no inunda el día. Sin botón de detalle a propósito:
+      // el CSS y los id del desplegable son del Resumen (`.history-item`), y repetir esos
+      // id en las dos vistas los haría chocar.
+      const items = _histColapsarPares(_histAgruparPkc(d.items));
+      items.sort((a, b) => (b.ts || 0) - (a.ts || 0));
       return `
       <div class="hist-day-block">
         <div class="hist-day-title">${escapeHtml(formatDayLong(d.fecha))} (${items.length})</div>
@@ -6986,12 +7109,17 @@ function openHistoryModal() {
           const arrived = it.createdAt || it.sentAt;
           // FJ: ocultar el "Dato" (JSON técnico), mostrar la entrada igual.
           const showDato = it.opcion !== "FJ" && it.texto;
-          const linea = it._desde
-            ? `Desde ${escapeHtml(formatTimeAr(it._desde))} hasta ${escapeHtml(formatTimeAr(it._hasta))}` +
-              (it._durMs ? ` (${escapeHtml(formatDur(it._durMs))})` : "")
-            : (it._abierto
-                ? `Desde ${escapeHtml(formatTimeAr(it.ts))} — sin cerrar`
-                : (it.ts ? escapeHtml(formatDateTime(it.ts)) : ""));
+          const linea = it._pkcItems
+            ? `Tanda <b>${escapeHtml(it._pkcTanda)}</b> · <b>${it._pkcItems.length}</b> artículo(s)` +
+              (it._pkcFaltan ? ` · ${it._pkcFaltan} con faltante` : "") +
+              (it._pkcDesde && it._pkcHasta > it._pkcDesde
+                ? ` — ${escapeHtml(formatTimeAr(it._pkcDesde))} a ${escapeHtml(formatTimeAr(it._pkcHasta))}` : "")
+            : (it._desde
+              ? `Desde ${escapeHtml(formatTimeAr(it._desde))} hasta ${escapeHtml(formatTimeAr(it._hasta))}` +
+                (it._durMs ? ` (${escapeHtml(formatDur(it._durMs))})` : "")
+              : (it._abierto
+                  ? `Desde ${escapeHtml(formatTimeAr(it.ts))} — sin cerrar`
+                  : (it.ts ? escapeHtml(formatDateTime(it.ts)) : "")));
           return `
             <div class="hist-day-item">
               <b>${escapeHtml(it.opcion)}</b> — ${escapeHtml(it.descripcion)}${statusBadge(it.status)}
@@ -9344,7 +9472,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v19.08";
+const APP_VERSION = "v19.09";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
