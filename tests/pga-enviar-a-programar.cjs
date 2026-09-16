@@ -110,15 +110,22 @@ catch (_e) {
       const pv = document.getElementById("pppPreview");
       return pv ? [...pv.querySelectorAll("tr.pga-n")].find((x) => x.textContent.indexOf("LK 0058") >= 0) : null;
     };
-    let filaD = buscarFila();
-    if (!filaD) {                       // el toggle quedó cerrado en el redibujo: lo reabrimos
-      try { pgaAbrirDia("20260915"); pgaAbrirTanda("20260915|E01A"); } catch (_e) {}
-      await new Promise((res) => setTimeout(res, 150));
+    /* ⚠ Acá había una espera fija de 150 ms y el test FALLABA de a ratos, pero SÓLO dentro de
+       la suite completa: solo daba 4/4 verde. Corriendo con la suite, la fila aparecía a
+       tiempo (`filaSigue` ✅) pero TODAVÍA SIN los botones, así que "un solo botón" veía 0.
+       Con la máquina cargada 150 ms no alcanzan. Ahora se espera a que la fila exista **y
+       tenga el botón**, sondeando hasta 3 s. v19.24. */
+    let filaD = null;
+    for (let intento = 0; intento < 30; intento++) {
       filaD = buscarFila();
+      if (filaD && filaD.querySelector(".pga-acc-b")) break;
+      if (intento === 0) { try { pgaAbrirDia("20260915"); pgaAbrirTanda("20260915|E01A"); } catch (_e) {} }
+      await new Promise((res) => setTimeout(res, 100));
     }
     out.filaSigue    = !!filaD;
     out.noHayTacho   = !!filaD && !filaD.querySelector(".pga-acc-b.del");
     out.unSoloBoton  = !!filaD && filaD.querySelectorAll(".pga-acc-b").length === 1;
+    out._botones = filaD ? [...filaD.querySelectorAll(".pga-acc-b")].map(b => (b.title || "") + "/" + b.textContent.trim()) : null;
 
     // (d) el cartel del web ya no promete el automático.
     // v18.44: el aviso se mudó de `pppVencVolver` (era el texto del confirm) al pop-up
@@ -179,6 +186,7 @@ catch (_e) {
   t(r.previo, "(d) y el pop-up le pide al backend qué NP se lleva antes de tocar nada");
   t(r.filaSigue, "(g) la fila de la NP sigue estando");
   t(r.noHayTacho, "(g) y YA NO trae el tacho de desarmar");
+  if (r._botones) console.log("     (botones en la fila: " + JSON.stringify(r._botones) + ")");
   t(r.unSoloBoton, "(g) queda un solo botón en la fila: el ↩");
   t(r.yaHecho, "(e) el pedido web retenido cuenta como «ya hecho»");
   t(/ya pickeada y armada · E01A/.test(r.chip), "(e) y sale con su chip rojo en A Programar — " + JSON.stringify(r.chip));

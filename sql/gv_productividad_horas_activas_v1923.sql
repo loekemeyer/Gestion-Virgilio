@@ -42,11 +42,21 @@ language plpgsql stable as $$
 /* Los TRAMOS TRABAJADOS entre dos instantes, recortados a la jornada del legajo.
    `gv_min_activos` y `gv_fin_activo` se apoyan acá — un solo criterio, un solo lugar.
 
-   Mismo criterio que `computeClosureDur` del monitor (index.html):
+   ⚠ Es EL MISMO criterio que `computeClosureDur` del monitor (index.html), a propósito y
+   hasta en el fallback: si los dos no dan el mismo número, el tablero y la productividad
+   discuten entre ellos (v19.24 — la primera versión usaba el primer evento del día en vez
+   de hora_entrada y se separaba del monitor por unos minutos en cada cruce).
      · día de apertura → de p_ini al FJ REAL de ese día (si lo marcó) o a hora_salida.
-     · día de cierre   → de la fichada REAL (o el primer evento, o hora_entrada) a p_fin.
+     · día de cierre   → de la fichada REAL, y si no hay, de hora_entrada, a p_fin.
      · días del medio  → jornada completa, salteando sábado, domingo y GV_Dias_No_Habiles.
    Fallback 08:00-17:00 si el legajo no tiene horario cargado.
+
+   ⚠⚠ La rama de la fichada está MUERTA en la práctica: en 30 días hay 0 fichadas para 97
+   días/legajo — el QR de ingreso no se usa más. O sea que el arranque del día de cierre lo
+   pone SIEMPRE hora_entrada, y si alguien arrancó más tarde eso cuenta de más. Se eligió
+   igual porque es lo que muestra el monitor: un solo número. Si algún día se quiere el
+   criterio más fino (el primer evento real del día, que es evidencia de presencia y no un
+   supuesto), se cambia ACÁ y las dos vistas lo toman solas.
 
    ⚠ MISMO DÍA sale sin tocar la base: es el 95% de los cierres. */
 declare
@@ -88,15 +98,11 @@ begin
     end if;
 
     if d = d_fin then
-      select least(
-               (select min(f.ts_cliente) from public."Fichadas_Virgilio" f
-                 where f.legajo::text = p_legajo
-                   and (f.ts_cliente at time zone tz)::date = d),
-               (select min(r.ts_cliente) from public."Registros_Produccion_Virgilio" r
-                 where r.legajo = p_legajo
-                   and (r.ts_cliente at time zone tz)::date = d)
-             ) into v_aux;
-      if v_aux is not null then s := v_aux; end if;
+      select min(f.ts_cliente) into v_aux
+        from public."Fichadas_Virgilio" f
+       where f.legajo::text = p_legajo and f.tipo = 'ingreso'
+         and (f.ts_cliente at time zone tz)::date = d;
+      if v_aux is not null then s := v_aux; end if;   -- si no fichó, queda hora_entrada
     end if;
 
     w_s := greatest(s, p_ini);
@@ -441,3 +447,10 @@ alter view public.vista_productividad_semanal set (security_invoker = true);
 -- d) los cierres que cruzan el día ahora cuentan, y con horas sanas:
 --    ver §3.ij de docs/SUPABASE-GESTION-VIRGILIO.md
 -- e) gv_endpoints_rotos vacío:  select * from public.gv_endpoints_rotos;
+-- f) MISMO NÚMERO QUE EL MONITOR (medido el 16/09 corriendo fetchMonitorDayStats con los
+--    datos reales del 15/09 inyectados por interceptación de red):
+--      D71B (lg 237, cruza 14→15/09): monitor 60,4 min  · gv_min_activos 60,4  ✓
+--      E11A (lg 8,   cruza 14→15/09): monitor 285 brutos · gv_min_activos 285   ✓
+--      picking del lg 277 en el día:  monitor 331,7 min  · vista 331,7          ✓
+--    select round(public.gv_min_activos('8','2026-09-14T16:22:43-03','2026-09-15T12:05:49-03'));
+--    -- 285

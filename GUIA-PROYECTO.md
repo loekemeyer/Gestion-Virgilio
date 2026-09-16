@@ -1,3 +1,35 @@
+## Nota v19.24 (2026-09-16) — El monitor y la productividad ahora dan el mismo número
+
+Luis: *"fijate que el monitor muestre lo mismo ahora"*. Se corrió el monitor **de verdad**
+(`fetchMonitorDayStats` con los datos reales del 15/09 inyectados por interceptación de red) y
+se comparó contra la vista.
+
+**Había una diferencia de criterio, chica pero en todos los cruces.** El arranque del día de
+cierre: el monitor usa la fichada y, si no hay, `hora_entrada`; la v19.23 usaba el **primer
+evento** del día. Y midiendo apareció el dato que lo vuelve importante:
+
+> **En 30 días hay 0 fichadas para 97 días/legajo. El QR de ingreso no se usa más.**
+
+Así que la rama de la fichada está muerta en los dos lados y lo que decide es el fallback.
+Alineado al monitor:
+
+| | monitor | backend |
+|---|---|---|
+| `D71B` (cruza 14→15/09) | 60,4 min | **60,4** ✓ |
+| `E11A` (cruza 14→15/09, bruto) | 285 min | **285** ✓ |
+| picking del lg 277 en el día | 331,7 min | **331,7** ✓ |
+
+### Lo que sigue distinto, a propósito
+
+El armado del lg 8 da **443,7** en el monitor y **319,5** en la vista. No es un error: la vista
+**topea cada cierre** (TAP 180 min, TP 120) y **cada tiempo muerto** (30 min; PC 90), y descarta
+las tandas con ritmo roto. Eso ya era así antes y también para cierres del mismo día. El monitor
+es la reconstrucción del día; la vista es la métrica con los outliers afuera.
+
+⚠ **Y esto no se verifica leyendo las dos implementaciones.** La diferencia de la fichada no se
+veía en el código —las dos "usaban la fichada real"—, se vio en los números al correr el monitor
+con datos reales.
+
 ## Nota v19.23 (2026-09-16) — Sólo se cuentan las HORAS ACTIVAS
 
 Luis, sobre el aviso de que un picking cerrado al otro día iba a figurar como ~20 h:

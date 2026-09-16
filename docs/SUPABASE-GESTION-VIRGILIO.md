@@ -21200,3 +21200,43 @@ vistas nuevas no las llama nadie.
 
 **Definición**: `sql/gv_productividad_horas_activas_v1923.sql`. Problema 366.
 
+### v19.24 — "fijate que el monitor muestre lo mismo ahora" (Luis)
+
+Se corrió el monitor **de verdad** (`fetchMonitorDayStats`, con los datos reales del 15/09
+inyectados por interceptación de red) y se comparó contra la vista, operario por operario.
+
+**Primero apareció una diferencia de criterio, chica pero sistemática.** El arranque del día
+de cierre: el monitor usa la **fichada** y, si no hay, `hora_entrada`; mi primera versión de
+`gv_jornada_ventanas` usaba el **primer evento** del día. Y resulta que:
+
+> **en 30 días hay 0 fichadas para 97 días/legajo — el QR de ingreso no se usa más.**
+
+O sea que la rama de la fichada está muerta en los dos lados y lo que gobierna es el
+fallback, así que la diferencia aplicaba a **todos** los cruces. Se alineó al monitor
+(`hora_entrada`). Después de eso:
+
+| | monitor | `gv_min_activos` |
+|---|---|---|
+| `D71B` lg 237, cruza 14→15/09 | **60,4 min** | **60,4** ✓ |
+| `E11A` lg 8, cruza 14→15/09 (bruto, antes de netear el muerto) | **285 min** | **285** ✓ |
+
+### Lo que SIGUE distinto entre el monitor y la vista, y está bien así
+
+| legajo, 15/09 | monitor | vista | de qué es la diferencia |
+|---|---|---|---|
+| 277 picking | 331,7 min | **331,7** | — coinciden |
+| 237 armado | 354,3 min | 359,5 | la vista **topea cada tiempo muerto** (30 min; PC 90): el `Limp` de 35,2 min se cuenta como 30 |
+| 8 armado | 443,7 min | 319,5 | la vista **topea cada cierre** (TAP 180, TP 120): `E11A` 271,6 → 180 y `D72A` 171,6 → 139,5 |
+
+Las dos son **protecciones de la métrica de productividad, no del tablero**, y ya existían
+antes de la v19.23 — también para cierres del mismo día (`D72A` es del mismo día y difiere
+igual). La vista además descarta las tandas con `ritmo_roto`. El monitor es la reconstrucción
+en vivo del día; la vista es la métrica con topes y outliers afuera. **Lo que tenía que ser
+igual —el criterio de horas activas— ahora es igual.**
+
+⚠ Al tocar cualquiera de los dos, la comparación se repite así: correr el monitor con los
+datos reales de un día por interceptación (hay un script de referencia en el scratchpad de la
+sesión, `mon-vs-vista.cjs`) y comparar contra `vista_productividad_diaria` de ese día. Leer
+las dos implementaciones no alcanza: la diferencia de la fichada no se veía en el código, se
+vio en los números.
+
