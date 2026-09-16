@@ -1,3 +1,14 @@
+/* ⚠⚠ ESTE ARCHIVO YA NO ES LA DEFINICIÓN VIVA. NO LO CORRAS TAL CUAL: revierte dos
+   decisiones posteriores del mismo día.
+     · `sql/gv_ppp_np_desarmar_v1891.sql` — los TRES caminos del desarme mandan la mercadería a
+       «A guardar» (Luis + Thomas, 16/09). Acá abajo todavía está el reparto a góndola/excedente.
+     · `sql/gv_ppp_np_desarmar_sin_guard_v1893.sql` — se sacó el guard que rechazaba
+       `p_vuelve` + `p_a_guardar` juntos.
+   Queda como registro de POR QUÉ existe `p_a_guardar` y de la firma de 5 argumentos.
+   La definición viva se saca siempre con:
+     select pg_get_functiondef('public.gv_ppp_np_desarmar(text,text,text,boolean,boolean)'::regprocedure);
+*/
+
 /* v18.90 — CANCELAR UN PEDIDO DESDE FACTURACIÓN: lo armado vuelve a «A guardar».
 
    ⚠ Los comentarios DE ADENTRO de la función dicen `v18.88`: se aplicó con ese número y otra

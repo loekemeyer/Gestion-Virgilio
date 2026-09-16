@@ -19722,16 +19722,17 @@ a salir. **Los atrasados se van a revisar uno por uno a mano, después; eso no e
 | | Cuándo | Qué hace con el stock | Qué hace con el pedido |
 |---|---|---|---|
 | **ANULAR** (`gv_pedido_anular`, §3.gh) | en «A Programar», el pedido entró MAL y nadie lo tocó | nada (no se movió nada) | sale de A Programar, queda en `GV_Pedidos_Anulados` |
-| **Enviar a programar** (`gv_ppp_pedido_a_programar` → `gv_ppp_np_desarmar` con `p_vuelve=true`) | el pedido sigue VIVO y hay que rehacerlo | **vuelve de donde salió** (góndola → excedente), regla de Luis del 16/09 | vuelve a A Programar, retenido para que el cron no lo agarre |
-| **CANCELAR desde Facturación** (esto) | ya está ARMADO y no va a salir | **TODO a `a_guardar`** | sale de la PPP y no vuelve |
+| **Enviar a programar** (`gv_ppp_pedido_a_programar` → `gv_ppp_np_desarmar` con `p_vuelve=true`) | el pedido sigue VIVO y hay que rehacerlo | **a `a_guardar`** (v18.91) | vuelve a A Programar, retenido para que el cron no lo agarre |
+| **CANCELAR desde Facturación** (esto) | ya está ARMADO y no va a salir | **a `a_guardar`** | sale de la PPP y no vuelve |
 | **BORRAR** (regla del `CLAUDE.md`) | el pedido no tiene que existir | — | se borra de la página **y** de Gestión, en los dos proyectos |
 
-⚠ **La regla de Luis y la del dueño no se pisan, porque son dos acciones distintas.** Cuando el
-pedido sigue vivo y se va a re-pickear, devolver a góndola/excedente es el reverso exacto del
-picking y deja el stock listo. Cuando el pedido murió, nadie va a re-pickear esas cajas: están
-armadas, en un lío, en el piso de armado, y tienen que quedar en **A guardar** para que un
-operario las baje y las guarde. Por eso el backend **se niega** si le mandan las dos cosas a la
-vez (`p_vuelve` y `p_a_guardar`): son intenciones contradictorias.
+⚠ **Esto cambió el mismo día, un rato después (v18.91 / v18.92 · §3.ih y §3.ii).** Cuando esta sección
+se escribió, «Enviar a programar» devolvía la mercadería a góndola/excedente (regla de Luis,
+v18.80) y el backend **se negaba** si le mandaban `p_vuelve` y `p_a_guardar` juntos. Thomas pidió
+que lo que se manda «a programar» **también** vaya a «A guardar», y con eso:
+**los tres caminos del desarme mandan todo a `a_guardar`** y el guard se sacó. `p_vuelve` decide
+qué pasa con el PEDIDO y `p_a_guardar` qué pasa con el STOCK — hoy el segundo ya no cambia el
+destino, sólo deja el rastro de que fue una cancelación.
 
 ### El cambio: un parámetro, no una función nueva
 
@@ -19758,8 +19759,13 @@ pidió cada cliente queda entera.
 
 ### La pantalla
 
-Botón **✕ Cancelar** en la columna Acción de Facturación, debajo del ✓ / ⬇ Excel, chico y en
-rojo apagado: es una acción rara y destructiva, no tiene que competirle al tilde. El pop-up
+Botón **✕ Cancelar** en la columna Acción de Facturación, **al lado** del ✓ / ⬇ Excel —Thomas,
+16/09: *"que los botones de acción aparezcan uno al lado del otro (como en columnas
+diferentes)"*—, chico y en rojo apagado: es una acción rara y destructiva, no tiene que
+competirle al tilde. Los dos van dentro de un `span.fac-acc-wrap` `inline-flex` con los márgenes
+reseteados (el margen global de `button` desalineaba el ✓ contra el ✕) y la columna pasó de 7 % a
+11 %, a costa de Razón Social. El test mide los rectángulos de verdad: mismo centro vertical, el
+✕ a la derecha, y la celda sin desborde. El pop-up
 tiene **dos pasos** —el segundo es la 2da confirmación que pidió el dueño en la v15.65 para todo
 lo que cancela o elimina— y de los dos se sale con ✕, con «Volver», con **Escape** o tocando
 afuera. Mientras la RPC está en vuelo no se cierra: si se cerrara, la pantalla quedaría
@@ -19782,8 +19788,8 @@ cajas armadas).
 | llamada | resultado |
 |---|---|
 | `p_a_guardar => true` | *"16 articulos · 35 cajas devueltas (**35 a A guardar**) · pedido CANCELADO: sale de la PPP y no vuelve"* |
-| `p_a_guardar => false` | *"16 articulos · 35 cajas devueltas (**29 a gondola, 6 a excedente**)"* ← la v18.83 intacta |
-| `p_vuelve => true` + `p_a_guardar => true` | rechazada, 22023 |
+| `p_a_guardar => false` | *"16 articulos · 35 cajas devueltas (**29 a gondola, 6 a excedente**)"* ← la v18.83, **que la v18.91 dio vuelta unas horas después: hoy también van a A guardar** |
+| `p_vuelve => true` + `p_a_guardar => true` | rechazada, 22023 — **el guard se sacó en la v18.93** |
 
 En la misma corrida: `PPP_Web_Programacion` sin tanda para esa NP, `GV_Web_Cancelados` con 1
 fila, `GV_Desarmes` con 1 registro. Barrido posterior de `Movimientos_Stock` (`tipo='desarme'`),
@@ -19808,7 +19814,7 @@ igual. En el front: sacar `.fac-btn-cancel` de la celda Acción de `facRender` y
 **Archivos:** `sql/gv_ppp_np_desarmar_a_guardar_v1890.sql`, `tests/fac-cancelar-pedido.cjs`.
 No hay problema de auditoría: es una funcionalidad nueva, no un bug.
 
-## §3.id — v18.91: el desarme vuelve a «A guardar», y qué son las 1.709 cajas de racks — 2026-09-16
+## §3.ih — v18.91: el desarme vuelve a «A guardar», y qué son las 1.709 cajas de racks — 2026-09-16
 
 ### 1. La mercadería desarmada va a A GUARDAR (deshace la v18.80, del mismo día)
 
@@ -19884,6 +19890,55 @@ select es_dual, deposito, count(*) codigos, sum(fantasma) cajas
 ```
 
 Problema 337.
+
+---
+
+## §3.ii — v18.93: se saca el guard de `p_vuelve` + `p_a_guardar` (y un pisotón entre dos sesiones) — 2026-09-16
+
+**Thomas, 16/09:** *"ahí le pedí a otra sesión que cambie a los que se envían «a programar» a «A
+guardar»"*.
+
+### Lo que quedó
+
+Con la **v18.91** (§3.ih) los **tres caminos** de `gv_ppp_np_desarmar` mandan la mercadería a
+`a_guardar`. Eso dejó sin sentido el guard que había puesto la v18.88: rechazaba `p_vuelve` y
+`p_a_guardar` juntos porque en ese momento significaban dos destinos distintos para el stock.
+Ya no hay dos destinos, así que los parámetros son **independientes**:
+
+| parámetro | qué decide |
+|---|---|
+| `p_vuelve` | qué pasa con el **PEDIDO** (vuelve a A Programar retenido, o se cancela y no vuelve) |
+| `p_a_guardar` | hoy **no cambia el destino del stock** (siempre es `a_guardar`); deja el rastro de que fue una **cancelación** — la descripción del movimiento y el motivo que se guarda |
+
+Medido en transacción revertida sobre `LK 0046` (E03F, 16 art / 35 cajas), las **cuatro**
+combinaciones devuelven **35 a A guardar**; la cuarta (`true, true`) antes daba error 22023.
+Barrido posterior de `Movimientos_Stock`, `GV_Desarmes`, `GV_Web_Cancelados` y
+`GV_PPP_Web_Retenido` → 0 filas.
+
+### ⚠ El pisotón, que vale más que el cambio
+
+Al sacar el guard se hizo un `create or replace` **con el cuerpo de la v18.88 tomado del archivo
+del repo, sin leer antes la definición viva**. Entre medio, la otra sesión había aplicado la
+v18.91 sobre esa misma función — así que el reemplazo **deshizo la v18.91** y los destinos
+volvieron a góndola/excedente durante unos minutos.
+
+No hubo ningún error: el `create or replace` salió limpio, como sale siempre. Se detectó
+mirando `origin/main` y viendo el commit de la otra sesión, no por un síntoma. Se restauró
+re-aplicando el mismo `replace()` de la v18.91 **sobre la definición viva** y se verificó
+llamando a la función de verdad, camino por camino.
+
+> **La regla que ya estaba escrita para las vistas vale igual para las funciones: antes de
+> reemplazar una, leer `pg_get_functiondef` y partir de ESO, no de un archivo del repo.** Un
+> archivo de `sql/` es el registro de un cambio, no la definición actual — sobre todo con varias
+> sesiones trabajando el mismo día sobre el mismo objeto.
+
+Los archivos de `sql/` que ya no son la definición viva llevan ahora un banner que lo dice:
+`sql/gv_ppp_np_desarmar_a_guardar_v1890.sql`.
+
+**Archivos:** `sql/gv_ppp_np_desarmar_sin_guard_v1893.sql` (el cambio y el rollback),
+`sql/gv_ppp_np_desarmar_v1891.sql` (de la otra sesión, lo que se restauró).
+
+---
 
 ## §3.ig — v18.92: «Reusar tanda» partía la tanda en dos días (D69C) — 2026-09-16
 

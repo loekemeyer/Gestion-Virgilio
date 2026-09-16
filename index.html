@@ -4874,8 +4874,13 @@ table.fac-np-tbl.nc-tbl th{ overflow: hidden; text-overflow: ellipsis; }
 .fac-btn-fc-lbl{ font-size:9px; font-weight:800; letter-spacing:.6px; }
 .fac-btn-fc:hover{ background:#dbeafe; border-color:#60a5fa; }
 .fac-btn-fc:active{ transform:scale(.93); }
-/* v6.61: los dos botones de acción, centrados verticalmente en la fila */
-.fac-accion-cell{ vertical-align:middle; overflow:visible; }
+/* v6.61: los dos botones de acción, centrados verticalmente en la fila
+   v18.93: y en UNA sola línea, uno al lado del otro (✓ / ⬇ Excel · ✕ Cancelar). */
+.fac-accion-cell{ vertical-align:middle; overflow:visible; white-space:nowrap; }
+.fac-acc-wrap{ display:inline-flex; align-items:center; justify-content:center; gap:6px; }
+/* el margen global de `button` desalineaba el ✓ contra el ✕ dentro del flex: el margen entra
+   en la caja del ítem, así que `align-items:center` centraba cajas de distinto alto. */
+.fac-acc-wrap > *{ margin:0; }
 .facfc-ov{ position:fixed; inset:0; background:rgba(2,6,23,.6); z-index:1500; display:none; align-items:flex-start; justify-content:center; padding:24px 12px; overflow:auto; }
 .facfc-ov.show{ display:flex; }
 .facfc-card{ background:#fff; border-radius:16px; width:100%; max-width:440px; box-shadow:0 24px 70px rgba(0,0,0,.5); overflow:hidden; }
@@ -4910,11 +4915,12 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
 .facfc-ok-meta{ font-size:12.5px; color:#64748b; }
 .fac-btn-tick:hover{ background: #15803d; }
 .fac-btn-tick:active{ transform: scale(.93); }
-/* v18.90 — "✕ Cancelar" por fila (Thomas, 16/09). Va DEBAJO del ✓ / ⬇ Excel, chico y en rojo
-   apagado: es una acción rara y destructiva, no tiene que competirle al tilde, que es lo que
-   la operadora aprieta cien veces por día. `width:auto` es el override del global
-   button{width:100%}. */
-.fac-btn-cancel{ display:block; width:auto; margin:5px auto 0; border:1px solid #fecaca; background:#fef2f2; color:#b91c1c; border-radius:6px; padding:3px 7px; font-size:10.5px; font-weight:800; line-height:1.4; cursor:pointer; white-space:nowrap; transition:background .15s, transform .1s; }
+/* v18.90 — "✕ Cancelar" por fila (Thomas, 16/09), en rojo apagado: es una acción rara y
+   destructiva, no tiene que competirle al tilde, que es lo que la operadora aprieta cien veces
+   por día. `width:auto` es el override del global button{width:100%}.
+   v18.93 (Thomas): va AL LADO del ✓ / ⬇ Excel, "como en columnas diferentes", no debajo — por
+   eso la celda es un flex en una sola línea y la columna Acción se ensanchó a 11%. */
+.fac-btn-cancel{ display:inline-block; width:auto; margin:0; border:1px solid #fecaca; background:#fef2f2; color:#b91c1c; border-radius:6px; padding:3px 7px; font-size:10.5px; font-weight:800; line-height:1.4; cursor:pointer; white-space:nowrap; transition:background .15s, transform .1s; }
 .fac-btn-cancel:hover{ background:#fee2e2; border-color:#fca5a5; }
 .fac-btn-cancel:active{ transform:scale(.93); }
 /* El pop-up de cancelar reusa las clases .facfc-* (mismo overlay que Facturar / NC) y agrega
@@ -5644,7 +5650,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=18.92"></script>
+<script type="module" src="recepcion.js?v=18.93"></script>
 <!-- Config del módulo de fichada (compartido con fichada.html). El secret
      hmacSecret tiene que ser el mismo acá y allá; cargándolo desde un solo
      archivo evitamos que se desincronicen. -->
@@ -9227,7 +9233,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v18.92";
+const APP_VERSION = "v18.93";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -49189,9 +49195,9 @@ function facRender(tandas){
           const c = _facCajas.get(np); return (!c) ? '<span class="fac-cajas0">—</span>' : escapeHtml(String(Math.round(c)));
         })()}</td>
         <td class="center fac-neto-cell fac-neto-click" id="fac-neto-${escapeHtml(String(f.np).trim().replace(/\.0+$/, ""))}" onclick="facNetoDetalle('${escapeHtml(String(f.np).trim().replace(/\.0+$/, ""))}')" title="Ver desglose por ítem"><span class="fac-neto-load">…</span></td>
-        <td class="center fac-accion-cell">${facNpEsWeb(f.np)
+        <td class="center fac-accion-cell"><span class="fac-acc-wrap">${facNpEsWeb(f.np)
           ? `<span class="fac-tick-web" title="NP de la página: se factura bajando el Excel ISIS (marcá la casilla de la izquierda)">⬇ Excel</span>`
-          : `<button class="fac-btn-tick" data-args='${args}' onclick="facTickNP(this)">✓</button>`}<button class="fac-btn-cancel" data-args='${args}' onclick="facCancelarNP(this)" title="Cancelar el pedido: no se factura y sale de la PPP. Pide el motivo (falta stock u otro) y se puede salir sin hacer nada. El pedido NO se borra de la base; lo que ya estaba armado vuelve a la bodega «A guardar».">✕ Cancelar</button></td>
+          : `<button class="fac-btn-tick" data-args='${args}' onclick="facTickNP(this)">✓</button>`}<button class="fac-btn-cancel" data-args='${args}' onclick="facCancelarNP(this)" title="Cancelar el pedido: no se factura y sale de la PPP. Pide el motivo (falta stock u otro) y se puede salir sin hacer nada. El pedido NO se borra de la base; lo que ya estaba armado vuelve a la bodega «A guardar».">✕ Cancelar</button></span></td>
       </tr>`;
   }).join("");
 
@@ -49204,12 +49210,12 @@ function facRender(tandas){
             <th style="width:11%" title="Nota de pedido. Pasá el mouse sobre el número para ver Tanda y fecha de Salida.">NP</th>
             <th class="center" style="width:8%" title="Fecha de ENTREGA de la PPP (el día para el que está programado el pedido). Las filas vienen ordenadas por esta fecha.">📅 Entrega</th>
             <th style="width:7%">Cod</th>
-            <th style="width:20%">Razón Social</th>
+            <th style="width:17%">Razón Social</th>
             <th style="width:20%" title="Ajustes respecto del pedido original — asistencia para cargar la factura:&#10;• FALTANTE (rojo, cod −N): faltó, restá N cajas de la factura o no la pongas.&#10;• AGREGADO (verde, cod +N): se armó algo que no estaba en el pedido, sumá N cajas a la factura.&#10;Los ítems armados iguales al pedido no aparecen (no hay que ajustar nada).">Faltantes y Agregados</th>
             <th class="center" style="width:5%" title="Líos ARMADOS (los que se cargaron al camión). Refleja lo real, no el pedido original.">Líos</th>
             <th class="center" style="width:5%" title="Cajas ARMADAS (las que se cargaron al camión). Refleja lo real, no el pedido original.">Cajas</th>
             <th class="center" style="width:12%" title="Subtotal (dto x ítem): precio de lista × unidades por caja × cajas armadas × (1 − dto por volumen del cliente). Antes del descuento del 2%.">💵 Subtotal <span class="fac-th-siva">(dto x ítem)</span></th>
-            <th class="center fac-accion-th" style="width:8%">Acción</th>
+            <th class="center fac-accion-th" style="width:11%">Acción</th>
           </tr>
         </thead>
         <tbody>${rowsHtml}</tbody>
@@ -49391,12 +49397,12 @@ async function facNCEmitir(){
 
    ⚠ Tres cosas parecidas que NO son lo mismo (la cuarta fila es ésta):
      · ANULAR      — «A Programar», pedido que entró MAL y todavía no se tocó (`gv_pedido_anular`).
-     · DESARMAR / «Enviar a programar» — el pedido sigue VIVO y se va a rehacer: la mercadería
-                     vuelve de donde salió (góndola / excedente), regla de Luis del 16/09.
+     · DESARMAR / «Enviar a programar» — el pedido sigue VIVO y se va a rehacer: vuelve a «A
+                     Programar» retenido, para que el cron no lo re-programe solo.
      · BORRAR      — la regla del CLAUDE.md: se borra de la página Y de Gestión. Acá NO se borra.
-     · CANCELAR (esto) — el pedido ya está ARMADO y murió: no se factura, sale de la PPP, y lo
-                     armado va TODO a «A guardar» porque nadie lo va a re-pickear: son cajas en
-                     el piso de armado que un operario tiene que bajar y guardar.
+     · CANCELAR (esto) — el pedido ya está ARMADO y murió: no se factura y sale de la PPP.
+   ⚠ Desde la v18.91 **los tres caminos del desarme mandan la mercadería a «A guardar»**, no
+   sólo éste: las cajas quedan físicamente en el piso de armado y nadie las llevó al estante.
 
    Todo el trabajo lo hace el backend: `gv_ppp_np_desarmar(..., p_vuelve=false, p_a_guardar=true)`
    (v18.90, `sql/gv_ppp_np_desarmar_a_guardar_v1890.sql`). Saca la NP de la PPP (web →
@@ -49520,6 +49526,10 @@ window.facCancelConfirmar = async function(){
       p_por: await aprQuien(),
       p_vuelve: false,        // el pedido NO vuelve a «A Programar»: se canceló
       p_a_guardar: true       // y lo armado va TODO a «A guardar» (regla del dueño, v18.90)
+      // v18.91: desde esa versión el desarme manda todo a «A guardar» por los tres caminos,
+      // así que este flag ya no cambia el destino del stock — sí deja el rastro de que fue
+      // una CANCELACIÓN (la descripción del movimiento y el motivo que se guarda). v18.93: y por
+      // eso el backend ya no rechaza p_vuelve + p_a_guardar juntos.
     });
     var x = (r && r[0]) || {};
     s.saving = false; facCancelClose();

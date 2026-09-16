@@ -1335,7 +1335,7 @@ lo único que ve es el saldo: la misma cantidad de cajas, en `a_guardar` en vez 
 
 **Por qué.** Regla de Luis (16/09): *"si hay un pedido programado que se pickeo y se manda de
 vuelta a programar, hace que los items que se pickearon vayan a A guardar"*. Deshace la v18.80,
-del mismo día. Detalle en `docs/SUPABASE-GESTION-VIRGILIO.md` §3.id.
+del mismo día. Detalle en `docs/SUPABASE-GESTION-VIRGILIO.md` §3.ih.
 
 **ROLLBACK exacto:** sobre la definición viva (`pg_get_functiondef`), volver a poner las tres
 expresiones originales — están literales en `sql/gv_ppp_np_desarmar_v1891.sql`:

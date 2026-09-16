@@ -1,6 +1,7 @@
 ## Nota v18.90 (2026-09-16) — CANCELAR un pedido desde Facturación
 
-Pedido del dueño: un botón **✕ Cancelar** en cada fila del módulo de **Facturación**, para el
+Pedido del dueño: un botón **✕ Cancelar** en cada fila del módulo de **Facturación**, al lado
+del ✓ / ⬇ Excel (*"uno al lado del otro, como en columnas diferentes"*), para el
 pedido que se armó, no salió y no va a salir (el caso que él mismo describió: *"muchos de los
 pedidos atrasados en la PPP no se cargaron al camión porque tenían faltantes de todos los
 artículos que pedía la nota de pedido"*).
@@ -19,17 +20,20 @@ consecuencias.
 - **Lo que ya estaba armado vuelve a la bodega «A guardar»**, para que un operario lo baje del
   piso de armado y lo guarde.
 
-⚠ **No confundir con «Enviar a programar»**, que es la otra cara: ahí el pedido sigue vivo y se va
-a rehacer, así que la mercadería vuelve **de donde salió** (góndola / excedente), que es la regla
-de Luis del 16/09. Cancelar es el pedido muerto: nadie va a re-pickear esas cajas. El backend es
-la misma función (`gv_ppp_np_desarmar`) con el parámetro nuevo `p_a_guardar`, y **se niega** si le
-mandan las dos intenciones a la vez.
+⚠ **Desde la v18.91, los TRES caminos del desarme mandan la mercadería a «A guardar»**, no sólo
+este botón: también «Enviar a programar» y el desarme a secas. El motivo es físico — las cajas
+quedan en el piso de armado y nadie las llevó al estante, así que escribirlas en góndola era
+mentir. Por eso el guard que rechazaba `p_vuelve` + `p_a_guardar` juntos se sacó en la v18.93:
+hoy `p_vuelve` decide qué pasa con el PEDIDO y `p_a_guardar` sólo deja el rastro de que fue una
+cancelación. La diferencia entre cancelar y «Enviar a programar» sigue siendo el PEDIDO: uno
+muere, el otro vuelve a A Programar retenido.
 
 ⚠ Si la NP **ya tiene Carga Camión o Recepción Remitos** (o sea que ya salió), el backend rechaza
 la cancelación y el pop-up lo dice: eso se cierra con el remito, no cancelando.
 
-Detalle, medición y rollback: `docs/SUPABASE-GESTION-VIRGILIO.md` §3.if ·
-`sql/gv_ppp_np_desarmar_a_guardar_v1890.sql` · `tests/fac-cancelar-pedido.cjs`.
+Detalle, medición y rollback: `docs/SUPABASE-GESTION-VIRGILIO.md` §3.if y §3.ii ·
+`sql/gv_ppp_np_desarmar_a_guardar_v1890.sql` · `sql/gv_ppp_np_desarmar_sin_guard_v1893.sql` ·
+`tests/fac-cancelar-pedido.cjs`.
 
 ## Nota v18.48 (2026-09-15) — Rotado el password del FDW LK→Chef
 

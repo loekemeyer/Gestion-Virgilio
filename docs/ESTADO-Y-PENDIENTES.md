@@ -1,4 +1,4 @@
-# Estado y pendientes — al 2026-09-16 (última actualización: v18.90)
+# Estado y pendientes — al 2026-09-16 (última actualización: v18.93)
 
 > **2026-09-16 (v18.90) — CANCELAR un pedido desde Facturación (pedido de Thomas).**
 > Botón **✕ Cancelar** en cada fila de Facturación, con pop-up de motivo (**Falta stock** / **Otro**
@@ -8,9 +8,16 @@
 > guardar»**. Backend: `gv_ppp_np_desarmar` con el parámetro nuevo `p_a_guardar` (la firma de 4
 > argumentos se dropeó). §3.if · `sql/gv_ppp_np_desarmar_a_guardar_v1890.sql`.
 >
-> ⚠ **No se pisa con la regla de Luis del 16/09** ("la mercadería vuelve de donde salió"): ésa es
-> para «Enviar a programar», donde el pedido sigue vivo y se re-pickea. Cancelar es el pedido
-> muerto. La función se niega si le mandan las dos intenciones juntas.
+> ⚠ **Y unas horas después esto cambió (v18.91 / v18.92, §3.ih y §3.ii):** Thomas pidió que lo
+> que se manda «a programar» **también** vaya a «A guardar», así que **los tres caminos del
+> desarme mandan todo a `a_guardar`** y el guard que rechazaba las dos intenciones juntas se
+> sacó. La diferencia entre cancelar y «Enviar a programar» sigue siendo el PEDIDO: uno muere,
+> el otro vuelve a A Programar retenido.
+>
+> ⚠⚠ **Dos sesiones tocaron `gv_ppp_np_desarmar` el mismo día y una pisó a la otra** (§3.ii): un
+> `create or replace` armado con el archivo del repo deshizo la v18.91 por unos minutos. Se
+> restauró y se verificó. **Antes de reemplazar una función, leer `pg_get_functiondef` y partir
+> de eso, no de un archivo de `sql/`.**
 >
 > **Lo que queda para una persona:** Thomas avisó que **muchos de los pedidos atrasados de la PPP
 > no se cargaron al camión porque tenían faltantes de todos los artículos de la nota de pedido**, y
