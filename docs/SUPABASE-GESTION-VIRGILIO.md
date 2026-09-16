@@ -20152,3 +20152,58 @@ dual**. La vista nueva da **0 diferencias, 0 NULL indebidos y 0 cajas** contra e
 por fila (790) contra un seq scan de 62.495 movimientos — ~49 M de filas, y **la consulta se
 cuelga** (timeout). Con dos joins planos son **858 ms**. Rollback en
 `sql/backups/gv_ocupacion_lugar_pre_v1895.sql`.
+
+---
+
+## §3.ia — v18.86: el pedido PI OL-10139 de Ownland queda como el proforma real (U$S 49.291,44) — 2026-09-16
+
+Thomas mandó el `PI_draft_OL-10139.xls` (Yangjiang Ownland, draft del 26/08, 1x20GP) para
+compararlo con lo cargado. **No coincidía ni una línea.**
+
+| | Proforma | Cargado (10/09) |
+|---|---|---|
+| Líneas | 16 | 13 |
+| Unidades | 100.728 | 98.376 |
+| FOB | **49.291,44** | **46.626,00** |
+| CBM | 27,658 (784 ctns) | 21,941 |
+
+Los **precios unitarios sí coincidían** en todos los códigos comunes: lo cargado salió de una
+versión anterior del mismo pedido, no de otro proveedor. Faltaban `812E` (1440), `503E` (1200),
+`589E` (1440) y `692ENS` (1248); sobraba `119E` (1872, corta queso Loke, que el PI no trae); y
+once códigos tenían otra cantidad — los más gordos, `1546903` (36.000 contra 47.088 cargadas),
+`816E` (9984/6144) y `702E` (3024/6192).
+
+**Thomas: *"dejá solo el de usd 49291.44"*.** Aplicado con backup previo:
+
+```sql
+create table zz_backups."GV_Backup_Imp_Baches_OL10139_20260916" as
+  select * from public."GV_Importados_Baches" where pedido_ref = 'PI OL-10139';   -- 13 filas
+create table zz_backups."GV_Backup_Imp_Pedido_CC_OL10139_20260916" as
+  select * from public."GV_Imp_Pedido_CC" where pedido_ref = 'PI OL-10139';       -- 1 fila
+-- las dos con enable row level security + revoke a anon/authenticated
+```
+
+Todo en una transacción: **12 updates** de cantidad, **alta de las 4 líneas que faltaban**,
+**baja del 119E**, y `GV_Imp_Pedido_CC.fob_total` de 46.626 a **49.291,44**.
+
+```sql
+select pedido_ref, n_lineas, unidades, usd, m3 from public.gv_importados_pedidos_curso
+ where pedido_ref = 'PI OL-10139';
+--  16 | 100728 | 49291.44 | 26.379
+select fob, pagado, pend_giro_directo, falta, fob_calculado, fob_difiere
+  from public.gv_imp_cuenta_corriente where pedido_ref = 'PI OL-10139';
+--  49291.44 | 14000.00 | 20956.00 | 14335.44 | 49291.44 | false
+```
+
+Tres cosas que conviene tener a mano:
+
+- **`692ENS` del PI se cargó como `692E`** (Pelador "V" horizontal Chef, `importado_id` 148), que
+  es el código que existe en `gv_importados_ordenes` y tiene el mismo FOB (0,49). El PI aclara
+  que el "NS" es la variante sin logo.
+- **El m³ no sale del PI**: Gestión lo calcula con su volumen por artículo y da **26,379**
+  contra los **27,658 CBM** del proforma (−4,6 %). El FOB y las unidades sí son exactos.
+- **La CC subió la deuda**: `falta` pasó de 11.670 a **14.335,44** (el pagado 14.000 y el
+  pendiente de giro directo 20.956 salen del Excel de Thomas del 11/09 y no se tocaron).
+
+**Rollback:** restaurar las 13 filas y la fila de CC desde las dos tablas de `zz_backups`
+(borrando antes las 16 líneas vivas del pedido). Problema **341**.
