@@ -20155,7 +20155,7 @@ cuelga** (timeout). Con dos joins planos son **858 ms**. Rollback en
 
 ---
 
-## §3.ia — v18.86: el pedido PI OL-10139 de Ownland queda como el proforma real (U$S 49.291,44) — 2026-09-16
+## §3.ia — v18.96: el pedido PI OL-10139 de Ownland queda como el proforma real (U$S 49.291,44) — 2026-09-16
 
 Thomas mandó el `PI_draft_OL-10139.xls` (Yangjiang Ownland, draft del 26/08, 1x20GP) para
 compararlo con lo cargado. **No coincidía ni una línea.**
