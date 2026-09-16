@@ -10013,6 +10013,51 @@ async function send() {
       }
     }
   }
+  /* v19.07 — LA FASE YA ESTÁ CERRADA EN EL SERVIDOR: no la cerremos de nuevo.
+     Caso real (problema 348): el armado E09A de Franco quedó trabado, sistemas lo cerró a
+     mano por SQL el 09/09 (`client_id = cierre_manual_e09a_20260909`) y el celular —que no
+     se enteró— lo volvió a cerrar el 10/09 con el MISMO `ts_inicio`. Quedaron dos TAP del
+     mismo trabajo: 20,8 h + 45,7 h.
+     Los guards que ya había miran otras cosas: `_tapCerradoSesion` vive en memoria (se
+     vacía con cualquier recarga) y `_compTandaYaArmada` pregunta por las Entregas del
+     asistente «Completar». Ninguno mira lo único que un cierre manual SÍ deja: el evento
+     TP/TAP en el servidor. Y el picking (TP) no tenía ningún guard.
+     Un cierre manual en la base no puede limpiar el `localStorage` del operario, y
+     `tandaChipSeguir` re-siembra `st.armado` desde el AP que sigue en el servidor, así que
+     el guard tiene que estar del lado del celular. Va ANTES de pedir la ubicación: no
+     tiene sentido preguntarle dónde dejó una tanda que ya está cerrada.
+     Falla ABIERTO a propósito: sin red `getActivityStatus` devuelve el caché o vacío y el
+     cierre sale igual — perder un cierre es peor que duplicarlo. */
+  if (opcion === "TP" || opcion === "TAP") {
+    const _t = String(texto || "").trim().toUpperCase();
+    if (_t) {
+      let _yaCerrada = false;
+      try {
+        const _act = await getActivityStatus(true);
+        _yaCerrada = (opcion === "TP")
+          ? !!(_act && _act.pickingDone && _act.pickingDone.has(_t))
+          : !!(_act && _act.armadoDone  && _act.armadoDone.has(_t));
+      } catch (_e) { _yaCerrada = false; }
+      if (_yaCerrada) {
+        try {
+          const _stc = getLegajoState(legajoStr);
+          if (opcion === "TP") _stc.picking = { active: false, value: "", ts_inicio: null };
+          else                 _stc.armado  = { active: false, value: "", ts_inicio: null };
+          if (_stc.continuar) delete _stc.continuar[opcion === "TP" ? "Picking" : "Armado"];
+          setLegajoState(legajoStr, _stc);
+        } catch (_e) { /* no-op */ }
+        try {
+          alert("⚠ " + (opcion === "TP" ? "El picking" : "El armado") + " de la tanda " + _t +
+                " YA figura terminado en el sistema.\n\n" +
+                "No se registró de nuevo (si no, quedaría contado dos veces).\n" +
+                "Te saqué la tarea de la pantalla. Si creés que es un error, avisá a sistemas.");
+        } catch (_e) {}
+        try { renderLegajoHistory(legajoStr); updateCoreButtonsState(); renderPendingSuggestion(); } catch (_e) {}
+        return;
+      }
+    }
+  }
+
   // v5.86: al TERMINAR ARMADO preguntar EN QUÉ UBICACIÓN queda cada NP de la tanda.
   // Se emiten eventos AUB (más abajo). Cancelar (null) → aborta el TAP; "Omitir" ({})
   // → sigue el TAP sin registrar ubicaciones.
@@ -30868,16 +30913,66 @@ async function fetchMonitorDayStats(dayKey, sheetMapArg) {
   //              + (ingreso real día cierre [o horaEntrada] → ts_cliente).
   //     "Ingreso real": fichada del día del cierre si existe (refleja llegadas
   //     tarde); si no, la horaEntrada programada del operario.
+  /* v19.07 — TIEMPO MUERTO NETEADO del picking y del armado (regla de Luis, 16/09:
+     "si arma 1 h, va al baño 10 min y arma 50 min más, debería ser 1 h 50 de armado y
+     10 de baño, cada uno contado individual").
+     Hasta la v19.02 NO estaba implementado en ninguna parte: `DEAD_TIME_CODES` sólo servía
+     para BLOQUEAR botones, `computeClosureDur` partía el cruce de día pero no descontaba
+     nada, y `vista_productividad_diaria` mergeaba los solapes del MISMO código pero tampoco
+     restaba. Medido del 07/09 al 16/09: 9,4 h de PC/PB/AT/Limp/CT corriendo adentro de un
+     TP/TAP abierto (6,5 h en 21 armados, 2,9 h en 12 pickings). Como `PC` está en
+     ALWAYS_ALLOWED_CODES, la media hora de comida entraba como armado todos los días.
+     Los intervalos se MERGEAN antes de restar: si dos tiempos muertos se pisan entre sí
+     (pasa: PC adentro de un Limp), restar los dos por separado descontaría de más.
+     ⚠ Sólo se puede netear lo que está en `events`, o sea el día que se fetcheó. En un
+     cierre que cruza el día, el tiempo muerto del día de APERTURA no está en la consulta y
+     no se resta (son 10 casos en toda la historia y el tramo de apertura ya se corta al fin
+     de jornada). Problema 349. */
+  const deadByLeg = new Map();
+  for (const ev of events) {
+    if (!ev.ts_inicio || !DEAD_TIME_CODES.includes(ev.opcion)) continue;
+    const s = new Date(ev.ts_inicio).getTime(), e = new Date(ev.ts_cliente).getTime();
+    if (!isFinite(s) || !isFinite(e) || e <= s) continue;
+    if (e - s > 8 * 3600 * 1000) continue;            // mismo guard que el resto: > 8 h es basura
+    const k = String(ev.legajo || "").trim();
+    if (!k) continue;
+    if (!deadByLeg.has(k)) deadByLeg.set(k, []);
+    deadByLeg.get(k).push({ s: s, e: e });
+  }
+  for (const [k, arr] of deadByLeg) {                  // merge de solapes, por legajo
+    arr.sort((a, b) => a.s - b.s);
+    const out = [];
+    for (const it of arr) {
+      const last = out[out.length - 1];
+      if (last && it.s <= last.e) last.e = Math.max(last.e, it.e);
+      else out.push({ s: it.s, e: it.e });
+    }
+    deadByLeg.set(k, out);
+  }
+  /* Cuánto tiempo muerto del legajo cae dentro del tramo [s, e]. */
+  const deadOverlapMs = (leg, s, e) => {
+    const arr = deadByLeg.get(String(leg)) || [];
+    let tot = 0;
+    for (const d of arr) {
+      const ov = Math.min(e, d.e) - Math.max(s, d.s);
+      if (ov > 0) tot += ov;
+    }
+    return tot;
+  };
   const computeClosureDur = (leg, tsInicioMs, tsClienteMs, outBreakdown) => {
     const dayOpen = isoToDayKey(tsInicioMs);
     const dayClose = isoToDayKey(tsClienteMs);
     if (dayOpen === dayClose) {
-      const dur = Math.max(0, tsClienteMs - tsInicioMs);
+      const bruto = Math.max(0, tsClienteMs - tsInicioMs);
+      const muerto = Math.min(bruto, deadOverlapMs(leg, tsInicioMs, tsClienteMs));
+      const dur = bruto - muerto;
       if (outBreakdown) {
         outBreakdown.sameDay = true;
         outBreakdown.openPortion = dur;
         outBreakdown.closePortion = 0;
         outBreakdown.intermediatePortion = 0;
+        outBreakdown.brutoMs = bruto;       // lo que duró de punta a punta
+        outBreakdown.muertoMs = muerto;     // lo que se descontó (baño, comida, timbre…)
       }
       return dur;
     }
@@ -30928,17 +31023,25 @@ async function fetchMonitorDayStats(dayKey, sheetMapArg) {
       intermediateDays++;
     }
     const intermediatePortion = intermediateDays * workH * 3600 * 1000;
+    /* v19.07 — netear el tiempo muerto de los DOS tramos visibles. El del día de apertura
+       sólo aparece si ese día también está en `events` (no lo está cuando se mira un día
+       suelto); los días intermedios se cuentan como jornada completa y no tienen detalle. */
+    const muertoOpen  = Math.min(openPortion,  deadOverlapMs(leg, tsInicioMs, Math.min(fjOpenMs, tsClienteMs)));
+    const muertoClose = Math.min(closePortion, deadOverlapMs(leg, closeStartMs, tsClienteMs));
+    const muerto = muertoOpen + muertoClose;
     if (outBreakdown) {
       outBreakdown.sameDay = false;
-      outBreakdown.openPortion = openPortion;        // ts_inicio → FJ del día apertura
-      outBreakdown.closePortion = closePortion;       // ingreso día cierre → ts_cliente
+      outBreakdown.openPortion = openPortion - muertoOpen;    // ts_inicio → FJ del día apertura
+      outBreakdown.closePortion = closePortion - muertoClose;  // ingreso día cierre → ts_cliente
       outBreakdown.intermediatePortion = intermediatePortion;
       outBreakdown.fjOpenMs = fjOpenMs;
       outBreakdown.closeStartMs = closeStartMs;
       outBreakdown.fjReal = sameDayAsPrev;            // true si usamos FJ real (no horaSalida)
       outBreakdown.ingresoReal = sameDayIngreso;      // true si usamos ingreso real (no horaEntrada)
+      outBreakdown.brutoMs = openPortion + intermediatePortion + closePortion;
+      outBreakdown.muertoMs = muerto;
     }
-    return openPortion + intermediatePortion + closePortion;
+    return Math.max(0, openPortion + intermediatePortion + closePortion - muerto);
   };
   const perLegajo = new Map();
   for (const ev of events) {
@@ -45663,7 +45766,7 @@ function businessDurSinceMs(startMs, legajo) {
   }
   return openPortion + intermediateDays * workH * 3600 * 1000 + closePortion;
 }
-/* v19.03 — igual que businessDurSinceMs pero con FIN explícito (para tareas YA cerradas):
+/* v19.07 — igual que businessDurSinceMs pero con FIN explícito (para tareas YA cerradas):
    descuenta noches, sábados, domingos y feriados entre arranque y cierre, con la hora
    programada del operario (fallback 08-17). Un armado abierto de un día para el otro deja de
    contar la noche. Mismo criterio que computeClosureDur del "Rendimiento del día", simplificado
