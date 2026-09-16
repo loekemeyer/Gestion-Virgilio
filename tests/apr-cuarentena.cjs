@@ -127,10 +127,11 @@ catch (_e) {
     // v17.11 (Luis): el número de cliente tiene que verse en la ficha (LK 1000 / CH 2533)
     out.codChip = /cuar-card-cod[^>]*>LK 1000</.test(html);
 
-    // (3) v18.95 — CLIENTE NUEVO: submódulo propio ("🆕 Clientes nuevos"). Un pedido cuyo ÚNICO
-    // motivo es cliente_nuevo YA NO cae en la columna Cuarentena; uno que además tiene deuda (u
-    // otro motivo) SÍ sigue en Cuarentena (caso Zhang Qikuan).
-    _apr.cuarContacto = {}; _apr.cliValor = {};   // evitan los fetch (la ruta REST está abortada)
+    // (3) v18.100 — CLIENTE NUEVO: submódulo DENTRO de "A Programar" (no una pestaña), debajo de
+    // Cuarentena, y las dos colapsables. Un pedido cuyo ÚNICO motivo es cliente_nuevo va al
+    // submódulo "Clientes nuevos"; uno que además tiene deuda (u otro motivo) sigue en Cuarentena.
+    try { localStorage.removeItem("vir_cuar_colapsado"); localStorage.removeItem("vir_cli_colapsado"); } catch (_e) {}
+    _apr.cuarContacto = {}; _apr.cliValor = {}; _apr.cliDemo = false;   // evitan los fetch (ruta REST abortada)
     _apr.pedidos = [
       mk({ order_id: 200, empresa: "chef", cod: "2533", razon_social: "Cliente Nuevo SA",
            cuarentena_motivos: ["cliente_nuevo"], cuarentena_detalle: { nuevo_pedidos: 1 } }),
@@ -138,24 +139,35 @@ catch (_e) {
            cuarentena_motivos: ["deuda", "cliente_nuevo"], cuarentena_detalle: { deuda: 50000, nuevo_pedidos: 1 } }),
       mk({ order_id: 201, razon_social: "Cliente Dos" })
     ];
-    // (3a) columna Cuarentena: el pedido puro de cliente nuevo NO está; el mixto SÍ, con badge.
     _pppTab = "prog"; aprRender(); await new Promise((res) => setTimeout(res, 50));
     html = document.getElementById("pppPreview").innerHTML;
-    out.nuevoFueraDeCuar = /🚧 Cuarentena <b>\(1\)<\/b>/.test(html);   // sólo el mixto
-    out.nuevoBadge = /cuar-badge b-nuevo[^>]*>🆕 Cliente nuevo</.test(html);   // en el mixto
-    out.nuevoMotivo = /Cliente nuevo \(1 pedido facturado en toda su historia\)\./.test(html);
-    // (3b) pestaña Clientes nuevos: el pedido puro está, con su chip CH 2533; el mixto NO.
-    _pppTab = "clinuevos"; pppRenderProg(); await new Promise((res) => setTimeout(res, 50));
+    // Los dos submódulos conviven en el mismo render; se parte el HTML por sus títulos.
+    const iCuar = html.indexOf("🚧 Cuarentena"), iCli = html.indexOf("🆕 Clientes nuevos");
+    const cuarSec = html.slice(iCuar, iCli), cliSec = html.slice(iCli);
+    // (3a) Cuarentena: sólo el mixto (deuda+nuevo), con badge; el puro NO.
+    out.nuevoFueraDeCuar = /🚧 Cuarentena <b>\(1\)<\/b>/.test(cuarSec);
+    out.nuevoBadge = /cuar-badge b-nuevo[^>]*>🆕 Cliente nuevo</.test(cuarSec);
+    out.nuevoMotivo = /Cliente nuevo \(1 pedido facturado en toda su historia\)\./.test(cuarSec);
+    // (3b) Clientes nuevos: el puro está (chip CH 2533); el mixto NO.
+    out.cliNuevosCuenta = /🆕 Clientes nuevos <b>\(1\)<\/b>/.test(cliSec);
+    out.nuevoCodChip = /cuar-card-cod[^>]*>CH 2533</.test(cliSec);
+    out.cliNuevosSinMixto = !/Cliente Nuevo Deudor/.test(cliSec);
+    // (3c) el botón "👁 Ver ejemplo" agrega una fila EJEMPLO con su monto, sin sumar al badge.
+    _apr.cliDemo = true; aprRender(); await new Promise((res) => setTimeout(res, 50));
     html = document.getElementById("pppPreview").innerHTML;
-    out.cliNuevosCuenta = /🆕 Clientes nuevos <b>\(1\)<\/b>/.test(html);
-    out.nuevoCodChip = /cuar-card-cod[^>]*>CH 2533</.test(html);
-    out.cliNuevosSinMixto = !/Cliente Nuevo Deudor/.test(html);
-    // (3c) v18.99 — el botón "👁 Ver ejemplo" agrega una fila EJEMPLO con su monto, sin sumar al badge.
-    _apr.cliDemo = true; pppRenderProg(); await new Promise((res) => setTimeout(res, 50));
+    const cliSec2 = html.slice(html.indexOf("🆕 Clientes nuevos"));
+    out.cliDemoFila = /cuar-demo-tag">EJEMPLO</.test(cliSec2) && /\$120\.480/.test(cliSec2);
+    out.cliDemoNoCuenta = /🆕 Clientes nuevos <b>\(1\)<\/b>/.test(cliSec2);
+    _apr.cliDemo = false;
+    // (3d) v18.100 — colapsar: el título queda, la tabla se esconde.
+    try { localStorage.setItem("vir_cli_colapsado", "1"); } catch (_e) {}
+    aprRender(); await new Promise((res) => setTimeout(res, 50));
     html = document.getElementById("pppPreview").innerHTML;
-    out.cliDemoFila = /cuar-demo-tag">EJEMPLO</.test(html) && /\$120\.480/.test(html);
-    out.cliDemoNoCuenta = /🆕 Clientes nuevos <b>\(1\)<\/b>/.test(html);
-    _apr.cliDemo = false; _pppTab = "prog";
+    const cliSec3 = html.slice(html.indexOf("🆕 Clientes nuevos"), html.indexOf("🆕 Clientes nuevos") + 400);
+    out.cliColapsaTitulo = /🆕 Clientes nuevos <b>\(1\)<\/b>/.test(cliSec3);   // el título con contador sigue
+    out.cliColapsaSinTabla = !/CH 2533/.test(html);   // la tabla (chip del cliente) desaparece
+    try { localStorage.removeItem("vir_cli_colapsado"); } catch (_e) {}
+    _pppTab = "prog";
     out.nuevoEtq = aprCuarentenaEtiqueta({ cuarentena_motivos: ["cliente_nuevo"] });
 
     // (4) v17.13 — "Ya programados" es una TABLA, con aprobación y librito de comentarios
@@ -506,6 +518,8 @@ catch (_e) {
   chk(r.cliNuevosSinMixto, "el pedido mixto (deuda+nuevo) NO aparece en Clientes nuevos");
   chk(r.cliDemoFila, "'Ver ejemplo' muestra una fila EJEMPLO con su monto ($120.480)");
   chk(r.cliDemoNoCuenta, "el ejemplo NO suma al badge (sigue en 1 real)");
+  chk(r.cliColapsaTitulo, "colapsar Clientes nuevos: el título con el contador (1) queda");
+  chk(r.cliColapsaSinTabla, "colapsar Clientes nuevos: la tabla se esconde");
   chk(r.nuevoEtq === "Cliente nuevo", "etiqueta de cliente_nuevo = 'Cliente nuevo'");
   chk(r.ypTabla, "ya programados: es una tabla con columnas NP / … / Enviar a");
   chk(r.ypSinColAprob, "ya programados: sin columna Aprobación (el aprobado sale de la lista)");

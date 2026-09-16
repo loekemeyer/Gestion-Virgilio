@@ -834,6 +834,9 @@ button {
    y bajas en fila, como una tira de calendario; antes eran una columna de 420 px que se iba al fondo. */
 .apr-wrap{ display:grid; grid-template-columns: 1fr; gap:10px; align-items:start; }
 .apr-wrap.apr-2col{ grid-template-columns: 1fr; }   /* v13.69: sin tandas sin fecha → pedidos | días (v13.74: apilados) */
+/* v18.100 (Luis): Cuarentena y Clientes nuevos colapsables — el título es el botón. */
+.apr-col-t.apr-col-t-clic{ cursor:pointer; user-select:none; }
+.apr-col-caret{ display:inline-block; width:1em; text-align:center; opacity:.8; }
 .apr-col-nps .apr-scroll{ display:grid; grid-template-columns:repeat(auto-fill, minmax(250px, 1fr)); gap:7px; align-items:start; }
 .apr-col-tandas .apr-scroll{ display:grid; grid-template-columns:repeat(auto-fill, minmax(280px, 1fr)); gap:7px; align-items:start; }
 .apr-col{ background:#f8fafc; border:1px solid #e2e8f0; border-radius:10px; padding:10px; min-width:0; }
@@ -38523,14 +38526,6 @@ function _pmodFecha(iso, conDia) {
   const d = new Date(+m[1], +m[2] - 1, +m[3]);
   return (conDia ? _PN_DOW[d.getDay()] + " " : "") + (+m[3]) + "/" + m[2];
 }
-/* v18.95 (Luis) — cuántos pedidos de "cliente nuevo" (único motivo) hay para el badge de la
-   pestaña. Lectura en memoria, sin red; null hasta que A Programar terminó de cargar y marcar. */
-function _pppCliNuevosN() {
-  try {
-    if (typeof _apr === "undefined" || !_apr || !_apr.listo) return null;
-    return (_apr.pedidos || []).filter(function (p) { return aprEnCuarentena(p) && aprSoloClienteNuevo(p); }).length;
-  } catch (_e) { return null; }
-}
 function pppTabsHtml(cProg, cPlan, cViaje, cEnt) {
   const n = function (v) { return (v == null ? "…" : v); };
   const b = function (id, txt) {
@@ -38545,7 +38540,6 @@ function pppTabsHtml(cProg, cPlan, cViaje, cEnt) {
     b("ent",     "✅ Pedidos Entregados (" + n(cEnt) + ")") +
     b("ocup",    "📦 Ocupación") +
     b("modif",   "✏️ Modificar Pedidos") +          // v18.14 (Luis): entre Ocupación y Config. Cuarentena
-    b("clinuevos", "🆕 Clientes nuevos (" + n(_pppCliNuevosN()) + ")") +   // v18.95 (Luis)
     b("cuarcfg", "🚧 Config. Cuarentena") +
   '</div>';
 }
@@ -38614,15 +38608,6 @@ function pppRenderProg() {
     pgaNeed();
     if (!_apr.listo && !_apr.cargando) { try { aprCargar(); } catch (_e) {} }
     _renderKeepFocus(box, pppModifHtml());
-    return;
-  }
-  // v18.95 (Luis) — Clientes nuevos. Pantalla propia, mismo patrón: no depende de una PPP
-  // importada. Los pedidos y su marca de cuarentena salen de A Programar (aprCargar +
-  // cuarMarcarPedidos, que corre solo al terminar la carga aunque no estemos en esa solapa).
-  if (_pppTab === "clinuevos") {
-    pppPaintTabs();
-    if (!_apr.listo && !_apr.cargando) { try { aprCargar(); } catch (_e) {} }
-    _renderKeepFocus(box, clinNuevosHtml());
     return;
   }
   // v8.61 — cargar (una vez) los entregados para el aviso "salió en fecha ≠ a la PPP".
@@ -42789,7 +42774,7 @@ function aprRender() {
   // existe mientras haya pedidos tildados. Al programar se vacía la selección, así que vuelve solo al paso 1.
   if (_apr.paso === 2 && !aprSelKeys().length) { _apr.paso = 1; _apr.diaSel = null; }
   if (_apr.paso === 2) h += '<div class="apr-wrap apr-2col">' + aprPaso2Html() + '</div>';
-  else h += '<div class="apr-wrap' + (conTandas ? '' : ' apr-2col') + '">' + aprColPedidos() + aprColCuarentena() + (conTandas ? aprColTandas() : '') + '</div>';
+  else h += '<div class="apr-wrap' + (conTandas ? '' : ' apr-2col') + '">' + aprColPedidos() + aprColCuarentena() + clinNuevosHtml() + (conTandas ? aprColTandas() : '') + '</div>';
   h += aprFootHtml();
 
   // Cada acción re-dibuja las tres columnas. Sin esto, sacar un pedido de una
@@ -43182,6 +43167,12 @@ function aprSoloClienteNuevo(p) {
   const ms = aprCuarentenaMotivos(p);
   return ms.length === 1 && ms[0] === "cliente_nuevo";
 }
+/* v18.100 (Luis): Cuarentena y Clientes nuevos son submódulos COLAPSABLES dentro de A Programar.
+   El estado se guarda por navegador (localStorage) para que quede como el operario lo dejó. */
+function aprColapsado(key) { try { return localStorage.getItem(key) === "1"; } catch (_e) { return false; } }
+function aprSetColapsado(key, v) { try { localStorage.setItem(key, v ? "1" : "0"); } catch (_e) {} }
+function aprCuarColapsar() { aprSetColapsado("vir_cuar_colapsado", !aprColapsado("vir_cuar_colapsado")); aprRender(); }
+function aprCliColapsar() { aprSetColapsado("vir_cli_colapsado", !aprColapsado("vir_cli_colapsado")); aprRender(); }
 /* 3 badges separados (suspendido/deuda/límite), sólo los que aplican. */
 /* v15.04 (dueño: "que diga ahí el motivo de la cuarentena: ej deuda $10000") — los
    montos vienen del backend en `cuarentena_detalle` (deuda, exceso, limite, estado).
@@ -43270,11 +43261,14 @@ function aprColCuarentena() {
   if (_apr.cuarComN === null && !_apr.cuarComNLoading && lista.some(function (p) { return !p._demo; })) cuarComLoteCargar();
   if (_apr.cuarDemo) lista = [cuarDemoPedido()].concat(lista);   // v14.84: pedido de ejemplo
   const _cuarCargando = !_apr.listo || aprCargandoAlgo();   // v15.54: mismo criterio que la columna de pedidos
-  let h = '<div class="apr-col apr-col-cuar' + (_cuarCargando ? ' apr-col-cargando' : '') + '">' +
-    '<div class="apr-col-t">🚧 Cuarentena <b>(' + (_cuarCargando ? '…' : lista.length) + ')</b>' +
-      '<span class="apr-cuar-help" title="Pedidos de clientes con deuda, suspendidos, que superan su límite de crédito o que son CLIENTES NUEVOS. No se programan (ni a mano ni por el automático): hay que liberarlos primero.">ⓘ</span>' +
-    '</div>' +
-    cuarDemoRowHtml();   // v14.88: los 4 botones de importación se movieron a "Config. Cuarentena"
+  const _cuarCol = aprColapsado("vir_cuar_colapsado");   // v18.100 (Luis): submódulo colapsable
+  let h = '<div class="apr-col apr-col-cuar' + (_cuarCargando ? ' apr-col-cargando' : '') + (_cuarCol ? ' apr-col-colapsado' : '') + '">' +
+    '<div class="apr-col-t apr-col-t-clic" onclick="aprCuarColapsar()" title="' + (_cuarCol ? "Mostrar" : "Ocultar") + ' Cuarentena">' +
+      '<span class="apr-col-caret">' + (_cuarCol ? "▸" : "▾") + '</span> 🚧 Cuarentena <b>(' + (_cuarCargando ? '…' : lista.length) + ')</b>' +
+      '<span class="apr-cuar-help" title="Pedidos de clientes con deuda, suspendidos, que superan su límite de crédito. No se programan (ni a mano ni por el automático): hay que liberarlos primero.">ⓘ</span>' +
+    '</div>';
+  if (_cuarCol) return h + '</div>';   // colapsado: sólo el título con el contador
+  h += cuarDemoRowHtml();   // v14.88: los 4 botones de importación se movieron a "Config. Cuarentena"
   h += cuarYaProgHtml();   // v16.57 — aviso de los que YA tienen tanda (problema 14)
   if (!lista.length) {
     h += _cuarCargando
@@ -43595,7 +43589,7 @@ async function cuarContactoCargar() {
     _apr.cuarContacto = m;
   } catch (_e) { _apr.cuarContacto = _apr.cuarContacto || {}; }
   _apr.cuarContactoLoading = false;
-  if (_pppTab === "prog") aprRender(); else if (_pppTab === "clinuevos") pppRenderProg();
+  if (_pppTab === "prog") aprRender();
 }
 
 /* ── CLIENTES NUEVOS (v18.95, Luis 2026-09-16) ───────────────────────────────
@@ -43626,7 +43620,7 @@ async function clinNuevosValorCargar() {
     _apr.cliValor = m;
   } catch (_e) { _apr.cliValor = _apr.cliValor || {}; }
   _apr.cliValorLoading = false;
-  if (_pppTab === "clinuevos") pppRenderProg();
+  if (_pppTab === "prog") aprRender();
 }
 function clinNuevosValorFmt(p) {
   if (p && p._demo) return '<b title="Ejemplo — precio total por lista (neto, sin IVA)">' + cuarPlata(120480) + '</b>';
@@ -43640,15 +43634,18 @@ function clinNuevosValorFmt(p) {
 function clinNuevosHtml() {
   const cargando = !_apr.listo || aprCargandoAlgo();
   let lista = (_apr.pedidos || []).filter(function (p) { return aprEnCuarentena(p) && aprSoloClienteNuevo(p); });
+  const realN = lista.length;   // el badge cuenta los reales, no el ejemplo
+  const _cliCol = aprColapsado("vir_cli_colapsado");   // v18.100 (Luis): submódulo colapsable
+  let h = '<div class="apr-col apr-col-cuar' + (cargando ? ' apr-col-cargando' : '') + (_cliCol ? ' apr-col-colapsado' : '') + '">' +
+    '<div class="apr-col-t apr-col-t-clic" onclick="aprCliColapsar()" title="' + (_cliCol ? "Mostrar" : "Ocultar") + ' Clientes nuevos">' +
+      '<span class="apr-col-caret">' + (_cliCol ? "▸" : "▾") + '</span> 🆕 Clientes nuevos <b>(' + (cargando ? '…' : realN) + ')</b>' +
+      '<span class="apr-cuar-help" title="Pedidos de CLIENTES NUEVOS (código alto y menos de 3 pedidos facturados en toda su historia). Si además tienen deuda, están suspendidos o superan su límite de crédito, NO caen acá: quedan en Cuarentena. No se programan solos: hay que liberarlos primero.">ⓘ</span>' +
+    '</div>';
+  if (_cliCol) return h + '</div>';   // colapsado: sólo el título con el contador
   if (_apr.cuarContacto === null && !_apr.cuarContactoLoading && lista.some(function (p) { return !p._demo; })) cuarContactoCargar();
   clinNuevosValorNeed();
-  const realN = lista.length;   // el badge cuenta los reales, no el ejemplo
   if (_apr.cliDemo) lista = [clinDemoPedido()].concat(lista);   // v18.99: fila de ejemplo (como Cuarentena)
-  let h = '<div class="apr-col apr-col-cuar' + (cargando ? ' apr-col-cargando' : '') + '">' +
-    '<div class="apr-col-t">🆕 Clientes nuevos <b>(' + (cargando ? '…' : realN) + ')</b>' +
-      '<span class="apr-cuar-help" title="Pedidos de CLIENTES NUEVOS (código alto y menos de 3 pedidos facturados en toda su historia). Si además tienen deuda, están suspendidos o superan su límite de crédito, NO caen acá: quedan en Cuarentena. No se programan solos: hay que liberarlos primero.">ⓘ</span>' +
-    '</div>' +
-    clinDemoRowHtml();
+  h += clinDemoRowHtml();
   if (!lista.length) {
     h += cargando
       ? '<div class="apr-cargando apr-cargando-cuar"><span class="apr-cargando-ic">⏳</span><b>Todavía controlando…</b></div>'
@@ -44431,7 +44428,7 @@ async function cuarMarcarPedidos() {
   _apr.cuarContacto = null;   // v14.90: cambió el set de retenidos → recargar contactos WhatsApp
   _apr.cuarComN = null;       // v18.01: ídem el contador de comentarios de cada 📖
   _apr.cliValor = null;       // v18.95: cambió el set → recargar el monto de los clientes nuevos
-  if (_pppTab === "prog") aprRender(); else if (_pppTab === "clinuevos") pppRenderProg();
+  if (_pppTab === "prog") aprRender();
 }
 /* Pedido de EJEMPLO para ver el sector sin datos reales (dueño: "poneme un pedido de prueba"). */
 function cuarDemoPedido() {
