@@ -5655,7 +5655,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=19.04"></script>
+<script type="module" src="recepcion.js?v=19.05"></script>
 <!-- Config del módulo de fichada (compartido con fichada.html). El secret
      hmacSecret tiene que ser el mismo acá y allá; cargándolo desde un solo
      archivo evitamos que se desincronicen. -->
@@ -9339,7 +9339,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v19.04";
+const APP_VERSION = "v19.05";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -30338,6 +30338,16 @@ async function showOperarioDia(legajo) {
   const hhmm = function (ms) {
     return new Date(ms).toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit", timeZone: "America/Argentina/Buenos_Aires" });
   };
+  const ddmm = function (ms) {
+    return new Date(ms).toLocaleDateString("es-AR", { day: "2-digit", month: "2-digit", timeZone: "America/Argentina/Buenos_Aires" });
+  };
+  // Duración REAL de cada fila: una tarea cerrada descuenta noches/finde/feriados (igual que el
+  // "Rendimiento del día"); una en curso corre hasta ahora en horario laboral; un hueco es crudo.
+  const taskMs = function (r2) {
+    if (r2.gap) return Math.max(0, r2.endMs - r2.startMs);
+    if (r2.ongoing) return (typeof businessDurSinceMs === "function") ? businessDurSinceMs(r2.startMs, leg) : Math.max(0, r2.endMs - r2.startMs);
+    return businessDurBetweenMs(leg, r2.startMs, r2.endMs);
+  };
   try {
     const dayKey = isoToDayKey(Date.now());
     const dayStartIso = new Date(`${dayKey}T00:00:00-03:00`).toISOString();
@@ -30392,10 +30402,10 @@ async function showOperarioDia(legajo) {
     }
 
     rows.sort((a, b) => a.startMs - b.startMs);
-    const totalMs = rows.reduce((s, r2) => s + Math.max(0, r2.endMs - r2.startMs), 0);
+    const totalMs = rows.reduce((s, r2) => s + taskMs(r2), 0);
     const nPick = data.filter(e => e.opcion === "TP").length;
     const nArm  = data.filter(e => e.opcion === "TAP").length;
-    const cortesMs = rows.filter(r2 => ["Baño", "Comida", "Permiso de salida"].some(t => r2.label.indexOf(t) === 0)).reduce((s, r2) => s + Math.max(0, r2.endMs - r2.startMs), 0);
+    const cortesMs = rows.filter(r2 => ["Baño", "Comida", "Permiso de salida"].some(t => r2.label.indexOf(t) === 0)).reduce((s, r2) => s + taskMs(r2), 0);
 
     // Huecos SIN TAREA entre tarea y tarea. Se calculan sobre la UNIÓN de los
     // intervalos (no next.start − prev.end), así un armado que quedó abierto y se
@@ -30417,8 +30427,12 @@ async function showOperarioDia(legajo) {
     const display = rows.concat(gaps).sort((a, b) => a.startMs - b.startMs);
 
     const rowsHtml = display.map(r2 => {
-      const dur = fmtDur(Math.max(0, r2.endMs - r2.startMs));
-      const rango = hhmm(r2.startMs) + " – " + (r2.ongoing ? "ahora" : hhmm(r2.endMs));
+      const dur = fmtDur(taskMs(r2));
+      // Si el arranque es de otro día (armado que cruzó la noche), se muestra la fecha para
+      // que no parezca de hoy. La duración ya viene descontada por taskMs.
+      const cruza = isoToDayKey(r2.startMs) !== dayKey;
+      const ini = (cruza ? ddmm(r2.startMs) + " " : "") + hhmm(r2.startMs);
+      const rango = ini + " – " + (r2.ongoing ? "ahora" : hhmm(r2.endMs));
       if (r2.gap) {
         return `
         <tr style="color:#94a3b8;font-style:italic;background:#f8fafc">
@@ -45641,6 +45655,41 @@ function businessDurSinceMs(startMs, legajo) {
   const closePortion = isOff(dayNow) ? 0 : Math.max(0, nowMs - closeStartMs);
   const dStart = new Date(dayOpen + "T00:00:00-03:00").getTime();
   const dEnd = new Date(dayNow + "T00:00:00-03:00").getTime();
+  let intermediateDays = 0;
+  for (let dm = dStart + 24 * 3600 * 1000; dm < dEnd - 1000; dm += 24 * 3600 * 1000) {
+    const dKey = new Date(dm).toISOString().slice(0, 10);
+    if (isOff(dKey)) continue;
+    intermediateDays++;
+  }
+  return openPortion + intermediateDays * workH * 3600 * 1000 + closePortion;
+}
+/* v19.03 — igual que businessDurSinceMs pero con FIN explícito (para tareas YA cerradas):
+   descuenta noches, sábados, domingos y feriados entre arranque y cierre, con la hora
+   programada del operario (fallback 08-17). Un armado abierto de un día para el otro deja de
+   contar la noche. Mismo criterio que computeClosureDur del "Rendimiento del día", simplificado
+   (sin fichada real: usa la hora programada). Lo usa showOperarioDia. */
+function businessDurBetweenMs(legajo, startMs, endMs) {
+  if (!(endMs > startMs)) return 0;
+  const dayOpen = isoToDayKey(startMs), dayEnd = isoToDayKey(endMs);
+  if (dayOpen === dayEnd) return endMs - startMs;
+  const hmap = (typeof getEmpleadosHorarios === "function") ? getEmpleadosHorarios() : null;
+  const h = (hmap && hmap.get) ? (hmap.get(String(legajo)) || {}) : {};
+  const _he = parseHHMMtoHours(h.entrada); const horaEntrada = (_he == null) ? 8 : _he;
+  const _hs = parseHHMMtoHours(h.salida);  const horaSalida  = (_hs == null) ? 17 : _hs;
+  const workH = Math.max(0, horaSalida - horaEntrada);
+  const tsOfHourOnDay = function (dayKey, hours) {
+    const hh = Math.floor(hours), mm = Math.floor((hours - hh) * 60), ss = Math.round((hours - hh - mm / 60) * 3600);
+    return new Date(dayKey + "T" + String(hh).padStart(2, "0") + ":" + String(mm).padStart(2, "0") + ":" + String(ss).padStart(2, "0") + "-03:00").getTime();
+  };
+  const isOff = function (dayKey) {
+    const wd = new Date(dayKey + "T00:00:00-03:00").getUTCDay();
+    return wd === 0 || wd === 6 || FERIADOS_AR.has(dayKey);
+  };
+  const openPortion = Math.max(0, tsOfHourOnDay(dayOpen, horaSalida) - startMs);
+  const closeStartMs = Math.max(tsOfHourOnDay(dayEnd, horaEntrada), startMs);
+  const closePortion = isOff(dayEnd) ? 0 : Math.max(0, endMs - closeStartMs);
+  const dStart = new Date(dayOpen + "T00:00:00-03:00").getTime();
+  const dEnd = new Date(dayEnd + "T00:00:00-03:00").getTime();
   let intermediateDays = 0;
   for (let dm = dStart + 24 * 3600 * 1000; dm < dEnd - 1000; dm += 24 * 3600 * 1000) {
     const dKey = new Date(dm).toISOString().slice(0, 10);
