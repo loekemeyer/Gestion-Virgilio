@@ -63,13 +63,20 @@ if (!src.includes("gv_ppp_web_desprogramar_previo")) {
    roto — pasó al escribir este test. Se mira el código, no lo que dice el código. */
 const sinComentarios = (t) => String(t).replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/[^\n]*/g, "");
 const iSal = src.indexOf("async function aprCargarSalida");
-const cuerpoSal = iSal >= 0 ? src.slice(iSal, iSal + 900) : "";
+const cuerpoSal = iSal >= 0 ? src.slice(iSal, iSal + 1400) : "";
 if (!cuerpoSal.includes("gv_ppp_web_dia_salida")) {
   fallas.push("no encuentro la llamada a gv_ppp_web_dia_salida dentro de aprCargarSalida");
 } else if (!/empresa\s*:/.test(sinComentarios(cuerpoSal)) ||
            !/order_id\s*:/.test(sinComentarios(cuerpoSal))) {
   fallas.push("aprCargarSalida no le manda empresa/order_id a gv_ppp_web_dia_salida: sin eso el " +
     "backend no puede saber si el pedido está retenido");
+}
+/* v19.12 (Thomas): y el `cod`, porque SUPER se decide por el padrón `GV_Supers` y no por la
+   zona — Matiz SA (Gigot, súper) entrega en Constitución, o sea "Zona 1 - CABA Sur", y el chip
+   le prometía "se arma solo → 23/09" a un pedido que el armado saltea con `gv_es_super`. */
+if (cuerpoSal && !/cod\s*:/.test(sinComentarios(cuerpoSal))) {
+  fallas.push("aprCargarSalida no le manda el cod a gv_ppp_web_dia_salida: sin eso el backend " +
+    "no puede saber si el cliente es un súper del padrón (zona numérica)");
 }
 if (!/s\.motivo === "retenido"/.test(src)) {
   fallas.push("el chip de A Programar no contempla el motivo 'retenido'");

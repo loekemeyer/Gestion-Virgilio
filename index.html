@@ -5703,7 +5703,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=19.11"></script>
+<script type="module" src="recepcion.js?v=19.12"></script>
 <!-- Config del módulo de fichada (compartido con fichada.html). El secret
      hmacSecret tiene que ser el mismo acá y allá; cargándolo desde un solo
      archivo evitamos que se desincronicen. -->
@@ -9485,7 +9485,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v19.11";
+const APP_VERSION = "v19.12";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -42757,9 +42757,14 @@ async function aprCargarSalida() {
     /* v18.77 — van también `empresa` y `order_id`: sin eso el backend no puede saber si el
        pedido está RETENIDO (sacado de una tanda a propósito) y el chip decía "se arma solo"
        de un pedido que el automático no va a tocar nunca. */
+    /* v19.12 — va TAMBIÉN el `cod`: si el cliente es un SÚPER del padrón (`GV_Supers`)
+       el armado automático no lo toca, y eso no se puede deducir de la zona (Matiz SA /
+       Gigot entrega en Constitución, o sea "Zona 1 - CABA Sur"). Sin el cod el chip decía
+       "🤖 se arma solo → mar 23/9" de un pedido que nadie iba a programar. */
     const filas = peds.map(function (p) {
       return { zona: p.zona || "", m3: Number(p.m3) || 0,
-               empresa: p.empresa || "", order_id: p.order_id };
+               empresa: p.empresa || "", order_id: p.order_id,
+               cod: String(p.cod || "").trim() };
     });
     const rows = await aprRpc("gv_ppp_web_dia_salida", { p_filas: filas }) || [];
     const m = {};

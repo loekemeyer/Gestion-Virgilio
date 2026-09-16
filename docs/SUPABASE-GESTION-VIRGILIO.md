@@ -20711,3 +20711,38 @@ antes HTTP 400.
 **Cubierto** en `tests/apr-badge-horario.cjs` (casos `(g)`: el badge sale por el turno de la OC
 aunque el cliente no coordine horario, con día y hora, el title dice de dónde sale, y el horario
 manual gana). **SQL y rollback**: `sql/gv_turno_entrega_oc_v1911.sql`.
+
+---
+
+## §3.io — v19.12: el chip de A Programar le prometía "se arma solo" a un SÚPER — 2026-09-16
+
+Contando los 7 pendientes de §3.in apareció el que no tenía explicación: **LK 1450, Matiz SA**,
+entrado el 15/09, liberado de cuarentena por Vivi el 15/09 14:07, zona automática… y sin
+programar. El motivo: **cod 4263 = Gigot, súper ACTIVO en `GV_Supers`**, y entrega en
+Constitución → zona `Zona 1 - CABA Sur`.
+
+`ppp_web_armar_tandas` lo saltea bien (`delete from _sin_tanda where gv_es_super(...)`, v18.28),
+pero `gv_ppp_web_dia_salida` —el chip que explica qué va a pasar con cada pedido— decidía "súper"
+**por el texto de la zona** (`zona ilike 'super%'`), así que le mostraba
+*"🤖 se arma solo → mar 23/9 · en minutos"*. El supervisor esperaba una tanda que no iba a salir.
+
+> **Quinta puerta del mismo bug**: v18.28 `_sin_tanda`, v18.60 `_ex` y `gv_ppp_web_dia_camion`,
+> v18.87 `_open`, y ahora el chip. **Al tocar el armado, buscar `'super|retira|expo'` y
+> preguntarse si ahí no debería ir `gv_es_super`.**
+
+Ahora el payload lleva `cod` (lo manda `aprCargarSalida`, v19.12) y un CTE `sup` resuelve súper
+con **el mismo padrón que el armado**. Detalle fino: en el `CASE` de `r_detalle` el orden no era
+el de `r_dia`/`r_motivo` (la zona automática se evaluaba antes), así que en el primer pase 1450
+salía con motivo `super` y detalle *"se arma sola"* — dos verdades distintas en la misma fila.
+De paso, `pend_auto` (el m³ con el que se decide si el intradía arma ya) dejó de contar súper.
+
+```sql
+select r_idx, r_motivo from gv_ppp_web_dia_salida('[
+  {"zona":"Zona 1 - CABA Sur","m3":0,    "empresa":"lk","order_id":1450,"cod":"4263"},
+  {"zona":"Zona 1 - CABA Sur","m3":0.171,"empresa":"lk","order_id":1470,"cod":"4069"}]'::jsonb);
+-- 1450 -> super (antes: job/23-09) · 1470 -> job  (y a las 16:05 salió de verdad: E29A)
+```
+
+**Cubierto** en `tests/enviar-a-programar-deshace.cjs` (el chequeo "el chip no puede mentir sobre
+el automático" ahora exige el `cod` en el payload). **SQL y rollback**:
+`sql/gv_ppp_web_dia_salida_super_v1912.sql`. Problema 359.
