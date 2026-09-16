@@ -20379,3 +20379,74 @@ update public."Facturacion_NP" f
 ```
 
 Sin bump de versión: no cambió una línea de la app — el arreglo del código ya viajó en la v19.01.
+
+## §3.ii — v19.03: las 6 RPC de Conciliación se cierran a `anon` — 2026-09-16
+
+**Lo que estaba abierto.** Las 6 funciones `gv_conciliacion_*` (`lista`, `comparar`, `motivo`,
+`detalle`, `totales`, `registrar`) eran `SECURITY DEFINER` con `EXECUTE` para **PUBLIC**, y `anon`
+lo hereda. Medido con `set role anon`:
+
+```
+gv_conciliacion_lista(500,0,null,null)  ->  143 filas
+  razón social "Extralimp S.A." · neto Gestión $3.142.920 · neto ISIS · storage_path del PDF
+```
+
+La anon key está escrita en `index.html`, que se sirve por GitHub Pages: **cualquiera que la copie
+leía la facturación del depósito**. Y `gv_conciliacion_registrar` además **escribe**.
+
+**Lo que NO se filtraba: el PDF.** Los buckets `isis-lk` / `isis-ch` son privados y su policy exige
+`authenticated` + `es_supervisor_virgilio()`. Se escapaba el **nombre** del archivo (que lleva el
+número de comprobante), no el contenido.
+
+⚠ **No es un agujero de esta pantalla ni de la v18.88.** Es el **default de Postgres** —cada
+función nueva nace con `EXECUTE` para `PUBLIC`— y nadie lo revocó nunca. Al 16/09 había
+**219 de 366** funciones `SECURITY DEFINER` alcanzables por `anon` en este proyecto.
+
+### Por qué no rompe nada (verificado ANTES, no supuesto)
+
+| Dónde se buscó | Resultado |
+|---|---|
+| `cron.job` (command) | ninguno la llama |
+| `pg_proc.prosrc` (otras funciones) | ninguna |
+| vistas (`pg_rewrite`) | ninguna |
+| Edge Functions (las 8 del repo) | ninguna |
+| repos `pagina-LK-copia` y `paginach` | nada |
+| repo `produccion-virgilio` (clonado y grepeado) | nada |
+| código de Gestión | **sólo `index.html`** |
+
+En `edge_logs` de 24 h quien las llama son **navegadores Chrome** — ningún n8n, script ni curl.
+
+**Y la prueba que cierra el tema:** en esos mismos logs,
+`/storage/v1/object/sign/isis-lk/...` devuelve **200**, y ese endpoint sólo funciona para
+`authenticated` + supervisor. O sea que **la pantalla ya entra con sesión de Google**: sacarle el
+permiso a `anon` no la toca.
+
+### Verificado DESPUÉS
+
+```
+set role anon          -> ERROR 42501: permission denied for function gv_conciliacion_lista
+set role authenticated -> lista 143 · totales 3 · comparar 1 · detalle 1 · motivo ok
+                          (idéntico a antes del revoke)
+```
+
+`authenticated` y `service_role` conservan su grant propio: el `revoke` fue sólo a `public, anon`.
+
+### Lo que esto NO resuelve
+
+`authenticated` es **cualquiera con sesión de Google** en este proyecto, no sólo un supervisor. Hoy
+alcanza (a esta app sólo se loguean supervisores; los operarios usan la sesión por legajo, que a
+nivel base es `anon`), pero el cierre fuerte sería el guard **adentro** de cada función, como ya
+hace el Storage:
+
+```sql
+if not public.es_supervisor_virgilio() then raise exception 'solo supervisores'; end if;
+```
+
+⚠ Con la trampa ya documentada: el guard **no** puede colgarse del `FROM` de una función SQL
+—Postgres elimina la subconsulta de una fila cuyas columnas no se referencian y **no se evalúa
+nunca**— va como `perform` en `plpgsql`.
+
+Y quedan **213** funciones `SECURITY DEFINER` abiertas a `anon` en el resto del proyecto. Eso es
+una tanda propia: inventariar cuáles llama el front de verdad y cerrar el resto.
+
+**Archivo:** `sql/gv_conciliacion_grants_v1903.sql` (lleva el rollback adentro). Problema 353.
