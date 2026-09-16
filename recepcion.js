@@ -2571,6 +2571,47 @@ function histMonthStartYmd() {
   const d = new Date(), p = n => String(n).padStart(2, "0");
   return d.getFullYear() + "-" + p(d.getMonth() + 1) + "-01";
 }
+/* v18.80 (Luis, 2026-09-16: "fechas no están ordenadas y formato de fecha inconsistente").
+   La fecha del histórico sale de `vista_historial_entregas.fecha`, que es TEXTO porque las dos
+   tablas de origen la guardan como texto: `"Entregas Prov AT".Dia_mes` y
+   `"Entregas Tallerista Virgilio".Fecha`. Convivían CUATRO formatos (`2026-09-15`, `01/07/26`,
+   `01-09` sin año, y una fila con `|||`), y eso rompía tres cosas a la vez: la columna mezclaba
+   `01/07/26` con `15/09`, el orden salía mal —comparar fechas como texto pone `0…` DESPUÉS de
+   `2026-…`— y los filtros Desde/Hasta (que son `gte`/`lte` sobre ese texto) dejaban 121 filas
+   afuera sin avisar.
+
+   **El arreglo vive en el backend**, como manda el protocolo: `gv_fecha_recepcion_norm` normaliza
+   todo a `YYYY-MM-DD` dentro de la vista, y lo que no es una fecha devuelve NULL (así no ensucia
+   el orden ni los filtros). `sql/gv_vista_historial_entregas_fecha_v1880.sql`.
+
+   `histYmd` es la MISMA regla duplicada acá, y sólo como red de seguridad: si algún día una fila
+   llega sin normalizar (una vista vieja, un origen nuevo), la pantalla la sigue ordenando y
+   mostrando bien en vez de tirarla al fondo de la tabla. No es la fuente de verdad. */
+function histYmd(f) {
+  const s = String(f == null ? "" : f).trim();
+  let m;
+  if ((m = /^(\d{4})-(\d{2})-(\d{2})/.exec(s))) return m[1] + "-" + m[2] + "-" + m[3];
+  const p2 = function (x) { return ("0" + x).slice(-2); };
+  if ((m = /^(\d{1,2})[/-](\d{1,2})[/-](\d{4})$/.exec(s))) return m[3] + "-" + p2(m[2]) + "-" + p2(m[1]);
+  if ((m = /^(\d{1,2})[/-](\d{1,2})[/-](\d{2})$/.exec(s))) return "20" + m[3] + "-" + p2(m[2]) + "-" + p2(m[1]);
+  // Sin año: el que está en curso, salvo que caiga en el futuro (un 28-12 leído en enero es
+  // del año pasado, no del que viene). Mismo criterio que la función de Supabase.
+  if ((m = /^(\d{1,2})[/-](\d{1,2})$/.exec(s))) {
+    const hoy = new Date(), y = hoy.getFullYear();
+    const cand = new Date(y, Number(m[2]) - 1, Number(m[1]));
+    const anio = (cand.getTime() - hoy.getTime() > 30 * 86400000) ? (y - 1) : y;
+    return anio + "-" + p2(m[2]) + "-" + p2(m[1]);
+  }
+  return "";
+}
+/* La etiqueta de la columna Fecha. `conAnio` lo decide `histRender` mirando TODO el resultado:
+   si lo filtrado cae en un solo año va `dd/mm` (lo de siempre), y si cruza de año va `dd/mm/aa`
+   en TODAS las filas — nunca mezclado, que es justo lo que se estaba viendo. */
+function histFechaTxt(ymd, conAnio) {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(ymd || "");
+  if (!m) return "—";
+  return m[3] + "/" + m[2] + (conAnio ? "/" + m[1].slice(2) : "");
+}
 let _histReqSeq = 0;
 function renderHistorico() {
   opState.step = "hist";
@@ -2656,7 +2697,10 @@ async function histLoad(f) {
   const codN = f.cod ? f.cod.toUpperCase().replace(/[,()]/g, " ").trim() : "";
   try {
     // v10.26: una sola query a vista_historial_entregas (antes 2 queries separadas).
-    // La vista ya convierte DD-MM → YYYY-MM-DD para prov_at.
+    // v18.80 — la vista devuelve `fecha` SIEMPRE como YYYY-MM-DD (gv_fecha_recepcion_norm), así
+    // que el `order` de acá y los `gte`/`lte` de Desde/Hasta —que son comparaciones de TEXTO—
+    // ordenan y filtran de verdad. Antes, con los formatos mezclados, `01/07/26` caía después de
+    // `2026-…` y encima el corte de 1000 filas se llevaba puestas las recientes de ese grupo.
     let q = supabase.from("vista_historial_entregas")
       .select("fuente,fecha,created_at,cod_art,descripcion,cajas,quien,remito,llegada,carga,demora_hs");
     if (f.desde) q = q.gte("fecha", f.desde);
@@ -2671,11 +2715,10 @@ async function histLoad(f) {
     if (myseq !== _histReqSeq) return;
     if (res.error) throw res.error;
 
-    const ddmm = function (ymd) { const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(ymd || ""); return m ? (m[3] + "/" + m[2]) : (ymd || "—"); };
     const rows = ((res.data) || []).map(function (r) {
       return {
-        ymd: r.fecha || "", ms: r.created_at ? Date.parse(r.created_at) : 0,
-        fechaTxt: ddmm(r.fecha), cod: r.cod_art || "—", desc: r.descripcion || "",
+        ymd: histYmd(r.fecha), ms: r.created_at ? Date.parse(r.created_at) : 0,
+        cod: r.cod_art || "—", desc: r.descripcion || "",
         cajas: Number(r.cajas) || 0, quien: r.fuente === "tallerista" ? displayName(r.quien || "—") : (r.quien || "—"),
         remito: r.remito || "", origen: r.fuente === "tallerista" ? "tall" : "prov",
         demoraHs: (r.demora_hs != null) ? Number(r.demora_hs) : null,
@@ -2714,6 +2757,11 @@ function histRender(rows, CAP, capped) {
   if (!n) { box.innerHTML = '<div class="histEmpty">No hay recepciones para ese filtro.</div>'; return; }
   const total = rows.reduce((s, r) => s + r.cajas, 0);
   const shown = rows.slice(0, CAP);
+  // v18.80 — ¿lo que se está mostrando cruza de año? Entonces la columna lleva el año, en todas
+  // las filas. Se mira sobre `shown`, que es lo que se ve (no sobre el total traído).
+  const anios = {};
+  shown.forEach(function (r) { if (r.ymd) anios[r.ymd.slice(0, 4)] = 1; });
+  const conAnio = Object.keys(anios).length > 1;
   let html = '<div class="histSummary">' + n + ' recepci' + (n === 1 ? 'ón' : 'ones') + ' · <b>' + total + ' cajas</b></div>';
   if (capped) html += '<div class="histNote">⚠ Hay más de 1000 filas; se muestran las más recientes. Acotá por fecha para ver el resto.</div>';
   else if (n > CAP) html += '<div class="histNote">Mostrando las primeras ' + CAP + ' de ' + n + '. Acotá el filtro para ver menos.</div>';
@@ -2726,7 +2774,7 @@ function histRender(rows, CAP, capped) {
     const demTxt = histFmtDemora(r.demoraHs);
     const demTip = histHoraTip(r);
     html += '<tr>' +
-      '<td class="histFe">' + escapeHtmlRcp(r.fechaTxt) + '</td>' +
+      '<td class="histFe">' + escapeHtmlRcp(histFechaTxt(r.ymd, conAnio)) + '</td>' +
       '<td class="histCodCell">' + escapeHtmlRcp(r.cod) + '</td>' +
       '<td class="histCaj">' + r.cajas + '</td>' +
       '<td class="histWho">' + who + '</td>' +

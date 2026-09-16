@@ -18881,3 +18881,87 @@ sus chequeos daban **verde con el código roto**: uno matcheaba `empresa: p.empr
 otras 5 veces en `index.html`, y el otro matcheaba **el comentario** que explicaba el cambio.
 Los dos están anclados ahora (a `aprCargarSalida`, y sobre el código sin comentarios) y
 verificados rompiendo el front a propósito.
+
+---
+
+## §3.hw — v18.80: Histórico de Recepción — la fecha, en UN solo formato (y por eso, ordenada) — 2026-09-16
+
+*(Ojo: el §3.hu está repetido más arriba — la v18.77 y la v18.79 se numeraron igual desde dos
+sesiones en paralelo. Esta entrada sigue después del §3.hv.)*
+
+Pedido de Luis: *"Histórico de recepción: fechas no están ordenadas y formato de fecha
+inconsistente. Arreglalo."*
+
+### Qué pasaba
+
+`vista_historial_entregas.fecha` es **TEXT**, porque las dos tablas de origen la guardan como
+texto: `"Entregas Prov AT".Dia_mes` y `"Entregas Tallerista Virgilio".Fecha`. La vista
+normalizaba **un solo** formato —el `dd-mm` sin año de Prov AT— y el resto pasaba crudo. Sobre
+1.544 filas:
+
+| origen | formato | filas | |
+|---|---|---|---|
+| prov_at | `dd-mm` | 34 | la vista lo convertía (año en curso) |
+| prov_at | `dd/mm/aa` | **121** | pasaba CRUDO (`01/07/26`), todo julio 2026 |
+| tallerista | `YYYY-MM-DD` | 1.388 | |
+| tallerista | `\|\|\|` | 1 | basura, pasaba cruda |
+
+Eso rompía **tres cosas a la vez**, y las tres se ven en la pantalla:
+
+1. La columna Fecha mezclaba `01/07/26` con `15/09`.
+2. **El orden.** Tanto el `order` del servidor como el `sort` del front comparan la fecha como
+   TEXTO, y `"01/07/26" < "2026-…"`: esas 121 filas se iban al fondo sin importar su fecha real.
+3. ⚠ **Los filtros Desde/Hasta son `gte`/`lte` sobre ese mismo texto**, así que esas 121 filas
+   quedaban **invisibles** al filtrar por fecha. Buscar julio 2026 no devolvía las recepciones de
+   julio 2026, y no había ningún aviso. Esto es lo más caro de los tres: lo otro se ve, esto no.
+
+De yapa: el corte de 1.000 filas avisa "se muestran las más recientes" y, con el orden roto, eso
+no era cierto.
+
+### El arreglo — en el backend
+
+`gv_fecha_recepcion_norm(text)` (inmutable) lleva los cuatro formatos a `YYYY-MM-DD`, y lo que no
+es una fecha devuelve **NULL** —no el texto crudo—, así no ensucia ni el orden ni los filtros. La
+vista la aplica a las dos mitades del UNION. **`fecha` sigue siendo TEXT**: no se cambia el tipo,
+justamente para no tocar ningún consumidor.
+
+El `dd-mm` sin año se sigue resolviendo con el año en curso, con un reparo nuevo: si la fecha
+resultante cae más de 30 días en el futuro, es del año **pasado** (un `28-12` leído en enero es de
+diciembre pasado). Con los datos de hoy —agosto y septiembre— el resultado es idéntico al anterior.
+
+### Medición (2026-09-16)
+
+| | antes | después |
+|---|---|---|
+| prov_at | 121 crudas + 34 ymd | **155 ymd** (2026-06-04 … 2026-09-15) |
+| tallerista | 1.388 ymd + 1 basura | 1.388 ymd + **1 NULL** |
+| total | 1.544 | **1.544** — ni una fila de más ni de menos |
+
+`security_invoker` conservado (`reloptions = {security_invoker=true}`); se vuelve a poner con un
+`ALTER` explícito porque un `CREATE OR REPLACE VIEW` puede borrar las reloptions.
+
+### Los consumidores no cambian de resultado
+
+`gv_entregas_mensuales_cod` y `_stkProyMes` de `index.html` ya traían su propio parser de los tres
+formatos; ahora les llega siempre la rama `YYYY-MM-DD`, que da el **mismo mes** que antes
+(`01/07/26` → `2026-07` por su rama dd/mm/aa; ahora `2026-07-01` → `2026-07`). Quedan como código
+muerto inofensivo. `ocFetchRecepcion` pide `order=fecha.asc`: pasa a ordenar de verdad.
+`gv_lecturas_al_limite` sólo cuenta filas.
+
+### Los datos de origen NO se tocaron
+
+`"Entregas Prov AT".Dia_mes` sigue con sus 121 `dd/mm/aa` y la fila `|||` sigue donde estaba: el
+protocolo pide no modificar datos sin permiso explícito, y normalizar en la vista alcanza para las
+tres cosas que estaban mal. Si algún día se quiere limpiar el origen, `gv_fecha_recepcion_norm` ya
+es la regla a aplicar.
+
+### Front (`recepcion.js`)
+
+`histYmd` repite la misma regla en el navegador, **sólo como red de seguridad** (si una fila
+llegara sin normalizar, la pantalla la ordena y la muestra bien igual), y `histFechaTxt` decide la
+etiqueta: `dd/mm`, o `dd/mm/aa` en **todas** las filas si lo que se está mostrando cruza de año —
+nunca mezclado, que es justo lo que se veía. Con "Todo" el histórico arranca en diciembre 2025, así
+que ahí el año ahora aparece.
+
+**Rollback**: en `sql/gv_vista_historial_entregas_fecha_v1880.sql`. **Test**:
+`tests/rcp-hist-fecha.cjs` (en `run.sh`, sin navegador).

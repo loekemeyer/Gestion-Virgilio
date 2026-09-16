@@ -177,6 +177,9 @@ PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node te
 echo "== rcp-reanudar (v7.12: recepcion a medio cargar sobrevive + boton Seguir recepcion) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/rcp-reanudar.cjs
 
+echo "== rcp-hist-fecha (v18.80: Historico de Recepcion — un solo formato de fecha y orden cronologico) =="
+node tests/rcp-hist-fecha.cjs
+
 echo "== anular-sesion (v7.15: botón rojo Anular picking / recepción / insumos) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/anular-sesion.cjs
 
