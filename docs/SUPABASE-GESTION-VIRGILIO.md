@@ -20809,3 +20809,64 @@ pop-up con los datos del árbol; c: mueve con `p_forzar` y recarga el árbol; d:
 `sql/gv_ppp_tanda_mover_v1911.sql` y `sql/gv_ppp_prog_arbol_v1911.sql`. **Rollback**:
 `sql/backups/gv_ppp_tanda_mover_gv_ppp_prog_arbol_20260916_pre_v1911.sql` (ojo: dropear antes la
 firma de 4 argumentos, si no toda llamada de 3 queda ambigua).
+
+## §3.ip — v19.14: el botón PPP ya tiene badge, y cuenta todo lo que hay para mirar — 2026-09-16
+
+**Pedido de Luis:** *"badge rojo con número arriba a la izquierda del ícono de la PPP como con los
+demás"*.
+
+### El badge existía desde la v8.82 y no se vio nunca
+
+Dos causas, las dos silenciosas:
+
+1. **Contaba sólo `Alertas_Pedidos_Web` pendientes**, que hoy son **0** (la tabla tiene 2 filas,
+   las dos ya revisadas). El badge quedaba escondido para siempre.
+2. **El botón de PPP era el único de la fila sin `position:relative`.** El badge es
+   `position:absolute`, así que se posicionaba contra otro ancestro: aunque hubiera aparecido, no
+   caía sobre la tarjeta.
+
+### Qué cuenta ahora
+
+La vista **`gv_ppp_avisos`**, una fila por tipo. **Se agrupa por COSA, no por fila**: un camión
+mezclado cuenta 1 aunque tenga 4 pedidos adentro.
+
+| tipo | qué es | al 16/09 |
+|---|---|---|
+| `super_mezclado` | un camión con un súper y clientes comunes | 1 (E11) |
+| `tanda_dos_camiones` | una tanda con paradas de dos recorridos | 1 (D69F) |
+| `tanda_dos_dias` | el mismo código de tanda en dos fechas | 1 (D69C) |
+| `retenido_sin_fecha` | pedidos sacados a mano de una tanda, esperando fecha | 7 |
+| `alerta_web` | pedidos web anómalos sin revisar | 0 |
+
+Total: **10**.
+
+⚠ **`retenido_sin_fecha` es el que más importa que esté ahí.** El retenido es a propósito —lo que
+se saca a mano de una tanda no lo vuelve a agarrar el automático (v17.85)— pero la contracara es
+que un pedido puede quedarse quieto **para siempre sin que nada avise**. Al 16/09 el más viejo
+lleva **10 días** (Gifel S.R.L., entró el 06/09). Hasta ahora la única forma de enterarse era abrir
+la pantalla y mirar.
+
+### El front
+
+`pppFetchAvisos` lee la vista y `pppAlertBadgeUpdate` suma y llama a **`supSetBadge`**, el mismo
+que usan Facturación, Stock y Recepción Remitos: número rojo si hay algo, **✓ verde si no**. El
+`title` desglosa los tipos, así no hace falta entrar para saber qué son.
+
+Va a la **izquierda** (`left:2px;right:auto` inline en el botón), que es donde lo pidió Luis; el
+resto de los números de esa fila están a la derecha. Ojo al tocarlo: `supSetBadge` repone
+`className`, así que el lado tiene que ir en el `style` inline o se pierde al pasar a ✓ — el test
+lo cubre.
+
+Se borró el CSS de `.ppp-alert-badge` y su animación, que quedaron sin uso.
+
+### Verificación
+
+- **177 ms** medidos, contra un tope de 8 s. El front la pide cada 2 min mientras el panel de
+  supervisor está a la vista, así que no es camino caliente.
+- Probada **con el rol `anon`**, que es el que usa la app: devuelve los mismos números. Sin ese
+  chequeo una tabla con RLS habría dado 0 en silencio y el badge volvería a no mostrarse nunca —
+  exactamente el bug que se está arreglando.
+
+**Archivo:** `sql/gv_ppp_avisos_v1914.sql`. **Test:** `tests/ppp-badge.cjs` (12 chequeos, incluido
+el `position:relative` del botón y que el badge no se corra al pasar a ✓).
+**Rollback:** `drop view public.gv_ppp_avisos;` y volver el botón a como estaba.

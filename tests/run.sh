@@ -42,6 +42,9 @@ PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node te
 echo "== ppp-tanda-dos-dias (v18.92: reusar tanda no puede dejar el mismo codigo en dos dias) =="
 node tests/ppp-tanda-dos-dias.cjs
 
+echo "== ppp-badge (v19.14: el boton PPP tiene badge como los demas, y cuenta todos los avisos) =="
+PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/ppp-badge.cjs
+
 echo "== mon-tv (monitor liviano de TV: solo lectura, mismas fuentes que el monitor grande) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/mon-tv.cjs
 
