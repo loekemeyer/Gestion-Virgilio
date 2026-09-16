@@ -5708,7 +5708,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=19.16"></script>
+<script type="module" src="recepcion.js?v=19.17"></script>
 <!-- Config del módulo de fichada (compartido con fichada.html). El secret
      hmacSecret tiene que ser el mismo acá y allá; cargándolo desde un solo
      archivo evitamos que se desincronicen. -->
@@ -9490,7 +9490,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v19.16";
+const APP_VERSION = "v19.17";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -39640,6 +39640,14 @@ async function pppFetchAlertasWeb() {
    COSA, no por fila: un camión mezclado cuenta 1 aunque tenga 4 pedidos adentro. */
 let _pppAvisos = [];
 async function pppFetchAvisos() {
+  // v19.14 — sólo con el panel de supervisor a la vista: el badge vive ahí, así que pedir esto
+  // desde cualquier otra pantalla es tráfico que nadie mira. Además evita meter una llamada de
+  // red en el arranque de pantallas que no la necesitan (los tests de la PPP abortan todo el
+  // REST, y una petición de más ahí es ruido que no aporta).
+  try {
+    const sup = document.getElementById("supervisorPanel");
+    if (!sup || sup.classList.contains("hidden")) return _pppAvisos;
+  } catch (_e) {}
   try {
     const r = await fetch(SUPABASE_URL + "/rest/v1/gv_ppp_avisos?select=tipo,titulo,n&n=gt.0&order=orden",
       { headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY }, cache: "no-store" });
