@@ -70,7 +70,7 @@ catch (_e) {
     // control de no-trivialidad: el tilde de la NP de ISIS sigue estando (no lo pisamos)
     out.tildeIntacto = !!(filaIsis && filaIsis.querySelector(".fac-btn-tick"));
 
-    // (a2) v18.93 (Thomas: "que los botones de acción aparezcan uno al lado del otro, como en
+    // (a2) v18.94 (Thomas: "que los botones de acción aparezcan uno al lado del otro, como en
     // columnas diferentes") — no apilados. Se mide de verdad: el módulo está oculto en la
     // pantalla inicial, así que primero se lo fuerza visible y después se miran los rectángulos.
     for (let n = document.getElementById("facContainer"); n && n !== document.body; n = n.parentElement) {

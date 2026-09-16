@@ -1,4 +1,4 @@
--- v18.93 — se saca el guard que rechazaba `p_vuelve` + `p_a_guardar` juntos.
+-- v18.94 — se saca el guard que rechazaba `p_vuelve` + `p_a_guardar` juntos.
 --
 -- QUÉ PASÓ, EN ORDEN (dos sesiones sobre la misma función, el mismo día)
 -- ---------------------------------------------------------------------

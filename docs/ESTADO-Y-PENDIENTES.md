@@ -1,4 +1,4 @@
-# Estado y pendientes — al 2026-09-16 (última actualización: v18.93)
+# Estado y pendientes — al 2026-09-16 (última actualización: v18.94)
 
 > **2026-09-16 (v18.90) — CANCELAR un pedido desde Facturación (pedido de Thomas).**
 > Botón **✕ Cancelar** en cada fila de Facturación, con pop-up de motivo (**Falta stock** / **Otro**

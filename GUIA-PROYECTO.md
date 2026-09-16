@@ -23,7 +23,7 @@ consecuencias.
 ⚠ **Desde la v18.91, los TRES caminos del desarme mandan la mercadería a «A guardar»**, no sólo
 este botón: también «Enviar a programar» y el desarme a secas. El motivo es físico — las cajas
 quedan en el piso de armado y nadie las llevó al estante, así que escribirlas en góndola era
-mentir. Por eso el guard que rechazaba `p_vuelve` + `p_a_guardar` juntos se sacó en la v18.93:
+mentir. Por eso el guard que rechazaba `p_vuelve` + `p_a_guardar` juntos se sacó en la v18.94:
 hoy `p_vuelve` decide qué pasa con el PEDIDO y `p_a_guardar` sólo deja el rastro de que fue una
 cancelación. La diferencia entre cancelar y «Enviar a programar» sigue siendo el PEDIDO: uno
 muere, el otro vuelve a A Programar retenido.
@@ -32,7 +32,7 @@ muere, el otro vuelve a A Programar retenido.
 la cancelación y el pop-up lo dice: eso se cierra con el remito, no cancelando.
 
 Detalle, medición y rollback: `docs/SUPABASE-GESTION-VIRGILIO.md` §3.if y §3.ii ·
-`sql/gv_ppp_np_desarmar_a_guardar_v1890.sql` · `sql/gv_ppp_np_desarmar_sin_guard_v1893.sql` ·
+`sql/gv_ppp_np_desarmar_a_guardar_v1890.sql` · `sql/gv_ppp_np_desarmar_sin_guard_v1894.sql` ·
 `tests/fac-cancelar-pedido.cjs`.
 
 ## Nota v18.48 (2026-09-15) — Rotado el password del FDW LK→Chef

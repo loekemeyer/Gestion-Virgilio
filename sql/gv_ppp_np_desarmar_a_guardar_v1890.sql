@@ -2,7 +2,7 @@
    decisiones posteriores del mismo día.
      · `sql/gv_ppp_np_desarmar_v1891.sql` — los TRES caminos del desarme mandan la mercadería a
        «A guardar» (Luis + Thomas, 16/09). Acá abajo todavía está el reparto a góndola/excedente.
-     · `sql/gv_ppp_np_desarmar_sin_guard_v1893.sql` — se sacó el guard que rechazaba
+     · `sql/gv_ppp_np_desarmar_sin_guard_v1894.sql` — se sacó el guard que rechazaba
        `p_vuelve` + `p_a_guardar` juntos.
    Queda como registro de POR QUÉ existe `p_a_guardar` y de la firma de 5 argumentos.
    La definición viva se saca siempre con:

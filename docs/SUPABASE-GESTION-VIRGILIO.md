@@ -19789,7 +19789,7 @@ cajas armadas).
 |---|---|
 | `p_a_guardar => true` | *"16 articulos · 35 cajas devueltas (**35 a A guardar**) · pedido CANCELADO: sale de la PPP y no vuelve"* |
 | `p_a_guardar => false` | *"16 articulos · 35 cajas devueltas (**29 a gondola, 6 a excedente**)"* ← la v18.83, **que la v18.91 dio vuelta unas horas después: hoy también van a A guardar** |
-| `p_vuelve => true` + `p_a_guardar => true` | rechazada, 22023 — **el guard se sacó en la v18.93** |
+| `p_vuelve => true` + `p_a_guardar => true` | rechazada, 22023 — **el guard se sacó en la v18.94** |
 
 En la misma corrida: `PPP_Web_Programacion` sin tanda para esa NP, `GV_Web_Cancelados` con 1
 fila, `GV_Desarmes` con 1 registro. Barrido posterior de `Movimientos_Stock` (`tipo='desarme'`),
@@ -19893,7 +19893,7 @@ Problema 337.
 
 ---
 
-## §3.ii — v18.93: se saca el guard de `p_vuelve` + `p_a_guardar` (y un pisotón entre dos sesiones) — 2026-09-16
+## §3.ii — v18.94: se saca el guard de `p_vuelve` + `p_a_guardar` (y un pisotón entre dos sesiones) — 2026-09-16
 
 **Thomas, 16/09:** *"ahí le pedí a otra sesión que cambie a los que se envían «a programar» a «A
 guardar»"*.
@@ -19935,7 +19935,7 @@ llamando a la función de verdad, camino por camino.
 Los archivos de `sql/` que ya no son la definición viva llevan ahora un banner que lo dice:
 `sql/gv_ppp_np_desarmar_a_guardar_v1890.sql`.
 
-**Archivos:** `sql/gv_ppp_np_desarmar_sin_guard_v1893.sql` (el cambio y el rollback),
+**Archivos:** `sql/gv_ppp_np_desarmar_sin_guard_v1894.sql` (el cambio y el rollback),
 `sql/gv_ppp_np_desarmar_v1891.sql` (de la otra sesión, lo que se restauró).
 
 ---
@@ -20013,7 +20013,7 @@ lo decide un supervisor (protocolo de `CLAUDE.md`). El centinela la muestra hast
 (el `select count(*) … into v_otras` y su `if`), dejando `v_code := v_prev; v_reuso := true;`
 directo, y `drop view public.gv_ppp_tanda_dos_dias;`.
 
-## §3.ie — v18.93: la empresa en el stock sólo tiene sentido en los duales (ESCRITO, NO APLICADO) — 2026-09-16
+## §3.ij — v18.93: la empresa en el stock sólo tiene sentido en los duales (ESCRITO, NO APLICADO) — 2026-09-16
 
 **Estado: el SQL está escrito, medido y probado, y NO se ejecutó.** Luis lo pidió con una
 condición — *"hacé 3527 ahora si no hay nadie pickeando"* — y al momento de mirarlo había
