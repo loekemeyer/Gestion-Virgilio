@@ -20647,3 +20647,67 @@ Si aparecen artículos a 10,5 %, hay que traer la tasa por artículo. El neto ya
 Aprobar/Eliminar). **Rollback** al pie de `sql/gv_clientes_nuevos_acciones_v1905.sql`.
 (El archivo de backend quedó nombrado `_v1905` de cuando la sesión iba por v19.05; el número
 final del bump fue v19.08 por colisión con otra sesión — el contenido es el mismo.)
+
+---
+
+## §3.in — v19.11: el TURNO de la OC apagaba el armado automático de LK (y no se veía) — 2026-09-16
+
+Thomas, mirando "Pedidos a programar": *"justificativo de por qué cada uno de estos no fue
+programado automáticamente. Del pedido de Inc Sociedad Anonima deberíamos tener el dato de la
+fecha y hora de entrega (el turno que figura en el pedido). ¿Por qué no aparece?"*
+
+Los 7 pendientes tenían motivo (3 retenidos a mano, 1 Retira, 1 Súper, 1 zona manual, 1 de hoy),
+pero al medirlo aparecieron **dos bugs**, los dos sobre el mismo dato.
+
+### 1. Un turno en dd/mm/yyyy mata el feed web de LK entero (problema 357, `critico`)
+
+`gv_pedidos_web_np_lk` (LK) devolvía `fecha_entrega_pactada` casteando el texto crudo de
+`orders.sheets_payload->>'fecha_entrega'` con **`::date`**. El pedido **LK 1468** (INC, OC de
+Krikos) entró el 16/09 **13:53** con `"29/09/2026 14:00"` → `22008 date/time field value out of
+range`. Desde las **13:55 hasta las 15:50** las **24 corridas** del cron 73 leyeron **0 NP de LK**:
+
+```sql
+select corrida_en, estado, np_leidas, detalle->'lk'->>'error'
+  from public."GV_Tandas_Auto_Log" where corrida_en >= '2026-09-16 13:40-03' order by 1;
+-- 13:50 intradia_ok        119 NP   (null)
+-- 13:55 intradia_sin_umbral 14 NP   LK gv_pedidos_web_np_lk: HTTP 400 …22008… "29/09/2026 14:00"
+```
+
+O sea: **un solo pedido con turno apagó la programación automática de LK por 2 horas** (LK 1470,
+que entró 15:01, quedó sin NP y sin tanda). El mismo `::date` estaba en
+`gv_pedidos_web_np_chef` y `gv_pedidos_web_np_chef_fdw`.
+
+El parseo bueno **ya existía** en `v_pedidos_match` desde la v13.77 y nadie lo reusó. Ahora vive
+en `gv_fe_pactada_fecha` / `gv_fe_pactada_hora` (LK, `immutable`), que **no pueden fallar**: lo
+que no entienden devuelve NULL. **Regla: `sheets_payload->>'fecha_entrega'` es TEXTO del
+proveedor — nunca castearlo directo.**
+
+### 2. El chip "día de salida" de A Programar estaba muerto (problema 358, `alto`)
+
+`gv_ppp_web_dia_salida` es exactamente el justificativo por pedido (retenido / retira / súper /
+sin zona / sin camión / "se arma solo → tal día"). Desde la v18.77 castea `order_id` a bigint
+para mirar `GV_PPP_Web_Retenido`, pero el front manda **también las NP de ISIS**, que disfraza de
+pedido con `order_id = 'np'||np` (`aprTraerIsis`): `'np98704'::bigint` → `22P02`, la RPC devuelve
+400, `aprCargarSalida` cae al catch y `_apr.salida` queda vacío → **ninguna** tarjeta mostraba su
+motivo, todas en "🚚 …" con el title *"calculando el día de salida…"*. Con NP de ISIS sin tanda
+(hoy 5) estaba roto **siempre**. Se castea sólo lo que es número.
+
+### 3. Y el turno ahora se VE (lo que pidió Thomas)
+
+`fecha_entrega_pactada` sólo salía por la RPC del job, **que no la usa** (su único consumidor era
+el contador `con_fecha_pactada` del modo dry). La vista que lee A Programar, `v_pedidos_web_np`,
+no la tenía → el INC mostraba el reloj en `----` teniendo el turno en el pedido; y el `::date`
+encima tiraba la **hora**, que para un súper es la mitad del dato.
+
+La vista publica 3 columnas nuevas **al final** (`fecha_entrega_txt`, `fecha_entrega_pactada`,
+`hora_entrega_pactada`) y el badge del reloj de la tarjeta las muestra en ámbar con 📅
+(`aprTurnoOc` / `aprHorBadge`, `index.html`). **Un horario cargado a mano MANDA sobre el de la
+OC** (si un supervisor lo pisó, recoordinó con el súper).
+
+**Medido:** 499 NP de los últimos 45 días, 1 con turno (LK 1468 → 29/09 14:00); el resto NULL
+porque sólo las OC de súper traen turno. `gv_pedidos_web_np_lk(current_date - 30)`: 377 filas,
+antes HTTP 400.
+
+**Cubierto** en `tests/apr-badge-horario.cjs` (casos `(g)`: el badge sale por el turno de la OC
+aunque el cliente no coordine horario, con día y hora, el title dice de dónde sale, y el horario
+manual gana). **SQL y rollback**: `sql/gv_turno_entrega_oc_v1911.sql`.

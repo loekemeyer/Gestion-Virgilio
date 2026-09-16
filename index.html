@@ -1297,6 +1297,8 @@ button {
 .apr-hor.vacio:hover{ background:#f8fafc; color:#475569; }
 .apr-hor.cli{ background:#dcfce7; color:#14532d; border-color:#86efac; }   /* lo eligió el cliente */
 .apr-hor.cli:hover{ background:#bbf7d0; }
+.apr-hor.oc{ background:#fef3c7; color:#78350f; border-color:#fcd34d; }   /* el turno lo pide la OC */
+.apr-hor.oc:hover{ background:#fde68a; }
 .cuar-td-zona .apr-hor{ margin-left:7px; }
 /* el pop-up de edición reusa la caja de Cuarentena */
 .apr-hor-f{ display:grid; grid-template-columns:70px 1fr; align-items:center; gap:9px; margin-bottom:9px; }
@@ -5701,7 +5703,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=19.10"></script>
+<script type="module" src="recepcion.js?v=19.11"></script>
 <!-- Config del módulo de fichada (compartido con fichada.html). El secret
      hmacSecret tiene que ser el mismo acá y allá; cargándolo desde un solo
      archivo evitamos que se desincronicen. -->
@@ -9483,7 +9485,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v19.10";
+const APP_VERSION = "v19.11";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -42557,7 +42559,7 @@ async function aprTraerPedidos(e) {
   // los pedidos de Tierra del Fuego, que viven en la página de LK y son de Chef.
   const desde = new Date(Date.now() - PWEB_VENTANA_DIAS * 86400000).toISOString().slice(0, 10);
   const rLk = await fetch(PWEB_LK_URL + "/rest/v1/v_pedidos_web_np"
-    + "?select=empresa,order_id,np_idx,cod,razon_social,fecha_recep,direccion,lineas,cajas,items,m3,m3_parcial,localidad,zona_expreso,nombre_expreso,direccion_expreso,enviado_a_compras,condicion_pago_code,diferido,no_antes_de,isis_empresa,cod_isis"
+    + "?select=empresa,order_id,np_idx,cod,razon_social,fecha_recep,direccion,lineas,cajas,items,m3,m3_parcial,localidad,zona_expreso,nombre_expreso,direccion_expreso,enviado_a_compras,condicion_pago_code,diferido,no_antes_de,isis_empresa,cod_isis,fecha_entrega_pactada,hora_entrega_pactada,fecha_entrega_txt"
     + "&fecha_recep=gte." + desde + "&order=order_id.asc,np_idx.asc&limit=5000",
     { headers: { apikey: PWEB_LK_ANON, Authorization: "Bearer " + tok } });
   if (!rLk.ok) throw new Error("LK respondió " + rLk.status);
@@ -42638,6 +42640,11 @@ async function aprTraerPedidos(e) {
       fecha_recep: n.fecha_recep || "", zona: pwebZonaSugerida(n),
       localidad: pwebLocalidad(n), direccion: pwebDireccion(n),
       cond: (n.condicion_pago_code == null ? "" : String(n.condicion_pago_code)),  // v14.85: condición de pago (2% web condicional)
+      // v19.10 — EL TURNO QUE PIDE LA OC. Es del PEDIDO, no del bloque: todos los bloques
+      // de un pedido comparten la misma fecha y hora de entrega pactada.
+      turno_fecha: (n.fecha_entrega_pactada ? String(n.fecha_entrega_pactada).slice(0, 10) : ""),
+      turno_hora: n.hora_entrega_pactada || "",
+      turno_txt: n.fecha_entrega_txt || "",
       m3: 0, m3_parcial: false, lineas: 0, cajas: 0, bloques: []
     });
     const p = by.get(k);
@@ -43447,16 +43454,38 @@ function aprHorTxt(h) {
   const f = h.fecha ? String(h.fecha).slice(8, 10) + "/" + String(h.fecha).slice(5, 7) : "";
   return [f, h.franja].filter(Boolean).join(" ");
 }
+/* v19.10 (Thomas, 2026-09-16, sobre el pedido de Inc Sociedad Anonima: *"deberíamos tener el dato
+   de la fecha y hora de entrega (el turno que figura en el pedido). ¿Por qué no aparece?"*)
+   EL TURNO YA VIENE EN LA OC Y NO SE MOSTRABA EN NINGUNA PANTALLA. Una OC de súper que entra por
+   Krikos trae el turno pactado ("29/09/2026 14:00"); LK lo guarda en
+   `orders.sheets_payload.fecha_entrega` y desde la v19.10 lo publica parseado en
+   `v_pedidos_web_np` (`fecha_entrega_pactada` + `hora_entrega_pactada`; el parseo vive en el
+   backend: `gv_fe_pactada_fecha` / `gv_fe_pactada_hora`). El único reloj de la tarjeta era el
+   horario que se carga A MANO, así que el INC mostraba "----" teniendo el turno en el pedido.
+   El horario cargado a mano MANDA sobre el de la OC: si un supervisor lo pisó es porque
+   recoordinó con el súper. */
+function aprTurnoOc(p) {
+  if (!p) return null;
+  const f = String(p.turno_fecha || "").slice(0, 10);
+  const hh = String(p.turno_hora || "").trim();
+  if (!f && !hh) return null;
+  return { fecha: f, franja: hh, origen: "oc", txt: String(p.turno_txt || "").trim() };
+}
 function aprHorBadge(p) {
-  if (!aprPideHorario(p)) return "";
-  const h = aprHorDe(p), vacio = !h || (!h.fecha && !h.franja);
+  const oc = aprTurnoOc(p);
+  if (!aprPideHorario(p) && !oc) return "";
+  const hm = aprHorDe(p);
+  const h = (hm && (hm.fecha || hm.franja)) ? hm : (oc || hm);
+  const vacio = !h || (!h.fecha && !h.franja);
+  const esOc = !!(h && h.origen === "oc");
   const k = aprHorKey(pppEmpDePedido(p), aprHorClave(p));
-  return '<span class="apr-hor' + (vacio ? " vacio" : "") + (h && h.origen === "cliente" ? " cli" : "") + '"' +
+  return '<span class="apr-hor' + (vacio ? " vacio" : "") + (h && h.origen === "cliente" ? " cli" : "") + (esOc ? " oc" : "") + '"' +
     ' onclick="event.stopPropagation();aprHorAbrir(\'' + escapeHtml(k) + '\')"' +
-    ' title="' + (vacio ? "Este cliente coordina horario y todavía no hay ninguno cargado. Tocá para ponerlo."
+    ' title="' + escapeHtml(vacio ? "Este cliente coordina horario y todavía no hay ninguno cargado. Tocá para ponerlo."
+                        : (esOc ? ("Turno que pide la OC del pedido" + (h.txt ? " (" + h.txt + ")" : "") + ". Tocá para cambiarlo a mano.")
                         : (h.origen === "cliente" ? "Día y franja que eligió el cliente en la página. Tocá para cambiarlos."
-                                                  : "Día y franja cargados a mano. Tocá para cambiarlos.")) + '">' +
-    "🕑 " + escapeHtml(aprHorTxt(h)) + "</span>";
+                                                  : "Día y franja cargados a mano. Tocá para cambiarlos."))) + '">' +
+    (esOc ? "📅 " : "🕑 ") + escapeHtml(aprHorTxt(h)) + "</span>";
 }
 
 /* El pop-up: día + franja. Vaciar los dos y guardar = sacar el horario. */
@@ -43468,8 +43497,13 @@ function aprHorPedidoDe(k) {
 }
 function aprHorAbrir(k) {
   const p = aprHorPedidoDe(k), h = (_aprHor || {})[k] || {};
+  /* v19.11 — si nadie cargó horario a mano pero el PEDIDO trae el turno de la OC, el pop-up
+     abre con ese turno puesto: confirmar es un clic y recién ahí el dato queda guardado y
+     viaja a Programación y a la hoja de ruta (que leen `gv_pedido_horario`, no la OC). */
+  const oc = (!h.fecha && !h.franja) ? aprTurnoOc(p) : null;
   _aprHorEdit = { k: k, cli: (p && (p.razon_social || p.cod)) || "", np: p ? aprPedLabel(p) : "",
-                  fecha: h.fecha || "", franja: h.franja || "", origen: h.origen || "", err: "", saving: false };
+                  fecha: h.fecha || (oc && oc.fecha) || "", franja: h.franja || (oc && oc.franja) || "",
+                  origen: h.origen || "", err: "", saving: false };
   aprHorRender();
 }
 function aprHorCerrar() { _aprHorEdit = null; aprHorRender(); }
