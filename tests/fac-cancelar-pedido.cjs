@@ -76,13 +76,19 @@ catch (_e) {
     for (let n = document.getElementById("facContainer"); n && n !== document.body; n = n.parentElement) {
       n.removeAttribute("hidden"); n.style.display = "block"; n.style.visibility = "visible";
     }
-    out.ladoALado = [filaWeb, filaIsis].every(function (fila) {
-      const els = [...fila.querySelectorAll("td.fac-accion-cell button, td.fac-accion-cell span.fac-tick-web")];
+    // v19.20 — la etiqueta «⬇ Excel» se sacó, así que la fila WEB tiene un solo botón (el ✕) y
+    // la de ISIS dos (✓ y ✕). Lo que se mide es la de ISIS, que es la que los tiene a los dos.
+    out.ladoALado = (function () {
+      const els = [...filaIsis.querySelectorAll("td.fac-accion-cell button")];
       if (els.length !== 2) return false;
       const r = els.map(function (e) { const b = e.getBoundingClientRect(); return { cen: Math.round(b.top + b.height / 2), izq: Math.round(b.left) }; });
       return r[0].cen === r[1].cen        // misma línea, centrados entre sí
-          && r[1].izq > r[0].izq;          // el ✕ a la DERECHA del ✓ / ⬇ Excel
-    });
+          && r[1].izq > r[0].izq;          // el ✕ a la DERECHA del ✓
+    })();
+    // y en la fila web queda SÓLO el ✕ Cancelar: nada que no haga algo
+    out.webSoloCancelar = filaWeb.querySelectorAll("td.fac-accion-cell button").length === 1
+      && !!filaWeb.querySelector("td.fac-accion-cell .fac-btn-cancel")
+      && !filaWeb.querySelector(".fac-tick-web");
     // y la columna no se desborda por meter los dos
     out.sinDesborde = [...document.querySelectorAll("td.fac-accion-cell")]
       .every(function (td) { return td.scrollWidth <= td.clientWidth + 1; });
@@ -174,6 +180,7 @@ catch (_e) {
   chk(r.botonIsis, "(a) la fila de una NP de ISIS también lo trae");
   chk(r.tildeIntacto, "(a) el tilde ✓ de la NP de ISIS sigue estando");
   chk(r.ladoALado, "(a2) los dos botones van UNO AL LADO DEL OTRO, centrados, con el ✕ a la derecha");
+  chk(r.webSoloCancelar, "(a2) en la fila web queda sólo el ✕ Cancelar — se fue la etiqueta «⬇ Excel»");
   chk(r.sinDesborde, "(a2) y la columna Acción no se desborda");
   chk(r.abre, "(b) el botón abre el pop-up");
   chk(r.dosMotivos, "(b) el pop-up muestra los dos motivos: Falta stock y Otro");

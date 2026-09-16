@@ -95,7 +95,9 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
     // v12.93 — regla del dueño: la NP web NO se tilda (se factura bajando el Excel ISIS)
     // y la de ISIS NO va al Excel (se tilda). La fila lo refleja:
     const filaWeb = html.slice(html.indexOf('data-fac-np="LK 1344"'), html.indexOf('</tr>', html.indexOf('data-fac-np="LK 1344"')));
-    out.webSinTilde   = filaWeb.length > 0 && filaWeb.indexOf("fac-btn-tick") < 0 && filaWeb.indexOf("fac-tick-web") >= 0;
+    // v19.20 — la etiqueta «⬇ Excel» se sacó (era un cartel que no hacía nada): la fila web no
+    // tiene tilde NI esa etiqueta; lo que la manda al Excel es la casilla de la izquierda.
+    out.webSinTilde   = filaWeb.length > 0 && filaWeb.indexOf("fac-btn-tick") < 0 && filaWeb.indexOf("fac-tick-web") < 0;
     out.webConCasilla = /class="fac-xls-chk" data-np="LK 1344"/.test(filaWeb);
     const filaIsis = html.slice(html.indexOf('data-fac-np="98574"'), html.indexOf('</tr>', html.indexOf('data-fac-np="98574"')));
     out.isisConTilde  = filaIsis.indexOf("fac-btn-tick") >= 0;
