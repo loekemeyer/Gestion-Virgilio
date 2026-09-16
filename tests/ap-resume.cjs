@@ -70,7 +70,18 @@ catch (_e) {
       await send();
       out.sameTandaEnq = enq.slice();
       out.sameTandaReopened = comp;
-      // AP de OTRA tanda (D11X) → armado nuevo → encola "AP".
+      /* AP de OTRA tanda (D11X) con C99Z todavía abierta → v18.73: se CORTA. Hasta la v18.72
+         esto encolaba un AP nuevo y C99Z quedaba pisada en silencio (es como quedaron E11B y
+         E23A). Ahora hay que cerrar la vieja primero. */
+      window.alert = function () {};
+      enq.length = 0;
+      selectOption("AP"); textInput.value = "D11X";
+      await send();
+      out.otraConAbiertaNoEnq = enq.indexOf("AP") < 0;
+      // …y con la vieja ya cerrada, el armado nuevo arranca normal.
+      const st2 = getLegajoState(leg);
+      st2.armado = { active: false, value: "", ts_inicio: null };
+      st2.toggles = {}; setLegajoState(leg, st2);
       enq.length = 0;
       selectOption("AP"); textInput.value = "D11X";
       await send();
@@ -82,6 +93,7 @@ catch (_e) {
     r.btnShownDuringToggle && r.btnClick && r.btnClick[1] === "C99Z" &&
     /Paso 2/.test(r.btnText || "") && r.btnHiddenWhenInactive &&
     r.sameTandaEnq.indexOf("AP") < 0 && r.sameTandaReopened && r.sameTandaReopened[1] === "C99Z" &&
+    r.otraConAbiertaNoEnq &&
     r.otherTandaEnq.indexOf("AP") >= 0 &&
     errs.length === 0;
   console.log("ap-resume:", JSON.stringify(r), "· pageerrors:", errs.length ? errs.join("|") : "none", "·", pass ? "✓ OK" : "✗ FAIL");

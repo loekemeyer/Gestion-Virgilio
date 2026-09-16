@@ -28,8 +28,13 @@ catch (_e) {
     window.fetchPickingBase   = async function () { baseCalls++;  throw new Error("sin red"); };
     window.pkFetchExcedente   = async function () { return {}; };
 
-    // Picking YA precargado hoy (como si se hubiera bajado entero con señal).
-    const snap = { day: getTodayKey(), tanda: tanda, legajo: leg,
+    /* Picking YA precargado hoy (como si se hubiera bajado entero con señal).
+       ⚠ `app` NO es opcional desde la v18.53: un snapshot sin sello de versión se considera
+       ANTERIOR al fix del corte de 1000 filas (la lista guardada podía estar recortada) y se
+       re-baja de la red a propósito. Sin este campo el fixture representa un guardado viejo,
+       no uno de hoy, y el test mide lo contrario de lo que dice medir — así estuvo en rojo
+       desde la v18.53, y nadie lo miró. */
+    const snap = { day: getTodayKey(), tanda: tanda, legajo: leg, app: APP_VERSION,
       items: [ { art: "502", key: "502", esp: 6, sector: "A01" }, { art: "321", key: "321", esp: 1, sector: "A02" }, { art: "501", key: "501", esp: 2, sector: "A03" } ],
       idx: 1, results: { "502": 6 }, mode: "item" };
     localStorage.setItem("vir_pk_" + leg, JSON.stringify(snap));
@@ -48,14 +53,26 @@ catch (_e) {
     await new Promise(function (res) { setTimeout(res, 40); });
     out.otraTandaTocaRed = monitorCalls >= 1;
 
+    /* C) la otra mitad del contrato v18.53: un guardado SIN sello de versión (o de una
+       anterior al fix de la base) NO se restaura offline — puede tener la lista recortada,
+       así que se re-baja entera. Esto es lo que hace que `app` sea obligatorio arriba. */
+    const viejo = JSON.parse(JSON.stringify(snap));
+    delete viejo.app;
+    localStorage.setItem("vir_pk_" + leg, JSON.stringify(viejo));
+    monitorCalls = 0; baseCalls = 0;
+    await showPickingList(tanda, leg);
+    await new Promise(function (res) { setTimeout(res, 40); });
+    out.viejoSeRebaja = (monitorCalls + baseCalls) >= 1;
+
     return out;
   });
 
   const pass = r.count === 1 && r.modalShown === true && r.sinRed === true &&
-    r.muestraCodigo === true && r.otraTandaTocaRed === true && errs.length === 0;
+    r.muestraCodigo === true && r.otraTandaTocaRed === true && r.viejoSeRebaja === true &&
+    errs.length === 0;
   console.log("pk-offline:", JSON.stringify(r));
   console.log("  pageerrors:", errs.length ? errs.join("|") : "none");
-  console.log(" ", r.sinRed ? "A sin-red ✓" : "A sin-red ✗", "·", r.count === 1 ? "A restauró ✓" : "A restauró ✗", "·", r.muestraCodigo ? "A render ✓" : "A render ✗", "·", r.otraTandaTocaRed ? "B otra→red ✓" : "B otra→red ✗", "·", pass ? "OK" : "FAIL");
+  console.log(" ", r.sinRed ? "A sin-red ✓" : "A sin-red ✗", "·", r.count === 1 ? "A restauró ✓" : "A restauró ✗", "·", r.muestraCodigo ? "A render ✓" : "A render ✗", "·", r.otraTandaTocaRed ? "B otra→red ✓" : "B otra→red ✗", "·", r.viejoSeRebaja ? "C viejo→red ✓" : "C viejo→red ✗", "·", pass ? "OK" : "FAIL");
   await b.close();
   process.exit(pass ? 0 : 1);
 })();

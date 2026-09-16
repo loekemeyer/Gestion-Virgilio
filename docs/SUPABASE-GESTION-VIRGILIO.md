@@ -18398,3 +18398,95 @@ Arreglado en dos niveles:
 Los dos locks basura se borraron (backup en `zz_backups."GV_Backup_Locks_999_20260916"`).
 
 `sql/anular_armado_virgilio_v1872.sql`
+
+---
+
+## §3.hr — v18.73: una tanda por operario (en el backend) y el test de paginación que no miraba nada — 2026-09-16
+
+Pedido de Luis, textual: *"confirmame que ahora ningún operario puede arrancar a pickear una
+tanda si ya tiene una abierta (y lo mismo con armado)"*. **No se podía confirmar**, y al ir a
+verificarlo apareció además un agujero en la paginación que la v18.62 creía cerrado.
+
+### 1. El invariante «una tanda por operario y fase» no existía
+
+La v18.65 cerró **dos operarios en la MISMA tanda**: `GV_Tandas_Lock` es por `(tanda, fase)` y
+gana el primero. Eso estaba bien y no se tocó.
+
+El caso **inverso** —UN operario con DOS tandas abiertas— vivía sólo en el front, y era un
+`confirm()` con *"Aceptar = arrancar igual"*: dejar la tanda vieja colgada estaba a **un
+toque**. Y el guard mira `getLegajoState`, que es `localStorage`: un celular que perdió el
+estado (app actualizada, otro equipo, cache limpiada) **no avisaba nada**.
+
+No es teórico. Medido sobre `GV_Tandas_Lock` el 16/09 09:05: **un legajo con dos filas
+`tomada` en la misma fase**. Un minuto después ya era una sola. Es el mismo mecanismo que dejó
+E11B colgada (leg 237: AP 11:15, arrancó E01C 13:44) y los de E25A / E23A del 15/09.
+
+**Ahora es una regla de backend** (`gv_tanda_reservar`, motivo `otra_tanda_abierta`), que es
+donde corresponde: afecta datos persistidos. El front la duplica como UX — corta antes de
+gastar el viaje — pero el que manda es la base.
+
+⚠ **La ventana de 3 días no es decorativa: es lo que evita la trampa.** Un bloqueo duro sin
+salida es peor que el problema. Si a alguien le quedó un picking abierto de hace un mes,
+bloquearlo lo deja sin trabajar **y sin poder destrabarse**, porque `gv_anular_picking_virgilio`
+sólo anula dentro de 3 días. Entonces el bloqueo aplica **sólo mientras la tanda vieja se pueda
+anular de verdad**. Más viejo que eso no es trabajo en curso, es basura, y no frena a nadie.
+
+Probado contra la base, en transacción con `rollback` (no se escribió nada):
+
+| caso | resultado |
+|---|---|
+| JC (277) con E11D abierta → otro picking | `otra_tanda_abierta`, dice **E11D** |
+| JC re-toca su propia E11D | `propia` (continuar no es bloquear) |
+| JC con picking abierto → arranca un **armado** | **deja**: la regla es por fase |
+| otro operario toca la E11D de JC | `tomada` (v18.65, intacto) |
+| E23A picking ya cerrada | `ya_completada` (v18.65, intacto) |
+
+Rollback: `sql/gv_tanda_reservar_una_por_operario_v1873.sql` tiene el bloque marcado y la
+versión previa está en `sql/gv_tandas_lock_v1865.sql`.
+
+### 2. El test de paginación tenía un `?` mal puesto y no miraba casi nada
+
+`tests/lecturas-paginadas.cjs` usaba el regex `supaFetchAllSafe?\(`. El `?` hace opcional
+**sólo la `e` final**, así que exige la cadena `supaFetchAllSaf` y matchea **únicamente**
+`supaFetchAllSafe`. **Nunca revisó una sola llamada a `supaFetchAll`**, que son la mayoría.
+Sumado a que `ALIAS` no tenía `SUPABASE_PPP_BASE_ENDPOINT`, el test daba **verde** con 12
+lecturas grandes paginadas sin `order=`.
+
+Corregido el regex (`supaFetchAll(?:Safe)?\(`), aparecieron **13 hallazgos**: 11 reales y 2
+falsos positivos por cortar los argumentos en el primer `)` (el de `encodeURIComponent(...)` o
+`toISOString()`) y por resolver las variables de consulta buscando en todo el archivo en vez de
+hacia atrás desde la llamada. Las tres cosas están arregladas; un test con falsos positivos se
+ignora, que es como empezó todo esto.
+
+Las **12 lecturas** que quedaron con `order=`: `gv_ppp_base_pedidos`, `vista_tanda_m3` (×2),
+`Movimientos_Stock`, `Registros_Produccion_Virgilio` (×4, **dos de ellas del monitor**),
+`Entregas_Virgilio` (×2), `gv_ppp_entregados_meta` (×3), `Facturacion_NP`,
+`vista_historial_entregas`. Las que no tienen `id` se ordenan **por las columnas que leen**:
+si dos filas son idénticas en todo lo que se consume, repetir una y saltear la otra da el
+mismo resultado.
+
+⚠ **La más grave era `gv_ppp_base_pedidos`: 9.664 filas, 10 páginas — la base de artículos del
+picking.** Si dos páginas se pisan, a un pedido le faltan renglones o aparece vacío, que es
+literalmente el síntoma del 15/09.
+
+**Por qué no había explotado todavía, y por qué iba a explotar.** El view es un `UNION ALL` de
+tres ramas **sin `ORDER BY`**; dos de ellas no son deterministas (una tiene `GROUP BY`, otra un
+`LATERAL`) y las dos salen de `GV_PPP_Base_Override`, que hoy tiene **0 filas**. O sea que hoy
+el view es, de hecho, un scan de una sola tabla y el orden sale estable de casualidad
+(verificado: la página 10 da lo mismo forzando otro plan con `enable_hashagg=off`). **La
+primera vez que alguien use «Modificar Pedidos»** (v18.45, RPC `gv_pedido_mod_isis`, que es lo
+único que escribe esa tabla) las dos ramas se encienden y esa casualidad se termina.
+
+Y para que el punto ciego no vuelva, el test ahora **verifica su propia lista**: resuelve las
+constantes `SUPABASE_*_ENDPOINT` desde el propio `index.html` y falla si una apunta a una
+relación vigilada y no está en `ALIAS`.
+
+### 3. De paso: `tests/pk-offline` estaba en rojo desde la v18.53
+
+La v18.53 hizo que un snapshot de picking **sin sello de versión** (campo `app`) se considere
+anterior al fix del corte de 1000 filas y se re-baje de la red. El fixture del test no tenía
+ese campo, así que representaba un guardado viejo: **el test medía lo contrario de lo que decía
+medir**. La app estaba bien —el offline-first funciona—, el test no. Estuvo rojo cinco
+versiones sin que saltara. Se le agregó además el caso C, que fija la otra mitad del contrato.
+
+Problemas 322, 323 y 324.

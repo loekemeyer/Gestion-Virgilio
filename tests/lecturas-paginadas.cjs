@@ -37,14 +37,27 @@ const RELACIONES_GRANDES = {
   "vista_historial_entregas": 1542,
   "PPP_Web_Base": 1308,          // ← la del 15/09
   "Facturacion_NP": 1265,
+  "vista_tanda_m3": 1206,
   "GV_Geo_Cliente": 1017,
 };
-/* Las constantes del index que apuntan a una de ésas. */
+/* Las constantes del index que apuntan a una de ésas.
+   ⚠ ESTA LISTA ES EL PUNTO CIEGO DEL TEST, y ya mordió. `nombreDe()` resuelve por TEXTO: si
+   una lectura nombra la relación con una constante que no está acá, el test no la reconoce
+   y la SALTEA en silencio — o sea que sale ✓ OK igual. Pasó con `SUPABASE_PPP_BASE_ENDPOINT`:
+   la v18.62 dejó `gv_ppp_base_pedidos` (9.664 filas, 10 páginas) paginada SIN `order=` y el
+   test dio verde. Y es la lectura más sensible que hay — la base de artículos del picking:
+   si dos páginas se pisan, a un pedido le faltan renglones o aparece vacío, que es
+   exactamente el síntoma del 15/09.
+   Al agregar un `SUPABASE_*_ENDPOINT` nuevo que apunte a una relación de arriba, sumalo acá.
+   Para ver si falta alguno:
+     grep -n 'SUPABASE_[A-Z_]*ENDPOINT *=' index.html   */
 const ALIAS = {
   "SUPABASE_TABLE_ENDPOINT": "Registros_Produccion_Virgilio",
   "SUPABASE_STOCK_ENDPOINT": "Movimientos_Stock",
   "SUPABASE_ENTREGAS_ENDPOINT": "Entregas_Virgilio",
   "SUPABASE_FACTURACION_NP_ENDPOINT": "Facturacion_NP",
+  "SUPABASE_PPP_BASE_ENDPOINT": "gv_ppp_base_pedidos",
+  "SUPABASE_PPP_ENTREGADOS_ENDPOINT": "gv_ppp_entregados_meta",
 };
 /* Excepciones, todas MEDIDAS contra la base el 15/09 — no son "me parece que es chica".
    Una lectura acotada por una CLAVE DE NEGOCIO (una tanda, una NP, un artículo) trae, en el
@@ -79,6 +92,23 @@ const nombreDe = (txt) => {
   return null;
 };
 
+/* ---- 0) la lista ALIAS no puede quedar incompleta ----
+   Sin esto el test se ciega solo: una relación grande leída por una constante que nadie sumó
+   a ALIAS no se chequea y el test igual sale verde. Acá se resuelven las constantes desde el
+   PROPIO index.html (`const SUPABASE_X_ENDPOINT = SUPABASE_URL + "/rest/v1/<relacion>"`), así
+   que la lista se mantiene sola: si aparece una constante nueva que apunta a una relación
+   vigilada y no está en ALIAS, esto falla y dice cuál. */
+const reConst = /(?:const|let|var)\s+(SUPABASE_[A-Z0-9_]*ENDPOINT)\s*=\s*SUPABASE_URL\s*\+\s*"\/rest\/v1\/([A-Za-z0-9_]+)"/g;
+let mc;
+while ((mc = reConst.exec(src)) !== null) {
+  const [, konst, rel] = mc;
+  if (!RELACIONES_GRANDES[rel]) continue;          // relación chica: no se vigila
+  if (ALIAS[konst] === rel) continue;              // ya declarada
+  fallas.push("la constante `" + konst + "` apunta a `" + rel + "` (" +
+    RELACIONES_GRANDES[rel] + " filas) y NO está en ALIAS — el test no la ve y las lecturas " +
+    "que la usen pasan sin chequear. Agregá:  \"" + konst + "\": \"" + rel + "\",");
+}
+
 // ---- 1 y 3) fetch suelto sobre una relación grande ----
 for (let i = src.indexOf("fetch("); i >= 0; i = src.indexOf("fetch(", i + 6)) {
   /* 400 caracteres CRUDOS desde `fetch(`. Un regex con `\)` no-greedy corta en el primer
@@ -95,20 +125,37 @@ for (let i = src.indexOf("fetch("); i >= 0; i = src.indexOf("fetch(", i + 6)) {
     ":\n      " + hit.slice(0, 150).replace(/\s+/g, " "));
 }
 
-// ---- 2) paginada pero sin order estable ----
-const reCall = /supaFetchAllSafe?\(([\s\S]{0,600}?)\)\s*[;,)]/g;
+/* ---- 2) paginada pero sin order estable ----
+   ⚠ El `?` estaba puesto mal: `supaFetchAllSafe?\(` exige la cadena «supaFetchAllSaf» y hace
+   opcional sólo la «e» final, así que este chequeo miraba ÚNICAMENTE las llamadas a
+   `supaFetchAllSafe` y no vio nunca una sola `supaFetchAll`. Con eso la v18.62 dejó pasar
+   `gv_ppp_base_pedidos` (10 páginas sin `order=`), que es la base de artículos del picking.
+   Lo correcto es un grupo: `supaFetchAll(?:Safe)?\(`. */
+const reCall = /supaFetchAll(?:Safe)?\(/g;
 let m;
 while ((m = reCall.exec(src)) !== null) {
-  const args = m[1];
+  /* Los argumentos se toman como en el chequeo 1: 400 caracteres CRUDOS y corte en el `;`.
+     Con un regex `\)` no-greedy se corta en el primer paréntesis —el de
+     `encodeURIComponent(...)` o `toISOString()`— y se pierde el `order=` que viene después:
+     dos falsos positivos medidos (`pkFetchServerMarks` y el resumen de jornada), y un test
+     con falsos positivos se ignora, que es como empezó todo esto. */
+  const args = src.slice(m.index + m[0].length, m.index + 400).split(";")[0];
   const rel = nombreDe(args);
   if (!rel) continue;
   if (/order=/.test(args)) continue;
-  // el order puede venir dentro de una variable de consulta (ccnQ, talQ…): la resolvemos
-  const v = (args.match(/,\s*([A-Za-z_$][\w$]*)\s*[\)\]\s]*$/) || [])[1];
+  /* El order puede venir dentro de una variable de consulta (evQuery, entQuery, q…).
+     Se resuelve MIRANDO HACIA ATRÁS desde la llamada: buscarla en todo el archivo agarraba
+     la primera `let q = …` que hubiera en cualquier lado —otra variable, otra función— y el
+     resultado era azar. */
+  /* El nombre es el último argumento, o sea el identificador pegado al `)` que CIERRA la
+     llamada — no el final de `args`, que acá puede seguir con `.catch(...)`, `.then(...)`
+     o la coma del `Promise.all`. */
+  const v = (args.match(/,\s*([A-Za-z_$][\w$]*)\s*\)/) || [])[1];
   if (v) {
-    const def = new RegExp("(?:const|let|var)\\s+" + v + "\\s*=[\\s\\S]{0,400}?;");
-    const d = src.match(def);
-    if (d && /order=/.test(d[0])) continue;
+    const atras = src.slice(Math.max(0, m.index - 4000), m.index);
+    const def = new RegExp("(?:const|let|var)\\s+" + v + "\\s*=[\\s\\S]{0,400}?;", "g");
+    const hits = atras.match(def);
+    if (hits && /order=/.test(hits[hits.length - 1])) continue;   // la más cercana manda
   }
   const ln = src.slice(0, m.index).split("\n").length;
   fallas.push("`" + rel + "` (" + RELACIONES_GRANDES[rel] + " filas) paginada SIN order= " +
