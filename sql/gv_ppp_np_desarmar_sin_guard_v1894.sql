@@ -1,0 +1,56 @@
+-- v18.94 — se saca el guard que rechazaba `p_vuelve` + `p_a_guardar` juntos.
+--
+-- QUÉ PASÓ, EN ORDEN (dos sesiones sobre la misma función, el mismo día)
+-- ---------------------------------------------------------------------
+-- 1. v18.88/90 (esta sesión, pedido de Thomas): nace `p_a_guardar` para el botón «✕ Cancelar»
+--    de Facturación, y con él un guard: `p_vuelve` y `p_a_guardar` juntos = error, porque en
+--    ese momento "vuelve a A Programar" implicaba devolver la mercadería a góndola/excedente
+--    para poder re-pickearla (regla de Luis del 16/09, v18.80).
+-- 2. v18.91 (otra sesión, `sql/gv_ppp_np_desarmar_v1891.sql`): Luis y Thomas dan vuelta esa
+--    regla — **los tres caminos del desarme mandan todo a «A guardar»**, porque las cajas
+--    quedan físicamente en el piso de armado y nadie las llevó al estante.
+-- 3. Con eso, el guard dejó de tener sentido: ya no hay dos destinos que elegir, así que
+--    `p_vuelve` (qué pasa con el PEDIDO) y `p_a_guardar` (qué pasa con el STOCK) son
+--    independientes y pueden venir los dos en true.
+--
+-- ⚠ Y UN PISOTÓN, PARA QUE QUEDE ESCRITO
+-- --------------------------------------
+-- Al sacar el guard se hizo un `create or replace` con el cuerpo de la v18.88 **sin haber leído
+-- la definición viva primero**, y eso deshizo la v18.91 (los destinos volvieron a
+-- góndola/excedente) durante unos minutos. Se detectó al mirar `origin/main`, no por un error:
+-- el `create or replace` salió limpio. Se restauró re-aplicando el mismo `replace()` de la
+-- v18.91 sobre la definición viva, y se verificó llamando a la función de verdad.
+--
+-- **La lección, que ya estaba escrita en el CLAUDE.md para las vistas y vale igual acá: antes de
+-- reemplazar una función, leer `pg_get_functiondef` y partir de ESO, no de un archivo del repo.**
+--
+-- CÓMO SE APLICÓ (sobre la definición viva, no sobre un archivo)
+-- -------------------------------------------------------------
+--   1. Se sacó el bloque `if v_vuelve and v_ag then raise exception … end if;` y en su lugar
+--      quedó el comentario que explica por qué los dos parámetros son independientes.
+--   2. La descripción del movimiento de stock dice «Cancelacion del pedido» sólo cuando
+--      `v_ag and not v_vuelve` (antes, con `v_ag` solo, un pedido que VUELVE se habría
+--      registrado como cancelado).
+--   3. Se re-aplicaron los tres reemplazos de la v18.91 (`0::numeric as a_term`,
+--      `0::numeric as a_exc`, `c.total as a_guardar`) sobre la definición resultante.
+--
+-- MEDIDO (transacción revertida, `LK 0046`, tanda E03F, 16 art / 35 cajas):
+--
+--   | llamada | detalle |
+--   |---|---|
+--   | `false, false` (desarme a secas)      | 35 cajas devueltas (**35 a A guardar**) · el pedido NO vuelve |
+--   | `true,  false` (enviar a programar)   | 35 cajas devueltas (**35 a A guardar**) · vuelve a A Programar y el automatico NO lo va a tomar |
+--   | `false, true`  (cancelar, el botón)   | 35 cajas devueltas (**35 a A guardar**) · pedido CANCELADO: sale de la PPP y no vuelve |
+--   | `true,  true`  (antes daba error)     | 35 cajas devueltas (**35 a A guardar**) · vuelve a A Programar y el automatico NO lo va a tomar |
+--
+--   Barrido posterior de `Movimientos_Stock` (tipo `desarme`), `GV_Desarmes`,
+--   `GV_Web_Cancelados` y `GV_PPP_Web_Retenido` con las marcas de prueba → **0 filas**.
+--
+-- `org_term` / `org_exc` se siguen calculando: ya no deciden el destino, pero quedan en
+-- `GV_Desarmes.stock_devuelto` para saber de dónde salió cada caja.
+--
+-- ROLLBACK: volver a meter, después del chequeo del justificativo,
+--   if v_vuelve and v_ag then
+--     raise exception 'No se puede: o el pedido vuelve a A Programar (y la mercaderia vuelve de donde salio), o se cancela y todo va a A guardar.' using errcode='22023';
+--   end if;
+-- partiendo SIEMPRE de `pg_get_functiondef`, no de un archivo.

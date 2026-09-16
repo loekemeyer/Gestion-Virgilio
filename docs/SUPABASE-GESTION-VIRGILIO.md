@@ -19722,16 +19722,17 @@ a salir. **Los atrasados se van a revisar uno por uno a mano, después; eso no e
 | | Cuándo | Qué hace con el stock | Qué hace con el pedido |
 |---|---|---|---|
 | **ANULAR** (`gv_pedido_anular`, §3.gh) | en «A Programar», el pedido entró MAL y nadie lo tocó | nada (no se movió nada) | sale de A Programar, queda en `GV_Pedidos_Anulados` |
-| **Enviar a programar** (`gv_ppp_pedido_a_programar` → `gv_ppp_np_desarmar` con `p_vuelve=true`) | el pedido sigue VIVO y hay que rehacerlo | **vuelve de donde salió** (góndola → excedente), regla de Luis del 16/09 | vuelve a A Programar, retenido para que el cron no lo agarre |
-| **CANCELAR desde Facturación** (esto) | ya está ARMADO y no va a salir | **TODO a `a_guardar`** | sale de la PPP y no vuelve |
+| **Enviar a programar** (`gv_ppp_pedido_a_programar` → `gv_ppp_np_desarmar` con `p_vuelve=true`) | el pedido sigue VIVO y hay que rehacerlo | **a `a_guardar`** (v18.91) | vuelve a A Programar, retenido para que el cron no lo agarre |
+| **CANCELAR desde Facturación** (esto) | ya está ARMADO y no va a salir | **a `a_guardar`** | sale de la PPP y no vuelve |
 | **BORRAR** (regla del `CLAUDE.md`) | el pedido no tiene que existir | — | se borra de la página **y** de Gestión, en los dos proyectos |
 
-⚠ **La regla de Luis y la del dueño no se pisan, porque son dos acciones distintas.** Cuando el
-pedido sigue vivo y se va a re-pickear, devolver a góndola/excedente es el reverso exacto del
-picking y deja el stock listo. Cuando el pedido murió, nadie va a re-pickear esas cajas: están
-armadas, en un lío, en el piso de armado, y tienen que quedar en **A guardar** para que un
-operario las baje y las guarde. Por eso el backend **se niega** si le mandan las dos cosas a la
-vez (`p_vuelve` y `p_a_guardar`): son intenciones contradictorias.
+⚠ **Esto cambió el mismo día, un rato después (v18.91 / v18.92 · §3.ih y §3.ii).** Cuando esta sección
+se escribió, «Enviar a programar» devolvía la mercadería a góndola/excedente (regla de Luis,
+v18.80) y el backend **se negaba** si le mandaban `p_vuelve` y `p_a_guardar` juntos. Thomas pidió
+que lo que se manda «a programar» **también** vaya a «A guardar», y con eso:
+**los tres caminos del desarme mandan todo a `a_guardar`** y el guard se sacó. `p_vuelve` decide
+qué pasa con el PEDIDO y `p_a_guardar` qué pasa con el STOCK — hoy el segundo ya no cambia el
+destino, sólo deja el rastro de que fue una cancelación.
 
 ### El cambio: un parámetro, no una función nueva
 
@@ -19758,8 +19759,13 @@ pidió cada cliente queda entera.
 
 ### La pantalla
 
-Botón **✕ Cancelar** en la columna Acción de Facturación, debajo del ✓ / ⬇ Excel, chico y en
-rojo apagado: es una acción rara y destructiva, no tiene que competirle al tilde. El pop-up
+Botón **✕ Cancelar** en la columna Acción de Facturación, **al lado** del ✓ / ⬇ Excel —Thomas,
+16/09: *"que los botones de acción aparezcan uno al lado del otro (como en columnas
+diferentes)"*—, chico y en rojo apagado: es una acción rara y destructiva, no tiene que
+competirle al tilde. Los dos van dentro de un `span.fac-acc-wrap` `inline-flex` con los márgenes
+reseteados (el margen global de `button` desalineaba el ✓ contra el ✕) y la columna pasó de 7 % a
+11 %, a costa de Razón Social. El test mide los rectángulos de verdad: mismo centro vertical, el
+✕ a la derecha, y la celda sin desborde. El pop-up
 tiene **dos pasos** —el segundo es la 2da confirmación que pidió el dueño en la v15.65 para todo
 lo que cancela o elimina— y de los dos se sale con ✕, con «Volver», con **Escape** o tocando
 afuera. Mientras la RPC está en vuelo no se cierra: si se cerrara, la pantalla quedaría
@@ -19782,8 +19788,8 @@ cajas armadas).
 | llamada | resultado |
 |---|---|
 | `p_a_guardar => true` | *"16 articulos · 35 cajas devueltas (**35 a A guardar**) · pedido CANCELADO: sale de la PPP y no vuelve"* |
-| `p_a_guardar => false` | *"16 articulos · 35 cajas devueltas (**29 a gondola, 6 a excedente**)"* ← la v18.83 intacta |
-| `p_vuelve => true` + `p_a_guardar => true` | rechazada, 22023 |
+| `p_a_guardar => false` | *"16 articulos · 35 cajas devueltas (**29 a gondola, 6 a excedente**)"* ← la v18.83, **que la v18.91 dio vuelta unas horas después: hoy también van a A guardar** |
+| `p_vuelve => true` + `p_a_guardar => true` | rechazada, 22023 — **el guard se sacó en la v18.94** |
 
 En la misma corrida: `PPP_Web_Programacion` sin tanda para esa NP, `GV_Web_Cancelados` con 1
 fila, `GV_Desarmes` con 1 registro. Barrido posterior de `Movimientos_Stock` (`tipo='desarme'`),
@@ -19808,7 +19814,7 @@ igual. En el front: sacar `.fac-btn-cancel` de la celda Acción de `facRender` y
 **Archivos:** `sql/gv_ppp_np_desarmar_a_guardar_v1890.sql`, `tests/fac-cancelar-pedido.cjs`.
 No hay problema de auditoría: es una funcionalidad nueva, no un bug.
 
-## §3.id — v18.91: el desarme vuelve a «A guardar», y qué son las 1.709 cajas de racks — 2026-09-16
+## §3.ih — v18.91: el desarme vuelve a «A guardar», y qué son las 1.709 cajas de racks — 2026-09-16
 
 ### 1. La mercadería desarmada va a A GUARDAR (deshace la v18.80, del mismo día)
 
@@ -19887,6 +19893,1045 @@ Problema 337.
 
 ---
 
+## §3.ii — v18.94: se saca el guard de `p_vuelve` + `p_a_guardar` (y un pisotón entre dos sesiones) — 2026-09-16
+
+**Thomas, 16/09:** *"ahí le pedí a otra sesión que cambie a los que se envían «a programar» a «A
+guardar»"*.
+
+### Lo que quedó
+
+Con la **v18.91** (§3.ih) los **tres caminos** de `gv_ppp_np_desarmar` mandan la mercadería a
+`a_guardar`. Eso dejó sin sentido el guard que había puesto la v18.88: rechazaba `p_vuelve` y
+`p_a_guardar` juntos porque en ese momento significaban dos destinos distintos para el stock.
+Ya no hay dos destinos, así que los parámetros son **independientes**:
+
+| parámetro | qué decide |
+|---|---|
+| `p_vuelve` | qué pasa con el **PEDIDO** (vuelve a A Programar retenido, o se cancela y no vuelve) |
+| `p_a_guardar` | hoy **no cambia el destino del stock** (siempre es `a_guardar`); deja el rastro de que fue una **cancelación** — la descripción del movimiento y el motivo que se guarda |
+
+Medido en transacción revertida sobre `LK 0046` (E03F, 16 art / 35 cajas), las **cuatro**
+combinaciones devuelven **35 a A guardar**; la cuarta (`true, true`) antes daba error 22023.
+Barrido posterior de `Movimientos_Stock`, `GV_Desarmes`, `GV_Web_Cancelados` y
+`GV_PPP_Web_Retenido` → 0 filas.
+
+### ⚠ El pisotón, que vale más que el cambio
+
+Al sacar el guard se hizo un `create or replace` **con el cuerpo de la v18.88 tomado del archivo
+del repo, sin leer antes la definición viva**. Entre medio, la otra sesión había aplicado la
+v18.91 sobre esa misma función — así que el reemplazo **deshizo la v18.91** y los destinos
+volvieron a góndola/excedente durante unos minutos.
+
+No hubo ningún error: el `create or replace` salió limpio, como sale siempre. Se detectó
+mirando `origin/main` y viendo el commit de la otra sesión, no por un síntoma. Se restauró
+re-aplicando el mismo `replace()` de la v18.91 **sobre la definición viva** y se verificó
+llamando a la función de verdad, camino por camino.
+
+> **La regla que ya estaba escrita para las vistas vale igual para las funciones: antes de
+> reemplazar una, leer `pg_get_functiondef` y partir de ESO, no de un archivo del repo.** Un
+> archivo de `sql/` es el registro de un cambio, no la definición actual — sobre todo con varias
+> sesiones trabajando el mismo día sobre el mismo objeto.
+
+Los archivos de `sql/` que ya no son la definición viva llevan ahora un banner que lo dice:
+`sql/gv_ppp_np_desarmar_a_guardar_v1890.sql`.
+
+**Archivos:** `sql/gv_ppp_np_desarmar_sin_guard_v1894.sql` (el cambio y el rollback),
+`sql/gv_ppp_np_desarmar_v1891.sql` (de la otra sesión, lo que se restauró).
+
+---
+
+## §3.ig — v18.92: «Reusar tanda» partía la tanda en dos días (D69C) — 2026-09-16
+
+**La pregunta de Luis:** *"¿por qué la D69C terminó en dos días diferentes? ¿cómo puede ser?"*
+
+### Lo que pasó, con hora
+
+ISIS dio la `D69C` con tres NP, las tres Zona 6 - GBA Norte, para el **14/09**:
+
+| NP | Cliente | Barrio | m³ |
+|---|---|---|---|
+| 98615 | Arguello Marcelo Claudio | Villa Ballester | 0,263 |
+| 98616 | Arguello Marcelo Claudio | Villa Ballester | 0,021 |
+| 98622 | Martinelli Daniel Roberto | Bella Vista | 0,325 |
+
+- **14/09 15:01** — las tres se mueven a mano desde la app al **21/09** (`GV_PPP_Prog_Override`,
+  nota *"movida desde la app a 21/09"*).
+- **16/09 11:58** — se sacan **98615 y 98616** a *A Programar* (*"desarmado: enviado a A Programar
+  desde la tabla de Programación"*, por `loekemeyer.n8n@gmail.com`).
+- **16/09 11:59** — un minuto después se las reprograma para el **17/09** con el botón que
+  **REUSA la tanda D69C** (*"ya pickeada/armada"*).
+- **98622 nunca se volvió a tocar**: sigue en `D69C` el **21/09**.
+
+Resultado: **`D69C` existe en dos fechas a la vez** — 17/09 con 0,284 m³ y 21/09 con 0,325 m³.
+
+### Por qué el guard no lo frenó
+
+`gv_ppp_isis_programar` (v16.03) reusa el código anterior cuando **todas** las NP que entran
+vienen de la misma tanda previa. La idea es buena: si la tanda ya se pickeó y se armó, volver a
+ella evita repetir el trabajo.
+
+El problema es de qué lado mira: **cuenta las que ENTRAN, no las que QUEDAN**. Nadie preguntó si
+la tanda seguía teniendo NP programadas en otro día.
+
+Y parte en dos todo lo que agrupa por tanda, porque un mismo código cae en dos camiones de dos
+días: `vista_tanda_m3`, el camión, la hoja de ruta y la carga. El panel de la PPP lo marca como
+*"tanda inconsistente"* (varias fechas), pero eso es **después**: nada lo impedía al programar.
+
+### El arreglo
+
+Antes de reusar se cuentan las NP de esa tanda que quedan **en otro día** (web + ISIS). Si hay
+alguna, **no se reusa**: va una tanda nueva y el aviso dice por qué, cuántas quedan y cuándo. Si
+las hermanas están en el **mismo día destino**, reusar sigue siendo lo correcto y no cambia nada.
+
+Se eligió **abrir tanda nueva y no bloquear con un `raise`**: separar un pedido de su tanda es una
+decisión legítima del supervisor y trabarlo lo dejaría sin salida. El aviso aclara que el
+contenido es el mismo y que **no hay que volver a pickear**, sólo cambia el código.
+
+### Verificación (transacciones abortadas)
+
+| Caso | Antes | Ahora |
+|---|---|---|
+| La hermana 98622 queda el 21/09 (**el caso real**) | reusa `D69C` | **tanda nueva `E30A`** + aviso |
+| La hermana va al MISMO día (17/09) | reusa `D69C` | reusa `D69C` (0,609 m³) ✓ |
+| Se mueve la tanda ENTERA al 18/09 | reusa `D69C` | reusa `D69C` ✓ |
+
+### Centinela
+
+```sql
+select * from public.gv_ppp_tanda_dos_dias;   -- vacía = todo bien
+```
+
+Cubre web + ISIS, así que también caza lo que se arme a mano por `GV_PPP_Prog_Override`, que se
+saltea la función. Medido el 16/09 antes del arreglo: `D69C` era **la única** tanda partida en
+todo el universo vivo.
+
+⚠ **No se tocó la D69C viva.** Son NP de una tanda ya programada y pickeada: qué hacer con ellas
+lo decide un supervisor (protocolo de `CLAUDE.md`). El centinela la muestra hasta que eso pase.
+
+**Archivo:** `sql/gv_ppp_isis_programar_reusar_v1892.sql`. **Test:** `tests/ppp-tanda-dos-dias.cjs`.
+**Problema 338.** **Rollback:** sacar el bloque marcado `v18.92` de `gv_ppp_isis_programar`
+(el `select count(*) … into v_otras` y su `if`), dejando `v_code := v_prev; v_reuso := true;`
+directo, y `drop view public.gv_ppp_tanda_dos_dias;`.
+
+## §3.ij — v18.93: la empresa en el stock sólo tiene sentido en los duales (ESCRITO, NO APLICADO) — 2026-09-16
+
+**Estado: el SQL está escrito, medido y probado, y NO se ejecutó.** Luis lo pidió con una
+condición — *"hacé 3527 ahora si no hay nadie pickeando"* — y al momento de mirarlo había
+picking activo: legajo **277** venía encadenando tandas toda la mañana (E11C → E25A → E11D →
+E03G → E12A → E12C → D69C, cerró D69C a las 13:07) y el legajo **237** tenía **E12C con el
+armado abierto** desde las 11:54, sin TAP. Todo el trabajo está en
+`sql/gv_empresa_solo_duales_v1893.sql`, listo para correr. Tarea de Planify 3527, problema 337.
+
+### El hallazgo que cambia el tamaño del cambio
+
+**`empresa` no es sólo una etiqueta: es parte de una CLAVE ÚNICA.** Entra en dos índices de
+deduplicación —`mov_stock_pipeline_dedup` (picking/separado/facturado) y
+`mov_stock_aguardar_dedup`— y los reconciliadores los usan como `ON CONFLICT`. El propio
+código lo avisa, en `reconciliar_pipeline_stock_etapa1` (v17.07), textual:
+
+> *"SIN ESTO SE DUPLICA EL PICKING. Si la empresa no se puede derivar del evento pero la fila
+> YA existe con empresa real, hay que reusar ESA empresa. Si no, el ON CONFLICT —que incluye
+> `coalesce(empresa,'')`— no matchea contra la fila 'CH'/'LK'"*
+
+O sea: ya se rompió una vez por esto. **Consecuencia: el trigger y el backfill van JUNTOS, en
+la misma corrida.** Cambiar sólo el trigger deja las filas viejas en LK/CH y las nuevas en
+'Mixto' — que es *exactamente* la condición que duplica el picking.
+
+### Lo medido, antes de aplicar
+
+| | |
+|---|---|
+| filas de códigos NO duales con empresa LK/CH | **5.794** |
+| colisiones contra `mov_stock_pipeline_dedup` | **3** (benignas, ver abajo) |
+| colisiones contra `mov_stock_aguardar_dedup` | **0** (0 filas afectadas) |
+| costo del UPDATE | 200 filas en **231 ms** → ~**6,7 s** las 5.794 |
+
+⚠ Esos 6,7 s están **pegados al `statement_timeout` de ~8 s**, así que el backfill va por
+**lotes de 1.000**, no de una. El costo lo pone `actualizar_saldo_trigger`, que corre una vez
+por fila y recalcula el saldo completo del artículo.
+
+Las 3 colisiones son el mismo caso y no cambian ningún saldo: tanda **D72A**, artículo **520**,
+donde convive una fila 'Mixto' con **delta 0** y la fila CH con el delta real (`55638992:Mixto:0`
+/ `63471807:CH:0`, y sus pares en `separar_pedidos` y `terminado`). El paso 3 las excluye.
+
+### El trigger nuevo, probado en transacción revertida
+
+El bloque va **antes** de los de la v18.24 y la v18.86: esos dos existen para elegir entre las
+**dos** góndolas de un dual, y en un código de una sola pila no hay nada que elegir.
+
+```
+505  (no dual)  con LK → Mixto · con CH → Mixto · sin empresa → Mixto   ✓
+438E (dual)     con LK → LK    · con CH → CH                            ✓
+505L            pela la L a 505, no es dual → Mixto                     ✓
+```
+
+Verificado después que la transacción revirtió: la función quedó en la v18.91 y no quedó
+ninguna fila de prueba.
+
+### Cuándo correrlo
+
+Con el depósito quieto — sin eventos de operarios en los últimos 30 min y sin picking ni armado
+abierto (EP sin TP, AP sin TAP). La consulta de chequeo está en el encabezado del `.sql`.
+
+## §3.ih — v18.95: auditoría profunda del cambio "empresa sólo en duales" (ESCRITO, NO APLICADO) — 2026-09-16
+
+**Estado: el SQL está escrito, medido y probado, y NO se ejecutó.** Luis: *"a la hora de cierre
+del depo lo corremos, hacé análisis bien profundo para verificar que no rompemos nada"*.
+Todo en `sql/gv_empresa_solo_duales_v1895.sql`. Tarea de Planify 3527, problema 337 (que de
+paso destapó el 340).
+
+### La lista de duales está completa — verificado, no asumido
+
+Son **4**: `437E`, `438E`, `439E`, `809E`. Y "dual" no significa *el mismo producto en dos
+góndolas*: significa **dos artículos DISTINTOS que comparten número** (809E: CH = Corta Queso,
+LK = Corta Pizza). Para todo el resto, un código = un artículo = **una pila**.
+
+Se buscaron códigos con celda de góndola en las dos empresas: aparecieron **702E** y **725E**,
+que **no son duales** — tienen una sola góndola (CH: M09/M10 y L40/L45) y el "LK" les viene del
+**rack** (X1, X26). Y `LIBRE`, que es un placeholder.
+
+### Lo que NO se rompe (los nueve, uno por uno)
+
+| | por qué |
+|---|---|
+| El saldo por código | no cambia ningún `delta`: sólo una etiqueta |
+| `vista_saldos_stock` | agrupa por `outkey`, que lleva la empresa **sólo si es dual** |
+| `stocks_carga_rapida` | su clave `norm_cod` también lleva empresa sólo si es dual |
+| `gv_stock_negativos` | suma todas las empresas antes de decidir |
+| `gv_stock_particion_sospechosa` | **se vacía** para no duales — es mejora |
+| Front, `_stkMovMatch` | filtra por empresa sólo si el código trae sufijo (dual) |
+| `recepcion.js` | detecta dual por `clave !== cod_art`, **no** por empresa |
+| **Producción Virgilio** | escribe `empresa` pero **no la lee nunca**: 0 filtros `empresa=eq.`, 0 `select` de esa columna sobre `Movimientos_Stock` en todo el repo |
+| Los 4 duales | no se tocan |
+
+### ⚠⚠ El trigger y el backfill van JUNTOS — y esto está MEDIDO
+
+`empresa` entra en dos índices ÚNICOS (`mov_stock_pipeline_dedup`, `mov_stock_aguardar_dedup`)
+que los reconciliadores usan como `ON CONFLICT`. El código ya lo avisaba, en
+`reconciliar_pipeline_stock_etapa1` (v17.07): *"SIN ESTO SE DUPLICA EL PICKING"*.
+
+Probado con las dos mitades, en transacciones revertidas, sobre `601E / E12E`:
+
+```
+trigger nuevo + fila backfilleada a 'Mixto' → reinsert con 'LK' → 0 filas   ✔ no duplica
+trigger nuevo y la fila vieja en 'LK'       → reinsert con 'LK' → 1 fila    ✘ DUPLICA
+```
+
+Funciona porque en Postgres el **BEFORE INSERT corre ANTES de la comprobación de unicidad**: el
+reconciliador manda `LK`, el trigger lo pisa a `Mixto` y choca contra la fila ya backfilleada.
+Sin el backfill no choca, y entra de nuevo.
+
+### Los crons hay que apagarlos (hallazgo del análisis)
+
+Cinco escriben en `Movimientos_Stock`. Los jobs **57 y 68 ya se serializan** con el advisory
+lock **5768** —por eso el paso 2 lo toma también—, pero **74 (`gv-reconciliar-facturado-web`,
+cada 10 min) y 81 (`gv-reconciliar-aguardar`, cada 2 min) NO lo toman**: si uno inserta durante
+la migración, esa fila queda con LK/CH sin backfillear y el reconciliador siguiente la duplica.
+El paso 0 apaga 34, 57, 68, 74 y 81; el paso 5 los prende.
+
+### Medido antes de aplicar
+
+| | |
+|---|---|
+| filas de no duales con LK/CH | **5.794** |
+| colisiones en `mov_stock_pipeline_dedup` | **3** — D72A/520, todas con `delta 0`, excluidas |
+| colisiones en `mov_stock_aguardar_dedup` | **0** (0 filas afectadas) |
+| costo | 200 filas en 231 ms → ~**6,7 s** las 5.794 → **lotes de 1.000** (el `statement_timeout` son ~8 s) |
+
+### De paso: `gv_ocupacion_lugar` ya estaba rota (problema 340)
+
+Cruza el saldo con `AND s.empresa = l.empresa`, o sea agarra **sólo la porción etiquetada**.
+Medido: de 790 filas, **458 difieren del saldo real** y 55 dan NULL teniéndolo — **57.181 cajas
+de diferencia**. Es **preexistente**; el cambio la llevaría de mal a vacía. No la lee nadie (0
+en los dos fronts, 0 vistas, 0 funciones, 0 crons; sólo expuesta a `anon`).
+
+Se arregla en el mismo paso, con el mismo principio: filtrar por empresa **sólo si el código es
+dual**. La vista nueva da **0 diferencias, 0 NULL indebidos y 0 cajas** contra el saldo real.
+
+⚠ **Y una trampa medida: NO usar `LEFT JOIN LATERAL` ahí.** La subconsulta se evalúa una vez
+por fila (790) contra un seq scan de 62.495 movimientos — ~49 M de filas, y **la consulta se
+cuelga** (timeout). Con dos joins planos son **858 ms**. Rollback en
+`sql/backups/gv_ocupacion_lugar_pre_v1895.sql`.
+
+---
+
+## §3.ia — v18.96: el pedido PI OL-10139 de Ownland queda como el proforma real (U$S 49.291,44) — 2026-09-16
+
+Thomas mandó el `PI_draft_OL-10139.xls` (Yangjiang Ownland, draft del 26/08, 1x20GP) para
+compararlo con lo cargado. **No coincidía ni una línea.**
+
+| | Proforma | Cargado (10/09) |
+|---|---|---|
+| Líneas | 16 | 13 |
+| Unidades | 100.728 | 98.376 |
+| FOB | **49.291,44** | **46.626,00** |
+| CBM | 27,658 (784 ctns) | 21,941 |
+
+Los **precios unitarios sí coincidían** en todos los códigos comunes: lo cargado salió de una
+versión anterior del mismo pedido, no de otro proveedor. Faltaban `812E` (1440), `503E` (1200),
+`589E` (1440) y `692ENS` (1248); sobraba `119E` (1872, corta queso Loke, que el PI no trae); y
+once códigos tenían otra cantidad — los más gordos, `1546903` (36.000 contra 47.088 cargadas),
+`816E` (9984/6144) y `702E` (3024/6192).
+
+**Thomas: *"dejá solo el de usd 49291.44"*.** Aplicado con backup previo:
+
+```sql
+create table zz_backups."GV_Backup_Imp_Baches_OL10139_20260916" as
+  select * from public."GV_Importados_Baches" where pedido_ref = 'PI OL-10139';   -- 13 filas
+create table zz_backups."GV_Backup_Imp_Pedido_CC_OL10139_20260916" as
+  select * from public."GV_Imp_Pedido_CC" where pedido_ref = 'PI OL-10139';       -- 1 fila
+-- las dos con enable row level security + revoke a anon/authenticated
+```
+
+Todo en una transacción: **12 updates** de cantidad, **alta de las 4 líneas que faltaban**,
+**baja del 119E**, y `GV_Imp_Pedido_CC.fob_total` de 46.626 a **49.291,44**.
+
+```sql
+select pedido_ref, n_lineas, unidades, usd, m3 from public.gv_importados_pedidos_curso
+ where pedido_ref = 'PI OL-10139';
+--  16 | 100728 | 49291.44 | 26.379
+select fob, pagado, pend_giro_directo, falta, fob_calculado, fob_difiere
+  from public.gv_imp_cuenta_corriente where pedido_ref = 'PI OL-10139';
+--  49291.44 | 14000.00 | 20956.00 | 14335.44 | 49291.44 | false
+```
+
+Tres cosas que conviene tener a mano:
+
+- **`692ENS` del PI se cargó como `692E`** (Pelador "V" horizontal Chef, `importado_id` 148), que
+  es el código que existe en `gv_importados_ordenes` y tiene el mismo FOB (0,49). El PI aclara
+  que el "NS" es la variante sin logo.
+- **El m³ no sale del PI**: Gestión lo calcula con su volumen por artículo y da **26,379**
+  contra los **27,658 CBM** del proforma (−4,6 %). El FOB y las unidades sí son exactos.
+- **La CC subió la deuda**: `falta` pasó de 11.670 a **14.335,44** (el pagado 14.000 y el
+  pendiente de giro directo 20.956 salen del Excel de Thomas del 11/09 y no se tocaron).
+
+**Rollback:** restaurar las 13 filas y la fila de CC desde las dos tablas de `zz_backups`
+(borrando antes las 16 líneas vivas del pedido). Problema **341**.
+
+## §3.ik — v18.97: la migración 337 empaquetada en funciones, lista para disparar — 2026-09-16
+
+Luis: *"prepará todo lo que necesites aparte (sin joder live) para que cuando te diga se
+implemente"*. Hecho: **seis funciones `gv_mig337_*` creadas y dormidas**. Crear una función no
+toca ningún dato ni ninguna pantalla. Ninguna es ejecutable por `anon` (todas con `revoke`).
+
+| | qué hace | escribe |
+|---|---|---|
+| `gv_mig337_simular()` | los 7 chequeos del preflight | **no** |
+| `gv_mig337_migrar(true)` | **ENSAYO**: corre TODO y al final lo revierte | no (revierte) |
+| `gv_mig337_preparar()` | apaga los 5 crons + preflight | sí |
+| `gv_mig337_migrar()` | backup · trigger · vista · backfill · md5 | sí |
+| `gv_mig337_verificar()` | repesca · reconciliadores · centinelas · prende crons | sí |
+| `gv_mig337_rollback()` | deshace todo de un tirón | sí |
+
+### Por qué son TRES fases y no una sola función
+
+Es el hallazgo que obligó al diseño: **`cron.alter_job` es transaccional** — hace un `UPDATE`
+sobre `cron.job`. Si el apagado de los crons va DENTRO de la misma transacción que la
+migración, el scheduler **sigue viendo `active = true`** hasta el commit, o sea hasta que la
+migración ya terminó. Los crons nunca quedarían apagados durante la ventana, que es
+exactamente para lo que se los apagaba. Por eso: fase 1 apaga y commitea, fase 2 migra, fase 3
+verifica y prende.
+
+### Las guardas que trae puestas
+
+- `preparar()` **se niega** si algún chequeo del preflight está en `FRENA` (depósito con
+  movimiento, picking/armado abierto, colisiones nuevas, o el ancla del trigger cambiada).
+- `migrar()` **se niega** si el bloque v18.95 ya está aplicado, y **aborta y revierte** si el
+  md5 del saldo por (código, depósito) cambia entre el principio y el final.
+- `migrar(true)` corre **exactamente el mismo código** y termina con un `raise` para revertir:
+  el ensayo prueba lo que se va a ejecutar, no una copia.
+- El backfill va **en lotes de 1.000** dentro de un `loop` (el `statement_timeout` ronda los 8 s
+  y las ~5.800 filas tardan ~6,7).
+- `verificar()` hace una **repesca** por si un cron alcanzó a insertar algo en la ventana.
+
+### Probado ya
+
+Corrido `gv_mig337_simular()` con los operarios trabajando: **frena solo**, como debe —
+*"deposito quieto: FRENA, último evento hace 0 min"* y *"sin picking/armado abierto: FRENA,
+2 tandas"*. Los otros cinco chequeos en OK (0 colisiones en los dos índices, ancla en su
+lugar, 4 duales). Las filas a corregir ya van en **5.897** (eran 5.794 hace unas horas): crece.
+
+### El archivo del repo == la base
+
+`sql/gv_mig337_empresa_solo_duales.sql`, verificado con el md5 del cuerpo normalizado de las
+**seis**. ⚠ El verificador tuvo **dos falsos verdes** antes de quedar bien, y los dos valen
+como advertencia para la próxima: (1) exigir `\nas $fn$` **se come la función escrita en una
+sola línea** y le cuelga su nombre al cuerpo de la siguiente; (2) sin anclar a
+`create or replace`, los `revoke execute on function public.X(` también matchean y corren
+todos los nombres un lugar. El patrón bueno ancla **las dos puntas**.
+
+### Cómo se corre al cierre
+
+```sql
+select * from public.gv_mig337_simular();       -- los 7 chequeos en OK
+select * from public.gv_mig337_migrar(true);    -- ENSAYO (termina con "ENSAYO OK")
+select * from public.gv_mig337_preparar();      -- apaga los crons
+select * from public.gv_mig337_migrar();        -- el cambio
+select * from public.gv_mig337_verificar();     -- y prende los crons
+```
+
+Lo que hay que mirar en el último paso: `reconciliar_pipeline_stock_etapa1` en **0 filas**
+(el picking no se duplicó) y `gv_stock_empresa_fantasma` con **0 duales**.
+Si algo sale mal: `select * from public.gv_mig337_rollback();`.
+
+### §3.gk — v18.98: Cuarentena partida en dos — submódulo "Clientes nuevos" — 2026-09-16
+
+**Pedido (Luis):** *"tenemos un sistema de cuarentena donde entran los pedidos de clientes con
+deuda, que piden más que su crédito, suspendidos y clientes nuevos. Separalo en dos: Cuarentena
+tal cual, y otro para Clientes nuevos… tabla similar con pedido (todas las NP), fecha, m³, razón
+social, zona, contacto, monto (precio total por lista). De momento solo visual. Si un cliente
+nuevo además entra en algún parámetro de cuarentena, dejalo en cuarentena (Zhang Qikuan)."*
+
+**El corte no toca la marca ni el candado.** La regla de "cliente nuevo" es la misma de la v17.12
+(`GV_Clientes_Nuevos`, la calcula LK y la espeja el cron). Lo único que cambia es **dónde se
+muestra**, en el front:
+
+- `aprSoloClienteNuevo(p)` = el pedido tiene **un solo** motivo y es `cliente_nuevo`.
+- La **columna Cuarentena** (`aprColCuarentena`) ahora filtra `aprEnCuarentena(p) && !aprSoloClienteNuevo(p)`:
+  deuda / suspendido / excede crédito, más el cliente nuevo que **además** cae en uno de ésos.
+- El **submódulo "🆕 Clientes nuevos"** (`clinNuevosHtml`) muestra `aprEnCuarentena(p) &&
+  aprSoloClienteNuevo(p)`. **v19.03 (Luis): NO es una pestaña** — va como sección DENTRO de "A
+  Programar", debajo de Cuarentena (`aprRender` la arma: `aprColPedidos() + aprColCuarentena() +
+  clinNuevosHtml()`). La pestaña `clinuevos` que se probó primero se sacó.
+- **Las dos secciones son COLAPSABLES** (v19.03): el título es el botón (`aprCuarColapsar` /
+  `aprCliColapsar`), estado por navegador en `localStorage` (`vir_cuar_colapsado`,
+  `vir_cli_colapsado`). Colapsado = sólo el título con el contador.
+- `aprEnCuarentena` **no cambió**: los dos submódulos siguen retenidos igual (no se programan solos).
+
+**El MONTO es lo único que necesitó backend** (protocolo: la valorización es lógica de negocio).
+No se inventó nada: la RPC nueva **`gv_clientes_nuevos_valor_lote(p_pedidos jsonb)`** llama a
+`gv_ppp_web_valor_items` — la MISMA función que valoriza el límite de crédito en
+`gv_cuarentena_limite` — así Cuarentena y Clientes nuevos no pueden decir montos distintos del
+mismo pedido. Devuelve `order_id, empresa, valor` (neto sin IVA). `SECURITY DEFINER`, gate
+`es_supervisor_virgilio() OR gv_es_supervisor_o_servicio()`, `EXECUTE` revocado a `anon`.
+`sql/gv_clientes_nuevos_valor_lote_v1895.sql`. Aditiva, no toca ningún objeto compartido.
+
+**Medición (2026-09-16):**
+- `has_function_privilege('anon', 'public.gv_clientes_nuevos_valor_lote(jsonb)', 'EXECUTE')` → **false**;
+  `authenticated` → **true**; `prosecdef` → **true**.
+- `gv_ppp_web_valor_items('lk','4223','[{"art":"505","cajas":2},{"art":"221","cajas":4}]',''')` →
+  **$120.480,00** (la valorización responde con un número real).
+- `tests/apr-cuarentena.cjs`: el cliente nuevo **puro** ya NO cuenta en Cuarentena (queda 1, el
+  mixto deuda+nuevo) y aparece en "Clientes nuevos" (1) con su chip `CH 2533`.
+
+**Sólo visual, y sólo web:** el submódulo no dispara ninguna acción (el WhatsApp de "monto a
+pagar" con descuento de contado y el reembolso de lo no entregado, del pedido anterior de Luis,
+quedan para una fase 2). Un cliente nuevo que entra por **ISIS** trae su NP y se valoriza aparte:
+ahí el monto queda en "—".
+
+**Rollback:** `drop function public.gv_clientes_nuevos_valor_lote(jsonb);` y revertir el front
+(el commit de v18.98). El front aguanta sin la RPC: `clinNuevosValorCargar` es best-effort → la
+columna Monto muestra "—" y nada más se rompe.
+
+**v18.99 (Luis, 2026-09-16):** botón **"👁 Ver ejemplo"** en la pestaña (igual que el pedido de
+prueba de Cuarentena), `clinDemoPedido` / `clinDemoRowHtml` / `clinDemoToggle` con `_apr.cliDemo`.
+Agrega una fila EJEMPLO (cliente nuevo puro, monto de muestra $120.480) sin sumar al badge. Sirve
+para ver el submódulo aunque hoy no haya ningún cliente nuevo real. Cubierto en `tests/apr-cuarentena.cjs`.
+
+---
+
+## §3.ik — v19.01: las 2 filas de `Facturacion_NP` que quedaron sin cliente (dato, no código) — 2026-09-16
+
+El bug que las dejó así está arreglado en el front (problema 352, `GUIA-PROYECTO.md` nota
+v19.01): al bajar el Excel ISIS, una NP que venía de `_facSinTanda` caía a un fallback vacío y
+la fila se guardaba sin razón social, código, tanda, m³ ni fecha. **Esto es la reparación de las
+dos filas que ya estaban escritas**, que Thomas autorizó explícitamente (*"sí, rellenalas"*).
+
+**Qué eran:** `LK 0034` y `LK 0035` — Mitre Hugo Alberto, cod 4181, pedido LK 1364, tanda `E01G`
+desarmada el 15/09. Únicas 2 de 1.305 filas sin razón social.
+
+**De dónde salió cada dato** (ninguno se inventó):
+
+| campo | fuente |
+|---|---|
+| `razon_social`, `cod_cliente`, `m3` | `PPP_Web_Programacion` (empresa `lk`, np 34 y 35) |
+| `tanda`, `fecha_salida` | `Entregas_Virgilio` (el armado real: `E01G`, 2026-09-17) |
+
+```sql
+update public."Facturacion_NP" f
+   set razon_social = src.razon_social, cod_cliente = src.cod_cliente,
+       tanda = src.tanda_armado, fecha_salida = src.fecha_salida_armado::date, m3 = src.m3
+  from ( … PPP_Web_Programacion + Entregas_Virgilio … ) src
+ where btrim(f.np) = src.np
+   and nullif(btrim(coalesce(f.razon_social,'')),'') is null;   -- ⬅ sólo las vacías
+```
+
+El `and` final es el que hace que el `update` no pueda pisar una fila sana ni siquiera si se
+corre dos veces.
+
+**Medido después:** `Facturacion_NP` sigue con **1.305** filas (no se creó ni se borró ninguna),
+**0** sin razón social, **0** sin código de cliente, y el cliente 4181 pasó de 1 a **3** NP.
+
+```
+LK 0034 → Mitre Hugo Alberto / 4181 / E01G / 2026-09-17 / 0.299
+LK 0035 → Mitre Hugo Alberto / 4181 / E01G / 2026-09-17 / 0.009
+```
+
+**Backup y ROLLBACK:** `zz_backups."GV_Backup_FacturacionNP_4181_20260916"` (con RLS, las dos
+filas como estaban). Para deshacer:
+
+```sql
+update public."Facturacion_NP" f
+   set razon_social = b.razon_social, cod_cliente = b.cod_cliente, tanda = b.tanda,
+       fecha_salida = b.fecha_salida, m3 = b.m3
+  from zz_backups."GV_Backup_FacturacionNP_4181_20260916" b
+ where btrim(f.np) = btrim(b.np);
+```
+
+Sin bump de versión: no cambió una línea de la app — el arreglo del código ya viajó en la v19.01.
+
+## §3.ii — v19.03: las 6 RPC de Conciliación se cierran a `anon` — 2026-09-16
+
+> ⛔ **REVERTIDO el mismo día, a pedido de Thomas: *"volvé para atrás, no había que borrar nada"*.** Los permisos volvieron a como estaban (`grant execute … to public`) y se comprobó llamando las RPC como `anon`. Esta sección queda **sólo como registro de lo que se midió**, no de un cambio vigente. El archivo `.sql` se borró del repo.
+
+
+**Lo que estaba abierto.** Las 6 funciones `gv_conciliacion_*` (`lista`, `comparar`, `motivo`,
+`detalle`, `totales`, `registrar`) eran `SECURITY DEFINER` con `EXECUTE` para **PUBLIC**, y `anon`
+lo hereda. Medido con `set role anon`:
+
+```
+gv_conciliacion_lista(500,0,null,null)  ->  143 filas
+  razón social "Extralimp S.A." · neto Gestión $3.142.920 · neto ISIS · storage_path del PDF
+```
+
+La anon key está escrita en `index.html`, que se sirve por GitHub Pages: **cualquiera que la copie
+leía la facturación del depósito**. Y `gv_conciliacion_registrar` además **escribe**.
+
+**Lo que NO se filtraba: el PDF.** Los buckets `isis-lk` / `isis-ch` son privados y su policy exige
+`authenticated` + `es_supervisor_virgilio()`. Se escapaba el **nombre** del archivo (que lleva el
+número de comprobante), no el contenido.
+
+⚠ **No es un agujero de esta pantalla ni de la v18.88.** Es el **default de Postgres** —cada
+función nueva nace con `EXECUTE` para `PUBLIC`— y nadie lo revocó nunca. Al 16/09 había
+**219 de 366** funciones `SECURITY DEFINER` alcanzables por `anon` en este proyecto.
+
+### Por qué no rompe nada (verificado ANTES, no supuesto)
+
+| Dónde se buscó | Resultado |
+|---|---|
+| `cron.job` (command) | ninguno la llama |
+| `pg_proc.prosrc` (otras funciones) | ninguna |
+| vistas (`pg_rewrite`) | ninguna |
+| Edge Functions (las 8 del repo) | ninguna |
+| repos `pagina-LK-copia` y `paginach` | nada |
+| repo `produccion-virgilio` (clonado y grepeado) | nada |
+| código de Gestión | **sólo `index.html`** |
+
+En `edge_logs` de 24 h quien las llama son **navegadores Chrome** — ningún n8n, script ni curl.
+
+**Y la prueba que cierra el tema:** en esos mismos logs,
+`/storage/v1/object/sign/isis-lk/...` devuelve **200**, y ese endpoint sólo funciona para
+`authenticated` + supervisor. O sea que **la pantalla ya entra con sesión de Google**: sacarle el
+permiso a `anon` no la toca.
+
+### Verificado DESPUÉS
+
+```
+set role anon          -> ERROR 42501: permission denied for function gv_conciliacion_lista
+set role authenticated -> lista 143 · totales 3 · comparar 1 · detalle 1 · motivo ok
+                          (idéntico a antes del revoke)
+```
+
+`authenticated` y `service_role` conservan su grant propio: el `revoke` fue sólo a `public, anon`.
+
+### Lo que esto NO resuelve
+
+`authenticated` es **cualquiera con sesión de Google** en este proyecto, no sólo un supervisor. Hoy
+alcanza (a esta app sólo se loguean supervisores; los operarios usan la sesión por legajo, que a
+nivel base es `anon`), pero el cierre fuerte sería el guard **adentro** de cada función, como ya
+hace el Storage:
+
+```sql
+if not public.es_supervisor_virgilio() then raise exception 'solo supervisores'; end if;
+```
+
+⚠ Con la trampa ya documentada: el guard **no** puede colgarse del `FROM` de una función SQL
+—Postgres elimina la subconsulta de una fila cuyas columnas no se referencian y **no se evalúa
+nunca**— va como `perform` en `plpgsql`.
+
+Y quedan **213** funciones `SECURITY DEFINER` abiertas a `anon` en el resto del proyecto. Eso es
+una tanda propia: inventariar cuáles llama el front de verdad y cerrar el resto.
+
+**El archivo `sql/gv_conciliacion_grants_v1903.sql` se borró** al revertir. Problema 353, revertido.
+
+## §3.ik — v19.06: barrido de grants — 61 RPC cerradas a `anon` — 2026-09-16
+
+> ⛔ **REVERTIDO el mismo día, a pedido de Thomas: *"volvé para atrás, no había que borrar nada"*.** Los permisos volvieron a como estaban (`grant execute … to public`) y se comprobó llamando las RPC como `anon`. Esta sección queda **sólo como registro de lo que se midió**, no de un cambio vigente. El archivo `.sql` se borró del repo.
+
+
+**El problema (354).** Postgres otorga `EXECUTE` a **PUBLIC** en CADA función nueva, y `anon`
+hereda de PUBLIC. O sea que **toda RPC nace ejecutable con la clave pública** que está escrita
+en `index.html`. Al 16/09: **216 de 369** `SECURITY DEFINER` en `public`, y sólo **10** con
+algún chequeo de identidad adentro. Y al ser `SECURITY DEFINER` corren como `postgres`, o sea
+que además saltean la RLS.
+
+### ⚠ Por qué esto NO se puede barrer a lo bruto
+
+**Los operarios entran como `anon`.** Su sesión es por legajo (`vir_legajo_auth`, localStorage),
+no Google; sólo los supervisores son `authenticated`. Un revoke en masa deja a la planta sin
+picking, armado, carga ni recepción.
+
+### Cómo se decidió qué cerrar
+
+1. Cruce de los 216 nombres contra **todo el código** de 4 repos — 874 archivos `.js`/`.html`/
+   `.ts`/`.cjs`/`.json` de `Gestion-Virgilio`, `pagina-LK-copia`, `paginach` y
+   `produccion-virgilio` (clonado para esto). → **123 aparecen, 88 no**.
+2. Cruce contra las llamadas REST **reales** de `edge_logs`, **5 días** (11/09 → 16/09).
+3. Se cerró sólo lo que falla las dos pruebas **y** entra en una categoría demostrable.
+
+### ⚠ Las cuatro cosas que la medición atajó, y que un barrido "obvio" habría roto
+
+| | |
+|---|---|
+| **`es_supervisor_virgilio`** | No está en el código ni en los logs — **pero la usan las policies de RLS** de `storage.objects` (buckets `isis-lk`/`isis-ch`). Revocarla dejaba a los supervisores sin las facturas. |
+| **`wa_dashboard_rango`, `wa_pipeline_log_reciente`** | 0 llamadas en 2 días… y **sí el 11/09**. Hay una pantalla que nadie abrió en la ventana corta. Por eso la ventana se estiró a 5 días: **dos días no alcanzan para decir "no se usa"**. |
+| **`validar_login`, `fichadaqr_ficho_hoy`, `cp_*`** | `sql/hardening_seguridad_20260828.sql` ya documentaba que son de **apps EXTERNAS** (login, FichadaQR, portal de proveedores) que entran como anon. |
+| **`planify_*`** | **Planify es un repo PRIVADO** que esta sesión no puede clonar, y varias `planify_recruit_*` sí figuran en los logs. Las 9 que no figuran quedan abiertas: sin leer ese front, "no aparece" no prueba nada. |
+
+La consulta que caza la primera, y que conviene correr **antes** de cualquier revoke:
+
+```sql
+select p.proname from pg_policy pol
+  cross join lateral (select pg_get_expr(pol.polqual, pol.polrelid) || ' ' ||
+                             coalesce(pg_get_expr(pol.polwithcheck, pol.polrelid),'') as txt) e
+  join pg_proc p on p.pronamespace = 'public'::regnamespace
+   and e.txt ~* ('\m' || p.proname || '\s*\(');
+```
+
+### Lo que se cerró: 61, en tres tandas
+
+| | Qué | Por qué es seguro |
+|---|---|---|
+| **A** | **24** funciones de **trigger** | Postgres **no chequea `EXECUTE`** para dispararlas y no se pueden llamar como RPC (devuelven `trigger`): el grant no hacía nada. **Probado**: un `INSERT` en `Movimientos_Stock` **como anon**, dentro de una transacción abortada, pasó sin "permission denied" → el trigger corrió. |
+| **B** | **10** que sólo dispara un cron + **8** helpers `wa_sim_*` de simulación | Los 12 crons corren como **`postgres`** (verificado en `cron.job.username`). **Probado**: `select public.simular_ocs_automaticas()` sigue andando. |
+| **C** | **18** sin **una sola** referencia en el código ni **una sola** llamada en 5 días | — |
+
+### Verificado después, como `anon` (que es como entra el operario)
+
+`gv_ppp_prog_arbol` · `gv_es_dia_habil` · `gv_ppp_atrasados` · `gv_importados_pedidos_curso` ·
+`gv_imp_cargas` → las cinco contestan igual. `select * from public.gv_endpoints_rotos;` → vacío.
+Vistas sin `security_invoker` legibles por anon → vacío.
+
+**216 → 155.**
+
+### Lo que queda
+
+- **155 abiertas**, la mayoría en uso real. Cerrarlas de verdad no es un `revoke`: es meterles
+  el chequeo de identidad adentro, y para eso hay que saber **quién** puede llamar cada una.
+- **El schema `GP2` no se tocó.** Sus bundles (`inicio_bundle`, `tablet_bundle`, `oc_bundle`,
+  `recepcion_bundle`…) son `SECURITY DEFINER` y también están abiertos a `anon`. Otra tanda.
+- Para avanzar con las 9 de Planify hace falta **acceso al repo `loekemeyer/Planify`**.
+
+**El archivo `sql/gv_grants_anon_barrido_v1906.sql` se borró** al revertir.
+Problema 354, **revertido** — la medición queda anotada acá por si algún día se retoma.
+
+---
+
+## §3.il — v19.07: el tiempo muerto se RESTA del picking y del armado — 2026-09-16
+
+**Pedido de Luis**, textual: *"suponete que arma por 1 hora, va al baño 10 minutos y después
+arma 50 min más (todo armado de 1 tanda). Debería ser 1 hora 50 min de armado y 10 de baño
+(cada uno contado individual, a lo mejor conviene contar las 2 horas de tanda y después
+netear, lo que sea más cómodo para el código)"*. Y: *"pensábamos que ya estaba implementado
+esto"*.
+
+**No estaba implementado en ninguna parte.** Lo que se verificó antes de tocar nada:
+
+| Dónde se creía que estaba | Qué hace en realidad |
+|---|---|
+| `DEAD_TIME_CODES` (index.html) | Sólo **bloquea botones** mientras un tiempo muerto está abierto (línea 7612). No descuenta. |
+| `computeClosureDur` (monitor) | Parte el cierre que **cruza el día** (jornada de apertura + días intermedios + jornada de cierre, con la fichada real). No restaba nada. |
+| `vista_productividad_diaria` / `_semanal` | **Mergean solapes del MISMO código** (dos TP de la misma tanda) y **capean** la duración (TAP 180 min, TP 120). Las dos se parecen a netear y no lo son. |
+| Funciones/vistas de la base | Ninguna cruzaba los códigos de tiempo muerto con TP/TAP (sólo `generar_inconsistencias` los nombra, para detectar). |
+
+Y `PC` está en `ALWAYS_ALLOWED_CODES` (nunca bloquea), así que la media hora de comida corría
+adentro del armado **todos los días, con todos los operarios**, sin que nada lo frenara.
+
+**Medición** (07/09, arranque de Gestión, al 16/09; a mano, sin caps ni merges):
+
+| | tandas con muerto adentro | horas |
+|---|---|---|
+| TAP (armado) | 21 de 55 | 6,5 h |
+| TP (picking) | 12 de 64 | 2,9 h |
+
+Con los caps de la vista aplicados: TAP 20 / 5,9 h · TP 12 / 2,9 h. Sobre los 40 días de la
+vista diaria, el armado pasa de **210,9 h a 192,3 h** (−18,6 h).
+
+**Qué se cambió.** `vista_productividad_diaria` (ventana 40 días) y
+`vista_productividad_semanal` (56 días): se agregaron los CTE `dead_raw` → `dead_isl` →
+`dead` (los intervalos de `AT/PB/Limp/PC/CT` del legajo, mergeados) y un CTE `muerto` que
+resta el solape contra las islas de core ya mergeadas. El front duplica lo mismo en
+`computeClosureDur` como optimización de UX (`deadByLeg` + `deadOverlapMs`; el `breakdown`
+ahora lleva `brutoMs` y `muertoMs`) — la **fuente de verdad son las vistas**.
+
+**El tiempo no desaparece, cambia de columna:** se resta del core y se sigue sumando en su
+propio casillero (`t_comida`, `t_limp`, `t_otros` en la semanal; `movMin` en el monitor). Eso
+es el *"cada uno contado individual"* del pedido.
+
+Cada intervalo muerto se recorta a su propio tope (PC 90 min, el resto 30) — los mismos
+`cap_min` que las vistas ya usaban para sumar esos códigos, así lo que se resta del core es
+exactamente lo que se suma en los casilleros, y un `PB` que quedó abierto tres horas no borra
+el armado entero. Y se **mergean por legajo antes de restar** (458 crudos → 453 mergeados, el
+más largo 80 min): dos tiempos muertos que se pisan entre sí —un PC adentro de un Limp—
+descontarían de más.
+
+> ### ⚠⚠⚠ `LEAST` y `GREATEST` IGNORAN los NULL
+>
+> La primera versión restaba **129,6 h de 210 h** de armado. En una fila del `LEFT JOIN` sin
+> match, `d.s` y `d.e` son NULL, y entonces `least(c.me, NULL)` devuelve **`c.me`** y
+> `greatest(c.ms, NULL)` devuelve **`c.ms`** → la resta daba la **duración completa de la
+> tanda**. Postgres no avisa nada.
+>
+> **El síntoma que lo delató:** el **100 %** de las tandas marcadas como "afectadas"
+> (210 de 210) y `count(d.legajo) = 0` en las mismas filas que restaban 25 minutos.
+>
+> El arreglo es `case when d.legajo is null then 0 else … end`, que **no es defensivo: es
+> parte del cálculo**. Dos reglas que quedan de acá:
+> 1. Si un `LEFT JOIN` alimenta un `LEAST`/`GREATEST`, el `case` por NULL va siempre.
+> 2. Una resta que afecta al **100 %** de las filas no está midiendo lo que parece. Contar
+>    las filas afectadas, no sólo el total.
+
+**Chequeos corridos después de aplicar** (los cinco en verde):
+
+1. El ejemplo del pedido, a mano: lg8 / D72A / 15-09 → 212,1 min brutos con un `PC` de
+   40,5 min adentro → **171,6 min** de armado.
+2. Ninguna resta de más: lg277 / 16-09, 8 pickings, sólo D69C tiene un `AT` adentro
+   (0,84 min); los otros 7 quedan intactos.
+3. Coincide con el conteo a mano sin caps ni merges (TP: 12 tandas / 2,9 h).
+4. `select * from public.gv_endpoints_rotos;` → **0 filas**.
+5. Vistas de `public` legibles por `anon` sin `security_invoker` → **0 filas** (las dos
+   conservan la opción: van con `with (security_invoker = true)` adentro **y** el
+   `alter view` después).
+
+**Rollback:** `sql/backups/vista_productividad_pre_v1907_20260916.sql` — las dos definiciones
+tal como estaban. Detalle del cambio en `sql/gv_productividad_muerto_neteado_v1907.sql`.
+Front: `tests/muerto-neteado.cjs` reproduce el ejemplo textual del pedido.
+
+**Decisión de Luis sobre lo que NO se toca:** el legajo **600** (entrevistas) sigue entrando
+en `vista_productividad_diaria` — *"dejalo ahí que no jode"* (su prueba del 10/09 es 1 tanda /
+1,38 m³ / 93 min). No se cambia `es_legajo_test`. Problema 350 → `descartado`.
+
+---
+
+## §3.im — v19.08: Clientes nuevos — Speech 1/2, timer de primer contacto, eliminar/aprobar — 2026-09-16
+
+Segundo tramo del submódulo Clientes nuevos (pedido de Luis). Todo aditivo; reusa lo que ya
+existía para eliminar y aprobar.
+
+**Columna "1er contacto" + botones Speech 1/2 (en Contacto):**
+- **Speech 1** sella el PRIMER contacto (una sola vez) y abre WhatsApp Web con el cliente pidiendo
+  una **seña del 30%** sobre el **total con IVA**. El timer "1er contacto" arranca en ese momento
+  y corre solo (se refresca cada 60 s en el front, `clinTickStart`).
+- **Speech 2** abre WhatsApp preguntando si paga en 24 h o el pedido se da de baja.
+- El sello vive en `public."GV_Clientes_Nuevos_Contacto"` (empresa, order_id, primer_contacto_at),
+  RLS on sin policies (sólo las RPC `SECURITY DEFINER` la tocan). `gv_cliente_nuevo_contacto_marcar`
+  (idempotente, `on conflict do nothing`) y `gv_cliente_nuevo_contacto_lote`.
+- El teléfono del cliente sale de `whatsapp_clientes` vía `gv_cliente_nuevo_wpp_lote` (el
+  `gv_cuar_contacto_lote` de Cuarentena prefiere el vendedor; acá queremos hablar con el cliente).
+  Medido 16/09: **184 de 367** clientes nuevos tienen teléfono cargado; si no hay, el botón queda
+  desactivado (Speech 1 igual sella el contacto).
+
+**Monto con IVA:** `gv_clientes_nuevos_valor_lote` ahora devuelve también `valor_con_iva` = neto ×
+**1,21**. ⚠ IVA **21 % plano**: `precios_venta`/`_chef` no guardan tasa por artículo (medido: cols
+= cod, precio_unit, descripcion, actualizado) y el catálogo de Loeke/Chef es bazar/menaje (21 %).
+Si aparecen artículos a 10,5 %, hay que traer la tasa por artículo. El neto ya viene con el 2 % web.
+
+**Columna "Acción":**
+- **Eliminar pedido** → reusa `gv_pedido_anular` (lo saca de la PPP y queda en el log de anulados;
+  el pedido de la página no se borra).
+- **Aprobar pedido** → reusa `gv_cuarentena_liberar` (pasa a Pedidos a programar). Ahí el pedido
+  muestra el badge **"🗓️ Programar dentro de los próximos 7 días"** (front, en el liberado que
+  tiene motivo `cliente_nuevo`).
+
+**Cubierto** en `tests/apr-cuarentena.cjs` (columnas 1er contacto/Acción, botones Speech 1/2,
+Aprobar/Eliminar). **Rollback** al pie de `sql/gv_clientes_nuevos_acciones_v1905.sql`.
+(El archivo de backend quedó nombrado `_v1905` de cuando la sesión iba por v19.05; el número
+final del bump fue v19.08 por colisión con otra sesión — el contenido es el mismo.)
+
+---
+
+## §3.in — v19.11: el TURNO de la OC apagaba el armado automático de LK (y no se veía) — 2026-09-16
+
+Thomas, mirando "Pedidos a programar": *"justificativo de por qué cada uno de estos no fue
+programado automáticamente. Del pedido de Inc Sociedad Anonima deberíamos tener el dato de la
+fecha y hora de entrega (el turno que figura en el pedido). ¿Por qué no aparece?"*
+
+Los 7 pendientes tenían motivo (3 retenidos a mano, 1 Retira, 1 Súper, 1 zona manual, 1 de hoy),
+pero al medirlo aparecieron **dos bugs**, los dos sobre el mismo dato.
+
+### 1. Un turno en dd/mm/yyyy mata el feed web de LK entero (problema 357, `critico`)
+
+`gv_pedidos_web_np_lk` (LK) devolvía `fecha_entrega_pactada` casteando el texto crudo de
+`orders.sheets_payload->>'fecha_entrega'` con **`::date`**. El pedido **LK 1468** (INC, OC de
+Krikos) entró el 16/09 **13:53** con `"29/09/2026 14:00"` → `22008 date/time field value out of
+range`. Desde las **13:55 hasta las 15:50** las **24 corridas** del cron 73 leyeron **0 NP de LK**:
+
+```sql
+select corrida_en, estado, np_leidas, detalle->'lk'->>'error'
+  from public."GV_Tandas_Auto_Log" where corrida_en >= '2026-09-16 13:40-03' order by 1;
+-- 13:50 intradia_ok        119 NP   (null)
+-- 13:55 intradia_sin_umbral 14 NP   LK gv_pedidos_web_np_lk: HTTP 400 …22008… "29/09/2026 14:00"
+```
+
+O sea: **un solo pedido con turno apagó la programación automática de LK por 2 horas** (LK 1470,
+que entró 15:01, quedó sin NP y sin tanda). El mismo `::date` estaba en
+`gv_pedidos_web_np_chef` y `gv_pedidos_web_np_chef_fdw`.
+
+El parseo bueno **ya existía** en `v_pedidos_match` desde la v13.77 y nadie lo reusó. Ahora vive
+en `gv_fe_pactada_fecha` / `gv_fe_pactada_hora` (LK, `immutable`), que **no pueden fallar**: lo
+que no entienden devuelve NULL. **Regla: `sheets_payload->>'fecha_entrega'` es TEXTO del
+proveedor — nunca castearlo directo.**
+
+### 2. El chip "día de salida" de A Programar estaba muerto (problema 358, `alto`)
+
+`gv_ppp_web_dia_salida` es exactamente el justificativo por pedido (retenido / retira / súper /
+sin zona / sin camión / "se arma solo → tal día"). Desde la v18.77 castea `order_id` a bigint
+para mirar `GV_PPP_Web_Retenido`, pero el front manda **también las NP de ISIS**, que disfraza de
+pedido con `order_id = 'np'||np` (`aprTraerIsis`): `'np98704'::bigint` → `22P02`, la RPC devuelve
+400, `aprCargarSalida` cae al catch y `_apr.salida` queda vacío → **ninguna** tarjeta mostraba su
+motivo, todas en "🚚 …" con el title *"calculando el día de salida…"*. Con NP de ISIS sin tanda
+(hoy 5) estaba roto **siempre**. Se castea sólo lo que es número.
+
+### 3. Y el turno ahora se VE (lo que pidió Thomas)
+
+`fecha_entrega_pactada` sólo salía por la RPC del job, **que no la usa** (su único consumidor era
+el contador `con_fecha_pactada` del modo dry). La vista que lee A Programar, `v_pedidos_web_np`,
+no la tenía → el INC mostraba el reloj en `----` teniendo el turno en el pedido; y el `::date`
+encima tiraba la **hora**, que para un súper es la mitad del dato.
+
+La vista publica 3 columnas nuevas **al final** (`fecha_entrega_txt`, `fecha_entrega_pactada`,
+`hora_entrega_pactada`) y el badge del reloj de la tarjeta las muestra en ámbar con 📅
+(`aprTurnoOc` / `aprHorBadge`, `index.html`). **Un horario cargado a mano MANDA sobre el de la
+OC** (si un supervisor lo pisó, recoordinó con el súper).
+
+**Medido:** 499 NP de los últimos 45 días, 1 con turno (LK 1468 → 29/09 14:00); el resto NULL
+porque sólo las OC de súper traen turno. `gv_pedidos_web_np_lk(current_date - 30)`: 377 filas,
+antes HTTP 400.
+
+**Cubierto** en `tests/apr-badge-horario.cjs` (casos `(g)`: el badge sale por el turno de la OC
+aunque el cliente no coordine horario, con día y hora, el title dice de dónde sale, y el horario
+manual gana). **SQL y rollback**: `sql/gv_turno_entrega_oc_v1911.sql`.
+
+---
+
+## §3.io — v19.12: el chip de A Programar le prometía "se arma solo" a un SÚPER — 2026-09-16
+
+Contando los 7 pendientes de §3.in apareció el que no tenía explicación: **LK 1450, Matiz SA**,
+entrado el 15/09, liberado de cuarentena por Vivi el 15/09 14:07, zona automática… y sin
+programar. El motivo: **cod 4263 = Gigot, súper ACTIVO en `GV_Supers`**, y entrega en
+Constitución → zona `Zona 1 - CABA Sur`.
+
+`ppp_web_armar_tandas` lo saltea bien (`delete from _sin_tanda where gv_es_super(...)`, v18.28),
+pero `gv_ppp_web_dia_salida` —el chip que explica qué va a pasar con cada pedido— decidía "súper"
+**por el texto de la zona** (`zona ilike 'super%'`), así que le mostraba
+*"🤖 se arma solo → mar 23/9 · en minutos"*. El supervisor esperaba una tanda que no iba a salir.
+
+> **Quinta puerta del mismo bug**: v18.28 `_sin_tanda`, v18.60 `_ex` y `gv_ppp_web_dia_camion`,
+> v18.87 `_open`, y ahora el chip. **Al tocar el armado, buscar `'super|retira|expo'` y
+> preguntarse si ahí no debería ir `gv_es_super`.**
+
+Ahora el payload lleva `cod` (lo manda `aprCargarSalida`, v19.12) y un CTE `sup` resuelve súper
+con **el mismo padrón que el armado**. Detalle fino: en el `CASE` de `r_detalle` el orden no era
+el de `r_dia`/`r_motivo` (la zona automática se evaluaba antes), así que en el primer pase 1450
+salía con motivo `super` y detalle *"se arma sola"* — dos verdades distintas en la misma fila.
+De paso, `pend_auto` (el m³ con el que se decide si el intradía arma ya) dejó de contar súper.
+
+```sql
+select r_idx, r_motivo from gv_ppp_web_dia_salida('[
+  {"zona":"Zona 1 - CABA Sur","m3":0,    "empresa":"lk","order_id":1450,"cod":"4263"},
+  {"zona":"Zona 1 - CABA Sur","m3":0.171,"empresa":"lk","order_id":1470,"cod":"4069"}]'::jsonb);
+-- 1450 -> super (antes: job/23-09) · 1470 -> job  (y a las 16:05 salió de verdad: E29A)
+```
+
+**Cubierto** en `tests/enviar-a-programar-deshace.cjs` (el chequeo "el chip no puede mentir sobre
+el automático" ahora exige el `cod` en el payload). **SQL y rollback**:
+`sql/gv_ppp_web_dia_salida_super_v1912.sql`. Problema 359.
+
+---
+
+### §3.gl — v19.13: «Cambiar de día» por tanda desde la TABLA (y en Pedidos atrasados) — 2026-09-16
+
+Thomas: *"PPP > Programación, vista tabla: quiero que agregues un botón a cada tanda que sea
+«Cambiar de día» y que te permita asignarla en un día diferente. Quiero que sea válido para la
+programación de entregas así como para los Pedidos atrasados"*.
+
+El botón es front (`pgaTandaMoverAbrir` → el pop-up de días que ya existía desde la v14.04) y vive
+en la fila de la TANDA de `_pgaCuerpoHtml`, que es el cuerpo que **comparten** la tabla de
+Programación y el submódulo de Pedidos atrasados: una sola copia, aparece en las dos. Los datos del
+pop-up (cuántos pedidos, cuántos m³, qué día tiene hoy) salen del **árbol** (`_pgaRows` /
+`_patrRows`) y no de `_pppParsed.prog`, que es de donde los saca el botón de la vista clásica y que
+sólo tiene de hoy en adelante — con eso, en atrasados el pop-up habría dicho "0 pedidos · 0 m³".
+
+**Lo del backend son las dos cosas que hacían que en atrasados el botón no sirviera para nada:**
+
+**1) La tanda empezada.** `gv_ppp_tanda_mover` (v13.87) rechazaba cualquier tanda con UN evento de
+operario. Medido el 16/09: las **8 de 8** tandas atrasadas tienen eventos y las 8 tienen TAP
+(armadas), o sea que el submódulo entero rebotaba. Y es al revés: un pedido atrasado es
+precisamente uno que ya se pickeó y se armó y cuyo camión no salió; cambiarle el día no obliga a
+rehacer nada. Ahora la firma es de 4 argumentos —la de 3 se dropeó a propósito— y `p_forzar` es el
+sí explícito del supervisor. Sin él, el error empieza con `TANDA_EMPEZADA:` para que el front lo
+reconozca, pregunte y reintente.
+
+**2) La tanda que ya no está en la programación.** El árbol tiene cuatro fuentes y las dos últimas
+—`Facturacion_NP` (`fact`) y `GV_PPP_Entregados_Historico` (`hist`)— no viven en ninguna tabla de
+programación: `gv_ppp_tanda_mover` contestaba *"No encontré la tanda D53C"*. Ahora la rama de ISIS
+levanta también las NP de `Facturacion_NP` por tanda, y `gv_ppp_prog_arbol` respeta
+`GV_PPP_Prog_Override.fecha_entrega` en las ramas `fact`/`hist`.
+
+**Lo que SÍ sigue bloqueado, y por qué.** Una tanda que **salió en parte** (medido: D53C 7 de 8,
+D66D 3 de 4 — 2 de las 8 atrasadas): moverla arrastraría la fecha de lo ya entregado, y mover sólo
+lo que queda la partiría en dos días, que es justo lo que prohíbe la v18.92 y lo que vigila
+`gv_ppp_tanda_dos_dias`. El mensaje dice qué hacer: separar ese pedido con el botón ↩ de su fila,
+que lo manda a una tanda NUEVA sin volver a pickear. "Salió" se define igual que en
+`gv_ppp_atrasados` (CCN vigente —sin FSS posterior— o CRN): una sola definición, no dos.
+
+**Impacto medido ANTES de tocar el árbol:** de las filas que ganan el `distinct on (np)`, 1.164 son
+`fact` y 1.687 `hist`, y **ninguna** tenía override con `fecha_entrega`. De los 10 `fact` con
+override y fecha distinta, **0** ganan el `distinct on` (todos existen además en `isis`/`web`, que
+tienen prioridad 1 y 2). O sea: el cambio no mueve una sola fila de lo que hoy se ve.
+
+**Probado contra la base real**, no leyendo la función: D66D → rechaza con el mensaje de "salió en
+parte"; E19A sin `p_forzar` → `TANDA_EMPEZADA` (11 eventos); con `p_forzar` → `movidas 1, np_web 1,
+np_isis 0, 0,043 m³`, el árbol pasa a mostrarla el 18/09 y `gv_ppp_atrasados` deja de listarla;
+vuelta al 15/09 → todo como estaba (12 atrasados, mismas 8 tandas, 0 overrides de prueba,
+`PPP_Web_Tandas.E19A` de nuevo en 2026-09-15). `gv_ppp_tanda_dos_dias` queda con las 3 filas de
+D69C que ya estaban (problema 338), ninguna nueva.
+
+⚠ **Una trampa que apareció en esa prueba y quedó anotada en el código:** `Facturacion_NP` guarda
+las NP web con su **etiqueta** (`LK 0067`), no con el número, así que el guard que evita pisar dos
+veces la misma NP tiene que comparar contra `gv_ppp_web_np_label` — con `w.np::text` le escribía un
+override al pedido web que la rama de arriba ya había movido (`np_isis` daba 1 en una tanda 100 %
+web). La fila de prueba se borró.
+
+**Cubierto** en `tests/ppp-tanda-cambiar-dia.cjs` (a: el botón está y no despliega la tanda; b: el
+pop-up con los datos del árbol; c: mueve con `p_forzar` y recarga el árbol; d: el reintento ante
+`TANDA_EMPEZADA`; e: el mismo botón en Pedidos atrasados). **SQL**:
+`sql/gv_ppp_tanda_mover_v1911.sql` y `sql/gv_ppp_prog_arbol_v1911.sql`. **Rollback**:
+`sql/backups/gv_ppp_tanda_mover_gv_ppp_prog_arbol_20260916_pre_v1911.sql` (ojo: dropear antes la
+firma de 4 argumentos, si no toda llamada de 3 queda ambigua).
+
+## §3.ip — v19.14: el botón PPP ya tiene badge, y cuenta todo lo que hay para mirar — 2026-09-16
+
+**Pedido de Luis:** *"badge rojo con número arriba a la izquierda del ícono de la PPP como con los
+demás"*.
+
+### El badge existía desde la v8.82 y no se vio nunca
+
+Dos causas, las dos silenciosas:
+
+1. **Contaba sólo `Alertas_Pedidos_Web` pendientes**, que hoy son **0** (la tabla tiene 2 filas,
+   las dos ya revisadas). El badge quedaba escondido para siempre.
+2. **El botón de PPP era el único de la fila sin `position:relative`.** El badge es
+   `position:absolute`, así que se posicionaba contra otro ancestro: aunque hubiera aparecido, no
+   caía sobre la tarjeta.
+
+### Qué cuenta ahora
+
+La vista **`gv_ppp_avisos`**, una fila por tipo. **Se agrupa por COSA, no por fila**: un camión
+mezclado cuenta 1 aunque tenga 4 pedidos adentro.
+
+| tipo | qué es | al 16/09 |
+|---|---|---|
+| `super_mezclado` | un camión con un súper y clientes comunes | 1 (E11) |
+| `tanda_dos_camiones` | una tanda con paradas de dos recorridos | 1 (D69F) |
+| `tanda_dos_dias` | el mismo código de tanda en dos fechas | 1 (D69C) |
+| `retenido_sin_fecha` | pedidos sacados a mano de una tanda, esperando fecha | 7 |
+| `alerta_web` | pedidos web anómalos sin revisar | 0 |
+
+Total: **10**.
+
+⚠ **`retenido_sin_fecha` es el que más importa que esté ahí.** El retenido es a propósito —lo que
+se saca a mano de una tanda no lo vuelve a agarrar el automático (v17.85)— pero la contracara es
+que un pedido puede quedarse quieto **para siempre sin que nada avise**. Al 16/09 el más viejo
+lleva **10 días** (Gifel S.R.L., entró el 06/09). Hasta ahora la única forma de enterarse era abrir
+la pantalla y mirar.
+
+### El front
+
+`pppFetchAvisos` lee la vista y `pppAlertBadgeUpdate` suma y llama a **`supSetBadge`**, el mismo
+que usan Facturación, Stock y Recepción Remitos: número rojo si hay algo, **✓ verde si no**. El
+`title` desglosa los tipos, así no hace falta entrar para saber qué son.
+
+Va a la **izquierda** (`left:2px;right:auto` inline en el botón), que es donde lo pidió Luis; el
+resto de los números de esa fila están a la derecha. Ojo al tocarlo: `supSetBadge` repone
+`className`, así que el lado tiene que ir en el `style` inline o se pierde al pasar a ✓ — el test
+lo cubre.
+
+Se borró el CSS de `.ppp-alert-badge` y su animación, que quedaron sin uso.
+
+### Verificación
+
+- **177 ms** medidos, contra un tope de 8 s. El front la pide cada 2 min mientras el panel de
+  supervisor está a la vista, así que no es camino caliente.
+- Probada **con el rol `anon`**, que es el que usa la app: devuelve los mismos números. Sin ese
+  chequeo una tabla con RLS habría dado 0 en silencio y el badge volvería a no mostrarse nunca —
+  exactamente el bug que se está arreglando.
+
+**Archivo:** `sql/gv_ppp_avisos_v1914.sql`. **Test:** `tests/ppp-badge.cjs` (12 chequeos, incluido
+el `position:relative` del botón y que el badge no se corra al pasar a ✓).
+**Rollback:** `drop view public.gv_ppp_avisos;` y volver el botón a como estaba.
+
+---
+
+## §3.iq — v19.15: excepción a la regla de los súper — el INC se programa solo, el día de su turno — 2026-09-16
+
+Thomas, 2026-09-16: *"hace una excepción a la regla de los super, ese INC se programa
+automáticamente siempre"*.
+
+**La regla sigue viva** (v14.23 / v18.28): un súper de `GV_Supers` no lo toca el armado y **nunca
+se junta con clientes comunes**. Lo que cambia es sólo lo primero, y **sólo para el cliente que
+tenga la excepción cargada** — que es un DATO, no código: una fila en `GV_Clientes_Reglas` con
+`regla = 'auto_super'`, al lado de las que ya existían (`solo`, `prioritario`). Hoy: **(lk, 1651)
+Inc Sociedad Anonima (Carrefour)**.
+
+```sql
+-- prender para otro súper                     -- apagar
+insert into public."GV_Clientes_Reglas"        delete from public."GV_Clientes_Reglas"
+  (cod_cliente, empresa, regla, nombre, nota)   where regla = 'auto_super' and cod_cliente = '<cod>';
+values ('<cod>','lk','auto_super','<nombre>','<quién y cuándo>');
+```
+
+### La mezcla NO se afloja
+
+El `auto_super` entra al armado pero queda marcado **`va_solo`** (mismo efecto que la regla
+`solo`), así que va **solo en su tanda** y ninguna tanda abierta lo absorbe; su camión sigue
+siendo `"Super"`, y `_ex` / `_open` siguen dejando afuera las tandas de súper (v18.60 / v18.87).
+Centinela: `select * from public.gv_ppp_super_mezclado;` — vacía.
+
+### El día es el TURNO de la OC, no el próximo día con cupo
+
+Un súper no se entrega "cuando haya cupo": se entrega **el día que pidió**. Y ese dato ya estaba
+en Virgilio — LK lo empuja cada 15 min a **`lk_pedidos_match.fecha_entrega`** (v13.77+), con el
+texto crudo en `fecha_entrega_txt` (`"29/09/2026 14:00"`). Lo lee
+**`gv_web_turno_pactado(empresa, order_id)`**, así que la excepción **no tocó ni la Edge Function
+ni el front**: toda la regla vive en el backend.
+
+El pase nuevo **(a3)** de `gv_ppp_web_armar_pendientes` agrupa los `auto_super` por su turno y los
+arma en ese día con `p_forzar_cods` → entran como **prioritarios, o sea que pisan el cupo**: el
+turno no se negocia. Sin turno en la OC caen al pase (b) y salen el próximo día hábil con cupo.
+
+### Probado CORRIENDO el armador (no leyéndolo)
+
+`gv_ppp_web_armar_pendientes_simular` con INC 1468 (turno 29/09) + un cliente común de Zona 1 +
+Coto 801 (súper sin excepción):
+
+| fila | resultado |
+|---|---|
+| 1651 INC | **2026-09-29**, tanda propia, zona "Super", 1 cliente ✅ (su turno) |
+| 9991 común | 2026-09-23, tanda aparte ✅ (cascada normal) |
+| 801 Coto | **no se programa** ✅ (sigue a mano) |
+
+Y el chip de A Programar (`gv_ppp_web_dia_salida`, motivo nuevo **`super_auto`**): 1651 con turno →
+29/09 *"…para el turno de la OC, el 29/09"*; 1651 sin turno → 23/09 *"…la OC no trajo turno…"*;
+801 y 4263 (Gigot) → *"camión propio, lo programa el supervisor"*. El front lo pinta
+`🛒 súper: se arma solo → mar 29/9`.
+
+**Cubierto** en `tests/enviar-a-programar-deshace.cjs` (el chip tiene que contemplar `super_auto`).
+**SQL y rollback**: `sql/gv_super_auto_programa_v1914.sql` — el rollback es borrar la fila de
+`GV_Clientes_Reglas`; el código queda inerte.
+(El archivo de backend y los comentarios del código quedaron nombrados `v19.14` de cuando la
+sesión iba por ese número; el bump final fue **v19.15** por colisión con otra sesión — el
+contenido es el mismo.)
 ## §3.ig — pedido web de Dorinka con artículos de Chef y sufijo "L" (ruteo a LK) — 2026-09-16
 
 **Síntoma (Tomás González, PPP de hoy).** La NP **CH 0025** (Dorinka S.R.L, cod 2686, order_id

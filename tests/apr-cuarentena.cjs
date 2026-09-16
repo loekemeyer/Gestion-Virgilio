@@ -127,18 +127,51 @@ catch (_e) {
     // v17.11 (Luis): el número de cliente tiene que verse en la ficha (LK 1000 / CH 2533)
     out.codChip = /cuar-card-cod[^>]*>LK 1000</.test(html);
 
-    // (3) v17.11 — CLIENTE NUEVO: badge propio y el número de cliente de Chef con prefijo CH
+    // (3) v18.100 — CLIENTE NUEVO: submódulo DENTRO de "A Programar" (no una pestaña), debajo de
+    // Cuarentena, y las dos colapsables. Un pedido cuyo ÚNICO motivo es cliente_nuevo va al
+    // submódulo "Clientes nuevos"; uno que además tiene deuda (u otro motivo) sigue en Cuarentena.
+    try { localStorage.removeItem("vir_cuar_colapsado"); localStorage.removeItem("vir_cli_colapsado"); } catch (_e) {}
+    _apr.cuarContacto = {}; _apr.cliValor = {}; _apr.cliDemo = false;   // evitan los fetch (ruta REST abortada)
     _apr.pedidos = [
       mk({ order_id: 200, empresa: "chef", cod: "2533", razon_social: "Cliente Nuevo SA",
            cuarentena_motivos: ["cliente_nuevo"], cuarentena_detalle: { nuevo_pedidos: 1 } }),
+      mk({ order_id: 202, cod: "4263", razon_social: "Cliente Nuevo Deudor",
+           cuarentena_motivos: ["deuda", "cliente_nuevo"], cuarentena_detalle: { deuda: 50000, nuevo_pedidos: 1 } }),
       mk({ order_id: 201, razon_social: "Cliente Dos" })
     ];
-    aprRender(); await new Promise((res) => setTimeout(res, 200));
+    _pppTab = "prog"; aprRender(); await new Promise((res) => setTimeout(res, 50));
     html = document.getElementById("pppPreview").innerHTML;
-    out.nuevoBadge = /cuar-badge b-nuevo[^>]*>🆕 Cliente nuevo</.test(html);
-    out.nuevoCuenta = /🚧 Cuarentena <b>\(1\)<\/b>/.test(html);
-    out.nuevoCodChip = /cuar-card-cod[^>]*>CH 2533</.test(html);
-    out.nuevoMotivo = /Cliente nuevo \(1 pedido facturado en toda su historia\)\./.test(html);
+    // Los dos submódulos conviven en el mismo render; se parte el HTML por sus títulos.
+    const iCuar = html.indexOf("🚧 Cuarentena"), iCli = html.indexOf("🆕 Clientes nuevos");
+    const cuarSec = html.slice(iCuar, iCli), cliSec = html.slice(iCli);
+    // (3a) Cuarentena: sólo el mixto (deuda+nuevo), con badge; el puro NO.
+    out.nuevoFueraDeCuar = /🚧 Cuarentena <b>\(1\)<\/b>/.test(cuarSec);
+    out.nuevoBadge = /cuar-badge b-nuevo[^>]*>🆕 Cliente nuevo</.test(cuarSec);
+    out.nuevoMotivo = /Cliente nuevo \(1 pedido facturado en toda su historia\)\./.test(cuarSec);
+    // (3b) Clientes nuevos: el puro está (chip CH 2533); el mixto NO.
+    out.cliNuevosCuenta = /🆕 Clientes nuevos <b>\(1\)<\/b>/.test(cliSec);
+    out.nuevoCodChip = /cuar-card-cod[^>]*>CH 2533</.test(cliSec);
+    out.cliNuevosSinMixto = !/Cliente Nuevo Deudor/.test(cliSec);
+    // (3b-2) v19.05 — columnas nuevas: 1er contacto, Speech 1/2, Acción (Aprobar / Eliminar).
+    out.cliCols = /1er contacto/.test(cliSec) && /Acci[oó]n/.test(cliSec);
+    out.cliSpeech = /Speech 1/.test(cliSec) && /Speech 2/.test(cliSec);
+    out.cliAccion = /Aprobar pedido/.test(cliSec) && /Eliminar pedido/.test(cliSec);
+    // (3c) el botón "👁 Ver ejemplo" agrega una fila EJEMPLO con su monto, sin sumar al badge.
+    _apr.cliDemo = true; aprRender(); await new Promise((res) => setTimeout(res, 50));
+    html = document.getElementById("pppPreview").innerHTML;
+    const cliSec2 = html.slice(html.indexOf("🆕 Clientes nuevos"));
+    out.cliDemoFila = /cuar-demo-tag">EJEMPLO</.test(cliSec2) && /\$120\.480/.test(cliSec2);
+    out.cliDemoNoCuenta = /🆕 Clientes nuevos <b>\(1\)<\/b>/.test(cliSec2);
+    _apr.cliDemo = false;
+    // (3d) v18.100 — colapsar: el título queda, la tabla se esconde.
+    try { localStorage.setItem("vir_cli_colapsado", "1"); } catch (_e) {}
+    aprRender(); await new Promise((res) => setTimeout(res, 50));
+    html = document.getElementById("pppPreview").innerHTML;
+    const cliSec3 = html.slice(html.indexOf("🆕 Clientes nuevos"), html.indexOf("🆕 Clientes nuevos") + 400);
+    out.cliColapsaTitulo = /🆕 Clientes nuevos <b>\(1\)<\/b>/.test(cliSec3);   // el título con contador sigue
+    out.cliColapsaSinTabla = !/CH 2533/.test(html);   // la tabla (chip del cliente) desaparece
+    try { localStorage.removeItem("vir_cli_colapsado"); } catch (_e) {}
+    _pppTab = "prog";
     out.nuevoEtq = aprCuarentenaEtiqueta({ cuarentena_motivos: ["cliente_nuevo"] });
 
     // (4) v17.13 — "Ya programados" es una TABLA, con aprobación y librito de comentarios
@@ -481,10 +514,19 @@ catch (_e) {
   chk(r.contactoBtn, "la ficha tiene el botón WhatsApp al vendedor/cliente");
   chk(r.motivo, "el retenido muestra el texto del motivo");
   chk(r.codChip, "la ficha muestra el número de cliente (LK 1000)");
-  chk(r.nuevoBadge, "cliente nuevo: badge '🆕 Cliente nuevo'");
-  chk(r.nuevoCuenta, "cliente nuevo: el pedido cae en Cuarentena (1)");
-  chk(r.nuevoCodChip, "cliente nuevo de Chef: el chip dice CH 2533");
+  chk(r.nuevoFueraDeCuar, "cliente nuevo puro: NO cae en Cuarentena; sólo el mixto (deuda+nuevo) queda (1)");
+  chk(r.nuevoBadge, "cliente nuevo mixto: badge '🆕 Cliente nuevo' en Cuarentena");
   chk(r.nuevoMotivo, "cliente nuevo: el motivo dice cuántos pedidos facturó");
+  chk(r.cliNuevosCuenta, "pestaña 'Clientes nuevos': muestra el pedido puro (1)");
+  chk(r.nuevoCodChip, "cliente nuevo de Chef: el chip dice CH 2533 (en Clientes nuevos)");
+  chk(r.cliNuevosSinMixto, "el pedido mixto (deuda+nuevo) NO aparece en Clientes nuevos");
+  chk(r.cliCols, "Clientes nuevos tiene columnas '1er contacto' y 'Acción'");
+  chk(r.cliSpeech, "Contacto tiene los botones 'Speech 1' y 'Speech 2'");
+  chk(r.cliAccion, "Acción tiene 'Aprobar pedido' y 'Eliminar pedido'");
+  chk(r.cliDemoFila, "'Ver ejemplo' muestra una fila EJEMPLO con su monto ($120.480)");
+  chk(r.cliDemoNoCuenta, "el ejemplo NO suma al badge (sigue en 1 real)");
+  chk(r.cliColapsaTitulo, "colapsar Clientes nuevos: el título con el contador (1) queda");
+  chk(r.cliColapsaSinTabla, "colapsar Clientes nuevos: la tabla se esconde");
   chk(r.nuevoEtq === "Cliente nuevo", "etiqueta de cliente_nuevo = 'Cliente nuevo'");
   chk(r.ypTabla, "ya programados: es una tabla con columnas NP / … / Enviar a");
   chk(r.ypSinColAprob, "ya programados: sin columna Aprobación (el aprobado sale de la lista)");

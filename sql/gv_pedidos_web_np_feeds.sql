@@ -30,6 +30,13 @@
 -- ROLLBACK: sql/backups/gv_pedidos_web_np_feeds_20260904_pre_filtro_enviado.sql
 -- (las dos funciones tal como estaban antes del día; la LK es idéntica a la de acá
 -- salvo el comentario, la Chef no devolvía `enviado_a_compras`).
+--
+-- ⚠⚠ DESACTUALIZADO — NO PEGAR ESTE TEXTO EN LA BASE (2026-09-16, v19.11). Las tres
+-- funciones cambiaron varias veces desde el 04/09 (isis_empresa/cod_isis de la v13.77,
+-- diferido/no_antes_de de la v15.67) y, sobre todo, el `::date` del turno que está más
+-- abajo es el bug que el 16/09 apagó el armado automático de LK por 2 horas: ese cast
+-- YA NO VA (ver `sql/gv_turno_entrega_oc_v1911.sql` y §3.in de la doc de Supabase).
+-- Para la definición VIVA: select pg_get_functiondef('public.gv_pedidos_web_np_lk(date)'::regprocedure);
 -- =============================================================================
 
 alter foreign table public.chef_orders add column if not exists enviado_a_compras_at timestamptz;

@@ -70,6 +70,23 @@ catch (_e) {
     // control de no-trivialidad: el tilde de la NP de ISIS sigue estando (no lo pisamos)
     out.tildeIntacto = !!(filaIsis && filaIsis.querySelector(".fac-btn-tick"));
 
+    // (a2) v18.94 (Thomas: "que los botones de acción aparezcan uno al lado del otro, como en
+    // columnas diferentes") — no apilados. Se mide de verdad: el módulo está oculto en la
+    // pantalla inicial, así que primero se lo fuerza visible y después se miran los rectángulos.
+    for (let n = document.getElementById("facContainer"); n && n !== document.body; n = n.parentElement) {
+      n.removeAttribute("hidden"); n.style.display = "block"; n.style.visibility = "visible";
+    }
+    out.ladoALado = [filaWeb, filaIsis].every(function (fila) {
+      const els = [...fila.querySelectorAll("td.fac-accion-cell button, td.fac-accion-cell span.fac-tick-web")];
+      if (els.length !== 2) return false;
+      const r = els.map(function (e) { const b = e.getBoundingClientRect(); return { cen: Math.round(b.top + b.height / 2), izq: Math.round(b.left) }; });
+      return r[0].cen === r[1].cen        // misma línea, centrados entre sí
+          && r[1].izq > r[0].izq;          // el ✕ a la DERECHA del ✓ / ⬇ Excel
+    });
+    // y la columna no se desborda por meter los dos
+    out.sinDesborde = [...document.querySelectorAll("td.fac-accion-cell")]
+      .every(function (td) { return td.scrollWidth <= td.clientWidth + 1; });
+
     // ── (b) abrirlo no llama a nada y muestra los dos motivos ───────────────
     btnWeb.click();
     const ov = document.getElementById("facCancelOverlay");
@@ -156,6 +173,8 @@ catch (_e) {
   chk(r.botonWeb, "(a) la fila de una NP web trae el botón ✕ Cancelar");
   chk(r.botonIsis, "(a) la fila de una NP de ISIS también lo trae");
   chk(r.tildeIntacto, "(a) el tilde ✓ de la NP de ISIS sigue estando");
+  chk(r.ladoALado, "(a2) los dos botones van UNO AL LADO DEL OTRO, centrados, con el ✕ a la derecha");
+  chk(r.sinDesborde, "(a2) y la columna Acción no se desborda");
   chk(r.abre, "(b) el botón abre el pop-up");
   chk(r.dosMotivos, "(b) el pop-up muestra los dos motivos: Falta stock y Otro");
   chk(r.diceLaNp, "(b) el pop-up dice qué NP y qué cliente se cancela");

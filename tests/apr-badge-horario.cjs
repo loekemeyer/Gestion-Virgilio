@@ -52,10 +52,15 @@ catch (_e) {
     _apr.pedidos = [
       mk({ order_id: 1400, cod: "1000", razon_social: "Cliente Comun" }),                       // sin badge
       mk({ order_id: 1401, cod: "801",  razon_social: "Coto C.I.C.S.A." }),                     // súper, a mano
-      mk({ order_id: 1402, cod: "4103", razon_social: "Villar Cristina", zona: "Retira" }),     // retira, del cliente
+      mk({ order_id: 1402, cod: "4103", razon_social: "Villar Cristina", zona: "Retira",        // retira, del cliente
+           turno_fecha: "2026-09-30", turno_hora: "09:00", turno_txt: "30/09/2026 09:00" }),      // v19.11: el de la persona MANDA sobre el de la OC
       mk({ order_id: 1403, cod: "3905", razon_social: "Andser Quimica SRL" }),                  // de los 3, sin dato
       mk({ order_id: 1404, cod: "4080", razon_social: "Distribuidora GM" }),                    // súper SIN horario
-      mk({ order_id: "np98426", _isis: true, np: "98426", cod: "4263", razon_social: "Matiz SA" }) // ISIS, súper
+      mk({ order_id: "np98426", _isis: true, np: "98426", cod: "4263", razon_social: "Matiz SA" }), // ISIS, súper
+      // v19.11 (Thomas) — EL TURNO QUE TRAE LA OC. INC no está en la lista de los que coordinan
+      // horario: el badge sale igual porque el PEDIDO trae fecha y hora de entrega pactada.
+      mk({ order_id: 1405, cod: "1651", razon_social: "Inc Sociedad Anonima", zona: "Super",
+           turno_fecha: "2026-09-29", turno_hora: "14:00", turno_txt: "29/09/2026 14:00" })
     ];
     _apr.pedidosTodos = _apr.pedidos.slice();
     _pppTab = "prog";
@@ -72,6 +77,13 @@ catch (_e) {
     out.coto  = badgeDe(1401);
     out.retira = badgeDe(1402);
     out.andser = badgeDe(1403);
+    out.inc = badgeDe(1405);
+    out.incTitle = (function () {
+      const c = [...prev.querySelectorAll(".apr-card")].find((x) => x.innerHTML.indexOf("aprSel('lk:1405')") >= 0);
+      const e = c && c.querySelector(".apr-hor");
+      return e ? (e.getAttribute("title") || "") : "";
+    })();
+    out.retiraTxt = (badgeDe(1402) || {}).txt;
     out.isis = (function () {
       const c = [...prev.querySelectorAll(".apr-card")].find((x) => x.innerHTML.indexOf("NP 98426") >= 0);
       const e = c && c.querySelector(".apr-hor");
@@ -99,6 +111,16 @@ catch (_e) {
     await aprHorGuardar(false); await new Promise((res) => setTimeout(res, 150));
     const gi = rpc.find((x) => x.fn === "gv_pedido_horario_set");
     out.claveIsis = !!gi && gi.args.p_clave === "98426" && gi.args.p_np === "NP 98426";
+
+    // (g) v19.11 — el pop-up de un pedido con turno de OC abre con ESE turno puesto:
+    // confirmar es un clic y recien ahi viaja a Programacion (que lee gv_pedido_horario).
+    rpc.length = 0;
+    aprHorAbrir("lk:1405"); await new Promise((res) => setTimeout(res, 120));
+    out.ocPrefill = _aprHorEdit.fecha === "2026-09-29" && _aprHorEdit.franja === "14:00";
+    await aprHorGuardar(false); await new Promise((res) => setTimeout(res, 150));
+    const go = rpc.find((x) => x.fn === "gv_pedido_horario_set");
+    out.ocGuarda = !!go && go.args.p_clave === "1405" && go.args.p_fecha === "2026-09-29" &&
+                   go.args.p_franja === "14:00" && go.args.p_origen === "manual";
 
     // (e) vaciar = sacar el horario
     rpc.length = 0;
@@ -139,6 +161,12 @@ catch (_e) {
   t(r.andser && r.andser.txt === "🕑 ----" && /vacio/.test(r.andser.cls), "(b) sin dato muestra ----");
   t(r.coto && r.coto.txt === "🕑 18/09 08:00 a 12:00", "(b) con dato, día y franja — " + JSON.stringify(r.coto && r.coto.txt));
   t(r.retira && /apr-hor cli/.test(r.retira.cls), "(c) el que eligió el cliente se distingue");
+  t(r.inc && /apr-hor/.test(r.inc.cls) && / oc/.test(r.inc.cls), "(g) el turno que trae la OC pinta el badge aunque el cliente no coordine horario");
+  t(r.inc && r.inc.txt === "📅 29/09 14:00", "(g) con día Y hora — " + JSON.stringify(r.inc && r.inc.txt));
+  t(/OC del pedido/.test(r.incTitle || "") && /29\/09\/2026 14:00/.test(r.incTitle || ""), "(g) y el title dice de dónde sale, con el texto crudo de la OC");
+  t(r.retiraTxt === "🕑 19/09 14:00 a 18:00", "(g) un horario ya cargado MANDA sobre el de la OC — " + JSON.stringify(r.retiraTxt));
+  t(r.ocPrefill, "(g) el pop-up abre con el turno de la OC ya puesto");
+  t(r.ocGuarda, "(g) y confirmarlo lo guarda, asi viaja a Programacion");
   t(r.coto && !/ cli/.test(r.coto.cls), "(c) del cargado a mano");
   t(r.modal, "(d) tocar el badge abre el pop-up con día y franja");
   t(r.modalChips, "(d) con las franjas de siempre como atajo");

@@ -1,6 +1,284 @@
+## Nota v19.09 (2026-09-16) — El detalle del picking, una línea por tanda en el Resumen
+
+Salió de mirar por qué *"Llegó al server"* mostraba una hora rara. Al contar las filas que
+un operario ve en el **Resumen de hoy** apareció otra cosa, más grande:
+
+| Legajo | Filas en el Resumen | De las cuales PKC | Tandas |
+|---|---|---|---|
+| **277 Jhonny** | **297** | **247** | 9 |
+| 104 Moncayo | 67 | 0 (32 CRN en 32 NP) | — |
+| 237 Franco | 62 | 0 | — |
+| 8 Farías | 34 | 0 | — |
+
+Cada artículo confirmado emite **su propio evento `PKC`**, y el Resumen los mostraba de a una
+tarjeta. Para ver lo que hizo en el día había que scrollear casi 300 veces en el celular.
+**El dato estaba bien; la pantalla no servía.**
+
+Luis: *"hace la 1"* (la opción de agrupar, contra la de sólo sacar el cartel).
+
+### Cómo queda
+
+Los `PKC` de una misma tanda entran en **UN renglón**:
+
+> **PKC — Picking artículo**
+> Tanda **E11C** · **12 artículos** · **2 con faltante**
+> Desde **08:31:24** hasta **08:57:04**
+> `▸ ver detalle`
+
+El desplegable lista cada artículo con `levantadas de pedidas` (`7 de 10`), y los que salieron
+**cortos** (`reales < esperadas`) van en ámbar. Ese contador de faltantes en el renglón es
+data nueva: antes había que abrir las 12 tarjetas para encontrarlo.
+
+### Lo que NO se agrupa, y por qué
+
+**Sólo `PKC`.** Los demás códigos emiten **una fila por NP o por tanda**, que ya es la
+granularidad correcta — agruparlos esconde cosas distintas bajo un número. Medido el mismo
+día, lo más numeroso después de PKC: 32 `CRN` en 32 NP, 15 `TAL`, 15 `ENT`, 9 `MG`. Ninguno
+justifica agruparse.
+
+### Detalles que importan si se toca
+
+- El estado abierto/cerrado vive en **`_pkcAbiertos`** (un `Set` de módulo) y **sobrevive el
+  re-render**: el Resumen se redibuja después de cada acción del operario, así que un estado
+  guardado en el DOM se perdía en el primer botón que apretara.
+- El grupo se ordena por el **último** artículo confirmado, para que quede donde corresponde
+  en la línea de tiempo del día. Por eso hay un `sort` **después** de agrupar.
+- Si alguno de los artículos sigue en la cola offline, **el grupo entero figura pendiente**.
+- `.pkc-ver` lleva `width: auto` porque el **`button{width:100%}` global** (deuda conocida,
+  línea 25 del CSS) lo estiraba de punta a punta.
+- El **historial de días anteriores** usa el mismo agrupador pero **sin desplegable**: ahí los
+  `PKC` casi nunca aparecen (`pkSendDetail` no escribe en el historial LOCAL, que es lo único
+  que ese modal lee) y repetir los `id` del desplegable en las dos vistas los haría chocar.
+
+`tests/resumen-pkc-agrupado.cjs` (28 aserciones: 247 PKC de 9 tandas → 9 renglones con los
+247 artículos adentro, el contador de faltantes, el desplegable y que el resto no se toca).
+
+## Nota v19.11/19.12 (2026-09-16) — De dónde sale el TURNO de un súper, y por qué un pedido no se programa solo
+
+**El turno (fecha y hora de entrega que exige el súper) sale de la OC, no de Gestión.** La OC entra
+por Krikos al mail de LK, la Bandeja la carga y el turno queda en
+`orders.sheets_payload.fecha_entrega` como **texto crudo** (`"29/09/2026 14:00"`). LK lo publica
+parseado en `v_pedidos_web_np` (`fecha_entrega_pactada`, `hora_entrega_pactada` y el crudo en
+`fecha_entrega_txt`; el parseo es `gv_fe_pactada_fecha` / `gv_fe_pactada_hora`) y **la tarjeta de
+"A Programar" lo muestra en el reloj, en ámbar con 📅**. Tocarlo abre el pop-up con ese turno ya
+puesto: **recién al confirmarlo queda guardado y viaja a Programación y a la hoja de ruta**, que
+leen `gv_pedido_horario`, no la OC. Un horario cargado a mano MANDA sobre el de la OC.
+
+⚠ **Ese texto nunca se castea con `::date`.** Un `"29/09/2026 14:00"` tira `22008` y mata la RPC
+entera: el 16/09, de 13:55 a 15:50, el cron de armado leyó **0 NP de LK** y ningún pedido web de
+LK se programó solo. §3.in de `docs/SUPABASE-GESTION-VIRGILIO.md`.
+
+**Por qué un pedido queda en "A Programar" (lo dice el chip del camioncito de cada tarjeta, que
+sale de `gv_ppp_web_dia_salida`):**
+
+| Chip | Qué pasó |
+|---|---|
+| `🤖 se arma solo → día` | zona automática (`PPP_Web_Config.zonas_automaticas`, hoy 1 y 2): lo toma el cron en minutos |
+| `🚚 va al camión del día` | zona manual con camión ya armado a esa zona (`zonas_manuales_con_camion`) |
+| `🔒 no lo toca el automático` | **retenido**: alguien lo sacó de su tanda con "↩ Enviar a programar" (`GV_PPP_Web_Retenido`, v17.85). Hay que ponerle día a mano |
+| `🛒 súper: a mano` | el cliente está en **`GV_Supers`** — y eso **no se ve en la zona**: Gigot entrega en Constitución, o sea "Zona 1" (v19.12) |
+| `🏭 retira` | lo pasa a buscar el cliente |
+| `⏳ sin camión previsto` | zona manual sin camión a esa zona en la ventana |
+| `❓ sin zona` | el barrio no resolvió: revisar la dirección de entrega |
+| `⏳ espera dd/mm` | bloque diferido: falta mercadería (`GV_PPP_Web_Diferido`) |
+
+Y lo que **ni aparece** en la lista: lo retenido por **Cuarentena** (va a su propia solapa) y lo
+que `gv_pedidos_web_excluidos` da por de ISIS/Producción.
+
+## Nota v19.07 (2026-09-16) — El tiempo muerto se resta del picking y del armado
+
+Regla de Luis: *"suponete que arma por 1 hora, va al baño 10 minutos y después arma 50 min
+más (todo armado de 1 tanda). Debería ser 1 hora 50 min de armado y 10 de baño (cada uno
+contado individual)"*.
+
+> **el tiempo se RESTA del core y se SIGUE SUMANDO en su casillero** — no desaparece, cambia
+> de columna
+
+**⚠ Se creía implementado y no lo estaba.** Luis pidió verificarlo antes de tocar
+(*"pensábamos que ya estaba implementado esto"*) y tenía razón en dudar:
+
+| Dónde se creía que estaba | Qué hace de verdad |
+|---|---|
+| `DEAD_TIME_CODES` | Sólo **bloquea botones** mientras un tiempo muerto está abierto. No descuenta. |
+| `computeClosureDur` | Parte el cierre que **cruza el día**. No restaba. |
+| `vista_productividad_diaria` / `_semanal` | Mergean solapes del **mismo código** y **capean** la duración. Se parecen a netear y no lo son. |
+
+Y `PC` está en `ALWAYS_ALLOWED_CODES` (nunca bloquea), así que la media hora de comida corría
+adentro del armado todos los días con todos los operarios.
+
+Medido del 07/09 al 16/09: **21 de 55 armados (6,5 h)** y **12 de 64 pickings (2,9 h)** tenían
+tiempo muerto adentro. En 40 días el armado pasa de 210,9 h a 192,3 h.
+
+**Dónde vive.** Backend (fuente de verdad): las dos vistas de productividad, con los CTE
+`dead_raw`/`dead_isl`/`dead` + `muerto`. Front (duplicación de UX, como pide el protocolo):
+`computeClosureDur`, con `deadByLeg` + `deadOverlapMs`; el `breakdown` ahora lleva `brutoMs` y
+`muertoMs`. Cada intervalo muerto se recorta a su tope (PC 90 min, resto 30) y se **mergean
+antes de restar** (dos que se pisan descontarían de más).
+
+⚠ En el front sólo se netea lo que está en la consulta del día: en un cierre que **cruza el
+día**, el tiempo muerto del día de apertura no se resta.
+
+> ### ⚠⚠⚠ `LEAST` y `GREATEST` ignoran los NULL
+>
+> La primera versión restó **129,6 h de 210 h**. Con un `LEFT JOIN` sin match, `d.s`/`d.e`
+> son NULL y `least(c.me, NULL)` devuelve **`c.me`** → la resta daba la tanda **completa**.
+> El síntoma: el **100 %** de las tandas "afectadas" con `count(d.legajo) = 0` en las mismas
+> filas que restaban 25 minutos.
+>
+> 1. Si un `LEFT JOIN` alimenta un `LEAST`/`GREATEST`, el `case when … is null` es **parte del
+>    cálculo**, no una defensa.
+> 2. Una resta que afecta al **100 %** de las filas no está midiendo lo que parece: contar las
+>    filas afectadas, no sólo el total.
+
+**Y una fase ya cerrada no se cierra dos veces** (problema 348). Antes de emitir un TP/TAP se
+le pregunta al servidor si esa tanda ya figura terminada; si lo está, no se manda nada, se
+limpia `st.picking`/`st.armado` y la marca de "continúa mañana", y se avisa. Los guards que ya
+había miraban otras cosas —`_tapCerradoSesion` vive en memoria, `_compTandaYaArmada` pregunta
+por las Entregas del asistente— y **ninguno miraba lo único que un cierre manual por SQL sí
+deja: el evento TP/TAP**; el picking no tenía ningún guard. Va **antes** de pedir la ubicación
+y **falla ABIERTO**: sin red el cierre sale igual, porque perder un cierre es peor que
+duplicarlo.
+
+Decisión de Luis: el TAP duplicado de E09A **se deja como está** (no se toca el histórico);
+lo que se arregla es que no vuelva a pasar. Y el legajo **600** (entrevistas) sigue contando en
+productividad — *"dejalo ahí que no jode"*.
+
+**Chequeos:** el ejemplo del pedido a mano (lg8/D72A: 212,1 min con un PC de 40,5 → 171,6),
+ninguna resta de más (lg277 16/09: 7 de 8 pickings intactos), coincidencia con el conteo sin
+caps, `gv_endpoints_rotos` en 0 y ninguna vista sin `security_invoker`.
+`tests/muerto-neteado.cjs` (14 aserciones) reproduce el ejemplo textual: armado de 2 h con un
+baño de 10 min → **170 min de armado + 10 de baño aparte**.
+`sql/gv_productividad_muerto_neteado_v1907.sql` · rollback en `sql/backups/` · §3.il.
+
+## Nota v19.02 (2026-09-16) — El Resumen del día se leía mal: reloj de 12 h, pares sin colapsar, RI/EI sin cerrar
+
+Luis trajo la foto del celular de un operario: el Resumen mostraba `PB — Paré Baño` **dos veces**
+y `EP`/`TP` de la tanda D69H a la **"01:07"** y **"01:08"**. Parecía trabajo de madrugada y
+registros duplicados. **No era ni una cosa ni la otra.**
+
+### 1. La tarde se leía como madrugada (problema 344)
+
+Lo que hay en la base para esos mismos eventos es **13:07:27**, **13:08:13** y **13:34:23**, y
+`created_at` (la llegada al server) coincide al segundo: **0,0 s de desvío**. En toda la tabla,
+desde el 07/09, hay **cero** eventos de operario entre las 22:00 y las 05:00.
+
+`formatDateTime` era `toLocaleString("es-AR", { timeZone: TZ_AR })` **sin opciones**, y sin
+opciones el **ciclo horario lo elige el dispositivo**. El WebView de ese Android resuelve `es-AR`
+a 12 h y su patrón no incluye el a.m./p.m., así que 13:34 sale `01:34`. En Chromium (ICU
+completo) `es-AR` da 24 h — **por eso probándolo en la PC no se ve**.
+
+Señal de que ya se sabía: de las **53** llamadas a `toLocale*String` de `index.html`, las **2**
+que traían `hour12:false` son justo las que usan el resultado **como dato** (armar un `"HH:MM"`
+para comparar), no para mostrar. Las de pantalla nunca se fijaron.
+
+Ahora `formatDateTime` fija todo (`hour12:false` + `day/month/year/hour/minute/second`) y
+normaliza el `24:` de medianoche a `00:`. Se agregan **`formatTimeAr`** (sólo la hora) y
+**`formatDur`** (`"2m 26s"`, `"1h 05m"`).
+
+> ⚠ **Al mostrar una hora, nunca `toLocaleString` pelado.** Usar `formatDateTime` /
+> `formatTimeAr`, o pasar `hour12:false` explícito. Lo que se ve en el celular del operario no
+> es lo que se ve en la PC.
+
+### 2. Un renglón por tarea, no dos (problema 345)
+
+Un toggle deja **dos filas**: la apertura (`ts_inicio` null) y el cierre (`ts_inicio` = la hora
+de apertura). Las dos se rotulaban igual, así que un baño de 2 minutos se leía como dos baños.
+
+`_histColapsarPares()` hace que **el cierre absorba su apertura**: marca la fila de cierre con
+`_desde` / `_hasta` / `_durMs` y descarta la apertura que le corresponde (mismo `opcion` + su
+`ts` igual al `ts_inicio` del cierre). Queda `Desde: 13:31:57 hasta 13:34:23 (2m 26s)`.
+
+La apertura que **no** tiene cierre sobrevive marcada `_abierto` y se muestra **"sin cerrar"** en
+ámbar. Eso es a propósito: hasta hoy los RI/EI colgados (punto 3) no se veían en ninguna pantalla.
+
+Dos arreglos que salieron al paso, en `_fetchAndRenderHistory`:
+- el mapeo del histórico remoto **traía `ts_inicio` en el `select` y lo tiraba** al mapear, así
+  que el front no tenía con qué distinguir una apertura de un cierre;
+- la deduplicación local/remoto comparaba el **uuid** de la base contra el **`client_id`** del
+  celular — nunca daba match, así que un evento ya sincronizado podía salir **dos veces**. Ahora
+  se trae `client_id` y se dedupe con eso (el `id` queda como red de seguridad).
+
+### 3. RI y EI se abrían y no cerraban nunca (problema 347)
+
+Medido del 07/09 al 16/09: **EI 15 aperturas / 2 cierres** y **RI 8 / 1** — **20 toggles
+abiertos**, algunos del 08/09 todavía sin cerrar. O sea que la duración de Recepción y Entrega de
+Insumos **no se podía medir** desde que arrancó Gestión.
+
+La causa: `closeIns()` (v5.02) cerraba el toggle llamando a **`toggleStartOrEnd`, que sólo muta el
+`localStorage`** — la emisión del evento vive en `send()`, no ahí. El flag bajaba y el cierre
+nunca salía al server; el siguiente apretón del botón generaba **otra apertura**. Los pocos
+cierres que sí existen son de los operarios que volvieron a apretar el **botón** en vez de cerrar
+el modal (ese camino pasa por `send()` y sí emite). El autocierre de las 17:00
+(`enqueueAutoClose`) tampoco los cubría: corre en el cambio de día y sólo si el flag local
+sobrevivió.
+
+Ahora `closeIns()` llama a **`insEmitCierre`**, que emite el cierre con `ts_inicio` = la hora de
+apertura y `texto` = **el total cargado en la sesión** (mismo criterio que RT, que cierra con las
+cajas del día). `insAnular()` pasa **`closeIns(true)`** para no dejar un cierre huérfano: ahí la
+apertura ya se borró del server con `anular_toggle_virgilio`.
+
+> ⚠ `anular_toggle_virgilio` borra **UNA** apertura (`order by created_at desc limit 1`). Si
+> quedaron varias abiertas del mismo código, anular limpia sólo la última.
+
+### Lo que se VERIFICÓ y NO hacía falta tocar
+
+Luis pidió expresamente chequearlo antes de cambiar nada, y tenía razón: los mecanismos existen.
+
+| Sospecha | Qué se encontró |
+|---|---|
+| El armado cross-day infla las horas | El dato crudo sí (10 de 63 TAP = 262 h de 319 h), pero **el monitor y la productividad ya lo cortan**: `computeClosureDur` reconstruye el tramo por jornada con la fichada real, y `vista_productividad_diaria` exige mismo día (`valido`), capea TAP a 180 min / TP a 120 (`cap_min`), descarta ritmo absurdo (`ritmo_roto`) y mergea intervalos solapados. Problema 346, bajado a severidad baja: lo que queda es que **una consulta SQL nueva que reste `ts_cliente - ts_inicio` a mano da números irreales.** |
+| El reloj de los celulares está mal | **No.** Los 79 casos de `ts_cliente` por delante de `created_at` son **todos** de códigos con `client_id` determinístico (PKC, FJ, CCN, PSP, CRN…): al re-confirmar un artículo el upsert actualiza `ts_cliente` y deja el `created_at` del primer insert. En los códigos **sin** upsert: **0 de 1.184**. Un solo retraso real (EPX del 15/09, 2 h 48 en la cola offline). ⚠ Corolario: **"Llegó al server" es un dato falso para esos códigos** — problema 351. |
+| El legajo 600 no existe | Existe **por diseño**: es el legajo compartido de **entrevistas** (v14.62, `INTERVIEW_LEGAJO`, `es_legajo_entrevista()`). Lo que sí queda abierto es que **no se excluye de las métricas**: `es_legajo_test()` sólo conoce 0 y 1, así que el picking del candidato del 10/09 figura en `vista_productividad_diaria`. Problema 350. |
+| Tandas fantasma | 3 de 200: `E01G` y `E09B` se **deshicieron a propósito** (`gv_tandas_deshechas`); sólo **D66G** (23 eventos, lg277, 08/09) no tiene registro de anulación. Sólo el **6 %** de las horas cae en tanda sin m³. |
+
+### Lo que sigue abierto
+
+- **Problema 349** — el **tiempo muerto corre adentro del picking y del armado**: 9,4 h de
+  PC/PB/AT/Limp caen dentro de un TP/TAP abierto (6,5 h en 21 armados, 2,9 h en 12 pickings).
+  `PC` está en `ALWAYS_ALLOWED_CODES`, así que el reloj del armado sigue corriendo al mediodía,
+  todos los días con todos. `vista_productividad_diaria` **no** lo resta (mergea solapes del mismo
+  código, no descuenta el tiempo muerto). Restarlo es un cambio de **backend** y **mueve los m³/h
+  que el supervisor mira** (para arriba), así que se decide antes de aplicarlo.
+- **Problema 348** — cerrar una fase a mano en la base no limpia el celular: `lg237/E09A` se cerró
+  por SQL el 09/09 (`client_id = cierre_manual_e09a_20260909`) y el operario lo volvió a cerrar el
+  10/09 con el **mismo `ts_inicio`**. `tandaChipSeguir` re-siembra `st.armado` desde el AP que
+  sigue en el server. Es el único `ts_inicio` cerrado dos veces en toda la ventana.
+
+**Test:** `tests/hora-24h-renglon.cjs` (23 aserciones), registrado en `tests/run.sh`. Como en
+Chromium el bug de la hora **no se reproduce**, el test además chequea que `hour12:false` esté
+fijado **en la implementación** — eso es lo que protege de la regresión.
+
+## Nota v19.01 (2026-09-16) — Facturación: la NP armada SIN tanda perdía cliente y código
+
+Thomas: *"el cliente 4181 de LK no tiene razón social en el módulo de facturación, ¿por qué?"*
+
+**La lista de Facturación sale de DOS fuentes**, y hay que acordarse de las dos:
+1. las **tandas de la PPP** (`_facLastTandas`), y
+2. las NP **armadas cuya tanda ya no está en la PPP** (`_facSinTanda`, la vista
+   `gv_fac_armado_sin_facturar`, v16.58) — por ejemplo una tanda que se desarmó.
+
+Los dos lugares que después necesitan los datos del pedido miraban **sólo la primera**:
+- **lo que se ESCRIBE en `Facturacion_NP`** al bajar el Excel ISIS (`facXlsBajar`): si no la
+  encontraba, caía a un fallback vacío y guardaba la fila **sin razón social, sin código de
+  cliente, sin tanda, sin m³ y sin fecha de salida**;
+- la lista **«Ya tildados hoy»** (`facRenderTicked`): mostraba el número de NP pelado.
+
+Caso testigo: **`LK 0034` y `LK 0035`** (Mitre Hugo Alberto, cod **4181**, pedido LK 1364). Su
+tanda `E01G` se desarmó el 15/09, así que quedaron armadas pero sin tanda, se facturaron con el
+Excel el 16/09 y sus filas quedaron vacías. Son las **únicas 2 de 1.305** filas de
+`Facturacion_NP` sin razón social.
+
+**El arreglo** es un helper único, **`facInfoNp(np)`**, que busca primero en las tandas y después
+en las armadas-sin-tanda, y lo usan los dos. El tilde ✓ de las NP de ISIS **nunca** tuvo el
+problema: lee el `data-args` de la fila, que `facRender` ya arma con los datos de `_facSinTanda`.
+
+⚠ **Al tocar Facturación, preguntarse siempre si el código mira las dos fuentes.** `tests/fac-rs-sin-tanda.cjs`.
+Problema 352.
+
 ## Nota v18.90 (2026-09-16) — CANCELAR un pedido desde Facturación
 
-Pedido del dueño: un botón **✕ Cancelar** en cada fila del módulo de **Facturación**, para el
+Pedido del dueño: un botón **✕ Cancelar** en cada fila del módulo de **Facturación**, al lado
+del ✓ / ⬇ Excel (*"uno al lado del otro, como en columnas diferentes"*), para el
 pedido que se armó, no salió y no va a salir (el caso que él mismo describió: *"muchos de los
 pedidos atrasados en la PPP no se cargaron al camión porque tenían faltantes de todos los
 artículos que pedía la nota de pedido"*).
@@ -19,17 +297,20 @@ consecuencias.
 - **Lo que ya estaba armado vuelve a la bodega «A guardar»**, para que un operario lo baje del
   piso de armado y lo guarde.
 
-⚠ **No confundir con «Enviar a programar»**, que es la otra cara: ahí el pedido sigue vivo y se va
-a rehacer, así que la mercadería vuelve **de donde salió** (góndola / excedente), que es la regla
-de Luis del 16/09. Cancelar es el pedido muerto: nadie va a re-pickear esas cajas. El backend es
-la misma función (`gv_ppp_np_desarmar`) con el parámetro nuevo `p_a_guardar`, y **se niega** si le
-mandan las dos intenciones a la vez.
+⚠ **Desde la v18.91, los TRES caminos del desarme mandan la mercadería a «A guardar»**, no sólo
+este botón: también «Enviar a programar» y el desarme a secas. El motivo es físico — las cajas
+quedan en el piso de armado y nadie las llevó al estante, así que escribirlas en góndola era
+mentir. Por eso el guard que rechazaba `p_vuelve` + `p_a_guardar` juntos se sacó en la v18.94:
+hoy `p_vuelve` decide qué pasa con el PEDIDO y `p_a_guardar` sólo deja el rastro de que fue una
+cancelación. La diferencia entre cancelar y «Enviar a programar» sigue siendo el PEDIDO: uno
+muere, el otro vuelve a A Programar retenido.
 
 ⚠ Si la NP **ya tiene Carga Camión o Recepción Remitos** (o sea que ya salió), el backend rechaza
 la cancelación y el pop-up lo dice: eso se cierra con el remito, no cancelando.
 
-Detalle, medición y rollback: `docs/SUPABASE-GESTION-VIRGILIO.md` §3.if ·
-`sql/gv_ppp_np_desarmar_a_guardar_v1890.sql` · `tests/fac-cancelar-pedido.cjs`.
+Detalle, medición y rollback: `docs/SUPABASE-GESTION-VIRGILIO.md` §3.if y §3.ii ·
+`sql/gv_ppp_np_desarmar_a_guardar_v1890.sql` · `sql/gv_ppp_np_desarmar_sin_guard_v1894.sql` ·
+`tests/fac-cancelar-pedido.cjs`.
 
 ## Nota v18.48 (2026-09-15) — Rotado el password del FDW LK→Chef
 
@@ -11730,6 +12011,28 @@ evento: todas se cuentan como atrasadas). Detalle y medición en
 **Desde cuándo mira:** `PPP_Web_Config.atrasados_desde` (hoy `2026-09-01`). No se puede barrer más
 atrás: antes de que los operarios pasaran a Gestión casi no se registraba la Carga Camión, así que
 la falta de `CCN` no prueba nada (junio daría 274 "sin salida" que en realidad se entregaron).
+
+---
+
+### 📅 Cambiar de día — en la fila de cada tanda (v19.13, pedido de Thomas)
+
+Cada fila de **tanda** —en la tabla de *Programación de entregas* **y** en *Pedidos atrasados*,
+que comparten el mismo cuerpo— trae el botón **📅 Cambiar de día**. Abre el mismo pop-up de días
+de siempre (un botón por día, con los m³ que ya tiene, el cupo y cuánto queda) y mueve **toda la
+tanda** con `gv_ppp_tanda_mover`: se guarda en el servidor, lo ven todos, también el operario.
+
+| Estado de la tanda | Qué pasa |
+|---|---|
+| Sin empezar | se mueve directo |
+| Pickeada / armada / facturada, **sin salir** | se mueve, avisando que el contenido no cambia y **no hay que volver a pickear** (`p_forzar`) |
+| **Salió una parte** (alguna NP con Carga Camión vigente o remito) | **no se mueve** — hay que sacar el pedido que falta con el ↩ de su fila, que lo manda a una tanda NUEVA |
+| Salió entera | no se mueve: no hay nada que reprogramar |
+
+⚠ Lo de "armada se mueve igual" es el caso normal de **Pedidos atrasados**: el 16/09 las 8 de 8
+tandas atrasadas estaban armadas, así que con la regla vieja (v13.87, cualquier evento bloqueaba)
+el botón habría rebotado siempre ahí. Y lo de "salió una parte" no es prudencia de más: partir una
+tanda en dos días es lo que prohíbe la regla de la v18.92 y lo que vigila `gv_ppp_tanda_dos_dias`.
+Detalle, medición y rollback en `docs/SUPABASE-GESTION-VIRGILIO.md` §3.gl.
 
 ---
 

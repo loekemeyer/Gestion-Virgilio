@@ -209,6 +209,47 @@ button {
   color: #666;
   margin-top: 18px;
 }
+/* v19.10 — el detalle del picking (PKC) va AGRUPADO por tanda en un solo renglón, con
+   el detalle artículo por artículo escondido detrás de "ver detalle". Antes salía una
+   tarjeta por artículo: el 16/09 el Resumen de Jhonny tenía 297 tarjetas y 247 eran
+   PKC de 9 tandas, o sea casi 300 scrolls para ver lo que hizo. */
+/* El botón se toca con el DEDO, y con guantes: 44 px de alto mínimo (medido a 360/390/412 px
+   daba 25 px, que es lo que sale del padding chico y no alcanza). `width:auto` porque el
+   `button{width:100%}` global —deuda conocida de la línea 25— lo estiraba de punta a punta. */
+.history-item .pkc-ver{
+  display: inline-flex;
+  align-items: center;
+  margin-top: 8px;
+  padding: 10px 16px;
+  min-height: 44px;
+  border: 1px solid #94a3b8;
+  border-radius: 10px;
+  background: #f1f5f9;
+  color: #334155;
+  font-size: 15px;
+  font-weight: 700;
+  cursor: pointer;
+  width: auto;
+  text-transform: none;
+  -webkit-tap-highlight-color: rgba(51,65,85,.2);
+}
+.history-item .pkc-ver:active{ background: #e2e8f0; }
+.history-item .pkc-det{ margin-top: 8px; }
+.history-item .pkc-det.hidden{ display: none; }
+/* Lista de 27 renglones leída a un brazo de distancia: 14 px como el resto de la tarjeta
+   (no 13) y aire suficiente entre líneas para no saltearse una. */
+.history-item .pkc-art{
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 7px 2px;
+  border-top: 1px dashed #cbd5e1;
+  font-size: 14px;
+  line-height: 1.25;
+}
+.history-item .pkc-art b{ font-variant-numeric: tabular-nums; white-space: nowrap; }
+.history-item .pkc-falta{ color: #b45309; }   /* ámbar: levantó menos de lo pedido */
+.history-item .pkc-art.pkc-falta{ font-weight: 700; }   /* el faltante, además, en negrita */
 
 .row { display: grid; gap: 8px; margin-top: 13px; }
 .row-6 { grid-template-columns: repeat(6, minmax(0, 1fr)); }
@@ -834,6 +875,14 @@ button {
    y bajas en fila, como una tira de calendario; antes eran una columna de 420 px que se iba al fondo. */
 .apr-wrap{ display:grid; grid-template-columns: 1fr; gap:10px; align-items:start; }
 .apr-wrap.apr-2col{ grid-template-columns: 1fr; }   /* v13.69: sin tandas sin fecha → pedidos | días (v13.74: apilados) */
+/* v18.100 (Luis): Cuarentena y Clientes nuevos colapsables — el título es el botón. */
+.apr-col-t.apr-col-t-clic{ cursor:pointer; user-select:none; }
+.apr-col-caret{ display:inline-block; width:1em; text-align:center; opacity:.8; }
+/* v19.05 (Luis): Clientes nuevos — Speech 1/2, acción, timer del primer contacto. */
+.clin-speech, .clin-accion{ display:flex; flex-direction:column; gap:4px; align-items:stretch; }
+.clin-tiempo{ font-weight:800; white-space:nowrap; color:#9a3412; }
+.clin-td-tiempo{ white-space:nowrap; }
+.clin-7dias{ display:inline-block; margin-top:4px; font-size:11px; font-weight:800; color:#9a3412; background:#ffedd5; border:1px solid #fdba74; border-radius:6px; padding:2px 7px; }
 .apr-col-nps .apr-scroll{ display:grid; grid-template-columns:repeat(auto-fill, minmax(250px, 1fr)); gap:7px; align-items:start; }
 .apr-col-tandas .apr-scroll{ display:grid; grid-template-columns:repeat(auto-fill, minmax(280px, 1fr)); gap:7px; align-items:start; }
 .apr-col{ background:#f8fafc; border:1px solid #e2e8f0; border-radius:10px; padding:10px; min-width:0; }
@@ -1248,6 +1297,8 @@ button {
 .apr-hor.vacio:hover{ background:#f8fafc; color:#475569; }
 .apr-hor.cli{ background:#dcfce7; color:#14532d; border-color:#86efac; }   /* lo eligió el cliente */
 .apr-hor.cli:hover{ background:#bbf7d0; }
+.apr-hor.oc{ background:#fef3c7; color:#78350f; border-color:#fcd34d; }   /* el turno lo pide la OC */
+.apr-hor.oc:hover{ background:#fde68a; }
 .cuar-td-zona .apr-hor{ margin-left:7px; }
 /* el pop-up de edición reusa la caja de Cuarentena */
 .apr-hor-f{ display:grid; grid-template-columns:70px 1fr; align-items:center; gap:9px; margin-bottom:9px; }
@@ -1714,6 +1765,8 @@ body.apr-dnd-tanda .apr-col-nps, body.apr-dnd-tanda .apr-dia-cerrado{ opacity:.4
 .mon-act-row{ display: flex; align-items: center; gap: 9px; padding: 7px 4px; border-top: 1px solid #17203400; font-size: 14px; }
 .mon-act-row + .mon-act-row{ border-top-color: #172034; }
 .mon-act-who{ flex: 0 0 auto; min-width: 130px; color: #cbd5e1; font-weight: 600; white-space: nowrap; }
+.mon-act-who-click{ cursor: pointer; }
+.mon-act-who-click:hover{ text-decoration: underline; color: #fff; }
 .mon-act-who b{ color: #f8fafc; margin-right: 3px; }
 .mon-act-ic{ flex: 0 0 auto; font-size: 17px; line-height: 1; }
 .mon-act-what{ flex: 1 1 auto; color: #e2e8f0; font-weight: 700; }
@@ -2983,9 +3036,8 @@ button.pk-anular small{ display:block; font-size:12px; font-weight:700; opacity:
 .ppp-ocup-empty{ color:#64748b; font-size:12.5px; padding:2px; }
 /* Alerta pedidos web anómalos — badge en botón PPP + banner dentro del overlay (v8.82). */
 .sup-action-btn{ position:relative; }
-.ppp-alert-badge{ position:absolute; top:6px; right:6px; min-width:20px; height:20px; line-height:20px; padding:0 5px; border-radius:999px; background:#dc2626; color:#fff; font-size:11px; font-weight:900; text-align:center; box-shadow:0 2px 6px rgba(220,38,38,.45); animation:pppAlertPulse 1.8s ease-in-out infinite; display:none; z-index:2; }
-.ppp-alert-badge.on{ display:block; }
-@keyframes pppAlertPulse{ 0%,100%{ transform:scale(1); } 50%{ transform:scale(1.15); } }
+/* v19.14 — el badge de PPP pasa a `dp-badge`, el mismo de Facturacion / Stock / RR (supSetBadge).
+   Queda a la IZQUIERDA (`left:2px` inline en el boton) porque asi lo pidio Luis. */
 .ppp-alert-banner{ display:none; width:100%; }
 .ppp-alert-banner.on{ display:block; }
 /* v9.05 — tarjetas de alerta del PPP compactas (~1/4 del tamaño): todo en una fila, botones chicos */
@@ -3394,12 +3446,18 @@ tr.ppp-err-zona > td{ background:#fffbeb !important; }
    ⚠ Y de paso: ese comentario tenía un byte LATIN1 suelto (0xF3) metido por la v17.85 — el único
    byte inválido de todo index.html. Era sólo un comentario CSS, pero al editar el archivo por
    script hay que escribir los acentos como bytes UTF-8, no como el carácter latin1. */
-.pga-nrow{ display:flex; align-items:center; gap:0; }
+/* v19.11: la fila de la TANDA usa `pga-trow` — mismo flex, clase propia. No comparte `pga-nrow` a
+   propósito: `tests/ppp-atrasados-modulo.cjs` cuenta ese `<div>` para probar que el render de la fila
+   de NP no está duplicado entre las dos tablas, y con la misma clase ese guard quedaba ciego. */
+.pga-nrow, .pga-trow{ display:flex; align-items:center; gap:0; }
 .pga-ninfo{ flex:1 1 auto; min-width:0; }
 .pga-acc{ flex:0 0 auto; margin-left:auto; padding-left:14px; white-space:nowrap; }
 .pga-acc-b{ background:#eef2f7; color:#1e6bd6; border:1px solid #d7e2f3; border-radius:7px;
   padding:2px 10px; font-size:13.5px; font-weight:800; cursor:pointer; width:auto; line-height:1.6; }
 .pga-acc-b:hover{ background:#e0eaf9; }
+/* v19.11 (Thomas) — «Cambiar de día» en la fila de la tanda. Lleva el texto y no sólo el ícono
+   (así lo pidió), pero chico: la fila de la tanda ya tiene el código, la pastilla de estado y la zona. */
+.pga-acc-b.dia{ font-size:12.5px; padding:2px 9px; }
 /* v17.88 (Luis): el tacho. Rojo, para que no se confunda con el de al lado. */
 .pga-acc-b.del{ background:#fee2e2; color:#b91c1c; border-color:#fca5a5; }
 .pga-acc-b.del:hover{ background:#fecaca; }
@@ -4874,8 +4932,13 @@ table.fac-np-tbl.nc-tbl th{ overflow: hidden; text-overflow: ellipsis; }
 .fac-btn-fc-lbl{ font-size:9px; font-weight:800; letter-spacing:.6px; }
 .fac-btn-fc:hover{ background:#dbeafe; border-color:#60a5fa; }
 .fac-btn-fc:active{ transform:scale(.93); }
-/* v6.61: los dos botones de acción, centrados verticalmente en la fila */
-.fac-accion-cell{ vertical-align:middle; overflow:visible; }
+/* v6.61: los dos botones de acción, centrados verticalmente en la fila
+   v18.94: y en UNA sola línea, uno al lado del otro (✓ / ⬇ Excel · ✕ Cancelar). */
+.fac-accion-cell{ vertical-align:middle; overflow:visible; white-space:nowrap; }
+.fac-acc-wrap{ display:inline-flex; align-items:center; justify-content:center; gap:6px; }
+/* el margen global de `button` desalineaba el ✓ contra el ✕ dentro del flex: el margen entra
+   en la caja del ítem, así que `align-items:center` centraba cajas de distinto alto. */
+.fac-acc-wrap > *{ margin:0; }
 .facfc-ov{ position:fixed; inset:0; background:rgba(2,6,23,.6); z-index:1500; display:none; align-items:flex-start; justify-content:center; padding:24px 12px; overflow:auto; }
 .facfc-ov.show{ display:flex; }
 .facfc-card{ background:#fff; border-radius:16px; width:100%; max-width:440px; box-shadow:0 24px 70px rgba(0,0,0,.5); overflow:hidden; }
@@ -4910,11 +4973,12 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
 .facfc-ok-meta{ font-size:12.5px; color:#64748b; }
 .fac-btn-tick:hover{ background: #15803d; }
 .fac-btn-tick:active{ transform: scale(.93); }
-/* v18.90 — "✕ Cancelar" por fila (Thomas, 16/09). Va DEBAJO del ✓ / ⬇ Excel, chico y en rojo
-   apagado: es una acción rara y destructiva, no tiene que competirle al tilde, que es lo que
-   la operadora aprieta cien veces por día. `width:auto` es el override del global
-   button{width:100%}. */
-.fac-btn-cancel{ display:block; width:auto; margin:5px auto 0; border:1px solid #fecaca; background:#fef2f2; color:#b91c1c; border-radius:6px; padding:3px 7px; font-size:10.5px; font-weight:800; line-height:1.4; cursor:pointer; white-space:nowrap; transition:background .15s, transform .1s; }
+/* v18.90 — "✕ Cancelar" por fila (Thomas, 16/09), en rojo apagado: es una acción rara y
+   destructiva, no tiene que competirle al tilde, que es lo que la operadora aprieta cien veces
+   por día. `width:auto` es el override del global button{width:100%}.
+   v18.94 (Thomas): va AL LADO del ✓ / ⬇ Excel, "como en columnas diferentes", no debajo — por
+   eso la celda es un flex en una sola línea y la columna Acción se ensanchó a 11%. */
+.fac-btn-cancel{ display:inline-block; width:auto; margin:0; border:1px solid #fecaca; background:#fef2f2; color:#b91c1c; border-radius:6px; padding:3px 7px; font-size:10.5px; font-weight:800; line-height:1.4; cursor:pointer; white-space:nowrap; transition:background .15s, transform .1s; }
 .fac-btn-cancel:hover{ background:#fee2e2; border-color:#fca5a5; }
 .fac-btn-cancel:active{ transform:scale(.93); }
 /* El pop-up de cancelar reusa las clases .facfc-* (mismo overlay que Facturar / NC) y agrega
@@ -5644,7 +5708,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=18.91"></script>
+<script type="module" src="recepcion.js?v=19.15"></script>
 <!-- Config del módulo de fichada (compartido con fichada.html). El secret
      hmacSecret tiene que ser el mismo acá y allá; cargándolo desde un solo
      archivo evitamos que se desincronicen. -->
@@ -5737,7 +5801,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
     <!-- GRANDES: uso diario (orden definido por el usuario). "Stock y Compras" = Stocks + OC en un solo botón. -->
     <div class="sup-actions sup-primary">
       <button class="sup-action-btn" onclick="openFacturacion()" style="position:relative;"><span class="sup-ico">📋</span><span>Facturación</span><span id="facBadge" class="dp-badge" style="display:none;" title="Pedidos listos para facturar (picking + separado terminados, todavía sin facturar)"></span></button>
-      <button class="sup-action-btn" onclick="openPPP()"><span id="pppAlertBadge" class="ppp-alert-badge"></span><span class="sup-ico">🗓️</span><span>PPP</span></button>
+      <button class="sup-action-btn" onclick="openPPP()" style="position:relative;"><span class="sup-ico">🗓️</span><span>PPP</span><span id="pppAlertBadge" class="dp-badge" style="left:2px;right:auto;display:none;" title="Cosas para mirar en la PPP"></span></button>
       <button class="sup-action-btn" onclick="openRecepcionAdmin()" style="position:relative;"><span class="sup-ico">🏭</span><span>Carga Recepción Mercadería</span><span id="recepBadge" class="dp-badge" style="display:none;min-width:26px;height:26px;line-height:26px;font-size:15px;padding:0 6px;border-radius:13px;" title="Pendiente en Recepción: remitos por cargar + bajadas de racks por aprobar"></span></button>
       <button class="sup-action-btn" onclick="showFaltAvisar()" style="position:relative;"><span class="sup-ico">📦➕</span><span>Completar Pedido</span><span id="cpBadge" class="dp-badge" style="display:none;" title="Pedidos con faltante que tiene stock para completarse"></span></button>
       <button class="sup-action-btn" onclick="openStockAdmin()" style="position:relative;"><span class="sup-ico">📦</span><span>Stock y Compras</span><span id="stkBadge" class="dp-badge" style="display:none;" title="Códigos con stock negativo"></span><span id="stkOkBadge" style="display:none;position:absolute;top:2px;right:2px;min-width:18px;height:18px;padding:0 5px;border-radius:999px;background:#16a34a;color:#fff;font-size:10px;font-weight:800;line-height:18px;text-align:center;pointer-events:none;">✓</span></button>
@@ -6367,9 +6431,158 @@ function getTodayKey() {
   const dd = String(d.getDate()).padStart(2,"0");
   return `${y}-${m}-${dd}`;
 }
+/* v19.02 — RELOJ DE 24 h FORZADO. `toLocaleString("es-AR")` sin opciones deja que el
+   dispositivo elija el ciclo horario, y el WebView de varios Android resuelve es-AR a
+   12 h SIN mostrar el a.m./p.m. → las 13:34 se leían "01:34" y el operario/supervisor
+   creía que el registro era de la madrugada. Caso real (Jhonny Cartaya, 16/09): el
+   Resumen del día mostraba EP/TP a la "01:07" cuando la base tenía 13:07 y el server
+   lo había recibido en el MISMO segundo. El dato nunca estuvo mal; era el cartel.
+   Se fijan todos los campos + hour12:false para que no dependa del celular. El "24" de
+   la medianoche (algunos ICU dan h24 en vez de h23) se normaliza a "00".
+   Nota: las dos únicas llamadas a toLocale*String que YA traían hour12:false son las que
+   usan el resultado como DATO, no para mostrar — el bug estaba sólo en pantalla.
+   Problema 344. */
 function formatDateTime(ts) {
-  try { return new Date(ts).toLocaleString("es-AR", { timeZone: TZ_AR }); }
-  catch (_e) { return ""; }
+  try {
+    if (ts == null || ts === "" || ts === 0) return "";   // null/0 no es "1/1/1970"
+    const d = new Date(ts);
+    if (isNaN(d.getTime())) return "";
+    return d.toLocaleString("es-AR", {
+      timeZone: TZ_AR, hour12: false,
+      day: "numeric", month: "numeric", year: "numeric",
+      hour: "2-digit", minute: "2-digit", second: "2-digit"
+    }).replace(/(^|\s)24:/, "$100:");
+  } catch (_e) { return ""; }
+}
+/* Sólo la hora, mismo criterio de 24 h. Lo usa el renglón "desde … hasta …". */
+function formatTimeAr(ts) {
+  try {
+    if (ts == null || ts === "" || ts === 0) return "";   // null/0 no es "21:00" del 69
+    const d = new Date(ts);
+    if (isNaN(d.getTime())) return "";
+    return d.toLocaleTimeString("es-AR", {
+      timeZone: TZ_AR, hour12: false,
+      hour: "2-digit", minute: "2-digit", second: "2-digit"
+    }).replace(/^24:/, "00:");
+  } catch (_e) { return ""; }
+}
+/* Duración legible a partir de milisegundos: "2m 26s", "1h 05m". */
+function formatDur(ms) {
+  const n = Number(ms);
+  if (!isFinite(n) || n < 0) return "";   // ojo: Math.round(-5/1000) da -0, y -0 < 0 es false
+  const s = Math.round(n / 1000);
+  const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), sec = s % 60;
+  if (h > 0) return h + "h " + String(m).padStart(2, "0") + "m";
+  if (m > 0) return m + "m " + String(sec).padStart(2, "0") + "s";
+  return sec + "s";
+}
+/* v19.02 — UN RENGLÓN POR TAREA (pedido de Luis, 16/09: "se puede poner en un solo
+   renglón 'paré baño desde XX hasta XX'?"). Un toggle deja DOS filas —la apertura
+   (`ts_inicio` null) y el cierre (`ts_inicio` = la hora de apertura)— y las dos se
+   rotulaban igual, así que un baño de 2 minutos se leía como dos baños. Acá el cierre
+   absorbe a su apertura: se marca la fila de cierre con `_desde`/`_hasta`/`_durMs` y se
+   descarta la apertura que le corresponde. La apertura que NO tiene cierre sobrevive
+   marcada con `_abierto` — eso deja A LA VISTA del operario los RI/EI que quedan
+   colgados, que hoy no se ven en ninguna parte. Problema 345. */
+/* v19.10 — EL DETALLE DEL PICKING, UNA LÍNEA POR TANDA (pedido de Luis, 16/09).
+   Cada artículo confirmado emite su propio evento PKC, y el Resumen los mostraba de a una
+   tarjeta: el 16/09 el de Jhonny (lg 277) tenía **297 tarjetas, 247 de ellas PKC de 9
+   tandas** — para ver lo que hizo tenía que scrollear casi 300 veces. Acá los PKC de una
+   misma tanda se juntan en UN renglón ("E11C · 12 artículos") y el detalle queda detrás de
+   "ver detalle". Los demás códigos NO se agrupan: emiten una fila por NP o por tanda, que
+   ya es la granularidad correcta (lo más numeroso después de PKC son 32 CRN en 32 NP).
+   El texto del PKC es `TANDA|ART|esperadas|reales|excedente|empresa`, así que de paso se
+   cuenta cuántos artículos salieron cortos (`reales < esperadas`) y se avisa en el renglón:
+   es el dato que el operario y el supervisor van a buscar. */
+const _pkcAbiertos = new Set();   // qué tandas dejó abiertas el operario (sobrevive el re-render)
+function histTogglePkc(key) {
+  const k = String(key || "");
+  if (_pkcAbiertos.has(k)) _pkcAbiertos.delete(k); else _pkcAbiertos.add(k);
+  const el = document.getElementById("pkcdet_" + k);
+  const bt = document.getElementById("pkcver_" + k);
+  if (el) el.classList.toggle("hidden", !_pkcAbiertos.has(k));
+  if (bt) bt.textContent = _pkcAbiertos.has(k) ? "▾ ocultar detalle" : "▸ ver detalle";
+}
+window.histTogglePkc = histTogglePkc;
+function _histAgruparPkc(arr) {
+  const porTanda = new Map();
+  const out = [];
+  for (const it of arr) {
+    if (it.opcion !== "PKC") { out.push(it); continue; }
+    const p = String(it.texto || "").split("|");
+    const tanda = (p[0] || "?").toUpperCase();
+    if (!porTanda.has(tanda)) {
+      const g = {
+        opcion: "PKC", descripcion: "Picking artículo", texto: "",
+        ts: it.ts, status: it.status,
+        _pkcTanda: tanda, _pkcItems: [], _pkcDesde: it.ts, _pkcHasta: it.ts, _pkcFaltan: 0
+      };
+      porTanda.set(tanda, g);
+      out.push(g);
+    }
+    const g = porTanda.get(tanda);
+    const esp = parseInt(p[2], 10), real = parseInt(p[3], 10);
+    const falta = isFinite(esp) && isFinite(real) && real < esp;
+    if (falta) g._pkcFaltan++;
+    g._pkcItems.push({ art: p[1] || "?", esp: esp, real: real, falta: falta, ts: it.ts });
+    if (it.ts && it.ts < g._pkcDesde) g._pkcDesde = it.ts;
+    if (it.ts && it.ts > g._pkcHasta) g._pkcHasta = it.ts;
+    // la tarjeta del grupo se ordena por el ÚLTIMO artículo confirmado
+    g.ts = g._pkcHasta;
+    // si alguno todavía está en la cola, el grupo entero figura pendiente
+    if (it.status && it.status !== "sent") g.status = it.status;
+  }
+  for (const g of porTanda.values()) {
+    g._pkcItems.sort((a, b) => (a.ts || 0) - (b.ts || 0));
+  }
+  return out;
+}
+/* El renglón del grupo + su detalle escondido. */
+function _histPkcHtml(h) {
+  const k = escapeHtml(h._pkcTanda);
+  const n = h._pkcItems.length;
+  const abierto = _pkcAbiertos.has(h._pkcTanda);
+  const cuando = (h._pkcDesde && h._pkcHasta && h._pkcHasta > h._pkcDesde)
+    ? "Desde: <b>" + escapeHtml(formatTimeAr(h._pkcDesde)) + "</b> hasta <b>" +
+      escapeHtml(formatTimeAr(h._pkcHasta)) + "</b>"
+    : (h._pkcHasta ? "Fecha: " + escapeHtml(formatDateTime(h._pkcHasta)) : "");
+  const faltan = h._pkcFaltan > 0
+    ? ' · <b class="pkc-falta">' + h._pkcFaltan + (h._pkcFaltan === 1 ? " con faltante" : " con faltante") + "</b>"
+    : "";
+  const det = h._pkcItems.map(function (a) {
+    const cant = (isFinite(a.esp) && isFinite(a.real))
+      ? (a.real + " de " + a.esp)
+      : "—";
+    return '<div class="pkc-art' + (a.falta ? " pkc-falta" : "") + '">' +
+           "<span>" + escapeHtml(a.art) + "</span><b>" + escapeHtml(cant) + "</b></div>";
+  }).join("");
+  return '<div class="line2">' +
+           "Tanda <b>" + k + "</b> · <b>" + n + (n === 1 ? " artículo" : " artículos") + "</b>" + faltan +
+           (cuando ? "<br>" + cuando : "") +
+           '<br><button type="button" class="pkc-ver" id="pkcver_' + k +
+             '" onclick="histTogglePkc(\'' + k + '\')">' +
+             (abierto ? "▾ ocultar detalle" : "▸ ver detalle") + "</button>" +
+           '<div class="pkc-det' + (abierto ? "" : " hidden") + '" id="pkcdet_' + k + '">' + det + "</div>" +
+         "</div>";
+}
+function _histColapsarPares(arr) {
+  const consumidas = new Set();
+  for (const it of arr) {
+    const ini = it.ts_inicio_iso ? new Date(it.ts_inicio_iso).getTime() : 0;
+    if (!ini || !isFinite(ini)) continue;
+    it._desde = ini;
+    it._hasta = it.ts || 0;
+    it._durMs = (it._hasta && it._hasta > ini) ? (it._hasta - ini) : 0;
+    consumidas.add(it.opcion + "@" + ini);
+  }
+  return arr.filter(it => {
+    if (it.ts_inicio_iso) return true;                       // es el cierre: queda
+    if (!TOGGLE_CODES.includes(it.opcion)) return true;      // no es toggle: queda
+    // apertura: se cae si su cierre ya está en la lista; si no, queda marcada
+    if (consumidas.has(it.opcion + "@" + (it.ts || 0))) return false;
+    it._abierto = true;
+    return true;
+  });
 }
 /* Total de cajas que el operario cargó hoy por el Modo OP de Recepción
    (recepcion.js lo va sumando en localStorage). Se usa para cerrar RT con esa
@@ -6664,13 +6877,22 @@ function renderLegajoHistory(legajo) {
 function _renderHistoryWithRemote(legajo, localHist, remoteHist) {
   const container = document.getElementById("legajoHistoryContent");
 
-  // Combinar sin duplicados (por ID):
+  // Combinar sin duplicados:
   // - remoteHist son definitivos (ya en server)
-  // - localHist se agregan si su ID no está en remoteHist
-  const remoteIds = new Set(remoteHist.map(r => r.id));
+  // - localHist se agregan si no están ya en remoteHist
+  // v19.02: el `id` de la fila remota es el UUID de la base, mientras que el del item
+  // local es el `client_id`. Comparar esos dos NUNCA daba match, así que un evento ya
+  // sincronizado podía salir DOS veces en el resumen (una por cada fuente). Se dedupe
+  // contra `client_id` —la misma clave que genera el celular— y se deja el `id` como red
+  // de seguridad para los items viejos que se hayan guardado con el uuid.
+  const remoteIds = new Set();
+  for (const r of remoteHist) {
+    if (r.id) remoteIds.add(String(r.id));
+    if (r.clientId) remoteIds.add(String(r.clientId));
+  }
   const combined = [
     ...remoteHist,
-    ...localHist.filter(l => !remoteIds.has(l.id))
+    ...localHist.filter(l => !remoteIds.has(String(l.id)))
   ];
 
   if (!combined.length) {
@@ -6682,17 +6904,33 @@ function _renderHistoryWithRemote(legajo, localHist, remoteHist) {
   // Orden defensivo: más reciente arriba, más viejo abajo.
   combined.sort((a, b) => (b.ts || b.createdAt || 0) - (a.ts || a.createdAt || 0));
   container.className = "history-list";
-  container.innerHTML = combined.map(h => {
+  // v19.02: un renglón por tarea (el cierre se come su apertura).
+  // v19.10: y el detalle del picking va agrupado por tanda (247 tarjetas → 9).
+  const filas = _histColapsarPares(_histAgruparPkc(combined));
+  // El orden se rearma: el grupo de PKC se mueve al ts de su último artículo.
+  filas.sort((a, b) => (b.ts || b.createdAt || 0) - (a.ts || a.createdAt || 0));
+  container.innerHTML = filas.map(h => {
     const arrived = h.createdAt || h.sentAt;
     const showDato = h.opcion !== "FJ" && h.texto;
+    /* v19.02 — el cierre muestra "Desde HH:MM:SS hasta HH:MM:SS (dur)"; la apertura
+       todavía abierta avisa que lo está, en vez de parecer un evento suelto. */
+    const linea = h._desde
+      ? `Desde: <b>${escapeHtml(formatTimeAr(h._desde))}</b> hasta <b>${escapeHtml(formatTimeAr(h._hasta))}</b>` +
+        (h._durMs ? ` (${escapeHtml(formatDur(h._durMs))})` : "")
+      : (h._abierto
+          ? `Desde: <b>${escapeHtml(formatTimeAr(h.ts))}</b> — <b style="color:#b45309;">sin cerrar</b>`
+          : (h.ts ? `Fecha: ${escapeHtml(formatDateTime(h.ts))}` : ""));
+    const cuerpo = h._pkcItems
+      ? _histPkcHtml(h)
+      : `<div class="line2">
+          ${showDato ? `Dato: <b>${escapeHtml(h.texto)}</b><br>` : ""}
+          ${linea}
+          ${arrived && !h._desde && !h._abierto ? `<br>Llegó al server: ${escapeHtml(formatDateTime(arrived))}` : ""}
+        </div>`;
     return `
       <div class="history-item">
         <div class="line1">${escapeHtml(h.opcion)} — ${escapeHtml(h.descripcion)}${statusBadge(h.status)}</div>
-        <div class="line2">
-          ${showDato ? `Dato: <b>${escapeHtml(h.texto)}</b><br>` : ""}
-          ${h.ts ? `Fecha: ${escapeHtml(formatDateTime(h.ts))}` : ""}
-          ${arrived ? `<br>Llegó al server: ${escapeHtml(formatDateTime(arrived))}` : ""}
-        </div>
+        ${cuerpo}
       </div>
     `;
   }).join("");
@@ -6710,7 +6948,7 @@ async function _fetchAndRenderHistory(legajo, localHist) {
     const endOfDay = new Date(year, month - 1, day, 23, 59, 59);
 
     const { data, error } = await sb.from("Registros_Produccion_Virgilio")
-      .select("id,legajo,opcion,descripcion,texto,ts_inicio,ts_cliente,created_at")
+      .select("id,client_id,legajo,opcion,descripcion,texto,ts_inicio,ts_cliente,created_at")
       .eq("legajo", String(legajo))
       .gte("created_at", startOfDay.toISOString())
       .lte("created_at", endOfDay.toISOString());
@@ -6718,10 +6956,15 @@ async function _fetchAndRenderHistory(legajo, localHist) {
     if (!error && data) {
       remoteHist = data.map(r => ({
         id: r.id,
+        clientId: r.client_id || null,   // v19.02: para deduplicar contra el historial local
         legajo: r.legajo,
         opcion: r.opcion,
         descripcion: r.descripcion,
         texto: r.texto,
+        // v19.02: `ts_inicio` se traía en el select y se descartaba al mapear, así que el
+        // front nunca sabía qué fila era un CIERRE. Sin esto no se puede colapsar el par
+        // apertura/cierre en un solo renglón.
+        ts_inicio_iso: r.ts_inicio || null,
         ts: r.ts_cliente ? new Date(r.ts_cliente).getTime() : 0,
         createdAt: r.created_at ? new Date(r.created_at).getTime() : 0,
         status: "sent"  // ya llegó al server
@@ -6868,24 +7111,44 @@ function openHistoryModal() {
   } else {
     // Orden defensivo dentro de cada día: más reciente arriba.
     previas.forEach(d => d.items.sort((a, b) => (b.ts || 0) - (a.ts || 0)));
-    content.innerHTML = previas.map(d => `
+    content.innerHTML = previas.map(d => {
+      // v19.02: mismo renglón único que el Resumen de hoy.
+      // v19.10: y el picking agrupado por tanda. Acá los PKC casi nunca aparecen —
+      // `pkSendDetail` no escribe en el historial LOCAL, que es lo único que lee este
+      // modal— pero si alguno llega, no inunda el día. Sin botón de detalle a propósito:
+      // el CSS y los id del desplegable son del Resumen (`.history-item`), y repetir esos
+      // id en las dos vistas los haría chocar.
+      const items = _histColapsarPares(_histAgruparPkc(d.items));
+      items.sort((a, b) => (b.ts || 0) - (a.ts || 0));
+      return `
       <div class="hist-day-block">
-        <div class="hist-day-title">${escapeHtml(formatDayLong(d.fecha))} (${d.items.length})</div>
-        ${d.items.map(it => {
+        <div class="hist-day-title">${escapeHtml(formatDayLong(d.fecha))} (${items.length})</div>
+        ${items.map(it => {
           const arrived = it.createdAt || it.sentAt;
           // FJ: ocultar el "Dato" (JSON técnico), mostrar la entrada igual.
           const showDato = it.opcion !== "FJ" && it.texto;
+          const linea = it._pkcItems
+            ? `Tanda <b>${escapeHtml(it._pkcTanda)}</b> · <b>${it._pkcItems.length}</b> artículo(s)` +
+              (it._pkcFaltan ? ` · ${it._pkcFaltan} con faltante` : "") +
+              (it._pkcDesde && it._pkcHasta > it._pkcDesde
+                ? ` — ${escapeHtml(formatTimeAr(it._pkcDesde))} a ${escapeHtml(formatTimeAr(it._pkcHasta))}` : "")
+            : (it._desde
+              ? `Desde ${escapeHtml(formatTimeAr(it._desde))} hasta ${escapeHtml(formatTimeAr(it._hasta))}` +
+                (it._durMs ? ` (${escapeHtml(formatDur(it._durMs))})` : "")
+              : (it._abierto
+                  ? `Desde ${escapeHtml(formatTimeAr(it.ts))} — sin cerrar`
+                  : (it.ts ? escapeHtml(formatDateTime(it.ts)) : "")));
           return `
             <div class="hist-day-item">
               <b>${escapeHtml(it.opcion)}</b> — ${escapeHtml(it.descripcion)}${statusBadge(it.status)}
               ${showDato ? ` — <i>${escapeHtml(it.texto)}</i>` : ""}
-              ${it.ts ? `<br><span style="color:#666;font-size:12px;">${escapeHtml(formatDateTime(it.ts))}</span>` : ""}
-              ${arrived ? `<br><span style="color:#666;font-size:12px;">Llegó al server: ${escapeHtml(formatDateTime(arrived))}</span>` : ""}
+              ${linea ? `<br><span style="color:#666;font-size:12px;">${linea}</span>` : ""}
+              ${arrived && !it._desde && !it._abierto ? `<br><span style="color:#666;font-size:12px;">Llegó al server: ${escapeHtml(formatDateTime(arrived))}</span>` : ""}
             </div>
           `;
         }).join("")}
       </div>
-    `).join("");
+    `;}).join("");
   }
   document.getElementById("histModal").classList.add("show");
 }
@@ -9227,7 +9490,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v18.91";
+const APP_VERSION = "v19.15";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -9901,6 +10164,51 @@ async function send() {
       }
     }
   }
+  /* v19.07 — LA FASE YA ESTÁ CERRADA EN EL SERVIDOR: no la cerremos de nuevo.
+     Caso real (problema 348): el armado E09A de Franco quedó trabado, sistemas lo cerró a
+     mano por SQL el 09/09 (`client_id = cierre_manual_e09a_20260909`) y el celular —que no
+     se enteró— lo volvió a cerrar el 10/09 con el MISMO `ts_inicio`. Quedaron dos TAP del
+     mismo trabajo: 20,8 h + 45,7 h.
+     Los guards que ya había miran otras cosas: `_tapCerradoSesion` vive en memoria (se
+     vacía con cualquier recarga) y `_compTandaYaArmada` pregunta por las Entregas del
+     asistente «Completar». Ninguno mira lo único que un cierre manual SÍ deja: el evento
+     TP/TAP en el servidor. Y el picking (TP) no tenía ningún guard.
+     Un cierre manual en la base no puede limpiar el `localStorage` del operario, y
+     `tandaChipSeguir` re-siembra `st.armado` desde el AP que sigue en el servidor, así que
+     el guard tiene que estar del lado del celular. Va ANTES de pedir la ubicación: no
+     tiene sentido preguntarle dónde dejó una tanda que ya está cerrada.
+     Falla ABIERTO a propósito: sin red `getActivityStatus` devuelve el caché o vacío y el
+     cierre sale igual — perder un cierre es peor que duplicarlo. */
+  if (opcion === "TP" || opcion === "TAP") {
+    const _t = String(texto || "").trim().toUpperCase();
+    if (_t) {
+      let _yaCerrada = false;
+      try {
+        const _act = await getActivityStatus(true);
+        _yaCerrada = (opcion === "TP")
+          ? !!(_act && _act.pickingDone && _act.pickingDone.has(_t))
+          : !!(_act && _act.armadoDone  && _act.armadoDone.has(_t));
+      } catch (_e) { _yaCerrada = false; }
+      if (_yaCerrada) {
+        try {
+          const _stc = getLegajoState(legajoStr);
+          if (opcion === "TP") _stc.picking = { active: false, value: "", ts_inicio: null };
+          else                 _stc.armado  = { active: false, value: "", ts_inicio: null };
+          if (_stc.continuar) delete _stc.continuar[opcion === "TP" ? "Picking" : "Armado"];
+          setLegajoState(legajoStr, _stc);
+        } catch (_e) { /* no-op */ }
+        try {
+          alert("⚠ " + (opcion === "TP" ? "El picking" : "El armado") + " de la tanda " + _t +
+                " YA figura terminado en el sistema.\n\n" +
+                "No se registró de nuevo (si no, quedaría contado dos veces).\n" +
+                "Te saqué la tarea de la pantalla. Si creés que es un error, avisá a sistemas.");
+        } catch (_e) {}
+        try { renderLegajoHistory(legajoStr); updateCoreButtonsState(); renderPendingSuggestion(); } catch (_e) {}
+        return;
+      }
+    }
+  }
+
   // v5.86: al TERMINAR ARMADO preguntar EN QUÉ UBICACIÓN queda cada NP de la tanda.
   // Se emiten eventos AUB (más abajo). Cancelar (null) → aborta el TAP; "Omitir" ({})
   // → sigue el TAP sin registrar ubicaciones.
@@ -25997,7 +26305,8 @@ async function insAnular() {
   } catch (_e) { /* no-op */ }
 
   try { opDraftClear(legajo); } catch (_e) {}   // el borrador ya no vale
-  closeIns();                                    // cierra el modal y el toggle RI/EI
+  closeIns(true);                                // cierra el modal y el toggle RI/EI, SIN
+                                                 // emitir cierre: la apertura ya se borró
   try {
     renderLegajoHistory(legajo);
     updateCoreButtonsState();
@@ -26009,7 +26318,41 @@ async function insAnular() {
     : "✕ " + qué.charAt(0).toUpperCase() + qué.slice(1) + " de insumos anulada.");
 }
 function insAskClose() { opAskClose(insHasProgress(), "INS", _ins && _ins.legajo, (_ins && _ins.mode === "EI" ? "Entrega de insumos" : "Recepción de insumos"), _ins, closeIns); }
-function closeIns() {
+/* v19.02 — EMITIR el cierre de RI/EI al terminar la recepción/entrega (pedido de Luis,
+   16/09: "que se cierre cuando terminan de recepcionar/entregar").
+   `closeIns` bajaba el flag local con `toggleStartOrEnd`, que sólo toca el localStorage:
+   el evento de CIERRE nunca salía al servidor. Medido del 07/09 al 16/09: 15 aperturas de
+   EI con 2 cierres y 8 de RI con 1 — 20 toggles abiertos, algunos del 08/09 todavía sin
+   cerrar, así que la duración de insumos no se podía medir. Los pocos cierres que sí
+   existen son los casos en que el operario volvió a apretar el BOTÓN (ese camino pasa por
+   `send()`, que sí emite). El autocierre de las 17:00 tampoco los salvaba: corre en el
+   cambio de día y sólo si el flag local sobrevivió.
+   `texto` = total cargado en la sesión, igual que RT cierra con las cajas del día.
+   Problema 347. */
+function insEmitCierre(legajo, mode, tsInicioIso, total) {
+  const nowMs = Date.now();
+  const descr = desc[mode] || "";
+  const payload = {
+    legajo:        String(legajo || ""),
+    opcion:        mode,
+    descripcion:   descr,
+    texto:         String(total > 0 ? total : ""),
+    ts:            nowMs,
+    id:            nowMs.toString(36) + "_inscl_" + Math.random().toString(36).slice(2, 8),
+    ts_inicio_iso: tsInicioIso || null
+  };
+  try {
+    pushHistoryForLegajo(payload.legajo, {
+      ts: nowMs, opcion: mode, descripcion: descr, texto: payload.texto,
+      id: payload.id, status: "queued", ts_inicio_iso: payload.ts_inicio_iso
+    });
+  } catch (_e) { /* no-op */ }
+  try { _enqueueReportRaw(payload); } catch (_e) { /* no-op */ }
+  try { updatePendingIndicator(); } catch (_e) {}
+}
+/* `noEmit` = true sólo cuando la sesión se ANULA: `insAnular` ya borró la apertura del
+   server, así que mandar un cierre ahí dejaría un cierre huérfano. */
+function closeIns(noEmit) {
   const ov = document.getElementById("insModal"); if (ov) ov.classList.remove("show");
   // v5.02: al cerrar el modal, CERRAR el toggle RI/EI. Así cada recepción/entrega de
   // insumos vuelve a abrir el buscador desde cero. Antes el toggle quedaba activo tras
@@ -26017,7 +26360,19 @@ function closeIns() {
   // y el dispatch de send() ya no abría el modal → "deja subir una sola vez" (reportado
   // por Marianela). Mismo patrón de cierre que CC/RR/CR. Bonus: no queda RI "activo"
   // bloqueando EP/TP, ni aparece el input "Indicar Cantidad" suelto.
-  try { if (_ins && _ins.legajo && _ins.mode) { const st = getLegajoState(_ins.legajo); if (st && st.toggles && st.toggles[_ins.mode]) toggleStartOrEnd(_ins.legajo, _ins.mode); } } catch (_e) {}
+  try {
+    if (_ins && _ins.legajo && _ins.mode) {
+      const leg = String(_ins.legajo), mode = _ins.mode;
+      const st = getLegajoState(leg);
+      const cur = st && st.toggles ? st.toggles[mode] : null;
+      if (cur) {
+        const iniIso = (typeof cur === "string") ? cur : null;
+        const total = (_ins.items || []).reduce(function (a, it) { return a + (Number(it && it.qty) || 0); }, 0);
+        toggleStartOrEnd(leg, mode);                            // baja el flag local
+        if (!noEmit) insEmitCierre(leg, mode, iniIso, total);   // …y AVISA al server
+      }
+    }
+  } catch (_e) { /* no-op */ }
   _ins = null;
 }
 
@@ -30145,6 +30500,166 @@ async function showTandaMessages(tandaCode, kind) {
   }
 }
 
+/* Click en el nombre del panel "En este momento" → línea de tiempo de lo que hizo
+   HOY ese operario. Cada tarea con duración = un evento de CIERRE (ts_inicio no nulo:
+   arranque; ts_cliente: fin) — TP=pickeó, TAP=armó, y los toggles (baño, comida, guardó,
+   carga, control/recepción de remitos, etc.). Lo que está ABIERTO ahora (EP/AP o un toggle
+   sin cerrar) se muestra "en curso" hasta el reloj. Reusa #tandaModal. Solo lectura. */
+var _DIA_ACT_LABELS = {
+  TP:  { ic: "🛒", vb: "Pickeó" },        TAP: { ic: "🔨", vb: "Armó" },
+  MG:  { ic: "📥", tx: "Guardó" },        RI:  { ic: "📥", tx: "Recibió insumos" },
+  EI:  { ic: "📤", tx: "Entregó insumos" }, CR: { ic: "📋", tx: "Controló remitos" },
+  RR:  { ic: "🚚", tx: "Recepción de remitos" }, CC: { ic: "🚛", tx: "Cargó camión" },
+  RT:  { ic: "🏭", tx: "Recibió mercadería" }, AT: { ic: "🔔", tx: "Atendió timbre" },
+  PB:  { ic: "🚽", tx: "Baño" },          Limp:{ ic: "🧹", tx: "Limpieza" },
+  PC:  { ic: "🍽", tx: "Comida" },        Perm:{ ic: "🚪", tx: "Permiso de salida" },
+  CT:  { ic: "🔢", tx: "Conteo" },        LT:  { ic: "⏱", tx: "Tiempo muerto" },
+  CP:  { ic: "🔢", tx: "Conteo parcial" }
+};
+async function showOperarioDia(legajo) {
+  const leg = String(legajo == null ? "" : legajo).trim();
+  if (!leg) return;
+  const nom = _empleadosNombres.get(leg) || "";
+  const m = document.getElementById("tandaModal");
+  if (!m) return;
+  m.querySelector(".tanda-modal-title").textContent = "Hoy — " + (nom || ("Legajo " + leg));
+  m.querySelector(".tanda-modal-body").innerHTML = `<div class="history-empty">Cargando…</div>`;
+  try { const _f = document.querySelector("#tandaModal .tanda-modal-foot"); if (_f) _f.innerHTML = ""; } catch (_e) {}
+  m.classList.add("show");
+  const fmtDur = function (ms) {
+    const mn = Math.round(ms / 60000);
+    if (!(mn >= 0)) return "";
+    return mn >= 60 ? (Math.floor(mn / 60) + "h" + String(mn % 60).padStart(2, "0")) : (mn + "m");
+  };
+  const hhmm = function (ms) {
+    return new Date(ms).toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit", timeZone: "America/Argentina/Buenos_Aires" });
+  };
+  const ddmm = function (ms) {
+    return new Date(ms).toLocaleDateString("es-AR", { day: "2-digit", month: "2-digit", timeZone: "America/Argentina/Buenos_Aires" });
+  };
+  // Duración REAL de cada fila: una tarea cerrada descuenta noches/finde/feriados (igual que el
+  // "Rendimiento del día"); una en curso corre hasta ahora en horario laboral; un hueco es crudo.
+  const taskMs = function (r2) {
+    if (r2.gap) return Math.max(0, r2.endMs - r2.startMs);
+    if (r2.ongoing) return (typeof businessDurSinceMs === "function") ? businessDurSinceMs(r2.startMs, leg) : Math.max(0, r2.endMs - r2.startMs);
+    return businessDurBetweenMs(leg, r2.startMs, r2.endMs);
+  };
+  try {
+    const dayKey = isoToDayKey(Date.now());
+    const dayStartIso = new Date(`${dayKey}T00:00:00-03:00`).toISOString();
+    const dayEndIso   = new Date(`${dayKey}T23:59:59-03:00`).toISOString();
+    const url = SUPABASE_TABLE_ENDPOINT +
+      "?legajo=eq." + encodeURIComponent(leg) +
+      "&ts_cliente=gte." + encodeURIComponent(dayStartIso) +
+      "&ts_cliente=lte." + encodeURIComponent(dayEndIso) +
+      "&order=ts_cliente.asc&limit=5000" +
+      "&select=opcion,texto,ts_cliente,ts_inicio";
+    const r = await fetch(url, { headers: { "apikey": SUPABASE_KEY, "Authorization": "Bearer " + SUPABASE_KEY } });
+    if (!r.ok) throw new Error("HTTP " + r.status);
+    const data = await r.json();
+
+    const rows = [];   // { startMs, endMs, ic, label, ongoing }
+    // 1) Tareas CERRADAS (ts_inicio no nulo) → una fila cada una, con arranque y fin reales.
+    for (const e of data) {
+      if (!e.ts_inicio) continue;
+      const op = String(e.opcion || "").trim();
+      const tanda = String(e.texto || "").trim().toUpperCase();
+      const info = _DIA_ACT_LABELS[op] || {};
+      const label = info.vb ? (info.vb + (tanda ? " " + tanda : "")) : (info.tx || (op + (tanda ? " " + tanda : "")));
+      const startMs = new Date(e.ts_inicio).getTime();
+      const endMs   = new Date(e.ts_cliente).getTime();
+      rows.push({ startMs, endMs, ic: info.ic || "•", label });
+    }
+    // 2) Lo que quedó ABIERTO ahora (misma lógica que el panel "En este momento").
+    let pick = null, pickTs = 0, arm = null, armTs = 0; const togOpen = {};
+    for (const e of data) {
+      const op = String(e.opcion || "").trim();
+      const tanda = String(e.texto || "").trim().toUpperCase();
+      const ts = new Date(e.ts_cliente).getTime();
+      if (op === "EP") { pick = tanda; pickTs = ts; }
+      else if (op === "TP") { if (!tanda || pick === tanda) pick = null; }
+      else if (op === "AP") { arm = tanda; armTs = ts; }
+      else if (op === "TAP") { if (!tanda || arm === tanda) arm = null; }
+      else if (_MON_ACT_TOGGLES[op]) { if (!e.ts_inicio) { togOpen[op] = ts; } else { delete togOpen[op]; } }
+    }
+    const nowMs = Date.now();
+    if (pick) rows.push({ startMs: pickTs, endMs: nowMs, ic: "🛒", label: "Pickeando " + pick, ongoing: true });
+    if (arm)  rows.push({ startMs: armTs,  endMs: nowMs, ic: "🔨", label: "Armando " + arm, ongoing: true });
+    for (const op in togOpen) {
+      const info = _DIA_ACT_LABELS[op] || _MON_ACT_INFO[op] || {};
+      rows.push({ startMs: togOpen[op], endMs: nowMs, ic: info.ic || "•", label: (info.tx || op) + " (en curso)", ongoing: true });
+    }
+
+    if (!rows.length) {
+      const picks = data.filter(e => e.opcion === "PKC").length;
+      m.querySelector(".tanda-modal-body").innerHTML =
+        `<div class="history-empty">Sin tareas con duración registradas hoy${picks ? ` (${picks} ítems pickeados sueltos)` : ""}.</div>`;
+      return;
+    }
+
+    rows.sort((a, b) => a.startMs - b.startMs);
+    const totalMs = rows.reduce((s, r2) => s + taskMs(r2), 0);
+    const nPick = data.filter(e => e.opcion === "TP").length;
+    const nArm  = data.filter(e => e.opcion === "TAP").length;
+    const cortesMs = rows.filter(r2 => ["Baño", "Comida", "Permiso de salida"].some(t => r2.label.indexOf(t) === 0)).reduce((s, r2) => s + taskMs(r2), 0);
+
+    // Huecos SIN TAREA entre tarea y tarea. Se calculan sobre la UNIÓN de los
+    // intervalos (no next.start − prev.end), así un armado que quedó abierto y se
+    // solapa con otras tareas —E23A cruzando la noche— no inventa huecos falsos.
+    // Umbral 1 min para no ensuciar con micro-cortes. No cuenta como "tiempo en tareas".
+    const GAP_MIN_MS = 60 * 1000;
+    const gaps = [];
+    const ivs = rows.map(r2 => [r2.startMs, Math.max(r2.startMs, r2.endMs)]).sort((a, b) => a[0] - b[0]);
+    if (ivs.length) {
+      let curEnd = ivs[0][1];
+      for (let i = 1; i < ivs.length; i++) {
+        if (ivs[i][0] > curEnd) {
+          if (ivs[i][0] - curEnd >= GAP_MIN_MS) gaps.push({ startMs: curEnd, endMs: ivs[i][0], gap: true });
+          curEnd = ivs[i][1];
+        } else if (ivs[i][1] > curEnd) { curEnd = ivs[i][1]; }
+      }
+    }
+    const sinTareaMs = gaps.reduce((s, g) => s + (g.endMs - g.startMs), 0);
+    const display = rows.concat(gaps).sort((a, b) => a.startMs - b.startMs);
+
+    const rowsHtml = display.map(r2 => {
+      const dur = fmtDur(taskMs(r2));
+      // Si el arranque es de otro día (armado que cruzó la noche), se muestra la fecha para
+      // que no parezca de hoy. La duración ya viene descontada por taskMs.
+      const cruza = isoToDayKey(r2.startMs) !== dayKey;
+      const ini = (cruza ? ddmm(r2.startMs) + " " : "") + hhmm(r2.startMs);
+      const rango = ini + " – " + (r2.ongoing ? "ahora" : hhmm(r2.endMs));
+      if (r2.gap) {
+        return `
+        <tr style="color:#94a3b8;font-style:italic;background:#f8fafc">
+          <td class="center" style="white-space:nowrap">${escapeHtml(rango)}</td>
+          <td>⏸ Sin tarea</td>
+          <td class="center" style="font-weight:800;white-space:nowrap">${escapeHtml(dur)}</td>
+        </tr>`;
+      }
+      return `
+        <tr${r2.ongoing ? ' style="background:#f0f9ff"' : ""}>
+          <td class="center" style="white-space:nowrap">${escapeHtml(rango)}</td>
+          <td>${r2.ic} ${escapeHtml(r2.label)}${r2.ongoing ? ' <span style="color:#0284c7;font-weight:700">⏳</span>' : ""}</td>
+          <td class="center" style="font-weight:800;white-space:nowrap">${escapeHtml(dur)}</td>
+        </tr>`;
+    }).join("");
+
+    m.querySelector(".tanda-modal-body").innerHTML = `
+      <div style="font-size:14px; color:#475569; margin-bottom:10px;">
+        <b>${rows.length}</b> tarea(s) · ${nPick} tanda(s) pickeada(s) · ${nArm} armada(s)
+        · tiempo en tareas <b>${escapeHtml(fmtDur(totalMs))}</b>${cortesMs ? ` · cortes ${escapeHtml(fmtDur(cortesMs))}` : ""}${sinTareaMs ? ` · sin tarea ${escapeHtml(fmtDur(sinTareaMs))}` : ""}
+      </div>
+      <table class="tanda-modal-table">
+        <thead><tr><th class="center">Horario</th><th>Qué hizo</th><th class="center">Duración</th></tr></thead>
+        <tbody>${rowsHtml}</tbody>
+      </table>`;
+  } catch (e) {
+    m.querySelector(".tanda-modal-body").innerHTML =
+      `<div class="history-empty" style="color:#dc2626">Error cargando el día: ${escapeHtml(e.message || String(e))}</div>`;
+  }
+}
+
 /* Muestra modal con el desglose de rendimiento por operario para un día.
    Por cada legajo: m3 picqueados, m3 armados, total m3, horas trabajadas
    (1ra → última acción) y promedio m3/h. Reusa el tandaModal. */
@@ -30549,16 +31064,66 @@ async function fetchMonitorDayStats(dayKey, sheetMapArg) {
   //              + (ingreso real día cierre [o horaEntrada] → ts_cliente).
   //     "Ingreso real": fichada del día del cierre si existe (refleja llegadas
   //     tarde); si no, la horaEntrada programada del operario.
+  /* v19.07 — TIEMPO MUERTO NETEADO del picking y del armado (regla de Luis, 16/09:
+     "si arma 1 h, va al baño 10 min y arma 50 min más, debería ser 1 h 50 de armado y
+     10 de baño, cada uno contado individual").
+     Hasta la v19.02 NO estaba implementado en ninguna parte: `DEAD_TIME_CODES` sólo servía
+     para BLOQUEAR botones, `computeClosureDur` partía el cruce de día pero no descontaba
+     nada, y `vista_productividad_diaria` mergeaba los solapes del MISMO código pero tampoco
+     restaba. Medido del 07/09 al 16/09: 9,4 h de PC/PB/AT/Limp/CT corriendo adentro de un
+     TP/TAP abierto (6,5 h en 21 armados, 2,9 h en 12 pickings). Como `PC` está en
+     ALWAYS_ALLOWED_CODES, la media hora de comida entraba como armado todos los días.
+     Los intervalos se MERGEAN antes de restar: si dos tiempos muertos se pisan entre sí
+     (pasa: PC adentro de un Limp), restar los dos por separado descontaría de más.
+     ⚠ Sólo se puede netear lo que está en `events`, o sea el día que se fetcheó. En un
+     cierre que cruza el día, el tiempo muerto del día de APERTURA no está en la consulta y
+     no se resta (son 10 casos en toda la historia y el tramo de apertura ya se corta al fin
+     de jornada). Problema 349. */
+  const deadByLeg = new Map();
+  for (const ev of events) {
+    if (!ev.ts_inicio || !DEAD_TIME_CODES.includes(ev.opcion)) continue;
+    const s = new Date(ev.ts_inicio).getTime(), e = new Date(ev.ts_cliente).getTime();
+    if (!isFinite(s) || !isFinite(e) || e <= s) continue;
+    if (e - s > 8 * 3600 * 1000) continue;            // mismo guard que el resto: > 8 h es basura
+    const k = String(ev.legajo || "").trim();
+    if (!k) continue;
+    if (!deadByLeg.has(k)) deadByLeg.set(k, []);
+    deadByLeg.get(k).push({ s: s, e: e });
+  }
+  for (const [k, arr] of deadByLeg) {                  // merge de solapes, por legajo
+    arr.sort((a, b) => a.s - b.s);
+    const out = [];
+    for (const it of arr) {
+      const last = out[out.length - 1];
+      if (last && it.s <= last.e) last.e = Math.max(last.e, it.e);
+      else out.push({ s: it.s, e: it.e });
+    }
+    deadByLeg.set(k, out);
+  }
+  /* Cuánto tiempo muerto del legajo cae dentro del tramo [s, e]. */
+  const deadOverlapMs = (leg, s, e) => {
+    const arr = deadByLeg.get(String(leg)) || [];
+    let tot = 0;
+    for (const d of arr) {
+      const ov = Math.min(e, d.e) - Math.max(s, d.s);
+      if (ov > 0) tot += ov;
+    }
+    return tot;
+  };
   const computeClosureDur = (leg, tsInicioMs, tsClienteMs, outBreakdown) => {
     const dayOpen = isoToDayKey(tsInicioMs);
     const dayClose = isoToDayKey(tsClienteMs);
     if (dayOpen === dayClose) {
-      const dur = Math.max(0, tsClienteMs - tsInicioMs);
+      const bruto = Math.max(0, tsClienteMs - tsInicioMs);
+      const muerto = Math.min(bruto, deadOverlapMs(leg, tsInicioMs, tsClienteMs));
+      const dur = bruto - muerto;
       if (outBreakdown) {
         outBreakdown.sameDay = true;
         outBreakdown.openPortion = dur;
         outBreakdown.closePortion = 0;
         outBreakdown.intermediatePortion = 0;
+        outBreakdown.brutoMs = bruto;       // lo que duró de punta a punta
+        outBreakdown.muertoMs = muerto;     // lo que se descontó (baño, comida, timbre…)
       }
       return dur;
     }
@@ -30609,17 +31174,25 @@ async function fetchMonitorDayStats(dayKey, sheetMapArg) {
       intermediateDays++;
     }
     const intermediatePortion = intermediateDays * workH * 3600 * 1000;
+    /* v19.07 — netear el tiempo muerto de los DOS tramos visibles. El del día de apertura
+       sólo aparece si ese día también está en `events` (no lo está cuando se mira un día
+       suelto); los días intermedios se cuentan como jornada completa y no tienen detalle. */
+    const muertoOpen  = Math.min(openPortion,  deadOverlapMs(leg, tsInicioMs, Math.min(fjOpenMs, tsClienteMs)));
+    const muertoClose = Math.min(closePortion, deadOverlapMs(leg, closeStartMs, tsClienteMs));
+    const muerto = muertoOpen + muertoClose;
     if (outBreakdown) {
       outBreakdown.sameDay = false;
-      outBreakdown.openPortion = openPortion;        // ts_inicio → FJ del día apertura
-      outBreakdown.closePortion = closePortion;       // ingreso día cierre → ts_cliente
+      outBreakdown.openPortion = openPortion - muertoOpen;    // ts_inicio → FJ del día apertura
+      outBreakdown.closePortion = closePortion - muertoClose;  // ingreso día cierre → ts_cliente
       outBreakdown.intermediatePortion = intermediatePortion;
       outBreakdown.fjOpenMs = fjOpenMs;
       outBreakdown.closeStartMs = closeStartMs;
       outBreakdown.fjReal = sameDayAsPrev;            // true si usamos FJ real (no horaSalida)
       outBreakdown.ingresoReal = sameDayIngreso;      // true si usamos ingreso real (no horaEntrada)
+      outBreakdown.brutoMs = openPortion + intermediatePortion + closePortion;
+      outBreakdown.muertoMs = muerto;
     }
-    return openPortion + intermediatePortion + closePortion;
+    return Math.max(0, openPortion + intermediatePortion + closePortion - muerto);
   };
   const perLegajo = new Map();
   for (const ev of events) {
@@ -33819,11 +34392,14 @@ async function pppTandaFecha(id, tanda) {
 }
 /* v14.04 — el mismo movimiento, pero recibiendo la fecha ya elegida (del pop-up de días o del
    campo de fecha viejo). Devuelve true si movió. */
-async function pppTandaMover(tanda, iso) {
+async function pppTandaMover(tanda, iso, opts) {
   const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(iso || "")); if (!m) return false;
   const f = m[3] + "/" + m[2] + "/" + m[1];
   const t = String(tanda).toUpperCase();
-  const filas = (_pppParsed.prog || []).filter(function (p) { return String(p.tanda || "").toUpperCase() === t; });
+  // v19.11: las filas pueden venir del árbol (botón de la tabla y de Pedidos atrasados). Si no vienen,
+  // salen de donde salían: la lista de la vista clásica.
+  const filas = (opts && opts.filas && opts.filas.length) ? opts.filas
+    : (_pppParsed.prog || []).filter(function (p) { return String(p.tanda || "").toUpperCase() === t; });
   const avisos = [];
   try {
     const cam = await aprRpc("gv_ppp_web_camion_nuevo", {
@@ -33834,24 +34410,42 @@ async function pppTandaMover(tanda, iso) {
     if (nuevos.length) avisos.push("El " + f + " ya salen " + Number(nuevos[0].camiones_dia) + " camión(es) y esto abre otro: " +
       nuevos.map(function (c) { return c.camion; }).join(", ") + ". ¿Seguro que vas a usar un segundo camión?");
   } catch (_e) {}
+  // v19.11 — una tanda YA EMPEZADA (pickeada, armada o facturada) ahora SÍ se puede mover: es justo el
+  // caso de Pedidos atrasados, donde el 100 % de las tandas está armada y lo único que falta es el
+  // camión. El contenido no cambia, así que no hay que volver a pickear; pero se avisa y se confirma.
+  let forzar = !!(opts && opts.empezada);
+  if (forzar) avisos.push("La tanda ya está pickeada o armada. Cambiarle el día NO deshace nada: el "
+    + "contenido queda igual y no hay que volver a pickear.");
   if (!confirm("¿Mover TODA la tanda " + t + " al " + f + "?" +
       (filas.length ? "\n\n" + filas.length + " pedido(s)." : "") +
       (avisos.length ? "\n\n⚠ " + avisos.join("\n⚠ ") : "") +
       "\n\nLo ven todos, también el operario en su celular.")) return false;
-  pppSetStatus("Moviendo la tanda " + t + "…", true);
-  try {
-    const r = await aprRpc("gv_ppp_tanda_mover", { p_tanda: t, p_fecha: iso, p_por: (typeof _faltMiLegajo === "function" ? _faltMiLegajo() : "") || null });
-    const x = (r && r[0]) || {};
-    pppSetStatus("✓ Tanda " + t + " movida al " + f + ": " + (x.movidas || 0) + " pedido(s) · " + (x.m3 || 0) + " m³." + (x.aviso ? "  ⚠ " + x.aviso : ""), true);
-    if (x.aviso) { try { alert("Se movió, pero ojo:\n\n" + x.aviso); } catch (_e) {} }
-    await pppLoadProgFromSupabase();
-    return true;
-  } catch (e) {
-    const msg = (e && e.message) ? e.message : String(e);
-    pppSetStatus("⚠ No se pudo mover: " + msg, false);
-    try { alert("No se pudo mover la tanda " + t + ":\n\n" + msg); } catch (_e) {}
-    return false;
+  for (let intento = 0; intento < 2; intento++) {
+    pppSetStatus("Moviendo la tanda " + t + "…", true);
+    try {
+      const r = await aprRpc("gv_ppp_tanda_mover", { p_tanda: t, p_fecha: iso,
+        p_por: (typeof _faltMiLegajo === "function" ? _faltMiLegajo() : "") || null, p_forzar: forzar });
+      const x = (r && r[0]) || {};
+      pppSetStatus("✓ Tanda " + t + " movida al " + f + ": " + (x.movidas || 0) + " pedido(s) · " + (x.m3 || 0) + " m³." + (x.aviso ? "  ⚠ " + x.aviso : ""), true);
+      if (x.aviso) { try { alert("Se movió, pero ojo:\n\n" + x.aviso); } catch (_e) {} }
+      await pppLoadProgFromSupabase();
+      if (opts && opts.desdeArbol) pgaRecargar();     // el árbol y los atrasados tienen su propio caché
+      return true;
+    } catch (e) {
+      const msg = (e && e.message) ? e.message : String(e);
+      // El backend manda `TANDA_EMPEZADA:` cuando la tanda tiene eventos y no se pidió forzar. Pasa si el
+      // front no lo había detectado (la vista clásica no sabe el estado): se pregunta y se reintenta.
+      if (intento === 0 && msg.indexOf("TANDA_EMPEZADA") >= 0) {
+        if (confirm(msg.replace(/^.*TANDA_EMPEZADA:\s*/, "") + "\n\n¿La movemos igual al " + f + "?")) { forzar = true; continue; }
+        pppSetStatus("No se movió la tanda " + t + ".", false);
+        return false;
+      }
+      pppSetStatus("⚠ No se pudo mover: " + msg, false);
+      try { alert("No se pudo mover la tanda " + t + ":\n\n" + msg); } catch (_e) {}
+      return false;
+    }
   }
+  return false;
 }
 /* =====================================================================================
    v14.04 — POP-UP para mover una tanda de día (dueño 07/09: "cuando toco el botón, que me abra un
@@ -33953,7 +34547,9 @@ async function pppMovElegir(iso) {
   if (!_pppMov) return;
   if (_pppMov.reprogNps) return pppReprogElegir(iso);   // v14.36: pop-up reutilizado para reprogramar un ISIS
   const t = _pppMov.tanda;
-  const ok = await pppTandaMover(t, iso);
+  // v19.11: si el pop-up lo abrió la tabla, las filas y el estado vienen del árbol.
+  const ok = await pppTandaMover(t, iso, { filas: _pppMov.arbolFilas, empezada: _pppMov.empezada,
+                                           desdeArbol: _pppMov.desdeArbol });
   if (ok) pppMovCerrar(); else pppMovCargar();
 }
 /* v15.55 — Los que NO salieron: volver a A Programar (web) o cancelar (web e ISIS). Todo en el backend:
@@ -34159,6 +34755,58 @@ function pppReprogAbrir(np) {
   o.classList.add("show");
   pppMovCargar();
 }
+/* v19.11 — el overlay del pop-up de días estaba copiado en `pppReprogAbrir` y en `pppMoverAbrir`; ahora
+   lo arma esta única función, que usan también el botón nuevo de la tabla. */
+function pppMovOverlay(titulo) {
+  _pppMovCss();
+  let o = document.getElementById("pppMovOverlay");
+  if (!o) {
+    o = document.createElement("div"); o.id = "pppMovOverlay";
+    o.innerHTML = '<div class="mv-card"><div class="mv-head"><div class="mv-title" id="pppMovTitle"></div>' +
+      '<button class="mv-close" onclick="pppMovCerrar()">Cerrar</button></div><div class="mv-body" id="pppMovBody"></div></div>';
+    o.addEventListener("click", function (e) { if (e.target === o) pppMovCerrar(); });
+    document.body.appendChild(o);
+  }
+  document.getElementById("pppMovTitle").textContent = titulo;
+  o.classList.add("show");
+  return o;
+}
+/* v19.11 (Thomas) — «CAMBIAR DE DÍA» DESDE LA TABLA (árbol día → tanda → NP), y lo mismo desde el
+   submódulo de Pedidos atrasados. Reusa el pop-up de días y `pppTandaMover`, pero los datos de la tanda
+   (cuántos pedidos, cuántos m³, qué día tiene hoy) salen del ÁRBOL — `_pgaRows` / `_patrRows` — y no de
+   `_pppParsed.prog`, que es lo que mira la vista clásica y sólo tiene de hoy en adelante: con eso, en
+   atrasados el pop-up habría dicho "0 pedidos · 0 m³" y el aviso del segundo camión nunca se calculaba. */
+function _pgaTandaDe(key) {
+  const k = String(key || ""), i = k.indexOf("|");
+  if (i < 0) return null;
+  const dia = k.slice(0, i), tanda = k.slice(i + 1), filas = [], vistas = {};
+  for (const r of (_pgaRows || []).concat(_patrRows || [])) {
+    if (String(r.tanda || "—") !== tanda) continue;
+    if (String(r.fecha == null ? "" : r.fecha).replace(/-/g, "") !== dia) continue;
+    const np = String(r.np || "");
+    if (vistas[np]) continue;                 // la misma NP puede venir en las dos listas
+    vistas[np] = 1; filas.push(r);
+  }
+  return { dia: dia, tanda: tanda, filas: filas };
+}
+function pgaTandaMoverAbrir(key) {
+  const t = _pgaTandaDe(key);
+  if (!t || !t.tanda || t.tanda === "—") {
+    pppSetStatus("Esos pedidos no tienen código de tanda: no se les puede cambiar el día desde acá.", false);
+    return;
+  }
+  let m3 = 0, empezada = false;
+  for (const r of t.filas) {
+    m3 += Number(r.m3) || 0;
+    if (r.estado && r.estado !== "pendiente") empezada = true;   // pickeada, armada o facturada
+  }
+  _pppMov = { tanda: t.tanda, np: t.filas.length, m3: m3, dias: 21, cal: [], cargando: true,
+              actual: _pppKeyISO(t.dia), actualTxt: _pgaDiaTxt(t.dia),
+              arbolFilas: t.filas, empezada: empezada, desdeArbol: true };
+  pppMovOverlay("📅 Cambiar de día — tanda " + t.tanda);
+  pppMovCargar();
+}
+window.pgaTandaMoverAbrir = pgaTandaMoverAbrir;
 async function pppReprogElegir(iso) {
   if (!_pppMov || !_pppMov.reprogNps) return;
   const nps = _pppMov.reprogNps.slice();
@@ -34190,17 +34838,7 @@ function pppMoverAbrir(tanda) {
   _pppMov = { tanda: t, np: filas.length, m3: m3, dias: 21, cal: [], cargando: true,
               actual: mm ? (mm[3] + "-" + mm[2] + "-" + mm[1]) : String(fe).slice(0, 10),
               actualTxt: mm ? (mm[1] + "/" + mm[2]) : "" };
-  _pppMovCss();
-  let o = document.getElementById("pppMovOverlay");
-  if (!o) {
-    o = document.createElement("div"); o.id = "pppMovOverlay";
-    o.innerHTML = '<div class="mv-card"><div class="mv-head"><div class="mv-title" id="pppMovTitle"></div>' +
-      '<button class="mv-close" onclick="pppMovCerrar()">Cerrar</button></div><div class="mv-body" id="pppMovBody"></div></div>';
-    o.addEventListener("click", function (e) { if (e.target === o) pppMovCerrar(); });
-    document.body.appendChild(o);
-  }
-  document.getElementById("pppMovTitle").textContent = "📅 Mover la tanda " + t + " a otro día";
-  o.classList.add("show");
+  pppMovOverlay("📅 Mover la tanda " + t + " a otro día");
   pppMovCargar();
 }
 function pppTandaAProgramar(tanda) {
@@ -36809,9 +37447,20 @@ function _pgaCuerpoHtml(dias, opts) {
     for (const t of d.tandasArr) {
       const tb = !!_pgaOpenT[t.key] || !!_pppSearch, te = _pgaEstadoGrupo(t.est, t.nps);
       h += '<tr class="pga-t e-' + te + '" onclick="pgaAbrirTanda(\'' + escapeHtml(t.key) + '\')">' +
-        '<td><span class="pga-chev">' + (tb ? "▾" : "▸") + '</span>' + escapeHtml(t.tanda) +
+        '<td><div class="pga-trow"><span class="pga-ninfo">' +
+          '<span class="pga-chev">' + (tb ? "▾" : "▸") + '</span>' + escapeHtml(t.tanda) +
           '<span class="pga-pill e-' + te + '">' + PGA_EST_TXT[te] + '</span>' +
-          '<span class="pga-sub">' + escapeHtml(_pgaZonaTanda(t)) + '</span></td>' +
+          '<span class="pga-sub">' + escapeHtml(_pgaZonaTanda(t)) + '</span></span>' +
+          // v19.11 (Thomas): "agregá un botón a cada tanda que sea Cambiar de día y que te permita
+          // asignarla en un día diferente". Va en la fila de la TANDA y acá lo heredan las dos tablas
+          // — Programación de entregas y Pedidos atrasados—, que comparten este cuerpo.
+          ((window.__isSupervisor || !PPP_READONLY)
+            ? '<span class="pga-acc"><button class="pga-acc-b dia" title="Cambiar de día — mueve TODA la tanda '
+              + escapeHtml(t.tanda) + ' a otra fecha. Se abre el calendario con los m³ que ya tiene cada día y el cupo.'
+              + ' El contenido no cambia: no hay que volver a pickear. Se guarda en el servidor, lo ven todos."'
+              + ' onclick="event.stopPropagation();pgaTandaMoverAbrir(\'' + escapeHtml(t.key) + '\')">📅 Cambiar de día</button></span>'
+            : '') +
+        '</div></td>' +
         '<td>' + _pppFmtM3(t.m3) + '</td><td></td><td>' + t.nps + '</td>' +
         _pgaPctFila(t.est, t.nps) + '</tr>';
       if (!tb) continue;
@@ -38981,16 +39630,34 @@ async function pppFetchAlertasWeb() {
   } catch (_e) { return []; }
 }
 
-function pppAlertBadgeUpdate(alertas) {
+/* v19.14 (Luis: "badge rojo con número arriba a la izquierda del ícono de la PPP como con los
+   demás"). El badge existía desde la v8.82 pero NO se veía nunca, por dos motivos: contaba sólo
+   `Alertas_Pedidos_Web` pendientes —que hoy son 0— y el botón no era `position:relative`, así
+   que el badge se posicionaba contra otro ancestro. Ahora usa `supSetBadge`, el mismo que
+   Facturación, Stock y los demás: número rojo si hay algo, ✓ verde si no.
+
+   Lo que cuenta sale de `gv_ppp_avisos`, una fila por tipo de aviso con su conteo. Se agrupa por
+   COSA, no por fila: un camión mezclado cuenta 1 aunque tenga 4 pedidos adentro. */
+let _pppAvisos = [];
+async function pppFetchAvisos() {
+  try {
+    const r = await fetch(SUPABASE_URL + "/rest/v1/gv_ppp_avisos?select=tipo,titulo,n&n=gt.0&order=orden",
+      { headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY }, cache: "no-store" });
+    if (!r.ok) return [];
+    const rows = await r.json();
+    return Array.isArray(rows) ? rows : [];
+  } catch (_e) { return []; }
+}
+function pppAlertBadgeUpdate() {
   const badge = document.getElementById("pppAlertBadge");
   if (!badge) return;
-  if (alertas.length > 0) {
-    badge.textContent = alertas.length;
-    badge.classList.add("on");
-  } else {
-    badge.textContent = "";
-    badge.classList.remove("on");
-  }
+  const total = _pppAvisos.reduce(function (a, x) { return a + (parseInt(x.n, 10) || 0); }, 0);
+  if (typeof supSetBadge === "function") supSetBadge("pppAlertBadge", total);
+  // el título desglosa qué son, así no hay que entrar para saberlo
+  badge.title = total
+    ? _pppAvisos.map(function (x) { return x.n + " · " + (x.titulo || x.tipo); }).join("\n")
+    : "Sin avisos en la PPP";
+  badge.style.left = "2px"; badge.style.right = "auto";   // supSetBadge repone className, no el style
 }
 
 function pppAlertBannerRender(alertas) {
@@ -39037,7 +39704,9 @@ async function pppAlertRevisar(id, estado, btn) {
     _pppAlertasWeb = _pppAlertasWeb.filter(function (a) { return a.id !== id; });
     var card = document.querySelector('.ppp-alert-card[data-alert-id="' + id + '"]');
     if (card) card.remove();
-    pppAlertBadgeUpdate(_pppAlertasWeb);
+    // v19.14: el badge ya no cuenta sólo estas alertas, así que se relee el resumen entero
+    _pppAvisos = await pppFetchAvisos();
+    pppAlertBadgeUpdate();
     if (!_pppAlertasWeb.length) {
       var banner = document.getElementById("pppAlertBanner");
       if (banner) banner.classList.remove("on");
@@ -39067,7 +39736,8 @@ async function pppRefreshAlertasWeb() {
       } catch (_e) {}
     }
   }
-  pppAlertBadgeUpdate(_pppAlertasWeb);
+  _pppAvisos = await pppFetchAvisos();   // v19.14: el badge cuenta TODOS los avisos, no sólo éstas
+  pppAlertBadgeUpdate();
   pppAlertBannerRender(_pppAlertasWeb);
 }
 
@@ -41773,6 +42443,11 @@ let _apr = {
   cuarContacto: null, cuarContactoLoading: false,
   // v18.01 — CUARENTENA: cuántos comentarios tiene cada pedido retenido (empresa:order_id → n)
   cuarComN: null, cuarComNLoading: false,
+  // v18.95 — CLIENTES NUEVOS: monto por lista de cada pedido (empresa:order_id → {valor, valorIva})
+  cliValor: null, cliValorLoading: false,
+  // v19.05 — CLIENTES NUEVOS: primer contacto (Speech 1) y teléfono del cliente
+  cliContacto: null, cliContactoLoading: false,   // empresa:order_id → ISO del primer contacto
+  cliWpp: null, cliWppLoading: false,              // empresa:cod → teléfono del cliente
   // v18.04 — log de pedidos ANULADOS (undefined = todavía no se pidió)
   anulados: undefined, anuladosLoading: false, anuModal: false
 };
@@ -41986,7 +42661,7 @@ async function aprTraerPedidos(e) {
   // los pedidos de Tierra del Fuego, que viven en la página de LK y son de Chef.
   const desde = new Date(Date.now() - PWEB_VENTANA_DIAS * 86400000).toISOString().slice(0, 10);
   const rLk = await fetch(PWEB_LK_URL + "/rest/v1/v_pedidos_web_np"
-    + "?select=empresa,order_id,np_idx,cod,razon_social,fecha_recep,direccion,lineas,cajas,items,m3,m3_parcial,localidad,zona_expreso,nombre_expreso,direccion_expreso,enviado_a_compras,condicion_pago_code,diferido,no_antes_de,isis_empresa,cod_isis"
+    + "?select=empresa,order_id,np_idx,cod,razon_social,fecha_recep,direccion,lineas,cajas,items,m3,m3_parcial,localidad,zona_expreso,nombre_expreso,direccion_expreso,enviado_a_compras,condicion_pago_code,diferido,no_antes_de,isis_empresa,cod_isis,fecha_entrega_pactada,hora_entrega_pactada,fecha_entrega_txt"
     + "&fecha_recep=gte." + desde + "&order=order_id.asc,np_idx.asc&limit=5000",
     { headers: { apikey: PWEB_LK_ANON, Authorization: "Bearer " + tok } });
   if (!rLk.ok) throw new Error("LK respondió " + rLk.status);
@@ -42067,6 +42742,11 @@ async function aprTraerPedidos(e) {
       fecha_recep: n.fecha_recep || "", zona: pwebZonaSugerida(n),
       localidad: pwebLocalidad(n), direccion: pwebDireccion(n),
       cond: (n.condicion_pago_code == null ? "" : String(n.condicion_pago_code)),  // v14.85: condición de pago (2% web condicional)
+      // v19.10 — EL TURNO QUE PIDE LA OC. Es del PEDIDO, no del bloque: todos los bloques
+      // de un pedido comparten la misma fecha y hora de entrega pactada.
+      turno_fecha: (n.fecha_entrega_pactada ? String(n.fecha_entrega_pactada).slice(0, 10) : ""),
+      turno_hora: n.hora_entrega_pactada || "",
+      turno_txt: n.fecha_entrega_txt || "",
       m3: 0, m3_parcial: false, lineas: 0, cajas: 0, bloques: []
     });
     const p = by.get(k);
@@ -42179,9 +42859,14 @@ async function aprCargarSalida() {
     /* v18.77 — van también `empresa` y `order_id`: sin eso el backend no puede saber si el
        pedido está RETENIDO (sacado de una tanda a propósito) y el chip decía "se arma solo"
        de un pedido que el automático no va a tocar nunca. */
+    /* v19.12 — va TAMBIÉN el `cod`: si el cliente es un SÚPER del padrón (`GV_Supers`)
+       el armado automático no lo toca, y eso no se puede deducir de la zona (Matiz SA /
+       Gigot entrega en Constitución, o sea "Zona 1 - CABA Sur"). Sin el cod el chip decía
+       "🤖 se arma solo → mar 23/9" de un pedido que nadie iba a programar. */
     const filas = peds.map(function (p) {
       return { zona: p.zona || "", m3: Number(p.m3) || 0,
-               empresa: p.empresa || "", order_id: p.order_id };
+               empresa: p.empresa || "", order_id: p.order_id,
+               cod: String(p.cod || "").trim() };
     });
     const rows = await aprRpc("gv_ppp_web_dia_salida", { p_filas: filas }) || [];
     const m = {};
@@ -42242,7 +42927,12 @@ function aprSalidaChip(p) {
     // está, no más en A Programar"): todo lo que tiene día lo programa el automático en la próxima
     // corrida (cada 15 min), también las zonas manuales con camión. El chip ya no pide "programalo".
     const f = DOW[d.getDay()] + " " + d.getDate() + "/" + (d.getMonth() + 1);
-    const txt = s.motivo === "camion" ? "🚚 va al camión del " + f + " · en minutos" : "🤖 se arma solo → " + f + " · en minutos";
+    /* v19.13 — `super_auto`: el súper con la excepción del dueño (GV_Clientes_Reglas) se arma
+       solo, y el día es el turno de su OC. Se distingue del resto porque para un súper "se
+       arma solo" es la excepción, no la regla: el de al lado sigue siendo "a mano". */
+    const txt = s.motivo === "camion" ? "🚚 va al camión del " + f + " · en minutos"
+              : s.motivo === "super_auto" ? "🛒 súper: se arma solo → " + f
+              : "🤖 se arma solo → " + f + " · en minutos";
     return '<span class="apr-chip apr-chip-sal" title="' + escapeHtml(recep + s.detalle + " Lo programa el automático en la próxima corrida (cada 15 min).") + '">' + txt + '</span>';
   }
   const lab = s.motivo === "retira" ? "🏭 retira" : (s.motivo === "super" ? "🛒 súper: a mano" : (s.motivo === "sin_zona" ? "❓ sin zona" : "⏳ sin camión previsto"));
@@ -42763,7 +43453,7 @@ function aprRender() {
   // existe mientras haya pedidos tildados. Al programar se vacía la selección, así que vuelve solo al paso 1.
   if (_apr.paso === 2 && !aprSelKeys().length) { _apr.paso = 1; _apr.diaSel = null; }
   if (_apr.paso === 2) h += '<div class="apr-wrap apr-2col">' + aprPaso2Html() + '</div>';
-  else h += '<div class="apr-wrap' + (conTandas ? '' : ' apr-2col') + '">' + aprColPedidos() + aprColCuarentena() + (conTandas ? aprColTandas() : '') + '</div>';
+  else h += '<div class="apr-wrap' + (conTandas ? '' : ' apr-2col') + '">' + aprColPedidos() + aprColCuarentena() + clinNuevosHtml() + (conTandas ? aprColTandas() : '') + '</div>';
   h += aprFootHtml();
 
   // Cada acción re-dibuja las tres columnas. Sin esto, sacar un pedido de una
@@ -42876,16 +43566,38 @@ function aprHorTxt(h) {
   const f = h.fecha ? String(h.fecha).slice(8, 10) + "/" + String(h.fecha).slice(5, 7) : "";
   return [f, h.franja].filter(Boolean).join(" ");
 }
+/* v19.10 (Thomas, 2026-09-16, sobre el pedido de Inc Sociedad Anonima: *"deberíamos tener el dato
+   de la fecha y hora de entrega (el turno que figura en el pedido). ¿Por qué no aparece?"*)
+   EL TURNO YA VIENE EN LA OC Y NO SE MOSTRABA EN NINGUNA PANTALLA. Una OC de súper que entra por
+   Krikos trae el turno pactado ("29/09/2026 14:00"); LK lo guarda en
+   `orders.sheets_payload.fecha_entrega` y desde la v19.10 lo publica parseado en
+   `v_pedidos_web_np` (`fecha_entrega_pactada` + `hora_entrega_pactada`; el parseo vive en el
+   backend: `gv_fe_pactada_fecha` / `gv_fe_pactada_hora`). El único reloj de la tarjeta era el
+   horario que se carga A MANO, así que el INC mostraba "----" teniendo el turno en el pedido.
+   El horario cargado a mano MANDA sobre el de la OC: si un supervisor lo pisó es porque
+   recoordinó con el súper. */
+function aprTurnoOc(p) {
+  if (!p) return null;
+  const f = String(p.turno_fecha || "").slice(0, 10);
+  const hh = String(p.turno_hora || "").trim();
+  if (!f && !hh) return null;
+  return { fecha: f, franja: hh, origen: "oc", txt: String(p.turno_txt || "").trim() };
+}
 function aprHorBadge(p) {
-  if (!aprPideHorario(p)) return "";
-  const h = aprHorDe(p), vacio = !h || (!h.fecha && !h.franja);
+  const oc = aprTurnoOc(p);
+  if (!aprPideHorario(p) && !oc) return "";
+  const hm = aprHorDe(p);
+  const h = (hm && (hm.fecha || hm.franja)) ? hm : (oc || hm);
+  const vacio = !h || (!h.fecha && !h.franja);
+  const esOc = !!(h && h.origen === "oc");
   const k = aprHorKey(pppEmpDePedido(p), aprHorClave(p));
-  return '<span class="apr-hor' + (vacio ? " vacio" : "") + (h && h.origen === "cliente" ? " cli" : "") + '"' +
+  return '<span class="apr-hor' + (vacio ? " vacio" : "") + (h && h.origen === "cliente" ? " cli" : "") + (esOc ? " oc" : "") + '"' +
     ' onclick="event.stopPropagation();aprHorAbrir(\'' + escapeHtml(k) + '\')"' +
-    ' title="' + (vacio ? "Este cliente coordina horario y todavía no hay ninguno cargado. Tocá para ponerlo."
+    ' title="' + escapeHtml(vacio ? "Este cliente coordina horario y todavía no hay ninguno cargado. Tocá para ponerlo."
+                        : (esOc ? ("Turno que pide la OC del pedido" + (h.txt ? " (" + h.txt + ")" : "") + ". Tocá para cambiarlo a mano.")
                         : (h.origen === "cliente" ? "Día y franja que eligió el cliente en la página. Tocá para cambiarlos."
-                                                  : "Día y franja cargados a mano. Tocá para cambiarlos.")) + '">' +
-    "🕑 " + escapeHtml(aprHorTxt(h)) + "</span>";
+                                                  : "Día y franja cargados a mano. Tocá para cambiarlos."))) + '">' +
+    (esOc ? "📅 " : "🕑 ") + escapeHtml(aprHorTxt(h)) + "</span>";
 }
 
 /* El pop-up: día + franja. Vaciar los dos y guardar = sacar el horario. */
@@ -42897,8 +43609,13 @@ function aprHorPedidoDe(k) {
 }
 function aprHorAbrir(k) {
   const p = aprHorPedidoDe(k), h = (_aprHor || {})[k] || {};
+  /* v19.11 — si nadie cargó horario a mano pero el PEDIDO trae el turno de la OC, el pop-up
+     abre con ese turno puesto: confirmar es un clic y recién ahí el dato queda guardado y
+     viaja a Programación y a la hoja de ruta (que leen `gv_pedido_horario`, no la OC). */
+  const oc = (!h.fecha && !h.franja) ? aprTurnoOc(p) : null;
   _aprHorEdit = { k: k, cli: (p && (p.razon_social || p.cod)) || "", np: p ? aprPedLabel(p) : "",
-                  fecha: h.fecha || "", franja: h.franja || "", origen: h.origen || "", err: "", saving: false };
+                  fecha: h.fecha || (oc && oc.fecha) || "", franja: h.franja || (oc && oc.franja) || "",
+                  origen: h.origen || "", err: "", saving: false };
   aprHorRender();
 }
 function aprHorCerrar() { _aprHorEdit = null; aprHorRender(); }
@@ -43114,7 +43831,10 @@ function aprColPedidos() {
         (p.np_total > 1 ? '<span class="apr-chip apr-chip-np">sale en ' + p.np_total + ' NP</span>' : '') +
       '</div>' +
       // v14.88: si el pedido fue LIBERADO de cuarentena, mantiene el aviso acá
-      (aprTieneCuarMotivos(p) ? '<div class="cuar-liberado-nota">🚧 Liberado de cuarentena</div>' + aprCuarBadgesHtml(p) : '');
+      (aprTieneCuarMotivos(p) ? '<div class="cuar-liberado-nota">🚧 Liberado de cuarentena</div>' + aprCuarBadgesHtml(p) +
+        // v19.05 (Luis): un cliente nuevo aprobado tiene que programarse pronto
+        (aprCuarentenaMotivos(p).indexOf("cliente_nuevo") >= 0 ? '<div class="clin-7dias">🗓️ Programar dentro de los próximos 7 días</div>' : '')
+        : '');
     // v17.57 (Luis): el detalle es el MISMO bloque que en Cuarentena — códigos, cajas y unidades.
     // v18.04 (Luis: *"agregá un botón para anular pedidos, visto debajo del detalle de la NP
     // cuando se expande"*) — va acá adentro y no en la tarjeta cerrada a propósito: anular es
@@ -43148,6 +43868,20 @@ function aprTieneCuarMotivos(p) {
   return !!(p && (p.cuarentena || p.cuarentena_motivo ||
     (Array.isArray(p.cuarentena_motivos) && p.cuarentena_motivos.length)));
 }
+/* v18.95 (Luis, 2026-09-16) — el corte entre los DOS submódulos: un pedido cuyo ÚNICO motivo es
+   "cliente_nuevo" va a la pestaña "🆕 Clientes nuevos"; si además tiene deuda, suspensión o
+   excede su límite, sigue en la columna Cuarentena (ej. Zhang Qikuan). El candado que impide
+   programarlos (aprEnCuarentena) NO cambia: los dos submódulos siguen retenidos igual. */
+function aprSoloClienteNuevo(p) {
+  const ms = aprCuarentenaMotivos(p);
+  return ms.length === 1 && ms[0] === "cliente_nuevo";
+}
+/* v18.100 (Luis): Cuarentena y Clientes nuevos son submódulos COLAPSABLES dentro de A Programar.
+   El estado se guarda por navegador (localStorage) para que quede como el operario lo dejó. */
+function aprColapsado(key) { try { return localStorage.getItem(key) === "1"; } catch (_e) { return false; } }
+function aprSetColapsado(key, v) { try { localStorage.setItem(key, v ? "1" : "0"); } catch (_e) {} }
+function aprCuarColapsar() { aprSetColapsado("vir_cuar_colapsado", !aprColapsado("vir_cuar_colapsado")); aprRender(); }
+function aprCliColapsar() { aprSetColapsado("vir_cli_colapsado", !aprColapsado("vir_cli_colapsado")); aprRender(); }
 /* 3 badges separados (suspendido/deuda/límite), sólo los que aplican. */
 /* v15.04 (dueño: "que diga ahí el motivo de la cuarentena: ej deuda $10000") — los
    montos vienen del backend en `cuarentena_detalle` (deuda, exceso, limite, estado).
@@ -43226,18 +43960,24 @@ function aprCuarentenaMotivo(p) {
   return ms.length ? ms.map(function (m) { return T[m] || m; }).join(" ") : "Pedido retenido en cuarentena.";
 }
 function aprColCuarentena() {
-  let lista = (_apr.pedidos || []).filter(aprEnCuarentena);
+  // v18.95 (Luis): los pedidos cuyo único motivo es "cliente nuevo" se mudaron a la pestaña
+  // "🆕 Clientes nuevos"; acá quedan deuda / suspendido / excede crédito (y el cliente nuevo
+  // que ADEMÁS tiene alguno de ésos, como Zhang Qikuan).
+  let lista = (_apr.pedidos || []).filter(function (p) { return aprEnCuarentena(p) && !aprSoloClienteNuevo(p); });
   // v14.90: cargar (una vez) los contactos WhatsApp de los retenidos reales
   if (_apr.cuarContacto === null && !_apr.cuarContactoLoading && lista.some(function (p) { return !p._demo; })) cuarContactoCargar();
   // v18.01: cuántos comentarios tiene cada retenido (una sola vuelta de red para toda la lista)
   if (_apr.cuarComN === null && !_apr.cuarComNLoading && lista.some(function (p) { return !p._demo; })) cuarComLoteCargar();
   if (_apr.cuarDemo) lista = [cuarDemoPedido()].concat(lista);   // v14.84: pedido de ejemplo
   const _cuarCargando = !_apr.listo || aprCargandoAlgo();   // v15.54: mismo criterio que la columna de pedidos
-  let h = '<div class="apr-col apr-col-cuar' + (_cuarCargando ? ' apr-col-cargando' : '') + '">' +
-    '<div class="apr-col-t">🚧 Cuarentena <b>(' + (_cuarCargando ? '…' : lista.length) + ')</b>' +
-      '<span class="apr-cuar-help" title="Pedidos de clientes con deuda, suspendidos, que superan su límite de crédito o que son CLIENTES NUEVOS. No se programan (ni a mano ni por el automático): hay que liberarlos primero.">ⓘ</span>' +
-    '</div>' +
-    cuarDemoRowHtml();   // v14.88: los 4 botones de importación se movieron a "Config. Cuarentena"
+  const _cuarCol = aprColapsado("vir_cuar_colapsado");   // v18.100 (Luis): submódulo colapsable
+  let h = '<div class="apr-col apr-col-cuar' + (_cuarCargando ? ' apr-col-cargando' : '') + (_cuarCol ? ' apr-col-colapsado' : '') + '">' +
+    '<div class="apr-col-t apr-col-t-clic" onclick="aprCuarColapsar()" title="' + (_cuarCol ? "Mostrar" : "Ocultar") + ' Cuarentena">' +
+      '<span class="apr-col-caret">' + (_cuarCol ? "▸" : "▾") + '</span> 🚧 Cuarentena <b>(' + (_cuarCargando ? '…' : lista.length) + ')</b>' +
+      '<span class="apr-cuar-help" title="Pedidos de clientes con deuda, suspendidos, que superan su límite de crédito. No se programan (ni a mano ni por el automático): hay que liberarlos primero.">ⓘ</span>' +
+    '</div>';
+  if (_cuarCol) return h + '</div>';   // colapsado: sólo el título con el contador
+  h += cuarDemoRowHtml();   // v14.88: los 4 botones de importación se movieron a "Config. Cuarentena"
   h += cuarYaProgHtml();   // v16.57 — aviso de los que YA tienen tanda (problema 14)
   if (!lista.length) {
     h += _cuarCargando
@@ -43560,6 +44300,251 @@ async function cuarContactoCargar() {
   _apr.cuarContactoLoading = false;
   if (_pppTab === "prog") aprRender();
 }
+
+/* ── CLIENTES NUEVOS (v18.95, Luis 2026-09-16) ───────────────────────────────
+   Submódulo hermano de Cuarentena. Misma marca (cuarentena_motivos), mismo candado
+   (aprEnCuarentena), pero SÓLO los pedidos cuyo único motivo es "cliente nuevo".
+   Tabla visual: pedido (con las NP que abriría) · fecha · m³ · cliente · zona ·
+   contacto · monto. El MONTO es el precio total por lista del pedido, valorizado en
+   el backend con gv_ppp_web_valor_items (misma función que usa el control de límite de
+   crédito), expuesto por gv_clientes_nuevos_valor_lote. Sólo web: un cliente nuevo que
+   entra por ISIS ya trae su NP y se valoriza aparte, así que ahí el monto queda en "—". */
+function clinNuevosValorNeed() { if (_apr.cliValor === null && !_apr.cliValorLoading) clinNuevosValorCargar(); }
+async function clinNuevosValorCargar() {
+  if (_apr.cliValorLoading) return;
+  const lista = (_apr.pedidos || []).filter(function (p) {
+    return !p._demo && !p._isis && aprEnCuarentena(p) && aprSoloClienteNuevo(p);
+  });
+  if (!lista.length) { _apr.cliValor = {}; return; }
+  _apr.cliValorLoading = true;
+  try {
+    const res = await aprRpc("gv_clientes_nuevos_valor_lote", {
+      p_pedidos: lista.map(function (p) {
+        return { order_id: String(p.order_id), empresa: p.empresa || "lk",
+                 cod: String(p.cod || "").trim(), cond: p.cond || "", items: cuarItemsDe(p) };
+      })
+    });
+    const m = {};
+    (res || []).forEach(function (r) { m[String(r.empresa) + ":" + String(r.order_id)] = { valor: Number(r.valor), valorIva: Number(r.valor_con_iva) }; });
+    _apr.cliValor = m;
+  } catch (_e) { _apr.cliValor = _apr.cliValor || {}; }
+  _apr.cliValorLoading = false;
+  if (_pppTab === "prog") aprRender();
+}
+/* ── v19.05 (Luis) — Clientes nuevos: primer contacto (timer), teléfono del cliente, Speech 1/2 ── */
+function clinContactoNeed() { if (_apr.cliContacto === null && !_apr.cliContactoLoading) clinContactoCargar(); }
+async function clinContactoCargar() {
+  if (_apr.cliContactoLoading) return;
+  const lista = (_apr.pedidos || []).filter(function (p) { return !p._demo && aprEnCuarentena(p) && aprSoloClienteNuevo(p); });
+  if (!lista.length) { _apr.cliContacto = {}; return; }
+  _apr.cliContactoLoading = true;
+  try {
+    const res = await aprRpc("gv_cliente_nuevo_contacto_lote", {
+      p_pedidos: lista.map(function (p) { return { empresa: p.empresa || "lk", order_id: String(p.order_id) }; })
+    });
+    const m = {};
+    (res || []).forEach(function (r) { m[String(r.empresa) + ":" + String(r.order_id)] = r.primer_contacto_at; });
+    _apr.cliContacto = m;
+  } catch (_e) { _apr.cliContacto = _apr.cliContacto || {}; }
+  _apr.cliContactoLoading = false;
+  if (_pppTab === "prog") aprRender();
+}
+function clinWppNeed() { if (_apr.cliWpp === null && !_apr.cliWppLoading) clinWppCargar(); }
+async function clinWppCargar() {
+  if (_apr.cliWppLoading) return;
+  const lista = (_apr.pedidos || []).filter(function (p) { return !p._demo && aprEnCuarentena(p) && aprSoloClienteNuevo(p); });
+  if (!lista.length) { _apr.cliWpp = {}; return; }
+  _apr.cliWppLoading = true;
+  try {
+    const res = await aprRpc("gv_cliente_nuevo_wpp_lote", {
+      p_pedidos: lista.map(function (p) { return { empresa: p.empresa || "lk", cod: String(p.cod || "").trim() }; })
+    });
+    const m = {};
+    (res || []).forEach(function (r) { m[String(r.empresa) + ":" + String(r.cod)] = r.telefono; });
+    _apr.cliWpp = m;
+  } catch (_e) { _apr.cliWpp = _apr.cliWpp || {}; }
+  _apr.cliWppLoading = false;
+  if (_pppTab === "prog") aprRender();
+}
+function clinPrimerContacto(p) {
+  if (p && p._demo) return "__demo__";
+  return (_apr.cliContacto || {})[aprKey(p.empresa, p.order_id)] || null;
+}
+function clinWppTel(p) {
+  if (p && p._demo) return null;
+  return (_apr.cliWpp || {})[String((p && p.empresa) || "lk") + ":" + String((p && p.cod) || "").trim()] || null;
+}
+/* elapsed corto: "N min" / "Nh Nmin" / "Nd Nh" */
+function clinFmtElapsed(sinceIso) {
+  const t = Date.parse(sinceIso); if (!isFinite(t)) return "";
+  let s = Math.max(0, Math.floor((Date.now() - t) / 1000));
+  const d = Math.floor(s / 86400); s -= d * 86400;
+  const h = Math.floor(s / 3600);  s -= h * 3600;
+  const m = Math.floor(s / 60);
+  if (d > 0) return d + "d " + h + "h";
+  if (h > 0) return h + "h " + m + "min";
+  return m + " min";
+}
+function clinTiempoHtml(p) {
+  if (p && p._demo) return '<span class="clin-tiempo" title="Ejemplo">2h 15min</span>';
+  const iso = clinPrimerContacto(p);
+  if (!iso) return '<span class="cuar-yp-sin" title="Todavía sin primer contacto — arranca al tocar «Speech 1»">—</span>';
+  return '<span class="clin-tiempo" data-since="' + escapeHtml(String(iso)) + '" title="Desde el primer contacto (Speech 1)">' + clinFmtElapsed(iso) + '</span>';
+}
+/* refresco del timer sin re-render pesado: cada 60 s actualiza sólo las celdas visibles */
+let _clinTick = null;
+function clinTickStart() {
+  if (_clinTick) return;
+  _clinTick = setInterval(function () {
+    try {
+      const nodos = document.querySelectorAll(".clin-tiempo[data-since]");
+      nodos.forEach(function (n) { n.textContent = clinFmtElapsed(n.getAttribute("data-since")); });
+    } catch (_e) {}
+  }, 60000);
+}
+function clinBrand(p) { return String((p && p.empresa) || "lk") === "chef" ? "Chef" : "Loekemeyer"; }
+function clinSpeechMsg1(p) {
+  const np = aprPedLabel(p || {});
+  const v = (_apr.cliValor || {})[aprKey(p.empresa, p.order_id)];
+  const iva = v && isFinite(v.valorIva) && v.valorIva > 0 ? v.valorIva : null;
+  const sena = iva != null ? Math.round(iva * 0.30) : null;
+  const plata = function (n) { return "$" + Number(n).toLocaleString("es-AR"); };
+  let m = "Hola, le escribimos de " + clinBrand(p) + " por su pedido " + np + ". ";
+  if (sena != null) m += "Para confirmarlo le pedimos una seña del 30%: " + plata(sena) + " (total con IVA " + plata(iva) + "). ";
+  else m += "Para confirmarlo le pedimos una seña del 30% del total del pedido. ";
+  m += "¿Nos confirma la transferencia? Muchas gracias.";
+  return m;
+}
+function clinSpeechMsg2(p) {
+  const np = aprPedLabel(p || {});
+  return "Hola, le escribimos de " + clinBrand(p) + " por su pedido " + np + ". " +
+    "¿Va a poder realizar el pago en las próximas 24 horas? De lo contrario, lamentablemente el pedido será dado de baja. Muchas gracias.";
+}
+function clinAbrirWa(p, msg) {
+  const tel = clinWppTel(p);
+  if (!tel) { _apr.msg = "No hay teléfono del cliente cargado para abrir WhatsApp."; _apr.msgErr = true; aprRender(); return false; }
+  const url = _avpWa(tel, msg);
+  try { window.open(url, "_blank", "noopener"); } catch (_e) { try { location.href = url; } catch (_e2) {} }
+  return true;
+}
+async function clinSpeech1(empresa, orderId) {
+  const p = (_apr.pedidosTodos || []).find(function (x) { return aprKey(x.empresa, x.order_id) === String(empresa) + ":" + String(orderId); });
+  if (!p) return;
+  // A) sellar el primer contacto (una sola vez) → arranca el timer
+  try {
+    const r = await aprRpc("gv_cliente_nuevo_contacto_marcar", { p_empresa: empresa, p_order_id: String(orderId), p_por: await aprQuien() });
+    const iso = (r && r.primer_contacto_at) || (Array.isArray(r) ? r[0] : r) || new Date().toISOString();
+    _apr.cliContacto = _apr.cliContacto || {};
+    _apr.cliContacto[aprKey(empresa, orderId)] = iso;
+  } catch (_e) { /* si el sello falla, igual abrimos el WhatsApp */ }
+  aprRender(); clinTickStart();
+  // B) abrir WhatsApp con la seña del 30%
+  clinAbrirWa(p, clinSpeechMsg1(p));
+}
+function clinSpeech2(empresa, orderId) {
+  const p = (_apr.pedidosTodos || []).find(function (x) { return aprKey(x.empresa, x.order_id) === String(empresa) + ":" + String(orderId); });
+  if (!p) return;
+  clinAbrirWa(p, clinSpeechMsg2(p));
+}
+function clinContactoBtns(p) {
+  if (p && p._demo) return '<button class="cuar-wpp cuar-wpp-cli" disabled title="En el ejemplo no se abre WhatsApp">💬 Speech 1 (ej.)</button>';
+  const emp = (p.empresa || "lk"), oid = escapeHtml(String(p.order_id));
+  const sinTel = !clinWppTel(p);
+  const t1 = sinTel ? "No hay teléfono del cliente — Speech 1 igual marca el primer contacto" : "Marca el primer contacto y abre WhatsApp pidiendo la seña del 30%";
+  const t2 = sinTel ? "No hay teléfono del cliente cargado" : "Abre WhatsApp preguntando si paga en 24 h";
+  return '<div class="clin-speech">' +
+    '<button class="cuar-wpp cuar-wpp-cli" onclick="clinSpeech1(\'' + emp + '\',\'' + oid + '\')" title="' + t1 + '">💬 Speech 1</button>' +
+    '<button class="cuar-wpp cuar-wpp-cli' + (sinTel ? ' cuar-wpp-off' : '') + '"' + (sinTel ? ' disabled' : '') +
+      ' onclick="clinSpeech2(\'' + emp + '\',\'' + oid + '\')" title="' + t2 + '">💬 Speech 2</button>' +
+    '</div>';
+}
+function clinAccionBtns(p) {
+  if (p && p._demo) return '<span class="cuar-yp-sin">—</span>';
+  const emp = (p.empresa || "lk"), oid = escapeHtml(String(p.order_id));
+  return '<div class="clin-accion">' +
+    '<button class="cuar-enviar" onclick="cuarLiberar(\'' + emp + '\',\'' + oid + '\')" title="Aprobar: pasa a «Pedidos a programar». Hay que programarlo en los próximos 7 días.">✅ Aprobar pedido</button>' +
+    '<button class="apr-anular apr-anular-chico" onclick="aprAnularAbrir(\'' + emp + '\',\'' + oid + '\')" title="Eliminar: lo saca de la PPP y queda registrado en el log de anulados.">🗑 Eliminar pedido</button>' +
+    '</div>';
+}
+function clinNuevosValorFmt(p) {
+  if (p && p._demo) return '<b title="Ejemplo — precio total por lista (neto, sin IVA)">' + cuarPlata(120480) + '</b>';
+  if (p && p._isis) return '<span class="cuar-yp-sin" title="El monto por lista se valoriza sobre los pedidos de la página; este entró por ISIS con NP propia">—</span>';
+  if (_apr.cliValor === null) return '<span class="cuar-yp-sin">…</span>';
+  const v = (_apr.cliValor || {})[aprKey(p.empresa, p.order_id)];
+  if (!v || !isFinite(v.valor) || v.valor <= 0)
+    return '<span class="cuar-yp-sin" title="Sin precio de lista para los artículos de este pedido">—</span>';
+  return '<b title="Precio total del pedido según lo pedido y la lista de precios (neto, sin IVA)">' + cuarPlata(v.valor) + '</b>';
+}
+function clinNuevosHtml() {
+  const cargando = !_apr.listo || aprCargandoAlgo();
+  let lista = (_apr.pedidos || []).filter(function (p) { return aprEnCuarentena(p) && aprSoloClienteNuevo(p); });
+  const realN = lista.length;   // el badge cuenta los reales, no el ejemplo
+  const _cliCol = aprColapsado("vir_cli_colapsado");   // v18.100 (Luis): submódulo colapsable
+  let h = '<div class="apr-col apr-col-cuar' + (cargando ? ' apr-col-cargando' : '') + (_cliCol ? ' apr-col-colapsado' : '') + '">' +
+    '<div class="apr-col-t apr-col-t-clic" onclick="aprCliColapsar()" title="' + (_cliCol ? "Mostrar" : "Ocultar") + ' Clientes nuevos">' +
+      '<span class="apr-col-caret">' + (_cliCol ? "▸" : "▾") + '</span> 🆕 Clientes nuevos <b>(' + (cargando ? '…' : realN) + ')</b>' +
+      '<span class="apr-cuar-help" title="Pedidos de CLIENTES NUEVOS (código alto y menos de 3 pedidos facturados en toda su historia). Si además tienen deuda, están suspendidos o superan su límite de crédito, NO caen acá: quedan en Cuarentena. No se programan solos: hay que liberarlos primero.">ⓘ</span>' +
+    '</div>';
+  if (_cliCol) return h + '</div>';   // colapsado: sólo el título con el contador
+  clinNuevosValorNeed();
+  clinContactoNeed();   // v19.05: timer "primer contacto"
+  clinWppNeed();        // v19.05: teléfono del cliente para los Speech
+  clinTickStart();      // v19.05: refresca los timers cada 60 s
+  if (_apr.cliDemo) lista = [clinDemoPedido()].concat(lista);   // v18.99: fila de ejemplo (como Cuarentena)
+  h += clinDemoRowHtml();
+  if (!lista.length) {
+    h += cargando
+      ? '<div class="apr-cargando apr-cargando-cuar"><span class="apr-cargando-ic">⏳</span><b>Todavía controlando…</b></div>'
+      : '<div class="apr-vacio">Sin pedidos de clientes nuevos. Acá caen los pedidos de <b>clientes nuevos</b> sin ningún otro problema; si tienen <b>deuda</b>, están <b>suspendidos</b> o <b>superan su límite</b>, quedan en <b>Cuarentena</b>. Tocá <b>👁 Ver ejemplo</b> para ver cómo se vería un cliente.</div>';
+    return h + '</div>';
+  }
+  h += '<div class="cuar-tblwrap"><table class="cuar-tbl"><thead><tr>' +
+    '<th>Pedido</th><th>Fecha</th><th class="cuar-td-m3">m³</th><th>Cliente</th><th>Zona</th>' +
+    '<th>1er contacto</th><th>Contacto</th><th class="cuar-td-m3">Monto</th><th>Acción</th>' +
+    '</tr></thead><tbody>';
+  for (const p of lista) {
+    const cid = "n" + p.empresa + p.order_id, cab = !!_apr.exp[cid];
+    const np = p._demo ? "web LK 9999" : aprPedLabel(p);
+    const nblo = Number(p.np_total) || ((p.bloques && p.bloques.length) || 1);
+    h += '<tr class="cuar-tr' + (p._demo ? ' cuar-tr-demo' : '') + (cab ? ' cuar-tr-open' : '') + '">' +
+      '<td class="cuar-td-np" onclick="aprToggle(\'' + cid + '\')" title="Ver qué pidió (códigos y cajas)">' +
+        '<span class="apr-card-chev">' + (cab ? "▾" : "▸") + '</span>' +
+        '<span class="cuar-card-np">' + escapeHtml(np) + '</span>' +
+        (p._demo ? '<span class="cuar-demo-tag">EJEMPLO</span>' : '') +
+        (nblo > 1 ? '<span class="cuar-demo-tag" title="Este pedido se parte en ' + nblo + ' NP">' + nblo + ' NP</span>' : '') +
+      '</td>' +
+      '<td class="cuar-td-fecha">' + cuarFechaPedidoHtml(p) + '</td>' +
+      '<td class="cuar-td-m3"><span class="cuar-card-m3">' + aprNum(p.m3) + ' m³</span></td>' +
+      '<td class="cuar-td-cli">' + cuarCodChip(p) + escapeHtml(p.razon_social || p.cod || ("#" + p.order_id)) + '</td>' +
+      '<td class="cuar-td-zona">📍 ' + escapeHtml(p.zona || "sin zona") + aprHorBadge(p) + '</td>' +
+      '<td class="clin-td-tiempo">' + clinTiempoHtml(p) + '</td>' +
+      '<td>' + clinContactoBtns(p) + '</td>' +
+      '<td class="cuar-td-m3">' + clinNuevosValorFmt(p) + '</td>' +
+      '<td>' + clinAccionBtns(p) + '</td>' +
+      '</tr>';
+    if (cab) h += '<tr class="cuar-tbl-det"><td colspan="9"><div class="apr-card-body">' + aprContenidoHtml(p) + '</div></td></tr>';
+  }
+  return h + '</tbody></table></div></div>';
+}
+/* v18.99 (Luis, 2026-09-16): fila de EJEMPLO para "Clientes nuevos", igual que el pedido de
+   prueba de Cuarentena. Un cliente nuevo puro (único motivo cliente_nuevo), con contenido para
+   que la flechita muestre algo y con monto de ejemplo. No es un pedido real. */
+function clinDemoPedido() {
+  const items = [{ art: "505", uni: 24, uxb: 12, cajas: 2 }, { art: "221", uni: 48, uxb: 12, cajas: 4 }];
+  let hoy = ""; try { hoy = new Date().toISOString().slice(0, 10); } catch (_e) {}
+  return { order_id: "EJEMPLO", empresa: "lk", cod: "4223", razon_social: "CLIENTE NUEVO DE EJEMPLO S.A.",
+           zona: "Zona 1 - CABA Sur", localidad: "Barracas", direccion: "Av. de Ejemplo 1234",
+           m3: 0.30, lineas: 2, cajas: 6, np_total: 1, fecha_recep: hoy,
+           bloques: [{ np_idx: 1, m3: 0.30, lineas: 2, cajas: 6, items: items }],
+           cuarentena_motivos: ["cliente_nuevo"], cuarentena_detalle: { nuevo_pedidos: 1 }, _demo: true };
+}
+function clinDemoRowHtml() {
+  return '<div class="cuar-demo-row">' +
+    '<span class="cuar-demo-hint">Ejemplo de cómo se ve un cliente nuevo. No es un pedido real.</span>' +
+    '<button class="cuar-demo-btn" onclick="clinDemoToggle()">' +
+    (_apr.cliDemo ? "✕ Quitar ejemplo" : "👁 Ver ejemplo") + '</button></div>';
+}
+function clinDemoToggle() { _apr.cliDemo = !_apr.cliDemo; pppRenderProg(); }
 /* v16.57 (problema 14) — "YA PROGRAMADOS con el cliente en cuarentena".
    La Cuarentena sólo mira lo que TODAVÍA NO tiene tanda: gv_cuarentena_marcar corre adentro del
    armado, sobre los pendientes. Si el reporte de deuda entra DESPUÉS de que el pedido ya recibió
@@ -44290,6 +45275,9 @@ async function cuarMarcarPedidos() {
   } catch (_e) { /* si falla, no marca; no rompe la pantalla */ }
   _apr.cuarContacto = null;   // v14.90: cambió el set de retenidos → recargar contactos WhatsApp
   _apr.cuarComN = null;       // v18.01: ídem el contador de comentarios de cada 📖
+  _apr.cliValor = null;       // v18.95: cambió el set → recargar el monto de los clientes nuevos
+  _apr.cliContacto = null;    // v19.05: ídem el timer de primer contacto
+  _apr.cliWpp = null;         // v19.05: ídem el teléfono del cliente
   if (_pppTab === "prog") aprRender();
 }
 /* Pedido de EJEMPLO para ver el sector sin datos reales (dueño: "poneme un pedido de prueba"). */
@@ -45215,6 +46203,41 @@ function businessDurSinceMs(startMs, legajo) {
   }
   return openPortion + intermediateDays * workH * 3600 * 1000 + closePortion;
 }
+/* v19.07 — igual que businessDurSinceMs pero con FIN explícito (para tareas YA cerradas):
+   descuenta noches, sábados, domingos y feriados entre arranque y cierre, con la hora
+   programada del operario (fallback 08-17). Un armado abierto de un día para el otro deja de
+   contar la noche. Mismo criterio que computeClosureDur del "Rendimiento del día", simplificado
+   (sin fichada real: usa la hora programada). Lo usa showOperarioDia. */
+function businessDurBetweenMs(legajo, startMs, endMs) {
+  if (!(endMs > startMs)) return 0;
+  const dayOpen = isoToDayKey(startMs), dayEnd = isoToDayKey(endMs);
+  if (dayOpen === dayEnd) return endMs - startMs;
+  const hmap = (typeof getEmpleadosHorarios === "function") ? getEmpleadosHorarios() : null;
+  const h = (hmap && hmap.get) ? (hmap.get(String(legajo)) || {}) : {};
+  const _he = parseHHMMtoHours(h.entrada); const horaEntrada = (_he == null) ? 8 : _he;
+  const _hs = parseHHMMtoHours(h.salida);  const horaSalida  = (_hs == null) ? 17 : _hs;
+  const workH = Math.max(0, horaSalida - horaEntrada);
+  const tsOfHourOnDay = function (dayKey, hours) {
+    const hh = Math.floor(hours), mm = Math.floor((hours - hh) * 60), ss = Math.round((hours - hh - mm / 60) * 3600);
+    return new Date(dayKey + "T" + String(hh).padStart(2, "0") + ":" + String(mm).padStart(2, "0") + ":" + String(ss).padStart(2, "0") + "-03:00").getTime();
+  };
+  const isOff = function (dayKey) {
+    const wd = new Date(dayKey + "T00:00:00-03:00").getUTCDay();
+    return wd === 0 || wd === 6 || FERIADOS_AR.has(dayKey);
+  };
+  const openPortion = Math.max(0, tsOfHourOnDay(dayOpen, horaSalida) - startMs);
+  const closeStartMs = Math.max(tsOfHourOnDay(dayEnd, horaEntrada), startMs);
+  const closePortion = isOff(dayEnd) ? 0 : Math.max(0, endMs - closeStartMs);
+  const dStart = new Date(dayOpen + "T00:00:00-03:00").getTime();
+  const dEnd = new Date(dayEnd + "T00:00:00-03:00").getTime();
+  let intermediateDays = 0;
+  for (let dm = dStart + 24 * 3600 * 1000; dm < dEnd - 1000; dm += 24 * 3600 * 1000) {
+    const dKey = new Date(dm).toISOString().slice(0, 10);
+    if (isOff(dKey)) continue;
+    intermediateDays++;
+  }
+  return openPortion + intermediateDays * workH * 3600 * 1000 + closePortion;
+}
 /* Celda de Picking / Pedido Separado: icono centrado en la columna + iniciales
    del operario que la empezó. Clickeable: abre el popup con los eventos de
    esa tanda de ese lado (EP/TP para picking, AP/TAP para separado). */
@@ -45272,7 +46295,7 @@ function _monActPanelHtml(list, nombres) {
       actHtml = '<span class="mon-act-ic">' + (info.ic || "•") + '</span><span class="mon-act-what">' + txt + '</span>';
     }
     return '<div class="mon-act-row ' + (r.idle ? "mon-act-idle" : "mon-act-on") + '">' +
-      '<span class="mon-act-who" title="' + escapeHtml(nom || ("Legajo " + r.legajo)) + '"><b>' + escapeHtml(sig || ("#" + r.legajo)) + '</b> ' + escapeHtml(quien) + '</span>' +
+      '<span class="mon-act-who mon-act-who-click" data-leg="' + escapeHtml(String(r.legajo)) + '" title="Ver qué hizo hoy · ' + escapeHtml(nom || ("Legajo " + r.legajo)) + '" onclick="showOperarioDia(this.dataset.leg)"><b>' + escapeHtml(sig || ("#" + r.legajo)) + '</b> ' + escapeHtml(quien) + '</span>' +
       actHtml +
       (dur ? '<span class="mon-act-dur" style="color:' + durCol(r.sinceTs) + '">' + dur + '</span>' : '') +
       '</div>';
@@ -47370,14 +48393,10 @@ async function facXlsBajar() {
     const enArchivo = Array.from(new Set(filas.map(function (r) { return String(r.np); })));
     let marcadas = 0;
     for (const np of enArchivo) {
-      let ped = null, tandaObj = null;
-      for (const t of (_facLastTandas || [])) {
-        const pp = (t.pedidos || []).find(function (p) { return String(p.np) === np; });
-        if (pp) { ped = pp; tandaObj = t; break; }
-      }
-      const args = ped
-        ? { np: np, tanda: tandaObj.tanda, m3: ped.m3 || 0, rs: ped.razonSocial || "", cod: ped.cod || "", feRaw: tandaObj.fechaEntregaRaw || null }
-        : { np: np, tanda: "", m3: 0, rs: "", cod: "", feRaw: null };
+      // v19.01 — `facInfoNp` mira las tandas Y las armadas-sin-tanda. Antes miraba sólo las
+      // tandas y caía al fallback vacío, que es lo que dejó a LK 0034 / LK 0035 sin razón
+      // social ni código de cliente en `Facturacion_NP`.
+      const args = facInfoNp(np) || { np: np, tanda: "", m3: 0, rs: "", cod: "", feRaw: null };
       if (await facMarcarFacturada(args, headers)) { marcadas++; _facXlsSel.delete(np); }
     }
     facShowToast("Excel bajado · " + marcadas + " NP web facturadas");
@@ -48212,6 +49231,39 @@ function facEstaArmada(npNorm){
   return (_facCajas && _facCajas.has(npNorm)) || (_facArmEv && _facArmEv.has(npNorm));
 }
 
+/* v19.01 — DE DÓNDE SALEN rs / cod / tanda DE UNA NP (Thomas, 16/09: *"el cliente 4181 de LK
+   no tiene razón social en el módulo de facturación, ¿por qué?"*).
+
+   La lista de Facturación se arma de DOS fuentes: las tandas de la PPP (`_facLastTandas`) y las
+   NP que están armadas pero cuya tanda ya no está en la PPP (`_facSinTanda`, la vista
+   `gv_fac_armado_sin_facturar`, v16.58). Pero los dos lugares que después necesitan los datos
+   del pedido —lo que se ESCRIBE en `Facturacion_NP` al bajar el Excel, y la lista «Ya tildados
+   hoy»— miraban SÓLO la primera. Para una NP de la segunda fuente se caían al fallback vacío y
+   guardaban la fila **sin razón social, sin código de cliente, sin tanda, sin m³ y sin fecha**.
+
+   Caso testigo: `LK 0034` y `LK 0035` (Mitre Hugo Alberto, cod 4181, pedido LK 1364). Su tanda
+   E01G se desarmó el 15/09, así que quedaron armadas pero sin tanda en la PPP → entraron a
+   Facturación por `_facSinTanda`, se facturaron con el Excel el 16/09 y sus dos filas quedaron
+   vacías. Son las ÚNICAS 2 de 1.305 en `Facturacion_NP` sin razón social, y las dos son de este
+   cliente: el síntoma que vio Thomas.
+
+   El tilde ✓ (NP de ISIS) nunca tuvo el problema: ése lee el `data-args` de la fila, que
+   `facRender` ya arma con los datos de `_facSinTanda`. */
+function facInfoNp(np){
+  const n = String(np == null ? "" : np).trim();
+  if (!n) return null;
+  for (const t of (_facLastTandas || [])){
+    const p = (t.pedidos || []).find(function (x) { return String(x.np).trim() === n; });
+    if (p) return { np: n, tanda: t.tanda || "", m3: p.m3 || 0,
+                    rs: p.razonSocial || "", cod: p.cod || "", feRaw: t.fechaEntregaRaw || null };
+  }
+  const r = (_facSinTanda || []).find(function (x) { return String(x.np || "").trim() === n; });
+  if (r) return { np: n, tanda: String(r.tanda_armado || "").trim(), m3: 0,
+                  rs: String(r.razon_social || "").trim(), cod: String(r.cod || "").trim(),
+                  feRaw: r.fecha_salida || null };
+  return null;
+}
+
 /* v18.77 (Luis, 2026-09-16: "un badge al lado del nombre en la razón social que diga Cliente
    nuevo") — CLIENTE NUEVO en Facturación.
 
@@ -48862,6 +49914,13 @@ function facRenderTicked(){
       info.set(String(p.np), { rs: p.razonSocial || "", tanda: t.tanda || "" });
     });
   });
+  // v19.01 — y las armadas SIN tanda en la PPP, que también se facturan desde acá. Sin esto
+  // salían en la lista con el número pelado, sin cliente ni tanda (caso LK 0034 / LK 0035).
+  (_facSinTanda || []).forEach(function(r){
+    const k = String(r.np || "").trim();
+    if (k && !info.has(k)) info.set(k, { rs: String(r.razon_social || "").trim(),
+                                         tanda: String(r.tanda_armado || "").trim() });
+  });
   nps.sort(function(a,b){ return String(a).localeCompare(String(b), undefined, { numeric: true }); });
   const items = nps.map(function(np){
     const d = info.get(String(np)) || {};
@@ -49189,9 +50248,9 @@ function facRender(tandas){
           const c = _facCajas.get(np); return (!c) ? '<span class="fac-cajas0">—</span>' : escapeHtml(String(Math.round(c)));
         })()}</td>
         <td class="center fac-neto-cell fac-neto-click" id="fac-neto-${escapeHtml(String(f.np).trim().replace(/\.0+$/, ""))}" onclick="facNetoDetalle('${escapeHtml(String(f.np).trim().replace(/\.0+$/, ""))}')" title="Ver desglose por ítem"><span class="fac-neto-load">…</span></td>
-        <td class="center fac-accion-cell">${facNpEsWeb(f.np)
+        <td class="center fac-accion-cell"><span class="fac-acc-wrap">${facNpEsWeb(f.np)
           ? `<span class="fac-tick-web" title="NP de la página: se factura bajando el Excel ISIS (marcá la casilla de la izquierda)">⬇ Excel</span>`
-          : `<button class="fac-btn-tick" data-args='${args}' onclick="facTickNP(this)">✓</button>`}<button class="fac-btn-cancel" data-args='${args}' onclick="facCancelarNP(this)" title="Cancelar el pedido: no se factura y sale de la PPP. Pide el motivo (falta stock u otro) y se puede salir sin hacer nada. El pedido NO se borra de la base; lo que ya estaba armado vuelve a la bodega «A guardar».">✕ Cancelar</button></td>
+          : `<button class="fac-btn-tick" data-args='${args}' onclick="facTickNP(this)">✓</button>`}<button class="fac-btn-cancel" data-args='${args}' onclick="facCancelarNP(this)" title="Cancelar el pedido: no se factura y sale de la PPP. Pide el motivo (falta stock u otro) y se puede salir sin hacer nada. El pedido NO se borra de la base; lo que ya estaba armado vuelve a la bodega «A guardar».">✕ Cancelar</button></span></td>
       </tr>`;
   }).join("");
 
@@ -49204,12 +50263,12 @@ function facRender(tandas){
             <th style="width:11%" title="Nota de pedido. Pasá el mouse sobre el número para ver Tanda y fecha de Salida.">NP</th>
             <th class="center" style="width:8%" title="Fecha de ENTREGA de la PPP (el día para el que está programado el pedido). Las filas vienen ordenadas por esta fecha.">📅 Entrega</th>
             <th style="width:7%">Cod</th>
-            <th style="width:20%">Razón Social</th>
+            <th style="width:17%">Razón Social</th>
             <th style="width:20%" title="Ajustes respecto del pedido original — asistencia para cargar la factura:&#10;• FALTANTE (rojo, cod −N): faltó, restá N cajas de la factura o no la pongas.&#10;• AGREGADO (verde, cod +N): se armó algo que no estaba en el pedido, sumá N cajas a la factura.&#10;Los ítems armados iguales al pedido no aparecen (no hay que ajustar nada).">Faltantes y Agregados</th>
             <th class="center" style="width:5%" title="Líos ARMADOS (los que se cargaron al camión). Refleja lo real, no el pedido original.">Líos</th>
             <th class="center" style="width:5%" title="Cajas ARMADAS (las que se cargaron al camión). Refleja lo real, no el pedido original.">Cajas</th>
             <th class="center" style="width:12%" title="Subtotal (dto x ítem): precio de lista × unidades por caja × cajas armadas × (1 − dto por volumen del cliente). Antes del descuento del 2%.">💵 Subtotal <span class="fac-th-siva">(dto x ítem)</span></th>
-            <th class="center fac-accion-th" style="width:8%">Acción</th>
+            <th class="center fac-accion-th" style="width:11%">Acción</th>
           </tr>
         </thead>
         <tbody>${rowsHtml}</tbody>
@@ -49391,12 +50450,12 @@ async function facNCEmitir(){
 
    ⚠ Tres cosas parecidas que NO son lo mismo (la cuarta fila es ésta):
      · ANULAR      — «A Programar», pedido que entró MAL y todavía no se tocó (`gv_pedido_anular`).
-     · DESARMAR / «Enviar a programar» — el pedido sigue VIVO y se va a rehacer: la mercadería
-                     vuelve de donde salió (góndola / excedente), regla de Luis del 16/09.
+     · DESARMAR / «Enviar a programar» — el pedido sigue VIVO y se va a rehacer: vuelve a «A
+                     Programar» retenido, para que el cron no lo re-programe solo.
      · BORRAR      — la regla del CLAUDE.md: se borra de la página Y de Gestión. Acá NO se borra.
-     · CANCELAR (esto) — el pedido ya está ARMADO y murió: no se factura, sale de la PPP, y lo
-                     armado va TODO a «A guardar» porque nadie lo va a re-pickear: son cajas en
-                     el piso de armado que un operario tiene que bajar y guardar.
+     · CANCELAR (esto) — el pedido ya está ARMADO y murió: no se factura y sale de la PPP.
+   ⚠ Desde la v18.91 **los tres caminos del desarme mandan la mercadería a «A guardar»**, no
+   sólo éste: las cajas quedan físicamente en el piso de armado y nadie las llevó al estante.
 
    Todo el trabajo lo hace el backend: `gv_ppp_np_desarmar(..., p_vuelve=false, p_a_guardar=true)`
    (v18.90, `sql/gv_ppp_np_desarmar_a_guardar_v1890.sql`). Saca la NP de la PPP (web →
@@ -49520,6 +50579,10 @@ window.facCancelConfirmar = async function(){
       p_por: await aprQuien(),
       p_vuelve: false,        // el pedido NO vuelve a «A Programar»: se canceló
       p_a_guardar: true       // y lo armado va TODO a «A guardar» (regla del dueño, v18.90)
+      // v18.91: desde esa versión el desarme manda todo a «A guardar» por los tres caminos,
+      // así que este flag ya no cambia el destino del stock — sí deja el rastro de que fue
+      // una CANCELACIÓN (la descripción del movimiento y el motivo que se guarda). v18.94: y por
+      // eso el backend ya no rechaza p_vuelve + p_a_guardar juntos.
     });
     var x = (r && r[0]) || {};
     s.saving = false; facCancelClose();

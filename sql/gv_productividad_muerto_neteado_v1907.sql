@@ -1,0 +1,124 @@
+-- ============================================================================
+-- v19.07 (problema 349) — NETEAR EL TIEMPO MUERTO del picking y del armado
+--
+-- Regla de Luis (2026-09-16): "suponete que arma por 1 hora, va al baño 10 minutos y
+-- después arma 50 min más (todo armado de 1 tanda). Debería ser 1 hora 50 min de armado
+-- y 10 de baño (cada uno contado individual, a lo mejor conviene contar las 2 horas de
+-- tanda y después netear, lo que sea más cómodo para el código)."
+--
+-- ⚠ Hasta la v19.02 esto NO estaba implementado en NINGUNA parte, aunque se daba por
+-- hecho que sí. Lo verificado:
+--   · `DEAD_TIME_CODES` de index.html sólo sirve para BLOQUEAR botones (línea 7612).
+--   · `computeClosureDur` (monitor) partía el cierre que cruza el día, pero no restaba nada.
+--   · `vista_productividad_diaria` / `_semanal` mergeaban los solapes del MISMO código
+--     (dos TP de la misma tanda) y capeaban la duración, pero tampoco restaban.
+--   · Ninguna función ni vista de la base cruzaba los códigos de tiempo muerto con TP/TAP.
+--
+-- Medición del 07/09 (arranque de Gestión) al 16/09, a mano y sin caps:
+--   TAP  21 tandas de 55 con tiempo muerto adentro →  6,5 h
+--   TP   12 tandas de 64                          →  2,9 h
+-- Con los caps de la vista aplicados: TAP 20 tandas / 5,9 h, TP 12 / 2,9 h.
+-- Sobre los 40 días de la vista diaria: el armado pasa de 210,9 h a 192,3 h (−18,6 h).
+-- Como `PC` está en ALWAYS_ALLOWED_CODES, la media hora de comida entraba como armado
+-- todos los días, con todos los operarios.
+--
+-- Criterio: se RESTA del core, y se sigue sumando aparte en su propio casillero
+-- (`t_comida`, `t_limp`, `t_otros` en la semanal; `movMin` en el monitor). Eso es el
+-- "cada uno contado individual" del pedido: el tiempo no desaparece, cambia de columna.
+--
+-- ⚠⚠⚠ LA TRAMPA QUE COSTÓ LA PRIMERA VERSIÓN: **LEAST y GREATEST IGNORAN los NULL.**
+-- En una fila del LEFT JOIN sin match, `d.s` y `d.e` son NULL, y entonces
+--   least(c.me, NULL)    devuelve c.me
+--   greatest(c.ms, NULL) devuelve c.ms
+-- o sea que la resta da la duración COMPLETA de la tanda y se descontaba TODO. Medido con
+-- la primera versión: 129,6 h restadas de 210 h de armado, con las 210 tandas marcadas
+-- como "afectadas" y `n_dead = 0` en todas — el síntoma que lo delató. Con el guard
+-- `case when d.legajo is null then 0 else … end`: 6,5 h en 21 tandas, que es el número
+-- que se puede verificar a mano.
+-- Regla para la próxima: si un LEFT JOIN alimenta un LEAST/GREATEST, el `case` por NULL
+-- NO es defensivo, es parte del cálculo. Y si una resta "afecta al 100 % de las filas",
+-- no está midiendo lo que parece.
+--
+-- Cada intervalo de tiempo muerto se recorta a su propio tope (PC 90 min, el resto 30),
+-- los mismos `cap_min` que las vistas ya usaban para sumar esos códigos. Así lo que se
+-- resta del core es exactamente lo que se suma en los casilleros, y un PB que quedó
+-- abierto tres horas no borra el armado entero.
+--
+-- Los intervalos muertos se MERGEAN por legajo antes de restar (gaps & islands): si dos
+-- se pisan entre sí —pasa, un PC adentro de un Limp— restarlos por separado descontaría
+-- de más. Medido: 458 crudos → 453 mergeados, el más largo de 80 min, ninguna isla
+-- gigante.
+--
+-- El front hace lo mismo en `computeClosureDur` (index.html, `deadByLeg` + `deadOverlapMs`),
+-- que es la duplicación de UX que permite el protocolo: la fuente de verdad son estas dos
+-- vistas. ⚠ En el front sólo se puede netear lo que está en la consulta del día: en un
+-- cierre que cruza el día, el tiempo muerto del día de APERTURA no se resta.
+--
+-- ROLLBACK: `sql/backups/vista_productividad_pre_v1907_20260916.sql` tiene las dos
+-- definiciones tal como estaban antes. Aplicarlas y volver a poner `security_invoker`.
+--
+-- ⚠ `CREATE OR REPLACE VIEW` sin `WITH (...)` borra las `reloptions`, así que las dos
+-- llevan el `with (security_invoker = true)` adentro Y el `alter view` después.
+-- Chequeo posterior: `select * from public.gv_endpoints_rotos;` → 0 filas (verificado).
+-- ============================================================================
+
+-- La definición viva de las dos vistas se aplicó con el MCP el 2026-09-16. Para
+-- recuperarla textualmente:
+--   select pg_get_viewdef('public.vista_productividad_diaria'::regclass,  true);
+--   select pg_get_viewdef('public.vista_productividad_semanal'::regclass, true);
+--
+-- Lo que se agregó, idéntico en las dos (cambia sólo la ventana: 40 días la diaria,
+-- 56 la semanal, y la clave de agrupación de las islas de core):
+
+--   , dead_raw as (
+--       select coalesce(legajo,'?') as legajo, ts_inicio as s,
+--         least(ts_cliente, ts_inicio + (case opcion when 'PC' then 90 else 30 end)
+--                                       * interval '1 minute') as e
+--       from public."Registros_Produccion_Virgilio"
+--       where coalesce(ts_cliente, created_at) > (now() - interval '40 days')
+--         and not es_legajo_test(legajo)
+--         and opcion = any (array['AT','PB','Limp','PC','CT'])
+--         and ts_inicio is not null and ts_cliente > ts_inicio
+--     ),
+--     dead_isl as (
+--       select legajo, s, e,
+--         sum(case when rmax is null or s > rmax then 1 else 0 end)
+--           over (partition by legajo order by s, e) as grp
+--       from (select legajo, s, e,
+--               max(e) over (partition by legajo order by s, e
+--                            rows between unbounded preceding and 1 preceding) as rmax
+--             from dead_raw) y
+--     ),
+--     dead as (select legajo, min(s) as s, max(e) as e from dead_isl group by legajo, grp)
+--
+-- y, sobre las islas de core ya mergeadas (`core` en la diaria, `mg` en la semanal):
+--
+--   , muerto as (
+--       select c.legajo, c.dia, c.opcion, c.tanda, c.grp,
+--         coalesce(sum(case when d.legajo is null then 0      -- ⚠ OBLIGATORIO, ver arriba
+--                           else greatest(0, extract(epoch from
+--                                  (least(c.me, d.e) - greatest(c.ms, d.s))) / 60.0)
+--                      end), 0) as min_muerto
+--       from core c
+--       left join dead d on d.legajo = c.legajo and d.s < c.me and c.ms < d.e
+--       group by 1,2,3,4,5
+--     ),
+--     efft as (
+--       select c.legajo, c.dia, c.opcion, c.tanda,
+--         sum(greatest(0, extract(epoch from (c.me - c.ms)) / 60.0 - mu.min_muerto)) as eff_min
+--       from core c join muerto mu using (…)   -- por legajo, dia, opcion, tanda, grp
+--       group by 1,2,3,4
+--     )
+
+-- Chequeos que se corrieron después de aplicar (todos en verde):
+--
+-- 1) el ejemplo del pedido, a mano: lg8 / D72A / 15-09 → 212,1 min brutos con un PC de
+--    40,5 min adentro → 171,6 min de armado.
+-- 2) ninguna resta de más: lg277 / 16-09, 8 pickings, sólo D69C tiene un AT adentro
+--    (0,84 min). El resto queda intacto.
+-- 3) coincide con el conteo a mano sin caps ni merges (TP: 12 tandas / 2,9 h).
+-- 4) select * from public.gv_endpoints_rotos;                        -- 0 filas
+-- 5) las vistas de public legibles por anon sin security_invoker;     -- 0 filas
+--
+-- Front: `tests/muerto-neteado.cjs` reproduce el ejemplo textual del pedido
+-- (armado de 2 h con un baño de 10 min → 1 h 50 de armado + 10 min de baño aparte).

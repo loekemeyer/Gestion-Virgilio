@@ -1,4 +1,27 @@
-# Estado y pendientes — al 2026-09-16 (última actualización: v18.90)
+# Estado y pendientes — al 2026-09-16 (última actualización: v18.94)
+
+> **2026-09-16, tanda de Thomas (v18.88, §3.id) — Conciliación abría el detalle con timeout.**
+> `🔍 Comparar` moría con *"canceling statement due to statement timeout"*. Tres capas: (1)
+> `gv_conciliacion_comparar` sacaba el `doc_id` por `gv_vista_cruce_facturacion`, que llamaba a
+> `gv_cruce_fc_asignacion()` **en vivo** (recalcula la asignación GLOBAL con temp tables, 1,2 s
+> fijos por consulta); (2) el filtro por NP viajaba como JOIN contra un CTE, así que la vista de
+> ítems calculaba **todas** las NP (2.143 ms, contra 37 ms de una sola); (3) el listado dispara el
+> motivo de **cada** fila con diferencia (23) en paralelo, y cada uno llamaba a `comparar`.
+> Arreglado con el cache `GV_Cruce_FC_Asig` (cron `gv-cruce-fc-asig`, jobid 90, cada 10 min, más
+> refresco desde la propia pantalla si tiene más de 3 min), `comparar` en plpgsql con el filtro
+> empujado, y los motivos en cola de 6. **Salida idéntica verificada**: la vista entera con el
+> mismo md5 y las 142 NP con la misma firma. comparar 2.143 → 90 ms · motivo → 31 ms · lista 920 ms.
+> Problema 335, cerrado.
+>
+> **⛔ Los grants de `anon` se tocaron y se REVIRTIERON el mismo día (2026-09-16).** Se habían
+> cerrado las 6 RPC de Conciliación (v19.03) y 61 más en un barrido (v19.06). Thomas: *"volvé
+> para atrás, no había que borrar nada"* → **todo restituido** y probado llamando las RPC como
+> `anon`. La base quedó igual que antes: **222** `SECURITY DEFINER` alcanzables por `anon`.
+>
+> **Lo que sigue siendo cierto, y quedó medido** (§3.ii y §3.ik, por si algún día se retoma):
+> con la clave que está en `index.html` se leen las 143 filas de Conciliación con razón social
+> y montos; el PDF no, que ése está cerrado. Y no es del módulo: es el default de Postgres
+> (`EXECUTE` a PUBLIC en cada función nueva). **Decisión del dueño: no se toca.**
 
 > **2026-09-16 (v18.90) — CANCELAR un pedido desde Facturación (pedido de Thomas).**
 > Botón **✕ Cancelar** en cada fila de Facturación, con pop-up de motivo (**Falta stock** / **Otro**
@@ -8,9 +31,16 @@
 > guardar»**. Backend: `gv_ppp_np_desarmar` con el parámetro nuevo `p_a_guardar` (la firma de 4
 > argumentos se dropeó). §3.if · `sql/gv_ppp_np_desarmar_a_guardar_v1890.sql`.
 >
-> ⚠ **No se pisa con la regla de Luis del 16/09** ("la mercadería vuelve de donde salió"): ésa es
-> para «Enviar a programar», donde el pedido sigue vivo y se re-pickea. Cancelar es el pedido
-> muerto. La función se niega si le mandan las dos intenciones juntas.
+> ⚠ **Y unas horas después esto cambió (v18.91 / v18.92, §3.ih y §3.ii):** Thomas pidió que lo
+> que se manda «a programar» **también** vaya a «A guardar», así que **los tres caminos del
+> desarme mandan todo a `a_guardar`** y el guard que rechazaba las dos intenciones juntas se
+> sacó. La diferencia entre cancelar y «Enviar a programar» sigue siendo el PEDIDO: uno muere,
+> el otro vuelve a A Programar retenido.
+>
+> ⚠⚠ **Dos sesiones tocaron `gv_ppp_np_desarmar` el mismo día y una pisó a la otra** (§3.ii): un
+> `create or replace` armado con el archivo del repo deshizo la v18.91 por unos minutos. Se
+> restauró y se verificó. **Antes de reemplazar una función, leer `pg_get_functiondef` y partir
+> de eso, no de un archivo de `sql/`.**
 >
 > **Lo que queda para una persona:** Thomas avisó que **muchos de los pedidos atrasados de la PPP
 > no se cargaron al camión porque tenían faltantes de todos los artículos de la nota de pedido**, y

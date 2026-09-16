@@ -39,6 +39,12 @@ node tests/ppp-tanda-por-camion.cjs
 echo "== ppp-super-mezclado (el aviso dice si la tanda se armo MANUAL o AUTOMATICA; la kangoo no es el camion) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/ppp-super-mezclado.cjs
 
+echo "== ppp-tanda-dos-dias (v18.92: reusar tanda no puede dejar el mismo codigo en dos dias) =="
+node tests/ppp-tanda-dos-dias.cjs
+
+echo "== ppp-badge (v19.14: el boton PPP tiene badge como los demas, y cuenta todos los avisos) =="
+PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/ppp-badge.cjs
+
 echo "== mon-tv (monitor liviano de TV: solo lectura, mismas fuentes que el monitor grande) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/mon-tv.cjs
 
@@ -414,6 +420,9 @@ PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node te
 echo "== supers-una-lista (v17.72: UNA sola lista de clientes super, en la base y por empresa+codigo) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/supers-una-lista.cjs
 
+echo "== ppp-tanda-cambiar-dia (v19.11: el botón 📅 Cambiar de día en cada tanda, en Programación y en Pedidos atrasados) =="
+PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/ppp-tanda-cambiar-dia.cjs
+
 echo "== ppp-tabla-arbol (v17.66: Programación como tabla día → tanda → NP → contenido, con los 4 % de avance) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/ppp-tabla-arbol.cjs
 
@@ -535,3 +544,15 @@ PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node te
 
 echo "== fac-cancelar-pedido (v18.90: botón ✕ Cancelar en Facturación — motivo, salida sin tocar nada, y todo a «A guardar») =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/fac-cancelar-pedido.cjs
+
+echo "== fac-rs-sin-tanda (v19.01: una NP armada sin tanda en la PPP conserva razón social y cod de cliente) =="
+PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/fac-rs-sin-tanda.cjs
+
+echo "== hora-24h-renglon (v19.02: reloj de 24h en pantalla + un renglon por tarea + cierre de RI/EI) =="
+PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/hora-24h-renglon.cjs
+
+echo "== muerto-neteado (v19.07: el tiempo muerto se resta del picking/armado + no cerrar dos veces) =="
+PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/muerto-neteado.cjs
+
+echo "== resumen-pkc-agrupado (v19.09: el detalle del picking, una linea por tanda) =="
+PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/resumen-pkc-agrupado.cjs

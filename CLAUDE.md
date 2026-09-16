@@ -418,6 +418,59 @@ las manda directo al portal de **Chef** (`precios_super.cadena`: `cencosud` → 
 Su caso propio —NP de Chef con artículos de Loeke **sin** L— ya lo cubre `gv_fac_ajustes_isis` (v13.79): es el caso
 **inverso** al de Tierra del Fuego. `sql/gv_cliente_isis_v1775.sql`, §3.fp.
 
+## ⚠ REGLA: el CÓDIGO DE CLIENTE es por EMPRESA — nunca cruzar por código solo
+
+**Thomas, 2026-09-16:** *"¿contemplaste que los códigos de clientes de LK y CH son diferentes?
+Un cliente puede tener un código en LK y otro diferente en CH, y el mismo número de código puede
+ser de dos clientes diferentes (uno de LK y otro de CH)."* Es la contracara operativa de la regla
+de arriba (*"el cod cliente no significa nada, sólo el CUIT vale"*, v13.76), y hay que tenerla a
+mano **cada vez que se escribe una consulta**, no sólo al pensar en identidad de clientes.
+
+**Medido el 16/09 sobre las facturas parseadas** (`isis_lk.documentos` / `isis_ch.documentos`):
+
+| | |
+|---|---|
+| códigos de cliente en facturas de **LK** | **1.057** |
+| códigos de cliente en facturas de **Chef** | **396** |
+| códigos que existen en **las dos** | **115** |
+| …de esos, **clientes DISTINTOS** | **114** |
+
+O sea: **cuando un código coincide entre las dos empresas, el 99 % de las veces son dos personas
+distintas.** Cruzar por código sin empresa no es "un poco impreciso": está mal casi siempre que
+matchea. Ejemplo del día: **4181 en LK es Mitre Hugo Alberto; en Chef ese código no existe.**
+
+```sql
+-- el barrido que lo mide (y que hay que repetir si se duda)
+with lk as (select distinct regexp_replace(coalesce(contraparte_codigo,''),'^0+','') cod,
+                   (array_agg(contraparte_nombre order by fecha desc))[1] nombre
+              from isis_lk.documentos where familia='factura_venta' group by 1),
+     ch as (select distinct regexp_replace(coalesce(contraparte_codigo,''),'^0+','') cod,
+                   (array_agg(contraparte_nombre order by fecha desc))[1] nombre
+              from isis_ch.documentos where familia='factura_venta' group by 1)
+select count(*) comparten_codigo,
+       count(*) filter (where upper(btrim(lk.nombre)) <> upper(btrim(ch.nombre))) son_otro_cliente
+  from lk join ch using (cod);
+```
+
+**Qué hacer siempre:**
+- La clave de un cliente es **`(empresa, cod)`**, nunca `cod` solo. Vale para `Facturacion_NP`,
+  `PPP_Web_Programacion`, `Entregas_Virgilio`, `GV_Clientes_Direcciones`, `GV_Clientes_Nuevos`,
+  `cobranzas_cliente_cadena` y cualquier tabla con `cod_cliente`.
+- Las facturas viven en **dos esquemas separados** (`isis_lk` / `isis_ch`): buscar la factura de
+  una NP **en el esquema de SU empresa**, no en los dos.
+- La empresa de una NP sale del **prefijo** (`LK …` / `CH …`) o, en las de ISIS, de
+  **`> 90000 = LK`** (la regla que usa `gv_ppp_prog_arbol`). No inventar otra: un
+  `np ~ '^4\d{4}$'` acierta con las NP de Chef de ISIS pero **manda las `CH 0012` web a LK**.
+  Lo que ya existe y es de fiar: `gv_empresa_de_np_texto(np)` y `gv_emp_de_np(np)`.
+- Las funciones que ya lo hacen bien y sirven de molde: `gv_fac_rs_np` (cruza por
+  `empresa + cod`) y `gv_vista_cruce_facturacion` (`d.empresa = b.empresa`).
+
+⚠ **La excepción que rompe hasta esto: Tierra del Fuego.** Una NP de **LK** se factura en el
+ISIS de **Chef**, con el **código de cliente de Chef** (regla v13.77, arriba). Si se busca la
+factura en `isis_lk` con el código LK no aparece, y la NP queda como *"sin factura"* sin estarlo.
+El mapeo `(lk, cod) → (chef, cod_isis)` está en **`GV_Cliente_Isis`** (9 filas al 16/09):
+**antes de concluir que una NP de LK no se facturó, mirar ahí.**
+
 ## ⚠ Regla del dueño (2026-09-07, v14.12): el agregado va en tanda nueva SÓLO si mezclaría ISIS con web
 
 *"Solo va en tanda nueva si mezcla lo que es pedido isis y pedido web"* → **el corte es el ORIGEN, no
@@ -502,6 +555,23 @@ armador** (con `p_filas` de prueba dentro de una transacción abortada, no leyen
 
 **Chequeo:** `select * from public.gv_ppp_tanda_camion_mezclado;` — vacía = todo bien.
 `sql/gv_ppp_web_tanda_por_camion_v1887.sql`, §3.ib.
+
+## ⚠ Una tanda NO puede salir en dos días (v18.92, problema 338)
+
+Un mismo código de tanda en dos fechas cae en **dos camiones distintos** y rompe todo lo que
+agrupa por tanda: `vista_tanda_m3`, el camión, la hoja de ruta y la carga.
+
+**Por dónde entraba:** el botón *"Reusar tanda"* al reprogramar una NP de ISIS desde *A Programar*
+(`gv_ppp_isis_programar`, v16.03). Reusa el código anterior cuando todas las NP que entran vienen
+de esa tanda — **pero contaba las que ENTRAN, no las que QUEDAN**. Caso D69C: el 16/09 11:59 se
+reprogramaron 98615 y 98616 al 17/09 reusando D69C mientras 98622 seguía en D69C el 21/09.
+
+Desde v18.92, si quedan NP de esa tanda en otro día **no se reusa**: va una tanda nueva y el aviso
+dice por qué. **No se bloquea con un `raise` a propósito**: separar un pedido de su tanda es una
+decisión legítima del supervisor, y el contenido es el mismo (no hay que volver a pickear).
+
+**Chequeo:** `select * from public.gv_ppp_tanda_dos_dias;` — vacía = todo bien.
+`sql/gv_ppp_isis_programar_reusar_v1892.sql`, §3.ig.
 
 ## ⚠ Regla del dueño (2026-09-15): Oscar hace el SKIN — la OC va a su nombre y NO se toca
 
