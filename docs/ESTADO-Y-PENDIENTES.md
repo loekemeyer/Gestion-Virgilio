@@ -13,10 +13,19 @@
 > mismo md5 y las 142 NP con la misma firma. comparar 2.143 → 90 ms · motivo → 31 ms · lista 920 ms.
 > Problema 335, cerrado.
 >
-> **Queda para definir (de Thomas, no del código):** las RPC de Conciliación
-> (`gv_conciliacion_lista` / `_comparar` / `_motivo`) tienen `EXECUTE` para **`anon`** desde antes
-> de esta tanda — el gate es sólo del front. Cerrarlas a `authenticated` es un `revoke`, pero
-> primero hay que confirmar con qué rol entra la pantalla. **No se tocó.**
+> **✅ RESUELTO el mismo día (v19.03, §3.ii, problema 353).** Las RPC de Conciliación tenían
+> `EXECUTE` para **`anon`** desde antes de esta tanda: con la clave que está en `index.html`,
+> cualquiera leía las 143 filas con razón social y montos. Thomas lo aprobó y se cerraron **las
+> 6** (`lista`, `comparar`, `motivo`, `detalle`, `totales` y `registrar`, que además escribe).
+> Antes de tocar se verificó que no la llama ningún cron, función, vista, Edge Function ni los
+> repos de LK, Chef y Producción — sólo `index.html` —, y que la pantalla ya entra con sesión de
+> Google (el sign de `isis-lk` da 200, y ese endpoint exige `authenticated` + supervisor).
+>
+> **Lo que queda de esto es una tanda propia, no un pendiente de Thomas:** son **213** funciones
+> `SECURITY DEFINER` más, abiertas a `anon` por el default de Postgres. Hay que inventariar
+> cuáles llama el front de verdad y cerrar el resto. Y el cierre fuerte de Conciliación sería el
+> guard `es_supervisor_virgilio()` **adentro** de cada función: hoy `authenticated` es cualquiera
+> con sesión de Google, no sólo un supervisor.
 
 > **2026-09-16 (v18.90) — CANCELAR un pedido desde Facturación (pedido de Thomas).**
 > Botón **✕ Cancelar** en cada fila de Facturación, con pop-up de motivo (**Falta stock** / **Otro**
