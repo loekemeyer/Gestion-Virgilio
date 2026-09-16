@@ -3275,6 +3275,14 @@ tr.ppp-err-zona > td{ background:#fffbeb !important; }
   border-radius:14px; background:#fff7f7; overflow:auto; }
 .patr.ok{ border-color:#bbf7d0; border-left-color:#16a34a; background:#f6fefa; }
 .patr-h{ display:flex; align-items:baseline; gap:14px; flex-wrap:wrap; padding:11px 14px 9px; }
+/* v18.82 (Luis): el encabezado colapsa el submódulo entero. Colapsado quedan el
+   título y los KPI — el resumen se ve siempre, lo que se guarda es la tabla. */
+.patr-h[onclick]{ cursor:pointer; user-select:none; }
+.patr-h[onclick]:hover{ background:#fee2e2; }
+.patr.ok .patr-h[onclick]:hover{ background:#dcfce7; }
+.patr-chev{ font-size:13px; color:#b91c1c; font-weight:900; line-height:1; }
+/* Colapsado no lleva el borde inferior del encabezado ni la tabla debajo. */
+.patr.col .patr-h{ padding-bottom:11px; }
 .patr-t{ font-size:16px; font-weight:900; color:#b91c1c; white-space:nowrap; }
 .patr.ok .patr-t{ color:#15803d; }
 .patr-kpi{ font-size:13px; font-weight:700; color:#7f1d1d; white-space:nowrap; }
@@ -5612,7 +5620,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=18.80"></script>
+<script type="module" src="recepcion.js?v=18.82"></script>
 <!-- Config del módulo de fichada (compartido con fichada.html). El secret
      hmacSecret tiene que ser el mismo acá y allá; cargándolo desde un solo
      archivo evitamos que se desincronicen. -->
@@ -9195,7 +9203,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v18.80";
+const APP_VERSION = "v18.82";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -36633,14 +36641,24 @@ function _patrHtml() {
   for (const d of dias) { nps += d.nps; m3 += d.m3; }
   const viejo = dias[dias.length - 1];
   const _dAtraso = function (k) { return Math.round((_pppKeyDate(_pppHoyKey()) - _pppKeyDate(k)) / 86400000); };
-  let h = '<div class="patr"><div class="patr-h">' +
+  // v18.82 (Luis): el submódulo entero se colapsa desde su encabezado. Colapsado
+  // NO desaparece: quedan el título y los KPI (cuántos, cuántos días, m³, el más
+  // viejo), que es el dato que hay que ver siempre; lo que se guarda es la tabla.
+  const col = _patrColapsado();
+  let h = '<div class="patr' + (col ? ' col' : '') + '">' +
+    '<div class="patr-h" onclick="patrColapsar()" title="' +
+      (col ? "Mostrar el detalle por día" : "Colapsar — el resumen queda a la vista") + '">' +
+    '<span class="patr-chev">' + (col ? "▸" : "▾") + '</span>' +
     '<span class="patr-t">⏰ Pedidos atrasados</span>' +
     '<span class="patr-kpi"><b>' + nps + '</b> pedido' + (nps === 1 ? '' : 's') + '</span>' +
     '<span class="patr-kpi"><b>' + dias.length + '</b> día' + (dias.length === 1 ? '' : 's') + '</span>' +
     '<span class="patr-kpi"><b>' + _pppFmtM3(m3) + '</b> m³</span>' +
     '<span class="patr-kpi">el más viejo hace <b>' + _dAtraso(viejo.key) + '</b> días</span>' +
-    '<span class="patr-sub">Estaban programados para un día que ya pasó y nadie registró la Carga Camión</span>' +
+    '<span class="patr-sub">' + (col
+      ? 'Tocá para ver el detalle por día'
+      : 'Estaban programados para un día que ya pasó y nadie registró la Carga Camión') + '</span>' +
     '</div>';
+  if (col) return h + '</div>';
   h += '<table class="pga patr-tbl"><thead><tr>' +
       '<th>Día</th><th>m³</th><th>Tandas</th><th>NPs</th>' +
       '<th class="pga-h fac">Factu<br>rado</th><th class="pga-h arm">Ar<br>mado</th>' +
@@ -36648,6 +36666,18 @@ function _patrHtml() {
     '</tr></thead><tbody>';
   h += _pgaCuerpoHtml(dias, { atraso: true });
   return h + '</div>';
+}
+/* Colapsado o no. Se recuerda en localStorage: si alguien lo cierra, no se le
+   vuelve a abrir en cada refresco de la pantalla (que corre solo). Arranca
+   ABIERTO: la primera vez tiene que verse sin que nadie lo busque. */
+const PATR_COL_KEY = "vir_patr_colapsado";
+function _patrColapsado() {
+  try { return localStorage.getItem(PATR_COL_KEY) === "1"; } catch (_e) { return false; }
+}
+function patrColapsar() {
+  const v = !_patrColapsado();
+  try { localStorage.setItem(PATR_COL_KEY, v ? "1" : "0"); } catch (_e) {}
+  pppRenderProg();
 }
 
 /* El cuerpo de la tabla día → tanda → NP. Lo comparten la programación y los
