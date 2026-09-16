@@ -20072,3 +20072,204 @@ ninguna fila de prueba.
 
 Con el depósito quieto — sin eventos de operarios en los últimos 30 min y sin picking ni armado
 abierto (EP sin TP, AP sin TAP). La consulta de chequeo está en el encabezado del `.sql`.
+
+## §3.ih — v18.95: auditoría profunda del cambio "empresa sólo en duales" (ESCRITO, NO APLICADO) — 2026-09-16
+
+**Estado: el SQL está escrito, medido y probado, y NO se ejecutó.** Luis: *"a la hora de cierre
+del depo lo corremos, hacé análisis bien profundo para verificar que no rompemos nada"*.
+Todo en `sql/gv_empresa_solo_duales_v1895.sql`. Tarea de Planify 3527, problema 337 (que de
+paso destapó el 340).
+
+### La lista de duales está completa — verificado, no asumido
+
+Son **4**: `437E`, `438E`, `439E`, `809E`. Y "dual" no significa *el mismo producto en dos
+góndolas*: significa **dos artículos DISTINTOS que comparten número** (809E: CH = Corta Queso,
+LK = Corta Pizza). Para todo el resto, un código = un artículo = **una pila**.
+
+Se buscaron códigos con celda de góndola en las dos empresas: aparecieron **702E** y **725E**,
+que **no son duales** — tienen una sola góndola (CH: M09/M10 y L40/L45) y el "LK" les viene del
+**rack** (X1, X26). Y `LIBRE`, que es un placeholder.
+
+### Lo que NO se rompe (los nueve, uno por uno)
+
+| | por qué |
+|---|---|
+| El saldo por código | no cambia ningún `delta`: sólo una etiqueta |
+| `vista_saldos_stock` | agrupa por `outkey`, que lleva la empresa **sólo si es dual** |
+| `stocks_carga_rapida` | su clave `norm_cod` también lleva empresa sólo si es dual |
+| `gv_stock_negativos` | suma todas las empresas antes de decidir |
+| `gv_stock_particion_sospechosa` | **se vacía** para no duales — es mejora |
+| Front, `_stkMovMatch` | filtra por empresa sólo si el código trae sufijo (dual) |
+| `recepcion.js` | detecta dual por `clave !== cod_art`, **no** por empresa |
+| **Producción Virgilio** | escribe `empresa` pero **no la lee nunca**: 0 filtros `empresa=eq.`, 0 `select` de esa columna sobre `Movimientos_Stock` en todo el repo |
+| Los 4 duales | no se tocan |
+
+### ⚠⚠ El trigger y el backfill van JUNTOS — y esto está MEDIDO
+
+`empresa` entra en dos índices ÚNICOS (`mov_stock_pipeline_dedup`, `mov_stock_aguardar_dedup`)
+que los reconciliadores usan como `ON CONFLICT`. El código ya lo avisaba, en
+`reconciliar_pipeline_stock_etapa1` (v17.07): *"SIN ESTO SE DUPLICA EL PICKING"*.
+
+Probado con las dos mitades, en transacciones revertidas, sobre `601E / E12E`:
+
+```
+trigger nuevo + fila backfilleada a 'Mixto' → reinsert con 'LK' → 0 filas   ✔ no duplica
+trigger nuevo y la fila vieja en 'LK'       → reinsert con 'LK' → 1 fila    ✘ DUPLICA
+```
+
+Funciona porque en Postgres el **BEFORE INSERT corre ANTES de la comprobación de unicidad**: el
+reconciliador manda `LK`, el trigger lo pisa a `Mixto` y choca contra la fila ya backfilleada.
+Sin el backfill no choca, y entra de nuevo.
+
+### Los crons hay que apagarlos (hallazgo del análisis)
+
+Cinco escriben en `Movimientos_Stock`. Los jobs **57 y 68 ya se serializan** con el advisory
+lock **5768** —por eso el paso 2 lo toma también—, pero **74 (`gv-reconciliar-facturado-web`,
+cada 10 min) y 81 (`gv-reconciliar-aguardar`, cada 2 min) NO lo toman**: si uno inserta durante
+la migración, esa fila queda con LK/CH sin backfillear y el reconciliador siguiente la duplica.
+El paso 0 apaga 34, 57, 68, 74 y 81; el paso 5 los prende.
+
+### Medido antes de aplicar
+
+| | |
+|---|---|
+| filas de no duales con LK/CH | **5.794** |
+| colisiones en `mov_stock_pipeline_dedup` | **3** — D72A/520, todas con `delta 0`, excluidas |
+| colisiones en `mov_stock_aguardar_dedup` | **0** (0 filas afectadas) |
+| costo | 200 filas en 231 ms → ~**6,7 s** las 5.794 → **lotes de 1.000** (el `statement_timeout` son ~8 s) |
+
+### De paso: `gv_ocupacion_lugar` ya estaba rota (problema 340)
+
+Cruza el saldo con `AND s.empresa = l.empresa`, o sea agarra **sólo la porción etiquetada**.
+Medido: de 790 filas, **458 difieren del saldo real** y 55 dan NULL teniéndolo — **57.181 cajas
+de diferencia**. Es **preexistente**; el cambio la llevaría de mal a vacía. No la lee nadie (0
+en los dos fronts, 0 vistas, 0 funciones, 0 crons; sólo expuesta a `anon`).
+
+Se arregla en el mismo paso, con el mismo principio: filtrar por empresa **sólo si el código es
+dual**. La vista nueva da **0 diferencias, 0 NULL indebidos y 0 cajas** contra el saldo real.
+
+⚠ **Y una trampa medida: NO usar `LEFT JOIN LATERAL` ahí.** La subconsulta se evalúa una vez
+por fila (790) contra un seq scan de 62.495 movimientos — ~49 M de filas, y **la consulta se
+cuelga** (timeout). Con dos joins planos son **858 ms**. Rollback en
+`sql/backups/gv_ocupacion_lugar_pre_v1895.sql`.
+
+---
+
+## §3.ia — v18.96: el pedido PI OL-10139 de Ownland queda como el proforma real (U$S 49.291,44) — 2026-09-16
+
+Thomas mandó el `PI_draft_OL-10139.xls` (Yangjiang Ownland, draft del 26/08, 1x20GP) para
+compararlo con lo cargado. **No coincidía ni una línea.**
+
+| | Proforma | Cargado (10/09) |
+|---|---|---|
+| Líneas | 16 | 13 |
+| Unidades | 100.728 | 98.376 |
+| FOB | **49.291,44** | **46.626,00** |
+| CBM | 27,658 (784 ctns) | 21,941 |
+
+Los **precios unitarios sí coincidían** en todos los códigos comunes: lo cargado salió de una
+versión anterior del mismo pedido, no de otro proveedor. Faltaban `812E` (1440), `503E` (1200),
+`589E` (1440) y `692ENS` (1248); sobraba `119E` (1872, corta queso Loke, que el PI no trae); y
+once códigos tenían otra cantidad — los más gordos, `1546903` (36.000 contra 47.088 cargadas),
+`816E` (9984/6144) y `702E` (3024/6192).
+
+**Thomas: *"dejá solo el de usd 49291.44"*.** Aplicado con backup previo:
+
+```sql
+create table zz_backups."GV_Backup_Imp_Baches_OL10139_20260916" as
+  select * from public."GV_Importados_Baches" where pedido_ref = 'PI OL-10139';   -- 13 filas
+create table zz_backups."GV_Backup_Imp_Pedido_CC_OL10139_20260916" as
+  select * from public."GV_Imp_Pedido_CC" where pedido_ref = 'PI OL-10139';       -- 1 fila
+-- las dos con enable row level security + revoke a anon/authenticated
+```
+
+Todo en una transacción: **12 updates** de cantidad, **alta de las 4 líneas que faltaban**,
+**baja del 119E**, y `GV_Imp_Pedido_CC.fob_total` de 46.626 a **49.291,44**.
+
+```sql
+select pedido_ref, n_lineas, unidades, usd, m3 from public.gv_importados_pedidos_curso
+ where pedido_ref = 'PI OL-10139';
+--  16 | 100728 | 49291.44 | 26.379
+select fob, pagado, pend_giro_directo, falta, fob_calculado, fob_difiere
+  from public.gv_imp_cuenta_corriente where pedido_ref = 'PI OL-10139';
+--  49291.44 | 14000.00 | 20956.00 | 14335.44 | 49291.44 | false
+```
+
+Tres cosas que conviene tener a mano:
+
+- **`692ENS` del PI se cargó como `692E`** (Pelador "V" horizontal Chef, `importado_id` 148), que
+  es el código que existe en `gv_importados_ordenes` y tiene el mismo FOB (0,49). El PI aclara
+  que el "NS" es la variante sin logo.
+- **El m³ no sale del PI**: Gestión lo calcula con su volumen por artículo y da **26,379**
+  contra los **27,658 CBM** del proforma (−4,6 %). El FOB y las unidades sí son exactos.
+- **La CC subió la deuda**: `falta` pasó de 11.670 a **14.335,44** (el pagado 14.000 y el
+  pendiente de giro directo 20.956 salen del Excel de Thomas del 11/09 y no se tocaron).
+
+**Rollback:** restaurar las 13 filas y la fila de CC desde las dos tablas de `zz_backups`
+(borrando antes las 16 líneas vivas del pedido). Problema **341**.
+
+## §3.ik — v18.97: la migración 337 empaquetada en funciones, lista para disparar — 2026-09-16
+
+Luis: *"prepará todo lo que necesites aparte (sin joder live) para que cuando te diga se
+implemente"*. Hecho: **seis funciones `gv_mig337_*` creadas y dormidas**. Crear una función no
+toca ningún dato ni ninguna pantalla. Ninguna es ejecutable por `anon` (todas con `revoke`).
+
+| | qué hace | escribe |
+|---|---|---|
+| `gv_mig337_simular()` | los 7 chequeos del preflight | **no** |
+| `gv_mig337_migrar(true)` | **ENSAYO**: corre TODO y al final lo revierte | no (revierte) |
+| `gv_mig337_preparar()` | apaga los 5 crons + preflight | sí |
+| `gv_mig337_migrar()` | backup · trigger · vista · backfill · md5 | sí |
+| `gv_mig337_verificar()` | repesca · reconciliadores · centinelas · prende crons | sí |
+| `gv_mig337_rollback()` | deshace todo de un tirón | sí |
+
+### Por qué son TRES fases y no una sola función
+
+Es el hallazgo que obligó al diseño: **`cron.alter_job` es transaccional** — hace un `UPDATE`
+sobre `cron.job`. Si el apagado de los crons va DENTRO de la misma transacción que la
+migración, el scheduler **sigue viendo `active = true`** hasta el commit, o sea hasta que la
+migración ya terminó. Los crons nunca quedarían apagados durante la ventana, que es
+exactamente para lo que se los apagaba. Por eso: fase 1 apaga y commitea, fase 2 migra, fase 3
+verifica y prende.
+
+### Las guardas que trae puestas
+
+- `preparar()` **se niega** si algún chequeo del preflight está en `FRENA` (depósito con
+  movimiento, picking/armado abierto, colisiones nuevas, o el ancla del trigger cambiada).
+- `migrar()` **se niega** si el bloque v18.95 ya está aplicado, y **aborta y revierte** si el
+  md5 del saldo por (código, depósito) cambia entre el principio y el final.
+- `migrar(true)` corre **exactamente el mismo código** y termina con un `raise` para revertir:
+  el ensayo prueba lo que se va a ejecutar, no una copia.
+- El backfill va **en lotes de 1.000** dentro de un `loop` (el `statement_timeout` ronda los 8 s
+  y las ~5.800 filas tardan ~6,7).
+- `verificar()` hace una **repesca** por si un cron alcanzó a insertar algo en la ventana.
+
+### Probado ya
+
+Corrido `gv_mig337_simular()` con los operarios trabajando: **frena solo**, como debe —
+*"deposito quieto: FRENA, último evento hace 0 min"* y *"sin picking/armado abierto: FRENA,
+2 tandas"*. Los otros cinco chequeos en OK (0 colisiones en los dos índices, ancla en su
+lugar, 4 duales). Las filas a corregir ya van en **5.897** (eran 5.794 hace unas horas): crece.
+
+### El archivo del repo == la base
+
+`sql/gv_mig337_empresa_solo_duales.sql`, verificado con el md5 del cuerpo normalizado de las
+**seis**. ⚠ El verificador tuvo **dos falsos verdes** antes de quedar bien, y los dos valen
+como advertencia para la próxima: (1) exigir `\nas $fn$` **se come la función escrita en una
+sola línea** y le cuelga su nombre al cuerpo de la siguiente; (2) sin anclar a
+`create or replace`, los `revoke execute on function public.X(` también matchean y corren
+todos los nombres un lugar. El patrón bueno ancla **las dos puntas**.
+
+### Cómo se corre al cierre
+
+```sql
+select * from public.gv_mig337_simular();       -- los 7 chequeos en OK
+select * from public.gv_mig337_migrar(true);    -- ENSAYO (termina con "ENSAYO OK")
+select * from public.gv_mig337_preparar();      -- apaga los crons
+select * from public.gv_mig337_migrar();        -- el cambio
+select * from public.gv_mig337_verificar();     -- y prende los crons
+```
+
+Lo que hay que mirar en el último paso: `reconciliar_pipeline_stock_etapa1` en **0 filas**
+(el picking no se duplicó) y `gv_stock_empresa_fantasma` con **0 duales**.
+Si algo sale mal: `select * from public.gv_mig337_rollback();`.
