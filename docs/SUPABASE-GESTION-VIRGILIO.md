@@ -19527,3 +19527,87 @@ lados** — los puntos están marcados con `≡ gv_ppp_super_mezclado`.
 **Rollback:** sacar `and not q.tiene_super` del `where` de `_open` y el `bool_or(...)` del subquery
 `q`; la vista anterior está en `sql/gv_ppp_super_mezclado_v1423.sql`.
 
+
+## §3.id — v18.88: Conciliación, "No se pudo cargar el detalle: statement timeout" — 2026-09-16
+
+**Lo que se veía.** Facturación → Conciliación → botón **🔍 Comparar**: el modal abría y en
+rojo decía *"No se pudo cargar el detalle: canceling statement due to statement timeout"*.
+Lo reportó Thomas.
+
+### La causa son tres cosas, no una
+
+1. **`gv_conciliacion_comparar(np)` resolvía el `doc_id` de la factura por
+   `gv_vista_cruce_facturacion`**, y esa vista llamaba a **`gv_cruce_fc_asignacion()` en vivo**.
+   Esa función es plpgsql, crea dos temp tables y recalcula la asignación **GLOBAL**
+   NP↔factura (867 pares, greedy por `dcajas`/`dfecha`) en **cada** consulta: **1,2 s fijos**,
+   traiga una fila o mil.
+2. **Y el filtro por NP no se empujaba.** `where i.np = r.np` contra
+   `gv_vista_facturacion_neto_items` quedaba como **JOIN** (porque `r` era un CTE), así que la
+   vista calculaba los ítems de **TODAS** las NP. Total por llamada: **2.143 ms**.
+   Para una sola NP la misma vista cuesta **37 ms** — o sea que el 98 % era trabajo tirado.
+3. **El listado dispara 23 de esas llamadas a la vez.** `concilCargarMotivos` pide
+   `gv_conciliacion_motivo` (que llama a `comparar`) para **cada fila con diferencia**, todas
+   en paralelo y sin límite. 23 recómputos globales simultáneos saturan el pool, y el
+   🔍 Comparar que toca el usuario se come el `statement_timeout` de 8 s. **Ésa es la razón de
+   que el error apareciera "a veces": aparece cuando la pantalla ya está cargando los motivos.**
+
+⚠ Vale la pena leer el comentario que quedó en el código desde la **v14.42**: el motivo se sacó
+del listado *justamente* porque "re-materializaba el cruce completo" y hacía timeout
+`gv_conciliacion_lista`. El costo no se eliminó: **se mudó a 23 llamadas paralelas**.
+
+### El fix
+
+| | Qué se hizo |
+|---|---|
+| **a** | **Cache `GV_Cruce_FC_Asig`** (np pk, doc_id, candidatos, actualizado_at) + `gv_cruce_fc_asig_refrescar()`. La asignación es greedy **global** —cada factura va a UNA sola NP— así que **no se puede calcular por NP**: hay que cachearla. |
+| **b** | `gv_vista_cruce_facturacion` lee el cache en vez de llamar a la función. Se le repuso `security_invoker = true` después del `CREATE OR REPLACE` (que borra las `reloptions`). |
+| **c** | `gv_conciliacion_comparar` pasa a **plpgsql** y resuelve `np`/`empresa`/`doc_id`/`neto` a **variables** antes de la consulta grande → el filtro por NP sí se empuja, y ya no toca la vista. |
+| **d** | `gv_conciliacion_lista` refresca el cache **si tiene más de 3 min** (`gv_cruce_fc_asig_refrescar_si_viejo(180)`): la pantalla es la que garantiza que lo que leen después los Comparar/motivos esté al día. |
+| **e** | Cron **`gv-cruce-fc-asig`** (jobid **90**, `*/10 * * * *`) para el resto de los consumidores, entre ellos la alerta de las 21:30 (cron 77). |
+| **f** | Front: `concilCargarMotivos` pasa a **cola de 6** (`CONCIL_MOT_CONC`). El backend ya no lo necesita, pero evita que vuelva a escalar con el número de filas. |
+
+El refresco tiene un **guard**: si `gv_cruce_fc_asignacion()` devuelve 0 filas, **no pisa el
+cache**. Un cache vacío dejaría la Conciliación sin una sola factura y nadie se enteraría.
+
+### Medido
+
+| | Antes | Después |
+|---|---|---|
+| `gv_conciliacion_comparar('LK 0097')` | 2.143 ms | **90 ms** (24×) |
+| `gv_conciliacion_motivo('LK 0097')` | ~2.900 ms | **31 ms** (93×) |
+| `gv_conciliacion_lista(200,0)` | ~3.000 ms | **920 ms** |
+
+**Salida idéntica, verificada dos veces:**
+
+- `gv_vista_cruce_facturacion` entera: **1.303 filas** y md5 `7f08b03adaa982c79c61e675f5d31f7c`
+  **antes y después**.
+- El cache contra la función viva: `except` en los dos sentidos → **0 y 0**.
+- `gv_conciliacion_comparar` NP por NP, las **142** de `GV_Conciliacion_Facturacion`: firma md5
+  igual en **142 de 142** (tabla `zz_backups."GV_Cmp_Comparar_20260916"`, con RLS). Se corrió
+  dos veces: contra la función nueva bajo otro nombre, y otra vez **después** de reemplazar la
+  original.
+- Los otros consumidores de la vista siguen contestando: `gv_conciliacion_totales` (3),
+  `gv_cruce_facturacion_totales` (3), `gv_cruce_facturacion_resumen` (50),
+  `gv_cruce_facturacion_nps` (1).
+- `select * from public.gv_endpoints_rotos;` → vacío. Barrido de tablas sin RLS escribibles por
+  `anon` → vacío. Barrido de vistas sin `security_invoker` legibles por `anon` → vacío.
+
+### Cómo se mantiene fresco (y qué pasa si no)
+
+El cache se desactualiza cuando entra una factura nueva a ISIS o se factura una NP nueva. Lo
+cubren el cron de 10 min y el refresco de la propia pantalla. Si quedara viejo, el síntoma es
+una NP recién facturada que figura **"sin factura aún"** hasta la próxima corrida — no un dato
+incorrecto. A mano: `select public.gv_cruce_fc_asig_refrescar();`
+
+```sql
+select count(*), max(actualizado_at) from public."GV_Cruce_FC_Asig";
+with viva as (select * from public.gv_cruce_fc_asignacion()),
+     cache as (select np, doc_id, candidatos from public."GV_Cruce_FC_Asig")
+select (select count(*) from (select * from viva except select * from cache) z) solo_viva,
+       (select count(*) from (select * from cache except select * from viva) z) solo_cache;
+-- 0 y 0 = el cache está al día
+```
+
+**Archivos:** `sql/gv_cruce_fc_asig_cache_v1888.sql` (todo el cambio) y
+`sql/backups/gv_conciliacion_comparar_20260916_pre_v1888.sql` (rollback completo de las tres
+piezas). Problema 335.

@@ -5625,7 +5625,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=18.87"></script>
+<script type="module" src="recepcion.js?v=18.88"></script>
 <!-- Config del módulo de fichada (compartido con fichada.html). El secret
      hmacSecret tiene que ser el mismo acá y allá; cargándolo desde un solo
      archivo evitamos que se desincronicen. -->
@@ -9208,7 +9208,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v18.87";
+const APP_VERSION = "v18.88";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -51624,21 +51624,34 @@ window.concilRender = concilRender;
 
 /* v14.42 — carga on-demand del "¿Por qué?" (motivo) por NP, en paralelo y sin bloquear el
    render. Backend gv_conciliacion_motivo(np) (SÓLO LEE). Antes venía en el listado y por cada
-   fila con diferencia re-materializaba el cruce completo → gv_conciliacion_lista hacía timeout. */
+   fila con diferencia re-materializaba el cruce completo → gv_conciliacion_lista hacía timeout.
+   v18.87 — en COLA, de a CONCIL_MOT_CONC a la vez. Se disparaban todas juntas (hoy 23) y cada
+   una costaba ~2,9 s de recómputo global: saturaban el pool y el 🔍 Comparar que tocaba el
+   usuario se comía el statement_timeout. El backend ya bajó a ~31 ms, pero la cola queda para
+   que esto no vuelva a escalar con el número de filas. */
+var CONCIL_MOT_CONC = 6;
 function concilCargarMotivos(shown) {
+  var cola = [];
   (shown || []).forEach(function (r, i) {
     if (r.motivo) return; // ya vino (por si un día se precalcula)
     if (!(r.estado === "diff" && !r.corregido && r.factura_neto != null)) return;
-    sb.rpc("gv_conciliacion_motivo", { p_np: r.np }).then(function (res) {
-      var td = document.getElementById("concilMot" + i); if (!td) return;
-      if (res.error) { td.innerHTML = '<span style="color:#cbd5e1;">—</span>'; return; }
-      var m = res.data; // escalar text
-      r.motivo = m || "";
-      td.innerHTML = m ? escapeHtml(String(m)) : '<span style="color:#cbd5e1;">—</span>';
-    }).catch(function () {
-      var td = document.getElementById("concilMot" + i); if (td) td.innerHTML = '<span style="color:#cbd5e1;">—</span>';
-    });
+    cola.push({ r: r, i: i });
   });
+  var next = 0;
+  function pintar(i, html) { var td = document.getElementById("concilMot" + i); if (td) td.innerHTML = html; }
+  function tomar() {
+    if (next >= cola.length) return Promise.resolve();
+    var it = cola[next++];
+    return sb.rpc("gv_conciliacion_motivo", { p_np: it.r.np }).then(function (res) {
+      if (res.error) { pintar(it.i, '<span style="color:#cbd5e1;">—</span>'); return; }
+      var m = res.data; // escalar text
+      it.r.motivo = m || "";
+      pintar(it.i, m ? escapeHtml(String(m)) : '<span style="color:#cbd5e1;">—</span>');
+    }).catch(function () {
+      pintar(it.i, '<span style="color:#cbd5e1;">—</span>');
+    }).then(tomar);
+  }
+  for (var k = 0; k < Math.min(CONCIL_MOT_CONC, cola.length); k++) tomar();
 }
 window.concilCargarMotivos = concilCargarMotivos;
 
