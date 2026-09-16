@@ -38913,7 +38913,7 @@ async function pppToggleDetalle(np) {
 async function pppFetchDetalle(np) {
   try {
     var H = { "apikey": SUPABASE_KEY, "Authorization": "Bearer " + SUPABASE_KEY };
-    var url = SUPABASE_URL + "/rest/v1/gv_ppp_base_pedidos?pedido=eq." + encodeURIComponent(np) + "&select=articulo,cajas&order=articulo";
+    var url = SUPABASE_URL + "/rest/v1/gv_ppp_np_items?np=eq." + encodeURIComponent(np) + "&select=articulo:art,cajas&order=art";
     var r = await fetch(url, { headers: H });
     if (!r.ok) return [];
     var items = await r.json();
