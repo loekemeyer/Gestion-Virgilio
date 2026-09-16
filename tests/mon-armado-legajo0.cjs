@@ -32,8 +32,10 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
     window.getHistoricMap = async function () { return new Map(); };
     window.fetch = function (url) {
       url = String(url);
-      // Query A del monitor (v10.26): vista_tanda_status por tanda.
-      if (url.indexOf("vista_tanda_status") >= 0) {
+      /* Query A del monitor (v10.26). v18.71: pasó a `gv_tanda_status`, que es
+         vista_tanda_status + pick_abandonado/arm_abandonado. Se matchea el sufijo común para
+         que el mock sirva con cualquiera de las dos. */
+      if (url.indexOf("tanda_status") >= 0) {
         return J([
           // D06C: pickeada y cerrada por 122. El AP de legajo 0 NO llega: la vista lo
           // descartó, así que la fila viene sin nada de armado.
@@ -41,7 +43,8 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
             last_arm_op: null, arm_legajo: null, arm_start_ts: null },
           // REAL: armado en curso por un legajo de verdad.
           { tanda: "REAL", last_pick_op: "TP", pick_legajo: "122", pick_start_ts: "2026-08-04T15:00:00Z",
-            last_arm_op: "AP", arm_legajo: "122", arm_start_ts: "2026-08-04T15:30:00Z" },
+            last_arm_op: "AP", arm_legajo: "122", arm_start_ts: "2026-08-04T15:30:00Z",
+            arm_abandonado: false, arm_fj_ts: null },
           // CERR: armado terminado (TAP) → "done".
           { tanda: "CERR", last_pick_op: "TP", pick_legajo: "55", pick_start_ts: "2026-08-04T14:00:00Z",
             last_arm_op: "TAP", arm_legajo: "55", arm_start_ts: "2026-08-04T14:40:00Z" }

@@ -18263,3 +18263,73 @@ de JC al fichar FJ, con `ts_cliente` idéntico y `created_at` nuevo). La dedup p
 alcanza justamente porque al borrar la fila desaparece contra qué deduplicar.
 
 `sql/gv_anular_picking_virgilio_v1870.sql` · `tests/anular-picking-fantasma.cjs`
+
+---
+
+## §3.ho — v18.71: los dos pendientes del lock — el monitor que contaba de más y el anular que se deshacía solo — 2026-09-16
+
+### 1. Una fase abierta por alguien que FICHÓ SALIDA no está «en curso»
+
+El 16/09 a las 8 de la mañana el monitor mostraba **«JC 17h54»** en E25A y **«FO 16h18»** en
+E23A. Los dos habían fichado **FJ** («terminé día») a las 17 del día anterior sin cerrar, así
+que el chip siguió corriendo toda la noche y al supervisor le parecía que seguían trabajando.
+Es la tercera vez en dos días que aparece la misma confusión.
+
+**FJ y cerrar un picking siguen siendo cosas independientes** — eso no cambia. Lo que cambia es
+la **lectura**: si hay un FJ posterior a la apertura, la fase está **abandonada**, la duración
+se congela en ese FJ y el chip lo dice (marca `⏏`, color propio, y un `title` que aclara que la
+tanda quedó libre para que la agarre otro).
+
+| | antes | ahora |
+|---|---|---|
+| E25A (JC) | 17h54 corriendo | **2h48** ⏏ |
+| E23A (FO) | 16h18 corriendo | **0h54** ⏏ |
+
+⚠ **El FJ que importa es el PRIMERO después de abrir, no el último del operario.** La primera
+versión usaba `max(ts)` por legajo y con eso una tanda abierta hace un mes daba una duración de
+un mes. Con el primero, queda lo que realmente se trabajó antes de irse.
+
+Va en el **backend** (`gv_tanda_status` = `vista_tanda_status` + `pick_abandonado` /
+`arm_abandonado` + los ts del FJ) porque «¿está abandonado?» es una regla, no un formato. Vista
+nueva: la vieja la comparte Producción Virgilio (5 usos en su `index.html`), y además
+**Facturación sigue leyendo la vieja** — sólo se movió el monitor.
+
+### 2. Anular deja de BORRAR: el celular lo resucitaba
+
+`Registros_Produccion_Virgilio` tiene un **UNIQUE sobre `client_id`**, y el front postea con
+`Prefer: resolution=ignore-duplicates`. **Eso** es lo que hace que un reenvío de la cola offline
+no duplique nada… mientras la fila siga existiendo.
+
+Al **borrarla**, su `client_id` queda libre: ya no hay contra qué chocar y el reenvío entra como
+evento nuevo. Pasó el 15/09 con E25A — borrado 16:56, **reinsertado 17:17** por el celular de JC
+al fichar FJ, con el mismo `ts_cliente` y un `id` nuevo. La anulación duró 21 minutos.
+
+**La salida barata: no borrar, cambiar el código de opción** (`EP` → `EPX`, `PKC` → `PKCX`).
+
+- la fila sigue ocupando su `client_id` → el reenvío choca y se descarta;
+- **ningún consumidor la cuenta**: los **21 funciones y 11 vistas** que leen este log filtran por
+  `opcion = 'EP'` / `'PKC'` con igualdad exacta — verificado que ninguna usa `LIKE 'EP%'` ni
+  regex — así que **no hay que tocar ni una**;
+- y queda el rastro, con fecha y motivo en `descripcion`.
+
+La alternativa era una columna `gv_anulado` y enseñarles a los 32 consumidores a saltearla; un
+solo olvido = un picking anulado que sigue contando.
+
+**Prueba del ciclo completo** (client_id `prueba_reenvio_1866`, ya borrado):
+
+```
+1. entra el EP ......................................... 1 fila, opcion 'EP'
+2. gv_anular_picking_virgilio(...) ..................... 'ok'
+3. el celular REENVÍA el mismo evento (on conflict do nothing,
+   que es exactamente lo que manda el front) ........... la fila sigue en 'EPX'
+```
+
+No revivió. Antes se insertaba una fila nueva con `EP`.
+
+Se hizo a las 8:30, con los operarios ya adentro pero **antes del primer picking del día** (0
+`EP`/`AP`; estaban en Control Remitos y Recepción) y con los celulares ya en v18.70.
+
+**Queda pendiente**: `anular_armado_virgilio` tiene el mismo patrón de borrado y todavía no se
+tocó.
+
+`sql/gv_tanda_status_y_anular_v1871.sql` · `tests/monitor-abandonado.cjs`

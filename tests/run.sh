@@ -78,6 +78,9 @@ PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node te
 echo "== anular-picking-fantasma (v18.66: anular un picking no borra el stock de otro) =="
 node tests/anular-picking-fantasma.cjs
 
+echo "== monitor-abandonado (v18.71: el monitor no cuenta horas de quien ya fichó salida) =="
+PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/monitor-abandonado.cjs
+
 echo "== fac-cuelgue (regresión: Facturación no queda en «Cargando tandas…» para siempre — timeout + cartel con motivo) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/fac-cuelgue.cjs
 
