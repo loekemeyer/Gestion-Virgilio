@@ -45,12 +45,26 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
     window.setHistoryItemStatus = () => {};
     window._compTandaYaArmada = async () => true;
     const hace = (h) => new Date(Date.now() - h * 3600000).toISOString();
-    let pickIni = hace(20);
+    /* ⚠ v19.23 — el umbral se mide en horas ACTIVAS, no de reloj (regla de Luis: la noche no
+       se trabaja). Un TP abierto "hace 20 h" son ~1-2 h trabajadas si se cerró a la mañana
+       siguiente, así que ya NO es una duración absurda y no pregunta nada: eso es el
+       arreglo, no una regresión. Para probar el cartel hace falta un olvido de verdad, y
+       tiene que ser independiente de la hora a la que corra el test → 20 DÍAS. */
+    let pickIni = hace(20 * 24);
     window.getLegajoState = () => ({ picking: { active: true, value: "D09B", ts_inicio: pickIni }, armado: { active: false }, toggles: { CR: hace(5) } });
     const prep = (op, txt) => { document.getElementById("legajoInput").value = "8"; document.getElementById("textInput").value = txt || ""; selected = op; emitted = []; confirms.length = 0; };
-    // TP abierto hace 20 h, Cancelar → no manda
+    // TP abierto hace 20 DÍAS, Cancelar → no manda
     prep("TP", "D09B"); confirmAnswer = false; await send();
-    out.tpCancelaNoManda = emitted.length === 0 && confirms.length === 1 && confirms[0].indexOf("20.0 h") >= 0;
+    out.tpCancelaNoManda = emitted.length === 0 && confirms.length === 1
+      && confirms[0].indexOf("TRABAJADAS") >= 0 && confirms[0].indexOf("sin contar la noche") >= 0;
+    // y el TP cerrado a la mañana siguiente (≈16 h de reloj) NO pregunta: son ~1 h activas
+    const _ayer16 = new Date(Date.now() - 24 * 3600000); _ayer16.setHours(16, 0, 0, 0);
+    const _guard = pickIni; pickIni = _ayer16.toISOString();
+    prep("TP", "D09B"); confirmAnswer = false; await send();
+    out.tpCruceNoEsAbsurdo = (typeof businessDurBetweenMs !== "function")
+      || (businessDurBetweenMs("8", _ayer16.getTime(), Date.now()) / 3600000 > 8)
+      || (confirms.length === 0 && emitted.indexOf("TP") >= 0);
+    pickIni = _guard;
     // Aceptar → manda
     prep("TP", "D09B"); confirmAnswer = true; await send();
     out.tpAceptaManda = emitted.indexOf("TP") >= 0 && confirms.length === 1;
@@ -118,7 +132,8 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
   });
 
   const checks = [
-    ["7953: TP abierto hace 20 h + Cancelar → no manda",           r.tpCancelaNoManda === true],
+    ["7953: TP olvidado 20 días + Cancelar → no manda",            r.tpCancelaNoManda === true],
+    ["v19.23: cierre a la mañana siguiente NO es duración absurda", r.tpCruceNoEsAbsurdo === true],
     ["7953: + Aceptar → manda",                                     r.tpAceptaManda === true],
     ["7953: TP de 2 h no pregunta",                                 r.tpNormalSinPregunta === true],
     ["7953: toggle CR de 5 h (> 3 h) pregunta",                     r.toggleLargoPregunta === true],

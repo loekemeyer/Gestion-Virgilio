@@ -559,3 +559,6 @@ PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node te
 
 echo "== cierre-cancelado-avisa (v19.22: cancelar el «donde dejas la tanda» avisa, no aborta en silencio) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/cierre-cancelado-avisa.cjs
+
+echo "== horas-activas (v19.23: solo se cuentan horas ACTIVAS, la noche no cuenta) =="
+PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/horas-activas.cjs

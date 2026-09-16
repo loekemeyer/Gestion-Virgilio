@@ -5710,7 +5710,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=19.22"></script>
+<script type="module" src="recepcion.js?v=19.23"></script>
 <!-- Config del módulo de fichada (compartido con fichada.html). El secret
      hmacSecret tiene que ser el mismo acá y allá; cargándolo desde un solo
      archivo evitamos que se desincronicen. -->
@@ -9556,7 +9556,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v19.22";
+const APP_VERSION = "v19.23";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -10345,16 +10345,41 @@ async function send() {
      picking/armado > 8 h, toggles > 3 h. Falla ABIERTO: si confirm() no existe, sigue. */
   if (payload.ts_inicio_iso) {
     const _iniMs = new Date(payload.ts_inicio_iso).getTime();
-    const _durH  = (isFinite(_iniMs) && _iniMs > 0) ? (nowMs - _iniMs) / 3600000 : 0;
+    const _iniOk = isFinite(_iniMs) && _iniMs > 0;
+    /* v19.23 — el umbral se mide en HORAS ACTIVAS, no de reloj (regla de Luis: "si está
+       1 hora pickeando algo, termina el día y después de 14 horas comienza el siguiente
+       día y en 30 min lo cierra, tardó 1:30 y no 15:30"). Antes cerrar a la mañana
+       siguiente daba 16 h y saltaba este cartel diciendo "duración absurda" para un
+       cierre perfectamente normal — y el que lo cancelaba perdía el cierre. La noche no
+       se trabaja: no cuenta. `businessDurBetweenMs` descuenta noches, fines de semana y
+       feriados; si no está cargada se cae al reloj (el criterio viejo). */
+    const _cruzaDia = _iniOk && isoToDayKey(_iniMs) !== isoToDayKey(nowMs);
+    const _durH = !_iniOk ? 0
+      : ((_cruzaDia && typeof businessDurBetweenMs === "function")
+          ? businessDurBetweenMs(legajoStr, _iniMs, nowMs) / 3600000
+          : (nowMs - _iniMs) / 3600000);
     const _limH  = (opcion === "TP" || opcion === "TAP")
       ? ((typeof INC_DUR_CORE_MAX_MIN   !== "undefined" ? INC_DUR_CORE_MAX_MIN   : 480) / 60)
       : ((typeof INC_DUR_TOGGLE_MAX_MIN !== "undefined" ? INC_DUR_TOGGLE_MAX_MIN : 180) / 60);
     if (_durH > _limH) {
       let _okDur = true;
       try {
-        _okDur = confirm("⚠ " + (descripcion || opcion) + (texto ? " (" + texto + ")" : "") + " está abierto hace " + _durH.toFixed(1) + " h (más de " + _limH + " h).\n\n¿Seguro que lo cerrás AHORA? Si lo abriste otro día y te olvidaste de cerrarlo, avisá a sistemas para corregir la hora.\n\nAceptar = cerrar igual · Cancelar = no mandar nada");
+        _okDur = confirm("⚠ " + (descripcion || opcion) + (texto ? " (" + texto + ")" : "") +
+          " lleva " + _durH.toFixed(1) + " h " + (_cruzaDia ? "TRABAJADAS" : "abierto") +
+          " (más de " + _limH + " h)" + (_cruzaDia ? ", sin contar la noche" : "") + ".\n\n" +
+          "¿Seguro que lo cerrás AHORA? Si te olvidaste de cerrarlo, avisá a sistemas para " +
+          "corregir la hora.\n\nAceptar = cerrar igual · Cancelar = no mandar nada");
       } catch (_e) { _okDur = true; }
-      if (!_okDur) return;
+      if (!_okDur) {
+        /* v19.23 — cancelar acá también dejaba el cierre sin registrar en silencio
+           (mismo patrón del problema 365). El texto del cartel lo avisa, pero conviene
+           que quede dicho después: el operario acaba de decir "no" a un cierre. */
+        try {
+          alert("Listo, NO se cerró " + (texto || (descripcion || opcion)) +
+                ".\n\nSigue abierto. Avisá a sistemas si la hora de arranque está mal.");
+        } catch (_e) {}
+        return;
+      }
     }
   }
 
@@ -47233,11 +47258,21 @@ function computeInconsistencias(events, dayKey, validTandas) {
 
     for (const e of list) {
       if (!e.ts_inicio) continue;
-      const dur = new Date(e.ts_cliente) - new Date(e.ts_inicio);
+      const _iniMs = new Date(e.ts_inicio).getTime(), _finMs = new Date(e.ts_cliente).getTime();
+      /* v19.23 — se mide TIEMPO ACTIVO, no reloj (regla de Luis: "si está 1 hora
+         pickeando, termina el día y al otro día en 30 min lo cierra, tardó 1:30 y no
+         15:30"). Un cierre de la mañana siguiente daba 16 h y salía acá como
+         "duración absurda" siendo un cierre legítimo: 23 de los 460 cierres de 40
+         días cruzan el día. `businessDurBetweenMs` descuenta noches, fines de semana
+         y feriados; si no está cargada se cae al reloj (mismo criterio que antes). */
+      const _cruza = isoToDayKey(_iniMs) !== isoToDayKey(_finMs);
+      const dur = (_cruza && typeof businessDurBetweenMs === "function")
+        ? businessDurBetweenMs(leg, _iniMs, _finMs)
+        : (_finMs - _iniMs);
       if (dur <= 0) continue;
       const durMin = _incMin(dur);
       if (e.opcion === "TP" || e.opcion === "TAP") {
-        if (durMin > INC_DUR_CORE_MAX_MIN) add("alta", "Duración", leg, _incHora(e.ts_cliente), `${INC_DESC[e.opcion]} ${String(e.texto || "").toUpperCase()} duró ${(durMin / 60).toFixed(1)} h`);
+        if (durMin > INC_DUR_CORE_MAX_MIN) add("alta", "Duración", leg, _incHora(e.ts_cliente), `${INC_DESC[e.opcion]} ${String(e.texto || "").toUpperCase()} duró ${(durMin / 60).toFixed(1)} h${_cruza ? " activas (se abrió otro día)" : ""}`);
       } else if (e.opcion === "PC") {
         if (durMin > INC_COMIDA_MAX_MIN) add("media", "Tiempos", leg, _incHora(e.ts_cliente), `Comida de ${Math.round(durMin)} min (> ${INC_COMIDA_MAX_MIN} min)`);
       } else if (INC_TOGGLE.includes(e.opcion)) {

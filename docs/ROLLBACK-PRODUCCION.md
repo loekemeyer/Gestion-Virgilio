@@ -1347,3 +1347,50 @@ expresiones originales — están literales en `sql/gv_ppp_np_desarmar_v1891.sql
 ```
 
 **No se tocó ningún dato** de `Movimientos_Stock` en este cambio: sólo aplica de acá en adelante.
+
+
+---
+
+## v19.23 (2026-09-16) — `vista_productividad_diaria` y `vista_productividad_semanal` reemplazadas
+
+**Objetos compartidos tocados:** las dos vistas de `public.*`.
+
+**Quién las consume, medido el 16/09** (no alcanzaba con mirar el tablero de Gestión):
+
+| Consumidor | Cómo se verificó |
+|---|---|
+| front de `produccion-virgilio` (`.js` / `.html`) | **0 apariciones** (clon fresco `bba6bcb`, grep) |
+| `reporte_diario_telegram(date, boolean)` | corrida con `p_enqueue = false` → 681 chars, **sin enviar** |
+| `reporte_semanal_telegram(date, boolean)` | corrida con `p_enqueue = false` → 364 chars, **sin enviar** |
+| `reporte_agentes_rendimiento_anomalo()` | **NO se llamó**: encola Telegram sin guard. Se corrió su consulta interna a mano → 8 filas |
+
+⚠ Esa última no tiene flag de "no enviar": si hay que probarla, se prueba la consulta, no la
+función. Las tres salieron del repo de Producción (`sql/reporte_diario.sql`,
+`sql/reporte_semanal.sql`, `sql/rendimiento_anomalo.sql`) y siguen vivas en la base compartida.
+
+**Por qué no se rompen:** no se agregó, quitó ni renombró ninguna columna — cambió sólo cómo se
+calculan los minutos.
+
+**Qué cambió:** pasan de medir tiempo de RELOJ a medir **horas activas** (la noche, el fin de
+semana y los feriados no cuentan), y dejan de descartar la tanda cerrada al otro día. Detalle y
+medición en `docs/SUPABASE-GESTION-VIRGILIO.md` §3.it.
+
+**Impacto medido:** ningún valor bajó; subieron los días que tenían un cierre cruzado (23 de 460
+cierres en 40 días). Ninguna columna se agregó ni se quitó, así que cualquier lector sigue
+funcionando igual.
+
+**Objetos nuevos (no tocan nada existente):** `gv_jornada_ventanas`, `gv_min_activos`,
+`gv_fin_activo`.
+
+**Rollback exacto:**
+
+```bash
+# deja las dos vistas como estaban (v19.07) y repone security_invoker
+psql < sql/backups/vista_productividad_pre_v1923_20260916.sql
+```
+
+Las tres funciones nuevas pueden quedar: sin las vistas nuevas no las llama nadie. Para borrarlas
+igual: `drop function public.gv_fin_activo(text,timestamptz,timestamptz,numeric);
+drop function public.gv_min_activos(text,timestamptz,timestamptz);
+drop function public.gv_jornada_ventanas(text,timestamptz,timestamptz);`
+

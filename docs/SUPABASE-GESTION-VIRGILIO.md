@@ -21096,3 +21096,107 @@ límite $31 M) **0 filas**; LK 1926 (común, límite $20.000) **1 fila**. `ya_pr
 `update public.gv_excepcion_cuarentena set motivos = array['deuda'];`
 (El archivo y los comentarios del código quedaron nombrados `v19.17` de cuando la sesión iba por
 ese número; el bump final fue **v19.19** por colisión con otra sesión — el contenido es el mismo.)
+
+
+---
+
+## §3.it — v19.23: la productividad cuenta HORAS ACTIVAS, no horas de reloj — 2026-09-16
+
+**Pedido de Luis, textual:** *"debería solo contar horas activas. si está 1 hora pickeando algo,
+termina el día y después de 14 horas comienza el siguiente día y en 30min de trabajo lo cierra,
+tardó 1:30hs y no 15:30"*.
+
+### El problema no era mostrar 15:30, era mostrar CERO
+
+`vista_productividad_diaria` y `_semanal` marcaban `valido = false` cuando `ts_inicio` y
+`ts_cliente` caían en días distintos (más un tope de 43.200 s de **reloj**). O sea que un cierre
+legítimo de la mañana siguiente **se descartaba entero, con sus m³**.
+
+El criterio correcto ya existía: `computeClosureDur` del monitor (index.html) parte el cruce de
+día y usa la fichada y el FJ reales. Estaba implementado en **un** lugar y faltaba en los otros
+cuatro (las dos vistas, el cartel de cierre y el tablero de Inconsistencias).
+
+### Medición (40 días)
+
+| | |
+|---|---|
+| cierres de picking/armado (`TP`/`TAP` con `ts_inicio`) | **460** |
+| que cruzan el día | **23** (5,0%) |
+| de esos, con ≤ 12 h **activas** → trabajo real que se perdía | **21** |
+| horas de reloj promedio de un cruce | **115,8 h** |
+| peor caso: `C06B` lg 94, 23/05 → 17/08 | 2.067 h reloj / **549 activas** → sigue inválido |
+
+Ejemplos del cálculo nuevo: `D71B` 16,0 h de reloj → **0,92 h activas**; `D25C` 16,4 → **0,82**;
+`E23A` 16,9 → **1,90**; `E11A` 19,7 → **4,70**.
+
+Impacto en la vista diaria (mismos días, antes → después). **Nada bajó**: sólo apareció trabajo
+que estaba descartado.
+
+| legajo · día | arm_m3 | arm_eff_min |
+|---|---|---|
+| 237 · 09/09 | 2,86 → **6,90** | 306,4 → **455,9** |
+| 8 · 11/09 | 1,18 → **3,80** | 61,3 → **224,1** |
+| 237 · 14/09 | 2,70 → **3,25** | 301,4 → **446,1** |
+| 8 · 15/09 | 2,32 → **3,07** | 139,5 → **319,5** |
+| 237 · 15/09 | 2,62 → **3,11** | 299,2 → **354,4** |
+
+### Qué se creó
+
+Tres funciones, con **una sola fuente de verdad**:
+
+| Función | Qué hace |
+|---|---|
+| `gv_jornada_ventanas(legajo, ini, fin)` | los **tramos trabajados** entre dos instantes (SRF) |
+| `gv_min_activos(legajo, ini, fin)` | minutos activos = suma de esos tramos |
+| `gv_fin_activo(legajo, ini, fin, cap_min)` | el instante donde se acumulan `cap_min` minutos **activos** |
+
+Ventanas: día de apertura → de `ini` al **FJ real** de ese día o a `hora_salida`; día de cierre →
+de la **fichada real** (o el primer evento, o `hora_entrada`) a `fin`; días del medio → jornada
+completa salteando sábado, domingo y `GV_Dias_No_Habiles`. Fallback 08:00-17:00.
+`EXECUTE` revocado a `public`, otorgado a `anon`, `authenticated`, `service_role`.
+
+### Qué cambió en las vistas
+
+1. `valido` **ya no exige mismo día**; el tope de 12 h pasó a ser sobre minutos **activos** (720).
+2. El tope por evento (`cap_min`) se aplica sobre tiempo **activo**, con `gv_fin_activo`. Antes era
+   `ts_inicio + least(reloj, cap)`, que en un cruce caía **dentro del primer día** y le contaba el
+   tope entero (2 h) a un trabajo de 55 min.
+3. La duración de cada isla pasó de `epoch(me - ms)/60` a los minutos activos de `[ms, me]`.
+4. En la semanal, `min_x_armado` y los `t_*` (carga, control, recepción, comida, limpieza) pasaron
+   de `raw_min` a `act_min`.
+
+⚠ **El camino caliente no llama a la función**: cuando apertura y cierre son del mismo día (437 de
+460) se resuelve con la resta directa, inline. La semanal barre **todos** los eventos de 56 días —
+sin ese atajo serían decenas de miles de llamadas a una plpgsql.
+
+⚠ **Las dos vistas se reemplazaron con `with (security_invoker = true)` Y el `alter view` después**
+(`CREATE OR REPLACE VIEW` sin `WITH (...)` borra las `reloptions`).
+
+### Chequeos (los cinco dieron lo esperado)
+
+| | |
+|---|---|
+| vistas de `public` sin `security_invoker` legibles por `anon` | **0** |
+| días con más minutos efectivos que jornada (> 960) | **0** |
+| `gv_endpoints_rotos` | **0** |
+| semanas con efectivos > `jornada_min` | **0** |
+| filas de la semanal | 38 |
+
+### El front, igual criterio
+
+- El cartel de "duración absurda" al cerrar (`send()`, v12.99) mide con `businessDurBetweenMs`
+  cuando cruza el día: dice **"lleva X h TRABAJADAS … sin contar la noche"**. Antes decía 16 h y
+  trataba un cierre normal como un olvido. Y **cancelarlo ahora avisa** que quedó abierta (antes
+  volvía mudo, el mismo patrón del problema 365).
+- El tablero de **Inconsistencias** mide activo y, si el cierre cruzó el día, lo dice:
+  *"duró 1,5 h activas (se abrió otro día)"*.
+
+**La hora guardada no se toca**: `ts_inicio` sigue siendo el real. Cambió cómo se **mide**, no lo
+que se registra — así que no hace falta ningún fix de datos y el rollback es sólo de definiciones.
+
+**Rollback**: `sql/backups/vista_productividad_pre_v1923_20260916.sql` (runnable, deja las dos
+vistas como la v19.07 y repone `security_invoker`). Las tres funciones pueden quedar: sin las
+vistas nuevas no las llama nadie.
+
+**Definición**: `sql/gv_productividad_horas_activas_v1923.sql`. Problema 366.
+

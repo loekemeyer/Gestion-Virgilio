@@ -1,3 +1,71 @@
+## Nota v19.23 (2026-09-16) — Sólo se cuentan las HORAS ACTIVAS
+
+Luis, sobre el aviso de que un picking cerrado al otro día iba a figurar como ~20 h:
+*"mal eso. debería solo contar horas activas. si está 1 hora pickeando algo, termina el día y
+después de 14 horas comienza el siguiente día y en 30min de trabajo lo cierra, tardó 1:30hs y
+no 15:30"*.
+
+Tenía razón, y el problema no era el aviso: **el criterio estaba implementado en UN solo lugar
+y faltaba en los otros cuatro.**
+
+| Dónde | Antes | Ahora |
+|---|---|---|
+| Monitor, "Rendimiento del día" (`computeClosureDur`) | **ya contaba activo** | igual |
+| `vista_productividad_diaria` / `_semanal` | **descartaba la tanda entera** | cuenta lo activo |
+| Cartel de "duración absurda" al cerrar | 16 h de reloj → asustaba de gratis | horas trabajadas |
+| Tablero de Inconsistencias | la listaba como anomalía | mide activo, y avisa si cruzó |
+
+### Lo peor no era mostrar 15:30: era mostrar CERO
+
+Las vistas exigían `ts_inicio` y `ts_cliente` **del mismo día** (más un tope de 12 h de reloj).
+Un cierre que cruzaba la noche quedaba `valido = false`, así que **no contaba 15:30 ni 1:30:
+contaba nada**, y se llevaba puestos los m³ de esa tanda. Medido sobre 40 días:
+
+| | |
+|---|---|
+| cierres de picking/armado | **460** |
+| que cruzan el día | **23** (5%) |
+| de esos, con ≤ 12 h **activas** (trabajo real) | **21** |
+| horas de reloj promedio de un cruce | **115,8 h** |
+| el peor: C06B, 23/05 → 17/08 | 2.067 h de reloj, 549 activas → **sigue inválido** |
+
+Lo que cambió al aplicarlo (mismos días, antes → después): 237 el 09/09 pasó de 2,86 a
+**6,90 m³**; 8 el 11/09 de 1,18 a **3,80 m³**; 237 el 14/09 de 301 a **446 min** de armado.
+**Nada bajó** — sólo apareció trabajo que estaba descartado.
+
+### Cómo se cuenta
+
+Tres funciones nuevas, y **una sola fuente de verdad**: `gv_jornada_ventanas(legajo, ini, fin)`
+devuelve los tramos trabajados, y `gv_min_activos` / `gv_fin_activo` se apoyan en ella.
+
+- **día de apertura** → de `ts_inicio` al **FJ real** de ese día (si lo marcó) o a `hora_salida`.
+- **día de cierre** → de la **fichada real** (o el primer evento, o `hora_entrada`) a `ts_cliente`.
+- **días del medio** → jornada completa, salteando sábado, domingo y `GV_Dias_No_Habiles`.
+
+Es el mismo criterio que ya usaba el monitor, ahora también en el backend.
+
+### Detalles que importan si se toca
+
+- **El tope por evento** (`cap_min`: TAP 180, TP 120, CC 60…) se aplica sobre tiempo **activo**,
+  con `gv_fin_activo`. Antes era `ts_inicio + least(reloj, cap)`, que para un cruce de día caía
+  **dentro del primer día** y le contaba el tope entero (2 h) a un trabajo de 55 min.
+- **El tope de sanidad pasó de reloj a activo**: `valido` exige ≤ **720 min activos**. Así entra
+  el cierre de la mañana siguiente y sigue afuera el olvido de tres meses.
+- ⚠ **El camino caliente no llama a la función.** Cuando apertura y cierre son del mismo día
+  (437 de 460) se usa la resta directa, inline en el SQL; la función se evalúa sólo en el 5%
+  que cruza. La vista semanal barre **todos** los eventos de 56 días: sin ese atajo serían
+  decenas de miles de llamadas a una función plpgsql.
+- **La hora guardada NO se toca.** `ts_inicio` sigue siendo el real; lo que cambió es cómo se
+  **mide**, no lo que se registra. Un fix de datos sería otra cosa y no hace falta.
+- **Trabajo del sábado**: el criterio saltea sábado y domingo. Si se trabajó excepcionalmente
+  un fin de semana, ese tramo no se cuenta. Es el límite conocido, igual que en el monitor.
+- El cartel de cierre ahora dice **"lleva X h TRABAJADAS … sin contar la noche"** sólo cuando
+  cruzó el día, y **cancelarlo avisa** que la tanda quedó abierta (antes volvía mudo).
+
+`sql/gv_productividad_horas_activas_v1923.sql`, rollback en
+`sql/backups/vista_productividad_pre_v1923_20260916.sql`, §3.ij de la doc de Supabase.
+Problema 366.
+
 ## Nota v19.22 (2026-09-16) — Por qué un picking terminado puede no dejar NI RASTRO en el celular
 
 Luis, sobre E12E: *"me dijo que lo había terminado. no queda registro local en su celu? no
