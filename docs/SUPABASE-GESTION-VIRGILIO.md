@@ -18801,3 +18801,83 @@ delete from public."PPP_Web_Config" where clave = 'atrasados_desde';
 
 Del lado del front, el submódulo es una línea en `_pppArbolHtml` (`let h = _patrHtml();`): sacarla
 deja la pantalla como estaba. `_pgaCuerpoHtml` queda igual — lo usa también la tabla de siempre.
+## §3.hu — v18.79: «Enviar a programar» absorbe al desarme, y el badge deja de mentir — 2026-09-16
+
+Tres pedidos de Luis en el mismo mensaje, y los tres del mismo nudo.
+
+### 1. «Todas las NP del pedido» ya estaba
+
+El backend resuelve el `order_id` y saca todas desde la **v18.40**; el pop-up lo dice antes de
+tocar nada (`gv_ppp_web_desprogramar_previo`). Si en pantalla dice *"Va 1 NP"* es porque **ese
+pedido tiene una sola**: dos NP del mismo cliente pueden ser dos pedidos distintos — LK 0033 y
+LK 0048 son las dos de Cresta M.Cecilia (LK 2105) pero son ped. 08/09 y ped. 09/09, `order_id`
+distintos. Lo que había que cuidar era no perderlo al cambiar de camino.
+
+### 2. Lo que faltaba de verdad: devolver la mercadería
+
+«Enviar a programar» sacaba la tanda y retenía, pero **no tocaba el stock**. El cartel lo decía
+con todas las letras: *"Las cajas ya pickeadas **no se mueven** de dónde están"*. Un pedido a
+medio armar dejaba su mercadería parada en `a_facturar` / `separar_pedidos`, sin dueño y sin que
+nadie la fuera a guardar.
+
+Al lado vivía el 🗑 **Desarmar pedido**, que sí devolvía el stock pero además mataba el pedido.
+**Dos botones para las dos mitades de la misma acción** — y de ahí salieron los dos bugs de hoy.
+Luis: *"el botón de desarmar pedido sacalo"*. Ahora hay uno.
+
+`gv_ppp_pedido_a_programar(p_np, p_por, p_motivo)`:
+
+- resuelve el pedido entero (todas las NP del `order_id`; para ISIS, la NP sola);
+- por **cada** NP con tanda llama a `gv_ppp_np_desarmar(..., p_vuelve => true)` — devuelve el
+  stock, retiene contra el cron, deja `tanda = null` y anota en `GV_Desarmes`. **Se reusa en vez
+  de repetir el cálculo de stock**, que es plata;
+- retiene también las NP que ya estaban sin tanda, para que **el pedido no se parta**.
+
+⚠ La guarda de "ya salió" (CCN/CRN) se evalúa sobre **todo el pedido antes de mover nada**: si
+una sola NP ya salió, no se desarma ninguna. Por NP dentro del loop, el pedido quedaría a medio
+deshacer.
+
+⚠ Llamar a `gv_ppp_np_desarmar` en loop **es seguro aunque dos NP compartan tanda**: su cálculo
+lee los movimientos *vivos*, así que la segunda llamada ya ve descontado lo que devolvió la
+primera y nunca devuelve de más.
+
+⚠⚠ **Adónde va la mercadería — esto hay que confirmarlo.** Luis escribió *"vuelve a las bodegas
+de donde salió (góndola, pickeado, etc)"*, pero el **14/09** la regla que él mismo fijó para este
+mismo movimiento fue la contraria: *"debería ir **A guardar** el pedido para hacerlo lo más
+limpio posible, y que un operador después lo tenga que procesar como toda la mercadería a
+guardar"*. Se mantuvo **A guardar** —es la vigente, y es la reversible: la decide un operario en
+vez de adivinarla la función— y de dónde había salido cada caja igual queda anotado
+(`salio_de_terminado` / `salio_de_excedente` en `GV_Desarmes.stock_devuelto`). Si Luis confirma
+lo otro, se cambia en **un solo lugar**: el bloque que arma `_gv_dev` en `gv_ppp_np_desarmar`.
+
+El front quedó con **un solo botón** (↩). El modal del desarme (v17.88) se sacó entero —era su
+única puerta—; el backend `gv_ppp_np_desarmar` **sigue vivo** y es el que hace el trabajo.
+Cancelar un pedido se hace desde A Programar con «✕ Anular pedido».
+
+### 3. El badge que mentía
+
+En A Programar, un pedido retenido seguía mostrando **"🤖 se arma solo → mar 22/9 · en minutos"**
+—con fecha y todo— cuando `gv_ppp_web_armar_pendientes` no lo va a tocar nunca. El supervisor se
+quedaba esperando una tanda que no iba a salir.
+
+Quién decide eso es regla de negocio, así que va al backend: `gv_ppp_web_dia_salida` devuelve
+ahora `r_motivo = 'retenido'` y **sin fecha**. Para poder mirarlo necesita saber **de qué pedido**
+se trata —el front le mandaba sólo `zona` y `m3`—, así que ahora van también `empresa` y
+`order_id`. **Si no llegan (página vieja cacheada) la función se comporta exactamente como
+antes**: el `exists` no matchea. Medido:
+
+| fila | motivo | día |
+|---|---|---|
+| LK 1364 (retenido) | `retenido` | (sin día) |
+| zona 1 sin retener | `intradia` | 2026-09-22 |
+| sin `empresa`/`order_id` (front viejo) | `intradia` | 2026-09-22 |
+
+El chip pasó a **"🔒 no lo toca el automático · ponele día"**.
+
+Las dos funciones del repo (`sql/gv_ppp_pedido_a_programar_v1878.sql`) se verificaron contra la
+base: md5 del cuerpo normalizado **idéntico** en las dos.
+
+`tests/enviar-a-programar-deshace.cjs` reemplaza a `desarmar-vuelve.cjs`. Al escribirlo, dos de
+sus chequeos daban **verde con el código roto**: uno matcheaba `empresa: p.empresa`, que aparece
+otras 5 veces en `index.html`, y el otro matcheaba **el comentario** que explicaba el cambio.
+Los dos están anclados ahora (a `aprCargarSalida`, y sobre el código sin comentarios) y
+verificados rompiendo el front a propósito.

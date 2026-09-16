@@ -3429,45 +3429,6 @@ tr.ppp-err-zona > td{ background:#fffbeb !important; }
   border:2px solid #cbd5e1; background:#fff; color:#475569; cursor:pointer; }
 .epa-b.go{ background:#1e6bd6; border-color:#1e6bd6; color:#fff; }
 .epa-b:active{ transform:scale(.97); }
-/* el pop-up de ATENCIÓN: "bien grande y bien notorio que avise que la acción es permanente" */
-#dsmModal{ position:fixed; inset:0; z-index:100000; background:rgba(15,23,42,.72);
-  display:flex; align-items:center; justify-content:center; padding:16px; }
-#dsmModal[hidden]{ display:none; }
-.dsm-card{ background:#fff; border-radius:16px; max-width:560px; width:100%; max-height:92vh;
-  overflow:auto; box-shadow:0 24px 60px rgba(0,0,0,.45); border:4px solid #b91c1c; }
-.dsm-top{ background:#b91c1c; color:#fff; padding:16px 20px; }
-.dsm-top h3{ margin:0; font-size:26px; font-weight:900; letter-spacing:.02em; line-height:1.15; }
-.dsm-top p{ margin:6px 0 0; font-size:15px; font-weight:700; opacity:.95; }
-.dsm-body{ padding:16px 20px 20px; }
-.dsm-np{ font-size:20px; font-weight:900; color:#0f172a; }
-.dsm-cli{ color:#334155; font-weight:700; margin-top:2px; }
-.dsm-sub{ color:#64748b; font-size:13px; margin-top:2px; }
-.dsm-list{ margin:14px 0 0; padding:12px 14px; background:#fef2f2; border:1px solid #fecaca;
-  border-radius:10px; color:#7f1d1d; font-size:14px; line-height:1.5; }
-.dsm-list b{ color:#b91c1c; }
-.dsm-isis{ margin-top:10px; padding:12px 14px; background:#fffbeb; border:1px solid #fcd34d;
-  border-radius:10px; color:#92400e; font-size:14px; font-weight:700; line-height:1.45; }
-.dsm-lbl{ display:block; margin:16px 0 6px; font-weight:800; color:#0f172a; font-size:14px; }
-/* v18.74 - la eleccion "vuelve / no vuelve". Sin default a proposito: son consecuencias
-   opuestas y elegir mal deja el pedido de un cliente invisible (paso con LK 1364). */
-.dsm-vuelve{ display:flex; flex-direction:column; gap:8px; margin:2px 0 4px; }
-.dsm-vuelve label{ display:flex; gap:9px; align-items:flex-start; padding:10px 12px;
-  border:1px solid #cbd5e1; border-radius:10px; background:#f8fafc; cursor:pointer;
-  font-size:13.5px; line-height:1.35; color:#0f172a; }
-.dsm-vuelve label:hover{ background:#f1f5f9; }
-.dsm-vuelve input{ margin:2px 0 0; width:17px; height:17px; flex:0 0 auto; cursor:pointer; }
-.dsm-vuelve label:has(input:checked){ border-color:#0f766e; background:#f0fdfa;
-  box-shadow:0 0 0 2px rgba(15,118,110,.18); }
-#dsmJust{ width:100%; min-height:82px; padding:10px 12px; border:2px solid #cbd5e1; border-radius:10px;
-  font-size:15px; font-family:inherit; resize:vertical; box-sizing:border-box; }
-#dsmJust:focus{ outline:none; border-color:#b91c1c; }
-.dsm-hint{ color:#64748b; font-size:12.5px; margin-top:5px; }
-.dsm-btns{ display:flex; gap:10px; margin-top:18px; }
-.dsm-btns button{ flex:1; padding:13px 14px; border:none; border-radius:11px; font-size:15px;
-  font-weight:900; cursor:pointer; width:auto; }
-.dsm-no{ background:#eef2f7; color:#0f172a; }
-.dsm-si{ background:#b91c1c; color:#fff; }
-.dsm-si:disabled{ background:#e5e7eb; color:#9ca3af; cursor:not-allowed; }
 .pga-pill{ display:inline-block; font-size:12px; font-weight:900; border-radius:999px; padding:1px 9px; letter-spacing:.02em; margin-left:8px; vertical-align:1px; }
 .pga-pill.e-facturado{ background:#dbeafe; color:#1e3a8a; } .pga-pill.e-armado{ background:#dcfce7; color:#14532d; }
 .pga-pill.e-proceso{ background:#fef9c3; color:#854d0e; }   .pga-pill.e-pendiente{ background:#fee2e2; color:#991b1b; }
@@ -5651,7 +5612,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=18.78"></script>
+<script type="module" src="recepcion.js?v=18.79"></script>
 <!-- Config del módulo de fichada (compartido con fichada.html). El secret
      hmacSecret tiene que ser el mismo acá y allá; cargándolo desde un solo
      archivo evitamos que se desincronicen. -->
@@ -9234,7 +9195,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v18.78";
+const APP_VERSION = "v18.79";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -34000,11 +33961,17 @@ async function pppVencVolver(np, opts) {
   if (!(opts && opts.sinConfirm) && !(await epaConfirmar(n))) return;
   pppSetStatus("Devolviendo " + n + " a A Programar…", true);
   try {
-    const r = await aprRpc("gv_ppp_web_desprogramar", { p_np: n, p_por: await aprQuien() });
+    /* v18.77 (Luis): "si tenían algo armado, se deshace = la mercadería vuelve a las bodegas
+       de donde salió y las NP vuelven a programar marcadas para que el cron no las programe".
+       `gv_ppp_pedido_a_programar` hace las tres cosas de una: por CADA NP del pedido que tenga
+       tanda llama a `gv_ppp_np_desarmar` con p_vuelve=true (devuelve el stock, retiene, saca la
+       tanda) y retiene también las que ya estaban sin tanda, para que el pedido no se parta.
+       Reemplaza a `gv_ppp_web_desprogramar`, que sacaba la tanda pero NO tocaba el stock. */
+    const r = await aprRpc("gv_ppp_pedido_a_programar", { p_np: n, p_por: await aprQuien() });
     const x = (r && r[0]) || {};
     const cu = await pppCuarDeNpSacada(n);   // v17.50: ¿quedó retenido en Cuarentena?
     pppSetStatus(cu ? pppCuarAvisoSacada(n, cu)
-      : ("✓ " + n + " volvió a 📥 A Programar (" + (x.np_sacadas || 0) + " NP del pedido). Ponele día vos: el automático no lo toca."), true);
+      : ("✓ " + n + " volvió a 📥 A Programar — " + (x.detalle || "") + ". Ponele día vos."), true);
     await pppLoadProgFromSupabase();
   } catch (e) {
     const msg = (e && e.message) ? e.message : String(e);
@@ -34057,11 +34024,15 @@ async function pppVencSinProgramar(np, opts) {
   try { motivo = prompt("¿Por qué lo sacás? (queda en la nota del pedido)", "nunca se registró la carga al camión") || ""; } catch (_e) {}
   pppSetStatus("Sacando " + n + " de la programación…", true);
   try {
-    const r = await aprRpc("gv_ppp_isis_desprogramar", { p_nps: [n], p_motivo: (motivo.trim() || null), p_por: await aprQuien() });
+    /* v18.77 — la misma RPC que las web: adentro detecta que es de ISIS y va por
+       `gv_ppp_isis_desprogramar`, pero antes devuelve la mercadería si la NP tenía algo
+       pickeado o armado. Antes se llamaba directo a la de ISIS y el stock quedaba parado. */
+    const r = await aprRpc("gv_ppp_pedido_a_programar", { p_np: n, p_por: await aprQuien(),
+                                                         p_motivo: (motivo.trim() || null) });
     const x = (r && r[0]) || {};
     const cu = await pppCuarDeNpSacada(n);   // v17.50: ¿quedó retenido en Cuarentena?
     pppSetStatus(cu ? pppCuarAvisoSacada(n, cu)
-      : ("↩ " + n + " quedó SIN programar (" + (x.np_sacadas || 0) + " NP). Está en 📥 A Programar."), true);
+      : ("↩ " + n + " quedó SIN programar — " + (x.detalle || "") + ". Está en 📥 A Programar."), true);
     await pppLoadProgFromSupabase();
   } catch (e) {
     const msg = (e && e.message) ? e.message : String(e);
@@ -36737,9 +36708,7 @@ function _pgaCuerpoHtml(dias, opts) {
             // cuando uno pone el mouse encima". El `title` es el que cuenta qué hace cada uno.
             ((window.__isSupervisor || !PPP_READONLY)
               ? '<span class="pga-acc"><button class="pga-acc-b" title="Enviar a programar — lo saca de esta tanda y lo manda a 📥 A Programar para darle otra fecha. Queda anotado en qué tanda estaba: al reprogramarlo vuelve a ESA tanda, así no se pickea ni se arma dos veces. El automático no lo toca."'
-                + ' onclick="event.stopPropagation();pgaEnviarAProgramar(\'' + escapeHtml(r.np) + '\')">↩</button>'
-                + '<button class="pga-acc-b del" title="Desarmar pedido — sale de la PPP para siempre y las cajas pasan a 📥 A guardar. Pide un justificativo y avisa antes."'
-                + ' onclick="event.stopPropagation();dsmAbrir(\'' + escapeHtml(r.np) + '\')">🗑</button></span>'
+                + ' onclick="event.stopPropagation();pgaEnviarAProgramar(\'' + escapeHtml(r.np) + '\')">↩</button></span>'
               : '') +
             '</div>' +
           '</td>' +
@@ -36945,9 +36914,13 @@ async function epaConfirmar(np) {
         : 'Van <b>las ' + N + ' NP del pedido entero</b> a 📥 A Programar' +
           (tandas.length > 1 ? ' (están en ' + tandas.length + ' tandas distintas):' : ':')) + '</div>' +
       '<div class="epa-nps">' + filas + '</div>' + avisos +
+      /* v18.77 — hasta acá decía que las cajas NO se movían, y era cierto: desprogramar sacaba
+         la tanda y dejaba la mercadería parada en a_facturar / separar_pedidos. Luis: "si tenían
+         algo armado, se deshace = la mercadería vuelve". Ahora vuelve, así que el cartel lo dice. */
       '<div class="epa-nota">Salen de su tanda y quedan esperándote en A Programar: el automático no las vuelve a tocar. ' +
         'Al darles día vuelven a <b>su misma tanda</b>, así no se pickean ni se arman de nuevo. ' +
-        'Las cajas ya pickeadas <b>no se mueven</b> de dónde están.</div>' +
+        'Lo que ya estaba pickeado o armado <b>se deshace</b>: esas cajas vuelven a <b>📥 A guardar</b> ' +
+        'y un operario las guarda como cualquier mercadería a guardar.</div>' +
     '</div>' +
     '<div class="epa-acc">' +
       (p.bloqueo ? '<button class="epa-b" onclick="epaCerrar(false)">Cerrar</button>'
@@ -36967,107 +36940,12 @@ async function pgaEnviarAProgramar(np) {
   await pgaRecargar();
 }
 
-/* v17.88 (Luis) — DESARMAR PEDIDO. *"un botón que sea un tacho de basura y que sea «Desarmar
-   pedido» que, si se aprieta, se elimina el pedido y acomoda el stock de las cajas que lo
-   componían (tiene que saltar un pop-up de ATENCIÓN, bien grande y bien notorio que avise que la
-   acción que se está por tomar es permanente)"*.
-   Y lo que definió después: el pedido NO se borra de la página de la empresa — sale de la PPP y
-   queda el registro de lo que el cliente había pedido; hay que escribir un JUSTIFICATIVO, que se
-   guarda; y si la NP es de ISIS, el aviso dice que además hay que darla de baja en ISIS a mano.
-   Todo el trabajo lo hace `gv_ppp_np_desarmar` en el backend: es plata y stock. */
-let _dsm = null;
-function dsmAbrir(np) {
-  const n = String(np || "").trim(); if (!n) return;
-  const r = (_pgaRows || []).find(function (x) { return String(x.np) === n; }) || {};
-  _dsm = { np: n, isis: !/^(LK|CH)\s*\d+/i.test(n), r: r, ocupado: false, vuelve: null };
-  let m = document.getElementById("dsmModal");
-  if (!m) { m = document.createElement("div"); m.id = "dsmModal"; document.body.appendChild(m); }
-  m.hidden = false;
-  m.innerHTML = '<div class="dsm-card">' +
-    '<div class="dsm-top"><h3>⚠ ATENCIÓN — ESTO NO SE DESHACE</h3>' +
-      '<p>Vas a DESARMAR un pedido. La acción es permanente.</p></div>' +
-    '<div class="dsm-body">' +
-      '<div class="dsm-np">' + escapeHtml(n) + (r.tanda ? ' · tanda ' + escapeHtml(r.tanda) : '') + '</div>' +
-      '<div class="dsm-cli">' + escapeHtml(r.razon_social || "—") + (r.cod ? ' (' + escapeHtml((r.empresa || "LK") + " " + r.cod) + ')' : '') + '</div>' +
-      '<div class="dsm-sub">' + (r.fecha ? aprDiaCorto(r.fecha) + ' · ' : '') + _pppFmtM3(r.m3) + ' m³</div>' +
-      '<div class="dsm-list"><b>Qué va a pasar:</b><br>' +
-        '• El pedido <b>sale de la PPP</b> y su tanda queda deshecha.<br>' +
-        '• Las cajas que ya se pickearon o se armaron pasan a <b>📥 A guardar</b>, y un operario las guarda como cualquier mercadería a guardar.<br>' +
-        '• Queda guardado el registro de lo que el cliente había pedido, con tu justificativo.<br>' +
-        '• <b>El pedido NO se borra de la página</b>: el cliente lo sigue teniendo.</div>' +
-      (_dsm.isis ? '<div class="dsm-isis">📋 Esta NP es de <b>ISIS</b>: acá se saca de la PPP, pero en ISIS la vas a tener que <b>dar de baja a mano</b>.</div>' : '') +
-      // v17.90: una NP ya facturada no tiene stock parado — salió del circuito al facturarse.
-      // El desarme la saca igual de la PPP, pero no devuelve cajas, y eso hay que decirlo antes.
-      (r.estado === "facturado" ? '<div class="dsm-isis">🧾 Esta NP <b>ya está facturada</b>: las cajas salieron del stock al facturarse, así que el desarme <b>no devuelve ninguna</b>. Si hay que deshacer la factura, es en ISIS.</div>' : '') +
-      /* v18.74 — DESARMAR servía para dos cosas distintas y nadie las había separado, así que
-         las dos terminaban anulando el pedido: quedaba sin tanda y a la vez excluido para
-         siempre de A Programar, o sea invisible. Pasó con LK 1364 (Mitre), desarmada el 15/09
-         porque el picking mostraba la lista recortada — un error NUESTRO, con el pedido del
-         cliente vivo. Ahora hay que elegir, y no hay default: son consecuencias opuestas. */
-      '<div class="dsm-lbl">¿Qué pasa con el pedido? (obligatorio)</div>' +
-      '<div class="dsm-vuelve">' +
-        '<label><input type="radio" name="dsmVuelve" value="si" onchange="dsmVuelveSet(true)"> ' +
-          '<b>Vuelve a «Pedidos a programar»</b> — fue un error nuestro; el cliente lo sigue esperando ' +
-          'y hay que volver a hacerlo.</label>' +
-        '<label><input type="radio" name="dsmVuelve" value="no" onchange="dsmVuelveSet(false)"> ' +
-          '<b>NO vuelve</b> — el pedido se cancela (lo canceló el cliente, se duplicó, etc.). ' +
-          'No lo va a tomar nadie más.</label>' +
-      '</div>' +
-      '<label class="dsm-lbl" for="dsmJust">Justificativo (obligatorio) — queda guardado con el registro</label>' +
-      '<textarea id="dsmJust" placeholder="Por qué se desarma este pedido" oninput="dsmChk()"></textarea>' +
-      '<div class="dsm-hint" id="dsmHint">Escribí al menos 10 caracteres.</div>' +
-      '<div class="dsm-btns">' +
-        '<button class="dsm-no" onclick="dsmCerrar()">No, dejarlo como está</button>' +
-        '<button class="dsm-si" id="dsmOk" disabled onclick="dsmConfirmar()">🗑 Sí, desarmar</button>' +
-      '</div>' +
-    '</div></div>';
-  try { document.getElementById("dsmJust").focus(); } catch (_e) {}
-}
-function dsmCerrar() { const m = document.getElementById("dsmModal"); if (m) { m.hidden = true; m.innerHTML = ""; } _dsm = null; }
-/* v18.74 — guardar la elección y refrescar el botón. Sin elegir, no se desarma nada. */
-function dsmVuelveSet(v) { if (_dsm) _dsm.vuelve = !!v; dsmChk(); }
-function dsmChk() {
-  const t = (document.getElementById("dsmJust") || {}).value || "";
-  const okTxt = t.trim().length >= 10;
-  const okSel = !!(_dsm && _dsm.vuelve !== null && _dsm.vuelve !== undefined);
-  const b = document.getElementById("dsmOk");
-  if (b) {
-    b.disabled = !okTxt || !okSel || !!(_dsm && _dsm.ocupado);
-    // el botón dice lo que va a pasar, no un genérico: son dos acciones distintas
-    if (!_dsm || !_dsm.ocupado) {
-      b.textContent = !okSel ? "🗑 Sí, desarmar"
-        : (_dsm.vuelve ? "🗑 Desarmar y que VUELVA a programar" : "🗑 Desarmar y CANCELAR el pedido");
-    }
-  }
-  const h = document.getElementById("dsmHint");
-  if (h) {
-    h.textContent = !okSel ? "Elegí si el pedido vuelve o no."
-      : (okTxt ? "✓ Listo." : ("Escribí al menos 10 caracteres (van " + t.trim().length + ")."));
-  }
-}
-async function dsmConfirmar() {
-  if (!_dsm || _dsm.ocupado) return;
-  const just = ((document.getElementById("dsmJust") || {}).value || "").trim();
-  if (just.length < 10) return;
-  _dsm.ocupado = true; dsmChk();
-  const n = _dsm.np, isis = _dsm.isis;
-  const b = document.getElementById("dsmOk"); if (b) b.textContent = "Desarmando…";
-  try {
-    const r = await aprRpc("gv_ppp_np_desarmar", { p_np: n, p_justificativo: just, p_por: await aprQuien(), p_vuelve: !!(_dsm && _dsm.vuelve) });
-    const x = (r && r[0]) || {};
-    dsmCerrar();
-    pppSetStatus("🗑 " + n + " desarmado · " + (x.detalle || "") +
-      (isis ? "  ⚠ Acordate de darla de baja en ISIS a mano." : ""), true);
-    if (isis) { try { alert(n + " salió de la PPP.\n\n⚠ Como es una NP de ISIS, además hay que darla de baja EN ISIS a mano."); } catch (_e) {} }
-    await pppLoadProgFromSupabase();
-    await pgaRecargar();
-  } catch (e) {
-    _dsm.ocupado = false; dsmChk();
-    if (b) b.textContent = "🗑 Sí, desarmar";
-    const msg = (e && e.message) ? e.message : String(e);
-    const h = document.getElementById("dsmHint"); if (h) { h.textContent = "⚠ " + msg; h.style.color = "#b91c1c"; }
-  }
-}
+/* v18.77 (Luis, 16/09: "el boton de desarmar pedido sacalo") — el modal de DESARMAR
+   (v17.88) se saco entero: era la unica puerta al desarme desde la pantalla y ya no existe.
+   Lo absorbio "Enviar a programar", que ahora devuelve la mercaderia y deja el pedido en A
+   Programar; cancelar un pedido se hace desde ahi con "X Anular pedido". La funcion
+   `gv_ppp_np_desarmar` del backend SIGUE VIVA y es la que hace el trabajo: la llama
+   `gv_ppp_pedido_a_programar` una vez por NP. */
 
 /* ═══ v17.97 (Luis) — IMPRIMIR LA PROGRAMACIÓN ═══════════════════════════════════════════
    Pedido: *"al lado del botón de «Actualizar» quiero que haya un botón de «Imprimir». Al
@@ -42156,7 +42034,13 @@ async function aprCargarSalida() {
   const peds = _apr.pedidos || [];
   if (!peds.length) { _apr.salida = {}; return; }
   try {
-    const filas = peds.map(function (p) { return { zona: p.zona || "", m3: Number(p.m3) || 0 }; });
+    /* v18.77 — van también `empresa` y `order_id`: sin eso el backend no puede saber si el
+       pedido está RETENIDO (sacado de una tanda a propósito) y el chip decía "se arma solo"
+       de un pedido que el automático no va a tocar nunca. */
+    const filas = peds.map(function (p) {
+      return { zona: p.zona || "", m3: Number(p.m3) || 0,
+               empresa: p.empresa || "", order_id: p.order_id };
+    });
     const rows = await aprRpc("gv_ppp_web_dia_salida", { p_filas: filas }) || [];
     const m = {};
     for (const r of rows) { const p = peds[r.r_idx]; if (p) m[p.order_id] = { dia: r.r_dia ? String(r.r_dia).slice(0, 10) : null, motivo: r.r_motivo || "", detalle: r.r_detalle || "" }; }
@@ -42201,6 +42085,13 @@ function aprSalidaChip(p) {
   const s = (_apr.salida || {})[p.order_id];
   const recep = p.fecha_recep ? "Llegó el " + p.fecha_recep + ". " : "";
   if (!s) return '<span class="apr-chip apr-chip-sal esp" title="' + escapeHtml(recep + "Calculando el día de salida…") + '">🚚 …</span>';
+  /* v18.77 (Luis) — RETENIDO: lo sacaron de una tanda a propósito, así que el automático no lo
+     vuelve a tomar. Va primero que todo lo demás porque es lo único que importa saber: hasta
+     acá salía "🤖 se arma solo → mar 22/9 · en minutos" con fecha y todo, y era mentira. */
+  if (s.motivo === "retenido") {
+    return '<span class="apr-chip apr-chip-sal no" title="' + escapeHtml(recep + s.detalle) +
+      '">🔒 no lo toca el automático · ponele día</span>';
+  }
   if (s.dia) {
     const d = new Date(+s.dia.slice(0, 4), +s.dia.slice(5, 7) - 1, +s.dia.slice(8, 10));
     const DOW = ["dom", "lun", "mar", "mié", "jue", "vie", "sáb"];

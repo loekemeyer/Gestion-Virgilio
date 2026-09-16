@@ -94,7 +94,7 @@ catch (_e) {
     // v17.90 (Luis): "que también pida confirmación para enviar a programar", con su texto, UNA vez
     out.confirmTxt = confirms.join(" ||| ");
     out.confirmUno = confirms.length === 1;
-    out.argWeb = JSON.stringify((rpc.find((x) => x.fn === "gv_ppp_web_desprogramar") || {}).args || {});
+    out.argWeb = JSON.stringify((rpc.find((x) => x.fn === "gv_ppp_pedido_a_programar") || {}).args || {});
     out.recargo = recargas;
 
     // (b bis) NP de ISIS → gv_ppp_isis_desprogramar
@@ -102,18 +102,10 @@ catch (_e) {
     await pgaEnviarAProgramar("98700"); await new Promise((res) => setTimeout(res, 250));
     out.rpcIsis = rpc.map((x) => x.fn).join(",");
 
-    // (g) v17.88 — el tacho: pop-up de ATENCIÓN, justificativo obligatorio y la RPC del desarme
-    rpc.length = 0;
-    // ⚠ NO volver a llamar a pgaAbrirDia / pgaAbrirTanda acá: son TOGGLE, y llamarlas de nuevo
-    // CIERRAN el día que ya estaba abierto y la fila desaparece. Basta con volver a pedir el nodo
-    // (#pppPreview se puede haber redibujado con el click de arriba).
-    /* Buscar la fila, y si NO está, reabrir el día/tanda UNA vez y volver a buscar.
-       Antes esto era `btD.click()` a secas: cuando el preview se había redibujado con el día
-       cerrado, `btD` venía null y el test moría con «Cannot read properties of null (reading
-       'click')» — un TypeError que corta la suite entera y no dice qué salió mal. Pasaba de
-       forma intermitente (2 de 3 corridas completas del 15/09) y nunca corriéndolo aislado.
-       Ahora, si tras reabrir la fila sigue sin aparecer, el test falla por ASERCIÓN
-       (`hayTacho: false`) y la suite sigue. */
+    /* (g) v18.77 — el 🗑 «Desarmar pedido» SE SACÓ (Luis: "el botón de desarmar pedido sacalo").
+       Lo absorbió «Enviar a programar», que ahora además deshace lo armado y devuelve la
+       mercadería. Lo que se chequea acá es que no haya vuelto: la fila tiene que traer UN solo
+       botón, el ↩. El flujo nuevo lo cubre tests/enviar-a-programar-deshace.cjs. */
     const buscarFila = () => {
       const pv = document.getElementById("pppPreview");
       return pv ? [...pv.querySelectorAll("tr.pga-n")].find((x) => x.textContent.indexOf("LK 0058") >= 0) : null;
@@ -124,41 +116,9 @@ catch (_e) {
       await new Promise((res) => setTimeout(res, 150));
       filaD = buscarFila();
     }
-    const btD = filaD && filaD.querySelector(".pga-acc-b.del");
-    out.hayTacho = !!btD;
-    out.textoTacho = btD ? btD.textContent.trim() : "";
-    out.titleTacho = btD ? btD.getAttribute("title") : "";
-    if (!btD) return out;               // sin botón no hay nada que clickear: que falle la aserción
-    btD.click(); await new Promise((res) => setTimeout(res, 150));
-    const mh = (document.getElementById("dsmModal") || {}).innerHTML || "";
-    out.atencion = /ATENCIÓN/.test(mh) && /NO SE DESHACE/.test(mh) && /permanente/i.test(mh);
-    // v17.90 (Luis): el stock NO vuelve a góndola — pasa a "A guardar" y lo procesa un operario
-    out.explica = /sale de la PPP<\/b>/.test(mh) && /A guardar<\/b>, y un operario las guarda/.test(mh) &&
-                  !/vuelven a góndola/.test(mh) && /NO se borra de la página/.test(mh);
-    out.sinAvisoFact = !/ya está facturada/.test(mh);   // LK 0058 está armada, no facturada
-    out.avisoIsisWeb = /dsm-isis/.test(mh);                 // una NP web NO lleva el aviso de ISIS
-    out.okBloqueado = !!(document.getElementById("dsmOk") || {}).disabled;
-    document.getElementById("dsmJust").value = "corto"; dsmChk();
-    out.cortoBloqueado = !!(document.getElementById("dsmOk") || {}).disabled;
-    document.getElementById("dsmJust").value = "el cliente lo cancelo por telefono"; dsmChk();
-    /* v18.74 — el justificativo ya NO alcanza solo: además hay que elegir si el pedido vuelve a
-       A Programar o se cancela. Eran dos acciones distintas metidas en un botón, y las dos
-       terminaban anulando el pedido (LK 1364 quedó invisible por eso). Sin elegir, sigue trabado. */
-    out.largoSinElegirSigueTrabado = !!(document.getElementById("dsmOk") || {}).disabled;
-    dsmVuelveSet(false);   // «no vuelve» = lo que este caso prueba (lo canceló el cliente)
-    out.largoHabilita = !(document.getElementById("dsmOk") || {}).disabled;
-    await dsmConfirmar(); await new Promise((res) => setTimeout(res, 250));
-    const g = rpc.find((x) => x.fn === "gv_ppp_np_desarmar");
-    out.desarma = !!g && g.args.p_np === "LK 0058" && g.args.p_justificativo === "el cliente lo cancelo por telefono" && g.args.p_vuelve === false;
-    out.cerro = !!(document.getElementById("dsmModal") || {}).hidden;
-
-    // y una NP de ISIS sí lleva el aviso de darla de baja a mano
-    dsmAbrir("98700"); await new Promise((res) => setTimeout(res, 120));
-    const mi = (document.getElementById("dsmModal") || {}).innerHTML || "";
-    out.avisoIsis = /dsm-isis/.test(mi) && /dar de baja a mano/.test(mi);
-    // 98700 además está facturada: tiene que avisar que no va a devolver ninguna caja
-    out.avisoFacturada = /ya está facturada/.test(mi) && /no devuelve ninguna/.test(mi);
-    dsmCerrar();
+    out.filaSigue    = !!filaD;
+    out.noHayTacho   = !!filaD && !filaD.querySelector(".pga-acc-b.del");
+    out.unSoloBoton  = !!filaD && filaD.querySelectorAll(".pga-acc-b").length === 1;
 
     // (d) el cartel del web ya no promete el automático.
     // v18.44: el aviso se mudó de `pppVencVolver` (era el texto del confirm) al pop-up
@@ -206,30 +166,20 @@ catch (_e) {
   t(r.textoBoton === "↩", "(a) es SÓLO el ícono — " + JSON.stringify(r.textoBoton));
   t(/Enviar a programar/.test(r.titleBoton), "(a) y lo que hace lo dice el tooltip — " + JSON.stringify(r.titleBoton));
   t(r.abiertasAntes === r.abiertasDespues, "(a) tocarlo NO abre ni cierra el contenido de la NP");
-  t(/gv_ppp_web_desprogramar/.test(r.rpcWeb), "(b) una NP web va por gv_ppp_web_desprogramar — " + r.rpcWeb);
+  /* v18.77 — los dos caminos van por gv_ppp_pedido_a_programar: desprograma, DEVUELVE la
+     mercadería de lo que estuviera pickeado/armado, y retiene contra el cron. */
+  t(/gv_ppp_pedido_a_programar/.test(r.rpcWeb), "(b) una NP web va por gv_ppp_pedido_a_programar — " + r.rpcWeb);
   t(/"p_np":"LK 0058"/.test(r.argWeb), "(b) con su NP — " + r.argWeb);
-  t(/gv_ppp_isis_desprogramar/.test(r.rpcIsis), "(b) y una de ISIS por gv_ppp_isis_desprogramar — " + r.rpcIsis);
+  t(/gv_ppp_pedido_a_programar/.test(r.rpcIsis), "(b) y una de ISIS por la misma RPC — " + r.rpcIsis);
   t(r.recargo >= 1, "(c) después de sacarlo se recarga el árbol");
   t(/¿Estás seguro que querés sacar este pedido de esta tanda y mandarlo «A PROGRAMAR»\?/.test(r.confirmTxt),
     "(h) pide confirmación con el texto que pidió Luis — " + JSON.stringify(r.confirmTxt));
   t(r.confirmUno, "(h) y una sola vez (no encadena la confirmación vieja)");
   t(r.cartel, "(d) el cartel ya no promete que lo reprograma el automático");
   t(r.previo, "(d) y el pop-up le pide al backend qué NP se lleva antes de tocar nada");
-  t(r.hayTacho, "(g) la fila trae también el tacho");
-  t(r.textoTacho === "🗑", "(g) el tacho también es sólo el ícono — " + JSON.stringify(r.textoTacho));
-  t(/Desarmar pedido/.test(r.titleTacho), "(g) con su tooltip — " + JSON.stringify(r.titleTacho));
-  t(r.atencion, "(g) el pop-up grita ATENCIÓN, que no se deshace y que es permanente");
-  t(r.explica, "(g) y explica las tres cosas: sale de la PPP, el stock pasa a «A guardar», NO se borra de la página");
-  t(r.sinAvisoFact, "(g) una NP armada (no facturada) no lleva ese aviso");
-  t(!r.avisoIsisWeb, "(g) una NP web no lleva el aviso de ISIS");
-  t(r.okBloqueado, "(g) sin justificativo no se puede confirmar");
-  t(r.cortoBloqueado, "(g) con un justificativo corto tampoco");
-  t(r.largoSinElegirSigueTrabado, "(g) con 10+ caracteres pero sin elegir, sigue trabado");
-  t(r.largoHabilita, "(g) con 10+ caracteres Y la elección hecha, sí");
-  t(r.desarma, "(g) confirmar llama a gv_ppp_np_desarmar con la NP y el justificativo");
-  t(r.cerro, "(g) y cierra el pop-up");
-  t(r.avisoIsis, "(g) en una NP de ISIS avisa que además hay que darla de baja a mano");
-  t(r.avisoFacturada, "(g) y si ya está facturada, que el desarme no va a devolver ninguna caja");
+  t(r.filaSigue, "(g) la fila de la NP sigue estando");
+  t(r.noHayTacho, "(g) y YA NO trae el tacho de desarmar");
+  t(r.unSoloBoton, "(g) queda un solo botón en la fila: el ↩");
   t(r.yaHecho, "(e) el pedido web retenido cuenta como «ya hecho»");
   t(/ya pickeada y armada · E01A/.test(r.chip), "(e) y sale con su chip rojo en A Programar — " + JSON.stringify(r.chip));
   t(/gv_ppp_web_tanda_reusar/.test(r.rpcProg) && !/gv_ppp_web_tanda_nueva/.test(r.rpcProg),
