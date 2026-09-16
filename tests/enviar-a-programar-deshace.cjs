@@ -81,6 +81,12 @@ if (cuerpoSal && !/cod\s*:/.test(sinComentarios(cuerpoSal))) {
 if (!/s\.motivo === "retenido"/.test(src)) {
   fallas.push("el chip de A Programar no contempla el motivo 'retenido'");
 }
+/* v19.13 (Thomas): la excepción a la regla de los súper — el que tenga `auto_super` en
+   GV_Clientes_Reglas SÍ lo programa el automático, y el chip tiene que decirlo: para un súper
+   "se arma solo" es la excepción, no la regla, y el de al lado sigue siendo "a mano". */
+if (!/s\.motivo === "super_auto"/.test(src)) {
+  fallas.push("el chip de A Programar no contempla el motivo 'super_auto'");
+}
 
 // ---- 3) el cartel ----
 if (/Las cajas ya pickeadas <b>no se mueven<\/b>/.test(src)) {

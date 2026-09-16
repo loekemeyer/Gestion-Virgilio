@@ -20809,3 +20809,62 @@ pop-up con los datos del árbol; c: mueve con `p_forzar` y recarga el árbol; d:
 `sql/gv_ppp_tanda_mover_v1911.sql` y `sql/gv_ppp_prog_arbol_v1911.sql`. **Rollback**:
 `sql/backups/gv_ppp_tanda_mover_gv_ppp_prog_arbol_20260916_pre_v1911.sql` (ojo: dropear antes la
 firma de 4 argumentos, si no toda llamada de 3 queda ambigua).
+
+---
+
+## §3.ip — v19.14: excepción a la regla de los súper — el INC se programa solo, el día de su turno — 2026-09-16
+
+Thomas, 2026-09-16: *"hace una excepción a la regla de los super, ese INC se programa
+automáticamente siempre"*.
+
+**La regla sigue viva** (v14.23 / v18.28): un súper de `GV_Supers` no lo toca el armado y **nunca
+se junta con clientes comunes**. Lo que cambia es sólo lo primero, y **sólo para el cliente que
+tenga la excepción cargada** — que es un DATO, no código: una fila en `GV_Clientes_Reglas` con
+`regla = 'auto_super'`, al lado de las que ya existían (`solo`, `prioritario`). Hoy: **(lk, 1651)
+Inc Sociedad Anonima (Carrefour)**.
+
+```sql
+-- prender para otro súper                     -- apagar
+insert into public."GV_Clientes_Reglas"        delete from public."GV_Clientes_Reglas"
+  (cod_cliente, empresa, regla, nombre, nota)   where regla = 'auto_super' and cod_cliente = '<cod>';
+values ('<cod>','lk','auto_super','<nombre>','<quién y cuándo>');
+```
+
+### La mezcla NO se afloja
+
+El `auto_super` entra al armado pero queda marcado **`va_solo`** (mismo efecto que la regla
+`solo`), así que va **solo en su tanda** y ninguna tanda abierta lo absorbe; su camión sigue
+siendo `"Super"`, y `_ex` / `_open` siguen dejando afuera las tandas de súper (v18.60 / v18.87).
+Centinela: `select * from public.gv_ppp_super_mezclado;` — vacía.
+
+### El día es el TURNO de la OC, no el próximo día con cupo
+
+Un súper no se entrega "cuando haya cupo": se entrega **el día que pidió**. Y ese dato ya estaba
+en Virgilio — LK lo empuja cada 15 min a **`lk_pedidos_match.fecha_entrega`** (v13.77+), con el
+texto crudo en `fecha_entrega_txt` (`"29/09/2026 14:00"`). Lo lee
+**`gv_web_turno_pactado(empresa, order_id)`**, así que la excepción **no tocó ni la Edge Function
+ni el front**: toda la regla vive en el backend.
+
+El pase nuevo **(a3)** de `gv_ppp_web_armar_pendientes` agrupa los `auto_super` por su turno y los
+arma en ese día con `p_forzar_cods` → entran como **prioritarios, o sea que pisan el cupo**: el
+turno no se negocia. Sin turno en la OC caen al pase (b) y salen el próximo día hábil con cupo.
+
+### Probado CORRIENDO el armador (no leyéndolo)
+
+`gv_ppp_web_armar_pendientes_simular` con INC 1468 (turno 29/09) + un cliente común de Zona 1 +
+Coto 801 (súper sin excepción):
+
+| fila | resultado |
+|---|---|
+| 1651 INC | **2026-09-29**, tanda propia, zona "Super", 1 cliente ✅ (su turno) |
+| 9991 común | 2026-09-23, tanda aparte ✅ (cascada normal) |
+| 801 Coto | **no se programa** ✅ (sigue a mano) |
+
+Y el chip de A Programar (`gv_ppp_web_dia_salida`, motivo nuevo **`super_auto`**): 1651 con turno →
+29/09 *"…para el turno de la OC, el 29/09"*; 1651 sin turno → 23/09 *"…la OC no trajo turno…"*;
+801 y 4263 (Gigot) → *"camión propio, lo programa el supervisor"*. El front lo pinta
+`🛒 súper: se arma solo → mar 29/9`.
+
+**Cubierto** en `tests/enviar-a-programar-deshace.cjs` (el chip tiene que contemplar `super_auto`).
+**SQL y rollback**: `sql/gv_super_auto_programa_v1914.sql` — el rollback es borrar la fila de
+`GV_Clientes_Reglas`; el código queda inerte.

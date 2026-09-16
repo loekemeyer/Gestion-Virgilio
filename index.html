@@ -5709,7 +5709,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=19.13"></script>
+<script type="module" src="recepcion.js?v=19.14"></script>
 <!-- Config del módulo de fichada (compartido con fichada.html). El secret
      hmacSecret tiene que ser el mismo acá y allá; cargándolo desde un solo
      archivo evitamos que se desincronicen. -->
@@ -9491,7 +9491,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v19.13";
+const APP_VERSION = "v19.14";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -42907,7 +42907,12 @@ function aprSalidaChip(p) {
     // está, no más en A Programar"): todo lo que tiene día lo programa el automático en la próxima
     // corrida (cada 15 min), también las zonas manuales con camión. El chip ya no pide "programalo".
     const f = DOW[d.getDay()] + " " + d.getDate() + "/" + (d.getMonth() + 1);
-    const txt = s.motivo === "camion" ? "🚚 va al camión del " + f + " · en minutos" : "🤖 se arma solo → " + f + " · en minutos";
+    /* v19.13 — `super_auto`: el súper con la excepción del dueño (GV_Clientes_Reglas) se arma
+       solo, y el día es el turno de su OC. Se distingue del resto porque para un súper "se
+       arma solo" es la excepción, no la regla: el de al lado sigue siendo "a mano". */
+    const txt = s.motivo === "camion" ? "🚚 va al camión del " + f + " · en minutos"
+              : s.motivo === "super_auto" ? "🛒 súper: se arma solo → " + f
+              : "🤖 se arma solo → " + f + " · en minutos";
     return '<span class="apr-chip apr-chip-sal" title="' + escapeHtml(recep + s.detalle + " Lo programa el automático en la próxima corrida (cada 15 min).") + '">' + txt + '</span>';
   }
   const lab = s.motivo === "retira" ? "🏭 retira" : (s.motivo === "super" ? "🛒 súper: a mano" : (s.motivo === "sin_zona" ? "❓ sin zona" : "⏳ sin camión previsto"));
