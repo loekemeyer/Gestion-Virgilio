@@ -20273,3 +20273,47 @@ select * from public.gv_mig337_verificar();     -- y prende los crons
 Lo que hay que mirar en el último paso: `reconciliar_pipeline_stock_etapa1` en **0 filas**
 (el picking no se duplicó) y `gv_stock_empresa_fantasma` con **0 duales**.
 Si algo sale mal: `select * from public.gv_mig337_rollback();`.
+
+### §3.gk — v18.98: Cuarentena partida en dos — submódulo "Clientes nuevos" — 2026-09-16
+
+**Pedido (Luis):** *"tenemos un sistema de cuarentena donde entran los pedidos de clientes con
+deuda, que piden más que su crédito, suspendidos y clientes nuevos. Separalo en dos: Cuarentena
+tal cual, y otro para Clientes nuevos… tabla similar con pedido (todas las NP), fecha, m³, razón
+social, zona, contacto, monto (precio total por lista). De momento solo visual. Si un cliente
+nuevo además entra en algún parámetro de cuarentena, dejalo en cuarentena (Zhang Qikuan)."*
+
+**El corte no toca la marca ni el candado.** La regla de "cliente nuevo" es la misma de la v17.12
+(`GV_Clientes_Nuevos`, la calcula LK y la espeja el cron). Lo único que cambia es **dónde se
+muestra**, en el front:
+
+- `aprSoloClienteNuevo(p)` = el pedido tiene **un solo** motivo y es `cliente_nuevo`.
+- La **columna Cuarentena** (`aprColCuarentena`) ahora filtra `aprEnCuarentena(p) && !aprSoloClienteNuevo(p)`:
+  deuda / suspendido / excede crédito, más el cliente nuevo que **además** cae en uno de ésos.
+- La **pestaña nueva "🆕 Clientes nuevos"** (`clinNuevosHtml`, solapa `clinuevos` de A Programar)
+  muestra `aprEnCuarentena(p) && aprSoloClienteNuevo(p)`.
+- `aprEnCuarentena` **no cambió**: los dos submódulos siguen retenidos igual (no se programan solos).
+
+**El MONTO es lo único que necesitó backend** (protocolo: la valorización es lógica de negocio).
+No se inventó nada: la RPC nueva **`gv_clientes_nuevos_valor_lote(p_pedidos jsonb)`** llama a
+`gv_ppp_web_valor_items` — la MISMA función que valoriza el límite de crédito en
+`gv_cuarentena_limite` — así Cuarentena y Clientes nuevos no pueden decir montos distintos del
+mismo pedido. Devuelve `order_id, empresa, valor` (neto sin IVA). `SECURITY DEFINER`, gate
+`es_supervisor_virgilio() OR gv_es_supervisor_o_servicio()`, `EXECUTE` revocado a `anon`.
+`sql/gv_clientes_nuevos_valor_lote_v1895.sql`. Aditiva, no toca ningún objeto compartido.
+
+**Medición (2026-09-16):**
+- `has_function_privilege('anon', 'public.gv_clientes_nuevos_valor_lote(jsonb)', 'EXECUTE')` → **false**;
+  `authenticated` → **true**; `prosecdef` → **true**.
+- `gv_ppp_web_valor_items('lk','4223','[{"art":"505","cajas":2},{"art":"221","cajas":4}]',''')` →
+  **$120.480,00** (la valorización responde con un número real).
+- `tests/apr-cuarentena.cjs`: el cliente nuevo **puro** ya NO cuenta en Cuarentena (queda 1, el
+  mixto deuda+nuevo) y aparece en "Clientes nuevos" (1) con su chip `CH 2533`.
+
+**Sólo visual, y sólo web:** el submódulo no dispara ninguna acción (el WhatsApp de "monto a
+pagar" con descuento de contado y el reembolso de lo no entregado, del pedido anterior de Luis,
+quedan para una fase 2). Un cliente nuevo que entra por **ISIS** trae su NP y se valoriza aparte:
+ahí el monto queda en "—".
+
+**Rollback:** `drop function public.gv_clientes_nuevos_valor_lote(jsonb);` y revertir el front
+(el commit de v18.98). El front aguanta sin la RPC: `clinNuevosValorCargar` es best-effort → la
+columna Monto muestra "—" y nada más se rompe.

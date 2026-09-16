@@ -127,18 +127,30 @@ catch (_e) {
     // v17.11 (Luis): el número de cliente tiene que verse en la ficha (LK 1000 / CH 2533)
     out.codChip = /cuar-card-cod[^>]*>LK 1000</.test(html);
 
-    // (3) v17.11 — CLIENTE NUEVO: badge propio y el número de cliente de Chef con prefijo CH
+    // (3) v18.95 — CLIENTE NUEVO: submódulo propio ("🆕 Clientes nuevos"). Un pedido cuyo ÚNICO
+    // motivo es cliente_nuevo YA NO cae en la columna Cuarentena; uno que además tiene deuda (u
+    // otro motivo) SÍ sigue en Cuarentena (caso Zhang Qikuan).
+    _apr.cuarContacto = {}; _apr.cliValor = {};   // evitan los fetch (la ruta REST está abortada)
     _apr.pedidos = [
       mk({ order_id: 200, empresa: "chef", cod: "2533", razon_social: "Cliente Nuevo SA",
            cuarentena_motivos: ["cliente_nuevo"], cuarentena_detalle: { nuevo_pedidos: 1 } }),
+      mk({ order_id: 202, cod: "4263", razon_social: "Cliente Nuevo Deudor",
+           cuarentena_motivos: ["deuda", "cliente_nuevo"], cuarentena_detalle: { deuda: 50000, nuevo_pedidos: 1 } }),
       mk({ order_id: 201, razon_social: "Cliente Dos" })
     ];
-    aprRender(); await new Promise((res) => setTimeout(res, 200));
+    // (3a) columna Cuarentena: el pedido puro de cliente nuevo NO está; el mixto SÍ, con badge.
+    _pppTab = "prog"; aprRender(); await new Promise((res) => setTimeout(res, 50));
     html = document.getElementById("pppPreview").innerHTML;
-    out.nuevoBadge = /cuar-badge b-nuevo[^>]*>🆕 Cliente nuevo</.test(html);
-    out.nuevoCuenta = /🚧 Cuarentena <b>\(1\)<\/b>/.test(html);
-    out.nuevoCodChip = /cuar-card-cod[^>]*>CH 2533</.test(html);
+    out.nuevoFueraDeCuar = /🚧 Cuarentena <b>\(1\)<\/b>/.test(html);   // sólo el mixto
+    out.nuevoBadge = /cuar-badge b-nuevo[^>]*>🆕 Cliente nuevo</.test(html);   // en el mixto
     out.nuevoMotivo = /Cliente nuevo \(1 pedido facturado en toda su historia\)\./.test(html);
+    // (3b) pestaña Clientes nuevos: el pedido puro está, con su chip CH 2533; el mixto NO.
+    _pppTab = "clinuevos"; pppRenderProg(); await new Promise((res) => setTimeout(res, 50));
+    html = document.getElementById("pppPreview").innerHTML;
+    out.cliNuevosCuenta = /🆕 Clientes nuevos <b>\(1\)<\/b>/.test(html);
+    out.nuevoCodChip = /cuar-card-cod[^>]*>CH 2533</.test(html);
+    out.cliNuevosSinMixto = !/Cliente Nuevo Deudor/.test(html);
+    _pppTab = "prog";
     out.nuevoEtq = aprCuarentenaEtiqueta({ cuarentena_motivos: ["cliente_nuevo"] });
 
     // (4) v17.13 — "Ya programados" es una TABLA, con aprobación y librito de comentarios
@@ -481,10 +493,12 @@ catch (_e) {
   chk(r.contactoBtn, "la ficha tiene el botón WhatsApp al vendedor/cliente");
   chk(r.motivo, "el retenido muestra el texto del motivo");
   chk(r.codChip, "la ficha muestra el número de cliente (LK 1000)");
-  chk(r.nuevoBadge, "cliente nuevo: badge '🆕 Cliente nuevo'");
-  chk(r.nuevoCuenta, "cliente nuevo: el pedido cae en Cuarentena (1)");
-  chk(r.nuevoCodChip, "cliente nuevo de Chef: el chip dice CH 2533");
+  chk(r.nuevoFueraDeCuar, "cliente nuevo puro: NO cae en Cuarentena; sólo el mixto (deuda+nuevo) queda (1)");
+  chk(r.nuevoBadge, "cliente nuevo mixto: badge '🆕 Cliente nuevo' en Cuarentena");
   chk(r.nuevoMotivo, "cliente nuevo: el motivo dice cuántos pedidos facturó");
+  chk(r.cliNuevosCuenta, "pestaña 'Clientes nuevos': muestra el pedido puro (1)");
+  chk(r.nuevoCodChip, "cliente nuevo de Chef: el chip dice CH 2533 (en Clientes nuevos)");
+  chk(r.cliNuevosSinMixto, "el pedido mixto (deuda+nuevo) NO aparece en Clientes nuevos");
   chk(r.nuevoEtq === "Cliente nuevo", "etiqueta de cliente_nuevo = 'Cliente nuevo'");
   chk(r.ypTabla, "ya programados: es una tabla con columnas NP / … / Enviar a");
   chk(r.ypSinColAprob, "ya programados: sin columna Aprobación (el aprobado sale de la lista)");
