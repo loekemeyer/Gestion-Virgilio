@@ -1,12 +1,12 @@
-# Estado y pendientes — al 2026-09-16 (última actualización: v18.89)
+# Estado y pendientes — al 2026-09-16 (última actualización: v18.90)
 
-> **2026-09-16 (v18.89) — CANCELAR un pedido desde Facturación (pedido de Thomas).**
+> **2026-09-16 (v18.90) — CANCELAR un pedido desde Facturación (pedido de Thomas).**
 > Botón **✕ Cancelar** en cada fila de Facturación, con pop-up de motivo (**Falta stock** / **Otro**
 > con texto libre), del que se sale con ✕, «Volver», Escape o tocando afuera, y con un segundo paso
 > de confirmación. Al cancelar: **no se factura, sale de la PPP, NO se borra de Supabase** (la
 > estadística de qué pidió cada cliente queda entera) y **lo que estaba armado va TODO a «A
 > guardar»**. Backend: `gv_ppp_np_desarmar` con el parámetro nuevo `p_a_guardar` (la firma de 4
-> argumentos se dropeó). §3.ie · `sql/gv_ppp_np_desarmar_a_guardar_v1889.sql`.
+> argumentos se dropeó). §3.if · `sql/gv_ppp_np_desarmar_a_guardar_v1890.sql`.
 >
 > ⚠ **No se pisa con la regla de Luis del 16/09** ("la mercadería vuelve de donde salió"): ésa es
 > para «Enviar a programar», donde el pedido sigue vivo y se re-pickea. Cancelar es el pedido

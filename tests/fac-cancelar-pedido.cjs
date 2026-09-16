@@ -1,4 +1,4 @@
-/* v18.89 (Thomas, 2026-09-16) — CANCELAR UN PEDIDO desde el módulo de Facturación.
+/* v18.90 (Thomas, 2026-09-16) — CANCELAR UN PEDIDO desde el módulo de Facturación.
    Pedido: *"un botón para cancelar pedido; un pop-up que pregunte el motivo y que me deje salir
    si toqué sin querer; dos botones, falta stock y otro (en otro me deja escribir); si se
    cancela desaparece de la PPP pero no de Supabase, y lo que estaba armado va a la bodega de

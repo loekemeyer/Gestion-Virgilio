@@ -4910,7 +4910,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
 .facfc-ok-meta{ font-size:12.5px; color:#64748b; }
 .fac-btn-tick:hover{ background: #15803d; }
 .fac-btn-tick:active{ transform: scale(.93); }
-/* v18.89 — "✕ Cancelar" por fila (Thomas, 16/09). Va DEBAJO del ✓ / ⬇ Excel, chico y en rojo
+/* v18.90 — "✕ Cancelar" por fila (Thomas, 16/09). Va DEBAJO del ✓ / ⬇ Excel, chico y en rojo
    apagado: es una acción rara y destructiva, no tiene que competirle al tilde, que es lo que
    la operadora aprieta cien veces por día. `width:auto` es el override del global
    button{width:100%}. */
@@ -4947,7 +4947,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
   tr.fac-en-progreso td.fac-accion-cell{ background: #fefce8; }
   .fac-btn-tick{ padding: 8px 12px; min-height: 36px; }
   .fac-btn-fc{ padding: 5px 8px; min-height: 36px; justify-content: center; }
-  .fac-btn-cancel{ padding: 6px 9px; min-height: 30px; font-size: 11px; }   /* v18.89 */
+  .fac-btn-cancel{ padding: 6px 9px; min-height: 30px; font-size: 11px; }   /* v18.90 */
 }
 .fac-empty{ padding: 32px 20px; text-align: center; color: #64748b; font-size: 15px; background: #fff; border-radius: 8px; border: 1px solid #cbd5e1; }
 /* v18.55 — el error de carga, DONDE se mira. El chip de estado (.fac-stats) está oculto desde
@@ -5644,7 +5644,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=18.89"></script>
+<script type="module" src="recepcion.js?v=18.90"></script>
 <!-- Config del módulo de fichada (compartido con fichada.html). El secret
      hmacSecret tiene que ser el mismo acá y allá; cargándolo desde un solo
      archivo evitamos que se desincronicen. -->
@@ -9227,7 +9227,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v18.89";
+const APP_VERSION = "v18.90";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -49376,7 +49376,7 @@ async function facNCEmitir(){
     if (note){ note.textContent = "⚠ " + String(msg); note.style.color = "#b91c1c"; note.style.fontWeight = "700"; }
   }
 }
-/* ═══ v18.89 — CANCELAR UN PEDIDO DESDE FACTURACIÓN (Thomas, 2026-09-16) ═════════════════════
+/* ═══ v18.90 — CANCELAR UN PEDIDO DESDE FACTURACIÓN (Thomas, 2026-09-16) ═════════════════════
    Pedido textual: *"Quiero agregar un botón al módulo de facturación para poner cancelar
    pedido. Cuando toco eso me tiene que abrir un pop-up que me debe preguntar el motivo de por
    qué se está cancelando y me tiene que poder dejar salir si es que toqué ahí sin querer.
@@ -49396,7 +49396,7 @@ async function facNCEmitir(){
                      el piso de armado que un operario tiene que bajar y guardar.
 
    Todo el trabajo lo hace el backend: `gv_ppp_np_desarmar(..., p_vuelve=false, p_a_guardar=true)`
-   (v18.89, `sql/gv_ppp_np_desarmar_a_guardar_v1889.sql`). Saca la NP de la PPP (web →
+   (v18.90, `sql/gv_ppp_np_desarmar_a_guardar_v1890.sql`). Saca la NP de la PPP (web →
    `GV_Web_Cancelados` + tanda/fecha en null; ISIS → `NP_Canceladas` + `oculto`), devuelve el
    stock a `a_guardar` y deja el log en `GV_Desarmes` con el snapshot de ítems — o sea que la
    estadística de qué pidió cada cliente queda entera y el pedido de la página no se borra.
@@ -49516,7 +49516,7 @@ window.facCancelConfirmar = async function(){
       p_justificativo: "Cancelado desde Facturación: " + facCancelMotivoTxt(s),
       p_por: await aprQuien(),
       p_vuelve: false,        // el pedido NO vuelve a «A Programar»: se canceló
-      p_a_guardar: true       // y lo armado va TODO a «A guardar» (regla del dueño, v18.89)
+      p_a_guardar: true       // y lo armado va TODO a «A guardar» (regla del dueño, v18.90)
     });
     var x = (r && r[0]) || {};
     s.saving = false; facCancelClose();

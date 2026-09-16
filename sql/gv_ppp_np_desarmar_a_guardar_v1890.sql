@@ -1,9 +1,9 @@
-/* v18.89 — CANCELAR UN PEDIDO DESDE FACTURACIÓN: lo armado vuelve a «A guardar».
+/* v18.90 — CANCELAR UN PEDIDO DESDE FACTURACIÓN: lo armado vuelve a «A guardar».
 
    ⚠ Los comentarios DE ADENTRO de la función dicen `v18.88`: se aplicó con ese número y otra
    sesión lo tomó en paralelo antes de pushear (mismo caso que la v18.83, "aplicada como
    v18.80"). No se volvió a aplicar la función sólo para cambiarle un comentario: `v18.88` y
-   `v18.89` son, acá, el mismo cambio.
+   `v18.90` son, acá, el mismo cambio.
 
    Pedido del dueño (Thomas, 2026-09-16):
      *"Quiero agregar un botón al módulo de facturación para poner cancelar pedido. (…) Si se

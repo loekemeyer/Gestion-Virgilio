@@ -1,4 +1,4 @@
-## Nota v18.89 (2026-09-16) — CANCELAR un pedido desde Facturación
+## Nota v18.90 (2026-09-16) — CANCELAR un pedido desde Facturación
 
 Pedido del dueño: un botón **✕ Cancelar** en cada fila del módulo de **Facturación**, para el
 pedido que se armó, no salió y no va a salir (el caso que él mismo describió: *"muchos de los
@@ -28,8 +28,8 @@ mandan las dos intenciones a la vez.
 ⚠ Si la NP **ya tiene Carga Camión o Recepción Remitos** (o sea que ya salió), el backend rechaza
 la cancelación y el pop-up lo dice: eso se cierra con el remito, no cancelando.
 
-Detalle, medición y rollback: `docs/SUPABASE-GESTION-VIRGILIO.md` §3.ie ·
-`sql/gv_ppp_np_desarmar_a_guardar_v1889.sql` · `tests/fac-cancelar-pedido.cjs`.
+Detalle, medición y rollback: `docs/SUPABASE-GESTION-VIRGILIO.md` §3.if ·
+`sql/gv_ppp_np_desarmar_a_guardar_v1890.sql` · `tests/fac-cancelar-pedido.cjs`.
 
 ## Nota v18.48 (2026-09-15) — Rotado el password del FDW LK→Chef
 

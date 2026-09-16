@@ -19614,7 +19614,94 @@ piezas). Problema 335.
 
 ---
 
-## §3.ie — v18.89: CANCELAR un pedido desde Facturación, y lo armado a «A guardar» — 2026-09-16
+## §3.ie — v18.89: un pedido desprogramado estaba en Atrasados y en A Programar a la vez — 2026-09-16
+
+**Thomas:** *"fíjate los pedidos del cliente 4275. Está en la parte de pedidos atrasados… que
+supuestamente se iba a entregar el 4 de septiembre, pero también está en a programar. No pueden
+estar en los dos lados a la vez."*
+
+Las 4 NP de **LK 4275** (Zhang Qikuan: 98587, 98588, 98589, 98590 · tanda **D56D** · entrega
+04/09) salían en **Pedidos atrasados** y en **A Programar** al mismo tiempo.
+
+### Qué había pasado con ese pedido (no es sólo un bug de pantalla)
+
+Se pickeó el 02/09, se armó y se facturó el 03/09, el 04/09 se le controló el remito (CCR) —y
+**nunca tuvo Carga Camión**: la mercadería quedó en el depósito porque es un cliente nuevo
+(`GV_Clientes_Nuevos`: 1 pedido en toda su historia) al que se le hizo la factura y todavía no
+pagó. El 11/09, en la v16.03, Thomas pidió sacar de la programación las NP viejas sin Carga
+Camión, así que las cuatro quedaron con `GV_PPP_Prog_Override.desprogramada = true` y
+`tanda_previa = D56D`.
+
+### El agujero
+
+`desprogramada` funcionaba bien de los dos lados que la miraban:
+
+* `gv_ppp_programacion_diaria` devuelve `tanda = ''` y `fecha_entrega = ''` → sale de la PPP;
+* `gv_ppp_isis_sin_tanda` la deja entrar **aunque esté facturada** (regla de la v15.93) → A Programar.
+
+Lo que no la miraba era **`gv_ppp_prog_arbol`**, que arma su universo con cuatro fuentes y
+`distinct on (np)`: la fuente 1 (ISIS) ya no las traía, pero **la fuente 3 sí** —
+`Facturacion_NP` guarda `tanda = D56D` y `fecha_salida = 2026-09-04`, y nadie le preguntaba si esa
+NP seguía programada. Volvían a la PPP del 04/09; y como ese día ya pasó y no tienen CCN,
+`gv_ppp_atrasados` —que se para sobre el mismo árbol— las contaba como atrasadas.
+
+El mismo agujero dejaba pasar a **98050** (Ferrero Santiago Miguel, C98F, 29/07), que está
+`oculto = true` **y** en `NP_Canceladas`, y aun así figuraba en la programación del 29/07.
+
+### El arreglo (v18.89)
+
+Una CTE `fuera` y una condición, en las **dos** funciones que comparten el universo — el
+encabezado de la v17.66 ya lo avisaba: *"Si se toca una, tocar la otra"*:
+
+```sql
+fuera as ( select o.np from "GV_PPP_Prog_Override" o where o.oculto or o.desprogramada
+           union
+           select regexp_replace(btrim(coalesce(c.np,'')), '\.0+$','') from "NP_Canceladas" c )
+uni   as ( … where … and not exists (select 1 from fuera x where x.np = f.np) )
+```
+
+O sea: la NP desprogramada, oculta o cancelada **no entra por ninguna de las cuatro fuentes**, no
+sólo por la de ISIS. Es el criterio que ya usaban las tres vistas del espejo y
+`gv_pedidos_web_excluidos`; lo único que faltaba era aplicarlo acá. Una NP facturada cuya fila de
+ISIS desapareció del espejo **sigue** entrando por la fuente 3 (98507 Perez Zarate 01/09, 98502
+Clapera 03/09): ninguna tiene override.
+
+### Medición
+
+| | antes | después |
+|---|---|---|
+| `gv_ppp_atrasados()` | 18 filas | **14** (se van las 4 de 4275) |
+| `gv_ppp_avance_dias('2026-09-04')` | 23 pedidos / 3,901 m³ | **19 / 3,435** |
+| NP oculta o cancelada dentro del árbol 2026 | 1 (98050) | **0** |
+| 4275 en `gv_ppp_isis_sin_tanda` (A Programar) | 4 | **4** — donde tienen que estar |
+
+Tiempos como `anon` (el rol corta a los 3 s): árbol 0,38 s · avance 0,18 s · atrasados 0,26 s.
+
+**Chequeo, para que no vuelva:**
+
+```sql
+select a.np, a.fecha, a.origen
+  from public.gv_ppp_prog_arbol('2026-01-01','2026-12-31') a
+  left join public."GV_PPP_Prog_Override" o on o.np = a.np
+  left join public."NP_Canceladas" c on regexp_replace(btrim(coalesce(c.np,'')),'\.0+$','') = a.np
+ where coalesce(o.oculto,false) or coalesce(o.desprogramada,false) or c.np is not null;
+-- vacío = ninguna NP está en dos lados
+```
+
+**Lo que queda abierto (decisión del dueño, no de código):** hoy un pedido facturado y no cobrado
+vive en **A Programar**, mezclado con los que sólo esperan fecha. No hay un estado que diga *"está
+armado y facturado, esperando que el cliente pague"*. Las piezas existen —Cuarentena (v14.82) ya
+retiene por deuda / suspendido / límite, `GV_Clientes_Nuevos` ya marca al cliente nuevo y
+`tanda_previa` ya guarda la tanda para no re-pickear— pero nadie las ató a la cobranza de una
+factura ya emitida. Ver problema 336.
+
+**Archivos:** `sql/gv_ppp_arbol_desprogramadas_v1889.sql` (todo el cambio),
+`sql/backups/gv_ppp_avance_dias_20260916_pre_v1889.sql` y `sql/gv_ppp_prog_arbol_v1766.sql`
+(rollback). Problema 336.
+
+---
+
+## §3.if — v18.90: CANCELAR un pedido desde Facturación, y lo armado a «A guardar» — 2026-09-16
 
 **Pedido del dueño (Thomas, 16/09), textual:** *"Quiero agregar un botón al módulo de
 facturación para poner cancelar pedido. Cuando toco eso me tiene que abrir un pop-up que me debe
@@ -19718,5 +19805,5 @@ la de 5. El botón deja de funcionar (la RPC responde "function does not exist")
 igual. En el front: sacar `.fac-btn-cancel` de la celda Acción de `facRender` y el bloque
 `facCancel*` de `index.html`.
 
-**Archivos:** `sql/gv_ppp_np_desarmar_a_guardar_v1889.sql`, `tests/fac-cancelar-pedido.cjs`.
+**Archivos:** `sql/gv_ppp_np_desarmar_a_guardar_v1890.sql`, `tests/fac-cancelar-pedido.cjs`.
 No hay problema de auditoría: es una funcionalidad nueva, no un bug.
