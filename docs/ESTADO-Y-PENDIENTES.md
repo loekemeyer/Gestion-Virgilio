@@ -1,4 +1,4 @@
-# Estado y pendientes — al 2026-09-15 (última actualización: v18.51)
+# Estado y pendientes — al 2026-09-16 (última actualización: v18.69)
 
 > **2026-09-15, revisión general pedida por Thomas (v18.51, §3.hi de la doc de Supabase).**
 > *"Está andando mal en general la app y su paso a paso."* Seis agentes sobre `main` + los 10

@@ -18173,3 +18173,19 @@ función (`sql/gv_valor_items_indices_v1868.sql`):
 
 Lo que queda de ese segundo es `cobranzas_precios_super`, que es una vista (no se indexa) y sólo
 pesa para clientes de súper. Verificar mañana en `edge_logs` que `gv_cuarentena_limite` no dé más 500.
+
+## §3.hq — v18.69: `vista_tanda_m3` — lo vivo manda sobre el histórico cuando se reusa un código (D47B) — 2026-09-15
+
+> **Luis:** *"¿Falta algo?"* → el último hallazgo del guardián de stock que quedaba sin tocar. Problema **316**, tarea 3481.
+
+D47B se entregó el 27/08 (1,962 m³ en `GV_PPP_Entregados_Historico`) y el override v16.03 reprogramó
+98480/98481 **reusando el código** para el 16/09 (0,238 m³). La vista hacía `COALESCE(histórico, ISIS,
+web)` y `entregado = histórico is not null`: Ocupación y `vista_productividad_diaria` veían 1,962 m³ y
+"entregada" para una tanda de mañana. **Única tanda afectada** (medido: un solo código con histórico y
+programación viva a la vez). Ahora m³ = ISIS vivo → web viva → histórico, y `entregado` sólo si no hay
+nada vivo. D47B → 0,238 / false; D46A (entregada de verdad) sigue 0,194 / true. Columnas iguales;
+`security_invoker` en el `WITH` y reforzado con `ALTER`. `sql/vista_tanda_m3_v1869.sql`, backup en
+`sql/backups/vista_tanda_m3_pre_v1869_20260915.sql`.
+
+**Chequeos del cierre del día (16/09 00:55):** `errores_cliente` sin filas desde las 18:30; `edge_logs`
+sin ningún HTTP 500 en `/rest/v1/*` desde los índices de la v18.68.
