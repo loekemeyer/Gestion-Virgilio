@@ -1,4 +1,4 @@
-/* Regresión v18.85 — "Mover a Góndola" mostraba cajas que NO existen.
+/* Regresión v18.86 — "Mover a Góndola" mostraba cajas que NO existen.
 
    El 16/09 la pantalla ofrecía 475 cajas en 10 códigos (026 70 · 027 53 · 031 133 · 103 73 ·
    312 7 · 562 54 · 564 17 · 735 41 · 859 21 · 862 6) que en la base sumaban CERO. El saldo
@@ -18,7 +18,7 @@
      2) un dual ("438E LK" / "438E CH") recibe cada empresa en SU clave;
      3) total 0 con desglose +70/−70 → NO hay renglón (el bug de las 475 cajas);
      4) un desglose que no cierra contra el total → UN renglón, con el total y SIN empresa
-        (la resuelve el trigger `zz_normalizar_empresa` v18.85 en el server);
+        (la resuelve el trigger `zz_normalizar_empresa` v18.86 en el server);
      5) un desglose que SÍ cierra (LK 30 + CH 20 = 50) → dos renglones con su empresa;
      6) la lectura de `gv_saldos_stock_emp` lleva `order=` (pagina con Range: sin orden
         estable se repiten filas de una página y se saltean otras).

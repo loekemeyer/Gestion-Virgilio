@@ -1,6 +1,6 @@
--- Backup de public.trg_normalizar_empresa_stock() tal como estaba ANTES de la v18.85
+-- Backup de public.trg_normalizar_empresa_stock() tal como estaba ANTES de la v18.86
 -- (tomado con pg_get_functiondef el 2026-09-16). Ejecutar este archivo es el rollback
--- exacto de sql/trg_normalizar_empresa_stock_v1885.sql.
+-- exacto de sql/trg_normalizar_empresa_stock_v1886.sql.
 
 CREATE OR REPLACE FUNCTION public.trg_normalizar_empresa_stock()
  RETURNS trigger

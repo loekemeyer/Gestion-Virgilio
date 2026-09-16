@@ -19205,7 +19205,7 @@ esta cuenta; el FDW `chef_db` de LK entra como `loke_reader` (sólo lectura) y e
 con la publishable key no es camino (la RLS del catálogo es de admin, y no corresponde). Lo
 aprieta Thomas en el SQL Editor de Chef, o se habilita ese proyecto en el MCP y lo corro yo.
 
-## §3.hz — v18.85: las 475 cajas fantasma de "Mover a Góndola" — 2026-09-16
+## §3.ia — v18.86: las 475 cajas fantasma de "Mover a Góndola" — 2026-09-16
 
 **Síntoma (lo reportaron los operarios).** En *Mover a Góndola* aparecía para guardar una
 cantidad que no era real. Eran **475 cajas en 10 códigos**:
@@ -19256,7 +19256,7 @@ entrada Mixto. Ahí no hay nada roto y no hay evidencia para reasignar.
 
 **Los tres arreglos, para que no vuelva:**
 
-1. **Backend — `trg_normalizar_empresa_stock` (`sql/trg_normalizar_empresa_stock_v1885.sql`).**
+1. **Backend — `trg_normalizar_empresa_stock` (`sql/trg_normalizar_empresa_stock_v1886.sql`).**
    Un movimiento `guardado*` sin empresa explícita **hereda la empresa con la que ese artículo
    entró a A Guardar**, si entró con una sola. Mismo patrón que el bloque v18.24 (que resuelve
    un `separar_pedidos`/`a_facturar` mirando el picking de esa tanda). Se mira el **historial
@@ -19269,7 +19269,7 @@ entrada Mixto. Ahí no hay nada roto y no hay evidencia para reasignar.
    ZZTEST2 (entró LK y CH)      → a_guardar=Mixto terminado=Mixto ← no adivina, y está bien
    ```
    md5 del cuerpo normalizado: repo == base (`59d30d8d762a743acc3804d399d357d2`).
-   Rollback: `sql/backups/trg_normalizar_empresa_stock_pre_v1885.sql`.
+   Rollback: `sql/backups/trg_normalizar_empresa_stock_pre_v1886.sql`.
 
 2. **Front — `index.html`.** (a) el desglose se engancha por el **código pelado** y, si no hay
    a quién colgarlo, **no se inventa un artículo**; para los duales cada empresa va a SU clave
@@ -19279,7 +19279,7 @@ entrada Mixto. Ahí no hay nada roto y no hay evidencia para reasignar.
    (c) la lectura de `gv_saldos_stock_emp` lleva `order=` — pagina con `Range` y hoy son **842
    filas**, a 158 de la página de 1000 donde empezaría a repetir y saltear en silencio.
 
-3. **Centinela — `gv_stock_empresa_fantasma`** (`sql/gv_stock_empresa_fantasma_v1885.sql`).
+3. **Centinela — `gv_stock_empresa_fantasma`** (`sql/gv_stock_empresa_fantasma_v1886.sql`).
    Lista (código, depósito) donde la suma de los saldos positivos por empresa supera al total,
    o sea cajas que una pantalla puede ofrecer y no existen.
 

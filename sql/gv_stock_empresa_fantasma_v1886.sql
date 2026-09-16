@@ -1,4 +1,4 @@
--- v18.85 — CENTINELA de stock partido por empresa ("cajas fantasma").
+-- v18.86 — CENTINELA de stock partido por empresa ("cajas fantasma").
 --
 -- QUÉ MIDE. Por (código, depósito): el saldo TOTAL contra la suma de los saldos por empresa
 -- que son POSITIVOS. Si alguna empresa quedó en NEGATIVO, esos dos números no coinciden, y la
@@ -22,7 +22,7 @@
 --     from public.gv_stock_empresa_fantasma group by 1 order by 3 desc;
 --
 -- Lo que impide que vuelva a crecer por el lado del guardado está en
--- sql/trg_normalizar_empresa_stock_v1885.sql (el trigger resuelve la empresa del montón) y en
+-- sql/trg_normalizar_empresa_stock_v1886.sql (el trigger resuelve la empresa del montón) y en
 -- `stockFetchSaldos` / la lista de MG de index.html (el total manda sobre el desglose).
 
 create or replace view public.gv_stock_empresa_fantasma

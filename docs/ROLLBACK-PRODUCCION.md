@@ -1284,7 +1284,7 @@ El backup tiene las 7 filas completas (todas las columnas), con RLS prendida y s
 
 ---
 
-## 2026-09-16 (v18.85) — `trg_normalizar_empresa_stock()`: el guardado hereda la empresa del montón
+## 2026-09-16 (v18.86) — `trg_normalizar_empresa_stock()`: el guardado hereda la empresa del montón
 
 **Objeto compartido tocado:** la función `public.trg_normalizar_empresa_stock()`, que usa el
 trigger `zz_normalizar_empresa` (BEFORE INSERT) de `public."Movimientos_Stock"`. Corre también
@@ -1305,7 +1305,7 @@ saldo del artículo: la mercadería entraba a A Guardar como LK y salía como Mi
 `−` no cancelaba al `+`. El 16/09 eso puso **475 cajas inexistentes** en "Mover a Góndola".
 Detalle en `docs/SUPABASE-GESTION-VIRGILIO.md` §3.hz. Problema 331.
 
-**ROLLBACK exacto:** ejecutar `sql/backups/trg_normalizar_empresa_stock_pre_v1885.sql`, que es
+**ROLLBACK exacto:** ejecutar `sql/backups/trg_normalizar_empresa_stock_pre_v1886.sql`, que es
 la definición anterior tal cual salió de `pg_get_functiondef`. No hay que tocar el trigger
 (sigue apuntando a la misma función).
 

@@ -1,4 +1,4 @@
--- v18.85 — el GUARDADO a góndola hereda la empresa del montón que está en A Guardar.
+-- v18.86 — el GUARDADO a góndola hereda la empresa del montón que está en A Guardar.
 --
 -- POR QUÉ. El 16/09 "Mover a Góndola" mostraba 475 cajas que no existen, repartidas en 10
 -- códigos (026 70 · 027 53 · 031 133 · 103 73 · 312 7 · 562 54 · 564 17 · 735 41 · 859 21 ·
@@ -27,7 +27,7 @@
 -- Si el artículo entró con DOS empresas distintas (o con Mixto y con LK, como el 355: 133 LK
 -- + 40 Mixto) NO se adivina: queda como estaba. Conservador a propósito.
 --
--- ROLLBACK: volver a aplicar sql/backups/trg_normalizar_empresa_stock_pre_v1885.sql.
+-- ROLLBACK: volver a aplicar sql/backups/trg_normalizar_empresa_stock_pre_v1886.sql.
 
 create or replace function public.trg_normalizar_empresa_stock()
  returns trigger
@@ -72,7 +72,7 @@ BEGIN
     END IF;
   END IF;
 
-  -- v18.85: un `guardado` SIN empresa hereda la del montón que está en A Guardar, si ese
+  -- v18.86: un `guardado` SIN empresa hereda la del montón que está en A Guardar, si ese
   -- artículo entró con UNA sola empresa. Las tres filas del mismo guardado (−a_guardar,
   -- +terminado, +excedente) resuelven igual porque se mira el historial de ENTRADAS, no el
   -- saldo del momento: si no, la que baja el montón dejaría a las otras dos sin referencia.
