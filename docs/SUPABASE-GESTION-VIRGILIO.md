@@ -20207,3 +20207,69 @@ Tres cosas que conviene tener a mano:
 
 **Rollback:** restaurar las 13 filas y la fila de CC desde las dos tablas de `zz_backups`
 (borrando antes las 16 líneas vivas del pedido). Problema **341**.
+
+## §3.ik — v18.97: la migración 337 empaquetada en funciones, lista para disparar — 2026-09-16
+
+Luis: *"prepará todo lo que necesites aparte (sin joder live) para que cuando te diga se
+implemente"*. Hecho: **seis funciones `gv_mig337_*` creadas y dormidas**. Crear una función no
+toca ningún dato ni ninguna pantalla. Ninguna es ejecutable por `anon` (todas con `revoke`).
+
+| | qué hace | escribe |
+|---|---|---|
+| `gv_mig337_simular()` | los 7 chequeos del preflight | **no** |
+| `gv_mig337_migrar(true)` | **ENSAYO**: corre TODO y al final lo revierte | no (revierte) |
+| `gv_mig337_preparar()` | apaga los 5 crons + preflight | sí |
+| `gv_mig337_migrar()` | backup · trigger · vista · backfill · md5 | sí |
+| `gv_mig337_verificar()` | repesca · reconciliadores · centinelas · prende crons | sí |
+| `gv_mig337_rollback()` | deshace todo de un tirón | sí |
+
+### Por qué son TRES fases y no una sola función
+
+Es el hallazgo que obligó al diseño: **`cron.alter_job` es transaccional** — hace un `UPDATE`
+sobre `cron.job`. Si el apagado de los crons va DENTRO de la misma transacción que la
+migración, el scheduler **sigue viendo `active = true`** hasta el commit, o sea hasta que la
+migración ya terminó. Los crons nunca quedarían apagados durante la ventana, que es
+exactamente para lo que se los apagaba. Por eso: fase 1 apaga y commitea, fase 2 migra, fase 3
+verifica y prende.
+
+### Las guardas que trae puestas
+
+- `preparar()` **se niega** si algún chequeo del preflight está en `FRENA` (depósito con
+  movimiento, picking/armado abierto, colisiones nuevas, o el ancla del trigger cambiada).
+- `migrar()` **se niega** si el bloque v18.95 ya está aplicado, y **aborta y revierte** si el
+  md5 del saldo por (código, depósito) cambia entre el principio y el final.
+- `migrar(true)` corre **exactamente el mismo código** y termina con un `raise` para revertir:
+  el ensayo prueba lo que se va a ejecutar, no una copia.
+- El backfill va **en lotes de 1.000** dentro de un `loop` (el `statement_timeout` ronda los 8 s
+  y las ~5.800 filas tardan ~6,7).
+- `verificar()` hace una **repesca** por si un cron alcanzó a insertar algo en la ventana.
+
+### Probado ya
+
+Corrido `gv_mig337_simular()` con los operarios trabajando: **frena solo**, como debe —
+*"deposito quieto: FRENA, último evento hace 0 min"* y *"sin picking/armado abierto: FRENA,
+2 tandas"*. Los otros cinco chequeos en OK (0 colisiones en los dos índices, ancla en su
+lugar, 4 duales). Las filas a corregir ya van en **5.897** (eran 5.794 hace unas horas): crece.
+
+### El archivo del repo == la base
+
+`sql/gv_mig337_empresa_solo_duales.sql`, verificado con el md5 del cuerpo normalizado de las
+**seis**. ⚠ El verificador tuvo **dos falsos verdes** antes de quedar bien, y los dos valen
+como advertencia para la próxima: (1) exigir `\nas $fn$` **se come la función escrita en una
+sola línea** y le cuelga su nombre al cuerpo de la siguiente; (2) sin anclar a
+`create or replace`, los `revoke execute on function public.X(` también matchean y corren
+todos los nombres un lugar. El patrón bueno ancla **las dos puntas**.
+
+### Cómo se corre al cierre
+
+```sql
+select * from public.gv_mig337_simular();       -- los 7 chequeos en OK
+select * from public.gv_mig337_migrar(true);    -- ENSAYO (termina con "ENSAYO OK")
+select * from public.gv_mig337_preparar();      -- apaga los crons
+select * from public.gv_mig337_migrar();        -- el cambio
+select * from public.gv_mig337_verificar();     -- y prende los crons
+```
+
+Lo que hay que mirar en el último paso: `reconciliar_pipeline_stock_etapa1` en **0 filas**
+(el picking no se duplicó) y `gv_stock_empresa_fantasma` con **0 duales**.
+Si algo sale mal: `select * from public.gv_mig337_rollback();`.
