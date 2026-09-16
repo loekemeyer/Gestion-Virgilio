@@ -21018,3 +21018,81 @@ más. Para ampliarla a otro motivo alcanza con editar `motivos` de su fila — n
 **Rollback**: `sql/backups/gv_cuarentena_exento_pre_v1916.sql` (las 3 funciones como estaban) +
 `drop function public.gv_cuarentena_exento(text,text,text);` +
 `drop table public.gv_excepcion_cuarentena;`.
+
+---
+
+## §3.is — v19.19: la excepción de Cuarentena es de **TODO**, no sólo de la deuda — 2026-09-16
+
+**Luis, encima de la v19.16:** *"excepción de todo, no solo deuda (limite credito y estado también)"*.
+
+La v19.16 dejó la lista (`gv_excepcion_cuarentena`) y la pregunta (`gv_cuarentena_exento`) pero
+cableada a UN motivo, `deuda` — el único que la excepción vieja (el `not exists` contra
+`cobranzas_cliente_cadena`) sabía tapar. Los otros cuatro seguían entrando: `suspendido` /
+`sin_cta_cte` del reporte **Búsqueda CL**, `limite_credito` del greedy de `gv_cuarentena_limite`
+(que ni miraba la lista) y `cliente_nuevo` de `GV_Clientes_Nuevos`.
+
+### 1. Cómo se cableó
+
+En `gv_cuarentena_marcar_calc` y `gv_cuarentena_ya_programado` la excepción **dejó de ser una
+condición adentro de cada motivo** y pasó a ser UN filtro sobre el array ya armado (CTE `exc`):
+
+```sql
+(select coalesce(array_agg(x order by ord), array[]::text[])
+   from unnest(m.motivos) with ordinality u(x, ord)
+  where not public.gv_cuarentena_exento(m.emp_ev, m.cod_ev, x))
+```
+
+Un lugar por función en vez de uno por motivo, y **un motivo nuevo queda cubierto solo**. Si el
+array queda vacío, el `array_length(...) >= 1` de siempre saca el pedido: no hubo que tocar el
+criterio de "está en cuarentena". `deuda`, `estado` y `nuevo_pedidos` se anulan si su motivo se
+fue, para no mostrar el monto de algo que ya no aplica.
+
+`gv_cuarentena_limite` no arma un array (es una caminata greedy), así que ahí el exento **se saca
+del CTE `ped`**: ni se lo mide contra el límite, y tampoco puede contarse como crédito consumido.
+
+### 2. Lo que cambia de verdad
+
+No son sólo los 3 clientes de Luis: los **súper** también están en la lista, y había 4 que caían
+por un motivo que no era deuda —
+
+| cliente | motivo que lo frenaba | después |
+|---|---|---|
+| Carrefour CH 1087 | `suspendido` | ya no cae |
+| Libertad CH 1093 | `suspendido` | ya no cae |
+| Coto CH 2261 | `suspendido` | ya no cae |
+| Gigot LK 4263 | `cliente_nuevo` | ya no cae |
+
+Los tres de Chef figuran *Suspendido* con límite 0 **porque a ese cliente no se le vende por
+Chef** — el mismo cuadro que ya había mordido con Tierra del Fuego (§3.fp / v17.75: evaluar por el
+padrón equivocado retiene pedidos sanos).
+
+⚠ **Contracara, y es la decisión que se toma acá:** si a un súper lo suspenden **de verdad**, la
+Cuarentena ya no lo frena. La lista pasa a ser el único lugar donde eso se decide, y `motivos` es
+**por cliente**: para que a uno se le vuelva a controlar el estado alcanza con sacarle
+`suspendido` de su fila — no hay que tocar código ni sacarlo de la lista.
+
+### 3. Medición (antes → después)
+
+Los mismos 8 pedidos de prueba por `gv_cuarentena_marcar_calc`:
+
+| pedido | antes | después |
+|---|---|---|
+| Carrefour CH 1087 | `{suspendido}` | — ✅ |
+| Libertad CH 1093 | `{suspendido}` | — ✅ |
+| Coto CH 2261 | `{suspendido}` | — ✅ |
+| Gigot LK 4263 | `{cliente_nuevo}` | — ✅ |
+| Torres y Liva / Osa / Muller | — (ya salían en v19.16) | — ✅ |
+| **LK 1792 (común, $9.739.800)** | `{deuda}` | **`{deuda}`** ✅ sigue cayendo |
+
+`gv_cuarentena_exento('lk','288', …)` → **true en los 5 motivos**, false en uno inventado; para el
+cliente común, false en los 5. `gv_cuarentena_limite` con un pedido gigante: Gigot (exento,
+límite $31 M) **0 filas**; LK 1926 (común, límite $20.000) **1 fila**. `ya_programado` 2 → 2,
+`cobranzas_cliente_cadena` 19 → 19, centinela `gv_excepcion_cuarentena_desincronizada` **vacío**,
+25 filas con los 5 motivos.
+
+**SQL**: `sql/gv_excepcion_cuarentena_todos_v1917.sql`.
+**Rollback**: `sql/gv_excepcion_cuarentena_v1916.sql` §5 (las dos funciones como v19.16) +
+`sql/backups/gv_cuarentena_limite_pre_v1917.sql` (el límite como v17.74) +
+`update public.gv_excepcion_cuarentena set motivos = array['deuda'];`
+(El archivo y los comentarios del código quedaron nombrados `v19.17` de cuando la sesión iba por
+ese número; el bump final fue **v19.19** por colisión con otra sesión — el contenido es el mismo.)
