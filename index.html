@@ -3447,12 +3447,18 @@ tr.ppp-err-zona > td{ background:#fffbeb !important; }
    ⚠ Y de paso: ese comentario tenía un byte LATIN1 suelto (0xF3) metido por la v17.85 — el único
    byte inválido de todo index.html. Era sólo un comentario CSS, pero al editar el archivo por
    script hay que escribir los acentos como bytes UTF-8, no como el carácter latin1. */
-.pga-nrow{ display:flex; align-items:center; gap:0; }
+/* v19.11: la fila de la TANDA usa `pga-trow` — mismo flex, clase propia. No comparte `pga-nrow` a
+   propósito: `tests/ppp-atrasados-modulo.cjs` cuenta ese `<div>` para probar que el render de la fila
+   de NP no está duplicado entre las dos tablas, y con la misma clase ese guard quedaba ciego. */
+.pga-nrow, .pga-trow{ display:flex; align-items:center; gap:0; }
 .pga-ninfo{ flex:1 1 auto; min-width:0; }
 .pga-acc{ flex:0 0 auto; margin-left:auto; padding-left:14px; white-space:nowrap; }
 .pga-acc-b{ background:#eef2f7; color:#1e6bd6; border:1px solid #d7e2f3; border-radius:7px;
   padding:2px 10px; font-size:13.5px; font-weight:800; cursor:pointer; width:auto; line-height:1.6; }
 .pga-acc-b:hover{ background:#e0eaf9; }
+/* v19.11 (Thomas) — «Cambiar de día» en la fila de la tanda. Lleva el texto y no sólo el ícono
+   (así lo pidió), pero chico: la fila de la tanda ya tiene el código, la pastilla de estado y la zona. */
+.pga-acc-b.dia{ font-size:12.5px; padding:2px 9px; }
 /* v17.88 (Luis): el tacho. Rojo, para que no se confunda con el de al lado. */
 .pga-acc-b.del{ background:#fee2e2; color:#b91c1c; border-color:#fca5a5; }
 .pga-acc-b.del:hover{ background:#fecaca; }
@@ -5703,7 +5709,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=19.12"></script>
+<script type="module" src="recepcion.js?v=19.13"></script>
 <!-- Config del módulo de fichada (compartido con fichada.html). El secret
      hmacSecret tiene que ser el mismo acá y allá; cargándolo desde un solo
      archivo evitamos que se desincronicen. -->
@@ -9485,7 +9491,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v19.12";
+const APP_VERSION = "v19.13";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -34387,11 +34393,14 @@ async function pppTandaFecha(id, tanda) {
 }
 /* v14.04 — el mismo movimiento, pero recibiendo la fecha ya elegida (del pop-up de días o del
    campo de fecha viejo). Devuelve true si movió. */
-async function pppTandaMover(tanda, iso) {
+async function pppTandaMover(tanda, iso, opts) {
   const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(iso || "")); if (!m) return false;
   const f = m[3] + "/" + m[2] + "/" + m[1];
   const t = String(tanda).toUpperCase();
-  const filas = (_pppParsed.prog || []).filter(function (p) { return String(p.tanda || "").toUpperCase() === t; });
+  // v19.11: las filas pueden venir del árbol (botón de la tabla y de Pedidos atrasados). Si no vienen,
+  // salen de donde salían: la lista de la vista clásica.
+  const filas = (opts && opts.filas && opts.filas.length) ? opts.filas
+    : (_pppParsed.prog || []).filter(function (p) { return String(p.tanda || "").toUpperCase() === t; });
   const avisos = [];
   try {
     const cam = await aprRpc("gv_ppp_web_camion_nuevo", {
@@ -34402,24 +34411,42 @@ async function pppTandaMover(tanda, iso) {
     if (nuevos.length) avisos.push("El " + f + " ya salen " + Number(nuevos[0].camiones_dia) + " camión(es) y esto abre otro: " +
       nuevos.map(function (c) { return c.camion; }).join(", ") + ". ¿Seguro que vas a usar un segundo camión?");
   } catch (_e) {}
+  // v19.11 — una tanda YA EMPEZADA (pickeada, armada o facturada) ahora SÍ se puede mover: es justo el
+  // caso de Pedidos atrasados, donde el 100 % de las tandas está armada y lo único que falta es el
+  // camión. El contenido no cambia, así que no hay que volver a pickear; pero se avisa y se confirma.
+  let forzar = !!(opts && opts.empezada);
+  if (forzar) avisos.push("La tanda ya está pickeada o armada. Cambiarle el día NO deshace nada: el "
+    + "contenido queda igual y no hay que volver a pickear.");
   if (!confirm("¿Mover TODA la tanda " + t + " al " + f + "?" +
       (filas.length ? "\n\n" + filas.length + " pedido(s)." : "") +
       (avisos.length ? "\n\n⚠ " + avisos.join("\n⚠ ") : "") +
       "\n\nLo ven todos, también el operario en su celular.")) return false;
-  pppSetStatus("Moviendo la tanda " + t + "…", true);
-  try {
-    const r = await aprRpc("gv_ppp_tanda_mover", { p_tanda: t, p_fecha: iso, p_por: (typeof _faltMiLegajo === "function" ? _faltMiLegajo() : "") || null });
-    const x = (r && r[0]) || {};
-    pppSetStatus("✓ Tanda " + t + " movida al " + f + ": " + (x.movidas || 0) + " pedido(s) · " + (x.m3 || 0) + " m³." + (x.aviso ? "  ⚠ " + x.aviso : ""), true);
-    if (x.aviso) { try { alert("Se movió, pero ojo:\n\n" + x.aviso); } catch (_e) {} }
-    await pppLoadProgFromSupabase();
-    return true;
-  } catch (e) {
-    const msg = (e && e.message) ? e.message : String(e);
-    pppSetStatus("⚠ No se pudo mover: " + msg, false);
-    try { alert("No se pudo mover la tanda " + t + ":\n\n" + msg); } catch (_e) {}
-    return false;
+  for (let intento = 0; intento < 2; intento++) {
+    pppSetStatus("Moviendo la tanda " + t + "…", true);
+    try {
+      const r = await aprRpc("gv_ppp_tanda_mover", { p_tanda: t, p_fecha: iso,
+        p_por: (typeof _faltMiLegajo === "function" ? _faltMiLegajo() : "") || null, p_forzar: forzar });
+      const x = (r && r[0]) || {};
+      pppSetStatus("✓ Tanda " + t + " movida al " + f + ": " + (x.movidas || 0) + " pedido(s) · " + (x.m3 || 0) + " m³." + (x.aviso ? "  ⚠ " + x.aviso : ""), true);
+      if (x.aviso) { try { alert("Se movió, pero ojo:\n\n" + x.aviso); } catch (_e) {} }
+      await pppLoadProgFromSupabase();
+      if (opts && opts.desdeArbol) pgaRecargar();     // el árbol y los atrasados tienen su propio caché
+      return true;
+    } catch (e) {
+      const msg = (e && e.message) ? e.message : String(e);
+      // El backend manda `TANDA_EMPEZADA:` cuando la tanda tiene eventos y no se pidió forzar. Pasa si el
+      // front no lo había detectado (la vista clásica no sabe el estado): se pregunta y se reintenta.
+      if (intento === 0 && msg.indexOf("TANDA_EMPEZADA") >= 0) {
+        if (confirm(msg.replace(/^.*TANDA_EMPEZADA:\s*/, "") + "\n\n¿La movemos igual al " + f + "?")) { forzar = true; continue; }
+        pppSetStatus("No se movió la tanda " + t + ".", false);
+        return false;
+      }
+      pppSetStatus("⚠ No se pudo mover: " + msg, false);
+      try { alert("No se pudo mover la tanda " + t + ":\n\n" + msg); } catch (_e) {}
+      return false;
+    }
   }
+  return false;
 }
 /* =====================================================================================
    v14.04 — POP-UP para mover una tanda de día (dueño 07/09: "cuando toco el botón, que me abra un
@@ -34521,7 +34548,9 @@ async function pppMovElegir(iso) {
   if (!_pppMov) return;
   if (_pppMov.reprogNps) return pppReprogElegir(iso);   // v14.36: pop-up reutilizado para reprogramar un ISIS
   const t = _pppMov.tanda;
-  const ok = await pppTandaMover(t, iso);
+  // v19.11: si el pop-up lo abrió la tabla, las filas y el estado vienen del árbol.
+  const ok = await pppTandaMover(t, iso, { filas: _pppMov.arbolFilas, empezada: _pppMov.empezada,
+                                           desdeArbol: _pppMov.desdeArbol });
   if (ok) pppMovCerrar(); else pppMovCargar();
 }
 /* v15.55 — Los que NO salieron: volver a A Programar (web) o cancelar (web e ISIS). Todo en el backend:
@@ -34727,6 +34756,58 @@ function pppReprogAbrir(np) {
   o.classList.add("show");
   pppMovCargar();
 }
+/* v19.11 — el overlay del pop-up de días estaba copiado en `pppReprogAbrir` y en `pppMoverAbrir`; ahora
+   lo arma esta única función, que usan también el botón nuevo de la tabla. */
+function pppMovOverlay(titulo) {
+  _pppMovCss();
+  let o = document.getElementById("pppMovOverlay");
+  if (!o) {
+    o = document.createElement("div"); o.id = "pppMovOverlay";
+    o.innerHTML = '<div class="mv-card"><div class="mv-head"><div class="mv-title" id="pppMovTitle"></div>' +
+      '<button class="mv-close" onclick="pppMovCerrar()">Cerrar</button></div><div class="mv-body" id="pppMovBody"></div></div>';
+    o.addEventListener("click", function (e) { if (e.target === o) pppMovCerrar(); });
+    document.body.appendChild(o);
+  }
+  document.getElementById("pppMovTitle").textContent = titulo;
+  o.classList.add("show");
+  return o;
+}
+/* v19.11 (Thomas) — «CAMBIAR DE DÍA» DESDE LA TABLA (árbol día → tanda → NP), y lo mismo desde el
+   submódulo de Pedidos atrasados. Reusa el pop-up de días y `pppTandaMover`, pero los datos de la tanda
+   (cuántos pedidos, cuántos m³, qué día tiene hoy) salen del ÁRBOL — `_pgaRows` / `_patrRows` — y no de
+   `_pppParsed.prog`, que es lo que mira la vista clásica y sólo tiene de hoy en adelante: con eso, en
+   atrasados el pop-up habría dicho "0 pedidos · 0 m³" y el aviso del segundo camión nunca se calculaba. */
+function _pgaTandaDe(key) {
+  const k = String(key || ""), i = k.indexOf("|");
+  if (i < 0) return null;
+  const dia = k.slice(0, i), tanda = k.slice(i + 1), filas = [], vistas = {};
+  for (const r of (_pgaRows || []).concat(_patrRows || [])) {
+    if (String(r.tanda || "—") !== tanda) continue;
+    if (String(r.fecha == null ? "" : r.fecha).replace(/-/g, "") !== dia) continue;
+    const np = String(r.np || "");
+    if (vistas[np]) continue;                 // la misma NP puede venir en las dos listas
+    vistas[np] = 1; filas.push(r);
+  }
+  return { dia: dia, tanda: tanda, filas: filas };
+}
+function pgaTandaMoverAbrir(key) {
+  const t = _pgaTandaDe(key);
+  if (!t || !t.tanda || t.tanda === "—") {
+    pppSetStatus("Esos pedidos no tienen código de tanda: no se les puede cambiar el día desde acá.", false);
+    return;
+  }
+  let m3 = 0, empezada = false;
+  for (const r of t.filas) {
+    m3 += Number(r.m3) || 0;
+    if (r.estado && r.estado !== "pendiente") empezada = true;   // pickeada, armada o facturada
+  }
+  _pppMov = { tanda: t.tanda, np: t.filas.length, m3: m3, dias: 21, cal: [], cargando: true,
+              actual: _pppKeyISO(t.dia), actualTxt: _pgaDiaTxt(t.dia),
+              arbolFilas: t.filas, empezada: empezada, desdeArbol: true };
+  pppMovOverlay("📅 Cambiar de día — tanda " + t.tanda);
+  pppMovCargar();
+}
+window.pgaTandaMoverAbrir = pgaTandaMoverAbrir;
 async function pppReprogElegir(iso) {
   if (!_pppMov || !_pppMov.reprogNps) return;
   const nps = _pppMov.reprogNps.slice();
@@ -34758,17 +34839,7 @@ function pppMoverAbrir(tanda) {
   _pppMov = { tanda: t, np: filas.length, m3: m3, dias: 21, cal: [], cargando: true,
               actual: mm ? (mm[3] + "-" + mm[2] + "-" + mm[1]) : String(fe).slice(0, 10),
               actualTxt: mm ? (mm[1] + "/" + mm[2]) : "" };
-  _pppMovCss();
-  let o = document.getElementById("pppMovOverlay");
-  if (!o) {
-    o = document.createElement("div"); o.id = "pppMovOverlay";
-    o.innerHTML = '<div class="mv-card"><div class="mv-head"><div class="mv-title" id="pppMovTitle"></div>' +
-      '<button class="mv-close" onclick="pppMovCerrar()">Cerrar</button></div><div class="mv-body" id="pppMovBody"></div></div>';
-    o.addEventListener("click", function (e) { if (e.target === o) pppMovCerrar(); });
-    document.body.appendChild(o);
-  }
-  document.getElementById("pppMovTitle").textContent = "📅 Mover la tanda " + t + " a otro día";
-  o.classList.add("show");
+  pppMovOverlay("📅 Mover la tanda " + t + " a otro día");
   pppMovCargar();
 }
 function pppTandaAProgramar(tanda) {
@@ -37377,9 +37448,20 @@ function _pgaCuerpoHtml(dias, opts) {
     for (const t of d.tandasArr) {
       const tb = !!_pgaOpenT[t.key] || !!_pppSearch, te = _pgaEstadoGrupo(t.est, t.nps);
       h += '<tr class="pga-t e-' + te + '" onclick="pgaAbrirTanda(\'' + escapeHtml(t.key) + '\')">' +
-        '<td><span class="pga-chev">' + (tb ? "▾" : "▸") + '</span>' + escapeHtml(t.tanda) +
+        '<td><div class="pga-trow"><span class="pga-ninfo">' +
+          '<span class="pga-chev">' + (tb ? "▾" : "▸") + '</span>' + escapeHtml(t.tanda) +
           '<span class="pga-pill e-' + te + '">' + PGA_EST_TXT[te] + '</span>' +
-          '<span class="pga-sub">' + escapeHtml(_pgaZonaTanda(t)) + '</span></td>' +
+          '<span class="pga-sub">' + escapeHtml(_pgaZonaTanda(t)) + '</span></span>' +
+          // v19.11 (Thomas): "agregá un botón a cada tanda que sea Cambiar de día y que te permita
+          // asignarla en un día diferente". Va en la fila de la TANDA y acá lo heredan las dos tablas
+          // — Programación de entregas y Pedidos atrasados—, que comparten este cuerpo.
+          ((window.__isSupervisor || !PPP_READONLY)
+            ? '<span class="pga-acc"><button class="pga-acc-b dia" title="Cambiar de día — mueve TODA la tanda '
+              + escapeHtml(t.tanda) + ' a otra fecha. Se abre el calendario con los m³ que ya tiene cada día y el cupo.'
+              + ' El contenido no cambia: no hay que volver a pickear. Se guarda en el servidor, lo ven todos."'
+              + ' onclick="event.stopPropagation();pgaTandaMoverAbrir(\'' + escapeHtml(t.key) + '\')">📅 Cambiar de día</button></span>'
+            : '') +
+        '</div></td>' +
         '<td>' + _pppFmtM3(t.m3) + '</td><td></td><td>' + t.nps + '</td>' +
         _pgaPctFila(t.est, t.nps) + '</tr>';
       if (!tb) continue;

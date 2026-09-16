@@ -20746,3 +20746,66 @@ select r_idx, r_motivo from gv_ppp_web_dia_salida('[
 **Cubierto** en `tests/enviar-a-programar-deshace.cjs` (el chequeo "el chip no puede mentir sobre
 el automático" ahora exige el `cod` en el payload). **SQL y rollback**:
 `sql/gv_ppp_web_dia_salida_super_v1912.sql`. Problema 359.
+
+---
+
+### §3.gl — v19.13: «Cambiar de día» por tanda desde la TABLA (y en Pedidos atrasados) — 2026-09-16
+
+Thomas: *"PPP > Programación, vista tabla: quiero que agregues un botón a cada tanda que sea
+«Cambiar de día» y que te permita asignarla en un día diferente. Quiero que sea válido para la
+programación de entregas así como para los Pedidos atrasados"*.
+
+El botón es front (`pgaTandaMoverAbrir` → el pop-up de días que ya existía desde la v14.04) y vive
+en la fila de la TANDA de `_pgaCuerpoHtml`, que es el cuerpo que **comparten** la tabla de
+Programación y el submódulo de Pedidos atrasados: una sola copia, aparece en las dos. Los datos del
+pop-up (cuántos pedidos, cuántos m³, qué día tiene hoy) salen del **árbol** (`_pgaRows` /
+`_patrRows`) y no de `_pppParsed.prog`, que es de donde los saca el botón de la vista clásica y que
+sólo tiene de hoy en adelante — con eso, en atrasados el pop-up habría dicho "0 pedidos · 0 m³".
+
+**Lo del backend son las dos cosas que hacían que en atrasados el botón no sirviera para nada:**
+
+**1) La tanda empezada.** `gv_ppp_tanda_mover` (v13.87) rechazaba cualquier tanda con UN evento de
+operario. Medido el 16/09: las **8 de 8** tandas atrasadas tienen eventos y las 8 tienen TAP
+(armadas), o sea que el submódulo entero rebotaba. Y es al revés: un pedido atrasado es
+precisamente uno que ya se pickeó y se armó y cuyo camión no salió; cambiarle el día no obliga a
+rehacer nada. Ahora la firma es de 4 argumentos —la de 3 se dropeó a propósito— y `p_forzar` es el
+sí explícito del supervisor. Sin él, el error empieza con `TANDA_EMPEZADA:` para que el front lo
+reconozca, pregunte y reintente.
+
+**2) La tanda que ya no está en la programación.** El árbol tiene cuatro fuentes y las dos últimas
+—`Facturacion_NP` (`fact`) y `GV_PPP_Entregados_Historico` (`hist`)— no viven en ninguna tabla de
+programación: `gv_ppp_tanda_mover` contestaba *"No encontré la tanda D53C"*. Ahora la rama de ISIS
+levanta también las NP de `Facturacion_NP` por tanda, y `gv_ppp_prog_arbol` respeta
+`GV_PPP_Prog_Override.fecha_entrega` en las ramas `fact`/`hist`.
+
+**Lo que SÍ sigue bloqueado, y por qué.** Una tanda que **salió en parte** (medido: D53C 7 de 8,
+D66D 3 de 4 — 2 de las 8 atrasadas): moverla arrastraría la fecha de lo ya entregado, y mover sólo
+lo que queda la partiría en dos días, que es justo lo que prohíbe la v18.92 y lo que vigila
+`gv_ppp_tanda_dos_dias`. El mensaje dice qué hacer: separar ese pedido con el botón ↩ de su fila,
+que lo manda a una tanda NUEVA sin volver a pickear. "Salió" se define igual que en
+`gv_ppp_atrasados` (CCN vigente —sin FSS posterior— o CRN): una sola definición, no dos.
+
+**Impacto medido ANTES de tocar el árbol:** de las filas que ganan el `distinct on (np)`, 1.164 son
+`fact` y 1.687 `hist`, y **ninguna** tenía override con `fecha_entrega`. De los 10 `fact` con
+override y fecha distinta, **0** ganan el `distinct on` (todos existen además en `isis`/`web`, que
+tienen prioridad 1 y 2). O sea: el cambio no mueve una sola fila de lo que hoy se ve.
+
+**Probado contra la base real**, no leyendo la función: D66D → rechaza con el mensaje de "salió en
+parte"; E19A sin `p_forzar` → `TANDA_EMPEZADA` (11 eventos); con `p_forzar` → `movidas 1, np_web 1,
+np_isis 0, 0,043 m³`, el árbol pasa a mostrarla el 18/09 y `gv_ppp_atrasados` deja de listarla;
+vuelta al 15/09 → todo como estaba (12 atrasados, mismas 8 tandas, 0 overrides de prueba,
+`PPP_Web_Tandas.E19A` de nuevo en 2026-09-15). `gv_ppp_tanda_dos_dias` queda con las 3 filas de
+D69C que ya estaban (problema 338), ninguna nueva.
+
+⚠ **Una trampa que apareció en esa prueba y quedó anotada en el código:** `Facturacion_NP` guarda
+las NP web con su **etiqueta** (`LK 0067`), no con el número, así que el guard que evita pisar dos
+veces la misma NP tiene que comparar contra `gv_ppp_web_np_label` — con `w.np::text` le escribía un
+override al pedido web que la rama de arriba ya había movido (`np_isis` daba 1 en una tanda 100 %
+web). La fila de prueba se borró.
+
+**Cubierto** en `tests/ppp-tanda-cambiar-dia.cjs` (a: el botón está y no despliega la tanda; b: el
+pop-up con los datos del árbol; c: mueve con `p_forzar` y recarga el árbol; d: el reintento ante
+`TANDA_EMPEZADA`; e: el mismo botón en Pedidos atrasados). **SQL**:
+`sql/gv_ppp_tanda_mover_v1911.sql` y `sql/gv_ppp_prog_arbol_v1911.sql`. **Rollback**:
+`sql/backups/gv_ppp_tanda_mover_gv_ppp_prog_arbol_20260916_pre_v1911.sql` (ojo: dropear antes la
+firma de 4 argumentos, si no toda llamada de 3 queda ambigua).

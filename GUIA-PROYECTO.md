@@ -12014,6 +12014,28 @@ la falta de `CCN` no prueba nada (junio daría 274 "sin salida" que en realidad 
 
 ---
 
+### 📅 Cambiar de día — en la fila de cada tanda (v19.13, pedido de Thomas)
+
+Cada fila de **tanda** —en la tabla de *Programación de entregas* **y** en *Pedidos atrasados*,
+que comparten el mismo cuerpo— trae el botón **📅 Cambiar de día**. Abre el mismo pop-up de días
+de siempre (un botón por día, con los m³ que ya tiene, el cupo y cuánto queda) y mueve **toda la
+tanda** con `gv_ppp_tanda_mover`: se guarda en el servidor, lo ven todos, también el operario.
+
+| Estado de la tanda | Qué pasa |
+|---|---|
+| Sin empezar | se mueve directo |
+| Pickeada / armada / facturada, **sin salir** | se mueve, avisando que el contenido no cambia y **no hay que volver a pickear** (`p_forzar`) |
+| **Salió una parte** (alguna NP con Carga Camión vigente o remito) | **no se mueve** — hay que sacar el pedido que falta con el ↩ de su fila, que lo manda a una tanda NUEVA |
+| Salió entera | no se mueve: no hay nada que reprogramar |
+
+⚠ Lo de "armada se mueve igual" es el caso normal de **Pedidos atrasados**: el 16/09 las 8 de 8
+tandas atrasadas estaban armadas, así que con la regla vieja (v13.87, cualquier evento bloqueaba)
+el botón habría rebotado siempre ahí. Y lo de "salió una parte" no es prudencia de más: partir una
+tanda en dos días es lo que prohíbe la regla de la v18.92 y lo que vigila `gv_ppp_tanda_dos_dias`.
+Detalle, medición y rollback en `docs/SUPABASE-GESTION-VIRGILIO.md` §3.gl.
+
+---
+
 ### Monitor TV — `monitor/tv.html` (v18.74, pedido de Luis)
 
 Versión **liviana y de solo lectura** del tablero, para la TV colgada en planta.
