@@ -3036,9 +3036,8 @@ button.pk-anular small{ display:block; font-size:12px; font-weight:700; opacity:
 .ppp-ocup-empty{ color:#64748b; font-size:12.5px; padding:2px; }
 /* Alerta pedidos web anómalos — badge en botón PPP + banner dentro del overlay (v8.82). */
 .sup-action-btn{ position:relative; }
-.ppp-alert-badge{ position:absolute; top:6px; right:6px; min-width:20px; height:20px; line-height:20px; padding:0 5px; border-radius:999px; background:#dc2626; color:#fff; font-size:11px; font-weight:900; text-align:center; box-shadow:0 2px 6px rgba(220,38,38,.45); animation:pppAlertPulse 1.8s ease-in-out infinite; display:none; z-index:2; }
-.ppp-alert-badge.on{ display:block; }
-@keyframes pppAlertPulse{ 0%,100%{ transform:scale(1); } 50%{ transform:scale(1.15); } }
+/* v19.14 — el badge de PPP pasa a `dp-badge`, el mismo de Facturacion / Stock / RR (supSetBadge).
+   Queda a la IZQUIERDA (`left:2px` inline en el boton) porque asi lo pidio Luis. */
 .ppp-alert-banner{ display:none; width:100%; }
 .ppp-alert-banner.on{ display:block; }
 /* v9.05 — tarjetas de alerta del PPP compactas (~1/4 del tamaño): todo en una fila, botones chicos */
@@ -5709,7 +5708,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=19.14"></script>
+<script type="module" src="recepcion.js?v=19.15"></script>
 <!-- Config del módulo de fichada (compartido con fichada.html). El secret
      hmacSecret tiene que ser el mismo acá y allá; cargándolo desde un solo
      archivo evitamos que se desincronicen. -->
@@ -5802,7 +5801,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
     <!-- GRANDES: uso diario (orden definido por el usuario). "Stock y Compras" = Stocks + OC en un solo botón. -->
     <div class="sup-actions sup-primary">
       <button class="sup-action-btn" onclick="openFacturacion()" style="position:relative;"><span class="sup-ico">📋</span><span>Facturación</span><span id="facBadge" class="dp-badge" style="display:none;" title="Pedidos listos para facturar (picking + separado terminados, todavía sin facturar)"></span></button>
-      <button class="sup-action-btn" onclick="openPPP()"><span id="pppAlertBadge" class="ppp-alert-badge"></span><span class="sup-ico">🗓️</span><span>PPP</span></button>
+      <button class="sup-action-btn" onclick="openPPP()" style="position:relative;"><span class="sup-ico">🗓️</span><span>PPP</span><span id="pppAlertBadge" class="dp-badge" style="left:2px;right:auto;display:none;" title="Cosas para mirar en la PPP"></span></button>
       <button class="sup-action-btn" onclick="openRecepcionAdmin()" style="position:relative;"><span class="sup-ico">🏭</span><span>Carga Recepción Mercadería</span><span id="recepBadge" class="dp-badge" style="display:none;min-width:26px;height:26px;line-height:26px;font-size:15px;padding:0 6px;border-radius:13px;" title="Pendiente en Recepción: remitos por cargar + bajadas de racks por aprobar"></span></button>
       <button class="sup-action-btn" onclick="showFaltAvisar()" style="position:relative;"><span class="sup-ico">📦➕</span><span>Completar Pedido</span><span id="cpBadge" class="dp-badge" style="display:none;" title="Pedidos con faltante que tiene stock para completarse"></span></button>
       <button class="sup-action-btn" onclick="openStockAdmin()" style="position:relative;"><span class="sup-ico">📦</span><span>Stock y Compras</span><span id="stkBadge" class="dp-badge" style="display:none;" title="Códigos con stock negativo"></span><span id="stkOkBadge" style="display:none;position:absolute;top:2px;right:2px;min-width:18px;height:18px;padding:0 5px;border-radius:999px;background:#16a34a;color:#fff;font-size:10px;font-weight:800;line-height:18px;text-align:center;pointer-events:none;">✓</span></button>
@@ -9491,7 +9490,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v19.14";
+const APP_VERSION = "v19.15";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -39631,16 +39630,34 @@ async function pppFetchAlertasWeb() {
   } catch (_e) { return []; }
 }
 
-function pppAlertBadgeUpdate(alertas) {
+/* v19.14 (Luis: "badge rojo con número arriba a la izquierda del ícono de la PPP como con los
+   demás"). El badge existía desde la v8.82 pero NO se veía nunca, por dos motivos: contaba sólo
+   `Alertas_Pedidos_Web` pendientes —que hoy son 0— y el botón no era `position:relative`, así
+   que el badge se posicionaba contra otro ancestro. Ahora usa `supSetBadge`, el mismo que
+   Facturación, Stock y los demás: número rojo si hay algo, ✓ verde si no.
+
+   Lo que cuenta sale de `gv_ppp_avisos`, una fila por tipo de aviso con su conteo. Se agrupa por
+   COSA, no por fila: un camión mezclado cuenta 1 aunque tenga 4 pedidos adentro. */
+let _pppAvisos = [];
+async function pppFetchAvisos() {
+  try {
+    const r = await fetch(SUPABASE_URL + "/rest/v1/gv_ppp_avisos?select=tipo,titulo,n&n=gt.0&order=orden",
+      { headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY }, cache: "no-store" });
+    if (!r.ok) return [];
+    const rows = await r.json();
+    return Array.isArray(rows) ? rows : [];
+  } catch (_e) { return []; }
+}
+function pppAlertBadgeUpdate() {
   const badge = document.getElementById("pppAlertBadge");
   if (!badge) return;
-  if (alertas.length > 0) {
-    badge.textContent = alertas.length;
-    badge.classList.add("on");
-  } else {
-    badge.textContent = "";
-    badge.classList.remove("on");
-  }
+  const total = _pppAvisos.reduce(function (a, x) { return a + (parseInt(x.n, 10) || 0); }, 0);
+  if (typeof supSetBadge === "function") supSetBadge("pppAlertBadge", total);
+  // el título desglosa qué son, así no hay que entrar para saberlo
+  badge.title = total
+    ? _pppAvisos.map(function (x) { return x.n + " · " + (x.titulo || x.tipo); }).join("\n")
+    : "Sin avisos en la PPP";
+  badge.style.left = "2px"; badge.style.right = "auto";   // supSetBadge repone className, no el style
 }
 
 function pppAlertBannerRender(alertas) {
@@ -39687,7 +39704,9 @@ async function pppAlertRevisar(id, estado, btn) {
     _pppAlertasWeb = _pppAlertasWeb.filter(function (a) { return a.id !== id; });
     var card = document.querySelector('.ppp-alert-card[data-alert-id="' + id + '"]');
     if (card) card.remove();
-    pppAlertBadgeUpdate(_pppAlertasWeb);
+    // v19.14: el badge ya no cuenta sólo estas alertas, así que se relee el resumen entero
+    _pppAvisos = await pppFetchAvisos();
+    pppAlertBadgeUpdate();
     if (!_pppAlertasWeb.length) {
       var banner = document.getElementById("pppAlertBanner");
       if (banner) banner.classList.remove("on");
@@ -39717,7 +39736,8 @@ async function pppRefreshAlertasWeb() {
       } catch (_e) {}
     }
   }
-  pppAlertBadgeUpdate(_pppAlertasWeb);
+  _pppAvisos = await pppFetchAvisos();   // v19.14: el badge cuenta TODOS los avisos, no sólo éstas
+  pppAlertBadgeUpdate();
   pppAlertBannerRender(_pppAlertasWeb);
 }
 
