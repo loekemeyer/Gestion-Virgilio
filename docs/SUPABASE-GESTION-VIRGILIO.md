@@ -20289,8 +20289,13 @@ muestra**, en el front:
 - `aprSoloClienteNuevo(p)` = el pedido tiene **un solo** motivo y es `cliente_nuevo`.
 - La **columna Cuarentena** (`aprColCuarentena`) ahora filtra `aprEnCuarentena(p) && !aprSoloClienteNuevo(p)`:
   deuda / suspendido / excede crédito, más el cliente nuevo que **además** cae en uno de ésos.
-- La **pestaña nueva "🆕 Clientes nuevos"** (`clinNuevosHtml`, solapa `clinuevos` de A Programar)
-  muestra `aprEnCuarentena(p) && aprSoloClienteNuevo(p)`.
+- El **submódulo "🆕 Clientes nuevos"** (`clinNuevosHtml`) muestra `aprEnCuarentena(p) &&
+  aprSoloClienteNuevo(p)`. **v19.03 (Luis): NO es una pestaña** — va como sección DENTRO de "A
+  Programar", debajo de Cuarentena (`aprRender` la arma: `aprColPedidos() + aprColCuarentena() +
+  clinNuevosHtml()`). La pestaña `clinuevos` que se probó primero se sacó.
+- **Las dos secciones son COLAPSABLES** (v19.03): el título es el botón (`aprCuarColapsar` /
+  `aprCliColapsar`), estado por navegador en `localStorage` (`vir_cuar_colapsado`,
+  `vir_cli_colapsado`). Colapsado = sólo el título con el contador.
 - `aprEnCuarentena` **no cambió**: los dos submódulos siguen retenidos igual (no se programan solos).
 
 **El MONTO es lo único que necesitó backend** (protocolo: la valorización es lógica de negocio).
