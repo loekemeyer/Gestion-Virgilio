@@ -24,7 +24,11 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
   const b = await chromium.launch();
   // Locale/TZ del dispositivo a propósito RAROS: si el formateo dependiera del celular,
   // (A) se rompe acá. Es exactamente el caso del Samsung de Jhonny.
-  const p = await b.newPage({ locale: "en-US", timezoneId: "America/Los_Angeles" });
+  // Y el viewport es de CELULAR (360 px, el más angosto del depósito): el Resumen se mira
+  // en la mano, no en el monitor.
+  const p = await b.newPage({ locale: "en-US", timezoneId: "America/Los_Angeles",
+                              viewport: { width: 360, height: 740 }, deviceScaleFactor: 2,
+                              isMobile: true, hasTouch: true });
   const errs = []; p.on("pageerror", (e) => errs.push(e.message));
   await p.goto("file://" + path.join(__dirname, "..", "index.html"), { waitUntil: "domcontentloaded" });
 
@@ -129,6 +133,37 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
 
     // y el que anula de verdad pasa noEmit=true
     out.C_insAnular_pasa_noEmit = /closeIns\(true\)/.test(String(insAnular));
+
+    /* ===== (D) MOBILE: el Resumen mezclado entra en 360 px sin desbordar ===== */
+    const cont = document.getElementById("legajoHistoryContent");
+    if (cont) {
+      const T = new Date("2026-09-16T08:00:00-03:00").getTime();
+      const mk = (o, d, t, ms, ini) => ({ opcion: o, descripcion: d, texto: t, ts: T + ms,
+        ts_inicio_iso: ini == null ? null : new Date(T + ini).toISOString(),
+        status: "sent", id: "m" + o + ms });
+      _historyCache["776::" + getTodayKey()] = [
+        mk("EP", "Empecé Picking", "E11C", 0),
+        mk("TP", "Fin Picking", "E11C", 300000, 0),
+        mk("PB", "Paré Baño", "", 400000),
+        mk("PB", "Paré Baño", "", 546000, 400000),
+        mk("EI", "Entrega Insumos", "", 600000),            // abierto → "sin cerrar"
+        mk("FGU", "Faltó pero había en góndola", "E12A|583E:4:42,566E:3:4", 700000),
+        mk("PSP", "Picking sin planimetría", "E12A|231,232,233,537", 800000),
+        mk("FJ", "Fin de Jornada", '{"picking":9,"armado":0,"cajas":412}', 900000)
+      ];
+      renderLegajoHistory("776");
+      const ancho = cont.clientWidth;
+      out.D_sin_overflow = (document.documentElement.scrollWidth
+                          - document.documentElement.clientWidth) <= 0;
+      out.D_tarjetas_entran = [...cont.querySelectorAll(".history-item")]
+        .every(x => x.scrollWidth <= ancho + 1);
+      out.D_avisa_sin_cerrar = cont.innerHTML.indexOf("sin cerrar") >= 0;
+      out.D_muestra_desde_hasta = cont.innerHTML.indexOf("hasta") >= 0;
+      // el JSON técnico del FJ sigue oculto (no se muestra como "Dato")
+      out.D_fj_sin_json = cont.innerHTML.indexOf('"picking"') < 0;
+      delete _historyCache["776::" + getTodayKey()];
+      cont.innerHTML = "";
+    }
 
     ev("_enqueueReportRaw = window.__rawOrig; delete window.__rawOrig; delete window.__enc;");
     try {

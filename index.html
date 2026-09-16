@@ -209,36 +209,47 @@ button {
   color: #666;
   margin-top: 18px;
 }
-/* v19.09 — el detalle del picking (PKC) va AGRUPADO por tanda en un solo renglón, con
+/* v19.10 — el detalle del picking (PKC) va AGRUPADO por tanda en un solo renglón, con
    el detalle artículo por artículo escondido detrás de "ver detalle". Antes salía una
    tarjeta por artículo: el 16/09 el Resumen de Jhonny tenía 297 tarjetas y 247 eran
    PKC de 9 tandas, o sea casi 300 scrolls para ver lo que hizo. */
+/* El botón se toca con el DEDO, y con guantes: 44 px de alto mínimo (medido a 360/390/412 px
+   daba 25 px, que es lo que sale del padding chico y no alcanza). `width:auto` porque el
+   `button{width:100%}` global —deuda conocida de la línea 25— lo estiraba de punta a punta. */
 .history-item .pkc-ver{
-  display: inline-block;
-  margin-top: 6px;
-  padding: 4px 10px;
+  display: inline-flex;
+  align-items: center;
+  margin-top: 8px;
+  padding: 10px 16px;
+  min-height: 44px;
   border: 1px solid #94a3b8;
-  border-radius: 8px;
+  border-radius: 10px;
   background: #f1f5f9;
   color: #334155;
-  font-size: 13px;
+  font-size: 15px;
   font-weight: 700;
   cursor: pointer;
-  width: auto;                /* el button{width:100%} global lo estiraba de punta a punta */
+  width: auto;
   text-transform: none;
+  -webkit-tap-highlight-color: rgba(51,65,85,.2);
 }
-.history-item .pkc-det{ margin-top: 6px; }
+.history-item .pkc-ver:active{ background: #e2e8f0; }
+.history-item .pkc-det{ margin-top: 8px; }
 .history-item .pkc-det.hidden{ display: none; }
+/* Lista de 27 renglones leída a un brazo de distancia: 14 px como el resto de la tarjeta
+   (no 13) y aire suficiente entre líneas para no saltearse una. */
 .history-item .pkc-art{
   display: flex;
   justify-content: space-between;
   gap: 10px;
-  padding: 3px 0;
+  padding: 7px 2px;
   border-top: 1px dashed #cbd5e1;
-  font-size: 13px;
+  font-size: 14px;
+  line-height: 1.25;
 }
-.history-item .pkc-art b{ font-variant-numeric: tabular-nums; }
+.history-item .pkc-art b{ font-variant-numeric: tabular-nums; white-space: nowrap; }
 .history-item .pkc-falta{ color: #b45309; }   /* ámbar: levantó menos de lo pedido */
+.history-item .pkc-art.pkc-falta{ font-weight: 700; }   /* el faltante, además, en negrita */
 
 .row { display: grid; gap: 8px; margin-top: 13px; }
 .row-6 { grid-template-columns: repeat(6, minmax(0, 1fr)); }
@@ -5690,7 +5701,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=19.09"></script>
+<script type="module" src="recepcion.js?v=19.10"></script>
 <!-- Config del módulo de fichada (compartido con fichada.html). El secret
      hmacSecret tiene que ser el mismo acá y allá; cargándolo desde un solo
      archivo evitamos que se desincronicen. -->
@@ -6466,7 +6477,7 @@ function formatDur(ms) {
    descarta la apertura que le corresponde. La apertura que NO tiene cierre sobrevive
    marcada con `_abierto` — eso deja A LA VISTA del operario los RI/EI que quedan
    colgados, que hoy no se ven en ninguna parte. Problema 345. */
-/* v19.09 — EL DETALLE DEL PICKING, UNA LÍNEA POR TANDA (pedido de Luis, 16/09).
+/* v19.10 — EL DETALLE DEL PICKING, UNA LÍNEA POR TANDA (pedido de Luis, 16/09).
    Cada artículo confirmado emite su propio evento PKC, y el Resumen los mostraba de a una
    tarjeta: el 16/09 el de Jhonny (lg 277) tenía **297 tarjetas, 247 de ellas PKC de 9
    tandas** — para ver lo que hizo tenía que scrollear casi 300 veces. Acá los PKC de una
@@ -6887,7 +6898,7 @@ function _renderHistoryWithRemote(legajo, localHist, remoteHist) {
   combined.sort((a, b) => (b.ts || b.createdAt || 0) - (a.ts || a.createdAt || 0));
   container.className = "history-list";
   // v19.02: un renglón por tarea (el cierre se come su apertura).
-  // v19.09: y el detalle del picking va agrupado por tanda (247 tarjetas → 9).
+  // v19.10: y el detalle del picking va agrupado por tanda (247 tarjetas → 9).
   const filas = _histColapsarPares(_histAgruparPkc(combined));
   // El orden se rearma: el grupo de PKC se mueve al ts de su último artículo.
   filas.sort((a, b) => (b.ts || b.createdAt || 0) - (a.ts || a.createdAt || 0));
@@ -7095,7 +7106,7 @@ function openHistoryModal() {
     previas.forEach(d => d.items.sort((a, b) => (b.ts || 0) - (a.ts || 0)));
     content.innerHTML = previas.map(d => {
       // v19.02: mismo renglón único que el Resumen de hoy.
-      // v19.09: y el picking agrupado por tanda. Acá los PKC casi nunca aparecen —
+      // v19.10: y el picking agrupado por tanda. Acá los PKC casi nunca aparecen —
       // `pkSendDetail` no escribe en el historial LOCAL, que es lo único que lee este
       // modal— pero si alguno llega, no inunda el día. Sin botón de detalle a propósito:
       // el CSS y los id del desplegable son del Resumen (`.history-item`), y repetir esos
@@ -9472,7 +9483,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v19.09";
+const APP_VERSION = "v19.10";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción

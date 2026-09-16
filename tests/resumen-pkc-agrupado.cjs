@@ -16,7 +16,9 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
 
 (async () => {
   const b = await chromium.launch();
-  const p = await b.newPage();
+  // Celular, no escritorio: el Resumen lo miran los operarios en la mano.
+  const p = await b.newPage({ viewport: { width: 360, height: 740 }, deviceScaleFactor: 2,
+                              isMobile: true, hasTouch: true });
   const errs = []; p.on("pageerror", (e) => errs.push(e.message));
   await p.goto("file://" + path.join(__dirname, "..", "index.html"), { waitUntil: "domcontentloaded" });
 
@@ -97,11 +99,65 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
       out.E_tarjetas_9 = cont.querySelectorAll(".history-item").length === 9;
       out.E_hay_desplegables = cont.querySelectorAll(".pkc-det").length === 9;
       out.E_todos_cerrados = cont.querySelectorAll(".pkc-det.hidden").length === 9;
+      /* ---- (F) MOBILE: se usa en el celular, con el dedo y a veces con guantes ----
+         Medido a 360 px (el celu más angosto que hay en el depósito). El botón daba 25 px
+         de alto con el padding original — abajo del mínimo para un dedo— y el `.pkc-art`
+         venía en 13 px. Las dos cosas se corrigieron; acá quedan clavadas. */
+      const cs = getComputedStyle(document.documentElement);
+      out.F_sin_overflow_pagina = (document.documentElement.scrollWidth
+                                 - document.documentElement.clientWidth) <= 0;
+      const anchoCont = cont.clientWidth;
+      out.F_tarjetas_entran = [...cont.querySelectorAll(".history-item")]
+        .every(x => x.scrollWidth <= anchoCont + 1);
+      const bt2 = cont.querySelector(".pkc-ver");
+      const rb = bt2.getBoundingClientRect();
+      out.F_boton_44px    = Math.round(rb.height) >= 44;      // tocable con el dedo
+      out.F_boton_no_full = rb.width < anchoCont * 0.8;       // el button{width:100%} global
+      // el detalle abierto tampoco desborda, y se lee a 14 px
+      histTogglePkc(cont.querySelector(".pkc-ver").id.replace("pkcver_", ""));
+      const det2 = cont.querySelector(".pkc-det:not(.hidden)");
+      out.F_detalle_entra = !!det2 && det2.scrollWidth <= det2.clientWidth + 1;
+      out.F_art_no_desborda = [...det2.querySelectorAll(".pkc-art")]
+        .every(a => a.scrollWidth <= a.clientWidth + 1);
+      out.F_art_14px = getComputedStyle(det2.querySelector(".pkc-art")).fontSize === "14px";
+      out.F_sin_overflow_abierto = (document.documentElement.scrollWidth
+                                  - document.documentElement.clientWidth) <= 0;
+      void cs;
+
       delete _historyCache["777::" + getTodayKey()];
       cont.innerHTML = "";
+      _pkcAbiertos.clear();
     }
     return out;
   });
+
+  /* (G) el toque REAL con el dedo abre y cierra — no alcanza con llamar a la función. */
+  const tap = await p.evaluate((n) => {
+    const c = document.getElementById("legajoHistoryContent");
+    const T0 = new Date("2026-09-16T09:00:00-03:00").getTime();
+    const filas = [];
+    for (let a = 0; a < 6; a++) {
+      filas.push({ opcion: "PKC", descripcion: "Picking artículo",
+        texto: "E11C|" + (500 + a) + "|2|2|0|LK", ts: T0 + a * 1000,
+        ts_inicio_iso: null, status: "sent", id: "t" + a });
+    }
+    _historyCache["778::" + getTodayKey()] = filas;
+    renderLegajoHistory("778");
+    return !!c.querySelector(".pkc-ver");
+  });
+  let tapOk = false;
+  if (tap) {
+    const bt = p.locator(".pkc-ver").first();
+    await bt.tap();
+    const abrio = await p.evaluate(() => {
+      const d = document.querySelector(".pkc-det");
+      return !!d && !d.classList.contains("hidden");
+    });
+    await bt.tap();
+    const cerro = await p.evaluate(() => document.querySelector(".pkc-det").classList.contains("hidden"));
+    tapOk = abrio && cerro;
+  }
+  r.G_toque_real_abre_y_cierra = tapOk;
 
   const claves = Object.keys(r);
   const malas = claves.filter(k => r[k] !== true);
