@@ -427,3 +427,53 @@ pero con la función real.
 | El armado se vuelve más lento (el cron corre cada 5 min) | el cálculo es sobre ≤ 40 paradas por corrida; `gv_km` es `immutable` y la ruta es O(n²) con n chico. Medir igual: hoy la corrida entera son 8,0 s |
 | Alguien toca las tablas de sectores esperando que sigan mandando | quedan como veto y etiqueta; hay que decirlo en `docs/SUPABASE-GESTION-VIRGILIO.md` y en `GUIA-PROYECTO.md` el mismo día |
 | Se pierde el `security_invoker` al reemplazar una vista | el chequeo del `CLAUDE.md`, sí o sí, después de cada `create or replace view` |
+
+---
+
+## 14. La sombra, corrida de verdad (v19.25 · 16/09/2026)
+
+Luis aprobó los tres números — **radio 3,5 km CABA / 5 km GBA**, **3 días hábiles de espera**, y el
+**techo de 8 h RETIENE** — así que el algoritmo se implementó y se corrió contra la programación
+real. **Nada del armado vivo cambió**: `ppp_web_armar_tandas` sigue igual y `geo_armado_activo = 0`.
+
+Se crearon `gv_km`, `gv_ppp_web_punto`, `gv_ppp_ruta_orden`, `gv_ppp_ruta_horas`,
+`gv_ppp_web_agrupar_geo`, `gv_ppp_web_sombra` y `gv_ppp_web_sombra_detalle`
+(`sql/gv_armado_geo_sombra_v1925.sql`, doc de Supabase §3.ij). Se corre con:
+
+```sql
+select * from public.gv_ppp_web_sombra('2026-09-08','2026-09-23');
+```
+
+### Resultado (12 días, 140 paradas, web + ISIS, sin Retira)
+
+| escenario | viajes | tandas | m³/tanda | km | horas | fletero-días | flacos | días > 2 fleteros |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|
+| hoy | 34 | 79 | 0,771 | 1.805 | 99,5 | 19 | 13 | **1** |
+| sombra | **25** | 77 | **0,791** | **1.492** | **88,3** | **16** | **6** | **0** |
+
+**−26 % viajes · −17 % km · −11 % horas · −16 % fletero-días**, y la tanda queda **más llena**, no
+más vacía — que era el riesgo de compactarla. Viernes 11/09: de 6 viajes (10,0 h de camión) a 2
+(6,5 h, 1 fletero).
+
+Invariantes sobre el plan completo, **todos en cero**: tandas o viajes que mezclan súper con
+clientes, tandas que cruzan la ruta Sur-Oeste/Norte, tandas por encima del diámetro, paradas sin
+ubicación. **Jazquel el 21/09 sale partido en dos tandas de dos viajes, el mismo día** — la regla
+de Luis, por construcción.
+
+### Tres cosas que aparecieron sólo al CORRER
+
+1. **`\b` en Postgres es BACKSPACE, no límite de palabra** (eso es `\y`). Los tres regex de zona no
+   matcheaban nunca: todo corría con los radios de GBA y la ruta salía `'?'`.
+2. **El radio de viaje de 12/25 km empeoraba dos días**: parte corredores que están *en el camino*
+   (Luján–Moreno, Pilar–San Isidro). Quedó en **20/60**, y se separó del radio de tanda, que es
+   otra cosa: **5/8 km con diámetro 9** da mismas tandas y mejor llenado que 3,5/5 con diámetro 6.
+3. **El paracaídas por código de cliente pisaba la sucursal.** "Donofrio 128- Ciudadela" de Jazquel
+   sí está geocodificada (como "Donofrio 128"), pero no matchea por texto, así que devolvía la
+   sucursal de Balvanera a 13 km. Corregido exigiendo el mismo barrio. **El front todavía lo
+   tiene** (problema 368): hoy el mapa y las horas de la PPP ubican esa parada en Capital.
+
+### Lo que falta
+
+**R5 — mover el pedido de día todavía no está en la sombra**: lo de arriba es sólo reagrupar
+dentro del día. Medido aparte, **4 de los 5 viajes flacos** que quedan tienen camión cerca dentro
+de 3 días hábiles (08→09/09, 15→16/09, 16→17/09, 17→21/09); el quinto (22/09) no tiene a dónde ir.

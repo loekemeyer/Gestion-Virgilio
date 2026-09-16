@@ -21100,7 +21100,7 @@ ese número; el bump final fue **v19.19** por colisión con otra sesión — el 
 
 ---
 
-## §3.it — v19.23: la productividad cuenta HORAS ACTIVAS, no horas de reloj — 2026-09-16
+## §3.it — v19.25: la productividad cuenta HORAS ACTIVAS, no horas de reloj — 2026-09-16
 
 **Pedido de Luis, textual:** *"debería solo contar horas activas. si está 1 hora pickeando algo,
 termina el día y después de 14 horas comienza el siguiente día y en 30min de trabajo lo cierra,
@@ -21229,7 +21229,7 @@ fallback, así que la diferencia aplicaba a **todos** los cruces. Se alineó al 
 | 8 armado | 443,7 min | 319,5 | la vista **topea cada cierre** (TAP 180, TP 120): `E11A` 271,6 → 180 y `D72A` 171,6 → 139,5 |
 
 Las dos son **protecciones de la métrica de productividad, no del tablero**, y ya existían
-antes de la v19.23 — también para cierres del mismo día (`D72A` es del mismo día y difiere
+antes de la v19.25 — también para cierres del mismo día (`D72A` es del mismo día y difiere
 igual). La vista además descarta las tandas con `ritmo_roto`. El monitor es la reconstrucción
 en vivo del día; la vista es la métrica con topes y outliers afuera. **Lo que tenía que ser
 igual —el criterio de horas activas— ahora es igual.**
@@ -21239,4 +21239,95 @@ datos reales de un día por interceptación (hay un script de referencia en el s
 sesión, `mon-vs-vista.cjs`) y comparar contra `vista_productividad_diaria` de ese día. Leer
 las dos implementaciones no alcanza: la diferencia de la fichada no se veía en el código, se
 vio en los números.
+---
 
+## §3.ij — v19.25: armado de tandas por CERCANÍA REAL, en modo SOMBRA — 2026-09-16
+
+**Pedido de Luis.** Hoy el armado decide dónde va un pedido con una cadena de tablas cargadas a
+mano — `Zonas_Barrios` (145) → zona, `GV_Barrios_Sector` (109) → sector, `GV_Sectores` (14) →
+camión, más `GV_Sectores_Vecinos` (27) y `GV_Barrios_Pares` (23): **318 filas para contestar una
+pregunta que es de distancia**, y ninguna sabe dónde queda la parada. La base sí: `GV_Geo_Cliente`
+tiene 1.031 direcciones con lat/lng y el **94,1 %** de las paradas programadas resuelven punto. Ese
+dato hoy **sólo** alimenta el aviso de jornada del front (`_pppJornadaCam`): **cero funciones y cero
+vistas del armado referencian `GV_Geo_Cliente`**.
+
+Esta entrada es **sombra**: nada del armado vivo cambió. `ppp_web_armar_tandas` sigue igual y
+`geo_armado_activo = 0`. Lo nuevo sólo calcula y devuelve el plan.
+
+### Qué se creó
+
+| función | para qué |
+|---|---|
+| `gv_km(lat1,lng1,lat2,lng2)` | haversine, `immutable` |
+| `gv_ppp_web_punto(cod, dir, barrio, zona)` | ubicación de una parada: dirección exacta → `PPP_Geo` → código de cliente **del mismo barrio** → centroide del barrio |
+| `gv_ppp_ruta_orden(pts)` | orden de paradas por vecino más cercano desde el depósito |
+| `gv_ppp_ruta_horas(pts, paradas)` | km y horas del viaje — **la misma cuenta que `_pppJornadaCam`**, que hasta hoy sólo existía en JS |
+| `gv_ppp_web_agrupar_geo(paradas)` | el núcleo: viajes por cercanía + tandas cortadas en el orden de la ruta |
+| `gv_ppp_web_sombra(desde, hasta)` | una fila `hoy` y una `sombra` por día |
+| `gv_ppp_web_sombra_detalle(desde, hasta)` | el plan parada por parada |
+
+Todas con `EXECUTE` revocado a `anon`. Parámetros nuevos en `PPP_Web_Config` (los tres que aprobó
+Luis y los calibrados): `geo_armado_activo`, `geo_fallback_tabla`, `radio_tanda_km(_gba)`,
+`tanda_diam_max_km`, `radio_viaje_km(_gba)`, `viaje_corta_por_ruta`, `radio_dia_km(_gba)`,
+`dia_espera_max_habiles`, `ruta_horas_guard`, `deposito_lat/lng`. SQL:
+`sql/gv_armado_geo_sombra_v1923.sql`.
+
+### La distinción que ordena todo
+
+> **La tanda es la unidad de PICKING. El viaje es la unidad de LOGÍSTICA.**
+
+Dos tandas a 300 m van igual en el mismo camión: eso no cuesta km, cuesta un armado de más. Lo que
+cuesta plata es mandar un camión a GBA Norte por una parada de 0,3 m³. Por eso hay **dos radios**:
+`radio_tanda_km` (compacta el picking) y `radio_viaje_km` (mucho más grande: la ruta barre).
+
+### Medición — ventana 2026-09-08 a 2026-09-23 (12 días, 140 paradas, web + ISIS, sin Retira)
+
+| escenario | viajes | tandas | m³/tanda | km | horas | fletero-días | flacos | días > 2 fleteros |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|
+| hoy (camión = prefijo de tanda, como agrupa el front) | 34 | 79 | 0,771 | 1.805 | 99,5 | 19 | 13 | **1** |
+| sombra | **25** | 77 | **0,791** | **1.492** | **88,3** | **16** | **6** | **0** |
+
+**−26 % viajes · −17 % km · −11 % horas · −16 % fletero-días**, y la tanda queda **más llena**, no
+más vacía. El día más claro es el viernes 11/09: hoy 6 viajes (2,4 + 1,9 + 1,8 + 1,4 + 1,3 + 1,2 h)
+→ sombra 2 viajes, 97 km, 6,5 h, 1 fletero.
+
+Invariantes sobre el plan completo, **todos en cero**: tandas que mezclan súper con clientes,
+viajes que los mezclan, tandas que cruzan la ruta so/n, tandas con diámetro mayor al tope, paradas
+sin ubicación. El caso **Jazquel (3814) del 21/09** — el que motivó la regla de Luis — sale
+partido en dos tandas de **dos viajes** (Balvanera/Once en la ruta so, Ciudadela en la n) **el
+mismo día**, que es exactamente lo pedido.
+
+### Tres cosas que sólo aparecieron al CORRER (ninguna leyendo el código)
+
+1. **`\b` en Postgres es BACKSPACE, no límite de palabra** (eso es `\y`). Los tres regex de zona
+   estaban escritos `'^\s*Zona\s*[1-4]\b'` y **no matcheaban nunca**: todo corría con los radios de
+   GBA y la ruta salía `'?'` para todas las paradas. Se ve en la columna `ruta` del detalle.
+2. **El radio de viaje de 12/25 km empeoraba dos días** (16 y 22/09): parte corredores que están
+   "en el camino" (Luján–Moreno, Pilar–San Isidro). Quedó en **20/60**.
+3. **El paracaídas por código de cliente pisaba la sucursal.** "Donofrio 128- Ciudadela" de Jazquel
+   **sí** está geocodificada (como "Donofrio 128"), pero no matchea por texto, así que el paso 3
+   devolvía la sucursal de Balvanera, a 13 km — y el armado las ponía en la misma tanda. Se
+   corrigió exigiendo el mismo barrio. **El front sigue teniendo ese defecto** (problema 368).
+
+### Problemas abiertos que salieron de acá
+
+- **368** — el mapa y las horas de la PPP ubican una sucursal en la dirección de otra del mismo
+  cliente (`_pppGeoDe` de `index.html`).
+- **369** — `gv_ppp_web_camion` no consulta `GV_Supers`: Dorinka (E11B) comparte la etiqueta de
+  camión *GBA Oeste* con E20A/E20B, que son clientes comunes. Quinta aparición de la familia
+  "súper con zona numérica"; el centinela no lo ve porque define camión como los 3 primeros
+  caracteres del código de tanda.
+
+### Lo que falta
+
+- **R5 — mover el pedido de día** (los 3 días hábiles que aprobó Luis) **todavía no está en la
+  sombra**: lo medido arriba es sólo reagrupar dentro del día. Medido aparte, **4 de los 5 viajes
+  flacos** que quedan tienen camión cerca dentro de 3 días hábiles (08→09/09, 15→16/09, 16→17/09,
+  17→21/09); el quinto (22/09) no tiene a dónde ir.
+- Prender `geo_armado_activo` exige además enchufar `gv_ppp_web_agrupar_geo` dentro de
+  `ppp_web_armar_tandas` (hoy no lo llama nadie) y correr el armador de verdad con `p_filas` de
+  prueba en una transacción abortada, caso por caso.
+
+**Rollback**: no hace falta (nada vivo cambió). Para borrar la sombra:
+`drop function gv_ppp_web_sombra_detalle, gv_ppp_web_sombra, gv_ppp_web_agrupar_geo, gv_ppp_ruta_horas, gv_ppp_ruta_orden, gv_ppp_web_punto, gv_km;`
+y borrar las claves nuevas de `PPP_Web_Config`.
