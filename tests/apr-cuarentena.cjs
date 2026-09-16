@@ -150,7 +150,12 @@ catch (_e) {
     out.cliNuevosCuenta = /🆕 Clientes nuevos <b>\(1\)<\/b>/.test(html);
     out.nuevoCodChip = /cuar-card-cod[^>]*>CH 2533</.test(html);
     out.cliNuevosSinMixto = !/Cliente Nuevo Deudor/.test(html);
-    _pppTab = "prog";
+    // (3c) v18.99 — el botón "👁 Ver ejemplo" agrega una fila EJEMPLO con su monto, sin sumar al badge.
+    _apr.cliDemo = true; pppRenderProg(); await new Promise((res) => setTimeout(res, 50));
+    html = document.getElementById("pppPreview").innerHTML;
+    out.cliDemoFila = /cuar-demo-tag">EJEMPLO</.test(html) && /\$120\.480/.test(html);
+    out.cliDemoNoCuenta = /🆕 Clientes nuevos <b>\(1\)<\/b>/.test(html);
+    _apr.cliDemo = false; _pppTab = "prog";
     out.nuevoEtq = aprCuarentenaEtiqueta({ cuarentena_motivos: ["cliente_nuevo"] });
 
     // (4) v17.13 — "Ya programados" es una TABLA, con aprobación y librito de comentarios
@@ -499,6 +504,8 @@ catch (_e) {
   chk(r.cliNuevosCuenta, "pestaña 'Clientes nuevos': muestra el pedido puro (1)");
   chk(r.nuevoCodChip, "cliente nuevo de Chef: el chip dice CH 2533 (en Clientes nuevos)");
   chk(r.cliNuevosSinMixto, "el pedido mixto (deuda+nuevo) NO aparece en Clientes nuevos");
+  chk(r.cliDemoFila, "'Ver ejemplo' muestra una fila EJEMPLO con su monto ($120.480)");
+  chk(r.cliDemoNoCuenta, "el ejemplo NO suma al badge (sigue en 1 real)");
   chk(r.nuevoEtq === "Cliente nuevo", "etiqueta de cliente_nuevo = 'Cliente nuevo'");
   chk(r.ypTabla, "ya programados: es una tabla con columnas NP / … / Enviar a");
   chk(r.ypSinColAprob, "ya programados: sin columna Aprobación (el aprobado sale de la lista)");

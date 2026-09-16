@@ -20317,3 +20317,8 @@ ahí el monto queda en "—".
 **Rollback:** `drop function public.gv_clientes_nuevos_valor_lote(jsonb);` y revertir el front
 (el commit de v18.98). El front aguanta sin la RPC: `clinNuevosValorCargar` es best-effort → la
 columna Monto muestra "—" y nada más se rompe.
+
+**v18.99 (Luis, 2026-09-16):** botón **"👁 Ver ejemplo"** en la pestaña (igual que el pedido de
+prueba de Cuarentena), `clinDemoPedido` / `clinDemoRowHtml` / `clinDemoToggle` con `_apr.cliDemo`.
+Agrega una fila EJEMPLO (cliente nuevo puro, monto de muestra $120.480) sin sumar al badge. Sirve
+para ver el submódulo aunque hoy no haya ningún cliente nuevo real. Cubierto en `tests/apr-cuarentena.cjs`.

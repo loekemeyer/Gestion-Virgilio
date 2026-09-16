@@ -5650,7 +5650,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=18.98"></script>
+<script type="module" src="recepcion.js?v=18.99"></script>
 <!-- Config del módulo de fichada (compartido con fichada.html). El secret
      hmacSecret tiene que ser el mismo acá y allá; cargándolo desde un solo
      archivo evitamos que se desincronicen. -->
@@ -9233,7 +9233,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v18.98";
+const APP_VERSION = "v18.99";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -43629,6 +43629,7 @@ async function clinNuevosValorCargar() {
   if (_pppTab === "clinuevos") pppRenderProg();
 }
 function clinNuevosValorFmt(p) {
+  if (p && p._demo) return '<b title="Ejemplo — precio total por lista (neto, sin IVA)">' + cuarPlata(120480) + '</b>';
   if (p && p._isis) return '<span class="cuar-yp-sin" title="El monto por lista se valoriza sobre los pedidos de la página; este entró por ISIS con NP propia">—</span>';
   if (_apr.cliValor === null) return '<span class="cuar-yp-sin">…</span>';
   const v = (_apr.cliValor || {})[aprKey(p.empresa, p.order_id)];
@@ -43638,17 +43639,20 @@ function clinNuevosValorFmt(p) {
 }
 function clinNuevosHtml() {
   const cargando = !_apr.listo || aprCargandoAlgo();
-  const lista = (_apr.pedidos || []).filter(function (p) { return aprEnCuarentena(p) && aprSoloClienteNuevo(p); });
+  let lista = (_apr.pedidos || []).filter(function (p) { return aprEnCuarentena(p) && aprSoloClienteNuevo(p); });
   if (_apr.cuarContacto === null && !_apr.cuarContactoLoading && lista.some(function (p) { return !p._demo; })) cuarContactoCargar();
   clinNuevosValorNeed();
+  const realN = lista.length;   // el badge cuenta los reales, no el ejemplo
+  if (_apr.cliDemo) lista = [clinDemoPedido()].concat(lista);   // v18.99: fila de ejemplo (como Cuarentena)
   let h = '<div class="apr-col apr-col-cuar' + (cargando ? ' apr-col-cargando' : '') + '">' +
-    '<div class="apr-col-t">🆕 Clientes nuevos <b>(' + (cargando ? '…' : lista.length) + ')</b>' +
+    '<div class="apr-col-t">🆕 Clientes nuevos <b>(' + (cargando ? '…' : realN) + ')</b>' +
       '<span class="apr-cuar-help" title="Pedidos de CLIENTES NUEVOS (código alto y menos de 3 pedidos facturados en toda su historia). Si además tienen deuda, están suspendidos o superan su límite de crédito, NO caen acá: quedan en Cuarentena. No se programan solos: hay que liberarlos primero.">ⓘ</span>' +
-    '</div>';
+    '</div>' +
+    clinDemoRowHtml();
   if (!lista.length) {
     h += cargando
       ? '<div class="apr-cargando apr-cargando-cuar"><span class="apr-cargando-ic">⏳</span><b>Todavía controlando…</b></div>'
-      : '<div class="apr-vacio">Sin pedidos de clientes nuevos. Acá caen los pedidos de <b>clientes nuevos</b> sin ningún otro problema; si tienen <b>deuda</b>, están <b>suspendidos</b> o <b>superan su límite</b>, quedan en <b>Cuarentena</b>.</div>';
+      : '<div class="apr-vacio">Sin pedidos de clientes nuevos. Acá caen los pedidos de <b>clientes nuevos</b> sin ningún otro problema; si tienen <b>deuda</b>, están <b>suspendidos</b> o <b>superan su límite</b>, quedan en <b>Cuarentena</b>. Tocá <b>👁 Ver ejemplo</b> para ver cómo se vería un cliente.</div>';
     return h + '</div>';
   }
   h += '<div class="cuar-tblwrap"><table class="cuar-tbl"><thead><tr>' +
@@ -43657,12 +43661,13 @@ function clinNuevosHtml() {
     '</tr></thead><tbody>';
   for (const p of lista) {
     const cid = "n" + p.empresa + p.order_id, cab = !!_apr.exp[cid];
-    const np = aprPedLabel(p);
+    const np = p._demo ? "web LK 9999" : aprPedLabel(p);
     const nblo = Number(p.np_total) || ((p.bloques && p.bloques.length) || 1);
-    h += '<tr class="cuar-tr' + (cab ? ' cuar-tr-open' : '') + '">' +
+    h += '<tr class="cuar-tr' + (p._demo ? ' cuar-tr-demo' : '') + (cab ? ' cuar-tr-open' : '') + '">' +
       '<td class="cuar-td-np" onclick="aprToggle(\'' + cid + '\')" title="Ver qué pidió (códigos y cajas)">' +
         '<span class="apr-card-chev">' + (cab ? "▾" : "▸") + '</span>' +
         '<span class="cuar-card-np">' + escapeHtml(np) + '</span>' +
+        (p._demo ? '<span class="cuar-demo-tag">EJEMPLO</span>' : '') +
         (nblo > 1 ? '<span class="cuar-demo-tag" title="Este pedido se parte en ' + nblo + ' NP">' + nblo + ' NP</span>' : '') +
       '</td>' +
       '<td class="cuar-td-fecha">' + cuarFechaPedidoHtml(p) + '</td>' +
@@ -43676,6 +43681,25 @@ function clinNuevosHtml() {
   }
   return h + '</tbody></table></div></div>';
 }
+/* v18.99 (Luis, 2026-09-16): fila de EJEMPLO para "Clientes nuevos", igual que el pedido de
+   prueba de Cuarentena. Un cliente nuevo puro (único motivo cliente_nuevo), con contenido para
+   que la flechita muestre algo y con monto de ejemplo. No es un pedido real. */
+function clinDemoPedido() {
+  const items = [{ art: "505", uni: 24, uxb: 12, cajas: 2 }, { art: "221", uni: 48, uxb: 12, cajas: 4 }];
+  let hoy = ""; try { hoy = new Date().toISOString().slice(0, 10); } catch (_e) {}
+  return { order_id: "EJEMPLO", empresa: "lk", cod: "4223", razon_social: "CLIENTE NUEVO DE EJEMPLO S.A.",
+           zona: "Zona 1 - CABA Sur", localidad: "Barracas", direccion: "Av. de Ejemplo 1234",
+           m3: 0.30, lineas: 2, cajas: 6, np_total: 1, fecha_recep: hoy,
+           bloques: [{ np_idx: 1, m3: 0.30, lineas: 2, cajas: 6, items: items }],
+           cuarentena_motivos: ["cliente_nuevo"], cuarentena_detalle: { nuevo_pedidos: 1 }, _demo: true };
+}
+function clinDemoRowHtml() {
+  return '<div class="cuar-demo-row">' +
+    '<span class="cuar-demo-hint">Ejemplo de cómo se ve un cliente nuevo. No es un pedido real.</span>' +
+    '<button class="cuar-demo-btn" onclick="clinDemoToggle()">' +
+    (_apr.cliDemo ? "✕ Quitar ejemplo" : "👁 Ver ejemplo") + '</button></div>';
+}
+function clinDemoToggle() { _apr.cliDemo = !_apr.cliDemo; pppRenderProg(); }
 /* v16.57 (problema 14) — "YA PROGRAMADOS con el cliente en cuarentena".
    La Cuarentena sólo mira lo que TODAVÍA NO tiene tanda: gv_cuarentena_marcar corre adentro del
    armado, sobre los pendientes. Si el reporte de deuda entra DESPUÉS de que el pedido ya recibió
