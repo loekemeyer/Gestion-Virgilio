@@ -152,6 +152,10 @@ catch (_e) {
     out.cliNuevosCuenta = /🆕 Clientes nuevos <b>\(1\)<\/b>/.test(cliSec);
     out.nuevoCodChip = /cuar-card-cod[^>]*>CH 2533</.test(cliSec);
     out.cliNuevosSinMixto = !/Cliente Nuevo Deudor/.test(cliSec);
+    // (3b-2) v19.05 — columnas nuevas: 1er contacto, Speech 1/2, Acción (Aprobar / Eliminar).
+    out.cliCols = /1er contacto/.test(cliSec) && /Acci[oó]n/.test(cliSec);
+    out.cliSpeech = /Speech 1/.test(cliSec) && /Speech 2/.test(cliSec);
+    out.cliAccion = /Aprobar pedido/.test(cliSec) && /Eliminar pedido/.test(cliSec);
     // (3c) el botón "👁 Ver ejemplo" agrega una fila EJEMPLO con su monto, sin sumar al badge.
     _apr.cliDemo = true; aprRender(); await new Promise((res) => setTimeout(res, 50));
     html = document.getElementById("pppPreview").innerHTML;
@@ -516,6 +520,9 @@ catch (_e) {
   chk(r.cliNuevosCuenta, "pestaña 'Clientes nuevos': muestra el pedido puro (1)");
   chk(r.nuevoCodChip, "cliente nuevo de Chef: el chip dice CH 2533 (en Clientes nuevos)");
   chk(r.cliNuevosSinMixto, "el pedido mixto (deuda+nuevo) NO aparece en Clientes nuevos");
+  chk(r.cliCols, "Clientes nuevos tiene columnas '1er contacto' y 'Acción'");
+  chk(r.cliSpeech, "Contacto tiene los botones 'Speech 1' y 'Speech 2'");
+  chk(r.cliAccion, "Acción tiene 'Aprobar pedido' y 'Eliminar pedido'");
   chk(r.cliDemoFila, "'Ver ejemplo' muestra una fila EJEMPLO con su monto ($120.480)");
   chk(r.cliDemoNoCuenta, "el ejemplo NO suma al badge (sigue en 1 real)");
   chk(r.cliColapsaTitulo, "colapsar Clientes nuevos: el título con el contador (1) queda");

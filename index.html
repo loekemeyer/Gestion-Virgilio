@@ -837,6 +837,11 @@ button {
 /* v18.100 (Luis): Cuarentena y Clientes nuevos colapsables — el título es el botón. */
 .apr-col-t.apr-col-t-clic{ cursor:pointer; user-select:none; }
 .apr-col-caret{ display:inline-block; width:1em; text-align:center; opacity:.8; }
+/* v19.05 (Luis): Clientes nuevos — Speech 1/2, acción, timer del primer contacto. */
+.clin-speech, .clin-accion{ display:flex; flex-direction:column; gap:4px; align-items:stretch; }
+.clin-tiempo{ font-weight:800; white-space:nowrap; color:#9a3412; }
+.clin-td-tiempo{ white-space:nowrap; }
+.clin-7dias{ display:inline-block; margin-top:4px; font-size:11px; font-weight:800; color:#9a3412; background:#ffedd5; border:1px solid #fdba74; border-radius:6px; padding:2px 7px; }
 .apr-col-nps .apr-scroll{ display:grid; grid-template-columns:repeat(auto-fill, minmax(250px, 1fr)); gap:7px; align-items:start; }
 .apr-col-tandas .apr-scroll{ display:grid; grid-template-columns:repeat(auto-fill, minmax(280px, 1fr)); gap:7px; align-items:start; }
 .apr-col{ background:#f8fafc; border:1px solid #e2e8f0; border-radius:10px; padding:10px; min-width:0; }
@@ -42078,8 +42083,11 @@ let _apr = {
   cuarContacto: null, cuarContactoLoading: false,
   // v18.01 — CUARENTENA: cuántos comentarios tiene cada pedido retenido (empresa:order_id → n)
   cuarComN: null, cuarComNLoading: false,
-  // v18.95 — CLIENTES NUEVOS: monto por lista de cada pedido (empresa:order_id → {valor})
+  // v18.95 — CLIENTES NUEVOS: monto por lista de cada pedido (empresa:order_id → {valor, valorIva})
   cliValor: null, cliValorLoading: false,
+  // v19.05 — CLIENTES NUEVOS: primer contacto (Speech 1) y teléfono del cliente
+  cliContacto: null, cliContactoLoading: false,   // empresa:order_id → ISO del primer contacto
+  cliWpp: null, cliWppLoading: false,              // empresa:cod → teléfono del cliente
   // v18.04 — log de pedidos ANULADOS (undefined = todavía no se pidió)
   anulados: undefined, anuladosLoading: false, anuModal: false
 };
@@ -43421,7 +43429,10 @@ function aprColPedidos() {
         (p.np_total > 1 ? '<span class="apr-chip apr-chip-np">sale en ' + p.np_total + ' NP</span>' : '') +
       '</div>' +
       // v14.88: si el pedido fue LIBERADO de cuarentena, mantiene el aviso acá
-      (aprTieneCuarMotivos(p) ? '<div class="cuar-liberado-nota">🚧 Liberado de cuarentena</div>' + aprCuarBadgesHtml(p) : '');
+      (aprTieneCuarMotivos(p) ? '<div class="cuar-liberado-nota">🚧 Liberado de cuarentena</div>' + aprCuarBadgesHtml(p) +
+        // v19.05 (Luis): un cliente nuevo aprobado tiene que programarse pronto
+        (aprCuarentenaMotivos(p).indexOf("cliente_nuevo") >= 0 ? '<div class="clin-7dias">🗓️ Programar dentro de los próximos 7 días</div>' : '')
+        : '');
     // v17.57 (Luis): el detalle es el MISMO bloque que en Cuarentena — códigos, cajas y unidades.
     // v18.04 (Luis: *"agregá un botón para anular pedidos, visto debajo del detalle de la NP
     // cuando se expande"*) — va acá adentro y no en la tarjeta cerrada a propósito: anular es
@@ -43912,11 +43923,146 @@ async function clinNuevosValorCargar() {
       })
     });
     const m = {};
-    (res || []).forEach(function (r) { m[String(r.empresa) + ":" + String(r.order_id)] = { valor: Number(r.valor) }; });
+    (res || []).forEach(function (r) { m[String(r.empresa) + ":" + String(r.order_id)] = { valor: Number(r.valor), valorIva: Number(r.valor_con_iva) }; });
     _apr.cliValor = m;
   } catch (_e) { _apr.cliValor = _apr.cliValor || {}; }
   _apr.cliValorLoading = false;
   if (_pppTab === "prog") aprRender();
+}
+/* ── v19.05 (Luis) — Clientes nuevos: primer contacto (timer), teléfono del cliente, Speech 1/2 ── */
+function clinContactoNeed() { if (_apr.cliContacto === null && !_apr.cliContactoLoading) clinContactoCargar(); }
+async function clinContactoCargar() {
+  if (_apr.cliContactoLoading) return;
+  const lista = (_apr.pedidos || []).filter(function (p) { return !p._demo && aprEnCuarentena(p) && aprSoloClienteNuevo(p); });
+  if (!lista.length) { _apr.cliContacto = {}; return; }
+  _apr.cliContactoLoading = true;
+  try {
+    const res = await aprRpc("gv_cliente_nuevo_contacto_lote", {
+      p_pedidos: lista.map(function (p) { return { empresa: p.empresa || "lk", order_id: String(p.order_id) }; })
+    });
+    const m = {};
+    (res || []).forEach(function (r) { m[String(r.empresa) + ":" + String(r.order_id)] = r.primer_contacto_at; });
+    _apr.cliContacto = m;
+  } catch (_e) { _apr.cliContacto = _apr.cliContacto || {}; }
+  _apr.cliContactoLoading = false;
+  if (_pppTab === "prog") aprRender();
+}
+function clinWppNeed() { if (_apr.cliWpp === null && !_apr.cliWppLoading) clinWppCargar(); }
+async function clinWppCargar() {
+  if (_apr.cliWppLoading) return;
+  const lista = (_apr.pedidos || []).filter(function (p) { return !p._demo && aprEnCuarentena(p) && aprSoloClienteNuevo(p); });
+  if (!lista.length) { _apr.cliWpp = {}; return; }
+  _apr.cliWppLoading = true;
+  try {
+    const res = await aprRpc("gv_cliente_nuevo_wpp_lote", {
+      p_pedidos: lista.map(function (p) { return { empresa: p.empresa || "lk", cod: String(p.cod || "").trim() }; })
+    });
+    const m = {};
+    (res || []).forEach(function (r) { m[String(r.empresa) + ":" + String(r.cod)] = r.telefono; });
+    _apr.cliWpp = m;
+  } catch (_e) { _apr.cliWpp = _apr.cliWpp || {}; }
+  _apr.cliWppLoading = false;
+  if (_pppTab === "prog") aprRender();
+}
+function clinPrimerContacto(p) {
+  if (p && p._demo) return "__demo__";
+  return (_apr.cliContacto || {})[aprKey(p.empresa, p.order_id)] || null;
+}
+function clinWppTel(p) {
+  if (p && p._demo) return null;
+  return (_apr.cliWpp || {})[String((p && p.empresa) || "lk") + ":" + String((p && p.cod) || "").trim()] || null;
+}
+/* elapsed corto: "N min" / "Nh Nmin" / "Nd Nh" */
+function clinFmtElapsed(sinceIso) {
+  const t = Date.parse(sinceIso); if (!isFinite(t)) return "";
+  let s = Math.max(0, Math.floor((Date.now() - t) / 1000));
+  const d = Math.floor(s / 86400); s -= d * 86400;
+  const h = Math.floor(s / 3600);  s -= h * 3600;
+  const m = Math.floor(s / 60);
+  if (d > 0) return d + "d " + h + "h";
+  if (h > 0) return h + "h " + m + "min";
+  return m + " min";
+}
+function clinTiempoHtml(p) {
+  if (p && p._demo) return '<span class="clin-tiempo" title="Ejemplo">2h 15min</span>';
+  const iso = clinPrimerContacto(p);
+  if (!iso) return '<span class="cuar-yp-sin" title="Todavía sin primer contacto — arranca al tocar «Speech 1»">—</span>';
+  return '<span class="clin-tiempo" data-since="' + escapeHtml(String(iso)) + '" title="Desde el primer contacto (Speech 1)">' + clinFmtElapsed(iso) + '</span>';
+}
+/* refresco del timer sin re-render pesado: cada 60 s actualiza sólo las celdas visibles */
+let _clinTick = null;
+function clinTickStart() {
+  if (_clinTick) return;
+  _clinTick = setInterval(function () {
+    try {
+      const nodos = document.querySelectorAll(".clin-tiempo[data-since]");
+      nodos.forEach(function (n) { n.textContent = clinFmtElapsed(n.getAttribute("data-since")); });
+    } catch (_e) {}
+  }, 60000);
+}
+function clinBrand(p) { return String((p && p.empresa) || "lk") === "chef" ? "Chef" : "Loekemeyer"; }
+function clinSpeechMsg1(p) {
+  const np = aprPedLabel(p || {});
+  const v = (_apr.cliValor || {})[aprKey(p.empresa, p.order_id)];
+  const iva = v && isFinite(v.valorIva) && v.valorIva > 0 ? v.valorIva : null;
+  const sena = iva != null ? Math.round(iva * 0.30) : null;
+  const plata = function (n) { return "$" + Number(n).toLocaleString("es-AR"); };
+  let m = "Hola, le escribimos de " + clinBrand(p) + " por su pedido " + np + ". ";
+  if (sena != null) m += "Para confirmarlo le pedimos una seña del 30%: " + plata(sena) + " (total con IVA " + plata(iva) + "). ";
+  else m += "Para confirmarlo le pedimos una seña del 30% del total del pedido. ";
+  m += "¿Nos confirma la transferencia? Muchas gracias.";
+  return m;
+}
+function clinSpeechMsg2(p) {
+  const np = aprPedLabel(p || {});
+  return "Hola, le escribimos de " + clinBrand(p) + " por su pedido " + np + ". " +
+    "¿Va a poder realizar el pago en las próximas 24 horas? De lo contrario, lamentablemente el pedido será dado de baja. Muchas gracias.";
+}
+function clinAbrirWa(p, msg) {
+  const tel = clinWppTel(p);
+  if (!tel) { _apr.msg = "No hay teléfono del cliente cargado para abrir WhatsApp."; _apr.msgErr = true; aprRender(); return false; }
+  const url = _avpWa(tel, msg);
+  try { window.open(url, "_blank", "noopener"); } catch (_e) { try { location.href = url; } catch (_e2) {} }
+  return true;
+}
+async function clinSpeech1(empresa, orderId) {
+  const p = (_apr.pedidosTodos || []).find(function (x) { return aprKey(x.empresa, x.order_id) === String(empresa) + ":" + String(orderId); });
+  if (!p) return;
+  // A) sellar el primer contacto (una sola vez) → arranca el timer
+  try {
+    const r = await aprRpc("gv_cliente_nuevo_contacto_marcar", { p_empresa: empresa, p_order_id: String(orderId), p_por: await aprQuien() });
+    const iso = (r && r.primer_contacto_at) || (Array.isArray(r) ? r[0] : r) || new Date().toISOString();
+    _apr.cliContacto = _apr.cliContacto || {};
+    _apr.cliContacto[aprKey(empresa, orderId)] = iso;
+  } catch (_e) { /* si el sello falla, igual abrimos el WhatsApp */ }
+  aprRender(); clinTickStart();
+  // B) abrir WhatsApp con la seña del 30%
+  clinAbrirWa(p, clinSpeechMsg1(p));
+}
+function clinSpeech2(empresa, orderId) {
+  const p = (_apr.pedidosTodos || []).find(function (x) { return aprKey(x.empresa, x.order_id) === String(empresa) + ":" + String(orderId); });
+  if (!p) return;
+  clinAbrirWa(p, clinSpeechMsg2(p));
+}
+function clinContactoBtns(p) {
+  if (p && p._demo) return '<button class="cuar-wpp cuar-wpp-cli" disabled title="En el ejemplo no se abre WhatsApp">💬 Speech 1 (ej.)</button>';
+  const emp = (p.empresa || "lk"), oid = escapeHtml(String(p.order_id));
+  const sinTel = !clinWppTel(p);
+  const t1 = sinTel ? "No hay teléfono del cliente — Speech 1 igual marca el primer contacto" : "Marca el primer contacto y abre WhatsApp pidiendo la seña del 30%";
+  const t2 = sinTel ? "No hay teléfono del cliente cargado" : "Abre WhatsApp preguntando si paga en 24 h";
+  return '<div class="clin-speech">' +
+    '<button class="cuar-wpp cuar-wpp-cli" onclick="clinSpeech1(\'' + emp + '\',\'' + oid + '\')" title="' + t1 + '">💬 Speech 1</button>' +
+    '<button class="cuar-wpp cuar-wpp-cli' + (sinTel ? ' cuar-wpp-off' : '') + '"' + (sinTel ? ' disabled' : '') +
+      ' onclick="clinSpeech2(\'' + emp + '\',\'' + oid + '\')" title="' + t2 + '">💬 Speech 2</button>' +
+    '</div>';
+}
+function clinAccionBtns(p) {
+  if (p && p._demo) return '<span class="cuar-yp-sin">—</span>';
+  const emp = (p.empresa || "lk"), oid = escapeHtml(String(p.order_id));
+  return '<div class="clin-accion">' +
+    '<button class="cuar-enviar" onclick="cuarLiberar(\'' + emp + '\',\'' + oid + '\')" title="Aprobar: pasa a «Pedidos a programar». Hay que programarlo en los próximos 7 días.">✅ Aprobar pedido</button>' +
+    '<button class="apr-anular apr-anular-chico" onclick="aprAnularAbrir(\'' + emp + '\',\'' + oid + '\')" title="Eliminar: lo saca de la PPP y queda registrado en el log de anulados.">🗑 Eliminar pedido</button>' +
+    '</div>';
 }
 function clinNuevosValorFmt(p) {
   if (p && p._demo) return '<b title="Ejemplo — precio total por lista (neto, sin IVA)">' + cuarPlata(120480) + '</b>';
@@ -43938,8 +44084,10 @@ function clinNuevosHtml() {
       '<span class="apr-cuar-help" title="Pedidos de CLIENTES NUEVOS (código alto y menos de 3 pedidos facturados en toda su historia). Si además tienen deuda, están suspendidos o superan su límite de crédito, NO caen acá: quedan en Cuarentena. No se programan solos: hay que liberarlos primero.">ⓘ</span>' +
     '</div>';
   if (_cliCol) return h + '</div>';   // colapsado: sólo el título con el contador
-  if (_apr.cuarContacto === null && !_apr.cuarContactoLoading && lista.some(function (p) { return !p._demo; })) cuarContactoCargar();
   clinNuevosValorNeed();
+  clinContactoNeed();   // v19.05: timer "primer contacto"
+  clinWppNeed();        // v19.05: teléfono del cliente para los Speech
+  clinTickStart();      // v19.05: refresca los timers cada 60 s
   if (_apr.cliDemo) lista = [clinDemoPedido()].concat(lista);   // v18.99: fila de ejemplo (como Cuarentena)
   h += clinDemoRowHtml();
   if (!lista.length) {
@@ -43950,7 +44098,7 @@ function clinNuevosHtml() {
   }
   h += '<div class="cuar-tblwrap"><table class="cuar-tbl"><thead><tr>' +
     '<th>Pedido</th><th>Fecha</th><th class="cuar-td-m3">m³</th><th>Cliente</th><th>Zona</th>' +
-    '<th>Contacto</th><th class="cuar-td-m3">Monto</th>' +
+    '<th>1er contacto</th><th>Contacto</th><th class="cuar-td-m3">Monto</th><th>Acción</th>' +
     '</tr></thead><tbody>';
   for (const p of lista) {
     const cid = "n" + p.empresa + p.order_id, cab = !!_apr.exp[cid];
@@ -43967,10 +44115,12 @@ function clinNuevosHtml() {
       '<td class="cuar-td-m3"><span class="cuar-card-m3">' + aprNum(p.m3) + ' m³</span></td>' +
       '<td class="cuar-td-cli">' + cuarCodChip(p) + escapeHtml(p.razon_social || p.cod || ("#" + p.order_id)) + '</td>' +
       '<td class="cuar-td-zona">📍 ' + escapeHtml(p.zona || "sin zona") + aprHorBadge(p) + '</td>' +
-      '<td><div class="cuar-td-acc">' + cuarWppContactoBtn(p) + '</div></td>' +
+      '<td class="clin-td-tiempo">' + clinTiempoHtml(p) + '</td>' +
+      '<td>' + clinContactoBtns(p) + '</td>' +
       '<td class="cuar-td-m3">' + clinNuevosValorFmt(p) + '</td>' +
+      '<td>' + clinAccionBtns(p) + '</td>' +
       '</tr>';
-    if (cab) h += '<tr class="cuar-tbl-det"><td colspan="7"><div class="apr-card-body">' + aprContenidoHtml(p) + '</div></td></tr>';
+    if (cab) h += '<tr class="cuar-tbl-det"><td colspan="9"><div class="apr-card-body">' + aprContenidoHtml(p) + '</div></td></tr>';
   }
   return h + '</tbody></table></div></div>';
 }
@@ -44724,6 +44874,8 @@ async function cuarMarcarPedidos() {
   _apr.cuarContacto = null;   // v14.90: cambió el set de retenidos → recargar contactos WhatsApp
   _apr.cuarComN = null;       // v18.01: ídem el contador de comentarios de cada 📖
   _apr.cliValor = null;       // v18.95: cambió el set → recargar el monto de los clientes nuevos
+  _apr.cliContacto = null;    // v19.05: ídem el timer de primer contacto
+  _apr.cliWpp = null;         // v19.05: ídem el teléfono del cliente
   if (_pppTab === "prog") aprRender();
 }
 /* Pedido de EJEMPLO para ver el sector sin datos reales (dueño: "poneme un pedido de prueba"). */

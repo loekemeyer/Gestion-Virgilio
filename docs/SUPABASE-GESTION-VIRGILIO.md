@@ -20450,3 +20450,38 @@ Y quedan **213** funciones `SECURITY DEFINER` abiertas a `anon` en el resto del 
 una tanda propia: inventariar cuáles llama el front de verdad y cerrar el resto.
 
 **Archivo:** `sql/gv_conciliacion_grants_v1903.sql` (lleva el rollback adentro). Problema 353.
+
+---
+
+## §3.il — v19.05: Clientes nuevos — Speech 1/2, timer de primer contacto, eliminar/aprobar — 2026-09-16
+
+Segundo tramo del submódulo Clientes nuevos (pedido de Luis). Todo aditivo; reusa lo que ya
+existía para eliminar y aprobar.
+
+**Columna "1er contacto" + botones Speech 1/2 (en Contacto):**
+- **Speech 1** sella el PRIMER contacto (una sola vez) y abre WhatsApp Web con el cliente pidiendo
+  una **seña del 30%** sobre el **total con IVA**. El timer "1er contacto" arranca en ese momento
+  y corre solo (se refresca cada 60 s en el front, `clinTickStart`).
+- **Speech 2** abre WhatsApp preguntando si paga en 24 h o el pedido se da de baja.
+- El sello vive en `public."GV_Clientes_Nuevos_Contacto"` (empresa, order_id, primer_contacto_at),
+  RLS on sin policies (sólo las RPC `SECURITY DEFINER` la tocan). `gv_cliente_nuevo_contacto_marcar`
+  (idempotente, `on conflict do nothing`) y `gv_cliente_nuevo_contacto_lote`.
+- El teléfono del cliente sale de `whatsapp_clientes` vía `gv_cliente_nuevo_wpp_lote` (el
+  `gv_cuar_contacto_lote` de Cuarentena prefiere el vendedor; acá queremos hablar con el cliente).
+  Medido 16/09: **184 de 367** clientes nuevos tienen teléfono cargado; si no hay, el botón queda
+  desactivado (Speech 1 igual sella el contacto).
+
+**Monto con IVA:** `gv_clientes_nuevos_valor_lote` ahora devuelve también `valor_con_iva` = neto ×
+**1,21**. ⚠ IVA **21 % plano**: `precios_venta`/`_chef` no guardan tasa por artículo (medido: cols
+= cod, precio_unit, descripcion, actualizado) y el catálogo de Loeke/Chef es bazar/menaje (21 %).
+Si aparecen artículos a 10,5 %, hay que traer la tasa por artículo. El neto ya viene con el 2 % web.
+
+**Columna "Acción":**
+- **Eliminar pedido** → reusa `gv_pedido_anular` (lo saca de la PPP y queda en el log de anulados;
+  el pedido de la página no se borra).
+- **Aprobar pedido** → reusa `gv_cuarentena_liberar` (pasa a Pedidos a programar). Ahí el pedido
+  muestra el badge **"🗓️ Programar dentro de los próximos 7 días"** (front, en el liberado que
+  tiene motivo `cliente_nuevo`).
+
+**Cubierto** en `tests/apr-cuarentena.cjs` (columnas 1er contacto/Acción, botones Speech 1/2,
+Aprobar/Eliminar). **Rollback** al pie de `sql/gv_clientes_nuevos_acciones_v1905.sql`.
