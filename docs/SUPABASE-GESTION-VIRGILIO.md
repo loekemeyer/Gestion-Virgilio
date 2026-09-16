@@ -20012,3 +20012,63 @@ lo decide un supervisor (protocolo de `CLAUDE.md`). El centinela la muestra hast
 **Problema 338.** **Rollback:** sacar el bloque marcado `v18.92` de `gv_ppp_isis_programar`
 (el `select count(*) … into v_otras` y su `if`), dejando `v_code := v_prev; v_reuso := true;`
 directo, y `drop view public.gv_ppp_tanda_dos_dias;`.
+
+## §3.ie — v18.93: la empresa en el stock sólo tiene sentido en los duales (ESCRITO, NO APLICADO) — 2026-09-16
+
+**Estado: el SQL está escrito, medido y probado, y NO se ejecutó.** Luis lo pidió con una
+condición — *"hacé 3527 ahora si no hay nadie pickeando"* — y al momento de mirarlo había
+picking activo: legajo **277** venía encadenando tandas toda la mañana (E11C → E25A → E11D →
+E03G → E12A → E12C → D69C, cerró D69C a las 13:07) y el legajo **237** tenía **E12C con el
+armado abierto** desde las 11:54, sin TAP. Todo el trabajo está en
+`sql/gv_empresa_solo_duales_v1893.sql`, listo para correr. Tarea de Planify 3527, problema 337.
+
+### El hallazgo que cambia el tamaño del cambio
+
+**`empresa` no es sólo una etiqueta: es parte de una CLAVE ÚNICA.** Entra en dos índices de
+deduplicación —`mov_stock_pipeline_dedup` (picking/separado/facturado) y
+`mov_stock_aguardar_dedup`— y los reconciliadores los usan como `ON CONFLICT`. El propio
+código lo avisa, en `reconciliar_pipeline_stock_etapa1` (v17.07), textual:
+
+> *"SIN ESTO SE DUPLICA EL PICKING. Si la empresa no se puede derivar del evento pero la fila
+> YA existe con empresa real, hay que reusar ESA empresa. Si no, el ON CONFLICT —que incluye
+> `coalesce(empresa,'')`— no matchea contra la fila 'CH'/'LK'"*
+
+O sea: ya se rompió una vez por esto. **Consecuencia: el trigger y el backfill van JUNTOS, en
+la misma corrida.** Cambiar sólo el trigger deja las filas viejas en LK/CH y las nuevas en
+'Mixto' — que es *exactamente* la condición que duplica el picking.
+
+### Lo medido, antes de aplicar
+
+| | |
+|---|---|
+| filas de códigos NO duales con empresa LK/CH | **5.794** |
+| colisiones contra `mov_stock_pipeline_dedup` | **3** (benignas, ver abajo) |
+| colisiones contra `mov_stock_aguardar_dedup` | **0** (0 filas afectadas) |
+| costo del UPDATE | 200 filas en **231 ms** → ~**6,7 s** las 5.794 |
+
+⚠ Esos 6,7 s están **pegados al `statement_timeout` de ~8 s**, así que el backfill va por
+**lotes de 1.000**, no de una. El costo lo pone `actualizar_saldo_trigger`, que corre una vez
+por fila y recalcula el saldo completo del artículo.
+
+Las 3 colisiones son el mismo caso y no cambian ningún saldo: tanda **D72A**, artículo **520**,
+donde convive una fila 'Mixto' con **delta 0** y la fila CH con el delta real (`55638992:Mixto:0`
+/ `63471807:CH:0`, y sus pares en `separar_pedidos` y `terminado`). El paso 3 las excluye.
+
+### El trigger nuevo, probado en transacción revertida
+
+El bloque va **antes** de los de la v18.24 y la v18.86: esos dos existen para elegir entre las
+**dos** góndolas de un dual, y en un código de una sola pila no hay nada que elegir.
+
+```
+505  (no dual)  con LK → Mixto · con CH → Mixto · sin empresa → Mixto   ✓
+438E (dual)     con LK → LK    · con CH → CH                            ✓
+505L            pela la L a 505, no es dual → Mixto                     ✓
+```
+
+Verificado después que la transacción revirtió: la función quedó en la v18.91 y no quedó
+ninguna fila de prueba.
+
+### Cuándo correrlo
+
+Con el depósito quieto — sin eventos de operarios en los últimos 30 min y sin picking ni armado
+abierto (EP sin TP, AP sin TAP). La consulta de chequeo está en el encabezado del `.sql`.
