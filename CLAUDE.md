@@ -503,6 +503,23 @@ armador** (con `p_filas` de prueba dentro de una transacción abortada, no leyen
 **Chequeo:** `select * from public.gv_ppp_tanda_camion_mezclado;` — vacía = todo bien.
 `sql/gv_ppp_web_tanda_por_camion_v1887.sql`, §3.ib.
 
+## ⚠ Una tanda NO puede salir en dos días (v18.92, problema 338)
+
+Un mismo código de tanda en dos fechas cae en **dos camiones distintos** y rompe todo lo que
+agrupa por tanda: `vista_tanda_m3`, el camión, la hoja de ruta y la carga.
+
+**Por dónde entraba:** el botón *"Reusar tanda"* al reprogramar una NP de ISIS desde *A Programar*
+(`gv_ppp_isis_programar`, v16.03). Reusa el código anterior cuando todas las NP que entran vienen
+de esa tanda — **pero contaba las que ENTRAN, no las que QUEDAN**. Caso D69C: el 16/09 11:59 se
+reprogramaron 98615 y 98616 al 17/09 reusando D69C mientras 98622 seguía en D69C el 21/09.
+
+Desde v18.92, si quedan NP de esa tanda en otro día **no se reusa**: va una tanda nueva y el aviso
+dice por qué. **No se bloquea con un `raise` a propósito**: separar un pedido de su tanda es una
+decisión legítima del supervisor, y el contenido es el mismo (no hay que volver a pickear).
+
+**Chequeo:** `select * from public.gv_ppp_tanda_dos_dias;` — vacía = todo bien.
+`sql/gv_ppp_isis_programar_reusar_v1892.sql`, §3.ig.
+
 ## ⚠ Regla del dueño (2026-09-15): Oscar hace el SKIN — la OC va a su nombre y NO se toca
 
 Al revisar por qué llegaban los WhatsApps de *"SIN OC generada"* aparecieron 14 códigos —casi

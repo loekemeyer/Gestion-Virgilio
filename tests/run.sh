@@ -39,6 +39,9 @@ node tests/ppp-tanda-por-camion.cjs
 echo "== ppp-super-mezclado (el aviso dice si la tanda se armo MANUAL o AUTOMATICA; la kangoo no es el camion) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/ppp-super-mezclado.cjs
 
+echo "== ppp-tanda-dos-dias (v18.92: reusar tanda no puede dejar el mismo codigo en dos dias) =="
+node tests/ppp-tanda-dos-dias.cjs
+
 echo "== mon-tv (monitor liviano de TV: solo lectura, mismas fuentes que el monitor grande) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/mon-tv.cjs
 

@@ -19884,3 +19884,76 @@ select es_dual, deposito, count(*) codigos, sum(fantasma) cajas
 ```
 
 Problema 337.
+
+## §3.ig — v18.92: «Reusar tanda» partía la tanda en dos días (D69C) — 2026-09-16
+
+**La pregunta de Luis:** *"¿por qué la D69C terminó en dos días diferentes? ¿cómo puede ser?"*
+
+### Lo que pasó, con hora
+
+ISIS dio la `D69C` con tres NP, las tres Zona 6 - GBA Norte, para el **14/09**:
+
+| NP | Cliente | Barrio | m³ |
+|---|---|---|---|
+| 98615 | Arguello Marcelo Claudio | Villa Ballester | 0,263 |
+| 98616 | Arguello Marcelo Claudio | Villa Ballester | 0,021 |
+| 98622 | Martinelli Daniel Roberto | Bella Vista | 0,325 |
+
+- **14/09 15:01** — las tres se mueven a mano desde la app al **21/09** (`GV_PPP_Prog_Override`,
+  nota *"movida desde la app a 21/09"*).
+- **16/09 11:58** — se sacan **98615 y 98616** a *A Programar* (*"desarmado: enviado a A Programar
+  desde la tabla de Programación"*, por `loekemeyer.n8n@gmail.com`).
+- **16/09 11:59** — un minuto después se las reprograma para el **17/09** con el botón que
+  **REUSA la tanda D69C** (*"ya pickeada/armada"*).
+- **98622 nunca se volvió a tocar**: sigue en `D69C` el **21/09**.
+
+Resultado: **`D69C` existe en dos fechas a la vez** — 17/09 con 0,284 m³ y 21/09 con 0,325 m³.
+
+### Por qué el guard no lo frenó
+
+`gv_ppp_isis_programar` (v16.03) reusa el código anterior cuando **todas** las NP que entran
+vienen de la misma tanda previa. La idea es buena: si la tanda ya se pickeó y se armó, volver a
+ella evita repetir el trabajo.
+
+El problema es de qué lado mira: **cuenta las que ENTRAN, no las que QUEDAN**. Nadie preguntó si
+la tanda seguía teniendo NP programadas en otro día.
+
+Y parte en dos todo lo que agrupa por tanda, porque un mismo código cae en dos camiones de dos
+días: `vista_tanda_m3`, el camión, la hoja de ruta y la carga. El panel de la PPP lo marca como
+*"tanda inconsistente"* (varias fechas), pero eso es **después**: nada lo impedía al programar.
+
+### El arreglo
+
+Antes de reusar se cuentan las NP de esa tanda que quedan **en otro día** (web + ISIS). Si hay
+alguna, **no se reusa**: va una tanda nueva y el aviso dice por qué, cuántas quedan y cuándo. Si
+las hermanas están en el **mismo día destino**, reusar sigue siendo lo correcto y no cambia nada.
+
+Se eligió **abrir tanda nueva y no bloquear con un `raise`**: separar un pedido de su tanda es una
+decisión legítima del supervisor y trabarlo lo dejaría sin salida. El aviso aclara que el
+contenido es el mismo y que **no hay que volver a pickear**, sólo cambia el código.
+
+### Verificación (transacciones abortadas)
+
+| Caso | Antes | Ahora |
+|---|---|---|
+| La hermana 98622 queda el 21/09 (**el caso real**) | reusa `D69C` | **tanda nueva `E30A`** + aviso |
+| La hermana va al MISMO día (17/09) | reusa `D69C` | reusa `D69C` (0,609 m³) ✓ |
+| Se mueve la tanda ENTERA al 18/09 | reusa `D69C` | reusa `D69C` ✓ |
+
+### Centinela
+
+```sql
+select * from public.gv_ppp_tanda_dos_dias;   -- vacía = todo bien
+```
+
+Cubre web + ISIS, así que también caza lo que se arme a mano por `GV_PPP_Prog_Override`, que se
+saltea la función. Medido el 16/09 antes del arreglo: `D69C` era **la única** tanda partida en
+todo el universo vivo.
+
+⚠ **No se tocó la D69C viva.** Son NP de una tanda ya programada y pickeada: qué hacer con ellas
+lo decide un supervisor (protocolo de `CLAUDE.md`). El centinela la muestra hasta que eso pase.
+
+**Archivo:** `sql/gv_ppp_isis_programar_reusar_v1892.sql`. **Test:** `tests/ppp-tanda-dos-dias.cjs`.
+**Problema 338.** **Rollback:** sacar el bloque marcado `v18.92` de `gv_ppp_isis_programar`
+(el `select count(*) … into v_otras` y su `if`), dejando `v_code := v_prev; v_reuso := true;`
+directo, y `drop view public.gv_ppp_tanda_dos_dias;`.
