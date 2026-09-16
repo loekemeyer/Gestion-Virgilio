@@ -1,4 +1,28 @@
-# Estado y pendientes — al 2026-09-16 (última actualización: v18.69)
+# Estado y pendientes — al 2026-09-16 (última actualización: v18.87)
+
+> **2026-09-16, tanda de Luis (v18.86 / v18.87) — las dos alertas de la PPP.**
+>
+> **1. Tanda por CAMIÓN (v18.86, §3.ia).** `D69F` del 21/09 llevaba 8 NP de Jazquel en Balvanera/Once
+> (Capital) metidas en un camión de GBA Oeste. Regla de Luis: *"¿lo pondrías en el mismo camión?"* →
+> **el DÍA sigue siendo uno solo por cliente, la TANDA se parte por camión**. La causa **no** era
+> `gv_ppp_web_tanda_abierta_cliente` ni el pase (a1) —que fue lo primero que se arregló y no
+> alcanzó— sino `ppp_web_armar_tandas`, que agrupaba `group by cliente` y tomaba `min(camion)`.
+> Centinela nuevo: `select * from public.gv_ppp_tanda_camion_mezclado;`
+>
+> **2. Súper mezclado (v18.87, §3.ib, problema 334).** La tabla que usa el aviso **era la correcta**
+> (`GV_Supers`, 19 activas; `gv_clientes_horario` habría sido la equivocada). Pero **quedaba una
+> cuarta puerta abierta**: `_open` —las tandas que todavía acumulan— filtraba súper por ZONA, y un
+> súper con zona numérica (Dorinka, Diarco: *"Zona 5 - GBA Oeste"*) pasaba de largo. Medido: un
+> cliente común caía **en la misma tanda** del súper. Cerrada con `gv_es_super`. Y el aviso ahora
+> dice **AUTOMÁTICA / MANUAL / ISIS** con quién y cuándo; para E11 del 16/09 la respuesta es
+> **AUTOMÁTICA** (15/09, el día antes de que la v18.60 tapara la puerta anterior).
+>
+> **Lo que queda para una persona, no para el código:**
+> - **`D69F` (21/09)**: las 8 NP de Jazquel de CABA Centro siguen en el camión de GBA Oeste. Es dato
+>   real de una tanda ya programada: moverlas es decisión de un supervisor.
+> - **Camión `E11` (16/09)**: Dorinka (súper) sigue con Todo Bazar y Goldar. Igual, se mueve a mano.
+> - **Problema 327** (abierto): 9 NP de agosto facturadas que volvieron al depósito (CCN + FSS, sin
+>   CRN) y desaparecieron de todas las pantallas.
 
 > **2026-09-15, revisión general pedida por Thomas (v18.51, §3.hi de la doc de Supabase).**
 > *"Está andando mal en general la app y su paso a paso."* Seis agentes sobre `main` + los 10

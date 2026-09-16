@@ -3116,6 +3116,11 @@ button.pk-anular small{ display:block; font-size:12px; font-weight:700; opacity:
 .ppp-errpanel-h{ font-weight:800; color:#9a3412; margin-bottom:6px; }
 .ppp-ei{ font-size:13px; line-height:1.5; padding:3px 0; border-top:1px dashed #fed7aa; word-break:break-word; }
 .ppp-ei-det{ margin-top:2px; } .ppp-ei-det>div{ padding:1px 0 1px 12px; } .ppp-ei-det u{ text-decoration:none; font-weight:700; color:#9a3412; }   /* v15.57 */
+/* v18.86 — "armada AUTOMÁTICA / MANUAL / ISIS" al lado del camión mezclado. Automática es lo
+   grave (hay una puerta abierta en el armador); manual es una decisión de alguien. */
+.ppp-arm{ display:inline-block; margin-left:6px; padding:0 6px; border-radius:999px; font-size:10px; font-weight:900; letter-spacing:.3px; vertical-align:middle; }
+.ppp-arm.warn{ background:#dc2626; color:#fff; } .ppp-arm.ok{ background:#e5e7eb; color:#374151; }
+.ppp-arm-det{ padding:1px 0 2px 12px; font-size:10px; color:#6b7280; }
 .ppp-ei.bad{ color:#b42318; } .ppp-ei.warn{ color:#92400e; }
 .ppp-eb{ display:inline-block; font-size:11px; font-weight:800; padding:1px 6px; border-radius:6px; margin-left:4px; vertical-align:middle; }
 .ppp-eb.bad{ background:#fee2e2; color:#b42318; border:1px solid #fecaca; }
@@ -5620,7 +5625,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=18.85"></script>
+<script type="module" src="recepcion.js?v=18.87"></script>
 <!-- Config del módulo de fichada (compartido con fichada.html). El secret
      hmacSecret tiene que ser el mismo acá y allá; cargándolo desde un solo
      archivo evitamos que se desincronicen. -->
@@ -9203,7 +9208,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v18.85";
+const APP_VERSION = "v18.87";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -35675,14 +35680,24 @@ function _pppComputeErrors(peds, entSet) {
     const porCam = {};
     for (const p of peds) {
       if (!p.programmed || !_pppTieneTanda(p)) continue;
-      const fe = _pppS(p.fecha_entrega) || "?", cam = String(p.tanda).trim().toUpperCase().slice(0, 3);
+      const fe = _pppS(p.fecha_entrega) || "?", tnd = String(p.tanda).trim().toUpperCase(), cam = tnd.slice(0, 3);
       if (!/^[A-Z]\d\d$/.test(cam)) continue;
+      // v18.86 (Luis) — una tanda marcada en GV_Vehiculo_Propio NO viaja en el camión del
+      // fletero: E11A (Extralimp, Luján) sale en la kangoo. Contarla como parte del camión E11
+      // hacía decir que la súper de Moreno viajaba con ella. Falso positivo. ≡ gv_ppp_super_mezclado
+      if (_pppVehPropio && _pppVehPropio[tnd]) continue;
       const k = fe + "|" + cam;
       (porCam[k] = porCam[k] || { fecha: fe, cam: cam, supers: [], clientes: [] })[pppEsSuper(p) ? "supers" : "clientes"].push(p);
     }
     for (const k of Object.keys(porCam).sort()) {
       const c = porCam[k];
       if (!c.supers.length || !c.clientes.length) continue;
+      // v18.86 (Luis: "que ese aviso mencione que la tanda se armó manual o automática"). Lo
+      // resuelve el backend (`gv_ppp_super_mezclado`, que sabe quién insertó cada fila y si la
+      // NP de ISIS tiene override a mano); acá sólo se lee lo que ya vino resuelto.
+      const o = _pppSuperOrig && _pppSuperOrig[k];
+      c.armado = (o && o.armado) || null;
+      c.detalles = (o && o.detalles) || null;
       superMezcl.push(c);
       for (const p of c.supers.concat(c.clientes)) if (p._err.indexOf("supermezcl") < 0) p._err.push("supermezcl");
     }
@@ -35774,9 +35789,21 @@ function pppErroresHtml(e) {
     // obliga a mover tandas de camión, no a corregir un dato.
     const dd = function (f) { return escapeHtml(String(f || "").replace(/\/\d{4}$/, "")); };
     const tnd = function (p) { return np(p) + cli(p) + ' <u>' + escapeHtml(String(p.tanda || "").toUpperCase()) + '</u>'; };
+    // v18.86 (Luis) — la primera pregunta al ver este aviso es "¿esto lo armó el sistema o lo
+    // movió alguien?", porque la respuesta cambia qué hay que arreglar: si fue automática hay
+    // que tapar la puerta en el armador, si fue a mano hay que avisarle a la persona.
+    const arm = function (c) {
+      if (!c.armado) return "";
+      const cls = c.armado === "AUTOMÁTICA" ? "warn" : "ok";
+      const det = c.detalles ? Object.keys(c.detalles).map(function (k) {
+        return escapeHtml(k) + ": " + escapeHtml(c.detalles[k]);
+      }).join(" · ") : "";
+      return ' <span class="ppp-arm ' + cls + '">armada ' + escapeHtml(c.armado) + '</span>' +
+             (det ? '<div class="ppp-arm-det">' + det + '</div>' : "");
+    };
     h += '<div class="ppp-ei bad">🛒 <b>Súper mezclado con clientes en el mismo camión (' + e.superMezcl.length + '):</b><div class="ppp-ei-det">' +
       e.superMezcl.map(function (c) {
-        return '<div><b>' + dd(c.fecha) + ' · Camión ' + escapeHtml(c.cam) + '</b> → SÚPER: ' + c.supers.map(tnd).join(", ") +
+        return '<div><b>' + dd(c.fecha) + ' · Camión ' + escapeHtml(c.cam) + '</b>' + arm(c) + ' → SÚPER: ' + c.supers.map(tnd).join(", ") +
                ' &nbsp;/&nbsp; clientes: ' + c.clientes.map(tnd).join(", ") + '</div>';
       }).join("") + '</div></div>';
   }
@@ -35881,6 +35908,31 @@ async function pppRefreshVehPropio() {
     _pppVehPropio = m;
   } catch (_e) {}
 }
+/* v18.86 (Luis: "si se rompe esa regla, que ese aviso mencione que la tanda se armó manual o
+   automática"). El dato NO se puede sacar de la pantalla: quién insertó cada fila vive en
+   `PPP_Web_Programacion.creado_por` ('sistema' = el armado automático) y, para una NP de ISIS,
+   en `GV_PPP_Prog_Override` (tanda/fecha pisadas a mano). Lo resuelve el backend en
+   `gv_ppp_super_mezclado` y acá sólo se lee. Si el select falla, el aviso sale como antes.
+   Clave del mapa: la MISMA que arma `_pppComputeErrors`, "DD/MM/AAAA|CAM". */
+let _pppSuperOrig = null;      // { "16/09/2026|E11": { armado: "AUTOMÁTICA", detalles: {…} }, … }
+async function pppRefreshSuperOrigen() {
+  try {
+    const r = await fetch(SUPABASE_URL + "/rest/v1/gv_ppp_super_mezclado?select=dia,cam,np,razon_social,que_es,origen_detalle,camion_armado&limit=2000",
+      { headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY }, cache: "no-store" });
+    if (!r.ok) return;
+    const rows = await r.json();
+    if (!Array.isArray(rows)) return;
+    const m = {};
+    for (const x of rows) {
+      const iso = String((x && x.dia) || "");          // "AAAA-MM-DD" → "DD/MM/AAAA"
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(iso)) continue;
+      const k = iso.slice(8, 10) + "/" + iso.slice(5, 7) + "/" + iso.slice(0, 4) + "|" + String(x.cam || "").toUpperCase();
+      const e = (m[k] = m[k] || { armado: x.camion_armado || null, detalles: {} });
+      if (x.np && x.origen_detalle) e.detalles[String(x.np)] = String(x.origen_detalle);
+    }
+    _pppSuperOrig = m;
+  } catch (_e) {}
+}
 /* Un camión de la vista (`_pppCamiones`) va en vehículo propio si TODAS sus tandas están marcadas. */
 function _pppCamEsVehPropio(cam) {
   const v = _pppVehPropio; if (!v) return false;
@@ -35941,6 +35993,7 @@ function _pppJornadaCam(cam) {
 async function pppRefreshGeo() {
   pppRefreshJornadaCfg();   // best-effort, en paralelo: si falla quedan los defaults
   pppRefreshVehPropio();    // v16.72: tandas en vehículo propio (si la tabla no existe, no pasa nada)
+  pppRefreshSuperOrigen();  // v18.86: si un camión mezcla súper con clientes, si fue automática o a mano
   if (_pppGeo) return;
   try { _pppGeo = await _rtCacheAll(); } catch (_e) { _pppGeo = {}; }
   // v13.40: además de PPP_Geo (por dirección), la ubicación POR CÓD DE CLIENTE. Es el paracaídas

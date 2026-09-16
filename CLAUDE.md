@@ -427,6 +427,9 @@ Agregado web + tanda de **ISIS** → **siempre tanda nueva**, aunque nadie la ha
 
 Vive en `gv_ppp_web_tanda_abierta_cliente` (sólo mira `PPP_Web_Programacion`; las tandas de ISIS **no**
 son candidatas), que usa el bloque (a1) de `gv_ppp_web_armar_pendientes` en los crons 71 y 73.
+**Desde v18.86 recibe un 4.º argumento, la zona**, y sólo devuelve tandas del mismo camión (regla de
+Luis, más abajo); la firma de 3 argumentos se dropeó a propósito para que ningún llamador viejo siga
+resolviendo a la vieja en silencio.
 **La v14.05 lo había leído al revés** y metía pedidos de la página adentro de tandas de ISIS; se corrigió
 en la v14.12. Caso testigo: Osa (2533, mié 09/09) → `E09A` ISIS + `E09B` web, mismo camión, picking
 separado. §3.ca/§3.cb de `docs/SUPABASE-GESTION-VIRGILIO.md` y `sql/gv_ppp_web_tanda_abierta_cliente_v1412.sql`.
@@ -453,8 +456,52 @@ esa zona). Lo que NO la respetaba era el atajo manual: un `GV_PPP_Prog_Override`
 se saltea esa función. Pasó el 07/09 —se enganchó Luján al camión de Chango Más en Moreno
 porque quedaba a 31,5 km— y se revirtió el mismo día.
 
+**⚠ La tabla que manda es `GV_Supers`** (19 activas), NO `gv_clientes_horario` (24: agrega 3
+clientes comunes que piden turno y se come 1 súper que no lo pide). El front (`pppSupersNeed`) y
+el backend (`gv_es_super`) ya usan la buena.
+
+**⚠ Y la regla se rompe por ZONA, siempre en el mismo lugar: un súper con zona numérica.** Dorinka
+(Chango Más) y Diarco vienen como *"Zona 5 - GBA Oeste"*, así que cualquier filtro escrito como
+`zona !~* 'super|retira|expo'` los deja pasar. Se tapó tres veces — `_sin_tanda` (v18.28), `_ex` y
+`gv_ppp_web_dia_camion` (v18.60) — y en la v18.87 apareció la cuarta: `_open`, la lista de tandas
+que todavía acumulan, metía clientes comunes **adentro de la tanda del súper**. **Al tocar el
+armado, buscar `'super|retira|expo'` y preguntarse si ahí no debería ir `gv_es_super`.**
+
+**⚠ Y no se prueba leyendo el código.** Las tres puertas anteriores parecían cerradas; la cuarta
+la destapó correr `ppp_web_armar_tandas` de verdad con `p_filas` de prueba dentro de una
+transacción abortada. Problema 334.
+
 **Chequeo:** `select * from public.gv_ppp_super_mezclado;` — vacía = todo bien. Mirarla después
-de tocar tandas a mano. `sql/gv_ppp_super_mezclado_v1423.sql`.
+de tocar tandas a mano. Desde v18.87 dice además si el camión se armó **AUTOMÁTICA / MANUAL /
+ISIS** (`camion_armado`, `origen`, `origen_detalle`) y deja afuera las tandas de
+`GV_Vehiculo_Propio` (la kangoo no es el camión). `sql/gv_ppp_super_mezclado_v1887.sql`, §3.ib.
+
+## ⚠ Regla de Luis (2026-09-16, v18.86): la tanda de un cliente se parte por CAMIÓN
+
+*"Claro que se parte en zonas distintas (si un mismo cliente pide para una sucursal que tiene en
+Tucumán y otra en Río Negro, ¿lo pondrías en el mismo camión?). Se factura diferente también, es
+uno de los criterios justamente para parsear qué factura correspondía con qué pedido (la zona)."*
+
+> **el DÍA sigue siendo uno solo por cliente · la TANDA se parte por camión**
+
+Así convive con la regla de Thomas (*"nunca si hay +1 pedido de un cliente puede ir separado en la
+PPP, salvo los súper"*): Jazquel entrega todo el mismo día, pero lo de Balvanera/Once va en el
+camión de **Capital** y lo de Ciudadela en el de **GBA Oeste**. Si las dos reglas chocan (hay que
+juntar al cliente en un día y ese día no hay camión de su etiqueta), **gana ésta: la NP no se
+mueve** y queda a la vista en `gv_ppp_cliente_dos_dias`.
+
+**El corte es la etiqueta de `gv_ppp_web_camion`** (Capital / GBA Sur / GBA Oeste / GBA Norte),
+**no el número de zona**: una tanda de CABA mezcla Zona 1+2 o 2+3 a propósito, por cercanía de
+sectores, y va en el mismo camión. Medido sobre toda la historia, el corte por camión marca **una
+sola** tanda mal (D69F) y el corte por número marca tres, dos de ellas sanas.
+
+⚠ **La causa estaba en `ppp_web_armar_tandas`, que agrupaba `group by cliente` y tomaba
+`min(camion)`** — no en `gv_ppp_web_tanda_abierta_cliente` ni en el pase (a1), que fue lo primero
+que se arregló y no alcanzó. **Un cambio de regla de armado no está probado hasta que se corre el
+armador** (con `p_filas` de prueba dentro de una transacción abortada, no leyendo la función).
+
+**Chequeo:** `select * from public.gv_ppp_tanda_camion_mezclado;` — vacía = todo bien.
+`sql/gv_ppp_web_tanda_por_camion_v1886.sql`, §3.ia.
 
 ## ⚠ Regla del dueño (2026-09-15): Oscar hace el SKIN — la OC va a su nombre y NO se toca
 

@@ -19204,3 +19204,231 @@ cosas y dejar el SQL donde va:
 esta cuenta; el FDW `chef_db` de LK entra como `loke_reader` (sólo lectura) y escribir por REST
 con la publishable key no es camino (la RLS del catálogo es de admin, y no corresponde). Lo
 aprieta Thomas en el SQL Editor de Chef, o se habilita ese proyecto en el MCP y lo corro yo.
+
+## §3.ia — v18.86: la tanda de un cliente se parte por CAMIÓN — 2026-09-16
+
+**Pedido de Luis, textual:** *"Claro que se parte en zonas distintas (si un mismo cliente pide
+para una sucursal que tiene en Tucumán y otra en Río Negro, ¿lo pondrías en el mismo camión?).
+Se factura diferente también, es uno de los criterios justamente para parsear qué factura
+correspondía con qué pedido (la zona)."*
+
+### El caso
+
+`D69F` del 21/09 se armó sola el 16/09 a las 08:05 con esto adentro:
+
+| NP | Cliente | Barrio | Zona | Camión |
+|---|---|---|---|---|
+| LK 0028 | Laza Ariel | Ituzaingó | Zona 5 | GBA Oeste |
+| LK 0032 | Gonzalez Pellegrini | Ciudadela | Zona 5 | GBA Oeste |
+| LK 0108 | Cosentino | Ciudadela | Zona 5 | GBA Oeste |
+| LK 0109 | **Jazquel SRL** | Ciudadela | Zona 5 | GBA Oeste |
+| LK 0110 … 0117 | **Jazquel SRL** | Balvanera / Once | **Zona 2** | **Capital** |
+
+Jazquel (cód 3814) hizo NUEVE pedidos, uno por sucursal (`order_id` 1455-1463). Las ocho de
+CABA Centro terminaron en un camión de GBA Oeste.
+
+### El corte es el CAMIÓN, no el número de zona
+
+La pregunta de Luis es literal —*"¿lo pondrías en el mismo camión?"*— así que el criterio es la
+etiqueta de `gv_ppp_web_camion` (**Capital · GBA Sur · GBA Oeste · GBA Norte**), la misma con la
+que `gv_ppp_web_camion_del_dia` decide a qué camión entra una tanda nueva.
+
+Cortar por número de zona sería **más fino que el reparto real** y fragmentaría Capital: hoy una
+tanda de CABA mezcla Zona 1+2 o 2+3 a propósito, por cercanía de sectores, y va en el mismo
+camión. Medido sobre **todo** `PPP_Web_Programacion`:
+
+| Criterio | Tandas mezcladas en la historia |
+|---|---|
+| Número de zona | 3 — D69F (2+5), **E03G (1+2)**, **E01D (2+3)** ← las dos últimas están bien |
+| **Camión** | **1 — D69F (Capital + GBA Oeste)**, el caso reportado |
+
+Sobre las tandas de ISIS de los últimos 45 días el corte por camión da **0**.
+
+### Cómo convive con la regla de Thomas
+
+Thomas (2026-09-11): *"nunca si hay +1 pedido de un cliente puede ir separado en la PPP … salvo
+los súper"*. Las dos reglas no chocan:
+
+> **el DÍA sigue siendo uno solo por cliente · la TANDA se parte por camión**
+
+Jazquel entrega todo el mismo día; lo de Balvanera/Once va en el camión de Capital y lo de
+Ciudadela en el de GBA Oeste.
+
+Cuando SÍ chocan —hay que juntar un cliente en un día y en ese día no existe ningún camión de su
+etiqueta— **gana la de Luis: la NP no se mueve**. Mezclar camiones rompe el reparto Y la
+facturación; quedar partido en dos días se ve (`gv_ppp_cliente_dos_dias`) y se arregla a mano.
+Antes se la mandaba igual a la tanda que hubiera.
+
+### ⚠ La causa NO era el pase (a1): era `ppp_web_armar_tandas`
+
+Se arreglaron primero los tres lugares "obvios" y **el bug seguía vivo**. Lo destapó probarlo de
+punta a punta: una corrida real de `gv_ppp_web_armar_pendientes` con tres NP de Jazquel (dos de
+CABA Centro y una de Ciudadela), dentro de una transacción abortada, las metió a las tres en la
+misma tanda. El armador las junta acá:
+
+```sql
+for r_cli in select cliente, …, min(camion) as camion, min(sector) as sector
+               from _sin_tanda group by cliente …
+```
+
+**`group by cliente`**, y de ahí `min(camion)`: las 9 NP de Jazquel son un solo grupo y el camión
+que gana es el alfabéticamente menor (`'Capital' < 'GBA Oeste'`). Todo el resto de la función ya
+estaba bien — `_open` sólo reusa tandas del mismo camión (v18.28) y `_cam` numera por camión. Lo
+único mal era la clave del grupo. Ahora es **`group by cliente, camion`**, y las tres consultas
+que reparten las NP del grupo (`_asig`, `_open_stops` y el chequeo de compatibilidad) se acotan a
+ese camión.
+
+**Regla que queda:** *un cambio de regla de armado no está probado hasta que se corre el
+armador.* Leer la función no alcanzó.
+
+### Los cuatro objetos
+
+| Objeto | Qué cambió |
+|---|---|
+| `gv_ppp_web_tanda_abierta_cliente` | **DROP + CREATE** con un 4.º argumento `p_zona`. Una tanda es candidata sólo si TODAS sus NP son del camión pedido. |
+| `gv_ppp_web_tanda_destino` *(nueva)* | A qué tanda de un día entra una NP del cliente, respetando su camión. `NULL` = no hay → no mover. |
+| `gv_ppp_web_juntar_clientes` + `gv_web_cliente_un_solo_dia` | La tanda destino se resuelve **por NP**, no una para todas. Lo que no se puede mover se informa (`r_motivo`, `raise notice`). |
+| `ppp_web_armar_tandas` | `group by cliente, camion`. **La causa real.** |
+
+⚠ El `DROP` de la firma de 3 argumentos y los llamadores van en la **misma transacción**: un
+`create or replace` con un parámetro más deja DOS funciones y la llamada de 3 sigue resolviendo a
+la vieja — el bug queda vivo y en silencio. Los parches por texto sobre `pg_get_functiondef`
+llevan guard de "el fragmento aparece exactamente 1 vez"; si no, abortan sin tocar nada.
+
+### Ciudadela NO queda exenta, a propósito
+
+El panel de errores del front exime a Ciudadela de "ruta mezclada" (está pegada a la fábrica y
+camino a Zona 1 por la autopista, regla del dueño). Acá **no**: es Zona 5 → GBA Oeste y se parte
+como cualquier otra. Partir de más nunca rompe un reparto; juntar de más sí. Si el dueño quiere
+que Ciudadela pueda viajar con Capital, el lugar es `gv_ppp_web_camion` y vale para todos.
+
+### Verificación (medida el 16/09)
+
+- Barrido de 30 días sobre todos los pares (empresa, cod, día, zona) con tanda: la respuesta de
+  `gv_ppp_web_tanda_abierta_cliente` cambia en **2 filas de cientos**, y las dos son Jazquel/D69F
+  (que al estar ya mezclada deja de recibir NP nuevas, que es lo correcto). Todo lo demás
+  contesta igual → sin regresión.
+- **Osa 2533** el 09/09 sigue dando `NULL`: la tanda de ISIS no es candidata, la regla v14.12
+  quedó intacta.
+- Corrida real del armador (transacción abortada): **2 tandas, 2 camiones, 1 día**. Las dos NP de
+  CABA Centro a `E12R` (Capital) y la de Ciudadela a `E20A` (GBA Oeste). Antes las tres caían en
+  `E12R`.
+- `gv_ppp_web_juntar_clientes('lk')` corre sin error y no mueve nada.
+- 0 vistas sin `security_invoker` legibles por `anon`; `gv_endpoints_rotos` vacío.
+
+### Centinela
+
+```sql
+select * from public.gv_ppp_tanda_camion_mezclado;   -- vacía = todo bien
+```
+
+Al 16/09 devuelve **una** fila: `D69F`. **No se tocó**: son 8 NP de una tanda ya programada, o sea
+dato real, y moverlas es decisión de un supervisor (protocolo de `CLAUDE.md`). El front ya la
+marca como "tanda inconsistente" (rutas mezcladas).
+
+**Archivo:** `sql/gv_ppp_web_tanda_por_camion_v1886.sql`. **Test:** `tests/ppp-tanda-por-camion.cjs`.
+**Rollback:** volver `ppp_web_armar_tandas` a `group by cliente` con `min(camion) as camion`, y
+recrear `gv_ppp_web_tanda_abierta_cliente` con la firma de 3 argumentos (dropeando la de 4) más
+las versiones previas de `gv_ppp_web_juntar_clientes` y `gv_web_cliente_un_solo_dia`, que están en
+el §3.ca/§3.cb y en `sql/gv_ppp_web_tanda_abierta_cliente_v1412.sql`.
+
+## §3.ib — v18.87: el SÚPER no se junta con clientes — la última puerta, y el aviso dice quién lo armó — 2026-09-16
+
+**Pedido de Luis, textual:** *"Fijate que no pueda volver a pasar automáticamente y que si se
+rompe esa regla, que ese aviso mencione que la tanda se armó manual o automática."*
+
+Regla del dueño (v14.23, 07/09): *"Súper no se puede juntar con clientes. Ya tenías esa regla.
+Van separados."*
+
+### 1. La tabla de súper: sí, era la correcta
+
+Luis preguntó si el aviso usa la tabla de súper correcta, sospechando que debía ser *"una de GV
+completa que es la que se usa en lógica para asignar horarios en A programar (la lista de supers
++ clientes que ponen retira al pedido)"*. **La que usa es `GV_Supers`, y está bien.** Medido:
+
+| Fuente | Filas | Qué es |
+|---|---|---|
+| `GV_Supers` (activo) | **19** | el padrón de cadenas. 18 con `pide_horario`, 1 sin |
+| `GV_Clientes_Horario` | 6 | 3 clientes **comunes** × 2 empresas (Andser, Osa, Rayabo) |
+| `gv_clientes_horario` (la unión, la de los horarios) | 24 | súper **+ esos 3 clientes comunes** |
+
+La unión de horarios sería **la equivocada** para esta regla: agrega 3 clientes comunes (que no
+son súper, sólo piden turno) y deja afuera 1 súper (el que no pide horario). El front
+(`pppSupersNeed` → `gv_supers`) y el backend (`gv_es_super` → `GV_Supers`) ya usan la buena, y
+`gv_supers_desincronizado` devuelve 0 filas.
+
+### 2. ⚠ La puerta que seguía abierta (problema 334)
+
+**Leer el código no alcanzó.** Se probó corriendo el armador de verdad, en una transacción
+abortada: con una súper (Diarco 4112, *"Zona 5 - GBA Oeste"*) ya programada en `F01A` el 14/10, un
+cliente común de Merlo **sin programación previa** cayó en `F01A` — **la misma tanda de la súper**,
+no ya el mismo camión.
+
+La causa es la de siempre, en el único lugar sin migrar. `ppp_web_armar_tandas` arma `_open` —las
+tandas del día que todavía pueden recibir un cliente más, regla v13.67 de acumular hasta 0,80 m³—
+filtrando por **ZONA**:
+
+```sql
+bool_and(coalesce(w.zona,'') !~* 'super|retira|expo')  as reparto
+```
+
+Un súper con zona numérica pasa ese filtro: Dorinka (Chango Más) y Diarco vienen los dos como
+*"Zona 5 - GBA Oeste"*. Es **el mismo patrón** que la v18.28 tapó en `_sin_tanda` y la v18.60 en
+`_ex` y en `gv_ppp_web_dia_camion`, donde se pasó de la zona al padrón `GV_Supers`.
+
+Ahora `_open` pide además `not q.tiene_super`, con `bool_or(gv_es_super(w.empresa, w.cod_cliente))`.
+
+**Las cuatro puertas, medidas con el armador corriendo:**
+
+| Puerta | Qué haría | Estado |
+|---|---|---|
+| La súper se arma sola | `_sin_tanda` la borra (v18.28) | cerrada ✓ |
+| "Ya hay camión a esa zona" | `gv_ppp_web_dia_camion` saltea súper (v18.60) | cerrada ✓ |
+| Reuso del número de camión | `_ex` saltea súper (v18.60) | cerrada ✓ |
+| **Tanda abierta que acumula** | **`_open` miraba la zona** | **cerrada acá (v18.87)** |
+
+Después del arreglo el mismo simulacro da `F02A` para el cliente: camión propio. Y no se rompió
+lo que tenía que seguir andando: dos clientes comunes chicos del mismo camión siguen entrando en
+**1** tanda, y un cliente con sucursales en dos camiones sigue partiéndose en **2 tandas, 1 día**
+(regla de Luis, §3.ia).
+
+### 3. El aviso dice MANUAL o AUTOMÁTICA
+
+Es la primera pregunta al ver la alerta, porque cambia qué hay que arreglar: **automática** = hay
+una puerta abierta en el armador; **manual** = hay que hablar con la persona. El dato no está en
+la pantalla, está en la base:
+
+- NP web → `PPP_Web_Programacion.creado_por` (`'sistema'` = armado automático)
+- NP ISIS → `GV_PPP_Prog_Override` con tanda o fecha pisadas = alguien la movió; sin override, la
+  tanda viene tipeada en ISIS
+
+`gv_ppp_super_mezclado` devuelve ahora `origen` (`automatica` / `manual` / `isis`),
+`origen_detalle` (quién, cuándo y la nota del override) y `camion_armado` por camión: **MANUAL**
+si alguna fila se puso a mano, **ISIS** si alguna viene de ISIS sin override, **AUTOMÁTICA** si
+todas las armó el sistema.
+
+Aplicado a la alerta viva del 16/09 (camión E11): **AUTOMÁTICA** — Dorinka 15/09 10:12, Todo Bazar
+12:16, Goldar 15:00. O sea: la armó el sistema el día ANTES de que la v18.60 cerrara la puerta del
+reuso de camión, y por eso sigue ahí.
+
+### 4. Y la KANGOO deja de contar como parte del camión
+
+`E11A` (Extralimp, Luján) está marcada en `GV_Vehiculo_Propio`: sale en kangoo, no en el camión del
+fletero. La alerta la contaba igual —comparte los tres primeros caracteres del código de tanda con
+`E11B`— y decía que la súper de Moreno viajaba con ella. **Falso positivo**, y encima el override
+de Thomas dice explícitamente lo contrario (*"NO se junta con el súper de Moreno"*). De 5 filas la
+alerta pasa a **4**, todas reales.
+
+### 5. El front lee la vista, no recalcula
+
+`_pppComputeErrors` sigue detectando la mezcla localmente (así el aviso sale aunque falle el
+select), pero el **origen** lo pide al backend: `pppRefreshSuperOrigen()` lee
+`gv_ppp_super_mezclado` y deja el mapa `"DD/MM/AAAA|CAM" → { armado, detalles }`. Y saltea las
+tandas de `GV_Vehiculo_Propio`, igual que la vista. **Si cambia una regla hay que tocar los dos
+lados** — los puntos están marcados con `≡ gv_ppp_super_mezclado`.
+
+**Archivos:** `sql/gv_ppp_super_mezclado_v1887.sql`, `index.html` (`pppRefreshSuperOrigen`,
+`_pppComputeErrors`, `pppErroresHtml`, CSS `.ppp-arm*`).
+**Test:** `tests/ppp-super-mezclado.cjs`. **Centinela:** `select * from public.gv_ppp_super_mezclado;`
+**Rollback:** sacar `and not q.tiene_super` del `where` de `_open` y el `bool_or(...)` del subquery
+`q`; la vista anterior está en `sql/gv_ppp_super_mezclado_v1423.sql`.
