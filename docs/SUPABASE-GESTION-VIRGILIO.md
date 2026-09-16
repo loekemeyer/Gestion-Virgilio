@@ -19807,3 +19807,80 @@ igual. En el front: sacar `.fac-btn-cancel` de la celda Acción de `facRender` y
 
 **Archivos:** `sql/gv_ppp_np_desarmar_a_guardar_v1890.sql`, `tests/fac-cancelar-pedido.cjs`.
 No hay problema de auditoría: es una funcionalidad nueva, no un bug.
+
+## §3.id — v18.91: el desarme vuelve a «A guardar», y qué son las 1.709 cajas de racks — 2026-09-16
+
+### 1. La mercadería desarmada va a A GUARDAR (deshace la v18.80, del mismo día)
+
+Luis, textual: *"si hay un pedido programado que se pickeo y se manda de vuelta a programar,
+hace que los items que se pickearon vayan a «A guardar»"*.
+
+Esto **deshace la v18.80** (*"se revierte la mercadería al lugar de donde se sacó — góndola o
+excedente"*), que se había tomado esa misma mañana. El motivo del cambio es **físico, no
+informático**: cuando se desarma, las cajas quedan en el piso de armado o en un pallet —
+**nadie las llevó de vuelta al estante**. Escribirlas en `terminado` decía que estaban en una
+góndola donde no están, y el picking siguiente iba a buscarlas ahí. En `a_guardar` aparecen en
+«Mover a Góndola», un operario las ve, las guarda de verdad, y recién ahí vuelven a la góndola.
+
+**Vale para los TRES caminos** de `gv_ppp_np_desarmar`, sin excepciones: `p_vuelve` (vuelve a A
+Programar), `p_a_guardar` (cancelación desde Facturación, v18.88 de Thomas — ya iba ahí) y el
+desarme a secas. Tener dos destinos distintos era justo lo que partía los saldos por empresa.
+
+`org_term` / `org_exc` se siguen calculando y quedan en `GV_Desarmes.stock_devuelto`: dicen de
+dónde SALIÓ cada caja. Ya no deciden nada, pero dejan la procedencia registrada.
+
+**Probado contra la base en una transacción revertida** (CH 0013, tanda E03G):
+
+```
+4 artículos · 6 cajas devueltas (6 a A guardar) · separar_pedidos −6 · a_guardar +6
+las 8 filas con empresa = CH   ← el saldo no se parte
+```
+
+El front acompaña: el pop-up de «Enviar a programar» decía *"cada caja vuelve al lugar de donde
+salió — góndola o excedente"* y ahora dice que vuelve a **A guardar**.
+`sql/gv_ppp_np_desarmar_v1891.sql`, `tests/enviar-a-programar-deshace.cjs`.
+
+### 2. Racks, góndola y excedente: qué son esas cajas, y por qué NO se tocaron
+
+`gv_stock_empresa_fantasma` devuelve al 16/09 **62 códigos / 1.709 cajas** — racks 1.105 ·
+góndola 368 · excedente 236, y **cero en `a_guardar`** (ése quedó limpio con la v18.86).
+
+**Los 62 son códigos NO DUALES**, y eso cambia por completo cómo se lee el número: un código
+no dual tiene **UNA SOLA PILA FÍSICA** — una góndola, un rack. El desglose por empresa de ese
+código **no significa nada**: es una etiqueta, no dos montones. Así que ahí **no falta
+mercadería**; el total por código está bien en los 62. En un DUAL sí son dos góndolas separadas
+(un 809E de LK va a J13/J14 y uno de CH a M13/M15) y la diferencia sería real — por eso la
+vista ahora trae `es_dual` y `riesgo`, y **lo que hay que mirar es que `es_dual = true` esté
+vacío**.
+
+**La causa es UNA sola para los tres depósitos**: la app empezó a marcar la empresa en las
+**SALIDAS** antes de que el saldo histórico —las **ENTRADAS**— la tuviera.
+
+| | pasó a LK/CH | lo que entró |
+|---|---|---|
+| `picking` (góndola, excedente) | **11/09** — 2.222 filas viejas en 'Mixto' contra 204 nuevas en LK/CH | recepción vieja, 'Mixto' |
+| `baja_racks` | **14/09** (`registrar_baja_racks` resuelve la empresa del sector por `Racks_Planimetria`) | `ingreso`, `inicial` y `traslado` a racks: **100 % 'Mixto'** |
+
+O sea: se saca con etiqueta de un pozo sin etiqueta, y el pozo no se vacía. **Crece todos los
+días**: entre dos mediciones de la misma tarde pasó de 1.474 a 1.709 cajas.
+
+**Por qué no se corrigió reasignando:** no hay nada que reasignar — el total está bien. El
+arreglo de fondo es de **una línea**: que para un código NO dual `trg_normalizar_empresa_stock`
+fuerce `empresa = 'Mixto'` siempre, entradas **y** salidas, porque la pila es una. Pero eso
+toca una tabla compartida que miran **13 funciones** (`reconciliar_pipeline_stock` y sus dos
+etapas, `reconciliar_stock_articulo_rt`, `gv_reconciliar_aguardar`,
+`gv_reconciliar_facturado_web`, `aceptar_conteo`, `faltante_resolver`, `racks_plani_ingreso`,
+`racks_plani_ingreso_nacional`, `registrar_baja_racks`, `anular_modo_op`, `gv_ppp_np_desarmar`),
+y no se hace un día hábil con los operarios pickeando. **Tarea de Planify 3527.**
+
+**Qué lo vuelve inofensivo mientras tanto:** que ninguna pantalla lea el desglose sin netear
+contra el total. «Mover a Góndola» era la única que lo hacía y se corrigió en la v18.86;
+«Bajar de racks» lee el TOTAL, así que las 1.105 cajas de racks no se ven en pantalla.
+
+```sql
+select es_dual, deposito, count(*) codigos, sum(fantasma) cajas
+  from public.gv_stock_empresa_fantasma group by 1,2 order by 1 desc, 4 desc;
+-- es_dual = true  →  vacío = todo bien
+```
+
+Problema 337.

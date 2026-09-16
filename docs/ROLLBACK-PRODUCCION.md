@@ -1315,3 +1315,35 @@ la definición anterior tal cual salió de `pg_get_functiondef`. No hay que toca
 `ts`. Backup fila por fila en `zz_backups."GV_Backup_MovStock_Mixto_guardado_20260916"`.
 Rollback: `update public."Movimientos_Stock" m set empresa = b.empresa from
 zz_backups."GV_Backup_MovStock_Mixto_guardado_20260916" b where b.id = m.id;`
+
+---
+
+## 2026-09-16 (v18.91) — `gv_ppp_np_desarmar()`: el desarme vuelve a «A guardar», no a la góndola
+
+**Objeto compartido tocado:** la función `public.gv_ppp_np_desarmar(text,text,text,boolean,boolean)`,
+que ESCRIBE en `public."Movimientos_Stock"` (tabla compartida con Producción Virgilio).
+
+**Qué cambió.** Sólo el DESTINO de la mercadería devuelta. Antes se repartía entre `terminado`
+(góndola) y `excedente` según de dónde había salido cada caja, y el resto caía en `a_guardar`;
+ahora **va todo a `a_guardar`**, en los tres caminos (`p_vuelve`, `p_a_guardar`, y el desarme a
+secas). Son tres expresiones del `select` y el mensaje de un `raise`. No cambia cuántas cajas se
+mueven, ni de qué depósito salen (`a_facturar` / `separar_pedidos` siguen igual), ni la empresa.
+
+**Impacto sobre Producción.** Producción no desarma pedidos (la función es de Gestión), así que
+lo único que ve es el saldo: la misma cantidad de cajas, en `a_guardar` en vez de en `terminado`
+/ `excedente`. Un desarme ya no hace aparecer stock en una góndola donde físicamente no está.
+
+**Por qué.** Regla de Luis (16/09): *"si hay un pedido programado que se pickeo y se manda de
+vuelta a programar, hace que los items que se pickearon vayan a A guardar"*. Deshace la v18.80,
+del mismo día. Detalle en `docs/SUPABASE-GESTION-VIRGILIO.md` §3.id.
+
+**ROLLBACK exacto:** sobre la definición viva (`pg_get_functiondef`), volver a poner las tres
+expresiones originales — están literales en `sql/gv_ppp_np_desarmar_v1891.sql`:
+
+```
+'0::numeric as a_term'   →  'case when v_ag then 0 else least(c.total, c.org_term) end as a_term'
+'0::numeric as a_exc'    →  'case when v_ag then 0 else least(c.total - least(c.total, c.org_term), c.org_exc) end as a_exc'
+'c.total as a_guardar'   →  'case when v_ag then c.total else c.total - least(c.total, c.org_term) - least(c.total - least(c.total, c.org_term), c.org_exc) end as a_guardar'
+```
+
+**No se tocó ningún dato** de `Movimientos_Stock` en este cambio: sólo aplica de acá en adelante.

@@ -1,0 +1,36 @@
+-- v18.91 — el DESARME devuelve la mercadería a «A GUARDAR», no a la góndola.
+--
+-- Regla de Luis (2026-09-16), textual: *"si hay un pedido programado que se pickeo y se manda
+-- de vuelta a programar, hace que los items que se pickearon vayan a «A guardar»"*.
+--
+-- DESHACE la v18.80 (*"se revierte la mercadería al lugar de donde se sacó — góndola o
+-- excedente"*), tomada el mismo día. El motivo del cambio es FÍSICO, no informático: cuando se
+-- desarma, las cajas quedan en el piso de armado o en un pallet — **nadie las llevó de vuelta
+-- al estante**. Escribirlas en `terminado` decía que estaban en una góndola donde no están, y
+-- el picking siguiente iba a buscarlas ahí. En `a_guardar` aparecen en «Mover a Góndola», un
+-- operario las ve, las guarda de verdad, y recién ahí vuelven a la góndola.
+--
+-- Vale para los TRES caminos, sin excepciones:
+--   · `p_vuelve = true`   → vuelve a A Programar (lo que pidió Luis)
+--   · `p_a_guardar = true`→ cancelación desde Facturación (v18.88 de Thomas; ya iba a A guardar)
+--   · los dos en false    → desarme a secas
+-- Tener dos destinos distintos era justo lo que partía los saldos por empresa.
+--
+-- `org_term` / `org_exc` se siguen calculando y quedan en `GV_Desarmes.stock_devuelto`: dicen
+-- de dónde SALIÓ cada caja. Ya no deciden nada, pero dejan la procedencia registrada.
+--
+-- PROBADO contra la base, en una transacción revertida (CH 0013, tanda E03G):
+--   4 artículos · 6 cajas devueltas (6 a A guardar) · separar_pedidos −6 · a_guardar +6
+--   las 8 filas con empresa = CH  ← el saldo no se parte
+--
+-- CÓMO SE APLICÓ: con `replace()` sobre `pg_get_functiondef`, cambiando SÓLO las tres
+-- expresiones del destino y el mensaje del guard. El resto del cuerpo es el de la v18.88.
+-- Para reproducirlo sobre la definición viva:
+--
+--   'case when v_ag then 0 else least(c.total, c.org_term) end as a_term'   → '0::numeric as a_term'
+--   'case when v_ag then 0 <ws> else least(...) end as a_exc'               → '0::numeric as a_exc'
+--   'case when v_ag then c.total <ws> else ... end as a_guardar'            → 'c.total as a_guardar'
+--
+-- ROLLBACK: volver a poner las tres expresiones originales (están arriba, literales). La
+-- definición completa y viva se saca siempre con:
+--   select pg_get_functiondef('public.gv_ppp_np_desarmar(text,text,text,boolean,boolean)'::regprocedure);
