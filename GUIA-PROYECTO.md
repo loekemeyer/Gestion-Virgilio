@@ -1,3 +1,101 @@
+## Nota v19.02 (2026-09-16) — El Resumen del día se leía mal: reloj de 12 h, pares sin colapsar, RI/EI sin cerrar
+
+Luis trajo la foto del celular de un operario: el Resumen mostraba `PB — Paré Baño` **dos veces**
+y `EP`/`TP` de la tanda D69H a la **"01:07"** y **"01:08"**. Parecía trabajo de madrugada y
+registros duplicados. **No era ni una cosa ni la otra.**
+
+### 1. La tarde se leía como madrugada (problema 344)
+
+Lo que hay en la base para esos mismos eventos es **13:07:27**, **13:08:13** y **13:34:23**, y
+`created_at` (la llegada al server) coincide al segundo: **0,0 s de desvío**. En toda la tabla,
+desde el 07/09, hay **cero** eventos de operario entre las 22:00 y las 05:00.
+
+`formatDateTime` era `toLocaleString("es-AR", { timeZone: TZ_AR })` **sin opciones**, y sin
+opciones el **ciclo horario lo elige el dispositivo**. El WebView de ese Android resuelve `es-AR`
+a 12 h y su patrón no incluye el a.m./p.m., así que 13:34 sale `01:34`. En Chromium (ICU
+completo) `es-AR` da 24 h — **por eso probándolo en la PC no se ve**.
+
+Señal de que ya se sabía: de las **53** llamadas a `toLocale*String` de `index.html`, las **2**
+que traían `hour12:false` son justo las que usan el resultado **como dato** (armar un `"HH:MM"`
+para comparar), no para mostrar. Las de pantalla nunca se fijaron.
+
+Ahora `formatDateTime` fija todo (`hour12:false` + `day/month/year/hour/minute/second`) y
+normaliza el `24:` de medianoche a `00:`. Se agregan **`formatTimeAr`** (sólo la hora) y
+**`formatDur`** (`"2m 26s"`, `"1h 05m"`).
+
+> ⚠ **Al mostrar una hora, nunca `toLocaleString` pelado.** Usar `formatDateTime` /
+> `formatTimeAr`, o pasar `hour12:false` explícito. Lo que se ve en el celular del operario no
+> es lo que se ve en la PC.
+
+### 2. Un renglón por tarea, no dos (problema 345)
+
+Un toggle deja **dos filas**: la apertura (`ts_inicio` null) y el cierre (`ts_inicio` = la hora
+de apertura). Las dos se rotulaban igual, así que un baño de 2 minutos se leía como dos baños.
+
+`_histColapsarPares()` hace que **el cierre absorba su apertura**: marca la fila de cierre con
+`_desde` / `_hasta` / `_durMs` y descarta la apertura que le corresponde (mismo `opcion` + su
+`ts` igual al `ts_inicio` del cierre). Queda `Desde: 13:31:57 hasta 13:34:23 (2m 26s)`.
+
+La apertura que **no** tiene cierre sobrevive marcada `_abierto` y se muestra **"sin cerrar"** en
+ámbar. Eso es a propósito: hasta hoy los RI/EI colgados (punto 3) no se veían en ninguna pantalla.
+
+Dos arreglos que salieron al paso, en `_fetchAndRenderHistory`:
+- el mapeo del histórico remoto **traía `ts_inicio` en el `select` y lo tiraba** al mapear, así
+  que el front no tenía con qué distinguir una apertura de un cierre;
+- la deduplicación local/remoto comparaba el **uuid** de la base contra el **`client_id`** del
+  celular — nunca daba match, así que un evento ya sincronizado podía salir **dos veces**. Ahora
+  se trae `client_id` y se dedupe con eso (el `id` queda como red de seguridad).
+
+### 3. RI y EI se abrían y no cerraban nunca (problema 347)
+
+Medido del 07/09 al 16/09: **EI 15 aperturas / 2 cierres** y **RI 8 / 1** — **20 toggles
+abiertos**, algunos del 08/09 todavía sin cerrar. O sea que la duración de Recepción y Entrega de
+Insumos **no se podía medir** desde que arrancó Gestión.
+
+La causa: `closeIns()` (v5.02) cerraba el toggle llamando a **`toggleStartOrEnd`, que sólo muta el
+`localStorage`** — la emisión del evento vive en `send()`, no ahí. El flag bajaba y el cierre
+nunca salía al server; el siguiente apretón del botón generaba **otra apertura**. Los pocos
+cierres que sí existen son de los operarios que volvieron a apretar el **botón** en vez de cerrar
+el modal (ese camino pasa por `send()` y sí emite). El autocierre de las 17:00
+(`enqueueAutoClose`) tampoco los cubría: corre en el cambio de día y sólo si el flag local
+sobrevivió.
+
+Ahora `closeIns()` llama a **`insEmitCierre`**, que emite el cierre con `ts_inicio` = la hora de
+apertura y `texto` = **el total cargado en la sesión** (mismo criterio que RT, que cierra con las
+cajas del día). `insAnular()` pasa **`closeIns(true)`** para no dejar un cierre huérfano: ahí la
+apertura ya se borró del server con `anular_toggle_virgilio`.
+
+> ⚠ `anular_toggle_virgilio` borra **UNA** apertura (`order by created_at desc limit 1`). Si
+> quedaron varias abiertas del mismo código, anular limpia sólo la última.
+
+### Lo que se VERIFICÓ y NO hacía falta tocar
+
+Luis pidió expresamente chequearlo antes de cambiar nada, y tenía razón: los mecanismos existen.
+
+| Sospecha | Qué se encontró |
+|---|---|
+| El armado cross-day infla las horas | El dato crudo sí (10 de 63 TAP = 262 h de 319 h), pero **el monitor y la productividad ya lo cortan**: `computeClosureDur` reconstruye el tramo por jornada con la fichada real, y `vista_productividad_diaria` exige mismo día (`valido`), capea TAP a 180 min / TP a 120 (`cap_min`), descarta ritmo absurdo (`ritmo_roto`) y mergea intervalos solapados. Problema 346, bajado a severidad baja: lo que queda es que **una consulta SQL nueva que reste `ts_cliente - ts_inicio` a mano da números irreales.** |
+| El reloj de los celulares está mal | **No.** Los 79 casos de `ts_cliente` por delante de `created_at` son **todos** de códigos con `client_id` determinístico (PKC, FJ, CCN, PSP, CRN…): al re-confirmar un artículo el upsert actualiza `ts_cliente` y deja el `created_at` del primer insert. En los códigos **sin** upsert: **0 de 1.184**. Un solo retraso real (EPX del 15/09, 2 h 48 en la cola offline). ⚠ Corolario: **"Llegó al server" es un dato falso para esos códigos** — problema 351. |
+| El legajo 600 no existe | Existe **por diseño**: es el legajo compartido de **entrevistas** (v14.62, `INTERVIEW_LEGAJO`, `es_legajo_entrevista()`). Lo que sí queda abierto es que **no se excluye de las métricas**: `es_legajo_test()` sólo conoce 0 y 1, así que el picking del candidato del 10/09 figura en `vista_productividad_diaria`. Problema 350. |
+| Tandas fantasma | 3 de 200: `E01G` y `E09B` se **deshicieron a propósito** (`gv_tandas_deshechas`); sólo **D66G** (23 eventos, lg277, 08/09) no tiene registro de anulación. Sólo el **6 %** de las horas cae en tanda sin m³. |
+
+### Lo que sigue abierto
+
+- **Problema 349** — el **tiempo muerto corre adentro del picking y del armado**: 9,4 h de
+  PC/PB/AT/Limp caen dentro de un TP/TAP abierto (6,5 h en 21 armados, 2,9 h en 12 pickings).
+  `PC` está en `ALWAYS_ALLOWED_CODES`, así que el reloj del armado sigue corriendo al mediodía,
+  todos los días con todos. `vista_productividad_diaria` **no** lo resta (mergea solapes del mismo
+  código, no descuenta el tiempo muerto). Restarlo es un cambio de **backend** y **mueve los m³/h
+  que el supervisor mira** (para arriba), así que se decide antes de aplicarlo.
+- **Problema 348** — cerrar una fase a mano en la base no limpia el celular: `lg237/E09A` se cerró
+  por SQL el 09/09 (`client_id = cierre_manual_e09a_20260909`) y el operario lo volvió a cerrar el
+  10/09 con el **mismo `ts_inicio`**. `tandaChipSeguir` re-siembra `st.armado` desde el AP que
+  sigue en el server. Es el único `ts_inicio` cerrado dos veces en toda la ventana.
+
+**Test:** `tests/hora-24h-renglon.cjs` (23 aserciones), registrado en `tests/run.sh`. Como en
+Chromium el bug de la hora **no se reproduce**, el test además chequea que `hour12:false` esté
+fijado **en la implementación** — eso es lo que protege de la regresión.
+
 ## Nota v19.01 (2026-09-16) — Facturación: la NP armada SIN tanda perdía cliente y código
 
 Thomas: *"el cliente 4181 de LK no tiene razón social en el módulo de facturación, ¿por qué?"*
