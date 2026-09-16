@@ -514,3 +514,6 @@ PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node te
 
 echo "== fac-np-modificada (v18.29: el badge MOD en la columna NP de Facturación) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/fac-np-modificada.cjs
+
+echo "== fac-cliente-nuevo (v18.77: el badge «Cliente nuevo» al lado de la razón social, por empresa+cod) =="
+PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/fac-cliente-nuevo.cjs

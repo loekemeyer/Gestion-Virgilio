@@ -1608,6 +1608,21 @@ Pedido de Luis. Dos cosas:
 > SQL y rollback: `sql/gv_clientes_nuevos_v1712.sql` · §3.ek de `docs/SUPABASE-GESTION-VIRGILIO.md` ·
 > test `tests/apr-cuarentena.cjs`.
 >
+> Nota **v18.77 (2026-09-16, Luis) — el mismo badge 🆕 Cliente nuevo, ahora también en FACTURACIÓN**,
+> al lado de la razón social. **Misma regla y MISMA FUENTE** que acá arriba: se lee la tabla
+> `GV_Clientes_Nuevos`, no se recalcula nada, así las dos pantallas no pueden decir cosas distintas
+> del mismo cliente. La lógica ya estaba desde la v17.12 y no se tocó: lo que faltaba era el
+> **permiso de lectura**. A Programar la lee por las RPC de Cuarentena (`SECURITY DEFINER`, saltean
+> la RLS), pero Facturación arma su lista con lecturas REST con la **anon key**, y la tabla tenía
+> RLS con una sola policy — la de escritura de `lk_ppp_reader` —, así que `anon` veía **0 filas** y
+> el badge nunca aparecía. Se agregó `GV_Clientes_Nuevos_lectura` (select para anon/authenticated);
+> escribir sigue siendo sólo de LK. El front (`facNuevosCargar` / `facNuevoBadge`, cache 5 min) es
+> **best-effort**: si la lectura falla no se pinta nada y la lista queda como antes. ⚠ La clave es
+> **(empresa, cod)**, y la empresa sale de la NP (`pppEmpDeNp`: prefijo LK/CH en las web, > 90000 en
+> las de ISIS) — el mismo número de cliente es **otro cliente** en cada empresa.
+> `sql/gv_clientes_nuevos_badge_facturacion_v1877.sql` · §3.hu de `docs/SUPABASE-GESTION-VIRGILIO.md` ·
+> test `tests/fac-cliente-nuevo.cjs`.
+>
 > Nota **v16.97 (2026-09-14, Thomas) — AVANCE DEL DÍA: "85 % listo · 60 % armado" en la PPP, por
 > Telegram a las 16:00 y como tarea de Planify para Marianela.**
 > Pedido del dueño: *"a las cuatro de la tarde quiero que mande su mensaje por Telegram, y que también se
