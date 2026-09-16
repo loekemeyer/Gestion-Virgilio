@@ -20450,3 +20450,71 @@ Y quedan **213** funciones `SECURITY DEFINER` abiertas a `anon` en el resto del 
 una tanda propia: inventariar cuáles llama el front de verdad y cerrar el resto.
 
 **Archivo:** `sql/gv_conciliacion_grants_v1903.sql` (lleva el rollback adentro). Problema 353.
+
+## §3.ik — v19.06: barrido de grants — 61 RPC cerradas a `anon` — 2026-09-16
+
+**El problema (354).** Postgres otorga `EXECUTE` a **PUBLIC** en CADA función nueva, y `anon`
+hereda de PUBLIC. O sea que **toda RPC nace ejecutable con la clave pública** que está escrita
+en `index.html`. Al 16/09: **216 de 369** `SECURITY DEFINER` en `public`, y sólo **10** con
+algún chequeo de identidad adentro. Y al ser `SECURITY DEFINER` corren como `postgres`, o sea
+que además saltean la RLS.
+
+### ⚠ Por qué esto NO se puede barrer a lo bruto
+
+**Los operarios entran como `anon`.** Su sesión es por legajo (`vir_legajo_auth`, localStorage),
+no Google; sólo los supervisores son `authenticated`. Un revoke en masa deja a la planta sin
+picking, armado, carga ni recepción.
+
+### Cómo se decidió qué cerrar
+
+1. Cruce de los 216 nombres contra **todo el código** de 4 repos — 874 archivos `.js`/`.html`/
+   `.ts`/`.cjs`/`.json` de `Gestion-Virgilio`, `pagina-LK-copia`, `paginach` y
+   `produccion-virgilio` (clonado para esto). → **123 aparecen, 88 no**.
+2. Cruce contra las llamadas REST **reales** de `edge_logs`, **5 días** (11/09 → 16/09).
+3. Se cerró sólo lo que falla las dos pruebas **y** entra en una categoría demostrable.
+
+### ⚠ Las cuatro cosas que la medición atajó, y que un barrido "obvio" habría roto
+
+| | |
+|---|---|
+| **`es_supervisor_virgilio`** | No está en el código ni en los logs — **pero la usan las policies de RLS** de `storage.objects` (buckets `isis-lk`/`isis-ch`). Revocarla dejaba a los supervisores sin las facturas. |
+| **`wa_dashboard_rango`, `wa_pipeline_log_reciente`** | 0 llamadas en 2 días… y **sí el 11/09**. Hay una pantalla que nadie abrió en la ventana corta. Por eso la ventana se estiró a 5 días: **dos días no alcanzan para decir "no se usa"**. |
+| **`validar_login`, `fichadaqr_ficho_hoy`, `cp_*`** | `sql/hardening_seguridad_20260828.sql` ya documentaba que son de **apps EXTERNAS** (login, FichadaQR, portal de proveedores) que entran como anon. |
+| **`planify_*`** | **Planify es un repo PRIVADO** que esta sesión no puede clonar, y varias `planify_recruit_*` sí figuran en los logs. Las 9 que no figuran quedan abiertas: sin leer ese front, "no aparece" no prueba nada. |
+
+La consulta que caza la primera, y que conviene correr **antes** de cualquier revoke:
+
+```sql
+select p.proname from pg_policy pol
+  cross join lateral (select pg_get_expr(pol.polqual, pol.polrelid) || ' ' ||
+                             coalesce(pg_get_expr(pol.polwithcheck, pol.polrelid),'') as txt) e
+  join pg_proc p on p.pronamespace = 'public'::regnamespace
+   and e.txt ~* ('\m' || p.proname || '\s*\(');
+```
+
+### Lo que se cerró: 61, en tres tandas
+
+| | Qué | Por qué es seguro |
+|---|---|---|
+| **A** | **24** funciones de **trigger** | Postgres **no chequea `EXECUTE`** para dispararlas y no se pueden llamar como RPC (devuelven `trigger`): el grant no hacía nada. **Probado**: un `INSERT` en `Movimientos_Stock` **como anon**, dentro de una transacción abortada, pasó sin "permission denied" → el trigger corrió. |
+| **B** | **10** que sólo dispara un cron + **8** helpers `wa_sim_*` de simulación | Los 12 crons corren como **`postgres`** (verificado en `cron.job.username`). **Probado**: `select public.simular_ocs_automaticas()` sigue andando. |
+| **C** | **18** sin **una sola** referencia en el código ni **una sola** llamada en 5 días | — |
+
+### Verificado después, como `anon` (que es como entra el operario)
+
+`gv_ppp_prog_arbol` · `gv_es_dia_habil` · `gv_ppp_atrasados` · `gv_importados_pedidos_curso` ·
+`gv_imp_cargas` → las cinco contestan igual. `select * from public.gv_endpoints_rotos;` → vacío.
+Vistas sin `security_invoker` legibles por anon → vacío.
+
+**216 → 155.**
+
+### Lo que queda
+
+- **155 abiertas**, la mayoría en uso real. Cerrarlas de verdad no es un `revoke`: es meterles
+  el chequeo de identidad adentro, y para eso hay que saber **quién** puede llamar cada una.
+- **El schema `GP2` no se tocó.** Sus bundles (`inicio_bundle`, `tablet_bundle`, `oc_bundle`,
+  `recepcion_bundle`…) son `SECURITY DEFINER` y también están abiertos a `anon`. Otra tanda.
+- Para avanzar con las 9 de Planify hace falta **acceso al repo `loekemeyer/Planify`**.
+
+**Archivo:** `sql/gv_grants_anon_barrido_v1906.sql` (lleva el rollback y los chequeos).
+Problema 354, queda **en curso**.
