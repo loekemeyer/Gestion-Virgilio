@@ -15,6 +15,13 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
 (async () => {
   const b = await chromium.launch(); const p = await b.newPage();
   const errs = []; p.on("pageerror", (e) => errs.push(e.message));
+  /* v18.72 — este test ejecuta `send()`, que reserva la tanda contra Supabase. Sin este corte
+     la corrida ESCRIBE EN LA BASE REAL: el 15/09 dejó dos locks del legajo de prueba 999
+     (C72F/picking y D11X/armado) que, con el lock sin TTL de la v18.65, bloqueaban esas dos
+     tandas para los operarios de verdad. Antes se limpiaban solos a las 10 h y por eso nadie
+     lo había notado. Abortar la red deja a `tandaReservar` fallando ABIERTO, que es su
+     comportamiento sin conexión y no cambia lo que este test mide. */
+  await p.route("**/*.supabase.co/**", (r) => r.abort());
   await p.goto("file://" + path.join(__dirname, "..", "index.html"), { waitUntil: "domcontentloaded" });
   const r = await p.evaluate(async () => {
     const out = {}; const alerts = [];

@@ -81,6 +81,9 @@ node tests/anular-picking-fantasma.cjs
 echo "== monitor-abandonado (v18.71: el monitor no cuenta horas de quien ya fichó salida) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/monitor-abandonado.cjs
 
+echo "== tests-no-escriben-en-prod (v18.72: ningún test puede escribir en la base real) =="
+node tests/tests-no-escriben-en-prod.cjs
+
 echo "== fac-cuelgue (regresión: Facturación no queda en «Cargando tandas…» para siempre — timeout + cartel con motivo) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/fac-cuelgue.cjs
 

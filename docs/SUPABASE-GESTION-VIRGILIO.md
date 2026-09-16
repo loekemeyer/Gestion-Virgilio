@@ -18333,3 +18333,68 @@ Se hizo a las 8:30, con los operarios ya adentro pero **antes del primer picking
 tocó.
 
 `sql/gv_tanda_status_y_anular_v1871.sql` · `tests/monitor-abandonado.cjs`
+
+---
+
+## §3.hp — v18.72: el armado anulado tampoco revive — y dos cosas que salieron a la luz — 2026-09-16
+
+### 1. `AP` → `APX`, igual que el picking
+
+Mismo arreglo que la v18.71: borrar la fila libera su `client_id`, que es justo lo que impide
+que el reenvío de la cola offline vuelva a insertar el evento. Con `APX` la fila conserva el
+client_id, el reenvío choca y se descarta, y ningún consumidor la cuenta (todos filtran
+`opcion = 'AP'` por igualdad exacta).
+
+### 2. ⚠ Soltaba el lock EQUIVOCADO — bug propio de la v18.65
+
+`anular_armado_virgilio` llamaba a `tanda_liberar`, que borra de la tabla **vieja**
+`Tandas_Lock`. Desde que el lock por etapas vive en `GV_Tandas_Lock`, anular un armado **no lo
+soltaba**: la tanda quedaba `tomada` para siempre y nadie más podía agarrarla.
+
+En el camino feliz no se notaba porque el front llama aparte a `gv_tanda_lock_anular`. Pero si
+esa llamada no llegaba —sin red, la pestaña cerrada, el operario que sale de la app justo ahí—
+el lock quedaba colgado **sin forma de soltarlo**, porque ya no hay TTL que lo limpie. Ahora la
+RPC suelta los dos.
+
+**Prueba del ciclo completo** (tanda ZZ77Z, todo borrado después):
+
+```
+1. entra el AP y se reserva ................ lock 'tomada'
+2. anular_armado_virgilio(...) ............. 'ok'
+3. el celular REENVÍA el AP ................ opcion APX · AP vivos: 0
+                                             lock: (libre)   ← antes quedaba 'tomada' para siempre
+                                             GV_Tanda_Anulada: 1
+```
+
+### 3. ⚠⚠ Y lo más importante: la SUITE estaba escribiendo en la base real
+
+Al revisar el estado del lock esta mañana aparecieron **tres** tandas `tomada` con una sola
+apertura real del día. Las otras dos eran del legajo de prueba **999**, creadas el 15/09 18:00,
+sin ningún `EP`/`AP` detrás:
+
+```
+D11X / armado  / 999 / 15-09 18:00   ← sin apertura real
+C72F / picking / 999 / 15-09 18:00   ← sin apertura real, y la tanda YA tenía TP
+```
+
+Salen de `tests/ap-resume.cjs`, que ejecuta `send()` y **no mockeaba `fetch`**: los tests corren
+sobre `file://index.html` con la anon key adentro y el contenedor tiene red a Supabase, así que
+`tandaReservar` pegaba contra **producción**.
+
+**Eso ya pasaba antes** — pero el TTL de 10 h borraba el lock solo y nadie lo veía. Al sacarlo
+(v18.65), cada corrida de la suite dejaba locks que **bloqueaban tandas reales para los
+operarios**. C72F y D11X estuvieron trabadas toda la mañana.
+
+Arreglado en dos niveles:
+
+- los **6 tests** que ejecutan `send()` sin cortar la red (`ap-resume`, `dos-en-curso`,
+  `ep-ppp-warn`, `send-prueba-nobloquea`, `tanda-sin-articulos`, `tap-sin-completar`) llevan
+  ahora `await p.route("**/*.supabase.co/**", (r) => r.abort())`. `tandaReservar` falla ABIERTO,
+  que es su comportamiento sin conexión, así que no cambia lo que miden;
+- y un guard nuevo, `tests/tests-no-escriben-en-prod.cjs`, que **falla si aparece un test que
+  dispara escrituras y no corta nada**. Sin eso, el próximo test que llame a `send()` vuelve a
+  caer en lo mismo.
+
+Los dos locks basura se borraron (backup en `zz_backups."GV_Backup_Locks_999_20260916"`).
+
+`sql/anular_armado_virgilio_v1872.sql`
