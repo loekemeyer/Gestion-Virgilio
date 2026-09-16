@@ -19156,3 +19156,51 @@ así que el precio aparece solo bajo el código nuevo.
 copiar el uni por bulto del original, así que o el 24 es lo correcto (la impo nueva viene x24 y
 hay que corregir `OC_Maximos` y la web) o es un error de carga. **No se tocó**: es dato de
 compra, lo define él.
+
+---
+
+## §3.hz — v18.85: los códigos E de Chef van TODOS x12, y el SQL de la página queda en su repo — 2026-09-16
+
+**Thomas, 16/09: *"todos van a ir x12"***. Cierra la duda que había quedado abierta en §3.hy:
+`Articulos_Cajas` tenía `631E`, `634E`, `635E` y `636E` cargados en **24** mientras `OC_Maximos`,
+la página de Chef y los originales sin E decían **12**. Se corrigieron los cuatro a 12 (`630E`
+ya estaba bien).
+
+```sql
+-- backup primero (protocolo), con RLS en el mismo paso
+create table zz_backups."GV_Backup_Articulos_Cajas_E_Chef_20260916" as
+  select * from public."Articulos_Cajas" where "Cod_Art" in ('630E','631E','634E','635E','636E');
+alter table zz_backups."GV_Backup_Articulos_Cajas_E_Chef_20260916" enable row level security;
+revoke insert, update, delete, truncate on zz_backups."GV_Backup_Articulos_Cajas_E_Chef_20260916"
+  from anon, authenticated;
+-- guardado por la PK real de la tabla (`id`), no por Cod_Art:
+--   466 635E · 467 630E(12) · 468 631E · 469 634E · 470 636E
+
+update public."Articulos_Cajas" set "Uni_x_Caja" = 12
+ where id in (468,469,466,470) and "Cod_Art" in ('631E','634E','635E','636E');
+-- 4 filas
+```
+
+**Rollback:** `update public."Articulos_Cajas" a set "Uni_x_Caja" = b."Uni_x_Caja" from
+zz_backups."GV_Backup_Articulos_Cajas_E_Chef_20260916" b where b.id = a.id;`
+
+Queda todo diciendo lo mismo: **12 unidades por bulto** en `Articulos_Cajas`, `OC_Maximos` y
+`products` de la página de Chef.
+
+### El repo de la página de Chef está clonado en esta sesión
+
+`loekemeyer/paginach` → `/home/user/paginach` (`add_repo` + clone). Sirvió para confirmar dos
+cosas y dejar el SQL donde va:
+
+- **El catálogo no está en el código**: `config.js` sólo trae la URL y la *publishable* key, y
+  no hay ningún `630`/`631` hardcodeado. Los productos viven en la base, así que el cambio es
+  un `UPDATE`, no un commit.
+- **Su `CLAUDE.md` ya tiene los cuatro bloques de reglas** (Planify, "no preguntar", auditoría
+  de problemas, copias de respaldo sin RLS), así que no hubo que propagar nada.
+- El SQL quedó versionado también allá: **`paginach/sql/codigos_e_630_631_v20260916.sql`**
+  (commit `decbb88`), gemelo de `sql/chef_pagina_codigos_e_v1884.sql` de este repo.
+
+**Sigue sin poder aplicarse desde acá.** El proyecto `nkhzocgdpwtgrmwleihr` no está en el MCP de
+esta cuenta; el FDW `chef_db` de LK entra como `loke_reader` (sólo lectura) y escribir por REST
+con la publishable key no es camino (la RLS del catálogo es de admin, y no corresponde). Lo
+aprieta Thomas en el SQL Editor de Chef, o se habilita ese proyecto en el MCP y lo corro yo.

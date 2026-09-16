@@ -2,6 +2,9 @@
 -- Pedido de Thomas: "en el programa GV que ya estén, y corregir en Página CH.
 --                    salvo los que tengamos stock hoy sin la E"
 --
+-- 📄 GEMELO en el repo de la página: `paginach/sql/codigos_e_630_631_v20260916.sql`
+-- (mismo contenido; se dejó también allá porque es donde vive el SQL de ese proyecto).
+--
 -- ⚠ ESTE ARCHIVO NO SE CORRIÓ. Va ejecutado a mano en el SQL Editor del proyecto
 -- Supabase de CHEF (nkhzocgdpwtgrmwleihr), que NO está en el MCP de esta cuenta.
 -- (El FDW `chef_db` de LK entra como `loke_reader`, o sea SOLO LECTURA: el UPDATE
@@ -26,6 +29,10 @@
 --        + coalesce(racks_ch,0)+coalesce(para_envasar,0) total
 --     from public.vista_saldos_stock
 --    where upper(btrim(cod_art)) in ('634','635','636');
+--
+-- El bulto NO cambia: **todos van x12** (Thomas, 16/09). Ya es lo que dice `uxb` en la
+-- página, `OC_Maximos`, y ahora también `Articulos_Cajas` (los 631E/634E/635E/636E estaban
+-- cargados en 24 y se corrigieron — ver §3.hz de docs/SUPABASE-GESTION-VIRGILIO.md).
 --
 -- ── Por qué RENOMBRAR y no crear un producto nuevo ────────────────────────────
 -- Es el mismo artículo con otro código. `order_items` de la página referencia
