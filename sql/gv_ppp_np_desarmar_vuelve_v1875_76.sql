@@ -51,6 +51,31 @@
    La intención queda registrada en `GV_Desarmes.vuelve`, para que dentro de un mes se pueda
    saber si aquel desarme fue un error nuestro o una cancelación.
 
+
+   ─────────────────────────────────────────────────────────────────────────────────────────
+   v18.76 — Y EL QUE VUELVE NO PUEDE VOLVER A CAER EN UNA TANDA SOLO
+   ─────────────────────────────────────────────────────────────────────────────────────────
+   La v18.75 devolvía el pedido a «A Programar»… y el cron de zonas automáticas lo agarraba de
+   nuevo en la corrida siguiente. **Medido: 18 minutos.** LK 1364 se destrabó a las 09:17 y a
+   las 09:35:15 ya estaba en la tanda E26C con entrega 22/09, sin que nadie lo tocara.
+
+   Luis, 16/09: *"los pedidos que se desarman o se mandan de vuelta «a programar» no deberían
+   volver a tandas automáticamente (tenés que marcarlos con excepción del cron)"*.
+
+   El mecanismo YA EXISTÍA y el automático ya lo respeta: `GV_PPP_Web_Retenido`, que escribe el
+   botón ↩ «Enviar a programar» (`gv_ppp_web_desprogramar`) y que `gv_ppp_web_armar_pendientes`
+   filtra al principio. Su propio comentario dice por qué existe: *"sin esto el cron lo
+   reprograma solo en la corrida siguiente y el botón no sirve de nada: es lo que avisó Luis al
+   pedirlo"*. O sea que el pedido ya se había hecho una vez, para el otro camino.
+
+   Lo que hacía el desarme era **exactamente lo contrario**: `delete from GV_PPP_Web_Retenido`.
+   Liberaba la retención, y el cron entraba. Ahora, con `p_vuelve = true`, **retiene** —misma
+   fila, mismos campos que el botón ↩, con `tanda_previa` para no re-pickear— y el pedido queda
+   en A Programar hasta que alguien lo programe a mano. Con `p_vuelve = false` (cancelado) el
+   `delete` se mantiene: ahí el pedido sale por `GV_Web_Cancelados` y la retención no hace falta.
+
+   ⚠ El `insert` va ANTES del `update` que pone `tanda = null`: `tanda_previa` se lee de esa fila.
+
    ROLLBACK
    --------
    Volver a la v17.90: re-aplicar la definición anterior (está en el historial de
@@ -201,17 +226,46 @@ begin
          había una de un desarme anterior, se BORRA: sin esto, "vuelve" no podría deshacer un
          "no vuelve" previo y el pedido seguiría escondido. */
       delete from public."GV_Web_Cancelados" c where c.empresa = v_emp and c.order_id = v_oid;
+      /* v18.76 — y se RETIENE, para que el cron de zonas automáticas no lo vuelva a armar solo.
+         Antes acá había un `delete` de esta misma tabla: liberaba la retención y el automático
+         lo agarraba en la corrida siguiente (18 minutos, medido, con LK 1364). Es la misma fila
+         y los mismos campos que escribe el botón ↩ «Enviar a programar», `tanda_previa`
+         incluido, así que al reprogramarlo a mano vuelve a SU tanda y no se re-pickea.
+         ⚠ Va ANTES del `update` de abajo: `tanda_previa` se lee de esa fila. */
+      insert into public."GV_PPP_Web_Retenido" as t
+        (empresa, order_id, np_idx, np, tanda_previa, fecha_previa, ya_pickeada, ya_armada, motivo, por)
+      select w.empresa, w.order_id, w.np_idx, w.np,
+             nullif(btrim(w.tanda), ''), w.fecha_entrega,
+             exists (select 1 from public."Registros_Produccion_Virgilio" r
+                      where r.opcion in ('EP','TP')
+                        and upper(btrim(split_part(r.texto,'|',1))) = upper(btrim(w.tanda))
+                        and not public.es_legajo_test(r.legajo)),
+             exists (select 1 from public."Registros_Produccion_Virgilio" r
+                      where r.opcion in ('AP','TAP')
+                        and upper(btrim(split_part(r.texto,'|',1))) = upper(btrim(w.tanda))
+                        and not public.es_legajo_test(r.legajo)),
+             'desarmado: ' || v_just, nullif(btrim(p_por), '')
+        from public."PPP_Web_Programacion" w
+       where w.empresa = v_emp and w.np = v_num
+         and coalesce(nullif(btrim(w.tanda), ''), '') <> ''
+      on conflict (empresa, order_id, np_idx) do update
+         set tanda_previa = coalesce(excluded.tanda_previa, t.tanda_previa),
+             fecha_previa = coalesce(excluded.fecha_previa, t.fecha_previa),
+             ya_pickeada  = excluded.ya_pickeada or t.ya_pickeada,
+             ya_armada    = excluded.ya_armada   or t.ya_armada,
+             motivo = excluded.motivo, por = excluded.por, creado_at = now();
     else
       insert into public."GV_Web_Cancelados" (empresa, order_id, np_label, motivo, por)
       values (v_emp, v_oid, v_np, 'desarmado: ' || v_just, nullif(btrim(p_por),''))
       on conflict (empresa, order_id) do update
          set motivo = excluded.motivo, por = excluded.por, np_label = excluded.np_label, creado_at = now();
+      /* cancelado: el pedido sale por GV_Web_Cancelados, la retención no hace falta. */
+      delete from public."GV_PPP_Web_Retenido" t where t.empresa = v_emp and t.order_id = v_oid;
     end if;
     update public."PPP_Web_Programacion" w
        set tanda = null, fecha_entrega = null, actualizado_at = now()
      where w.empresa = v_emp and w.np = v_num;
     get diagnostics v_n = row_count;
-    delete from public."GV_PPP_Web_Retenido" t where t.empresa = v_emp and t.order_id = v_oid;
   end if;
 
   insert into public."GV_Desarmes"
@@ -224,7 +278,7 @@ begin
   return query select v_np, v_isis, v_tanda, v_arts, v_cajas,
     (v_arts || ' articulo' || case when v_arts = 1 then '' else 's' end || ' · ' || v_cajas
      || ' caja' || case when v_cajas = 1 then '' else 's' end || ' pasaron a A GUARDAR'
-     || case when v_vuelve then ' · el pedido VUELVE a A Programar'
+     || case when v_vuelve then ' · vuelve a A Programar y el automatico NO lo va a tomar'
              else ' · el pedido NO vuelve' end)::text;
 end;
 $function$;

@@ -18575,3 +18575,60 @@ Backup en `zz_backups."GV_Backup_Web_Cancelados_1364_20260916"`. Comprobado desp
 `insert … where not exists` por `(empresa, order_id, np_idx)`, así que conserva LK 0034 / LK 0035.
 
 Problema 325. `sql/gv_ppp_np_desarmar_vuelve_v1874.sql`, `tests/desarmar-vuelve.cjs`.
+
+---
+
+## §3.ht — v18.76: el que vuelve a A Programar no puede caer en una tanda solo — 2026-09-16
+
+La v18.75 devolvía el pedido a «Pedidos a programar»… y el cron de zonas automáticas lo agarraba
+de nuevo. **Medido: 18 minutos.** LK 1364 se destrabó a las 09:17 y a las **09:35:15** ya estaba
+en la tanda **E26C** con entrega 22/09, sin que nadie lo tocara. Luis lo fue a buscar a A
+Programar y no estaba — otra vez.
+
+Luis, textual: *"los pedidos que se desarman o se mandan de vuelta «a programar» no deberían
+volver a tandas automáticamente (tenés que marcarlos con excepción del cron)"*.
+
+### El mecanismo ya existía, y el desarme hacía lo contrario
+
+`GV_PPP_Web_Retenido` es exactamente esa excepción: la escribe el botón ↩ «Enviar a programar»
+(`gv_ppp_web_desprogramar`) y `gv_ppp_web_armar_pendientes` la filtra **al principio**, antes de
+cualquier otra cosa. Su propio comentario dice por qué existe:
+
+> *"sin esto el cron de las zonas 1-3 (jobs 71 y 73) lo reprograma solo en la corrida siguiente
+> y el botón no sirve de nada: es lo que avisó Luis al pedirlo"*
+
+O sea: el pedido ya se había hecho una vez, para el otro camino. Lo que hacía el desarme era
+**`delete from GV_PPP_Web_Retenido`** — liberaba la retención y le abría la puerta al cron.
+
+Ahora, con `p_vuelve = true`, **retiene**: la misma fila y los mismos campos que el botón ↩,
+`tanda_previa` incluido, así que al reprogramarlo a mano vuelve a SU tanda y no se re-pickea.
+Con `p_vuelve = false` (cancelado) el `delete` se mantiene: ahí el pedido sale por
+`GV_Web_Cancelados` y la retención no hace falta.
+
+⚠ El `insert` va **antes** del `update` que pone `tanda = null`: `tanda_previa` se lee de esa fila.
+
+### El dato
+
+LK 1364 se devolvió con la vía que ya existe y retiene —`gv_ppp_web_desprogramar`, la del botón
+↩— en vez de a mano. Queda:
+
+| NP | tanda | retenido |
+|---|---|---|
+| LK 0034 | (sin tanda) | **sí**, `tanda_previa = E26C` |
+| LK 0035 | (sin tanda) | **sí**, `tanda_previa = E26C` |
+
+Backup del estado con la tanda E26C en `zz_backups."GV_Backup_Prog_1364_20260916b"`.
+
+**Barrido de los demás**: los únicos desarmes web son los de LK 1364 y LK 1375. El de LK 1375
+figura "no retenido" y **está bien así**: fue cancelado por el cliente, así que lo que lo
+mantiene afuera es `GV_Web_Cancelados` (`gv_pedidos_web_excluidos` sigue devolviendo `anulado`
+para él, verificado). Ningún otro pedido quedó expuesto.
+
+### Por qué al 22/09 y no antes
+
+No fue el cupo: el jueves 17 tenía 3,21 de 6 m³ y este pedido son 0,308. Es la **anticipación
+mínima de 4 días hábiles** (`PPP_Web_Config.dias_anticipacion_min = 4`):
+`gv_ppp_web_dia_minimo()` devolvía **2026-09-22**. El automático no podía ponerlo antes.
+
+El archivo del repo (`sql/gv_ppp_np_desarmar_vuelve_v1875_76.sql`) se verificó contra la base:
+md5 del cuerpo normalizado **idéntico** al de `pg_get_functiondef`.
