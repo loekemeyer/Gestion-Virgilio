@@ -13,19 +13,15 @@
 > mismo md5 y las 142 NP con la misma firma. comparar 2.143 → 90 ms · motivo → 31 ms · lista 920 ms.
 > Problema 335, cerrado.
 >
-> **✅ RESUELTO el mismo día (v19.03, §3.ii, problema 353).** Las RPC de Conciliación tenían
-> `EXECUTE` para **`anon`** desde antes de esta tanda: con la clave que está en `index.html`,
-> cualquiera leía las 143 filas con razón social y montos. Thomas lo aprobó y se cerraron **las
-> 6** (`lista`, `comparar`, `motivo`, `detalle`, `totales` y `registrar`, que además escribe).
-> Antes de tocar se verificó que no la llama ningún cron, función, vista, Edge Function ni los
-> repos de LK, Chef y Producción — sólo `index.html` —, y que la pantalla ya entra con sesión de
-> Google (el sign de `isis-lk` da 200, y ese endpoint exige `authenticated` + supervisor).
+> **⛔ Los grants de `anon` se tocaron y se REVIRTIERON el mismo día (2026-09-16).** Se habían
+> cerrado las 6 RPC de Conciliación (v19.03) y 61 más en un barrido (v19.06). Thomas: *"volvé
+> para atrás, no había que borrar nada"* → **todo restituido** y probado llamando las RPC como
+> `anon`. La base quedó igual que antes: **222** `SECURITY DEFINER` alcanzables por `anon`.
 >
-> **Lo que queda de esto es una tanda propia, no un pendiente de Thomas:** son **213** funciones
-> `SECURITY DEFINER` más, abiertas a `anon` por el default de Postgres. Hay que inventariar
-> cuáles llama el front de verdad y cerrar el resto. Y el cierre fuerte de Conciliación sería el
-> guard `es_supervisor_virgilio()` **adentro** de cada función: hoy `authenticated` es cualquiera
-> con sesión de Google, no sólo un supervisor.
+> **Lo que sigue siendo cierto, y quedó medido** (§3.ii y §3.ik, por si algún día se retoma):
+> con la clave que está en `index.html` se leen las 143 filas de Conciliación con razón social
+> y montos; el PDF no, que ése está cerrado. Y no es del módulo: es el default de Postgres
+> (`EXECUTE` a PUBLIC en cada función nueva). **Decisión del dueño: no se toca.**
 
 > **2026-09-16 (v18.90) — CANCELAR un pedido desde Facturación (pedido de Thomas).**
 > Botón **✕ Cancelar** en cada fila de Facturación, con pop-up de motivo (**Falta stock** / **Otro**

@@ -1,3 +1,68 @@
+## Nota v19.07 (2026-09-16) — El tiempo muerto se resta del picking y del armado
+
+Regla de Luis: *"suponete que arma por 1 hora, va al baño 10 minutos y después arma 50 min
+más (todo armado de 1 tanda). Debería ser 1 hora 50 min de armado y 10 de baño (cada uno
+contado individual)"*.
+
+> **el tiempo se RESTA del core y se SIGUE SUMANDO en su casillero** — no desaparece, cambia
+> de columna
+
+**⚠ Se creía implementado y no lo estaba.** Luis pidió verificarlo antes de tocar
+(*"pensábamos que ya estaba implementado esto"*) y tenía razón en dudar:
+
+| Dónde se creía que estaba | Qué hace de verdad |
+|---|---|
+| `DEAD_TIME_CODES` | Sólo **bloquea botones** mientras un tiempo muerto está abierto. No descuenta. |
+| `computeClosureDur` | Parte el cierre que **cruza el día**. No restaba. |
+| `vista_productividad_diaria` / `_semanal` | Mergean solapes del **mismo código** y **capean** la duración. Se parecen a netear y no lo son. |
+
+Y `PC` está en `ALWAYS_ALLOWED_CODES` (nunca bloquea), así que la media hora de comida corría
+adentro del armado todos los días con todos los operarios.
+
+Medido del 07/09 al 16/09: **21 de 55 armados (6,5 h)** y **12 de 64 pickings (2,9 h)** tenían
+tiempo muerto adentro. En 40 días el armado pasa de 210,9 h a 192,3 h.
+
+**Dónde vive.** Backend (fuente de verdad): las dos vistas de productividad, con los CTE
+`dead_raw`/`dead_isl`/`dead` + `muerto`. Front (duplicación de UX, como pide el protocolo):
+`computeClosureDur`, con `deadByLeg` + `deadOverlapMs`; el `breakdown` ahora lleva `brutoMs` y
+`muertoMs`. Cada intervalo muerto se recorta a su tope (PC 90 min, resto 30) y se **mergean
+antes de restar** (dos que se pisan descontarían de más).
+
+⚠ En el front sólo se netea lo que está en la consulta del día: en un cierre que **cruza el
+día**, el tiempo muerto del día de apertura no se resta.
+
+> ### ⚠⚠⚠ `LEAST` y `GREATEST` ignoran los NULL
+>
+> La primera versión restó **129,6 h de 210 h**. Con un `LEFT JOIN` sin match, `d.s`/`d.e`
+> son NULL y `least(c.me, NULL)` devuelve **`c.me`** → la resta daba la tanda **completa**.
+> El síntoma: el **100 %** de las tandas "afectadas" con `count(d.legajo) = 0` en las mismas
+> filas que restaban 25 minutos.
+>
+> 1. Si un `LEFT JOIN` alimenta un `LEAST`/`GREATEST`, el `case when … is null` es **parte del
+>    cálculo**, no una defensa.
+> 2. Una resta que afecta al **100 %** de las filas no está midiendo lo que parece: contar las
+>    filas afectadas, no sólo el total.
+
+**Y una fase ya cerrada no se cierra dos veces** (problema 348). Antes de emitir un TP/TAP se
+le pregunta al servidor si esa tanda ya figura terminada; si lo está, no se manda nada, se
+limpia `st.picking`/`st.armado` y la marca de "continúa mañana", y se avisa. Los guards que ya
+había miraban otras cosas —`_tapCerradoSesion` vive en memoria, `_compTandaYaArmada` pregunta
+por las Entregas del asistente— y **ninguno miraba lo único que un cierre manual por SQL sí
+deja: el evento TP/TAP**; el picking no tenía ningún guard. Va **antes** de pedir la ubicación
+y **falla ABIERTO**: sin red el cierre sale igual, porque perder un cierre es peor que
+duplicarlo.
+
+Decisión de Luis: el TAP duplicado de E09A **se deja como está** (no se toca el histórico);
+lo que se arregla es que no vuelva a pasar. Y el legajo **600** (entrevistas) sigue contando en
+productividad — *"dejalo ahí que no jode"*.
+
+**Chequeos:** el ejemplo del pedido a mano (lg8/D72A: 212,1 min con un PC de 40,5 → 171,6),
+ninguna resta de más (lg277 16/09: 7 de 8 pickings intactos), coincidencia con el conteo sin
+caps, `gv_endpoints_rotos` en 0 y ninguna vista sin `security_invoker`.
+`tests/muerto-neteado.cjs` (14 aserciones) reproduce el ejemplo textual: armado de 2 h con un
+baño de 10 min → **170 min de armado + 10 de baño aparte**.
+`sql/gv_productividad_muerto_neteado_v1907.sql` · rollback en `sql/backups/` · §3.il.
+
 ## Nota v19.02 (2026-09-16) — El Resumen del día se leía mal: reloj de 12 h, pares sin colapsar, RI/EI sin cerrar
 
 Luis trajo la foto del celular de un operario: el Resumen mostraba `PB — Paré Baño` **dos veces**
