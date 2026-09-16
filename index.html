@@ -3426,6 +3426,16 @@ tr.ppp-err-zona > td{ background:#fffbeb !important; }
 .dsm-isis{ margin-top:10px; padding:12px 14px; background:#fffbeb; border:1px solid #fcd34d;
   border-radius:10px; color:#92400e; font-size:14px; font-weight:700; line-height:1.45; }
 .dsm-lbl{ display:block; margin:16px 0 6px; font-weight:800; color:#0f172a; font-size:14px; }
+/* v18.74 - la eleccion "vuelve / no vuelve". Sin default a proposito: son consecuencias
+   opuestas y elegir mal deja el pedido de un cliente invisible (paso con LK 1364). */
+.dsm-vuelve{ display:flex; flex-direction:column; gap:8px; margin:2px 0 4px; }
+.dsm-vuelve label{ display:flex; gap:9px; align-items:flex-start; padding:10px 12px;
+  border:1px solid #cbd5e1; border-radius:10px; background:#f8fafc; cursor:pointer;
+  font-size:13.5px; line-height:1.35; color:#0f172a; }
+.dsm-vuelve label:hover{ background:#f1f5f9; }
+.dsm-vuelve input{ margin:2px 0 0; width:17px; height:17px; flex:0 0 auto; cursor:pointer; }
+.dsm-vuelve label:has(input:checked){ border-color:#0f766e; background:#f0fdfa;
+  box-shadow:0 0 0 2px rgba(15,118,110,.18); }
 #dsmJust{ width:100%; min-height:82px; padding:10px 12px; border:2px solid #cbd5e1; border-radius:10px;
   font-size:15px; font-family:inherit; resize:vertical; box-sizing:border-box; }
 #dsmJust:focus{ outline:none; border-color:#b91c1c; }
@@ -5612,7 +5622,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=18.74"></script>
+<script type="module" src="recepcion.js?v=18.75"></script>
 <!-- Config del módulo de fichada (compartido con fichada.html). El secret
      hmacSecret tiene que ser el mismo acá y allá; cargándolo desde un solo
      archivo evitamos que se desincronicen. -->
@@ -9195,7 +9205,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v18.74";
+const APP_VERSION = "v18.75";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -36855,7 +36865,7 @@ let _dsm = null;
 function dsmAbrir(np) {
   const n = String(np || "").trim(); if (!n) return;
   const r = (_pgaRows || []).find(function (x) { return String(x.np) === n; }) || {};
-  _dsm = { np: n, isis: !/^(LK|CH)\s*\d+/i.test(n), r: r, ocupado: false };
+  _dsm = { np: n, isis: !/^(LK|CH)\s*\d+/i.test(n), r: r, ocupado: false, vuelve: null };
   let m = document.getElementById("dsmModal");
   if (!m) { m = document.createElement("div"); m.id = "dsmModal"; document.body.appendChild(m); }
   m.hidden = false;
@@ -36867,7 +36877,7 @@ function dsmAbrir(np) {
       '<div class="dsm-cli">' + escapeHtml(r.razon_social || "—") + (r.cod ? ' (' + escapeHtml((r.empresa || "LK") + " " + r.cod) + ')' : '') + '</div>' +
       '<div class="dsm-sub">' + (r.fecha ? aprDiaCorto(r.fecha) + ' · ' : '') + _pppFmtM3(r.m3) + ' m³</div>' +
       '<div class="dsm-list"><b>Qué va a pasar:</b><br>' +
-        '• El pedido <b>sale de la PPP</b> y no vuelve a entrar.<br>' +
+        '• El pedido <b>sale de la PPP</b> y su tanda queda deshecha.<br>' +
         '• Las cajas que ya se pickearon o se armaron pasan a <b>📥 A guardar</b>, y un operario las guarda como cualquier mercadería a guardar.<br>' +
         '• Queda guardado el registro de lo que el cliente había pedido, con tu justificativo.<br>' +
         '• <b>El pedido NO se borra de la página</b>: el cliente lo sigue teniendo.</div>' +
@@ -36875,6 +36885,20 @@ function dsmAbrir(np) {
       // v17.90: una NP ya facturada no tiene stock parado — salió del circuito al facturarse.
       // El desarme la saca igual de la PPP, pero no devuelve cajas, y eso hay que decirlo antes.
       (r.estado === "facturado" ? '<div class="dsm-isis">🧾 Esta NP <b>ya está facturada</b>: las cajas salieron del stock al facturarse, así que el desarme <b>no devuelve ninguna</b>. Si hay que deshacer la factura, es en ISIS.</div>' : '') +
+      /* v18.74 — DESARMAR servía para dos cosas distintas y nadie las había separado, así que
+         las dos terminaban anulando el pedido: quedaba sin tanda y a la vez excluido para
+         siempre de A Programar, o sea invisible. Pasó con LK 1364 (Mitre), desarmada el 15/09
+         porque el picking mostraba la lista recortada — un error NUESTRO, con el pedido del
+         cliente vivo. Ahora hay que elegir, y no hay default: son consecuencias opuestas. */
+      '<div class="dsm-lbl">¿Qué pasa con el pedido? (obligatorio)</div>' +
+      '<div class="dsm-vuelve">' +
+        '<label><input type="radio" name="dsmVuelve" value="si" onchange="dsmVuelveSet(true)"> ' +
+          '<b>Vuelve a «Pedidos a programar»</b> — fue un error nuestro; el cliente lo sigue esperando ' +
+          'y hay que volver a hacerlo.</label>' +
+        '<label><input type="radio" name="dsmVuelve" value="no" onchange="dsmVuelveSet(false)"> ' +
+          '<b>NO vuelve</b> — el pedido se cancela (lo canceló el cliente, se duplicó, etc.). ' +
+          'No lo va a tomar nadie más.</label>' +
+      '</div>' +
       '<label class="dsm-lbl" for="dsmJust">Justificativo (obligatorio) — queda guardado con el registro</label>' +
       '<textarea id="dsmJust" placeholder="Por qué se desarma este pedido" oninput="dsmChk()"></textarea>' +
       '<div class="dsm-hint" id="dsmHint">Escribí al menos 10 caracteres.</div>' +
@@ -36886,12 +36910,26 @@ function dsmAbrir(np) {
   try { document.getElementById("dsmJust").focus(); } catch (_e) {}
 }
 function dsmCerrar() { const m = document.getElementById("dsmModal"); if (m) { m.hidden = true; m.innerHTML = ""; } _dsm = null; }
+/* v18.74 — guardar la elección y refrescar el botón. Sin elegir, no se desarma nada. */
+function dsmVuelveSet(v) { if (_dsm) _dsm.vuelve = !!v; dsmChk(); }
 function dsmChk() {
   const t = (document.getElementById("dsmJust") || {}).value || "";
-  const ok = t.trim().length >= 10;
-  const b = document.getElementById("dsmOk"); if (b) b.disabled = !ok || !!(_dsm && _dsm.ocupado);
+  const okTxt = t.trim().length >= 10;
+  const okSel = !!(_dsm && _dsm.vuelve !== null && _dsm.vuelve !== undefined);
+  const b = document.getElementById("dsmOk");
+  if (b) {
+    b.disabled = !okTxt || !okSel || !!(_dsm && _dsm.ocupado);
+    // el botón dice lo que va a pasar, no un genérico: son dos acciones distintas
+    if (!_dsm || !_dsm.ocupado) {
+      b.textContent = !okSel ? "🗑 Sí, desarmar"
+        : (_dsm.vuelve ? "🗑 Desarmar y que VUELVA a programar" : "🗑 Desarmar y CANCELAR el pedido");
+    }
+  }
   const h = document.getElementById("dsmHint");
-  if (h) h.textContent = ok ? "✓ Listo." : ("Escribí al menos 10 caracteres (van " + t.trim().length + ").");
+  if (h) {
+    h.textContent = !okSel ? "Elegí si el pedido vuelve o no."
+      : (okTxt ? "✓ Listo." : ("Escribí al menos 10 caracteres (van " + t.trim().length + ")."));
+  }
 }
 async function dsmConfirmar() {
   if (!_dsm || _dsm.ocupado) return;
@@ -36901,7 +36939,7 @@ async function dsmConfirmar() {
   const n = _dsm.np, isis = _dsm.isis;
   const b = document.getElementById("dsmOk"); if (b) b.textContent = "Desarmando…";
   try {
-    const r = await aprRpc("gv_ppp_np_desarmar", { p_np: n, p_justificativo: just, p_por: await aprQuien() });
+    const r = await aprRpc("gv_ppp_np_desarmar", { p_np: n, p_justificativo: just, p_por: await aprQuien(), p_vuelve: !!(_dsm && _dsm.vuelve) });
     const x = (r && r[0]) || {};
     dsmCerrar();
     pppSetStatus("🗑 " + n + " desarmado · " + (x.detalle || "") +

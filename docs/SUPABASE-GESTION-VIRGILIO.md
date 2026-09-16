@@ -18490,3 +18490,88 @@ medir**. La app estaba bien —el offline-first funciona—, el test no. Estuvo 
 versiones sin que saltara. Se le agregó además el caso C, que fija la otra mitad del contrato.
 
 Problemas 322, 323 y 324.
+
+---
+
+## §3.hs — v18.75: desarmar dejaba el pedido INVISIBLE — LK 1364 estuvo un día en ninguna parte — 2026-09-16
+
+Luis, mirando A Programar: *"no las veo, algo pasó"*. Y después: *"ni lo veo en cuarentena"*.
+
+### El limbo
+
+`gv_ppp_np_desarmar`, con un pedido WEB, hacía **dos cosas que se contradicen**:
+
+```sql
+insert into "GV_Web_Cancelados" ...   -- gv_pedidos_web_excluidos lo lee como 'anulado':
+                                      -- NO VUELVE NUNCA
+update "PPP_Web_Programacion"
+   set tanda = null, fecha_entrega = null   -- o sea: VUELVE a A Programar
+```
+
+Las dos juntas dejan el pedido **sin tanda y excluido para siempre**: no está en ninguna tanda,
+no sale en «Pedidos a programar», no sale en Cuarentena y el armado automático no lo toma.
+No es que se ve mal — **no se ve**.
+
+**Caso real: LK 1364.** Mitre Hugo Alberto (cod 4181), Barracas, Zona 1 – CABA Sur. Un pedido
+del 08/09 partido en dos bloques: **LK 0034** (18 renglones, 44 cajas, 0,299 m³) y **LK 0035**
+(1 renglón, 2 cajas). Su tanda **E01G** se desarmó el 15/09 15:53 porque el picking mostraba la
+lista recortada por el corte de 1000 filas — un error **nuestro**, con el pedido del cliente
+vivo. De los 19 renglones el picking sólo mostró 9; los 10 que nunca aparecieron fueron
+`506 510 513 530 544 582E 590E 870E 957E` y el `958E`, que **era el bloque LK 0035 entero** (por
+eso ese bloque se veía vacío).
+
+La propia fila de `GV_Web_Cancelados` dice en su `motivo`: *"Se deshace y **vuelve a A
+Programar**"*. El mecanismo hizo exactamente lo contrario, y nadie se enteró hasta que Luis lo
+buscó en pantalla al día siguiente.
+
+### Por qué pasó (no es un descuido suelto)
+
+Desarmar servía para **dos intenciones que nadie había separado**:
+
+| intención | qué corresponde |
+|---|---|
+| «se canceló» — lo canceló el cliente, está duplicado | el pedido murió: **no vuelve** |
+| «me equivoqué yo» — la lista estaba mal, se armó de más | el pedido **está vivo**: vuelve |
+
+El modal decía *"sale de la PPP y no vuelve a entrar"*, así que el backend hacía lo que
+prometía. **Lo que no existía era la segunda acción.**
+
+### Qué cambió
+
+`gv_ppp_np_desarmar` toma `p_vuelve boolean default false` — el default es el comportamiento de
+hoy, así que ningún llamador viejo cambia:
+
+- `p_vuelve = true`, **web** → no se escribe `GV_Web_Cancelados`, y si había una fila de un
+  desarme anterior **se borra** (sin eso, "vuelve" no podría deshacer un "no vuelve" previo);
+- `p_vuelve = true`, **ISIS** → se reusa `gv_ppp_isis_desprogramar`, que ya es el camino probado
+  para sacar de la programación sin anular (deja `desprogramada = true`, guarda la tanda en
+  `tanda_previa` y **no** pone `oculto`);
+- el stock vuelve a **A guardar** en los dos casos: eso no depende de la intención.
+
+La intención queda en `GV_Desarmes.vuelve`, para poder saber dentro de un mes si aquel desarme
+fue un error nuestro o una cancelación.
+
+⚠ **El `drop` de la firma vieja no es opcional.** `create or replace` con un parámetro MÁS no
+reemplaza nada: crea una **sobrecarga**, y entonces la llamada de 3 argumentos que hace el front
+queda ambigua entre las dos y Postgres la rechaza — con la versión buggeada todavía viva.
+Drop + create van en la misma transacción. Verificado después:
+`gv_ppp_np_desarmar(text,text,text,boolean)` es la única firma.
+
+En el front, el modal **pregunta y no trae default** (son consecuencias opuestas: elegir mal
+esconde el pedido de un cliente). Sin elegir, el botón sigue trabado; al elegir, dice cuál de
+las dos cosas va a hacer.
+
+### El dato
+
+`GV_Web_Cancelados` tenía **dos filas**, y sólo una estaba mal:
+
+| pedido | motivo | qué se hizo |
+|---|---|---|
+| **LK 1364** | *"desarmado: … Se deshace y vuelve a A Programar"* | fila **borrada** → el pedido volvió |
+| LK 1375 | *"desarmado: Pedido cancelado por el cliente"* | **se deja**: ahí anular es lo correcto |
+
+Backup en `zz_backups."GV_Backup_Web_Cancelados_1364_20260916"`. Comprobado después:
+`gv_pedidos_web_excluidos` ya no devuelve nada para 1364. Y no se renumera: la NP se asigna con
+`insert … where not exists` por `(empresa, order_id, np_idx)`, así que conserva LK 0034 / LK 0035.
+
+Problema 325. `sql/gv_ppp_np_desarmar_vuelve_v1874.sql`, `tests/desarmar-vuelve.cjs`.

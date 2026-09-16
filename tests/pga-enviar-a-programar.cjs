@@ -141,10 +141,15 @@ catch (_e) {
     document.getElementById("dsmJust").value = "corto"; dsmChk();
     out.cortoBloqueado = !!(document.getElementById("dsmOk") || {}).disabled;
     document.getElementById("dsmJust").value = "el cliente lo cancelo por telefono"; dsmChk();
+    /* v18.74 — el justificativo ya NO alcanza solo: además hay que elegir si el pedido vuelve a
+       A Programar o se cancela. Eran dos acciones distintas metidas en un botón, y las dos
+       terminaban anulando el pedido (LK 1364 quedó invisible por eso). Sin elegir, sigue trabado. */
+    out.largoSinElegirSigueTrabado = !!(document.getElementById("dsmOk") || {}).disabled;
+    dsmVuelveSet(false);   // «no vuelve» = lo que este caso prueba (lo canceló el cliente)
     out.largoHabilita = !(document.getElementById("dsmOk") || {}).disabled;
     await dsmConfirmar(); await new Promise((res) => setTimeout(res, 250));
     const g = rpc.find((x) => x.fn === "gv_ppp_np_desarmar");
-    out.desarma = !!g && g.args.p_np === "LK 0058" && g.args.p_justificativo === "el cliente lo cancelo por telefono";
+    out.desarma = !!g && g.args.p_np === "LK 0058" && g.args.p_justificativo === "el cliente lo cancelo por telefono" && g.args.p_vuelve === false;
     out.cerro = !!(document.getElementById("dsmModal") || {}).hidden;
 
     // y una NP de ISIS sí lleva el aviso de darla de baja a mano
@@ -219,7 +224,8 @@ catch (_e) {
   t(!r.avisoIsisWeb, "(g) una NP web no lleva el aviso de ISIS");
   t(r.okBloqueado, "(g) sin justificativo no se puede confirmar");
   t(r.cortoBloqueado, "(g) con un justificativo corto tampoco");
-  t(r.largoHabilita, "(g) con uno de 10+ caracteres sí");
+  t(r.largoSinElegirSigueTrabado, "(g) con 10+ caracteres pero sin elegir, sigue trabado");
+  t(r.largoHabilita, "(g) con 10+ caracteres Y la elección hecha, sí");
   t(r.desarma, "(g) confirmar llama a gv_ppp_np_desarmar con la NP y el justificativo");
   t(r.cerro, "(g) y cierra el pop-up");
   t(r.avisoIsis, "(g) en una NP de ISIS avisa que además hay que darla de baja a mano");
