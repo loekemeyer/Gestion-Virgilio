@@ -1,15 +1,15 @@
 # Estado y pendientes — al 2026-09-16 (última actualización: v18.87)
 
-> **2026-09-16, tanda de Luis (v18.86 / v18.87) — las dos alertas de la PPP.**
+> **2026-09-16, tanda de Luis (v18.87) — las dos alertas de la PPP.**
 >
-> **1. Tanda por CAMIÓN (v18.86, §3.ia).** `D69F` del 21/09 llevaba 8 NP de Jazquel en Balvanera/Once
+> **1. Tanda por CAMIÓN (v18.87, §3.ib).** `D69F` del 21/09 llevaba 8 NP de Jazquel en Balvanera/Once
 > (Capital) metidas en un camión de GBA Oeste. Regla de Luis: *"¿lo pondrías en el mismo camión?"* →
 > **el DÍA sigue siendo uno solo por cliente, la TANDA se parte por camión**. La causa **no** era
 > `gv_ppp_web_tanda_abierta_cliente` ni el pase (a1) —que fue lo primero que se arregló y no
 > alcanzó— sino `ppp_web_armar_tandas`, que agrupaba `group by cliente` y tomaba `min(camion)`.
 > Centinela nuevo: `select * from public.gv_ppp_tanda_camion_mezclado;`
 >
-> **2. Súper mezclado (v18.87, §3.ib, problema 334).** La tabla que usa el aviso **era la correcta**
+> **2. Súper mezclado (v18.87, §3.ic, problema 334).** La tabla que usa el aviso **era la correcta**
 > (`GV_Supers`, 19 activas; `gv_clientes_horario` habría sido la equivocada). Pero **quedaba una
 > cuarta puerta abierta**: `_open` —las tandas que todavía acumulan— filtraba súper por ZONA, y un
 > súper con zona numérica (Dorinka, Diarco: *"Zona 5 - GBA Oeste"*) pasaba de largo. Medido: un

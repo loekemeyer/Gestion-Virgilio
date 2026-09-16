@@ -1,4 +1,4 @@
-/* La tanda de un cliente se parte por CAMIÓN (v18.86, pedido de Luis 2026-09-16).
+/* La tanda de un cliente se parte por CAMIÓN (v18.87, pedido de Luis 2026-09-16).
 
    Luis: *"claro que se parte en zonas distintas (si un mismo cliente pide para una sucursal
    que tiene en Tucumán y otra en Río Negro, ¿lo pondrías en el mismo camión?). Se factura
@@ -20,11 +20,11 @@
 const path = require("path");
 const fs = require("fs");
 
-const p = path.join(__dirname, "..", "sql", "gv_ppp_web_tanda_por_camion_v1886.sql");
+const p = path.join(__dirname, "..", "sql", "gv_ppp_web_tanda_por_camion_v1887.sql");
 const fallas = [];
 
 if (!fs.existsSync(p)) {
-  console.log("ppp-tanda-por-camion: ✗ FAIL\n  - falta sql/gv_ppp_web_tanda_por_camion_v1886.sql");
+  console.log("ppp-tanda-por-camion: ✗ FAIL\n  - falta sql/gv_ppp_web_tanda_por_camion_v1887.sql");
   process.exit(1);
 }
 const src = fs.readFileSync(p, "utf8");

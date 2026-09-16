@@ -1,5 +1,5 @@
 /* ============================================================================
-   La tanda de un cliente se parte por CAMIÓN.  (v18.86, pedido de Luis 2026-09-16)
+   La tanda de un cliente se parte por CAMIÓN.  (v18.87, pedido de Luis 2026-09-16)
 
    ── El caso ─────────────────────────────────────────────────────────────────
    D69F del 21/09 se armó sola el 16/09 a las 08:05 con esto adentro:
@@ -111,7 +111,7 @@ as $function$
   -- tanda de ISIS, devuelve NULL y el armado abre tanda nueva (caso Osa 2533 del
   -- 09/09: E09A es de ISIS, así que LK 0024 fue a E09B).
   --
-  -- v18.86 (Luis) — Y ADEMÁS DEL MISMO CAMIÓN. Un cliente con sucursales en
+  -- v18.87 (Luis) — Y ADEMÁS DEL MISMO CAMIÓN. Un cliente con sucursales en
   -- zonas que van en camiones distintos se parte: no viajan juntas y no se
   -- facturan juntas. Una tanda es candidata sólo si TODAS sus NP son del camión
   -- pedido; si ya está mezclada, no se le suma nada más.
@@ -159,7 +159,7 @@ grant execute on function public.gv_ppp_web_tanda_abierta_cliente(text, text, da
   to anon, authenticated, service_role;
 
 comment on function public.gv_ppp_web_tanda_abierta_cliente(text, text, date, text) is
-  'Tanda web sin empezar del cliente ese día Y DE ESE CAMIÓN (v18.86). Un cliente con '
+  'Tanda web sin empezar del cliente ese día Y DE ESE CAMIÓN (v18.87). Un cliente con '
   'sucursales que van en camiones distintos se parte en tandas distintas: no viajan '
   'juntas y no se facturan juntas. NULL = abrir tanda nueva.';
 
@@ -171,13 +171,13 @@ language sql
 stable
 set search_path to 'public'
 as $function$
-  -- v18.86 — la usan el candado de "un cliente, un día" (gv_ppp_web_juntar_clientes
+  -- v18.87 — la usan el candado de "un cliente, un día" (gv_ppp_web_juntar_clientes
   -- y el trigger gv_web_cliente_un_solo_dia) para saber a qué tanda del día destino
   -- entra CADA NP. Dos intentos, en este orden:
   --   1) la tanda del cliente ese día, de ese camión, SIN empezar;
   --   2) si todas las de ese camión ya se empezaron, la del cliente ese día igual:
   --      el día ya está decidido y la NP tiene que caer en alguna. (Es el mismo
-  --      fallback que había antes de v18.86, ahora acotado al camión.)
+  --      fallback que había antes de v18.87, ahora acotado al camión.)
   -- NULL = en ese día no hay ninguna tanda del cliente de ese camión. Quien llama
   -- NO la mueve: mezclar camiones es peor que dejarla partida en dos días.
   select coalesce(
@@ -205,7 +205,7 @@ grant execute on function public.gv_ppp_web_tanda_destino(text, text, date, text
   to anon, authenticated, service_role;
 
 comment on function public.gv_ppp_web_tanda_destino(text, text, date, text) is
-  'A qué tanda de ese día va una NP del cliente, respetando su camión (v18.86). '
+  'A qué tanda de ese día va una NP del cliente, respetando su camión (v18.87). '
   'NULL = no hay tanda de ese camión ese día → no mover la NP.';
 
 -- ── 3) El candado "un cliente, un día": la tanda destino es por NP ──────────
@@ -239,7 +239,7 @@ begin
   -- esta ahi. Super / Retira / Expo y el padron de cadenas quedan afuera. Solo mira lo web: un
   -- cliente partido entre una NP de ISIS y una web lo muestra gv_ppp_cliente_dos_dias.
   --
-  -- v18.86 (Luis) -- LA TANDA DESTINO SE RESUELVE POR NP, NO UNA PARA TODAS. Un cliente con
+  -- v18.87 (Luis) -- LA TANDA DESTINO SE RESUELVE POR NP, NO UNA PARA TODAS. Un cliente con
   -- sucursales en camiones distintos (Capital y GBA Oeste, por ejemplo) entrega el mismo dia
   -- pero en camiones distintos. Si en el dia destino no hay tanda de su camion, esa NP NO se
   -- mueve: mezclar camiones rompe el reparto y la facturacion. Se informa en r_motivo.
@@ -276,7 +276,7 @@ begin
 
     v_target := coalesce(v_fijos[1], v_dias[1]);
 
-    -- v18.86: las que se quedan porque en el dia destino no hay camion de su etiqueta
+    -- v18.87: las que se quedan porque en el dia destino no hay camion de su etiqueta
     select count(*) into v_queda
       from public."PPP_Web_Programacion" w
      where w.empresa = c.empresa and btrim(coalesce(w.cod_cliente,'')) = c.cod
@@ -356,7 +356,7 @@ begin
         coalesce(NEW.razon_social, NEW.cod_cliente), r.tanda, to_char(r.fecha_entrega, 'DD/MM')
         using errcode = 'raise_exception';
     end if;
-    -- v18.86 (Luis): la tanda destino es la del CAMION de ESA NP, no la de NEW. Si en el dia
+    -- v18.87 (Luis): la tanda destino es la del CAMION de ESA NP, no la de NEW. Si en el dia
     -- de NEW no hay ninguna tanda del cliente de ese camion, la NP se queda donde esta:
     -- mezclar Capital con GBA Oeste rompe el reparto y la facturacion, y eso pesa mas que
     -- tenerlo partido en dos dias (que ademas se ve en gv_ppp_cliente_dos_dias).
@@ -485,7 +485,7 @@ having count(distinct public.gv_ppp_web_camion(w.zona, null)) > 1;
 grant select on public.gv_ppp_tanda_camion_mezclado to anon, authenticated, service_role;
 
 comment on view public.gv_ppp_tanda_camion_mezclado is
-  'Tandas web con NP de mas de un camion adentro (v18.86, Luis). Vacia = todo bien. '
+  'Tandas web con NP de mas de un camion adentro (v18.87, Luis). Vacia = todo bien. '
   'El camion sale de gv_ppp_web_camion: Capital / GBA Sur / GBA Oeste / GBA Norte.';
 
 commit;

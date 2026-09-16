@@ -427,7 +427,7 @@ Agregado web + tanda de **ISIS** → **siempre tanda nueva**, aunque nadie la ha
 
 Vive en `gv_ppp_web_tanda_abierta_cliente` (sólo mira `PPP_Web_Programacion`; las tandas de ISIS **no**
 son candidatas), que usa el bloque (a1) de `gv_ppp_web_armar_pendientes` en los crons 71 y 73.
-**Desde v18.86 recibe un 4.º argumento, la zona**, y sólo devuelve tandas del mismo camión (regla de
+**Desde v18.87 recibe un 4.º argumento, la zona**, y sólo devuelve tandas del mismo camión (regla de
 Luis, más abajo); la firma de 3 argumentos se dropeó a propósito para que ningún llamador viejo siga
 resolviendo a la vieja en silencio.
 **La v14.05 lo había leído al revés** y metía pedidos de la página adentro de tandas de ISIS; se corrigió
@@ -474,9 +474,9 @@ transacción abortada. Problema 334.
 **Chequeo:** `select * from public.gv_ppp_super_mezclado;` — vacía = todo bien. Mirarla después
 de tocar tandas a mano. Desde v18.87 dice además si el camión se armó **AUTOMÁTICA / MANUAL /
 ISIS** (`camion_armado`, `origen`, `origen_detalle`) y deja afuera las tandas de
-`GV_Vehiculo_Propio` (la kangoo no es el camión). `sql/gv_ppp_super_mezclado_v1887.sql`, §3.ib.
+`GV_Vehiculo_Propio` (la kangoo no es el camión). `sql/gv_ppp_super_mezclado_v1887.sql`, §3.ic.
 
-## ⚠ Regla de Luis (2026-09-16, v18.86): la tanda de un cliente se parte por CAMIÓN
+## ⚠ Regla de Luis (2026-09-16, v18.87): la tanda de un cliente se parte por CAMIÓN
 
 *"Claro que se parte en zonas distintas (si un mismo cliente pide para una sucursal que tiene en
 Tucumán y otra en Río Negro, ¿lo pondrías en el mismo camión?). Se factura diferente también, es
@@ -501,7 +501,7 @@ que se arregló y no alcanzó. **Un cambio de regla de armado no está probado h
 armador** (con `p_filas` de prueba dentro de una transacción abortada, no leyendo la función).
 
 **Chequeo:** `select * from public.gv_ppp_tanda_camion_mezclado;` — vacía = todo bien.
-`sql/gv_ppp_web_tanda_por_camion_v1886.sql`, §3.ia.
+`sql/gv_ppp_web_tanda_por_camion_v1887.sql`, §3.ib.
 
 ## ⚠ Regla del dueño (2026-09-15): Oscar hace el SKIN — la OC va a su nombre y NO se toca
 
