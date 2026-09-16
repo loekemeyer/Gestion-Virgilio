@@ -78,8 +78,18 @@ if (!/s\.motivo === "retenido"/.test(src)) {
 if (/Las cajas ya pickeadas <b>no se mueven<\/b>/.test(src)) {
   fallas.push("el pop-up sigue prometiendo que las cajas no se mueven");
 }
-if (!/se deshace<\/b>/.test(src) || !/A guardar<\/b>/.test(src)) {
-  fallas.push("el pop-up no explica que lo pickeado/armado se deshace y vuelve a A guardar");
+/* v18.80 (Luis, 16/09): "se revierte la mercadería al lugar de donde se sacó (góndola o
+   excedente)". Antes iba todo a «A guardar» — la regla del 14/09, tomada cuando la función no
+   sabía de dónde había salido cada caja. Ahora no adivina: usa los movimientos del picking. */
+/* ⚠ `src` se lee en LATIN1, así que un "ó" del archivo llega como dos caracteres y una regex
+   con acento NO matchea nunca (daría un falso rojo, o peor, un falso verde si se invirtiera).
+   Por eso el patrón evita la vocal acentuada. */
+if (!/se deshace<\/b>/.test(src) || !/ndola<\/b>/.test(src) || !/excedente<\/b>/.test(src)) {
+  fallas.push("el pop-up no explica que lo pickeado/armado se deshace y cada caja vuelve a " +
+    "góndola o excedente, que es de donde salió");
+}
+if (/esas cajas vuelven a <b>📥 A guardar<\/b>/.test(src)) {
+  fallas.push("el pop-up sigue diciendo que las cajas van a «A guardar»");
 }
 
 if (fallas.length) {
@@ -125,7 +135,7 @@ catch (_e) {
     await new Promise((res) => setTimeout(res, 120));
     const mh = (document.getElementById("epaModal") || {}).innerHTML || "";
     out.popupLasDos   = /LK 0034/.test(mh) && /LK 0035/.test(mh);
-    out.popupDiceDeshace = /se deshace/.test(mh) && /A guardar/.test(mh);
+    out.popupDiceDeshace = /se deshace/.test(mh) && /góndola/.test(mh) && /excedente/.test(mh);
     out.popupNoMiente = !/no se mueven/.test(mh);
     epaCerrar(true);
     await pr;

@@ -126,6 +126,18 @@ catch (_e) {
     const h3 = _patrHtml();
     out.abreNps = /98001/.test(h3) && /98002/.test(h3);
 
+    // v18.82 — colapsable: colapsado se va la TABLA pero quedan los KPI, y la elección
+    // se recuerda (si no, el refresco automático de la pantalla lo vuelve a abrir solo).
+    try { localStorage.removeItem("vir_patr_colapsado"); } catch (_e) {}
+    out.abrePorDefecto = !/class="patr col"/.test(_patrHtml());
+    patrColapsar();
+    const hc = _patrHtml();
+    out.colapsaTabla = !/<table/.test(hc);
+    out.colapsadoDejaKpi = /<b>4<\/b> pedido/.test(hc) && /el más viejo hace <b>9<\/b> días/.test(hc);
+    out.recuerda = (function () { try { return localStorage.getItem("vir_patr_colapsado") === "1"; } catch (_e) { return false; } })();
+    patrColapsar();
+    out.vuelveAAbrir = /<table/.test(_patrHtml());
+
     // sin atrasados: el módulo no desaparece
     _patrRows = [];
     const h4 = _patrHtml();
@@ -153,6 +165,11 @@ catch (_e) {
   ok(r.noGraveAyer, "un solo día de atraso no debería pintarse como grave");
   ok(r.abreTanda, "abrir el día no muestra su tanda");
   ok(r.abreNps, "abrir la tanda no muestra sus NP");
+  ok(r.abrePorDefecto, "la primera vez tiene que arrancar abierto");
+  ok(r.colapsaTabla, "colapsado sigue mostrando la tabla");
+  ok(r.colapsadoDejaKpi, "colapsado se lleva puestos los KPI: el resumen tiene que quedar a la vista");
+  ok(r.recuerda, "no recuerda que quedó colapsado — el refresco automático lo volvería a abrir");
+  ok(r.vuelveAAbrir, "volver a tocarlo no lo reabre");
   ok(r.vacioDice, "sin atrasados el módulo desaparece en vez de decir que no hay");
   ok(r.vacioVerde, "sin atrasados el módulo sigue en rojo");
   ok(r.cargando, "mientras carga no avisa");

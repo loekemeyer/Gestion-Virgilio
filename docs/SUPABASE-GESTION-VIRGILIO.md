@@ -19022,3 +19022,62 @@ tocó** y sigue andando.
 **Rollback:** correr entero `sql/recepcion_tarea_pagos_planify.sql` — recrea la función y los
 dos triggers tal cual estaban. El archivo quedó con un encabezado que aclara que está dado de
 baja, para que nadie lo aplique de nuevo sin querer.
+
+---
+
+## §3.hv — v18.83: la mercadería vuelve de DONDE SALIÓ (góndola o excedente) — 2026-09-16
+
+La v18.79 dejó todo en «A guardar» y se avisó que eso chocaba con lo que Luis había escrito. Lo
+zanjó él, por partes:
+
+| caso | qué pasa |
+|---|---|
+| Pedido **pendiente**, nada pickeado | vuelve a A Programar y **no se mueve ninguna caja** |
+| Pedido **en proceso** (pickeado / armado / facturado) | cada caja **vuelve al lugar de donde salió** — góndola o excedente — y el pedido queda como uno nuevo |
+| **Siempre** | queda registrado para que el automático no le asigne tanda |
+
+Esto **reemplaza** la regla del 14/09 (*"debería ir A guardar… y que un operador después lo
+procese"*), y el motivo por el que aquélla existía ya no aplica: se tomó cuando la función **no
+sabía de dónde había salido cada caja y tenía que adivinar**. Ahora no adivina — `org_term` y
+`org_exc` son los movimientos **reales** del picking, así que la devolución es el reverso exacto.
+Reparto: primero a góndola hasta lo que salió de ahí, después excedente, y **lo que no se puede
+explicar con un movimiento de picking cae a `a_guardar`**, que queda como red de seguridad.
+
+⚠ **El CTE `dev` no es un adorno.** El movimiento de devolución lleva `ref` = NP, **no la tanda**,
+así que no entra en `sal` (que filtra por tanda). Sin `dev`, dos NP de la misma tanda que
+comparten un artículo devolverían las dos a góndola aunque la segunda hubiera salido de
+excedente: `org_term` se leería igual de completo en la segunda llamada. `dev` descuenta lo ya
+devuelto, identificándolo por el texto `"(tanda XXXX)"` que escribe esta misma función.
+
+Medido en transacción con `rollback`, contra tandas reales:
+
+| caso | resultado |
+|---|---|
+| `LK 0093` (E11C, todo de góndola) | −6 de `a_facturar`, **+6 a góndola** |
+| `CH 0012` (E03G, mezcla) | `054`, `307`, `731` **a excedente**; los otros 12 códigos **a góndola**; 0 a A guardar |
+| `CH 0009` (ya salió) | rechazada por la guarda de Carga Camión / Recepción Remitos |
+
+Nada quedó escrito: el barrido posterior de `Movimientos_Stock` y `GV_Desarmes` dio vacío. El
+archivo del repo se verificó contra la base — md5 del cuerpo normalizado **idéntico**.
+
+### Y el pop-up de «Va 1 NP» NO estaba mal
+
+Luis: *"el front sigue diciendo «Va 1 NP a A programar» y eso está mal, debería mostrar todas las
+NPs que se corresponden a ese pedido"*. **Medido: en ese caso el pedido tiene una sola NP.**
+
+Las ocho NP de Jazquel SRL (LK 3814) que se ven juntas en pantalla —LK 0109 a LK 0116— son
+**ocho pedidos distintos**, cargados de a uno en la página entre las **21:33 y las 22:00 del
+15/09**, cada uno a **una sucursal diferente**: Donofrio 128, Azcuenaga 368, Sarmiento 2565,
+Sarmiento 2745, Larrea 359, Pasteur 332, B. Mitre 2735, Castelli 266. `order_id` 1455 a 1462,
+cada uno con `np_idx = 1`.
+
+El agrupado por pedido funciona, y se comprobó con un pedido de verdad multi-bloque:
+
+```sql
+select jsonb_array_length((gv_ppp_web_desprogramar_previo('LK 0105'))->'nps');  -- 4
+```
+
+LK 0104, 0105, 0106 y 0107 son los cuatro bloques del pedido 1453 (Heredia Juan José) y el
+pop-up muestra **las cuatro**, con la tocada marcada. O sea: el criterio es `order_id`, no el
+cliente — dos NP del mismo cliente pueden ser dos pedidos separados, y juntarlas arrastraría
+pedidos que nadie pidió mover.

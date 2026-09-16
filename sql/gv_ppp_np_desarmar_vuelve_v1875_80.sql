@@ -76,6 +76,46 @@
 
    ⚠ El `insert` va ANTES del `update` que pone `tanda = null`: `tanda_previa` se lee de esa fila.
 
+
+   ─────────────────────────────────────────────────────────────────────────────────────────
+   v18.83 (aplicada como v18.80) — LA MERCADERIA VUELVE DE DONDE SALIO (Luis zanja la ambigüedad)
+   ─────────────────────────────────────────────────────────────────────────────────────────
+   La v18.79 dejó todo en «A guardar» y se avisó que eso chocaba con lo que Luis había escrito.
+   Lo zanjó él, 16/09, por partes:
+
+     · *"Pedido que no se pickeó ni nada «pendiente»: se devuelve «a programar», no se movió
+       ningún producto, no hay problema"* → ya era así: sin movimientos de picking el cálculo
+       no produce ninguna fila y no se toca el stock.
+     · *"Pedido que está «en proceso»: si está pickeado/armado/facturado, se revierte la
+       mercadería **al lugar de donde se sacó (góndola o excedente)** y vuelve «A programar»
+       como un pedido nuevo"*.
+     · *"siempre que algo vuelva usando este botón queda registrado para que no se le asigne
+       tanda automáticamente"* → la retención de la v18.76.
+
+   Esto **reemplaza** la regla del 14/09 (*"debería ir A guardar… y que un operador después lo
+   procese"*), y el motivo por el que aquélla existía ya no aplica: se tomó cuando la función
+   **no sabía de dónde había salido cada caja y tenía que adivinar**. Ahora no adivina —
+   `org_term` y `org_exc` son los movimientos REALES del picking (lo que salió de `terminado`
+   y de `excedente`), así que la devolución es el reverso exacto. El reparto es: primero a
+   góndola hasta lo que salió de ahí, después a excedente, y **lo que no se puede explicar con
+   un movimiento de picking cae a `a_guardar`**, que queda como red de seguridad.
+
+   ⚠ **El CTE `dev` no es un adorno.** El movimiento de devolución lleva `ref` = NP, no la
+   tanda, así que NO entra en `sal` (que filtra por tanda). Sin `dev`, dos NP de la misma tanda
+   que comparten un artículo devolverían las dos a góndola aunque la segunda hubiera salido de
+   excedente: `org_term` se leería igual de completo en la segunda llamada. `dev` descuenta lo
+   ya devuelto, y se identifica por el texto `"(tanda XXXX)"` que escribe esta misma función.
+
+   Medido en transacción con `rollback`, contra tandas reales:
+
+   | caso | resultado |
+   |---|---|
+   | `LK 0093` (E11C, todo de góndola) | −6 de `a_facturar`, **+6 a góndola** |
+   | `CH 0012` (E03G, mezcla) | `054`, `307`, `731` **a excedente**; los otros 12 códigos **a góndola**; 0 a A guardar |
+   | `CH 0009` (ya salió) | rechazada por la guarda de Carga Camión / Recepción Remitos |
+
+   Nada quedó escrito: el barrido posterior de `Movimientos_Stock` y `GV_Desarmes` dio vacío.
+
    ROLLBACK
    --------
    Volver a la v17.90: re-aplicar la definición anterior (está en el historial de
@@ -108,6 +148,7 @@ declare
   v_isis boolean; v_emp text; v_num int; v_oid bigint;
   v_tanda text; v_fe date; v_cod text; v_rs text; v_m3 numeric;
   v_items jsonb; v_dev jsonb; v_arts int := 0; v_cajas numeric := 0; v_n int;
+  v_term numeric := 0; v_exc numeric := 0; v_guard numeric := 0;
 begin
   if not (es_supervisor_virgilio() or gv_es_supervisor_o_servicio()) then
     raise exception 'Solo un supervisor puede desarmar un pedido.' using errcode='42501';
@@ -148,15 +189,15 @@ begin
                             order by i.art), '[]'::jsonb)
     into v_items from public.gv_ppp_np_items i where i.np = v_np;
 
-  -- EL STOCK VUELVE A "A GUARDAR", no a la gondola (Luis, 14/09: "cuando se aprieta ese boton,
-  -- deberia ir A guardar el pedido para hacerlo lo mas limpio posible, y que un operador despues
-  -- lo tenga que procesar como toda la mercaderia a guardar"). La pantalla MG "Guardar a gondola"
-  -- lista por SALDO de a_guardar (por codigo y empresa), asi que esto aparece ahi solo, y es el
-  -- operario el que decide si va a gondola o a excedente y con que ubicacion -- que es la decision
-  -- que antes esta funcion adivinaba sola.
-  -- De donde HABIA salido cada caja igual se guarda (salio_de_terminado / salio_de_excedente en
-  -- GV_Desarmes.stock_devuelto): es dato util para el que la guarda, pero no mueve stock.
-  -- ⚠ v18.74: esto NO depende de p_vuelve. Las cajas se movieron igual, asi que vuelven igual.
+  /* v18.80 (Luis, 16/09) — LA MERCADERIA VUELVE DE DONDE SALIO, no a "A guardar".
+     Regla textual: "si esta pickeado/armado/facturado, se revierte la mercaderia al lugar de
+     donde se saco (gondola o excedente) y vuelve A programar como un pedido nuevo".
+     Reemplaza la regla del 14/09 ("deberia ir A guardar... y que un operador despues lo
+     procese"), que se tomo cuando la funcion NO sabia de donde habia salido cada caja y tenia
+     que adivinar. Ahora no adivina: `org_term` / `org_exc` son los movimientos REALES del
+     picking (lo que salio de terminado y de excedente), asi que la devolucion es el reverso
+     exacto. Lo que no se puede explicar con un movimiento de picking cae a `a_guardar`, que
+     sigue siendo la red de seguridad. */
   drop table if exists _gv_dev;
   create temp table _gv_dev on commit drop as
   with ped as (
@@ -173,14 +214,37 @@ begin
       from public."Movimientos_Stock" m
      where upper(btrim(m.ref)) = upper(btrim(v_tanda))
      group by 1
+  ), dev as (
+    /* Lo que ya devolvio un desarme ANTERIOR de esta misma tanda. Hace falta porque el
+       movimiento de devolucion lleva `ref` = NP (no la tanda), asi que NO entra en `sal`: sin
+       esto, dos NP de la misma tanda que comparten un articulo devolverian las dos a gondola
+       aunque la segunda hubiera salido de excedente. Se identifica por el texto que escribe
+       esta misma funcion, "(tanda XXXX)". */
+    select public.canon_cod(m.cod_art) ck,
+           coalesce(sum(m.delta) filter (where m.deposito = 'terminado'), 0) t,
+           coalesce(sum(m.delta) filter (where m.deposito = 'excedente'), 0) e
+      from public."Movimientos_Stock" m
+     where m.tipo = 'desarme' and m.delta > 0
+       and m.descripcion like '%(tanda ' || v_tanda || ')%'
+     group by 1
   ), c as (
-    select s.cod_art, s.empresa, s.fact, s.sep, s.org_term, s.org_exc,
+    select s.cod_art, s.empresa, s.fact, s.sep,
+           greatest(s.org_term - coalesce(dv.t, 0), 0) as org_term,
+           greatest(s.org_exc  - coalesce(dv.e, 0), 0) as org_exc,
            least(p.cajas, greatest(s.fact, 0) + greatest(s.sep, 0)) as total
-      from ped p join sal s on s.ck = p.ck
+      from ped p
+      join sal s on s.ck = p.ck
+      left join dev dv on dv.ck = p.ck
   )
   select c.cod_art, c.empresa, c.org_term, c.org_exc, c.total,
          least(c.total, greatest(c.fact, 0))           as de_fact,
-         c.total - least(c.total, greatest(c.fact, 0)) as de_sep
+         c.total - least(c.total, greatest(c.fact, 0)) as de_sep,
+         -- a donde vuelve: primero la gondola (lo que salio de ahi), despues excedente,
+         -- y lo que no tenga origen conocido queda en A guardar
+         least(c.total, c.org_term) as a_term,
+         least(c.total - least(c.total, c.org_term), c.org_exc) as a_exc,
+         c.total - least(c.total, c.org_term)
+                 - least(c.total - least(c.total, c.org_term), c.org_exc) as a_guardar
     from c where c.total > 0;
 
   insert into public."Movimientos_Stock" (ts, cod_art, descripcion, deposito, delta, tipo, ref, legajo, empresa)
@@ -191,24 +255,25 @@ begin
     cross join lateral (values
       ('a_facturar',      -1, d.de_fact),
       ('separar_pedidos', -1, d.de_sep),
-      ('a_guardar',        1, d.total)
+      ('terminado',        1, d.a_term),
+      ('excedente',        1, d.a_exc),
+      ('a_guardar',        1, d.a_guardar)
     ) as x(dep, signo, cant)
    where x.cant > 0;
 
   select coalesce(jsonb_agg(jsonb_build_object('art', d.cod_art, 'empresa', d.empresa,
                               'de_a_facturar', d.de_fact, 'de_separar', d.de_sep,
-                              'a_guardar', d.total,
+                              'a_gondola', d.a_term, 'a_excedente', d.a_exc, 'a_guardar', d.a_guardar,
+                              'total', d.total,
                               'salio_de_terminado', d.org_term, 'salio_de_excedente', d.org_exc)
                             order by d.cod_art), '[]'::jsonb),
-         count(*), coalesce(sum(d.total), 0)
-    into v_dev, v_arts, v_cajas
+         count(*), coalesce(sum(d.total), 0),
+         coalesce(sum(d.a_term), 0), coalesce(sum(d.a_exc), 0), coalesce(sum(d.a_guardar), 0)
+    into v_dev, v_arts, v_cajas, v_term, v_exc, v_guard
     from _gv_dev d;
 
   if v_isis then
     if v_vuelve then
-      /* v18.74 — «me equivoqué»: la NP de ISIS vuelve a A Programar. Se reusa el camino que ya
-         existe para eso (guarda la tanda en tanda_previa y NO pone oculto), en vez de escribir
-         otra variante de lo mismo. La guarda de "ya salió" ya se evaluó arriba. */
       perform public.gv_ppp_isis_desprogramar(array[v_np], 'desarmado: ' || v_just, p_por);
     else
       insert into public."NP_Canceladas" (np, motivo, legajo)
@@ -216,22 +281,13 @@ begin
       on conflict (np) do update set motivo = excluded.motivo, legajo = excluded.legajo;
       insert into public."GV_PPP_Prog_Override" (np, oculto, nota)
       values (v_np, true, 'v17.90 ' || to_char(now() at time zone 'America/Argentina/Buenos_Aires','YYYY-MM-DD HH24:MI')
-                          || ' · DESARMADO (' || v_arts || ' art / ' || v_cajas || ' cajas a guardar): ' || v_just
+                          || ' · DESARMADO (' || v_arts || ' art / ' || v_cajas || ' cajas): ' || v_just
                           || coalesce(' · por ' || nullif(btrim(p_por),''), ''))
       on conflict (np) do update set oculto = true, nota = excluded.nota;
     end if;
   else
     if v_vuelve then
-      /* NO se escribe GV_Web_Cancelados — es justamente la fila que lo dejaba invisible. Y si
-         había una de un desarme anterior, se BORRA: sin esto, "vuelve" no podría deshacer un
-         "no vuelve" previo y el pedido seguiría escondido. */
       delete from public."GV_Web_Cancelados" c where c.empresa = v_emp and c.order_id = v_oid;
-      /* v18.76 — y se RETIENE, para que el cron de zonas automáticas no lo vuelva a armar solo.
-         Antes acá había un `delete` de esta misma tabla: liberaba la retención y el automático
-         lo agarraba en la corrida siguiente (18 minutos, medido, con LK 1364). Es la misma fila
-         y los mismos campos que escribe el botón ↩ «Enviar a programar», `tanda_previa`
-         incluido, así que al reprogramarlo a mano vuelve a SU tanda y no se re-pickea.
-         ⚠ Va ANTES del `update` de abajo: `tanda_previa` se lee de esa fila. */
       insert into public."GV_PPP_Web_Retenido" as t
         (empresa, order_id, np_idx, np, tanda_previa, fecha_previa, ya_pickeada, ya_armada, motivo, por)
       select w.empresa, w.order_id, w.np_idx, w.np,
@@ -259,7 +315,6 @@ begin
       values (v_emp, v_oid, v_np, 'desarmado: ' || v_just, nullif(btrim(p_por),''))
       on conflict (empresa, order_id) do update
          set motivo = excluded.motivo, por = excluded.por, np_label = excluded.np_label, creado_at = now();
-      /* cancelado: el pedido sale por GV_Web_Cancelados, la retención no hace falta. */
       delete from public."GV_PPP_Web_Retenido" t where t.empresa = v_emp and t.order_id = v_oid;
     end if;
     update public."PPP_Web_Programacion" w
@@ -276,8 +331,14 @@ begin
           nullif(btrim(p_por),''), v_vuelve);
 
   return query select v_np, v_isis, v_tanda, v_arts, v_cajas,
-    (v_arts || ' articulo' || case when v_arts = 1 then '' else 's' end || ' · ' || v_cajas
-     || ' caja' || case when v_cajas = 1 then '' else 's' end || ' pasaron a A GUARDAR'
+    (case when v_cajas = 0 then 'no habia mercaderia movida: no se devolvio nada'
+          else v_arts || ' articulo' || case when v_arts = 1 then '' else 's' end || ' · ' || v_cajas
+               || ' caja' || case when v_cajas = 1 then '' else 's' end || ' devueltas ('
+               || concat_ws(', ',
+                    case when v_term  > 0 then v_term  || ' a gondola'   end,
+                    case when v_exc   > 0 then v_exc   || ' a excedente' end,
+                    case when v_guard > 0 then v_guard || ' a A guardar' end) || ')'
+     end
      || case when v_vuelve then ' · vuelve a A Programar y el automatico NO lo va a tomar'
              else ' · el pedido NO vuelve' end)::text;
 end;
