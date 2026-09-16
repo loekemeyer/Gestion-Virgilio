@@ -18635,7 +18635,79 @@ md5 del cuerpo normalizado **idéntico** al de `pg_get_functiondef`.
 
 ---
 
-## §3.hu — v18.77: submódulo "Pedidos atrasados" y el criterio de qué está atrasado — 2026-09-16
+## §3.hu — v18.77: el badge «Cliente nuevo» en Facturación — la lógica estaba, faltaba la policy de LECTURA — 2026-09-16
+
+Pedido de Luis: *"en el módulo de facturación, fijate si hay algo en el código para marcar a
+«clientes nuevos» bajo la misma lógica que usa el filtro de cuarentena en «A programar». Quiero
+un badge al lado del nombre en la razón social que diga «Cliente nuevo». Si la lógica está y hay
+código, no aparece en el front actualmente."*
+
+**Tenía razón en las dos mitades: la lógica está y el front no la mostraba.**
+
+### Qué había
+
+La regla es la de la **v17.12** (§ `sql/gv_clientes_nuevos_v1712.sql`) y **no se tocó**: es NUEVO
+el cliente con **código alto** (LK ≥ 3800 / CH ≥ 2300) **y menos de 3 pedidos facturados en toda
+su historia**, contando la identidad cruzada (mismo CUIT, `customer_grupos`,
+`clientes_lk_ch_links`). La calcula LK y la espeja acá `public."GV_Clientes_Nuevos"` (cron
+`sync-clientes-nuevos-virgilio`, cada hora al :40). Al 16/09: **367 filas** (227 lk / 140 chef),
+actualizadas ese mismo día a las 09:40.
+
+Hasta ahora la usaba sólo la **Cuarentena de A Programar** (motivo `cliente_nuevo`, badge
+`.cuar-badge.b-nuevo`). Facturación no.
+
+### Por qué no se veía (la causa, no el síntoma)
+
+A Programar lee esa tabla **por las RPC de Cuarentena**, que son `SECURITY DEFINER` y por eso
+saltean la RLS. **Facturación arma su lista con lecturas REST directas, con la anon key.** Y la
+tabla nació (v17.12) con RLS prendida y **una sola policy**: `GV_Clientes_Nuevos_writer`, la de
+escritura del rol `lk_ppp_reader`. Sin policy de lectura, `anon` no ve nada — y no da error,
+devuelve 0 filas:
+
+```sql
+set local role anon; select count(*) from public."GV_Clientes_Nuevos";   -- 0  (antes)
+```
+
+O sea: **no faltaba lógica, faltaba el permiso**. Es el reverso de la trampa que ya está escrita
+en el `CLAUDE.md` ("sin policies, con la RLS prendida `anon` ve 0 filas, no da error"): ahí es lo
+que se busca en un backup, acá dejó muda una pantalla.
+
+### El cambio
+
+```sql
+create policy "GV_Clientes_Nuevos_lectura" on public."GV_Clientes_Nuevos"
+  as permissive for select to anon, authenticated using (true);
+```
+
+`sql/gv_clientes_nuevos_badge_facturacion_v1877.sql`. **Escribir sigue siendo sólo de LK**: los
+`insert/update/delete/truncate` están revocados para `anon`/`authenticated` desde la v17.12 y
+esto no los devuelve. Medido después del cambio:
+
+| | antes | después |
+|---|---|---|
+| `set local role anon; select count(*) …` | 0 | **367** (227 lk / 140 chef) |
+| `has_table_privilege('anon', …, 'INSERT'/'UPDATE'/'DELETE')` | false/false/false | **false/false/false** |
+
+Lo que queda legible con la anon key son `(empresa, cod, razón social, pedidos)` — el mismo tipo
+de dato que la app ya expone con esa clave en `Facturacion_NP`, `PPP_Web_Programacion` y la PPP.
+
+### El front (`index.html` v18.77)
+
+`facNuevosCargar()` (cache 5 min; la tabla se actualiza 1 vez por hora) + `facEsClienteNuevo()` +
+`facNuevoBadge()`, y el badge se pinta en la celda `.fac-rs-cell`, al lado de la razón social,
+con los mismos colores que el de Cuarentena para que se lea como lo mismo. El title dice cuántos
+pedidos facturados tiene ("2 pedidos facturados en toda su historia").
+
+**La clave es `(empresa, cod)`, no el código solo**, y la empresa sale de la NP con `pppEmpDeNp`
+(prefijo LK/CH en las web, > 90000 en las de ISIS): el mismo número de cliente es **otro cliente**
+en cada empresa. El test cubre justamente ese cruce.
+
+**Best-effort**: si la lectura falla (policy caída, sin red), no se pinta ningún badge y la lista
+queda exactamente como antes — facturar nunca depende de esto.
+
+En la pantalla del 16/09 pasan a llevarlo dos filas: **lk 4185** Goldar Hector Maximiliano
+(2 pedidos) y **lk 4223** Iro Iro S.R.L (1 pedido).
+## §3.hv — v18.78: submódulo "Pedidos atrasados" y el criterio de qué está atrasado — 2026-09-16
 
 **Pedido de Luis:** *"vamos a poner un submódulo arriba de Programación de entregas que sea
 «Pedidos atrasados». La idea es que se crea una fila de día cuando pasa un día, para poner ahí
@@ -18716,6 +18788,13 @@ números distintos de lo mismo. El tablero de 6 días y su vista `venc` no se to
 ### Rollback
 
 ```sql
+drop policy "GV_Clientes_Nuevos_lectura" on public."GV_Clientes_Nuevos";
+```
+
+El front aguanta solo: vuelve a no pintar nada.
+
+**Test**: `tests/fac-cliente-nuevo.cjs` (en `run.sh`) — badge sí/no, plural y "ninguna compra",
+el mismo código en la otra empresa, y tabla vacía sin explotar.
 drop function if exists public.gv_ppp_atrasados(date);
 delete from public."PPP_Web_Config" where clave = 'atrasados_desde';
 ```

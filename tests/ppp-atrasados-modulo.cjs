@@ -1,4 +1,4 @@
-/* Submódulo "Pedidos atrasados" (v18.77, pedido de Luis 2026-09-16).
+/* Submódulo "Pedidos atrasados" (v18.78, pedido de Luis 2026-09-16).
 
    Arriba de "Programación de entregas": una fila por día YA PASADO que todavía tiene pedidos
    sin registro de salida. La fila del día aparece sola cuando el día pasa y desaparece sola

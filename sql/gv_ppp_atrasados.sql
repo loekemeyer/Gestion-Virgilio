@@ -1,6 +1,6 @@
 /* ============================================================================
    gv_ppp_atrasados — los pedidos de un día que YA PASÓ y de los que todavía no
-   se registró la salida.  (v18.77, pedido de Luis 2026-09-16)
+   se registró la salida.  (v18.78, pedido de Luis 2026-09-16)
 
    Alimenta el submódulo "Pedidos atrasados", arriba de "Programación de
    entregas": una fila por día vencido, y adentro sus tandas y sus NP, con el

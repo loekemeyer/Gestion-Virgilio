@@ -3266,7 +3266,7 @@ tr.ppp-err-zona > td{ background:#fffbeb !important; }
    de la pantalla para ver una tanda ni una NP. */
 .pga-wrap{ margin-top:12px; border:1px solid #e2e8f0; border-radius:14px; background:#fff; overflow:auto; }
 
-/* ── Pedidos atrasados (v18.77, Luis) ──────────────────────────────────────────
+/* ── Pedidos atrasados (v18.78, Luis) ──────────────────────────────────────────
    Submódulo propio arriba de la programación. Va en rojo y arriba de todo porque
    es lo único de esta pantalla que ya salió mal: lo de abajo todavía se puede
    cumplir. Reusa la tabla `.pga` (mismas columnas, mismo comportamiento al abrir)
@@ -4853,6 +4853,13 @@ table.fac-np-tbl td.center{ text-align: center; }
    + nowrap y CLIPEABA el badge de faltante (no se veía nunca). v5.70. */
 table.fac-np-tbl td.fac-rs-cell{ white-space: normal; overflow: visible; }
 .fac-rs-name{ display:block; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+/* v18.77 (Luis, 2026-09-16) — CLIENTE NUEVO en Facturación. Mismo criterio y misma fuente que el
+   badge de Cuarentena en "A Programar" (tabla local GV_Clientes_Nuevos, que llena LK): código alto
+   (LK >= 3800 / CH >= 2300) y menos de 3 pedidos facturados en toda su historia. Mismos colores
+   que `.cuar-badge.b-nuevo`, para que se lea como lo mismo en las dos pantallas. */
+.fac-nuevo-badge{ display:inline-block; margin-top:3px; font-size:10.5px; font-weight:800;
+  background:#dcfce7; color:#14532d; border:1px solid #86efac; border-radius:999px;
+  padding:1px 8px; line-height:1.3; letter-spacing:.3px; white-space:nowrap; }
 /* Cabecera grupo eliminada — la tanda ahora es una col más. Para no perder
    el agrupamiento visual, las filas de cada tanda comparten un fondo sutil
    alternado (zebra por tanda, no por fila). */
@@ -5644,7 +5651,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=18.77"></script>
+<script type="module" src="recepcion.js?v=18.78"></script>
 <!-- Config del módulo de fichada (compartido con fichada.html). El secret
      hmacSecret tiene que ser el mismo acá y allá; cargándolo desde un solo
      archivo evitamos que se desincronicen. -->
@@ -9227,7 +9234,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v18.77";
+const APP_VERSION = "v18.78";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -36602,7 +36609,7 @@ function _pgaSearchStr(r) {
           r.empresa, r.origen, r.estado, f, dm].join(" ").toLowerCase();
 }
 /* ═══════════════════════════════════════════════════════════════════════════
-   PEDIDOS ATRASADOS (v18.77, pedido de Luis 2026-09-16)
+   PEDIDOS ATRASADOS (v18.78, pedido de Luis 2026-09-16)
    Submódulo propio ARRIBA de "Programación de entregas": una fila por día que YA
    PASÓ y todavía tiene pedidos sin registro de salida. La fila del día aparece
    sola cuando el día pasa, y desaparece sola cuando esa NP se carga al camión.
@@ -36754,7 +36761,7 @@ function _pgaCuerpoHtml(dias, opts) {
     _pgaPctFila(tot.est, tot.nps) + '</tr></tfoot></table>';
 }
 
-/* v18.77 — recibe las filas por parámetro para que el submódulo "Pedidos atrasados"
+/* v18.78 — recibe las filas por parámetro para que el submódulo "Pedidos atrasados"
    (RPC gv_ppp_atrasados) arme su árbol con ESTE mismo código. Si cada tabla agrupara
    por su lado podrían decir cosas distintas del mismo pedido. Sin argumento sigue
    usando `_pgaRows`, que es como la llama la programación de siempre. */
@@ -36820,7 +36827,7 @@ function _pgaItemsHtml(np) {
 function _pppArbolHtml(programados) {
   pgaNeed();
   patrNeed();
-  // v18.77 (Luis): "un submódulo arriba de Programación de entregas que sea Pedidos
+  // v18.78 (Luis): "un submódulo arriba de Programación de entregas que sea Pedidos
   // atrasados". Va PRIMERO y con su propia tabla: es lo que hay que resolver hoy, no
   // una nota al pie de lo que viene. Reemplaza a la banda "⏰ N atrasados · Ver la
   // lista →", que contaba con otro criterio (no miraba el FSS) y mandaba a otra
@@ -36854,7 +36861,7 @@ function _pppArbolHtml(programados) {
       '<th class="pga-h pro" title="Pickeando o armando ahora">En<br>proceso</th>' +
       '<th class="pga-h pen" title="Programado para ese día y todavía sin empezar">Pen<br>dientes</th>' +
     '</tr></thead><tbody>';
-  // v18.77: el cuerpo dia -> tanda -> NP lo arma _pgaCuerpoHtml, que comparten
+  // v18.78: el cuerpo dia -> tanda -> NP lo arma _pgaCuerpoHtml, que comparten
   // esta tabla y el submodulo de atrasados. Una sola copia = no pueden divergir.
   h += _pgaCuerpoHtml(dias, {}) + '</div>';
   return h;
@@ -48171,6 +48178,65 @@ async function facSinTandaCargar() {
 function facEstaArmada(npNorm){
   return (_facCajas && _facCajas.has(npNorm)) || (_facArmEv && _facArmEv.has(npNorm));
 }
+
+/* v18.77 (Luis, 2026-09-16: "un badge al lado del nombre en la razón social que diga Cliente
+   nuevo") — CLIENTE NUEVO en Facturación.
+
+   La lógica ya existía y es la MISMA que usa el filtro de Cuarentena de "A Programar" desde la
+   v17.12: es nuevo el cliente con código alto (LK >= 3800 / CH >= 2300) Y menos de 3 pedidos
+   facturados en TODA su historia, contando la identidad cruzada (mismo CUIT, `customer_grupos`,
+   `clientes_lk_ch_links`). La calcula LK y la espeja acá la tabla local `GV_Clientes_Nuevos`
+   (cron `sync-clientes-nuevos-virgilio`, cada hora al :40). Acá NO se recalcula nada: se lee esa
+   misma tabla, así las dos pantallas no pueden decir cosas distintas del mismo cliente.
+
+   Por qué no se veía acá: "A Programar" la lee por las RPC de Cuarentena, que son SECURITY
+   DEFINER, y la tabla tenía RLS prendida con UNA sola policy — la de escritura del rol
+   `lk_ppp_reader`. O sea que con la anon key devolvía 0 filas. Se le agregó la policy de LECTURA
+   `GV_Clientes_Nuevos_lectura` (select para anon/authenticated); escribir sigue siendo sólo de
+   LK. Detalle y rollback en `sql/gv_clientes_nuevos_badge_facturacion_v1877.sql`.
+
+   Best-effort: si la lectura falla, la lista queda exactamente como antes y no aparece el badge.
+   Cache 5 min — la tabla se actualiza una vez por hora. */
+let _facNuevos = new Map(); let _facNuevosTs = 0; let _facNuevosInflight = null;
+let _facNuevosPintado = false;
+async function facNuevosCargar() {
+  if (_facNuevosTs && (Date.now() - _facNuevosTs) < 300000) return _facNuevos;
+  if (_facNuevosInflight) return _facNuevosInflight;
+  _facNuevosInflight = (async function () {
+    try {
+      const r = await fetch(SUPABASE_URL + "/rest/v1/GV_Clientes_Nuevos?select=empresa,cod,pedidos&limit=2000",
+        { headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY }, cache: "no-store" });
+      if (r.ok) {
+        const m = new Map();
+        for (const x of (await r.json())) {
+          const c = String(x.cod == null ? "" : x.cod).trim();
+          if (c) m.set(pppEmpNorm(x.empresa) + "|" + c, Number(x.pedidos));
+        }
+        _facNuevos = m; _facNuevosTs = Date.now();
+      }
+    } catch (_e) { /* sin red: queda el último cache y no se pinta nada */ }
+    _facNuevosInflight = null;
+    return _facNuevos;
+  })();
+  return _facNuevosInflight;
+}
+/* La empresa sale de la NP (`pppEmpDeNp`: prefijo LK/CH en las web, > 90000 en las de ISIS) y no
+   del código solo, porque el mismo número de cliente es OTRO cliente en cada empresa. */
+function facEsClienteNuevo(np, cod) {
+  const c = String(cod == null ? "" : cod).trim();
+  if (!c) return null;
+  const v = _facNuevos.get(pppEmpDeNp(np) + "|" + c);
+  return (v === undefined) ? null : v;
+}
+function facNuevoBadge(np, cod) {
+  const n = facEsClienteNuevo(np, cod);
+  if (n === null) return "";
+  const det = !isFinite(n) ? "menos de 3 pedidos facturados"
+    : (n === 0 ? "ninguna compra facturada"
+               : n + " pedido" + (n === 1 ? "" : "s") + " facturado" + (n === 1 ? "" : "s"));
+  return '<span class="fac-nuevo-badge" title="Cliente nuevo: código alto y ' + escapeHtml(det) +
+    ' en toda su historia (se cuentan también sus otros códigos y la otra empresa). Mismo criterio que la Cuarentena de A Programar.">🆕 Cliente nuevo</span>';
+}
 /* Equivalencias por NP (vista_pedidos_equivalencia): NP → [{cod, real, nota}], para el
    cartel "facturá con el código REAL" en el módulo de Facturación (la factura se hace
    afuera de la app y debe ir con el código real, no el del pedido). Cache 60s. */
@@ -48991,6 +49057,9 @@ function facRender(tandas){
   // ARMADO (Entregas_Virgilio) para que se puedan tildar igual que el resto. Si la carga de la
   // vista todavía no volvió, la lista queda exactamente como antes.
   facSinTandaCargar().then(function (l) { if ((l || []).length && !_facSinTandaPintado) { _facSinTandaPintado = true; facRender(_facLastTandas); } });
+  // v18.77 — clientes nuevos: se piden una vez y, cuando llegan, se re-dibuja la lista para que
+  // aparezca el badge. Si no llegan, queda igual que siempre (no bloquea la facturación).
+  facNuevosCargar().then(function (m) { if (m && m.size && !_facNuevosPintado) { _facNuevosPintado = true; facRender(_facLastTandas); } });
   {
     const _yaEsta = new Set(filas.map(function (f) { return String(f.np).trim(); }));
     for (const r of (_facSinTanda || [])) {
@@ -49072,7 +49141,7 @@ function facRender(tandas){
         <td class="fac-np-cell" title="${escapeHtml(_npTip)}">${escapeHtml(f.np)}${_npSrcChip(f.np)}${facModChip(f.np)}${f._sinTanda ? `<span class="fac-sintanda" title="${escapeHtml(f._sinTanda)} — se armó igual (tanda ${escapeHtml(String(f.tanda))}), por eso aparece acá">sin tanda</span>` : ""}</td>
         <td class="center fac-fe-cell">${f.fechaSalida ? escapeHtml(String(f.fechaSalida)) : '<span class="fac-lios0">—</span>'}</td>
         <td class="fac-cod-cell">${escapeHtml(f.cod)}</td>
-        <td class="fac-rs-cell"><span class="fac-rs-name">${escapeHtml(f.rs)}</span>${_ft ? facTareaBadge(f.np) : ''}</td>
+        <td class="fac-rs-cell"><span class="fac-rs-name">${escapeHtml(f.rs)}</span>${facNuevoBadge(f.np, f.cod)}${_ft ? facTareaBadge(f.np) : ''}</td>
         <td class="fac-falta-col">${facFaltAgregDist(f.np)}</td>
         <td class="fac-lios-cell">${(() => {
           const np = String(f.np).trim().replace(/\.0+$/, "");

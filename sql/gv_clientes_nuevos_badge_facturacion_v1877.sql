@@ -1,0 +1,59 @@
+-- ============================================================================
+-- v18.77 (2026-09-16, pedido de Luis) — BADGE "Cliente nuevo" EN FACTURACIÓN
+-- ============================================================================
+-- Pedido: "en el módulo de facturación, fijate si hay algo en el código para marcar a
+-- clientes nuevos bajo la misma lógica que usa el filtro de cuarentena en A programar…
+-- quiero un badge al lado del nombre en la razón social que diga «Cliente nuevo»".
+--
+-- LA LÓGICA YA ESTABA, Y NO SE TOCÓ. Es la de la v17.12 (`sql/gv_clientes_nuevos_v1712.sql`):
+-- es NUEVO el cliente con código alto (LK >= 3800 / CH >= 2300) Y menos de 3 pedidos
+-- facturados en toda su historia, contando la identidad cruzada (mismo CUIT,
+-- `customer_grupos`, `clientes_lk_ch_links`). La calcula LK y la espeja acá la tabla
+-- `public."GV_Clientes_Nuevos"` (cron `sync-clientes-nuevos-virgilio`, cada hora al :40).
+-- Facturación lee ESA MISMA tabla: no se recalcula nada, así las dos pantallas no pueden
+-- decir cosas distintas del mismo cliente.
+--
+-- POR QUÉ NO SE VEÍA EN EL FRONT
+--   "A Programar" la lee por las RPC de Cuarentena (`gv_cuarentena_marcar`,
+--   `gv_cuarentena_ya_programado`), que son SECURITY DEFINER y por eso saltean la RLS.
+--   Facturación arma su lista con lecturas REST directas, con la anon key. Y la tabla nació
+--   con RLS prendida y UNA sola policy: `GV_Clientes_Nuevos_writer`, del rol `lk_ppp_reader`
+--   (el que escribe desde LK por el FDW). Sin policy de lectura, `anon` ve 0 filas — no da
+--   error, simplemente no devuelve nada:
+--     set local role anon; select count(*) from public."GV_Clientes_Nuevos";  -- 0
+--   O sea: no faltaba lógica, faltaba el permiso de LECTURA.
+--
+-- LO QUE SE CAMBIA (una sola línea de verdad)
+--   Se agrega la policy de SELECT para anon/authenticated. Escribir sigue siendo sólo de LK:
+--   `insert/update/delete/truncate` ya están revocados para anon y authenticated desde la
+--   v17.12, y esto no los devuelve (medido abajo).
+--   Lo que queda legible con la anon key son 367 filas de (empresa, cod, razón social,
+--   pedidos) — el mismo tipo de dato que la app ya expone con la anon key en
+--   `Facturacion_NP`, `PPP_Web_Programacion` y la PPP.
+-- ============================================================================
+
+drop policy if exists "GV_Clientes_Nuevos_lectura" on public."GV_Clientes_Nuevos";
+create policy "GV_Clientes_Nuevos_lectura" on public."GV_Clientes_Nuevos"
+  as permissive for select to anon, authenticated using (true);
+
+-- ── Medición del día que se hizo (2026-09-16) ──────────────────────────────
+--   Antes:  set local role anon; select count(*) from public."GV_Clientes_Nuevos";  ->   0
+--   Después: idem                                                                   -> 367 (227 lk / 140 chef)
+--   Escritura sigue cerrada:
+--     select has_table_privilege('anon','public."GV_Clientes_Nuevos"','INSERT') ins,
+--            has_table_privilege('anon','public."GV_Clientes_Nuevos"','UPDATE') upd,
+--            has_table_privilege('anon','public."GV_Clientes_Nuevos"','DELETE') del;
+--     -> false / false / false
+--   Filas de la pantalla de Facturación del 16/09 que pasan a llevar el badge:
+--     lk 4185 Goldar Hector Maximiliano (2 pedidos), lk 4223 Iro Iro S.R.L (1 pedido).
+--
+-- ── ROLLBACK ───────────────────────────────────────────────────────────────
+--   drop policy "GV_Clientes_Nuevos_lectura" on public."GV_Clientes_Nuevos";
+--   El front aguanta: `facNuevosCargar` es best-effort — sin filas no pinta ningún badge y la
+--   lista de Facturación queda exactamente como antes.
+--
+-- ── FRONT (index.html, v18.77) ─────────────────────────────────────────────
+--   `facNuevosCargar` (cache 5 min) + `facEsClienteNuevo` + `facNuevoBadge`, y el badge se
+--   pinta en la celda `.fac-rs-cell`, al lado de la razón social. La empresa del pedido sale
+--   de la NP con `pppEmpDeNp` (prefijo LK/CH en las web, > 90000 en las de ISIS): el mismo
+--   número de cliente es OTRO cliente en cada empresa, así que la clave es (empresa, cod).
