@@ -532,3 +532,6 @@ PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node te
 
 echo "== mg-neteo-empresa (v18.86: Mover a Góndola — el TOTAL manda sobre el desglose por empresa) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/mg-neteo-empresa.cjs
+
+echo "== fac-cancelar-pedido (v18.89: botón ✕ Cancelar en Facturación — motivo, salida sin tocar nada, y todo a «A guardar») =="
+PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/fac-cancelar-pedido.cjs

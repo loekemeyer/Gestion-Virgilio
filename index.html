@@ -4910,6 +4910,24 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
 .facfc-ok-meta{ font-size:12.5px; color:#64748b; }
 .fac-btn-tick:hover{ background: #15803d; }
 .fac-btn-tick:active{ transform: scale(.93); }
+/* v18.89 — "✕ Cancelar" por fila (Thomas, 16/09). Va DEBAJO del ✓ / ⬇ Excel, chico y en rojo
+   apagado: es una acción rara y destructiva, no tiene que competirle al tilde, que es lo que
+   la operadora aprieta cien veces por día. `width:auto` es el override del global
+   button{width:100%}. */
+.fac-btn-cancel{ display:block; width:auto; margin:5px auto 0; border:1px solid #fecaca; background:#fef2f2; color:#b91c1c; border-radius:6px; padding:3px 7px; font-size:10.5px; font-weight:800; line-height:1.4; cursor:pointer; white-space:nowrap; transition:background .15s, transform .1s; }
+.fac-btn-cancel:hover{ background:#fee2e2; border-color:#fca5a5; }
+.fac-btn-cancel:active{ transform:scale(.93); }
+/* El pop-up de cancelar reusa las clases .facfc-* (mismo overlay que Facturar / NC) y agrega
+   sólo lo suyo: los dos botones de motivo, el texto libre y los avisos del paso de confirmar. */
+.faccan-q{ font-size:13.5px; font-weight:800; color:#0f172a; margin:4px 0 8px; }
+.faccan-ops{ display:flex; gap:10px; flex-wrap:wrap; }
+.faccan-op{ flex:1 1 140px; width:auto; margin:0; padding:14px 10px; border:2px solid #cbd5e1; background:#fff; color:#0f172a; border-radius:12px; font-size:15px; font-weight:800; cursor:pointer; }
+.faccan-op:hover{ border-color:#94a3b8; background:#f8fafc; }
+.faccan-op.on{ border-color:#dc2626; background:#fef2f2; color:#b91c1c; }
+.faccan-txt{ width:100%; box-sizing:border-box; margin-top:10px; padding:10px; border:1px solid #cbd5e1; border-radius:10px; font-size:15px; font-family:inherit; resize:vertical; }
+.faccan-motivo{ font-size:14px; color:#0f172a; background:#f8fafc; border:1px solid #e2e8f0; border-radius:10px; padding:9px 11px; margin-bottom:10px; }
+.faccan-avisos{ font-size:12.5px; color:#334155; line-height:1.7; }
+.faccan-avisos b{ color:#0f172a; }
 /* idea 5178 — Facturación en celular: la tabla scrollea horizontal (min-width 980px)
    y la columna Acción (✓/ARCA) quedaba al final, había que arrastrar ~530px por fila
    para tocarla. En celular la fijamos sticky a la derecha (siempre visible) y agrandamos
@@ -4929,6 +4947,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
   tr.fac-en-progreso td.fac-accion-cell{ background: #fefce8; }
   .fac-btn-tick{ padding: 8px 12px; min-height: 36px; }
   .fac-btn-fc{ padding: 5px 8px; min-height: 36px; justify-content: center; }
+  .fac-btn-cancel{ padding: 6px 9px; min-height: 30px; font-size: 11px; }   /* v18.89 */
 }
 .fac-empty{ padding: 32px 20px; text-align: center; color: #64748b; font-size: 15px; background: #fff; border-radius: 8px; border: 1px solid #cbd5e1; }
 /* v18.55 — el error de carga, DONDE se mira. El chip de estado (.fac-stats) está oculto desde
@@ -5625,7 +5644,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=18.88"></script>
+<script type="module" src="recepcion.js?v=18.89"></script>
 <!-- Config del módulo de fichada (compartido con fichada.html). El secret
      hmacSecret tiene que ser el mismo acá y allá; cargándolo desde un solo
      archivo evitamos que se desincronicen. -->
@@ -9208,7 +9227,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v18.88";
+const APP_VERSION = "v18.89";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -49169,7 +49188,7 @@ function facRender(tandas){
         <td class="center fac-neto-cell fac-neto-click" id="fac-neto-${escapeHtml(String(f.np).trim().replace(/\.0+$/, ""))}" onclick="facNetoDetalle('${escapeHtml(String(f.np).trim().replace(/\.0+$/, ""))}')" title="Ver desglose por ítem"><span class="fac-neto-load">…</span></td>
         <td class="center fac-accion-cell">${facNpEsWeb(f.np)
           ? `<span class="fac-tick-web" title="NP de la página: se factura bajando el Excel ISIS (marcá la casilla de la izquierda)">⬇ Excel</span>`
-          : `<button class="fac-btn-tick" data-args='${args}' onclick="facTickNP(this)">✓</button>`}</td>
+          : `<button class="fac-btn-tick" data-args='${args}' onclick="facTickNP(this)">✓</button>`}<button class="fac-btn-cancel" data-args='${args}' onclick="facCancelarNP(this)" title="Cancelar el pedido: no se factura y sale de la PPP. Pide el motivo (falta stock u otro) y se puede salir sin hacer nada. El pedido NO se borra de la base; lo que ya estaba armado vuelve a la bodega «A guardar».">✕ Cancelar</button></td>
       </tr>`;
   }).join("");
 
@@ -49182,12 +49201,12 @@ function facRender(tandas){
             <th style="width:11%" title="Nota de pedido. Pasá el mouse sobre el número para ver Tanda y fecha de Salida.">NP</th>
             <th class="center" style="width:8%" title="Fecha de ENTREGA de la PPP (el día para el que está programado el pedido). Las filas vienen ordenadas por esta fecha.">📅 Entrega</th>
             <th style="width:7%">Cod</th>
-            <th style="width:21%">Razón Social</th>
+            <th style="width:20%">Razón Social</th>
             <th style="width:20%" title="Ajustes respecto del pedido original — asistencia para cargar la factura:&#10;• FALTANTE (rojo, cod −N): faltó, restá N cajas de la factura o no la pongas.&#10;• AGREGADO (verde, cod +N): se armó algo que no estaba en el pedido, sumá N cajas a la factura.&#10;Los ítems armados iguales al pedido no aparecen (no hay que ajustar nada).">Faltantes y Agregados</th>
             <th class="center" style="width:5%" title="Líos ARMADOS (los que se cargaron al camión). Refleja lo real, no el pedido original.">Líos</th>
             <th class="center" style="width:5%" title="Cajas ARMADAS (las que se cargaron al camión). Refleja lo real, no el pedido original.">Cajas</th>
             <th class="center" style="width:12%" title="Subtotal (dto x ítem): precio de lista × unidades por caja × cajas armadas × (1 − dto por volumen del cliente). Antes del descuento del 2%.">💵 Subtotal <span class="fac-th-siva">(dto x ítem)</span></th>
-            <th class="center fac-accion-th" style="width:7%">Acción</th>
+            <th class="center fac-accion-th" style="width:8%">Acción</th>
           </tr>
         </thead>
         <tbody>${rowsHtml}</tbody>
@@ -49357,6 +49376,160 @@ async function facNCEmitir(){
     if (note){ note.textContent = "⚠ " + String(msg); note.style.color = "#b91c1c"; note.style.fontWeight = "700"; }
   }
 }
+/* ═══ v18.89 — CANCELAR UN PEDIDO DESDE FACTURACIÓN (Thomas, 2026-09-16) ═════════════════════
+   Pedido textual: *"Quiero agregar un botón al módulo de facturación para poner cancelar
+   pedido. Cuando toco eso me tiene que abrir un pop-up que me debe preguntar el motivo de por
+   qué se está cancelando y me tiene que poder dejar salir si es que toqué ahí sin querer.
+   Cuando pongo el motivo, tiene que haber dos botones: uno que sea falta stock y otro que sea
+   otro. En otro me tiene que dejar escribir el motivo. Si se cancela el pedido, tiene que
+   desaparecer de la PPP, pero no de Supabase, para la estadística de qué artículos me pidió
+   cada cliente. Si el pedido estaba armado con algún tipo de ítem, ese ítem tiene que ir a la
+   bodega de aguardar."*
+
+   ⚠ Tres cosas parecidas que NO son lo mismo (la cuarta fila es ésta):
+     · ANULAR      — «A Programar», pedido que entró MAL y todavía no se tocó (`gv_pedido_anular`).
+     · DESARMAR / «Enviar a programar» — el pedido sigue VIVO y se va a rehacer: la mercadería
+                     vuelve de donde salió (góndola / excedente), regla de Luis del 16/09.
+     · BORRAR      — la regla del CLAUDE.md: se borra de la página Y de Gestión. Acá NO se borra.
+     · CANCELAR (esto) — el pedido ya está ARMADO y murió: no se factura, sale de la PPP, y lo
+                     armado va TODO a «A guardar» porque nadie lo va a re-pickear: son cajas en
+                     el piso de armado que un operario tiene que bajar y guardar.
+
+   Todo el trabajo lo hace el backend: `gv_ppp_np_desarmar(..., p_vuelve=false, p_a_guardar=true)`
+   (v18.89, `sql/gv_ppp_np_desarmar_a_guardar_v1889.sql`). Saca la NP de la PPP (web →
+   `GV_Web_Cancelados` + tanda/fecha en null; ISIS → `NP_Canceladas` + `oculto`), devuelve el
+   stock a `a_guardar` y deja el log en `GV_Desarmes` con el snapshot de ítems — o sea que la
+   estadística de qué pidió cada cliente queda entera y el pedido de la página no se borra.
+   Acá sólo se junta lo que hay que preguntarle a la persona.
+
+   El pop-up tiene DOS pasos a propósito (el segundo es la "2da confirmación" que pidió el dueño
+   en la v15.65 para todo lo que cancela o elimina). De los dos se sale con ✕, con «Volver», con
+   Escape o tocando afuera: apretar el botón sin querer no puede cancelar nada. */
+let _facCancel = null;
+
+function _facCancelEsc(e){ if (e.key === "Escape" && _facCancel) facCancelClose(); }
+function facCancelEnsure(){
+  var ov = document.getElementById("facCancelOverlay");
+  if (ov) return ov;
+  ov = document.createElement("div");
+  ov.id = "facCancelOverlay"; ov.className = "facfc-ov";
+  ov.innerHTML = '<div class="facfc-card"><div class="facfc-head" style="background:linear-gradient(90deg,#b91c1c,#dc2626)">' +
+    '<span class="facfc-title">✕ Cancelar pedido</span>' +
+    '<button class="facfc-x" onclick="facCancelClose()">✕</button></div>' +
+    '<div class="facfc-body" id="facCancelBody"></div></div>';
+  ov.addEventListener("click", function(e){ if (e.target === ov) facCancelClose(); });
+  document.addEventListener("keydown", _facCancelEsc);
+  document.body.appendChild(ov);
+  return ov;
+}
+/* Salir sin hacer nada. Mientras la RPC está en vuelo NO se cierra: si se cerrara, la pantalla
+   quedaría mintiendo sobre si el pedido se canceló o no. */
+window.facCancelClose = function(){
+  if (_facCancel && _facCancel.saving) return;
+  _facCancel = null;
+  var ov = document.getElementById("facCancelOverlay"); if (ov) ov.classList.remove("show");
+};
+window.facCancelarNP = function(btn){
+  var a;
+  try { a = JSON.parse(btn.dataset.args); }
+  catch(e){ if (typeof facShowToast === "function") facShowToast("Error leyendo la NP"); return; }
+  _facCancel = { np: String(a.np || "").trim(), tanda: String(a.tanda || ""), rs: a.rs || "",
+                 cod: a.cod || "", motivo: null, texto: "", paso: "motivo", saving: false, err: "" };
+  facCancelEnsure().classList.add("show");
+  facCancelRender();
+};
+window.facCancelMotivo = function(m){
+  if (!_facCancel) return;
+  _facCancel.motivo = m; _facCancel.err = "";
+  facCancelRender();
+};
+window.facCancelVolver = function(){
+  if (!_facCancel) return;
+  _facCancel.paso = "motivo"; _facCancel.err = "";
+  facCancelRender();
+};
+function facCancelMotivoTxt(s){ return s.motivo === "stock" ? "falta stock" : String(s.texto || "").trim(); }
+window.facCancelPaso2 = function(){
+  var s = _facCancel; if (!s) return;
+  if (!s.motivo){ s.err = "Elegí el motivo: falta stock u otro."; facCancelRender(); return; }
+  if (s.motivo === "otro"){
+    var ta = document.getElementById("facCancelTxt"); if (ta) s.texto = ta.value;
+    // El motivo escrito es OBLIGATORIO: dentro de un mes es lo único que va a explicar por qué
+    // este pedido no se facturó.
+    if (String(s.texto || "").trim().length < 5){
+      s.err = "Escribí por qué se cancela. Queda en el log y es lo único que va a explicar esto mañana.";
+      facCancelRender(); return;
+    }
+  }
+  s.err = ""; s.paso = "confirmar"; facCancelRender();
+};
+function facCancelRender(){
+  var s = _facCancel; if (!s) return;
+  var body = document.getElementById("facCancelBody"); if (!body) return;
+  var cab = '<div class="facfc-cli"><b>' + escapeHtml(s.rs || ("Cliente " + s.cod)) + '</b></div>' +
+            '<div class="facfc-sub">NP ' + escapeHtml(s.np) + (s.tanda ? ' · Tanda ' + escapeHtml(s.tanda) : '') + '</div>';
+  var err = s.err ? '<div class="facfc-warn">⚠ ' + escapeHtml(s.err) + '</div>' : '';
+  if (s.paso === "motivo"){
+    body.innerHTML = cab +
+      '<div class="faccan-q">¿Por qué se cancela el pedido?</div>' +
+      '<div class="faccan-ops">' +
+        '<button class="faccan-op' + (s.motivo === "stock" ? " on" : "") + '" onclick="facCancelMotivo(\'stock\')">📦 Falta stock</button>' +
+        '<button class="faccan-op' + (s.motivo === "otro"  ? " on" : "") + '" onclick="facCancelMotivo(\'otro\')">✏ Otro</button>' +
+      '</div>' +
+      (s.motivo === "otro"
+        ? '<textarea id="facCancelTxt" class="faccan-txt" rows="3" placeholder="Escribí por qué se cancela este pedido…">' + escapeHtml(String(s.texto || "")) + '</textarea>'
+        : '') +
+      err +
+      '<div class="facfc-actions">' +
+        '<button class="facfc-cancel" onclick="facCancelClose()">Volver — no cancelar nada</button>' +
+        '<button class="facfc-go" style="background:#dc2626"' + (s.motivo ? '' : ' disabled') + ' onclick="facCancelPaso2()">Seguir</button>' +
+      '</div>';
+    if (s.motivo === "otro"){
+      var ta = document.getElementById("facCancelTxt");
+      // El texto se guarda en el estado a mano y NO se re-dibuja en cada tecla: redibujar
+      // perdería el foco y el cursor en el celular.
+      if (ta){ ta.oninput = function(){ if (_facCancel) _facCancel.texto = ta.value; }; try { ta.focus(); } catch(_e){} }
+    }
+    return;
+  }
+  body.innerHTML = cab +
+    '<div class="faccan-motivo">Motivo: <b>' + escapeHtml(facCancelMotivoTxt(s)) + '</b></div>' +
+    '<div class="faccan-avisos">' +
+      '<div>• <b>No se factura</b> y sale de la <b>PPP</b>: el armado automático no lo toma más.</div>' +
+      '<div>• <b>No se borra de la base</b>: el pedido y sus artículos quedan para la estadística de qué pidió cada cliente.</div>' +
+      '<div>• Lo que ya estaba armado vuelve a la bodega <b>A guardar</b>, para que un operario lo baje y lo guarde.</div>' +
+    '</div>' + err +
+    '<div class="facfc-actions">' +
+      '<button class="facfc-cancel" onclick="facCancelVolver()">← Volver</button>' +
+      '<button class="facfc-go" id="facCancelGo" style="background:#dc2626" onclick="facCancelConfirmar()">Sí, cancelar ' + escapeHtml(s.np) + '</button>' +
+    '</div>';
+}
+window.facCancelConfirmar = async function(){
+  var s = _facCancel; if (!s || s.saving) return;
+  s.saving = true; s.err = "";
+  var go = document.getElementById("facCancelGo");
+  if (go){ go.disabled = true; go.textContent = "Cancelando…"; }
+  var np = s.np;
+  try {
+    var r = await aprRpc("gv_ppp_np_desarmar", {
+      p_np: np,
+      p_justificativo: "Cancelado desde Facturación: " + facCancelMotivoTxt(s),
+      p_por: await aprQuien(),
+      p_vuelve: false,        // el pedido NO vuelve a «A Programar»: se canceló
+      p_a_guardar: true       // y lo armado va TODO a «A guardar» (regla del dueño, v18.89)
+    });
+    var x = (r && r[0]) || {};
+    s.saving = false; facCancelClose();
+    try { var row = document.querySelector('tr[data-fac-np="' + CSS.escape(np) + '"]'); if (row) row.remove(); } catch(_e){}
+    if (typeof facShowToast === "function") facShowToast("✕ " + np + " cancelado — " + (x.detalle || ""));
+    facReintentar();   // limpia el cache de la PPP y vuelve a leer: la fila no tiene que volver
+  } catch (e){
+    s.saving = false;
+    s.err = String((e && e.message) || e);
+    facCancelRender();
+  }
+};
+
 window.facFacturarNP = async function(btn){
   var args;
   try { args = JSON.parse(btn.dataset.args); }

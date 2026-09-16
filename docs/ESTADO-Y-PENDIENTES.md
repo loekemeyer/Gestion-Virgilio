@@ -1,4 +1,21 @@
-# Estado y pendientes — al 2026-09-16 (última actualización: v18.87)
+# Estado y pendientes — al 2026-09-16 (última actualización: v18.89)
+
+> **2026-09-16 (v18.89) — CANCELAR un pedido desde Facturación (pedido de Thomas).**
+> Botón **✕ Cancelar** en cada fila de Facturación, con pop-up de motivo (**Falta stock** / **Otro**
+> con texto libre), del que se sale con ✕, «Volver», Escape o tocando afuera, y con un segundo paso
+> de confirmación. Al cancelar: **no se factura, sale de la PPP, NO se borra de Supabase** (la
+> estadística de qué pidió cada cliente queda entera) y **lo que estaba armado va TODO a «A
+> guardar»**. Backend: `gv_ppp_np_desarmar` con el parámetro nuevo `p_a_guardar` (la firma de 4
+> argumentos se dropeó). §3.ie · `sql/gv_ppp_np_desarmar_a_guardar_v1889.sql`.
+>
+> ⚠ **No se pisa con la regla de Luis del 16/09** ("la mercadería vuelve de donde salió"): ésa es
+> para «Enviar a programar», donde el pedido sigue vivo y se re-pickea. Cancelar es el pedido
+> muerto. La función se niega si le mandan las dos intenciones juntas.
+>
+> **Lo que queda para una persona:** Thomas avisó que **muchos de los pedidos atrasados de la PPP
+> no se cargaron al camión porque tenían faltantes de todos los artículos de la nota de pedido**, y
+> que los va a revisar **uno por uno diciendo qué hacer con cada uno**. Eso todavía no se tocó: el
+> botón es la herramienta, la revisión es aparte. Tarea Planify **3524**, asignada a **Luis**.
 
 > **2026-09-16, tanda de Luis (v18.87) — las dos alertas de la PPP.**
 >

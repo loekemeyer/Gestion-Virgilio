@@ -19611,3 +19611,112 @@ select (select count(*) from (select * from viva except select * from cache) z) 
 **Archivos:** `sql/gv_cruce_fc_asig_cache_v1888.sql` (todo el cambio) y
 `sql/backups/gv_conciliacion_comparar_20260916_pre_v1888.sql` (rollback completo de las tres
 piezas). Problema 335.
+
+---
+
+## §3.ie — v18.89: CANCELAR un pedido desde Facturación, y lo armado a «A guardar» — 2026-09-16
+
+**Pedido del dueño (Thomas, 16/09), textual:** *"Quiero agregar un botón al módulo de
+facturación para poner cancelar pedido. Cuando toco eso me tiene que abrir un pop-up que me debe
+preguntar el motivo de por qué se está cancelando y me tiene que poder dejar salir si es que
+toqué ahí sin querer. Cuando pongo el motivo, tiene que haber dos botones: uno que sea falta
+stock y otro que sea otro. En otro me tiene que dejar escribir el motivo. Si se cancela el
+pedido, tiene que desaparecer de la PPP, pero no de Supabase, para la estadística de qué
+artículos me pidió cada cliente. Si el pedido estaba armado con algún tipo de ítem, ese ítem
+tiene que ir a la bodega de aguardar."*
+
+Contexto que dio él mismo a continuación: *"muchos de los pedidos que están atrasados en la PPP,
+el motivo es que no se cargó camión porque tenía faltantes de todos los artículos que pedía la
+nota de pedido"*. O sea que el botón es para eso: pedidos que se armaron, no salieron, y no van
+a salir. **Los atrasados se van a revisar uno por uno a mano, después; eso no es de este cambio.**
+
+### Cuatro acciones parecidas que NO son la misma
+
+| | Cuándo | Qué hace con el stock | Qué hace con el pedido |
+|---|---|---|---|
+| **ANULAR** (`gv_pedido_anular`, §3.gh) | en «A Programar», el pedido entró MAL y nadie lo tocó | nada (no se movió nada) | sale de A Programar, queda en `GV_Pedidos_Anulados` |
+| **Enviar a programar** (`gv_ppp_pedido_a_programar` → `gv_ppp_np_desarmar` con `p_vuelve=true`) | el pedido sigue VIVO y hay que rehacerlo | **vuelve de donde salió** (góndola → excedente), regla de Luis del 16/09 | vuelve a A Programar, retenido para que el cron no lo agarre |
+| **CANCELAR desde Facturación** (esto) | ya está ARMADO y no va a salir | **TODO a `a_guardar`** | sale de la PPP y no vuelve |
+| **BORRAR** (regla del `CLAUDE.md`) | el pedido no tiene que existir | — | se borra de la página **y** de Gestión, en los dos proyectos |
+
+⚠ **La regla de Luis y la del dueño no se pisan, porque son dos acciones distintas.** Cuando el
+pedido sigue vivo y se va a re-pickear, devolver a góndola/excedente es el reverso exacto del
+picking y deja el stock listo. Cuando el pedido murió, nadie va a re-pickear esas cajas: están
+armadas, en un lío, en el piso de armado, y tienen que quedar en **A guardar** para que un
+operario las baje y las guarde. Por eso el backend **se niega** si le mandan las dos cosas a la
+vez (`p_vuelve` y `p_a_guardar`): son intenciones contradictorias.
+
+### El cambio: un parámetro, no una función nueva
+
+Cancelar es **exactamente** lo que ya hacía `gv_ppp_np_desarmar` con `p_vuelve = false` —saca la
+NP de la PPP (web → `GV_Web_Cancelados` + `tanda`/`fecha_entrega` en null; ISIS →
+`NP_Canceladas` + `GV_PPP_Prog_Override.oculto`), deja el pedido de la página vivo y guarda el
+snapshot de ítems en `GV_Desarmes`—. Lo único que faltaba era el **destino** del stock.
+
+```
+gv_ppp_np_desarmar(p_np, p_justificativo, p_por, p_vuelve, p_a_guardar)   ← 5 argumentos
+```
+
+`p_a_guardar` default `false`, así que **ningún llamador viejo cambia de conducta**. La firma de
+4 argumentos se **dropeó**: con las dos, una llamada de 4 queda ambigua y Postgres la rechaza.
+Los dos llamadores internos (`gv_ppp_pedido_a_programar`, `gv_entregas_reconstruir`) pasan 4 y
+resuelven a la nueva con el default. Grants: la vieja tenía EXECUTE para `PUBLIC` y `anon`; la
+nueva queda como `gv_pedido_anular`, sólo `authenticated` y `service_role` (la pantalla entra
+con el JWT del supervisor por `facAuthWriteHeaders`).
+
+**"No desaparece de Supabase"** sale gratis y ya era así: el pedido de la página no se toca,
+`PPP_Web_NP` conserva la NP, `gv_ppp_np_items` sigue teniendo los renglones y `GV_Desarmes`
+guarda el snapshot de ítems + el reparto del stock devuelto. La estadística de qué artículos
+pidió cada cliente queda entera.
+
+### La pantalla
+
+Botón **✕ Cancelar** en la columna Acción de Facturación, debajo del ✓ / ⬇ Excel, chico y en
+rojo apagado: es una acción rara y destructiva, no tiene que competirle al tilde. El pop-up
+tiene **dos pasos** —el segundo es la 2da confirmación que pidió el dueño en la v15.65 para todo
+lo que cancela o elimina— y de los dos se sale con ✕, con «Volver», con **Escape** o tocando
+afuera. Mientras la RPC está en vuelo no se cierra: si se cerrara, la pantalla quedaría
+mintiendo sobre si el pedido se canceló o no.
+
+Motivo: **📦 Falta stock** (no pide tipear nada) o **✏ Otro** (textarea obligatoria, ≥ 5
+caracteres). Viaja como `p_justificativo = "Cancelado desde Facturación: <motivo>"`, que es lo
+que queda en `GV_Desarmes.justificativo`, en el motivo de `GV_Web_Cancelados` / `NP_Canceladas`
+y en la descripción de cada movimiento de stock.
+
+La fila desaparece de la lista al confirmar y se vuelve a leer la PPP (`facReintentar`). Si el
+backend rechaza —el caso típico: **la NP ya tiene Carga Camión o Recepción Remitos, o sea que ya
+salió**— el pop-up **queda abierto con el error** y la fila NO desaparece.
+
+### Medición (en transacción con ROLLBACK, contra datos reales)
+
+No se probó leyendo la función: se la llamó contra `LK 0046` (tanda E03F, 16 artículos / 35
+cajas armadas).
+
+| llamada | resultado |
+|---|---|
+| `p_a_guardar => true` | *"16 articulos · 35 cajas devueltas (**35 a A guardar**) · pedido CANCELADO: sale de la PPP y no vuelve"* |
+| `p_a_guardar => false` | *"16 articulos · 35 cajas devueltas (**29 a gondola, 6 a excedente**)"* ← la v18.83 intacta |
+| `p_vuelve => true` + `p_a_guardar => true` | rechazada, 22023 |
+
+En la misma corrida: `PPP_Web_Programacion` sin tanda para esa NP, `GV_Web_Cancelados` con 1
+fila, `GV_Desarmes` con 1 registro. Barrido posterior de `Movimientos_Stock` (`tipo='desarme'`),
+`GV_Desarmes` y `GV_Web_Cancelados` con las marcas de prueba → **0 filas**: no quedó nada escrito.
+
+La lista de Facturación ya sabía esconder lo cancelado y no hubo que tocarla:
+`gv_fac_armado_sin_facturar` excluye `NP_Canceladas` **y** `GV_Web_Cancelados`, y la lista
+principal se arma recorriendo tandas (sin tanda, no hay fila).
+
+⚠ **Un pedido web de varios bloques tiene una NP por bloque, y el botón cancela LA NP.** La
+marca de `GV_Web_Cancelados` es por `order_id`, así que cancelar un bloque marca el pedido
+entero, pero el otro bloque sigue con su tanda y hay que cancelarlo también desde su fila. Es la
+conducta que ya tenía el desarme; no se cambió acá.
+
+### Rollback
+
+Volver a la definición de 4 argumentos de `sql/gv_ppp_np_desarmar_vuelve_v1875_80.sql` y dropear
+la de 5. El botón deja de funcionar (la RPC responde "function does not exist") y el resto sigue
+igual. En el front: sacar `.fac-btn-cancel` de la celda Acción de `facRender` y el bloque
+`facCancel*` de `index.html`.
+
+**Archivos:** `sql/gv_ppp_np_desarmar_a_guardar_v1889.sql`, `tests/fac-cancelar-pedido.cjs`.
+No hay problema de auditoría: es una funcionalidad nueva, no un bug.

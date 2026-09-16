@@ -1,3 +1,36 @@
+## Nota v18.89 (2026-09-16) — CANCELAR un pedido desde Facturación
+
+Pedido del dueño: un botón **✕ Cancelar** en cada fila del módulo de **Facturación**, para el
+pedido que se armó, no salió y no va a salir (el caso que él mismo describió: *"muchos de los
+pedidos atrasados en la PPP no se cargaron al camión porque tenían faltantes de todos los
+artículos que pedía la nota de pedido"*).
+
+**El pop-up.** Pregunta el motivo con dos botones —**📦 Falta stock** y **✏ Otro**, que abre un
+campo de texto obligatorio— y se sale sin hacer nada con ✕, «Volver», **Escape** o tocando
+afuera: apretar el botón sin querer no puede cancelar nada. Tiene un **segundo paso de
+confirmación** (la regla de la v15.65) que repite la NP, el cliente, el motivo y las tres
+consecuencias.
+
+**Qué pasa al cancelar:**
+- **No se factura** y **sale de la PPP**: el armado automático no lo toma más.
+- **No se borra de Supabase.** El pedido de la página queda, la NP queda asignada, los renglones
+  quedan, y `GV_Desarmes` guarda el snapshot de ítems: la estadística de qué artículos pidió cada
+  cliente no pierde nada.
+- **Lo que ya estaba armado vuelve a la bodega «A guardar»**, para que un operario lo baje del
+  piso de armado y lo guarde.
+
+⚠ **No confundir con «Enviar a programar»**, que es la otra cara: ahí el pedido sigue vivo y se va
+a rehacer, así que la mercadería vuelve **de donde salió** (góndola / excedente), que es la regla
+de Luis del 16/09. Cancelar es el pedido muerto: nadie va a re-pickear esas cajas. El backend es
+la misma función (`gv_ppp_np_desarmar`) con el parámetro nuevo `p_a_guardar`, y **se niega** si le
+mandan las dos intenciones a la vez.
+
+⚠ Si la NP **ya tiene Carga Camión o Recepción Remitos** (o sea que ya salió), el backend rechaza
+la cancelación y el pop-up lo dice: eso se cierra con el remito, no cancelando.
+
+Detalle, medición y rollback: `docs/SUPABASE-GESTION-VIRGILIO.md` §3.ie ·
+`sql/gv_ppp_np_desarmar_a_guardar_v1889.sql` · `tests/fac-cancelar-pedido.cjs`.
+
 ## Nota v18.48 (2026-09-15) — Rotado el password del FDW LK→Chef
 
 El user mapping del foreign server `chef_db` se conectaba al proyecto de Chef con un password que
