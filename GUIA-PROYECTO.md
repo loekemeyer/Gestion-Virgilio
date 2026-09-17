@@ -12221,6 +12221,44 @@ evento: todas se cuentan como atrasadas). Detalle y medición en
 atrás: antes de que los operarios pasaran a Gestión casi no se registraba la Carga Camión, así que
 la falta de `CCN` no prueba nada (junio daría 274 "sin salida" que en realidad se entregaron).
 
+**Orden: del más VIEJO al más nuevo, de arriba para abajo** (v19.27, pedido de Luis). Hasta la
+v19.25 salía al revés (lo de ayer primero). Lo que más tiempo lleva parado es lo primero que hay
+que mirar; el KPI de la cabecera ("el más viejo hace N días") sigue diciendo lo mismo.
+
+---
+
+### ⏸ Armados en espera — el día que no es un día (v19.27, pedido de Luis)
+
+Luis: *"agregá un «día» en programación que sea «Armados en espera», va a servir para
+intencionalmente mandar pedidos que se arman sin fecha de entrega definida"*.
+
+Es el **último día** de la tabla de *Programación de entregas*, en gris y con el cartelito *sin
+fecha de entrega*. Lo que está ahí **está armado pero NO tiene fecha**, y por eso:
+
+- **no consume cupo** de ningún día,
+- **no entra en ningún camión**,
+- **no figura como atrasado** (por más que hayan pasado semanas),
+- **no se le avisa al cliente** ninguna fecha,
+- y el **armado automático no le suma** pedidos nuevos a esa tanda.
+
+**Cómo se manda ahí.** Con el botón **📅 Cambiar de día** de la fila de la tanda —el mismo de
+siempre, así que funciona igual desde *Programación de entregas* y desde *Pedidos atrasados*—: en
+el pop-up, arriba de la grilla de días, está **⏸ Mandar a «Armados en espera»**.
+
+**Cómo se saca.** El mismo botón: se elige un día de la grilla y listo. **El contenido nunca se
+toca: no hay que volver a pickear ni a armar.**
+
+| | |
+|---|---|
+| Unidad | la **tanda** entera (como «Cambiar de día»; una tanda no puede partirse en dos días) |
+| Si la tanda ya salió | no se puede parar: primero está el remito |
+| Quién puede | supervisor (o el modo edición) |
+| Qué queda anotado | quién la paró y cuándo, en `public."GV_PPP_Armados_Espera"` |
+
+⚠ **No es una fecha**, aunque por dentro viaje con la fecha centinela `9999-12-31`: eso es sólo
+para que la tabla pueda agruparlo como un día. Si en alguna pantalla aparece *"31/12/9999"*, eso es
+un bug de esa pantalla. Detalle, medición y rollback en `docs/SUPABASE-GESTION-VIRGILIO.md` §3.gm.
+
 ---
 
 ### 📅 Cambiar de día — en la fila de cada tanda (v19.13, pedido de Thomas)

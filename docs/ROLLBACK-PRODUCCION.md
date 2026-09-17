@@ -1434,3 +1434,35 @@ tandas D72A y E11B, 126 filas.
 
 **Planimetría:** el sector `P39` pasó de empresa `CH` a `LK` (backup
 `zz_backups.GV_Backup_Lugar_P39_20260916`); tiene un solo artículo, el 396.
+
+## v19.27 (2026-09-17) — `gv_ppp_programacion_diaria`: una NP «en espera» queda sin fecha de entrega
+
+**Qué se cambió.** El espejo de ISIS —que Producción ve a través de la vista de compatibilidad
+`PPP_Programacion_Diaria`— tiene una rama nueva: si la NP está marcada en
+`public."GV_PPP_Armados_Espera"`, devuelve `fecha_entrega = ''`. La **tanda queda** (a diferencia
+de `desprogramada`, que borra tanda y fecha). Es el módulo «⏸ Armados en espera» que pidió Luis:
+un pedido que se arma a propósito sin fecha de entrega definida.
+
+**Impacto en Producción.** Una NP parada le va a imprimir el remito con `Fecha Entrega —`, igual
+que hoy pasa con una NP desprogramada. Sólo puede pasar con NP que un supervisor haya parado a
+mano desde Gestión; **con la tabla vacía, la vista devuelve exactamente lo mismo que antes** (el
+`left join` no agrega ni saca filas: la clave es `np`, única en esa tabla).
+
+**Medición (2026-09-17).** `GV_PPP_Armados_Espera` tiene 0 filas al aplicarse;
+`gv_ppp_isis_sin_tanda` da 5 antes y 5 después; `gv_endpoints_rotos` vacío; la vista conserva
+`security_invoker=true`.
+
+**Rollback exacto.** `sql/backups/pre_v1927_armados_espera_20260917.sql` recrea la vista sin esa
+rama (y vuelve a poner `security_invoker`). Si además hay que "despertar" lo que quedó parado:
+
+```sql
+select * from public."GV_PPP_Armados_Espera";                      -- qué está parado y de qué tanda
+select * from public.gv_ppp_tanda_mover('<TANDA>', date '<AAAA-MM-DD>', 'rollback', true);
+```
+
+⚠ Restaurar la vista **no** le devuelve la fecha a una tanda ya parada: la fecha de una tanda WEB
+se puso en `NULL` en `PPP_Web_Programacion`, y eso se deshace reprogramándola (arriba) o desde la
+app con «📅 Cambiar de día».
+
+**Permisos que hay que conservar** (si no, se cae el FDW de LK, no Producción):
+`grant select on public."GV_PPP_Armados_Espera" to anon, authenticated, lk_ppp_reader, ch_ppp_reader;`

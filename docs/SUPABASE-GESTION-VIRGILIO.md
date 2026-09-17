@@ -21421,3 +21421,81 @@ L07/L08, LK en F09-F12 + racks AC04/Z05 · 439E → CH en Ñ53, LK en H33/H34/Ñ
 como CH. Luis: *"396 no es un dual mal asignado, es LK. la góndola está mal asignada"* →
 **P39 pasó de CH a LK** (backup `zz_backups.GV_Backup_Lugar_P39_20260916`). Con eso los
 códigos que figuran en las dos góndolas quedaron en los 4 duales declarados.
+
+### §3.gm — v19.27: «⏸ Armados en espera», el día que no es un día — 2026-09-17
+
+Luis, 2026-09-17: *"PPP > Programación. Cambiá el orden de cómo se muestran los pedidos atrasados,
+de los más antiguos a los más nuevos (de arriba para abajo). Agregá un «día» en programación que
+sea «Armados en espera», va a servir para intencionalmente mandar pedidos que se arman sin fecha de
+entrega definida. Asegurate que se pueda enviar desde pedidos atrasados y desde programación de
+entregas"*.
+
+**Lo del orden es sólo front** (`_patrDias`): la lista de Pedidos atrasados se ordena ascendente y
+el KPI "el más viejo hace N días" pasa a mirar `dias[0]`. Lo cubre `tests/ppp-atrasados-modulo.cjs`,
+que verificaba lo contrario y se dio vuelta.
+
+**Lo otro es una tanda SIN FECHA DE ENTREGA, y ahí está todo el truco.** No hace falta inventar un
+estado nuevo: este sistema ya trata "sin fecha" como "no sale". Al sacarle la fecha a la tanda,
+sola se cae de todo lo que mira fechas, sin tocar ninguno de esos objetos:
+
+| | por qué queda afuera |
+|---|---|
+| cupo del día (`gv_ppp_web_calendario`) | filtra `fecha_entrega between` |
+| camión (`gv_ppp_camion_pasado`, `gv_ppp_super_mezclado`) | piden `fecha_entrega is not null` / la regex de fecha |
+| Pedidos atrasados (`gv_ppp_atrasados`) | pide el árbol hasta AYER |
+| aviso al cliente (`vista_avisar_programacion`) | pide fecha |
+| armado automático (`gv_ppp_web_tanda_abierta_cliente`) | compara `fecha_entrega = p_fecha`, y NULL nunca matchea |
+| "un cliente, un día" (trigger `gv_web_cliente_un_solo_dia`) | corta con `NEW.fecha_entrega is null` |
+
+**Por qué NO se usó una fecha futura guardada en la tabla** (que era la idea obvia, 9999-12-31 como
+`fecha_entrega` de verdad): una fecha futura la ven todos esos consumidores. El trigger
+`gv_web_cliente_un_solo_dia` se llevaría al año 9999 el resto de los pedidos de ese cliente,
+`notificar_tandas_adelantar_telegram` pediría adelantarlas todos los días, y al cliente le llegaría
+un WhatsApp con esa fecha. Sin fecha, cada guard ya la ignora solo.
+
+**Lo único que hacía falta era que no desaparecieran de la pantalla**, y eso es
+**`GV_PPP_Armados_Espera`** (una fila por NP: tanda, empresa, quién y cuándo). Con esa marca:
+
+- `gv_ppp_prog_arbol` devuelve esas NP con la fecha **centinela** `9999-12-31`
+  (`gv_ppp_espera_fecha()`), y el front las agrupa como un día más, el último.
+  ⚠ **Sólo salen si el rango pedido llega hasta el centinela.** Programación pide
+  `p_hasta = 9999-12-31` (antes hoy+120); Pedidos atrasados pide hasta ayer, así que nunca las ve
+  — por eso parar una tanda la saca de atrasados sin tocar `gv_ppp_atrasados`.
+- `gv_ppp_programacion_diaria` (el espejo de ISIS) devuelve `fecha_entrega = ''` para las NP
+  marcadas. **La tanda queda** (a diferencia de `desprogramada`, que saca las dos cosas): el armado
+  sigue existiendo y la NP no cae en `gv_ppp_isis_sin_tanda` (medido: 5 antes y 5 después).
+
+**Cómo se entra y cómo se sale.** Se entra con el botón nuevo del pop-up de días
+(`pppMovEsperaElegir` → `gv_ppp_tanda_espera`), que es el MISMO pop-up de las dos pantallas que
+pidió Luis — comparten `_pgaCuerpoHtml` —, así que quedó en las dos sin código aparte. Se sale con
+el «📅 Cambiar de día» de siempre: `gv_ppp_tanda_mover` ahora borra la marca al final. **El
+contenido nunca se toca: no hay que volver a pickear ni a armar.** Lo único que se rechaza es una
+tanda que ya salió (CCN vigente o CRN), con la misma definición que el resto.
+
+**Medido el 17/09 corriendo de verdad las dos RPC dentro de una transacción abortada** (no leyendo
+el código: la lección de la v18.87), parando E21A (web, atrasada) y E12I (ISIS, 3 NP del 18/09):
+
+```
+ANTES  · atrasados=14 · arbol(hoy..+120)=151 · tanda_dos_dias=0 · super_mezclado=0
+       · cliente_dos_dias=0 · camion_pasado=3 · avisar_prog=12 · cupo del 18/09=7,942 m³
+DESPUES· atrasados=13 · arbol(hoy..+120)=148 · arbol(hoy..centinela)=152 · en_espera=4
+       · tanda_dos_dias=0 · super_mezclado=0 · cliente_dos_dias=0 · camion_pasado=3
+       · avisar_prog=12 · cupo del 18/09=7,703 m³ · isis_sin_tanda=5 (igual que antes)
+VOLVER · gv_ppp_tanda_mover las devuelve a un día real, marcas=0, árbol de nuevo completo
+```
+
+O sea: salió de atrasados, liberó los 0,239 m³ de cupo del 18, **ningún centinela se movió** y
+volver deja todo como estaba. `gv_endpoints_rotos` vacío.
+
+**Rollback:** `sql/backups/pre_v1927_armados_espera_20260917.sql` (el espejo como estaba + qué
+sacarle a las dos funciones). Ojo: restaurar los objetos **no** le devuelve la fecha a una tanda ya
+parada — eso se hace con `gv_ppp_tanda_mover` (o desde la app). Qué hay parado:
+`select * from public."GV_PPP_Armados_Espera";`
+
+**SQL:** `sql/gv_ppp_armados_espera_v1927.sql`. **Front:** `PGA_ESPERA_ISO` / `_pgaDiaTxt` /
+`pppTandaEspera` en `index.html`. **Test:** `tests/ppp-armados-espera.cjs`.
+
+⚠ **Lo que hay que mirar si alguna vez se vuelve raro:** `gv_ppp_programacion_diaria` es
+`security_invoker` y ahora joinea `GV_PPP_Armados_Espera`, así que la tabla tiene SELECT para
+`anon`, `authenticated` **y los roles del FDW** `lk_ppp_reader` / `ch_ppp_reader` — sin eso, el
+`sincronizar_ppp()` de LK se cae con *permission denied*.
