@@ -21716,3 +21716,39 @@ pregunta al elegir el día y sale en el confirm del paso 2. Lo cubre `tests/ppp-
 
 Tests: `tests/ppp-pedido-cambiar-dia.cjs` (nuevo), `ppp-tanda-cambiar-dia`, `ppp-mover-popup`,
 `ppp-tabla-arbol`, `pga-enviar-a-programar`.
+
+### v19.33 (17/09) — conteo físico del 809E en el depósito
+
+Luis contó el 809E el 17/09 y pasó los números. Cierra el pendiente "conteo físico del 809E" y
+la contradicción de AD06. Detalle, SQL y rollback en `sql/gv_conteo_809e_v1933.sql`.
+
+**Lo contado:** 809E LK → J14 14 cajas (J13 vacía) y AD05 28 MC, en ningún otro rack. 809E CH →
+M14 104 cajas (M13 y M15 vacías), sin rack. AD06 → 368E, 14 MC.
+
+**⚠ Las 9 cajas de M16 son `809`, no `809E`** — otro artículo, también de Chef, el secundario.
+Corrección de Luis en el momento; el primer cálculo las había sumado al 809E. No hubo que tocar
+nada: `809` ya estaba en 9 en el libro y M16 ya estaba asignado a `809`.
+
+| cod | emp | depósito | antes | conteo | ajuste |
+|---|---|---|---|---|---|
+| 809E | LK | terminado | 21 | 14 | −7 |
+| 809E | CH | terminado | 110 | 104 | −6 |
+| 809E | LK | racks | 0 | 336 (28 MC × 12) | +336 |
+| 809E | CH | racks | 336 | 0 | −336 |
+
+Los 4 movimientos van como `tipo='ajuste'` con ref *"ajuste de admin en base a conteo del
+17.09"* (como pidió Luis) y **empresa explícita**: es un código dual y el trigger respeta LK/CH
+explícito sin intentar resolverlo por la NP.
+
+**`separar_pedidos` CH = 6 no se tocó** y está bien: es la tanda **E03G**, pickeada el 16/09 y
+todavía sin separar. Esas cajas están en la mesa de armado, no en la góndola, así que el conteo
+del depósito no las ve. Ajustarlas habría borrado un pedido en curso.
+
+**Lugares:** `AD05` pasó de CH a **LK** en `GV_Lugar` y en `Racks_Planimetria` (mismo criterio
+que el 396 en P39: se corrige el lugar, no se mueve el artículo). Se borraron de
+`Racks_Planimetria` las filas que el conteo no encontró — `AD06 / 809E / CH / 30 MC` y
+`AE11 / 809E / LK / 8 MC` —, que no estaban en el libro de stock, así que no movieron ningún
+número. Alta en `GV_Lugar_Item` de `AD05 / 809E`. `368E` no se tocó: sus 4 racks suman 236 cajas
+y coinciden con el libro.
+
+Respaldos: `zz_backups."GV_Backup_Conteo809E_{Racks,Lugar,LugarItem,Saldos}_20260917"`.

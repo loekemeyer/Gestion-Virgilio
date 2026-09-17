@@ -495,11 +495,21 @@ select distinct r.sector from public."Racks_Planimetria" r
 -- y Z7 (su gemelo Z07 existe pero es GÓNDOLA, no rack)
 ```
 
-### Y una contradicción que quedó a la vista, sin resolver
+### ✅ La contradicción de AD06 — resuelta por el conteo del 17/09
 
-**`AD06` tiene dos filas**: `CH / 809E / 360 cajas` (del 08/07) y `LK / 368E / 56` (del 31/08),
-mientras `GV_Lugar` dice que AD06 es un rack de **LK**. Un rack con dos artículos de dos empresas.
-No se tocó: hay que mirarlo en el depósito.
+`AD06` figuraba con dos filas: `CH / 809E / 360 cajas` (del 08/07) y `LK / 368E / 56` (del
+31/08), con `GV_Lugar` diciendo que AD06 es un rack de **LK**. Luis contó: **en AD06 hay 368E,
+14 MC**, y punto. Las 360 de 809E CH eran layout viejo que ya no estaba (ni en el libro de
+stock: el saldo de racks eran las 336 de AD05), así que se borraron. Igual `AE11 / 809E / 8 MC`.
+
+**Y apareció la misma contradicción en AD05**: tenía `emp = CH` pero las 28 MC que hay adentro
+son **809E de Loekemeyer**. Se aplicó el criterio de Luis para el 396 en P39 (*"la góndola está
+mal asignada, ajustala"*): **AD05 pasó a LK**, el artículo no se movió. v19.33,
+`sql/gv_conteo_809e_v1933.sql`.
+
+⚠ **Y el que muerde: `809` y `809E` son artículos DISTINTOS, los dos de Chef.** El `809` es el
+secundario, vive en la góndola **M16**; el `809E` de Chef está en **M14**. Contar las cajas de
+M16 como 809E le habría sumado 9 al código equivocado. Lo frenó Luis en el momento.
 
 ### ⚠ Un código DUAL no tiene empresa: `gv_empresa_de_articulo` contesta **NULL**
 
