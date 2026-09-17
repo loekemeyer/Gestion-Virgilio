@@ -1,3 +1,45 @@
+## Nota v19.53 (2026-09-17) — Los otros dos crons: 19,5 s de reescribir lo mismo, y un lock sobre el stock
+
+Segunda parte de lo del cron 34 (v19.46). Luis: *"¿qué pasa con los benditos crons?"*.
+
+**El cron 68 (`reconciliar-pipeline-stock`, cada 10 min) tardaba 19,5 s**, y 14,5 de esos eran
+`etapa1`: recalcula todo el picking en cada corrida —5.451 pares (tanda, artículo)— y lo vuelca
+con tres upserts, o sea **16.000 filas tocadas**, pero **reescribiendo cada una con el valor que
+ya tenía**. Cada reescritura dispara los 9 triggers de `Movimientos_Stock`; medido a propósito, un
+`update … set delta = delta` sobre 10.305 filas tarda **8,9 s**. Se le puso un `WHERE … IS
+DISTINCT FROM …` a los tres upserts: **20,2 s → 2,1 s**, con el md5 del estado final idéntico.
+
+**El cron 57 (`refresh_stocks_carga_rapida`, cada 5 min) hacía algo peor que tardar**: arrancaba
+con un `REFRESH MATERIALIZED VIEW` **sin `CONCURRENTLY`**, que toma ACCESS EXCLUSIVE — 1,3 s en
+los que **nadie puede leer** `vista_stock_procesada`, que es de donde come la pantalla de stock
+(`vista_saldos_stock`: 15.984 llamadas, 1,25 s de media, 7,9 s de máximo). No se puede poner
+`CONCURRENTLY` adentro de una función (corre en transacción), y **no hace falta**: el cron 55 ya
+refresca esa matview cada 2 minutos con `CONCURRENTLY`. Se sacó la línea: **1,27 s → 67 ms**, con
+`stocks_carga_rapida` idéntica.
+
+**Y así se explican los 4,6 s de espera media del advisory lock.** El 57 corre cada 5 min y el 68
+cada 10, así que chocan en :00 / :10 / :20…, y comparten `pg_advisory_xact_lock(5768)`:
+
+| hora | cron 68 | cron 57 |
+|---|---|---|
+| 17:05 | — | 1,47 s (solo) |
+| 17:10 | 16,91 s | **18,15 s** (esperando) |
+| 17:20 | 20,09 s | **38,89 s** (esperando) |
+| 17:25 | — | 1,50 s (solo) |
+
+El lock está bien puesto —los dos escriben stock y no pueden pisarse—; lo que estaba mal era
+cuánto lo tenían tomado. No se tocó ni el lock ni el schedule.
+
+**La prueba, en la corrida conjunta de las 17:30** (el peor minuto, los dos juntos): el 68 pasó
+de 20,09 s a **5,98 s** y el 57 de 38,89 s a **0,54 s**. De 59 s de crons pesados en ese minuto
+a 6,5 s.
+
+**Lo que queda medido y sin tocar**: cron 92 (`gv-refrescar-articulo-empresa`, 5,2 s de media y
+22,4 s de máximo), cron 90 (`gv-cruce-fc-asig`, 5,4 s) y `ppp_web_armar_tandas`, que llega a
+**7,7 s contra el límite de 8** — si lo cruza, el armado automático se corta en silencio.
+
+Detalle y medición: §3.jb de `docs/SUPABASE-GESTION-VIRGILIO.md` · problema 384.
+
 ## Nota v19.46 (2026-09-17) — Un cron se comía el 54 % de la base: por eso saltaban «canceling statement» al azar
 
 Luis tocó **✕ Cancelar pedido** en la NP 98507 y salió **`canceling statement due to statement
