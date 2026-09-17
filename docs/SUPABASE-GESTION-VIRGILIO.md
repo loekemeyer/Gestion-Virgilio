@@ -22664,3 +22664,101 @@ Hoy esas paradas viajan repartidas entre los camiones de reparto común. Las **3
 recurrentes** son candidatas naturales a parada fija —tienen dirección estable y no dependen de
 dónde viva el cliente— y las 9 primeras concentran la mitad del volumen. **Queda como pregunta
 para Luis, no como cambio**: si el expreso merece su propia ancla diaria al sur.
+
+## §3.jd — v19.46: EL ANCLA DEL EXPRESO (y el intento que salió peor)
+
+**Luis, 17/09/2026**, sobre el informe de §3.jc: *"— ¿Le damos ancla propia al sur? — Sí, dásela."*
+
+Sigue **apagado**: `ancla_activo = 0`, lo único ejecutable es el simulador, que no escribe.
+`sql/gv_ancla_expreso_v1946.sql`.
+
+### ⚠⚠ El primer intento salió PEOR, y ésa es la parte que hay que leer
+
+Lo obvio era darle al expreso un **pool aparte** (`tipo = 'EXPRESO'`, una parada de expreso sólo
+se junta con expreso). Medido sobre los mismos 90 días:
+
+| | anclas | de 1 parada | km | paradas/camión |
+|---|---:|---:|---:|---:|
+| v19.40 (sin nada) | 86 | 12 | 4.221 | 6,07 |
+| **pool aparte** | **93** | **16** | **4.628** | **5,61** ← peor |
+| imán (lo que quedó) | **80** | 13 | 4.277 | **6,53** |
+
+**Por qué falló:** los galpones **ya se venían juntando** con clientes a domicilio de CABA que les
+quedan cerca. Separarlos en su propio pool no les dio compañía nueva — les **sacó** la que ya
+tenían. En el modelo final, **33 de las 38 anclas con expreso son MIXTAS** y sólo 5 son de expreso
+puro.
+
+> **El ancla del expreso es un IMÁN, no un corralito.** Lo único que cambia: cuando el ancla **ya
+> lleva expreso**, el radio para sumarle otra parada de expreso pasa a ser el del **corredor
+> (8 km)** en vez del de CABA (3,5). Es estrictamente **más permisivo** que la v19.40, así que no
+> puede perder nada de lo que ya funcionaba.
+
+**Y la regla que deja, que vale para cualquier cambio:** un cambio que *aísla* un subconjunto hay
+que medirlo contra el anterior **antes** de escribirlo lindo. Éste se aplicó, se corrió, dio peor y
+se reescribió. Leerlo no lo habría mostrado — es el mismo criterio del súper mezclado (§3.ic).
+
+### Por qué 8 km y no 12 ni 15
+
+El barrido de 90 días da **3,5→86 · 6→86 · 8→80 · 10→85 · 12→78 · 15→77**: **no es monótono**, o
+sea que la diferencia entre 8 y 15 es **ruido del orden greedy**, no señal. Mes a mes empatan o
+gana 8:
+
+| | 8 km | 12 km |
+|---|---|---|
+| septiembre | 20 camiones · 1.106 km | 20 · 1.106 |
+| agosto | **28** camiones · 1.549 km | 29 · 1.551 |
+
+Y 8 km es el único valor que sale de la **geografía** y no de tunear: es el tamaño del corredor
+(Soldati–Pompeya–Barracas–P. Patricios miden 6,9 km de punta a punta) y cubre el **94 % del m³**
+de expreso. Medido, distancia al centro de Soldati: ≤4 km → 155 paradas / 75,7 m³; 4-8 km → 67 /
+30,2; 8-15 km → 8 / 3,2; >15 km → 9 / 4,3.
+
+### Lo que dio
+
+| | real | v19.40 | **v19.46** |
+|---|---:|---:|---:|
+| **SEPTIEMBRE** camiones | 36 | 22 (−38,9 %) | **20 (−44,4 %)** |
+| de 1 sola parada | 13 | 3 | 4 |
+| m³ por camión | 1,08 | 1,77 | **1,94** |
+| km | — | 1.151 | **1.106** ← menos km *y* menos camiones |
+| **AGOSTO** camiones | 52 | 31 (−40,4 %) | **28 (−46,2 %)** |
+| de 1 sola parada | 14 | 7 | **4** |
+| m³ por camión | 1,85 | 3,10 | **3,43** |
+| km | — | 1.531 | 1.549 (+1,2 %) |
+| **90 días** anclas | — | 86 | **80** |
+| `sin_lugar` | — | **1** | **0** |
+
+El `sin_lugar = 1` era el único pendiente que había dejado la v19.40 (una ancla que forzaba un día
+por encima del tope de 2 camiones): **la v19.46 lo tapa sola**.
+
+Las 38 anclas con expreso: **9,9 paradas y 4,35 m³** de media, diámetro medio 7,6 km, **4,28 h**
+(máx 7,69 sobre un tope de 8).
+
+### Invariantes, los cinco en 0
+
+```sql
+select count(*) filter (where horas > 8)                       fuera_de_jornada,
+       count(*) filter (where extract(isodow from fecha) > 5)  en_fin_de_semana,
+       count(*) filter (where sin_lugar)                       sin_lugar,
+       count(*) filter (where m3 > 6.0)                        pasa_el_camion,
+       (select count(*) from public.gv_ancla_paradas(current_date-90, current_date))
+         - sum(paradas)                                        paradas_perdidas
+  from public.gv_ancla_simular(current_date - 90, current_date);
+-- 0 · 0 · 0 · 0 · 0   (80 anclas, 522 paradas, h máx 7,69)
+```
+
+**Regresión:** con el interruptor apagado tiene que reproducir la v19.40 exacta —
+`gv_ancla_simular(current_date-90, current_date, p_expreso_activo => false)` da **86**, igual que
+§3.ja/§3.jb.
+
+⚠ **La firma de 7 argumentos se dropeó a propósito** (cambió el `RETURNS TABLE`: ahora trae
+`es_expreso` y `paradas_exp`), para que ningún llamador viejo resuelva a la vieja en silencio —
+mismo criterio que la v18.87 con `gv_ppp_web_tanda_abierta_cliente`.
+
+⚠ **Lo que queda feo NO es de la regla, es dato:** dos anclas con expreso pasan los 15 km de
+diámetro (38,3 y 19,3 km). Las dos las siembra una parada cuyo punto es el **centroide de
+Avellaneda**, que sale de sólo 2 clientes geocodificados y cae 12 km al sudeste de donde está
+(§3.jc). Con el centroide bien, esas dos miden ~10 km. No se tocó nada del padrón.
+
+**Apagarlo sin tocar código:**
+`update public."PPP_Web_Config" set valor = 0 where clave = 'ancla_expreso_activo';`
