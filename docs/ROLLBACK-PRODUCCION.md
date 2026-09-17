@@ -1394,3 +1394,43 @@ igual: `drop function public.gv_fin_activo(text,timestamptz,timestamptz,numeric)
 drop function public.gv_min_activos(text,timestamptz,timestamptz);
 drop function public.gv_jornada_ventanas(text,timestamptz,timestamptz);`
 
+
+
+## v19.26 (2026-09-16/17) — `trg_normalizar_empresa_stock`: la empresa la da el artículo
+
+**Objeto compartido tocado:** `public.trg_normalizar_empresa_stock()` (trigger BEFORE INSERT
+de `Movimientos_Stock`) y 55.380 filas de la propia tabla (columna `empresa`, nada más).
+
+**Qué cambió.** Para un código NO dual el trigger ya no escribe `Mixto`: toma la empresa del
+artículo (góndola → lista de precios → racks) y pisa lo que venga del front. Para los duales
+no cambia nada salvo que la NP ahora se busca de los dos lados de la barra del `ref`.
+
+**Impacto medido.** La huella del saldo (`md5` de `sum(delta)` por cod_art+depósito) es
+**idéntica** antes y después: `d8028d919ec17a583c4662d52550ae23`. Ningún depósito cambió de
+número. Lo que cambia es la columna `empresa`, que sólo parte la pila en `vista_saldos_stock`
+para los 4 códigos duales.
+
+**Rollback exacto.**
+```sql
+-- 1) el trigger
+select def from zz_backups."GV_Backup_Fn_NormalizarEmpresa_20260916";  -- y ejecutarlo
+-- 2) las filas (apagar antes el trigger de saldo: corre FOR EACH ROW y reescanea todo)
+alter table public."Movimientos_Stock" disable trigger trigger_actualizar_saldo_stock;
+update public."Movimientos_Stock" m set empresa = b.empresa_antes
+  from zz_backups."GV_Backup_MovStock_empresa_backfill_20260916" b where b.id = m.id;
+update public."Movimientos_Stock" m set empresa = b.empresa_antes
+  from zz_backups."GV_Backup_MovStock_empresa_alineadas_20260916" b where b.id = m.id;
+alter table public."Movimientos_Stock" enable trigger trigger_actualizar_saldo_stock;
+select public.refresh_stocks_carga_rapida();
+-- 3) el resto
+select cron.unschedule('gv-refrescar-articulo-empresa');
+drop table public."GV_Articulo_Empresa_Cache" cascade;
+```
+
+⚠ **Al revertir, revertir las dos cosas juntas.** Si se vuelve el trigger viejo y se dejan
+las filas alineadas (o al revés), historia y futuro quedan con criterios distintos y el
+`ON CONFLICT` del reconciliador **duplica el picking** — pasó el 16/09 a las 18:20 con las
+tandas D72A y E11B, 126 filas.
+
+**Planimetría:** el sector `P39` pasó de empresa `CH` a `LK` (backup
+`zz_backups.GV_Backup_Lugar_P39_20260916`); tiene un solo artículo, el 396.

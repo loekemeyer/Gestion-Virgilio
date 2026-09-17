@@ -21331,3 +21331,93 @@ mismo día**, que es exactamente lo pedido.
 **Rollback**: no hace falta (nada vivo cambió). Para borrar la sombra:
 `drop function gv_ppp_web_sombra_detalle, gv_ppp_web_sombra, gv_ppp_web_agrupar_geo, gv_ppp_ruta_horas, gv_ppp_ruta_orden, gv_ppp_web_punto, gv_km;`
 y borrar las claves nuevas de `PPP_Web_Config`.
+
+
+## §3.iu — La empresa de un movimiento la da el ARTÍCULO, no el pedido (v19.26, 16-17/09)
+
+Pedido de Luis, textual: *"para todos los que no son duales, necesito que siempre viajen con
+la empresa correspondiente (que es el dato que aparece ahí en la columna LK/CH)"*.
+
+**El concepto.** Un código NO dual es UNA pila en UN estante, y el dueño es el artículo: un
+artículo de Loekemeyer que sale en un pedido de Chef **sigue siendo de Loeke** — para eso
+existe el sufijo L (505L es el 505 de Loeke facturado por Chef, y se pickea igual de la
+góndola Loeke). Hasta la v18.86 el trigger escribía `Mixto` en esa rama y la app etiquetaba
+por el **pedido**, así que el saldo quedaba partido entre entradas sin etiqueta y salidas
+etiquetadas al revés: 61 códigos con la pila partida (862 con CH −40 / LK +55, total 15).
+
+**Qué se hizo.** `sql/gv_empresa_del_articulo_v1926.sql`.
+
+| | |
+|---|---|
+| Movimientos etiquetados | 7.356 → **62.152** |
+| Backfill (16/09) | 54.914 filas — 48.453 LK, 6.461 CH |
+| Alineadas (tenían la etiqueta del criterio viejo) | 466 — 443 decían CH siendo LK, 23 al revés |
+| Sin etiqueta que quedan | 170 (48 huérfanos + 119 del 809E pre-split + 3 en cero) |
+| Centinela `gv_stock_empresa_fantasma` | 61 → **5** |
+| Huella del saldo | idéntica antes y después |
+
+**De dónde sale la empresa** (`gv_empresa_de_articulo`): la **góndola** (`gv_lugar_articulo`,
+que es el dato de la columna LK/CH) → la lista de precios para los códigos sin góndola →
+los racks. Devuelve NULL a propósito para duales y huérfanos: ahí no se inventa nada.
+
+⚠ **NO usar `gv_articulo_empresa`** (la vista vieja): dice 439 LK y sólo 4 CH porque toma
+`gv_uxb_lk` —tabla de unidades por caja, no de propiedad— como si fuera "es de LK", y los
+101 códigos de Chef están todos ahí. No la lee nadie.
+
+### Las dos trampas que costaron caro
+
+**1. A los duales NO se les toca la etiqueta histórica.** Se intentó etiquetar los
+movimientos viejos del 809E "por el pedido" y se rompieron los números en pantalla: CH
+terminado pasó de 110 a **−119**. Motivo: los movimientos anteriores al conteo del 01/08
+**ya suman cero** —lo de antes (+400 racks, +360 racks_ch, +79 góndola) lo cancela exacto el
+reset de ese día— así que etiquetar una pata y dejar su contrapartida sin etiquetar inventa
+un negativo. Las 119 filas volvieron a `Mixto` y el 809E quedó idéntico. Lo que esos
+códigos necesitan es un **conteo físico**, no una deducción.
+
+**2. El índice único `mov_stock_pipeline_dedup` incluye `empresa`.** Si la historia dice CH
+y el trigger nuevo escribe LK, el `ON CONFLICT` del reconciliador no matchea y **duplica el
+picking**. Pasó de verdad: la corrida de las 18:20 del 16/09 re-insertó 126 filas de D72A y
+E11B. Se verificaron una por una contra su gemela (las 126 tenían gemela con el mismo
+delta) y se borraron.
+
+**Orden obligatorio de aplicación**, por eso mismo:
+1. apagar los crons 34, 57, 68, 74, 81
+2. poner el trigger
+3. alinear la historia (filas cuya empresa ≠ la del artículo)
+4. correr los reconciliadores **a mano** y confirmar **0 filas nuevas**
+5. recién ahí prender los crons
+
+### Performance
+
+El trigger corre en el camino caliente del picking, así que la regla va **cacheada** en
+`GV_Articulo_Empresa_Cache` (374 códigos, cron 92 `gv-refrescar-articulo-empresa` cada 15
+min): de **10,5 ms a 1,8 ms** por fila; un movimiento completo, con todos los triggers,
+~4 ms. La función cae a la versión viva si el artículo no está cacheado (uno nuevo).
+Verificado: 0 diferencias entre caché y versión viva sobre los 357 códigos con movimientos.
+
+### El `44619|CP` y el −14 del 438E
+
+El 438E mostraba `a facturar −14`. No había ningún quilombo en los movimientos: entraron 14
+(Cp, 15/09, **CH**) y salieron 14 (Facturado, 16/09, **sin empresa**), y el sistema los
+contaba en dos pilas. La causa: el trigger buscaba la NP **después** de la barra (formato
+`D33B|98329`) y esa fila viene como `44619|CP`, con la NP **adelante**. Desde la v19.26 se
+busca de los dos lados, con guard de largo 4-6 — sin él `D33B` da "33" y
+`D06E|FIX_..._20260811` da "20260811", que `empresa_de_np` resolvería como LK.
+
+### Chequeos
+
+```sql
+select count(*) from public.gv_stock_empresa_fantasma;              -- pila partida (5)
+select public.reconciliar_pipeline_stock();                          -- 0 filas nuevas
+select cod, empresa, tipo, sector from public.gv_lugar_articulo      -- donde va cada dual
+ where regexp_replace(upper(btrim(cod)),'^0+(?=.)','') in ('437E','438E','439E','809E');
+```
+
+**Dónde va cada dual** (lo que ve el operario al guardar o pickear): 438E → CH en L05/L06,
+LK en F13-F16 + racks AD11/X11 · 809E → CH en M13/M14/M15, LK en J13/J14 · 437E → CH en
+L07/L08, LK en F09-F12 + racks AC04/Z05 · 439E → CH en Ñ53, LK en H33/H34/Ñ54.
+
+**Y el 396 no era dual**: estaba cargado en dos góndolas, A65 (LK) y P39, y P39 figuraba
+como CH. Luis: *"396 no es un dual mal asignado, es LK. la góndola está mal asignada"* →
+**P39 pasó de CH a LK** (backup `zz_backups.GV_Backup_Lugar_P39_20260916`). Con eso los
+códigos que figuran en las dos góndolas quedaron en los 4 duales declarados.
