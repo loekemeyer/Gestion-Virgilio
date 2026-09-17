@@ -100,12 +100,30 @@ Rabanal 2866, Troxler 3259, J. B. Justo 8587 (Liniers).
 | **Resto de CABA** | C01, C02, C03, C05, C06, C11, C12, C13, C14, C15 | ~7 | 1 o 2 días por semana |
 | **GBA Norte** | Vicente López, Olivos, Martínez, San Isidro, Tigre, Pilar | 3,2 | 1 día |
 | **GBA Oeste** | Tres de Febrero, Ciudadela, Morón, Ituzaingó, Moreno, La Matanza | 3,5 | 1 día |
-| **GBA Sur** | Avellaneda, Lanús, Lomas, Quilmes, Berazategui, Varela | 3,7 | 1 día |
+| **GBA Sur** | Avellaneda, Lanús, Lomas, Quilmes, Berazategui, Varela | 3,7 | 1 día · **viaje dedicado, ver §3.1** |
 
 **Las bandas son etiqueta y prioridad, no pared.** Con 3 a 7 pedidos por semana fuera del eje
 sur, seis zonas rígidas fabrican viajes flacos: en la ventana medida, **13 de 34 viajes fueron
 1-2 paradas con menos de 0,8 m³**. Quién viaja con quién lo cierra la distancia del día; la banda
 sirve para nombrar el camión y para priorizar.
+
+### 3.1 · SEGURIDAD: GBA Sur va SOLO (Luis, 17/09/2026)
+
+> *"Zona sur es una zona peligrosa de robos, no se podría meter con CABA Sur."*
+
+**GBA Sur nunca comparte camión con CABA Sur ni con ninguna otra banda.** Viaje dedicado, aunque
+la distancia diga que conviene juntarlos: el Riachuelo es un borde de **riesgo**, no de kilómetros.
+Un camión asaltado ahí se lleva también la mercadería de todos los demás clientes del viaje.
+
+Esta regla **gana sobre cualquier optimización de km, horas o m³**. Si el algoritmo propone
+juntar GBA Sur con otra cosa porque "queda al lado", el algoritmo está mal, no la regla.
+
+Consecuencias de armado:
+- `C04`/`C08` ↔ `GBA-S` es un par **prohibido** (va como veto en `GV_Region_Vecina`, igual que
+  Núñez–Lugano en `GV_Barrios_Pares`), aunque sean limítrofes por el Riachuelo.
+- El viaje de GBA Sur lleva **sólo su propia carga**.
+- Si además se quiere bajar exposición: programarlo con el camión lo menos cargado posible
+  (último tramo del día o viaje corto propio). **Pendiente de confirmar con Luis.**
 
 ### Bordes y bisagras
 
@@ -113,7 +131,9 @@ sirve para nombrar el camión y para priorizar.
 - **C11 / C10 → GBA Oeste**: saliendo de Virgilio y Jonte, la General Paz está a 2 km. Ciudadela,
   Caseros, Ramos y el anillo C9-C10-C11 son **el mismo corredor**: separarlos parte un viaje que
   ya está armado.
-- **C12 → GBA Norte** y **C08 → GBA Sur**: regla de Luis (16/09), textual.
+- **C12 → GBA Norte**: regla de Luis (16/09), textual. Lo de **C08 → GBA Sur** que Luis dijo el
+  16/09 quedó **anulado por §3.1** (seguridad): son limítrofes por el Riachuelo, pero no comparten
+  camión.
 - **San Martín / V. Ballester / Villa Lynch / José León Suárez / Chilavert**: 11 pedidos en
   3 meses (0,85/semana). No merece decisión de diseño: lo resuelve la cercanía del día. Si hay
   que fijarlo, va con **Oeste** (salen por Constituyentes–Márquez, como Tres de Febrero; el Norte
@@ -140,6 +160,7 @@ Cualquier propuesta tuya las respeta o no se propone:
 | Camión 6 m³ · jornada 8 h · 2 fleteros | `PPP_Web_Config` |
 | Anticipación mínima 4 días hábiles | v13.22 |
 | Norte y Sur de CABA nunca juntos | `GV_Barrios_Pares` |
+| **GBA Sur no comparte camión con nadie (robos)** | **Luis, 17/09 · §3.1** |
 | En el chat los nombres, en la app los códigos | v14.00 |
 
 **Súper con zona numérica**: Dorinka y Diarco vienen como "Zona 5 - GBA Oeste". Cualquier filtro
