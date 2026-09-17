@@ -1,6 +1,12 @@
 # Handoff — Submódulo "Clientes nuevos" (Gestión Virgilio)
 
-**Fecha:** 2026-09-16 · **Pedido de:** Luis · **Estado:** vivo en `main`, **v19.08**, testeado y pusheado.
+**Fecha:** 2026-09-16 (actualizado 2026-09-17, v19.36) · **Pedido de:** Luis · **Estado:** vivo en
+`main`, testeado y pusheado.
+
+> ⚠ **v19.36 (Luis, 17/09): NO hay seña del 30%.** El cliente nuevo paga el **TOTAL del pedido con
+> IVA** (la factura simulada) **antes del armado y la entrega**. El Speech 1 manda ese monto y la
+> columna Monto lo muestra como `c/IVA $…` debajo del neto. Todo lo que este archivo diga sobre
+> una seña del 30 % quedó derogado. Detalle en `docs/SUPABASE-GESTION-VIRGILIO.md` §3.iv.
 **Repo:** `loekemeyer/Gestion-Virgilio` (GitHub Pages sirve `main`). Rama de trabajo de esa sesión:
 `claude/keen-galileo-yb906o` (se mergeó a `main`).
 **Supabase:** proyecto `hrxfctzncixxqmpfhskv` (compartido; leer las reglas del `CLAUDE.md` antes de
@@ -78,8 +84,9 @@ las columnas 1er contacto/Acción, Speech 1/2, Aprobar/Eliminar, la fila de ejem
 
 ## Pendientes / decisiones abiertas (Luis las dejó sin responder)
 
-1. ¿**Eliminar** dispara además un **reembolso / aviso** (del 30 % ya señado), o por ahora sólo
-   saca de la PPP y registra? — mencionado en el primer pedido, NO implementado.
+1. ¿**Eliminar** dispara además un **reembolso / aviso** de lo ya pagado (desde la v19.36 el
+   cliente nuevo paga el **total**, no una seña), o por ahora sólo saca de la PPP y registra? —
+   mencionado en el primer pedido, NO implementado.
 2. ¿Traer el teléfono del **pedido web** (de la página) para cubrir a los 183 clientes nuevos que
    no están en `whatsapp_clientes`?
 3. Monto de un cliente nuevo que entre por **ISIS**: hoy "—" (se valoriza por NP aparte).
