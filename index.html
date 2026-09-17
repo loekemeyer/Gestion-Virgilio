@@ -1269,8 +1269,6 @@ button {
 /* v16.03 — el pedido ya se pickeó y se armó en una tanda anterior: rojo, para que nadie lo mande
    a pickear de nuevo. Al programarlo vuelve a ESA tanda, no a una nueva. */
 .apr-chip-hecho{ background:#fee2e2; color:#991b1b; font-weight:800; border:1px solid #fca5a5; }
-/* v19.41 (Luis): el pedido que NO cayó en cuarentena por ser una reposición chica. */
-.apr-chip-repo{ background:#ecfeff; color:#155e75; font-weight:800; border:1px solid #a5f3fc; }
 .apr-chip-z{ background:#e0edff; color:#1e40af; }
 /* idea 2048: última corrida del armado automático */
 .apr-log{ margin:0 0 8px; padding:7px 12px; border-radius:10px; font-size:12.5px; font-weight:700; background:#dcfce7; color:#166534; border:1px solid #bbf7d0; }
@@ -5733,7 +5731,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=19.42"></script>
+<script type="module" src="recepcion.js?v=19.43"></script>
 <!-- Config del módulo de fichada (compartido con fichada.html). El secret
      hmacSecret tiene que ser el mismo acá y allá; cargándolo desde un solo
      archivo evitamos que se desincronicen. -->
@@ -9579,7 +9577,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v19.42";
+const APP_VERSION = "v19.43";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -43169,9 +43167,6 @@ let _apr = {
   // v19.05 — CLIENTES NUEVOS: primer contacto (Speech 1) y teléfono del cliente
   cliContacto: null, cliContactoLoading: false,   // empresa:order_id → ISO del primer contacto
   cliWpp: null, cliWppLoading: false,              // empresa:cod → teléfono del cliente
-  // v19.41 — REPOSICIÓN CHICA: pedidos que NO caen en cuarentena porque el cliente acaba de
-  // recibir factura y pidió un solo código (empresa:order_id → {items, dias, fecha_factura})
-  cuarRepo: null,
   // v18.04 — log de pedidos ANULADOS (undefined = todavía no se pidió)
   anulados: undefined, anuladosLoading: false, anuModal: false
 };
@@ -43620,23 +43615,6 @@ function aprEsperaChip(p) {
 /* v15.67 — el bloque que espera mercadería. LK lo manda como NP aparte
    (v_pedidos_web_np.diferido) con la fecha estimada de reingreso; acá sólo se
    muestra, para que nadie lo programe antes sin darse cuenta. */
-/* v19.41 (Luis, 2026-09-17) — "si un cliente hizo un pedido, se le factura (tiene deuda) y en un
-   plazo de 10 días desde la facturación entra un pedido de ese mismo cliente de 1 item, debería
-   quedar exceptuado de la cuarentena". La decisión la toma el BACKEND (gv_cuarentena_repo_lote,
-   que usa gv_cuarentena_marcar_calc); este chip sólo la muestra, porque si no el pedido aparece
-   en la lista normal sin ninguna marca y no hay forma de saber por qué no lo retuvo la deuda. */
-function aprRepoChip(p) {
-  if (!p || p._demo) return "";
-  const r = (_apr.cuarRepo || {})[aprKey(p.empresa, p.order_id)];
-  if (!r) return "";
-  const dias = isFinite(r.dias) ? r.dias : null;
-  const cuando = dias === 0 ? "el mismo día" : dias === 1 ? "hace 1 día" : dias != null ? "hace " + dias + " días" : "";
-  return '<span class="apr-chip apr-chip-repo" title="No cae en Cuarentena: es una reposición chica. Se le facturó ' +
-    escapeHtml(cuando) + (r.fecha ? " (" + escapeHtml(String(r.fecha)) + ")" : "") +
-    ' y este pedido trae un solo código. La deuda es la de esa compra reciente, así que no lo retiene.">' +
-    '\u{1F501} Reposición · ' + (isFinite(r.items) ? r.items : 1) + ' código' + (r.items > 1 ? 's' : '') +
-    (cuando ? ' · facturado ' + escapeHtml(cuando) : '') + '</span>';
-}
 function aprDiferidoChip(p) {
   if (!p || !p.no_antes_de) return "";
   const q = String(p.no_antes_de).slice(0, 10).split("-");
@@ -44567,7 +44545,6 @@ function aprColPedidos() {
         // programarlo vuelve a ESA tanda (gv_ppp_isis_programar reusa tanda_previa), no a una nueva.
         (_aprYaHecho(p) ? '<span class="apr-chip apr-chip-hecho" title="Ya se pickeó y se armó en la tanda ' + escapeHtml(p.tanda_previa) + '. Al programarla vuelve a esa misma tanda: NO se pickea de nuevo.">⚠ ya ' + (p.ya_pickeada ? 'pickeada' : '') + (p.ya_pickeada && p.ya_armada ? ' y ' : '') + (p.ya_armada ? 'armada' : '') + ' · ' + escapeHtml(p.tanda_previa) + '</span>' : '') +
         // v13.21 (dueño): qué día va a poder salir, no la fecha en que llegó (queda en el title)
-        aprRepoChip(p) +     // v19.41 (Luis): no cayó en cuarentena por ser reposición chica
         aprSalidaChip(p) +
         // v17.57: el m³ se mudó arriba, al lado del número (como en Cuarentena)
         (p.np_total > 1 ? '<span class="apr-chip apr-chip-np">sale en ' + p.np_total + ' NP</span>' : '') +
@@ -46034,7 +46011,7 @@ async function cuarMarcarPedidos() {
   try {
     // (1) Estado + Deuda (por empresa+cod) y (2) Límite (valoriza + greedy, sólo web) — en paralelo.
     const webPend = peds.filter(function (p) { return !p._demo && !p._isis; });
-    const [res, lim, libs, repo] = await Promise.all([
+    const [res, lim, libs] = await Promise.all([
       aprRpc("gv_cuarentena_marcar", {
         // v17.23: np y razón social viajan para que el LOG de Cuarentena se lea sin joins
         p_pedidos: peds.map(function (p) {
@@ -46048,15 +46025,7 @@ async function cuarMarcarPedidos() {
                    fecha_recep: p.fecha_recep || "", cond: p.cond || "", items: cuarItemsDe(p) };
         })
       }) : Promise.resolve([]),
-      aprRpc("gv_cuarentena_liberados"),  // v14.88: los liberados van a la lista normal, con badge
-      // v19.41 (Luis): la excepción "reposición chica" — quién quedó exento y por qué. La cuenta
-      // ya la hizo el backend adentro de gv_cuarentena_marcar; esto es sólo para poder MOSTRARLO
-      // (si no, el pedido simplemente no aparece en Cuarentena y nadie sabe por qué).
-      aprRpc("gv_cuarentena_repo_lote", {
-        p_pedidos: peds.filter(function (p) { return !p._demo; }).map(function (p) {
-          return { order_id: String(p.order_id), empresa: p.empresa || "lk", cod: String(p.cod || "").trim() };
-        })
-      })
+      aprRpc("gv_cuarentena_liberados")   // v14.88: los liberados van a la lista normal, con badge
     ]);
     const byKey = {};   // retenidos (no liberados) → sector
     const detKey = {};  // v15.04: montos del motivo (deuda / exceso de crédito / estado)
@@ -46076,13 +46045,6 @@ async function cuarMarcarPedidos() {
       if (r.exceso != null) detKey[k].exceso = Number(r.exceso);
       if (r.limite != null) detKey[k].limite = Number(r.limite);
     });
-    const repoKey = {};   // v19.41: exentos por reposición chica → chip en la tarjeta
-    (repo || []).forEach(function (r) {
-      if (!r || !r.exento) return;
-      repoKey[String(r.empresa) + ":" + String(r.order_id)] =
-        { items: Number(r.items), dias: Number(r.dias), fecha: r.fecha_factura };
-    });
-    _apr.cuarRepo = repoKey;
     const libKey = {};  // liberados → badge en la lista normal
     (libs || []).forEach(function (r) { libKey[String(r.empresa) + ":" + String(r.order_id)] = (r.motivos && r.motivos.length ? r.motivos : ["cuarentena"]); });
     (_apr.pedidosTodos || []).forEach(function (p) {

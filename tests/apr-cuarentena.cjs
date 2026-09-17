@@ -288,35 +288,6 @@ catch (_e) {
       return null;
     };
 
-    // (4c) v19.41 (Luis) — REPOSICIÓN CHICA: el pedido que el backend deja exento (factura de
-    // hace ≤10 días + un solo código) NO cae en Cuarentena y lleva el chip que lo explica.
-    llamadas.length = 0;
-    window.aprRpc = async function (fn, args) {
-      llamadas.push({ fn: fn, args: args });
-      if (fn === "gv_cuarentena_marcar") return [];            // el backend ya lo perdonó
-      if (fn === "gv_cuarentena_repo_lote")
-        return [{ empresa: "lk", order_id: "1449", exento: true, items: 1,
-                  fecha_pedido: "2026-09-15", fecha_factura: "2026-09-15", dias: 0, motivo: "reposicion" },
-                { empresa: "lk", order_id: "1475", exento: false, items: 15,
-                  fecha_pedido: "2026-09-16", fecha_factura: null, dias: null, motivo: "muchos_items" }];
-      return [];
-    };
-    const repoPed = mk({ order_id: 1449, empresa: "lk", cod: "1840", razon_social: "Cliente Reposición" });
-    const otroPed = mk({ order_id: 1475, empresa: "lk", cod: "1618", razon_social: "Cliente Grande" });
-    _apr.pedidos = [repoPed, otroPed]; _apr.pedidosTodos = _apr.pedidos;
-    await cuarMarcarPedidos(); await new Promise((res) => setTimeout(res, 120));
-    const rph = document.getElementById("pppPreview").innerHTML;
-    out.repoRpc = llamadas.some(function (c) {
-      return c.fn === "gv_cuarentena_repo_lote" && (c.args.p_pedidos || []).length === 2 &&
-             c.args.p_pedidos[0].order_id === "1449" && c.args.p_pedidos[0].cod === "1840";
-    });
-    out.repoChip = /apr-chip-repo[^>]*>🔁 Reposición · 1 código · facturado el mismo día/.test(rph);
-    out.repoSoloElExento = (rph.match(/apr-chip-repo/g) || []).length === 1;
-    out.repoFueraDeCuar = /🚧 Cuarentena <b>\(0\)<\/b>/.test(rph);   // no lo retiene la deuda
-    out.repoEnLaLista = /📋 Pedidos a programar <b>\(2\)<\/b>/.test(rph);
-    out.repoTitle = /No cae en Cuarentena: es una reposición chica/.test(rph);
-    _apr.cuarRepo = null;
-
     // (5) aprobar NO dispara la RPC de una: primero pide el comentario
     llamadas.length = 0;
     _apr.pedidosTodos = [mk({ order_id: 900, empresa: "lk", cod: "4275", razon_social: "Zhang Qikuan",
@@ -646,12 +617,6 @@ catch (_e) {
   chk(r.libSoloLectura, "es SOLO LECTURA: sin textarea, sin '¿quién?' y sin guardar — sólo Cerrar");
   chk(r.libRpc, "pide gv_cuarentena_liberado_info con empresa y order_id");
   chk(r.libSinFila, "sin fila de liberación lo dice, no inventa");
-  chk(r.repoRpc, "v19.41: pide gv_cuarentena_repo_lote con los pedidos (empresa, order_id, cod)");
-  chk(r.repoChip, "el exento lleva el chip '🔁 Reposición · 1 código · facturado el mismo día'");
-  chk(r.repoTitle, "el chip explica en el title por qué no lo retiene la deuda");
-  chk(r.repoSoloElExento, "el pedido de 15 códigos NO lleva chip de reposición");
-  chk(r.repoFueraDeCuar, "el exento no cae en Cuarentena (0 retenidos)");
-  chk(r.repoEnLaLista, "y sigue en 'Pedidos a programar' con los demás");
   chk(r.aprModal, "aprobar abre el cuadro de comentario (no libera de una)");
   chk(r.aprSinLiberar, "aprobar NO llamó a gv_cuarentena_liberar antes de confirmar");
   chk(r.aprPideQuien, "aprobar pide quién (Vivi / Marian / Otro)");
