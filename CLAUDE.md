@@ -427,7 +427,7 @@ leer la que no es da respuestas que suenan bien y están mal.
 
 | Para saber… | **LA QUE VALE** | La vieja, NO usar |
 |---|---|---|
-| Qué artículo va en qué sector de **góndola**, y de qué empresa es el sector | **`GV_Lugar` + `GV_Lugar_Item`** → vista **`gv_lugar_articulo`** (y `gv_planimetria_celda`) | `Planimetria` |
+| Qué artículo va en qué sector de **góndola**, y de qué empresa es el sector | **`GV_Lugar` + `GV_Lugar_Item`** → vista **`gv_lugar_articulo`** (y `gv_planimetria_celda`) | `Planimetria` ⚠ ver abajo |
 | Qué hay cargado en cada **rack** | **`Racks_Planimetria`** | **`Ubicaciones_Articulos`** |
 | De qué **empresa** es un artículo (el dato de la columna LK/CH) | **`gv_empresa_de_articulo(cod)`** y su caché `GV_Articulo_Empresa_Cache` | `gv_articulo_empresa` (la vista rota) |
 
@@ -443,6 +443,27 @@ leer la que no es da respuestas que suenan bien y están mal.
 Y quién las escribe: `Racks_Planimetria` la mueven `racks_plani_ingreso`, `racks_plani_descontar`,
 `racks_plani_mover`, `registrar_baja_racks` y `vista_insumos` — o sea, la app. A
 `Ubicaciones_Articulos` **no la escribe nadie** desde el 10/08.
+
+### ⚠ `Planimetria` está congelada pero NO se borra
+
+Dejó de leerse para el picking en la **v15.77** y de escribirse en la **v17.26**, así que como
+fuente **no vale**. Pero tiene un rol vivo a propósito, y el código lo dice en tres lugares:
+guarda los **códigos huérfanos que nunca llegaron a `GV_Lugar_Item`** (los 17 del problema 156 —
+palos de amasar 231/232/233, línea Acacia, 537, 567…), y el Mapa de góndolas los **rescata de ahí
+con un click** (`pmapViejaFetch` / `pmapViejaTraer`). Además la leen `gv_codigos_multigrafia` y
+`vista_nc_loeke_chef`. **No usarla como fuente, no borrarla.**
+
+`Ubicaciones_Articulos` es otra cosa: **38 días sin escribirse, 0 funciones y 0 lectores en el
+front**. Ésa sí no sirve para nada vivo.
+
+### El centinela: `gv_fuentes_lugares`
+
+Para no tener que volver a medir esto a mano, la vista dice sola cuál está viva:
+
+```sql
+select * from public.gv_fuentes_lugares;
+-- tabla · rol · última escritura · días sin escribirse · funciones y vistas que la leen
+```
 
 ### Lo que costó descubrirlo
 

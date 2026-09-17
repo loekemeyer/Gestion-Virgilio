@@ -314,3 +314,30 @@ $function$;
 --   update public."Racks_Planimetria" r set sector = b.sector
 --     from zz_backups."GV_Backup_RacksPlani_sectores_20260917" b where b.id = r.id;
 -- ════════════════════════════════════════════════════════════════════════════════════
+
+-- ════════════════════════════════════════════════════════════════════════════════════
+-- v19.28 (2026-09-17) — LA VISTA DE LA REGLA TENIA EL ORDEN VIEJO
+-- ════════════════════════════════════════════════════════════════════════════════════
+-- `gv_mov_empresa_resuelta` (la vista que documenta como se resolvio el backfill) se habia
+-- quedado con el orden de reglas del 16/09 a la mañana: la NP del pedido y las señales
+-- fisicas ANTES que el articulo. O sea el criterio VIEJO, el que rompio los saldos.
+-- Medido: 275 movimientos de codigos NO duales donde la vista opinaba distinto que la
+-- etiqueta. Si alguien la hubiera usado para re-alinear, volvia a etiquetar por pedido.
+--
+-- Corregido: para un codigo NO dual el articulo va PRIMERO (igual que el trigger) y, si el
+-- articulo no se sabe, la vista **no opina** (`when du.cc is null then null`) en vez de caer
+-- a la tanda. Sin ese corte, 3 codigos huerfanos (1546903, 838, VASTIDOR) seguian
+-- resolviendose por el pedido. Resultado: **0 desacuerdos en codigos no duales**.
+-- Los 64 de codigos duales quedan y estan bien: ahi la vista es ORIENTATIVA, la etiqueta
+-- real dice de que pila salio la caja y no se toca.
+--
+-- Ademas la vista leia `Ubicaciones_Articulos` (congelada): pasa a `Racks_Planimetria`.
+--
+-- ── Centinela nuevo: gv_fuentes_lugares ─────────────────────────────────────────────
+-- Dice sola cual de las tablas de lugares esta viva, hace cuanto no se escribe y cuantas
+-- funciones y vistas la leen. Sirve para no volver a medirlo a mano:
+--   select * from public.gv_fuentes_lugares;
+-- Al 17/09: GV_Lugar / GV_Lugar_Item / Racks_Planimetria con 1 dia; Planimetria con 6
+-- (congelada, pero se conserva: guarda los codigos huerfanos que el mapa rescata); y
+-- Ubicaciones_Articulos con **38 dias**, 0 funciones y 0 lectores en el front.
+-- ════════════════════════════════════════════════════════════════════════════════════
