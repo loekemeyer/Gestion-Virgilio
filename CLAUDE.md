@@ -680,6 +680,28 @@ decisión legítima del supervisor, y el contenido es el mismo (no hay que volve
 **Chequeo:** `select * from public.gv_ppp_tanda_dos_dias;` — vacía = todo bien.
 `sql/gv_ppp_isis_programar_reusar_v1892.sql`, §3.ig.
 
+## ⚠ Regla de Luis (2026-09-17, v19.41): la REPOSICIÓN CHICA no cae en cuarentena
+
+*"Si un cliente hizo un pedido, se le factura (tiene deuda) y en un plazo de 10 días desde la
+facturación entra un pedido de ese mismo cliente de 1 item (un código nada más que pide) debería
+quedar exceptuado de la cuarentena."* Es el cliente que acaba de comprar, todavía no le venció la
+factura —por eso figura con deuda— y pide una reposición de un solo código.
+
+**Perdona SÓLO `deuda`.** Suspendido, sin cta cte y cliente nuevo siguen reteniendo: son estados
+del cliente, no la plata de la compra recién facturada. La lista es configurable
+(`PPP_Web_Config.cuar_repo_motivos`, default `'deuda'`); **`limite_credito` NO entra ahí** porque
+ese motivo lo arma `gv_cuarentena_limite`, no `gv_cuarentena_marcar_calc`.
+
+**El plazo se cuenta contra la FECHA DEL PEDIDO, no contra hoy**, y el `max(fecha)` de la factura va
+topeado a esa fecha: sin el tope entran facturas POSTERIORES al pedido y se cuelan pedidos de hace
+40 días. Los ítems salen de `lk_pedidos_match.items_string` (única fuente viva de los ítems de un
+pedido web dentro de Virgilio) y la factura de `isis_lk`/`isis_ch.documentos` — la fuente de deuda
+`GV_Cuarentena_Fuente` **no tiene fecha**. Una NP de ISIS no se exime: `GV_PPP_Base_Pedidos` está
+congelada desde el 04/09 y sin datos el default es retener.
+
+**Chequeo:** `select * from public.gv_cuarentena_repo_hoy where exento;` — quién está exento hoy y,
+los que no, por qué. `sql/gv_cuarentena_repo_chica_v1941.sql`, §3.ix.
+
 ## ⚠ Regla del dueño (2026-09-15): Oscar hace el SKIN — la OC va a su nombre y NO se toca
 
 Al revisar por qué llegaban los WhatsApps de *"SIN OC generada"* aparecieron 14 códigos —casi
