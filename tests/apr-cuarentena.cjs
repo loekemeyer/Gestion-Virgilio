@@ -239,6 +239,55 @@ catch (_e) {
     cuarComCerrar();
     out.comCerrado = !!(document.getElementById("cuarComModal") || {}).hidden;
 
+    // (4b) v19.39 (Luis) — el badge "Liberado de cuarentena" es CLICKEABLE y abre el mismo
+    // pop-up en SOLO LECTURA: quién liberó, cuándo y el hilo de comentarios; sin textarea,
+    // sin selector de persona y sin botón de guardar.
+    llamadas.length = 0;
+    window.aprRpc = async function (fn, args) {
+      llamadas.push({ fn: fn, args: args });
+      if (fn === "gv_cuarentena_comentarios")
+        return [{ id: 9, creado_at: "2026-09-17T12:32:06-03:00", persona: "Vivi",
+                  por: "luis@loekemeyer.com", texto: "Pagó por transferencia, autorizó cobranzas" }];
+      if (fn === "gv_cuarentena_liberado_info")
+        return [{ empresa: "lk", order_id: "98587", motivos: ["deuda", "cliente_nuevo"],
+                  persona: "Vivi", liberado_por: "luis@loekemeyer.com",
+                  liberado_at: "2026-09-17T12:32:06-03:00" }];
+      return null;
+    };
+    const libPed = mk({ order_id: "np98587", empresa: "lk", cod: "4275", razon_social: "Zhang Qikuan",
+                        cuarentena_motivos: ["deuda", "cliente_nuevo"],
+                        cuarentena_detalle: { deuda: 2734562, nuevo_pedidos: 1 }, _cuarLiberado: true });
+    _apr.pedidosTodos = [libPed];
+    _apr.pedidos = [libPed];
+    aprRender(); await new Promise((res) => setTimeout(res, 80));
+    const libHtml = document.getElementById("pppPreview").innerHTML;
+    out.libBadgeBtn = /cuar-lib-btn[^>]*onclick="cuarLibVer\('lk','np98587'\)"/.test(libHtml) &&
+                      /Liberado de cuarentena/.test(libHtml);
+    out.libFueraDeCuar = /🚧 Cuarentena <b>\(0\)<\/b>/.test(libHtml);   // liberado = NO retenido
+    cuarLibVer("lk", "np98587"); await new Promise((res) => setTimeout(res, 150));
+    const lvh = (document.getElementById("cuarComModal") || {}).innerHTML || "";
+    out.libAbre = /🚧 Liberado de cuarentena<\/b>/.test(lvh);
+    out.libQuien = /Liberado por <b>Vivi<\/b>/.test(lvh) && /17\/09 12:32/.test(lvh);
+    out.libUsuario = /luis@loekemeyer\.com/.test(lvh);
+    out.libMotivos = /Estaba retenido por/.test(lvh) && /Deuda/.test(lvh);
+    out.libComentario = /Pagó por transferencia/.test(lvh);
+    out.libSoloLectura = !/id="cuarComTexto"/.test(lvh) && !/cuar-quien/.test(lvh) &&
+                         !/cuarComAgregar\(\)/.test(lvh) && /onclick="cuarComCerrar\(\)">Cerrar</.test(lvh);
+    out.libRpc = llamadas.some(function (c) {
+      return c.fn === "gv_cuarentena_liberado_info" && c.args.p_empresa === "lk" && c.args.p_order_id === "np98587";
+    });
+    // si el backend no tiene la fila, el pop-up lo dice en vez de mentir
+    window.aprRpc = async function (fn) { return fn === "gv_cuarentena_comentarios" ? [] : null; };
+    cuarLibVer("lk", "np98587"); await new Promise((res) => setTimeout(res, 150));
+    out.libSinFila = /No quedó registrada la liberación/.test((document.getElementById("cuarComModal") || {}).innerHTML || "");
+    cuarComCerrar();
+    window.aprRpc = async function (fn, args) {
+      llamadas.push({ fn: fn, args: args });
+      if (fn === "gv_cuarentena_comentarios")
+        return [{ id: 1, creado_at: "2026-09-14T09:00:00-03:00", por: "luis@loekemeyer.com", texto: "Habló Vivi, lo autoriza" }];
+      return null;
+    };
+
     // (5) aprobar NO dispara la RPC de una: primero pide el comentario
     llamadas.length = 0;
     _apr.pedidosTodos = [mk({ order_id: 900, empresa: "lk", cod: "4275", razon_social: "Zhang Qikuan",
@@ -558,6 +607,16 @@ catch (_e) {
   chk(r.comConQuien, "con identidad guarda el comentario con la persona");
   chk(r.comRpc, "el log pide los comentarios de ESE pedido (empresa + clave)");
   chk(r.comCerrado, "el modal se cierra");
+  chk(r.libBadgeBtn, "v19.39: el badge 'Liberado de cuarentena' es un botón (cuarLibVer)");
+  chk(r.libFueraDeCuar, "el liberado sigue fuera de Cuarentena (0 retenidos)");
+  chk(r.libAbre, "el badge abre el pop-up '🚧 Liberado de cuarentena'");
+  chk(r.libQuien, "el pop-up dice quién liberó y cuándo (Vivi · 17/09 12:32)");
+  chk(r.libUsuario, "y con qué usuario de la sesión se hizo");
+  chk(r.libMotivos, "el pop-up dice de qué motivos salió el pedido");
+  chk(r.libComentario, "el pop-up muestra el hilo de comentarios");
+  chk(r.libSoloLectura, "es SOLO LECTURA: sin textarea, sin '¿quién?' y sin guardar — sólo Cerrar");
+  chk(r.libRpc, "pide gv_cuarentena_liberado_info con empresa y order_id");
+  chk(r.libSinFila, "sin fila de liberación lo dice, no inventa");
   chk(r.aprModal, "aprobar abre el cuadro de comentario (no libera de una)");
   chk(r.aprSinLiberar, "aprobar NO llamó a gv_cuarentena_liberar antes de confirmar");
   chk(r.aprPideQuien, "aprobar pide quién (Vivi / Marian / Otro)");

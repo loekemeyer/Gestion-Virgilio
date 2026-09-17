@@ -22056,3 +22056,50 @@ seña ni el 30 %, dice "por adelantado / antes de armar y entregar", y la column
 `c/IVA`. Suite entera en verde.
 
 **Rollback:** `git revert` del commit de la v19.37 (no hay nada aplicado en la base).
+
+---
+
+## §3.iw — v19.39: el badge "Liberado de cuarentena" abre el log en SOLO LECTURA — 2026-09-17
+
+**Luis, 2026-09-17:** *"pedidos como esos que se liberaron de cuarentena tendrían que tener el
+badge de «Liberado de cuarentena» clickeable y debería abrir los comentarios en un pop-up (solo
+lectura) para que alguien pueda consultar el motivo de la liberación y quién lo hizo."*
+
+Hasta acá el badge de la tarjeta de **A Programar** era un `<div>` muerto: decía que el pedido
+había salido de Cuarentena y nada más. Para saber por qué había que ir al log de Config.
+Cuarentena y buscarlo a mano.
+
+### Backend: una RPC nueva, `gv_cuarentena_liberado_info(p_empresa, p_order_id)`
+
+El hilo de comentarios ya lo traía `gv_cuarentena_comentarios`. **Lo que faltaba era el "quién /
+cuándo"**, que vive en `GV_Cuarentena_Liberados` (`persona`, `liberado_por`, `liberado_at`) y que
+`gv_cuarentena_liberados()` —la que usa la pantalla al cargar— **no devuelve**: su `RETURNS TABLE`
+es `(empresa, order_id, motivos)`. No se la tocó a propósito: cambiarle el tipo de retorno obliga
+a `DROP` + `CREATE` y la llaman dos lugares del front. La nueva es aditiva y se pide **de a un
+pedido, sólo al abrir el pop-up**, así que no le agrega peso a la carga de A Programar.
+
+⚠ La clave se compara **normalizada** con `gv_cuarentena_clave`, por lo mismo que ya documenta
+`gv_cuarentena_comentarios`: el mismo pedido de ISIS es `np98587` en A Programar y `98587` en el
+log. Medido con la fila real del 98587 (Zhang Qikuan): las dos formas devuelven la misma fila
+(Vivi, 17/09 12:32). `SECURITY DEFINER`, gate `es_supervisor_virgilio() OR
+gv_es_supervisor_o_servicio()`, `EXECUTE` **revocado a `anon`** (medido: `anon` false,
+`authenticated` true). SQL y rollback: `sql/gv_cuarentena_liberado_info_v1939.sql`.
+
+### Front (`index.html`)
+
+- `cuarLibBtnHtml(p)` — el badge pasa a ser un `<button class="cuar-lib-btn">` con el 📖 al lado;
+  en la fila de ejemplo sigue siendo el `<div>` de antes (no hay nada que consultar).
+- `cuarLibVer(empresa, orderId)` → abre el **mismo** pop-up de 📖 Comentarios en un modo nuevo,
+  **`"ver"`**: sin `textarea`, sin el selector "¿quién comenta?" y sin botón de guardar. Sólo
+  **Cerrar**. Desde acá no se escribe: para eso está el 📖 de Cuarentena.
+- `cuarLibInfoHtml(s)` — la ficha verde arriba del hilo: **quién** autorizó (Vivi / Marian / lo
+  que hayan tipeado), **cuándo** (hora de Buenos Aires, `cuarFechaHora`), con qué **usuario** de
+  la sesión, y **de qué motivos** salió. Si el backend no tiene la fila lo dice ("No quedó
+  registrada la liberación"), no inventa — el hilo de comentarios igual se muestra, porque el
+  comentario de la aprobación es **opcional** y puede estar vacío.
+
+**Cubierto** en `tests/apr-cuarentena.cjs` (bloque 4b): el badge es botón, abre el pop-up, dice
+quién/cuándo/usuario/motivos, muestra el hilo, es solo lectura, llama la RPC con empresa y
+order_id, y el caso sin fila. Suite entera en verde.
+
+**Rollback:** `git revert` del commit de la v19.39 + el `drop function` del pie del `.sql`.

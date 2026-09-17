@@ -1212,6 +1212,16 @@ button {
 .cuar-wpp[disabled]:hover{ background:#fff; }
 .cuar-wpp-off{ background:#e2e8f0; color:#94a3b8; cursor:default; }
 .cuar-liberado-nota{ font-size:11px; font-weight:800; color:#166534; margin-top:5px; }
+/* v19.39 (Luis): el aviso de liberado es un BOTÓN — abre el log del pedido en solo lectura. */
+.cuar-lib-btn{ display:inline-flex; align-items:center; gap:5px; font:inherit; font-size:11px;
+  font-weight:800; color:#166534; background:#f0fdf4; border:1px solid #bbf7d0; border-radius:8px;
+  padding:2px 8px; margin-top:5px; cursor:pointer; }
+.cuar-lib-btn:hover{ background:#dcfce7; border-color:#86efac; }
+.cuar-lib-btn .cuar-lib-ic{ opacity:.7; }
+.cuar-lib-info{ background:#f0fdf4; border:1px solid #bbf7d0; border-radius:10px; padding:8px 10px;
+  font-size:12px; color:#14532d; margin:6px 0 10px; line-height:1.5; }
+.cuar-lib-info b{ color:#166534; }
+.cuar-lib-info .cuar-lib-sin{ color:#92400e; }
 .cuar-demo-hint{ display:block; font-size:10.5px; color:#b45309; margin-top:3px; }
 /* v14.88 — pestaña Config. Cuarentena */
 /* v17.46 (Luis: *"hay que aprovechar mejor el espacio de esta pestaña, el texto e info está
@@ -5721,7 +5731,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=19.38"></script>
+<script type="module" src="recepcion.js?v=19.39"></script>
 <!-- Config del módulo de fichada (compartido con fichada.html). El secret
      hmacSecret tiene que ser el mismo acá y allá; cargándolo desde un solo
      archivo evitamos que se desincronicen. -->
@@ -9567,7 +9577,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v19.38";
+const APP_VERSION = "v19.39";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -44521,7 +44531,7 @@ function aprColPedidos() {
         (p.np_total > 1 ? '<span class="apr-chip apr-chip-np">sale en ' + p.np_total + ' NP</span>' : '') +
       '</div>' +
       // v14.88: si el pedido fue LIBERADO de cuarentena, mantiene el aviso acá
-      (aprTieneCuarMotivos(p) ? '<div class="cuar-liberado-nota">🚧 Liberado de cuarentena</div>' + aprCuarBadgesHtml(p) +
+      (aprTieneCuarMotivos(p) ? cuarLibBtnHtml(p) + aprCuarBadgesHtml(p) +
         // v19.05 (Luis): un cliente nuevo aprobado tiene que programarse pronto
         (aprCuarentenaMotivos(p).indexOf("cliente_nuevo") >= 0 ? '<div class="clin-7dias">🗓️ Programar dentro de los próximos 7 días</div>' : '')
         : '');
@@ -44748,6 +44758,44 @@ function cuarComBtnHtml(p) {
   return '<button class="cuar-yp-lib" onclick="cuarComAbrirPed(\'' + ((p && p.empresa) || "lk") + '\',\'' +
     escapeHtml(String(p && p.order_id)) + '\')" title="' + escapeHtml(t) + '">📖' +
     (n ? '<b>' + n + '</b>' : '') + '</button>';
+}
+/* ┄┄ v19.39 (Luis, 2026-09-17) — "pedidos como esos que se liberaron de cuarentena tendrían que
+   tener el badge de «Liberado de cuarentena» clickeable y debería abrir los comentarios en un
+   pop-up (solo lectura) para que alguien pueda consultar el motivo de la liberación y quién lo
+   hizo". Es el MISMO pop-up de 📖 Comentarios, en modo "ver": sin textarea, sin selector de
+   persona y sin botón de guardar — desde acá no se escribe, se consulta. Arriba del hilo va la
+   ficha de la liberación (quién, cuándo y de qué motivos salió), que sale de
+   gv_cuarentena_liberado_info: el hilo de comentarios puede estar vacío (el comentario de la
+   aprobación es opcional) y sin esa ficha el pop-up no contestaría "quién lo hizo". ┄┄ */
+function cuarLibBtnHtml(p) {
+  const emp = (p && p.empresa) || "lk", oid = String((p && p.order_id) || "");
+  if (!oid || oid === "EJEMPLO") return '<div class="cuar-liberado-nota">\u{1F6A7} Liberado de cuarentena</div>';
+  return '<button class="cuar-lib-btn" onclick="cuarLibVer(\'' + emp + '\',\'' + escapeHtml(oid) + '\')"' +
+    ' title="Ver por qué se liberó y quién lo hizo (solo lectura)">\u{1F6A7} Liberado de cuarentena' +
+    '<span class="cuar-lib-ic">\u{1F4D6}</span></button>';
+}
+function cuarLibVer(empresa, orderId) {
+  const p = (_apr.pedidosTodos || []).find(function (x) { return aprKey(x.empresa, x.order_id) === String(empresa) + ":" + String(orderId); });
+  cuarComAbrir({ modo: "ver", empresa: empresa || "lk", clave: String(orderId),
+                 np: p ? aprPedLabel(p) : String(orderId),
+                 cli: (p && (p.razon_social || p.cod)) || "",
+                 motivos: (p && aprCuarentenaMotivos(p)) || null });
+}
+/* La ficha de la liberación. El hilo de comentarios puede estar vacío —el comentario de la
+   aprobación es opcional—, así que esto es lo que contesta "quién lo hizo": la persona que
+   autorizó (Vivi / Marian / la que hayan tipeado), el usuario de la sesión y la fecha y hora en
+   hora de Buenos Aires. `motivos` son los motivos de los que salió, no los de ahora. */
+function cuarLibInfoHtml(s) {
+  const l = s && s.lib;
+  if (s && s.cargando) return '<div class="cuar-lib-info">Buscando la liberación…</div>';
+  if (!l) return '<div class="cuar-lib-info"><span class="cuar-lib-sin">No quedó registrada la liberación de este pedido</span> — si hay comentarios, están abajo.</div>';
+  const mot = (l.motivos || []).map(function (m) { return aprCuarentenaEtiqueta({ cuarentena_motivos: [m] }); }).filter(Boolean);
+  return '<div class="cuar-lib-info">' +
+    '\u{1F513} Liberado por <b>' + escapeHtml(String(l.persona || "—")) + '</b>' +
+    (l.liberado_at ? ' el <b>' + escapeHtml(cuarFechaHora(l.liberado_at)) + '</b>' : '') +
+    (l.liberado_por ? '<br><span style="opacity:.75">usuario: ' + escapeHtml(String(l.liberado_por)) + '</span>' : '') +
+    (mot.length ? '<br>Estaba retenido por: <b>' + escapeHtml(mot.join(" · ")) + '</b>' : '') +
+    '</div>';
 }
 function cuarComAbrirPed(empresa, orderId) {
   if (String(orderId) === "EJEMPLO") return;
@@ -45372,6 +45420,15 @@ async function cuarComAbrir(o) {
     _apr.cuarCom.lista = (await aprRpc("gv_cuarentena_comentarios",
       { p_empresa: _apr.cuarCom.empresa, p_order_id: _apr.cuarCom.clave })) || [];
   } catch (e) { _apr.cuarCom.err = String((e && e.message) || e); }
+  // v19.39 — sólo el modo "ver" (badge "Liberado de cuarentena") necesita quién liberó y cuándo.
+  // Va en una llamada aparte, de a un pedido, para no encarecer el 📖 de todos los días.
+  if (_apr.cuarCom && _apr.cuarCom.modo === "ver") {
+    try {
+      const r = await aprRpc("gv_cuarentena_liberado_info",
+        { p_empresa: _apr.cuarCom.empresa, p_order_id: _apr.cuarCom.clave });
+      if (_apr.cuarCom) _apr.cuarCom.lib = (Array.isArray(r) ? r[0] : r) || null;
+    } catch (_e) { if (_apr.cuarCom) _apr.cuarCom.lib = null; }   // sin la ficha, igual se ve el hilo
+  }
   if (_apr.cuarCom) { _apr.cuarCom.cargando = false; cuarComRender(); }
 }
 function cuarComRender() {
@@ -45383,6 +45440,7 @@ function cuarComRender() {
   if (otro) s.personaOtro = otro.value;
   const aprobar = s.modo === "aprobar", devolver = s.modo === "cuarentena";
   const anular = s.modo === "anular";   // v18.04
+  const ver = s.modo === "ver";         // v19.39 — SOLO LECTURA: desde acá no se escribe
   let log = "";
   if (s.cargando) log = '<div class="cuar-m-load">Buscando comentarios…</div>';
   else if (!s.lista.length) log = '<div class="cuar-log-vacio">Todavía no hay comentarios en este pedido.</div>';
@@ -45399,7 +45457,7 @@ function cuarComRender() {
   el.innerHTML =
     '<div class="cuar-m-back" onclick="cuarComCerrar()"></div>' +
     '<div class="cuar-m-card">' +
-      '<div class="cuar-m-head"><b>' + (aprobar ? '➡ Enviar a Pedidos a programar' : devolver ? '🚧 Volver a Cuarentena' : anular ? '✕ Anular pedido' : '📖 Comentarios') + '</b>' +
+      '<div class="cuar-m-head"><b>' + (aprobar ? '➡ Enviar a Pedidos a programar' : devolver ? '🚧 Volver a Cuarentena' : anular ? '✕ Anular pedido' : ver ? '🚧 Liberado de cuarentena' : '📖 Comentarios') + '</b>' +
         '<button class="cuar-m-x" onclick="cuarComCerrar()">✕</button></div>' +
       '<div class="cuar-m-body">' +
         '<p class="cuar-com-sub"><b>' + escapeHtml(String(s.np || "")) + '</b>' +
@@ -45408,13 +45466,14 @@ function cuarComRender() {
                    : devolver ? '<br>Vuelve a Cuarentena: se lo <b>saca de la programación</b> (pierde tanda y fecha) y reaparece en <b>A Programar</b>, retenido. Contá por qué, queda en el log.'
                    : anular ? ('<br>Sale de <b>A Programar</b> y el armado automático <b>no lo toma más</b>. Es para un pedido que entró <b>mal</b>. El pedido de la página <b>no se borra</b>, y esto <b>no se deshace</b> desde la pantalla.'
                        + (s.m3 != null ? ' Son <b>' + aprNum(s.m3) + ' m³</b>.' : ''))
+                   : ver ? '<br>Solo lectura: por qué se liberó y quién lo hizo. Para escribir un comentario está el 📖 de Cuarentena.'
                    : '') + '</p>' +
-        cuarQuienHtml(s, s.modo) +
+        (ver ? cuarLibInfoHtml(s) : cuarQuienHtml(s, s.modo)) +
         (devolver && s.tanda ? '<div class="cuar-m-warn">Sale de la tanda <b>' + escapeHtml(String(s.tanda)) + '</b>.' +
           (s.picking ? ' ⚠ Esa tanda <b>ya se empezó a trabajar</b>: lo más probable es que el servidor no deje sacarlo — primero hay que resolverlo con el depósito.' : '') +
           '</div>' : '') +
         log +
-        '<textarea id="cuarComTexto" class="cuar-com-ta" placeholder="' + (aprobar ? 'Comentario de la aprobación (opcional)' : devolver ? 'Por qué vuelve a Cuarentena (opcional)' : anular ? 'Por qué se anula — OBLIGATORIO (ej: lo cargó mal el cliente, pedido duplicado…)' : 'Escribí un comentario…') + '">' + escapeHtml(String(s.texto || "")) + '</textarea>' +
+        (ver ? '' : '<textarea id="cuarComTexto" class="cuar-com-ta" placeholder="' + (aprobar ? 'Comentario de la aprobación (opcional)' : devolver ? 'Por qué vuelve a Cuarentena (opcional)' : anular ? 'Por qué se anula — OBLIGATORIO (ej: lo cargó mal el cliente, pedido duplicado…)' : 'Escribí un comentario…') + '">' + escapeHtml(String(s.texto || "")) + '</textarea>') +
         (s.err ? '<div class="cuar-m-err">⚠ ' + escapeHtml(s.err) + '</div>' : '') +
       '</div>' +
       '<div class="cuar-m-foot">' +
@@ -45424,6 +45483,8 @@ function cuarComRender() {
           ? '<button class="cuar-danger" ' + (s.saving ? "disabled" : "") + ' onclick="cuarDevolverConfirmar()">' + (s.saving ? "Sacando…" : "🚧 Volver a Cuarentena") + '</button>'
           : anular
           ? '<button class="cuar-danger" ' + (s.saving ? "disabled" : "") + ' onclick="aprAnularConfirmar()">' + (s.saving ? "Anulando…" : "✕ Anular pedido") + '</button>'
+          : ver
+          ? '<button class="cuar-save" onclick="cuarComCerrar()">Cerrar</button>'
           : '<button class="cuar-save" ' + (s.saving ? "disabled" : "") + ' onclick="cuarComAgregar()">' + (s.saving ? "Guardando…" : "Agregar comentario") + '</button>') +
       '</div>' +
     '</div>';
