@@ -66,6 +66,12 @@ create policy gv_art_emp_cache_lectura on public."GV_Articulo_Empresa_Cache"
 create or replace function public.gv_empresa_de_articulo_vivo(p_cod text)
 returns text language sql stable as $fn$
   with base as (select regexp_replace(upper(btrim(regexp_replace(coalesce(p_cod,''),'([0-9E])L$','\1'))),'^0+(?=.)','') cc),
+  -- v19.30: un DUAL no tiene dueño: las dos pilas existen. Se contesta NULL SIEMPRE, antes
+  -- de mirar ninguna fuente. Si no, la góndola (que hoy sólo tiene 437E/438E/439E del lado
+  -- LK) lo resolvía a LK y cualquier llamador que no chequee `codigos_duales` primero
+  -- —el trigger sí lo hace— se llevaba una respuesta falsa.
+  dual as (select 1 from public.codigos_duales d, base b
+            where regexp_replace(upper(btrim(d.cod)),'^0+(?=.)','') = b.cc),
   gond as (select case when count(distinct g.empresa)=1 then min(g.empresa) end emp
              from public.gv_lugar_articulo g, base b
             where regexp_replace(upper(btrim(g.cod)),'^0+(?=.)','') = b.cc),
@@ -80,8 +86,20 @@ returns text language sql stable as $fn$
                         then min(replace(upper(r.emp),'LOKE','LK')) end emp
               from public."Racks_Planimetria" r, base b
              where upper(r.emp) in ('LK','CH','LOKE')
-               and regexp_replace(upper(btrim(r.cod_art)),'^0+(?=.)','') = b.cc)
-  select coalesce((select emp from gond),(select emp from lista),(select emp from racks));
+               and regexp_replace(upper(btrim(r.cod_art)),'^0+(?=.)','') = b.cc),
+  -- v19.30: ULTIMO recurso, la planimetria VIEJA. Congelada como fuente, pero guarda el
+  -- sector de 16 codigos que nunca se dieron de alta en GV_Lugar_Item, y el sector SI dice
+  -- la empresa (cruzado contra GV_Lugar, que si esta viva). Nunca para un "codigo" que en
+  -- realidad es codigo+empresa (`437E CH`) ni para `LIBRE`; los duales ya salieron arriba.
+  vieja as (select case when count(distinct l.empresa)=1 then min(l.empresa) end emp
+              from public."Planimetria" p
+              join public."GV_Lugar" l on l.sector = upper(btrim(p.sector)), base b
+             where l.empresa in ('LK','CH')
+               and p.cod !~* '\s+(LK|CH|LOKE)$' and upper(btrim(p.cod)) <> 'LIBRE'
+               and regexp_replace(upper(btrim(p.cod)),'^0+(?=.)','') = b.cc)
+  select case when exists (select 1 from dual) then null
+              else coalesce((select emp from gond),(select emp from lista),
+                            (select emp from racks),(select emp from vieja)) end;
 $fn$;
 revoke execute on function public.gv_empresa_de_articulo_vivo(text) from anon, authenticated;
 
@@ -116,16 +134,32 @@ begin
                  case when count(distinct replace(upper(emp),'LOKE','LK'))=1
                       then min(replace(upper(emp),'LOKE','LK')) end emp
             from public."Racks_Planimetria" where upper(emp) in ('LK','CH','LOKE') group by 1),
-  todos as (select cc from gond union select cc from lista union select cc from rck),
+  du as (select distinct regexp_replace(upper(btrim(cod)),'^0+(?=.)','') cc from public.codigos_duales),
+  -- v19.30: planimetria vieja, ultimo recurso (ver gv_empresa_de_articulo_vivo)
+  vieja as (select regexp_replace(upper(btrim(p.cod)),'^0+(?=.)','') cc,
+                   case when count(distinct l.empresa)=1 then min(l.empresa) end emp
+              from public."Planimetria" p
+              join public."GV_Lugar" l on l.sector = upper(btrim(p.sector))
+             where l.empresa in ('LK','CH')
+               and p.cod !~* '\s+(LK|CH|LOKE)$' and upper(btrim(p.cod)) <> 'LIBRE'
+             group by 1),
+  todos as (select cc from gond union select cc from lista union select cc from rck union select cc from vieja),
   final as (
-    select t.cc, coalesce(g.emp, li.emp, r.emp) emp,
-           case when g.emp is not null then 'gondola'
+    -- v19.30: el dual se excluye ENTERO, no sólo de la planimetría vieja. Un dual no tiene
+    -- dueño (las dos pilas existen) y la góndola lo resolvía a LK.
+    select t.cc,
+           case when d.cc is null then coalesce(g.emp, li.emp, r.emp, v.emp) end emp,
+           case when d.cc is not null then null
+                when g.emp  is not null then 'gondola'
                 when li.emp is not null then 'lista_precios'
-                when r.emp is not null then 'racks' end fuente
+                when r.emp  is not null then 'racks'
+                when v.emp  is not null then 'planimetria_vieja' end fuente
       from todos t
       left join gond  g  on g.cc  = t.cc
       left join lista li on li.cc = t.cc
-      left join rck   r  on r.cc  = t.cc)
+      left join rck   r  on r.cc  = t.cc
+      left join du    d  on d.cc  = t.cc
+      left join vieja v  on v.cc  = t.cc)
   insert into public."GV_Articulo_Empresa_Cache"(cod_canon, empresa, fuente, refrescado_at)
   select cc, emp, fuente, now() from final where emp is not null and cc <> ''
   on conflict (cod_canon) do update
@@ -340,4 +374,97 @@ $function$;
 -- Al 17/09: GV_Lugar / GV_Lugar_Item / Racks_Planimetria con 1 dia; Planimetria con 6
 -- (congelada, pero se conserva: guarda los codigos huerfanos que el mapa rescata); y
 -- Ubicaciones_Articulos con **38 dias**, 0 funciones y 0 lectores en el front.
+-- ════════════════════════════════════════════════════════════════════════════════════
+
+-- ════════════════════════════════════════════════════════════════════════════════════
+-- v19.30 (2026-09-17) — LA PLANIMETRIA VIEJA COMO ULTIMO RECURSO, Y EL DUAL SIN DUEÑO
+-- ════════════════════════════════════════════════════════════════════════════════════
+-- Dos cosas, las dos salidas de la misma pregunta de Luis: "la data de planimetria no esta
+-- en las tablas GV_?".
+--
+-- ── 1. Medido: casi toda, pero no toda ──────────────────────────────────────────────
+-- `Planimetria` (vieja, 370 filas / 354 codigos) contra `GV_Lugar_Item` + `gv_lugar_articulo`
+-- (viva, 336 codigos): **335 de 370 pares (cod, sector) son identicos**. Lo que sobra en la
+-- vieja son 25 codigos, y no son todos lo mismo:
+--   · 8 son DUALES escritos con sufijo de empresa (`437E CH`, `809E LK`, …). Misma info,
+--     otra grafia: la tabla viva tiene esos mismos sectores con el codigo pelado.
+--   · 1 es basura (`LIBRE` en A65).
+--   · 16 son codigos reales que nunca se dieron de alta en `GV_Lugar_Item`, 12 de ellos CON
+--     movimientos: 580E (153 mov), 232 (42), 231 (33), 233 (30), 865ED (23), 702EN (20),
+--     537 (18), 567 (15), 828 (9), 997E (9), 998E (6), 702 (4). Esos 16 son la razon por la
+--     que la tabla vieja NO se borra.
+--
+-- Por eso `gv_empresa_de_articulo_vivo` y `gv_refrescar_articulo_empresa` suman un CUARTO
+-- recurso, el ultimo de todos: el sector de la planimetria vieja cruzado contra `GV_Lugar`
+-- (que si esta viva y dice de que empresa es cada sector). Filtrado a proposito:
+--   · NUNCA un codigo que en realidad es codigo+empresa (`p.cod !~* '\s+(LK|CH|LOKE)$'`),
+--   · NUNCA `LIBRE`,
+--   · NUNCA un dual (ver punto 2).
+-- Sin esos tres filtros el fallback "resolvia" los duales, que es justo lo que rompio los
+-- saldos de 809E el 16/09.
+--
+-- ── 2. Un DUAL no tiene dueño: la funcion ahora contesta NULL SIEMPRE ────────────────
+-- Estaba latente y se encontro midiendo: `gv_empresa_de_articulo('438E')` devolvia **'LK'**,
+-- porque la gondola hoy tiene 437E/438E/439E de un solo lado. Es falso — las dos pilas
+-- existen, por eso el codigo es dual. El trigger nunca se comio esa respuesta (chequea
+-- `codigos_duales` ANTES de llamar a la funcion), pero cualquier otro llamador si.
+-- Ahora el guard esta adentro de la funcion y adentro del refresco del cache, arriba de
+-- todo, no solo en la rama de la planimetria vieja.
+--
+--   select cod, public.gv_empresa_de_articulo(cod) from public.codigos_duales;
+--   -- 437E | null      438E | null      439E | null      809E | null
+--
+-- ── Composicion del cache despues (372 codigos) ─────────────────────────────────────
+--   gondola 332 · lista_precios 32 · racks 4 · planimetria_vieja 4
+-- (eran 375: los 3 duales que resolvian mal salieron)
+--
+-- ── Backfill: 17 movimientos mas ────────────────────────────────────────────────────
+-- Con el cuarto recurso se resolvieron 17 movimientos que quedaban en 'Mixto':
+--   702EN 4 → CH · 828 2 → CH · 584E 3, 520 0, 035E 2, 590E 2, 102E 2, 066 1, 440E 1,
+--   523C 1 → LK
+-- Huella de saldos ANTES y DESPUES: **949c9231e008c04a7a17eb89f4745a9d**, identica.
+-- Respaldo: zz_backups."GV_Backup_MovStock_Empresa_v1929_20260917" (con `empresa_antes`).
+--
+-- ⚠ Y aparecio un sobreviviente del incidente del 16/09 (problema 370): el movimiento
+-- 68009779 (D72C / 066 / excedente / picking / delta 0, creado 17:55 del 16/09) era un
+-- duplicado del 54123349 del 09/09. Zafo del barrido de aquel dia **justamente porque tenia
+-- empresa distinta** ('Mixto' contra 'LK'): el barrido comparaba la quintupla del indice
+-- unico, que incluye `empresa`. Delta 0, o sea que nunca movio stock. Borrado, con respaldo
+-- en zz_backups."GV_Backup_MovStock_Fantasma_D72C_20260917".
+-- Leccion: para cazar gemelos de este tipo hay que comparar SIN la empresa.
+--
+--   select n.id, v.id, n.cod_art, n.deposito, n.tipo, n.ref
+--     from public."Movimientos_Stock" n
+--     join public."Movimientos_Stock" v
+--       on upper(btrim(v.ref))=upper(btrim(n.ref))
+--      and upper(btrim(v.cod_art))=upper(btrim(n.cod_art))
+--      and v.deposito=n.deposito and v.tipo=n.tipo and v.id < n.id
+--      and coalesce(v.empresa,'') not in ('','Mixto')
+--    where coalesce(n.empresa,'') in ('','Mixto')
+--      and n.tipo in ('picking','separado','facturado');
+--   -- vacio = todo bien
+--
+-- ── Lo que queda sin empresa, y por que esta bien ───────────────────────────────────
+--   412 filas / 148 codigos → insumos y codigos internos (flejes, N°xx, TMP-xxxx, letras
+--       de rack). Luis: "insumos no me importan, solo mercaderia para vender".
+--   125 filas / 3 codigos   → DUALES (809E 118 anteriores al conteo del 01/08 + 437E 3 +
+--       439E 4). Etiquetarlos inventa un negativo: los movimientos previos al corte ya
+--       suman cero entre si.
+--   3 filas / 1 codigo      → 520 en D72A, picking VACIO del 10/09 (los tres deltas en 0),
+--       rehecho de verdad el 14/09 con 6 cajas. No se les puede poner LK porque chocan con
+--       el indice unico contra el picking bueno. Son datos de otro, de antes de este
+--       trabajo: NO se tocaron. Si molestan, se borran (delta 0, es inerte).
+--
+-- Centinela: `gv_stock_empresa_fantasma` paso de 5 a **2**.
+--
+-- ── Rollback ────────────────────────────────────────────────────────────────────────
+--   -- volver las etiquetas
+--   alter table public."Movimientos_Stock" disable trigger trigger_actualizar_saldo_stock;
+--   update public."Movimientos_Stock" m set empresa = b.empresa_antes
+--     from zz_backups."GV_Backup_MovStock_Empresa_v1929_20260917" b where b.id = m.id;
+--   insert into public."Movimientos_Stock"
+--     select * from zz_backups."GV_Backup_MovStock_Fantasma_D72C_20260917";
+--   alter table public."Movimientos_Stock" enable trigger trigger_actualizar_saldo_stock;
+--   select public.refresh_stocks_carga_rapida();
+--   -- y sacar el cuarto recurso: reponer las dos funciones de la v19.27 (mas arriba)
 -- ════════════════════════════════════════════════════════════════════════════════════
