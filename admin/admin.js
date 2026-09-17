@@ -13642,21 +13642,34 @@ function _gvProyeccion(pr) {
 
 function _gvFugaTemprana(f) {
   if (!f.clientes) return "";
-  // Se muestran las primeras 15 filas y un botón despliega el resto (la RPC ya
-  // devuelve la lista completa).
+  // Filas ordenadas por ticket desc (viene así de la RPC). Se muestran las 15 de
+  // mayor ticket y un botón despliega el resto (la RPC ya devuelve la lista
+  // completa). Se inserta UNA línea en blanco en el corte de $1M para que el ojo
+  // no compare "$535.815" contra "$1.1 M" y le parezca más grande el primero.
   var VISIBLE = 15;
   var lista = f.lista || [];
   var total = lista.length;
+  var prevBig = null;
   var filas = lista.map(function (x, i) {
     var oculta = i >= VISIBLE;
     var cls = oculta ? " gv-fuga-mas" : "";
     var sty = oculta ? ' style="display:none"' : "";
-    return '<tr class="gv-drill-click' + cls + '"' + sty +
+    var t = x.ticket != null ? Number(x.ticket) : null;
+    var big = t != null && t >= 1e6;
+    var sep = "";
+    if (prevBig === true && big === false) {
+      sep = '<tr class="gv-fuga-sep' + cls + '"' + sty +
+        '><td colspan="5" style="padding:0;border:none;' +
+        'background:transparent;height:12px"></td></tr>';
+    }
+    prevBig = big;
+    return sep + '<tr class="gv-drill-click' + cls + '"' + sty +
       ' onclick="gvAbrirDrill(\'pedidos\',null,' +
       _gvQ(x.cod) + ',null,' + _gvQ(x.nom) + ',true)"><td>' + escHtml(x.nom) +
-      ' <span class="est-cod">' + escHtml(x.cod) + "</span></td><td>compra cada " +
-      _gvNum(x.mediana) + " días</td><td>hace <strong>" + _gvNum(x.dias) +
-      "</strong> que no compra</td></tr>";
+      ' <span class="est-cod">' + escHtml(x.cod) + "</span></td><td>" +
+      _gvNum(x.mediana) + "</td><td><strong>" + _gvNum(x.dias) +
+      "</strong></td><td>" + Math.round((Number(x.dto) || 0) * 100) +
+      "%</td><td>" + (t != null ? _gvPlata(t) : "—") + "</td></tr>";
   }).join("");
   var boton = total > VISIBLE
     ? '<div class="gv-fuga-mas-wrap"><button type="button" class="fc-vermas" ' +
@@ -13668,7 +13681,11 @@ function _gvFugaTemprana(f) {
     " clientes se están retrasando</h4>" +
     '<p class="gv-dash-nota">Se pasaron de su ritmo habitual pero todavía no están fríos. ' +
     "Es el momento de llamarlos: agarrarlos ahora es más barato que reactivarlos después.</p>" +
-    '<table class="est-table gv-mini"><tbody>' + filas + "</tbody></table>" + boton + "</div>"
+    '<table class="est-table gv-mini" style="width:auto;table-layout:auto">' +
+    "<thead><tr><th>Cliente</th>" +
+    "<th>Compra<br>Cada</th><th>Días que<br>no compra</th><th>Dto vol</th>" +
+    "<th>Ticket prom.</th></tr></thead><tbody>" +
+    filas + "</tbody></table>" + boton + "</div>"
   );
 }
 
