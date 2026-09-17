@@ -22184,3 +22184,131 @@ por cliente (con 100 pedidos no entra en el `statement_timeout` de 8 s). Con 160
 
 **Cubierto** en `tests/apr-cuarentena.cjs` (bloque 4c), incluido el caso *"la RPC del chip explota
 y la Cuarentena sigue marcando"*. **Rollback** al pie de `sql/gv_cuarentena_repo_chica_v1944.sql`.
+
+## §3.iz — v19.46: el cron 34 se comía el 54 % de la base — «canceling statement» al cancelar un pedido — 2026-09-17
+
+**Luis, con captura:** *"cuando le doy «Sí, cancelar» sale lo de canceling statement"*. El pop-up
+de **✕ Cancelar pedido** de la NP 98507 confirmaba, y al apretar salía
+**`⚠ canceling statement due to statement timeout`**.
+
+### La RPC no era el problema — la base estaba ocupada
+
+Lo primero fue medir `gv_ppp_pedido_cancelar('98507')` como `authenticated`, paso por paso, con la
+base tranquila:
+
+| paso | |
+|---|---|
+| `es_supervisor_virgilio()` + `gv_es_supervisor_o_servicio()` | 2 ms |
+| `gv_ppp_pedido_nps` | 17 ms |
+| `gv_ppp_np_devolucion` | 363 ms |
+| `gv_ppp_np_desarmar` | 892 ms |
+| **total** | **1,3 s** contra un `statement_timeout` de **8 s** |
+
+O sea: 6× de margen. Y sin embargo se cortó. Lo primero que hay que descartar en ese caso es que
+el fallo haya escrito a medias: **no escribió nada**, la transacción se deshizo entera (0 filas en
+`NP_Canceladas`, 0 en `GV_PPP_Prog_Override`, 0 movimientos de `desarme`, y
+`gv_ppp_np_devolucion('98507')` sigue devolviendo las mismas 3 cajas en `a_facturar`).
+
+### Quién se comía la base: `pg_stat_statements`
+
+Ventana del **12/09 14:53 al 17/09 15:12**, o sea **120 horas de reloj**:
+
+| consulta | llamadas | media | máx | TOTAL ejecutado |
+|---|---|---|---|---|
+| `detectar_faltantes_llegaron()` | 3.606 | **64,7 s** | 110 s | **233.157 s = 64,8 h** |
+| `reconciliar_pipeline_stock()` | 719 | 17,9 s | 67,8 s | 12.884 s = 3,6 h |
+| `pg_advisory_xact_lock($1)` | 2.240 | **4,6 s de espera** | 67,6 s | 10.402 s = 2,9 h |
+| `REFRESH MATERIALIZED VIEW CONCURRENTLY vista_stock_procesada` | 3.609 | 1,6 s | 12,7 s | 5.815 s |
+| `ppp_web_armar_tandas` (el armador) | 691 | 1,8 s | **7,7 s** | 1.245.960 ms |
+
+**64,8 h de ejecución en 120 h de reloj = el 54 % del tiempo.** El cron **34** dispara esa función
+`*/2 * * * *` y cada corrida tarda **un minuto**: hay **una o dos corriendo siempre**. Cualquier
+statement de un supervisor competía por CPU con eso, y una RPC de 1,3 s se va de los 8 s sola.
+
+### La causa, exacta
+
+El CTE `fmark` de `detectar_faltantes_llegaron` corría un `exists` **correlacionado** contra
+`Movimientos_Stock` **por cada fila** de `Entregas_Virgilio` con `cajas_falto > 0`:
+
+> **967 filas × 63.614 movimientos = 61,5 millones de comparaciones**, cada una con dos
+> `regexp_replace` y un `OR` que anula cualquier índice.
+
+### El arreglo: el mismo dato, una sola pasada
+
+Se pre-agrega `Movimientos_Stock` **una vez** (`ag0`: saldo por código normalizado +
+`max(ts) filter (where tipo='recepcion')`) y se JOINea por la clave. O(n+m) en lugar de O(n×m).
+
+Las dos simplificaciones, escritas porque no son obvias:
+
+1. `ag.codn = X or rtrim(ag.codn,'E') = rtrim(X,'E')` **se reduce a la segunda mitad**: si
+   `codn = X`, los dos `rtrim` también son iguales. El `OR` era redundante y el criterio real
+   siempre fue *"el código sin la E final"*.
+2. `exists (… and m.ts > e.creado)` ≡ `max(m.ts) > e.creado`.
+
+**Medido: de 64.700 ms a 37–87 ms.** Unas **1.000 veces** más rápido.
+
+**Y confirmado con el cron real** (`cron.job_run_details` del jobid 34, el mismo día, sin tocar el
+schedule). El arreglo se aplicó a las 15:19:
+
+| corrida | 15:04 | 15:06 | 15:08 | 15:10 | 15:12 | 15:14 | 15:16 | 15:18 | **15:20** | **15:22** | **15:24** | **15:26** |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| segundos | 92,7 | 69,5 | 69,0 | 83,0 | 71,4 | 82,6 | 85,2 | 67,8 | **0,20** | **0,09** | **0,11** | **0,05** |
+
+Corridas de 68–93 s **cada 120 s**: había solapamiento casi permanente. Ahora son décimas.
+Y la RPC que se quejaba, medida con la base libre: previo 405 ms, `gv_ppp_pedido_cancelar` **842 ms**.
+
+### Verificación: fila por fila, sobre el 100 % de los datos
+
+No una muestra. Se comparó vieja vs nueva, columna por columna, sobre las **967 filas**:
+
+| columna | filas | `true` viejo / nuevo | diferencias |
+|---|---|---|---|
+| `llego` | 967 | 17 / 17 | **0** |
+| `arrived_after` (4 tandas por `id % 4`) | 240+247+230+250 = **967** | 331 / 331 | **0** |
+
+El `except all` completo de la salida final no se pudo correr de una: la versión vieja tarda 65 s
+y el MCP corta a los 60 s. Por eso se comparó al nivel de `fmark`, que es **el único lugar donde
+las dos versiones difieren** (de `falt` para abajo el SQL es idéntico).
+
+### ⚠ Lo que NO funciona: subir el `statement_timeout` desde adentro de la función
+
+Parece la salida obvia y **no sirve**. Postgres arma el timer **al empezar el statement** y no lo
+re-arma si el GUC cambia después. Medido:
+
+```sql
+begin;
+set local statement_timeout = '2s';
+do $$ begin
+  perform set_config('statement_timeout','25s', true);   -- no tiene efecto sobre este statement
+  perform pg_sleep(4);
+end $$;
+-- ERROR: canceling statement due to statement timeout   ← cortó a los 2 s igual
+```
+
+### Del lado del front: reintento y decir la verdad
+
+`pgaCanConfirmar` ahora detecta el corte (`_pgaCanEsTimeout`: `canceling statement` /
+`statement timeout` / `57014`), **reintenta una vez** —es seguro, porque la primera se deshizo
+entera— y si vuelve a cortar muestra lo único que le importa saber al supervisor:
+
+> *"Supabase cortó la operación a los 8 segundos y la deshizo entera: el pedido NO se canceló y no
+> se movió ninguna caja. Se reintentó una vez y volvió a cortar, así que la base está ocupada en
+> este momento. Probá de nuevo en un minuto."*
+
+El error crudo no sólo era ilegible: dejaba sin saber **si el pedido se canceló o no**, que en una
+operación destructiva es la única pregunta que cuenta.
+
+### Lo que queda abierto (no se tocó)
+
+- **`reconciliar_pipeline_stock()`**: 17,9 s de media, 67,8 s de máximo, cada 10 min (cron 68).
+- **`pg_advisory_xact_lock(5768)`**: 2.240 esperas con **media de 4,6 s**. Los crons 57 y 68
+  comparten ese lock y se hacen cola.
+- **`ppp_web_armar_tandas`** ya llega a **7,7 s** de máximo contra el límite de 8 s. Si lo cruza,
+  el armado automático se corta **en silencio** (el cron figura `succeeded`) — es exactamente lo
+  que pasó en la v19.11 por otra causa.
+- **`detectar_faltantes_llegaron` termina en `exception when others then return 'error: '||sqlerrm`**,
+  así que se come cualquier fallo y el cron figura `succeeded` igual. Para saber si anda hay que
+  mirar lo que devuelve: `select public.detectar_faltantes_llegaron();` tiene que empezar con `ok `.
+
+**SQL:** `sql/detectar_faltantes_llegaron.sql` (CREATE completo, no un parche).
+**Rollback:** `sql/backups/detectar_faltantes_llegaron_pre_v1945.sql`. Problema **382**.

@@ -1132,6 +1132,45 @@ los cambios en la v15.45. **Regla: al editar un archivo por script, leer a una v
 largo del resultado, y recién entonces escribir. Y antes de `git commit`, mirar `git diff --stat`: un
 archivo con miles de líneas borradas no es un cambio, es un error.**
 
+## ⚠ REGLA: si algo tira «canceling statement», mirar `pg_stat_statements` ANTES de tocar la función
+
+**Luis, 2026-09-17:** *"cuando le doy «Sí, cancelar» sale lo de canceling statement"*. La RPC que
+fallaba tardaba **1,3 s** medida paso por paso contra un `statement_timeout` de **8 s** — o sea 6×
+de margen. El problema no era ella: era que **el cron 34 (`detectar_faltantes_llegaron`) ocupaba el
+54 % del tiempo de la base** (3.606 corridas, 64,7 s de media, 233.157 s de ejecución en 120 h de
+reloj) porque corría un `exists` correlacionado por fila: 967 × 63.614 = 61,5 millones de
+comparaciones, cada 2 minutos. Optimizar la RPC lenta habría sido tiempo perdido.
+
+**El orden que hay que seguir**, y son tres consultas:
+
+```sql
+-- 1) ¿quién se está comiendo la base? (esto contesta el 90 % de los "timeout al azar")
+select calls, round(total_exec_time/1000) total_s, round(mean_exec_time) mean_ms,
+       round(max_exec_time) max_ms, left(regexp_replace(query,'\s+',' ','g'),110) q
+  from extensions.pg_stat_statements order by total_exec_time desc limit 12;
+select stats_reset::text, now()::text from extensions.pg_stat_statements_info;  -- 2) la ventana
+-- 3) y recién ahora, la función sospechosa, paso por paso con clock_timestamp()
+```
+
+**Comparar `total_s` contra los segundos de reloj de la ventana**: si una sola consulta suma más
+de la mitad, ahí está el problema, no en la que se queja.
+
+Cuatro cosas que aprendimos y no hay que volver a probar:
+
+- **Subir el `statement_timeout` desde adentro de la función NO sirve.** Postgres arma el timer al
+  empezar el statement y no lo re-arma si el GUC cambia después. Medido: con `set local
+  statement_timeout = '2s'`, un `set_config('statement_timeout','25s',true)` adentro de un `do`
+  no evita que corte a los 2 s.
+- **Medir desde el MCP no reproduce el timeout.** El MCP entra como `postgres`, que **no tiene**
+  `statement_timeout`; `authenticated`, `anon` y `authenticator` tienen **8 s** (y `authenticator`
+  además `lock_timeout = 8 s`). Para medir como el front: `set local role authenticated`.
+- **Un statement cortado por timeout NO queda en `pg_stat_statements`.** Que la RPC que se quejó no
+  aparezca ahí es señal de que nunca terminó, no de que no se llamó.
+- **Y el corte deshace la transacción ENTERA**, así que reintentar es seguro: eso es lo que hay que
+  decirle al usuario ("no se canceló nada, probá de nuevo"), no el texto crudo de Postgres.
+
+Detalle y medición: `docs/SUPABASE-GESTION-VIRGILIO.md` §3.iz, problema 382.
+
 ## ⚠ PROTOCOLO OBLIGATORIO: NUNCA modificar datos sin permiso explícito
 
 **Ante cualquier consulta sobre datos corruptos, errores, o inconsistencias en Supabase:**

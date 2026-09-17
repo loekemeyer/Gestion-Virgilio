@@ -1590,3 +1590,41 @@ Y el stock se revierte con el movimiento inverso (nunca borrando la fila: el log
 
 ⚠ **Antes de borrar `GV_PPP_Web_NP_Cancelada`, mirarla**: cada fila es una NP que un supervisor
 canceló a mano, y sin ella el cron la vuelve a programar sola.
+
+---
+
+## v19.46 (2026-09-17) — `detectar_faltantes_llegaron()` reescrita por performance
+
+**Objeto compartido tocado:** `public.detectar_faltantes_llegaron()` — función de `public.*`, o sea
+alcanzable desde Producción Virgilio. Se hizo `CREATE OR REPLACE` (no se cambió firma, ni tipo de
+retorno, ni grants; `CREATE OR REPLACE` los conserva).
+
+**Qué cambió:** SÓLO el plan de la consulta. El CTE `fmark` hacía un `exists` correlacionado contra
+`Movimientos_Stock` por cada fila de `Entregas_Virgilio` (967 × 63.614 = 61,5 millones de
+comparaciones); ahora pre-agrega una vez y JOINea. **La salida es idéntica**, verificado fila por
+fila sobre las 967 filas (`llego` 0 diferencias, `arrived_after` 0 diferencias en 4 tandas que
+suman 967).
+
+**Impacto medido:** de **64.700 ms** a **37–87 ms** por corrida. La dispara el cron **34**
+(`*/2 * * * *`), que estaba ocupando el **54 % del tiempo de la base** (233.157 s de ejecución en
+120 h de reloj) y por eso la app tiraba `canceling statement due to statement timeout` al azar.
+
+**Quién la usa:** sólo el cron 34. `grep` en el repo: ninguna llamada desde el front de Gestión
+(`index.html`, `recepcion.js`, `planimetria.js`). Producción Virgilio no la llama —es una función
+de alerta server-side, no hay `rpc/detectar_faltantes_llegaron` en ningún front—, así que no hay
+pantalla que pueda cambiar de comportamiento. Lo que sí toca son las tablas de siempre
+(`Faltantes_Tareas` + Telegram), y eso no cambió.
+
+**Rollback exacto:**
+
+```sql
+-- correr sql/backups/detectar_faltantes_llegaron_pre_v1945.sql
+```
+
+⚠ Ese rollback devuelve la versión de 64,7 s por corrida cada 2 minutos. Sólo tiene sentido si el
+arreglo resultara incorrecto, y la equivalencia está verificada sobre el 100 % de los datos.
+
+**Lo que NO se tocó** y queda anotado como pendiente (§3.iz): `reconciliar_pipeline_stock()`
+(17,9 s de media, cron 68), la cola del `pg_advisory_xact_lock(5768)` entre los crons 57 y 68
+(media de 4,6 s de espera pura) y `ppp_web_armar_tandas`, que ya llega a 7,7 s contra el límite
+de 8 s.

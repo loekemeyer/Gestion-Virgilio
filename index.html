@@ -5733,7 +5733,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=19.45"></script>
+<script type="module" src="recepcion.js?v=19.46"></script>
 <!-- Config del módulo de fichada (compartido con fichada.html). El secret
      hmacSecret tiene que ser el mismo acá y allá; cargándolo desde un solo
      archivo evitamos que se desincronicen. -->
@@ -9579,7 +9579,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v19.45";
+const APP_VERSION = "v19.46";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -35046,6 +35046,23 @@ async function _pgaCanRpc(fn, args, ms) {
     ]);
   } finally { clearTimeout(t); }
 }
+/* v19.46 (Luis, 17/09: "cuando le doy Sí, cancelar sale lo de canceling statement") — QUÉ HACER
+   CUANDO SUPABASE CORTA EL STATEMENT A LOS 8 SEGUNDOS.
+   El rol `authenticated` tiene `statement_timeout = 8 s`, y cuando salta, Postgres **deshace la
+   transacción entera**: no queda media cancelación ni media caja movida (medido en el caso de
+   Luis: 0 filas en `NP_Canceladas`, 0 en el override y 0 movimientos de stock). O sea que
+   reintentar es seguro, y es lo que hay que hacer.
+   Las dos cosas que arregla esto: (a) un reintento automático, porque la causa típica es que la
+   base estaba ocupada un segundo; (b) el TEXTO — «canceling statement due to statement timeout»
+   no le dice nada a un supervisor y, peor, lo deja sin saber si el pedido se canceló, que en una
+   operación así es lo único que importa saber.
+   La causa de fondo de aquel día era el cron 34 (`detectar_faltantes_llegaron`: 65 s por corrida
+   cada 2 minutos, problema 382), ya arreglada; esto queda como red. */
+function _pgaCanEsTimeout(e) {
+  const m = String((e && e.message) ? e.message : (e || "")).toLowerCase();
+  return m.indexOf("canceling statement") >= 0 || m.indexOf("statement timeout") >= 0 ||
+         m.indexOf("57014") >= 0;
+}
 window.pgaCanAbrir = async function (np) {
   const n = String(np || "").trim(); if (!n) return;
   _pgaCan = { np: n, prev: null, alcance: "np", motivo: null, texto: "", paso: "cargando",
@@ -35197,7 +35214,7 @@ window.pgaCanConfirmar = async function () {
   const go = document.getElementById("pgaCanGo");
   if (go) { go.disabled = true; go.textContent = "Cancelando…"; }
   try {
-    const r = await aprRpc("gv_ppp_pedido_cancelar", {
+    const args = {
       p_np: s.np,
       p_motivo: pgaCanMotivoTxt(s),
       p_por: await aprQuien(),
@@ -35205,7 +35222,16 @@ window.pgaCanConfirmar = async function () {
       // Luis: "se puede hacer con cualquier pedido en cualquier estado". El backend igual frena
       // lo que ya salió salvo que se le diga que sí a sabiendas — y lo deja escrito en el log.
       p_forzar: !!R.salio
-    });
+    };
+    let r;
+    try {
+      r = await aprRpc("gv_ppp_pedido_cancelar", args);
+    } catch (e1) {
+      if (!_pgaCanEsTimeout(e1)) throw e1;
+      // La primera murió sin escribir nada (la transacción se deshizo): repetirla es seguro.
+      if (go) go.textContent = "Reintentando…";
+      r = await aprRpc("gv_ppp_pedido_cancelar", args);
+    }
     const n = (r || []).length, cajas = (r || []).reduce(function (a, x) { return a + (Number(x.cajas) || 0); }, 0);
     s.saving = false; pgaCanCerrar();
     pppSetStatus("✕ " + n + " NP cancelada" + (n === 1 ? "" : "s") +
@@ -35214,7 +35240,11 @@ window.pgaCanConfirmar = async function () {
     pgaRecargar();
   } catch (e) {
     s.saving = false;
-    s.err = (e && e.message) ? e.message : String(e);
+    s.err = _pgaCanEsTimeout(e)
+      ? "Supabase cortó la operación a los 8 segundos y la deshizo entera: el pedido NO se canceló " +
+        "y no se movió ninguna caja. Se reintentó una vez y volvió a cortar, así que la base está " +
+        "ocupada en este momento. Probá de nuevo en un minuto."
+      : ((e && e.message) ? e.message : String(e));
     pgaCanRender();
   }
 };

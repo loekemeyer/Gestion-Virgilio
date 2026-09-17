@@ -1,3 +1,34 @@
+## Nota v19.46 (2026-09-17) — Un cron se comía el 54 % de la base: por eso saltaban «canceling statement» al azar
+
+Luis tocó **✕ Cancelar pedido** en la NP 98507 y salió **`canceling statement due to statement
+timeout`**. La RPC de cancelar tarda **1,3 s** contra un límite de **8 s**, así que no era ella.
+
+**Era el cron 34** (`detectar_faltantes_llegaron`, el que avisa *"faltante que llegó"*): corría
+cada 2 minutos y **cada corrida tardaba entre 68 y 93 segundos**, o sea que había siempre una o
+dos corriendo a la vez. En 120 horas de reloj acumuló **64,8 horas de ejecución: el 54 % del
+tiempo de la base**. Cualquier pantalla que escribiera competía con eso.
+
+La culpa era un `exists` correlacionado: por **cada** una de las 967 filas de
+`Entregas_Virgilio` con faltante, recorría los 63.614 movimientos de stock → **61,5 millones de
+comparaciones**, con dos `regexp_replace` cada una. Ahora pre-agrega una vez y cruza por clave:
+**de 64,7 s a 0,05–0,20 s** (medido con el cron real, corridas 15:20 en adelante).
+
+La salida es la misma: verificado fila por fila sobre las 967 filas, **0 diferencias** en las dos
+columnas que cambian (`llego` y `arrived_after`).
+
+**Lo que hay que recordar cuando algo tira timeout**: mirar primero
+`extensions.pg_stat_statements` y comparar el total ejecutado contra los
+segundos de reloj de la ventana; si una sola consulta suma más de la mitad, el problema está ahí y
+no en la que se queja. Y **subir el `statement_timeout` desde adentro de la función no sirve**:
+Postgres arma el timer al empezar el statement.
+
+Del lado de la pantalla, cancelar ahora **reintenta una vez** si Supabase corta (el corte deshace
+la transacción entera, así que repetir es seguro) y, si vuelve a cortar, dice lo único que
+importa: *"el pedido NO se canceló y no se movió ninguna caja"*.
+
+Detalle y medición: §3.iz de `docs/SUPABASE-GESTION-VIRGILIO.md` · `sql/detectar_faltantes_llegaron.sql`
+· problema 382.
+
 ## Nota v19.42 (2026-09-17) — el "de menos" sobre una tanda sin picking dejaba Pickeados negativo (problema 378)
 
 Caso 323E/E03C: Jhonny Cartaya (277) pickeó E03C pero **323E nunca se pickeó** (0 picking del

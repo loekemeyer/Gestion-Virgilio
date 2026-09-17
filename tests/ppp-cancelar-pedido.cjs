@@ -208,6 +208,54 @@ catch (_e) {
     return o;
   });
 
+  /* (i) v19.46 — QUÉ PASA SI SUPABASE CORTA EL STATEMENT A LOS 8 SEGUNDOS.
+         Lo trajo Luis: apretó «Sí, cancelar» y salió el error crudo de Postgres
+         («canceling statement due to statement timeout»), que además de ilegible lo dejaba sin
+         saber lo único que importa: si el pedido se canceló o no. El corte deshace la
+         transacción entera, así que reintentar es seguro. Se prueban las dos mitades:
+         que reintente UNA vez, y que si vuelve a cortar diga que NO se canceló nada. */
+  const to = await p.evaluate(async () => {
+    const esperar = async (f) => { const t0 = Date.now();
+      while (Date.now() - t0 < 4000) { if (f()) return true; await new Promise((x) => setTimeout(x, 40)); } return false; };
+    const cuerpo = () => (document.getElementById("pgaCanBody") || {}).innerHTML || "";
+    const o = {};
+    let intentos = 0, fallar = 2;
+    const previoOk = window.aprRpc;
+    window.aprRpc = async function (fn, args) {
+      if (fn === "gv_ppp_np_cancelar_previo") return previoOk(fn, args);
+      if (fn === "gv_ppp_pedido_cancelar") {
+        intentos++;
+        if (intentos <= fallar) throw new Error("canceling statement due to statement timeout");
+        return [{ np: args.p_np, tanda: "E01B", arts: 0, cajas: 0, detalle: "" }];
+      }
+      return [];
+    };
+    const confirmar = async function () {
+      await pgaCanAbrir("LK 0010");
+      await esperar(() => /Por qué se cancela/.test(cuerpo()));
+      [...document.querySelectorAll(".can-op")].find((x) => /Falta stock/.test(x.textContent)).click();
+      await esperar(() => !document.querySelector(".can-b.go[disabled]"));
+      document.querySelector(".can-b.go").click();          // → paso 2: la confirmación
+      await esperar(() => !!document.getElementById("pgaCanGo"));
+      document.getElementById("pgaCanGo").click();           // → ahora sí, cancelar
+    };
+    // corta las dos veces: reintentó una sola vez y el cartel dice que no se canceló nada
+    await confirmar();
+    await esperar(() => /NO se cancel/.test(cuerpo()));
+    o.intentosCuandoFallaSiempre = intentos;
+    o.diceQueNoSeCancelo = /NO se cancel/.test(cuerpo()) && /ninguna caja/.test(cuerpo());
+    o.noMuestraElErrorCrudo = !/canceling statement/i.test(cuerpo());
+    o.sigueAbierto = document.getElementById("pgaCanOv").classList.contains("show");
+    pgaCanCerrar();
+    // corta la primera y anda la segunda: el reintento la saca adelante, sin molestar a nadie
+    intentos = 0; fallar = 1;
+    await confirmar();
+    o.cerroTrasReintento = await esperar(() => !document.getElementById("pgaCanOv").classList.contains("show"));
+    o.intentosCuandoFallaUna = intentos;
+    window.aprRpc = previoOk;
+    return o;
+  });
+
   const mal = [];
   const t = (c, m) => { if (!c) mal.push(m); };
   t(errs.length === 0, "errores de página: " + errs.join(" | "));
@@ -240,6 +288,14 @@ catch (_e) {
   t(med.tituloAlto > 0 && med.tituloAlto <= 34, "el título del pop-up ocupa " + med.tituloAlto + "px de alto: se parte en varias líneas");
   t(med.go > 0 && med.go <= 300, "el botón de confirmar mide " + med.go + "px: sale full width");
   t(med.card >= 400, "la tarjeta del pop-up quedó angosta (" + med.card + "px)");
+
+  t(to.intentosCuandoFallaSiempre === 2,
+    "con timeout tiene que reintentar UNA vez (ni cero ni en loop): intentó " + to.intentosCuandoFallaSiempre + " veces");
+  t(to.diceQueNoSeCancelo, "tras el timeout no dice que el pedido NO se canceló ni que no se movió ninguna caja");
+  t(to.noMuestraElErrorCrudo, "le muestra al supervisor el «canceling statement» crudo de Postgres");
+  t(to.sigueAbierto, "cerró el pop-up después del timeout: deja sin saber si se canceló");
+  t(to.intentosCuandoFallaUna === 2 && to.cerroTrasReintento,
+    "si la primera corta y la segunda anda, el reintento tiene que salir adelante y cerrar");
 
   await b.close();
   if (mal.length) { console.log("ppp-cancelar-pedido: ✗ FAIL\n  - " + mal.join("\n  - ")); process.exit(1); }
