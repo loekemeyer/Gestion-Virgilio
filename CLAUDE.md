@@ -418,6 +418,60 @@ las manda directo al portal de **Chef** (`precios_super.cadena`: `cencosud` → 
 Su caso propio —NP de Chef con artículos de Loeke **sin** L— ya lo cubre `gv_fac_ajustes_isis` (v13.79): es el caso
 **inverso** al de Tierra del Fuego. `sql/gv_cliente_isis_v1775.sql`, §3.fp.
 
+## ⚠ REGLA: LAS TABLAS QUE VALEN — góndola, racks y empresa del artículo
+
+**Luis, 2026-09-17:** *"fijate que estés usando las tablas actualizadas de `gv_` y escribí en
+algún lado que esas son las tablas que valen para que no se vean tablas desactualizadas o
+erróneas"*. Hay tablas viejas conviviendo con las vivas, con el **mismo contenido aparente**, y
+leer la que no es da respuestas que suenan bien y están mal.
+
+| Para saber… | **LA QUE VALE** | La vieja, NO usar |
+|---|---|---|
+| Qué artículo va en qué sector de **góndola**, y de qué empresa es el sector | **`GV_Lugar` + `GV_Lugar_Item`** → vista **`gv_lugar_articulo`** (y `gv_planimetria_celda`) | `Planimetria` |
+| Qué hay cargado en cada **rack** | **`Racks_Planimetria`** | **`Ubicaciones_Articulos`** |
+| De qué **empresa** es un artículo (el dato de la columna LK/CH) | **`gv_empresa_de_articulo(cod)`** y su caché `GV_Articulo_Empresa_Cache` | `gv_articulo_empresa` (la vista rota) |
+
+**Medido el 17/09**, que es lo que decide cuál está viva:
+
+| tabla | filas | último movimiento |
+|---|---|---|
+| `GV_Lugar` / `GV_Lugar_Item` | 872 / 790 | **2026-09-16** |
+| `Racks_Planimetria` | 154 | **2026-09-16** |
+| `Ubicaciones_Articulos` | 872 | **2026-08-10** ← congelada hace más de un mes |
+| `Planimetria` | 370 | 2026-09-11 |
+
+Y quién las escribe: `Racks_Planimetria` la mueven `racks_plani_ingreso`, `racks_plani_descontar`,
+`racks_plani_mover`, `registrar_baja_racks` y `vista_insumos` — o sea, la app. A
+`Ubicaciones_Articulos` **no la escribe nadie** desde el 10/08.
+
+### Lo que costó descubrirlo
+
+Buscando dónde estaban físicamente las cajas del **809E**, `Ubicaciones_Articulos` decía que en el
+rack `AD5` había un código **`809E-QUESO`** y en `Y12` un **`809E-PIZZA`**. Los dos son **inventos
+de esa tabla**: no existen como artículo ni como insumo (**0 movimientos** en `Movimientos_Stock`,
+0 en el depósito `insumos`) y son los **únicos dos códigos con guion** de toda la tabla. La tabla
+viva dice lo correcto: el código es `809E` y el rack de LK es **`AE11`**, no Y12.
+
+### ⚠ Los sectores de rack van con CERO adelante: `AD05`, no `AD5`
+
+**27 de los 29** sectores de `Racks_Planimetria` que no existían en `GV_Lugar` eran el mismo error
+de tipeo: falta el cero. Se corrigieron 26 (los que tienen gemelo `rack`) el 17/09, backup en
+`zz_backups."GV_Backup_RacksPlani_sectores_20260917"`. **Al cargar un rack a mano, escribir el
+sector como está en `GV_Lugar`.** Chequeo:
+
+```sql
+select distinct r.sector from public."Racks_Planimetria" r
+ where not exists (select 1 from public."GV_Lugar" l where l.sector = r.sector);
+-- al 17/09 quedan 3 y son otro problema, no el del cero: O2, O5 (no existen en ninguna forma)
+-- y Z7 (su gemelo Z07 existe pero es GÓNDOLA, no rack)
+```
+
+### Y una contradicción que quedó a la vista, sin resolver
+
+**`AD06` tiene dos filas**: `CH / 809E / 360 cajas` (del 08/07) y `LK / 368E / 56` (del 31/08),
+mientras `GV_Lugar` dice que AD06 es un rack de **LK**. Un rack con dos artículos de dos empresas.
+No se tocó: hay que mirarlo en el depósito.
+
 ## ⚠ REGLA: el CÓDIGO DE CLIENTE es por EMPRESA — nunca cruzar por código solo
 
 **Thomas, 2026-09-16:** *"¿contemplaste que los códigos de clientes de LK y CH son diferentes?
