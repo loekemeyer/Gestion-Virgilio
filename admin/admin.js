@@ -13642,20 +13642,48 @@ function _gvProyeccion(pr) {
 
 function _gvFugaTemprana(f) {
   if (!f.clientes) return "";
-  var lista = (f.lista || []).map(function (x) {
-    return '<tr class="gv-drill-click" onclick="gvAbrirDrill(\'pedidos\',null,' +
+  // Se muestran las primeras 15 filas y un botón despliega el resto (la RPC ya
+  // devuelve la lista completa).
+  var VISIBLE = 15;
+  var lista = f.lista || [];
+  var total = lista.length;
+  var filas = lista.map(function (x, i) {
+    var oculta = i >= VISIBLE;
+    var cls = oculta ? " gv-fuga-mas" : "";
+    var sty = oculta ? ' style="display:none"' : "";
+    return '<tr class="gv-drill-click' + cls + '"' + sty +
+      ' onclick="gvAbrirDrill(\'pedidos\',null,' +
       _gvQ(x.cod) + ',null,' + _gvQ(x.nom) + ',true)"><td>' + escHtml(x.nom) +
       ' <span class="est-cod">' + escHtml(x.cod) + "</span></td><td>compra cada " +
       _gvNum(x.mediana) + " días</td><td>hace <strong>" + _gvNum(x.dias) +
       "</strong> que no compra</td></tr>";
   }).join("");
+  var boton = total > VISIBLE
+    ? '<div class="gv-fuga-mas-wrap"><button type="button" class="fc-vermas" ' +
+      'data-mas="' + (total - VISIBLE) + '" data-open="0" onclick="gvFugaToggle(this)">' +
+      "Ver los " + (total - VISIBLE) + " restantes ▾</button></div>"
+    : "";
   return (
     '<div class="gv-graf gv-graf-full gv-alerta"><h4>⚠ Fuga temprana — ' + f.clientes +
     " clientes se están retrasando</h4>" +
     '<p class="gv-dash-nota">Se pasaron de su ritmo habitual pero todavía no están fríos. ' +
     "Es el momento de llamarlos: agarrarlos ahora es más barato que reactivarlos después.</p>" +
-    '<table class="est-table gv-mini"><tbody>' + lista + "</tbody></table></div>"
+    '<table class="est-table gv-mini"><tbody>' + filas + "</tbody></table>" + boton + "</div>"
   );
+}
+
+// Despliega / colapsa las filas de fuga temprana que están más allá de las 15
+// visibles. No re-renderiza: solo togglea display sobre las filas .gv-fuga-mas.
+function gvFugaToggle(btn) {
+  var card = btn.closest(".gv-alerta");
+  if (!card) return;
+  var abierto = btn.getAttribute("data-open") === "1";
+  card.querySelectorAll(".gv-fuga-mas").forEach(function (r) {
+    r.style.display = abierto ? "none" : "";
+  });
+  var n = btn.getAttribute("data-mas");
+  btn.setAttribute("data-open", abierto ? "0" : "1");
+  btn.innerHTML = abierto ? "Ver los " + n + " restantes ▾" : "Ver menos ▴";
 }
 
 function _gvTablaProductos(pv) {
