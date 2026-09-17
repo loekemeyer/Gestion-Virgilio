@@ -21422,7 +21422,7 @@ como CH. Luis: *"396 no es un dual mal asignado, es LK. la góndola está mal as
 **P39 pasó de CH a LK** (backup `zz_backups.GV_Backup_Lugar_P39_20260916`). Con eso los
 códigos que figuran en las dos góndolas quedaron en los 4 duales declarados.
 
-### §3.gm — v19.27: «⏸ Armados en espera», el día que no es un día — 2026-09-17
+### §3.gm — v19.29: «⏸ Armados en espera», el día que no es un día — 2026-09-17
 
 Luis, 2026-09-17: *"PPP > Programación. Cambiá el orden de cómo se muestran los pedidos atrasados,
 de los más antiguos a los más nuevos (de arriba para abajo). Agregá un «día» en programación que
@@ -21487,12 +21487,12 @@ VOLVER · gv_ppp_tanda_mover las devuelve a un día real, marcas=0, árbol de nu
 O sea: salió de atrasados, liberó los 0,239 m³ de cupo del 18, **ningún centinela se movió** y
 volver deja todo como estaba. `gv_endpoints_rotos` vacío.
 
-**Rollback:** `sql/backups/pre_v1927_armados_espera_20260917.sql` (el espejo como estaba + qué
+**Rollback:** `sql/backups/pre_v1929_armados_espera_20260917.sql` (el espejo como estaba + qué
 sacarle a las dos funciones). Ojo: restaurar los objetos **no** le devuelve la fecha a una tanda ya
 parada — eso se hace con `gv_ppp_tanda_mover` (o desde la app). Qué hay parado:
 `select * from public."GV_PPP_Armados_Espera";`
 
-**SQL:** `sql/gv_ppp_armados_espera_v1927.sql`. **Front:** `PGA_ESPERA_ISO` / `_pgaDiaTxt` /
+**SQL:** `sql/gv_ppp_armados_espera_v1929.sql`. **Front:** `PGA_ESPERA_ISO` / `_pgaDiaTxt` /
 `pppTandaEspera` en `index.html`. **Test:** `tests/ppp-armados-espera.cjs`.
 
 ⚠ **Lo que hay que mirar si alguna vez se vuelve raro:** `gv_ppp_programacion_diaria` es

@@ -1,5 +1,5 @@
 -- ═══════════════════════════════════════════════════════════════════════════════════════════
--- v19.27 — «ARMADOS EN ESPERA»: un día más en Programación, para lo que se arma SIN fecha
+-- v19.29 — «ARMADOS EN ESPERA»: un día más en Programación, para lo que se arma SIN fecha
 -- Pedido de Luis (2026-09-17): *"agrega un 'día' en programación que sea «Armados en espera»,
 -- va a servir para intencionalmente mandar pedidos que se arman sin fecha de entrega definida.
 -- Asegurate que se pueda enviar desde pedidos atrasados y desde programación de entregas"*.
@@ -94,7 +94,7 @@ create or replace view public.gv_ppp_programacion_diaria as
     p.op,
         case
             when coalesce(o.desprogramada, false) then ''::text
-            -- v19.27: en espera = sin fecha de entrega. La tanda queda.
+            -- v19.29: en espera = sin fecha de entrega. La tanda queda.
             when (esp.np is not null) then ''::text
             else coalesce(((o.fecha_entrega)::text || ' 00:00:00'::text), p.fecha_entrega)
         end as fecha_entrega,
@@ -140,7 +140,7 @@ fuentes as (
          'isis'::text                                                      as origen
     from public.gv_ppp_programacion_diaria p
    where left(btrim(coalesce(p.fecha_entrega, '')), 10) ~ '^\d{4}-\d{2}-\d{2}$'
-      -- v19.27: una NP de ISIS en espera quedó sin fecha en el espejo; igual tiene que entrar,
+      -- v19.29: una NP de ISIS en espera quedó sin fecha en el espejo; igual tiene que entrar,
       -- porque su día lo pone la marca.
       or exists (select 1 from esp where esp.np = regexp_replace(upper(btrim(p.np)), '\.0+$', ''))
   union all
@@ -206,7 +206,7 @@ uni as (
    order by f.np, f.pri, f.m3 desc
 ),
 dia as (
-  -- v19.27: el día de una NP en espera es el centinela. Con eso entra en el rango sólo cuando
+  -- v19.29: el día de una NP en espera es el centinela. Con eso entra en el rango sólo cuando
   -- quien pregunta llega hasta ahí (la Programación), y nunca en un rango de días reales
   -- (Pedidos atrasados, Avance del día).
   select u.*, (case when u.en_espera then public.gv_ppp_espera_fecha() else u.fe end) as fe_dia
@@ -331,7 +331,7 @@ begin
     raise exception 'La tanda % ya salió (% de % pedidos tienen carga de camión o remito controlado): no se puede dejar en espera lo que ya se entregó.', v_t, v_salio, v_total;
   end if;
 
-  v_nota := 'v19.27 ' || to_char(now() at time zone 'America/Argentina/Buenos_Aires', 'YYYY-MM-DD HH24:MI')
+  v_nota := 'v19.29 ' || to_char(now() at time zone 'America/Argentina/Buenos_Aires', 'YYYY-MM-DD HH24:MI')
             || ' · Armados en espera (sin fecha de entrega)'
             || coalesce(' por ' || nullif(btrim(p_por), ''), '')
             || coalesce(' · ' || nullif(btrim(p_motivo), ''), '');
@@ -432,7 +432,7 @@ begin
   end if;
   if v_t = '' then raise exception 'Falta el código de la tanda.'; end if;
   if p_fecha is null then raise exception 'Falta la fecha nueva.'; end if;
-  -- v19.27: a «Armados en espera» no se llega por acá (no tiene fecha): va gv_ppp_tanda_espera.
+  -- v19.29: a «Armados en espera» no se llega por acá (no tiene fecha): va gv_ppp_tanda_espera.
   if p_fecha = public.gv_ppp_espera_fecha() then
     raise exception 'Para dejar la tanda % en Armados en espera usá gv_ppp_tanda_espera: ahí no se le pone fecha, se le saca.', v_t;
   end if;
@@ -489,7 +489,7 @@ begin
     raise exception 'TANDA_EMPEZADA: la tanda % ya tiene % evento(s) de operarios (pickeada o armada). Se puede mover igual —el contenido no cambia, no hay que volver a pickear— pero hay que confirmarlo.', v_t, v_ev;
   end if;
 
-  v_nota := 'v19.27 ' || to_char(now() at time zone 'America/Argentina/Buenos_Aires', 'YYYY-MM-DD HH24:MI')
+  v_nota := 'v19.29 ' || to_char(now() at time zone 'America/Argentina/Buenos_Aires', 'YYYY-MM-DD HH24:MI')
             || ' · movida desde la app a ' || to_char(p_fecha, 'DD/MM')
             || coalesce(' por ' || nullif(btrim(p_por), ''), '')
             || case when v_ev > 0 then ' · estaba empezada (' || v_ev || ' evento(s))' else '' end;
@@ -533,7 +533,7 @@ begin
     raise exception 'No encontré la tanda %.', v_t;
   end if;
 
-  -- v19.27 — si estaba en «Armados en espera», vuelve a tener día: se borra la marca.
+  -- v19.29 — si estaba en «Armados en espera», vuelve a tener día: se borra la marca.
   delete from public."GV_PPP_Armados_Espera" e where upper(btrim(coalesce(e.tanda, ''))) = v_t;
 
   -- m³ de lo movido (ya con la fecha nueva)

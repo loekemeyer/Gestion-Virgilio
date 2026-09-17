@@ -1,4 +1,4 @@
--- BACKUP previo a la v19.27 («Armados en espera») — 2026-09-17.
+-- BACKUP previo a la v19.29 («Armados en espera») — 2026-09-17.
 -- Ejecutar ESTE archivo entero deja los tres objetos como estaban antes del cambio.
 -- Después de restaurar, borrar la marca si quedó alguna:
 --   delete from public."GV_PPP_Armados_Espera" where true;   -- las NP vuelven a su fecha:
@@ -55,7 +55,7 @@ alter view public.gv_ppp_programacion_diaria set (security_invoker = true);
 -- Para recuperarlos tal cual estaban:
 --   select pg_get_functiondef('public.gv_ppp_prog_arbol(date,date)'::regprocedure);
 --   select pg_get_functiondef('public.gv_ppp_tanda_mover(text,date,text,boolean)'::regprocedure);
--- Las diferencias que introdujo la v19.27, y que hay que deshacer a mano si se vuelve atrás:
+-- Las diferencias que introdujo la v19.29, y que hay que deshacer a mano si se vuelve atrás:
 --   · gv_ppp_prog_arbol: CTE `esp`, el `or exists(...)` de la rama ISIS, `en_espera` en `uni`,
 --     y el CTE `dia` con `fe_dia`. Sacando esas cuatro cosas queda la v19.11.
 --   · gv_ppp_tanda_mover: el guard de `p_fecha = gv_ppp_espera_fecha()` y el `delete from

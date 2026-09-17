@@ -12221,13 +12221,13 @@ evento: todas se cuentan como atrasadas). Detalle y medición en
 atrás: antes de que los operarios pasaran a Gestión casi no se registraba la Carga Camión, así que
 la falta de `CCN` no prueba nada (junio daría 274 "sin salida" que en realidad se entregaron).
 
-**Orden: del más VIEJO al más nuevo, de arriba para abajo** (v19.27, pedido de Luis). Hasta la
+**Orden: del más VIEJO al más nuevo, de arriba para abajo** (v19.29, pedido de Luis). Hasta la
 v19.25 salía al revés (lo de ayer primero). Lo que más tiempo lleva parado es lo primero que hay
 que mirar; el KPI de la cabecera ("el más viejo hace N días") sigue diciendo lo mismo.
 
 ---
 
-### ⏸ Armados en espera — el día que no es un día (v19.27, pedido de Luis)
+### ⏸ Armados en espera — el día que no es un día (v19.29, pedido de Luis)
 
 Luis: *"agregá un «día» en programación que sea «Armados en espera», va a servir para
 intencionalmente mandar pedidos que se arman sin fecha de entrega definida"*.

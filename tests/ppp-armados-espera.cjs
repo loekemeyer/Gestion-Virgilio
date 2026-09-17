@@ -1,4 +1,4 @@
-/* «⏸ Armados en espera» (v19.27, pedido de Luis 2026-09-17).
+/* «⏸ Armados en espera» (v19.29, pedido de Luis 2026-09-17).
 
    Pedido textual: *"agregá un «día» en programación que sea «Armados en espera», va a servir para
    intencionalmente mandar pedidos que se arman sin fecha de entrega definida. Asegurate que se
@@ -38,8 +38,8 @@ if (!src.includes("function pppMovEsperaElegir")) fallas.push("falta pppMovEsper
 // el árbol se pide hasta el centinela: con hoy+120 el día de espera no vuelve nunca
 if (!/const hasta = PGA_ESPERA_ISO;/.test(src)) fallas.push("pgaNeed no pide el árbol hasta el centinela: el día de espera no va a venir");
 // el SQL vive en el repo, no sólo aplicado en la base
-if (!fs.existsSync(path.join(__dirname, "..", "sql", "gv_ppp_armados_espera_v1927.sql"))) {
-  fallas.push("falta sql/gv_ppp_armados_espera_v1927.sql (la definición tiene que estar en el repo)");
+if (!fs.existsSync(path.join(__dirname, "..", "sql", "gv_ppp_armados_espera_v1929.sql"))) {
+  fallas.push("falta sql/gv_ppp_armados_espera_v1929.sql (la definición tiene que estar en el repo)");
 }
 
 if (fallas.length) {

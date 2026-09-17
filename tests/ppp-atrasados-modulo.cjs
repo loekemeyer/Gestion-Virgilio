@@ -22,7 +22,7 @@
      1) que el submódulo lea la RPC y no arme el criterio por su cuenta;
      2) que se dibuje ARRIBA de "Programación de entregas";
      3) que las dos tablas compartan el render (una sola copia de día → tanda → NP);
-     4) en vivo: agrupa por día, ordena **del más viejo al más nuevo** (v19.27, Luis: *"de los más
+     4) en vivo: agrupa por día, ordena **del más viejo al más nuevo** (v19.29, Luis: *"de los más
         antiguos a los más nuevos, de arriba para abajo"* — antes salía al revés), cuenta bien y
         marca hace cuántos días venció;
      5) en vivo: sin atrasados el módulo sigue estando y lo dice.
@@ -110,7 +110,7 @@ catch (_e) {
     const h = _patrHtml();
     out.html = h;
     out.dias = (h.match(/class="pga-d/g) || []).length;
-    // v19.27: el más viejo va ARRIBA. Lo que más tiempo lleva parado es lo primero que hay que ver.
+    // v19.29: el más viejo va ARRIBA. Lo que más tiempo lleva parado es lo primero que hay que ver.
     out.ordenAsc = h.indexOf(_pgaDiaTxt(dk(9).replace(/-/g, ""))) < h.indexOf(_pgaDiaTxt(dk(1).replace(/-/g, "")));
     out.dice4 = /<b>4<\/b> pedido/.test(h);
     out.dice3dias = /<b>3<\/b> día/.test(h);
@@ -157,7 +157,7 @@ catch (_e) {
 
   ok(errs.length === 0, "errores de página: " + errs.join(" | "));
   ok(r.dias === 3, "debería armar 3 filas de día (una por fecha vencida) y armó " + r.dias);
-  ok(r.ordenAsc, "los días no van del más VIEJO al más nuevo (v19.27, pedido de Luis)");
+  ok(r.ordenAsc, "los días no van del más VIEJO al más nuevo (v19.29, pedido de Luis)");
   ok(r.dice4, "el encabezado no cuenta los 4 pedidos");
   ok(r.dice3dias, "el encabezado no cuenta los 3 días");
   ok(r.m3, "el encabezado no suma los m³ (0,5+0,25+1+2 = 3,75)");

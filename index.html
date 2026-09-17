@@ -3394,7 +3394,7 @@ tr.ppp-err-zona > td{ background:#fffbeb !important; }
 .pga-d.on>td{ background:#eff6ff; }
 .pga-d.hoy>td:first-child::after{ content:"HOY"; background:#1e6bd6; color:#fff; font-size:11px; font-weight:900;
   border-radius:999px; padding:1px 8px; margin-left:8px; vertical-align:1px; letter-spacing:.04em; }
-/* v19.27 — «Armados en espera»: el día que no es un día. Gris, para que no se lea como una fecha. */
+/* v19.29 — «Armados en espera»: el día que no es un día. Gris, para que no se lea como una fecha. */
 .pga-d.espera>td{ background:#f8fafc; }
 .pga-d.espera:hover>td{ background:#f1f5f9; }
 .pga-d.espera>td:first-child{ color:#475569; }
@@ -5716,7 +5716,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=19.28"></script>
+<script type="module" src="recepcion.js?v=19.29"></script>
 <!-- Config del módulo de fichada (compartido con fichada.html). El secret
      hmacSecret tiene que ser el mismo acá y allá; cargándolo desde un solo
      archivo evitamos que se desincronicen. -->
@@ -9562,7 +9562,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v19.28";
+const APP_VERSION = "v19.29";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -34612,7 +34612,7 @@ function _pppMovCss() {
     ".mv-tag.lleno{background:#fef3c7;color:#92400e;}.mv-tag.pronto{background:#ede9fe;color:#5b21b6;}" +
     ".mv-note{font-size:11.5px;color:#64748b;background:#f1f5f9;border-radius:8px;padding:8px 11px;margin-bottom:11px;}" +
     ".mv-cargando{padding:26px;text-align:center;color:#64748b;font-weight:700;}" +
-    // v19.27 — el destino «Armados en espera», arriba de la grilla de días: no es un día, así que
+    // v19.29 — el destino «Armados en espera», arriba de la grilla de días: no es un día, así que
     // no puede ser un botón más de la grilla.
     ".mv-esp{margin-bottom:11px;}" +
     ".mv-esp-b{display:block;width:100%;text-align:left;background:#fff;border:1px dashed #94a3b8;border-radius:11px;" +
@@ -34643,7 +34643,7 @@ function pppMovRender() {
   let h = '<div class="mv-sub"><b>' + M.np + '</b> pedido' + (M.np === 1 ? '' : 's') + ' · <b>' + _pppFmtM3(M.m3) + ' m³</b>' +
     (M.actualTxt ? ' · hoy está el <b>' + escapeHtml(M.actualTxt) + '</b>' : '') + '</div>';
   h += '<div class="mv-note">Tocá el día al que la querés mover. Los m³ de cada día son <b>todo lo que ya tiene programado</b> (ISIS y web). Se guarda en el servidor: <b>lo ven todos</b>, también el operario. Una tanda ya empezada se puede mover igual: el contenido no cambia y no hay que volver a pickear.</div>';
-  // v19.27 (Luis): «Armados en espera» es un destino más, y va ACÁ para que se llegue desde los dos
+  // v19.29 (Luis): «Armados en espera» es un destino más, y va ACÁ para que se llegue desde los dos
   // lados que lo pidió — la tabla de Programación de entregas y el submódulo de Pedidos atrasados—,
   // que abren este mismo pop-up. No aparece al reprogramar una NP suelta de A Programar
   // (`reprogNps`): ahí todavía no hay tanda que parar.
@@ -34688,7 +34688,7 @@ function pppMovRender() {
   h += '</div><div class="mv-mas"><button onclick="pppMovMas()">Ver más días →</button></div>';
   body.innerHTML = h;
 }
-/* v19.27 (Luis) — «ARMADOS EN ESPERA». Lo pidió así: *"agregá un «día» en programación que sea
+/* v19.29 (Luis) — «ARMADOS EN ESPERA». Lo pidió así: *"agregá un «día» en programación que sea
    Armados en espera, va a servir para intencionalmente mandar pedidos que se arman sin fecha de
    entrega definida. Asegurate que se pueda enviar desde pedidos atrasados y desde programación de
    entregas"*. Las dos pantallas abren ESTE pop-up (comparten `_pgaCuerpoHtml`), así que con el
@@ -37442,12 +37442,12 @@ function _pppCamionNombre(c) { return c.ruta === "ret" ? "Retira en fábrica" : 
    `gv_ppp_avance_dias` ("Avance del día"): los dos tienen que decir lo mismo del mismo día.
    El contenido de cada NP sale de `gv_ppp_np_items` (ISIS + web), al abrirla y cacheado. */
 const PGA_TTL_MS = 60 * 1000;
-/* v19.27 (Luis) — «⏸ ARMADOS EN ESPERA»: un día más, el último, para lo que se arma A PROPÓSITO
+/* v19.29 (Luis) — «⏸ ARMADOS EN ESPERA»: un día más, el último, para lo que se arma A PROPÓSITO
    sin fecha de entrega definida. No es una fecha: es la fecha CENTINELA con la que el backend
    (`gv_ppp_espera_fecha`) devuelve lo que está parado, para que la tabla lo agrupe como un día.
    Lo que está ahí no tiene fecha de verdad: no consume cupo, no va en ningún camión, no figura
    como atrasado y no se le avisa al cliente. Se entra con el botón del pop-up de días y se sale
-   con el mismo «📅 Cambiar de día» de siempre. Detalle: sql/gv_ppp_armados_espera_v1927.sql. */
+   con el mismo «📅 Cambiar de día» de siempre. Detalle: sql/gv_ppp_armados_espera_v1929.sql. */
 const PGA_ESPERA_ISO = "9999-12-31";
 const PGA_ESPERA_KEY = "99991231";
 const PGA_ESPERA_TXT = "⏸ Armados en espera";
@@ -37463,7 +37463,7 @@ function pgaNeed(force) {
   if (!force && _pgaRows && (Date.now() - _pgaTs) < PGA_TTL_MS) return;
   _pgaBusy = true;
   const hoyK = _pppHoyKey(), desde = _pppKeyISO(hoyK);
-  // v19.27: se pide hasta el CENTINELA, no hasta hoy+120 como hasta la v19.25, porque «Armados en
+  // v19.29: se pide hasta el CENTINELA, no hasta hoy+120 como hasta la v19.25, porque «Armados en
   // espera» viene con esa fecha. Medido el 17/09: no hay nada programado más allá de hoy+120 (0
   // filas entre web, ISIS y Facturacion_NP), así que lo único que agrega el rango largo es ese día
   // — y si algún día alguien programa a 6 meses, ahora se ve en vez de esconderse.
@@ -37560,7 +37560,7 @@ function patrNeed(force) {
       pppRenderProg();
     });
 }
-/* v19.27 (Luis): DEL MÁS VIEJO AL MÁS NUEVO, de arriba para abajo. Hasta la v19.25 salía al
+/* v19.29 (Luis): DEL MÁS VIEJO AL MÁS NUEVO, de arriba para abajo. Hasta la v19.25 salía al
    revés (lo de ayer primero) con el criterio de "lo de ayer todavía se resuelve hoy"; el pedido
    textual del 17/09 es *"cambia el orden de cómo se muestran los pedidos atrasados. De los más
    antiguos a los más nuevos (de arriba para abajo)"* — lo que más tiempo lleva parado es lo que
@@ -37581,7 +37581,7 @@ function _patrHtml() {
   }
   let nps = 0, m3 = 0;
   for (const d of dias) { nps += d.nps; m3 += d.m3; }
-  const viejo = dias[0];   // v19.27: la lista va del más viejo al más nuevo, así que el más viejo es el primero
+  const viejo = dias[0];   // v19.29: la lista va del más viejo al más nuevo, así que el más viejo es el primero
   const _dAtraso = function (k) { return Math.round((_pppKeyDate(_pppHoyKey()) - _pppKeyDate(k)) / 86400000); };
   // v18.82 (Luis): el submódulo entero se colapsa desde su encabezado. Colapsado
   // NO desaparece: quedan el título y los KPI (cuántos, cuántos días, m³, el más
@@ -37636,7 +37636,7 @@ function _pgaCuerpoHtml(dias, opts) {
     // una NP, no un día, así que esconderla atrás de dos clics es lo mismo que no encontrarla.
     const ab = !!_pgaOpenD[d.key] || !!_pppSearch;
     const atr = esAtraso ? Math.round((_pppKeyDate(hoy) - _pppKeyDate(d.key)) / 86400000) : 0;
-    const esp = d.key === PGA_ESPERA_KEY;   // v19.27: el día que no es un día
+    const esp = d.key === PGA_ESPERA_KEY;   // v19.29: el día que no es un día
     h += '<tr class="pga-d' + (ab ? ' on' : '') + (d.key === hoy ? ' hoy' : '') + (esp ? ' espera' : '') +
         '" onclick="pgaAbrirDia(\'' + d.key + '\')"' +
         (esp ? ' title="Armado y parado a propósito, sin fecha de entrega: no consume cupo, no va en ningún camión y no cuenta como atrasado. Para sacarlo de acá, «📅 Cambiar de día» en la tanda."' : '') + '>' +
@@ -37758,7 +37758,7 @@ function _pgaZonaTanda(t) {
   return z.length === 1 ? z[0] : (z[0] + " +" + (z.length - 1));
 }
 function _pgaDiaTxt(k) {
-  if (String(k) === PGA_ESPERA_KEY) return PGA_ESPERA_TXT;   // v19.27: no es una fecha, es el estacionamiento
+  if (String(k) === PGA_ESPERA_KEY) return PGA_ESPERA_TXT;   // v19.29: no es una fecha, es el estacionamiento
   const d = _pppKeyDate(k);
   return _PN_DOW[d.getDay()] + " " + d.getDate() + "/" + String(d.getMonth() + 1).padStart(2, "0");
 }
@@ -39366,7 +39366,7 @@ async function pmodZonaCambio(p, antes, despues) {
   pppRenderProg();
 }
 function _pmodFecha(iso, conDia) {
-  if (String(iso || "").slice(0, 10) === PGA_ESPERA_ISO) return "⏸ En espera";   // v19.27
+  if (String(iso || "").slice(0, 10) === PGA_ESPERA_ISO) return "⏸ En espera";   // v19.29
   const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(iso || "")); if (!m) return String(iso || "");
   const d = new Date(+m[1], +m[2] - 1, +m[3]);
   return (conDia ? _PN_DOW[d.getDay()] + " " : "") + (+m[3]) + "/" + m[2];

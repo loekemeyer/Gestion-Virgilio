@@ -1435,7 +1435,7 @@ tandas D72A y E11B, 126 filas.
 **Planimetría:** el sector `P39` pasó de empresa `CH` a `LK` (backup
 `zz_backups.GV_Backup_Lugar_P39_20260916`); tiene un solo artículo, el 396.
 
-## v19.27 (2026-09-17) — `gv_ppp_programacion_diaria`: una NP «en espera» queda sin fecha de entrega
+## v19.29 (2026-09-17) — `gv_ppp_programacion_diaria`: una NP «en espera» queda sin fecha de entrega
 
 **Qué se cambió.** El espejo de ISIS —que Producción ve a través de la vista de compatibilidad
 `PPP_Programacion_Diaria`— tiene una rama nueva: si la NP está marcada en
@@ -1452,7 +1452,7 @@ mano desde Gestión; **con la tabla vacía, la vista devuelve exactamente lo mis
 `gv_ppp_isis_sin_tanda` da 5 antes y 5 después; `gv_endpoints_rotos` vacío; la vista conserva
 `security_invoker=true`.
 
-**Rollback exacto.** `sql/backups/pre_v1927_armados_espera_20260917.sql` recrea la vista sin esa
+**Rollback exacto.** `sql/backups/pre_v1929_armados_espera_20260917.sql` recrea la vista sin esa
 rama (y vuelve a poner `security_invoker`). Si además hay que "despertar" lo que quedó parado:
 
 ```sql
