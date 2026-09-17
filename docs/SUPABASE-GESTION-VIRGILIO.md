@@ -22579,3 +22579,88 @@ ju)` → GBA-O.
 Y agosto pasó de −38,5 % a **−40,4 %**. Cada localidad sin mapear se paga en viajes.
 
 `sql/gv_ancla_localidad_faltante_v1941.sql`.
+
+## §3.jc — v19.45: los PUNTOS DE EXPRESO (mapa de calor del histórico)
+
+**Luis, 2026-09-17:** *"Mirá el histórico de pedidos (lo que puedas sacar del dato) y hacé un mapa
+de calor, con eso determiná los puntos de expreso (mandamos mercadería y ellos se encargan de
+mandársela al cliente). Decime cuántos son y cuánta mercadería le mandamos a cada uno por mes en
+promedio en m³."*
+
+No crea ningún objeto: es medición. SQL en `sql/gv_expresos_puntos_v1945.sql`, entregable
+`Expresos-mapa-y-volumen.pdf`.
+
+### La fuente larga es `gv_ppp_entregados_meta`, no `Facturacion_NP`
+
+Las tres tablas de programación son **amnésicas** (sólo lo que está en curso: 133 y 166 filas al
+17/09) y `Facturacion_NP` arranca el **2026-05-27**, o sea 3,7 meses. `gv_ppp_entregados_meta`
+tiene **2.937 filas del 2026-01-02 al 2026-09-17** — 8,6 meses, 1.028 m³. Es la que hay que usar
+para cualquier pregunta de histórico de entregas.
+
+⚠ **No tiene columna `empresa`**: sale de la NP con `gv_emp_de_np(np)`, y recién ahí se cruza con
+`GV_Clientes_Direcciones` por `(empresa, cod)`.
+
+### El corte, medido
+
+| clase | entregas | m³ | % |
+|---|---:|---:|---:|
+| domicilio | 1.349 | 584,5 | 58 % |
+| **expreso** | **1.204** | **330,4** | **33 %** |
+| retira | 311 | 80,9 | 8 % |
+
+⚠ **`Virgilio 2788` cargado como `dir_expreso` es el DEPÓSITO, o sea retira** — y hay filas con
+esa dirección y `zona_expreso = 'Longchamps'`, que el filtro por zona no caza. Son 35,5 m³ en 25
+entregas que, sin excluirlas por la dirección, aparecen como el segundo punto de expreso más
+grande del país. Filtrar `dir_expreso !~* 'virgilio *2788'`.
+
+### Una PUERTA no es un expreso
+
+El camión para en una **dirección**, no en una razón social: en **Pergamino 3751** conviven **24
+empresas de transporte** y es **una sola parada**. Contar por `nombre_expreso` da 182 y engaña.
+Agrupando por calle + altura, y fusionando las grafías con similitud ≥ 0,80 dentro de la misma
+altura (que es lo que junta los typos del padrón: `PEDRO BALLINA 4060` = `PEDRO BALIÑA 4060`,
+`PERGAMINO 3751` = `PEGAMINO 3751`, `PINEDO 50` = `PINEDOS 50`), **164 grafías quedan en 124
+puertas**.
+
+### Lo que dio
+
+> **124 puertas · 38,41 m³/mes · 1,83 m³ por día hábil = el 30 % de UN camión de 6 m³**
+
+- **9 puertas hacen el 50 %** del volumen; **36 puertas hacen el 80 %**.
+- **35 puertas son recurrentes** (activas en ≥ 5 de los 9 meses) y explican el **73 %**.
+- 24 puertas recibieron 1 o 2 veces en 8,6 meses y suman 0,63 m³/mes entre todas.
+- **Pergamino 3751 (Soldati) sola es el 15 %**: 5,79 m³/mes, 20,4 entregas/mes, 24 expresos,
+  48 clientes nuestros.
+
+| barrio del galpón | m³/mes | % | puertas | km al depósito |
+|---|---:|---:|---:|---:|
+| Soldati | 18,50 | 48,2 % | 57 | 9,7 |
+| Barracas | 7,56 | 19,7 % | 16 | 15,1 |
+| Pompeya | 7,45 | 19,4 % | 28 | 10,9 |
+| Parque Patricios | 1,36 | 3,5 % | 9 | 11,6 |
+| Avellaneda | 1,14 | 3,0 % | 1 | s/d |
+| Paternal | 1,10 | 2,9 % | 3 | 5,7 |
+| los otros 9 | 1,30 | 3,3 % | 10 | |
+
+**91 % del expreso cae en cuatro barrios contiguos con 6,9 km de punta a punta.**
+
+### ⚠ El mapa ubica el BARRIO, no la puerta
+
+Las direcciones de galpón **no están geocodificadas**: 0 de 272 en `PPP_Geo`, 1 en
+`GV_Geo_Cliente`. `gv_ppp_web_punto()` las resuelve por su rama (4), el promedio de los clientes
+de ese barrio — que es también lo que hace `gv_ancla_paradas`, o sea que la simulación de anclas
+ya trataba al expreso así. La API de Georef está bloqueada por el proxy de egress, así que
+geocodificar la puerta exacta desde una sesión de Claude no se puede.
+
+⚠ **Y un centroide de barrio con pocos clientes miente.** El de **Avellaneda** sale de `n=2` y cae
+en (−34,7243 / −58,2520), **12 km al sur** de donde está Estanislao Zeballos 333. Por eso
+Avellaneda no se dibujó en el mapa (sus 1,14 m³/mes sí están en la tabla). **Antes de usar un
+centroide de barrio, mirar el `n`.**
+
+### Para qué sirve en el modelo de anclas
+
+El expreso es **un tercio del m³** que sale del depósito y está concentrado en un racimo de 7 km.
+Hoy esas paradas viajan repartidas entre los camiones de reparto común. Las **35 puertas
+recurrentes** son candidatas naturales a parada fija —tienen dirección estable y no dependen de
+dónde viva el cliente— y las 9 primeras concentran la mitad del volumen. **Queda como pregunta
+para Luis, no como cambio**: si el expreso merece su propia ancla diaria al sur.
