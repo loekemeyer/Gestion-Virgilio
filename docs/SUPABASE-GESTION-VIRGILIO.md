@@ -21943,14 +21943,14 @@ del 17/09 dijo que no están y se borraron (v19.33). **Pero `Racks_Planimetria` 
 
 ---
 
-### §3.gq — v19.37: cancelar una NP que ya salió del espejo de ISIS — 2026-09-17
+### §3.gq — v19.38: cancelar una NP que ya salió del espejo de ISIS — 2026-09-17
 
 Lo reportó Luis con una captura, el mismo día que se subió el botón: en *Pedidos atrasados*,
 tocar **✕ Cancelar pedido** en la **NP 98507** (D53C, Perez Zarate, facturada el 01/09) contestaba
 *"No encuentro la NP 98507 en la programación"*. Y la pregunta que hizo es la que resuelve el
 caso: ***"¿cómo está en pedido atrasado si no tiene la NP?"***
 
-SQL: `sql/gv_ppp_cancelar_atrasados_v1937.sql`. Problema **374**.
+SQL: `sql/gv_ppp_cancelar_atrasados_v1938.sql`. Problema **374**.
 
 #### ⚠ EL ESPEJO DE ISIS ES AMNÉSICO
 
@@ -22017,7 +22017,7 @@ para lo que está ese chequeo.
 La primera versión de esto se aplicó como `do $do$` con `replace()` sobre `pg_get_functiondef`.
 Eso deja el repo mintiendo: `sql/gv_ppp_cancelar_pedido_v1934.sql` tiene el `CREATE` de
 `gv_ppp_np_desarmar` **sin** los fallbacks, así que correr ese archivo pisaría el arreglo en
-silencio. Se reemplazó por el `CREATE` completo y vigente en el archivo de la v19.37, y el v1934
+silencio. Se reemplazó por el `CREATE` completo y vigente en el archivo de la v19.38, y el v1934
 quedó marcado como superado. md5 **3/3** contra la base.
 ---
 

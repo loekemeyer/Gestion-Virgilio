@@ -200,9 +200,9 @@ $function$;
 revoke execute on function public.gv_ppp_np_cancelar_previo(text) from public, anon;
 grant  execute on function public.gv_ppp_np_cancelar_previo(text) to authenticated, service_role;
 
--- ⚠⚠ SUPERADO POR LA v19.37: `gv_ppp_np_desarmar` tiene DOS FALLBACKS MÁS (Facturacion_NP y
+-- ⚠⚠ SUPERADO POR LA v19.38: `gv_ppp_np_desarmar` tiene DOS FALLBACKS MÁS (Facturacion_NP y
 -- GV_PPP_Entregados_Historico) para la NP que ya salió del espejo amnésico de ISIS. La definición
--- VIGENTE está en `sql/gv_ppp_cancelar_atrasados_v1937.sql`. **Correr el CREATE de abajo pisa ese
+-- VIGENTE está en `sql/gv_ppp_cancelar_atrasados_v1938.sql`. **Correr el CREATE de abajo pisa ese
 -- arreglo** y deja sin cancelar 21 de las 31 NP de Pedidos atrasados. Se conserva como historia y
 -- como rollback de las dos perillas (p_forzar / p_solo_np), no para re-aplicar.
 -- ── 4) El desarme, con dos perillas nuevas ────────────────────────────────────────────────

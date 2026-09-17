@@ -1,5 +1,5 @@
 -- ═══════════════════════════════════════════════════════════════════════════════════════════
--- v19.37 (2026-09-17) — CANCELAR / DESARMAR UNA NP QUE YA SALIÓ DEL ESPEJO DE ISIS
+-- v19.38 (2026-09-17) — CANCELAR / DESARMAR UNA NP QUE YA SALIÓ DEL ESPEJO DE ISIS
 --
 -- Lo reportó Luis con una captura: en *Pedidos atrasados*, tocar **✕ Cancelar pedido** en la
 -- NP **98507** (tanda D53C, Perez Zarate, facturada el 01/09) contestaba
@@ -226,7 +226,7 @@ begin
       into v_tanda, v_fe, v_cod, v_rs, v_m3
       from public.gv_ppp_programacion_diaria p
      where regexp_replace(btrim(p.np), '\.0+$','') = v_np limit 1;
-    /* v19.37 -- el espejo de ISIS es AMNESICO: solo trae lo que ISIS tiene cargado HOY, asi que
+    /* v19.38 -- el espejo de ISIS es AMNESICO: solo trae lo que ISIS tiene cargado HOY, asi que
        una NP de hace dos semanas ya no esta. `gv_ppp_atrasados` ya la levanta de `Facturacion_NP`
        (origen = 'fact'), que al 17/09 son 21 de las 31 NP de Pedidos atrasados. Ultimo recurso,
        no reemplazo: si la NP esta en la programacion viva, manda esa. */

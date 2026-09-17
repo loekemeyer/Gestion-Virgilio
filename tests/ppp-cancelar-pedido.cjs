@@ -17,11 +17,11 @@
      · Un pedido que YA SALIÓ no se bloquea (Luis: "en cualquier estado") pero avisa fuerte y
        manda `p_forzar: true` — el backend lo deja escrito en el log.
      · Una NP sin mercadería movida lo dice, en vez de mostrar una lista vacía.
-     · v19.37 — el pop-up se MIDE, no se mira: la app tiene un `button{width:100%;padding:16px;
+     · v19.38 — el pop-up se MIDE, no se mira: la app tiene un `button{width:100%;padding:16px;
        font-size:22px;margin-top:14px}` GLOBAL y la primera versión no lo overrideaba, así que el
        ✕ se comía toda la cabecera y el título salía en tres líneas (problema 375). Un assert de
        "el botón existe" no ve eso; uno de ancho sí.
-     · v19.37 — una NP que ya salió del espejo de ISIS (Pedidos atrasados, `origen = 'fact'`)
+     · v19.38 — una NP que ya salió del espejo de ISIS (Pedidos atrasados, `origen = 'fact'`)
        también se puede cancelar: eran 21 de 31 y el previo contestaba "no encuentro la NP".
    Estado inyectado; no pega contra la red. Sale 1 si falla. */
 const path = require("path");
@@ -187,7 +187,7 @@ catch (_e) {
     return out;
   });
 
-  // (h) v19.37 — el pop-up, MEDIDO. El bug que llegó a Luis no era de lógica: era que los
+  // (h) v19.38 — el pop-up, MEDIDO. El bug que llegó a Luis no era de lógica: era que los
   //     <button> del pop-up heredaban el `width:100%` global de la app.
   const med = await p.evaluate(async () => {
     const esperar = async (f) => { const t0 = Date.now();

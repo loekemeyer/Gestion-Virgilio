@@ -121,7 +121,7 @@ catch (_e) {
     for (let intento = 0; intento < 30; intento++) {
       filaD = buscarFila();
       if (filaD && filaD.querySelector(".pga-acc-b:not(.dia)")) break;
-      /* ⚠ v19.37 — NO se llama a pgaAbrirDia/pgaAbrirTanda: TOGGLEAN. Si el día ya estaba
+      /* ⚠ v19.38 — NO se llama a pgaAbrirDia/pgaAbrirTanda: TOGGLEAN. Si el día ya estaba
          abierto cuando corría este intento, el test lo CERRABA y no lo volvía a abrir nunca,
          así que los tres asserts de (g) fallaban juntos. Medido: 1 de cada 3 corridas. Ahora se
          ponen los flags directo, que es idempotente, y en CADA intento. */
