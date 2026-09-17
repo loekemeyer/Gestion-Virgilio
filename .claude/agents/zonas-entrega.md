@@ -88,11 +88,19 @@ Rabanal 2866, Troxler 3259, J. B. Justo 8587 (Liniers).
 
 > **El sur de CABA no es una zona de reparto: es el corredor de expresos.** Muchos pedidos,
 > poquísimas direcciones, mucho bulto. Es un viaje de otra naturaleza que el reparto a comercios,
-> y hay que contarlo aparte o distorsiona cualquier balance de zonas.
+> y **para MEDIR** conviene contarlo aparte o distorsiona cualquier balance de zonas.
+
+⚠ **Pero para ARMAR no es una categoría propia** (Luis, 17/09/2026, textual: *"si hay espacio para
+hacer alguna entrega aledaña, viaja con el mismo camión"*). El expreso **no** se lleva un camión
+dedicado: si en el viaje sobra lugar, se le cuelgan las paradas que queden en el camino. Contarlo
+aparte es una lente de análisis, no una regla de reparto.
 
 ---
 
 ## 3. El mapa vigente (17/09/2026, discutido con Luis)
+
+> ⚠ **Hay un esquema de 5 bandas PROPUESTO que todavía no está aprobado: §8.1.** Mientras Luis no
+> conteste las definiciones de §8.2, el mapa que manda es éste.
 
 | eje | comunas / regiones | pedidos/sem | frecuencia |
 |---|---|---:|---|
@@ -157,6 +165,8 @@ Cualquier propuesta tuya las respeta o no se propone:
 | Una tanda no sale en dos días | v18.92 |
 | Web no se mezcla con ISIS en la misma tanda | v14.12 |
 | Tope de mezcla 1,00 m³ · mínimo deseable 0,60 · cliente >1 m³ va solo | `PPP_Web_Config` |
+| **Piso de 1,4 m³ para que salga un DÍA/CAMIÓN** (no por tanda: 1,4 > el tope de 1,00) | **Luis, 17/09 · §4.1** |
+| **Pedido nuevo entra a la tanda web abierta que no se pickeó, antes que abrir otro día** | **Luis, 17/09 · §4.1** |
 | Camión 6 m³ · jornada 8 h · 2 fleteros | `PPP_Web_Config` |
 | Anticipación mínima 4 días hábiles | v13.22 |
 | Norte y Sur de CABA nunca juntos | `GV_Barrios_Pares` |
@@ -166,6 +176,26 @@ Cualquier propuesta tuya las respeta o no se propone:
 **Súper con zona numérica**: Dorinka y Diarco vienen como "Zona 5 - GBA Oeste". Cualquier filtro
 escrito como `zona !~* 'super|retira|expo'` los deja pasar. Se tapó cuatro veces. Usá
 `gv_es_super(empresa, cod)`, nunca la zona.
+
+### 4.1 · El piso de 1,4 m³ y la acumulación (Luis, 17/09/2026)
+
+> *"establecemos un minimo de 1,4 m³ (si se cumple ese minimo ya se puede programar) … si entra
+> un nuevo pedido para CABA Norte o CABA Centro y ya hay programado para otro día y todavía no se
+> pickeó nada, que se agregue a ese (ej, hay una tanda de 0,8 m³ otra de 0,6 m³ y llega un pedido
+> de 0,2 m³ que lo meta en ese de 0,6 m³ para que vaya en ese mismo camión y no abra otro día para
+> la próxima semana). Si el pedido nuevo que llegó es de 1 m³, tanda nueva mismo día."*
+
+**El 1,4 es del DÍA/CAMIÓN, no de la tanda.** `tanda_m3_max_mezcla` = 1,00: un piso de 1,4 sobre
+un techo de 1,00 sería imposible. El propio ejemplo lo dice: 0,8 + 0,6 = **dos tandas, un camión**.
+
+**Por qué existe la regla de acumular**: las bandas flacas (CABA Centro junta 1,16 m³/semana) no
+llegan solas al piso. Sin acumular, cada pedido nuevo abre un día propio y la banda sale con medio
+camión — o se pasa a la semana siguiente. Acumular contra un día **ya programado y sin pickear**
+es lo que la mantiene viable.
+
+Dos bordes que la regla no resuelve sola y hay que respetar:
+- **Contra una tanda de ISIS no se acumula** (v14.12): ahí va tanda nueva, mismo día, mismo camión.
+- Un pedido que cruza el tope de 1,00 abre **tanda nueva el mismo día**, no un día nuevo.
 
 ---
 
@@ -222,9 +252,51 @@ Resultado de la sombra sobre 12 días reales (v19.25): **34 → 25 viajes · 1.8
 
 ## 8. Lo que falta decidir
 
-1. Si las bandas son **etiqueta** (el día lo cierra la distancia) o **corte rígido**.
-2. **R5**: mover un pedido hasta 3 días hábiles al día en que ya pasa un camión cerca. Medido:
-   4 de los 5 viajes flacos que quedan tendrían dónde engancharse.
-3. Enchufar `gv_ppp_web_agrupar_geo` dentro de `ppp_web_armar_tandas` y prender
-   `geo_armado_activo` por zona, mirando los centinelas
-   (`gv_ppp_tanda_camion_mezclado`, `gv_ppp_super_mezclado`, `gv_ppp_tanda_dos_dias`).
+### 8.1 · El esquema de 5 bandas — PROPUESTO, no aprobado (17/09/2026)
+
+**No lo apliques como si estuviera decidido.** Está esperando respuesta de Luis.
+
+| banda | contenido | absorbe | m³/sem medidos |
+|---|---|---|---:|
+| 1 · Sur | C04, C08, C09 (+ expresos) | C07, C10, Centro a ≤3,5 km | 12,22 |
+| 2 · Oeste | C10, C11, GBA-O | C07, C09, Centro a ≤3,5 km | 5,68 |
+| 3 · Norte | C12, C13, C15, GBA-N | C02, C14, Centro a ≤3,5 km | 2,77 |
+| 4 · Centro | C01, C02, C03, C05, C06, C14 | — **relleno de las otras tres** | **1,16** |
+| 5 · GBA Sur | va solo (robos, §3.1) | nada | 1,41 |
+
+Los dos cambios que lo sostienen, y que van **juntos** porque son el mismo problema (qué hacer con
+lo que no tiene masa propia):
+
+- **C10, C09 y C07 no son "Centro"**: son el principio del corredor. C10 es el kilómetro 0 (el
+  depósito), C09 cuelga del viaje a C08 con 0,5 km de desvío, C07 es bisagra Sur/Oeste.
+- **Permeabilidad simétrica de 3,5 km** en vez de una banda "anillo" propia. El anillo se descartó
+  midiendo: 3,5 pedidos/semana, no rinde (criterio de Luis).
+
+**CABA Centro no llega al piso de 1,4 por semana** (1,16 medido) → por eso se propone que **no
+tenga día propio** y se reparta por cercanía. Sale sola sólo si acumuló ≥1,4 por su cuenta.
+
+### 8.2 · Definiciones pedidas a Luis (17/09, sin respuesta todavía)
+
+1. El piso de 1,4 m³, ¿es del **camión/día**? (así está interpretado en §4.1)
+2. Si Centro / GBA Sur no llega a 1,4: ¿cuántos días hábiles espera antes de salir igual?
+3. ¿Centro sin día propio (relleno) o sale sí o sí una vez por semana aunque vaya flaco?
+4. ¿Cuánto puede pasarse una tanda de 1,00 m³ cuando el pedido que entra la cruza?
+5. La permeabilidad de 3,5 km: ¿contra **alguna parada del día** o contra el centro de la banda?
+6. Acumular contra tanda de **ISIS**: ¿respeta v14.12 o se levanta para este caso?
+7. `dias_anticipacion_min` = 4: ¿se puede saltear para meter un agregado en un día ya programado?
+8. GBA Sur: ¿tampoco levanta C04/C08 aunque queden a 2 km? (hoy bloqueado duro)
+
+### 8.3 · Contradicciones estructurales abiertas
+
+- **Las etiquetas de `gv_ppp_web_camion`** (Capital / GBA Sur / GBA Oeste / GBA Norte) no cubren
+  5 bandas. Y la regla v18.87 —*"la tanda se parte por camión"*— **corta por esa etiqueta**: si
+  cambian las bandas sin tocarla, v18.87 deja de cortar donde debe.
+- Si las bandas son **etiqueta** (el día lo cierra la distancia) o **corte rígido**.
+
+### 8.4 · Pendiente de construcción
+
+- **R5**: mover un pedido hasta 3 días hábiles al día en que ya pasa un camión cerca. Medido:
+  4 de los 5 viajes flacos que quedan tendrían dónde engancharse.
+- Enchufar `gv_ppp_web_agrupar_geo` dentro de `ppp_web_armar_tandas` y prender
+  `geo_armado_activo` por zona, mirando los centinelas
+  (`gv_ppp_tanda_camion_mezclado`, `gv_ppp_super_mezclado`, `gv_ppp_tanda_dos_dias`).
