@@ -22400,3 +22400,112 @@ registro. Mismo patrón que el ya documentado *"v16.91 neteo doble drenaje"* del
 | 321 · 504 · 584E · 599E | 2 | −2 | **−2** | −2 |
 | 315 · 361E · 583E · 816E · 817E · 969E | 1..6 | cerrado | **−1** | −1 |
 | 501 | 46 | −46 | — | **0** ✓ |
+
+---
+
+## §3.ja — v19.40: armado de tandas por ANCLAS GEOGRÁFICAS (en rama, APAGADO)
+
+**Pedido de Luis, 17/09/2026.** Rediseño del armado automático. **No toca nada de lo que corre
+hoy**: son objetos nuevos con prefijo `gv_ancla_*`, el interruptor `ancla_activo` nace en **0** y
+lo único ejecutable es un **simulador que no escribe**. Va en la rama
+`claude/dreamy-bell-29izan`, no en `main`.
+
+### La regla, textual
+
+> *"Cuando entra un pedido, el sistema chequea si en los próximos días hay entrega a un punto
+> aledaño. Si no hay ninguna, para el día 13 se crea una tanda con ese pedido, y ese pedido pasa a
+> ser el punto ancla de ese día. Todos los demás pedidos que llegan hacen lo mismo… El rango de
+> punto aledaño es un radio de 2 km desde el ancla para Capital. Todo lo que sea provincia se
+> divide en tres zonas: Norte, Oeste y Sur. Esos van aparte y no tienen un límite."*
+>
+> *"Llega un pedido de 0,6 m³ a Lanús. Los próximos días no tenemos programada ninguna entrega
+> para esa zona, por lo que se programa para el día 13. Llegado ese día, no se le agregó ningún
+> pedido: listo, se arma y se entrega así."*
+
+Valores finales, después de medir: **radio 3,5 km** (los 2 km originales dejaban 24 círculos y el
+49 % de los camiones con una sola parada), **ventana 13 días** (llega el 17/09 → se arma el 30/09
+→ entrega el 1/10), **centroide móvil**, **súper y retiros afuera**, **sólo días hábiles**.
+
+### Objetos nuevos — `sql/gv_ancla_v1940.sql`
+
+| objeto | qué es |
+|---|---|
+| `PPP_Web_Config` `ancla_*` (6 claves) | `ancla_activo` **0** · radio 3,5 · ventana 13 · offset 13 · cupo 10 m³/día · centroide 1 |
+| `GV_Ancla_Localidad` (81 filas) | localidad → `GBA-N`/`GBA-O`/`GBA-S`. Editable: una localidad nueva se agrega acá, no en el código |
+| `gv_ancla_cfg` · `_es_habil` · `_habil_atras` · `_norm` | helpers |
+| `gv_ancla_grupo(region, localidad, provincia)` | CABA (por distancia) · GBA (por zona, sin límite de km) · OTRO |
+| `gv_ancla_paradas(desde, hasta)` | el feed: un pedido = un **cliente-día** |
+| `gv_ancla_simular(desde, hasta, …)` | **el motor. No escribe nada** |
+| `gv_ancla_comparar(desde, hasta)` | lo real contra el modelo, sobre los mismos pedidos |
+
+El tope por camión (6 m³), los camiones por día (2) y la jornada (8 h) **no se duplican**: se leen
+de `camion_m3_tope`, `jornada_camiones` y `jornada_horas_max`, las mismas que usa el armado vivo.
+
+### ⚠ Tres cosas que aparecieron corriéndolo, no leyéndolo
+
+**1. Lo que más pesa no es el radio: es DÓNDE cae el ancla.** Ponerla en el **último** día
+permitido en vez del primero libre, sobre los mismos 90 días:
+
+| | ancla al día 11 (ventana 10) | **ancla al día 13 (ventana 13)** |
+|---|---:|---:|
+| camiones / 90 días | 136 | **84** |
+| paradas por camión | 3,9 | **6,3** |
+| camiones de 1 parada | 49 % | **12 %** |
+| km | 5.799 | **4.210** |
+
+**2. El guard de jornada no es opcional.** Sin él, las paradas de fuera del AMBA se agrupaban
+entre sí por compartir la etiqueta `BSAS-?` y armaban recorridos de **62 km de diámetro y 8,2 h**.
+Con el guard son 91 anclas y **0 fuera de jornada**; sin él, 87 y una imposible. Las 4 anclas de
+más son el precio de que todas entren.
+
+**3. El centroide móvil casi no aporta** (136 contra 139 anclas, 2 %), pero Luis lo pidió para que
+el círculo de un cliente del borde de la ciudad no quede medio tirado en provincia. Queda
+activado, con su interruptor.
+
+### Medición (90 días: 522 paradas, 213,4 m³)
+
+```sql
+select count(*) anclas,
+       count(*) filter (where horas > 8)                      fuera_de_jornada,
+       count(*) filter (where extract(isodow from fecha) > 5) en_fin_de_semana,
+       count(*) filter (where sin_lugar)                      sin_lugar,
+       (select count(*) from public.gv_ancla_paradas(current_date-90, current_date))
+         - sum(paradas)                                       paradas_perdidas
+  from public.gv_ancla_simular(current_date - 90, current_date);
+-- 91 · 0 · 0 · 3 · 0
+```
+
+**Septiembre, contra lo que pasó de verdad** (`gv_ancla_comparar`, camión real = prefijo de la
+tanda por día, mismas exclusiones):
+
+| | real | modelo | |
+|---|---:|---:|---|
+| pedidos (cliente-día) | 118 | 118 | = |
+| **camiones** | **36** | **22** | **−38,9 %** |
+| paradas por camión | 3,28 | 5,36 | +63,6 % |
+| m³ por camión | 1,08 | 1,77 | +63,6 % |
+| camiones de 1 sola parada | 13 | 3 | −76,9 % |
+
+El SQL da **exactamente** los mismos números que una simulación independiente escrita en Python
+sobre el mismo dataset (87 anclas y 4.270 km sin el guard de jornada; 4.272 con el SQL). Esa
+coincidencia es la validación: dos implementaciones distintas, el mismo resultado.
+
+### ⚠ Limitación conocida, sin resolver: `sin_lugar`
+
+**3 anclas de 91** (todas el 19/08) no encontraron día con cupo retrocediendo y **se forzaron
+igual**: ese día termina con **5 camiones y 11,57 m³**, o sea rompe el tope de 2 camiones. Pasa en
+el arranque en frío de la serie. El algoritmo **no avanza** la fecha a propósito (avanzar se pasa
+de los 14 días comprometidos), así que fuerza y lo marca. **Qué hacer con esos casos es decisión
+de Luis**, no técnica: o se acepta un tercer camión ese día, o el pedido se entrega tarde.
+
+### Lo que el método NO puede probar
+
+El histórico **no guarda la fecha en que ENTRÓ cada pedido**, sólo la de entrega. La simulación usa
+la de entrega como aproximación de la llegada, lo que dispersa las llegadas más de lo real: los
+números son **conservadores**. Para medirlo de verdad hay que empezar a guardar la fecha de
+entrada, o correr el modelo en sombra hacia adelante.
+
+### Rollback
+
+Está completo al pie de `sql/gv_ancla_v1940.sql`: 8 `drop function`, un `drop table` y un
+`delete` de las 6 claves de config. No deja rastro.
