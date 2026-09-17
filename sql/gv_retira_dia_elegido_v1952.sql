@@ -208,3 +208,27 @@ $do$;
 --   drop function if exists public.gv_web_retiro_pactado(text, bigint);
 --   drop function if exists public.gv_web_retiro_franja(text, bigint);
 --   -- las columnas se pueden dejar: son aditivas y nadie más las lee.
+
+-- =====================================================================================
+-- 7) LO QUE QUEDÓ MUERTO Y SE BORRÓ (Luis, 17/09: *"no sirve para nada?"*)
+-- =====================================================================================
+-- `public.gv_pedidos_web_retiro` (vista de LK, v17.74) era la ÚNICA lectora del día/franja
+-- mientras eso viajaba por HTTP. Desde esta versión el badge lee `lk_pedidos_match`, así que
+-- no la leía ni una función, ni una vista, ni una línea del front de los tres repos (barrido
+-- sobre `pg_proc.prosrc`, `pg_get_viewdef` y los .js/.html: 0 lectores).
+--
+-- Se borró — `drop view if exists public.gv_pedidos_web_retiro;` — y NO es limpieza cosmética:
+-- una fuente duplicada del mismo dato es exactamente la trampa del `CLAUDE.md` ("tablas viejas
+-- conviviendo con las vivas, con el mismo contenido aparente"). Si quedaba, la próxima sesión
+-- podía leerla creyendo que es la fuente y contestar algo que suena bien y está mal.
+--
+-- Para recrearla (está entera en `sql/gv_pedido_horario_v1774.sql`, líneas 171-180):
+--   create or replace view public.gv_pedidos_web_retiro with (security_invoker = true) as
+--   select o.id as order_id, 'lk'::text as empresa,
+--          nullif(btrim(o.sheets_payload->>'retiro_fecha'), '')::date as retiro_fecha,
+--          nullif(btrim(o.sheets_payload->>'retiro_franja'), '')      as retiro_franja,
+--          o.created_at
+--     from public.orders o
+--    where o.sheets_payload ? 'retiro_fecha'
+--      and nullif(btrim(coalesce(o.sheets_payload->>'retiro_fecha','')), '') is not null;
+--   grant select on public.gv_pedidos_web_retiro to anon, authenticated;
