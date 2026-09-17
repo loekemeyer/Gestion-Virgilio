@@ -21856,3 +21856,63 @@ Botón **✕** (`.pga-acc-b.cancel`, rojo como el tacho) en la fila de la NP. El
 ✕, «Volver», Escape o tocando afuera.
 
 Test: `tests/ppp-cancelar-pedido.cjs`.
+
+### v19.35 (17/09) — se cierra el libro del 809E: no queda ninguna fila en `Mixto`
+
+Luis: *"si no va a cambiar nada actualmente y solo afecta un registro de mierda de hace meses
+que ni siquiera quedó bien registrado: FIJATE BIEN QUE CAMBIAR ESO NO ROMPA NADA NI JODA NADA
+y si es así, hacelo"*. Detalle, SQL y rollback en `sql/gv_809e_cerrar_mixto_v1935.sql`.
+
+Eran **118 movimientos del 809E anteriores al 01/08** sin empresa: el 809E es dual y en
+junio/julio la app todavía no guardaba de qué pila salía la caja. Neteaban cero, pero jodían en
+dos lugares: la vista de saldos mostraba una **tercera fila fantasma** `809E · Mixto` con todo
+en 0, y el índice `mov_stock_pipeline_dedup` incluye `empresa`, así que una fila en Mixto y su
+gemela en LK/CH no se reconocen como la misma y el `ON CONFLICT` de los 6 reconciliadores puede
+duplicar el picking (problema 370, el 16/09).
+
+**113 de las 118 se resolvieron con evidencia**: 95 por tanda → NP (`Facturacion_NP`, >90000 =
+LK), 11 por la propia fila (el `ubicacion` dice `J13 · LK` / `M13 · CH`, y los refs dicen *"pasa
+a 809E CH"*), 9 por el depósito `racks` → LK (AD05 es LK desde v19.33) y 2 por `racks_ch` → CH.
+
+⚠ **La carga inicial del 26/06 (+168) hubo que PARTIRLA en LK 16 / CH 152, y es el único dato
+inventado.** Los pickings se llevan CH −48 y LK −16 de `terminado`, y el resto con evidencia
+cierra en cero solo, así que las 4 filas que quedan (inicial, su reset −68, el ajuste −11 y la
+tanda mezclada C70B −25) tienen que aportar exactamente LK +16 / CH +48. **Ninguna combinación
+de filas enteras da 16/48**, así que había que partir una: se partió la carga inicial, que es
+justamente la pila que nadie había separado (por eso existe el conteo del 01/08). C70B es la
+única tanda mezclada —NP 97891 (LK) y 44481 (CH), el **mismo cliente**, Orfali— y se asignó CH,
+que en el conteo tenía el 89 % de la pila.
+
+**Los tres chequeos que se corrieron ANTES de escribir:** (1) cada empresa en cero en cada
+depósito → 8 de 8 en 0; (2) colisiones con el índice único → 0 contra filas existentes y 0
+entre sí; (3) triggers → `zz_normalizar_empresa` es BEFORE **INSERT** solamente (no pisa un
+UPDATE) y respeta la empresa explícita en el INSERT de la fila partida.
+
+| | antes | después |
+|---|---|---|
+| huella de saldos | `6fba453c97ce295f583b4d8d0ee5d695` | **idéntica** |
+| huella de saldos por empresa (resto de los códigos) | `96d2e371…` | **idéntica** |
+| filas de `vista_saldos_stock` | 494 | **493** (se fue el fantasma) |
+| `gv_stock_empresa_fantasma` · `gv_stock_negativos` · `gv_endpoints_rotos` | 2 · 1 · 0 | igual |
+| 809E en Mixto | 118 | **0** |
+| 809E LK terminado/racks · CH terminado/separar | 14/336 · 104/6 | igual |
+
+Se corrieron además **los 4 reconciliadores a mano** —lo que faltó el 16/09—: metieron 27
+filas, todas de la tanda **E32A** pickeada ese mediodía, ninguna del 809E. 0 duplicados.
+
+**De yapa**, el barrido dejó a la vista el último gemelo escondido de mercadería: 3 filas del
+**520 en D72A**, un picking **vacío** del 10/09 (los tres deltas en 0) rehecho de verdad el
+14/09. Estaban en Mixto contra el bueno en LK. Delta 0, borradas.
+
+**Ya no queda ningún movimiento de mercadería sin empresa, ni ningún gemelo escondido.**
+Centinela nuevo, que ahora da 0:
+
+```sql
+select count(*) from (
+  select 1 from public."Movimientos_Stock" where tipo in ('picking','separado','facturado')
+   group by upper(btrim(ref)), upper(btrim(cod_art)), deposito, tipo
+  having count(*) > 1 and count(distinct coalesce(empresa,'')) > 1) z;
+```
+
+Respaldos: `zz_backups."GV_Backup_809E_Mixto_20260917"` (las 118 enteras) y
+`zz_backups."GV_Backup_520_D72A_vacio_20260917"`.
