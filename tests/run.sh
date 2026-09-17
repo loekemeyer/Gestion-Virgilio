@@ -432,6 +432,9 @@ PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node te
 echo "== ppp-pedido-cambiar-dia (v19.32: 📅 en la NP mueve el pedido entero, y elige tanda destino o crea una nueva) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/ppp-pedido-cambiar-dia.cjs
 
+echo "== textos-visibles (v19.38, Luis: «que se lleva puesto» no es profesional — jerga en texto que ve el usuario) =="
+node tests/textos-visibles.cjs
+
 echo "== ppp-cancelar-pedido (v19.34: ✕ Cancelar pedido en la NP — detalle de lo que vuelve a «A guardar», alcance y aviso de lo que ya salió) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/ppp-cancelar-pedido.cjs
 

@@ -5731,7 +5731,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=19.39"></script>
+<script type="module" src="recepcion.js?v=19.40"></script>
 <!-- Config del módulo de fichada (compartido con fichada.html). El secret
      hmacSecret tiene que ser el mismo acá y allá; cargándolo desde un solo
      archivo evitamos que se desincronicen. -->
@@ -9577,7 +9577,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v19.39";
+const APP_VERSION = "v19.40";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -34844,7 +34844,7 @@ function pppMovPaso2Html() {
   if (!M.dest) return h + '<div class="mv-cargando">Buscando las tandas de ese día…</div>';
   if (M.destErr) return h + '<div class="mv-cargando">No pude leer las tandas del día (' + escapeHtml(M.destErr) + ').</div>';
   if (!M.dest.length) return h + '<div class="mv-cargando">Ese día no hay ninguna otra tanda: va en una nueva.</div>';
-  h += '<div class="mv-dest-t">…o adentro de una que ya existe:</div><div class="mv-dests">';
+  h += '<div class="mv-dest-t">…o dentro de una que ya existe:</div><div class="mv-dests">';
   for (const t of M.dest) {
     const ok = t.compatible !== false;
     h += '<button class="mv-dest' + (ok ? '' : ' no') + '"' +
@@ -35029,6 +35029,21 @@ window.pgaCanCerrar = function () {
   _pgaCan = null;
   const o = document.getElementById("pgaCanOv"); if (o) o.classList.remove("show");
 };
+/* ⚠ `aprRpc` no tiene timeout: si el fetch queda pendiente, el pop-up se queda en «Buscando…»
+   para siempre, sin decir qué pasó. Esto lo acota y devuelve un error que se entiende. No se tocó
+   `aprRpc` porque la usa toda la app; el problema es de esta pantalla, el arreglo también. */
+async function _pgaCanRpc(fn, args, ms) {
+  let t;
+  try {
+    return await Promise.race([
+      aprRpc(fn, args),
+      new Promise(function (_r, rej) { t = setTimeout(function () {
+        rej(new Error("Supabase no contestó en " + Math.round((ms || 15000) / 1000) + " segundos. " +
+                      "Probá de nuevo; si sigue igual, es la conexión."));
+      }, ms || 15000); })
+    ]);
+  } finally { clearTimeout(t); }
+}
 window.pgaCanAbrir = async function (np) {
   const n = String(np || "").trim(); if (!n) return;
   _pgaCan = { np: n, prev: null, alcance: "np", motivo: null, texto: "", paso: "cargando",
@@ -35037,7 +35052,7 @@ window.pgaCanAbrir = async function (np) {
   document.getElementById("pgaCanTitle").textContent = "✕ Cancelar pedido — " + n;
   pgaCanRender();
   try {
-    const p = await aprRpc("gv_ppp_np_cancelar_previo", { p_np: n });
+    const p = await _pgaCanRpc("gv_ppp_np_cancelar_previo", { p_np: n }, 15000);
     if (!_pgaCan || _pgaCan.np !== n) return;             // se cerró mientras respondía
     _pgaCan.prev = p || {};
     if (!_pgaCan.prev.existe) { _pgaCan.paso = "error"; _pgaCan.err = "No encuentro la NP " + n + " en la programación."; }
@@ -35067,7 +35082,7 @@ window.pgaCanPaso2 = function () {
     // El motivo escrito es OBLIGATORIO: dentro de un mes es lo único que va a explicar por qué
     // este pedido no se entregó.
     if (String(s.texto || "").trim().length < 5) {
-      s.err = "Escribí por qué se cancela. Queda en el log y es lo único que va a explicar esto mañana.";
+      s.err = "Escribí por qué se cancela: queda guardado con tu nombre.";
       pgaCanRender(); return;
     }
   }
@@ -35090,7 +35105,11 @@ function _pgaCanResumen() {
 function pgaCanRender() {
   const s = _pgaCan; if (!s) return;
   const body = document.getElementById("pgaCanBody"); if (!body) return;
-  if (s.paso === "cargando") { body.innerHTML = '<div class="can-load">Buscando qué se lleva puesto cancelar ' + escapeHtml(s.np) + '…</div>'; return; }
+  if (s.paso === "cargando") {
+    body.innerHTML = '<div class="can-load">Buscando el pedido ' + escapeHtml(s.np) + ' y su mercadería…</div>' +
+      '<div class="can-acts"><button class="can-b sec" onclick="pgaCanCerrar()">Cerrar</button></div>';
+    return;
+  }
   if (s.paso === "error") {
     body.innerHTML = '<div class="can-err">⚠ ' + escapeHtml(s.err) + '</div>' +
       '<div class="can-acts"><button class="can-b sec" onclick="pgaCanCerrar()">Cerrar</button></div>';
@@ -38160,14 +38179,14 @@ function _pgaCuerpoHtml(dias, opts) {
               // v19.32 (Luis): «Cambiar de día» TAMBIÉN por pedido. Mueve todas las NP del mismo
               // pedido juntas y pregunta a qué tanda del día destino van (nueva o una que ya exista).
               ? '<span class="pga-acc"><button class="pga-acc-b dia" title="Cambiar de día — mueve ESTE PEDIDO (todas las NP del mismo pedido, juntas) a otro día.'
-                + ' Se elige el día y después si va en una tanda NUEVA o adentro de una que ya existe ese día.'
+                + ' Se elige el día y después si va en una tanda NUEVA o dentro de una que ya existe ese día.'
                 + ' El contenido no cambia: no hay que volver a pickear."'
                 + ' onclick="event.stopPropagation();pgaNpMoverAbrir(\'' + escapeHtml(r.np) + '\')">📅</button>'
                 + '<button class="pga-acc-b" title="Enviar a programar — lo saca de esta tanda y lo manda a 📥 A Programar para darle otra fecha. Queda anotado en qué tanda estaba: al reprogramarlo vuelve a ESA tanda, así no se pickea ni se arma dos veces. El automático no lo toca."'
                 + ' onclick="event.stopPropagation();pgaEnviarAProgramar(\'' + escapeHtml(r.np) + '\')">↩</button>'
                 // v19.34 (Luis): cancelar el pedido, en cualquier estado. Sale de la PPP y lo que
                 // se había armado vuelve a «A guardar». El pop-up avisa QUÉ vuelve antes de tocar nada.
-                + '<button class="pga-acc-b cancel" title="Cancelar pedido — el pedido murió: sale de la PPP, no se factura, y lo que ya estaba armado vuelve a «A guardar» para que un operario lo baje.'
+                + '<button class="pga-acc-b cancel" title="Cancelar pedido — el pedido no se entrega: sale de la PPP, no se factura, y lo que ya estaba armado vuelve a «A guardar» para que un operario lo baje.'
                 + ' Se pide el motivo y se muestra qué mercadería vuelve antes de confirmar. Si el pedido está partido en varias NP, pregunta si se cancelan todas o sólo ésta.'
                 + ' No se borra nada de la base: el pedido queda para la estadística."'
                 + ' onclick="event.stopPropagation();pgaCanAbrir(\'' + escapeHtml(r.np) + '\')">✕</button></span>'
@@ -44866,7 +44885,7 @@ async function aprAnularConfirmar() {
   if (!quien) { s.err = "Decinos quién anula el pedido (Vivi, Marian u Otro)."; cuarComRender(); return; }
   // El motivo es OBLIGATORIO, a diferencia del de aprobar: dentro de un mes, el log es lo único
   // que va a explicar por qué este pedido no salió.
-  if (txt.length < 5) { s.err = "Escribí por qué se anula. Queda en el log y es lo único que va a explicar esto mañana."; cuarComRender(); return; }
+  if (txt.length < 5) { s.err = "Escribí por qué se anula: queda guardado con tu nombre."; cuarComRender(); return; }
   if (!confirm("¿Anular " + String(s.np || "") + (s.cli ? " · " + s.cli : "") + "?\n\n" +
                "Sale de A Programar y el armado automático no lo va a tomar más.\n\n" +
                "Motivo: " + txt + "\nLo anula: " + quien)) return;
@@ -51297,7 +51316,7 @@ window.facCancelPaso2 = function(){
     // El motivo escrito es OBLIGATORIO: dentro de un mes es lo único que va a explicar por qué
     // este pedido no se facturó.
     if (String(s.texto || "").trim().length < 5){
-      s.err = "Escribí por qué se cancela. Queda en el log y es lo único que va a explicar esto mañana.";
+      s.err = "Escribí por qué se cancela: queda guardado con tu nombre.";
       facCancelRender(); return;
     }
   }
