@@ -126,9 +126,11 @@ catch (_e) {
     }
     out.filaSigue    = !!filaD;
     out.noHayTacho   = !!filaD && !filaD.querySelector(".pga-acc-b.del");
-    // v19.32: son dos y ninguno es el tacho de borrar — 📅 mover el pedido de día y ↩ a programar.
-    out.unSoloBoton  = !!filaD && filaD.querySelectorAll(".pga-acc-b:not(.dia)").length === 1
-                       && filaD.querySelectorAll(".pga-acc-b.dia").length === 1;
+    // v19.34: son TRES y ninguno es el tacho de borrar — 📅 mover el pedido de día, ↩ a programar
+    // y ✕ cancelar. El de cancelar es el único que devuelve mercadería a «A guardar».
+    out.unSoloBoton  = !!filaD && filaD.querySelectorAll(".pga-acc-b:not(.dia):not(.cancel)").length === 1
+                       && filaD.querySelectorAll(".pga-acc-b.dia").length === 1
+                       && filaD.querySelectorAll(".pga-acc-b.cancel").length === 1;
     out._botones = filaD ? [...filaD.querySelectorAll(".pga-acc-b")].map(b => (b.title || "") + "/" + b.textContent.trim()) : null;
 
     // (d) el cartel del web ya no promete el automático.
@@ -191,7 +193,7 @@ catch (_e) {
   t(r.filaSigue, "(g) la fila de la NP sigue estando");
   t(r.noHayTacho, "(g) y YA NO trae el tacho de desarmar");
   if (r._botones) console.log("     (botones en la fila: " + JSON.stringify(r._botones) + ")");
-  t(r.unSoloBoton, "(g) en la fila quedan los dos botones sanos: 📅 Cambiar de día y ↩ Enviar a programar — " + JSON.stringify(r._botones));
+  t(r.unSoloBoton, "(g) en la fila quedan los tres botones sanos: 📅 Cambiar de día, ↩ Enviar a programar y ✕ Cancelar pedido — " + JSON.stringify(r._botones));
   t(r.yaHecho, "(e) el pedido web retenido cuenta como «ya hecho»");
   t(/ya pickeada y armada · E01A/.test(r.chip), "(e) y sale con su chip rojo en A Programar — " + JSON.stringify(r.chip));
   t(/gv_ppp_web_tanda_reusar/.test(r.rpcProg) && !/gv_ppp_web_tanda_nueva/.test(r.rpcProg),

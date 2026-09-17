@@ -12350,6 +12350,46 @@ del operario en Rendimiento.
 Al **re-codificar una tanda entera** se renombra también lo que la nombra por su código: los
 eventos de los operarios, las entregas y el `ref` de los movimientos de stock. El stock en sí no
 se mueve. Detalle, medición y rollback en `docs/SUPABASE-GESTION-VIRGILIO.md` §3.go.
+---
+
+### ✕ Cancelar pedido — en la fila de cada NP (v19.34, pedido de Luis)
+
+Luis: *"Quiero agregar un boton junto al de cambiar fecha para NPs que sea «Cancelar pedido». Se
+puede hacer con cualquier pedido en cualquier estado."*
+
+**Qué hace.** El pedido **murió**: sale de la PPP, no se factura, y lo que ya estaba armado
+**vuelve a «A guardar»** para que un operario lo baje del piso de armado. **No se borra nada de
+la base**: el pedido y sus artículos quedan para la estadística de qué pidió cada cliente.
+
+⚠ **Cuatro cosas parecidas que NO son lo mismo:**
+
+| | Qué es |
+|---|---|
+| **Anular** (A Programar) | el pedido entró MAL y nadie lo tocó |
+| **↩ Enviar a programar** | el pedido sigue VIVO y se va a rehacer: vuelve retenido a A Programar |
+| **Borrar** | la regla del `CLAUDE.md`: se borra de la página Y de Gestión. Acá NO se borra |
+| **✕ Cancelar** (esto) | el pedido murió, pero queda en la base |
+
+**Los tres pasos del pop-up**, en este orden:
+
+1. **Alcance** — sólo aparece si el pedido está partido en varias NP: *«Sólo la NP LK 0009»* o
+   *«Las 3 NP del pedido»*. Si se elige una sola, **las otras no se tocan**.
+2. **Motivo** — 📦 Falta stock o ✏ Otro (escrito, obligatorio). Queda en el log con el nombre de
+   quien canceló: dentro de un mes es lo único que va a explicar por qué este pedido no salió.
+3. **Confirmación** — dice **cuántas cajas vuelven y de qué artículos**, artículo por artículo.
+   Ese número no es una estimación: sale de la misma función que después mueve el stock.
+
+**En cualquier estado, sí — pero avisando.** Una NP que ya tiene **Carga Camión** o **Recepción
+Remitos** normalmente se cierra con el remito, no cancelando. No se bloquea (lo pidió Luis), pero
+sale un cartel **rojo y grande** y el botón pasa a decir *«Sí, cancelar IGUAL»*; el backend deja
+escrito en el log que fue forzado.
+
+⚠ **Una NP que volvió del camión NO cuenta como «salió».** Si tiene un **`FSS`** («↩ sin salida»)
+posterior a su carga, la mercadería está de nuevo en el depósito, así que se cancela normal, sin
+forzar. Es el caso que trajo Luis: la **98668 de la tanda D66D** (Nexxo), cargada el 11/09 y
+devuelta el 14/09.
+
+Detalle, medición y rollback en `docs/SUPABASE-GESTION-VIRGILIO.md` §3.gp.
 
 ---
 

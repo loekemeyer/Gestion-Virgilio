@@ -1514,3 +1514,53 @@ select * from public.gv_ppp_tanda_renombrar('<NUEVA>', '<VIEJA>', 'rollback');
 
 Y una fusión (tanda de origen que quedó vacía y dejó de existir) se deshace moviendo esos pedidos
 de vuelta con `gv_ppp_pedido_mover(<np>, <fecha vieja>, '<TANDA VIEJA>')`.
+
+---
+
+## v19.34 (2026-09-17) — «✕ Cancelar pedido» desde la fila de la NP
+
+**Qué se tocó de lo compartido.**
+
+| Objeto | Qué se hace |
+|---|---|
+| `public."Movimientos_Stock"` | **inserta** los movimientos de devolución (`tipo = 'desarme'`): `a_facturar`/`separar_pedidos` en negativo y `a_guardar` en positivo. Nada de esto es nuevo: es lo que ya hacía `gv_ppp_np_desarmar` desde la v18.90. Lo que cambió es **quién lo dispara** (ahora también el botón de la PPP) y **cuándo se deja** (con `p_forzar`, una NP que ya tenía Carga Camión). |
+| `public."Registros_Produccion_Virgilio"` | **sólo lectura**: se agregó el evento `FSS` al chequeo de «ya salió». No se escribe nada. |
+| `public.gv_ppp_web_armar_pendientes` | `create or replace` con un pase nuevo **(a0c)** al principio, calcado del (a0b). Es una función `gv_*`: la lee el cron de armado de Gestión, no Producción. |
+| `public."PPP_Web_Programacion"` | `update tanda = null, fecha_entrega = null` de la NP cancelada — igual que el desarme de la v18.90. |
+| `public."NP_Canceladas"` / `public."GV_PPP_Prog_Override"` | la NP de ISIS cancelada se anota y se oculta, igual que antes. |
+
+**Objeto nuevo:** `public."GV_PPP_Web_NP_Cancelada"` (prefijo `GV_`, RLS prendida, `select` para
+`anon`/`authenticated`). Nace vacía; con la tabla vacía el armador se comporta exactamente igual.
+
+**Impacto en Producción.** Nulo mientras nadie cancele nada. Cuando se cancela, Producción ve lo
+mismo que veía con el desarme desde la v18.90: la NP sale de la programación y el remito no se
+imprime. La única diferencia real es que ahora **se puede cancelar una NP que ya tiene `CCN`**, y
+en ese caso el stock vuelve a `a_guardar` aunque la mercadería ya haya salido físicamente — por eso
+el front lo avisa en rojo y el backend lo escribe en el justificativo.
+
+**Medición (2026-09-17).** Pruebas en transacción abortada: 98668 (D66D) devuelve **60 cajas** a
+`a_guardar` y sale de la PPP; un pedido web de 5 NP cancelado «sólo ésta» deja **4** en pie;
+98633 (entregada de verdad) **rebota** sin `p_forzar`. `gv_ppp_np_devolucion` coincide **80/80**
+con la fórmula que reemplaza. El armador, con un bloque marcado, arma **sólo el otro**.
+
+**Rollback exacto.** `sql/backups/pre_v1934_cancelar_pedido_20260917.sql` — saca el pase (a0c),
+vuelve `gv_ppp_np_desarmar` a su firma de 5 argumentos (la de la v18.94) y dropea las tres
+funciones nuevas.
+
+⚠ **Lo que NO se deshace solo:** los movimientos de stock que una cancelación ya escribió, y la
+NP que ya salió de la PPP. Para revivir una NP cancelada:
+
+```sql
+-- web, un bloque
+delete from public."GV_PPP_Web_NP_Cancelada" where np_label = '<NP>';
+-- web, el pedido entero
+delete from public."GV_Web_Cancelados" where np_label = '<NP>';
+-- ISIS
+delete from public."NP_Canceladas" where np = '<NP>';
+update public."GV_PPP_Prog_Override" set oculto = false where np = '<NP>';
+```
+
+Y el stock se revierte con el movimiento inverso (nunca borrando la fila: el log es append-only).
+
+⚠ **Antes de borrar `GV_PPP_Web_NP_Cancelada`, mirarla**: cada fila es una NP que un supervisor
+canceló a mano, y sin ella el cron la vuelve a programar sola.

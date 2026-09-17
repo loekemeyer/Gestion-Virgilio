@@ -3468,6 +3468,10 @@ tr.ppp-err-zona > td{ background:#fffbeb !important; }
 /* v17.88 (Luis): el tacho. Rojo, para que no se confunda con el de al lado. */
 .pga-acc-b.del{ background:#fee2e2; color:#b91c1c; border-color:#fca5a5; }
 .pga-acc-b.del:hover{ background:#fecaca; }
+/* v19.34 (Luis) — ✕ Cancelar pedido. Rojo, como el tacho: los dos son permanentes. Va con margen
+   a la izquierda para que no se toque sin querer al apuntarle al ↩ de al lado. */
+.pga-acc-b.cancel{ background:#fee2e2; color:#b91c1c; border-color:#fca5a5; margin-left:6px; }
+.pga-acc-b.cancel:hover{ background:#fecaca; }
 /* v18.40 (Luis) — el pop-up de «Enviar a programar»: qué NP se llevan, en qué estado están y
    qué tanda queda vacía. No es el de ATENCIÓN rojo (eso es Desarmar, que sí es permanente):
    acá el pedido no se pierde, se mueve. Azul, informativo, todas o ninguna. */
@@ -5716,7 +5720,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=19.33"></script>
+<script type="module" src="recepcion.js?v=19.34"></script>
 <!-- Config del módulo de fichada (compartido con fichada.html). El secret
      hmacSecret tiene que ser el mismo acá y allá; cargándolo desde un solo
      archivo evitamos que se desincronicen. -->
@@ -9562,7 +9566,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v19.33";
+const APP_VERSION = "v19.34";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -34915,6 +34919,266 @@ async function pgaNpMoverAbrir(np) {
 }
 window.pgaNpMoverAbrir = pgaNpMoverAbrir; window.pppMovPaso2 = pppMovPaso2;
 window.pppMovVolverDias = pppMovVolverDias; window.pppMovDestinoElegir = pppMovDestinoElegir;
+/* ═══════════════════════════════════════════════════════════════════════════════════════════
+   v19.34 (Luis, 17/09) — ✕ CANCELAR PEDIDO, desde la fila de la NP
+   Textual: *"Quiero agregar un boton junto al de cambiar fecha para NPs que sea «Cancelar
+   pedido». Se puede hacer con cualquier pedido en cualquier estado. Se borra el pedido de la
+   programacion y la mercadería que tenía (si es que tenía) vuelve a A guardar (que pida
+   confirmacion y que ahi avise si tiene mercadería que va a volver a «A guardar» y que diga el
+   detalle). Si se «Cancela pedido» a una NP que es parte de un pedido distribuido en muchas NPs,
+   tiene que preguntar si se quieren cancelar todas las NPs de ese pedido o solo esa."*
+
+   ⚠ Cuatro cosas parecidas que NO son lo mismo:
+     · ANULAR    — «A Programar», el pedido entró MAL y nadie lo tocó (`gv_pedido_anular`).
+     · ↩ ENVIAR A PROGRAMAR — el pedido sigue VIVO y se va a rehacer: vuelve retenido.
+     · BORRAR    — regla del CLAUDE.md: se borra de la página Y de Gestión. Acá NO se borra nada.
+     · CANCELAR (esto) — el pedido murió: sale de la PPP, no se factura, y lo que se había
+       armado vuelve a «A guardar» para que un operario lo baje. El pedido y sus artículos
+       QUEDAN en la base, para la estadística de qué pidió cada cliente.
+
+   El trabajo lo hace el backend, `gv_ppp_pedido_cancelar` (v19.34). Acá sólo se junta lo que hay
+   que preguntar: alcance (esta NP o todo el pedido) → motivo → confirmación con el detalle.
+   El detalle sale de `gv_ppp_np_cancelar_previo`, que hace la MISMA cuenta que después ejecuta
+   el desarme (`gv_ppp_np_devolucion`): lo que se muestra es lo que va a pasar, no una estimación.
+   ═══════════════════════════════════════════════════════════════════════════════════════════ */
+let _pgaCan = null;
+function _pgaCanCss() {
+  if (document.getElementById("pgaCanCss")) return;
+  const s = document.createElement("style"); s.id = "pgaCanCss";
+  s.textContent =
+    "#pgaCanOv{position:fixed;inset:0;background:rgba(15,23,42,.55);z-index:100060;display:none;" +
+      "align-items:center;justify-content:center;padding:16px;}" +
+    "#pgaCanOv.show{display:flex;}" +
+    ".can-card{background:#f8fafc;border-radius:16px;width:min(620px,96vw);max-height:92vh;display:flex;" +
+      "flex-direction:column;box-shadow:0 18px 50px rgba(15,23,42,.35);overflow:hidden;}" +
+    ".can-head{display:flex;align-items:center;gap:10px;padding:12px 16px;background:linear-gradient(90deg,#b91c1c,#dc2626);color:#fff;}" +
+    ".can-title{flex:1;font-size:15.5px;font-weight:800;}" +
+    ".can-x{background:rgba(255,255,255,.18);border:0;color:#fff;border-radius:8px;padding:4px 10px;font-weight:800;cursor:pointer;}" +
+    ".can-body{padding:15px 16px 16px;overflow:auto;}" +
+    ".can-cli{font-size:15px;font-weight:800;color:#0f172a;}" +
+    ".can-sub{margin-top:2px;font-size:12px;font-weight:700;color:#64748b;}" +
+    ".can-q{margin:14px 0 8px;font-size:13.5px;font-weight:800;color:#334155;}" +
+    ".can-ops{display:grid;gap:9px;}" +
+    ".can-op{text-align:left;background:#fff;border:1px solid #dbe3ee;border-radius:11px;padding:10px 13px;cursor:pointer;font:inherit;}" +
+    ".can-op:hover{border-color:#dc2626;}" +
+    ".can-op.on{border-color:#dc2626;background:#fef2f2;box-shadow:inset 0 0 0 1px #dc2626;}" +
+    ".can-op b{display:block;font-size:13.5px;font-weight:800;color:#0f172a;}" +
+    ".can-op span{display:block;margin-top:3px;font-size:11.5px;font-weight:600;color:#64748b;}" +
+    ".can-txt{width:100%;margin-top:9px;border:1px solid #cbd5e1;border-radius:10px;padding:9px 11px;font:inherit;font-size:13px;resize:vertical;}" +
+    ".can-err{margin-top:10px;background:#fef2f2;border:1px solid #fecaca;color:#b91c1c;border-radius:9px;padding:8px 11px;font-size:12.5px;font-weight:700;}" +
+    // El cartel de «ya salió». Grande y rojo a propósito: es el único caso en que cancelar
+    // contradice un remito ya emitido, y aun así Luis pidió que se pueda (no bloquea, avisa).
+    ".can-alerta{margin:12px 0;background:#7f1d1d;color:#fff;border-radius:12px;padding:12px 14px;}" +
+    ".can-alerta b{display:block;font-size:15px;font-weight:900;letter-spacing:.3px;}" +
+    ".can-alerta span{display:block;margin-top:4px;font-size:12.5px;font-weight:600;opacity:.95;}" +
+    ".can-avisos{margin-top:12px;background:#fff;border:1px solid #dbe3ee;border-radius:11px;padding:11px 13px;" +
+      "font-size:12.5px;color:#334155;line-height:1.55;}" +
+    ".can-avisos div+div{margin-top:4px;}" +
+    ".can-merc{margin-top:12px;background:#ecfdf5;border:1px solid #a7f3d0;border-radius:11px;padding:11px 13px;}" +
+    ".can-merc-t{font-size:12.5px;font-weight:800;color:#065f46;}" +
+    ".can-merc-l{margin-top:8px;display:flex;flex-wrap:wrap;gap:6px;}" +
+    ".can-merc-i{background:#fff;border:1px solid #a7f3d0;border-radius:999px;padding:2px 10px;font-size:12px;font-weight:700;color:#065f46;" +
+      "font-variant-numeric:tabular-nums;}" +
+    ".can-merc-no{margin-top:12px;background:#f1f5f9;border:1px solid #e2e8f0;border-radius:11px;padding:10px 13px;" +
+      "font-size:12.5px;font-weight:700;color:#64748b;}" +
+    ".can-acts{display:flex;gap:9px;justify-content:flex-end;margin-top:15px;flex-wrap:wrap;}" +
+    ".can-b{border:0;border-radius:10px;padding:9px 15px;font-size:13.5px;font-weight:800;cursor:pointer;}" +
+    ".can-b.sec{background:#fff;border:1px solid #cbd5e1;color:#334155;}" +
+    ".can-b.go{background:#dc2626;color:#fff;}" +
+    ".can-b[disabled]{opacity:.55;cursor:default;}" +
+    ".can-load{padding:26px;text-align:center;color:#64748b;font-weight:700;}";
+  document.head.appendChild(s);
+}
+function _pgaCanEsc(e) { if (e.key === "Escape" && _pgaCan && !_pgaCan.saving) pgaCanCerrar(); }
+function pgaCanOverlay() {
+  _pgaCanCss();
+  let o = document.getElementById("pgaCanOv");
+  if (!o) {
+    o = document.createElement("div"); o.id = "pgaCanOv";
+    o.innerHTML = '<div class="can-card"><div class="can-head"><div class="can-title" id="pgaCanTitle"></div>' +
+      '<button class="can-x" onclick="pgaCanCerrar()">✕</button></div><div class="can-body" id="pgaCanBody"></div></div>';
+    o.addEventListener("click", function (e) { if (e.target === o) pgaCanCerrar(); });
+    document.addEventListener("keydown", _pgaCanEsc);
+    document.body.appendChild(o);
+  }
+  o.classList.add("show");
+  return o;
+}
+/* Salir sin hacer nada. Con la RPC en vuelo NO se cierra: si se cerrara, la pantalla quedaría
+   mintiendo sobre si el pedido se canceló o no. */
+window.pgaCanCerrar = function () {
+  if (_pgaCan && _pgaCan.saving) return;
+  _pgaCan = null;
+  const o = document.getElementById("pgaCanOv"); if (o) o.classList.remove("show");
+};
+window.pgaCanAbrir = async function (np) {
+  const n = String(np || "").trim(); if (!n) return;
+  _pgaCan = { np: n, prev: null, alcance: "np", motivo: null, texto: "", paso: "cargando",
+              err: "", saving: false };
+  pgaCanOverlay();
+  document.getElementById("pgaCanTitle").textContent = "✕ Cancelar pedido — " + n;
+  pgaCanRender();
+  try {
+    const p = await aprRpc("gv_ppp_np_cancelar_previo", { p_np: n });
+    if (!_pgaCan || _pgaCan.np !== n) return;             // se cerró mientras respondía
+    _pgaCan.prev = p || {};
+    if (!_pgaCan.prev.existe) { _pgaCan.paso = "error"; _pgaCan.err = "No encuentro la NP " + n + " en la programación."; }
+    else _pgaCan.paso = (Number(_pgaCan.prev.n_nps) || 1) > 1 ? "alcance" : "motivo";
+  } catch (e) {
+    if (!_pgaCan) return;
+    _pgaCan.paso = "error"; _pgaCan.err = (e && e.message) ? e.message : String(e);
+  }
+  pgaCanRender();
+};
+window.pgaCanAlcance = function (a) { if (!_pgaCan) return; _pgaCan.alcance = a; _pgaCan.err = ""; _pgaCan.paso = "motivo"; pgaCanRender(); };
+window.pgaCanMotivo  = function (m) { if (!_pgaCan) return; _pgaCan.motivo = m; _pgaCan.err = ""; pgaCanRender(); };
+window.pgaCanVolver  = function () {
+  const s = _pgaCan; if (!s) return;
+  s.err = "";
+  if (s.paso === "confirmar") s.paso = "motivo";
+  else if (s.paso === "motivo" && (Number((s.prev || {}).n_nps) || 1) > 1) s.paso = "alcance";
+  else return pgaCanCerrar();
+  pgaCanRender();
+};
+function pgaCanMotivoTxt(s) { return s.motivo === "stock" ? "falta stock" : String(s.texto || "").trim(); }
+window.pgaCanPaso2 = function () {
+  const s = _pgaCan; if (!s) return;
+  if (!s.motivo) { s.err = "Elegí el motivo: falta stock u otro."; pgaCanRender(); return; }
+  if (s.motivo === "otro") {
+    const ta = document.getElementById("pgaCanTxt"); if (ta) s.texto = ta.value;
+    // El motivo escrito es OBLIGATORIO: dentro de un mes es lo único que va a explicar por qué
+    // este pedido no se entregó.
+    if (String(s.texto || "").trim().length < 5) {
+      s.err = "Escribí por qué se cancela. Queda en el log y es lo único que va a explicar esto mañana.";
+      pgaCanRender(); return;
+    }
+  }
+  s.err = ""; s.paso = "confirmar"; pgaCanRender();
+};
+/* Qué NP se van y cuánta mercadería vuelve, según el alcance elegido. Los dos números salen del
+   previo, así que son los mismos que va a mover el backend. */
+function _pgaCanResumen() {
+  const s = _pgaCan, p = s.prev || {}, todas = s.alcance === "todas";
+  const nps = todas ? (p.nps || []) : (p.nps || []).filter(function (x) { return String(x.np) === s.np; });
+  let cajas = 0, items = {};
+  for (const x of nps) {
+    cajas += Number(x.cajas) || 0;
+    for (const it of (x.items || [])) items[it.art] = (items[it.art] || 0) + (Number(it.cajas) || 0);
+  }
+  return { nps: nps, cajas: cajas,
+           items: Object.keys(items).sort().map(function (a) { return { art: a, cajas: items[a] }; }),
+           salio: nps.some(function (x) { return x.salio; }) };
+}
+function pgaCanRender() {
+  const s = _pgaCan; if (!s) return;
+  const body = document.getElementById("pgaCanBody"); if (!body) return;
+  if (s.paso === "cargando") { body.innerHTML = '<div class="can-load">Buscando qué se lleva puesto cancelar ' + escapeHtml(s.np) + '…</div>'; return; }
+  if (s.paso === "error") {
+    body.innerHTML = '<div class="can-err">⚠ ' + escapeHtml(s.err) + '</div>' +
+      '<div class="can-acts"><button class="can-b sec" onclick="pgaCanCerrar()">Cerrar</button></div>';
+    return;
+  }
+  const p = s.prev || {};
+  const cab = '<div class="can-cli">' + escapeHtml(p.razon_social || ("Cliente " + (p.cod || ""))) + '</div>' +
+              '<div class="can-sub">NP ' + escapeHtml(s.np) + (p.tanda ? ' · Tanda ' + escapeHtml(p.tanda) : '') +
+                ' · ' + escapeHtml(PGA_EST_TXT[p.estado] || p.estado || "") + '</div>';
+  const err = s.err ? '<div class="can-err">⚠ ' + escapeHtml(s.err) + '</div>' : '';
+
+  if (s.paso === "alcance") {
+    const n = Number(p.n_nps) || 1;
+    body.innerHTML = cab +
+      '<div class="can-q">Este pedido está partido en <b>' + n + ' notas de pedido</b>. ¿Qué se cancela?</div>' +
+      '<div class="can-ops">' +
+        '<button class="can-op" onclick="pgaCanAlcance(\'np\')"><b>Sólo la NP ' + escapeHtml(s.np) + '</b>' +
+          '<span>Las otras ' + (n - 1) + ' siguen su camino, en su tanda y su día.</span></button>' +
+        '<button class="can-op" onclick="pgaCanAlcance(\'todas\')"><b>Las ' + n + ' NP del pedido</b>' +
+          '<span>' + escapeHtml((p.nps || []).map(function (x) { return x.np; }).join(", ")) + '</span></button>' +
+      '</div>' + err +
+      '<div class="can-acts"><button class="can-b sec" onclick="pgaCanCerrar()">Volver — no cancelar nada</button></div>';
+    return;
+  }
+
+  if (s.paso === "motivo") {
+    body.innerHTML = cab +
+      '<div class="can-q">¿Por qué se cancela el pedido?</div>' +
+      '<div class="can-ops">' +
+        '<button class="can-op' + (s.motivo === "stock" ? " on" : "") + '" onclick="pgaCanMotivo(\'stock\')"><b>📦 Falta stock</b></button>' +
+        '<button class="can-op' + (s.motivo === "otro"  ? " on" : "") + '" onclick="pgaCanMotivo(\'otro\')"><b>✏ Otro</b></button>' +
+      '</div>' +
+      (s.motivo === "otro"
+        ? '<textarea id="pgaCanTxt" class="can-txt" rows="3" placeholder="Escribí por qué se cancela este pedido…">' + escapeHtml(String(s.texto || "")) + '</textarea>'
+        : '') + err +
+      '<div class="can-acts">' +
+        '<button class="can-b sec" onclick="pgaCanVolver()">← Volver</button>' +
+        '<button class="can-b go"' + (s.motivo ? '' : ' disabled') + ' onclick="pgaCanPaso2()">Seguir</button>' +
+      '</div>';
+    if (s.motivo === "otro") {
+      const ta = document.getElementById("pgaCanTxt");
+      // El texto se guarda a mano y NO se re-dibuja en cada tecla: redibujar perdería el foco.
+      if (ta) { ta.oninput = function () { if (_pgaCan) _pgaCan.texto = ta.value; }; try { ta.focus(); } catch (_e) {} }
+    }
+    return;
+  }
+
+  const R = _pgaCanResumen();
+  const qué = s.alcance === "todas"
+    ? ('las <b>' + R.nps.length + ' NP</b> del pedido (' + escapeHtml(R.nps.map(function (x) { return x.np; }).join(", ")) + ')')
+    : ('la <b>NP ' + escapeHtml(s.np) + '</b>');
+  body.innerHTML = cab +
+    '<div class="can-q">Se cancela ' + qué + '.</div>' +
+    (R.salio
+      ? '<div class="can-alerta"><b>⚠⚠ OJO — ESTE PEDIDO YA SALIÓ ⚠⚠</b>' +
+        '<span>Tiene Carga Camión o Recepción Remitos y no volvió al depósito. Normalmente eso se cierra con el remito, no cancelando. ' +
+        'Si la mercadería no está físicamente acá, las cajas que vuelven a «A guardar» van a ser stock que no existe.</span></div>'
+      : '') +
+    (R.cajas > 0
+      ? '<div class="can-merc"><div class="can-merc-t">📦 Vuelve a «A guardar»: ' + R.items.length +
+          ' artículo' + (R.items.length === 1 ? '' : 's') + ' · <b>' + R.cajas + ' caja' + (R.cajas === 1 ? '' : 's') + '</b></div>' +
+          '<div class="can-merc-l">' + R.items.map(function (i) {
+            return '<span class="can-merc-i">' + escapeHtml(i.art) + ' × ' + i.cajas + '</span>';
+          }).join("") + '</div></div>'
+      : '<div class="can-merc-no">No hay mercadería movida: no se devuelve nada al stock.</div>') +
+    '<div class="can-avisos">' +
+      '<div>• <b>No se factura</b> y sale de la <b>PPP</b>: el armado automático no lo toma más.</div>' +
+      '<div>• <b>No se borra de la base</b>: el pedido y sus artículos quedan para la estadística de qué pidió cada cliente.</div>' +
+      (s.alcance === "np" && (Number(p.n_nps) || 1) > 1
+        ? '<div>• Las otras <b>' + ((Number(p.n_nps) || 1) - 1) + ' NP</b> del pedido <b>NO</b> se tocan.</div>' : '') +
+      '<div>• Motivo: <b>' + escapeHtml(pgaCanMotivoTxt(s)) + '</b> — queda en el log con tu nombre.</div>' +
+    '</div>' + err +
+    '<div class="can-acts">' +
+      '<button class="can-b sec" onclick="pgaCanVolver()">← Volver</button>' +
+      '<button class="can-b go" id="pgaCanGo" onclick="pgaCanConfirmar()">' +
+        (R.salio ? 'Sí, cancelar IGUAL' : 'Sí, cancelar') + '</button>' +
+    '</div>';
+}
+window.pgaCanConfirmar = async function () {
+  const s = _pgaCan; if (!s || s.saving) return;
+  const R = _pgaCanResumen();
+  s.saving = true; s.err = "";
+  const go = document.getElementById("pgaCanGo");
+  if (go) { go.disabled = true; go.textContent = "Cancelando…"; }
+  try {
+    const r = await aprRpc("gv_ppp_pedido_cancelar", {
+      p_np: s.np,
+      p_motivo: pgaCanMotivoTxt(s),
+      p_por: await aprQuien(),
+      p_todas: s.alcance === "todas",
+      // Luis: "se puede hacer con cualquier pedido en cualquier estado". El backend igual frena
+      // lo que ya salió salvo que se le diga que sí a sabiendas — y lo deja escrito en el log.
+      p_forzar: !!R.salio
+    });
+    const n = (r || []).length, cajas = (r || []).reduce(function (a, x) { return a + (Number(x.cajas) || 0); }, 0);
+    s.saving = false; pgaCanCerrar();
+    pppSetStatus("✕ " + n + " NP cancelada" + (n === 1 ? "" : "s") +
+      (cajas > 0 ? " · " + cajas + " caja" + (cajas === 1 ? "" : "s") + " a «A guardar»" : " · sin mercadería que devolver"), true);
+    await pppLoadProgFromSupabase();
+    pgaRecargar();
+  } catch (e) {
+    s.saving = false;
+    s.err = (e && e.message) ? e.message : String(e);
+    pgaCanRender();
+  }
+};
 /* v15.55 — Los que NO salieron: volver a A Programar (web) o cancelar (web e ISIS). Todo en el backend:
    gv_ppp_web_desprogramar saca la NP web de su tanda (queda pendiente en A Programar);
    gv_ppp_np_cancelar: ISIS → NP_Canceladas + oculta en la PPP (GV_PPP_Prog_Override.oculto); web →
@@ -37882,7 +38146,13 @@ function _pgaCuerpoHtml(dias, opts) {
                 + ' El contenido no cambia: no hay que volver a pickear."'
                 + ' onclick="event.stopPropagation();pgaNpMoverAbrir(\'' + escapeHtml(r.np) + '\')">📅</button>'
                 + '<button class="pga-acc-b" title="Enviar a programar — lo saca de esta tanda y lo manda a 📥 A Programar para darle otra fecha. Queda anotado en qué tanda estaba: al reprogramarlo vuelve a ESA tanda, así no se pickea ni se arma dos veces. El automático no lo toca."'
-                + ' onclick="event.stopPropagation();pgaEnviarAProgramar(\'' + escapeHtml(r.np) + '\')">↩</button></span>'
+                + ' onclick="event.stopPropagation();pgaEnviarAProgramar(\'' + escapeHtml(r.np) + '\')">↩</button>'
+                // v19.34 (Luis): cancelar el pedido, en cualquier estado. Sale de la PPP y lo que
+                // se había armado vuelve a «A guardar». El pop-up avisa QUÉ vuelve antes de tocar nada.
+                + '<button class="pga-acc-b cancel" title="Cancelar pedido — el pedido murió: sale de la PPP, no se factura, y lo que ya estaba armado vuelve a «A guardar» para que un operario lo baje.'
+                + ' Se pide el motivo y se muestra qué mercadería vuelve antes de confirmar. Si el pedido está partido en varias NP, pregunta si se cancelan todas o sólo ésta.'
+                + ' No se borra nada de la base: el pedido queda para la estadística."'
+                + ' onclick="event.stopPropagation();pgaCanAbrir(\'' + escapeHtml(r.np) + '\')">✕</button></span>'
               : '') +
             '</div>' +
           '</td>' +

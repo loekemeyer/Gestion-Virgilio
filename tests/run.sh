@@ -432,6 +432,9 @@ PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node te
 echo "== ppp-pedido-cambiar-dia (v19.32: 📅 en la NP mueve el pedido entero, y elige tanda destino o crea una nueva) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/ppp-pedido-cambiar-dia.cjs
 
+echo "== ppp-cancelar-pedido (v19.34: ✕ Cancelar pedido en la NP — detalle de lo que vuelve a «A guardar», alcance y aviso de lo que ya salió) =="
+PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/ppp-cancelar-pedido.cjs
+
 echo "== ppp-tabla-arbol (v17.66: Programación como tabla día → tanda → NP → contenido, con los 4 % de avance) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/ppp-tabla-arbol.cjs
 

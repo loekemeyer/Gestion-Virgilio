@@ -21752,3 +21752,107 @@ número. Alta en `GV_Lugar_Item` de `AD05 / 809E`. `368E` no se tocó: sus 4 rac
 y coinciden con el libro.
 
 Respaldos: `zz_backups."GV_Backup_Conteo809E_{Racks,Lugar,LugarItem,Saldos}_20260917"`.
+---
+
+### §3.gp — v19.34: «✕ Cancelar pedido» en la fila de la NP — 2026-09-17
+
+Pedido de Luis (17/09), textual: *"Quiero agregar un boton junto al de cambiar fecha para NPs que
+sea «Cancelar pedido». Se puede hacer con cualquier pedido en cualquier estado. Se borra el pedido
+de la programacion y la mercadería que tenía (si es que tenía) vuelve a A guardar (que pida
+confirmacion y que ahi avise si tiene mercadería que va a volver a «A guardar» y que diga el
+detalle). Si se «Cancela pedido» a una NP que es parte de un pedido distribuido en muchas NPs,
+tiene que preguntar si se quieren cancelar todas las NPs de ese pedido o solo esa."*
+
+SQL completo (lo que está aplicado): `sql/gv_ppp_cancelar_pedido_v1934.sql`.
+Rollback: `sql/backups/pre_v1934_cancelar_pedido_20260917.sql`.
+
+#### El caso que lo trajo: la tanda D66D
+
+Luis: *"El pedido se armo, se facturo, se cargo en el camion y justo ahi el cliente lo cancelo."*
+Es la **NP 98668, Nexxo S.R.L.** — la única de las 4 de esa tanda que no llegó. Medido:
+
+| evento | cuándo |
+|---|---|
+| `EP` / `TP` (picking) | 10/09 08:02 → 08:54 |
+| `TAP` (armado) | 10/09 10:24 |
+| `CCN` (Carga Camión) | **11/09 10:28** |
+| `FSS` («↩ sin salida») | **14/09 10:04** ← volvió al depósito |
+| `CRN` (Recepción Remitos) | las otras 3 NP sí, ésta **no** |
+
+O sea que el depósito ya la había devuelto físicamente, pero la NP seguía en la PPP y sus **60
+cajas (501 × 40, 509 × 20)** seguían contadas en `a_facturar`.
+
+#### ⚠ NO ES UN MOTOR NUEVO
+
+`gv_ppp_np_desarmar` ya devolvía el stock a «A guardar» desde la v18.90, y el pop-up de cancelar
+con motivo ya existía **en Facturación** (`facCancelarNP`, v18.90). Lo que faltaba eran cuatro
+cosas, y ninguna es el cálculo:
+
+1. **El botón en la PPP**, en la fila de la NP, junto al 📅 y al ↩.
+2. **Que ande con algo que ya salió.** El guard rechazaba cualquier NP con `CCN` o `CRN`.
+3. **Mostrar el detalle ANTES de confirmar** — no había forma de saber qué iba a volver.
+4. **Cancelar UN bloque** sin matar el pedido entero.
+
+#### Lo que se agregó
+
+| Objeto | Qué hace |
+|---|---|
+| `GV_PPP_Web_NP_Cancelada` (tabla) | la marca por **bloque** `(empresa, order_id, np_idx)` |
+| `gv_ppp_np_devolucion(np, tanda)` | la cuenta de qué vuelve — **sacada** de adentro del desarme |
+| `gv_ppp_np_cancelar_previo(np)` | todo lo que la pantalla necesita preguntar, sin escribir nada |
+| `gv_ppp_np_desarmar(…, p_forzar, p_solo_np)` | firma nueva; la de 5 args se **dropeó** |
+| `gv_ppp_web_armar_pendientes` | pase **(a0c)**: el armador no re-agarra un bloque cancelado |
+| `gv_ppp_pedido_cancelar(np, motivo, por, todas, forzar)` | la que llama el front |
+
+#### ⚠ «Ya salió» ahora mira el FSS, no sólo el CCN
+
+El guard decía *"tiene Carga Camión o Recepción Remitos: salió"*. Pero un **`FSS` posterior** a esa
+carga significa que la NP **volvió** al depósito — es exactamente el estado de la 98668. Ahora:
+
+```
+salio = coalesce(último CRN, último CCN) existe  AND  (no hay FSS  OR  ese evento es posterior al FSS)
+```
+
+Con eso, el caso de Luis **pasa sin forzar nada**. Y lo que sí salió de verdad se puede cancelar
+igual con `p_forzar` (*"se puede hacer con cualquier pedido en cualquier estado"*): no se bloquea,
+se avisa **en rojo y grande** en la confirmación y el backend **escribe el forzado en el
+justificativo** (`⚠ FORZADO: la NP ya tenia Recepcion Remitos al cancelarla.`).
+
+#### ⚠ Cancelar UNA NP web no puede escribir en `GV_Web_Cancelados`
+
+Esa tabla tiene clave `(empresa, order_id)`, o sea que es **por pedido entero**: usarla para un
+bloque cancelaba los otros. Y dejar la NP con `tanda = null` sin ninguna marca es el **problema
+213** de nuevo — el cron la re-arma en la corrida siguiente. Por eso la tabla nueva por bloque y
+el pase **(a0c)** en el armador, calcado del **(a0b)** que ya existía para lo retenido.
+
+**Probado corriendo el armador de verdad** (regla del repo: un cambio de armado no está probado
+hasta que se corre el armador, con `p_filas` de prueba en una transacción abortada): con el
+bloque `np_idx = 1` marcado, de los dos bloques del pedido arma **sólo el 2**.
+
+#### La cuenta del stock, en una sola función
+
+`gv_ppp_np_devolucion` es la fórmula que estaba adentro de `gv_ppp_np_desarmar`, sacada afuera
+para que **la pantalla muestre exactamente lo que después va a mover el backend**. Duplicarla era
+garantizar que un día digan cosas distintas. Validada contra la fórmula vieja sobre **80 NP**
+(40 de ISIS + 40 web): **0 diferencias**, 1.552 y 405 cajas idénticas.
+
+#### Pruebas (transacción abortada, datos reales)
+
+| Caso | Resultado |
+|---|---|
+| 98668 (facturada, cargada, con FSS) | ✔ sin forzar · 60 cajas a «A guardar» · sale de la PPP · queda en `NP_Canceladas` |
+| Pedido web de 5 NP, «sólo ésta» | ✔ quedan 4 · 1 marca por-NP · pedido entero **NO** cancelado |
+| El mismo, «todas» | ✔ 5 canceladas · 0 marcas por-NP · pedido entero cancelado |
+| 98633 (entregada de verdad, `CRN` sin `FSS`) sin forzar | ✔ **rebota** |
+| …con forzar | ✔ pasa, 74 cajas, y el justificativo guarda el `⚠ FORZADO` |
+| El armador, con un bloque marcado | ✔ arma sólo el otro |
+
+#### Front (`index.html`)
+
+Botón **✕** (`.pga-acc-b.cancel`, rojo como el tacho) en la fila de la NP. El pop-up es
+`pgaCan*`: **alcance** (sólo si el pedido tiene más de una NP) → **motivo** (📦 Falta stock /
+✏ Otro, obligatorio) → **confirmación** con el detalle artículo por artículo de lo que vuelve a
+«A guardar», el cartel rojo si ya salió, y qué NP **no** se tocan. De los tres pasos se sale con
+✕, «Volver», Escape o tocando afuera.
+
+Test: `tests/ppp-cancelar-pedido.cjs`.
