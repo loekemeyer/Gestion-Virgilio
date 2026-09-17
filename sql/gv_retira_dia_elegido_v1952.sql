@@ -1,5 +1,5 @@
 -- =====================================================================================
--- v19.51 (Luis, 2026-09-17) — RETIRA: EL DÍA Y LA FRANJA QUE ELIGIÓ EL CLIENTE VIAJAN
+-- v19.52 (Luis, 2026-09-17) — RETIRA: EL DÍA Y LA FRANJA QUE ELIGIÓ EL CLIENTE VIAJAN
 --                              CON EL PEDIDO Y SE PROGRAMAN SOLOS.
 -- =====================================================================================
 --
@@ -55,7 +55,7 @@ grant select, insert, update (retiro_fecha, retiro_franja, hora_entrega) on publ
 -- =====================================================================================
 create or replace function public.gv_web_retiro_pactado(p_empresa text, p_order_id bigint)
 returns date language sql stable set search_path to 'public' as $$
-  /* v19.51 (Luis, 2026-09-17) — EL DIA QUE EL CLIENTE ELIGIO PARA RETIRAR. La pagina se lo
+  /* v19.52 (Luis, 2026-09-17) — EL DIA QUE EL CLIENTE ELIGIO PARA RETIRAR. La pagina se lo
      pide al marcar "Retira" (minimo +3 dias habiles, lun-vie) y lo guarda en
      orders.sheets_payload->>'retiro_fecha'. Viaja de LK por el FDW cada 15 min
      (sync_pedidos_match_virgilio -> lk_pedidos_match.retiro_fecha). NULL = el pedido no es
@@ -69,7 +69,7 @@ $$;
 
 create or replace function public.gv_web_retiro_franja(p_empresa text, p_order_id bigint)
 returns text language sql stable set search_path to 'public' as $$
-  /* v19.51 — la franja horaria elegida ("9:00 a 12:00" / "13:00 a 16:30"). Es informativa:
+  /* v19.52 — la franja horaria elegida ("9:00 a 12:00" / "13:00 a 16:30"). Es informativa:
      no parte tandas ni mueve dias, sale en el badge de la PPP. */
   select m.retiro_franja
     from public.lk_pedidos_match m
@@ -101,14 +101,14 @@ declare
      and not public.gv_cliente_auto_super(p_empresa, cliente);$a$;
   v_b    constant text := $b$     -- v19.13: la zona de un super es "Super", no "Zona N": sin esto la excepcion no sirve
      and not public.gv_cliente_auto_super(p_empresa, cliente)
-     -- v19.51 (Luis, 2026-09-17): RETIRA CON DIA ELEGIDO. La zona es "Retira", no "Zona N", asi
+     -- v19.52 (Luis, 2026-09-17): RETIRA CON DIA ELEGIDO. La zona es "Retira", no "Zona N", asi
      -- que este delete la borraba SIEMPRE y ningun pase automatico podia programarla. Si el
      -- cliente eligio el dia en la pagina (lk_pedidos_match.retiro_fecha), la fila se queda y la
      -- programa el pase (a4). Un Retira SIN dia elegido sigue afuera: queda en A Programar.
      and not (zona ~* 'retira'
               and public.gv_web_retiro_pactado(p_empresa, order_id) is not null);$b$;
   v_c    constant text := $c$             bool_or(grupo = 'Super') as es_super,$c$;
-  v_d    constant text := $d$             -- v19.51: "Retira" cierra su tanda igual que un super: cada cliente que
+  v_d    constant text := $d$             -- v19.52: "Retira" cierra su tanda igual que un super: cada cliente que
              -- retira tiene su propia tanda, no se mezcla con el reparto ni con otro que retira.
              bool_or(grupo in ('Super', 'Retira')) as es_super,$d$;
 begin
@@ -126,9 +126,9 @@ declare
   v_src text := pg_get_functiondef('public.gv_ppp_web_armar_pendientes(text,date,jsonb,jsonb)'::regprocedure);
   v_new text;
   v_anchor constant text := '  -- (b) zonas automaticas en cascada';
-  v_a4 constant text := $a4$  -- (a4) v19.51 (Luis, 2026-09-17) — RETIRA CON DIA ELEGIDO POR EL CLIENTE.
+  v_a4 constant text := $a4$  -- (a4) v19.52 (Luis, 2026-09-17) — RETIRA CON DIA ELEGIDO POR EL CLIENTE.
   --   La pagina le pide el dia (minimo +3 habiles, lun-vie) y la franja al marcar "Retira", y
-  --   desde la v19.51 ese dato viaja con el pedido: LK -> lk_pedidos_match.retiro_fecha por el
+  --   desde la v19.52 ese dato viaja con el pedido: LK -> lk_pedidos_match.retiro_fecha por el
   --   FDW cada 15 min, lo lee gv_web_retiro_pactado. Hasta hoy NINGUN pase podia tocar un
   --   Retira, porque todos exigen zona ~ '^Zona N' y la zona de un Retira es "Retira": quedaba
   --   siempre en A Programar aunque el cliente ya se hubiera comprometido con un dia.

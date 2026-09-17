@@ -775,13 +775,13 @@ decisión legítima del supervisor, y el contenido es el mismo (no hay que volve
 **Chequeo:** `select * from public.gv_ppp_tanda_dos_dias;` — vacía = todo bien.
 `sql/gv_ppp_isis_programar_reusar_v1892.sql`, §3.ig.
 
-## ⚠ Regla de Luis (2026-09-17, v19.51): RETIRA con día elegido se programa SOLO y PISA EL CUPO
+## ⚠ Regla de Luis (2026-09-17, v19.52): RETIRA con día elegido se programa SOLO y PISA EL CUPO
 
 *"Necesito que viaje el dato y llegue a la PPP para que se pueda programar automaticamente"* · y
 sobre el cupo: ***"si, igual que super con turno (que tambien tiene que viajar en el pedido)"***.
 
 Las dos páginas le piden el **día** (mínimo +3 días hábiles, lun-vie) y la **franja** a quien marca
-"Retira". Desde la v19.51 ese dato **viaja con el pedido**: LK → `lk_pedidos_match.retiro_fecha` /
+"Retira". Desde la v19.52 ese dato **viaja con el pedido**: LK → `lk_pedidos_match.retiro_fecha` /
 `retiro_franja` por el FDW (cron cada 15 min), y lo lee `gv_web_retiro_pactado`. El pase **(a4)** de
 `gv_ppp_web_armar_pendientes` lo programa ese día, con `p_forzar_cods` → **pisa el cupo**. Cada
 Retira va en **su propia tanda** (no se mezcla con reparto ni con otro que retira).
@@ -800,7 +800,7 @@ pases lo exigen, y por eso durante dos semanas ningún Retira se programó solo 
 hubiera elegido el día. Es el mismo tipo de agujero que `'super|retira|expo'` (regla del súper).
 
 **Chequeo:** `select empresa, order_id, retiro_fecha, retiro_franja from public.lk_pedidos_match
-where retiro_fecha is not null;` · `sql/gv_retira_dia_elegido_v1951.sql`, §3.gt.
+where retiro_fecha is not null;` · `sql/gv_retira_dia_elegido_v1952.sql`, §3.ja.
 
 ## ⚠ Regla de Luis (2026-09-17, v19.44): la REPOSICIÓN CHICA no cae en cuarentena
 

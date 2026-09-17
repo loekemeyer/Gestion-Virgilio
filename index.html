@@ -9579,7 +9579,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v19.51";
+const APP_VERSION = "v19.52";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -44260,7 +44260,7 @@ function aprPorQueHtml(lista) {
 
    DE DÓNDE SALE EL DÍA Y LA FRANJA. Dos fuentes, y la manual pisa a la del cliente:
      · el cliente, al retirar, los elige en el checkout de la página → `orders.sheets_payload`
-       (`retiro_fecha` / `retiro_franja`). ⚠ v19.51 (Luis, 17/09): eso ya NO se lee por HTTP
+       (`retiro_fecha` / `retiro_franja`). ⚠ v19.52 (Luis, 17/09): eso ya NO se lee por HTTP
        contra la REST de LK (`gv_pedidos_web_retiro`, que además sólo tenía LK). Ahora viaja con
        el pedido — LK lo empuja por el FDW a `lk_pedidos_match.retiro_fecha` / `retiro_franja`,
        cron cada 15 min — y se lee de ahí, que es la MISMA fila que mira el armado automático
@@ -44293,7 +44293,7 @@ function aprHorNeed(force) {
   if (!_aprHorBusy && (force || !_aprHorTs || (Date.now() - _aprHorTs) >= APR_HORARIO_TTL_MS)) {
     _aprHorBusy = true; _aprHorTs = Date.now();
     const manual = aprGet("GV_Pedido_Horario?select=empresa,clave,fecha,franja,origen&limit=2000").catch(function () { return []; });
-    // el día/franja que eligió el cliente al retirar. v19.51: sale de `lk_pedidos_match`, la
+    // el día/franja que eligió el cliente al retirar. v19.52: sale de `lk_pedidos_match`, la
     // tabla de acá que LK refresca por el FDW — misma fila que usa el armado. Si falla, sólo se
     // pierden ésos; los cargados a mano son los que de verdad usa el que programa.
     const delCliente = aprGet("lk_pedidos_match?select=empresa,order_id,retiro_fecha,retiro_franja" +
