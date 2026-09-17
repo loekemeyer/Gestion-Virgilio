@@ -21499,3 +21499,69 @@ parada — eso se hace con `gv_ppp_tanda_mover` (o desde la app). Qué hay parad
 `security_invoker` y ahora joinea `GV_PPP_Armados_Espera`, así que la tabla tiene SELECT para
 `anon`, `authenticated` **y los roles del FDW** `lk_ppp_reader` / `ch_ppp_reader` — sin eso, el
 `sincronizar_ppp()` de LK se cae con *permission denied*.
+
+### §3.gm — v19.30: un barrio sin sector volvía a la regla vieja de 7 zonas — 2026-09-17
+
+**Pedido de Thomas:** *"en la PPP hay siete zonas, pero estoy seguro que ya las habíamos
+separado más, porque por ejemplo Liniers y Núñez comparten una zona y eso estaría mal."*
+
+**Lo que estaba bien:** los 14 sectores de la v13.07 están cargados y **activos**
+(`PPP_Web_Config.sectores_activos = 1`). Núñez es sector **H** y Liniers sector **C**, C-H no
+son vecinos, y `gv_ppp_web_compat` ya devolvía `false` para ese par. Las 7 zonas que se ven en
+la PPP son la etiqueta vieja (`Zonas_Barrios`, 145 filas), que se sigue usando para el **camión**
+y para la pantalla; los 14 sectores son de backend y no se muestran.
+
+**Lo que estaba mal — el agujero:** `gv_ppp_web_sector` devolvía `'~' || gv_ppp_web_grupo_zona(zona)`
+cuando el barrio **no está** en `GV_Barrios_Sector`, y `gv_ppp_web_compat` comparaba ese **grupo**.
+El grupo `'Zonas 2+3'` mete CABA Centro y CABA Oeste en la misma bolsa: o sea que un barrio sin
+sector **volvía a la regla vieja de 7 zonas**, justo lo que los sectores vinieron a impedir.
+Eran **35 de 145** barrios sin fila en `GV_Barrios_Sector` (que tenía 109).
+
+Medido el 17/09 **antes** del cambio:
+
+| par | sectores | ¿juntos? |
+|---|---|---|
+| Núñez + Floresta | H / `~Zonas 2+3` | **true** ← el caso de Thomas |
+| Núñez + Monte Castro | H / `~Zonas 2+3` | **true** |
+| Saavedra + Liniers | `~Zonas 2+3` / C | **true** |
+| Saavedra + Mataderos | `~Zonas 2+3` / C | **true** |
+| Villa Maipú + Del Viso | `~Zonas 6+7` / `~Zonas 6+7` | **true** (50 km) |
+
+En la programación viva **todavía no había mordido**: los únicos sin sector programados en los
+últimos 60 días son *Retira* (11 NP) y dos súper, que van solos igual. Era una mina, no un
+incendio.
+
+**Qué se hizo** (`sql/gv_ppp_barrios_sector_v1930.sql`):
+
+1. **30 barrios cargados** en `GV_Barrios_Sector` (109 → 139). Los 5 que quedan afuera son
+   Retira, Expo y Súper: no tienen zona numérica, así que `gv_ppp_web_sector` ni los mira.
+   Monte Castro fue a **C** y Villa Santa Rita a **D** a propósito: en E (que es donde caen
+   por barrio lindero) el par vecino **E-H** los habría dejado ir con Núñez, que es
+   exactamente lo que se estaba arreglando. Desde C y D siguen llegando a Devoto/V. Gral.
+   Mitre por los pares C-E y D-E, así que no se pierde nada.
+2. **El fallback ya no usa el grupo**: un barrio sin sector se compara por la **zona exacta**.
+   Sin esto, el primer barrio nuevo que entre reabre el agujero.
+3. **Centinela `gv_ppp_barrios_sin_sector`** — vacía = todo bien.
+
+**Medido después:** Núñez + Liniers/Floresta/Monte Castro/Villa Lugano = `false`;
+Saavedra + Núñez, Monte Castro + Liniers, Monte Castro + Devoto, Villa Santa Rita + Flores,
+Wilde + Avellaneda, Grand Bourg + San Miguel = `true`. Corrido además el armador de verdad
+(`gv_ppp_web_armar_simular` con 6 filas sintéticas): Núñez + Saavedra juntos, San Telmo solo.
+Centinelas: `gv_ppp_barrios_sin_sector` 0, `gv_ppp_super_mezclado` 0, `gv_ppp_tanda_dos_dias` 0,
+`gv_endpoints_rotos` 0. `gv_ppp_tanda_camion_mezclado` sigue en **1** (D69F, Balvanera +
+Ciudadela) — es la tanda de ISIS que ya estaba en rojo antes de este cambio.
+
+**Backups:** `zz_backups."GV_Backup_BarriosSector_20260917"` (la tabla entera, 109 filas) y
+`zz_backups."GV_Backup_FnSectorCompat_20260917"` (el `CREATE` de las dos funciones como estaban).
+
+**Rollback:** `delete from public."GV_Barrios_Sector" where nota like 'v19.30:%';` y re-ejecutar
+los dos `def` del backup de funciones.
+
+**Impacto sobre Producción:** ninguno. `GV_Barrios_Sector`, `gv_ppp_web_sector`,
+`gv_ppp_web_compat` y la vista nueva son de Gestión; `produccion-virgilio` no nombra ninguno.
+
+⚠ **Lo que queda a la vista y NO se tocó:** el par vecino **E-H** (*"V. del Parque/Devoto –
+V. Pueyrredón/V. Urquiza"*) deja pasar **Devoto con Núñez**, que son ~9 km. Es un par que cargó
+el dueño en `GV_Sectores_Vecinos` y se saca con una fila en `GV_Barrios_Pares`
+(`('devoto','nuñez', false)`), pero es decisión suya. Lo mismo **F-H** (Recoleta/Retiro con
+Belgrano), que hoy produce la tanda E12C (Boedo + Villa Urquiza).
