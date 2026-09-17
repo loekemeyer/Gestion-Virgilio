@@ -197,6 +197,48 @@ Dos bordes que la regla no resuelve sola y hay que respetar:
 - **Contra una tanda de ISIS no se acumula** (v14.12): ahí va tanda nueva, mismo día, mismo camión.
 - Un pedido que cruza el tope de 1,00 abre **tanda nueva el mismo día**, no un día nuevo.
 
+### 4.2 · Ventana de 9 días y ANCLA al día 10 (Luis, 17/09/2026)
+
+> *"llega un pedido, el sistema debería ver si en los próximos 9 días hay algo que vaya para esa
+> zona … si la respuesta es sí, genial, se agrega. Si la respuesta es no, se lo programa para el
+> 10.º día y pasa a ser un "ancla" (se agregan pedidos para esa zona, ese día)."*
+>
+> *"llega un pedido de 0,6 m³ a Lanús. Los próximos 9 días no tenemos programada ninguna entrega
+> para esa zona por lo que se programa para el 10.º día desde que llegó. Llegado ese día, no se le
+> agregó ningún pedido, listo, se arma y se entrega así."*
+
+**El ancla sale el día 10 como esté.** Aunque junte 0,6 m³. El piso de 1,4 **no la retiene** — el
+día 10 es un compromiso con el cliente, no una meta de carga. Por eso las dos reglas conviven sin
+pisarse, y hay que leerlas juntas:
+
+| regla | para qué sirve |
+|---|---|
+| **día 10 (ancla)** | **techo de espera.** Nadie espera más de 10 días, pase lo que pase |
+| **piso de 1,4 m³** (§4.1) | **permiso para adelantar.** Un día se abre ANTES del 10 sólo si junta 1,4 |
+
+**Cuánto se dispara, medido sobre 90 días reales** (huecos entre días con salida de la misma banda):
+
+| banda | días c/ salida | hueco prom | hueco máx | huecos > 9 = **anclas** |
+|---|---:|---:|---:|---:|
+| 1 Sur | 54 | 1,7 | 6 | **0** |
+| 4 Centro | 32 | 2,9 | 8 | **0** |
+| 2 Oeste | 28 | 3,3 | 10 | **1** |
+| 3 Norte | 33 | 2,8 | 11 | **1** |
+| 5 GBA Sur | 19 | 4,2 | 11 | **2** |
+
+**4 anclas en 3 meses.** La ventana de 9 días cubre el 97 %: casi siempre hay dónde pegar.
+
+⚠ **Y por eso el riesgo es el OPUESTO al que parece.** El ancla casi nunca se dispara; si *"encaja"*
+significa sólo *"hay un día de esa zona"*, el pedido **siempre** encuentra día y el camión sale tan
+flaco como hoy — el modelo no cambiaría nada. **Los 9 días evitan que alguien espere; lo que llena
+el camión es el piso de 1,4.** No confundir los roles.
+
+Ventajas del modelo, que conviene no perder al implementarlo:
+- **Nada se mueve.** El pedido se pega a un día que ya existe o crea uno. Al no reprogramar nunca,
+  no se puede romper una tanda ni partirla en dos días (v18.92). **Reemplaza a R5**, que sí movía.
+- **Da fecha comprometida desde que entra el pedido** — hoy no se le puede decir al cliente cuándo
+  llega; con el ancla sí.
+
 ---
 
 ## 5. Qué hay construido en la base
@@ -277,13 +319,24 @@ tenga día propio** y se reparta por cercanía. Sale sola sólo si acumuló ≥1
 
 ### 8.2 · Definiciones pedidas a Luis (17/09, sin respuesta todavía)
 
-1. El piso de 1,4 m³, ¿es del **camión/día**? (así está interpretado en §4.1)
-2. Si Centro / GBA Sur no llega a 1,4: ¿cuántos días hábiles espera antes de salir igual?
-3. ¿Centro sin día propio (relleno) o sale sí o sí una vez por semana aunque vaya flaco?
-4. ¿Cuánto puede pasarse una tanda de 1,00 m³ cuando el pedido que entra la cruza?
-5. La permeabilidad de 3,5 km: ¿contra **alguna parada del día** o contra el centro de la banda?
-6. Acumular contra tanda de **ISIS**: ¿respeta v14.12 o se levanta para este caso?
-7. `dias_anticipacion_min` = 4: ¿se puede saltear para meter un agregado en un día ya programado?
+**Cerradas por él ese mismo día** (ya están arriba, no volver a preguntarlas): el piso de 1,4 es
+del camión/día; *"cuántos días espera una banda que no llega"* → **10, y sale como esté** (§4.2);
+*"¿Centro tiene día propio?"* → la pregunta se disolvió: con el ancla, ninguna banda necesita día
+garantizado.
+
+Lo que queda:
+
+1. **9 días corridos o hábiles.** Los huecos medidos en §4.2 son **corridos**; 9 hábiles son ~13.
+2. **Qué significa "encaja"** — ¿alcanza con que haya un día de esa zona, o el camión además tiene
+   que tener m³ y horas libres? Y el **piso de anticipación**: si el día de esa zona es mañana,
+   ¿se mete igual? (`dias_anticipacion_min` = 4 días hábiles lo prohíbe; el día 10 no choca).
+3. **Ancla llena**: si le entran 7 m³, ¿sale un segundo camión ese día o el excedente abre un ancla
+   nueva?
+4. **Cuánto puede pasarse** una tanda de 1,00 m³ cuando el pedido que entra la cruza.
+5. **Dos anclas de la misma zona dentro de la ventana**: ¿gana la más próxima en fecha o la más
+   cercana geográficamente?
+6. La permeabilidad de 3,5 km: ¿contra **alguna parada del día** o contra el centro de la banda?
+7. Acumular contra tanda de **ISIS**: ¿respeta v14.12 o se levanta para este caso?
 8. GBA Sur: ¿tampoco levanta C04/C08 aunque queden a 2 km? (hoy bloqueado duro)
 
 ### 8.3 · Contradicciones estructurales abiertas
@@ -295,8 +348,8 @@ tenga día propio** y se reparta por cercanía. Sale sola sólo si acumuló ≥1
 
 ### 8.4 · Pendiente de construcción
 
-- **R5**: mover un pedido hasta 3 días hábiles al día en que ya pasa un camión cerca. Medido:
-  4 de los 5 viajes flacos que quedan tendrían dónde engancharse.
+- ~~**R5**~~ (mover un pedido hasta 3 días hábiles al día en que ya pasa un camión cerca):
+  **reemplazada por la ventana de 9 días + ancla** (§4.2), que consigue lo mismo sin mover nada.
 - Enchufar `gv_ppp_web_agrupar_geo` dentro de `ppp_web_armar_tandas` y prender
   `geo_armado_activo` por zona, mirando los centinelas
   (`gv_ppp_tanda_camion_mezclado`, `gv_ppp_super_mezclado`, `gv_ppp_tanda_dos_dias`).
