@@ -522,7 +522,9 @@ begin
 
   -- las NP de la tanda, con la etiqueta con la que las nombra el árbol
   create temp table if not exists _tm_nps (np text primary key, web boolean, zona text) on commit drop;
-  delete from _tm_nps;
+  delete from _tm_nps where true;   -- v19.45: WHERE obligatorio — el rol authenticator precarga safeupdate,
+                                    -- que rechaza todo DELETE sin WHERE (incluso sobre tabla temporal).
+                                    -- Sin esto, mover una tanda de día tiraba "DELETE requires a WHERE clause".
   insert into _tm_nps (np, web, zona)
   select x.np, bool_or(x.web), min(x.zona) from (
     select upper(btrim(public.gv_ppp_web_np_label(w.empresa, w.np, w.np_idx))) np, true web, coalesce(w.zona,'') zona
