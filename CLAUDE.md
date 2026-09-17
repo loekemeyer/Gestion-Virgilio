@@ -1562,3 +1562,47 @@ select n.nspname, c.relname
    and has_table_privilege('anon', c.oid, 'SELECT')
    and n.nspname not in ('pg_catalog','information_schema','pg_toast');
 ```
+
+## ⚠⚠ `trg_normalizar_empresa_stock()` LA TOCAN VARIAS SESIONES — traer la viva antes de tocarla
+
+**Problema 390, 17/09.** Dos sesiones de Claude editaron esa función el mismo día. La segunda
+hizo `CREATE OR REPLACE` **partiendo de una copia anterior** a la regla de la v19.26, y la borró
+sin que nada avisara. Costó **4 tandas con el picking duplicado** (D72A 228 filas, E11B 24, D72C
+y 98648|CP 2 cada una), con **+287 cajas fantasma en Pickeados y −265 en góndola**.
+
+**Por qué el índice único no lo frenó:** `mov_stock_pipeline_dedup` incluye
+`COALESCE(empresa,'')`. Con la regla vieja (por NP) **D72A se etiquetó CH** —se factura por Chef,
+NP 44609— mientras el picking original del 14/09 estaba en **LK**, porque sus 38 artículos son de
+Loekemeyer. Distinta empresa = distinta fila para el `ON CONFLICT` = duplicado.
+
+**Antes de hacerle un `CREATE OR REPLACE` a esa función** (o a cualquiera del stock):
+
+```sql
+-- 1. traer la definicion VIVA y agregarle el cambio ENCIMA. Nunca partir de una copia propia.
+select pg_get_functiondef('public.trg_normalizar_empresa_stock()'::regprocedure);
+-- 2. despues, probar con un INSERT de verdad (leer la funcion no alcanza):
+insert into public."Movimientos_Stock" (cod_art, deposito, delta, tipo, ref, legajo, empresa)
+values ('501','separar_pedidos',0,'ajuste','__PRUEBA__','t','CH');   -- tiene que quedar LK
+delete from public."Movimientos_Stock" where ref = '__PRUEBA__';
+-- 3. y el centinela, que tiene que dar TRUE:
+select p.prosrc ~ 'gv_empresa_de_articulo' as tiene_la_regla_del_articulo
+  from pg_proc p join pg_trigger t on t.tgfoid = p.oid where t.tgname = 'zz_normalizar_empresa';
+```
+
+**Las tres reglas que tienen que convivir en esa función, y ninguna puede pisar a la otra:**
+
+| regla | qué hace |
+|---|---|
+| **v19.42** (problema 378) | un NPD sin picking en esa tanda → `RETURN NULL` (si no, deja Pickeados en negativo) |
+| **v19.26** (Luis, 16/09) | código **NO dual** → manda el **ARTÍCULO**, no el pedido. Va **antes** de la herencia por tanda |
+| **v18.99** | en un dual, la NP puede venir de los **dos lados** del pipe, con guard de largo 4-6 |
+
+**Chequeo de que no volvió a pasar:** `select * from public.gv_stock_empresa_fantasma;` vacía, y
+esta consulta en 0 — caza el duplicado que el índice único no ve, porque compara **sin** la empresa:
+
+```sql
+select count(*) from (
+  select 1 from public."Movimientos_Stock" where tipo in ('picking','separado','facturado')
+   group by upper(btrim(ref)), upper(btrim(cod_art)), deposito, tipo
+  having count(*) > 1 and count(distinct coalesce(empresa,'')) > 1) z;
+```

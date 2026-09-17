@@ -1,0 +1,121 @@
+-- ════════════════════════════════════════════════════════════════════════════════════
+-- v19.47 (2026-09-17) — SE PERDIO LA REGLA DEL ARTICULO Y DUPLICO 4 TANDAS (problema 390)
+-- ════════════════════════════════════════════════════════════════════════════════════
+-- Luis vio la tanda **D72A** dos veces en la pantalla de movimientos: pickeada el 14/09 y
+-- otra vez "hoy 17/09 14:00". Nadie la toco: el ultimo evento de operario es del 15/09.
+--
+-- ── Que paso ────────────────────────────────────────────────────────────────────────
+-- Otra sesion de Claude reemplazo `trg_normalizar_empresa_stock()` el 17/09 para arreglar
+-- el problema 378 (un NPD sin picking dejaba 323E en -1), **partiendo de una copia ANTERIOR
+-- a la v19.26**. Al hacerlo borro la regla que Luis pidio el 16/09:
+--
+--   > *"para todos los que no son duales, necesito que siempre viajen con la empresa
+--   > correspondiente (que es el dato que aparece ahi en la columna LK/CH)"*
+--   > → en un codigo NO dual manda el **ARTICULO**, no el pedido.
+--
+-- La funcion volvio a etiquetar por la NP. Y **D72A es el caso que lo hace explotar**:
+-- se factura por **Chef** (NP 44609) pero lleva articulos de **Loekemeyer** — los 38
+-- codigos del picking (031, 066, 501, 504, 520, 523, 931E…) resuelven **LK**.
+--
+--   · picking del 14/09, con la regla del articulo  → **LK**  ✅
+--   · reinsercion de hoy, con la regla vieja por NP → **CH**  ❌
+--
+-- Y como el indice `mov_stock_pipeline_dedup` incluye `COALESCE(empresa,'')`, las dos filas
+-- **no son la misma para el ON CONFLICT**: el reconciliador duplico el picking entero.
+--
+-- | tanda | filas de mas | codigos | empresas |
+-- |---|---|---|---|
+-- | **D72A** | **228** | 38 | CH + LK |
+-- | E11B | 24 | 4 | CH + LK |
+-- | D72C | 2 | 1 | LK + Mixto |
+-- | 98648\|CP | 2 | 1 | LK + Mixto |
+--
+-- Stock fantasma: **+287 cajas en Pickeados y -265 en gondola** (D72A), +50/-50 (E11B).
+--
+-- ── Como se diagnostico (no leyendo el codigo) ──────────────────────────────────────
+--   insert ... cod_art='501', empresa='CH'  → quedo **CH**
+--   select gv_empresa_de_articulo('501')    → **LK**
+-- Un `insert` de prueba en la tabla real, borrado en el mismo batch. Leer la funcion no
+-- alcanzaba: el `pg_get_functiondef` que uno tiene en la cabeza puede ser de otra version.
+--
+--   select (prosrc ~ 'gv_empresa_de_articulo') from pg_proc p join pg_trigger t
+--     on t.tgfoid = p.oid where t.tgname = 'zz_normalizar_empresa';   -- dio FALSE
+--
+-- ── El arreglo: FUSION, no reemplazo ────────────────────────────────────────────────
+-- Se conservan las dos cosas. Orden nuevo de la funcion:
+--   1. insumos → return
+--   2. sufijos (`438E CH`, `505L`) y `v_dual`
+--   3. **v19.42 — NPD sin picking → RETURN NULL** (lo de la otra sesion, intacto)
+--   4. **v19.26 — codigo NO dual: manda el articulo → RETURN NEW** (repuesto)
+--   5. v18.30 — herencia por tanda (ahora solo alcanza a los duales)
+--   6. dual: la NP, con el guard de largo 4-6 y leyendo los DOS lados del pipe (v18.99,
+--      tambien repuesto: sin el, un ref `44619|CP` caia en Mixto)
+--
+-- ⚠ El punto 4 va **antes** del 5 a proposito: si el picking quedo mal etiquetado, heredarlo
+-- propaga el error. Para un codigo no dual el articulo manda siempre.
+--
+-- ── Las 6 pruebas que se corrieron contra la tabla real ─────────────────────────────
+-- | fila | esperado | quedo |
+-- |---|---|---|
+-- | 501 con empresa CH (articulo LK en pedido de Chef) | LK | **LK** |
+-- | 520 idem | LK | **LK** |
+-- | 031 idem | LK | **LK** (es de Loeke; el supuesto de que era de Chef estaba mal) |
+-- | 809E sin empresa, ref `D72A\|44609` | CH (dual → manda la NP) | **CH** |
+-- | 438EL sin empresa | LK (sufijo L) | **LK** |
+-- | insumo `PP 2630` | sin empresa | **null** |
+--
+-- ── Limpieza ────────────────────────────────────────────────────────────────────────
+-- Se borraron las **128 filas** duplicadas (las que tenian un gemelo mas viejo con la misma
+-- ref+codigo+deposito+tipo). El criterio del gemelo protegio el trabajo legitimo del dia:
+-- las tandas E32A y E33A, pickeadas esta tarde, no se tocaron.
+-- Respaldo: zz_backups."GV_Backup_Duplicados_reconciliador_20260917".
+--
+-- ── Y un ultimo codigo que seguia duplicando: 838E ──────────────────────────────────
+-- Despues de arreglar el trigger, una corrida de prueba duplico 12 filas mas, todas del
+-- **838E** en 4 tandas viejas (D25G, D33A, D53A, D58A), todas con delta 0. Causa: la
+-- **gondola Ñ55 lo tenia como CH** mientras que sus **38 movimientos son todos LK**, esta
+-- **solo en la lista de precios de LK** y **no tiene stock** (saldo 0 en los 5 depositos).
+-- O sea: el lugar estaba mal, igual que la gondola P39 con el 396 (Luis, 16/09: *"no es un
+-- dual mal asignado, es LK. la gondola esta mal asignada, ajustala"*). Se aplico el mismo
+-- criterio: **Ñ55 paso a LK** (es el unico articulo de ese sector, asi que no afecta a
+-- nadie mas). Respaldo: zz_backups."GV_Backup_Lugar_N55_20260917".
+--
+-- **Era el unico codigo del sistema con esa contradiccion**, medido:
+--
+--   select count(*) from (
+--     select regexp_replace(upper(btrim(m.cod_art)),'^0+(?=.)','') cc,
+--            public.gv_empresa_de_articulo(m.cod_art) art,
+--            case when count(distinct m.empresa)=1 then max(m.empresa) end hist
+--       from public."Movimientos_Stock" m
+--      where m.empresa in ('LK','CH') and m.deposito <> 'insumos'
+--        and not exists (select 1 from public.codigos_duales d
+--                         where regexp_replace(upper(btrim(d.cod)),'^0+(?=.)','')
+--                             = regexp_replace(upper(btrim(m.cod_art)),'^0+(?=.)',''))
+--      group by 1,2) z
+--    where art is not null and hist is not null and art <> hist;
+--   -- 1 antes (838E), 0 despues
+--
+-- ── Verificacion final ──────────────────────────────────────────────────────────────
+-- Con los crons apagados se corrieron los reconciliadores **dos veces seguidas**:
+-- **0 filas nuevas, 0 duplicados, 0 gemelos escondidos.** Recien ahi se volvieron a prender
+-- los crons 68, 74 y 81.
+--
+-- ── LA LECCION, que es la que importa ───────────────────────────────────────────────
+-- **`trg_normalizar_empresa_stock()` la tocan varias sesiones a la vez.** Antes de hacerle
+-- un `CREATE OR REPLACE`, traer la definicion VIVA con `pg_get_functiondef` y agregarle el
+-- cambio encima — nunca partir de una copia que uno tenga a mano, por reciente que parezca.
+-- Y despues probar con un `insert` real, no leyendo el resultado.
+--
+-- Chequeo que lo caza en un segundo (tiene que dar TRUE):
+--   select p.prosrc ~ 'gv_empresa_de_articulo' AS tiene_la_regla_del_articulo
+--     from pg_proc p join pg_trigger t on t.tgfoid = p.oid
+--    where t.tgname = 'zz_normalizar_empresa';
+--
+-- ── Rollback ────────────────────────────────────────────────────────────────────────
+--   -- la definicion anterior (v19.42) quedo guardada entera:
+--   select def from zz_backups."GV_Backup_TrgEmpresa_defs_20260917";
+--   insert into public."Movimientos_Stock"
+--     select (b).* from zz_backups."GV_Backup_Duplicados_reconciliador_20260917" b;
+--   update public."GV_Lugar" l set empresa = b.empresa, notas = b.notas
+--     from zz_backups."GV_Backup_Lugar_N55_20260917" b where b.sector = l.sector;
+-- ════════════════════════════════════════════════════════════════════════════════════

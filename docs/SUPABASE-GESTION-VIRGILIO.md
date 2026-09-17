@@ -22312,3 +22312,46 @@ operación destructiva es la única pregunta que cuenta.
 
 **SQL:** `sql/detectar_faltantes_llegaron.sql` (CREATE completo, no un parche).
 **Rollback:** `sql/backups/detectar_faltantes_llegaron_pre_v1945.sql`. Problema **382**.
+
+### v19.47 (17/09) — se perdió la regla del artículo y duplicó 4 tandas (problema 390)
+
+Luis vio **D72A** dos veces en la pantalla de movimientos: pickeada el 14/09 y otra vez "hoy
+17/09 14:00". Nadie la tocó — el último evento de operario es del 15/09. Detalle, pruebas y
+rollback en `sql/gv_empresa_articulo_repuesta_v1947.sql`.
+
+**Causa:** otra sesión reemplazó `trg_normalizar_empresa_stock()` para arreglar el problema 378,
+**partiendo de una copia anterior a la v19.26**, y borró la regla *"en un código NO dual manda el
+ARTÍCULO, no el pedido"*. Y **D72A es el caso que lo hace explotar**: se factura por **Chef** (NP
+44609) pero lleva artículos de **Loekemeyer** (los 38 códigos resuelven LK). Picking del 14/09 →
+LK; reinserción de hoy → CH. Como `mov_stock_pipeline_dedup` incluye `COALESCE(empresa,'')`, las
+dos filas no son la misma para el `ON CONFLICT` y se duplicó el picking entero.
+
+| tanda | filas de más | códigos | empresas |
+|---|---|---|---|
+| **D72A** | **228** | 38 | CH + LK |
+| E11B | 24 | 4 | CH + LK |
+| D72C · 98648\|CP | 2 + 2 | 1 + 1 | LK + Mixto |
+
+Stock fantasma: +287 cajas en Pickeados y −265 en góndola.
+
+**Diagnóstico, con un insert real** (leer la función no alcanzaba): `insert cod_art='501',
+empresa='CH'` → quedó **CH**, mientras `gv_empresa_de_articulo('501')` = **LK**.
+
+**El arreglo es una FUSIÓN, no un reemplazo**: se conservan el fix del 378 (NPD sin picking →
+`RETURN NULL`), la regla del artículo repuesta **antes** de la herencia por tanda, y el guard de
+la NP de la v18.99. Verificado con 6 inserts reales contra la tabla.
+
+**Limpieza:** 128 filas borradas (sólo las que tenían gemelo más viejo con la misma
+ref+código+depósito+tipo; E32A y E33A, pickeadas esa tarde, no se tocaron).
+
+**Y un último código que seguía duplicando: 838E.** La góndola **Ñ55** lo tenía como CH mientras
+sus **38 movimientos son todos LK**, está **sólo en la lista de precios de LK** y **no tiene
+stock**. Mismo caso que el 396 en P39 → **Ñ55 pasó a LK** (es el único artículo de ese sector).
+**Era el único código del sistema con esa contradicción**: la consulta que lo mide daba 1 antes y
+**0** después.
+
+**Verificación:** con los crons apagados se corrieron los reconciliadores **dos veces seguidas**
+→ 0 filas nuevas, 0 duplicados. Recién ahí se prendieron los crons 68, 74 y 81.
+
+Respaldos: `GV_Backup_TrgEmpresa_defs_20260917` (la definición anterior entera),
+`GV_Backup_Duplicados_reconciliador_20260917`, `GV_Backup_Lugar_N55_20260917`.
