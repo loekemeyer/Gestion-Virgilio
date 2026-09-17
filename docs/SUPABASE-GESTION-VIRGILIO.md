@@ -22795,3 +22795,54 @@ select count(*) from public.gv_endpoints_rotos;   -- 0
   app y hoy nadie la bloquea, pero sigue siendo 1,25 s por carga de pantalla.
 
 Problema **384**.
+
+### §3.jb — v19.54: barrido retroactivo de cancelados ya facturados — 2026-09-17
+
+Regla del dueño (Luis): *"asumí que cualquier pedido que se marca o se marcó como cancelado y que
+estaba facturado tiene NC y el stock tiene que volver a «A guardar», y ninguno de esos movimientos
+se tienen que duplicar"*. La v19.51 lo dejó resuelto para adelante; esto es el barrido hacia atrás
+más el centinela. `sql/gv_cancelados_sin_devolver_v1954.sql`.
+
+**27 NP canceladas, una sola quedaba pendiente.** Se cruzaron las cuatro puertas que existen
+(`NP_Canceladas`, `GV_Desarmes` con `vuelve = false`, `GV_Web_Cancelados`,
+`GV_PPP_Web_NP_Cancelada`) contra los drenajes de `facturado` a nombre de cada NP (`TANDA|NP` o
+`NP|CP`):
+
+| NP | tanda | cajas | estado |
+|---|---|---|---|
+| 98507 | D53C | 3 | ya repuestas (v19.50) |
+| **98050** | **C98F** | **3** | **pendiente** ← la única |
+
+Las demás no tenían nada que devolver, y el motivo está a la vista: 98582 / 98502 / 98450 son
+*"tildada como facturada pero NO se facturó … nunca salió: 0 cajas armadas, faltó todo"* (limpieza
+de atrasados); 98049 se había resuelto a mano el 05/08 con un ajuste de 18 cajas a góndola (nunca
+se facturó, sus cajas seguían en la pila); el resto —LK 0052, LK 0024, LK 0014, LK 0058, 98272 y
+las 12 de agosto— no tiene factura.
+
+⚠ **98615 y 98616 NO son cancelaciones.** Están en `GV_Desarmes` con **`vuelve = true`**
+(*"enviado a A Programar desde la tabla de Programación"*) y después se facturaron el 17/09.
+`gv_ppp_np_devolucion` decía que había que devolverles **55 cajas**: hacerlo habría sido inventar
+stock. Por eso tanto el barrido como el centinela filtran `not coalesce(vuelve,false)` —
+**desarmar para reprogramar no es cancelar**.
+
+**La 98050**: cancelada el 11/09 por Thomas (*"Cancelado por el cliente"*), facturada el 28/07 y
+con su drenaje `C98F|98050` nunca repuesto. Se repuso con la misma forma que escribe el desarme:
+reversa +3 en `a_facturar`, salida −3, y **3 cajas a A guardar** (360E ×2, 501 ×1). Neto en
+a_facturar: 0.
+
+**Centinela: `gv_cancelados_sin_devolver`.**
+
+```sql
+select * from public.gv_cancelados_sin_devolver;   -- vacía = todo bien
+```
+
+Compara, por NP y por código, lo que el facturado sacó contra lo ya repuesto — esa resta es lo que
+evita duplicar. **Probado rompiéndolo**: sacándole la reposición de la 98050 dentro de una
+transacción abortada, canta `2 filas: 98050/360E=2, 98050/501=1`. Una vista que da vacío no prueba
+nada por sí sola.
+
+**Lo que NO se hizo:** ponerle un trigger a `NP_Canceladas` para que la devolución salga sola desde
+cualquier puerta. Hoy la pantalla de cancelar pasa por `gv_ppp_np_desarmar`, que ya lo hace; la
+fila de la 98050 la escribió una pantalla anterior. Un trigger que mueve stock desde una tabla que
+escriben varias cosas es más fácil de romper que de arreglar, y el centinela canta el mismo día. Si
+aparece una segunda, ahí conviene el trigger.
