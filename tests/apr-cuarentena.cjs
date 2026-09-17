@@ -288,6 +288,57 @@ catch (_e) {
       return null;
     };
 
+    // (4c) v19.44 (Luis) — REPOSICIÓN CHICA. El backend ya decidió (el pedido exento no vuelve
+    // en gv_cuarentena_marcar); acá se chequea el chip y, sobre todo, LO QUE ROMPIÓ LA v19.41:
+    // que si gv_cuarentena_repo_lote falla, la marcación NO se caiga con ella.
+    llamadas.length = 0;
+    window.aprRpc = async function (fn, args) {
+      llamadas.push({ fn: fn, args: args });
+      if (fn === "gv_cuarentena_marcar")
+        return [{ order_id: "1475", empresa: "lk", motivos: ["deuda"], deuda: 3222079 }];   // el grande sigue retenido
+      if (fn === "gv_cuarentena_repo_lote")
+        return [{ empresa: "lk", order_id: "1449", exento: true, items: 1,
+                  fecha_pedido: "2026-09-15", fecha_factura: "2026-09-15", dias: 0, motivo: "reposicion" },
+                { empresa: "lk", order_id: "1475", exento: false, items: 15, motivo: "muchos_items" }];
+      return [];
+    };
+    const repoPed = mk({ order_id: 1449, empresa: "lk", cod: "1840", razon_social: "Cliente Reposición" });
+    const otroPed = mk({ order_id: 1475, empresa: "lk", cod: "1618", razon_social: "Cliente Grande" });
+    _apr.pedidos = [repoPed, otroPed]; _apr.pedidosTodos = _apr.pedidos;
+    _apr.cuarRepo = null; _apr.cuarRepoLoading = false;
+    await cuarMarcarPedidos(); await new Promise((res) => setTimeout(res, 150));
+    aprRender(); await new Promise((res) => setTimeout(res, 150));
+    const rph = document.getElementById("pppPreview").innerHTML;
+    out.repoRpc = llamadas.some(function (c) {
+      return c.fn === "gv_cuarentena_repo_lote" && (c.args.p_pedidos || []).length === 2 &&
+             c.args.p_pedidos[0].order_id === "1449" && c.args.p_pedidos[0].cod === "1840";
+    });
+    out.repoChip = /apr-chip-repo[^>]*>🔁 Reposición · 1 código · facturado el mismo día/.test(rph);
+    out.repoSoloElExento = (rph.match(/apr-chip-repo/g) || []).length === 1;
+    out.repoTitle = /No cae en Cuarentena: es una reposición chica/.test(rph);
+    out.repoOtroRetenido = /🚧 Cuarentena <b>\(1\)<\/b>/.test(rph);   // el de 15 códigos sigue adentro
+
+    // ⚠ EL TEST QUE FALTÓ EN LA v19.41: la RPC del chip EXPLOTA (como lo hacía con una NP de
+    // ISIS) y la marcación tiene que seguir viva. Si esto falla, la Cuarentena se ve en 0.
+    llamadas.length = 0;
+    window.aprRpc = async function (fn, args) {
+      llamadas.push({ fn: fn, args: args });
+      if (fn === "gv_cuarentena_repo_lote") throw new Error('22P02 invalid input syntax for type bigint: "np98587"');
+      if (fn === "gv_cuarentena_marcar")
+        return [{ order_id: "1475", empresa: "lk", motivos: ["deuda"], deuda: 3222079 },
+                { order_id: "1449", empresa: "lk", motivos: ["deuda"], deuda: 464872 }];
+      return [];
+    };
+    _apr.cuarRepo = null; _apr.cuarRepoLoading = false;
+    _apr.pedidos = [repoPed, otroPed]; _apr.pedidosTodos = _apr.pedidos;
+    await cuarMarcarPedidos(); await new Promise((res) => setTimeout(res, 200));
+    aprRender(); await new Promise((res) => setTimeout(res, 150));
+    const rpk = document.getElementById("pppPreview").innerHTML;
+    out.repoFalloSigueMarcando = /🚧 Cuarentena <b>\(2\)<\/b>/.test(rpk);   // los DOS retenidos
+    out.repoFalloSinChip = !/apr-chip-repo/.test(rpk);                        // sólo se pierde el chip
+    out.repoFalloMarco = llamadas.some(function (c) { return c.fn === "gv_cuarentena_marcar"; });
+    _apr.cuarRepo = null;
+
     // (5) aprobar NO dispara la RPC de una: primero pide el comentario
     llamadas.length = 0;
     _apr.pedidosTodos = [mk({ order_id: 900, empresa: "lk", cod: "4275", razon_social: "Zhang Qikuan",
@@ -617,6 +668,14 @@ catch (_e) {
   chk(r.libSoloLectura, "es SOLO LECTURA: sin textarea, sin '¿quién?' y sin guardar — sólo Cerrar");
   chk(r.libRpc, "pide gv_cuarentena_liberado_info con empresa y order_id");
   chk(r.libSinFila, "sin fila de liberación lo dice, no inventa");
+  chk(r.repoRpc, "v19.44: pide gv_cuarentena_repo_lote con los pedidos (empresa, order_id, cod)");
+  chk(r.repoChip, "el exento lleva el chip '🔁 Reposición · 1 código · facturado el mismo día'");
+  chk(r.repoTitle, "el chip explica en el title por qué no lo retiene la deuda");
+  chk(r.repoSoloElExento, "el pedido de 15 códigos NO lleva chip de reposición");
+  chk(r.repoOtroRetenido, "y ése sigue retenido en Cuarentena (1)");
+  chk(r.repoFalloMarco, "si la RPC del chip explota, la marcación igual se pide");
+  chk(r.repoFalloSigueMarcando, "⚠ v19.41: con la RPC del chip rota, la Cuarentena SIGUE marcando (2)");
+  chk(r.repoFalloSinChip, "…y lo único que se pierde es el chip");
   chk(r.aprModal, "aprobar abre el cuadro de comentario (no libera de una)");
   chk(r.aprSinLiberar, "aprobar NO llamó a gv_cuarentena_liberar antes de confirmar");
   chk(r.aprPideQuien, "aprobar pide quién (Vivi / Marian / Otro)");

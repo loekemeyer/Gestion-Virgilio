@@ -22103,3 +22103,84 @@ quién/cuándo/usuario/motivos, muestra el hilo, es solo lectura, llama la RPC c
 order_id, y el caso sin fila. Suite entera en verde.
 
 **Rollback:** `git revert` del commit de la v19.39 + el `drop function` del pie del `.sql`.
+
+---
+
+## §3.iy — v19.44: Cuarentena — la REPOSICIÓN CHICA no se retiene (segundo intento) — 2026-09-17
+
+**Luis:** *"si un cliente hizo un pedido, se le factura (tiene deuda) y en un plazo de 10 días
+desde la facturación entra un pedido de ese mismo cliente de 1 item (un código nada más que pide)
+debería quedar exceptuado de la cuarentena."*
+
+⚠ **El primer intento (v19.41) se revirtió en la v19.43 porque dejó la Cuarentena en 0.** Esta
+sección documenta las dos cosas: la regla y por qué la primera vez salió mal.
+
+### Lo que salió mal la primera vez
+
+1. **El cast.** El join contra `lk_pedidos_match` casteaba el `order_id` **del pedido** a bigint,
+   con un regex al lado para protegerlo:
+   `and p.order_id ~ '^[0-9]+$' and lp.order_id = (p.order_id)::bigint`.
+   Postgres **no garantiza el orden de evaluación**: hace el cast primero. "A Programar" disfraza
+   una NP de ISIS como pedido con `order_id = 'npNNNNN'` → `22P02 invalid input syntax for type
+   bigint: "np98587"` → la RPC entera devuelve 400. Es **el mismo pozo del problema 358** (v19.11),
+   que ya estaba escrito en el `CLAUDE.md`.
+2. **Dónde se llamó.** En el front, la RPC nueva se pidió **dentro del mismo `Promise.all`** que
+   `gv_cuarentena_marcar`. Al fallar una, el `await` tira y `cuarMarcarPedidos` entero cae al
+   catch: **ningún** pedido queda marcado. En pantalla, **Cuarentena (0) con 60 retenidos de
+   verdad**. Lo nuevo se llevó puesto lo que ya funcionaba.
+
+**Las dos defensas que quedaron:**
+
+- `lp.order_id::text = p.order_id` — se castea el bigint **de la tabla** a texto, conversión que
+  no puede fallar. **Nunca al revés.**
+- **`gv_cuarentena_repo_seguro(jsonb)`**, un envoltorio `plpgsql` con `exception when others` que
+  devuelve **vacío** si el evaluador explota (nadie exento = todos retenidos) y deja un `warning`.
+  `gv_cuarentena_marcar_calc` llama **sólo** a este envoltorio.
+- En el front, `cuarRepoCargar()` es una llamada **aparte**, con su propio `catch`, disparada
+  desde `aprColPedidos`. Si falla, lo único que se pierde es el chip.
+
+### La prueba de fuego (la que faltó la primera vez)
+
+Se reemplazó `gv_cuarentena_repo_lote` por una versión que hace `1/0` y se corrió
+`gv_cuarentena_marcar_calc` con el lote real más una NP de ISIS:
+
+| | retenidos |
+|---|---|
+| excepción **ROTA** | **60** ← la Cuarentena sigue viva, nadie exento |
+| excepción restaurada | **59** ← saca exactamente 1 (LK 1449) |
+
+Y contra `gv_cuarentena_repo_lote` directo, un lote hostil: `np98587`, `np44620`, `EJEMPLO`,
+`' 1449 '`, `1450-2`, `''`, sin `order_id`, `cod` null y `999999999999999999999` (no entra en
+bigint) → **0 errores**; todo lo que no es un pedido web cae en motivo `sin_datos`.
+
+### La regla
+
+Perdona **`deuda`** y nada más: suspendido, sin cta cte y cliente nuevo siguen reteniendo.
+Configurable en `gv_cuarentena_repo_motivos()` (`PPP_Web_Config.cuar_repo_motivos`, default
+`'deuda'`). ⚠ `limite_credito` **no entra**: ese motivo lo arma `gv_cuarentena_limite`, no
+`marcar_calc`. Medido: los dos casos reales no estaban retenidos por límite.
+
+| Dato | Fuente | Por qué no la otra |
+|---|---|---|
+| ítems y fecha del pedido | **`lk_pedidos_match.items_string`** | los feeds `gv_pedidos_web_np_*` viven en los proyectos de las páginas; `PPP_Web_Base` se llena recién al armar la NP |
+| última factura | **`isis_lk` / `isis_ch.documentos`** | `GV_Cuarentena_Fuente` **no tiene fecha**: su `raw` es `{cod, deuda, razon_social}` |
+| qué cliente es | `gv_cuarentena_ident` | Tierra del Fuego (§3.fp) |
+
+⚠ El plazo se cuenta contra la **fecha del pedido**, no contra hoy, y el `max(fecha)` va **topeado
+a esa fecha**: sin el tope, LK 1375 y LK 1354 daban *"-2 días"* —factura POSTERIOR al pedido— y se
+colaban con la última factura real a 44 y 38 días.
+⚠ Una NP de ISIS no se exime: `GV_PPP_Base_Pedidos` está congelada en 2026-09-04. Sin datos,
+retener.
+
+**Exentos hoy:** LK 1449 (`607Ex20`, facturado el mismo día) y CH 217 (`609x20`, 3 días). Los dos
+habían entrado a Cuarentena con motivo `deuda` y al CH 217 tuvo que liberarlo alguien a mano el
+17/09 12:07.
+
+**Rendimiento:** en bloque, un solo escaneo de facturas para todo el lote. Fila por fila son ~95 ms
+por cliente (con 100 pedidos no entra en el `statement_timeout` de 8 s). Con 160 pedidos:
+`marcar_calc` entera **200 ms**.
+
+**Front:** chip **🔁 Reposición · 1 código · facturado el mismo día** (`aprRepoChip`).
+
+**Cubierto** en `tests/apr-cuarentena.cjs` (bloque 4c), incluido el caso *"la RPC del chip explota
+y la Cuarentena sigue marcando"*. **Rollback** al pie de `sql/gv_cuarentena_repo_chica_v1944.sql`.
