@@ -775,6 +775,33 @@ decisión legítima del supervisor, y el contenido es el mismo (no hay que volve
 **Chequeo:** `select * from public.gv_ppp_tanda_dos_dias;` — vacía = todo bien.
 `sql/gv_ppp_isis_programar_reusar_v1892.sql`, §3.ig.
 
+## ⚠ Regla de Luis (2026-09-17, v19.51): RETIRA con día elegido se programa SOLO y PISA EL CUPO
+
+*"Necesito que viaje el dato y llegue a la PPP para que se pueda programar automaticamente"* · y
+sobre el cupo: ***"si, igual que super con turno (que tambien tiene que viajar en el pedido)"***.
+
+Las dos páginas le piden el **día** (mínimo +3 días hábiles, lun-vie) y la **franja** a quien marca
+"Retira". Desde la v19.51 ese dato **viaja con el pedido**: LK → `lk_pedidos_match.retiro_fecha` /
+`retiro_franja` por el FDW (cron cada 15 min), y lo lee `gv_web_retiro_pactado`. El pase **(a4)** de
+`gv_ppp_web_armar_pendientes` lo programa ese día, con `p_forzar_cods` → **pisa el cupo**. Cada
+Retira va en **su propia tanda** (no se mezcla con reparto ni con otro que retira).
+
+**Sin día elegido no se programa solo**: queda en A Programar con el badge para completarlo a mano.
+Pasa siempre con los que carga un admin por el **Cotizador** y con los **recuperados**
+(`payload_recuperado`), que no pasan por el checkout.
+
+⚠ **Un Retira puede no llamarse "Retira".** Lo que manda es `customer_delivery_addresses.zona_expreso`,
+no el nombre de la sucursal: *"Convenir en Av. Panamericana"* tiene `zona_expreso = 'Retira'` y
+`direccion_entrega = 'Virgilio 2788'` (el depósito). Antes de decir que un pedido con `retiro_fecha`
+"no es Retira", mirar la zona, no la etiqueta.
+
+⚠ **Al tocar el armado, buscar `'^\s*Zona\s*[0-9]+'` y preguntarse si ahí no falta Retira.** Los 11
+pases lo exigen, y por eso durante dos semanas ningún Retira se programó solo aunque el cliente ya
+hubiera elegido el día. Es el mismo tipo de agujero que `'super|retira|expo'` (regla del súper).
+
+**Chequeo:** `select empresa, order_id, retiro_fecha, retiro_franja from public.lk_pedidos_match
+where retiro_fecha is not null;` · `sql/gv_retira_dia_elegido_v1951.sql`, §3.gt.
+
 ## ⚠ Regla de Luis (2026-09-17, v19.44): la REPOSICIÓN CHICA no cae en cuarentena
 
 *"Si un cliente hizo un pedido, se le factura (tiene deuda) y en un plazo de 10 días desde la

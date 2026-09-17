@@ -22524,3 +22524,105 @@ tampoco lo toca a propósito: mira `tipo='facturado'`, y un desarme no es un dre
 
 No se implementó ninguno: (A) cambia un flujo que Facturación usa todos los días y (B) deja una
 factura emitida sin avisar. Mientras tanto el centinela lo canta el mismo día.
+
+### §3.gt — v19.51: RETIRA con día elegido — el dato viaja y el armado lo programa solo — 2026-09-17
+
+**Pedido de Luis.** *"Necesito que viaje el dato y llegue a la PPP para que se pueda programar
+automaticamente"*, y a la pregunta de si el día elegido pisa el cupo: ***"si, igual que super con
+turno (que tambien tiene que viajar en el pedido)"***.
+
+#### Qué había, y por qué no alcanzaba
+
+La v17.74 (14/09) construyó la mitad de arriba: las dos páginas le piden el **día** (mínimo +3
+días hábiles, lun-vie) y la **franja** a quien marca "Retira", lo guardan en
+`orders.sheets_payload` (`retiro_fecha` / `retiro_franja`), y Gestión pinta un badge editable en
+A Programar (`aprHorNeed` / `aprHorBadge`), que se puede pisar a mano (`GV_Pedido_Horario`) y que
+viaja a Programación por `gv_ppp_prog_arbol`.
+
+Pero el badge lo leía **por HTTP contra la REST de LK** (vista `gv_pedidos_web_retiro`). El
+**backend de Virgilio nunca vio el dato**, y eso tenía dos consecuencias:
+
+1. **Ningún pase del armado podía programar un Retira.** Los 11 pases de
+   `gv_ppp_web_armar_pendientes` exigen `zona ~ '^\s*Zona\s*[0-9]+'` y, adentro,
+   `ppp_web_armar_tandas` borra de `_sin_tanda` todo lo que no sea zona automática. La zona de un
+   Retira es **`Retira`**: se borraba siempre. Todo Retira quedaba en A Programar hasta que
+   alguien lo arrastraba a mano.
+2. El badge y el armado miraban fuentes distintas, así que podían decir cosas distintas.
+
+⚠ La nota que decía *"al 14/09 eso todavía NO llega, el front de la página no está deployado"*
+**ya era falsa**: al 17/09 hay 3 pedidos de LK con el dato, y la página de Chef también lo graba
+(el pedido 230 del 16/09 trae la clave). Estaba corregida en el comentario del front.
+
+#### Lo que se hizo
+
+**LK** (`sql/pedidos_match_retiro_v1951.sql` del repo `pagina-LK-copia`) — `v_pedidos_match` suma
+`retiro_fecha`, `retiro_franja` y **`hora_entrega`**; `v_pedidos_match_chef`, las dos primeras; y
+`sync_pedidos_match_virgilio()` las empuja por el FDW (cron cada 15 min). `hora_entrega` es la
+hora del turno del súper, que hasta hoy sólo viajaba embebida en `fecha_entrega_txt`
+(`"29/09/2026 14:00"`).
+
+⚠ **La fecha no se castea con `::date` crudo**: se castea sólo lo que matchea
+`^\d{4}-\d{2}-\d{2}$`, lo demás devuelve NULL. Es el pozo del problema 357 (v19.11), donde un
+`"29/09/2026 14:00"` en un feed tiró `22008` y dejó al cron sin leer ninguna NP de LK por dos horas.
+
+**Virgilio** (`sql/gv_retira_dia_elegido_v1951.sql`) — 3 columnas nuevas en `lk_pedidos_match`
+(⚠ sus GRANT son **por columna**: una columna nueva nace sin permisos y el sync falla en silencio),
+los lectores `gv_web_retiro_pactado` / `gv_web_retiro_franja`, y dos parches al armado:
+
+- `ppp_web_armar_tandas`: un Retira **con día elegido** sobrevive al filtro de zona, y **cierra su
+  propia tanda** (`bool_or(grupo in ('Super','Retira'))`) — cada cliente que retira va en su tanda,
+  no se mezcla con el reparto ni con otro que retira.
+- `gv_ppp_web_armar_pendientes`: **pase (a4)**, calcado del (a3) del súper con turno. Va con
+  `p_forzar_cods` → `prioritario`, o sea que **PISA EL CUPO**. Es lo que pidió Luis, y se sostiene
+  solo: la página ya le forzó al cliente los 3 días hábiles de anticipación.
+
+**Front de Gestión**: el badge ya no pega contra la REST de LK — lee `lk_pedidos_match`, **la misma
+fila que mira el armado**, así que el badge y el cron no pueden decir cosas distintas. Y de paso
+entra Chef, que la vista de LK no tenía.
+
+#### Cómo se probó ⚠ corriendo el armador, no leyendo la función
+
+Dos `DO` que escriben de verdad en `PPP_Web_Programacion` y terminan en `raise exception`
+(todo revertido):
+
+| Prueba | Resultado |
+|---|---|
+| Retira con `retiro_fecha` = hoy+14 | `E39A`, `fecha_entrega` = **hoy+14** ✅ |
+| Retira **sin** `retiro_fecha` | no aparece en la PPP ✅ |
+| Retira de **9,99 m³**, día elegido, con cupo del día = **6 m³** | entra igual ese día ✅ (pisa el cupo) |
+| Dos Retira distintos, mismo día | `E39A` y `E39B`, tandas separadas ✅ |
+| Zona 1 - CABA Norte 0,30 m³ | `E37C`, 24/09 por cupo — sin cambios ✅ |
+
+Centinelas después: `gv_ppp_super_mezclado` 0 · `gv_ppp_tanda_dos_dias` 0 · `gv_endpoints_rotos` 0 ·
+`gv_ppp_tanda_camion_mezclado` 1 (D69F, el pre-existente que ya figura en el `CLAUDE.md`).
+
+El pase (d) `gv_ppp_web_juntar_clientes` **no puede arrastrar un Retira** fuera de su día: todos sus
+filtros exigen `zona ~ '^\s*Zona\s*[0-9]+'`.
+
+#### Por qué 5 de 8 Retira llegaban sin el dato — medido, no supuesto
+
+| Pedido | Qué pasó |
+|---|---|
+| 1474, 1448 | `source = "Cotizador"`: los carga un admin desde el Excel, por un camino que **no pregunta** el día. No es un bug de la página. Quedan en A Programar con el badge para completarlos. |
+| 1426, 1416 | `payload_recuperado` + `sucursal_autocompletada`: son pedidos **recuperados** automáticamente, sin checkout. |
+| 1482, 1466 | **Sí es un bug del front**, y es el que se arregló: 1482 llegó sin fecha ni franja, 1466 **con franja y sin fecha**. |
+| 1471 | ⚠ **NO es un bug.** La sucursal *"Convenir en Av. Panamericana"* tiene `zona_expreso = 'Retira'` y `direccion_entrega = 'Virgilio 2788'`: es un Retira con apodo, y Gestión ya lo ve con zona `Retira`. Un reporte anterior lo dio por error; no lo es. |
+
+**La causa del bug de 1482/1466:** lo único que exigía día + franja era el estado `disabled` del
+botón Confirmar (`mustChooseRetiro`). Y algo toca ese estado después: **`_syncRetiroUI()` corre en
+cada render del carrito** (`updateCart` → `_syncEntregaEstimada`) y **borra la fecha** si deja de ser
+válida, **sin volver a pedir el recálculo del botón**. El botón queda habilitado con el campo vacío.
+Además `_resetRetiro()` no se llamaba nunca al cambiar de sucursal, así que una elección vieja
+sobrevivía.
+
+Arreglado en las dos páginas (`pagina-LK-copia` y `paginach`):
+- `_retiroGuardOk()` en `submitOrder()` — el guard duro, en el último lugar por el que pasan todos
+  los caminos;
+- `_syncRetiroUI()` ahora llama a `refreshSubmitEnabled()` cuando borra la fecha, y **limpia día y
+  franja cuando la sucursal deja de ser Retira**.
+
+#### Rollback
+
+Las definiciones previas de las dos funciones del armado están en
+`zz_backups."GV_Backup_armado_fns_20260917_pre_v1945"` (`proname`, `def`): correr esos `def`
+deshace el cambio. Las columnas son aditivas y pueden quedar.

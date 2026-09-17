@@ -5733,7 +5733,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=19.50"></script>
+<script type="module" src="recepcion.js?v=19.51"></script>
 <!-- Config del módulo de fichada (compartido con fichada.html). El secret
      hmacSecret tiene que ser el mismo acá y allá; cargándolo desde un solo
      archivo evitamos que se desincronicen. -->
@@ -9579,7 +9579,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v19.50";
+const APP_VERSION = "v19.51";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -44260,9 +44260,12 @@ function aprPorQueHtml(lista) {
 
    DE DÓNDE SALE EL DÍA Y LA FRANJA. Dos fuentes, y la manual pisa a la del cliente:
      · el cliente, al retirar, los elige en el checkout de la página → `orders.sheets_payload`
-       (`retiro_fecha` / `retiro_franja`), que Gestión lee por la vista `gv_pedidos_web_retiro`.
-       ⚠ Al 14/09 eso todavía NO llega: el front de la página que los graba no está deployado
-       (0 de 610 pedidos en 90 días traen la clave). Por eso el badge arranca en "----" para todos.
+       (`retiro_fecha` / `retiro_franja`). ⚠ v19.51 (Luis, 17/09): eso ya NO se lee por HTTP
+       contra la REST de LK (`gv_pedidos_web_retiro`, que además sólo tenía LK). Ahora viaja con
+       el pedido — LK lo empuja por el FDW a `lk_pedidos_match.retiro_fecha` / `retiro_franja`,
+       cron cada 15 min — y se lee de ahí, que es la MISMA fila que mira el armado automático
+       (`gv_web_retiro_pactado`, pase (a4)). Así el badge y lo que hace el cron no pueden decir
+       cosas distintas, y Chef entra por el mismo camino.
      · el que programa, tocando el badge → `GV_Pedido_Horario` (RPC `gv_pedido_horario_set`).
    Como Virgilio no tiene FDW contra LK, el merge de las dos fuentes se hace acá; lo que se EDITA va
    siempre a la tabla de Virgilio, que es la que después lee `gv_ppp_prog_arbol` para Programación. */
@@ -44290,11 +44293,12 @@ function aprHorNeed(force) {
   if (!_aprHorBusy && (force || !_aprHorTs || (Date.now() - _aprHorTs) >= APR_HORARIO_TTL_MS)) {
     _aprHorBusy = true; _aprHorTs = Date.now();
     const manual = aprGet("GV_Pedido_Horario?select=empresa,clave,fecha,franja,origen&limit=2000").catch(function () { return []; });
-    // el día/franja que eligió el cliente al retirar (LK). Si falla, sólo se pierden ésos; los
-    // cargados a mano son los que de verdad usa el que programa.
-    const delCliente = fetch(PWEB_LK_URL + "/rest/v1/gv_pedidos_web_retiro?select=order_id,empresa,retiro_fecha,retiro_franja&limit=2000",
-                             { headers: { apikey: PWEB_LK_ANON }, cache: "no-store" })
-      .then(function (r) { return r.ok ? r.json() : []; }).catch(function () { return []; });
+    // el día/franja que eligió el cliente al retirar. v19.51: sale de `lk_pedidos_match`, la
+    // tabla de acá que LK refresca por el FDW — misma fila que usa el armado. Si falla, sólo se
+    // pierden ésos; los cargados a mano son los que de verdad usa el que programa.
+    const delCliente = aprGet("lk_pedidos_match?select=empresa,order_id,retiro_fecha,retiro_franja" +
+                              "&or=(retiro_fecha.not.is.null,retiro_franja.not.is.null)&limit=2000")
+      .catch(function () { return []; });
     Promise.all([manual, delCliente]).then(function (res) {
       const m = {};
       for (const r of (res[1] || [])) {   // primero lo que eligió el cliente…
