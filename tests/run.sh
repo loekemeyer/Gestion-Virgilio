@@ -189,6 +189,9 @@ PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node te
 echo "== rcp-exceso-gate (v17.99: WhatsApp a Thomas obligatorio si se recibe de mas o sin OC) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/rcp-exceso-gate.cjs
 
+echo "== rcp-oc-ajena (v19.57: 'no esta en SU OC, la tiene otro' es un aviso distinto de 'no hay OC') =="
+PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/rcp-oc-ajena.cjs
+
 echo "== rcp-reanudar (v7.12: recepcion a medio cargar sobrevive + boton Seguir recepcion) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/rcp-reanudar.cjs
 

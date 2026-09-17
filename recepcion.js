@@ -430,7 +430,8 @@ const opState = {
   excesoGondFirma: null, // v18.02: firma para la que ya se pidió la góndola (no repetir)
   listaTipo: null,
   ocPorCod: null,    // v7.07: OCs vigentes del proveedor { codNorm: {ped,rec,pend,fecha} } (null = sin cargar)
-  ocOk: false        // v17.99: true sólo si la RPC de OCs contestó (sin eso no se exige el aviso)
+  ocOk: false,       // v17.99: true sólo si la RPC de OCs contestó (sin eso no se exige el aviso)
+  ocAjena: null      // v19.57: códigos que NO están en SU OC pero sí en la de otro { codNorm: {otros,pend,...} }
 };
 
 /* v3.81-fix: usar TZ Argentina (igual que getTodayKey() en index.html) en
@@ -495,7 +496,7 @@ function opResetState() {
   opState.linea = null; opState.fecha = opTodayStr();
   opState.remito = ""; opState.articulos = null; opState.cargas = {};
   opState.altaNuevos = {};      // v15.36: altas del "+" esperando el OK de Thomas
-  opState.ocPorCod = null; opState.ocOk = false;
+  opState.ocPorCod = null; opState.ocOk = false; opState.ocAjena = null;   // v19.57
   opState.excesoAvisado = null; opState.excesoGond = null; opState.excesoGondFirma = null;   // v18.02
   opState.fotoFile = null;
   if (opState.fotoPreviewUrl) { try { URL.revokeObjectURL(opState.fotoPreviewUrl); } catch(_e){} }
@@ -738,7 +739,8 @@ function seleccionarEntidad(e) {
   opState.linea = null;
   opState.articulos = null;
   opState.cargas = {};
-  opState.ocPorCod = null; opState.ocOk = false;   // las OCs vigentes son POR proveedor → se recargan
+  opState.ocPorCod = null; opState.ocOk = false;
+  opState.ocAjena = null;   // v19.57 — las ajenas también son POR proveedor → se recargan
   renderLinea();
 }
 
@@ -1012,6 +1014,54 @@ function ocDeCod(cod) {
   if (!m) return null;
   return m[_ocgNorm(cod)] || null;
 }
+/* ============== v19.57 — ENTREGA AJENA: "esto no está en SU orden de compra" =========
+   Pedido de Thomas (2026-09-17): *"si pasa que un proveedor entrega mercadería que no le
+   corresponde, tiene que avisarme de otra manera... 'está entregando un proveedor algo que
+   no está en su orden de compra', por fuera de que él tiene la orden de compra"*.
+
+   Es OTRA cosa que el exceso: el exceso dice "entró más de lo que la OC habilita"; esto dice
+   "esto no es de él, la OC la tiene otro". Pueden pasar juntos o por separado.
+
+   El aviso que le llega a Thomas lo manda el BACKEND (`gv_oc_aplicar_recepcion` → Telegram),
+   así que NO depende de que el operario toque ningún botón. Lo de acá es sólo el cartel, para
+   que el que recibe vea de quién es la OC en el momento — igual que el resto de los avisos.
+
+   Medido el 17/09 sobre 13/07–17/09: 83 entregas / 7.553 cajas / 28 códigos entraron por un
+   proveedor que no tenía ese código en ninguna OC, teniéndola otro. */
+function ocAjenaDe(cod) {
+  const m = opState.ocAjena;
+  if (!m) return null;
+  return m[_ocgNorm(cod)] || null;
+}
+/* Trae, para los códigos de la lista, los que NO están en la OC de ESTE proveedor pero sí en
+   la de otro. Best-effort: si falla queda {} y la pantalla funciona como antes (el gate de
+   exceso no depende de esto). */
+async function cargarOCAjenas(cods) {
+  const nombre = opState.tallNombre;
+  const ks = (cods || []).map(function (c) { return String(c || "").trim(); }).filter(Boolean);
+  if (!nombre || !ks.length) return;
+  try {
+    await sessionReady;
+    const { data: rows, error } = await supabase.rpc('gv_oc_entrega_ajena', {
+      p_nombre: nombre, p_cods: ks
+    });
+    if (error) throw new Error(error.message);
+    if (opState.tallNombre !== nombre) return;
+    const out = {};
+    (rows || []).forEach(function (r) {
+      // `otros` null = el código no está en la OC de NADIE: eso ya lo dice el aviso de
+      // exceso ("SIN OC generada"), no es una entrega ajena.
+      if (!r || !r.otros) return;
+      const k = _ocgNorm(r.cod); if (!k) return;
+      out[k] = { otros: String(r.otros), pend: Number(r.pend_otros) || 0,
+                 fecha: r.fecha_otra || "", config: r.prov_config || "" };
+    });
+    opState.ocAjena = out;
+  } catch (e) {
+    console.warn("OC ajenas (sigue sin el detalle):", e);
+    if (opState.tallNombre === nombre) opState.ocAjena = {};
+  }
+}
 /* Cantidad de referencia de la OC: lo que FALTA recibir (= lo pedido mientras no se
    haya marcado nada recibido en el módulo de OCs). */
 function ocRef(oc) { return (oc && oc.pend > 0) ? oc.pend : (oc ? oc.ped : 0); }
@@ -1209,6 +1259,15 @@ async function renderArticulos() {
 function drawArticulosGrid() {
   opBody.innerHTML = "";
   const hayArts = opState.articulos && opState.articulos.length > 0;
+  /* v19.57 — las AJENAS se piden una vez, con todos los códigos de la lista del proveedor, y
+     cuando llegan se repinta (igual que las OC vigentes). Va acá y no en renderArticulos
+     porque la lista de códigos se resuelve recién al final de esa función. */
+  if (opState.ocAjena === null && hayArts) {
+    opState.ocAjena = {};   // marca "pedido" para no disparar dos veces en los repintados
+    cargarOCAjenas(opState.articulos.map(function (a) { return a.Cod_Art; })).then(function () {
+      if (opState.step === "articulos") drawArticulosGrid();
+    });
+  }
   // Sin códigos: aviso normal, salvo en Log/Fabr (ahí igual mostramos el "+").
   if (!hayArts && !arEsLogFabr()) {
     opBody.innerHTML = '<div class="opEmpty">No hay códigos para la línea ' + opState.linea + '.</div>';
@@ -1755,6 +1814,14 @@ function renderResumen() {
       if (opState.step === "resumen") renderResumen();
     });
   }
+  // v19.57 — mismo caso para las ajenas: al reanudar un borrador parado en el resumen no pasó
+  // por la grilla, que es la que las pide. Acá alcanza con los códigos cargados.
+  if (opState.ocAjena === null) {
+    opState.ocAjena = {};
+    cargarOCAjenas(Object.keys(opState.cargas || {})).then(function () {
+      if (opState.step === "resumen") renderResumen();
+    });
+  }
   rcpDraftSave();
 }
 
@@ -1774,8 +1841,10 @@ function openCajas(cod) {
   if (opCajasOc) {
     opCajasOc.style.display = "";
     opCajasOc.style.background = ""; opCajasOc.style.borderColor = "";
-    if (oc) opCajasOc.innerHTML = _opCajasOcBase(oc);
-    else if (opState.ocOk === true) opCajasOc.innerHTML = _OC_SIN;
+    // v19.57 — el cartel suma la nota de "esto no está en TU OC, es de <otro>".
+    if (oc) opCajasOc.innerHTML = _opCajasOcTexto(cod, oc);
+    else if (opState.ocOk === true) opCajasOc.innerHTML = _opCajasOcTexto(cod, null);
+    else if (ocAjenaDe(cod)) opCajasOc.innerHTML = _opCajasAjena(cod).replace(/^<br>/, "");
     else { opCajasOc.style.display = "none"; opCajasOc.innerHTML = ""; }
   }
   // v11.78: teclado con punto decimal para códigos fraccionarios
@@ -1789,6 +1858,21 @@ const _OC_SIN = "📑 Este código <b>no tiene OC vigente</b>: no hay cajas habi
 function _opCajasOcBase(oc) {
   return "📑 OC vigente (" + escapeHtmlRcp(fechaCorta(oc.fecha)) + "): <b>" + oc.ped + "</b> caja(s) pedidas" +
     (oc.rec > 0 ? " · <b>" + oc.pend + "</b> por recibir" : "");
+}
+/* v19.57 — la línea de ENTREGA AJENA: el código no está en la OC de este proveedor, pero sí en
+   la de otro. Se suma al cartel que ya estaba (no lo reemplaza): el operario tiene que ver las
+   dos cosas — que no hay OC suya, y de quién es. "" si no aplica. */
+function _opCajasAjena(cod) {
+  const a = ocAjenaDe(cod);
+  if (!a) return "";
+  return '<br><b style="color:#b45309;">📋 Ojo: este código no está en la OC de ' +
+    escapeHtmlRcp(displayName(opState.tallNombre || "")) + '. La OC es de <u>' +
+    escapeHtmlRcp(a.otros) + '</u>' + (a.pend > 0 ? ' (' + a.pend + ' pendientes)' : '') +
+    '.</b>';
+}
+/* Texto completo del cartel de OC del pop-up de cajas (OC propia + nota de ajena). */
+function _opCajasOcTexto(cod, oc) {
+  return (oc ? _opCajasOcBase(oc) : _OC_SIN) + _opCajasAjena(cod);
 }
 /* v8.60 — aviso EN VIVO si lo tipeado supera lo que falta recibir por OC (caza typos tipo 500 vs 50
    antes de enviar; sin pop-up, no bloquea — mismo espíritu que el aviso ROC pero visible al momento). */
@@ -1809,12 +1893,12 @@ function _opCajasExceso() {
     // y el aviso a Thomas se pide UNA vez en la pantalla de resumen, con el botón
     // "📲 Enviar WhatsApp a Thomas" (_opExcesoSeccion), que además traba el envío hasta
     // que se toque. Antes (v14.61) el botón estaba acá y lo interrumpía código por código.
-    opCajasOc.innerHTML = (oc ? _opCajasOcBase(oc) : _OC_SIN) +
+    opCajasOc.innerHTML = _opCajasOcTexto(opState.cajasCod, oc) +
       '<br><b style="color:#b91c1c;">⚠ Estás recibiendo más mercadería que la que tenés habilitada: cargás ' +
       n + (ref > 0 ? ' y por OC faltan ' + ref + '.' : ' y este código no tiene ninguna OC.') + '</b>';
   } else {
     opCajasOc.style.background = ""; opCajasOc.style.borderColor = "";
-    opCajasOc.innerHTML = oc ? _opCajasOcBase(oc) : _OC_SIN;
+    opCajasOc.innerHTML = _opCajasOcTexto(opState.cajasCod, oc);
   }
 }
 
@@ -1843,7 +1927,9 @@ function opExcesoItems() {
     .filter(function (e) { return e[1] > 0; })
     .map(function (e) {
       const cod = e[0], cajas = e[1], oc = ocDeCod(cod), ref = ocRef(oc);
-      return { cod: cod, cajas: cajas, oc: oc, ref: ref, exced: cajas - ref, sinOc: !oc };
+      // v19.57 — `ajena` = el código no está en SU OC pero sí en la de otro proveedor.
+      return { cod: cod, cajas: cajas, oc: oc, ref: ref, exced: cajas - ref, sinOc: !oc,
+               ajena: ocAjenaDe(cod) };
     })
     .filter(function (i) { return i.cajas > i.ref; });
 }
@@ -1949,8 +2035,13 @@ async function _opPrefetchGond(cods) {
 /* v14.61 / v17.17 — WhatsApp a Thomas (dueño) con el resumen de TODO lo que entró de más. */
 function opWhatsExceso(exc) {
   const g = opState.excesoGond || {};
+  // v19.57 — si hay alguna ajena, el título lo dice: no es "se pasó de la OC", es "esto no es
+  // de él". El backend además manda su propio aviso por Telegram, que no depende de este botón.
+  const hayAjena = (exc || []).some(function (i) { return !!i.ajena; });
   const L = [
-    "Hola Thomas, entró mercadería que la OC no habilita:",
+    hayAjena
+      ? "Hola Thomas, un proveedor entregó mercadería que no está en su orden de compra:"
+      : "Hola Thomas, entró mercadería que la OC no habilita:",
     "Proveedor: " + (opState.tallNombre || "?"),
     "RTO/FC: " + (opState.remito || "s/remito") + " · " + (opState.linea || "") + " · " + fechaCorta(opState.fecha),
     ""
@@ -1963,7 +2054,13 @@ function opWhatsExceso(exc) {
       ? (libre >= i.exced ? ("entra en góndola, " + libre + " libres") : ("NO entra en góndola, solo " + libre + " libres"))
       : "s/dato de capacidad";
     // v17.99 — dos casos: sin OC generada (OC = 0, todo es excedente) o se pasó de la OC.
-    L.push(i.sinOc
+    // v19.57 — y un tercero, que es el que pidió Thomas: el código NO es de este proveedor,
+    // la OC la tiene otro. "SIN OC generada" ahí era falso: la OC existe, sólo que no es suya.
+    L.push(i.ajena
+      ? ("• " + i.cod + ": recibo " + i.cajas + ", NO está en la OC de " +
+         (opState.tallNombre || "?") + " → la OC es de " + i.ajena.otros +
+         (i.ajena.pend > 0 ? " (" + i.ajena.pend + " pendientes)" : "") + " · " + entra)
+      : i.sinOc
       ? ("• " + i.cod + ": recibo " + i.cajas + ", SIN OC generada (OC = 0) → las " + i.exced +
          " son de más · " + entra)
       : ("• " + i.cod + ": recibo " + i.cajas + ", por OC faltaban " + i.ref +

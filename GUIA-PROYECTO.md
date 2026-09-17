@@ -5194,7 +5194,17 @@ Pedido de Luis. Dos cosas:
 > **v17.99 (Luis): un código SIN OC vigente cuenta como OC = 0**, así que CUALQUIER cantidad recibida es
 > excedente y también obliga a avisar. `opExcesoItems` dejó de filtrar `ref > 0` y marca `sinOc`; el
 > mensaje distingue los dos casos (*"SIN OC generada (OC = 0) → las N son de más"* vs *"por OC faltaban
-> N"*). **Guard:** sólo se exige si las OCs se pudieron leer (`opState.ocOk`, que `cargarOCVigentes` deja
+> N"*).
+> ⚠ **v19.57 — y un TERCER caso, que hasta acá se contaba mal: la OC existe pero es de OTRO proveedor.**
+> El gate no pregunta *"¿hay OC?"*, pregunta `oc_vigentes_por_proveedor(<quién entrega>)`, así que el
+> **550** —que entrega **Garcia** y tiene la OC a nombre de **Poly**, con 155 cajas pendientes— salía
+> como *"SIN OC generada (OC = 0)"*. **Era falso**, y es lo que le hacía ruido a Thomas: el generador
+> pide bien (144 cajas al 17/09) y la OC estaba hecha. Ahora `gv_oc_entrega_ajena` dice de quién es, el
+> item lleva `ajena`, y el mensaje pasa a *"NO está en la OC de Garcia → la OC es de Poly"*. El aviso a
+> Thomas además **lo manda el backend** (`gv_oc_aplicar_recepcion` → Telegram), así que no depende de
+> que el operario toque el botón. Pedido de Thomas 17/09: *"tiene que avisarme de otra manera… está
+> entregando un proveedor algo que no está en su orden de compra"*. Medido 13/07–17/09: **83 entregas /
+> 7.553 cajas / 28 códigos**. `tests/rcp-oc-ajena.cjs`, §3.je de la doc de Supabase. **Guard:** sólo se exige si las OCs se pudieron leer (`opState.ocOk`, que `cargarOCVigentes` deja
 > en `true` únicamente cuando la RPC contestó); si la RPC falla no se distingue *"el proveedor no tiene
 > OCs"* de *"no hubo red"*, y trabar ahí dejaría a todos los operarios sin poder recibir.
 > **v18.02 — revisión de salud del gate, tres agujeros tapados:** (1) **reanudar un borrador parado en

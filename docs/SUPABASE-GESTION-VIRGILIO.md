@@ -22976,3 +22976,96 @@ no se justifica por 5 s cada 10 minutos. Si no baja, la palanca es la frecuencia
 la decide el dueño (afecta cuán fresca está la Conciliación).
 
 `sql/gv_ppp_web_armado_tope_v1955.sql` · problema **384**.
+
+## §3.je — v19.57: aviso propio «un proveedor entregó algo que no está en SU OC» — 2026-09-17
+
+**Pedido de Thomas:** *"si pasa que un proveedor entrega mercadería que no le corresponde, tiene
+que avisarme de otra manera... el aviso tiene que llegarme de 'está entregando un proveedor algo
+que no está en su orden de compra', por fuera de que él tiene la orden de compra"*.
+
+Arranca del 550. Thomas: *"algunos artículos me estás diciendo que no hay OC generada, pero no
+hay stock, que me hace ruido"*. **El generador no falla: el 550 SÍ pide.** Medido el 17/09:
+proyección 102,5 cj/mes × índice 1,5 = **154** (la capacidad de 210 no topea), stock 11, pedidos 1
+→ **144 a pedir**, y la OC ya estaba hecha (id **914** del 16/09, 155 cj, a nombre de **Poly**).
+
+Lo que mentía era el aviso. El gate de la v17.99 no pregunta *"¿hay OC?"*: pregunta
+`oc_vigentes_por_proveedor(<quién entrega>)`. **El 550 lo entrega Garcia y la OC es de Poly**, así
+que para Garcia la RPC devuelve 0 filas → OC = 0 → *"SIN OC generada"*, que es falso.
+
+### Lo que se midió antes de escribir nada (13/07–17/09, la ventana de `Ordenes_Compra`)
+
+| Caso | Entregas | Cajas | Códigos |
+|---|---|---|---|
+| El código está en la OC de ese proveedor | 271 | 20.484 | 82 |
+| **La OC la tiene OTRO proveedor** ← el aviso nuevo | **83** | **7.553** | **28** |
+| El código no tiene OC de nadie (lo cubre el aviso de exceso) | 96 | 9.351 | 33 |
+
+Peores: **506** LogFabr/Oscar 2.249 cj · **544** Pedernera/LogFabr 1.269 · **510** LogFabr/CarlosE
+786 · **315** Rafael/German 704 · **280** LogFabr/Oscar 494 · **31** Cabral/Poly 374 · **550**
+Garcia/Poly 256. Los de **Oscar** (11 códigos) son la regla ya decidida del 15/09 (*"dejalo ahí"*,
+él hacía sólo el skin): ver el punto de las excepciones.
+
+⚠ **La medición hay que hacerla con el matcher REAL**, `gv_norm_prov_keys` + `gv_prov_match`, no
+con `norm_nombre` pelado. Sin el alias (`pettofrezza`→`rafael`), sin el split por `/ , + & " y "`
+y sin el prefijo ±2 (`Martin`/`Martin C`, `Carlos`/`Carlos E`) el conteo daba **293 entregas /
+25.584 cajas** — 3,5× de más, todo ruido de nombres. Y a la primera pasada me faltó la rama del
+**nombre completo sin partir**, que es la primera condición de la RPC: `Log/ Fabr` se partía en
+`log` + `fabr` y no matcheaba contra sí mismo, inventando 21 filas.
+
+### ⚠ Y lo que NO se hizo, aunque se había pedido: sumar todas las OC abiertas
+
+En la vuelta anterior de esta charla registré el problema **398** diciendo que
+`oc_vigentes_por_proveedor` se come 4.214 cajas por quedarse con `max(fecha)`. **Está mal
+planteado y quedó `descartado`.** El número es real pero la conclusión era al revés:
+
+- Hay **85 OC en `pendiente` que NO son la última de su (código, proveedor)**, por exactamente
+  **4.214 cajas** — el mismo conjunto. No son cajas invisibles: son OC que
+  `gv_oc_recompute_recibido` debía dejar en `anulada` (su `es_ultima`) y no pudo, porque esa
+  función **sólo corre cuando se recibe DE ESE proveedor** y esos proveedores nunca entregaron.
+- El generador recalcula `Máximo + Pedidos − Stock` cada miércoles, así que **la OC nueva ya
+  contempla lo que no llegó de la anterior**. Caso 550/Poly: la 720 del 09/09 (220 cj) y la 914
+  del 16/09 (155) se calcularon **las dos con stock 0**. Sumarlas sería pedir dos veces lo mismo.
+
+O sea: el arreglo no es sumar, es **anular**. Se hace corriendo `gv_oc_recompute_recibido()` sin
+filtros, que **escribe** en `Ordenes_Compra` → queda pendiente del permiso del dueño (protocolo
+"NUNCA modificar datos sin permiso explícito").
+
+### Lo que quedó hecho
+
+| Objeto | Qué hace |
+|---|---|
+| `gv_oc_entrega_ajena(p_nombre, p_cods[])` | por cada código entregado que **no** está en la OC vigente de ese proveedor, dice de quién SÍ es (`otros`), cuánto le queda pendiente y a quién lo tiene configurado `OC_Maximos`. `otros` null = de nadie → **no** es entrega ajena, eso lo sigue diciendo el aviso de exceso |
+| `gv_oc_aplicar_recepcion(text, jsonb)` | además de descontar la OC, si hay ajenas **manda el aviso por Telegram**. En bloque aparte con su propio `exception when others then null`: la recepción ya quedó aplicada y no se puede caer por el aviso |
+| `GV_OC_Entrega_Permitida` | pares (quien entrega, de quién es la OC) que **no** avisan. `cod` null = todo el par. **Nace vacía a propósito** |
+| `gv_oc_entregas_ajenas` | el histórico, con `caso` = `oc_de_otro` / `sin_oc_de_nadie`. Da exactamente los 83/7.553/28 y 96/9.351/33 de la tabla de arriba |
+| `recepcion.js` | el cartel del pop-up dice de quién es la OC (y **no se pierde** cuando encima hay exceso), y el WhatsApp usa el texto nuevo en vez de mentir con *"SIN OC generada"* |
+
+**El aviso a Thomas lo manda el BACKEND**, no el botón: así llega aunque el operario no toque
+nada. El botón de WhatsApp sigue como estaba (gate de la v17.27), sólo cambia el texto.
+
+⚠ **Las excepciones nacen vacías y es una decisión, no un olvido.** El par **Log/ Fabr ← Oscar**
+(11 códigos, ~3.400 cj) va a avisar todas las semanas. Silenciarlo de entrada taparía justo lo
+que el 15/09 quedó anotado como *"el arreglo es que al recibir esos artículos elijan Oscar"*
+(problema 250, abierto). Para silenciarlo, el `insert` está escrito en el archivo SQL.
+
+### Cómo se probó (no leyendo la función)
+
+`gv_oc_aplicar_recepcion` se corrió **de verdad** con `('Garcia', [{"cod":"550","cajas":11},
+{"cod":"437E","cajas":5}])` dentro de `begin … rollback`, y se leyó el mensaje que dejó en
+`telegram_outbox`:
+
+```
+⚠ ENTREGA FUERA DE SU ORDEN DE COMPRA
+Entrego: Garcia   17/09 18:07
+Estos codigos NO estan en la OC de Garcia:
+- 550 (11 cj) -> la OC es de Poly, 155 pendientes - configurado a Poly
+```
+
+El **437E no aparece** (nadie tiene OC de ese código: es el caso `sin_oc_de_nadie`), y después del
+rollback quedaron **0 filas** con `dedup_key like 'ocajena_%'` — no se mandó nada.
+`tests/rcp-oc-ajena.cjs` cubre el front y **se verificó rompiéndolo**: con `ajena: null` en
+`opExcesoItems` el test falla en 4 chequeos.
+
+**Chequeo:** `select caso, count(*), sum(cajas) from public.gv_oc_entregas_ajenas
+where fecha >= current_date - 30 group by 1;`
+`sql/gv_oc_entrega_ajena_v1957.sql` · problemas **250** (abierto) y **398** (descartado).
