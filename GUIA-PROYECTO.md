@@ -1,3 +1,26 @@
+## Nota v19.42 (2026-09-17) — el "de menos" sobre una tanda sin picking dejaba Pickeados negativo (problema 378)
+
+Caso 323E/E03C: Jhonny Cartaya (277) pickeó E03C pero **323E nunca se pickeó** (0 picking del
+código en esa tanda). En el armado, Franco Ortiz (237) marcó 323E como *"de menos / no hay en
+góndola"* → el wizard (`_compDifResolve`, evento NPD) emitió un `ajuste −1` sobre
+`separar_pedidos`. Ese `−qty` existe para descontar la **caja fantasma** que el picking habría
+metido ahí, pero **si no hubo picking no hay fantasma que descontar**: el −1 quedó solo y dejó
+**Pickeados de 323E en −1** (único negativo de toda la base al 17/09).
+
+Es el agujero que la v18.30 no cubría: su neteo (etapa 2) sólo actúa con `net > 0`; un ajuste
+negativo aislado, sin picking contra qué netear, nunca se limpia.
+
+**Fix (backend, fuente de verdad):** `trg_normalizar_empresa_stock` descarta (`RETURN NULL`) una
+fila `ajuste` sobre `separar_pedidos`, `delta < 0`, `client_id` `npd_…` y `ref` = tanda **sin
+picking** del código. Conservador: con picking real, pasa igual que hoy. Probado en transacción
+abortada (fantasma descartado, válido insertado). El −1 ya escrito se neutralizó con un `+1`
+(no se borró el registro de Franco). `sql/gv_npd_sin_picking_v1942.sql`, rollback en
+`docs/ROLLBACK-PRODUCCION.md` §1.
+
+⚠ **No se prueba leyendo el código**: el bug no está en el front (el `−qty` es correcto cuando el
+picking sí metió la caja), sino en la combinación con una tanda sin picking; se ve corriendo el
+insert contra el trigger, no leyendo `_compDifResolve`.
+
 ## Nota v19.24 (2026-09-16) — El monitor y la productividad ahora dan el mismo número
 
 Luis: *"fijate que el monitor muestre lo mismo ahora"*. Se corrió el monitor **de verdad**

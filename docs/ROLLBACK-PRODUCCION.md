@@ -42,6 +42,32 @@ numeración) y en `docs/SUPABASE-GESTION-VIRGILIO.md`.
 
 ## 1. Registro de cambios que tocan objetos compartidos / de Producción
 
+### v19.42 (2026-09-17) — `trg_normalizar_empresa_stock`: descarta el NPD "de menos" sin picking (problema 378)
+
+**Qué se tocó:** `public.trg_normalizar_empresa_stock()` (BEFORE INSERT en la tabla compartida
+`Movimientos_Stock`). Se agregó un guard: una fila `ajuste` sobre `separar_pedidos`, con
+`delta < 0`, `client_id` de NPD (`'npd_…'`) y `ref` = tanda **sin picking** de ese código en
+`separar_pedidos`, se **descarta** (`RETURN NULL`). Antes esa fila dejaba Pickeados en negativo
+(caso 323E/E03C = −1, único negativo de la base al 17/09).
+
+**Impacto en Producción:** el guard sólo dispara con el `client_id` determinístico del wizard de
+armado (`npd_…`) y sólo cuando **no hay picking** de esa (tanda, código) → en ese caso la fila es
+un fantasma también para Producción. Cualquier NPD con picking real pasa igual que antes.
+Medido: barrido de negativos en `separar_pedidos` = sólo 323E; test en transacción abortada
+(ZZPHANTOM sin picking → descartada; 315 con picking → insertada).
+
+**Dato ya escrito:** el −1 de 323E se neutralizó con un `+1` (`client_id`
+`fix378_323E_E03C_neutraliza_npd`); el registro NPD de Franco no se tocó. Saldo verificado = 0.
+
+**Rollback:**
+```sql
+-- 1) trigger: volver a la versión v18.30 (inmediatamente anterior)
+\i sql/gv_ajuste_hereda_empresa_v1830.sql   -- o reaplicar esa función a mano
+-- 2) dato: sacar el +1 de compensación (deja 323E en -1 de nuevo)
+delete from public."Movimientos_Stock" where client_id = 'fix378_323E_E03C_neutraliza_npd';
+-- backup del entorno del -1: zz_backups."GV_Backup_323E_sepped_20260917"
+```
+
 ### v14.75 (2026-09-10) — 6 writers de Movimientos_Stock pasan `empresa` explícita
 
 **Regla del dueño:** la columna `empresa` se agregó al pipeline para ser la fuente explícita; que
