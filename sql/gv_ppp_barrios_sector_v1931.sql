@@ -1,5 +1,5 @@
 -- =====================================================================================
--- gv_ppp_barrios_sector_v1930.sql — v19.30 · 2026-09-17 · proyecto Virgilio (hrxfctzncixxqmpfhskv)
+-- gv_ppp_barrios_sector_v1931.sql — v19.31 · 2026-09-17 · proyecto Virgilio (hrxfctzncixxqmpfhskv)
 --
 -- Pedido de Thomas: "en la PPP hay siete zonas, pero ya las habíamos separado más, porque
 -- por ejemplo Liniers y Núñez comparten una zona y eso estaría mal."
@@ -35,49 +35,49 @@
 -- CREATE de las dos funciones tal como estaban).
 --
 -- Rollback:
---   delete from public."GV_Barrios_Sector" where nota like 'v19.30:%';
+--   delete from public."GV_Barrios_Sector" where nota like 'v19.31:%';
 --   -- y re-ejecutar los dos `def` guardados en GV_Backup_FnSectorCompat_20260917.
 -- =====================================================================================
 
 -- ── 1. Los 30 barrios que no tenían sector ───────────────────────────────────────────
 insert into public."GV_Barrios_Sector" (barrio_norm, sector, nota) values
-  ('abasto',            'F', 'v19.30: Abasto es Balvanera/Almagro'),
-  ('chacarita',         'G', 'v19.30: pega con Colegiales y Villa Ortuzar'),
-  ('congreso',          'F', 'v19.30: Balvanera/Monserrat'),
-  ('saavedra',          'H', 'v19.30: pega con Nunez y Villa Urquiza'),
-  ('san nicolas',       'F', 'v19.30: Microcentro'),
-  ('san telmo',         'A', 'v19.30: pega con Constitucion y La Boca'),
-  ('tribunales',        'F', 'v19.30: Microcentro/Retiro'),
-  ('floresta',          'D', 'v19.30: pega con Flores'),
-  ('monte castro',      'C', 'v19.30: pega con Liniers/Villa Luro/Versalles; en C no alcanza Nunez (C-H no son vecinos)'),
-  ('villa santa rita',  'D', 'v19.30: pega con Flores; en D no alcanza Nunez (D-H no son vecinos)'),
-  ('villa sta rita',    'D', 'v19.30: alias de Villa Santa Rita'),
-  ('ezeiza',            'L', 'v19.30: pega con Monte Grande'),
-  ('sarandi',           'J', 'v19.30: partido de Avellaneda'),
-  ('wilde',             'J', 'v19.30: partido de Avellaneda'),
-  ('haedo',             'M', 'v19.30: Zona 5 entera es el sector M'),
-  ('isidro casanova',   'M', 'v19.30: Zona 5 entera es el sector M'),
-  ('lomas del mirador', 'M', 'v19.30: Zona 5 entera es el sector M'),
-  ('rafael castillo',   'M', 'v19.30: Zona 5 entera es el sector M'),
-  ('santos lugares',    'M', 'v19.30: Zona 5 entera es el sector M'),
-  ('virrey del pino',   'M', 'v19.30: Zona 5 entera es el sector M'),
-  ('adolfo sordeaux',   'N', 'v19.30: Malvinas Argentinas, con Grand Bourg'),
-  ('boulogne',          'P', 'v19.30: partido de San Isidro'),
-  ('villa maipu',       'N', 'v19.30: partido de San Martin'),
-  ('del viso',          'P', 'v19.30: partido de Pilar'),
-  ('don torcuato',      'P', 'v19.30: partido de Tigre'),
-  ('el triangulo',      'N', 'v19.30: Malvinas Argentinas, con Grand Bourg'),
-  ('florida',           'P', 'v19.30: partido de Vicente Lopez'),
-  ('grand bourg',       'N', 'v19.30: Malvinas Argentinas, con San Miguel/Jose C. Paz'),
-  ('san fernando',      'P', 'v19.30: ribera norte'),
-  ('virreyes',          'P', 'v19.30: partido de San Fernando')
+  ('abasto',            'F', 'v19.31: Abasto es Balvanera/Almagro'),
+  ('chacarita',         'G', 'v19.31: pega con Colegiales y Villa Ortuzar'),
+  ('congreso',          'F', 'v19.31: Balvanera/Monserrat'),
+  ('saavedra',          'H', 'v19.31: pega con Nunez y Villa Urquiza'),
+  ('san nicolas',       'F', 'v19.31: Microcentro'),
+  ('san telmo',         'A', 'v19.31: pega con Constitucion y La Boca'),
+  ('tribunales',        'F', 'v19.31: Microcentro/Retiro'),
+  ('floresta',          'D', 'v19.31: pega con Flores'),
+  ('monte castro',      'C', 'v19.31: pega con Liniers/Villa Luro/Versalles; en C no alcanza Nunez (C-H no son vecinos)'),
+  ('villa santa rita',  'D', 'v19.31: pega con Flores; en D no alcanza Nunez (D-H no son vecinos)'),
+  ('villa sta rita',    'D', 'v19.31: alias de Villa Santa Rita'),
+  ('ezeiza',            'L', 'v19.31: pega con Monte Grande'),
+  ('sarandi',           'J', 'v19.31: partido de Avellaneda'),
+  ('wilde',             'J', 'v19.31: partido de Avellaneda'),
+  ('haedo',             'M', 'v19.31: Zona 5 entera es el sector M'),
+  ('isidro casanova',   'M', 'v19.31: Zona 5 entera es el sector M'),
+  ('lomas del mirador', 'M', 'v19.31: Zona 5 entera es el sector M'),
+  ('rafael castillo',   'M', 'v19.31: Zona 5 entera es el sector M'),
+  ('santos lugares',    'M', 'v19.31: Zona 5 entera es el sector M'),
+  ('virrey del pino',   'M', 'v19.31: Zona 5 entera es el sector M'),
+  ('adolfo sordeaux',   'N', 'v19.31: Malvinas Argentinas, con Grand Bourg'),
+  ('boulogne',          'P', 'v19.31: partido de San Isidro'),
+  ('villa maipu',       'N', 'v19.31: partido de San Martin'),
+  ('del viso',          'P', 'v19.31: partido de Pilar'),
+  ('don torcuato',      'P', 'v19.31: partido de Tigre'),
+  ('el triangulo',      'N', 'v19.31: Malvinas Argentinas, con Grand Bourg'),
+  ('florida',           'P', 'v19.31: partido de Vicente Lopez'),
+  ('grand bourg',       'N', 'v19.31: Malvinas Argentinas, con San Miguel/Jose C. Paz'),
+  ('san fernando',      'P', 'v19.31: ribera norte'),
+  ('virreyes',          'P', 'v19.31: partido de San Fernando')
 on conflict (barrio_norm) do nothing;
 
 -- ── 2. El fallback ya no usa el GRUPO de zona, usa la zona exacta ────────────────────
 create or replace function public.gv_ppp_web_sector(p_zona text, p_barrio text, p_direccion text default null)
  returns text language sql stable set search_path to 'public','pg_temp'
 as $function$
-  -- v19.30: el fallback de un barrio sin sector ya NO es el grupo de zona ('Zonas 2+3'),
+  -- v19.31: el fallback de un barrio sin sector ya NO es el grupo de zona ('Zonas 2+3'),
   -- que juntaba CABA Centro con CABA Oeste (Nunez con Floresta). Ahora es la zona EXACTA.
   select coalesce(
     case when coalesce(p_zona, '') ~ '^\s*Zona\s*[0-9]' then
@@ -114,7 +114,7 @@ begin
     return false;
   end if;
   if p_sector_a is not distinct from p_sector_b then return true; end if;
-  -- v19.30: barrio sin sector -> se compara la ZONA EXACTA, no el grupo. El grupo 'Zonas 2+3'
+  -- v19.31: barrio sin sector -> se compara la ZONA EXACTA, no el grupo. El grupo 'Zonas 2+3'
   -- dejaba pasar Nunez (CABA Centro) con Floresta/Monte Castro (CABA Oeste), que era justo
   -- lo que la tabla de sectores vino a impedir.
   if p_sector_a is null or p_sector_b is null or p_sector_a like '~%' or p_sector_b like '~%' then
@@ -139,7 +139,7 @@ select z.barrio_norm,
  where z.zona ~ '^\s*Zona\s*[0-9]'
    and s.barrio_norm is null;
 alter view public.gv_ppp_barrios_sin_sector set (security_invoker = true);
-comment on view public.gv_ppp_barrios_sin_sector is 'v19.30 (centinela): barrio con zona numerica que NO tiene sector en GV_Barrios_Sector. Vacia = todo bien. Un barrio aca cae al fallback por zona exacta y no aprovecha los vecinos.';
+comment on view public.gv_ppp_barrios_sin_sector is 'v19.31 (centinela): barrio con zona numerica que NO tiene sector en GV_Barrios_Sector. Vacia = todo bien. Un barrio aca cae al fallback por zona exacta y no aprovecha los vecinos.';
 grant select on public.gv_ppp_barrios_sin_sector to anon, authenticated;
 
 -- ── 4. Verificacion (correr despues) ─────────────────────────────────────────────────

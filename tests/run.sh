@@ -42,7 +42,7 @@ PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node te
 echo "== ppp-tanda-dos-dias (v18.92: reusar tanda no puede dejar el mismo codigo en dos dias) =="
 node tests/ppp-tanda-dos-dias.cjs
 
-echo "== ppp-barrios-sin-sector (v19.30: un barrio sin sector no vuelve a la regla vieja de 7 zonas) =="
+echo "== ppp-barrios-sin-sector (v19.31: un barrio sin sector no vuelve a la regla vieja de 7 zonas) =="
 node tests/ppp-barrios-sin-sector.cjs
 
 echo "== ppp-badge (v19.14: el boton PPP tiene badge como los demas, y cuenta todos los avisos) =="

@@ -1,4 +1,4 @@
-/* Un barrio SIN sector no puede volver a la regla vieja de 7 zonas. (v19.30, pedido de Thomas
+/* Un barrio SIN sector no puede volver a la regla vieja de 7 zonas. (v19.31, pedido de Thomas
    2026-09-17: *"en la PPP hay siete zonas, pero ya las habíamos separado más, porque por ejemplo
    Liniers y Núñez comparten una zona y eso estaría mal."*)
 
@@ -17,9 +17,9 @@
 const path = require("path");
 const fs = require("fs");
 
-const p = path.join(__dirname, "..", "sql", "gv_ppp_barrios_sector_v1930.sql");
+const p = path.join(__dirname, "..", "sql", "gv_ppp_barrios_sector_v1931.sql");
 if (!fs.existsSync(p)) {
-  console.log("ppp-barrios-sin-sector: ✗ FAIL\n  - falta sql/gv_ppp_barrios_sector_v1930.sql");
+  console.log("ppp-barrios-sin-sector: ✗ FAIL\n  - falta sql/gv_ppp_barrios_sector_v1931.sql");
   process.exit(1);
 }
 const src = fs.readFileSync(p, "utf8");

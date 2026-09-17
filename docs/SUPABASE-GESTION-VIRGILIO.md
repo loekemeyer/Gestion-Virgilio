@@ -21499,8 +21499,53 @@ parada — eso se hace con `gv_ppp_tanda_mover` (o desde la app). Qué hay parad
 `security_invoker` y ahora joinea `GV_PPP_Armados_Espera`, así que la tabla tiene SELECT para
 `anon`, `authenticated` **y los roles del FDW** `lk_ppp_reader` / `ch_ppp_reader` — sin eso, el
 `sincronizar_ppp()` de LK se cae con *permission denied*.
+### v19.30 (17/09) — la planimetría vieja como último recurso, y el dual sin dueño
 
-### §3.gm — v19.30: un barrio sin sector volvía a la regla vieja de 7 zonas — 2026-09-17
+Luis: *"las tablas viejas se conservan porque tienen data que va a servir para algunas cosas.
+¿la data de planimetría no está en las tablas GV_? Además, los backfills de ayer se hicieron
+usando las tablas viejas? fijate si usando las tablas nuevas dan resultados diferentes"*.
+
+**Respuesta 1 — casi toda está, pero no toda.** De los 370 pares (código, sector) de
+`Planimetria`, **335 son idénticos** a `GV_Lugar_Item` / `gv_lugar_articulo`. De los 25 códigos
+que sobran: **8 duales escritos con sufijo** (`437E CH`, `809E LK`…, misma info otra grafía),
+**1 basura** (`LIBRE` en A65) y **16 códigos reales sin lugar en las `GV_`**, 12 con
+movimientos — 580E (153), 232 (42), 231 (33), 233 (30), 865ED (23), 702EN (20), 537 (18),
+567 (15), 828 (9), 997E (9), 998E (6), 702 (4).
+
+**Respuesta 2 — el backfill de ayer NO cambia con las tablas nuevas.** Sobre los 55.380
+movimientos que se tocaron: **55.016 conservan el valor escrito**, 364 cambiaron después (los
+reverts de los duales) y **0 resolverían distinto** con las tablas vivas.
+
+**Lo que sí cambió:** la planimetría vieja entró como **cuarto y último recurso** de
+`gv_empresa_de_articulo_vivo` / `gv_refrescar_articulo_empresa` (góndola → lista de precios →
+racks → planimetría vieja), filtrada para no tocar duales, pseudo-códigos con sufijo de empresa
+ni `LIBRE`. Con eso se resolvieron **17 movimientos** que quedaban en `Mixto` (702EN 4 y 828 2 a
+CH; 584E, 035E, 590E, 102E, 066, 440E, 523C a LK). Huella de saldos antes y después
+**949c9231e008c04a7a17eb89f4745a9d**, idéntica. Centinela `gv_stock_empresa_fantasma`: 5 → **2**.
+
+**Y un bug latente que apareció midiendo:** `gv_empresa_de_articulo('438E')` devolvía `'LK'`
+porque la góndola hoy tiene 437E/438E/439E de un lado solo. Un dual **no tiene dueño**. El guard
+pasó a estar arriba de todo, en la función y en el refresco del caché. El trigger nunca se la
+comió (chequea `codigos_duales` primero), pero cualquier otro llamador sí.
+
+Composición del caché (372 códigos): góndola 332 · lista_precios 32 · racks 4 ·
+planimetria_vieja 4.
+
+**Sobreviviente del incidente del 16/09 (problema 370):** el movimiento `68009779`
+(D72C / 066 / excedente / picking / delta 0) duplicaba al `54123349` del 09/09 y zafó del
+barrido **porque tenía otra empresa** ('Mixto' contra 'LK') — el barrido comparaba la quíntupla
+del índice único, que incluye `empresa`. Delta 0, nunca movió stock. Borrado, backup en
+`zz_backups."GV_Backup_MovStock_Fantasma_D72C_20260917"`. Para cazar gemelos así hay que
+comparar **sin** la empresa (la consulta está en `sql/gv_empresa_del_articulo_v1926.sql`).
+
+**Lo que queda sin empresa y está bien:** 412 filas / 148 códigos de insumos y códigos internos
+(Luis: *"insumos no me importan"*); 125 filas / 3 códigos duales (809E 118 previas al conteo del
+01/08, 437E 3, 439E 4 — etiquetarlas inventa un negativo); y 3 filas del 520 en D72A, un picking
+**vacío** del 10/09 (los tres deltas en 0) rehecho de verdad el 14/09, que no puede tomar la
+etiqueta LK porque choca con el índice único contra el picking bueno. Son datos previos a este
+trabajo y no se tocaron.
+
+### §3.gn — v19.31: un barrio sin sector volvía a la regla vieja de 7 zonas — 2026-09-17
 
 **Pedido de Thomas:** *"en la PPP hay siete zonas, pero estoy seguro que ya las habíamos
 separado más, porque por ejemplo Liniers y Núñez comparten una zona y eso estaría mal."*
@@ -21531,7 +21576,7 @@ En la programación viva **todavía no había mordido**: los únicos sin sector 
 últimos 60 días son *Retira* (11 NP) y dos súper, que van solos igual. Era una mina, no un
 incendio.
 
-**Qué se hizo** (`sql/gv_ppp_barrios_sector_v1930.sql`):
+**Qué se hizo** (`sql/gv_ppp_barrios_sector_v1931.sql`):
 
 1. **30 barrios cargados** en `GV_Barrios_Sector` (109 → 139). Los 5 que quedan afuera son
    Retira, Expo y Súper: no tienen zona numérica, así que `gv_ppp_web_sector` ni los mira.
@@ -21554,7 +21599,7 @@ Ciudadela) — es la tanda de ISIS que ya estaba en rojo antes de este cambio.
 **Backups:** `zz_backups."GV_Backup_BarriosSector_20260917"` (la tabla entera, 109 filas) y
 `zz_backups."GV_Backup_FnSectorCompat_20260917"` (el `CREATE` de las dos funciones como estaban).
 
-**Rollback:** `delete from public."GV_Barrios_Sector" where nota like 'v19.30:%';` y re-ejecutar
+**Rollback:** `delete from public."GV_Barrios_Sector" where nota like 'v19.31:%';` y re-ejecutar
 los dos `def` del backup de funciones.
 
 **Impacto sobre Producción:** ninguno. `GV_Barrios_Sector`, `gv_ppp_web_sector`,

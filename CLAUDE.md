@@ -453,6 +453,14 @@ palos de amasar 231/232/233, línea Acacia, 537, 567…), y el Mapa de góndolas
 con un click** (`pmapViejaFetch` / `pmapViejaTraer`). Además la leen `gv_codigos_multigrafia` y
 `vista_nc_loeke_chef`. **No usarla como fuente, no borrarla.**
 
+**Cuánto se superpone con las `GV_`, medido el 17/09**: de los 370 pares (código, sector) de la
+vieja, **335 son idénticos** a la viva. De los 25 códigos que sobran, **8 son duales escritos con
+sufijo de empresa** (`437E CH`, `809E LK`… misma info, otra grafía), **1 es basura** (`LIBRE`) y
+**16 son códigos reales sin lugar en `GV_Lugar_Item`**, 12 de ellos con movimientos (580E con 153,
+232, 231, 233, 865ED, 702EN, 537, 567, 828, 997E, 998E, 702). **Ésos 16 son la razón por la que la
+tabla no se borra** — y el motivo por el que `gv_empresa_de_articulo` la usa como **último
+recurso**, filtrada (nunca un dual, nunca un pseudo-código con sufijo, nunca `LIBRE`).
+
 `Ubicaciones_Articulos` es otra cosa: **38 días sin escribirse, 0 funciones y 0 lectores en el
 front**. Ésa sí no sirve para nada vivo.
 
@@ -492,6 +500,20 @@ select distinct r.sector from public."Racks_Planimetria" r
 **`AD06` tiene dos filas**: `CH / 809E / 360 cajas` (del 08/07) y `LK / 368E / 56` (del 31/08),
 mientras `GV_Lugar` dice que AD06 es un rack de **LK**. Un rack con dos artículos de dos empresas.
 No se tocó: hay que mirarlo en el depósito.
+
+### ⚠ Un código DUAL no tiene empresa: `gv_empresa_de_articulo` contesta **NULL**
+
+Los 4 de `codigos_duales` (437E, 438E, 439E, 809E) viven en las **dos** góndolas: la empresa la
+dice de qué pila salió la caja, o sea el **pedido**, no el artículo. Hasta la v19.30 la función
+devolvía **`'LK'`** para 437E/438E/439E, porque la góndola hoy los tiene de un solo lado — falso, y
+el tipo de respuesta que suena bien y está mal. El trigger nunca se la comió (chequea
+`codigos_duales` **antes** de llamarla), pero cualquier otro llamador sí. Ahora el guard está
+adentro de la función y del refresco del caché. Chequeo:
+
+```sql
+select cod, public.gv_empresa_de_articulo(cod) from public.codigos_duales;
+-- las 4 tienen que dar NULL
+```
 
 ## ⚠ REGLA: el CÓDIGO DE CLIENTE es por EMPRESA — nunca cruzar por código solo
 

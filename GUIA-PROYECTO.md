@@ -3792,13 +3792,13 @@ Pedido de Luis. Dos cosas:
 > → "Sin tanda · Zona 4". §3.y de la doc de Supabase; análisis previo en
 > `docs/ANALISIS-TANDAS-CERCANIA-20260905.md`.
 >
-> ⚠ **Corrección v19.30 (17/09, pedido de Thomas)** — ese *"barrio desconocido cae en la regla
+> ⚠ **Corrección v19.31 (17/09, pedido de Thomas)** — ese *"barrio desconocido cae en la regla
 > vieja"* era un agujero: el fallback comparaba el **grupo** de zona, y el grupo `'Zonas 2+3'`
 > junta CABA Centro con CABA Oeste, así que un barrio sin sector volvía a la regla de 7 zonas
 > (medido: Núñez + Floresta = `true`, Saavedra + Liniers = `true`). Se cargaron los **30 barrios
 > con zona numérica que no tenían sector** (`GV_Barrios_Sector` 109 → 139) y el fallback pasó a
 > comparar la **zona exacta**. Centinela: `select * from public.gv_ppp_barrios_sin_sector;` —
-> vacía = todo bien. `sql/gv_ppp_barrios_sector_v1930.sql`, §3.gm.
+> vacía = todo bien. `sql/gv_ppp_barrios_sector_v1931.sql`, §3.gn.
 >
 > Nota **v13.06** — **Tablero en celular**: los KPI ya no se desbordan (grilla `minmax(0,1fr)`, valor
 > con `overflow-wrap`, tarjeta Atrasados a lo ancho, tipografía un punto menor ≤ 640 px). Visto en el
