@@ -20619,9 +20619,10 @@ Segundo tramo del submódulo Clientes nuevos (pedido de Luis). Todo aditivo; reu
 existía para eliminar y aprobar.
 
 **Columna "1er contacto" + botones Speech 1/2 (en Contacto):**
-- **Speech 1** sella el PRIMER contacto (una sola vez) y abre WhatsApp Web con el cliente pidiendo
-  una **seña del 30%** sobre el **total con IVA**. El timer "1er contacto" arranca en ese momento
-  y corre solo (se refresca cada 60 s en el front, `clinTickStart`).
+- **Speech 1** sella el PRIMER contacto (una sola vez) y abre WhatsApp Web con el cliente. El
+  timer "1er contacto" arranca en ese momento y corre solo (se refresca cada 60 s en el front,
+  `clinTickStart`). ⚠ **Lo que pide el mensaje cambió en la v19.37**: ya NO es una seña del 30%,
+  es el **total del pedido con IVA, pagado por adelantado** — ver §3.iv.
 - **Speech 2** abre WhatsApp preguntando si paga en 24 h o el pedido se da de baja.
 - El sello vive en `public."GV_Clientes_Nuevos_Contacto"` (empresa, order_id, primer_contacto_at),
   RLS on sin policies (sólo las RPC `SECURITY DEFINER` la tocan). `gv_cliente_nuevo_contacto_marcar`
@@ -21939,3 +21940,40 @@ los racks: 424 cajas de 809E que el stock no cuenta"* eran AD06 (360) + AE11 (64
 del 17/09 dijo que no están y se borraron (v19.33). **Pero `Racks_Planimetria` y
 `Movimientos_Stock` siguen sin cuadrar en 15+ códigos más**: 505I −974, 546V +891, 523C +240,
 725E +192, 1000900 +160, 702E ±... La consulta que lo mide quedó anotada en el problema.
+---
+
+## §3.iv — v19.37: Clientes nuevos — el cliente nuevo paga el TOTAL, no una seña del 30% — 2026-09-17
+
+**Luis, 2026-09-17:** *"La seña no es del 30% sino que tiene que pagar el total del pedido
+(debería simular la factura completa con todo lo que pidió y mandarle ese monto diciendo que lo
+tiene que pagar previo al armado y entrega)."*
+
+Corrige la regla que había quedado en la v19.08 (§3.im). **Cambio 100 % de front**, en el
+submódulo 🆕 Clientes nuevos de "A Programar": el monto ya lo calculaba el backend entero, lo
+que estaba mal era qué parte de ese monto se pedía.
+
+**Qué cambió (`index.html`):**
+
+- `clinSpeechMsg1` — el WhatsApp del **Speech 1** manda el **total con IVA** del pedido
+  (`valor_con_iva`, o sea la factura simulada: todo lo que pidió, valorizado por lista) y dice
+  que el pago **es por adelantado, antes de armar y entregar**. Desapareció el `Math.round(iva *
+  0.30)`. Sin precio de lista el mensaje igual sale, sin el número.
+- `clinNuevosValorFmt` — la columna **Monto** ahora muestra el neto en negrita **y debajo el
+  `c/IVA $…`** (clase `.clin-iva`): ése es el número que se le pide al cliente, así que tiene que
+  estar a la vista en la pantalla y no sólo adentro del WhatsApp. La fila de ejemplo también lo
+  trae ($120.480 neto → c/IVA $145.781).
+- Los dos tooltips que decían "seña del 30%" (el del botón Speech 1 y el ⓘ de la sección) ahora
+  dicen que se cobra el total por adelantado.
+
+**Backend: sin cambios.** `gv_clientes_nuevos_valor_lote` ya devolvía `valor` (neto, con el 2 %
+web) y `valor_con_iva` (= neto × 1,21) desde la v19.08. Sigue en pie la nota de IVA **21 % plano**
+de §3.im: `precios_venta` / `precios_venta_chef` no guardan tasa por artículo.
+
+**Speech 2 no se tocó** (sigue preguntando si paga en 24 h o el pedido se da de baja) — ahora se
+lee como el recordatorio del mismo pago total.
+
+**Cubierto** en `tests/apr-cuarentena.cjs`: el Speech 1 manda el total con IVA, ya no nombra la
+seña ni el 30 %, dice "por adelantado / antes de armar y entregar", y la columna Monto muestra el
+`c/IVA`. Suite entera en verde.
+
+**Rollback:** `git revert` del commit de la v19.37 (no hay nada aplicado en la base).

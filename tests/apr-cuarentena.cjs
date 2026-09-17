@@ -156,6 +156,19 @@ catch (_e) {
     out.cliCols = /1er contacto/.test(cliSec) && /Acci[oó]n/.test(cliSec);
     out.cliSpeech = /Speech 1/.test(cliSec) && /Speech 2/.test(cliSec);
     out.cliAccion = /Aprobar pedido/.test(cliSec) && /Eliminar pedido/.test(cliSec);
+    // (3b-3) v19.37 (Luis) — NO hay seña del 30%: el Speech 1 pide el TOTAL con IVA, por
+    // adelantado, y la columna Monto muestra ese mismo número debajo del neto.
+    _apr.cliValor = { "chef:200": { valor: 100000, valorIva: 121000 } };
+    aprRender(); await new Promise((res) => setTimeout(res, 50));
+    const cliSecIva = document.getElementById("pppPreview").innerHTML.slice(
+      document.getElementById("pppPreview").innerHTML.indexOf("🆕 Clientes nuevos"));
+    out.cliMontoIva = /clin-iva[^>]*>c\/IVA \$121\.000/.test(cliSecIva);
+    const msg1 = clinSpeechMsg1({ order_id: 200, empresa: "chef", np: null });
+    out.cliMsgTotal = /\$121\.000/.test(msg1) && /IVA incluido/.test(msg1);
+    out.cliMsgSinSena = !/30\s*%/.test(msg1) && !/se\u00f1a/i.test(msg1);
+    out.cliMsgAdelantado = /por adelantado/.test(msg1) && /antes de armar y entregar/.test(msg1);
+    _apr.cliValor = {}; aprRender(); await new Promise((res) => setTimeout(res, 50));
+    html = document.getElementById("pppPreview").innerHTML;
     // (3c) el botón "👁 Ver ejemplo" agrega una fila EJEMPLO con su monto, sin sumar al badge.
     _apr.cliDemo = true; aprRender(); await new Promise((res) => setTimeout(res, 50));
     html = document.getElementById("pppPreview").innerHTML;
@@ -523,6 +536,10 @@ catch (_e) {
   chk(r.cliCols, "Clientes nuevos tiene columnas '1er contacto' y 'Acción'");
   chk(r.cliSpeech, "Contacto tiene los botones 'Speech 1' y 'Speech 2'");
   chk(r.cliAccion, "Acción tiene 'Aprobar pedido' y 'Eliminar pedido'");
+  chk(r.cliMontoIva, "Monto muestra el total con IVA debajo del neto (c/IVA $121.000)");
+  chk(r.cliMsgTotal, "Speech 1 manda el TOTAL con IVA del pedido");
+  chk(r.cliMsgSinSena, "Speech 1 ya NO pide seña del 30%");
+  chk(r.cliMsgAdelantado, "Speech 1 dice que el pago va por adelantado, antes de armar y entregar");
   chk(r.cliDemoFila, "'Ver ejemplo' muestra una fila EJEMPLO con su monto ($120.480)");
   chk(r.cliDemoNoCuenta, "el ejemplo NO suma al badge (sigue en 1 real)");
   chk(r.cliColapsaTitulo, "colapsar Clientes nuevos: el título con el contador (1) queda");
