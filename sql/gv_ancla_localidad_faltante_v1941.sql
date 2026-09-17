@@ -1,0 +1,67 @@
+-- =====================================================================
+-- gv_ancla_localidad_faltante — el centinela del mapeo de zonas (v19.41)
+-- =====================================================================
+-- Pregunta de Luis, 17/09/2026:
+--   "quiero planear esto a futuro contemplando clientes que se incorporen,
+--    ¿se puede hacer el mapeo de manera automática?"
+--
+-- LA RESPUESTA CORTA: en su mayor parte YA ES AUTOMÁTICO, y no por
+-- adivinanza. Los tres casos:
+--
+--   1. CLIENTE NUEVO DE CABA           -> automático. La comuna sale del
+--      barrio (GV_Comuna_Barrio) y el agrupamiento es por distancia: no
+--      hay nada que mapear.
+--
+--   2. CLIENTE NUEVO QUE VA POR EXPRESO -> automático, y es el 46,6% de
+--      los pedidos. Su parada NO es su ciudad: es el GALPÓN del expreso,
+--      que está en CABA (Soldati, Barracas, Pompeya, Parque Patricios).
+--      Medido: los clientes de Mar del Plata, Bahía Blanca y La Plata
+--      caen a 9-13 km del depósito, que es donde está el galpón. Por eso
+--      un cliente nuevo de Tucumán no necesita que nadie lo clasifique.
+--
+--   3. CLIENTE NUEVO DEL CONURBANO CON ENTREGA A DOMICILIO -> es el ÚNICO
+--      que necesita una fila en GV_Ancla_Localidad. En TODO un año fueron
+--      **4 localidades**. Para eso está esta vista.
+--
+-- ⚠ POR QUÉ NO SE AUTOMATIZA DEL TODO, con el número que lo dice:
+--   Se probó asignar la zona por el VECINO MÁS CERCANO (la zona de la
+--   localidad mapeada más próxima), validado leave-one-out contra las 37
+--   ya cargadas a mano: **acierta 27 de 37 = 73%**. Uno de cada cuatro
+--   mal. Alcanza para SUGERIR, no para cargar solo — y por eso la
+--   columna se llama `sugerencia` y no `region`.
+--   (También se probó deducir la zona por el RUMBO desde el depósito y se
+--   descartó: daba Luján al este y San Martín al noroeste. La fórmula o
+--   los puntos están mal; no se construyó nada encima.)
+--
+-- ⚠ Y la sugerencia se APAGA si la localidad está a más de 40 km: ahí no
+--   es conurbano, es interior, y va por expreso. Sin ese guard el vecino
+--   más cercano proponía **Junín -> GBA-N** (por Pilar, a 37 km), cuando
+--   Junín está a 250 km de Buenos Aires.
+-- =====================================================================
+
+-- La vista vive en la base; su definición completa se aplica junto con
+-- gv_ancla_v1940.sql. Uso:
+--
+--   select * from public.gv_ancla_localidad_faltante;
+--
+-- Vacía = no hay nada que clasificar. Si aparece una fila:
+--   · `que_hacer` dice si es conurbano (mapear) o interior (dejar)
+--   · `sugerencia` propone la zona; `se_parece_a` y `km_a_esa` dicen por qué
+--   · se carga con un INSERT, no tocando código:
+--
+--     insert into public."GV_Ancla_Localidad" (localidad, region, nota)
+--     values ('<localidad normalizada>', 'GBA-N|GBA-O|GBA-S', '<por qué>');
+--
+-- Cargadas el 17/09 con este criterio (las tres a menos de 7 km de su gemelo):
+--   quilmes oeste            -> GBA-S  (2,3 km de Quilmes)
+--   san antonio de padua     -> GBA-O  (1,5 km de Merlo)
+--   mercado central (ma a ju)-> GBA-O  (La Matanza, 6,7 km de San Justo)
+--
+-- Efecto medido de mapear esas tres: las anclas de 90 días bajaron de 91 a
+-- **86** y los `sin_lugar` de 3 a **1**. O sea que mantener esta tabla al
+-- día no es burocracia: cada localidad sin mapear cuesta camiones.
+--
+-- ROLLBACK:  drop view if exists public.gv_ancla_localidad_faltante;
+--            delete from public."GV_Ancla_Localidad"
+--             where localidad in ('quilmes oeste','san antonio de padua',
+--                                 'mercado central (ma a ju)');

@@ -22509,3 +22509,73 @@ entrada, o correr el modelo en sombra hacia adelante.
 
 Está completo al pie de `sql/gv_ancla_v1940.sql`: 8 `drop function`, un `drop table` y un
 `delete` de las 6 claves de config. No deja rastro.
+
+---
+
+## §3.jb — v19.41: AGOSTO confirma el modelo, y el mapeo de zonas es casi todo automático
+
+### Agosto, con el mismo método que septiembre
+
+`gv_ancla_comparar(date '2026-08-01', date '2026-08-31')`, mes completo:
+
+| | real | modelo | |
+|---|---:|---:|---|
+| pedidos (cliente-día) | 212 | 212 | = |
+| m³ despachados | 95,99 | 95,99 | = |
+| **camiones** | **52** | **31** | **−40,4 %** |
+| paradas por camión | 4,08 | 6,84 | +67,7 % |
+| m³ por camión | 1,85 | 3,10 | +67,7 % |
+| camiones de 1 sola parada | 14 | 7 | −50 % |
+
+**Dos meses distintos, el mismo resultado: −40,4 % en agosto y −38,9 % en septiembre.** No es
+un mes bueno: agosto tiene el doble de volumen que el tramo medido de septiembre (96 contra
+39 m³) y el ahorro se sostiene.
+
+### ¿El mapeo de localidades se puede automatizar? En su mayor parte YA LO ES
+
+Luis preguntó cómo se contemplan los clientes que se incorporen. Hay tres casos y **sólo uno**
+necesita intervención:
+
+| cliente nuevo de… | ¿hay que mapearlo? |
+|---|---|
+| **CABA** | **No.** La comuna sale del barrio y el agrupamiento es por distancia |
+| **Lo que va por EXPRESO** (46,6 % de los pedidos) | **No.** Su parada es el **galpón**, no su ciudad |
+| **Conurbano con entrega a domicilio** | **Sí** — y en todo un año fueron **4 localidades** |
+
+⚠ **El hallazgo que lo explica:** los clientes de Mar del Plata, Bahía Blanca y La Plata caen a
+**9-13 km del depósito**, no a 400. No es un error de geocodificación: `gv_ancla_paradas` los
+manda al **galpón del expreso** (Soldati, Barracas, Pompeya, Parque Patricios), que es adonde
+va el camión de verdad. Por eso un cliente nuevo de Tucumán no necesita que nadie lo clasifique.
+
+### El centinela: `gv_ancla_localidad_faltante`
+
+```sql
+select * from public.gv_ancla_localidad_faltante;   -- vacía = nada que clasificar
+```
+
+Lista sólo las localidades **con entrega a domicilio** que no están en `GV_Ancla_Localidad`,
+con su volumen, su distancia al depósito y una **sugerencia** de zona.
+
+⚠ **La sugerencia sugiere, no decide — y el número es el que manda.** Se probó asignar la zona
+por el **vecino más cercano**, validado leave-one-out contra las 37 localidades ya cargadas a
+mano: **acierta 27 de 37 = 73 %**. Uno de cada cuatro mal. Por eso la columna se llama
+`sugerencia` y no `region`.
+
+⚠ **Y se apaga a más de 40 km.** Sin ese guard proponía **Junín → GBA-N** (por Pilar, a 37 km de
+su punto), cuando Junín está a 250 km: es interior y va por expreso. La columna `que_hacer` lo
+dice con todas las letras.
+
+También se probó deducir la zona por el **rumbo desde el depósito** y **se descartó**: daba
+Luján al este (107°) y San Martín al noroeste (343°). La fórmula o los puntos están mal, y no
+se construyó nada encima — queda anotado para que nadie lo reintente sin revisarlo.
+
+### Mantener la tabla al día no es burocracia: cuesta camiones
+
+Se cargaron las tres del conurbano que estaban pendientes (todas a menos de 7 km de su gemelo
+ya mapeado): `quilmes oeste` → GBA-S, `san antonio de padua` → GBA-O, `mercado central (ma a
+ju)` → GBA-O.
+
+**Efecto medido:** las anclas de 90 días bajaron de **91 a 86** y los `sin_lugar` de **3 a 1**.
+Y agosto pasó de −38,5 % a **−40,4 %**. Cada localidad sin mapear se paga en viajes.
+
+`sql/gv_ancla_localidad_faltante_v1941.sql`.
