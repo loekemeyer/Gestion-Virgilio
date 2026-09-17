@@ -22524,3 +22524,52 @@ tampoco lo toca a propósito: mira `tipo='facturado'`, y un desarme no es un dre
 
 No se implementó ninguno: (A) cambia un flujo que Facturación usa todos los días y (B) deja una
 factura emitida sin avisar. Mientras tanto el centinela lo canta el mismo día.
+
+### §3.gt — v19.51: desarmar una NP ya facturada compensa el asiento — 2026-09-17
+
+Decisión del dueño (Luis), cerrando el problema 392: *"No, porque no quiero ponerme a cruzar
+notas de crédito. Asumí que si se desarma un pedido ya facturado significa que hay nota de crédito
+que lo compensa, así que compensá asiento solo."* → **opción (B)**. La factura **no se toca desde
+acá**: nada de borrar la fila de `Facturacion_NP` ni de encolar anulaciones en ISIS. El desarme
+sólo deja bien el **stock**. SQL en `sql/gv_desarme_reversa_facturado_v1951.sql`.
+
+**La reversa.** Antes de devolver la mercadería, el desarme repone lo que el facturado había
+descontado: una fila `desarme` de **+N** en `a_facturar` con descripción *"Reversa del facturado de
+la NP X (tanda T): …"*, y enseguida la salida de −N. Neto **cero**: la pila no queda negativa y el
+stock total cierra. El supervisor lo ve en el mensaje: *"⚠ la NP ya estaba facturada: se repuso el
+facturado de N cajas (se compensa con nota de crédito)"*.
+
+**`gv_ppp_np_devolucion` tenía DOS problemas, no uno:**
+
+1. **Medía la pila con `ref = tanda` EXACTO**, así que no veía los drenajes por NP (`tanda|NP`) ni
+   los desarmes de otras NP de la misma tanda (que salen con `ref = NP`): creía que las cajas
+   seguían ahí. Es el mismo pozo que el front ya había tapado en su v5.96 con
+   `_stockAfacturarRestanteTanda`. Ahora suma `ref = tanda`, `ref = tanda|…` y los desarmes
+   atribuidos por el `(tanda XXXX)` de la descripción.
+2. **Columna nueva `rev_fact`**: cuántas cajas hay que reponer porque esta NP ya las drenó al
+   facturarse. Los dos formatos de `ref` son los mismos que usa `revertir_drenaje_facturado()`:
+   `tanda|NP` y `NP|CP`.
+
+⚠ **Y `dren` resta lo ya repuesto.** Sin eso, desarmar dos veces la misma NP devuelve la mercadería
+**dos veces** — no lo vi leyendo el código, lo destapó correr el desarme dos veces seguidas: la
+primera vuelta devolvía 24 cajas y la segunda otras 24.
+
+⚠ Cambia el tipo de retorno → **DROP + CREATE**, no hay `OR REPLACE` que valga. La llaman
+`gv_ppp_np_desarmar` y `gv_ppp_np_cancelar_previo` (la pantalla de confirmación), las dos por
+nombre de columna, así que la columna nueva no les molesta.
+
+⚠ La descripción de la reversa **tiene que llevar el `(tanda XXXX)`**: es por ahí que la vuelven a
+encontrar el centinela `gv_stock_afacturar_tanda_negativa` y el CTE `sal`. Y el guard
+`zzz_facturado_no_negativo` (v19.49) no interfiere: mira `tipo='facturado'` y estas filas son
+`desarme`.
+
+**Probado corriendo el desarme de verdad, dentro de una transacción abortada:**
+
+| prueba | esperado | resultado |
+|---|---|---|
+| NP 98497 (ya facturada, pila D53C en 0) | a_facturar neto 0 | **0** — 34 filas: 17 reversas y 17 salidas · a_guardar +24 ✔ |
+| la misma, segunda vuelta | no devolver nada | *"no había mercadería movida: no se devolvió nada"* ✔ |
+| NP LK 0054 (sin facturar, tanda E03F con pila viva) | igual que siempre | a_facturar **−19** · a_guardar +19 · **0 reversas** ✔ |
+| `gv_ppp_np_cancelar_previo('98497')` (la pantalla) | las mismas cajas | 17 art / 24 cajas ✔ |
+
+Nada quedó vivo: 0 filas en `Movimientos_Stock`, `GV_Desarmes` y `NP_Canceladas`.
