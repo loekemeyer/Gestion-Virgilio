@@ -133,3 +133,31 @@ delete from public."Movimientos_Stock" where id in (55634924, 55638992, 55643060
 
 alter table public."Movimientos_Stock" enable trigger trigger_actualizar_saldo_stock;
 select public.refresh_stocks_carga_rapida();
+
+-- ════════════════════════════════════════════════════════════════════════════════════
+-- v19.36 (2026-09-17) — REVISION POSTERIOR: los 2 fantasmas que quedaban, cerrados
+-- ════════════════════════════════════════════════════════════════════════════════════
+-- Al barrer después del 809E quedaban 2 filas en `gv_stock_empresa_fantasma`, y eran el
+-- **mismo caso**, en dos códigos huérfanos (no están en góndola, ni en lista, ni en racks,
+-- así que `gv_empresa_de_articulo` devuelve NULL y el backfill no los pudo resolver):
+--
+--   029 · terminado · total 0 · LK −2 / Mixto +2
+--   830 · terminado · total 0 · CH −6 / Mixto +6
+--
+-- Cada uno tiene UN solo picking en toda su historia, y ese picking sí dice la empresa
+-- (029 → C67A → LK; 830 → C69C → CH). Lo que quedó en Mixto es la carga inicial del 26/06
+-- y el reset del 01/08, o sea las dos puntas del mismo movimiento. Se les puso la empresa
+-- de su picking: cada empresa queda en 0 y el fantasma desaparece.
+--
+--   update public."Movimientos_Stock" set empresa='LK' where id in (5, 20596);    -- 029
+--   update public."Movimientos_Stock" set empresa='CH' where id in (230, 20662);  -- 830
+--
+-- Respaldo: zz_backups."GV_Backup_029_830_Mixto_20260917".
+--
+-- ── Estado final de los centinelas de stock ─────────────────────────────────────────
+--   gv_stock_empresa_fantasma      0   (eran 2)
+--   gv_stock_particion_sospechosa  0   (eran 3)
+--   gemelos escondidos             0
+--   movimientos de mercadería sin empresa  0
+--   gv_endpoints_rotos             0
+-- ════════════════════════════════════════════════════════════════════════════════════

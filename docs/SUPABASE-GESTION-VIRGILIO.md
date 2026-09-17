@@ -21916,3 +21916,26 @@ select count(*) from (
 
 Respaldos: `zz_backups."GV_Backup_809E_Mixto_20260917"` (las 118 enteras) y
 `zz_backups."GV_Backup_520_D72A_vacio_20260917"`.
+
+### v19.36 (17/09) — revisión posterior: los 2 fantasmas que quedaban, cerrados
+
+Al barrer después del 809E quedaban 2 filas en `gv_stock_empresa_fantasma`, y eran el **mismo
+caso** en dos códigos huérfanos (no están en góndola, ni en lista, ni en racks, así que
+`gv_empresa_de_articulo` devuelve NULL y el backfill no los pudo resolver): **029** (LK −2 /
+Mixto +2) y **830** (CH −6 / Mixto +6), los dos con total 0 en `terminado`.
+
+Cada uno tiene **un solo picking** en toda su historia y ese picking sí dice la empresa (029 →
+C67A → LK; 830 → C69C → CH); lo que quedó en Mixto es la carga inicial del 26/06 y el reset del
+01/08, o sea las dos puntas del mismo movimiento. Se les puso la empresa de su picking: cada
+empresa queda en 0 y el fantasma desaparece. Respaldo:
+`zz_backups."GV_Backup_029_830_Mixto_20260917"`.
+
+**Centinelas de stock, estado final:** `gv_stock_empresa_fantasma` **0** (eran 2) ·
+`gv_stock_particion_sospechosa` **0** (eran 3) · gemelos escondidos **0** · movimientos de
+mercadería sin empresa **0** · `gv_endpoints_rotos` **0**.
+
+⚠ **El problema 110 sigue abierto, pero ya no por el 809E.** *"El depósito inventa códigos en
+los racks: 424 cajas de 809E que el stock no cuenta"* eran AD06 (360) + AE11 (64), que el conteo
+del 17/09 dijo que no están y se borraron (v19.33). **Pero `Racks_Planimetria` y
+`Movimientos_Stock` siguen sin cuadrar en 15+ códigos más**: 505I −974, 546V +891, 523C +240,
+725E +192, 1000900 +160, 702E ±... La consulta que lo mide quedó anotada en el problema.
