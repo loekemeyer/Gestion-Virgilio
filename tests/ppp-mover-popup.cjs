@@ -5,9 +5,11 @@
    (a) el botón de la tanda llama a pppMoverAbrir, no al panel viejo;
    (b) el pop-up trae un botón por día con m³ / cupo y cuánto queda, y una barra de carga;
    (c) el día donde YA está la tanda se marca "está acá" y no se puede elegir; el no hábil tampoco;
-   (d) tocar un día mueve la tanda a ESE día (gv_ppp_tanda_mover) y cierra el pop-up;
+   (d) tocar un día abre el PASO 2 (v19.32: ¿en qué tanda?) y desde ahí se mueve (gv_ppp_tanda_mover)
+       y se cierra el pop-up;
    (e) si el backend rechaza (tanda empezada) NO cierra: deja ver el error y volver a elegir;
-   (f) sigue avisando si el día destino abre un segundo camión.
+   (f) sigue avisando si el día destino abre un segundo camión — el aviso lo daba `pppTandaMover`,
+       que dejó de estar en este camino: ahora se pregunta al elegir el día y sale en el confirm.
    RPC interceptadas por fetch, sin red. Sale 1 si falla. */
 const path = require("path");
 let chromium;
@@ -84,14 +86,17 @@ catch (_e) {
     out.lleno = /mv-tag lleno">completo/.test(h) && /pasado por 1,2 m³/.test(h);
     out.barra = /<div class="mv-bar"><i style="width:/.test(h);
 
-    // (f)+(d) elegir un día: avisa del segundo camión, mueve y cierra
+    // (f)+(d) elegir un día abre el paso 2; desde ahí se mueve, avisando del segundo camión
     window.__cam = [{ camion: "Capital", ya_va: false, paradas: 2, camiones_dia: 2, es_super: false }];
     window.confirm = (m) => { preg.push(String(m)); return true; };
     calls.length = 0;
     await pppMovElegir(dd(4));
+    out.paso2 = _pppMov.paso === "tanda" && !calls.some((x) => x.fn === "gv_ppp_tanda_mover");
+    for (let i = 0; i < 40 && !_pppMov.avisoCamion; i++) await new Promise((r) => setTimeout(r, 25));
+    await pppMovDestinoElegir("");
     const c = calls.find((x) => x.fn === "gv_ppp_tanda_mover") || { body: {} };
     out.pregunta = preg[0] || "";
-    out.movio = { tanda: c.body.p_tanda, fecha: c.body.p_fecha };
+    out.movio = { tanda: c.body.p_tanda, fecha: c.body.p_fecha, dest: c.body.p_tanda_destino };
     out.cerroAlMover = !document.getElementById("pppMovOverlay").classList.contains("show");
 
     // (e) si el backend rechaza, NO cierra
@@ -99,6 +104,7 @@ catch (_e) {
     pppMoverAbrir("D66B");
     for (let i = 0; i < 40 && (!_pppMov || _pppMov.cargando); i++) await new Promise((r) => setTimeout(r, 25));
     await pppMovElegir(dd(4));
+    await pppMovDestinoElegir("");
     for (let i = 0; i < 40 && _pppMov.cargando; i++) await new Promise((r) => setTimeout(r, 25));
     out.sigueAbierto = document.getElementById("pppMovOverlay").classList.contains("show");
     out.dijoElError = (out.alerts || []).some((a) => /ya está empezada/.test(a));
@@ -119,8 +125,10 @@ catch (_e) {
   chk(r.noHabil, "el día no hábil se muestra y no se puede elegir");
   chk(r.lleno, "un día pasado de cupo se marca 'completo' y dice por cuánto");
   chk(r.diasClickeables === 3, "quedan 3 días elegibles (hoy, el lleno y el libre): " + r.diasClickeables);
+  chk(r.paso2, "tocar un día NO mueve: abre el paso 2 «¿en qué tanda?» (v19.32)");
   chk(/ya salen 2 camión\(es\) y esto abre otro: Capital/.test(r.pregunta), "avisa si el día elegido abre un segundo camión");
-  chk(r.movio.tanda === "D66B" && !!r.movio.fecha, "mueve la tanda al día que se tocó (" + JSON.stringify(r.movio) + ")");
+  chk(r.movio.tanda === "D66B" && !!r.movio.fecha && r.movio.dest === "",
+      "mueve la tanda al día que se tocó, con tanda nueva (" + JSON.stringify(r.movio) + ")");
   chk(r.recargo >= 1, "recarga la programación desde Supabase");
   chk(r.cerroAlMover, "y cierra el pop-up");
   chk(r.sigueAbierto && r.dijoElError, "si el backend rechaza, dice por qué y NO cierra");

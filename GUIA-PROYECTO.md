@@ -12291,6 +12291,68 @@ Detalle, medición y rollback en `docs/SUPABASE-GESTION-VIRGILIO.md` §3.gl.
 
 ---
 
+### 📅 Cambiar de día — ahora también por PEDIDO, y eligiendo la tanda (v19.32, pedido de Luis)
+
+Dos cambios sobre lo de arriba.
+
+#### 1. El botón 📅 está también en la fila de la NP, y mueve el PEDIDO entero
+
+Luis: *"si hay más notas de pedido que se corresponden a un mismo pedido de ese cliente, que se
+muevan todas en conjunto. Parecido a cómo funciona el botón de enviar a programar"*.
+
+Un pedido de la página se parte en **bloques de 18 renglones (LK) / 15 (Chef)**, y cada bloque es
+una NP. Tocar 📅 en una de ellas mueve **las NP de ese mismo pedido, juntas** — quién es el pedido
+lo resuelve el backend con `gv_ppp_web_desprogramar_previo`, el mismo previo que ya usaba
+«↩ Enviar a programar». Una NP de ISIS va sola (ahí no hay bloques).
+
+Las NP **se mueven en un solo `UPDATE`** y eso no es un detalle: el trigger
+`gv_web_cliente_un_solo_dia` es `AFTER … FOR EACH ROW`, y moviéndolas de a una la segunda chocaba
+contra la primera — el pedido rebotaba contra sí mismo.
+
+#### 2. Al elegir el día se elige TAMBIÉN la tanda
+
+Luis: *"que se dé la opción de crear una tanda nueva para esos pedidos o agregarlos a una tanda
+que ya existe ese día… Si le doy que la quiero agregar a la E18A… deja de existir la tanda
+original y los pedidos pasan a integrarse dentro de la tanda que elegí"*.
+
+El pop-up ahora tiene **dos pasos**: primero el día (igual que siempre), después **a qué tanda**.
+
+- **➕ Tanda nueva** → código nuevo del día (el del camión que ya va, si hay).
+- **…o una que ya existe** → cada candidata muestra sus m³, NP, clientes, camión y zonas. Si la
+  tanda de origen queda **vacía, deja de existir**: sus pedidos pasan a ser de la elegida.
+- **El contenido no cambia nunca: no hay que volver a pickear.**
+
+**La regla del estado (Luis).** *"un pedido armado solo a una tanda que este armada, un pedido
+facturado solo a una tanda que este facturada, uno en espera a una tanda en espera; el problema es
+si esta en ese momento siendo pickeado/armado en cuyo caso no se puede mover a una tanda existente
+y debería decir que solo se puede mover creandole una tanda nueva."*
+
+| Lo que se mueve | A qué tanda puede entrar |
+|---|---|
+| Pendiente (sin empezar) | a una tanda pendiente, o tanda nueva |
+| Armado | **sólo** a una tanda armada, o tanda nueva |
+| Facturado | **sólo** a una tanda facturada, o tanda nueva |
+| **En proceso** (pickeándose o armándose AHORA) | **sólo tanda nueva** |
+
+Las que no dan salen **apagadas y con el motivo escrito**. Esto **no se puede forzar**: es la
+regla, no un aviso.
+
+**Las mezclas se avisan, no se bloquean** (también decisión de Luis: *"de momento advertir sin
+bloquear"*). Un súper adentro de una tanda de clientes comunes —o al revés—, o zonas distintas,
+pintan un **cartel rojo** en el botón y encabezan la confirmación con **⚠⚠ OJO ⚠⚠**.
+
+**Un pedido armado que se separa sigue figurando armado.** El árbol resuelve «armado» por
+**tanda** (el evento `TAP` se guarda con el código de tanda, no con la NP), así que una NP separada
+habría vuelto a figurar *pendiente* y alguien la manda a pickear de nuevo. Se sostiene con un piso
+de estado por NP (`GV_PPP_NP_Estado`), no copiando eventos — copiarlos duplicaría la producción
+del operario en Rendimiento.
+
+Al **re-codificar una tanda entera** se renombra también lo que la nombra por su código: los
+eventos de los operarios, las entregas y el `ref` de los movimientos de stock. El stock en sí no
+se mueve. Detalle, medición y rollback en `docs/SUPABASE-GESTION-VIRGILIO.md` §3.go.
+
+---
+
 ### Monitor TV — `monitor/tv.html` (v18.74, pedido de Luis)
 
 Versión **liviana y de solo lectura** del tablero, para la TV colgada en planta.

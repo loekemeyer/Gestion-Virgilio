@@ -57,6 +57,16 @@ catch (_e) {
                 { dia: "2026-09-18", m3: 0, cupo: 6, habil: true, tandas: 0 }];
       }
       if (fn === "gv_ppp_web_camion_nuevo") return [];
+      // v19.32: el paso 2 del pop-up pregunta qué tandas hay ese día, ya juzgadas por el backend.
+      if (fn === "gv_ppp_tandas_del_dia") {
+        return [{ tanda: "E18A", m3: 1.1, nps: 3, clientes: 2, estado: "armado", orden: 3,
+                  zonas: "Zona 2", camiones: "Capital", es_super: false, compatible: true,
+                  motivo: null, aviso: null },
+                { tanda: "E30A", m3: 0.4, nps: 1, clientes: 1, estado: "pendiente", orden: 1,
+                  zonas: "Zona 5", camiones: "GBA Oeste", es_super: true, compatible: false,
+                  motivo: "Esa tanda esta pendiente y lo que moves esta armado. Solo se juntan tandas en el mismo estado.",
+                  aviso: "Esa tanda es de un SUPER y lo que moves no: los super van solos, sin clientes comunes." }];
+      }
       if (fn === "gv_ppp_tanda_mover") {
         if (window.__falla && !args.p_forzar) {
           window.__falla = "";
@@ -118,9 +128,19 @@ catch (_e) {
     rpc.length = 0; confirms.length = 0;
     const dia18 = [...document.querySelectorAll("#pppMovBody .mv-d")].find((x) => x.textContent.indexOf("18") >= 0);
     dia18.click();
+    // v19.32: el dia ya no mueve nada — abre el PASO 2, «en que tanda?».
+    await esperar(() => !!document.querySelector("#pppMovBody .mv-esp-b.nueva"));
+    out.paso2 = !!document.querySelector("#pppMovBody .mv-esp-b.nueva");
+    out.pidioTandas = rpc.some((x) => x.fn === "gv_ppp_tandas_del_dia");
+    const dests = [...document.querySelectorAll("#pppMovBody .mv-dest")];
+    out.destOk = dests.some((b) => /E18A/.test(b.textContent) && !b.disabled);
+    out.destNo = dests.some((b) => /E30A/.test(b.textContent) && b.disabled);
+    out.destMotivo = /mismo estado/.test((dests.find((b) => /E30A/.test(b.textContent)) || {}).textContent || "");
+    out.destAviso = !!document.querySelector("#pppMovBody .mv-dest-av");
+    document.querySelector("#pppMovBody .mv-esp-b.nueva").click();
     await esperar(() => rpc.some((x) => x.fn === "gv_ppp_tanda_mover"));
     const arg = (rpc.find((x) => x.fn === "gv_ppp_tanda_mover") || {}).args || {};
-    out.argMover = JSON.stringify({ t: arg.p_tanda, f: arg.p_fecha, forzar: arg.p_forzar });
+    out.argMover = JSON.stringify({ t: arg.p_tanda, f: arg.p_fecha, forzar: arg.p_forzar, dest: arg.p_tanda_destino });
     out.confirmDiceArmada = confirms.join(" ").indexOf("pickeada o armada") >= 0;
     out.confirmDiceNoRepickear = confirms.join(" ").toLowerCase().indexOf("no hay que volver a pickear") >= 0;
     await esperar(() => recargas > 0);
@@ -169,8 +189,13 @@ catch (_e) {
   ok(/Cambiar de d[ií]a/.test(r.titulo) && /E01A/.test(r.titulo), "(b) con la tanda en el título", JSON.stringify(r.titulo));
   ok(/2/.test(r.sub) && /1,5|1\.5/.test(r.sub), "(b) y con sus pedidos y m³, sacados del árbol", JSON.stringify(r.sub));
   ok(r.pidioCalendario, "(b) pide el calendario con los m³ y el cupo de cada día");
-  ok(r.argMover === JSON.stringify({ t: "E01A", f: "2026-09-18", forzar: true }),
-     "(c) mueve la tanda al día que se tocó, forzando porque está armada", r.argMover);
+  ok(r.paso2, "(c) elegir el día abre el paso 2 («¿en qué tanda?») y todavía no mueve nada");
+  ok(r.pidioTandas, "(c) y le pregunta al backend qué tandas hay ese día (gv_ppp_tandas_del_dia)");
+  ok(r.destOk, "(c) la tanda compatible se puede elegir");
+  ok(r.destNo && r.destMotivo, "(c) la incompatible queda apagada y dice por qué (la regla de estados de Luis)");
+  ok(r.destAviso, "(c) y el aviso de súper / camión distinto se ve, sin bloquear");
+  ok(r.argMover === JSON.stringify({ t: "E01A", f: "2026-09-18", forzar: true, dest: "" }),
+     "(c) elegir «tanda nueva» mueve la tanda al día tocado, forzando porque está armada", r.argMover);
   ok(r.confirmDiceArmada && r.confirmDiceNoRepickear, "(c) y el confirm avisa que está armada y que no hay que volver a pickear");
   ok(r.recargoElArbol, "(c) recarga el árbol y los atrasados (tienen caché propio)");
   ok(r.popupCerrado, "(c) y cierra el pop-up");

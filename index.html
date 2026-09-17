@@ -5716,7 +5716,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=19.31"></script>
+<script type="module" src="recepcion.js?v=19.32"></script>
 <!-- Config del módulo de fichada (compartido con fichada.html). El secret
      hmacSecret tiene que ser el mismo acá y allá; cargándolo desde un solo
      archivo evitamos que se desincronicen. -->
@@ -9562,7 +9562,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v19.31";
+const APP_VERSION = "v19.32";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -34621,6 +34621,26 @@ function _pppMovCss() {
     ".mv-esp-b[disabled]{cursor:default;background:#f1f5f9;border-style:solid;}" +
     ".mv-esp-b b{display:block;font-size:14px;font-weight:800;color:#334155;}" +
     ".mv-esp-b span{display:block;margin-top:3px;font-size:11.5px;font-weight:600;color:#64748b;}" +
+    // v19.32 — paso 2: la tanda destino. Las que no se pueden quedan grises CON el motivo, no
+    // escondidas: si no están, el supervisor no entiende por qué falta la que busca.
+    ".mv-esp-b.nueva{border-color:#1e6bd6;border-style:solid;}" +
+    ".mv-esp-b.nueva b{color:#1e6bd6;}" +
+    ".mv-back{float:right;background:#fff;border:1px solid #cbd5e1;border-radius:8px;padding:3px 10px;" +
+      "font-size:12px;font-weight:800;color:#1e6bd6;cursor:pointer;width:auto;}" +
+    ".mv-dest-t{margin:13px 0 7px;font-size:12.5px;font-weight:800;color:#475569;}" +
+    ".mv-dests{display:grid;grid-template-columns:repeat(auto-fill,minmax(232px,1fr));gap:9px;}" +
+    ".mv-dest{text-align:left;background:#fff;border:1px solid #dbe3ee;border-radius:11px;padding:9px 11px;" +
+      "cursor:pointer;width:auto;font:inherit;}" +
+    ".mv-dest:hover{border-color:#1e6bd6;box-shadow:0 3px 10px rgba(30,107,214,.14);}" +
+    ".mv-dest.no{background:#f1f5f9;cursor:not-allowed;opacity:.85;}" +
+    ".mv-dest-h{display:flex;align-items:center;gap:7px;flex-wrap:wrap;}" +
+    ".mv-dest-h b{font-size:15px;font-weight:900;color:#0f172a;}" +
+    ".mv-dest-sup{background:#fef3c7;color:#92400e;border-radius:999px;padding:1px 8px;font-size:10px;font-weight:900;letter-spacing:.4px;}" +
+    ".mv-dest-d{display:block;margin-top:5px;font-size:12px;font-weight:700;color:#334155;font-variant-numeric:tabular-nums;}" +
+    ".mv-dest-z{display:block;font-size:11.5px;font-weight:600;color:#64748b;}" +
+    ".mv-dest-av{display:block;margin-top:6px;font-size:12px;font-weight:800;color:#b91c1c;background:#fee2e2;" +
+      "border-radius:7px;padding:5px 8px;line-height:1.3;}" +
+    ".mv-dest-no{display:block;margin-top:6px;font-size:11.5px;font-weight:700;color:#7c2d12;}" +
     ".mv-mas{margin-top:11px;text-align:center;}" +
     ".mv-mas button{background:#fff;border:1px solid #cbd5e1;border-radius:9px;padding:7px 14px;font-size:12.5px;font-weight:800;color:#1e6bd6;cursor:pointer;width:auto;}";
   document.head.appendChild(st);
@@ -34640,6 +34660,7 @@ async function pppMovCargar() {
 function pppMovRender() {
   const body = document.getElementById("pppMovBody"); if (!body || !_pppMov) return;
   const M = _pppMov;
+  if (M.paso === "tanda") { body.innerHTML = pppMovPaso2Html(); return; }   // v19.32: ¿en qué tanda?
   let h = '<div class="mv-sub"><b>' + M.np + '</b> pedido' + (M.np === 1 ? '' : 's') + ' · <b>' + _pppFmtM3(M.m3) + ' m³</b>' +
     (M.actualTxt ? ' · hoy está el <b>' + escapeHtml(M.actualTxt) + '</b>' : '') + '</div>';
   h += '<div class="mv-note">Tocá el día al que la querés mover. Los m³ de cada día son <b>todo lo que ya tiene programado</b> (ISIS y web). Se guarda en el servidor: <b>lo ven todos</b>, también el operario. Una tanda ya empezada se puede mover igual: el contenido no cambia y no hay que volver a pickear.</div>';
@@ -34730,12 +34751,170 @@ window.pppTandaEspera = pppTandaEspera; window.pppMovEsperaElegir = pppMovEspera
 async function pppMovElegir(iso) {
   if (!_pppMov) return;
   if (_pppMov.reprogNps) return pppReprogElegir(iso);   // v14.36: pop-up reutilizado para reprogramar un ISIS
-  const t = _pppMov.tanda;
-  // v19.11: si el pop-up lo abrió la tabla, las filas y el estado vienen del árbol.
-  const ok = await pppTandaMover(t, iso, { filas: _pppMov.arbolFilas, empezada: _pppMov.empezada,
-                                           desdeArbol: _pppMov.desdeArbol });
-  if (ok) pppMovCerrar(); else pppMovCargar();
+  // v19.32 (Luis): elegir el día ya no mueve nada — abre el PASO 2, «¿en qué tanda?».
+  return pppMovPaso2(iso);
 }
+
+/* ═══════════════════════════════════════════════════════════════════════════════════════════
+   v19.32 (Luis) — PASO 2 DEL POP-UP: ¿EN QUÉ TANDA DE ESE DÍA?
+   *"cuando se mueven a un día, se dé la opción de crear una tanda nueva para esos pedidos o
+   agregarlos a una tanda que ya existe ese día… Si le doy que la quiero agregar a la E18A…
+   deja de existir la tanda original y los pedidos pasan a integrarse dentro de la que elegí."*
+
+   Quién juzga cada candidata es el BACKEND (`gv_ppp_tandas_del_dia`), no esta pantalla: la regla
+   de estados y las mezclas de súper / camión son de negocio. Acá sólo se pintan.
+     · `compatible = false` → el botón queda apagado y dice POR QUÉ (regla de Luis: un pedido
+       armado sólo entra en una tanda armada; lo que se está pickeando ahora, sólo tanda nueva).
+     · `aviso` → cartel ROJO y grande arriba (súper mezclado con clientes comunes, o dos camiones
+       distintos): advierte, no bloquea — también decisión de Luis.
+   ═══════════════════════════════════════════════════════════════════════════════════════════ */
+async function pppMovPaso2(iso) {
+  if (!_pppMov) return;
+  _pppMov.paso = "tanda"; _pppMov.destIso = iso; _pppMov.dest = null; _pppMov.destErr = "";
+  _pppMov.avisoCamion = "";
+  pppMovRender();
+  pppMovCamionNuevo(iso);            // en paralelo: no frena la lista de tandas
+  try {
+    _pppMov.dest = await aprRpc("gv_ppp_tandas_del_dia", {
+      p_fecha: iso,
+      p_np: _pppMov.pedidoNp || null,
+      p_tanda_origen: _pppMov.pedidoNp ? null : (_pppMov.tanda || null)
+    }) || [];
+  } catch (e) {
+    _pppMov.dest = []; _pppMov.destErr = (e && e.message) ? e.message : String(e);
+  }
+  pppMovRender();
+}
+/* v19.32 — el aviso de "esto abre un segundo camión" que daba `pppTandaMover` sigue vivo: al partir
+   el pop-up en dos pasos habría quedado afuera. Se pregunta al elegir el DÍA y se muestra en el
+   confirm del paso 2. Si falla, no avisa y no rompe: es una advertencia, no una validación. */
+async function pppMovCamionNuevo(iso) {
+  const M = _pppMov; if (!M) return;
+  // las filas vienen del árbol; desde la vista clásica salen de donde salían (igual que `pppTandaMover`)
+  const filas = (M.arbolFilas && M.arbolFilas.length) ? M.arbolFilas
+    : (M.tanda ? (_pppParsed.prog || []).filter(function (p) { return String(p.tanda || "").toUpperCase() === M.tanda; }) : []);
+  if (!filas.length) return;
+  try {
+    const cam = await aprRpc("gv_ppp_web_camion_nuevo", {
+      p_fecha: iso,
+      p_filas: filas.map(function (p) { return { zona: p.zona || "", barrio: p.barrio || p.localidad || "", direccion: p.direccion || "" }; })
+    }) || [];
+    const nuevos = cam.filter(function (c) { return !c.ya_va && !c.es_super && Number(c.camiones_dia) > 0; });
+    if (_pppMov !== M || M.destIso !== iso) return;                  // cambió de día mientras respondía
+    M.avisoCamion = nuevos.length
+      ? ("El " + _pppMovDiaTxt(iso) + " ya salen " + Number(nuevos[0].camiones_dia) + " camión(es) y esto abre otro: " +
+         nuevos.map(function (c) { return c.camion; }).join(", ") + ". ¿Seguro que vas a usar un segundo camión?")
+      : "";
+  } catch (_e) {}
+}
+function pppMovVolverDias() { if (_pppMov) { _pppMov.paso = "dia"; pppMovRender(); } }
+function _pppMovDiaTxt(iso) {
+  if (String(iso) === PGA_ESPERA_ISO) return PGA_ESPERA_TXT;
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(iso || "")); if (!m) return String(iso || "");
+  const d = new Date(+m[1], +m[2] - 1, +m[3]);
+  return _PN_DOW[d.getDay()] + " " + (+m[3]) + "/" + m[2];
+}
+function pppMovPaso2Html() {
+  const M = _pppMov, qué = M.pedidoNp ? ("el pedido de " + (M.pedidoCli || M.pedidoNp)) : ("la tanda " + M.tanda);
+  let h = '<div class="mv-sub">' + escapeHtml(qué) + ' → <b>' + escapeHtml(_pppMovDiaTxt(M.destIso)) + '</b>' +
+    (M.pedidoNps && M.pedidoNps.length > 1 ? ' · se llevan <b>' + M.pedidoNps.length + '</b> NP juntas (' +
+      escapeHtml(M.pedidoNps.join(", ")) + ')' : '') +
+    ' · <b>' + _pppFmtM3(M.m3) + ' m³</b>' +
+    '<button class="mv-back" onclick="pppMovVolverDias()">← otro día</button></div>';
+  h += '<div class="mv-note">Elegí <b>a qué tanda</b> van. <b>Tanda nueva</b> les da un código propio de ese día; ' +
+    'entrar en una que ya existe hace que <b>la tanda de origen deje de existir</b> si se queda vacía — el contenido no se toca, ' +
+    'no hay que volver a pickear.</div>';
+  h += '<button class="mv-esp-b nueva" onclick="pppMovDestinoElegir(\'\')"><b>➕ Tanda nueva</b>' +
+    '<span>Le pongo un código nuevo del día (el del camión que ya va, si hay).</span></button>';
+  if (!M.dest) return h + '<div class="mv-cargando">Buscando las tandas de ese día…</div>';
+  if (M.destErr) return h + '<div class="mv-cargando">No pude leer las tandas del día (' + escapeHtml(M.destErr) + ').</div>';
+  if (!M.dest.length) return h + '<div class="mv-cargando">Ese día no hay ninguna otra tanda: va en una nueva.</div>';
+  h += '<div class="mv-dest-t">…o adentro de una que ya existe:</div><div class="mv-dests">';
+  for (const t of M.dest) {
+    const ok = t.compatible !== false;
+    h += '<button class="mv-dest' + (ok ? '' : ' no') + '"' +
+      (ok ? ' onclick="pppMovDestinoElegir(\'' + escapeHtml(t.tanda) + '\')"' : ' disabled') + '>' +
+      '<span class="mv-dest-h"><b>' + escapeHtml(t.tanda) + '</b>' +
+        '<span class="pga-pill e-' + escapeHtml(t.estado) + '">' + escapeHtml(PGA_EST_TXT[t.estado] || t.estado) + '</span>' +
+        (t.es_super ? '<span class="mv-dest-sup">SÚPER</span>' : '') + '</span>' +
+      '<span class="mv-dest-d">' + _pppFmtM3(t.m3) + ' m³ · ' + t.nps + ' NP · ' + t.clientes + ' cliente' +
+        (t.clientes === 1 ? '' : 's') + ' · ' + escapeHtml(t.camiones || '—') + '</span>' +
+      '<span class="mv-dest-z">' + escapeHtml(t.zonas || '') + '</span>' +
+      (t.aviso ? '<span class="mv-dest-av">⚠ ' + escapeHtml(t.aviso) + '</span>' : '') +
+      (ok ? '' : '<span class="mv-dest-no">' + escapeHtml(t.motivo || 'No se puede') + '</span>') +
+      '</button>';
+  }
+  return h + '</div>';
+}
+/* El movimiento, ya con día y tanda elegidos. `tanda` vacío = tanda nueva. */
+async function pppMovDestinoElegir(tanda) {
+  if (!_pppMov || !_pppMov.destIso) return;
+  const M = _pppMov, iso = M.destIso, t = String(tanda || "");
+  const dTxt = _pppMovDiaTxt(iso);
+  const cand = (M.dest || []).find(function (x) { return String(x.tanda) === t; }) || null;
+  const destTxt = t ? ("la tanda " + t) : "una tanda NUEVA";
+  const av = cand && cand.aviso ? cand.aviso : "";
+  let msg = M.pedidoNp
+    ? ("¿Mover el pedido de " + (M.pedidoCli || M.pedidoNp) + " al " + dTxt + ", en " + destTxt + "?" +
+       (M.pedidoNps && M.pedidoNps.length > 1 ? "\n\nSe mueven las " + M.pedidoNps.length + " NP del pedido juntas: " + M.pedidoNps.join(", ") + "." : ""))
+    : ("¿Mover TODA la tanda " + M.tanda + " al " + dTxt + ", en " + destTxt + "?" +
+       (M.np ? "\n\n" + M.np + " pedido(s)." : ""));
+  if (t) msg += "\n\nSi la tanda de origen queda vacía, deja de existir: sus pedidos pasan a ser de " + t + ".";
+  if (M.empezada) msg += "\n\nYa está pickeada o armada: el contenido NO cambia y no hay que volver a pickear.";
+  if (M.avisoCamion) msg += "\n\n⚠ " + M.avisoCamion;
+  if (av) msg = "⚠⚠ OJO ⚠⚠\n\n" + av + "\n\n" + msg;
+  msg += "\n\nLo ven todos, también el operario.";
+  if (!confirm(msg)) return;
+  pppSetStatus("Moviendo…", true);
+  try {
+    let x;
+    if (M.pedidoNp) {
+      const r = await aprRpc("gv_ppp_pedido_mover", { p_np: M.pedidoNp, p_fecha: iso, p_tanda: (t || null),
+        p_por: (typeof _faltMiLegajo === "function" ? _faltMiLegajo() : "") || null, p_forzar: false });
+      x = (r && r[0]) || {};
+      pppSetStatus("✓ " + (x.movidas || 0) + " NP del pedido " + M.pedidoNp + " → " + dTxt +
+        " · tanda " + (x.tanda || t) + (x.aviso ? "  ⚠ " + x.aviso : ""), true);
+    } else {
+      const r = await aprRpc("gv_ppp_tanda_mover", { p_tanda: M.tanda, p_fecha: iso, p_tanda_destino: t,
+        p_por: (typeof _faltMiLegajo === "function" ? _faltMiLegajo() : "") || null, p_forzar: true });
+      x = (r && r[0]) || {};
+      pppSetStatus("✓ Tanda " + M.tanda + " → " + dTxt + " como " + (x.tanda_final || t) + ": " +
+        (x.movidas || 0) + " pedido(s) · " + (x.m3 || 0) + " m³." + (x.aviso ? "  ⚠ " + x.aviso : ""), true);
+    }
+    if (x.aviso) { try { alert("Se movió, pero ojo:\n\n" + x.aviso); } catch (_e) {} }
+    pppMovCerrar();
+    await pppLoadProgFromSupabase();
+    pgaRecargar();
+    return true;
+  } catch (e) {
+    const msg2 = (e && e.message) ? e.message : String(e);
+    pppSetStatus("⚠ No se pudo mover: " + msg2, false);
+    try { alert("No se pudo mover:\n\n" + msg2.replace(/^.*?(ESTADO_DISTINTO|PEDIDO_SALIO):\s*/, "")); } catch (_e) {}
+    return false;
+  }
+}
+/* v19.32 — «📅 Cambiar de día» en la fila de la NP. Mueve el PEDIDO entero (todas sus NP), igual
+   que «↩ Enviar a programar»: quién es el pedido lo resuelve el backend
+   (`gv_ppp_web_desprogramar_previo`, el mismo previo que ya usaba ese botón). */
+async function pgaNpMoverAbrir(np) {
+  const n = String(np || "").trim(); if (!n) return;
+  let prev = null;
+  try { prev = await aprRpc("gv_ppp_web_desprogramar_previo", { p_np: n }); } catch (_e) {}
+  const nps = (prev && Array.isArray(prev.nps)) ? prev.nps.map(function (x) { return String(x.np_label || ""); }).filter(Boolean) : [n];
+  let m3 = 0;
+  if (prev && Array.isArray(prev.nps)) for (const x of prev.nps) m3 += Number(x.m3) || 0;
+  const todas = (_pgaRows || []).concat(_patrRows || []);
+  const fila = todas.find(function (r) { return String(r.np) === n; }) || {};
+  const filas = todas.filter(function (r) { return nps.indexOf(String(r.np)) >= 0; });
+  _pppMov = { pedidoNp: n, pedidoNps: nps, arbolFilas: filas.length ? filas : (fila.np ? [fila] : []), pedidoCli: (prev && prev.cliente) || fila.razon_social || n,
+              np: nps.length, m3: m3 || (Number(fila.m3) || 0), dias: 21, cal: [], cargando: true,
+              actual: String(fila.fecha || "").slice(0, 10), actualTxt: fila.fecha ? _pgaDiaTxt(String(fila.fecha).replace(/-/g, "")) : "",
+              empezada: !!(fila.estado && fila.estado !== "pendiente"), desdeArbol: true, paso: "dia" };
+  pppMovOverlay("📅 Cambiar de día — pedido de " + _pppMov.pedidoCli + (nps.length > 1 ? " (" + nps.length + " NP)" : ""));
+  pppMovCargar();
+}
+window.pgaNpMoverAbrir = pgaNpMoverAbrir; window.pppMovPaso2 = pppMovPaso2;
+window.pppMovVolverDias = pppMovVolverDias; window.pppMovDestinoElegir = pppMovDestinoElegir;
 /* v15.55 — Los que NO salieron: volver a A Programar (web) o cancelar (web e ISIS). Todo en el backend:
    gv_ppp_web_desprogramar saca la NP web de su tanda (queda pendiente en A Programar);
    gv_ppp_np_cancelar: ISIS → NP_Canceladas + oculta en la PPP (GV_PPP_Prog_Override.oculto); web →
@@ -37641,7 +37820,8 @@ function _pgaCuerpoHtml(dias, opts) {
         '" onclick="pgaAbrirDia(\'' + d.key + '\')"' +
         (esp ? ' title="Armado y parado a propósito, sin fecha de entrega: no consume cupo, no va en ningún camión y no cuenta como atrasado. Para sacarlo de acá, «📅 Cambiar de día» en la tanda."' : '') + '>' +
       '<td><span class="pga-chev">' + (ab ? "▾" : "▸") + '</span>' + escapeHtml(_pgaDiaTxt(d.key)) +
-        (esp ? '<span class="pga-esp">sin fecha de entrega</span>' : '') +
+        (esp ? '<span class="pga-esp">' + (d.nps ? 'sin fecha de entrega'
+                 : 'vacío · acá se mandan las tandas armadas sin fecha, con 📅 Cambiar de día') + '</span>' : '') +
         (esAtraso ? '<span class="patr-dias' + (atr >= 7 ? ' grave' : '') + '">hace ' + atr + ' día' + (atr === 1 ? '' : 's') + '</span>' : '') + '</td>' +
       '<td>' + _pppFmtM3(d.m3) + '</td><td>' + d.tandasArr.length + '</td><td>' + d.nps + '</td>' +
       _pgaPctFila(d.est, d.nps) + '</tr>';
@@ -37695,7 +37875,13 @@ function _pgaCuerpoHtml(dias, opts) {
             // v17.90 (Luis): "hacé que los botones sean sólo los íconos y agregá la descripción
             // cuando uno pone el mouse encima". El `title` es el que cuenta qué hace cada uno.
             ((window.__isSupervisor || !PPP_READONLY)
-              ? '<span class="pga-acc"><button class="pga-acc-b" title="Enviar a programar — lo saca de esta tanda y lo manda a 📥 A Programar para darle otra fecha. Queda anotado en qué tanda estaba: al reprogramarlo vuelve a ESA tanda, así no se pickea ni se arma dos veces. El automático no lo toca."'
+              // v19.32 (Luis): «Cambiar de día» TAMBIÉN por pedido. Mueve todas las NP del mismo
+              // pedido juntas y pregunta a qué tanda del día destino van (nueva o una que ya exista).
+              ? '<span class="pga-acc"><button class="pga-acc-b dia" title="Cambiar de día — mueve ESTE PEDIDO (todas las NP del mismo pedido, juntas) a otro día.'
+                + ' Se elige el día y después si va en una tanda NUEVA o adentro de una que ya existe ese día.'
+                + ' El contenido no cambia: no hay que volver a pickear."'
+                + ' onclick="event.stopPropagation();pgaNpMoverAbrir(\'' + escapeHtml(r.np) + '\')">📅</button>'
+                + '<button class="pga-acc-b" title="Enviar a programar — lo saca de esta tanda y lo manda a 📥 A Programar para darle otra fecha. Queda anotado en qué tanda estaba: al reprogramarlo vuelve a ESA tanda, así no se pickea ni se arma dos veces. El automático no lo toca."'
                 + ' onclick="event.stopPropagation();pgaEnviarAProgramar(\'' + escapeHtml(r.np) + '\')">↩</button></span>'
               : '') +
             '</div>' +
@@ -37740,6 +37926,17 @@ function _pgaArbol(filas) {
   const out = [...dias.values()].sort(function (a, b) { return a.key.localeCompare(b.key); });
   for (const d of out) d.tandasArr = [...d.tandas.values()].sort(function (a, b) { return a.tanda.localeCompare(b.tanda); });
   return out;
+}
+/* v19.32 (Luis: *"no lo veo, debería ser siempre visible"*) — el día «⏸ Armados en espera»
+   EXISTE aunque esté vacío. Sin esto sólo aparecía cuando ya había algo parado ahí, o sea que
+   nadie podía descubrir que la función existe: el destino se ofrece en el pop-up de la tanda,
+   pero el día no estaba en la tabla para verlo. Se agrega SÓLO en la tabla de Programación
+   (`_pppArbolHtml`), no en Pedidos atrasados ni en la hoja impresa, donde un día vacío sería
+   ruido. */
+function _pgaConEspera(dias) {
+  if (dias.some(function (d) { return d.key === PGA_ESPERA_KEY; })) return dias;
+  dias.push({ key: PGA_ESPERA_KEY, m3: 0, nps: 0, est: _pgaEstCero(), tandas: new Map(), tandasArr: [] });
+  return dias;
 }
 function _pgaPctTd(n, tot, cls) {
   const p = tot ? Math.round(100 * n / tot) : 0;
@@ -37810,6 +38007,9 @@ function _pppArbolHtml(programados) {
   if (!dias.length) return h + '<div class="pga-msg">' + (_pppSearch
     ? 'Sin coincidencias para «' + escapeHtml(_pppSearch) + '» en lo programado de hoy en adelante.'
     : 'No hay nada programado de hoy en adelante.') + '</div></div>';
+  // v19.32: el día de espera está siempre, aunque hoy no haya nada parado (con el buscador
+  // puesto no, que ahí la tabla muestra coincidencias y un día vacío sería una falsa).
+  if (!_pppSearch) _pgaConEspera(dias);
   // v17.79 (Luis): los 4 estados van a la DERECHA del todo, angostos y con su color en el
   // encabezado; todo el ancho que sobra es para la info de cada NP.
   h += '<table class="pga"><thead><tr>' +

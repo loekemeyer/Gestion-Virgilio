@@ -1466,3 +1466,51 @@ app con «📅 Cambiar de día».
 
 **Permisos que hay que conservar** (si no, se cae el FDW de LK, no Producción):
 `grant select on public."GV_PPP_Armados_Espera" to anon, authenticated, lk_ppp_reader, ch_ppp_reader;`
+
+---
+
+## v19.32 (2026-09-17) — mover un PEDIDO de día, y elegir en qué tanda cae
+
+**Qué se tocó de lo compartido.** Cuatro objetos que Producción también mira:
+
+| Objeto | Qué se hace |
+|---|---|
+| `public.gv_ppp_prog_arbol` | `create or replace`: el CTE `est` ahora aplica un **piso** de estado por NP desde `GV_PPP_NP_Estado` (`greatest()`). Es una función `gv_*`, sólo la lee Gestión. |
+| `public."Registros_Produccion_Virgilio".texto` | `update` **sólo al re-codificar una tanda entera** (`gv_ppp_tanda_renombrar`), mismo precedente que la v17.47 |
+| `public."Entregas_Virgilio".tanda` | ídem |
+| `public."Movimientos_Stock".ref` | ídem: se renombra el código de tanda, **no se mueve un solo movimiento de stock** |
+| `public."Facturacion_NP".tanda` | `update` al separar una NP: Carga Camión ofrece las NP desde acá, no por el evento `TAP` |
+
+**Objeto nuevo:** `public."GV_PPP_NP_Estado"` (prefijo `GV_`, RLS prendida). Nace vacía; con la
+tabla vacía el árbol devuelve exactamente lo mismo que antes.
+
+**Impacto en Producción.** Nulo mientras nadie mueva nada. Cuando se mueve una tanda entera,
+Producción ve el **código nuevo** en los eventos y los remitos — que es justo lo que se quiere, y
+lo mismo que ya pasaba desde la v17.47. Renombrar **no borra ni duplica** eventos: los actualiza.
+
+**Medición (2026-09-17).** Prueba real en transacción abortada: D72B → E34A renombró **9 eventos**
+y **138 filas** de `Movimientos_Stock.ref`, sin tocar deltas ni saldos. `gv_ppp_np_estado`
+coincide **153/153** con el estado que el árbol ya mostraba. Centinelas después:
+`gv_ppp_tanda_dos_dias` 0, `gv_ppp_super_mezclado` 0, `gv_ppp_tanda_camion_mezclado` 1 (la D69F de
+siempre), `gv_endpoints_rotos` 0.
+
+**Rollback exacto.**
+
+```sql
+-- 1) el piso de estado: vaciarlo devuelve el árbol al comportamiento anterior sin recrear nada
+delete from public."GV_PPP_NP_Estado" where np is not null;   -- supautils exige el WHERE
+
+-- 2) volver a la firma vieja de gv_ppp_tanda_mover (la de 4 args se dropeó a propósito)
+--    está en sql/gv_ppp_armados_espera_v1929.sql
+-- 3) el árbol sin el piso: sql/gv_ppp_armados_espera_v1929.sql trae el CREATE completo de v19.29
+```
+
+⚠ **Lo que NO se deshace solo:** un renombre de tanda ya aplicado. Para volver atrás hay que
+renombrarla de vuelta, que es una operación simétrica:
+
+```sql
+select * from public.gv_ppp_tanda_renombrar('<NUEVA>', '<VIEJA>', 'rollback');
+```
+
+Y una fusión (tanda de origen que quedó vacía y dejó de existir) se deshace moviendo esos pedidos
+de vuelta con `gv_ppp_pedido_mover(<np>, <fecha vieja>, '<TANDA VIEJA>')`.

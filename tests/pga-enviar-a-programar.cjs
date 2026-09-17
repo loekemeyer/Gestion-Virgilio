@@ -81,7 +81,9 @@ catch (_e) {
 
     // (a) el botón está, dice lo que pidió Luis y no abre la fila
     const fila = [...prev.querySelectorAll("tr.pga-n")].find((x) => x.textContent.indexOf("LK 0058") >= 0);
-    const bt = fila && fila.querySelector(".pga-acc-b");
+    // v19.32: la fila tiene DOS botones — 📅 Cambiar de día (clase `dia`) y ↩ Enviar a programar.
+    // Este test es el del ↩, así que se lo busca por descarte y no por "el primero".
+    const bt = fila && fila.querySelector(".pga-acc-b:not(.dia)");
     out.hayBoton = !!bt;
     out.textoBoton = bt ? bt.textContent.trim() : "";
     out.titleBoton = bt ? bt.getAttribute("title") : "";
@@ -118,13 +120,15 @@ catch (_e) {
     let filaD = null;
     for (let intento = 0; intento < 30; intento++) {
       filaD = buscarFila();
-      if (filaD && filaD.querySelector(".pga-acc-b")) break;
+      if (filaD && filaD.querySelector(".pga-acc-b:not(.dia)")) break;
       if (intento === 0) { try { pgaAbrirDia("20260915"); pgaAbrirTanda("20260915|E01A"); } catch (_e) {} }
       await new Promise((res) => setTimeout(res, 100));
     }
     out.filaSigue    = !!filaD;
     out.noHayTacho   = !!filaD && !filaD.querySelector(".pga-acc-b.del");
-    out.unSoloBoton  = !!filaD && filaD.querySelectorAll(".pga-acc-b").length === 1;
+    // v19.32: son dos y ninguno es el tacho de borrar — 📅 mover el pedido de día y ↩ a programar.
+    out.unSoloBoton  = !!filaD && filaD.querySelectorAll(".pga-acc-b:not(.dia)").length === 1
+                       && filaD.querySelectorAll(".pga-acc-b.dia").length === 1;
     out._botones = filaD ? [...filaD.querySelectorAll(".pga-acc-b")].map(b => (b.title || "") + "/" + b.textContent.trim()) : null;
 
     // (d) el cartel del web ya no promete el automático.
@@ -187,7 +191,7 @@ catch (_e) {
   t(r.filaSigue, "(g) la fila de la NP sigue estando");
   t(r.noHayTacho, "(g) y YA NO trae el tacho de desarmar");
   if (r._botones) console.log("     (botones en la fila: " + JSON.stringify(r._botones) + ")");
-  t(r.unSoloBoton, "(g) queda un solo botón en la fila: el ↩");
+  t(r.unSoloBoton, "(g) en la fila quedan los dos botones sanos: 📅 Cambiar de día y ↩ Enviar a programar — " + JSON.stringify(r._botones));
   t(r.yaHecho, "(e) el pedido web retenido cuenta como «ya hecho»");
   t(/ya pickeada y armada · E01A/.test(r.chip), "(e) y sale con su chip rojo en A Programar — " + JSON.stringify(r.chip));
   t(/gv_ppp_web_tanda_reusar/.test(r.rpcProg) && !/gv_ppp_web_tanda_nueva/.test(r.rpcProg),

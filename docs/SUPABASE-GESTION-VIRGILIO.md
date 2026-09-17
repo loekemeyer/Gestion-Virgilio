@@ -21610,3 +21610,109 @@ V. Pueyrredón/V. Urquiza"*) deja pasar **Devoto con Núñez**, que son ~9 km. E
 el dueño en `GV_Sectores_Vecinos` y se saca con una fila en `GV_Barrios_Pares`
 (`('devoto','nuñez', false)`), pero es decisión suya. Lo mismo **F-H** (Recoleta/Retiro con
 Belgrano), que hoy produce la tanda E12C (Boedo + Villa Urquiza).
+---
+
+### §3.go — v19.32: «Cambiar de día» mueve el PEDIDO, y elige en qué tanda cae — 2026-09-17
+
+Pedido de Luis (17/09), textual: *"Quiero que cada nota de pedido tenga el botón cambiar de día.
+Quiero que cuando se cambia de día una nota de pedido, si hay más notas de pedido que se
+corresponden a un mismo pedido de ese cliente, que se muevan todas en conjunto. Parecido a cómo
+funciona el botón de enviar a programar"* y *"que cuando se mueven a un día, se dé la opción de
+crear una tanda nueva para esos pedidos o agregarlos a una tanda que ya existe ese día. Esa misma
+funcionalidad la quiero para cuando se mueve una tanda entera… si muevo la tanda D71B a el martes
+29, que me diga si la quiero agregar a la E18A, a la E30A, o si quiero crear un nuevo código de
+tanda. Si le doy que la quiero agregar a la E18A… deja de existir la tanda original y los pedidos
+de la D71B pasan a integrarse dentro de la tanda que elegí."*
+
+SQL completo (lo que está aplicado): `sql/gv_ppp_mover_pedido_v1931.sql`.
+
+#### Las dos reglas de negocio que puso Luis, y de dónde salen
+
+1. **El ESTADO manda a dónde puede caer.** Textual: *"un pedido armado solo a una tanda que este
+   armada, un pedido facturado solo a una tanda que este facturada, uno en espera a una tanda en
+   espera; el problema es si esta en ese momento siendo pickeado/armado en cuyo caso no se puede
+   mover a una tanda existente y debería decir que solo se puede mover creandole una tanda nueva."*
+   → `gv_ppp_tandas_del_dia` devuelve `compatible=false` + `motivo` y el botón queda apagado.
+   **No hay `p_forzar` que saltee esto**: es la regla, no una advertencia (se probó dejarlo
+   forzable y se sacó).
+2. **Las MEZCLAS se avisan, no se bloquean.** Textual: *"cuando se intenta agregar un super a una
+   tanda normal o agregarle un pedido normal a una tanda de super debería poner una adventencia
+   bien clara y bien grande que diga que esta mal, mismo cuando se trata de agregar pedidos en
+   zonas difertes… (de momento advertir sin bloquear)"* → viaja en `aviso`, el front lo pinta en
+   rojo dentro del botón y encabeza el confirm con `⚠⚠ OJO ⚠⚠`.
+
+#### Por qué el estado necesitó una TABLA (`GV_PPP_NP_Estado`)
+
+El árbol resuelve **«armado» por TANDA**: el evento `TAP` se registra con `texto = <tanda>`, no
+por NP. Así que separar una NP armada a una tanda nueva la dejaba figurando **pendiente**, y el
+supervisor la volvía a mandar a pickear. Copiar los eventos a la tanda nueva estaba descartado:
+duplica producción en Rendimiento (el mismo TAP contado dos veces).
+
+La solución es un **piso de estado por NP**: `GV_PPP_NP_Estado(np, estado, ...)`, que
+`gv_ppp_nps_mover_a` escribe al separar y que el CTE `est` de `gv_ppp_prog_arbol` aplica con un
+`greatest()` sobre el estado calculado. Nunca baja un estado, sólo lo sostiene.
+
+`gv_ppp_np_estado(text[])` es la misma regla que ese CTE, expuesta como función para que la usen
+las validaciones. **Validación cruzada: coincide 153/153** con el estado que el árbol ya mostraba.
+
+#### Lo que se mueve, y lo que no
+
+| Objeto | Qué pasa |
+|---|---|
+| `PPP_Web_Programacion` / `GV_PPP_Prog_Override` | tanda + fecha nuevas |
+| `Facturacion_NP.tanda` | **se actualiza** — Carga Camión ofrece las NP desde acá, no por el TAP: sin esto una NP separada se seguía cargando con la tanda vieja |
+| `Registros_Produccion_Virgilio.texto` | sólo al **re-codificar una tanda entera** (mismo precedente que v17.47) |
+| `Entregas_Virgilio.tanda`, `Movimientos_Stock.ref` | ídem: se renombran con la tanda, no con la NP suelta |
+| `Movimientos_Stock` (el stock en sí) | **no se toca**: el picking entra al depósito `a_facturar` con `ref = <tanda>` y sale con `ref = <np>|CP`, así que no es una cuenta por tanda |
+
+#### ⚠ El trigger `gv_web_cliente_un_solo_dia` obliga a UN SOLO `update`
+
+Es un `AFTER UPDATE FOR EACH ROW`, y los AFTER-ROW corren **al final del statement**. Moviendo NP
+por NP, la segunda NP del pedido veía a la primera ya en el día nuevo y el trigger rebotaba con
+*"Emilio Martinez ya tiene otro pedido en la tanda E01B del 17/09 y esa tanda ya se empezo a
+trabajar"* — un choque contra sí mismo. Por eso la función es **`gv_ppp_nps_mover_a(text[], …)`**
+(plural, un solo `UPDATE`) y la de una sola NP se dropeó.
+
+#### Las funciones
+
+| Función | Qué hace |
+|---|---|
+| `gv_ppp_np_estado(text[])` | estado por NP (`pendiente`/`proceso`/`armado`/`facturado` + orden 1-4) |
+| `gv_ppp_estado_grupo(text[])` | el estado de un pedido o una tanda (misma regla que `_pgaEstadoGrupo` del front) |
+| `gv_ppp_pedido_nps(text)` | web: todas las NP **con tanda** del mismo `order_id`; ISIS: la NP sola |
+| `gv_ppp_tandas_del_dia(date, p_np, p_tanda_origen)` | las candidatas del día con `compatible`, `motivo` y `aviso` |
+| `gv_ppp_tanda_codigo_nuevo(date, zona)` | el próximo código del día (reusa el camión que ya va) |
+| `gv_ppp_nps_mover_a(text[], tanda, fecha)` | el `UPDATE` único + `Facturacion_NP` + el piso de estado |
+| `gv_ppp_tanda_renombrar(vieja, nueva)` | eventos, entregas y `Movimientos_Stock.ref` |
+| `gv_ppp_pedido_mover(np, fecha, p_tanda, …)` | mueve el pedido entero |
+| `gv_ppp_tanda_mover(tanda, fecha, p_por, p_tanda_destino, p_forzar)` | **firma nueva**; la de 4 argumentos se **dropeó a propósito**: con las dos, PostgREST no sabe cuál llamar |
+
+Si la tanda de origen queda **vacía**, deja de existir (es lo que pidió Luis). Si el destino es
+una tanda existente, los pedidos pasan a ser de ésa sin volver a pickear.
+
+#### Pruebas (todas dentro de una transacción abortada, con datos reales)
+
+| Caso | Resultado |
+|---|---|
+| Pedido LK 0009 (2 NP) → tanda nueva E12D | ✔ las 2 juntas, sin rebote del trigger |
+| Pedido LK 0012 → tanda existente | ✔ + E01B quedó vacía y se fusionó sola |
+| Pedido armado → tanda pendiente | ✔ rebota (`ESTADO_DISTINTO`) |
+| Tanda entera D72B → E34A | ✔ 8→9 eventos renombrados, 138 filas de `Movimientos_Stock.ref`; atrasados 14 → 11 |
+| Fusión E12P → E12O | ✔ |
+| Pedido de 4 NP al día «⏸ Armados en espera» | ✔ |
+| Centinelas (`gv_ppp_tanda_dos_dias`, `_super_mezclado`, `_camion_mezclado`, `gv_endpoints_rotos`) | sin cambios (`_camion_mezclado` sigue con la D69F de siempre) |
+
+#### Front (`index.html`)
+
+El pop-up de «📅 Cambiar de día» pasó a tener **dos pasos**: día → tanda. `pppMovElegir(iso)` ya
+no mueve nada, llama a `pppMovPaso2(iso)`; el que mueve es `pppMovDestinoElegir(tanda)` (`''` =
+tanda nueva). El botón 📅 está ahora también **en la fila de la NP** (`pgaNpMoverAbrir`), que
+resuelve qué NP se lleva con `gv_ppp_web_desprogramar_previo` — el mismo previo que ya usaba
+«↩ Enviar a programar», que es a lo que Luis lo comparó.
+
+⚠ **El aviso de "esto abre un segundo camión" casi se pierde en el camino**: lo daba
+`pppTandaMover`, que dejó de estar en este flujo. Se reimplantó como `pppMovCamionNuevo(iso)`, que
+pregunta al elegir el día y sale en el confirm del paso 2. Lo cubre `tests/ppp-mover-popup.cjs`.
+
+Tests: `tests/ppp-pedido-cambiar-dia.cjs` (nuevo), `ppp-tanda-cambiar-dia`, `ppp-mover-popup`,
+`ppp-tabla-arbol`, `pga-enviar-a-programar`.
