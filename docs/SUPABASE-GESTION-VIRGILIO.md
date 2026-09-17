@@ -22355,3 +22355,48 @@ stock**. Mismo caso que el 396 en P39 → **Ñ55 pasó a LK** (es el único art�
 
 Respaldos: `GV_Backup_TrgEmpresa_defs_20260917` (la definición anterior entera),
 `GV_Backup_Duplicados_reconciliador_20260917`, `GV_Backup_Lugar_N55_20260917`.
+
+### v19.48 (17/09) — centinelas: definiciones vivas y tablas vigentes
+
+Luis, después del problema 390: *"QUE SIEMPRE TRAIGAN DEFINICIONES VIVAS Y ACTUALIZADAS ASÍ COMO
+TAMBIÉN QUE USEN LAS TABLAS VIGENTES. Rastrilla, que quede bien claro ahí."* Detalle en
+`sql/gv_centinelas_reglas_vivas_v1948.sql`.
+
+**La prosa sola no alcanza** — ya estaba escrito "no usar la tabla vieja" y se usó igual. Así que
+además del bloque de regla (que quedó arriba de todo en los `CLAUDE.md` de los **tres** repos),
+hay dos centinelas que fallan solos:
+
+| vista | qué avisa | al 17/09 |
+|---|---|---|
+| **`gv_reglas_perdidas`** | una función a la que le borraron una regla | **0** |
+| **`gv_tablas_viejas_en_uso`** | un objeto que sigue leyendo una tabla congelada | **1** |
+
+`gv_reglas_perdidas` se alimenta de **`GV_Reglas_Centinela`**, tabla editable: cada fila dice *"en
+tal objeto tiene que seguir apareciendo tal patrón, porque tal regla"*. Agregar una regla nueva es
+un `insert`, no tocar código. Las 7 cargadas cubren `trg_normalizar_empresa_stock` (las tres
+reglas que tienen que convivir), `gv_empresa_de_articulo_vivo`, `gv_refrescar_articulo_empresa` y
+`gv_mov_empresa_resuelta`.
+
+⚠ **`gv_tablas_viejas_en_uso` saca los comentarios antes de buscar.** La primera versión dio 5 y
+**4 eran falsos positivos**: un `-- NO usar Ubicaciones_Articulos` contaba como uso, y los dos
+centinelas la nombran a propósito. Con los comentarios afuera queda **1 objeto real**:
+**`gv_codigos_multigrafia`**, que lee `Ubicaciones_Articulos`. No se tocó —esa vista busca códigos
+escritos con varias grafías y la tabla congelada le sirve de histórico— pero queda a la vista.
+
+### Los 3 negativos de a_facturar: la tanda D66D se facturó DOS veces
+
+`gv_stock_negativos` marcaba 599E, 817E y 969E en −1, los tres con el mismo `ultimo_mov`
+(17/09 14:05). **Son 12 códigos, no 3**: los otros 9 tenían saldo de otras tandas que les tapaba
+el negativo.
+
+La tanda **D66D** se drenó dos veces de `a_facturar`: el **10/09 16:11** con `ref = 'D66D'` (sin
+NP) y **hoy 14:05** con `ref = 'D66D|98648'`. Las entradas (`separado`) fueron una sola vez.
+Total: **20 cajas drenadas de más**. Es depósito de tránsito — no falta mercadería, es error de
+registro. Mismo patrón que el ya documentado *"v16.91 neteo doble drenaje"* del 14/09.
+
+| cod | entró | facturado 10/09 | facturado hoy | neto |
+|---|---|---|---|---|
+| 506 · 513 | 11 | −11 | **−3** | −3 |
+| 321 · 504 · 584E · 599E | 2 | −2 | **−2** | −2 |
+| 315 · 361E · 583E · 816E · 817E · 969E | 1..6 | cerrado | **−1** | −1 |
+| 501 | 46 | −46 | — | **0** ✓ |

@@ -8,6 +8,89 @@ lo que la tabla NO cuenta: **qué decidió el dueño y no hay que revisitar**, *
 destrabar él** (redeploy de Vercel, rotar las credenciales de Meta y OpenAI) y **qué quedó a
 medias**. Mantenerlo al día al cerrar cada tanda de trabajo.
 
+## ⚠⚠⚠ REGLA: TRAER SIEMPRE LA DEFINICIÓN VIVA, Y USAR SIEMPRE LA TABLA VIGENTE
+
+**Luis, 2026-09-17, después de que esto costara 4 tandas con el picking duplicado:**
+*"QUE SIEMPRE TRAIGAN DEFINICIONES VIVAS Y ACTUALIZADAS ASÍ COMO TAMBIÉN QUE USEN LAS TABLAS
+VIGENTES."*
+
+**Vale para TODOS los repos** (LK, Chef, Gestión Virgilio, Planify y cualquiera nuevo: copiar
+este bloque al `CLAUDE.md` del repo nuevo). Son dos reglas con la misma raíz: **lo que uno tiene
+en la cabeza no es lo que está corriendo.**
+
+### 1. Antes de `CREATE OR REPLACE`, traer la definición VIVA
+
+**Nunca** partir de una copia propia, de un archivo del repo, ni de lo que se leyó hace un rato
+en la misma charla. **Varias sesiones de Claude tocan los mismos objetos al mismo tiempo**, y un
+`CREATE OR REPLACE` pisa el cuerpo entero sin decir una palabra.
+
+```sql
+-- SIEMPRE este, justo antes de escribir:
+select pg_get_functiondef('public.<la funcion>'::regprocedure);
+select pg_get_viewdef('public.<la vista>'::regclass, true);
+-- y para una vista, ademas, las opciones (o te comes el security_invoker):
+select relname, reloptions from pg_class where oid = 'public.<la vista>'::regclass;
+```
+
+Se le agrega el cambio **encima de eso**, y recién ahí se escribe.
+
+**Lo que costó no hacerlo (problema 390, 17/09):** dos sesiones editaron
+`trg_normalizar_empresa_stock()` el mismo día. La segunda partió de una copia anterior y borró la
+regla *"en un código no dual la empresa la da el artículo"*. La tanda **D72A** —que se factura por
+Chef pero lleva artículos de Loekemeyer— pasó a etiquetarse CH, el índice único no la reconoció
+contra el LK del picking original, y **se duplicó el picking entero de 4 tandas**: +287 cajas
+fantasma en Pickeados y −265 en góndola.
+
+### 2. Y después PROBARLO, no leerlo
+
+Leer la función que uno acaba de escribir no prueba nada: la que corre puede ser otra. Se hace un
+`insert` de verdad contra la tabla real, se mira el resultado y se borra:
+
+```sql
+insert into public."Movimientos_Stock" (cod_art, deposito, delta, tipo, ref, legajo, empresa)
+values ('501','separar_pedidos',0,'ajuste','__PRUEBA__','t','CH');   -- tiene que quedar LK
+select cod_art, empresa from public."Movimientos_Stock" where ref = '__PRUEBA__';
+delete from public."Movimientos_Stock" where ref = '__PRUEBA__';
+```
+
+Mismo criterio que ya vale para el armado de tandas: *"un cambio de regla de armado no está
+probado hasta que se corre el armador"*.
+
+### 3. Los dos centinelas, que avisan solos
+
+```sql
+select * from public.gv_reglas_perdidas;        -- vacía = ninguna regla se perdió
+select * from public.gv_tablas_viejas_en_uso;   -- qué objeto sigue leyendo una tabla congelada
+```
+
+`gv_reglas_perdidas` se alimenta de **`GV_Reglas_Centinela`**, que es una tabla editable: cada
+fila dice "en tal objeto tiene que seguir apareciendo tal patrón, porque tal regla". **Al agregar
+una regla que no se puede perder, agregarle su fila**, que es un `insert`, no código:
+
+```sql
+insert into public."GV_Reglas_Centinela" (objeto, clase, patron, regla, quien_pidio, version)
+values ('<objeto>','funcion','<regex que tiene que estar>','<la regla en castellano>',
+        '<quien la pidio>','<version>');
+```
+
+⚠ El centinela **saca los comentarios antes de buscar**: si no, un `-- NO usar X` contaba como
+uso de X.
+
+### 4. Las tablas que valen hoy
+
+La lista viva está en la regla **"LAS TABLAS QUE VALEN"** más abajo, con la medición de cuál se
+escribió por última vez. Resumen: góndola y racks → **`GV_Lugar` + `GV_Lugar_Item`** (vista
+`gv_lugar_articulo`) y **`Racks_Planimetria`**; **nunca** `Ubicaciones_Articulos` (congelada el
+10/08) ni `Planimetria` como fuente (sólo guarda los huérfanos que el mapa rescata). Entregados
+→ **Recepción Remitos** (`opcion='CRN'`), nunca `PPP_Entregados_Meta`.
+
+**Antes de escribir una consulta contra una tabla que uno no tocó nunca**, mirar cuándo se
+escribió por última vez:
+
+```sql
+select * from public.gv_fuentes_lugares;   -- tabla · rol · última escritura · días · quién la lee
+```
+
 ## ⚠ REGLA: preguntar QUIÉN habla y dejar cada pedido como tarea en su Planify
 
 **Vale para TODOS los repos** (LK, Gestión Virgilio, Planify y cualquiera nuevo: copiar este
