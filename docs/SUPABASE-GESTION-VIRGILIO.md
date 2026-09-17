@@ -22470,3 +22470,57 @@ y las 15:09 del 17/09, o sea **la ventana en la que la regla del artículo no es
 etiquetaría bien —medido con un insert de prueba—, así que se reetiquetaron las 8 a CH. Backup en
 `zz_backups."GV_Backup_920_mixto_20260917"`. La huella del saldo por (código, depósito) **sin**
 empresa quedó idéntica (`72816c64…`): no se movió una caja. `gv_stock_empresa_fantasma` → 0.
+
+### §3.gs — v19.50: las 11 filas del centinela — 8 estaban bien, 3 eran un agujero — 2026-09-17
+
+Pedido de Luis: *"fijate las 11 de CP también"*. SQL y medición en
+**`sql/gv_desarme_np_facturada_v1950.sql`**.
+
+⚠ **Primero, la corrección del diagnóstico: no eran drenajes de CP.** Son `tipo='desarme'`
+—desarmar / cancelar pedido—. Lo de "CP" fue una suposición al ver un `ref` con forma de NP;
+mirando las filas, no.
+
+**Las 8 de `LK 0034` estaban bien: falso positivo del centinela.** NP LK 0034 (Mitre Hugo
+Alberto, order 1364), tanda E01G: `separado` +16 a las 15:31 del 15/09 y `desarme` −16 a las
+15:53. Balanceado. El problema era que la **entrada va con `ref = tanda` y la salida del desarme
+con `ref = NP`**, así que agrupando por prefijo del ref quedaban en dos pilas y la de la NP salía
+en rojo. Corregido: el centinela le devuelve cada desarme a su tanda leyendo el **`(tanda XXXX)`
+de la descripción**, que es lo que escribe `gv_ppp_np_desarmar` — el mismo truco que ya usa el CTE
+`dev` de `gv_ppp_np_devolucion`.
+
+**Las 3 de `98507` sí eran un agujero.** Perez Zarate S.R.L., tanda D53C:
+
+| cuándo | qué | ref | a_facturar |
+|---|---|---|---|
+| 01/09 15:08 | separado | `D53C` | 404E +1 · 522E +2 · 599E +3 |
+| 02/09 08:46 | facturado | `D53C\|98497` | 522E −1 · 599E −2 |
+| 02/09 08:48 | facturado | `D53C\|98507` | 404E −1 · 522E −1 · 599E −1 → **pila en 0** |
+| 17/09 16:09 | **desarme** | `98507` | −1 −1 −1 ← **de una pila vacía** |
+| 17/09 16:25 | guardado (legajo 104) | | a_guardar −3 · terminado +3 |
+
+Justificativo: *"Cancelado desde la PPP: Canceló el pedido el cliente porque no cubre el flete"*.
+
+**Las cajas físicas están bien** —el pedido se canceló, nunca salió, volvieron a góndola—. Lo que
+quedó mal es el **asiento**: la NP ya se había facturado, y el facturado significa *"estas cajas
+salieron del depósito"*, así que al volver había que deshacer **ese** asiento, no sacar otra vez de
+`a_facturar`. Quedó `a_facturar` en −3 y el stock total 3 cajas corto; la góndola, bien. Se repuso
+con 3 filas de `ajuste` +1 bajo el mismo ref (la pila de D53C cerró en 0) y el centinela quedó
+vacío.
+
+**Causa: `gv_ppp_np_desarmar` no mira si la NP está en `Facturacion_NP`.** El camino correcto ya
+existe y es completo —borrar la fila de `Facturacion_NP` dispara `revertir_drenaje_facturado()`,
+que borra el drenaje y devuelve la pila, e `isis_anular_facturado()`, que encola la anulación—
+pero el desarme ni lo usa ni avisa. El guard de la v19.34 mira **CCN/CRN** (carga camión, recepción
+remitos), no la facturación, y esta NP no tenía ninguno. Y `zzz_facturado_no_negativo` (v19.49)
+tampoco lo toca a propósito: mira `tipo='facturado'`, y un desarme no es un drenaje de facturación.
+
+**Queda abierto (problema 392), y la decisión es de negocio porque toca la factura:**
+
+- **(A) frenarlo**, como ya se frena el *"ya salió"*: *"la NP está facturada, primero hay que
+  desfacturarla"*. Facturación borra la fila, se revierte el drenaje y se encola la anulación en
+  ISIS, y recién ahí se desarma. Deja bien el stock **y** la factura.
+- **(B) compensarlo solo**: que el desarme escriba la reversa del facturado y siga. El stock cierra
+  al instante, pero la factura queda emitida y alguien tiene que acordarse de la nota de crédito.
+
+No se implementó ninguno: (A) cambia un flujo que Facturación usa todos los días y (B) deja una
+factura emitida sin avisar. Mientras tanto el centinela lo canta el mismo día.
