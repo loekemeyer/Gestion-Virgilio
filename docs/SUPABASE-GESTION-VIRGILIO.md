@@ -22922,6 +22922,19 @@ clientes distintos, así que en pocas vueltas pasaron todos.
 quedan en *A Programar* a propósito —Retira, súper, zonas manuales sin camión previsto—, así que
 el armador los mira y no arma. Lo que importaba era que los 12 se miraran igual.)
 
+### ⚠ Y la rotación rompió el armado de LK por 5 minutos (problema 400)
+
+Los CTE de la rotación se llamaron `z / g / k / r / o / a / e`, y la función **ya tiene una
+variable `r record`**: `ERROR 42702 column reference "r.*" is ambiguous`. El error es de
+**ejecución** y sólo en la rama del tope, así que el `CREATE OR REPLACE` salió limpio y la prueba
+posterior (36 ms, con 0 pendientes) tampoco lo tocó.
+
+Lo cantó el propio log: a las **17:55 `chef` dejó fila y `lk` no** — chef tiene 23 pedidos y no
+llega al tope, así que ni entraba a la rama rota. Una corrida perdida.
+
+Arreglado poniéndole **prefijo `_tp_`** a todos los CTE. La lección quedó en el `CLAUDE.md`
+("un CTE con el nombre de una variable plpgsql explota sólo al ejecutarse — y sólo en su rama").
+
 ### El centinela que faltaba
 
 `GV_PPP_Web_Armado_Log` (una fila por corrida) + la vista **`gv_ppp_web_armado_salud`**:

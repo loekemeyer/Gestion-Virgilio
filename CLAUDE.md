@@ -1293,6 +1293,37 @@ Cuatro cosas que aprendimos y no hay que volver a probar:
 
 Detalle y medición: `docs/SUPABASE-GESTION-VIRGILIO.md` §3.iz, problema 382.
 
+## ⚠ REGLA: un CTE con el nombre de una variable plpgsql explota SÓLO al ejecutarse — y sólo en su rama
+
+**2026-09-17 (v19.56, problema 400).** Al agregarle rotación al tope del armador, los CTE nuevos se
+llamaron `z / g / k / r / o / a / e`. `gv_ppp_web_armar_pendientes` **ya tiene una variable
+`r record`** en su `declare`, así que el CTE `r` la vuelve ambigua:
+
+```
+ERROR: 42702 column reference "r.*" is ambiguous
+DETAIL: It could refer to either a PL/pgSQL variable or a table column.
+```
+
+**Las tres cosas que lo hicieron pasar inadvertido**, y son las que hay que recordar:
+
+1. **El `CREATE OR REPLACE` salió limpio.** Postgres no valida los cuerpos de las sentencias SQL
+   de una función plpgsql al crearla: el error es de **ejecución**.
+2. **La función corrió bien después de aplicarla** (36 ms) — pero con 0 pendientes, o sea **sin
+   entrar nunca a la rama nueva**. Que la función no explote NO prueba que el camino nuevo ande:
+   hay que llamarla con datos que **entren por ahí**. En este caso, con más pedidos que el tope.
+3. **La prueba previa sí había andado**, porque se hizo en un bloque `do $$` anónimo que no tiene
+   la variable `r`. El SQL suelto y el SQL adentro de la función no son el mismo ambiente.
+
+Resultado: la corrida del cron de las 17:55 de **LK** murió (y `chef` no, porque sus 23 pedidos no
+llegaban al tope y no entraban a la rama). Una corrida perdida, 5 minutos.
+
+**Qué hacer:** a todo CTE nuevo dentro de una función plpgsql, **prefijo** (`_tp_z`, `_tp_g`…).
+Es gratis y saca el problema de raíz. Y antes de dar por buena una rama nueva, **hacerla entrar**.
+
+⚠ **Lo bueno**: lo cazó el centinela que la misma versión había agregado — el hueco en
+`GV_PPP_Web_Armado_Log`. Un camino nuevo sin forma de ver si corrió es un camino que falla en
+silencio; por eso el log iba junto con el cambio y no después.
+
 ## ⚠ PROTOCOLO OBLIGATORIO: NUNCA modificar datos sin permiso explícito
 
 **Ante cualquier consulta sobre datos corruptos, errores, o inconsistencias en Supabase:**
