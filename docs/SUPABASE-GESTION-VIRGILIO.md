@@ -22219,7 +22219,7 @@ Ventana del **12/09 14:53 al 17/09 15:12**, o sea **120 horas de reloj**:
 | `reconciliar_pipeline_stock()` | 719 | 17,9 s | 67,8 s | 12.884 s = 3,6 h |
 | `pg_advisory_xact_lock($1)` | 2.240 | **4,6 s de espera** | 67,6 s | 10.402 s = 2,9 h |
 | `REFRESH MATERIALIZED VIEW CONCURRENTLY vista_stock_procesada` | 3.609 | 1,6 s | 12,7 s | 5.815 s |
-| `ppp_web_armar_tandas` (el armador) | 691 | 1,8 s | **7,7 s** | 1.245.960 ms |
+| `gv_ppp_web_armar_pendientes` (el armador) | 691 | 1,8 s | **7,7 s** | 1.245.960 ms |
 
 **64,8 h de ejecución en 120 h de reloj = el 54 % del tiempo.** El cron **34** dispara esa función
 `*/2 * * * *` y cada corrida tarda **un minuto**: hay **una o dos corriendo siempre**. Cualquier
@@ -22303,7 +22303,7 @@ operación destructiva es la única pregunta que cuenta.
 - **`reconciliar_pipeline_stock()`**: 17,9 s de media, 67,8 s de máximo, cada 10 min (cron 68).
 - **`pg_advisory_xact_lock(5768)`**: 2.240 esperas con **media de 4,6 s**. Los crons 57 y 68
   comparten ese lock y se hacen cola.
-- **`ppp_web_armar_tandas`** ya llega a **7,7 s** de máximo contra el límite de 8 s. Si lo cruza,
+- **`gv_ppp_web_armar_pendientes`** ya llega a **7,7 s** de máximo contra el límite de 8 s. Si lo cruza,
   el armado automático se corta **en silencio** (el cron figura `succeeded`) — es exactamente lo
   que pasó en la v19.11 por otra causa.
 - **`detectar_faltantes_llegaron` termina en `exception when others then return 'error: '||sqlerrm`**,
@@ -22789,7 +22789,7 @@ select count(*) from public.gv_endpoints_rotos;   -- 0
 
 - **`gv-refrescar-articulo-empresa` (cron 92)**: 5,2 s de media, **22,4 s de máximo**, cada 15 min.
 - **`gv-cruce-fc-asig` (cron 90)**: 5,4 s de media, 7,7 s de máximo, cada 10 min.
-- **`ppp_web_armar_tandas`**: 1,8 s de media y **7,7 s de máximo contra el límite de 8 s**. Si lo
+- **`gv_ppp_web_armar_pendientes`**: 1,8 s de media y **7,7 s de máximo contra el límite de 8 s**. Si lo
   cruza, el armado automático se corta **en silencio** (el cron figura `succeeded`).
 - **`vista_saldos_stock`**: 15.984 llamadas con 1,25 s de media. Es la consulta más caliente de la
   app y hoy nadie la bloquea, pero sigue siendo 1,25 s por carga de pantalla.
@@ -22846,3 +22846,120 @@ cualquier puerta. Hoy la pantalla de cancelar pasa por `gv_ppp_np_desarmar`, que
 fila de la 98050 la escribió una pantalla anterior. Un trigger que mueve stock desde una tabla que
 escriben varias cosas es más fácil de romper que de arreglar, y el centinela canta el mismo día. Si
 aparece una segunda, ahí conviene el trigger.
+
+## §3.jd — v19.55: el armador tenía techo de ~180 pedidos y se cortaba en silencio — 2026-09-17
+
+**Luis:** *"arreglalos 3 priorizando el 1"*. El 1 resultó bastante peor de lo que decía el
+problema 384.
+
+⚠ **Corrección de la §3.jb**: la RPC que llega a 7,7 s **no es `ppp_web_armar_tandas`** (así
+quedó escrito y está mal). Es **`gv_ppp_web_armar_pendientes(text,date,jsonb,jsonb)`**, la que
+llama la Edge Function de los crons 71 y 73 y que por dentro llama **7 veces** a
+`ppp_web_armar_tandas`. En `pg_stat_statements`: 747 llamadas, media 1.771 ms, **mín 36 ms**,
+máx 7.711 ms.
+
+### El techo
+
+Medido con `gv_ppp_web_armar_pendientes_simular` —que revierte con un savepoint propio, así que
+se puede correr con carga real sin escribir nada— pasándole como `p_filas` los pedidos web ya
+programados, presentados como si estuvieran pendientes:
+
+| pedidos pendientes | tarda |
+|---|---|
+| 124 | 5.197 ms |
+| **248** | **9.007 ms** ← muerta: `statement_timeout` = 8 s |
+| 496 | 18.694 ms |
+
+**Lineal, ~43 ms por pedido**, y no es plan cache frío: tres corridas seguidas con las mismas 124
+filas dieron 5.333 / 5.286 / 5.674 ms.
+
+> Con más de **~180 pendientes** la RPC muere y **no arma nada**. Lo que no se arma queda
+> pendiente, la corrida siguiente entra con más, tarda más y vuelve a morir. **Espiral.**
+
+### Y no avisaba
+
+El cron 73 sólo dispara la Edge Function por HTTP (`net.http_post`): **tarda 0,05 s y figura
+`succeeded` pase lo que pase del otro lado**. Y un statement cortado por timeout tampoco queda en
+`pg_stat_statements`. Nadie se enteraba.
+
+### El arreglo: tope por corrida — y va PRIMERO
+
+`PPP_Web_Config.armado_tope_pedidos` (120 por defecto, **0 = sin tope**). El bloque `(a00)`
+recorta `p_filas` **por cliente completo** —nunca parte un cliente, para no romper "un cliente, un
+día"— y lo que queda lo toma la corrida siguiente, 5 minutos después. Si un solo cliente ya pasa
+el tope, entra igual: mejor una corrida larga que no arrancar nunca.
+
+⚠ **Dónde se pone importa tanto como el tope.** Primero se puso después de los filtros
+(a0…a0c) y con 496 de entrada seguía tardando **9,6 s**. No alcanza con recortar: hay que
+recortar **antes de todo**.
+
+| 496 pedidos de entrada | sin tope | con tope 120 |
+|---|---|---|
+| | 18.694 ms | **4.104 ms** (4.036 ms la segunda vez) |
+
+Con el tope, **el peor caso deja de depender de cuántos pendientes haya**. Y por debajo del tope
+el bloque no hace nada: comportamiento idéntico al de antes.
+
+### ⚠ El agujero que abrió el tope, y que lo encontró el propio log
+
+La primera corrida real con el tope puesto lo cantó enseguida:
+
+| hora | empresa | entraron | procesados | pospuestos | tandas |
+|---|---|---|---|---|---|
+| 17:45 | lk | 131 | 119 | **12** | 0 |
+| 17:50 | lk | 131 | 119 | **12** | 0 |
+
+**Las dos idénticas.** El feed devuelve siempre los mismos pendientes y en el mismo orden, así que
+el recorte elegía siempre a los mismos clientes: **esos 12 pedidos no se iban a evaluar nunca**.
+Un tope sin rotación no pospone, esconde.
+
+Por eso el arranque del recorte **rota**: `turno = floor(epoch/300)` —cambia cada 5 minutos, la
+frecuencia del cron 73— y los clientes se toman en orden circular desde ahí. Medido sobre esos
+mismos datos (70 clientes, tope 119 pedidos): turnos consecutivos eligen **67, 67, 68, 68**
+clientes distintos, así que en pocas vueltas pasaron todos.
+
+(Los `tandas = 0` de esas corridas son correctos y son otra cosa: esos 131 pendientes son los que
+quedan en *A Programar* a propósito —Retira, súper, zonas manuales sin camión previsto—, así que
+el armador los mira y no arma. Lo que importaba era que los 12 se miraran igual.)
+
+### El centinela que faltaba
+
+`GV_PPP_Web_Armado_Log` (una fila por corrida) + la vista **`gv_ppp_web_armado_salud`**:
+
+```sql
+select * from public.gv_ppp_web_armado_salud;
+-- estado: ok | BACKLOG | LENTO (a menos de 2 s del límite) | SIN CORRER hace mas de 20 min
+```
+
+Primera lectura, con las dos empresas: `lk` 37 ms, `chef` 22 ms, margen 7.963 ms, `ok`.
+
+Una corrida que muere **no deja fila** (se deshace la transacción), así que el hueco —`hace_min`
+grande— es la señal de que murió. Por eso el centinela mira las dos cosas.
+
+### Los otros dos del problema 384
+
+**Cron 92 `gv-refrescar-articulo-empresa`** (5,2 s de media, 22,4 s de máximo): **se arregló
+solo**. La función tarda **91 ms**; todo lo demás era esperar el `pg_advisory_xact_lock(5768)`
+que comparte con el cron 68. Medido el mismo día:
+
+| 17:00 (chocando con el 68) | 17:15 | 17:30 (ya con la v19.53) |
+|---|---|---|
+| **22,37 s** | 1,62 s | **0,21 s** |
+
+**Cron 90 `gv-cruce-fc-asig`** (4–6 s, constante): ése no espera ningún lock. Medido:
+
+| | |
+|---|---|
+| `gv_cruce_fc_asig_refrescar()` con cache caliente | **831 / 814 / 819 ms** |
+| lo mismo en frío | 5.303 ms |
+| `gv_cruce_fc_asignacion()` sola | 864 ms (905 filas) |
+| el upsert de las 905 | 8 ms |
+| **filas que cambian de verdad** | **0** |
+
+O sea: lo que cuesta es **leer las facturas con el cache frío**, no el algoritmo. Como el cron 34
+—que barría el cache cada 2 minutos escaneando 63.614 filas— ya no está, esto debería bajar solo.
+**No se tocó a propósito**: hacer el cruce incremental es un cambio de lógica sobre facturación y
+no se justifica por 5 s cada 10 minutos. Si no baja, la palanca es la frecuencia del cron, y ésa
+la decide el dueño (afecta cuán fresca está la Conciliación).
+
+`sql/gv_ppp_web_armado_tope_v1955.sql` · problema **384**.

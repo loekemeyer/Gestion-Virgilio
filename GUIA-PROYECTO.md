@@ -1,3 +1,49 @@
+## Nota v19.55 (2026-09-17) — El armador tenía techo de ~180 pedidos y se cortaba sin avisar
+
+Tercera parte de lo de los crons. Luis: *"arreglalos 3 priorizando el 1"*.
+
+**El 1 era peor de lo que decía la nota anterior.** La RPC que arma las tandas
+(`gv_ppp_web_armar_pendientes` — no `ppp_web_armar_tandas`, que es la que llama 7 veces por
+adentro) cuesta **~43 ms por pedido**, y es lineal. Medido con carga real:
+
+| pedidos pendientes | tarda |
+|---|---|
+| 124 | 5,2 s |
+| **248** | **9,0 s** ← muerta: el límite es 8 s |
+| 496 | 18,7 s |
+
+O sea que **con más de ~180 pendientes no armaba nada**. Y lo que no se arma queda pendiente: la
+corrida siguiente entra con más, tarda más y vuelve a morir. Un lunes con acumulación de fin de
+semana entraba en esa espiral.
+
+**Y no avisaba**: el cron sólo dispara la Edge Function por HTTP, así que tarda 0,05 s y figura
+`succeeded` pase lo que pase del otro lado.
+
+**Arreglo**: un tope de pedidos por corrida (`PPP_Web_Config.armado_tope_pedidos`, 120; 0 = como
+antes), que corta **por cliente completo** para no romper "un cliente, un día", y lo que queda lo
+toma la corrida siguiente 5 minutos después. Con el tope, **496 pedidos de entrada = 4,1 s**, y el
+peor caso ya no depende de cuántos pendientes haya. ⚠ Y el tope va **antes de todo**: puesto
+después de los filtros, la misma entrada seguía tardando 9,6 s.
+
+⚠ **Y el tope necesitó rotación, que la encontró el propio log**: la primera corrida real dio
+131 pedidos → 119 procesados y los **mismos 12 pospuestos dos veces seguidas**. El feed manda
+siempre los mismos y en el mismo orden, así que sin rotar el arranque esos 12 **no se iban a
+mirar nunca**: un tope sin rotación no pospone, esconde. Ahora el arranque rota cada 5 min y
+en pocas vueltas pasan todos.
+
+**Y ahora hay dónde mirarlo**: `select * from public.gv_ppp_web_armado_salud;` — dice cuánto tardó
+la última corrida, cuánto quedó para la próxima, el margen contra los 8 s, y si hace más de 20
+minutos que no corre (que es la señal de que una corrida murió: las que mueren no dejan registro).
+
+**Los otros dos**: el **cron 92** se arregló solo (22,4 s → **0,21 s**; eran todo espera del lock
+que comparte con el 68, la función son 91 ms). El **cron 90** (4-6 s) no se tocó: su cálculo son
+831 ms con el cache caliente y de sus 905 filas **no cambia ninguna** en régimen, así que lo que
+cuesta es leer las facturas en frío — y el cache ya no lo barre nadie. Hacerlo incremental es
+tocar facturación y no se justifica por 5 s cada 10 min.
+
+Detalle y medición: §3.jd de `docs/SUPABASE-GESTION-VIRGILIO.md` · `sql/gv_ppp_web_armado_tope_v1955.sql`
+· problema 384.
+
 ## Nota v19.53 (2026-09-17) — Los otros dos crons: 19,5 s de reescribir lo mismo, y un lock sobre el stock
 
 Segunda parte de lo del cron 34 (v19.46). Luis: *"¿qué pasa con los benditos crons?"*.

@@ -1626,7 +1626,7 @@ arreglo resultara incorrecto, y la equivalencia está verificada sobre el 100 % 
 
 **Lo que NO se tocó** y queda anotado como pendiente (§3.iz): `reconciliar_pipeline_stock()`
 (17,9 s de media, cron 68), la cola del `pg_advisory_xact_lock(5768)` entre los crons 57 y 68
-(media de 4,6 s de espera pura) y `ppp_web_armar_tandas`, que ya llega a 7,7 s contra el límite
+(media de 4,6 s de espera pura) y `gv_ppp_web_armar_pendientes`, que ya llega a 7,7 s contra el límite
 de 8 s.
 
 ---
@@ -1674,3 +1674,38 @@ con `pg_proc.prosrc` y `cron.job`: 0 funciones y 0 crons más las nombran— y n
 invoca por RPC.
 
 **Centinelas después:** `gv_stock_negativos` = 0, `gv_endpoints_rotos` = 0.
+
+---
+
+## v19.55 (2026-09-17) — tope de pedidos por corrida en el armador + log
+
+**Objeto compartido tocado:** `public.gv_ppp_web_armar_pendientes(text,date,jsonb,jsonb)`
+(`CREATE OR REPLACE`, sin cambiar firma ni tipo de retorno). Objetos **nuevos**:
+`public."GV_PPP_Web_Armado_Log"` (tabla, RLS prendida) y `public.gv_ppp_web_armado_salud`
+(vista, `security_invoker = true`).
+
+**Qué cambió:** un bloque `(a00)` al principio que recorta `p_filas` a
+`PPP_Web_Config.armado_tope_pedidos` pedidos (120), cortando por cliente completo, y un `insert`
+al log al final (dentro de un `exception when others then null`, así que nunca puede tumbar el
+armado).
+
+**Por qué:** el armado cuesta ~43 ms por pedido y con más de ~180 pendientes la RPC cruzaba el
+`statement_timeout` de 8 s y no armaba nada, acumulando para la corrida siguiente. Medido:
+248 pedidos = 9,0 s (muerta), 496 = 18,7 s. Con el tope, 496 de entrada = **4,1 s**.
+
+**Efecto sobre Producción Virgilio:** ninguno. Es el armado automático de tandas web, que
+Producción no ejecuta ni consume; la función la llama sólo la Edge Function de los crons 71 y 73
+(verificado: 0 funciones y 0 crons más la nombran).
+
+**Rollback (el rápido, sin tocar código):**
+
+```sql
+update public."PPP_Web_Config" set valor = 0 where clave = 'armado_tope_pedidos';
+```
+
+Con 0 el bloque no hace nada y el comportamiento vuelve a ser exactamente el de antes. El
+rollback del código está al final de `sql/gv_ppp_web_armado_tope_v1955.sql`.
+
+⚠ **El tope cambia el comportamiento en un caso y hay que saberlo:** con más pendientes que el
+tope, una corrida ya no los arma todos — el resto sale en la corrida siguiente (5 minutos
+después). Se ve en `gv_ppp_web_armado_salud.ultima_pospuestos`.
