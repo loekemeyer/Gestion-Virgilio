@@ -12389,7 +12389,13 @@ posterior a su carga, la mercadería está de nuevo en el depósito, así que se
 forzar. Es el caso que trajo Luis: la **98668 de la tanda D66D** (Nexxo), cargada el 11/09 y
 devuelta el 14/09.
 
-Detalle, medición y rollback en `docs/SUPABASE-GESTION-VIRGILIO.md` §3.gp.
+Detalle, medición y rollback en `docs/SUPABASE-GESTION-VIRGILIO.md` §3.gp y §3.gq.
+⚠ **Y anda con lo que ya salió del espejo de ISIS** (v19.37). `gv_ppp_programacion_diaria` sólo
+trae lo que ISIS tiene cargado **hoy**, así que una NP de hace dos semanas ya no está ahí — pero
+sí se sigue viendo en *Pedidos atrasados*, porque el árbol la levanta de la facturación. Hasta la
+v19.36, cancelar una de ésas contestaba *"No encuentro la NP en la programación"*: eran **22 de
+las 31** NP atrasadas. La regla ahora es **si la NP se ve en la PPP, se puede cancelar** (mismas
+cuatro fuentes que el árbol: web → ISIS → `Facturacion_NP` → histórico de entregados).
 
 ---
 

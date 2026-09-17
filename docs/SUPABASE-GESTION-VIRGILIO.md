@@ -21939,3 +21939,82 @@ los racks: 424 cajas de 809E que el stock no cuenta"* eran AD06 (360) + AE11 (64
 del 17/09 dijo que no están y se borraron (v19.33). **Pero `Racks_Planimetria` y
 `Movimientos_Stock` siguen sin cuadrar en 15+ códigos más**: 505I −974, 546V +891, 523C +240,
 725E +192, 1000900 +160, 702E ±... La consulta que lo mide quedó anotada en el problema.
+
+---
+
+### §3.gq — v19.37: cancelar una NP que ya salió del espejo de ISIS — 2026-09-17
+
+Lo reportó Luis con una captura, el mismo día que se subió el botón: en *Pedidos atrasados*,
+tocar **✕ Cancelar pedido** en la **NP 98507** (D53C, Perez Zarate, facturada el 01/09) contestaba
+*"No encuentro la NP 98507 en la programación"*. Y la pregunta que hizo es la que resuelve el
+caso: ***"¿cómo está en pedido atrasado si no tiene la NP?"***
+
+SQL: `sql/gv_ppp_cancelar_atrasados_v1937.sql`. Problema **374**.
+
+#### ⚠ EL ESPEJO DE ISIS ES AMNÉSICO
+
+`gv_ppp_programacion_diaria` **sólo trae lo que ISIS tiene cargado HOY**. Una NP de hace 16 días
+ya no está ahí. Eso el **árbol** de la PPP lo sabe y por eso usa **CUATRO** fuentes, con prioridad:
+
+| # | fuente | `origen` |
+|---|---|---|
+| 1 | `PPP_Web_Programacion` | `web` |
+| 2 | `gv_ppp_programacion_diaria` | `isis` |
+| 3 | `Facturacion_NP` | `fact` |
+| 4 | `GV_PPP_Entregados_Historico` | `hist` |
+
+`gv_ppp_pedido_nps`, `gv_ppp_np_devolucion` y `gv_ppp_np_desarmar` sólo miraban **las dos
+primeras**. Medido sobre Pedidos atrasados el 17/09:
+
+| origen | NP | las encontraba |
+|---|--:|--:|
+| `fact` | 21 | **0** |
+| `hist` | 1 | **0** |
+| `isis` | 9 | 9 |
+
+O sea: **22 de las 31 NP del módulo no se podían ni cancelar ni desarmar**. Y el desarme viene
+así desde la **v17.90** — estaba latente; lo destapó el botón nuevo de la v19.34.
+
+#### La regla que queda
+
+> **Si la NP se ve en la PPP, se puede cancelar.**
+
+`gv_ppp_pedido_nps` resuelve por **las mismas cuatro fuentes y en el mismo orden** que
+`gv_ppp_prog_arbol`, y las otras dos funciones resuelven la tanda igual. Barrido de verificación
+sobre **toda** la PPP (−30/+20 días): **578 de 578, cero agujeros** — fact 314, isis 117, web 146,
+hist 1. Prueba de punta a punta con la 98507 (transacción abortada): el previo la encuentra,
+devuelve **3 artículos / 3 cajas** (404E, 522E, 599E), cancela, sale de Pedidos atrasados.
+
+**Costo:** el previo tarda **725 ms** (1 NP de ISIS) / **1.118 ms** (un pedido web), contra el
+`statement_timeout` de ~8 s. Se abre de a uno por click, así que no se optimizó.
+
+#### Y el pop-up salía desarmado (problema 375)
+
+En la misma captura: el **✕** de cerrar ocupaba toda la cabecera —**421 px medidos**— y empujaba
+el título a tres líneas; el botón *Cerrar* salía full width con letra gigante.
+
+**Causa:** la app tiene un **`button { width:100%; padding:16px; font-size:22px; margin-top:14px }`
+GLOBAL**, y las clases `.can-*` del pop-up nuevo no lo overrideaban. El repo ya tenía ese override
+escrito —en `.pga-acc-b`, `.mv-back` y `.mv-dest`, con el comentario explicando por qué— y al
+escribir el CSS nuevo no se copió.
+
+⚠ **Y el test no lo cazó porque preguntaba si el botón EXISTE, no cuánto MIDE.** Ahora
+`tests/ppp-cancelar-pedido.cjs` mide: ✕ ≤ 80 px, título ≤ 34 px de alto, botón de confirmar
+≤ 300 px. Verificado que **falla** contra el CSS roto (421 px) y pasa con el arreglo (32 px).
+
+#### ⚠ Y una trampa de JavaScript que casi entra al repo
+
+Al reconstruir el `CREATE` de `gv_ppp_np_desarmar` para volcarlo al repo, el archivo salió de
+**46.856 bytes en vez de 13.208**. Causa: `String.prototype.replace(a, b)` con **`b` como string**
+interpreta `$'` como *"todo lo que sigue al match"* — y el texto de reemplazo contenía
+`'\.0+$',''`, o sea un `$` seguido de comilla. **Al reemplazar con texto que puede tener `$`, va
+una función: `replace(a, () => b)`.** Lo delató comparar el md5 contra la base, que es justamente
+para lo que está ese chequeo.
+
+#### ⚠ El CREATE completo va en el repo, no un parche
+
+La primera versión de esto se aplicó como `do $do$` con `replace()` sobre `pg_get_functiondef`.
+Eso deja el repo mintiendo: `sql/gv_ppp_cancelar_pedido_v1934.sql` tiene el `CREATE` de
+`gv_ppp_np_desarmar` **sin** los fallbacks, así que correr ese archivo pisaría el arreglo en
+silencio. Se reemplazó por el `CREATE` completo y vigente en el archivo de la v19.37, y el v1934
+quedó marcado como superado. md5 **3/3** contra la base.

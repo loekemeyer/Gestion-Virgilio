@@ -17,6 +17,12 @@
      · Un pedido que YA SALIÓ no se bloquea (Luis: "en cualquier estado") pero avisa fuerte y
        manda `p_forzar: true` — el backend lo deja escrito en el log.
      · Una NP sin mercadería movida lo dice, en vez de mostrar una lista vacía.
+     · v19.37 — el pop-up se MIDE, no se mira: la app tiene un `button{width:100%;padding:16px;
+       font-size:22px;margin-top:14px}` GLOBAL y la primera versión no lo overrideaba, así que el
+       ✕ se comía toda la cabecera y el título salía en tres líneas (problema 375). Un assert de
+       "el botón existe" no ve eso; uno de ancho sí.
+     · v19.37 — una NP que ya salió del espejo de ISIS (Pedidos atrasados, `origen = 'fact'`)
+       también se puede cancelar: eran 21 de 31 y el previo contestaba "no encuentro la NP".
    Estado inyectado; no pega contra la red. Sale 1 si falla. */
 const path = require("path");
 const fs = require("fs");
@@ -181,6 +187,27 @@ catch (_e) {
     return out;
   });
 
+  // (h) v19.37 — el pop-up, MEDIDO. El bug que llegó a Luis no era de lógica: era que los
+  //     <button> del pop-up heredaban el `width:100%` global de la app.
+  const med = await p.evaluate(async () => {
+    const esperar = async (f) => { const t0 = Date.now();
+      while (Date.now() - t0 < 3000) { if (f()) return true; await new Promise((x) => setTimeout(x, 40)); } return false; };
+    const cuerpo = () => (document.getElementById("pgaCanBody") || {}).innerHTML || "";
+    await pgaCanAbrir("LK 0010");
+    await esperar(() => /Por qué se cancela/.test(cuerpo()));
+    const x = document.querySelector(".can-x").getBoundingClientRect();
+    const tit = document.querySelector(".can-title").getBoundingClientRect();
+    [...document.querySelectorAll(".can-op")].find((o) => /Falta stock/.test(o.textContent)).click();
+    await esperar(() => !document.querySelector(".can-b.go[disabled]"));
+    const go = document.querySelector(".can-b.go").getBoundingClientRect();
+    const card = document.querySelector(".can-card").getBoundingClientRect();
+    const o = { x: Math.round(x.width), xAlto: Math.round(x.height),
+                tituloAlto: Math.round(tit.height), go: Math.round(go.width),
+                card: Math.round(card.width) };
+    pgaCanCerrar();
+    return o;
+  });
+
   const mal = [];
   const t = (c, m) => { if (!c) mal.push(m); };
   t(errs.length === 0, "errores de página: " + errs.join(" | "));
@@ -208,6 +235,11 @@ catch (_e) {
   t(r.unaSolaNpSaltaAlcance, "con una sola NP igual pregunta el alcance");
   t(r.sinMercaderia, "una NP sin mercadería no lo dice");
   t(r.sinAlerta, "muestra la alerta de «ya salió» en una NP que no salió");
+
+  t(med.x > 0 && med.x <= 80, "el ✕ de cerrar mide " + med.x + "px: hereda el width:100% global de la app (problema 375)");
+  t(med.tituloAlto > 0 && med.tituloAlto <= 34, "el título del pop-up ocupa " + med.tituloAlto + "px de alto: se parte en varias líneas");
+  t(med.go > 0 && med.go <= 300, "el botón de confirmar mide " + med.go + "px: sale full width");
+  t(med.card >= 400, "la tarjeta del pop-up quedó angosta (" + med.card + "px)");
 
   await b.close();
   if (mal.length) { console.log("ppp-cancelar-pedido: ✗ FAIL\n  - " + mal.join("\n  - ")); process.exit(1); }

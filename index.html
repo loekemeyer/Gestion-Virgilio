@@ -5720,7 +5720,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=19.36"></script>
+<script type="module" src="recepcion.js?v=19.37"></script>
 <!-- Config del módulo de fichada (compartido con fichada.html). El secret
      hmacSecret tiene que ser el mismo acá y allá; cargándolo desde un solo
      archivo evitamos que se desincronicen. -->
@@ -9566,7 +9566,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v19.36";
+const APP_VERSION = "v19.37";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -34952,14 +34952,20 @@ function _pgaCanCss() {
     ".can-card{background:#f8fafc;border-radius:16px;width:min(620px,96vw);max-height:92vh;display:flex;" +
       "flex-direction:column;box-shadow:0 18px 50px rgba(15,23,42,.35);overflow:hidden;}" +
     ".can-head{display:flex;align-items:center;gap:10px;padding:12px 16px;background:linear-gradient(90deg,#b91c1c,#dc2626);color:#fff;}" +
-    ".can-title{flex:1;font-size:15.5px;font-weight:800;}" +
-    ".can-x{background:rgba(255,255,255,.18);border:0;color:#fff;border-radius:8px;padding:4px 10px;font-weight:800;cursor:pointer;}" +
+    ".can-title{flex:1 1 auto;min-width:0;font-size:15.5px;font-weight:800;line-height:1.3;}" +
+    // ⚠ `width:auto;margin:0;font-size` son el OVERRIDE del global `button{width:100%;padding:16px;
+    // font-size:22px;margin-top:14px}` de la app. Sin esto el ✕ ocupa toda la cabecera y empuja
+    // el título a tres líneas — que es como salió la primera vez (problema 375). Mismo override
+    // que ya llevan .pga-acc-b, .mv-back y .mv-dest.
+    ".can-x{background:rgba(255,255,255,.18);border:0;color:#fff;border-radius:8px;padding:4px 10px;" +
+      "font-size:14px;font-weight:800;cursor:pointer;width:auto;margin:0;flex:0 0 auto;line-height:1.3;}" +
     ".can-body{padding:15px 16px 16px;overflow:auto;}" +
     ".can-cli{font-size:15px;font-weight:800;color:#0f172a;}" +
     ".can-sub{margin-top:2px;font-size:12px;font-weight:700;color:#64748b;}" +
     ".can-q{margin:14px 0 8px;font-size:13.5px;font-weight:800;color:#334155;}" +
     ".can-ops{display:grid;gap:9px;}" +
-    ".can-op{text-align:left;background:#fff;border:1px solid #dbe3ee;border-radius:11px;padding:10px 13px;cursor:pointer;font:inherit;}" +
+    ".can-op{text-align:left;background:#fff;border:1px solid #dbe3ee;border-radius:11px;padding:10px 13px;" +
+      "cursor:pointer;font:inherit;width:100%;margin:0;box-sizing:border-box;}" +
     ".can-op:hover{border-color:#dc2626;}" +
     ".can-op.on{border-color:#dc2626;background:#fef2f2;box-shadow:inset 0 0 0 1px #dc2626;}" +
     ".can-op b{display:block;font-size:13.5px;font-weight:800;color:#0f172a;}" +
@@ -34982,7 +34988,8 @@ function _pgaCanCss() {
     ".can-merc-no{margin-top:12px;background:#f1f5f9;border:1px solid #e2e8f0;border-radius:11px;padding:10px 13px;" +
       "font-size:12.5px;font-weight:700;color:#64748b;}" +
     ".can-acts{display:flex;gap:9px;justify-content:flex-end;margin-top:15px;flex-wrap:wrap;}" +
-    ".can-b{border:0;border-radius:10px;padding:9px 15px;font-size:13.5px;font-weight:800;cursor:pointer;}" +
+    ".can-b{border:0;border-radius:10px;padding:9px 15px;font-size:13.5px;font-weight:800;cursor:pointer;" +
+      "width:auto;margin:0;line-height:1.4;}" +
     ".can-b.sec{background:#fff;border:1px solid #cbd5e1;color:#334155;}" +
     ".can-b.go{background:#dc2626;color:#fff;}" +
     ".can-b[disabled]{opacity:.55;cursor:default;}" +

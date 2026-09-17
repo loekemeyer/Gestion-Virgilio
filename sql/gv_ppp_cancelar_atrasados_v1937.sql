@@ -1,67 +1,103 @@
 -- ═══════════════════════════════════════════════════════════════════════════════════════════
--- v19.34 (Luis, 2026-09-17) — «✕ CANCELAR PEDIDO» DESDE LA FILA DE LA NP
+-- v19.37 (2026-09-17) — CANCELAR / DESARMAR UNA NP QUE YA SALIÓ DEL ESPEJO DE ISIS
 --
--- Pedido textual: *"Quiero agregar un boton junto al de cambiar fecha para NPs que sea «Cancelar
--- pedido». Se puede hacer con cualquier pedido en cualquier estado. Se borra el pedido de la
--- programacion y la mercadería que tenía (si es que tenía) vuelve a A guardar (que pida
--- confirmacion y que ahi avise si tiene mercadería que va a volver a «A guardar» y que diga el
--- detalle). Si se «Cancela pedido» a una NP que es parte de un pedido distribuido en muchas NPs,
--- tiene que preguntar si se quieren cancelar todas las NPs de ese pedido o solo esa."*
+-- Lo reportó Luis con una captura: en *Pedidos atrasados*, tocar **✕ Cancelar pedido** en la
+-- NP **98507** (tanda D53C, Perez Zarate, facturada el 01/09) contestaba
+-- *"No encuentro la NP 98507 en la programación"*. Su pregunta fue la correcta:
+-- **"¿cómo está en pedido atrasado si no tiene la NP?"**
 --
--- El caso que lo trajo: la tanda **D66D**, NP **98668** (Nexxo S.R.L.). Se armó, se facturó, se
--- cargó al camión el 11/09 — y ahí el cliente la canceló. El 14/09 la marcaron «↩ sin salida»
--- (evento FSS) y las cajas volvieron al depósito, pero la NP seguía en la PPP y su mercadería
--- seguía contada en `a_facturar`.
+-- ⚠ LA CAUSA: EL ESPEJO DE ISIS ES AMNÉSICO. `gv_ppp_programacion_diaria` sólo trae lo que ISIS
+-- tiene cargado HOY, así que una NP de hace 16 días ya no está ahí. El ÁRBOL de la PPP
+-- (`gv_ppp_prog_arbol`) lo sabe y usa CUATRO fuentes, con prioridad:
 --
--- ⚠ NO ES UN MOTOR NUEVO. `gv_ppp_np_desarmar` ya devolvía el stock a «A guardar» desde la
--- v18.90, y el pop-up de cancelar ya existía en Facturación. Lo que faltaba es (a) el botón en la
--- PPP, (b) que ande con algo que ya salió, (c) mostrar el detalle ANTES de confirmar y (d) poder
--- cancelar UN bloque sin matar el pedido entero.
+--   1. `PPP_Web_Programacion`          → origen 'web'
+--   2. `gv_ppp_programacion_diaria`    → origen 'isis'
+--   3. `Facturacion_NP`                → origen 'fact'   ← la que faltaba
+--   4. `GV_PPP_Entregados_Historico`   → origen 'hist'   ← y ésta
+--
+-- `gv_ppp_pedido_nps`, `gv_ppp_np_devolucion` y `gv_ppp_np_desarmar` sólo miraban las DOS
+-- primeras. Medido el 17/09 sobre Pedidos atrasados: **21 de 31 NP tienen origen 'fact'** y 1
+-- tiene 'hist', o sea que **dos tercios del módulo no se podían ni cancelar ni desarmar**.
+-- El de desarmar venía latente desde la v17.90; lo destapó el botón nuevo de la v19.34.
+--
+-- LA REGLA QUE QUEDA: **si la NP se ve en la PPP, se puede cancelar.** `gv_ppp_pedido_nps`
+-- resuelve por las mismas cuatro fuentes y en el mismo orden que el árbol. Barrido de
+-- verificación sobre toda la PPP (−30/+20 días, 578 NP): **578 de 578, cero agujeros**
+-- (fact 314, isis 117, web 146, hist 1).
+--
+-- Problema 374 de `github_repo_problemas`.
 --
 -- ⚠ ESTE ARCHIVO ES LO QUE ESTÁ APLICADO. Verificación (md5 del cuerpo sin comentarios ni
 -- espacios, el chequeo que usa el repo):
 --   select p.proname, md5(regexp_replace(regexp_replace(regexp_replace(
 --            p.prosrc,'/\*.*?\*/','','gs'),'--[^\n]*','','g'),'\s','','g'))
 --     from pg_proc p join pg_namespace n on n.oid = p.pronamespace
---    where n.nspname='public' and p.proname in ('gv_ppp_np_devolucion','gv_ppp_np_cancelar_previo',
---          'gv_ppp_np_desarmar','gv_ppp_pedido_cancelar');
+--    where n.nspname='public' and p.proname in ('gv_ppp_pedido_nps','gv_ppp_np_devolucion',
+--          'gv_ppp_np_desarmar');
 --
--- Rollback: `sql/backups/pre_v1934_cancelar_pedido_20260917.sql`.
+-- Rollback: las versiones anteriores están en `sql/gv_ppp_mover_pedido_v1932.sql`
+-- (`gv_ppp_pedido_nps`) y `sql/gv_ppp_cancelar_pedido_v1934.sql` (las otras dos).
 -- ═══════════════════════════════════════════════════════════════════════════════════════════
 
--- ── 1) La marca de "esta NP web se cancela, pero el resto del pedido NO" ───────────────────
--- `GV_Web_Cancelados` tiene clave (empresa, order_id), o sea que es por PEDIDO ENTERO: escribir
--- ahí para cancelar un bloque mataría los otros. Para un bloque hace falta la misma granularidad
--- que ya usan `GV_PPP_Web_Diferido` y `GV_PPP_Web_Retenido`: (empresa, order_id, np_idx). Sin
--- esto la NP queda con tanda=null y el cron la re-arma sola — el problema 213, a nivel bloque.
-create table if not exists public."GV_PPP_Web_NP_Cancelada" (
-  empresa    text   not null,
-  order_id   bigint not null,
-  np_idx     int    not null,
-  np_label   text,
-  motivo     text,
-  por        text,
-  creado_at  timestamptz not null default now(),
-  primary key (empresa, order_id, np_idx)
-);
-alter table public."GV_PPP_Web_NP_Cancelada" enable row level security;
+-- ── 1) Las NP de un pedido, por las CUATRO fuentes del árbol ───────────────────────────────
+create or replace function public.gv_ppp_pedido_nps(p_np text)
+ returns table(np text, empresa text, order_id bigint, np_idx integer, tanda text, fecha date,
+               m3 numeric, cod text, razon_social text, zona text, es_isis boolean)
+ language sql stable set search_path to 'public', 'pg_temp'
+as $function$
+with q as (select regexp_replace(upper(btrim(coalesce(p_np, ''))), '\.0+$', '') as np),
+web as (
+  select w.empresa, w.order_id
+    from public."PPP_Web_Programacion" w, q
+   where upper(btrim(public.gv_ppp_web_np_label(w.empresa, w.np, w.np_idx))) = q.np
+   limit 1
+),
+isis as (
+  select regexp_replace(upper(btrim(d.np)), '\.0+$', '') np, public.gv_empresa_de_np_texto(d.np) empresa,
+         null::bigint order_id, null::int np_idx, upper(btrim(coalesce(d.tanda, ''))) tanda,
+         case when left(btrim(coalesce(d.fecha_entrega, '')), 10) ~ '^\d{4}-\d{2}-\d{2}$'
+              then left(btrim(d.fecha_entrega), 10)::date end fecha,
+         coalesce(d.m3, 0) m3, btrim(coalesce(d.cod, '')) cod, coalesce(d.razon_social, '') razon_social,
+         coalesce(d.zona, '') zona, true es_isis
+    from public.gv_ppp_programacion_diaria d, q
+   where regexp_replace(upper(btrim(d.np)), '\.0+$', '') = q.np
+     and not exists (select 1 from web)
+     and coalesce(nullif(btrim(d.tanda), ''), '') <> ''
+),
+fact as (
+  select regexp_replace(upper(btrim(f.np::text)), '\.0+$', ''), public.gv_empresa_de_np_texto(f.np::text),
+         null::bigint, null::int, upper(btrim(coalesce(f.tanda, ''))), f.fecha_salida::date,
+         coalesce(f.m3, 0), btrim(coalesce(f.cod_cliente, '')), coalesce(f.razon_social, ''), '', true
+    from public."Facturacion_NP" f, q
+   where regexp_replace(upper(btrim(f.np::text)), '\.0+$', '') = q.np
+     and not exists (select 1 from web) and not exists (select 1 from isis)
+     and coalesce(nullif(btrim(f.tanda), ''), '') <> ''
+)
+select upper(btrim(public.gv_ppp_web_np_label(w.empresa, w.np, w.np_idx))), w.empresa, w.order_id,
+       w.np_idx, upper(btrim(coalesce(w.tanda, ''))), w.fecha_entrega, coalesce(w.m3, 0),
+       btrim(coalesce(w.cod_cliente, '')), coalesce(w.razon_social, ''), coalesce(w.zona, ''), false
+  from public."PPP_Web_Programacion" w
+  join web on web.empresa = w.empresa and web.order_id = w.order_id
+ where coalesce(nullif(btrim(w.tanda), ''), '') <> ''
+union all
+select * from isis
+union all
+select * from fact
+union all
+-- (4) la última fuente del árbol: el histórico de entregados. Es 1 de las 31 NP atrasadas, pero
+--     si no está acá queda un agujero: se ve en la pantalla y no se puede cancelar.
+select regexp_replace(btrim(h.np), '\.0+$', ''), public.gv_empresa_de_np_texto(h.np),
+       null::bigint, null::int, upper(btrim(coalesce(h.tanda, ''))),
+       case when left(btrim(coalesce(h.fecha_entrega, '')), 10) ~ '^\d{4}-\d{2}-\d{2}$'
+            then left(btrim(h.fecha_entrega), 10)::date end,
+       coalesce(h.m3, 0), btrim(coalesce(h.cod, '')), coalesce(h.rs, ''), '', true
+  from public."GV_PPP_Entregados_Historico" h, q
+ where regexp_replace(btrim(h.np), '\.0+$', '') = q.np
+   and not exists (select 1 from web) and not exists (select 1 from isis) and not exists (select 1 from fact)
+   and coalesce(nullif(btrim(h.tanda), ''), '') <> '';
+$function$;
 
-do $do$
-begin
-  if not exists (select 1 from pg_policies where schemaname='public'
-                   and tablename='GV_PPP_Web_NP_Cancelada' and policyname='gv_web_np_cancelada_lectura') then
-    create policy gv_web_np_cancelada_lectura on public."GV_PPP_Web_NP_Cancelada"
-      for select to anon, authenticated using (true);
-  end if;
-end $do$;
-
-grant select on public."GV_PPP_Web_NP_Cancelada" to anon, authenticated;
-
--- ── 2) La cuenta de "qué mercadería vuelve", en UNA sola función ───────────────────────────
--- Estaba escrita adentro de `gv_ppp_np_desarmar` y ahora la necesita también la pantalla, para
--- poder mostrar el detalle ANTES de confirmar (pedido de Luis). Duplicar la fórmula es lo que
--- garantiza que un día digan cosas distintas, así que sale acá y el desarme la llama.
--- Validada contra la fórmula vieja sobre 80 NP (40 de ISIS + 40 web): 0 diferencias.
+-- ── 2) La cuenta del stock: la TANDA, por las mismas cuatro fuentes ────────────────────────
 create or replace function public.gv_ppp_np_devolucion(p_np text, p_tanda text default null)
  returns table(cod_art text, empresa text, org_term numeric, org_exc numeric, total numeric,
                de_fact numeric, de_sep numeric, a_guardar numeric)
@@ -70,12 +106,20 @@ as $function$
 with np as (
   select regexp_replace(btrim(p_np), '\.0+$', '') as np
 ), t as (
+  /* La tanda, por las MISMAS cuatro fuentes que `gv_ppp_prog_arbol` y en el mismo orden: la
+     programación viva primero, y después lo que ya salió del espejo de ISIS (que es amnésico). */
   select coalesce(
     nullif(btrim(coalesce(p_tanda, '')), ''),
     (select regexp_replace(btrim(p.tanda),'\s+$','') from public.gv_ppp_programacion_diaria p, np
       where regexp_replace(btrim(p.np), '\.0+$','') = np.np limit 1),
     (select btrim(w.tanda) from public."PPP_Web_Programacion" w, np
-      where upper(public.gv_ppp_web_np_label(w.empresa, w.np, w.np_idx)) = upper(np.np) limit 1)
+      where upper(public.gv_ppp_web_np_label(w.empresa, w.np, w.np_idx)) = upper(np.np) limit 1),
+    (select btrim(f.tanda) from public."Facturacion_NP" f, np
+      where regexp_replace(btrim(f.np::text), '\.0+$','') = np.np
+        and coalesce(nullif(btrim(f.tanda), ''), '') <> '' limit 1),
+    (select btrim(h.tanda) from public."GV_PPP_Entregados_Historico" h, np
+      where regexp_replace(btrim(h.np), '\.0+$','') = np.np
+        and coalesce(nullif(btrim(h.tanda), ''), '') <> '' limit 1)
   ) as tanda
 ), ped as (
   select public.canon_cod(i.art) ck, sum(i.cajas)::numeric cajas
@@ -115,107 +159,12 @@ select c.cod_art, c.empresa, c.org_term, c.org_exc, c.total,
   from c where c.total > 0;
 $function$;
 
--- ── 3) El PREVIO: qué se lleva puesto cancelar, sin escribir nada ─────────────────────────
--- Luis: "que pida confirmacion y que ahi avise si tiene mercadería que va a volver a A guardar
--- y que diga el detalle" + "si es parte de un pedido distribuido en muchas NPs, tiene que
--- preguntar si se quieren cancelar todas o solo esa".
-create or replace function public.gv_ppp_np_cancelar_previo(p_np text)
- returns jsonb
- language plpgsql stable security definer set search_path to 'public', 'pg_temp'
-as $function$
-#variable_conflict use_column
-declare
-  v_np text := regexp_replace(upper(btrim(coalesce(p_np,''))), '\.0+$', '');
-  v_out jsonb;
-begin
-  if not (es_supervisor_virgilio() or gv_es_supervisor_o_servicio()) then
-    raise exception 'Solo un supervisor puede cancelar un pedido.' using errcode='42501';
-  end if;
-
-  with nps as (
-    select * from public.gv_ppp_pedido_nps(v_np)
-  ),
-  -- ¿Ya salió? CCN = Carga Camión, CRN = Recepción Remitos, FSS = «↩ sin salida» (volvió al
-  -- depósito). Una NP con FSS POSTERIOR a su última carga NO salió: está de nuevo acá. Es el
-  -- caso que trajo Luis (98668 de la D66D: cargada el 11/09, marcada sin salida el 14/09).
-  ev as (
-    select regexp_replace(upper(btrim(split_part(r.texto,'|',1))), '\.0+$','') np,
-           max(r.ts_cliente) filter (where r.opcion = 'CCN') ccn,
-           max(r.ts_cliente) filter (where r.opcion = 'CRN') crn,
-           max(r.ts_cliente) filter (where r.opcion = 'FSS') fss
-      from public."Registros_Produccion_Virgilio" r
-     where r.opcion in ('CCN','CRN','FSS') and not public.es_legajo_test(r.legajo)
-       and regexp_replace(upper(btrim(split_part(r.texto,'|',1))), '\.0+$','') in (select np from nps)
-     group by 1
-  ),
-  det as (
-    select n.*,
-           coalesce(e.crn, e.ccn) is not null
-             and (e.fss is null or coalesce(e.crn, e.ccn) > e.fss)     as salio,
-           e.crn is not null and (e.fss is null or e.crn > e.fss)      as entregado,
-           e.fss is not null and e.fss >= coalesce(e.crn, e.ccn, e.fss) as volvio,
-           coalesce(st.estado, 'pendiente')                            as estado,
-           d.arts, d.cajas, d.items
-      from nps n
-      left join ev e on e.np = n.np
-      left join lateral (select estado from public.gv_ppp_np_estado(array[n.np]) limit 1) st on true
-      left join lateral (
-        select count(*)::int arts, coalesce(sum(v.total),0) cajas,
-               coalesce(jsonb_agg(jsonb_build_object('art', v.cod_art, 'cajas', v.total)
-                                  order by v.cod_art), '[]'::jsonb) items
-          from public.gv_ppp_np_devolucion(n.np, n.tanda) v
-      ) d on true
-  )
-  select jsonb_build_object(
-    'np',         v_np,
-    'existe',     exists (select 1 from det),
-    'es_isis',    (select bool_or(es_isis) from det),
-    'empresa',    (select empresa  from det where np = v_np),
-    'order_id',   (select order_id from det where np = v_np),
-    'tanda',      (select tanda    from det where np = v_np),
-    'cod',        (select cod      from det where np = v_np),
-    'razon_social', (select razon_social from det where np = v_np),
-    'fecha',      (select fecha    from det where np = v_np),
-    'estado',     (select estado   from det where np = v_np),
-    'salio',      (select coalesce(salio, false)     from det where np = v_np),
-    'entregado',  (select coalesce(entregado, false) from det where np = v_np),
-    'volvio',     (select coalesce(volvio, false)    from det where np = v_np),
-    'nps',        (select coalesce(jsonb_agg(jsonb_build_object(
-                            'np', np, 'tanda', tanda, 'fecha', fecha, 'm3', m3, 'estado', estado,
-                            'salio', coalesce(salio,false), 'entregado', coalesce(entregado,false),
-                            'volvio', coalesce(volvio,false),
-                            'arts', arts, 'cajas', cajas, 'items', items) order by np), '[]'::jsonb)
-                     from det),
-    'n_nps',      (select count(*)::int from det),
-    'dev_np',     (select jsonb_build_object('arts', arts, 'cajas', cajas, 'items', items)
-                     from det where np = v_np),
-    'dev_todas',  (select jsonb_build_object('arts', coalesce(sum(arts),0), 'cajas', coalesce(sum(cajas),0))
-                     from det)
-  ) into v_out;
-
-  return v_out;
-end;
-$function$;
-
-revoke execute on function public.gv_ppp_np_cancelar_previo(text) from public, anon;
-grant  execute on function public.gv_ppp_np_cancelar_previo(text) to authenticated, service_role;
-
--- ⚠⚠ SUPERADO POR LA v19.37: `gv_ppp_np_desarmar` tiene DOS FALLBACKS MÁS (Facturacion_NP y
--- GV_PPP_Entregados_Historico) para la NP que ya salió del espejo amnésico de ISIS. La definición
--- VIGENTE está en `sql/gv_ppp_cancelar_atrasados_v1937.sql`. **Correr el CREATE de abajo pisa ese
--- arreglo** y deja sin cancelar 21 de las 31 NP de Pedidos atrasados. Se conserva como historia y
--- como rollback de las dos perillas (p_forzar / p_solo_np), no para re-aplicar.
--- ── 4) El desarme, con dos perillas nuevas ────────────────────────────────────────────────
---  · p_forzar  → Luis: "Se puede hacer con cualquier pedido en cualquier estado". El guard de
---                CCN/CRN sigue existiendo (si ya salió y llegó, eso se cierra con el remito),
---                pero ahora se puede pasar por arriba a sabiendas, y queda escrito en el log.
---  · p_solo_np → cancelar UN bloque de un pedido web sin matar el pedido entero.
--- Además la cuenta del stock ya no está acá: la hace `gv_ppp_np_devolucion`, que es la misma
--- que ve la pantalla antes de confirmar.
--- ⚠ La firma vieja de 5 argumentos se DROPEA a propósito: con las dos, PostgREST no sabe cuál
--- llamar (mismo precedente que `gv_ppp_tanda_mover` en la v19.32).
-drop function if exists public.gv_ppp_np_desarmar(text, text, text, boolean, boolean);
-
+-- ── 3) El desarme, con los dos fallbacks ──────────────────────────────────────────────────
+-- ⚠ Va el CREATE COMPLETO, no un parche sobre `pg_get_functiondef`. La primera versión de esto
+-- era un `do $do$` con `replace()`, y eso deja el repo mintiendo: `sql/gv_ppp_cancelar_pedido_v1934.sql`
+-- tiene el CREATE SIN los fallbacks, así que correr ese archivo pisaría el arreglo en silencio.
+-- Es el pozo que el CLAUDE.md ya tiene escrito ("el CREATE completo va EN EL REPO").
+-- **Ésta es la definición vigente de `gv_ppp_np_desarmar`**; la del v1934 quedó superada.
 create or replace function public.gv_ppp_np_desarmar(p_np text, p_justificativo text, p_por text default null,
                                                      p_vuelve boolean default false, p_a_guardar boolean default false,
                                                      p_forzar boolean default false, p_solo_np boolean default false)
@@ -277,6 +226,27 @@ begin
       into v_tanda, v_fe, v_cod, v_rs, v_m3
       from public.gv_ppp_programacion_diaria p
      where regexp_replace(btrim(p.np), '\.0+$','') = v_np limit 1;
+    /* v19.37 -- el espejo de ISIS es AMNESICO: solo trae lo que ISIS tiene cargado HOY, asi que
+       una NP de hace dos semanas ya no esta. `gv_ppp_atrasados` ya la levanta de `Facturacion_NP`
+       (origen = 'fact'), que al 17/09 son 21 de las 31 NP de Pedidos atrasados. Ultimo recurso,
+       no reemplazo: si la NP esta en la programacion viva, manda esa. */
+    if v_tanda is null then
+      select upper(btrim(f.tanda)), f.fecha_salida::date, btrim(f.cod_cliente), btrim(f.razon_social), f.m3
+        into v_tanda, v_fe, v_cod, v_rs, v_m3
+        from public."Facturacion_NP" f
+       where regexp_replace(btrim(f.np::text), '\.0+$','') = v_np
+         and coalesce(nullif(btrim(f.tanda), ''), '') <> '' limit 1;
+    end if;
+    if v_tanda is null then
+      select upper(btrim(h.tanda)),
+             case when left(btrim(coalesce(h.fecha_entrega, '')), 10) ~ '^\d{4}-\d{2}-\d{2}$'
+                  then left(btrim(h.fecha_entrega), 10)::date end,
+             btrim(h.cod), btrim(h.rs), h.m3
+        into v_tanda, v_fe, v_cod, v_rs, v_m3
+        from public."GV_PPP_Entregados_Historico" h
+       where regexp_replace(btrim(h.np), '\.0+$','') = v_np
+         and coalesce(nullif(btrim(h.tanda), ''), '') <> '' limit 1;
+    end if;
   else
     v_emp := case when upper(left(v_np,2)) = 'CH' then 'chef' else 'lk' end;
     v_num := (regexp_match(v_np, '(\d+)'))[1]::int;
@@ -417,92 +387,3 @@ begin
              else ' · el pedido NO vuelve' end)::text;
 end;
 $function$;
-
-revoke execute on function public.gv_ppp_np_desarmar(text,text,text,boolean,boolean,boolean,boolean) from public, anon;
-grant  execute on function public.gv_ppp_np_desarmar(text,text,text,boolean,boolean,boolean,boolean) to authenticated, service_role;
-
--- ── 5) El armador no vuelve a agarrar un bloque cancelado ─────────────────────────────────
--- Pase (a0c) de `gv_ppp_web_armar_pendientes`, calcado del (a0b) que ya existía para lo retenido.
--- Se aplica como parche de texto porque la función es larga y lo único que cambia es este pase.
--- Probado corriendo el armador de verdad: con el bloque 1 marcado, arma sólo el 2.
-do $do$
-declare d text; marca text; nuevo text;
-begin
-  d := pg_get_functiondef('public.gv_ppp_web_armar_pendientes(text,date,jsonb,jsonb)'::regprocedure);
-  if d like '%GV_PPP_Web_NP_Cancelada%' then raise notice 'ya estaba'; return; end if;
-
-  marca := '  -- (a) forzados con fecha';
-  if position(marca in d) = 0 then raise exception 'no encuentro el bloque (a): la funcion cambio'; end if;
-
-  nuevo :=
-'  -- (a0c) v19.34 (Luis) -- BLOQUE CANCELADO A MANO: la NP que un supervisor cancelo con el boton
-  --   "Cancelar pedido" de su fila no vuelve a entrar. Es el mismo pase que (a0b) pero para lo
-  --   cancelado, y hace falta por lo mismo: la NP queda con tanda=null y sin esto el cron la
-  --   re-arma en la corrida siguiente (el problema 213, ahora a nivel bloque). El pedido ENTERO
-  --   cancelado ya lo frena `gv_pedidos_web_excluidos` via GV_Web_Cancelados; esta tabla es para
-  --   cuando se cancelo UNA sola NP de un pedido de varias.
-  p_filas := coalesce((
-    select jsonb_agg(x)
-      from jsonb_array_elements(p_filas) x
-     where not exists (select 1 from public."GV_PPP_Web_NP_Cancelada" c
-                        where c.empresa  = p_empresa
-                          and c.order_id = (x->>''order_id'')::bigint
-                          and c.np_idx   = (x->>''np_idx'')::int)), ''[]''::jsonb);
-
-' || marca;
-
-  execute replace(d, marca, nuevo);
-end $do$;
-
--- ── 6) La que llama la pantalla: cancelar ESTA NP o TODO el pedido ────────────────────────
-create or replace function public.gv_ppp_pedido_cancelar(p_np text, p_motivo text, p_por text default null,
-                                                         p_todas boolean default false, p_forzar boolean default false)
- returns table(np text, tanda text, arts integer, cajas numeric, detalle text)
- language plpgsql security definer set search_path to 'public', 'pg_temp'
-as $function$
-#variable_conflict use_column
-declare
-  v_np   text := regexp_replace(upper(btrim(coalesce(p_np,''))), '\.0+$', '');
-  v_mot  text := btrim(coalesce(p_motivo, ''));
-  v_todas boolean := coalesce(p_todas, false);
-  v_just text;
-  r record; v_n int := 0;
-begin
-  if not (es_supervisor_virgilio() or gv_es_supervisor_o_servicio()) then
-    raise exception 'Solo un supervisor puede cancelar un pedido.' using errcode='42501';
-  end if;
-  if length(v_mot) < 5 then
-    raise exception 'Falta el motivo de la cancelacion: es lo unico que va a explicar esto manana.';
-  end if;
-  v_just := 'Cancelado desde la PPP: ' || v_mot;
-
-  /* El alcance lo decide quien cancela (Luis: "tiene que preguntar si se quieren cancelar todas
-     las NPs de ese pedido o solo esa"). Con `p_todas` van todas las NP CON TANDA del mismo
-     pedido — `gv_ppp_pedido_nps` ya sabe cuales son, es la misma que usa «Cambiar de dia» — y
-     ademas la marca web queda a nivel PEDIDO, asi que tampoco vuelve un bloque que todavia no
-     estaba programado. Con `p_todas = false` se cancela solo este bloque y el resto del pedido
-     sigue su camino. */
-  for r in
-    select n.np from public.gv_ppp_pedido_nps(v_np) n where v_todas
-    union
-    select v_np where not v_todas
-    order by 1
-  loop
-    return query
-      select d.np, d.tanda, d.arts, d.cajas, d.detalle
-        from public.gv_ppp_np_desarmar(r.np, v_just, p_por,
-                                       false,          -- el pedido NO vuelve a A Programar: se cancelo
-                                       true,           -- y lo armado va a «A guardar»
-                                       coalesce(p_forzar, false),
-                                       not v_todas) d; -- solo este bloque, o el pedido entero
-    v_n := v_n + 1;
-  end loop;
-
-  if v_n = 0 then
-    raise exception 'No encuentro la NP % en la programacion.', v_np;
-  end if;
-end;
-$function$;
-
-revoke execute on function public.gv_ppp_pedido_cancelar(text,text,text,boolean,boolean) from public, anon;
-grant  execute on function public.gv_ppp_pedido_cancelar(text,text,text,boolean,boolean) to authenticated, service_role;
