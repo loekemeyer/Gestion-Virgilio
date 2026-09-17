@@ -74,11 +74,13 @@ returns text language sql stable as $fn$
                              where regexp_replace(upper(btrim(p.cod)),'^0+(?=.)','') = b.cc) l,
                      exists(select 1 from public.precios_venta_chef p, base b
                              where regexp_replace(upper(btrim(p.cod)),'^0+(?=.)','') = b.cc) c) z),
-  racks as (select case when count(distinct replace(upper(u.empresa),'LOKE','LK'))=1
-                        then min(replace(upper(u.empresa),'LOKE','LK')) end emp
-              from public."Ubicaciones_Articulos" u, base b
-             where upper(u.empresa) in ('LK','CH','LOKE')
-               and regexp_replace(upper(btrim(u.cod_art)),'^0+(?=.)','') = b.cc)
+  -- v19.27: Racks_Planimetria, NO Ubicaciones_Articulos (esa quedo congelada el 10/08 y
+  -- tiene codigos que no existen, como 809E-QUESO / 809E-PIZZA).
+  racks as (select case when count(distinct replace(upper(r.emp),'LOKE','LK'))=1
+                        then min(replace(upper(r.emp),'LOKE','LK')) end emp
+              from public."Racks_Planimetria" r, base b
+             where upper(r.emp) in ('LK','CH','LOKE')
+               and regexp_replace(upper(btrim(r.cod_art)),'^0+(?=.)','') = b.cc)
   select coalesce((select emp from gond),(select emp from lista),(select emp from racks));
 $fn$;
 revoke execute on function public.gv_empresa_de_articulo_vivo(text) from anon, authenticated;
@@ -111,9 +113,9 @@ begin
                         when l.cc is not null then 'LK' else 'CH' end emp
               from lkp l full join chp c on c.cc = l.cc),
   rck as (select regexp_replace(upper(btrim(cod_art)),'^0+(?=.)','') cc,
-                 case when count(distinct replace(upper(empresa),'LOKE','LK'))=1
-                      then min(replace(upper(empresa),'LOKE','LK')) end emp
-            from public."Ubicaciones_Articulos" where upper(empresa) in ('LK','CH','LOKE') group by 1),
+                 case when count(distinct replace(upper(emp),'LOKE','LK'))=1
+                      then min(replace(upper(emp),'LOKE','LK')) end emp
+            from public."Racks_Planimetria" where upper(emp) in ('LK','CH','LOKE') group by 1),
   todos as (select cc from gond union select cc from lista union select cc from rck),
   final as (
     select t.cc, coalesce(g.emp, li.emp, r.emp) emp,
@@ -283,3 +285,59 @@ $function$;
 -- 4) drop table public."GV_Articulo_Empresa_Cache";
 --    drop function public.gv_empresa_de_articulo(text), public.gv_empresa_de_articulo_vivo(text),
 --                  public.gv_refrescar_articulo_empresa();
+
+-- ════════════════════════════════════════════════════════════════════════════════════
+-- v19.27 (Luis, 2026-09-17) — LA FUENTE DE RACKS ERA LA TABLA VIEJA
+-- ════════════════════════════════════════════════════════════════════════════════════
+-- El tercer fallback (racks) leia `Ubicaciones_Articulos`, que **quedo congelada el
+-- 2026-08-10**: 872 filas, nadie la escribe desde entonces. La viva es
+-- `Racks_Planimetria` (154 filas, ultima carga 16/09), que es la que mueven
+-- racks_plani_ingreso / _descontar / _mover, registrar_baja_racks y vista_insumos.
+--
+-- Como se noto: buscando donde estaban fisicamente las cajas del 809E, la tabla vieja
+-- decia que en el rack AD5 habia un codigo `809E-QUESO` y en Y12 un `809E-PIZZA`. Los dos
+-- son inventos de esa tabla: 0 movimientos en Movimientos_Stock, 0 en el deposito insumos,
+-- y son los unicos dos codigos con guion que tiene. La viva dice `809E` y el rack de LK es
+-- AE11, no Y12.
+--
+-- Impacto del cambio de fuente, medido: 7 codigos resuelven distinto (2 son los inventados,
+-- 2 son duales donde la funcion devuelve NULL igual) y **0 movimientos** quedan con una
+-- etiqueta que no coincida con el catalogo. El cache paso de 374 a 371 codigos.
+--
+-- Ademas se corrigieron 26 sectores de `Racks_Planimetria` a los que les faltaba el cero
+-- (AD5 -> AD05, X1 -> X01, N3 -> N03 ...): 27 de los 29 que no existian en GV_Lugar eran
+-- ese mismo error de tipeo. Backup: zz_backups."GV_Backup_RacksPlani_sectores_20260917".
+-- Quedan 3 sin corregir a proposito: O2 y O5 (no existen en ninguna forma) y Z7 (su gemelo
+-- Z07 existe pero es GONDOLA, no rack).
+--
+-- Rollback de los sectores:
+--   update public."Racks_Planimetria" r set sector = b.sector
+--     from zz_backups."GV_Backup_RacksPlani_sectores_20260917" b where b.id = r.id;
+-- ════════════════════════════════════════════════════════════════════════════════════
+
+-- ════════════════════════════════════════════════════════════════════════════════════
+-- v19.28 (2026-09-17) — LA VISTA DE LA REGLA TENIA EL ORDEN VIEJO
+-- ════════════════════════════════════════════════════════════════════════════════════
+-- `gv_mov_empresa_resuelta` (la vista que documenta como se resolvio el backfill) se habia
+-- quedado con el orden de reglas del 16/09 a la mañana: la NP del pedido y las señales
+-- fisicas ANTES que el articulo. O sea el criterio VIEJO, el que rompio los saldos.
+-- Medido: 275 movimientos de codigos NO duales donde la vista opinaba distinto que la
+-- etiqueta. Si alguien la hubiera usado para re-alinear, volvia a etiquetar por pedido.
+--
+-- Corregido: para un codigo NO dual el articulo va PRIMERO (igual que el trigger) y, si el
+-- articulo no se sabe, la vista **no opina** (`when du.cc is null then null`) en vez de caer
+-- a la tanda. Sin ese corte, 3 codigos huerfanos (1546903, 838, VASTIDOR) seguian
+-- resolviendose por el pedido. Resultado: **0 desacuerdos en codigos no duales**.
+-- Los 64 de codigos duales quedan y estan bien: ahi la vista es ORIENTATIVA, la etiqueta
+-- real dice de que pila salio la caja y no se toca.
+--
+-- Ademas la vista leia `Ubicaciones_Articulos` (congelada): pasa a `Racks_Planimetria`.
+--
+-- ── Centinela nuevo: gv_fuentes_lugares ─────────────────────────────────────────────
+-- Dice sola cual de las tablas de lugares esta viva, hace cuanto no se escribe y cuantas
+-- funciones y vistas la leen. Sirve para no volver a medirlo a mano:
+--   select * from public.gv_fuentes_lugares;
+-- Al 17/09: GV_Lugar / GV_Lugar_Item / Racks_Planimetria con 1 dia; Planimetria con 6
+-- (congelada, pero se conserva: guarda los codigos huerfanos que el mapa rescata); y
+-- Ubicaciones_Articulos con **38 dias**, 0 funciones y 0 lectores en el front.
+-- ════════════════════════════════════════════════════════════════════════════════════
