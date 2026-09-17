@@ -22400,3 +22400,73 @@ registro. Mismo patrón que el ya documentado *"v16.91 neteo doble drenaje"* del
 | 321 · 504 · 584E · 599E | 2 | −2 | **−2** | −2 |
 | 315 · 361E · 583E · 816E · 817E · 969E | 1..6 | cerrado | **−1** | −1 |
 | 501 | 46 | −46 | — | **0** ✓ |
+
+### §3.gr — v19.49: el doble drenaje de D66D, borrado, y el guard que lo frena — 2026-09-17
+
+Pedido de Luis: *"dale, borrá las 12 … y tenés el OK para lo otro asegurándote de que para
+adelante no haya error"*. SQL completo, medición y rollback en
+**`sql/gv_facturado_no_negativo_v1949.sql`**.
+
+**Qué se borró.** Las 12 filas `D66D|98648` del 17/09 14:05 (ids 69971466–69971477), idénticas
+código por código al barrido del 10/09 (12 de 12, mismo delta). Backup en
+`zz_backups."GV_Backup_D66D_doble_drenaje_20260917"`. La pila de D66D cerró en **0** y
+`gv_stock_negativos` pasó de 3 filas a 1 (522E −1, que es el cierre a mano de la NP 97870, otro
+caso). ⚠ `trigger_actualizar_saldo_stock` es AFTER **INSERT OR UPDATE**: un DELETE no lo dispara,
+así que hay que correr `refresh_stocks_carga_rapida()` y `refresh_stock_view()` a mano.
+
+**Por dónde entró.** No fue ninguno de los dos reconciliadores: los dos ya tienen el guard por
+tanda (`not exists … upper(trim(m.ref))=s.tanda or split_part(m.ref,'|',1)=s.tanda`) y además
+escriben con `legajo='pipeline'`. Estas filas vinieron con `legajo=''` y `ubicacion='98648'`, o sea
+del **front** (`stockSalidaFacturadoNP`, `index.html`). Y el front tiene su propio tope desde la
+v5.96 —`_stockAfacturarRestanteTanda`, que justamente suma `ref=tanda` + `ref=tanda|NP`—, con el
+que el drenaje habría dado 0. **Conclusión: la copia que corrió no era la del repo.** Un celular
+con el `index.html` viejo cacheado alcanza para reponer el bug.
+
+> **Un guard que vive SOLO en el front no protege nada**: no se controla qué versión corre cada
+> operario. Va al backend. Es el mismo protocolo que ya está escrito arriba, aplicado a un caso
+> donde el front estaba bien y el agujero lo abrió la caché.
+
+**El guard: `zzz_facturado_no_negativo`.** BEFORE INSERT sobre `Movimientos_Stock`, al lado del
+`zzz_guardado_no_negativo` que ya existía para `a_guardar`. Si entra un `facturado` negativo sobre
+`a_facturar` y la pila de esa tanda para ese código **ya está en cero o menos**, la fila se
+**descarta** (`RETURN NULL`) y queda anotada en `GV_Stock_Drenaje_Bloqueado`. Se descarta en vez de
+tirar excepción a propósito: el drenaje entra en lotes y un `raise` mataría el batch entero,
+incluidas las filas legítimas de los otros códigos.
+
+⚠ **El saldo se mide SIN empresa.** Es la lección del problema 390 y del propio D66D: una etiqueta
+de empresa distinta hace que el mismo movimiento parezca otro, y es exactamente por eso que el
+índice único `mov_stock_pipeline_dedup` —que lleva `COALESCE(empresa,'')` en la clave— no frena
+estos duplicados.
+
+⚠ **Y sólo actúa cuando el `ref` empieza con un CÓDIGO DE TANDA** (`^[A-Z][0-9]{2}[A-Z]$`). La
+primera versión medía también las NP y **habría frenado los drenajes de CP**, que salen con
+`ref = NP|CP` contra una pila que se lleva por tanda. Lo destapó el centinela, no la lectura del
+código: al correrlo aparecieron `LK 0034` y `98507`.
+
+**El corte NO es el orden de los drenajes, es el saldo.** Que una NP drene DESPUÉS del barrido de
+su tanda pasó también en E12C (17/09), D14B (03/08) y 97923 (31/07) — y esas tres cierran en 0, o
+sea que ahí el drenaje por NP era legítimo. Un guard escrito contra el orden las habría roto.
+
+**Centinela: `gv_stock_afacturar_tanda_negativa`.**
+
+```sql
+select * from public.gv_stock_afacturar_tanda_negativa where clase = 'tanda';  -- vacía = todo bien
+```
+
+`gv_stock_negativos` **no ve esto**: agrega por código sin mirar la tanda, así que el saldo positivo
+de otra tanda tapa el agujero — de los 12 códigos que D66D dejó en negativo, mostraba 3. La vista
+nueva también expone `clase='np'`, que hoy tiene **11 filas (−20 cajas)** en `LK 0034` (15/09) y
+`98507` (17/09): drenajes de CP sin la fila de entrada bajo la misma NP. **Es otro problema y no se
+tocó.**
+
+**Cómo se probó** — con `insert` de verdad, no leyendo la función: (a) repetir `D66D|98648` →
+frenado y anotado; (b) `E03F|__PRUEBA__` sobre una pila de 23 → pasa; (c) `98507|CP` → pasa;
+(d) un `ref` de texto libre de corrección a mano → pasa. Todo borrado después.
+
+**Apéndice — las 8 filas del 920 en `Mixto`.** `gv_stock_empresa_fantasma` cantó el 920 con
+CH:+15 / Mixto:−15 en `a_guardar` (total 0: etiqueta, no cajas). Las 8 filas son de entre las 13:58
+y las 15:09 del 17/09, o sea **la ventana en la que la regla del artículo no estaba en el trigger**
+(problema 390, repuesta a las 16:04). Hoy `gv_empresa_de_articulo('920')` = CH y el trigger las
+etiquetaría bien —medido con un insert de prueba—, así que se reetiquetaron las 8 a CH. Backup en
+`zz_backups."GV_Backup_920_mixto_20260917"`. La huella del saldo por (código, depósito) **sin**
+empresa quedó idéntica (`72816c64…`): no se movió una caja. `gv_stock_empresa_fantasma` → 0.

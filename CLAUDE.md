@@ -76,6 +76,18 @@ values ('<objeto>','funcion','<regex que tiene que estar>','<la regla en castell
 ⚠ El centinela **saca los comentarios antes de buscar**: si no, un `-- NO usar X` contaba como
 uso de X.
 
+**Y un tercero, del lado del stock** (v19.49, después del doble drenaje de D66D):
+
+```sql
+select * from public.gv_stock_afacturar_tanda_negativa where clase='tanda';  -- vacía = todo bien
+select * from public."GV_Stock_Drenaje_Bloqueado";   -- lo que el guard frenó: si tiene filas, alguien factura dos veces
+```
+
+Lo sostiene el trigger **`zzz_facturado_no_negativo`**: un `facturado` sobre `a_facturar` cuya pila
+de tanda ya está en cero se descarta y queda anotado. **`gv_stock_negativos` no reemplaza a esto**:
+agrega por código sin mirar la tanda, así que el saldo positivo de otra tanda tapa el agujero — el
+17/09 mostraba 3 de los 12 códigos que D66D había dejado en negativo. §3.gr.
+
 ### 4. Las tablas que valen hoy
 
 La lista viva está en la regla **"LAS TABLAS QUE VALEN"** más abajo, con la medición de cuál se
