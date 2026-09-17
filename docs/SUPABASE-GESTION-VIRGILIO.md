@@ -22674,3 +22674,175 @@ Arreglado en las dos páginas (`pagina-LK-copia` y `paginach`):
 Las definiciones previas de las dos funciones del armado están en
 `zz_backups."GV_Backup_armado_fns_20260917_pre_v1945"` (`proname`, `def`): correr esos `def`
 deshace el cambio. Las columnas son aditivas y pueden quedar.
+
+## §3.jb — v19.53: los otros dos crons — 19,5 s y un lock que bloqueaba la pantalla de stock — 2026-09-17
+
+**Luis, después del arreglo del cron 34:** *"¿qué pasa con los benditos crons?"*. Van los dos que
+quedaban del problema 384, los dos medidos y los dos verificados por md5.
+
+### El panorama, ya sin el cron 34 encima
+
+`cron.job_run_details`, 2 h de corridas reales:
+
+| cron | schedule | media | máx |
+|---|---|---|---|
+| **68 `reconciliar-pipeline-stock`** | `*/10` | **19,5 s** | 21,6 s |
+| **57 `refresh_stocks_carga_rapida`** | `*/5` | **8,1 s** | **38,9 s** |
+| 92 `gv-refrescar-articulo-empresa` | `*/15` | 5,2 s | 22,4 s |
+| 90 `gv-cruce-fc-asig` | `*/10` | 5,4 s | 7,7 s |
+| 55 `refresh-vista-stock-procesada` | `*/2` | 1,8 s | 6,6 s |
+| 34 `detectar-faltantes-llegaron` | `*/2` | **0,17 s** | 1,1 s ← el de la v19.46 |
+
+### (1) El cron 68 reescribía 16.000 filas idénticas cada 10 minutos
+
+De los 19,5 s, **`etapa1` son 14,5 s** (`etapa2` = 258 ms). El bloque *forward-fill* recalcula
+todo el picking desde `Stock_Config.etapa1_pkc_desde` en cada corrida —**5.451 pares (tanda,
+artículo)**— y lo vuelca con **tres `INSERT … ON CONFLICT … DO UPDATE`**, o sea hasta **16.353
+filas tocadas**. Y el `DO UPDATE` no comparaba nada: **reescribía cada fila con el valor que ya
+tenía**.
+
+Cada reescritura dispara los **9 triggers** de `Movimientos_Stock`, y el que pesa es
+`actualizar_saldo_trigger`: por cada fila, un agregado del artículo más un `upsert` en
+`stocks_carga_rapida`. Medido a propósito: un `update … set delta = delta` sobre las 10.305
+filas de `separar_pedidos` —escribir exactamente lo que ya está— tarda **8.856 ms**.
+
+**El arreglo:** un `WHERE … IS DISTINCT FROM …` en los tres `DO UPDATE`. (`IS DISTINCT FROM` y
+no `<>` porque `delta` y `legajo` pueden ser NULL.)
+
+| | tiempo | filas | md5 del estado final de picking |
+|---|---|---|---|
+| vieja | 20.196 ms | 26.740 | `071b9e98dc4354038f9713079460e5a5` |
+| **nueva** | **2.135 ms** | 26.740 | `071b9e98dc4354038f9713079460e5a5` |
+
+Idéntico bit a bit, **9,5× más rápido**, las dos devuelven `5451`.
+
+`sql/gv_reconciliar_pipeline_etapa1_v1953.sql` · rollback
+`sql/backups/reconciliar_pipeline_etapa1_pre_v1953.sql`.
+
+### (2) El cron 57 tomaba ACCESS EXCLUSIVE sobre la matview del stock
+
+`refresh_stocks_carga_rapida()` empezaba con `REFRESH MATERIALIZED VIEW
+public.vista_stock_procesada;` **sin `CONCURRENTLY`** → **ACCESS EXCLUSIVE**: mientras dura,
+**nadie puede leer la matview**. Y de ahí come la pantalla de stock: `vista_saldos_stock` es la
+segunda consulta más llamada del proyecto (**15.984 llamadas, media 1.246 ms, máx 7.869 ms**, a
+131 ms del `statement_timeout`).
+
+El refresh bloqueante tarda **1.267 ms** y era el **95 %** de la función.
+
+⚠ **No se arregla agregándole `CONCURRENTLY`**: eso no se puede ejecutar dentro de una
+transacción, y el cuerpo de una función plpgsql siempre está en una. Por eso el cron 55 lo hace
+como comando suelto. **Y no hace falta: es redundante** — el cron 55 refresca esa misma matview
+cada 2 minutos y *con* `CONCURRENTLY` (60 corridas, 0 fallidas). El 57 corre cada 5 min, así que
+lee una matview de 2 minutos de atraso como techo.
+
+| | tiempo | filas | md5 de `stocks_carga_rapida` |
+|---|---|---|---|
+| con el refresh | 1.270 ms | 370 | `b3896f66eded33c465cd861440b1d106` |
+| **sin el refresh** | **67 ms** | 370 | `b3896f66eded33c465cd861440b1d106` |
+
+`sql/gv_refresh_stocks_sin_lock_v1953.sql`.
+
+⚠ **La dependencia nueva, escrita para que no sorprenda:** el cron 57 ahora depende del **55**
+para tener la matview fresca. Si alguien apaga el 55, el 57 sigue corriendo pero sincroniza
+saldos viejos y **nada lo avisa**. Si hay que apagar el 55, volver a poner la línea del REFRESH.
+
+### De dónde salían los 4,6 s de espera media del advisory lock
+
+El 57 corre cada 5 min y el 68 cada 10, así que **coinciden en :00 / :10 / :20 / :30…** y los dos
+toman `pg_advisory_xact_lock(5768)`. Medido el 17/09:
+
+| hora | cron 68 | cron 57 |
+|---|---|---|
+| 17:05 | — | **1,47 s** (corrió solo) |
+| **17:10** | 16,91 s | **18,15 s** ← esperando el lock |
+| 17:15 | — | **1,69 s** |
+| **17:20** | 20,09 s | **38,89 s** ← esperando el lock |
+| 17:25 | — | **1,50 s** |
+
+Con el 68 en ~7 s y el 57 en décimas, el choque se vuelve irrelevante. **No se tocó el schedule
+ni el lock**: el lock está bien puesto (los dos escriben `Movimientos_Stock` / saldos y no
+pueden pisarse), lo que estaba mal era cuánto lo tenían tomado.
+
+### ✅ La corrida conjunta de las 17:30, con los dos arreglos puestos
+
+El minuto `:30` es el peor caso: el 57 y el 68 arrancan juntos y se pelean el lock. Medido antes
+y después, en el mismo día y sin tocar el schedule:
+
+| cron | 17:20 (antes) | **17:30 (después)** |
+|---|---|---|
+| 68 `reconciliar-pipeline-stock` | 20,09 s | **5,98 s** |
+| 57 `refresh_stocks_carga_rapida` | 38,89 s | **0,54 s** |
+| 55 `refresh-vista-stock-procesada` | 2,10 s | 3,19 s |
+
+**De 58,98 s de crons pesados en ese minuto a 6,52 s: 9× menos.** Y el 57, que es el que le
+bloqueaba la matview a la pantalla de stock, pasó de 38,89 s a **medio segundo** (72×).
+
+### Centinelas después de los dos cambios
+
+```sql
+select count(*) from public.gv_stock_negativos;   -- 0
+select count(*) from public.gv_endpoints_rotos;   -- 0
+-- y el md5 de las 26.740 filas de picking, igual antes y después: 071b9e98dc4354038f9713079460e5a5
+```
+
+### Lo que queda, medido y sin tocar
+
+- **`gv-refrescar-articulo-empresa` (cron 92)**: 5,2 s de media, **22,4 s de máximo**, cada 15 min.
+- **`gv-cruce-fc-asig` (cron 90)**: 5,4 s de media, 7,7 s de máximo, cada 10 min.
+- **`ppp_web_armar_tandas`**: 1,8 s de media y **7,7 s de máximo contra el límite de 8 s**. Si lo
+  cruza, el armado automático se corta **en silencio** (el cron figura `succeeded`).
+- **`vista_saldos_stock`**: 15.984 llamadas con 1,25 s de media. Es la consulta más caliente de la
+  app y hoy nadie la bloquea, pero sigue siendo 1,25 s por carga de pantalla.
+
+Problema **384**.
+
+### §3.jb — v19.54: barrido retroactivo de cancelados ya facturados — 2026-09-17
+
+Regla del dueño (Luis): *"asumí que cualquier pedido que se marca o se marcó como cancelado y que
+estaba facturado tiene NC y el stock tiene que volver a «A guardar», y ninguno de esos movimientos
+se tienen que duplicar"*. La v19.51 lo dejó resuelto para adelante; esto es el barrido hacia atrás
+más el centinela. `sql/gv_cancelados_sin_devolver_v1954.sql`.
+
+**27 NP canceladas, una sola quedaba pendiente.** Se cruzaron las cuatro puertas que existen
+(`NP_Canceladas`, `GV_Desarmes` con `vuelve = false`, `GV_Web_Cancelados`,
+`GV_PPP_Web_NP_Cancelada`) contra los drenajes de `facturado` a nombre de cada NP (`TANDA|NP` o
+`NP|CP`):
+
+| NP | tanda | cajas | estado |
+|---|---|---|---|
+| 98507 | D53C | 3 | ya repuestas (v19.50) |
+| **98050** | **C98F** | **3** | **pendiente** ← la única |
+
+Las demás no tenían nada que devolver, y el motivo está a la vista: 98582 / 98502 / 98450 son
+*"tildada como facturada pero NO se facturó … nunca salió: 0 cajas armadas, faltó todo"* (limpieza
+de atrasados); 98049 se había resuelto a mano el 05/08 con un ajuste de 18 cajas a góndola (nunca
+se facturó, sus cajas seguían en la pila); el resto —LK 0052, LK 0024, LK 0014, LK 0058, 98272 y
+las 12 de agosto— no tiene factura.
+
+⚠ **98615 y 98616 NO son cancelaciones.** Están en `GV_Desarmes` con **`vuelve = true`**
+(*"enviado a A Programar desde la tabla de Programación"*) y después se facturaron el 17/09.
+`gv_ppp_np_devolucion` decía que había que devolverles **55 cajas**: hacerlo habría sido inventar
+stock. Por eso tanto el barrido como el centinela filtran `not coalesce(vuelve,false)` —
+**desarmar para reprogramar no es cancelar**.
+
+**La 98050**: cancelada el 11/09 por Thomas (*"Cancelado por el cliente"*), facturada el 28/07 y
+con su drenaje `C98F|98050` nunca repuesto. Se repuso con la misma forma que escribe el desarme:
+reversa +3 en `a_facturar`, salida −3, y **3 cajas a A guardar** (360E ×2, 501 ×1). Neto en
+a_facturar: 0.
+
+**Centinela: `gv_cancelados_sin_devolver`.**
+
+```sql
+select * from public.gv_cancelados_sin_devolver;   -- vacía = todo bien
+```
+
+Compara, por NP y por código, lo que el facturado sacó contra lo ya repuesto — esa resta es lo que
+evita duplicar. **Probado rompiéndolo**: sacándole la reposición de la 98050 dentro de una
+transacción abortada, canta `2 filas: 98050/360E=2, 98050/501=1`. Una vista que da vacío no prueba
+nada por sí sola.
+
+**Lo que NO se hizo:** ponerle un trigger a `NP_Canceladas` para que la devolución salga sola desde
+cualquier puerta. Hoy la pantalla de cancelar pasa por `gv_ppp_np_desarmar`, que ya lo hace; la
+fila de la 98050 la escribió una pantalla anterior. Un trigger que mueve stock desde una tabla que
+escriben varias cosas es más fácil de romper que de arreglar, y el centinela canta el mismo día. Si
+aparece una segunda, ahí conviene el trigger.

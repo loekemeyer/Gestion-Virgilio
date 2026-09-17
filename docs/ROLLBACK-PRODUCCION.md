@@ -1628,3 +1628,49 @@ arreglo resultara incorrecto, y la equivalencia está verificada sobre el 100 % 
 (17,9 s de media, cron 68), la cola del `pg_advisory_xact_lock(5768)` entre los crons 57 y 68
 (media de 4,6 s de espera pura) y `ppp_web_armar_tandas`, que ya llega a 7,7 s contra el límite
 de 8 s.
+
+---
+
+## v19.53 (2026-09-17) — dos funciones de stock más rápidas, con el mismo resultado
+
+**Objetos compartidos tocados** (los dos de `public.*`, o sea alcanzables desde Producción
+Virgilio). En los dos casos se hizo `CREATE OR REPLACE` sin cambiar firma, tipo de retorno ni
+grants.
+
+### 1. `public.reconciliar_pipeline_stock_etapa1()`
+
+**Qué cambió:** un `WHERE … IS DISTINCT FROM …` en los tres `ON CONFLICT DO UPDATE`, para no
+reescribir filas de `Movimientos_Stock` con el valor que ya tienen. Nada más.
+
+**Impacto medido:** 20.196 ms → **2.135 ms**. Estado final **idéntico**: md5 de las 26.740 filas
+de picking = `071b9e98dc4354038f9713079460e5a5` con las dos versiones, y las dos devuelven `5451`.
+
+**Rollback:** correr `sql/backups/reconciliar_pipeline_etapa1_pre_v1953.sql` (verificado por md5
+contra la base antes de aplicar: `88845482ddcebba20f6efe3ff1a77003`).
+
+### 2. `public.refresh_stocks_carga_rapida()`
+
+**Qué cambió:** se quitó la primera sentencia, `REFRESH MATERIALIZED VIEW
+public.vista_stock_procesada;`. Sin `CONCURRENTLY` tomaba **ACCESS EXCLUSIVE** sobre la matview
+1,3 s cada 5 minutos, bloqueando a **todo** lector — incluida la pantalla de stock de Producción
+y de Gestión. Es redundante: el cron 55 refresca la misma matview cada 2 min con `CONCURRENTLY`.
+
+**Impacto medido:** 1.270 ms → **67 ms**, con `stocks_carga_rapida` idéntica (md5
+`b3896f66eded33c465cd861440b1d106`, 370 filas).
+
+⚠ **Efecto sobre Producción: sólo lo BENEFICIA** — es un lock menos sobre la matview que su
+pantalla de stock lee. No hay caso en que la deje peor.
+
+⚠ **Dependencia nueva:** el cron 57 ahora necesita el cron **55** prendido para tener la matview
+fresca. Si se apaga el 55, sincroniza saldos viejos y nada lo avisa.
+
+**Rollback:** poner de nuevo la línea `REFRESH MATERIALIZED VIEW public.vista_stock_procesada;`
+como primera sentencia del `BEGIN` (el CREATE completo está en
+`sql/gv_refresh_stocks_sin_lock_v1953.sql`; el rollback es agregarle esa línea).
+
+**Grep en el repo de Producción:** no se pudo (no está clonado en esta sesión). Igual no
+corresponde: las dos son funciones de backend que **sólo llaman los crons 68 y 57** —verificado
+con `pg_proc.prosrc` y `cron.job`: 0 funciones y 0 crons más las nombran— y ningún front las
+invoca por RPC.
+
+**Centinelas después:** `gv_stock_negativos` = 0, `gv_endpoints_rotos` = 0.
