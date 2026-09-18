@@ -989,6 +989,41 @@ revés, salen **todas** a nombre de Oscar (31 líneas de esos 14 códigos en los
 siempre. **El arreglo es que al recibir esos artículos elijan `Oscar`, no `Log/ Fabr`.**
 Problema 250.
 
+## ⚠ Regla del dueño (2026-09-18): en las OC la PROYECCIÓN es siempre rey
+
+**Thomas, 2026-09-18, sobre el generador de OCs:** *"Proyección es siempre rey"*.
+
+El **Máximo** de un artículo es `ceil(proyección × índice)` y **nada lo topa**. Si eso da más que
+la capacidad de góndola, **se pide igual** y el excedente va a racks. Medido el 18/09 con el **505**:
+capacidad 3340, proyección 2342,33 × índice 1,5 = **3514**, y el máximo es 3514.
+
+Es lo que ya hace `vista_generador_oc`, así que **no hay nada que cambiar** — está escrito acá para
+que nadie vuelva a "arreglarlo" agregándole un `min(proy × índice, capacidad)`.
+
+**La capacidad manda en un solo caso, y no es una excepción a la regla: cuando NO hay proyección**
+(`proy = 0`, artículos sin ventas). Son **10 de los 238 activos** al 18/09 (109 Sac Zincado, 618,
+630E, 631, 631E, 634E, 635E, 636E, 857, 613), 152 cajas en total. Sin proyección no hay rey: el
+objetivo pasa a ser llenar la góndola.
+
+⚠ **El tilde `llenar_gondola` de ⚙ Configuraciones hace exactamente lo contrario** — pisa la
+proyección con la capacidad, incluso cuando la proyección es más alta. **Al 18/09 no lo tiene
+tildado ningún artículo (0 de 238)**, y no hay que tildarlo salvo que el dueño lo pida para un
+código puntual.
+
+La flecha roja **⤓ "Topado a la capacidad de góndola"** que el generador pintaba era de la **v4.31**,
+cuando el tope sí existía; afirmaba un tope que hace rato no pasa. **Se sacó en la v19.78**
+(problema 419). Si vuelve a aparecer un cartel de tope, está mintiendo.
+
+**Chequeo:**
+
+```sql
+select count(*) filter (where llenar_gondola)                as pisan_la_proyeccion,   -- tiene que dar 0
+       count(*) filter (where activo and tiene_prov_real
+                          and proy = 0 and cap > 0)          as sin_proy_van_por_cap,  -- 10 al 18/09
+       count(*) filter (where activo and tiene_prov_real)    as activos                -- 238 al 18/09
+  from public.vista_generador_oc;
+```
+
 ## ⚠ PROTOCOLO: Backend vs Front-end — decidir y avisar (ya NO se pregunta)
 
 **Cuando alguien pide cambiar lógica** (normalización de códigos, cálculos, filtros,
