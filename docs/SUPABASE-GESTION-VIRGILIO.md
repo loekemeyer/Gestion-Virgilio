@@ -24384,3 +24384,73 @@ siempre. Ahora el disparador es **`cuarComNeed()`**, uno solo, que mira **todos*
 **Prueba:** `node tests/apr-cuarentena.cjs` — tres asserts nuevos (la columna existe, la fila abre
 `cuarComAbrirPed('chef','200')`, y la tabla tiene tantos `<td>` como `<th>`, que es lo que caza un
 desalineo de columnas).
+
+## §3.ju — v19.91: los escaneos vuelven a su tanda — la cadena de códigos reciclados E12 — 2026-09-18
+
+**Problema 429.** Cierra lo que la v19.80 dejó abierto, con la regla que puso el dueño.
+
+> **Thomas, 2026-09-18:** *"si armo un pedido y lo muevo a otra tanda o creo otra tanda, el
+> contenido de ese pedido (físico) sigue a ese pedido (registro en la PPP)"*
+> → **el escaneo de picking pertenece a la tanda donde está HOY su pedido.**
+
+### Qué había pasado: cada código heredó el picking de su inquilino anterior
+
+Al renombrar, el stock viajaba al nombre nuevo pero los eventos PKC se quedaban con el viejo
+(problema 421), y el cron 68 volvía a crear el picking con ese código. Como el código liberado
+**se reutilizó después para otra tanda**, cada uno arrastró el picking del que lo usó antes.
+Verificado artículo por artículo, no por parecido:
+
+| PKC bajo | son el picking de | evidencia |
+|---|---|---|
+| E12A (66) | **E12S** | las 7 NP de los remitos en papel (LK 0030/0036/0037/0039/0040/0044/0045) |
+| E12E (62) | **E37F** | 62 de 62 códigos, 0 sobrantes |
+| E12I (37) | **E12E** | 37 de 37 exactos (98605/98606/98607) |
+| E12M (11) | **E12A** | LK 0029 Tegerina: 7 códigos exactos + el dual `437E`; pide 47, pickeó 40 |
+| E12J (32) | **E12G** | 32 de 32, 93 = 93 |
+| E12K (8) | **E12J** | 8 de 8, 20 = 20 contra el ENT de 98618 |
+
+⚠⚠ **Un solo UPDATE con el mapa, no seis encadenados.** E12A, E12E y E12J son **origen y destino
+a la vez**. En updates sucesivos, el `E12A → E12S` se habría llevado por delante los 11 PKC que
+acababan de llegar de E12M. En una sola sentencia cada fila se evalúa contra su valor **viejo**.
+
+⚠⚠ **Sólo se mueven los eventos de CAMPO 1** (PKC, PSP, FGU, SSG, RAG), que **no llevan NP**. El
+primer intento movió también `TAL`, `ENT` y compañía porque `gv_evento_tanda` los resuelve — y
+ésos **sí** llevan la NP, o sea que ya estaban donde correspondía. Se devolvieron desde el backup.
+La regla del dueño habla del **pedido**: el evento que ya nombra su pedido no se toca.
+
+El stock de picking se puso en cero (`delta = 0`, no DELETE: el trigger de saldo no corre en
+DELETE) y lo reconstruyó el cron desde los PKC ya reasignados, con `pg_advisory_xact_lock(5768)`
+—el mismo del cron 68— para que no se metiera en el medio. Guardas: las 9 tandas tenían que
+quedar exactas o no se commiteaba nada.
+
+**Resultado, verificado corriendo `reconciliar_pipeline_stock()` después:**
+
+| tanda | pickeado | armado | colgado |
+|---|---|---|---|
+| **E12S** (los remitos) | 188 | −188 | **0** ✅ |
+| E12A (LK 0029, sin armar) | 40 | 0 | 40 ✅ |
+| E37F (sin armar, 24/09) | 107 | 0 | 107 ✅ |
+| E12G | 93 | −93 | **0** ✅ |
+| E12M · E12I · E12K | 0 | — | 0 ✅ |
+
+`gv_stock_picking_duplicado`, `gv_reglas_perdidas`, `gv_stock_empresa_fantasma`,
+`GV_Stock_Drenaje_Bloqueado` y el dedup por empresa: **todos en cero**.
+
+### ⚠ Lo que quedó ABIERTO: 192 cajas que los armados drenaron de más
+
+Con el picking en su lugar queda a la vista una **tercera capa** del mismo bug. `etapa2` es
+**insert-only con guard** (`not exists (separado de esa tanda+articulo)`): una vez que escribió el
+`separado`, **no lo recalcula nunca**. Así que los armados de ayer y hoy drenaron lo que **había**
+pickeado bajo ese código en ese momento — el picking del inquilino anterior:
+
+| tanda | drenó el armado | picking real | de más |
+|---|---|---|---|
+| E12E | 114 | 38 | 76 |
+| E12J | 100 | 20 | 80 |
+| E12K | 46 | 0 | 46 |
+
+Esas cajas salieron de `separar_pedidos` y entraron a `a_facturar` + `terminado`, así que el saldo
+total del depósito no cambia — pero el comprometido de esas tres queda en negativo. **No se
+corrigió: toca `a_facturar`, o sea camino de facturación.** Va con decisión aparte.
+
+`sql/gv_pkc_cadena_e12_v1991.sql`.
