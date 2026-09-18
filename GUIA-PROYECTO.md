@@ -1,3 +1,55 @@
+## Nota v19.78 (2026-09-18) — Generador de OCs: un artículo con dos talleristas, UNA fila (problema 419)
+
+Thomas, mirando el 505 (Pelador Plástico, repartido 50/50 entre **Garcia** y **Lucho**): *"para
+productos con 2 proveedores, ¿contempla la proyección total para cada uno? ¿no está duplicando eso
+la proyección?"*
+
+**El pedido no se duplicaba** —el total 768 salía partido 384 + 384, y la OC que se genera es esa—
+pero la pantalla invitaba a pensarlo, porque de las cinco columnas del renglón **cuatro salían
+divididas y una no**:
+
+| columna | lo que mostraba cada una de las 2 filas | el artículo |
+|---|---|---|
+| Proy | **2342** (entera, sin dividir) | 2342 |
+| Máx | 1757 | 3514 |
+| Pedidos | 273 | 545 |
+| Stock | 1646 | 3291 |
+| A pedir | 384 | 768 |
+
+Con la proyección entera al lado de un máximo partido, el renglón **no cierra a la vista**:
+2342 × 1,5 = 3513, y la columna de al lado dice 1757.
+
+**Desde la v19.78 la vista "Por artículo" muestra UNA fila por artículo**, con los números enteros,
+y el reparto se aclara en la columna Tallerista: `2 talleristas` y debajo `Garcia 50% → 384` ·
+`Lucho 50% → 384`. La vista **"Por tallerista"** queda como estaba (ahí el corte por tallerista es
+el punto) y **lo que se genera no cambió**: `ocgGenerar` sigue armando una línea de OC por
+tallerista desde `gen.items`, que se siguen partiendo igual.
+
+⚠ El máx/pedidos/stock de la fila agrupada salen de **los totales del artículo**
+(`maxTot`/`demandaTot`/`stockTot`, nuevos en el ítem), **no de la suma de las mitades**: 545
+repartido 50/50 redondea a 273 + 273 = 546 y el renglón no cerraría por 1. El "a pedir", en cambio,
+**sí** es la suma de lo que se le pide a cada uno, que es lo que realmente se va a ordenar.
+
+### Y se sacó la flecha ⤓ "topado a la capacidad de góndola", que mentía
+
+El generador pintaba `⤓` cuando `proy × índice > capacidad`, con el cartel *"Topado a la capacidad
+de góndola (N cajas)"*. **Hace rato que no topa nada.** `vista_generador_oc` calcula
+`maximo = ceil(proy × índice)` y sólo usa la capacidad si el artículo tiene tildado **Llenar
+góndola** (o si no tiene proyección). Medido en el 505: cap 3340, y el máximo igual salió 3514.
+Era un resto de la **v4.31**, cuando el tope sí existía. El campo `capped` se borró del ítem.
+
+### De paso, de dónde sale el "A pedir" (la cuenta que no cerraba a mano)
+
+`total = máximo + pedidos − stock`, y las dos puntas no son lo que uno mira en la góndola:
+
+- **el stock son TODOS los depósitos**, no la góndola: en el 505, terminado 3147 + separar_pedidos
+  68 + a_facturar 76 = **3291**, contra los ~3142 que se ven en góndola;
+- **se suman los pedidos pendientes** (545), porque esa mercadería ya está vendida y va a salir.
+
+O sea: 3514 + 545 − 3291 = **768**. Hacer `máximo − góndola` da 371 y le faltan las dos cosas.
+
+Tests: `tests/ocg-una-fila.cjs` (13 chequeos, con el caso real del 505) y `tests/ocg-norm.cjs`
+actualizado (ya no hay `capped`; sí `maxTot`/`stockTot`).
 ## Nota v19.77 (2026-09-18) — El nombre del artículo NO sale del libro de stock
 
 El **505I** se veía en la tabla de Stock como **"Esta en racks"** en vez de *Pelador Mgo Plastico

@@ -16166,7 +16166,6 @@ async function ocgEnter() {
       const cap = Number(r.cap) || 0;
       // fuente: proy (vende) · capacidad (objetivo = góndola) · sin (sin proveedor, no se envía)
       const fuente = (pc > 0) ? "proy" : (r.tiene_prov_real ? "capacidad" : "sin");
-      const capped = (pc > 0 && cap > 0 && Math.ceil(pc * indice) > cap);
       // v7.66 — REPARTO por proveedor: Prov 1 (pr1 %) + Prov 2 (pr2 %). Único → 100% al 1.
       // "(sin proveedor)" se muestra pero no se envía; Racks queda excluido (por sub).
       const p1 = String(r.proveedor || "").trim(), p2 = String(r.proveedor2 || "").trim();
@@ -16182,7 +16181,7 @@ async function ocgEnter() {
         const k = sub.prop / 100;
         // v11.67 — se incluyen también los de falta 0 (para la vista Por tallerista). El armado
         // de `items` (a pedir > 0) filtra después, así lo que se genera/manda queda idéntico.
-        itemsAll.push({ cod: cod, desc: r.descripcion || "", prov: sub.prov, max: Math.round(maxCajas * k), fuente: fuente, indice: indice, proy: (pc > 0 ? pc : null), demanda: Math.round(demanda * k), stock: Math.round(stock * k), falta: Math.max(0, faltaSub), cap: (cap > 0 ? cap : null), capped: capped, uni: Number(r.uni_x_caja) || 0, ncaja: (r.n_caja != null ? r.n_caja : null), prop: sub.prop, sinProv: (sub.prov === "(sin proveedor)") });
+        itemsAll.push({ cod: cod, desc: r.descripcion || "", prov: sub.prov, max: Math.round(maxCajas * k), fuente: fuente, indice: indice, proy: (pc > 0 ? pc : null), demanda: Math.round(demanda * k), stock: Math.round(stock * k), falta: Math.max(0, faltaSub), cap: (cap > 0 ? cap : null), maxTot: maxCajas, demandaTot: demanda, stockTot: stock, uni: Number(r.uni_x_caja) || 0, ncaja: (r.n_caja != null ? r.n_caja : null), prop: sub.prop, sinProv: (sub.prov === "(sin proveedor)") });
       });
     });
     const items = itemsAll.filter(function (it) { return it.falta > 0; });
@@ -16216,26 +16215,48 @@ function ocBodyGen() {
   if (gen.error) return h + '<div class="oc-empty" style="color:#b91c1c">Error: ' + escapeHtml(gen.error) + '</div>';
   return h + (mode === "tall" ? ocBodyGenTall() : ocBodyGenArt());
 }
-// Vista "Por artículo": lista plana (un renglón por artículo·proveedor), solo a pedir > 0, ordenada por a pedir.
+// Vista "Por artículo": UNA fila por artículo (no una por artículo·tallerista), solo a pedir > 0.
+// v19.76 — antes el artículo repartido entre dos talleristas salía en DOS filas con máx/pedidos/
+// stock/a pedir divididos por el % y la PROYECCIÓN entera en las dos, así que parecía duplicada y
+// el renglón no cerraba (2342 × 1,5 al lado de un máx de 1757). Ahora el artículo va en una sola
+// fila con sus números enteros y el reparto se aclara en la columna Tallerista. Lo que se genera
+// NO cambia: ocgGenerar sigue armando una línea de OC por tallerista desde gen.items. Problema 419.
 function ocBodyGenArt() {
   const gen = _oc.gen;
   const items = (gen && gen.items) || [];
   const gf = (_oc.genFiltro || "").toLowerCase().trim();
-  const fitems = (gf ? items.filter(function (it) { return (codCanon(it.cod) + " " + (it.desc || "") + " " + (it.prov || "")).toLowerCase().indexOf(gf) !== -1; }) : items.slice())
+  const byCod = {}; const orden = [];
+  items.forEach(function (it) {
+    const k = codCanon(it.cod);
+    // máx/pedidos/stock salen de los totales del ARTÍCULO (maxTot/demandaTot/stockTot), no de la
+    // suma de las mitades: 545 repartido 50/50 redondea a 273+273 = 546 y el renglón no cerraría.
+    if (!byCod[k]) { byCod[k] = { cod: it.cod, desc: it.desc, fuente: it.fuente, indice: it.indice, proy: it.proy, max: it.maxTot, demanda: it.demandaTot, stock: it.stockTot, falta: 0, subs: [] }; orden.push(k); }
+    byCod[k].subs.push(it); byCod[k].falta += it.falta;   // a pedir = lo que realmente se va a ordenar
+  });
+  const fgrupos = orden.map(function (k) { return byCod[k]; })
+    .filter(function (g) { return !gf || (codCanon(g.cod) + " " + (g.desc || "") + " " + g.subs.map(function (s) { return s.prov; }).join(" ")).toLowerCase().indexOf(gf) !== -1; })
     .sort(function (a, b) { return b.falta - a.falta; });
-  if (!fitems.length) return '<div class="oc-empty">' + (gf ? "Nada coincide con la búsqueda." : "No hay nada para pedir (todo está en o sobre el máximo).<br><small>Con el stock en 0, va a dar todo para pedir cuando lo cargues.</small>") + '</div>' + ocBodyGenImportados();
-  const totCajas = fitems.reduce(function (s, it) { return s + it.falta; }, 0);
-  const sinN = fitems.filter(function (it) { return it.sinProv; }).length;
-  let h = '<div class="oc-meta">Fecha <b>' + escapeHtml(gen.fecha) + '</b> · <b>' + fitems.length + '</b> ítem(s) a pedir · <b>' + totCajas + '</b> cajas' + (sinN ? ' · <b style="color:#b45309">' + sinN + ' sin proveedor</b>' : '') + '.</div>';
+  if (!fgrupos.length) return '<div class="oc-empty">' + (gf ? "Nada coincide con la búsqueda." : "No hay nada para pedir (todo está en o sobre el máximo).<br><small>Con el stock en 0, va a dar todo para pedir cuando lo cargues.</small>") + '</div>' + ocBodyGenImportados();
+  const totCajas = fgrupos.reduce(function (s, g) { return s + g.falta; }, 0);
+  const sinN = fgrupos.filter(function (g) { return g.subs.some(function (x) { return x.sinProv; }); }).length;
+  let h = '<div class="oc-meta">Fecha <b>' + escapeHtml(gen.fecha) + '</b> · <b>' + fgrupos.length + '</b> artículo(s) a pedir · <b>' + totCajas + '</b> cajas' + (sinN ? ' · <b style="color:#b45309">' + sinN + ' sin proveedor</b>' : '') + '.</div>';
   h += '<div class="oc-tblwrap"><table class="oc-tbl"><thead><tr><th>Código</th><th>Descripción</th><th>Tallerista</th><th class="num">Proy</th><th class="num">Índice</th><th class="num">Máx</th><th class="num">Pedidos</th><th class="num">Stock</th><th class="num">A pedir</th></tr></thead><tbody>';
-  fitems.forEach(function (it) {
-    const proyTxt = (it.fuente === "proy") ? (Math.round(it.proy) + "") : '<span style="color:#94a3b8" title="Sin ventas (proyección 0) → el Máximo sale de la capacidad de góndola">0</span>';
-    const maxTxt = it.max + (it.capped ? ' <span style="color:#b45309;font-weight:800" title="Topado a la capacidad de góndola (' + it.cap + ' cajas) — proy×índice daba más">⤓</span>' : '');
-    const provTxt = it.sinProv ? '<span style="color:#b45309;font-weight:700" title="Asigná proveedor en ⚙ Configuraciones (así no se envía)">(sin proveedor)</span>' : escapeHtml(it.prov);
-    h += '<tr><td class="oc-cod">' + escapeHtml(codCanon(it.cod)) + '</td><td>' + escapeHtml(artNombre(it.cod, it.desc)) + '</td><td>' + provTxt + '</td><td class="num">' + proyTxt + '</td><td class="num">' + it.indice + '</td><td class="num">' + maxTxt + '</td><td class="num">' + it.demanda + '</td><td class="num">' + it.stock + '</td><td class="num oc-falt">' + it.falta + '</td></tr>';
+  fgrupos.forEach(function (g) {
+    const proyTxt = (g.fuente === "proy") ? (Math.round(g.proy) + "") : '<span style="color:#94a3b8" title="Sin ventas (proyección 0) → el Máximo sale de la capacidad de góndola">0</span>';
+    h += '<tr><td class="oc-cod">' + escapeHtml(codCanon(g.cod)) + '</td><td>' + escapeHtml(artNombre(g.cod, g.desc)) + '</td><td>' + _ocgProvCell(g.subs) + '</td><td class="num">' + proyTxt + '</td><td class="num">' + g.indice + '</td><td class="num">' + g.max + '</td><td class="num">' + g.demanda + '</td><td class="num">' + g.stock + '</td><td class="num oc-falt">' + g.falta + '</td></tr>';
   });
   h += '</tbody></table></div>';
   return h + ocBodyGenImportados();
+}
+// Celda "Tallerista": uno solo → el nombre. Repartido → "2 talleristas" y, debajo, cada uno con su
+// % y las cajas que le tocan (es la OC que se le va a generar a cada uno). v19.76.
+function _ocgProvNom(s) { return s.sinProv ? '<span style="color:#b45309;font-weight:700" title="Asigná proveedor en ⚙ Configuraciones (así no se envía)">(sin proveedor)</span>' : escapeHtml(s.prov); }
+function _ocgProvCell(subs) {
+  if (!subs || !subs.length) return "";
+  if (subs.length === 1) return _ocgProvNom(subs[0]);
+  return '<b title="El total de la fila se reparte entre estos talleristas">' + subs.length + ' talleristas</b>' + subs.map(function (s) {
+    return '<div style="font-size:11px;color:#64748b;white-space:nowrap">' + _ocgProvNom(s) + ' ' + Math.round(s.prop) + '% → <b style="color:#334155">' + s.falta + '</b></div>';
+  }).join("");
 }
 // Vista "Por tallerista": agrupada por proveedor, muestra TODOS los artículos de cada tallerista (incluye a pedir 0).
 function ocBodyGenTall() {
@@ -16261,10 +16282,9 @@ function ocBodyGenTall() {
     h += '<div class="oc-tblwrap"><table class="oc-tbl"><thead><tr><th>Código</th><th>Descripción</th><th class="num">Proy</th><th class="num">Índice</th><th class="num">Máx</th><th class="num">Pedidos</th><th class="num">Stock</th><th class="num">A pedir</th></tr></thead><tbody>';
     fitems.forEach(function (it) {
       const proyTxt = (it.fuente === "proy") ? (Math.round(it.proy) + "") : '<span style="color:#94a3b8" title="Sin ventas (proyección 0)">0</span>';
-      const maxTxt = it.max + (it.capped ? ' <span style="color:#b45309;font-weight:800" title="Topado a la capacidad de góndola (' + it.cap + ' cajas)">⤓</span>' : '');
       const faltCls = it.falta > 0 ? " oc-falt" : "";
       const faltTxt = it.falta > 0 ? it.falta : '<span style="color:#cbd5e1">0</span>';
-      h += '<tr><td class="oc-cod">' + escapeHtml(codCanon(it.cod)) + '</td><td>' + escapeHtml(artNombre(it.cod, it.desc)) + '</td><td class="num">' + proyTxt + '</td><td class="num">' + it.indice + '</td><td class="num">' + maxTxt + '</td><td class="num">' + it.demanda + '</td><td class="num">' + it.stock + '</td><td class="num' + faltCls + '">' + faltTxt + '</td></tr>';
+      h += '<tr><td class="oc-cod">' + escapeHtml(codCanon(it.cod)) + '</td><td>' + escapeHtml(artNombre(it.cod, it.desc)) + '</td><td class="num">' + proyTxt + '</td><td class="num">' + it.indice + '</td><td class="num">' + it.max + '</td><td class="num">' + it.demanda + '</td><td class="num">' + it.stock + '</td><td class="num' + faltCls + '">' + faltTxt + '</td></tr>';
     });
     h += '</tbody></table></div>';
   });
