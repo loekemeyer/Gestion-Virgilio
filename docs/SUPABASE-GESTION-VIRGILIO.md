@@ -25321,3 +25321,35 @@ select * from public.gv_endpoints_rotos;   -- vacía
 
 Backups: `zz_backups."GV_Backup_VistaGeneradorOC_proy_20260918"` (definición previa) y
 `zz_backups."GV_Backup_VistaGeneradorOC_filas_proy_20260918"` (las 355 filas de antes).
+
+### §3.kj.1 — Las OCs del 18/09 se borraron y se regeneraron (dato, no código)
+
+Thomas, 18/09: *"Eliminá las OCs del 18 al 9 que están mal generadas. Tienen el problema como
+mínimo del 706."* Las 123 líneas de ese día se habían generado a mano a las **16:17**, horas antes
+del arreglo de la proyección, así que salieron cortas.
+
+**Lo que hizo que el borrado fuera seguro, y conviene tenerlo escrito:** `cantidad_recibida`
+**no es un dato guardado**, lo recalcula `gv_oc_recompute_recibido()` desde
+`Entregas Tallerista Virgilio` + `Entregas Prov AT`, por ventana de fechas (desde la fecha de la
+OC hasta la siguiente OC del mismo código+proveedor, topada a +120 días). Borrar una OC **no
+borra ninguna recepción**: sólo devuelve la ventana a la OC anterior.
+
+Se midió antes de tocar nada, con un `delete` + `recompute` **dentro de una transacción abortada**
+(`raise exception` al final): 123 borradas, **5** filas de otras fechas afectadas, **0**
+recepciones perdidas.
+
+| | |
+|---|---|
+| backup | `zz_backups."GV_Backup_OrdenesCompra_dia1809_20260918_2030"` (123 filas con su `id`) |
+| borradas | 123 · 9.944 cajas |
+| regeneradas | **149** · **11.432 cajas** · 17 talleristas |
+| el 706 | **381 cajas** (Martin C) |
+| códigos con "L" | **0** |
+
+La regeneración se hizo con **`gv_oc_generar_pendientes`** —el mismo camino que el botón ⚙ Generar
+OCs— y **no** con `generar_ocs_automaticas`, a propósito: esa última manda un Telegram, y mandar
+algo afuera no estaba pedido.
+
+Las 159 cajas ya recibidas pasaron por el 16/09 y volvieron solas a las líneas nuevas del 18/09 al
+recalcular (`gv_oc_generar_pendientes` llama al recompute al terminar). Verificado: las del 16/09
+quedaron en `recibida = 0` y las del 18/09 con su cantidad, sin duplicar.
