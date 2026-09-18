@@ -23069,3 +23069,69 @@ rollback quedaron **0 filas** con `dedup_key like 'ocajena_%'` — no se mandó 
 **Chequeo:** `select caso, count(*), sum(cajas) from public.gv_oc_entregas_ajenas
 where fecha >= current_date - 30 group by 1;`
 `sql/gv_oc_entrega_ajena_v1957.sql` · problemas **250** (abierto) y **398** (descartado).
+
+---
+
+## §3.jf — v19.58: el armado estuvo 5 h 40 sin correr y el log decía «no había nada que armar» — 2026-09-18
+
+**Lo que pasó.** El 17/09 a las 18:20 ART el armado automático de pedidos web dejó de correr, y
+siguió sin correr toda la noche: la última tanda armada de LK es de las 18:20 y la de Chef de las
+20:42. El job de las 00:01 (cron 71) también murió. **Nadie se enteró**, porque todas esas
+corridas quedaron anotadas en `GV_Tandas_Auto_Log` como `estado = 'intradia_sin_umbral'`, con
+motivo *"pendiente automático 0.000 m³ (0 NP) < umbral 0.001 m³"* — o sea, en verde.
+
+**La causa no era de Gestión: era la base de LK.** Desde las 21:00 UTC (18:00 ART) los logs de
+Postgres de LK tiran `cron job N job startup timeout` sin parar (**0 por hora antes, 92 a 166 por
+hora después**, nueve horas seguidas). Con eso, `gv_pedidos_web_np_lk` —que vive en LK y es el
+feed que lee Gestión— empezó a contestar `57014 canceling statement due to statement timeout` y
+`504`. Medido esta madrugada, ya con la base respirando: el mismo feed tarda **1.179 ms** (392
+filas) y el de Chef **477 ms**. El problema nunca fue la consulta.
+
+Detalle de la causa y el arreglo del lado de LK: problema **402** y
+`sql/lk_crons_escalonados.sql` del repo `pagina-LK-copia`. Resumen: `max_worker_processes = 6` y
+**once crons arrancando juntos en el minuto :00** (1, 5, 20, 21, 24, 26, 28, 38, 39, 41, 46).
+
+### Lo que sí era nuestro: la Edge Function informaba un error como «no había nada»
+
+En el bloque intradía de `gv-ppp-web-tandas-diarias`, si `traerLk()` o `traerChef()` tiraban, el
+`catch` dejaba el error en `detalle` y **`m3Auto` seguía en 0**. Abajo, `m3Auto < umbral` entraba
+por la rama "no llegó al umbral": `estado = 'intradia_sin_umbral'`, `ok: true`, HTTP 200.
+
+> **Una lectura ROTA no es un cero.** Si no se pudo medir lo pendiente, el umbral no dice nada.
+
+Desde la v19.58 un feed caído se anota como **`estado = 'error'`**, con el error adelante en el
+motivo, y la función contesta **500** (así el `net.http_post` del cron también lo registra como
+no-2xx). Si las dos empresas se leen bien, no cambia nada.
+
+### Y el centinela no podía ayudar, por cómo estaba hecho
+
+`gv_ppp_web_armado_salud` miraba **sólo** `GV_PPP_Web_Armado_Log`, que en esas corridas **no
+tiene fila** porque el armador nunca se llegó a llamar. Decía *"SIN CORRER hace mas de 20 min"* y
+nada más. Tres cosas que se le agregaron (`sql/gv_armado_salud_feed_v1958.sql`):
+
+1. **Cruza con `GV_Tandas_Auto_Log`**, que la Edge Function escribe SIEMPRE, corra o no el
+   armador: `ultimo_intento`, `ultimo_intento_estado`, `ultimo_intento_motivo`, `errores_12`.
+2. **Las dos empresas salen siempre** (lista fija + `left join`). Antes, si el armador no había
+   corrido nunca para una, esa empresa no aparecía: un centinela que se queda mudo justo el día
+   que todo está roto. Por lo mismo, el último intento se toma con `array_agg(... order by ...)[1]`
+   y no con `order by ... limit 1`: un `cross join` contra una tabla vacía devuelve **cero filas**.
+3. **Cuatro estados en lugar de uno**, porque "SIN CORRER" tapaba cosas distintas:
+
+| estado | qué significa |
+|---|---|
+| `FEED CAIDO: <motivo>` | 3 o más de los últimos 12 intentos fallaron — esto es lo del 17/09 |
+| `sin nada que armar (ultimo intento: …)` | el cron corrió hace poco y no había pendiente |
+| `fuera de horario (el cron 73 corre 06:00-20:55 ART)` | de noche no correr es lo correcto |
+| `SIN CORRER hace mas de 20 min` | en horario y sin intentos: ahí sí hay que mirar |
+
+**Chequeo:** `select * from public.gv_ppp_web_armado_salud;`
+
+⚠ **Las columnas nuevas van AL FINAL, después de `estado`**: un `create or replace view` sólo
+deja agregar columnas al final; meterlas en el medio obliga a un `DROP` y a recrear lo que
+cuelgue. Y la vista se dejó con `security_invoker = true`, como siempre.
+
+**Rollback** (los dos, independientes): el final de `sql/gv_armado_salud_feed_v1958.sql` para la
+vista; para la Edge Function, revertir el bloque `preErrores` de
+`supabase/functions/gv-ppp-web-tandas-diarias/index.ts` y redeployar.
+
+Problemas **402** (LK) y **403** (Gestión).

@@ -815,21 +815,42 @@ Deno.serve(async (req: Request) => {
         const umbral = await umbralIntradia();
         let m3Auto = 0, npAuto = 0;
         const det: Record<string, unknown> = {};
+        // v19.58 -- SI EL FEED FALLA, EL UMBRAL NO SIGNIFICA NADA. Hasta acá el catch
+        //   dejaba el error en `detalle` y `m3Auto` seguía en 0, así que abajo entraba por
+        //   la rama "no llegó al umbral" y la corrida quedaba anotada como
+        //   `intradia_sin_umbral` con motivo "pendiente automático 0.000 m³", ok:true y
+        //   HTTP 200. O sea: una lectura ROTA informada como "no había nada que hacer".
+        //   El 17/09, con la base de LK ahogada, fueron 30+ corridas así entre las 18:20 y
+        //   las 00:01 ART: ningún pedido web de LK se programó y todo figuraba en verde.
+        //   Ahora un feed caído se anota como `error` y contesta 500.
+        const preErrores: string[] = [];
         try {
           const s = await soloPendientes("lk", await traerLk(desde)); filasLk = s.filas; exLk = s.excluidos;
           const p = await pendienteAutomatico("lk", filasLk); m3Auto += p.m3; npAuto += p.np; det.lk = p;
-        } catch (e) { det.lk = { error: e instanceof Error ? e.message : String(e) }; }
+        } catch (e) {
+          const msg = `lk: ${e instanceof Error ? e.message : String(e)}`;
+          preErrores.push(msg); det.lk = { error: msg };
+        }
         try {
           const s = await soloPendientes("chef", await traerChef(ventana)); filasChef = s.filas; exChef = s.excluidos;
           const p = await pendienteAutomatico("chef", filasChef); m3Auto += p.m3; npAuto += p.np; det.chef = p;
-        } catch (e) { det.chef = { error: e instanceof Error ? e.message : String(e) }; }
+        } catch (e) {
+          const msg = `chef: ${e instanceof Error ? e.message : String(e)}`;
+          preErrores.push(msg); det.chef = { error: msg };
+        }
         // v13.47: lo de zona manual con camión a la zona se arma siempre, sin umbral
         const npManual = ((det.lk as { np_manual_camion?: number })?.np_manual_camion ?? 0) +
                          ((det.chef as { np_manual_camion?: number })?.np_manual_camion ?? 0);
         if (m3Auto < umbral && npManual === 0) {
-          const motivo = `intradía: pendiente automático ${m3Auto.toFixed(3)} m³ (${npAuto} NP) < umbral ${umbral} m³ y nada de zona manual con camión`;
-          await log("intradia_sin_umbral", motivo, { np_leidas: (filasLk?.length ?? 0) + (filasChef?.length ?? 0), detalle: { m3_pendiente_automatico: m3Auto, np_pendiente_automatico: npAuto, umbral_m3: umbral, ...det } });
-          return { status: 200, body: { ok: true, intradia: true, fecha, armo: false, motivo, m3_pendiente_automatico: m3Auto, umbral_m3: umbral } };
+          const motivo = preErrores.length
+            ? `${preErrores.join(" | ")} — NO se pudo medir lo pendiente, así que el umbral no dice nada ` +
+              `(lo que sí se leyó: ${m3Auto.toFixed(3)} m³, ${npAuto} NP)`
+            : `intradía: pendiente automático ${m3Auto.toFixed(3)} m³ (${npAuto} NP) < umbral ${umbral} m³ y nada de zona manual con camión`;
+          await log(preErrores.length ? "error" : "intradia_sin_umbral", motivo, { np_leidas: (filasLk?.length ?? 0) + (filasChef?.length ?? 0), detalle: { m3_pendiente_automatico: m3Auto, np_pendiente_automatico: npAuto, umbral_m3: umbral, ...det } });
+          return {
+            status: preErrores.length ? 500 : 200,
+            body: { ok: !preErrores.length, intradia: true, fecha, armo: false, motivo, m3_pendiente_automatico: m3Auto, umbral_m3: umbral },
+          };
         }
         out.intradia = { m3_pendiente_automatico: m3Auto, np_pendiente_automatico: npAuto, umbral_m3: umbral, ...det };
       }

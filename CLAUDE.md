@@ -1759,3 +1759,43 @@ select count(*) from (
    group by upper(btrim(ref)), upper(btrim(cod_art)), deposito, tipo
   having count(*) > 1 and count(distinct coalesce(empresa,'')) > 1) z;
 ```
+
+## ⚠ REGLA: una lectura ROTA no es un CERO — y un centinela que sólo mira el log del éxito es ciego
+
+**2026-09-18, problemas 402 y 403.** El armado automático de pedidos web estuvo **5 h 40 sin
+correr** (17/09 18:20 → 18/09 00:01 ART) y las 30 y pico de corridas quedaron anotadas **en
+verde**. Dos errores distintos, los dos del mismo tipo, y los dos hay que buscarlos en cualquier
+cosa que lea de afuera:
+
+**1. El `catch` que deja el número en 0 y sigue.** En `gv-ppp-web-tandas-diarias`, si el feed de
+LK tiraba (la base de LK estaba ahogada y devolvía `57014`), el `catch` guardaba el error en
+`detalle` y **`m3Auto` seguía valiendo 0**. Dos líneas más abajo, `m3Auto < umbral` entraba por
+la rama *"no hay nada que armar"*, escribía `estado = 'intradia_sin_umbral'` con motivo
+*"pendiente automático 0.000 m³"* y contestaba `ok: true` / HTTP 200.
+
+> **Si no se pudo medir, el umbral no dice nada.** Un feed caído tiene que salir por la rama de
+> error, no por la de "no había nada". Ojo con esto cada vez que un `catch` no corta el flujo:
+> la variable que quedó en su valor inicial va a ser leída como un dato real más abajo.
+
+**2. El centinela miraba el log equivocado.** `gv_ppp_web_armado_salud` leía sólo
+`GV_PPP_Web_Armado_Log`, que escribe el armador **al final de su corrida**: si el armador nunca
+se llama, no hay fila y el centinela no tiene nada que decir más que "SIN CORRER". Ahora cruza
+con `GV_Tandas_Auto_Log`, que la Edge Function escribe **siempre**, corra o no el armador.
+
+> **El log del paso que falló no está donde está el log del paso que anduvo.** Al armar un
+> centinela, preguntarse *"¿qué fila existe cuando esto se rompe?"* — si la respuesta es
+> "ninguna", el centinela está mirando el lugar equivocado.
+
+Dos detalles de implementación que costaron y conviene no repetir:
+
+- **Las dos empresas tienen que salir siempre** (lista fija `unnest(array['lk','chef'])` +
+  `left join`). Si el centinela se arma desde el log, la empresa que nunca corrió no aparece: se
+  queda mudo justo el día que todo está roto. Por lo mismo, el último intento se toma con
+  `(array_agg(x order by ts desc))[1]` y **no** con `order by … limit 1`: un `cross join` contra
+  una tabla vacía devuelve **cero filas**.
+- **`create or replace view` sólo deja agregar columnas AL FINAL.** Meter una en el medio obliga
+  a `DROP` + recrear todo lo que cuelgue (y a acordarse del `security_invoker`).
+
+**Chequeo:** `select * from public.gv_ppp_web_armado_salud;` — `FEED CAIDO` / `SIN CORRER` son
+para mirar; `sin nada que armar` y `fuera de horario` son sanos. §3.jf,
+`sql/gv_armado_salud_feed_v1958.sql`.

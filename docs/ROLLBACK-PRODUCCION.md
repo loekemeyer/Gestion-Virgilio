@@ -1709,3 +1709,23 @@ rollback del código está al final de `sql/gv_ppp_web_armado_tope_v1955.sql`.
 ⚠ **El tope cambia el comportamiento en un caso y hay que saberlo:** con más pendientes que el
 tope, una corrida ya no los arma todos — el resto sale en la corrida siguiente (5 minutos
 después). Se ve en `gv_ppp_web_armado_salud.ultima_pospuestos`.
+
+---
+
+## v19.58 (2026-09-18) — `gv_ppp_web_armado_salud`: el centinela cruza con `GV_Tandas_Auto_Log`
+
+**Objeto tocado:** `public.gv_ppp_web_armado_salud` (vista creada por nosotros en la v19.55; no
+la lee Producción). `create or replace` con **4 columnas nuevas al final** (`ultimo_intento`,
+`ultimo_intento_estado`, `ultimo_intento_motivo`, `errores_12`) y el `case` de `estado` con
+cuatro salidas en vez de una. Ninguna columna vieja cambió de nombre, tipo ni orden.
+
+**Impacto medido:** 0 consumidores fuera de la consulta a mano. `security_invoker = true`
+confirmado después del reemplazo:
+`select reloptions from pg_class where oid='public.gv_ppp_web_armado_salud'::regclass;` →
+`{security_invoker=true}`.
+
+**Rollback exacto:** el bloque comentado al final de `sql/gv_armado_salud_feed_v1958.sql`
+(la vista tal cual estaba en la v19.55).
+
+**No se tocó nada de `public.*` compartido.** El otro cambio de esta versión es la Edge Function
+`gv-ppp-web-tandas-diarias`, que no es un objeto de la base.

@@ -1,3 +1,25 @@
+## Nota v19.58 (2026-09-18) — El armado estuvo 5 h 40 sin correr y el log decía que todo bien
+
+**El armado automático de pedidos web no corrió entre las 18:20 del 17/09 y las 00:01 del 18/09**,
+y las 30 y pico de corridas quedaron anotadas en verde: `intradia_sin_umbral`, *"pendiente
+automático 0.000 m³ < umbral"*.
+
+**La causa estaba en la base de LK**, no acá: se quedó sin worker slots (once crons arrancando
+juntos en el minuto :00 contra `max_worker_processes = 6`) y el feed `gv_pedidos_web_np_lk`
+empezó a contestar `57014` / `504`. Ya con la base respirando, ese mismo feed tarda **1.179 ms**.
+Arreglo del lado de LK: escalonar los crons (`sql/lk_crons_escalonados.sql` del repo
+`pagina-LK-copia`, problema 402).
+
+**Lo nuestro eran dos cosas, y las dos son la misma lección:**
+
+1. La Edge Function tomaba el error del feed y seguía con `m3Auto = 0`, o sea que informaba una
+   **lectura rota como un cero**. Ahora eso es `estado = 'error'` y HTTP 500.
+2. El centinela `gv_ppp_web_armado_salud` sólo miraba el log del armador — que en esas corridas
+   no tiene ni una fila, porque el armador nunca se llamó. Ahora cruza con `GV_Tandas_Auto_Log`
+   y distingue **FEED CAIDO** / **sin nada que armar** / **fuera de horario** / **SIN CORRER**.
+
+`select * from public.gv_ppp_web_armado_salud;` · §3.jf · problemas 402 y 403.
+
 ## Nota v19.55 (2026-09-17) — El armador tenía techo de ~180 pedidos y se cortaba sin avisar
 
 Tercera parte de lo de los crons. Luis: *"arreglalos 3 priorizando el 1"*.

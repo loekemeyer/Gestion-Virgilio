@@ -51,7 +51,12 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
        arreglo, no una regresión. Para probar el cartel hace falta un olvido de verdad, y
        tiene que ser independiente de la hora a la que corra el test → 20 DÍAS. */
     let pickIni = hace(20 * 24);
-    window.getLegajoState = () => ({ picking: { active: true, value: "D09B", ts_inicio: pickIni }, armado: { active: false }, toggles: { CR: hace(5) } });
+    /* ⚠ v19.58 — el toggle CR arrastraba el MISMO bug que el comentario de arriba explica
+       para el TP, y por eso el test fallaba SÓLO de madrugada: con `hace(5)` corrido a las
+       04:40 ART las 5 horas caen enteras de noche, o sea ~0 horas ACTIVAS, y el cartel no
+       tiene por qué salir. La corrección es la misma que ya se le hizo al TP: 20 días, que
+       son > 3 h trabajadas corra a la hora que corra. El código nunca estuvo mal. */
+    window.getLegajoState = () => ({ picking: { active: true, value: "D09B", ts_inicio: pickIni }, armado: { active: false }, toggles: { CR: hace(20 * 24) } });
     const prep = (op, txt) => { document.getElementById("legajoInput").value = "8"; document.getElementById("textInput").value = txt || ""; selected = op; emitted = []; confirms.length = 0; };
     // TP abierto hace 20 DÍAS, Cancelar → no manda
     prep("TP", "D09B"); confirmAnswer = false; await send();
@@ -72,7 +77,7 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
     pickIni = hace(2);
     prep("TP", "D09B"); confirmAnswer = false; await send();
     out.tpNormalSinPregunta = emitted.indexOf("TP") >= 0 && confirms.length === 0;
-    // toggle CR abierto hace 5 h (> 3 h) → pregunta
+    // toggle CR abierto hace 20 DÍAS (> 3 h trabajadas) → pregunta
     prep("CR", ""); confirmAnswer = false; await send();
     out.toggleLargoPregunta = confirms.length === 1 && emitted.length === 0;
 
