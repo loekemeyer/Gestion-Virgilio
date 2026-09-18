@@ -14458,3 +14458,16 @@ distinta, empresa distinta.
 > con fecha de carga. Llave de apagado (vuelve la regla vieja, sin DDL):
 > `update "PPP_Web_Config" set valor = 0 where clave = 'en_salida_solo_cargadas'`.
 > Detalle §3.cn de `docs/SUPABASE-GESTION-VIRGILIO.md` · `sql/gv_ppp_en_salida_solo_cargadas_v1585.sql`.
+
+> Nota **v19.82** — **Carga Camión: los Retira ya no caen en el reparto** (Thomas, 18/09:
+> *"Están apareciendo los pedidos que están marcados como que los retiran los clientes en el
+> módulo «cargar camión»"*). La zona de cada NP se leía de `gv_ppp_programacion_diaria`, que es
+> el espejo de **ISIS** y no tiene las NP web (`LK 0076`, `CH 0011`): sin zona, `esRetira` quedaba
+> en false y el pedido iba al camión salvo que el armador hubiera marcado la clase `nada` en el
+> TAL. Ahora el front lee **`gv_np_prog_reparto`**, que une las dos programaciones con la NP
+> etiquetada y trae el flag **`es_retira` resuelto en el backend**. De paso esas NP entran al
+> **orden de carga por ruta** (antes quedaban siempre en "sin ubicación en ruta"). Eran 4 NP el
+> 18/09 (Spillare, E32A). Chequeo:
+> `select np, origen, zona, es_retira from gv_np_prog_reparto where es_retira order by np;`
+> `sql/gv_np_prog_reparto_v1982.sql` · `tests/cc-retira-web.cjs` · §3.jp de
+> `docs/SUPABASE-GESTION-VIRGILIO.md`.

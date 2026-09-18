@@ -5733,7 +5733,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=19.81"></script>
+<script type="module" src="recepcion.js?v=19.82"></script>
 <!-- Config del módulo de fichada (compartido con fichada.html). El secret
      hmacSecret tiene que ser el mismo acá y allá; cargándolo desde un solo
      archivo evitamos que se desincronicen. -->
@@ -9579,7 +9579,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v19.81";
+const APP_VERSION = "v19.82";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -29588,7 +29588,7 @@ async function fetchCCData() {
   try { await _ccAttachUbicYOrden(items); } catch (_e) {}
   // v11.47 — RETIRA = zona "Retira" (Programación) O clase TAL 'nada'. El resto = camión.
   items.forEach(function (it) {
-    it.esRetira = (String(it.zona || "").toLowerCase() === "retira") || (String(it.clase || "").toLowerCase() === "nada");
+    it.esRetira = (it.retiraProg === true) || (String(it.zona || "").toLowerCase() === "retira") || (String(it.clase || "").toLowerCase() === "nada");
   });
   return items;
 }
@@ -29617,7 +29617,13 @@ async function _ccAttachUbicYOrden(items) {
   } catch (_e) {}
   // (b) orden de carga = inverso de la ruta
   try {
-    const pedUrl = SUPABASE_URL + "/rest/v1/gv_ppp_programacion_diaria?select=np,zona,direccion,barrio,m3&np=in.(" + nps.map(encodeURIComponent).join(",") + ")&limit=20000";
+    /* v19.82 — la programación de ISIS SOLA no tiene las NP web (LK 0076, CH 0011…): quedaban
+       SIN zona, o sea sin «Retira» y sin orden de ruta, y los pedidos que retira el cliente
+       aparecían en «Carga Camión — reparto». `gv_np_prog_reparto` une las dos programaciones
+       (mismo criterio que la v19.65 con `gv_np_prog_info`) y resuelve el Retira en el BACKEND
+       (`es_retira`). Los valores van entre comillas porque la NP web lleva espacio ("LK 0076"). */
+    const pedUrl = SUPABASE_URL + "/rest/v1/gv_np_prog_reparto?select=np,zona,direccion,barrio,m3,es_retira&np=in.("
+      + nps.map(function (n) { return encodeURIComponent('"' + String(n).replace(/"/g, "") + '"'); }).join(",") + ")&limit=20000";
     const _p = await Promise.all([
       fetch(pedUrl, { headers: H, cache: "no-store" }).then(function (r) { return r.ok ? r.json() : []; }),
       _rtCacheAll()
@@ -29627,9 +29633,9 @@ async function _ccAttachUbicYOrden(items) {
     peds.forEach(function (p) {
       const n = _rtNpNorm(p.np); if (!n || geoByNp[n]) return;
       const c = cache[_rtDirKey(p.direccion, p.barrio)];
-      geoByNp[n] = { zona: String(p.zona || "").trim(), lat: c ? c.lat : null, lng: c ? c.lng : null, m3: Number(p.m3) || 0 };
+      geoByNp[n] = { zona: String(p.zona || "").trim(), lat: c ? c.lat : null, lng: c ? c.lng : null, m3: Number(p.m3) || 0, esRetira: (p.es_retira === true) };
     });
-    items.forEach(function (it) { const g = geoByNp[_rtNpNorm(it.np)]; if (g) { it.zona = g.zona; it.lat = g.lat; it.lng = g.lng; it.m3 = g.m3; } });
+    items.forEach(function (it) { const g = geoByNp[_rtNpNorm(it.np)]; if (g) { it.zona = g.zona; it.lat = g.lat; it.lng = g.lng; it.m3 = g.m3; it.retiraProg = g.esRetira; } });
     // v11.62 — si el DEPÓSITO no está geocodificado en PPP_Geo, el orden de ruta no corría y
     // TODAS las NP caían en «sin ubicación en ruta». Lo geocodificamos on-demand (Nominatim en el
     // navegador) y lo cacheamos → se auto-repara la 1ª vez y queda para siempre.

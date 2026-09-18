@@ -24041,3 +24041,58 @@ select motivo, count(*) from public.gv_web_sucursal_sin_match group by 1;   -- e
 Al 18/09: **11** (eran 15). 9 de nombre que no coincide —la última del 07/08— y los 2 de arriba.
 
 `sql/gv_web_cliente_nuevo_expo_v1981.sql`.
+
+## §3.jp — v19.82: «Carga Camión» mostraba en el reparto los pedidos que RETIRA el cliente — 2026-09-18
+
+**Thomas, 18/09:** *"Están apareciendo los pedidos que están marcados como que los retiran los
+clientes en el módulo «cargar camión»"*. En la foto: `LK 0076` (Rodriguez Jonatan) y
+`LK 0130`–`LK 0133` (Spillare Miriam Edith), los cinco con **zona `Retira`** en la programación.
+
+### La causa: la zona se leía de la programación de ISIS, que no tiene las NP web
+
+`_ccAttachUbicYOrden` (index.html) resolvía la zona con
+
+```
+/rest/v1/gv_ppp_programacion_diaria?select=np,zona,direccion,barrio,m3&np=in.(…)
+```
+
+y esa vista es el **espejo de ISIS**: sus NP son numéricas (`98585`, `44619`). Las NP web
+(`LK 0076`, `CH 0011`) viven en **`PPP_Web_Programacion`**, así que la consulta no devolvía
+ninguna fila para ellas → `it.zona` quedaba vacía → el flag
+
+```js
+it.esRetira = (String(it.zona||"").toLowerCase() === "retira") || (clase === "nada");
+```
+
+daba **false** y el pedido se iba al camión. Sólo lo salvaba el segundo término, la clase `nada`
+del evento TAL, que el operario puede no marcar. Medido el 18/09: **4 NP Retira** esperando
+carga en el reparto (las cuatro de Spillare, tanda E32A).
+
+⚠ **Es el mismo pozo que tapó la v19.65** con `gv_np_prog_info` en otra pantalla: *cualquier*
+consulta que resuelva una NP contra la programación de ISIS sola se come las web. Al escribir una,
+preguntarse si no hace falta la unión.
+
+**Efecto colateral que también se arregla:** sin zona, esas NP tampoco entraban al **orden de
+carga por ruta** (`RT_RUTAS` filtra por zona), así que aparecían siempre en «sin ubicación en
+ruta».
+
+### El arreglo: una vista que une las dos programaciones y decide el Retira en el backend
+
+`public.gv_np_prog_reparto` (nueva, `security_invoker = true`, `select` para `anon`/`authenticated`)
+= `gv_ppp_programacion_diaria` ∪ `PPP_Web_Programacion` con la NP etiquetada por
+`gv_ppp_web_np_label`, y expone `np · origen · zona · direccion · barrio · m3 · tanda · es_retira`.
+La regla de negocio (`zona ~* '^retira'`) queda del lado del servidor, como manda el protocolo;
+el front sólo la lee.
+
+⚠ Las NP van **entre comillas** en el `in.()` porque la web lleva espacio (`"LK 0076"`) — el mismo
+patrón que ya usa `gv_np_items` desde la v15.57.
+
+### Chequeo
+
+```sql
+select np, origen, zona, es_retira from public.gv_np_prog_reparto where es_retira order by np;
+```
+
+`sql/gv_np_prog_reparto_v1982.sql`. Regresión: `tests/cc-retira-web.cjs` (verificado que **falla**
+contra el código anterior). **Rollback:** `drop view public.gv_np_prog_reparto;` y volver el
+`pedUrl` a `gv_ppp_programacion_diaria`.
