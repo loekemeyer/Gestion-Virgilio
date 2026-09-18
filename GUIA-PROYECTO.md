@@ -1,4 +1,4 @@
-## Nota v19.83 (2026-09-18) — El generador de OC contaba lo comprometido como disponible (problema 428)
+## Nota v19.85 (2026-09-18) — El generador de OC contaba lo comprometido como disponible (problema 428)
 
 Thomas: *"lo comprometido (separar_pedidos y a_facturar) no debería contar como stock disponible
 para la cuenta de 'lo que tenemos - lo que nos falta'"*.
@@ -14,7 +14,7 @@ apareció el agujero del otro lado: **las dos puntas de la resta trataban la mis
 Resultado: la caja ya vendida se contaba como disponible **y** su pedido ya no se contaba como
 demanda. Se pedía de menos, siempre para el mismo lado.
 
-**Desde la v19.83 el `stock` del generador es el DISPONIBLE** — terminado + a_guardar + racks +
+**Desde la v19.85 el `stock` del generador es el DISPONIBLE** — terminado + a_guardar + racks +
 excedente + para_envasar + racks_ch. La columna Stock de la pantalla muestra eso.
 
 | | antes | después |
@@ -30,7 +30,57 @@ sea un sobre-pickeo que ya estaba en el libro y que el stock total tapaba. **No 
 cambio, lo destapa**; el `greatest(0, …)` lo contiene. No se tocó el dato.
 
 Detalle, respaldos y rollback: `docs/SUPABASE-GESTION-VIRGILIO.md` §3.jq y
-`docs/ROLLBACK-PRODUCCION.md`. SQL: `sql/gv_generador_oc_stock_disponible_v1983.sql`.
+`docs/ROLLBACK-PRODUCCION.md`. SQL: `sql/gv_generador_oc_stock_disponible_v1985.sql`.
+## Nota v19.84 (2026-09-18) — La OC de un código DUAL va con la empresa, y eso destapó faltantes
+
+**Thomas:** *"LO QUE SE PIDE POR OCs TIENE QUE SER LOS CODIGOS CON EMPRESA. Considera que esos
+códigos viajan en todos lados con el código de empresa y ese se tiene que usar en las órdenes de
+compra para saber cuál se está comprando."*
+
+`vista_generador_oc` pelaba el sufijo y devolvía los **4 duales** (437E, 438E, 439E, 809E) en
+**una** fila, con stock, capacidad, proyección y pedidos de las dos empresas **sumados**. Dos
+problemas: la OC decía "437E" y no se sabía cuál se compraba, y —peor— **el stock de una empresa
+tapaba el faltante de la otra**:
+
+| código | antes | ahora |
+|---|---|---|
+| **437E** | total **0** (304 de stock contra 196 de máximo) | **CH pide 126** (tiene **14**, máximo 140) · LK 0 (tiene 290) |
+| **438E** | total 10 | **CH 86** (tiene 3) · LK 0 (tiene 119) |
+| **439E** | total 7 | CH 4 · LK 3 |
+| **809E** | total 0 (463 de stock) | **CH 123** (tiene 113) · LK 0 (350) — sin proveedor, no entra a ninguna OC |
+
+Había 304 coladores de 16 cm y el sistema decía "no pidas nada": **290 eran de Loeke y Chef
+estaba en 14**.
+
+**Cómo se parte cada cosa** (y por qué las sumas cierran exacto):
+
+| dato | fuente de la partición |
+|---|---|
+| stock | `vista_saldos_stock.clave`, que ya viene partida (`437E LK` / `437E CH`) |
+| capacidad | `Capacidad_Sector.empresa`, con **`LOKE` → `LK`** (así están Ñ53 y Ñ54 del 439E: sin eso se perdían 36 cajas) |
+| proyección | la **razón** `proyeccion_madre.proy_cajas_lk` / `proy_cajas_chef` aplicada al total → la suma de las dos da el mismo número de antes (69,82 + 27,93 = 97,75) |
+| pedidos | la empresa de la **NP** (`gv_empresa_de_np_texto`) + la regla de la "L" (438EL → LK) |
+| descripción | `codigos_duales.nombre_lk` / `nombre_ch` cuando están cargados — el 809E los tiene y por eso su OC ahora dice **Corta Pizza Familiar** o **Corta Queso** |
+| **config** (proveedor, %, índice, uni×caja, activo, objetivo) | **una sola, la del código pelado** en `OC_Maximos`: es el mismo que fabrica los dos. La vista devuelve la columna nueva **`cod_config`** y la pantalla Config escribe ahí |
+
+**Medido contra el estado anterior** (snapshot en
+`zz_backups."GV_Backup_GeneradorOC_antes_20260918"`): filas 404 → 408, **0 códigos no duales
+cambiaron** (ni una fila, ni un número), total a pedir de los activos 10.307 → **10.632** (+325,
+todo de los duales).
+
+⚠ **Lo que FALTA, y hay que saberlo antes de generar una OC de un dual:** cuando llega la
+mercadería, la OC se descuenta en `gv_oc_recompute_recibido`, que cruza
+`Entregas Tallerista Virgilio."Cod"` —el código **pelado**, esa tabla no tiene empresa— contra
+`norm_cod(Ordenes_Compra.codigo)`. Con la OC del dual escrita `437E CH` ese cruce **no matchea**:
+la OC no se cierra sola y el aviso de *"SIN OC generada"* / *"entrega ajena"* puede saltar de más.
+Falta agregarle a esa tabla una columna de empresa (nullable, `gv_`) —que `recepcion.js` ya sabe,
+es `opState.linea`— y hacer empresa-aware `gv_oc_recompute_recibido` y `gv_oc_entrega_ajena`.
+**Mientras tanto, una OC de un dual se marca recibida a mano en el módulo de OCs.** El cartel de
+la pantalla de recepción ya está bien (`ocDeCod` busca `437E` + la línea antes que pelado).
+
+Centinela: fila en `GV_Reglas_Centinela` (el patrón `codigos_duales` tiene que seguir en la
+vista). Rollback completo y medición: `sql/gv_generador_oc_dual_por_empresa_v1984.sql`.
+Problema 430.
 
 ## Nota v19.78 (2026-09-18) — Generador de OCs: un artículo con dos talleristas, UNA fila (problema 419)
 
@@ -14493,7 +14543,7 @@ distinta, empresa distinta.
 > `update "PPP_Web_Config" set valor = 0 where clave = 'en_salida_solo_cargadas'`.
 > Detalle §3.cn de `docs/SUPABASE-GESTION-VIRGILIO.md` · `sql/gv_ppp_en_salida_solo_cargadas_v1585.sql`.
 
-> Nota **v19.82** — **Carga Camión: los Retira ya no caen en el reparto** (Thomas, 18/09:
+> Nota **v19.84** — **Carga Camión: los Retira ya no caen en el reparto** (Thomas, 18/09:
 > *"Están apareciendo los pedidos que están marcados como que los retiran los clientes en el
 > módulo «cargar camión»"*). La zona de cada NP se leía de `gv_ppp_programacion_diaria`, que es
 > el espejo de **ISIS** y no tiene las NP web (`LK 0076`, `CH 0011`): sin zona, `esRetira` quedaba
@@ -14503,5 +14553,5 @@ distinta, empresa distinta.
 > **orden de carga por ruta** (antes quedaban siempre en "sin ubicación en ruta"). Eran 4 NP el
 > 18/09 (Spillare, E32A). Chequeo:
 > `select np, origen, zona, es_retira from gv_np_prog_reparto where es_retira order by np;`
-> `sql/gv_np_prog_reparto_v1982.sql` · `tests/cc-retira-web.cjs` · §3.jp de
+> `sql/gv_np_prog_reparto_v1984.sql` · `tests/cc-retira-web.cjs` · §3.jp de
 > `docs/SUPABASE-GESTION-VIRGILIO.md`.

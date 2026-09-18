@@ -1027,11 +1027,11 @@ hasta esa tarde. Si vuelve a aparecer un cartel de tope, está mintiendo.
 select count(*) filter (where llenar_gondola)                as pisan_la_proyeccion,   -- tiene que dar 0
        count(*) filter (where activo and tiene_prov_real
                           and proy = 0 and cap > 0)          as sin_proy_van_por_cap,  -- 10 al 18/09
-       count(*) filter (where activo and tiene_prov_real)    as activos                -- 238 al 18/09
+       count(*) filter (where activo and tiene_prov_real)    as activos                -- 241 al 18/09 (eran 238: los 3 duales con proveedor pasaron a 2 filas cada uno, v19.84)
   from public.vista_generador_oc;
 ```
 
-## ⚠ Regla del dueño (2026-09-18, v19.83): lo COMPROMETIDO no es stock disponible
+## ⚠ Regla del dueño (2026-09-18, v19.85): lo COMPROMETIDO no es stock disponible
 
 **Thomas, 2026-09-18:** *"lo comprometido (separar_pedidos y a_facturar) no debería contar como
 stock disponible para la cuenta de 'lo que tenemos - lo que nos falta'"*.
@@ -1063,7 +1063,7 @@ libro y que el stock total tapaba. El `greatest(0, …)` lo contiene. **No se to
 > defendibles por separado.
 
 **Chequeo:** `select * from public.gv_reglas_perdidas;` — el centinela `COALESCE\(s\.fin_dep`
-vive ahí. `sql/gv_generador_oc_stock_disponible_v1983.sql`.
+vive ahí. `sql/gv_generador_oc_stock_disponible_v1985.sql`.
 
 ## ⚠ PROTOCOLO: Backend vs Front-end — decidir y avisar (ya NO se pregunta)
 

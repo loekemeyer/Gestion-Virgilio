@@ -23831,7 +23831,7 @@ Vacía = todo bien. Al 18/09 quedan **15**, todas de pedidos ya entregados:
 
 ---
 
-## §3.jj — AD09 estaba marcado GÓNDOLA y es un RACK (18/09, problema 423)
+## §3.jq — AD09 estaba marcado GÓNDOLA y es un RACK (18/09, problema 423)
 
 **Lo pidió Thomas** al mirar el 505I: *"Poné AD09 como rack en GV_Lugar"*.
 
@@ -24097,7 +24097,7 @@ select np, origen, zona, es_retira from public.gv_np_prog_reparto where es_retir
 contra el código anterior). **Rollback:** `drop view public.gv_np_prog_reparto;` y volver el
 `pedUrl` a `gv_ppp_programacion_diaria`.
 
-## §3.jq — v19.83: el generador de OC contaba lo COMPROMETIDO como disponible (problema 428) — 2026-09-18
+## §3.jq — v19.85: el generador de OC contaba lo COMPROMETIDO como disponible (problema 428) — 2026-09-18
 
 **Thomas:** *"lo comprometido (separar_pedidos y a_facturar) no debería contar como stock
 disponible para la cuenta de 'lo que tenemos - lo que nos falta'"*.
@@ -24176,4 +24176,4 @@ select relname, reloptions from pg_class where oid='public.vista_generador_oc'::
 Respaldos: `zz_backups."GV_Backup_Def_GeneradorOC_20260918c"` (definición previa) y
 `zz_backups."GV_Backup_GeneradorOC_Filas_20260918c"` (las 382 filas de antes).
 Rollback exacto en `docs/ROLLBACK-PRODUCCION.md`; SQL completo en
-`sql/gv_generador_oc_stock_disponible_v1983.sql`.
+`sql/gv_generador_oc_stock_disponible_v1985.sql`.

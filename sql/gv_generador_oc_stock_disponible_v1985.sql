@@ -1,4 +1,4 @@
--- v19.83 (2026-09-18) — El STOCK del generador de OC pasa a ser el DISPONIBLE
+-- v19.85 (2026-09-18) — El STOCK del generador de OC pasa a ser el DISPONIBLE
 -- ---------------------------------------------------------------------------
 -- Thomas: "lo comprometido (separar_pedidos y a_facturar) no debería contar como stock
 -- disponible para la cuenta de 'lo que tenemos - lo que nos falta'".
@@ -61,7 +61,7 @@ $mig$;
 insert into public."GV_Reglas_Centinela" (objeto, clase, patron, regla, quien_pidio, version)
 values ('vista_generador_oc','vista','COALESCE\(s\.fin_dep',
  'El STOCK del generador de OC es el DISPONIBLE: no cuenta separar_pedidos ni a_facturar.',
- 'Thomas','v19.83')
+ 'Thomas','v19.85')
 on conflict do nothing;
 
 -- CHEQUEOS

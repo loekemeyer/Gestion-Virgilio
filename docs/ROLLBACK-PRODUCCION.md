@@ -1905,7 +1905,7 @@ end $$;
 delete from public."GV_Reglas_Centinela" where version = 'v19.66';
 ```
 
-## v19.83 — `vista_generador_oc`: el stock pasa a ser el DISPONIBLE — 2026-09-18
+## v19.85 — `vista_generador_oc`: el stock pasa a ser el DISPONIBLE — 2026-09-18
 
 **Qué cambió.** El `stock` que expone la vista deja de sumar **`separar_pedidos`** y
 **`a_facturar`**: pasa a salir de `fin_dep` (terminado + a_guardar + racks + excedente +
@@ -1956,4 +1956,4 @@ end $rb$;
 select sum(total) from public.vista_generador_oc where activo;
 ```
 
-`sql/gv_generador_oc_stock_disponible_v1983.sql`.
+`sql/gv_generador_oc_stock_disponible_v1985.sql`.
