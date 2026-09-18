@@ -23831,7 +23831,7 @@ Vacía = todo bien. Al 18/09 quedan **15**, todas de pedidos ya entregados:
 
 ---
 
-## §3.jj — AD09 estaba marcado GÓNDOLA y es un RACK (18/09, problema 423)
+## §3.jq — AD09 estaba marcado GÓNDOLA y es un RACK (18/09, problema 423)
 
 **Lo pidió Thomas** al mirar el 505I: *"Poné AD09 como rack en GV_Lugar"*.
 

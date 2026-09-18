@@ -5733,7 +5733,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=19.82"></script>
+<script type="module" src="recepcion.js?v=19.84"></script>
 <!-- Config del módulo de fichada (compartido con fichada.html). El secret
      hmacSecret tiene que ser el mismo acá y allá; cargándolo desde un solo
      archivo evitamos que se desincronicen. -->
@@ -9579,7 +9579,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v19.82";
+const APP_VERSION = "v19.84";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -16376,13 +16376,16 @@ async function ocgEnterCfg() {
     // no de una lista cargada a mano. Acá solo se configura proveedor(es) + % + índice + activo.
     // uni×caja es read-only (maestro→backup→uxb). Ya no hay Objetivo ni alta manual.
     const res = await Promise.all([
-      supaFetchAllSafe(SUPABASE_GENERADOR_ENDPOINT, "select=cod,descripcion,proveedor,tiene_prov_real,pr1,proveedor2,pr2,indice,activo,uni_x_caja,en_config,total,cap,llenar_gondola&order=tiene_prov_real.asc,total.desc,cod.asc"),
+      supaFetchAllSafe(SUPABASE_GENERADOR_ENDPOINT, "select=cod,cod_config,descripcion,proveedor,tiene_prov_real,pr1,proveedor2,pr2,indice,activo,uni_x_caja,en_config,total,cap,llenar_gondola&order=tiene_prov_real.asc,total.desc,cod.asc"),
       ocgLoadProvs()
     ]);
     const rows = res[0] || [];
     _oc.cfg.provs = res[1] || [];
     _oc.cfg.rows = rows.map(function (x) {
-      return { cod: String(x.cod), descripcion: x.descripcion || "",
+      /* v19.84 — `cod` puede venir con la empresa pegada ("437E CH", un dual), pero la CONFIG
+         vive en OC_Maximos con el codigo PELADO y es UNA sola para las dos mitades (mismo
+         proveedor). `cod_config` es la clave a la que hay que escribir. Problema 430. */
+      return { cod: String(x.cod), codCfg: String(x.cod_config || x.cod), descripcion: x.descripcion || "",
         proveedor: (x.tiene_prov_real ? String(x.proveedor || "") : ""),
         prop_prov1: (x.pr1 == null ? 100 : Number(x.pr1)), proveedor2: x.proveedor2 || "", prop_prov2: (x.pr2 == null ? 0 : Number(x.pr2)),
         uni_x_caja: (x.uni_x_caja == null ? 0 : Number(x.uni_x_caja)),
@@ -16499,7 +16502,7 @@ async function ocCfgSave() {
         const _linea = String(row.linea || "").toUpperCase().trim() ||
           ((typeof artMarca === "function" ? (artMarca(row.cod || c) || "") : "")) || "LK";
         const body = Object.assign({
-          cod: (row.cod || c), descripcion: row.descripcion || null, linea: _linea,
+          cod: ((row && row.codCfg) || c), descripcion: row.descripcion || null, linea: _linea,   // v19.84: la config va al codigo PELADO
           max_cajas: (row.max_cajas == null ? 0 : row.max_cajas),
           proveedor: (String(row.proveedor || "").trim() || null), prop_prov1: (row.prop_prov1 == null ? 100 : row.prop_prov1),
           proveedor2: (String(row.proveedor2 || "").trim() || null), prop_prov2: (row.prop_prov2 == null ? 0 : row.prop_prov2),
@@ -16509,11 +16512,11 @@ async function ocCfgSave() {
         return fetch(SUPABASE_OCMAX_ENDPOINT, { method: "POST", headers: headers, body: JSON.stringify(body) })
           .then(function (r) {
             if (r.ok) return;
-            if (r.status === 409) return fetch(SUPABASE_OCMAX_ENDPOINT + "?cod=eq." + encodeURIComponent(row.cod || c), { method: "PATCH", headers: headers, body: JSON.stringify(patch) }).then(function (r2) { if (!r2.ok) throw new Error("HTTP " + r2.status + " (" + c + ")"); });
+            if (r.status === 409) return fetch(SUPABASE_OCMAX_ENDPOINT + "?cod=eq." + encodeURIComponent((row && row.codCfg) || c), { method: "PATCH", headers: headers, body: JSON.stringify(patch) }).then(function (r2) { if (!r2.ok) throw new Error("HTTP " + r2.status + " (" + c + ")"); });
             throw new Error("HTTP " + r.status + " (" + c + ")");
           });
       }
-      return fetch(SUPABASE_OCMAX_ENDPOINT + "?cod=eq." + encodeURIComponent(c), { method: "PATCH", headers: headers, body: JSON.stringify(patch) })
+      return fetch(SUPABASE_OCMAX_ENDPOINT + "?cod=eq." + encodeURIComponent((row && row.codCfg) || c), { method: "PATCH", headers: headers, body: JSON.stringify(patch) })   // v19.84: clave PELADA
         .then(function (r) { if (!r.ok) throw new Error("HTTP " + r.status + " (" + c + ")"); });
     }));
     alert("✓ Guardados " + cods.length + " artículo(s). Volvé a generar para ver el efecto.");
@@ -29617,7 +29620,7 @@ async function _ccAttachUbicYOrden(items) {
   } catch (_e) {}
   // (b) orden de carga = inverso de la ruta
   try {
-    /* v19.82 — la programación de ISIS SOLA no tiene las NP web (LK 0076, CH 0011…): quedaban
+    /* v19.84 — la programación de ISIS SOLA no tiene las NP web (LK 0076, CH 0011…): quedaban
        SIN zona, o sea sin «Retira» y sin orden de ruta, y los pedidos que retira el cliente
        aparecían en «Carga Camión — reparto». `gv_np_prog_reparto` une las dos programaciones
        (mismo criterio que la v19.65 con `gv_np_prog_info`) y resuelve el Retira en el BACKEND

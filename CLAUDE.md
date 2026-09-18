@@ -1027,7 +1027,7 @@ hasta esa tarde. Si vuelve a aparecer un cartel de tope, está mintiendo.
 select count(*) filter (where llenar_gondola)                as pisan_la_proyeccion,   -- tiene que dar 0
        count(*) filter (where activo and tiene_prov_real
                           and proy = 0 and cap > 0)          as sin_proy_van_por_cap,  -- 10 al 18/09
-       count(*) filter (where activo and tiene_prov_real)    as activos                -- 238 al 18/09
+       count(*) filter (where activo and tiene_prov_real)    as activos                -- 241 al 18/09 (eran 238: los 3 duales con proveedor pasaron a 2 filas cada uno, v19.84)
   from public.vista_generador_oc;
 ```
 

@@ -1012,7 +1012,13 @@ async function cargarOCVigentes() {
 function ocDeCod(cod) {
   const m = opState.ocPorCod;
   if (!m) return null;
-  return m[_ocgNorm(cod)] || null;
+  /* v19.84 (problema 430) - la OC de un codigo DUAL viene con la empresa pegada ("437E CH"),
+     porque es lo que se compra: el 437E de Loeke y el de Chef son dos productos distintos y
+     ahora cada uno tiene su linea de OC. Se busca primero con la LINEA que eligio el operario
+     y despues pelado, que es lo que vale para los codigos comunes y para las OC viejas. */
+  const k = _ocgNorm(cod), lin = String(opState.linea || "").toUpperCase().trim();
+  if (lin && m[k + " " + lin]) return m[k + " " + lin];
+  return m[k] || null;
 }
 /* ============== v19.57 — ENTREGA AJENA: "esto no está en SU orden de compra" =========
    Pedido de Thomas (2026-09-17): *"si pasa que un proveedor entrega mercadería que no le
