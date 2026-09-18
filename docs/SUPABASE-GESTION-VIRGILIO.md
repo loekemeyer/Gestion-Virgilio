@@ -24915,6 +24915,18 @@ Backups: `zz_backups."GV_Backup_E12K_Movs_20260918"` (384), `…_Eventos_2026091
 agosto, ajena) · picking duplicado, reglas perdidas y empresa fantasma en cero · ningún código con
 góndola negativa · el candado huérfano de E12L desapareció.
 
+**El centinela que se usó para verificar es nuevo y su `CREATE` vive en
+`sql/gv_stock_tanda_pickeado_negativo_v2013.sql`** (antes estaba sólo aplicado en la base, que es
+justo lo que el `CLAUDE.md` prohíbe). Mira **por tanda**, no por código, porque
+`gv_stock_negativos` agrega por código y el saldo de otra tanda tapa el agujero: el hueco de E12K
+eran 34 códigos / 46 cajas y en pantalla se veían 7, e iban apareciendo de a uno a medida que se
+armaban las tandas que hacían de colchón. Distingue *"armada sin picking propio"* (pickeado 0 y
+el armado igual drenó — la firma del renombre) de *"drenaje mayor que el picking"*.
+
+⚠ **Dos snapshots mal nombrados:** `zz_backups."GV_Backup_E12K_Recon_20260918"` y
+`…_ReconEv_20260918` se tomaron **después** del arreglo, así que NO sirven de rollback; quedan con
+`comment on table` que lo aclara. El estado previo es el de `…_Movs_/_Eventos_/_Lock_20260918`.
+
 ### 2. Las cuatro tablas que el renombrador no tocaba
 
 Se agregan a `gv_ppp_tanda_renombrar`: `Etiquetas_Lio` (las etiquetas de lío se **imprimen** con el
