@@ -5745,7 +5745,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=20.01"></script>
+<script type="module" src="recepcion.js?v=20.02"></script>
 <!-- Config del módulo de fichada (compartido con fichada.html). El secret
      hmacSecret tiene que ser el mismo acá y allá; cargándolo desde un solo
      archivo evitamos que se desincronicen. -->
@@ -9591,7 +9591,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v20.01";
+const APP_VERSION = "v20.02";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -18300,7 +18300,14 @@ function stkBodyStocks() {
     h += '<tr class="stk-row" data-stk-cod="' + escapeHtml(String(a.cod).toUpperCase()) + '" onclick="stockToggleArt(\'' + encodeURIComponent(a.cod) + '\')">' + tds + '</tr>';
     if (_stk.openArt === a.cod) {
       const _lim = _stk.asOf ? new Date(_stk.asOf).getTime() : 0;
-      const det = _stk.movs.filter(function (mv) { return String(mv.cod_art) === a.cod && !(_stk.cutoff && new Date(mv.ts).getTime() < new Date(_stk.cutoff).getTime()) && !(_lim && new Date(mv.ts).getTime() > _lim); });
+      // v20.02 — el detalle matcheaba el código CRUDO (`mv.cod_art === a.cod`), y las dos puntas
+      // no se escriben igual: la fila viene de la vista SIN el cero adelante ("55", "35E") o CON
+      // sufijo de empresa ("809E LK"), y Movimientos_Stock guarda "055" / "035E" / "809E" + la
+      // columna `empresa`. Así 31 de las 367 filas abrían diciendo "sin movimientos contados"
+      // teniendo stock (830 cajas el 031, 349 el 809E LK). Es el mismo bug que la v14.58 arregló
+      // en los pop-ups con _stkMovMatch y que acá había quedado suelto.
+      const _detCodN = _stkNormCod(codBase(a.cod)), _detEmp = _stkEmpDe(a.cod);
+      const det = _stk.movs.filter(function (mv) { return _stkMovMatch(mv, _detCodN, _detEmp) && !(_stk.cutoff && new Date(mv.ts).getTime() < new Date(_stk.cutoff).getTime()) && !(_lim && new Date(mv.ts).getTime() > _lim); });
       h += '<tr class="stk-detrow"><td colspan="' + ncol + '"><div class="stk-det">' + (det.length ? det.map(stkMvRow).join("") : '<div class="stk-mv">sin movimientos contados</div>') + '</div></td></tr>';
     }
   });
