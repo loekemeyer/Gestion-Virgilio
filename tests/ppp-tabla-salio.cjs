@@ -1,4 +1,4 @@
-/* v20.04 (Thomas, 2026-09-18) — COLUMNA «SALIÓ» en la tabla de Programación.
+/* v20.09 (Thomas, 2026-09-18) — COLUMNA «SALIÓ» en la tabla de Programación.
    Pedido: *"agregá columna a esa visión que sea SALIÓ a la izquierda de FACTURADO que busque en el
    módulo En salida para ver si esa tanda/NP ya salió en el camión"*.
    Lo que prueba:

@@ -1,3 +1,39 @@
+## Nota v20.09 (2026-09-18) — El desglose por TANDA ya estaba: lo que no entraba era la pantalla
+
+Thomas: *"el desglose de Salió/Facturado/Armado/en proceso tiene que figurar por tanda también"*.
+**Figuraba desde la v17.66** — la fila de la tanda llama al mismo `_pgaPctFila` que la del día. Lo
+que pasaba es que **en el celular no se veía**: al abrir un día, la columna 1 se estiraba con la
+info de la tanda y empujaba los porcentajes fuera de la pantalla.
+
+**Por qué se estiraba, que es lo que importa:** cada pedacito de esa columna es **indivisible**
+(`white-space:nowrap` en `.pga-cli`, `.pga-loc`, `.pga-ped`, `.pga-sub`, y `.pga-trow` sin
+`flex-wrap`), así que el ancho **mínimo** de la columna era el renglón entero. El más caro era el
+botón **«📅 Cambiar de día»** de la tanda: ~120 px él solo. Medido a 390 px con el día abierto:
+columna 1 = **173 px**, tabla = **459** contra 364 de marco.
+
+Qué cambió, todo dentro de `@media (max-width:760px)`:
+
+| | medido a 390 px |
+|---|---|
+| el botón de la tanda queda en **ícono** (el texto va en `.pga-acc-t`) | 173 → 94 px de columna |
+| la info de tanda y NP **envuelve por palabra** (`white-space:normal` + `flex-wrap` en `.pga-trow`) | |
+| las pastillas de estado y el chip 🚚 a 10 px | 94 → 77 px · **tabla 364 = marco 364** |
+| la letra de la tabla a 13,5 px | cubre el día con m³ de tres dígitos (112,34), que sumaba 8 px |
+
+⚠ **La fila de la NP lleva `min-width:180px` a propósito.** Con la tanda abierta esa fila tiene NP +
+estado + 🚚 + código + cliente + zona + barrio + fecha: en 77 px queda una columna de palabras
+sueltas, ilegible. Con la tanda **cerrada** esa fila no existe, la columna vuelve a 77 px y las 9
+columnas entran — que es justo cuando se miran las tandas. Abierta la tanda, la tabla scrollea a lo
+ancho y lo que se está mirando es la NP.
+
+`tests/ppp-tabla-cel.cjs` fija las dos cosas: **con el día abierto** la fila de la tanda trae sus
+**5 porcentajes** y la última columna termina **dentro** del marco.
+
+⚠ Y una trampa de medición que costó una vuelta: `pppRenderProg()` **reemplaza el HTML**, así que un
+nodo guardado antes de abrir el día queda **desconectado** y todos sus `getBoundingClientRect()` dan
+**0**. Hay que volver a buscar los nodos después de cada render — en el test eso es la función
+`medir()`.
+
 ## Nota v20.08 (2026-09-18) — Los códigos con "L" NO son artículos: fuera del Generador de OC
 
 Thomas, mirando el Generador de OC: *"Todos los que tienen L no deben aparecer para OC. Son para

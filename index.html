@@ -3391,7 +3391,7 @@ tr.ppp-err-zona > td{ background:#fffbeb !important; }
 .pga th:first-child, .pga td:first-child{ text-align:left; width:100%; }
 .pga-h{ text-align:right !important; line-height:1.15; padding-top:7px !important; padding-bottom:7px !important;
   border-top:3px solid transparent; letter-spacing:.02em; }
-.pga-h.sal{ border-top-color:#7c3aed; color:#6d28d9; }   /* v20.04: SALIÓ — violeta, para que no se confunda con los 4 estados */
+.pga-h.sal{ border-top-color:#7c3aed; color:#6d28d9; }   /* v20.09: SALIÓ — violeta, para que no se confunda con los 4 estados */
 .pga-h.fac{ border-top-color:#1d4ed8; color:#1d4ed8; }
 .pga-h.arm{ border-top-color:#15803d; color:#15803d; }
 .pga-h.pro{ border-top-color:#ca8a04; color:#a16207; }
@@ -3528,7 +3528,7 @@ tr.ppp-err-zona > td{ background:#fffbeb !important; }
 .pga-pill{ display:inline-block; font-size:12px; font-weight:900; border-radius:999px; padding:1px 9px; letter-spacing:.02em; margin-left:8px; vertical-align:1px; }
 .pga-pill.e-facturado{ background:#dbeafe; color:#1e3a8a; } .pga-pill.e-armado{ background:#dcfce7; color:#14532d; }
 .pga-pill.e-proceso{ background:#fef9c3; color:#854d0e; }   .pga-pill.e-pendiente{ background:#fee2e2; color:#991b1b; }
-/* v20.04 — el «salió» de UNA NP, al lado de su pastilla de estado */
+/* v20.09 — el «salió» de UNA NP, al lado de su pastilla de estado */
 .pga-salio{ display:inline-block; font-size:12px; font-weight:900; border-radius:999px; padding:1px 9px;
   background:#ede9fe; color:#5b21b6; margin-left:8px; vertical-align:1px; white-space:nowrap; }
 /* fila de CONTENIDO de la NP (los códigos y las cajas) */
@@ -3645,7 +3645,7 @@ tr.ppp-err-zona > td{ background:#fffbeb !important; }
 @media (max-width:760px){
   /* v17.94: en el celular la letra baja un punto, pero SIGUE siendo la misma en los tres niveles
      — que es lo que pidió Luis; lo que se achica es todo junto, no la fila de la NP sola. */
-  .pga{ font-size:14px; } .pga th, .pga td{ padding:6px 4px; }
+  .pga{ font-size:13.5px; } .pga th, .pga td{ padding:6px 4px; }
   .pga-pct small{ display:none; }
   .pga th:nth-child(n+2), .pga td:nth-child(n+2){ padding-left:2px; padding-right:2px; }
   /* v20.01 (Thomas) — la columna del día deja de comerse la pantalla: sólo la fecha ("18/9"),
@@ -3656,6 +3656,25 @@ tr.ppp-err-zona > td{ background:#fffbeb !important; }
   .pga-sem, .pga-m0, .pga-esp, .pga-pcs{ display:none; }
   .pga th:first-child, .pga td:first-child{ width:auto; max-width:54vw; }
   .pga-t>td:first-child{ white-space:normal; }   /* la tanda envuelve en vez de estirar la columna */
+  /* v20.09 (Thomas: *"el desglose de Salió/Facturado/Armado/en proceso tiene que figurar por tanda
+     también"*) — figuraba: lo que pasaba es que al abrir el día la columna 1 se estiraba con la
+     info de la tanda (el botón «📅 Cambiar de día» solo medía ~120 px) y empujaba los porcentajes
+     fuera de la pantalla. Cada pedacito de esa columna era INDIVISIBLE (`white-space:nowrap`), así
+     que el ancho mínimo de la columna era el renglón entero. Acá se los deja envolver por palabra
+     y el botón de la tanda queda en ícono: la columna se hace alta en vez de ancha, que es lo que
+     corresponde en un teléfono, y las 9 columnas siguen entrando con el día abierto. */
+  .pga-n>td:first-child{ white-space:normal; min-width:180px; }
+  /* ⚠ ese `min-width` es a propósito: con la tanda abierta la fila de la NP tiene NP + estado +
+     🚚 + código + cliente + zona + barrio + fecha, y en 78 px queda una columna de palabras
+     sueltas. Con la tanda CERRADA no existe esa fila, así que la columna vuelve a los 78 px y las
+     9 columnas entran — que es cuando hace falta ver el desglose de la tanda. Abierta la tanda, la
+     tabla scrollea a lo ancho y lo que se está mirando es la NP. */
+  .pga-cli, .pga-loc, .pga-ped, .pga-sub, .pga-acc{ white-space:normal; }
+  .pga-cli{ max-width:42vw; }
+  .pga-acc-t{ display:none; }
+  /* las pastillas de estado y el chip 🚚 son los pedacitos más anchos de esa columna: en el
+     teléfono van un punto más chicas, y con eso las 9 columnas entran con el día abierto */
+  .pga-pill, .pga-salio{ font-size:10px; padding:1px 5px; margin-left:5px; }
   .pga-d.espera>td:first-child{ white-space:normal; }   /* sólo el día de espera, que es el único con texto largo */
   .pga th{ font-size:9px; letter-spacing:0; text-transform:none; }
   .pga-chev{ width:11px; }
@@ -3663,7 +3682,7 @@ tr.ppp-err-zona > td{ background:#fffbeb !important; }
   /* ⚠ las acciones NO se anclan a la derecha acá: la columna es mucho más ancha que la pantalla,
      así que `margin-left:auto` las mandaba fuera de lo que se ve y había que scrollear para
      encontrarlas. Van pegadas al texto y la fila puede cortar. */
-  .pga-nrow{ flex-wrap:wrap; }
+  .pga-nrow, .pga-trow{ flex-wrap:wrap; }   /* v20.09: la fila de la tanda también envuelve */
   .pga-acc{ margin-left:0; padding-left:10px; }
   .pga-its{ grid-template-columns:repeat(auto-fill, minmax(160px, 1fr)); }
   .pga th:first-child, .pga td:first-child{ position:sticky; left:0; z-index:1;
@@ -5750,7 +5769,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=20.08"></script>
+<script type="module" src="recepcion.js?v=20.09"></script>
 <!-- Config del módulo de fichada (compartido con fichada.html). El secret
      hmacSecret tiene que ser el mismo acá y allá; cargándolo desde un solo
      archivo evitamos que se desincronicen. -->
@@ -9596,7 +9615,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v20.08";
+const APP_VERSION = "v20.09";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -38206,7 +38225,7 @@ function _pgaEstadoGrupo(e, n) {
   return "proceso";
 }
 function _pgaEstCero() { return { facturado: 0, armado: 0, proceso: 0, pendiente: 0 }; }
-/* v20.04 (Thomas, 2026-09-18) — COLUMNA «SALIÓ»: ¿esa NP ya se fue en el camión?
+/* v20.09 (Thomas, 2026-09-18) — COLUMNA «SALIÓ»: ¿esa NP ya se fue en el camión?
    Pedido: *"agregá columna a esa visión que sea SALIÓ a la izquierda de FACTURADO que busque en el
    módulo En salida para ver si esa tanda/NP ya salió en el camión"*.
    ⚠ NO alcanza con mirar «En Salida»: de ahí la NP **se va sola** cuando vuelve el remito (CRN), y
@@ -38381,7 +38400,7 @@ function _pgaCuerpoHtml(dias, opts) {
               + escapeHtml(t.tanda) + ' a otra fecha. Se abre el calendario con los m³ que ya tiene cada día y el cupo,'
               + ' y arriba el botón para dejarla en ⏸ Armados en espera (armada, sin fecha de entrega).'
               + ' El contenido no cambia: no hay que volver a pickear. Se guarda en el servidor, lo ven todos."'
-              + ' onclick="event.stopPropagation();pgaTandaMoverAbrir(\'' + escapeHtml(t.key) + '\')">📅 Cambiar de día</button></span>'
+              + ' onclick="event.stopPropagation();pgaTandaMoverAbrir(\'' + escapeHtml(t.key) + '\')">📅<span class="pga-acc-t"> Cambiar de día</span></button></span>'
             : '') +
         '</div></td>' +
         '<td>' + _pppFmtM3(t.m3) + '</td><td></td><td>' + t.nps + '</td>' +
@@ -38400,7 +38419,7 @@ function _pgaCuerpoHtml(dias, opts) {
           '<span class="pga-chev">' + (nb ? "▾" : "▸") + '</span>' +
             '<span class="pga-np">' + escapeHtml(r.np) + '</span>' + _npSrcChip(r.np) +
             '<span class="pga-pill e-' + est + '">' + PGA_EST_TXT[est] + '</span>' +
-            // v20.04: el «salió» de UNA NP va acá y no en la columna, que en esta fila la tapa el
+            // v20.09: el «salió» de UNA NP va acá y no en la columna, que en esta fila la tapa el
             // contenido cuando se abre. La columna SALIÓ es el % del día y de la tanda.
             (_pgaSalio(r) ? '<span class="pga-salio" title="Ya salió en el camión (En Salida / Carga Camión)">🚚 Salió</span>' : '') +
             // v17.74 (Luis): el horario viaja con el pedido — acá se ve, no se edita
@@ -38464,7 +38483,7 @@ function _pgaArbol(filas) {
     if (q && _pgaSearchStr(r).indexOf(q) < 0) continue;
     const k = String(r.fecha == null ? "" : r.fecha).replace(/-/g, ""); if (!k) continue;
     const est = PGA_EST.indexOf(r.estado) >= 0 ? r.estado : "pendiente";
-    const sal = _pgaSalio(r) ? 1 : 0;   // v20.04: ya se fue en el camión
+    const sal = _pgaSalio(r) ? 1 : 0;   // v20.09: ya se fue en el camión
     let d = dias.get(k);
     if (!d) { d = { key: k, m3: 0, nps: 0, est: _pgaEstCero(), salio: 0, tandas: new Map() }; dias.set(k, d); }
     d.m3 += Number(r.m3) || 0; d.nps++; d.est[est]++; d.salio += sal;
@@ -38490,12 +38509,12 @@ function _pgaConEspera(dias) {
 }
 function _pgaPctTd(n, tot, cls) {
   const p = tot ? Math.round(100 * n / tot) : 0;
-  // v20.04: el espacio antes del % va en su propio span — en el celular se esconde («100%») y con
+  // v20.09: el espacio antes del % va en su propio span — en el celular se esconde («100%») y con
   // cinco columnas de porcentaje eso son ~20 px, que es justo lo que hacía que la tabla no entrara.
   // El `textContent` no cambia: sigue diciendo "100 %".
   return '<td><span class="pga-pct ' + cls + (n ? '' : ' z') + '">' + p + '<span class="pga-pcs"> </span>%<small>' + n + '</small></span></td>';
 }
-/* v20.04: la 1ª celda es SALIÓ y NO entra en el reparto de los otros cuatro — una NP facturada
+/* v20.09: la 1ª celda es SALIÓ y NO entra en el reparto de los otros cuatro — una NP facturada
    puede haber salido o no, así que esta columna se lee sola y la fila ya no suma 100 %.
    Si todavía no llegaron las dos fuentes (En Salida y los CCN), dice «—»: un 0 % ahí sería mentira. */
 function _pgaPctFila(e, n, salio) {
@@ -38590,7 +38609,7 @@ function _pppArbolHtml(programados) {
   // encabezado; todo el ancho que sobra es para la info de cada NP.
   h += '<table class="pga"><thead><tr>' +
       '<th>Día</th><th>m³</th><th>Tandas</th><th>NPs</th>' +
-      // v20.04 (Thomas): SALIÓ va a la izquierda de Facturado. No es un estado más: se cruza con
+      // v20.09 (Thomas): SALIÓ va a la izquierda de Facturado. No es un estado más: se cruza con
       // el módulo En Salida y con los CCN, así que una NP puede estar facturada Y salida.
       '<th class="pga-h sal" title="Ya salió en el camión: está en En Salida (carga al camión, salida a mano o salida presunta) o ya volvió con el remito">Sa<br>lió</th>' +
       '<th class="pga-h fac" title="Ya facturado">Factu<br>rado</th>' +
