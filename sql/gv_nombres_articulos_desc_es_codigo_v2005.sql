@@ -39,7 +39,7 @@
 --   que es lo correcto — antes decía "000E" y parecía un nombre.
 --
 -- Rollback: volver a aplicar la definición anterior (git show HEAD~1 de este archivo no existe: la
--- versión previa quedó sólo en la base, guardada acá abajo como comentario en el commit v20.04).
+-- versión previa quedó sólo en la base, guardada acá abajo como comentario en el commit v20.05).
 
 create or replace view public.vista_nombres_articulos as
 with norm_pm as (

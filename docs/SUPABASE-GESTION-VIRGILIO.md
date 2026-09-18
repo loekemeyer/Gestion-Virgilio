@@ -25073,7 +25073,7 @@ una descripción basura, y corregir 18 filas a mano no evita la número 19.
 
 `gv_reglas_perdidas`, `gv_endpoints_rotos` y el barrido de vistas sin `security_invoker`: **0**.
 
-**Rollback**: la definición anterior está en el mensaje del commit v20.04 y se vuelve con un
+**Rollback**: la definición anterior está en el mensaje del commit v20.05 y se vuelve con un
 `create or replace` a `sql/gv_nombres_articulos_desc_es_codigo_v2005.sql` cambiando los cuatro
 guards por la forma vieja. `stocks_carga_rapida` se realinea sola con el cron 57.
 
