@@ -1,3 +1,33 @@
+## Nota v19.77 (2026-09-18) — El nombre del artículo NO sale del libro de stock
+
+El **505I** se veía en la tabla de Stock como **"Esta en racks"** en vez de *Pelador Mgo Plastico
+Loeke Super* (el **503E** como "Para pedido Np 98690" y el **518** como "Devolucin de Nexxo").
+Ninguno es un nombre: son **comentarios de un ajuste manual**. Dos causas encadenadas:
+
+1. **`stockAjustar` / `stockFijar` guardaban el comentario del operario en
+   `Movimientos_Stock.descripcion`**, además del `ref` —que es donde corresponde y donde lo
+   muestra el detalle del movimiento—. Y **`vista_saldos_stock` elige la descripción MÁS CORTA**
+   del código (`array_agg(descripcion ORDER BY length(descripcion))[1]`), así que un comentario
+   corto ("Esta en racks", 13 caracteres) le gana al nombre real (32) **para siempre**. Desde la
+   v19.77 el comentario va SOLO al `ref`.
+
+2. **El merge en background de `openStockAdmin` pisaba la descripción buena.** El render rápido
+   lee `stocks_carga_rapida`, que la resuelve bien —`COALESCE(vista_nombres_articulos,
+   vista_stock_procesada, …)`, o sea el **catálogo primero**—, y el merge la reemplazaba por la de
+   `vista_stock_procesada`, que hace el `COALESCE` **al revés** (`se.descripcion` del libro antes
+   que `nom.descripcion`). Ahora sólo la completa si la fila no traía ninguna: por eso los tres
+   códigos ya se ven bien **sin tocar un solo dato**.
+
+⚠ Y un tercero que explica por qué el 505 se veía *"Pelador Mgo Plastico"* **sin acento** (el
+catálogo lo tiene con acento): **`loadArtNombres` cacheaba el mapa VACÍO** cuando el fetch
+fallaba, así que `artNombre()` devolvía el fallback —la descripción del libro— por el resto de la
+sesión, sin forma de recuperarse.
+
+**La regla, para cualquier pantalla:** el **nombre** de un artículo sale de
+**`vista_nombres_articulos`** (`artNombre()`); `Movimientos_Stock.descripcion` es lo que quedó
+grabado en el evento y **no es una fuente de nombres**. `tests/stk-desc-no-comentario.cjs` cuida
+las tres cosas. Problema 422.
+
 ## Nota v19.60 (2026-09-18) — La Conciliación se recalcula cuando alguien la mira
 
 El cron 90 (`gv-cruce-fc-asig`) cruzaba cada NP facturada con su factura de ISIS **cada 10
