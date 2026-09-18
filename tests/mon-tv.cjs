@@ -74,11 +74,13 @@ const iso = (ms) => new Date(ms).toISOString();
 
 const DATOS = {
   // E30A en curso · E31A terminada y facturada · E32A mañana sin tocar · E33A facturada Y despachada
+  // E34A terminada y YA CARGADA AL CAMIÓN, pero SIN facturar (v20.13: el caso urgente)
   prog: [
     { tanda: "E30A", np: "98801", m3: 2.5, fecha_entrega: HOY },
     { tanda: "E31A", np: "98802", m3: 1.5, fecha_entrega: HOY },
     { tanda: "E32A", np: "98803", m3: 3.0, fecha_entrega: MANANA },
-    { tanda: "E33A", np: "98804", m3: 4.0, fecha_entrega: HOY }
+    { tanda: "E33A", np: "98804", m3: 4.0, fecha_entrega: HOY },
+    { tanda: "E34A", np: "98805", m3: 2.0, fecha_entrega: HOY }
   ],
   web: [
     { empresa: "lk", np: 97, tanda: "E30A", fecha_entrega: HOY, razon_social: "Casa Pepe",
@@ -93,6 +95,9 @@ const DATOS = {
       pick_abandonado: false, arm_abandonado: false, pick_fj_ts: null, arm_fj_ts: null },
     { tanda: "E33A", last_pick_op: "TP", pick_legajo: 8, pick_start_ts: iso(Date.now() - 5 * H),
       last_arm_op: "TAP", arm_legajo: 8, arm_start_ts: iso(Date.now() - 4 * H),
+      pick_abandonado: false, arm_abandonado: false, pick_fj_ts: null, arm_fj_ts: null },
+    { tanda: "E34A", last_pick_op: "TP", pick_legajo: 8, pick_start_ts: iso(Date.now() - 30 * H),
+      last_arm_op: "TAP", arm_legajo: 8, arm_start_ts: iso(Date.now() - 29 * H),
       pick_abandonado: false, arm_abandonado: false, pick_fj_ts: null, arm_fj_ts: null }
   ],
   eventos: [
@@ -114,7 +119,8 @@ const DATOS = {
     { Legajo: 44, Empleado: "Gomez Ana",           hora_entrada: "08:00:00", hora_salida: "17:00:00" }
   ],
   facturadas: [{ np: "98802" }, { np: "98804" }],
-  ccn: [{ opcion: "CCN", texto: "98804", ts_cliente: iso(Date.now() - 6 * H) }],
+  ccn: [{ opcion: "CCN", texto: "98804", ts_cliente: iso(Date.now() - 6 * H) },
+         { opcion: "CCN", texto: "98805", ts_cliente: iso(Date.now() - 5 * H) }],
   deshechas: []
 };
 
@@ -160,7 +166,7 @@ function responder(url) {
     const t = (id) => (document.getElementById(id) || {}).innerHTML || "";
     return {
       arranco: document.getElementById("splash").classList.contains("hide"),
-      tandas: t("tandasBox"), fc: t("fcBox"), tot: t("totBox"),
+      tandas: t("tandasBox"), fc: t("fcBox"), fcTit: t("fcTit"), tot: t("totBox"),
       act: t("actBox"), avisos: t("avisos"),
       m3Pick: (document.getElementById("m3Pick") || {}).textContent || "",
       m3Arm: (document.getElementById("m3Arm") || {}).textContent || "",
@@ -193,6 +199,13 @@ function responder(url) {
   ok(/E31A/.test(r.fc), "E31A no aparece en 'a facturar'");
   ok(/✅/.test(r.fc), "E31A está facturada (NP 98802) y no tiene el ✅");
 
+  // 4b) v20.13 (Thomas) — la columna SALIÓ del monitor: sólo carga al camión (CCN)
+  ok(/Salió/.test(r.fc), "la tabla 'a facturar' no trae la columna Salió");
+  ok(/E34A/.test(r.fc), "E34A (terminada y cargada al camión, sin FC) no aparece en 'a facturar'");
+  ok(/🚚/.test(r.fc), "E34A tiene CCN (NP 98805): le falta el 🚚 de salió");
+  ok(/salio-sinfc/.test(r.fc), "E34A salió y no está facturada: la fila tiene que quedar marcada");
+  ok(/ya salió sin FC/.test(r.fcTit), "el título no avisa cuántas se fueron sin factura: " + r.fcTit);
+
   // m³ terminados hoy
   ok(/1,5/.test(r.m3Pick), "m³ pickeados hoy debería ser 1,5 (E31A) y dice: " + r.m3Pick);
   ok(/1,5/.test(r.m3Arm), "m³ armados hoy debería ser 1,5 (E31A) y dice: " + r.m3Arm);
@@ -207,12 +220,12 @@ function responder(url) {
   ok(/AGREGADO/.test(r.avisos), "no canta el agregado de la PPP web (LK 0097 sobre el 0095)");
   ok(/E99Z/.test(r.avisos), "no avisa la tanda trabajada que no está en la PPP");
 
-  // m³ por día y camión: E30A (2,5 + 0,8 de la web) + E31A (1,5) = 4,8 hoy
-  ok(/4,8/.test(r.tot), "el total de hoy debería ser 4,8 m³ (E30A 3,3 + E31A 1,5)");
+  // m³ por día y camión: E30A (2,5 + 0,8 de la web) + E31A (1,5) + E34A (2,0) = 6,8 hoy
+  ok(/6,8/.test(r.tot), "el total de hoy debería ser 6,8 m³ (E30A 3,3 + E31A 1,5 + E34A 2,0)");
   ok(/E30/.test(r.tot), "no agrupa por camión (E30)");
 
   // header
-  ok(/1\/3/.test(r.prog), "la barra de avance debería decir 1/3 (E31A terminada de 3 en ventana), dice: " + r.prog);
+  ok(/2\/4/.test(r.prog), "la barra de avance debería decir 2/4 (E31A y E34A terminadas de 4 en ventana), dice: " + r.prog);
   ok(/1 en curso/.test(r.meta), "el header no cuenta la tanda en curso: " + r.meta);
   ok(/en vivo/.test(r.estado), "el estado no quedó 'en vivo': " + r.estado);
 

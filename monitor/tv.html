@@ -93,6 +93,12 @@ td{padding:.55vh .5vw;border-bottom:1px solid #16203a;font-size:2vh;font-weight:
 .cen{text-align:center}
 tr.curso td{background:#1c2a12}
 tr.fact td{background:#14311f}
+/* v20.13 — YA SALIÓ y todavía SIN FACTURA: la mercadería está en la calle sin
+   papel. Es lo único de esta tabla que hay que resolver hoy, así que se pinta
+   violeta (el mismo color que la columna SALIÓ de la PPP) y no verde. */
+tr.salio-sinfc td{background:#2a1f45}
+.st-salio{font-size:2.1vh}
+.fc-salio{color:#c4b5fd}
 
 /* Tabla de tandas: el código de tanda es lo que se busca de lejos. */
 .t-tanda{font-weight:900;font-size:2.3vh;color:#f8fafc;letter-spacing:.03em}
@@ -869,21 +875,30 @@ function pintar(d) {
 
   // ── A facturar
   var totFc = fc.reduce(function (s, x) { return s + (x.v.m3 || 0); }, 0);
-  el("fcTit").innerHTML = "Tandas a facturar <small>· " + n1(totFc) + " m³</small>";
+  /* v20.13 (Thomas): cuántas de las que faltan facturar YA SE FUERON en el camión. */
+  var fcSalidas = fc.filter(function (x) {
+    return tandaSalio(x.v, d.despachadas) && !tandaFacturada(x.v, d.facturadas);
+  }).length;
+  el("fcTit").innerHTML = "Tandas a facturar <small>· " + n1(totFc) + " m³" +
+    (fcSalidas ? " · <b class=\"fc-salio\">" + fcSalidas + " ya salió" + (fcSalidas === 1 ? "" : "eron") +
+      " sin FC</b>" : "") + "</small>";
   if (fc.length) {
     var MAX_FC = cabenFilas("fcBox", true);
     var fcFilas = fc.slice(0, MAX_FC).map(function (x) {
-      var facturada = x.v.nps.length > 0 && x.v.nps.every(function (np) {
-        return d.facturadas.has(np) || d.facturadas.has(String(np).replace(/\.0+$/, ""));
-      });
-      return '<tr' + (facturada ? ' class="fact"' : '') + '>' +
+      var facturada = tandaFacturada(x.v, d.facturadas);
+      var salio = tandaSalio(x.v, d.despachadas);
+      /* v20.13: la que YA SE FUE y todavía no tiene factura es lo urgente de esta
+         tabla — la mercadería está en la calle sin papel. Va marcada. */
+      return '<tr' + (facturada ? ' class="fact"' : (salio ? ' class="salio-sinfc"' : '')) + '>' +
         '<td class="t-tanda">' + esc(x.v.tanda) + '</td>' +
         '<td class="num">' + n1(x.v.m3) + '</td>' +
         '<td class="cen t-fe">' + esc(x.v.fecha) + '</td>' +
+        '<td class="cen st-salio">' + (salio ? "🚚" : "") + '</td>' +
         '<td class="cen st-done">' + (facturada ? "✅" : "") + '</td></tr>';
     }).join("");
     el("fcBox").innerHTML = '<table><thead><tr><th>Tanda</th><th class="num">M³</th>' +
-      '<th class="cen">Salida</th><th class="cen">FC</th></tr></thead><tbody>' + fcFilas + '</tbody></table>' +
+      '<th class="cen">Salida</th><th class="cen">Salió</th><th class="cen">FC</th></tr></thead><tbody>' +
+      fcFilas + '</tbody></table>' +
       (fc.length > MAX_FC ? '<div class="mas">+ ' + (fc.length - MAX_FC) + ' más</div>' : "");
   } else {
     el("fcBox").innerHTML = '<div class="vacio">Ninguna terminada todavía</div>';
@@ -969,17 +984,30 @@ function pintar(d) {
   el("meta").textContent = d.prog.size + " programadas · " + enCursoN + " en curso · " + fc.length + " a FC";
 }
 
-/* Una tanda sale del tablero cuando TODAS sus NP están facturadas y cargadas
-   al camión: ya no hay nada que hacer con ella. ≡ index.html _tandaDespachada. */
-function despachadaYFacturada(v, facturadas, despachadas) {
+/* v20.13 (Thomas) — ¿esta tanda YA SALIÓ? Es la misma pregunta que contesta la
+   columna SALIÓ de la PPP (≡ index.html _pgaSalio) y la misma respuesta:
+   **sólo cuenta la carga al camión registrada** (evento CCN, ya descontado el
+   FSS posterior en `cargarDespachadas`). Una tanda "dada por salida a mano" o
+   "presunta" NO cuenta acá tampoco. */
+function tandaSalio(v, despachadas) {
+  if (!v.nps.length) return false;
+  for (var i = 0; i < v.nps.length; i++) {
+    if (!despachadas.has(String(v.nps[i]).trim().replace(/\.0+$/, ""))) return false;
+  }
+  return true;
+}
+function tandaFacturada(v, facturadas) {
   if (!v.nps.length) return false;
   for (var i = 0; i < v.nps.length; i++) {
     var np = String(v.nps[i]).trim();
-    var npN = np.replace(/\.0+$/, "");
-    if (!(facturadas.has(np) || facturadas.has(npN))) return false;
-    if (!despachadas.has(npN)) return false;
+    if (!(facturadas.has(np) || facturadas.has(np.replace(/\.0+$/, "")))) return false;
   }
   return true;
+}
+/* Una tanda sale del tablero cuando TODAS sus NP están facturadas y cargadas
+   al camión: ya no hay nada que hacer con ella. ≡ index.html _tandaDespachada. */
+function despachadaYFacturada(v, facturadas, despachadas) {
+  return tandaFacturada(v, facturadas) && tandaSalio(v, despachadas);
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════

@@ -1,3 +1,25 @@
+## Nota v20.13 (2026-09-18) — El monitor de la TV también dice qué ya salió
+
+Thomas, sobre `monitor/tv.html`: **sí**, que lleve SALIÓ. En la TV no hay columnas de porcentaje
+(no es la PPP), así que la pregunta se contesta donde importa en una pared: **la tabla «Tandas a
+facturar»**.
+
+- Columna **Salió** con el **🚚**: la tanda tiene **todas** sus NP con carga al camión registrada
+  (CCN vigente — `cargarDespachadas` ya descuenta el FSS posterior). Misma regla estricta que la
+  PPP desde la v20.12: una salida "a mano" o "presunta" no cuenta.
+- La fila que **ya salió y todavía no tiene FC** queda pintada en **violeta** (`tr.salio-sinfc`),
+  no en verde: es lo único de esa tabla que hay que resolver hoy — la mercadería está en la calle
+  sin papel.
+- El título suma el contador: *"Tandas a facturar · 4,7 m³ · **1 ya salió sin FC**"*.
+
+⚠ **El dato ya estaba en la página**: `d.despachadas` se usaba sólo para **sacar** del tablero la
+tanda facturada Y despachada (`despachadaYFacturada`). Se partió en dos piezas —`tandaSalio` y
+`tandaFacturada`— y esa función quedó como la conjunción de las dos. Cero consultas nuevas.
+
+`tests/mon-tv.cjs` suma el caso: **E34A**, terminada y con CCN pero sin factura, tiene que aparecer
+con 🚚, con la fila marcada y con el aviso en el título. Se verificó **rompiéndolo a propósito**
+(sacando el 🚚 del render): el test cae con *"le falta el 🚚 de salió"*.
+
 ## Nota v20.12 (2026-09-18) — SALIÓ = carga al camión registrada, y nada más
 
 Thomas, sobre las tres formas de salida que la v20.10 contaba: ***"sólo salió si se cargó a
