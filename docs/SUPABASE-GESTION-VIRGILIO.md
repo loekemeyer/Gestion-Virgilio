@@ -24755,3 +24755,52 @@ select count(*) from public."Registros_Produccion_Virgilio" r
 anteriores a este cambio y no tienen ninguna NP en común con él: son las dos tandas que
 `gv_stock_picking_duplicado` ya había marcado por el renombre (E03G/E44A y D71B/E40A). Toca
 `a_facturar`, así que queda para una decisión aparte.
+
+## §3.kb — v19.98: un código de tanda no se recicla nunca más — 2026-09-18
+
+**Decisión de Thomas (18/09)**, después de que cinco incidentes de la semana resultaran ser el
+mismo bug con distinta tabla olvidada.
+
+**El diagnóstico.** El código de tanda **es** la identidad: no hay un id estable abajo, así que
+"mover una tanda" se implementa como *renombrar ese texto en N tablas*, y cada tabla que se olvida
+queda mintiendo. Eso solo sería un dato viejo. Lo que lo vuelve **mentiroso** es el **reciclaje**:
+el código liberado vuelve a la bolsa y otra tanda lo **adopta**, con lo que la fila olvidada pasa a
+hablar de la tanda equivocada.
+
+| tabla olvidada | qué salió | dónde |
+|---|---|---|
+| eventos `PKC` (campo 1) | picking del inquilino anterior | 421 / v19.80 |
+| `Movimientos_Stock` + el unique | fusionar dos tandas armadas era imposible | 407 / v19.69 |
+| `GV_Tandas_Lock` | *"ya la agarró Jhonny"* | v19.96 |
+| el `localStorage` del celular | el operario trabado con `E12M` | v19.92 |
+| la restauración de `ENT`/`TAL` | la red de seguridad cosida al lado | v19.97 |
+
+**Medido antes de tocar:** 1.087 códigos con huella histórica (eventos, Entregas, candado,
+facturación, líos, anuladas); 440 ya bloqueados y **647 reciclables hoy**. De esos 647, **sólo tres
+son de la serie viva: `E03F`, `E03G` y `E11B`** — justo los que aparecieron esta semana con candado
+ajeno y comprometido en negativo. Los otros 644 son series A/B/C/D viejas, así que bloquearlos no
+le saca un código a nadie.
+
+**Cómo quedó.** Tabla **`GV_Tandas_Codigos_Usados`** (código PK, con RLS y sólo lectura para
+`anon`), la memoria que no se borra. La llena `gv_tandas_codigos_usados_sync()` barriendo las 11
+tablas donde un código deja rastro — idempotente, 590 ms, cron **`gv-tandas-codigos-usados`**
+(jobid 95) cada 10 min. La lee `gv_ppp_web_codigo_tomado`, que es el **único cuello**: las tres
+funciones que reparten códigos (`gv_ppp_web_tanda_codigo_nuevo`, `gv_ppp_tanda_codigo_nuevo` y
+`ppp_web_armar_tandas`) pasan todas por ahí. Semilla: **1.140 códigos**.
+
+Y `gv_ppp_tanda_renombrar` anota el código **en el momento exacto en que se libera**, antes de mover
+nada: el cron lo haría igual, pero cada 10 min, y esto cierra la ventana de una tanda creada y
+renombrada entre dos corridas.
+
+**Lo que NO se tocó, a propósito:** `gv_ppp_tanda_codigo_nuevo` sigue reusando la base y el `NN` del
+camión del día (E12A, E12B, E12C… es el mismo camión); el cambio sólo corre la **última letra**. Y
+`ppp_web_proxima_letra` queda igual: sumarle el ledger la haría leer bases raras que hay en la
+historia (`BO`, `CO`, `TA`) y correr la serie a cualquier lado.
+
+**Probado corriéndolo:** E03F/E03G/E11B pasaron de `false` a `true`; un renombre de prueba
+(`ZZ94Z → ZZ95Z`) dejó las dos en el ledger; y los dos generadores siguen contestando —`E63A`, 63 ms
+los dos juntos—. ⚠ **Prueba que NO sirve:** preguntar el `tomado` en el MISMO statement que el
+renombre — la función es `STABLE`, usa el snapshot del statement, no ve la fila recién insertada y
+contesta `false` como si no anduviera.
+
+`sql/gv_tandas_codigos_no_reciclar_v1998.sql`.
