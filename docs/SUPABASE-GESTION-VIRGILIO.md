@@ -24948,7 +24948,7 @@ exactamente `D69C | 98622 | facturada = false`. Lo habría cazado.
 
 `sql/gv_tanda_renombrar_tablas_faltantes_v2000.sql`.
 
-## §3.ke — v20.01: mover un pedido cuya tanda ya tiene trabajo hecho queda BLOQUEADO — 2026-09-18
+## §3.ke — v20.03: mover un pedido cuya tanda ya tiene trabajo hecho queda BLOQUEADO — 2026-09-18
 
 **Thomas, 18/09, con el caso Martinelli todavía caliente:** *"que el sistema avise cuando movés un
 pedido que ya tiene picking o armado hecho. **URGENTE YA y que inhabilite.** Cuando haga falta se
