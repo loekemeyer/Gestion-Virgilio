@@ -1,3 +1,41 @@
+## Nota v20.09 (2026-09-18) — El 706 no generaba OC: el generador recalculaba la proyección y le daba 12 veces menos
+
+Thomas: *"706 tiene proveedor, necesita pedir stock, no generó OCs"*. La fila **estaba** en el
+Generador de OC, con **`total = 0`** — la pantalla no muestra lo que no hay que pedir. Daba 0
+porque la **proyección** del generador era **16,75 cj/mes** mientras el módulo **Stocks**, para
+el mismo artículo, mostraba **201**. Dos pantallas, un artículo, un factor de 12.
+
+**La causa: dos fuentes para el mismo número.** `proyeccion_madre` guarda el dato de las dos
+formas (`proy_uni_mes` y `proy_cajas_mes`). Stocks lee `proy_cajas_mes`; el generador lo
+**recalculaba** como `proy_uni_mes / uxb`. Mientras coinciden da igual — pero el motor de LK, para
+los códigos que no tiene con `uxb`, escribe **las cajas en las dos columnas** (706: uni 201 =
+cajas 201, uxb 12 → 16,75). **119 de 333 códigos** discrepaban, casi todos de la línea de **Chef**
+(706, 713, 836, 840, 701, 824, 798E, 702E, 901, 847, 802…): el generador proyectaba **20.281,85
+cj/mes** contra las **22.305,87** de la madre. **~2.000 cajas/mes de menos, siempre para el lado
+de comprar de menos.**
+
+**El arreglo:** la proyección del generador es **`sum(proy_cajas_mes)`**, tal cual. El CTE `gux`
+—el `uxb` que sólo servía para esta cuenta— se fue. Y `max(proy_cajas_mes)` pasó a `sum`, que es
+lo que ya hacía la columna de unidades: el código base y su gemelo con "L" son dos tajadas de la
+misma proyección (505 = 2.321,17 + 21,17 = **2.342,34**, el número que cita este archivo).
+
+> **La regla que queda: la proyección en cajas es `proy_cajas_mes`. Nadie la recalcula.**
+
+Medido: **53** códigos suben el "a pedir", **4** bajan, total **11.230 → 12.477** cajas
+(**+1.247**). **El 706**: proy 201, máximo `ceil(201 × 2,5)` = 503, y con 136 de stock y 14
+pedidos pasa a pedir **381 cajas**.
+
+⚠ **Las 4 bajas no son un error, y tocan una lista de este archivo.** Tres —**618**, **631**,
+**857**— figuraban entre los *"artículos sin proyección"* donde manda la capacidad de góndola:
+**estaban ahí por este mismo bug** (`proy_uni_mes = 0` con `proy_cajas_mes` de 0,17 / 0,33). Ahora
+tienen proyección —mínima, pero proyección— y gana *"proyección es siempre rey"*. **Los "sin
+proyección" bajan de 10 a 6.** La cuarta es el 502, 256 → 255: `proy_cajas_mes` viene redondeada a
+2 decimales.
+
+**Chequeo:** `select cod, proy, total from public.vista_generador_oc where codn = '706';` → 201 y
+381. §3.kj de `docs/SUPABASE-GESTION-VIRGILIO.md` y
+`sql/gv_generador_oc_proyeccion_en_cajas_v2009.sql`.
+
 ## Nota v20.08 (2026-09-18) — Los códigos con "L" NO son artículos: fuera del Generador de OC
 
 Thomas, mirando el Generador de OC: *"Todos los que tienen L no deben aparecer para OC. Son para

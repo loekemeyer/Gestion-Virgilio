@@ -1009,9 +1009,12 @@ Es lo que ya hace `vista_generador_oc`, así que **no hay nada que cambiar** —
 que nadie vuelva a "arreglarlo" agregándole un `min(proy × índice, capacidad)`.
 
 **La capacidad manda en un solo caso, y no es una excepción a la regla: cuando NO hay proyección**
-(`proy = 0`, artículos sin ventas). Son **10 de los 238 activos** al 18/09 (109 Sac Zincado, 618,
-630E, 631, 631E, 634E, 635E, 636E, 857, 613), 152 cajas en total. Sin proyección no hay rey: el
-objetivo pasa a ser llenar la góndola.
+(`proy = 0`, artículos sin ventas). Sin proyección no hay rey: el objetivo pasa a ser llenar la
+góndola. Eran **10 de los 238 activos** al 18/09 a la mañana (109 Sac Zincado, 618, 630E, 631,
+631E, 634E, 635E, 636E, 857, 613); **desde la v20.09 son 6**, porque tres de ellos —**618, 631 y
+857**— figuraban ahí **por un bug de la cuenta**: tienen `proy_uni_mes = 0` pero `proy_cajas_mes`
+de 0,17 / 0,33, y el generador leía la columna de unidades. Sí tienen proyección, mínima, así que
+mandan ellos y no la góndola.
 
 ⚠ **El tilde `llenar_gondola` de ⚙ Configuraciones hace exactamente lo contrario** — pisa la
 proyección con la capacidad, incluso cuando la proyección es más alta. **Al 18/09 no lo tiene
@@ -1034,7 +1037,7 @@ hasta esa tarde. Si vuelve a aparecer un cartel de tope, está mintiendo.
 ```sql
 select count(*) filter (where llenar_gondola)                as pisan_la_proyeccion,   -- tiene que dar 0
        count(*) filter (where activo and tiene_prov_real
-                          and proy = 0 and cap > 0)          as sin_proy_van_por_cap,  -- 10 al 18/09
+                          and proy = 0 and cap > 0)          as sin_proy_van_por_cap,  -- 6 (v20.09)
        count(*) filter (where activo and tiene_prov_real)    as activos                -- 241 al 18/09 (eran 238: los 3 duales con proveedor pasaron a 2 filas cada uno, v19.84)
   from public.vista_generador_oc;
 ```
