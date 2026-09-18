@@ -23828,3 +23828,56 @@ Vacía = todo bien. Al 18/09 quedan **15**, todas de pedidos ya entregados:
 
 `sql/gv_web_sucursal_match_v1978.sql` · rollback en
 `sql/backups/v_pedidos_web_20260918_pre_v1978.sql`.
+
+---
+
+## §3.jj — AD09 estaba marcado GÓNDOLA y es un RACK (18/09, problema 423)
+
+**Lo pidió Thomas** al mirar el 505I: *"Poné AD09 como rack en GV_Lugar"*.
+
+`GV_Lugar.sector = 'AD09'` tenía `tipo = 'gondola'`. Todo lo demás decía que es un rack, y las
+**tres** fuentes coincidían:
+
+| fuente | qué decía |
+|---|---|
+| `Racks_Planimetria` (LA QUE VALE) | AD09 = rack, `505I`, 336 innercajas, LK |
+| `Ubicaciones_Articulos` (congelada) | AD09 con `fuente = 'racks'` — la vieja ya lo tenía bien |
+| `Movimientos_Stock` | el reset del 01/08 dice `"reset 505I: la zona AD es RACKS, no gondola/excedente"` |
+
+O sea que el `tipo` se mal-migró el 11/09, cuando se creó `GV_Lugar`. Mismo caso que **AD05 y
+AD06**, corregidos el 17/09 (v19.33).
+
+```sql
+-- backup (protocolo): zz_backups."GV_Backup_GVLugar_AD09_20260918", con RLS y sin permisos para anon
+update public."GV_Lugar" set tipo = 'rack', notas = '…', updated_at = now() where sector = 'AD09';
+-- rollback: update public."GV_Lugar" set tipo = 'gondola' where sector = 'AD09';
+```
+
+Verificado después: `select cod, tipo from public.gv_lugar_articulo where sector='AD09'` → `505I ·
+rack`. **No se movió ni una caja**: el `tipo` del sector no entra en ningún saldo.
+
+### El barrido que lo encontró, y lo que queda mal
+
+```sql
+select r.sector, coalesce(l.tipo,'(no existe en GV_Lugar)') tipo, string_agg(distinct r.cod_art,', ') cods,
+       sum(r.innercajas) cajas
+  from public."Racks_Planimetria" r
+  left join public."GV_Lugar" l on l.sector = r.sector
+ where coalesce(l.tipo,'x') <> 'rack' group by 1,2 order by 1;
+```
+
+Daba 5 sectores; con AD09 arreglado **quedan 4, y no se tocaron** (son otro problema, no el del
+`tipo`):
+
+- **`Z07`** → `tipo = 'gondola'` con **69 cajas de 437E** en `Racks_Planimetria`. Ojo: el
+  `CLAUDE.md` ya anota que `Z7` y `Z07` conviven y que *"su gemelo Z07 existe pero es GÓNDOLA, no
+  rack"*, así que acá hay que decidir qué es cada uno antes de tocar.
+- **`O2`, `O5`, `Z7`** → **no existen en `GV_Lugar`** (513, 546 y 363E). Son los 3 que quedaron
+  del arreglo de los ceros del 17/09.
+
+⚠ **Y de paso, el ejemplo de por qué no se cruza la tabla vieja con la nueva:**
+`Ubicaciones_Articulos` tiene el **505** en racks `N5` (229 cajas) y `N6` (500), cargados el 28 y
+el 30/07 — pero `Racks_Planimetria` **no tiene ninguna fila del 505**, y el libro dice
+`racks = 0`. Esa tabla está congelada desde el **10/08**: esas 729 cajas ya se bajaron y la vieja
+nunca se actualizó. Leerla hoy para saber dónde está el 505 da una respuesta que suena bien y
+está mal.
