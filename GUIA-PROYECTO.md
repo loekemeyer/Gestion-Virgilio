@@ -1,4 +1,4 @@
-## Nota v20.12 (2026-09-18) — El picking arrancaba por el excedente y rompía el recorrido
+## Nota v20.13 (2026-09-18) — El picking arrancaba por el excedente y rompía el recorrido
 
 Thomas, probando el módulo de operarios con una tanda: *"primero le dice que pickee del excedente,
 eso rompe el flujo de movimiento por las góndolas"*. Tenía razón, y el dato lo dice solo.
@@ -36,6 +36,32 @@ Si alguna vez molesta, el arreglo completo no es volver atrás sino que el falta
 Tests: `tests/pk-excedente-orden.cjs` (nuevo: el primer paso no es de excedente, un excedente en
 A05 se pickea entre A01 y D18, uno en P13 queda al final, y sin mapa de sectores todos al final) y
 `tests/pk-deposito-pkc.cjs`, cuyo candado del orden quedó invertido.
+## Nota v20.12 (2026-09-18) — SALIÓ = carga al camión registrada, y nada más
+
+Thomas, sobre las tres formas de salida que la v20.10 contaba: ***"sólo salió si se cargó a
+camión"***. Desde la v20.12 la columna cuenta **únicamente** el evento **CCN**:
+
+| estado de `gv_ppp_en_salida` | qué es | ¿cuenta? |
+|---|---|---|
+| `cargada` | se registró la **Carga Camión** (CCN) | **sí** |
+| `salida_manual` | un supervisor la dio por salida a mano, sin CCN (v15.97) | **no** |
+| `armada_sin_carga` | salida presunta: armada hace +36 h y nadie registró nada (v15.55) | **no** |
+| facturada sin cargar | está facturada pero sigue en el depósito | no (nunca contó) |
+
+Los CCN de los últimos 60 días (`_pppLoadMs`) siguen contando: son las que ya volvieron con el
+remito y por eso no están más en En Salida.
+
+⚠ **Las dos que quedaron afuera son presunciones, no registros** — y muy probablemente esos pedidos
+sí se fueron. Se siguen viendo en **En Salida** con su chip (🚨 «salió hace N h sin registro de
+carga», 📝 «dada por salida a mano»), que es donde hay que ir a cerrarlas. En la PPP, «Salió»
+quiere decir *hay un CCN*, y punto.
+
+**Y el chip de la NP quedó fino** (Thomas: *"que sea finito"*): sólo el **🚚**, sin la palabra. La
+palabra ya la dice la columna SALIÓ, que está en la misma fila; el `title` cuenta el resto.
+
+`tests/ppp-tabla-salio.cjs` fija la regla con las cuatro variantes: de 5 NP salen **2**, y la fila
+del día queda `["40 %2","40 %2","20 %1","0 %0","0 %0"]`.
+
 ## Nota v20.11 (2026-09-18) — Las 5 columnas NETEAN, y cada NP lleva su porcentaje
 
 Thomas, sobre la v20.10: *"quiero que cada NP lleve el dato de los porcentajes (para determinar su

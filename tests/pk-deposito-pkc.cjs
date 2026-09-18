@@ -87,7 +87,7 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
   });
   await b.close();
 
-  /* v20.12 (Thomas, 18/09) — se DIO VUELTA la regla de la v15.41: los pasos de EXCEDENTE
+  /* v20.13 (Thomas, 18/09) — se DIO VUELTA la regla de la v15.41: los pasos de EXCEDENTE
      ya no van todos al principio, van en el orden del RECORRIDO (el `orden` del sector
      donde está el excedente; sin ese dato, al final). Poner el excedente adelante hacía
      arrancar el picking por la zona P —orden 718..757 en GV_Lugar, contra 1..657 de la

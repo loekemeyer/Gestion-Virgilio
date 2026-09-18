@@ -1,4 +1,4 @@
-/* Regresión v20.12 — los pasos de EXCEDENTE del picking van en el ORDEN DEL RECORRIDO,
+/* Regresión v20.13 — los pasos de EXCEDENTE del picking van en el ORDEN DEL RECORRIDO,
    no todos al principio.
 
    Thomas, 2026-09-18, después de probar el módulo de operarios con una tanda: "primero

@@ -3,8 +3,10 @@
    módulo En salida para ver si esa tanda/NP ya salió en el camión"*.
    Lo que prueba:
      (1) la columna va 5ª, a la izquierda de Facturado, y tiene su color propio;
-     (2) cuenta como SALIDA la NP cargada al camión (CCN), la dada por salida a mano y la salida
-         presunta — y NO la facturada que nunca se cargó, que sigue en el depósito;
+     (2) cuenta como SALIDA **sólo** la NP con carga al camión registrada (CCN) — v20.12, Thomas:
+         *"sólo salió si se cargó a camión"*. La dada por salida a mano (`salida_manual`) y la
+         salida presunta (`armada_sin_carga`) son presunciones y NO cuentan, igual que la facturada
+         que nunca se cargó;
      (3) suma la NP que ya volvió con el remito (CRN): ésa se fue de «En Salida», pero salió;
      (4) el % es por día y por tanda, y la fila de la NP lleva su chip 🚚;
      (5) mientras las dos fuentes no llegaron, dice «—» y no 0 % (un 0 % sería mentira).
@@ -38,8 +40,8 @@ catch (_e) {
     // Un día con 5 NP en una tanda: 4 salieron (cada una por un camino distinto) y 1 no.
     _pgaRows = [
       mk("2026-09-22", "E41A", "98001", "facturado"),   // CCN → cargada
-      mk("2026-09-22", "E41A", "98002", "facturado"),   // la dio por salida un supervisor
-      mk("2026-09-22", "E41A", "98003", "armado"),      // salida presunta (armada +36 h sin papel)
+      mk("2026-09-22", "E41A", "98002", "facturado"),   // la dio por salida un supervisor: NO cuenta
+      mk("2026-09-22", "E41A", "98003", "armado"),      // salida presunta (+36 h sin papel): NO cuenta
       mk("2026-09-22", "E41A", "98004", "facturado"),   // facturada SIN cargar → no salió
       mk("2026-09-22", "E41A", "98005", "facturado")    // ya volvió con el remito → salió
     ];
@@ -71,8 +73,8 @@ catch (_e) {
       return e ? getComputedStyle(e).color : "";
     })();
     out.pctDia = (dia.querySelector(".pga-pct.sal") || {}).textContent;
-    // v20.11: las 5 columnas netean y suman 100 % — 4 salieron (3 facturadas + 1 armada) y queda
-    // 1 facturada que todavía está en el depósito.
+    // v20.11 + v20.12: las 5 columnas netean y suman 100 %. Con la regla estricta salen 2 (las que
+    // tienen CCN): quedan 2 facturadas y 1 armada, que todavía están en el depósito.
     out.filaDia = [...dia.querySelectorAll(".pga-pct")].map((e) => e.textContent.trim());
     out.salioUno = _pgaSalio({ np: "98001" }) + "," + _pgaSalio({ np: "98002" }) + "," +
                    _pgaSalio({ np: "98003" }) + "," + _pgaSalio({ np: "98004" }) + "," +
@@ -103,18 +105,19 @@ catch (_e) {
   t(/Salió/.test(r.thSalio || ""), "(1) y se llama «Salió» — «" + r.thSalio + "»");
   t(/109|violeta|124/.test(r.color) || /rgb\(109, 40, 217\)/.test(r.color),
     "(1) con su color propio, distinto de los 4 estados — " + r.color);
-  t(r.salioUno === "true,true,true,false,true",
-    "(2)(3) cargada, salida a mano, salida presunta y entregada SALIERON; la facturada sin cargar NO — " + r.salioUno);
-  t(r.pctDia === "80 %4", "(4) el día dice 80 % (4 de 5) — «" + r.pctDia + "»");
-  t(r.pctTanda === "80 %4", "(4) y la tanda lo mismo — «" + r.pctTanda + "»");
-  t(r.total === "80 %4", "(4) igual que el total de abajo — «" + r.total + "»");
-  const espera = ["98001:🚚", "98002:🚚", "98003:🚚", "98004:—", "98005:🚚"];
+  t(r.salioUno === "true,false,false,false,true",
+    "(2)(3) SÓLO la cargada al camión y la ya entregada salieron; la dada por salida a mano, la " +
+    "presunta y la facturada sin cargar NO — " + r.salioUno);
+  t(r.pctDia === "40 %2", "(4) el día dice 40 % (2 de 5) — «" + r.pctDia + "»");
+  t(r.pctTanda === "40 %2", "(4) y la tanda lo mismo — «" + r.pctTanda + "»");
+  t(r.total === "40 %2", "(4) igual que el total de abajo — «" + r.total + "»");
+  const espera = ["98001:🚚", "98002:—", "98003:—", "98004:—", "98005:🚚"];
   t(JSON.stringify(r.chips) === JSON.stringify(espera),
     "(4) y cada NP lleva su chip 🚚 salvo la que no salió — " + JSON.stringify(r.chips));
-  t(JSON.stringify(r.filaDia) === JSON.stringify(["80 %4", "20 %1", "0 %0", "0 %0", "0 %0"]),
+  t(JSON.stringify(r.filaDia) === JSON.stringify(["40 %2", "40 %2", "20 %1", "0 %0", "0 %0"]),
     "(5) las 5 columnas NETEAN y suman 100 %: lo que salió no se cuenta otra vez como facturado — " +
     JSON.stringify(r.filaDia));
-  const npEsp = ["98001:sal=100 %", "98002:sal=100 %", "98003:sal=100 %",
+  const npEsp = ["98001:sal=100 %", "98002:fac=100 %", "98003:arm=100 %",
                  "98004:fac=100 %", "98005:sal=100 %"];
   t(JSON.stringify(r.npPct) === JSON.stringify(npEsp),
     "(6) cada NP lleva su 100 % en la columna que le toca — " + JSON.stringify(r.npPct));
