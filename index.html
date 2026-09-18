@@ -5733,7 +5733,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=19.91"></script>
+<script type="module" src="recepcion.js?v=19.92"></script>
 <!-- Config del módulo de fichada (compartido con fichada.html). El secret
      hmacSecret tiene que ser el mismo acá y allá; cargándolo desde un solo
      archivo evitamos que se desincronicen. -->
@@ -9579,7 +9579,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v19.91";
+const APP_VERSION = "v19.92";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -13097,7 +13097,40 @@ async function showCompletarWizard(legajo, codigo) {
       const items = (pickBase.get(pickNormNp(npT)) || []).map(function (it) { return { art: String(it.art), cajas: Number(it.cajas) || 0 }; }).filter(function (it) { return it.art && it.cajas > 0; });
       if (items.length) pedidoFull.push({ np: pickNormNp(npT), cod: String(p.cod || ""), items: items });
     }
-    if (!nps.length) return;   // sin pedidos en el PPP → no abre (no rompe el TAP)
+    if (!nps.length) {
+      /* v19.92 — LA TANDA NO TIENE PEDIDOS EN LA PPP. Antes acá se volvía EN SILENCIO
+         ("no abre, no rompe el TAP") y el operario quedaba SIN SALIDA. Caso real del 18/09
+         (legajo 8, tanda E12M): su pedido —LK 0029— ya se había mudado a E12A, así que el
+         código quedó con el picking viejo y CERO pedidos. Desde ahí, las tres salidas
+         estaban cerradas a la vez: «Terminar» (TAP) no sale porque la tanda no tiene
+         Entregas y manda al asistente; el asistente no abre porque no hay pedidos; y con un
+         armado abierto el botón AP queda bloqueado (updateCoreButtonsState), o sea que
+         tampoco podía agarrar la tanda buena. Tres horas mirando la pantalla sin un cartel.
+         Ahora se le dice qué pasa y, si el armado abierto es SUYO, se le ofrece soltarlo por
+         el mismo camino que «No la armo yo» (compAnularArmado): no marca nada como armado,
+         no mueve stock, libera el lock y deja el registro en GV_Tanda_Anulada. */
+      let _mio = false;
+      try {
+        const _st = getLegajoState(legajo);
+        _mio = !!(_st && _st.armado && _st.armado.active &&
+                  String(_st.armado.value || "").trim().toUpperCase() === tanda);
+      } catch (_e) {}
+      if (_mio) {
+        try {
+          alert("\u26a0 La tanda " + tanda + " no tiene ning\u00fan pedido en la programaci\u00f3n.\n\n" +
+                "Lo m\u00e1s probable es que su pedido se haya movido a otra tanda y este c\u00f3digo haya " +
+                "quedado vac\u00edo.\n\nTe la suelto as\u00ed pod\u00e9s agarrar la que corresponde \u2014 " +
+                "NO se marca como armada.");
+        } catch (_e) {}
+        try { await compAnularArmado(tanda, legajo); } catch (_e) {}
+        return;
+      }
+      try {
+        alert("\u26a0 La tanda " + tanda + " no tiene ning\u00fan pedido en la programaci\u00f3n.\n\n" +
+              "No se puede armar. Fijate el c\u00f3digo en la PPP o avis\u00e1 a sistemas.");
+      } catch (_e) {}
+      return;
+    }
     let falt = []; try { falt = await faltantesDeTanda(tanda); } catch (_e) {}
     if (falt.length && enr) { try { await faltEnsureBase(enr, [tanda]); } catch (_e) {} }
     // v8.73 (idea 9849): total de cajas pedidas por NP en TODA la tanda, para desempatar
@@ -14074,9 +14107,13 @@ function compPausar() {
    ARMAR para cualquiera, y en `GV_Tanda_Anulada` queda el registro de quién la soltó y por qué.
    La RPC NO anula si el asistente ya grabó Entregas: eso mueve stock y lo tiene que resolver
    sistemas, no un botón. */
-async function compAnularArmado() {
-  const tanda  = String((_comp && _comp.tanda) || (textInput && textInput.value) || "").trim().toUpperCase();
-  const legajo = String((_comp && _comp.legajo) || (legajoInput && legajoInput.value) || "").trim();
+async function compAnularArmado(_tandaArg, _legajoArg) {
+  /* v19.92 — los dos argumentos son OPCIONALES y existen para el único llamador que NO
+     está adentro del asistente: el aviso de "tanda sin pedidos" de showCompletarWizard. Ahí
+     `_comp` puede seguir teniendo el wizard de OTRA tanda en memoria, y sin esto se soltaba
+     la tanda equivocada. Sin argumentos se comporta igual que siempre. */
+  const tanda  = String(_tandaArg || (_comp && _comp.tanda) || (textInput && textInput.value) || "").trim().toUpperCase();
+  const legajo = String(_legajoArg || (_comp && _comp.legajo) || (legajoInput && legajoInput.value) || "").trim();
   if (!tanda || !legajo) { try { alert("No sé qué tanda soltar. Cerrá y volvé a entrar."); } catch (_e) {} return; }
   let ok = false;
   try {
