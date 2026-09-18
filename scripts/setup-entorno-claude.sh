@@ -22,10 +22,10 @@
 # (Medido: con "Bash" en allow y "Bash(curl:*)" en ask, el curl queda denegado.)
 #
 # QUE SIGUE PREGUNTANDO, a proposito:
-#   - mcp__Supabase__execute_sql / apply_migration / deploy_edge_function.
-#     Es la puerta a los datos de produccion, y la regla del dueno (incidente
-#     del 26/08/2026) es que los datos no se tocan sin permiso explicito.
-#     Si algun dia se quiere que tampoco pregunte, agregarlas a ALLOW.
+#   - mcp__Supabase__apply_migration / deploy_edge_function: estructura y deploy.
+#     (execute_sql SI esta permitida desde el 18/09: preguntaba en cada select y
+#     era el 90 % de los carteles. La regla del 26/08 —los datos no se tocan sin
+#     permiso explicito— la sostiene el CLAUDE.md, no el dialogo.)
 #   - git push, curl y wget (lista ASK).
 #   - Todo lo que este en DENY, que ni preguntando pasa.
 #
@@ -44,7 +44,10 @@ ALLOW = [
     "WebFetch", "WebSearch",
     # TODA la terminal (git, node, npm, python, tests...). Lo peligroso va en DENY.
     "Bash",
-    # Supabase: solo lo que LEE
+    # Supabase: el SQL (Thomas, 18/09: en este laburo es casi todo) y lo que LEE.
+    # ⚠ Que no pregunte NO cambia la regla del 26/08: los datos no se tocan sin
+    # permiso explicito. Eso lo sostiene el CLAUDE.md, no el dialogo.
+    "mcp__Supabase__execute_sql",
     "mcp__Supabase__list_tables", "mcp__Supabase__list_migrations",
     "mcp__Supabase__list_projects", "mcp__Supabase__get_project",
     "mcp__Supabase__get_project_url", "mcp__Supabase__get_publishable_keys",
