@@ -612,6 +612,52 @@ las manda directo al portal de **Chef** (`precios_super.cadena`: `cencosud` → 
 Su caso propio —NP de Chef con artículos de Loeke **sin** L— ya lo cubre `gv_fac_ajustes_isis` (v13.79): es el caso
 **inverso** al de Tierra del Fuego. `sql/gv_cliente_isis_v1775.sql`, §3.fp.
 
+## ⚠⚠⚠ REGLA: LA "L" NO ES UN CÓDIGO — ES UNA DENOTACIÓN
+
+**Thomas, 2026-09-18, textual:** *"la L no existe. `026L` no es un código válido. Existe sólo para
+denotar que el `026L` es un `026` en pedido de Chef que se pickea del stock de LK."*
+
+**No hay ningún artículo que termine en L** (verificado el 02/09 en `loke_products`,
+`chef_articulos_activos`, `milver_products`, remaps y todo el pipeline). La L es una **marca de
+ruteo** que viaja pegada al código del PEDIDO y significa exactamente dos cosas:
+
+1. al **pickear** → la caja sale de la góndola de **Loekemeyer**, no de la de Chef;
+2. al **facturar** → la línea va al ISIS de **Chef** con el artículo de Loeke.
+
+### Dónde va la L y dónde NO — está resuelto en el código, no hay que decidirlo cada vez
+
+| capa | objeto | ¿lleva L? | quién lo resuelve |
+|---|---|:--:|---|
+| Pedido | `PPP_Web_Base.articulo`, `gv_ppp_np_items` | **SÍ** (`026L`) | lo trae el feed de la página |
+| Picking (pantalla y stock) | lista de picking, `Movimientos_Stock.cod_art` | **NO** (`026`, o `438E LK` si es dual) | **`pkResolveArt`** = `pkStripL` + `pkEmpresaArt` |
+| Armado / factura | `Entregas_Virgilio.cod_art`, Excel ISIS | **SÍ**, crudo (`438EL`) | `_facXlsArmar` lo toma tal cual de `Entregas_Virgilio` |
+
+```js
+// index.html, v12.39 — el comentario que lo dice todo:
+function pkEmpresaArt(cod, np) { return /[0-9E]L$/.test(cod) ? "LK" : empresaDeNp(np); }
+function pkStripL(cod)         { return cod.replace(/([0-9E])L$/, "$1"); }
+function pkResolveArt(art, np) { return pkCodEmpresa(pkStripL(art), np, pkEmpresaArt(art, np)); }
+//  "NO se usa para el código del PEDIDO que va a Entregas_Virgilio/factura
+//   (ese se conserva crudo, ej. 438EL)."
+```
+
+⚠ **Por eso NO hay que "limpiar" la L de `PPP_Web_Base`.** Si se la saca, el código deja de matchear
+`/[0-9E]L$/`, `pkEmpresaArt` cae en `empresaDeNp(np)` → como la NP es de Chef, **el picking manda al
+operario a la góndola de Chef** y la factura sale con el artículo equivocado. El 18/09 se sacó y se
+repuso dentro de la misma tanda de trabajo; queda escrito para que no se repita.
+
+⚠ **Y la L tampoco se agrega a mano en Gestión.** La pone la página al armar el pedido
+(`admin-supercot.js`, `addLSuffix = isChef`). Gestión la **respeta y la rutea**, no la genera.
+
+**Chequeo** (el operario tiene que ver el código pelado y la góndola LK):
+
+```sql
+-- el pedido con L …
+select np_label, articulo from public."PPP_Web_Base" where empresa='chef' and articulo ~ '[0-9E]L$';
+-- … y el picking sin L: ningún movimiento de stock puede terminar en L
+select cod_art from public."Movimientos_Stock" where cod_art ~ '[0-9E]L$';   -- vacío = todo bien
+```
+
 ## ⚠ REGLA: LAS TABLAS QUE VALEN — góndola, racks y empresa del artículo
 
 **Luis, 2026-09-17:** *"fijate que estés usando las tablas actualizadas de `gv_` y escribí en
